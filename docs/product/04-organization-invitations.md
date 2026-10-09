@@ -162,10 +162,27 @@ Rules:
 - Email verification is required before onboarding is considered complete
 - Password reset uses reset-email flow
 - Password policy:
-  - minimum 8 characters
-  - letter + number required
+  - minimum **10** characters (2026-08-03 강화 — `MIN_PASSWORD_LENGTH` in `src/app/auth/actions.ts`)
+  - letter + number required, obvious strings blocked (product names, `password`, email local part …)
   - special character optional
+  - 가입 화면은 조건 체크(10자 · 영문 · 숫자) + **비밀번호 확인 칸**(2026-10-09). 서버도 확인 칸이 오면 일치를 본다(`password_mismatch`).
 - Login attempts for email/password should be rate-limited
+
+### 가입 → 메일 확인 흐름의 실제 동작 (2026-10-09 점검)
+
+- 「계속하기」를 누르면 Supabase 가 **확인 전 계정**을 먼저 만들고 확인 메일을 보낸다. 메일 링크를 누르기 전에는 로그인되지 않는다.
+  직원 등록(프로필 · 조직)은 그 뒤 온보딩에서 끝난다.
+- **이미 가입된 이메일인지는 가입 응답으로 알 수 없다** — Supabase 가 새 가입에도, 이미 확인된 주소의 반복 가입에도 오류 없이
+  `user = null` 을 돌려준다(실측). 그래서 가입하면 늘 「이메일을 확인해 주세요」 화면이고, 그 화면이
+  「메일이 오지 않으면 이미 가입된 이메일일 수 있어요 — 로그인 · 비밀번호 재설정」을 안내한다. (가입 여부를 알려 주려면
+  관리자 권한 조회가 필요한데, 누구나 가입 여부를 캐볼 수 있게 되므로 하지 않는다.)
+- **메일 다시 보내기**: 확인 화면의 버튼(`resendSignupConfirmation` → `auth.resend({ type: "signup" })`). Supabase 가 같은 주소에
+  60초 안에 다시 보내지 못하게 하므로 버튼도 60초 잠긴다. 예전에는 가입을 다시 하는 수밖에 없어 발송 한도만 빨리 찼다.
+- **확인 안 된 오래된 가입 정리**: 메일 확인도 로그인도 한 번 없는 이메일 가입은 **7일 뒤 자동 삭제**(Supabase Auth 사용자 행만,
+  프로필이 있으면 건너뜀). 매일 도는 `/api/tasks/reminders` 크론에 붙어 있다(`src/lib/auth/unconfirmed-signup-cleanup.ts`, 판정
+  `unconfirmed-signup-rule.ts` + 테스트). 2026-10-09 사용자 승인(삭제 정책 예외 아님 — 쓰지 않은 인증 행 정리).
+- **메일 발송 한도**: Supabase 기본 메일 서버는 시간당 몇 통뿐이라 여럿이 같은 날 가입하면 막힌다(「짧은 시간에 메일을 너무 많이
+  보냈어요」). 외부 SMTP 연결이 출시 전 필수 — `docs/planning/17-app-release-plan.md` H14.
 
 ## Account Identity Rules
 

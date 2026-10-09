@@ -10,6 +10,7 @@ import { EmailNewPasswordForm } from "@/app/auth/login/email-new-password-form";
 import { EmailResetForm } from "@/app/auth/login/email-reset-form";
 import { EmailSignupForm } from "@/app/auth/login/email-signup-form";
 import { GoogleSubmitButton } from "@/app/auth/login/google-button";
+import { ResendConfirmationForm } from "@/app/auth/login/resend-confirmation-form";
 import { legalOverlayProps } from "@/components/legal/legal-overlay-props";
 import { resolveAuthErrorMessage } from "@/lib/auth-errors";
 import { ATTENDANCE_QR_PATH } from "@/lib/attendance-qr";
@@ -29,6 +30,7 @@ type LoginPageProps = {
     mode?: string;
     next?: string;
     sent?: string;
+    resent?: string;
     view?: string;
   }>;
 };
@@ -224,7 +226,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {params.email && (
             <span className="aw-status__email"><Ic>{Mail}</Ic>{params.email}</span>
           )}
+          {params.resent === "1" && !errorMessage && (
+            <div className="banner banner--info" style={{ width: "100%", boxSizing: "border-box" }}>
+              <span className="banner__ic"><Ic>{Mail}</Ic></span>
+              <div>{t.email.resentNote}</div>
+            </div>
+          )}
+          {errorMessage && <div style={{ width: "100%" }}><ErrorBanner message={errorMessage} /></div>}
           <Link href={emailHref} className="aw-btn aw-gap-m">{t.email.resetSentBackToLogin}</Link>
+          {params.email && (
+            <ResendConfirmationForm
+              email={params.email}
+              label={t.email.resendCta}
+              lang={locale}
+              next={effectiveNext}
+              waitLabel={t.email.resendWait}
+            />
+          )}
           <p className="aw-note">
             {t.email.verificationSentHint}{" "}
             <Link href={forgotHref}>{t.email.forgot}</Link>

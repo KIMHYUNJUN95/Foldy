@@ -3080,6 +3080,9 @@ const FALLBACK_DICTIONARY = {
       verificationSentBody:
         "We sent a verification link to your email. Click it to activate your account.",
       verificationSentHint: "No email? This address may already be registered — sign in, or reset your password.",
+      resendCta: "Resend email",
+      resendWait: "Resend in {s}s",
+      resentNote: "We sent the confirmation email again.",
       resetTitle: "Reset\npassword",
       resetSubtitle:
         "We'll send a reset link to your registered email.",
@@ -9413,6 +9416,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         verificationSentBody:
           "인증 링크를 이메일로 보냈습니다. 링크를 클릭하면 계정이 활성화됩니다.",
         verificationSentHint: "메일이 오지 않으면 이미 가입된 이메일일 수 있어요. 로그인하거나 비밀번호를 재설정해 주세요.",
+        resendCta: "메일 다시 보내기",
+        resendWait: "{s}초 뒤에 다시 보낼 수 있어요",
+        resentNote: "확인 메일을 다시 보냈어요.",
         resetTitle: "비밀번호\n재설정",
         resetSubtitle: "가입한 이메일로 재설정 링크를 보내드립니다.",
         resetHint: "이 주소로 가입된 계정이 있으면 메일을 보냅니다.",
@@ -15623,6 +15629,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         verificationSentBody:
           "確認リンクをメールで送信しました。リンクをクリックするとアカウントが有効になります。",
         verificationSentHint: "メールが届かない場合は、登録済みのアドレスかもしれません。ログインするか、パスワードを再設定してください。",
+        resendCta: "メールを再送する",
+        resendWait: "{s}秒後に再送できます",
+        resentNote: "確認メールを再送しました。",
         resetTitle: "パスワード\nのリセット",
         resetSubtitle: "ご登録のメールアドレスにリセットリンクをお送りします。",
         resetHint: "このアドレスで登録されたアカウントがあればメールを送信します。",

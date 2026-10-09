@@ -254,6 +254,37 @@ export async function signUpWithEmail(formData: FormData) {
 }
 
 /**
+ * 가입 확인 메일 다시 보내기(2026-10-09).
+ *
+ * 메일이 안 오면 예전에는 가입을 처음부터 다시 하는 수밖에 없었고, 그때마다 메일이 나가 발송 한도만 빨리 찼다.
+ * Supabase 가 같은 주소에 60초 안에 다시 보내는 것을 막으므로(그 오류는 `rate_limit`) 화면도 60초 동안 버튼을 잠근다.
+ * 이미 확인된 주소면 Supabase 는 조용히 아무것도 보내지 않는다 — 화면은 똑같이 「다시 보냈어요」(가입 여부를 드러내지 않는다).
+ */
+export async function resendSignupConfirmation(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const surface = await getCurrentSurface();
+  const next = sanitizeNextForSurface(formData.get("next"), surface);
+  const lang = String(formData.get("lang") ?? "").trim();
+  const langParam = lang ? `&lang=${encodeURIComponent(lang)}` : "";
+  const base = `/auth/login?view=email&mode=signup&next=${encodeURIComponent(next)}${langParam}&sent=verify&email=${encodeURIComponent(email)}`;
+
+  if (!email) redirect(`/auth/login?view=email&mode=signup&next=${encodeURIComponent(next)}${langParam}&error=missing_email`);
+
+  const callbackNext = preserveOnboardingLang(next, lang);
+  const supabase = await getSupabaseServerClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${await getAppUrl()}/auth/callback?next=${encodeURIComponent(callbackNext)}`,
+    },
+  });
+
+  if (error) redirect(`${base}&error=${mapSupabaseError(error.message)}`);
+  redirect(`${base}&resent=1`);
+}
+
+/**
  * Request a password reset email.
  * Always shows success (does not reveal whether the email exists).
  */

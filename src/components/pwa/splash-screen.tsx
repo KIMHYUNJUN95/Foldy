@@ -40,7 +40,7 @@ export function SplashScreen() {
         alignItems: "center",
         justifyContent: "center",
         /* Hardcoded so the ivory appears before CSS vars resolve on cold PWA launch. */
-        background: "#f7f4ee",
+        background: "#ffffff",
         opacity: phase === "fading" ? 0 : 1,
         transition: `opacity ${FADE_MS}ms ease`,
         pointerEvents: "none",

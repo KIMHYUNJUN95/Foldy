@@ -14,15 +14,15 @@
   --primary-tint: color-mix(in oklab, var(--adm-primary) 24%, var(--line));
 
   /* perm4.css tokens (exact globals.css values, namespaced) */
-  --ui-bg: hsl(42 36% 95%);
-  --ui-fg: hsl(222 28% 14%);
-  --ui-muted: hsl(40 22% 90%);
-  --ui-muted-fg: hsl(222 10% 44%);
-  --ui-surface: hsl(44 52% 98.5%);
-  --ui-border: hsl(40 20% 84%);
-  --ui-primary: hsl(223 46% 32%);
+  --ui-bg: #ffffff;
+  --ui-fg: #16141f;
+  --ui-muted: #f4f4f7;
+  --ui-muted-fg: #6b6878;
+  --ui-surface: #ffffff;
+  --ui-border: #ececf0;
+  --ui-primary: #7a52e6;
   --ui-primary-fg: hsl(0 0% 100%);
-  --ui-ring: hsl(223 46% 40%);
+  --ui-ring: #7a52e6;
   --ui-destructive: hsl(4 62% 46%);
   --ui-destructive-bg: hsl(6 70% 95.5%);
   --ui-shadow-glass: 0 18px 70px hsl(222 30% 14% / 0.1);
@@ -60,7 +60,7 @@
 .adm .filterbar__search input::placeholder { color: var(--faint); font-weight: 500; }
 .adm .filterbar__search input:focus { border-color: var(--adm-primary); box-shadow: 0 0 0 3.5px var(--primary-soft); background: var(--card); }
 .adm .filterbar .dd { width: 172px; flex: 0 0 auto; }
-.adm .filterbar__go { flex: 0 0 auto; width: 46px; height: 42px; border-radius: 11px; border: 1px solid transparent; background: linear-gradient(165deg, var(--primary-lift), var(--primary-ink)); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 26px -16px hsl(223 46% 32% / 0.7); cursor: pointer; }
+.adm .filterbar__go { flex: 0 0 auto; width: 46px; height: 42px; border-radius: 11px; border: 1px solid transparent; background: linear-gradient(165deg, var(--primary-lift), var(--primary-ink)); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 26px -16px rgb(122 82 230 / 0.7); cursor: pointer; }
 .adm .filterbar__go:hover { filter: brightness(1.06); }
 .adm .filterbar__go .ic svg { width: 20px; height: 20px; }
 
@@ -108,7 +108,7 @@
 .adm .uact .dd { width: 148px; flex: 0 0 auto; }
 .adm .uact__save { flex: 0 0 auto; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink-soft); font-size: 12.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
 .adm .uact__save:hover { background: var(--adm-surface); }
-.adm .uact__save.dirty { background: var(--adm-primary); border-color: transparent; color: #fff; box-shadow: 0 10px 22px -14px hsl(223 46% 32% / 0.8); }
+.adm .uact__save.dirty { background: var(--adm-primary); border-color: transparent; color: #fff; box-shadow: 0 10px 22px -14px rgb(122 82 230 / 0.8); }
 .adm .uact__save .ic svg { width: 15px; height: 15px; }
 
 /* ===================================================================

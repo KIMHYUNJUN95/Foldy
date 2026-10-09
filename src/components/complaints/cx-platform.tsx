@@ -84,8 +84,8 @@ export const PLATFORMS: Record<ComplaintPlatform, PlatformDef> = {
     mono: "D",
     bg: "var(--primary-bg)",
     ink: "var(--cx-primary)",
-    solid: "hsl(223 46% 32%)",
-    avg: "linear-gradient(160deg,hsl(223 50% 42%),hsl(223 54% 22%))",
+    solid: "#7a52e6",
+    avg: "linear-gradient(160deg,#8a63f0,#5a30cf)",
     maxRating: 0,
   },
   other: {

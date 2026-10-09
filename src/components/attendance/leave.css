@@ -9,21 +9,21 @@
    `.att` 1:1. */
 .lv,
 .lv-sheet {
-  --bg: hsl(42 36% 95%);
-  --card: hsl(44 52% 98.5%);
+  --bg: #ffffff;
+  --card: #ffffff;
   --card2: hsl(42 34% 96%);
-  --ink: hsl(222 28% 14%);
-  --ink-soft: hsl(222 20% 28%);
-  --att-muted: hsl(222 10% 44%);
-  --faint: hsl(222 10% 62%);
-  --line: hsl(40 20% 84%);
-  --line-soft: hsl(40 24% 89%);
-  --att-surface: hsl(40 22% 90%);
+  --ink: #16141f;
+  --ink-soft: #3a3746;
+  --att-muted: #6b6878;
+  --faint: #9a97a6;
+  --line: #ececf0;
+  --line-soft: #f1f1f4;
+  --att-surface: #f4f4f7;
   --surface2: hsl(40 24% 94%);
-  --att-primary: hsl(223 46% 32%);
-  --primary-ink: hsl(223 54% 22%);
-  --primary-lift: hsl(223 50% 42%);
-  --primary-soft: color-mix(in oklab, hsl(223 46% 32%) 8%, hsl(44 52% 98.5%));
+  --att-primary: #7a52e6;
+  --primary-ink: #5a30cf;
+  --primary-lift: #8a63f0;
+  --primary-soft: color-mix(in oklab, #7a52e6 8%, #ffffff);
   --done: hsl(146 50% 32%);
   --done-bg: hsl(146 44% 92%);
   --warn: hsl(35 80% 38%);
@@ -424,7 +424,7 @@
   flex: 1;
   background: var(--att-primary);
   color: #fff;
-  box-shadow: 0 16px 30px -14px hsl(223 46% 32% / 0.55);
+  box-shadow: 0 16px 30px -14px rgb(122 82 230 / 0.55);
 }
 
 /* ── L2 · 신청서 작성 (종이 양식 디지털화) ── */
@@ -932,7 +932,7 @@
 }
 .lv .exbtn .ic { font-size: 19px; display: inline-flex; }
 .lv .exbtn .ic svg { width: 19px; height: 19px; }
-.lv .exbtn--pri { background: var(--att-primary); color: #fff; box-shadow: 0 16px 30px -14px hsl(223 46% 32% / 0.55); }
+.lv .exbtn--pri { background: var(--att-primary); color: #fff; box-shadow: 0 16px 30px -14px rgb(122 82 230 / 0.55); }
 .lv .exbtn--ghost { background: var(--att-surface); color: var(--ink-soft); margin-top: 10px; }
 
 /* ── C · 신청 취소 — BottomSheet 내부 콘텐츠 (.lv-sheet 는 <body>로 포털된 시트 래퍼) ── */
@@ -1026,7 +1026,7 @@
 .lv-sheet .lbtn--ghost { background: var(--att-surface); color: var(--ink-soft); }
 .lv-sheet .lbtn--danger { background: var(--danger); color: #fff; box-shadow: 0 14px 28px -14px hsl(4 62% 46% / 0.6); }
 .lv-sheet .lbtn--danger-soft { background: var(--danger-bg); color: var(--danger); }
-.lv-sheet .lbtn--primary { background: var(--att-primary); color: #fff; box-shadow: 0 14px 28px -14px hsl(223 46% 32% / 0.6); }
+.lv-sheet .lbtn--primary { background: var(--att-primary); color: #fff; box-shadow: 0 14px 28px -14px rgb(122 82 230 / 0.6); }
 .lv-sheet .lbtn.dim { opacity: 0.5; }
 
 /* ── D · 날짜 범위 캘린더 (바텀시트) ── */
@@ -1132,7 +1132,7 @@
 .lv-sheet .dpick__cell.rsingle .dpick__d {
   background: var(--att-primary);
   color: #fff;
-  box-shadow: 0 8px 16px -8px hsl(223 46% 32% / 0.7);
+  box-shadow: 0 8px 16px -8px rgb(122 82 230 / 0.7);
 }
 /* month label as a button that opens the year/month grid view */
 .lv-sheet button.lcal__month {

@@ -16,14 +16,15 @@ const OPTIONS: { code: Locale; name: string; roman: string; flag: string }[] = [
 
 // Deliberately bilingual, language-agnostic header (matches the design handoff).
 const SHEET_TITLE = "언어 선택 · Language";
+const LANGUAGE_LABEL = "Language";
 // i18n-ignore-end
 
 const PRIMARY_SOFT =
-  "color-mix(in oklab, hsl(223 46% 32%) 8%, hsl(44 52% 98.5%))";
+  "color-mix(in oklab, #7a52e6 8%, #ffffff)";
 
 function GlobeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="size-[15px]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" className="size-[20px]" aria-hidden="true">
       <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" />
       <path
         d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5S14.4 18.2 12 20.5C9.6 18.2 8.4 15.2 8.4 12S9.6 5.8 12 3.5z"
@@ -31,14 +32,6 @@ function GlobeIcon() {
         strokeWidth="1.7"
         strokeLinejoin="round"
       />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="size-[13px]" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -57,9 +50,9 @@ type LanguageSheetProps = {
   view?: string;
 };
 
-// 데스크톱 콘솔 폭(브랜드 패널이 보이는 폭, auth-console.css 의 1080px 분기와 같다)에서는
+// 넓은 화면(머리 · 바닥 줄이 보이는 폭, auth-white.css 의 1200px 분기와 같다)에서는
 // 관리자 대시보드의 `.dd` 드롭다운처럼 버튼 아래로 펼친다. 그보다 좁으면 모바일 BottomSheet 계약.
-const DESKTOP_QUERY = "(min-width: 1081px)";
+const DESKTOP_QUERY = "(min-width: 1200px)";
 
 export function LanguageSheet({ locale, next, view }: LanguageSheetProps) {
   const [open, setOpen] = useState<null | "menu" | "sheet">(null);
@@ -111,16 +104,14 @@ export function LanguageSheet({ locale, next, view }: LanguageSheetProps) {
         onClick={toggle}
         aria-haspopup={open === "menu" ? "listbox" : "dialog"}
         aria-expanded={open !== null}
-        aria-label={SHEET_TITLE}
+        aria-label={`${SHEET_TITLE} (${current.name})`}
         className="langpill"
       >
         <span className="ic">
           <GlobeIcon />
         </span>
-        {current.name}
-        <span className="ic chev">
-          <ChevronDownIcon />
-        </span>
+        {/* 화이트 리디자인(2026-10-09): 어느 언어로 보고 있든 「Language」 — 못 읽는 언어로 바뀌어도 찾을 수 있게. */}
+        {LANGUAGE_LABEL}
       </button>
 
       {open === "menu" && (
@@ -179,14 +170,14 @@ export function LanguageSheet({ locale, next, view }: LanguageSheetProps) {
                       className={
                         active
                           ? "flex size-[30px] flex-none items-center justify-center rounded-full bg-primary text-[13px] font-extrabold text-primary-foreground"
-                          : "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[13px] font-extrabold text-[hsl(222_20%_28%)]"
+                          : "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[13px] font-extrabold text-[#3a3746]"
                       }
                     >
                       {o.flag}
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[15px] font-bold text-foreground">{o.name}</span>
-                      <span className="mt-px block text-[11.5px] font-semibold text-[hsl(222_10%_62%)]">
+                      <span className="mt-px block text-[11.5px] font-semibold text-[#9a97a6]">
                         {o.roman}
                       </span>
                     </span>

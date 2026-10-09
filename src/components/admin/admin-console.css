@@ -16,33 +16,33 @@
  */
 
 .adm {
-  --bg: hsl(42 36% 95%);
-  --bg2: hsl(42 30% 93%);
-  --card: hsl(44 52% 98.5%);
-  --card2: hsl(44 40% 97%);
-  --ink: hsl(222 28% 14%);
-  --ink-soft: hsl(222 20% 28%);
-  --adm-muted: hsl(222 10% 44%);
-  --faint: hsl(222 10% 62%);
-  --line: hsl(40 20% 84%);
-  --line-soft: hsl(40 24% 89%);
-  --adm-surface: hsl(40 22% 90%);
-  --surface2: hsl(40 20% 93%);
-  --adm-primary: hsl(223 46% 32%);
-  --primary-ink: hsl(223 54% 22%);
-  --primary-lift: hsl(223 50% 42%);
-  --primary-soft: color-mix(in oklab, hsl(223 46% 32%) 8%, hsl(44 52% 98.5%));
-  /* sidebar — warm espresso */
-  --nav: hsl(24 30% 18%);
-  --nav2: hsl(16 40% 12%);
-  --nav-line: hsl(26 20% 30%);
-  --nav-ink: hsl(38 32% 87%);
-  --nav-muted: hsl(30 16% 64%);
-  --nav-faint: hsl(28 14% 49%);
-  --nav-on-bg: color-mix(in oklab, #fff 13%, transparent);
-  --nav-accent: hsl(34 74% 60%);
-  --open: hsl(223 46% 36%);
-  --open-bg: hsl(223 42% 94%);
+  --bg: #ffffff;
+  --bg2: #f7f7f9;
+  --card: #ffffff;
+  --card2: #fafafb;
+  --ink: #16141f;
+  --ink-soft: #3a3746;
+  --adm-muted: #6b6878;
+  --faint: #9a97a6;
+  --line: #ececf0;
+  --line-soft: #f1f1f4;
+  --adm-surface: #f4f4f7;
+  --surface2: #f7f7f9;
+  --adm-primary: #7a52e6;
+  --primary-ink: #5a30cf;
+  --primary-lift: #8a63f0;
+  --primary-soft: color-mix(in oklab, #7a52e6 8%, #ffffff);
+  /* sidebar — white rail (white redesign 2026-10-09). No border, one sheet with the page. */
+  --nav: #ffffff;
+  --nav2: #ffffff;
+  --nav-line: #f1f1f4;
+  --nav-ink: #3a3746;
+  --nav-muted: #8b8898;
+  --nav-faint: #9a97a6;
+  --nav-on-bg: #f1ecfd;
+  --nav-accent: #7a52e6;
+  --open: #7a52e6;
+  --open-bg: #f1ecfd;
   --done: hsl(146 50% 32%);
   --done-bg: hsl(146 44% 92%);
   --warn: hsl(35 80% 38%);
@@ -97,11 +97,10 @@
 
 /* ── sidebar ── */
 .adm .side {
-  background: linear-gradient(178deg, var(--nav), var(--nav2));
+  background: var(--nav);
   color: var(--nav-ink);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--nav2);
   position: relative;
   z-index: 5;
   min-height: 0;
@@ -120,7 +119,7 @@
   background-image: url("/icons/icon-192.png");
   background-size: cover;
   background-position: center;
-  box-shadow: 0 8px 18px -10px #000;
+  box-shadow: none;
   flex: 0 0 auto;
 }
 .adm .side__mark span {
@@ -128,7 +127,7 @@
   font-style: italic;
   font-weight: 600;
   font-size: 22px;
-  color: #fff;
+  color: var(--ink);
   margin-top: -2px;
 }
 .adm .side__wm {
@@ -136,7 +135,7 @@
   font-style: italic;
   font-weight: 600;
   font-size: 21px;
-  color: #fff;
+  color: var(--ink);
   line-height: 1;
 }
 .adm .side__role {
@@ -157,20 +156,20 @@
   gap: 10px;
   padding: 9px 10px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--nav-line);
+  background: #f7f7f9;
+  border: 0;
   color: var(--nav-ink);
   text-align: left;
   cursor: pointer;
 }
 .adm .orgsw__btn:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: #f1f1f4;
 }
 .adm .orgsw__logo {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: linear-gradient(150deg, #c98a4b, #9c5a2c);
+  background: #16141f;
   color: #fff;
   display: flex;
   align-items: center;
@@ -182,7 +181,7 @@
 .adm .orgsw__nm {
   font-size: 13px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink);
   display: block;
   white-space: nowrap;
   overflow: hidden;
@@ -260,7 +259,7 @@
   margin-top: 1px;
 }
 .adm .navi:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: #f7f7f9;
   color: var(--nav-ink);
 }
 .adm .navi .ic {
@@ -270,18 +269,12 @@
 }
 .adm .navi.on {
   background: var(--nav-on-bg);
-  color: #fff;
-  font-weight: 700;
+  color: var(--primary-ink);
+  font-weight: 600;
 }
-.adm .navi.on::before {
-  content: "";
-  position: absolute;
-  left: -12px;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--nav-accent);
+.adm .navi.on .ic {
+  color: var(--nav-accent);
+  opacity: 1;
 }
 .adm .navi__badge {
   margin-left: auto;
@@ -302,11 +295,10 @@
   background: var(--warn);
 }
 .adm .navi__badge.muted {
-  background: rgba(255, 255, 255, 0.14);
+  background: #f1f1f4;
   color: var(--nav-muted);
 }
 .adm .side__foot {
-  border-top: 1px solid var(--nav-line);
   padding: 10px 12px 12px;
 }
 .adm .side__mob {
@@ -316,15 +308,15 @@
   gap: 9px;
   padding: 9px 11px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--nav-line);
+  background: #f7f7f9;
+  border: 0;
   color: var(--nav-ink);
   font-size: 12.5px;
   font-weight: 700;
   text-decoration: none;
 }
 .adm .side__mob:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f1f1f4;
 }
 .adm .side__mob .ic {
   font-size: 16px;
@@ -346,8 +338,8 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(150deg, #c98a4b, #9c5a2c);
-  color: #fff;
+  background: #f1ecfd;
+  color: var(--primary-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -358,7 +350,7 @@
 .adm .side__nm {
   font-size: 12.5px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -490,13 +482,13 @@
 }
 .adm .side:hover .orgsw__btn,
 .adm .side:focus-within .orgsw__btn {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: var(--nav-line);
+  background-color: #f7f7f9;
+  border-color: transparent;
 }
 /* 이 규칙이 `.orgsw__btn:hover` 보다 뒤에 있어 **버튼 자체의 반응을 덮는다.** 되살린다. */
 .adm .side:hover .orgsw__btn:hover,
 .adm .side:focus-within .orgsw__btn:hover {
-  background-color: rgba(255, 255, 255, 0.09);
+  background-color: #f1f1f4;
 }
 /* 메뉴 아이콘 18px → 23 + 9 = 32 */
 .adm .side__scroll { padding-left: 0; padding-right: 0; }
@@ -1896,7 +1888,7 @@
 
 /* ---- bulk action bar (multi-select) ---- */
 .adm .bulkbar { display:flex; align-items:center; gap:12px; padding:10px 14px; margin:0 2px 13px; border-radius:13px;
-  background:var(--primary-ink); color:#fff; box-shadow:0 16px 34px -22px hsl(223 46% 32% / .8); flex-wrap:wrap; }
+  background:var(--primary-ink); color:#fff; box-shadow:0 16px 34px -22px rgb(122 82 230 / .8); flex-wrap:wrap; }
 .adm .bulkbar__n { font-size:13px; font-weight:800; display:flex; align-items:center; gap:9px; }
 .adm .bulkbar__n .badge { min-width:24px; height:24px; padding:0 8px; border-radius:999px; background:rgba(255,255,255,.18); display:inline-flex; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
 .adm .bulkbar__clear { font-size:12px; font-weight:700; color:rgba(255,255,255,.7); background:none; border:none; cursor:pointer; }
@@ -2409,7 +2401,7 @@
 .adm .lvsubtab { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 15px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink-soft); font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; }
 .adm .lvsubtab .ic { font-size:17px; color:var(--adm-muted); display:inline-flex; }
 .adm .lvsubtab:hover { background:var(--adm-surface); }
-.adm .lvsubtab.on { background:var(--adm-primary); border-color:var(--adm-primary); color:#fff; box-shadow:0 12px 26px -18px hsl(223 46% 32% / .7); }
+.adm .lvsubtab.on { background:var(--adm-primary); border-color:var(--adm-primary); color:#fff; box-shadow:0 12px 26px -18px rgb(122 82 230 / .7); }
 .adm .lvsubtab.on .ic { color:#fff; }
 
 /* ---- leave console: summary cards row ---- */

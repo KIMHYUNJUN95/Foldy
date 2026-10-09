@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signInWithGoogle, signOut } from "@/app/auth/actions";
 import { AuthFrame } from "@/app/auth/login/auth-frame";
+import { FoldyMark } from "@/components/brand/foldy-mark";
 import { EmailLoginForm } from "@/app/auth/login/email-login-form";
 import { EmailNewPasswordForm } from "@/app/auth/login/email-new-password-form";
 import { EmailResetForm } from "@/app/auth/login/email-reset-form";
@@ -36,14 +37,8 @@ type LoginPageProps = {
 const Mail = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8" /><path d="M4.5 7l7.5 5.5L19.5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
-const Back = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-);
 const QrMark = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.4" stroke="currentColor" strokeWidth="1.7" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.4" stroke="currentColor" strokeWidth="1.7" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.4" stroke="currentColor" strokeWidth="1.7" /><path d="M13.5 13.5h3v3h-3zM17.5 17.5h2.5v2.5h-2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
-);
-const Ticket = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 8a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 000-4V8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M14 6v12" stroke="currentColor" strokeWidth="1.6" strokeDasharray="2 2.5" /></svg>
 );
 const Warn = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4l9 16H3l9-16z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M12 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="17" r="1.1" fill="currentColor" /></svg>
@@ -149,20 +144,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   // ===== Password reset — sent confirmation =====
   if (params.view === "email" && params.mode === "reset" && params.sent) {
     return (
-      <AuthFrame locale={locale} next={effectiveNext} view="email">
-        <div className="auth-card scard">
-          <span className="scard__ic bg-pri"><Ic>{Mail}</Ic></span>
-          <p className="scard__ey">{t.email.resetSentEyebrow}</p>
-          <h2 className="scard__t">{t.email.resetSentTitle}</h2>
-          <p className="scard__s">{t.email.resetSentBody}</p>
+      <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
+        <div className="aw-status authw__col--center" style={{ flex: 1 }}>
+          <span className="aw-status__ic"><Ic>{Mail}</Ic></span>
+          <span className="aw-status__ey">{t.email.resetSentEyebrow}</span>
+          <h1 className="aw-title">{t.email.resetSentTitle}</h1>
+          <p className="aw-lede">{t.email.resetSentBody}</p>
           {params.email && (
-            <span className="scard__email"><Ic>{Mail}</Ic>{params.email}</span>
+            <span className="aw-status__email"><Ic>{Mail}</Ic>{params.email}</span>
           )}
-          <Link href={emailHref} className="submit" style={{ maxWidth: 300, marginTop: 26 }}>
-            {t.email.resetSentBackToLogin}
-          </Link>
-          <div className="auth-help" style={{ marginTop: 16 }}>
-            {t.email.resetSentNoMail}{" "}
+          <Link href={emailHref} className="aw-btn aw-gap-m">{t.email.resetSentBackToLogin}</Link>
+          <div className="aw-help">
+            {t.email.resetSentNoMail}
             <Link href={forgotHref}>{t.email.resetSentResend}</Link>
           </div>
         </div>
@@ -173,46 +166,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   // ===== New password (recovery) =====
   if (params.view === "email" && params.mode === "new_password") {
     return (
-      <AuthFrame locale={locale} next={effectiveNext} view="email">
-        <div className="auth-card">
-          <p className="auth-eyebrow">{c.resetEyebrow}</p>
-          <h2 className="auth-title" style={{ whiteSpace: "pre-line" }}>{t.email.newPasswordTitle}</h2>
-          <p className="auth-lede">{t.email.newPasswordSubtitle}</p>
-          {errorMessage && <div style={{ marginTop: 18 }}><ErrorBanner message={errorMessage} /></div>}
-          <div style={{ marginTop: 22 }}>
-            <EmailNewPasswordForm
-              copy={{
-                newPasswordLabel: t.email.newPasswordLabel,
-                newPasswordConfirmLabel: t.email.newPasswordConfirmLabel,
-                updatePasswordCta: t.email.updatePasswordCta,
-                showPassword: t.email.showPassword,
-                hidePassword: t.email.hidePassword,
-              }}
-              next={effectiveNext}
-              lang={locale}
-            />
-          </div>
+      <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
+        <div className="aw-head">
+          <h1 className="aw-title">{t.email.newPasswordTitle}</h1>
+          <p className="aw-lede">{t.email.newPasswordSubtitle}</p>
         </div>
-      </AuthFrame>
-    );
-  }
-
-  // ===== Password reset request =====
-  if (params.view === "email" && params.mode === "reset") {
-    return (
-      <AuthFrame locale={locale} next={effectiveNext} view="email">
-        <div className="auth-card">
-          <Link href={emailHref} className="backlink"><Ic>{Back}</Ic>{t.email.back}</Link>
-          <p className="auth-eyebrow">{c.resetEyebrow}</p>
-          <h2 className="auth-title" style={{ whiteSpace: "pre-line" }}>{t.email.resetTitle}</h2>
-          <p className="auth-lede">{t.email.resetSubtitle}</p>
-          {errorMessage && <div style={{ marginTop: 18 }}><ErrorBanner message={errorMessage} /></div>}
-          <EmailResetForm
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <div className="aw-gap-l">
+          <EmailNewPasswordForm
             copy={{
-              emailLabel: t.emailLabel,
-              emailPlaceholder: t.emailPlaceholder,
-              resetHint: t.email.resetHint,
-              resetCta: t.email.resetCta,
+              newPasswordLabel: t.email.newPasswordLabel,
+              newPasswordConfirmLabel: t.email.newPasswordConfirmLabel,
+              updatePasswordCta: t.email.updatePasswordCta,
+              showPassword: t.email.showPassword,
+              hidePassword: t.email.hidePassword,
             }}
             next={effectiveNext}
             lang={locale}
@@ -222,21 +189,42 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
+  // ===== Password reset request =====
+  if (params.view === "email" && params.mode === "reset") {
+    return (
+      <AuthFrame locale={locale} next={effectiveNext} view="email" backHref={emailHref} mobileCopy={showMobileCopy}>
+        <div className="aw-head">
+          <h1 className="aw-title">{t.email.resetTitle}</h1>
+          <p className="aw-lede">{t.email.resetSubtitle}</p>
+        </div>
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <EmailResetForm
+          copy={{
+            emailLabel: t.emailLabel,
+            emailPlaceholder: t.emailPlaceholder,
+            resetHint: t.email.resetHint,
+            resetCta: t.email.resetCta,
+          }}
+          next={effectiveNext}
+          lang={locale}
+        />
+      </AuthFrame>
+    );
+  }
+
   // ===== Email verification sent =====
   if (params.view === "email" && params.mode === "signup" && params.sent === "verify") {
     return (
-      <AuthFrame locale={locale} next={effectiveNext} view="email">
-        <div className="auth-card scard">
-          <span className="scard__ic bg-pri"><Ic>{Mail}</Ic></span>
-          <p className="scard__ey">{c.sentEyebrow}</p>
-          <h2 className="scard__t">{t.email.verificationSentTitle}</h2>
-          <p className="scard__s">{t.email.verificationSentBody}</p>
+      <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
+        <div className="aw-status authw__col--center" style={{ flex: 1 }}>
+          <span className="aw-status__ic"><Ic>{Mail}</Ic></span>
+          <span className="aw-status__ey">{c.sentEyebrow}</span>
+          <h1 className="aw-title">{t.email.verificationSentTitle}</h1>
+          <p className="aw-lede">{t.email.verificationSentBody}</p>
           {params.email && (
-            <span className="scard__email"><Ic>{Mail}</Ic>{params.email}</span>
+            <span className="aw-status__email"><Ic>{Mail}</Ic>{params.email}</span>
           )}
-          <Link href={emailHref} className="submit" style={{ maxWidth: 300, marginTop: 26 }}>
-            {t.email.resetSentBackToLogin}
-          </Link>
+          <Link href={emailHref} className="aw-btn aw-gap-m">{t.email.resetSentBackToLogin}</Link>
         </div>
       </AuthFrame>
     );
@@ -272,17 +260,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     };
     const configs: Record<string, BlockedConfig> = {
       suspended: {
-        icon: Lock, iconBg: "var(--warn-bg)", iconColor: "var(--warn)",
+        icon: Lock, iconBg: "#fdf3e3", iconColor: "#a15c07",
         eyebrow: b.suspendedEyebrow, title: b.suspendedTitle, body: b.suspendedBody,
         showEmail: true, primary: b.suspendedCta, primaryHref: buildMailto(b.contactSubjectSuspended), secondary: b.logout,
       },
       removed: {
-        icon: UserX, iconBg: "var(--authx-surface)", iconColor: "var(--authx-muted)",
+        icon: UserX, iconBg: "#f4f4f7", iconColor: "#6b6878",
         eyebrow: b.removedEyebrow, title: b.removedTitle, body: b.removedBody,
         showEmail: false, primary: b.removedCta, primaryHref: removedRejoinHref, secondary: b.logout,
       },
       disabled: {
-        icon: Power, iconBg: "var(--danger-bg)", iconColor: "var(--danger)",
+        icon: Power, iconBg: "#fdecec", iconColor: "#c5282e",
         eyebrow: b.disabledEyebrow, title: b.disabledTitle, body: b.disabledBody,
         showEmail: true, primary: b.disabledCta, primaryHref: buildMailto(b.contactSubjectDisabled), secondary: b.disabledAltLogin,
       },
@@ -290,22 +278,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     const cfg = configs[params.mode ?? ""] ?? configs.suspended;
 
     return (
-      <AuthFrame locale={locale} next={effectiveNext} view="blocked">
-        <div className="auth-card scard wide">
-          <span className="scard__ic" style={{ background: cfg.iconBg, color: cfg.iconColor }}><Ic>{cfg.icon}</Ic></span>
-          <p className="scard__ey">{cfg.eyebrow}</p>
-          <h2 className="scard__t" style={{ whiteSpace: "pre-line" }}>{cfg.title}</h2>
-          <p className="scard__s">{cfg.body}</p>
+      <AuthFrame locale={locale} next={effectiveNext} view="blocked" mobileCopy={showMobileCopy}>
+        <div className="aw-status authw__col--center" style={{ flex: 1 }}>
+          <span className="aw-status__ic" style={{ background: cfg.iconBg, color: cfg.iconColor }}><Ic>{cfg.icon}</Ic></span>
+          <span className="aw-status__ey" style={{ color: cfg.iconColor }}>{cfg.eyebrow}</span>
+          <h1 className="aw-title">{cfg.title}</h1>
+          <p className="aw-lede">{cfg.body}</p>
           {cfg.showEmail && blockedEmail && (
-            <span className="scard__email"><Ic>{Mail}</Ic>{blockedEmail}</span>
+            <span className="aw-status__email"><Ic>{Mail}</Ic>{blockedEmail}</span>
           )}
-          <div style={{ display: "flex", gap: 9, marginTop: 22, width: "100%", maxWidth: 360 }}>
-            <a href={cfg.primaryHref} className="submit" style={{ margin: 0, flex: 1 }}>{cfg.primary}</a>
-            <form action={signOut} style={{ flex: "0 0 auto" }}>
+          <div className="aw-row aw-gap-m">
+            <a href={cfg.primaryHref} className="aw-btn">{cfg.primary}</a>
+            <form action={signOut} style={{ display: "flex" }}>
               <input name="next" type="hidden" value="/auth/login" />
-              <button type="submit" className="abtn abtn--google" style={{ width: 120, height: 50 }}>
-                {cfg.secondary}
-              </button>
+              <button type="submit" className="aw-btn aw-btn--line">{cfg.secondary}</button>
             </form>
           </div>
         </div>
@@ -316,23 +302,28 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   // ===== Email signup =====
   if (params.view === "email" && params.mode === "signup") {
     return (
-      <AuthFrame locale={locale} next={effectiveNext} view="email">
-        <div className="auth-card">
-          <Link href={splitHref} className="backlink"><Ic>{Back}</Ic>{t.email.back}</Link>
-          <p className="auth-eyebrow">{c.signupEyebrow}</p>
-          <h2 className="auth-title" style={{ whiteSpace: "pre-line" }}>{t.email.signupTitle}</h2>
-          <p className="auth-lede">{t.email.signupSubtitle}</p>
-          <div className="seg">
-            <Link href={emailHref}>{t.email.tabLogin}</Link>
-            <span className="on">{t.email.tabSignup}</span>
-          </div>
-          {errorMessage && <ErrorBanner message={errorMessage} />}
+      <AuthFrame locale={locale} next={effectiveNext} view="email" backHref={splitHref} mobileCopy={showMobileCopy}>
+        <div className="aw-tabs" role="tablist">
+          <Link href={emailHref} role="tab" aria-selected="false">{t.email.tabLogin}</Link>
+          <span className="on" role="tab" aria-selected="true">{t.email.tabSignup}</span>
+        </div>
+        <div className="aw-head aw-gap-m">
+          <h1 className="aw-title">{t.email.signupTitle}</h1>
+          <p className="aw-lede">{t.email.signupSubtitle}</p>
+        </div>
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <div className="aw-gap-l">
           <EmailSignupForm
             copy={{
               emailLabel: t.emailLabel,
               emailPlaceholder: t.emailPlaceholder,
               passwordLabel: t.email.passwordLabel,
-              passwordHint: t.email.passwordPolicy,
+              confirmLabel: t.email.confirmPasswordLabel,
+              confirmPlaceholder: t.email.confirmPasswordPlaceholder,
+              ruleLength: t.email.pwRuleLength,
+              ruleLetter: t.email.pwRuleLetter,
+              ruleNumber: t.email.pwRuleNumber,
+              mismatch: t.email.passwordMismatch,
               signupCta: t.email.signupCta,
               showPassword: t.email.showPassword,
               hidePassword: t.email.hidePassword,
@@ -354,23 +345,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   // ===== Email login =====
   if (params.view === "email") {
     return (
-      <AuthFrame locale={locale} next={effectiveNext} view="email" help={<>{c.help} <Link href={legalHref("support", locale)}>{t.entry.helpLink}</Link></>}>
-        <div className="auth-card">
-          <Link href={splitHref} className="backlink"><Ic>{Back}</Ic>{t.email.back}</Link>
-          <p className="auth-eyebrow">{c.emailEyebrow}</p>
-          <h2 className="auth-title" style={{ whiteSpace: "pre-line" }}>{t.email.welcomeTitle}</h2>
-          <p className="auth-lede">{t.email.loginSubtitle}</p>
-          <div className="seg">
-            <span className="on">{t.email.tabLogin}</span>
-            <Link href={signupHref}>{t.email.tabSignup}</Link>
+      <AuthFrame locale={locale} next={effectiveNext} view="email" backHref={splitHref} mobileCopy={showMobileCopy}>
+        <div className="aw-tabs" role="tablist">
+          <span className="on" role="tab" aria-selected="true">{t.email.tabLogin}</span>
+          <Link href={signupHref} role="tab" aria-selected="false">{t.email.tabSignup}</Link>
+        </div>
+        <div className="aw-head aw-gap-l">
+          <h1 className="aw-title">{t.email.welcomeTitle}</h1>
+          <p className="aw-lede">{t.email.loginSubtitle}</p>
+        </div>
+        {params.sent === "password_updated" && (
+          <div className="banner banner--info">
+            <span className="banner__ic"><Ic>{Mail}</Ic></span>
+            <div>{t.email.passwordUpdatedNote}</div>
           </div>
-          {params.sent === "password_updated" && (
-            <div className="banner banner--info">
-              <span className="banner__ic"><Ic>{Mail}</Ic></span>
-              <div className="banner__s">{t.email.passwordUpdatedNote}</div>
-            </div>
-          )}
-          {errorMessage && <ErrorBanner message={errorMessage} />}
+        )}
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <div className="aw-gap-l">
           <EmailLoginForm
             copy={{
               emailLabel: t.emailLabel,
@@ -387,59 +378,63 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             next={effectiveNext}
             lang={locale}
           />
-          <div className="divider"><span>{t.divider}</span></div>
-          <form action={signInWithGoogle}>
-            <input name="next" type="hidden" value={effectiveNext} />
-            <input name="lang" type="hidden" value={locale} />
-            <GoogleSubmitButton label={t.entry.continueGoogle} />
-          </form>
         </div>
       </AuthFrame>
     );
   }
 
-  // ===== Entry (split) =====
+  // ===== Entry =====
   return (
-    <AuthFrame locale={locale} next={effectiveNext} view={params.view}>
-      <div className="auth-card">
-        {/* 폰 · 태블릿 · 앱에서는 현장 앱 문구 — 「관리자 콘솔」 문구는 PC 에서만(2026-10-08, 앱 심사 준비) */}
-        <p className="auth-eyebrow">{showMobileCopy ? c.entryEyebrowMobile : c.entryEyebrow}</p>
-        <h2 className="auth-title" style={{ whiteSpace: "pre-line" }}>
-          {showMobileCopy ? c.entryTitleMobile : c.entryTitle}
-        </h2>
-        <p className="auth-lede">{showMobileCopy ? c.entryLedeMobile : c.entryLede}</p>
+    <AuthFrame locale={locale} next={effectiveNext} view={params.view} mobileCopy={showMobileCopy}>
+      <div className="authw__col--center" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="aw-hero">
+          <span className="aw-hero__mark"><FoldyMark size={56} /></span>
+          <h1 className="aw-title">{c.welcomeTitle}</h1>
+          <p className="aw-lede">{c.welcomeLede}</p>
+        </div>
         {isAttendanceQrEntry && (
-          <div className="banner banner--info" style={{ marginTop: 18 }}>
+          <div className="banner banner--info" style={{ marginTop: 0 }}>
             <span className="banner__ic"><Ic>{QrMark}</Ic></span>
             <div>
               <div className="banner__t">{t.entry.qrNoticeTitle}</div>
-              <div className="banner__s">{t.entry.qrNoticeBody}</div>
+              <div>{t.entry.qrNoticeBody}</div>
             </div>
           </div>
         )}
-        {errorMessage && <div style={{ marginTop: 18 }}><ErrorBanner message={errorMessage} /></div>}
-        <div className="abtns">
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <div className="aw-stack" style={{ paddingTop: 8 }}>
           <form action={signInWithGoogle}>
             <input name="next" type="hidden" value={effectiveNext} />
             <input name="lang" type="hidden" value={locale} />
             <GoogleSubmitButton label={t.entry.continueGoogle} />
           </form>
-          <Link href={emailHref} className="abtn abtn--email"><Ic>{Mail}</Ic>{t.entry.continueEmail}</Link>
+          <div className="aw-or">{t.divider}</div>
+          {/* 이메일을 여기서 받아 이메일 로그인 화면으로 넘긴다(비밀번호는 그 화면에서). */}
+          <form method="get" action="/auth/login" className="aw-stack" style={{ marginTop: 6 }}>
+            <input type="hidden" name="view" value="email" />
+            <input type="hidden" name="lang" value={locale} />
+            <input type="hidden" name="next" value={effectiveNext} />
+            <div className="field">
+              <label className="field__l" htmlFor="entry-email">{t.emailLabel}</label>
+              <div className="inp">
+                <input id="entry-email" type="email" name="email" autoComplete="email" enterKeyHint="go" placeholder={t.emailPlaceholder} />
+              </div>
+            </div>
+            <button type="submit" className="aw-btn">{t.entry.continueEmail}</button>
+          </form>
+          <div className="aw-help">
+            {t.entry.noAccount}
+            <Link href={signupHref}>{t.entry.signUpEmail}</Link>
+          </div>
         </div>
-        <div className="divider"><span>{t.divider}</span></div>
-        <div className="auth-help" style={{ textAlign: "center" }}>
-          {t.entry.noAccount} <Link href={signupHref}>{t.entry.signUpEmail}</Link>
-        </div>
-        <div className="auth-invite">
-          <span className="auth-invite__ic"><Ic>{Ticket}</Ic></span>
-          <div className="auth-invite__t">{t.entry.inviteNote}</div>
-        </div>
-        <div className="auth-legal">
-          <Link href={legalHref("terms", locale)}>{t.entry.termsLink}</Link><span className="dot" />
-          <Link href={legalHref("privacy", locale)}>{t.entry.privacyLink}</Link><span className="dot" />
-          <Link href={legalHref("privacy", locale, "security")}>{c.legalSecurity}</Link><span className="dot" />
-          <Link href={legalHref("support", locale)}>{t.entry.helpLink}</Link>
-        </div>
+        <p className="aw-note aw-note--mobile">{t.entry.inviteNote}</p>
+        {!showMobileCopy && (
+          <div className="aw-feats">
+            <span>{c.feat1T}</span>
+            <span>{c.feat2T}</span>
+            <span>{c.feat3T}</span>
+          </div>
+        )}
       </div>
     </AuthFrame>
   );

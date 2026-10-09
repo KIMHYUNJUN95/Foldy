@@ -11,17 +11,17 @@
  */
 
 .sg {
-  --bg: hsl(42 36% 95%);
-  --card: hsl(44 52% 98.5%);
-  --ink: hsl(222 28% 14%);
-  --ink-soft: hsl(222 20% 28%);
-  --sg-muted: hsl(222 10% 44%);
-  --faint: hsl(222 10% 62%);
-  --line: hsl(40 20% 84%);
-  --line-soft: hsl(40 24% 89%);
-  --sg-surface: hsl(40 22% 90%);
-  --sg-primary: hsl(223 46% 32%);
-  --primary-soft: color-mix(in oklab, hsl(223 46% 32%) 9%, hsl(44 52% 98.5%));
+  --bg: #ffffff;
+  --card: #ffffff;
+  --ink: #16141f;
+  --ink-soft: #3a3746;
+  --sg-muted: #6b6878;
+  --faint: #9a97a6;
+  --line: #ececf0;
+  --line-soft: #f1f1f4;
+  --sg-surface: #f4f4f7;
+  --sg-primary: #7a52e6;
+  --primary-soft: color-mix(in oklab, #7a52e6 9%, #ffffff);
   /* status hues */
   --sub: hsl(223 38% 40%);
   --sub-bg: hsl(223 40% 94%);

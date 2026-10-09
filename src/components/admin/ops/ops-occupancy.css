@@ -28,11 +28,11 @@
 }
 .adm .occ__col .b1 { display: block; width: 50%; max-width: 24px; background: var(--adm-primary); border-radius: 5px 5px 2px 2px; }
 .adm .occ__col .b1.low { background: var(--occ-low); }
-.adm .occ__col.is-future .b1 { background: repeating-linear-gradient(135deg, hsl(223 46% 32% / 0.55) 0 4px, hsl(223 46% 32% / 0.32) 4px 8px); }
+.adm .occ__col.is-future .b1 { background: repeating-linear-gradient(135deg, rgb(122 82 230 / 0.55) 0 4px, rgb(122 82 230 / 0.32) 4px 8px); }
 .adm .occ__col.is-current .b1 {
   background:
     linear-gradient(var(--adm-primary) 0 0) bottom / 100% var(--done, 0%) no-repeat,
-    repeating-linear-gradient(135deg, hsl(223 46% 32% / 0.55) 0 4px, hsl(223 46% 32% / 0.32) 4px 8px);
+    repeating-linear-gradient(135deg, rgb(122 82 230 / 0.55) 0 4px, rgb(122 82 230 / 0.32) 4px 8px);
 }
 .adm .occ__col .ml { font-size: 10.5px; font-weight: 800; text-align: center; color: var(--ink-soft); white-space: nowrap; }
 .adm .occ__col .ml.y { color: var(--adm-primary); }
@@ -74,7 +74,7 @@
   color: var(--ink);
   text-decoration: none;
 }
-.adm .occ__hc:hover { border-color: hsl(223 46% 32% / 0.5); }
+.adm .occ__hc:hover { border-color: rgb(122 82 230 / 0.5); }
 .adm .occ__hc.last { border-color: var(--adm-primary); }
 .adm .occ__hc.na { border: 1px dashed var(--line); background: transparent; }
 .adm .occ__hc.off { opacity: 0.6; }
@@ -113,7 +113,7 @@
   color: var(--ink);
   text-decoration: none;
 }
-.adm .occ__fc:hover { border-color: hsl(223 46% 32% / 0.6); border-style: solid; }
+.adm .occ__fc:hover { border-color: rgb(122 82 230 / 0.6); border-style: solid; }
 .adm .occ__fc.cur { border: 1.5px solid hsl(223 40% 74%); }
 .adm .occ__fc.off { opacity: 0.65; }
 .adm .occ__fc.tot { background: var(--open-bg); border: 1.5px solid color-mix(in oklab, var(--adm-primary) 25%, var(--line)); }
@@ -123,7 +123,7 @@
 .adm .occ__cmp .track { position: relative; height: 16px; }
 .adm .occ__cmp .track i { position: absolute; left: 0; border-radius: 4px; }
 .adm .occ__cmp .track i.prev { top: 0; bottom: 0; background: hsl(40 14% 86%); }
-.adm .occ__cmp .track i.now { top: 3px; bottom: 3px; background: repeating-linear-gradient(135deg, hsl(223 46% 40%) 0 3px, hsl(223 40% 62%) 3px 6px); }
+.adm .occ__cmp .track i.now { top: 3px; bottom: 3px; background: repeating-linear-gradient(135deg, #7a52e6 0 3px, hsl(223 40% 62%) 3px 6px); }
 .adm .occ__cmp .track em { position: absolute; top: -2px; bottom: -2px; border-left: 1.5px dashed var(--occ-line); }
 .adm .occ__cmp .num { text-align: right; font-weight: 700; }
 

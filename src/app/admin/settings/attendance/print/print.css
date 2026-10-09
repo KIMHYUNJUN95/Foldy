@@ -30,7 +30,7 @@
 .qrsheet__btn {
   display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px;
   border-radius: 11px; border: none; color: #fff; font: inherit; font-size: 13px; font-weight: 800;
-  background: linear-gradient(165deg, hsl(223 50% 42%), hsl(223 54% 22%)); cursor: pointer;
+  background: linear-gradient(165deg, #8a63f0, #5a30cf); cursor: pointer;
 }
 .qrsheet__btn svg { width: 16px; height: 16px; }
 .qrsheet__btn:disabled { background: #c9c3b6; cursor: not-allowed; }

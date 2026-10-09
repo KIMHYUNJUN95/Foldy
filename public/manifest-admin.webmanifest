@@ -11,8 +11,8 @@
   "display": "standalone",
   "launch_handler": { "client_mode": "navigate-existing" },
   "prefer_related_applications": false,
-  "background_color": "#f7f4ee",
-  "theme_color": "#f7f4ee",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/icons/icon-192.png",

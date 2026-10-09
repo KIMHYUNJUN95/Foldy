@@ -9,13 +9,13 @@
 .mops-vars {
   --mops-cell: 46px;
   --mops-room: 56px;
-  --mops-ink: hsl(222 28% 14%);
-  --mops-soft: hsl(222 20% 28%);
-  --mops-muted: hsl(222 10% 44%);
-  --mops-faint: hsl(222 10% 62%);
-  --mops-line: hsl(40 20% 84%);
-  --mops-line-soft: hsl(40 24% 89%);
-  --mops-bg2: hsl(42 30% 93%);
+  --mops-ink: #16141f;
+  --mops-soft: #3a3746;
+  --mops-muted: #6b6878;
+  --mops-faint: #9a97a6;
+  --mops-line: #ececf0;
+  --mops-line-soft: #f1f1f4;
+  --mops-bg2: #f7f7f9;
   --mops-we: hsl(6 70% 97.5%);
   --mops-danger: hsl(4 62% 46%);
   --mops-danger-bg: hsl(6 70% 95.5%);
@@ -371,7 +371,7 @@ a.mops-pill { padding-inline: 14px; }
 }
 .mops-d.we b { color: var(--mops-danger); }
 .mops-d.we span { color: color-mix(in oklab, var(--mops-danger) 75%, white); }
-.mops-d.today { background: hsl(223 42% 94% / 0.55); }
+.mops-d.today { background: rgb(241 236 253 / 0.55); }
 .mops-d.today span { color: var(--primary); font-weight: 800; }
 .mops-d.today b {
   background: var(--primary);
@@ -380,7 +380,7 @@ a.mops-pill { padding-inline: 14px; }
 }
 .mops-d.past b,
 .mops-d.past span { opacity: 0.45; }
-.mops-d.m1 { box-shadow: inset 1.5px 0 0 hsl(223 46% 32% / 0.35); }
+.mops-d.m1 { box-shadow: inset 1.5px 0 0 rgb(122 82 230 / 0.35); }
 
 .mops-group {
   position: sticky;
@@ -452,7 +452,7 @@ a.mops-pill { padding-inline: 14px; }
   padding-top: 6px;
 }
 .mops-c.we { background: var(--mops-we); }
-.mops-c.today { background: hsl(223 42% 94% / 0.55); }
+.mops-c.today { background: rgb(241 236 253 / 0.55); }
 .mops-c.past { opacity: 0.5; }
 .mops-p { font-size: 11px; font-weight: 600; color: var(--mops-ink); font-variant-numeric: tabular-nums; line-height: 13px; }
 .mops-m { font-size: 9.5px; font-weight: 700; color: var(--mops-faint); line-height: 12px; }

@@ -16,12 +16,12 @@ import type { Locale } from "@/lib/i18n";
 import type { ProfileGender } from "@/lib/onboarding";
 
 // Navy accent gradient + shadow pulled from the design tokens (matches the auth screens).
-const GRADIENT = "linear-gradient(165deg, hsl(223 50% 42%), hsl(223 54% 22%))";
-const SHADOW = "0 18px 36px -20px hsl(223 46% 32% / 0.7)";
+const GRADIENT = "#7a52e6";
+const SHADOW = "none";
 const IVORY_BG =
-  "radial-gradient(120% 50% at 50% -6%, hsl(42 36% 95%) 42%, hsl(42 30% 93%) 100%)";
+  "radial-gradient(120% 50% at 50% -6%, #ffffff 42%, #f7f7f9 100%)";
 const PRIMARY_SOFT =
-  "color-mix(in oklab, hsl(223 46% 32%) 8%, hsl(44 52% 98.5%))";
+  "color-mix(in oklab, #7a52e6 8%, #ffffff)";
 
 // Numbered steps shown in the progress bar: name → dob → phone → invite.
 // (Language is intentionally not a wizard step — it's already chosen at login.)
@@ -270,7 +270,7 @@ function SpinnerButton({
       onClick={onClick}
       disabled={off}
       aria-busy={busy}
-      className={`relative flex h-[54px] w-full items-center justify-center rounded-[15px] text-[15.5px] font-extrabold tracking-[-0.01em] text-white ${
+      className={`relative flex h-[52px] w-full items-center justify-center rounded-[14px] text-[16px] font-semibold text-white ${
         off ? "pointer-events-none opacity-80" : ""
       }`}
       style={{ background: GRADIENT, boxShadow: off ? "none" : SHADOW }}
@@ -298,16 +298,14 @@ function ChecklistRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-3 py-[13px] ${
-        divider ? "border-t border-[hsl(40_24%_89%)]" : ""
-      }`}
+      className={`flex items-center gap-[14px] py-[12px] ${divider ? "" : ""}`}
     >
-      <span className="flex size-[34px] flex-none items-center justify-center rounded-[10px] bg-muted text-primary">
+      <span className="flex size-[44px] flex-none items-center justify-center rounded-[14px] bg-[#f4f1fd] text-primary">
         {icon}
       </span>
       <div className="min-w-0">
-        <div className="text-[13.5px] font-extrabold text-foreground">{title}</div>
-        <div className="text-[11.5px] font-semibold text-muted-foreground">{sub}</div>
+        <div className="text-[15px] font-semibold text-foreground">{title}</div>
+        <div className="text-[13px] text-[#8b8898]">{sub}</div>
       </div>
     </div>
   );
@@ -332,35 +330,34 @@ function ProgressHeader({
   backLabel?: string;
   onBack?: () => void;
 }) {
-  const pct = Math.round((step / TOTAL_STEPS) * 100);
   return (
-    <header className="flex-none px-[26px] pb-[10px] pt-1">
-      <div className="flex h-[44px] items-center justify-between">
-        <span className="flex w-[112px] items-center">
-          {onBack ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="-ml-2 inline-flex h-9 items-center gap-1 rounded-[10px] px-2 text-[12.5px] font-extrabold text-muted-foreground transition-colors hover:bg-black/[0.04] hover:text-foreground"
-            >
-              <ChevronLeftIcon />
-              {backLabel}
-            </button>
-          ) : null}
+    <header className="flex-none px-[24px] pb-[10px] pt-1">
+      <div className="flex h-[48px] items-center gap-3">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label={backLabel}
+            className="-ml-[10px] inline-flex size-11 flex-none items-center justify-center rounded-[12px] text-foreground transition-colors hover:bg-black/[0.04]"
+          >
+            <ChevronLeftIcon />
+          </button>
+        ) : (
+          <span className="-ml-[10px] size-11 flex-none" aria-hidden="true" />
+        )}
+        {/* 칸 나눈 진행 막대(화이트 리디자인 2026-10-09) — 지난 · 지금 단계는 보라, 남은 단계는 옅은 회색. */}
+        <div className="flex flex-1 gap-[6px]" aria-hidden="true">
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+            <i
+              key={i}
+              className="block h-[4px] flex-1 rounded-full transition-colors duration-300"
+              style={{ background: i < step ? GRADIENT : "#efeff3" }}
+            />
+          ))}
+        </div>
+        <span className="flex-none text-[13px] tabular-nums text-[#8b8898]">
+          {step}/{TOTAL_STEPS}
         </span>
-        <span className="text-[12.5px] font-extrabold tabular-nums text-muted-foreground">
-          <b className="text-foreground">{step}</b> / {TOTAL_STEPS}
-        </span>
-        <span className="w-[112px]" />
-      </div>
-      <div className="h-[5px] overflow-hidden rounded-full bg-muted">
-        <i
-          // 폭을 100% 로 두고 `scaleX` 로 줄인다 — `width` 애니메이션은 매 프레임 리플로우를
-          // 부르지만 `transform` 은 컴포지터에서 끝난다. 왼쪽 기준으로 늘어나야 하므로
-          // `origin-left` 가 필수다.
-          className="block h-full w-full origin-left rounded-full transition-transform duration-300"
-          style={{ transform: `scaleX(${pct / 100})`, background: GRADIENT }}
-        />
       </div>
     </header>
   );
@@ -410,9 +407,9 @@ function StickyCta({
         onClick={onClick}
         disabled={disabled}
         className={`flex h-[54px] w-full items-center justify-center gap-2 rounded-[15px] text-[15.5px] font-extrabold tracking-[-0.01em] text-white ${
-          disabled ? "opacity-40" : ""
+          disabled ? "text-[#8b80ac]" : ""
         }`}
-        style={{ background: GRADIENT, boxShadow: disabled ? "none" : SHADOW }}
+        style={{ background: disabled ? "#e6e1f5" : GRADIENT, boxShadow: "none" }}
       >
         {label}
         {withArrow && <ArrowRightIcon />}
@@ -734,7 +731,7 @@ function BirthDateSheet({
             <button
               type="button"
               onClick={confirm}
-              className="mt-[14px] flex h-[54px] w-full items-center justify-center rounded-[15px] text-[15.5px] font-extrabold tracking-[-0.01em] text-white"
+              className="mt-[14px] flex h-[52px] w-full items-center justify-center rounded-[14px] text-[16px] font-semibold text-white"
               style={{ background: GRADIENT, boxShadow: SHADOW }}
             >
               {confirmLabel}
@@ -1174,13 +1171,13 @@ export function OnboardingWizard({
         <header className="h-[48px] flex-none" />
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <span className="mb-5 flex size-[76px] items-center justify-center rounded-[24px] bg-[hsl(146_44%_92%)] text-[hsl(146_50%_32%)]">
+            <span className="mb-5 flex size-[76px] items-center justify-center rounded-[24px] bg-[#f1ecfd] text-primary">
               <CheckIcon />
             </span>
             <p className="mb-[9px] text-[11px] font-extrabold uppercase tracking-[0.13em] t-eyebrow text-muted-foreground">
               {success.eyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[23px] font-black leading-[1.2] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[32px] font-bold leading-[1.25] tracking-[-0.035em] t-display">
               {success.welcomePrefix}
               {name.trim()}
               {success.welcomeSuffix}
@@ -1222,7 +1219,7 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {review.title}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1340,10 +1337,10 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.04em] t-eyebrow text-primary">
+            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {join.confirmEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {join.confirmTitle}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1411,10 +1408,10 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.04em] t-eyebrow text-primary">
+            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {join.inviteEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {join.inviteTitle}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1479,7 +1476,7 @@ export function OnboardingWizard({
               type="button"
               onClick={verifyInvite}
               disabled={!inviteCode.trim() || verifying}
-              className={`flex h-[54px] w-full items-center justify-center rounded-[15px] text-[15.5px] font-extrabold tracking-[-0.01em] text-white ${
+              className={`flex h-[52px] w-full items-center justify-center rounded-[14px] text-[16px] font-semibold text-white ${
                 !inviteCode.trim() || verifying ? "opacity-40" : ""
               }`}
               style={{
@@ -1523,10 +1520,10 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.04em] t-eyebrow text-primary">
+            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.phoneTitle}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1635,10 +1632,10 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.04em] t-eyebrow text-primary">
+            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.dobTitle}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1711,10 +1708,10 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.04em] t-eyebrow text-primary">
+            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.genderTitle}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1770,10 +1767,10 @@ export function OnboardingWizard({
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.04em] t-eyebrow text-primary">
+            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
               {steps.basicsEyebrow}
             </p>
-            <h1 className="whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.nameTitle}
             </h1>
             <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
@@ -1839,7 +1836,7 @@ export function OnboardingWizard({
           {/* Logo slot intentionally empty (a brand logo is added later). */}
           <div className="size-14" aria-hidden="true" />
 
-          <h1 className="mt-[6px] whitespace-pre-line text-[25px] font-black leading-[1.18] tracking-[-0.03em] t-display">
+          <h1 className="mt-[6px] whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
             {intro.title}
           </h1>
           <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">

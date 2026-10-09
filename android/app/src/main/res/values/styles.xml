@@ -14,16 +14,16 @@
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
         <!-- 상태바 · 내비게이션 바 뒤(WebView 가 여백으로 밀릴 때 보이는 창 바탕)를 앱 배경 아이보리로 — 기본값은 검정이라 상태바가 검게 보였다(N1) -->
-        <item name="android:windowBackground">#F7F4EE</item>
+        <item name="android:windowBackground">#FFFFFF</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <!-- 예전엔 android:background = @drawable/splash(아이콘이 그려진 비트맵)였다. 시스템 시작 화면이 끝나고 웹이 뜨기 전 아주 잠깐
              그 비트맵이 화면 비율에 맞지 않게 늘어나 로고가 엉뚱한 위치에 보였다(N11) — 단색 바탕만 둔다. -->
-        <item name="android:windowBackground">#F7F4EE</item>
+        <item name="android:windowBackground">#FFFFFF</item>
         <!-- Android 시작 화면: 아이보리 바탕 + 가운데 원 안의 제품 로고(회색 문) — scripts/dev/generate-app-icons.mjs -->
-        <item name="windowSplashScreenBackground">#F7F4EE</item>
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
         <item name="windowSplashScreenIconBackgroundColor">#EFE7FF</item>
     </style>

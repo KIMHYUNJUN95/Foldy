@@ -72,15 +72,14 @@
 html,
 body {
   overscroll-behavior: none;
-  /* Ivory on BOTH html and body. In an installed/standalone iOS PWA the area behind the
+  /* Canvas colour on BOTH html and body. In an installed/standalone iOS PWA the area behind the
      status bar / notch (and any safe-area or overscroll region) shows the ROOT element's
      background; with no background on <html> iOS paints those bands black — most visible
-     when the sidebar opens and the layout repaints. Painting <html> ivory removes the
-     black bands. Not a design change (the visible canvas is already this ivory). */
-  /* Hardcoded fallback so the ivory canvas is painted before CSS custom properties
+     when the sidebar opens and the layout repaints. Painting <html> removes the black bands. */
+  /* Hardcoded fallback so the canvas is painted before CSS custom properties
      resolve (e.g. before the stylesheet is parsed on cold launch). Prevents a white
      flash on iOS PWA startup. Value matches --background exactly. */
-  background: #f7f4ee;
+  background: #ffffff;
   background: var(--background);
 }
 button,
@@ -182,19 +181,20 @@ summary,
 }
 
 :root {
-  /* Warm ivory canvas + chrome (sidebar, bottom bar, page background). */
-  --background: hsl(42 36% 95%);
-  --foreground: hsl(222 28% 14%);
-  --muted: hsl(40 22% 90%);
-  --muted-foreground: hsl(222 10% 44%);
-  /* Cards/sheets: warm cream (same family as the canvas, a touch lighter) so they
-     read as soft panels instead of stark pure-white that pops on the ivory. */
-  --surface: hsl(44 52% 98.5%);
-  --border: hsl(40 20% 84%);
-  /* Brand accent: deep ink navy / indigo (replaces the former teal). */
-  --primary: hsl(223 46% 32%);
-  --primary-foreground: hsl(0 0% 100%);
-  --ring: hsl(223 46% 40%);
+  /* White redesign (2026-10-09, docs/design/05-white-redesign.md): one white sheet —
+     page, chrome, cards and sheets are all white; areas are separated by spacing and
+     faint horizontal lines, never by boxes. Light fills (#F4F4F7 · #F7F7F9) stand in
+     for inputs and selected controls. */
+  --background: #ffffff;
+  --foreground: #16141f;
+  --muted: #f4f4f7;
+  --muted-foreground: #6b6878;
+  --surface: #ffffff;
+  --border: #ececf0;
+  /* Brand accent: soft violet (pressed #5A30CF). Replaces the former deep navy. */
+  --primary: #7a52e6;
+  --primary-foreground: #ffffff;
+  --ring: #7a52e6;
 
   /* ── Motion tokens ──────────────────────────────────────────────────────────
      One native-feel vocabulary for every animated surface so the whole mobile app
@@ -211,14 +211,14 @@ summary,
   --dur-fast: 0.2s;
   --dur-base: 0.28s;
   --dur-slow: 0.4s;
-  --primary-hsl: 223 46% 32%;
-  --glass-shadow: 0 18px 70px hsl(222 30% 14% / 0.1);
+  --primary-hsl: 256 75% 61%;
+  --glass-shadow: 0 18px 70px hsl(252 20% 10% / 0.1);
   --calendar-grid-line: rgb(203, 213, 225);
   /* Board feature: amber pin color + destructive */
   --board-pin: hsl(38 72% 42%);
   --board-pin-bg: hsl(40 78% 92%);
-  --destructive: hsl(4 62% 46%);
-  --destructive-bg: hsl(6 70% 95.5%);
+  --destructive: #c5282e;
+  --destructive-bg: #fdecec;
 }
 
 @theme inline {
@@ -400,12 +400,12 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
 .tabbar {
   display: flex;
   align-items: flex-end;
-  /* Ivory bottom bar (slightly lifted off the canvas) with a hairline top edge. */
-  background: color-mix(in oklab, var(--background) 70%, white);
-  border-top: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  /* White bottom bar — no border, a soft upward shadow separates it from the page
+     (white redesign 2026-10-09). */
+  background: #ffffff;
   border-radius: 22px 22px 0 0;
   padding: 12px 14px max(16px, env(safe-area-inset-bottom));
-  box-shadow: 0 -6px 20px -10px rgba(46, 40, 28, 0.14);
+  box-shadow: 0 -12px 24px -20px rgba(22, 20, 31, 0.25);
 }
 .tabbar__item {
   flex: 1;
@@ -436,7 +436,10 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   font-weight: 600;
 }
 .tabbar__item.is-active {
-  color: var(--primary);
+  color: #5a30cf;
+}
+.tabbar__item.is-active .lbl {
+  font-weight: 700;
 }
 .tabbar__fab {
   flex: 1;
@@ -453,15 +456,15 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   width: 52px;
   height: 52px;
   /* Squircle (rounded square) center button — "Bottom Bar (Squircle Edit)" design. */
-  border-radius: 17px;
-  background: linear-gradient(160deg, hsl(223 50% 42%), hsl(223 54% 22%));
+  border-radius: 18px;
+  background: var(--primary);
   color: var(--primary-foreground);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-top: -26px;
-  border: 4px solid color-mix(in oklab, var(--background) 70%, white);
-  box-shadow: 0 12px 24px -8px hsl(var(--primary-hsl) / 0.55);
+  border: 4px solid #ffffff;
+  box-shadow: 0 8px 18px -8px rgba(122, 82, 230, 0.7);
   transition: transform var(--dur-fast) var(--ease-out);
 }
 .tabbar__fab:active .circle {

@@ -429,7 +429,7 @@ export function TaskCard({
       null
     : null;
   const ctxChip = ctxLabel ? (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold text-primary" style={{ background: "hsl(223 46% 32% / 0.09)" }}>
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold text-primary" style={{ background: "rgb(122 82 230 / 0.09)" }}>
       <MapPin className="size-3" aria-hidden="true" />
       {ctxLabel}
     </span>

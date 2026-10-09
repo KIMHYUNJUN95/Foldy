@@ -1,95 +1,87 @@
-import "./auth-console.css";
+import "./auth-white.css";
+import Link from "next/link";
 import { LanguageSheet } from "@/app/auth/login/language-sheet";
+import { FoldyMark } from "@/components/brand/foldy-mark";
+import { legalHref } from "@/components/legal/legal-page-shell";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { ReactNode } from "react";
 
-/* Brand-panel feature icons (warm gold on the espresso panel). */
-const Zap = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 3L5 13h6l-1 8 8-10h-6l1-8z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>
-);
-const Shield = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 2.5v5.2c0 4.5-3 8-7 10-4-2-7-5.5-7-10V5.5L12 3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-);
-const Layers = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4 8-4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>
+const Back = (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
 
 /**
- * AuthFrame — the desktop console auth surface frame (split layout).
- * Left: warm espresso/clay brand panel. Right: language pill + the auth card.
- * Ported from the "Stay Ari Admin Console" handoff. Brand copy is localized.
- * See docs/product/05-admin-web-ia.md → "Admin Login Screen".
+ * AuthFrame — login / signup / reset surface (white redesign 2026-10-09).
+ *
+ * One white page, no brand panel. Wide screens (≥ 1200px): a header (mark · Foldy · 「운영 콘솔」,
+ * Language on the right — help lives only in the footer, 2026-10-09), a centred 400px stage and a footer (staff-only note · legal links).
+ * Narrower (phone · fold · tablet landscape): a single centred column — back + Language on top,
+ * legal links at the bottom. See docs/product/05-admin-web-ia.md → 「Admin Login Screen」 and
+ * docs/design/05-white-redesign.md.
  */
 export function AuthFrame({
   locale,
   next,
   view,
-  help,
+  backHref,
+  mobileCopy = false,
   children,
 }: {
   locale: Locale;
   next: string;
   view?: string;
-  help?: ReactNode;
+  /** Shows a back control (top-left chevron on narrow screens, text link on wide screens). */
+  backHref?: string;
+  /** Phone · tablet · app — hides the 「운영 콘솔」 label (app-review copy rule, 2026-10-08). */
+  mobileCopy?: boolean;
   children: ReactNode;
 }) {
-  const c = getDictionary(locale).auth.console;
-  const feats = [
-    { ic: Zap, t: c.feat1T, s: c.feat1S },
-    { ic: Shield, t: c.feat2T, s: c.feat2S },
-    { ic: Layers, t: c.feat3T, s: c.feat3S },
-  ];
+  const dict = getDictionary(locale);
+  const c = dict.auth.console;
+  const e = dict.auth.entry;
 
   return (
     // 표시 언어를 여기서 명시한다. `<html lang>` 은 세션·쿠키 기준이라, 로그아웃 상태에서 `?lang=`
-    // 로만 언어를 바꾼 첫 방문에는 실제 화면 언어와 어긋난다. auth-console.css 의 CJK 자간 보정이
-    // `:lang()` 으로 걸리므로 이 값이 맞아야 한다(가장 가까운 lang 조상이 이긴다).
-    <div className="authx" lang={locale}>
-      <div className="auth">
-        <aside className="auth-brand">
-          <div className="auth-brand__deco a" />
-          <div className="auth-brand__deco b" />
-          <div className="auth-brand__deco c" />
-          <div className="auth-brand__top">
-            <span className="auth-brand__mark" aria-hidden="true" />
-            <div>
-              <div className="auth-brand__wm">Foldy</div>
-              <div className="auth-brand__role">{c.role}</div>
-            </div>
-          </div>
-          <div className="auth-brand__mid">
-            <h1 className="auth-brand__head">{c.head}</h1>
-            <p className="auth-brand__lede">{c.lede}</p>
-            <div className="auth-brand__feats">
-              {feats.map((f, i) => (
-                <div className="auth-feat" key={i}>
-                  <span className="auth-feat__ic"><span className="ic">{f.ic}</span></span>
-                  <div>
-                    <div className="auth-feat__t">{f.t}</div>
-                    <div className="auth-feat__s">{f.s}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="auth-brand__foot">
-            <span>{c.foot1}</span>
-            <span className="dot" />
-            <span>{c.foot2}</span>
-            <span className="dot" />
-            <span>{c.foot3}</span>
-          </div>
-        </aside>
-
-        <div className="auth-action">
-          <div className="auth-topbar">
-            <span className="grow" />
-            {help ? <span className="auth-help">{help}</span> : null}
-            <LanguageSheet locale={locale} next={next} view={view} />
-          </div>
-          <div className="auth-stage">{children}</div>
+    // 로만 언어를 바꾼 첫 방문에는 실제 화면 언어와 어긋난다.
+    <div className="authw" lang={locale}>
+      <header className="authw__top">
+        <div className="authw__brand">
+          <FoldyMark />
+          <span className="authw__wm">Foldy</span>
+          {!mobileCopy && <span className="authw__role">{c.role}</span>}
         </div>
-      </div>
+        {backHref ? (
+          <Link href={backHref} className="authw__backicon" aria-label={dict.auth.email.back}>
+            <span className="ic">{Back}</span>
+          </Link>
+        ) : (
+          <span className="authw__backicon is-empty" aria-hidden="true" />
+        )}
+        <div className="authw__tools">
+          <LanguageSheet locale={locale} next={next} view={view} />
+        </div>
+      </header>
+
+      <main className="authw__stage">
+        <div className="authw__col">
+          {backHref && (
+            <Link href={backHref} className="authw__backlink">
+              <span className="ic">{Back}</span>
+              {dict.auth.email.back}
+            </Link>
+          )}
+          {children}
+        </div>
+      </main>
+
+      <footer className="authw__foot">
+        <span className="authw__staff">{c.footStaff}</span>
+        <span className="authw__legal">
+          <Link href={legalHref("terms", locale)}>{e.termsLink}</Link>
+          <Link href={legalHref("privacy", locale)}>{e.privacyLink}</Link>
+          <Link href={legalHref("support", locale)}>{e.helpLink}</Link>
+        </span>
+      </footer>
     </div>
   );
 }

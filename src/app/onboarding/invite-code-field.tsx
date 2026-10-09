@@ -18,7 +18,7 @@ export type InviteCodeFieldCopy = {
   roleCategories: Record<string, string>;
 };
 
-const GRADIENT = "linear-gradient(165deg, hsl(223 50% 42%), hsl(223 54% 22%))";
+const GRADIENT = "linear-gradient(165deg, #8a63f0, #5a30cf)";
 
 const inputClass =
   "h-[54px] w-full rounded-[14px] border border-border bg-surface px-[15px] text-base font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[hsl(222_10%_62%)] focus:border-primary focus:ring-[3.5px] focus:ring-primary/15";

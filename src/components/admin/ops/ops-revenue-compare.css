@@ -16,7 +16,7 @@
   margin: -6px -8px 0;
   border-radius: 18px;
   /* 배경 모눈은 뺐다(2026-10-08 사용자 — 「뒤의 십자 선은 없애자」). 아이보리 바탕만. */
-  background-color: hsl(42 36% 95%);
+  background-color: #ffffff;
 }
 .adm .orc .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
@@ -45,7 +45,7 @@
 .adm .orc__pill.is-primary { border-color: hsl(223 40% 80%); background: hsl(223 50% 96%); color: var(--adm-primary); }
 
 /* A · B 고르기 */
-.adm .orc__builder { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 10px; align-items: stretch; padding: 10px; border-radius: 20px; background: var(--card); border: 1px solid hsl(40 18% 82%); box-shadow: var(--orc-shadow); }
+.adm .orc__builder { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 10px; align-items: stretch; padding: 10px; border-radius: 20px; background: var(--card); border: 1px solid #e2e2e8; box-shadow: var(--orc-shadow); }
 .adm .orc__vs { align-self: center; font: 600 11px var(--mono); letter-spacing: 0.14em; color: hsl(222 14% 50%); padding: 0 4px; }
 .adm .orc__slot { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 14px; min-width: 0; }
 .adm .orc__slot.is-a { background: hsl(223 50% 96%); border: 1px solid hsl(223 40% 84%); }
@@ -67,7 +67,7 @@
 .adm .orc .cn.tr { right: 12px; top: 12px; border-right-width: 1.5px; border-top-width: 1.5px; }
 .adm .orc .cn.bl { left: 12px; bottom: 12px; border-left-width: 1.5px; border-bottom-width: 1.5px; }
 .adm .orc .cn.br { right: 12px; bottom: 12px; border-right-width: 1.5px; border-bottom-width: 1.5px; }
-.adm .orc__code { display: flex; justify-content: space-between; gap: 10px; font: 500 10.5px var(--mono); letter-spacing: 0.2em; color: hsl(222 14% 46%); text-transform: uppercase; }
+.adm .orc__code { display: flex; justify-content: space-between; gap: 10px; font: 500 10.5px var(--mono); letter-spacing: 0.2em; color: #6b6878; text-transform: uppercase; }
 .adm .orc__total .orc__code { color: hsl(223 30% 70%); }
 .adm .orc__big { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
 .adm .orc__big .v { font: 300 60px var(--mono); letter-spacing: -0.06em; line-height: 0.9; font-variant-numeric: tabular-nums; }
@@ -101,13 +101,13 @@
 .adm .orc__split .v.up { color: hsl(158 55% 72%); }
 .adm .orc__split .v.dn { color: hsl(8 80% 76%); }
 
-.adm .orc__growth { display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; border-radius: 24px; background: var(--card); border: 1px solid hsl(40 18% 82%); box-shadow: var(--orc-shadow); min-width: 0; }
+.adm .orc__growth { display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; border-radius: 24px; background: var(--card); border: 1px solid #e2e2e8; box-shadow: var(--orc-shadow); min-width: 0; }
 .adm .orc__growthv { font: 300 46px var(--mono); letter-spacing: -0.05em; line-height: 1; margin: 2px 0 6px; }
 .adm .orc__growthv.up { color: var(--orc-a); }
 .adm .orc__growthv.dn { color: var(--orc-dn-ink); }
 /* 기여 막대 — 가운데 0 선, 왼쪽 = 뺀 몫, 오른쪽 = 보탠 몫 */
 .adm .orc__drivers { display: flex; flex-direction: column; }
-.adm .orc__drivers .dr { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 118px; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid hsl(40 18% 90%); }
+.adm .orc__drivers .dr { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 118px; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #f1f1f4; }
 .adm .orc__drivers .dr.total { border-top: 1.5px solid var(--ink); }
 .adm .orc__drivers .nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .adm .orc__drivers .nm b { font-size: 12.5px; }
@@ -126,14 +126,14 @@
 .adm .orc__drivers .y { font: 400 10.5px var(--mono); color: var(--adm-muted); }
 .adm .orc__drnote { margin: 4px 0 6px; font-size: 11px; line-height: 1.55; color: var(--adm-muted); }
 .adm .orc__ins { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--orc-hair); }
-.adm .orc__ins li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 10px 0; border-bottom: 1px solid hsl(40 18% 90%); font-size: 12.5px; line-height: 1.55; color: var(--ink); }
+.adm .orc__ins li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 10px 0; border-bottom: 1px solid #f1f1f4; font-size: 12.5px; line-height: 1.55; color: var(--ink); }
 .adm .orc__ins .no { font: 500 11px var(--mono); color: var(--faint); }
 
 /* 지표 카드 */
 .adm .orc__kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.adm .orc__kpi { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 20px; background: var(--card); border: 1px solid hsl(40 18% 82%); box-shadow: var(--orc-shadow); min-width: 0; }
+.adm .orc__kpi { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 20px; background: var(--card); border: 1px solid #e2e2e8; box-shadow: var(--orc-shadow); min-width: 0; }
 .adm .orc__kpi .cn { width: 10px; height: 10px; border-color: hsl(222 14% 70%); }
-.adm .orc__kpi .code { font: 500 10.5px var(--mono); letter-spacing: 0.18em; color: hsl(222 14% 46%); }
+.adm .orc__kpi .code { font: 500 10.5px var(--mono); letter-spacing: 0.18em; color: #6b6878; }
 .adm .orc__kpi .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .adm .orc__kpi .v { font: 400 26px var(--mono); letter-spacing: -0.05em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .adm .orc__kpi .dl { flex: none; padding: 3px 9px; border-radius: 999px; font: 600 12px var(--mono); }
@@ -145,26 +145,26 @@
 .adm .orc__kpi .tag { font: 600 9.5px var(--mono); }
 .adm .orc__kpi .tag.a { color: var(--orc-a); }
 .adm .orc__kpi .tag.b { color: var(--orc-b-ink); }
-.adm .orc__kpi .tr { position: relative; height: 4px; border-radius: 2px; background: hsl(40 18% 90%); }
+.adm .orc__kpi .tr { position: relative; height: 4px; border-radius: 2px; background: #f1f1f4; }
 .adm .orc__kpi .tr i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; }
 .adm .orc__kpi .tr i.a { background: var(--orc-a); }
 .adm .orc__kpi .tr i.b { background: var(--orc-b); }
-.adm .orc__kpi .foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-top: 10px; border-top: 1px solid hsl(40 18% 88%); }
+.adm .orc__kpi .foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-top: 10px; border-top: 1px solid #f1f1f4; }
 .adm .orc__kpi .foot .l { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .orc__kpi .foot .bv { flex: none; font: 500 12px var(--mono); color: var(--orc-b-ink); }
 .adm .orc__kpi .note { margin-top: -6px; font-size: 11px; color: var(--adm-muted); }
 
 /* 카드 공통 */
-.adm .orc__card { padding: 22px 24px 16px; border-radius: 24px; background: var(--card); border: 1px solid hsl(40 18% 82%); box-shadow: var(--orc-shadow); min-width: 0; }
+.adm .orc__card { padding: 22px 24px 16px; border-radius: 24px; background: var(--card); border: 1px solid #e2e2e8; box-shadow: var(--orc-shadow); min-width: 0; }
 .adm .orc__cardhd { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 .adm .orc__cardhd > div:first-child { display: flex; flex-direction: column; gap: 4px; }
-.adm .orc__codeline { font: 500 10.5px var(--mono); letter-spacing: 0.2em; color: hsl(222 14% 46%); }
+.adm .orc__codeline { font: 500 10.5px var(--mono); letter-spacing: 0.2em; color: #6b6878; }
 .adm .orc__cardhd h2 { margin: 0; font: 600 20px var(--serif); letter-spacing: -0.02em; color: var(--ink); }
 .adm .orc__hint { font: 500 11px var(--mono); color: var(--faint); }
-.adm .orc__seg { display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: hsl(40 20% 93%); border: 1px solid hsl(40 18% 84%); }
+.adm .orc__seg { display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: #f7f7f9; border: 1px solid #ececf0; }
 .adm .orc__seg button { height: 28px; padding: 0 14px; white-space: nowrap; border-radius: 999px; border: 0; background: transparent; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--adm-muted); cursor: pointer; }
 .adm .orc__seg button.on { background: var(--ink); color: #fff; }
-.adm .orc__seg button:not(.on):hover { color: var(--ink-soft); background: hsl(40 18% 88%); }
+.adm .orc__seg button:not(.on):hover { color: var(--ink-soft); background: #f1f1f4; }
 
 /* 03 브리지 */
 .adm .orc__bridge { display: grid; grid-template-columns: 112px minmax(0, 1fr); margin-top: 18px; }
@@ -172,11 +172,11 @@
 .adm .orc__bridge .axis span { position: absolute; right: 14px; transform: translateY(50%); font: 500 10.5px var(--mono); color: var(--faint); white-space: nowrap; }
 .adm .orc__bridge .plot { min-width: 0; }
 .adm .orc__bridge .area { position: relative; height: 330px; }
-.adm .orc__bridge .gl { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed hsl(40 18% 84%); }
+.adm .orc__bridge .gl { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed #ececf0; }
 .adm .orc__bridge .gl.base { border-top-style: solid; border-top-color: hsl(40 18% 80%); }
 .adm .orc__bridge .cols { position: absolute; inset: 0 12px; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: 40px; }
 .adm .orc__bridge .col { position: relative; height: 100%; }
-.adm .orc__bridge .ghost { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 6px 6px 0 0; background: repeating-linear-gradient(135deg, hsl(40 20% 93%) 0 5px, hsl(40 16% 87%) 5px 6px); }
+.adm .orc__bridge .ghost { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 6px 6px 0 0; background: repeating-linear-gradient(135deg, #f7f7f9 0 5px, hsl(40 16% 87%) 5px 6px); }
 .adm .orc__bridge .bar { position: absolute; left: 0; right: 0; border-radius: 8px; box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.5); }
 .adm .orc__bridge .bar.is-B { background: linear-gradient(180deg, hsl(30 84% 58%), hsl(28 78% 48%)); border-radius: 8px 8px 0 0; box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.5), 0 10px 24px -14px var(--orc-b); }
 .adm .orc__bridge .bar.is-A { background: linear-gradient(180deg, hsl(223 62% 46%), hsl(223 62% 36%)); border-radius: 8px 8px 0 0; box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.5), 0 10px 24px -14px var(--orc-a); }
@@ -202,7 +202,7 @@
 .adm .orc__bridge .share.is-up,
 .adm .orc__bridge .share.is-A { color: var(--orc-up-ink); }
 .adm .orc__bridge .share.is-down { color: var(--orc-dn-ink); }
-.adm .orc__legend { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 16px; padding-top: 12px; border-top: 1px solid hsl(40 18% 88%); font-size: 11.5px; color: var(--adm-muted); }
+.adm .orc__legend { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f1f1f4; font-size: 11.5px; color: var(--adm-muted); }
 .adm .orc__legend span { display: inline-flex; align-items: center; gap: 6px; }
 .adm .orc__legend i { width: 10px; height: 10px; border-radius: 3px; }
 .adm .orc__legend i.is-A { background: var(--orc-a); }
@@ -219,7 +219,7 @@
 .adm .orc__duel .hd { padding: 6px 0; font: 500 10px var(--mono); letter-spacing: 0.16em; color: var(--faint); text-transform: uppercase; }
 .adm .orc__duel .hd .r { text-align: right; }
 .adm .orc__duel .hd .c { text-align: center; }
-.adm .orc__duel .row { padding: 12px 0; border-top: 1px solid hsl(40 18% 88%); }
+.adm .orc__duel .row { padding: 12px 0; border-top: 1px solid #f1f1f4; }
 .adm .orc__duel .nm { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .adm .orc__duel .nm b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .orc__duel .no { font: 500 10.5px var(--mono); color: var(--faint); }

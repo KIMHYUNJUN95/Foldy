@@ -119,13 +119,13 @@ export function ContextLinkSection({
   return (
     <div
       className="rounded-2xl border bg-gradient-to-br from-primary/[0.07] to-surface shadow-[0_8px_28px_-18px_hsl(223_46%_32%/0.28)]"
-      style={{ borderColor: "color-mix(in oklab, hsl(223 46% 32%) 22%, hsl(40 20% 84%))" }}
+      style={{ borderColor: "color-mix(in oklab, #7a52e6 22%, #ececf0)" }}
     >
       {/* Top row — icon + names + X */}
       <div className="flex items-start gap-3 p-3.5">
         <span
           className="flex size-10 shrink-0 items-center justify-center rounded-[11px] border bg-surface text-primary"
-          style={{ borderColor: "color-mix(in oklab, hsl(223 46% 32%) 18%, hsl(40 20% 84%))" }}
+          style={{ borderColor: "color-mix(in oklab, #7a52e6 18%, #ececf0)" }}
         >
           <Building2 className="size-[19px]" aria-hidden="true" />
         </span>
@@ -164,7 +164,7 @@ export function ContextLinkSection({
       {/* Bottom actions */}
       <div
         className="flex gap-2 border-t px-3.5 pb-3.5 pt-2.5"
-        style={{ borderColor: "color-mix(in oklab, hsl(223 46% 32%) 12%, hsl(40 20% 84%))" }}
+        style={{ borderColor: "color-mix(in oklab, #7a52e6 12%, #ececf0)" }}
       >
         <button
           className="flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface text-[12px] font-bold text-muted-foreground transition-colors active:bg-slate-50"

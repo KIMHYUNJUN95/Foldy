@@ -96,10 +96,10 @@ export const metadata: Metadata = {
 // viewportFit: "cover" makes the app go edge-to-edge so safe-area-inset-* env()
 // values are non-zero on notched devices (the mobile shell pads the top notch and
 // bottom home-indicator with them). themeColor tints the browser top chrome /
-// address bar the warm ivory so it blends with the app instead of a grey band.
-// Both light/dark map to the SAME ivory: iOS Safari ignores a single themeColor in
+// address bar white (white redesign 2026-10-09) so it blends with the app instead of a grey band.
+// Both light/dark map to the SAME white: iOS Safari ignores a single themeColor in
 // dark mode and falls back to black system chrome, so declaring an explicit dark
-// variant (identical ivory) forces the light design's chrome in both schemes.
+// variant (identical white) forces the light design's chrome in both schemes.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -110,8 +110,8 @@ export const viewport: Viewport = {
   // most visible when the sidebar scrim is up and Safari samples the dimmed content.
   colorScheme: "light",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f4ee" },
-    { media: "(prefers-color-scheme: dark)", color: "#f7f4ee" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#ffffff" },
   ],
 };
 

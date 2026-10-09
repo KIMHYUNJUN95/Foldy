@@ -217,6 +217,9 @@ export async function signUpWithEmail(formData: FormData) {
 
   if (!email) redirect(`${errorBase}&error=missing_email`);
   if (!password) redirect(`${errorBase}&error=missing_password`);
+  // 비밀번호 확인 칸(화이트 리디자인 2026-10-09). 예전 폼처럼 칸이 없이 들어오면 건너뛴다.
+  const confirm = formData.get("confirm");
+  if (confirm !== null && String(confirm) !== password) redirect(`${errorBase}&error=password_mismatch`);
   if (!isValidPassword(password, email)) redirect(`${errorBase}&error=weak_password`);
 
   const callbackNext = preserveOnboardingLang(next, lang);

@@ -5,18 +5,18 @@
   asset is preserved at src/assets/home-hero-3d.svg for future reuse.
 */
 .hm {
-  --hm-card: hsl(44 52% 98.5%);
-  --hm-ink: hsl(222 28% 14%);
-  --hm-ink-soft: hsl(222 20% 28%);
-  --hm-muted: hsl(222 10% 44%);
-  --hm-faint: hsl(222 10% 62%);
-  --hm-line: hsl(40 20% 84%);
-  --hm-line-soft: hsl(40 24% 89%);
-  --hm-surface: hsl(40 22% 90%);
-  --hm-primary: hsl(223 46% 32%);
-  --hm-primary-ink: hsl(223 54% 22%);
-  --hm-primary-lift: hsl(223 50% 42%);
-  --hm-primary-soft: color-mix(in oklab, hsl(223 46% 32%) 8%, hsl(44 52% 98.5%));
+  --hm-card: #ffffff;
+  --hm-ink: #16141f;
+  --hm-ink-soft: #3a3746;
+  --hm-muted: #6b6878;
+  --hm-faint: #9a97a6;
+  --hm-line: #ececf0;
+  --hm-line-soft: #f1f1f4;
+  --hm-surface: #f4f4f7;
+  --hm-primary: #7a52e6;
+  --hm-primary-ink: #5a30cf;
+  --hm-primary-lift: #8a63f0;
+  --hm-primary-soft: color-mix(in oklab, #7a52e6 8%, #ffffff);
   --hm-warn: hsl(35 80% 38%);
   --hm-warn-bg: hsl(38 82% 92%);
   --hm-mono: "Geist Mono", var(--font-noto-kr), var(--font-noto-jp), ui-monospace, monospace;
@@ -191,7 +191,7 @@
   cursor: pointer;
   background: var(--hm-primary);
   color: #fff;
-  box-shadow: 0 14px 26px -12px hsl(223 46% 32% / 0.6);
+  box-shadow: 0 14px 26px -12px rgb(122 82 230 / 0.6);
 }
 .hm__ch-btn .ic {
   font-size: 19px;

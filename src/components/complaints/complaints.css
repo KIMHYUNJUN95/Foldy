@@ -6,19 +6,19 @@
  */
 
 .cx {
-  --bg: hsl(42 36% 95%);
-  --card: hsl(44 52% 98.5%);
-  --ink: hsl(222 28% 14%);
-  --ink-soft: hsl(222 20% 28%);
-  --cx-muted: hsl(222 10% 44%);
-  --faint: hsl(222 10% 62%);
-  --line: hsl(40 20% 84%);
-  --line-soft: hsl(40 24% 89%);
-  --cx-surface: hsl(40 22% 90%);
-  --cx-primary: hsl(223 46% 32%);
-  --primary-ink: hsl(223 54% 22%);
-  --primary-lift: hsl(223 50% 42%);
-  --primary-bg: color-mix(in oklab, hsl(223 46% 32%) 9%, hsl(44 52% 98.5%));
+  --bg: #ffffff;
+  --card: #ffffff;
+  --ink: #16141f;
+  --ink-soft: #3a3746;
+  --cx-muted: #6b6878;
+  --faint: #9a97a6;
+  --line: #ececf0;
+  --line-soft: #f1f1f4;
+  --cx-surface: #f4f4f7;
+  --cx-primary: #7a52e6;
+  --primary-ink: #5a30cf;
+  --primary-lift: #8a63f0;
+  --primary-bg: color-mix(in oklab, #7a52e6 9%, #ffffff);
   --open: hsl(35 78% 38%);
   --open-bg: hsl(38 80% 93%);
   --done: hsl(146 48% 33%);
@@ -518,14 +518,14 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  background: repeating-linear-gradient(135deg, hsl(40 20% 90%) 0 9px, hsl(40 15% 86%) 9px 18px);
-  border: 1px solid hsl(40 18% 84%);
+  background: repeating-linear-gradient(135deg, #f1f1f4 0 9px, #ececf0 9px 18px);
+  border: 1px solid #ececf0;
 }
 .cx-shot__l {
   font-size: 10px;
   font-weight: 700;
   color: hsl(40 8% 48%);
-  background: hsl(44 52% 98.5% / 0.85);
+  background: rgb(255 255 255 / 0.85);
   padding: 2px 7px;
   border-radius: 5px;
 }
@@ -1059,8 +1059,8 @@ textarea.cx-fld {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: repeating-linear-gradient(135deg, hsl(40 20% 90%) 0 8px, hsl(40 15% 86%) 8px 16px);
-  border: 1px solid hsl(40 18% 84%);
+  background: repeating-linear-gradient(135deg, #f1f1f4 0 8px, #ececf0 8px 16px);
+  border: 1px solid #ececf0;
 }
 .cx-upthumb__img {
   position: absolute;
@@ -1073,7 +1073,7 @@ textarea.cx-fld {
   font-size: 9px;
   font-weight: 700;
   color: hsl(40 8% 48%);
-  background: hsl(44 52% 98.5% / 0.85);
+  background: rgb(255 255 255 / 0.85);
   padding: 1px 6px;
   border-radius: 5px;
 }

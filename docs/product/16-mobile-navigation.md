@@ -659,6 +659,8 @@ Current rules:
   (`[@media(max-height:560px)]` — 시트마다 준 max-h 보다 우선).
 - **BottomSheet — 넓은 화면(2026-10-05)**: `fold:` 폭 560px(바닥에서 올라옴). `tablet:` 은 **가운데 카드**(아이패드 양식 시트) —
   네 모서리 둥글게 · 그림자 · 최대 높이 86dvh, 아래에서 40px 만 올라오며 나타난다. 끌어 닫기 · 스크림 · Esc 는 그대로.
+  - **예외 — 출근 QR 결과(화이트 리디자인 시안, 2026-10-09 사용자 결정, 구현 전)**: 카메라 화면 위의 「출근했어요」 결과는
+    `tablet:` 에서도 가운데 카드가 아니라 **바닥에서 올라오는 시트**(폭 560px)로 띄운다 — 가운데 카드가 QR 틀을 가리기 때문.
 - **운영 관리자는 별도 구역이다**(2026-10-01 사용자 지시 — 「일반 사이드바에 넣으면 안 된다, 대시보드처럼 구분」).
   `mobileOpsAdminNavigation`(`src/config/navigation.ts`)은 `mobileSidebarNavigation` 과 **다른 목록**이고, 사이드 메뉴
   아래쪽에 구분선 + 제목(`admin.console.navGroupOpsAdmin` — 운영 관리자 / 運営管理者 / Revenue Ops)을 단 구역으로 그린다.

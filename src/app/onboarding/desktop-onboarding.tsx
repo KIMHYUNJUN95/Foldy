@@ -1,6 +1,7 @@
 "use client";
 
-import "@/app/auth/login/auth-console.css";
+import "@/app/auth/login/auth-white.css";
+import { FoldyMark } from "@/components/brand/foldy-mark";
 import "./desktop-onboarding.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "@/app/auth/actions";
@@ -523,57 +524,43 @@ function Frame({
     { key: "start", title: copy.railStart, sub: copy.railStartSub, state: step === "done" ? ("on" as const) : ("todo" as const) },
   ];
   return (
-    <div className="authx obd" lang={locale}>
-      <div className="auth">
-        <aside className="auth-brand">
-          <div className="auth-brand__deco a" />
-          <div className="auth-brand__deco b" />
-          <div className="auth-brand__top">
-            <span className="auth-brand__mark" aria-hidden="true" />
-            <div>
-              <div className="auth-brand__wm">Foldy</div>
-              <div className="auth-brand__role">{copy.brandRole}</div>
-            </div>
-          </div>
-          <div className="obd__brandmid">
-            <h2 className="obd__bhead">{copy.brandHead}</h2>
-            <p className="obd__blede">{copy.brandLede}</p>
-            <ol className="obd__rail">
-              {rail.map((item, index) => (
-                <li className={`obd__rs ${item.state}`} key={item.key}>
-                  <span className="obd__rn">{item.state === "done" ? <CheckIcon /> : index + 1}</span>
-                  <div>
-                    <div className="obd__rt">{item.title}</div>
-                    {item.sub ? <div className="obd__rsub">{item.sub}</div> : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <div className="auth-brand__foot">
-            {copy.brandFoot.map((text, index) => (
-              <span className="obd__footitem" key={text}>
-                {index > 0 ? <span className="dot" /> : null}
-                {text}
-              </span>
-            ))}
-          </div>
-        </aside>
-        <div className="auth-action">
-          <div className="auth-topbar">
-            <span className="grow" />
-            {step === "done" ? null : (
-              <form action={signOut}>
-                <input name="next" type="hidden" value={`/auth/login?lang=${locale}`} />
-                <button className="obd__link" type="submit">
-                  {copy.exit}
-                </button>
-              </form>
-            )}
-          </div>
-          <div className="obd__stage">{children}</div>
+    <div className="authw obd" lang={locale}>
+      <header className="authw__top">
+        <div className="authw__brand">
+          <FoldyMark />
+          <span className="authw__wm">Foldy</span>
+          <span className="authw__role">{copy.brandRole}</span>
         </div>
-      </div>
+        <span className="authw__backicon is-empty" aria-hidden="true" />
+        <div className="authw__tools">
+          {step === "done" ? null : (
+            <form action={signOut}>
+              <input name="next" type="hidden" value={`/auth/login?lang=${locale}`} />
+              <button className="obd__link" type="submit">
+                {copy.exit}
+              </button>
+            </form>
+          )}
+        </div>
+      </header>
+      <main className="obd__body">
+        <ol className="obd__rail" aria-label={copy.brandHead}>
+          {rail.map((item, index) => (
+            <li className={`obd__rs ${item.state}`} key={item.key}>
+              <span className="obd__rn">{item.state === "done" ? <CheckIcon /> : index + 1}</span>
+              <div>
+                <div className="obd__rt">{item.title}</div>
+                {item.sub ? <div className="obd__rsub">{item.sub}</div> : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="obd__stage">{children}</div>
+      </main>
+      <footer className="authw__foot">
+        <span className="authw__staff">{copy.brandFoot[copy.brandFoot.length - 1]}</span>
+        <span />
+      </footer>
     </div>
   );
 }

@@ -46,7 +46,7 @@ type EmailLoginFormCopy = {
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} aria-busy={pending} className="submit" style={pending ? { opacity: 0.7 } : undefined}>
+    <button type="submit" disabled={pending} aria-busy={pending} className="aw-btn" style={pending ? { opacity: 0.7 } : undefined}>
       {pending ? (
         <span className="size-5 animate-spin rounded-full border-[2.4px] border-white/60 border-t-white" aria-hidden="true" />
       ) : (
@@ -92,10 +92,7 @@ export function EmailLoginForm({
       </div>
 
       <div className="field">
-        <div className="field__l">
-          {copy.passwordLabel}
-          <a href={forgotHref}>{copy.forgot}</a>
-        </div>
+        <div className="field__l">{copy.passwordLabel}</div>
         <div className="inp pw">
           <input
             type={showPassword ? "text" : "password"}
@@ -113,6 +110,9 @@ export function EmailLoginForm({
           >
             <span className="ic">{showPassword ? <EyeOffIcon /> : <EyeIcon />}</span>
           </button>
+        </div>
+        <div className="field__under">
+          <a href={forgotHref}>{copy.forgot}</a>
         </div>
       </div>
 

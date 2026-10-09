@@ -107,8 +107,8 @@ export function LinkedContextBlock({
         disabled={!href}
         onClick={href ? () => router.push(href) : undefined}
         style={{
-          border: "1px solid color-mix(in oklab, hsl(223 46% 32%) 22%, hsl(40 20% 84%))",
-          background: "linear-gradient(150deg, hsl(223 46% 32% / 0.07), hsl(44 52% 98.5%))",
+          border: "1px solid color-mix(in oklab, #7a52e6 22%, #ececf0)",
+          background: "linear-gradient(150deg, rgb(122 82 230 / 0.07), #ffffff)",
         }}
         type="button"
       >
@@ -116,7 +116,7 @@ export function LinkedContextBlock({
         <span
           className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface text-primary"
           style={{
-            border: "1px solid color-mix(in oklab, hsl(223 46% 32%) 20%, hsl(40 20% 84%))",
+            border: "1px solid color-mix(in oklab, #7a52e6 20%, #ececf0)",
           }}
         >
           <Building2 className="size-[23px]" aria-hidden="true" />

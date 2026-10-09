@@ -7,7 +7,7 @@ import { IN_APP_BROWSER_OPTIONS, isNativeApp } from "@/lib/native-app";
 
 function GoogleGlyph() {
   return (
-    <svg viewBox="0 0 24 24" className="abtn__g" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
       <path fill="#4285F4" d="M22.5 12.27c0-.79-.07-1.55-.2-2.27H12v4.3h5.9a5.05 5.05 0 01-2.19 3.31v2.75h3.54c2.07-1.91 3.25-4.72 3.25-8.09z" />
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.54-2.75c-.98.66-2.24 1.05-3.74 1.05-2.87 0-5.3-1.94-6.17-4.55H2.18v2.84A11 11 0 0012 23z" />
       <path fill="#FBBC05" d="M5.83 14.09a6.6 6.6 0 010-4.18V7.07H2.18a11 11 0 000 9.86l3.65-2.84z" />
@@ -58,7 +58,7 @@ export function GoogleSubmitButton({ label }: { label: string; compact?: boolean
       onClick={onClick}
       disabled={pending}
       aria-busy={pending}
-      className="abtn abtn--google"
+      className="aw-btn aw-btn--line"
       style={pending ? { pointerEvents: "none" } : undefined}
     >
       {pending ? (

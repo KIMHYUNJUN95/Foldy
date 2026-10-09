@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
   appName: "Foldy",
   webDir: "capacitor-www",
   // 웹이 그려지기 전 WebView 바탕 — 기본 흰색이면 시작 화면(아이보리) → 흰 화면 → 웹(아이보리)으로 깜빡인다(N11).
-  backgroundColor: "#F7F4EE",
+  backgroundColor: "#FFFFFF",
   // 서버가 「앱」임을 알도록 UA 끝에 붙인다 — `src/lib/native-app.ts` NATIVE_APP_UA_TAG 와 같아야 한다. 아이패드 앱은 Mac UA 를 보내
   // 관리 콘솔로 갈 수 있었다. 꼬리표가 있으면 늘 모바일 화면(`src/lib/mobile-device.ts`).
   appendUserAgent: "StayOpsApp",

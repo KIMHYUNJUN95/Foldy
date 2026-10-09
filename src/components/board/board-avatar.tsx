@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { AvatarColor } from "./board-types";
 
 const gradientMap: Record<AvatarColor, string> = {
-  default: "from-[hsl(223_50%_42%)] to-[hsl(223_54%_22%)]",
+  default: "from-[#8a63f0] to-[#5a30cf]",
   red: "from-[hsl(348_62%_56%)] to-[hsl(346_64%_40%)]",
   blue: "from-[hsl(200_58%_48%)] to-[hsl(206_64%_34%)]",
   green: "from-[hsl(158_42%_42%)] to-[hsl(160_48%_28%)]",

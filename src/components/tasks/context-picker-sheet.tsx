@@ -184,7 +184,7 @@ function RoomCell({
       className={cn(
         "relative flex aspect-square flex-col items-center justify-center gap-[3px] rounded-[13px] border transition-all",
         selected
-          ? "border-primary bg-primary/[0.08] shadow-[0_0_0_2.5px_color-mix(in_oklab,hsl(223_46%_32%)_22%,transparent)]"
+          ? "border-primary bg-primary/[0.08] shadow-[0_0_0_2.5px_color-mix(in_oklab,#7a52e6_22%,transparent)]"
           : "border-border bg-surface",
       )}
       onClick={onTap}

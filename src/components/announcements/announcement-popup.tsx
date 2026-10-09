@@ -269,7 +269,7 @@ export function AnnouncementPopup({
             </button>
             <Link
               href={`${detailHrefBase}/${announcement.id}`}
-              className="flex-1 h-12 rounded-[13px] bg-primary text-sm font-extrabold text-white inline-flex items-center justify-center shadow-[0_12px_22px_-12px_hsl(223_46%_32%/0.55)]"
+              className="flex-1 h-12 rounded-[13px] bg-primary text-sm font-extrabold text-white inline-flex items-center justify-center shadow-[0_12px_22px_-12px_rgb(122_82_230/0.55)]"
             >
               {copy.viewDetail}
             </Link>

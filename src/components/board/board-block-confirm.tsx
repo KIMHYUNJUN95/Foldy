@@ -25,7 +25,7 @@ export function BoardBlockConfirm({
         <p className="mt-[7px] text-[12.5px] font-semibold leading-[1.5] text-muted-foreground">{copy.blockConfirmBody}</p>
         <div className="mt-[18px] flex gap-[9px]">
           <button
-            className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[hsl(222_20%_28%)]"
+            className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[#3a3746]"
             onClick={onCancel}
             type="button"
           >

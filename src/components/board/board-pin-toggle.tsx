@@ -31,7 +31,7 @@ export function BoardPinToggle({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative h-[27px] w-[46px] shrink-0 rounded-full transition-colors duration-150",
-          checked ? "bg-primary" : "bg-[hsl(40_22%_90%)]",
+          checked ? "bg-primary" : "bg-[#f4f4f7]",
         )}
       >
         <span

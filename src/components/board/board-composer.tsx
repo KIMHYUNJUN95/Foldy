@@ -169,7 +169,7 @@ export function BoardComposer({
   return (
     <div className="shrink-0 border-t border-border bg-background px-[14px] py-[11px] pb-[calc(11px+env(safe-area-inset-bottom,0px))]">
       {error && (
-        <div className="mb-[8px] text-[11.5px] font-semibold text-[hsl(4_62%_46%)]">{error}</div>
+        <div className="mb-[8px] text-[11.5px] font-semibold text-[#c5282e]">{error}</div>
       )}
 
       {/* 선택된 멘션 배지 미리보기 — 텍스트는 시트 재오픈, X는 멘션 초기화 */}
@@ -220,7 +220,7 @@ export function BoardComposer({
           className={cn(
             "flex flex-1 items-center gap-2 h-[42px] rounded-full border bg-surface pl-[14px] pr-[6px]",
             focused
-              ? "border-primary shadow-[0_0_0_3px_hsl(223_46%_32%/0.12)]"
+              ? "border-primary shadow-[0_0_0_3px_rgb(122_82_230/0.12)]"
               : "border-border",
           )}
         >
@@ -253,7 +253,7 @@ export function BoardComposer({
               borderRadius: 0,
               WebkitTapHighlightColor: "transparent",
             }}
-            className="flex-1 bg-transparent text-[13px] font-medium text-foreground outline-none focus:outline-none focus-visible:outline-none placeholder:text-[hsl(222_10%_62%)]"
+            className="flex-1 bg-transparent text-[13px] font-medium text-foreground outline-none focus:outline-none focus-visible:outline-none placeholder:text-[#9a97a6]"
           />
           {/* @ 멘션 트리거 버튼 */}
           {onOpenMentionSheet && (
@@ -286,7 +286,7 @@ export function BoardComposer({
           onClick={send}
           disabled={!canSend}
           aria-label={copy.commentSend}
-          className="inline-flex size-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[hsl(223_50%_42%)] to-[hsl(223_54%_22%)] text-white shadow-[0_10px_20px_-10px_hsl(223_46%_32%/0.6)] disabled:opacity-50"
+          className="inline-flex size-[42px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8a63f0] to-[#5a30cf] text-white shadow-[0_10px_20px_-10px_rgb(122_82_230/0.6)] disabled:opacity-50"
         >
           <Send className="size-[19px]" aria-hidden="true" />
         </button>

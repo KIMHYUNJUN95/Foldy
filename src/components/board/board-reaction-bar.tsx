@@ -21,7 +21,7 @@ export function BoardReactionBar({
             "inline-flex h-9 items-center gap-[6px] rounded-full border px-[13px] text-[13px] font-extrabold",
             r.isMine
               ? "border-primary/[0.36] bg-primary/[0.12] text-primary"
-              : "border-border bg-surface text-[hsl(222_20%_28%)]",
+              : "border-border bg-surface text-[#3a3746]",
           )}
         >
           <span className="text-[16px] leading-none">{r.emoji}</span>

@@ -19,7 +19,7 @@ function formatSize(bytes: number): string {
 
 const typeStyles: Record<FileType, { bg: string; text: string; label: string }> = {
   xls:     { bg: "bg-[hsl(146_44%_92%)]", text: "text-[hsl(150_56%_28%)]", label: "XLS" },
-  pdf:     { bg: "bg-[hsl(6_70%_95%)]",   text: "text-[hsl(4_62%_46%)]",   label: "PDF" },
+  pdf:     { bg: "bg-[#fdecec]",   text: "text-[#c5282e]",   label: "PDF" },
   doc:     { bg: "bg-[hsl(206_66%_93%)]", text: "text-[hsl(206_70%_38%)]", label: "DOC" },
   generic: { bg: "bg-[hsl(220_12%_92%)]", text: "text-[hsl(220_12%_52%)]", label: "FILE" },
 };
@@ -86,7 +86,7 @@ export function BoardFileCard({
         <button
           type="button"
           onClick={onRemove}
-          className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-[hsl(40_22%_90%)] text-muted-foreground"
+          className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-[#f4f4f7] text-muted-foreground"
         >
           <X className="size-[13px]" aria-hidden="true" />
         </button>
@@ -109,7 +109,7 @@ export function BoardFileAddButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 items-center gap-[7px] rounded-[12px] border-[1.5px] border-dashed border-border px-[14px] text-[13px] font-bold text-[hsl(222_20%_28%)] disabled:opacity-50"
+      className="inline-flex h-10 items-center gap-[7px] rounded-[12px] border-[1.5px] border-dashed border-border px-[14px] text-[13px] font-bold text-[#3a3746] disabled:opacity-50"
     >
       <Paperclip className="size-[17px]" aria-hidden="true" />
       {label}

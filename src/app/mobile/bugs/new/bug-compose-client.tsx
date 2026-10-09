@@ -242,7 +242,7 @@ export function BugComposeClient({ copy }: { copy: BugCopy }) {
           type="button"
           onClick={onSubmit}
           disabled={!canSubmit}
-          className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-br from-[hsl(223_50%_42%)] to-[hsl(223_54%_22%)] text-[15px] font-extrabold text-white shadow-[0_14px_26px_-12px_hsl(223_46%_32%/0.5)] disabled:bg-none disabled:bg-[hsl(40_22%_90%)] disabled:text-[hsl(222_10%_60%)] disabled:shadow-none"
+          className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-br from-[#8a63f0] to-[#5a30cf] text-[15px] font-extrabold text-white shadow-[0_14px_26px_-12px_rgb(122_82_230/0.5)] disabled:bg-none disabled:bg-[#f4f4f7] disabled:text-[hsl(222_10%_60%)] disabled:shadow-none"
         >
           {isPending ? copy.composeSubmitting : copy.composeSubmit}
         </button>

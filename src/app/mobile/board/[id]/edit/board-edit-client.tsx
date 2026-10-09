@@ -226,7 +226,7 @@ export function BoardEditClient({
         <button
           type="button"
           onClick={() => router.back()}
-          className="inline-flex size-10 items-center justify-center rounded-full text-[hsl(222_20%_28%)]"
+          className="inline-flex size-10 items-center justify-center rounded-full text-[#3a3746]"
           aria-label={copy.close}
         >
           <X className="size-[22px]" aria-hidden="true" />
@@ -236,7 +236,7 @@ export function BoardEditClient({
           type="button"
           onClick={handleSubmit}
           disabled={!canSave}
-          className="h-9 rounded-full bg-primary px-[18px] text-[13.5px] font-extrabold text-white shadow-[0_10px_18px_-10px_hsl(223_46%_32%/0.55)] disabled:cursor-not-allowed disabled:bg-[hsl(40_22%_90%)] disabled:text-[hsl(222_10%_62%)] disabled:shadow-none"
+          className="h-9 rounded-full bg-primary px-[18px] text-[13.5px] font-extrabold text-white shadow-[0_10px_18px_-10px_rgb(122_82_230/0.55)] disabled:cursor-not-allowed disabled:bg-[#f4f4f7] disabled:text-[#9a97a6] disabled:shadow-none"
         >
           {copy.submitEdit}
         </button>
@@ -244,7 +244,7 @@ export function BoardEditClient({
 
       {/* 에러 배너 */}
       {error && (
-        <div className="shrink-0 border-b border-[hsl(6_70%_85%)] bg-[hsl(6_70%_97%)] px-[18px] py-[10px] text-[12.5px] font-semibold text-[hsl(4_62%_46%)]">
+        <div className="shrink-0 border-b border-[hsl(6_70%_85%)] bg-[hsl(6_70%_97%)] px-[18px] py-[10px] text-[12.5px] font-semibold text-[#c5282e]">
           {error}
         </div>
       )}
@@ -256,7 +256,7 @@ export function BoardEditClient({
           placeholder={copy.titlePlaceholder}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full border-0 border-b border-border bg-transparent pb-[11px] pt-1 text-[16px] font-extrabold tracking-[-0.01em] text-foreground outline-none placeholder:font-bold placeholder:text-[hsl(222_10%_62%)]"
+          className="w-full border-0 border-b border-border bg-transparent pb-[11px] pt-1 text-[16px] font-extrabold tracking-[-0.01em] text-foreground outline-none placeholder:font-bold placeholder:text-[#9a97a6]"
         />
 
         <textarea
@@ -264,10 +264,10 @@ export function BoardEditClient({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={4}
-          className="min-h-[96px] resize-none bg-transparent py-[14px] text-[13.5px] font-medium leading-[1.7] text-[hsl(222_20%_28%)] outline-none placeholder:text-[hsl(222_10%_62%)]"
+          className="min-h-[96px] resize-none bg-transparent py-[14px] text-[13.5px] font-medium leading-[1.7] text-[#3a3746] outline-none placeholder:text-[#9a97a6]"
         />
 
-        <div className="text-right text-[11px] font-bold text-[hsl(222_10%_62%)]">
+        <div className="text-right text-[11px] font-bold text-[#9a97a6]">
           <span className="font-mono text-muted-foreground">{content.length}</span> / 1000
         </div>
 
@@ -304,7 +304,7 @@ export function BoardEditClient({
               {copy.addPhoto}
             </button>
           ) : (
-            <div className="inline-flex size-[70px] flex-col items-center justify-center gap-[3px] rounded-[10px] border border-border/60 bg-[hsl(40_22%_90%)] text-[10.5px] font-bold text-[hsl(222_10%_62%)]">
+            <div className="inline-flex size-[70px] flex-col items-center justify-center gap-[3px] rounded-[10px] border border-border/60 bg-[#f4f4f7] text-[10.5px] font-bold text-[#9a97a6]">
               <ImageIcon className="size-[18px]" aria-hidden="true" />
               {copy.photoFull}
             </div>
@@ -391,7 +391,7 @@ export function BoardEditClient({
                   if (tagInput.trim()) addTag();
                 }}
                 placeholder={copy.tagPlaceholder}
-                className="w-full bg-transparent text-[12.5px] font-bold outline-none placeholder:text-[hsl(222_10%_62%)]"
+                className="w-full bg-transparent text-[12.5px] font-bold outline-none placeholder:text-[#9a97a6]"
               />
             </div>
           </div>

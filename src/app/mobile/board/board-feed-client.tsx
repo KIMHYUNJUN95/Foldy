@@ -134,13 +134,13 @@ export function BoardFeedClient({
           <h1 className="text-[22px] font-black tracking-[-0.03em] text-foreground">
             {copy.title}
           </h1>
-          <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full border border-border bg-surface px-[7px] text-[11px] font-black text-muted-foreground shadow-[0_4px_10px_-6px_hsl(223_46%_32%/0.25)]">
+          <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full border border-border bg-surface px-[7px] text-[11px] font-black text-muted-foreground shadow-[0_4px_10px_-6px_rgb(122_82_230/0.25)]">
             {allPosts.length}
           </span>
           {pendingReportCount > 0 && (
             <Link
               href="/mobile/board/reports"
-              className="ml-auto flex h-9 items-center gap-[5px] rounded-full border border-[hsl(4_62%_46%/0.35)] bg-[hsl(6_70%_95.5%)] px-[12px] text-[12.5px] font-extrabold text-[hsl(4_62%_46%)]"
+              className="ml-auto flex h-9 items-center gap-[5px] rounded-full border border-[rgb(197_40_46/0.35)] bg-[#fdecec] px-[12px] text-[12.5px] font-extrabold text-[#c5282e]"
             >
               <Flag className="size-[14px]" aria-hidden="true" />
               {copy.reportsChip.replace("{count}", String(pendingReportCount))}
@@ -148,7 +148,7 @@ export function BoardFeedClient({
           )}
           <Link
             href="/mobile/board/compose"
-            className={`${pendingReportCount > 0 ? "" : "ml-auto "}flex h-9 items-center gap-[6px] rounded-full bg-primary px-[15px] text-[13.5px] font-extrabold text-white shadow-[0_10px_18px_-10px_hsl(223_46%_32%/0.55)]`}
+            className={`${pendingReportCount > 0 ? "" : "ml-auto "}flex h-9 items-center gap-[6px] rounded-full bg-primary px-[15px] text-[13.5px] font-extrabold text-white shadow-[0_10px_18px_-10px_rgb(122_82_230/0.55)]`}
           >
             <Pencil className="size-4" aria-hidden="true" />
             {copy.compose}
@@ -187,13 +187,13 @@ export function BoardFeedClient({
               type="button"
               onClick={onLoadMore}
               disabled={loadingMore}
-              className="mt-[18px] flex h-11 w-full items-center justify-center rounded-[12px] border border-border bg-surface text-[13.5px] font-extrabold text-[hsl(222_20%_28%)] disabled:opacity-60"
+              className="mt-[18px] flex h-11 w-full items-center justify-center rounded-[12px] border border-border bg-surface text-[13.5px] font-extrabold text-[#3a3746] disabled:opacity-60"
             >
               {loadingMore ? copy.loadingMore : copy.loadMore}
             </button>
           )}
           {loadError && (
-            <p className="mt-[10px] text-center text-[12px] font-semibold text-[hsl(4_62%_46%)]">
+            <p className="mt-[10px] text-center text-[12px] font-semibold text-[#c5282e]">
               {loadError}
             </p>
           )}

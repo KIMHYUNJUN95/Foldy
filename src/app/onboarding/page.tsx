@@ -163,7 +163,7 @@ export default async function OnboardingPage({
           roleCategories: o.roleCategories,
           skip: o.joinFlow.skip,
           submit: o.review.submit,
-          exit: dictionary.auth.email.resetSentBackToLogin,
+          exit: dictionary.auth.blocked.logout,
           nameRequired: d.nameRequired,
           genderRequired: d.genderRequired,
           phoneRequired: d.phoneRequired,

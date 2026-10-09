@@ -66,11 +66,11 @@ export function BoardReportsClient({
                   {r.targetType === "post" ? copy.reportsTargetPost : copy.reportsTargetComment}
                 </span>
                 <span className="truncate text-foreground">{r.authorName || copy.reportsAuthorUnknown}</span>
-                <span className="ml-auto shrink-0 text-[hsl(4_62%_46%)]">
+                <span className="ml-auto shrink-0 text-[#c5282e]">
                   {copy.reportsCount.replace("{count}", String(r.count))}
                 </span>
               </div>
-              <p className="mt-2 line-clamp-3 whitespace-pre-line text-[13.5px] font-medium leading-[1.6] text-[hsl(222_20%_28%)]">
+              <p className="mt-2 line-clamp-3 whitespace-pre-line text-[13.5px] font-medium leading-[1.6] text-[#3a3746]">
                 {r.preview}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -88,10 +88,10 @@ export function BoardReportsClient({
                   “{note}”
                 </p>
               ))}
-              <p className="mt-2 text-[11px] font-semibold text-[hsl(222_10%_62%)]">{dateFmt.format(new Date(r.latestAt))}</p>
+              <p className="mt-2 text-[11px] font-semibold text-[#9a97a6]">{dateFmt.format(new Date(r.latestAt))}</p>
               <div className="mt-auto flex gap-2 pt-3">
                 <Link
-                  className="flex h-10 flex-1 items-center justify-center rounded-[11px] border border-border bg-background text-[12.5px] font-extrabold text-[hsl(222_20%_28%)]"
+                  className="flex h-10 flex-1 items-center justify-center rounded-[11px] border border-border bg-background text-[12.5px] font-extrabold text-[#3a3746]"
                   href={`/mobile/board/${r.postId}`}
                 >
                   {copy.reportsViewPost}
@@ -128,7 +128,7 @@ export function BoardReportsClient({
             <p className="mt-[7px] text-[12.5px] font-semibold leading-[1.5] text-muted-foreground">{copy.reportsRemoveBody}</p>
             <div className="mt-[18px] flex gap-[9px]">
               <button
-                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[hsl(222_20%_28%)]"
+                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[#3a3746]"
                 onClick={() => setConfirm(null)}
                 type="button"
               >

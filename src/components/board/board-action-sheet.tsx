@@ -42,9 +42,9 @@ function ActionRow({
           "inline-flex size-[38px] shrink-0 items-center justify-center rounded-[11px]",
           variant === "primary" && "bg-primary/[0.12] text-primary",
           variant === "danger" &&
-            "bg-[hsl(6_70%_95.5%)] text-[hsl(4_62%_46%)]",
+            "bg-[#fdecec] text-[#c5282e]",
           variant === "default" &&
-            "bg-[hsl(40_22%_90%)] text-[hsl(222_20%_28%)]",
+            "bg-[#f4f4f7] text-[#3a3746]",
         )}
       >
         {icon}
@@ -53,7 +53,7 @@ function ActionRow({
         className={cn(
           "text-[14.5px] font-bold",
           variant === "primary" && "text-primary",
-          variant === "danger" && "text-[hsl(4_62%_46%)]",
+          variant === "danger" && "text-[#c5282e]",
           variant === "default" && "text-foreground",
         )}
       >
@@ -155,7 +155,7 @@ function ActionSheetContent({
       <button
         type="button"
         onClick={close}
-        className="mt-[10px] h-[52px] w-full rounded-[14px] border border-border bg-background text-[14.5px] font-extrabold text-[hsl(222_20%_28%)]"
+        className="mt-[10px] h-[52px] w-full rounded-[14px] border border-border bg-background text-[14.5px] font-extrabold text-[#3a3746]"
       >
         {copy.actionCancel}
       </button>

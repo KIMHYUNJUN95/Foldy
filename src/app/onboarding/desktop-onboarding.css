@@ -71,130 +71,129 @@
   .obd .authw__brand { display: flex; }
 }
 .obd__stage {
-  flex: 1;
-  overflow-y: auto;
+  width: 560px;
+  max-width: 100%;
   display: flex;
   justify-content: center;
-  padding: 8px 56px 48px;
 }
-.obd__form {
-  width: 100%;
-  max-width: 680px;
-  margin: auto 0;
-}
+.obd__form { width: 100%; }
+/* 시안: 폼 위 작은 머리글은 두지 않는다(완료 화면만). */
+.obd__form .obd__eye { display: none; }
 .obd__eye {
   margin: 0;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--authx-primary);
 }
 .obd__title {
-  margin: 6px 0 0;
-  font-size: 26px;
-  font-weight: 900;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.03em;
   color: var(--ink);
   text-wrap: balance;
 }
 .obd__lede {
-  margin: 8px 0 0;
-  font-size: 13.5px;
+  margin: 10px 0 0;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--authx-muted);
 }
-.obd__sec {
-  margin-top: 20px;
-  padding: 18px 20px 20px;
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: var(--card);
-}
-.obd__sech {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.obd__sech b { font-size: 14.5px; font-weight: 800; color: var(--ink); }
-.obd__sech span { font-size: 12px; font-weight: 600; color: var(--faint); }
+/* 구역은 상자 없이 — 두 번째 구역부터 옅은 가로선 하나. */
+.obd__sec { margin-top: 28px; }
+.obd__sec + .obd__sec { margin-top: 26px; padding-top: 28px; border-top: 1px solid var(--line-soft); }
+.obd__sech { display: none; }
 .obd__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px 18px;
+  gap: 22px 16px;
 }
+/* 입력칸 = 테두리 위에 이름표가 걸린 모양(로그인과 같다). */
+.obd__fld { position: relative; }
 .obd__lbl {
-  display: block;
-  margin-bottom: 6px;
+  position: absolute;
+  top: -8px;
+  left: 11px;
+  z-index: 1;
+  padding: 0 5px;
+  background: #fff;
   font-size: 12px;
-  font-weight: 800;
-  color: var(--ink-soft);
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--authx-muted);
+  pointer-events: none;
 }
-.obd__lbl em { margin-left: 2px; font-style: normal; color: var(--danger); }
+.obd__fld:focus-within .obd__lbl { color: var(--authx-primary); }
+.obd__lbl em { display: none; }
 .obd__in {
   width: 100%;
-  height: 42px;
+  height: 50px;
   box-sizing: border-box;
-  padding: 0 13px;
-  border-radius: 10px;
+  padding: 0 16px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background: #fff;
   font: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--ink);
   outline: none;
 }
-.obd__in::placeholder { color: var(--faint); font-weight: 500; }
+.obd__in::placeholder { color: var(--faint); font-weight: 400; }
 .obd__in:focus {
-  border-color: var(--authx-primary);
-  box-shadow: 0 0 0 3.5px var(--primary-soft);
+  border: 1.5px solid var(--authx-primary);
+  box-shadow: 0 0 0 4px #eee8fc;
 }
-.obd__fld.bad .obd__in { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
-.obd__hint { margin: 5px 0 0; font-size: 11.5px; font-weight: 500; color: var(--faint); }
-.obd__err { margin: 5px 0 0; font-size: 11.5px; font-weight: 700; color: var(--danger); }
+.obd__fld.bad .obd__in { border-color: var(--danger); }
+.obd__hint { margin: 6px 0 0; font-size: 12px; color: var(--faint); }
+.obd__err { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--danger); }
 
+/* 생년월일 · 성별 · 전화 — 칸 여러 개를 테두리 하나로 묶는다(시안). */
+.obd__dob, .obd__seg, .obd__phone {
+  height: 50px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.obd__dob:focus-within, .obd__phone:focus-within { border: 1.5px solid var(--authx-primary); box-shadow: 0 0 0 4px #eee8fc; }
+.obd__dob .obd__in, .obd__phone .obd__in { height: 100%; border: 0; border-radius: 12px; box-shadow: none; background: transparent; }
 .obd__dob {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  align-items: center;
+  padding: 0 6px;
 }
-.obd__dob .obd__in { text-align: center; font-variant-numeric: tabular-nums; }
+.obd__dob .obd__in { text-align: left; padding: 0 10px; font-variant-numeric: tabular-nums; }
+.obd__dob .obd__in + .obd__in { border-left: 1px solid var(--line-soft); border-radius: 0; }
 
 .obd__seg {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  height: 42px;
-  box-sizing: border-box;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--authx-surface);
+  gap: 4px;
+  padding: 4px;
 }
 .obd__seg button {
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   background: none;
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--authx-muted);
   cursor: pointer;
 }
-.obd__seg button.on {
-  background: #fff;
-  color: var(--ink);
-  box-shadow: 0 1px 3px rgba(20, 32, 43, 0.15);
-}
+.obd__seg button.on { background: #f1ecfd; color: var(--primary-ink); font-weight: 600; }
 .obd__seg button:focus-visible { outline: 2px solid var(--authx-primary); outline-offset: 1px; }
-.obd__fld.bad .obd__seg { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 55%, transparent); }
+.obd__fld.bad .obd__seg, .obd__fld.bad .obd__dob, .obd__fld.bad .obd__phone { border-color: var(--danger); }
 
 .obd__phone {
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr);
-  gap: 6px;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
 }
+.obd__phone .obd__ccbtn { height: 48px; border: 0; box-shadow: none; background: transparent; white-space: nowrap; padding: 0 6px 0 14px; }
 .obd__cc { position: relative; }
 .obd__ccbtn {
   display: flex;
@@ -267,51 +266,51 @@
 }
 .obd__in--code { font-family: var(--mono); letter-spacing: 0.12em; }
 .obd__org {
-  margin-top: 10px;
+  margin-top: 14px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
-  border-radius: 12px;
-  border: 1px solid hsl(146 40% 80%);
-  background: var(--done-bg);
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #f7f7f9;
 }
 .obd__orgav {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex: none;
-  border-radius: 9px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: hsl(28 70% 52%);
+  background: #16141f;
   color: #fff;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
 }
-.obd__org b { display: block; font-size: 13.5px; font-weight: 800; color: var(--ink); }
-.obd__org small { font-size: 12px; font-weight: 600; color: var(--authx-muted); }
-.obd__orgok { margin-left: auto; font-size: 12px; font-weight: 800; color: var(--done); }
+.obd__org b { display: block; font-size: 15px; font-weight: 600; color: var(--ink); }
+.obd__org small { font-size: 13px; color: var(--authx-muted); }
+.obd__orgok { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--authx-muted); }
 
 .obd__banner {
-  margin: 16px 0 0;
-  padding: 11px 14px;
+  margin: 18px 0 0;
+  padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid color-mix(in oklab, var(--danger) 24%, transparent);
   background: var(--danger-bg);
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1.5;
   color: var(--danger);
 }
 
+/* 주 버튼이 왼쪽, 「코드 없이 나중에 입력」은 그 오른쪽 글자 링크(시안). */
 .obd__foot {
-  margin-top: 18px;
+  margin-top: 28px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
-.obd__sp { flex: 1; }
+.obd__foot .obd__btn--pri { order: -1; }
+.obd__sp { display: none; }
 .obd__link {
   border: none;
   background: none;
@@ -323,51 +322,46 @@
   cursor: pointer;
 }
 .obd__link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-/* 「코드 없이 나중에 입력」 — 로그인의 「이메일로 가입」 링크(`.auth-help a`)와 같은 남색 · 굵기. */
 .obd__link--skip {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--authx-primary);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--authx-muted);
 }
 .obd__link--skip:hover { color: var(--primary-ink); }
 .obd__btn {
-  height: 42px;
-  padding: 0 18px;
+  height: 50px;
+  padding: 0 20px;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background: #fff;
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 800;
-  color: var(--ink-soft);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
   white-space: nowrap;
   cursor: pointer;
 }
 .obd__btn svg { width: 15px; height: 15px; }
 .obd__btn:disabled { cursor: default; opacity: 0.6; }
-.obd__btn--ok:disabled { opacity: 1; color: var(--done); border-color: hsl(146 40% 80%); background: var(--done-bg); }
-/* 주 버튼은 로그인의 「이메일로 계속하기」(`.abtn--email`)와 같은 그라디언트 · 높이 · 글자 — 로그인에서 넘어온
-   화면이 같은 제품으로 보이게(2026-10-01 사용자 「폰트가 컨셉과 안 맞는다」). */
+.obd__btn--ok:disabled { opacity: 1; color: var(--authx-primary); border-color: var(--line); background: #fff; }
+/* 주 버튼 — 로그인과 같은 단색 보라(화이트 리디자인, 그라데이션 없음). */
 .obd__btn--pri {
   border-color: transparent;
-  background: linear-gradient(165deg, var(--primary-lift), var(--primary-ink));
+  background: var(--authx-primary);
   color: #fff;
-  box-shadow: 0 16px 34px -20px rgb(122 82 230 / 0.7);
 }
-.obd__btn--pri:hover:not(:disabled) { filter: brightness(1.06); }
+.obd__btn--pri:hover:not(:disabled) { background: #6b40e0; }
 .obd__btn--lg {
   height: 50px;
-  padding: 0 26px;
-  border-radius: 13px;
-  font-size: 14.5px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  padding: 0 28px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* ── 완료 ── */
@@ -388,8 +382,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--done-bg);
-  color: var(--done);
+  background: #f1ecfd;
+  color: var(--authx-primary);
 }
 .obd__doneic svg { width: 34px; height: 34px; }
 .obd__title--center { text-align: center; }

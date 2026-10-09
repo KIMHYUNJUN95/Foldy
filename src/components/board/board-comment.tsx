@@ -75,14 +75,14 @@ export function BoardComment({
               {comment.role}
             </span>
           )}
-          <span className="text-[11px] font-semibold text-[hsl(222_10%_62%)]">
+          <span className="text-[11px] font-semibold text-[#9a97a6]">
             {comment.timeLabel}
           </span>
           {comment.canDelete && onDelete && (
             <button
               type="button"
               onClick={() => onDelete(comment.id)}
-              className="ml-auto text-[11px] font-extrabold text-[hsl(4_62%_46%)] px-1 py-0.5"
+              className="ml-auto text-[11px] font-extrabold text-[#c5282e] px-1 py-0.5"
             >
               {copy.commentDelete}
             </button>
@@ -92,13 +92,13 @@ export function BoardComment({
               type="button"
               onClick={() => onMore(comment.id)}
               aria-label={copy.commentMore}
-              className={`${comment.canDelete && onDelete ? "" : "ml-auto "}inline-flex size-[24px] items-center justify-center rounded-[7px] text-[hsl(222_10%_62%)]`}
+              className={`${comment.canDelete && onDelete ? "" : "ml-auto "}inline-flex size-[24px] items-center justify-center rounded-[7px] text-[#9a97a6]`}
             >
               <MoreHorizontal className="size-[15px]" aria-hidden="true" />
             </button>
           )}
         </div>
-        <div className="mt-[3px] text-[13px] font-medium leading-[1.6] text-[hsl(222_20%_28%)]">
+        <div className="mt-[3px] text-[13px] font-medium leading-[1.6] text-[#3a3746]">
           {mentionSegments
             ? mentionSegments.map((seg, idx) =>
                 seg.type === "text" ? (
@@ -148,7 +148,7 @@ export function BoardComment({
           </div>
         )}
         {comment.reaction && (
-          <span className="mt-[9px] inline-flex items-center gap-[5px] h-[26px] rounded-full border border-border bg-background px-[9px] text-[11.5px] font-extrabold text-[hsl(222_20%_28%)]">
+          <span className="mt-[9px] inline-flex items-center gap-[5px] h-[26px] rounded-full border border-border bg-background px-[9px] text-[11.5px] font-extrabold text-[#3a3746]">
             <span className="text-[13px] leading-none">{comment.reaction.emoji}</span>
             {comment.reaction.count}
           </span>

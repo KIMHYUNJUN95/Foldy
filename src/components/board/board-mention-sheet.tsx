@@ -195,7 +195,7 @@ export function BoardMentionSheet({
           type="button"
           onClick={confirm}
           disabled={totalSelected === 0}
-          className="h-[48px] w-full rounded-[14px] bg-primary text-[14px] font-extrabold text-white disabled:bg-[hsl(40_22%_90%)] disabled:text-[hsl(222_10%_62%)]"
+          className="h-[48px] w-full rounded-[14px] bg-primary text-[14px] font-extrabold text-white disabled:bg-[#f4f4f7] disabled:text-[#9a97a6]"
         >
           {copy.mentionDone(totalSelected)}
         </button>

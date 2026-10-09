@@ -21,7 +21,7 @@ export default async function MobileNotFound() {
     <main className="flex min-h-svh flex-col items-center justify-center bg-background px-8 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-center text-foreground">
       <Image
         alt="Foldy"
-        className="rounded-[22px] shadow-[0_22px_50px_-26px_hsl(223_46%_32%/0.55)]"
+        className="rounded-[22px] shadow-[0_22px_50px_-26px_rgb(122_82_230/0.55)]"
         height={84}
         priority
         src="/icons/icon-192.png"
@@ -35,7 +35,7 @@ export default async function MobileNotFound() {
       </p>
 
       <Link
-        className="mt-8 inline-flex h-12 items-center rounded-full bg-primary px-8 text-[14px] font-extrabold text-primary-foreground shadow-[0_14px_28px_-12px_hsl(223_46%_32%/0.55)] transition-transform active:scale-[0.97]"
+        className="mt-8 inline-flex h-12 items-center rounded-full bg-primary px-8 text-[14px] font-extrabold text-primary-foreground shadow-[0_14px_28px_-12px_rgb(122_82_230/0.55)] transition-transform active:scale-[0.97]"
         href="/mobile"
       >
         {copy.goHome}

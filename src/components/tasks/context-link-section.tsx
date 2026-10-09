@@ -118,7 +118,7 @@ export function ContextLinkSection({
 
   return (
     <div
-      className="rounded-2xl border bg-gradient-to-br from-primary/[0.07] to-surface shadow-[0_8px_28px_-18px_hsl(223_46%_32%/0.28)]"
+      className="rounded-2xl border bg-gradient-to-br from-primary/[0.07] to-surface shadow-[0_8px_28px_-18px_rgb(122_82_230/0.28)]"
       style={{ borderColor: "color-mix(in oklab, #7a52e6 22%, #ececf0)" }}
     >
       {/* Top row — icon + names + X */}

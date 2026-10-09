@@ -348,7 +348,7 @@ export function BoardDetailClient({
               type="button"
               onClick={() => setShowActionSheet(true)}
               aria-label={copy.postMore}
-              className="inline-flex size-[30px] items-center justify-center rounded-[9px] text-[hsl(222_10%_62%)]"
+              className="inline-flex size-[30px] items-center justify-center rounded-[9px] text-[#9a97a6]"
             >
               <MoreHorizontal className="size-[18px]" aria-hidden="true" />
             </button>
@@ -360,7 +360,7 @@ export function BoardDetailClient({
           )}
 
           {/* 본문 */}
-          <p className="mt-[11px] whitespace-pre-line text-[14px] font-medium leading-[1.72] text-[hsl(222_20%_28%)]">
+          <p className="mt-[11px] whitespace-pre-line text-[14px] font-medium leading-[1.72] text-[#3a3746]">
             {post.content}
           </p>
 
@@ -596,7 +596,7 @@ export function BoardDetailClient({
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[hsl(222_20%_28%)]"
+                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[#3a3746]"
               >
                 {copy.actionCancel}
               </button>

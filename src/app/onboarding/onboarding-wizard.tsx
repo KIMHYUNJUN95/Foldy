@@ -1,5 +1,6 @@
 "use client";
 
+import { FoldyMark } from "@/components/brand/foldy-mark";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { signOut } from "@/app/auth/actions";
 import {
@@ -18,8 +19,8 @@ import type { ProfileGender } from "@/lib/onboarding";
 // Navy accent gradient + shadow pulled from the design tokens (matches the auth screens).
 const GRADIENT = "#7a52e6";
 const SHADOW = "none";
-const IVORY_BG =
-  "radial-gradient(120% 50% at 50% -6%, #ffffff 42%, #f7f7f9 100%)";
+// 흰 한 장(화이트 리디자인 2026-10-09) — 예전 아이보리 방사 그라데이션 대신.
+const IVORY_BG = "#ffffff";
 const PRIMARY_SOFT =
   "color-mix(in oklab, #7a52e6 8%, #ffffff)";
 
@@ -401,7 +402,7 @@ function StickyCta({
   withArrow?: boolean;
 }) {
   return (
-    <div className="flex-none px-[26px] py-[14px] pb-[calc(max(14px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))]">
+    <div className="flex-none py-[14px] pb-[calc(max(14px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))]">
       <button
         type="button"
         onClick={onClick}
@@ -629,7 +630,7 @@ function Wheel({
                 ? "font-extrabold text-foreground"
                 : Math.abs(i - active) === 1
                   ? "font-semibold text-muted-foreground"
-                  : "font-semibold text-[hsl(222_10%_62%)]"
+                  : "font-semibold text-[#9a97a6]"
             }`}
             style={{ height: ITEM_H, lineHeight: `${ITEM_H}px` }}
           >
@@ -758,7 +759,7 @@ function DateCell({
 }) {
   return (
     <div className={grow ? "flex-[1.4]" : "flex-1"}>
-      <div className="mb-[6px] text-center text-[11px] font-extrabold uppercase tracking-[0.05em] t-eyebrow text-[hsl(222_10%_62%)]">
+      <div className="mb-[6px] text-center text-[11px] font-extrabold uppercase tracking-[0.05em] t-eyebrow text-[#9a97a6]">
         {label}
       </div>
       <button
@@ -767,7 +768,7 @@ function DateCell({
         className="h-[54px] w-full rounded-[14px] border border-border bg-surface text-center text-[16px] font-semibold text-foreground"
       >
         {value ?? (
-          <span className="font-medium text-[hsl(222_10%_62%)]">{placeholder}</span>
+          <span className="font-medium text-[#9a97a6]">{placeholder}</span>
         )}
       </button>
     </div>
@@ -790,7 +791,7 @@ function ReviewRow({
   return (
     <div
       className={`flex items-center gap-3 py-[14px] ${
-        divider ? "border-t border-[hsl(40_24%_89%)]" : ""
+        divider ? "border-t border-[#f1f1f4]" : ""
       }`}
     >
       <span className="w-[78px] flex-none text-[12px] font-bold text-muted-foreground">
@@ -827,10 +828,8 @@ function GenderChoice({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex min-h-[84px] items-start justify-between rounded-[18px] border px-[18px] py-[16px] text-left transition-all ${
-        active
-          ? "border-[hsl(223_46%_32%/0.34)] bg-[hsl(223_46%_32%/0.08)] shadow-[0_16px_34px_-30px_rgba(20,32,43,0.6)]"
-          : "border-border bg-surface hover:border-[hsl(223_22%_74%)]"
+      className={`group relative flex min-h-[84px] items-start justify-between rounded-[16px] px-[18px] py-[16px] text-left transition-colors ${
+        active ? "bg-[#f1ecfd]" : "bg-[#f7f7f9] hover:bg-[#f4f4f7]"
       }`}
     >
       <div>
@@ -841,8 +840,8 @@ function GenderChoice({
       <span
         className={`mt-[2px] flex size-6 items-center justify-center rounded-full border transition-colors ${
           active
-            ? "border-[hsl(223_46%_32%)] bg-[hsl(223_46%_32%)] text-white"
-            : "border-[hsl(222_14%_78%)] bg-white text-transparent"
+            ? "border-[#7a52e6] bg-[#7a52e6] text-white"
+            : "border-[#d0cfd8] bg-white text-transparent"
         }`}
         aria-hidden="true"
       >
@@ -1222,11 +1221,11 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {review.title}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {review.subtitle}
             </p>
 
-            <div className="mt-[22px] rounded-[18px] border border-border bg-surface px-4 py-[2px] shadow-[0_14px_34px_-30px_rgba(20,32,43,0.5)]">
+            <div className="mt-[22px] py-[2px]">
               <ReviewRow
                 label={review.rowName}
                 value={name.trim()}
@@ -1283,11 +1282,11 @@ export function OnboardingWizard({
             </div>
 
             {submitErrorKey ? (
-              <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border border-[hsl(4_62%_46%/0.24)] bg-[hsl(6_70%_95.5%)] px-[14px] py-[13px]">
-                <span className="mt-[1px] flex-none text-[hsl(4_62%_46%)]">
+              <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border border-[rgb(197_40_46/0.24)] bg-[#fdecec] px-[14px] py-[13px]">
+                <span className="mt-[1px] flex-none text-[#c5282e]">
                   <WarnIcon />
                 </span>
-                <div className="text-[12px] font-semibold leading-[1.5] text-[hsl(4_62%_46%)]">
+                <div className="text-[12px] font-semibold leading-[1.5] text-[#c5282e]">
                   {join.errors[submitErrorKey] ?? submitErrorKey}
                 </div>
               </div>
@@ -1306,7 +1305,7 @@ export function OnboardingWizard({
                   <div className="text-[12.5px] font-extrabold text-[hsl(206_70%_40%)]">
                     {review.infoTitle}
                   </div>
-                  <div className="mt-[2px] text-[11.5px] font-semibold leading-[1.5] text-[hsl(222_20%_28%)]">
+                  <div className="mt-[2px] text-[11.5px] font-semibold leading-[1.5] text-[#3a3746]">
                     {review.infoBody}
                   </div>
                 </div>
@@ -1343,15 +1342,14 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {join.confirmTitle}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {join.confirmSubtitle}
             </p>
 
-            <div className="mt-[22px] overflow-hidden rounded-[18px] border border-border shadow-[0_18px_40px_-28px_rgba(20,32,43,0.5)]">
-              <div className="relative px-[18px] pb-4 pt-[18px] text-white" style={{ background: GRADIENT }}>
-                <span className="absolute -right-[30px] -top-[30px] size-[120px] rounded-full border-[24px] border-white/[0.07]" />
+            <div className="mt-[22px] overflow-hidden rounded-[16px] bg-[#f7f7f9]">
+              <div className="relative px-[18px] pb-4 pt-[18px] text-foreground">
                 <div className="relative flex items-center gap-[11px]">
-                  <span className="flex size-[42px] flex-none items-center justify-center rounded-[12px] bg-white/[0.16] text-[15px] font-extrabold">
+                  <span className="flex size-[42px] flex-none items-center justify-center rounded-[12px] bg-[#16141f] text-[15px] font-bold text-white">
                     {preview.organizationName.slice(0, 2)}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1414,7 +1412,7 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {join.inviteTitle}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {join.inviteSubtitle}
             </p>
 
@@ -1443,28 +1441,28 @@ export function OnboardingWizard({
                 // Oversized segmented code field (19px) — opt out of the touch ≥16px rule so it
                 // keeps its intended large size (still ≥16px, so it never triggers iOS focus zoom).
                 data-keep-font-size
-                className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-bold tracking-[0.12em] text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-[hsl(222_10%_62%)] ${
+                className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-bold tracking-[0.12em] text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-[#9a97a6] ${
                   inviteStatus === "error"
-                    ? "border-[hsl(4_62%_46%)]"
+                    ? "border-[#c5282e]"
                     : "border-border focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
                 }`}
               />
               {inviteStatus === "error" ? (
-                <div className="mt-[18px] flex items-start gap-[11px] rounded-[14px] border border-[hsl(4_62%_46%/0.24)] bg-[hsl(6_70%_95.5%)] px-[14px] py-[13px]">
-                  <span className="mt-[1px] flex-none text-[hsl(4_62%_46%)]">
+                <div className="mt-[18px] flex items-start gap-[11px] rounded-[14px] border border-[rgb(197_40_46/0.24)] bg-[#fdecec] px-[14px] py-[13px]">
+                  <span className="mt-[1px] flex-none text-[#c5282e]">
                     <WarnIcon />
                   </span>
                   <div>
-                    <div className="text-[13px] font-extrabold text-[hsl(4_62%_46%)]">
+                    <div className="text-[13px] font-extrabold text-[#c5282e]">
                       {join.invalidTitle}
                     </div>
-                    <div className="mt-[3px] text-[11.5px] font-semibold leading-[1.5] text-[hsl(222_20%_28%)]">
+                    <div className="mt-[3px] text-[11.5px] font-semibold leading-[1.5] text-[#3a3746]">
                       {(inviteErrorKey && join.errors[inviteErrorKey]) ?? join.invalidTitle}
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="mt-[14px] text-[11.5px] font-semibold text-[hsl(222_10%_62%)]">
+                <p className="mt-[14px] text-[11.5px] font-semibold text-[#9a97a6]">
                   {join.caseHint}
                 </p>
               )}
@@ -1526,12 +1524,12 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.phoneTitle}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {steps.phoneSubtitle}
             </p>
 
             <div className="mt-[22px]">
-              <div className="mb-2 text-[12.5px] font-extrabold text-[hsl(222_20%_28%)]">
+              <div className="mb-2 text-[12.5px] font-extrabold text-[#3a3746]">
                 {steps.phoneNumLabel}
               </div>
               <div className="flex gap-[10px]">
@@ -1544,7 +1542,7 @@ export function OnboardingWizard({
                     {selectedCountry.flag}
                   </span>
                   {selectedCountry.dial}
-                  <span className="text-[hsl(222_10%_62%)]">
+                  <span className="text-[#9a97a6]">
                     <ChevronDownIcon />
                   </span>
                 </button>
@@ -1566,22 +1564,22 @@ export function OnboardingWizard({
                     goTo(5);
                   }}
                   placeholder={steps.phoneInputPlaceholder}
-                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[hsl(222_10%_62%)] focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
+                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[#9a97a6] focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
                 />
               </div>
-              <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-[hsl(222_10%_62%)]">
+              <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-[#9a97a6]">
                 {steps.phoneHint}
               </p>
               {phoneErrorKey ? (
-                <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border border-[hsl(4_62%_46%/0.24)] bg-[hsl(6_70%_95.5%)] px-[14px] py-[13px]">
-                  <span className="mt-[1px] flex-none text-[hsl(4_62%_46%)]">
+                <div className="mt-[14px] flex items-start gap-[11px] rounded-[14px] border border-[rgb(197_40_46/0.24)] bg-[#fdecec] px-[14px] py-[13px]">
+                  <span className="mt-[1px] flex-none text-[#c5282e]">
                     <WarnIcon />
                   </span>
                   <div>
-                    <div className="text-[13px] font-extrabold text-[hsl(4_62%_46%)]">
+                    <div className="text-[13px] font-extrabold text-[#c5282e]">
                       {join.errors[phoneErrorKey] ?? phoneErrorKey}
                     </div>
-                    <div className="mt-[3px] text-[11.5px] font-semibold leading-[1.5] text-[hsl(222_20%_28%)]">
+                    <div className="mt-[3px] text-[11.5px] font-semibold leading-[1.5] text-[#3a3746]">
                       {phoneErrorKey === "phone_duplicate"
                         ? steps.phoneDuplicateHelp
                         : steps.phoneHint}
@@ -1638,7 +1636,7 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.dobTitle}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {steps.dobSubtitle}
             </p>
 
@@ -1663,7 +1661,7 @@ export function OnboardingWizard({
                 onClick={() => setDobSheet(true)}
               />
             </div>
-            <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-[hsl(222_10%_62%)]">
+            <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-[#9a97a6]">
               {steps.dobHint}
             </p>
           </div>
@@ -1714,12 +1712,12 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.genderTitle}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {steps.genderSubtitle}
             </p>
 
             <div className="mt-[22px]">
-              <div className="mb-3 flex items-center gap-2 text-[12.5px] font-extrabold text-[hsl(222_20%_28%)]">
+              <div className="mb-3 flex items-center gap-2 text-[12.5px] font-extrabold text-[#3a3746]">
                 <span className="text-primary">
                   <SparkIcon />
                 </span>
@@ -1736,7 +1734,7 @@ export function OnboardingWizard({
                   />
                 ))}
               </div>
-              <p className="mt-3 text-[11.5px] font-semibold leading-[1.5] text-[hsl(222_10%_62%)]">
+              <p className="mt-3 text-[11.5px] font-semibold leading-[1.5] text-[#9a97a6]">
                 {steps.genderHint}
               </p>
             </div>
@@ -1773,12 +1771,12 @@ export function OnboardingWizard({
             <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
               {steps.nameTitle}
             </h1>
-            <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
               {steps.nameSubtitle}
             </p>
 
             <div className="mt-[22px]">
-              <div className="mb-2 text-[12.5px] font-extrabold text-[hsl(222_20%_28%)]">
+              <div className="mb-2 text-[12.5px] font-extrabold text-[#3a3746]">
                 {steps.nameLabel}
               </div>
               <div className="relative">
@@ -1794,7 +1792,7 @@ export function OnboardingWizard({
                     e.preventDefault();
                     goTo(2);
                   }}
-                  className={`h-[54px] w-full rounded-[14px] border bg-surface px-[15px] pr-[46px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[hsl(222_10%_62%)] focus:ring-[3.5px] focus:ring-primary/15 ${
+                  className={`h-[54px] w-full rounded-[14px] border bg-surface px-[15px] pr-[46px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[#9a97a6] focus:ring-[3.5px] focus:ring-primary/15 ${
                     isGood ? "border-[hsl(146_50%_32%)]" : "border-border focus:border-primary"
                   }`}
                 />
@@ -1804,7 +1802,7 @@ export function OnboardingWizard({
                   </span>
                 )}
               </div>
-              <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-[hsl(222_10%_62%)]">
+              <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-[#9a97a6]">
                 {steps.nameHint}
               </p>
             </div>
@@ -1828,22 +1826,19 @@ export function OnboardingWizard({
       className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
       style={{ background: IVORY_BG }}
     >
-      <header className="flex h-[48px] flex-none items-center justify-end px-[26px]">
-        {exitAction}
+      <header className="mx-auto flex h-[64px] w-full max-w-[460px] flex-none items-center px-[26px]">
+        <FoldyMark size={36} />
       </header>
       <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
         <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-          {/* Logo slot intentionally empty (a brand logo is added later). */}
-          <div className="size-14" aria-hidden="true" />
-
-          <h1 className="mt-[6px] whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+          <h1 className="mt-[18px] whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
             {intro.title}
           </h1>
-          <p className="mt-[10px] text-[13.5px] font-semibold leading-[1.55] text-muted-foreground">
+          <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
             {intro.subtitle}
           </p>
 
-          <div className="mt-6 rounded-[18px] border border-border bg-surface px-4 py-[4px] shadow-[0_14px_34px_-30px_rgba(20,32,43,0.5)]">
+          <div className="mt-6 py-[4px]">
             <ChecklistRow
               icon={<UserIcon />}
               title={intro.itemBasicsTitle}
@@ -1866,6 +1861,7 @@ export function OnboardingWizard({
         </div>
 
         <StickyCta label={intro.startCta} onClick={() => goTo(1)} withArrow />
+        {exitAction ? <div className="flex justify-center pb-[max(12px,env(safe-area-inset-bottom))]">{exitAction}</div> : null}
       </section>
     </main>
   );

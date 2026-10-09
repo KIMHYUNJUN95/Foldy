@@ -194,7 +194,7 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer }: Props
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[hsl(222_20%_28%)]"
+                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[#3a3746]"
               >
                 {copy.detailDeleteConfirmCancel}
               </button>

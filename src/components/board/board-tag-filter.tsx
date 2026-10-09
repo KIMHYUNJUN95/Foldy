@@ -23,7 +23,7 @@ export function BoardTagFilter({
               "inline-flex h-8 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border px-[14px] text-[12.5px] font-bold transition-colors",
               isActive
                 ? "border-primary/[0.26] bg-primary/[0.09] font-extrabold text-primary"
-                : "border-border bg-surface text-[hsl(222_20%_28%)]",
+                : "border-border bg-surface text-[#3a3746]",
             )}
           >
             {tag}

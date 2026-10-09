@@ -10,7 +10,7 @@ import { EmailNewPasswordForm } from "@/app/auth/login/email-new-password-form";
 import { EmailResetForm } from "@/app/auth/login/email-reset-form";
 import { EmailSignupForm } from "@/app/auth/login/email-signup-form";
 import { GoogleSubmitButton } from "@/app/auth/login/google-button";
-import { legalHref } from "@/components/legal/legal-page-shell";
+import { legalOverlayProps } from "@/components/legal/legal-overlay-props";
 import { resolveAuthErrorMessage } from "@/lib/auth-errors";
 import { ATTENDANCE_QR_PATH } from "@/lib/attendance-qr";
 import { isMobileSurfacePath, isSurfaceNeutralPath } from "@/lib/surface-routing";
@@ -334,8 +334,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             }}
             next={effectiveNext}
             lang={locale}
-            termsHref={legalHref("terms", locale)}
-            privacyHref={legalHref("privacy", locale)}
+            legal={legalOverlayProps(locale)}
           />
         </div>
       </AuthFrame>

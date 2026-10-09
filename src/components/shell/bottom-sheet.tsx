@@ -133,6 +133,11 @@ type BottomSheetProps = {
   zIndexClassName?: string;
   ariaLabel?: string;
   ariaLabelledBy?: string;
+  /**
+   * 태블릿 가로(`tablet:`)에서의 모양. 기본은 가운데 카드(2026-10-05). `"bottom"` 이면 태블릿에서도 바닥에서
+   * 올라오는 시트(폭 560) — 약관 보기 · 출근 QR 결과처럼 사용자가 정한 예외(2026-10-09, 16번 「BottomSheet — 넓은 화면」).
+   */
+  tabletLayout?: "card" | "bottom";
 };
 
 export function BottomSheet({
@@ -143,7 +148,9 @@ export function BottomSheet({
   zIndexClassName = "z-[80]",
   ariaLabel,
   ariaLabelledBy,
+  tabletLayout = "card",
 }: BottomSheetProps) {
+  const tabletCard = tabletLayout === "card";
   const [shown, setShown] = useState(false);
 
   // `onClose` 는 보통 인라인 화살표라 렌더마다 새 함수다. 그걸 의존으로 두면 `close` 가 렌더마다 바뀌고, 아래
@@ -262,7 +269,7 @@ export function BottomSheet({
           className={cn(
             "fixed inset-0 flex items-end justify-center bg-slate-950/45 motion-reduce:transition-none!",
             // 태블릿 가로(`tablet:`) — 바닥에 붙지 않고 **가운데 카드**(아이패드 양식 시트, 2026-10-05 시안 7c).
-            "tablet:items-center tablet:p-6",
+            tabletCard && "tablet:items-center tablet:p-6",
             zIndexClassName,
             shown ? "opacity-100" : "opacity-0",
           )}
@@ -293,9 +300,9 @@ export function BottomSheet({
               "[@media(max-height:560px)]:max-w-[600px] [@media(max-height:560px)]:max-h-[94dvh]",
               // 넓은 화면 — 폭 560 가운데(펼친 폴드 · 태블릿 세로는 바닥에서, 태블릿 가로는 가운데 카드로).
               "fold:max-w-[560px]",
-              "tablet:max-h-[86dvh] tablet:rounded-[24px] tablet:pb-5 tablet:shadow-[0_30px_80px_-30px_rgba(2,6,23,0.6)]",
+              tabletCard && "tablet:max-h-[86dvh] tablet:rounded-[24px] tablet:pb-5 tablet:shadow-[0_30px_80px_-30px_rgba(2,6,23,0.6)]",
               // 가운데 카드는 아래에서 조금만 올라오며 나타난다(바닥 시트처럼 화면 밖에서 오면 거리가 너무 길다).
-              shown ? "translate-y-0" : "translate-y-full tablet:translate-y-10",
+              shown ? "translate-y-0" : tabletCard ? "translate-y-full tablet:translate-y-10" : "translate-y-full",
               className,
             )}
             data-sheet

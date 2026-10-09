@@ -6388,6 +6388,10 @@ const FALLBACK_DICTIONARY = {
   // 공개 법적 고지 · 고객지원 페이지 크롬(`/legal/*`, `/support`). 본문은 `src/lib/legal-content.ts`.
   legal: {
     navTerms: "Terms",
+    overlayTitle: "Terms & policies",
+    overlayConfirm: "OK",
+    overlayOpenNew: "Open in a new window",
+    overlayClose: "Close",
     navPrivacy: "Privacy",
     navSupport: "Support",
     navAria: "Policies and support",
@@ -12625,6 +12629,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     },
     legal: {
       navTerms: "이용약관",
+      overlayTitle: "약관 및 정책",
+      overlayConfirm: "확인",
+      overlayOpenNew: "새 창에서 보기",
+      overlayClose: "닫기",
       navPrivacy: "개인정보처리방침",
       navSupport: "고객지원",
       navAria: "약관 및 지원",
@@ -18830,6 +18838,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     },
     legal: {
       navTerms: "利用規約",
+      overlayTitle: "規約とポリシー",
+      overlayConfirm: "確認",
+      overlayOpenNew: "新しいウィンドウで開く",
+      overlayClose: "閉じる",
       navPrivacy: "プライバシーポリシー",
       navSupport: "サポート",
       navAria: "規約とサポート",

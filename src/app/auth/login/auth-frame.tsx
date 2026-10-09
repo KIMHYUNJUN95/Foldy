@@ -2,6 +2,8 @@ import "./auth-white.css";
 import Link from "next/link";
 import { LanguageSheet } from "@/app/auth/login/language-sheet";
 import { FoldyMark } from "@/components/brand/foldy-mark";
+import { LegalLink } from "@/components/legal/legal-overlay";
+import { legalOverlayProps } from "@/components/legal/legal-overlay-props";
 import { legalHref } from "@/components/legal/legal-page-shell";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { ReactNode } from "react";
@@ -39,6 +41,7 @@ export function AuthFrame({
   const dict = getDictionary(locale);
   const c = dict.auth.console;
   const e = dict.auth.entry;
+  const legal = legalOverlayProps(locale);
 
   return (
     // 표시 언어를 여기서 명시한다. `<html lang>` 은 세션·쿠키 기준이라, 로그아웃 상태에서 `?lang=`
@@ -77,8 +80,8 @@ export function AuthFrame({
       <footer className="authw__foot">
         <span className="authw__staff">{c.footStaff}</span>
         <span className="authw__legal">
-          <Link href={legalHref("terms", locale)}>{e.termsLink}</Link>
-          <Link href={legalHref("privacy", locale)}>{e.privacyLink}</Link>
+          <LegalLink doc="terms" href={legal.hrefs.terms} {...legal}>{e.termsLink}</LegalLink>
+          <LegalLink doc="privacy" href={legal.hrefs.privacy} {...legal}>{e.privacyLink}</LegalLink>
           <Link href={legalHref("support", locale)}>{e.helpLink}</Link>
         </span>
       </footer>

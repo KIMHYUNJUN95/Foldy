@@ -3,6 +3,8 @@
 import { useFormStatus } from "react-dom";
 import { useState } from "react";
 import { signUpWithEmail } from "@/app/auth/actions";
+import { LegalLink, type LegalOverlayCopy, type LegalOverlayDoc } from "@/components/legal/legal-overlay";
+import type { LegalDocument } from "@/lib/legal-content";
 
 function CheckIcon() {
   return (
@@ -86,14 +88,16 @@ export function EmailSignupForm({
   copy,
   next,
   lang,
-  termsHref = "#",
-  privacyHref = "#",
+  legal,
 }: {
   copy: EmailSignupFormCopy;
   next: string;
   lang: string;
-  termsHref?: string;
-  privacyHref?: string;
+  legal: {
+    copy: LegalOverlayCopy;
+    documents: Record<LegalOverlayDoc, LegalDocument>;
+    hrefs: Record<LegalOverlayDoc, string>;
+  };
 }) {
   const [emailValid, setEmailValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -172,9 +176,9 @@ export function EmailSignupForm({
       </div>
 
       <p className="field__hint" style={{ marginTop: 22, lineHeight: 1.6 }}>
-        <a href={termsHref} style={{ fontWeight: 600 }}>{copy.termsLink}</a>
+        <LegalLink doc="terms" href={legal.hrefs.terms} {...legal} className="font-semibold">{copy.termsLink}</LegalLink>
         {copy.termsConMid}
-        <a href={privacyHref} style={{ fontWeight: 600 }}>{copy.privacyLink}</a>
+        <LegalLink doc="privacy" href={legal.hrefs.privacy} {...legal} className="font-semibold">{copy.privacyLink}</LegalLink>
         {copy.termsConPost}
       </p>
 

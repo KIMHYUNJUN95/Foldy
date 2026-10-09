@@ -572,12 +572,12 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
 }
 
 /* Brand wordmark — serif italic "Foldy" used across all shells. */
+/* 워드마크 — 화이트 리디자인(2026-10-09): 세리프 이탤릭 대신 본문과 같은 Geist 굵게(시안 「Foldy」). */
 .wordmark {
-  font-family: var(--font-wordmark), "Noto Serif", Georgia, "Times New Roman",
-    serif;
-  font-style: italic;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 @keyframes modal-overlay-in {

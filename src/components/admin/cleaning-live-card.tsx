@@ -6,12 +6,6 @@ import Link from "next/link";
 import type { CleaningLive } from "@/lib/admin-dashboard";
 import { getDictionary } from "@/lib/i18n";
 
-const Clean = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden><path d="M12 4l1.4 3.6L17 9l-3.6 1.4L12 14l-1.4-3.6L7 9l3.6-1.4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M5 20l4-7M19 20l-4-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
-);
-const ChevR = (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-);
 const X = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
 );
@@ -60,53 +54,34 @@ export function CleaningLiveCard({
   }, [sel]);
 
   return (
-    <div className="card" style={{ gridColumn: "span 7" }}>
-      <div className="card__h">
-        <span className="card__ic bg-pri"><Ic>{Clean}</Ic></span>
-        <div className="card__ti">
-          <span className="card__t">{c.cleaningTitle}</span>
-          <span className="card__live"><span className="d" />{c.cleaningLive}</span>
-        </div>
-        <span className="card__cnt">{cleaning.length}{c.unitRooms}</span>
-        <div className="card__act">
-          <Link href="/admin/cleaning" className="linkmore">{c.viewAll}<Ic>{ChevR}</Ic></Link>
-        </div>
+    <div className="dh-col7">
+      <div className="dh-ch">
+        <span className="dh-ct">{c.cleaningTitle}</span>
+        <span className="dh-live"><i />{c.dhRealtime}</span>
+        <Link href="/admin/cleaning" className="dh-link" style={{ marginLeft: "auto" }}>{c.dhCleaningLink} →</Link>
       </div>
 
       {cleaning.length === 0 ? (
-        <div className="empty">{c.cleaningEmpty}</div>
+        <div className="dh-empty">{c.cleaningEmpty}</div>
       ) : (
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>{c.colRoom}</th>
-              <th>{c.colType}</th>
-              <th>{c.colStaff}</th>
-              <th style={{ textAlign: "right" }}>{c.colStarted}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cleaning.map((row) => (
-              <tr
-                key={row.id}
-                className={`clickable${row.id === selectedId ? " sel" : ""}`}
-                onClick={() => setSelectedId(row.id)}
-              >
-                <td><span className="room">{row.room}</span></td>
-                <td>{row.taskLabel || c.taskOther}</td>
-                <td>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="avatar qrow__av" style={{ background: row.staff ? "var(--adm-primary)" : "var(--adm-surface)", color: row.staff ? "#fff" : "var(--adm-muted)" }}>
-                      {row.staff ? initial(row.staff) : "?"}
-                    </span>
-                    <span style={{ fontWeight: 700 }}>{row.staff || c.unassigned}</span>
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }} className="mono">{fmtTime(row.startedAt, locale)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        cleaning.map((row) => (
+          <button
+            className={`dh-row${row.id === selectedId ? " dh-sel" : ""}`}
+            key={row.id}
+            onClick={() => setSelectedId(row.id)}
+            style={{ width: "100%", border: 0, borderTop: "1px solid #f3f3f6", background: row.id === selectedId ? "#f4f1fd" : "transparent", font: "inherit", textAlign: "left", padding: 0 }}
+            type="button"
+          >
+            <span className="dh-room">{row.room}</span>
+            <div className="dh-rb">
+              <div className="dh-rt">{row.staff || c.unassigned}</div>
+              <div className="dh-rs">
+                {row.taskLabel || c.taskOther} · {c.dhCleaningStarted.replace("{time}", fmtTime(row.startedAt, locale))}
+              </div>
+            </div>
+            <span className="dh-cc">{c.elapsedMin(elapsedMinutes(row.startedAt))}</span>
+          </button>
+        ))
       )}
 
       {sel &&

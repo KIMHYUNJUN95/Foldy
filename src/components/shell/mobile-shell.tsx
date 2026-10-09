@@ -921,35 +921,29 @@ export function MobileShell({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,var(--background)_0%,color-mix(in_oklab,var(--background)_82%,transparent)_55%,transparent_100%)]"
               />
-              <div className="relative flex h-12 w-full items-center justify-between px-2">
-                <button
-                  aria-label={dictionary.common.menu}
-                  className="relative z-10 flex size-[38px] items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-[color-mix(in_oklab,var(--muted)_82%,var(--foreground))]"
-                  onClick={openSidebar}
-                  type="button"
-                >
-                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M4 7h16M4 12h11M4 17h16"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-
-                <Link
-                  href="/mobile"
-                  className="wordmark absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[20px] text-foreground"
-                >
-                  Foldy
-                </Link>
+              {/* 화이트 리디자인(2026-10-09): 세 줄 메뉴(가운데 짧게) · 왼쪽 「Foldy」 · 알림 · 내 이니셜 동그라미. */}
+              <div className="relative flex h-12 w-full items-center justify-between pr-1">
+                <div className="relative z-10 flex items-center gap-1">
+                  <button
+                    aria-label={dictionary.common.menu}
+                    className="flex size-11 items-center justify-center rounded-[12px] text-foreground transition-colors hover:bg-black/[0.04]"
+                    onClick={openSidebar}
+                    type="button"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M3 6h18M3 12h12M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                  <Link href="/mobile" className="wordmark whitespace-nowrap text-[19px] text-foreground">
+                    Foldy
+                  </Link>
+                </div>
 
                 {/* Notification bell — top-bar shortcut, left of profile */}
                 <div className="relative z-10 flex items-center gap-1.5">
                   <Link
                     aria-label={dictionary.navigation.utility.notifications}
-                    className="relative flex size-[38px] items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    className="relative flex size-[38px] items-center justify-center text-[#3a3746] transition-colors hover:text-foreground"
                     href="/mobile/notifications"
                   >
                     <Bell className="size-[21px]" aria-hidden="true" />
@@ -964,18 +958,12 @@ export function MobileShell({
                   </Link>
                   <Link
                     aria-label={dictionary.onboarding.profileTitle}
-                    className="flex size-[38px] items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex size-[38px] items-center justify-center"
                     href="/account?mode=mobile"
                   >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <circle cx="12" cy="8.5" r="3.4" stroke="currentColor" strokeWidth="2" />
-                      <path
-                        d="M5.5 19c1.1-3 3.7-4.5 6.5-4.5S17.4 16 18.5 19"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <span className="flex size-[34px] items-center justify-center rounded-full bg-[#ede7fc] text-[13px] font-bold text-[#5a30cf]">
+                      {Array.from(session.user.name?.trim() || "·")[0]}
+                    </span>
                   </Link>
                 </div>
               </div>

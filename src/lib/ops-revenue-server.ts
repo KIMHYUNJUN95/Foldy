@@ -238,6 +238,116 @@ export async function getOpsRevenueCompareData(
   };
 }
 
+// ── 대시보드 홈(화이트 리디자인 2026-10-09) ───────────────────────────────
+
+export type DashboardOpsSummary = {
+  month: string;
+  today: string;
+  /** 고른 달 매출 합계(지난 날 실적 + 남은 날 예약 확정). 기본 제외 건물(오쿠보A · 사노)은 매출 화면처럼 뺀다. */
+  revenue: number;
+  /** 오늘(이번 달일 때)까지 실적 · 그 날짜. 지난 달이면 달 전체, 앞날이면 0 · null. */
+  actualToDate: number;
+  actualThroughDay: number | null;
+  /** 전월 같은 기간(1일 ~ 같은 날) 실적 대비 % — 비교 불가면 null. */
+  changePct: number | null;
+  daily: Array<{ day: number; revenue: number; actual: boolean; today: boolean }>;
+  occupancyPct: number;
+  occupiedNights: number;
+  availableNights: number;
+  previousOccupancyPct: number;
+  buildings: Array<{ name: string; pct: number }>;
+  months: Array<{ month: string; revenue: number; occupancyPct: number }>;
+};
+
+/**
+ * 관리자 대시보드 홈의 「매출 · 가동률」 · 「최근 6개월」 — 매출 · 가동률 화면과 **같은 요약기(`createRevenueSummarizer`)**.
+ * 날짜별 막대는 그 달 예약을 한 번 읽고 하루씩 같은 식(`buildOpsSalesSummary`)으로 나눈다(31번 읽지 않는다).
+ * 운영 관리자 게이트를 지난 뒤에만 부른다(`canAccessOpsAdmin`).
+ */
+export async function getDashboardOpsSummary(session: AppSession, monthArg?: string): Promise<DashboardOpsSummary> {
+  const today = toJstDateString(new Date());
+  const thisMonth = today.slice(0, 7);
+  const month = monthArg && /^\d{4}-\d{2}$/.test(monthArg) ? monthArg : thisMonth;
+  const prevMonth = shiftMonthKey(month, -1);
+  const months6 = Array.from({ length: 6 }, (_, index) => shiftMonthKey(month, index - 5));
+  const monthPiece = (key: string): Piece => ({ endExclusive: nextDay(lastDayOfMonth(key)), start: `${key}-01` });
+
+  const lastDay = Number(lastDayOfMonth(month).slice(8, 10));
+  const throughDay = month === thisMonth ? Number(today.slice(8, 10)) : month < thisMonth ? lastDay : null;
+  const prevLastDay = Number(lastDayOfMonth(prevMonth).slice(8, 10));
+  const toDatePiece: Piece | null = throughDay ? { endExclusive: nextDay(`${month}-${String(throughDay).padStart(2, "0")}`), start: `${month}-01` } : null;
+  const prevToDatePiece: Piece | null = throughDay
+    ? { endExclusive: nextDay(`${prevMonth}-${String(Math.min(throughDay, prevLastDay)).padStart(2, "0")}`), start: `${prevMonth}-01` }
+    : null;
+
+  const pieces: Piece[] = [...months6.map(monthPiece), monthPiece(prevMonth)];
+  if (toDatePiece) pieces.push(toDatePiece);
+  if (prevToDatePiece) pieces.push(prevToDatePiece);
+  const organizationId = session.organization.id;
+  const { inputs, summarize, supabase } = await createRevenueSummarizer(organizationId, pieces, today);
+  const excluded = new Set(defaultSalesExcluded(inputs.properties));
+  const included = inputs.properties.filter((name) => !excluded.has(name));
+  const total = (piece: Piece | null) => {
+    const cell = emptyCell();
+    if (!piece) return cell;
+    const result = summarize(piece);
+    for (const name of included) {
+      const part = result.properties.get(name);
+      if (part) addCell(cell, part);
+    }
+    return cell;
+  };
+
+  const current = total(monthPiece(month));
+  const previous = total(monthPiece(prevMonth));
+  const actual = total(toDatePiece);
+  const prevActual = total(prevToDatePiece);
+  const pct = (cell: RevenueCell) => (cell.availableNights > 0 ? (cell.occupiedNights / cell.availableNights) * 100 : 0);
+  const currentResult = summarize(monthPiece(month));
+
+  // 날짜별 매출 — 그 달 예약을 한 번만 읽는다.
+  const monthWindow = monthPiece(month);
+  const raw = await readOpsSalesInputs({ concurrency: 4, organizationId, properties: [], supabase, window: monthWindow, withBlocks: false });
+  const reservations = raw.reservations.map((r) => ({ ...r, raw: r.raw as SalesRawPayload }));
+  const daily: DashboardOpsSummary["daily"] = [];
+  for (let day = 1; day <= lastDay; day += 1) {
+    const start = `${month}-${String(day).padStart(2, "0")}`;
+    const summary = buildOpsSalesSummary({
+      blocks: [],
+      endExclusive: nextDay(start),
+      negativeAmounts: "include",
+      properties: raw.properties,
+      reservations,
+      rooms: raw.rooms,
+      start,
+      today,
+    });
+    const revenue = summary.byProperty.filter((row) => !excluded.has(row.propertyName)).reduce((sum, row) => sum + row.revenue, 0);
+    daily.push({ actual: throughDay !== null && day <= throughDay, day, revenue, today: month === thisMonth && day === throughDay });
+  }
+
+  return {
+    actualThroughDay: throughDay,
+    actualToDate: actual.revenue,
+    availableNights: current.availableNights,
+    buildings: included
+      .map((name) => ({ name, pct: pct(currentResult.properties.get(name) ?? emptyCell()) }))
+      .filter((row) => (currentResult.properties.get(row.name)?.availableNights ?? 0) > 0),
+    changePct: prevActual.revenue > 0 ? ((actual.revenue - prevActual.revenue) / prevActual.revenue) * 100 : null,
+    daily,
+    month,
+    months: months6.map((key) => {
+      const cell = total(monthPiece(key));
+      return { month: key, occupancyPct: pct(cell), revenue: cell.revenue };
+    }),
+    occupancyPct: pct(current),
+    occupiedNights: current.occupiedNights,
+    previousOccupancyPct: pct(previous),
+    revenue: current.revenue,
+    today,
+  };
+}
+
 /**
  * 조각들의 매출 요약을 미리 모아 두고 꺼내 주는 함수 — 매출 화면 · 가동률 · 비교가 같이 쓴다(2026-10-08 집계 표).
  *

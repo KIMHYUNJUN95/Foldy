@@ -10,7 +10,6 @@ import {
   Shirt,
   Sparkles,
   Timer,
-  Wifi,
   Wrench,
 } from "lucide-react";
 import {
@@ -18,7 +17,6 @@ import {
   type HomeReservationItem,
 } from "@/components/mobile/home-checkinout";
 import { HomeElapsedTimer } from "@/components/mobile/home-elapsed-timer";
-import { HomeLastUpdatedClock } from "@/components/mobile/home-last-updated-clock";
 import { HomeRefreshButton } from "@/components/mobile/home-refresh-button";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getCurrentOpenSession } from "@/lib/attendance-sessions";
@@ -228,42 +226,26 @@ async function HomeBody({
           className="hm__clockhero"
           href="/mobile/attendance"
         >
-          <span className="hm__ch-deco" aria-hidden="true" />
           <div className="hm__ch-top">
-            <span className="hm__ch-state">
+            <span className={`hm__ch-state${openAttendanceSession ? " is-on" : ""}`}>
+              <i aria-hidden="true" />
               {openAttendanceSession
                 ? (openAttendanceSession.openBreakStartedAt ? a.ringOnBreak : a.ringWorking)
                 : m.homeClockBefore}
             </span>
-            <span className="hm__ch-tag">
-              {openAttendanceSession
-                ? (openAttendanceSession.openBreakStartedAt ? a.ringOnBreak : a.ringWorking)
-                : m.homeClockWaiting}
-            </span>
+            <span className="hm__ch-tag">{m.homeClockMethodQr}</span>
           </div>
-          <div className="hm__ch-mid">
-            <div>
-              {openAttendanceSession?.clockInAt ? (
-                <div className="hm__ch-big hm__ch-big--timer mono">
-                  <HomeElapsedTimer startedAt={openAttendanceSession.clockInAt} />
-                </div>
-              ) : (
-                <div className="hm__ch-big">{m.homeClockIdleTitle}</div>
-              )}
-              <div className="hm__ch-sub">
-                {openAttendanceSession
-                  ? (openAttendanceSession.openBreakStartedAt
-                      ? m.homeClockBreakSub
-                      : m.homeClockOpenSub)
-                  : m.homeClockIdleSub}
-              </div>
+          {openAttendanceSession?.clockInAt ? (
+            <div className="hm__ch-big hm__ch-big--timer mono">
+              <HomeElapsedTimer startedAt={openAttendanceSession.clockInAt} />
             </div>
-            <span className="hm__ch-btn">
-              <span className="ic">
-                <QrCode aria-hidden="true" />
-              </span>
-              {openAttendanceSession ? m.homeClockOpenCta : m.homeClockIn}
-            </span>
+          ) : (
+            <div className="hm__ch-big">{m.homeClockIdleTitle}</div>
+          )}
+          <div className="hm__ch-sub">
+            {openAttendanceSession
+              ? (openAttendanceSession.openBreakStartedAt ? m.homeClockBreakSub : m.homeClockOpenSub)
+              : m.homeClockIdleSub}
           </div>
           {openAttendanceSession ? (
             <div className="hm__ch-meta">
@@ -277,20 +259,14 @@ async function HomeBody({
               </div>
             </div>
           ) : null}
-          <div className="hm__ch-methods">
-            <span className="hm__mchip hm__mchip--on">
+          <span className="hm__ch-btn">
+            {openAttendanceSession ? null : (
               <span className="ic">
                 <QrCode aria-hidden="true" />
               </span>
-              {m.homeClockMethodQr}
-            </span>
-            <span className="hm__mchip hm__mchip--ghost">
-              <span className="ic">
-                <Wifi aria-hidden="true" />
-              </span>
-              {m.homeClockMethodWifi}
-            </span>
-          </div>
+            )}
+            {openAttendanceSession ? m.homeClockOpenCta : m.homeClockIn}
+          </span>
         </Link>
 
       </div>
@@ -299,21 +275,14 @@ async function HomeBody({
         {latestAnnouncement ? (
           <Link aria-label={latestAnnouncement.title} href={announcementHref}>
             <div className="hm__notice">
-              <span className="hm__notice-ic">
-                <Bell aria-hidden="true" />
-              </span>
               <div className="hm__notice-b">
                 <div className="hm__notice-h">
                   <span className="hm__notice-cat">{m.homeAnnouncementTitle}</span>
                   <span className="hm__notice-badge">{m.homeAnnouncementImportant}</span>
                 </div>
                 <div className="hm__notice-t">{latestAnnouncement.title}</div>
-                <div className="hm__notice-s">{latestAnnouncement.content}</div>
-                <span className="hm__notice-more">
-                  {m.homeAnnouncementViewDetail}
-                  <ChevronRight aria-hidden="true" />
-                </span>
               </div>
+              <ChevronRight aria-hidden="true" className="hm__notice-chev" />
             </div>
           </Link>
         ) : null}
@@ -491,10 +460,8 @@ export default async function MobileHomePage() {
 
   const navBadges = await getMobileNotificationBadge();
 
-  const lastUpdatedTime = formatActivityTimeJst(new Date().toISOString());
   const greetDate = formatGreetingDate(locale);
   const userName = session.user.name?.trim() || "";
-  const avatarInitial = userName ? Array.from(userName)[0] : "·";
 
   return (
     // 넓은 화면(폴드 · 태블릿)은 카드를 열로 나눠 쓴다(`home-screen.css` `.hm__grid` — 2026-10-05 시안 6b · 6c).
@@ -507,15 +474,8 @@ export default async function MobileHomePage() {
             <div className="hm__greet-d">{greetDate}</div>
             <div className="hm__greet-n">{m.homeGreeting(userName)}</div>
           </div>
-          <span className="hm__greet-av" aria-hidden="true">
-            {avatarInitial}
-          </span>
         </div>
 
-        {/* Last updated — auto-refreshes every minute client-side */}
-        <div className="hm__updated">
-          <HomeLastUpdatedClock initialTime={lastUpdatedTime} locale={locale} />
-        </div>
 
         {/* Data-heavy sections stream in behind a skeleton so first paint stays fast. */}
         <Suspense fallback={<HomeBodySkeleton />}>

@@ -7,6 +7,7 @@ import { Bell, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import { getNavigationLabel, getNavigationTabLabel, mobileNavBugs, type NavigationItem } from "@/config/navigation";
 import type { Locale } from "@/lib/i18n";
+import { FoldyMark } from "@/components/brand/foldy-mark";
 import { cn } from "@/lib/utils";
 
 /**
@@ -110,23 +111,23 @@ export function MobileSideNav({
       <Link
         aria-current={active ? "page" : undefined}
         className={cn(
-          "relative flex w-[70px] shrink-0 flex-col items-center gap-1 pb-1.5 pt-1 text-[11px] tracking-[-0.01em]",
-          active ? "font-extrabold text-foreground" : "font-semibold text-muted-foreground",
+          "relative flex w-[62px] shrink-0 flex-col items-center gap-1 rounded-[12px] py-2 text-[11px]",
+          active ? "bg-white font-semibold text-[#5a30cf] shadow-[0_1px_2px_rgba(22,20,31,0.08)]" : "text-[#6b6878]",
         )}
         href={item.href}
         key={item.id}
       >
         <span
           className={cn(
-            "flex h-8 w-[52px] items-center justify-center rounded-full transition-colors",
-            active ? "bg-primary/10 text-primary" : "text-muted-foreground",
+            "flex h-6 items-center justify-center transition-colors",
+            active ? "text-[#5a30cf]" : "text-[#6b6878]",
           )}
         >
           <Icon aria-hidden="true" className="size-[21px]" />
         </span>
         <span className="max-w-full truncate px-0.5">{getNavigationTabLabel(item, locale)}</span>
         {count > 0 && (
-          <span className="absolute left-[41px] top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9.5px] font-extrabold text-white ring-2 ring-background">
+          <span className="absolute left-[37px] top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#e5484d] px-1 text-[9.5px] font-bold text-white ring-2 ring-[#f7f7f9]">
             {badgeText(count)}
           </span>
         )}
@@ -143,22 +144,20 @@ export function MobileSideNav({
         aria-current={active ? "page" : undefined}
         className={cn(
           "flex h-[38px] shrink-0 items-center gap-[11px] rounded-[11px] px-2.5 text-[13.5px] transition-colors",
-          active
-            ? "bg-surface font-extrabold text-foreground shadow-[0_1px_2px_rgba(20,32,43,0.08),inset_0_0_0_1px_var(--border)]"
-            : "font-semibold text-foreground/80 hover:bg-muted",
+          active ? "bg-[#f1ecfd] font-semibold text-[#5a30cf]" : "text-[#3a3746] hover:bg-[#f7f7f9]",
         )}
         href={item.href}
         key={item.id}
       >
-        <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+        <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-[#7a52e6]" : "text-[#8b8898]")} />
         <span className="min-w-0 flex-1 truncate">{getNavigationLabel(item, locale)}</span>
         {count > 0 && (
           <span
             className={cn(
               "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-mono text-[10.5px] font-extrabold tabular-nums",
               item.id === "notifications" || item.id === "requests"
-                ? "bg-rose-500 text-white"
-                : "bg-muted text-muted-foreground",
+                ? "bg-[#e5484d] text-white"
+                : "text-[#8b8898]",
             )}
           >
             {badgeText(count)}
@@ -175,24 +174,24 @@ export function MobileSideNav({
         aria-label={labels.menu}
         data-shell-sidenav=""
         className={cn(
-          "relative z-[2] hidden w-[78px] shrink-0 flex-col items-center gap-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 border-r border-border bg-background pb-[max(14px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pt-[max(10px,env(safe-area-inset-top))] fold:flex",
+          "relative z-[2] hidden w-[78px] shrink-0 flex-col items-center gap-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 bg-[#f7f7f9] pb-[max(14px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pt-[max(14px,env(safe-area-inset-top))] fold:flex",
           collapsed ? "tablet:flex" : "tablet:hidden",
         )}
         style={{ boxSizing: "content-box" }}
       >
         <button
           aria-label={labels.menu}
-          className="flex size-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+          className="flex h-11 w-12 items-center justify-center rounded-[12px] text-foreground transition-colors hover:bg-black/[0.04]"
           onClick={onMenu}
           type="button"
         >
           <svg aria-hidden="true" fill="none" height="19" viewBox="0 0 24 24" width="19">
-            <path d="M4 7h16M4 12h11M4 17h16" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            <path d="M3 6h18M3 12h12M3 18h18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
           </svg>
         </button>
         <button
           aria-label={labels.editBottomBar}
-          className="mb-3 mt-1 flex size-[50px] items-center justify-center rounded-[17px] bg-primary text-primary-foreground shadow-[0_8px_16px_-8px_color-mix(in_oklab,var(--primary)_75%,transparent)]"
+          className="mb-3 mt-0.5 flex size-10 items-center justify-center rounded-[12px] bg-white text-[#5a30cf] shadow-[inset_0_0_0_1px_#e0e0e6]"
           onClick={onEdit}
           type="button"
         >
@@ -203,21 +202,21 @@ export function MobileSideNav({
         <Link
           aria-current={activeItem === "notifications" ? "page" : undefined}
           aria-label={labels.notifications}
-          className="relative flex w-[70px] flex-col items-center gap-1 pb-1.5 pt-1 text-[11px] font-semibold text-muted-foreground"
+          className="relative flex size-11 items-center justify-center text-[#3a3746]"
           href="/mobile/notifications"
         >
-          <span className="flex h-8 w-[52px] items-center justify-center rounded-full">
+          <span className="flex items-center justify-center">
             <Bell aria-hidden="true" className="size-[21px]" />
           </span>
           {notifications > 0 && (
-            <span className="absolute left-[41px] top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9.5px] font-extrabold text-white ring-2 ring-background">
+            <span className="absolute right-0.5 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#e5484d] px-1 text-[9.5px] font-bold text-white">
               {badgeText(notifications)}
             </span>
           )}
         </Link>
         <Link
           aria-label={labels.account}
-          className="mt-1 flex size-[34px] items-center justify-center rounded-full bg-primary text-[13px] font-extrabold text-primary-foreground"
+          className="mt-1 flex size-[34px] items-center justify-center rounded-full bg-[#ede7fc] text-[13px] font-bold text-[#5a30cf]"
           href="/account?mode=mobile"
         >
           {userName.slice(0, 1)}
@@ -239,13 +238,14 @@ export function MobileSideNav({
         aria-label={labels.menu}
         data-shell-sidenav=""
         className={cn(
-          "relative z-[2] hidden w-[248px] shrink-0 flex-col gap-0.5 border-r border-border bg-background px-3 pb-[max(14px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]",
+          "relative z-[2] hidden w-[248px] shrink-0 flex-col gap-0.5 bg-white px-3 pb-[max(14px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]",
           collapsed ? "tablet:hidden" : "tablet:flex",
         )}
       >
         <div className="flex items-center gap-2.5 px-2 pb-3 pt-1">
-          <Link className="wordmark text-[21px] text-foreground" href="/mobile">
-            Foldy
+          <Link className="flex items-center gap-2.5" href="/mobile">
+            <FoldyMark size={30} />
+            <span className="wordmark text-[19px] text-foreground">Foldy</span>
           </Link>
           <Link
             aria-label={labels.notifications}
@@ -272,19 +272,19 @@ export function MobileSideNav({
           {menuItems.map(sideLink)}
           {opsItems.length > 0 && (
             <>
-              <p className="px-2.5 pb-1 pt-3 text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground/80">
+              <p className="px-2.5 pb-1 pt-3 text-[12px] font-semibold text-[#8b8898]">
                 {opsTitle}
               </p>
               {opsItems.map(sideLink)}
             </>
           )}
         </div>
-        <div className="mt-2 flex items-center gap-1 border-t border-border pt-2.5">
+        <div className="mt-2 flex items-center gap-1 pt-2.5">
           <Link
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[11px] px-2 py-1.5 transition-colors hover:bg-muted"
             href="/account?mode=mobile"
           >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-[12.5px] font-extrabold text-primary-foreground">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#ede7fc] text-[12.5px] font-bold text-[#5a30cf]">
               {userName.slice(0, 1)}
             </span>
             <span className="min-w-0">

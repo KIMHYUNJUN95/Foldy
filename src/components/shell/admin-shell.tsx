@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import Link from "next/link";
-import { ChevronDown, Search, Settings, Smartphone } from "lucide-react";
+import { ChevronDown, Search, Smartphone } from "lucide-react";
 import { AdminGuestSearch } from "@/components/shell/admin-guest-search";
 import { MobilePreview } from "@/components/shell/mobile-preview";
 import "@/components/admin/admin-console.css";
@@ -42,8 +42,6 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
   const c = dictionary.admin.console;
   const orgName = session.organization.name;
   const userName = session.user.name ?? "";
-  const settingsItem = adminNavigation.find((item) => item.id === "settings");
-  const settingsLabel = settingsItem ? getNavigationLabel(settingsItem, locale) : c.account;
 
   const groupLabel: Record<AdminNavGroupKey, string> = {
     operations: c.navGroupOps,
@@ -166,9 +164,6 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
                   empty: c.notifEmpty,
                 }}
               />
-              <Link className="tbtn" href="/admin/settings" aria-label={settingsLabel}>
-                <span className="ic"><Settings /></span>
-              </Link>
               <Link className="top__av" href="/account?mode=admin" aria-label={c.account}>
                 {userName.slice(0, 1) || "·"}
               </Link>

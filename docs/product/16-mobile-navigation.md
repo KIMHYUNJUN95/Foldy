@@ -489,6 +489,9 @@ Current rules:
 - **Left**: a hamburger menu button (3-line SVG with a shorter middle line) opens the mobile side menu. `aria-label` uses `dictionary.common.menu`.
 - **Layout**: the header is a 3-part `justify-between` row — left menu button / centered wordmark / right notification-and-profile group.
 - **Center**: the `Foldy` wordmark (20px, `text-foreground`, `white-space: nowrap`) uses the shared `.wordmark` class (serif italic — Noto Serif, defined in `src/app/globals.css` and loaded in `src/app/layout.tsx`).
+- **화이트 리디자인(2026-10-09)**: 워드마크는 세리프 이탤릭 대신 **Geist 700**(`.wordmark`), 세 줄 메뉴 바로 오른쪽에 **왼쪽 정렬**(가운데 정렬 아님),
+  메뉴 버튼은 동그란 회색 바탕 없이 줄만, 오른쪽 프로필은 사람 아이콘 대신 **옅은 보라 동그라미 이니셜**. 레일(폴드)은 옅은 면(`#F7F7F9`) · 테두리 없음 ·
+  선택 = 흰 칸 · 편집 버튼 = 흰 네모(테두리 1px), 사이드바(태블릿)는 테두리 없음 · 로고 마크 + 워드마크 · 선택 = 옅은 보라 면.
 - **Top chrome surface**: the header bar is flat/borderless — no capsule outline, ring, glass blur, or shadow. Menu, notification, profile controls and the centered wordmark sit over the shared ivory chrome.
 - **Buttons**: the menu button is a 38px muted circle; notification and profile controls use the same 38px touch target and muted icon color. The menu icon is a 3-line SVG with a shorter middle line; the profile icon is a person SVG.
 - **Right**: the notification bell links to `/mobile/notifications` and can show the unread badge; the profile button links to `/account?mode=mobile`. Accessible labels use the shared dictionary.

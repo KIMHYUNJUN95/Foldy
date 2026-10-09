@@ -1,328 +1,356 @@
 import Link from "next/link";
 import "./admin-console.css";
+import "./dashboard-home.css";
 import { CleaningLiveCard } from "./cleaning-live-card";
+import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
 import type { AdminDashboardData, QueueKind } from "@/lib/admin-dashboard";
 import type { Dictionary } from "@/lib/i18n";
+import type { DashboardOpsSummary } from "@/lib/ops-revenue-server";
 
 type Console = Dictionary["admin"]["console"];
 
-/* ── inline icons (match the mobile icon language) ── */
 const I = {
-  clean: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M12 4l1.4 3.6L17 9l-3.6 1.4L12 14l-1.4-3.6L7 9l3.6-1.4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M5 20l4-7M19 20l-4-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
-  ),
-  inbox: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M4 13l2.5-7.5A2 2 0 018.4 4h7.2a2 2 0 011.9 1.5L20 13v5a2 2 0 01-2 2H6a2 2 0 01-2-2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /><path d="M4 13h4l1.5 2.5h5L16 13h4" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>
-  ),
-  clock: (
-    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" /><path d="M12 7.5v5l3.2 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  ),
-  board: (
-    <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.7" /><path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
-  ),
-  check: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4.5 4.5L19 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  ),
-  bed: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M3 8v10M3 12h18v6M21 12v-1.5a2.5 2.5 0 00-2.5-2.5H11v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><circle cx="7" cy="11" r="1.6" stroke="currentColor" strokeWidth="1.6" /></svg>
-  ),
-  arrowIn: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  ),
-  logout: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M10 4H6a1.5 1.5 0 00-1.5 1.5v13A1.5 1.5 0 006 20h4M16 8l4 4-4 4M20 12H10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  ),
   wrench: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M14.5 6.5a3.5 3.5 0 00-4.6 4.3l-5.1 5.1a1.6 1.6 0 002.3 2.3l5.1-5.1a3.5 3.5 0 004.3-4.6l-2 2-1.8-1.8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+    <svg viewBox="0 0 24 24" fill="none"><path d="M14.5 6.5a3.5 3.5 0 00-4.6 4.3l-5.1 5.1a1.6 1.6 0 002.3 2.3l5.1-5.1a3.5 3.5 0 004.3-4.6l-2 2-1.8-1.8z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>
   ),
   found: (
-    <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.7" /><path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+    <svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12l1 14H5zM9 7a3 3 0 016 0" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>
   ),
-  box: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M4 8l8-4 8 4-8 4-8-4z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /><path d="M4 8v8l8 4 8-4V8M12 12v8" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+  cart: (
+    <svg viewBox="0 0 24 24" fill="none"><path d="M3 4h2l2.4 11.2a2 2 0 002 1.6h7.7a2 2 0 002-1.5L21 8H6.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
   ),
-  chevR: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  check: (
+    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4.5 4.5L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
   ),
 };
+
+const QUEUE_ICON: Record<QueueKind, React.ReactNode> = { maintenance: I.wrench, lost: I.found, order: I.cart };
 
 function Ic({ children }: { children: React.ReactNode }) {
   return <span className="ic">{children}</span>;
 }
 
 function relDay(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric", timeZone: "Asia/Tokyo" }).format(
-    new Date(iso),
-  );
-}
-function initial(name: string): string {
-  return name.trim().slice(0, 1) || "·";
+  return new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric", timeZone: "Asia/Tokyo" }).format(new Date(iso));
 }
 
-const QUEUE_ICON: Record<QueueKind, { icon: React.ReactNode; bg: string }> = {
-  maintenance: { icon: I.wrench, bg: "bg-danger" },
-  lost: { icon: I.found, bg: "bg-info" },
-  order: { icon: I.box, bg: "bg-pri" },
+const yen = (value: number) => `¥${Math.round(value).toLocaleString("ja-JP")}`;
+const pct = (value: number) => `${Math.round(value)}%`;
+
+/** 축 눈금 — 가장 큰 막대보다 크고 보기 좋은 값(정확한 엔 표기, 줄이지 않는다). */
+function niceMax(value: number): number {
+  if (value <= 0) return 10000;
+  const step = 10 ** Math.floor(Math.log10(value));
+  for (const m of [1, 2, 3, 5, 10]) if (m * step >= value) return m * step;
+  return 10 * step;
+}
+
+function monthLabel(key: string, localeTag: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat(localeTag, { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+export type DashboardOpsBlock = {
+  summary: DashboardOpsSummary;
+  monthPickerLabels: AdminMonthPickerLabels;
 };
 
-export function DashboardHome({ data, c, locale }: { data: AdminDashboardData; c: Console; locale: string }) {
+/**
+ * 관리자 대시보드 홈(화이트 리디자인 2026-10-09, 시안 두 장 그대로 — 사용자 결정).
+ * - 운영 관리자: 숫자 줄 → 매출 · 가동률(달 고르기) → 최근 6개월
+ * - 그 밖: 숫자 줄 → 즉시 처리해야 하는 큐(진행 중 청소 · 즉시 처리 큐) → 오늘 할 일 · 예약 현황
+ * 「이상 근태 · 정정 요청」 · 「중요 공지」 구역은 두 시안 모두에 없어 뺐다(근태 · 공지 화면에 있다).
+ */
+export function DashboardHome({
+  data,
+  c,
+  locale,
+  ops,
+}: {
+  data: AdminDashboardData;
+  c: Console;
+  locale: string;
+  ops?: DashboardOpsBlock | null;
+}) {
   const mCount = data.queue.filter((q) => q.kind === "maintenance").length;
   const lCount = data.queue.filter((q) => q.kind === "lost").length;
   const oCount = data.queue.filter((q) => q.kind === "order").length;
   const occPct = data.ops.totalRooms > 0 ? Math.round((data.ops.occupiedRooms / data.ops.totalRooms) * 100) : 0;
 
-  const opsCells: {
-    href: string;
-    label: string;
-    value: number;
-    total?: number;
-    unit?: string;
-    delta?: string;
-    deltaCls?: "up" | "down" | "flat";
-    bar?: number;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      href: "/admin/calendar",
-      label: c.opsOccupied,
-      value: data.ops.occupiedRooms,
-      total: data.ops.totalRooms,
-      unit: c.unitRooms,
-      delta: c.occupancyRate(occPct),
-      deltaCls: "flat",
-      bar: occPct,
-      icon: I.bed,
-    },
-    { href: "/admin/calendar", label: c.opsCheckIn, value: data.ops.checkIns, icon: I.arrowIn },
-    { href: "/admin/calendar", label: c.opsCheckOut, value: data.ops.checkOuts, icon: I.logout },
-    { href: "/admin/cleaning", label: c.opsCleaning, value: data.ops.cleaningInProgress, unit: c.unitRooms, icon: I.clean },
+  const kpis: { href: string; label: string; value: number; unit?: string; detail?: string }[] = [
+    { href: "/admin/calendar", label: c.opsOccupied, value: data.ops.occupiedRooms, unit: ` / ${data.ops.totalRooms}${c.unitRooms}`, detail: c.occupancyRate(occPct) },
+    { href: "/admin/calendar", label: c.opsCheckIn, value: data.ops.checkIns },
+    { href: "/admin/calendar", label: c.opsCheckOut, value: data.ops.checkOuts },
+    { href: "/admin/cleaning", label: c.opsCleaning, value: data.ops.cleaningInProgress, unit: c.unitRooms },
     {
       href: "/admin/maintenance",
       label: c.opsRequests,
       value: data.ops.openRequests,
       unit: c.unitCount,
-      delta: `${c.kindMaintenance} ${mCount} · ${c.kindLost} ${lCount} · ${c.kindOrder} ${oCount}`,
-      deltaCls: "flat",
-      icon: I.inbox,
+      detail: `${c.kindMaintenance} ${mCount} · ${c.kindLost} ${lCount} · ${c.kindOrder} ${oCount}`,
     },
   ];
 
   return (
-    <>
-      {/* Ops summary bar */}
-      <div className="opsbar">
-        {opsCells.map((cell, i) => (
-          <Link key={i} href={cell.href} className="opscell">
-            <div className="opscell__k"><Ic>{cell.icon}</Ic>{cell.label}</div>
-            <div className="opscell__v">
-              {cell.value}
-              {cell.total != null ? (
-                <small> / {cell.total}{cell.unit}</small>
-              ) : cell.unit ? (
-                <small> {cell.unit}</small>
-              ) : null}
-            </div>
-            {cell.delta ? <div className={`opscell__delta ${cell.deltaCls ?? "flat"}`}>{cell.delta}</div> : null}
-            {cell.bar != null ? (
-              <div className="opscell__bar"><i style={{ width: `${cell.bar}%` }} /></div>
-            ) : null}
+    <div className="dh">
+      <div className="dh-kpis">
+        {kpis.map((k) => (
+          <Link className="dh-kpi" href={k.href} key={k.label}>
+            <span className="dh-kpi__k">{k.label}</span>
+            <span className="dh-kpi__v">
+              {k.value}
+              {k.unit ? <small>{k.unit}</small> : null}
+            </span>
+            {k.detail ? <span className="dh-kpi__d">{k.detail}</span> : null}
           </Link>
         ))}
       </div>
 
-      {/* Section 1 — 진행 중 청소 + 미처리 큐 (top-priority: 문서 05-admin-web-ia.md) */}
-      <div className="secthead">
-        <span className="secthead__t">{c.sectQueueTitle}</span>
-        <span className="secthead__c">{data.queue.length}</span>
-        <span className="secthead__line" />
-      </div>
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
-        {/* 진행 중 청소 — 행 클릭 시 우측 상세 패널 */}
-        <CleaningLiveCard cleaning={data.cleaning} locale={locale} />
+      {ops ? <OpsBlock c={c} locale={locale} ops={ops} /> : <QueueBlock c={c} data={data} locale={locale} />}
+    </div>
+  );
+}
 
-        {/* 미처리 정비 / 분실물 / 주문 */}
-        <div className="card" style={{ gridColumn: "span 5" }}>
-          <div className="card__h">
-            <span className="card__ic bg-warn"><Ic>{I.inbox}</Ic></span>
-            <div className="card__ti"><span className="card__t">{c.queueTitle}</span></div>
-            <span className="card__cnt">{data.queue.length}{c.unitCount}</span>
-          </div>
-          <div style={{ paddingBottom: 6 }}>
-            {data.queue.length === 0 ? (
-              <div className="empty">{c.queueEmpty}</div>
-            ) : (
-              data.queue.slice(0, 5).map((q) => {
-                const meta = QUEUE_ICON[q.kind];
-                const href =
-                  q.kind === "maintenance" ? "/admin/maintenance" : q.kind === "lost" ? "/admin/lost-found" : "/admin/orders";
-                const kindLabel = q.kind === "maintenance" ? c.kindMaintenance : q.kind === "lost" ? c.kindLost : c.kindOrder;
-                return (
-                  <Link key={`${q.kind}-${q.id}`} href={href} className="qrow">
-                    <span className={`qrow__ic ${meta.bg}`}><Ic>{meta.icon}</Ic></span>
-                    <div className="qrow__b">
-                      <div className="qrow__t">{q.title}</div>
-                      <div className="qrow__s">{kindLabel}{q.location ? ` · ${q.location}` : ""}</div>
-                    </div>
-                    <div className="qrow__meta">
-                      {q.urgent ? <span className="pill pill--danger">{c.urgentTag}</span> : null}
-                      <span className="qrow__time">{relDay(q.createdAt, locale)}</span>
-                    </div>
-                  </Link>
-                );
-              })
-            )}
-          </div>
+function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; locale: string }) {
+  const s = ops.summary;
+  const max = niceMax(Math.max(...s.daily.map((d) => d.revenue), 1));
+  const showLabel = (day: number) => [1, 5, 10, 15, 20, 25, s.daily.length].includes(day);
+  const prevDiff = Math.round(s.occupancyPct) - Math.round(s.previousOccupancyPct);
+  const r = 44;
+  const circ = 2 * Math.PI * r;
+  const mMax = niceMax(Math.max(...s.months.map((m) => m.revenue), 1));
+  const thisMonth = s.today.slice(0, 7);
+  const linePoints = s.months.map((m, i) => ({ x: 40 + i * 80, y: 120 - (Math.min(m.occupancyPct, 100) / 100) * 100, v: m.occupancyPct }));
+  const peak = linePoints.reduce((best, p) => (p.v > best.v ? p : best), linePoints[0]);
+
+  return (
+    <>
+      <div className="dh-sec">
+        <b>{c.dhOpsTitle}</b>
+        <span className="dh-cc">{c.dhOpsNote}</span>
+        <div className="dh-sec__end">
+          <AdminMonthPicker basePath="/admin" labels={ops.monthPickerLabels} localeTag={locale} ym={s.month} />
         </div>
       </div>
-
-      {/* Section 2 — 이상 근태 / 정정 요청 + 중요 공지 (top-priority: 문서 05-admin-web-ia.md) */}
-      <div className="secthead">
-        <span className="secthead__t">{c.sectReviewTitle}</span>
-        <span className="secthead__line" />
-      </div>
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
-        {/* 이상 근태 / 정정 요청 */}
-        <div className="card" style={{ gridColumn: "span 7" }}>
-          <div className="card__h">
-            <span className="card__ic bg-warn"><Ic>{I.clock}</Ic></span>
-            <div className="card__ti">
-              <span className="card__t">{c.attTitle}</span>
-              <span className="card__live" style={{ color: "var(--warn)" }}>
-                <span className="d" style={{ background: "var(--warn)" }} />{c.attReviewNeeded}
-              </span>
+      <div className="dh-grid">
+        <div className="dh-rev">
+          <div className="dh-rev__top">
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="dh-ct">{c.dhRevenue}</span>
+              <span className="dh-rev__v">{yen(s.revenue)}</span>
+              {s.actualThroughDay ? (
+                <span className="dh-rev__note">
+                  {c.dhActualNote.replace("{day}", String(s.actualThroughDay)).replace("{amount}", yen(s.actualToDate))}
+                  {s.changePct !== null ? <b>{`${s.changePct >= 0 ? "+" : ""}${s.changePct.toFixed(1)}%`}</b> : <b>—</b>}
+                </span>
+              ) : null}
             </div>
-            <span className="card__cnt">{data.attendance.length}{c.unitCount}</span>
-            <div className="card__act">
-              <Link href="/admin/attendance" className="linkmore">{c.attModule}<Ic>{I.chevR}</Ic></Link>
+            <div className="dh-legend">
+              <span><i style={{ background: "#7a52e6" }} />{c.dhLegendActual}</span>
+              <span><i style={{ background: "#cdbbfb" }} />{c.dhLegendBooked}</span>
+            </div>
+            <Link className="dh-link" href="/admin/ops/revenue">{c.dhRevenueLink} →</Link>
+          </div>
+          <div className="dh-chart">
+            <div className="dh-axis"><span>{yen(max)}</span><span>{yen(max / 2)}</span><span>¥0</span></div>
+            <div className="dh-plot">
+              <div className="dh-plot__lines"><span /><span /><span /></div>
+              <div className="dh-bars">
+                {s.daily.map((d) => (
+                  <div
+                    className={`dh-bar${d.actual ? " is-actual" : ""}${d.today ? " is-today" : ""}`}
+                    key={d.day}
+                    style={{ height: `${Math.max(0, (d.revenue / max) * 100)}%` }}
+                    title={c.dhDayTip.replace("{day}", String(d.day)).replace("{amount}", yen(d.revenue))}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-          <div style={{ paddingBottom: 6 }}>
-            {data.attendance.length === 0 ? (
-              <div className="empty">{c.attEmpty}</div>
-            ) : (
-              data.attendance.slice(0, 4).map((a) => (
-                <Link key={a.sessionId} href="/admin/attendance" className="qrow">
-                  <span className="avatar qrow__av" style={{ background: "var(--adm-primary)" }}>{initial(a.userName)}</span>
-                  <div className="qrow__b">
-                    <div className="qrow__t">
-                      {a.userName} · <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>{a.dateLabel}</span>
-                    </div>
-                    <div className="qrow__s">
-                      {a.clockInLabel ?? "—"} → {a.clockOutLabel ?? "—"}
-                      {a.clockInSiteName ? ` · ${a.clockInSiteName}` : ""}
-                    </div>
-                  </div>
-                  <div className="qrow__meta">
-                    <span className={`pill ${a.reviewState === "pending_correction" ? "pill--info" : "pill--warn"}`}>
-                      {a.reviewState === "pending_correction" ? c.attCorrection : c.attAbnormal}
-                    </span>
-                  </div>
-                  <span className="ic qrow__chev">{I.chevR}</span>
-                </Link>
-              ))
-            )}
+          <div className="dh-xlabels">
+            <span style={{ width: 72, flex: "none" }} />
+            <div>
+              {s.daily.map((d) => (
+                <span className={d.today ? "is-today" : undefined} key={d.day}>
+                  {d.today ? c.dhToday : showLabel(d.day) ? d.day : ""}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* 중요 공지 */}
-        <div className="card" style={{ gridColumn: "span 5" }}>
-          <div className="card__h">
-            <span className="card__ic bg-info"><Ic>{I.board}</Ic></span>
-            <div className="card__ti"><span className="card__t">{c.noticeTitle}</span></div>
-            <div className="card__act">
-              <Link href="/admin/announcements" className="linkmore">{c.noticeBoard}<Ic>{I.chevR}</Ic></Link>
-            </div>
+        <div className="dh-occ">
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span className="dh-ct">{c.dhOccupancy}</span>
+            <Link className="dh-link" href="/admin/ops/occupancy" style={{ marginLeft: "auto" }}>{c.dhOccupancyLink} →</Link>
           </div>
-          <div style={{ paddingBottom: 6 }}>
-            {data.notices.length === 0 ? (
-              <div className="empty">{c.noticeEmpty}</div>
-            ) : (
-              data.notices.map((n) => (
-                <Link key={n.id} href={`/admin/announcements/${n.id}`} className="nrow">
-                  <span className={`nrow__ic ${n.important ? "bg-danger" : "bg-surf"}`}><Ic>{I.board}</Ic></span>
-                  <div className="nrow__b">
-                    {n.important ? (
-                      <div className="nrow__h"><span className="pill pill--danger">{c.noticeImportant}</span></div>
+          <div className="dh-occ__ring">
+            <svg aria-label={c.dhOccDesc.replace("{pct}", String(Math.round(s.occupancyPct)))} height="104" role="img" viewBox="0 0 104 104" width="104">
+              <circle cx="52" cy="52" fill="none" r={r} stroke="#EFEFF3" strokeWidth="10" />
+              <circle
+                cx="52"
+                cy="52"
+                fill="none"
+                r={r}
+                stroke="#7A52E6"
+                strokeDasharray={`${(Math.min(s.occupancyPct, 100) / 100) * circ} ${circ}`}
+                strokeLinecap="round"
+                strokeWidth="10"
+                transform="rotate(-90 52 52)"
+              />
+              <text fill="#16141F" fontSize="22" fontWeight="700" textAnchor="middle" x="52" y="59">{pct(s.occupancyPct)}</text>
+            </svg>
+            <p>
+              {c.dhOccMonth.replace("{avail}", s.availableNights.toLocaleString("ja-JP")).replace("{occ}", s.occupiedNights.toLocaleString("ja-JP"))}
+              <br />
+              {c.dhOccPrev} <b>{pct(s.previousOccupancyPct)}</b> → <b>{`${prevDiff >= 0 ? "+" : ""}${prevDiff}%p`}</b>
+            </p>
+          </div>
+          <div className="dh-bld">
+            {s.buildings.map((b) => (
+              <div className="dh-bld__row" key={b.name}>
+                <span className="dh-bld__n" title={b.name}>{b.name}</span>
+                <span className="dh-meter"><i style={{ width: `${Math.min(b.pct, 100)}%` }} /></span>
+                <span className="dh-bld__v">{pct(b.pct)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="dh-months">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="dh-ct">{c.dhMonthsTitle}</span>
+            {s.months.some((m) => m.month === thisMonth) ? (
+              <span className="dh-cc">{c.dhMonthsNote.replace("{month}", monthLabel(thisMonth, locale))}</span>
+            ) : null}
+          </div>
+          <div className="dh-months__grid">
+            <div className="dh-months__col">
+              <span className="dh-months__k">{c.dhMonthRevenue}</span>
+              <div className="dh-mbars">
+                {s.months.map((m) => (
+                  <div className="dh-mbar" key={m.month}>
+                    <span>{yen(m.revenue)}</span>
+                    <i className={m.month === thisMonth ? "is-current" : undefined} style={{ height: `${(m.revenue / mMax) * 100}%` }} />
+                  </div>
+                ))}
+              </div>
+              <div className="dh-mlbl">{s.months.map((m) => <span key={m.month}>{monthLabel(m.month, locale)}</span>)}</div>
+            </div>
+            <div className="dh-months__col">
+              <span className="dh-months__k">{c.dhMonthOcc}</span>
+              <svg
+                aria-label={c.dhMonthsDesc.replace("{list}", s.months.map((m) => pct(m.occupancyPct)).join(", "))}
+                height="150"
+                preserveAspectRatio="none"
+                role="img"
+                viewBox="0 0 480 130"
+                width="100%"
+              >
+                <line stroke="#E6E6EB" x1="0" x2="480" y1="129.5" y2="129.5" />
+                <line stroke="#F1F1F4" x1="0" x2="480" y1="70" y2="70" />
+                <polyline fill="none" points={linePoints.map((p) => `${p.x},${p.y}`).join(" ")} stroke="#7A52E6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                <g fill="#7A52E6" stroke="#FFFFFF" strokeWidth="2">
+                  {linePoints.map((p) => <circle cx={p.x} cy={p.y} key={p.x} r="4.5" />)}
+                </g>
+                {linePoints.length > 0 ? (
+                  <>
+                    <text fill="#6B6878" fontSize="11" textAnchor="middle" x={peak.x} y={peak.y - 10}>{pct(peak.v)}</text>
+                    {peak !== linePoints[linePoints.length - 1] ? (
+                      <text fill="#16141F" fontSize="11" fontWeight="600" textAnchor="middle" x={linePoints[linePoints.length - 1].x} y={linePoints[linePoints.length - 1].y - 10}>
+                        {pct(linePoints[linePoints.length - 1].v)}
+                      </text>
                     ) : null}
-                    <div className="nrow__t">{n.title}</div>
-                  </div>
-                  <span className="nrow__time">{relDay(n.createdAt, locale)}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Section 3 — 오늘 할 일 + 예약/체크인아웃 (secondary block: 문서 05-admin-web-ia.md) */}
-      <div className="secthead">
-        <span className="secthead__t">{c.sectTodayTitle}</span>
-        <span className="secthead__line" />
-      </div>
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
-        {/* 오늘 할 일 */}
-        <div className="card" style={{ gridColumn: "span 4" }}>
-          <div className="card__h">
-            <span className="card__ic bg-pri"><Ic>{I.check}</Ic></span>
-            <div className="card__ti"><span className="card__t">{c.todoTitle}</span></div>
-            <span className="card__cnt">{data.todos.filter((t) => t.done).length} / {data.todos.length}</span>
-          </div>
-          <div style={{ paddingBottom: 6 }}>
-            {data.todos.length === 0 ? (
-              <div className="empty">{c.todoEmpty}</div>
-            ) : (
-              data.todos.map((t) => (
-                <div key={t.id} className={`todo${t.done ? " is-done" : ""}`}>
-                  <span className={`todo__chk${t.done ? " done" : ""}`}>{t.done ? <Ic>{I.check}</Ic> : null}</span>
-                  <span className="todo__t">{t.title}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 예약 / 체크인 / 체크아웃 현황 */}
-        <div className="card" style={{ gridColumn: "span 8" }}>
-          <div className="card__h">
-            <span className="card__ic bg-pri"><Ic>{I.bed}</Ic></span>
-            <div className="card__ti"><span className="card__t">{c.resvTitle}</span></div>
-            <div className="card__act">
-              <div className="minirow" style={{ gap: 0, marginRight: 6 }}>
-                <div className="ministat"><div className="ministat__v" style={{ fontSize: 17, color: "var(--info)" }}>{data.ops.checkIns}</div><div className="ministat__k">{c.resvCheckIn}</div></div>
-                <div className="minisep" />
-                <div className="ministat"><div className="ministat__v" style={{ fontSize: 17, color: "var(--done)" }}>{data.ops.checkOuts}</div><div className="ministat__k">{c.resvCheckOut}</div></div>
-              </div>
-              <Link href="/admin/calendar" className="linkmore">{c.viewAll}<Ic>{I.chevR}</Ic></Link>
+                  </>
+                ) : null}
+              </svg>
+              <div className="dh-mlbl">{s.months.map((m) => <span key={m.month}>{monthLabel(m.month, locale)}</span>)}</div>
             </div>
           </div>
-          <div className="card__body">
-            {data.reservations.checkIns.length === 0 && data.reservations.checkOuts.length === 0 ? (
-              <div className="empty">{c.resvEmpty}</div>
-            ) : (
-              <div className="tl" style={{ marginTop: 4 }}>
-                {data.reservations.checkIns.map((r) => (
-                  <div key={`in-${r.id}`} className="tlrow">
-                    <span className="tlrow__dot on" />
-                    <div className="tlrow__b">
-                      <div className="tlrow__t"><span className="mono">{r.roomLabel}</span> <span style={{ color: "var(--adm-muted)", fontWeight: 600 }}>{r.guestName}</span></div>
-                      <div className="tlrow__s">{r.propertyName}{r.source ? ` · ${r.source}` : ""}</div>
-                    </div>
-                    <span className="tlrow__kind" style={{ background: "var(--info-bg)", color: "var(--info)" }}>{c.resvCheckIn}</span>
-                  </div>
-                ))}
-                {data.reservations.checkOuts.map((r) => (
-                  <div key={`out-${r.id}`} className="tlrow">
-                    <span className="tlrow__dot done" />
-                    <div className="tlrow__b">
-                      <div className="tlrow__t"><span className="mono">{r.roomLabel}</span> <span style={{ color: "var(--adm-muted)", fontWeight: 600 }}>{r.guestName}</span></div>
-                      <div className="tlrow__s">{r.propertyName}{r.source ? ` · ${r.source}` : ""}</div>
-                    </div>
-                    <span className="tlrow__kind" style={{ background: "var(--done-bg)", color: "var(--done)" }}>{c.resvCheckOut}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function QueueBlock({ data, c, locale }: { data: AdminDashboardData; c: Console; locale: string }) {
+  return (
+    <>
+      <div className="dh-sec">
+        <b>{c.sectQueueTitle}</b>
+        <span className="dh-cc">{data.queue.length + data.cleaning.length}</span>
+      </div>
+      <div className="dh-grid">
+        <CleaningLiveCard cleaning={data.cleaning} locale={locale} />
+        <div className="dh-col5">
+          <div className="dh-ch">
+            <span className="dh-ct">{c.queueTitle}</span>
+            <span className="dh-cc">{data.queue.length}{c.unitCount}</span>
           </div>
+          {data.queue.length === 0 ? (
+            <div className="dh-empty">{c.queueEmpty}</div>
+          ) : (
+            data.queue.slice(0, 5).map((q) => {
+              const href = q.kind === "maintenance" ? "/admin/maintenance" : q.kind === "lost" ? "/admin/lost-found" : "/admin/orders";
+              const kindLabel = q.kind === "maintenance" ? c.kindMaintenance : q.kind === "lost" ? c.kindLost : c.kindOrder;
+              return (
+                <Link className="dh-row" href={href} key={`${q.kind}-${q.id}`}>
+                  <span className="dh-qic"><Ic>{QUEUE_ICON[q.kind]}</Ic></span>
+                  <div className="dh-rb">
+                    <div className="dh-rt">{q.title}</div>
+                    <div className="dh-rs">{kindLabel}{q.location ? ` · ${q.location}` : ""}</div>
+                  </div>
+                  {q.urgent ? <span className="dh-urgent">{c.urgentTag}</span> : null}
+                  <span className="dh-cc">{relDay(q.createdAt, locale)}</span>
+                </Link>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="dh-sec dh-sec--line">
+        <b>{c.sectTodayTitle}</b>
+      </div>
+      <div className="dh-grid">
+        <div className="dh-col5 dh-left">
+          <div className="dh-ch">
+            <span className="dh-ct">{c.todoTitle}</span>
+            <span className="dh-cc" style={{ marginLeft: "auto" }}>{data.todos.filter((t) => t.done).length} / {data.todos.length}</span>
+          </div>
+          {data.todos.length === 0 ? (
+            <div className="dh-empty">{c.todoEmpty}</div>
+          ) : (
+            data.todos.map((t) => (
+              <div className={`dh-todo${t.done ? " is-done" : ""}`} key={t.id}>
+                <span className="dh-todo__box">{t.done ? <Ic>{I.check}</Ic> : null}</span>
+                <span>{t.title}</span>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="dh-col7 dh-right">
+          <div className="dh-ch">
+            <span className="dh-ct">{c.resvTitle}</span>
+            <Link className="dh-link" href="/admin/calendar" style={{ marginLeft: "auto" }}>{c.dhAllLink} →</Link>
+          </div>
+          {data.reservations.checkIns.length === 0 && data.reservations.checkOuts.length === 0 ? (
+            <div className="dh-empty">{c.resvEmpty}</div>
+          ) : (
+            [
+              ...data.reservations.checkIns.map((r) => ({ r, kind: c.resvCheckIn, key: `in-${r.id}` })),
+              ...data.reservations.checkOuts.map((r) => ({ r, kind: c.resvCheckOut, key: `out-${r.id}` })),
+            ].map(({ r, kind, key }) => (
+              <div className="dh-row" key={key} style={{ cursor: "default" }}>
+                <span className="dh-room">{r.roomLabel}</span>
+                <div className="dh-rb">
+                  <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
+                  <div className="dh-rs">{r.propertyName}{r.source ? ` · ${r.source}` : ""}</div>
+                </div>
+                <span className="dh-kind">{kind}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>

@@ -3079,6 +3079,7 @@ const FALLBACK_DICTIONARY = {
       verificationSentTitle: "Check your inbox",
       verificationSentBody:
         "We sent a verification link to your email. Click it to activate your account.",
+      verificationSentHint: "No email? This address may already be registered — sign in, or reset your password.",
       resetTitle: "Reset\npassword",
       resetSubtitle:
         "We'll send a reset link to your registered email.",
@@ -9411,6 +9412,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         verificationSentTitle: "이메일을 확인해 주세요",
         verificationSentBody:
           "인증 링크를 이메일로 보냈습니다. 링크를 클릭하면 계정이 활성화됩니다.",
+        verificationSentHint: "메일이 오지 않으면 이미 가입된 이메일일 수 있어요. 로그인하거나 비밀번호를 재설정해 주세요.",
         resetTitle: "비밀번호\n재설정",
         resetSubtitle: "가입한 이메일로 재설정 링크를 보내드립니다.",
         resetHint: "이 주소로 가입된 계정이 있으면 메일을 보냅니다.",
@@ -15620,6 +15622,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         verificationSentTitle: "メールをご確認ください",
         verificationSentBody:
           "確認リンクをメールで送信しました。リンクをクリックするとアカウントが有効になります。",
+        verificationSentHint: "メールが届かない場合は、登録済みのアドレスかもしれません。ログインするか、パスワードを再設定してください。",
         resetTitle: "パスワード\nのリセット",
         resetSubtitle: "ご登録のメールアドレスにリセットリンクをお送りします。",
         resetHint: "このアドレスで登録されたアカウントがあればメールを送信します。",

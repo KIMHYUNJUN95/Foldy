@@ -225,6 +225,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <span className="aw-status__email"><Ic>{Mail}</Ic>{params.email}</span>
           )}
           <Link href={emailHref} className="aw-btn aw-gap-m">{t.email.resetSentBackToLogin}</Link>
+          <p className="aw-note">
+            {t.email.verificationSentHint}{" "}
+            <Link href={forgotHref}>{t.email.forgot}</Link>
+          </p>
         </div>
       </AuthFrame>
     );

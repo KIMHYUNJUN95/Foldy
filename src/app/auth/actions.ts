@@ -237,10 +237,12 @@ export async function signUpWithEmail(formData: FormData) {
     redirect(`${errorBase}&error=${mapSupabaseError(error.message)}`);
   }
 
-  // identities array empty → email already registered (Supabase deduplication).
-  // Redirect to login so the user can sign in or reset their password instead
-  // of ending up with a duplicate account.
-  if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+  // Email already registered (Supabase deduplication) → send them to login instead of the
+  // "check your inbox" screen — no mail is sent for a repeated signup.
+  // 예전 Supabase 는 identities 가 빈 가짜 user 를 돌려줬지만, **지금은 오류 없이 user 자체가 null** 이다
+  // (2026-10-09 실측 — 이미 확인된 계정으로 가입하면 메일 없이 「이메일을 확인해 주세요」만 떠서 사용자가
+  // 메일이 안 온다고 신고). 두 모양을 다 기존 계정으로 본다.
+  if (!data.user || !data.user.identities || data.user.identities.length === 0) {
     redirect(
       `/auth/login?view=email&next=${encodeURIComponent(next)}${langParam}&email=${encodeURIComponent(email)}&error=resume_existing_account`,
     );
@@ -248,7 +250,7 @@ export async function signUpWithEmail(formData: FormData) {
 
   // Verification email sent — show the "check your inbox" state.
   redirect(
-    `/auth/login?view=email&mode=signup&next=${encodeURIComponent(next)}${langParam}&sent=verify`,
+    `/auth/login?view=email&mode=signup&next=${encodeURIComponent(next)}${langParam}&sent=verify&email=${encodeURIComponent(email)}`,
   );
 }
 

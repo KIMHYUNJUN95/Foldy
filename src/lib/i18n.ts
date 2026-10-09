@@ -3190,7 +3190,7 @@ const FALLBACK_DICTIONARY = {
       email_already_exists:
         "An account with this email already exists. Try logging in instead.",
       resume_existing_account:
-        "This email already has an unfinished account. Sign in to continue onboarding.",
+        "This email is already registered. Sign in, or reset your password if you forgot it.",
       weak_password:
         "Use at least 10 characters with letters and numbers. Avoid your email address or easy-to-guess words.",
       email_not_confirmed:
@@ -9520,7 +9520,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         email_already_exists:
           "이미 사용 중인 이메일입니다. 로그인을 시도해 보세요.",
         resume_existing_account:
-          "이 이메일로 시작한 가입이 아직 완료되지 않았습니다. 로그인해서 온보딩을 이어서 진행해주세요.",
+          "이미 가입된 이메일이에요. 로그인하거나, 비밀번호가 기억나지 않으면 재설정해 주세요.",
         weak_password:
           "10자 이상, 영문자와 숫자를 포함해 주세요. 이메일 주소나 쉽게 짐작되는 단어는 사용할 수 없습니다.",
         email_not_confirmed:
@@ -15729,7 +15729,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         email_already_exists:
           "このメールアドレスはすでに使用されています。ログインをお試しください。",
         resume_existing_account:
-          "このメールアドレスで開始した登録がまだ完了していません。ログインしてオンボーディングを続けてください。",
+          "このメールアドレスは登録済みです。ログインするか、パスワードを忘れた場合は再設定してください。",
         weak_password:
           "10文字以上で英字と数字を含めてください。メールアドレスや推測されやすい単語は使用できません。",
         email_not_confirmed:

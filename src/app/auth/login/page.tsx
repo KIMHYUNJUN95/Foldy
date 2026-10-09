@@ -218,7 +218,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
         <div className="aw-status authw__col--center" style={{ flex: 1 }}>
           <span className="aw-status__ic"><Ic>{Mail}</Ic></span>
-          <span className="aw-status__ey">{c.sentEyebrow}</span>
+          <span className="aw-status__ey">{c.signupEyebrow}</span>
           <h1 className="aw-title">{t.email.verificationSentTitle}</h1>
           <p className="aw-lede">{t.email.verificationSentBody}</p>
           {params.email && (

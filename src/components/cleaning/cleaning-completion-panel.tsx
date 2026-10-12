@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Ban, CheckCircle2, Clock3, Edit3, Timer } from "lucide-react";
+import { Ban, CheckCircle2, Clock3, Edit3, Package, Timer, Wrench } from "lucide-react";
 import { cancelCleaningSession, completeCleaningSession } from "@/app/mobile/cleaning/actions";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -24,7 +25,15 @@ type CleaningCompletionPanelProps = {
     room: string;
     startedAt: string;
     task: string;
+    cleaningNow: string;
+    finishCleaning: string;
+    lostShort: string;
+    issueShort: string;
   };
+  /** 링 아래 한 줄 — 「오쿠보 A · 체크아웃 청소 · 10:20 시작」 */
+  metaLine: string;
+  lostHref: string;
+  maintenanceHref: string;
   roomLabel: string;
   sessionId: string;
   startedAt: string;
@@ -48,6 +57,9 @@ function formatElapsed(totalSeconds: number) {
 
 export function CleaningCompletionPanel({
   labels,
+  metaLine,
+  lostHref,
+  maintenanceHref,
   roomLabel,
   sessionId,
   startedAt,
@@ -73,52 +85,63 @@ export function CleaningCompletionPanel({
 
   const elapsedLabel = formatElapsed(elapsed);
 
+  // 링은 한 시간에 한 바퀴 — 시안(2026-10-13). 숫자는 그대로 경과 시간.
+  const RING = 2 * Math.PI * 88;
+  const ringFill = ((elapsed % 3600) / 3600) * RING;
+
   return (
     <>
+      {/* 화이트 리디자인(2026-10-13): 링 타이머 · 객실 · 한 줄 메타 · 꽉 찬 「청소 완료」 · 분실물 · 문제 신고 · 청소 취소.
+          태블릿에서는 링이 왼쪽, 버튼이 오른쪽(cleaning-screen.css). */}
       <div
-        className={
-          isConfirming || isCancelConfirming
-            ? "pointer-events-none opacity-0 transition-all duration-200"
-            : "transition-all duration-300"
-        }
+        className={`cln-active__grid${
+          isConfirming || isCancelConfirming ? " pointer-events-none opacity-0 transition-all duration-200" : " transition-all duration-300"
+        }`}
       >
-        <div className="mt-2 flex justify-center">
-          <div className="relative flex size-64 flex-col items-center justify-center rounded-full border border-border bg-gradient-to-br from-white/45 to-white/20 shadow-[0_20px_40px_-18px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-2xl">
-            <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-tr from-white/20 via-transparent to-white/45" />
-            <p className="z-10 text-[11px] font-black uppercase tracking-[0.14em] text-primary/80">
-              {labels.startedAt} {startedAtLabel}
-            </p>
-            <p className="z-10 mt-2 font-mono text-6xl font-black tracking-tight text-foreground">
-              {elapsedLabel}
-            </p>
+        <div className="cln-active__ringwrap">
+          <div className="cln-ring">
+            <svg aria-hidden="true" viewBox="0 0 200 200">
+              <circle cx="100" cy="100" fill="none" r="88" stroke="#ede7fc" strokeWidth="12" />
+              <circle
+                cx="100"
+                cy="100"
+                fill="none"
+                r="88"
+                stroke="#7a52e6"
+                strokeDasharray={`${ringFill} ${RING}`}
+                strokeLinecap="round"
+                strokeWidth="12"
+                transform="rotate(-90 100 100)"
+              />
+            </svg>
+            <div className="cln-ring__in">
+              <span className="cln-ring__lbl">
+                <i aria-hidden="true" />
+                {labels.cleaningNow}
+              </span>
+              <span className="cln-ring__time">{elapsedLabel}</span>
+            </div>
           </div>
+          <p className="cln-active__room">{roomLabel}</p>
+          <p className="cln-active__meta">{metaLine}</p>
         </div>
-
-        <div className="mt-4 rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
-            {labels.elapsed}
-          </p>
-          <p className="mt-1 text-sm font-semibold text-muted-foreground">{elapsedLabel}</p>
-        </div>
-
-        <div className="mt-4 space-y-3 rounded-2xl border border-border bg-surface/32 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-xl">
-          <Button
-            className="h-12 w-full rounded-full border border-border bg-primary/90 font-black uppercase tracking-wide text-white shadow-[0_12px_30px_hsl(var(--primary-hsl)/0.32)] hover:bg-primary"
-            onClick={() => setIsConfirming(true)}
-            type="button"
-          >
-            <CheckCircle2 className="mr-2 size-4" aria-hidden="true" />
-            {labels.completedToday}
-          </Button>
-          <Button
-            className="h-10 w-full rounded-full text-xs font-semibold text-destructive/80 hover:text-destructive"
-            onClick={() => setIsCancelConfirming(true)}
-            type="button"
-            variant="ghost"
-          >
-            <Ban className="mr-1.5 size-3.5" aria-hidden="true" />
-            {labels.cancelCleaning}
-          </Button>
+        <div className="cln-active__acts">
+          <button className="cln-btn cln-btn--pri" onClick={() => setIsConfirming(true)} type="button">
+            {labels.finishCleaning}
+          </button>
+          <div className="cln-active__row">
+            <Link className="cln-btn cln-btn--soft" href={lostHref}>
+              <Package aria-hidden="true" />
+              {labels.lostShort}
+            </Link>
+            <Link className="cln-btn cln-btn--soft" href={maintenanceHref}>
+              <Wrench aria-hidden="true" />
+              {labels.issueShort}
+            </Link>
+            <button className="cln-btn cln-btn--soft is-muted" onClick={() => setIsCancelConfirming(true)} type="button">
+              {labels.cancelCleaning}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -128,7 +151,7 @@ export function CleaningCompletionPanel({
           header={
             <>
               <div className="flex justify-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-[#f1ecfd] text-primary">
                   <CheckCircle2 className="size-6" aria-hidden="true" />
                 </div>
               </div>
@@ -145,21 +168,21 @@ export function CleaningCompletionPanel({
         >
           {({ close }) => (
             <>
-              <div className="mt-4 rounded-2xl border border-border bg-surface p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <div className="mt-4 rounded-2xl bg-[#f7f7f9] p-4">
                 <div className="min-w-0">
                   <p className="text-lg font-black leading-tight">{labels.room} {roomLabel}</p>
                   <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{taskLabel}</p>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl border border-border bg-surface p-3">
+                  <div className="rounded-xl bg-white p-3">
                     <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                       <Clock3 className="size-3.5" aria-hidden="true" />
                       {labels.startedAt}
                     </dt>
                     <dd className="mt-1 font-black">{startedAtLabel}</dd>
                   </div>
-                  <div className="rounded-xl border border-border bg-surface p-3">
+                  <div className="rounded-xl bg-white p-3">
                     <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                       <Timer className="size-3.5" aria-hidden="true" />
                       {labels.elapsed}
@@ -190,7 +213,7 @@ export function CleaningCompletionPanel({
                   {labels.confirmCompletion}
                 </SubmitButton>
                 <Button
-                  className="h-12 w-full rounded-xl border border-border bg-surface font-bold"
+                  className="h-12 w-full rounded-xl border-0 bg-[#f4f4f7] font-bold"
                   onClick={close}
                   type="button"
                   variant="secondary"
@@ -209,7 +232,7 @@ export function CleaningCompletionPanel({
           header={
             <>
               <div className="flex justify-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10 text-destructive">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
                   <Ban className="size-6" aria-hidden="true" />
                 </div>
               </div>
@@ -226,12 +249,12 @@ export function CleaningCompletionPanel({
         >
           {({ close }) => (
             <>
-              <div className="mt-4 rounded-2xl border border-border bg-surface p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+              <div className="mt-4 rounded-2xl bg-[#f7f7f9] p-4">
                 <div className="min-w-0">
                   <p className="text-lg font-black leading-tight">{labels.room} {roomLabel}</p>
                   <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{taskLabel}</p>
                 </div>
-                <div className="mt-3 rounded-xl border border-border bg-surface p-3">
+                <div className="mt-3 rounded-xl bg-white p-3">
                   <dt className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                     <Clock3 className="size-3.5" aria-hidden="true" />
                     {labels.startedAt}
@@ -250,7 +273,7 @@ export function CleaningCompletionPanel({
                   {labels.confirmCancelCleaning}
                 </Button>
                 <Button
-                  className="h-12 w-full rounded-xl border border-border bg-surface font-bold"
+                  className="h-12 w-full rounded-xl border-0 bg-[#f4f4f7] font-bold"
                   onClick={close}
                   type="button"
                   variant="secondary"

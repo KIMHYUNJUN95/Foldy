@@ -1,0 +1,101 @@
+/*
+ * 모바일 청소 화면 — 화이트 리디자인(2026-10-13, 시안 Clean-Phone · Clean-Fold · Clean-Tablet).
+ * 상자 없는 한 장: 제목 · 숫자 3개 → 날짜 · 내 기록 → 진행 중인 청소(링) → 청소 목록 | 셋팅 목록 · 오늘 기록.
+ * 폰은 한 줄로 쌓고 구역 사이에 가는 줄, 폴드는 2열, 태블릿 가로는 3열. docs/design/05-white-redesign.md
+ */
+.cln { display: flex; flex-direction: column; gap: 16px; color: #16141f; padding-bottom: 8px; }
+
+/* 제목 · 숫자 */
+.cln-head { display: flex; flex-direction: column; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid #f1f1f4; }
+.cln-head__t h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+.cln-head__t p { margin: 4px 0 0; font-size: 13px; color: #8b8898; }
+.cln-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cln-kpi { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cln-kpi__k { font-size: 12px; color: #6b6878; white-space: nowrap; }
+.cln-kpi__v { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cln-kpi__v.is-live { color: #7a52e6; }
+/* 셋팅 대상 숫자는 시트를 여는 버튼 — 글자 그대로 보이게 */
+.cln-kpi__v button { font: inherit; color: inherit; letter-spacing: inherit; }
+.cln-kpi__v, .cln-kpi__v * { text-decoration: none !important; }
+
+/* 날짜 · 내 청소 기록 */
+.cln-nav { display: flex; align-items: center; gap: 12px; }
+.cln-nav__day { flex: 1; min-width: 0; }
+.cln-nav__rec { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; font-size: 13px; font-weight: 500; color: #7a52e6; }
+.cln-nav__rec svg { width: 15px; height: 15px; }
+
+/* 안내 줄 */
+.cln-note { padding: 11px 14px; border-radius: 12px; background: #f1ecfd; color: #5a30cf; font-size: 13px; font-weight: 500; line-height: 1.5; }
+.cln-note.is-danger { background: #fdecec; color: #c5282e; }
+.cln-note.is-warn { background: #fdf3e6; color: #a8641c; }
+
+/* 구역 제목 */
+.cln-h { display: flex; align-items: baseline; gap: 6px; margin: 0 0 10px; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.cln-h__c { font-size: 13px; font-weight: 500; color: #8b8898; font-variant-numeric: tabular-nums; }
+
+/* 진행 중인 청소 */
+.cln-active { padding-bottom: 20px; border-bottom: 1px solid #f1f1f4; }
+.cln-active__grid { display: flex; flex-direction: column; gap: 18px; }
+.cln-active__ringwrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.cln-ring { position: relative; width: 188px; height: 188px; }
+.cln-ring svg { width: 100%; height: 100%; }
+.cln-ring__in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.cln-ring__lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: #7a52e6; }
+.cln-ring__lbl i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; }
+.cln-ring__time { font-family: var(--font-mono, ui-monospace), monospace; font-size: 40px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: #16141f; }
+.cln-active__room { margin: 14px 0 0; font-family: var(--font-mono, ui-monospace), monospace; font-size: 22px; font-weight: 700; }
+.cln-active__meta { margin: 4px 0 0; font-size: 13px; color: #6b6878; }
+.cln-active__acts { display: flex; flex-direction: column; gap: 10px; }
+.cln-active__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cln-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 10px; border: 0; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: transform 0.12s; }
+.cln-btn:active { transform: scale(0.98); }
+.cln-btn svg { width: 15px; height: 15px; color: #7a52e6; flex: 0 0 auto; }
+.cln-btn--pri { height: 52px; border-radius: 16px; background: #7a52e6; color: #fff; font-size: 16px; }
+.cln-btn--soft { background: #f4f4f7; color: #16141f; }
+.cln-btn--soft.is-muted { color: #6b6878; font-weight: 500; }
+
+/* 목록 */
+.cln-cols { display: flex; flex-direction: column; gap: 22px; }
+.cln-side { display: flex; flex-direction: column; gap: 22px; }
+.cln-col + .cln-col, .cln-side > .cln-col, .cln-manual { padding-top: 20px; border-top: 1px solid #f1f1f4; }
+.cln-side > .cln-col + .cln-col { margin-top: 0; }
+.cln-group + .cln-group { margin-top: 14px; }
+.cln-group__t { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: #8b8898; }
+.cln-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; }
+.cln-row + .cln-row { border-top: 1px solid #f3f3f6; }
+.cln-row__rm { flex: 0 0 auto; min-width: 58px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono, ui-monospace), monospace; font-size: 14px; font-weight: 700; }
+.cln-row__b { flex: 1; min-width: 0; }
+.cln-row__t { margin: 0; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cln-row__s { margin: 2px 0 0; font-size: 12px; color: #8b8898; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cln-row__r { flex: 0 0 auto; }
+.cln-row__time { font-family: var(--font-mono, ui-monospace), monospace; font-size: 12px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.cln-row.is-muted .cln-row__rm { color: #9a97a6; }
+.cln-start { height: 36px; padding: 0 14px; border-radius: 12px; border: 1px solid #ddd3fb; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; white-space: nowrap; cursor: pointer; }
+.cln-start:active { background: #f1ecfd; }
+.cln-rec { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cln-rec__st { font-size: 12px; font-weight: 600; color: #1f7a45; }
+.cln-rec__s { font-size: 12px; color: #8b8898; }
+.cln-rec__none { font-size: 12px; color: #9a97a6; }
+.cln-empty { margin: 0; padding: 14px 0; font-size: 14px; color: #8b8898; }
+.cln-manual { margin-top: 20px; }
+
+/* 폴드 — 제목 오른쪽에 숫자, 진행 중인 청소는 옅은 면, 목록 2열 */
+@media (min-width: 600px) {
+  .cln-head { flex-direction: row; align-items: flex-end; justify-content: space-between; border-bottom: 0; padding-bottom: 0; }
+  .cln-kpis { display: flex; gap: 28px; }
+  .cln-kpi { align-items: center; }
+  .cln-active { padding: 18px; border: 0; border-radius: 20px; background: #f7f7f9; }
+  .cln-btn--soft { background: #fff; }
+  .cln-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .cln-col + .cln-col { border-top: 0; padding-top: 0; }
+  .cln-cols > .cln-col { border-top: 0; padding-top: 0; }
+  .cln-side > .cln-col:first-child { border-top: 0; padding-top: 0; }
+}
+
+/* 태블릿 가로 — 링 왼쪽 · 버튼 오른쪽, 목록 3열 */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .cln-active__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 32px; }
+  .cln-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cln-side { display: contents; }
+  .cln-side > .cln-col { border-top: 0; padding-top: 0; }
+}

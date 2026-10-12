@@ -1,20 +1,20 @@
 "use client";
 
-// Admin cleaning console — "오늘 현황" board: KPI-driven room-status cards grouped either by
-// building or by status bucket, plus the 셋팅 대상 and 직원별 오늘 요약 sections below. Mirrors
-// clean-views.js todayBoard()/buildingSections()/statusBuckets()/staffSummary() from the design
-// handoff, rebuilt as React components over the shared .rmc/.bkgrid/.csec/.setgrid/.staffgrid CSS.
+// Admin cleaning console — "오늘 현황" board: room tiles grouped either by building or by status
+// bucket, plus the 셋팅 대상 list and 직원별 오늘 요약 side by side below. White redesign (2026-10-13,
+// docs/design/05-white-redesign.md): tiles are light fills without borders or a left status bar, the
+// status is a small text badge, and section heads are a plain title + progress bar.
 // Data is real (src/lib/admin-cleaning.ts) as of 2026-07-14.
 import type { ReactNode } from "react";
-import { Ban, Building2, Check, Clock, KeyRound, Search, Users } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import type { AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
-import { BUILDING_ORDER, durationMin, elapsedMin, fmtDur, type BuildingKey } from "./cleaning-console-data";
+import { BUILDING_ORDER, durationMin, elapsedMin, type BuildingKey, type CleaningTaskType } from "./cleaning-console-data";
 import {
   CancelledBadge,
   ReportBadges,
-  StaffAvatar,
-  StatusPill,
   buildingLabelOf,
+  durLabel,
+  statusLabel,
   type ConsoleCopy,
   type StaffDirectory,
   staffLabelOf,
@@ -30,6 +30,7 @@ type TodayBoardProps = {
   group: "building" | "status";
   propFilter: BuildingKey | "all";
   staffFilter: string;
+  typeFilter: CleaningTaskType | "all";
   query: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -37,6 +38,10 @@ type TodayBoardProps = {
   onSelectSetupTarget: (roomKey: string) => void;
   onClearFilters: () => void;
 };
+
+function Initial({ name }: { name: string }) {
+  return <span className="cl-av">{name ? Array.from(name)[0] : "–"}</span>;
+}
 
 function RoomCard({
   task,
@@ -55,12 +60,13 @@ function RoomCard({
   selected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const dur = durationMin(task.start, task.end);
-  const elapsed = elapsedMin(task.start);
+  const minutes =
+    task.status === "progress" ? elapsedMin(task.start) : task.status === "done" ? durationMin(task.start, task.end) : null;
+  const staffName = task.staffId ? staffLabelOf(task.staffId, staffDirectory) : "";
 
   return (
     <div
-      className={`rmc is-${task.status}${selected ? " sel" : ""}`}
+      className={`cl-tile is-${task.status}${selected ? " sel" : ""}`}
       onClick={() => onSelect(task.id)}
       role="button"
       tabIndex={0}
@@ -71,98 +77,36 @@ function RoomCard({
         }
       }}
     >
-      <div className="rmc__top">
-        <div style={{ minWidth: 0 }}>
-          <div className="rmc__rm">{task.room}</div>
-          <div className="rmc__type">
-            {showProp ? `${buildingLabelOf(task, buildingLabels)} · ` : ""}
-            {typeLabel(task.type, t)}
-          </div>
-        </div>
-        <div className="rmc__badges">
+      <div className="cl-tile__top">
+        <span className="cl-tile__rm">{task.room}</span>
+        <span className="cl-tile__badges">
           <CancelledBadge count={task.cancelledCount} t={t} />
           <ReportBadges reports={task.reports} t={t} />
-        </div>
+          <span className={`cl-st cl-st--${task.status}`}>{statusLabel(task.status, t)}</span>
+        </span>
       </div>
-
-      <div className="rmc__st">
-        <StatusPill status={task.status} t={t} />
-        {task.status === "progress" ? (
-          <span className="elapsed">
-            <span className="ic">
-              <Clock />
-            </span>
-            {fmtDur(elapsed)}
-          </span>
+      <div className="cl-tile__type">
+        {showProp ? `${buildingLabelOf(task, buildingLabels)} · ` : ""}
+        {typeLabel(task.type, t)}
+      </div>
+      <div className="cl-tile__foot">
+        {staffName ? <Initial name={staffName} /> : <span className="cl-av cl-av--none">–</span>}
+        <span className={`cl-tile__who${staffName ? "" : " is-none"}`}>{staffName || t.unassigned}</span>
+        {task.proxy ? <span className="cl-proxy">{t.stProxy}</span> : null}
+        {minutes != null ? (
+          <span className={`cl-tile__min mono${task.status === "progress" ? " is-live" : ""}`}>{durLabel(minutes, t)}</span>
         ) : null}
       </div>
-
-      {task.staffId || task.status === "done" || task.status === "progress" ? (
-        <div className="rmc__meta">
-          {task.staffId ? (
-            <div className="rmc__row">
-              <span className="rmc__who">
-                <StaffAvatar staffId={task.staffId} directory={staffDirectory} />
-                <span>{staffLabelOf(task.staffId, staffDirectory)}</span>
-              </span>
-              {task.proxy ? (
-                <>
-                  <span className="sp" />
-                  <span className="proxytag">{t.proxy}</span>
-                </>
-              ) : null}
-            </div>
-          ) : null}
-          {task.status === "done" ? (
-            <div className="rmc__row">
-              <Clock className="ic" aria-hidden="true" />
-              <span className="k">{t.duration}</span>
-              <span className="mono">{fmtDur(dur)}</span>
-              <span className="sp" />
-              <span className="k">{t.endAt}</span>
-              <span className="mono">{task.end}</span>
-            </div>
-          ) : null}
-          {task.status === "progress" ? (
-            <div className="rmc__row">
-              <Clock className="ic" aria-hidden="true" />
-              <span className="k">{t.startAt}</span>
-              <span className="mono">{task.start}</span>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {task.status === "done" ? (
-        <div className="rmc__foot">
-          <span className="rmc__done">
-            <Check className="ic" aria-hidden="true" />
-            {task.start} → {task.end}
-          </span>
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function SectionHead({
-  icon,
-  title,
-  count,
-  progress,
-}: {
-  icon: ReactNode;
-  title: string;
-  count: number;
-  progress?: ReactNode;
-}) {
+function SectionHead({ title, count, progress }: { title: string; count: number; progress?: ReactNode }) {
   return (
-    <div className="csec">
-      <span className="csec__ic">{icon}</span>
-      <span className="csec__t">{title}</span>
-      <span className="csec__c">{count}</span>
-      <span className="csec__line" />
-      {progress ? <span className="csec__prog">{progress}</span> : null}
+    <div className="cl-sec">
+      <b>{title}</b>
+      <span className="cl-sec__c">{count}</span>
+      {progress ? <span className="cl-sec__prog">{progress}</span> : null}
     </div>
   );
 }
@@ -215,20 +159,22 @@ function BuildingSections(props: {
         return (
           <div key={key}>
             <SectionHead
-              icon={<Building2 aria-hidden="true" />}
               title={label}
               count={items.length}
               progress={
                 <>
-                  {done}/{items.length} {t.doneN}
-                  <span className="csec__bar">
+                  <span className="mono">
+                    {done}/{items.length}
+                  </span>{" "}
+                  {t.doneN}
+                  <span className="cl-prog">
                     <i style={{ width: `${pct}%` }} />
                   </span>
-                  {pct}%
+                  <span className="mono">{pct}%</span>
                 </>
               }
             />
-            <div className="rmcgrid">
+            <div className="cl-grid">
               {items.map((task) => (
                 <RoomCard
                   key={task.id}
@@ -264,43 +210,26 @@ function StatusBuckets(props: {
   const buckets: Array<{
     key: "pending" | "progress" | "done" | "cancelled";
     label: string;
-    icon: ReactNode;
     has: (task: AdminCleaningTask) => boolean;
   }> = [
-    {
-      key: "pending",
-      label: t.bkPending,
-      icon: <Clock aria-hidden="true" />,
-      has: (task) => task.status === "pending",
-    },
-    {
-      key: "progress",
-      label: t.bkProgress,
-      icon: <Clock aria-hidden="true" />,
-      has: (task) => task.status === "progress",
-    },
-    { key: "done", label: t.bkDone, icon: <Check aria-hidden="true" />, has: (task) => task.status === "done" },
+    { key: "pending", label: t.bkPending, has: (task) => task.status === "pending" },
+    { key: "progress", label: t.bkProgress, has: (task) => task.status === "progress" },
+    { key: "done", label: t.bkDone, has: (task) => task.status === "done" },
   ];
   if (hasCancelled) {
-    buckets.push({
-      key: "cancelled",
-      label: t.stCancelled,
-      icon: <Ban aria-hidden="true" />,
-      has: (task) => task.status === "cancelled",
-    });
+    buckets.push({ key: "cancelled", label: t.stCancelled, has: (task) => task.status === "cancelled" });
   }
   return (
-    <div className={`bkgrid${hasCancelled ? " bkgrid--4" : ""}`}>
+    <div className={`cl-bk${hasCancelled ? " cl-bk--4" : ""}`}>
       {buckets.map((bucket) => {
         const items = tasks.filter(bucket.has);
         return (
-          <section className={`bkcol bkcol--${bucket.key}`} key={bucket.key}>
-            <div className="bkcol__h">
-              <span className="bkcol__ic">{bucket.icon}</span>
-              <span className="bkcol__t">{bucket.label}</span>
-              <span className="bkcol__c">{items.length}</span>
+          <section className="cl-bk__col" key={bucket.key}>
+            <div className="cl-sec cl-sec--col">
+              <b>{bucket.label}</b>
+              <span className="cl-sec__c">{items.length}</span>
             </div>
-            <div className="bkcol__body">
+            <div className="cl-bk__body">
               {items.length ? (
                 items.map((task) => (
                   <RoomCard
@@ -315,10 +244,7 @@ function StatusBuckets(props: {
                   />
                 ))
               ) : (
-                <div className="cnone">
-                  <Check className="ic" aria-hidden="true" />
-                  {t.emptyT}
-                </div>
+                <div className="cl-none">{t.emptyT}</div>
               )}
             </div>
           </section>
@@ -343,17 +269,16 @@ function SetupSection({
 }) {
   if (!targets.length) return null;
   return (
-    <>
-      <SectionHead
-        icon={<KeyRound aria-hidden="true" style={{ color: "var(--adm-primary)" }} />}
-        title={t.secSetup}
-        count={targets.length}
-        progress={<span style={{ color: "var(--adm-muted)" }}>{t.secSetupSub}</span>}
-      />
-      <div className="setgrid">
+    <section className="cl-split__col">
+      <div className="cl-sec cl-sec--col">
+        <b>{t.secSetup}</b>
+        <span className="cl-sec__c">{targets.length}</span>
+      </div>
+      <div className="cl-sub">{t.secSetupSub}</div>
+      <div className="cl-list">
         {targets.map((target) => (
           <div
-            className={`setrow${selectedSetupKey === target.roomKey ? " sel" : ""}`}
+            className={`cl-setrow${selectedSetupKey === target.roomKey ? " sel" : ""}`}
             key={target.roomKey}
             onClick={() => onSelectSetupTarget(target.roomKey)}
             role="button"
@@ -365,22 +290,23 @@ function SetupSection({
               }
             }}
           >
-            <span className="setrow__rm">{target.room}</span>
-            <div className="setrow__b">
-              <div className="setrow__t">{target.guest}</div>
-              <div className="setrow__s">
-                {buildingLabelOf(target, buildingLabels)} · {t.arriving} <span className="mono">{t.today}</span>
+            <span className="cl-setrow__rm mono">{target.room}</span>
+            <div className="cl-setrow__b">
+              <div className="cl-setrow__t">{target.guest}</div>
+              <div className="cl-setrow__s">
+                {buildingLabelOf(target, buildingLabels)} · {t.arriving} {t.today}
               </div>
             </div>
-            <span className="setrow__pax">
-              <Users className="ic" aria-hidden="true" />
-              {target.pax}
-              {t.pax}
-            </span>
+            {target.pax != null ? (
+              <span className="cl-setrow__pax">
+                {target.pax}
+                {t.pax}
+              </span>
+            ) : null}
           </div>
         ))}
       </div>
-    </>
+    </section>
   );
 }
 
@@ -393,40 +319,41 @@ function StaffSummarySection({
   t: ConsoleCopy;
   staffDirectory: StaffDirectory;
 }) {
-  const done = tasks.filter((task) => task.status === "done" && task.staffId);
-  const doneStaffIds = new Set(done.map((task) => task.staffId));
-  const staffList = [...staffDirectory.values()].filter((s) => doneStaffIds.has(s.id));
+  // 완료했거나 지금 청소 중인 사람 — 시안 「완료 1 · 진행 1」(2026-10-13, 진행만 있는 사람도 보인다).
+  const worked = tasks.filter((task) => task.staffId && (task.status === "done" || task.status === "progress"));
+  const ids = new Set(worked.map((task) => task.staffId));
+  const staffList = [...staffDirectory.values()].filter((s) => ids.has(s.id));
   if (!staffList.length) return null;
   return (
-    <>
-      <SectionHead icon={<Users aria-hidden="true" />} title={t.secStaff} count={staffList.length} />
-      <div className="staffgrid">
+    <section className="cl-split__col">
+      <div className="cl-sec cl-sec--col">
+        <b>{t.secStaff}</b>
+      </div>
+      <div className="cl-staff">
         {staffList.map((s) => {
-          const mine = done.filter((task) => task.staffId === s.id);
-          const durs = mine.map((task) => durationMin(task.start, task.end)).filter((v): v is number => v != null);
+          const mine = worked.filter((task) => task.staffId === s.id);
+          const done = mine.filter((task) => task.status === "done");
+          const prog = mine.length - done.length;
+          const durs = done.map((task) => durationMin(task.start, task.end)).filter((v): v is number => v != null);
           const avg = durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null;
           return (
-            <div className="staffc" key={s.id}>
-              <span className="staffc__av" style={{ background: s.bg }}>
-                {s.name.slice(0, 1)}
-              </span>
-              <div className="staffc__b">
-                <div className="staffc__nm">{s.name}</div>
-                <div className="staffc__s">
-                  {t.doneN} {mine.length}
-                  {t.unitCount}
+            <div className="cl-staffc" key={s.id}>
+              <span className="cl-av cl-av--lg">{Array.from(s.name)[0] ?? "–"}</span>
+              <div className="cl-staffc__b">
+                <div className="cl-staffc__nm">{s.name}</div>
+                <div className="cl-staffc__s">
+                  {t.staffDoneProg.replace("{done}", String(done.length)).replace("{prog}", String(prog))}
                 </div>
               </div>
-              <div className="staffc__sep" />
-              <div className="staffc__stat">
-                <div className="staffc__v">{avg == null ? "—" : fmtDur(avg)}</div>
-                <div className="staffc__k">{t.avg}</div>
+              <div className="cl-staffc__stat">
+                <div className="cl-staffc__v mono">{avg == null ? "—" : durLabel(avg, t)}</div>
+                <div className="cl-staffc__k">{t.avg}</div>
               </div>
             </div>
           );
         })}
       </div>
-    </>
+    </section>
   );
 }
 
@@ -439,6 +366,7 @@ export function TodayBoard({
   group,
   propFilter,
   staffFilter,
+  typeFilter,
   query,
   selectedId,
   onSelect,
@@ -450,6 +378,7 @@ export function TodayBoard({
   const match = (task: AdminCleaningTask) => {
     if (propFilter !== "all" && task.building !== propFilter) return false;
     if (staffFilter !== "all" && task.staffId !== staffFilter) return false;
+    if (typeFilter !== "all" && task.type !== typeFilter) return false;
     if (!q) return true;
     const buildingText = buildingLabelOf(task, buildingLabels).toLowerCase();
     const staffText = task.staffId ? staffLabelOf(task.staffId, staffDirectory).toLowerCase() : "";
@@ -460,23 +389,21 @@ export function TodayBoard({
   const setups = setupTargets.filter(
     (target) => propFilter === "all" || target.building === propFilter,
   );
-  const filtersActive = staffFilter !== "all" || propFilter !== "all" || Boolean(q);
+  const filtersActive = staffFilter !== "all" || propFilter !== "all" || typeFilter !== "all" || Boolean(q);
 
   if (!all.length) {
     return (
-      <div className="card">
-        <div className="state">
-          <div className={`state__ic ${filtersActive ? "empty" : "ok"}`}>
-            {filtersActive ? <Search aria-hidden="true" /> : <Check aria-hidden="true" />}
-          </div>
-          <div className="state__t">{t.emptyT}</div>
-          <div className="state__s">{t.emptyS}</div>
-          {filtersActive ? (
-            <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 16 }} onClick={onClearFilters}>
-              {t.clearFilter}
-            </button>
-          ) : null}
-        </div>
+      <div className="cl-empty">
+        <span className={`cl-empty__ic${filtersActive ? "" : " is-ok"}`}>
+          {filtersActive ? <Search aria-hidden="true" /> : <Check aria-hidden="true" />}
+        </span>
+        <div className="cl-empty__t">{t.emptyT}</div>
+        <div className="cl-empty__s">{t.emptyS}</div>
+        {filtersActive ? (
+          <button type="button" className="cl-empty__btn" onClick={onClearFilters}>
+            {t.clearFilter}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -503,14 +430,16 @@ export function TodayBoard({
           onSelect={onSelect}
         />
       )}
-      <SetupSection
-        targets={setups}
-        t={t}
-        buildingLabels={buildingLabels}
-        selectedSetupKey={selectedSetupKey}
-        onSelectSetupTarget={onSelectSetupTarget}
-      />
-      <StaffSummarySection tasks={tasks} t={t} staffDirectory={staffDirectory} />
+      <div className="cl-split">
+        <SetupSection
+          targets={setups}
+          t={t}
+          buildingLabels={buildingLabels}
+          selectedSetupKey={selectedSetupKey}
+          onSelectSetupTarget={onSelectSetupTarget}
+        />
+        <StaffSummarySection tasks={tasks} t={t} staffDirectory={staffDirectory} />
+      </div>
     </>
   );
 }

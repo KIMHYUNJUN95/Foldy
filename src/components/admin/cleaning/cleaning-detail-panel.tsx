@@ -7,12 +7,13 @@
 import { BedDouble, ChevronRight, Info, PackageSearch, ShieldCheck, Wrench, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
-import { durationMin, elapsedMin, fmtDate, fmtDur, todayDateKeyTokyo, toMin } from "./cleaning-console-data";
+import { durationMin, elapsedMin, fmtDate, todayDateKeyTokyo, toMin } from "./cleaning-console-data";
 import {
   ReportBadges,
   StatusPill,
   TYPE_ICON,
   buildingLabelOf,
+  durLabel,
   localeTagOf,
   staffLabelOf,
   typeLabel,
@@ -130,7 +131,7 @@ export function CleaningDetailPanel({
   const staffId = task ? task.staffId : history!.staffId;
   const proxy = task ? task.proxy : history!.proxy;
   const note = task ? task.note : history!.note;
-  const reports = task ? task.reports : null;
+  const reports = task ? task.reports : history!.reports;
   const start = task ? task.start : history!.start;
   const dur = task ? durationMin(task.start, task.end) : history!.dur;
   const localeTag = localeTagOf(locale);
@@ -204,7 +205,7 @@ export function CleaningDetailPanel({
                   <div className="timenode__t">{start}</div>
                 </div>
                 <div className="timemid">
-                  <div className="timemid__n">{fmtDur(dur)}</div>
+                  <div className="timemid__n">{durLabel(dur, t)}</div>
                   <div className="timeline2" />
                 </div>
                 <div className="timenode">
@@ -213,7 +214,7 @@ export function CleaningDetailPanel({
                 </div>
               </div>
               <div className="durbig" style={{ marginTop: 12 }}>
-                <div className="durbig__v">{fmtDur(dur)}</div>
+                <div className="durbig__v">{durLabel(dur, t)}</div>
                 <span className="durbig__lbl">{t.duration}</span>
               </div>
             </div>
@@ -223,7 +224,7 @@ export function CleaningDetailPanel({
               <div className="durbig">
                 <div className="durbig__v">{start}</div>
                 <span className="durbig__lbl">
-                  {t.startAt} · {t.elapsed} {fmtDur(task ? elapsedMin(task.start) : null)}
+                  {t.startAt} · {t.elapsed} {durLabel(task ? elapsedMin(task.start) : null, t)}
                 </span>
               </div>
             </div>

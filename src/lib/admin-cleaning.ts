@@ -159,18 +159,27 @@ async function collectReportLinksBySession(
   if (sessionIds.length === 0) return result;
 
   const supabase = await getSupabaseServerClient();
-  const [lostRes, issueRes] = await Promise.all([
-    supabase
-      .from("lost_items")
-      .select("id, cleaning_session_id")
-      .eq("organization_id", organizationId)
-      .in("cleaning_session_id", sessionIds),
-    supabase
-      .from("maintenance_reports")
-      .select("id, cleaning_session_id")
-      .eq("organization_id", organizationId)
-      .in("cleaning_session_id", sessionIds),
-  ]);
+  // 기록 탭은 한 달치 세션 id 를 넘길 수 있어 URL 이 길어지지 않게 나눠서 묻는다.
+  const chunks: string[][] = [];
+  for (let i = 0; i < sessionIds.length; i += 150) chunks.push(sessionIds.slice(i, i + 150));
+  const responses = await Promise.all(
+    chunks.map((ids) =>
+      Promise.all([
+        supabase
+          .from("lost_items")
+          .select("id, cleaning_session_id")
+          .eq("organization_id", organizationId)
+          .in("cleaning_session_id", ids),
+        supabase
+          .from("maintenance_reports")
+          .select("id, cleaning_session_id")
+          .eq("organization_id", organizationId)
+          .in("cleaning_session_id", ids),
+      ]),
+    ),
+  );
+  const lostRes = { data: responses.flatMap(([lost]) => lost.data ?? []) };
+  const issueRes = { data: responses.flatMap(([, issue]) => issue.data ?? []) };
 
   for (const row of (lostRes.data ?? []) as { id: string; cleaning_session_id: string | null }[]) {
     if (!row.cleaning_session_id) continue;
@@ -381,6 +390,8 @@ export type AdminCleaningHistoryItem = {
   /** 관리자 대리 완료 여부. 세션 상태와는 별개인 "완료 유형" 축. */
   proxy: boolean;
   note: string;
+  /** 이 세션에서 올라온 분실물 · 수리 신고(화이트 리디자인 2026-10-13 — 기록 표 · 상세의 「연결된 기록」). */
+  reports: { lost?: number; issue?: number; lostIds?: string[]; issueIds?: string[] } | null;
 };
 
 function mapSessionToHistoryItem(
@@ -413,6 +424,7 @@ function mapSessionToHistoryItem(
     status: sessionStatusToAdminStatus(s.status),
     proxy: Boolean(s.completed_by_admin),
     note: s.notes ?? "",
+    reports: null,
   };
 }
 
@@ -430,8 +442,23 @@ export async function getAdminCleaningHistory(
   // Query order is cleaning_date ASC, started_at DESC — keep the day ordering, but make rooms within
   // one day read in operational order instead of start-time order. Table rows and the Excel/PDF
   // export both derive from this array, so they stay in sync.
-  return sessions
+  const items = sessions
     .map((s) => mapSessionToHistoryItem(s, catalog))
     .sort((a, b) => a.date.localeCompare(b.date) || compareByBuildingThenRoom(a, b));
+  const links = await collectReportLinksBySession(
+    session.organization.id,
+    items.map((item) => item.id),
+  ).catch(() => new Map<string, ReportLinks>());
+  for (const item of items) {
+    const link = links.get(item.id);
+    if (!link || (link.lostIds.length === 0 && link.issueIds.length === 0)) continue;
+    item.reports = {
+      lost: link.lostIds.length || undefined,
+      issue: link.issueIds.length || undefined,
+      lostIds: link.lostIds.length ? link.lostIds : undefined,
+      issueIds: link.issueIds.length ? link.issueIds : undefined,
+    };
+  }
+  return items;
 }
 

@@ -17,17 +17,31 @@ import {
   type CleaningHistoryExportRow,
 } from "@/app/admin/cleaning/actions";
 import type { AdminCleaningHistoryItem } from "@/lib/admin-cleaning";
-import { BUILDING_ORDER, fmtDate, fmtDur, type BuildingKey } from "./cleaning-console-data";
+import { BUILDING_ORDER, fmtDate, toMin, type BuildingKey } from "./cleaning-console-data";
 import {
-  StaffAvatar,
-  StatusPill,
   buildingLabelOf,
+  durLabel,
   localeTagOf,
   staffLabelOf,
   typeLabel,
   type ConsoleCopy,
   type StaffDirectory,
 } from "./cleaning-console-shared";
+
+/** 이보다 오래 걸린 청소는 「오래 걸림」(빨강) — 시안 KPI 「70분 넘김」(2026-10-13). */
+export const LONG_CLEANING_MIN = 70;
+
+function endOf(start: string, dur: number | null): string | null {
+  const s = toMin(start);
+  if (s == null || dur == null) return null;
+  const total = (s + dur) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function shortDate(dateKey: string): string {
+  const [, m, d] = dateKey.split("-").map(Number);
+  return `${m}/${d}`;
+}
 
 /** 세션 상태 축 — 모바일 "상태"(완료/진행중/취소)와 같은 뜻. */
 export type HistorySessionStatusFilter = "all" | "done" | "progress" | "cancelled";
@@ -215,13 +229,11 @@ export function HistoryBoard({
     return (
       <>
         {toolbar}
-        <div className="card">
-          <div className="state">
-            <div className="state__ic empty">
-              <Search aria-hidden="true" />
-            </div>
-            <div className="state__t">{t.histLoading}</div>
-          </div>
+        <div className="cl-empty">
+          <span className="cl-empty__ic">
+            <Search aria-hidden="true" />
+          </span>
+          <div className="cl-empty__t">{t.histLoading}</div>
         </div>
       </>
     );
@@ -231,84 +243,137 @@ export function HistoryBoard({
     return (
       <>
         {toolbar}
-        <div className="card">
-          <div className="state">
-            <div className="state__ic empty">
-              <Search aria-hidden="true" />
-            </div>
-            <div className="state__t">{t.histEmptyT}</div>
-            <div className="state__s">{t.histEmptyS}</div>
-            <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 16 }} onClick={onClearFilters}>
-              {t.clearFilter}
-            </button>
-          </div>
+        <div className="cl-empty">
+          <span className="cl-empty__ic">
+            <Search aria-hidden="true" />
+          </span>
+          <div className="cl-empty__t">{t.histEmptyT}</div>
+          <div className="cl-empty__s">{t.histEmptyS}</div>
+          <button type="button" className="cl-empty__btn" onClick={onClearFilters}>
+            {t.clearFilter}
+          </button>
         </div>
       </>
     );
   }
 
+  // 숫자 줄 — 지금 걸러진 줄 기준(시안: 기록 · 총 소요 · 평균 소요 · 오래 걸림 · 관리자 완료).
+  const timed = rows.filter((h) => h.dur != null && h.status === "done");
+  const totalMin = timed.reduce((sum, h) => sum + (h.dur ?? 0), 0);
+  const avgMin = timed.length ? Math.round(totalMin / timed.length) : null;
+  const longCount = timed.filter((h) => (h.dur ?? 0) > LONG_CLEANING_MIN).length;
+  const proxyCount = rows.filter((h) => h.proxy).length;
+  const staffCount = new Set(rows.map((h) => h.staffId).filter(Boolean)).size;
+  const totalH = Math.floor(totalMin / 60);
+  const totalM = totalMin % 60;
+  // 최근 날짜가 위로(시안). 내보내기는 서버 순서(날짜 오름차순) 그대로다.
+  const shown = [...rows].reverse();
+
   return (
     <>
       {toolbar}
-      <div className="hmeta">
-        <b style={{ color: "var(--ink-soft)" }}>
-          {rows.length}
-          {t.unitRecords}
-        </b>
-        <span className="sep" />
-        {fmtDate(from, localeTag)} – {fmtDate(to, localeTag)}
+      <div className="cl-kpis cl-kpis--5">
+        <div className="cl-kpi">
+          <span className="cl-kpi__k">{t.kpiRecords}</span>
+          <span className="cl-kpi__v">
+            {rows.length}
+            <small>{t.unitRecords}</small>
+          </span>
+          <span className="cl-kpi__d">
+            {fmtDate(from, localeTag)} – {fmtDate(to, localeTag)}
+          </span>
+        </div>
+        <div className="cl-kpi">
+          <span className="cl-kpi__k">{t.kpiTotalDur}</span>
+          <span className="cl-kpi__v">
+            {totalH > 0 ? (
+              <>
+                {totalH}
+                <small>{t.unitHour}</small>{" "}
+              </>
+            ) : null}
+            {totalM}
+            <small>{t.unitMin}</small>
+          </span>
+          <span className="cl-kpi__d">{t.staffN.replace("{n}", String(staffCount))}</span>
+        </div>
+        <div className="cl-kpi">
+          <span className="cl-kpi__k">{t.kpiAvgDur}</span>
+          <span className="cl-kpi__v">
+            {avgMin == null ? "—" : avgMin}
+            {avgMin == null ? null : <small>{t.unitMin}</small>}
+          </span>
+          <span className="cl-kpi__d">{t.doneBasis.replace("{n}", String(timed.length))}</span>
+        </div>
+        <div className="cl-kpi">
+          <span className="cl-kpi__k">{t.kpiLong}</span>
+          <span className={`cl-kpi__v${longCount > 0 ? " is-danger" : ""}`}>
+            {longCount}
+            <small>{t.unitCount}</small>
+          </span>
+          <span className="cl-kpi__d">{t.longSub.replace("{n}", String(LONG_CLEANING_MIN))}</span>
+        </div>
+        <div className="cl-kpi">
+          <span className="cl-kpi__k">{t.kpiProxy}</span>
+          <span className="cl-kpi__v">
+            {proxyCount}
+            <small>{t.unitCount}</small>
+          </span>
+          <span className="cl-kpi__d">{t.stProxy}</span>
+        </div>
       </div>
-      <div className="card" style={{ overflow: "hidden" }}>
-        <table className="qtbl">
-          <thead>
-            <tr>
-              <th style={{ paddingLeft: 16 }}>{t.colRoom}</th>
-              <th>{t.colType}</th>
-              <th>{t.colStaff}</th>
-              <th>{t.colStatus}</th>
-              <th>{t.colStart}</th>
-              <th>{t.colDur}</th>
-              <th>{t.colDate}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((h) => {
-              return (
-                <tr key={h.id} className={selectedId === h.id ? "sel" : ""} onClick={() => onSelect(h.id)}>
-                  <td style={{ paddingLeft: 16 }}>
-                    <span className="rrow__rm mono">{h.room}</span>
-                    <div className="who__sub" style={{ fontSize: 11, color: "var(--adm-muted)", fontWeight: 600, marginTop: 2 }}>
-                      {buildingLabelOf(h, buildingLabels)}
-                    </div>
-                  </td>
-                  <td>
-                    <span className="htype">{typeLabel(h.type, t)}</span>
-                  </td>
-                  <td>
-                    <span className="who">
-                      <StaffAvatar staffId={h.staffId} directory={staffDirectory} className="who__av" />
-                      <span className="who__nm">{staffLabelOf(h.staffId, staffDirectory)}</span>
-                      {h.proxy ? (
-                        <span className="proxytag" style={{ marginLeft: 2 }}>
-                          {t.proxy}
-                        </span>
-                      ) : null}
-                    </span>
-                  </td>
-                  <td>
-                    <StatusPill status={h.status} t={t} />
-                  </td>
-                  <td className="mono">{h.start}</td>
-                  <td>
-                    <span className="hdur">{fmtDur(h.dur)}</span>
-                  </td>
-                  <td className="dim-cell mono">{fmtDate(h.date, localeTag)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <table className="cl-tbl">
+        <thead>
+          <tr>
+            <th>{t.colDate}</th>
+            <th>{t.colRoom}</th>
+            <th>{t.building}</th>
+            <th>{t.colStaff}</th>
+            <th>{t.colWhen}</th>
+            <th>{t.colDur}</th>
+            <th className="r">{t.colMemo}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((h) => {
+            // 취소된 세션은 끝난 게 아니라 완료 시각 · 소요를 비운다.
+            const shownDur = h.status === "done" ? h.dur : null;
+            const end = endOf(h.start, shownDur);
+            const long = h.status === "done" && (h.dur ?? 0) > LONG_CLEANING_MIN;
+            const memo: string[] = [];
+            if (h.status === "cancelled") memo.push(t.stCancelled);
+            if (h.proxy) memo.push(t.stProxy);
+            if (h.reports?.issue) memo.push(`${t.pIssue} ${h.reports.issue}`);
+            if (h.reports?.lost) memo.push(`${t.pLostItem} ${h.reports.lost}`);
+            if (long) memo.push(t.longTag);
+            if (h.note) memo.push(h.note);
+            const staffName = staffLabelOf(h.staffId, staffDirectory) || h.staffName;
+            return (
+              <tr key={h.id} className={selectedId === h.id ? "sel" : ""} onClick={() => onSelect(h.id)}>
+                <td className="mono b">{shortDate(h.date)}</td>
+                <td>
+                  <span className="mono b">{h.room}</span>
+                  <div className="cl-tbl__sub">{typeLabel(h.type, t)}</div>
+                </td>
+                <td>{buildingLabelOf(h, buildingLabels)}</td>
+                <td>
+                  <span className="cl-who">
+                    <span className="cl-av">{staffName ? Array.from(staffName)[0] : "–"}</span>
+                    <b>{staffName || t.unassigned}</b>
+                  </span>
+                </td>
+                <td className="mono">
+                  {h.start || "—"} → {h.status === "progress" ? <span className="cl-live">{t.stProgress}</span> : (end ?? "—")}
+                </td>
+                <td className={`mono b${long ? " is-danger" : ""}${shownDur == null ? " is-muted" : ""}`}>{durLabel(shownDur, t)}</td>
+                <td className="r cl-tbl__memo" title={memo.join(" · ")}>
+                  {memo.length ? memo.join(" · ") : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </>
   );
 }

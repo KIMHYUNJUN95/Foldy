@@ -61,7 +61,7 @@ export function CleaningDaySwitcher({
     <div className="flex items-center gap-1.5">
       <button
         aria-label={labels.prev}
-        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors active:bg-muted"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#f4f4f7] text-muted-foreground transition-colors active:bg-[#ececf0]"
         onClick={() => shift(-1)}
         type="button"
       >
@@ -71,7 +71,7 @@ export function CleaningDaySwitcher({
       <div className="relative min-w-0 flex-1">
         <button
           aria-label={labels.select}
-          className="flex h-9 w-full items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-3 text-[13px] font-extrabold tracking-[-0.01em] text-foreground transition-colors active:bg-muted"
+          className="flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-[#f4f4f7] px-3 text-[13px] font-extrabold tracking-[-0.01em] text-foreground transition-colors active:bg-[#ececf0]"
           onClick={() => setPickerOpen(true)}
           type="button"
         >
@@ -86,7 +86,7 @@ export function CleaningDaySwitcher({
 
       <button
         aria-label={labels.next}
-        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors active:bg-muted"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#f4f4f7] text-muted-foreground transition-colors active:bg-[#ececf0]"
         onClick={() => shift(1)}
         type="button"
       >

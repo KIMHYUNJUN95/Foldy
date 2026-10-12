@@ -2697,6 +2697,13 @@
 .adm .dd__chev svg { width: 17px; height: 17px; }
 .adm .dd.open .dd__btn { border-color: var(--adm-primary); box-shadow: 0 0 0 3.5px var(--primary-soft); }
 .adm .dd.open .dd__chev { transform: rotate(180deg); }
+/* 화이트 리디자인(2026-10-13): 필터 줄의 작은 드롭다운은 상자 없이 「전체 건물 ⌄」 글자 버튼(시안 — 칩 대신 단순 필터).
+   폼 안의 기본 크기 드롭다운은 그대로 테두리 칸이다. 메뉴는 버튼보다 넓게 열린다. */
+.adm .dd__btn--sm { width: auto; height: 34px; padding: 0 8px; gap: 4px; border: 0; border-radius: 9px; background: transparent; font-size: 14px; font-weight: 500; color: #3a3746; }
+.adm .dd__btn--sm:hover { background: #f4f4f7; }
+.adm .dd__btn--sm .dd__chev svg { width: 15px; height: 15px; }
+.adm .dd.open .dd__btn--sm { box-shadow: none; background: #f4f4f7; }
+.adm .dd:has(.dd__btn--sm) .dd__menu { right: auto; min-width: max(100%, 180px); }
 .adm .dd__menu { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; min-width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--sh-pop); padding: 6px; animation: ddIn 0.14s ease; overflow: hidden; }
 .adm .dd__menu--up { top: auto; bottom: calc(100% + 6px); transform-origin: bottom; }
 .adm .dd__menu--wide { min-width: 280px; }
@@ -3007,3 +3014,36 @@
 .adm .calpop__typein:focus { border-color:var(--adm-primary); box-shadow:0 0 0 3px var(--primary-soft); background:var(--card); }
 .adm .calpop__typein.is-bad { border-color:var(--danger); background:var(--danger-bg); }
 .adm .calpop__typedash { color:var(--faint); font-weight:700; }
+
+/* ══ 화이트 리디자인 (2026-10-13) — 공용 오른쪽 상세 패널 ═══════════════════════════════════════
+   모든 콘솔 패널이 같이 바뀐다(CLAUDE.md §4): 테두리 · 구분선 없는 흰 면, 옅은 그림자, 제목은 Geist 굵게,
+   키-값 줄은 선 없이, 아래 버튼은 꽉 찬 보라 / 옅은 회색. docs/design/05-white-redesign.md */
+.adm .panel-scrim { background: rgba(22, 20, 31, 0.18); }
+.adm .panel { width: 420px; border-left: 0; box-shadow: -24px 0 60px -30px rgba(22, 20, 31, 0.28); }
+.adm .panel__h { padding: 22px 24px 8px; border-bottom: 0; }
+.adm .panel__kicker { font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #6b6878; }
+.adm .panel__x { width: 36px; height: 36px; border-radius: 10px; background: transparent; color: #3a3746; }
+.adm .panel__x:hover { background: #f4f4f7; }
+.adm .panel__x svg { width: 20px; height: 20px; }
+.adm .panel__tool { border: 0; background: #f4f4f7; font-weight: 600; }
+.adm .panel__title { margin-top: 8px; }
+.adm .panel__room { font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+.adm .panel__sub { font-weight: 500; color: #6b6878; }
+.adm .panel__body { padding: 12px 24px 24px; }
+.adm .panel__foot { padding: 14px 24px 20px; border-top: 0; }
+.adm .panel__foot .btn { height: 48px; border-radius: 12px; font-size: 15px; }
+.adm .panel .btn--pri { background: #7a52e6; }
+.adm .panel .btn--pri:hover { background: #6b40e0; }
+.adm .panel .btn--ghost { background: #f4f4f7; border-color: transparent; color: #3a3746; }
+.adm .panel .btn--ghost:hover { background: #ececf0; }
+.adm .pblock { margin-bottom: 0; padding: 16px 0; border-top: 1px solid #f1f1f4; }
+.adm .pblock:first-child { border-top: 0; padding-top: 4px; }
+.adm .pblock__t { font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #16141f; margin-bottom: 8px; }
+.adm .panel .kv { padding: 6px 0; border-bottom: 0; }
+.adm .panel .kv__k { font-size: 13px; font-weight: 400; color: #6b6878; }
+.adm .panel .kv__v { font-size: 14px; font-weight: 500; color: #16141f; }
+.adm .locknote { font-size: 13px; font-weight: 400; color: #6b6878; background: #f7f7f9; border-radius: 12px; padding: 10px 12px; }
+.adm .rptile { border: 0; background: #f7f7f9; border-radius: 12px; }
+.adm .rptile:hover { background: #f1f1f4; box-shadow: none; }
+.adm .rptile__t { font-weight: 600; }
+.adm .rptile__s { font-weight: 400; }

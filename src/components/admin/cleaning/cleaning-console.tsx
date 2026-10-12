@@ -8,7 +8,8 @@
 // from the original design handoff.
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, BedDouble, Check, Clock, History, Info, RefreshCw, SprayCan } from "lucide-react";
+import { Info } from "lucide-react";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
@@ -16,7 +17,7 @@ import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } 
 import type { CleaningStaffOption } from "@/lib/cleaning";
 import { fetchAdminCleaningHistory, forceCompleteCleaningSession } from "@/app/admin/cleaning/actions";
 import "./cleaning-console.css";
-import { nowLabelTokyo, type BuildingKey } from "./cleaning-console-data";
+import { BUILDING_ORDER, nowLabelTokyo, type BuildingKey, type CleaningTaskType } from "./cleaning-console-data";
 import { buildConsoleCopy, buildStaffDirectory } from "./cleaning-console-shared";
 import type { HistoryCompletionFilter, HistorySessionStatusFilter } from "./cleaning-history-board";
 import { TodayBoard } from "./cleaning-today-board";
@@ -87,6 +88,7 @@ export function CleaningConsole({
   const [group, setGroup] = useState<"building" | "status">("building");
   const [propFilter, setPropFilter] = useState<BuildingKey | "all">("all");
   const [staffFilter, setStaffFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<CleaningTaskType | "all">("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSetupKey, setSelectedSetupKey] = useState<string | null>(null);
@@ -151,6 +153,7 @@ export function CleaningConsole({
   function handleClearFilters() {
     setPropFilter("all");
     setStaffFilter("all");
+    setTypeFilter("all");
     setHistorySessionStatus("all");
     setHistoryCompletion("all");
     setQuery("");
@@ -168,7 +171,8 @@ export function CleaningConsole({
   // (only today's session-backed tasks do — see admin-cleaning.ts), so this only fires for the today
   // board. Multiple linked records for one session are rare; falls back to the list screen for them.
   function handleOpenReport(kind: "lost" | "issue") {
-    const ids = kind === "lost" ? selectedTask?.reports?.lostIds : selectedTask?.reports?.issueIds;
+    const reports = selectedTask?.reports ?? selectedHistory?.reports;
+    const ids = kind === "lost" ? reports?.lostIds : reports?.issueIds;
     if (!ids || ids.length === 0) return;
     const base = kind === "lost" ? "/admin/lost-found" : "/admin/maintenance";
     router.push(ids.length === 1 ? `${base}/${ids[0]}` : base);
@@ -206,101 +210,29 @@ export function CleaningConsole({
     showToast(t.tSynced);
   }
 
+  const staffOptions = [...staffDirectory.values()].sort((x, y) => x.name.localeCompare(y.name, "ko"));
+  const kpis: Array<{ k: string; v: string | number; unit?: string; tone?: "danger" | "live" }> = [
+    { k: t.kpiTarget, v: countableTasks.length, unit: dictionary.admin.console.unitRooms },
+    { k: t.kpiPending, v: pendingCount, unit: dictionary.admin.console.unitRooms, tone: pendingCount > 0 && !isFuture ? "danger" : undefined },
+    { k: t.kpiProgress, v: progressCount, unit: dictionary.admin.console.unitRooms, tone: progressCount > 0 ? "live" : undefined },
+    { k: t.kpiDone, v: doneCount, unit: dictionary.admin.console.unitRooms },
+    { k: t.kpiRate, v: rate, unit: "%" },
+    { k: t.kpiSetup, v: setupCount, unit: dictionary.admin.console.unitRooms },
+  ];
+
   return (
     <>
-      <div className="opsbar opsbar--6">
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <SprayCan />
-            </span>
-            {t.kpiTarget}
-          </div>
-          <div className="opscell__v">{loadError ? "-" : countableTasks.length}</div>
-          <div className="opscell__sub">{loadError ? t.errT : t.today}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Clock />
-            </span>
-            {t.kpiPending}
-          </div>
-          <div className={`opscell__v${!loadError && pendingCount > 0 ? " is-danger" : " is-muted"}`}>
-            {loadError ? "-" : pendingCount}
-          </div>
-          <div className="opscell__sub">
-            {loadError ? (
-              t.errT
-            ) : pendingCount ? (
-              t.today
-            ) : (
-              <span style={{ color: "var(--done)", fontWeight: 800 }}>{t.stDone}</span>
-            )}
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <SprayCan />
-            </span>
-            {t.kpiProgress}
-          </div>
-          <div className={`opscell__v${!loadError && progressCount > 0 ? " is-progress" : " is-muted"}`}>
-            {loadError ? "-" : progressCount}
-          </div>
-          <div className="opscell__sub">{loadError ? t.errT : progressCount > 0 ? t.live : t.today}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Check />
-            </span>
-            {t.kpiDone}
-          </div>
-          <div className="opscell__v is-done">{loadError ? "-" : doneCount}</div>
-          <div className="opscell__sub">{loadError ? t.errT : `/ ${countableTasks.length}`}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <BarChart3 />
-            </span>
-            {t.kpiRate}
-          </div>
-          <div className="opscell__v">{loadError ? "-" : `${rate}%`}</div>
-          <div className="opscell__bar" style={{ marginTop: 4 }}>
-            <i style={{ width: `${loadError ? 0 : rate}%` }} />
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <BedDouble />
-            </span>
-            {t.kpiSetup}
-          </div>
-          <div className="opscell__v">{loadError ? "-" : setupCount}</div>
-          <div className="opscell__sub">{loadError ? t.errT : setupCount > 0 ? t.arriving : t.today}</div>
-        </div>
-      </div>
-
-      <div className="cviewbar">
-        <div className="lviews" style={{ margin: 0 }}>
-          <button type="button" className={view === "today" ? "on" : ""} onClick={() => handleViewChange("today")}>
-            <span className="ic">
-              <SprayCan />
-            </span>
+      {/* 화이트 리디자인(2026-10-13): 보기 탭 · 날짜 · 실시간 줄이 맨 위, 오른쪽에 묶기 · 필터.
+          숫자 줄은 오늘 현황에만 — 기록에는 기록 전용 숫자 줄이 따로 있다. */}
+      <div className="cl-bar">
+        <div className="cl-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={view === "today"} className={view === "today" ? "on" : ""} onClick={() => handleViewChange("today")}>
             {t.vToday}
           </button>
-          <button type="button" className={view === "history" ? "on" : ""} onClick={() => handleViewChange("history")}>
-            <span className="ic">
-              <History />
-            </span>
+          <button type="button" role="tab" aria-selected={view === "history"} className={view === "history" ? "on" : ""} onClick={() => handleViewChange("history")}>
             {t.vHistory}
           </button>
         </div>
-        <span style={{ flex: 1 }} />
         {view === "today" ? (
           <>
             {/* 날짜 이동 — 공용 `AdminDatePicker` 의 nav 변형(CLAUDE.md §4a: 콘솔 달력은 공용
@@ -322,7 +254,12 @@ export function CleaningConsole({
                 pastTag: isFuture ? t.dateFutureTag : shared.datePastTag,
               }}
             />
-            <div className="groupseg">
+            <button type="button" className="cl-sync" onClick={handleSync}>
+              <i aria-hidden="true" />
+              {t.syncLabel} · {syncAgoText(lastSyncAt, t, locale)}
+            </button>
+            <span className="cl-bar__sp" />
+            <div className="cl-group" role="group">
               <button type="button" className={group === "building" ? "on" : ""} onClick={() => setGroup("building")}>
                 {t.byBuilding}
               </button>
@@ -330,16 +267,50 @@ export function CleaningConsole({
                 {t.byStatus}
               </button>
             </div>
-            <button type="button" className="syncchip" onClick={handleSync}>
-              <span className="syncchip__dot" />
-              {t.syncLabel} · {syncAgoText(lastSyncAt, t, locale)}
-              <span className="ic">
-                <RefreshCw />
-              </span>
-            </button>
+            <AdmDropdown
+              size="sm"
+              value={propFilter}
+              onChange={(v) => setPropFilter(v as BuildingKey | "all")}
+              ariaLabel={t.building}
+              options={[{ value: "all", label: t.allProp }, ...BUILDING_ORDER.map((b) => ({ value: b, label: buildingLabels[b] ?? b }))]}
+            />
+            <AdmDropdown
+              size="sm"
+              value={staffFilter}
+              onChange={setStaffFilter}
+              ariaLabel={t.staff}
+              options={[{ value: "all", label: t.allStaff }, ...staffOptions.map((s) => ({ value: s.id, label: s.name }))]}
+            />
+            <AdmDropdown
+              size="sm"
+              value={typeFilter}
+              onChange={(v) => setTypeFilter(v as CleaningTaskType | "all")}
+              ariaLabel={t.type}
+              options={[
+                { value: "all", label: t.allCleanType },
+                { value: "checkout", label: t.tyCheckout },
+                { value: "simple", label: t.tySimple },
+                { value: "longstay", label: t.tyLongstay },
+              ]}
+            />
           </>
         ) : null}
       </div>
+
+      {view === "today" ? (
+        <div className="cl-kpis">
+          {kpis.map((kpi) => (
+            <div className="cl-kpi" key={kpi.k}>
+              <span className="cl-kpi__k">{kpi.k}</span>
+              <span className={`cl-kpi__v${kpi.tone ? ` is-${kpi.tone}` : ""}`}>
+                {loadError ? "-" : kpi.v}
+                {!loadError && kpi.unit ? <small>{kpi.unit}</small> : null}
+              </span>
+              {loadError ? <span className="cl-kpi__d">{t.errT}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {/* 오늘이 아닌 날짜의 한계를 명시한다. 과거는 재계산이라 그날 화면과 다를 수 있고, 미래는
           예약이 덜 차서 실제보다 적게 보인다 — 둘 다 말해 주지 않으면 숫자를 오해한다. */}
@@ -363,6 +334,7 @@ export function CleaningConsole({
             group={group}
             propFilter={propFilter}
             staffFilter={staffFilter}
+            typeFilter={typeFilter}
             query={query}
             selectedId={selectedId}
             onSelect={handleSelect}

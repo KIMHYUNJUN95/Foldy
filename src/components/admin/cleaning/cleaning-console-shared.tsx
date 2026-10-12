@@ -193,6 +193,15 @@ export function CancelledBadge({ count, t }: { count: number; t: ConsoleCopy }) 
   );
 }
 
+/** 소요 시간 — 「46분」 · 「1시간 22분」(화이트 리디자인 2026-10-13, 시안 표기). 값이 없으면 「—」. */
+export function durLabel(min: number | null, t: ConsoleCopy): string {
+  if (min == null) return "—";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m}${t.unitMin}`;
+  return m === 0 ? `${h}${t.unitHour}` : `${h}${t.unitHour} ${m}${t.unitMin}`;
+}
+
 export function localeTagOf(locale: Locale): string {
   return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
 }

@@ -106,7 +106,9 @@ export function DashboardHome({
         ))}
       </div>
 
-      {ops ? <OpsBlock c={c} locale={locale} ops={ops} /> : <QueueBlock c={c} data={data} locale={locale} />}
+      {/* 운영 관리자는 매출 · 가동률 아래에 큐 · 할 일 · 예약까지 전부, 그 밖의 관리자는 매출 · 가동률 없이 큐부터. */}
+      {ops ? <OpsBlock c={c} locale={locale} ops={ops} /> : null}
+      <QueueBlock c={c} data={data} divided={Boolean(ops)} locale={locale} />
     </div>
   );
 }
@@ -273,10 +275,10 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
   );
 }
 
-function QueueBlock({ data, c, locale }: { data: AdminDashboardData; c: Console; locale: string }) {
+function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c: Console; locale: string; divided: boolean }) {
   return (
     <>
-      <div className="dh-sec">
+      <div className={divided ? "dh-sec dh-sec--line" : "dh-sec"}>
         <b>{c.sectQueueTitle}</b>
         <span className="dh-cc">{data.queue.length + data.cleaning.length}</span>
       </div>

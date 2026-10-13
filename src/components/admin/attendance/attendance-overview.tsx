@@ -26,6 +26,15 @@ function corrFieldLabel(field: AdminCorrectionField, c: Att): string {
 
 function ReviewRow({ item, c, ym }: { item: ReviewQueueItem; c: Att; ym: string }) {
   const isUrgent = item.reviewState === "review_required" && (item.isAbnormal || !item.clockOutLabel);
+  // 사유는 데이터로 알 수 있는 것만 — 퇴근 누락 · 장시간(인정 12시간 초과) · 이상 감지(2026-10-13 시안 컨펌).
+  const reason = !item.clockOutLabel
+    ? c.issueClockoutMissing
+    : (item.paidDurationSec ?? 0) > 12 * 3600
+      ? c.issueLongShift
+      : item.isAbnormal
+        ? c.issueAbnormal
+        : c.cardReviewLive;
+  const tag = isUrgent && reason !== c.cardReviewLive ? `${c.tagUrgent} · ${reason}` : isUrgent ? c.tagUrgent : reason;
   const subParts = [
     item.clockInLabel ? `${item.clockInLabel} → ${item.clockOutLabel ?? "—"}` : null,
     item.clockInSiteName ?? null,
@@ -40,7 +49,7 @@ function ReviewRow({ item, c, ym }: { item: ReviewQueueItem; c: Att; ym: string 
         </div>
         {subParts.length ? <div className="wrow__s">{subParts.join(" · ")}</div> : null}
       </div>
-      <span className={`wtag ${isUrgent ? "wtag--danger" : "wtag--warn"}`}>{isUrgent ? c.tagUrgent : c.cardReviewLive}</span>
+      <span className={`wtag ${isUrgent ? "wtag--danger" : "wtag--warn"}`}>{tag}</span>
     </Link>
   );
 }

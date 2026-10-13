@@ -129,7 +129,7 @@ function LiveOpenRing({ clockInAt, copy }: { clockInAt: string | null; copy: Att
   }, [startMs]);
   const { big, sec } = fmtElapsed(elapsed);
   const pct = Math.min(Math.max(elapsed, 0) / (8 * 3600), 1);
-  return <Ring variant="open" cls="open" state={copy.ringWorking} big={big} sec={sec} lbl={copy.ringAccumLabel} pct={pct} />;
+  return <Ring variant="open" cls="open" state={copy.ringWorking} big={big} sec={sec} lbl={`${copy.ringAccumLabel} · ${copy.ringScaleNote}`} pct={pct} />;
 }
 
 function LiveBreakBody({
@@ -273,6 +273,38 @@ function Methods({ copy }: { copy: AttendanceCopy }) {
   );
 }
 
+/** 오늘 기록 — 출근 · 휴게(지금 있는 데이터만). 태블릿 가로의 빈 왼쪽 아래를 채운다(2026-10-13 시안 컨펌). */
+function TodayLog({ session, copy }: { session: OpenSessionView; copy: AttendanceCopy }) {
+  const breakMin = Math.round(session.closedBreakSeconds / 60);
+  const onBreakAt = session.openBreakStartedAt
+    ? new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tokyo" }).format(new Date(session.openBreakStartedAt))
+    : null;
+  return (
+    <div className="att-todaylog">
+      <div className="seclbl att-todaylog__t">{copy.homeTodayLog}</div>
+      {onBreakAt ? (
+        <div className="att-todaylog__r is-now">
+          <i aria-hidden="true" />
+          <span>{copy.homeLogOnBreak}</span>
+          <time className="mono">{onBreakAt}</time>
+        </div>
+      ) : null}
+      {session.breakCount > 0 && !onBreakAt ? (
+        <div className="att-todaylog__r">
+          <i aria-hidden="true" />
+          <span>{copy.homeLogBreaks.replace("{n}", String(session.breakCount)).replace("{min}", String(breakMin))}</span>
+          <time className="mono" />
+        </div>
+      ) : null}
+      <div className={`att-todaylog__r${!onBreakAt && session.breakCount === 0 ? " is-now" : ""}`}>
+        <i aria-hidden="true" />
+        <span>{copy.homeLogClockIn.replace("{site}", session.siteName)}</span>
+        <time className="mono">{session.clockInTimeLabel}</time>
+      </div>
+    </div>
+  );
+}
+
 export type OpenSessionView = {
   clockInAt: string | null;
   clockInTimeLabel: string;
@@ -382,16 +414,6 @@ export function AttendanceHome({
     <>
       <div className="seclbl">{copy.homeShortcutLabel}</div>
       <div className="entrylist">
-        <Link href="/mobile/attendance/leave" className="entryrow leave">
-          <span className="entryrow__ic"><AIc>{AttIcon.beach}</AIc></span>
-          <div className="entryrow__b">
-            <div className="entryrow__t">{copy.homeLeaveTitle}</div>
-            <div className="entryrow__s">{copy.homeLeaveSub}</div>
-          </div>
-          <div className="entryrow__r">
-            <span className="entryrow__new">{copy.homeNewBadge}</span>
-          </div>
-        </Link>
         <Link href="/mobile/attendance/history" className="entryrow hist">
           <span className="entryrow__ic"><AIc>{AttIcon.clock}</AIc></span>
           <div className="entryrow__b">
@@ -425,11 +447,11 @@ export function AttendanceHome({
             </button>
           </div>
         </Link>
-        <Link href="/mobile/attendance/transport" className="entryrow transport">
-          <span className="entryrow__ic"><AIc>{AttIcon.bus}</AIc></span>
+        <Link href="/mobile/attendance/leave" className="entryrow leave">
+          <span className="entryrow__ic"><AIc>{AttIcon.beach}</AIc></span>
           <div className="entryrow__b">
-            <div className="entryrow__t">{dict.transport.homeTransportTitle}</div>
-            <div className="entryrow__s">{dict.transport.homeTransportSub}</div>
+            <div className="entryrow__t">{copy.homeLeaveTitle}</div>
+            <div className="entryrow__s">{copy.homeLeaveSub}</div>
           </div>
         </Link>
         {canSeeRoster && (
@@ -441,6 +463,13 @@ export function AttendanceHome({
             </div>
           </Link>
         )}
+        <Link href="/mobile/attendance/transport" className="entryrow transport">
+          <span className="entryrow__ic"><AIc>{AttIcon.bus}</AIc></span>
+          <div className="entryrow__b">
+            <div className="entryrow__t">{dict.transport.homeTransportTitle}</div>
+            <div className="entryrow__s">{dict.transport.homeTransportSubNow}</div>
+          </div>
+        </Link>
       </div>
     </>
   );
@@ -472,7 +501,7 @@ export function AttendanceHome({
         {openSession ? (
           <LiveOpenRing clockInAt={openSession.clockInAt} copy={copy} />
         ) : (
-          <Ring variant="open" cls="open" state={copy.ringWorking} big="04:38" sec="12" lbl={copy.ringAccumLabel} pct={0.58} />
+          <Ring variant="open" cls="open" state={copy.ringWorking} big="04:38" sec="12" lbl={`${copy.ringAccumLabel} · ${copy.ringScaleNote}`} pct={0.58} />
         )}
         <Methods copy={copy} />
         <div className="infostrip">
@@ -500,6 +529,7 @@ export function AttendanceHome({
             {copy.clockOut}
           </Link>
         </div>
+        {openSession ? <TodayLog session={openSession} copy={copy} /> : null}
         {errorMsg ? (
           <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
         ) : null}

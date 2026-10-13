@@ -3506,3 +3506,16 @@
 .att.att--home .infocell + .infocell { border: 1px solid #e0e0e6; }
 .att.att--home .infocell__k { position: absolute; top: -8px; left: 11px; padding: 0 5px; background: #ffffff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; white-space: nowrap; }
 .att.att--home .infocell__v { margin-top: 0; }
+
+/* 오늘 기록 — 태블릿 가로에서만(왼쪽 아래 빈 곳), 2026-10-13 시안 컨펌 */
+.att .att-todaylog { display: none; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--home .att-todaylog { display: flex; flex-direction: column; margin-top: 8px; }
+  .att.att--home .att-todaylog__t { margin: 18px 0 6px !important; padding-top: 0 !important; border-top: 0 !important; }
+  .att .att-todaylog__r { display: flex; align-items: center; gap: 12px; min-height: 44px; border-top: 1px solid #f3f3f6; font-size: 14px; color: var(--ink); }
+  .att .att-todaylog__r i { width: 8px; height: 8px; border-radius: 50%; background: #d0cfd8; flex: none; }
+  .att .att-todaylog__r.is-now i { background: #7a52e6; }
+  .att .att-todaylog__r span { flex: 1; min-width: 0; }
+  .att .att-todaylog__r time { font-size: 12px; color: #8b8898; }
+  .att.att--home > .att-todaylog { grid-column: 1; }
+}

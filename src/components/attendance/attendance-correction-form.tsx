@@ -7,10 +7,12 @@
  * picker sheet, photos use the app's compress + `request-images` upload, and submit calls
  * `createAttendanceCorrectionRequest` (self-scoped + current/previous-month only, server-enforced).
  * Supports session-linked requests (`sessionId` + context) and session-less EXCEPTION requests.
+ * 화이트 리디자인(2026-10-13, 시안 AttCorr-Phone · Fold · Tablet): 제목 · 한 줄 설명 → (기록 없는 날이면 근무 날짜)
+ * → 사유 6가지 → 출근 · 퇴근 · 현장 · 메모(테두리 이름표 칸) → 사진 → 보내기. 태블릿 가로는 오른쪽에 내 정정 요청(최근 30일).
  */
 
-import { useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import "./attendance.css";
 import { AIc, AttIcon } from "./att-icons";
@@ -28,7 +30,7 @@ import {
   createAttendanceCorrectionRequest,
   type CreateCorrectionInput,
 } from "@/app/mobile/attendance/actions";
-import type { AttendanceCorrectionReason } from "@/lib/attendance";
+import type { AttendanceCorrectionReason, AttendanceCorrectionStatus } from "@/lib/attendance";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/annual-leave";
 import { HireDatePicker } from "./hire-date-picker";
@@ -40,6 +42,15 @@ type SessionContext = {
   clockInTime: string | null;
   clockOutTime: string | null;
   siteName: string | null;
+};
+
+export type MyCorrectionItem = {
+  id: string;
+  status: AttendanceCorrectionStatus;
+  reasonKey: string;
+  targetDateLabel: string | null;
+  desiredClockInLabel: string | null;
+  desiredClockOutLabel: string | null;
 };
 
 const MAX_PHOTOS = 5;
@@ -71,21 +82,19 @@ export function AttendanceCorrectionForm({
   sessionId,
   sessionContext,
   sites,
+  myRequests,
   locale,
 }: {
   organizationId: string;
   sessionId: string | null;
   sessionContext: SessionContext | null;
   sites: { id: string; name: string }[];
+  /** 태블릿 가로 오른쪽 목록 — 내 정정 요청(최근 30일). */
+  myRequests: MyCorrectionItem[];
   locale: string;
 }) {
   const copy = getDictionary(locale).attendance;
   const router = useRouter();
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [reason, setReason] = useState<AttendanceCorrectionReason>("missing_clock_out");
@@ -207,63 +216,46 @@ export function AttendanceCorrectionForm({
     });
   }
 
-  return (
-    <div className="att">
-      <div className="scroll-pad" style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}>
-        <div className="caphead">
-          <div>
-            <div className="capttl">{copy.corrFormTitle}</div>
-            <div className="capsub">
-              {sessionContext
-                ? copy.corrSubWithSession(sessionContext.dateLabel)
-                : copy.corrSubException}
-            </div>
-          </div>
-        </div>
+  const statusLabel: Record<AttendanceCorrectionStatus, string> = {
+    requested: copy.stepRequested,
+    in_review: copy.stepInReview,
+    approved: copy.stepApproved,
+    rejected: copy.stepRejected,
+    cancelled: copy.stepCancelled,
+  };
+  const sub = sessionContext
+    ? [sessionContext.dateLabel, sessionContext.siteName].filter(Boolean).join(" · ")
+    : copy.corrSubExceptionShort;
 
-        <div className="srcsess">
-          <span className="srcsess__ic">{AttIcon.clock}</span>
-          <div className="srcsess__b">
-            <div className="srcsess__d">
-              {sessionContext ? copy.corrSessLabel(sessionContext.dateLabel) : copy.corrSessNoSession}
-            </div>
-            <div className="srcsess__m">
-              <AIc>{AttIcon.pin}</AIc>
-              {sessionContext
-                ? copy.corrSessMeta(
-                    sessionContext.siteName ?? copy.corrSessNoSite,
-                    sessionContext.clockInTime ?? copy.corrSessNoRecord,
-                    sessionContext.clockOutTime ?? copy.corrSessNoRecord,
-                  )
-                : copy.corrSessExceptionNote}
-            </div>
+  return (
+    <div className="att att--corrw">
+      <div className="corrw-form">
+        <div className="ptitle-row">
+          <div>
+            <h1 className="ptitle">{copy.corrFormTitle}</h1>
+            <div className="ptitle__sub">{sub}</div>
           </div>
         </div>
 
         {sessionContext ? null : (
-          <div className="field">
-            <div className="field__l">
-              {copy.corrFieldWorkDate} <span className="req">*</span>
-            </div>
-            <button type="button" className="ibox" onClick={() => setDatePickerOpen(true)}>
-              <div className="ibox__v mono">
-                <AIc>{AttIcon.calendar}</AIc>
-                <span>{formatWorkDate(workDate, locale)}</span>
-              </div>
+          <div className="nf">
+            <span className="nf__l">{copy.corrFieldWorkDate}</span>
+            <button type="button" className="nf__in" onClick={() => setDatePickerOpen(true)}>
+              <span>{formatWorkDate(workDate, locale)}</span>
+              <AIc>{AttIcon.calendar}</AIc>
             </button>
           </div>
         )}
 
-        <div className="field">
-          <div className="field__l">
-            {copy.corrFieldReason} <span className="req">*</span>
-          </div>
-          <div className="rchips">
+        <div className="corrw-reason">
+          <div className="corrw-q">{copy.corrReasonQ}</div>
+          <div className="corrw-chips">
             {REASON_VALUES.map((v) => (
               <button
                 key={v}
                 type="button"
-                className={`rchip${reason === v ? " on" : ""}`}
+                aria-pressed={reason === v}
+                className={`corrw-chip${reason === v ? " on" : ""}`}
                 onClick={() => setReason(v)}
               >
                 {reasonLabels[v]}
@@ -272,60 +264,36 @@ export function AttendanceCorrectionForm({
           </div>
         </div>
 
-        <div className="field">
-          <div className="field__l">
-            {copy.corrFieldTime} <span className="opt">{copy.corrFieldTimeOpt}</span>
-          </div>
-          <div className="duo">
-            <button
-              type="button"
-              className="ibox"
-              onClick={() => setInPickerOpen(true)}
-            >
-              <div className="ibox__k">{copy.corrFieldClockIn}</div>
-              <div className="ibox__v mono">
-                <AIc>{AttIcon.clock}</AIc>
-                <span className={inTime ? "" : "ibox__ph"}>
-                  {formatTimeDisplay(inTime, locale)}
-                </span>
-              </div>
+        <div className="corrw-duo">
+          <div className="nf">
+            <span className="nf__l">{copy.corrFieldClockIn}</span>
+            <button type="button" className="nf__in mono" onClick={() => setInPickerOpen(true)}>
+              <span className={inTime ? "" : "nf__ph"}>{formatTimeDisplay(inTime, locale)}</span>
             </button>
-            <button
-              type="button"
-              className="ibox"
-              onClick={() => setOutPickerOpen(true)}
-            >
-              <div className="ibox__k">{copy.corrFieldClockOut}</div>
-              <div className="ibox__v mono">
-                <AIc>{AttIcon.clock}</AIc>
-                <span className={outTime ? "" : "ibox__ph"}>
-                  {formatTimeDisplay(outTime, locale)}
-                </span>
-              </div>
+          </div>
+          <div className="nf">
+            <span className="nf__l">{copy.corrFieldClockOut}</span>
+            <button type="button" className="nf__in mono" onClick={() => setOutPickerOpen(true)}>
+              <span className={outTime ? "" : "nf__ph"}>{formatTimeDisplay(outTime, locale)}</span>
             </button>
           </div>
         </div>
 
-        <div className="field">
-          <div className="field__l">
-            {copy.corrFieldSite} <span className="opt">{copy.corrFieldSiteOpt}</span>
-          </div>
-          <button type="button" className="sitebox" onClick={() => setPickerOpen(true)}>
-            <AIc>{AttIcon.pin}</AIc>
-            <div className="sitebox__b">
-              <b>{siteName ?? copy.corrSiteNone}</b>
-              <span>{siteName ? copy.corrFieldSiteChange : copy.corrFieldSiteSelect}</span>
-            </div>
-            <span className="chev">{AttIcon.chevR}</span>
+        <div className="nf">
+          <span className="nf__l">{copy.corrSiteField}</span>
+          <button type="button" className="nf__in" onClick={() => setPickerOpen(true)}>
+            <span className={siteName ? "" : "nf__ph"}>{siteName ?? copy.corrSiteNone}</span>
+            <AIc>{AttIcon.caret}</AIc>
           </button>
         </div>
 
-        <div className="field">
-          <div className="field__l">
-            {copy.corrFieldMemo} <span className="opt">{copy.corrFieldMemoOpt}</span>
-          </div>
+        <div className="nf">
+          <label className="nf__l" htmlFor="corrw-memo">
+            {copy.corrFieldMemo} · {copy.corrFieldMemoOpt}
+          </label>
           <textarea
-            className="memo"
+            id="corrw-memo"
+            className="nf__in nf__ta"
             rows={3}
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
@@ -333,54 +301,61 @@ export function AttendanceCorrectionForm({
           />
         </div>
 
-        <div className="field">
-          <div className="field__l">
-            {copy.corrFieldPhoto} <span className="opt">{copy.corrFieldPhotoOpt}</span>
+        <div className="corrw-photos">
+          <div className="corrw-q">
+            {copy.corrFieldPhoto} <span>{copy.corrFieldTimeOpt} · {copy.corrPhotoCount.replace("{n}", String(photos.length))}</span>
           </div>
-          <div className="photos">
+          <div className="corrw-photos__row">
             {photos.map((p) => (
               <div
                 key={p.id}
-                className="photo-thumb"
-                style={{ backgroundImage: `url(${p.previewUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                className="corrw-thumb"
+                style={{ backgroundImage: `url(${p.previewUrl})` }}
               >
-                <button
-                  type="button"
-                  className="x"
-                  onClick={() => removePhoto(p.id)}
-                  aria-label={copy.corrFieldPhotoDelete}
-                >
+                <button type="button" onClick={() => removePhoto(p.id)} aria-label={copy.corrFieldPhotoDelete}>
                   {AttIcon.x}
                 </button>
               </div>
             ))}
             {photos.length < MAX_PHOTOS ? (
-              <button type="button" className="photo-add" onClick={() => fileRef.current?.click()}>
-                <AIc>{AttIcon.image}</AIc>
-                <span>{copy.corrFieldPhotoAdd}</span>
+              <button type="button" className="corrw-add" onClick={() => fileRef.current?.click()} aria-label={copy.corrFieldPhotoAdd}>
+                <AIc>{AttIcon.plus}</AIc>
               </button>
             ) : null}
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            onChange={onPickFiles}
-          />
-          <div className="helper">
-            <AIc>{AttIcon.info}</AIc>
-            <span>{copy.corrFieldHelper}</span>
-          </div>
-          {error ? (
-            <div className="helper" style={{ color: "var(--danger)" }}>
-              <AIc>{AttIcon.warn}</AIc>
-              <span>{error}</span>
-            </div>
-          ) : null}
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onPickFiles} />
         </div>
+
+        {error ? (
+          <p className="corrw-err" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <button type="button" className="corrw-submit" onClick={submit} disabled={isPending}>
+          {isPending ? copy.corrSubmitting : copy.corrSubmit}
+        </button>
+        <p className="corrw-help">{copy.corrFieldHelper}</p>
       </div>
+
+      <aside className="corrw-mine">
+        <div className="corrw-mine__h">
+          <b>{copy.corrMyRequests}</b>
+          <span>{copy.corrRecent30}</span>
+        </div>
+        {myRequests.length === 0 ? <p className="corrw-mine__empty">{copy.corrMyRequestsEmpty}</p> : null}
+        {myRequests.map((r) => (
+          <Link key={r.id} href={`/mobile/attendance/correction/status?id=${r.id}`} className="corrw-mine__row">
+            <span className="corrw-mine__b">
+              <b>{r.targetDateLabel ?? copy.corrDetailNoSession}</b>
+              <span>
+                {(copy[r.reasonKey as keyof typeof copy] as string | undefined) ?? r.reasonKey} ·{" "}
+                {r.desiredClockInLabel ?? "—"} → {r.desiredClockOutLabel ?? "—"}
+              </span>
+            </span>
+            <span className={`corrw-mine__s is-${r.status}`}>{statusLabel[r.status]}</span>
+          </Link>
+        ))}
+      </aside>
 
       {/* clock-in time picker */}
       {inPickerOpen && (
@@ -458,20 +433,6 @@ export function AttendanceCorrectionForm({
         </BottomSheet>
       )}
 
-      {/* fixed submit bar — portaled to <body> (shell scroll transform traps `position: fixed`). */}
-      {hydrated
-        ? createPortal(
-            <div className="att">
-              <div className="submitbar">
-                <button type="button" className="submitbtn" onClick={submit} disabled={isPending}>
-                  <AIc>{AttIcon.send}</AIc>
-                  {isPending ? copy.corrSubmitting : copy.corrSubmit}
-                </button>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
     </div>
   );
 }

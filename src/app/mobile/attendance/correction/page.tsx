@@ -7,6 +7,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import {
   getSessionCorrectionContext,
   listActiveAttendanceSites,
+  listMyCorrectionRequests,
 } from "@/lib/attendance-corrections";
 import { getDictionary } from "@/lib/i18n";
 
@@ -38,9 +39,10 @@ export default async function MobileAttendanceCorrectionPage({ searchParams }: P
   const localeMap: Record<string, string> = { ko: "ko-KR", ja: "ja-JP", en: "en-US" };
   const bcp47Locale = localeMap[session.user.preferredLanguage] ?? "ko-KR";
   const sessionId = params.sessionId?.trim() || null;
-  const [navBadges, sites, context] = await Promise.all([
+  const [navBadges, sites, myRequests, context] = await Promise.all([
     getMobileNavBadges(),
     listActiveAttendanceSites(session.organization.id, bcp47Locale),
+    listMyCorrectionRequests(session.organization.id, session.user.id, bcp47Locale),
     sessionId
       ? getSessionCorrectionContext(session.organization.id, session.user.id, sessionId, bcp47Locale)
       : Promise.resolve(null),
@@ -51,7 +53,7 @@ export default async function MobileAttendanceCorrectionPage({ searchParams }: P
   const effectiveSessionId = context ? sessionId : null;
 
   return (
-    <MobileShell activeItem="attendance" badges={navBadges} title={dict.attendance.corrPageTitle} hideBottomNav>
+    <MobileShell activeItem="attendance" badges={navBadges} title={dict.attendance.corrPageTitle} hideBottomNav wide>
       <AttendanceCorrectionForm
         organizationId={session.organization.id}
         sessionId={effectiveSessionId}
@@ -66,6 +68,7 @@ export default async function MobileAttendanceCorrectionPage({ searchParams }: P
             : null
         }
         sites={sites}
+        myRequests={myRequests}
         locale={session.user.preferredLanguage}
       />
     </MobileShell>

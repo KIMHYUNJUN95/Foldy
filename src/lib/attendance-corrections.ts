@@ -12,6 +12,7 @@ import {
   type AttendanceSiteDisplayRow,
 } from "@/lib/attendance-site-display";
 import { getDictionary } from "@/lib/i18n";
+import { tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
 import type {
   AttendanceCorrectionRequestRow,
   AttendanceCorrectionReason,
@@ -304,4 +305,61 @@ export async function getCorrectionStatusBySession(
     }
   }
   return map;
+}
+
+export type MyCorrectionRow = {
+  id: string;
+  status: AttendanceCorrectionStatus;
+  reasonKey: string;
+  targetDateLabel: string | null;
+  desiredClockInLabel: string | null;
+  desiredClockOutLabel: string | null;
+};
+
+/**
+ * 내 정정 요청 — 최근 `days`일(도쿄 기준, 기본 30). 본인 것만(requested_by_user_id = 나). 태블릿 정정 요청
+ * 화면 오른쪽 목록(2026-10-13 리디자인)에 쓴다. 날짜는 세션 운영일 → 없으면 직원이 고른 target_date.
+ */
+export async function listMyCorrectionRequests(
+  organizationId: string,
+  userId: string,
+  locale = "ko-KR",
+  days = 30,
+): Promise<MyCorrectionRow[]> {
+  const service = getSupabaseServiceClient();
+  const [y, m, d] = tokyoToday().split("-").map(Number);
+  const since = new Date(Date.UTC(y, m - 1, d - days)).toISOString().slice(0, 10);
+  const res = await service
+    .from("attendance_correction_requests")
+    .select("id, status, reason_type, session_id, target_date, desired_clock_in_at, desired_clock_out_at, created_at")
+    .eq("organization_id", organizationId)
+    .eq("requested_by_user_id", userId)
+    .gte("created_at", tokyoDayStart(since))
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const rows = (res.data ?? []) as Pick<
+    AttendanceCorrectionRequestRow,
+    "id" | "status" | "reason_type" | "session_id" | "target_date" | "desired_clock_in_at" | "desired_clock_out_at" | "created_at"
+  >[];
+  const sessionIds = rows.map((r) => r.session_id).filter((v): v is string => !!v);
+  const odBySession = new Map<string, string>();
+  if (sessionIds.length > 0) {
+    const sres = await service
+      .from("attendance_sessions")
+      .select("id, operating_date")
+      .eq("organization_id", organizationId)
+      .in("id", sessionIds);
+    for (const r of (sres.data ?? []) as { id: string; operating_date: string }[]) odBySession.set(r.id, r.operating_date);
+  }
+  return rows.map((r) => {
+    const date = (r.session_id ? odBySession.get(r.session_id) : null) ?? r.target_date ?? null;
+    return {
+      id: r.id,
+      status: r.status as AttendanceCorrectionStatus,
+      reasonKey: CORRECTION_REASON_I18N_KEYS[r.reason_type as AttendanceCorrectionReason] ?? r.reason_type,
+      targetDateLabel: date ? dateLabelOf(date, locale) : null,
+      desiredClockInLabel: tokyoTimeLabel(r.desired_clock_in_at, locale),
+      desiredClockOutLabel: tokyoTimeLabel(r.desired_clock_out_at, locale),
+    };
+  });
 }

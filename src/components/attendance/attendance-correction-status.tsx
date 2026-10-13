@@ -4,7 +4,9 @@
  * Attendance correction request — status read-back (frames 상태 1~4), wired to real data in Step 6.
  * Renders 요청됨 / 검토 중 / 승인 / 반려 from a real `CorrectionRequestView`. Admin approve/reject is
  * Step 7, so in practice requests are `requested` for now; the four-state rendering is kept so Step 7
- * can light up without redesign. Design preserved (steps · recap · review block).
+ * can light up without redesign.
+ * 화이트 리디자인(2026-10-13, 시안 AttCorrStatus-Phone · Fold): 상태 한 마디 + 큰 문장 → 세로 진행(요청됨 · 검토 중 ·
+ * 승인/반려/철회) → 요청 내용(시각 · 현장 · 메모 · 사진) → 관리자 답변 → 다시 요청 / 근무 기록에서 보기 / 철회.
  */
 
 import Link from "next/link";
@@ -13,11 +15,8 @@ import { useState, useTransition } from "react";
 import { cancelAttendanceCorrectionRequest } from "@/app/mobile/attendance/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import "./attendance.css";
-import { AIc, AttIcon } from "./att-icons";
 import type { AttendanceCorrectionStatus } from "@/lib/attendance";
-import { getDictionary, type Dictionary } from "@/lib/i18n";
-
-type AttendanceCopy = Dictionary["attendance"];
+import { getDictionary } from "@/lib/i18n";
 
 export type CorrectionRequestView = {
   id: string;
@@ -33,59 +32,12 @@ export type CorrectionRequestView = {
   desiredSiteName: string | null;
   memo: string | null;
   photoCount: number;
+  imageUrls?: string[];
   reviewComment: string | null;
   reviewerName: string | null;
   reviewedAtLabel: string | null;
   createdAtLabel: string;
 };
-
-type MetaEntry = {
-  chip: string;
-  chipIcon: "none" | "check" | "x";
-  stage: number;
-  rejected: boolean;
-};
-
-function Steps({
-  stage,
-  rejected,
-  copy,
-}: {
-  stage: number;
-  rejected: boolean;
-  copy: AttendanceCopy;
-}) {
-  const node = (i: number, label: string) => {
-    let cls = "";
-    if (rejected) {
-      if (i < 2) cls = "done";
-      if (i === 2) cls = "rej";
-    } else if (i < stage) {
-      cls = "done";
-    } else if (i === stage) {
-      cls = "cur";
-    }
-    const warn = stage === 1 && i === 1 && !rejected;
-    const inner =
-      cls === "done" ? <AIc>{AttIcon.check}</AIc> : cls === "rej" ? <AIc>{AttIcon.x}</AIc> : i + 1;
-    return (
-      <div className={`stp ${cls}${warn ? " warn" : ""}`}>
-        <span className="stp__dot">{inner}</span>
-        <span className="stp__l">{label}</span>
-      </div>
-    );
-  };
-  const line = (on: boolean) => <span className={`stpline${on ? " done" : ""}`} />;
-  return (
-    <div className="steps">
-      {node(0, copy.stepRequested)}
-      {line(stage >= 1 || rejected)}
-      {node(1, copy.stepInReview)}
-      {line(rejected || stage >= 2)}
-      {node(2, rejected ? copy.stepRejected : copy.stepApproved)}
-    </div>
-  );
-}
 
 export function AttendanceCorrectionStatus({
   request,
@@ -95,16 +47,6 @@ export function AttendanceCorrectionStatus({
   locale: string;
 }) {
   const copy = getDictionary(locale).attendance;
-  const META: Record<AttendanceCorrectionStatus, MetaEntry & { label: string }> = {
-    requested: { chip: "c-info", chipIcon: "none", label: copy.stepRequested, stage: 0, rejected: false },
-    in_review: { chip: "c-warn", chipIcon: "none", label: copy.stepInReview, stage: 1, rejected: false },
-    approved: { chip: "c-done", chipIcon: "check", label: copy.stepApproved, stage: 2, rejected: false },
-    rejected: { chip: "c-danger", chipIcon: "x", label: copy.stepRejected, stage: 2, rejected: true },
-    // 철회 — 요청자가 스스로 거둔 것이라 반려와 달리 경고색을 쓰지 않는다. 진행 막대는 마지막
-    // 단계까지 채우되(더 진행되지 않음) 실패로 읽히지 않게 중립 칩을 쓴다.
-    cancelled: { chip: "c-muted", chipIcon: "x", label: copy.stepCancelled, stage: 2, rejected: false },
-  };
-
   const router = useRouter();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, startCancel] = useTransition();
@@ -119,179 +61,129 @@ export function AttendanceCorrectionStatus({
       else setCancelErr(true);
     });
 
-  const m = META[request.status];
   const editHref = request.sessionId
     ? `/mobile/attendance/correction?sessionId=${request.sessionId}`
     : "/mobile/attendance/correction";
+  const st = request.status;
+  const done = st === "approved" || st === "rejected" || st === "cancelled";
+  const stateLabel =
+    st === "requested" ? copy.stepRequested : st === "in_review" ? copy.stepInReview : st === "approved" ? copy.stepApproved : st === "rejected" ? copy.stepRejected : copy.stepCancelled;
+  const headline =
+    st === "requested"
+      ? copy.corrHeadRequested
+      : st === "in_review"
+        ? copy.corrHeadInReview
+        : st === "approved"
+          ? copy.corrHeadApproved
+          : st === "rejected"
+            ? copy.corrHeadRejected
+            : copy.corrHeadCancelled;
+  const reasonText = request.reasonKey
+    ? ((copy[request.reasonKey as keyof typeof copy] as string | undefined) ?? request.reasonLabel)
+    : request.reasonLabel;
+  const reviewedBits = [request.reviewedAtLabel, request.reviewerName].filter(Boolean).join(" · ");
+  const steps: { label: string; sub: string; on: boolean; tone?: "danger" }[] = [
+    { label: copy.stepRequested, sub: request.createdAtLabel, on: true },
+    { label: copy.stepInReview, sub: "", on: st !== "requested" && st !== "cancelled" },
+    {
+      label: st === "rejected" ? copy.stepRejected : st === "cancelled" ? copy.stepCancelled : copy.stepApproved,
+      sub: done ? reviewedBits : copy.corrStepAfterReview,
+      on: done,
+      tone: st === "rejected" ? "danger" : undefined,
+    },
+  ];
+  const photos = request.imageUrls ?? [];
 
   return (
-    <div className="att">
-      <div className="caphead">
+    <div className="att att--corrst">
+      <div className="ptitle-row">
         <div>
-          <div className="capttl">{copy.corrStatusTitle}</div>
-          <div className="capsub">
-            {request.targetDateLabel
-              ? copy.corrStatusSubSession(request.targetDateLabel)
-              : copy.corrStatusSubException}
+          <h1 className="ptitle">{copy.corrStatusTitle}</h1>
+          <div className="ptitle__sub">
+            {request.targetDateLabel ?? copy.corrStatusSubException} · {reasonText}
           </div>
         </div>
       </div>
 
-      <div className="statushero">
-        <div className="statushero__top">
-          <span className="statushero__ttl">{copy.corrStatusHeading}</span>
-          <span className={`chip ${m.chip}`}>
-            {m.chipIcon === "check" ? (
-              <AIc>{AttIcon.check}</AIc>
-            ) : m.chipIcon === "x" ? (
-              <AIc>{AttIcon.x}</AIc>
-            ) : (
-              <span className="d" />
-            )}
-            {m.label}
-          </span>
-          <span className="statushero__time">{request.createdAtLabel}</span>
-        </div>
-        <Steps stage={m.stage} rejected={m.rejected} copy={copy} />
+      <div className="corrst-head">
+        <span className={`corrst-head__k is-${st}`}>{stateLabel}</span>
+        <b>{headline}</b>
       </div>
 
-      <div className="sectt">{copy.corrDetailSectionTitle}</div>
-      <div className="recap">
-        <div className="recap__r">
-          <span className="recap__k">{copy.corrDetailTarget}</span>
-          <span className="recap__v">{request.targetDateLabel ?? copy.corrDetailNoSession}</span>
-        </div>
-        <div className="recap__r">
-          <span className="recap__k">{copy.corrDetailReason}</span>
-          <span className="recap__v">
-            {request.reasonKey
-              ? (copy[request.reasonKey as keyof typeof copy] as string | undefined) ??
-                request.reasonLabel
-              : request.reasonLabel}
-          </span>
-        </div>
-        <div className="recap__r">
-          <span className="recap__k">{copy.corrDetailDesiredIn}</span>
-          <span className="recap__v mono">{request.desiredClockInLabel ?? "—"}</span>
-        </div>
-        <div className="recap__r">
-          <span className="recap__k">{copy.corrDetailDesiredOut}</span>
-          <span className="recap__v mono">{request.desiredClockOutLabel ?? "—"}</span>
-        </div>
-        <div className="recap__r">
-          <span className="recap__k">{copy.corrDetailSite}</span>
-          <span className="recap__v">{request.desiredSiteName ?? copy.corrSiteNone}</span>
-        </div>
-        <div className="recap__r">
-          <span className="recap__k">{copy.corrDetailAttachment}</span>
-          <span className="recap__v">
-            {request.photoCount > 0 ? copy.corrDetailPhotos(request.photoCount) : copy.corrDetailNone}
-          </span>
-        </div>
+      <ol className="corrst-steps">
+        {steps.map((x) => (
+          <li key={x.label} className={`${x.on ? "is-on" : ""}${x.tone ? ` is-${x.tone}` : ""}`}>
+            <i aria-hidden="true" />
+            <div>
+              <b>{x.label}</b>
+              {x.sub ? <span>{x.sub}</span> : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <dl className="corrst-dl">
+        <dt>{copy.corrRowRequested}</dt>
+        <dd className="mono">
+          {request.desiredClockInLabel ?? "—"} → {request.desiredClockOutLabel ?? "—"}
+        </dd>
+        <dt>{copy.corrDetailSite}</dt>
+        <dd>{request.desiredSiteName ?? copy.corrSiteNone}</dd>
         {request.memo ? (
-          <div className="recap__r">
-            <span className="recap__k">{copy.corrDetailMemo}</span>
-            <span className="recap__v">{request.memo}</span>
-          </div>
+          <>
+            <dt>{copy.corrDetailMemo}</dt>
+            <dd>{request.memo}</dd>
+          </>
+        ) : null}
+        {photos.length > 0 ? (
+          <>
+            <dt className="is-mid">{copy.corrRowPhotos}</dt>
+            <dd className="corrst-photos">
+              {photos.map((u) => (
+                <a key={u} href={u} target="_blank" rel="noreferrer" style={{ backgroundImage: `url(${u})` }} aria-label={copy.corrRowPhotos} />
+              ))}
+            </dd>
+          </>
+        ) : null}
+      </dl>
+
+      {request.reviewComment && (st === "approved" || st === "rejected") ? (
+        <div className="corrst-reply">
+          <span>{[copy.corrReplyLabel, request.reviewerName, request.reviewedAtLabel].filter(Boolean).join(" · ")}</span>
+          <p>{request.reviewComment}</p>
+        </div>
+      ) : null}
+
+      <div className="corrst-actions">
+        {st === "approved" ? (
+          <Link href="/mobile/attendance/history" className="corrst-link">
+            {copy.corrViewInHistory} ›
+          </Link>
+        ) : null}
+        {st === "requested" || st === "rejected" ? (
+          <Link href={editHref} className="corrst-link">
+            {copy.corrResend} ›
+          </Link>
+        ) : null}
+        {/* 철회 — 대기 중인 요청에만. 예전에는 잘못 낸 요청을 거둘 방법이 없어, 관리자가 반려해 줄
+            때까지 대기 큐에 남고 그 달 근태 마감까지 막혔다(2026-08-03). */}
+        {canCancel ? (
+          <>
+            {cancelErr ? <div className="ferr">{copy.corrCancelFailed}</div> : null}
+            <button
+              className="corrst-cancel"
+              disabled={cancelling}
+              onClick={() => {
+                setCancelErr(false);
+                setConfirmCancel(true);
+              }}
+              type="button"
+            >
+              {copy.corrCancel}
+            </button>
+          </>
         ) : null}
       </div>
-
-      {request.status === "requested" ? (
-        <>
-          <div
-            className="review"
-            style={{
-              background: "var(--info-bg)",
-              border: "1px solid color-mix(in oklab, var(--info) 20%, transparent)",
-            }}
-          >
-            <AIc>{AttIcon.info}</AIc>
-            <div className="review__b">
-              <b style={{ color: "var(--info)" }}>{copy.corrWaitingTitle}</b>
-              <p>{copy.corrWaitingBody}</p>
-            </div>
-          </div>
-          <Link href={editHref} className="ghostbtn">
-            <AIc>{AttIcon.edit}</AIc>{copy.corrResend}
-          </Link>
-        </>
-      ) : request.status === "in_review" ? (
-        <div
-          className="review"
-          style={{
-            background: "var(--warn-bg)",
-            border: "1px solid color-mix(in oklab, var(--warn) 22%, transparent)",
-          }}
-        >
-          <span className="review__av">
-            {(request.reviewerName ?? copy.corrInReviewAdmin)[0]}
-          </span>
-          <div className="review__b">
-            <b style={{ color: "var(--warn)" }}>
-              {copy.corrInReviewTitle(request.reviewerName ?? copy.corrInReviewAdmin)}
-            </b>
-            <p>{copy.corrInReviewBody}</p>
-          </div>
-        </div>
-      ) : request.status === "approved" ? (
-        <div className="review ok">
-          <span className="review__av">
-            {(request.reviewerName ?? copy.corrInReviewAdmin)[0]}
-          </span>
-          <div className="review__b">
-            <b>
-              {request.reviewerName
-                ? copy.corrApprovedTitle(request.reviewerName)
-                : copy.stepApproved}
-            </b>
-            <p>{request.reviewComment ?? copy.corrApprovedDefault}</p>
-            {request.reviewedAtLabel ? (
-              <div className="review__t">{copy.corrApprovedAt(request.reviewedAtLabel)}</div>
-            ) : null}
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="review rej">
-            <span className="review__av">
-              {(request.reviewerName ?? copy.corrInReviewAdmin)[0]}
-            </span>
-            <div className="review__b">
-              <b>
-                {request.reviewerName
-                  ? copy.corrRejectedTitle(request.reviewerName)
-                  : copy.stepRejected}
-              </b>
-              <p>{request.reviewComment ?? copy.corrRejectedDefault}</p>
-              {request.reviewedAtLabel ? (
-                <div className="review__t">{copy.corrRejectedAt(request.reviewedAtLabel)}</div>
-              ) : null}
-            </div>
-          </div>
-          <Link href={editHref} className="ghostbtn">
-            <AIc>{AttIcon.edit}</AIc>{copy.corrResend}
-          </Link>
-        </>
-      )}
-      {/* 철회 — 대기 중인 요청에만. 예전에는 잘못 낸 요청을 거둘 방법이 없어, 관리자가 반려해 줄
-          때까지 대기 큐에 남고 그 달 근태 마감까지 막혔다(2026-08-03). */}
-      {canCancel ? (
-        <>
-          {cancelErr ? <div className="ferr">{copy.corrCancelFailed}</div> : null}
-          <button
-            className="ghostbtn"
-            disabled={cancelling}
-            onClick={() => {
-              setCancelErr(false);
-              setConfirmCancel(true);
-            }}
-            type="button"
-          >
-            <AIc>{AttIcon.x}</AIc>
-            {copy.corrCancel}
-          </button>
-        </>
-      ) : null}
 
       {confirmCancel ? (
         <BottomSheet ariaLabel={copy.corrCancelConfirmTitle} onClose={() => setConfirmCancel(false)}>
@@ -323,7 +215,6 @@ export function AttendanceCorrectionStatus({
         </BottomSheet>
       ) : null}
 
-      <div style={{ height: "16px" }} />
     </div>
   );
 }

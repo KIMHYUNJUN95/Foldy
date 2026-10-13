@@ -1961,6 +1961,7 @@ const FALLBACK_DICTIONARY = {
       allowCancelBtn: "Cancel",
       allowCancelTitle: "Cancel allowance",
       allowCancelKeep: "Keep it",
+      allowPanelSub: "Base rate stays the same · extra pay for that day only",
       allowCancelDesc:
         "This allowance will no longer apply to the affected pay. This cannot be undone.",
       allowCreated: "Attendance allowance added.",
@@ -8486,6 +8487,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         allowCancelBtn: "취소",
         allowCancelTitle: "추가수당 취소",
         allowCancelKeep: "그대로 두기",
+        allowPanelSub: "기본 시급은 그대로 · 그날만 더 지급",
         allowCancelDesc: "이 추가수당은 해당 급여에 더 이상 반영되지 않습니다. 되돌릴 수 없습니다.",
         allowCreated: "추가수당이 등록되었습니다.",
         allowCancelled: "추가수당이 취소되었습니다.",
@@ -14863,6 +14865,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         allowCancelBtn: "取消",
         allowCancelTitle: "手当を取消",
         allowCancelKeep: "そのままにする",
+        allowPanelSub: "基本時給はそのまま · その日だけ上乗せ",
         allowCancelDesc: "この手当は該当の給与に反映されなくなります。元に戻せません。",
         allowCreated: "手当を登録しました。",
         allowCancelled: "手当を取り消しました。",

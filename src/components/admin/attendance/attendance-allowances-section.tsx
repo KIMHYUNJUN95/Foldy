@@ -8,7 +8,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleAlert, Info, Plus, Sparkles } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import type { AdminAllowanceRow } from "@/lib/admin-attendance";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import {
@@ -152,160 +152,138 @@ export function AttendanceAllowancesSection({
             <div className="alw__sub">{c.allowSecDesc}</div>
           </div>
         </div>
-        {/* 폼이 열려 있으면 위쪽 닫기는 두지 않는다 — 폼 아래 「닫기」 하나(2026-10-13 제보: 닫기 중복). */}
-        {formOpen ? null : (
-          <button type="button" className="btn btn--pri btn--sm" onClick={() => setFormOpen(true)}>
-            {c.allowAddBtn}
-          </button>
-        )}
+        <button type="button" className="btn btn--pri btn--sm" onClick={() => setFormOpen(true)}>
+          {c.allowAddBtn}
+        </button>
       </div>
 
+      {/* 입력은 오른쪽 패널에서 위아래로(2026-10-13 시안 AttAllowAdd-PC — 화면 폭 전체 폼이 길쭉하다는 지적). 닫기는 위 × 하나. */}
       {formOpen ? (
-        <div className="alw__form">
-          <div className="wreason">
-            <div className="wfield__l">{c.allowFieldType}</div>
-            <div className="fseg" role="tablist">
-              <button
-                type="button"
-                className={type === "daily_fixed" ? "on" : ""}
-                onClick={() => setType("daily_fixed")}
-              >
-                {c.allowTypeDailyFixed}
-              </button>
-              <button
-                type="button"
-                className={type === "hourly_extra" ? "on" : ""}
-                onClick={() => setType("hourly_extra")}
-              >
-                {c.allowTypeHourlyExtra}
-              </button>
-            </div>
-          </div>
-
-          <div className="wreason">
-            <div className="wfield__l">{c.allowFieldScope}</div>
-            <div className="fseg" role="tablist">
-              <button
-                type="button"
-                className={scope === "all" ? "on" : ""}
-                onClick={() => setScope("all")}
-              >
-                {c.allowScopeAll}
-              </button>
-              <button
-                type="button"
-                className={scope === "user" ? "on" : ""}
-                onClick={() => setScope("user")}
-              >
-                {c.allowScopeUser}
-              </button>
-            </div>
-          </div>
-
-          <div className="wreason">
-            <div className="wfield__l">{c.allowFieldAmount}</div>
-            <div className="winp">
-              <span className="yen">{c.yenSym}</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                step={10}
-                min={0}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div className="alw__unit">{amountUnit}</div>
-          </div>
-
-          <div className="wreason">
-            <div className="wfield__l">{c.allowFieldDate}</div>
-            <AdminDatePicker
-              value={date}
-              onChange={setDate}
-              localeTag={localeTag}
-              ariaLabel={c.allowFieldDate}
-              labels={{
-                prevMonth: c.datePickerPrevMonth,
-                nextMonth: c.datePickerNextMonth,
-                today: c.datePickerToday,
-              }}
-            />
-          </div>
-
-          <div className="wreason">
-            <div className="wfield__l">{c.allowFieldCategory}</div>
-            <AdmDropdown
-              value={category}
-              onChange={(v) => setCategory(v as Category)}
-              options={CATEGORIES.map((cat) => ({ value: cat, label: categoryLabel(cat, c) }))}
-              ariaLabel={c.allowFieldCategory}
-            />
-          </div>
-
-          {scope === "user" ? (
-            <div className="wreason">
-              <div className="wfield__l">{c.allowFieldUser}</div>
-              <AdmDropdown
-                value={targetUserId}
-                onChange={setTargetUserId}
-                options={staff.map((s) => ({ value: s.userId, label: s.userName }))}
-                placeholder={c.allowUserPlaceholder}
-                ariaLabel={c.allowFieldUser}
-              />
-            </div>
-          ) : null}
-
-          <div className={scope === "user" ? "wreason alw__span2" : "wreason alw__span3"}>
-            <div className="wfield__l">{c.allowFieldMemo}</div>
-            <input
-              type="text"
-              placeholder={c.allowMemoPlaceholder}
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-            />
-          </div>
-
-          <div className="alw__note alw__spanfull">
-            <Ic>
-              <Info />
-            </Ic>
-            <span>{c.allowFormNote}</span>
-          </div>
-
-          {err ? (
-            <div className="errbar is-warn alw__spanfull" style={{ margin: 0 }}>
-              <span className="errbar__ic">
-                <Ic>
-                  <CircleAlert />
-                </Ic>
-              </span>
-              <div>
-                <div className="errbar__t">{err}</div>
+        <>
+          <div className="panel-scrim on" onClick={() => (pending ? undefined : (setFormOpen(false), resetForm()))} />
+          <aside className="panel on alw-panel" role="dialog" aria-label={c.allowAddBtn}>
+            <div className="panel__h">
+              <div className="panel__top">
+                <span className="panel__kicker">{c.allowSecTitle}</span>
+                <button
+                  type="button"
+                  className="panel__x"
+                  aria-label={c.allowFormClose}
+                  disabled={pending}
+                  onClick={() => {
+                    setFormOpen(false);
+                    resetForm();
+                  }}
+                >
+                  <Ic>
+                    <X />
+                  </Ic>
+                </button>
+              </div>
+              <div className="panel__title alw-panel__title">
+                <b>{c.allowAddBtn}</b>
+                <span className="panel__sub">{c.allowPanelSub}</span>
               </div>
             </div>
-          ) : null}
 
-          <div className="alw__formfoot alw__spanfull">
-            <button
-              type="button"
-              className="btn btn--subtle"
-              onClick={() => {
-                setFormOpen(false);
-                resetForm();
-              }}
-              disabled={pending}
-            >
-              {c.allowFormClose}
-            </button>
-            <button type="button" className="btn btn--pri" onClick={submitCreate} disabled={pending}>
-              <Ic>
-                <Plus />
-              </Ic>
-              {c.allowSave}
-            </button>
-          </div>
-        </div>
+            <div className="panel__body alw-panel__body">
+              <div className="anf">
+                <span className="anf__l">{c.allowFieldDate}</span>
+                <AdminDatePicker
+                  value={date}
+                  onChange={setDate}
+                  localeTag={localeTag}
+                  ariaLabel={c.allowFieldDate}
+                  labels={{
+                    prevMonth: c.datePickerPrevMonth,
+                    nextMonth: c.datePickerNextMonth,
+                    today: c.datePickerToday,
+                  }}
+                />
+              </div>
+
+              <div className="alw-q">{c.allowFieldScope}</div>
+              <div className="fseg alw-seg" role="tablist">
+                <button type="button" className={scope === "all" ? "on" : ""} onClick={() => setScope("all")}>
+                  {c.allowScopeAll}
+                </button>
+                <button type="button" className={scope === "user" ? "on" : ""} onClick={() => setScope("user")}>
+                  {c.allowScopeUser}
+                </button>
+              </div>
+              {scope === "user" ? (
+                <div className="anf">
+                  <span className="anf__l">{c.allowFieldUser}</span>
+                  <AdmDropdown
+                    value={targetUserId}
+                    onChange={setTargetUserId}
+                    options={staff.map((x) => ({ value: x.userId, label: x.userName }))}
+                    placeholder={c.allowUserPlaceholder}
+                    ariaLabel={c.allowFieldUser}
+                    searchable={staff.length > 8}
+                    wide
+                  />
+                </div>
+              ) : null}
+
+              <div className="alw-q">{c.allowFieldCategory}</div>
+              <div className="fseg alw-seg" role="tablist">
+                {CATEGORIES.map((cat) => (
+                  <button key={cat} type="button" className={category === cat ? "on" : ""} onClick={() => setCategory(cat)}>
+                    {categoryLabel(cat, c)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="alw-q">{c.allowFieldType}</div>
+              <div className="fseg alw-seg" role="tablist">
+                <button type="button" className={type === "daily_fixed" ? "on" : ""} onClick={() => setType("daily_fixed")}>
+                  {c.allowTypeDailyFixed}
+                </button>
+                <button type="button" className={type === "hourly_extra" ? "on" : ""} onClick={() => setType("hourly_extra")}>
+                  {c.allowTypeHourlyExtra}
+                </button>
+              </div>
+
+              <label className="anf">
+                <span className="anf__l">
+                  {c.allowFieldAmount} · {amountUnit}
+                </span>
+                <span className="anf__in">
+                  <span className="anf__yen">{c.yenSym}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    step={10}
+                    min={0}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </span>
+              </label>
+
+              <label className="anf">
+                <span className="anf__l">{c.allowFieldMemo}</span>
+                <span className="anf__in">
+                  <input type="text" placeholder={c.allowMemoPlaceholder} value={memo} onChange={(e) => setMemo(e.target.value)} />
+                </span>
+              </label>
+
+              <p className="alw-note">{c.allowFormNote}</p>
+              {err ? (
+                <p className="alw-err" role="alert">
+                  {err}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="panel__foot">
+              <button type="button" className="btn btn--pri alw-save" onClick={submitCreate} disabled={pending}>
+                {c.allowSave}
+              </button>
+            </div>
+          </aside>
+        </>
       ) : null}
 
       {allowances.length === 0 ? (

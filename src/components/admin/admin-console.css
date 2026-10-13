@@ -3234,3 +3234,21 @@
 /* 추가수당 입력 폼 — 상자 없이 위아래 줄만 */
 .adm .alw--w .alw__form { padding: 16px 0; border: 0; border-top: 1px solid #f1f1f4; border-bottom: 1px solid #f1f1f4; border-radius: 0; background: none; box-shadow: none; }
 .adm .alw--w .winp input { border: 0; box-shadow: none; background: transparent; }
+
+/* 추가수당 추가 패널 — 테두리 이름표 칸 · 토글 · 저장 하나(2026-10-13 시안 AttAllowAdd-PC) */
+.adm .alw-panel .alw-panel__title { display: flex; flex-direction: column; gap: 4px; }
+.adm .alw-panel .alw-panel__title b { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .alw-panel__body { display: flex; flex-direction: column; gap: 0; }
+.adm .alw-panel .anf { position: relative; display: block; margin-top: 18px; }
+.adm .alw-panel .anf__l { position: absolute; top: -8px; left: 11px; z-index: 2; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; pointer-events: none; white-space: nowrap; }
+.adm .alw-panel .anf__in { display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.adm .alw-panel .anf__in:focus-within { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.adm .alw-panel .anf__in input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; font: inherit; font-size: 15px; color: #16141f; box-shadow: none; padding: 0; }
+.adm .alw-panel .anf__yen { color: #8b8898; font-size: 15px; }
+.adm .alw-panel .anf .adp > button, .adm .alw-panel .anf .dd > button { height: 48px; border-radius: 12px; }
+.adm .alw-panel .alw-q { margin: 18px 0 8px; font-size: 13px; font-weight: 600; color: #3a3746; }
+.adm .alw-panel .alw-seg { display: flex; width: 100%; }
+.adm .alw-panel .alw-seg button { flex: 1; justify-content: center; text-align: center; }
+.adm .alw-panel .alw-note { margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: #8b8898; }
+.adm .alw-panel .alw-err { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: #c5282e; }
+.adm .alw-panel .alw-save { flex: 1; height: 46px; justify-content: center; }

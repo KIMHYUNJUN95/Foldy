@@ -438,7 +438,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <div className="field">
               <label className="field__l" htmlFor="entry-email">{t.emailLabel}</label>
               <div className="inp">
-                <input id="entry-email" type="email" name="email" autoComplete="email" enterKeyHint="go" placeholder={t.emailPlaceholder} />
+                <input id="entry-email" type="email" name="email" autoComplete="email" autoCapitalize="none" spellCheck={false} enterKeyHint="go" placeholder={t.emailPlaceholder} />
               </div>
             </div>
             <button type="submit" className="aw-btn">{t.entry.continueEmail}</button>

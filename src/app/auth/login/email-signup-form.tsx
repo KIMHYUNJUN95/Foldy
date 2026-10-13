@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useState } from "react";
+import { useState, useId } from "react";
 import { signUpWithEmail } from "@/app/auth/actions";
 import { LegalLink, type LegalOverlayCopy, type LegalOverlayDoc } from "@/components/legal/legal-overlay";
 import type { LegalDocument } from "@/lib/legal-content";
@@ -99,6 +99,7 @@ export function EmailSignupForm({
     hrefs: Record<LegalOverlayDoc, string>;
   };
 }) {
+  const fieldId = useId();
   const [emailValid, setEmailValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -116,12 +117,15 @@ export function EmailSignupForm({
       <input type="hidden" name="lang" value={lang} />
 
       <div className="field">
-        <div className="field__l">{copy.emailLabel}</div>
+        <label className="field__l" htmlFor={`${fieldId}-1`}>{copy.emailLabel}</label>
         <div className="inp">
           <input
+            id={`${fieldId}-1`}
             type="email"
             name="email"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
             enterKeyHint="next"
             placeholder={copy.emailPlaceholder}
             onChange={(e) => setEmailValid(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value))}
@@ -131,9 +135,10 @@ export function EmailSignupForm({
       </div>
 
       <div className="field">
-        <div className="field__l">{copy.passwordLabel}</div>
+        <label className="field__l" htmlFor={`${fieldId}-2`}>{copy.passwordLabel}</label>
         <div className="inp pw">
           <input
+            id={`${fieldId}-2`}
             type={showPassword ? "text" : "password"}
             name="password"
             autoComplete="new-password"
@@ -159,9 +164,10 @@ export function EmailSignupForm({
       </div>
 
       <div className="field">
-        <div className="field__l">{copy.confirmLabel}</div>
+        <label className="field__l" htmlFor={`${fieldId}-3`}>{copy.confirmLabel}</label>
         <div className={`inp${mismatch ? " bad" : ""}`}>
           <input
+            id={`${fieldId}-3`}
             type={showPassword ? "text" : "password"}
             name="confirm"
             autoComplete="new-password"

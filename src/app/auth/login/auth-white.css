@@ -348,3 +348,74 @@
 }
 
 :lang(ko) .aw-title, :lang(ja) .aw-title { letter-spacing: -0.04em; }
+
+/* ══ 디테일 다듬기 (2026-10-13 — emil-design-eng · web-interface-guidelines 점검) ══════════════════════
+   색 · 배치는 그대로, 손에 닿는 감각만: 누름 반응 · 포커스 표시 · 이름표 전환 · 자동완성 색 · 로딩 중 버튼 · 첫 등장. */
+
+/* 누름 반응 — 눌렀다는 게 손끝에 느껴지게(0.97, 짧게). 마우스가 있는 기기에서만 hover 색. */
+.aw-btn { transition: background-color 160ms ease, transform 160ms var(--ease-out); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.aw-btn:active:not(:disabled) { transform: scale(0.97); }
+@media (hover: none) { .aw-btn:hover { background: var(--aw-primary); } .aw-btn--line:hover { background: #ffffff; } }
+.aw-btn--line { transition: background-color 160ms ease, border-color 160ms ease, transform 160ms var(--ease-out); }
+@media (hover: hover) { .aw-btn--line:hover { border-color: #d6d6de; } }
+
+/* 로딩 중 — 회색으로 죽지 않고 보라 그대로 살짝 옅게, 흰 회전 표시가 보이게 */
+.aw-btn[aria-busy="true"] { background: var(--aw-primary); color: #fff !important; opacity: 0.86; cursor: progress; }
+
+/* 키보드 포커스 — 마우스로 누를 땐 안 보이고 Tab 으로 왔을 때만 보라 링 */
+.authw a:focus-visible, .authw button:focus-visible, .aw-btn:focus-visible {
+  outline: 2px solid var(--aw-primary);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+.authw .inp input:focus-visible { outline: none; }
+
+/* 입력칸 — 포커스 때 테두리 두께가 바뀌며 글자가 0.5px 밀리던 것을 그림자로 대신 */
+.authw .inp input {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.authw .inp input:focus { border: 1px solid var(--aw-primary); box-shadow: 0 0 0 0.5px var(--aw-primary), 0 0 0 4px var(--aw-ring); }
+.authw .inp.bad input:focus { border-color: var(--aw-danger); box-shadow: 0 0 0 0.5px var(--aw-danger), 0 0 0 4px var(--aw-danger-bg); }
+.authw .field__l { transition: color 150ms ease; cursor: text; pointer-events: auto; }
+.authw .field:has(.inp.bad) .field__l { color: var(--aw-danger); }
+@media (hover: hover) { .authw .inp input:hover:not(:focus) { border-color: #cfcfd8; } }
+
+/* 브라우저 자동완성 — 노란 · 파란 바탕 대신 흰 바탕 그대로(포커스 링과 함께) */
+.authw .inp input:-webkit-autofill { -webkit-text-fill-color: var(--aw-ink); box-shadow: 0 0 0 1000px #fff inset; caret-color: var(--aw-ink); }
+.authw .inp input:-webkit-autofill:focus { box-shadow: 0 0 0 1000px #fff inset, 0 0 0 0.5px var(--aw-primary), 0 0 0 4px var(--aw-ring); }
+
+/* 비밀번호 보기 단추 — 누름 반응 · 마우스 올림 바탕 */
+.authw .inp__eye { transition: background-color 150ms ease, color 150ms ease, transform 140ms var(--ease-out); -webkit-tap-highlight-color: transparent; }
+.authw .inp__eye:active { transform: scale(0.92); }
+@media (hover: hover) { .authw .inp__eye:hover { background: #f4f4f7; color: var(--aw-ink); } }
+
+/* 탭 · 링크 — 색이 툭 바뀌지 않게 */
+.aw-tabs a, .authw__legal a, .authw__backlink, .authw .field__under a { transition: color 150ms ease; }
+@media (hover: hover) { .aw-tabs a:hover { color: var(--aw-soft) !important; } }
+
+/* 언어 메뉴 — 단추 쪽(오른쪽 위)에서 살짝 커지며 열린다 */
+.authw .langdd__menu { transform-origin: top right; animation: aw-pop 160ms var(--ease-out); }
+.authw .langpill { transition: background-color 150ms ease; }
+@keyframes aw-pop { from { opacity: 0; transform: scale(0.97) translateY(-4px); } }
+
+/* 안내 · 오류 줄 — 나타날 때 툭 끼어들지 않게 */
+.authw .banner { animation: aw-in 220ms var(--ease-out) both; }
+
+/* 첫 등장 — 처음 여는 화면이라 아주 짧게 위에서 아래로 차례대로(40ms 간격, 막지 않음) */
+.authw__col > * { animation: aw-in 320ms var(--ease-out) both; }
+.authw__col > *:nth-child(2) { animation-delay: 40ms; }
+.authw__col > *:nth-child(3) { animation-delay: 80ms; }
+.authw__col > *:nth-child(4) { animation-delay: 120ms; }
+.authw__col > *:nth-child(n + 5) { animation-delay: 160ms; }
+@keyframes aw-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* 제목 줄바꿈 — 한 단어만 떨어지지 않게 */
+.aw-title, .aw-lede { text-wrap: balance; }
+
+/* 움직임 줄이기 — 이동은 빼고 옅어지는 것만 */
+@media (prefers-reduced-motion: reduce) {
+  .authw__col > *, .authw .banner, .authw .langdd__menu { animation: aw-fade 160ms ease both; animation-delay: 0ms; }
+  .aw-btn:active:not(:disabled), .authw .inp__eye:active { transform: none; }
+}
+@keyframes aw-fade { from { opacity: 0; } }

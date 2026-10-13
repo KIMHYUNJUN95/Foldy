@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useState } from "react";
+import { useState, useId } from "react";
 import { signInWithEmailPassword } from "@/app/auth/actions";
 
 function EyeIcon() {
@@ -46,7 +46,7 @@ type EmailLoginFormCopy = {
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} aria-busy={pending} className="aw-btn" style={pending ? { opacity: 0.7 } : undefined}>
+    <button type="submit" disabled={pending} aria-busy={pending} className="aw-btn">
       {pending ? (
         <span className="size-5 animate-spin rounded-full border-[2.4px] border-white/60 border-t-white" aria-hidden="true" />
       ) : (
@@ -69,6 +69,7 @@ export function EmailLoginForm({
   next: string;
   lang: string;
 }) {
+  const fieldId = useId();
   const [showPassword, setShowPassword] = useState(false);
 
   return (
@@ -77,12 +78,15 @@ export function EmailLoginForm({
       <input type="hidden" name="lang" value={lang} />
 
       <div className="field">
-        <div className="field__l">{copy.emailLabel}</div>
+        <label className="field__l" htmlFor={`${fieldId}-1`}>{copy.emailLabel}</label>
         <div className="inp">
           <input
+            id={`${fieldId}-1`}
             type="email"
             name="email"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
             enterKeyHint="next"
             defaultValue={initialEmail}
             placeholder={copy.emailPlaceholder}
@@ -92,9 +96,10 @@ export function EmailLoginForm({
       </div>
 
       <div className="field">
-        <div className="field__l">{copy.passwordLabel}</div>
+        <label className="field__l" htmlFor={`${fieldId}-2`}>{copy.passwordLabel}</label>
         <div className="inp pw">
           <input
+            id={`${fieldId}-2`}
             type={showPassword ? "text" : "password"}
             name="password"
             autoComplete="current-password"

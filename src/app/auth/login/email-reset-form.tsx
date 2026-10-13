@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { useFormStatus } from "react-dom";
 import { requestPasswordReset } from "@/app/auth/actions";
 
@@ -13,7 +14,7 @@ type EmailResetFormCopy = {
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} aria-busy={pending} className="aw-btn" style={pending ? { opacity: 0.7 } : undefined}>
+    <button type="submit" disabled={pending} aria-busy={pending} className="aw-btn">
       {pending ? (
         <span className="size-5 animate-spin rounded-full border-[2.4px] border-white/60 border-t-white" aria-hidden="true" />
       ) : (
@@ -32,18 +33,22 @@ export function EmailResetForm({
   next: string;
   lang: string;
 }) {
+  const fieldId = useId();
   return (
     <form action={requestPasswordReset}>
       <input type="hidden" name="next" value={next} />
       <input type="hidden" name="lang" value={lang} />
 
       <div className="field" style={{ marginTop: 22 }}>
-        <div className="field__l">{copy.emailLabel}</div>
+        <label className="field__l" htmlFor={`${fieldId}-1`}>{copy.emailLabel}</label>
         <div className="inp focus">
           <input
+            id={`${fieldId}-1`}
             type="email"
             name="email"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
             enterKeyHint="go"
             placeholder={copy.emailPlaceholder}
             required

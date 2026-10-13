@@ -3519,3 +3519,61 @@
   .att .att-todaylog__r time { font-size: 12px; color: #8b8898; }
   .att.att--home > .att-todaylog { grid-column: 1; }
 }
+
+/* 급여(모바일) 화이트 리디자인 — 큰 총액 · 숫자 셋 · 날짜별 막대 · 날짜 줄(2026-10-13 시안 AttPay-Phone · Fold · Tablet) */
+.att.att--payw .payw-hero { padding: 6px 0 18px; }
+.att.att--payw .payw-hero__k { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #8b8898; font-weight: 500; }
+.att.att--payw .payw-eye { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -6px 0; border: 0; background: none; color: #8b8898; border-radius: 50%; cursor: pointer; }
+.att.att--payw .payw-eye svg { width: 16px; height: 16px; }
+.att.att--payw .payw-eye:active { transform: scale(0.94); }
+.att.att--payw .payw-hero__v { margin-top: 4px; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; transition: filter 200ms ease; }
+.att.att--payw .payw-hero__v.is-hidden { filter: blur(12px); user-select: none; }
+.att.att--payw .payw-hero__s { margin-top: 6px; font-size: 13px; color: #6b6878; }
+.att.att--payw .payw-hero__note { margin-top: 4px; font-size: 12px; color: #8b8898; }
+.att.att--payw .payw-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px 0; border-top: 1px solid #f0eff4; border-bottom: 1px solid #f0eff4; }
+.att.att--payw .payw-stat { display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; }
+.att.att--payw button.payw-stat:not(:disabled) { cursor: pointer; }
+.att.att--payw .payw-stat__k { font-size: 12px; color: #8b8898; }
+.att.att--payw .payw-stat__v { font-size: 17px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.att.att--payw .payw-stat.is-danger .payw-stat__v { color: #c5282e; }
+.att.att--payw .payw-sec { margin-top: 20px; }
+.att.att--payw .payw-sec__t { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.att.att--payw .payw-sec__t span { font-weight: 500; color: #8b8898; }
+.att.att--payw .payw-row { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid #f3f3f6; }
+.att.att--payw .payw-row__b { flex: 1; min-width: 0; }
+.att.att--payw .payw-row__t { font-size: 14px; color: var(--ink); font-weight: 500; }
+.att.att--payw .payw-row__s { font-size: 12px; color: #8b8898; margin-top: 2px; }
+.att.att--payw .payw-row__v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.att.att--payw .payw-chart { margin-top: 22px; }
+.att.att--payw .payw-chart__h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.att.att--payw .payw-chart__h b { font-size: 14px; font-weight: 600; color: var(--ink); }
+.att.att--payw .payw-chart__h span { font-size: 11px; color: #8b8898; }
+.att.att--payw .payw-bars { display: flex; align-items: flex-end; gap: 2px; height: 128px; }
+.att.att--payw .payw-bar.is-empty { cursor: default; }
+.att.att--payw .payw-bar.is-empty i { height: 2px; background: #efedf4; }
+.att.att--payw .payw-bar__n { display: none; }
+.att.att--payw .payw-bar { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.att.att--payw .payw-bar i { display: block; width: 100%; max-width: 28px; border-radius: 4px 4px 2px 2px; background: #c2aef6; transition: background 150ms ease; }
+.att.att--payw .payw-bar:hover i { background: #a88cf0; }
+.att.att--payw .payw-bar i.is-now { background: #7a52e6; }
+.att.att--payw .payw-bar i.is-danger { background: #e5484d; }
+.att.att--payw .payw-bar__v { font-size: 10px; line-height: 12px; min-height: 12px; color: #6b6878; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.att.att--payw .payw-bar__v.is-danger { color: #c5282e; }
+.att.att--payw .payw-days { display: flex; gap: 2px; margin-top: 6px; }
+.att.att--payw .payw-days span { flex: 1 1 0; min-width: 0; text-align: center; font-size: 10px; color: #b4b1bf; font-variant-numeric: tabular-nums; overflow: visible; white-space: nowrap; }
+.att.att--payw .payw-days span.is-on { color: var(--ink); font-weight: 600; }
+.att.att--payw .payw-list { margin-top: 18px; display: flex; flex-direction: column; }
+.att.att--payw .payw-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0; border: 0; border-bottom: 1px solid #f3f3f6; background: none; font: inherit; text-align: left; cursor: pointer; }
+.att.att--payw .payw-line:active { background: #faf9fc; }
+.att.att--payw .payw-line__t { font-size: 14px; color: var(--ink); min-width: 0; }
+.att.att--payw .payw-line__v { font-size: 14px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.att.att--payw .payw-line__v.is-danger { color: #c5282e; font-weight: 500; }
+.att.att--payw .payw-line__v.is-now { color: #7a52e6; font-weight: 500; }
+.att.att--payw .payw-line--foot { cursor: default; border-bottom: 0; }
+.att.att--payw .payw-line--foot .payw-line__t { color: #6b6878; font-weight: 500; }
+.att.att--payw .payw-line--foot .payw-line__v { font-size: 16px; font-weight: 700; }
+.att.att--payw .gross-note { margin-top: 12px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--payw > .att-pay__main > .payw-chart:first-child { margin-top: 0; }
+  .att.att--payw .payw-bars { height: 168px; }
+}

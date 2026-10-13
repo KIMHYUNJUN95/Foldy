@@ -7,13 +7,10 @@ import {
   ArrowUpRight,
   Ban,
   Check,
-  ChevronDown,
-  ChevronRight,
   CircleAlert,
   CircleCheck,
   Download,
   FileText,
-  Filter,
   LogOut,
   Shield,
   Wallet,
@@ -83,7 +80,7 @@ export function AttendancePayrollClient({
   const [rows, setRows] = useState(initialRows);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
-  const showToast = (msg: string) => setToast({ id: Date.now(), msg });
+  const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
   const [pendingMonthExport, startMonthExport] = useTransition();
   const [pendingPdfExport, startPdfExport] = useTransition();
   const [exportHourlyOnly, setExportHourlyOnly] = useState(false);
@@ -98,6 +95,18 @@ export function AttendancePayrollClient({
 
   function applyRow(updated: AdminPayrollRow) {
     setRows((prev) => prev.map((r) => (r.userId === updated.userId ? updated : r)));
+  }
+
+  // 평균 시급 = 직원별 시급을 인정 시간으로 가중 평균. 기본급 ÷ 시간으로 내면 월 10엔 올림이 섞여
+  // 실제 없는 시급(¥1,613 등)이 나온다. 시급 대상이 없으면 0.
+  const hourlyRows = rows.filter((r) => r.employment !== "salaried" && r.totalPaidMinutes > 0 && r.primaryRate > 0);
+  const paidMinutesSum = hourlyRows.reduce((sum, r) => sum + r.totalPaidMinutes, 0);
+  const avgRate = paidMinutesSum > 0 ? Math.round(hourlyRows.reduce((sum, r) => sum + r.primaryRate * r.totalPaidMinutes, 0) / paidMinutesSum) : 0;
+  function hoursLabel(mins: number) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h === 0) return `${m}${c.unitMinShort}`;
+    return m === 0 ? `${h}${c.unitHourShort}` : c.payHoursFmt.replace("{h}", String(h)).replace("{m}", String(m));
   }
 
   function doMonthlyExport() {
@@ -134,73 +143,50 @@ export function AttendancePayrollClient({
 
   return (
     <div style={{ position: "relative" }}>
-      {/* KPI mini-row — 4 cells (override default 5-column .opsbar grid) */}
-      <div
-        className="opsbar"
-        style={{ marginBottom: 18, gridTemplateColumns: "repeat(4, 1fr)" }}
-      >
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <Wallet />
-            </Ic>
-            {c.payKpiHourly}
-          </div>
-          <div className="opscell__v">{initialKpi.hourlyTarget}</div>
-          <div className="opscell__sub">{c.unitPeople}</div>
+      {/* 화이트 리디자인(2026-10-13, 시안 AttPay-PC): 숫자 줄 → 상태 · 내보내기 줄 → 표(근무일 · 인정 시간 · 시급 · 수당 · 예상 급여 · 제외 · 상태).
+          쓰이지 않던 「고용형태」 필터 칩(비활성)은 뺐다. */}
+      <div className="wkpis" style={{ marginBottom: 6 }}>
+        <div className="wkpi">
+          <span className="wkpi__k">{c.payKpiHourly}</span>
+          <span className="wkpi__v">
+            {initialKpi.hourlyTarget}
+            <small>{c.unitPeople}</small>
+          </span>
+          <span className="wkpi__d">{monthLabel}</span>
         </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <Wallet />
-            </Ic>
-            {c.payKpiExpected}
-          </div>
-          <div className="opscell__v mono">
+        <div className="wkpi">
+          <span className="wkpi__k">{c.payKpiExpected}</span>
+          <span className="wkpi__v">
             {c.yenSym}
             {formatAdminYen(initialKpi.expectedTotal, localeTag)}
-          </div>
-          <div className="opscell__sub">{monthLabel}</div>
-          <span className="opscell__tag">
-            <span className="pill pill--info">
-              <span className="d" />
-              {c.tagEstimated}
-            </span>
           </span>
+          <span className="wkpi__d">{c.payKpiExpectedSub}</span>
         </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <AlertTriangle />
-            </Ic>
-            {c.payKpiExcluded}
-          </div>
-          <div className="opscell__v">{initialKpi.excludedTotal}</div>
-          <div className="opscell__sub">{c.kpiPayExcludedSub}</div>
+        <div className="wkpi">
+          <span className="wkpi__k">{c.payKpiExcluded}</span>
+          <span className={`wkpi__v${initialKpi.excludedTotal > 0 ? " is-danger" : ""}`}>
+            {initialKpi.excludedTotal}
+            <small>{c.unitCount}</small>
+          </span>
+          <span className="wkpi__d">{c.kpiPayExcludedSub}</span>
         </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <Check />
-            </Ic>
-            {c.payKpiFinalized}
-          </div>
-          <div className="opscell__v">{initialKpi.finalizedCount}</div>
-          <div className="opscell__sub">{c.unitPeople}</div>
+        <div className="wkpi">
+          <span className="wkpi__k">{c.payKpiAvgRate}</span>
+          <span className="wkpi__v">{avgRate > 0 ? `${c.yenSym}${formatAdminYen(avgRate, localeTag)}` : "—"}</span>
+          <span className="wkpi__d">{c.payKpiAvgRateSub}</span>
+        </div>
+        <div className="wkpi">
+          <span className="wkpi__k">{c.payKpiFinalized}</span>
+          <span className="wkpi__v">
+            {initialKpi.finalizedCount}
+            <small>{c.unitPeople}</small>
+          </span>
+          <span className="wkpi__d">{c.payStatusFinalized}</span>
         </div>
       </div>
 
-      {/* Toolbar — filter chips + monthly export */}
-      <div className="toolbar">
-        <button type="button" className="chipbtn" disabled aria-disabled="true">
-          <Ic>
-            <Filter />
-          </Ic>
-          {c.payFilterEmployment}
-          <span className="ic chev">
-            <ChevronDown />
-          </span>
-        </button>
+      <div className="toolbar" style={{ marginTop: 10 }}>
+        <span className="pay-state">{initialKpi.finalizedCount > 0 && initialKpi.finalizedCount >= rows.length ? c.payStatusFinalized : c.payStateLine}</span>
         <span className="toolbar__spacer" />
         <button
           type="button"
@@ -214,146 +200,104 @@ export function AttendancePayrollClient({
           </span>
           <span className="export-toggle__label">{c.payExportHourlyOnly}</span>
         </button>
-        <button
-          type="button"
-          className="chipbtn"
-          onClick={doPdfExport}
-          disabled={pendingPdfExport}
-        >
-          <Ic>
-            <FileText />
-          </Ic>
-          {pendingPdfExport ? c.payActionExporting : c.payExportPdf}
-        </button>
-        <button
-          type="button"
-          className="chipbtn"
-          onClick={doMonthlyExport}
-          disabled={pendingMonthExport}
-        >
+        <button type="button" className="chipbtn" onClick={doMonthlyExport} disabled={pendingMonthExport}>
           <Ic>
             <Download />
           </Ic>
           {pendingMonthExport ? c.payActionExporting : c.payExportMonthly}
         </button>
+        <button type="button" className="chipbtn" onClick={doPdfExport} disabled={pendingPdfExport}>
+          <Ic>
+            <FileText />
+          </Ic>
+          {pendingPdfExport ? c.payActionExporting : c.payExportPdf}
+        </button>
       </div>
 
       {rows.length === 0 ? (
-        <div className="card">
-          <div className="state">
-            <span className="state__ic empty">
-              <Ic>
-                <Wallet />
-              </Ic>
-            </span>
-            <div className="state__t">{c.payEmptyTitle}</div>
-            <div className="state__s">{c.payEmptyBody}</div>
-          </div>
+        <div className="state">
+          <span className="state__ic empty">
+            <Ic>
+              <Wallet />
+            </Ic>
+          </span>
+          <div className="state__t">{c.payEmptyTitle}</div>
+          <div className="state__s">{c.payEmptyBody}</div>
         </div>
       ) : (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <table className="qtbl">
-            <thead>
-              <tr>
-                <th style={{ paddingLeft: 16 }}>{c.payColStaff}</th>
-                <th>{c.payColEmployment}</th>
-                <th>{c.payColRecognized}</th>
-                <th>{c.payColRate}</th>
-                <th>{c.payColExpected}</th>
-                <th>{c.payColExcluded}</th>
-                <th>{c.payColStatus}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const pill = payStatusPill(r, c);
-                const sel = panelId === r.userId;
-                const isSalaried = r.employment === "salaried";
-                return (
-                  <tr
-                    key={r.userId}
-                    className={sel ? "sel" : ""}
-                    onClick={() => setPanelId(r.userId)}
-                  >
-                    <td style={{ paddingLeft: 16 }}>
-                      <div className="who">
-                        <span
-                          className="uhead__av"
-                          style={{
-                            background: "var(--adm-primary)",
-                            width: 34,
-                            height: 34,
-                            borderRadius: 9,
-                            fontSize: 13,
-                          }}
-                        >
-                          {initial(r.userName)}
-                        </span>
-                        <div>
-                          <div className="who__nm">{r.userName}</div>
-                          <div className="who__sub">{r.role ?? "—"}</div>
+        <table className="qtbl pay-tbl">
+          <thead>
+            <tr>
+              <th style={{ paddingLeft: 16 }}>{c.payColStaff}</th>
+              <th className="r">{c.payColWorkDays}</th>
+              <th className="r">{c.payColRecognized}</th>
+              <th className="r">{c.payColRate}</th>
+              <th className="r">{c.payColAllowance}</th>
+              <th className="r">{c.payColExpected}</th>
+              <th className="r">{c.payColExcluded}</th>
+              <th className="r">{c.payColStatus}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const pill = payStatusPill(r, c);
+              const sel = panelId === r.userId;
+              const isSalaried = r.employment === "salaried";
+              return (
+                <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => setPanelId(r.userId)}>
+                  <td style={{ paddingLeft: 16 }}>
+                    <div className="who">
+                      <span className="uhead__av" style={{ width: 32, height: 32 }}>
+                        {initial(r.userName)}
+                      </span>
+                      <div>
+                        <div className="who__nm">{r.userName}</div>
+                        <div className="who__sub">
+                          {r.employmentMissing ? (
+                            <span style={{ color: "#a8641c", fontWeight: 600 }}>{c.payEmploymentMissing}</span>
+                          ) : (
+                            employmentLabel(r.employment, c)
+                          )}
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      {r.employmentMissing ? (
-                        <span className="pill pill--warn">{c.payEmploymentMissing}</span>
-                      ) : (
-                        <span className={`tag ${isSalaried ? "tag--ghost" : "tag--method"}`}>
-                          {employmentLabel(r.employment, c)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="mono">{r.recognizedLabel}</td>
-                    <td className="mono">
-                      {r.primaryRate > 0 ? (
-                        <>
-                          {c.yenSym}
-                          {formatAdminYen(r.primaryRate, localeTag)}
-                          <span className="dim-cell"> {c.payRateUnit}</span>
-                        </>
-                      ) : (
-                        <span className="dim-cell">—</span>
-                      )}
-                    </td>
-                    <td className="mono">
-                      {isSalaried ? (
-                        <span className="dim-cell">—</span>
-                      ) : (
-                        <>
-                          <span style={{ color: "var(--adm-muted)" }}>{c.yenSym}</span>
-                          {formatAdminYen(r.expectedGross, localeTag)}
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      {r.excludedCount > 0 ? (
-                        <span style={{ color: "var(--warn)", fontWeight: 800 }}>
-                          {r.excludedCount}
-                          {c.unitCount}
-                        </span>
-                      ) : (
-                        <span className="dim-cell">0</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`pill ${pill.cls}`}>
-                        <span className="d" />
-                        {pill.label}
-                      </span>
-                    </td>
-                    <td className="colchev">
-                      <Ic>
-                        <ChevronRight />
-                      </Ic>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </td>
+                  <td className="r num">{r.workDays > 0 ? `${r.workDays}${c.unitDay}` : <span className="dim-cell">—</span>}</td>
+                  <td className="r num">{r.totalPaidMinutes > 0 ? hoursLabel(r.totalPaidMinutes) : <span className="dim-cell">—</span>}</td>
+                  <td className="r num">
+                    {r.primaryRate > 0 ? `${c.yenSym}${formatAdminYen(r.primaryRate, localeTag)}` : <span className="dim-cell">—</span>}
+                  </td>
+                  <td className="r num">
+                    {r.allowanceTotal > 0 ? `${c.yenSym}${formatAdminYen(r.allowanceTotal, localeTag)}` : <span className="dim-cell">—</span>}
+                  </td>
+                  <td className="r num">
+                    {isSalaried || (r.expectedGross === 0 && r.totalPaidMinutes === 0) ? (
+                      <span className="dim-cell">—</span>
+                    ) : (
+                      <b>{`${c.yenSym}${formatAdminYen(r.expectedGross, localeTag)}`}</b>
+                    )}
+                  </td>
+                  <td className="r">
+                    {r.excludedCount > 0 ? (
+                      <Link
+                        className="pay-excl"
+                        href={`/admin/attendance/queue?ym=${ym}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {c.payExcludedLink.replace("{n}", String(r.excludedCount))} ›
+                      </Link>
+                    ) : (
+                      <span className="dim-cell">—</span>
+                    )}
+                  </td>
+                  <td className="r">
+                    <span className={`pill ${pill.cls}`}>{pill.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
 
       {/* Right detail panel */}

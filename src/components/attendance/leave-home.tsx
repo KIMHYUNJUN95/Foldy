@@ -1,6 +1,5 @@
 import Link from "next/link";
 import "./leave.css";
-import { AIc, AttIcon } from "./att-icons";
 import { tokyoToday, type AnnualLeaveSummary } from "@/lib/annual-leave";
 import type { LeaveRequestView } from "@/lib/annual-leave-requests-server";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
@@ -17,24 +16,8 @@ type LeaveType = "annual" | "paid" | "special" | "other";
 type LeaveStatus = "requested" | "review" | "approved" | "rejected" | "draft" | "cancelled";
 
 function shortDate(iso: string): string {
-  return iso.slice(5).replace("-", "/");
+  return `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 }
-
-const TYPE_ICON: Record<LeaveType, keyof typeof AttIcon> = {
-  annual: "heart",
-  special: "gift",
-  paid: "coin",
-  other: "doc",
-};
-
-const STATUS_CHIP: Record<LeaveStatus, string> = {
-  requested: "c-warn",
-  review: "c-info",
-  approved: "c-done",
-  rejected: "c-danger",
-  draft: "c-muted",
-  cancelled: "c-muted",
-};
 
 function typeLabel(t: LeaveType, c: LeaveCopy): string {
   return t === "annual" ? c.typeAnnual : t === "paid" ? c.typePaid : t === "special" ? c.typeSpecial : c.typeOther;
@@ -73,140 +56,107 @@ export function LeaveHome({
   const used = Math.max(0, totalPool - summary.baseRemaining);
   const usedPct = totalPool > 0 ? Math.round((used / totalPool) * 100) : 0;
 
-  return (
-    <div className="lv" style={{ paddingBottom: 92 }}>
-      <div className="pagehead">
-        <span className="pagehead__crumb">{c.crumb}</span>
-        <span className="pagehead__t">{c.appTitle}</span>
-      </div>
-
-      {/* balance summary */}
-      <div className="balcard">
-        <div className="balcard__deco" />
-        <div className="balcard__top">
-          <span className="balcard__k">{c.balTitle}</span>
-          <span className="balcard__yr">{today.slice(0, 4)}</span>
-        </div>
-        <div className="balcard__main">
-          <div className="balcard__big">
-            {summary.baseRemaining}
-            <small> {c.unitD}</small>
-          </div>
-          <div className="balcard__meta">
-            <div>
-              {c.balUsed} {used}
-              {c.unitD} · {c.balGranted} {totalPool}
-              {c.unitD}
-            </div>
-            {summary.nextBaseGrant ? (
-              <div>{c.balNextGrant(summary.nextBaseGrant.date, summary.nextBaseGrant.amount)}</div>
-            ) : null}
-          </div>
-        </div>
-        <div className="balcard__bar">
-          <i style={{ width: `${usedPct}%` }} />
-        </div>
-        <div className="balcard__foot">
-          <span>
-            {c.balUsed} {used}
+  const bonusOn = summary.nextBonusGrant;
+  const recentRows = recent.map((r) => {
+    const st = r.status as LeaveStatus;
+    const range = r.startDate === r.endDate ? shortDate(r.startDate) : `${shortDate(r.startDate)} – ${shortDate(r.endDate)}`;
+    return (
+      <Link className="lvw-row" key={r.id} href="/mobile/attendance/leave/history">
+        <span className="lvw-row__b">
+          <span className="lvw-row__t">
+            {typeLabel(r.leaveType as LeaveType, c)} · {r.daysCount}
             {c.unitD}
           </span>
-          <span>
-            {summary.baseRemaining}
-            {c.unitD} {c.msRemain}
+          <span className="lvw-row__s">
+            {range}
+            {r.submittedAt ? ` · ${c.submittedOn(shortDate(r.submittedAt.slice(0, 10)))}` : ""}
           </span>
-        </div>
-      </div>
+        </span>
+        <span className={`lvw-row__v is-${st}`}>{statusLabel(st, c)}</span>
+      </Link>
+    );
+  });
 
-      {/* 특별휴가(4년 보너스) — 유급 휴가 풀과 별도로 관리되는 독립 항목 */}
-      {summary.bonusRemaining > 0 || summary.nextBonusGrant ? (
-        <div className="balcard balcard--sub">
-          <div className="balcard__top">
-            <span className="balcard__k">{c.balSpecialTitle}</span>
+  // 화이트 리디자인(2026-10-13, 시안 AttLeaveHomeM-Phone · Fold · Tablet): 큰 「사용 가능 n일」 → 부여 · 사용 · 대기 한 줄 + 막대 →
+  // 다음 자동 부여 · 4년 보너스 줄 → 연차 신청하기 · 캘린더 · 신청 내역 → 최근 신청. 태블릿 가로는 오른쪽에 최근 신청 · 부여 규칙.
+  return (
+    <div className="lv lvw">
+      <div className="lvw-left">
+        <div className="lvw-title">
+          <h1>{c.homeTitle}</h1>
+          <span>{c.homeYear.replace("{y}", today.slice(0, 4))}</span>
+        </div>
+
+        <div className="lvw-hero">
+          <span className="lvw-hero__k">{c.balTitle}</span>
+          <b className="lvw-hero__v">
+            {summary.baseRemaining}
+            <small>{c.unitD}</small>
+          </b>
+          <span className="lvw-hero__s">
+            {c.balLine.replace("{g}", String(totalPool)).replace("{u}", String(used)).replace("{p}", String(pendingCount))}
+          </span>
+          <div className="lvw-bar" aria-hidden="true">
+            <i className="is-used" style={{ flex: Math.max(used, 0.0001) }} />
+            <i className="is-left" style={{ flex: Math.max(summary.baseRemaining, 0.0001) }} />
           </div>
-          {summary.bonusRemaining > 0 ? (
-            <div className="balcard__big" style={{ fontSize: 22 }}>
-              {summary.bonusRemaining}
-              <small> {c.unitD}</small>
+          <div className="lvw-legend">
+            <span><i className="is-used" />{c.legUsed}</span>
+            <span><i className="is-left" />{c.legLeft}</span>
+          </div>
+          <span className="sr-only">{usedPct}%</span>
+        </div>
+
+        <div className="lvw-info">
+          {summary.nextBaseGrant ? (
+            <div className="lvw-row is-static">
+              <span className="lvw-row__b">
+                <span className="lvw-row__t">{c.nextGrantK}</span>
+                <span className="lvw-row__s">{summary.nextBaseGrant.date}</span>
+              </span>
+              <b className="lvw-row__n">+{summary.nextBaseGrant.amount}{c.unitD}</b>
             </div>
-          ) : summary.nextBonusGrant ? (
-            <div className="balcard__meta">
-              <div>{c.balSpecialUnlock(summary.nextBonusGrant.date)}</div>
+          ) : null}
+          {summary.bonusRemaining > 0 || bonusOn ? (
+            <div className="lvw-row is-static">
+              <span className="lvw-row__b">
+                <span className="lvw-row__t">{c.balSpecialTitle}</span>
+                <span className="lvw-row__s">
+                  {summary.bonusRemaining > 0
+                    ? c.bonusHave.replace("{n}", String(summary.bonusRemaining))
+                    : c.bonusOn.replace("{date}", bonusOn!.date)}
+                </span>
+              </span>
+              {bonusOn && summary.bonusRemaining <= 0 ? <b className="lvw-row__n">+{bonusOn.amount}{c.unitD}</b> : null}
             </div>
           ) : null}
         </div>
-      ) : null}
 
-      {/* 3-up mini stats */}
-      <div className="mstats">
-        <div className="mstat">
-          <div className="mstat__v pri">{summary.baseRemaining}</div>
-          <div className="mstat__k">{c.msRemain}</div>
-        </div>
-        <div className="mstat">
-          <div className="mstat__v">{used}</div>
-          <div className="mstat__k">{c.msUsed}</div>
-        </div>
-        <div className="mstat">
-          <div className="mstat__v warn">{pendingCount}</div>
-          <div className="mstat__k">{c.msPending}</div>
-        </div>
-      </div>
-
-      {/* recent requests */}
-      <div className="slabel">
-        {c.recent}
-        <Link className="more" href="/mobile/attendance/leave/history">
-          {c.viewAll} <AIc>{AttIcon.chevR}</AIc>
-        </Link>
-      </div>
-      {recent.length === 0 ? <div className="histempty">{c.histEmpty}</div> : null}
-      {recent.map((r) => (
-        <div className="lrow" key={r.id}>
-          <span className={`lrow__ic t-${r.leaveType}`}>
-            <AIc>{AttIcon[TYPE_ICON[r.leaveType as LeaveType]]}</AIc>
-          </span>
-          <div className="lrow__b">
-            <div className="lrow__t">{typeLabel(r.leaveType as LeaveType, c)}</div>
-            <div className="lrow__s mono">
-              {shortDate(r.startDate)} – {shortDate(r.endDate)}
-            </div>
-          </div>
-          <div className="lrow__meta">
-            <span className="lrow__days">
-              {r.daysCount}
-              {c.unitD}
-            </span>
-            <span className={`chip ${STATUS_CHIP[r.status as LeaveStatus]}`}>
-              {r.status === "requested" ? <span className="d" /> : null}
-              {statusLabel(r.status as LeaveStatus, c)}
-            </span>
-          </div>
-        </div>
-      ))}
-
-      {/* accrual rules */}
-      <div className="slabel" style={{ marginTop: 16 }}>
-        {c.ruleTitle}
-      </div>
-      <div className="rulecard">
-        {rules.map((rule, i) => (
-          <div className="rulerow" key={i}>
-            <span className="ic">{AttIcon.check}</span>
-            <span>{rule}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* sticky actions (shell bottom nav hidden) */}
-      <div className="lv-foot">
-        <Link className="fbtn fbtn--draft" href="/mobile/attendance/leave/calendar" aria-label={c.appTitle}>
-          <AIc>{AttIcon.calendar}</AIc>
-        </Link>
-        <Link className="fbtn fbtn--submit" href="/mobile/attendance/leave/new">
-          <AIc>{AttIcon.plus}</AIc>
+        <Link className="lvw-cta" href="/mobile/attendance/leave/new">
           {c.newReq}
         </Link>
+        <div className="lvw-links">
+          <Link href="/mobile/attendance/leave/calendar">{c.calTitle} ›</Link>
+          <Link href="/mobile/attendance/leave/history">{c.histTitle} ›</Link>
+        </div>
+      </div>
+
+      <div className="lvw-right">
+        <div className="lvw-sec">
+          <b>{c.recent}</b>
+          <Link href="/mobile/attendance/leave/history">{c.viewAll} ›</Link>
+        </div>
+        {recent.length === 0 ? <p className="lvw-empty">{c.histEmpty}</p> : recentRows}
+        <div className="lvw-sec lvw-rules-h">
+          <b>{c.ruleTitle}</b>
+        </div>
+        <div className="lvw-rules">
+          {rules.map((rule, i) => (
+            <div className="lvw-row is-static" key={i}>
+              <span className="lvw-row__t">{rule}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

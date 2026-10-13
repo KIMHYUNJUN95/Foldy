@@ -1201,3 +1201,131 @@
   .lv.lv--cal > .lv-cal__list { grid-column: 2; }
   .lv.lv--cal > .lv-cal__list > .slabel:first-child { margin-top: 0; }
 }
+
+/* 연차 화이트 리디자인 — 공용(홈 · 신청서 · 내역 · 캘린더), 2026-10-13 시안 AttLeave*M */
+.lv.lvw { padding: 0 0 28px; }
+.lvw .lvw-title h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.lvw .lvw-title span { display: block; margin-top: 4px; font-size: 13px; color: #8b8898; }
+.lvw .lvw-title { display: flex; flex-direction: column; }
+.lvw .lvw-title--row { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.lvw .lvw-hero { display: flex; flex-direction: column; gap: 4px; margin-top: 18px; }
+.lvw .lvw-hero__k { font-size: 13px; color: #6b6878; }
+.lvw .lvw-hero__v { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lvw .lvw-hero__v small { margin-left: 4px; font-size: 18px; font-weight: 600; color: #8b8898; }
+.lvw .lvw-hero__s { font-size: 13px; color: #8b8898; }
+.lvw .lvw-bar { display: flex; gap: 2px; height: 8px; margin-top: 10px; border-radius: 4px; overflow: hidden; }
+.lvw .lvw-bar .is-used { background: #7a52e6; }
+.lvw .lvw-bar .is-left { background: #efedf4; }
+.lvw .lvw-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: #6b6878; }
+.lvw .lvw-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.lvw .lvw-legend i { width: 7px; height: 7px; border-radius: 50%; }
+.lvw .lvw-legend .is-used { background: #7a52e6; }
+.lvw .lvw-legend .is-left { background: #e4e2ea; }
+.lvw .lvw-info { margin-top: 14px; }
+.lvw .lvw-row { display: flex; align-items: center; gap: 12px; min-height: 62px; border-top: 1px solid #f3f3f6; color: inherit; text-decoration: none; }
+.lvw .lvw-row__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lvw .lvw-row__t { font-size: 15px; color: var(--ink); }
+.lvw .lvw-row__s { font-size: 12px; color: #8b8898; }
+.lvw .lvw-row__n { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.lvw .lvw-row__v { font-size: 13px; font-weight: 600; color: #6b6878; white-space: nowrap; }
+.lvw .lvw-row__v.is-requested, .lvw .lvw-row__v.is-review { color: #5a30cf; }
+.lvw .lvw-row__v.is-rejected { color: #c5282e; }
+.lvw .lvw-row__v.is-draft, .lvw .lvw-row__v.is-cancelled { color: #8b8898; font-weight: 500; }
+.lvw a.lvw-row:active { background: #faf9fc; }
+.lvw .lvw-cta { display: flex; align-items: center; justify-content: center; height: 50px; margin-top: 18px; border-radius: 14px; background: #7a52e6; color: #fff; font-size: 15px; font-weight: 600; text-decoration: none; transition: background 150ms ease, transform 120ms ease; }
+.lvw .lvw-cta:active { transform: scale(0.98); }
+.lvw .lvw-links { display: flex; gap: 18px; margin-top: 14px; }
+.lvw .lvw-links a { font-size: 14px; font-weight: 600; color: #6b6878; text-decoration: none; }
+.lvw .lvw-sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 22px; padding-bottom: 6px; }
+.lvw .lvw-sec b { font-size: 15px; font-weight: 700; color: var(--ink); }
+.lvw .lvw-sec a, .lvw .lvw-sec span { font-size: 14px; font-weight: 600; color: #7a52e6; text-decoration: none; }
+.lvw .lvw-empty { margin: 18px 0; font-size: 14px; color: #8b8898; }
+.lvw .lvw-rules-h, .lvw .lvw-rules { display: none; }
+.lvw .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .lv.lvw { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 36px; align-items: start; }
+  .lvw .lvw-left { position: sticky; top: 12px; }
+  .lvw .lvw-right > .lvw-sec:first-child { margin-top: 4px; }
+  .lvw .lvw-rules-h, .lvw .lvw-rules { display: flex; }
+  .lvw .lvw-rules { flex-direction: column; }
+}
+
+/* 연차 신청서 — 테두리 이름표 칸 · 칩 · 제자리 버튼 */
+.lvw--form .lvw-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.lvw--form .lvw-duo:has(> .lnf:only-child) { grid-template-columns: 1fr; }
+.lvw .lnf { position: relative; min-width: 0; margin-top: 16px; }
+.lvw .lvw-duo .lnf { margin-top: 0; }
+.lvw .lnf__l { position: absolute; top: -8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; white-space: nowrap; pointer-events: none; }
+.lvw .lnf__in { box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 15px; color: var(--ink); text-align: left; cursor: pointer; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.lvw .lnf__in:focus, .lvw .lnf__in:focus-visible { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.lvw .lnf__in.err { border-color: #e5484d; }
+.lvw .lnf__in.mono { font-family: var(--mono); font-weight: 600; }
+.lvw .lnf__in svg { width: 16px; height: 16px; color: #8b8898; flex: none; }
+.lvw .lnf__in::placeholder { color: #b4b1bf; font-weight: 400; }
+.lvw .lnf__ta { display: block; min-height: 96px; padding: 12px 14px 24px; line-height: 1.55; resize: none; cursor: text; }
+.lvw .lnf__count { position: absolute; right: 12px; bottom: 8px; font-size: 11px; color: #b4b1bf; }
+.lvw .lvw-q { margin: 18px 0 8px; font-size: 13px; font-weight: 600; color: #3a3746; }
+.lvw .lvw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lvw .lvw-chip { height: 38px; padding: 0 14px; border: 0; border-radius: 19px; background: #f4f4f7; font: inherit; font-size: 14px; color: #3a3746; cursor: pointer; transition: transform 120ms ease; }
+.lvw .lvw-chip:active { transform: scale(0.97); }
+.lvw .lvw-chip.on { background: #7a52e6; color: #fff; font-weight: 600; }
+.lvw .lvw-days { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.lvw .lvw-days span { font-size: 13px; color: #6b6878; }
+.lvw .lvw-days b { font-size: 18px; font-weight: 700; color: var(--ink); }
+.lvw .lvw-err { margin: 6px 0 0; font-size: 12px; color: #c5282e; }
+.lvw .lvw-hint { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: #8b8898; }
+.lvw .lvw-acts { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 20px; }
+.lvw .lvw-btn { height: 50px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 120ms ease, background 150ms ease; }
+.lvw .lvw-btn:hover { background: #6b40e0; }
+.lvw .lvw-btn:active { transform: scale(0.98); }
+.lvw .lvw-btn:disabled { opacity: .6; cursor: default; }
+.lvw .lvw-btn--ghost { background: #f4f4f7; color: #3a3746; }
+.lvw .lvw-btn--ghost:hover { background: #ececf0; }
+.lvw .lvw-preview { display: none; }
+.lvw .lvw-after { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.lvw .lvw-after b { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lvw .lvw-after b small { margin-left: 3px; font-size: 16px; color: #8b8898; }
+.lvw .lvw-after span { font-size: 13px; color: #8b8898; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .lvw .lvw-preview { display: block; }
+}
+
+/* 연차 신청 내역 — 글자 탭 · 줄 */
+.lvw .lvw-addlink { font-size: 14px; font-weight: 600; color: #7a52e6; text-decoration: none; white-space: nowrap; }
+.lvw .lvw-tabs { display: flex; gap: 20px; margin-top: 16px; border-bottom: 1px solid #f1f1f4; }
+.lvw .lvw-tabs button { height: 40px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; color: #8b8898; cursor: pointer; }
+.lvw .lvw-tabs button span { margin-left: 4px; }
+.lvw .lvw-tabs button.on { color: var(--ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--ink); }
+.lvw .lvw-row--btn { width: 100%; padding: 0; border: 0; border-top: 1px solid #f3f3f6; background: none; font: inherit; text-align: left; cursor: pointer; }
+.lvw--hist .lrow-outer { margin: 0; }
+.lvw--hist .lrow-outer:first-of-type .lvw-row { border-top: 0; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .lv.lvw.lvw--hist { display: block; max-width: 720px; }
+}
+.lv-sheet .lvw-sheet-st { margin: 2px 0 10px; font-size: 13px; font-weight: 600; color: #6b6878; }
+.lv-sheet .lvw-sheet-st.is-requested, .lv-sheet .lvw-sheet-st.is-review { color: #5a30cf; }
+.lv-sheet .lvw-sheet-st.is-rejected { color: #c5282e; }
+
+/* 연차 캘린더 — 월 알약 · 점 달력 */
+.lvw .lvw-mpill { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: #f2f2f5; flex: none; }
+.lvw .lvw-mpill a { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: #6b6878; font-size: 16px; text-decoration: none; }
+.lvw .lvw-mpill b { height: 32px; padding: 0 12px; display: flex; align-items: center; border-radius: 999px; background: #fff; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); font-size: 14px; color: var(--ink); }
+.lvw .lvw-legend--cal { margin-top: 14px; }
+.lvw .lvw-legend .is-past { background: #c9c6d3; }
+.lvw .lvw-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; margin-top: 8px; }
+.lvw .lvw-cal__wd { text-align: center; font-size: 12px; color: #8b8898; padding: 6px 0; }
+.lvw .lvw-cal__wd.is-sat { color: #2f6fde; }
+.lvw .lvw-cal__wd.is-sun { color: #d8455a; }
+.lvw .lvw-cal__cell { height: 46px; display: flex; align-items: center; justify-content: center; }
+.lvw .lvw-cal__d { width: 38px; height: 40px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lvw .lvw-cal__d.is-today { background: #7a52e6; color: #fff; font-weight: 700; }
+.lvw .lvw-cal__dot { display: flex; height: 5px; }
+.lvw .lvw-cal__dot i { width: 5px; height: 5px; border-radius: 50%; background: #7a52e6; }
+.lvw .lvw-cal__dot i.is-past { background: #c9c6d3; }
+.lvw .lvw-cal__d.is-today .lvw-cal__dot i { background: #fff; }
+.lvw .lvw-sec__n { font-size: 12px !important; font-weight: 500 !important; color: #8b8898 !important; }
+/* 내역 줄은 상자 없는 줄 — 밀어서 삭제 틀의 둥근 모서리 · 빨간 바탕이 줄 가장자리에 비치지 않게(삭제 버튼은 열릴 때만 보임) */
+.lvw--hist .lswipe { border-radius: 0; }
+.lvw--hist .lswipe__del { opacity: 0; transition: opacity 120ms ease; }
+.lvw--hist .lswipe:has(.lswipe__content[data-swipe-back="off"]) .lswipe__del,
+.lvw--hist .lswipe:active .lswipe__del { opacity: 1; }

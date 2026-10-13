@@ -1,7 +1,5 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
 import "./leave.css";
-import { AttIcon } from "./att-icons";
 import type { ApprovedLeaveEntry } from "@/lib/annual-leave-requests-server";
 import { getDictionary } from "@/lib/i18n";
 
@@ -12,8 +10,6 @@ import { getDictionary } from "@/lib/i18n";
 // 겹치는 휴가는 각자 레인(행)을 배정해 리본이 안 겹치게 한다.
 
 type LeaveType = "annual" | "paid" | "special" | "other";
-const CHIP_CLS: Record<LeaveType, string> = { annual: "c-info", special: "c-violet", paid: "c-done", other: "c-muted" };
-const AVATAR_COLORS = ["#4d6db5", "#9c5a2c", "#3f7d5a", "#c98a4b", "#7a5ea8", "#b5504d"];
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -60,142 +56,99 @@ export function LeaveCalendar({
     new Date(Date.UTC(year, month - 1, 1)),
   );
 
-  // clip each entry to this month's day range, then greedily assign non-overlapping lanes
-  const clipped = entries
-    .map((e, i) => {
-      const s = e.startDate < monthStart ? 1 : Number(e.startDate.slice(8, 10));
-      const en = e.endDate > monthEnd ? total : Number(e.endDate.slice(8, 10));
-      return { ...e, s, e2: en, color: AVATAR_COLORS[i % AVATAR_COLORS.length] };
-    })
-    .sort((a, b) => a.s - b.s || a.e2 - b.e2);
-
-  const lanes: { s: number; e: number }[][] = [];
-  const withLane = clipped.map((ev) => {
-    let lane = lanes.findIndex((l) => l.every((o) => ev.s > o.e || ev.e2 < o.s));
-    if (lane === -1) {
-      lane = lanes.length;
-      lanes.push([]);
-    }
-    lanes[lane].push({ s: ev.s, e: ev.e2 });
-    return { ...ev, lane };
-  });
-  const laneCount = Math.max(1, lanes.length);
-
-  const cells: React.ReactNode[] = [];
-  for (let i = 0; i < lead; i++) cells.push(<div className="lcal__cell pad" key={`pad${i}`} />);
-  for (let d = 1; d <= total; d++) {
-    const bars: React.ReactNode[] = [];
-    for (let ln = 0; ln < laneCount; ln++) {
-      const ev = withLane.find((e) => e.lane === ln && d >= e.s && d <= e.e2);
-      if (ev) {
-        const isS = d === ev.s;
-        const isE = d === ev.e2;
-        const style: CSSProperties = {
-          borderRadius: isS && isE ? "999px" : isS ? "999px 0 0 999px" : isE ? "0 999px 999px 0" : "0",
-          background: ev.color,
-        };
-        if (!isS) style.marginLeft = -7;
-        if (!isE) style.marginRight = -7;
-        bars.push(<span className="lcal__bar" style={style} key={ln} />);
-      } else {
-        bars.push(<span className="lcal__bar lcal__bar--gap" key={ln} />);
-      }
-    }
-    cells.push(
-      <div className={`lcal__cell${d === today ? " today" : ""}`} key={d}>
-        <span className="lcal__d">{d}</span>
-        <div className="lcal__bars">{bars}</div>
-      </div>,
-    );
-  }
+  // 화이트 리디자인(2026-10-13, 시안 AttLeaveCalM): 제목 · 「승인된 휴가만」 · 월 알약 → 월요일 시작 달력(휴가 있는 날 점 —
+  // 지난 날은 회색) → 이번 달 휴가 줄(이름 · 종류 / 기간 · 일수 / 오늘 휴가). 예전 리본 · 아바타 색 · 칩은 뺐다.
+  const leadMon = (lead + 6) % 7;
+  const dayHas = (d: number) => {
+    const key = `${ym}-${pad2(d)}`;
+    return entries.some((e) => e.startDate <= key && e.endDate >= key);
+  };
+  const wd = new Intl.DateTimeFormat(localeTag(locale), { weekday: "short", timeZone: "UTC" });
+  const heads = Array.from({ length: 7 }, (_, i) => wd.format(new Date(Date.UTC(2024, 0, 1 + i))));
+  const monthShort = new Intl.DateTimeFormat(localeTag(locale), { month: "long", timeZone: "UTC" }).format(
+    new Date(Date.UTC(year, month - 1, 1)),
+  );
+  const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 
   return (
-    <div className="lv lv--cal" style={{ paddingBottom: 26 }}>
-      <div className="pagehead">
-        <span className="pagehead__crumb">{c.crumb}</span>
-        <span className="pagehead__t">{c.calTitle}</span>
-      </div>
-
-      {/* 넓은 화면(2026-10-05): 태블릿 가로는 왼쪽 달력 | 오른쪽 휴가 목록(`leave.css` `.lv--cal`). */}
-      <div className="lv-cal__main">
-      <div className="lcal__nav">
-        <span className="lcal__month">{monthLabel}</span>
-        <span className="lcal__navsp" />
-        <Link
-          className="lcal__navbtn"
-          aria-label={c.calPrevMonth}
-          href={`/mobile/attendance/leave/calendar?ym=${shiftMonth(ym, -1)}`}
-        >
-          {AttIcon.back}
-        </Link>
-        <Link
-          className="lcal__navbtn"
-          aria-label={c.calNextMonth}
-          href={`/mobile/attendance/leave/calendar?ym=${shiftMonth(ym, 1)}`}
-        >
-          {AttIcon.chevR}
-        </Link>
-      </div>
-
-      <div className="lcal__wk">
-        {c.calWk.map((w, i) => (
-          <div className={`lcal__wd${i === 0 ? " sun" : i === 6 ? " sat" : ""}`} key={i}>
-            {w}
+    <div className="lv lvw lvw--cal">
+      <div className="lvw-left">
+        <div className="lvw-title lvw-title--row">
+          <div>
+            <h1>{c.calTitle}</h1>
+            <span>
+              {monthLabel} · {c.calApprovedOnly}
+            </span>
           </div>
-        ))}
-      </div>
-      <div className="lcal__grid">{cells}</div>
-
-      <div className="lcal__auto">
-        {AttIcon.info}
-        {c.calAuto}
-      </div>
-      </div>
-
-      <div className="lv-cal__list">
-      <div className="slabel">
-        {c.calList}
-        <span style={{ marginLeft: "auto", fontWeight: 800, color: "var(--att-muted)" }}>{c.calCount(entries.length)}</span>
-      </div>
-      {entries.length === 0 ? (
-        <div className="histempty">{c.histEmpty}</div>
-      ) : (
-        [...entries]
-          .sort((a, b) => (a.startDate < b.startDate ? -1 : 1))
-          .map((e, idx) => {
-            const off = today !== null && e.startDate <= monthEnd && e.endDate >= monthStart && e.startDate <= todayDate && e.endDate >= todayDate;
+          <div className="lvw-mpill">
+            <Link aria-label={c.calPrevMonth} href={`/mobile/attendance/leave/calendar?ym=${shiftMonth(ym, -1)}`}>
+              ‹
+            </Link>
+            <b>{monthShort}</b>
+            <Link aria-label={c.calNextMonth} href={`/mobile/attendance/leave/calendar?ym=${shiftMonth(ym, 1)}`}>
+              ›
+            </Link>
+          </div>
+        </div>
+        <div className="lvw-legend lvw-legend--cal">
+          <span><i className="is-used" />{c.calLegendLeave}</span>
+          <span><i className="is-past" />{c.calLegendPast}</span>
+        </div>
+        <div className="lvw-cal">
+          {heads.map((h, i) => (
+            <span key={h} className={`lvw-cal__wd${i === 5 ? " is-sat" : i === 6 ? " is-sun" : ""}`}>
+              {h}
+            </span>
+          ))}
+          {Array.from({ length: leadMon }, (_, i) => (
+            <span key={`p${i}`} />
+          ))}
+          {Array.from({ length: total }, (_, i) => {
+            const d = i + 1;
+            const key = `${ym}-${pad2(d)}`;
+            const has = dayHas(d);
+            const past = key < todayDate;
             return (
-              <div className="lrow" key={e.id}>
-                <span className="lav" style={{ background: AVATAR_COLORS[idx % AVATAR_COLORS.length] }}>
-                  {Array.from(e.applicantName)[0]}
+              <span key={d} className="lvw-cal__cell">
+                <span className={`lvw-cal__d${d === today ? " is-today" : ""}`}>
+                  {d}
+                  <span className="lvw-cal__dot">{has ? <i className={past ? "is-past" : undefined} /> : null}</span>
                 </span>
-                <div className="lrow__b">
-                  <div className="lrow__t">
-                    {e.applicantName}
-                    {off ? (
-                      <span className="chip c-warn" style={{ height: 18, fontSize: 10, marginLeft: 6 }}>
-                        <span className="d" />
-                        {c.calOff}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="lrow__s mono">
-                    {e.startDate} – {e.endDate}
-                  </div>
-                </div>
-                <div className="lrow__meta">
-                  <span className={`chip ${CHIP_CLS[e.leaveType as LeaveType]}`}>
-                    {typeLabel(e.leaveType as LeaveType, c)}
-                  </span>
-                  <span className="lrow__days">
-                    {e.daysCount}
-                    {c.unitD}
-                  </span>
-                </div>
-              </div>
+              </span>
             );
-          })
-      )}
+          })}
+        </div>
+      </div>
+
+      <div className="lvw-right">
+        <div className="lvw-sec">
+          <b>{c.calList}</b>
+          <span className="lvw-sec__n">{c.calCount(entries.length)}</span>
+        </div>
+        {entries.length === 0 ? (
+          <p className="lvw-empty">{c.histEmpty}</p>
+        ) : (
+          [...entries]
+            .sort((x, y) => (x.startDate < y.startDate ? -1 : 1))
+            .map((e) => {
+              const off = e.startDate <= todayDate && e.endDate >= todayDate;
+              const past = e.endDate < todayDate;
+              return (
+                <div className="lvw-row" key={e.id}>
+                  <span className="lvw-row__b">
+                    <span className="lvw-row__t">
+                      {e.applicantName} · {typeLabel(e.leaveType as LeaveType, c)}
+                    </span>
+                    <span className="lvw-row__s">
+                      {e.startDate === e.endDate ? md(e.startDate) : `${md(e.startDate)} – ${md(e.endDate)}`} · {e.daysCount}
+                      {c.unitD}
+                    </span>
+                  </span>
+                  {off ? <span className="lvw-row__v is-requested">{c.calOff}</span> : past ? <span className="lvw-row__v is-draft">{c.calLegendPast}</span> : null}
+                </div>
+              );
+            })
+        )}
       </div>
     </div>
   );

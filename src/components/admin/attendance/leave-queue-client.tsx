@@ -4,9 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Ban,
   Calendar,
-  CalendarPlus,
   Check,
-  CheckCheck,
   ChevronRight,
   CircleCheck,
   Clock,
@@ -16,7 +14,6 @@ import {
   LogOut,
   Search,
   TriangleAlert,
-  UserPlus,
   Wallet,
   X,
 } from "lucide-react";
@@ -199,78 +196,48 @@ const SUB_TABS: { view: LeaveView; key: keyof Lc; icon: React.ReactNode }[] = [
 ];
 
 /** Sub-tab bar for the leave section — all five views now render real content. */
-function LeaveSubTabs({ view, onChange, lc }: { view: LeaveView; onChange: (v: LeaveView) => void; lc: Lc }) {
+function LeaveSubTabs({
+  view,
+  onChange,
+  lc,
+  onRequest,
+}: {
+  view: LeaveView;
+  onChange: (v: LeaveView) => void;
+  lc: Lc;
+  onRequest: (mode: "proxy" | "self") => void;
+}) {
+  // 화이트 리디자인(2026-10-13, 시안 AttLeave-PC): 보기 탭은 글자 세그(아이콘 · 보라 채움 없음), 오른쪽에 내 연차 신청 · 대리 신청.
   return (
-    <div className="lvsubtabs" role="tablist">
-      {SUB_TABS.map((t) => (
-        <button
-          key={t.view}
-          type="button"
-          className={`lvsubtab${view === t.view ? " on" : ""}`}
-          aria-current={view === t.view ? "page" : undefined}
-          onClick={() => onChange(t.view)}
-        >
-          <span className="ic">{t.icon}</span>
-          {lc[t.key] as string}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SummaryCards({ summary, lc }: { summary: LeaveQueueSummary; lc: Lc }) {
-  return (
-    <div className="lvsummary">
-      <div className="lvscard">
-        <span className="lvscard__ic bg-warn">
-          <Ic>
-            <Calendar />
-          </Ic>
-        </span>
-        <div className="lvscard__b">
-          <div className="lvscard__v">
-            {summary.pendingCount}
-            {lc.unitCount}
-          </div>
-          <div className="lvscard__t">
-            {lc.summaryPendingTitle} · {lc.summaryPendingSub(String(summary.pendingDays))}
-          </div>
-        </div>
+    <div className="toolbar lvw-subbar">
+      <div className="lviews" role="tablist" style={{ margin: 0 }}>
+        {SUB_TABS.map((t) => (
+          <button
+            key={t.view}
+            type="button"
+            role="tab"
+            aria-selected={view === t.view}
+            className={view === t.view ? "on" : ""}
+            onClick={() => onChange(t.view)}
+          >
+            {lc[t.key] as string}
+          </button>
+        ))}
       </div>
-      <div className="lvscard">
-        <span className="lvscard__ic bg-done">
-          <Ic>
-            <CheckCheck />
-          </Ic>
-        </span>
-        <div className="lvscard__b">
-          <div className="lvscard__v">
-            {summary.approvedThisWeekCount}
-            {lc.unitPeople}
-          </div>
-          <div className="lvscard__t">{lc.summaryApprovedTitle}</div>
-        </div>
-      </div>
-      <div className="lvscard">
-        <span className={`lvscard__ic ${summary.balanceWarningName ? "bg-danger" : "bg-done"}`}>
-          <Ic>{summary.balanceWarningName ? <TriangleAlert /> : <CircleCheck />}</Ic>
-        </span>
-        <div className="lvscard__b">
-          <div className="lvscard__v" style={{ fontSize: 15 }}>
-            {summary.balanceWarningName
-              ? lc.summaryBalanceTitleWarning(summary.balanceWarningName)
-              : lc.summaryBalanceTitleOk}
-          </div>
-          <div className="lvscard__t">{lc.summaryBalanceSub}</div>
-        </div>
-      </div>
+      <span className="toolbar__spacer" />
+      <button type="button" className="btn btn--ghost" onClick={() => onRequest("self")}>
+        {lc.btnSelfRequest}
+      </button>
+      <button type="button" className="btn btn--pri" onClick={() => onRequest("proxy")}>
+        {lc.btnProxyRequest}
+      </button>
     </div>
   );
 }
 
 export function LeaveQueueClient({
   initialItems,
-  summary,
+  // summary(숫자 카드)는 2026-10-13 리디자인에서 화면에 쓰지 않는다 — 상태 탭 건수로 대신.
   initialStatusGroup,
   initialType,
   initialSearch,
@@ -381,7 +348,7 @@ export function LeaveQueueClient({
   if (view === "calendar") {
     return (
       <div style={{ position: "relative" }}>
-        <LeaveSubTabs view={view} onChange={setView} lc={lc} />
+        <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
         <LeaveTeamCalendar
           lc={lc}
           locale={locale}
@@ -424,7 +391,7 @@ export function LeaveQueueClient({
   if (view === "balance") {
     return (
       <div style={{ position: "relative" }}>
-        <LeaveSubTabs view={view} onChange={setView} lc={lc} />
+        <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
         <LeaveBalanceView
           lc={lc}
           shared={dictionary.admin.shared}
@@ -444,7 +411,7 @@ export function LeaveQueueClient({
   if (view === "documents") {
     return (
       <div style={{ position: "relative" }}>
-        <LeaveSubTabs view={view} onChange={setView} lc={lc} />
+        <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
         <LeaveDocumentsView lc={lc} locale={locale} documents={documents} />
       </div>
     );
@@ -453,7 +420,7 @@ export function LeaveQueueClient({
   if (view === "ledger") {
     return (
       <div style={{ position: "relative" }}>
-        <LeaveSubTabs view={view} onChange={setView} lc={lc} />
+        <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
         <LeaveLedgerView
           lc={lc}
           shared={dictionary.admin.shared}
@@ -470,18 +437,9 @@ export function LeaveQueueClient({
     );
   }
 
-  // Keep the 승인 대기 card in sync with the client-held list (approve/reject updates `items`).
-  const pendingItems = items.filter((i) => i.status === "requested");
-  const liveSummary = {
-    ...summary,
-    pendingCount: pendingItems.length,
-    pendingDays: pendingItems.reduce((sum, i) => sum + i.daysCount, 0),
-  };
-
   return (
     <div style={{ position: "relative" }}>
-      <LeaveSubTabs view={view} onChange={setView} lc={lc} />
-      <SummaryCards summary={liveSummary} lc={lc} />
+      <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
 
       {/* Filter toolbar */}
       <div className="toolbar">
@@ -567,23 +525,6 @@ export function LeaveQueueClient({
             ariaLabel={lc.sortLabel}
           />
         </div>
-        <button
-          type="button"
-          className="btn"
-          style={{ background: "var(--adm-primary)", color: "#fff" }}
-          onClick={() => setRequestModal({ mode: "proxy" })}
-        >
-          <Ic>
-            <UserPlus />
-          </Ic>
-          {lc.btnProxyRequest}
-        </button>
-        <button type="button" className="btn btn--ghost" onClick={() => setRequestModal({ mode: "self" })}>
-          <Ic>
-            <CalendarPlus />
-          </Ic>
-          {lc.btnSelfRequest}
-        </button>
       </div>
 
       {rows.length === 0 ? (

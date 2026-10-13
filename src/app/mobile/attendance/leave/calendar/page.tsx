@@ -40,7 +40,7 @@ export default async function MobileLeaveCalendarPage({
 
   return (
     // 넓은 화면(2026-10-05): 태블릿 가로 = 달력 | 휴가 목록(`leave.css` `.lv--cal`).
-    <MobileShell activeItem="attendance" badges={navBadges} split title={copy.calTitle}>
+    <MobileShell activeItem="attendance" badges={navBadges} wide title={copy.calTitle}>
       <LeaveCalendar locale={session.user.preferredLanguage} ym={ym} entries={entries} todayDate={today} />
     </MobileShell>
   );

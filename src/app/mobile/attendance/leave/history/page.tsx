@@ -31,7 +31,7 @@ export default async function MobileLeaveHistoryPage() {
   );
 
   return (
-    <MobileShell activeItem="attendance" badges={navBadges} title={copy.histTitle} hideBottomNav>
+    <MobileShell activeItem="attendance" badges={navBadges} title={copy.histTitle}>
       <LeaveHistory locale={session.user.preferredLanguage} requests={requests} />
     </MobileShell>
   );

@@ -44,10 +44,13 @@ export function LeaveForm({
   locale,
   userName,
   draft,
+  remaining = null,
 }: {
   locale: string;
   userName: string;
   draft?: LeaveRequestView | null;
+  /** 지금 남은 유급 연차 — 태블릿 오른쪽 「신청 후 남는 연차」 미리보기용. */
+  remaining?: number | null;
 }) {
   const c: LeaveCopy = getDictionary(locale).leave;
   const router = useRouter();
@@ -97,90 +100,52 @@ export function LeaveForm({
     router.push(asDraft ? "/mobile/attendance/leave" : `/mobile/attendance/leave/done?id=${result.id}`);
   }
 
+  const useDays = isBereavement ? BEREAVEMENT_DAYS : half ? 0.5 : rangeDays;
+  const fmtDay = (iso: string) =>
+    new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+      timeZone: "UTC",
+    }).format(new Date(`${iso}T00:00:00Z`));
+
+  // 화이트 리디자인(2026-10-13, 시안 AttLeaveNewM-Phone · Fold · Tablet): 신청일 · 신청자 회색 칸 → 제목 아래 한 줄,
+  // 기간 · 사유 · 비상 연락처는 테두리 이름표 칸, 종류 · 단위는 칩, 버튼은 맨 아래 제자리. 태블릿 가로 오른쪽은 신청 후 남는 연차.
   return (
-    <div className="lv" style={{ paddingBottom: 96 }}>
-      <div className="pagehead">
-        <span className="pagehead__crumb">{c.crumb}</span>
-        <span className="pagehead__t">{c.formTitle}</span>
-      </div>
+    <div className="lv lvw lvw--form">
+      <div className="lvw-left">
+        <div className="lvw-title">
+          <h1>{c.formTitleShort}</h1>
+          <span>{c.formSub.replace("{name}", userName).replace("{date}", today.slice(5).replace("-", "/"))}</span>
+        </div>
 
-      {/* 신청일 (자동) */}
-      <div className="field">
-        <div className="field__l">
-          {c.fApp}
-          <span className="auto">{c.fAuto}</span>
-        </div>
-        <div className="finput ro mono">
-          {today}
-          <span className="ro-badge">{c.fAuto}</span>
-        </div>
-      </div>
-
-      {/* 신청자 (읽기전용) */}
-      <div className="field">
-        <div className="field__l">{c.fName}</div>
-        <div className="finput ro">
-          <span className="lead"><AIc>{AttIcon.users}</AIc></span>
-          {userName}
-          <span className="ro-badge">{c.fRo}</span>
-        </div>
-      </div>
-
-      {/* 휴가 기간 */}
-      <div className={`field period${half ? " half" : ""}`}>
-        <div className="field__l">
-          {c.fPeriod}
-          <span className="req">*</span>
-        </div>
-        <div className="daterange">
-          <button type="button" className="finput mono start" onClick={() => setPickerOpen(true)}>
-            {startDate}
-            <span className="tail"><AIc>{AttIcon.calendar}</AIc></span>
-          </button>
-          <span className="daterange__arrow"><AIc>{AttIcon.arrowR}</AIc></span>
-          <button type="button" className="finput mono end" onClick={() => setPickerOpen(true)}>
-            {endDate}
-            <span className="tail"><AIc>{AttIcon.calendar}</AIc></span>
-          </button>
-        </div>
-        {isBereavement ? null : (
-          <div className="durseg">
-            {([["full", c.dFull], ["am", c.dAm], ["pm", c.dPm]] as const).map(([d, label]) => (
-              <button
-                key={d}
-                type="button"
-                className={dur === d ? "on" : ""}
-                onClick={() => {
-                  setDur(d);
-                  if (d !== "full") setEndDate(startDate);
-                }}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="lvw-duo">
+          <div className="lnf">
+            <span className="lnf__l">{half ? c.fDate : c.fStart}</span>
+            <button type="button" className="lnf__in" onClick={() => setPickerOpen(true)}>
+              <span>{fmtDay(startDate)}</span>
+              <AIc>{AttIcon.calendar}</AIc>
+            </button>
           </div>
-        )}
-        <div className="periodfoot">
-          <span className="daycount">
-            <AIc>{AttIcon.calendar}</AIc>
-            {isBereavement ? c.fBereaveDays : half ? c.fHalf : c.fDays(rangeDays)}
-          </span>
+          {half ? null : (
+            <div className="lnf">
+              <span className="lnf__l">{c.fEnd}</span>
+              <button type="button" className="lnf__in" onClick={() => setPickerOpen(true)}>
+                <span>{fmtDay(endDate)}</span>
+                <AIc>{AttIcon.calendar}</AIc>
+              </button>
+            </div>
+          )}
         </div>
-        {isBereavement ? <div className="fhint">{c.fBereaveHint}</div> : null}
-      </div>
 
-      {/* 휴가 종류 */}
-      <div className="field">
-        <div className="field__l">
-          {c.fType}
-          <span className="req">*</span>
-        </div>
-        <div className="ftypes">
+        <div className="lvw-q">{c.fType}</div>
+        <div className="lvw-chips">
           {TYPES.map((ty) => (
             <button
               key={ty}
               type="button"
-              className={`ftype${ty === selType ? " on" : ""}`}
+              aria-pressed={ty === selType}
+              className={`lvw-chip${ty === selType ? " on" : ""}`}
               onClick={() => {
                 setSelType(ty);
                 if (ty === "annual") {
@@ -189,66 +154,101 @@ export function LeaveForm({
                 }
               }}
             >
-              <span className="ftype__box">{ty === selType ? AttIcon.check : null}</span>
-              <span className="ftype__l">{typeLabel(ty, c)}</span>
+              {typeLabel(ty, c)}
             </button>
           ))}
         </div>
-        {isUnpaid ? <div className="fhint">{c.fOtherUnpaidHint}</div> : null}
-      </div>
 
-      {/* 사유 */}
-      <div className="field">
-        <div className="field__l">
-          {c.fReason}
-          <span className="req">*</span>
-        </div>
-        <textarea
-          className="ftext"
-          placeholder={c.fReasonPh}
-          maxLength={300}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-        <div className="fcount">{reason.length} / 300</div>
-        {reasonErr ? <div className="ferr">{c.fReasonErr}</div> : null}
-      </div>
+        {isBereavement ? null : (
+          <>
+            <div className="lvw-q">{c.fUnit}</div>
+            <div className="lvw-chips">
+              {([["full", c.dFull], ["am", c.dAm], ["pm", c.dPm]] as const).map(([d, label]) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={dur === d}
+                  className={`lvw-chip${dur === d ? " on" : ""}`}
+                  onClick={() => {
+                    setDur(d);
+                    if (d !== "full") setEndDate(startDate);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
-      {/* 비상 연락처 */}
-      <div className="field">
-        <div className="field__l">
-          {c.fEmg}
-          <span className="req">*</span>
+        <div className="lvw-days">
+          <span>{c.fDaysLabel}</span>
+          <b>{isBereavement ? c.fBereaveDays : half ? c.fHalf : c.fDays(rangeDays)}</b>
         </div>
-        <div className={`finput${emergencyErr ? " err" : ""}`}>
-          <span className="lead"><AIc>{AttIcon.phone}</AIc></span>
+
+        <div className="lnf">
+          <label className="lnf__l" htmlFor="lvw-reason">
+            {c.fReason}
+          </label>
+          <textarea
+            id="lvw-reason"
+            className={`lnf__in lnf__ta${reasonErr ? " err" : ""}`}
+            placeholder={c.fReasonPh}
+            maxLength={300}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <span className="lnf__count">{reason.length} / 300</span>
+        </div>
+        {reasonErr ? <p className="lvw-err">{c.fReasonErr}</p> : null}
+
+        <div className="lnf">
+          <label className="lnf__l" htmlFor="lvw-emg">
+            {c.fEmg}
+          </label>
           <input
+            id="lvw-emg"
+            className={`lnf__in mono${emergencyErr ? " err" : ""}`}
             inputMode="tel"
             placeholder={c.fEmgPh}
             value={emergency}
             onChange={(e) => setEmergency(e.target.value)}
           />
         </div>
-        {emergencyErr ? <div className="ferr">{c.fEmgErr}</div> : null}
+        {emergencyErr ? <p className="lvw-err">{c.fEmgErr}</p> : null}
+
+        {isBereavement ? <p className="lvw-hint">{c.fBereaveHint}</p> : null}
+        {isUnpaid ? <p className="lvw-hint">{c.fOtherUnpaidHint}</p> : null}
+        {submitErr ? <p className="lvw-err">{c.exSetupSaveErr}</p> : null}
+
+        <div className="lvw-acts">
+          <button type="button" className="lvw-btn lvw-btn--ghost" disabled={busy !== null} onClick={() => submit(true)}>
+            {c.save}
+          </button>
+          <button type="button" className="lvw-btn" disabled={busy !== null} onClick={() => submit(false)}>
+            {c.submit}
+          </button>
+        </div>
       </div>
 
-      {submitErr ? (
-        <div className="fhint" style={{ color: "var(--danger)" }}>
-          {c.exSetupSaveErr}
+      {remaining !== null ? (
+        <div className="lvw-right lvw-preview">
+          <div className="lvw-sec">
+            <b>{selType === "paid" ? c.afterTitle : c.nowRemain}</b>
+          </div>
+          <div className="lvw-after">
+            <b>
+              {selType === "paid" ? Math.max(0, remaining - useDays) : remaining}
+              <small>{c.unitD}</small>
+            </b>
+            <span>
+              {selType === "paid"
+                ? c.afterCalc.replace("{now}", String(remaining)).replace("{use}", String(useDays))
+                : c.afterNoDeduct}
+            </span>
+          </div>
         </div>
       ) : null}
-
-      {/* sticky actions */}
-      <div className="lv-foot">
-        <button type="button" className="fbtn fbtn--draft" disabled={busy !== null} onClick={() => submit(true)}>
-          <AIc>{AttIcon.save}</AIc>
-          {c.save}
-        </button>
-        <button type="button" className="fbtn fbtn--submit" disabled={busy !== null} onClick={() => submit(false)}>
-          <AIc>{AttIcon.check}</AIc>
-          {c.submit}
-        </button>
-      </div>
 
       {/* D · 날짜 범위 캘린더 (바텀시트) */}
       {pickerOpen ? (

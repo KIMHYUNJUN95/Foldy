@@ -22,26 +22,9 @@ type LeaveType = "annual" | "paid" | "special" | "other";
 type LeaveStatus = "requested" | "review" | "approved" | "rejected" | "draft" | "cancelled";
 type Filter = "all" | "pending" | "approved" | "rejected";
 
-const TYPE_ICON: Record<LeaveType, keyof typeof AttIcon> = {
-  annual: "heart",
-  special: "gift",
-  paid: "coin",
-  other: "doc",
-};
-const STATUS_CHIP: Record<LeaveStatus, string> = {
-  requested: "c-warn",
-  review: "c-info",
-  approved: "c-done",
-  rejected: "c-danger",
-  draft: "c-muted",
-  cancelled: "c-muted",
-};
 
 function shortDate(iso: string): string {
-  return iso.slice(5).replace("-", "/");
-}
-function requestNo(id: string): string {
-  return `LV-${id.slice(0, 8).toUpperCase()}`;
+  return `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 }
 
 function typeLabel(t: LeaveType, c: LeaveCopy): string {
@@ -69,32 +52,20 @@ function isCancellable(s: LeaveStatus): boolean {
 
 // ── Row content (shared by plain rows and the swipeable draft rows) ──────────
 function RowContent({ r, c, onClick }: { r: LeaveRequestView; c: LeaveCopy; onClick: () => void }) {
+  const st = r.status as LeaveStatus;
+  const range = r.startDate === r.endDate ? shortDate(r.startDate) : `${shortDate(r.startDate)} – ${shortDate(r.endDate)}`;
   return (
-    <button type="button" className="lrow" onClick={onClick}>
-      <span className={`lrow__ic t-${r.leaveType}`}>
-        <AIc>{AttIcon[TYPE_ICON[r.leaveType as LeaveType]]}</AIc>
+    <button type="button" className="lvw-row lvw-row--btn" onClick={onClick}>
+      <span className="lvw-row__b">
+        <span className="lvw-row__t">
+          {typeLabel(r.leaveType as LeaveType, c)} · {r.daysCount}
+          {c.unitD}
+        </span>
+        <span className="lvw-row__s">
+          {range} · {c.submittedOn(shortDate(r.createdAt.slice(0, 10)))}
+        </span>
       </span>
-      <div className="lrow__b">
-        <div className="lrow__t">
-          {typeLabel(r.leaveType as LeaveType, c)} ·{" "}
-          <span className="mono">
-            {r.daysCount}
-            {c.unitD}
-          </span>
-        </div>
-        <div className="lrow__s mono">
-          {shortDate(r.startDate)} – {shortDate(r.endDate)} · {c.submittedOn(shortDate(r.createdAt.slice(0, 10)))}
-        </div>
-      </div>
-      <div className="lrow__meta">
-        <span className={`chip ${STATUS_CHIP[r.status as LeaveStatus]}`}>
-          {r.status === "requested" ? <span className="d" /> : null}
-          {statusLabel(r.status as LeaveStatus, c)}
-        </span>
-        <span className="lrow__s mono" style={{ fontSize: "10.5px" }}>
-          {requestNo(r.id)}
-        </span>
-      </div>
+      <span className={`lvw-row__v is-${st}`}>{statusLabel(st, c)}</span>
     </button>
   );
 }
@@ -254,23 +225,35 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
     ["rejected", c.fRejected],
   ];
 
+  // 화이트 리디자인(2026-10-13, 시안 AttLeaveHistM): 제목 · 「올해 · n건」 · + 신청 → 글자 탭(건수) → 줄(종류 · 일수 / 기간 · 신청일 / 상태).
+  // 카드 · 종류 아이콘 · LV 코드 · 아래 고정 버튼은 뺐다. 상세 · 취소 시트와 임시 저장 줄의 밀어서 삭제는 그대로.
+  const year = new Date().getFullYear();
   return (
-    <div className="lv" style={{ paddingBottom: 92 }}>
-      <div className="pagehead">
-        <span className="pagehead__crumb">{c.crumb}</span>
-        <span className="pagehead__t">{c.histTitle}</span>
+    <div className="lv lvw lvw--hist">
+      <div className="lvw-title lvw-title--row">
+        <div>
+          <h1>{c.histTitle}</h1>
+          <span>{c.histSub.replace("{y}", String(year)).replace("{n}", String(requests.length))}</span>
+        </div>
+        <Link className="lvw-addlink" href="/mobile/attendance/leave/new">
+          {c.histAdd}
+        </Link>
       </div>
 
-      <div className="seg">
-        {tabs.map(([f, label]) => (
-          <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
-            {label}
-          </button>
-        ))}
+      <div className="lvw-tabs" role="tablist">
+        {tabs.map(([f, label]) => {
+          const n = requests.filter((r) => matches(f, r.status as LeaveStatus)).length;
+          return (
+            <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
+              {label}
+              {n > 0 ? <span>{n}</span> : null}
+            </button>
+          );
+        })}
       </div>
 
       {rows.length === 0 ? (
-        <div className="histempty">{c.histEmpty}</div>
+        <p className="lvw-empty">{c.histEmpty}</p>
       ) : (
         rows.map((r) =>
           r.status === "draft" ? (
@@ -305,12 +288,6 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
         )
       )}
 
-      <div className="lv-foot">
-        <Link className="fbtn fbtn--submit" href="/mobile/attendance/leave/new">
-          <AIc>{AttIcon.plus}</AIc>
-          {c.newReq}
-        </Link>
-      </div>
 
       {/* C1 · 신청 상세 시트 — 승인 전이면 [신청 취소]로 같은 자리에서 확인 시트로 전환(중첩 X).
           입력칸이 없으므로 키보드 인셋 항을 빼고 하단 패딩을 조인다. */}
@@ -322,18 +299,12 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
           {({ close }) => (
             <div className="lv-sheet">
               <div className="lsheet__h">
-                <span className={`lsheet__ic t-${selected.leaveType}`}>
-                  <AIc>{AttIcon[TYPE_ICON[selected.leaveType as LeaveType]]}</AIc>
-                </span>
-                <span className="lsheet__t">{typeLabel(selected.leaveType as LeaveType, c)}</span>
-                <span className="lsheet__no">{requestNo(selected.id)}</span>
-              </div>
-              <div className="lsheet__chips">
-                <span className={`chip ${STATUS_CHIP[selected.status as LeaveStatus]}`}>
-                  {selected.status === "requested" ? <span className="d" /> : null}
-                  {statusLabel(selected.status as LeaveStatus, c)}
+                <span className="lsheet__t">
+                  {typeLabel(selected.leaveType as LeaveType, c)} · {selected.daysCount}
+                  {c.unitD}
                 </span>
               </div>
+              <div className={`lvw-sheet-st is-${selected.status}`}>{statusLabel(selected.status as LeaveStatus, c)}</div>
               <div className="lsheet__recap">
                 <div className="reqrow">
                   <span className="reqrow__k">{c.rPeriod}</span>

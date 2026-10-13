@@ -44,7 +44,7 @@ export default async function MobileLeavePage() {
   }
 
   return (
-    <MobileShell activeItem="attendance" badges={navBadges} title={copy.appTitle} hideBottomNav>
+    <MobileShell activeItem="attendance" badges={navBadges} title={copy.appTitle} wide>
       {recentSection ?? <LeaveException locale={session.user.preferredLanguage} variant="missing" />}
     </MobileShell>
   );

@@ -3204,3 +3204,6 @@
 .adm .ro-tbl .ro-call a { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #f4f1fd; color: #5a30cf; }
 .adm .ro-tbl .ro-call a:hover { background: #ebe5fc; }
 .adm .ro-tbl .ro-call svg { width: 15px; height: 15px; }
+
+/* 연차 보기 탭 줄 — 글자 세그 + 신청 버튼(2026-10-13 시안 AttLeave-PC) */
+.adm .lvw-subbar { margin: 4px 0 14px; }

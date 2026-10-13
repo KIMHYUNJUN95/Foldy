@@ -1,8 +1,8 @@
 ﻿"use client";
 
+import "./requests-list.css";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSplitPush } from "@/components/shell/split-list";
@@ -11,15 +11,10 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
-  ChevronRight,
-  Clock,
-  MapPin,
+  ChevronDown,
   Package,
   ShoppingCart,
-  SlidersHorizontal,
   Trash2,
-  Undo2,
-  User,
   Wrench,
   X,
 } from "lucide-react";
@@ -29,8 +24,6 @@ import {
   deleteMaintenanceReport,
   deleteOrderRequest,
 } from "@/app/mobile/requests/delete-actions";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {
   DateRangeCalendar,
@@ -62,12 +55,12 @@ type MaintenanceStatus = Database["public"]["Enums"]["maintenance_status"];
 type OrderStatus = OrderRequestStatus;
 
 type ScopeFilter = "all" | "mine";
-// "all" type removed: the list now shows exactly one request kind at a time
-// via the top tabs, which eliminates the long mixed scroll.
-type TypeFilter = "lost-found" | "maintenance" | "order";
+// 「전체」 다시 추가(2026-10-13 화이트 리디자인 시안 Req-Phone, 사용자 승인): 세 종류를 날짜별 한 목록으로 섞어 보고,
+// 종류 탭으로 하나만 볼 수도 있다. 긴 혼합 목록은 줄 높이를 낮춘 한 줄 행으로 줄였다.
+type TypeFilter = "all" | "lost-found" | "maintenance" | "order";
 type StatusFilter = "all" | "active" | "closed";
 
-const DEFAULT_TYPE: TypeFilter = "lost-found";
+const DEFAULT_TYPE: TypeFilter = "all";
 
 // Whitelist of keys that belong to the list filter state.
 const LIST_FILTER_KEYS = [
@@ -84,55 +77,8 @@ const activeMaintenanceStatuses = new Set<MaintenanceStatus>(["open", "in_progre
 // active: requested/approved/ordered, closed: received/closed
 const activeOrderStatuses = new Set<OrderStatus>(["requested", "approved", "ordered"]);
 
-const lostStatusBadgeClass: Record<LostItemStatus, string> = {
-  registered:
-    "border-primary/20 bg-primary/10 text-primary",
-  stored:
-    "border-amber-200 bg-amber-50 text-amber-700",
-  disposal_scheduled:
-    "border-orange-200 bg-orange-50 text-orange-700",
-  disposed: "border-border bg-muted/50 text-muted-foreground",
-  returned: "border-[#c5cdf0] bg-[#eef1fb] text-[#3949ab]",
-};
 
-const maintenanceStatusBadgeClass: Record<MaintenanceStatus, string> = {
-  open: "border-primary/20 bg-primary/10 text-primary",
-  in_progress:
-    "border-amber-200 bg-amber-50 text-amber-700",
-  closed:
-    "border-green-200 bg-green-50 text-green-700",
-  cancelled: "border-border bg-muted/50 text-muted-foreground",
-};
 
-const orderStatusBadgeClass: Record<OrderStatus, string> = {
-  requested:
-    "border-primary/20 bg-primary/10 text-primary",
-  approved:
-    "border-indigo-200 bg-indigo-50 text-indigo-700",
-  ordered:
-    "border-amber-200 bg-amber-50 text-amber-700",
-  received:
-    "border-green-200 bg-green-50 text-green-700",
-  closed: "border-border bg-muted/50 text-muted-foreground",
-};
-const REQUEST_PANEL =
-  "rounded-[28px] border border-slate-200/80 bg-surface shadow-[0_22px_46px_-32px_rgba(31,58,95,0.48)] backdrop-blur-none";
-const REQUEST_CARD =
-  "rounded-[24px] border border-slate-200/80 bg-surface shadow-[0_16px_34px_-28px_rgba(31,58,95,0.48)] backdrop-blur-none";
-const requestTypeTone = {
-  "lost-found": {
-    bar: "bg-primary/70",
-    icon: "bg-primary/10 text-primary ring-primary/20",
-  },
-  maintenance: {
-    bar: "bg-primary/70",
-    icon: "bg-primary/10 text-primary ring-primary/20",
-  },
-  order: {
-    bar: "bg-rose-300/80",
-    icon: "bg-rose-50 text-rose-700 ring-rose-200/80",
-  },
-} as const;
 
 // ── Date grouping (Tokyo operating date) ─────────────────────────────────────
 // Requests are bucketed into Today / Yesterday / Earlier using the Asia/Tokyo
@@ -158,30 +104,26 @@ function shiftDateKey(key: string, deltaDays: number): string {
 
 function GroupHeader({ label, count }: { label: string; count: number }) {
   return (
-    <div className="mb-2.5 mt-[18px] flex items-center gap-2 first:mt-1">
-      <span className="text-[11.5px] font-extrabold uppercase tracking-[0.04em] text-slate-500">
-        {label}
-      </span>
-      <span className="rounded-full bg-slate-100 px-1.5 py-px text-[10.5px] font-extrabold text-slate-500 ring-1 ring-slate-200">
-        {count}
-      </span>
-      <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+    <div className="rqw-gh">
+      <span>{label}</span>
+      <b>{count}</b>
     </div>
   );
 }
 
-function formatDateTime(value: string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(value));
-}
 
 // delivery_date is date-only; use 03:00 UTC (= noon JST) + explicit Asia/Tokyo
 // so the calendar day is always stable regardless of runner timezone.
+/** 오늘 · 어제는 시각만, 그 전은 「9/26 14:05」(도쿄) — 「이전」 묶음에서 날짜가 안 보이던 것. */
+function formatTime(value: string, locale: Locale) {
+  const hm = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
+  const key = tokyoDateKey(value);
+  const today = tokyoDateKey(new Date().toISOString());
+  if (key === today || key === shiftDateKey(today, -1)) return hm;
+  const [, m, d] = key.split("-");
+  return `${Number(m)}/${Number(d)} ${hm}`;
+}
+
 function formatDeliveryDate(value: string, locale: Locale) {
   const [y, m, d] = value.split("-").map(Number);
   const noonJst = new Date(Date.UTC(y, m - 1, d, 3, 0, 0));
@@ -261,6 +203,7 @@ type MaintenanceCopy = {
   reporter: string;
   room: string;
   statusLabels: Record<MaintenanceStatus, string>;
+  urgentLabel: string;
 };
 
 type OrderCopy = {
@@ -351,134 +294,60 @@ function SegButton({
   );
 }
 
-function MetaItem({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
-      <span className="text-slate-400">{icon}</span>
-      <span className="truncate text-foreground/75">{children}</span>
-    </span>
-  );
-}
+const KIND_ICON: Record<ListKind, React.ReactNode> = {
+  "lost-found": <Package aria-hidden="true" />,
+  maintenance: <Wrench aria-hidden="true" />,
+  order: <ShoppingCart aria-hidden="true" />,
+};
 
-// memo: avoids re-rendering unchanged cards when parent re-renders due to filter state change.
+// 화이트 리디자인(2026-10-13, 시안 Req-Phone): 카드 · 사진 · 메모 · 배지 대신 한 줄 행 — 종류 아이콘 · 제목(긴급) · 「호실 · 건물 · 신고자 · 시각」 · 상태 글자.
+// 눌림 반응(scale) · 삭제는 오른쪽 작은 휴지통(권한 있을 때만).
 const RequestListCard = memo(function RequestListCard({
-  cleaningTag,
-  deliveryTag,
+  kind,
   href,
-  imageUrl,
-  leadingIcon,
-  locationLabel,
-  memo: memoProp,
-  onDelete,
-  reporter,
-  requestType,
-  roomLabel,
-  statusClass,
-  statusLabel,
-  time,
   title,
+  urgentLabel = null,
+  meta,
+  statusLabel,
+  statusTone,
+  onDelete,
+  deleteLabel,
 }: {
-  cleaningTag?: string | null;
-  deliveryTag?: string | null;
+  kind: ListKind;
   href: string;
-  imageUrl?: string | null;
-  leadingIcon: React.ReactNode;
-  locationLabel: string;
-  memo?: string | null;
-  onDelete?: () => void;
-  reporter: string;
-  requestType: TypeFilter;
-  roomLabel: string;
-  statusClass: string;
-  statusLabel: string;
-  time: string;
   title: string;
+  urgentLabel?: string | null;
+  meta: (string | null | undefined)[];
+  statusLabel: string;
+  statusTone: "open" | "prog" | "done";
+  onDelete?: () => void;
+  deleteLabel: string;
 }) {
-  const tone = requestTypeTone[requestType];
-
   return (
-    <Link className="block" href={href}>
-      <Card className={`${REQUEST_CARD} relative overflow-hidden p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_42px_-30px_rgba(31,58,95,0.55)] active:scale-[0.99]`}>
-        <div
-          aria-hidden="true"
-          className={cn("pointer-events-none absolute inset-y-4 left-0 w-1 rounded-r-full", tone.bar)}
-        />
-        <div className="flex items-start gap-3">
-          {imageUrl ? (
-            <div className="relative size-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50 shadow-[0_12px_22px_-18px_rgba(31,58,95,0.45)]">
-              <Image
-                alt={title}
-                className="object-cover"
-                fill
-                sizes="44px"
-                src={imageUrl}
-              />
-            </div>
-          ) : (
-            <div className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl ring-1 shadow-[0_12px_22px_-18px_rgba(31,58,95,0.45)]", tone.icon)}>
-              {leadingIcon}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2.5">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <p className="truncate text-[15px] font-black leading-tight tracking-[-0.03em] text-slate-950">
-                    {title}
-                  </p>
-                  {cleaningTag ? (
-                    <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-black tracking-wide text-primary">
-                      {cleaningTag}
-                    </span>
-                  ) : null}
-                </div>
-                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-slate-400">
-                  <Clock className="size-3" aria-hidden="true" />
-                  {time}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {onDelete ? (
-                  <button
-                    className="inline-flex size-8 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-400 shadow-[0_10px_20px_-18px_rgba(31,58,95,0.45)] transition-colors hover:bg-red-50 hover:text-red-500"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
-                    type="button"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                  </button>
-                ) : null}
-                <Badge className={cn("shrink-0", statusClass)}>{statusLabel}</Badge>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {memoProp ? (
-          <p className="mt-3 line-clamp-2 rounded-2xl bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-            {memoProp}
-          </p>
-        ) : null}
-
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200/70 pt-3">
-          <MetaItem icon={<MapPin className="size-3.5" aria-hidden="true" />}>
-            {locationLabel} {"\u00B7"} {roomLabel}
-          </MetaItem>
-          <MetaItem icon={<User className="size-3.5" aria-hidden="true" />}>
-            {reporter}
-          </MetaItem>
-          {deliveryTag ? (
-            <MetaItem icon={<Clock className="size-3.5" aria-hidden="true" />}>
-              {deliveryTag}
-            </MetaItem>
-          ) : null}
-        </div>
-      </Card>
+    <Link className="rqw-row" href={href}>
+      <span className="rqw-row__ic">{KIND_ICON[kind]}</span>
+      <span className="rqw-row__b">
+        <span className="rqw-row__t">
+          {title}
+          {urgentLabel ? <em>{urgentLabel}</em> : null}
+        </span>
+        <span className="rqw-row__m">{meta.filter((x, i, arr) => x && x !== "-" && arr.indexOf(x) === i).join(" · ")}</span>
+      </span>
+      <span className={`rqw-row__s is-${statusTone}`}>{statusLabel}</span>
+      {onDelete ? (
+        <button
+          className="rqw-row__del"
+          aria-label={deleteLabel}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete();
+          }}
+          type="button"
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+      ) : null}
     </Link>
   );
 });
@@ -489,7 +358,7 @@ function sanitizeScope(val: string | null): ScopeFilter {
 }
 
 function sanitizeType(val: string | null): TypeFilter {
-  if (val === "lost-found" || val === "maintenance" || val === "order") return val;
+  if (val === "all" || val === "lost-found" || val === "maintenance" || val === "order") return val;
   return DEFAULT_TYPE;
 }
 
@@ -510,6 +379,8 @@ const DELETE_ANY_ROLES: ReadonlySet<Role> = new Set([
   "cs_staff",
   "field_manager",
 ]);
+
+type ListKind = "lost-found" | "maintenance" | "order";
 
 type DeleteTarget = {
   type: "lost-found" | "maintenance" | "order";
@@ -748,8 +619,7 @@ export function RequestsFilterView({
 
   // Single-pass filter pipeline: scope + type + status + building applied together.
   // Only re-runs when the enriched data or active filters actually change.
-  const visibleLostItems = useMemo<EnrichedLostItem[]>(() => {
-    if (typeFilter !== "lost-found") return [];
+  const baseLostItems = useMemo<EnrichedLostItem[]>(() => {
     return enrichedLostItems.filter((item) => {
       if (scopeFilter === "mine" && item.reported_by_user_id !== currentUserId) return false;
       if (selectedBuildingLabel && item.location.buildingLabel !== selectedBuildingLabel)
@@ -758,10 +628,10 @@ export function RequestsFilterView({
       if (statusFilter === "closed") return !activeLostStatuses.has(item.status);
       return true;
     });
-  }, [enrichedLostItems, scopeFilter, typeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  }, [enrichedLostItems, scopeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  const visibleLostItems = useMemo(() => (typeFilter === "all" || typeFilter === "lost-found" ? baseLostItems : []), [typeFilter, baseLostItems]);
 
-  const visibleMaintenance = useMemo<EnrichedMaintenance[]>(() => {
-    if (typeFilter !== "maintenance") return [];
+  const baseMaintenance = useMemo<EnrichedMaintenance[]>(() => {
     return enrichedMaintenance.filter((report) => {
       if (scopeFilter === "mine" && report.reported_by_user_id !== currentUserId) return false;
       if (selectedBuildingLabel && report.location.buildingLabel !== selectedBuildingLabel)
@@ -770,7 +640,8 @@ export function RequestsFilterView({
       if (statusFilter === "closed") return !activeMaintenanceStatuses.has(report.status);
       return true;
     });
-  }, [enrichedMaintenance, scopeFilter, typeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  }, [enrichedMaintenance, scopeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  const visibleMaintenance = useMemo(() => (typeFilter === "all" || typeFilter === "maintenance" ? baseMaintenance : []), [typeFilter, baseMaintenance]);
 
   const enrichedOrders = useMemo<EnrichedOrder[]>(
     () =>
@@ -781,8 +652,7 @@ export function RequestsFilterView({
     [orderRequests],
   );
 
-  const visibleOrders = useMemo<EnrichedOrder[]>(() => {
-    if (typeFilter !== "order") return [];
+  const baseOrders = useMemo<EnrichedOrder[]>(() => {
     return enrichedOrders.filter((order) => {
       if (scopeFilter === "mine" && order.reported_by_user_id !== currentUserId) return false;
       if (selectedBuildingLabel && order.building_name !== selectedBuildingLabel) return false;
@@ -790,7 +660,8 @@ export function RequestsFilterView({
       if (statusFilter === "closed") return !activeOrderStatuses.has(order.status);
       return true;
     });
-  }, [enrichedOrders, scopeFilter, typeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  }, [enrichedOrders, scopeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  const visibleOrders = useMemo(() => (typeFilter === "all" || typeFilter === "order" ? baseOrders : []), [typeFilter, baseOrders]);
 
   const hasAnyResults =
     visibleLostItems.length > 0 || visibleMaintenance.length > 0 || visibleOrders.length > 0;
@@ -814,31 +685,6 @@ export function RequestsFilterView({
         })),
     [enrichedOrders, scopeFilter, currentUserId],
   );
-
-  // ── Top "open count": current tab + scope, counting only active (open) status.
-  // Completed/closed records are excluded, so the number drops as work is closed.
-  const openCount = useMemo(() => {
-    const inScope = (reporterId: string) =>
-      scopeFilter !== "mine" || reporterId === currentUserId;
-    if (typeFilter === "lost-found") {
-      return enrichedLostItems.filter(
-        (i) => inScope(i.reported_by_user_id) && activeLostStatuses.has(i.status),
-      ).length;
-    }
-    if (typeFilter === "maintenance") {
-      return enrichedMaintenance.filter(
-        (r) => inScope(r.reported_by_user_id) && activeMaintenanceStatuses.has(r.status),
-      ).length;
-    }
-    return enrichedOrders.filter(
-      (o) => inScope(o.reported_by_user_id) && activeOrderStatuses.has(o.status),
-    ).length;
-  }, [typeFilter, scopeFilter, currentUserId, enrichedLostItems, enrichedMaintenance, enrichedOrders]);
-
-  const [openCountPrefix, openCountSuffix] = useMemo(() => {
-    const parts = filterLabels.openCountTemplate.split("{n}");
-    return [parts[0] ?? "", parts[1] ?? ""];
-  }, [filterLabels.openCountTemplate]);
 
   // ── Date grouping (Tokyo operating date): Today / Yesterday / Earlier.
   const todayKey = useMemo(() => tokyoDateKey(new Date().toISOString()), []);
@@ -865,18 +711,6 @@ export function RequestsFilterView({
     [todayKey, yesterdayKey, filterLabels.groupToday, filterLabels.groupYesterday, filterLabels.groupEarlier],
   );
 
-  const lostGroups = useMemo(
-    () => groupByDate(visibleLostItems, (item) => item.found_at),
-    [groupByDate, visibleLostItems],
-  );
-  const maintenanceGroups = useMemo(
-    () => groupByDate(visibleMaintenance, (report) => report.created_at),
-    [groupByDate, visibleMaintenance],
-  );
-  const orderGroups = useMemo(
-    () => groupByDate(visibleOrders, (order) => order.created_at),
-    [groupByDate, visibleOrders],
-  );
 
   const hasDateFilter = hasCustomRange || datePreset !== "all";
   const presetLabel =
@@ -927,145 +761,159 @@ export function RequestsFilterView({
     });
   }
 
-  const typeTabs: { id: TypeFilter; icon: React.ReactNode; label: string }[] = [
-    {
-      id: "lost-found",
-      icon: <Package className="size-3.5" aria-hidden="true" />,
-      label: filterLabels.filterLostFound,
-    },
-    {
-      id: "maintenance",
-      icon: <Wrench className="size-3.5" aria-hidden="true" />,
-      label: filterLabels.filterMaintenance,
-    },
-    {
-      id: "order",
-      icon: <ShoppingCart className="size-3.5" aria-hidden="true" />,
-      label: filterLabels.filterOrder,
-    },
+  const typeTabs: { id: TypeFilter; label: string; count: number }[] = [
+    { id: "all", label: filterLabels.filterAll, count: baseLostItems.length + baseMaintenance.length + baseOrders.length },
+    { id: "maintenance", label: filterLabels.filterMaintenance, count: baseMaintenance.length },
+    { id: "lost-found", label: filterLabels.filterLostFound, count: baseLostItems.length },
+    { id: "order", label: filterLabels.filterOrder, count: baseOrders.length },
   ];
+
+  // One row list for every tab — kinds mixed on 「전체」, grouped by Tokyo date.
+  type Row = { key: string; time: string; node: React.ReactNode };
+  const rows: Row[] = [
+    ...visibleLostItems.map((item) => ({
+      key: `l-${item.id}`,
+      time: item.found_at,
+      node: (
+        <RequestListCard
+          key={item.id}
+          kind="lost-found"
+          href={`/mobile/requests/lost-found/${item.id}${listQueryString ? `?${listQueryString}` : ""}`}
+          title={item.item_name}
+          meta={[item.location.roomLabel, item.location.buildingLabel, item.reporter_name, formatTime(item.found_at, locale)]}
+          statusLabel={lostFoundCopy.statusLabels[item.status]}
+          statusTone={activeLostStatuses.has(item.status) ? "open" : "done"}
+          onDelete={
+            canDeleteAny || item.reported_by_user_id === currentUserId
+              ? () => openDelete({ type: "lost-found", id: item.id, title: item.item_name })
+              : undefined
+          }
+          deleteLabel={deleteCopy.deleteAction}
+        />
+      ),
+    })),
+    ...visibleMaintenance.map((report) => ({
+      key: `m-${report.id}`,
+      time: report.created_at,
+      node: (
+        <RequestListCard
+          key={report.id}
+          kind="maintenance"
+          href={`/mobile/requests/maintenance/${report.id}${listQueryString ? `?${listQueryString}` : ""}`}
+          title={report.issue_title}
+          urgentLabel={report.priority === "urgent" ? maintenanceCopy.urgentLabel : null}
+          meta={[report.location.roomLabel, report.location.buildingLabel, report.reporter_name, formatTime(report.created_at, locale)]}
+          statusLabel={maintenanceCopy.statusLabels[report.status]}
+          statusTone={report.status === "in_progress" ? "prog" : activeMaintenanceStatuses.has(report.status) ? "open" : "done"}
+          onDelete={
+            canDeleteAny || report.reported_by_user_id === currentUserId
+              ? () => openDelete({ type: "maintenance", id: report.id, title: report.issue_title })
+              : undefined
+          }
+          deleteLabel={deleteCopy.deleteAction}
+        />
+      ),
+    })),
+    ...visibleOrders.map((order) => {
+      const win = formatDeliveryDateWindow(order.delivery_start_date, order.delivery_end_date, order.delivery_date, locale);
+      return {
+        key: `o-${order.id}`,
+        time: order.created_at,
+        node: (
+          <RequestListCard
+            key={order.id}
+            kind="order"
+            href={`/mobile/requests/orders/${order.id}${listQueryString ? `?${listQueryString}` : ""}`}
+            title={order.title || order.parsedItems[0]?.name || "-"}
+            meta={[
+              order.room_label,
+              localizePropertyName(order.building_name, buildingLabels),
+              order.reporter_name,
+              win ? `${orderCopy.deliveryDateShort} ${win}` : formatTime(order.created_at, locale),
+            ]}
+            statusLabel={orderCopy.statusLabels[order.status]}
+            statusTone={activeOrderStatuses.has(order.status) ? "open" : "done"}
+            onDelete={
+              canDeleteAny || order.reported_by_user_id === currentUserId
+                ? () => openDelete({ type: "order", id: order.id, title: order.title || order.parsedItems[0]?.name || order.id })
+                : undefined
+            }
+            deleteLabel={deleteCopy.deleteAction}
+          />
+        ),
+      };
+    }),
+  ].sort((x, y) => (x.time < y.time ? 1 : -1));
+  const rowGroups = groupByDate(rows, (r) => r.time);
 
   return (
     <div className="space-y-4">
-      {/* Type tabs (one request kind at a time) + filter trigger */}
+      {/* 화이트 리디자인(2026-10-13, 시안 Req-Phone): 글자 탭(건수) → [전체 | 내가 등록] · 기간/필터 · (주문이면 납품 달력). */}
       <div className="space-y-3">
-        <div className={`${REQUEST_PANEL} grid grid-cols-3 gap-1 p-1.5`}>
+        <div className="rqw-tabs" role="tablist">
           {typeTabs.map((tab) => (
             <button
               key={tab.id}
-              aria-pressed={typeFilter === tab.id}
-              className={cn(
-                "inline-flex items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-[13px] font-black transition-all",
-                typeFilter === tab.id
-                  ? "bg-white text-primary shadow-[0_12px_24px_-20px_rgba(31,58,95,0.45)] ring-1 ring-primary/20"
-                  : "text-slate-500 hover:bg-white/60 hover:text-slate-900",
-              )}
+              role="tab"
+              aria-selected={typeFilter === tab.id}
+              className={typeFilter === tab.id ? "on" : undefined}
               onClick={() => updateQuery({ type: tab.id === DEFAULT_TYPE ? null : tab.id })}
               type="button"
             >
-              {tab.icon}
               {tab.label}
+              <span>{tab.count}</span>
             </button>
           ))}
         </div>
 
-        {/* Filter row: [필터 버튼] · [내 요청 토글] · [총 N건 카운트] */}
-        <div className="flex items-center gap-2">
+        <div className="rqw-bar">
+          <div className="rqw-seg" role="tablist">
+            <button
+              type="button"
+              aria-pressed={scopeFilter !== "mine"}
+              className={scopeFilter !== "mine" ? "on" : undefined}
+              onClick={() => updateQuery({ scope: null })}
+            >
+              {filterLabels.filterAll}
+            </button>
+            <button
+              type="button"
+              aria-pressed={scopeFilter === "mine"}
+              className={scopeFilter === "mine" ? "on" : undefined}
+              onClick={() => updateQuery({ scope: "mine" })}
+            >
+              {typeFilter === "lost-found" ? filterLabels.filterScopeMine : filterLabels.filterScopeMineRequest}
+            </button>
+          </div>
+          {typeFilter === "order" ? (
+            <button
+              aria-label={deliveryCalendarCopy.openLabel}
+              className="rqw-icon"
+              onClick={() => setDeliveryCalOpen(true)}
+              type="button"
+            >
+              <CalendarDays aria-hidden="true" />
+            </button>
+          ) : null}
           <button
             ref={sheetTriggerRef}
             aria-haspopup="dialog"
             aria-expanded={filterSheetOpen}
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-black shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)] transition-colors",
-              activeFilterCount > 0
-                ? "border-primary/20 bg-primary/10 text-primary"
-                : "border-slate-200/80 bg-white/80 text-slate-500 hover:text-slate-900",
-            )}
+            className={`rqw-filter${activeFilterCount > 0 ? " is-on" : ""}`}
             onClick={() => setFilterSheetOpen(true)}
             type="button"
           >
-            <SlidersHorizontal className="size-3.5" aria-hidden="true" />
-            {filterLabels.filterButton}
-            {activeFilterCount > 0 ? (
-              <span className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black leading-4 text-white">
-                {activeFilterCount}
-              </span>
-            ) : null}
+            {dateChipLabel ?? filterLabels.filterButton}
+            {activeFilterCount > 1 ? <b>{activeFilterCount}</b> : null}
+            <ChevronDown aria-hidden="true" />
           </button>
-
-          {/* "내 요청" toggle switch — promotes scope=mine out of the filter sheet. */}
-          <button
-            aria-checked={scopeFilter === "mine"}
-            className="inline-flex shrink-0 items-center gap-1.5"
-            onClick={() => updateQuery({ scope: scopeFilter === "mine" ? null : "mine" })}
-            role="switch"
-            type="button"
-          >
-            <span
-              className={cn(
-                "text-[13px] font-extrabold transition-colors",
-                scopeFilter === "mine" ? "text-primary" : "text-slate-500",
-              )}
-            >
-              {typeFilter === "lost-found"
-                ? filterLabels.filterScopeMine
-                : filterLabels.filterScopeMineRequest}
-            </span>
-            <span
-              className={cn(
-                "relative h-[22px] w-[38px] rounded-full transition-colors",
-                scopeFilter === "mine" ? "bg-primary" : "bg-slate-300",
-              )}
-            >
-              <span
-                className={cn(
-                  // `left` 대신 `transform` — 레이아웃 리플로우 없이 컴포지터에서 처리된다.
-                  "absolute left-0.5 top-0.5 size-[18px] rounded-full bg-white shadow-[0_2px_5px_rgba(15,23,42,0.28)] transition-transform duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]",
-                  scopeFilter === "mine" ? "translate-x-4" : "translate-x-0",
-                )}
-              />
-            </span>
-          </button>
-
-          {/* Delivery calendar — order tab only (only order requests carry a delivery date). */}
-          {typeFilter === "order" ? (
-            <button
-              aria-label={deliveryCalendarCopy.openLabel}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/[0.08] text-primary shadow-[0_10px_22px_-16px_rgba(31,58,95,0.5)] transition-colors hover:bg-primary/15 active:scale-[0.96]"
-              onClick={() => setDeliveryCalOpen(true)}
-              type="button"
-            >
-              <CalendarDays className="size-[18px]" aria-hidden="true" />
-            </button>
-          ) : null}
-
-          {/* Total open count — drops as records are completed/closed. */}
-          <span className="ml-auto whitespace-nowrap text-xs font-bold text-slate-500">
-            {openCountPrefix}
-            <b className="text-primary font-extrabold tabular-nums">{openCount}</b>
-            {openCountSuffix}
-          </span>
         </div>
 
         {/* 완료-목록 진입 행 (분실물 탭 전용) — 반환완료·폐기 내역. 필터 행이 좁아 별도 줄로 분리했다. */}
         {typeFilter === "lost-found" ? (
-          <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <Link
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border-[1.5px] border-[#c5cdf0] bg-[#eef1fb] px-3 py-1.5 text-[13px] font-black text-[#3949ab] shadow-[0_10px_22px_-16px_rgba(57,73,171,0.55)] transition-colors hover:bg-[#e2e7f8] active:scale-[0.97]"
-              href="/mobile/requests/lost-found/returned"
-            >
-              <Undo2 className="size-3.5" aria-hidden="true" />
-              {filterLabels.returnedEntry}
-              <ChevronRight className="size-3.5 text-[#3949ab]/60" aria-hidden="true" />
-            </Link>
-            <Link
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border-[1.5px] border-slate-200 bg-slate-100 px-3 py-1.5 text-[13px] font-black text-slate-600 shadow-[0_10px_22px_-16px_rgba(71,85,105,0.5)] transition-colors hover:bg-slate-200 active:scale-[0.97]"
-              href="/mobile/requests/lost-found/disposed"
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-              {filterLabels.disposedEntry}
-              <ChevronRight className="size-3.5 text-slate-500/60" aria-hidden="true" />
-            </Link>
+          <div className="rqw-links">
+            <Link href="/mobile/requests/lost-found/returned">{filterLabels.returnedEntry} ›</Link>
+            <Link href="/mobile/requests/lost-found/disposed">{filterLabels.disposedEntry} ›</Link>
           </div>
         ) : null}
 
@@ -1278,130 +1126,12 @@ export function RequestsFilterView({
         </BottomSheet>
       ) : null}
 
-      {/* No results */}
-      {!hasAnyResults ? (
-        <Card className={`${REQUEST_CARD} p-5`}>
-          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-2xl bg-slate-50 text-slate-500 ring-1 ring-slate-200/80">
-            <SlidersHorizontal className="size-5" aria-hidden="true" />
-          </div>
-          <p className="text-center text-sm font-bold text-slate-500">
-            {filterLabels.noFilterResults}
-          </p>
-        </Card>
-      ) : null}
+      {!hasAnyResults ? <p className="rqw-empty">{filterLabels.noFilterResults}</p> : null}
 
-      {/* Lost items list (kind is conveyed by the active tab), grouped by date */}
-      {lostGroups.map((group) => (
+      {rowGroups.map((group) => (
         <div key={group.key}>
           <GroupHeader label={group.label} count={group.items.length} />
-          <div className="space-y-2.5">
-            {group.items.map((item) => (
-              <RequestListCard
-                cleaningTag={item.cleaning_session_id ? lostFoundCopy.fromCleaningTag : null}
-                href={`/mobile/requests/lost-found/${item.id}${listQueryString ? `?${listQueryString}` : ""}`}
-                imageUrl={item.image_urls?.[0] ?? null}
-                key={item.id}
-                leadingIcon={<Package className="size-5" aria-hidden="true" />}
-                locationLabel={item.location.buildingLabel ?? "-"}
-                memo={item.memo}
-                onDelete={
-                  canDeleteAny || item.reported_by_user_id === currentUserId
-                    ? () => openDelete({ type: "lost-found", id: item.id, title: item.item_name })
-                    : undefined
-                }
-                reporter={item.reporter_name || "-"}
-                requestType="lost-found"
-                roomLabel={item.location.roomLabel}
-                statusClass={lostStatusBadgeClass[item.status]}
-                statusLabel={lostFoundCopy.statusLabels[item.status]}
-                time={formatDateTime(item.found_at, locale)}
-                title={item.item_name}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Maintenance list, grouped by date */}
-      {maintenanceGroups.map((group) => (
-        <div key={group.key}>
-          <GroupHeader label={group.label} count={group.items.length} />
-          <div className="space-y-2.5">
-            {group.items.map((report) => (
-              <RequestListCard
-                cleaningTag={
-                  report.cleaning_session_id ? maintenanceCopy.fromCleaningTag : null
-                }
-                href={`/mobile/requests/maintenance/${report.id}${listQueryString ? `?${listQueryString}` : ""}`}
-                imageUrl={report.image_urls?.[0] ?? null}
-                key={report.id}
-                leadingIcon={<Wrench className="size-5" aria-hidden="true" />}
-                locationLabel={report.location.buildingLabel ?? "-"}
-                memo={report.description}
-                onDelete={
-                  canDeleteAny || report.reported_by_user_id === currentUserId
-                    ? () => openDelete({ type: "maintenance", id: report.id, title: report.issue_title })
-                    : undefined
-                }
-                reporter={report.reporter_name || "-"}
-                requestType="maintenance"
-                roomLabel={report.location.roomLabel}
-                statusClass={maintenanceStatusBadgeClass[report.status]}
-                statusLabel={maintenanceCopy.statusLabels[report.status]}
-                time={formatDateTime(report.created_at, locale)}
-                title={report.issue_title}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Order requests list, grouped by date */}
-      {orderGroups.map((group) => (
-        <div key={group.key}>
-          <GroupHeader label={group.label} count={group.items.length} />
-          <div className="space-y-2.5">
-            {group.items.map((order) => (
-              <RequestListCard
-                deliveryTag={
-                  formatDeliveryDateWindow(
-                    order.delivery_start_date,
-                    order.delivery_end_date,
-                    order.delivery_date,
-                    locale,
-                  )
-                    ? `${orderCopy.deliveryDateShort} ${formatDeliveryDateWindow(
-                      order.delivery_start_date,
-                      order.delivery_end_date,
-                      order.delivery_date,
-                      locale,
-                    )}`
-                    : null
-                }
-                href={`/mobile/requests/orders/${order.id}${listQueryString ? `?${listQueryString}` : ""}`}
-                imageUrl={
-                  order.parsedItems.find((item) => item.imageUrls && item.imageUrls.length > 0)
-                    ?.imageUrls?.[0] ?? null
-                }
-                key={order.id}
-                leadingIcon={<ShoppingCart className="size-5" aria-hidden="true" />}
-                locationLabel={localizePropertyName(order.building_name, buildingLabels)}
-                memo={order.description}
-                onDelete={
-                  canDeleteAny || order.reported_by_user_id === currentUserId
-                    ? () => openDelete({ type: "order", id: order.id, title: order.title || order.parsedItems[0]?.name || order.id })
-                    : undefined
-                }
-                reporter={order.reporter_name || "-"}
-                requestType="order"
-                roomLabel={order.room_label}
-                statusClass={orderStatusBadgeClass[order.status]}
-                statusLabel={orderCopy.statusLabels[order.status]}
-                time={formatDateTime(order.created_at, locale)}
-                title={order.title || order.parsedItems[0]?.name || "-"}
-              />
-            ))}
-          </div>
+          <div className="rqw-list">{group.items.map((r) => r.node)}</div>
         </div>
       ))}
 

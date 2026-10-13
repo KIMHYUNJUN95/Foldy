@@ -4,6 +4,7 @@ import { Package, ShoppingCart, Wrench } from "lucide-react";
 import { RequestsFilterView } from "@/components/requests/requests-filter-view";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
+import "@/components/requests/requests-list.css";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOrgLostItems } from "@/lib/lost-found";
@@ -65,32 +66,18 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={dictionary.mobile.requestsTitle} split>
       <SplitList detail="requests">
-        <div className="mb-5 grid grid-cols-3 gap-2.5">
-          <Link
-            className="group flex h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-slate-200/80 bg-surface px-1.5 text-[13px] font-black tracking-tight text-slate-800 shadow-[0_14px_28px_-24px_rgba(31,58,95,0.42)] transition-all hover:bg-slate-50 active:scale-[0.98]"
-            href="/mobile/lost-found/new"
-          >
-            <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
-              <Package className="size-3.5 shrink-0" aria-hidden="true" />
-            </span>
+        {/* 화이트 리디자인(2026-10-13, 시안 Req-Phone): 옅은 정사각 타일 셋(아이콘 위 · 글자 아래). */}
+        <div className="rqw-quick">
+          <Link href="/mobile/lost-found/new">
+            <Package aria-hidden="true" />
             {dictionary.lostFound.reportButton}
           </Link>
-          <Link
-            className="group flex h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-slate-200/80 bg-surface px-1.5 text-[13px] font-black tracking-tight text-slate-800 shadow-[0_14px_28px_-24px_rgba(31,58,95,0.42)] transition-all hover:bg-slate-50 active:scale-[0.98]"
-            href="/mobile/maintenance/new"
-          >
-            <span className="flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
-              <Wrench className="size-3.5 shrink-0" aria-hidden="true" />
-            </span>
+          <Link href="/mobile/maintenance/new">
+            <Wrench aria-hidden="true" />
             {dictionary.maintenance.reportButton}
           </Link>
-          <Link
-            className="group flex h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-slate-200/80 bg-surface px-1.5 text-[13px] font-black tracking-tight text-slate-800 shadow-[0_14px_28px_-24px_rgba(31,58,95,0.42)] transition-all hover:bg-slate-50 active:scale-[0.98]"
-            href="/mobile/requests/orders/new"
-          >
-            <span className="flex size-7 items-center justify-center rounded-xl bg-rose-50 text-rose-700 ring-1 ring-rose-200/80">
-              <ShoppingCart className="size-3.5 shrink-0" aria-hidden="true" />
-            </span>
+          <Link href="/mobile/requests/orders/new">
+            <ShoppingCart aria-hidden="true" />
             {dictionary.mobile.quickActions.order}
           </Link>
         </div>
@@ -161,6 +148,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
             reporter: dictionary.maintenance.reporter,
             room: dictionary.maintenance.room,
             statusLabels: dictionary.maintenance.statusLabels,
+            urgentLabel: dictionary.maintenance.form.urgencies.urgent,
           }}
           maintenanceReports={maintenanceReports}
           orderRequests={orderRequests}

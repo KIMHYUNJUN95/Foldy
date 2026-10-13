@@ -1031,6 +1031,8 @@ export type AdminTransportRow = {
   itemCount: number;
   totalAmount: number;
   missingCount: number;
+  /** 제출 시각(ISO) — 표의 제출일 열(2026-10-13 리디자인). 미제출 · 작성 중이면 null. */
+  submittedAt: string | null;
 };
 
 export type AdminAttendanceTransportData = {
@@ -1163,6 +1165,7 @@ export async function getAdminAttendanceTransport(
       itemCount: s?.itemCount ?? 0,
       totalAmount: s?.totalAmount ?? 0,
       missingCount: s?.missingCount ?? 0,
+      submittedAt: s?.submittedAt ?? null,
     };
   });
   rows.sort((a, b) => a.userName.localeCompare(b.userName));

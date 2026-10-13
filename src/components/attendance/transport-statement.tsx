@@ -93,20 +93,6 @@ async function uploadTransportImage(
   return storagePath;
 }
 
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-function DownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 4v12M7 12l5 5 5-5M4 20h16" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 function ChevDownIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -262,17 +248,6 @@ function roomsLabel(item: TransportItem): string {
 // Tokyo 오늘 날짜를 'YYYY-MM-DD' 형식으로 반환.
 function getTodayTokyo(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
-}
-
-function ItemBadge({ item, dict }: { item: TransportItem; dict: Dictionary }) {
-  const t = dict.transport;
-  if (item.receiptCount === 0) {
-    return <span className="trn-miss-badge">{t.badgeMissing}</span>;
-  }
-  if (item.mode === "linked") {
-    return <span className="trn-lk">{t.badgeAuto(item.receiptCount)}</span>;
-  }
-  return <span className="trn-mn">{t.badgeManual(item.receiptCount)}</span>;
 }
 
 function AddItemSheet({
@@ -1162,94 +1137,104 @@ export function TransportStatement({
   const statusKey = STATUS_KEY_MAP[report.status];
   const statusLabel = statusKey ? (t as Record<string, unknown>)[statusKey] as string : null;
 
+  // 화이트 리디자인(2026-10-13, 시안 AttTransportM-Phone · Fold · Tablet): 제목 · 「달 · 상태」 · + 추가 → (보완 요청 · 반려면
+  // 관리자 메모) → 「달 합계 · n건」 + 큰 금액 → 날짜 줄(출근지 · 영수증) → 안내 한 줄 → 제출. 태블릿 가로는 왼쪽 합계 · 제출 | 오른쪽 날짜 줄.
+  // 쓰이지 않던(눌러도 아무 일 없던) 「엑셀」 버튼은 뺐다.
+  void userName; // 정산서 머리의 이름 줄은 리디자인에서 뺐다(제목 · 달로 충분).
+  const missingN = items.filter((x) => x.missingReceipt || x.receiptCount === 0).length;
+  const sentBack = report.status === "changes_requested" || report.status === "rejected";
+  const monthShort = monthLabel.replace(/^\d{4}\D*\s*/, "") || monthLabel;
+  const subState = report.status === "draft" ? t.subDraft : statusLabel;
+
   return (
-    <div className="trn">
-      {/* 제출 후 상태 칩 */}
-      {statusLabel && (
-        <div className="trn-status-chip" data-status={report.status}>
-          {statusLabel}
-        </div>
-      )}
-
-      {/* Top action bar */}
-      <div className="trn-top">
-        <button
-          type="button"
-          className="trn-add"
-          onClick={() => setShowAddSheet(true)}
-          disabled={!isEditable}
-        >
-          <PlusIcon />
-          {t.addBtn}
-        </button>
-        <button type="button" className="trn-xls">
-          <DownloadIcon />
-          {t.excelBtn}
-        </button>
-      </div>
-
-      {/* Document card */}
-      <div className="trn-doc">
-        {/* Header */}
-        <div className="trn-dh">
-          <div className="trn-dt">{t.statementTitle}</div>
-          <div className="trn-dm">
-            <span>{userName}</span>
-            <span>{monthLabel}</span>
-          </div>
-          <div className="trn-tot">
-            <span className="trn-l">{t.claimTotal}</span>
-            <span className="trn-v">{fmtYen(total)}</span>
-          </div>
-        </div>
-
-        {/* Line items */}
-        {items.map((item, idx) => (
-          <button
-            type="button"
-            key={item.id}
-            className={`trn-line${item.id === selectedId ? " trn-sel" : ""}`}
-            onClick={() => {
-              setSelectedId(item.id);
-              setShowEdit(false);
-              setShowDelete(false);
-            }}
-          >
-            <span className="trn-no">{String(idx + 1).padStart(2, "0")}</span>
-            <div className="trn-c">
-              <div className="trn-c1">
-                <span className="trn-dt-label">{shortDateLabel(item.date)}</span>
-                {item.building}
-              </div>
-              <div className="trn-c2">
-                {item.context ? <>{item.context} · </> : null}
-                <ItemBadge item={item} dict={dict} />
-              </div>
+    <div className="trn trnw">
+      <div className="trnw-left">
+        <div className="ptitle-row trnw-title">
+          <div>
+            <h1 className="ptitle">{t.homeTransportTitle}</h1>
+            <div className="ptitle__sub">
+              {monthShort}
+              {subState ? (
+                <>
+                  {" · "}
+                  <b className={sentBack ? "is-danger" : undefined}>{subState}</b>
+                </>
+              ) : null}
             </div>
-            <span className={`trn-amt${item.missingReceipt ? " trn-miss" : ""}`}>
-              {fmtYen(item.amount)}
-            </span>
-          </button>
-        ))}
+          </div>
+          {isEditable ? (
+            <button type="button" className="trnw-add" onClick={() => setShowAddSheet(true)}>
+              {t.addShort}
+            </button>
+          ) : null}
+        </div>
 
-        {/* Summary footer */}
-        <div className="trn-sum">
-          <span className="trn-sl">{t.sumLabel(items.length)}</span>
-          <span className="trn-sv">{fmtYen(total)}</span>
+        {sentBack && report.reviewNote ? (
+          <div className="trnw-note">
+            <span>{t.reviewNoteLabel}</span>
+            <p>{report.reviewNote}</p>
+          </div>
+        ) : null}
+
+        <div className="trnw-total">
+          <span>{t.monthTotalLine.replace("{month}", monthShort).replace("{n}", String(items.length))}</span>
+          <b>{fmtYen(total)}</b>
+        </div>
+
+        <div className="trnw-actions">
+          {missingN > 0 && isEditable ? (
+            <p className="trnw-warn">
+              <AlertTriangleIcon />
+              {(sentBack ? t.missingFixLine : t.missingLine).replace("{n}", String(missingN))}
+            </p>
+          ) : null}
+          {isEditable ? (
+            <button type="button" className="trnw-submit" disabled={submitting || items.length === 0} onClick={handleSubmit}>
+              {submitting ? <span className="trn-spin" /> : null}
+              {sentBack ? t.resubmitBtn : t.submitMonthBtn.replace("{month}", monthShort)}
+            </button>
+          ) : (
+            <p className="trnw-locked">{t.lockedNote}</p>
+          )}
+          {isEditable ? (
+            <button type="button" className="trnw-add-wide" onClick={() => setShowAddSheet(true)}>
+              {t.addLong}
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {/* Submit */}
-      <div className="trn-acts">
-        <button
-          type="button"
-          className="trn-submit"
-          disabled={!isEditable || submitting}
-          onClick={handleSubmit}
-        >
-          {submitting ? <span className="trn-spin" /> : null}
-          {t.submitBtn}
-        </button>
+      <div className="trnw-right">
+        <div className="trnw-right__h">
+          <b>{t.monthItems.replace("{month}", monthShort)}</b>
+          {isEditable ? <span>{t.tapToEdit}</span> : null}
+        </div>
+        {items.length === 0 ? <p className="trnw-empty">{t.emptyItems}</p> : null}
+        {items.map((item) => {
+          const missing = item.missingReceipt || item.receiptCount === 0;
+          return (
+            <button
+              type="button"
+              key={item.id}
+              className="trnw-line"
+              onClick={() => {
+                setSelectedId(item.id);
+                setShowEdit(false);
+                setShowDelete(false);
+              }}
+            >
+              <span className="trnw-line__d">{shortDateLabel(item.date)}</span>
+              <span className="trnw-line__b">
+                <span className="trnw-line__t">{item.building}</span>
+                <span className={`trnw-line__s${missing ? " is-danger" : ""}`}>
+                  {item.context ? `${item.context} · ` : ""}
+                  {missing ? t.badgeMissing : t.receiptN.replace("{n}", String(item.receiptCount))}
+                </span>
+              </span>
+              <b className="trnw-line__v">{fmtYen(item.amount)}</b>
+            </button>
+          );
+        })}
       </div>
 
       {showAddSheet && isEditable && (

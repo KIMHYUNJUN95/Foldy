@@ -3156,3 +3156,32 @@
 .adm .pay-tbl td:last-child, .adm .pay-tbl th:last-child { padding-right: 16px; }
 .adm .pay-excl { color: #c5282e; font-weight: 600; white-space: nowrap; text-decoration: none; }
 .adm .pay-excl:hover { text-decoration: underline; }
+
+/* 교통비 검토 표 — 숫자 오른쪽 정렬 · 굵은 금액 · 증빙 누락 빨강(2026-10-13 시안 AttTransport-PC) */
+.adm .tr-tbl th.r, .adm .tr-tbl td.r { text-align: right; }
+.adm .tr-tbl td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .tr-tbl td b { font-weight: 600; color: #16141f; }
+.adm .tr-tbl td:last-child, .adm .tr-tbl th:last-child { padding-right: 16px; }
+.adm .tr-tbl .tr-miss { color: #c5282e; font-weight: 600; white-space: nowrap; }
+.adm .tr-tbl .tr-date { color: #8b8898; white-space: nowrap; }
+
+/* 교통비 상세 패널 — 위 한 줄(증빙 누락 · 상태) · 이름 · 날짜 줄 · 반려 글자 버튼(2026-10-13 시안 AttTransport-PC) */
+.adm .panel .trp-kicker { display: flex; gap: 8px; font-size: 12px; color: #8b8898; }
+.adm .panel .trp-kicker b { color: #c5282e; font-weight: 600; }
+.adm .panel .trp-name { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .panel .trp-review { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: #6b6878; }
+.adm .panel .trp-row { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 6px 0; border-top: 1px solid #f3f3f6; font-size: 14px; }
+.adm .panel .trp-row:first-child { border-top: 0; }
+.adm .panel .trp-row__d { width: 40px; flex: none; color: #8b8898; font-variant-numeric: tabular-nums; }
+.adm .panel .trp-row__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.adm .panel .trp-row__t { color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .panel .trp-row__s { font-size: 12px; color: #8b8898; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .panel .trp-row__miss { font-size: 12px; font-weight: 600; color: #c5282e; white-space: nowrap; }
+.adm .panel .trp-row__v { font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .panel .trp-row .trthumb { width: 28px; height: 28px; }
+.adm .panel__foot .trp-reject { flex: none; padding: 0 14px; background: transparent; border: 0; color: #c5282e; font-weight: 600; }
+.adm .panel__foot .trp-reject:hover { background: #fdecec; }
+.adm .panel .panel__title.trp-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.adm .panel .trp-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; padding-top: 14px; border-top: 1px solid #ebeaf0; }
+.adm .panel .trp-total span { font-size: 13px; color: #6b6878; }
+.adm .panel .trp-total b { font-size: 18px; font-weight: 700; color: #16141f; font-variant-numeric: tabular-nums; }

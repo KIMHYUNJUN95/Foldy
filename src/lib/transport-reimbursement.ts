@@ -458,6 +458,7 @@ export type TransportReportAdminSummary = {
   totalAmount: number;
   itemCount: number;
   missingCount: number;
+  submittedAt: string | null;
 };
 
 /**
@@ -520,6 +521,7 @@ export async function getTransportReportSummaryForAdmin(
     totalAmount: r.total_amount_cached,
     itemCount: itemCounts.get(r.id) ?? 0,
     missingCount: missingCounts.get(r.id) ?? 0,
+    submittedAt: r.submitted_at,
   }));
 }
 

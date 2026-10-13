@@ -7,18 +7,12 @@ import {
   Ban,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleAlert,
   Download,
   FileText,
-  Filter,
-  Link2,
   LogOut,
-  MessageSquare,
-  Pencil,
   Receipt,
   RotateCcw,
-  Shield,
   Wallet,
   X,
 } from "lucide-react";
@@ -50,12 +44,10 @@ function Ic({ children }: { children: React.ReactNode }) {
 function initial(name: string): string {
   return name.trim().slice(0, 1) || "·";
 }
-function fmtUsageDate(iso: string, localeTag: string): string {
-  return new Intl.DateTimeFormat(localeTag, {
-    timeZone: "Asia/Tokyo",
-    month: "numeric",
-    day: "numeric",
-  }).format(new Date(`${iso}T00:00:00+09:00`));
+/** 'YYYY-MM-DD' → 「9/11」(언어와 상관없이 짧게 — ko 의 「9. 11.」 대신). */
+function shortMd(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return `${Number(m)}/${Number(d)}`;
 }
 function fmtSubmitted(iso: string | null, localeTag: string): string | null {
   if (!iso) return null;
@@ -67,6 +59,17 @@ function fmtSubmitted(iso: string | null, localeTag: string): string | null {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
+}
+
+type TrTab = "pending" | "changes_requested" | "approved" | "rejected" | "before";
+function trTabOf(status: TransportReportStatus | "none"): TrTab {
+  if (status === "submitted" || status === "reviewing") return "pending";
+  if (status === "changes_requested" || status === "approved" || status === "rejected") return status;
+  return "before";
+}
+function fmtSubmittedDay(iso: string | null, localeTag: string): string | null {
+  if (!iso) return null;
+  return new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric" }).format(new Date(iso));
 }
 
 export function AttendanceTransportClient({
@@ -90,7 +93,7 @@ export function AttendanceTransportClient({
     initialUserId && initialRows.some((r) => r.userId === initialUserId) ? initialUserId : null,
   );
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
-  const showToast = (msg: string) => setToast({ id: Date.now(), msg });
+  const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
   const [pendingMonthExport, startMonthExport] = useTransition();
   const [pendingPdfExport, startPdfExport] = useTransition();
 
@@ -100,6 +103,11 @@ export function AttendanceTransportClient({
     return () => clearTimeout(t);
   }, [toast]);
 
+  // 첫 탭은 검토 대기 — 비어 있으면 정산서가 있는 첫 탭(빈 화면부터 보이지 않게).
+  const [tab, setTab] = useState<TrTab>(() => {
+    const order: TrTab[] = ["pending", "changes_requested", "approved", "rejected", "before"];
+    return order.find((k) => initialRows.some((r) => trTabOf(r.status) === k)) ?? "pending";
+  });
   const panelRow = panelUserId ? rows.find((r) => r.userId === panelUserId) ?? null : null;
   const liveKpi = useMemo(
     () => ({
@@ -150,168 +158,113 @@ export function AttendanceTransportClient({
     });
   }
 
+  // 화이트 리디자인(2026-10-13, 시안 AttTransport-PC): 숫자 줄 대신 상태 탭(검토 대기 · 보완 요청 · 승인 · 반려 · 제출 전)
+  // → 표(직원 · 건수 · 제출 금액 · 증빙 · 제출일). 비활성이던 상태 필터 칩은 탭이 대신한다.
+  const TABS: { key: TrTab; label: string }[] = [
+    { key: "pending", label: c.trTabPending },
+    { key: "changes_requested", label: c.trStatusChangesRequested },
+    { key: "approved", label: c.trStatusApproved },
+    { key: "rejected", label: c.trStatusRejected },
+    { key: "before", label: c.trTabBefore },
+  ];
+  const tabCount = (k: TrTab) => rows.filter((r) => trTabOf(r.status) === k).length;
+  const visible = rows.filter((r) => trTabOf(r.status) === tab);
+  void liveKpi;
+
   return (
     <div style={{ position: "relative" }}>
-      {/* KPI mini-row — 3 cells */}
-      <div
-        className="opsbar"
-        style={{ marginBottom: 18, gridTemplateColumns: "repeat(3, 1fr)" }}
-      >
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <Wallet />
-            </Ic>
-            {c.trKpiPending}
-          </div>
-          <div className="opscell__v">{liveKpi.pendingReview}</div>
-          <div className="opscell__sub">{c.unitPeople}</div>
+      <div className="toolbar" style={{ marginTop: 4 }}>
+        <div className="lviews" role="tablist" style={{ margin: 0 }}>
+          {TABS.map((t) => {
+            const n = tabCount(t.key);
+            return (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                className={tab === t.key ? "on" : ""}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+                {n > 0 && t.key !== "approved" && t.key !== "rejected" ? <span className="cnt">{n}</span> : null}
+              </button>
+            );
+          })}
         </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <Wallet />
-            </Ic>
-            {c.trKpiSubmitted}
-          </div>
-          <div className="opscell__v mono">
-            {c.yenSym}
-            {formatAdminYen(liveKpi.submittedTotal, localeTag)}
-          </div>
-          <div className="opscell__sub">{monthLabel}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <Ic>
-              <Check />
-            </Ic>
-            {c.trKpiApproved}
-          </div>
-          <div className="opscell__v">{liveKpi.approvedTotal}</div>
-          <div className="opscell__sub">{c.unitPeople}</div>
-        </div>
-      </div>
-
-      <div className="toolbar">
-        <button type="button" className="chipbtn" disabled aria-disabled="true">
-          <Ic>
-            <Filter />
-          </Ic>
-          {c.trFilterStatus}
-          <span className="ic chev">
-            <ChevronDown />
-          </span>
-        </button>
         <span className="toolbar__spacer" />
-        <button
-          type="button"
-          className="chipbtn"
-          onClick={doPdfExport}
-          disabled={pendingPdfExport}
-        >
-          <Ic>
-            <FileText />
-          </Ic>
-          {pendingPdfExport ? c.payActionExporting : c.trExportPdf}
-        </button>
-        <button
-          type="button"
-          className="chipbtn"
-          onClick={doMonthlyExport}
-          disabled={pendingMonthExport}
-        >
+        <button type="button" className="chipbtn" onClick={doMonthlyExport} disabled={pendingMonthExport}>
           <Ic>
             <Download />
           </Ic>
           {pendingMonthExport ? c.payActionExporting : c.trExportMonthly}
         </button>
+        <button type="button" className="chipbtn" onClick={doPdfExport} disabled={pendingPdfExport}>
+          <Ic>
+            <FileText />
+          </Ic>
+          {pendingPdfExport ? c.payActionExporting : c.trExportPdf}
+        </button>
       </div>
 
-      {rows.length === 0 ? (
-        <div className="card">
-          <div className="state">
-            <span className="state__ic empty">
-              <Ic>
-                <Wallet />
-              </Ic>
-            </span>
-            <div className="state__t">{c.trEmptyTitle}</div>
-            <div className="state__s">{c.trEmptyBody}</div>
-          </div>
+      {rows.length === 0 || visible.length === 0 ? (
+        <div className="state">
+          <span className="state__ic empty">
+            <Ic>
+              <Wallet />
+            </Ic>
+          </span>
+          <div className="state__t">{rows.length === 0 ? c.trEmptyTitle : c.trTabEmpty}</div>
+          {rows.length === 0 ? <div className="state__s">{c.trEmptyBody}</div> : null}
         </div>
       ) : (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <table className="qtbl">
-            <thead>
-              <tr>
-                <th style={{ paddingLeft: 16 }}>{c.trColStaff}</th>
-                <th>{c.trColItems}</th>
-                <th>{c.trColTotal}</th>
-                <th>{c.trColStatus}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const pill = adminTransportStatusPill(r.status, c);
-                const sel = panelUserId === r.userId;
-                const noReport = r.status === "none";
-                return (
-                  <tr
-                    key={r.userId}
-                    className={sel ? "sel" : ""}
-                    onClick={() => setPanelUserId(r.userId)}
-                  >
-                    <td style={{ paddingLeft: 16 }}>
-                      <div className="who">
-                        <span
-                          className="uhead__av"
-                          style={{
-                            background: "var(--adm-primary)",
-                            width: 34,
-                            height: 34,
-                            borderRadius: 9,
-                            fontSize: 13,
-                          }}
-                        >
-                          {initial(r.userName)}
-                        </span>
-                        <div>
-                          <div className="who__nm">{r.userName}</div>
-                          <div className="who__sub">
-                            {noReport ? c.trStatusNone : `${r.itemCount}${c.unitCount}`}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="mono">{noReport ? "—" : r.itemCount}</td>
-                    <td className="mono">
-                      {noReport ? (
-                        <span className="dim-cell">—</span>
-                      ) : (
-                        <>
-                          <span style={{ color: "var(--adm-muted)" }}>{c.yenSym}</span>
-                          {formatAdminYen(r.totalAmount, localeTag)}
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`pill ${pill.cls}`}>
-                        <span className="d" />
-                        {pill.label}
+        <table className="qtbl tr-tbl">
+          <thead>
+            <tr>
+              <th style={{ paddingLeft: 16 }}>{c.trColStaff}</th>
+              <th className="r">{c.trColItems}</th>
+              <th className="r">{c.trColTotal}</th>
+              <th className="r">{c.trColEvidence}</th>
+              <th className="r">{c.trColSubmittedOn}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r) => {
+              const sel = panelUserId === r.userId;
+              const noReport = r.status === "none";
+              const submitted = fmtSubmittedDay(r.submittedAt, localeTag);
+              return (
+                <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => setPanelUserId(r.userId)}>
+                  <td style={{ paddingLeft: 16 }}>
+                    <div className="who">
+                      <span className="uhead__av" style={{ width: 32, height: 32 }}>
+                        {initial(r.userName)}
                       </span>
-                    </td>
-                    <td className="colchev">
-                      <Ic>
-                        <ChevronRight />
-                      </Ic>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <div>
+                        <div className="who__nm">{r.userName}</div>
+                        <div className="who__sub">{adminTransportStatusPill(r.status, c).label}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="r num">{noReport ? <span className="dim-cell">—</span> : `${r.itemCount}${c.unitCount}`}</td>
+                  <td className="r num">
+                    {noReport ? <span className="dim-cell">—</span> : <b>{`${c.yenSym}${formatAdminYen(r.totalAmount, localeTag)}`}</b>}
+                  </td>
+                  <td className="r">
+                    {noReport || r.itemCount === 0 ? (
+                      <span className="dim-cell">—</span>
+                    ) : r.missingCount > 0 ? (
+                      <span className="tr-miss">{c.trMissingN.replace("{n}", String(r.missingCount))}</span>
+                    ) : (
+                      c.trEvidenceN.replace("{n}", String(r.itemCount))
+                    )}
+                  </td>
+                  <td className="r tr-date">{submitted ? c.trSubmittedOn.replace("{d}", submitted) : <span className="dim-cell">—</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
 
       {panelRow ? (
@@ -389,7 +342,6 @@ function TransportPanel({
   const report = detailOk?.report ?? null;
   const items = detailOk?.items ?? [];
   const missingCount = detailOk?.missingCount ?? 0;
-  const linkedCount = detailOk?.linkedCount ?? 0;
   const resolved = row.status === "approved" || row.status === "rejected";
   const reviewable = row.status === "submitted" || row.status === "reviewing";
 
@@ -532,42 +484,20 @@ function TransportPanel({
               </Ic>
             </button>
           </div>
-          <div className="panel__title">
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="uhead__av" style={{ background: "var(--adm-primary)" }}>
-                {initial(row.userName)}
-              </span>
-              <span>
-                <span
-                  className="panel__sub"
-                  style={{
-                    display: "block",
-                    color: "var(--ink)",
-                    fontSize: 17,
-                    fontWeight: 900,
-                  }}
-                >
-                  {row.userName}
-                </span>
-                <span className="panel__sub">{monthLabel}</span>
-              </span>
-            </span>
-          </div>
-          <div className="panel__chips">
-            <span className={`pill ${pill.cls}`}>
-              <span className="d" />
+          <div className="panel__title trp-head">
+            <span className="trp-kicker">
+              {missingCount > 0 ? (
+                <b>
+                  {c.trEvidenceMissing} {missingCount}
+                </b>
+              ) : null}
               {pill.label}
             </span>
-            <span className="pill pill--muted">
-              {row.itemCount}
+            <span className="trp-name">{row.userName}</span>
+            <span className="panel__sub">
+              {monthLabel} · {row.itemCount}
               {c.unitCount}
             </span>
-            {missingCount > 0 ? (
-              <span className="pill pill--warn">
-                <span className="d" />
-                {c.trEvidenceMissing} {missingCount}
-              </span>
-            ) : null}
           </div>
         </div>
 
@@ -598,17 +528,6 @@ function TransportPanel({
             </div>
           ) : (
             <>
-              {/* total summary */}
-              <div className="pblock">
-                <div className="psum">
-                  <span className="psum__amt">
-                    <span className="yen">{c.yenSym}</span>
-                    {formatAdminYen(row.totalAmount, localeTag)}
-                  </span>
-                  <span className="psum__lbl">{c.trPanelSummaryLabel(linkedCount)}</span>
-                </div>
-              </div>
-
               {/* items (with inline receipt thumbnails, collapsible) */}
               <div className="pblock">
                 <div className="pblock__t">{c.trPanelItemsTitle(items.length)}</div>
@@ -618,7 +537,7 @@ function TransportPanel({
                   <>
                     <div
                       className="ledger"
-                      style={{ position: "relative", margin: "0 -6px" }}
+                      style={{ position: "relative" }}
                     >
                       {visibleItems.map((it) => (
                         <TransportItemRow
@@ -652,6 +571,15 @@ function TransportPanel({
                     ) : null}
                   </>
                 )}
+                {items.length > 0 ? (
+                  <div className="trp-total">
+                    <span>{c.trColTotal}</span>
+                    <b>
+                      {c.yenSym}
+                      {formatAdminYen(row.totalAmount, localeTag)}
+                    </b>
+                  </div>
+                ) : null}
                 {missingCount > 0 ? (
                   <div
                     className="locknote"
@@ -684,43 +612,14 @@ function TransportPanel({
                   </div>
                 </div>
               ) : (
-                <div className="pblock">
-                  <div className="permzone">
-                    <div className="permzone__h">
-                      <span className="permzone__ic">
-                        <Ic>
-                          <Shield />
-                        </Ic>
-                      </span>
-                      <div>
-                        <div className="permzone__t">{c.trPanelPermTitle}</div>
-                        <div className="permzone__s">{c.trPanelPermSub}</div>
-                      </div>
-                      <span className="permzone__role">
-                        <Ic>
-                          <Shield />
-                        </Ic>
-                        {c.panelPermRole}
-                      </span>
-                    </div>
-                    {row.status === "submitted" ? (
-                      <div className="permbtns">
-                        <button
-                          type="button"
-                          className="btn btn--ghost btn--sm"
-                          style={{ flex: 1 }}
-                          onClick={doReview}
-                          disabled={pending}
-                        >
-                          <Ic>
-                            <Pencil />
-                          </Ic>
-                          {pending ? c.trActionReviewing : c.trPanelBtnReview}
-                        </button>
-                      </div>
-                    ) : null}
+                row.status === "submitted" ? (
+                  <div className="pblock trp-review">
+                    <span>{c.trPanelPermSub}</span>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={doReview} disabled={pending}>
+                      {pending ? c.trActionReviewing : c.trPanelBtnReview}
+                    </button>
                   </div>
-                </div>
+                ) : null
               )}
             </>
           )}
@@ -775,38 +674,28 @@ function TransportPanel({
             <>
               <button
                 type="button"
+                className="btn trp-reject"
+                onClick={() => setModal("reject")}
+                disabled={pending || !report}
+              >
+                {pending ? c.trActionRejecting : c.trPanelBtnReject}
+              </button>
+              <button
+                type="button"
                 className="btn btn--ghost"
                 style={{ flex: 1 }}
                 onClick={() => setModal("requestFix")}
                 disabled={pending || !report}
               >
-                <Ic>
-                  <MessageSquare />
-                </Ic>
                 {pending ? c.trActionRequestingFix : c.trPanelBtnRequestFix}
               </button>
               <button
                 type="button"
-                className="btn btn--danger-ghost"
-                style={{ flex: 1 }}
-                onClick={() => setModal("reject")}
-                disabled={pending || !report}
-              >
-                <Ic>
-                  <Ban />
-                </Ic>
-                {pending ? c.trActionRejecting : c.trPanelBtnReject}
-              </button>
-              <button
-                type="button"
                 className="btn btn--ok"
-                style={{ flex: 1.3 }}
+                style={{ flex: 1.2 }}
                 onClick={() => setModal("approve")}
                 disabled={pending || !report}
               >
-                <Ic>
-                  <Check />
-                </Ic>
                 {pending ? c.trActionApproving : c.trPanelBtnApprove}
               </button>
             </>
@@ -891,66 +780,42 @@ function TransportItemRow({
   localeTag: string;
   onOpenImage: (url: string) => void;
 }) {
-  const isLinked = item.entryMode === "linked";
   const missing = item.imageCount === 0;
   const thumbs = item.imageUrls.slice(0, 2);
   const extra = item.imageUrls.length - thumbs.length;
   return (
-    <div className="qrow" style={{ cursor: "default" }}>
-      <span className={`qrow__ic ${isLinked ? "bg-info" : "bg-surf"}`}>
-        <Ic>{isLinked ? <Link2 /> : <Pencil />}</Ic>
+    <div className="trp-row">
+      <span className="trp-row__d">{shortMd(item.usageDate)}</span>
+      <span className="trp-row__b">
+        <span className="trp-row__t">{item.buildingLabel || item.contextSummary || "—"}</span>
+        {item.buildingLabel && item.contextSummary && item.contextSummary !== "—" ? <span className="trp-row__s">{item.contextSummary}</span> : null}
       </span>
-      <div className="qrow__b">
-        <div className="qrow__t">
-          <span className="mono">{fmtUsageDate(item.usageDate, localeTag)}</span>
-          {item.buildingLabel ? ` · ${item.buildingLabel}` : ""}
-        </div>
-        <div className="qrow__s">
-          {item.contextSummary}
-          <span className="sep" />
-          {isLinked ? c.trPanelLinkedTag : c.trPanelManualTag}
-          {missing ? (
-            <>
-              <span className="sep" />
-              <span style={{ color: "var(--warn)", fontWeight: 800 }}>{c.trPanelMissingTag}</span>
-            </>
+      {missing ? (
+        <span className="trp-row__miss">{c.trPanelMissingTag}</span>
+      ) : (
+        <span className="trthumbs">
+          {thumbs.map((u, i) => (
+            <button
+              key={i}
+              type="button"
+              className="trthumb"
+              onClick={() => onOpenImage(u)}
+              aria-label={c.trPanelEvidenceCount(item.imageCount)}
+            >
+              <Image src={u} alt="" width={28} height={28} />
+            </button>
+          ))}
+          {extra > 0 ? (
+            <button type="button" className="trthumb trthumb--more" onClick={() => onOpenImage(item.imageUrls[thumbs.length])}>
+              +{extra}
+            </button>
           ) : null}
-        </div>
-      </div>
-      <div className="qrow__meta" style={{ gap: 10 }}>
-        {missing ? (
-          <span className="trthumb trthumb--missing" title={c.trEvidenceMissing}>
-            <Receipt />
-          </span>
-        ) : (
-          <span className="trthumbs">
-            {thumbs.map((u, i) => (
-              <button
-                key={i}
-                type="button"
-                className="trthumb"
-                onClick={() => onOpenImage(u)}
-                aria-label={c.trPanelEvidenceCount(item.imageCount)}
-              >
-                <Image src={u} alt="" width={34} height={34} />
-              </button>
-            ))}
-            {extra > 0 ? (
-              <button
-                type="button"
-                className="trthumb trthumb--more"
-                onClick={() => onOpenImage(item.imageUrls[thumbs.length])}
-              >
-                +{extra}
-              </button>
-            ) : null}
-          </span>
-        )}
-        <span className="amt">
-          <span className="yen">{c.yenSym}</span>
-          {formatAdminYen(item.amountYen, localeTag)}
         </span>
-      </div>
+      )}
+      <b className="trp-row__v">
+        {c.yenSym}
+        {formatAdminYen(item.amountYen, localeTag)}
+      </b>
     </div>
   );
 }

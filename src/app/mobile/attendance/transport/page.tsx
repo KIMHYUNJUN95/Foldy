@@ -75,7 +75,7 @@ export default async function MobileTransportPage({
   const userName = session.user.name?.trim() || dict.attendance.userFallback;
 
   return (
-    <MobileShell activeItem="attendance" badges={navBadges} title={dict.transport.pageTitle}>
+    <MobileShell activeItem="attendance" badges={navBadges} title={dict.transport.pageTitle} wide>
       <TransportStatement
         locale={locale}
         userName={userName}

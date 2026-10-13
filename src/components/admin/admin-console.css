@@ -3185,3 +3185,22 @@
 .adm .panel .trp-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; padding-top: 14px; border-top: 1px solid #ebeaf0; }
 .adm .panel .trp-total span { font-size: 13px; color: #6b6878; }
 .adm .panel .trp-total b { font-size: 18px; font-weight: 700; color: #16141f; font-variant-numeric: tabular-nums; }
+
+/* 출근자 명단 — 날짜 제목 · 실시간 한 줄 · 숫자 넷 · 표 · 전화(2026-10-13 시안 AttRoster-PC) */
+.adm .ro-w .ro-head { margin-top: 4px; }
+.adm .ro-w .ro-date { font-size: 16px; font-weight: 700; color: #16141f; }
+.adm .ro-w .ro-live { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; font-size: 12px; color: #8b8898; }
+.adm .ro-w .ro-live i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; }
+.adm .ro-w .ro-v--now { color: #5a30cf; }
+.adm .ro-tbl th.r, .adm .ro-tbl td.r { text-align: right; }
+.adm .ro-tbl td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .ro-tbl .ro-st { font-weight: 600; white-space: nowrap; }
+.adm .ro-tbl .ro-st--work { color: #5a30cf; }
+.adm .ro-tbl .ro-st--rest { color: #a8641c; }
+.adm .ro-tbl .ro-st--done { color: #8b8898; font-weight: 500; }
+.adm .ro-tbl .ro-st--review { color: #c5282e; }
+.adm .ro-tbl .ro-st--void { color: #b4b1bf; font-weight: 500; }
+.adm .ro-tbl .ro-call { width: 56px; padding-right: 12px; text-align: right; }
+.adm .ro-tbl .ro-call a { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #f4f1fd; color: #5a30cf; }
+.adm .ro-tbl .ro-call a:hover { background: #ebe5fc; }
+.adm .ro-tbl .ro-call svg { width: 15px; height: 15px; }

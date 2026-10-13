@@ -2,7 +2,8 @@
 
 /**
  * AttendanceRoster — 매니저/오피스 역할 전용 일일 출근자 명단.
- * 주간 스트립 + 날짜 메타 + 직원 카드 리스트.
+ * 화이트 리디자인(2026-10-13, 시안 AttRosterM-Phone · Fold · Tablet): 제목 · 「오늘 n명 출근 · 실시간」 → ‹ 날짜 › · 오늘 →
+ * 상태 막대 + 범례 → 줄(이름 · 역할 · 현장 · 출근 → 퇴근 · 상태 · 전화). 태블릿 가로는 왼쪽 달력 · 요약 | 오른쪽 줄.
  * 날짜 변경 시 router.replace로 ?date= 파라미터를 업데이트해 서버 컴포넌트를 재실행.
  */
 
@@ -34,26 +35,6 @@ function fmtKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function startOfWeek(d: Date): Date {
-  const x = new Date(d);
-  x.setDate(x.getDate() - x.getDay()); // 일요일 기준
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-/** 오늘부터 최대 9주 전까지의 주 시작일 배열 */
-function buildWeeks(todayDate: Date): Date[] {
-  const cur = startOfWeek(todayDate);
-  const weeks: Date[] = [];
-  const s = new Date(cur);
-  s.setDate(cur.getDate() - 8 * 7);
-  while (s <= cur) {
-    weeks.push(new Date(s));
-    s.setDate(s.getDate() + 7);
-  }
-  return weeks;
-}
-
 function localeTag(locale: string): string {
   if (locale === "ko") return "ko-KR";
   if (locale === "ja") return "ja-JP";
@@ -79,51 +60,112 @@ function fmtDateMeta(d: Date, locale: string): string {
   }).format(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())));
 }
 
-// ─── 직원 행 ──────────────────────────────────────────────────────────────────
+// ─── 직원 줄 ──────────────────────────────────────────────────────────────────
 
-function RosterCard({ entry, copy }: { entry: RosterEntry; copy: ReturnType<typeof getDictionary>["attendance"] }) {
+const ORDER: RosterEntry["statusKey"][] = ["working", "on_break", "needs_review", "done", "void"];
+
+function RosterLine({ entry, copy }: { entry: RosterEntry; copy: ReturnType<typeof getDictionary>["attendance"] }) {
   const isActive = entry.statusKey === "working" || entry.statusKey === "on_break";
-  const isDone = entry.statusKey === "done";
   const canCall = isActive && !!entry.phoneNumber;
-  // 출근 중이면 출근 사이트, 퇴근 완료면 퇴근 사이트 표시
-  const displaySite = isDone ? entry.clockOutSiteName : entry.siteName;
-
-  const outCell = () => {
-    if (entry.clockOutTimeLabel) {
-      return <span className="tv">{entry.clockOutTimeLabel}</span>;
-    }
-    if (entry.isVoid) {
-      return <span className="dash">—</span>;
-    }
-    return (
-      <span className="working">
-        <span className="d" />
-        {copy.rosterStatusWorking}
-      </span>
-    );
-  };
-
+  const site = entry.statusKey === "done" && entry.clockOutSiteName ? entry.clockOutSiteName : entry.siteName;
+  const label =
+    entry.statusKey === "working"
+      ? copy.rosterStatusWorking
+      : entry.statusKey === "on_break"
+        ? copy.rosterStatusOnBreak
+        : entry.statusKey === "done"
+          ? copy.rosterDoneShort
+          : entry.statusKey === "needs_review"
+            ? copy.rosterStatusNeedsReview
+            : copy.rosterStatusVoid;
   return (
-    <div className={`rcard${entry.isVoid ? " void" : ""}`}>
-      <div className="rcard__av">{entry.avatarInitial}</div>
-      <div className="rcard__id">
-        <div className="rcard__name">{entry.name}</div>
-        <div className="rcard__role">{entry.role}</div>
-        {displaySite && <div className="rcard__site">{displaySite}</div>}
-      </div>
-      <div className="rcard__t inn">{entry.clockInTimeLabel}</div>
-      <div className="rcard__t outt">{outCell()}</div>
+    <div className={`ro-line is-${entry.statusKey}`}>
+      <span className="ro-line__av">{entry.avatarInitial}</span>
+      <span className="ro-line__b">
+        <span className="ro-line__t">
+          {entry.name} <small>{entry.role}</small>
+        </span>
+        <span className="ro-line__m">
+          {site ? `${site} · ` : ""}
+          {entry.clockInTimeLabel} → {entry.clockOutTimeLabel ?? ""}
+        </span>
+      </span>
+      <span className="ro-line__s">{label}</span>
       {canCall ? (
-        <a
-          href={`tel:${entry.phoneNumber}`}
-          className="rcard__call"
-          aria-label={`${entry.name} ${copy.rosterCallLabel}`}
-        >
+        <a href={`tel:${entry.phoneNumber}`} className="ro-line__call" aria-label={`${entry.name} ${copy.rosterCallLabel}`}>
           <AIc>{AttIcon.phone}</AIc>
         </a>
       ) : (
-        <div className="rcard__call-ph" />
+        <span className="ro-line__call is-empty" aria-hidden="true" />
       )}
+    </div>
+  );
+}
+
+/** 태블릿 가로 왼쪽 달력 — 월요일 시작, 오늘 이후는 고를 수 없음. */
+function MiniCal({
+  selected,
+  todayKey,
+  onSelect,
+  locale,
+  copy,
+}: {
+  selected: Date;
+  todayKey: string;
+  onSelect: (key: string) => void;
+  locale: string;
+  copy: ReturnType<typeof getDictionary>["attendance"];
+}) {
+  const [y, setY] = useState(selected.getFullYear());
+  const [m, setM] = useState(selected.getMonth());
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7;
+  const days = new Date(y, m + 1, 0).getDate();
+  const wd = new Intl.DateTimeFormat(localeTag(locale), { weekday: "short", timeZone: "UTC" });
+  const heads = Array.from({ length: 7 }, (_, i) => wd.format(new Date(Date.UTC(2024, 0, 1 + i))));
+  const title = new Intl.DateTimeFormat(localeTag(locale), { year: "numeric", month: "long" }).format(new Date(y, m, 1));
+  const canNext = fmtKey(new Date(y, m + 1, 1)) <= todayKey;
+  return (
+    <div className="ro-cal">
+      <div className="ro-cal__h">
+        <button type="button" aria-label={copy.monthPrev} onClick={() => (m === 0 ? (setM(11), setY(y - 1)) : setM(m - 1))}>
+          ‹
+        </button>
+        <b>{title}</b>
+        <button type="button" aria-label={copy.monthNext} disabled={!canNext} onClick={() => (m === 11 ? (setM(0), setY(y + 1)) : setM(m + 1))}>
+          ›
+        </button>
+        {fmtKey(selected) !== todayKey ? (
+          <button type="button" className="ro-cal__today" onClick={() => onSelect(todayKey)}>
+            {copy.rosterTodayTag}
+          </button>
+        ) : null}
+      </div>
+      <div className="ro-cal__g">
+        {heads.map((h, i) => (
+          <span key={h} className={`ro-cal__wd${i === 5 ? " is-sat" : i === 6 ? " is-sun" : ""}`}>
+            {h}
+          </span>
+        ))}
+        {Array.from({ length: lead }, (_, i) => (
+          <span key={`b${i}`} />
+        ))}
+        {Array.from({ length: days }, (_, i) => {
+          const k = fmtKey(new Date(y, m, i + 1));
+          const future = k > todayKey;
+          return (
+            <button
+              key={k}
+              type="button"
+              disabled={future}
+              aria-pressed={k === fmtKey(selected)}
+              className={`ro-cal__d${k === fmtKey(selected) ? " is-on" : ""}${k === todayKey ? " is-today" : ""}`}
+              onClick={() => onSelect(k)}
+            >
+              {i + 1}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -240,58 +282,6 @@ function CalendarSheet({ selectedDate, todayDate, hasDataDates, onSelect, onClos
   );
 }
 
-// ─── 주간 스트립 ──────────────────────────────────────────────────────────────
-
-type WeekStripProps = {
-  weeks: Date[];
-  selectedKey: string;
-  todayKey: string;
-  hasDataDates: Set<string>;
-  onSelect: (key: string) => void;
-  locale: string;
-};
-
-function WeekStrip({ weeks, selectedKey, todayKey, hasDataDates, onSelect, locale }: WeekStripProps) {
-  const dow = dowLabels(locale);
-  return (
-    <div className="week-scroller">
-      {weeks.map((weekStart, wi) => (
-        <div key={wi} className="week-page">
-          {Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(weekStart);
-            d.setDate(weekStart.getDate() + i);
-            const k = fmtKey(d);
-            const isFuture = k > todayKey;
-            const isSel = k === selectedKey;
-            const hasData = hasDataDates.has(k);
-            const cls = [
-              "week-day",
-              i === 0 ? "sun" : "",
-              isFuture ? "future" : "",
-              isSel ? "sel" : "",
-              hasData ? "has" : "",
-            ].filter(Boolean).join(" ");
-            return (
-              <button
-                key={k}
-                type="button"
-                className={cls}
-                disabled={isFuture}
-                onClick={() => !isFuture && onSelect(k)}
-                aria-label={k}
-                aria-pressed={isSel}
-              >
-                <span className="week-day__dow">{dow[d.getDay()]}</span>
-                <span className="week-day__num">{d.getDate()}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 
 export function AttendanceRoster({ rosterDay, operatingDate, todayDate, locale }: Props) {
@@ -301,80 +291,114 @@ export function AttendanceRoster({ rosterDay, operatingDate, todayDate, locale }
 
   const todayDateObj = useMemo(() => parseDate(todayDate), [todayDate]);
   const selectedDateObj = useMemo(() => parseDate(operatingDate), [operatingDate]);
-  const weeks = useMemo(() => buildWeeks(todayDateObj), [todayDateObj]);
 
-  // 데이터가 있는 날짜 Set — 현재 rosterDay만 갖고 있으므로 선택된 날만 dot 표시
   const hasDataDates = useMemo(() => {
-    const s = new Set<string>();
-    if (rosterDay.entries.length > 0) s.add(rosterDay.operatingDate);
-    return s;
+    const set = new Set<string>();
+    if (rosterDay.entries.length > 0) set.add(rosterDay.operatingDate);
+    return set;
   }, [rosterDay]);
 
   const navigateToDate = useCallback((dateKey: string) => {
     router.replace(`/mobile/attendance/roster?date=${dateKey}`);
   }, [router]);
-
-  const handleCalSelect = useCallback((date: Date) => {
-    navigateToDate(fmtKey(date));
-  }, [navigateToDate]);
+  const handleCalSelect = useCallback((date: Date) => navigateToDate(fmtKey(date)), [navigateToDate]);
+  const shiftDay = (n: number) => {
+    const d = new Date(selectedDateObj);
+    d.setDate(d.getDate() + n);
+    const k = fmtKey(d);
+    if (k <= todayDate) navigateToDate(k);
+  };
 
   const isToday = operatingDate === todayDate;
   const dateLabel = fmtDateMeta(selectedDateObj, locale);
+  const k = rosterDay.counts;
+  const total = Math.max(1, k.total);
+  const active = k.working + k.on_break;
+  const entries = [...rosterDay.entries].sort(
+    (a, b) => ORDER.indexOf(a.statusKey) - ORDER.indexOf(b.statusKey) || a.clockInTimeLabel.localeCompare(b.clockInTimeLabel),
+  );
+  const legend = [
+    { key: "work", label: copy.rosterStatusWorking, n: active },
+    { key: "done", label: copy.rosterDoneShort, n: k.done },
+    { key: "review", label: copy.rosterStatusNeedsReview, n: k.needs_review },
+    { key: "void", label: copy.rosterStatusVoid, n: k.void },
+  ];
 
   return (
-    <div className="att">
-      {/* 페이지 타이틀 + 캘린더 버튼 */}
-      <div className="roster-ttl">
-        <h1 style={{ fontSize: 23, fontWeight: 900, letterSpacing: "-0.03em", margin: 0 }}>
-          {copy.rosterPageTitle}
-          {isToday && (
-            <span className="roster-live">
-              <span className="pulse" />
-              {copy.rosterLiveLabel}
-            </span>
-          )}
-        </h1>
-        <button
-          type="button"
-          className="roster-calbtn"
-          aria-label={copy.rosterDateSelectLabel}
-          onClick={() => setCalOpen(true)}
-        >
-          <AIc>{AttIcon.calendar}</AIc>
-        </button>
+    <div className="att att--rosterw">
+      <div className="ro-left">
+        <div className="ptitle-row">
+          <div>
+            <h1 className="ptitle">{copy.rosterPageTitle}</h1>
+            <div className="ptitle__sub">
+              {(isToday ? copy.rosterSubToday : copy.rosterSubDay).replace("{n}", String(k.total))}
+              {isToday ? (
+                <span className="ro-live">
+                  {" · "}
+                  <i aria-hidden="true" />
+                  {copy.rosterLiveLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="ro-daterow">
+          <button type="button" className="ro-daterow__arrow" aria-label={copy.rosterPrevDay} onClick={() => shiftDay(-1)}>
+            <AIc>{AttIcon.back}</AIc>
+          </button>
+          <button type="button" className="ro-daterow__d" onClick={() => setCalOpen(true)} aria-label={copy.rosterDateSelectLabel}>
+            {dateLabel}
+            <AIc>{AttIcon.caret}</AIc>
+          </button>
+          <button
+            type="button"
+            className="ro-daterow__arrow is-next"
+            aria-label={copy.rosterNextDay}
+            disabled={isToday}
+            onClick={() => shiftDay(1)}
+          >
+            <AIc>{AttIcon.back}</AIc>
+          </button>
+          {!isToday ? (
+            <button type="button" className="ro-daterow__today" onClick={() => navigateToDate(todayDate)}>
+              {copy.rosterTodayTag}
+            </button>
+          ) : null}
+        </div>
+
+        <MiniCal selected={selectedDateObj} todayKey={todayDate} onSelect={navigateToDate} locale={locale} copy={copy} />
+
+        {k.total > 0 ? (
+          <div className="ro-sum">
+            <b className="ro-sum__d">{dateLabel}</b>
+            <div className="ro-bar" aria-hidden="true">
+              {active > 0 ? <i className="is-work" style={{ flex: active / total }} /> : null}
+              {k.done > 0 ? <i className="is-done" style={{ flex: k.done / total }} /> : null}
+              {k.needs_review > 0 ? <i className="is-review" style={{ flex: k.needs_review / total }} /> : null}
+              {k.void > 0 ? <i className="is-void" style={{ flex: k.void / total }} /> : null}
+            </div>
+            <div className="ro-legend">
+              {legend.map((l) => (
+                <span key={l.key} className={`is-${l.key}`}>
+                  <i aria-hidden="true" />
+                  {l.label}
+                  <b>{l.n}</b>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {/* 주간 스트립 */}
-      <WeekStrip
-        weeks={weeks}
-        selectedKey={operatingDate}
-        todayKey={todayDate}
-        hasDataDates={hasDataDates}
-        onSelect={navigateToDate}
-        locale={locale}
-      />
-
-      {/* 날짜 메타 행 */}
-      <div className="roster-datemeta">
-        <div className="roster-datemeta__d">
-          {dateLabel}
-          {isToday && <span className="todaytag">{copy.rosterTodayTag}</span>}
-        </div>
-        <div className="roster-datemeta__c">
-          <span className="cin">
-            <span className="cdot" style={{ background: "var(--work-dot)" }} />
-            {copy.rosterSummaryIn(rosterDay.counts.working + rosterDay.counts.on_break)}
-          </span>
-          <span className="cout">
-            <span className="cdot" style={{ background: "var(--out-col)" }} />
-            {copy.rosterSummaryOut(rosterDay.counts.done)}
-          </span>
-        </div>
-      </div>
-
-      {/* 직원 행 리스트 — 출근 중 / 퇴근 완료 섹션 분리 */}
-      <div style={{ marginTop: 8 }}>
-        {rosterDay.entries.length === 0 ? (
+      <div className="ro-right">
+        {k.total > 0 ? (
+          <div className="ro-right__h">
+            <b>{copy.rosterListTitle.replace("{date}", isToday ? copy.rosterTodayTag : dateLabel).replace("{n}", String(k.total))}</b>
+            <span>{copy.rosterActiveFirst}</span>
+          </div>
+        ) : null}
+        {entries.length === 0 ? (
           <div className="roster-empty">
             <div className="roster-empty__ic">
               <AIc>{AttIcon.clock}</AIc>
@@ -382,63 +406,9 @@ export function AttendanceRoster({ rosterDay, operatingDate, todayDate, locale }
             <div className="roster-empty__t">{copy.rosterNoEntries}</div>
             <div className="roster-empty__s">{copy.rosterNoEntriesSub}</div>
           </div>
-        ) : (() => {
-          const activeEntries = rosterDay.entries.filter(
-            (e) => e.statusKey === "working" || e.statusKey === "on_break",
-          );
-          const doneEntries = rosterDay.entries.filter((e) => e.statusKey === "done");
-          const otherEntries = rosterDay.entries.filter(
-            (e) => e.statusKey !== "working" && e.statusKey !== "on_break" && e.statusKey !== "done",
-          );
-          const colHead = (
-            <div className="roster-colhead">
-              <span className="rch-who">{copy.rosterColWho}</span>
-              <span className="rch-ci">{copy.rosterColIn}</span>
-              <span className="rch-co">{copy.rosterColOut}</span>
-              <span className="rch-sp" />
-            </div>
-          );
-          return (
-            // 넓은 화면(2026-10-05): 폴드부터 출근 중 · 퇴근 완료 섹션을 나란히(`.roster-sections`).
-            <div className="roster-sections">
-              {/* 출근 중 섹션 */}
-              {activeEntries.length > 0 && (
-                <div className="roster-section">
-                  <div className="roster-section__hd">
-                    <span className="cdot" style={{ background: "var(--work-dot)" }} />
-                    {copy.rosterSummaryIn(activeEntries.length)}
-                  </div>
-                  {colHead}
-                  {activeEntries.map((entry) => (
-                    <RosterCard key={entry.sessionId} entry={entry} copy={copy} />
-                  ))}
-                </div>
-              )}
-              {/* 퇴근 완료 섹션 */}
-              {doneEntries.length > 0 && (
-                <div className="roster-section">
-                  <div className="roster-section__hd">
-                    <span className="cdot" style={{ background: "var(--out-col)" }} />
-                    {copy.rosterSummaryOut(doneEntries.length)}
-                  </div>
-                  {colHead}
-                  {doneEntries.map((entry) => (
-                    <RosterCard key={entry.sessionId} entry={entry} copy={copy} />
-                  ))}
-                </div>
-              )}
-              {/* 검토 필요 / 무효 (기타) */}
-              {otherEntries.length > 0 && (
-                <div className="roster-section">
-                  {colHead}
-                  {otherEntries.map((entry) => (
-                    <RosterCard key={entry.sessionId} entry={entry} copy={copy} />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        ) : (
+          entries.map((entry) => <RosterLine key={entry.sessionId} entry={entry} copy={copy} />)
+        )}
       </div>
 
       {/* 날짜 선택 캘린더 BottomSheet */}

@@ -3694,3 +3694,77 @@
 @media (min-width: 1000px) and (min-height: 600px) {
   .att.att--corrst { max-width: 640px; }
 }
+
+/* 출근자 명단(모바일) 화이트 리디자인 — 날짜 줄 · 상태 막대 · 줄(2026-10-13 시안 AttRosterM-Phone · Fold · Tablet) */
+.att.att--rosterw .ro-live i { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: #7a52e6; vertical-align: 1px; }
+.att.att--rosterw .ro-daterow { display: flex; align-items: center; gap: 4px; margin-top: 16px; }
+.att.att--rosterw .ro-daterow__arrow { width: 36px; height: 36px; border: 0; border-radius: 10px; background: none; color: #3a3746; display: grid; place-items: center; cursor: pointer; }
+.att.att--rosterw .ro-daterow__arrow svg { width: 16px; height: 16px; }
+.att.att--rosterw .ro-daterow__arrow.is-next svg { transform: scaleX(-1); }
+.att.att--rosterw .ro-daterow__arrow:disabled { opacity: .3; cursor: default; }
+.att.att--rosterw .ro-daterow__d { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px; border: 0; background: none; font: inherit; font-size: 17px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.att.att--rosterw .ro-daterow__d svg { width: 12px; height: 12px; color: #8b8898; }
+.att.att--rosterw .ro-daterow__today { margin-left: auto; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: #f4f1fd; color: #5a30cf; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.att.att--rosterw .ro-cal { display: none; }
+.att.att--rosterw .ro-sum { margin-top: 14px; }
+.att.att--rosterw .ro-sum__d { display: none; }
+.att.att--rosterw .ro-bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
+.att.att--rosterw .ro-bar i { display: block; min-width: 6px; }
+.att.att--rosterw .ro-bar .is-work { background: #7a52e6; }
+.att.att--rosterw .ro-bar .is-done { background: #c9c6d3; }
+.att.att--rosterw .ro-bar .is-review { background: #e5484d; }
+.att.att--rosterw .ro-bar .is-void { background: #ebeaf0; }
+.att.att--rosterw .ro-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 13px; color: #3a3746; }
+.att.att--rosterw .ro-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.att.att--rosterw .ro-legend i { width: 7px; height: 7px; border-radius: 50%; }
+.att.att--rosterw .ro-legend b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.att.att--rosterw .ro-legend .is-work i { background: #7a52e6; } .att.att--rosterw .ro-legend .is-work b { color: #5a30cf; }
+.att.att--rosterw .ro-legend .is-done i { background: #c9c6d3; }
+.att.att--rosterw .ro-legend .is-review i { background: #e5484d; } .att.att--rosterw .ro-legend .is-review b { color: #c5282e; }
+.att.att--rosterw .ro-legend .is-void i { background: #ebeaf0; } .att.att--rosterw .ro-legend .is-void b { color: #8b8898; }
+.att.att--rosterw .ro-right { margin-top: 14px; }
+.att.att--rosterw .ro-right__h { display: none; }
+.att.att--rosterw .ro-line { display: flex; align-items: center; gap: 12px; min-height: 66px; border-top: 1px solid #f3f3f6; }
+.att.att--rosterw .ro-line__av { width: 38px; height: 38px; flex: none; border-radius: 50%; background: #f1ecfd; color: #5a30cf; font-size: 14px; font-weight: 700; display: grid; place-items: center; }
+.att.att--rosterw .ro-line__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.att.att--rosterw .ro-line__t { font-size: 15px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att.att--rosterw .ro-line__t small { font-size: 12px; font-weight: 500; color: #8b8898; }
+.att.att--rosterw .ro-line__m { font-family: var(--mono); font-size: 12px; color: #8b8898; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att.att--rosterw .ro-line__s { font-size: 13px; font-weight: 600; white-space: nowrap; color: #8b8898; }
+.att.att--rosterw .ro-line.is-working .ro-line__s { color: #5a30cf; }
+.att.att--rosterw .ro-line.is-on_break .ro-line__s { color: #a8641c; }
+.att.att--rosterw .ro-line.is-needs_review .ro-line__s { color: #c5282e; }
+.att.att--rosterw .ro-line.is-void { opacity: .55; }
+.att.att--rosterw .ro-line__call { width: 40px; height: 40px; flex: none; border-radius: 50%; background: #f4f1fd; color: #5a30cf; display: grid; place-items: center; }
+.att.att--rosterw .ro-line__call svg { width: 16px; height: 16px; }
+.att.att--rosterw .ro-line__call.is-empty { background: none; }
+.att.att--rosterw .ro-line__call:active { transform: scale(0.95); }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--rosterw { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 36px; align-items: start; }
+  .att.att--rosterw .ro-left { position: sticky; top: 12px; }
+  .att.att--rosterw .ro-daterow { display: none; }
+  .att.att--rosterw .ro-cal { display: block; margin-top: 18px; }
+  .att.att--rosterw .ro-cal__h { display: flex; align-items: center; gap: 10px; }
+  .att.att--rosterw .ro-cal__h b { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .att.att--rosterw .ro-cal__h button { width: 32px; height: 32px; border: 0; border-radius: 9px; background: none; font-size: 18px; color: #3a3746; cursor: pointer; }
+  .att.att--rosterw .ro-cal__h button:disabled { opacity: .3; cursor: default; }
+  .att.att--rosterw .ro-cal__h .ro-cal__today { width: auto; margin-left: auto; padding: 0 12px; background: #f4f1fd; color: #5a30cf; font-size: 13px; font-weight: 600; }
+  .att.att--rosterw .ro-cal__g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; margin-top: 10px; }
+  .att.att--rosterw .ro-cal__wd { text-align: center; font-size: 12px; color: #8b8898; padding: 6px 0; }
+  .att.att--rosterw .ro-cal__wd.is-sat { color: #2f6fde; }
+  .att.att--rosterw .ro-cal__wd.is-sun { color: #d8455a; }
+  .att.att--rosterw .ro-cal__d { justify-self: center; width: 38px; height: 38px; border: 0; border-radius: 11px; background: none; font: inherit; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; cursor: pointer; }
+  .att.att--rosterw .ro-cal__d:hover:not(:disabled) { background: #f4f1fd; }
+  .att.att--rosterw .ro-cal__d:disabled { color: #c9c6d3; cursor: default; }
+  .att.att--rosterw .ro-cal__d.is-today { font-weight: 700; }
+  .att.att--rosterw .ro-cal__d.is-on { background: #7a52e6; color: #fff; font-weight: 700; }
+  .att.att--rosterw .ro-sum { margin-top: 18px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+  .att.att--rosterw .ro-sum__d { display: block; margin-bottom: 10px; font-size: 15px; color: var(--ink); }
+  .att.att--rosterw .ro-legend { flex-direction: column; gap: 0; }
+  .att.att--rosterw .ro-legend span { justify-content: flex-start; min-height: 40px; }
+  .att.att--rosterw .ro-legend b { margin-left: auto; font-size: 16px; }
+  .att.att--rosterw .ro-right { margin-top: 0; }
+  .att.att--rosterw .ro-right__h { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0 10px; }
+  .att.att--rosterw .ro-right__h b { font-size: 17px; font-weight: 700; color: var(--ink); }
+  .att.att--rosterw .ro-right__h span { font-size: 12px; color: #8b8898; }
+}

@@ -71,7 +71,7 @@ export default async function AttendanceRosterPage({ searchParams }: PageProps) 
 
   return (
     // 넓은 화면(2026-10-05): 출근 중 · 퇴근 완료 섹션 나란히 — 태블릿 가로는 폭 전부(`.roster-sections`).
-    <MobileShell activeItem="attendance" badges={navBadges} split title={dict.attendance.rosterPageTitle}>
+    <MobileShell activeItem="attendance" badges={navBadges} wide title={dict.attendance.rosterPageTitle}>
       <AttendanceRoster
         rosterDay={rosterDay}
         operatingDate={operatingDate}

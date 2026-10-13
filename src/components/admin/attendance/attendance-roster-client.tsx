@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
-import {
-  AlertTriangle,
-  Clock,
-  FileText,
-  Users,
-} from "lucide-react";
+import { Clock, Phone } from "lucide-react";
+import { AdmDropdown } from "../shared/adm-dropdown";
 import { loadAdminAttendanceRoster } from "@/app/admin/attendance/roster/actions";
 import type { RosterDay, RosterEntry, RosterStatusKey } from "@/lib/attendance-roster";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
@@ -36,17 +32,6 @@ function parseDateKey(key: string): Date {
   return new Date(`${key}T00:00:00+09:00`);
 }
 
-function dateLabel(dateKey: string, localeTag: string): string {
-  const date = parseDateKey(dateKey);
-  return new Intl.DateTimeFormat(localeTag, {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  }).format(date);
-}
-
 function timeLabel(localeTag: string): string {
   return new Intl.DateTimeFormat(localeTag, {
     timeZone: "Asia/Tokyo",
@@ -68,175 +53,23 @@ function statusMeta(status: RosterStatusKey, c: Att): StatusMeta {
   return map[status];
 }
 
-function breakLabel(entry: RosterEntry, c: Att, nowMs: number): string {
-  // Total break minutes for the day = closed breaks + (current ongoing break so far).
-  let totalSeconds = entry.closedBreakSeconds;
+/** 휴게 칸 — 휴게 중이면 「11:30 –」(시작 시각), 끝난 휴게만 있으면 합계 「30분」, 없으면 —.
+ *  휴게마다의 시작 · 끝 시각은 명단 데이터에 없다(2026-10-13 시안 컨펌). */
+function breakCell(entry: RosterEntry, localeTag: string): string {
   if (entry.hasOpenBreak && entry.openBreakStartedAt) {
-    totalSeconds += Math.max(
-      0,
-      Math.floor((nowMs - new Date(entry.openBreakStartedAt).getTime()) / 1000),
+    const t = new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(
+      new Date(entry.openBreakStartedAt),
     );
+    return `${t} –`;
   }
-  if (entry.breakCount === 0 && !entry.hasOpenBreak) return c.rosterBreakNone;
-  // An ongoing break with no measurable elapsed time yet.
-  if (entry.hasOpenBreak && totalSeconds < 60) return c.rosterBreakOpen;
-  return c.rosterBreakElapsed(Math.floor(totalSeconds / 60));
+  if (entry.breakCount === 0) return "—";
+  return `${Math.round(entry.closedBreakSeconds / 60)}${minUnit(localeTag)}`;
+}
+function minUnit(localeTag: string): string {
+  return localeTag.startsWith("ja") ? "分" : localeTag.startsWith("en") ? "m" : "분";
 }
 
-function RosterRow({ entry, c, nowMs }: { entry: RosterEntry; c: Att; nowMs: number }) {
-  const meta = statusMeta(entry.statusKey, c);
-  const out = entry.clockOutTimeLabel ?? c.rosterNotClockedOut;
-  const site = entry.clockOutSiteName && entry.clockOutSiteName !== entry.siteName
-    ? `${entry.siteName} -> ${entry.clockOutSiteName}`
-    : entry.siteName || c.rosterSiteUnknown;
-
-  return (
-    <tr className={entry.statusKey === "needs_review" ? "flag" : undefined}>
-      <td>
-        <div className="rwho">
-          <span className="avatar rwho__av">{entry.avatarInitial}</span>
-          <div>
-            <div className="rwho__nm">{entry.name}</div>
-            <div className="rwho__role">
-              {entry.role} <span className="code">{entry.roleCode}</span>
-            </div>
-          </div>
-        </div>
-      </td>
-      <td>
-        <span className="rsite">{site}</span>
-        <span className="rsite_task">{c.rosterSessionCode(entry.sessionId.slice(0, 8))}</span>
-      </td>
-      <td>
-        <span className="rt-time">{entry.clockInTimeLabel}</span>
-      </td>
-      <td>
-        <span className={`rt-time${entry.clockOutTimeLabel ? "" : " none"}`}>{out}</span>
-      </td>
-      <td>
-        <span className={`rt-break${entry.breakCount === 0 && !entry.hasOpenBreak ? " none" : ""}`}>
-          {breakLabel(entry, c, nowMs)}
-        </span>
-      </td>
-      <td>
-        <span className={`rchip ${meta.cls}`}>
-          <span className={`d${meta.active ? " live-d" : ""}`} />
-          {meta.label}
-        </span>
-        {entry.statusKey === "needs_review" ? (
-          <div className="rt-note">
-            <Ic>
-              <AlertTriangle />
-            </Ic>
-            {c.rosterReviewNote}
-          </div>
-        ) : null}
-      </td>
-    </tr>
-  );
-}
-
-function Summary({ rosterDay, c }: { rosterDay: RosterDay; c: Att }) {
-  const cells: Array<{ status: RosterStatusKey; n: number }> = [
-    { status: "working", n: rosterDay.counts.working },
-    { status: "on_break", n: rosterDay.counts.on_break },
-    { status: "needs_review", n: rosterDay.counts.needs_review },
-    { status: "done", n: rosterDay.counts.done },
-    { status: "void", n: rosterDay.counts.void },
-  ];
-  return (
-    <div className="rsum">
-      <div className="rsum__total">
-        <Ic>
-          <Users />
-        </Ic>
-        <div>
-          <span className="n">
-            {rosterDay.counts.total}
-            <small>{c.unitPeople}</small>
-          </span>
-          <span className="k">{c.rosterTotalPeople}</span>
-        </div>
-      </div>
-      {cells.map((cell) => {
-        const meta = statusMeta(cell.status, c);
-        return (
-          <div key={cell.status} className="rsum__cell">
-            <span className="rsum__n">
-              {cell.n}
-              <small>{cell.status === "needs_review" || cell.status === "void" ? c.unitCount : c.unitPeople}</small>
-            </span>
-            <span className="rsum__lab">
-              <span className="d" style={{ background: `var(${meta.dotVar})` }} />
-              {meta.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function RosterTable({ rosterDay, c, nowMs }: { rosterDay: RosterDay; c: Att; nowMs: number }) {
-  const order: RosterStatusKey[] = ["working", "on_break", "needs_review", "done", "void"];
-  return (
-    <div className="card" style={{ overflow: "hidden" }}>
-      <table className="rtbl">
-        <thead>
-          <tr>
-            <th style={{ paddingLeft: 16 }}>{c.rosterColWho}</th>
-            <th>{c.rosterColSiteTask}</th>
-            <th>{c.rosterColIn}</th>
-            <th>{c.rosterColOut}</th>
-            <th>{c.rosterColBreak}</th>
-            <th>{c.rosterColStatus}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.map((status) => {
-            const rows = rosterDay.entries.filter((entry) => entry.statusKey === status);
-            if (rows.length === 0) return null;
-            const meta = statusMeta(status, c);
-            return (
-              <FragmentGroup key={status} label={meta.label} count={rows.length} dotVar={meta.dotVar}>
-                {rows.map((entry) => (
-                  <RosterRow key={entry.sessionId} entry={entry} c={c} nowMs={nowMs} />
-                ))}
-              </FragmentGroup>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function FragmentGroup({
-  label,
-  count,
-  dotVar,
-  children,
-}: {
-  label: string;
-  count: number;
-  dotVar: string;
-  children: ReactNode;
-}) {
-  return (
-    <>
-      <tr className="grouphd">
-        <td colSpan={6}>
-          <div className="grouphd__l">
-            <span className="d" style={{ background: `var(${dotVar})` }} />
-            {label}
-            <span className="n">{count}</span>
-          </div>
-        </td>
-      </tr>
-      {children}
-    </>
-  );
-}
+const STATUS_ORDER: RosterStatusKey[] = ["working", "on_break", "needs_review", "done", "void"];
 
 export function AttendanceRosterClient({
   initialRosterDay,
@@ -252,10 +85,15 @@ export function AttendanceRosterClient({
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  const selectedLabel = useMemo(
-    () => dateLabel(rosterDay.operatingDate, localeTag),
+  const shortDate = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" }).format(
+        parseDateKey(rosterDay.operatingDate),
+      ),
     [localeTag, rosterDay.operatingDate],
   );
+  const [siteFilter, setSiteFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const isToday = rosterDay.operatingDate === todayDate;
 
   const refreshCurrentDate = useCallback(
@@ -292,55 +130,163 @@ export function AttendanceRosterClient({
   }, [isToday, localeTag]);
 
   const empty = rosterDay.entries.length === 0;
+  const sites = Array.from(new Set(rosterDay.entries.map((e) => e.siteName || c.rosterSiteUnknown))).sort();
+  const rows = rosterDay.entries
+    .filter((e) => siteFilter === "all" || (e.siteName || c.rosterSiteUnknown) === siteFilter)
+    .filter((e) => statusFilter === "all" || e.statusKey === statusFilter)
+    .sort((x, y) => STATUS_ORDER.indexOf(x.statusKey) - STATUS_ORDER.indexOf(y.statusKey) || x.clockInTimeLabel.localeCompare(y.clockInTimeLabel));
+  const k = rosterDay.counts;
+  void nowMs;
 
+  // 화이트 리디자인(2026-10-13, 시안 AttRoster-PC): 날짜 제목 + 실시간 한 줄 · 근무지 · 상태 고르기 → 숫자 넷(근무 중 · 퇴근 완료 ·
+  // 검토 필요 · 무효 세션) → 표(직원 · 근무지 · 출근 · 퇴근 · 휴게 · 상태 · 전화). 날짜 고르기는 근태 탭 줄의 공용 피커 그대로.
   return (
-    <div className="aroster">
-      <div className="roster-livebar">
-        <div className="roster-date-title">{selectedLabel}</div>
+    <div className="aroster ro-w">
+      <div className="toolbar ro-head">
+        <b className="ro-date">{shortDate}</b>
         {isToday ? (
-          <span className="liveflag">
-            <span className="pulse" />
-            {c.rosterLiveUpdated(liveTime)}
+          <span className="ro-live">
+            <i aria-hidden="true" />
+            {c.rosterLiveLine.replace("{t}", liveTime.slice(0, 5))}
           </span>
         ) : (
-          <span className="readflag">
-            <Ic>
-              <FileText />
-            </Ic>
-            {c.rosterReadOnly}
-          </span>
+          <span className="ro-live is-past">{c.rosterReadOnly}</span>
         )}
+        <span className="toolbar__spacer" />
+        {!empty ? (
+          <>
+            <AdmDropdown
+              size="sm"
+              ariaLabel={c.rosterAllSites}
+              value={siteFilter}
+              onChange={setSiteFilter}
+              options={[{ value: "all", label: c.rosterAllSites }, ...sites.map((x) => ({ value: x, label: x }))]}
+            />
+            <AdmDropdown
+              size="sm"
+              ariaLabel={c.rosterAllStatus}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "all", label: c.rosterAllStatus },
+                ...STATUS_ORDER.map((st) => ({ value: st, label: statusMeta(st, c).label })),
+              ]}
+            />
+          </>
+        ) : null}
       </div>
 
       {error ? <div className="privnote">{error}</div> : null}
 
       {empty ? (
-        <div className="card">
-          <div className="rstate">
-            <span className="rstate__ic">
-              <Ic>
-                <Clock />
-              </Ic>
-            </span>
-            <div className="rstate__t">{c.rosterNoEntries}</div>
-            <div className="rstate__s">{c.rosterNoEntriesSub}</div>
-            <div className="rstate__act">
+        <div className="state">
+          <span className="state__ic empty">
+            <Ic>
+              <Clock />
+            </Ic>
+          </span>
+          <div className="state__t">{c.rosterNoEntries}</div>
+          <div className="state__s">{c.rosterNoEntriesSub}</div>
+          {!isToday ? (
+            <div style={{ marginTop: 14 }}>
               <a className="btn btn--pri" href={`?date=${todayDate}`}>
                 {c.rosterGoToday}
               </a>
             </div>
-          </div>
+          ) : null}
         </div>
       ) : (
         <>
-          <Summary rosterDay={rosterDay} c={c} />
-          <RosterTable rosterDay={rosterDay} c={c} nowMs={nowMs} />
-          <p className="roster-footnote">
-            <Ic>
-              <FileText />
-            </Ic>
-            {c.rosterReadonlyFootnote}
-          </p>
+          <div className="wkpis" style={{ marginTop: 6 }}>
+            <div className="wkpi">
+              <span className="wkpi__k">{c.rosterStatusWorking}</span>
+              <span className="wkpi__v ro-v--now">
+                {k.working + k.on_break}
+                <small>{c.unitPeople}</small>
+              </span>
+              <span className="wkpi__d">{k.on_break > 0 ? c.rosterKpiWorkingSub.replace("{n}", String(k.on_break)) : "\u00a0"}</span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{c.rosterStatusDone}</span>
+              <span className="wkpi__v">
+                {k.done}
+                <small>{c.unitPeople}</small>
+              </span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{c.rosterStatusNeedsReview}</span>
+              <span className={`wkpi__v${k.needs_review > 0 ? " is-danger" : ""}`}>
+                {k.needs_review}
+                <small>{c.unitPeople}</small>
+              </span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{c.rosterKpiVoid}</span>
+              <span className="wkpi__v">
+                {k.void}
+                <small>{c.unitCount}</small>
+              </span>
+            </div>
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="state">
+              <div className="state__s">{c.rosterFilterEmpty}</div>
+            </div>
+          ) : (
+            <table className="qtbl ro-tbl">
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: 16 }}>{c.rosterColWho}</th>
+                  <th>{c.rosterColSite}</th>
+                  <th className="r">{c.rosterColIn}</th>
+                  <th className="r">{c.rosterColOut}</th>
+                  <th className="r">{c.rosterColBreak}</th>
+                  <th className="r">{c.rosterColStatus}</th>
+                  <th aria-hidden="true" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((e) => {
+                  const meta = statusMeta(e.statusKey, c);
+                  const site =
+                    e.clockOutSiteName && e.clockOutSiteName !== e.siteName
+                      ? `${e.siteName} → ${e.clockOutSiteName}`
+                      : e.siteName || c.rosterSiteUnknown;
+                  const canCall = !!meta.active && !!e.phoneNumber;
+                  return (
+                    <tr key={e.sessionId}>
+                      <td style={{ paddingLeft: 16 }}>
+                        <div className="who">
+                          <span className="uhead__av" style={{ width: 32, height: 32 }}>
+                            {e.avatarInitial}
+                          </span>
+                          <div>
+                            <div className="who__nm">{e.name}</div>
+                            <div className="who__sub">{e.role}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{site}</td>
+                      <td className="r num">{e.clockInTimeLabel}</td>
+                      <td className="r num">{e.clockOutTimeLabel ?? <span className="dim-cell">—</span>}</td>
+                      <td className="r num">{breakCell(e, localeTag)}</td>
+                      <td className="r">
+                        <span className={`ro-st ro-st--${meta.cls}`}>{meta.label}</span>
+                      </td>
+                      <td className="ro-call">
+                        {canCall ? (
+                          <a href={`tel:${e.phoneNumber}`} aria-label={c.rosterCallLabel} title={c.rosterCallLabel}>
+                            <Phone />
+                          </a>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </>
       )}
     </div>

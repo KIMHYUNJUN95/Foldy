@@ -171,6 +171,9 @@
 .adm .lfw-viewbar { flex-wrap: wrap; row-gap: 8px; }
 .adm .lfw-viewbar__sp { flex: 1; }
 .adm .lfw-viewbar .dd > button { border: 0; background: transparent; box-shadow: none; }
+/* 고르기는 보기 줄 오른쪽에 붙어 있어서 메뉴를 오른쪽 끝에 맞춰 왼쪽으로 연다(화면 밖으로 잘리지 않게). */
+/* 공용 `.adm .dd:has(.dd__btn--sm) .dd__menu { right: auto }` 보다 강해야 해서 :has 까지 같이 건다. */
+.adm .lfw-viewbar .dd:has(.dd__btn--sm) .dd__menu, .adm .lfw-viewbar .dd .dd__menu { left: auto; right: 0; width: max-content; min-width: max(100%, 160px); max-width: 280px; transform-origin: top right; }
 .adm .lfw-viewbar .datepick { border: 0; background: transparent; padding: 0 8px; font-size: 14px; font-weight: 600; color: #16141f; }
 .adm .lfw-viewbar .datepick:hover { background: #f4f4f7; }
 .adm .lfw-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 14px 0 18px; }

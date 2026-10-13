@@ -3768,3 +3768,70 @@
   .att.att--rosterw .ro-right__h b { font-size: 17px; font-weight: 700; color: var(--ink); }
   .att.att--rosterw .ro-right__h span { font-size: 12px; color: #8b8898; }
 }
+
+/* 출근 QR 화이트 리디자인 — 화면 전체 어두운 스캔 · 사각 구멍 · 코너 맥박 · 잠금 · 체크 그리기(2026-10-13 시안 AttQR*) */
+.att.capw { position: fixed; inset: 0; z-index: 90; overflow: hidden; background: #0e0d13; color: #fff; display: flex; flex-direction: column; align-items: center; padding: max(56px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); }
+.att.capw .capw__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.att.capw .capw__top { position: relative; z-index: 2; text-align: center; }
+.att.capw .capw__top h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+.att.capw .capw__top p { margin: 6px 0 0; font-size: 13px; color: rgba(255,255,255,.66); max-width: 320px; }
+.att.capw .capw__frame { position: relative; z-index: 1; width: min(250px, 66vw); aspect-ratio: 1; margin: auto 0 0; border-radius: 22px;
+  box-shadow: 0 0 0 200vmax rgba(14, 13, 19, .62); transition: transform 260ms cubic-bezier(.23,1,.32,1); }
+.att.capw .capw__c { position: absolute; width: 46px; height: 46px; border: 0 solid #fff; transition: border-color 200ms ease, transform 260ms cubic-bezier(.23,1,.32,1); animation: capw-breathe 2.4s ease-in-out infinite; }
+.att.capw .capw__c.tl { top: 0; left: 0; border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 18px; --tx: -3px; --ty: -3px; }
+.att.capw .capw__c.tr { top: 0; right: 0; border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 18px; --tx: 3px; --ty: -3px; }
+.att.capw .capw__c.bl { bottom: 0; left: 0; border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 18px; --tx: -3px; --ty: 3px; }
+.att.capw .capw__c.br { bottom: 0; right: 0; border-bottom-width: 4px; border-right-width: 4px; border-bottom-right-radius: 18px; --tx: 3px; --ty: 3px; }
+@keyframes capw-breathe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(var(--tx), var(--ty)); } }
+.att.capw .capw__frame.is-locked { transform: scale(.94); }
+.att.capw .capw__frame.is-locked .capw__c { border-color: #b9a0fa; animation: none; }
+.att.capw .capw__frame.is-idle .capw__c { animation: none; opacity: .5; }
+.att.capw .capw__line { position: absolute; left: 16px; right: 16px; top: 16px; height: 2px; border-radius: 2px; background: #b9a0fa; box-shadow: 0 0 14px #8a63f0; animation: capw-scan 2.2s cubic-bezier(.77,0,.175,1) infinite alternate; }
+@keyframes capw-scan { from { transform: translateY(0); } to { transform: translateY(calc(min(250px, 66vw) - 34px)); } }
+.att.capw .capw__gps { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 8px; height: 36px; margin-top: 26px; padding: 0 14px; border-radius: 18px; background: rgba(255,255,255,.12); font-size: 13px; color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.att.capw .capw__gps i { width: 7px; height: 7px; border-radius: 50%; background: #f5b83d; transition: background 200ms ease; }
+.att.capw .capw__gps.is-ok i { background: #22a06b; box-shadow: 0 0 0 4px rgba(34,160,107,.25); }
+.att.capw .capw__gps.is-wait i { animation: capw-blink 1s ease-in-out infinite; }
+.att.capw .capw__gps.is-bad i { background: #e5484d; }
+@keyframes capw-blink { 50% { opacity: .3; } }
+.att.capw .capw__retry { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 6px; height: 40px; margin-top: 14px; padding: 0 16px; border: 0; border-radius: 20px; background: #fff; color: #16141f; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.att.capw .capw__retry svg { width: 16px; height: 16px; }
+.att.capw .capw__retry:active, .att .capw-btn:active { transform: scale(.97); }
+.att.capw .capw__link { position: relative; z-index: 2; margin: auto 0 0; padding: 10px; font-size: 14px; font-weight: 600; color: #6b6878; text-decoration: none; }
+.att.capw .capw__link--dark { color: rgba(255,255,255,.7); }
+.att .capw-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 50px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; transition: transform 140ms ease, background 150ms ease; }
+.att .capw-btn:disabled { opacity: .6; }
+.att .capw-btn--ghost { background: #f4f4f7; color: #3a3746; }
+/* 현장 QR 로 열었을 때 — 아래 흰 판 */
+.att.capw--land .capw__frame { margin-top: auto; }
+.att.capw--land .capw__panel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 20px max(24px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; background: #fff; color: #16141f; text-align: center; animation: capw-up 320ms cubic-bezier(.32,.72,0,1) both; }
+.att.capw--land .capw__panel-k { font-size: 13px; color: #8b8898; }
+.att.capw--land .capw__panel-t { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.att.capw--land .capw__panel-s { font-size: 12px; color: #8b8898; }
+.att.capw--land .capw__duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 4px; }
+.att.capw--land .capw__link { margin: 0; }
+@keyframes capw-up { from { transform: translateY(100%); } to { transform: none; } }
+/* 결과 시트 */
+.att .capr { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 4px 4px; text-align: center; }
+.att .capr__ic { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; animation: capr-pop 420ms cubic-bezier(.23,1,.32,1) both; }
+.att .capr__ic.is-ok { background: #f1ecfd; color: #7a52e6; }
+.att .capr__ic.is-bad { background: #fdecec; color: #e5484d; animation: capr-pop 420ms cubic-bezier(.23,1,.32,1) both, capr-shake 360ms 300ms ease both; }
+.att .capr__ic.is-warn { background: #fdf3e2; color: #b7791f; }
+.att .capr__check { stroke-dasharray: 24; stroke-dashoffset: 24; animation: capr-draw 420ms 180ms cubic-bezier(.65,0,.35,1) forwards; }
+@keyframes capr-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes capr-draw { to { stroke-dashoffset: 0; } }
+@keyframes capr-shake { 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+.att .capr__t { margin: 4px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.att .capr__s { margin: 0; font-size: 14px; line-height: 1.5; color: #6b6878; }
+.att .capr .capw-btn { margin-top: 10px; }
+.att .capr .capw__link { margin: 0; color: #6b6878; padding: 6px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.capw--land .capw__panel { left: 50%; right: auto; width: 560px; transform: translateX(-50%); animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .att.capw .capw__c, .att.capw .capw__line, .att.capw .capw__gps i, .att .capr__ic, .att .capr__check, .att.capw--land .capw__panel { animation: none !important; }
+  .att .capr__check { stroke-dashoffset: 0; }
+}
+.att.capw .capw__x { position: absolute; z-index: 4; top: max(12px, env(safe-area-inset-top)); left: 12px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fff; cursor: pointer; transition: transform 140ms ease, background 150ms ease; }
+.att.capw .capw__x:hover { background: rgba(255,255,255,.18); }
+.att.capw .capw__x:active { transform: scale(.94); }

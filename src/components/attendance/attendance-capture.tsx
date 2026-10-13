@@ -18,7 +18,8 @@
  * direction, so the staff member picks 출근/퇴근 here and we submit that token directly.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import jsQR from "jsqr";
@@ -33,6 +34,7 @@ import {
 import { extractAttendanceToken } from "@/lib/attendance-qr";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { hasNativePlugin } from "@/lib/native-app";
+import { haptic } from "@/lib/haptics";
 
 type AttendanceCopy = Dictionary["attendance"];
 
@@ -106,6 +108,11 @@ export function AttendanceCapture({
 }) {
   const copy = getDictionary(locale).attendance;
   const router = useRouter();
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const [phase, setPhase] = useState<Phase>(qrToken ? "landing" : "scanning");
   const [result, setResult] = useState<AttendanceScanResult | null>(null);
@@ -144,6 +151,7 @@ export function AttendanceCapture({
       submittedRef.current = true;
       setActiveMode(submitMode);
       stopCamera();
+      haptic("light");
       setPhase("submitting");
       let g = gpsRef.current;
       if (!g) {
@@ -156,6 +164,7 @@ export function AttendanceCapture({
           ? { mode: submitMode, token, latitude: g.lat, longitude: g.lng, accuracy: g.acc, gpsError: null, userAgent }
           : { mode: submitMode, token, latitude: null, longitude: null, accuracy: null, gpsError: g.error, userAgent },
       );
+      haptic(res.ok ? "success" : "error");
       setResult(res);
       setPhase("result");
     },
@@ -242,6 +251,18 @@ export function AttendanceCapture({
   }, [phase]);
 
   const goHome = useCallback(() => router.push("/mobile/attendance"), [router]);
+  const leave = useCallback(() => {
+    if (window.history.length > 1) router.back();
+    else router.push("/mobile/attendance");
+  }, [router]);
+  // Esc(안드로이드 뒤로가기 포함) — 결과 시트가 열려 있으면 시트가 먼저 닫힌다(BottomSheet 가 처리).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && phase !== "result") leave();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, leave]);
   const retry = useCallback(() => {
     setCameraError(false);
     setGpsStatus("pending");
@@ -272,181 +293,119 @@ export function AttendanceCapture({
       ? copy.captureHintSubmitting
       : copy.captureHintScan;
 
+  // 화이트 리디자인(2026-10-13, 시안 AttQR-Phone · Fold · Tablet · AttQRFail · AttQRLand): 화면 전체 어두운 스캔 —
+  // 카메라 위 어두운 막에 사각 구멍(코너 맥박 · 스캔선), 아래 GPS 알약, 결과는 흰 시트. QR 을 잡으면 코너가 보라로
+  // 조여지고(잠금) 짧은 진동, 성공이면 체크가 그려진다. 방식 카드(Wi-Fi 준비중) · 1/2 단계 표시는 뺐다.
+  const gpsTone = gpsStatus === "ok" ? "ok" : gpsStatus === "pending" ? "wait" : "bad";
+  const resultSheet =
+    phase === "result" && result ? (
+      <BottomSheet ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle} className="att att__result-sheet capw-sheet" onClose={onDismiss}>
+        <ResultSheet result={result} isOut={isOut} onHome={goHome} onRetry={retry} copy={copy} />
+      </BottomSheet>
+    ) : null;
+
+  // 화면 전체(레일 · 사이드바 위)를 덮도록 <body> 로 띄운다 — 셸 안의 transform 이 position: fixed 를 가두기 때문.
+  const toBody = (node: React.ReactNode) => (hydrated ? createPortal(node, document.body) : null);
+  // 위층에 떠 있어 화면 스와이프 뒤로가기가 닿지 않는다 — 사진 뷰어처럼 × · Esc · 안드로이드 뒤로가기(Esc 로 들어옴)로 나간다.
+  const closeLabel = getDictionary(locale).common.close;
+  const exit = (
+    <button type="button" className="capw__x" aria-label={closeLabel} onClick={leave}>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  );
+
   // ── QR deep link landing: pick 출근 / 퇴근 for the building we just scanned ──
   if (isQrLanding) {
     const submitting = phase === "submitting";
     const unusable = qrSiteName === null;
-    return (
-      <div className="att">
-        <div className="caphead">
-          <span className="capttl">
-            {unusable ? copy.qrLandingInvalidTitle : copy.qrLandingTitle}
-          </span>
+    return toBody(
+      <div className="att capw capw--land" data-native-back-overlay="">
+        {exit}
+        <div className="capw__top">
+          <h1>{unusable ? copy.qrLandingInvalidTitle : copy.landingRead}</h1>
+          <p>{unusable ? copy.qrLandingInvalidSub : copy.landingSite.replace("{site}", qrSiteName ?? "")}</p>
+        </div>
+        <div className="capw__frame is-idle" aria-hidden="true">
+          <span className="capw__c tl" />
+          <span className="capw__c tr" />
+          <span className="capw__c bl" />
+          <span className="capw__c br" />
+        </div>
+        <div className={`capw__gps is-${gpsTone}`}>
+          <i aria-hidden="true" />
+          {gpsText}
         </div>
 
-        <p className="caplead">{unusable ? copy.qrLandingInvalidSub : copy.qrLandingSub}</p>
-
-        {unusable ? null : (
-          <div className="recap">
-            <div className="recap__r">
-              <span className="recap__k">
-                <AIc>{AttIcon.pin}</AIc>
-                {copy.resultSiteLabel}
-              </span>
-              <span className="recap__v">{qrSiteName}</span>
-            </div>
-            <div className="recap__r">
-              <span className="recap__k">
-                <AIc>{AttIcon.pin}</AIc>GPS
-              </span>
-              <span className="recap__v">{gpsText}</span>
-            </div>
-            {trustedDeviceName ? (
-              <div className="recap__r">
-                <span className="recap__k">
-                  <AIc>{AttIcon.checkc}</AIc>
-                  {copy.resultAuthLabel}
-                </span>
-                <span className="recap__v">
-                  {copy.qrLandingRememberedAs.replace("{name}", trustedDeviceName)}
-                </span>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {trustedDeviceName && !unusable ? (
-          <p className="caplead" style={{ marginTop: "-8px" }}>
-            {copy.qrLandingRememberedHint}
-          </p>
-        ) : null}
-
-        {unusable ? (
-          <div className="rbtns">
-            <Link href="/mobile/attendance/capture?mode=in" className="rbtn rbtn--primary">
-              <AIc>{AttIcon.qr}</AIc>
+        <div className="capw__panel">
+          {unusable ? (
+            <Link href="/mobile/attendance/capture?mode=in" className="capw-btn">
               {copy.qrLandingScanInstead}
             </Link>
-          </div>
-        ) : (
-          <div className="rbtns">
-            <button
-              type="button"
-              className="rbtn rbtn--primary"
-              disabled={submitting}
-              onClick={() => void submit(qrToken, "in")}
-            >
-              {copy.qrLandingIn}
-            </button>
-            <button
-              type="button"
-              className="rbtn rbtn--retry"
-              disabled={submitting}
-              onClick={() => void submit(qrToken, "out")}
-            >
-              {copy.qrLandingOut}
-            </button>
-          </div>
-        )}
-
-        <Link href="/mobile/attendance/correction" className="breakbtn" style={{ marginTop: "14px" }}>
-          <AIc>{AttIcon.edit}</AIc>
-          {copy.captureNoQr}
-        </Link>
-
-        {phase === "result" && result ? (
-          <BottomSheet
-            ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle}
-            className="att att__result-sheet"
-            onClose={onDismiss}
-          >
-            <ResultSheet result={result} isOut={isOut} onHome={goHome} onRetry={retry} copy={copy} />
-          </BottomSheet>
-        ) : null}
-      </div>
+          ) : (
+            <>
+              <span className="capw__panel-k">{copy.landingSite.replace("{site}", qrSiteName ?? "")}</span>
+              <b className="capw__panel-t">{copy.landingAsk}</b>
+              {trustedDeviceName ? (
+                <span className="capw__panel-s">{copy.qrLandingRememberedAs.replace("{name}", trustedDeviceName)}</span>
+              ) : null}
+              <div className="capw__duo">
+                <button type="button" className="capw-btn" disabled={submitting} onClick={() => void submit(qrToken, "in")}>
+                  {copy.landingIn}
+                </button>
+                <button type="button" className="capw-btn capw-btn--ghost" disabled={submitting} onClick={() => void submit(qrToken, "out")}>
+                  {copy.landingOut}
+                </button>
+              </div>
+              {trustedDeviceName ? <span className="capw__panel-s">{copy.qrLandingRememberedHint}</span> : null}
+            </>
+          )}
+          <Link href="/mobile/attendance/correction" className="capw__link">
+            {copy.scanNoQr} ›
+          </Link>
+        </div>
+        {resultSheet}
+      </div>,
     );
   }
 
-  return (
-    <div className="att">
-      <div className="caphead">
-        <span className="capttl">{isOut ? copy.captureOutTitle : copy.captureInTitle}</span>
-        <span className="capstep">{copy.captureStep}</span>
-      </div>
-
-      <div className="scanview">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            borderRadius: "inherit",
-          }}
-        />
-        <div className="gpschip">
-          <AIc>{AttIcon.pin}</AIc>
-          <span className="dot" />
-          {gpsText}
-        </div>
-        <div className="scanframe">
-          <span className="scancorner tl" />
-          <span className="scancorner tr" />
-          <span className="scancorner bl" />
-          <span className="scancorner br" />
-          <div className="scanline" />
-        </div>
-        <div className="scanhint">{scanHint}</div>
-      </div>
+  const locked = phase === "submitting" || phase === "result";
+  return toBody(
+    <div className="att capw" data-native-back-overlay="">
+      {exit}
+      <video ref={videoRef} playsInline muted className="capw__video" />
       <canvas ref={canvasRef} style={{ display: "none" }} />
-
+      <div className="capw__top">
+        <h1>{isOut ? copy.scanTitleOut : copy.scanTitleIn}</h1>
+        <p>{scanHint}</p>
+      </div>
+      <div className={`capw__frame${locked ? " is-locked" : ""}${cameraError ? " is-idle" : ""}`} aria-hidden="true">
+        <span className="capw__c tl" />
+        <span className="capw__c tr" />
+        <span className="capw__c bl" />
+        <span className="capw__c br" />
+        {cameraError || locked ? null : <i className="capw__line" />}
+      </div>
+      <div className={`capw__gps is-${gpsTone}`}>
+        <i aria-hidden="true" />
+        {gpsText}
+      </div>
       {cameraError ? (
-        <button type="button" className="breakbtn" style={{ marginTop: "12px" }} onClick={retryCamera}>
-          <AIc>{AttIcon.refresh}</AIc>{copy.captureRetryCamera}
+        <button type="button" className="capw__retry" onClick={retryCamera}>
+          <AIc>{AttIcon.refresh}</AIc>
+          {copy.captureRetryCamera}
         </button>
       ) : null}
-
-      <div className="methods">
-        <div className="methodchip on">
-          <span className="methodchip__ic">
-            <AIc>{AttIcon.qr}</AIc>
-          </span>
-          <div className="methodchip__t">
-            <b>{copy.methodGpsQr}</b>
-            <span>{copy.methodQrAvailable}</span>
-          </div>
-        </div>
-        <div className="methodchip ghost">
-          <span className="methodchip__ic">
-            <AIc>{AttIcon.wifi}</AIc>
-          </span>
-          <div className="methodchip__t">
-            <b>{copy.methodWifi}</b>
-            <span>{copy.methodWifiSoon}</span>
-          </div>
-        </div>
-      </div>
-      <Link href="/mobile/attendance/correction" className="breakbtn" style={{ marginTop: "14px" }}>
-        <AIc>{AttIcon.edit}</AIc>{copy.captureNoQr}
+      <Link href="/mobile/attendance/correction" className="capw__link capw__link--dark">
+        {copy.scanNoQr} ›
       </Link>
-
-      {phase === "result" && result ? (
-        <BottomSheet
-          ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle}
-          className="att att__result-sheet"
-          onClose={onDismiss}
-        >
-          <ResultSheet result={result} isOut={isOut} onHome={goHome} onRetry={retry} copy={copy} />
-        </BottomSheet>
-      ) : null}
-    </div>
+      {resultSheet}
+    </div>,
   );
 }
 
+/** 결과 시트 — 아이콘 · 제목 · 한두 줄 · 버튼. 성공 체크는 그려지고, 실패 아이콘은 짧게 흔들린다. */
 function ResultSheet({
   result,
   isOut,
@@ -460,217 +419,68 @@ function ResultSheet({
   onRetry: () => void;
   copy: AttendanceCopy;
 }) {
+  const correction = (
+    <Link href="/mobile/attendance/correction" className="capw__link">
+      {copy.scanNoQr} ›
+    </Link>
+  );
   if (result.ok) {
     return (
-      <>
-        <div className="rsheet__ic ic-ok">{AttIcon.checkc}</div>
-        <h3 className="rsheet__t">{isOut ? copy.resultOutTitle : copy.resultInTitle}</h3>
-        <p className="rsheet__s">
-          {isOut ? copy.resultOutMessage : copy.resultInMessage}
-        </p>
-        <div className="recap">
-          <div className="recap__r">
-            <span className="recap__k">
-              <AIc>{AttIcon.pin}</AIc>{copy.resultSiteLabel}
-            </span>
-            <span className="recap__v">{result.siteName}</span>
-          </div>
-          <div className="recap__r">
-            <span className="recap__k">
-              <AIc>{AttIcon.clock}</AIc>
-              {isOut ? copy.resultOutTimeLabel : copy.resultInTimeLabel}
-            </span>
-            <span className="recap__v mono">{result.timeLabel}</span>
-          </div>
-          <div className="recap__r">
-            <span className="recap__k">
-              <AIc>{AttIcon.qr}</AIc>{copy.resultAuthLabel}
-            </span>
-            <span className="recap__v">
-              <span className="chip c-method" style={{ padding: "3px 9px" }}>
-                {copy.methodGpsQr}
-              </span>
-            </span>
-          </div>
-          <div className="recap__r">
-            <span className="recap__k">{copy.resultSessionLabel}</span>
-            <span className="recap__v">
-              {isOut ? (
-                <span className="chip" style={{ padding: "3px 9px" }}>
-                  {copy.resultSessionDone}
-                </span>
-              ) : (
-                <span className="chip c-open" style={{ padding: "3px 9px" }}>
-                  <span className="d" />
-                  {copy.resultSessionOpen}
-                </span>
-              )}
-            </span>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--primary" onClick={onHome}>
-            {copy.resultConfirm}
-          </button>
-        </div>
-      </>
-    );
-  }
-
-  if (result.reason === "radius") {
-    return (
-      <>
-        <div className="rsheet__ic ic-warn">{AttIcon.pin}</div>
-        <h3 className="rsheet__t">{copy.resultRadiusTitle}</h3>
-        <p className="rsheet__s">{copy.resultRadiusSub}</p>
-        <div className="failnote warn">
-          <AIc>{AttIcon.warn}</AIc>
-          <div style={{ flex: 1 }}>
-            <b>{copy.resultRadiusDetail(result.siteName ?? copy.resultSiteFallback, result.radiusMeters ?? "—")}</b>
-            <p>{copy.resultRadiusDistance(result.distanceMeters ?? "—")}</p>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--retry" onClick={onRetry}>
-            <AIc>{AttIcon.refresh}</AIc>{copy.resultRetry}
-          </button>
-          <Link href="/mobile/attendance/correction" className="rbtn rbtn--ghost">
-            <AIc>{AttIcon.edit}</AIc>{copy.resultCorrection}
-          </Link>
-        </div>
-      </>
-    );
-  }
-
-  if (result.reason === "gps") {
-    return (
-      <>
-        <div className="rsheet__ic ic-fail">{AttIcon.gpsoff}</div>
-        <h3 className="rsheet__t">{copy.resultGpsTitle}</h3>
-        <p className="rsheet__s">{copy.resultGpsSub}</p>
-        <div className="failnote">
-          <AIc>{AttIcon.warn}</AIc>
-          <div>
-            <b>{copy.resultGpsDetail}</b>
-            <p>{copy.resultGpsHint}</p>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--primary" onClick={onRetry}>
-            <AIc>{AttIcon.refresh}</AIc>{copy.resultRetry}
-          </button>
-          <Link href="/mobile/attendance/correction" className="rbtn rbtn--ghost">
-            <AIc>{AttIcon.edit}</AIc>{copy.resultCorrection}
-          </Link>
-        </div>
-      </>
-    );
-  }
-
-  if (result.reason === "qr") {
-    return (
-      <>
-        <div className="rsheet__ic ic-fail">{AttIcon.qr}</div>
-        <h3 className="rsheet__t">{copy.resultQrTitle}</h3>
-        <p className="rsheet__s">{copy.resultQrSub}</p>
-        <div className="failnote">
-          <AIc>{AttIcon.warn}</AIc>
-          <div>
-            <b>{copy.resultQrDetail}</b>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--primary" onClick={onRetry}>
-            <AIc>{AttIcon.refresh}</AIc>{copy.resultRetry}
-          </button>
-          <Link href="/mobile/attendance/correction" className="rbtn rbtn--ghost">
-            <AIc>{AttIcon.edit}</AIc>{copy.resultCorrection}
-          </Link>
-        </div>
-      </>
-    );
-  }
-
-  if (result.reason === "open_session") {
-    return (
-      <>
-        <div className="rsheet__ic ic-warn">{AttIcon.warn}</div>
-        <h3 className="rsheet__t">{copy.resultOpenSessionTitle}</h3>
-        <p className="rsheet__s">{copy.resultOpenSessionSub}</p>
-        <div className="failnote warn">
-          <AIc>{AttIcon.info}</AIc>
-          <div>
-            <b>{copy.resultOpenSessionHint}</b>
-            <p>{copy.resultOpenSessionCanRetry}</p>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--primary" onClick={onHome}>
-            {copy.resultHomeButton}
-          </button>
-        </div>
-      </>
-    );
-  }
-
-  if (result.reason === "no_session") {
-    return (
-      <>
-        <div className="rsheet__ic ic-warn">{AttIcon.warn}</div>
-        <h3 className="rsheet__t">{copy.resultNoSessionTitle}</h3>
-        <p className="rsheet__s">{copy.resultNoSessionSub}</p>
-        <div className="failnote warn">
-          <AIc>{AttIcon.info}</AIc>
-          <div>
-            <b>{copy.resultNoSessionCheck}</b>
-            <p>{copy.resultNoSessionHint}</p>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--primary" onClick={onHome}>
-            {copy.resultHomeButton}
-          </button>
-          <Link href="/mobile/attendance/correction" className="rbtn rbtn--ghost">
-            <AIc>{AttIcon.edit}</AIc>{copy.resultCorrection}
-          </Link>
-        </div>
-      </>
-    );
-  }
-
-  if (result.reason === "open_break") {
-    return (
-      <>
-        <div className="rsheet__ic ic-warn">{AttIcon.warn}</div>
-        <h3 className="rsheet__t">{copy.resultOpenBreakTitle}</h3>
-        <p className="rsheet__s">{copy.resultOpenBreakSub}</p>
-        <div className="failnote warn">
-          <AIc>{AttIcon.info}</AIc>
-          <div>
-            <b>{copy.resultOpenBreakEndFirst}</b>
-            <p>{copy.resultOpenBreakHint}</p>
-          </div>
-        </div>
-        <div className="rbtns">
-          <button type="button" className="rbtn rbtn--primary" onClick={onHome}>
-            {copy.resultHomeButton}
-          </button>
-        </div>
-      </>
-    );
-  }
-
-  // error
-  return (
-    <>
-      <div className="rsheet__ic ic-fail">{AttIcon.warn}</div>
-      <h3 className="rsheet__t">{copy.resultGenericTitle}</h3>
-      <p className="rsheet__s">{copy.resultGenericSub}</p>
-      <div className="rbtns">
-        <button type="button" className="rbtn rbtn--primary" onClick={onRetry}>
-          <AIc>{AttIcon.refresh}</AIc>{copy.resultRetry}
+      <div className="capr">
+        <span className="capr__ic is-ok" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path className="capr__check" d="M5 12l5 5 9-10" />
+          </svg>
+        </span>
+        <h3 className="capr__t">{isOut ? copy.resultOutTitle : copy.resultInTitle}</h3>
+        <p className="capr__s">{copy.resultLine.replace("{site}", result.siteName).replace("{time}", result.timeLabel)}</p>
+        <button type="button" className="capw-btn" onClick={onHome}>
+          {copy.resultConfirm}
         </button>
       </div>
-    </>
+    );
+  }
+  const fail = (title: string, lines: (string | null)[], primary: "retry" | "home", withCorrection: boolean, tone: "warn" | "bad" = "bad") => (
+    <div className="capr">
+      <span className={`capr__ic is-${tone}`} aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M12 7v6M12 17h.01" />
+        </svg>
+      </span>
+      <h3 className="capr__t">{title}</h3>
+      {lines.filter(Boolean).map((l, i) => (
+        <p key={i} className="capr__s">
+          {l}
+        </p>
+      ))}
+      <button type="button" className="capw-btn" onClick={primary === "retry" ? onRetry : onHome}>
+        {primary === "retry" ? copy.resultRetry : copy.resultHomeButton}
+      </button>
+      {withCorrection ? correction : null}
+    </div>
   );
+  switch (result.reason) {
+    case "radius":
+      return fail(
+        copy.resultRadiusTitle,
+        [
+          copy.resultRadiusDetail(result.siteName ?? copy.resultSiteFallback, result.radiusMeters ?? "—"),
+          copy.resultRadiusDistance(result.distanceMeters ?? "—"),
+        ],
+        "retry",
+        true,
+      );
+    case "gps":
+      return fail(copy.resultGpsTitle, [copy.resultGpsSub, copy.resultGpsHint], "retry", true);
+    case "qr":
+      return fail(copy.resultQrTitle, [copy.resultQrSub], "retry", true);
+    case "open_session":
+      return fail(copy.resultOpenSessionTitle, [copy.resultOpenSessionSub, copy.resultOpenSessionCanRetry], "home", false, "warn");
+    case "no_session":
+      return fail(copy.resultNoSessionTitle, [copy.resultNoSessionSub, copy.resultNoSessionHint], "home", true, "warn");
+    case "open_break":
+      return fail(copy.resultOpenBreakTitle, [copy.resultOpenBreakSub, copy.resultOpenBreakHint], "home", false, "warn");
+    default:
+      return fail(copy.resultGenericTitle, [copy.resultGenericSub], "retry", false);
+  }
 }

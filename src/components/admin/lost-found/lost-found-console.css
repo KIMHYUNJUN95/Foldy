@@ -165,3 +165,164 @@
 
 .adm .btn--prisolid { background: var(--adm-primary); color: #fff; box-shadow: 0 10px 22px -16px color-mix(in oklab, var(--adm-primary) 80%, transparent); }
 .adm .btn--prisolid:hover { filter: brightness(1.06); }
+
+/* ── 화이트 리디자인(2026-10-14, 시안 LF-PC · LFReturn-PC · LFDisposed-PC · LFAll-PC · LFAct-PC) ──
+   보기 줄 하나에 탭 + 고르기 · 숫자 다섯 · 보관 타임라인 줄(막대가 채워지며 등장) · 상자 없는 표 · 패널 · 처리 창. */
+.adm .lfw-viewbar { flex-wrap: wrap; row-gap: 8px; }
+.adm .lfw-viewbar__sp { flex: 1; }
+.adm .lfw-viewbar .dd > button { border: 0; background: transparent; box-shadow: none; }
+.adm .lfw-viewbar .datepick { border: 0; background: transparent; padding: 0 8px; font-size: 14px; font-weight: 600; color: #16141f; }
+.adm .lfw-viewbar .datepick:hover { background: #f4f4f7; }
+.adm .lfw-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 14px 0 18px; }
+.adm .lfw-kpis--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
+.adm .lfw-body { padding-top: 18px; }
+.adm .num { font-variant-numeric: tabular-nums; }
+
+.adm .lfw-tl__h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.adm .lfw-tl__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .lfw-tl__h span { font-size: 13px; color: #8b8898; }
+.adm .lfw-tl__h .lfw-tl__rule { margin-left: auto; font-size: 12px; }
+.adm .lfw-th, .adm .lfw-tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 170px) minmax(160px, 240px) 72px; column-gap: 20px; align-items: center; }
+.adm .lfw-th { margin-top: 10px; padding: 0 12px 8px; font-size: 12px; color: #8b8898; }
+.adm .lfw-th > :last-child { text-align: right; }
+.adm .lfw-tr { width: 100%; min-height: 60px; padding: 8px 12px; border: 0; border-top: 1px solid #f3f3f6; border-radius: 0; background: none; font: inherit; color: #16141f; text-align: left; cursor: pointer; transition: background 150ms ease, transform 140ms ease, border-radius 150ms ease; }
+.adm .lfw-tr:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
+.adm .lfw-tr:hover + .lfw-tr, .adm .lfw-tr.on + .lfw-tr { border-top-color: transparent; }
+.adm .lfw-tr:active { transform: scale(.995); }
+.adm .lfw-tr.on { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; }
+.adm .lfw-tr__item { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.adm .lfw-thumb { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 10px; overflow: hidden; background: #f2f2f5; color: #8b8898; }
+.adm .lfw-thumb svg { width: 17px; height: 17px; }
+.adm .lfw-thumb img { object-fit: cover; }
+.adm .lfw-tr__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adm .lfw-tr__txt b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .lfw-tr__txt span { font-size: 12px; color: #8b8898; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .lfw-tr__loc { font-size: 13px; color: #8b8898; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .lfw-tr__loc b { font-weight: 600; color: #3a3746; }
+.adm .lfw-tr__bar { display: flex; align-items: center; gap: 10px; }
+.adm .lfw-tr__days { width: 56px; flex: none; text-align: right; white-space: nowrap; font-size: 12px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.adm .lfw-bar { position: relative; display: block; flex: 1; height: 6px; border-radius: 3px; background: #efeff3; overflow: hidden; }
+.adm .lfw-bar--lg { flex: none; width: 100%; }
+.adm .lfw-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: lfw-fill 700ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .lfw-bar i.is-soon { background: #c5282e; }
+.adm .lfw-bar i.is-ext { background: #b4b1bf; }
+@keyframes lfw-fill { from { transform: scaleX(0); } }
+.adm .lfw-tr__due { text-align: right; font-size: 13px; font-weight: 600; color: #3a3746; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .lfw-tr__due.is-soon { color: #c5282e; }
+.adm .lfw-rows .lfw-tr { animation: lfw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .lfw-rows .lfw-tr:nth-child(2) { animation-delay: 30ms; }
+.adm .lfw-rows .lfw-tr:nth-child(3) { animation-delay: 60ms; }
+.adm .lfw-rows .lfw-tr:nth-child(4) { animation-delay: 90ms; }
+.adm .lfw-rows .lfw-tr:nth-child(n + 5) { animation-delay: 120ms; }
+@keyframes lfw-in { from { opacity: 0; transform: translateY(4px); } }
+
+.adm .lfw-grid { display: flex; flex-direction: column; }
+.adm .lfw-gh, .adm .lfw-gr { display: grid; column-gap: 16px; align-items: center; padding: 0 12px; }
+.adm .lfw-grid--ret .lfw-gh, .adm .lfw-grid--ret .lfw-gr { grid-template-columns: 110px minmax(0, 1.2fr) minmax(0, 1fr) 84px minmax(0, 1.1fr) 90px; }
+.adm .lfw-grid--disp .lfw-gh, .adm .lfw-grid--disp .lfw-gr { grid-template-columns: 84px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 110px 120px; }
+.adm .lfw-grid--all .lfw-gh, .adm .lfw-grid--all .lfw-gr { grid-template-columns: 110px minmax(0, 1.3fr) minmax(0, 1fr) 120px 110px 90px; }
+.adm .lfw-gh { padding-bottom: 8px; border-bottom: 1px solid #f1f1f4; font-size: 12px; color: #8b8898; }
+.adm .lfw-gr { width: 100%; min-height: 58px; border: 0; border-top: 1px solid #f3f3f6; background: none; font: inherit; font-size: 13px; color: #3a3746; text-align: left; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .lfw-gh + .lfw-gr { border-top: 0; }
+.adm .lfw-gr:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
+.adm .lfw-gr:active { transform: scale(.995); }
+.adm .lfw-gr.on { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; }
+.adm .lfw-gr:hover + .lfw-gr, .adm .lfw-gr.on + .lfw-gr { border-top-color: transparent; }
+.adm .lfw-gr b { font-weight: 600; color: #16141f; }
+.adm .lfw-gh .r, .adm .lfw-gr .r { text-align: right; }
+.adm .lfw-gr .ell { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .lfw-gr .strong { font-weight: 500; color: #16141f; }
+.adm .lfw-gr .dim { color: #8b8898; }
+.adm .lfw-gr .dim2 { color: #6b6878; }
+.adm .lfw-gr .danger { color: #c5282e; font-weight: 600; }
+.adm .lfw-gr .st { font-weight: 600; color: #3a3746; }
+.adm .lfw-gr .st.ok { color: #1f7a4d; }
+.adm .lfw-gr .st.danger { color: #c5282e; }
+.adm .lfw-gr .st.dim { color: #8b8898; font-weight: 500; }
+.adm .lfw-note { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: #3a3746; }
+.adm .lfw-note svg { width: 15px; height: 15px; color: #b7791f; flex: none; }
+.adm .lfw-count { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.adm .lfw-count b { font-size: 15px; color: #16141f; }
+.adm .lfw-count span { font-size: 13px; color: #8b8898; }
+.adm .lfw-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 64px 16px; text-align: center; color: #8b8898; font-size: 13px; }
+.adm .lfw-empty svg { width: 22px; height: 22px; margin-bottom: 4px; color: #b4b1bf; }
+.adm .lfw-empty b { font-size: 15px; color: #16141f; }
+.adm .lfw-empty .btn { margin-top: 10px; }
+
+/* 상세 패널 */
+.adm .lfp .lfp__kick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: #6b6878; }
+.adm .lfp .lfp__kick > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
+.adm .lfp .lfp__flag { color: #c5282e; font-weight: 600; }
+.adm .lfp .lfp__st.is-returned { color: #1f7a4d; font-weight: 600; }
+.adm .lfp .lfp__acts { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.adm .lfp .lfp__del { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: #c5282e; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .lfp .lfp__del:hover { background: #fdecec; }
+.adm .lfp .lfp__del:active { transform: scale(.94); }
+.adm .lfp .lfp__del svg { width: 18px; height: 18px; }
+.adm .lfp .lfp__title { margin-top: 10px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .lfp .lfp__sub { margin-top: 6px; font-size: 13px; color: #8b8898; }
+.adm .lfp .lfp__sub b { font-weight: 700; color: #16141f; }
+.adm .lfp__body { display: flex; flex-direction: column; gap: 18px; }
+.adm .lfp .lfp__gal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.adm .lfp .lfp__shot { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: #f4f4f7; transition: transform 160ms ease; }
+.adm .lfp .lfp__shot:hover { transform: scale(1.02); }
+.adm .lfp .lfp__shot img { object-fit: cover; }
+.adm .lfp .lfp__dim { margin: 0; font-size: 13px; color: #8b8898; }
+.adm .lfp .lfp__clock { display: flex; flex-direction: column; gap: 10px; }
+.adm .lfp .lfp__clockh { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; color: #6b6878; }
+.adm .lfp .lfp__clockh b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; font-variant-numeric: tabular-nums; }
+.adm .lfp .lfp__clockh b.is-soon { color: #c5282e; }
+.adm .lfp .lfp__clocks { font-size: 12px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.adm .lfp .lfp__dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; margin: 0; padding-top: 16px; border-top: 1px solid #f1f1f4; font-size: 13px; }
+.adm .lfp .lfp__dl dt { color: #8b8898; }
+.adm .lfp .lfp__dl dd { margin: 0; color: #16141f; overflow-wrap: anywhere; white-space: pre-wrap; }
+.adm .lfp .lfp__muted { color: #8b8898; }
+.adm .lfp .lfp__danger { color: #c5282e; font-weight: 600; }
+.adm .lfp .lfp__sec { font-size: 13px; font-weight: 600; color: #3a3746; }
+.adm .lfp__foot { flex-direction: column; align-items: stretch; gap: 8px; border-top: 1px solid #f1f1f4; }
+.adm .lfp__foot .btn { flex: none; }
+.adm .lfp .lfp__main { height: 44px; justify-content: center; font-size: 15px; }
+.adm .lfp .lfp__two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.adm .lfp .lfp__two .btn, .adm .lfp .lfp__restore { height: 40px; justify-content: center; border: 0; font-weight: 600; transition: background 150ms ease, transform 140ms ease; }
+.adm .lfp .lfp__two .btn:active, .adm .lfp .lfp__restore:active, .adm .lfp .lfp__main:active { transform: scale(.98); }
+.adm .lfp .lfp__soft { background: #f4f1fd; color: #5a30cf; }
+.adm .lfp .lfp__soft:hover { background: #ece5fc; }
+.adm .lfp .lfp__gray { background: #f4f4f7; color: #3a3746; }
+.adm .lfp .lfp__gray:hover { background: #ececf1; }
+.adm .lfp .lfp__restore { display: inline-flex; align-items: center; gap: 6px; }
+.adm .lfp .lfp__restore svg, .adm .lfp .lfp__link svg { width: 15px; height: 15px; }
+.adm .lfp .lfp__link { display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: center; height: 34px; padding: 0 10px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 13px; color: #4c4958; cursor: pointer; }
+.adm .lfp .lfp__link svg { color: #8b8898; }
+.adm .lfp .lfp__link:hover { background: #f4f4f7; }
+.adm .lfp .lfp__exc { font-size: 12px; font-weight: 600; color: #8b8898; }
+.adm .lfp .lfp__note { font-size: 12px; line-height: 1.5; color: #8b8898; }
+
+/* 처리 창 */
+.adm .modal.lfm { width: 440px; padding: 24px; gap: 16px; border: 0; overflow: visible; animation: lfm-in 240ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes lfm-in { from { opacity: 0; transform: translate(-50%, -47%) scale(.97); } }
+.adm .lfm .lfm__h { display: flex; flex-direction: column; gap: 4px; }
+.adm .lfm .lfm__h h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .lfm .lfm__h span { font-size: 13px; color: #6b6878; }
+.adm .lfm .lfm__body { margin: 0; font-size: 13px; line-height: 1.55; color: #6b6878; }
+.adm .lfm .lfm__lbl { margin-bottom: -8px; font-size: 13px; font-weight: 600; color: #3a3746; }
+.adm .lfm .lfm__seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; }
+.adm .lfm .lfm__seg--3 { grid-template-columns: repeat(3, 1fr); }
+.adm .lfm .lfm__seg button { height: 36px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13px; color: #6b6878; cursor: pointer; transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.adm .lfm .lfm__seg button.on { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
+.adm .lfm .lfm__nf { position: relative; display: block; }
+.adm .lfm .lfm__nl { position: absolute; top: -8px; left: 11px; z-index: 2; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; pointer-events: none; white-space: nowrap; }
+.adm .lfm .lfm__nf input, .adm .lfm .lfm__nf textarea { display: block; width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; line-height: 1.5; color: #16141f; outline: none; resize: none; box-shadow: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.adm .lfm .lfm__nf input { height: 48px; padding: 0 14px; }
+.adm .lfm .lfm__nf input:focus, .adm .lfm .lfm__nf textarea:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.adm .lfm .lfm__nf--date .adp > button { width: 100%; height: 48px; border-radius: 12px; }
+.adm .lfm .lfm__reveal { animation: revIn 200ms ease; }
+.adm .lfm .lfm__foot { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
+.adm .lfm .lfm__foot .btn { height: 44px; justify-content: center; border: 0; font-size: 14px; font-weight: 600; transition: transform 140ms ease, filter 150ms ease; }
+.adm .lfm .lfm__foot .btn:active { transform: scale(.98); }
+.adm .lfm .lfm__cancel { background: #f4f4f7; color: #3a3746; }
+.adm .lfm .lfm__ok.is-pri { background: #7a52e6; color: #fff; }
+.adm .lfm .lfm__ok.is-danger { background: #c5282e; color: #fff; }
+.adm .lfm .lfm__ok:hover { filter: brightness(1.06); }
+@media (prefers-reduced-motion: reduce) {
+  .adm .lfw-bar i, .adm .lfw-rows .lfw-tr, .adm .modal.lfm, .adm .lfm .lfm__reveal { animation: none; }
+}

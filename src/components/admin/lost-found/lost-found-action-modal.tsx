@@ -1,28 +1,17 @@
 "use client";
 
-// Admin 분실물 console — 능동 처리 모달 5종(반환/폐기/보관연장/상태정정/삭제). 같은 껍데기(cfhead +
-// cfrec + 필드 + foot)를 쓰고 아이콘·문구·필드·확인 버튼 톤만 달라진다. Mirrors
-// maintenance-confirm-modal.tsx, plus lf-design.css의 segradio/stpick/reveal 필드 컴포넌트.
-import { useState } from "react";
-import {
-  ArchiveRestore,
-  CalendarPlus,
-  Handshake,
-  Pencil,
-  ShieldCheck,
-  Trash2,
-  Truck,
-  Undo2,
-  X,
-} from "lucide-react";
+// Admin 분실물 console — 처리 창 6종(반환 · 폐기 · 보관 연장 · 상태 정정 · 복원 · 삭제). 화이트 리디자인(2026-10-14,
+// 시안 LFAct-PC): 제목 · 품목 한 줄, 설명 한 줄, 이름표 칸(송장번호 · 메모 · 새 예정일), 아래 [취소][확인] 두 개.
+// 닫기는 「취소」 하나뿐(× 없음) · Esc · 바깥 누르기도 취소.
+import { useEffect, useState } from "react";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
 import type { LostItemStatus, LostReturnMethod } from "@/lib/lost-found-constants";
-import { BOARD_ORDER, LOST_STATUS, locationLabel } from "./lost-found-console-data";
-import { CATEGORY_ICON, STATUS_ICON, copyOf, localeTagOf, type LFCopy } from "./lost-found-console-shared";
-import type { LFActionKind } from "./lost-found-detail-panel";
 import { tokyoToday } from "@/lib/tokyo-date";
+import { BOARD_ORDER, LOST_STATUS } from "./lost-found-console-data";
+import { copyOf, localeTagOf, type LFCopy } from "./lost-found-console-shared";
+import type { LFActionKind } from "./lost-found-detail-panel";
 
 export type LFActionPayload = {
   memo?: string;
@@ -44,66 +33,12 @@ type ActionModalProps = {
 };
 
 const KIND_META = {
-  return: {
-    Icon: Undo2,
-    kicker: "mrKicker",
-    title: "mrTitle",
-    body: "mrBody",
-    confirm: "mrConfirm",
-    foot: "mrFoot",
-    btn: "btn--prisolid",
-    icCls: "cficon--return",
-  },
-  dispose: {
-    Icon: Trash2,
-    kicker: "mdKicker",
-    title: "mdTitle",
-    body: "mdBody",
-    confirm: "mdConfirm",
-    foot: "mdFoot",
-    btn: "btn--danger",
-    icCls: "cficon--dispose",
-  },
-  extend: {
-    Icon: CalendarPlus,
-    kicker: "meKicker",
-    title: "meTitle",
-    body: "meBody",
-    confirm: "meConfirm",
-    foot: "meFoot",
-    btn: "btn--pri",
-    icCls: "cficon--extend",
-  },
-  correct: {
-    Icon: Pencil,
-    kicker: "mcKicker",
-    title: "mcTitle",
-    body: "mcBody",
-    confirm: "mcConfirm",
-    foot: "mcFoot",
-    btn: "btn--pri",
-    icCls: "cficon--correct",
-  },
-  restore: {
-    Icon: ArchiveRestore,
-    kicker: "mrsKicker",
-    title: "mrsTitle",
-    body: "mrsBody",
-    confirm: "mrsConfirm",
-    foot: "mrsFoot",
-    btn: "btn--pri",
-    icCls: "cficon--restore",
-  },
-  delete: {
-    Icon: Trash2,
-    kicker: "mxKicker",
-    title: "mxTitle",
-    body: "mxBody",
-    confirm: "mxConfirm",
-    foot: "mxFoot",
-    btn: "btn--danger",
-    icCls: "cficon--del",
-  },
+  return: { title: "actReturn", body: "mrBody", confirm: "mrConfirm", memo: "cfMemo", ph: "cfMemoPh", tone: "pri" },
+  dispose: { title: "actDispose", body: "mdBody", confirm: "mdConfirm", memo: "mdMemo", ph: "mdMemoPh", tone: "danger" },
+  extend: { title: "actExtend", body: "meBody", confirm: "meConfirm", memo: "meMemo", ph: "meMemoPh", tone: "pri" },
+  correct: { title: "actCorrect", body: "mcBody", confirm: "mcConfirm", memo: "mcMemo", ph: "mcMemoPh", tone: "pri" },
+  restore: { title: "actRestore", body: "mrsBody", confirm: "mrsConfirm", memo: "mrsMemo", ph: "mrsMemoPh", tone: "pri" },
+  delete: { title: "del", body: "mxBody", confirm: "mxConfirm", memo: null, ph: null, tone: "danger" },
 } as const;
 
 function addDaysISO(iso: string, delta: number): string {
@@ -111,217 +46,123 @@ function addDaysISO(iso: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
 }
 
-export function LostFoundActionModal({
-  kind,
-  item,
-  t,
-  locale,
-  sharedLabels,
-  pending,
-  onCancel,
-  onConfirm,
-}: ActionModalProps) {
+export function LostFoundActionModal({ kind, item, t, locale, sharedLabels, pending, onCancel, onConfirm }: ActionModalProps) {
   const meta = KIND_META[kind];
-  const { Icon } = meta;
-  const CatIcon = CATEGORY_ICON[item.category];
-  const localeTag = localeTagOf(locale);
-
   const [memo, setMemo] = useState("");
   const [method, setMethod] = useState<LostReturnMethod>("pickup");
   const [tracking, setTracking] = useState("");
   const [dueDate, setDueDate] = useState(addDaysISO(item.dueDate, 14));
-  const [status, setStatus] = useState<LostItemStatus>(item.status === "returned" || item.status === "disposed" ? "registered" : item.status);
-
-  // `new Date().toISOString()` 은 **UTC** 날짜다 — JST 00:00~09:00 사이에는 도쿄 기준 어제가 나와
-  // 보관 연장 마감의 하한(`min`)이 하루 이르게 열렸다. 이 저장소의 업무 날짜는 전부 도쿄 기준이다
-  // (CLAUDE.md → Tokyo timezone). 순수 모듈의 `tokyoToday()` 를 쓴다.
+  const [status, setStatus] = useState<LostItemStatus>(
+    item.status === "returned" || item.status === "disposed" ? "registered" : item.status,
+  );
+  // 업무 날짜는 도쿄 기준 — `toISOString()` 은 UTC 라 JST 새벽에 하루 이르다(CLAUDE.md → Tokyo timezone).
   const tomorrowKey = addDaysISO(tokyoToday(), 1);
 
-  function handleConfirm() {
-    if (kind === "return") {
-      onConfirm(kind, item.id, { method, tracking: method === "delivery" ? tracking : "", memo });
-      return;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !pending) onCancel();
     }
-    if (kind === "extend") {
-      onConfirm(kind, item.id, { dueDate, memo });
-      return;
-    }
-    if (kind === "correct") {
-      onConfirm(kind, item.id, { status, memo });
-      return;
-    }
-    onConfirm(kind, item.id, { memo });
-  }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel, pending]);
 
-  const memoLabel =
-    kind === "dispose"
-      ? t.mdMemo
-      : kind === "extend"
-        ? t.meMemo
-        : kind === "correct"
-          ? t.mcMemo
-          : kind === "restore"
-            ? t.mrsMemo
-            : t.cfMemo;
-  const memoPh =
-    kind === "dispose"
-      ? t.mdMemoPh
-      : kind === "extend"
-        ? t.meMemoPh
-        : kind === "correct"
-          ? t.mcMemoPh
-          : kind === "restore"
-            ? t.mrsMemoPh
-            : t.cfMemoPh;
+  function handleConfirm() {
+    if (kind === "return") onConfirm(kind, item.id, { method, tracking: method === "delivery" ? tracking : "", memo });
+    else if (kind === "extend") onConfirm(kind, item.id, { dueDate, memo });
+    else if (kind === "correct") onConfirm(kind, item.id, { status, memo });
+    else onConfirm(kind, item.id, { memo });
+  }
 
   return (
     <>
-      <div className="modal-scrim on" onClick={onCancel} />
-      <div className="modal on" style={{ width: 496 }}>
-        <div className="modal__h">
-          <div>
-            <div className="modal__kicker">{t[meta.kicker]}</div>
-          </div>
-          <button type="button" className="panel__x" onClick={onCancel} aria-label={t.cfCancel}>
-            <X />
-          </button>
-        </div>
-        <div className="modal__body">
-          <div className="cfhead">
-            <div className={`cficon ${meta.icCls}`}>
-              <span className="ic">
-                <Icon aria-hidden="true" />
-              </span>
-            </div>
-            <div>
-              <div className="cfbody-t">{t[meta.title]}</div>
-              <div className="cfbody-s">{t[meta.body]}</div>
-            </div>
-          </div>
-
-          <div className="cfrec">
-            <span className="cfrec__ic">
-              <span className="ic">
-                <CatIcon aria-hidden="true" />
-              </span>
-            </span>
-            <div className="cfrec__b">
-              <div className="cfrec__t">{item.itemName}</div>
-              <div className="cfrec__s">
-                {item.shortId} · {locationLabel(item, t.buildingWhole)}
-              </div>
-            </div>
-          </div>
-
-          {kind === "return" ? (
-            <>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.mrMethod}</label>
-                <div className="segradio">
-                  <button
-                    type="button"
-                    className={`segopt${method === "delivery" ? " on" : ""}`}
-                    onClick={() => setMethod("delivery")}
-                  >
-                    <span className="segopt__ic">
-                      <span className="ic">
-                        <Truck aria-hidden="true" />
-                      </span>
-                    </span>
-                    <span className="segopt__b">
-                      <span className="segopt__t">{t.mrDelivery}</span>
-                      <span className="segopt__s">{t.mrDeliveryS}</span>
-                    </span>
-                    <span className="segopt__rd" />
-                  </button>
-                  <button
-                    type="button"
-                    className={`segopt${method === "pickup" ? " on" : ""}`}
-                    onClick={() => setMethod("pickup")}
-                  >
-                    <span className="segopt__ic">
-                      <span className="ic">
-                        <Handshake aria-hidden="true" />
-                      </span>
-                    </span>
-                    <span className="segopt__b">
-                      <span className="segopt__t">{t.mrPickup}</span>
-                      <span className="segopt__s">{t.mrPickupS}</span>
-                    </span>
-                    <span className="segopt__rd" />
-                  </button>
-                </div>
-              </div>
-              {method === "delivery" ? (
-                <div className="fld reveal" style={{ marginTop: 12 }}>
-                  <label className="fld__l">{t.mrTracking}</label>
-                  <input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder={t.mrTrackingPh} />
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          {kind === "extend" ? (
-            <div className="fld" style={{ marginTop: 14 }}>
-              <label className="fld__l">{t.meDue}</label>
-              <AdminDatePicker
-                value={dueDate}
-                onChange={setDueDate}
-                min={tomorrowKey}
-                localeTag={localeTag}
-                ariaLabel={t.meDue}
-                labels={{
-                  prevMonth: sharedLabels?.datePrevMonth ?? "",
-                  nextMonth: sharedLabels?.dateNextMonth ?? "",
-                  today: sharedLabels?.dateToday ?? "",
-                }}
-              />
-            </div>
-          ) : null}
-
-          {kind === "correct" ? (
-            <div className="fld" style={{ marginTop: 14 }}>
-              <label className="fld__l">{t.mcStatus}</label>
-              <div className="stpick">
-                {BOARD_ORDER.map((s) => {
-                  const StIcon = STATUS_ICON[s];
-                  return (
-                    <button
-                      type="button"
-                      key={s}
-                      className={`stchip${status === s ? " on" : ""}`}
-                      onClick={() => setStatus(s)}
-                    >
-                      <span className="ic">
-                        <StIcon aria-hidden="true" />
-                      </span>
-                      {copyOf(t, LOST_STATUS[s].key)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="fld" style={{ marginTop: 14 }}>
-            <label className="fld__l">{memoLabel}</label>
-            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={memoPh} />
-          </div>
-        </div>
-        <div className="modal__foot">
-          <span className={`modal__foot-note${kind === "dispose" || kind === "delete" ? " is-danger" : ""}`}>
-            <ShieldCheck className="ic" aria-hidden="true" />
-            {t[meta.foot]}
+      <div className="modal-scrim on" onClick={pending ? undefined : onCancel} />
+      <div className="modal on lfm" role="dialog" aria-modal="true" aria-labelledby="lfm-title">
+        <div className="lfm__h">
+          <h2 id="lfm-title">{copyOf(t, meta.title)}</h2>
+          <span>
+            {item.itemName} · {item.room ?? t.buildingWhole}
           </span>
-          <div style={{ display: "flex", gap: 9 }}>
-            <button type="button" className="btn btn--ghost" onClick={onCancel} disabled={pending}>
-              {t.cfCancel}
-            </button>
-            <button type="button" className={`btn ${meta.btn}`} disabled={pending} onClick={handleConfirm}>
-              <Icon className="ic" aria-hidden="true" />
-              {t[meta.confirm]}
-            </button>
+        </div>
+        <p className="lfm__body">{copyOf(t, meta.body)}</p>
+
+        {kind === "return" ? (
+          <>
+            <div className="lfm__lbl">{t.mrMethod}</div>
+            <div className="lfm__seg" role="radiogroup" aria-label={t.mrMethod}>
+              {(["pickup", "delivery"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={method === m}
+                  className={method === m ? "on" : ""}
+                  onClick={() => setMethod(m)}
+                >
+                  {m === "pickup" ? t.mrPickup : t.mrDelivery}
+                </button>
+              ))}
+            </div>
+            {method === "delivery" ? (
+              <label className="lfm__nf lfm__reveal">
+                <span className="lfm__nl">{t.mrTracking}</span>
+                <input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder={t.mrTrackingPh} />
+              </label>
+            ) : null}
+          </>
+        ) : null}
+
+        {kind === "extend" ? (
+          <div className="lfm__nf lfm__nf--date">
+            <span className="lfm__nl">{t.meDue}</span>
+            <AdminDatePicker
+              value={dueDate}
+              onChange={setDueDate}
+              min={tomorrowKey}
+              localeTag={localeTagOf(locale)}
+              ariaLabel={t.meDue}
+              labels={{
+                prevMonth: sharedLabels?.datePrevMonth ?? "",
+                nextMonth: sharedLabels?.dateNextMonth ?? "",
+                today: sharedLabels?.dateToday ?? "",
+              }}
+            />
           </div>
+        ) : null}
+
+        {kind === "correct" ? (
+          <>
+            <div className="lfm__lbl">{t.mcStatus}</div>
+            <div className="lfm__seg lfm__seg--3" role="radiogroup" aria-label={t.mcStatus}>
+              {BOARD_ORDER.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  role="radio"
+                  aria-checked={status === s}
+                  className={status === s ? "on" : ""}
+                  onClick={() => setStatus(s)}
+                >
+                  {copyOf(t, LOST_STATUS[s].key)}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {meta.memo ? (
+          <label className="lfm__nf">
+            <span className="lfm__nl">{copyOf(t, meta.memo)}</span>
+            <textarea rows={2} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={copyOf(t, meta.ph ?? "")} />
+          </label>
+        ) : null}
+
+        <div className="lfm__foot">
+          <button type="button" className="btn lfm__cancel" onClick={onCancel} disabled={pending}>
+            {t.cfCancel}
+          </button>
+          <button type="button" className={`btn lfm__ok is-${meta.tone}`} disabled={pending} onClick={handleConfirm}>
+            {copyOf(t, meta.confirm)}
+          </button>
         </div>
       </div>
     </>

@@ -1,7 +1,7 @@
 // Admin 분실물 console — shared display helpers: status pill, category chip, D-day badges (폐기 임박/
 // 만료 및 삭제 임박), 사진 배지, 연장 배지. Board, list, done, disposal, panel and modal all render
 // through these so every view stays visually identical. Mirrors maintenance-console-shared.tsx.
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
   Briefcase,
   CalendarPlus,
@@ -204,4 +204,32 @@ export function ReporterAvatar({
 
 export function localeTagOf(locale: Locale): string {
   return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
+}
+
+/** 빈 · 오류 상태 한 덩어리(상자 없음) — 화이트 리디자인(2026-10-14) 보기 4개 공용. */
+export function LFState({
+  icon,
+  title,
+  sub,
+  action,
+  onAction,
+}: {
+  icon?: ReactNode;
+  title: string;
+  sub: string;
+  action?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="lfw-empty">
+      {icon}
+      <b>{title}</b>
+      <span>{sub}</span>
+      {action && onAction ? (
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onAction}>
+          {action}
+        </button>
+      ) : null}
+    </div>
+  );
 }

@@ -1,23 +1,14 @@
 "use client";
 
 // Admin 분실물 console — content area for /admin/lost-found (AdminShell owns the sidebar/topbar).
-// Four views: 현황 보드 / 목록·이력 / 완료 / 폐기 내역. Unlike 수리·점검 (read-centric), this console is
+// Four views: 보관 중 / 반환 / 폐기 내역 / 전체 기록 (화이트 리디자인 2026-10-14, 시안 LF-PC · LFReturn-PC · LFDisposed-PC · LFAll-PC). Unlike 수리·점검 (read-centric), this console is
 // where admins actively process items — 반환 / 폐기 / 보관 연장 — plus 예외 개입(상태 정정 / 삭제).
 // Mirrors maintenance-console.tsx wiring 1:1. See docs/product/09-lost-found-workflow.md.
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CircleCheck,
-  Clock,
-  Eye,
-  Hourglass,
-  LayoutGrid,
-  Package,
-  RefreshCw,
-  Trash2,
-  TriangleAlert,
-  Undo2,
-} from "lucide-react";
+import { Search, TriangleAlert, X } from "lucide-react";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
+import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
@@ -32,7 +23,15 @@ import {
 } from "@/app/admin/lost-found/actions";
 import "@/components/admin/maintenance/maintenance-console.css";
 import "./lost-found-console.css";
-import { defaultRangeTokyo, type LFFilters } from "./lost-found-console-data";
+import {
+  CATEGORY_ORDER,
+  buildingOptionsOf,
+  defaultRangeTokyo,
+  reporterOptionsOf,
+  type LFFilters,
+} from "./lost-found-console-data";
+import { categoryLabel, localeTagOf, statusLabel } from "./lost-found-console-shared";
+import { lostItemStatuses } from "@/lib/lost-found-constants";
 import { LostFoundBoard } from "./lost-found-board";
 import { LostFoundList } from "./lost-found-list";
 import { LostFoundDone } from "./lost-found-done";
@@ -65,7 +64,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
   const [view, setView] = useState<LFView>("board");
   const [filters, setFilters] = useState<LFFilters>(() => {
     const range = defaultRangeTokyo();
-    return { status: "all", building: "all", reporter: "all", from: range.from, to: range.to, query: "" };
+    return { status: "all", category: "all", method: "all", building: "all", reporter: "all", from: range.from, to: range.to, query: "" };
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: LFActionKind; id: string } | null>(null);
@@ -73,18 +72,27 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
 
   const thisMonth = useMemo(() => defaultRangeTokyo().from.slice(0, 7), []);
 
+  const returnedMonth = useMemo(
+    () => items.filter((i) => i.status === "returned" && isThisMonthTokyo(i.handledAt, thisMonth)),
+    [items, thisMonth],
+  );
+  const disposedMonth = useMemo(
+    () => items.filter((i) => i.status === "disposed" && isThisMonthTokyo(i.disposedDate, thisMonth)),
+    [items, thisMonth],
+  );
   const kpi = useMemo(
     () => ({
-      stored: items.filter((i) => i.status === "stored").length,
-      soon: items.filter((i) => i.isDueSoon).length,
-      expired: items.filter((i) => i.isExpired).length,
-      returnedMonth: items.filter((i) => i.status === "returned" && isThisMonthTokyo(i.handledAt, thisMonth))
-        .length,
-      disposedMonth: items.filter(
-        (i) => i.status === "disposed" && isThisMonthTokyo(i.disposedDate, thisMonth),
-      ).length,
+      active: items.filter((i) => i.status !== "returned" && i.status !== "disposed").length,
+      soon: items.filter((i) => i.isDueSoon || i.isExpired).length,
+      returnedMonth: returnedMonth.length,
+      retDelivery: returnedMonth.filter((i) => i.returnMethod === "delivery").length,
+      retPickup: returnedMonth.filter((i) => i.returnMethod === "pickup").length,
+      disposedMonth: disposedMonth.length,
+      dispAuto: disposedMonth.filter((i) => i.isAutoDisposed).length,
+      log: items.filter((i) => i.status === "disposed").length,
+      delSoon: items.filter((i) => i.status === "disposed" && i.isDeleteSoon).length,
     }),
-    [items, thisMonth],
+    [items, returnedMonth, disposedMonth],
   );
 
   const selected = selectedId ? (items.find((i) => i.id === selectedId) ?? null) : null;
@@ -95,7 +103,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
   }
 
   function handleClearFilters() {
-    setFilters((prev) => ({ ...prev, status: "all", building: "all", reporter: "all", query: "" }));
+    setFilters((prev) => ({ ...prev, status: "all", category: "all", method: "all", building: "all", reporter: "all", query: "" }));
   }
 
   function handleViewChange(next: LFView) {
@@ -210,166 +218,206 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
   }
 
   const V = (value: number) => (loadError ? "–" : value);
+  const shared = dictionary.admin.shared;
+  const buildings = buildingOptionsOf(items);
+  const buildingDd = (
+    <AdmDropdown
+      size="sm"
+      value={filters.building}
+      onChange={(v) => handleFilterChange("building", v)}
+      ariaLabel={t.colBuilding}
+      options={[{ value: "all", label: t.allProp }, ...buildings.map((b) => ({ value: b, label: b }))]}
+    />
+  );
+  const range = (
+    <AdminDateRangePicker
+      from={filters.from}
+      to={filters.to}
+      onChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
+      localeTag={localeTagOf(locale)}
+      ariaLabel={shared.pickRange}
+      labels={{
+        prevMonth: shared.datePrevMonth,
+        nextMonth: shared.dateNextMonth,
+        thisMonth: shared.dateThisMonth,
+        reset: shared.dateReset,
+        typeStart: shared.dateTypeStart,
+        typeEnd: shared.dateTypeEnd,
+        pickYear: shared.datePickYear,
+        pickMonth: shared.datePickMonth,
+        apply: shared.dateApply,
+      }}
+    />
+  );
+  const views: { key: LFView; label: string }[] = [
+    { key: "board", label: t.vStored },
+    { key: "done", label: t.vReturned },
+    { key: "disposal", label: t.vDisposal },
+    { key: "list", label: t.vAll },
+  ];
 
   return (
     <>
-      <div className="opsbar opsbar--5">
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Package />
-            </span>
-            {t.kpiStored}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.stored > 0 ? "" : " is-muted"}`}>{V(kpi.stored)}</div>
-          <div className="opscell__sub">{loadError ? t.errT : t.kpiStoredSub}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Hourglass />
-            </span>
-            {t.kpiSoon}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.soon > 0 ? " is-progress" : " is-muted"}`}>
-            {V(kpi.soon)}
-          </div>
-          <div className="opscell__sub">{loadError ? t.errT : t.kpiSoonSub}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <TriangleAlert />
-            </span>
-            {t.kpiExpired}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.expired > 0 ? " is-danger" : " is-muted"}`}>
-            {V(kpi.expired)}
-          </div>
-          <div className="opscell__sub">
-            {loadError ? (
-              " "
-            ) : kpi.expired ? (
-              <span className="opscell__flag">
-                <span className="ic">
-                  <TriangleAlert />
-                </span>
-                {t.kpiExpired}
-              </span>
-            ) : (
-              <span style={{ color: "var(--adm-muted)" }}>{t.within}</span>
-            )}
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Undo2 />
-            </span>
-            {t.kpiReturned}
-          </div>
-          <div className={`opscell__v${loadError ? " is-muted" : " is-done"}`}>{V(kpi.returnedMonth)}</div>
-          <div className="opscell__sub">{loadError ? t.errT : t.thisMonth}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Trash2 />
-            </span>
-            {t.kpiDisposed}
-          </div>
-          <div className={`opscell__v${loadError ? " is-muted" : ""}`}>{V(kpi.disposedMonth)}</div>
-          <div className="opscell__sub">{loadError ? t.errT : t.thisMonth}</div>
-        </div>
-      </div>
-
-      <div className="cviewbar">
+      {/* 화이트 리디자인(2026-10-14, 시안 LF-PC 외): 보기 탭 넷(아이콘 없음) + 보기마다 고르기가 한 줄에. */}
+      <div className="cviewbar mw-viewbar lfw-viewbar">
         <div className="lviews" style={{ margin: 0 }}>
-          <button type="button" className={view === "board" ? "on" : ""} onClick={() => handleViewChange("board")}>
-            <span className="ic">
-              <LayoutGrid />
-            </span>
-            {t.vBoard}
-          </button>
-          <button type="button" className={view === "list" ? "on" : ""} onClick={() => handleViewChange("list")}>
-            <span className="ic">
-              <Clock />
-            </span>
-            {t.vList}
-          </button>
-          <button type="button" className={view === "done" ? "on" : ""} onClick={() => handleViewChange("done")}>
-            <span className="ic">
-              <CircleCheck />
-            </span>
-            {t.vDone}
-          </button>
-          <button
-            type="button"
-            className={view === "disposal" ? "on" : ""}
-            onClick={() => handleViewChange("disposal")}
-          >
-            <span className="ic">
-              <Trash2 />
-            </span>
-            {t.vDisposal}
-          </button>
-        </div>
-        <span style={{ flex: 1 }} />
-        {view === "board" ? (
-          <>
-            <span className="robadge">
-              <span className="ic">
-                <Eye />
-              </span>
-              {t.readonly}
-            </span>
-            <button type="button" className="syncchip" onClick={handleSync}>
-              <span className="syncchip__dot" />
-              {t.syncLabel} · {t.syncAgo}
-              <span className="ic">
-                <RefreshCw />
-              </span>
+          {views.map((v) => (
+            <button key={v.key} type="button" className={view === v.key ? "on" : ""} onClick={() => handleViewChange(v.key)}>
+              {v.label}
             </button>
-          </>
+          ))}
+        </div>
+        {view === "board" ? (
+          <button type="button" className="mw-live" onClick={handleSync}>
+            <i aria-hidden="true" />
+            {t.syncLabel} · {t.syncAgo}
+          </button>
+        ) : (
+          range
+        )}
+        <span className="lfw-viewbar__sp" />
+        {view === "list" ? (
+          <div className="qsearch qsearch--inline">
+            <span className="ic">
+              <Search aria-hidden="true" />
+            </span>
+            <input
+              placeholder={t.search}
+              aria-label={t.search}
+              value={filters.query}
+              onChange={(e) => handleFilterChange("query", e.target.value)}
+            />
+            {filters.query ? (
+              <button type="button" className="qsearch__clear" onClick={() => handleFilterChange("query", "")} aria-label={t.clearFilter}>
+                <span className="ic">
+                  <X aria-hidden="true" />
+                </span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {view === "list" ? (
+          <AdmDropdown
+            size="sm"
+            value={filters.status}
+            onChange={(v) => handleFilterChange("status", v as LFFilters["status"])}
+            ariaLabel={t.colStatus}
+            options={[{ value: "all", label: t.allStatus }, ...lostItemStatuses.map((s) => ({ value: s, label: statusLabel(s, t) }))]}
+          />
+        ) : null}
+        {view === "done" ? (
+          <AdmDropdown
+            size="sm"
+            value={filters.method}
+            onChange={(v) => handleFilterChange("method", v as LFFilters["method"])}
+            ariaLabel={t.colMethod}
+            options={[
+              { value: "all", label: t.allMethod },
+              { value: "delivery", label: t.methodDelivery },
+              { value: "pickup", label: t.methodPickup },
+            ]}
+          />
+        ) : null}
+        {buildingDd}
+        {view === "board" ? (
+          <AdmDropdown
+            size="sm"
+            value={filters.category}
+            onChange={(v) => handleFilterChange("category", v as LFFilters["category"])}
+            ariaLabel={t.pCategory}
+            options={[{ value: "all", label: t.allCategory }, ...CATEGORY_ORDER.map((c) => ({ value: c, label: categoryLabel(c, t) }))]}
+          />
+        ) : null}
+        {view === "list" ? (
+          <AdmDropdown
+            size="sm"
+            value={filters.reporter}
+            onChange={(v) => handleFilterChange("reporter", v)}
+            ariaLabel={t.colReporter}
+            options={[{ value: "all", label: t.allReporter }, ...reporterOptionsOf(items).map((r) => ({ value: r.id, label: r.name }))]}
+          />
         ) : null}
       </div>
 
-      <div className="cbody">
+      {view === "board" ? (
+        <div className="wkpis lfw-kpis">
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiStored}</span>
+            <span className="wkpi__v">
+              {V(kpi.active)}
+              <small>{t.countUnit}</small>
+            </span>
+            <span className="wkpi__d">{t.kpiActiveSub}</span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiSoon}</span>
+            <span className={`wkpi__v${!loadError && kpi.soon > 0 ? " is-danger" : ""}`}>
+              {V(kpi.soon)}
+              <small>{t.countUnit}</small>
+            </span>
+            <span className="wkpi__d">{t.kpiSoonAuto}</span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiReturned}</span>
+            <span className="wkpi__v">
+              {V(kpi.returnedMonth)}
+              <small>{t.countUnit}</small>
+            </span>
+            <span className="wkpi__d">
+              {t.methodDelivery} {V(kpi.retDelivery)} · {t.methodPickup} {V(kpi.retPickup)}
+            </span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiDisposed}</span>
+            <span className="wkpi__v">
+              {V(kpi.disposedMonth)}
+              <small>{t.countUnit}</small>
+            </span>
+            <span className="wkpi__d">
+              {t.modeAuto} {V(kpi.dispAuto)} · {t.modeManual} {V(kpi.disposedMonth - kpi.dispAuto)}
+            </span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.vDisposal}</span>
+            <span className="wkpi__v">
+              {V(kpi.log)}
+              <small>{t.countUnit}</small>
+            </span>
+            <span className="wkpi__d">
+              {t.deleteSoon} {V(kpi.delSoon)} · {t.keep90}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="cbody lfw-body">
         {view === "board" ? (
           loadError ? (
-            <div className="card">
-              <div className="state">
-                <div className="state__ic err">
-                  <TriangleAlert aria-hidden="true" />
-                </div>
-                <div className="state__t">{t.errT}</div>
-                <div className="state__s">{t.errS}</div>
-                <button type="button" className="btn btn--pri btn--sm" style={{ marginTop: 16 }} onClick={handleSync}>
-                  {t.retry}
-                </button>
-              </div>
+            <div className="lfw-empty">
+              <TriangleAlert aria-hidden="true" />
+              <b>{t.errT}</b>
+              <span>{t.errS}</span>
+              <button type="button" className="btn btn--pri btn--sm" onClick={handleSync}>
+                {t.retry}
+              </button>
             </div>
           ) : (
             <LostFoundBoard
               items={items}
               t={t}
               locale={locale}
-              query={filters.query}
+              filters={filters}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onClearQuery={() => handleFilterChange("query", "")}
+              onClearFilters={handleClearFilters}
             />
           )
         ) : view === "list" ? (
           <LostFoundList
             items={items}
-            allItems={items}
             t={t}
-            sharedLabels={dictionary.admin.shared}
             locale={locale}
             filters={filters}
-            onFilterChange={handleFilterChange}
-            onRangeChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
             onClearFilters={handleClearFilters}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -379,13 +427,9 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
         ) : view === "done" ? (
           <LostFoundDone
             items={items}
-            allItems={items}
             t={t}
-            sharedLabels={dictionary.admin.shared}
             locale={locale}
             filters={filters}
-            onFilterChange={handleFilterChange}
-            onRangeChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
             onClearFilters={handleClearFilters}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -395,13 +439,9 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
         ) : (
           <LostFoundDisposal
             items={items}
-            allItems={items}
             t={t}
-            sharedLabels={dictionary.admin.shared}
             locale={locale}
             filters={filters}
-            onFilterChange={handleFilterChange}
-            onRangeChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
             onClearFilters={handleClearFilters}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -427,7 +467,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
           item={confirmItem}
           t={t}
           locale={locale}
-          sharedLabels={dictionary.admin.shared}
+          sharedLabels={shared}
           pending={isPending}
           onCancel={() => setConfirm(null)}
           onConfirm={handleConfirmAction}

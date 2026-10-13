@@ -11,6 +11,8 @@ export type { AdminLostItemVM, AdminLostFoundData };
 
 export type LFFilters = {
   status: LostItemStatus | "all";
+  category: LostItemCategory | "all";
+  method: "delivery" | "pickup" | "all";
   building: string;
   reporter: string;
   from: string;

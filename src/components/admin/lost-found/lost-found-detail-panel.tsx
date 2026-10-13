@@ -1,39 +1,17 @@
 "use client";
 
-// Admin 분실물 console — 우측 상세 패널. 진행(active) 항목은 반환/폐기/보관연장 액션 존을, 종결
-// (반환·폐기) 항목은 처리 이력을 보여준다. 예외 개입(상태 정정/삭제)은 항상 하단에 노출.
-// Mirrors maintenance-detail-panel.tsx.
+// Admin 분실물 console — 우측 상세 패널. 화이트 리디자인(2026-10-14, 시안 LF-PC · LFReturn-PC): 위 한 줄(임박 · 상태 ·
+// 분류) + 삭제 · 닫기, 제목, 사진, 진행 중이면 「자동 폐기까지 D-n」 막대, 정보 줄. 아래는 진행 중이면
+// [반환 처리] · [보관 연장 | 폐기 처리] · 상태 정정, 완료면 「관리자 예외 개입」 복원. 상자 · 칩 없음.
 import Image from "next/image";
-import {
-  ArchiveRestore,
-  Camera,
-  CalendarPlus,
-  Hourglass,
-  Info,
-  MapPin,
-  Pencil,
-  Handshake,
-  ShieldCheck,
-  Trash2,
-  Truck,
-  Undo2,
-  User,
-  X,
-} from "lucide-react";
+import { RotateCcw, Trash2, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
-import { LOST_FOUND_DISPOSAL_RETENTION_DAYS } from "@/lib/lost-found-constants";
 import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { fmtDate, fmtDateTime, isActive, tpl } from "./lost-found-console-data";
-import {
-  CategoryChip,
-  DdayBadge,
-  DelDdayBadge,
-  ExtBadge,
-  StatusPill,
-  type LFCopy,
-} from "./lost-found-console-shared";
+import { categoryLabel, statusLabel, type LFCopy } from "./lost-found-console-shared";
+import { dueText, storageTotal } from "./lost-found-board";
 
 export type LFActionKind = "return" | "dispose" | "extend" | "correct" | "restore" | "delete";
 
@@ -47,24 +25,16 @@ type PanelProps = {
   disabled?: boolean;
 };
 
-function Kv({ label, children }: { label: string; children: React.ReactNode }) {
+function Gallery({ urls }: { urls: readonly string[] }) {
   return (
-    <div className="kv">
-      <span className="kv__k">{label}</span>
-      <span className="kv__v">{children}</span>
+    <div className="lfp__gal">
+      {urls.map((url) => (
+        <a className="lfp__shot" href={url} key={url} rel="noreferrer" target="_blank">
+          <Image alt="" src={url} fill sizes="170px" />
+        </a>
+      ))}
     </div>
   );
-}
-
-function storagePct(storedDays: number, daysLeft: number): number {
-  const total = storedDays + Math.max(daysLeft, 0);
-  if (total <= 0) return 100;
-  return Math.min(100, Math.max(0, (storedDays / total) * 100));
-}
-
-function deletePct(deleteDaysLeft: number): number {
-  const elapsed = LOST_FOUND_DISPOSAL_RETENTION_DAYS - Math.max(deleteDaysLeft, 0);
-  return Math.min(100, Math.max(0, (elapsed / LOST_FOUND_DISPOSAL_RETENTION_DAYS) * 100));
 }
 
 export function LostFoundDetailPanel({ item, t, adminRestoreLabel, locale, onClose, onAction, disabled }: PanelProps) {
@@ -72,365 +42,150 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, locale, onClo
   if (!item) return null;
 
   const active = isActive(item);
-  const terminal = item.status === "returned" || item.status === "disposed";
+  const flag = active && item.isExpired ? t.expiredFlag : active && item.isDueSoon ? t.soonFlag : null;
+  const total = storageTotal(item);
+  const pct = Math.min(100, Math.round((item.storedDays / total) * 100));
+  const guest = item.guest
+    ? t.guestStay
+        .replace("{name}", item.guest.name)
+        .replace("{in}", fmtDate(item.guest.checkIn, locale))
+        .replace("{out}", fmtDate(item.guest.checkOut, locale))
+    : null;
+  const memo = item.handlingMemo ? localizeLostFoundMemo(item.handlingMemo, adminRestoreLabel) : null;
 
   return (
     <>
       <div className="panel-scrim on" onClick={onClose} />
-      <aside ref={panelRef} className="panel on" role="dialog" aria-label={t.pKicker} tabIndex={-1}>
+      <aside ref={panelRef} className="panel on lfp" role="dialog" aria-label={t.pKicker} tabIndex={-1}>
         <div className="panel__h">
           <div className="panel__top">
-            <span className="panel__kicker">
-              {t.pKicker} · {item.shortId}
+            <span className="lfp__kick">
+              {flag ? <span className="lfp__flag">{flag}</span> : null}
+              {flag && item.status === "disposal_scheduled" ? null : (
+                <span className={`lfp__st is-${item.status}`}>{statusLabel(item.status, t)}</span>
+              )}
+              {item.status === "returned" && item.returnMethod ? (
+                <span>{item.returnMethod === "delivery" ? t.methodDelivery : t.methodPickup}</span>
+              ) : null}
+              {item.isExtended && active ? <span>{t.extended}</span> : null}
+              <span>{categoryLabel(item.category, t)}</span>
             </span>
-            <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
-              <X />
-            </button>
+            <span className="lfp__acts">
+              <button type="button" className="lfp__del" title={t.del} aria-label={t.del} onClick={() => onAction("delete", item.id)}>
+                <Trash2 aria-hidden="true" />
+              </button>
+              <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
+                <X />
+              </button>
+            </span>
           </div>
-          <div className="mpanel__title" style={{ marginTop: 11 }}>
-            {item.itemName}
-          </div>
-          <div className="mpanel__chips">
-            <StatusPill status={item.status} t={t} />
-            <CategoryChip category={item.category} t={t} />
-            {item.isExtended ? <ExtBadge t={t} /> : null}
-            {active ? <DdayBadge item={item} t={t} /> : null}
-            {item.status === "disposed" ? (
-              <DelDdayBadge daysLeft={item.deleteDaysLeft ?? 0} soon={item.isDeleteSoon} t={t} />
-            ) : null}
+          <div className="lfp__title">{item.itemName}</div>
+          <div className="lfp__sub">
+            {item.room ? <b className="mono">{item.room}</b> : <b>{t.buildingWhole}</b>} · {item.buildingLabel}
           </div>
         </div>
 
-        <div className="panel__body">
-          {/* 사진 */}
-          <div className="pblock">
-            <div className="pblock__t">{item.photos.length ? `${t.pPhotos} · ${item.photos.length}` : t.pPhotos}</div>
-            {item.photos.length ? (
-              <div className="pgal">
-                {item.photos.map((url) => (
-                  <a className="pshot" href={url} key={url} rel="noreferrer" target="_blank">
-                    <Image alt="" src={url} fill sizes="200px" />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="pnophoto">
-                <span className="ic">
-                  <Camera aria-hidden="true" />
-                </span>
-                {t.noPhoto}
-              </div>
-            )}
-          </div>
+        <div className="panel__body lfp__body">
+          {item.photos.length ? <Gallery urls={item.photos} /> : <p className="lfp__dim">{t.noPhoto}</p>}
 
-          {/* 설명 */}
-          <div className="pblock">
-            <div className="pblock__t">{t.pDesc}</div>
-            <div className="mdesc">{item.description || "—"}</div>
-          </div>
-
-          {/* 기본정보 */}
-          <div className="pblock">
-            <div className="pblock__t">{t.pInfo}</div>
-            <Kv label={t.pCategory}>
-              <CategoryChip category={item.category} t={t} align="end" />
-            </Kv>
-            <Kv label={t.pLocation}>
-              <span className="mono">{item.room ?? t.buildingWhole}</span> · {item.buildingLabel}
-            </Kv>
-            <Kv label={t.pStatus}>
-              <StatusPill status={item.status} t={t} />
-            </Kv>
-            <Kv label={t.pReporter}>{item.reporterName}</Kv>
-            <Kv label={t.pFoundAt}>
-              <span className="mono">{fmtDateTime(item.foundAt, locale)}</span>
-            </Kv>
-          </div>
-
-          {/* 게스트 */}
-          <div className="pblock">
-            <div className="pblock__t">{t.pGuest}</div>
-            {item.guest ? (
-              <div className="rptile rptile--guest">
-                <span className="rptile__ic">
-                  <span className="ic">
-                    <User aria-hidden="true" />
-                  </span>
-                </span>
-                <span className="rptile__b">
-                  <span className="rptile__t">{item.guest.name}</span>
-                  <span className="rptile__s">
-                    {fmtDate(item.guest.checkIn, locale)} – {fmtDate(item.guest.checkOut, locale)}
-                  </span>
-                </span>
-              </div>
-            ) : (
-              <div className="dimnote">
-                <span className="ic">
-                  <Info aria-hidden="true" />
-                </span>
-                {t.noGuest}
-              </div>
-            )}
-          </div>
-
-          {/* 보관 시계 (active) */}
           {active ? (
-            <div className="pblock">
-              <div className="pblock__t">{t.pStorage}</div>
-              {item.isExpired || item.isDueSoon ? (
-                <div className={`stnote${item.isExpired ? " stnote--expired" : " stnote--soon"}`}>
-                  <span className="stnote__ic">
-                    <span className="ic">
-                      {item.isExpired ? <Trash2 aria-hidden="true" /> : <Hourglass aria-hidden="true" />}
-                    </span>
-                  </span>
-                  <div>
-                    <div className="stnote__t">{item.isExpired ? t.kpiExpired : t.kpiSoon}</div>
-                    <div className="stnote__s">{item.isExpired ? t.expiredNote : t.dueSoonNote}</div>
-                  </div>
-                </div>
-              ) : null}
-              <div className="sgrid" style={{ marginTop: 10 }}>
-                <div className="scell">
-                  <div className="scell__k">{t.pStoredDays}</div>
-                  <div className="scell__v">
-                    {item.storedDays}
-                    <span className="u">{t.days}</span>
-                  </div>
-                </div>
-                <div className="scell">
-                  <div className="scell__k">{t.pDueDate}</div>
-                  <div className={`scell__v${item.isExpired ? " is-expired" : item.isDueSoon ? " is-soon" : ""}`}>
-                    <span className="mono">{fmtDate(item.dueDate, locale)}</span>
-                  </div>
-                </div>
+            <div className="lfp__clock">
+              <div className="lfp__clockh">
+                <span>{t.autoDueIn}</span>
+                <b className={item.isDueSoon || item.isExpired ? "is-soon" : ""}>{dueText(item, t, locale)}</b>
               </div>
-              <div className="sbar">
-                <div
-                  className={`sbar__fill${item.isExpired ? " is-expired" : item.isDueSoon ? " is-soon" : ""}`}
-                  style={{ width: `${storagePct(item.storedDays, item.daysLeft)}%` }}
-                />
-              </div>
-              <div className="stnote__s" style={{ marginTop: 8 }}>
-                {item.daysLeft >= 0 ? tpl(t.daysLeft, item.daysLeft) : tpl(t.dOver, Math.abs(item.daysLeft))}
-              </div>
-              {item.isExtended ? (
-                <div className="infonote" style={{ marginTop: 10 }}>
-                  {item.holdReason || t.extended}
-                </div>
-              ) : null}
+              <span className="lfw-bar lfw-bar--lg">
+                <i className={item.isExtended && !item.isDueSoon ? "is-ext" : ""} style={{ width: `${pct}%` }} />
+              </span>
+              <span className="lfp__clocks">
+                {tpl(t.regOn, fmtDate(item.foundAt.split(" ")[0], locale))} · {tpl(t.storedNth, item.storedDays)} ·{" "}
+                {tpl(t.dueOnDate, fmtDate(item.dueDate, locale))}
+              </span>
             </div>
           ) : null}
 
-          {/* 삭제 시계 (disposed) */}
-          {item.status === "disposed" ? (
-            <div className="pblock">
-              <div className="pblock__t">{t.pDelDate}</div>
-              {item.isDeleteSoon ? (
-                <div className="stnote stnote--soon">
-                  <span className="stnote__ic">
-                    <span className="ic">
-                      <Trash2 aria-hidden="true" />
-                    </span>
-                  </span>
-                  <div>
-                    <div className="stnote__t">{t.deleteSoon}</div>
-                    <div className="stnote__s">{t.delSoonNote}</div>
-                  </div>
-                </div>
-              ) : null}
-              <div className="sgrid" style={{ marginTop: 10 }}>
-                <div className="scell">
-                  <div className="scell__k">{t.pDisposedAt}</div>
-                  <div className="scell__v">
-                    <span className="mono">{item.disposedDate ? fmtDate(item.disposedDate, locale) : "—"}</span>
-                  </div>
-                </div>
-                <div className="scell">
-                  <div className="scell__k">{t.pDelDate}</div>
-                  <div className={`scell__v${item.isDeleteSoon ? " is-soon" : ""}`}>
-                    <span className="mono">{item.deleteDate ? fmtDate(item.deleteDate, locale) : "—"}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="sbar">
-                <div
-                  className={`sbar__fill${item.isDeleteSoon ? " is-soon" : ""}`}
-                  style={{ width: `${deletePct(item.deleteDaysLeft ?? 0)}%` }}
-                />
-              </div>
-              <div className="stnote__s" style={{ marginTop: 8 }}>
-                {t.pDelClock} · {item.deleteDaysLeft ?? 0}
-                {t.days}
-              </div>
-            </div>
+          <dl className="lfp__dl">
+            {!active ? (
+              <>
+                <dt>{t.pClosedAt}</dt>
+                <dd>
+                  {fmtDateTime(item.handledAt, locale)} · {item.handledByName ?? t.sysAuto}
+                </dd>
+                {item.status === "returned" && item.returnTrackingNo ? (
+                  <>
+                    <dt>{t.pTracking}</dt>
+                    <dd className="mono">{item.returnTrackingNo}</dd>
+                  </>
+                ) : null}
+                {item.status === "disposed" && item.deleteDate ? (
+                  <>
+                    <dt>{t.pDelDate}</dt>
+                    <dd className={item.isDeleteSoon ? "lfp__danger" : ""}>
+                      {tpl(t.delIn, fmtDate(item.deleteDate, locale))} · {tpl(t.delDaysLeft, item.deleteDaysLeft ?? 0)}
+                    </dd>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+            <dt>{t.guestShort}</dt>
+            <dd>{guest ?? <span className="lfp__muted">—</span>}</dd>
+            <dt>{t.pReporter}</dt>
+            <dd>
+              {item.reporterName} · {fmtDateTime(item.foundAt, locale)}
+            </dd>
+            {item.isExtended && item.holdReason ? (
+              <>
+                <dt>{t.pExtReason}</dt>
+                <dd>{item.holdReason}</dd>
+              </>
+            ) : null}
+            <dt>{t.memoShort}</dt>
+            <dd>{item.description || <span className="lfp__muted">—</span>}</dd>
+            {!active ? (
+              <>
+                <dt>{t.pCloseMemo}</dt>
+                <dd>{memo ?? <span className="lfp__muted">{t.noMemo}</span>}</dd>
+              </>
+            ) : null}
+          </dl>
+
+          {!active && item.handlingPhotos.length ? (
+            <>
+              <div className="lfp__sec">{t.pResPhotos}</div>
+              <Gallery urls={item.handlingPhotos} />
+            </>
           ) : null}
+        </div>
 
-          {/* 처리 이력 (terminal) */}
-          {terminal ? (
-            <div className="pblock">
-              <div className="pblock__t">{t.pHistory}</div>
-              <Kv label={t.pStatus}>
-                <StatusPill status={item.status} t={t} />
-              </Kv>
-              <Kv label={t.pClosedBy}>{item.handledByName ?? t.sysAuto}</Kv>
-              <Kv label={t.pClosedAt}>
-                <span className="mono">{fmtDateTime(item.handledAt, locale)}</span>
-              </Kv>
-              {item.status === "returned" && item.returnMethod ? (
-                <Kv label={t.pMethod}>
-                  <span className="methline">
-                    <span className="ic">
-                      {item.returnMethod === "delivery" ? (
-                        <Truck aria-hidden="true" />
-                      ) : (
-                        <Handshake aria-hidden="true" />
-                      )}
-                    </span>
-                    {item.returnMethod === "delivery" ? t.methodDelivery : t.methodPickup}
-                  </span>
-                </Kv>
-              ) : null}
-              {item.status === "returned" && item.returnMethod === "delivery" && item.returnTrackingNo ? (
-                <Kv label={t.pTracking}>
-                  <span className="mono">{item.returnTrackingNo}</span>
-                </Kv>
-              ) : null}
-              {item.status === "disposed" ? (
-                <Kv label={t.pMethod}>
-                  {item.isAutoDisposed ? (
-                    <span className="syschip">
-                      <span className="ic">
-                        <Hourglass aria-hidden="true" />
-                      </span>
-                      {t.sysAuto}
-                    </span>
-                  ) : (
-                    <span className="methline">
-                      <span className="ic">
-                        <Pencil aria-hidden="true" />
-                      </span>
-                      {t.modeManual}
-                    </span>
-                  )}
-                </Kv>
-              ) : null}
-
-              <div className="pblock__t" style={{ marginTop: 12 }}>
-                {t.pCloseMemo}
-              </div>
-              {item.handlingMemo ? (
-                <div className="infonote">{localizeLostFoundMemo(item.handlingMemo, adminRestoreLabel)}</div>
-              ) : (
-                <div className="dimnote">
-                  <span className="ic">
-                    <Info aria-hidden="true" />
-                  </span>
-                  {t.noMemo}
-                </div>
-              )}
-
-              <div className="pblock__t" style={{ marginTop: 12 }}>
-                {item.handlingPhotos.length ? `${t.pResPhotos} · ${item.handlingPhotos.length}` : t.pResPhotos}
-              </div>
-              {item.handlingPhotos.length ? (
-                <div className="pgal pgal--res">
-                  {item.handlingPhotos.map((url) => (
-                    <a className="pshot pshot--res" href={url} key={url} rel="noreferrer" target="_blank">
-                      <Image alt="" src={url} fill sizes="200px" />
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <div className="dimnote">
-                  <span className="ic">
-                    <Camera aria-hidden="true" />
-                  </span>
-                  {t.noResPhoto}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {/* 능동 처리 (active) */}
+        <div className="panel__foot lfp__foot">
           {active ? (
-            <div className="actzone">
-              <div className="actzone__t">
-                <span className="ic">
-                  <MapPin aria-hidden="true" />
-                </span>
-                {t.activeT}
-              </div>
-              <div className="actzone__s">{t.activeS}</div>
-              <div className="actzone__btns">
-                <button type="button" className="actbtn actbtn--return" onClick={() => onAction("return", item.id)}>
-                  <span className="ic">
-                    <Undo2 aria-hidden="true" />
-                  </span>
-                  {t.actReturn}
-                </button>
-                <button type="button" className="actbtn actbtn--dispose" onClick={() => onAction("dispose", item.id)}>
-                  <span className="ic">
-                    <Trash2 aria-hidden="true" />
-                  </span>
-                  {t.actDispose}
-                </button>
-                <button type="button" className="actbtn actbtn--extend" onClick={() => onAction("extend", item.id)}>
-                  <span className="ic">
-                    <CalendarPlus aria-hidden="true" />
-                  </span>
+            <>
+              <button type="button" className="btn btn--pri lfp__main" onClick={() => onAction("return", item.id)}>
+                {t.actReturn}
+              </button>
+              <div className="lfp__two">
+                <button type="button" className="btn lfp__soft" onClick={() => onAction("extend", item.id)}>
                   {t.actExtend}
                 </button>
+                <button type="button" className="btn lfp__gray" onClick={() => onAction("dispose", item.id)}>
+                  {t.actDispose}
+                </button>
               </div>
-            </div>
-          ) : null}
-
-          {/* 예외 개입 */}
-          <div className="exczone">
-            <div className="exczone__t">
-              <span className="ic">
-                <ShieldCheck aria-hidden="true" />
-              </span>
-              {t.exceptionT}
-            </div>
-            <div className="exczone__s">{t.exceptionS}</div>
-            <div className="exczone__btns">
-              {active ? (
-                <button type="button" className="excbtn excbtn--force" onClick={() => onAction("correct", item.id)}>
-                  <span className="ic">
-                    <Pencil aria-hidden="true" />
-                  </span>
-                  {t.actCorrect}
-                </button>
-              ) : null}
-              {terminal ? (
-                <button type="button" className="excbtn excbtn--restore" onClick={() => onAction("restore", item.id)}>
-                  <span className="ic">
-                    <ArchiveRestore aria-hidden="true" />
-                  </span>
-                  {t.actRestore}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="excbtn excbtn--del"
-                title={t.del}
-                aria-label={t.del}
-                onClick={() => onAction("delete", item.id)}
-              >
-                <span className="ic">
-                  <Trash2 aria-hidden="true" />
-                </span>
+              <button type="button" className="lfp__link" onClick={() => onAction("correct", item.id)}>
+                <RotateCcw aria-hidden="true" />
+                {t.actCorrect}
               </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="panel__foot">
-          <button type="button" className="btn btn--ghost btn--block" onClick={onClose}>
-            {t.close}
-          </button>
+            </>
+          ) : (
+            <>
+              <span className="lfp__exc">{t.exceptionT}</span>
+              <button type="button" className="btn lfp__gray lfp__restore" onClick={() => onAction("restore", item.id)}>
+                <RotateCcw aria-hidden="true" />
+                {t.mrsConfirm}
+              </button>
+              <span className="lfp__note">{t.restoreNote}</span>
+            </>
+          )}
         </div>
       </aside>
     </>

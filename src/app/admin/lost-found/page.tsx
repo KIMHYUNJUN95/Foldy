@@ -4,7 +4,7 @@ import { getAdminLostFound } from "@/lib/admin-lost-found";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 
-// Admin · 분실물 — 현황 보드 / 목록·이력 / 완료 / 폐기 내역 console. Ported from the Claude Design
+// Admin · 분실물 — 보관 중 / 반환 / 폐기 내역 / 전체 기록 console (화이트 리디자인 2026-10-14). Ported from the Claude Design
 // handoff on 2026-07-16 and wired to real data (lost_items + linked reservation) the same day. See
 // docs/product/09-lost-found-workflow.md.
 export default async function AdminLostFoundPage() {

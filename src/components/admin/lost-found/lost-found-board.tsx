@@ -1,178 +1,135 @@
 "use client";
 
-// Admin 분실물 console — 현황 보드. 3개 상태 컬럼(접수 / 보관중 / 폐기예정); 종결(반환·폐기)은 별도
-// "완료"/"폐기 내역" 뷰에서만 본다. Mirrors maintenance-board.tsx.
-import { Clock, MapPin, Search } from "lucide-react";
+// Admin 분실물 console — 「보관 중」 보기. 화이트 리디자인(2026-10-14, 시안 LF-PC): 상태 3칸 보드 대신
+// 자동 폐기까지 남은 날 순으로 한 줄씩 세운 「보관 타임라인」. 줄마다 품목 · 위치 · 보관 경과 막대 · D-day.
+// 종결(반환 · 폐기)은 「반환」 · 「폐기 내역」 보기에서만 본다.
+import Image from "next/image";
+import { Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
-import {
-  BOARD_ORDER,
-  LOST_STATUS,
-  locationLabel,
-  sortForBoard,
-  tpl,
-} from "./lost-found-console-data";
-import {
-  CATEGORY_ICON,
-  CategoryChip,
-  DdayBadge,
-  ExtBadge,
-  PhotoBadge,
-  ReporterAvatar,
-  STATUS_ICON,
-  copyOf,
-  type LFCopy,
-} from "./lost-found-console-shared";
+import { fmtDate, isActive, sortForBoard, tpl, type LFFilters } from "./lost-found-console-data";
+import { CATEGORY_ICON, categoryLabel, type LFCopy } from "./lost-found-console-shared";
 
 type BoardProps = {
   items: AdminLostItemVM[];
   t: LFCopy;
   locale: Locale;
-  query: string;
+  filters: LFFilters;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onClearQuery: () => void;
+  onClearFilters: () => void;
 };
 
-function LFCard({
+/** 보관 경과 막대 — 지난 날 / (지난 날 + 남은 날). 만료면 100%. */
+export function storageTotal(item: AdminLostItemVM): number {
+  return Math.max(1, item.storedDays + Math.max(item.daysLeft, 0));
+}
+
+export function dueText(item: AdminLostItemVM, t: LFCopy, locale: Locale): string {
+  if (item.isExtended && !item.isDueSoon && !item.isExpired) return fmtDate(item.dueDate, locale);
+  if (item.daysLeft < 0) return tpl(t.dOver, Math.abs(item.daysLeft));
+  return tpl(t.dueOn, item.daysLeft);
+}
+
+function Row({
   item,
   t,
+  locale,
   selected,
   onSelect,
 }: {
   item: AdminLostItemVM;
   t: LFCopy;
+  locale: Locale;
   selected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const cls = ["mcard", `is-${LOST_STATUS[item.status].cls}`, item.isExpired ? "is-expired" : "", selected ? "sel" : ""]
-    .filter(Boolean)
-    .join(" ");
   const CatIcon = CATEGORY_ICON[item.category];
+  const total = storageTotal(item);
+  const pct = Math.min(100, Math.round((item.storedDays / total) * 100));
+  const tone = item.isExpired || item.isDueSoon ? "is-soon" : item.isExtended ? "is-ext" : "";
+  const meta = [
+    categoryLabel(item.category, t),
+    item.isExtended ? tpl(t.extUntil, fmtDate(item.dueDate, locale)) : item.guest?.name ?? item.reporterName,
+    item.photoCount ? `${t.pPhotos} ${item.photoCount}` : null,
+  ].filter(Boolean);
 
   return (
-    <div
-      className={cls}
-      onClick={() => onSelect(item.id)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect(item.id);
-        }
-      }}
-    >
-      <div className="mcard__head">
-        <span className="mcard__thumb">
-          <span className="ic">
-            <CatIcon aria-hidden="true" />
-          </span>
-        </span>
-        <div className="mcard__hbody">
-          <div className="mcard__top">
-            <CategoryChip category={item.category} t={t} />
-            <span className="mcard__sp" />
-            {item.isExtended ? <ExtBadge t={t} /> : null}
-            <PhotoBadge count={item.photoCount} t={t} />
-          </div>
-          <div className="mcard__title">{item.itemName}</div>
-        </div>
-      </div>
-      <div className="mcard__mid">
-        <span className="mcard__loc">
-          <span className="ic">
-            <MapPin aria-hidden="true" />
-          </span>
-          {item.room ? (
-            <>
-              <span className="mono">{item.room}</span> · {item.buildingLabel}
-            </>
+    <button type="button" className={`lfw-tr${selected ? " on" : ""}`} onClick={() => onSelect(item.id)}>
+      <span className="lfw-tr__item">
+        <span className="lfw-thumb">
+          {item.photos[0] ? (
+            <Image alt="" src={item.photos[0]} fill sizes="40px" />
           ) : (
-            `${item.buildingLabel} · ${t.buildingWhole}`
+            <CatIcon aria-hidden="true" />
           )}
         </span>
-        <DdayBadge item={item} t={t} />
-      </div>
-      <div className="mcard__foot">
-        <span className="mcard__rep">
-          <ReporterAvatar id={item.reporterId} name={item.reporterName} className="mcard__av" />
-          <span>{item.reporterName}</span>
+        <span className="lfw-tr__txt">
+          <b>{item.itemName}</b>
+          <span>{meta.join(" · ")}</span>
         </span>
-        <span className={`mcard__el${item.isDueSoon ? " is-soon" : ""}`}>
-          <span className="ic">
-            <Clock aria-hidden="true" />
-          </span>
-          {tpl(t.storedFor, item.storedDays)}
+      </span>
+      <span className="lfw-tr__loc">
+        {item.room ? <b className="mono">{item.room}</b> : null} {item.room ? item.buildingLabel : `${item.buildingLabel} · ${t.buildingWhole}`}
+      </span>
+      <span className="lfw-tr__bar">
+        <span className="lfw-bar">
+          <i className={tone} style={{ width: `${pct}%` }} />
         </span>
-      </div>
-    </div>
+        <span className="lfw-tr__days">
+          {item.storedDays}/{total}
+          {t.days}
+        </span>
+      </span>
+      <span className={`lfw-tr__due ${tone}`}>{dueText(item, t, locale)}</span>
+    </button>
   );
 }
 
-export function LostFoundBoard({ items, t, query, selectedId, onSelect, onClearQuery }: BoardProps) {
-  const q = query.trim().toLowerCase();
-  const matched = items.filter((i) => {
-    if (i.status === "disposed" || i.status === "returned") return false;
-    if (!q) return true;
-    return (
-      i.itemName.toLowerCase().includes(q) ||
-      locationLabel(i, t.buildingWhole).toLowerCase().includes(q) ||
-      i.reporterName.toLowerCase().includes(q) ||
-      (i.room ? i.room.toLowerCase().includes(q) : false)
-    );
-  });
+export function LostFoundBoard({ items, t, locale, filters, selectedId, onSelect, onClearFilters }: BoardProps) {
+  const rows = sortForBoard(
+    items.filter(
+      (i) =>
+        isActive(i) &&
+        (filters.building === "all" || i.buildingLabel === filters.building) &&
+        (filters.category === "all" || i.category === filters.category),
+    ),
+  );
+  const filtered = filters.building !== "all" || filters.category !== "all";
 
-  if (!matched.length) {
-    return (
-      <div className="card">
-        <div className="state">
-          <div className="state__ic empty">
-            <Search aria-hidden="true" />
+  return (
+    <section className="lfw-tl">
+      <div className="lfw-tl__h">
+        <b>{t.tlTitle}</b>
+        <span>{t.tlSort}</span>
+        <span className="lfw-tl__rule">{t.tlRule}</span>
+      </div>
+      {rows.length ? (
+        <>
+          <div className="lfw-th">
+            <span>{t.colItem}</span>
+            <span>{t.colPlace}</span>
+            <span>{t.colElapsed}</span>
+            <span>{t.colAutoDue}</span>
           </div>
-          <div className="state__t">{t.emptyBoardT}</div>
-          <div className="state__s">{t.emptyBoardS}</div>
-          {q ? (
-            <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 16 }} onClick={onClearQuery}>
+          <div className="lfw-rows">
+            {rows.map((i) => (
+              <Row key={i.id} item={i} t={t} locale={locale} selected={selectedId === i.id} onSelect={onSelect} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="lfw-empty">
+          <Search aria-hidden="true" />
+          <b>{t.emptyBoardT}</b>
+          <span>{t.emptyBoardS}</span>
+          {filtered ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={onClearFilters}>
               {t.clearFilter}
             </button>
           ) : null}
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mboard-wrap">
-      <div className="mbkgrid">
-        {BOARD_ORDER.map((status) => {
-          const meta = LOST_STATUS[status];
-          const Icon = STATUS_ICON[status];
-          const col = sortForBoard(matched.filter((i) => i.status === status));
-          return (
-            <section className={`mbkcol mbkcol--${meta.cls}`} key={status}>
-              <div className="mbkcol__h">
-                <span className="mbkcol__ic">
-                  <span className="ic">
-                    <Icon aria-hidden="true" />
-                  </span>
-                </span>
-                <span className="mbkcol__t">{copyOf(t, meta.key)}</span>
-                <span className="mbkcol__c">{col.length}</span>
-              </div>
-              <div className="mbkcol__body">
-                {col.length ? (
-                  col.map((i) => (
-                    <LFCard key={i.id} item={i} t={t} selected={selectedId === i.id} onSelect={onSelect} />
-                  ))
-                ) : (
-                  <div className="mnone">{t.colNone}</div>
-                )}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

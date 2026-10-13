@@ -3497,8 +3497,17 @@
 .att.att--payw .payw-eye { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -6px 0; border: 0; background: none; color: #8b8898; border-radius: 50%; cursor: pointer; }
 .att.att--payw .payw-eye svg { width: 16px; height: 16px; }
 .att.att--payw .payw-eye:active { transform: scale(0.94); }
-.att.att--payw .payw-hero__v { margin-top: 4px; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; transition: filter 200ms ease; }
-.att.att--payw .payw-hero__v.is-hidden { filter: blur(12px); user-select: none; }
+.att.att--payw .payw-hero__v { display: inline-block; margin: -10px -20px -14px; padding: 14px 20px; align-self: flex-start; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; transition: color 200ms ease, text-shadow 200ms ease; }
+.att.att--payw .payw-hero__v.is-hidden {
+  /* 가리기: filter 대신 투명 글자 + 그림자(iOS 사각 잘림 회피, 위 entryrow 주석). 그림자가 화면 왼쪽 경계에서
+     일직선으로 잘려 보여서(2026-10-13 제보) 양끝을 마스크로 부드럽게 흐린다. */
+  color: transparent;
+  text-shadow: 0 0 14px var(--ink);
+  -webkit-mask-image: linear-gradient(90deg, transparent 20px, #000 60px, #000 calc(100% - 60px), transparent calc(100% - 20px));
+  mask-image: linear-gradient(90deg, transparent 20px, #000 60px, #000 calc(100% - 60px), transparent calc(100% - 20px));
+  user-select: none;
+  -webkit-user-select: none;
+}
 .att.att--payw .payw-hero__s { margin-top: 6px; font-size: 13px; color: #6b6878; }
 .att.att--payw .payw-hero__note { margin-top: 4px; font-size: 12px; color: #8b8898; }
 .att.att--payw .payw-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px 0; border-top: 1px solid #f0eff4; border-bottom: 1px solid #f0eff4; }

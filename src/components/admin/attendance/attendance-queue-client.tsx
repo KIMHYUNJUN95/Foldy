@@ -187,7 +187,7 @@ function SessionRow({
         <div className="who">
           <span
             className="uhead__av"
-            style={{ background: "var(--adm-primary)", width: 34, height: 34, borderRadius: 9 }}
+            style={{ width: 32, height: 32 }}
           >
             {initial(item.userName)}
           </span>
@@ -777,13 +777,7 @@ export function AttendanceQueueClient({
                         <div className="who">
                           <span
                             className="uhead__av"
-                            style={{
-                              background: "var(--adm-primary)",
-                              width: 34,
-                              height: 34,
-                              borderRadius: 9,
-                              fontSize: 13,
-                            }}
+                            style={{ width: 32, height: 32 }}
                           >
                             {initial(r.requesterName)}
                           </span>
@@ -927,10 +921,11 @@ export function AttendanceQueueClient({
                               <span
                                 className="uhead__av"
                                 style={{
-                                  background: "var(--adm-primary)",
+                                  background: "#ede7fc",
+                                  color: "#5a30cf",
                                   width: 30,
                                   height: 30,
-                                  borderRadius: 8,
+                                  borderRadius: "50%",
                                   fontSize: 12,
                                 }}
                               >

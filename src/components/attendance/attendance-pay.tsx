@@ -218,6 +218,7 @@ export function AttendancePay({
     return { n: i + 1, date, d, isRunning, isExcluded };
   });
   const maxMin = Math.max(60, ...view.days.map((d) => d.paidMinutes));
+  // 날짜 숫자는 1 · 5 · 10 … 만(근무일마다 쓰면 붙어서 겹친다, 2026-10-13 제보).
   // 막대가 좁아 숫자는 근무일이 적을 때만(이웃과 겹치지 않게). 진행 중 · 제외 사유는 아래 날짜 줄에.
   const showValues = view.days.length <= 8;
   function hm(mins: number) {
@@ -332,7 +333,7 @@ export function AttendancePay({
           <div className="payw-days" aria-hidden="true">
             {bars.map(({ n, date, d }) => (
               <span key={date} className={d ? "is-on" : undefined}>
-                {d || n === 1 || n % 5 === 0 || (n === monthDays && n % 5 >= 2) ? n : ""}
+                {n === 1 || n % 5 === 0 || (n === monthDays && n % 5 >= 3) ? n : ""}
               </span>
             ))}
           </div>

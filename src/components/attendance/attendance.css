@@ -39,7 +39,9 @@
 
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* clip(hidden 아님) — hidden 은 세로를 auto 로 바꿔 .att 자체가 스크롤 영역이 된다. 그러면 월 고르기 메뉴가
+     넘칠 때 PC 브라우저에 스크롤바가 생기고 메뉴가 잘렸다(2026-10-13 제보). */
+  overflow-x: clip;
 }
 .att *,
 .att *::before,
@@ -2060,8 +2062,10 @@
   box-shadow: 0 22px 48px -20px rgba(20, 32, 43, 0.42);
   max-height: 288px;
   overflow-y: auto;
+  scrollbar-width: none;
   animation: msw-pop 0.16s var(--ease-out);
 }
+.att .msw__menu::-webkit-scrollbar { display: none; }
 @keyframes msw-pop {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: none; }

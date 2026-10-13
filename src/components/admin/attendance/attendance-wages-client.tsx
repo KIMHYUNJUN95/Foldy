@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   ArrowUpRight,
-  ChevronRight,
   CircleAlert,
   Info,
   Lock,
@@ -150,93 +149,54 @@ export function AttendanceWagesClient({
           </div>
         </div>
       ) : (
-        <div className="card" style={{ overflow: "hidden" }}>
-          <table className="qtbl">
+        // 화이트 리디자인(2026-10-13, 시안 AttRate-PC): 카드 · 고용형태 배지 · 구간 수 대신 현재 시급 · 적용일 · 최근 변경 · 변경 이력(오른쪽 정렬).
+        <div>
+          <table className="qtbl wage-tbl">
             <thead>
               <tr>
                 <th style={{ paddingLeft: 16 }}>{c.wageColStaff}</th>
-                <th>{c.wageColEmployment}</th>
-                <th>{c.wageColCurrent}</th>
-                <th>{c.wageColFrom}</th>
-                <th>{c.wageColTiers}</th>
-                <th />
+                <th className="r">{c.wageColCurrent}</th>
+                <th className="r">{c.wageColFrom}</th>
+                <th className="r">{c.wageColRecent}</th>
+                <th className="r">{c.wageColChanges}</th>
               </tr>
             </thead>
             <tbody>
               {list.map((r) => {
                 const salaried = r.employment === "salaried";
                 const sel = panelId === r.userId;
+                const hist = [...r.history].filter((h) => h.rate != null).sort((x, y) => (x.from < y.from ? 1 : -1));
+                const yen = (n: number | null) => (n == null ? "—" : `${c.yenSym}${formatOptionalAdminYen(n, localeTag)}`);
                 return (
-                  <tr
-                    key={r.userId}
-                    className={sel ? "sel" : ""}
-                    onClick={() => setPanelId(r.userId)}
-                  >
+                  <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => setPanelId(r.userId)}>
                     <td style={{ paddingLeft: 16 }}>
                       <div className="who">
-                        <span
-                          className="uhead__av"
-                          style={{
-                            background: "var(--adm-primary)",
-                            width: 34,
-                            height: 34,
-                            borderRadius: 9,
-                            fontSize: 13,
-                          }}
-                        >
+                        <span className="uhead__av" style={{ width: 32, height: 32 }}>
                           {initial(r.userName)}
                         </span>
                         <div>
                           <div className="who__nm">{r.userName}</div>
-                          <div className="who__sub">{r.role ?? "—"}</div>
+                          <div className="who__sub">
+                            {r.role ?? "—"} · {salaried ? c.wageTagSalaried : c.wageTagHourly}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td>
-                      <span className={`tag ${salaried ? "tag--manual" : "tag--linked"}`}>
-                        {salaried ? c.wageTagSalaried : c.wageTagHourly}
-                      </span>
+                    <td className="r num">
+                      {salaried || r.currentRate == null ? <span className="dim-cell">{c.wageNotApplied}</span> : <b>{yen(r.currentRate)}</b>}
                     </td>
-                    <td className="mono">
-                      {salaried || r.currentRate == null ? (
-                        <span
-                          className="dim-cell"
-                          style={{ fontFamily: "var(--font)", fontWeight: 700 }}
-                        >
-                          {c.wageNotApplied}
-                        </span>
-                      ) : (
-                        <>
-                          <span style={{ color: "var(--adm-muted)" }}>{c.yenSym}</span>
-                          {formatOptionalAdminYen(r.currentRate, localeTag)}
-                          <span
-                            className="dim-cell"
-                            style={{
-                              fontFamily: "var(--font)",
-                              fontWeight: 600,
-                              fontSize: 11,
-                              marginLeft: 2,
-                            }}
-                          >
-                            {c.payRateUnit}
-                          </span>
-                        </>
-                      )}
-                    </td>
-                    <td className="mono">
-                      {salaried ? <span className="dim-cell">—</span> : fmtDate(r.currentFrom)}
-                    </td>
-                    <td>
-                      {salaried ? (
+                    <td className="r num">{salaried || !r.currentFrom ? <span className="dim-cell">—</span> : fmtDate(r.currentFrom)}</td>
+                    <td className="r num">
+                      {salaried || hist.length === 0 ? (
                         <span className="dim-cell">—</span>
+                      ) : hist.length === 1 ? (
+                        <span className="dim-cell">{c.wageInitialSet}</span>
                       ) : (
-                        <span className="dim-cell">{c.wageTiersSuffix(r.history.length)}</span>
+                        `${yen(hist[1].rate)} → ${yen(hist[0].rate)}`
                       )}
                     </td>
-                    <td className="colchev">
-                      <Ic>
-                        <ChevronRight />
-                      </Ic>
+                    <td className="r">
+                      {salaried || hist.length === 0 ? <span className="dim-cell">—</span> : <span className="dim-cell">{c.wageTimes.replace("{n}", String(hist.length))}</span>}
                     </td>
                   </tr>
                 );

@@ -8,7 +8,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, CircleAlert, HandCoins, Info, Plus, Sparkles, X } from "lucide-react";
+import { CircleAlert, Info, Plus, Sparkles } from "lucide-react";
 import type { AdminAllowanceRow } from "@/lib/admin-attendance";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import {
@@ -143,38 +143,18 @@ export function AttendanceAllowancesSection({
   const amountUnit = type === "hourly_extra" ? c.allowAmountUnitHourly : c.allowAmountUnitDaily;
 
   return (
-    <section className="card alw">
+    // 화이트 리디자인(2026-10-13, 시안 AttRate-PC): 카드 · 아이콘 배지 · 배지 묶음 대신 제목 + 설명 + 버튼, 표 줄(날짜 · 직원 · 메모 · 방식 · 금액 · 취소).
+    <section className="alw alw--w">
       <div className="alw__head">
         <div className="alw__headl">
-          <span className="alw__badge">
-            <Ic>
-              <HandCoins />
-            </Ic>
-          </span>
           <div>
             <div className="alw__title">{c.allowSecTitle}</div>
             <div className="alw__sub">{c.allowSecDesc}</div>
           </div>
         </div>
-        {formOpen ? (
-          <button
-            type="button"
-            className="btn btn--subtle btn--sm"
-            onClick={() => {
-              setFormOpen(false);
-              resetForm();
-            }}
-          >
-            <Ic>
-              <X />
-            </Ic>
-            {c.allowFormClose}
-          </button>
-        ) : (
+        {/* 폼이 열려 있으면 위쪽 닫기는 두지 않는다 — 폼 아래 「닫기」 하나(2026-10-13 제보: 닫기 중복). */}
+        {formOpen ? null : (
           <button type="button" className="btn btn--pri btn--sm" onClick={() => setFormOpen(true)}>
-            <Ic>
-              <Plus />
-            </Ic>
             {c.allowAddBtn}
           </button>
         )}
@@ -338,50 +318,52 @@ export function AttendanceAllowancesSection({
           <span>{c.allowEmpty}</span>
         </div>
       ) : (
-        <div className="alw__list">
-          {allowances.map((a) => (
-            <div
-              key={a.id}
-              className={`alw__row${a.status === "cancelled" ? " is-cancelled" : ""}`}
-            >
-              <div className="alw__rowdate">{a.targetDateLabel}</div>
-              <div className="alw__rowmain">
-                <div className="alw__rowtop">
-                  <span className="alw__rowtarget">
-                    {a.targetUserName ?? c.allowScopeAll}
-                  </span>
-                  <span className={`pill ${a.category === "special" ? "pill--warn" : "pill--info"}`}>
-                    {categoryLabel(a.category, c)}
-                  </span>
-                  <span className="pill pill--muted">{typeLabel(a.allowanceType, c)}</span>
-                  <span className="alw__rowamt">
-                    {c.yenSym}
-                    {formatAdminYen(a.amountYen, localeTag)}
-                    {a.allowanceType === "hourly_extra" ? c.allowPerHourSuffix : ""}
-                  </span>
-                </div>
-                {a.memo ? <div className="alw__rowsub">{a.memo}</div> : null}
-              </div>
-              <div className="alw__rowend">
-                {a.status === "cancelled" ? (
-                  <span className="pill pill--muted">{c.allowStatusCancelled}</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn--danger-ghost btn--sm"
-                    onClick={() => setCancelId(a.id)}
-                    disabled={pending}
-                  >
-                    <Ic>
-                      <Ban />
-                    </Ic>
-                    {c.allowCancelBtn}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <table className="qtbl alw-tbl">
+          <thead>
+            <tr>
+              <th style={{ paddingLeft: 16 }}>{c.allowFieldDate}</th>
+              <th>{c.allowFieldUser}</th>
+              <th>{c.allowFieldType}</th>
+              <th className="r">{c.allowFieldAmount}</th>
+              <th aria-hidden="true" />
+            </tr>
+          </thead>
+          <tbody>
+            {allowances.map((a) => {
+              const cancelled = a.status === "cancelled";
+              return (
+                <tr key={a.id} className={cancelled ? "is-cancelled" : undefined}>
+                  <td style={{ paddingLeft: 16 }}>
+                    <b>{a.targetDateLabel}</b>
+                  </td>
+                  <td>
+                    <b>{a.targetUserName ?? c.allowScopeAll}</b>
+                    {a.memo ? <span className="alw-memo"> · {a.memo}</span> : null}
+                  </td>
+                  <td>
+                    {categoryLabel(a.category, c)} · {typeLabel(a.allowanceType, c)}
+                  </td>
+                  <td className="r num">
+                    <b>
+                      {c.yenSym}
+                      {formatAdminYen(a.amountYen, localeTag)}
+                      {a.allowanceType === "hourly_extra" ? c.allowPerHourSuffix : ""}
+                    </b>
+                  </td>
+                  <td className="r alw-act">
+                    {cancelled ? (
+                      <span className="dim-cell">{c.allowStatusCancelled}</span>
+                    ) : (
+                      <button type="button" className="alw-cancel" onClick={() => setCancelId(a.id)} disabled={pending}>
+                        {c.allowCancelBtn}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
 
       {cancelId ? (
@@ -389,8 +371,9 @@ export function AttendanceAllowancesSection({
           title={c.allowCancelTitle}
           description={c.allowCancelDesc}
           placeholder={c.dialogReasonPlaceholder}
-          confirmLabel={c.allowCancelBtn}
-          cancelLabel={c.dialogCancel}
+          // 버튼 둘 다 「취소」라 헷갈려서(2026-10-13 제보) — 「그대로 두기 · 추가수당 취소」.
+          confirmLabel={c.allowCancelTitle}
+          cancelLabel={c.allowCancelKeep}
           pending={pending}
           danger
           onConfirm={submitCancel}

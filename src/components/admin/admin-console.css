@@ -3210,3 +3210,27 @@
 
 /* 창(모달) 안 두 칸 날짜: 왼쪽 칸 달력은 왼쪽 기준으로 펼쳐 창 밖으로 잘리지 않게(2026-10-13 제보 — 연차 대리 신청) */
 .adm .modal .fld2 > .fld:first-child .adp__pop { left: 0; right: auto; }
+
+/* 시급 관리 표 — 오른쪽 정렬 숫자 · 굵은 현재 시급(2026-10-13 시안 AttRate-PC) */
+.adm .wage-tbl th.r, .adm .wage-tbl td.r { text-align: right; }
+.adm .wage-tbl td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .wage-tbl td b { font-weight: 600; color: #16141f; }
+.adm .wage-tbl td:last-child, .adm .wage-tbl th:last-child { padding-right: 16px; }
+
+/* 추가수당 — 카드 없는 묶음 · 표 줄 · 빨간 글자 취소(2026-10-13 시안 AttRate-PC) */
+.adm .alw.alw--w { margin-top: 32px; padding: 0; border: 0; background: none; box-shadow: none; }
+.adm .alw--w .alw__head { padding: 0 0 10px; }
+.adm .alw--w .alw__title { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .alw--w .alw__sub { font-size: 12px; color: #8b8898; margin-top: 4px; }
+.adm .alw-tbl th.r, .adm .alw-tbl td.r { text-align: right; }
+.adm .alw-tbl td b { font-weight: 600; color: #16141f; }
+.adm .alw-tbl td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .alw-tbl .alw-memo { color: #8b8898; }
+.adm .alw-tbl tr.is-cancelled td { color: #b4b1bf; }
+.adm .alw-tbl tr.is-cancelled td b { color: #b4b1bf; text-decoration: line-through; }
+.adm .alw-tbl .alw-act { width: 80px; padding-right: 16px; }
+.adm .alw-tbl .alw-cancel { height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #c5282e; cursor: pointer; }
+.adm .alw-tbl .alw-cancel:hover { background: #fdecec; }
+/* 추가수당 입력 폼 — 상자 없이 위아래 줄만 */
+.adm .alw--w .alw__form { padding: 16px 0; border: 0; border-top: 1px solid #f1f1f4; border-bottom: 1px solid #f1f1f4; border-radius: 0; background: none; box-shadow: none; }
+.adm .alw--w .winp input { border: 0; box-shadow: none; background: transparent; }

@@ -440,6 +440,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <div className="inp">
                 <input id="entry-email" type="email" name="email" autoComplete="email" autoCapitalize="none" spellCheck={false} enterKeyHint="go" placeholder={t.emailPlaceholder} />
               </div>
+              {/* 비밀번호 찾기는 첫 화면에서도 바로(2026-10-13 사용자 지적 — 예전엔 이메일 로그인 화면까지 가야 보였다).
+                  아이디 = 이메일이라 「아이디 찾기」는 따로 없다. */}
+              <div className="field__under">
+                <Link href={forgotHref}>{t.email.forgot}</Link>
+              </div>
             </div>
             <button type="submit" className="aw-btn">{t.entry.continueEmail}</button>
           </form>

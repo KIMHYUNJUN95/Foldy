@@ -43,3 +43,5 @@
 @media (hover: hover) { .rqw-quick a:hover { background: #f1f0f5; } }
 .rqw-quick a svg { width: 20px; height: 20px; color: #7a52e6; }
 @media (prefers-reduced-motion: reduce) { .rqw-row, .rqw-quick a { transition: none; } }
+/* 칸 모드에서 고른 줄 — 테두리 대신 옅은 보라 바탕(선택 표시 규칙) */
+.split-list a.rqw-row[data-split-active] { outline: none; background: #f4f1fd; }

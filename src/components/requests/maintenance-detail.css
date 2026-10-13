@@ -1,0 +1,50 @@
+/* 수리 상세 화이트 리디자인(2026-10-13, 시안 ReqDetail-Phone) — 상자 없는 한 줄 머리 · 정보 줄 · 현장 처리 */
+.mdw { display: flex; flex-direction: column; gap: 14px; padding-bottom: 28px; }
+.mdw .mono { font-family: "Geist Mono", var(--font-noto-kr), ui-monospace, monospace; }
+.mdw-created { margin: 0; font-size: 13px; font-weight: 600; color: #5a30cf; }
+.mdw-kick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #6b6878; }
+.mdw-kick > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
+.mdw-pri { font-weight: 600; }
+.mdw-pri.is-urgent { color: #c5282e; }
+.mdw-pri.is-high { color: #a8641c; }
+.mdw-from { color: #7a52e6; font-weight: 600; }
+.mdw-title { margin: -4px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; color: #16141f; }
+.mdw-sub { margin: -6px 0 0; font-size: 13px; color: #8b8898; }
+.mdw-sub b { font-weight: 700; color: #16141f; }
+.mdw-warn { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: #3a3746; }
+.mdw-warn span { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #fdf3e2; color: #b7791f; font-size: 12px; font-weight: 800; flex: none; }
+.mdw-desc { margin: 0; font-size: 15px; line-height: 1.6; color: #16141f; white-space: pre-wrap; }
+.mdw-dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; margin: 0; padding-top: 14px; border-top: 1px solid #f1f1f4; font-size: 14px; }
+.mdw-dl dt { color: #8b8898; }
+.mdw-dl dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
+.mdw-dl dd.is-urgent { color: #c5282e; font-weight: 600; }
+.mdw-note { margin: 0; font-size: 13px; font-weight: 600; color: #a8641c; }
+.mdw-block { display: flex; flex-direction: column; gap: 8px; }
+.mdw-k { font-size: 13px; font-weight: 600; color: #3a3746; }
+.mdw-k em { margin-left: 4px; font-style: normal; font-weight: 500; color: #8b8898; }
+.mdw-readonly { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding-top: 16px; border-top: 1px solid #f1f1f4; font-size: 13px; color: #8b8898; }
+.mdw-readonly svg { width: 16px; height: 16px; }
+.mdw-handle { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; padding-top: 18px; border-top: 1px solid #f1f1f4; }
+.mdw-handle__h { display: flex; flex-direction: column; gap: 4px; }
+.mdw-handle__h b { font-size: 16px; font-weight: 700; color: #16141f; }
+.mdw-handle__h span { font-size: 12px; color: #8b8898; }
+.mdw-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.mdw-seg button { height: 42px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; font-size: 14px; color: #3a3746; cursor: pointer; transition: background 180ms cubic-bezier(.23,1,.32,1), color 180ms ease, transform 140ms ease; }
+.mdw-seg button:active { transform: scale(.96); }
+.mdw-seg button.on { background: #7a52e6; color: #fff; font-weight: 600; }
+.mdw-hint { margin: -6px 0 0; font-size: 12px; line-height: 1.5; color: #8b8898; }
+.mdw-hint.is-warn { color: #a8641c; }
+.mdw-hint.is-err { color: #c5282e; margin: 0; }
+.mdw-nf { position: relative; margin-top: 6px; }
+.mdw-nf__l { position: absolute; top: -8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; pointer-events: none; }
+.mdw-nf__in { display: block; box-sizing: border-box; width: 100%; min-height: 96px; padding: 12px 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 15px; line-height: 1.55; color: #16141f; resize: none; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.mdw-nf__in:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.mdw-nf__in::placeholder { color: #b4b1bf; }
+.mdw-photos { display: flex; flex-direction: column; gap: 8px; }
+.mdw-save { display: flex; align-items: center; justify-content: center; gap: 6px; height: 50px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 200ms ease, transform 140ms ease; }
+.mdw-save:active { transform: scale(.98); }
+.mdw-save:disabled { opacity: .6; }
+.mdw-save.is-saved { background: #22a06b; }
+.mdw-save svg { width: 18px; height: 18px; animation: mdw-pop 320ms cubic-bezier(.23,1,.32,1) both; }
+@keyframes mdw-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mdw-seg button, .mdw-save, .mdw-save svg { transition: none; animation: none; } }

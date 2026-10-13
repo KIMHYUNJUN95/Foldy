@@ -1,31 +1,19 @@
 import { notFound, redirect } from "next/navigation";
-import { Wrench } from "lucide-react";
 import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
 import { MaintenanceHandlingForm } from "@/components/requests/maintenance-handling-form";
 import { canHandleMaintenance } from "@/app/mobile/requests/maintenance/actions";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   getMaintenanceReportById,
   isMaintenanceTerminal,
-  type MaintenanceStatus,
 } from "@/lib/maintenance-reports";
 import { getOnboardingState } from "@/lib/onboarding";
 import { resolveRequestLocation } from "@/lib/request-location";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-
-const statusBadgeClass: Record<MaintenanceStatus, string> = {
-  open: "border-blue-200 bg-blue-50 text-blue-700",
-  in_progress: "border-amber-200 bg-amber-50 text-amber-700",
-  closed: "border-green-200 bg-green-50 text-green-700",
-  cancelled: "border-border bg-muted/50 text-muted-foreground",
-};
-const DETAIL_CARD =
-  "rounded-[24px] border border-slate-200/80 bg-surface shadow-[0_16px_34px_-28px_rgba(31,58,95,0.48)]";
+import "@/components/requests/maintenance-detail.css";
 
 type ListFilterQuery = {
   building?: string;
@@ -43,14 +31,17 @@ type PageProps = {
   searchParams: Promise<ListFilterQuery>;
 };
 
+/** 「7/15 03:02」(도쿄) — 시안처럼 짧게. 해가 다르면 「2025/12/3 09:00」. */
 function formatDateTime(value: string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  void locale;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(new Date(value))
+      .map((p) => [p.type, p.value]),
+  );
+  const thisYear = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric" }).format(new Date());
+  const md = `${parts.month}/${parts.day}`;
+  return `${parts.year === thisYear ? md : `${parts.year}/${md}`} ${parts.hour}:${parts.minute}`;
 }
 
 export default async function MobileMaintenanceDetailPage({ params, searchParams }: PageProps) {
@@ -103,145 +94,81 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
 
   const navBadges = await getMobileNavBadges();
 
+  // 화이트 리디자인(2026-10-13, 시안 ReqDetail-Phone · Req-Tablet): 카드 · 아이콘 상자 · 배지 대신 위 한 줄(우선순위 · 상태 · 분류) →
+  // 제목 → 「호실 · 건물 · 신고자 · 시각」 → (연결된 예약) → 사진 → 설명 → 정보 줄 → 처리 결과 → 현장 처리.
+  const roomText = location.roomLabel && location.roomLabel !== "-" ? location.roomLabel : null;
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.detailTitle}>
-      <div className="space-y-4">
-        {showCreatedBanner ? (
-          <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
-            {copy.createdSuccess}
-          </div>
+      <div className="mdw">
+        {showCreatedBanner ? <p className="mdw-created">{copy.createdSuccess}</p> : null}
+
+        <div className="mdw-kick">
+          <span className={`mdw-pri is-${report.priority}`}>{copy.form.urgencies[report.priority]}</span>
+          <span>{copy.statusLabels[report.status]}</span>
+          <span>{copy.form.categories[report.category]}</span>
+          {report.cleaning_session_id ? <span className="mdw-from">{copy.fromCleaningTag}</span> : null}
+        </div>
+        <h1 className="mdw-title">{report.issue_title}</h1>
+        <p className="mdw-sub">
+          {roomText ? <b className="mono">{roomText}</b> : null}
+          {[location.buildingLabel, report.reporter_name, formatDateTime(report.created_at, locale)]
+            .filter(Boolean)
+            .map((x, i) => (
+              <span key={i}>{roomText || i > 0 ? ` · ${x}` : x}</span>
+            ))}
+        </p>
+
+        {report.guest_name ? (
+          <p className="mdw-warn">
+            <span aria-hidden="true">!</span>
+            {dictionary.tasks.contextLinkedSection} · {report.guest_name}
+          </p>
         ) : null}
 
-        <Card className={`${DETAIL_CARD} p-5`}>
-          {report.cleaning_session_id ? (
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-primary">
-              {copy.fromCleaningTag}
-            </p>
-          ) : null}
+        <AnnouncementImageGrid imageUrls={report.image_urls} closeLabel={dictionary.common.close} imageAltLabel={dictionary.requestImages.attachments} />
 
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700 ring-1 ring-sky-200/80">
-              <Wrench className="size-5" aria-hidden="true" />
-            </div>
-            <h2 className="min-w-0 break-words pt-0.5 text-xl font-black leading-tight">
-              {report.issue_title}
-            </h2>
+        {report.description ? <p className="mdw-desc">{report.description}</p> : null}
+
+        <dl className="mdw-dl">
+          <dt>{dictionary.cleaning.manualBuildingLabel}</dt>
+          <dd>{[location.buildingLabel, roomText].filter(Boolean).join(" · ") || "-"}</dd>
+          <dt>{copy.form.categoryLabel}</dt>
+          <dd>{copy.form.categories[report.category]}</dd>
+          <dt>{copy.form.urgencyLabel}</dt>
+          <dd className={report.priority === "urgent" ? "is-urgent" : undefined}>{copy.form.urgencies[report.priority]}</dd>
+          {report.reservation_id ? (
+            <>
+              <dt>{dictionary.mobile.calendarReservationId}</dt>
+              <dd className="mono">{report.reservation_id}</dd>
+            </>
+          ) : null}
+          {isTerminal && report.completed_at ? (
+            <>
+              <dt>{copy.handling.completedAt}</dt>
+              <dd>
+                {formatDateTime(report.completed_at, locale)}
+                {report.completed_by_name ? ` · ${report.completed_by_name}` : ""}
+              </dd>
+            </>
+          ) : null}
+        </dl>
+
+        {report.completed_by_admin ? (
+          <p className="mdw-note">{report.status === "cancelled" ? copy.handling.adminVoided : copy.handling.adminForced}</p>
+        ) : null}
+
+        {isTerminal && report.resolution_memo ? (
+          <div className="mdw-block">
+            <span className="mdw-k">{copy.handling.memoLabel}</span>
+            <p className="mdw-desc">{report.resolution_memo}</p>
           </div>
-
-          <dl className="mt-4 space-y-2.5 border-t border-slate-200/70 pt-4">
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">
-                {dictionary.cleaning.manualBuildingLabel}
-              </dt>
-              <dd className="text-right font-black">{location.buildingLabel ?? "-"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.room}</dt>
-              <dd className="text-right font-black">{location.roomLabel}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.form.categoryLabel}</dt>
-              <dd className="text-right font-black">{copy.form.categories[report.category]}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.form.urgencyLabel}</dt>
-              <dd className="text-right font-black">{copy.form.urgencies[report.priority]}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.reportedAt}</dt>
-              <dd className="font-semibold">{formatDateTime(report.created_at, locale)}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.reporter}</dt>
-              <dd className="text-right font-black">{report.reporter_name || "-"}</dd>
-            </div>
-          </dl>
-
-          {report.reservation_id || report.guest_name ? (
-            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/82 p-3.5 shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)]">
-              <p className="text-xs font-semibold text-muted-foreground">
-                {dictionary.tasks.contextLinkedSection}
-              </p>
-              <dl className="mt-2 space-y-2 text-sm">
-                {report.guest_name ? (
-                  <div className="flex items-start justify-between gap-3">
-                    <dt className="font-semibold text-muted-foreground">
-                      {dictionary.admin.calendar.guestName}
-                    </dt>
-                    <dd className="text-right font-black">{report.guest_name}</dd>
-                  </div>
-                ) : null}
-                {report.reservation_id ? (
-                  <div className="flex items-start justify-between gap-3">
-                    <dt className="font-semibold text-muted-foreground">
-                      {dictionary.mobile.calendarReservationId}
-                    </dt>
-                    <dd className="font-mono text-[11px] font-semibold">{report.reservation_id}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            </div>
-          ) : null}
-
-          {report.description ? (
-            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/82 p-3.5 shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)]">
-              <p className="text-xs font-semibold text-muted-foreground">{copy.description}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{report.description}</p>
-            </div>
-          ) : null}
-
-          <AnnouncementImageGrid imageUrls={report.image_urls} closeLabel={dictionary.common.close} imageAltLabel={dictionary.requestImages.attachments} />
-        </Card>
-
-        <Card className={`${DETAIL_CARD} p-5`}>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">
-              {copy.statusLabel}
-            </p>
-            <Badge className={statusBadgeClass[report.status]}>
-              {copy.statusLabels[report.status]}
-            </Badge>
+        ) : null}
+        {report.resolution_image_urls.length > 0 ? (
+          <div className="mdw-block">
+            <span className="mdw-k">{copy.handling.photosLabel}</span>
+            <AnnouncementImageGrid imageUrls={report.resolution_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
           </div>
-
-          {isTerminal ? (
-            <dl className="mt-4 space-y-2.5 border-t border-slate-200/70 pt-4">
-              {report.completed_at ? (
-                <div className="flex items-start justify-between gap-3 text-sm">
-                  <dt className="font-semibold text-muted-foreground">{copy.handling.completedAt}</dt>
-                  <dd className="font-semibold">{formatDateTime(report.completed_at, locale)}</dd>
-                </div>
-              ) : null}
-              {report.completed_by_name ? (
-                <div className="flex items-start justify-between gap-3 text-sm">
-                  <dt className="font-semibold text-muted-foreground">{copy.handling.completedBy}</dt>
-                  <dd className="text-right font-black">{report.completed_by_name}</dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : null}
-
-          {report.completed_by_admin ? (
-            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
-              {report.status === "cancelled" ? copy.handling.adminVoided : copy.handling.adminForced}
-            </p>
-          ) : null}
-
-          {report.resolution_memo ? (
-            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/82 p-3.5">
-              <p className="text-xs font-semibold text-muted-foreground">{copy.handling.memoLabel}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{report.resolution_memo}</p>
-            </div>
-          ) : null}
-
-          {report.resolution_image_urls.length > 0 ? (
-            <div className="mt-4">
-              <p className="text-xs font-semibold text-muted-foreground">
-                {copy.handling.photosLabel}
-              </p>
-              <AnnouncementImageGrid imageUrls={report.resolution_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
-            </div>
-          ) : null}
-        </Card>
+        ) : null}
 
         <MaintenanceHandlingForm
           canHandle={canHandle}

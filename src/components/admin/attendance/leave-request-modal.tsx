@@ -8,10 +8,11 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Info, Sun, TriangleAlert, Users, X } from "lucide-react";
+import { Check, Info, Sun, TriangleAlert, X } from "lucide-react";
 import { createAdminLeaveRequestAction } from "@/app/admin/attendance/leave/actions";
 import { loadApplicantLeaveSummary } from "@/app/admin/attendance/leave/detail-actions";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { adminLocaleTag } from "@/lib/admin-export-meta";
 import { getDictionary } from "@/lib/i18n";
 import type {
@@ -276,27 +277,21 @@ export function LeaveRequestModal({
 
         <div className="modal__body">
           {mode === "proxy" ? (
-            <label className="fld">
+            <div className="fld">
               <span className="fld__l">
                 {lc.formTarget} <b className="req">*</b>
               </span>
-              <div className="selwrap">
-                <span className="ic">
-                  <Users />
-                </span>
-                <select value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)}>
-                  <option value="">{lc.formTargetSelect}</option>
-                  {applicants.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="ic chev">
-                  <ChevronDown />
-                </span>
-              </div>
-            </label>
+              {/* 브라우저 기본 <select> 대신 공용 드롭다운(검색) — 콘솔의 다른 고르기와 같은 모양(2026-10-13 제보). */}
+              <AdmDropdown
+                options={[{ value: "", label: lc.formTargetSelect }, ...applicants.map((a) => ({ value: a.id, label: a.name }))]}
+                value={targetUserId}
+                onChange={setTargetUserId}
+                ariaLabel={lc.formTarget}
+                placeholder={lc.formTargetSelect}
+                searchable={applicants.length > 8}
+                wide
+              />
+            </div>
           ) : null}
 
           {summary ? (

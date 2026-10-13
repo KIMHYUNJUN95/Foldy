@@ -3207,3 +3207,6 @@
 
 /* 연차 보기 탭 줄 — 글자 세그 + 신청 버튼(2026-10-13 시안 AttLeave-PC) */
 .adm .lvw-subbar { margin: 4px 0 14px; }
+
+/* 창(모달) 안 두 칸 날짜: 왼쪽 칸 달력은 왼쪽 기준으로 펼쳐 창 밖으로 잘리지 않게(2026-10-13 제보 — 연차 대리 신청) */
+.adm .modal .fld2 > .fld:first-child .adp__pop { left: 0; right: auto; }

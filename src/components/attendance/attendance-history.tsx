@@ -1,18 +1,17 @@
 "use client";
 
 /**
- * Attendance self-view history — redesigned to match screenshot handoff.
- * Structure: ptitle-row → summary card (live ticker when open) → attn banners → date-grouped srow cards.
- * Session detail bottom sheet (drag-dismiss) preserved from previous version.
+ * 근무 기록(본인) — 화이트 리디자인(2026-10-13, 시안 AttHist-Phone · Fold · Tablet).
+ * 제목 · 월 알약 → 「검토 필요 n건 ›」 한 줄 → 달력(근무 점 · 검토 필요 빨간 점) → 날짜별 줄.
+ * 태블릿 가로는 왼쪽 달력 | 오른쪽 월 기록. 기록을 누르면 상세 시트(태블릿은 가운데 카드).
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import "./attendance.css";
 import { AIc, AttIcon } from "./att-icons";
 import { MonthSwitcher } from "./month-switcher";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
-import { useIsTablet } from "@/components/shell/split-list";
 import type {
   AttendanceSessionView,
   AttendanceTodaySummary,
@@ -28,23 +27,6 @@ function fmtDur(sec: number, hourLabel: string, minLabel: string): string {
   if (h > 0) return `${h}${hourLabel} ${m}${minLabel}`;
   if (m > 0) return `${m}${minLabel}`;
   return `0${minLabel}`;
-}
-
-function fmtHM(sec: number): string {
-  const safe = Math.max(0, Math.floor(sec));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(h)}:${pad(m)}`;
-}
-
-function fmtHMS(sec: number): { hm: string; ss: string } {
-  const safe = Math.max(0, Math.floor(sec));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return { hm: `${pad(h)}:${pad(m)}`, ss: `:${pad(s)}` };
 }
 
 function methodLabel(m: string | null, copy: AttendanceCopy): string {
@@ -92,22 +74,6 @@ function dateGroupLabel(
   return { d: isToday ? `${todayLabel} ${mm}/${dd}` : `${mm}/${dd}`, wd };
 }
 
-/** Weekly worked seconds: past days (Mon–yesterday) + today's summary. */
-function computeWeekSec(sessions: AttendanceSessionView[], summary: AttendanceTodaySummary): number {
-  const todayDate = summary.date;
-  const dt = new Date(`${todayDate}T00:00:00+09:00`);
-  const dow = dt.getDay(); // 0=Sun
-  const monday = new Date(dt);
-  monday.setDate(dt.getDate() - (dow === 0 ? 6 : dow - 1));
-  const mondayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(monday);
-
-  const pastWeekSec = sessions
-    .filter((s) => s.operatingDate >= mondayStr && s.operatingDate < todayDate)
-    .reduce((acc, s) => acc + (s.workedSec ?? 0), 0);
-
-  return pastWeekSec + summary.workedSec;
-}
-
 function StatusChips({ s, copy }: { s: AttendanceSessionView; copy: AttendanceCopy }) {
   return (
     <>
@@ -134,98 +100,6 @@ function StatusChips({ s, copy }: { s: AttendanceSessionView; copy: AttendanceCo
         <span className="chip c-danger">{copy.sessCorrRejected}</span>
       ) : null}
     </>
-  );
-}
-
-function SummaryCard({
-  summary,
-  todaySession,
-  weekSec,
-  copy,
-}: {
-  summary: AttendanceTodaySummary;
-  todaySession: AttendanceSessionView | null;
-  weekSec: number;
-  copy: AttendanceCopy;
-}) {
-  const [elapsed, setElapsed] = useState<number>(summary.workedSec);
-
-  useEffect(() => {
-    if (!summary.hasOpenSession || !todaySession?.clockInAt) return;
-    const clockInMs = new Date(todaySession.clockInAt).getTime();
-    // Find the open (in-progress) break, if any — endedAt === null means still running.
-    const openBreak = todaySession.breaks.find((b) => b.endedAt === null) ?? null;
-    const tick = () => {
-      const gross = (Date.now() - clockInMs) / 1000;
-      const openBreakSec = openBreak
-        ? Math.floor((Date.now() - new Date(openBreak.startedAt).getTime()) / 1000)
-        : 0;
-      setElapsed(Math.max(0, Math.floor(gross) - summary.breakTotalSec - openBreakSec));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [summary.hasOpenSession, summary.breakTotalSec, todaySession?.clockInAt, todaySession?.breaks]);
-
-  if (summary.hasOpenSession && todaySession) {
-    const { hm, ss } = fmtHMS(elapsed);
-    return (
-      <div className="summary summary--open">
-        <div className="sm__deco" />
-        <div className="sm__top">
-          <span className="sm__pulse" />
-          <span className="sm__state-label">{copy.ringWorking}</span>
-          <span className="sm__tag">{copy.sessOpen}</span>
-        </div>
-        <div className="sm__mid">
-          <div>
-            <div className="sm__biglbl">{copy.histTodayAccum}</div>
-            <div className="sm__big">{hm}<span className="sec">{ss}</span></div>
-          </div>
-        </div>
-        <div className="sm__divider" />
-        <div className="sm__rows">
-          <div className="sm__cell">
-            <div className="sm__k"><AIc>{AttIcon.pin}</AIc>{copy.clockInSite}</div>
-            <div className="sm__v">{todaySession.clockInSiteName ?? "—"}</div>
-          </div>
-          <div className="sm__cell">
-            <div className="sm__k"><AIc>{AttIcon.clock}</AIc>{copy.histClockIn}</div>
-            <div className="sm__v" style={{ fontFamily: "var(--mono)" }}>{todaySession.clockInLabel ?? "--:--"}</div>
-          </div>
-          <div className="sm__cell">
-            <div className="sm__k"><AIc>{AttIcon.coffee}</AIc>{copy.histBreakTime}</div>
-            <div className="sm__v" style={{ fontFamily: "var(--mono)" }}>{fmtHM(summary.breakTotalSec)}</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="summary summary--idle">
-      <div className="sm__deco" />
-      <div className="sm__top">
-        <span className="sm__state-label">{copy.ringIdleLabel}</span>
-        <span className="sm__tag">{copy.sumWaiting}</span>
-      </div>
-      <div className="sm__mid">
-        <div className="sm__big">
-          {summary.workedSec > 0 ? fmtHM(summary.workedSec) : copy.histIdleMsg}
-        </div>
-      </div>
-      <div className="sm__divider" />
-      <div className="sm__rows">
-        <div className="sm__cell">
-          <div className="sm__k">{copy.histTodayAccum}</div>
-          <div className="sm__v" style={{ fontFamily: "var(--mono)" }}>{fmtHM(summary.workedSec)}</div>
-        </div>
-        <div className="sm__cell">
-          <div className="sm__k">{copy.histThisWeek}</div>
-          <div className="sm__v" style={{ fontFamily: "var(--mono)" }}>{fmtHM(weekSec)}</div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -359,90 +233,135 @@ function FlaggedSessionPicker({
   );
 }
 
-function SessionRow({
-  s,
-  copy,
-  onClick,
-  active = false,
-}: {
-  s: AttendanceSessionView;
-  copy: AttendanceCopy;
-  onClick: () => void;
-  /** 태블릿 가로 — 오른쪽 칸에 보이는 기록. */
-  active?: boolean;
-}) {
-  const isFlagged = s.reviewState === "review_required" || s.isAbnormal;
-  const isInfo = !!s.correctionStatus;
-  const flagCls = s.status === "invalid"
-    ? "srow--invalid"
-    : isFlagged
-      ? "srow--flag"
-      : isInfo
-        ? "srow--flag info"
-        : "";
+/** "+1일" — 퇴근이 출근(운영일) 다음 날 이후면 며칠 뒤인지(도쿄 기준). */
+function nextDayOffset(s: AttendanceSessionView): number {
+  if (!s.clockOutAt) return 0;
+  const outDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date(s.clockOutAt));
+  const diff = Math.round(
+    (new Date(`${outDate}T00:00:00Z`).getTime() - new Date(`${s.operatingDate}T00:00:00Z`).getTime()) / 86400000,
+  );
+  return diff > 0 ? diff : 0;
+}
 
-  const paidLabel = s.workedSec != null ? fmtHM(s.workedSec) : "—";
-  const missingClockOut = !s.clockOutLabel && s.status !== "open";
-  const inMethod = methodLabel(s.clockInMethod, copy);
+const LONG_SHIFT_SEC = 12 * 3600;
 
+/** 줄 오른쪽 아래 한 마디 — 데이터로 알 수 있는 것만. */
+function rowTag(s: AttendanceSessionView, copy: AttendanceCopy): { text: string; tone: "" | "now" | "danger" | "muted" } {
+  if (s.status === "open") return { text: copy.sessOpen, tone: "now" };
+  if (s.status === "invalid") return { text: copy.statusInvalid, tone: "muted" };
+  if (s.correctionStatus === "requested") return { text: copy.sessCorrRequested, tone: "now" };
+  if (s.correctionStatus === "in_review") return { text: copy.sessCorrInReview, tone: "now" };
+  if (!s.clockOutLabel) return { text: `${copy.reasonMissingOut} · ${copy.histCorrShort}`, tone: "danger" };
+  if (s.reviewState === "review_required" || s.isAbnormal) return { text: copy.statusReviewRequired, tone: "danger" };
+  const parts: string[] = [];
+  if ((s.workedSec ?? 0) > LONG_SHIFT_SEC) parts.push(copy.histLongShift);
+  if (s.correctionStatus === "approved") parts.push(copy.sessCorrApproved);
+  if (s.correctionStatus === "rejected") parts.push(copy.sessCorrRejected);
+  return { text: parts.join(" · "), tone: "" };
+}
+
+function isFlaggedSession(s: AttendanceSessionView) {
+  return s.reviewState === "review_required" || s.isAbnormal || (!s.clockOutLabel && s.status !== "open" && s.status !== "invalid");
+}
+
+/** 진행 중 기록의 근무 시간 — 1분마다 다시 센다(출근 → 지금 − 끝난 휴게 − 진행 중 휴게). */
+function useLiveWorked(s: AttendanceSessionView | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!s || s.status !== "open") return;
+    const id = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, [s]);
+  if (!s || s.status !== "open" || !s.clockInAt) return null;
+  const openBreak = s.breaks.find((b) => b.endedAt === null);
+  const openBreakSec = openBreak ? (now - new Date(openBreak.startedAt).getTime()) / 1000 : 0;
+  return Math.max(0, Math.floor((now - new Date(s.clockInAt).getTime()) / 1000 - s.breakTotalSec - openBreakSec));
+}
+
+function HistRow({ s, copy, onClick }: { s: AttendanceSessionView; copy: AttendanceCopy; onClick: () => void }) {
+  const live = useLiveWorked(s);
+  const worked = live ?? s.workedSec;
+  const plus = nextDayOffset(s);
+  const tag = rowTag(s, copy);
+  const method = methodLabel(s.clockInMethod, copy);
+  const meta = [
+    s.clockInSiteName ?? "—",
+    method !== "—" ? method : null,
+    copy.histBreakMin.replace("{min}", String(Math.round(s.breakTotalSec / 60))),
+  ].filter(Boolean);
   return (
-    <button aria-pressed={active || undefined} type="button" className={`srow ${flagCls}${active ? " srow--on" : ""}`} onClick={onClick}>
-      <div className="srow__top">
-        <div className="srow__chips">
-          <StatusChips s={s} copy={copy} />
-        </div>
-        <div className="srow__paid">
-          <div className="v">{paidLabel}</div>
-          <div className="k">{copy.histWorkApproved}</div>
-        </div>
-      </div>
-      <div className="inout">
-        <TimeCol
-          label={s.clockInLabel}
-          siteName={s.clockInSiteName}
-          lbl={copy.histClockIn}
-          isOpen={false}
-          isMissing={false}
-          missingLabel={copy.histNoRecord}
-          openLabel={copy.sessOpen}
-          amLabel={copy.amLabel}
-          pmLabel={copy.pmLabel}
-        />
-        <div className="io__arrow"><AIc>{AttIcon.arrowR}</AIc></div>
-        <TimeCol
-          label={s.clockOutLabel}
-          siteName={s.clockOutSiteName}
-          lbl={copy.histClockOut}
-          isOpen={s.status === "open"}
-          isMissing={missingClockOut}
-          missingLabel={copy.histNoRecord}
-          missingOutLabel={copy.reasonMissingOut}
-          openLabel={copy.sessOpen}
-          amLabel={copy.amLabel}
-          pmLabel={copy.pmLabel}
-        />
-      </div>
-      <div className="srow__foot">
-        <span className="sfi">
-          <AIc>{AttIcon.qr}</AIc>{inMethod}
+    <button type="button" className="atth-row" onClick={onClick}>
+      <span className="atth-row__b">
+        <span className="atth-row__io">
+          {s.clockInLabel ?? "--:--"} → {s.status === "open" ? copy.sessOpen : (s.clockOutLabel ?? "—")}
+          {plus > 0 ? <sup>{copy.histNextDay.replace("{n}", String(plus))}</sup> : null}
         </span>
-        {s.breakCount > 0 ? (
-          <span className="sfi">
-            <AIc>{AttIcon.coffee}</AIc>
-            {copy.histBreakCountSuffix(s.breakCount).replace(" · ", "")}
-          </span>
-        ) : null}
-        {missingClockOut ? (
-          <span className="sfi note" style={{ color: "var(--warn)" }}>
-            <AIc>{AttIcon.warn}</AIc>{copy.reasonMissingOut}
-          </span>
-        ) : s.isAbnormal ? (
-          <span className="sfi note" style={{ color: "var(--warn)" }}>
-            <AIc>{AttIcon.warn}</AIc>{copy.histAbnormalTitle}
-          </span>
-        ) : null}
-      </div>
+        <span className="atth-row__m">{meta.join(" · ")}</span>
+      </span>
+      <span className="atth-row__r">
+        <b>{worked != null && (s.clockOutLabel || s.status === "open") ? fmtDur(worked, copy.durationHour, copy.durationMin) : "—"}</b>
+        {tag.text ? <span className={tag.tone ? `is-${tag.tone}` : undefined}>{tag.text}</span> : null}
+      </span>
     </button>
+  );
+}
+
+/** 달력 — 월요일 시작, 근무한 날 보라 점 · 검토 필요 빨간 점, 오늘 이후는 옅게. */
+function HistCalendar({
+  ym,
+  todayDate,
+  locale,
+  marks,
+  selected,
+  onSelect,
+}: {
+  ym: string;
+  todayDate: string;
+  locale: string;
+  marks: Map<string, "work" | "flag">;
+  selected: string | null;
+  onSelect: (date: string) => void;
+}) {
+  const [y, m] = ym.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const firstDow = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // 0 = 월
+  const wdFmt = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
+  // 2024-01-01 은 월요일 — 요일 머리글을 월~일로.
+  const weekdays = Array.from({ length: 7 }, (_, i) => wdFmt.format(new Date(Date.UTC(2024, 0, 1 + i))));
+  return (
+    <div className="atth-cal">
+      {weekdays.map((w, i) => (
+        <span key={w} className={`atth-cal__wd${i === 5 ? " is-sat" : i === 6 ? " is-sun" : ""}`}>
+          {w}
+        </span>
+      ))}
+      {Array.from({ length: firstDow }, (_, i) => (
+        <span key={`b${i}`} />
+      ))}
+      {Array.from({ length: daysInMonth }, (_, i) => {
+        const day = i + 1;
+        const date = `${ym}-${String(day).padStart(2, "0")}`;
+        const mark = marks.get(date);
+        const cls = `atth-day${date > todayDate ? " is-future" : ""}${date === todayDate ? " is-today" : ""}${selected === date ? " is-on" : ""}`;
+        const inner = (
+          <>
+            {day}
+            <span className="atth-day__dot">{mark ? <i className={mark === "flag" ? "is-flag" : undefined} /> : null}</span>
+          </>
+        );
+        return (
+          <span key={date} className="atth-cal__cell">
+            {mark ? (
+              <button type="button" className={cls} onClick={() => onSelect(date)} aria-pressed={selected === date}>
+                {inner}
+              </button>
+            ) : (
+              <span className={cls}>{inner}</span>
+            )}
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -460,8 +379,6 @@ export function AttendanceHistory({
   locale: string;
 }) {
   const copy = getDictionary(locale).attendance;
-  const isCurrentMonth = ym === currentYm;
-  const isTablet = useIsTablet();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
@@ -472,20 +389,35 @@ export function AttendanceHistory({
   }
 
   const todayDate = summary.date;
-  const todayOpen =
-    sessions.find((s) => s.operatingDate === todayDate && s.status === "open") ??
-    sessions.find((s) => s.operatingDate === todayDate) ??
-    null;
-
-  const weekSec = computeWeekSec(sessions, summary);
-
-  const flagged = sessions.filter(
-    (s) => s.reviewState === "review_required" || s.isAbnormal,
-  );
-
+  const flagged = sessions.filter(isFlaggedSession);
   const groups = groupByDate(sessions);
-  // 넓은 화면(2026-10-05): 태블릿 가로는 시트 대신 오른쪽 칸 — 고른 기록, 없으면 맨 위 기록.
-  const paneSession = selected ?? groups[0]?.sessions[0] ?? null;
+  const marks = useMemo(() => {
+    const map = new Map<string, "work" | "flag">();
+    for (const s of sessions) {
+      if (isFlaggedSession(s)) map.set(s.operatingDate, "flag");
+      else if (!map.has(s.operatingDate)) map.set(s.operatingDate, "work");
+    }
+    return map;
+  }, [sessions]);
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const selectedDate = pickedDate ?? (marks.has(todayDate) ? todayDate : (groups[0]?.date ?? null));
+
+  const monthName = new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC" }).format(
+    new Date(`${ym}-01T00:00:00Z`),
+  );
+  // 월 합계는 정상 기록만(검토 필요 · 무효 · 진행 중 제외) — 급여 화면의 인정 시간과 같은 기준.
+  const monthWorked = sessions
+    .filter((s) => s.status !== "open" && s.status !== "invalid" && !isFlaggedSession(s))
+    .reduce((acc, s) => acc + (s.workedSec ?? 0), 0);
+  const monthLine = copy.histMonthLine
+    .replace("{month}", monthName)
+    .replace("{days}", String(marks.size))
+    .replace("{dur}", dur(monthWorked));
+
+  function pickDate(date: string) {
+    setPickedDate(date);
+    document.getElementById(`atth-${date}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // 기록 상세 — 폰 · 폴드는 바텀시트, 태블릿 가로는 오른쪽 칸. 내용은 하나.
   const detail = (target: AttendanceSessionView) => (
@@ -585,106 +517,62 @@ export function AttendanceHistory({
   );
 
   return (
-    // 두 칸(`.att--hist-pane`)은 **상세 칸이 있을 때만**(2026-10-06 아이패드 점검) — 기록이 없는 달엔 한 칸 전부.
-    <div className={`att att--hist${isTablet && paneSession ? " att--hist-pane" : ""}`}>
-      <div className="ptitle-row">
-        <div>
-          <h1 className="ptitle">{copy.historyTitle}</h1>
-          <div className="ptitle__sub">{copy.histSubtitle}</div>
-        </div>
-        <MonthSwitcher
-          ym={ym}
-          currentYm={currentYm}
-          basePath="/mobile/attendance/history"
-          locale={locale}
-          labels={{ prev: copy.monthPrev, next: copy.monthNext, select: copy.monthSelect }}
-        />
-      </div>
-
-      {isCurrentMonth ? (
-        <SummaryCard summary={summary} todaySession={todayOpen} weekSec={weekSec} copy={copy} />
-      ) : null}
-
-      {flagged.length > 0 ? (
-        <button
-          type="button"
-          className="attn attn--warn"
-          onClick={() => {
-              if (flagged.length === 1) setSelectedId(flagged[0].id);
-              else setPickerOpen(true);
-            }}
-        >
-          <span className="attn__ic"><AIc>{AttIcon.warn}</AIc></span>
-          <div className="attn__b">
-            <div className="attn__t">
-              {copy.statusReviewRequired} {copy.histFlaggedCount(flagged.length)}
-            </div>
-            <div className="attn__s">
-              {(() => {
-                const f = flagged[0];
-                const [, mm, dd] = f.operatingDate.split("-");
-                const shortDate = `${parseInt(mm, 10)}/${parseInt(dd, 10)}`;
-                const missOut = !f.clockOutLabel && f.status !== "open";
-                return `${shortDate} ${missOut ? copy.reasonMissingOut : f.dateLabel}`;
-              })()}
-            </div>
-          </div>
-          <span className="attn__chev"><AIc>{AttIcon.chevR}</AIc></span>
-        </button>
-      ) : null}
-
-      {sessions.length === 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "56px 28px", gap: "14px" }}>
-          <span style={{ width: 60, height: 60, borderRadius: 19, background: "var(--att-surface)", color: "var(--faint)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
-            <AIc>{AttIcon.clock}</AIc>
-          </span>
-          <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: "var(--ink)" }}>{copy.histEmpty}</p>
-          <p style={{ fontSize: 13, color: "var(--att-muted)", margin: 0 }}>{copy.histSubtitle}</p>
-        </div>
-      ) : null}
-
-      <div className="att-hist__groups">
-      {groups.map((g) => {
-        const { d, wd } = dateGroupLabel(g.date, todayDate, locale, copy.histToday);
-        const groupWorked = g.sessions.reduce((acc, s) => acc + (s.workedSec ?? 0), 0);
-        const hasRunning = g.sessions.some((s) => s.status === "open");
-        const hasFlagged = g.sessions.some(
-          (s) => s.reviewState === "review_required" || s.isAbnormal,
-        );
-        const sumLabel = hasRunning
-          ? copy.sessOpen
-          : hasFlagged
-            ? copy.statusReviewRequired
-            : groupWorked > 0
-              ? fmtHM(groupWorked)
-              : "—";
-        return (
-          <div key={g.date}>
-            <div className="dgroup">
-              <span className="dgroup__d">{d}</span>
-              <span className="dgroup__wd">{wd}</span>
-              <span
-                className="dgroup__sum"
-                style={hasFlagged ? { color: "var(--warn)" } : undefined}
+    <div className="att att--hist att--histw">
+      <div className="atth-left">
+        <div className="ptitle-row">
+          <div>
+            <h1 className="ptitle">{copy.historyTitle}</h1>
+            <div className="ptitle__sub">{monthLine}</div>
+            {flagged.length > 0 ? (
+              <button
+                type="button"
+                className="atth-review"
+                onClick={() => {
+                  if (flagged.length === 1) setSelectedId(flagged[0].id);
+                  else setPickerOpen(true);
+                }}
               >
-                {sumLabel}
-              </span>
-            </div>
-            {g.sessions.map((s) => (
-              <SessionRow
-                key={s.id}
-                s={s}
-                copy={copy}
-                onClick={() => setSelectedId(s.id)}
-                active={isTablet && paneSession?.id === s.id}
-              />
-            ))}
+                <i aria-hidden="true" />
+                {copy.statusReviewRequired} {copy.histFlaggedCount(flagged.length)}
+                <AIc>{AttIcon.chevR}</AIc>
+              </button>
+            ) : null}
           </div>
-        );
-      })}
+          <MonthSwitcher
+            ym={ym}
+            currentYm={currentYm}
+            basePath="/mobile/attendance/history"
+            locale={locale}
+            labels={{ prev: copy.monthPrev, next: copy.monthNext, select: copy.monthSelect }}
+          />
+        </div>
+
+        <div className="atth-legend">
+          <span><i />{copy.histLegendWork}</span>
+          <span><i className="is-flag" />{copy.statusReviewRequired}</span>
+        </div>
+        <HistCalendar ym={ym} todayDate={todayDate} locale={locale} marks={marks} selected={selectedDate} onSelect={pickDate} />
       </div>
 
-      {isTablet && paneSession ? <aside className="att-hist__pane">{detail(paneSession)}</aside> : null}
+      <div className="atth-right">
+        <div className="atth-right__h">
+          <b>{copy.histMonthRecords.replace("{month}", monthName)}</b>
+          <span>{copy.histTapDayHint}</span>
+        </div>
+        {sessions.length === 0 ? <p className="atth-empty">{copy.histEmpty}</p> : null}
+        {groups.map((g) => {
+          return (
+            <section key={g.date} id={`atth-${g.date}`} className={`atth-group${selectedDate === g.date ? " is-on" : ""}`}>
+              <h2 className="atth-group__d">
+                {g.sessions[0].dateLabel}{g.date === todayDate ? ` · ${copy.histToday}` : ""}
+              </h2>
+              {g.sessions.map((s) => (
+                <HistRow key={s.id} s={s} copy={copy} onClick={() => setSelectedId(s.id)} />
+              ))}
+            </section>
+          );
+        })}
+      </div>
 
       {pickerOpen && (
         <FlaggedSessionPicker
@@ -700,9 +588,7 @@ export function AttendanceHistory({
         />
       )}
 
-      {!isTablet && selected && (
-        <BottomSheet onClose={close}>{detail(selected)}</BottomSheet>
-      )}
+      {selected && <BottomSheet onClose={close}>{detail(selected)}</BottomSheet>}
     </div>
   );
 }

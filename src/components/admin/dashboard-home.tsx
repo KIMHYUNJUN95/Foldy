@@ -247,43 +247,49 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
             </div>
             <div className="dh-months__col">
               <span className="dh-months__k">{c.dhMonthOcc}</span>
-              <svg
-                aria-label={c.dhMonthsDesc.replace("{list}", s.months.map((m) => pct(m.occupancyPct)).join(", "))}
-                height="150"
-                preserveAspectRatio="none"
-                role="img"
-                viewBox="0 0 480 130"
-                width="100%"
-              >
-                <line stroke="#E6E6EB" x1="0" x2="480" y1="129.5" y2="129.5" />
-                <line stroke="#F1F1F4" x1="0" x2="480" y1="70" y2="70" />
-                {linePoints.length > 0 ? (
-                  <>
-                    <defs>
-                      <linearGradient id="dhOccArea" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0" stopColor="#7A52E6" stopOpacity="0.12" />
-                        <stop offset="1" stopColor="#7A52E6" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d={`M${linePoints[0].x},129 ${linePoints.map((p) => `L${p.x},${p.y}`).join(" ")} L${linePoints[linePoints.length - 1].x},129 Z`}
-                      fill="url(#dhOccArea)"
-                    />
-                  </>
-                ) : null}
-                <polyline fill="none" points={linePoints.map((p) => `${p.x},${p.y}`).join(" ")} stroke="#7A52E6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+              {/* 선 · 면만 칸 폭에 맞춰 늘이고, 점 · 숫자는 늘이지 않는다 — 함께 늘이면 동그라미가 옆으로 퍼진
+                  타원이 되고 글자가 뭉개져 흐려 보였다(2026-10-13 사용자 지적). */}
+              <div aria-label={c.dhMonthsDesc.replace("{list}", s.months.map((m) => pct(m.occupancyPct)).join(", "))} className="dh-line" role="img">
+                <svg aria-hidden="true" className="dh-line__svg" preserveAspectRatio="none" viewBox="0 0 480 130">
+                  <line stroke="#E6E6EB" vectorEffect="non-scaling-stroke" x1="0" x2="480" y1="129.5" y2="129.5" />
+                  <line stroke="#F1F1F4" vectorEffect="non-scaling-stroke" x1="0" x2="480" y1="70" y2="70" />
+                  {linePoints.length > 0 ? (
+                    <>
+                      <defs>
+                        <linearGradient id="dhOccArea" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0" stopColor="#7A52E6" stopOpacity="0.12" />
+                          <stop offset="1" stopColor="#7A52E6" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        d={`M${linePoints[0].x},129 ${linePoints.map((p) => `L${p.x},${p.y}`).join(" ")} L${linePoints[linePoints.length - 1].x},129 Z`}
+                        fill="url(#dhOccArea)"
+                      />
+                    </>
+                  ) : null}
+                  <polyline
+                    fill="none"
+                    points={linePoints.map((p) => `${p.x},${p.y}`).join(" ")}
+                    stroke="#7A52E6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
                 {linePoints.map((p, i) => {
                   const last = i === linePoints.length - 1;
+                  const pos = { left: `${(p.x / 480) * 100}%`, top: `${(p.y / 130) * 100}%` };
                   return (
-                    <g key={p.x}>
-                      <circle cx={p.x} cy={p.y} fill={last ? "#7A52E6" : "#FFFFFF"} r="4.5" stroke="#7A52E6" strokeWidth="2" />
-                      <text fill={last ? "#16141F" : "#8B8898"} fontSize="11" fontWeight={last ? 600 : 400} textAnchor="middle" x={p.x} y={p.y - 12}>
+                    <span aria-hidden="true" key={p.x}>
+                      <i className={`dh-line__dot${last ? " is-now" : ""}`} style={pos} />
+                      <b className={`dh-line__v${last ? " is-now" : ""}`} style={pos}>
                         {pct(p.v)}
-                      </text>
-                    </g>
+                      </b>
+                    </span>
                   );
                 })}
-              </svg>
+              </div>
               <div className="dh-mlbl">{s.months.map((m) => <span key={m.month}>{monthLabel(m.month, locale)}</span>)}</div>
             </div>
           </div>

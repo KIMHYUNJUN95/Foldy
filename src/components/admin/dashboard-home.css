@@ -126,3 +126,11 @@
 .adm .dh-trend__up { color: #7a52e6; }
 .adm .dh-trend__down { color: #c5282e; }
 .adm .dh-kind--in { color: #5a30cf; font-weight: 600; }
+
+/* 월 가동률 — 선 · 면은 SVG(가로로 늘어남), 점 · 숫자는 HTML(늘어나지 않아 또렷하다) */
+.adm .dh-line { position: relative; height: 150px; }
+.adm .dh-line__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.adm .dh-line__dot { position: absolute; width: 10px; height: 10px; box-sizing: border-box; border: 2px solid #7a52e6; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); }
+.adm .dh-line__dot.is-now { background: #7a52e6; box-shadow: 0 0 0 3px #ede7fc; }
+.adm .dh-line__v { position: absolute; transform: translate(-50%, calc(-100% - 10px)); font-size: 12px; font-weight: 500; color: #8b8898; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .dh-line__v.is-now { color: #16141f; font-weight: 700; }

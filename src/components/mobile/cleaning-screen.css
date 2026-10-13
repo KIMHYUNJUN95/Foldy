@@ -70,7 +70,7 @@
 .cln-row__r { flex: 0 0 auto; }
 .cln-row__time { font-family: var(--font-mono, ui-monospace), monospace; font-size: 12px; color: #8b8898; font-variant-numeric: tabular-nums; }
 .cln-row.is-muted .cln-row__rm { color: #9a97a6; }
-.cln-start { height: 36px; padding: 0 14px; border-radius: 12px; border: 1px solid #ddd3fb; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; white-space: nowrap; cursor: pointer; }
+.cln-start { height: 40px; min-width: 64px; padding: 0 16px; border-radius: 12px; border: 1px solid #ddd3fb; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; white-space: nowrap; cursor: pointer; touch-action: manipulation; }
 .cln-start:active { background: #f1ecfd; }
 .cln-rec { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .cln-rec__st { font-size: 12px; font-weight: 600; color: #1f7a45; }

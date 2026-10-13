@@ -4,33 +4,12 @@
 // 담당하고, 여기서는 기록 열람 + 관리자 예외 개입(강제 완료 / 무효 / 삭제)만 한다.
 // Mirrors maint-views.js panel().
 import Image from "next/image";
-import {
-  Ban,
-  BedDouble,
-  Camera,
-  ChevronRight,
-  Info,
-  Link2,
-  Lock,
-  Trash2,
-  ShieldCheck,
-  Smartphone,
-  SprayCan,
-  User,
-  X,
-} from "lucide-react";
+import { Trash2, TriangleAlert, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { Locale } from "@/lib/i18n";
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
-import { fmtDate, fmtDateTime, isActive } from "./maintenance-console-data";
-import {
-  AgingTag,
-  CategoryChip,
-  OccupiedBadge,
-  PriorityBadge,
-  StatusPill,
-  type MaintCopy,
-} from "./maintenance-console-shared";
+import { fmtDate, fmtDateTime, fmtElapsed, isActive } from "./maintenance-console-data";
+import { categoryLabel, priorityLabel, statusLabel, type MaintCopy } from "./maintenance-console-shared";
 
 export type MaintExceptionKind = "force" | "void" | "del";
 
@@ -43,15 +22,6 @@ type PanelProps = {
   onOpenLink: (kind: "clean" | "resv") => void;
   disabled?: boolean;
 };
-
-function Kv({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="kv">
-      <span className="kv__k">{label}</span>
-      <span className="kv__v">{children}</span>
-    </div>
-  );
-}
 
 export function MaintenanceDetailPanel({
   report,
@@ -69,255 +39,133 @@ export function MaintenanceDetailPanel({
   const aging = report.aging;
   const canAct = isActive(report);
 
+  const resv = report.link.reservation;
+  const clean = report.link.cleaning;
+
+  // 화이트 리디자인(2026-10-13, 시안 Maint-PC 오른쪽 패널): 위 한 줄(우선순위 · 상태 · 분류) + 삭제 · 닫기 → 제목 → 호실 · 건물 →
+  // 재실 경고 한 줄 → 사진 → 설명 → 정보 줄(신고자 · 접수 · 연동 · 처리 메모) → 아래 관리자 예외 개입(강제 완료 · 무효). 칩 · 상자 · 아래 닫기 버튼 제거.
   return (
     <>
       <div className="panel-scrim on" onClick={onClose} />
-      <aside ref={panelRef} className="panel on" role="dialog" aria-label={t.pKicker} tabIndex={-1}>
+      <aside ref={panelRef} className="panel on mwp" role="dialog" aria-label={t.pKicker} tabIndex={-1}>
         <div className="panel__h">
           <div className="panel__top">
-            <span className="panel__kicker">
-              {t.pKicker} · {report.shortId}
+            <span className="mwp__kick">
+              <span className={`mwp__pri is-${report.priority}`}>{priorityLabel(report.priority, t)}</span>
+              <span>{statusLabel(report.status, t)}</span>
+              <span>{categoryLabel(report.category, t)}</span>
             </span>
-            <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
-              <X />
-            </button>
+            <span className="mwp__acts">
+              <button type="button" className="mwp__del" title={t.del} aria-label={t.del} onClick={() => onException("del", report.id)}>
+                <Trash2 aria-hidden="true" />
+              </button>
+              <button type="button" className="panel__x" onClick={onClose} aria-label={t.close}>
+                <X />
+              </button>
+            </span>
           </div>
-          <div className="mpanel__title" style={{ marginTop: 11 }}>
-            {report.title}
-          </div>
-          <div className="mpanel__chips">
-            <StatusPill status={report.status} t={t} />
-            <PriorityBadge priority={report.priority} t={t} />
-            <CategoryChip category={report.category} t={t} />
-            {occupied ? <OccupiedBadge t={t} /> : null}
-            {aging ? <AgingTag t={t} /> : null}
+          <div className="mwp__title">{report.title}</div>
+          <div className="mwp__sub">
+            {report.room ? <b className="mono">{report.room}</b> : <b>{t.buildingOnly}</b>} · {report.buildingLabel}
+            {aging ? <span className="mwp__aging"> · {t.oldFlag}</span> : null}
           </div>
         </div>
 
-        <div className="panel__body">
+        <div className="panel__body mwp__body">
           {occupied ? (
-            <div className="occnote">
-              <span className="occnote__ic">
-                <span className="ic">
-                  <User aria-hidden="true" />
-                </span>
+            <p className="mwp__warn">
+              <TriangleAlert aria-hidden="true" />
+              <span>
+                {t.occupied}
+                {resv ? ` · ${resv.guest} (${fmtDate(resv.checkIn, locale)} – ${fmtDate(resv.checkOut, locale)})` : ""}. {t.occNote}
               </span>
-              <div>
-                <div className="occnote__t">{t.occupied}</div>
-                <div className="occnote__s">{t.occNote}</div>
-              </div>
-            </div>
+            </p>
           ) : null}
 
-          <div className="pblock">
-            <div className="pblock__t">
-              {report.photos.length ? `${t.pPhotos} · ${report.photos.length}` : t.pPhotos}
+          {report.photos.length ? (
+            <div className="mwp__gal">
+              {report.photos.map((url) => (
+                <a className="mwp__shot" href={url} key={url} rel="noreferrer" target="_blank">
+                  <Image alt="" src={url} fill sizes="160px" />
+                </a>
+              ))}
             </div>
-            {report.photos.length ? (
-              <div className="pgal">
-                {report.photos.map((url) => (
-                  <a className="pshot" href={url} key={url} rel="noreferrer" target="_blank">
-                    <Image alt="" src={url} fill sizes="200px" />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="pnophoto">
-                <span className="ic">
-                  <Camera aria-hidden="true" />
-                </span>
-                {t.noPhoto}
-              </div>
-            )}
-          </div>
+          ) : (
+            <p className="mwp__dim">{t.noPhoto}</p>
+          )}
 
-          <div className="pblock">
-            <div className="pblock__t">{t.pDesc}</div>
-            <div className="mdesc">{report.description || "—"}</div>
-          </div>
+          <p className="mwp__desc">{report.description || "—"}</p>
 
-          <div className="pblock">
-            <div className="pblock__t">{t.pInfo}</div>
-            <Kv label={t.pLocation}>
-              {`${report.buildingLabel} · ${report.room ?? t.buildingOnly}`}
-            </Kv>
-            <Kv label={t.pCategory}>
-              <CategoryChip category={report.category} t={t} align="end" />
-            </Kv>
-            <Kv label={t.pPriority}>
-              <PriorityBadge priority={report.priority} t={t} />
-            </Kv>
-            <Kv label={t.pStatus}>
-              <StatusPill status={report.status} t={t} />
-            </Kv>
-            <Kv label={t.pReporter}>{report.reporterName}</Kv>
-            <Kv label={t.pReportedAt}>
-              <span className="mono">{fmtDateTime(report.createdAt, locale)}</span>
-            </Kv>
-            <Kv label={t.pUpdatedAt}>
-              <span className="mono">{fmtDateTime(report.updatedAt, locale)}</span>
-            </Kv>
+          <dl className="mwp__dl">
+            <dt>{t.pReporter}</dt>
+            <dd>{report.reporterName}</dd>
+            <dt>{t.pReportedAt}</dt>
+            <dd>
+              {fmtDateTime(report.createdAt, locale)}
+              {canAct ? <span className="mwp__muted"> · {fmtElapsed(report.createdAt, locale)}</span> : null}
+            </dd>
             {report.completedAt ? (
-              <Kv label={t.pCompletedAt}>
-                <span className="mono">{fmtDateTime(report.completedAt, locale)}</span>
-              </Kv>
+              <>
+                <dt>{t.pCompletedAt}</dt>
+                <dd>
+                  {fmtDateTime(report.completedAt, locale)}
+                  {report.completedByName ? <span className="mwp__muted"> · {report.completedByName}</span> : null}
+                </dd>
+              </>
             ) : null}
-            {report.completedByName ? (
-              <Kv label={t.pCompletedBy}>{report.completedByName}</Kv>
-            ) : null}
-          </div>
-
-          <div className="pblock">
-            <div className="pblock__t">{t.pMemo}</div>
-            {report.memo ? (
-              <div className="infonote">{report.memo}</div>
-            ) : (
-              <div className="dimnote">
-                <span className="ic">
-                  <Info aria-hidden="true" />
-                </span>
-                {t.noMemo}
-              </div>
-            )}
-          </div>
+            <dt>{t.pLinked}</dt>
+            <dd>
+              {clean ? (
+                <button type="button" className="mwp__link" onClick={() => onOpenLink("clean")}>
+                  {t.pCleaning} · {clean.room} {fmtDate(clean.date, locale)}
+                </button>
+              ) : null}
+              {clean && resv ? <br /> : null}
+              {resv && !occupied ? (
+                <button type="button" className="mwp__link" onClick={() => onOpenLink("resv")}>
+                  {t.pReservation} · {resv.guest}
+                </button>
+              ) : null}
+              {!clean && (!resv || occupied) ? <span className="mwp__muted">{t.noLinked}</span> : null}
+            </dd>
+            <dt>{t.pMemo}</dt>
+            <dd>{report.memo ? report.memo : <span className="mwp__muted">{t.noMemo}</span>}</dd>
+          </dl>
 
           {report.status === "closed" ? (
-            <div className="pblock">
-              <div className="pblock__t">
-                {report.resolutionPhotos.length
-                  ? `${t.pResPhotos} · ${report.resolutionPhotos.length}`
-                  : t.pResPhotos}
-              </div>
+            <>
+              <div className="mwp__sec">{t.pResPhotos}</div>
               {report.resolutionPhotos.length ? (
-                <div className="pgal pgal--res">
+                <div className="mwp__gal">
                   {report.resolutionPhotos.map((url) => (
-                    <a className="pshot pshot--res" href={url} key={url} rel="noreferrer" target="_blank">
-                      <Image alt="" src={url} fill sizes="200px" />
+                    <a className="mwp__shot" href={url} key={url} rel="noreferrer" target="_blank">
+                      <Image alt="" src={url} fill sizes="160px" />
                     </a>
                   ))}
                 </div>
               ) : (
-                <div className="dimnote">
-                  <span className="ic">
-                    <Camera aria-hidden="true" />
-                  </span>
-                  {t.noResPhoto}
-                </div>
+                <p className="mwp__dim">{t.noResPhoto}</p>
               )}
-            </div>
+            </>
           ) : null}
+        </div>
 
-          <div className="pblock">
-            <div className="pblock__t">{t.pLinked}</div>
-            {report.link.cleaning || report.link.reservation ? (
-              <div className="rptiles">
-                {report.link.cleaning ? (
-                  <button type="button" className="rptile rptile--clean" onClick={() => onOpenLink("clean")}>
-                    <span className="rptile__ic">
-                      <span className="ic">
-                        <SprayCan aria-hidden="true" />
-                      </span>
-                    </span>
-                    <span className="rptile__b">
-                      <span className="rptile__t">{t.pCleaning}</span>
-                      <span className="rptile__s">
-                        {report.link.cleaning.room} · {fmtDate(report.link.cleaning.date, locale)} ·{" "}
-                        {report.link.cleaning.staff}
-                      </span>
-                    </span>
-                    <span className="ic rptile__go">
-                      <ChevronRight aria-hidden="true" />
-                    </span>
-                  </button>
-                ) : null}
-                {report.link.reservation ? (
-                  <button type="button" className="rptile rptile--resv" onClick={() => onOpenLink("resv")}>
-                    <span className="rptile__ic">
-                      <span className="ic">
-                        <BedDouble aria-hidden="true" />
-                      </span>
-                    </span>
-                    <span className="rptile__b">
-                      <span className="rptile__t">{t.pReservation}</span>
-                      <span className="rptile__s">
-                        {report.link.reservation.guest} · {fmtDate(report.link.reservation.checkIn, locale)} –{" "}
-                        {fmtDate(report.link.reservation.checkOut, locale)}
-                      </span>
-                    </span>
-                    <span className="ic rptile__go">
-                      <ChevronRight aria-hidden="true" />
-                    </span>
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <div className="dimnote">
-                <span className="ic">
-                  <Link2 aria-hidden="true" />
-                </span>
-                {t.noLinked}
-              </div>
-            )}
-          </div>
-
-          <div className="mobnote">
-            <span className="mobnote__ic">
-              <span className="ic">
-                <Smartphone aria-hidden="true" />
-              </span>
-            </span>
-            <div className="mobnote__t">{t.pMobileNote}</div>
-          </div>
-
-          <div className="exczone">
-            <div className="exczone__t">
-              <span className="ic">
-                <ShieldCheck aria-hidden="true" />
-              </span>
-              {t.exceptionT}
+        {canAct ? (
+          <div className="panel__foot mwp__foot">
+            <div className="mwp__exc">
+              <b>{t.exceptionT}</b>
+              <span>{t.exceptionS}</span>
             </div>
-            <div className="exczone__s">{t.exceptionS}</div>
-            <div className="exczone__btns">
-              {canAct ? (
-                <>
-                  <button
-                    type="button"
-                    className="excbtn excbtn--force"
-                    onClick={() => onException("force", report.id)}
-                  >
-                    <span className="ic">
-                      <Lock aria-hidden="true" />
-                    </span>
-                    {t.forceClose}
-                  </button>
-                  <button type="button" className="excbtn excbtn--void" onClick={() => onException("void", report.id)}>
-                    <span className="ic">
-                      <Ban aria-hidden="true" />
-                    </span>
-                    {t.voidReport}
-                  </button>
-                </>
-              ) : null}
-              <button
-                type="button"
-                className="excbtn excbtn--del"
-                title={t.del}
-                aria-label={t.del}
-                onClick={() => onException("del", report.id)}
-              >
-                <span className="ic">
-                  <Trash2 aria-hidden="true" />
-                </span>
+            <div className="mwp__btns">
+              <button type="button" className="btn btn--pri" onClick={() => onException("force", report.id)}>
+                {t.forceClose}
+              </button>
+              <button type="button" className="btn mwp__void" onClick={() => onException("void", report.id)}>
+                {t.voidReport}
               </button>
             </div>
           </div>
-        </div>
-
-        <div className="panel__foot">
-          <button type="button" className="btn btn--ghost btn--block" onClick={onClose}>
-            {t.close}
-          </button>
-        </div>
+        ) : null}
       </aside>
     </>
   );

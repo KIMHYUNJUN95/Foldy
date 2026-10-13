@@ -8,7 +8,7 @@
 // 삭제)도 실제 서버 액션이다. See docs/product/08-maintenance-workflow.md.
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CircleCheck, Clock, Eye, Flag, Inbox, LayoutGrid, RefreshCw, TriangleAlert, Wrench } from "lucide-react";
+import { Eye, TriangleAlert } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
@@ -132,131 +132,80 @@ export function MaintenanceConsole({ locale, reports, loadError }: MaintenanceCo
 
   return (
     <>
-      <div className="opsbar opsbar--5">
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Inbox />
-            </span>
-            {t.kpiOpen}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.open > 0 ? "" : " is-muted"}`}>{V(kpi.open)}</div>
-          <div className="opscell__sub">{loadError ? t.errT : t.readonly}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Wrench />
-            </span>
-            {t.kpiProg}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.progress > 0 ? " is-progress" : " is-muted"}`}>
-            {V(kpi.progress)}
-          </div>
-          <div className="opscell__sub">{loadError ? t.errT : t.live}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Flag />
-            </span>
-            {t.kpiUrgent}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.urgent > 0 ? " is-danger" : " is-muted"}`}>
-            {V(kpi.urgent)}
-          </div>
-          <div className="opscell__sub">
-            {loadError ? (
-              " "
-            ) : kpi.urgent ? (
-              <span className="opscell__flag">
-                <span className="ic">
-                  <TriangleAlert />
-                </span>
-                {t.kpiUrgent}
-              </span>
-            ) : (
-              <span style={{ color: "var(--adm-muted)" }}>{t.within}</span>
-            )}
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Clock />
-            </span>
-            {t.kpiOld}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.aging > 0 ? " is-danger" : " is-muted"}`}>
-            {V(kpi.aging)}
-          </div>
-          <div className="opscell__sub">
-            {loadError ? (
-              " "
-            ) : kpi.aging ? (
-              <span className="opscell__flag">
-                <span className="ic">
-                  <TriangleAlert />
-                </span>
-                {t.oldSub}
-              </span>
-            ) : (
-              <span style={{ color: "var(--done)", fontWeight: 800 }}>{t.within}</span>
-            )}
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Check />
-            </span>
-            {t.kpiResolved}
-          </div>
-          <div className={`opscell__v${loadError ? " is-muted" : " is-done"}`}>{V(kpi.resolved)}</div>
-          <div className="opscell__sub">{loadError ? t.errT : t.within}</div>
-        </div>
-      </div>
-
-      <div className="cviewbar">
+      {/* 화이트 리디자인(2026-10-13, 시안 Maint-PC · MaintList-PC · MaintDone-PC): 보기 탭(아이콘 없음) · 실시간 한 줄이 맨 위,
+          그 아래 숫자 다섯(현황 보드에서만) · 「읽기 전용 · 정렬」 한 줄. */}
+      <div className="cviewbar mw-viewbar">
         <div className="lviews" style={{ margin: 0 }}>
           <button type="button" className={view === "board" ? "on" : ""} onClick={() => handleViewChange("board")}>
-            <span className="ic">
-              <LayoutGrid />
-            </span>
             {t.vBoard}
           </button>
           <button type="button" className={view === "list" ? "on" : ""} onClick={() => handleViewChange("list")}>
-            <span className="ic">
-              <Clock />
-            </span>
             {t.vList}
           </button>
           <button type="button" className={view === "done" ? "on" : ""} onClick={() => handleViewChange("done")}>
-            <span className="ic">
-              <CircleCheck />
-            </span>
             {t.vDone}
           </button>
         </div>
-        <span style={{ flex: 1 }} />
         {view === "board" ? (
-          <>
-            <span className="robadge">
-              <span className="ic">
-                <Eye />
-              </span>
-              {t.readonly}
-            </span>
-            <button type="button" className="syncchip" onClick={handleSync}>
-              <span className="syncchip__dot" />
-              {t.syncLabel} · {t.syncAgo}
-              <span className="ic">
-                <RefreshCw />
-              </span>
-            </button>
-          </>
+          <button type="button" className="mw-live" onClick={handleSync}>
+            <i aria-hidden="true" />
+            {t.syncLabel} · {t.syncAgo}
+          </button>
         ) : null}
       </div>
+
+      {view === "board" ? (
+        <>
+          <div className="wkpis mw-kpis">
+            <div className="wkpi">
+              <span className="wkpi__k">{t.kpiOpen}</span>
+              <span className="wkpi__v">
+                {V(kpi.open)}
+                <small>{t.unit}</small>
+              </span>
+              <span className="wkpi__d">{t.kpiOpenSub}</span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{t.kpiProg}</span>
+              <span className="wkpi__v">
+                {V(kpi.progress)}
+                <small>{t.unit}</small>
+              </span>
+              <span className="wkpi__d">{t.kpiProgSub}</span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{t.kpiUrgent}</span>
+              <span className={`wkpi__v${!loadError && kpi.urgent > 0 ? " is-danger" : ""}`}>
+                {V(kpi.urgent)}
+                <small>{t.unit}</small>
+              </span>
+              <span className="wkpi__d">{t.kpiUrgentSub}</span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{t.kpiOld}</span>
+              <span className={`wkpi__v${!loadError && kpi.aging > 0 ? " is-warn" : ""}`}>
+                {V(kpi.aging)}
+                <small>{t.unit}</small>
+              </span>
+              <span className="wkpi__d">{t.oldSub}</span>
+            </div>
+            <div className="wkpi">
+              <span className="wkpi__k">{t.kpiResolved}</span>
+              <span className="wkpi__v">
+                {V(kpi.resolved)}
+                <small>{t.unit}</small>
+              </span>
+              <span className="wkpi__d">{t.within}</span>
+            </div>
+          </div>
+          <p className="mw-note">
+            <span className="ic">
+              <Eye />
+            </span>
+            {t.readonly}. {t.sortNote}
+          </p>
+        </>
+      ) : null}
 
       <div className="cbody">
         {view === "board" ? (

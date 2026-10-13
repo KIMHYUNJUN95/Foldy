@@ -226,3 +226,82 @@
 :lang(ja) .adm .pri {
   letter-spacing: 0;
 }
+
+/* 화이트 리디자인(2026-10-13, 시안 Maint-PC) — 보기 탭 줄 · 숫자 다섯 · 상자 없는 열 · 옅은 카드 */
+.adm .mw-viewbar { margin: 4px 0 6px; gap: 16px; }
+.adm .mw-live { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 12px; color: #8b8898; cursor: pointer; }
+.adm .mw-live i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; box-shadow: 0 0 0 0 rgba(122, 82, 230, .5); animation: mw-ping 2.4s ease-out infinite; }
+@keyframes mw-ping { 0% { box-shadow: 0 0 0 0 rgba(122, 82, 230, .45); } 70%, 100% { box-shadow: 0 0 0 7px rgba(122, 82, 230, 0); } }
+.adm .mw-kpis { margin-top: 8px; }
+.adm .wkpi__v.is-warn { color: #a8641c; }
+.adm .mw-note { display: flex; align-items: center; gap: 6px; margin: 14px 0 12px; font-size: 12px; color: #8b8898; }
+.adm .mw-note .ic svg { width: 14px; height: 14px; }
+.adm .mbkcol { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+.adm .mbkcol::before { display: none !important; }
+.adm .mbkcol__h { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px !important; border: 0 !important; background: none !important; }
+.adm .mbkcol__dot { width: 7px; height: 7px; border-radius: 50%; background: #7a52e6; }
+.adm .mbkcol--progress .mbkcol__dot { background: #2f6fde; }
+.adm .mbkcol--cancelled .mbkcol__dot, .adm .mbkcol--void .mbkcol__dot { background: #b4b1bf; }
+.adm .mbkcol__t { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .mbkcol__c { font-size: 13px; font-weight: 500; color: #8b8898; background: none !important; padding: 0 !important; }
+.adm .mbkcol__body { display: flex; flex-direction: column; gap: 10px; padding: 0 !important; }
+.adm .mcard { padding: 14px 16px !important; border: 0 !important; border-radius: 14px !important; background: #f7f7f9 !important; box-shadow: none !important; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .mcard::before { display: none !important; }
+.adm .mcard:hover { background: #f1f0f5 !important; }
+.adm .mcard:active { transform: scale(.985); }
+.adm .mcard.sel { background: #f1ecfd !important; }
+.adm .mcard__kick { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6878; }
+.adm .mcard__kick > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
+.adm .mcard__pri { font-weight: 600; color: #6b6878; }
+.adm .mcard__pri.is-urgent { color: #c5282e; display: inline-flex; align-items: center; gap: 5px; }
+.adm .mcard__pri.is-urgent::after { content: ""; order: -1; width: 6px; height: 6px; border-radius: 50%; background: #e5484d; animation: mw-breathe 1.8s ease-in-out infinite; }
+@keyframes mw-breathe { 50% { opacity: .35; transform: scale(.8); } }
+.adm .mcard__pri.is-high { color: #a8641c; }
+.adm .mcard__occ { color: #6b6878; }
+.adm .mcard__title { margin-top: 6px; font-size: 15px !important; font-weight: 700; color: #16141f; }
+.adm .mcard__loc { margin-top: 6px; font-size: 12px; color: #8b8898; }
+.adm .mcard__loc b { margin-right: 4px; font-weight: 600; color: #3a3746; }
+.adm .mcard__foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 0 !important; border: 0 !important; font-size: 12px; color: #8b8898; }
+.adm .mcard__el.is-late { color: #a8641c; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .mw-live i, .adm .mcard__pri.is-urgent::after { animation: none; }
+}
+
+/* 상세 패널 — 위 한 줄 · 제목 · 경고 한 줄 · 정보 줄 · 예외 개입(2026-10-13 시안 Maint-PC) */
+.adm .mwp .mwp__kick { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6878; }
+.adm .mwp .mwp__kick > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
+.adm .mwp .mwp__pri { font-weight: 600; }
+.adm .mwp .mwp__pri.is-urgent { color: #c5282e; }
+.adm .mwp .mwp__pri.is-high { color: #a8641c; }
+.adm .mwp .mwp__acts { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.adm .mwp .mwp__del { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: #c5282e; cursor: pointer; }
+.adm .mwp .mwp__del:hover { background: #fdecec; }
+.adm .mwp .mwp__del svg { width: 18px; height: 18px; }
+.adm .mwp .mwp__title { margin-top: 10px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .mwp .mwp__sub { margin-top: 6px; font-size: 13px; color: #8b8898; }
+.adm .mwp .mwp__sub b { font-weight: 700; color: #16141f; }
+.adm .mwp .mwp__aging { color: #a8641c; font-weight: 600; }
+.adm .mwp__body { display: flex; flex-direction: column; gap: 16px; }
+.adm .mwp .mwp__warn { display: flex; gap: 8px; margin: 0; font-size: 13px; line-height: 1.5; color: #3a3746; }
+.adm .mwp .mwp__warn svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: #b7791f; }
+.adm .mwp .mwp__gal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.adm .mwp .mwp__shot { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #f4f4f7; transition: transform 160ms ease; }
+.adm .mwp .mwp__shot:hover { transform: scale(1.02); }
+.adm .mwp .mwp__shot img { object-fit: cover; }
+.adm .mwp .mwp__dim { margin: 0; font-size: 13px; color: #8b8898; }
+.adm .mwp .mwp__desc { margin: 0; font-size: 14px; line-height: 1.6; color: #16141f; white-space: pre-wrap; }
+.adm .mwp .mwp__dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; margin: 0; padding-top: 16px; border-top: 1px solid #f1f1f4; font-size: 13px; }
+.adm .mwp .mwp__dl dt { color: #8b8898; }
+.adm .mwp .mwp__dl dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
+.adm .mwp .mwp__muted { color: #8b8898; }
+.adm .mwp .mwp__link { padding: 0; border: 0; background: none; font: inherit; color: #7a52e6; cursor: pointer; text-align: left; }
+.adm .mwp .mwp__link:hover { text-decoration: underline; }
+.adm .mwp .mwp__sec { font-size: 13px; font-weight: 600; color: #3a3746; }
+.adm .mwp__foot { flex-direction: column; align-items: stretch; gap: 12px; border-top: 1px solid #f1f1f4; }
+.adm .mwp .mwp__exc { display: flex; flex-direction: column; gap: 4px; }
+.adm .mwp .mwp__exc b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .mwp .mwp__exc span { font-size: 12px; line-height: 1.5; color: #8b8898; }
+.adm .mwp .mwp__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.adm .mwp .mwp__btns .btn { height: 44px; justify-content: center; }
+.adm .mwp .mwp__void { background: #fff; border: 1px solid #f0d3a3; color: #a8641c; }
+.adm .mwp .mwp__void:hover { background: #fdf6ea; }

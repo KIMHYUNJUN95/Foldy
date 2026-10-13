@@ -2,11 +2,12 @@
 
 // Admin 수리·점검 console — 현황 보드. Three status columns (접수 / 처리중 / 무효); 완료(closed)는
 // 누적 데이터라 별도 "완료" 뷰에서만 본다. Data is real (src/lib/admin-maintenance.ts) as of 2026-07-14.
-import { Check, Clock, MapPin, Search, TriangleAlert } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
 import {
   BOARD_ORDER,
+  MAINT_PRIORITY,
   MAINT_STATUS,
   fmtDateTime,
   fmtElapsed,
@@ -14,16 +15,7 @@ import {
   locationLabel,
   sortForBoard,
 } from "./maintenance-console-data";
-import {
-  CategoryChip,
-  OccupiedBadge,
-  PhotoBadge,
-  PriorityBadge,
-  ReporterAvatar,
-  STATUS_ICON,
-  copyOf,
-  type MaintCopy,
-} from "./maintenance-console-shared";
+import { categoryLabel, copyOf, priorityLabel, type MaintCopy } from "./maintenance-console-shared";
 
 type BoardProps = {
   reports: AdminMaintenanceReport[];
@@ -71,48 +63,30 @@ function MaintCard({
         }
       }}
     >
-      <div className="mcard__top">
-        <PriorityBadge priority={report.priority} t={t} />
-        <CategoryChip category={report.category} t={t} />
-        <span className="mcard__sp" />
-        <PhotoBadge count={report.photos.length} />
+      {/* 화이트 리디자인(2026-10-13, 시안 Maint-PC): 한 줄 머리(우선순위 · 분류 · 재실 중) → 제목 → 호실 · 건물 → 신고자 | 사진 · 경과. */}
+      <div className="mcard__kick">
+        <span className={`mcard__pri is-${MAINT_PRIORITY[report.priority].cls}`}>{priorityLabel(report.priority, t)}</span>
+        <span>{categoryLabel(report.category, t)}</span>
+        {report.occupied ? <span className="mcard__occ">{t.occupied}</span> : null}
       </div>
       <div className="mcard__title">{report.title}</div>
-      <div className="mcard__mid">
-        <span className="mcard__loc">
-          <span className="ic">
-            <MapPin aria-hidden="true" />
-          </span>
-          {report.room ? (
-            <>
-              <span className="mono">{report.room}</span> · {report.buildingLabel}
-            </>
-          ) : (
-            `${report.buildingLabel} · ${t.buildingOnly}`
-          )}
-        </span>
-        {report.occupied ? <OccupiedBadge t={t} /> : null}
+      <div className="mcard__loc">
+        {report.room ? (
+          <>
+            <b className="mono">{report.room}</b> {report.buildingLabel}
+          </>
+        ) : (
+          <>
+            <b>{t.buildingOnly}</b> {report.buildingLabel}
+          </>
+        )}
       </div>
       <div className="mcard__foot">
-        <span className="mcard__rep">
-          <ReporterAvatar id={report.reporterId} name={report.reporterName} className="mcard__av" />
-          <span>{report.reporterName}</span>
+        <span className="mcard__rep">{report.reporterName}</span>
+        <span className={`mcard__el${isActive(report) && report.aging ? " is-late" : ""}`}>
+          {report.photos.length > 0 ? `${t.photoN.replace("{n}", String(report.photos.length))} · ` : ""}
+          {isActive(report) ? fmtElapsed(report.createdAt, locale) : fmtDateTime(report.completedAt ?? report.updatedAt, locale)}
         </span>
-        {isActive(report) ? (
-          <span className={`mcard__el${report.aging ? " is-late" : ""}`}>
-            <span className="ic">
-              {report.aging ? <TriangleAlert aria-hidden="true" /> : <Clock aria-hidden="true" />}
-            </span>
-            {fmtElapsed(report.createdAt, locale)}
-          </span>
-        ) : (
-          <span className="mcard__el">
-            <span className="ic">
-              <Check aria-hidden="true" />
-            </span>
-            {fmtDateTime(report.completedAt ?? report.updatedAt, locale)}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -180,16 +154,11 @@ export function MaintenanceBoard({
       <div className="mbkgrid">
         {BOARD_ORDER.map((status) => {
           const meta = MAINT_STATUS[status];
-          const Icon = STATUS_ICON[status];
           const items = sortForBoard(matched.filter((r) => r.status === status));
           return (
             <section className={`mbkcol mbkcol--${meta.cls}`} key={status}>
               <div className="mbkcol__h">
-                <span className="mbkcol__ic">
-                  <span className="ic">
-                    <Icon aria-hidden="true" />
-                  </span>
-                </span>
+                <i className="mbkcol__dot" aria-hidden="true" />
                 <span className="mbkcol__t">{copyOf(t, meta.key)}</span>
                 <span className="mbkcol__c">{items.length}</span>
               </div>

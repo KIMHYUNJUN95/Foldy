@@ -3500,3 +3500,9 @@
 @media (min-width: 1000px) and (min-height: 600px) {
   .att.att--home > .seclbl { border-top: 0; padding-top: 0; margin-top: 58px; }
 }
+/* 출근 현장 · 출근 시각 — 홈과 같은 테두리 이름표 칸(2026-10-13 시안 컨펌) */
+.att.att--home .infostrip { margin-top: 6px; }
+.att.att--home .infocell { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 0 16px; box-sizing: border-box; border: 1px solid #e0e0e6; background: #ffffff; }
+.att.att--home .infocell + .infocell { border: 1px solid #e0e0e6; }
+.att.att--home .infocell__k { position: absolute; top: -8px; left: 11px; padding: 0 5px; background: #ffffff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; white-space: nowrap; }
+.att.att--home .infocell__v { margin-top: 0; }

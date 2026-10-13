@@ -119,3 +119,10 @@
 .adm .dh-todo.is-done { color: #9a97a6; text-decoration: line-through; }
 .adm .dh-todo.is-done .dh-todo__box { background: #7a52e6; border-color: #7a52e6; }
 .adm .dh-sel { background: #f4f1fd; }
+
+/* 디테일 다듬기(2026-10-13 시안 컨펌): 증감 화살표 · 체크인 보라 글자 */
+.adm .dh-trend { white-space: nowrap; }
+.adm .dh-trend__up, .adm .dh-trend__down { font-size: 9px; vertical-align: 1px; }
+.adm .dh-trend__up { color: #7a52e6; }
+.adm .dh-trend__down { color: #c5282e; }
+.adm .dh-kind--in { color: #5a30cf; font-weight: 600; }

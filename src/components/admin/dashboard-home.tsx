@@ -123,7 +123,6 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
   const mMax = niceMax(Math.max(...s.months.map((m) => m.revenue), 1));
   const thisMonth = s.today.slice(0, 7);
   const linePoints = s.months.map((m, i) => ({ x: 40 + i * 80, y: 120 - (Math.min(m.occupancyPct, 100) / 100) * 100, v: m.occupancyPct }));
-  const peak = linePoints.reduce((best, p) => (p.v > best.v ? p : best), linePoints[0]);
 
   return (
     <>
@@ -143,7 +142,14 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
               {s.actualThroughDay ? (
                 <span className="dh-rev__note">
                   {c.dhActualNote.replace("{day}", String(s.actualThroughDay)).replace("{amount}", yen(s.actualToDate))}
-                  {s.changePct !== null ? <b>{`${s.changePct >= 0 ? "+" : ""}${s.changePct.toFixed(1)}%`}</b> : <b>—</b>}
+                  {s.changePct !== null ? (
+                    <b className="dh-trend">
+                      <span aria-hidden="true" className={s.changePct >= 0 ? "dh-trend__up" : "dh-trend__down"}>{s.changePct >= 0 ? "▲" : "▼"}</span>{" "}
+                      {`${s.changePct >= 0 ? "+" : ""}${s.changePct.toFixed(1)}%`}
+                    </b>
+                  ) : (
+                    <b>—</b>
+                  )}
                 </span>
               ) : null}
             </div>
@@ -188,7 +194,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
           </div>
           <div className="dh-occ__ring">
             <svg aria-label={c.dhOccDesc.replace("{pct}", String(Math.round(s.occupancyPct)))} height="104" role="img" viewBox="0 0 104 104" width="104">
-              <circle cx="52" cy="52" fill="none" r={r} stroke="#EFEFF3" strokeWidth="10" />
+              <circle cx="52" cy="52" fill="none" r={r} stroke="#EDE7FC" strokeWidth="10" />
               <circle
                 cx="52"
                 cy="52"
@@ -251,20 +257,32 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
               >
                 <line stroke="#E6E6EB" x1="0" x2="480" y1="129.5" y2="129.5" />
                 <line stroke="#F1F1F4" x1="0" x2="480" y1="70" y2="70" />
-                <polyline fill="none" points={linePoints.map((p) => `${p.x},${p.y}`).join(" ")} stroke="#7A52E6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                <g fill="#7A52E6" stroke="#FFFFFF" strokeWidth="2">
-                  {linePoints.map((p) => <circle cx={p.x} cy={p.y} key={p.x} r="4.5" />)}
-                </g>
                 {linePoints.length > 0 ? (
                   <>
-                    <text fill="#6B6878" fontSize="11" textAnchor="middle" x={peak.x} y={peak.y - 10}>{pct(peak.v)}</text>
-                    {peak !== linePoints[linePoints.length - 1] ? (
-                      <text fill="#16141F" fontSize="11" fontWeight="600" textAnchor="middle" x={linePoints[linePoints.length - 1].x} y={linePoints[linePoints.length - 1].y - 10}>
-                        {pct(linePoints[linePoints.length - 1].v)}
-                      </text>
-                    ) : null}
+                    <defs>
+                      <linearGradient id="dhOccArea" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0" stopColor="#7A52E6" stopOpacity="0.12" />
+                        <stop offset="1" stopColor="#7A52E6" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d={`M${linePoints[0].x},129 ${linePoints.map((p) => `L${p.x},${p.y}`).join(" ")} L${linePoints[linePoints.length - 1].x},129 Z`}
+                      fill="url(#dhOccArea)"
+                    />
                   </>
                 ) : null}
+                <polyline fill="none" points={linePoints.map((p) => `${p.x},${p.y}`).join(" ")} stroke="#7A52E6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                {linePoints.map((p, i) => {
+                  const last = i === linePoints.length - 1;
+                  return (
+                    <g key={p.x}>
+                      <circle cx={p.x} cy={p.y} fill={last ? "#7A52E6" : "#FFFFFF"} r="4.5" stroke="#7A52E6" strokeWidth="2" />
+                      <text fill={last ? "#16141F" : "#8B8898"} fontSize="11" fontWeight={last ? 600 : 400} textAnchor="middle" x={p.x} y={p.y - 12}>
+                        {pct(p.v)}
+                      </text>
+                    </g>
+                  );
+                })}
               </svg>
               <div className="dh-mlbl">{s.months.map((m) => <span key={m.month}>{monthLabel(m.month, locale)}</span>)}</div>
             </div>
@@ -340,16 +358,16 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
             <div className="dh-empty">{c.resvEmpty}</div>
           ) : (
             [
-              ...data.reservations.checkIns.map((r) => ({ r, kind: c.resvCheckIn, key: `in-${r.id}` })),
-              ...data.reservations.checkOuts.map((r) => ({ r, kind: c.resvCheckOut, key: `out-${r.id}` })),
-            ].map(({ r, kind, key }) => (
+              ...data.reservations.checkIns.map((r) => ({ r, kind: c.resvCheckIn, key: `in-${r.id}`, isIn: true })),
+              ...data.reservations.checkOuts.map((r) => ({ r, kind: c.resvCheckOut, key: `out-${r.id}`, isIn: false })),
+            ].map(({ r, kind, key, isIn }) => (
               <div className="dh-row" key={key} style={{ cursor: "default" }}>
                 <span className="dh-room">{r.roomLabel}</span>
                 <div className="dh-rb">
                   <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
                   <div className="dh-rs">{r.propertyName}{r.source ? ` · ${r.source}` : ""}</div>
                 </div>
-                <span className="dh-kind">{kind}</span>
+                <span className={`dh-kind${isIn ? " dh-kind--in" : ""}`}>{kind}</span>
               </div>
             ))
           )}

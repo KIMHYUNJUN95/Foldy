@@ -31,6 +31,7 @@ import {
 } from "@/components/requests/date-range-calendar";
 import type { Locale } from "@/lib/i18n";
 import type { LostItemWithReporter } from "@/lib/lost-found";
+import { lostItemClock } from "@/lib/lost-found-constants";
 import type { MaintenanceReportWithReporter } from "@/lib/maintenance-reports";
 import type {
   OrderRequestStatus,
@@ -189,6 +190,8 @@ type FilterLabels = {
 
 type LostFoundCopy = {
   fromCleaningTag: string;
+  groupActive: string;
+  groupClosed: string;
   mobileListTitle: string;
   noRecords: string;
   reporter: string;
@@ -319,7 +322,7 @@ const RequestListCard = memo(function RequestListCard({
   urgentLabel?: string | null;
   meta: (string | null | undefined)[];
   statusLabel: string;
-  statusTone: "open" | "prog" | "done";
+  statusTone: "open" | "prog" | "done" | "soon";
   onDelete?: () => void;
   deleteLabel: string;
 }) {
@@ -769,20 +772,30 @@ export function RequestsFilterView({
   ];
 
   // One row list for every tab — kinds mixed on 「전체」, grouped by Tokyo date.
-  type Row = { key: string; time: string; node: React.ReactNode };
+  type Row = { key: string; time: string; node: React.ReactNode; active?: boolean; daysLeft?: number };
   const rows: Row[] = [
-    ...visibleLostItems.map((item) => ({
+    ...visibleLostItems.map((item) => {
+      // 보관 중이면 시각 대신 자동 폐기까지 D-day(만료면 +n). 3일 이내 · 만료는 빨간 상태 글자.
+      const clock = lostItemClock(item, todayKey);
+      return {
       key: `l-${item.id}`,
       time: item.found_at,
+      active: clock != null,
+      daysLeft: clock?.daysLeft ?? 0,
       node: (
         <RequestListCard
           key={item.id}
           kind="lost-found"
           href={`/mobile/requests/lost-found/${item.id}${listQueryString ? `?${listQueryString}` : ""}`}
           title={item.item_name}
-          meta={[item.location.roomLabel, item.location.buildingLabel, item.reporter_name, formatTime(item.found_at, locale)]}
+          meta={[
+            item.location.roomLabel,
+            item.location.buildingLabel,
+            item.reporter_name,
+            clock ? (clock.daysLeft < 0 ? `D+${-clock.daysLeft}` : `D-${clock.daysLeft}`) : formatTime(item.found_at, locale),
+          ]}
           statusLabel={lostFoundCopy.statusLabels[item.status]}
-          statusTone={activeLostStatuses.has(item.status) ? "open" : "done"}
+          statusTone={clock && (clock.isDueSoon || clock.isExpired) ? "soon" : activeLostStatuses.has(item.status) ? "open" : "done"}
           onDelete={
             canDeleteAny || item.reported_by_user_id === currentUserId
               ? () => openDelete({ type: "lost-found", id: item.id, title: item.item_name })
@@ -791,7 +804,8 @@ export function RequestsFilterView({
           deleteLabel={deleteCopy.deleteAction}
         />
       ),
-    })),
+      };
+    }),
     ...visibleMaintenance.map((report) => ({
       key: `m-${report.id}`,
       time: report.created_at,
@@ -844,7 +858,18 @@ export function RequestsFilterView({
       };
     }),
   ].sort((x, y) => (x.time < y.time ? 1 : -1));
-  const rowGroups = groupByDate(rows, (r) => r.time);
+  // 분실물 탭만 날짜 대신 「보관 중 · 자동 폐기 가까운 순」 → 「완료 · 최근 순」으로 묶는다(2026-10-14 시안 LF-Tablet).
+  const rowGroups =
+    typeFilter === "lost-found"
+      ? [
+          {
+            key: "lf-active",
+            label: lostFoundCopy.groupActive,
+            items: rows.filter((r) => r.active).sort((x, y) => (x.daysLeft ?? 0) - (y.daysLeft ?? 0)),
+          },
+          { key: "lf-closed", label: lostFoundCopy.groupClosed, items: rows.filter((r) => !r.active) },
+        ].filter((g) => g.items.length > 0)
+      : groupByDate(rows, (r) => r.time);
 
   return (
     <div className="space-y-4">

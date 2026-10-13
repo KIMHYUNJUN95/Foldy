@@ -3,6 +3,7 @@
 // 상태 배열·가드·상한 같은 순수 상수는 여기 두고, 서버 lib은 이 파일을 재수출한다.
 // (수리·점검의 maintenance-constants.ts와 동일한 분리 패턴.)
 import type { Database } from "@/types/database";
+import { tokyoDateOf, tokyoToday, ymdShift } from "@/lib/tokyo-date";
 
 export type LostItemStatus = Database["public"]["Enums"]["lost_item_status"];
 export type LostItemCategory = Database["public"]["Enums"]["lost_item_category"];
@@ -68,3 +69,36 @@ export const LOST_FOUND_DUE_SOON_DAYS = 3;
 // 폐기 후 90일 경과 시 하드 삭제(자동 정리). 삭제 7일 전부터 "삭제 임박".
 export const LOST_FOUND_DISPOSAL_RETENTION_DAYS = 90;
 export const LOST_FOUND_PURGE_SOON_DAYS = 7;
+
+export type LostItemClock = {
+  /** "YYYY-MM-DD" = hold_until ?? 발견일 + 14. */
+  dueDate: string;
+  storedDays: number;
+  daysLeft: number;
+  isDueSoon: boolean;
+  isExpired: boolean;
+  isExtended: boolean;
+};
+
+/**
+ * 보관 시계(도쿄 달력) — 모바일 상세 · 요청 목록용 파생 계산. 어드민은 `admin-lost-found.ts` 가 같은 규칙으로 계산한다.
+ * 종결(반환 · 폐기) 건은 null.
+ */
+export function lostItemClock(
+  item: { status: LostItemStatus; found_at: string; hold_until: string | null },
+  todayKey: string = tokyoToday(),
+): LostItemClock | null {
+  if (isLostItemTerminal(item.status)) return null;
+  const foundDate = tokyoDateOf(item.found_at) ?? todayKey;
+  const dueDate = item.hold_until ?? ymdShift(foundDate, LOST_FOUND_STORAGE_DAYS);
+  const diff = (a: string, b: string) => Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
+  const daysLeft = diff(dueDate, todayKey);
+  return {
+    dueDate,
+    storedDays: Math.max(0, diff(todayKey, foundDate)),
+    daysLeft,
+    isDueSoon: daysLeft >= 0 && daysLeft <= LOST_FOUND_DUE_SOON_DAYS,
+    isExpired: daysLeft < 0,
+    isExtended: item.hold_until != null,
+  };
+}

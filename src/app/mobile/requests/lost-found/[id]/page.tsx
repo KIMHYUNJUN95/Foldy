@@ -1,34 +1,19 @@
 import { notFound, redirect } from "next/navigation";
-import { Info, Lock, Package } from "lucide-react";
+import { Check } from "lucide-react";
 import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
 import { LostFoundHandlingForm } from "@/components/requests/lost-found-handling-form";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import {
-  getLostItemById,
-  isLostItemTerminal,
-  lostItemLinearStatuses,
-  type LostItemStatus,
-} from "@/lib/lost-found";
+import { getLostItemById, isLostItemTerminal } from "@/lib/lost-found";
+import { lostItemClock } from "@/lib/lost-found-constants";
 import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { getOnboardingState } from "@/lib/onboarding";
 import { resolveRequestLocation } from "@/lib/request-location";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-import { cn } from "@/lib/utils";
-
-const statusBadgeClass: Record<LostItemStatus, string> = {
-  registered: "border-blue-200 bg-blue-50 text-blue-700",
-  stored: "border-amber-200 bg-amber-50 text-amber-700",
-  disposal_scheduled: "border-orange-200 bg-orange-50 text-orange-700",
-  disposed: "border-border bg-muted/50 text-muted-foreground",
-  returned: "border-[#c5cdf0] bg-[#eef1fb] text-[#3949ab]",
-};
-const DETAIL_CARD =
-  "rounded-[24px] border border-slate-200/80 bg-surface shadow-[0_16px_34px_-28px_rgba(31,58,95,0.48)]";
+import "@/components/requests/maintenance-detail.css";
+import "@/components/requests/lost-found-detail.css";
 
 type ListFilterQuery = {
   building?: string;
@@ -46,14 +31,23 @@ type PageProps = {
   searchParams: Promise<ListFilterQuery>;
 };
 
+/** 짧은 도쿄 시각 — 올해면 M/D HH:mm, 아니면 YYYY/M/D HH:mm (수리 상세와 같은 규칙). */
 function formatDateTime(value: string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  void locale;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(new Date(value))
+      .map((p) => [p.type, p.value]),
+  );
+  const thisYear = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric" }).format(new Date());
+  const md = `${Number(parts.month)}/${Number(parts.day)}`;
+  return `${parts.year === thisYear ? md : `${parts.year}/${md}`} ${parts.hour}:${parts.minute}`;
+}
+
+/** "YYYY-MM-DD" → "M/D". */
+function shortDate(ymd: string) {
+  const [, m, d] = ymd.split("-").map(Number);
+  return `${m}/${d}`;
 }
 
 export default async function MobileLostItemDetailPage({ params, searchParams }: PageProps) {
@@ -97,144 +91,106 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
   const isTerminal = isLostItemTerminal(item.status);
   // 상태 변경 = part_time_staff 제외 전원. 서버 액션과 RLS가 최종 게이트, 여기서는 UI만 감춘다.
   const canHandle = session.user.role !== "part_time_staff";
-  // 읽기 전용 진행바는 폐기 경로(4단계)만 표시한다. 반환완료는 이 선형 흐름 밖의 종결이다.
-  const linearStatusIdx = lostItemLinearStatuses.indexOf(item.status);
+  const clock = lostItemClock(item);
+  const c = copy.console;
+  const flag = clock?.isExpired ? c.expiredFlag : clock?.isDueSoon ? c.soonFlag : null;
+  const roomText = location.roomLabel && location.roomLabel !== "-" ? location.roomLabel : null;
   const showCreatedBanner = query.created === "1";
 
   const navBadges = await getMobileNavBadges();
 
+  // 화이트 리디자인(2026-10-14, 시안 LFDetail-Phone · LFDone-Phone): 한 줄 머리 · 제목 · 사진 · 「자동 폐기까지 D-n」 막대 ·
+  // 정보 줄 · 아래로 현장 처리(진행 중) 또는 처리 기록(완료). 상자 · 칩 · 아이콘 타일 없음.
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.detailTitle}>
-      <div className="space-y-4">
-        {showCreatedBanner ? (
-          <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
-            {copy.createdSuccess}
+      <div className="mdw">
+        {showCreatedBanner ? <p className="mdw-created">{copy.createdSuccess}</p> : null}
+
+        <div className="mdw-kick">
+          {flag ? <span className="mdw-pri is-urgent">{flag}</span> : null}
+          {flag && item.status === "disposal_scheduled" ? null : (
+            <span className={item.status === "returned" ? "lfd-ok" : undefined}>{copy.statusLabels[item.status]}</span>
+          )}
+          <span>{copy.categoryLabels[item.category]}</span>
+          {item.cleaning_session_id ? <span className="mdw-from">{copy.fromCleaningTag}</span> : null}
+        </div>
+        <h1 className="mdw-title">{item.item_name}</h1>
+        <p className="mdw-sub">
+          {roomText ? <b className="mono">{roomText}</b> : null}
+          {[location.buildingLabel, item.reporter_name, formatDateTime(item.found_at, locale)]
+            .filter(Boolean)
+            .map((x, i) => (
+              <span key={i}>{roomText || i > 0 ? ` · ${x}` : x}</span>
+            ))}
+        </p>
+
+        <AnnouncementImageGrid imageUrls={item.image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
+
+        {clock ? (
+          <div className="lfd-clock">
+            <div className="lfd-clock__h">
+              <span>{c.autoDueIn}</span>
+              <b className={clock.isDueSoon || clock.isExpired ? "is-soon" : undefined}>
+                {clock.daysLeft < 0 ? c.dOver.replace("{n}", String(-clock.daysLeft)) : c.dueOn.replace("{n}", String(clock.daysLeft))}
+              </b>
+            </div>
+            <span className="lfd-bar">
+              <i
+                className={clock.isExtended && !clock.isDueSoon ? "is-ext" : undefined}
+                style={{ width: `${Math.min(100, Math.round((clock.storedDays / Math.max(1, clock.storedDays + Math.max(clock.daysLeft, 0))) * 100))}%` }}
+              />
+            </span>
+            <span className="lfd-clock__s">
+              {c.storedNth.replace("{n}", String(clock.storedDays))} · {c.dueOnDate.replace("{n}", shortDate(clock.dueDate))} · {copy.handling.extendHint}
+            </span>
           </div>
         ) : null}
 
-        <Card className={`${DETAIL_CARD} p-5`}>
-          {item.cleaning_session_id ? (
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-primary">
-              {copy.fromCleaningTag}
-            </p>
-          ) : null}
+        {item.memo ? <p className="mdw-desc">{item.memo}</p> : null}
 
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700 ring-1 ring-sky-200/80">
-              <Package className="size-5" aria-hidden="true" />
-            </div>
-            <h2 className="min-w-0 break-words pt-0.5 text-xl font-black leading-tight">
-              {item.item_name}
-            </h2>
-          </div>
-
-          <dl className="mt-4 space-y-2.5 border-t border-slate-200/70 pt-4">
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">
-                {dictionary.cleaning.manualBuildingLabel}
-              </dt>
-              <dd className="text-right font-black">{location.buildingLabel ?? "-"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.room}</dt>
-              <dd className="text-right font-black">{location.roomLabel}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.foundAt}</dt>
-              <dd className="font-semibold">{formatDateTime(item.found_at, locale)}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-3 text-sm">
-              <dt className="font-semibold text-muted-foreground">{copy.reporter}</dt>
-              <dd className="text-right font-black">{item.reporter_name || "-"}</dd>
-            </div>
+        {item.guest_name ? (
+          <dl className="mdw-dl">
+            <dt>{c.guestShort}</dt>
+            <dd>{item.guest_name}</dd>
           </dl>
-
-          {item.reservation_id || item.guest_name ? (
-            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/82 p-3.5 shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)]">
-              <p className="text-xs font-semibold text-muted-foreground">
-                {dictionary.tasks.contextLinkedSection}
-              </p>
-              <dl className="mt-2 space-y-2 text-sm">
-                {item.guest_name ? (
-                  <div className="flex items-start justify-between gap-3">
-                    <dt className="font-semibold text-muted-foreground">
-                      {dictionary.admin.calendar.guestName}
-                    </dt>
-                    <dd className="text-right font-black">{item.guest_name}</dd>
-                  </div>
-                ) : null}
-                {item.reservation_id ? (
-                  <div className="flex items-start justify-between gap-3">
-                    <dt className="font-semibold text-muted-foreground">
-                      {dictionary.mobile.calendarReservationId}
-                    </dt>
-                    <dd className="font-mono text-[11px] font-semibold">{item.reservation_id}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            </div>
-          ) : null}
-
-          {item.memo ? (
-            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/82 p-3.5 shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)]">
-              <p className="text-xs font-semibold text-muted-foreground">{copy.memo}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{item.memo}</p>
-            </div>
-          ) : null}
-
-          <AnnouncementImageGrid imageUrls={item.image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
-        </Card>
+        ) : null}
 
         {isTerminal ? (
-          <Card className={`${DETAIL_CARD} p-5`}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">
-                {copy.statusLabel}
-              </p>
-              <Badge className={statusBadgeClass[item.status]}>
-                {copy.statusLabels[item.status]}
-              </Badge>
+          <section className="mdw-handle lfd-hist">
+            <div className="lfd-hist__h">
+              <span aria-hidden="true">
+                <Check />
+              </span>
+              <b>{copy.handling.historyTitle}</b>
             </div>
-
-            <dl className="mt-4 space-y-2.5 border-t border-slate-200/70 pt-4">
-              {item.handled_by_name ? (
-                <div className="flex items-start justify-between gap-3 text-sm">
-                  <dt className="font-semibold text-muted-foreground">{copy.handling.handledBy}</dt>
-                  <dd className="text-right font-black">{item.handled_by_name}</dd>
-                </div>
+            <dl className="mdw-dl lfd-hist__dl">
+              <dt>{copy.handling.handledBy}</dt>
+              <dd>
+                {item.handled_by_name ?? (item.status === "disposed" ? c.sysAuto : "-")}
+                {item.handled_at ? ` · ${formatDateTime(item.handled_at, locale)}` : ""}
+              </dd>
+              {item.status === "returned" && item.return_method ? (
+                <>
+                  <dt>{c.pMethod}</dt>
+                  <dd>
+                    {item.return_method === "delivery" ? c.methodDelivery : c.methodPickup}
+                    {item.return_tracking_no ? ` · ${item.return_tracking_no}` : ""}
+                  </dd>
+                </>
               ) : null}
-              {item.handled_at ? (
-                <div className="flex items-start justify-between gap-3 text-sm">
-                  <dt className="font-semibold text-muted-foreground">{copy.handling.handledAt}</dt>
-                  <dd className="font-semibold">{formatDateTime(item.handled_at, locale)}</dd>
-                </div>
+              {localizedHandlingMemo ? (
+                <>
+                  <dt>{c.memoShort}</dt>
+                  <dd>{localizedHandlingMemo}</dd>
+                </>
               ) : null}
             </dl>
-
-            {localizedHandlingMemo ? (
-              <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/82 p-3.5">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {copy.handling.memoLabel}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{localizedHandlingMemo}</p>
-              </div>
-            ) : null}
-
             {item.handling_image_urls.length > 0 ? (
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {copy.handling.photosLabel}
-                </p>
-                <AnnouncementImageGrid imageUrls={item.handling_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
-              </div>
+              <AnnouncementImageGrid imageUrls={item.handling_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
             ) : null}
-
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-slate-200 bg-muted/40 px-3 py-2.5 text-xs font-semibold leading-5 text-muted-foreground">
-              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>{copy.handling.adminNote}</span>
-            </div>
-          </Card>
-        ) : canHandle ? (
+            <p className="mdw-hint">{copy.handling.adminNote}</p>
+          </section>
+        ) : (
           <LostFoundHandlingForm
             canHandle={canHandle}
             copy={copy}
@@ -246,57 +202,6 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
             itemName={item.item_name}
             organizationId={session.organization.id}
           />
-        ) : (
-          <>
-            <Card className={`${DETAIL_CARD} p-5`}>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">
-                  {copy.statusLabel}
-                </p>
-                <Badge className={statusBadgeClass[item.status]}>
-                  {copy.statusLabels[item.status]}
-                </Badge>
-              </div>
-              <div className="mt-4 flex gap-1.5">
-                {lostItemLinearStatuses.map((s, i) => (
-                  <div
-                    key={s}
-                    className={cn(
-                      "h-2 flex-1 rounded-full",
-                      i <= linearStatusIdx ? "bg-primary" : "bg-muted",
-                    )}
-                  />
-                ))}
-              </div>
-              <div className="mt-2 flex">
-                {lostItemLinearStatuses.map((s) => (
-                  <p
-                    key={s}
-                    className={cn(
-                      "flex-1 text-center text-[10px] font-semibold leading-tight",
-                      s === item.status ? "text-foreground" : "text-muted-foreground/40",
-                    )}
-                  >
-                    {copy.statusLabels[s]}
-                  </p>
-                ))}
-              </div>
-            </Card>
-
-            <Card className={`${DETAIL_CARD} p-5`}>
-              <div className="flex items-start gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                  <Lock className="size-4" aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-sm font-black text-foreground">{copy.handling.readOnlyTitle}</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">
-                    {copy.handling.readOnlySub}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </>
         )}
       </div>
     </MobileShell>

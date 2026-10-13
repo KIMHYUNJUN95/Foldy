@@ -40,7 +40,7 @@ function formatDateTime(value: string, locale: Locale) {
       .map((p) => [p.type, p.value]),
   );
   const thisYear = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric" }).format(new Date());
-  const md = `${parts.month}/${parts.day}`;
+  const md = `${Number(parts.month)}/${Number(parts.day)}`;
   return `${parts.year === thisYear ? md : `${parts.year}/${md}`} ${parts.hour}:${parts.minute}`;
 }
 

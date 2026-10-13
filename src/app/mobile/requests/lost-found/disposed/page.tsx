@@ -1,14 +1,10 @@
 import { redirect } from "next/navigation";
-import {
-  DisposedLostFoundList,
-  type DisposedItemVM,
-} from "@/components/requests/disposed-lost-found-list";
+import { LostFoundArchiveList, type ArchiveItemVM } from "@/components/requests/lost-found-archive-list";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getDictionary } from "@/lib/i18n";
 import { getDisposedLostItems } from "@/lib/lost-found";
-import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { getOnboardingState } from "@/lib/onboarding";
 import { resolveRequestLocation } from "@/lib/request-location";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
@@ -60,7 +56,7 @@ export default async function DisposedLostFoundPage() {
   lm.setUTCMonth(lm.getUTCMonth() - 1);
   const lastMonthKey = `${lm.getUTCFullYear()}-${String(lm.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  const vms: DisposedItemVM[] = items.map((item) => {
+  const vms: ArchiveItemVM[] = items.map((item) => {
     const location = resolveRequestLocation(
       item.room_label,
       roomCatalog,
@@ -77,13 +73,11 @@ export default async function DisposedLostFoundPage() {
       itemName: item.item_name,
       buildingLabel: location.buildingLabel ?? "-",
       roomLabel: location.roomLabel,
-      thumbnailUrl: item.image_urls?.[0] ?? null,
-      disposedAtIso,
-      disposedDateKey,
-      isAuto: !item.handled_by, // 자동 폐기 배치는 handled_by 를 비운다
-      handledByName: item.handled_by_name,
       reporterName: item.reporter_name || "-",
-      handlingMemo: localizeLostFoundMemo(item.handling_memo, dictionary.lostFound.adminRestoreMemoLabel),
+      handlerLabel: item.handled_by ? (item.handled_by_name ?? "-") : copy.metaAuto,
+      atIso: disposedAtIso,
+      dateKey: disposedDateKey,
+      extra: null,
       monthKey,
       relativeGroup,
     };
@@ -91,7 +85,7 @@ export default async function DisposedLostFoundPage() {
 
   const monthCount = vms.filter((v) => v.monthKey === currentMonthKey).length;
   const weekCount = vms.filter(
-    (v) => v.disposedDateKey && dayDiff(todayKey, v.disposedDateKey) >= 0 && dayDiff(todayKey, v.disposedDateKey) <= 6,
+    (v) => v.dateKey && dayDiff(todayKey, v.dateKey) >= 0 && dayDiff(todayKey, v.dateKey) <= 6,
   ).length;
 
   const buildingOptions = Array.from(new Set(vms.map((v) => v.buildingLabel).filter((b) => b && b !== "-")))
@@ -100,7 +94,8 @@ export default async function DisposedLostFoundPage() {
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.title} split>
       <SplitList detail="requests">
-        <DisposedLostFoundList
+        <LostFoundArchiveList
+          filterLabel={dictionary.mobile.filterButton}
           buildingOptions={buildingOptions}
           copy={copy}
           items={vms}

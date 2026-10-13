@@ -33,6 +33,7 @@
 .rqw-row__s.is-open { color: #5a30cf; }
 .rqw-row__s.is-prog { color: #2f6fde; }
 .rqw-row__s.is-done { color: #8b8898; font-weight: 500; }
+.rqw-row__s.is-soon { color: #c5282e; }
 .rqw-row__del { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border: 0; border-radius: 8px; background: none; color: #b4b1bf; cursor: pointer; }
 .rqw-row__del:hover { background: #fdecec; color: #c5282e; }
 .rqw-row__del svg { width: 15px; height: 15px; }
@@ -45,3 +46,42 @@
 @media (prefers-reduced-motion: reduce) { .rqw-row, .rqw-quick a { transition: none; } }
 /* 칸 모드에서 고른 줄 — 테두리 대신 옅은 보라 바탕(선택 표시 규칙) */
 .split-list a.rqw-row[data-split-active] { outline: none; background: #f4f1fd; }
+
+/* 분실물 반환완료 · 폐기 내역 목록(2026-10-14, 시안 LFReturned-Phone) — 제목 · 숫자 셋(올라오며 등장) · 검색 + 필터 · 한 줄 행 */
+.lfa { display: flex; flex-direction: column; gap: 16px; padding-bottom: 24px; }
+.lfa-title { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
+.lfa-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: 16px; border-bottom: 1px solid #f1f1f4; }
+.lfa-stats div { display: flex; flex-direction: column; gap: 4px; animation: lfa-up 420ms cubic-bezier(.23, 1, .32, 1) both; }
+.lfa-stats div:nth-child(2) { animation-delay: 60ms; }
+.lfa-stats div:nth-child(3) { animation-delay: 120ms; }
+.lfa-stats span { font-size: 12px; color: #8b8898; }
+.lfa-stats b { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; font-variant-numeric: tabular-nums; }
+@keyframes lfa-up { from { opacity: 0; transform: translateY(6px); } }
+.lfa-bar { display: flex; align-items: center; gap: 8px; }
+.lfa-search { flex: 1; display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-radius: 12px; background: #f4f4f7; color: #8b8898; transition: box-shadow 150ms ease, background 150ms ease; }
+.lfa-search:focus-within { background: #fff; box-shadow: 0 0 0 1px #7a52e6, 0 0 0 4px #eee8fc; }
+.lfa-search svg { width: 16px; height: 16px; flex: none; }
+.lfa-search input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 15px; color: #16141f; outline: none; }
+.lfa-search input::placeholder { color: #b4b1bf; }
+.lfa-bar .rqw-filter { margin-left: 0; height: 42px; }
+.lfa-row .rqw-row__b { gap: 2px; }
+.lfa-extra { font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lfa-at { flex: none; font-size: 13px; font-weight: 600; color: #3a3746; font-variant-numeric: tabular-nums; }
+.lfa-sheet__t { margin: 0; padding: 0 4px; font-size: 16px; font-weight: 700; color: #16141f; }
+.lfa-sheet { display: flex; flex-direction: column; gap: 10px; padding: 12px 4px 0; }
+.lfa-sheet__k { margin-top: 6px; font-size: 13px; font-weight: 600; color: #3a3746; }
+.lfa-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.lfa-opts { display: flex; flex-direction: column; }
+.lfa-opts button { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px; border: 0; border-top: 1px solid #f3f3f6; border-radius: 0; background: none; font: inherit; font-size: 15px; color: #16141f; text-align: left; cursor: pointer; transition: background 150ms ease; }
+.lfa-opts button:first-child { border-top: 0; }
+.lfa-opts button.on { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; font-weight: 600; color: #5a30cf; }
+.lfa-opts button.on + button { border-top-color: transparent; }
+.lfa-opts button svg { width: 17px; height: 17px; animation: mdw-pop-lfa 260ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes mdw-pop-lfa { from { transform: scale(.4); opacity: 0; } }
+.lfa-sheet__foot { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 10px; }
+.lfa-sheet__foot button { height: 48px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
+.lfa-sheet__foot button:active { transform: scale(.98); }
+.lfa-sheet__reset { background: #f4f4f7; color: #3a3746; }
+.lfa-sheet__reset:disabled { opacity: .45; }
+.lfa-sheet__apply { background: #7a52e6; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .lfa-stats div, .lfa-opts button svg { animation: none; } }

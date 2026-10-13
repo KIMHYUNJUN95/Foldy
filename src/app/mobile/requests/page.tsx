@@ -134,6 +134,8 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
           locale={locale}
           lostFoundCopy={{
             fromCleaningTag: dictionary.lostFound.fromCleaningTag,
+            groupActive: dictionary.lostFound.groupActive,
+            groupClosed: dictionary.lostFound.groupClosed,
             mobileListTitle: dictionary.lostFound.mobileListTitle,
             noRecords: dictionary.lostFound.noRecords,
             reporter: dictionary.lostFound.reporter,

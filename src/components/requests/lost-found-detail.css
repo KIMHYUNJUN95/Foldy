@@ -1,0 +1,33 @@
+/* 분실물 상세 화이트 리디자인(2026-10-14, 시안 LFDetail-Phone · LFDone-Phone) — maintenance-detail.css 의 .mdw 위에 분실물만의 것.
+   「자동 폐기까지」 막대(채워지며 등장) · 5칸 상태 토글 · 처리 기록 · 반환 확인 시트. */
+.lfd-ok { color: #1f7a4d; font-weight: 600; }
+.lfd-clock { display: flex; flex-direction: column; gap: 10px; }
+.lfd-clock__h { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; color: #6b6878; }
+.lfd-clock__h b { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; font-variant-numeric: tabular-nums; }
+.lfd-clock__h b.is-soon { color: #c5282e; }
+.lfd-clock__s { font-size: 12px; line-height: 1.5; color: #8b8898; font-variant-numeric: tabular-nums; }
+.lfd-bar { display: block; height: 6px; border-radius: 3px; background: #e6e6eb; overflow: hidden; }
+.lfd-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: lfd-fill 800ms cubic-bezier(.23, 1, .32, 1) 120ms both; }
+.lfd-bar i.is-ext { background: #b4b1bf; }
+@keyframes lfd-fill { from { transform: scaleX(0); } }
+.mdw-seg.lfd-seg { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.mdw-seg.lfd-seg button { padding: 0; font-size: 13px; white-space: nowrap; }
+.lfd-hist__h { display: flex; align-items: center; gap: 10px; }
+.lfd-hist__h span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #e7f5ee; color: #1f7a4d; }
+.lfd-hist__h svg { width: 15px; height: 15px; stroke-width: 2.6; stroke-dasharray: 24; stroke-dashoffset: 24; animation: lfd-draw 520ms cubic-bezier(.23, 1, .32, 1) 160ms forwards; }
+@keyframes lfd-draw { to { stroke-dashoffset: 0; } }
+.lfd-hist__h b { font-size: 16px; font-weight: 700; color: #16141f; }
+.lfd-hist__dl { padding-top: 0; border-top: 0; }
+.lfd-sheet { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding-top: 4px; text-align: center; }
+.lfd-sheet__ic { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 4px; border-radius: 50%; background: #f1ecfd; color: #7a52e6; }
+.lfd-sheet__ic svg { width: 24px; height: 24px; }
+.lfd-sheet h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.lfd-sheet p { margin: 0; font-size: 14px; line-height: 1.55; color: #6b6878; }
+.lfd-sheet dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 10px; margin: 8px 0 6px; padding-top: 14px; border-top: 1px solid #f1f1f4; font-size: 14px; text-align: left; }
+.lfd-sheet dt { color: #8b8898; }
+.lfd-sheet dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
+.lfd-sheet dd b { color: #5a30cf; }
+.lfd-sheet__back { height: 46px; border: 0; border-radius: 14px; background: none; font: inherit; font-size: 15px; font-weight: 600; color: #6b6878; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  .lfd-bar i, .lfd-hist__h svg { animation: none; stroke-dashoffset: 0; }
+}

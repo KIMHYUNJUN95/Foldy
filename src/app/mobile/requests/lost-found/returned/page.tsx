@@ -1,14 +1,10 @@
 import { redirect } from "next/navigation";
-import {
-  ReturnedLostFoundList,
-  type ReturnedItemVM,
-} from "@/components/requests/returned-lost-found-list";
+import { LostFoundArchiveList, type ArchiveItemVM } from "@/components/requests/lost-found-archive-list";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getDictionary } from "@/lib/i18n";
 import { getReturnedLostItems } from "@/lib/lost-found";
-import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { getOnboardingState } from "@/lib/onboarding";
 import { resolveRequestLocation } from "@/lib/request-location";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
@@ -46,6 +42,7 @@ export default async function ReturnedLostFoundPage() {
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
   const copy = dictionary.lostFound.returned;
+  const c = dictionary.lostFound.console;
 
   const [items, roomCatalog, navBadges] = await Promise.all([
     getReturnedLostItems(session),
@@ -60,7 +57,7 @@ export default async function ReturnedLostFoundPage() {
   lm.setUTCMonth(lm.getUTCMonth() - 1);
   const lastMonthKey = `${lm.getUTCFullYear()}-${String(lm.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  const vms: ReturnedItemVM[] = items.map((item) => {
+  const vms: ArchiveItemVM[] = items.map((item) => {
     const location = resolveRequestLocation(
       item.room_label,
       roomCatalog,
@@ -77,12 +74,13 @@ export default async function ReturnedLostFoundPage() {
       itemName: item.item_name,
       buildingLabel: location.buildingLabel ?? "-",
       roomLabel: location.roomLabel,
-      thumbnailUrl: item.image_urls?.[0] ?? null,
-      handledAtIso,
-      handledDateKey,
-      handledByName: item.handled_by_name,
       reporterName: item.reporter_name || "-",
-      handlingMemo: localizeLostFoundMemo(item.handling_memo, dictionary.lostFound.adminRestoreMemoLabel),
+      handlerLabel: item.handled_by_name ?? "-",
+      atIso: handledAtIso,
+      dateKey: handledDateKey,
+      extra: item.return_method
+        ? [item.return_method === "delivery" ? c.methodDelivery : c.methodPickup, item.return_tracking_no].filter(Boolean).join(" · ")
+        : null,
       monthKey,
       relativeGroup,
     };
@@ -90,7 +88,7 @@ export default async function ReturnedLostFoundPage() {
 
   const monthCount = vms.filter((v) => v.monthKey === currentMonthKey).length;
   const weekCount = vms.filter(
-    (v) => v.handledDateKey && dayDiff(todayKey, v.handledDateKey) >= 0 && dayDiff(todayKey, v.handledDateKey) <= 6,
+    (v) => v.dateKey && dayDiff(todayKey, v.dateKey) >= 0 && dayDiff(todayKey, v.dateKey) <= 6,
   ).length;
 
   const buildingOptions = Array.from(new Set(vms.map((v) => v.buildingLabel).filter((b) => b && b !== "-")))
@@ -99,7 +97,8 @@ export default async function ReturnedLostFoundPage() {
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.title} split>
       <SplitList detail="requests">
-        <ReturnedLostFoundList
+        <LostFoundArchiveList
+          filterLabel={dictionary.mobile.filterButton}
           buildingOptions={buildingOptions}
           copy={copy}
           items={vms}

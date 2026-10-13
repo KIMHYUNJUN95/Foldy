@@ -3455,3 +3455,48 @@
     align-items: start;
   }
 }
+
+/* ══ 화이트 리디자인 (2026-10-13) — 근태 홈 (시안 Att-Phone · Att-Fold · Att-Tablet) ═══════════════════
+   제목 「근태」 · 링(근무 중 보라) · 방법 두 글자 · 현장/시각 옅은 칸 · 휴게 | 퇴근 · 바로가기 줄(상자 없이 가는 줄). */
+.att.att--home .greet--title { margin: 2px 0 6px; }
+.att.att--home .greet__h { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.att.att--home .greet--title .greet__d { margin-top: 4px; font-size: 13px; font-weight: 400; color: #8b8898; }
+.att.att--home .att-gap { height: 18px; }
+.att.att--home .att-ring svg circle { stroke-width: 14; }
+.att.att--home .ring__track { stroke: #ede7fc; }
+.att.att--home .ring__prog.open { stroke: #7a52e6; }
+.att.att--home .ring__state { font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; background: none; padding: 0; }
+.att.att--home .ring__big { font-size: 44px; font-weight: 600; letter-spacing: -0.02em; }
+.att.att--home .ring__big .sec { font-size: inherit; color: inherit; font-weight: inherit; opacity: 1; }
+.att.att--home .ring__lbl { font-size: 13px; font-weight: 400; color: #8b8898; letter-spacing: 0; text-transform: none; }
+.att.att--home .methods { display: flex; justify-content: center; gap: 8px; margin: 10px 0 18px; }
+.att.att--home .methodpill { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px; background: #f4f4f7; color: #8b8898; font-size: 12px; font-weight: 500; }
+.att.att--home .methodpill.on { background: #f1ecfd; color: #5a30cf; font-weight: 600; }
+.att.att--home .infostrip { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; background: none; box-shadow: none; }
+.att.att--home .infocell { padding: 12px 14px; border: 0; border-radius: 14px; background: #f7f7f9; text-align: left; }
+.att.att--home .infocell__k { justify-content: flex-start; }
+.att.att--home .infocell + .infocell { border: 0; }
+.att.att--home .infocell__k { font-size: 12px; font-weight: 400; color: #8b8898; letter-spacing: 0; text-transform: none; }
+.att.att--home .infocell__v { font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 4px; }
+.att.att--home .att-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.att.att--home .clockbtn, .att.att--home .breakbtn { height: 52px; margin: 0; border: 0; border-radius: 16px; box-shadow: none; font-size: 16px; font-weight: 600; letter-spacing: 0; }
+.att.att--home .clockbtn--in, .att.att--home .clockbtn--out { background: #7a52e6; color: #fff; }
+.att.att--home .clockbtn--in { width: 100%; }
+.att.att--home .breakbtn { background: #f1ecfd; color: #5a30cf; }
+.att.att--home .breakbtn--active { background: #7a52e6; color: #fff; }
+.att.att--home .clockbtn--disabled { background: #f4f4f7; color: #9a97a6; margin-bottom: 8px; }
+.att.att--home .breakbanner { border: 0; border-radius: 14px; background: #fdf3e6; box-shadow: none; }
+.att.att--home .seclbl { margin: 26px 0 4px; padding-top: 22px; border-top: 1px solid #f1f1f4; font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.att.att--home .entrylist { display: flex; flex-direction: column; gap: 0; }
+.att.att--home .entryrow { min-height: 62px; padding: 8px 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.att.att--home .entryrow + .entryrow { border-top: 1px solid #f3f3f6; }
+.att.att--home .entryrow__ic { width: 38px; height: 38px; border-radius: 12px; background: #f1ecfd !important; color: #7a52e6 !important; }
+.att.att--home .entryrow__t { font-size: 15px; font-weight: 600; }
+.att.att--home .entryrow__s { font-size: 12px; font-weight: 400; color: #8b8898; }
+.att.att--home .entryrow__val { font-size: 13px; font-weight: 500; color: #6b6878; }
+.att.att--home .entryrow__new { background: #f1ecfd; color: #5a30cf; }
+.att.att--home .eyemini { background: none; }
+.att.att--home .att-warn { border: 0; border-radius: 14px; background: #fdf3e6; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--home > .seclbl { border-top: 0; padding-top: 0; margin-top: 58px; }
+}

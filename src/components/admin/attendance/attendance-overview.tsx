@@ -1,14 +1,4 @@
 import Link from "next/link";
-import {
-  AlertTriangle,
-  Bus,
-  ChevronRight,
-  Clock,
-  Info,
-  Pencil,
-  Shield,
-  Wallet,
-} from "lucide-react";
 import type {
   AdminAttendanceOverviewData,
   AdminCorrectionField,
@@ -18,14 +8,13 @@ import type { ReviewQueueItem } from "@/lib/attendance-review";
 import type { Dictionary } from "@/lib/i18n";
 import { formatAdminYen } from "../shared/admin-format";
 
+// 화이트 리디자인(2026-10-13, 시안 Att-PC): 상자 없는 한 장 — 숫자 줄 → 즉시 검토(검토 필요 세션 | 정정 요청) →
+// 급여 · 교통비 요약. 공용 흰 프리미티브(.wkpis · .wsec · .wrow · .wtag …)는 admin-console.css 맨 아래.
+
 type Att = Dictionary["admin"]["attendanceConsole"];
 
-function Ic({ children }: { children: React.ReactNode }) {
-  return <span className="ic">{children}</span>;
-}
-
 function initial(name: string): string {
-  return name.trim().slice(0, 1) || "·";
+  return Array.from(name.trim())[0] ?? "·";
 }
 
 function corrFieldLabel(field: AdminCorrectionField, c: Att): string {
@@ -38,70 +27,38 @@ function corrFieldLabel(field: AdminCorrectionField, c: Att): string {
 function ReviewRow({ item, c, ym }: { item: ReviewQueueItem; c: Att; ym: string }) {
   const isUrgent = item.reviewState === "review_required" && (item.isAbnormal || !item.clockOutLabel);
   const subParts = [
-    item.dateLabel,
+    item.clockInLabel ? `${item.clockInLabel} → ${item.clockOutLabel ?? "—"}` : null,
     item.clockInSiteName ?? null,
-    item.clockInLabel
-      ? `${item.clockInLabel} → ${item.clockOutLabel ?? "—"}`
-      : null,
   ].filter(Boolean) as string[];
   return (
-    <Link href={`/admin/attendance/queue?ym=${ym}&sessionId=${item.sessionId}`} className="qrow">
-      <span className="avatar qrow__av" style={{ background: "var(--adm-primary)" }}>
-        {initial(item.userName)}
-      </span>
-      <div className="qrow__b">
-        <div className="qrow__t">
+    <Link href={`/admin/attendance/queue?ym=${ym}&sessionId=${item.sessionId}`} className="wrow">
+      <span className="wav">{initial(item.userName)}</span>
+      <div className="wrow__b">
+        <div className="wrow__t">
           {item.userName}
-          {isUrgent ? (
-            <>
-              {" "}
-              <span className="pill pill--danger" style={{ height: 18 }}>
-                {c.tagUrgent}
-              </span>
-            </>
-          ) : null}
+          <span className="wrow__dim"> · {item.dateLabel}</span>
         </div>
-        <div className="qrow__s">{subParts.join(" · ")}</div>
+        {subParts.length ? <div className="wrow__s">{subParts.join(" · ")}</div> : null}
       </div>
-      <div className="qrow__meta">
-        <span className="pill pill--warn">
-          <span className="d" />
-          {c.cardReviewLive}
-        </span>
-      </div>
-      <span className="ic qrow__chev">
-        <ChevronRight />
-      </span>
+      <span className={`wtag ${isUrgent ? "wtag--danger" : "wtag--warn"}`}>{isUrgent ? c.tagUrgent : c.cardReviewLive}</span>
     </Link>
   );
 }
 
 function CorrectionRow({ item, c, ym }: { item: AdminCorrectionRow; c: Att; ym: string }) {
-  const field = corrFieldLabel(item.field, c);
-  const subParts = [
-    item.dateLabel ?? c.corrColTargetDate,
-    `${item.beforeLabel} → ${item.afterLabel}`,
-    item.submittedLabel,
-  ];
-
   return (
-    <Link href={`/admin/attendance/queue?ym=${ym}`} className="qrow">
-      <span className="avatar qrow__av" style={{ background: "var(--info)" }}>
-        {initial(item.requesterName)}
-      </span>
-      <div className="qrow__b">
-        <div className="qrow__t">{item.requesterName}</div>
-        <div className="qrow__s">{subParts.join(" · ")}</div>
+    <Link href={`/admin/attendance/queue?ym=${ym}`} className="wrow">
+      <span className="wav">{initial(item.requesterName)}</span>
+      <div className="wrow__b">
+        <div className="wrow__t">
+          {item.requesterName}
+          <span className="wrow__dim"> · {item.dateLabel ?? c.corrColTargetDate}</span>
+        </div>
+        <div className="wrow__s">
+          {item.beforeLabel} → {item.afterLabel} · {item.submittedLabel}
+        </div>
       </div>
-      <div className="qrow__meta">
-        <span className="pill pill--info">
-          <span className="d" />
-          {field}
-        </span>
-      </div>
-      <span className="ic qrow__chev">
-        <ChevronRight />
-      </span>
+      <span className="wtag wtag--info">{corrFieldLabel(item.field, c)}</span>
     </Link>
   );
 }
@@ -118,285 +75,125 @@ export function AttendanceOverview({
   const k = data.kpi;
   const yen = (n: number) => `${c.yenSym}${formatAdminYen(n, localeTag)}`;
 
-  const opsCells: {
-    label: string;
-    value: string;
-    sub: string;
-    tag?: { label: string; cls: "pill--danger" | "pill--info" };
-    icon: React.ReactNode;
-  }[] = [
-    {
-      label: c.kpiReviewSessions,
-      value: `${k.reviewSessions}`,
-      sub: c.kpiReviewUrgent(k.urgent),
-      tag: k.urgent > 0 ? { label: c.tagUrgent, cls: "pill--danger" } : undefined,
-      icon: <Clock />,
-    },
-    {
-      label: c.kpiCorrOpen,
-      value: `${k.corrOpen}`,
-      sub: c.kpiCorrSub,
-      icon: <Pencil />,
-    },
-    {
-      label: c.kpiPayEstimated,
-      value: yen(k.payTotal),
-      sub: c.kpiPaySub(k.payEstimated),
-      tag: { label: c.tagEstimated, cls: "pill--info" },
-      icon: <Wallet />,
-    },
-    {
-      label: c.kpiPayExcluded,
-      value: `${k.payExcluded}`,
-      sub: c.kpiPayExcludedSub,
-      icon: <AlertTriangle />,
-    },
-    {
-      label: c.kpiTrPending,
-      value: `${k.trPending}`,
-      sub: c.kpiTrSub(yen(k.trTotal)),
-      icon: <Bus />,
-    },
+  const kpis: { label: string; value: string; unit?: string; sub: string; tone?: "danger" }[] = [
+    { label: c.kpiReviewSessions, value: `${k.reviewSessions}`, unit: c.unitCount, sub: c.kpiReviewUrgent(k.urgent), tone: k.urgent > 0 ? "danger" : undefined },
+    { label: c.kpiCorrOpen, value: `${k.corrOpen}`, unit: c.unitCount, sub: c.kpiCorrSub },
+    { label: c.kpiPayEstimated, value: yen(k.payTotal), sub: c.kpiPaySub(k.payEstimated) },
+    { label: c.kpiPayExcluded, value: `${k.payExcluded}`, unit: c.unitCount, sub: c.kpiPayExcludedSub },
+    { label: c.kpiTrPending, value: `${k.trPending}`, unit: c.unitCount, sub: c.kpiTrSub(yen(k.trTotal)) },
   ];
 
   return (
     <>
       {!data.isPrivileged ? <div className="privnote">{c.privilegedNotice}</div> : null}
 
-      {/* KPI bar */}
-      <div className="opsbar">
-        {opsCells.map((cell, i) => (
-          <div key={i} className="opscell">
-            <div className="opscell__k">
-              <Ic>{cell.icon}</Ic>
-              {cell.label}
-            </div>
-            <div className="opscell__v">{cell.value}</div>
-            <div className="opscell__sub">{cell.sub}</div>
-            {cell.tag ? (
-              <span className="opscell__tag">
-                <span className={`pill ${cell.tag.cls}`}>
-                  <span className="d" />
-                  {cell.tag.label}
-                </span>
-              </span>
-            ) : null}
+      <div className="wkpis">
+        {kpis.map((cell) => (
+          <div key={cell.label} className="wkpi">
+            <span className="wkpi__k">{cell.label}</span>
+            <span className={`wkpi__v${cell.tone ? ` is-${cell.tone}` : ""}`}>
+              {cell.value}
+              {cell.unit ? <small>{cell.unit}</small> : null}
+            </span>
+            <span className="wkpi__d">{cell.sub}</span>
           </div>
         ))}
       </div>
 
-      {/* Section — immediate review */}
-      <div className="secthead">
-        <span className="secthead__t">{c.sectImmediate}</span>
-        <span className="secthead__c">{c.sectImmediateCount(k.urgent, k.reviewSessions)}</span>
-        <span className="secthead__line" />
-        <Link href={`/admin/attendance/queue?ym=${data.ym}`} className="secthead__a">
+      {/* 즉시 검토 */}
+      <div className="wsec">
+        <b>{c.sectImmediate}</b>
+        <span className="wsec__c">{c.sectImmediateCount(k.urgent, k.reviewSessions)}</span>
+        <Link href={`/admin/attendance/queue?ym=${data.ym}`} className="wsec__a">
           {c.goQueue} →
         </Link>
       </div>
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
-        {/* Review card */}
-        <div className="card" style={{ gridColumn: "span 7" }}>
-          <div className="card__h">
-            <span className="card__ic bg-warn">
-              <Ic>
-                <Clock />
-              </Ic>
-            </span>
-            <div className="card__ti">
-              <span className="card__t">{c.cardReview}</span>
-              <span className="card__live" style={{ color: "var(--warn)" }}>
-                <span className="d" style={{ background: "var(--warn)" }} />
-                {c.cardReviewLive}
-              </span>
-            </div>
-            <span className="card__cnt">
+      <div className="wcols">
+        <section>
+          <div className="wsub">
+            <b>{c.cardReview}</b>
+            <span className="wsub__c">
               {k.reviewSessions}
               {c.unitCount}
             </span>
-            <div className="card__act">
-              <Link href={`/admin/attendance/queue?ym=${data.ym}`} className="linkmore">
-                {c.tabQueue}
-                <Ic>
-                  <ChevronRight />
-                </Ic>
-              </Link>
-            </div>
           </div>
-          <div style={{ paddingBottom: 6 }}>
-            {data.reviewSample.length === 0 ? (
-              <div className="empty">{c.cardReviewEmpty}</div>
-            ) : (
-              data.reviewSample.map((item) => (
-                <ReviewRow key={item.sessionId} item={item} c={c} ym={data.ym} />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Correction card */}
-        <div className="card" style={{ gridColumn: "span 5" }}>
-          <div className="card__h">
-            <span className="card__ic bg-info">
-              <Ic>
-                <Pencil />
-              </Ic>
-            </span>
-            <div className="card__ti">
-              <span className="card__t">{c.cardCorr}</span>
-            </div>
-            <span className="card__cnt">
+          {data.reviewSample.length === 0 ? (
+            <div className="wempty">{c.cardReviewEmpty}</div>
+          ) : (
+            data.reviewSample.map((item) => <ReviewRow key={item.sessionId} item={item} c={c} ym={data.ym} />)
+          )}
+        </section>
+        <section>
+          <div className="wsub">
+            <b>{c.cardCorr}</b>
+            <span className="wsub__c">
               {k.corrOpen}
               {c.unitCount}
             </span>
-            <div className="card__act">
-              <Link href={`/admin/attendance/queue?ym=${data.ym}`} className="linkmore">
-                {c.goQueue}
-                <Ic>
-                  <ChevronRight />
-                </Ic>
-              </Link>
-            </div>
           </div>
-          <div style={{ paddingBottom: 6 }}>
-            {data.correctionSample.length === 0 ? (
-              <div className="empty">{c.cardCorrEmpty}</div>
-            ) : (
-              data.correctionSample.map((item) => (
-                <CorrectionRow key={item.id} item={item} c={c} ym={data.ym} />
-              ))
-            )}
-          </div>
-          <div className="card__foot">
-            <span className="locknote" style={{ background: "transparent", padding: 0 }}>
-              <Ic>
-                <Shield />
-              </Ic>
-              {c.cardCorrPermNote}
-            </span>
-          </div>
-        </div>
+          {data.correctionSample.length === 0 ? (
+            <div className="wempty">{c.cardCorrEmpty}</div>
+          ) : (
+            data.correctionSample.map((item) => <CorrectionRow key={item.id} item={item} c={c} ym={data.ym} />)
+          )}
+          <p className="wnote">{c.cardCorrPermNote}</p>
+        </section>
       </div>
 
-      {/* Section — payroll/transport summary */}
-      <div className="secthead">
-        <span className="secthead__t">{c.sectSummary}</span>
-        <span className="secthead__line" />
+      {/* 급여 · 교통비 요약 */}
+      <div className="wsec wsec--line">
+        <b>{c.sectSummary}</b>
       </div>
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
-        {/* Payroll summary */}
-        <div className="card" style={{ gridColumn: "span 6" }}>
-          <div className="card__h">
-            <span className="card__ic bg-pri">
-              <Ic>
-                <Wallet />
-              </Ic>
-            </span>
-            <div className="card__ti">
-              <span className="card__t">{c.cardPayroll(data.monthLabel)}</span>
-              <span className="pill pill--info" style={{ marginLeft: 2 }}>
-                <span className="d" />
-                {c.tagEstimated}
-              </span>
+      <div className="wcols">
+        <section>
+          <div className="wsub">
+            <b>{c.cardPayroll(data.monthLabel)}</b>
+            <span className="wtag wtag--info">{c.tagEstimated}</span>
+            <Link href={`/admin/attendance/payroll?ym=${data.ym}`} className="wsub__a">
+              {c.tabPayroll} →
+            </Link>
+          </div>
+          <div className="wstats">
+            <div className="wstat">
+              <span className="wstat__k">{c.payHourlyTarget}</span>
+              <span className="wstat__v">{k.payEstimated}</span>
             </div>
-            <div className="card__act">
-              <Link href={`/admin/attendance/payroll?ym=${data.ym}`} className="linkmore">
-                {c.tabPayroll}
-                <Ic>
-                  <ChevronRight />
-                </Ic>
-              </Link>
+            <div className="wstat">
+              <span className="wstat__k">{c.payPretaxTotal}</span>
+              <span className="wstat__v">{yen(k.payTotal)}</span>
+            </div>
+            <div className="wstat">
+              <span className="wstat__k">{c.payExcluded}</span>
+              <span className={`wstat__v${k.payExcluded > 0 ? " is-warn" : ""}`}>{k.payExcluded}</span>
             </div>
           </div>
-          <div className="card__body" style={{ paddingTop: 4 }}>
-            <div className="minirow" style={{ padding: "6px 0 14px" }}>
-              <div className="ministat">
-                <div className="ministat__v">{k.payEstimated}</div>
-                <div className="ministat__k">{c.payHourlyTarget}</div>
-              </div>
-              <div className="minisep" />
-              <div className="ministat">
-                <div className="ministat__v mono" style={{ fontSize: 18 }}>
-                  {yen(k.payTotal)}
-                </div>
-                <div className="ministat__k">{c.payPretaxTotal}</div>
-              </div>
-              <div className="minisep" />
-              <div className="ministat">
-                <div className="ministat__v" style={{ color: "var(--warn)" }}>
-                  {k.payExcluded}
-                </div>
-                <div className="ministat__k">{c.payExcluded}</div>
-              </div>
+          <p className="wnote">{c.payNote(k.payExcluded)}</p>
+          <p className="wnote">{c.payFootNote}</p>
+        </section>
+        <section>
+          <div className="wsub">
+            <b>{c.cardTransport(data.monthLabel)}</b>
+            <Link href={`/admin/attendance/transport?ym=${data.ym}`} className="wsub__a">
+              {c.tabTransport} →
+            </Link>
+          </div>
+          <div className="wstats">
+            <div className="wstat">
+              <span className="wstat__k">{c.trPending}</span>
+              <span className="wstat__v">{k.trPending}</span>
             </div>
-            <div className="locknote">
-              <Ic>
-                <Info />
-              </Ic>
-              {c.payNote(k.payExcluded)}
+            <div className="wstat">
+              <span className="wstat__k">{c.trSubmittedTotal}</span>
+              <span className="wstat__v">{yen(k.trTotal)}</span>
+            </div>
+            <div className="wstat">
+              <span className="wstat__k">{c.trMissing}</span>
+              <span className={`wstat__v${k.trMissing > 0 ? " is-warn" : ""}`}>{k.trMissing}</span>
             </div>
           </div>
-          <div className="card__foot">
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--adm-muted)" }}>
-              {c.payFootNote}
-            </span>
-          </div>
-        </div>
-
-        {/* Transport summary */}
-        <div className="card" style={{ gridColumn: "span 6" }}>
-          <div className="card__h">
-            <span className="card__ic bg-info">
-              <Ic>
-                <Bus />
-              </Ic>
-            </span>
-            <div className="card__ti">
-              <span className="card__t">{c.cardTransport(data.monthLabel)}</span>
-            </div>
-            <div className="card__act">
-              <Link href={`/admin/attendance/transport?ym=${data.ym}`} className="linkmore">
-                {c.tabTransport}
-                <Ic>
-                  <ChevronRight />
-                </Ic>
-              </Link>
-            </div>
-          </div>
-          <div className="card__body" style={{ paddingTop: 4 }}>
-            <div className="minirow" style={{ padding: "6px 0 14px" }}>
-              <div className="ministat">
-                <div className="ministat__v">{k.trPending}</div>
-                <div className="ministat__k">{c.trPending}</div>
-              </div>
-              <div className="minisep" />
-              <div className="ministat">
-                <div className="ministat__v mono" style={{ fontSize: 18 }}>
-                  {yen(k.trTotal)}
-                </div>
-                <div className="ministat__k">{c.trSubmittedTotal}</div>
-              </div>
-              <div className="minisep" />
-              <div className="ministat">
-                <div className="ministat__v" style={{ color: "var(--warn)" }}>
-                  {k.trMissing}
-                </div>
-                <div className="ministat__k">{c.trMissing}</div>
-              </div>
-            </div>
-            <div className="locknote">
-              <Ic>
-                <AlertTriangle />
-              </Ic>
-              {c.trNote(k.trMissing)}
-            </div>
-          </div>
-          <div className="card__foot">
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--adm-muted)" }}>
-              {c.trFootNote}
-            </span>
-          </div>
-        </div>
+          <p className="wnote">{c.trNote(k.trMissing)}</p>
+          <p className="wnote">{c.trFootNote}</p>
+        </section>
       </div>
     </>
   );

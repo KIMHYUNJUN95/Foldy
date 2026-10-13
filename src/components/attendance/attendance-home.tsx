@@ -262,22 +262,13 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
 }
 
 function Methods({ copy }: { copy: AttendanceCopy }) {
+  // 화이트 리디자인(2026-10-13): 링 아래 작은 글자 두 개 — 쓸 수 있는 방법(보라) · 준비 중(회색).
   return (
     <div className="methods">
-      <div className="methodchip on">
-        <span className="methodchip__ic"><AIc>{AttIcon.qr}</AIc></span>
-        <div className="methodchip__t">
-          <b>{copy.methodGpsQr}</b>
-          <span>{copy.methodQrAvailable}</span>
-        </div>
-      </div>
-      <div className="methodchip ghost">
-        <span className="methodchip__ic"><AIc>{AttIcon.wifi}</AIc></span>
-        <div className="methodchip__t">
-          <b>{copy.methodWifi}</b>
-          <span>{copy.methodWifiSoon}</span>
-        </div>
-      </div>
+      <span className="methodpill on">{copy.methodGpsQr}</span>
+      <span className="methodpill">
+        {copy.methodWifi} {copy.methodWifiSoon}
+      </span>
     </div>
   );
 }
@@ -366,10 +357,13 @@ export function AttendanceHome({
   const showLoading = state === "loading" || booting;
 
   // Greeting header — replaces old topline with avatar/links
+  // 화이트 리디자인(2026-10-13): 인사말 대신 제목 「근태」 + 「10월 13일 화요일 · 김현준 님」.
   const greet = (
-    <div className="greet">
-      <div className="greet__d">{todayLabel}</div>
-      <div className="greet__n">{copy.homeGreetFull(userName)}</div>
+    <div className="greet greet--title">
+      <h1 className="greet__h">{copy.homeTitle}</h1>
+      <div className="greet__d">
+        {todayLabel} · {copy.homeNameLine.replace("{name}", userName)}
+      </div>
     </div>
   );
 
@@ -437,10 +431,6 @@ export function AttendanceHome({
             <div className="entryrow__t">{dict.transport.homeTransportTitle}</div>
             <div className="entryrow__s">{dict.transport.homeTransportSub}</div>
           </div>
-          <div className="entryrow__r">
-            <span className="entryrow__val">¥13,160</span>
-            <span className="entryrow__chip">{dict.transport.statusDraft}</span>
-          </div>
         </Link>
         {canSeeRoster && (
           <Link href="/mobile/attendance/roster" className="entryrow roster">
@@ -478,41 +468,44 @@ export function AttendanceHome({
       <div className="att att--home">
         <AttRingDefs />
         {greet}
-        <div style={{ height: "5vh" }} />
+        <div className="att-gap" />
         {openSession ? (
           <LiveOpenRing clockInAt={openSession.clockInAt} copy={copy} />
         ) : (
           <Ring variant="open" cls="open" state={copy.ringWorking} big="04:38" sec="12" lbl={copy.ringAccumLabel} pct={0.58} />
         )}
+        <Methods copy={copy} />
         <div className="infostrip">
           <div className="infocell">
-            <div className="infocell__k"><AIc>{AttIcon.pin}</AIc>{copy.clockInSite}</div>
+            <div className="infocell__k">{copy.clockInSite}</div>
             <div className="infocell__v">{siteName}</div>
           </div>
           <div className="infocell">
-            <div className="infocell__k"><AIc>{AttIcon.clock}</AIc>{copy.clockInTime}</div>
+            <div className="infocell__k">{copy.clockInTime}</div>
             <div className="infocell__v mono">{clockInLabel}</div>
           </div>
         </div>
-        <Link href="/mobile/attendance/capture?mode=out" className="clockbtn clockbtn--out">
-          <AIc>{AttIcon.logout}</AIc>{copy.clockOut}
-        </Link>
-        {openSession ? (
-          <button type="button" className="breakbtn" onClick={onStartBreak} disabled={busy}>
-            <AIc>{AttIcon.coffee}</AIc>{copy.startBreak}
-          </button>
-        ) : (
-          <Link href="/mobile/attendance?state=break" className="breakbtn">
-            <AIc>{AttIcon.coffee}</AIc>{copy.startBreak}
+        {/* 휴게 시작(옅은 보라) | 퇴근(꽉 찬 보라) — 시안 Att-Phone */}
+        <div className="att-actions">
+          {openSession ? (
+            <button type="button" className="breakbtn" onClick={onStartBreak} disabled={busy}>
+              {copy.startBreak}
+            </button>
+          ) : (
+            <Link href="/mobile/attendance?state=break" className="breakbtn">
+              {copy.startBreak}
+            </Link>
+          )}
+          <Link href="/mobile/attendance/capture?mode=out" className="clockbtn clockbtn--out">
+            {copy.clockOut}
           </Link>
-        )}
+        </div>
         {errorMsg ? (
           <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
         ) : null}
         {/* 근무 중 상태에서도 이력·급여로 바로 이동할 수 있도록 주요 액션 아래에 배치 */}
         {abandonedBanner}
-        {abandonedBanner}
-      {entryList}
+        {entryList}
         {reminderOpenSessionId ? <ReminderPrompt sessionId={reminderOpenSessionId} copy={copy} /> : null}
       </div>
     );
@@ -523,7 +516,7 @@ export function AttendanceHome({
       <div className="att att--home">
         <AttRingDefs />
         {greet}
-        <div style={{ height: "5vh" }} />
+        <div className="att-gap" />
         {openSession ? (
           <LiveBreakBody
             clockInAt={openSession.clockInAt}
@@ -579,12 +572,12 @@ export function AttendanceHome({
     <div className="att att--home">
       <AttRingDefs />
       {greet}
-      <div style={{ height: "4vh" }} />
+      <div className="att-gap" />
       <Ring variant="idle" state={copy.ringIdle} lbl={copy.ringIdleLabel} />
-      <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in" style={{ marginTop: "4px" }}>
+      <Methods copy={copy} />
+      <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in">
         <AIc>{AttIcon.qr}</AIc>{copy.clockIn}
       </Link>
-      <Methods copy={copy} />
       {entryList}
     </div>
   );

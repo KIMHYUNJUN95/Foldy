@@ -3047,3 +3047,52 @@
 .adm .rptile:hover { background: #f1f1f4; box-shadow: none; }
 .adm .rptile__t { font-weight: 600; }
 .adm .rptile__s { font-weight: 400; }
+
+/* ══ 화이트 리디자인 (2026-10-13) — 공용 흰 프리미티브 ══════════════════════════════════════════
+   상자 없는 한 장에서 쓰는 숫자 줄 · 구역 머리 · 두 칸 · 줄 · 글자 배지. 근태부터 쓰고, 다음 화면들도 이것을 쓴다. */
+.adm .wkpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; padding: 18px 22px 22px; border-bottom: 1px solid #f1f1f4; }
+.adm .wkpi { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.adm .wkpi__k { font-size: 13px; color: #6b6878; }
+.adm .wkpi__v { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .wkpi__v small { font-size: 13px; font-weight: 500; color: #8b8898; margin-left: 3px; letter-spacing: 0; }
+.adm .wkpi__v.is-danger { color: #c5282e; }
+.adm .wkpi__d { font-size: 12px; color: #8b8898; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .wsec { display: flex; align-items: center; gap: 8px; margin: 32px 0 14px; }
+.adm .wsec b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .wsec__c { font-size: 13px; color: #8b8898; }
+.adm .wsec__a, .adm .wsub__a { margin-left: auto; font-size: 13px; font-weight: 500; color: #7a52e6; white-space: nowrap; }
+.adm .wsec--line { margin-top: 40px; padding-top: 28px; border-top: 1px solid #f1f1f4; }
+.adm .wcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+@media (max-width: 1100px) { .adm .wcols { grid-template-columns: 1fr; gap: 28px; } }
+.adm .wsub { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-height: 26px; }
+.adm .wsub b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .wsub__c { font-size: 13px; color: #8b8898; }
+.adm .wrow { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 8px 0; border-top: 1px solid #f1f1f4; color: inherit; text-decoration: none; }
+.adm .wrow:hover { background: #fafafb; }
+.adm .wrow__b { flex: 1; min-width: 0; }
+.adm .wrow__t { font-size: 14px; font-weight: 600; color: #16141f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .wrow__dim { font-weight: 400; color: #8b8898; }
+.adm .wrow__s { font-size: 13px; color: #8b8898; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .wav { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: #ede7fc; color: #5a30cf; font-size: 13px; font-weight: 700; flex: 0 0 auto; }
+.adm .wtag { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; flex: 0 0 auto; }
+.adm .wtag--danger { background: #fdecec; color: #c5282e; }
+.adm .wtag--warn { background: #fdf3e6; color: #a8641c; }
+.adm .wtag--info { background: #f1ecfd; color: #5a30cf; }
+.adm .wtag--ok { background: #e7f5ec; color: #1f7a45; }
+.adm .wstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 10px 0 12px; }
+.adm .wstat { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.adm .wstat__k { font-size: 12px; color: #6b6878; }
+.adm .wstat__v { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .wstat__v.is-warn { color: #a8641c; }
+.adm .wnote { margin: 8px 0 0; font-size: 13px; color: #6b6878; line-height: 1.55; }
+.adm .wempty { padding: 26px 0; border-top: 1px solid #f1f1f4; text-align: center; font-size: 13px; color: #8b8898; }
+
+/* 근태 위 탭 줄 — 상자 없이 글자 탭 + 밑줄, 아래 가는 줄(시안 Att-*). 오른쪽 달 선택은 그대로. */
+.adm .subnav { height: 52px; margin: -8px 0 8px; padding: 0; gap: 26px; background: none; border: 0; border-bottom: 1px solid #ececf0; border-radius: 0; box-shadow: none; }
+.adm .subnav__t { height: 52px; padding: 0 2px; gap: 6px; border: 0; border-radius: 0; font-size: 14px; font-weight: 500; letter-spacing: 0; color: #6b6878; }
+.adm .subnav__t:hover { background: none; color: #16141f; border-color: transparent; }
+.adm .subnav__t.on { background: none; color: #16141f; font-weight: 600; border-color: transparent; box-shadow: inset 0 -2px 0 #16141f; }
+.adm .subnav__t .ic { display: none; }
+.adm .subnav__t .cnt { min-width: 0; height: auto; padding: 0; background: none; color: #8b8898; font-size: 12px; font-weight: 500; }
+.adm .subnav__t.on .cnt { background: none; color: #7a52e6; }
+.adm .subnav__t .cnt.urgent { background: none; color: #c5282e; }

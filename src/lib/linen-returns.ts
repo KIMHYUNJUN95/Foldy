@@ -109,6 +109,8 @@ export function revalidateLinenReturnPaths(): void {
   revalidatePath("/admin/linen-return");
 }
 
+export { LINEN_LAST_BUILDING_COOKIE } from "@/lib/linen-return-constants";
+
 // ── Buildings ───────────────────────────────────────────────────────────────
 /** Distinct canonical building names the org operates (same source as orders). */
 export async function getLinenBuildings(session: AppSession): Promise<string[]> {

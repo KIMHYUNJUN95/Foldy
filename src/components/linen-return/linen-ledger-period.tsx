@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   DateRangeCalendar,
   type DateRangeValue,
@@ -65,40 +65,16 @@ export function LinenLedgerPeriod({
   }
 
   return (
-    <div className="flex items-center gap-1">
-      <button
-        aria-label={copy.rangePreviousMonth}
-        className="flex size-9 items-center justify-center rounded-full border border-border bg-surface text-slate-600"
-        onClick={() => goMonth(-1)}
-        type="button"
-      >
-        <ChevronLeft className="size-[18px]" aria-hidden="true" />
+    <div className="lnw-period">
+      <button aria-label={copy.rangePreviousMonth} className="lnw-navb" onClick={() => goMonth(-1)} type="button">
+        <ChevronLeft aria-hidden="true" />
       </button>
-
-      <button
-        className="inline-flex min-w-[92px] items-center justify-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1.5 text-[13px] font-bold text-foreground"
-        onClick={() => setOpen(true)}
-        type="button"
-      >
-        <CalendarDays className="size-[15px] text-slate-400" aria-hidden="true" />
+      <button className="lnw-period__label" onClick={() => setOpen(true)} type="button">
         {label}
       </button>
-
-      {canGoNext ? (
-        <button
-          aria-label={copy.rangeNextMonth}
-          className="flex size-9 items-center justify-center rounded-full border border-border bg-surface text-slate-600"
-          onClick={() => goMonth(1)}
-          type="button"
-        >
-          <ChevronRight className="size-[18px]" aria-hidden="true" />
-        </button>
-      ) : (
-        <span className="flex size-9 items-center justify-center text-slate-300">
-          <ChevronRight className="size-[18px]" aria-hidden="true" />
-        </span>
-      )}
-
+      <button aria-label={copy.rangeNextMonth} className="lnw-navb" disabled={!canGoNext} onClick={() => goMonth(1)} type="button">
+        <ChevronRight aria-hidden="true" />
+      </button>
       <DateRangeCalendar
         labels={{
           apply: copy.rangeApply,

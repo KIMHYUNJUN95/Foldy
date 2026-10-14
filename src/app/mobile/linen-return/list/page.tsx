@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Image as ImageIcon, Inbox, Plus, ScrollText } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
+import { LinenBuildingSwitch } from "@/components/linen-return/linen-building-switch";
 import { LinenReturnSuccess } from "@/components/linen-return/linen-return-success";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
-import { getDictionary, type Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import "@/components/linen-return/linen-mobile.css";
+import { getDictionary } from "@/lib/i18n";
 import {
+  getCurrentTokyoYearMonth,
+  getLinenBuildings,
+  getLinenBuildingStats,
   getLinenReturnsByBuilding,
   isKnownBuilding,
   type LinenReturnRecord,
@@ -17,25 +21,26 @@ import { localizePropertyName } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
 type PageProps = {
-  searchParams: Promise<{ building?: string; created?: string }>;
+  searchParams: Promise<{ building?: string; created?: string; merged?: string }>;
 };
 
-function formatDateTime(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: "long",
-    day: "numeric",
+/** 도쿄 기준 「M/D」 · 「HH:mm」 · 「YYYY-MM」. */
+function tokyoParts(iso: string): { md: string; hm: string; ym: string } {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(iso));
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+  return { md: `${+g("month")}/${+g("day")}`, hm: `${g("hour")}:${g("minute")}`, ym: `${g("year")}-${g("month")}` };
 }
 
-function itemSummary(record: LinenReturnRecord, copy: { summaryMore: string; kindsUnit: string }): string {
-  if (record.lines.length === 0) return "—";
-  const first = record.lines[0].name;
-  if (record.lines.length === 1) return first;
-  return `${first} ${copy.summaryMore} ${record.lines.length - 1}${copy.kindsUnit}`;
+function linesText(record: LinenReturnRecord): string {
+  return record.lines.length ? record.lines.map((l) => `${l.name} ${l.quantity}`).join(" · ") : "—";
 }
 
 export default async function LinenReturnListPage({ searchParams }: PageProps) {
@@ -47,6 +52,7 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
 
   const building = (params.building ?? "").trim();
   const createdId = (params.created ?? "").trim();
+  const merged = params.merged === "1";
 
   if (state.status === "unauthenticated") {
     redirect(
@@ -68,116 +74,104 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
   const copy = dict.linenReturn;
   const buildingLabel = localizePropertyName(building, dict.cleaning.buildingLabels);
 
-  const [records, navBadges] = await Promise.all([
+  const [records, navBadges, allBuildings, stats] = await Promise.all([
     getLinenReturnsByBuilding(session, building),
     getMobileNavBadges(),
+    getLinenBuildings(session),
+    getLinenBuildingStats(session),
   ]);
+  const ym = getCurrentTokyoYearMonth();
+  const monthKey = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
+  const monthRecords = records.filter((r) => tokyoParts(r.registeredAt).ym === monthKey);
+  const monthQty = monthRecords.reduce((sum, r) => sum + r.totalQuantity, 0);
+  const created = createdId ? records.find((r) => r.id === createdId) : undefined;
+  const buildingOptions = allBuildings.map((name) => ({
+    name,
+    label: localizePropertyName(name, dict.cleaning.buildingLabels),
+    monthCount: stats[name]?.count ?? 0,
+  }));
 
   const buildingParam = encodeURIComponent(building);
 
   return (
     <MobileShell activeItem="linen-return" badges={navBadges} title={buildingLabel} split>
       <SplitList detail="linen">
-        <div className="relative min-h-[60vh] pb-24">
-          {/* Context bar */}
-          <div className="flex items-center gap-[11px] px-0.5 pb-4 pt-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[19px] font-black leading-tight tracking-[-0.03em] text-foreground">
-                {buildingLabel}
-              </p>
-              <p className="mt-0.5 text-[11.5px] font-semibold text-muted-foreground">
-                {/* 이 화면은 기간 필터가 없는 건물 전체 이력이다(기간 조회는 장부 화면 담당).
-                    건물 카드 배지의 "이번 달"과 숫자가 달라 보이지 않도록 총계 라벨을 쓴다. */}
-                {`${copy.totalPrefix} ${records.length}${copy.countUnit} · ${copy.latestOrder}`}
-              </p>
+        {/* 화이트 리디자인(2026-10-14, 시안 Linen-Phone · Linen-Tablet): 상자 없는 머리(건물 이름을 눌러 바꾸기) · 이번 달 숫자 · 한 줄 기록 · 등록 단추. */}
+        <div className="lnw">
+          <div className="lnw-head">
+            <span className="lnw-kick">{copy.eyebrow}</span>
+            <LinenBuildingSwitch buildings={buildingOptions} copy={copy} current={building} currentLabel={buildingLabel} />
+          </div>
+          <div className="lnw-kpis">
+            <div>
+              <span>{copy.wMonthQty}</span>
+              <b className="num">
+                {monthQty}
+                <small>{copy.quantityUnit}</small>
+              </b>
             </div>
-            <Link
-              className="flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-[7px] text-xs font-bold text-primary"
-              href={`/mobile/linen-return/ledger?building=${buildingParam}`}
-            >
-              <ScrollText className="size-[15px]" aria-hidden="true" />
-              {copy.ledgerButton}
+            <div>
+              <span>{copy.wRecordsLabel}</span>
+              <b className="num">
+                {monthRecords.length}
+                <small>{copy.countUnit}</small>
+              </b>
+            </div>
+            <Link className="lnw-link" href={`/mobile/linen-return/ledger?building=${buildingParam}`}>
+              {copy.wLedgerLink}
+              <ChevronRight aria-hidden="true" />
             </Link>
           </div>
 
           {records.length === 0 ? (
-            <div className="flex flex-col items-center px-6 py-14 text-center">
-              <span className="mb-4 flex size-[60px] items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
-                <Inbox className="size-7" aria-hidden="true" />
-              </span>
-              <p className="text-[15px] font-extrabold text-foreground">{copy.listEmptyTitle}</p>
-              <p className="mt-1.5 text-[13px] text-muted-foreground">{copy.listEmptySub}</p>
-              <Link
-                className="mt-[18px] inline-flex h-[50px] items-center justify-center gap-1.5 rounded-2xl bg-primary px-5 text-[15px] font-extrabold text-primary-foreground"
-                href={`/mobile/linen-return/new?building=${buildingParam}`}
-              >
-                <Plus className="size-5" aria-hidden="true" />
-                {copy.registerButton}
-              </Link>
+            <div className="lnw-empty-state">
+              <b>{copy.listEmptyTitle}</b>
+              <span>{copy.listEmptySub}</span>
             </div>
           ) : (
-            <div className="flex flex-col gap-2.5">
-              {records.map((record) => (
-                <Link
-                  className={cn(
-                    "flex items-center gap-3 rounded-[20px] border bg-surface px-3.5 py-[15px] shadow-[0_1px_2px_rgba(20,32,43,0.03)] transition-all active:scale-[0.99] hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.4)]",
-                    record.id === createdId
-                      ? "border-primary/40 ring-2 ring-primary/15"
-                      : "border-border",
-                  )}
-                  href={`/mobile/linen-return/record/${record.id}?building=${buildingParam}`}
-                  key={record.id}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-extrabold tracking-[-0.01em] text-foreground">
-                      {formatDateTime(record.registeredAt, locale)}
-                    </div>
-                    <div className="mt-1 text-[12.5px] font-semibold text-slate-600">
-                      {itemSummary(record, copy)}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 text-[11.5px] text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-600">
-                        <span className="flex size-[18px] items-center justify-center rounded-full bg-primary/10 text-[10px] font-extrabold text-primary">
-                          {record.registrantName.slice(0, 1)}
-                        </span>
+            <div className="lnw-rows">
+              {records.map((record) => {
+                const t = tokyoParts(record.registeredAt);
+                return (
+                  <Link
+                    className={`lnw-row${record.id === createdId ? " is-new" : ""}`}
+                    href={`/mobile/linen-return/record/${record.id}?building=${buildingParam}`}
+                    key={record.id}
+                  >
+                    <span className="lnw-row__d num">
+                      <b>{t.md}</b>
+                      <span>{t.hm}</span>
+                    </span>
+                    <span className="lnw-row__b">
+                      <b>{linesText(record)}</b>
+                      <span>
                         {record.registrantName}
-                      </span>
-                      {record.imageUrls.length > 0 ? (
-                        <>
-                          <span className="size-[3px] rounded-full bg-border" />
-                          <span className="inline-flex items-center gap-1 font-semibold">
-                            <ImageIcon className="size-[14px]" aria-hidden="true" />
-                            {copy.photoLabel}
-                          </span>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="inline-flex items-baseline gap-0.5 font-mono text-foreground">
-                      <b className="text-[19px] font-bold tracking-[-0.02em]">{record.totalQuantity}</b>
-                      <span className="font-sans text-[11px] font-semibold text-muted-foreground">
-                        {copy.quantityUnit}
+                        {record.imageUrls.length > 0 ? ` · ${copy.wPhotoN.replace("{n}", String(record.imageUrls.length))}` : ""}
                       </span>
                     </span>
-                    <ChevronRight className="size-[18px] text-slate-400" aria-hidden="true" />
-                  </div>
-                </Link>
-              ))}
+                    <span className="lnw-row__q num">
+                      {record.totalQuantity}
+                      <small>{copy.quantityUnit}</small>
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
 
-          {records.length > 0 ? (
-            <Link
-              className="fixed bottom-24 right-4 z-30 inline-flex h-[50px] items-center gap-1.5 rounded-full bg-primary pl-[17px] pr-5 text-[14.5px] font-extrabold text-primary-foreground shadow-[0_16px_30px_-10px_hsl(var(--primary-hsl)/0.5)] transition-transform active:scale-95"
-              href={`/mobile/linen-return/new?building=${buildingParam}`}
-            >
-              <Plus className="size-5" aria-hidden="true" />
-              {copy.registerButton}
-            </Link>
-          ) : null}
+          <Link className="lnw-fab" href={`/mobile/linen-return/new?building=${buildingParam}`}>
+            <Plus aria-hidden="true" />
+            {copy.registerButton}
+          </Link>
 
-          <LinenReturnSuccess building={building} copy={copy} show={Boolean(createdId)} />
+          <LinenReturnSuccess
+            building={building}
+            buildingLabel={buildingLabel}
+            copy={copy}
+            fallback={created ? { total: created.totalQuantity, lines: linesText(created) } : null}
+            merged={merged}
+            show={Boolean(createdId)}
+          />
         </div>
       </SplitList>
     </MobileShell>

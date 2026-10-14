@@ -1,29 +1,24 @@
 "use client";
 
+// 린넨 반품 등록 · 수정 폼 — 화이트 리디자인(2026-10-14, 시안 LinenNew-Phone · Linen-Fold · Linen-Tablet).
+// 예전 「품목 고르기 + 수량」 줄을 하나씩 더하던 방식 대신 **이 건물의 활성 품목을 모두 펼쳐 ± 로 수량만** 정한다(사용자 승인).
+// 같은 품목을 두 번 넣을 일이 없고(규칙 4), 0 인 품목은 저장하지 않는다. 서버에 보내는 모양(linesJson)은 그대로.
+// 0 인 줄은 「−」를 숨긴다(hallmark 절제 점검). 숫자는 바뀔 때 살짝 굴러 바뀐다.
 import Image from "next/image";
-import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { createPortal } from "react-dom";
-import {
-  Building2,
-  ChevronDown,
-  Clock,
-  Minus,
-  Plus,
-  Trash2,
-  TriangleAlert,
-  User,
-  X,
-} from "lucide-react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { Minus, Plus, X } from "lucide-react";
 import { createLinenReturnRecord } from "@/app/mobile/linen-return/new/actions";
 import { updateLinenReturnRecord } from "@/app/mobile/linen-return/record/[id]/actions";
 import {
   AnnouncementImageUploader,
   type AnnouncementImageUploaderHandle,
 } from "@/components/announcements/announcement-image-uploader";
+import { LINEN_JUST_SAVED_KEY } from "@/components/linen-return/linen-return-success";
 import { uploadRequestImages } from "@/components/requests/request-image-upload";
+import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import type { LinenItemOption } from "@/lib/linen-returns";
-import { cn } from "@/lib/utils";
+import "@/components/requests/order-form.css";
 
 type FormLine = { itemId: string; quantity: number };
 
@@ -39,7 +34,7 @@ type LinenReturnCreateFormProps = {
   /** Edit mode reuses this form; defaults to create. */
   mode?: "create" | "edit";
   recordId?: string;
-  initialLines?: FormLine[];
+  initialLines?: (FormLine & { name?: string })[];
   initialNote?: string;
   /** 이미 저장된 사진 URL — 수정 모드에서 남기거나 지울 수 있다. */
   initialPhotos?: string[];
@@ -51,112 +46,63 @@ const MAX_PHOTOS = 5;
 
 export function LinenReturnCreateForm({
   building,
-  buildingLabel,
   copy,
   imgCopy,
   items,
   organizationId,
-  reporterName,
   serverError,
   mode = "create",
   recordId,
   initialLines,
   initialNote,
   initialPhotos,
-  submitLabel,
 }: LinenReturnCreateFormProps) {
   const isEdit = mode === "edit";
   const formRef = useRef<HTMLFormElement>(null);
   const uploaderRef = useRef<AnnouncementImageUploaderHandle>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const hasItems = items.length > 0;
-  const [lines, setLines] = useState<FormLine[]>(() => {
-    if (isEdit && initialLines && initialLines.length > 0) return initialLines;
-    return hasItems ? [{ itemId: items[0].id, quantity: 1 }] : [];
+  // 수정 모드: 품목 목록에 없는(은퇴한) 품목이 기록에 있으면 그 줄도 함께 보여 준다.
+  const rows = useMemo(() => {
+    const known = new Set(items.map((it) => it.id));
+    const extra = (initialLines ?? []).filter((l) => !known.has(l.itemId)).map((l) => ({ id: l.itemId, name: l.name ?? l.itemId }));
+    return [...items.map((it) => ({ id: it.id, name: it.name })), ...extra];
+  }, [items, initialLines]);
+
+  const [qty, setQty] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    for (const l of initialLines ?? []) init[l.itemId] = l.quantity;
+    return init;
   });
-  // 수정 모드에서 "남길" 기존 사진. 여기서 뺀 URL 은 저장 시 record 에서 사라진다.
-  const [keptPhotos, setKeptPhotos] = useState<string[]>(() =>
-    isEdit ? (initialPhotos ?? []) : [],
-  );
-  const [openLine, setOpenLine] = useState<number | null>(null);
+  const [keptPhotos, setKeptPhotos] = useState<string[]>(() => (isEdit ? (initialPhotos ?? []) : []));
   const [error, setError] = useState<string | null>(serverError);
   const [isPending, startTransition] = useTransition();
-  // Portal the submit bar to <body> so it escapes the shell's transformed scroll container and is
-  // not hidden behind the fixed bottom tab bar; the button links back via the `form` attribute.
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
 
-  const itemName = (id: string) => items.find((it) => it.id === id)?.name ?? "";
-  const usedIds = lines.map((l) => l.itemId);
-  const allUsed = usedIds.length >= items.length;
+  const lines: FormLine[] = rows.filter((r) => (qty[r.id] ?? 0) > 0).map((r) => ({ itemId: r.id, quantity: qty[r.id] }));
+  const total = lines.reduce((sum, l) => sum + l.quantity, 0);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpenLine(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const totalQuantity = lines.reduce((sum, l) => sum + l.quantity, 0);
-
-  function addLine() {
-    if (allUsed) return;
-    const next = items.find((it) => !usedIds.includes(it.id));
-    if (!next) return;
-    setLines((prev) => [...prev, { itemId: next.id, quantity: 1 }]);
+  function change(id: string, delta: number) {
+    haptic("light");
     setError(null);
-  }
-
-  function removeLine(index: number) {
-    setLines((prev) => prev.filter((_, i) => i !== index));
-    setOpenLine(null);
-  }
-
-  function setLineItem(index: number, itemId: string) {
-    setLines((prev) => prev.map((l, i) => (i === index ? { ...l, itemId } : l)));
-    setOpenLine(null);
-    setError(null);
-  }
-
-  function changeQty(index: number, delta: number) {
-    setLines((prev) =>
-      prev.map((l, i) =>
-        i === index ? { ...l, quantity: Math.max(1, l.quantity + delta) } : l,
-      ),
-    );
+    setQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-
     if (lines.length === 0) {
+      haptic("error");
       setError(copy.errorMinItems);
       return;
     }
-
     const form = formRef.current;
     if (!form) return;
     const formData = new FormData(form);
     formData.set("building", building);
-    formData.set(
-      "linesJson",
-      JSON.stringify(lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity }))),
-    );
+    formData.set("linesJson", JSON.stringify(lines));
 
     if (isEdit) {
       formData.set("recordId", recordId ?? "");
-      // 사진은 "남긴 기존 URL + 새로 올린 URL" 집합으로 통째로 교체한다.
-      for (const url of keptPhotos) {
-        formData.append("imageUrls", url);
-      }
+      for (const url of keptPhotos) formData.append("imageUrls", url);
       try {
         const pending = uploaderRef.current?.getItems() ?? [];
         if (pending.length > 0) {
@@ -167,9 +113,7 @@ export function LinenReturnCreateForm({
             requestId: recordId ?? crypto.randomUUID(),
             requestType: "linen-returns",
           });
-          for (const url of imageUrls) {
-            formData.append("imageUrls", url);
-          }
+          for (const url of imageUrls) formData.append("imageUrls", url);
         }
       } catch {
         setError(copy.errors.save_failed);
@@ -183,7 +127,6 @@ export function LinenReturnCreateForm({
 
     const requestId = crypto.randomUUID();
     formData.set("id", requestId);
-
     try {
       const photos = uploaderRef.current?.getItems() ?? [];
       const { imageUrls } = await uploadRequestImages({
@@ -192,260 +135,110 @@ export function LinenReturnCreateForm({
         requestId,
         requestType: "linen-returns",
       });
-      for (const url of imageUrls) {
-        formData.append("imageUrls", url);
-      }
+      for (const url of imageUrls) formData.append("imageUrls", url);
     } catch {
       setError(copy.errors.save_failed);
       return;
     }
-
+    // 완료 화면이 「이번에 보낸 장수 · 품목」을 보여 주도록 남겨 둔다(합쳐진 기록이면 기록 합계와 다르다).
+    try {
+      const name = (id: string) => rows.find((r) => r.id === id)?.name ?? "";
+      window.sessionStorage.setItem(
+        LINEN_JUST_SAVED_KEY,
+        JSON.stringify({ total, lines: lines.map((l) => `${name(l.itemId)} ${l.quantity}`).join(" · ") }),
+      );
+    } catch {
+      // 못 남기면 완료 화면이 기록 합계를 보여 준다.
+    }
     startTransition(async () => {
       await createLinenReturnRecord(formData);
     });
   }
 
   return (
-    <>
-    <form className="relative pb-28" id="linen-return-form" onSubmit={handleSubmit} ref={formRef}>
-      {/* Locked building */}
-      <div className="mb-2.5 flex items-center gap-3 rounded-[20px] border border-primary/20 bg-primary/10 p-3.5">
-        <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[11px] bg-surface text-primary">
-          <Building2 className="size-5" aria-hidden="true" />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-primary">
-            {copy.buildingFieldLabel}
-          </span>
-          <span className="truncate text-[15px] font-extrabold tracking-[-0.02em] text-foreground">
-            {buildingLabel}
-          </span>
-        </span>
-        <span className="shrink-0 rounded-full bg-surface px-2.5 py-1 text-[11px] font-bold text-primary">
-          {copy.buildingLockedBadge}
-        </span>
-      </div>
-      <div className="mb-[22px] flex items-center gap-1.5 px-1 text-[12px] font-medium text-muted-foreground">
-        <User className="size-[15px] text-slate-400" aria-hidden="true" />
-        <span>
-          {copy.registrantLabel} <b className="font-bold text-slate-700">{reporterName}</b>
-        </span>
-        <span className="size-[3px] rounded-full bg-border" />
-        <Clock className="size-[15px] text-slate-400" aria-hidden="true" />
-        <span>{copy.autoNowLabel}</span>
-      </div>
-
-      {/* Items */}
-      <div className="mb-[22px]" ref={dropdownRef}>
-        <div className="mb-[11px] flex items-center gap-2 px-0.5 text-[12.5px] font-extrabold tracking-[-0.01em] text-foreground">
-          <span>{copy.itemsSectionTitle}</span>
-          <span className="rounded-full bg-slate-50 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-            {lines.length}
-            {copy.linesUnit}
-          </span>
-        </div>
-
-        {hasItems ? (
-          <>
-            <div className="flex flex-col gap-2.5">
-              {lines.map((line, index) => {
-                const options = items.filter(
-                  (it) => it.id === line.itemId || !usedIds.includes(it.id),
-                );
-                const isOpen = openLine === index;
-                return (
-                  // Key by the (per-line unique) itemId, not the array index — index keys made a
-                  // mid-list delete rebind the dropdown-open state / quantity onto the wrong row.
-                  <div className="flex items-center gap-2.5" key={line.itemId}>
-                    <div className="relative min-w-0 flex-1">
-                      <button
-                        className={cn(
-                          "flex h-12 w-full items-center justify-between rounded-2xl border bg-surface px-3.5 text-left text-sm font-bold text-foreground outline-none transition-colors",
-                          isOpen ? "border-primary ring-2 ring-primary/15" : "border-border",
-                        )}
-                        onClick={() => setOpenLine(isOpen ? null : index)}
-                        type="button"
-                      >
-                        <span className="truncate">{itemName(line.itemId)}</span>
-                        <ChevronDown
-                          aria-hidden="true"
-                          className="size-4 shrink-0 text-slate-400 transition-transform duration-200"
-                          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                        />
-                      </button>
-                      {isOpen ? (
-                        <ul className="absolute left-0 z-50 mt-1.5 max-h-60 w-full divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-border bg-surface p-1 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.55)]">
-                          {options.map((it) => (
-                            <li
-                              className={cn(
-                                "flex h-10 w-full cursor-pointer items-center rounded-lg px-3 text-sm font-semibold transition-colors",
-                                line.itemId === it.id
-                                  ? "bg-primary/10 text-primary"
-                                  : "text-slate-700 hover:bg-slate-50",
-                              )}
-                              key={it.id}
-                              onClick={() => setLineItem(index, it.id)}
-                            >
-                              {it.name}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-
-                    <div className="flex h-12 shrink-0 items-center gap-0.5 rounded-2xl border border-border bg-slate-50 px-[3px]">
-                      <button
-                        className="flex size-9 items-center justify-center rounded-[10px] text-slate-700 disabled:text-slate-300"
-                        disabled={line.quantity <= 1}
-                        onClick={() => changeQty(index, -1)}
-                        type="button"
-                      >
-                        <Minus className="size-[18px]" aria-hidden="true" />
-                      </button>
-                      <span className="min-w-[26px] text-center font-mono text-base font-bold text-foreground">
-                        {line.quantity}
-                      </span>
-                      <button
-                        className="flex size-9 items-center justify-center rounded-[10px] text-slate-700"
-                        onClick={() => changeQty(index, 1)}
-                        type="button"
-                      >
-                        <Plus className="size-[18px]" aria-hidden="true" />
-                      </button>
-                    </div>
-
-                    <button
-                      className="flex h-12 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-surface disabled:hover:text-slate-400"
-                      disabled={lines.length <= 1}
-                      onClick={() => removeLine(index)}
-                      type="button"
-                    >
-                      <Trash2 className="size-[18px]" aria-hidden="true" />
-                    </button>
-                  </div>
-                );
-              })}
+    <form className="lnw-form" onSubmit={handleSubmit} ref={formRef}>
+      {rows.length === 0 ? <p className="lnw-empty">{copy.noItemsAvailable}</p> : null}
+      <div className="lnw-steps">
+        {rows.map((r) => {
+          const q = qty[r.id] ?? 0;
+          return (
+            <div className={`lnw-step${q > 0 ? " has" : ""}`} key={r.id}>
+              <span className="lnw-step__n">{r.name}</span>
+              <button
+                aria-label={copy.wMinus.replace("{item}", r.name)}
+                className={`lnw-st${q === 0 ? " is-hidden" : ""}`}
+                disabled={q === 0}
+                onClick={() => change(r.id, -1)}
+                type="button"
+              >
+                <Minus aria-hidden="true" />
+              </button>
+              <span className="lnw-step__q num" aria-live="polite" key={q}>
+                {q}
+              </span>
+              <button aria-label={copy.wPlus.replace("{item}", r.name)} className="lnw-st is-plus" onClick={() => change(r.id, 1)} type="button">
+                <Plus aria-hidden="true" />
+              </button>
             </div>
+          );
+        })}
+        <div className="lnw-step is-total">
+          <b>{copy.wTotal}</b>
+          <span className="num" key={total}>
+            {total}
+            <small>{copy.quantityUnit}</small>
+          </span>
+        </div>
+      </div>
 
-            <button
-              className={cn(
-                "mt-[11px] flex h-[46px] w-full items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed text-[13.5px] font-bold transition-colors",
-                allUsed
-                  ? "cursor-default border-border text-slate-400"
-                  : "border-border text-primary hover:border-primary/40 hover:bg-primary/10",
-              )}
-              disabled={allUsed}
-              onClick={addLine}
-              type="button"
-            >
-              <Plus className="size-[18px]" aria-hidden="true" />
-              <span>{allUsed ? copy.allItemsAdded : copy.addItem}</span>
-            </button>
-          </>
-        ) : (
-          <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[12.5px] font-semibold text-amber-700">
-            <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
-            {copy.noItemsAvailable}
+      <section className="ofw-sec">
+        <label className="ofw-nf">
+          <span className="ofw-nf__l">{copy.wMemoOpt}</span>
+          <textarea className="ofw-nf__in ofw-ta" defaultValue={initialNote ?? ""} name="note" placeholder={copy.memoPlaceholder} rows={2} />
+        </label>
+        {keptPhotos.length > 0 ? (
+          <div className="ofw-photos__row">
+            {keptPhotos.map((url) => (
+              <div className="ofw-photos__th" key={url}>
+                <Image alt="" fill sizes="72px" src={url} />
+                <button
+                  aria-label={imgCopy.remove}
+                  onClick={() => setKeptPhotos((prev) => prev.filter((u) => u !== url))}
+                  type="button"
+                >
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-
-      {/* Note */}
-      <div className="mb-[22px]">
-        <div className="mb-[11px] flex items-center gap-2 px-0.5 text-[12.5px] font-extrabold tracking-[-0.01em] text-foreground">
-          <span>{copy.memoSectionTitle}</span>
-          <span className="text-[11px] font-semibold text-slate-400">{copy.optionalLabel}</span>
-        </div>
-        <textarea
-          className="min-h-[84px] w-full resize-none rounded-2xl border border-border bg-slate-50 px-3.5 py-3 text-sm font-medium leading-6 text-foreground outline-none transition-colors placeholder:text-slate-400 focus:border-primary focus:bg-surface"
-          defaultValue={initialNote ?? ""}
-          name="note"
-          placeholder={copy.memoPlaceholder}
-          rows={3}
+        ) : null}
+        <AnnouncementImageUploader
+          addImagesLabel={imgCopy.addPhotos}
+          errorCountExceeded={imgCopy.errorCount}
+          errorSizeExceeded={imgCopy.errorSize}
+          errorTypeInvalid={imgCopy.errorType}
+          imageAttachmentsLabel={copy.wPhotoOpt}
+          imageLimitLabel={imgCopy.limit}
+          imageRemoveLabel={imgCopy.remove}
+          maxImages={MAX_PHOTOS - keptPhotos.length}
+          ref={uploaderRef}
+          variant="white"
         />
-      </div>
-
-      {/* Photos — 등록과 수정 모두 지원한다. 수정 모드에서는 이미 저장된 사진을 지울 수 있고,
-          남은 자리(최대 5장)만큼 새 사진을 추가할 수 있다. */}
-      <div className="mb-[22px]">
-        <div className="mb-[11px] flex items-center gap-2 px-0.5 text-[12.5px] font-extrabold tracking-[-0.01em] text-foreground">
-          <span>{copy.photoSectionTitle}</span>
-          <span className="text-[11px] font-semibold text-slate-400">{copy.optionalLabel}</span>
-        </div>
-        <div className="rounded-2xl border border-border bg-slate-50/60 p-3">
-          {keptPhotos.length > 0 ? (
-            <ul className="mb-3 grid grid-cols-4 gap-2">
-              {keptPhotos.map((url) => (
-                <li className="relative" key={url}>
-                  {/* `request-images` 는 remotePatterns 에 등록돼 있다 — 예전 주석은 사실과 달랐다. */}
-                  <Image
-                    alt=""
-                    className="rounded-xl border border-border object-cover"
-                    fill
-                    sizes="25vw"
-                    src={url}
-                  />
-                  <button
-                    aria-label={imgCopy.remove}
-                    className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full bg-slate-900/80 text-white"
-                    onClick={() => setKeptPhotos((prev) => prev.filter((item) => item !== url))}
-                    type="button"
-                  >
-                    <X className="size-3.5" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <AnnouncementImageUploader
-            addImagesLabel={imgCopy.addPhotos}
-            errorCountExceeded={imgCopy.errorCount}
-            errorSizeExceeded={imgCopy.errorSize}
-            errorTypeInvalid={imgCopy.errorType}
-            imageAttachmentsLabel={imgCopy.attachments}
-            imageLimitLabel={imgCopy.limit}
-            imageRemoveLabel={imgCopy.remove}
-            maxImages={MAX_PHOTOS - keptPhotos.length}
-            ref={uploaderRef}
-          />
-        </div>
-      </div>
+      </section>
 
       {error ? (
-        <p className="mb-2 flex items-center gap-1.5 px-0.5 text-xs font-semibold text-red-500">
-          <TriangleAlert className="size-3.5" aria-hidden="true" />
+        <p className="ofw-err" role="alert">
           {error}
         </p>
       ) : null}
 
+      <div className="lnw-submit">
+        <button className="ofw-submit" disabled={isPending || total === 0} type="submit">
+          {isPending ? <span className="ofw-spin" aria-hidden="true" /> : null}
+          {(isEdit ? copy.wSaveN : copy.wSubmitN).replace("{n}", String(total))}
+        </button>
+        {!isEdit ? <span>{copy.wMergeNote}</span> : null}
+      </div>
     </form>
-
-    {/* Submit bar — portaled to <body> (sits above the bottom tab bar); the button submits the
-        form via its `form` attribute even though it lives outside the <form> in the DOM. */}
-    {hydrated
-      ? createPortal(
-          <div
-            className="fixed inset-x-0 z-40 mx-auto flex max-w-[460px] items-center gap-3 border-t border-border bg-surface px-[18px] pb-[max(18px,env(safe-area-inset-bottom))] pt-3.5 shadow-[0_-14px_36px_-14px_rgba(20,16,10,0.28)]"
-            style={{ bottom: "var(--keyboard-inset, 0px)" }}
-          >
-            <div className="whitespace-nowrap text-[12.5px] font-semibold text-muted-foreground">
-              {copy.totalPrefix}{" "}
-              <b className="font-mono text-base font-bold text-foreground">{totalQuantity}</b>
-              {copy.quantityUnit} · {lines.length}
-              {copy.kindsUnit}
-            </div>
-            <button
-              className="flex h-[50px] flex-1 items-center justify-center rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60"
-              disabled={isPending || !hasItems || lines.length === 0}
-              form="linen-return-form"
-              type="submit"
-            >
-              {submitLabel ?? copy.submitButton}
-            </button>
-          </div>,
-          document.body,
-        )
-      : null}
-    </>
   );
 }

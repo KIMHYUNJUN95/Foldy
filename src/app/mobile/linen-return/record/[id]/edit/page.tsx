@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { LinenReturnCreateForm } from "@/components/linen-return/linen-return-create-form";
+import "@/components/linen-return/linen-mobile.css";
 import { MobileShell } from "@/components/shell/mobile-shell";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   canManageLinenRecord,
   getActiveLinenItems,
@@ -16,6 +17,10 @@ type PageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 };
+
+function formatDay(iso: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Tokyo" }).format(new Date(iso));
+}
 
 export default async function LinenReturnEditPage({ params, searchParams }: PageProps) {
   const [state, session, { id }, query] = await Promise.all([
@@ -63,11 +68,14 @@ export default async function LinenReturnEditPage({ params, searchParams }: Page
       hideBottomNav
       title={copy.editAction}
     >
-      <div className="flex items-center gap-[11px] px-0.5 pb-3 pt-2">
-        <p className="text-[19px] font-black leading-tight tracking-[-0.03em] text-foreground">
-          {copy.editAction}
-        </p>
-      </div>
+      {/* 화이트 리디자인(2026-10-14): 등록 폼과 같은 머리 — 「기록 수정 · 날짜 · 등록자」 + 건물(수정 화면에선 바꾸지 않는다). */}
+      <div className="lnw lnw--form">
+        <div className="lnw-head">
+          <span className="lnw-kick">
+            {copy.wEditKick.replace("{date}", formatDay(record.registeredAt, locale)).replace("{who}", record.registrantName)}
+          </span>
+          <h1 className="lnw-title">{buildingLabel}</h1>
+        </div>
 
       <LinenReturnCreateForm
         building={record.buildingName}
@@ -76,6 +84,7 @@ export default async function LinenReturnEditPage({ params, searchParams }: Page
         imgCopy={dict.requestImages}
         initialLines={record.lines.map((line) => ({
           itemId: line.itemId,
+          name: line.name,
           quantity: line.quantity,
         }))}
         initialNote={record.note ?? ""}
@@ -88,6 +97,7 @@ export default async function LinenReturnEditPage({ params, searchParams }: Page
         serverError={serverError}
         submitLabel={copy.editAction}
       />
+      </div>
     </MobileShell>
   );
 }

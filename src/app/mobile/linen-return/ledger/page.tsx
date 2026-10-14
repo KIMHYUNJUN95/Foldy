@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { LinenLedgerPeriod } from "@/components/linen-return/linen-ledger-period";
 import { LinenLedgerView } from "@/components/linen-return/linen-ledger-view";
 import { SplitList } from "@/components/shell/split-list";
+import "@/components/linen-return/linen-mobile.css";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
+  getActiveLinenItems,
   getCurrentTokyoYearMonth,
   getLinenLedgerRecords,
   getLinenLedgerRecordsByRange,
@@ -104,7 +106,7 @@ export default async function LinenReturnLedgerPage({ searchParams }: PageProps)
     rangeValue = {};
   }
 
-  const navBadges = await getMobileNavBadges();
+  const [navBadges, catalog] = await Promise.all([getMobileNavBadges(), getActiveLinenItems(session, building)]);
   // Do not allow paging into the future beyond the current Tokyo month.
   const canGoNext =
     baseMonth.year < current.year ||
@@ -114,17 +116,12 @@ export default async function LinenReturnLedgerPage({ searchParams }: PageProps)
     // 넓은 화면(2026-10-05): 태블릿 가로는 왼쪽 장부 · 오른쪽 그 기록의 상세 칸(`SplitList` — 린넨 기록 목록과 같다).
     <MobileShell activeItem="linen-return" badges={navBadges} split title={copy.ledgerTitle}>
       <SplitList detail="linen">
-      <div className="pb-6">
-        <div className="mb-3.5 flex items-end justify-between px-0.5 pt-1">
-          <div className="flex items-center gap-2.5">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
-                {buildingLabel}
-              </p>
-              <h1 className="text-[26px] font-black tracking-[-0.03em] text-foreground">
-                {copy.ledgerTitle}
-              </h1>
-            </div>
+      {/* 화이트 리디자인(2026-10-14, 시안 LinenLedger-Phone): 건물 · 「장부」 + 달 이동(가운데 누르면 기간 고르기). */}
+      <div className="lnw">
+        <div className="lnw-ledger-head">
+          <div className="lnw-head">
+            <span className="lnw-kick">{buildingLabel}</span>
+            <h1 className="lnw-title">{copy.ledgerTitle}</h1>
           </div>
 
           <LinenLedgerPeriod
@@ -145,6 +142,7 @@ export default async function LinenReturnLedgerPage({ searchParams }: PageProps)
           currentUserId={session.user.id}
           locale={locale}
           records={records}
+          catalog={catalog}
         />
       </div>
       </SplitList>

@@ -1,11 +1,13 @@
 "use client";
 
+// 린넨 장부 — 화이트 리디자인(2026-10-14, 시안 LinenLedger-Phone · LinenLedgerItems-Phone): [기록 | 품목 집계] 토글 →
+// 글자 고르기(내 등록만 · 등록자 · 품목) → 숫자 둘(반품 장수 · 기록 건수) → 한 줄 기록 / 품목 막대. 상자 · 칩 · 그라데이션 제거.
+
 import { useMemo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { BedDouble, Check, ChevronDown, Filter, Package, User } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import type { LinenReturnRecord } from "@/lib/linen-returns";
-import { cn } from "@/lib/utils";
+import type { LinenItemOption, LinenReturnRecord } from "@/lib/linen-returns";
 
 type LinenLedgerViewProps = {
   building: string;
@@ -13,27 +15,18 @@ type LinenLedgerViewProps = {
   currentUserId: string;
   locale: Locale;
   records: LinenReturnRecord[];
+  /** 이 건물의 활성 품목 — 품목 집계에 반품 0 인 품목도 보이려고(2026-10-14). */
+  catalog?: LinenItemOption[];
 };
 
 type Mode = "records" | "aggregate";
-
-function formatDateTime(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(iso));
-}
 
 export function LinenLedgerView({
   building,
   copy,
   currentUserId,
-  locale,
   records,
+  catalog = [],
 }: LinenLedgerViewProps) {
   const [mode, setMode] = useState<Mode>("records");
   const [mineOnly, setMineOnly] = useState(false);
@@ -99,282 +92,180 @@ export function LinenLedgerView({
   const registrantLabel = registrant
     ? registrants.find((r) => r.id === registrant)?.name ?? copy.filterRegistrant
     : copy.allRegistrants;
-  const itemLabel = itemId
-    ? itemOptions.find((i) => i.id === itemId)?.name ?? copy.filterItem
-    : copy.filterItem;
+  const itemLabel = itemId ? itemOptions.find((i) => i.id === itemId)?.name ?? copy.filterItem : copy.allItems;
 
   const buildingParam = encodeURIComponent(building);
+  // 품목 집계: 반품이 없던 품목도 0 으로 보여 준다(「반품 없음」과 「품목 없음」을 구분 — PC 품목별 수량과 같다).
+  const aggRows = (() => {
+    const rows = [...aggregate];
+    if (!itemId) {
+      for (const it of catalog) {
+        if (!rows.some((r) => r.name === it.name)) rows.push({ name: it.name, qty: 0, count: 0 });
+      }
+    }
+    return rows;
+  })();
 
   return (
-    <div ref={wrapRef}>
-      {/* Mode switch */}
-      <div className="relative mb-3.5 flex rounded-[13px] bg-slate-50 p-1">
-        <span
-          // `left` 대신 `transform` — 레이아웃 리플로우 없이 컴포지터에서 처리된다.
-          // 폭이 `calc(50%-6px)` 로 고정이라 이동량은 «자기 폭 + 4px» 로 정확히 떨어진다
-          // (4px → calc(50%+2px) = 50%-2px 이동 = (50%-6px) + 4px).
-          className="absolute bottom-1 left-1 top-1 w-[calc(50%-6px)] rounded-[10px] bg-surface shadow-[0_2px_6px_rgba(20,32,43,0.12)] transition-transform duration-300"
-          style={{ transform: mode === "records" ? "translateX(0)" : "translateX(calc(100% + 4px))" }}
-        />
+    <div className="lnw-ledger" ref={wrapRef}>
+      <div className="lnw-seg" role="tablist">
         {(["records", "aggregate"] as const).map((m) => (
           <button
-            className={cn(
-              "relative z-10 h-[38px] flex-1 text-[13.5px] transition-colors",
-              mode === m ? "font-extrabold text-foreground" : "font-semibold text-muted-foreground",
-            )}
+            aria-selected={mode === m}
+            className={mode === m ? "on" : ""}
             key={m}
             onClick={() => setMode(m)}
+            role="tab"
             type="button"
           >
-            {m === "records" ? copy.modeRecords : copy.modeAggregate}
+            {m === "records" ? copy.wModeRecords : copy.wModeAgg}
           </button>
         ))}
       </div>
 
-      {/* Filter chips — centered; no overflow clip so dropdowns can render below */}
-      <div className="mb-4 flex flex-wrap justify-center gap-2">
-        <button
-          aria-checked={mineOnly}
-          className={cn(
-            "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-bold transition-colors",
-            mineOnly
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border bg-surface text-slate-700",
-          )}
-          onClick={() => setMineOnly((v) => !v)}
-          role="switch"
-          type="button"
-        >
-          <span
-            className={cn(
-              "flex size-[15px] items-center justify-center rounded-full border",
-              mineOnly ? "border-primary bg-primary text-primary-foreground" : "border-slate-300",
-            )}
-          >
-            {mineOnly ? <Check className="size-2.5" strokeWidth={3} aria-hidden="true" /> : null}
-          </span>
-          {copy.filterMine}
+      <div className="lnw-filters">
+        <button aria-pressed={mineOnly} className={`lnw-fbtn${mineOnly ? " on" : ""}`} onClick={() => setMineOnly((v) => !v)} type="button">
+          {mineOnly ? <Check aria-hidden="true" /> : null}
+          {copy.wMineOnly}
         </button>
-        <FilterChip
-          icon={<User className="size-[15px]" aria-hidden="true" />}
-          label={registrantLabel}
-          onToggle={() => setOpenFilter(openFilter === "registrant" ? null : "registrant")}
-          open={openFilter === "registrant"}
-        >
+        <FilterMenu label={registrantLabel} onToggle={() => setOpenFilter(openFilter === "registrant" ? null : "registrant")} open={openFilter === "registrant"}>
           <FilterOption active={!registrant} label={copy.allRegistrants} onClick={() => { setRegistrant(""); setOpenFilter(null); }} />
           {registrants.map((r) => (
-            <FilterOption
-              active={registrant === r.id}
-              key={r.id}
-              label={r.name}
-              onClick={() => { setRegistrant(r.id); setOpenFilter(null); }}
-            />
+            <FilterOption active={registrant === r.id} key={r.id} label={r.name} onClick={() => { setRegistrant(r.id); setOpenFilter(null); }} />
           ))}
-        </FilterChip>
-        <FilterChip
-          align="right"
-          icon={<BedDouble className="size-[15px]" aria-hidden="true" />}
-          label={itemLabel}
-          onToggle={() => setOpenFilter(openFilter === "item" ? null : "item")}
-          open={openFilter === "item"}
-        >
+        </FilterMenu>
+        <FilterMenu align="right" label={itemLabel} onToggle={() => setOpenFilter(openFilter === "item" ? null : "item")} open={openFilter === "item"}>
           <FilterOption active={!itemId} label={copy.allItems} onClick={() => { setItemId(""); setOpenFilter(null); }} />
           {itemOptions.map((i) => (
-            <FilterOption
-              active={itemId === i.id}
-              key={i.id}
-              label={i.name}
-              onClick={() => { setItemId(i.id); setOpenFilter(null); }}
-            />
+            <FilterOption active={itemId === i.id} key={i.id} label={i.name} onClick={() => { setItemId(i.id); setOpenFilter(null); }} />
           ))}
-        </FilterChip>
+        </FilterMenu>
       </div>
 
-      {/* Summary */}
-      <div className="mb-[18px] flex items-center rounded-[18px] border border-primary/15 bg-[linear-gradient(150deg,color-mix(in_oklab,var(--primary)_11%,white),color-mix(in_oklab,var(--primary)_6%,white))] p-4">
-        <div className="flex flex-1 flex-col items-center gap-0.5">
-          <span className="font-mono text-[26px] font-bold tracking-[-0.02em] text-primary">{totalRecords}</span>
-          <span className="text-[11.5px] font-semibold text-muted-foreground">{copy.summaryRecords}</span>
+      <div className="lnw-kpis is-ledger">
+        <div>
+          <span>{copy.wQtyLabel}</span>
+          <b className="num">
+            {totalQty}
+            <small>{copy.quantityUnit}</small>
+          </b>
         </div>
-        <div className="h-[38px] w-px bg-primary/15" />
-        <div className="flex flex-1 flex-col items-center gap-0.5">
-          <span className="font-mono text-[26px] font-bold tracking-[-0.02em] text-primary">{totalQty}</span>
-          <span className="text-[11.5px] font-semibold text-muted-foreground">{copy.summaryQuantity}</span>
+        <div>
+          <span>{copy.wRecordsLabel}</span>
+          <b className="num">
+            {totalRecords}
+            <small>{copy.countUnit}</small>
+          </b>
         </div>
       </div>
 
       {mode === "records" ? (
         filtered.length === 0 ? (
-          <EmptyState
-            icon={<Filter className="size-7" aria-hidden="true" />}
-            sub={copy.noLedgerResultSub}
-            title={copy.noLedgerResultTitle}
-          />
+          <div className="lnw-empty-state">
+            <b>{copy.noLedgerResultTitle}</b>
+            <span>{copy.noLedgerResultSub}</span>
+          </div>
         ) : (
-          // 폴드 · 태블릿 세로는 두 줄 카드. 태블릿 가로는 2분할의 왼쪽 목록(400px)이라 한 줄로 돌아간다.
-          <div className="grid gap-2.5 fold:grid-cols-2 tablet:grid-cols-1">
-            {filtered.map((r) => (
-              <Link
-                className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_14px_26px_-22px_rgba(15,23,42,0.4)]"
-                href={`/mobile/linen-return/record/${r.id}?building=${buildingParam}`}
-                key={r.id}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] font-extrabold text-foreground">
-                    {formatDateTime(r.registeredAt, locale)}
-                  </div>
-                  <div className="mt-1 text-[12px] font-semibold text-slate-600">
-                    {r.lines.length === 0
-                      ? "—"
-                      : r.lines.length === 1
-                        ? r.lines[0].name
-                        : `${r.lines[0].name} ${copy.summaryMore} ${r.lines.length - 1}${copy.kindsUnit}`}
-                  </div>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-muted-foreground">
-                    <span className="flex size-[18px] items-center justify-center rounded-full bg-primary/10 text-[10px] font-extrabold text-primary">
-                      {r.registrantName.slice(0, 1)}
-                    </span>
-                    {r.registrantName}
-                  </div>
-                </div>
-                <span className="inline-flex items-baseline gap-0.5 font-mono text-foreground">
-                  <b className="text-[19px] font-bold tracking-[-0.02em]">{relevantQty(r)}</b>
-                  <span className="font-sans text-[11px] font-semibold text-muted-foreground">
-                    {copy.quantityUnit}
+          <div className="lnw-rows">
+            {filtered.map((r) => {
+              const t = parts(r.registeredAt);
+              return (
+                <Link className="lnw-row" href={`/mobile/linen-return/record/${r.id}?building=${buildingParam}`} key={r.id}>
+                  <span className="lnw-row__d num">
+                    <b>{t.md}</b>
+                    <span>{t.hm}</span>
                   </span>
-                </span>
-              </Link>
-            ))}
+                  <span className="lnw-row__b">
+                    <b>{r.lines.length ? r.lines.map((l) => `${l.name} ${l.quantity}`).join(" · ") : "—"}</b>
+                    <span>
+                      {r.registrantName}
+                      {r.imageUrls.length > 0 ? ` · ${copy.wPhotoN.replace("{n}", String(r.imageUrls.length))}` : ""}
+                    </span>
+                  </span>
+                  <span className="lnw-row__q num">
+                    {relevantQty(r)}
+                    <small>{copy.quantityUnit}</small>
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         )
-      ) : aggregate.length === 0 ? (
-        <EmptyState
-          icon={<Package className="size-7" aria-hidden="true" />}
-          sub={copy.noLedgerResultSub}
-          title={copy.noAggTitle}
-        />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border">
-          <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-slate-50 px-[15px] py-[11px] text-[11px] font-bold uppercase tracking-[0.04em] text-muted-foreground">
-            <span>{copy.aggHeaderItem}</span>
-            <span className="text-right">{copy.aggHeaderCount}</span>
-            <span className="min-w-[54px] text-right">{copy.aggHeaderQty}</span>
-          </div>
-          {aggregate.map((row) => (
-            <div
-              className="grid grid-cols-[84px_1fr_auto_auto] items-center gap-[11px] border-t border-slate-100 px-[15px] py-[13px]"
-              key={row.name}
-            >
-              <span className="text-sm font-bold text-foreground">{row.name}</span>
-              <span className="h-[7px] overflow-hidden rounded-full bg-slate-100">
-                <span
-                  className="block h-full rounded-full bg-[linear-gradient(90deg,color-mix(in_oklab,var(--primary)_60%,white),var(--primary))]"
-                  style={{ width: `${Math.max(8, Math.round((row.qty / maxQty) * 100))}%` }}
-                />
-              </span>
-              <span className="min-w-[30px] text-right text-[11.5px] font-semibold text-muted-foreground">
-                {row.count}
-                {copy.aggCountUnit}
-              </span>
-              <span className="min-w-[44px] text-right font-mono text-base font-bold text-foreground">
-                {row.qty}
-                <i className="ml-0.5 font-sans text-[10px] not-italic text-muted-foreground">
-                  {copy.quantityUnit}
-                </i>
-              </span>
+        <>
+          <p className="lnw-note">{copy.wAggNote}</p>
+          {aggRows.length === 0 ? (
+            <div className="lnw-empty-state">
+              <b>{copy.noAggTitle}</b>
+              <span>{copy.noLedgerResultSub}</span>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="lnw-agg">
+              {aggRows.map((row, idx) => (
+                <div className={`lnw-agg__row${row.qty === 0 ? " is-zero" : ""}`} key={`${row.name}-${idx}`}>
+                  <div className="lnw-agg__h">
+                    <span>{row.name}</span>
+                    <span className="num">
+                      {copy.wAggLine.replace("{q}", String(row.qty)).replace("{c}", String(row.count))}
+                    </span>
+                  </div>
+                  <span className="lnw-agg__bar" aria-hidden="true">
+                    <i style={{ width: `${row.qty ? Math.max(4, Math.round((row.qty / maxQty) * 100)) : 0}%` }} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function FilterChip({
-  align = "center",
+/** 도쿄 기준 「M/D」 · 「HH:mm」. */
+function parts(iso: string): { md: string; hm: string } {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+  return { md: `${+g("month")}/${+g("day")}`, hm: `${g("hour")}:${g("minute")}` };
+}
+
+function FilterMenu({
+  align = "left",
   children,
-  icon,
   label,
   onToggle,
   open,
 }: {
-  align?: "center" | "right";
+  align?: "left" | "right";
   children: React.ReactNode;
-  icon: React.ReactNode;
   label: string;
   onToggle: () => void;
   open: boolean;
 }) {
   return (
-    <div className="relative">
-      <button
-        className={cn(
-          "flex h-9 items-center gap-1.5 rounded-full border bg-surface px-3 text-[12.5px] font-bold transition-colors",
-          open ? "border-primary text-primary" : "border-border text-slate-700",
-        )}
-        onClick={onToggle}
-        type="button"
-      >
-        <span className="text-muted-foreground">{icon}</span>
-        <span className="max-w-[110px] truncate">{label}</span>
-        <ChevronDown
-          className="size-[15px] text-slate-400 transition-transform"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-          aria-hidden="true"
-        />
+    <div className="lnw-fmenu">
+      <button aria-expanded={open} className="lnw-fbtn" onClick={onToggle} type="button">
+        <span>{label}</span>
+        <ChevronDown aria-hidden="true" style={{ transform: open ? "rotate(180deg)" : undefined }} />
       </button>
-      {open ? (
-        <ul
-          className={cn(
-            "absolute z-50 mt-1.5 max-h-60 w-48 divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-border bg-surface p-1 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.55)]",
-            align === "right" ? "right-0" : "left-1/2 -translate-x-1/2",
-          )}
-        >
-          {children}
-        </ul>
-      ) : null}
+      {open ? <ul className={`lnw-fmenu__list${align === "right" ? " is-right" : ""}`}>{children}</ul> : null}
     </div>
   );
 }
 
-function FilterOption({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
+function FilterOption({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
-    <li
-      className={cn(
-        "flex h-10 cursor-pointer items-center rounded-lg px-3 text-sm font-semibold transition-colors",
-        active ? "bg-primary/10 text-primary" : "text-slate-700 hover:bg-slate-50",
-      )}
-      onClick={onClick}
-    >
-      {label}
+    <li>
+      <button className={active ? "on" : ""} onClick={onClick} type="button">
+        {label}
+      </button>
     </li>
-  );
-}
-
-function EmptyState({
-  icon,
-  sub,
-  title,
-}: {
-  icon: React.ReactNode;
-  sub?: string;
-  title: string;
-}) {
-  return (
-    <div className="flex flex-col items-center px-6 py-14 text-center">
-      <span className="mb-4 flex size-[60px] items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
-        {icon}
-      </span>
-      <p className="text-[15px] font-extrabold text-foreground">{title}</p>
-      {sub ? <p className="mt-1.5 text-[13px] text-muted-foreground">{sub}</p> : null}
-    </div>
   );
 }

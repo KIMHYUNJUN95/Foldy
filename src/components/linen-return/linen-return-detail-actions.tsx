@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+// 린넨 반품 기록 상세 — 빨간 휴지통 하나 + 삭제 확인 시트. 화이트 리디자인(2026-10-14, 시안 LinenDetail-Phone):
+// 예전 「…」 메뉴(수정 · 삭제)는 없앴다 — 수정은 화면 아래 「기록 수정」, 삭제는 위 줄 오른쪽 끝 휴지통.
+// 확인 시트는 「그대로 두기 · 삭제」(같은 이름 버튼 두 개 금지, 닫기는 한 곳 — 끌어내리기 · 바깥 누르기도 그대로 두기).
+import { useState, useTransition } from "react";
+import { Trash2 } from "lucide-react";
 import { deleteLinenReturnRecord } from "@/app/mobile/linen-return/record/[id]/actions";
-import type { Dictionary } from "@/lib/i18n";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import type { Dictionary } from "@/lib/i18n";
 
 type LinenReturnDetailActionsProps = {
   building: string;
@@ -13,26 +15,9 @@ type LinenReturnDetailActionsProps = {
   recordId: string;
 };
 
-export function LinenReturnDetailActions({
-  building,
-  copy,
-  recordId,
-}: LinenReturnDetailActionsProps) {
-  const router = useRouter();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+export function LinenReturnDetailActions({ copy, recordId }: LinenReturnDetailActionsProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   function handleDelete() {
     const formData = new FormData();
@@ -43,85 +28,30 @@ export function LinenReturnDetailActions({
   }
 
   return (
-    <div className="relative shrink-0" ref={menuRef}>
-      <button
-        aria-label={copy.editAction}
-        className="flex size-9 items-center justify-center rounded-full bg-slate-50 text-slate-700"
-        onClick={() => setOpen((v) => !v)}
-        type="button"
-      >
-        <MoreHorizontal className="size-5" aria-hidden="true" />
+    <>
+      <button aria-label={copy.wDeleteAria} className="lnw-trash" onClick={() => setConfirmOpen(true)} type="button">
+        <Trash2 aria-hidden="true" />
       </button>
-
-      {open ? (
-        <div className="absolute right-0 z-50 mt-1.5 w-40 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.55)]">
-          <button
-            className="flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
-            onClick={() => {
-              setOpen(false);
-              router.push(
-                `/mobile/linen-return/record/${recordId}/edit?building=${encodeURIComponent(building)}`,
-              );
-            }}
-            type="button"
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-            {copy.editAction}
-          </button>
-          <button
-            className="flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-50"
-            onClick={() => {
-              setOpen(false);
-              setConfirmOpen(true);
-            }}
-            type="button"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-            {copy.deleteAction}
-          </button>
-        </div>
-      ) : null}
-
       {confirmOpen ? (
-        <BottomSheet
-          ariaLabel={copy.deleteConfirmTitle}
-          header={
-            <div className="flex items-center gap-3">
-              <span className="flex size-12 items-center justify-center rounded-full bg-red-50 text-red-500">
-                <Trash2 className="size-6" aria-hidden="true" />
-              </span>
-              <p className="text-[17px] font-black tracking-[-0.02em] text-foreground">
-                {copy.deleteConfirmTitle}
-              </p>
-            </div>
-          }
-          onClose={() => setConfirmOpen(false)}
-        >
+        <BottomSheet ariaLabel={copy.deleteConfirmTitle} onClose={() => (isPending ? undefined : setConfirmOpen(false))}>
           {({ close }) => (
-            <>
-              <p className="mt-3 text-sm text-muted-foreground">{copy.deleteConfirmBody}</p>
-              <div className="mt-6 flex gap-2.5">
-                <button
-                  className="h-12 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700 disabled:opacity-50"
-                  disabled={isPending}
-                  onClick={close}
-                  type="button"
-                >
-                  {copy.deleteConfirmCancel}
+            <div className="lnw-sheet">
+              <div className="lnw-sheet__h">
+                <h3>{copy.deleteConfirmTitle}</h3>
+                <span>{copy.deleteConfirmBody}</span>
+              </div>
+              <div className="lnw-sheet__btns">
+                <button className="ofw-btn is-gray" disabled={isPending} onClick={close} type="button">
+                  {copy.wKeepIt}
                 </button>
-                <button
-                  className="h-12 flex-1 rounded-2xl bg-red-500 text-sm font-extrabold text-white transition-colors hover:bg-red-600 disabled:opacity-60"
-                  disabled={isPending}
-                  onClick={handleDelete}
-                  type="button"
-                >
+                <button className="ofw-btn is-danger" disabled={isPending} onClick={handleDelete} type="button">
                   {copy.deleteConfirmConfirm}
                 </button>
               </div>
-            </>
+            </div>
           )}
         </BottomSheet>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -206,8 +206,9 @@ export async function createLinenReturnRecord(formData: FormData) {
     }
 
     revalidateLinenReturnPaths();
+    // merged=1 — 완료 화면이 「오늘 등록한 기록에 합쳐졌어요」를 보여 준다(2026-10-14 화이트 리디자인).
     redirect(
-      `/mobile/linen-return/list?building=${encodeURIComponent(building)}&created=${targetRecord.id}`,
+      `/mobile/linen-return/list?building=${encodeURIComponent(building)}&created=${targetRecord.id}&merged=1`,
     );
   }
 

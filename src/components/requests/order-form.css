@@ -1,0 +1,119 @@
+/* 주문 요청 폼 화이트 리디자인(2026-10-14, 시안 OrderNew-Phone · OrderConfirm-Phone · Order-Fold) —
+   상자 없는 한 장 · 이름표(notched) 칸 · 가로선만 · 보라 #7A52E6. 폴드 · 태블릿은 520px 가운데 열. */
+.ofw-head { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 18px; }
+.ofw-head h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
+.ofw-head p { margin: 0; font-size: 13px; color: #6b6878; }
+.ofw-page { width: 100%; max-width: 520px; margin: 0 auto; padding-bottom: 32px; }
+.ofw-page .ofw-error { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: #c5282e; }
+.ofw { display: flex; flex-direction: column; gap: 22px; }
+.ofw .num { font-variant-numeric: tabular-nums; }
+.ofw-sec { display: flex; flex-direction: column; gap: 16px; }
+.ofw-sec + .ofw-sec { padding-top: 20px; border-top: 1px solid #f1f1f4; }
+.ofw-sec__h { display: flex; align-items: baseline; justify-content: space-between; }
+.ofw-sec__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.ofw-sec__h span { font-size: 12px; color: #6b6878; }
+.ofw-items { gap: 0; }
+.ofw-hint { margin: 2px 0 8px; font-size: 12px; color: #6b6878; }
+.ofw-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 13px; font-weight: 600; color: #5a30cf; }
+.ofw-banner.is-err { color: #a8641c; }
+.ofw-banner button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: none; color: inherit; }
+.ofw-banner svg { width: 16px; height: 16px; }
+
+/* 이름표 칸 */
+.ofw-nf { position: relative; min-width: 0; }
+.ofw-nf__l { position: absolute; top: -8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; white-space: nowrap; pointer-events: none; transition: color 150ms ease; }
+.ofw-nf:focus-within > .ofw-nf__l { color: #5a30cf; }
+.ofw-nf__in { display: flex; align-items: center; box-sizing: border-box; width: 100%; height: 48px; padding: 0 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 15px; color: #16141f; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.ofw-nf__in:focus, .ofw-nf__in:focus-visible { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
+.ofw-nf__in::placeholder { color: #8b8898; }
+.ofw-nf__in.is-err { border-color: #c5282e; }
+.ofw-ta { display: block; height: auto; min-height: 76px; padding: 12px 14px; line-height: 1.5; resize: none; }
+.ofw-ro { justify-content: space-between; }
+.ofw-ro em { font-style: normal; font-size: 12px; color: #6b6878; }
+.ofw-grow { flex: 1; }
+
+/* 건물 고르기 */
+.ofw-dd { z-index: 5; }
+.ofw-dd.is-open { z-index: 30; }
+.ofw-dd__btn { justify-content: space-between; text-align: left; cursor: pointer; }
+.ofw-dd__btn.is-ph span { color: #8b8898; }
+.ofw-dd__btn svg { width: 16px; height: 16px; color: #8b8898; transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
+.ofw-dd.is-open .ofw-dd__btn svg { transform: rotate(180deg); }
+.ofw-dd__menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: 264px; margin: 0; padding: 6px; list-style: none; overflow-y: auto; border-radius: 14px; background: #fff; box-shadow: 0 18px 40px -18px rgba(22, 20, 31, .35), 0 0 0 1px rgba(22, 20, 31, .05); transform-origin: top center; animation: ofw-menu 180ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes ofw-menu { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.ofw-dd__menu button { display: flex; align-items: center; width: 100%; height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: none; font: inherit; font-size: 15px; color: #16141f; text-align: left; cursor: pointer; }
+.ofw-dd__menu button:active { background: #f4f4f7; }
+.ofw-dd__menu button.on { background: #f4f1fd; color: #5a30cf; font-weight: 600; }
+
+/* 품목 줄 */
+.ofw-item { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 8px; border-top: 1px solid #f3f3f6; animation: ofw-in 280ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes ofw-in { from { opacity: 0; transform: translateY(6px); } }
+.ofw-item__top { display: flex; gap: 8px; }
+.ofw-qty { width: 76px; flex: none; }
+.ofw-qty .ofw-nf__in { justify-content: center; text-align: center; }
+.ofw-item__bar { display: flex; align-items: center; gap: 2px; }
+.ofw-shop { display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 6px; height: 44px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 13px; color: #6b6878; text-align: left; cursor: pointer; }
+.ofw-shop span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ofw-shop svg { width: 14px; height: 14px; flex: none; }
+.ofw-shop.is-open { color: #5a30cf; font-weight: 600; }
+.ofw-ib { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; height: 44px; padding: 0 6px; border: 0; border-radius: 12px; background: none; font: inherit; font-size: 12px; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.ofw-ib:active { background: #f4f4f7; transform: scale(.94); }
+.ofw-ib:disabled { opacity: .4; }
+.ofw-ib svg { width: 18px; height: 18px; }
+.ofw-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.ofw-thumb { position: relative; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: #f2f2f5; animation: ofw-pop 240ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes ofw-pop { from { opacity: 0; transform: scale(.92); } }
+.ofw-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ofw-thumb button { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(22, 20, 31, .62); color: #fff; }
+.ofw-thumb button svg { width: 12px; height: 12px; }
+.ofw-more { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 4px; animation: ofw-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+.ofw-more__link { display: flex; gap: 8px; }
+.ofw-paste { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border: 0; border-radius: 12px; background: #f4f1fd; color: #5a30cf; cursor: pointer; transition: transform 140ms ease; }
+.ofw-paste:active { transform: scale(.94); }
+.ofw-paste svg { width: 18px; height: 18px; }
+.ofw-find { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: -4px; }
+.ofw-find a { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; font-size: 13px; font-weight: 500; color: #5a30cf; }
+.ofw-find svg { width: 12px; height: 12px; }
+.ofw-warn { margin: -6px 0 0; font-size: 12px; color: #a8641c; }
+.ofw-err { margin: 0; font-size: 13px; font-weight: 600; color: #c5282e; }
+.ofw-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; margin-top: 4px; border: 0; border-radius: 12px; background: none; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.ofw-add:active { background: #f4f1fd; transform: scale(.98); }
+.ofw-add svg { width: 16px; height: 16px; }
+
+/* 긴급도 · 보내기 */
+.ofw-urg { display: flex; flex-direction: column; gap: 8px; }
+.ofw-k { font-size: 13px; font-weight: 600; color: #3a3746; }
+.ofw-seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: 10px; background: #f2f2f5; }
+.ofw-seg button { min-width: 64px; height: 38px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 14px; color: #6b6878; cursor: pointer; transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.ofw-seg button.on { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
+.ofw-seg button.on:last-child { color: #c5282e; }
+.ofw-submit, .ofw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 50px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease, opacity 150ms ease; }
+.ofw-submit { background: #7a52e6; color: #fff; }
+.ofw-submit:active, .ofw-btn:active { transform: scale(.98); }
+.ofw-submit:disabled, .ofw-btn:disabled { opacity: .55; }
+.ofw-btn.is-gray { background: #f4f4f7; color: #3a3746; }
+.ofw-btn.is-pri { background: #7a52e6; color: #fff; }
+.ofw-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: ofw-spin 700ms linear infinite; }
+@keyframes ofw-spin { to { transform: rotate(360deg); } }
+
+/* 확인 시트 */
+.ofw-sheet { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+.ofw-sheet__h { display: flex; flex-direction: column; gap: 4px; }
+.ofw-sheet__h h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.ofw-sheet__h span { font-size: 13px; color: #6b6878; }
+.ofw-sheet__list { display: flex; flex-direction: column; max-height: 40vh; overflow-y: auto; }
+.ofw-sheet__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; border-top: 1px solid #f3f3f6; font-size: 14px; color: #16141f; }
+.ofw-sheet__row span { min-width: 0; overflow-wrap: anywhere; }
+.ofw-sheet__row b { flex: none; font-weight: 600; }
+.ofw-sheet__sum { display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #f1f1f4; font-size: 13px; color: #6b6878; }
+.ofw-sheet__btns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ofw-item, .ofw-more, .ofw-thumb, .ofw-dd__menu { animation: none; }
+  .ofw-dd__btn svg { transition: none; }
+}
+
+/* 키보드 포커스(web-design-guidelines 점검) */
+.ofw-shop:focus-visible, .ofw-ib:focus-visible, .ofw-add:focus-visible, .ofw-paste:focus-visible, .ofw-seg button:focus-visible,
+.ofw-submit:focus-visible, .ofw-btn:focus-visible, .ofw-dd__menu button:focus-visible, .ofw-find a:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.ofw-shop, .ofw-ib, .ofw-add, .ofw-submit, .ofw-btn, .ofw-seg button { touch-action: manipulation; }

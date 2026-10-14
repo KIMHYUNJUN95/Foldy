@@ -213,6 +213,13 @@ type OrderCopy = {
   sectionTitle: string;
   statusLabels: Record<OrderStatus, string>;
   deliveryDateShort: string;
+  groupActive: string;
+  groupDeliv: string;
+  groupPast: string;
+  arriveToday: string;
+  arriveTomorrow: string;
+  arriveOn: string;
+  reqOn: string;
 };
 
 type DeliveryCalendarCopy = {
@@ -226,6 +233,8 @@ type DeliveryCalendarCopy = {
   nextMonth: string;
   countTemplate: string;
   rangeLabel: string;
+  monthCountTemplate: string;
+  tomorrow: string;
 };
 
 type EnrichedOrder = OrderRequestWithReporter & {
@@ -772,7 +781,7 @@ export function RequestsFilterView({
   ];
 
   // One row list for every tab — kinds mixed on 「전체」, grouped by Tokyo date.
-  type Row = { key: string; time: string; node: React.ReactNode; active?: boolean; daysLeft?: number };
+  type Row = { key: string; time: string; node: React.ReactNode; active?: boolean; daysLeft?: number; orderGroup?: "active" | "deliv" | "past"; sortKey?: string };
   const rows: Row[] = [
     ...visibleLostItems.map((item) => {
       // 보관 중이면 시각 대신 자동 폐기까지 D-day(만료면 +n). 3일 이내 · 만료는 빨간 상태 글자.
@@ -830,9 +839,28 @@ export function RequestsFilterView({
     })),
     ...visibleOrders.map((order) => {
       const win = formatDeliveryDateWindow(order.delivery_start_date, order.delivery_end_date, order.delivery_date, locale);
+      // 비품 주문 탭 묶음(2026-10-14 시안 Order-Tablet): 처리 중(요청됨 · 승인됨) → 배송 예정(주문 처리됨 · 배송이 오늘 이후) → 지난 요청.
+      const delivEnd = order.delivery_end_date ?? order.delivery_date;
+      const delivStart = order.delivery_start_date ?? order.delivery_date;
+      const isOrdered = order.status === "ordered" || order.status === "received";
+      const orderGroup: "active" | "deliv" | "past" =
+        order.status === "requested" || order.status === "approved"
+          ? "active"
+          : isOrdered && delivEnd && delivEnd >= todayKey
+            ? "deliv"
+            : "past";
+      const arrive = (() => {
+        if (!isOrdered || !delivStart) return null;
+        if (delivStart === todayKey) return orderCopy.arriveToday;
+        if (delivStart === shiftDateKey(todayKey, 1)) return orderCopy.arriveTomorrow;
+        return orderCopy.arriveOn.replace("{d}", `${+delivStart.slice(5, 7)}/${+delivStart.slice(8, 10)}`);
+      })();
+      const reqDay = tokyoDateKey(order.created_at);
       return {
         key: `o-${order.id}`,
         time: order.created_at,
+        orderGroup,
+        sortKey: orderGroup === "deliv" ? (delivStart ?? "") : order.created_at,
         node: (
           <RequestListCard
             key={order.id}
@@ -843,7 +871,11 @@ export function RequestsFilterView({
               order.room_label,
               localizePropertyName(order.building_name, buildingLabels),
               order.reporter_name,
-              win ? `${orderCopy.deliveryDateShort} ${win}` : formatTime(order.created_at, locale),
+              typeFilter === "order"
+                ? (arrive ?? orderCopy.reqOn.replace("{d}", `${+reqDay.slice(5, 7)}/${+reqDay.slice(8, 10)}`))
+                : win
+                  ? `${orderCopy.deliveryDateShort} ${win}`
+                  : formatTime(order.created_at, locale),
             ]}
             statusLabel={orderCopy.statusLabels[order.status]}
             statusTone={activeOrderStatuses.has(order.status) ? "open" : "done"}
@@ -869,7 +901,21 @@ export function RequestsFilterView({
           },
           { key: "lf-closed", label: lostFoundCopy.groupClosed, items: rows.filter((r) => !r.active) },
         ].filter((g) => g.items.length > 0)
-      : groupByDate(rows, (r) => r.time);
+      : typeFilter === "order"
+        ? [
+            {
+              key: "o-active",
+              label: orderCopy.groupActive,
+              items: rows.filter((r) => r.orderGroup === "active").sort((x, y) => (x.time < y.time ? -1 : 1)),
+            },
+            {
+              key: "o-deliv",
+              label: orderCopy.groupDeliv,
+              items: rows.filter((r) => r.orderGroup === "deliv").sort((x, y) => ((x.sortKey ?? "") < (y.sortKey ?? "") ? -1 : 1)),
+            },
+            { key: "o-past", label: orderCopy.groupPast, items: rows.filter((r) => r.orderGroup === "past") },
+          ].filter((g) => g.items.length > 0)
+        : groupByDate(rows, (r) => r.time);
 
   return (
     <div className="space-y-4">
@@ -1239,6 +1285,8 @@ export function RequestsFilterView({
             nextMonth: deliveryCalendarCopy.nextMonth,
             countTemplate: deliveryCalendarCopy.countTemplate,
             rangeLabel: deliveryCalendarCopy.rangeLabel,
+            monthCountTemplate: deliveryCalendarCopy.monthCountTemplate,
+            tomorrow: deliveryCalendarCopy.tomorrow,
           }}
           locale={locale}
           onClose={() => setDeliveryCalOpen(false)}

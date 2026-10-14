@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, ChevronRight as RowChevron } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { OrderRequestStatus as OrderStatus } from "@/lib/order-requests";
 import { cn } from "@/lib/utils";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { tokyoToday } from "@/lib/tokyo-date";
+import { haptic } from "@/lib/haptics";
+import "@/components/requests/order-detail.css";
 
 /**
  * Order delivery calendar — a bottom sheet with a large month grid of supply-order deliveries.
@@ -40,6 +42,8 @@ type Copy = {
   nextMonth: string;
   countTemplate: string;
   rangeLabel: string;
+  monthCountTemplate: string;
+  tomorrow: string;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -53,13 +57,13 @@ function dayMatches(order: DeliveryCalendarOrder, iso: string): boolean {
   return order.deliveryDate === iso;
 }
 
-function formatDeliveryDate(value: string, locale: Locale) {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat(locale, {
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Tokyo",
-  }).format(new Date(Date.UTC(y, m - 1, d, 3, 0, 0)));
+function formatDeliveryDate(value: string) {
+  return `${+value.slice(5, 7)}/${+value.slice(8, 10)}`;
+}
+
+function nextDay(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
 export function OrderDeliveryCalendar({
@@ -119,211 +123,115 @@ export function OrderDeliveryCalendar({
   };
 
   const weekdays = Array.from({ length: 7 }, (_, i) =>
-    new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(
-      new Date(Date.UTC(2025, 0, 5 + i)),
-    ),
+    new Intl.DateTimeFormat(locale, { weekday: "narrow", timeZone: "UTC" }).format(new Date(Date.UTC(2025, 0, 5 + i))),
   );
 
   const cells: React.ReactNode[] = [];
   for (let i = 0; i < first; i++) cells.push(<span key={`pad-${i}`} />);
   for (let d = 1; d <= daysIn; d++) {
     const iso = `${monthPrefix}-${pad(d)}`;
-    const list = ordersOnDay(iso);
-    const isT = iso === today;
-    const isSel = iso === selected;
-    const w = (first + d - 1) % 7;
+    const has = ordersOnDay(iso).length > 0;
     cells.push(
       <button
-        className={cn(
-          "flex aspect-square flex-col items-center justify-start gap-1 rounded-xl pt-2 text-[14px] font-bold transition-colors",
-          isSel
-            ? "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_hsl(var(--primary-hsl)/0.7)]"
-            : isT
-              ? "bg-primary/[0.07] text-primary ring-1 ring-inset ring-primary/25"
-              : "text-foreground hover:bg-slate-50",
-        )}
+        aria-pressed={iso === selected}
+        className={cn("odc-day", iso === selected && "is-sel", iso === today && "is-today", has && "has")}
         key={iso}
-        onClick={() => setSelected(iso)}
+        onClick={() => {
+          haptic("light");
+          setSelected(iso);
+        }}
         type="button"
       >
-        <span
-          className={cn(
-            !isSel && !isT && w === 0 && "text-rose-500",
-            !isSel && !isT && w === 6 && "text-blue-600",
-          )}
-        >
-          {d}
-        </span>
-        <span className="flex h-1.5 items-center gap-0.5">
-          {list.slice(0, 3).map((_, i) => (
-            <span
-              className={cn("size-1 rounded-full", isSel ? "bg-primary-foreground/80" : "bg-primary")}
-              key={i}
-            />
-          ))}
-        </span>
+        {d}
       </button>,
     );
   }
 
   const selectedList = selected ? ordersOnDay(selected) : [];
   const selectedLabel = selected
-    ? new Intl.DateTimeFormat(locale, {
-        month: "long",
-        day: "numeric",
-        weekday: "short",
-        timeZone: "Asia/Tokyo",
-      }).format(new Date(`${selected}T00:00:00+09:00`))
+    ? new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(
+        new Date(`${selected}T00:00:00Z`),
+      )
     : null;
+  const rel = selected === today ? copy.today : selected === nextDay(today) ? copy.tomorrow : null;
 
-  const monthCount = useMemo(() => {
-    let n = 0;
-    for (let d = 1; d <= daysIn; d++) {
-      if (ordersOnDay(`${monthPrefix}-${pad(d)}`).length > 0) n++;
-    }
-    return n;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthPrefix, daysIn, deliverable]);
+  // 이번 달(보이는 달) 배송 건수 — 같은 주문이 기간으로 여러 날에 걸쳐도 한 번만 센다.
+  const monthCount = deliverable.filter((o) => {
+    const s0 = o.deliveryStartDate ?? o.deliveryDate ?? "";
+    const e0 = o.deliveryEndDate ?? o.deliveryDate ?? "";
+    return s0.slice(0, 7) <= monthPrefix && e0.slice(0, 7) >= monthPrefix;
+  }).length;
 
   return (
     <BottomSheet
       ariaLabel={copy.title}
       className="max-h-[88dvh] flex flex-col"
       header={
-        <div className="flex items-center gap-2 pb-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-primary/[0.09] text-primary">
-            <CalendarDays className="size-[17px]" aria-hidden="true" />
-          </span>
-          <p className="text-[16px] font-black tracking-[-0.01em] text-foreground">{copy.title}</p>
+        <div className="odc-h">
+          <h3>{copy.title}</h3>
+          <span>{copy.monthCountTemplate.replace("{n}", String(monthCount))}</span>
         </div>
       }
       onClose={onClose}
       zIndexClassName="z-[120]"
     >
       {() => (
-        <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5">
-          {/* Month nav */}
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <button
-                aria-label={copy.previousMonth}
-                className="flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
-                onClick={() => shiftMonth(-1)}
-                type="button"
-              >
-                <ChevronLeft className="size-[18px]" aria-hidden="true" />
-              </button>
-              <span className="min-w-[124px] text-center text-[15px] font-black tracking-[-0.01em] text-foreground">
-                {monthLabel}
-              </span>
-              <button
-                aria-label={copy.nextMonth}
-                className="flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
-                onClick={() => shiftMonth(1)}
-                type="button"
-              >
-                <ChevronRight className="size-[18px]" aria-hidden="true" />
-              </button>
-            </div>
+        <div className="odc -mx-5 min-h-0 flex-1 overflow-y-auto px-5">
+          {/* 화이트 리디자인(2026-10-14, 시안 OrderCalSheet-Phone): 달 이동 · 일요일 시작 달력(배송 있는 날 보라 점) → 고른 날 배송 줄. */}
+          <div className="odc-nav">
+            <button aria-label={copy.previousMonth} onClick={() => shiftMonth(-1)} type="button">
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <b>{monthLabel}</b>
+            <button aria-label={copy.nextMonth} onClick={() => shiftMonth(1)} type="button">
+              <ChevronRight aria-hidden="true" />
+            </button>
             {!isCurrentMonth ? (
-              <button
-                className="inline-flex items-center gap-1 rounded-full bg-primary/[0.07] px-3 py-1.5 text-[12px] font-bold text-primary transition-colors hover:bg-primary/10"
-                onClick={goToday}
-                type="button"
-              >
-                <CalendarDays className="size-3.5" aria-hidden="true" />
+              <button className="odc-today" onClick={goToday} type="button">
                 {copy.today}
               </button>
             ) : null}
           </div>
-
-          {/* Weekday row */}
-          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-muted-foreground">
+          <div className="odc-g odc-wd">
             {weekdays.map((label, i) => (
-              <span className={cn(i === 0 && "text-rose-500", i === 6 && "text-blue-600")} key={i}>
-                {label}
-              </span>
+              <span key={i}>{label}</span>
             ))}
           </div>
-          <div className="mt-1.5 grid grid-cols-7 gap-1">{cells}</div>
+          <div className="odc-g">{cells}</div>
 
-          {/* Month summary / empty */}
-          {monthCount === 0 ? (
-            <div className="mt-4 flex flex-col items-center rounded-[18px] border border-dashed border-border bg-surface/60 px-6 py-8 text-center">
-              <span className="mb-2.5 flex size-10 items-center justify-center rounded-full bg-slate-50 text-slate-400">
-                <CalendarDays className="size-5" aria-hidden="true" />
-              </span>
-              <p className="text-[12.5px] font-semibold text-muted-foreground">{copy.empty}</p>
-            </div>
-          ) : null}
+          {monthCount === 0 ? <p className="odc-empty">{copy.empty}</p> : null}
 
-          {/* Selected day detail */}
           {selected ? (
-            <div className="mt-4">
-              <div className="mb-2 flex items-center gap-2 px-0.5">
-                <span
-                  className={cn(
-                    "text-[13px] font-black tracking-[-0.01em]",
-                    selected === today ? "text-primary" : "text-foreground",
-                  )}
-                >
-                  {selectedLabel}
-                </span>
-                {selected === today ? (
-                  <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-bold text-primary">
-                    {copy.today}
-                  </span>
-                ) : null}
+            <div className="odc-day-list">
+              <div className="odc-dh">
+                <b>{selectedLabel}</b>
+                {rel ? <em>{rel}</em> : null}
                 {selectedList.length > 0 ? (
-                  <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-                    {copy.countTemplate.replace("{n}", String(selectedList.length))}
-                  </span>
+                  <span>{copy.countTemplate.replace("{n}", String(selectedList.length))}</span>
                 ) : null}
               </div>
-
               {selectedList.length === 0 ? (
-                <p className="px-0.5 py-3 text-[12.5px] text-muted-foreground">{copy.dayEmpty}</p>
+                <p className="odc-empty">{copy.dayEmpty}</p>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {selectedList.map((o) => {
-                    const building = buildingLabels[o.buildingName] ?? o.buildingName;
-                    const place = o.roomLabel && o.roomLabel !== "-" ? `${building} · ${o.roomLabel}` : building;
-                    const isRange = Boolean(o.deliveryStartDate && o.deliveryEndDate);
-                    return (
-                      <button
-                        className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors active:bg-slate-50"
-                        key={o.id}
-                        onClick={() => onOpenOrder(o.id)}
-                        type="button"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-1.5">
-                            <span className="truncate text-[14px] font-bold tracking-[-0.01em] text-foreground">
-                              {o.title}
-                            </span>
-                            <span className="shrink-0 rounded-full bg-primary/[0.08] px-1.5 py-px text-[10px] font-bold text-primary">
-                              {statusLabels[o.status] ?? o.status}
-                            </span>
-                          </span>
-                          <span className="mt-1 block truncate text-[12px] text-muted-foreground">{place}</span>
-                          <span className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                            <span className="inline-flex size-[18px] items-center justify-center rounded-full bg-slate-100 text-[9.5px] font-extrabold text-slate-600">
-                              {o.reporterName.slice(0, 1)}
-                            </span>
-                            <span className="truncate">{o.reporterName}</span>
-                            {isRange ? (
-                              <span className="ml-1 shrink-0 text-muted-foreground/80">
-                                · {copy.rangeLabel}: {formatDeliveryDate(o.deliveryStartDate!, locale)} ~{" "}
-                                {formatDeliveryDate(o.deliveryEndDate!, locale)}
-                              </span>
-                            ) : null}
-                          </span>
+                selectedList.map((o) => {
+                  const building = buildingLabels[o.buildingName] ?? o.buildingName;
+                  const place = o.roomLabel && o.roomLabel !== "-" ? `${building} · ${o.roomLabel}` : building;
+                  const isRange = Boolean(o.deliveryStartDate && o.deliveryEndDate && o.deliveryStartDate !== o.deliveryEndDate);
+                  return (
+                    <button className="odc-row" key={o.id} onClick={() => onOpenOrder(o.id)} type="button">
+                      <span className="odc-row__b">
+                        <b>{o.title}</b>
+                        <span>
+                          {place} · {o.reporterName}
+                          {isRange
+                            ? ` · ${formatDeliveryDate(o.deliveryStartDate!)} – ${formatDeliveryDate(o.deliveryEndDate!)}`
+                            : ""}
                         </span>
-                        <RowChevron className="mt-1 size-4 shrink-0 text-slate-300" aria-hidden="true" />
-                      </button>
-                    );
-                  })}
-                </div>
+                      </span>
+                      <span className="odc-row__st">{statusLabels[o.status] ?? o.status}</span>
+                    </button>
+                  );
+                })
               )}
             </div>
           ) : null}

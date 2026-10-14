@@ -1,7 +1,9 @@
-﻿"use client";
+// 주문 요청 폼 — 품목 한 줄. 화이트 리디자인(2026-10-14, 시안 OrderNew-Phone): 이름표 칸(품목 이름 · 수량) →
+// [쇼핑몰 검색(링크가 있으면 주소)] · 사진(n/5) · × → 펼치면 상품 링크 + 붙여넣기 · Amazon/IKEA 에서 찾기 · 메모.
+"use client";
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { Camera, Clipboard, ExternalLink, Link2, Minus, Plus, Trash2, X } from "lucide-react";
+import { memo, useCallback, useId, useRef, useState } from "react";
+import { Camera, Clipboard, ExternalLink, Search, X } from "lucide-react";
 import type { PreviewItem } from "@/components/announcements/announcement-image-uploader";
 import type { Dictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -65,8 +67,18 @@ type OrderItemRowProps = {
   photos: PreviewItem[];
 };
 
-const INPUT_CLASS =
-  "h-11 w-full rounded-xl border border-border bg-background/65 px-3 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-[#315F91] focus:ring-2 focus:ring-[#315F91]/20";
+/** 상품 링크의 짧은 주소(「amazon.co.jp」 · 「ikea.com/jp」). 링크가 없거나 형식이 아니면 null. */
+function linkHost(link: string): string | null {
+  const trimmed = link.trim();
+  if (!trimmed) return null;
+  try {
+    const u = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    const host = u.hostname.replace(/^www\./, "");
+    return host === "ikea.com" && u.pathname.startsWith("/jp") ? "ikea.com/jp" : host;
+  } catch {
+    return null;
+  }
+}
 
 function normalizeQuantity(value: string) {
   const digits = value.replace(/[^0-9]/g, "");
@@ -133,253 +145,146 @@ function OrderItemRowComponent({
     [item.id, onPhotosChange, photos],
   );
 
-  function renderItemCardTitle(indexValue: number) {
-    if (typeof copy.itemCardTitle === "function") {
-      return copy.itemCardTitle(indexValue);
-    }
-    return `Item ${indexValue}`;
-  }
-
-  const quantityNumber = Number(item.quantity || "0");
-  const domainLabel = useMemo(() => {
-    if (domain === "amazon") return copy.domainAmazon;
-    if (domain === "ikea") return copy.domainIkea;
-    if (domain === "other") return copy.domainOther;
-    return null;
-  }, [copy, domain]);
-
   const hasLinkWarning = item.link.trim().length > 0 && domain === null;
-
-  function updateQuantity(next: number) {
-    onChange(item.id, { quantity: String(Math.max(1, next)) });
-  }
+  const host = linkHost(item.link);
+  // 품목 id 는 클라이언트에서 무작위로 만들어져 서버 HTML 과 달라진다 — 라벨 연결은 useId 로(하이드레이션 불일치 방지).
+  const uid = useId();
+  const nameId = `${uid}-name`;
+  const qtyId = `${uid}-qty`;
 
   return (
-    <article className="rounded-2xl border border-border bg-surface/78 p-3.5 shadow-glass backdrop-blur-xl">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#EAF1F8] text-xs font-black text-[#1F3A5F]">
-            {index + 1}
-          </div>
-          <h3 className="truncate text-sm font-black text-foreground">
-            {renderItemCardTitle(index + 1)}
-          </h3>
-        </div>
-        {canRemove ? (
-          <button
-            aria-label={`${copy.removeItem} ${index + 1}`}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
-            onClick={() => onRemove(item.id)}
-            type="button"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-          </button>
-        ) : null}
-      </div>
-
-      <div className="space-y-3">
-        <label className="block space-y-1.5">
-          <span className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-            {copy.itemName}
-          </span>
+    <div className="ofw-item">
+      <div className="ofw-item__top">
+        <div className="ofw-nf ofw-grow">
+          <label className="ofw-nf__l" htmlFor={nameId}>
+            {copy.wItemName}
+          </label>
           <input
+            id={nameId}
             autoComplete="off"
-            className={cn(INPUT_CLASS, errors.includes("name") && "border-destructive focus:border-destructive focus:ring-destructive/20")}
+            className={cn("ofw-nf__in", errors.includes("name") && "is-err")}
             onChange={(event) => onChange(item.id, { name: event.target.value })}
             placeholder={copy.itemNamePlaceholder}
             type="text"
             value={item.name}
           />
-        </label>
-
-        <div className="space-y-1.5">
-          <span className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-            {copy.quantity}
-          </span>
-          <div className="grid grid-cols-[44px_1fr_44px] gap-2">
-            <button
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-background/65 text-foreground transition-colors hover:bg-muted/70 disabled:opacity-40"
-              disabled={quantityNumber <= 1}
-              onClick={() => updateQuantity(quantityNumber - 1)}
-              type="button"
-            >
-              <Minus className="size-4" aria-hidden="true" />
-            </button>
-            <input
-              autoComplete="off"
-              className={cn(INPUT_CLASS, "text-center text-base font-black", errors.includes("quantity") && "border-destructive focus:border-destructive focus:ring-destructive/20")}
-              inputMode="numeric"
-              onChange={(event) => onChange(item.id, { quantity: normalizeQuantity(event.target.value) })}
-              placeholder={copy.quantityPlaceholder}
-              type="text"
-              value={item.quantity}
-            />
-            <button
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-background/65 text-foreground transition-colors hover:bg-muted/70"
-              onClick={() => updateQuantity(quantityNumber + 1)}
-              type="button"
-            >
-              <Plus className="size-4" aria-hidden="true" />
-            </button>
-          </div>
         </div>
-
-        {/* 쇼핑몰 검색 + 사진 추가 버튼 행 */}
-        <div className="flex gap-2">
-          <button
-            className="inline-flex min-h-11 flex-1 items-center justify-between rounded-xl border border-dashed border-border bg-background/45 px-3 text-left text-sm font-bold text-[#1F3A5F] transition-colors hover:bg-[#EAF1F8]/70"
-            onClick={() => setAdvancedOpen((open) => !open)}
-            type="button"
-          >
-            <span>{copy.itemAdvancedToggle}</span>
-            <span className="text-xs text-muted-foreground">
-              {advancedOpen ? "-" : "+"}
-            </span>
-          </button>
-
-          {/* 사진 추가 버튼 */}
-          <button
-            aria-label={imgCopy.addPhotos}
-            className={cn(
-              "relative inline-flex min-h-11 min-w-[72px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-background/45 px-2.5 text-xs font-bold transition-colors",
-              photos.length >= MAX_PHOTOS
-                ? "cursor-not-allowed text-muted-foreground/50"
-                : "text-[#1F3A5F] hover:bg-[#EAF1F8]/70",
-            )}
-            disabled={photos.length >= MAX_PHOTOS}
-            onClick={() => fileInputRef.current?.click()}
-            type="button"
-          >
-            <Camera className="size-4 shrink-0" aria-hidden="true" />
-            <span>
-              {photos.length}/{MAX_PHOTOS}
-            </span>
-          </button>
+        <div className="ofw-nf ofw-qty">
+          <label className="ofw-nf__l" htmlFor={qtyId}>
+            {copy.quantity}
+          </label>
           <input
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            aria-hidden="true"
-            className="sr-only"
-            multiple
-            onChange={handlePhotoChange}
-            ref={fileInputRef}
-            type="file"
+            id={qtyId}
+            autoComplete="off"
+            className={cn("ofw-nf__in", errors.includes("quantity") && "is-err")}
+            inputMode="numeric"
+            onChange={(event) => onChange(item.id, { quantity: normalizeQuantity(event.target.value) })}
+            placeholder={copy.quantityPlaceholder}
+            type="text"
+            value={item.quantity}
           />
         </div>
+      </div>
 
-        {/* 사진 에러 메시지 */}
-        {photoError ? (
-          <p className="text-xs font-semibold text-destructive">{photoError}</p>
-        ) : null}
-
-        {/* 사진 썸네일 */}
-        {photos.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {photos.map((photo) => (
-              <div className="relative" key={photo.id}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt=""
-                  className="size-16 rounded-xl border border-border object-cover"
-                  src={photo.previewUrl}
-                />
-                <button
-                  aria-label={imgCopy.remove}
-                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-destructive hover:text-white"
-                  onClick={() => removePhoto(photo.id)}
-                  type="button"
-                >
-                  <X className="size-3" aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {advancedOpen ? (
-          <div className="space-y-3 rounded-xl border border-border/80 bg-background/45 p-3">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-                  {copy.referenceUrl}
-                </span>
-                {domainLabel ? (
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide",
-                    domain === "amazon" && "bg-orange-50 text-orange-700",
-                    domain === "ikea" && "bg-blue-50 text-blue-700",
-                    domain === "other" && "bg-muted text-muted-foreground",
-                  )}>
-                    {domainLabel}
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex gap-2">
-                <div className="relative min-w-0 flex-1">
-                  <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <input
-                    autoComplete="off"
-                    className={cn(INPUT_CLASS, "pl-9")}
-                    onChange={(event) => onChange(item.id, { link: event.target.value })}
-                    placeholder={copy.referenceUrlPlaceholder}
-                    type="url"
-                    value={item.link}
-                  />
-                </div>
-                <button
-                  aria-label={copy.pasteLink}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-border bg-background/70 text-[#315F91] transition-colors hover:bg-[#EAF1F8]"
-                  onClick={() => onPasteLink(item.id)}
-                  type="button"
-                >
-                  <Clipboard className="size-4" aria-hidden="true" />
-                </button>
-              </div>
-              {hasLinkWarning ? (
-                <p className="text-xs font-semibold text-amber-600">
-                  {copy.linkWarning}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-background/70 text-sm font-bold text-foreground transition-colors hover:bg-muted/70"
-                href="https://www.amazon.co.jp/?ref_=abn_logo"
-                rel="noreferrer"
-                target="_blank"
-              >
-                Amazon
-                <ExternalLink className="size-3.5" aria-hidden="true" />
-              </a>
-              <a
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-background/70 text-sm font-bold text-foreground transition-colors hover:bg-muted/70"
-                href="https://www.ikea.com/jp/ja/"
-                rel="noreferrer"
-                target="_blank"
-              >
-                IKEA
-                <ExternalLink className="size-3.5" aria-hidden="true" />
-              </a>
-            </div>
-
-            <label className="block space-y-1.5">
-              <span className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-                {copy.itemMemo}
-              </span>
-              <textarea
-                className="min-h-20 w-full resize-none rounded-xl border border-border bg-background/65 px-3 py-2.5 text-sm font-medium text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-[#315F91] focus:ring-2 focus:ring-[#315F91]/20"
-                onChange={(event) => onChange(item.id, { memo: event.target.value })}
-                placeholder={copy.itemMemoPlaceholder}
-                rows={3}
-                value={item.memo}
-              />
-            </label>
-          </div>
+      <div className="ofw-item__bar">
+        <button
+          aria-expanded={advancedOpen}
+          className={cn("ofw-shop", advancedOpen && "is-open", host && "has-link")}
+          onClick={() => setAdvancedOpen((open) => !open)}
+          type="button"
+        >
+          {host ? <ExternalLink aria-hidden="true" /> : <Search aria-hidden="true" />}
+          <span>{host ?? copy.itemAdvancedToggle}</span>
+        </button>
+        <button
+          aria-label={imgCopy.addPhotos}
+          className="ofw-ib"
+          disabled={photos.length >= MAX_PHOTOS}
+          onClick={() => fileInputRef.current?.click()}
+          type="button"
+        >
+          <Camera aria-hidden="true" />
+          {photos.length > 0 ? <span className="num">{photos.length}/{MAX_PHOTOS}</span> : null}
+        </button>
+        <input
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          aria-hidden="true"
+          className="sr-only"
+          multiple
+          onChange={handlePhotoChange}
+          ref={fileInputRef}
+          tabIndex={-1}
+          type="file"
+        />
+        {canRemove ? (
+          <button aria-label={`${copy.removeItem} ${index + 1}`} className="ofw-ib" onClick={() => onRemove(item.id)} type="button">
+            <X aria-hidden="true" />
+          </button>
         ) : null}
       </div>
-    </article>
+
+      {photoError ? <p className="ofw-err">{photoError}</p> : null}
+
+      {photos.length > 0 ? (
+        <div className="ofw-thumbs">
+          {photos.map((photo) => (
+            <div className="ofw-thumb" key={photo.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="" src={photo.previewUrl} />
+              <button aria-label={imgCopy.remove} onClick={() => removePhoto(photo.id)} type="button">
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {advancedOpen ? (
+        <div className="ofw-more">
+          <div className="ofw-more__link">
+            <div className="ofw-nf ofw-grow">
+              <span className="ofw-nf__l">{copy.wLink}</span>
+              <input
+                aria-label={copy.wLink}
+                autoComplete="off"
+                className="ofw-nf__in"
+                onChange={(event) => onChange(item.id, { link: event.target.value })}
+                placeholder={copy.referenceUrlPlaceholder}
+                type="url"
+                value={item.link}
+              />
+            </div>
+            <button aria-label={copy.pasteLink} className="ofw-paste" onClick={() => onPasteLink(item.id)} type="button">
+              <Clipboard aria-hidden="true" />
+            </button>
+          </div>
+          {hasLinkWarning ? <p className="ofw-warn">{copy.linkWarning}</p> : null}
+          <div className="ofw-find">
+            <a href="https://www.amazon.co.jp/?ref_=abn_logo" rel="noreferrer" target="_blank">
+              {copy.wFindAmazon}
+              <ExternalLink aria-hidden="true" />
+            </a>
+            <a href="https://www.ikea.com/jp/ja/" rel="noreferrer" target="_blank">
+              {copy.wFindIkea}
+              <ExternalLink aria-hidden="true" />
+            </a>
+          </div>
+          <div className="ofw-nf">
+            <span className="ofw-nf__l">{copy.wMemoOpt}</span>
+            <input
+              aria-label={copy.wMemoOpt}
+              autoComplete="off"
+              className="ofw-nf__in"
+              onChange={(event) => onChange(item.id, { memo: event.target.value })}
+              placeholder={copy.itemMemoPlaceholder}
+              type="text"
+              value={item.memo}
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 export const OrderItemRow = memo(OrderItemRowComponent);
-

@@ -1,65 +1,59 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+// 모바일 주문 상세 — 사무실 처리 줄. 화이트 리디자인(2026-10-14, 시안 OrderOffice-Phone · OrderProcess-Phone ·
+// OrderReject-Phone): 지금 할 수 있는 버튼만 보인다 — 요청됨 = [반려][승인], 승인됨 = [반려][주문 처리],
+// 주문 처리됨 = [반려][배송일 수정], 종료 = 없음. 주문 처리 · 배송일 수정은 공용 BottomSheet 안 달력(하루/기간),
+// 반려는 사유를 받는 시트(되돌리기 어려운 동작이라 확인 — ui-ux-pro-max 점검). 승인은 바로 처리.
+// 성공하면 성공 진동 + 위에 한 줄 안내(체크가 그려짐).
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
-import {
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  PackageCheck,
-  X,
-  XCircle,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   updateOrderDeliveryDate,
   updateOrderRequestStatus,
 } from "@/app/mobile/requests/orders/actions";
-import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { PermissionDeniedSheet } from "@/components/shell/permission-denied-sheet";
-import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
-import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
+import { tokyoToday } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 import type { Locale } from "@/lib/i18n";
 
-type OrderAction = "approve" | "ordered" | "reject" | "edit-delivery";
 type OrderStatus = Database["public"]["Enums"]["order_request_status"];
+type Sheet = "ordered" | "edit-delivery" | "reject";
 
-type OrderActionBarLabels = {
+export type OrderActionBarLabels = {
   actionApprove: string;
   actionMarkOrdered: string;
   actionReject: string;
+  actionEditDelivery: string;
   successApprove: string;
   successOrdered: string;
   successReject: string;
-  successBody: string;
-  done: string;
+  successEditDelivery: string;
   errorInvalidTransition: string;
   errorSaveFailed: string;
-  deliveryDateLabel: string;
-  deliveryDatePlaceholder: string;
   deliveryDateRequired: string;
   deliveryDateInvalid: string;
   deliveryRangeRequired: string;
   deliveryRangeInvalid: string;
-  deliveryModeExact: string;
-  deliveryModeRange: string;
-  deliveryStartDateLabel: string;
-  deliveryEndDateLabel: string;
-  actionProcessOrderWithDateTitle: string;
-  actionProcessOrderWithDateBody: string;
-  actionEditDelivery: string;
-  editDeliveryTitle: string;
-  editDeliveryBody: string;
-  successEditDelivery: string;
-  hintStatusRequested: string;
-  hintStatusApproved: string;
-  hintStatusOrdered: string;
-  hintStatusClosed: string;
   calPrevMonth: string;
   calNextMonth: string;
+  wHintRequested: string;
+  wHintApproved: string;
+  wHintOrdered: string;
+  wProcessBody: string;
+  wEditDelivBody: string;
+  wDay: string;
+  wRange: string;
+  wDelivPreview: string;
+  wPickEnd: string;
+  wPickDay: string;
+  wRejectTitle: string;
+  wRejectBody: string;
+  wRejectReason: string;
+  wRejectPh: string;
+  wKeep: string;
   permissionDeniedTitle: string;
   permissionDeniedBody: string;
   close: string;
@@ -69,207 +63,101 @@ type OrderActionBarProps = {
   labels: OrderActionBarLabels;
   locale: Locale;
   orderId: string;
+  /** 시트 머리에 보일 「제목 · 건물」. */
+  summary: string;
   status: OrderStatus;
-  /** Which shell this renders inside — picks the permission-denied UI (mobile sheet vs admin toast). */
-  surface: "mobile" | "admin";
   currentDeliveryDate?: string | null;
   currentDeliveryStartDate?: string | null;
   currentDeliveryEndDate?: string | null;
 };
 
-const ACTION_ICON = {
-  approve: CheckCircle2,
-  ordered: PackageCheck,
-  reject: XCircle,
-  "edit-delivery": PackageCheck,
-} as const;
-
-// ─── Calendar utilities ───────────────────────────────────────────────────────
-
-function toIsoDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
-function addMonthsTo(base: Date, n: number): Date {
-  return new Date(base.getFullYear(), base.getMonth() + n, 1);
+function keyOf(y: number, m0: number, d: number): string {
+  return `${y}-${pad(m0 + 1)}-${pad(d)}`;
 }
 
-function buildCalendarCells(month: Date): (string | null)[] {
-  const firstWeekday = month.getDay();
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < firstWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(toIsoDate(new Date(month.getFullYear(), month.getMonth(), d)));
-  }
-  return cells;
-}
-
-function getShortWeekdays(locale: Locale): string[] {
-  const fmt = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
-  return Array.from({ length: 7 }, (_, i) =>
-    fmt.format(new Date(Date.UTC(2021, 7, 1 + i))),
+function dayLabel(key: string, locale: Locale): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(
+    new Date(Date.UTC(y, m - 1, d)),
   );
 }
 
-function formatDeliveryPreview(
-  startIso: string,
-  endIso: string,
-  locale: Locale,
-): string {
-  const fmt = new Intl.DateTimeFormat(locale, {
-    month: "short",
-    day: "numeric",
-    timeZone: "Asia/Tokyo",
-  });
-  const toDisplay = (iso: string) => {
-    const [y, m, d] = iso.split("-").map(Number);
-    return fmt.format(new Date(Date.UTC(y, m - 1, d, 3, 0, 0)));
-  };
-  if (!endIso || startIso === endIso) return toDisplay(startIso);
-  return `${toDisplay(startIso)} - ${toDisplay(endIso)}`;
-}
-
-// ─── Inline Delivery Calendar ─────────────────────────────────────────────────
-
-type DeliveryCalendarProps = {
-  calNextMonth: string;
-  calPrevMonth: string;
-  endDate: string;
-  locale: Locale;
-  mode: "exact" | "range";
-  onDayClick: (iso: string) => void;
-  onNextMonth: () => void;
-  onPrevMonth: () => void;
-  selectedDate: string;
-  startDate: string;
-  viewMonth: Date;
-};
-
-function DeliveryCalendar({
-  calNextMonth,
-  calPrevMonth,
-  endDate,
+function Calendar({
   locale,
+  labels,
+  todayKey,
   mode,
-  onDayClick,
-  onNextMonth,
-  onPrevMonth,
-  selectedDate,
-  startDate,
-  viewMonth,
-}: DeliveryCalendarProps) {
-  const weekdays = useMemo(() => getShortWeekdays(locale), [locale]);
-  const cells = useMemo(() => buildCalendarCells(viewMonth), [viewMonth]);
-  const todayIso = toIsoDate(new Date());
-
-  const monthLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(viewMonth),
-    [locale, viewMonth],
+  date,
+  start,
+  end,
+  onPick,
+}: {
+  locale: Locale;
+  labels: OrderActionBarLabels;
+  todayKey: string;
+  mode: "exact" | "range";
+  date: string;
+  start: string;
+  end: string;
+  onPick: (key: string) => void;
+}) {
+  const seed = (mode === "range" ? start : date) || todayKey;
+  const [month, setMonth] = useState(() => ({ y: +seed.slice(0, 4), m: +seed.slice(5, 7) - 1 }));
+  const first = new Date(Date.UTC(month.y, month.m, 1)).getUTCDay(); // 일요일 시작(모바일 달력과 같음)
+  const days = new Date(Date.UTC(month.y, month.m + 1, 0)).getUTCDate();
+  const wd = Array.from({ length: 7 }, (_, i) =>
+    new Intl.DateTimeFormat(locale, { weekday: "narrow", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 7, 2 + i))),
   );
-
-  const rangeStart = mode === "exact" ? selectedDate : startDate;
-  const rangeEnd   = mode === "exact" ? selectedDate : (endDate || startDate);
-  const isSinglePoint = rangeStart === rangeEnd;
+  const title = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", timeZone: "UTC" }).format(
+    new Date(Date.UTC(month.y, month.m, 1)),
+  );
+  const move = (delta: number) =>
+    setMonth((cur) => {
+      const total = cur.y * 12 + cur.m + delta;
+      return { y: Math.floor(total / 12), m: ((total % 12) + 12) % 12 };
+    });
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/40 bg-background/35 backdrop-blur-sm">
-      {/* Month header */}
-      <div className="flex items-center justify-between px-3 pb-2 pt-3">
-        <button
-          aria-label={calPrevMonth}
-          className="flex size-8 items-center justify-center rounded-xl border border-border/50 bg-background/60 text-muted-foreground transition-all active:scale-90 hover:border-border hover:text-foreground"
-          onClick={onPrevMonth}
-          type="button"
-        >
-          <ChevronLeft className="size-3.5" />
+    <div className="odw-cal">
+      <div className="odw-cal__h">
+        <button type="button" aria-label={labels.calPrevMonth} onClick={() => move(-1)}>
+          <ChevronLeft aria-hidden="true" />
         </button>
-        <span className="text-[13px] font-black tracking-tight text-foreground">
-          {monthLabel}
-        </span>
-        <button
-          aria-label={calNextMonth}
-          className="flex size-8 items-center justify-center rounded-xl border border-border/50 bg-background/60 text-muted-foreground transition-all active:scale-90 hover:border-border hover:text-foreground"
-          onClick={onNextMonth}
-          type="button"
-        >
-          <ChevronRight className="size-3.5" />
+        <b>{title}</b>
+        <button type="button" aria-label={labels.calNextMonth} onClick={() => move(1)}>
+          <ChevronRight aria-hidden="true" />
         </button>
       </div>
-
-      {/* Weekday header */}
-      <div className="grid grid-cols-7 px-2">
-        {weekdays.map((wd, i) => (
-          <div
-            className={cn(
-              "py-1 text-center text-[9px] font-black uppercase tracking-widest",
-              i === 0 ? "text-rose-500/70" : i === 6 ? "text-[#315F91]/70" : "text-muted-foreground/50",
-            )}
-            key={wd}
-          >
-            {wd.replace(/[.\s]/g, "").slice(0, 2)}
-          </div>
+      <div className="odw-cal__g odw-cal__wd">
+        {wd.map((d, i) => (
+          <span key={i}>{d}</span>
         ))}
       </div>
-
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-y-0.5 px-2 pb-3">
-        {cells.map((iso, idx) => {
-          if (!iso) return <div key={`g${idx}`} />;
-
-          const isStart  = iso === rangeStart;
-          const isEnd    = iso === rangeEnd;
-          const inRange  = Boolean(rangeStart && rangeEnd && iso > rangeStart && iso < rangeEnd);
-          const isEdge   = isStart || isEnd;
-          const isToday  = iso === todayIso;
-          const dayNum   = Number(iso.slice(8, 10));
-
+      <div className="odw-cal__g">
+        {Array.from({ length: first }, (_, i) => (
+          <span key={`b${i}`} />
+        ))}
+        {Array.from({ length: days }, (_, i) => {
+          const key = keyOf(month.y, month.m, i + 1);
+          const sel = mode === "exact" ? key === date : key === start || key === end;
+          const inRange = mode === "range" && start && end && key > start && key < end;
           return (
-            <div
-              className="relative flex items-center justify-center"
-              key={iso}
+            <button
+              key={key}
+              type="button"
+              aria-pressed={sel}
+              className={`odw-day${sel ? " is-sel" : ""}${inRange ? " is-in" : ""}${key === todayKey ? " is-today" : ""}`}
+              onClick={() => {
+                haptic("light");
+                onPick(key);
+              }}
             >
-              {/* Range fill strip */}
-              {inRange && (
-                <span
-                  aria-hidden
-                  className="absolute inset-y-[3px] inset-x-0 bg-[#EAF1F8]"
-                />
-              )}
-              {/* Edge half-caps */}
-              {isEdge && !isSinglePoint && (
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute inset-y-[3px] w-[52%] bg-[#EAF1F8]",
-                    isStart ? "right-0" : "left-0",
-                  )}
-                />
-              )}
-
-              <button
-                aria-pressed={isEdge}
-                className={cn(
-                  "relative z-10 flex size-[38px] items-center justify-center rounded-full text-[13px] font-semibold transition-all active:scale-90",
-                  isEdge
-                    ? "bg-[#315F91] font-black text-white shadow-[0_4px_12px_-3px_rgba(49,95,145,0.55)]"
-                    : inRange
-                      ? "font-semibold text-[#1F3A5F]"
-                      : "text-foreground hover:bg-muted/60",
-                  isToday && !isEdge
-                    ? "ring-[1.5px] ring-[#315F91]/35 ring-offset-1 ring-offset-transparent"
-                    : "",
-                )}
-                onClick={() => onDayClick(iso)}
-                type="button"
-              >
-                {dayNum}
-              </button>
-            </div>
+              {i + 1}
+            </button>
           );
         })}
       </div>
@@ -277,453 +165,244 @@ function DeliveryCalendar({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
 export function OrderActionBar({
   labels,
   locale,
   orderId,
+  summary,
   status,
-  surface,
   currentDeliveryDate,
   currentDeliveryStartDate,
   currentDeliveryEndDate,
 }: OrderActionBarProps) {
   const router = useRouter();
-  const [activeAction, setActiveAction]         = useState<OrderAction | null>(null);
-  const [isPending, setIsPending]               = useState(false);
-  const [errorMessage, setErrorMessage]         = useState<string | null>(null);
+  const todayKey = useMemo(() => tokyoToday(), []);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const adminToast = useAdminToast();
-  const [deliveryMode, setDeliveryMode]         = useState<"exact" | "range">("exact");
-  const [deliveryDate, setDeliveryDate]         = useState("");
-  const [deliveryStartDate, setDeliveryStartDate] = useState("");
-  const [deliveryEndDate, setDeliveryEndDate]   = useState("");
-  const [calViewMonth, setCalViewMonth]         = useState<Date>(() => new Date());
+  const [mode, setMode] = useState<"exact" | "range">("exact");
+  const [date, setDate] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [reason, setReason] = useState("");
 
-  const close = useCallback(() => {
-    setActiveAction(null);
-    setDeliveryMode("exact");
-    setDeliveryDate("");
-    setDeliveryStartDate("");
-    setDeliveryEndDate("");
-    setErrorMessage(null);
-    setCalViewMonth(new Date());
-  }, []);
-
-  useBodyScrollLock(Boolean(activeAction));
-
-  useEffect(() => {
-    if (!activeAction) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [activeAction, close]);
-
-  const isOrdered = activeAction === "ordered";
-  const isReject  = activeAction === "reject";
-  const isDeliveryEdit = activeAction === "edit-delivery";
-  // Both "process order" and "edit delivery" show the delivery-date picker as a bottom sheet.
-  const showsDelivery = isOrdered || isDeliveryEdit;
-
-  // iOS-style drag-to-dismiss — only the mobile bottom-sheet variants (delivery picker) get a grab
-  // handle; the centered confirm/reject dialog is excluded.
-  const sheetDrag = useSheetDragDismiss({ shown: showsDelivery, onDismiss: close });
-  const Icon      = activeAction ? ACTION_ICON[activeAction] : Check;
-
-  const modalTitle = isDeliveryEdit
-    ? labels.editDeliveryTitle
-    : isOrdered
-      ? labels.actionProcessOrderWithDateTitle
-      : activeAction === "approve"
-        ? labels.successApprove
-        : labels.successReject;
-
-  const modalBody = isDeliveryEdit
-    ? labels.editDeliveryBody
-    : isOrdered
-      ? labels.actionProcessOrderWithDateBody
-      : labels.successBody;
-
-  const hasValidDelivery =
-    deliveryMode === "exact"
-      ? Boolean(deliveryDate)
-      : Boolean(deliveryStartDate && deliveryEndDate);
-
-  const isConfirmDisabled = isPending || (showsDelivery && !hasValidDelivery);
-
-  function handleCalendarDayClick(iso: string) {
-    if (deliveryMode === "exact") {
-      setDeliveryDate(iso);
-      setErrorMessage(null);
-      return;
-    }
-    // Range: first click sets start, second sets end (auto-swap)
-    if (!deliveryStartDate || (deliveryStartDate && deliveryEndDate)) {
-      setDeliveryStartDate(iso);
-      setDeliveryEndDate("");
-      setErrorMessage(null);
-      return;
-    }
-    if (iso < deliveryStartDate) {
-      setDeliveryEndDate(deliveryStartDate);
-      setDeliveryStartDate(iso);
+  function openDelivery(kind: "ordered" | "edit-delivery") {
+    if (kind === "edit-delivery" && currentDeliveryStartDate && currentDeliveryEndDate) {
+      setMode("range");
+      setStart(currentDeliveryStartDate);
+      setEnd(currentDeliveryEndDate);
+      setDate("");
     } else {
-      setDeliveryEndDate(iso);
+      setMode("exact");
+      setDate(kind === "edit-delivery" ? (currentDeliveryDate ?? "") : "");
+      setStart("");
+      setEnd("");
     }
-    setErrorMessage(null);
+    setError(null);
+    setSheet(kind);
   }
 
-  const deliveryPreview = useMemo(() => {
-    if (deliveryMode === "exact" && deliveryDate)
-      return formatDeliveryPreview(deliveryDate, deliveryDate, locale);
-    if (deliveryMode === "range" && deliveryStartDate)
-      return formatDeliveryPreview(deliveryStartDate, deliveryEndDate, locale);
-    return null;
-  }, [deliveryMode, deliveryDate, deliveryStartDate, deliveryEndDate, locale]);
+  function pick(key: string) {
+    setError(null);
+    if (mode === "exact") {
+      setDate(key);
+      return;
+    }
+    if (!start || (start && end)) {
+      setStart(key);
+      setEnd("");
+    } else if (key < start) {
+      setEnd(start);
+      setStart(key);
+    } else {
+      setEnd(key);
+    }
+  }
 
-  async function handleConfirmAction() {
-    if (!activeAction || isPending) return;
-    setIsPending(true);
-    setErrorMessage(null);
-
-    // Editing an already-ordered request's delivery date — status stays "ordered".
-    const result = isDeliveryEdit
-      ? await updateOrderDeliveryDate({
-          orderId,
-          ...(deliveryMode === "exact"
-            ? { deliveryMode, deliveryDate }
-            : { deliveryMode, deliveryStartDate, deliveryEndDate }),
-        })
-      : await updateOrderRequestStatus({
-          orderId,
-          targetStatus:
-            activeAction === "approve" ? "approved" :
-            activeAction === "ordered" ? "ordered"  : "closed",
-          ...(activeAction === "ordered"
-            ? deliveryMode === "exact"
-              ? { deliveryMode, deliveryDate }
-              : { deliveryMode, deliveryStartDate, deliveryEndDate }
-            : {}),
-        });
-    setIsPending(false);
+  async function run(kind: "approve" | Sheet, close?: () => void) {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    const delivery =
+      mode === "exact"
+        ? { deliveryMode: "exact" as const, deliveryDate: date }
+        : { deliveryMode: "range" as const, deliveryStartDate: start, deliveryEndDate: end };
+    const result =
+      kind === "edit-delivery"
+        ? await updateOrderDeliveryDate({ orderId, ...delivery })
+        : await updateOrderRequestStatus({
+            orderId,
+            targetStatus: kind === "approve" ? "approved" : kind === "ordered" ? "ordered" : "closed",
+            ...(kind === "ordered" ? delivery : {}),
+            ...(kind === "reject" ? { reason } : {}),
+          });
+    setPending(false);
 
     if (!result.ok) {
       if (result.error === "unauthorized" || result.error === "forbidden") {
-        close();
-        if (surface === "admin") {
-          adminToast.showToast(labels.permissionDeniedBody, true);
-        } else {
-          setPermissionDenied(true);
-        }
+        close?.();
+        setPermissionDenied(true);
         return;
       }
-      setErrorMessage(
-        result.error === "invalid_transition"      ? labels.errorInvalidTransition :
-        result.error === "missing_delivery_date"   ? labels.deliveryDateRequired :
-        result.error === "invalid_delivery_date"   ? labels.deliveryDateInvalid :
-        result.error === "missing_delivery_range"  ? labels.deliveryRangeRequired :
-        result.error === "invalid_delivery_range"  ? labels.deliveryRangeInvalid :
-        labels.errorSaveFailed,
+      haptic("error");
+      setError(
+        result.error === "invalid_transition"
+          ? labels.errorInvalidTransition
+          : result.error === "missing_delivery_date"
+            ? labels.deliveryDateRequired
+            : result.error === "invalid_delivery_date"
+              ? labels.deliveryDateInvalid
+              : result.error === "missing_delivery_range"
+                ? labels.deliveryRangeRequired
+                : result.error === "invalid_delivery_range"
+                  ? labels.deliveryRangeInvalid
+                  : labels.errorSaveFailed,
       );
       return;
     }
 
-    setActiveAction(null);
+    haptic("success");
+    setDone(
+      kind === "approve"
+        ? labels.successApprove
+        : kind === "ordered"
+          ? labels.successOrdered
+          : kind === "edit-delivery"
+            ? labels.successEditDelivery
+            : labels.successReject,
+    );
+    close?.();
     router.refresh();
   }
 
-  const canApprove = status === "requested";
-  const canOrdered = status === "approved";
-  const canReject  = status !== "closed";
+  const valid = mode === "exact" ? Boolean(date) : Boolean(start && end);
+  const preview =
+    mode === "exact"
+      ? date
+        ? dayLabel(date, locale)
+        : labels.wPickDay
+      : start
+        ? end
+          ? `${dayLabel(start, locale)} – ${dayLabel(end, locale)}`
+          : `${dayLabel(start, locale)} – ${labels.wPickEnd}`
+        : labels.wPickDay;
 
-  const statusHint =
-    status === "closed"    ? labels.hintStatusClosed :
-    status === "ordered"   ? labels.hintStatusOrdered :
-    status === "approved"  ? labels.hintStatusApproved :
-    status === "requested" ? labels.hintStatusRequested :
-    null;
+  const hint =
+    status === "requested" ? labels.wHintRequested : status === "approved" ? labels.wHintApproved : status === "ordered" ? labels.wHintOrdered : null;
+
+  if (status === "closed" && !done) return null;
 
   return (
     <>
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface/85 p-2.5 shadow-glass backdrop-blur-xl">
-          {status === "ordered" ? (
-            <button
-              className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#C9D8E8] bg-[#EAF1F8] text-sm font-bold text-[#1F3A5F] transition-colors hover:bg-[#DCE8F4] active:scale-[0.98]"
-              disabled={isPending}
-              onClick={() => {
-                if (currentDeliveryStartDate && currentDeliveryEndDate) {
-                  setDeliveryMode("range");
-                  setDeliveryStartDate(currentDeliveryStartDate);
-                  setDeliveryEndDate(currentDeliveryEndDate);
-                  setDeliveryDate("");
-                } else {
-                  setDeliveryMode("exact");
-                  setDeliveryDate(currentDeliveryDate ?? "");
-                  setDeliveryStartDate("");
-                  setDeliveryEndDate("");
-                }
-                setCalViewMonth(
-                  currentDeliveryDate ? new Date(`${currentDeliveryDate}T00:00:00`) : new Date(),
-                );
-                setErrorMessage(null);
-                setActiveAction("edit-delivery");
-              }}
-              type="button"
-            >
-              <PackageCheck className="size-4" aria-hidden="true" />
-              {labels.actionEditDelivery}
+      {done ? (
+        <p className="odw-done" role="status">
+          <span aria-hidden="true">
+            <Check />
+          </span>
+          {done}
+        </p>
+      ) : null}
+
+      {status !== "closed" && status !== "received" ? (
+        <div className="odw-act">
+          <div className="odw-act__btns">
+            <button type="button" className="odw-btn is-gray" disabled={pending} onClick={() => { setReason(""); setError(null); setSheet("reject"); }}>
+              {labels.actionReject}
             </button>
-          ) : null}
-          <button
-            className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 text-sm font-bold text-red-600 transition-colors hover:bg-red-100/80 active:scale-[0.98]"
-            disabled={!canReject || isPending}
-            onClick={() => { setErrorMessage(null); setActiveAction("reject"); }}
-            type="button"
-          >
-            <X className="size-4" aria-hidden="true" />
-            {labels.actionReject}
-          </button>
-          {status !== "ordered" ? (
-            <>
-              <button
-                className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#C9D8E8] bg-[#EAF1F8] text-sm font-bold text-[#1F3A5F] transition-colors hover:bg-[#DCE8F4] active:scale-[0.98]"
-                disabled={!canOrdered || isPending}
-                onClick={() => {
-                  setDeliveryMode("exact");
-                  setDeliveryDate("");
-                  setDeliveryStartDate("");
-                  setDeliveryEndDate("");
-                  setCalViewMonth(new Date());
-                  setErrorMessage(null);
-                  setActiveAction("ordered");
-                }}
-                type="button"
-              >
-                <PackageCheck className="size-4" aria-hidden="true" />
-                {labels.actionMarkOrdered}
-              </button>
-              <button
-                className="inline-flex h-12 flex-[1.4] items-center justify-center gap-1.5 rounded-xl bg-[#315F91] text-sm font-black text-white shadow-sm transition-colors hover:bg-[#274D76] active:scale-[0.98]"
-                disabled={!canApprove || isPending}
-                onClick={() => { setErrorMessage(null); setActiveAction("approve"); }}
-                type="button"
-              >
-                <Check className="size-4" aria-hidden="true" />
+            {status === "requested" ? (
+              <button type="button" className="odw-btn is-pri" disabled={pending} onClick={() => run("approve")}>
                 {labels.actionApprove}
               </button>
-            </>
-          ) : null}
+            ) : status === "approved" ? (
+              <button type="button" className="odw-btn is-pri" disabled={pending} onClick={() => openDelivery("ordered")}>
+                {labels.actionMarkOrdered}
+              </button>
+            ) : (
+              <button type="button" className="odw-btn is-soft" disabled={pending} onClick={() => openDelivery("edit-delivery")}>
+                {labels.actionEditDelivery}
+              </button>
+            )}
+          </div>
+          {error && !sheet ? <p className="odw-err">{error}</p> : hint ? <p className="odw-hint">{hint}</p> : null}
         </div>
-        {statusHint ? (
-          <p className="px-1 text-center text-[11px] font-medium text-muted-foreground/70">
-            {statusHint}
-          </p>
-        ) : null}
-      </div>
+      ) : null}
 
-      {activeAction && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              aria-labelledby="order-action-modal-title"
-              aria-modal="true"
-              className={cn(
-                "fixed inset-0 z-[100] flex min-h-dvh justify-center px-6 py-8",
-                showsDelivery ? "items-end sm:items-center" : "items-center",
-              )}
-              role="dialog"
-            >
-              <button
-                aria-hidden="true"
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl"
-                onClick={close}
-                style={showsDelivery ? sheetDrag.scrimStyle : undefined}
-                tabIndex={-1}
-                type="button"
-              />
-
-              <div
-                className={cn(
-                  "relative flex w-full flex-col overflow-hidden border border-white/55 bg-surface shadow-[0_28px_90px_-34px_rgba(15,23,42,0.7)]",
-                  showsDelivery
-                    ? "max-h-[92dvh] rounded-t-[28px] sm:max-h-none sm:max-w-[400px] sm:rounded-[28px]"
-                    : "max-w-[360px] rounded-[28px] sm:mx-auto",
-                )}
-                data-sheet
-                style={
-                  showsDelivery && sheetDrag.dragging
-                    ? sheetDrag.sheetStyle
-                    : { animation: "modal-card-in 280ms cubic-bezier(0.34,1.26,0.64,1) both" }
-                }
-              >
-                {/* Drag handle (mobile) — doubles as the drag-to-dismiss grip. */}
-                {showsDelivery ? (
-                  <div
-                    className="flex shrink-0 justify-center pb-1 pt-2.5 sm:hidden"
-                    {...sheetDrag.handleProps}
-                  >
-                    <div className="h-1 w-10 rounded-full bg-border/60" />
-                  </div>
-                ) : null}
-
-                {/* ── Scrollable body ── */}
-                <div
-                  className={cn(
-                    "flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pb-3 text-center",
-                    showsDelivery ? "pt-4" : "pt-8",
-                  )}
-                >
-                  {/* Icon */}
-                  <div
-                    className={cn(
-                      "relative mb-4 flex size-16 items-center justify-center overflow-hidden rounded-full ring-1",
-                      showsDelivery
-                        ? "bg-[#EAF1F8] text-[#315F91] ring-[#C9D8E8]"
-                        : isReject
-                          ? "bg-red-50 text-red-500 ring-red-200/70"
-                          : "bg-[#EAF1F8] text-[#315F91] ring-[#C9D8E8]",
-                    )}
-                  >
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/55 to-transparent"
-                    />
-                    <Icon className="relative size-8" aria-hidden="true" />
-                  </div>
-
-                  <h3
-                    className="text-xl font-black tracking-tight text-foreground"
-                    id="order-action-modal-title"
-                  >
-                    {modalTitle}
-                  </h3>
-                  <p className="mt-1.5 text-sm font-medium leading-6 text-muted-foreground">
-                    {modalBody}
-                  </p>
-
-                  {/* ── Delivery date picker ── */}
-                  {showsDelivery ? (
-                    <div className="mt-5 w-full text-left">
-                      {/* Mode toggle */}
-                      <div className="mb-3 inline-flex w-full items-center gap-1 rounded-xl border border-border/60 bg-background/55 p-1">
-                        <button
-                          className={cn(
-                            "inline-flex h-9 flex-1 items-center justify-center rounded-lg text-xs font-black transition-all",
-                            deliveryMode === "exact"
-                              ? "bg-[#315F91] text-white shadow-sm"
-                              : "text-muted-foreground hover:text-foreground",
-                          )}
-                          onClick={() => {
-                            setDeliveryMode("exact");
-                            setErrorMessage(null);
-                          }}
-                          type="button"
-                        >
-                          {labels.deliveryModeExact}
-                        </button>
-                        <button
-                          className={cn(
-                            "inline-flex h-9 flex-1 items-center justify-center rounded-lg text-xs font-black transition-all",
-                            deliveryMode === "range"
-                              ? "bg-[#315F91] text-white shadow-sm"
-                              : "text-muted-foreground hover:text-foreground",
-                          )}
-                          onClick={() => {
-                            setDeliveryMode("range");
-                            setErrorMessage(null);
-                          }}
-                          type="button"
-                        >
-                          {labels.deliveryModeRange}
-                        </button>
-                      </div>
-
-                      {/* Range mode hint */}
-                      {deliveryMode === "range" && (
-                        <p className="mb-2 text-[11px] font-medium text-muted-foreground/80">
-                          {!deliveryStartDate || (deliveryStartDate && deliveryEndDate)
-                            ? labels.deliveryStartDateLabel
-                            : labels.deliveryEndDateLabel}
-                        </p>
-                      )}
-
-                      {/* Inline calendar */}
-                      <DeliveryCalendar
-                        calNextMonth={labels.calNextMonth}
-                        calPrevMonth={labels.calPrevMonth}
-                        endDate={deliveryEndDate}
-                        locale={locale}
-                        mode={deliveryMode}
-                        onDayClick={handleCalendarDayClick}
-                        onNextMonth={() => setCalViewMonth((m) => addMonthsTo(m, 1))}
-                        onPrevMonth={() => setCalViewMonth((m) => addMonthsTo(m, -1))}
-                        selectedDate={deliveryDate}
-                        startDate={deliveryStartDate}
-                        viewMonth={calViewMonth}
-                      />
-
-                      {/* Selected date preview */}
-                      {deliveryPreview ? (
-                        <div className="mt-2.5 flex items-center justify-center gap-2 rounded-xl border border-[#C9D8E8]/60 bg-[#EAF1F8] px-3 py-2.5">
-                          <PackageCheck className="size-3.5 shrink-0 text-[#315F91]" aria-hidden="true" />
-                          <p className="text-[13px] font-black text-[#315F91]">
-                            {deliveryPreview}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="mt-2.5 h-10 rounded-xl border border-dashed border-border/50" />
-                      )}
-                    </div>
-                  ) : null}
-
-                  {errorMessage ? (
-                    <p className="mt-3 text-xs font-semibold text-destructive">{errorMessage}</p>
-                  ) : null}
-                </div>
-
-                {/* ── Fixed footer (항상 화면에 노출) ── */}
-                <div
-                  className={cn(
-                    "shrink-0 px-6 pb-6 pt-3",
-                    showsDelivery && "border-t border-border/20",
-                  )}
-                >
-                  <button
-                    className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#315F91] text-sm font-black text-white shadow-sm transition-colors hover:bg-[#274D76] disabled:opacity-40"
-                    disabled={isConfirmDisabled}
-                    onClick={handleConfirmAction}
-                    type="button"
-                  >
-                    {isPending ? (
-                      <span className="flex items-center gap-2">
-                        <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        {labels.done}
-                      </span>
-                    ) : (
-                      labels.done
-                    )}
-                  </button>
-                </div>
+      {sheet === "ordered" || sheet === "edit-delivery" ? (
+        <BottomSheet ariaLabel={sheet === "ordered" ? labels.actionMarkOrdered : labels.actionEditDelivery} onClose={() => setSheet(null)}>
+          {({ close }) => (
+            <div className="odw-sheet">
+              <div className="odw-sheet__h">
+                <h3>{sheet === "ordered" ? labels.actionMarkOrdered : labels.actionEditDelivery}</h3>
+                <span>{summary}</span>
               </div>
-            </div>,
-            document.body,
-          )
-        : null}
+              <p className="odw-sheet__p">{sheet === "ordered" ? labels.wProcessBody : labels.wEditDelivBody}</p>
+              <div className="odw-seg" role="radiogroup">
+                {(["exact", "range"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === m}
+                    className={mode === m ? "on" : ""}
+                    onClick={() => {
+                      setMode(m);
+                      setError(null);
+                    }}
+                  >
+                    {m === "exact" ? labels.wDay : labels.wRange}
+                  </button>
+                ))}
+              </div>
+              <Calendar locale={locale} labels={labels} todayKey={todayKey} mode={mode} date={date} start={start} end={end} onPick={pick} />
+              <div className="odw-sheet__sum">
+                <span>{labels.wDelivPreview}</span>
+                <b className={valid ? "" : "is-dim"}>{preview}</b>
+              </div>
+              {error ? <p className="odw-err">{error}</p> : null}
+              <button type="button" className="odw-btn is-pri is-lg" disabled={!valid || pending} onClick={() => run(sheet, close)}>
+                {sheet === "ordered" ? labels.actionMarkOrdered : labels.actionEditDelivery}
+              </button>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
 
-      {surface === "mobile" && permissionDenied ? (
+      {sheet === "reject" ? (
+        <BottomSheet ariaLabel={labels.wRejectTitle} onClose={() => setSheet(null)}>
+          {({ close }) => (
+            <div className="odw-sheet">
+              <div className="odw-sheet__h">
+                <h3>{labels.wRejectTitle}</h3>
+                <span>{summary}</span>
+              </div>
+              <p className="odw-sheet__p">{labels.wRejectBody}</p>
+              <label className="mdw-nf">
+                <span className="mdw-nf__l">{labels.wRejectReason}</span>
+                <textarea className="mdw-nf__in" rows={3} value={reason} placeholder={labels.wRejectPh} onChange={(e) => setReason(e.target.value)} />
+              </label>
+              {error ? <p className="odw-err">{error}</p> : null}
+              <div className="odw-act__btns">
+                <button type="button" className="odw-btn is-gray is-lg" onClick={close}>
+                  {labels.wKeep}
+                </button>
+                <button type="button" className="odw-btn is-ink is-lg" disabled={pending} onClick={() => run("reject", close)}>
+                  {labels.actionReject}
+                </button>
+              </div>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
+
+      {permissionDenied ? (
         <PermissionDeniedSheet
           body={labels.permissionDeniedBody}
           closeLabel={labels.close}
           onClose={() => setPermissionDenied(false)}
           title={labels.permissionDeniedTitle}
         />
-      ) : null}
-
-      {surface === "admin" && adminToast.toast ? (
-        <AdminToast message={adminToast.toast.message} onDismiss={adminToast.dismiss} />
       ) : null}
     </>
   );

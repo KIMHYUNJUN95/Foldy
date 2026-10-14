@@ -42,7 +42,7 @@ import { buildingOptionsOf, copyOf, localeTagOf, type OrdersFilters } from "./or
 import { OrdersExportBar } from "./orders-export-bar";
 import { OrdersQueue } from "./orders-queue";
 import { OrdersList } from "./orders-list";
-import { OrdersCalendar, type CalMonth } from "./orders-calendar";
+import { OrdersCalendar, OrdersMonthNav, type CalMonth } from "./orders-calendar";
 import { OrdersDetailPanel, type OrdActionKind } from "./orders-detail-panel";
 import { OrdersActionModal, type OrdActionPayload } from "./orders-action-modal";
 
@@ -300,6 +300,19 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
             {t.syncLabel} · {t.syncAgo}
           </button>
         ) : null}
+        {view === "cal" ? (
+          <OrdersMonthNav
+            t={t}
+            locale={locale}
+            todayKey={todayKey}
+            calMonth={calMonth}
+            onCalMonthChange={setCalMonth}
+            onToday={() => {
+              setCalMonth({ y: +todayKey.slice(0, 4), m: +todayKey.slice(5, 7) - 1 });
+              setCalSel(todayKey);
+            }}
+          />
+        ) : null}
         {view === "all" ? (
           <AdminDateRangePicker
             from={filters.from}
@@ -453,7 +466,6 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
             locale={locale}
             todayKey={todayKey}
             calMonth={calMonth}
-            onCalMonthChange={setCalMonth}
             calSel={calSel}
             onCalSelChange={setCalSel}
             onSelectOrder={setSelectedId}

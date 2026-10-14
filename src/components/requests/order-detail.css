@@ -1,0 +1,133 @@
+/* 주문 상세 화이트 리디자인(2026-10-14, 시안 OrderDetail-Phone · OrderOffice-Phone · OrderProcess-Phone · OrderReject-Phone)
+   — maintenance-detail.css 의 .mdw 위에 주문만의 것: 배송 예정 줄 · 품목 줄 · 진행 3단 막대(채워지며 등장) · 처리 줄 · 시트 달력. */
+.odw .num { font-variant-numeric: tabular-nums; }
+.odw-deliv { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.odw-deliv > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.odw-deliv span { font-size: 13px; color: #6b6878; }
+.odw-deliv b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.odw-deliv em { font-style: normal; font-size: 15px; color: #6b6878; }
+.odw-deliv strong { flex: none; font-size: 15px; font-weight: 600; color: #5a30cf; }
+.odw-deliv strong.is-past { color: #6b6878; font-weight: 500; }
+
+.odw-items { display: flex; flex-direction: column; padding-top: 14px; border-top: 1px solid #f1f1f4; }
+.odw-items__h { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 6px; }
+.odw-items__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.odw-items__h span { font-size: 12px; color: #6b6878; }
+.odw-item { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 0; border-top: 1px solid #f3f3f6; animation: odw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes odw-in { from { opacity: 0; transform: translateY(4px); } }
+.odw-item__ph { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 10px; overflow: hidden; background: #f2f2f5; color: #8b8898; }
+.odw-item__ph.is-none svg { width: 16px; height: 16px; }
+.odw-item__thumbs, .odw-item__thumbs > button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; }
+.odw-item__thumbs > button:nth-of-type(n + 2) { display: none; }
+.odw-item__img { position: relative; width: 44px; height: 44px; }
+.odw-item__phn { position: absolute; right: 2px; bottom: 2px; padding: 0 4px; border-radius: 6px; background: rgba(22, 20, 31, .62); font-size: 10px; color: #fff; pointer-events: none; }
+.odw-item__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.odw-item__n { font-size: 15px; font-weight: 500; color: #16141f; overflow-wrap: anywhere; }
+.odw-item__s { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: #6b6878; }
+.odw-item__s a { display: inline-flex; align-items: center; gap: 4px; flex: none; min-height: 24px; color: #6b6878; }
+.odw-item__s a svg { width: 12px; height: 12px; }
+.odw-item__s a + .odw-item__m::before { content: "·"; margin-right: 8px; color: #c9c6d3; }
+.odw-item__m { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.odw-item__q { flex: none; font-size: 15px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; }
+
+.odw-steps { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid #f1f1f4; }
+.odw-steps__h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+.odw-steps__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.odw-steps__h span { font-size: 12px; color: #6b6878; }
+.odw-steps__bars, .odw-steps__lbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.odw-steps__bars i { position: relative; display: block; height: 4px; border-radius: 2px; background: #ecebf0; overflow: hidden; }
+.odw-steps__bars i.on::after { content: ""; position: absolute; inset: 0; border-radius: 2px; background: #7a52e6; transform-origin: left center; animation: odw-fill 520ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: inherit; }
+@keyframes odw-fill { from { transform: scaleX(0); } }
+.odw-steps__lbs span { font-size: 12px; color: #8b8898; }
+.odw-steps__lbs span.is-done { color: #6b6878; }
+.odw-steps__lbs span.is-cur { color: #16141f; font-weight: 600; }
+.odw-closed { margin: 2px 0 0; font-size: 12px; color: #6b6878; }
+
+.odw-act { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.odw-act__btns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.odw-btn { height: 50px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.odw-btn:active { transform: scale(.98); }
+.odw-btn:disabled { opacity: .5; }
+.odw-btn.is-gray { background: #f4f4f7; color: #3a3746; }
+.odw-btn.is-pri { background: #7a52e6; color: #fff; }
+.odw-btn.is-soft { background: #f4f1fd; color: #5a30cf; }
+.odw-btn.is-ink { background: #16141f; color: #fff; }
+.odw-hint, .odw-err { margin: 0; text-align: center; font-size: 12px; color: #6b6878; }
+.odw-err { color: #c5282e; font-weight: 600; }
+.odw-done { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; color: #1f7a4d; animation: odw-in 280ms cubic-bezier(.23, 1, .32, 1) both; }
+.odw-done span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e7f5ee; }
+.odw-done svg { width: 13px; height: 13px; stroke-width: 2.8; stroke-dasharray: 24; stroke-dashoffset: 24; animation: lfd-draw 520ms cubic-bezier(.23, 1, .32, 1) 120ms forwards; }
+@keyframes lfd-draw { to { stroke-dashoffset: 0; } }
+
+/* 시트 — 주문 처리 · 배송일 수정 · 반려 */
+.odw-sheet { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+.odw-sheet__h { display: flex; flex-direction: column; gap: 4px; }
+.odw-sheet__h h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.odw-sheet__h span { font-size: 13px; color: #6b6878; }
+.odw-sheet__p { margin: -4px 0 0; font-size: 13px; line-height: 1.5; color: #6b6878; }
+.odw-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; }
+.odw-seg button { height: 38px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; color: #6b6878; cursor: pointer; transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.odw-seg button.on { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
+.odw-sheet__sum { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid #f1f1f4; }
+.odw-sheet__sum span { font-size: 13px; color: #6b6878; }
+.odw-sheet__sum b { font-size: 16px; font-weight: 700; color: #16141f; text-align: right; }
+.odw-sheet__sum b.is-dim { font-weight: 500; color: #8b8898; }
+.odw-btn.is-lg { width: 100%; }
+.odw-sheet .mdw-nf { margin-top: 8px; }
+
+.odw-cal { display: flex; flex-direction: column; gap: 6px; }
+.odw-cal__h { display: flex; align-items: center; justify-content: space-between; }
+.odw-cal__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.odw-cal__h button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none; color: #6b6878; cursor: pointer; }
+.odw-cal__h button:active { background: #f4f4f7; }
+.odw-cal__h svg { width: 18px; height: 18px; }
+.odw-cal__g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
+.odw-cal__wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: #8b8898; }
+.odw-day { position: relative; height: 44px; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; color: #16141f; font-variant-numeric: tabular-nums; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.odw-day:active { transform: scale(.94); }
+.odw-day.is-in { background: #f1ecfd; border-radius: 0; }
+.odw-day.is-sel { background: #7a52e6; color: #fff; font-weight: 600; }
+.odw-day.is-today { font-weight: 600; }
+.odw-day.is-today::after { content: ""; position: absolute; bottom: 6px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
+
+@media (prefers-reduced-motion: reduce) {
+  .odw-item, .odw-steps__bars i.on::after, .odw-done, .odw-done svg { animation: none; stroke-dashoffset: 0; }
+  .odw-day, .odw-btn { transition: none; }
+}
+
+/* 배송 캘린더 시트(요청 · 비품 주문 탭) — 시안 OrderCalSheet-Phone */
+.odc-h { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 8px; }
+.odc-h h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.odc-h span { font-size: 13px; color: #6b6878; }
+.odc-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.odc-nav b { font-size: 15px; font-weight: 700; color: #16141f; }
+.odc-nav button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none; color: #6b6878; }
+.odc-nav button:active { background: #f4f4f7; }
+.odc-nav svg { width: 18px; height: 18px; }
+.odc-nav .odc-today { width: auto; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; }
+.odc-g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
+.odc-wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: #8b8898; }
+.odc-day { position: relative; height: 44px; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; color: #16141f; font-variant-numeric: tabular-nums; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.odc-day:active { transform: scale(.94); }
+.odc-day.is-today { font-weight: 700; }
+.odc-day.has::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #7a52e6; }
+.odc-day.is-sel { background: #7a52e6; color: #fff; font-weight: 600; }
+.odc-day.is-sel.has::after { background: #fff; }
+.odc-empty { margin: 10px 0 0; font-size: 13px; color: #6b6878; }
+.odc-day-list { display: flex; flex-direction: column; margin-top: 14px; padding-bottom: 8px; }
+.odc-dh { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; }
+.odc-dh b { font-size: 15px; font-weight: 700; color: #16141f; }
+.odc-dh em { font-style: normal; font-size: 12px; font-weight: 600; color: #5a30cf; }
+.odc-dh span { margin-left: auto; font-size: 12px; color: #6b6878; }
+.odc-row { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 6px 0; border: 0; border-top: 1px solid #f3f3f6; background: none; font: inherit; text-align: left; animation: odw-in 280ms cubic-bezier(.23, 1, .32, 1) both; }
+.odc-row:active { background: #faf9fc; }
+.odc-row__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.odc-row__b b { font-size: 15px; font-weight: 500; color: #16141f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.odc-row__b span { font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.odc-row__st { flex: none; font-size: 12px; color: #6b6878; }
+@media (prefers-reduced-motion: reduce) { .odc-row { animation: none; } .odc-day { transition: none; } }
+
+/* 키보드 포커스(web-design-guidelines 점검): 새 단추들에 보라 링 — 마우스 · 터치에는 안 보인다. */
+.odw-btn:focus-visible, .odw-day:focus-visible, .odw-seg button:focus-visible, .odw-cal__h button:focus-visible,
+.odc-day:focus-visible, .odc-row:focus-visible, .odc-nav button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.odw-btn, .odw-day, .odc-day, .odc-row { touch-action: manipulation; }

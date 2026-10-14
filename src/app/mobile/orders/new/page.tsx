@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
-import { ShoppingCart } from "lucide-react";
 import { OrderCreateForm } from "@/components/requests/order-create-form";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
-import { Card } from "@/components/ui/card";
 import { getDictionary } from "@/lib/i18n";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { sanitizeSharedUrl } from "@/lib/share-target";
+import "@/components/requests/order-form.css";
 
 type PageProps = {
   searchParams: Promise<{ sharedUrl?: string; shareError?: string; error?: string }>;
@@ -59,24 +58,14 @@ export default async function MobileOrderNewPage({ searchParams }: PageProps) {
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} hideBottomNav title={copy.title}>
-      <div className="space-y-4 pb-8">
-        <Card className="rounded-2xl p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF1F8] text-[#315F91]">
-              <ShoppingCart className="size-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-2xl font-black tracking-tight">{copy.title}</h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">{copy.subtitle}</p>
-            </div>
-          </div>
-        </Card>
+      {/* 화이트 리디자인(2026-10-14, 시안 OrderNew-Phone · Order-Fold): 상자 없는 제목 줄 → 폼. 폴드 · 태블릿은 520px 가운데 열. */}
+      <div className="ofw-page">
+        <div className="ofw-head">
+          <h1>{copy.wHeading}</h1>
+          <p>{copy.wSub}</p>
+        </div>
 
-        {errorMessage ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
-            {errorMessage}
-          </div>
-        ) : null}
+        {errorMessage ? <p className="ofw-error" role="alert">{errorMessage}</p> : null}
 
         <OrderCreateForm
           buildingLabels={dict.cleaning.buildingLabels}

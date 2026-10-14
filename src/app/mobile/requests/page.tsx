@@ -158,6 +158,13 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
             sectionTitle: dictionary.mobile.quickActions.order,
             statusLabels: dictionary.mobile.orderStatusLabels,
             deliveryDateShort: dictionary.mobile.orderDetail.deliveryDateShort,
+            groupActive: dictionary.mobile.orderDetail.wGroupActive,
+            groupDeliv: dictionary.mobile.orderDetail.wGroupDeliv,
+            groupPast: dictionary.mobile.orderDetail.wGroupPast,
+            arriveToday: dictionary.mobile.orderDetail.wArriveToday,
+            arriveTomorrow: dictionary.mobile.orderDetail.wArriveTomorrow,
+            arriveOn: dictionary.mobile.orderDetail.wArriveOn,
+            reqOn: dictionary.mobile.orderDetail.wReqOn,
           }}
           deliveryCalendarCopy={{
             title: dictionary.mobile.deliveryCalendar.title,
@@ -170,6 +177,8 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
             nextMonth: dictionary.mobile.deliveryCalendar.nextMonth,
             countTemplate: dictionary.mobile.deliveryCalendar.countTemplate,
             rangeLabel: dictionary.mobile.deliveryCalendar.rangeLabel,
+            monthCountTemplate: dictionary.mobile.deliveryCalendar.monthCountTemplate,
+            tomorrow: dictionary.mobile.deliveryCalendar.tomorrow,
           }}
           roomCatalog={roomCatalog ?? []}
           startDate={dateRange.startDate}

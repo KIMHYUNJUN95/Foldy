@@ -19,7 +19,6 @@ type CalendarProps = {
   locale: Locale;
   todayKey: string;
   calMonth: CalMonth;
-  onCalMonthChange: (next: CalMonth) => void;
   calSel: string | null;
   onCalSelChange: (v: string | null) => void;
   onSelectOrder: (id: string) => void;
@@ -38,13 +37,47 @@ function shift(m: CalMonth, delta: number): CalMonth {
   return { y: +key.slice(0, 4), m: +key.slice(5, 7) - 1 };
 }
 
+/** 보기 줄(orders-console.tsx)에 놓는 달 이동 — 「‹ 2026년 10월 › 오늘」(시안 OrderCal-PC 보기 줄의 달 자리). */
+export function OrdersMonthNav({
+  t,
+  locale,
+  todayKey,
+  calMonth,
+  onCalMonthChange,
+  onToday,
+}: {
+  t: OrdersCopy;
+  locale: Locale;
+  todayKey: string;
+  calMonth: CalMonth;
+  onCalMonthChange: (next: CalMonth) => void;
+  onToday: () => void;
+}) {
+  const isThisMonth = calMonth.y === +todayKey.slice(0, 4) && calMonth.m === +todayKey.slice(5, 7) - 1;
+  return (
+    <span className="ow-mnav">
+      <button type="button" className="ow-navb" aria-label={t.wPrevMonth} onClick={() => onCalMonthChange(shift(calMonth, -1))}>
+        <ChevronLeft aria-hidden="true" />
+      </button>
+      <b className="num">{fmtMonth(calMonth.y, calMonth.m, locale)}</b>
+      <button type="button" className="ow-navb" aria-label={t.wNextMonth} onClick={() => onCalMonthChange(shift(calMonth, 1))}>
+        <ChevronRight aria-hidden="true" />
+      </button>
+      {!isThisMonth ? (
+        <button type="button" className="ow-link" onClick={onToday}>
+          {t.calToday}
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
 export function OrdersCalendar({
   orders,
   t,
   locale,
   todayKey,
   calMonth,
-  onCalMonthChange,
   calSel,
   onCalSelChange,
   onSelectOrder,
@@ -88,25 +121,6 @@ export function OrdersCalendar({
   return (
     <div className="ow-cal">
       <div className="ow-cal__main">
-        <div className="ow-cal__head">
-          <button type="button" className="ow-navb" aria-label={t.wPrevMonth} onClick={() => onCalMonthChange(shift(calMonth, -1))}>
-            <ChevronLeft aria-hidden="true" />
-          </button>
-          <b className="num">{fmtMonth(y, m, locale)}</b>
-          <button type="button" className="ow-navb" aria-label={t.wNextMonth} onClick={() => onCalMonthChange(shift(calMonth, 1))}>
-            <ChevronRight aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="ow-link"
-            onClick={() => {
-              onCalMonthChange({ y: +todayKey.slice(0, 4), m: +todayKey.slice(5, 7) - 1 });
-              onCalSelChange(todayKey);
-            }}
-          >
-            {t.calToday}
-          </button>
-        </div>
         <div className="ow-cal__wd">
           {wd.map((d, i) => (
             <span key={i}>{d}</span>

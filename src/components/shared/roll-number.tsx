@@ -30,7 +30,7 @@ export function RollNumber({ text, delay = 0, delta = false }: { text: string; d
       {text.split("").map((ch, i) => {
         if (!/[0-9]/.test(ch)) {
           return (
-            <span aria-hidden="true" className="rolln__sym" key={i}>
+            <span aria-hidden="true" className={`rolln__sym${ch === "," || ch === "." ? " is-sep" : ""}`} key={i}>
               {ch}
             </span>
           );

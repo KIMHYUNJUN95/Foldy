@@ -117,3 +117,40 @@
 .ofw-shop:focus-visible, .ofw-ib:focus-visible, .ofw-add:focus-visible, .ofw-paste:focus-visible, .ofw-seg button:focus-visible,
 .ofw-submit:focus-visible, .ofw-btn:focus-visible, .ofw-dd__menu button:focus-visible, .ofw-find a:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 .ofw-shop, .ofw-ib, .ofw-add, .ofw-submit, .ofw-btn, .ofw-seg button { touch-action: manipulation; }
+
+/* 요청 등록 폼 공용(request-form-kit.tsx) — 분실물 신고 · 수리 신고(시안 LFNew-Phone · MaintNew-Phone) */
+.ofw-tiles-wrap { display: flex; flex-direction: column; gap: 8px; }
+.ofw-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ofw-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ofw-tiles button { min-height: 44px; padding: 0 6px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; font-size: 14px; font-weight: 500; color: #3a3746; cursor: pointer; touch-action: manipulation; transition: background 160ms ease, color 160ms ease, transform 140ms ease; }
+.ofw-tiles button:active { transform: scale(.97); }
+.ofw-tiles button.on { background: #f4f1fd; color: #5a30cf; font-weight: 600; }
+.ofw-tiles button.on.is-danger { background: #fdecec; color: #c5282e; }
+.ofw-tiles button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.ofw-dd__empty { padding: 12px; font-size: 13px; color: #6b6878; }
+.ofw-field-hint { margin: -8px 0 0; font-size: 12px; color: #6b6878; }
+.ofw-sheet__dl { display: flex; flex-direction: column; gap: 10px; margin: 0; padding-top: 12px; border-top: 1px solid #f1f1f4; font-size: 14px; }
+.ofw-sheet__dl > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); }
+.ofw-sheet__dl dt { color: #6b6878; }
+.ofw-sheet__dl dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
+.ofw-sheet__dl dd.is-danger { color: #c5282e; font-weight: 600; }
+/* 사진 고르기 흰 모양(announcement-image-uploader variant="white") */
+.ofw-photos { display: flex; flex-direction: column; gap: 8px; }
+.ofw-photos__k { font-size: 13px; font-weight: 600; color: #3a3746; }
+.ofw-photos__k em { font-style: normal; font-weight: 500; color: #6b6878; }
+.ofw-photos__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ofw-photos__add { display: grid; place-items: center; width: 72px; height: 72px; border: 0; border-radius: 10px; background: #f4f4f7; color: #7a52e6; cursor: pointer; transition: transform 140ms ease; }
+.ofw-photos__add:active { transform: scale(.95); }
+.ofw-photos__add svg { width: 20px; height: 20px; }
+.ofw-photos__th { position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; background: #f2f2f5; animation: ofw-pop 240ms cubic-bezier(.23, 1, .32, 1) both; }
+.ofw-photos__th img { width: 100%; height: 100%; object-fit: cover; }
+.ofw-photos__th button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: rgba(22, 20, 31, .62); color: #fff; }
+.ofw-photos__th button svg { width: 12px; height: 12px; }
+@media (prefers-reduced-motion: reduce) { .ofw-photos__th { animation: none; } .ofw-tiles button { transition: none; } }
+.ofw-kick { font-size: 13px; font-weight: 600; color: #5a30cf; }
+.ofw-linked { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f1f1f4; }
+.ofw-linked p { margin: 0; font-size: 13px; font-weight: 600; color: #5a30cf; }
+.ofw-linked dl { display: flex; flex-direction: column; gap: 8px; margin: 0; font-size: 14px; }
+.ofw-linked dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.ofw-linked dt { color: #6b6878; font-weight: 400; }
+.ofw-linked dd { margin: 0; color: #16141f; font-weight: 600; }

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Wrench } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { MaintenanceLinkedForm } from "@/components/cleaning/maintenance-linked-form";
 import { MaintenanceCreateForm } from "@/components/requests/maintenance-create-form";
+import "@/components/requests/order-form.css";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { getDictionary } from "@/lib/i18n";
 import { getOnboardingState } from "@/lib/onboarding";
 import {
@@ -129,29 +129,18 @@ export default async function MaintenanceNewPage({ searchParams }: PageProps) {
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} hideBottomNav title={copy.mobileTitle}>
-      <div className="space-y-4">
-        <Card className="rounded-2xl p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Wrench className="size-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              {isLinkedMode && linkedSessionValid ? (
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">
-                  {copy.fromCleaning}
-                </p>
-              ) : null}
-              <h2 className="mt-1 text-2xl font-black">{copy.mobileTitle}</h2>
-            </div>
-          </div>
-        </Card>
+      {/* 화이트 리디자인(2026-10-14, 시안 MaintNew-Phone · MaintNew-Fold): 상자 없는 제목 줄 → 폼. 폴드 · 태블릿은 520px 가운데 열. */}
+      <div className="ofw-page">
+        <div className="ofw-head">
+          {isLinkedMode && linkedSessionValid ? <span className="ofw-kick">{copy.fromCleaning}</span> : null}
+          <h1>{copy.wHeading}</h1>
+          <p>{copy.wSub}</p>
+        </div>
 
         {reservationPrefill ? (
-          <Card className="rounded-2xl p-4">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">
-              {dict.tasks.contextLinkedSection}
-            </p>
-            <dl className="mt-3 space-y-2 text-sm">
+          <div className="ofw-linked">
+            <p>{dict.tasks.contextLinkedSection}</p>
+            <dl>
               <div className="flex items-start justify-between gap-3">
                 <dt className="font-semibold text-muted-foreground">
                   {dict.cleaning.manualBuildingLabel}
@@ -180,7 +169,7 @@ export default async function MaintenanceNewPage({ searchParams }: PageProps) {
                 </dd>
               </div>
             </dl>
-          </Card>
+          </div>
         ) : null}
 
         {isLinkedMode && !linkedSessionValid ? (
@@ -197,11 +186,7 @@ export default async function MaintenanceNewPage({ searchParams }: PageProps) {
           </>
         ) : (
           <>
-            {errorMessage ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
-                {errorMessage}
-              </div>
-            ) : null}
+            {errorMessage ? <p className="ofw-error" role="alert">{errorMessage}</p> : null}
 
             {isLinkedMode ? (
               <MaintenanceLinkedForm
@@ -233,12 +218,15 @@ export default async function MaintenanceNewPage({ searchParams }: PageProps) {
               />
             )}
 
-            <Link href="/mobile/cleaning">
-              <Button className="h-12 w-full rounded-xl" type="button" variant="secondary">
-                <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
-                {copy.backToCleaning}
-              </Button>
-            </Link>
+            {/* 청소에서 넘어온 경우에만 청소로 돌아가기(일반 신고는 화면 스와이프로 뒤로). */}
+            {isLinkedMode ? (
+              <Link href="/mobile/cleaning">
+                <Button className="h-12 w-full rounded-xl" type="button" variant="secondary">
+                  <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
+                  {copy.backToCleaning}
+                </Button>
+              </Link>
+            ) : null}
           </>
         )}
       </div>

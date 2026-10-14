@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { ChevronDown, Package, User } from "lucide-react";
+// 분실물 신고 폼 — 화이트 리디자인(2026-10-14, 시안 LFNew-Phone · LFNewConfirm-Phone · LFNew-Fold).
+
+import { useRef, useState, useTransition } from "react";
 import { createLostItem } from "@/app/mobile/lost-found/new/actions";
 import {
   AnnouncementImageUploader,
   type AnnouncementImageUploaderHandle,
 } from "@/components/announcements/announcement-image-uploader";
-import { LostFoundConfirmModal } from "@/components/requests/lost-found-confirm-modal";
+import { ChoiceTiles, ConfirmFormSheet, PickField, ReadonlyField } from "@/components/requests/request-form-kit";
 import { uploadRequestImages } from "@/components/requests/request-image-upload";
-import { Button } from "@/components/ui/button";
-import type { Dictionary } from "@/lib/i18n";
+import type { Dictionary, Locale } from "@/lib/i18n";
+import { tokyoToday } from "@/lib/tokyo-date";
 import { lostItemCategories } from "@/lib/lost-found-constants";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import { localizePropertyName } from "@/lib/room-label-normalization";
-import { cn } from "@/lib/utils";
 
 type LostFoundCreateFormProps = {
   buildingLabels: Record<string, string>;
@@ -23,26 +23,13 @@ type LostFoundCreateFormProps = {
   defaultRoom: string;
   imgCopy: Dictionary["requestImages"];
   initialPropertyName: string;
+  locale: Locale;
   linkedGuestName: string;
   linkedReservationId: string;
   organizationId: string;
   reporterName: string;
   roomCatalog: readonly ActiveRoomCatalogItem[];
 };
-
-const FIELD_CLASS =
-  "flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200/80 bg-white/82 px-3.5 text-sm font-bold text-slate-900 outline-none shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)] transition-colors placeholder:text-slate-400 focus:border-sky-300 focus:ring-2 focus:ring-sky-200/60 disabled:opacity-50 cursor-pointer select-none text-left";
-
-const PANEL_CLASS =
-  "flex flex-col gap-4 rounded-[24px] border border-slate-200/80 bg-surface p-4 shadow-[0_16px_34px_-28px_rgba(31,58,95,0.48)] backdrop-blur-none";
-
-function SectionLabel({ children, index }: { children: string; index: number }) {
-  return (
-    <h2 className="pl-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-      {index}. {children}
-    </h2>
-  );
-}
 
 export function LostFoundCreateForm({
   buildingLabels,
@@ -51,6 +38,7 @@ export function LostFoundCreateForm({
   defaultRoom,
   imgCopy,
   initialPropertyName,
+  locale,
   linkedGuestName,
   linkedReservationId,
   organizationId,
@@ -74,40 +62,8 @@ export function LostFoundCreateForm({
   const [summary, setSummary] = useState({ item: "", building: "", room: "" });
   const [isPending, startTransition] = useTransition();
 
-  // Custom select dropdown state
-  const [buildingOpen, setBuildingOpen] = useState(false);
-  const [roomOpen, setRoomOpen] = useState(false);
-  const [categoryOpen, setCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const buildingDropdownRef = useRef<HTMLDivElement>(null);
-  const roomDropdownRef = useRef<HTMLDivElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        buildingDropdownRef.current &&
-        !buildingDropdownRef.current.contains(event.target as Node)
-      ) {
-        setBuildingOpen(false);
-      }
-      if (
-        roomDropdownRef.current &&
-        !roomDropdownRef.current.contains(event.target as Node)
-      ) {
-        setRoomOpen(false);
-      }
-      if (
-        categoryDropdownRef.current &&
-        !categoryDropdownRef.current.contains(event.target as Node)
-      ) {
-        setCategoryOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const [photoCount, setPhotoCount] = useState(0);
 
   // Deduplicate and sort active properties
   const buildings = Array.from(new Set(roomCatalog.map((item) => item.propertyName))).sort();
@@ -146,6 +102,7 @@ export function LostFoundCreateForm({
       return;
     }
 
+    setPhotoCount(uploaderRef.current?.getItems().length ?? 0);
     setSummary({
       item: itemName,
       building: selectedBuilding,
@@ -205,269 +162,112 @@ export function LostFoundCreateForm({
     });
   }
 
-  const isLocationDropdownOpen = buildingOpen || roomOpen;
+  const disposeLabel = (() => {
+    const [y, m, d] = tokyoToday().split("-").map(Number);
+    const due = new Date(Date.UTC(y, m - 1, d + 14));
+    return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(due);
+  })();
 
   return (
     <>
-      <form
-        action={createLostItem}
-        className="flex flex-col gap-6"
-        onSubmit={handleSubmit}
-        ref={formRef}
-      >
+      {/* 화이트 리디자인(2026-10-14, 시안 LFNew-Phone · LFNewConfirm-Phone · LFNew-Fold): 상자 없이 이름표 칸 → 분류 타일 → 확인 시트. */}
+      <form action={createLostItem} className="ofw" onSubmit={handleSubmit} ref={formRef}>
         <input name="cleaningSessionId" type="hidden" value={cleaningSessionId} />
         <input name="guestName" type="hidden" value={linkedGuestName} />
         <input name="reservationId" type="hidden" value={linkedReservationId} />
-
-        {/* Hidden inputs to feed data to Server Action validation successfully */}
         <input name="propertyName" type="hidden" value={selectedBuilding} />
         <input name="roomLabel" type="hidden" value={selectedRoom} />
         <input name="category" type="hidden" value={selectedCategory} />
 
-        {/* Section 1: Location */}
-        {/* We dynamically raise the z-index (z-30) on this section when a dropdown is open, ensuring options display on top of the next card */}
-        <section className={cn("flex flex-col gap-2 relative transition-all duration-150", isLocationDropdownOpen ? "z-30" : "z-10")}>
-          <SectionLabel index={1}>{copy.form.sectionLocation}</SectionLabel>
-          <div className={cn(PANEL_CLASS, "relative", isLocationDropdownOpen ? "z-30" : "z-10")}>
-            {/* Step 1: Building (Property) Custom Selector */}
-            <div className="flex flex-col gap-2" ref={buildingDropdownRef}>
-              <span className="text-xs font-semibold text-muted-foreground">{copy.form.building}</span>
-              <div className="relative">
-                <button
-                  className={cn(FIELD_CLASS, buildingOpen && "border-sky-300 ring-2 ring-sky-200/60")}
-                  onClick={() => setBuildingOpen(!buildingOpen)}
-                  type="button"
-                >
-                  <span className={cn("truncate text-sm font-semibold", !selectedBuilding && "text-muted-foreground/70")}>
-                    {selectedBuilding
-                      ? localizePropertyName(selectedBuilding, buildingLabels)
-                      : copy.form.buildingPlaceholder}
-                  </span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className="size-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                    style={{ transform: buildingOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                  />
-                </button>
-
-                {buildingOpen && (
-                  <ul className="absolute left-0 z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-[0_18px_40px_-24px_rgba(31,58,95,0.55)] divide-y divide-slate-100">
-                    {buildings.map((b) => (
-                      <li
-                        className={cn(
-                          "flex items-center h-10 w-full px-3 text-sm font-semibold rounded-lg cursor-pointer transition-colors",
-                          selectedBuilding === b
-                            ? "bg-sky-50 text-sky-700"
-                            : "text-slate-700 hover:bg-slate-50"
-                        )}
-                        key={b}
-                        onClick={() => {
-                          setSelectedBuilding(b);
-                          setSelectedRoom("");
-                          setBuildingOpen(false);
-                          if (validationError) setValidationError(null);
-                        }}
-                      >
-                        {localizePropertyName(b, buildingLabels)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            {/* Step 2: Room Custom Selector */}
-            <div className="flex flex-col gap-2" ref={roomDropdownRef}>
-              <span className="text-xs font-semibold text-muted-foreground">{copy.room}</span>
-              <div className="relative">
-                <button
-                  className={cn(FIELD_CLASS, roomOpen && "border-sky-300 ring-2 ring-sky-200/60")}
-                  disabled={!selectedBuilding}
-                  onClick={() => setRoomOpen(!roomOpen)}
-                  type="button"
-                >
-                  <span className={cn("truncate text-sm font-semibold", !selectedRoom && "text-muted-foreground/70")}>
-                    {selectedRoom
-                      ? selectedRoom
-                      : selectedBuilding
-                        ? copy.form.roomPlaceholderSelectRoom
-                        : copy.form.roomPlaceholderSelectBuilding}
-                  </span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className="size-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                    style={{ transform: roomOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                  />
-                </button>
-
-                {roomOpen && selectedBuilding && (
-                  <ul className="absolute left-0 z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-[0_18px_40px_-24px_rgba(31,58,95,0.55)] divide-y divide-slate-100">
-                    {availableRooms.map((canonicalLabel) => (
-                      <li
-                        className={cn(
-                          "flex items-center h-10 w-full px-3 text-sm font-semibold rounded-lg cursor-pointer transition-colors",
-                          selectedRoom === canonicalLabel
-                            ? "bg-sky-50 text-sky-700"
-                            : "text-slate-700 hover:bg-slate-50"
-                        )}
-                        key={canonicalLabel}
-                        onClick={() => {
-                          setSelectedRoom(canonicalLabel);
-                          setRoomOpen(false);
-                          if (validationError) setValidationError(null);
-                        }}
-                      >
-                        {canonicalLabel}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              {selectedBuilding && availableRooms.length === 0 ? (
-                <p className="pl-1 text-xs text-amber-500 font-semibold">
-                  {copy.form.noRoomsInBuilding}
-                </p>
-              ) : null}
-            </div>
-          </div>
+        <section className="ofw-sec">
+          <PickField
+            label={copy.form.building}
+            onChange={(v) => {
+              setSelectedBuilding(v);
+              setSelectedRoom("");
+              setValidationError(null);
+            }}
+            options={buildings.map((b) => ({ value: b, label: localizePropertyName(b, buildingLabels) }))}
+            placeholder={copy.form.buildingPlaceholder}
+            value={selectedBuilding}
+          />
+          <PickField
+            disabled={!selectedBuilding}
+            emptyText={copy.form.noRoomsInBuilding}
+            label={copy.room}
+            onChange={(v) => {
+              setSelectedRoom(v);
+              setValidationError(null);
+            }}
+            options={availableRooms.map((r) => ({ value: r, label: r }))}
+            placeholder={selectedBuilding ? copy.form.roomPlaceholderSelectRoom : copy.form.roomPlaceholderSelectBuilding}
+            value={selectedRoom}
+          />
         </section>
 
-        {/* Section 2: Details */}
-        <section className={cn("flex flex-col gap-2 relative transition-all duration-150", categoryOpen ? "z-20" : "z-10")}>
-          <SectionLabel index={2}>{copy.form.sectionDetails}</SectionLabel>
-          <div className={PANEL_CLASS}>
-            <label className="flex flex-col gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">{copy.itemName}</span>
-              <input
-                autoComplete="off"
-                className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white/82 px-3.5 text-sm font-bold text-slate-900 outline-none shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)] transition-colors placeholder:text-slate-400 focus:border-sky-300 focus:ring-2 focus:ring-sky-200/60"
-                name="itemName"
-                onChange={() => {
-                  if (validationError) setValidationError(null);
-                }}
-                placeholder={copy.itemNamePlaceholder}
-                required
-                type="text"
-              />
-            </label>
-
-            <div className="flex flex-col gap-2" ref={categoryDropdownRef}>
-              <span className="text-xs font-semibold text-muted-foreground">{copy.form.category}</span>
-              <div className="relative">
-                <button
-                  className={cn(FIELD_CLASS, categoryOpen && "border-sky-300 ring-2 ring-sky-200/60")}
-                  onClick={() => setCategoryOpen(!categoryOpen)}
-                  type="button"
-                >
-                  <span className={cn("truncate text-sm font-semibold", !selectedCategory && "text-muted-foreground/70")}>
-                    {selectedCategory
-                      ? copy.categoryLabels[selectedCategory as keyof typeof copy.categoryLabels]
-                      : copy.form.category}
-                  </span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className="size-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                    style={{ transform: categoryOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                  />
-                </button>
-                {categoryOpen && (
-                  <ul className="absolute left-0 z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-1 shadow-[0_18px_40px_-24px_rgba(31,58,95,0.55)] divide-y divide-slate-100">
-                    {lostItemCategories.map((key) => (
-                      <li
-                        className={cn(
-                          "flex items-center h-10 w-full px-3 text-sm font-semibold rounded-lg cursor-pointer transition-colors",
-                          selectedCategory === key ? "bg-sky-50 text-sky-700" : "text-slate-700 hover:bg-slate-50",
-                        )}
-                        key={key}
-                        onClick={() => {
-                          setSelectedCategory(key);
-                          setCategoryOpen(false);
-                        }}
-                      >
-                        {copy.categoryLabels[key]}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            <label className="flex flex-col gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">{copy.memo}</span>
-              <textarea
-                className="min-h-24 w-full resize-none rounded-2xl border border-slate-200/80 bg-white/82 px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)] transition-colors placeholder:text-slate-400 focus:border-sky-300 focus:ring-2 focus:ring-sky-200/60"
-                name="memo"
-                placeholder={copy.memoPlaceholder}
-                rows={4}
-              />
-            </label>
-          </div>
+        <section className="ofw-sec">
+          <label className="ofw-nf">
+            <span className="ofw-nf__l">{copy.itemName}</span>
+            <input autoComplete="off" className="ofw-nf__in" name="itemName" placeholder={copy.itemNamePlaceholder} type="text" />
+          </label>
+          <ChoiceTiles
+            label={copy.wCategory}
+            onChange={setSelectedCategory}
+            options={lostItemCategories.map((key) => ({ value: key, label: copy.categoryLabels[key] }))}
+            value={selectedCategory}
+          />
+          <label className="ofw-nf">
+            <span className="ofw-nf__l">{copy.wMemoOpt}</span>
+            <textarea className="ofw-nf__in ofw-ta" name="memo" placeholder={copy.memoPlaceholder} rows={2} />
+          </label>
         </section>
 
-        {/* Section 3: Photos */}
-        <section className="flex flex-col gap-2 relative z-10">
-          <SectionLabel index={3}>{copy.form.sectionPhotos}</SectionLabel>
-          <div className={PANEL_CLASS}>
-            <AnnouncementImageUploader
-              addImagesLabel={imgCopy.addPhotos}
-              errorCountExceeded={imgCopy.errorCount}
-              errorSizeExceeded={imgCopy.errorSize}
-              errorTypeInvalid={imgCopy.errorType}
-              imageAttachmentsLabel={imgCopy.attachments}
-              imageLimitLabel={imgCopy.limit}
-              imageRemoveLabel={imgCopy.remove}
-              ref={uploaderRef}
-            />
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-2 relative z-10">
-          <SectionLabel index={4}>{copy.form.sectionInfo}</SectionLabel>
-          <div className={PANEL_CLASS}>
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">{copy.reporter}</span>
-              <div className="flex h-12 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/82 px-3.5 shadow-[0_10px_20px_-18px_rgba(31,58,95,0.4)]">
-                <User className="size-4 text-[#1F3A5F]" aria-hidden="true" />
-                <span className="truncate text-sm font-semibold text-foreground">
-                  {reporterName}
-                </span>
-              </div>
-            </div>
-          </div>
+        <section className="ofw-sec">
+          <AnnouncementImageUploader
+            addImagesLabel={imgCopy.addPhotos}
+            errorCountExceeded={imgCopy.errorCount}
+            errorSizeExceeded={imgCopy.errorSize}
+            errorTypeInvalid={imgCopy.errorType}
+            imageAttachmentsLabel={copy.wPhotosOpt}
+            imageLimitLabel={imgCopy.limit}
+            imageRemoveLabel={imgCopy.remove}
+            ref={uploaderRef}
+            variant="white"
+          />
+          <ReadonlyField label={copy.reporter} tail={copy.wAuto} value={reporterName} />
         </section>
 
         {validationError ? (
-          <p className="text-xs font-semibold text-destructive">{validationError}</p>
+          <p className="ofw-err" role="alert">
+            {validationError}
+          </p>
         ) : null}
 
-        <Button
-          className="h-14 w-full rounded-2xl bg-[#315F91] text-base font-black text-white shadow-[0_18px_34px_-22px_rgba(49,95,145,0.68)] hover:bg-[#274D76]"
-          disabled={isPending}
-          type="submit"
-        >
-          <Package className="mr-2 size-5" aria-hidden="true" />
+        <button className="ofw-submit" disabled={isPending} type="submit">
           {copy.reportButton}
-        </Button>
+        </button>
       </form>
 
-      <LostFoundConfirmModal
-        cancelLabel={copy.cancelConfirm}
-        confirmLabel={copy.confirmSubmit}
-        description={copy.form.confirmDescription}
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={handleConfirm}
-        open={confirmOpen}
-        pending={isPending}
-        rows={[
-          { label: copy.form.confirmType, value: copy.form.confirmTypeValue },
-          {
-            label: copy.form.confirmLocation,
-            value: `${summary.room} (${summary.building})`,
-          },
-          { label: copy.form.confirmItem, value: summary.item },
-        ]}
-        title={copy.confirmationTitle}
-      />
+      {confirmOpen ? (
+        <ConfirmFormSheet
+          cancelLabel={copy.wCancel}
+          confirmLabel={copy.wRegister}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={handleConfirm}
+          pending={isPending}
+          rows={[
+            { k: copy.wLoc, v: `${summary.room} · ${localizePropertyName(summary.building, buildingLabels)}` },
+            {
+              k: copy.wCategory,
+              v: selectedCategory ? copy.categoryLabels[selectedCategory as keyof typeof copy.categoryLabels] : copy.wNone,
+            },
+            { k: copy.wPhotos, v: photoCount > 0 ? copy.wPhotosN.replace("{n}", String(photoCount)) : copy.wNone },
+            { k: copy.wKeep, v: copy.wKeepValue.replace("{date}", disposeLabel) },
+          ]}
+          sub={summary.item}
+          title={copy.wConfirmTitle}
+        />
+      ) : null}
     </>
   );
 }

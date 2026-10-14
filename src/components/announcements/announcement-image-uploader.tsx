@@ -36,6 +36,8 @@ type Props = {
   imageRemoveLabel: string;
   /** Max selectable images. Defaults to 5 (the standard per-feature limit). */
   maxImages?: number;
+  /** "white" = 화이트 리디자인 요청 폼 모양(이름 · n/max · 72px 타일, order-form.css 의 .ofw-photos). */
+  variant?: "default" | "white";
 };
 
 export async function compressImageFile(file: File): Promise<File> {
@@ -101,6 +103,7 @@ export const AnnouncementImageUploader = forwardRef<
     imageLimitLabel,
     imageRemoveLabel,
     maxImages = DEFAULT_MAX_IMAGES,
+    variant = "default",
   },
   ref,
 ) {
@@ -186,6 +189,47 @@ export const AnnouncementImageUploader = forwardRef<
     });
     setError(null);
   }, []);
+
+  if (variant === "white") {
+    return (
+      <div className="ofw-photos">
+        <span className="ofw-photos__k">
+          {imageAttachmentsLabel} <em>· {items.length}/{maxImages}</em>
+        </span>
+        <div className="ofw-photos__row">
+          {items.map((item) => (
+            <div className="ofw-photos__th" key={item.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="" aria-hidden="true" src={item.previewUrl} />
+              <button aria-label={imageRemoveLabel} onClick={() => removeItem(item.id)} type="button">
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          {items.length < maxImages ? (
+            <button aria-label={addImagesLabel} className="ofw-photos__add" onClick={() => pickInputRef.current?.click()} type="button">
+              <Camera aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <input
+          accept="image/gif,image/jpeg,image/png,image/webp"
+          aria-hidden="true"
+          className="sr-only"
+          multiple
+          onChange={handlePickChange}
+          ref={pickInputRef}
+          tabIndex={-1}
+          type="file"
+        />
+        {error !== null ? (
+          <p className="ofw-err" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2.5">

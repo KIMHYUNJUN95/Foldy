@@ -49,6 +49,7 @@ import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import type { Role } from "@/config/roles";
 import type { Database } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { FoldyEmpty } from "@/components/shared/foldy-empty";
 
 type LostItemStatus = Database["public"]["Enums"]["lost_item_status"];
 type MaintenanceStatus = Database["public"]["Enums"]["maintenance_status"];
@@ -1197,7 +1198,7 @@ export function RequestsFilterView({
         </BottomSheet>
       ) : null}
 
-      {!hasAnyResults ? <p className="rqw-empty">{filterLabels.noFilterResults}</p> : null}
+      {!hasAnyResults ? <FoldyEmpty title={filterLabels.noFilterResults} /> : null}
 
       {rowGroups.map((group) => (
         <div key={group.key}>

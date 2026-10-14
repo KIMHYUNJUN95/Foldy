@@ -1,0 +1,29 @@
+/* 공용 빈 화면(2026-10-14) — 6초 느린 반복. 겹마다 다른 높이(4 · 9 · 14px)로 떠다녀 시차. */
+.fem { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 24px 32px; }
+.fem--compact { padding: 12px 16px 18px; }
+.fem__stage { position: relative; width: 170px; height: 144px; }
+.fem--compact .fem__stage { width: 130px; height: 110px; }
+.fem__bg { position: absolute; left: 50%; top: 50%; width: 200px; height: 200px; margin: -100px 0 0 -100px; border-radius: 50%; background: radial-gradient(circle, #f1ecfd 0%, rgba(241, 236, 253, 0) 65%); animation: fem-bg 6s cubic-bezier(.37, 0, .63, 1) infinite; }
+.fem__ly { position: absolute; inset: 0; display: block; }
+.fem__ly svg { width: 100%; height: 100%; display: block; }
+.fem__l0 { animation: fem-f0 6s cubic-bezier(.37, 0, .63, 1) infinite; }
+.fem__l1 { animation: fem-f1 6s cubic-bezier(.37, 0, .63, 1) 300ms infinite; }
+.fem__l2 { animation: fem-f2 6s cubic-bezier(.37, 0, .63, 1) 600ms infinite; }
+.fem__tw { position: absolute; width: 12px; height: 12px; opacity: 0; animation: fem-tw 6s cubic-bezier(.37, 0, .63, 1) infinite; }
+.fem__tw::before, .fem__tw::after { content: ""; position: absolute; left: 5px; top: 0; width: 2px; height: 12px; border-radius: 1px; background: #b9a0fa; }
+.fem__tw::after { transform: rotate(90deg); }
+.fem__t0 { left: 14%; top: 18%; animation-delay: 200ms; }
+.fem__t1 { right: 8%; top: 4%; animation-delay: 1700ms; }
+.fem__t2 { left: 22%; top: 66%; animation-delay: 3300ms; }
+.fem__t3 { right: 16%; top: 58%; animation-delay: 4600ms; }
+.fem__sh { width: 96px; height: 12px; margin-top: -2px; border-radius: 50%; background: radial-gradient(closest-side, rgba(122, 82, 230, .26), rgba(122, 82, 230, 0)); animation: fem-sh 6s cubic-bezier(.37, 0, .63, 1) infinite; }
+.fem__t { margin-top: 20px; font-size: 17px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
+.fem--compact .fem__t { margin-top: 12px; font-size: 15px; }
+.fem__s { margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: #8b8898; }
+@keyframes fem-f0 { 50% { transform: translateY(-4px); } }
+@keyframes fem-f1 { 50% { transform: translateY(-9px); } }
+@keyframes fem-f2 { 50% { transform: translateY(-14px) rotate(-1.2deg); } }
+@keyframes fem-sh { 50% { transform: scaleX(.8); opacity: .55; } }
+@keyframes fem-bg { 50% { transform: scale(1.08); opacity: .75; } }
+@keyframes fem-tw { 0%, 100% { opacity: 0; transform: scale(.5) rotate(0deg); } 10% { opacity: 1; transform: scale(1) rotate(90deg); } 24% { opacity: 0; transform: scale(.6) rotate(180deg); } }
+@media (prefers-reduced-motion: reduce) { .fem__bg, .fem__ly, .fem__tw, .fem__sh { animation: none; } }

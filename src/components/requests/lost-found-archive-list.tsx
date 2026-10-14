@@ -10,6 +10,7 @@ import { Check, ChevronDown, Search } from "lucide-react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import "./requests-list.css";
+import { FoldyEmpty } from "@/components/shared/foldy-empty";
 
 export type ArchiveItemVM = {
   id: string;
@@ -172,7 +173,7 @@ export function LostFoundArchiveList({ locale, items, stats, todayKey, buildingO
       </div>
 
       {filtered.length === 0 ? (
-        <p className="rqw-empty">{copy.empty}</p>
+        <FoldyEmpty title={copy.empty} />
       ) : (
         groups.map((group) => (
           <div key={group.key}>

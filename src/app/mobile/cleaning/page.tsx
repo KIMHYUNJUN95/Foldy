@@ -40,6 +40,7 @@ import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
+import { FoldyEmpty } from "@/components/shared/foldy-empty";
 
 type MobileCleaningPageProps = {
   searchParams: Promise<{
@@ -676,7 +677,7 @@ export default async function MobileCleaningPage({
                 </div>
               ))
             ) : (
-              <p className="cln-empty">{copy.noCleaningToday}</p>
+              <FoldyEmpty title={copy.noCleaningToday} compact />
             )}
 
             {/* 기타 청소 — 목록에 없는 객실을 골라 시작. 청소 중에는 시작할 수 없어 감춘다. */}
@@ -771,7 +772,7 @@ export default async function MobileCleaningPage({
                   ))}
                 </div>
               ) : (
-                <p className="cln-empty">{copy.noCompleted}</p>
+                <FoldyEmpty title={copy.noCompleted} compact />
               )}
             </section>
           </div>

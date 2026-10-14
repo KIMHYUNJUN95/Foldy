@@ -1,0 +1,42 @@
+/* 온보딩 완료 모션(2026-10-14, 시안 Motion-B-OnbDone-Phone) — 한 번 재생. */
+.obd {
+  --sp: linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000);
+  --spb: linear(0.000,0.045,0.160,0.317,0.490,0.657,0.801,0.913,0.989,1.032,1.047,1.042,1.024,1.002,0.982,0.968,0.962,0.962,0.968,0.976,0.985,0.993,0.999,1.003,1.005,1.005,1.004,1.002,1.000,0.999,0.998,0.998,0.998,0.999,0.999,1.000,1.000,1.000,1.000,1.000,1.000);
+  position: relative; overflow: hidden;
+}
+.obd__ic { position: relative; display: block; width: 84px; height: 84px; }
+.obd__glow { position: absolute; left: 50%; top: 50%; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .42), rgba(239, 231, 255, 0) 62%); opacity: 0; transform: scale(.5); animation: obd-glow 900ms cubic-bezier(.23, 1, .32, 1) 120ms forwards; }
+@keyframes obd-glow { to { opacity: 1; transform: scale(1); } }
+.obd__ray { position: absolute; left: 50%; top: 50%; width: 3px; height: 12px; margin: -6px 0 0 -1.5px; border-radius: 2px; background: #8a63f0; opacity: 0; animation: obd-ray 460ms cubic-bezier(.23, 1, .32, 1) 520ms; }
+@keyframes obd-ray {
+  0% { opacity: 0; transform: rotate(var(--r)) translateY(-44px) scaleY(.2); }
+  22% { opacity: 1; transform: rotate(var(--r)) translateY(-58px) scaleY(1); }
+  100% { opacity: 0; transform: rotate(var(--r)) translateY(-76px) scaleY(.3); }
+}
+.obd__dot { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(150deg, #9b78f5 0%, #6b3fe0 60%, #5b2bd6 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 18px 36px -14px rgba(91, 43, 214, .75); display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.88); animation: obd-pop 750ms var(--spb) 150ms forwards; }
+@keyframes obd-pop { to { opacity: 1; transform: scale(1); } }
+.obd__dot path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: obd-draw 340ms cubic-bezier(.23, 1, .32, 1) 420ms forwards; }
+@keyframes obd-draw { to { stroke-dashoffset: 0; } }
+.obd__ln { display: block; overflow: hidden; padding: 2px 0; }
+.obd__ln > span { transform: translateY(110%) rotate(2deg); transform-origin: 0 100%; animation: obd-up 600ms var(--sp) 600ms forwards; }
+.obd__d2 > span { animation-delay: 660ms; }
+.obd__d3 > span { animation-delay: 720ms; }
+@keyframes obd-up { to { transform: translateY(0) rotate(0deg); } }
+.obd__org { font-weight: 700; color: transparent; background: linear-gradient(100deg, #16141f 0%, #16141f 38%, #8a63f0 50%, #16141f 62%, #16141f 100%); background-size: 300% 100%; background-position: 150% 0; -webkit-background-clip: text; background-clip: text; animation: obd-sweep 800ms cubic-bezier(.77, 0, .175, 1) 1300ms forwards; }
+@keyframes obd-sweep { to { background-position: -50% 0; } }
+.obd__cta { opacity: 0; transform: translateY(16px) scale(.98); animation: obd-cta 600ms var(--sp) 900ms forwards; }
+.obd__cta button { position: relative; overflow: hidden; }
+.obd__cta button::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .35), rgba(255, 255, 255, 0)); transform: translateX(-120%) skewX(-20deg); animation: obd-shine 700ms cubic-bezier(.77, 0, .175, 1) 1700ms forwards; }
+@keyframes obd-cta { to { opacity: 1; transform: none; } }
+@keyframes obd-shine { to { transform: translateX(320%) skewX(-20deg); } }
+.obd__dust { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
+.obd__dust i { position: absolute; left: var(--x); top: 0; width: 4px; height: 4px; border-radius: 50%; background: #b9a0fa; opacity: 0; animation: obd-dust 2300ms linear forwards; }
+@keyframes obd-dust {
+  0% { opacity: 0; transform: translateY(0); }
+  15% { opacity: .8; transform: translateY(-30px); }
+  100% { opacity: 0; transform: translateY(-150px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .obd *, .obd *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .obd__dust, .obd__ray { display: none; }
+}

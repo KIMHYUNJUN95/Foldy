@@ -15,6 +15,8 @@ import {
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import type { Locale } from "@/lib/i18n";
 import type { ProfileGender } from "@/lib/onboarding";
+import { haptic } from "@/lib/haptics";
+import "./onboarding-done.css";
 
 // Navy accent gradient + shadow pulled from the design tokens (matches the auth screens).
 const GRADIENT = "#7a52e6";
@@ -971,6 +973,12 @@ export function OnboardingWizard({
     ? initialPhoneDigits.slice(inferredCountry.dial.replace(/\D/g, "").length)
     : "";
   const [step, setStep] = useState(initialStep);
+  // 완료 화면에서 체크가 그려질 때 성공 진동 한 번(2026-10-14 모션).
+  useEffect(() => {
+    if (step !== 8) return;
+    const id = window.setTimeout(() => haptic("success"), 450);
+    return () => window.clearTimeout(id);
+  }, [step]);
   const [depth, setDepth] = useState(0);
   const [name, setName] = useState(profile.initialName ?? "");
   const [dob, setDob] = useState<DateParts | null>(() => {
@@ -1161,36 +1169,67 @@ export function OnboardingWizard({
           .replace("{org}", preview.organizationName)
           .replace("{role}", roleLabel)
       : success.bodyNoTeam;
+    // 모션(2026-10-14, 시안 Motion-B-OnbDone-Phone): 빛 번짐 위로 체크 원이 튀어나오고 방사선 8개 · 체크 그리기 → 글이 폭포처럼 →
+    // 조직 이름에 빛이 지나감 → 버튼이 올라오며 반짝 한 번. 빛 알갱이가 천천히 떠오름. 체크가 그려질 때 성공 진동(onboarding-done.css).
+    const orgName = preview?.organizationName ?? "";
+    const bodyParts = orgName && body.includes(orgName) ? body.split(orgName) : null;
     return (
       <main
         lang={profile.locale}
-        className="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
+        className="obd flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] text-foreground"
         style={{ background: IVORY_BG }}
       >
         <header className="h-[48px] flex-none" />
+        <span className="obd__dust" aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => (
+            <i key={i} style={{ ["--x" as string]: `${Math.round(Math.cos(i * 2.39996) * 130)}px`, animationDelay: `${900 + i * 90}ms` }} />
+          ))}
+        </span>
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
           <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <span className="mb-5 flex size-[76px] items-center justify-center rounded-[24px] bg-[#f1ecfd] text-primary">
-              <CheckIcon />
+            <span className="obd__ic mb-6" aria-hidden="true">
+              <span className="obd__glow" />
+              {Array.from({ length: 8 }, (_, i) => (
+                <span key={i} className="obd__ray" style={{ ["--r" as string]: `${i * 45}deg` }} />
+              ))}
+              <span className="obd__dot">
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="none">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </span>
-            <p className="mb-[9px] text-[11px] font-extrabold uppercase tracking-[0.13em] t-eyebrow text-muted-foreground">
-              {success.eyebrow}
-            </p>
-            <h1 className="whitespace-pre-line text-[32px] font-bold leading-[1.25] tracking-[-0.035em] t-display">
-              {success.welcomePrefix}
-              {name.trim()}
-              {success.welcomeSuffix}
+            <span className="obd__ln">
+              <span className="mb-[9px] inline-block text-[11px] font-extrabold uppercase tracking-[0.13em] t-eyebrow text-primary">{success.eyebrow}</span>
+            </span>
+            <h1 className="obd__ln obd__d2 whitespace-pre-line text-[32px] font-bold leading-[1.25] tracking-[-0.035em] t-display">
+              <span className="inline-block">
+                {success.welcomePrefix}
+                {name.trim()}
+                {success.welcomeSuffix}
+              </span>
             </h1>
-            <p className="mt-3 max-w-[290px] text-[13.5px] font-semibold leading-[1.6] text-muted-foreground">
-              {body}
+            <p className="obd__ln obd__d3 mt-3 max-w-[290px] text-[13.5px] font-semibold leading-[1.6] text-muted-foreground">
+              <span className="inline-block">
+                {bodyParts ? (
+                  <>
+                    {bodyParts[0]}
+                    <span className="obd__org">{orgName}</span>
+                    {bodyParts.slice(1).join(orgName)}
+                  </>
+                ) : (
+                  body
+                )}
+              </span>
             </p>
           </div>
 
-          <StickyCta
-            label={success.startCta}
-            onClick={() => { window.location.replace(dest); }}
-            withArrow
-          />
+          <div className="obd__cta">
+            <StickyCta
+              label={success.startCta}
+              onClick={() => { window.location.replace(dest); }}
+              withArrow
+            />
+          </div>
         </section>
       </main>
     );

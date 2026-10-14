@@ -15,7 +15,7 @@
 
 import Image from "next/image";
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
-import { Check, Plus, Star, X } from "lucide-react";
+import { Camera, Star, X } from "lucide-react";
 import { AdmDropdown, type AdmOption } from "@/components/admin/shared/adm-dropdown";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import {
@@ -37,6 +37,7 @@ type LinkMode = "reservation" | "place" | "none";
  */
 export type CreatePanelLabels = {
   createTitle: string;
+  createSub: string;
   fieldPlatform: string;
   fieldRating: string;
   fieldTitle: string;
@@ -199,57 +200,67 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
     <>
       <div className="panel-scrim" onClick={isPending ? undefined : onClose} />
       <aside
-        className="panel"
+        className="panel cxw-panel cxw-newp"
         role="dialog"
         aria-modal="true"
         aria-label={labels.createTitle}
         ref={panelRef}
         tabIndex={-1}
       >
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{labels.createTitle}</span>
-            <button type="button" className="panel__x" aria-label={labels.close} onClick={onClose}>
-              <X />
-            </button>
+        {/* 화이트 리디자인(2026-10-14, 시안 FBNewCx-PC): 제목 + 한 줄 설명, 닫기는 위 × 하나. */}
+        <div className="cxw-ph">
+          <div className="cxw-ph__main">
+            <h2 className="cxw-ph__title is-lg">{labels.createTitle}</h2>
+            <span className="cxw-ph__ctx">{labels.createSub}</span>
           </div>
+          <button type="button" className="cxw-ph__x" aria-label={labels.close} onClick={onClose}>
+            <X aria-hidden="true" />
+          </button>
         </div>
 
-        <div className="panel__body">
-          <div className="fld cxfld">
-            <label className="fld__l" htmlFor="cxc-title">
-              {labels.fieldTitle} <span className="req">{labels.required}</span>
-            </label>
-            <input id="cxc-title" ref={titleRef} autoComplete="off" />
-          </div>
+        <div className="panel__body cxw-pb cxw-form">
+          <label className="cxw-nf">
+            <span className="cxw-nf__l">
+              {labels.fieldTitle} <b className="req">{labels.required}</b>
+            </span>
+            <input id="cxc-title" name="title" ref={titleRef} autoComplete="off" />
+          </label>
 
-          <div className="fld cxfld">
-            <label className="fld__l" htmlFor="cxc-body">
-              {labels.fieldBody} <span className="cxopt">{labels.optional}</span>
-            </label>
-            <textarea id="cxc-body" ref={bodyRef} rows={4} placeholder={labels.fieldBodyPlaceholder} />
-          </div>
+          <label className="cxw-nf">
+            <span className="cxw-nf__l">
+              {labels.fieldBody} {labels.optional}
+            </span>
+            <textarea id="cxc-body" name="description" ref={bodyRef} rows={3} placeholder={labels.fieldBodyPlaceholder} />
+          </label>
 
-          <div className="fld cxfld">
-            <label className="fld__l">{labels.fieldPlatform}</label>
-            <AdmDropdown
-              options={platformOptions}
-              value={platform}
-              ariaLabel={labels.fieldPlatform}
-              onChange={(next) => {
-                setPlatform(next as ComplaintPlatform);
-                // 척도가 다른 플랫폼으로 바꾸면 이전 점수는 의미를 잃는다 — 초기화한다.
-                setRating(0);
-              }}
-            />
+          <div className="cxw-fg">
+            <span className="cxw-fg__l">{labels.fieldPlatform}</span>
+            <div className="cxw-tiles is-4" role="radiogroup" aria-label={labels.fieldPlatform}>
+              {platformOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={platform === option.value}
+                  className={platform === option.value ? "on" : undefined}
+                  onClick={() => {
+                    setPlatform(option.value as ComplaintPlatform);
+                    // 척도가 다른 플랫폼으로 바꾸면 이전 점수는 의미를 잃는다 — 초기화한다.
+                    setRating(0);
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* 평점은 척도가 있는 플랫폼에서만 — direct/other는 별점 개념이 없다. */}
           {maxRating > 0 ? (
-            <div className="fld cxfld">
-              <label className="fld__l">
-                {labels.fieldRating} <span className="cxopt">{labels.optional}</span>
-              </label>
+            <div className="cxw-fg">
+              <span className="cxw-fg__l">
+                {labels.fieldRating} {labels.optional}
+              </span>
               <div className="cxstars">
                 {Array.from({ length: maxRating }).map((_, index) => (
                   <button
@@ -269,9 +280,9 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
             </div>
           ) : null}
 
-          <div className="fld cxfld">
-            <label className="fld__l">{labels.fieldLink}</label>
-            <div className="cxseg cxseg--full">
+          <div className="cxw-fg">
+            <span className="cxw-fg__l">{labels.fieldLink}</span>
+            <div className="cxw-tiles" role="radiogroup" aria-label={labels.fieldLink}>
               {(
                 [
                   ["reservation", labels.linkModeReservation],
@@ -282,6 +293,8 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
                 <button
                   key={mode}
                   type="button"
+                  role="radio"
+                  aria-checked={linkMode === mode}
                   className={linkMode === mode ? "on" : undefined}
                   onClick={() => setLinkMode(mode)}
                 >
@@ -292,6 +305,7 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
 
             {linkMode === "reservation" ? (
               <>
+                <p className="cxhint">{labels.linkModeHint}</p>
                 <input
                   className="cxsearch"
                   value={reservationSearch}
@@ -325,7 +339,6 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
 
             {linkMode === "place" ? (
               <>
-                <p className="cxhint">{labels.linkModeHint}</p>
                 <AdmDropdown
                   options={buildingOptions}
                   value={propertyName}
@@ -349,23 +362,24 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
             ) : null}
           </div>
 
-          <div className="fld cxfld">
-            <label className="fld__l" htmlFor="cxc-guest">
-              {labels.fieldGuestName} <span className="cxopt">{labels.optional}</span>
-            </label>
+          <label className="cxw-nf">
+            <span className="cxw-nf__l">
+              {labels.fieldGuestName} {labels.optional}
+            </span>
             <input
               id="cxc-guest"
+              name="guestName"
               value={guestName}
               autoComplete="off"
               placeholder={labels.fieldGuestPlaceholder}
               onChange={(event) => setGuestName(event.target.value)}
             />
-          </div>
+          </label>
 
-          <div className="fld cxfld">
-            <label className="fld__l">
-              {labels.fieldImages} <span className="cxopt">{labels.imagesMax}</span>
-            </label>
+          <div className="cxw-fg">
+            <span className="cxw-fg__l">
+              {labels.fieldImages} {labels.optional} · {images.length}/{MAX_IMAGES}
+            </span>
             <div className="cxupgrid">
               {images.map((url, index) => (
                 <div key={url} className="cxupthumb">
@@ -386,10 +400,7 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
                   disabled={isPending}
                   onClick={() => fileRef.current?.click()}
                 >
-                  <Plus aria-hidden="true" />
-                  <span>
-                    {images.length} / {MAX_IMAGES}
-                  </span>
+                  <Camera aria-hidden="true" />
                 </button>
               ) : null}
             </div>
@@ -405,17 +416,9 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
           {error ? <p className="cxerr">{error}</p> : null}
         </div>
 
-        <div className="panel__foot">
-          <button type="button" className="btn btn--subtle" onClick={onClose} disabled={isPending}>
-            {labels.cancel}
-          </button>
-          <button
-            type="button"
-            className="btn btn--pri btn--block"
-            onClick={handleSubmit}
-            disabled={isPending}
-          >
-            <Check aria-hidden="true" />
+        <div className="cxw-pf">
+          <button type="button" className="cxw-btn is-pri" onClick={handleSubmit} disabled={isPending}>
+            {isPending ? <span className="cxw-spin" aria-hidden="true" /> : null}
             {labels.submit}
           </button>
         </div>

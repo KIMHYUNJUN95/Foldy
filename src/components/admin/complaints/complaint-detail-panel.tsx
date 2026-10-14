@@ -1,21 +1,22 @@
 import Image from "next/image";
 import Link from "next/link";
 import { X } from "lucide-react";
-import type { Complaint } from "@/lib/complaints";
+import type { Complaint, ComplaintComment } from "@/lib/complaints";
 import type { Dictionary } from "@/lib/i18n";
+import { tokyoDateOf } from "@/lib/tokyo-date";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { PLATFORMS } from "@/components/complaints/cx-platform";
+import {
+  ComplaintComposer,
+  ComplaintDeleteButton,
+  ComplaintStatusButton,
+  type ComplaintActionLabels,
+} from "@/components/admin/complaints/complaint-panel-actions";
 
-// 수동 컴플레인 상세 패널 — 서버 컴포넌트.
-//
-// **왜 새 라우트가 아니라 패널인가.** 이 콘솔은 상태를 전부 쿼리스트링으로 들고 서버 렌더 한 번으로
-// 끝낸다(`?review=<id>` 와 동일). `/admin/complaints/[id]` 라우트를 새로 파면 같은 콘솔인데 화면
-// 전환 방식만 다른 곳이 생겨, 「하나의 운영 콘솔」 계약을 깬다(CLAUDE.md §4). `ReviewDetailPanel`
-// 과 **같은 `.panel` 프리미티브와 오버레이**(`ReviewDetailOverlay`)를 그대로 쓴다.
-//
-// 그전에는 수동 컴플레인의 본문·사진·평점·게스트를 콘솔에서 **볼 방법이 아예 없었다** — 목록 행은
-// 제목·상태·건물·날짜·작성자만 보여 주고 클릭도 되지 않았다. 외부 리뷰의 「연결된 컴플레인」 링크도
-// 갈 곳이 없어 수동 목록 전체로 보냈다(2026-09-08 신설).
-//
+// 수동 컴플레인 상세 패널 — 서버 컴포넌트. 화이트 리디자인(2026-10-14, 시안 FBManual-PC 오른쪽):
+// 상태 · 플랫폼 → 제목 → 건물 · 객실 / 예약 / 평점 / 작성자 → 내용 → 사진 → 처리 기록(댓글) + 남기기 →
+// 아래 「처리 완료로 바꾸기」. 위 휴지통은 확인 창을 거친다(hard delete, CLAUDE.md §9).
+// 콘솔 계약대로 `?complaint=<id>` 쿼리로 열고 `.panel` 오버레이를 쓴다(새 라우트를 파지 않는다).
 // 도메인 계약: docs/product/25-complaint-workflow.md
 
 export type ComplaintPanelLabels = {
@@ -28,120 +29,163 @@ export type ComplaintPanelLabels = {
 
 type Props = {
   complaint: Complaint;
+  comments: ComplaintComment[];
   copy: Dictionary["complaints"];
-  /** `dictionary.cleaning.buildingLabels` — 캘린더·청소와 같은 건물 표기를 쓴다. */
   buildingLabels: Record<string, string>;
   labels: ComplaintPanelLabels;
   closeHref: string;
+  canComment: boolean;
+  canChangeStatus: boolean;
+  canDelete: boolean;
+  linkedReviewHref: string | null;
 };
 
-function Kv({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="kv">
-      <span className="kv__k">{label}</span>
-      <span className="kv__v">{children}</span>
-    </div>
-  );
+function stamp(iso: string): string {
+  const day = tokyoDateOf(iso);
+  const time = new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+  return day ? `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))} ${time}` : "—";
 }
 
 export function ComplaintDetailPanel({
   complaint,
+  comments,
   copy,
   buildingLabels,
   labels,
   closeHref,
+  canComment,
+  canChangeStatus,
+  canDelete,
 }: Props) {
   const isOpen = complaint.status === "open";
-  const propertyName = complaint.propertyName
+  const platform =
+    complaint.platform === "direct"
+      ? copy.platformDirect
+      : complaint.platform === "other"
+        ? copy.platformOther
+        : PLATFORMS[complaint.platform]?.name ?? complaint.platform;
+  const building = complaint.propertyName
     ? localizePropertyName(getCanonicalPropertyName(complaint.propertyName), buildingLabels)
-    : "—";
+    : null;
+  const place = building ? `${building}${complaint.roomLabel ? ` · ${complaint.roomLabel}` : ""}` : "—";
+  const max = PLATFORMS[complaint.platform]?.maxRating ?? 5;
+
+  const actionLabels: ComplaintActionLabels = {
+    deleteAction: copy.deleteAction,
+    deleteTitle: copy.wDeleteTitle,
+    deleteSummary: `${complaint.title} · ${place} · ${stamp(complaint.createdAt)} ${complaint.authorName}`,
+    deleteBody: copy.wDeleteBody.replace("{n}", String(comments.length)),
+    deleteLinked: copy.wDeleteLinked,
+    deleteWarn: copy.wDeleteWarn,
+    keep: copy.wKeep,
+    confirmDelete: copy.deleteConfirm,
+    logPlaceholder: copy.wLogPlaceholder,
+    send: copy.wSend,
+    resolve: copy.wResolve,
+    reopen: copy.wReopen,
+    failed: copy.wActionFailed,
+  };
+
+  const rows: [string, React.ReactNode][] = [[copy.wFieldPlace, place]];
+  if (complaint.guestName || complaint.platformRef) {
+    rows.push([
+      copy.wFieldReservation,
+      <span key="r">
+        {complaint.guestName ?? copy.noGuestName}
+        {complaint.platformRef ? <span className="num">{` · ${complaint.platformRef}`}</span> : null}
+      </span>,
+    ]);
+  }
+  if (complaint.rating !== null) {
+    rows.push([
+      copy.metaRating,
+      <span key="g" className="num">
+        <b className="is-bad">{complaint.rating}</b>
+        {` / ${max} · ${platform}`}
+      </span>,
+    ]);
+  }
+  rows.push([copy.authorLabel, <span key="a" className="num">{`${complaint.authorName || "—"} · ${stamp(complaint.createdAt)}`}</span>]);
+  if (complaint.resolvedAt) rows.push([copy.resolvedAtLabel, <span key="d" className="num">{stamp(complaint.resolvedAt)}</span>]);
 
   return (
     <>
-      <Link href={closeHref} className="panel-scrim" aria-label={labels.close} data-panel-close />
-      <aside className="panel" role="dialog" aria-label={copy.viewManual}>
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.viewManual}</span>
-            <Link href={closeHref} className="panel__x" aria-label={labels.close} data-panel-close>
-              <X />
-            </Link>
-          </div>
-          <div className="panel__chips">
-            <span className="rchip void">{complaint.platform}</span>
-            <span className={isOpen ? "rchip review" : "rchip done"}>
-              {isOpen ? copy.statusOpen : copy.statusDone}
+      <Link href={closeHref} className="panel-scrim" aria-label={labels.close} data-panel-close scroll={false} />
+      <aside className="panel cxw-panel" role="dialog" aria-label={copy.viewManual}>
+        <div className="cxw-ph">
+          <div className="cxw-ph__main">
+            <span className="cxw-ph__kick">
+              <span className={`cxw-st${isOpen ? " is-open" : " is-done"}`}>
+                <i aria-hidden="true" />
+                {isOpen ? copy.statusOpen : copy.wDoneTab}
+              </span>
+              <span>{platform}</span>
             </span>
+            <h2 className="cxw-ph__title is-lg">{complaint.title}</h2>
           </div>
-
-          <div className="cxhero">
-            {/* 평점은 있을 때만 — 수동 컴플레인은 점수 없이 등록되는 경우가 더 흔하다. */}
-            {complaint.rating !== null ? (
-              <div className="cxhero__score">
-                <span className="cxhero__v is-bad">{complaint.rating}</span>
-                <span className="cxhero__scale">/ 5</span>
-              </div>
-            ) : null}
-            <div className="cxhero__title">{complaint.title}</div>
-          </div>
+          {canDelete ? <ComplaintDeleteButton complaintId={complaint.id} closeHref={closeHref} labels={actionLabels} /> : null}
+          <Link href={closeHref} className="cxw-ph__x" aria-label={labels.close} data-panel-close scroll={false}>
+            <X aria-hidden="true" />
+          </Link>
         </div>
 
-        <div className="panel__body">
-          <div className="cxbody">
-            {complaint.description ? (
-              <p className="cxbodypart__b">{complaint.description}</p>
-            ) : (
-              <div className="cxscoreonly">
-                <p>{copy.noDescription}</p>
+        <div className="panel__body cxw-pb">
+          <dl className="cxw-dl">
+            {rows.map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{value}</dd>
               </div>
-            )}
-          </div>
+            ))}
+          </dl>
 
-          {/* 첨부 사진 — 목록에서는 있는지조차 알 수 없었다. 원본은 새 탭에서 연다(콘솔에는
-              라이트박스 프리미티브가 없고, 여기서 새로 만들면 모바일과 두 벌이 된다). */}
-          {complaint.imageUrls.length > 0 ? (
-            <div className="pblock">
-              <div className="pblock__t">{copy.photosTitle}</div>
-              <div className="cxshots">
+          <div className="cxw-sec">
+            <div className="cxw-part">
+              <small>{copy.wContent}</small>
+              <p className={complaint.description ? "" : "cxw-dim"}>{complaint.description || copy.noDescription}</p>
+            </div>
+            {complaint.imageUrls.length > 0 ? (
+              <div className="cxw-shots">
                 {complaint.imageUrls.map((url) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="cxshot"
-                    aria-label={copy.photosTitle}
-                  >
-                    <Image src={url} alt="" width={96} height={96} className="cxshot__img" />
+                  <a key={url} href={url} target="_blank" rel="noreferrer" className="cxw-shot" aria-label={copy.photosTitle}>
+                    <Image src={url} alt="" width={72} height={72} />
                   </a>
                 ))}
               </div>
-            </div>
-          ) : null}
-
-          <div className="pblock">
-            <div className="pblock__t">{copy.contextTitle}</div>
-            <Kv label={labels.building}>{propertyName}</Kv>
-            <Kv label={labels.room}>{complaint.roomLabel ?? "—"}</Kv>
-            <Kv label={labels.reservation}>
-              {complaint.platformRef ? (
-                <span className="mono">{complaint.platformRef}</span>
-              ) : (
-                copy.noReservationLink
-              )}
-            </Kv>
-            <Kv label={labels.guest}>{complaint.guestName ?? copy.noGuestName}</Kv>
-            <Kv label={copy.authorLabel}>{complaint.authorName}</Kv>
-            <Kv label={copy.createdAtLabel}>
-              <span className="mono">{complaint.createdAt.slice(0, 10)}</span>
-            </Kv>
-            {complaint.resolvedAt ? (
-              <Kv label={copy.resolvedAtLabel}>
-                <span className="mono">{complaint.resolvedAt.slice(0, 10)}</span>
-              </Kv>
             ) : null}
           </div>
+
+          <div className="cxw-sec">
+            <small className="cxw-k">{copy.wLogTitle.replace("{n}", String(comments.length))}</small>
+            <ol className="cxw-log">
+              {comments.map((comment) => (
+                <li key={comment.id}>
+                  <span className="cxw-log__by">
+                    <b>{comment.authorName || "—"}</b>
+                    <span className="num">{stamp(comment.createdAt)}</span>
+                  </span>
+                  <p>{comment.content}</p>
+                  {comment.imageUrls.length > 0 ? (
+                    <span className="cxw-shots">
+                      {comment.imageUrls.map((url) => (
+                        <a key={url} href={url} target="_blank" rel="noreferrer" className="cxw-shot is-sm" aria-label={copy.photosTitle}>
+                          <Image src={url} alt="" width={56} height={56} />
+                        </a>
+                      ))}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+            {canComment ? <ComplaintComposer complaintId={complaint.id} labels={actionLabels} /> : null}
+          </div>
         </div>
+
+        {canChangeStatus ? (
+          <div className="cxw-pf">
+            <ComplaintStatusButton complaintId={complaint.id} open={isOpen} labels={actionLabels} />
+          </div>
+        ) : null}
       </aside>
     </>
   );

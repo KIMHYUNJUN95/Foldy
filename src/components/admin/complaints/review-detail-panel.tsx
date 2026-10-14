@@ -1,17 +1,21 @@
 import Link from "next/link";
-import { Languages, RotateCcw, X } from "lucide-react";
+import { X } from "lucide-react";
 import { convertReviewAction, translateReviewAction } from "@/app/admin/complaints/actions";
 import { REVIEW_SCALE, type ExternalReviewDetail, type ReviewProvider } from "@/lib/external-reviews";
 import { parseReviewBreakdown, reviewRoomFallbackLabel } from "@/lib/external-review-rules";
 import type { TranslationPart } from "@/lib/review-translate";
 import type { Dictionary } from "@/lib/i18n";
+import { tokyoDateOf } from "@/lib/tokyo-date";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
 
-// 외부 리뷰 상세 패널 — 서버 컴포넌트. 콘솔과 마찬가지로 상태는 전부 쿼리스트링(review/tr)이고,
-// 전환·번역은 서버 액션 폼으로만 일어난다. 클라이언트 상태를 새로 만들지 않는다.
+// 외부 리뷰 상세 패널 — 서버 컴포넌트. 화이트 리디자인(2026-10-14, 시안 FB-PC 오른쪽):
+// 큰 점수 → 제목 → 건물 · 객실 · 게스트 · 예약 → 세부 점수 막대 → 본문(번역) → 비공개 피드백 → 숙소 답글 →
+// 아래 「컴플레인으로 등록」. 상태는 여전히 쿼리스트링(review/tr), 전환 · 번역은 서버 액션 폼.
 // 도메인 계약: docs/product/25-complaint-workflow.md → "External Review Fields", "Review Translation"
 
 const PROVIDER_LABEL: Record<ReviewProvider, string> = { airbnb: "Airbnb", booking: "Booking.com" };
+/** 낮은 평점 경계(서버 위험도 규칙과 같다) — 세부 점수 막대를 빨갛게 칠할 때만 쓴다. */
+const LOW_AT: Record<ReviewProvider, number> = { airbnb: 3, booking: 7 };
 
 export type ReviewPanelLabels = {
   building: string;
@@ -24,7 +28,6 @@ export type ReviewPanelLabels = {
 type Props = {
   review: ExternalReviewDetail;
   copy: Dictionary["complaints"];
-  /** `dictionary.cleaning.buildingLabels` — 캘린더·청소와 같은 건물 표기를 쓰기 위해 받는다. */
   buildingLabels: Record<string, string>;
   labels: ReviewPanelLabels;
   closeHref: string;
@@ -37,7 +40,6 @@ type Props = {
   linkedComplaintHref: string | null;
 };
 
-/** 토글이 켜져 있고 해당 파트의 저장된 번역이 있으면 번역문, 아니면 원문. 번역 실패는 조용히 원문으로. */
 function textFor(
   part: TranslationPart,
   original: string | null,
@@ -47,15 +49,6 @@ function textFor(
   if (!original) return null;
   if (showTranslation && translations[part]) return translations[part] as string;
   return original;
-}
-
-function Kv({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="kv">
-      <span className="kv__k">{label}</span>
-      <span className="kv__v">{children}</span>
-    </div>
-  );
 }
 
 export function ReviewDetailPanel({
@@ -73,16 +66,11 @@ export function ReviewDetailPanel({
   linkedComplaintHref,
 }: Props) {
   const scale = REVIEW_SCALE[review.provider];
+  const risk = review.riskLevel === "risk";
   const hasBody = Boolean(review.reviewText || review.positiveReviewText || review.negativeReviewText);
-  // 번역 버튼은 텍스트가 실제로 있을 때만 — 점수만 있는 리뷰에는 번역할 것이 없다.
   const hasTranslatableText = Boolean(
-    review.reviewText ||
-      review.positiveReviewText ||
-      review.negativeReviewText ||
-      review.headline ||
-      review.privateFeedback,
+    review.reviewText || review.positiveReviewText || review.negativeReviewText || review.headline || review.privateFeedback,
   );
-  // 세부 점수 라벨은 사전으로 현지화한다 — 저장된 원본 키·구조는 그대로다.
   const breakdown = parseReviewBreakdown(review.provider, review.ratingBreakdown, copy.breakdownLabels);
 
   const headlineText = textFor("headline", review.headline, showTranslation, translations);
@@ -91,181 +79,146 @@ export function ReviewDetailPanel({
   const negativeText = textFor("negative", review.negativeReviewText, showTranslation, translations);
   const privateText = textFor("private", review.privateFeedback, showTranslation, translations);
 
+  const building = review.propertyName
+    ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels)
+    : "—";
+  const room = review.displayRoomLabel ?? reviewRoomFallbackLabel(review, copy);
+  const reviewedDay = tokyoDateOf(review.reviewedAt);
+
   return (
     <>
-      <Link href={closeHref} className="panel-scrim" aria-label={labels.close} data-panel-close />
-      <aside className="panel" role="dialog" aria-label={copy.viewReviews}>
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.viewReviews}</span>
-            <Link href={closeHref} className="panel__x" aria-label={labels.close} data-panel-close>
-              <X />
-            </Link>
+      <Link href={closeHref} className="panel-scrim" aria-label={labels.close} data-panel-close scroll={false} />
+      <aside className="panel cxw-panel" role="dialog" aria-label={copy.viewReviews}>
+        <div className="cxw-ph">
+          <div className="cxw-ph__main">
+            <span className="cxw-ph__kick">
+              {risk ? <em className="is-bad">{copy.riskChip}</em> : null}
+              {review.riskLevel === "unrated" ? <em>{copy.unratedChip}</em> : null}
+              <span>{PROVIDER_LABEL[review.provider]}</span>
+              {reviewedDay ? <span className="num">{reviewedDay.replaceAll("-", ".")}</span> : null}
+            </span>
+            <span className="cxw-ph__score">
+              <b className={`num${risk ? " is-bad" : ""}`}>{review.ratingValue === null ? "—" : review.ratingValue}</b>
+              <span>{`/ ${scale}`}</span>
+            </span>
+            {headlineText ? <h2 className="cxw-ph__title">{headlineText}</h2> : null}
+            <span className="cxw-ph__ctx">
+              {`${building} · ${room}${review.guestDisplayName ? ` · ${review.guestDisplayName}` : ""}`}
+              {review.sourceReservationId ? (
+                <>
+                  <br />
+                  <span className="num">{copy.wReservationNo.replace("{id}", review.sourceReservationId)}</span>
+                </>
+              ) : null}
+            </span>
           </div>
-          <div className="panel__chips">
-            <span className="rchip void">{PROVIDER_LABEL[review.provider]}</span>
-            {review.riskLevel === "risk" ? <span className="rchip review">{copy.riskChip}</span> : null}
-            {review.riskLevel === "normal" ? <span className="rchip void">{copy.normalChip}</span> : null}
-            {review.riskLevel === "unrated" ? <span className="rchip void">{copy.unratedChip}</span> : null}
-          </div>
-
-          <div className="cxhero">
-            <div className="cxhero__score">
-              <span className={review.riskLevel === "risk" ? "cxhero__v is-bad" : "cxhero__v"}>
-                {review.ratingValue === null ? "—" : review.ratingValue}
-              </span>
-              <span className="cxhero__scale">{`/ ${scale}`}</span>
-            </div>
-            {headlineText ? (
-              <div className="cxhero__title">{headlineText}</div>
-            ) : review.provider === "airbnb" ? (
-              <div className="cxhero__title is-dim">{copy.noHeadlineAirbnb}</div>
-            ) : null}
-          </div>
+          <Link href={closeHref} className="cxw-ph__x" aria-label={labels.close} data-panel-close scroll={false}>
+            <X aria-hidden="true" />
+          </Link>
         </div>
 
-        <div className="panel__body">
+        <div className="panel__body cxw-pb">
           {breakdown.length > 0 ? (
-            <div className="pblock">
-              <div className="pblock__t cxbodyhead">
-                <span>{copy.breakdownTitle}</span>
-                <span className="cxsrc">{copy.breakdownSource}</span>
-              </div>
-              {breakdown.map((row) => (
-                <Kv key={row.key} label={row.label}>
-                  {row.value}
-                </Kv>
-              ))}
+            <div className="cxw-bk">
+              {breakdown.map((row) => {
+                const value = Number(row.value);
+                const known = Number.isFinite(value);
+                return (
+                  <div className="cxw-bk__row" key={row.key}>
+                    <span>{row.label}</span>
+                    <span className="cxw-bk__bar" aria-hidden="true">
+                      {known ? (
+                        <i className={value <= LOW_AT[review.provider] ? "is-bad" : ""} style={{ width: `${Math.min(100, (value / scale) * 100)}%` }} />
+                      ) : null}
+                    </span>
+                    <b className="num">{known ? value.toFixed(review.provider === "booking" ? 1 : 0) : "—"}</b>
+                  </div>
+                );
+              })}
             </div>
           ) : null}
 
-          <div className="pblock">
-            <div className="pblock__t cxbodyhead">
-              <span>
-                {review.provider === "airbnb" ? copy.publicReview : copy.reviewBody}
-                {/* 번역본을 보여줄 때는 그것이 자동 번역임을 반드시 밝힌다 —
-                    docs/product/25-complaint-workflow.md → "Review Translation". */}
-                {showTranslation ? <span className="cxsrc"> · {copy.translatedBadge}</span> : null}
-              </span>
-              {hasTranslatableText ? (
-                showTranslation ? (
-                  <Link
-                    href={originalHref}
-                    className="cxtrbtn"
-                    aria-label={copy.originalAction}
-                    title={copy.originalAction}
-                  >
-                    <RotateCcw aria-hidden="true" />
-                  </Link>
-                ) : (
-                  <form action={translateReviewAction}>
-                    <input type="hidden" name="reviewId" value={review.id} />
-                    <input type="hidden" name="redirectTo" value={translateRedirectTo} />
-                    <button
-                      type="submit"
-                      className="cxtrbtn"
-                      aria-label={copy.translateAction}
-                      title={copy.translateAction}
-                    >
-                      <Languages aria-hidden="true" />
-                    </button>
-                  </form>
-                )
-              ) : null}
-            </div>
-
+          <div className="cxw-sec">
             {!hasBody ? (
-              <div className="cxscoreonly">
-                <span className="rchip void">{copy.scoreOnly}</span>
-                <p>{copy.scoreOnlyNote}</p>
-              </div>
-            ) : review.provider === "booking" ? (
-              <>
-                {positiveText ? (
-                  <div className="cxbodypart">
-                    <div className="cxbodypart__t">{copy.positiveLabel}</div>
-                    <p className="cxbodypart__b">{positiveText}</p>
-                  </div>
-                ) : null}
-                {negativeText ? (
-                  <div className="cxbodypart">
-                    <div className="cxbodypart__t">{copy.negativeLabel}</div>
-                    <p className="cxbodypart__b">{negativeText}</p>
-                  </div>
-                ) : null}
-              </>
+              <p className="cxw-dim">{copy.scoreOnlyNote}</p>
             ) : (
-              <p className="cxbodypart__b">{publicText}</p>
+              <div className={showTranslation ? "cxw-text is-tr" : "cxw-text"}>
+                {review.provider === "booking" ? (
+                  <>
+                    {positiveText ? (
+                      <div className="cxw-part">
+                        <small>{copy.positiveLabel}</small>
+                        <p>{positiveText}</p>
+                      </div>
+                    ) : null}
+                    {negativeText ? (
+                      <div className="cxw-part">
+                        <small>{copy.negativeLabel}</small>
+                        <p>{negativeText}</p>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="cxw-part">
+                    <p>{publicText}</p>
+                  </div>
+                )}
+              </div>
             )}
-          </div>
-
-          {/* 비공개 피드백 — Airbnb 전용, 공개 리뷰와 반드시 시각적으로 분리한다 (점선 테두리 + warn 톤). */}
-          {review.privateFeedback ? (
-            <div className="cxprivate">
-              <div className="cxprivate__top">
-                <span className="rchip review">{copy.privateBadge}</span>
-                <span className="cxprivate__from">{copy.privateFrom}</span>
-              </div>
-              <p className="cxprivate__body">{privateText}</p>
-              <p className="cxprivate__note">{copy.privateNote}</p>
-            </div>
-          ) : null}
-
-          {/* OTA 답글 — Booking.com 전용, 읽기 전용. Foldy에서 답글을 작성·전송하지 않는다. */}
-          {review.otaReplyText ? (
-            <div className="cxreply">
-              <div className="cxreply__top">
-                <span className="cxreply__t">{copy.otaReply}</span>
-                <span className="rchip void">{copy.readOnly}</span>
-              </div>
-              <p className="cxreply__body">{review.otaReplyText}</p>
-              <p className="cxreply__note">{copy.otaReplyNote}</p>
-            </div>
-          ) : null}
-
-          <div className="pblock">
-            <div className="pblock__t">{copy.contextTitle}</div>
-            <Kv label={labels.building}>
-              {review.propertyName
-                ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels)
-                : "—"}
-            </Kv>
-            <Kv label={labels.room}>
-              {review.displayRoomLabel ?? reviewRoomFallbackLabel(review, copy)}
-            </Kv>
-            {/* 제공자가 쓰는 예약 번호를 그대로 보여 준다 — 운영자가 OTA 익스트라넷에서 검색할 수
-                있는 값이라야 의미가 있다. 우리 예약 행의 uuid는 노출하지 않는다. */}
-            <Kv label={labels.reservation}>
-              {review.sourceReservationId ? (
-                <span className="mono">{review.sourceReservationId}</span>
+            {hasTranslatableText ? (
+              showTranslation ? (
+                <Link href={originalHref} className="cxw-link" scroll={false}>
+                  {copy.wTranslatedNote}
+                </Link>
               ) : (
-                copy.noReservationLink
-              )}
-            </Kv>
-            <Kv label={labels.guest}>{review.guestDisplayName ?? copy.noGuestName}</Kv>
-            <Kv label={copy.importedAt}>
-              <span className="mono">{review.importedAt.slice(0, 10)}</span>
-            </Kv>
+                <form action={translateReviewAction}>
+                  <input type="hidden" name="reviewId" value={review.id} />
+                  <input type="hidden" name="redirectTo" value={translateRedirectTo} />
+                  <button type="submit" className="cxw-link">
+                    {copy.wTranslate}
+                  </button>
+                </form>
+              )
+            ) : null}
           </div>
 
-          <div className="pblock">
-            {review.linkedComplaintId && linkedComplaintHref ? (
-              <Link href={linkedComplaintHref} className="cxlinked">
-                <span className="rchip void">{copy.converted}</span>
-              </Link>
-            ) : canConvert ? (
-              <form action={convertReviewAction}>
-                <input type="hidden" name="reviewId" value={review.id} />
-                <input type="hidden" name="redirectTo" value={convertRedirectTo} />
-                <p className="cxconvertnote">{copy.convertNote}</p>
-                <button type="submit" className="btn btn--pri cxconvertbtn">
-                  {copy.convert}
-                </button>
-              </form>
-            ) : (
-              <p className="cxconvertnote">{copy.convertNote}</p>
-            )}
-          </div>
+          {/* 비공개 피드백 — Airbnb 전용. 공개 리뷰와 섞이지 않게 따로 이름을 단다(점수 · 위험도에는 넣지 않는다). */}
+          {review.privateFeedback ? (
+            <div className="cxw-sec">
+              <div className="cxw-part">
+                <small>{copy.wPrivateLabel}</small>
+                <p>{privateText}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {review.otaReplyText ? (
+            <div className="cxw-sec">
+              <div className="cxw-part is-reply">
+                <small>{copy.wReply}</small>
+                <p>{review.otaReplyText}</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="cxw-pf">
+          {review.linkedComplaintId && linkedComplaintHref ? (
+            <Link href={linkedComplaintHref} className="cxw-btn is-soft" scroll={false}>
+              {copy.wLinked} · {copy.viewLinkedComplaint}
+            </Link>
+          ) : canConvert ? (
+            <form action={convertReviewAction} className="cxw-pf__form">
+              <input type="hidden" name="reviewId" value={review.id} />
+              <input type="hidden" name="redirectTo" value={convertRedirectTo} />
+              <span className="cxw-pf__note">{copy.wConvertNote}</span>
+              <button type="submit" className="cxw-btn is-pri">
+                {copy.convert}
+              </button>
+            </form>
+          ) : (
+            <span className="cxw-pf__note">{copy.wConvertNote}</span>
+          )}
         </div>
       </aside>
     </>

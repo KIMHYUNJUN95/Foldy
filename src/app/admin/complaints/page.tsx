@@ -2,9 +2,13 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { ComplaintsConsole } from "@/components/admin/complaints/complaints-console";
 import {
   canModerateComplaints,
+  canChangeStatus,
+  canWriteComment,
   canWriteComplaint,
   getComplaint,
+  listComplaintComments,
   listComplaints,
+  type ComplaintComment,
   type Complaint,
 } from "@/lib/complaints";
 import {
@@ -14,6 +18,7 @@ import {
 import {
   getExternalReview,
   listExternalReviews,
+  listReviewBuildingOptions,
   summarizeReviewsByPlace,
   type ExternalReviewDetail,
   type ReviewListFilter,
@@ -37,6 +42,19 @@ type SearchParams = {
   provider?: string;
   property?: string;
   room?: string;
+  /** 건물 필터(정규화 건물명) — 리뷰 · 수동 컴플레인 공용. 화이트 리디자인(2026-10-14). */
+  building?: string;
+  /** 객실 필터(표시 라벨) — 건물을 고른 뒤에만. */
+  rl?: string;
+  /** 건물 · 객실별 집계 단위 — building(기본) | room. */
+  by?: string;
+  /** 건물 · 객실별 정렬 — ratio(기본) | count. */
+  sort?: string;
+  /** 수동 컴플레인 상태 — open | done. */
+  st?: string;
+  /** 수동 컴플레인 플랫폼 · 작성자 고르기. */
+  mp?: string;
+  author?: string;
   risk?: string;
   /** 상세 패널을 여는 외부 리뷰 id. */
   review?: string;
@@ -73,12 +91,18 @@ export default async function AdminComplaintsPage({
       ? params.view
       : "reviews";
 
+  // 건물 고르기는 정규화 이름 하나가 여러 property_id 에 대응한다(Beds24 원본 표기가 여럿) — 마스터에서 묶는다.
+  const buildingOptions = await listReviewBuildingOptions({ session, locale: session.user.preferredLanguage });
+  const building = buildingOptions.find((option) => option.value === params.building?.trim()) ?? null;
+  const roomLabel = building ? params.rl?.trim() || null : null;
+
   const filter: ReviewListFilter = {
     from,
     to,
     riskOnly: params.risk === "1",
     provider: params.provider === "airbnb" || params.provider === "booking" ? params.provider : undefined,
     propertyId: params.property?.trim() || undefined,
+    propertyIds: building ? building.propertyIds : undefined,
     roomId: params.room?.trim() || undefined,
   };
 
@@ -87,7 +111,7 @@ export default async function AdminComplaintsPage({
   // 등록 패널의 선택지는 작성 권한자에게만 필요하다 — 권한이 없으면 두 쿼리를 아예 돌리지 않는다.
   const canWrite = canWriteComplaint(session.user.role);
 
-  const [complaints, reviews, summaries, createReservations, createPlaces, reviewSync] = await Promise.all([
+  const [complaints, allReviews, summaries, createReservations, createPlaces, reviewSync] = await Promise.all([
     listComplaints({ session }),
     listExternalReviews({ session, filter }),
     summarizeReviewsByPlace({ session, from, to, locale: session.user.preferredLanguage }),
@@ -119,9 +143,14 @@ export default async function AdminComplaintsPage({
     }
   }
 
+  let comments: ComplaintComment[] = [];
   if (complaintId) {
     selectedComplaint = await getComplaint({ session, id: complaintId });
+    if (selectedComplaint) comments = await listComplaintComments({ session, complaintId });
   }
+
+  // 객실은 표시 라벨로 거른다 — 같은 방을 두 Beds24 어카운트가 나눠 쓰므로 room_id 하나로는 모자란다.
+  const reviews = roomLabel ? allReviews.filter((review) => review.displayRoomLabel === roomLabel) : allReviews;
 
   return (
     <AdminShell activeItem="complaints" title={dictionary.complaints.adminTitle}>
@@ -135,6 +164,17 @@ export default async function AdminComplaintsPage({
         to={to}
         filter={filter}
         complaints={complaints}
+        comments={comments}
+        canComment={canWriteComment(session.user.role)}
+        canChangeSelectedStatus={selectedComplaint ? canChangeStatus(session, selectedComplaint) : false}
+        buildingOptions={buildingOptions.map(({ value, label }) => ({ value, label }))}
+        building={building?.value ?? null}
+        roomLabel={roomLabel}
+        roomsBy={params.by === "room" ? "room" : "building"}
+        roomsSort={params.sort === "count" ? "count" : "ratio"}
+        manualStatus={params.st === "open" || params.st === "done" ? params.st : "all"}
+        manualPlatform={params.mp?.trim() || "all"}
+        manualAuthor={params.author?.trim() || "all"}
         currentUserId={session.user.id}
         canModerate={canModerateComplaints(session.user.role)}
         canWrite={canWrite}

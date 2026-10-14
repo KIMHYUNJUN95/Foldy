@@ -63,6 +63,8 @@ function collectImageUrls(formData: FormData): string[] {
 function revalidateComplaintSurfaces(complaintId?: string) {
   revalidatePath("/mobile/complaints");
   if (complaintId) revalidatePath(`/mobile/complaints/${complaintId}`);
+  // 어드민 콘솔도 같은 데이터를 보여 준다(상세 패널의 처리 기록 · 상태).
+  revalidatePath("/admin/complaints");
 }
 
 export async function uploadComplaintImageAction(

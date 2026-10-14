@@ -23,10 +23,8 @@ export function ComplaintCreateLauncher({ label, labels, reservations, places }:
 
   return (
     <>
-      <button type="button" className="chipbtn" onClick={() => setOpen(true)}>
-        <span className="ic">
-          <Plus aria-hidden="true" />
-        </span>
+      <button type="button" className="cxw-create" onClick={() => setOpen(true)}>
+        <Plus aria-hidden="true" />
         {label}
       </button>
       {open ? (

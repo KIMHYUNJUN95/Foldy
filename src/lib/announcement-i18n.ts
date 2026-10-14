@@ -208,8 +208,104 @@ export type AnnouncementConsoleDictionary = {
   retry: string;
 };
 
+// 화이트 리디자인 공지 콘솔(2026-10-15) 문구. `{n}` `{p}` `{r}` `{t}` `{d}` `{date}` 는 String.replace 로 채운다.
+export type AnnouncementWhiteCopy = {
+  sumPinned: string;
+  sumPopup: string;
+  sumImpUnread: string;
+  sumImpClear: string;
+  colTitle: string;
+  colTarget: string;
+  colAuthor: string;
+  colPublished: string;
+  colUpdated: string;
+  colRead: string;
+  unreadPeople: string;
+  allRead: string;
+  readOf: string;
+  notPublished: string;
+  pinned: string;
+  important: string;
+  popupUntil: string;
+  popupOn: string;
+  popupEnded: string;
+  everyone: string;
+  emptyPub: string;
+  emptyDraft: string;
+  emptyArc: string;
+  emptyPubHint: string;
+  loadError: string;
+  stPublished: string;
+  stDraft: string;
+  stArchived: string;
+  readTitle: string;
+  tabUnread: string;
+  tabRead: string;
+  readLoading: string;
+  readListError: string;
+  noneUnread: string;
+  noneRead: string;
+  notSentNote: string;
+  popupNote: string;
+  org: string;
+  edit: string;
+  archive: string;
+  publish: string;
+  revert: string;
+  republish: string;
+  delete: string;
+  close: string;
+  mobileView: string;
+  noPermission: string;
+  photoOpen: string;
+  keep: string;
+  cDelT: string;
+  cDelS: string;
+  cDelBtn: string;
+  cArcT: string;
+  cArcS: string;
+  cRevT: string;
+  cRevS: string;
+  cPubT: string;
+  cPubS: string;
+  cRepT: string;
+  back: string;
+  newTitle: string;
+  editTitle: string;
+  fTitle: string;
+  fBody: string;
+  fTitlePh: string;
+  fBodyPh: string;
+  photoAdd: string;
+  photoRemove: string;
+  photoCount: string;
+  settings: string;
+  target: string;
+  scopeEveryone: string;
+  scopeRoles: string;
+  recipients: string;
+  fImportant: string;
+  fImportantSub: string;
+  fPinned: string;
+  fPinnedSub: string;
+  fPopup: string;
+  fPopupSub: string;
+  fPopupEnd: string;
+  fPopupEndPh: string;
+  publishHint: string;
+  saveDraft: string;
+  save: string;
+  cancel: string;
+  saving: string;
+  uploading: string;
+  leaveT: string;
+  leaveS: string;
+  leaveBtn: string;
+};
+
 type AnnouncementDictionary = {
   console: AnnouncementConsoleDictionary;
+  white: AnnouncementWhiteCopy;
   allowComments: string;
   archive: string;
   archivedAt: string;
@@ -625,6 +721,100 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       errS: "\uB124\uD2B8\uC6CC\uD06C \uC0C1\uD0DC\uB97C \uD655\uC778\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.",
       retry: "\uB2E4\uC2DC \uC2DC\uB3C4",
     },
+    // 화이트 리디자인(2026-10-15) — PC 공지 콘솔 · 작성 화면.
+    white: {
+      sumPinned: "고정 {n}",
+      sumPopup: "팝업 켜짐 {n}",
+      sumImpUnread: "중요 공지 {n}건에 아직 안 읽은 사람 {p}명",
+      sumImpClear: "중요 공지는 모두 읽었어요",
+      colTitle: "제목",
+      colTarget: "대상",
+      colAuthor: "작성자",
+      colPublished: "게시일",
+      colUpdated: "수정일",
+      colRead: "읽음",
+      unreadPeople: "{n}명 안 읽음",
+      allRead: "모두 읽음",
+      readOf: "{r} / {t}명",
+      notPublished: "게시 전",
+      pinned: "고정",
+      important: "중요",
+      popupUntil: "팝업 {date}까지",
+      popupOn: "팝업",
+      popupEnded: "팝업 끝남",
+      everyone: "전체",
+      emptyPub: "게시 중인 공지가 없어요",
+      emptyDraft: "초안이 없어요",
+      emptyArc: "보관한 공지가 없어요",
+      emptyPubHint: "새 공지를 쓰면 받는 사람 앱에 바로 보여요",
+      loadError: "공지를 불러오지 못했어요",
+      stPublished: "게시 중",
+      stDraft: "초안",
+      stArchived: "보관됨",
+      readTitle: "읽음",
+      tabUnread: "안 읽음",
+      tabRead: "읽음",
+      readLoading: "명단을 불러오는 중…",
+      readListError: "명단을 불러오지 못했어요",
+      noneUnread: "모두 읽었어요",
+      noneRead: "아직 읽은 사람이 없어요",
+      notSentNote: "게시하면 받는 사람 {n}명의 읽음이 여기 보여요",
+      popupNote: "팝업을 닫은 사람 {d}명 · 닫은 것은 읽음으로 세지 않아요",
+      org: "조직",
+      edit: "수정",
+      archive: "보관하기",
+      publish: "게시하기",
+      revert: "초안으로",
+      republish: "다시 게시",
+      delete: "공지 삭제",
+      close: "상세 닫기",
+      mobileView: "모바일 화면으로 보기",
+      noPermission: "이 공지는 작성자와 운영 관리자만 바꿀 수 있어요",
+      photoOpen: "사진 {n} 크게 보기",
+      keep: "그대로 두기",
+      cDelT: "이 공지를 삭제할까요?",
+      cDelS: "삭제하면 되돌릴 수 없어요. 읽음 기록도 함께 지워져요.",
+      cDelBtn: "삭제",
+      cArcT: "이 공지를 보관할까요?",
+      cArcS: "직원 앱에서 내려가고 보관 탭으로 옮겨져요. 읽음 기록은 남아요.",
+      cRevT: "초안으로 되돌릴까요?",
+      cRevS: "직원 앱에서 내려가고 초안 탭으로 옮겨져요.",
+      cPubT: "이 공지를 게시할까요?",
+      cPubS: "받는 사람 {n}명의 앱에 바로 보여요.",
+      cRepT: "보관한 공지를 다시 게시할까요?",
+      back: "공지 목록",
+      newTitle: "새 공지",
+      editTitle: "공지 수정",
+      fTitle: "제목",
+      fBody: "본문",
+      fTitlePh: "예) 11월 근무표 제출 안내",
+      fBodyPh: "직원에게 전할 내용을 써 주세요",
+      photoAdd: "사진 추가",
+      photoRemove: "사진 빼기",
+      photoCount: "{n} / 5",
+      settings: "게시 설정",
+      target: "대상",
+      scopeEveryone: "전체",
+      scopeRoles: "역할 선택",
+      recipients: "받는 사람 {n}명",
+      fImportant: "중요",
+      fImportantSub: "목록에서 빨간 글자로 강조",
+      fPinned: "맨 위 고정",
+      fPinnedSub: "목록 맨 위에 계속 보여요",
+      fPopup: "앱 열 때 팝업",
+      fPopupSub: "받는 사람이 7일 동안 숨길 수 있어요",
+      fPopupEnd: "팝업 끝나는 날",
+      fPopupEndPh: "정하지 않음",
+      publishHint: "게시하면 받는 사람 앱에 바로 보여요",
+      saveDraft: "초안 저장",
+      save: "저장",
+      cancel: "취소",
+      saving: "저장하는 중…",
+      uploading: "사진 올리는 중…",
+      leaveT: "작성 중인 내용을 버릴까요?",
+      leaveS: "지금 나가면 저장하지 않은 내용이 사라져요.",
+      leaveBtn: "버리고 나가기",
+    },
   },
   ja: {
     allowComments: "\u30B3\u30E1\u30F3\u30C8\u3092\u8A31\u53EF",
@@ -960,6 +1150,100 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       errS: "\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u72B6\u614B\u3092\u78BA\u8A8D\u3057\u3066\u304B\u3089\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
       retry: "\u518D\u8A66\u884C",
     },
+    // 화이트 리디자인(2026-10-15) — PC 공지 콘솔 · 작성 화면.
+    white: {
+      sumPinned: "固定 {n}",
+      sumPopup: "ポップアップ {n}",
+      sumImpUnread: "重要なお知らせ{n}件に未読 {p}人",
+      sumImpClear: "重要なお知らせは全員既読です",
+      colTitle: "タイトル",
+      colTarget: "対象",
+      colAuthor: "作成者",
+      colPublished: "掲載日",
+      colUpdated: "更新日",
+      colRead: "既読",
+      unreadPeople: "未読 {n}人",
+      allRead: "全員既読",
+      readOf: "{r} / {t}人",
+      notPublished: "未掲載",
+      pinned: "固定",
+      important: "重要",
+      popupUntil: "ポップアップ {date}まで",
+      popupOn: "ポップアップ",
+      popupEnded: "ポップアップ終了",
+      everyone: "全員",
+      emptyPub: "掲載中のお知らせはありません",
+      emptyDraft: "下書きはありません",
+      emptyArc: "アーカイブしたお知らせはありません",
+      emptyPubHint: "新しいお知らせはすぐに対象者のアプリに表示されます",
+      loadError: "お知らせを読み込めませんでした",
+      stPublished: "掲載中",
+      stDraft: "下書き",
+      stArchived: "アーカイブ済み",
+      readTitle: "既読",
+      tabUnread: "未読",
+      tabRead: "既読",
+      readLoading: "名簿を読み込み中…",
+      readListError: "名簿を読み込めませんでした",
+      noneUnread: "全員既読です",
+      noneRead: "まだ誰も読んでいません",
+      notSentNote: "掲載すると対象者{n}人の既読がここに表示されます",
+      popupNote: "ポップアップを閉じた人 {d}人 · 閉じただけでは既読になりません",
+      org: "組織",
+      edit: "編集",
+      archive: "アーカイブ",
+      publish: "掲載する",
+      revert: "下書きに戻す",
+      republish: "再掲載",
+      delete: "お知らせを削除",
+      close: "詳細を閉じる",
+      mobileView: "モバイル画面で見る",
+      noPermission: "このお知らせは作成者と運営管理者のみ変更できます",
+      photoOpen: "写真{n}を拡大",
+      keep: "そのままにする",
+      cDelT: "このお知らせを削除しますか？",
+      cDelS: "削除すると元に戻せません。既読の記録も消えます。",
+      cDelBtn: "削除",
+      cArcT: "このお知らせをアーカイブしますか？",
+      cArcS: "スタッフのアプリから外れ、アーカイブに移ります。既読の記録は残ります。",
+      cRevT: "下書きに戻しますか？",
+      cRevS: "スタッフのアプリから外れ、下書きに移ります。",
+      cPubT: "このお知らせを掲載しますか？",
+      cPubS: "対象者{n}人のアプリにすぐ表示されます。",
+      cRepT: "アーカイブしたお知らせを再掲載しますか？",
+      back: "お知らせ一覧",
+      newTitle: "新しいお知らせ",
+      editTitle: "お知らせを編集",
+      fTitle: "タイトル",
+      fBody: "本文",
+      fTitlePh: "例）11月のシフト提出のお願い",
+      fBodyPh: "スタッフに伝える内容を入力してください",
+      photoAdd: "写真を追加",
+      photoRemove: "写真を外す",
+      photoCount: "{n} / 5",
+      settings: "掲載設定",
+      target: "対象",
+      scopeEveryone: "全員",
+      scopeRoles: "役割を選ぶ",
+      recipients: "対象者 {n}人",
+      fImportant: "重要",
+      fImportantSub: "一覧で赤字で強調",
+      fPinned: "上部に固定",
+      fPinnedSub: "一覧の一番上に表示し続けます",
+      fPopup: "アプリ起動時にポップアップ",
+      fPopupSub: "対象者は7日間非表示にできます",
+      fPopupEnd: "ポップアップ終了日",
+      fPopupEndPh: "指定しない",
+      publishHint: "掲載するとすぐに対象者のアプリに表示されます",
+      saveDraft: "下書き保存",
+      save: "保存",
+      cancel: "キャンセル",
+      saving: "保存中…",
+      uploading: "写真をアップロード中…",
+      leaveT: "入力中の内容を破棄しますか？",
+      leaveS: "今離れると保存していない内容は消えます。",
+      leaveBtn: "破棄して戻る",
+    },
   },
   en: {
     allowComments: "Allow comments",
@@ -1267,6 +1551,100 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       errT: "Could not load announcements",
       errS: "Check your connection and try again.",
       retry: "Retry",
+    },
+    // 화이트 리디자인(2026-10-15) — PC 공지 콘솔 · 작성 화면.
+    white: {
+      sumPinned: "{n} pinned",
+      sumPopup: "{n} with pop-up",
+      sumImpUnread: "{p} people still haven't read {n} important notices",
+      sumImpClear: "Everyone has read the important notices",
+      colTitle: "Title",
+      colTarget: "Audience",
+      colAuthor: "Author",
+      colPublished: "Posted",
+      colUpdated: "Edited",
+      colRead: "Read",
+      unreadPeople: "{n} unread",
+      allRead: "All read",
+      readOf: "{r} / {t}",
+      notPublished: "Not posted",
+      pinned: "Pinned",
+      important: "Important",
+      popupUntil: "Pop-up until {date}",
+      popupOn: "Pop-up",
+      popupEnded: "Pop-up ended",
+      everyone: "Everyone",
+      emptyPub: "No notices are posted",
+      emptyDraft: "No drafts",
+      emptyArc: "No archived notices",
+      emptyPubHint: "A new notice shows up in recipients' app right away",
+      loadError: "Couldn't load notices",
+      stPublished: "Posted",
+      stDraft: "Draft",
+      stArchived: "Archived",
+      readTitle: "Read",
+      tabUnread: "Unread",
+      tabRead: "Read",
+      readLoading: "Loading list…",
+      readListError: "Couldn't load the list",
+      noneUnread: "Everyone has read it",
+      noneRead: "No one has read it yet",
+      notSentNote: "Once posted, read status for {n} recipients shows here",
+      popupNote: "{d} closed the pop-up · closing it doesn't count as read",
+      org: "Organization",
+      edit: "Edit",
+      archive: "Archive",
+      publish: "Post",
+      revert: "Back to draft",
+      republish: "Post again",
+      delete: "Delete notice",
+      close: "Close details",
+      mobileView: "View on mobile",
+      noPermission: "Only the author and operations admins can change this notice",
+      photoOpen: "Open photo {n}",
+      keep: "Keep it",
+      cDelT: "Delete this notice?",
+      cDelS: "This can't be undone. Read records are deleted too.",
+      cDelBtn: "Delete",
+      cArcT: "Archive this notice?",
+      cArcS: "It leaves the staff app and moves to Archived. Read records are kept.",
+      cRevT: "Move back to draft?",
+      cRevS: "It leaves the staff app and moves to Drafts.",
+      cPubT: "Post this notice?",
+      cPubS: "It shows up right away for {n} recipients.",
+      cRepT: "Post this archived notice again?",
+      back: "Notices",
+      newTitle: "New notice",
+      editTitle: "Edit notice",
+      fTitle: "Title",
+      fBody: "Body",
+      fTitlePh: "e.g. Submit your November shifts",
+      fBodyPh: "Write what staff need to know",
+      photoAdd: "Add photo",
+      photoRemove: "Remove photo",
+      photoCount: "{n} / 5",
+      settings: "Posting",
+      target: "Audience",
+      scopeEveryone: "Everyone",
+      scopeRoles: "Pick roles",
+      recipients: "{n} recipients",
+      fImportant: "Important",
+      fImportantSub: "Highlighted in red in the list",
+      fPinned: "Pin to top",
+      fPinnedSub: "Stays at the top of the list",
+      fPopup: "Pop-up on app open",
+      fPopupSub: "Recipients can hide it for 7 days",
+      fPopupEnd: "Pop-up ends",
+      fPopupEndPh: "No end date",
+      publishHint: "Posting shows it in recipients' app right away",
+      saveDraft: "Save draft",
+      save: "Save",
+      cancel: "Cancel",
+      saving: "Saving…",
+      uploading: "Uploading photos…",
+      leaveT: "Discard what you wrote?",
+      leaveS: "Unsaved changes will be lost if you leave now.",
+      leaveBtn: "Discard and leave",
     },
   },
 };

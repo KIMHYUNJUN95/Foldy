@@ -808,8 +808,8 @@ export async function deleteAnnouncementConsole(
 export type AnnouncementReadStatusResult =
   | {
       ok: true;
-      readers: { id: string; name: string; readAt: string | null }[];
-      unreadUsers: { id: string; name: string }[];
+      readers: { id: string; name: string; readAt: string | null; role: string }[];
+      unreadUsers: { id: string; name: string; role: string }[];
     }
   | { ok: false; error: string };
 
@@ -835,10 +835,12 @@ export async function getAnnouncementReadStatusConsole(
       id: reader.id,
       name: reader.name,
       readAt: reader.readAt,
+      role: reader.role,
     })),
     unreadUsers: summary.unreadUsers.map((user) => ({
       id: user.id,
       name: user.name,
+      role: user.role,
     })),
   };
 }

@@ -1645,6 +1645,20 @@
 .adm .acw-rcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); column-gap: 28px; }
 .adm .acw-rc { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; border-top: 1px solid #f7f7f9; font-size: 13px; }
 
+.adm .acw-copy { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px; margin: -2px -6px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 13px; color: #16141f; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .acw-copy.is-big { font-size: 18px; font-weight: 700; }
+.adm .acw-copy:hover { background: #f4f4f7; }
+.adm .acw-copy:active { transform: scale(.97); }
+.adm .acw-copy:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.adm .acw-copy__ic { width: 13px; height: 13px; color: #8b8898; opacity: 0; transition: opacity 120ms ease; }
+.adm .acw-copy.is-big .acw-copy__ic { width: 14px; height: 14px; opacity: 1; }
+.adm .acw-copy:hover .acw-copy__ic, .adm .acw-copy:focus-visible .acw-copy__ic { opacity: 1; }
+@media (hover: none) { .adm .acw-copy__ic { opacity: 1; } }
+.adm .acw-copy__done { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #1f7a4d; }
+.adm .acw-copy__done svg { width: 14px; height: 14px; }
+.adm .acw-copy__done svg path, .adm .acw-copy__done svg polyline { stroke-dasharray: 24; animation: acw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes acw-draw { from { stroke-dashoffset: 24; } }
+
 /* 예약 상세 패널 */
 .adm .acw-panel { background: #fff; border-left: 0; }
 .adm .acw-ph { display: flex; align-items: center; gap: 8px; padding: 18px 20px 4px 24px; }
@@ -1675,6 +1689,6 @@
 .adm .acw-panel button:focus-visible, .adm .acw-panel a:focus-visible, .adm .acw-bar button:focus-visible, .adm .acw-bar a:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .acw .admcal__bar, .adm .acw-row, .adm .acw-pb { animation: none; }
+  .adm .acw .admcal__bar, .adm .acw-row, .adm .acw-pb, .adm .acw-copy__done svg path, .adm .acw-copy__done svg polyline { animation: none; }
   .adm .acw .admcal__bar, .adm .acw-ib, .adm .acw-sq, .adm .acw-btn, .adm .acw-fresh svg { transition: none; }
 }

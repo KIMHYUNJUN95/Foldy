@@ -2729,6 +2729,8 @@ const FALLBACK_DICTIONARY = {
       wPhoneMissing: "No phone number",
       wBlockedLegend: "Blocked dates",
       wPhoneCopied: "Phone number copied",
+      wCodeCopied: "Copied",
+      wCopyCode: "Copy {label}",
     },
     orders: {
       adminDescription: "Review and export supply order requests for your organization.",
@@ -9680,6 +9682,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         wPhoneMissing: "전화번호 없음",
         wBlockedLegend: "막아 둔 기간",
         wPhoneCopied: "전화번호를 복사했어요",
+        wCodeCopied: "복사됨",
+        wCopyCode: "{label} 복사",
       },
       orders: {
         adminDescription: "조직의 비품·주문 요청을 필터 조건에 맞춰 CSV로 내려받을 수 있습니다.",
@@ -16497,6 +16501,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         wPhoneMissing: "電話番号なし",
         wBlockedLegend: "ブロック期間",
         wPhoneCopied: "電話番号をコピーしました",
+        wCodeCopied: "コピーしました",
+        wCopyCode: "{label}をコピー",
       },
       orders: {
         adminDescription: "組織の備品・注文リクエストを確認し、CSVでダウンロードできます。",

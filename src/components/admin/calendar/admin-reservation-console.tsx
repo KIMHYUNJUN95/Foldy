@@ -13,6 +13,7 @@ import {
   BedDouble,
   Building2,
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -297,10 +298,24 @@ function cloneBuildingInfos(buildingInfos: PropertyMapMeta[]) {
 }
 
 function copyText(value: string) {
-  if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-    return Promise.reject(new Error("clipboard_unavailable"));
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(value).catch(() => legacyCopy(value));
   }
-  return navigator.clipboard.writeText(value);
+  return legacyCopy(value);
+}
+
+/** 보안 컨텍스트가 아니거나 권한이 막혔을 때 — 숨긴 입력칸으로 복사한다(초대코드 복사와 같은 방식). */
+function legacyCopy(value: string) {
+  if (typeof document === "undefined") return Promise.reject(new Error("clipboard_unavailable"));
+  const area = document.createElement("textarea");
+  area.value = value;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(area);
+  return ok ? Promise.resolve() : Promise.reject(new Error("clipboard_unavailable"));
 }
 
 export function AdminReservationConsole({
@@ -1117,7 +1132,12 @@ export function AdminReservationConsole({
                             value={access.code}
                           />
                         ) : (
-                          <b className="acw-mono">{access.code}</b>
+                          <CopyCode
+                            big
+                            code={access.code}
+                            copiedLabel={copy.wCodeCopied}
+                            label={copy.wCopyCode.replace("{label}", labels.label)}
+                          />
                         )}
                       </div>
                     );
@@ -1169,7 +1189,15 @@ export function AdminReservationConsole({
                             value={room.code}
                           />
                         ) : (
-                          <span className="acw-mono">{room.code || copy.none}</span>
+                          room.code ? (
+                            <CopyCode
+                              code={room.code}
+                              copiedLabel={copy.wCodeCopied}
+                              label={copy.wCopyCode.replace("{label}", room.roomLabel)}
+                            />
+                          ) : (
+                            <span className="acw-soft">{copy.none}</span>
+                          )
                         )}
                       </div>
                     ))}
@@ -1714,5 +1742,43 @@ function FragmentRows({
         })
       )}
     </>
+  );
+}
+
+/**
+ * 출입 코드 복사 — 화이트 리디자인(2026-10-14, 사용자 요청 · 시안 CalInfo-PC). 코드를 누르면 복사되고 그 자리가 1.6초 「✓ 복사됨」(체크 그리기).
+ * 따로 알림 창을 띄우지 않는다 — 누른 자리에서 결과가 보인다.
+ */
+function CopyCode({ code, label, copiedLabel, big = false }: { code: string; label: string; copiedLabel: string; big?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      aria-label={label}
+      className={`acw-copy${big ? " is-big" : ""}${copied ? " is-done" : ""}`}
+      onClick={() => {
+        copyText(code)
+          .then(() => setCopied(true))
+          .catch(() => setCopied(false));
+      }}
+      title={label}
+      type="button"
+    >
+      {copied ? (
+        <span className="acw-copy__done" role="status">
+          <Check aria-hidden="true" strokeWidth={2.4} />
+          {copiedLabel}
+        </span>
+      ) : (
+        <>
+          <span className="acw-mono">{code}</span>
+          <Copy aria-hidden="true" className="acw-copy__ic" />
+        </>
+      )}
+    </button>
   );
 }

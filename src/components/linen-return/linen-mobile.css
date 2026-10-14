@@ -173,3 +173,6 @@
   .lnw-done__ic svg { animation: none; stroke-dashoffset: 0; }
   .lnw-done__bar i { animation: none; }
 }
+/* 모바일 목록 · 메뉴는 스크롤바를 보이지 않는다(스크롤은 그대로). */
+.lnw-blist, .lnw-fmenu__list { scrollbar-width: none; -ms-overflow-style: none; }
+.lnw-blist::-webkit-scrollbar, .lnw-fmenu__list::-webkit-scrollbar { display: none; }

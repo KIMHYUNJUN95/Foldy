@@ -154,3 +154,6 @@
 .ofw-linked dl > div { display: flex; justify-content: space-between; gap: 12px; }
 .ofw-linked dt { color: #6b6878; font-weight: 400; }
 .ofw-linked dd { margin: 0; color: #16141f; font-weight: 600; }
+/* 모바일 목록 · 메뉴는 스크롤바를 보이지 않는다(스크롤은 그대로). */
+.ofw-dd__menu, .ofw-sheet__list { scrollbar-width: none; -ms-overflow-style: none; }
+.ofw-dd__menu::-webkit-scrollbar, .ofw-sheet__list::-webkit-scrollbar { display: none; }

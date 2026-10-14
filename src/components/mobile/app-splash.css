@@ -4,9 +4,12 @@
   --sps: linear(0.000,0.027,0.096,0.189,0.294,0.401,0.505,0.600,0.685,0.759,0.822,0.873,0.915,0.947,0.972,0.990,1.003,1.011,1.016,1.019,1.020,1.019,1.018,1.016,1.014,1.012,1.010,1.008,1.006,1.005,1.004,1.003,1.002,1.001,1.001,1.000,1.000,1.000,1.000,1.000,1.000);
   position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
   background: radial-gradient(55% 35% at 28% 22%, rgba(185, 160, 250, .16), rgba(185, 160, 250, 0) 70%), radial-gradient(50% 40% at 82% 74%, rgba(217, 204, 251, .22), rgba(217, 204, 251, 0) 70%), #fff;
-  animation: spl-out 320ms cubic-bezier(.4, 0, 1, 1) 1420ms forwards;
+  animation: spl-out 320ms cubic-bezier(.4, 0, 1, 1) 6000ms forwards;
 }
-.spl__c { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -60px; perspective: 700px; animation: spl-away 360ms cubic-bezier(.5, 0, .75, 0) 1300ms forwards; }
+/* 걷기는 스크립트가 is-out 을 붙일 때만(위 6초는 스크립트가 끝내 못 돌 때의 안전장치). 이름을 따로 둬야 새로 시작한다. */
+.spl.is-out { animation: spl-out2 320ms cubic-bezier(.4, 0, 1, 1) 120ms forwards; }
+.spl.is-out .spl__c { animation: spl-away2 360ms cubic-bezier(.5, 0, .75, 0) forwards; }
+.spl__c { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -60px; perspective: 700px; animation: spl-away 360ms cubic-bezier(.5, 0, .75, 0) 5900ms forwards; }
 .spl__glow { position: absolute; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: spl-glow 900ms cubic-bezier(.23, 1, .32, 1) 300ms forwards; }
 .spl__tile { position: relative; width: 110px; height: 110px; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: spl-tile 540ms var(--sps) 60ms forwards; }
 .spl__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: spl-fly 800ms var(--sp) forwards; }
@@ -35,7 +38,14 @@
 @keyframes spl-tag { to { opacity: 1; transform: none; filter: blur(0); } }
 @keyframes spl-away { to { opacity: 0; transform: scale(1.35); filter: blur(8px); } }
 @keyframes spl-out { to { opacity: 0; visibility: hidden; } }
+@keyframes spl-out2 { to { opacity: 0; visibility: hidden; } }
+@keyframes spl-away2 { to { opacity: 0; transform: scale(1.35); filter: blur(8px); } }
 
 /* 서버에서도 그리므로(첫 화면부터 흰 바탕) 동작 줄이기 · 태블릿 상세 칸(프레임)에선 CSS 로도 숨긴다. */
 @media (prefers-reduced-motion: reduce) { .spl { display: none; } }
 html[data-pane] .spl { display: none; }
+/* 걷히지 않고 기다리는 동안(로딩 중 · 스크립트가 아직 못 돎) — 모인 로고 뒤 빛이 천천히 숨 쉰다. 보통은 1300ms 에 걷혀 안 보임. */
+.spl__hold { position: absolute; top: -16px; width: 142px; height: 142px; border-radius: 44px; background: radial-gradient(circle, rgba(185, 160, 250, .45), rgba(185, 160, 250, 0) 70%); opacity: 0; pointer-events: none; }
+.spl__hold { animation: spl-hold 1400ms cubic-bezier(.37, 0, .63, 1) 1500ms infinite; }
+.spl.is-out .spl__hold { animation: none; }
+@keyframes spl-hold { 50% { opacity: 1; transform: scale(1.08); } }

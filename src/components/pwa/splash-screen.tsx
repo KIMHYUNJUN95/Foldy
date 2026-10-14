@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 /**
  * Launch splash — shows the app icon centered on the ivory canvas for a brief
@@ -15,6 +16,10 @@ const FADE_MS = 180;
 
 export function SplashScreen() {
   const [phase, setPhase] = useState<"visible" | "fading" | "gone">("visible");
+  // /admin · /mobile 은 자기 진입 모션(admin-entry · app-splash)이 있다 — 이 아이콘 스플래시까지 뜨면 「가만히 있는 로고가
+  // 떴다 꺼진 뒤 모션 로고가 또 나옴」이 됐다(2026-10-14 사용자 지적). 로그인 · 온보딩 같은 나머지 화면에서만.
+  const pathname = usePathname() ?? "";
+  const hasOwnEntry = pathname.startsWith("/admin") || pathname.startsWith("/mobile");
 
   useEffect(() => {
     const fadeTimer = setTimeout(() => setPhase("fading"), HOLD_MS);
@@ -25,7 +30,7 @@ export function SplashScreen() {
     };
   }, []);
 
-  if (phase === "gone") return null;
+  if (phase === "gone" || hasOwnEntry) return null;
 
   return (
     <div

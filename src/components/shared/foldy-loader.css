@@ -1,0 +1,17 @@
+/* 공용 로딩(2026-10-14) — 로고 세 막대(연보라 · 보라 · 진보라)가 서로 엇갈리며 줄었다 늘어남. 0.3초 뒤에야 나타남. */
+.fldr { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 60vh; }
+.fldr--fill { position: fixed; inset: 0; z-index: 40; min-height: 0; background: var(--background, #fff); }
+.fldr__in { display: flex; flex-direction: column; align-items: center; gap: 16px; opacity: 0; animation: fldr-in 260ms cubic-bezier(.23, 1, .32, 1) 300ms forwards; }
+.fldr__bars { position: relative; display: block; width: 70px; height: 50px; }
+.fldr__bars i { position: absolute; left: 50%; height: 12px; border-radius: 6px; animation: fldr-a 1700ms cubic-bezier(.37, 0, .63, 1) infinite; }
+.fldr__bars i:nth-child(1) { top: 0; width: 34px; margin-left: -17px; background: #b9a0fa; }
+.fldr__bars i:nth-child(2) { top: 19px; width: 48px; margin-left: -24px; background: #8a63f0; animation-name: fldr-b; animation-delay: 110ms; }
+.fldr__bars i:nth-child(3) { top: 38px; width: 64px; margin-left: -32px; background: #5b2bd6; animation-delay: 220ms; }
+.fldr__t { font-size: 13px; color: #8b8898; }
+@keyframes fldr-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fldr-a { 0%, 100% { transform: translateX(0) scaleX(1); } 50% { transform: translateX(10px) scaleX(.55); } }
+@keyframes fldr-b { 0%, 100% { transform: translateX(0) scaleX(1); } 50% { transform: translateX(-10px) scaleX(.55); } }
+@media (prefers-reduced-motion: reduce) {
+  .fldr__bars i { animation: none; }
+  .fldr__in { animation-duration: 1ms; }
+}

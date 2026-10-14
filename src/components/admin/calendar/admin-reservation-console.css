@@ -1518,7 +1518,7 @@
 .adm .acw-soft { font-size: 13px; color: #6b6878; }
 .adm .acw-k { font-size: 12px; color: #6b6878; }
 .adm .acw-sp { flex: 1; }
-.adm .acw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 2px 0; }
+.adm .acw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 2px 18px; }
 .adm .acw-bar .dd > button { border: 0; background: transparent; box-shadow: none; font-weight: 600; color: #16141f; }
 .adm .acw-month { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
 .adm .acw-month__label { padding: 0 6px; font-size: 15px; font-weight: 700; color: #16141f; }
@@ -1547,7 +1547,8 @@
 .adm .acw-btn:disabled { opacity: .55; }
 
 /* 월간 보드 */
-.adm .acw-sub { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: #6b6878; }
+.adm .acw-sub { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 2px 16px; font-size: 13px; color: #6b6878; }
+.adm .acw .admcal__grid-days .admcal__day-head { padding: 8px 0 10px; }
 .adm .acw-legend { display: flex; align-items: center; gap: 14px; font-size: 12px; }
 .adm .acw-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .adm .acw-legend i { width: 6px; height: 6px; border-radius: 50%; }
@@ -1592,7 +1593,7 @@
 .adm .acw .admcal__state-card { border: 0; box-shadow: none; background: #fafafc; }
 
 /* 오늘 운영 */
-.adm .acw-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 6px 0 18px; border-bottom: 1px solid #f1f1f4; }
+.adm .acw-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px 0 20px; border-bottom: 1px solid #f1f1f4; }
 .adm .acw-kpi { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
 .adm .acw-kpi > span { font-size: 13px; color: #6b6878; }
 .adm .acw-kpi > span:last-child { font-size: 12px; }

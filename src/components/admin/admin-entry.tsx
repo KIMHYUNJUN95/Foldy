@@ -5,40 +5,59 @@
 // 흰 화면 가운데에서 로고 세 막대가 3D 로 모이고 「Foldy」 → 로고가 작아지며 사이드바 로고 자리로 날아가 앉고,
 // 그사이 사이드바 · 위 줄 · 본문이 차례로 깔린다.
 //
-// 콘솔이 깔리는 움직임은 CSS 가 아니라 Web Animations 로, 모두 오버레이와 **같은 시계**(startTime = 오버레이 시작)에 묶는다.
-// 새로고침하면 먼저 로딩 화면(공용 틀)이 뜨고 1초쯤 뒤 실제 화면이 들어오며 사이드바가 새로 그려지는데, CSS 애니메이션이면
-// 새 사이드바가 처음부터 다시 시작해 로고가 날아갈 자리가 비어 버렸다(2026-10-14 사용자 지적 「중간에 끊김」).
-// 지금은 새로 들어온 요소도 MutationObserver 로 잡아 같은 시계의 현재 진행 지점부터 이어 간다.
-//
-// 서버에서도 오버레이를 그려(새로 불러올 때만 서버가 그리므로) 첫 화면부터 흰 바탕 — 콘솔이 잠깐 보였다 덮이는 깜빡임이 없다.
-// 시계 · 날아갈 자리 재기 · 콘솔 깔기(`runEntry`)는 오버레이 HTML 바로 뒤의 인라인 스크립트로 **그 자리에서** 돈다 — React 가 화면을
-// 붙이는(하이드레이션) 걸 기다리면 개발 모드 등 느린 환경에선 1.3초를 넘겨, 로고가 자리를 모른 채 엉뚱한 방향으로 날았다
-// (2026-10-14 사용자 지적). 화면을 껐다 켜서 브라우저에서만 다시 그릴 땐 같은 함수를 effect 가 부른다.
-// 동작 줄이기면 보이지 않는다(CSS 로도 숨김).
+// **진입 화면은 React 바깥에 있다.** 서버 HTML 의 인라인 스크립트(`mountEntry`)가 body 에 직접 붙이고, 끝나면 직접 지운다.
+// - React 안에 두면 하이드레이션이 어긋나 화면을 다시 그릴 때(확장 프로그램 · 시간대 차이 등) 진입 화면도 지워졌다 처음부터 다시 나와
+//   「가운데 로고가 떴다 꺼진 뒤 모션 로고가 또 나옴」이 됐다(2026-10-14 사용자 지적).
+// - 하이드레이션을 기다리면 느린 환경에서 1.3초를 넘겨 로고가 자리를 모른 채 날았다 → 스크립트가 그 자리에서 바로 돈다.
+// - 레이아웃에서 내용(children)보다 **앞**에 둬 콘솔 HTML 보다 먼저 실행된다(콘솔이 잠깐 보였다 덮이는 깜빡임 없음).
+// - 콘솔 깔기는 Web Animations 로 걷기 시작 시각에 묶는다 — 로딩 화면 → 실제 화면으로 바뀌며 사이드바가 새로 그려져도 이어 간다.
+// 화면을 껐다 돌아와 다시 띄울 땐 같은 함수를 effect 가 부른다. 동작 줄이기면 안 나온다.
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { finishEntry, getEntryPlay, getServerEntryPlay, subscribeEntry } from "@/lib/entry-replay";
+import { getEntryPlay, getServerEntryPlay, subscribeEntry } from "@/lib/entry-replay";
 import "./admin-entry.css";
 
-const FINISH_AT = 7000;
-
 /**
- * 진입 한 번의 시계 · 걷기 · 콘솔 깔기. **혼자 도는 함수**여야 한다 — 인라인 스크립트로 문자열이 되어 서버 HTML 안에서 실행된다
- * (바깥 변수 · import 를 쓰지 말 것).
+ * 진입 한 번 — 화면 만들기 · 시계 · 걷기 · 콘솔 깔기 · 지우기. **혼자 도는 함수**여야 한다 — 인라인 스크립트로 문자열이 되어
+ * 서버 HTML 안에서 실행된다(바깥 변수 · import 를 쓰지 말 것). `id` 는 재생 번호(같은 번호는 두 번 안 띄움).
  *
- * 로고가 모이는 앞부분(0~1300ms)만 CSS 시간표로 돌고, **걷히는 건 이 스크립트가 `lift()` 할 때만** 일어난다(.aden.is-out).
- * 시간이 되면 혼자 걷히게 두면, 느린 환경에서 하이드레이션이 메인 스레드를 1초 넘게 붙잡는 동안 스크립트가 끼어들 틈이 없어
- * 진입 화면이 걷히자마자 로더가 비쳤다(2026-10-14 사용자 지적 「진입 모션 뒤 로딩」). 지금은 스크립트가 못 돌면 로고를 든 채
- * 기다리고(뒤 빛이 숨 쉼), 로딩 중(.fldr)이면 로더가 두 번 연달아 안 보일 때까지 기다렸다 걷는다(최대 4초 + CSS 안전장치 6초).
+ * 로고가 모이는 앞부분(0~1300ms)만 CSS 시간표이고 **걷히는 건 이 스크립트가 `lift()` 할 때만**(.aden.is-out) — 혼자 걷히게 두면
+ * 느린 환경에서 하이드레이션이 메인 스레드를 붙잡는 동안 걷혀 로더가 비쳤다. 로딩 중(.fldr)이면 로더가 두 번 연달아(≈0.25초)
+ * 안 보일 때까지 모인 로고를 든 채 기다린다(뒤 빛이 숨 쉼, 최대 ~5.3초 + CSS 안전장치 6초 + 8초엔 무조건 치움).
  */
-function runEntry(logo: HTMLElement | null) {
-  if (!logo || logo.dataset.run) return;
-  logo.dataset.run = "1";
+function mountEntry(id: number, host: Element | null) {
+  const w = window as unknown as { __foldyEntryLast?: number };
+  if (w.__foldyEntryLast === id) return;
+  w.__foldyEntryLast = id;
+  try {
+    if (document.documentElement.hasAttribute("data-pane") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  } catch {
+    return;
+  }
+  const prev = document.querySelector(".aden");
+  if (prev) prev.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "aden";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML =
+    '<div class="aden__logo"><span class="aden__glow"></span><span class="aden__hold"></span><span class="aden__tile">' +
+    '<span class="aden__bw aden__b3"><span class="aden__bar"></span></span>' +
+    '<span class="aden__bw aden__b2"><span class="aden__bar"></span></span>' +
+    '<span class="aden__bw aden__b1"><span class="aden__bar"><i></i></span></span>' +
+    '</span></div><span class="aden__ww"><span class="aden__word">Foldy</span></span>';
+  (host || document.body).appendChild(overlay);
+  const logo = overlay.firstChild as HTMLElement;
+
   const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
   const t0 = now();
   const root = document.documentElement;
-  const overlay = logo.parentElement as HTMLElement;
   const ease = "cubic-bezier(.23, 1, .32, 1)";
-  logo.dataset.endAt = String(t0 + 7000);
+  let removed = false;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    overlay.remove();
+  };
+  setTimeout(remove, 8000); // 무슨 일이 있어도 8초 뒤엔 치운다
   // 화면 모션(대시보드 숫자 굴림 · 막대 등)은 걷힐 때까지 미뤄 둔다(걷을 때 실제 값으로 바꿈).
   root.style.setProperty("--entry-d0", "60s");
 
@@ -87,7 +106,7 @@ function runEntry(logo: HTMLElement | null) {
     overlay.classList.add("is-out");
     root.style.setProperty("--entry-d0", Math.round(L - t0 + 150) + "ms");
     setTimeout(() => root.style.removeProperty("--entry-d0"), 6500);
-    logo.dataset.endAt = String(L + 700);
+    setTimeout(remove, 760);
 
     // 콘솔 깔기 — 모두 같은 시계(startTime = L). 걷는 동안 늦게 들어온 요소도 현재 진행 지점부터 이어 간다.
     const done = new WeakSet<Element>();
@@ -131,61 +150,20 @@ function runEntry(logo: HTMLElement | null) {
   setTimeout(check, Math.max(0, t0 + 1180 - now()));
 }
 
-const subscribeNoop = () => () => {};
+// 진입 화면이 붙는 빈 상자 — React 는 이 상자의 안(innerHTML)을 한 번 넣고 다시 건드리지 않는다(값이 안 바뀌므로). 그래서 스크립트가
+// 안에 붙인 진입 화면이 하이드레이션 · 다시 그리기와 부딪히지 않는다. body 에 바로 붙였더니 React 가 예상한 자리가 어긋나 화면을
+// 통째로 다시 그렸다. 안의 스크립트는 서버 HTML 에서만 실행된다(브라우저가 innerHTML 로 넣은 스크립트는 실행 안 됨).
+const ENTRY_SCRIPT = `<script>(${mountEntry.toString()})(1, document.currentScript.parentElement)</script>`;
 
 export function AdminEntry() {
   const play = useSyncExternalStore(subscribeEntry, getEntryPlay, getServerEntryPlay);
-  // 서버 HTML · 하이드레이션 첫 렌더에서만 true — 그때만 인라인 스크립트를 넣는다(브라우저에서 새로 그린 스크립트는 실행되지 않는다).
-  const fromServer = useSyncExternalStore(subscribeNoop, () => false, () => true);
-  const logoRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!play) return;
-    const logo = logoRef.current;
-    runEntry(logo); // 서버 HTML 의 스크립트가 이미 돌았으면 아무것도 안 한다
-    // 끝나는 시각은 runEntry 가 data-end-at 에 둔다(로딩을 기다리면 늦춰진다).
-    const nowT = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
-    let id = 0;
-    const schedule = () => {
-      const r = (Number(logo?.dataset.endAt) || nowT() + FINISH_AT) - nowT();
-      if (r <= 0) finishEntry(play);
-      else id = window.setTimeout(schedule, Math.min(r, 200));
-    };
-    schedule();
-    return () => window.clearTimeout(id);
+    // 새로 불러온 재생(1)은 서버 HTML 의 스크립트가 이미 띄웠다 — 같은 번호는 안에서 걸러진다. 브라우저에서만 붙은 경우(앱 안 이동으로
+    // 처음 관리자 화면에 온 경우)와 화면을 껐다 돌아온 재생(2, 3 …)은 여기서 띄운다.
+    if (play) mountEntry(play, hostRef.current);
   }, [play]);
 
-  if (!play) return null;
-  return (
-    <div className="aden" aria-hidden="true" key={play}>
-      {/* 인라인 스크립트가 하이드레이션 전에 data-run · data-t0 를 붙이므로 속성 차이는 무시 */}
-      <div className="aden__logo" ref={logoRef} suppressHydrationWarning>
-        <span className="aden__glow" />
-        <span className="aden__hold" />
-        <span className="aden__tile">
-          <span className="aden__bw aden__b3">
-            <span className="aden__bar" />
-          </span>
-          <span className="aden__bw aden__b2">
-            <span className="aden__bar" />
-          </span>
-          <span className="aden__bw aden__b1">
-            <span className="aden__bar">
-              <i />
-            </span>
-          </span>
-        </span>
-      </div>
-      <span className="aden__ww">
-        <span className="aden__word">Foldy</span>
-      </span>
-      {/* 마지막에 둔다 — 실행 시점에 글자까지 그려져 있어야 로고 자리를 정확히 잰다. */}
-      {fromServer ? (
-        <script
-          dangerouslySetInnerHTML={{ __html: `(${runEntry.toString()})(document.currentScript.parentElement.querySelector(".aden__logo"))` }}
-          suppressHydrationWarning
-        />
-      ) : null}
-    </div>
-  );
+  return <div className="aden-host" dangerouslySetInnerHTML={{ __html: ENTRY_SCRIPT }} ref={hostRef} suppressHydrationWarning />;
 }

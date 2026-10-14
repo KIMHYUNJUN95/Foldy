@@ -10,8 +10,8 @@ export default async function MobileLayout({ children }: { children: React.React
   const tagline = getDictionary(session?.user.preferredLanguage ?? "ko").mobile.splashTagline;
   return (
     <>
-      {children}
       <AppSplash tagline={tagline} />
+      {children}
     </>
   );
 }

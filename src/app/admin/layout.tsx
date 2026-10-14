@@ -17,12 +17,12 @@ export const metadata: Metadata = {
   },
 };
 
-// 진입 모션은 레이아웃에 — 어느 관리자 화면에서 새로고침 · 다시 접속해도 나오고, 콘솔 안 이동 땐 레이아웃이 그대로라 다시 안 나온다.
+// 진입 모션은 레이아웃에, 내용보다 앞(스크립트가 콘솔 HTML 보다 먼저 돈다) — 어느 관리자 화면에서 새로고침 · 다시 접속해도 나오고, 콘솔 안 이동 땐 레이아웃이 그대로라 다시 안 나온다.
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      {children}
       <AdminEntry />
+      {children}
     </>
   );
 }

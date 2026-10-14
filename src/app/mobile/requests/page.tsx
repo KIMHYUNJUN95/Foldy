@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Package, ShoppingCart, Wrench } from "lucide-react";
+import { ShoppingBag, ShoppingCart, Wrench } from "lucide-react";
 import { RequestsFilterView } from "@/components/requests/requests-filter-view";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
@@ -66,19 +66,23 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={dictionary.mobile.requestsTitle} split>
       <SplitList detail="requests">
-        {/* 화이트 리디자인(2026-10-13, 시안 Req-Phone): 옅은 정사각 타일 셋(아이콘 위 · 글자 아래). */}
+        {/* 화이트 리디자인(2026-10-13 · 10-14 문구 맞춤, 시안 Req-Phone): 제목 · 한 줄 → 옅은 타일 셋(아이콘 위 · 글자 아래). */}
+        <div className="rqw-head">
+          <h1>{dictionary.mobile.requestsHead.title}</h1>
+          <p>{dictionary.mobile.requestsHead.sub}</p>
+        </div>
         <div className="rqw-quick">
           <Link href="/mobile/lost-found/new">
-            <Package aria-hidden="true" />
-            {dictionary.lostFound.reportButton}
+            <ShoppingBag aria-hidden="true" />
+            {dictionary.mobile.requestsHead.lost}
           </Link>
           <Link href="/mobile/maintenance/new">
             <Wrench aria-hidden="true" />
-            {dictionary.maintenance.reportButton}
+            {dictionary.mobile.requestsHead.maintenance}
           </Link>
           <Link href="/mobile/requests/orders/new">
             <ShoppingCart aria-hidden="true" />
-            {dictionary.mobile.quickActions.order}
+            {dictionary.mobile.requestsHead.order}
           </Link>
         </div>
 

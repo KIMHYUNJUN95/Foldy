@@ -5347,6 +5347,8 @@ const FALLBACK_DICTIONARY = {
     homeGuestUnknown: "Guest",
     ready: "Ready",
     requestsTitle: "Requests",
+    // 화이트 리디자인(2026-10-14, 시안 Req-Phone): 요청 화면 머리 · 새로 만들기 세 타일
+    requestsHead: { title: "Requests", sub: "Repairs · lost & found · orders in one place", lost: "Report lost item", maintenance: "Report repair", order: "Order supplies" },
     snapshotDescription: "Operational snapshot",
     snapshotTitle: "Snapshot",
     today: "Today",
@@ -11887,6 +11889,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       homeGuestUnknown: "게스트",
       ready: "준비됨",
       requestsTitle: "요청 목록",
+      // 화이트 리디자인(2026-10-14, 시안 Req-Phone): 요청 화면 머리 · 새로 만들기 세 타일
+      requestsHead: { title: "요청", sub: "수리/점검 · 분실물 · 주문을 한곳에서", lost: "분실물 신고", maintenance: "수리 신고", order: "주문 요청" },
       snapshotDescription: "오늘 운영 흐름과 빠른 작업을 확인합니다.",
       snapshotTitle: "운영 현황",
       today: "오늘",
@@ -18370,6 +18374,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       homeGuestUnknown: "ゲスト",
       ready: "準備完了",
       requestsTitle: "リクエスト",
+      // 화이트 리디자인(2026-10-14, 시안 Req-Phone): 요청 화면 머리 · 새로 만들기 세 타일
+      requestsHead: { title: "リクエスト", sub: "修理/点検 · 忘れ物 · 注文をひとつに", lost: "忘れ物を報告", maintenance: "修理を報告", order: "備品を注文" },
       snapshotDescription: "本日の運営フローとクイックアクションを確認します。",
       snapshotTitle: "運営状況",
       today: "今日",

@@ -25,6 +25,7 @@ import {
   compareRoomLabel,
   getDisplayRoomLabel,
   getDisplaySessionRoomLabel,
+  physicalRoomKeyOfSessionLabel,
   resolveRoomKey,
 } from "@/lib/room-label-normalization";
 import { getActiveRoomCatalogServer, type ActiveRoomCatalogItem } from "@/lib/rooms";
@@ -221,10 +222,13 @@ export async function getAdminCleaningToday(
 
   // Resolve every today session to a roomKey; group by roomKey to find the one relevant session
   // (in_progress > completed > none-if-only-cancelled) per room.
+  //
+  // 짝짓기는 **실제 방** 단위(2026-10-15) — 아라키초는 한 방에 계정이 둘이라 「401」 예약 카드와 「401_2_2」 로 시작한 세션이
+  // 같은 방이다. 글자 키로 짝지으면 카드는 「대기」로 남고 세션은 따로 「기타」 카드가 된다.
   const sessionsByRoomKey = new Map<string, CleaningSessionRow[]>();
   for (const s of orgTodaySessions) {
     const resolved = resolveRoomKey(s.room_label, catalogLabelMap, legacyAliasMap);
-    const key = resolved.roomKey ?? `unresolved:${s.room_label}`;
+    const key = physicalRoomKeyOfSessionLabel(s.room_label) ?? resolved.roomKey ?? `unresolved:${s.room_label}`;
     const list = sessionsByRoomKey.get(key) ?? [];
     list.push(s);
     sessionsByRoomKey.set(key, list);
@@ -235,8 +239,9 @@ export async function getAdminCleaningToday(
 
   if (targetsResult) {
     for (const target of targetsResult.cleaningList) {
-      targetRoomKeys.add(target.roomKey);
-      const roomSessions = sessionsByRoomKey.get(target.roomKey) ?? [];
+      const physicalKey = physicalRoomKeyOfSessionLabel(target.sessionRoomLabel) ?? target.roomKey;
+      targetRoomKeys.add(physicalKey);
+      const roomSessions = sessionsByRoomKey.get(physicalKey) ?? [];
       const matched = pickRelevantSession(roomSessions);
 
       // 취소만 있는 방은 모바일 큐에서 다시 "미처리"로 돌아가므로 콘솔에서도 `pending` 이 맞다.

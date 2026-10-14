@@ -5,6 +5,7 @@ import {
   CANONICAL_TO_BUILDING_KEY,
   getDisplayRoomLabel,
   isExcludedOperationalProperty,
+  physicalRoomKeyOfSessionLabel,
 } from "@/lib/room-label-normalization";
 
 /**
@@ -31,5 +32,23 @@ describe("cleaning building order", () => {
 
   it("shows STAY ARI rooms as numbers only", () => {
     expect(getDisplayRoomLabel("STAY ARI Apartment Hotel", "O103")).toBe("103");
+  });
+});
+
+describe("physicalRoomKeyOfSessionLabel", () => {
+  it("folds the Arakicho dual accounts into one physical room (10/15 401 start rejected)", () => {
+    const room = physicalRoomKeyOfSessionLabel("아라키초A 401");
+    expect(room).not.toBeNull();
+    expect(physicalRoomKeyOfSessionLabel("아라키초A 401_2_2")).toBe(room);
+    expect(physicalRoomKeyOfSessionLabel("아라키초A 402_2")).toBe(physicalRoomKeyOfSessionLabel("아라키초A 402"));
+    expect(physicalRoomKeyOfSessionLabel("아라키초A 402")).not.toBe(room);
+  });
+
+  it("keeps other buildings one-to-one and rejects unknown buildings", () => {
+    expect(physicalRoomKeyOfSessionLabel("STAY ARI Apartment Hotel O103")).not.toBe(
+      physicalRoomKeyOfSessionLabel("STAY ARI Apartment Hotel O104"),
+    );
+    expect(physicalRoomKeyOfSessionLabel("오쿠보A")).not.toBeNull();
+    expect(physicalRoomKeyOfSessionLabel("어딘가 101")).toBeNull();
   });
 });

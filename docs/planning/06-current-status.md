@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-15 — 「청소 시작」 무반응 수정
+
+- 아라키초 쉬는 계정(`401` 등)으로 들어온 예약 카드의 시작이 늘 `invalid_selection` 으로 거절되던 것 — 시작 검사 · 「이미 처리한 방」 ·
+  카드 ↔ 세션 짝짓기를 실제 방 단위로(`physicalRoomKeyOfSessionLabel`). 거절 · 결과 안내가 화면 밖에 떠 무반응처럼 보이던 것 — 뜨면 화면
+  안으로 끌어옴(`CleaningNotice`). 상세 `07-cleaning-workflow.md` 2026-10-15 절.
+
 ## 2026-10-15 — 청소에 STAY ARI 표시 · 건물 순서 = 예약 캘린더
 
 - 대시보드 청소 오늘 현황에서 STAY ARI 칸이 통째로 빠지던 것 수정(`BUILDING_ORDER` 에 없었음), 기록 필터에도 추가. 모바일 청소는 맨 아래로

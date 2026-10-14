@@ -306,6 +306,26 @@ export function buildSessionRoomLabel(canonicalPropertyName: string, canonicalRo
     : `${canonicalPropertyName} ${canonicalRoomLabel}`;
 }
 
+/**
+ * 청소 세션 라벨(`cleaning_sessions.room_label` 모양 — 「아라키초A 401」) → **실제 방** 키 (2026-10-15).
+ *
+ * 아라키초는 한 방에 Beds24 계정이 둘이다(`401` 쉬는 계정 · `401_2_2` 판매 중). 예약은 어느 계정으로도 들어오므로
+ * 청소 대상은 이미 실제 방으로 접어서 계산한다(`getCleaningTargets` 의 `physicalKey`). 그런데 「청소 시작」 검사는 판매 중
+ * 계정 라벨만 받아, **쉬는 계정으로 들어온 예약은 카드는 뜨는데 시작이 늘 거절됐다**(`invalid_selection`, 10/15 아라키초A 401).
+ * 시작 검사 · 「이미 시작/완료한 방」 판정은 이 키로 한다. 모르는 건물이면 null.
+ */
+export function physicalRoomKeyOfSessionLabel(sessionRoomLabel: string): string | null {
+  const label = sessionRoomLabel.trim();
+  for (const cp of Object.keys(CANONICAL_TO_BUILDING_KEY)) {
+    if (label === cp) return buildRoomKey(cp, cp);
+    if (label.startsWith(`${cp} `)) {
+      const canonicalRoom = getCanonicalRoomLabel(cp, label.slice(cp.length + 1));
+      return buildRoomKey(cp, getDisplayRoomLabel(cp, canonicalRoom));
+    }
+  }
+  return null;
+}
+
 function normalizeRoomLabelInput(value: string): string {
   return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 }

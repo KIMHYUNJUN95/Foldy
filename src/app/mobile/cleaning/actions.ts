@@ -7,6 +7,7 @@ import {
   isCleaningTaskKey,
   type CleaningSessionRow,
 } from "@/lib/cleaning";
+import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { getActiveRoomCatalog } from "@/lib/rooms";
 import { getCurrentAppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,6 +20,13 @@ function cleanText(value: FormDataEntryValue | null) {
 }
 
 /**
+ * 결과 안내마다 새 값 — 같은 거절이 연달아 와도 화면이 안내를 다시 보이는 곳으로 끌어오게(`CleaningNotice`, 2026-10-15).
+ */
+function noticeNonce() {
+  return Date.now().toString(36);
+}
+
+/**
  * 실패 사유를 쿼리로 넘겨 화면에 띄운다.
  *
  * 사유를 서버 로그에도 남긴다 — 이 액션들은 실패해도 throw 하지 않고 redirect 하므로 Vercel
@@ -27,7 +35,7 @@ function cleanText(value: FormDataEntryValue | null) {
  */
 function redirectWithError(error: string): never {
   console.warn(`[cleaning] blocked: ${error}`);
-  redirect(`${cleaningPath}?error=${encodeURIComponent(error)}`);
+  redirect(`${cleaningPath}?error=${encodeURIComponent(error)}&n=${noticeNonce()}`);
 }
 
 export async function startCleaningSession(formData: FormData) {
@@ -50,31 +58,36 @@ export async function startCleaningSession(formData: FormData) {
 
   const supabase = await getSupabaseServerClient();
 
+  // **실제 방** 기준으로 받는다(2026-10-15). 아라키초는 한 방에 Beds24 계정이 둘이라(`401` 쉬는 계정 · `401_2_2` 판매 중)
+  // 쉬는 계정으로 들어온 예약의 카드가 판매 중 계정 라벨만 있는 카탈로그와 글자로 안 맞아 시작이 늘 거절됐다.
+  // 라벨은 카드가 보낸 그대로 저장한다 — 화면 · 콘솔이 그 라벨로 예약 카드와 짝을 짓는다.
+  const physicalRoom = physicalRoomKeyOfSessionLabel(roomLabel);
   const catalog = await getActiveRoomCatalog(session.organization.id, supabase).catch(() => undefined);
   if (catalog !== undefined) {
-    const allowed = new Set(
-      catalog.map((item) =>
-        item.canonicalRoomLabel === item.propertyName
-          ? item.propertyName
-          : `${item.propertyName} ${item.canonicalRoomLabel}`,
-      ),
-    );
-    if (!allowed.has(roomLabel)) {
+    const labels = catalog.map((item) => buildSessionRoomLabel(item.propertyName, item.canonicalRoomLabel));
+    const allowedPhysical = new Set(labels.map(physicalRoomKeyOfSessionLabel));
+    // 이름표가 아직 없는 새 건물은 실제 방 키를 못 만든다 — 그때는 예전처럼 글자 그대로 맞춰 본다.
+    const allowed = labels.includes(roomLabel) || (physicalRoom !== null && allowedPhysical.has(physicalRoom));
+    if (!allowed) {
       redirectWithError("invalid_selection");
     }
   }
 
-  // Block re-starting a room that already has an in_progress or completed session today
-  const { data: existingForRoom } = await supabase
+  // Block re-starting a room that already has an in_progress or completed session today — 같은 실제 방의 다른 계정
+  // 라벨로 시작한 것도 막는다(「401」로 시작했는데 「401_2_2」로 또 시작하지 않게).
+  const { data: todayActive } = await supabase
     .from("cleaning_sessions")
-    .select("id")
+    .select("room_label")
     .eq("organization_id", session.organization.id)
     .eq("cleaning_date", getCleaningOperatingDateKey())
-    .eq("room_label", roomLabel)
-    .in("status", ["in_progress", "completed"])
-    .limit(1);
+    .in("status", ["in_progress", "completed"]);
 
-  if (existingForRoom && existingForRoom.length > 0) {
+  const alreadyProcessed = (todayActive ?? []).some(
+    (row) =>
+      row.room_label === roomLabel ||
+      (physicalRoom !== null && physicalRoomKeyOfSessionLabel(row.room_label) === physicalRoom),
+  );
+  if (alreadyProcessed) {
     redirectWithError("already_processed_today");
   }
 
@@ -94,7 +107,7 @@ export async function startCleaningSession(formData: FormData) {
     redirectWithError(error.code === "23505" ? "already_active" : "start_failed");
   }
 
-  redirect(`${cleaningPath}?started=1`);
+  redirect(`${cleaningPath}?started=1&n=${noticeNonce()}`);
 }
 
 export async function cancelCleaningSession(formData: FormData) {
@@ -162,7 +175,7 @@ export async function cancelCleaningSession(formData: FormData) {
     redirectWithError("cancel_failed");
   }
 
-  redirect(`${cleaningPath}?cancelled=1`);
+  redirect(`${cleaningPath}?cancelled=1&n=${noticeNonce()}`);
 }
 
 export async function completeCleaningSession(formData: FormData) {
@@ -222,5 +235,5 @@ export async function completeCleaningSession(formData: FormData) {
     redirectWithError("complete_failed");
   }
 
-  redirect(`${cleaningPath}?completed=1`);
+  redirect(`${cleaningPath}?completed=1&n=${noticeNonce()}`);
 }

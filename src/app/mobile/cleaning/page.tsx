@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { BedDouble, CheckCircle2, ChevronRight, ClipboardList, DoorOpen, Package, Sparkles, SprayCan, Timer, UsersRound, Wrench } from "lucide-react";
 import { startCleaningSession } from "@/app/mobile/cleaning/actions";
+import { CleaningNotice } from "@/components/cleaning/cleaning-notice";
 import { CleaningCompletionPanel } from "@/components/cleaning/cleaning-completion-panel";
 import type { ManualBuildingOption, ManualRoomEntry } from "@/components/cleaning/manual-cleaning-form";
 import { ManualCleaningForm } from "@/components/cleaning/manual-cleaning-form";
@@ -36,6 +37,7 @@ import {
   buildSessionRoomLabel,
   CALENDAR_BUILDING_ORDER,
   CANONICAL_TO_BUILDING_KEY,
+  physicalRoomKeyOfSessionLabel,
   getDisplayRoomLabel,
   resolveRoomKey,
 } from "@/lib/room-label-normalization";
@@ -53,6 +55,8 @@ type MobileCleaningPageProps = {
     error?: string;
     lostReported?: string;
     maintenanceReported?: string;
+    /** 결과 안내 갱신용(액션이 매번 새로 준다) — `CleaningNotice` 가 이 값이 바뀔 때마다 안내를 화면 안으로 끌어온다. */
+    n?: string;
     started?: string;
   }>;
 };
@@ -518,6 +522,7 @@ export default async function MobileCleaningPage({
   // 사전에 없는 키여도 **무언가는 보여준다.** 예전에는 `copy.errors[key]` 가 undefined 면 배너가
   // 통째로 사라져, 액션이 막혀도 화면상 아무 일도 안 일어난 것처럼 보였다(2026-08-04). 키가 빠진
   // 것은 버그지만, 그 버그가 사용자에게 "무반응"으로 보이는 것이 더 나쁘다.
+  const noticeNonce = params.n ?? "";
   const errorMessage = params.error
     ? (copy.errors[params.error] ?? copy.errors.start_failed ?? params.error)
     : null;
@@ -545,6 +550,11 @@ export default async function MobileCleaningPage({
   // Truly unknown labels return null and are excluded so they never produce false exclusions.
   const catalogLabelMap = buildSessionLabelToRoomKeyMap(roomCatalog ?? []);
   const legacyAliasMap = buildLegacyAliasToRoomKeyMap(roomCatalog ?? []);
+  // 「이미 시작/완료한 방」 · 지난 날 기록은 **실제 방** 단위로 짝짓는다(2026-10-15). 아라키초는 한 방에 계정이 둘이라
+  // 「401」 예약 카드와 「401_2_2」 로 시작한 세션이 같은 방이다 — 글자 키로는 카드가 안 사라진다.
+  const roomKeyOfSession = (label: string, resolved: string) => physicalRoomKeyOfSessionLabel(label) ?? resolved;
+  const roomKeyOfTarget = (target: { sessionRoomLabel: string; roomKey: string }) =>
+    physicalRoomKeyOfSessionLabel(target.sessionRoomLabel) ?? target.roomKey;
   const processedRoomKeys = new Set<string>();
   const unknownRoomLabelSamples: string[] = [];
   let unknownRoomLabelCount = 0;
@@ -554,7 +564,7 @@ export default async function MobileCleaningPage({
     const resolved = resolveRoomKey(s.room_label, catalogLabelMap, legacyAliasMap);
     if (resolved.matchedBy === "legacy_alias") resolvedByAliasCount += 1;
     if (resolved.roomKey !== null) {
-      processedRoomKeys.add(resolved.roomKey);
+      processedRoomKeys.add(roomKeyOfSession(s.room_label, resolved.roomKey));
       continue;
     }
     unknownRoomLabelCount += 1;
@@ -567,7 +577,7 @@ export default async function MobileCleaningPage({
       if (s.status !== "completed") continue;
       const resolved = resolveRoomKey(s.room_label, catalogLabelMap, legacyAliasMap);
       if (resolved.roomKey === null) continue;
-      recordByRoomKey.set(resolved.roomKey, {
+      recordByRoomKey.set(roomKeyOfSession(s.room_label, resolved.roomKey), {
         staffName: staffNameById.get(s.staff_user_id) ?? copy.console.unknownStaff,
         timeLabel: s.completed_at ? formatTime(s.completed_at, locale) : null,
       });
@@ -583,10 +593,10 @@ export default async function MobileCleaningPage({
   }
 
   const filteredCleaningList = (cleaningTargets?.cleaningList ?? []).filter(
-    (t) => !processedRoomKeys.has(t.roomKey),
+    (t) => !processedRoomKeys.has(roomKeyOfTarget(t)),
   );
   const filteredSettingList = (cleaningTargets?.settingList ?? []).filter(
-    (t) => !processedRoomKeys.has(t.roomKey),
+    (t) => !processedRoomKeys.has(roomKeyOfTarget(t)),
   );
 
   // Pre-compute grouped lists outside JSX for readability
@@ -725,34 +735,34 @@ export default async function MobileCleaningPage({
         </Link>
 
         {errorMessage ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
+          <CleaningNotice className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive" nonce={noticeNonce}>
             {errorMessage}
-          </div>
+          </CleaningNotice>
         ) : null}
         {params.cancelled ? (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
+          <CleaningNotice className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive" nonce={noticeNonce}>
             {copy.cancelSuccess}
-          </div>
+          </CleaningNotice>
         ) : null}
         {params.started ? (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+          <CleaningNotice className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary" nonce={noticeNonce}>
             {copy.startSuccess}
-          </div>
+          </CleaningNotice>
         ) : null}
         {params.completed ? (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+          <CleaningNotice className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary" nonce={noticeNonce}>
             {copy.completeSuccess}
-          </div>
+          </CleaningNotice>
         ) : null}
         {params.lostReported ? (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+          <CleaningNotice className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary" nonce={noticeNonce}>
             {copy.lostReported}
-          </div>
+          </CleaningNotice>
         ) : null}
         {params.maintenanceReported ? (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+          <CleaningNotice className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary" nonce={noticeNonce}>
             {copy.maintenanceReported}
-          </div>
+          </CleaningNotice>
         ) : null}
         {unknownRoomLabelCount >= ROOM_LABEL_MAPPING_WARNING_THRESHOLD ? (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-700">
@@ -883,7 +893,7 @@ export default async function MobileCleaningPage({
                           locale={locale}
                           readOnly={!isToday}
                           record={
-                            recordByRoomKey.get(target.roomKey) ??
+                            recordByRoomKey.get(roomKeyOfTarget(target)) ??
                             (canSeeAllSessions ? null : undefined)
                           }
                           target={target}
@@ -934,7 +944,7 @@ export default async function MobileCleaningPage({
                           key={target.roomKey}
                           readOnly={!isToday}
                           record={
-                            recordByRoomKey.get(target.roomKey) ??
+                            recordByRoomKey.get(roomKeyOfTarget(target)) ??
                             (canSeeAllSessions ? null : undefined)
                           }
                           target={target}

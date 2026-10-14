@@ -10,7 +10,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, LayoutList, Layers, Smartphone, TriangleAlert, X } from "lucide-react";
+import { CalendarDays, SearchX, TriangleAlert } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { AdminExportButtons } from "@/components/admin/shared/admin-export-buttons";
@@ -25,6 +25,7 @@ import type { AdminLinenReturnData } from "@/lib/admin-linen-returns";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import "@/components/admin/maintenance/maintenance-console.css";
 import "@/components/admin/lost-found/lost-found-console.css";
+import "@/components/admin/orders/orders-console.css";
 import "./linen-console.css";
 import {
   aggregateByItem,
@@ -38,7 +39,7 @@ import {
 } from "./linen-console-data";
 import { LinenRecordList } from "./linen-record-list";
 import { LinenItemSummary } from "./linen-item-summary";
-import { LinenDetailPanel, type LinenEditPayload } from "./linen-detail-panel";
+import { LinenDetailPanel, LinenEditModal, type LinenEditPayload } from "./linen-detail-panel";
 import { LinenDeleteModal } from "./linen-delete-modal";
 
 type LinenView = "records" | "items";
@@ -80,8 +81,7 @@ export function LinenReturnConsole({
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  // 저장에 성공하면 패널을 열어 둔 채 읽기 모드로 되돌린다 — key 를 바꿔 새 데이터로 다시 마운트한다.
-  const [saveNonce, setSaveNonce] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const { records, items, buildings, loadError } = data;
@@ -214,7 +214,7 @@ export function LinenReturnConsole({
         showToast(linen.errors[result.reason] ?? t.tError);
         return;
       }
-      setSaveNonce((prev) => prev + 1);
+      setEditOpen(false);
       showToast(t.tSaved);
       router.refresh();
     });
@@ -235,8 +235,17 @@ export function LinenReturnConsole({
     });
   }
 
-  const toolbar = (
-    <div className="ctoolbar filterbar">
+  // 화이트 리디자인(2026-10-14, 시안 Linen-PC · LinenItems-PC): 보기 탭(아이콘 없음) · 기간 · 고르기 · 내보내기를 한 줄에.
+  const viewbar = (
+    <div className="cviewbar mw-viewbar lfw-viewbar ow-viewbar lnp-viewbar">
+      <div className="lviews" style={{ margin: 0 }}>
+        <button className={view === "records" ? "on" : ""} onClick={() => changeView("records")} type="button">
+          {t.vRecords}
+        </button>
+        <button className={view === "items" ? "on" : ""} onClick={() => changeView("items")} type="button">
+          {t.vItems}
+        </button>
+      </div>
       <AdminDateRangePicker
         ariaLabel={shared.pickRange}
         from={from}
@@ -255,19 +264,20 @@ export function LinenReturnConsole({
         onChange={applyRange}
         to={to}
       />
+      <span className="lfw-viewbar__sp" />
       <AdmDropdown
-        ariaLabel={t.colBuilding}
-        onChange={(value) => {
-          setFilters((prev) => ({ ...prev, building: value }));
-          setSelectedId(null);
-        }}
-        options={[
-          { value: "all", label: t.allBuildings },
-          ...buildingOptions.map((option) => ({ value: option.name, label: option.label })),
-        ]}
-        size="sm"
-        value={filters.building}
-      />
+          ariaLabel={t.colBuilding}
+          onChange={(value) => {
+            setFilters((prev) => ({ ...prev, building: value }));
+            setSelectedId(null);
+          }}
+          options={[
+            { value: "all", label: t.allBuildings },
+            ...buildingOptions.map((option) => ({ value: option.name, label: option.label })),
+          ]}
+          size="sm"
+          value={filters.building}
+        />
       {view === "items" ? null : (
         <AdmDropdown
           ariaLabel={t.colItems}
@@ -275,10 +285,7 @@ export function LinenReturnConsole({
             setFilters((prev) => ({ ...prev, item: value }));
             setSelectedId(null);
           }}
-          options={[
-            { value: "all", label: t.allItems },
-            ...items.map((item) => ({ value: item.id, label: item.name })),
-          ]}
+          options={[{ value: "all", label: t.allItems }, ...items.map((item) => ({ value: item.id, label: item.name }))]}
           size="sm"
           value={filters.item}
         />
@@ -299,15 +306,6 @@ export function LinenReturnConsole({
         size="sm"
         value={filters.registrant}
       />
-      {hasFilter ? (
-        <button className="btn btn--ghost btn--sm" onClick={clearFilters} type="button">
-          <span className="ic">
-            <X aria-hidden="true" />
-          </span>
-          {t.clearFilter}
-        </button>
-      ) : null}
-      <span className="ctoolbar__spacer" />
       <AdminExportButtons
         disabled={loadError || exportPayload.records.length === 0}
         labels={shared}
@@ -318,90 +316,36 @@ export function LinenReturnConsole({
     </div>
   );
 
-  const viewtabs = (
-    <div className="cviewbar">
-      <div className="lviews" style={{ margin: 0 }}>
-        <button
-          className={view === "records" ? "on" : ""}
-          onClick={() => changeView("records")}
-          type="button"
-        >
-          <span className="ic">
-            <LayoutList aria-hidden="true" />
-          </span>
-          {t.vRecords}
-        </button>
-        <button
-          className={view === "items" ? "on" : ""}
-          onClick={() => changeView("items")}
-          type="button"
-        >
-          <span className="ic">
-            <Layers aria-hidden="true" />
-          </span>
-          {t.vItems}
-        </button>
-      </div>
-      <span style={{ flex: 1 }} />
-      <span className="robadge">
-        <span className="ic">
-          <Smartphone aria-hidden="true" />
-        </span>
-        {t.mobileBadge}
-      </span>
-    </div>
-  );
-
   let body: React.ReactNode;
   if (loadError) {
     body = (
-      <div className="card">
-        <div className="state">
-          <div className="state__ic err">
-            <TriangleAlert aria-hidden="true" />
-          </div>
-          <div className="state__t">{t.errT}</div>
-          <div className="state__s">{t.errS}</div>
-          <button
-            className="btn btn--pri btn--sm"
-            onClick={() => router.refresh()}
-            style={{ marginTop: 16 }}
-            type="button"
-          >
-            {t.retry}
-          </button>
-        </div>
+      <div className="lfw-empty">
+        <TriangleAlert aria-hidden="true" />
+        <b>{t.errT}</b>
+        <span>{t.errS}</span>
+        <button className="btn btn--pri btn--sm" onClick={() => router.refresh()} type="button">
+          {t.retry}
+        </button>
       </div>
     );
   } else if (visible.length === 0) {
     body = (
-      <div className="card">
-        <div className="state">
-          <div className="state__ic empty">
-            <LayoutList aria-hidden="true" />
-          </div>
-          <div className="state__t">{t.emptyTitle}</div>
-          <div className="state__s">{t.emptySub}</div>
-          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-            {hasFilter ? (
-              <button className="btn btn--ghost btn--sm" onClick={clearFilters} type="button">
-                <span className="ic">
-                  <X aria-hidden="true" />
-                </span>
-                {t.clearFilter}
-              </button>
-            ) : null}
-            <button
-              className="btn btn--ghost btn--sm"
-              onClick={() => applyRange(defaultFrom, defaultTo)}
-              type="button"
-            >
-              <span className="ic">
-                <CalendarDays aria-hidden="true" />
-              </span>
-              {t.emptyThisMonth}
+      <div className="lfw-empty">
+        <SearchX aria-hidden="true" />
+        <b>{t.emptyTitle}</b>
+        <span>{t.emptySub}</span>
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          {hasFilter ? (
+            <button className="btn btn--ghost btn--sm" onClick={clearFilters} type="button">
+              {t.clearFilter}
             </button>
-          </div>
+          ) : null}
+          <button className="btn btn--ghost btn--sm" onClick={() => applyRange(defaultFrom, defaultTo)} type="button">
+            <span className="ic">
+              <CalendarDays aria-hidden="true" />
+            </span>
+            {t.emptyThisMonth}
+          </button>
         </div>
       </div>
     );
@@ -438,32 +382,34 @@ export function LinenReturnConsole({
 
   return (
     <>
-      <div className="dimnote" style={{ margin: "2px 2px 14px" }}>
-        <span className="ic">
-          <Smartphone aria-hidden="true" />
-        </span>
-        {t.intro}
-      </div>
-
-      {toolbar}
-      {viewtabs}
-      <div className="cbody">{body}</div>
+      {viewbar}
+      <div className="cbody lfw-body">{body}</div>
 
       {selected ? (
         <LinenDetailPanel
-          buildings={buildings}
-          catalog={items}
-          errors={linen.errors}
-          key={`${selected.id}-${saveNonce}`}
+          disabled={editOpen || confirmId !== null}
           localeTag={localeTag}
           onClose={() => setSelectedId(null)}
           onDelete={() => setConfirmId(selected.id)}
+          onEdit={() => setEditOpen(true)}
+          record={selected}
+          t={t}
+          units={linen}
+        />
+      ) : null}
+
+      {selected && editOpen ? (
+        <LinenEditModal
+          buildings={buildings}
+          catalog={items}
+          errors={linen.errors}
+          localeTag={localeTag}
+          onCancel={() => setEditOpen(false)}
           onSave={handleSave}
           organizationId={organizationId}
           record={selected}
           saving={isPending}
           t={t}
-          units={linen}
         />
       ) : null}
 

@@ -113,3 +113,67 @@
 :lang(ja) .adm .lehead {
   letter-spacing: 0;
 }
+
+/* ── 화이트 리디자인(2026-10-14, 시안 Linen-PC · LinenItems-PC · LinenEdit-PC) ──
+   분실물 · 주문 리디자인(.lfw-* · .lfp · .lfm · .ow-*)을 그대로 쓰고 린넨에만 있는 것만 여기에. */
+.adm .lnp-grid .lfw-gh, .adm .lnp-grid .lfw-gr { grid-template-columns: 112px 110px minmax(0, 1fr) 64px 120px; column-gap: 20px; }
+.adm .lnp-grid.has-item .lfw-gh, .adm .lnp-grid.has-item .lfw-gr { grid-template-columns: 112px 110px minmax(0, 1fr) 72px 64px 120px; }
+.adm .lnp-grid .lfw-gr { min-height: 62px; }
+.adm .lnp-when { display: flex; flex-direction: column; gap: 2px; }
+.adm .lnp-when b { font-size: 14px; font-weight: 600; color: #16141f; }
+.adm .lnp-when span { font-size: 12px; color: #6b6878; }
+.adm .lnp-items { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.adm .lnp-items b { font-size: 14px; font-weight: 500; color: #16141f; }
+.adm .lnp-items span { font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .lnp-q { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .lnp-items-grid .lfw-gh, .adm .lnp-items-grid .lfw-gr { grid-template-columns: minmax(140px, 1.1fr) minmax(0, 2.4fr) 60px 90px 120px; column-gap: 20px; }
+.adm .lnp-items-grid.is-scoped .lfw-gh, .adm .lnp-items-grid.is-scoped .lfw-gr { grid-template-columns: minmax(140px, 1.1fr) minmax(0, 2.2fr) 60px 90px 90px 120px; }
+.adm .lnp-items-grid .lfw-gh > span:nth-child(2) { grid-column: span 2; }
+.adm .lnp-items-grid .lfw-gh > span:nth-child(3) { display: none; }
+.adm .lnp-items-grid .lfw-gr { min-height: 58px; }
+.adm .lnp-iname { font-weight: 600; color: #16141f; }
+.adm .lnp-bar { height: 5px; }
+.adm .lnp-items-grid .lfw-gr.is-zero { cursor: default; }
+.adm .lnp-items-grid .lfw-gr.is-zero, .adm .lnp-items-grid .lfw-gr.is-zero .lnp-iname { color: #8b8898; }
+.adm .lnp-items-grid .lfw-gr.is-zero:hover { background: none; }
+.adm .lnp-viewbar .lfw-viewbar__sp { flex: 1; }
+
+/* 상세 패널 */
+.adm .lnp .lnp-lines { display: flex; flex-direction: column; }
+.adm .lnp .lnp-line { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-top: 1px solid #f3f3f6; font-size: 14px; color: #16141f; }
+.adm .lnp .lnp-line:first-child { border-top: 0; }
+.adm .lnp .lnp-line b { font-weight: 700; }
+.adm .lnp .lnp-line.is-total { min-height: 52px; border-top-color: #e6e6eb; }
+.adm .lnp .lnp-line.is-total b:last-child { font-size: 16px; }
+
+/* 수정 창 */
+.adm .modal.lfm.lnm { width: 520px; }
+.adm .lnm .lnm-bld .dd > button { width: 100%; height: 48px; border-radius: 12px; }
+.adm .lnm-steps { display: flex; flex-direction: column; }
+.adm .lnm-step { display: flex; align-items: center; gap: 6px; min-height: 46px; border-top: 1px solid #f3f3f6; }
+.adm .lnm-step:first-child { border-top: 0; }
+.adm .lnm-step > span { flex: 1; min-width: 0; font-size: 14px; color: #6b6878; }
+.adm .lnm-step.has > span { color: #16141f; font-weight: 600; }
+.adm .lnm-step > b { width: 36px; text-align: center; font-size: 15px; font-weight: 700; color: #8b8898; animation: lnm-tick 180ms cubic-bezier(.23, 1, .32, 1); }
+.adm .lnm-step.has > b { color: #16141f; }
+@keyframes lnm-tick { from { opacity: .3; transform: translateY(-4px); } }
+.adm .lnm-st { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: #f4f4f7; color: #3a3746; cursor: pointer; transition: transform 120ms ease; }
+.adm .lnm-st:active { transform: scale(.92); }
+.adm .lnm-st.is-plus { background: #f1ecfd; color: #5a30cf; }
+.adm .lnm-st.is-hidden { visibility: hidden; }
+.adm .lnm-st svg { width: 15px; height: 15px; }
+.adm .lnm-st:focus-visible, .adm .lnp-grid .lfw-gr:focus-visible, .adm .lnp-items-grid .lfw-gr:focus-visible,
+.adm .lnm .lfm__cancel:focus-visible, .adm .lnm .lfm__ok:focus-visible, .adm .lnm-add:focus-visible, .adm .lnm-ph button:focus-visible,
+.adm .lfp__del:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.adm .lnm-step.is-total { justify-content: space-between; border-top-color: #e6e6eb; }
+.adm .lnm-step.is-total b { width: auto; font-size: 16px; color: #16141f; }
+.adm .lnm-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm .lnm-ph { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; background: #f2f2f5; }
+.adm .lnm-ph img { object-fit: cover; width: 100%; height: 100%; }
+.adm .lnm-ph button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(22, 20, 31, .62); color: #fff; cursor: pointer; }
+.adm .lnm-ph button svg { width: 12px; height: 12px; }
+.adm .lnm-add { display: grid; place-items: center; width: 64px; height: 64px; border: 0; border-radius: 10px; background: #f4f4f7; color: #7a52e6; cursor: pointer; }
+.adm .lnm-add svg { width: 20px; height: 20px; }
+.adm .lnm-err { margin: 0; font-size: 13px; font-weight: 600; color: #c5282e; }
+.adm .lnm-warn { color: #c5282e; }
+@media (prefers-reduced-motion: reduce) { .adm .lnm-step > b { animation: none; } }

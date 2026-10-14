@@ -13,7 +13,11 @@ export function AppSplash({ tagline }: { tagline: string }) {
 
   useEffect(() => {
     if (!play) return;
-    const id = window.setTimeout(() => finishEntry(play), 1800);
+    // 서버에서 그렸으면 CSS 애니메이션은 페이지가 처음 그려질 때부터 돌고 있다 — 그 시작 시각 기준으로 1.8초에 걷는다.
+    const now = (document.timeline.currentTime as number | null) ?? performance.now();
+    const own = document.querySelector(".spl")?.getAnimations({ subtree: true }).find((a) => typeof a.startTime === "number");
+    const t0 = typeof own?.startTime === "number" ? own.startTime : now;
+    const id = window.setTimeout(() => finishEntry(play), Math.max(0, t0 + 1800 - now));
     return () => window.clearTimeout(id);
   }, [play]);
 

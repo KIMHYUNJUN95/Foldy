@@ -187,6 +187,21 @@
 .adm .dh-todo.is-done.is-fresh .dh-todo__box { animation: dh-pop 460ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
 .adm .dh-row.is-fresh .dh-kind--in { animation: dh-pop 460ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) 200ms both; }
 
+/* 새로고침 때 PC 진입 화면(admin-entry)이 덮고 있는 동안 위 모션이 밑에서 끝나 버리지 않게 — 진입 화면이 걷히는 시점만큼
+   html 의 --entry-d0 으로 미룬다(admin-entry.tsx 가 넣고 몇 초 뒤 뺀다). 앱 안에서 대시보드로 올 땐 0. */
+.adm .dh-bar { animation-delay: calc(var(--entry-d0, 0ms) + 260ms + var(--i, 0) * 18ms); }
+.adm .dh-bar.is-today { animation-delay: calc(var(--entry-d0, 0ms) + 260ms + var(--i, 0) * 18ms), calc(var(--entry-d0, 0ms) + 1300ms); }
+.adm .dh-trend { animation-delay: calc(var(--entry-d0, 0ms) + 1100ms); }
+.adm .dh-occ__arc { animation-delay: calc(var(--entry-d0, 0ms) + 300ms); }
+.adm .dh-occ__cap { animation-delay: calc(var(--entry-d0, 0ms) + 300ms), calc(var(--entry-d0, 0ms) + 1700ms); }
+.adm .dh-meter i { animation-delay: calc(var(--entry-d0, 0ms) + 500ms + var(--i, 0) * 90ms); }
+.adm .dh-mbar i { animation-delay: calc(var(--entry-d0, 0ms) + 450ms + var(--i, 0) * 80ms); }
+.adm .dh-mbar span { animation-delay: calc(var(--entry-d0, 0ms) + 900ms + var(--i, 0) * 80ms); }
+.adm .dh-line__svg { animation-delay: calc(var(--entry-d0, 0ms) + 500ms); }
+.adm .dh-line__dot { animation-delay: calc(var(--entry-d0, 0ms) + 560ms + var(--i, 0) * 260ms); }
+.adm .dh-line__v { animation-delay: calc(var(--entry-d0, 0ms) + 640ms + var(--i, 0) * 260ms); }
+.adm .dh-line__dot.is-now { animation-delay: calc(var(--entry-d0, 0ms) + 560ms + var(--i, 0) * 260ms), calc(var(--entry-d0, 0ms) + 2400ms); }
+
 @media (prefers-reduced-motion: reduce) {
   .adm .dh-bar, .adm .dh-trend, .adm .dh-occ__arc, .adm .dh-occ__cap, .adm .dh-meter i, .adm .dh-mbar i, .adm .dh-mbar span, .adm .dh-line__svg, .adm .dh-line__dot, .adm .dh-line__v, .adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-todo__t::after, .adm .dh-todo__box, .adm .dh-kind--in { animation: none !important; }
 }

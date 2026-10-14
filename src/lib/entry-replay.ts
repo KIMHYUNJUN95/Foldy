@@ -56,8 +56,10 @@ export function getEntryPlay() {
   return play;
 }
 
+/** 서버 스냅숏 = 재생 중. 서버가 그리는 건 페이지를 새로 불러올 때뿐이라(앱 안 이동은 브라우저가 그린다)
+ *  첫 화면부터 흰 진입 화면이 깔려 콘솔 · 홈이 잠깐 보였다 덮이는 깜빡임이 없다. 동작 줄이기 · 상세 칸은 CSS 로 숨김. */
 export function getServerEntryPlay() {
-  return 0;
+  return 1;
 }
 
 /** 재생이 끝났을 때(모션 컴포넌트의 타이머). 그사이 새 재생이 시작됐으면 무시. */

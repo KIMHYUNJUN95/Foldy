@@ -7,6 +7,7 @@ import { cancelCleaningSession, completeCleaningSession } from "@/app/mobile/cle
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { haptic } from "@/lib/haptics";
 
 type CleaningCompletionPanelProps = {
   labels: {
@@ -206,7 +207,7 @@ export function CleaningCompletionPanel({
                 </div>
               </label>
 
-              <form action={completeCleaningSession} className="mt-4 space-y-2">
+              <form action={completeCleaningSession} className="mt-4 space-y-2" onSubmit={() => haptic("success")}>
                 <input name="sessionId" type="hidden" value={sessionId} />
                 <input name="notes" type="hidden" value={notes} />
                 <SubmitButton autoFocus className="h-12 w-full rounded-xl bg-primary font-black text-white shadow-[0_10px_28px_hsl(var(--primary-hsl)/0.28)] hover:bg-primary/90">

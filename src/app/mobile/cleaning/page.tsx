@@ -250,15 +250,24 @@ function CleanRow({
   sub,
   right,
   muted,
+  just,
 }: {
   room: string;
   title: ReactNode;
   sub?: ReactNode;
   right?: ReactNode;
   muted?: boolean;
+  /** 방금 완료한 줄 — 왼쪽부터 옅은 초록이 차오르고 앞쪽에 빛 선, 체크가 톡(2026-10-14 모션, 시안 Motion-B-RoomDone-Phone). */
+  just?: boolean;
 }) {
   return (
-    <div className={`cln-row${muted ? " is-muted" : ""}`}>
+    <div className={`cln-row${muted ? " is-muted" : ""}${just ? " is-just" : ""}`}>
+      {just ? (
+        <>
+          <span className="cln-row__fill" aria-hidden="true" />
+          <span className="cln-row__edge" aria-hidden="true" />
+        </>
+      ) : null}
       <span className="cln-row__rm">{room}</span>
       <div className="cln-row__b">
         <p className="cln-row__t">{title}</p>
@@ -364,6 +373,13 @@ export default async function MobileCleaningPage({
       ? activeSession.cleaning_date
       : null;
   const recentSessions = sessions.filter((item) => item.status === "completed");
+  // 완료하고 돌아온 직후(?completed=1)면 가장 최근에 끝난 줄 하나만 「방금 완료」 모션.
+  const justCompletedId = params.completed
+    ? recentSessions.reduce<{ id: string; at: string } | null>(
+        (best, item) => (item.completed_at && (!best || item.completed_at > best.at) ? { id: item.id, at: item.completed_at } : best),
+        null,
+      )?.id ?? null
+    : null;
   // 사전에 없는 키여도 **무언가는 보여준다.** 예전에는 `copy.errors[key]` 가 undefined 면 배너가
   // 통째로 사라져, 액션이 막혀도 화면상 아무 일도 안 일어난 것처럼 보였다(2026-08-04). 키가 빠진
   // 것은 버그지만, 그 버그가 사용자에게 "무반응"으로 보이는 것이 더 나쁘다.
@@ -560,7 +576,7 @@ export default async function MobileCleaningPage({
         {errorMessage ? <CleaningNotice className="cln-note is-danger" nonce={noticeNonce}>{errorMessage}</CleaningNotice> : null}
         {params.cancelled ? <CleaningNotice className="cln-note is-danger" nonce={noticeNonce}>{copy.cancelSuccess}</CleaningNotice> : null}
         {params.started ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.startSuccess}</CleaningNotice> : null}
-        {params.completed ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.completeSuccess}</CleaningNotice> : null}
+        {params.completed ? <CleaningNotice className="cln-note cln-note--done" nonce={noticeNonce}>{copy.completeSuccess}</CleaningNotice> : null}
         {params.lostReported ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.lostReported}</CleaningNotice> : null}
         {params.maintenanceReported ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.maintenanceReported}</CleaningNotice> : null}
         {unknownRoomLabelCount >= ROOM_LABEL_MAPPING_WARNING_THRESHOLD ? (
@@ -736,7 +752,21 @@ export default async function MobileCleaningPage({
                       sub={[copy.durTaken.replace("{dur}", minutesLabel(item.duration_seconds, copy)), item.notes]
                         .filter(Boolean)
                         .join(" · ")}
-                      right={<span className="cln-row__time">{formatTime(item.completed_at, locale)}</span>}
+                      right={
+                        item.id === justCompletedId ? (
+                          <span className="cln-row__done">
+                            <span className="cln-row__ck" aria-hidden="true">
+                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 12.5l4.5 4.5L19 7.5" />
+                              </svg>
+                            </span>
+                            <span className="cln-row__time">{formatTime(item.completed_at, locale)}</span>
+                          </span>
+                        ) : (
+                          <span className="cln-row__time">{formatTime(item.completed_at, locale)}</span>
+                        )
+                      }
+                      just={item.id === justCompletedId}
                     />
                   ))}
                 </div>

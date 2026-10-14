@@ -268,6 +268,18 @@ export async function getAnnouncementReadAt(
   return read?.read_at ?? null;
 }
 
+/** 이 사람이 이미 읽은 공지 id — 모바일 목록의 안 읽음 점(2026-10-15 화이트 리디자인). 본인 기록만 읽는다. */
+export async function getReadAnnouncementIds(userId: string, announcementIds: string[]): Promise<Set<string>> {
+  if (announcementIds.length === 0) return new Set();
+  const service = getSupabaseServiceClient();
+  const { data } = await service
+    .from("announcement_reads")
+    .select("announcement_id")
+    .eq("user_id", userId)
+    .in("announcement_id", announcementIds);
+  return new Set(((data ?? []) as { announcement_id: string }[]).map((row) => row.announcement_id));
+}
+
 export async function ensureAnnouncementRead(
   announcement: Pick<AnnouncementRow, "id" | "organization_id">,
   userId: string,

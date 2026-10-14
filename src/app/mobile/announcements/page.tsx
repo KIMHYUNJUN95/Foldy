@@ -1,33 +1,17 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AnnouncementPopup } from "@/components/announcements/announcement-popup";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getAnnouncementDictionary } from "@/lib/announcement-i18n";
-import { getPopupDismissals, getVisibleAnnouncements } from "@/lib/announcements";
+import { getPopupDismissals, getReadAnnouncementIds, getVisibleAnnouncements } from "@/lib/announcements";
+import { AnnouncementListMobile, type MobileNoticeGroup } from "@/components/announcements/announcement-list-mobile";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import type { OrganizationRole } from "@/config/roles";
 
-function AlertIcon() {
-  return (
-    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 3.5l9 16H3l9-16z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/>
-      <path d="M12 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-      <circle cx="12" cy="16.7" r="1.05" fill="currentColor"/>
-    </svg>
-  );
-}
-
-function ImageIcon() {
-  return (
-    <svg className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.6"/>
-      <circle cx="9" cy="10" r="1.4" fill="currentColor"/>
-      <path d="M5 17l4.5-4.5 3 3L16 11l3 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
+function localeTag(locale: string): string {
+  return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
 }
 
 function toTokyoDate(dateStr: string | null): string {
@@ -35,11 +19,19 @@ function toTokyoDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
 }
 
-function formatDateLabel(dateStr: string | null, locale: string): string {
+/** 묶음 머리 — 「10월 6일 (월)」. */
+function formatDayLabel(dateStr: string | null, locale: string): string {
   if (!dateStr) return "";
-  const tag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-  return new Intl.DateTimeFormat(tag, {
-    year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Tokyo",
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Tokyo",
+  }).format(new Date(dateStr));
+}
+
+/** 고정 묶음 meta 앞 날짜 — 「10월 8일」. */
+function formatShortDay(dateStr: string | null, locale: string): string {
+  if (!dateStr) return "";
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    month: "long", day: "numeric", timeZone: "Asia/Tokyo",
   }).format(new Date(dateStr));
 }
 
@@ -48,11 +40,9 @@ function targetLabel(
   roles: string[],
   copy: ReturnType<typeof getAnnouncementDictionary>
 ): string {
-  if (scope === "everyone") return copy.targetScopes.everyone;
+  if (scope === "everyone") return copy.white.everyone;
   if (roles.length === 0) return copy.targetScopes.roles;
-  const names = roles.map((r) => copy.targetRoles[r as OrganizationRole] ?? r);
-  if (names.length <= 2) return names.join(", ");
-  return `${names[0]} +${names.length - 1}`;
+  return roles.map((r) => copy.targetRoles[r as OrganizationRole] ?? r).join(" · ");
 }
 
 export default async function MobileAnnouncementsPage() {
@@ -101,19 +91,33 @@ export default async function MobileAnnouncementsPage() {
 
   const navBadges = await getMobileNavBadges();
 
-  // pinned 먼저, 그 다음 published_at 내림차순으로 이미 DB에서 정렬되어 옴
-  // Tokyo 기준 날짜로 그룹핑
-  const dateGroupMap = new Map<string, typeof announcements>();
-  for (const ann of announcements) {
-    const dateKey = toTokyoDate(ann.published_at);
-    const key = dateKey || "unknown";
-    if (!dateGroupMap.has(key)) {
-      dateGroupMap.set(key, []);
-    }
-    dateGroupMap.get(key)!.push(ann);
-  }
+  const locale = session.user.preferredLanguage;
+  const readIds = await getReadAnnouncementIds(session.user.id, announcements.map((a) => a.id));
 
-  const dateGroups = Array.from(dateGroupMap.entries());
+  // 화이트 리디자인(2026-10-15): 고정 공지는 맨 위 「고정」 묶음(날짜를 meta 에), 나머지는 도쿄 게시일 묶음.
+  const toRow = (ann: (typeof announcements)[number], withDate: boolean) => ({
+    id: ann.id,
+    title: ann.title,
+    meta: [withDate ? formatShortDay(ann.published_at, locale) : null, targetLabel(ann.target_scope, ann.target_roles as string[], copy), ann.author_name || null]
+      .filter(Boolean)
+      .join(" · "),
+    important: ann.is_important,
+    unread: !readIds.has(ann.id),
+    hasImages: ann.image_urls.length > 0,
+  });
+  const groups: MobileNoticeGroup[] = [];
+  const pinned = announcements.filter((ann) => ann.is_pinned);
+  if (pinned.length > 0) groups.push({ key: "pinned", label: copy.white.mPinned, items: pinned.map((ann) => toRow(ann, true)) });
+  for (const ann of announcements) {
+    if (ann.is_pinned) continue;
+    const key = toTokyoDate(ann.published_at) || "unknown";
+    let group = groups.find((g) => g.key === key);
+    if (!group) {
+      group = { key, label: formatDayLabel(ann.published_at, locale), items: [] };
+      groups.push(group);
+    }
+    group.items.push(toRow(ann, false));
+  }
 
   return (
     <MobileShell
@@ -126,73 +130,22 @@ export default async function MobileAnnouncementsPage() {
         <AnnouncementPopup
           announcements={popupAnnouncements}
           detailHrefBase="/mobile/announcements"
-          locale={session.user.preferredLanguage}
+          locale={locale}
         />
 
-        <h1 className="px-2 pt-2 pb-1 text-[22px] font-black tracking-tight">
-          {copy.title}
-        </h1>
-
-        {announcements.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <p className="text-sm font-bold text-slate-500">{copy.mobileEmpty}</p>
-          </div>
-        ) : (
-          <div>
-            {dateGroups.map(([dateKey, items]) => (
-              <div key={dateKey}>
-                <p className="ml-7 px-4 py-2 pb-3 text-[11.5px] font-extrabold text-slate-700">
-                  {formatDateLabel(items[0]?.published_at ?? null, session.user.preferredLanguage)}
-                </p>
-                {items.map((ann, idx) => {
-                  const isLast = idx === items.length - 1;
-                  return (
-                    <Link
-                      key={ann.id}
-                      href={`/mobile/announcements/${ann.id}`}
-                      className="flex gap-[13px] items-start px-[18px] pb-[18px]"
-                    >
-                      {/* 도트 + 라인 */}
-                      <div className="w-[14px] shrink-0 flex flex-col items-center">
-                        <div
-                          className={`w-[9px] h-[9px] rounded-full mt-1 shrink-0 ${ann.is_important ? "bg-red-600" : "bg-primary"}`}
-                        />
-                        {!isLast && (
-                          <div className="flex-1 w-0.5 bg-border mt-1.5 min-h-[16px]" />
-                        )}
-                      </div>
-
-                      {/* 콘텐츠 */}
-                      <div className="flex-1 min-w-0 pb-1">
-                        {ann.is_important ? (
-                          <span className="inline-flex items-center gap-[3px] text-[10.5px] font-extrabold text-red-600 bg-red-50 px-2 py-[3px] rounded-full border border-red-200">
-                            <AlertIcon />
-                            {copy.important}
-                          </span>
-                        ) : (
-                          <span className="text-[10.5px] font-extrabold uppercase text-slate-500 tracking-wide">
-                            {targetLabel(ann.target_scope, ann.target_roles as string[], copy)}
-                          </span>
-                        )}
-                        <h3 className="mt-0.5 text-[14.5px] font-extrabold leading-snug line-clamp-2 text-foreground">
-                          {ann.title}
-                        </h3>
-                        <p className="mt-1.5 text-[11.5px] font-semibold text-slate-500">
-                          {targetLabel(ann.target_scope, ann.target_roles as string[], copy)}
-                          {" · "}
-                          {ann.author_name}
-                        </p>
-                      </div>
-
-                      {/* 이미지 아이콘 */}
-                      {ann.image_urls.length > 0 && <ImageIcon />}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        )}
+        <AnnouncementListMobile
+          title={copy.title}
+          groups={groups}
+          copy={{
+            important: copy.white.important,
+            unreadN: copy.white.mUnreadN,
+            allRead: copy.white.mAllRead,
+            unreadSr: copy.white.mUnreadSr,
+            hasPhoto: copy.white.mHasPhoto,
+            empty: copy.white.mEmpty,
+            emptyHint: copy.white.mEmptyHint,
+          }}
+        />
       </SplitList>
     </MobileShell>
   );

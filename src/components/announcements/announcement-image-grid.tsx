@@ -8,7 +8,8 @@ type AnnouncementImageGridProps = {
   imageUrls: string[];
   closeLabel: string;
   imageAltLabel: string;
-  variant?: "grid" | "feature";
+  /** plain = 화이트 리디자인(2026-10-15) — 테두리 · 그림자 없는 2열, 한 장이면 넓게. 스타일은 announcements-mobile.css. */
+  variant?: "grid" | "feature" | "plain";
 };
 
 export function AnnouncementImageGrid({
@@ -33,6 +34,19 @@ export function AnnouncementImageGrid({
       urls={imageUrls}
     />
   );
+
+  if (variant === "plain") {
+    return (
+      <div className={`ntw-shots${imageUrls.length === 1 ? " is-one" : ""}`}>
+        {imageUrls.map((url, index) => (
+          <button className="ntw-shot" key={url} onClick={() => setOpenIndex(index)} type="button" aria-label={`${imageAltLabel} ${index + 1}`}>
+            <Image alt="" fill sizes={imageUrls.length === 1 ? "(max-width: 640px) 100vw, 640px" : "(max-width: 640px) 50vw, 320px"} src={url} />
+          </button>
+        ))}
+        {lightbox}
+      </div>
+    );
+  }
 
   if (variant === "feature") {
     const isSingle = imageUrls.length === 1;

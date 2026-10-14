@@ -301,6 +301,16 @@ export type AnnouncementWhiteCopy = {
   leaveT: string;
   leaveS: string;
   leaveBtn: string;
+  mUnreadN: string;
+  mAllRead: string;
+  mPinned: string;
+  mUnreadSr: string;
+  mHasPhoto: string;
+  mEmpty: string;
+  mEmptyHint: string;
+  mTapPhoto: string;
+  mPopupCount: string;
+  mPopupLabel: string;
 };
 
 type AnnouncementDictionary = {
@@ -814,6 +824,16 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       leaveT: "작성 중인 내용을 버릴까요?",
       leaveS: "지금 나가면 저장하지 않은 내용이 사라져요.",
       leaveBtn: "버리고 나가기",
+      mUnreadN: "안 읽은 공지 {n}개",
+      mAllRead: "모두 읽었어요",
+      mPinned: "고정",
+      mUnreadSr: "안 읽음",
+      mHasPhoto: "사진 있음",
+      mEmpty: "아직 공지가 없어요",
+      mEmptyHint: "새 공지가 올라오면 여기에 보여요",
+      mTapPhoto: "사진을 누르면 크게 볼 수 있어요",
+      mPopupCount: "{i} / {n}",
+      mPopupLabel: "앱 열 때 공지",
     },
   },
   ja: {
@@ -1243,6 +1263,16 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       leaveT: "入力中の内容を破棄しますか？",
       leaveS: "今離れると保存していない内容は消えます。",
       leaveBtn: "破棄して戻る",
+      mUnreadN: "未読のお知らせ {n}件",
+      mAllRead: "すべて既読です",
+      mPinned: "固定",
+      mUnreadSr: "未読",
+      mHasPhoto: "写真あり",
+      mEmpty: "まだお知らせはありません",
+      mEmptyHint: "新しいお知らせはここに表示されます",
+      mTapPhoto: "写真をタップすると拡大できます",
+      mPopupCount: "{i} / {n}",
+      mPopupLabel: "お知らせ",
     },
   },
   en: {
@@ -1645,6 +1675,16 @@ const dictionaries: Record<Locale, AnnouncementDictionary> = {
       leaveT: "Discard what you wrote?",
       leaveS: "Unsaved changes will be lost if you leave now.",
       leaveBtn: "Discard and leave",
+      mUnreadN: "{n} unread",
+      mAllRead: "All caught up",
+      mPinned: "Pinned",
+      mUnreadSr: "Unread",
+      mHasPhoto: "Has photos",
+      mEmpty: "No notices yet",
+      mEmptyHint: "New notices will show up here",
+      mTapPhoto: "Tap a photo to enlarge it",
+      mPopupCount: "{i} / {n}",
+      mPopupLabel: "Notice",
     },
   },
 };

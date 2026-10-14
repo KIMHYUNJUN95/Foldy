@@ -1147,7 +1147,8 @@ export function AdminReservationConsole({
                   {card.info.roomAccess.length === 0 ? (
                     <span className="acw-note is-dim">{copy.noRoomAccess}</span>
                   ) : (
-                    card.info.roomAccess.map((room) => (
+                    <div className="acw-rcs">
+                    {card.info.roomAccess.map((room) => (
                       <div className="acw-rc" key={room.roomLabel}>
                         <span className="acw-mono">{room.roomLabel}</span>
                         {isEditing ? (
@@ -1171,7 +1172,8 @@ export function AdminReservationConsole({
                           <span className="acw-mono">{room.code || copy.none}</span>
                         )}
                       </div>
-                    ))
+                    ))}
+                    </div>
                   )}
                 </div>
               </section>

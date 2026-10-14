@@ -1631,7 +1631,7 @@
 
 /* 건물 정보 */
 .adm .acw-infos { display: flex; flex-direction: column; }
-.adm .acw-info { display: grid; grid-template-columns: 300px minmax(0, 1fr) 360px; column-gap: 40px; padding: 22px 12px; border-top: 1px solid #f1f1f4; }
+.adm .acw-info { display: grid; grid-template-columns: 260px 260px minmax(0, 1fr); column-gap: 40px; padding: 22px 12px; border-top: 1px solid #f1f1f4; }
 .adm .acw-info__a { display: flex; flex-direction: column; gap: 6px; }
 .adm .acw-info__a > b { font-size: 16px; font-weight: 700; color: #16141f; }
 .adm .acw-info__links { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
@@ -1642,6 +1642,7 @@
 .adm .acw-note.is-dim { color: #9a97a6; }
 .adm .acw-info__c { display: flex; flex-direction: column; }
 .adm .acw-info__c > .acw-k { padding-bottom: 6px; }
+.adm .acw-rcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); column-gap: 28px; }
 .adm .acw-rc { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; border-top: 1px solid #f7f7f9; font-size: 13px; }
 
 /* 예약 상세 패널 */

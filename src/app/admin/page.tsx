@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/shell/admin-shell";
+import { AdminEntry } from "@/components/admin/admin-entry";
 import { DashboardHome } from "@/components/admin/dashboard-home";
 import { canAccessAdminWeb } from "@/config/roles";
 import { getDictionary } from "@/lib/i18n";
@@ -45,6 +46,8 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
   return (
     <AdminShell activeItem="dashboard" title={dictionary.admin.console.headerToday}>
+      {/* 하루 첫 진입 모션(약 1.8초) — 시안 Motion-PC-Entry-PC */}
+      <AdminEntry />
       {session.organization ? <Beds24LiveRefresh organizationId={session.organization.id} /> : null}
       <DashboardHome
         c={dictionary.admin.console}

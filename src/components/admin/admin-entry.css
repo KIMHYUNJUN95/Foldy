@@ -1,0 +1,58 @@
+/* PC 진입 모션(2026-10-14) — 한 번 재생. 로고 묶음은 화면 가운데, --fx/--fy/--fs 는 사이드바 로고까지의 거리(스크립트가 잼). */
+.aden {
+  --sp: linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000);
+  --sps: linear(0.000,0.027,0.096,0.189,0.294,0.401,0.505,0.600,0.685,0.759,0.822,0.873,0.915,0.947,0.972,0.990,1.003,1.011,1.016,1.019,1.020,1.019,1.018,1.016,1.014,1.012,1.010,1.008,1.006,1.005,1.004,1.003,1.002,1.001,1.001,1.000,1.000,1.000,1.000,1.000,1.000);
+  position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;
+  background: #fff; animation: aden-bg 380ms cubic-bezier(.4, 0, .2, 1) 1300ms forwards;
+}
+.aden__logo { position: relative; width: 110px; height: 110px; perspective: 700px; animation: aden-fly 460ms cubic-bezier(.77, 0, .175, 1) 1300ms forwards, aden-land 60ms linear 1760ms forwards; }
+.aden__glow { position: absolute; left: -75px; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: aden-glow 700ms cubic-bezier(.23, 1, .32, 1) 400ms forwards, aden-fade 200ms ease 1300ms forwards; }
+.aden__tile { position: absolute; inset: 0; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: aden-tile 540ms var(--sps) 60ms forwards; }
+.aden__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: aden-assemble 800ms var(--sp) forwards; }
+.aden__bar { position: absolute; inset: 0; border-radius: 9px; filter: blur(6px); animation: aden-sharp 460ms cubic-bezier(.23, 1, .32, 1) forwards; }
+.aden__b3 { left: 36px; top: 28px; width: 38px; --sx: -60px; --sy: 120px; --sz: 260px; --rx: 64deg; --ry: -30deg; animation-delay: 120ms; }
+.aden__b3 .aden__bar { background: #b9a0fa; animation-delay: 120ms; }
+.aden__b2 { left: 29px; top: 48px; width: 52px; --sx: 110px; --sy: -80px; --sz: 120px; --rx: -46deg; --ry: 60deg; animation-delay: 190ms; }
+.aden__b2 .aden__bar { background: #8a63f0; animation-delay: 190ms; }
+.aden__b1 { left: 21px; top: 68px; width: 68px; --sx: -130px; --sy: -44px; --sz: -20px; --rx: 20deg; --ry: -76deg; animation-delay: 260ms; }
+.aden__b1 .aden__bar { background: #5b2bd6; animation-delay: 260ms; }
+.aden__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: aden-line 300ms cubic-bezier(.23, 1, .32, 1) 950ms forwards; }
+.aden__ww { margin-top: 28px; overflow: hidden; padding: 0 6px; animation: aden-fade 150ms ease 1300ms forwards; }
+.aden__word { display: block; font-family: "Geist", var(--font-noto-kr), sans-serif; font-size: 34px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: #16141f; transform: translateY(110%); animation: aden-word 600ms var(--sp) 650ms forwards; }
+@keyframes aden-tile { to { opacity: 1; transform: scale(1); } }
+@keyframes aden-assemble {
+  0% { opacity: 0; transform: translate3d(var(--sx), var(--sy), var(--sz)) rotateX(var(--rx)) rotateY(var(--ry)); }
+  8% { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg); }
+}
+@keyframes aden-sharp { to { filter: blur(0); } }
+@keyframes aden-line { to { transform: scaleX(1); } }
+@keyframes aden-glow { to { opacity: 1; } }
+@keyframes aden-word { to { transform: translateY(0); } }
+@keyframes aden-fade { to { opacity: 0; } }
+@keyframes aden-bg { to { background: rgba(255, 255, 255, 0); } }
+@keyframes aden-fly { to { transform: translate(var(--fx, -600px), var(--fy, -380px)) scale(var(--fs, .34)); } }
+@keyframes aden-land { to { opacity: 0; } }
+
+/* 콘솔이 차례로 깔림 — 진입 중(html[data-adm-entry])에만. 시간은 오버레이와 같은 시작점 기준. */
+html[data-adm-entry] .adm .side { animation: aden-side 450ms cubic-bezier(.32, .72, 0, 1) 1350ms both; }
+html[data-adm-entry] .adm .side .navi { animation: aden-navi 380ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: 1500ms; }
+html[data-adm-entry] .adm .side .navgrp:nth-child(2) .navi { animation-delay: 1560ms; }
+html[data-adm-entry] .adm .side .navgrp:nth-child(3) .navi { animation-delay: 1620ms; }
+html[data-adm-entry] .adm .side .navgrp:nth-child(n + 4) .navi { animation-delay: 1680ms; }
+html[data-adm-entry] .adm .top { animation: aden-top 400ms cubic-bezier(.23, 1, .32, 1) 1450ms both; }
+html[data-adm-entry] .adm .dh > * { animation: aden-rise 650ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: 1820ms; }
+html[data-adm-entry] .adm .dh > *:nth-child(1) { animation: none; }
+html[data-adm-entry] .adm .dh > *:nth-child(2), html[data-adm-entry] .adm .dh > *:nth-child(3) { animation-delay: 1700ms; }
+html[data-adm-entry] .adm .dh > *:nth-child(4), html[data-adm-entry] .adm .dh > *:nth-child(5) { animation-delay: 1770ms; }
+html[data-adm-entry] .adm .dh-kpis > * { animation: aden-kpi 600ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: 1550ms; }
+html[data-adm-entry] .adm .dh-kpis > *:nth-child(2) { animation-delay: 1600ms; }
+html[data-adm-entry] .adm .dh-kpis > *:nth-child(3) { animation-delay: 1650ms; }
+html[data-adm-entry] .adm .dh-kpis > *:nth-child(4) { animation-delay: 1700ms; }
+html[data-adm-entry] .adm .dh-kpis > *:nth-child(5) { animation-delay: 1750ms; }
+@keyframes aden-side { from { transform: translateX(-100%); } }
+@keyframes aden-navi { from { opacity: 0; transform: translateX(-8px); } }
+@keyframes aden-top { from { opacity: 0; transform: translateY(-10px); } }
+@keyframes aden-rise { from { opacity: 0; transform: translateY(18px); filter: blur(4px); } }
+@keyframes aden-kpi { from { opacity: 0; transform: translateY(14px); } }
+@media (prefers-reduced-motion: reduce) { .aden { display: none; } }

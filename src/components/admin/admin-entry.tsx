@@ -62,6 +62,17 @@ function runEntry(logo: HTMLElement | null) {
   const l = logo.getBoundingClientRect();
   const lx = l.left + l.width / 2;
   const ly = l.top + l.height / 2;
+  // 날기 · 착지는 Web Animations 에 **실제 숫자**로 — CSS 변수를 쓴 키프레임은 메인 스레드에서 돌아, 대시보드가 화면을 붙이느라
+  // 바쁜 동안 로고가 중간에서 멈췄다(2026-10-14 사용자 지적 3차). 숫자 transform · opacity 는 컴포지터에서 돌아 안 멈춘다.
+  const fly = logo.animate([{ transform: "none" }, { transform: "translate(0px, 0px) scale(.6)" }], {
+    delay: 1300,
+    duration: 560,
+    easing: "cubic-bezier(.5, 0, .1, 1)",
+    fill: "forwards",
+  });
+  fly.startTime = t0;
+  const land = logo.animate([{ opacity: 1 }, { opacity: 0 }], { delay: 1800, duration: 140, easing: "ease-out", fill: "forwards" });
+  land.startTime = t0;
   const measure = () => {
     const mark = document.querySelector<HTMLElement>(".adm .side__mark");
     if (!mark) return;
@@ -69,9 +80,12 @@ function runEntry(logo: HTMLElement | null) {
     const tf = side ? getComputedStyle(side).transform : "none";
     const shift = tf && tf !== "none" ? new DOMMatrixReadOnly(tf).m41 : 0;
     const m = mark.getBoundingClientRect();
-    logo.style.setProperty("--fx", m.left - shift + m.width / 2 - lx + "px");
-    logo.style.setProperty("--fy", m.top + m.height / 2 - ly + "px");
-    logo.style.setProperty("--fs", String(m.width / l.width));
+    const fx = m.left - shift + m.width / 2 - lx;
+    const fy = m.top + m.height / 2 - ly;
+    (fly.effect as KeyframeEffect).setKeyframes([
+      { transform: "translate(0px, 0px) scale(1)" },
+      { transform: "translate(" + fx + "px, " + fy + "px) scale(" + m.width / l.width + ")" },
+    ]);
   };
   measure();
   setTimeout(measure, 1240);
@@ -131,7 +145,7 @@ export function AdminEntry() {
   if (!play) return null;
   return (
     <div className="aden" aria-hidden="true" key={play}>
-      {/* 인라인 스크립트가 하이드레이션 전에 data-run · data-t0 · --fx/--fy/--fs 를 붙이므로 속성 차이는 무시 */}
+      {/* 인라인 스크립트가 하이드레이션 전에 data-run · data-t0 를 붙이므로 속성 차이는 무시 */}
       <div className="aden__logo" ref={logoRef} suppressHydrationWarning>
         <span className="aden__glow" />
         <span className="aden__tile">

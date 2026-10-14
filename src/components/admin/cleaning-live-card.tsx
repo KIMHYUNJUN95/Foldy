@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import type { CleaningLive } from "@/lib/admin-dashboard";
 import { getDictionary } from "@/lib/i18n";
+import { LiveWash } from "@/components/shared/live-wash";
 
 const X = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -64,9 +65,11 @@ export function CleaningLiveCard({
       {cleaning.length === 0 ? (
         <div className="dh-empty">{c.cleaningEmpty}</div>
       ) : (
-        cleaning.map((row) => (
+        <LiveWash sig={cleaning.map((row) => row.id).join(",")}>
+        {cleaning.map((row) => (
           <button
             className={`dh-row${row.id === selectedId ? " dh-sel" : ""}`}
+            data-live={row.id}
             key={row.id}
             onClick={() => setSelectedId(row.id)}
             style={{ width: "100%", border: 0, borderTop: "1px solid #f3f3f6", background: row.id === selectedId ? "#f4f1fd" : "transparent", font: "inherit", textAlign: "left", padding: 0 }}
@@ -81,7 +84,8 @@ export function CleaningLiveCard({
             </div>
             <span className="dh-cc">{c.elapsedMin(elapsedMinutes(row.startedAt))}</span>
           </button>
-        ))
+        ))}
+        </LiveWash>
       )}
 
       {sel &&

@@ -2,6 +2,8 @@ import Link from "next/link";
 import "./admin-console.css";
 import "./dashboard-home.css";
 import { CleaningLiveCard } from "./cleaning-live-card";
+import { LiveWash } from "@/components/shared/live-wash";
+import { RollNumber } from "@/components/shared/roll-number";
 import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
 import type { AdminDashboardData, QueueKind } from "@/lib/admin-dashboard";
 import type { Dictionary } from "@/lib/i18n";
@@ -94,11 +96,11 @@ export function DashboardHome({
   return (
     <div className="dh">
       <div className="dh-kpis">
-        {kpis.map((k) => (
+        {kpis.map((k, i) => (
           <Link className="dh-kpi" href={k.href} key={k.label}>
             <span className="dh-kpi__k">{k.label}</span>
             <span className="dh-kpi__v">
-              {k.value}
+              <RollNumber delay={150 + i * 70} delta text={String(k.value)} />
               {k.unit ? <small>{k.unit}</small> : null}
             </span>
             {k.detail ? <span className="dh-kpi__d">{k.detail}</span> : null}
@@ -138,7 +140,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
           <div className="dh-rev__top">
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <span className="dh-ct">{c.dhRevenue}</span>
-              <span className="dh-rev__v">{yen(s.revenue)}</span>
+              <span className="dh-rev__v"><RollNumber delay={200} text={yen(s.revenue)} /></span>
               {s.actualThroughDay ? (
                 <span className="dh-rev__note">
                   {c.dhActualNote.replace("{day}", String(s.actualThroughDay)).replace("{amount}", yen(s.actualToDate))}
@@ -164,12 +166,12 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
             <div className="dh-plot">
               <div className="dh-plot__lines"><span /><span /><span /></div>
               <div className="dh-bars">
-                {s.daily.map((d) => (
+                {s.daily.map((d, i) => (
                   <div
                     className={`dh-bar${d.actual ? " is-actual" : ""}${d.today ? " is-today" : ""}`}
+                    data-tip={c.dhDayTip.replace("{day}", String(d.day)).replace("{amount}", yen(d.revenue))}
                     key={d.day}
-                    style={{ height: `${Math.max(0, (d.revenue / max) * 100)}%` }}
-                    title={c.dhDayTip.replace("{day}", String(d.day)).replace("{amount}", yen(d.revenue))}
+                    style={{ height: `${Math.max(0, (d.revenue / max) * 100)}%`, ["--i" as string]: i }}
                   />
                 ))}
               </div>
@@ -193,6 +195,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
             <Link className="dh-link" href="/admin/ops/occupancy" style={{ marginLeft: "auto" }}>{c.dhOccupancyLink} →</Link>
           </div>
           <div className="dh-occ__ring">
+            <span className="dh-occ__dial">
             <svg aria-label={c.dhOccDesc.replace("{pct}", String(Math.round(s.occupancyPct)))} height="104" role="img" viewBox="0 0 104 104" width="104">
               <circle cx="52" cy="52" fill="none" r={r} stroke="#EDE7FC" strokeWidth="10" />
               <circle
@@ -201,13 +204,21 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
                 fill="none"
                 r={r}
                 stroke="#7A52E6"
+                className="dh-occ__arc"
                 strokeDasharray={`${(Math.min(s.occupancyPct, 100) / 100) * circ} ${circ}`}
                 strokeLinecap="round"
                 strokeWidth="10"
+                style={{ ["--len" as string]: (Math.min(s.occupancyPct, 100) / 100) * circ, ["--circ" as string]: circ }}
                 transform="rotate(-90 52 52)"
               />
-              <text fill="#16141F" fontSize="22" fontWeight="700" textAnchor="middle" x="52" y="59">{pct(s.occupancyPct)}</text>
+              {s.occupancyPct > 0 ? (
+                <g className="dh-occ__cap" style={{ ["--deg" as string]: `${(Math.min(s.occupancyPct, 100) / 100) * 360}deg` }}>
+                  <circle cx="52" cy="8" fill="#fff" r="3" />
+                </g>
+              ) : null}
             </svg>
+            <span aria-hidden="true" className="dh-occ__pct"><RollNumber delay={250} text={pct(s.occupancyPct)} /></span>
+            </span>
             <p>
               {c.dhOccMonth.replace("{avail}", s.availableNights.toLocaleString("ja-JP")).replace("{occ}", s.occupiedNights.toLocaleString("ja-JP"))}
               <br />
@@ -215,10 +226,10 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
             </p>
           </div>
           <div className="dh-bld">
-            {s.buildings.map((b) => (
+            {s.buildings.map((b, i) => (
               <div className="dh-bld__row" key={b.name}>
                 <span className="dh-bld__n" title={b.name}>{b.name}</span>
-                <span className="dh-meter"><i style={{ width: `${Math.min(b.pct, 100)}%` }} /></span>
+                <span className="dh-meter"><i style={{ width: `${Math.min(b.pct, 100)}%`, ["--i" as string]: i }} /></span>
                 <span className="dh-bld__v">{pct(b.pct)}</span>
               </div>
             ))}
@@ -236,8 +247,8 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
             <div className="dh-months__col">
               <span className="dh-months__k">{c.dhMonthRevenue}</span>
               <div className="dh-mbars">
-                {s.months.map((m) => (
-                  <div className="dh-mbar" key={m.month}>
+                {s.months.map((m, i) => (
+                  <div className="dh-mbar" key={m.month} style={{ ["--i" as string]: i }}>
                     <span>{yen(m.revenue)}</span>
                     <i className={m.month === thisMonth ? "is-current" : undefined} style={{ height: `${(m.revenue / mMax) * 100}%` }} />
                   </div>
@@ -281,7 +292,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
                   const last = i === linePoints.length - 1;
                   const pos = { left: `${(p.x / 480) * 100}%`, top: `${(p.y / 130) * 100}%` };
                   return (
-                    <span aria-hidden="true" key={p.x}>
+                    <span aria-hidden="true" key={p.x} style={{ ["--i" as string]: i }}>
                       <i className={`dh-line__dot${last ? " is-now" : ""}`} style={pos} />
                       <b className={`dh-line__v${last ? " is-now" : ""}`} style={pos}>
                         {pct(p.v)}
@@ -316,11 +327,12 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
           {data.queue.length === 0 ? (
             <div className="dh-empty">{c.queueEmpty}</div>
           ) : (
-            data.queue.slice(0, 5).map((q) => {
+            <LiveWash sig={data.queue.slice(0, 5).map((q) => `${q.kind}-${q.id}`).join(",")}>
+            {data.queue.slice(0, 5).map((q) => {
               const href = q.kind === "maintenance" ? "/admin/maintenance" : q.kind === "lost" ? "/admin/lost-found" : "/admin/orders";
               const kindLabel = q.kind === "maintenance" ? c.kindMaintenance : q.kind === "lost" ? c.kindLost : c.kindOrder;
               return (
-                <Link className="dh-row" href={href} key={`${q.kind}-${q.id}`}>
+                <Link className="dh-row" data-live={`${q.kind}-${q.id}`} href={href} key={`${q.kind}-${q.id}`}>
                   <span className="dh-qic"><Ic>{QUEUE_ICON[q.kind]}</Ic></span>
                   <div className="dh-rb">
                     <div className="dh-rt">{q.title}</div>
@@ -330,7 +342,8 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
                   <span className="dh-cc">{relDay(q.createdAt, locale)}</span>
                 </Link>
               );
-            })
+            })}
+            </LiveWash>
           )}
         </div>
       </div>
@@ -347,12 +360,14 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
           {data.todos.length === 0 ? (
             <div className="dh-empty">{c.todoEmpty}</div>
           ) : (
-            data.todos.map((t) => (
-              <div className={`dh-todo${t.done ? " is-done" : ""}`} key={t.id}>
-                <span className="dh-todo__box">{t.done ? <Ic>{I.check}</Ic> : null}</span>
-                <span>{t.title}</span>
-              </div>
-            ))
+            <LiveWash sig={data.todos.map((t) => `${t.id}:${t.done ? 1 : 0}`).join(",")}>
+              {data.todos.map((t) => (
+                <div className={`dh-todo${t.done ? " is-done" : ""}`} data-live={`${t.id}:${t.done ? 1 : 0}`} key={t.id}>
+                  <span className="dh-todo__box">{t.done ? <Ic>{I.check}</Ic> : null}</span>
+                  <span className="dh-todo__t">{t.title}</span>
+                </div>
+              ))}
+            </LiveWash>
           )}
         </div>
         <div className="dh-col7 dh-right">
@@ -363,11 +378,14 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
           {data.reservations.checkIns.length === 0 && data.reservations.checkOuts.length === 0 ? (
             <div className="dh-empty">{c.resvEmpty}</div>
           ) : (
-            [
+            <LiveWash
+              sig={[...data.reservations.checkIns.map((r) => `in-${r.id}`), ...data.reservations.checkOuts.map((r) => `out-${r.id}`)].join(",")}
+            >
+            {[
               ...data.reservations.checkIns.map((r) => ({ r, kind: c.resvCheckIn, key: `in-${r.id}`, isIn: true })),
               ...data.reservations.checkOuts.map((r) => ({ r, kind: c.resvCheckOut, key: `out-${r.id}`, isIn: false })),
             ].map(({ r, kind, key, isIn }) => (
-              <div className="dh-row" key={key} style={{ cursor: "default" }}>
+              <div className="dh-row" data-live={key} key={key} style={{ cursor: "default" }}>
                 <span className="dh-room">{r.roomLabel}</span>
                 <div className="dh-rb">
                   <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
@@ -375,7 +393,8 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
                 </div>
                 <span className={`dh-kind${isIn ? " dh-kind--in" : ""}`}>{kind}</span>
               </div>
-            ))
+            ))}
+            </LiveWash>
           )}
         </div>
       </div>

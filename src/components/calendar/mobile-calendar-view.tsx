@@ -1141,6 +1141,7 @@ export function MobileCalendarView({
                                 aria-label={`${bar.item.guestName}, ${bar.item.roomLabel}, ${channelName(bar.item.source)}`}
                                 className={cn(
                                   "mcw-bar",
+                                  `is-${normalizeSource(bar.item.source)}`,
                                   !startsInView && "is-cut-l",
                                   !endsInView && "is-cut-r",
                                   selectedReservationId === bar.id && "is-on",

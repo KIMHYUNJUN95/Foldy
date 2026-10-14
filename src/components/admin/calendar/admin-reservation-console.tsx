@@ -124,22 +124,26 @@ const DEFAULT_CHECK_OUT_TIME = "10:00";
 
 const CHANNEL_STYLE: Record<
   ReservationChannel,
-  { accent: string; background: string; badge: string }
+  { accent: string; background: string; badge: string; tint: string }
 > = {
   airbnb: {
     accent: "hsl(352 71% 60%)",
     background: "hsl(353 88% 96.1%)",
     badge: "linear-gradient(180deg, #ff9fad 0%, #f16f82 100%)",
+    // 월간 보드 막대 바탕 — 흰 바탕에서 또렷하게(2026-10-15 「예약바가 너무 흰색」).
+    tint: "#fbdde7",
   },
   booking: {
     accent: "hsl(214 57% 46%)",
     background: "hsl(212 70% 95.9%)",
     badge: "linear-gradient(180deg, #7ca3e5 0%, #4b72bf 100%)",
+    tint: "#dce8fb",
   },
   manual: {
     accent: "hsl(221 11% 42%)",
     background: "hsl(218 17% 95.7%)",
     badge: "linear-gradient(180deg, #bdc6d2 0%, #909daf 100%)",
+    tint: "#e8e6ef",
   },
 };
 
@@ -839,6 +843,7 @@ export function AdminReservationConsole({
                                           {
                                             "--admcal-bar-accent": channelStyle.accent,
                                             "--admcal-bar-background": channelStyle.background,
+                                            "--acw-bar-tint": channelStyle.tint,
                                             "--admcal-status-dot": statusStyle.dot,
                                             left: `calc(${startUnit} * var(--admcal-day-width) + 3px)`,
                                             width: `calc(${span} * var(--admcal-day-width) - 6px)`,

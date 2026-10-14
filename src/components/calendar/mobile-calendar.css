@@ -53,8 +53,10 @@
 .mcw-row { position: relative; z-index: 1; display: flex; border-top: 1px solid var(--mcw-line); }
 .mcw-room { position: sticky; left: 0; z-index: 25; display: flex; align-items: center; flex: none; padding-left: 2px; background: #fff; font-family: var(--font-mono, ui-monospace), monospace; font-size: 13px; font-weight: 700; }
 .mcw-track { position: relative; flex: none; }
-.mcw-bar { position: absolute; z-index: 20; display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 0; border-radius: 8px; background: #f1f0f5; font: inherit; font-size: 12px; font-weight: 500; color: var(--mcw-ink); white-space: nowrap; overflow: hidden; cursor: pointer; transform-origin: left center; transition: background 150ms ease, transform 140ms ease, box-shadow 150ms ease; animation: mcw-bar-in 360ms cubic-bezier(.23, 1, .32, 1) both; -webkit-tap-highlight-color: transparent; }
-.mcw-bar:active { transform: scale(.98); background: #e9e7f0; }
+.mcw-bar { position: absolute; z-index: 20; display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 0; border-radius: 8px; background: #e8e6ef; font: inherit; font-size: 12px; font-weight: 500; color: var(--mcw-ink); white-space: nowrap; overflow: hidden; cursor: pointer; transform-origin: left center; transition: background 150ms ease, filter 150ms ease, transform 140ms ease, box-shadow 150ms ease; animation: mcw-bar-in 360ms cubic-bezier(.23, 1, .32, 1) both; -webkit-tap-highlight-color: transparent; }
+.mcw-bar.is-airbnb { background: #fbdde7; }
+.mcw-bar.is-booking { background: #dce8fb; }
+.mcw-bar:active { transform: scale(.98); filter: brightness(.96); }
 .mcw-bar.is-on { background: #e6ddfb; box-shadow: 0 0 0 2px var(--mcw-pri); }
 .mcw-bar.is-cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .mcw-bar.is-cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; }

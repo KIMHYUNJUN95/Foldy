@@ -1579,8 +1579,8 @@
 .adm .acw .admcal__cell { border-right: 0; }
 .adm .acw .admcal__cell.is-sat, .adm .acw .admcal__cell.is-sun { background: #fafafc; }
 .adm .acw .admcal__cell.is-today { background: #f4f1fd; }
-.adm .acw .admcal__bar { top: 8px; height: 28px; padding: 0 8px; gap: 5px; border: 0; border-radius: 8px; background: #f1f0f5; color: #16141f; box-shadow: none; font-size: 12px; font-weight: 500; transform-origin: left center; transition: background 150ms ease, transform 140ms ease, box-shadow 150ms ease; animation: acw-bar-in 360ms cubic-bezier(.23, 1, .32, 1) both; }
-.adm .acw .admcal__bar:hover { background: #e9e7f0; }
+.adm .acw .admcal__bar { top: 8px; height: 28px; padding: 0 8px; gap: 5px; border: 0; border-radius: 8px; background: var(--acw-bar-tint, #e8e6ef); color: #16141f; box-shadow: none; font-size: 12px; font-weight: 500; transform-origin: left center; transition: background 150ms ease, filter 150ms ease, transform 140ms ease, box-shadow 150ms ease; animation: acw-bar-in 360ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .acw .admcal__bar:hover { filter: brightness(.96); }
 .adm .acw .admcal__bar:active { transform: scale(.98); }
 .adm .acw .admcal__bar.is-selected { background: #e6ddfb; box-shadow: 0 0 0 2px #7a52e6; }
 .adm .acw .admcal__bar.is-clamped-left, .adm .acw .admcal__bar.is-clamped-right { border-radius: 8px; }

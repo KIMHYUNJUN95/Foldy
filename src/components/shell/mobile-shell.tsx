@@ -30,6 +30,7 @@ import {
 import { canAccessAdminWeb } from "@/config/roles";
 import { haptic } from "@/lib/haptics";
 import { getDictionary } from "@/lib/i18n";
+import { AppSplash } from "@/components/mobile/app-splash";
 import { cn } from "@/lib/utils";
 
 // Capitalized alias so the icon can be used as a JSX tag in the sidebar footer.
@@ -688,6 +689,9 @@ export function MobileShell({
       className="h-dvh overflow-hidden bg-background text-foreground"
       ref={mainRef}
     >
+
+      {/* 앱 스플래시 — 어느 모바일 화면에서든 새로고침 · 다시 접속 · 화면 껐다 켬마다(`entry-replay`), 화면 이동 땐 안 나옴. */}
+      <AppSplash tagline={dictionary.mobile.splashTagline} />
 
       {/* ── Option-B PTR indicator — fixed at the top, revealed as the whole shell slides down ── */}
       {/* The shell (header + content + bottom nav) all translate together; this fixed layer fills

@@ -1,44 +1,23 @@
 "use client";
 
-// PC 진입 모션(2026-10-14, 시안 Motion-PC-Entry-PC) — 하루 첫 대시보드 진입에만 약 1.8초.
+// PC 진입 모션(2026-10-14, 시안 Motion-PC-Entry-PC) — 관리자 콘솔을 새로 불러올 때마다(새로고침 · 다시 접속 · 화면 껐다 30초 넘어 돌아옴,
+// `entry-replay`) 약 1.8초. 콘솔 안에서 화면을 옮길 땐 다시 안 나온다.
 // 흰 화면 가운데에서 로고 세 막대가 3D 로 모이고 「Foldy」 → 로고가 작아지며 사이드바 로고 자리로 날아가 앉고,
 // 그사이 사이드바 · 위 줄 · 본문이 차례로 깔린다(html[data-adm-entry] 동안만 — admin-entry.css).
-// 동작 줄이기면 보이지 않는다. 같은 날 다시 들어오거나 새로고침하면 없음(localStorage 에 도쿄 날짜).
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+// 동작 줄이기면 보이지 않는다.
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { finishEntry, getEntryPlay, getServerEntryPlay, subscribeEntry } from "@/lib/entry-replay";
 import "./admin-entry.css";
 
-const KEY = "foldy:adm-entry-day";
-
-function tokyoDay() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-}
-
-function shouldShow() {
-  try {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
-    return window.localStorage.getItem(KEY) !== tokyoDay();
-  } catch {
-    return false;
-  }
-}
-
-function subscribe() {
-  return () => {};
-}
-
 export function AdminEntry() {
-  const wanted = useSyncExternalStore(subscribe, shouldShow, () => false);
-  const [done, setDone] = useState(false);
+  const play = useSyncExternalStore(subscribeEntry, getEntryPlay, getServerEntryPlay);
   const logoRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef(0);
 
   useEffect(() => {
-    if (!wanted) return;
+    if (!play) return;
     const root = document.documentElement;
-    try {
-      window.localStorage.setItem(KEY, tokyoDay());
-    } catch {
-      /* 저장 못 해도 한 번 보여 주고 끝 */
-    }
+    activeRef.current = play;
     // 날아갈 자리 = 사이드바 로고. 로고 묶음 가운데 → 그 가운데로.
     const mark = document.querySelector<HTMLElement>(".adm .side__mark");
     const logo = logoRef.current;
@@ -50,18 +29,17 @@ export function AdminEntry() {
       logo.style.setProperty("--fs", String(m.width / l.width));
     }
     root.setAttribute("data-adm-entry", "");
-    const t1 = window.setTimeout(() => setDone(true), 1850);
-    const t2 = window.setTimeout(() => root.removeAttribute("data-adm-entry"), 2600);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      root.removeAttribute("data-adm-entry");
-    };
-  }, [wanted]);
+    const t1 = window.setTimeout(() => finishEntry(play), 1850);
+    // 겉 화면이 사라진 뒤에도 콘솔이 깔리는 끝부분(~2.6초)까지 표시를 둔다 — 그사이 새 재생이 시작됐으면 그쪽이 맡는다.
+    window.setTimeout(() => {
+      if (activeRef.current === play) root.removeAttribute("data-adm-entry");
+    }, 2600);
+    return () => window.clearTimeout(t1);
+  }, [play]);
 
-  if (!wanted || done) return null;
+  if (!play) return null;
   return (
-    <div className="aden" aria-hidden="true">
+    <div className="aden" aria-hidden="true" key={play}>
       <div className="aden__logo" ref={logoRef}>
         <span className="aden__glow" />
         <span className="aden__tile">

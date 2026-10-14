@@ -40,7 +40,6 @@ import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@
 import type { Dictionary, Locale } from "@/lib/i18n";
 import "@/components/mobile/home-screen.css";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
-import { AppSplash } from "@/components/mobile/app-splash";
 import { FoldyLoader } from "@/components/shared/foldy-loader";
 
 type QuickActionItem = {
@@ -448,7 +447,6 @@ export default async function MobileHomePage() {
     <MobileShell activeItem="home" badges={navBadges} title={m.homeTitle} wide>
       <Beds24LiveRefresh organizationId={session.organization.id} />
       {/* 앱을 켤 때(세션당 한 번) 스플래시 — 시안 Motion-B-Splash-Phone */}
-      <AppSplash tagline={m.splashTagline} />
       <div className="hm pb-2">
         {/* Greeting — renders immediately with the shell (no data reads). */}
         <div className="hm__greet">

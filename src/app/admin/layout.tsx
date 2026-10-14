@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AdminEntry } from "@/components/admin/admin-entry";
 
 // The admin console is an installable PWA in its own right, kept fully separate from the
 // mobile app. Next.js metadata merges by segment, so overriding `manifest` here makes every
@@ -16,6 +17,12 @@ export const metadata: Metadata = {
   },
 };
 
+// 진입 모션은 레이아웃에 — 어느 관리자 화면에서 새로고침 · 다시 접속해도 나오고, 콘솔 안 이동 땐 레이아웃이 그대로라 다시 안 나온다.
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <AdminEntry />
+    </>
+  );
 }

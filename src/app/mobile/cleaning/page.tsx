@@ -34,6 +34,7 @@ import {
   buildLegacyAliasToRoomKeyMap,
   buildSessionLabelToRoomKeyMap,
   buildSessionRoomLabel,
+  CALENDAR_BUILDING_ORDER,
   CANONICAL_TO_BUILDING_KEY,
   getDisplayRoomLabel,
   resolveRoomKey,
@@ -56,15 +57,8 @@ type MobileCleaningPageProps = {
   }>;
 };
 
-const BUILDING_KEY_ORDER = [
-  "arakicho_a",
-  "arakicho_b",
-  "kabukicho",
-  "takadanobaba",
-  "okubo_a",
-  "okubo_b",
-  "okubo_c",
-] as const;
+// 건물 순서는 예약 캘린더와 같다(`CALENDAR_BUILDING_ORDER`, 2026-10-15). 전에는 여기 7개를 따로 적어 스테이아리가 맨 뒤로 밀렸다.
+const BUILDING_KEY_ORDER = CALENDAR_BUILDING_ORDER.map((name) => CANONICAL_TO_BUILDING_KEY[name] ?? name);
 
 const BUILDING_KEY_RANK = new Map<string, number>(
   BUILDING_KEY_ORDER.map((key, i) => [key, i]),

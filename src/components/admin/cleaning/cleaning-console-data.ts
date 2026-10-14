@@ -5,24 +5,45 @@
 // and force-complete modal. See docs/product/07-cleaning-workflow.md →
 // "2026-07-14 어드민 청소 대시보드 — 백엔드 연동".
 
+import { CANONICAL_TO_BUILDING_KEY } from "@/lib/room-label-normalization";
+
 export type BuildingKey =
   | "arakicho_a"
   | "arakicho_b"
   | "kabukicho"
+  | "stay_ari"
   | "takadanobaba"
   | "okubo_a"
   | "okubo_b"
   | "okubo_c";
 
+/**
+ * 청소 현황 · 기록의 건물 순서 — **예약 캘린더와 같은 순서**(`CALENDAR_BUILDING_ORDER`, 2026-10-15 사용자 결정).
+ * 사노는 현장 운영에서 빠진 건물이라 넣지 않는다(`isExcludedOperationalProperty`).
+ *
+ * 2026-10-15 까지 스테이아리가 여기 없었다. 9/29 에 이름표(`CANONICAL_TO_BUILDING_KEY` → `stay_ari`)가 붙으면서 「아는 건물」로
+ * 분류됐는데 이 목록에는 없어, 오늘 현황이 그 건물 칸을 **통째로 그리지 않았다**(기타 칸으로도 안 감). 건물을 늘리면 여기에도
+ * 넣어야 하고, 빠뜨리면 `cleaning-building-order.test.ts` 가 잡는다.
+ */
 export const BUILDING_ORDER: BuildingKey[] = [
   "arakicho_a",
   "arakicho_b",
   "kabukicho",
+  "stay_ari",
   "takadanobaba",
   "okubo_a",
   "okubo_b",
   "okubo_c",
 ];
+
+/**
+ * 청소 콘솔이 아는 건물이면 그 키, 아니면 null(→ 화면의 「기타」 칸 — 이름 그대로). 이름표가 있어도 `BUILDING_ORDER` 에 없는
+ * 건물은 null 로 돌린다 — 키만 있고 순서에 없으면 오늘 현황이 그 칸을 그리지 않아 조용히 사라진다(2026-10-15 스테이아리).
+ */
+export function buildingKeyOf(canonicalPropertyName: string): BuildingKey | null {
+  const key = CANONICAL_TO_BUILDING_KEY[canonicalPropertyName] as BuildingKey | undefined;
+  return key && BUILDING_ORDER.includes(key) ? key : null;
+}
 
 export type CleaningTaskType = "checkout" | "simple" | "longstay" | "setup";
 

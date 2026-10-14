@@ -1,6 +1,11 @@
 import "server-only";
 
-import { BUILDING_ORDER, type BuildingKey, type CleaningTaskType } from "@/components/admin/cleaning/cleaning-console-data";
+import {
+  BUILDING_ORDER,
+  buildingKeyOf,
+  type BuildingKey,
+  type CleaningTaskType,
+} from "@/components/admin/cleaning/cleaning-console-data";
 import {
   cleaningOperatingTimeZone,
   getCleaningStaffOptions,
@@ -17,7 +22,6 @@ import {
   buildLegacyAliasToRoomKeyMap,
   buildSessionLabelToRoomKeyMap,
   buildSessionRoomLabel,
-  CANONICAL_TO_BUILDING_KEY,
   compareRoomLabel,
   getDisplayRoomLabel,
   getDisplaySessionRoomLabel,
@@ -92,10 +96,6 @@ function taskLabelToType(taskLabel: string): CleaningTaskType {
   return taskLabel;
 }
 
-function buildingKeyOf(canonicalPropertyName: string): BuildingKey | null {
-  const key = CANONICAL_TO_BUILDING_KEY[canonicalPropertyName];
-  return (key as BuildingKey | undefined) ?? null;
-}
 
 /** Fixed operational building order; unknown/unmapped properties sort after the 7 canonical ones. */
 function buildingRank(building: BuildingKey | null): number {

@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-15 — 청소에 STAY ARI 표시 · 건물 순서 = 예약 캘린더
+
+- 대시보드 청소 오늘 현황에서 STAY ARI 칸이 통째로 빠지던 것 수정(`BUILDING_ORDER` 에 없었음), 기록 필터에도 추가. 모바일 청소는 맨 아래로
+  밀리던 것을 예약 캘린더 순서(가부키초 다음)로. 모르는 건물은 「기타」 칸으로 — 조용히 사라지지 않게. 회귀 테스트
+  `cleaning-building-order.test.ts`. 상세 `07-cleaning-workflow.md` 2026-10-15 절.
+
 ## 2026-10-09 — 앱 안 브라우저 툴바 · iOS TestFlight 워크플로
 
 - N5: 앱 안 브라우저(외부 링크 · Google 로그인) 툴바를 앱 바탕색 아이보리로(`IN_APP_BROWSER_OPTIONS`).

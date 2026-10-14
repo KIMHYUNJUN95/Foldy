@@ -2,6 +2,12 @@
 
 This file records important project decisions.
 
+## 2026-10-15 청소 화면 건물 순서 = 예약 캘린더 순서 (사용자 결정)
+
+- 앱 · 대시보드 청소의 건물 순서는 예약 캘린더(`CALENDAR_BUILDING_ORDER`)와 같다 — STAY ARI 는 가부키초 바로 다음. 둘 다 STAY ARI 를
+  보여야 한다(대시보드는 그 칸을 통째로 빠뜨리고 있었다). Slack 자동화 청소 명단의 순서(2026-10-07, 오쿠보 뒤)는 이번에 바꾸지 않았다.
+  상세 `docs/product/07-cleaning-workflow.md` 2026-10-15 절.
+
 ## 2026-10-09 앱 ID com.harutokyo.stayops → `com.harutokyo.foldy` (사용자 확정)
 
 - 사용자 「응 직접해줘」(추천안). 스토어 등록(C4) 전이라 지금 바꾸는 비용이 가장 작다 — 등록 후에는 못 바꾸고 Play 스토어 주소

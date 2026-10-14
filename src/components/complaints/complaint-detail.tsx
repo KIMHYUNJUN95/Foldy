@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import "./complaints.css";
-import { CIc, CxIcon } from "./cx-icons";
-import { PlatformSource, ratingMax } from "./cx-platform";
+import { ArrowRight, Check, Trash2, X, ZoomIn } from "lucide-react";
+import "./feedback-mobile.css";
+import { platformName, ratingMax } from "./cx-platform";
+import { ComplaintDeleteSheet } from "./complaint-delete-sheet";
 import { getDictionary } from "@/lib/i18n";
+import { tokyoDateOf } from "@/lib/tokyo-date";
+import { haptic } from "@/lib/haptics";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
 import type { Complaint, ComplaintComment } from "@/lib/complaints";
 import {
@@ -16,68 +19,53 @@ import {
   createComplaintCommentAction,
 } from "@/app/mobile/complaints/actions";
 
-// 오늘이면 HH:MM, 그 외엔 날짜로 표시 (하드코딩 없이 Intl 사용)
-function formatCommentTime(iso: string, locale: string): string {
-  const d = new Date(iso);
-  const isToday = d.toDateString() === new Date().toDateString();
-  if (isToday) {
-    return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(d);
-  }
-  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" }).format(d);
+/** «10/8 14:20» — 도쿄 기준. */
+function stamp(iso: string): string {
+  const day = tokyoDateOf(iso);
+  const time = new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+  return day ? `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))} ${time}` : "—";
 }
 
-function isOwnerRole(role: string | null): boolean {
-  return (
-    role === "owner" ||
-    role === "senior_managing_director" ||
-    role === "developer_super_admin" ||
-    role === "office_admin"
-  );
-}
-
-function Lightbox({
-  src,
-  caption,
-  onClose,
-  hint,
-  closeLabel,
-}: {
-  src: string;
-  caption: string;
-  onClose: () => void;
-  hint: string;
-  closeLabel: string;
-}) {
+function Lightbox({ src, caption, onClose, hint, closeLabel }: { src: string; caption: string; onClose: () => void; hint: string; closeLabel: string }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="cx cx-lightbox" role="dialog" aria-modal="true">
-      <div className="cx-lightbox__bar">
-        <span className="t">{caption}</span>
-        <button type="button" className="cx-lightbox__x" onClick={onClose} aria-label={closeLabel}>
-          {CxIcon.x}
-        </button>
+    <div className="fbw-lightbox" role="dialog" aria-modal="true" aria-label={caption}>
+      <button type="button" className="fbw-lightbox__x" onClick={onClose} aria-label={closeLabel}>
+        <X aria-hidden="true" />
+      </button>
+      <div className="fbw-lightbox__stage" onClick={onClose}>
+        {/* 라이트박스는 원본 해상도로 본다(결정 로그 2026-06-22) — next/image 축소본을 쓰지 않는다. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={caption} />
       </div>
-      <div className="cx-lightbox__stage" onClick={onClose}>
-        <div className="cx-lightbox__img">
-          {/* 라이트박스는 **원본 해상도**로 본다(결정 로그 2026-06-22). `next/image` 로 바꾸면
-              뷰포트에 맞춰 축소된 사본이 내려와 «크게 봐서 확인한다» 는 목적이 깨진다. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={caption} />
-        </div>
-      </div>
-      <div className="cx-lightbox__hint">
-        <CIc>{CxIcon.zoom}</CIc>
+      <span className="fbw-lightbox__hint">
+        <ZoomIn aria-hidden="true" />
         {hint}
-      </div>
+      </span>
     </div>,
     document.body,
   );
 }
 
+/**
+ * 수동 컴플레인 상세 — 모바일. 화이트 리디자인(2026-10-14, 시안 FBCx-Phone):
+ * 상태 · 플랫폼 → 제목(오른쪽 휴지통) → 건물 · 객실 / 예약 / 평점 / 등록자 → 내용 · 사진 → 처리 기록 + 남기기 →
+ * 「처리 완료로 바꾸기」(체크 그리기 + 진동) / 「미처리로 되돌리기」. 삭제는 확인 시트(hard delete).
+ * PC 상세 패널과 같은 순서 · 같은 서버 액션. See docs/product/25-complaint-workflow.md → 「화이트 리디자인」.
+ */
 export function ComplaintDetail({
   complaint,
   comments,
   locale,
+  currentUserId,
+  canModerate,
   canChangeStatus,
   canComment,
 }: {
@@ -85,6 +73,7 @@ export function ComplaintDetail({
   comments: ComplaintComment[];
   locale: string;
   currentUserId: string;
+  canModerate: boolean;
   canChangeStatus: boolean;
   canComment: boolean;
 }) {
@@ -92,202 +81,195 @@ export function ComplaintDetail({
   const t = dict.complaints;
   const buildingLabels = dict.cleaning.buildingLabels;
   const c = complaint;
-  const [done, setDone] = useState(c.status === "resolved");
+  const router = useRouter();
   const [lightbox, setLightbox] = useState<{ src: string; caption: string } | null>(null);
   const [commentText, setCommentText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [justResolved, setJustResolved] = useState(false);
+  const [error, setError] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
+  const open = c.status === "open";
   const max = ratingMax(c.platform);
+  const canDelete = canModerate || c.createdByUserId === currentUserId;
+  const building = c.propertyName ? localizePropertyName(getCanonicalPropertyName(c.propertyName), buildingLabels) : null;
+  const place = building ? `${building}${c.roomLabel ? ` · ${c.roomLabel}` : ""}` : "—";
 
-  function handleStatusToggle() {
+  function handleStatus() {
+    setError(false);
     startTransition(async () => {
-      const action = done ? reopenComplaintAction : resolveComplaintAction;
-      const res = await action(c.id);
-      if ("ok" in res) {
-        setDone((v) => !v);
-        router.refresh();
+      const res = open ? await resolveComplaintAction(c.id) : await reopenComplaintAction(c.id);
+      if ("error" in res) {
+        setError(true);
+        haptic("error");
+        return;
       }
+      if (open) {
+        setJustResolved(true);
+        haptic("success");
+      }
+      router.refresh();
     });
   }
 
   function handleComment() {
     const text = commentText.trim();
-    if (!text) return;
+    if (!text || isPending) return;
+    setError(false);
     startTransition(async () => {
       const res = await createComplaintCommentAction(c.id, text, []);
-      if ("id" in res) {
-        setCommentText("");
-        router.refresh();
+      if ("error" in res) {
+        setError(true);
+        haptic("error");
+        return;
       }
+      setCommentText("");
+      haptic("light");
+      router.refresh();
     });
   }
 
+  const rows: [string, React.ReactNode][] = [[t.wFieldPlace, place]];
+  if (c.guestName || c.platformRef) {
+    rows.push([
+      t.wFieldReservation,
+      <>
+        {c.guestName ?? t.noGuestName}
+        {c.platformRef ? <span className="num">{` · ${c.platformRef}`}</span> : null}
+      </>,
+    ]);
+  }
+  if (max > 0 && c.rating != null) {
+    rows.push([
+      t.metaRating,
+      <span className="num" key="r">
+        <b className="is-bad">{c.rating}</b>
+        {` / ${max} · ${platformName(c.platform, dict)}`}
+      </span>,
+    ]);
+  }
+  rows.push([t.authorLabel, <span className="num" key="a">{`${c.authorName || "—"} · ${stamp(c.createdAt)}`}</span>]);
+  if (c.resolvedAt) rows.push([t.resolvedAtLabel, <span className="num" key="d">{stamp(c.resolvedAt)}</span>]);
+
   return (
-    <div className="cx cx-detail cx-mdetail">
-      <div className="cx-dsrc-row">
-        <PlatformSource plat={c.platform} dict={dict} />
-        <span className="time mono">
-          {new Intl.DateTimeFormat(locale, {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(new Date(c.createdAt))}
-        </span>
-      </div>
-
-      <h2 className="cx-mdetail__t">{c.title}</h2>
-
-      {/* 상태는 칩 하나로만 — v1 의 점(dot)과 병기하지 않는다. */}
-      <div className="cx-mdetail__status">
-        <span className={done ? "cx-statuschip is-resolved" : "cx-statuschip is-open"}>
-          {done ? t.statusDone : t.statusOpen}
-        </span>
-      </div>
-
-      {/* 문맥 — S3 리뷰 상세와 같은 kv 카드를 쓴다. 두 상세가 다른 모양이면 같은 사건을 두고
-          다른 화면처럼 읽힌다. 값이 없는 행은 숨긴다 — 리뷰와 달리 사용자가 직접 넣는 값이라
-          «수집 누락»과 «실제 부재»를 구분할 필요가 없다. */}
-      <div className="cx-kvcard">
-        {c.propertyName && (
-          <div className="cx-kvrow">
-            <span className="cx-kvrow__k">{t.metaBuilding}</span>
-            <span className="cx-kvrow__v">
-              {localizePropertyName(getCanonicalPropertyName(c.propertyName), buildingLabels)}
+    <div className="fbw fbw-detail">
+      <div className="fbw-dh">
+        <div className="fbw-dh__main">
+          <span className="fbw-kick">
+            <span className={`fbw-st${open ? " is-open" : " is-done"}`}>
+              <i aria-hidden="true" />
+              {open ? t.statusOpen : t.wDoneTab}
             </span>
-          </div>
-        )}
-        {c.roomLabel && (
-          <div className="cx-kvrow">
-            <span className="cx-kvrow__k">{t.metaRoom}</span>
-            <span className="cx-kvrow__v">{c.roomLabel}</span>
-          </div>
-        )}
-        {c.guestName && (
-          <div className="cx-kvrow">
-            <span className="cx-kvrow__k">{t.metaGuest}</span>
-            <span className="cx-kvrow__v">{c.guestName}</span>
-          </div>
-        )}
-        {max > 0 && c.rating != null && (
-          <div className="cx-kvrow">
-            <span className="cx-kvrow__k">{t.metaRating}</span>
-            <span className="cx-kvrow__v cx-ratingv">
-              <CIc>{CxIcon.star}</CIc>
-              <span className="mono">
-                {c.rating.toFixed(1)} <i>/ {max}</i>
-              </span>
-            </span>
-          </div>
-        )}
-      </div>
-
-      {c.description && <p className="cx-mdetail__body">{c.description}</p>}
-
-      {c.imageUrls.length > 0 && (
-        <div className="cx-shots">
-          {c.imageUrls.map((url, i) => {
-            const caption = url.split("/").pop() ?? String(i + 1);
-            return (
-              <button
-                key={url}
-                type="button"
-                className="cx-shot"
-                onClick={() => setLightbox({ src: url, caption })}
-              >
-                {/* `.cx-shot` 이 relative + aspect-ratio:1 이라 `fill` 이 그대로 맞는다. */}
-                <Image src={url} alt={caption} fill sizes="33vw" className="cx-shot__img" />
-                <span className="cx-shot__z">{CxIcon.zoom}</span>
-              </button>
-            );
-          })}
+            <span>{platformName(c.platform, dict)}</span>
+          </span>
+          <h1 className="fbw-dh__title">{c.title}</h1>
         </div>
-      )}
-
-      {canChangeStatus && (
-        <button
-          type="button"
-          className={done ? "cx-prim-btn done-state" : "cx-prim-btn"}
-          onClick={handleStatusToggle}
-          disabled={isPending}
-        >
-          <CIc>{CxIcon.check}</CIc>
-          {done ? t.markedDone : t.markDone}
-        </button>
-      )}
-
-      <div className="cx-sechead cx-sechead--log">
-        <span>{t.logTitle}</span>
-        <span className="cx-logcount">{comments.length}</span>
-      </div>
-
-      <div className="cx-cmtlist">
-        {comments.map((cm) => {
-          const initial = cm.authorName.slice(0, 1) || "?";
-          const ownerStyle = isOwnerRole(cm.authorRole);
-          return (
-            <div key={cm.id} className="cx-cmt">
-              <span className={ownerStyle ? "cx-cmt__av p" : "cx-cmt__av n"}>{initial}</span>
-              <div className="cx-cmt__b">
-                <div className="cx-cmt__h">
-                  <span className="cx-cmt__n">{cm.authorName}</span>
-                  <span className={ownerStyle ? "cx-role-pill" : "cx-role-pill ref"}>
-                    {ownerStyle ? t.roleOwner : t.roleRef}
-                  </span>
-                  <span className="cx-cmt__t mono">{formatCommentTime(cm.createdAt, locale)}</span>
-                </div>
-                <div className="cx-cmt__body">{cm.content}</div>
-                {cm.imageUrls.length > 0 && (
-                  <div className="cx-cmt__imgs">
-                    {cm.imageUrls.map((url, i) => (
-                      // `.cx-cmt__img` 이 64×64 고정이라 치수를 그대로 넘긴다.
-                      <Image key={i} src={url} alt="" width={64} height={64} className="cx-cmt__img" />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 댓글 권한이 없으면(파트타임) 입력창 자체가 사라진다 — 비활성 입력창은 «고장»으로 읽힌다. */}
-      {canComment && (
-        <div className="cx-composer">
-          <input
-            className="cx-composer__in"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder={t.commentPlaceholder}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleComment();
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="cx-composer__send"
-            onClick={handleComment}
-            disabled={isPending || !commentText.trim()}
-            aria-label={t.commentPlaceholder}
-          >
-            {CxIcon.send}
+        {canDelete ? (
+          <button type="button" className="fbw-del" aria-label={t.deleteAction} onClick={() => setDeleting(true)}>
+            <Trash2 aria-hidden="true" />
           </button>
-        </div>
-      )}
-      {lightbox && (
-        <Lightbox
-          src={lightbox.src}
-          caption={lightbox.caption}
-          hint={t.lightboxHint}
-          closeLabel={t.lightboxClose}
-          onClose={() => setLightbox(null)}
+        ) : null}
+      </div>
+
+      <dl className="fbw-dl">
+        {rows.map(([key, value]) => (
+          <div key={key}>
+            <dt>{key}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <section className="fbw-sec">
+        <small className="fbw-k">{t.wContent}</small>
+        <p className={c.description ? "fbw-p" : "fbw-p is-dim"}>{c.description || t.noDescription}</p>
+        {c.imageUrls.length > 0 ? (
+          <div className="fbw-shots">
+            {c.imageUrls.map((url, i) => {
+              const caption = `${t.photosTitle} ${i + 1}`;
+              return (
+                <button key={url} type="button" className="fbw-shot" aria-label={caption} onClick={() => setLightbox({ src: url, caption })}>
+                  <Image src={url} alt="" fill sizes="96px" />
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="fbw-sec">
+        <small className="fbw-k">{t.wLogTitle.replace("{n}", String(comments.length))}</small>
+        <ol className="fbw-log">
+          {comments.map((cm) => (
+            <li key={cm.id}>
+              <span className="fbw-log__by">
+                <b>{cm.authorName || "—"}</b>
+                <span className="num">{stamp(cm.createdAt)}</span>
+              </span>
+              <p>{cm.content}</p>
+              {cm.imageUrls.length > 0 ? (
+                <span className="fbw-shots">
+                  {cm.imageUrls.map((url, i) => (
+                    <button key={url} type="button" className="fbw-shot is-sm" aria-label={`${t.photosTitle} ${i + 1}`} onClick={() => setLightbox({ src: url, caption: `${t.photosTitle} ${i + 1}` })}>
+                      <Image src={url} alt="" fill sizes="56px" />
+                    </button>
+                  ))}
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        {/* 댓글 권한이 없으면(파트타임) 입력칸 자체를 그리지 않는다 — 막힌 칸은 고장으로 읽힌다. */}
+        {canComment ? (
+          <div className="fbw-compose">
+            <textarea
+              rows={1}
+              name="content"
+              autoComplete="off"
+              value={commentText}
+              aria-label={t.wLogPlaceholder}
+              placeholder={t.wLogPlaceholder}
+              onChange={(e) => setCommentText(e.target.value)}
+            />
+            <button type="button" className="fbw-send" aria-label={t.wSend} onClick={handleComment} disabled={isPending || !commentText.trim()}>
+              <ArrowRight aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      {error ? (
+        <p className="fbw-err" role="alert">
+          {t.wActionFailed}
+        </p>
+      ) : null}
+
+      {canChangeStatus ? (
+        <button type="button" className={`fbw-btn ${open ? "is-pri" : "is-soft"} is-big${justResolved ? " is-done" : ""}`} onClick={handleStatus} disabled={isPending}>
+          {open ? <Check className="fbw-check" aria-hidden="true" /> : null}
+          {open ? t.wResolve : t.wReopen}
+        </button>
+      ) : null}
+
+      {deleting ? (
+        <ComplaintDeleteSheet
+          complaintId={c.id}
+          onClose={() => setDeleting(false)}
+          labels={{
+            title: t.wDeleteTitle,
+            summary: `${c.title} · ${place}`,
+            body: `${t.wDeleteBody.replace("{n}", String(comments.length))} ${t.wDeleteLinked}`,
+            warn: t.wDeleteWarn,
+            keep: t.wKeep,
+            confirm: t.deleteConfirm,
+            failed: dict.common.deleteFailed,
+          }}
         />
-      )}
+      ) : null}
+
+      {lightbox ? (
+        <Lightbox src={lightbox.src} caption={lightbox.caption} hint={t.lightboxHint} closeLabel={t.lightboxClose} onClose={() => setLightbox(null)} />
+      ) : null}
     </div>
   );
 }

@@ -1,35 +1,31 @@
 "use client";
 
-// 수동 컴플레인 삭제 확인 — 공용 `BottomSheet` 규격 (목업 2j).
-//
-// v1 은 중앙 모달이었으나 CLAUDE.md §3 상 **모든 슬라이드업 표면은 공용 BottomSheet** 다.
-// 스크림·핸들·드래그 닫기·Esc 는 전부 그 컴포넌트가 담당하고, 여기서는 내용만 그린다.
-//
-// 컴플레인 본체는 MVP hard delete 라 되돌릴 수 없다 — 그래서 확인 UX 를 유지한다(§9).
+// 수동 컴플레인 삭제 확인 — 공용 `BottomSheet`. 화이트 리디자인(2026-10-14, PC 삭제 창과 같은 문장):
+// 제목 · 요약 → 「처리 기록 N개와 사진이 함께 지워져요. 연결된 리뷰는 남고…」 → 되돌릴 수 없음 → [그대로 두기][삭제].
+// 컴플레인 본체는 MVP hard delete 라 확인을 거친다(CLAUDE.md §9). 지우면 목록으로 돌아간다.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
-import { CIc, CxIcon } from "./cx-icons";
 import { deleteComplaintAction } from "@/app/mobile/complaints/actions";
+import { haptic } from "@/lib/haptics";
 
 export type DeleteSheetLabels = {
   title: string;
+  summary: string;
   body: string;
-  linkedNote: string;
-  cancel: string;
+  warn: string;
+  keep: string;
   confirm: string;
   failed: string;
 };
 
 export function ComplaintDeleteSheet({
   complaintId,
-  complaintTitle,
   labels,
   onClose,
 }: {
   complaintId: string;
-  complaintTitle: string;
   labels: DeleteSheetLabels;
   onClose: () => void;
 }) {
@@ -43,46 +39,35 @@ export function ComplaintDeleteSheet({
       const result = await deleteComplaintAction(complaintId);
       if ("error" in result) {
         setFailed(true);
+        haptic("error");
         return;
       }
+      haptic("success");
       close();
-      router.refresh();
+      router.replace("/mobile/complaints?view=manual");
     });
   }
 
   return (
     <BottomSheet ariaLabel={labels.title} onClose={onClose}>
       {({ close }) => (
-        <div className="cx cx-delsheet">
-          <div className="cx-delsheet__head">
-            <span className="cx-delsheet__ic">
-              <CIc>{CxIcon.warn}</CIc>
-            </span>
+        <div className="fbw fbw-sheet">
+          <div className="fbw-sheet__h">
             <h3>{labels.title}</h3>
-            <p>{labels.body}</p>
+            <span>{labels.summary}</span>
           </div>
-
-          {/* 무엇을 지우는지 다시 보여 준다 — 시트가 올라온 뒤 대상이 안 보이면 오삭제가 난다. */}
-          <div className="cx-delsheet__target">{complaintTitle}</div>
-
-          <div className="cx-delsheet__note">
-            <CIc>{CxIcon.info}</CIc>
-            <span>{labels.linkedNote}</span>
-          </div>
-
-          {failed && <p className="cx-delsheet__err">{labels.failed}</p>}
-
-          <div className="cx-delsheet__acts">
-            <button type="button" className="cx-delsheet__cancel" onClick={close} disabled={isPending}>
-              {labels.cancel}
+          <p className="fbw-sheet__p">{labels.body}</p>
+          <p className="fbw-sheet__p is-warn">{labels.warn}</p>
+          {failed ? (
+            <p className="fbw-err" role="alert">
+              {labels.failed}
+            </p>
+          ) : null}
+          <div className="fbw-sheet__btns">
+            <button type="button" className="fbw-btn is-gray" onClick={close} disabled={isPending}>
+              {labels.keep}
             </button>
-            <button
-              type="button"
-              className="cx-delsheet__go"
-              onClick={() => handleDelete(close)}
-              disabled={isPending}
-            >
-              <CIc>{CxIcon.trash}</CIc>
+            <button type="button" className="fbw-btn is-danger" onClick={() => handleDelete(close)} disabled={isPending}>
               {labels.confirm}
             </button>
           </div>

@@ -1,317 +1,140 @@
 import Link from "next/link";
-import "./complaints.css";
-import { CIc, CxIcon } from "./cx-icons";
-import { PLATFORMS } from "./cx-platform";
-import { ReviewRangeChip } from "./review-range-chip";
-import { RANGE_PRESET_DAYS } from "./review-list";
+import "./feedback-mobile.css";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { BuildingSummary, PlaceSummary, PlatformStat } from "@/lib/external-reviews";
+import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
 
-/**
- * `PlaceSummary.riskRatio` 는 **이미 퍼센트 단위(0~100)** 다 — 분수가 아니다.
- * 어드민 콘솔도 `ratio.toFixed(1)}%` 로 그대로 쓴다. 여기서 다시 100을 곱하면 `2220%` 가 된다.
- */
-const RATIO_BAD = 25;
-const RATIO_WARN = 10;
-
-/** 25% 이상은 붉게, 10% 이상은 앰버, 그 아래는 초록. 목업 «문제 비율 막대» 기준. */
-function ratioTone(ratio: number | null): "bad" | "warn" | "ok" | "none" {
-  if (ratio === null) return "none";
-  if (ratio >= RATIO_BAD) return "bad";
-  if (ratio >= RATIO_WARN) return "warn";
-  return "ok";
-}
-
-function fmtRatio(ratio: number | null): string {
-  return ratio === null ? "—" : `${Math.round(ratio)}%`;
-}
-
-/** 막대 너비(%). 비율이 100을 넘을 일은 없지만 데이터가 이상해도 막대가 넘치지 않게 잠근다. */
-function barWidth(ratio: number | null): string {
-  return `${Math.min(100, Math.max(0, ratio ?? 0))}%`;
-}
+/** `riskRatio` 는 이미 퍼센트(0~100)다. 20% 이상은 빨강 — PC 콘솔과 같은 경계. */
+const HOT = 20;
 
 type Props = {
   locale: Locale;
   summaries: BuildingSummary[];
-  from: string | null;
-  to: string | null;
-  rangeDays: number | null;
+  from: string;
+  to: string;
+  by: "building" | "room";
 };
 
+function avg(stat: PlatformStat, digits: number): string {
+  return stat.average === null || stat.reviewCount === 0 ? "—" : stat.average.toFixed(digits);
+}
+
 /**
- * S4 문제 객실 — 모바일 신규 화면.
- *
- * 데스크톱은 8열 표지만 390px 에 표는 성립하지 않는다. **건물 카드 + 객실 아코디언**으로 바꾸고,
- * 플랫폼 행은 `모노그램 / 평균 / 리뷰 / 문제` **4열 그리드**로 정렬해 EN 라벨에서도 열이 흔들리지
- * 않게 했다.
- *
- * 집계는 어드민과 **같은 `summarizeReviewsByPlace`** 를 쓴다 — 화면별 집계를 따로 만들면 두
- * 화면의 숫자가 갈라진다.
- *
- * Airbnb 5점 / Booking 10점은 척도가 달라 **평균을 합치지 않는다.** 반면 문제 비율은 척도에
- * 의존하지 않아 합쳐도 되며, 그래서 정렬 기준이 된다.
+ * 건물 · 객실별 — 모바일. 화이트 리디자인(2026-10-14, 시안 FBRooms-Phone · FB-Fold):
+ * 건물별(건물 줄 + 객실 줄) / 객실별(모든 건물의 객실 한 줄) 전환. 막대는 낮은 평점 비율, % 를 누르면 그 낮은 평점 리뷰만.
+ * 집계는 PC 와 같은 `summarizeReviewsByPlace` — 화면별 집계를 따로 만들지 않는다. 플랫폼 평균은 척도가 달라 합치지 않는다.
  */
-export function ReviewRoomsBoard({ locale, summaries, from, to, rangeDays }: Props) {
-  const dict = getDictionary(locale);
-  const t = dict.complaints;
+export function ReviewRoomsBoard({ locale, summaries, from, to, by }: Props) {
+  const t = getDictionary(locale).complaints;
 
-  const baseParams: Record<string, string> = { view: "rooms" };
-  const rangeChipLabel = rangeDays
-    ? t.rangeDays.replace("{n}", String(rangeDays))
-    : from && to
-      ? `${from.slice(5).replace("-", ".")} – ${to.slice(5).replace("-", ".")}`
-      : t.rangeTitle;
-
-  /** 객실 미연결 리뷰만 보는 링크. 객실을 못 붙였다고 리뷰 내용까지 못 보게 두지 않는다. */
-  function unmappedHref(propertyId: string | null): string {
-    const params = new URLSearchParams({ view: "reviews", unmapped: "1" });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    if (propertyId) params.set("propertyId", propertyId);
+  const drill = (buildingName: string, room?: string) => {
+    const params = new URLSearchParams({ view: "reviews", risk: "1", from, to, building: getCanonicalPropertyName(buildingName) });
+    if (room) params.set("rl", room);
     return `/mobile/complaints?${params.toString()}`;
-  }
-
-  /** 문제 건수 링크 → 그 건물/객실로 필터된 외부 리뷰 목록. */
-  function riskHref(propertyId: string | null): string {
-    const params = new URLSearchParams({ view: "reviews", risk: "1" });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    if (propertyId) params.set("propertyId", propertyId);
+  };
+  const byHref = (value: "building" | "room") => {
+    const params = new URLSearchParams({ view: "rooms", from, to });
+    if (value === "room") params.set("by", "room");
     return `/mobile/complaints?${params.toString()}`;
-  }
+  };
+  const platformLine = (place: PlaceSummary) =>
+    `Airbnb ${avg(place.airbnb, 2)} · ${t.wCountN.replace("{n}", String(place.airbnb.reviewCount))} · ${t.colRisk} ${place.airbnb.riskCount}\n` +
+    `Booking ${avg(place.booking, 1)} · ${t.wCountN.replace("{n}", String(place.booking.reviewCount))} · ${t.colRisk} ${place.booking.riskCount}`;
+  const roomLine = (place: PlaceSummary) =>
+    `A ${avg(place.airbnb, 2)} · B ${avg(place.booking, 1)} · ${t.colRisk} ${place.riskCount}`;
 
-  function PlatformRow({
-    plat,
-    stat,
-    href,
-  }: {
-    plat: "airbnb" | "booking";
-    stat: PlatformStat;
-    href: string;
-  }) {
-    const def = PLATFORMS[plat];
-    const scale = plat === "airbnb" ? 5 : 10;
-    if (stat.reviewCount === 0) {
-      return (
-        <>
-          <span className="cx-mono" style={{ background: def.bg, color: def.ink }}>
-            {def.mono}
-          </span>
-          <span className="cx-pgrid__none">{t.noReviewsShort}</span>
-          <span />
-          <span />
-        </>
-      );
-    }
-    return (
-      <>
-        <span className="cx-mono" style={{ background: def.bg, color: def.ink }}>
-          {def.mono}
-        </span>
-        <span className="cx-pgrid__avg mono">
-          {stat.average === null ? "—" : stat.average}
-          <i> / {scale}</i>
-        </span>
-        <span className="cx-pgrid__n mono">{stat.reviewCount}</span>
-        {stat.riskCount > 0 ? (
-          <Link className="cx-pgrid__risk mono" href={href}>
-            {stat.riskCount}
-          </Link>
-        ) : (
-          <span className="cx-pgrid__n mono">0</span>
-        )}
-      </>
+  const Pct = ({ place, href, big }: { place: PlaceSummary; href: string; big?: boolean }) => {
+    const ratio = place.riskRatio;
+    const text = ratio === null ? "—" : `${Math.round(ratio)}%`;
+    const cls = `fbw-pct num${big ? " is-big" : ""}${ratio !== null && ratio >= HOT ? " is-hot" : ""}`;
+    return place.riskCount > 0 ? (
+      <Link href={href} className={cls}>
+        {text}
+      </Link>
+    ) : (
+      <span className={cls}>{text}</span>
     );
-  }
+  };
+  const Bar = ({ place, big }: { place: PlaceSummary; big?: boolean }) => (
+    <span className={`fbw-bar${big ? " is-big" : ""}`} aria-hidden="true">
+      <i className={(place.riskRatio ?? 0) >= HOT ? "is-hot" : ""} style={{ width: `${Math.min(100, place.riskRatio ?? 0)}%` }} />
+    </span>
+  );
 
-  /** 플랫폼별 4열 표. 독채는 이것만, 다객실은 객실 블록 안에서 쓴다. */
-  function PlaceGrid({ place, propertyId }: { place: PlaceSummary; propertyId: string | null }) {
+  if (summaries.length === 0) {
     return (
-      <div className="cx-pgrid">
-        <span />
-        <span className="cx-pgrid__hd">{t.colAverage}</span>
-        <span className="cx-pgrid__hd">{t.colReviews}</span>
-        <span className="cx-pgrid__hd">{t.colRisk}</span>
-        <PlatformRow plat="airbnb" stat={place.airbnb} href={riskHref(propertyId)} />
-        <PlatformRow plat="booking" stat={place.booking} href={riskHref(propertyId)} />
+      <div className="fbw fbw-empty">
+        <b>{t.roomsEmptyTitle}</b>
+        <span>{t.roomsEmptyBody}</span>
       </div>
     );
   }
 
-  function PlaceBlock({
-    place,
-    propertyId,
-    highlight,
-    name,
-  }: {
-    place: PlaceSummary;
-    propertyId: string | null;
-    highlight: boolean;
-    name: string;
-  }) {
-    const tone = ratioTone(place.riskRatio);
-    return (
-      <div className={`cx-roomblk${highlight ? " is-hot" : ""}`}>
-        <div className="cx-roomblk__h">
-          <span className="cx-roomblk__n">{name}</span>
-          <span className={`cx-roomblk__r mono is-${tone}`}>{fmtRatio(place.riskRatio)}</span>
-        </div>
-        <span className="cx-bar">
-          <span
-            className={`cx-bar__f is-${tone}`}
-            style={{ width: barWidth(place.riskRatio) }}
-          />
-        </span>
-        <PlaceGrid place={place} propertyId={propertyId} />
-      </div>
-    );
-  }
+  const flat = summaries.flatMap((building) =>
+    building.rooms.length === 0
+      ? [{ key: building.key, place: building as PlaceSummary, name: building.label || building.name, sub: building.standalone ? t.standalone : "", href: drill(building.name) }]
+      : building.rooms.map((room) => ({ key: `${building.key}-${room.key}`, place: room, name: room.name, sub: building.label || building.name, href: drill(building.name, room.name) })),
+  );
+  flat.sort((a, b) => (b.place.riskRatio ?? -1) - (a.place.riskRatio ?? -1));
 
   return (
-    <div className="cx cx-reviews cx-rooms">
-      <div className="cx-ctrlrow">
-        <ReviewRangeChip
-          from={from}
-          to={to}
-          locale={locale}
-          baseParams={baseParams}
-          labels={{
-            chip: rangeChipLabel,
-            title: t.rangeTitle,
-            apply: dict.common.apply,
-            clear: dict.common.clear,
-            close: dict.common.close,
-            previousMonth: t.rangePrevMonth,
-            nextMonth: t.rangeNextMonth,
-            selectStart: t.rangeHintStart,
-            selectEnd: t.rangeHintEnd,
-            summary: t.rangeSummary,
-            presets: RANGE_PRESET_DAYS.map((days) => ({
-              days,
-              label: t.rangeDays.replace("{n}", String(days)),
-            })),
-          }}
-        />
-        <span className="cx-sortnote">{t.sortRatio}</span>
+    <div className="fbw fbw-rooms">
+      <div className="fbw-rooms__ctl">
+        <div className="fbw-seg" role="radiogroup" aria-label={t.viewRooms}>
+          <Link href={byHref("building")} role="radio" aria-checked={by === "building"} className={by === "building" ? "on" : undefined} scroll={false}>
+            {t.wByBuilding}
+          </Link>
+          <Link href={byHref("room")} role="radio" aria-checked={by === "room"} className={by === "room" ? "on" : undefined} scroll={false}>
+            {t.wByRoom}
+          </Link>
+        </div>
+        <span>{t.wRoomsNoteShort}</span>
       </div>
 
-      <div className="cx-note cx-note--tight">
-        <CIc>{CxIcon.info}</CIc>
-        <span>{t.scaleNote}</span>
-      </div>
-
-      {summaries.length === 0 ? (
-        <div className="cx-rempty">
-          <span className="cx-rempty__ic">
-            <CIc>{CxIcon.building}</CIc>
-          </span>
-          <div className="cx-rempty__t">{t.roomsEmptyTitle}</div>
-          <p className="cx-rempty__s">{t.roomsEmptyBody}</p>
+      {by === "room" ? (
+        <div className="fbw-rows">
+          {flat.map((row) => (
+            <div className="fbw-room is-flat" key={row.key}>
+              <span className="fbw-room__name">
+                <b>{row.name}</b>
+                {row.sub ? <small>{row.sub}</small> : null}
+              </span>
+              <Bar place={row.place} />
+              <span className="fbw-room__sub num">{roomLine(row.place)}</span>
+              <Pct place={row.place} href={row.href} />
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="cx-rlist">
-          {summaries.map((building, index) => {
-            const tone = ratioTone(building.riskRatio);
-            // 현지화는 집계(`summarizeReviewsByPlace`)가 끝냈다 — 어드민과 같은 라벨을 쓴다.
-            const label = building.label || building.name;
-            const empty = building.reviewCount === 0;
-            return (
-              /**
-               * 건물 카드를 접는다. 건물 7개를 전부 펼치면 객실이 40개 넘게 이어져 스캔이 안 된다.
-               *
-               * `<details>` 를 쓰는 이유: 이 화면은 서버 컴포넌트라 열림 상태를 들 수 없는데,
-               * 이걸 위해 클라이언트 컴포넌트로 바꾸거나 쿼리스트링에 상태를 넣는 건 과하다.
-               * 브라우저 기본 동작이라 JS 없이 동작하고 키보드·스크린리더도 그대로 지원된다.
-               *
-               * 기본으로 **문제 비율이 가장 높은 건물 하나만** 펼친다(정렬이 비율 내림차순이라
-               * 첫 번째다). 화면을 열자마자 «지금 봐야 할 곳»이 보이는 것이 이 화면의 목적이다.
-               */
-              <details className="cx-bldcard" key={building.key} open={index === 0 && !empty}>
-                <summary className="cx-bldcard__sum">
-                  <div className="cx-bldcard__h">
-                    <div className="cx-bldcard__hb">
-                      <span className="cx-bldcard__n">
-                        {label}
-                        {building.standalone && (
-                          <span className="cx-tag">{t.standalone}</span>
-                        )}
+        <div className="fbw-rows">
+          {summaries.map((building) => (
+            <section className="fbw-bld" key={building.key}>
+              <div className="fbw-bld__h">
+                <span className="fbw-bld__name">
+                  <b>{building.label || building.name}</b>
+                  {building.standalone ? <small>{t.standalone}</small> : null}
+                  {building.unmappedCount > 0 ? <small>{t.unmapped.replace("{n}", String(building.unmappedCount))}</small> : null}
+                </span>
+                <Pct place={building} href={drill(building.name)} big />
+              </div>
+              <Bar place={building} big />
+              <span className="fbw-bld__sub num">{platformLine(building)}</span>
+              {building.rooms.length > 0 ? (
+                <div className="fbw-bld__rooms">
+                  {building.rooms.map((room) => (
+                    <div className="fbw-room" key={room.key}>
+                      <span className="fbw-room__name">
+                        <b>{room.name}</b>
                       </span>
-                      <span className="cx-bldcard__s">
-                        {empty
-                          ? t.roomsNoneInPeriod
-                          : `${t.colReviews} ${building.reviewCount} · ${t.riskChip} ${building.riskCount}`}
-                      </span>
+                      <Bar place={room} />
+                      <span className="fbw-room__sub num">{roomLine(room)}</span>
+                      <Pct place={room} href={drill(building.name, room.name)} />
                     </div>
-                    <span className={`cx-bldcard__r mono is-${tone}`}>
-                      {fmtRatio(building.riskRatio)}
-                    </span>
-                    {!empty && (
-                      <span className="cx-bldcard__chev">
-                        <CIc>{CxIcon.chevR}</CIc>
-                      </span>
-                    )}
-                  </div>
-                  {/* 막대는 접혀 있어도 보인다 — 목록을 훑을 때 비교 기준이 된다. */}
-                  {!empty && (
-                    <span className="cx-bar cx-bar--wide">
-                      <span
-                        className={`cx-bar__f is-${tone}`}
-                        style={{ width: barWidth(building.riskRatio) }}
-                      />
-                    </span>
-                  )}
-                </summary>
-
-                {!empty && (
-                  <>
-                    <div className="cx-bldcard__b">
-                      {/* 독채는 «건물 = 객실» 이다. 객실 행을 또 만들면 같은 이름·같은 비율이 두 번
-                          나오므로, 헤더는 위 summary 로 끝내고 여기서는 플랫폼 표만 보여 준다. */}
-                      {building.standalone ? (
-                        <PlaceGrid place={building} propertyId={building.propertyId} />
-                      ) : (
-                        building.rooms.map((room) => (
-                          <PlaceBlock
-                            key={room.key}
-                            place={room}
-                            propertyId={building.propertyId}
-                            highlight={ratioTone(room.riskRatio) === "bad"}
-                            name={room.name}
-                          />
-                        ))
-                      )}
-
-                      {/* 독채는 «건물 = 객실» 이라 미연결이든 아니든 같은 방이다 — 표시하지 않는다.
-                          다객실 건물에서는 객실별 숫자의 합이 건물 합계와 다른 이유를 설명하므로 남긴다.
-                          누르면 그 리뷰들만 볼 수 있다 — 객실을 못 붙였다고 내용까지 못 보게 두면 손해다. */}
-                      {!building.standalone && building.unmappedCount > 0 && (
-                        <Link className="cx-unmapped" href={unmappedHref(building.propertyId)}>
-                          <CIc>{CxIcon.link}</CIc>
-                          <span className="cx-unmapped__n">
-                            {t.unmapped.replace("{n}", String(building.unmappedCount))}
-                          </span>
-                          <span className="cx-unmapped__pct mono">
-                            {building.reviewCount > 0
-                              ? `${Math.round((building.unmappedCount / building.reviewCount) * 100)}%`
-                              : ""}
-                          </span>
-                          <span className="cx-unmapped__s">{t.unmappedShort}</span>
-                          <CIc>{CxIcon.chevR}</CIc>
-                        </Link>
-                      )}
-                      {building.unratedCount > 0 && (
-                        <p className="cx-unrated">
-                          {t.unratedFoot.replace("{n}", String(building.unratedCount))} —{" "}
-                          {t.unratedNote}
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </details>
-            );
-          })}
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ))}
         </div>
       )}
     </div>

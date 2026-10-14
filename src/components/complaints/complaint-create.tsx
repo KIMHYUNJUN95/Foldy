@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -9,12 +9,17 @@ import {
   uploadComplaintImageAction,
 } from "@/app/mobile/complaints/actions";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
-import type { ReservationPickRow } from "@/lib/complaint-reservations";
+import type { PlacePickRow, ReservationPickRow } from "@/lib/complaint-reservations";
+import { Camera, ChevronDown, Star, X } from "lucide-react";
+import { ChoiceTiles, ConfirmFormSheet, PickField } from "@/components/requests/request-form-kit";
+import { haptic } from "@/lib/haptics";
 import { ImageLightbox } from "./image-lightbox";
 import { type LinkTarget, type PlatformKey } from "./complaint-mock";
 import { CIc, CxIcon } from "./cx-icons";
-import { PlatformSource, PLATFORMS, platformName, ratingMax } from "./cx-platform";
+import { PLATFORMS, platformName, ratingMax } from "./cx-platform";
+// 예약 고르기 시트 안쪽은 기존 모양(.cx-*)을 그대로 쓴다.
 import "./complaints.css";
+import "./feedback-mobile.css";
 
 const MAX_IMAGES = 5;
 
@@ -25,13 +30,8 @@ const MAX_IMAGES = 5;
  * 저장되는 기존 규약을 그대로 쓴다. 별도 타입을 만들지 않는다.
  */
 const PLATFORM_CHOICES: (PlatformKey | null)[] = ["airbnb", "booking", "direct", null];
+const PLATFORM_LABEL = (key: PlatformKey | null, dict: Dictionary) => (key ? platformName(key, dict) : dict.complaints.platformOther);
 
-function defaultRatingForPlatform(plat: PlatformKey | null) {
-  if (!plat) return 0;
-  const max = ratingMax(plat);
-  if (!max) return 0;
-  return max === 5 ? 2 : 4;
-}
 
 function RatingInput({
   plat,
@@ -45,45 +45,57 @@ function RatingInput({
   dict: Dictionary;
 }) {
   const max = ratingMax(plat);
-  if (!max) return <div className="cx-rate-none">{dict.complaints.ratingNone}</div>;
+  if (!max) return <p className="fbw-hint">{dict.complaints.ratingNone}</p>;
 
   return (
-    <>
-      <div className={`cx-rstars${max > 5 ? " ten" : ""}`}>
-        {Array.from({ length: max }).map((_, index) => (
-          <button
-            key={index}
-            type="button"
-            className={`cx-rstar${index < value ? " on" : ""}`}
-            onClick={() => onChange(index + 1)}
-            aria-label={`${index + 1}`}
-          >
-            {CxIcon.star}
-          </button>
-        ))}
-      </div>
-      <div className="cx-rval">
-        <b>{value.toFixed(1)}</b> / {max}
-      </div>
-    </>
+    <div className="fbw-stars" role="radiogroup" aria-label={dict.complaints.fieldRating}>
+      {Array.from({ length: max }).map((_, index) => (
+        <button
+          key={index}
+          type="button"
+          role="radio"
+          aria-checked={index + 1 === value}
+          className={index < value ? "on" : undefined}
+          onClick={() => {
+            haptic("light");
+            onChange(index + 1 === value ? 0 : index + 1);
+          }}
+          aria-label={`${index + 1}`}
+        >
+          <Star aria-hidden="true" />
+        </button>
+      ))}
+      <span className="num">{value > 0 ? `${value.toFixed(1)} / ${max}` : "—"}</span>
+    </div>
   );
 }
 
+type LinkMode = "reservation" | "place" | "none";
+
+/**
+ * 컴플레인 등록 — 모바일. 화이트 리디자인(2026-10-14, 시안 FBNew-Phone · FBNewConfirm-Phone):
+ * 제목 · 내용 이름표 칸 → 플랫폼 4칸 → 평점 별(척도 있는 플랫폼만) → 「어디 건인가요」(예약 · 건물 · 객실 · 연결 안 함) →
+ * 예약 고르기 / 건물 · 객실 고르기 → 고객명 → 사진 → 「컴플레인 등록」 → 확인 시트.
+ * 「건물 · 객실」은 PC 등록 패널과 같은 길이다 — Beds24 밖 예약(전화 · 워크인 · 자사 홈페이지)도 객실 집계에 들어가게(사용자 승인).
+ * 저장 경로는 그대로 `createComplaintAction`. See docs/product/25-complaint-workflow.md → 「화이트 리디자인」.
+ */
 export function ComplaintCreate({
   initialLinked = null,
   locale,
   pickRows,
+  places,
 }: {
   initialLinked?: LinkTarget | null;
   locale: string;
   pickRows: ReservationPickRow[];
+  places: PlacePickRow[];
 }) {
   const dict = getDictionary(locale);
   const t = dict.complaints;
   const router = useRouter();
 
   const [plat, setPlat] = useState<PlatformKey | null>(initialLinked?.plat ?? null);
-  const [rating, setRating] = useState(defaultRatingForPlatform(initialLinked?.plat ?? null));
+  const [rating, setRating] = useState(0);
   const [linked, setLinked] = useState<LinkTarget | null>(initialLinked);
   const [showPicker, setShowPicker] = useState(false);
   const [search, setSearch] = useState("");
@@ -96,6 +108,23 @@ export function ComplaintCreate({
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [linkMode, setLinkMode] = useState<LinkMode>("reservation");
+  const [placeBuilding, setPlaceBuilding] = useState("");
+  const [placeRoom, setPlaceRoom] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [titleError, setTitleError] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
+  const [titleText, setTitleText] = useState("");
+
+  const placeBuildings = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const row of places) if (!seen.has(row.propertyName)) seen.set(row.propertyName, row.displayPropertyName);
+    return [...seen.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [places]);
+  const placeRooms = useMemo(
+    () => places.filter((row) => row.propertyName === placeBuilding).map((row) => ({ value: row.roomLabel, label: row.displayRoomLabel })),
+    [places, placeBuilding],
+  );
 
   const draftId = useRef(crypto.randomUUID()).current;
   const titleRef = useRef<HTMLInputElement>(null);
@@ -139,176 +168,240 @@ export function ComplaintCreate({
       if (rating > 0) formData.append("rating", String(rating));
       uploadedImages.forEach((url, index) => formData.append(`image_${index}`, url));
 
-      if (linked?.reservationId) formData.append("reservation_id", linked.reservationId);
-      if (linked?.propertyName) formData.append("property_name", linked.propertyName);
-      if (linked?.roomLabel) formData.append("room_label", linked.roomLabel);
+      if (linkMode === "reservation" && linked) {
+        if (linked.reservationId) formData.append("reservation_id", linked.reservationId);
+        if (linked.propertyName) formData.append("property_name", linked.propertyName);
+        if (linked.roomLabel) formData.append("room_label", linked.roomLabel);
+      } else if (linkMode === "place" && placeBuilding) {
+        formData.append("property_name", placeBuilding);
+        if (placeRoom) formData.append("room_label", placeRoom);
+      }
       if (guestName.trim()) formData.append("guest_name", guestName.trim());
 
       const result = await createComplaintAction(formData);
       if ("id" in result) {
+        haptic("success");
         router.push(`/mobile/complaints/${result.id}`);
+      } else {
+        setConfirmOpen(false);
+        setSubmitError(true);
+        haptic("error");
       }
     });
   }
 
+  const placeLabel =
+    linkMode === "reservation" && linked
+      ? linked.place
+      : linkMode === "place" && placeBuilding
+        ? `${placeBuildings.find((b) => b.value === placeBuilding)?.label ?? placeBuilding}${placeRoom ? ` · ${placeRooms.find((r) => r.value === placeRoom)?.label ?? placeRoom}` : ""}`
+        : t.linkModeNone;
+
+  function openConfirm() {
+    if (!titleRef.current?.value.trim()) {
+      setTitleError(true);
+      titleRef.current?.focus();
+      haptic("error");
+      return;
+    }
+    setTitleError(false);
+    setSubmitError(false);
+    setTitleText(titleRef.current.value.trim());
+    setConfirmOpen(true);
+  }
+
   return (
-    <div className="cx cx-create">
-      {/* 플랫폼 선택 (2026-08-07 신규).
-          예전에는 `plat` 이 **예약을 연결할 때만** 설정돼, 연결 없이 등록하면 전부 `기타` 로
-          저장됐다. 전화·현장 접수처럼 예약을 못 고르는 경우가 오히려 흔한데도 그랬다.
-          예약을 연결하면 아래 피커가 플랫폼을 자동으로 덮어쓴다. */}
-      <div className="cx-fsec">
-        <div className="cx-fsec__h">{t.fieldPlatform}</div>
-        <div className="cx-platgrid">
-          {PLATFORM_CHOICES.map((key) => {
-            const def = PLATFORMS[key ?? "other"];
-            return (
+    <div className="fbw fbw-form">
+      <div className="ofw-head">
+        <h1>{t.wCreateTitle}</h1>
+        <p>{t.wCreateSub}</p>
+      </div>
+
+      <section className="ofw-sec">
+        <label className="ofw-nf">
+          <span className="ofw-nf__l">{t.fieldTitle}</span>
+          <input
+            ref={titleRef}
+            name="title"
+            autoComplete="off"
+            className={`ofw-nf__in${titleError ? " is-err" : ""}`}
+            aria-invalid={titleError}
+            aria-describedby={titleError ? "cxn-title-err" : undefined}
+            onChange={() => titleError && setTitleError(false)}
+          />
+        </label>
+        {titleError ? (
+          <p className="fbw-err" id="cxn-title-err" role="alert">
+            {t.titleRequired}
+          </p>
+        ) : null}
+        <label className="ofw-nf">
+          <span className="ofw-nf__l">
+            {t.wContent} {t.wOptional}
+          </span>
+          <textarea ref={bodyRef} name="description" rows={3} className="ofw-nf__in ofw-ta" placeholder={t.fieldBodyPlaceholder} />
+        </label>
+      </section>
+
+      <section className="ofw-sec">
+        <div className="fbw-fg">
+          <span className="ofw-k">{t.wPlatform}</span>
+          <div className="fbw-tiles" role="radiogroup" aria-label={t.wPlatform}>
+            {PLATFORM_CHOICES.map((key) => (
               <button
                 key={key ?? "other"}
                 type="button"
-                className={plat === key ? "cx-platopt is-on" : "cx-platopt"}
+                role="radio"
+                aria-checked={plat === key}
+                className={plat === key ? "on" : undefined}
                 onClick={() => {
+                  haptic("light");
                   setPlat(key);
                   // 척도가 다른 플랫폼으로 바꾸면 이전 점수는 의미를 잃는다.
-                  setRating(defaultRatingForPlatform(key));
+                  setRating(0);
                 }}
               >
-                <span className="cx-platopt__m" style={{ background: def.bg, color: def.ink }}>
-                  {def.mono}
-                </span>
-                <span className="cx-platopt__n">
-                  {key ? platformName(key, dict) : t.platformOther}
-                </span>
+                {PLATFORM_LABEL(key, dict)}
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="cx-fsec">
-        <div className="cx-fsec__h">
-          {t.fieldTitle} <span className="req">{t.required}</span>
-        </div>
-        <input ref={titleRef} className="cx-fld" placeholder={t.fieldTitle} />
-      </div>
-
-      <div className="cx-fsec">
-        <div className="cx-fsec__h">
-          {t.fieldBody} <span className="opt">{t.optional}</span>
-        </div>
-        <textarea ref={bodyRef} className="cx-fld" placeholder={t.fieldBodyPlaceholder} />
-      </div>
-
-      <div className="cx-fsec">
-        <div className="cx-fsec__h">
-          {t.fieldLink} <span className="opt">{t.optional}</span>
-        </div>
-        {linked ? (
-          <div className="cx-linked">
-            <span className="cx-linked__ic">{CxIcon.building}</span>
-            <div className="cx-linked__b">
-              <div className="cx-linked__n">{linked.place}</div>
-              <div className="cx-linked__s">
-                <PlatformSource plat={linked.plat} dict={dict} />
-                <span>
-                  {linked.guest} · {linked.stay}
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="cx-linked__x"
-              onClick={() => {
-                setLinked(null);
-                setPlat(null);
-                setRating(0);
-              }}
-            >
-              {CxIcon.x}
-            </button>
+            ))}
           </div>
-        ) : (
-          <button type="button" className="cx-linkrow" onClick={() => setShowPicker(true)}>
-            <span className="cx-linkrow__ic">{CxIcon.link}</span>
-            <span className="cx-linkrow__t">{t.linkAdd}</span>
-            <span className="cx-linkrow__chev">{CxIcon.chevR}</span>
-          </button>
-        )}
-      </div>
-
-      {plat !== null && (
-        <div className="cx-fsec">
-          <div className="cx-fsec__h">
-            {t.fieldRating} <span className="opt">{t.optional}</span>
+        </div>
+        {plat !== null && ratingMax(plat) > 0 ? (
+          <div className="fbw-fg">
+            <span className="ofw-k">
+              {t.fieldRating} {t.wOptional}
+            </span>
+            <RatingInput plat={plat} value={rating} onChange={setRating} dict={dict} />
           </div>
-          <RatingInput plat={plat} value={rating} onChange={setRating} dict={dict} />
-        </div>
-      )}
+        ) : null}
+      </section>
 
-      <div className="cx-fsec">
-        <div className="cx-fsec__h">
-          {t.fieldGuestName} <span className="opt">{t.optional}</span>
-        </div>
-        <input
-          className="cx-fld"
-          value={guestName}
-          onChange={(event) => setGuestName(event.target.value)}
-          placeholder={t.fieldGuestPlaceholder}
+      <section className="ofw-sec">
+        <ChoiceTiles
+          label={t.wWhere}
+          value={linkMode}
+          onChange={(value) => setLinkMode(value as LinkMode)}
+          options={[
+            { value: "reservation", label: t.wLinkReservation },
+            { value: "place", label: t.linkModePlace },
+            { value: "none", label: t.linkModeNone },
+          ]}
         />
-      </div>
-
-      <div className="cx-fsec">
-        <div className="cx-fsec__h">
-          {t.fieldImages} <span className="opt">{t.imagesMax}</span>
-        </div>
-        <div className="cx-upgrid">
-          {uploadedImages.map((url, index) => (
-            <div key={url} className="cx-upthumb">
-              {/* `.cx-upthumb` 이 relative + aspect-ratio:1 이라 `fill` 이 그대로 맞는다. */}
-              <Image
-                src={url}
-                alt=""
-                fill
-                sizes="33vw"
-                className="cx-upthumb__img"
-                onClick={() => setLightboxIndex(index)}
-              />
+        {linkMode === "reservation" ? (
+          <div className="ofw-nf fbw-pickwrap">
+            <span className="ofw-nf__l">{t.wLinkReservation}</span>
+            <button type="button" className={`ofw-nf__in fbw-pickbtn${linked ? " has-x" : " is-ph"}`} onClick={() => setShowPicker(true)} aria-haspopup="dialog">
+              <span>{linked ? `${linked.guest} · ${linked.place} · ${linked.stay}` : t.wPickReservation}</span>
+              {linked ? null : <ChevronDown aria-hidden="true" />}
+            </button>
+            {linked ? (
               <button
                 type="button"
-                className="cx-upthumb__x"
-                onClick={() => handleRemoveImage(index)}
+                className="fbw-pickbtn__x"
+                aria-label={t.wClearLink}
+                onClick={() => {
+                  setLinked(null);
+                  setGuestName("");
+                }}
               >
-                {CxIcon.x}
+                <X aria-hidden="true" />
               </button>
-            </div>
-          ))}
-          {uploadedImages.length < MAX_IMAGES && (
-            <button
-              type="button"
-              className="cx-upadd"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isPending}
-            >
-              <CIc>{CxIcon.plus}</CIc>
-              <span>
-                {uploadedImages.length} / {MAX_IMAGES}
-              </span>
-            </button>
-          )}
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={handleImageChange}
-        />
-      </div>
+            ) : null}
+          </div>
+        ) : null}
+        {linkMode === "place" ? (
+          <>
+            <PickField
+              label={t.metaBuilding}
+              value={placeBuilding}
+              placeholder={t.pickBuilding}
+              options={placeBuildings}
+              onChange={(value) => {
+                setPlaceBuilding(value);
+                setPlaceRoom("");
+              }}
+            />
+            <PickField
+              label={t.metaRoom}
+              value={placeRoom}
+              placeholder={t.pickRoom}
+              options={placeRooms}
+              disabled={!placeBuilding}
+              onChange={setPlaceRoom}
+            />
+          </>
+        ) : null}
+        {linkMode !== "none" ? <p className="fbw-hint">{t.wLinkHint}</p> : null}
+        <label className="ofw-nf">
+          <span className="ofw-nf__l">
+            {t.fieldGuestName} {t.wOptional}
+          </span>
+          <input
+            name="guestName"
+            autoComplete="off"
+            className="ofw-nf__in"
+            value={guestName}
+            onChange={(event) => setGuestName(event.target.value)}
+            placeholder={t.fieldGuestPlaceholder}
+          />
+        </label>
+      </section>
 
-      <button type="button" className="cx-submit" onClick={handleSubmit} disabled={isPending}>
-        <CIc>{CxIcon.check}</CIc>
+      <section className="ofw-sec">
+        <div className="fbw-fg">
+          <span className="ofw-k">
+            {t.photosTitle} <em className="fbw-opt">{`${t.wOptional} · ${uploadedImages.length}/${MAX_IMAGES}`}</em>
+          </span>
+          <div className="fbw-photos">
+            {uploadedImages.map((url, index) => (
+              <div key={url} className="fbw-photo">
+                <button type="button" className="fbw-photo__img" aria-label={`${t.photosTitle} ${index + 1}`} onClick={() => setLightboxIndex(index)}>
+                  <Image src={url} alt="" fill sizes="72px" />
+                </button>
+                <button type="button" className="fbw-photo__x" aria-label={t.lightboxClose} onClick={() => handleRemoveImage(index)}>
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            {uploadedImages.length < MAX_IMAGES ? (
+              <button type="button" className="fbw-photo__add" aria-label={t.fieldImages} onClick={() => fileInputRef.current?.click()} disabled={isPending}>
+                {isPending ? <span className="fbw-spin is-pri" aria-hidden="true" /> : <Camera aria-hidden="true" />}
+              </button>
+            ) : null}
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleImageChange} />
+        </div>
+      </section>
+
+      {submitError ? (
+        <p className="fbw-err" role="alert">
+          {t.createFailed}
+        </p>
+      ) : null}
+
+      <button type="button" className="ofw-submit" onClick={openConfirm} disabled={isPending}>
         {t.submit}
       </button>
+
+      {confirmOpen ? (
+        <ConfirmFormSheet
+          title={t.wConfirmCreate}
+          sub={titleText}
+          rows={[
+            {
+              k: t.wPlatform,
+              v: `${PLATFORM_LABEL(plat, dict)}${rating > 0 && plat ? ` · ${rating.toFixed(1)} / ${ratingMax(plat)}` : ""}`,
+            },
+            { k: t.wWhereShort, v: placeLabel },
+            { k: t.photosTitle, v: uploadedImages.length > 0 ? t.wPhotosN.replace("{n}", String(uploadedImages.length)) : "—" },
+          ]}
+          cancelLabel={t.cancel}
+          confirmLabel={t.wSubmit}
+          pending={isPending}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={handleSubmit}
+        />
+      ) : null}
 
       {lightboxIndex !== null && uploadedImages.length > 0 && (
         <ImageLightbox
@@ -530,7 +623,7 @@ export function ComplaintCreate({
                 });
                 setPlat(row.plat);
                 setGuestName(row.guest);
-                setRating(defaultRatingForPlatform(row.plat));
+                setRating(0);
                 closePicker();
               };
 

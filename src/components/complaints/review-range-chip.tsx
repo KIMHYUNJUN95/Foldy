@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DateRangeCalendar, type DateRangeValue } from "@/components/requests/date-range-calendar";
 import type { Locale } from "@/lib/i18n";
+import { ChevronDown } from "lucide-react";
 import { CIc, CxIcon } from "./cx-icons";
 
 export type RangeChipLabels = {
@@ -35,12 +36,15 @@ export function ReviewRangeChip({
   labels,
   /** 적용 시 유지할 나머지 쿼리(뷰·플랫폼·문제만). 페이지는 항상 1로 되돌린다. */
   baseParams,
+  variant = "chip",
 }: {
   from: string | null;
   to: string | null;
   locale: Locale;
   labels: RangeChipLabels;
   baseParams: Record<string, string>;
+  /** "line" = 화이트 리디자인 머리의 기간 줄(글자 + ▾). */
+  variant?: "chip" | "line";
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -57,10 +61,17 @@ export function ReviewRangeChip({
 
   return (
     <>
-      <button type="button" className="cx-rangechip" onClick={() => setOpen(true)}>
-        <CIc>{CxIcon.cal}</CIc>
-        {labels.chip}
-      </button>
+      {variant === "line" ? (
+        <button type="button" className="fbw-rangeline" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+          {labels.chip}
+          <ChevronDown aria-hidden="true" />
+        </button>
+      ) : (
+        <button type="button" className="cx-rangechip" onClick={() => setOpen(true)}>
+          <CIc>{CxIcon.cal}</CIc>
+          {labels.chip}
+        </button>
+      )}
       <DateRangeCalendar
         open={open}
         locale={locale}

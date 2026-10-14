@@ -3,11 +3,12 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import "./complaints.css";
-import { CIc, CxIcon } from "./cx-icons";
-import { PlatformSource } from "./cx-platform";
+import { Check, Plus } from "lucide-react";
+import "./feedback-mobile.css";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { getDictionary } from "@/lib/i18n";
+import { tokyoDateOf } from "@/lib/tokyo-date";
+import { haptic } from "@/lib/haptics";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
 import {
   REVIEW_SCALE,
@@ -21,12 +22,14 @@ import {
   translateReviewPartAction,
 } from "@/app/mobile/complaints/actions";
 
-function formatDate(iso: string | null, locale: string): string {
-  if (!iso) return "—";
-  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric" }).format(
-    new Date(iso),
-  );
+/** «10/8» — 도쿄 기준. */
+function md(iso: string | null): string {
+  const day = tokyoDateOf(iso);
+  return day ? `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}` : "—";
 }
+
+/** 낮은 평점 경계 — 세부 점수 막대를 빨갛게 칠할 때만(서버 위험도 규칙과 같다). */
+const LOW_AT = { airbnb: 3, booking: 7 } as const;
 
 /** Only used to skip an obviously-redundant translate offer (Booking gives a source language). */
 function isSameLanguage(sourceLanguageCode: string | null, locale: string): boolean {
@@ -34,7 +37,9 @@ function isSameLanguage(sourceLanguageCode: string | null, locale: string): bool
   return sourceLanguageCode.trim().slice(0, 2).toLowerCase() === locale;
 }
 
-// External Reviews — Screen 2 (read-only detail). See docs/product/25-complaint-workflow.md.
+// 외부 리뷰 상세 — 모바일. 화이트 리디자인(2026-10-14, 시안 FBDetail-Phone): 낮은 평점 · 플랫폼 · 날짜 → 큰 점수 → 제목 →
+// 건물 · 객실 · 게스트 · 예약 → 세부 점수 막대 → 리뷰 내용(번역) → 비공개 피드백 → 숙소 답글 → 「컴플레인으로 등록」.
+// PC 리뷰 패널과 같은 순서. 번역은 이 리뷰 하나만, 누를 때만. See docs/product/25-complaint-workflow.md.
 export function ReviewDetail({
   review,
   locale,
@@ -138,6 +143,7 @@ export function ReviewDetail({
         convertBodyRef.current?.value ?? "",
       );
       if ("id" in res) {
+        haptic("success");
         close();
         router.push(`/mobile/complaints/${res.id}`);
       } else {
@@ -146,264 +152,176 @@ export function ReviewDetail({
     });
   }
 
+  const translateLabel = t.wTranslate;
+  const building = review.propertyName
+    ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels)
+    : "—";
+  const room = review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t);
+  const risk = review.riskLevel === "risk";
+
   return (
-    <div className="cx cx-detail cx-rdetail">
-      {/* 순서는 어드민 상세 패널과 동일하다 — 칩 → hero(점수+제목) → 세부 점수 → 본문 →
-          비공개 → OTA 답글 → 문맥 → 전환. 두 화면이 다른 순서를 쓰면 같은 리뷰를 두고
-          대화가 안 된다. */}
-      <div className="cx-dsrc-row">
-        <PlatformSource plat={review.provider} dict={dict} />
-        {review.riskLevel === "risk" && <span className="cx-risk-chip risk">{t.riskChip}</span>}
-        {review.riskLevel === "normal" && <span className="cx-risk-chip normal">{t.normalChip}</span>}
-        {review.riskLevel === "unrated" && <span className="cx-risk-chip unrated">{t.unratedChip}</span>}
-        <span className="time mono">{formatDate(review.reviewedAt, locale)}</span>
-      </div>
-
-      {/* hero — 점수는 판단의 시작점이라 가장 먼저·가장 크게. */}
-      <div className="cx-hero">
-        <span
-          className={`cx-hero__score${review.riskLevel === "risk" ? " is-bad" : ""}${
-            review.ratingValue == null ? " is-none" : ""
-          }`}
-        >
-          <b>{review.ratingValue == null ? "—" : review.ratingValue}</b>
-          <i>/ {scale}</i>
-        </span>
-        <div className="cx-hero__b">
-          {headlineText ? (
-            <h2 className="cx-hero__t">{headlineText}</h2>
-          ) : review.provider === "airbnb" ? (
-            <div className="cx-hero__t is-dim">{t.noHeadlineAirbnb}</div>
-          ) : null}
-          <div className="cx-hero__rule">
-            {review.provider === "airbnb" ? t.riskRuleAirbnb : t.riskRuleBooking}
-          </div>
+    <div className="fbw fbw-detail">
+      <div className="fbw-dh">
+        <div className="fbw-dh__main">
+          <span className="fbw-kick">
+            {risk ? <em className="is-bad">{t.riskChip}</em> : null}
+            {review.riskLevel === "unrated" ? <em>{t.unratedChip}</em> : null}
+            <span>{review.provider === "airbnb" ? "Airbnb" : "Booking.com"}</span>
+            <span className="num">{t.wReviewedOn.replace("{date}", md(review.reviewedAt))}</span>
+          </span>
+          <span className="fbw-score">
+            <b className={`num${risk ? " is-bad" : ""}`}>{review.ratingValue == null ? "—" : review.ratingValue}</b>
+            <span>{`/ ${scale}`}</span>
+          </span>
+          {headlineText ? <h1 className="fbw-dh__title is-md">{headlineText}</h1> : null}
+          <span className="fbw-ctx">
+            {`${building} · ${room}${review.guestDisplayName ? ` · ${review.guestDisplayName}` : ""}`}
+            {review.sourceReservationId ? (
+              <>
+                <br />
+                <span className="num">{t.wReservationNo.replace("{id}", review.sourceReservationId)}</span>
+              </>
+            ) : null}
+          </span>
         </div>
       </div>
 
-      {breakdown.length > 0 && (
-        <>
-          <div className="cx-sechead">
-            <span>{t.breakdownTitle}</span>
-            <span className="opt">{t.breakdownSource}</span>
-          </div>
-          <div className="cx-kvcard">
-            {breakdown.map((row) => (
-              <div className="cx-kvrow" key={row.key}>
-                <span className="cx-kvrow__k">{row.label}</span>
-                <span className={`cx-kvrow__v mono${row.value === "—" ? " is-dim" : ""}`}>
-                  {row.value}
+      {breakdown.length > 0 ? (
+        <div className="fbw-bk">
+          {breakdown.map((row) => {
+            const value = Number(row.value);
+            const known = Number.isFinite(value);
+            return (
+              <div className="fbw-bk__row" key={row.key}>
+                <span>{row.label}</span>
+                <span className="fbw-bk__bar" aria-hidden="true">
+                  {known ? <i className={value <= LOW_AT[review.provider] ? "is-bad" : ""} style={{ width: `${Math.min(100, (value / scale) * 100)}%` }} /> : null}
                 </span>
+                <b className="num">{known ? value.toFixed(review.provider === "booking" ? 1 : 0) : "—"}</b>
               </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* 본문 헤더 우측에 번역 컨트롤. 번역은 **이 리뷰 하나**에만, 누를 때만 실행된다 —
-          목록·상세 어디서도 자동 번역하지 않는다(크레딧·정확성 둘 다의 이유). */}
-      <div className="cx-sechead">
-        <span>
-          {review.provider === "airbnb" ? t.publicReview : t.reviewBody}
-          {showTranslation && <span className="cx-trbadge">{t.translatedBadge}</span>}
-        </span>
-        {offerTranslate && (
-          <button
-            type="button"
-            className={`cx-trbtn${showTranslation ? " is-plain" : ""}`}
-            onClick={handleToggleTranslation}
-            disabled={isTranslating}
-          >
-            {isTranslating ? (
-              <>
-                <span className="cx-spin" aria-hidden="true" />
-                {t.translating}
-              </>
-            ) : (
-              <>
-                <CIc>{showTranslation ? CxIcon.undo : CxIcon.translate}</CIc>
-                {showTranslation ? t.originalAction : t.translateAction}
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
-      {translateError && (
-        <div className="cx-trfail">
-          <CIc>{CxIcon.warn}</CIc>
-          <div>
-            <div className="cx-trfail__t">{t.translateFailed}</div>
-          </div>
-          <button type="button" className="cx-trfail__retry" onClick={handleToggleTranslation}>
-            {t.translateAction}
-          </button>
+            );
+          })}
         </div>
-      )}
+      ) : null}
 
-      {!hasBody ? (
-        <div className="cx-bodycard is-dim">
-          <span className="cx-risk-chip unrated">{t.scoreOnly}</span>
-          <p className="cx-bodycard__b">{t.scoreOnlyNote}</p>
+      <section className="fbw-sec">
+        <div className="fbw-sec__h">
+          <b>{t.wReviewContent}</b>
+          {offerTranslate ? (
+            <button type="button" className="fbw-link" onClick={handleToggleTranslation} disabled={isTranslating} aria-busy={isTranslating}>
+              {isTranslating ? t.translating : showTranslation ? t.originalAction : translateLabel}
+            </button>
+          ) : null}
         </div>
-      ) : (
-        <>
-          {review.positiveReviewText && (
-            <div className="cx-bodycard">
-              <div className="cx-bodycard__h">
-                <span className="cx-pn__k is-pos">+</span>
-                <span className="is-pos">{t.positiveLabel}</span>
-              </div>
-              <p className="cx-bodycard__b">{textFor("positive", review.positiveReviewText)}</p>
-            </div>
+        {showTranslation ? <span className="fbw-trnote">{t.translatedBadge}</span> : null}
+        {translateError ? (
+          <p className="fbw-err" role="alert">
+            {t.translateFailed}
+          </p>
+        ) : null}
+        <div className={showTranslation ? "fbw-text is-tr" : "fbw-text"} key={showTranslation ? "tr" : "or"}>
+          {!hasBody ? (
+            <p className="fbw-p is-dim">{t.scoreOnlyNote}</p>
+          ) : (
+            <>
+              {review.positiveReviewText ? (
+                <div className="fbw-part">
+                  <small>{t.positiveLabel}</small>
+                  <p>{textFor("positive", review.positiveReviewText)}</p>
+                </div>
+              ) : null}
+              {review.negativeReviewText ? (
+                <div className="fbw-part">
+                  <small>{t.negativeLabel}</small>
+                  <p>{textFor("negative", review.negativeReviewText)}</p>
+                </div>
+              ) : null}
+              {review.reviewText ? (
+                <div className="fbw-part">
+                  <p>{textFor("review", review.reviewText)}</p>
+                </div>
+              ) : null}
+            </>
           )}
-          {review.negativeReviewText && (
-            <div className="cx-bodycard">
-              <div className="cx-bodycard__h">
-                <span className="cx-pn__k is-neg">−</span>
-                <span className="is-neg">{t.negativeLabel}</span>
-              </div>
-              <p className="cx-bodycard__b">{textFor("negative", review.negativeReviewText)}</p>
-            </div>
-          )}
-          {review.reviewText && (
-            <div className="cx-bodycard">
-              <p className="cx-bodycard__b">{textFor("review", review.reviewText)}</p>
-            </div>
-          )}
-        </>
-      )}
+        </div>
+      </section>
 
-      {/* 비공개 피드백 — v1 의 중립 회색은 약하다. 목적이 «직원이 공개 내용으로 오해하는 것»을
-          막는 데 있으므로 경고 톤(앰버 + 점선)으로 올리고 출처와 각주를 함께 둔다. */}
-      {review.provider === "airbnb" && review.privateFeedback && (
-        <div className="cx-privcard">
-          <div className="cx-privcard__h">
-            <CIc>{CxIcon.lock}</CIc>
-            <span className="cx-privcard__t">{t.privateFeedbackTitle}</span>
-            <span className="cx-privcard__badge">{t.privateBadge}</span>
+      {/* 비공개 피드백 — Airbnb 전용. 공개 리뷰와 섞이지 않게 따로 이름을 단다(점수 · 위험도에 넣지 않는다). */}
+      {review.provider === "airbnb" && review.privateFeedback ? (
+        <section className="fbw-sec">
+          <div className="fbw-part">
+            <small>{t.wPrivateLabel}</small>
+            <p>{textFor("private", review.privateFeedback)}</p>
           </div>
-          <div className="cx-privcard__from mono">{t.privateFrom}</div>
-          <p className="cx-privcard__b">{textFor("private", review.privateFeedback)}</p>
-          <p className="cx-privcard__note">{t.privateNote}</p>
-        </div>
-      )}
+        </section>
+      ) : null}
 
-      {/* Booking.com OTA 답글 — 읽기 전용. Foldy 는 답글을 작성·전송하지 않는다.
-          번역 대상도 아니다(review_translations 에 "reply" source_part 가 없다). */}
-      {review.provider === "booking" && review.otaReplyText && (
-        <div className="cx-bodycard cx-replycard">
-          <div className="cx-bodycard__h">
-            <span className="cx-replycard__t">{t.otaReply}</span>
-            <span className="cx-risk-chip unrated">{t.readOnly}</span>
+      {/* Booking.com 숙소 답글 — 읽기 전용(Foldy 는 답글을 쓰지 않는다). */}
+      {review.provider === "booking" && review.otaReplyText ? (
+        <section className="fbw-sec">
+          <div className="fbw-part is-reply">
+            <small>{t.wReply}</small>
+            <p>{review.otaReplyText}</p>
           </div>
-          <p className="cx-bodycard__b">{review.otaReplyText}</p>
-          <p className="cx-privcard__note">{t.otaReplyNote}</p>
-        </div>
-      )}
+        </section>
+      ) : null}
 
-      <div className="cx-sechead">
-        <span>{t.contextTitle}</span>
-      </div>
-      <div className="cx-kvcard">
-        <div className="cx-kvrow">
-          <span className="cx-kvrow__k">{t.metaBuilding}</span>
-          <span className="cx-kvrow__v">
-            {review.propertyName
-              ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels)
-              : "—"}
-          </span>
-        </div>
-        <div className="cx-kvrow">
-          <span className="cx-kvrow__k">{t.metaRoom}</span>
-          <span className={`cx-kvrow__v${review.displayRoomLabel ? "" : " is-dim"}`}>
-            {review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t)}
-          </span>
-        </div>
-        <div className="cx-kvrow">
-          <span className="cx-kvrow__k">{dict.mobile.calendarReservationId}</span>
-          {/* 제공자가 쓰는 예약 번호 — 운영자가 OTA 익스트라넷에서 검색할 수 있는 값이다. */}
-          <span className={`cx-kvrow__v${review.sourceReservationId ? " mono" : " is-dim"}`}>
-            {review.sourceReservationId ?? t.noReservationLink}
-          </span>
-        </div>
-        <div className="cx-kvrow">
-          <span className="cx-kvrow__k">{t.metaGuest}</span>
-          <span className={`cx-kvrow__v${review.guestDisplayName ? "" : " is-dim"}`}>
-            {review.guestDisplayName ?? t.noGuestName}
-          </span>
-        </div>
-        <div className="cx-kvrow">
-          <span className="cx-kvrow__k">{t.importedAt}</span>
-          <span className="cx-kvrow__v mono">{formatDate(review.importedAt, locale)}</span>
-        </div>
-      </div>
-
-      <div className="cx-convertzone">
-        <div className="cx-note">
-          <CIc>{CxIcon.info}</CIc>
-          <span>{t.convertNote}</span>
-        </div>
+      <div className="fbw-convert">
         {review.linkedComplaintId ? (
-          <Link
-            href={`/mobile/complaints/${review.linkedComplaintId}`}
-            className="cx-prim-btn done-state"
-          >
-            <CIc>{CxIcon.check}</CIc>
-            {t.viewLinkedComplaint}
+          <Link href={`/mobile/complaints/${review.linkedComplaintId}`} className="fbw-btn is-soft is-big">
+            <Check aria-hidden="true" />
+            {t.wLinked} · {t.viewLinkedComplaint}
           </Link>
         ) : canConvert ? (
-          <button type="button" className="cx-prim-btn" onClick={() => setShowConvert(true)}>
-            <CIc>{CxIcon.plus}</CIc>
-            {t.convert}
-          </button>
+          <>
+            <button type="button" className="fbw-btn is-pri is-big" onClick={() => setShowConvert(true)}>
+              <Plus aria-hidden="true" />
+              {t.convert}
+            </button>
+            <span className="fbw-convert__note">{t.wConvertNote}</span>
+          </>
         ) : (
           // 권한이 없으면 버튼을 숨기지 않고 왜 못 하는지 말한다 — 없어진 버튼은 고장으로 읽힌다.
-          <div className="cx-nopermit">
-            <CIc>{CxIcon.lock}</CIc>
-            <span>{t.noPermission}</span>
-          </div>
+          <span className="fbw-convert__note">{t.noPermission}</span>
         )}
       </div>
 
-      {showConvert && (
-        <BottomSheet ariaLabel={t.createTitle} onClose={() => setShowConvert(false)}>
+      {showConvert ? (
+        <BottomSheet ariaLabel={t.wConvertTitle} onClose={() => setShowConvert(false)}>
           {({ close }) => (
-            <div className="cx cx-sheet">
-              <div className="cx-sheet__head">
-                <p className="cx-sheet__title">{t.createTitle}</p>
+            <div className="fbw fbw-sheet">
+              <div className="fbw-sheet__h">
+                <h3>{t.wConvertTitle}</h3>
+                <span>{t.wConvertNote}</span>
               </div>
-              <div className="cx-fsec">
-                <div className="cx-fsec__h">
-                  {t.fieldTitle} <span className="req">{t.required}</span>
-                </div>
-                <input
-                  ref={convertTitleRef}
-                  className="cx-fld"
-                  placeholder={t.fieldTitle}
-                  defaultValue={review.headline ?? ""}
-                />
+              <label className="fbw-nf">
+                <span className="fbw-nf__l">{t.fieldTitle}</span>
+                <input ref={convertTitleRef} name="title" autoComplete="off" defaultValue={review.headline ?? ""} />
+              </label>
+              <label className="fbw-nf">
+                <span className="fbw-nf__l">
+                  {t.wContent} {t.wOptional}
+                </span>
+                <textarea ref={convertBodyRef} name="description" rows={3} placeholder={t.fieldBodyPlaceholder} />
+              </label>
+              {convertError ? (
+                <p className="fbw-err" role="alert">
+                  {t.convertFailed}
+                </p>
+              ) : null}
+              <div className="fbw-sheet__btns">
+                <button type="button" className="fbw-btn is-gray" onClick={close} disabled={isConverting}>
+                  {t.cancel}
+                </button>
+                <button type="button" className="fbw-btn is-pri" disabled={isConverting} onClick={() => handleConvert(close)}>
+                  {isConverting ? <span className="fbw-spin" aria-hidden="true" /> : null}
+                  {t.wSubmit}
+                </button>
               </div>
-              <div className="cx-fsec">
-                <div className="cx-fsec__h">
-                  {t.fieldBody} <span className="opt">{t.optional}</span>
-                </div>
-                <textarea ref={convertBodyRef} className="cx-fld" placeholder={t.fieldBodyPlaceholder} />
-              </div>
-              {convertError && <div className="cx-rate-none">{t.convertFailed}</div>}
-              <button
-                type="button"
-                className="cx-submit"
-                disabled={isConverting}
-                onClick={() => handleConvert(close)}
-              >
-                <CIc>{CxIcon.check}</CIc>
-                {t.submit}
-              </button>
             </div>
           )}
         </BottomSheet>
-      )}
+      ) : null}
     </div>
   );
 }

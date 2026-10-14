@@ -63,6 +63,10 @@ Home   Calendar   [ ✎ 편집 (center FAB) ]   Requests   Announcements
     bar taller. The Japanese nav label stays within the 6-character ceiling set by the longest
     existing tab label (`スタッフ一覧`). "수동 컴플레인" and every other complaint-entity string
     (등록 / 삭제 / 전환) keeps the word complaint — the entity did not get renamed, the feature did.
+  - **화이트 리디자인(2026-10-14)**: 목록 머리는 `FeedbackHead`(제목 · 기간 줄 · 「+ 컴플레인 등록」 · 보기 셋 세그 — 외부 리뷰 /
+    수동 컴플레인 + 미처리 수 / 건물 · 객실별)로 바뀌었고 `ComplaintViewTabs` 와 떠 있는 + 버튼은 없어졌다. 리뷰 고르기는 쿼리
+    (`provider` · `risk` · `building` · `rl` · `from` · `to` · `page`), 기본 기간은 최근 90일(도쿄). 상세: 25번 「화이트 리디자인」.
+    아래 문단은 그 전 상태의 기록이다.
   - `/mobile/complaints`: the two views are separated before filtering via a `?view=manual|reviews`
     tab switch rendered above the list content (`ComplaintViewTabs`, plain `<Link>` tabs — no client
     state, so only the active view's data is fetched). Manual complaints keep their existing

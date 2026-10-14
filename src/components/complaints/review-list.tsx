@@ -1,76 +1,74 @@
 import Link from "next/link";
-import "./complaints.css";
-import { CIc, CxIcon } from "./cx-icons";
+import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import "./feedback-mobile.css";
 import { ReviewSyncButton } from "./review-sync-button";
+import { FeedbackFilterDd } from "./feedback-filter-dd";
 import type { ReviewSyncStatus } from "@/lib/beds24/reviews-sync-manual";
 import { reviewSyncLabels } from "@/lib/review-sync-labels";
-import { PLATFORMS } from "./cx-platform";
-import { ReviewRangeChip } from "./review-range-chip";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { tokyoDateOf } from "@/lib/tokyo-date";
 import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
 import { REVIEW_SCALE, reviewRoomFallbackLabel } from "@/lib/external-review-rules";
 import type { ExternalReview, ReviewProvider } from "@/lib/external-reviews";
 
-/** 한 페이지에 보여줄 리뷰 수. 카드가 본문을 전량 노출해 세로가 길어 20건이 상한선이다. */
+/** 한 페이지에 보여줄 리뷰 수. */
 export const REVIEW_PAGE_SIZE = 20;
 
-/** 기간 칩 프리셋. 목업(2o)의 7 / 30 / 90 / 1년. */
+/** 기간 시트 프리셋 — 7 / 30 / 90 / 1년. */
 export const RANGE_PRESET_DAYS = [7, 30, 90, 365];
 
-const PROVIDERS: ("all" | ReviewProvider)[] = ["all", "airbnb", "booking"];
+const PROVIDER_SHORT: Record<ReviewProvider, string> = { airbnb: "Airbnb", booking: "Booking" };
+const PROVIDER_FULL: Record<ReviewProvider, string> = { airbnb: "Airbnb", booking: "Booking.com" };
 
-/**
- * 카드·칩의 날짜는 `08.02` 처럼 2자리 고정이다.
- *
- * `Intl` 의 numeric 포맷은 로케일마다 `8. 6.` / `8/6` 처럼 달라지고 자릿수도 흔들려, 목록에서
- * 세로로 늘어놓았을 때 줄이 맞지 않는다. 날짜는 이미 ISO 문자열이라 잘라 쓰는 편이 안정적이다.
- */
-function formatShortDate(iso: string | null): string {
-  if (!iso) return "—";
-  return iso.slice(5, 10).replace("-", ".");
+function md(iso: string | null): string {
+  const day = tokyoDateOf(iso);
+  return day ? `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}` : "—";
 }
+
+export type ReviewStats = {
+  airbnb: number | null;
+  booking: number | null;
+  risk: number;
+};
 
 type Props = {
   locale: Locale;
   reviews: ExternalReview[];
   total: number;
-  /** 현재 필터 안의 «문제» 건수 — 카운트 줄에 함께 보여 준다. */
-  riskTotal: number;
   page: number;
   provider: "all" | ReviewProvider;
   riskOnly: boolean;
-  from: string | null;
-  to: string | null;
-  rangeDays: number | null;
+  from: string;
+  to: string;
+  building: string | null;
+  roomLabel: string | null;
+  buildingOptions: { value: string; label: string }[];
+  roomOptions: string[];
+  stats: ReviewStats;
   /** 「지금 가져오기」 상태. 작성 권한이 없으면 `null`(그리지 않는다). */
   reviewSync?: ReviewSyncStatus | null;
 };
 
 /**
- * External Reviews — S2 목록 (v2 디자인).
- *
- * **서버 컴포넌트다.** 필터·페이지가 전부 쿼리스트링이라 클라이언트 상태가 필요 없고, 이 화면은
- * 클라이언트 번들에서 통째로 빠진다(기간 시트만 별도 client 조각).
- *
- * 컨트롤은 **2줄로 고정**한다 — 플랫폼 3분할 + 위험도 2분할 + 기간을 한 줄에 넣으면 390px 에서
- * 각 항목이 44px 밑으로 떨어진다. 위험도 토글은 세 번째 컨트롤 바를 만드는 대신 카운트 줄
- * 오른쪽에 얹었다. 문제 수와 필터가 같은 줄에 있는 편이 의미도 맞는다.
- *
- * 본문은 **발췌하지 않고 전량** 노출한다. 말줄임으로는 문제 리뷰인지 판단할 수 없다.
- *
- * See docs/product/25-complaint-workflow.md.
+ * 외부 리뷰 — 모바일 목록. 화이트 리디자인(2026-10-14, 시안 FB-Phone):
+ * 숫자 셋(Airbnb 평균 · Booking 평균 · 낮은 평점 — 누르면 낮은 평점만) → 고르기 셋(플랫폼 · 건물 · 객실) →
+ * 「최신 리뷰 순 · N건 · 마지막 수집」 + 지금 가져오기 → 리뷰 줄(점수 · 줄 정보 · 제목 · 본문 두 줄) → 쪽 넘김.
+ * 서버 컴포넌트 — 고르기 · 쪽은 전부 쿼리스트링. See docs/product/25-complaint-workflow.md → 「화이트 리디자인」.
  */
 export function ReviewList({
   locale,
   reviews,
   total,
-  riskTotal,
   page,
   provider,
   riskOnly,
   from,
   to,
-  rangeDays,
+  building,
+  roomLabel,
+  buildingOptions,
+  roomOptions,
+  stats,
   reviewSync = null,
 }: Props) {
   const dict = getDictionary(locale);
@@ -80,15 +78,14 @@ export function ReviewList({
   const totalPages = Math.max(Math.ceil(total / REVIEW_PAGE_SIZE), 1);
   const currentPage = Math.min(page, totalPages);
 
-  const baseParams: Record<string, string> = { view: "reviews" };
-  if (provider !== "all") baseParams.provider = provider;
-  if (riskOnly) baseParams.risk = "1";
+  const base: Record<string, string> = { view: "reviews", from, to };
+  if (provider !== "all") base.provider = provider;
+  if (riskOnly) base.risk = "1";
+  if (building) base.building = building;
+  if (roomLabel) base.rl = roomLabel;
 
-  function hrefWith(patch: Record<string, string | null>, keepPage = false): string {
-    const params = new URLSearchParams(baseParams);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    if (keepPage && currentPage > 1) params.set("page", String(currentPage));
+  function hrefWith(patch: Record<string, string | null>): string {
+    const params = new URLSearchParams(base);
     for (const [key, value] of Object.entries(patch)) {
       if (value === null) params.delete(key);
       else params.set(key, value);
@@ -96,242 +93,164 @@ export function ReviewList({
     return `/mobile/complaints?${params.toString()}`;
   }
 
-  const hasFilters = provider !== "all" || riskOnly || Boolean(from) || Boolean(to);
-  const rangeChipLabel = rangeDays
-    ? t.rangeDays.replace("{n}", String(rangeDays))
-    : from && to
-      ? `${formatShortDate(from)} – ${formatShortDate(to)}`
-      : t.rangeTitle;
+  const buildingName = buildingOptions.find((option) => option.value === building)?.label;
 
   return (
-    <div className="cx cx-reviews">
-      {/* ── 컨트롤 1줄: 플랫폼 세그 + 기간 칩 ── */}
-      <div className="cx-ctrlrow">
-        <div className="cx-seg cx-seg--plat">
-          {PROVIDERS.map((p) => (
-            <Link
-              key={p}
-              href={hrefWith({ provider: p === "all" ? null : p, page: null })}
-              className={provider === p ? "on" : undefined}
-              scroll={false}
-            >
-              {p === "all" ? (
-                t.filterAll
-              ) : (
-                <>
-                  <span className="d" style={{ background: PLATFORMS[p].solid }} />
-                  {PLATFORMS[p].name}
-                </>
-              )}
-            </Link>
-          ))}
+    <div className="fbw fbw-reviews">
+      <div className="fbw-stats">
+        <div className="fbw-stat">
+          <span>Airbnb</span>
+          <b className="num">
+            {stats.airbnb === null ? "—" : stats.airbnb.toFixed(2)}
+            <small>/ 5</small>
+          </b>
         </div>
-        <ReviewRangeChip
-          from={from}
-          to={to}
-          locale={locale}
-          baseParams={baseParams}
-          labels={{
-            chip: rangeChipLabel,
-            title: t.rangeTitle,
-            apply: dict.common.apply,
-            clear: dict.common.clear,
-            close: dict.common.close,
-            previousMonth: t.rangePrevMonth,
-            nextMonth: t.rangeNextMonth,
-            selectStart: t.rangeHintStart,
-            selectEnd: t.rangeHintEnd,
-            summary: t.rangeSummary,
-            presets: RANGE_PRESET_DAYS.map((days) => ({
-              days,
-              label: t.rangeDays.replace("{n}", String(days)),
-            })),
-          }}
-        />
-      </div>
-
-      {/* ── 「지금 가져오기」 — 정기 수집(하루 1회)을 기다리지 않고 누른 시점 기준으로 받는다(2026-10-02) ── */}
-      {reviewSync ? (
-        <ReviewSyncButton
-          availableAt={reviewSync.availableAt}
-          labels={reviewSyncLabels(t)}
-          lastSyncedAt={reviewSync.lastSyncedAt}
-          localeTag={locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR"}
-          running={reviewSync.running}
-          variant="mobile"
-        />
-      ) : null}
-
-      {/* ── 카운트 줄 + 문제만 토글 (세 번째 컨트롤 바를 만들지 않기 위해 여기에 얹었다) ── */}
-      <div className="cx-countrow">
-        <span className="cx-countrow__t">
-          {t.viewReviews} <b className="mono">{total}</b>
-          {riskTotal > 0 && (
-            <>
-              <span className="sep">·</span>
-              {t.riskChip} <b className="mono is-bad">{riskTotal}</b>
-            </>
-          )}
-        </span>
+        <div className="fbw-stat">
+          <span>Booking.com</span>
+          <b className="num">
+            {stats.booking === null ? "—" : stats.booking.toFixed(1)}
+            <small>/ 10</small>
+          </b>
+        </div>
         <Link
           href={hrefWith({ risk: riskOnly ? null : "1", page: null })}
-          className={`cx-riskpill${riskOnly ? " on" : ""}`}
+          className={`fbw-stat is-btn${riskOnly ? " on" : ""}`}
+          role="switch"
+          aria-checked={riskOnly}
           scroll={false}
         >
-          {riskOnly && <CIc>{CxIcon.check}</CIc>}
-          {t.riskOnly}
+          <span>{t.kpiRiskLabel}</span>
+          <b className={`num${stats.risk > 0 ? " is-bad" : ""}`}>
+            {stats.risk}
+            {t.wUnitCount ? <small>{t.wUnitCount}</small> : null}
+          </b>
         </Link>
       </div>
 
-      <div className="cx-rlist">
-        {reviews.length === 0 ? (
-          <div className="cx-rempty">
-            <span className="cx-rempty__ic">
-              <CIc>{CxIcon.chat}</CIc>
-            </span>
-            <div className="cx-rempty__t">{t.reviewsEmptyTitle}</div>
-            <p className="cx-rempty__s">{t.reviewsEmptyBody}</p>
-            {/* 빈 화면에서 다음 행동을 주지 않으면 사용자가 필터를 되돌릴 방법을 찾아야 한다. */}
-            <div className="cx-rempty__acts">
-              <Link className="cx-rempty__btn" href={hrefWith({ from: null, to: null, page: null })}>
-                {t.emptyWiden}
-              </Link>
-              {hasFilters && (
-                <Link className="cx-rempty__btn is-pri" href="/mobile/complaints?view=reviews">
-                  {t.emptyReset}
-                </Link>
-              )}
-            </div>
-          </div>
-        ) : (
-          reviews.map((review) => {
-            const scale = REVIEW_SCALE[review.provider];
-            const plat = PLATFORMS[review.provider];
-            const bad = review.riskLevel === "risk";
-            const unrated = review.ratingValue === null;
-            const hasBody = Boolean(
-              review.reviewText || review.positiveReviewText || review.negativeReviewText,
-            );
-            return (
-              <Link
-                key={review.id}
-                href={`/mobile/complaints/reviews/${review.id}`}
-                className="cx-rcard"
-              >
-                <div className="cx-rcard__h">
-                  <span className={`cx-score${bad ? " is-bad" : ""}${unrated ? " is-none" : ""}`}>
-                    <b>{unrated ? "—" : review.ratingValue}</b>
-                    <i>/ {scale}</i>
-                  </span>
-                  <div className="cx-rcard__hb">
-                    <div className="cx-rcard__chips">
-                      <span className="cx-psrc" style={{ background: plat.bg, color: plat.ink }}>
-                        <span className="d" style={{ background: plat.solid }} />
-                        {plat.name}
-                      </span>
-                      {bad && <span className="cx-risk-chip risk">{t.riskChip}</span>}
-                      {unrated && <span className="cx-risk-chip unrated">{t.unratedChip}</span>}
-                      {!hasBody && <span className="cx-risk-chip unrated">{t.scoreOnly}</span>}
-                    </div>
-                    {review.headline ? (
-                      <div className="cx-rcard__t">{review.headline}</div>
-                    ) : review.provider === "airbnb" ? (
-                      <div className="cx-rcard__t is-dim">{t.noHeadlineAirbnb}</div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Booking 은 긍정/부정을 나눠 주고, Airbnb 는 본문 하나다. 어느 쪽이든 발췌하지 않는다. */}
-                {hasBody && (
-                  <div className="cx-rcard__body">
-                    {review.positiveReviewText && (
-                      <div className="cx-pn">
-                        <span className="cx-pn__k is-pos">+</span>
-                        <div>
-                          <div className="cx-pn__l is-pos">{t.positiveLabel}</div>
-                          <p className="cx-pn__b">{review.positiveReviewText}</p>
-                        </div>
-                      </div>
-                    )}
-                    {review.negativeReviewText && (
-                      <div className="cx-pn">
-                        <span className="cx-pn__k is-neg">−</span>
-                        <div>
-                          <div className="cx-pn__l is-neg">{t.negativeLabel}</div>
-                          <p className="cx-pn__b">{review.negativeReviewText}</p>
-                        </div>
-                      </div>
-                    )}
-                    {review.reviewText && <p className="cx-rcard__plain">{review.reviewText}</p>}
-                  </div>
-                )}
-                {!hasBody && <p className="cx-rcard__plain is-dim">{t.scoreOnlyNote}</p>}
-
-                <div className="cx-rcard__f">
-                  <span className="cx-rcard__place">
-                    {review.propertyName
-                      ? localizePropertyName(
-                          getCanonicalPropertyName(review.propertyName),
-                          buildingLabels,
-                        )
-                      : "—"}
-                  </span>
-                  <span className="sep">·</span>
-                  <span className={review.displayRoomLabel ? undefined : "is-dim"}>
-                    {review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t)}
-                  </span>
-                  <span className="sep">·</span>
-                  <span className="mono">{formatShortDate(review.reviewedAt)}</span>
-                  {review.linkedComplaintId ? (
-                    <span className="cx-rcard__link is-on">
-                      <CIc>{CxIcon.check}</CIc>
-                      {t.linkedShort}
-                    </span>
-                  ) : (
-                    <span className="cx-rcard__link">{t.notLinkedShort}</span>
-                  )}
-                </div>
-              </Link>
-            );
-          })
-        )}
+      <div className="fbw-filters">
+        <FeedbackFilterDd
+          ariaLabel={t.wPlatform}
+          label={provider === "all" ? t.allPlatforms : PROVIDER_FULL[provider]}
+          options={(["all", "airbnb", "booking"] as const).map((value) => ({
+            label: value === "all" ? t.allPlatforms : PROVIDER_FULL[value],
+            href: hrefWith({ provider: value === "all" ? null : value, page: null }),
+            on: provider === value,
+          }))}
+        />
+        <FeedbackFilterDd
+          ariaLabel={t.metaBuilding}
+          label={buildingName ?? t.allBuildings}
+          options={[
+            { label: t.allBuildings, href: hrefWith({ building: null, rl: null, page: null }), on: !building },
+            ...buildingOptions.map((option) => ({
+              label: option.label,
+              href: hrefWith({ building: option.value, rl: null, page: null }),
+              on: building === option.value,
+            })),
+          ]}
+        />
+        <FeedbackFilterDd
+          ariaLabel={t.metaRoom}
+          align="right"
+          disabled={!building || roomOptions.length === 0}
+          label={roomLabel ?? t.wAllRooms}
+          options={[
+            { label: t.wAllRooms, href: hrefWith({ rl: null, page: null }), on: !roomLabel },
+            ...roomOptions.map((room) => ({ label: room, href: hrefWith({ rl: room, page: null }), on: roomLabel === room })),
+          ]}
+        />
       </div>
 
-      {totalPages > 1 && (
-        <nav className="cx-pager" aria-label={t.viewReviews}>
+      <div className="fbw-countrow">
+        <span>{t.wNewestCount.replace("{n}", String(total))}</span>
+        {reviewSync ? (
+          <ReviewSyncButton
+            availableAt={reviewSync.availableAt}
+            labels={reviewSyncLabels(t)}
+            lastSyncedAt={reviewSync.lastSyncedAt}
+            localeTag={locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR"}
+            running={reviewSync.running}
+            variant="mobile"
+          />
+        ) : null}
+      </div>
+
+      {reviews.length === 0 ? (
+        <div className="fbw-empty">
+          <span className="fbw-empty__ic">
+            <Star aria-hidden="true" />
+          </span>
+          <b>{t.reviewsEmptyTitle}</b>
+          <span>{t.reviewsEmptyBody}</span>
+          {provider !== "all" || riskOnly || building ? (
+            <Link className="fbw-empty__btn" href={`/mobile/complaints?view=reviews&from=${from}&to=${to}`}>
+              {t.emptyReset}
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <div className="fbw-rows">
+          {reviews.map((review) => {
+            const bad = review.riskLevel === "risk";
+            const neg = review.negativeReviewText;
+            const pos = review.positiveReviewText;
+            // 두 줄로 줄일 때는 아쉬운 점을 먼저 — 운영에서 읽어야 할 쪽이다.
+            const body = neg
+              ? `${t.negativeLabel}: ${neg}`
+              : pos
+                ? `${t.positiveLabel}: ${pos}`
+                : review.reviewText || t.scoreOnlyNote;
+            const place = `${
+              review.propertyName ? localizePropertyName(getCanonicalPropertyName(review.propertyName), buildingLabels) : "—"
+            } · ${review.displayRoomLabel ?? reviewRoomFallbackLabel(review, t)}`;
+            return (
+              <Link key={review.id} href={`/mobile/complaints/reviews/${review.id}`} className="fbw-rv">
+                <span className="fbw-rv__score">
+                  <b className={`num${bad ? " is-bad" : ""}`}>{review.ratingValue ?? "—"}</b>
+                  <span>{`/ ${REVIEW_SCALE[review.provider]}`}</span>
+                </span>
+                <span className="fbw-rv__main">
+                  <span className="fbw-rv__meta">
+                    {bad ? <em className="is-bad">{t.riskChip}</em> : null}
+                    <b>{PROVIDER_SHORT[review.provider]}</b>
+                    <span className="fbw-rv__place">{place}</span>
+                    {review.linkedComplaintId ? <em className="is-linked">{t.wLinkedShort}</em> : null}
+                    <time className="num">{md(review.reviewedAt)}</time>
+                  </span>
+                  {review.headline ? <span className="fbw-rv__hl">{review.headline}</span> : null}
+                  <span className={`fbw-rv__body${!neg && !pos && !review.reviewText ? " is-dim" : ""}`}>{body}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {totalPages > 1 ? (
+        <nav className="fbw-pager" aria-label={t.viewReviews}>
           {currentPage > 1 ? (
-            <Link
-              className="cx-pager__btn"
-              href={hrefWith({ page: currentPage - 1 === 1 ? null : String(currentPage - 1) })}
-            >
-              <CIc>{CxIcon.chevL}</CIc>
-              {t.pagerPrev}
+            <Link className="fbw-pager__btn" href={hrefWith({ page: currentPage - 1 === 1 ? null : String(currentPage - 1) })} aria-label={t.pagerPrev}>
+              <ChevronLeft aria-hidden="true" />
             </Link>
           ) : (
-            <span className="cx-pager__btn is-off">
-              <CIc>{CxIcon.chevL}</CIc>
-              {t.pagerPrev}
+            <span className="fbw-pager__btn is-off" aria-hidden="true">
+              <ChevronLeft />
             </span>
           )}
-          <span className="cx-pager__pos">
-            <b className="mono">{currentPage}</b>
-            <span className="sep">/</span>
-            <span className="mono">{totalPages}</span>
-            <span className="cx-pager__total">{t.pagerTotal.replace("{n}", String(total))}</span>
+          <span className="fbw-pager__pos num">
+            {currentPage} / {totalPages}
           </span>
           {currentPage < totalPages ? (
-            <Link className="cx-pager__btn" href={hrefWith({ page: String(currentPage + 1) })}>
-              {t.pagerNext}
-              <CIc>{CxIcon.chevR}</CIc>
+            <Link className="fbw-pager__btn" href={hrefWith({ page: String(currentPage + 1) })} aria-label={t.pagerNext}>
+              <ChevronRight aria-hidden="true" />
             </Link>
           ) : (
-            <span className="cx-pager__btn is-off">
-              {t.pagerNext}
-              <CIc>{CxIcon.chevR}</CIc>
+            <span className="fbw-pager__btn is-off" aria-hidden="true">
+              <ChevronRight />
             </span>
           )}
         </nav>
-      )}
+      ) : null}
     </div>
   );
 }

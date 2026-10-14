@@ -3,7 +3,7 @@ import { ComplaintCreate } from "@/components/complaints/complaint-create";
 import type { LinkTarget } from "@/components/complaints/complaint-mock";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { canWriteComplaint } from "@/lib/complaints";
-import { listComplaintPickerReservations } from "@/lib/complaint-reservations";
+import { listComplaintPickerPlaces, listComplaintPickerReservations } from "@/lib/complaint-reservations";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -43,9 +43,10 @@ export default async function MobileComplaintCreatePage({ searchParams }: PagePr
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
 
-  const [navBadges, pickRows] = await Promise.all([
+  const [navBadges, pickRows, places] = await Promise.all([
     getMobileNavBadges(),
     listComplaintPickerReservations(session.organization.id, locale),
+    listComplaintPickerPlaces(session.organization.id, locale),
   ]);
 
   const prefilledRow = params.reservationId
@@ -66,8 +67,11 @@ export default async function MobileComplaintCreatePage({ searchParams }: PagePr
     : null;
 
   return (
-    <MobileShell activeItem="complaints" badges={navBadges} title={dict.complaints.createTitle}>
-      <ComplaintCreate initialLinked={initialLinked} locale={locale} pickRows={pickRows} />
+    <MobileShell activeItem="complaints" badges={navBadges} hideBottomNav title={dict.complaints.createTitle}>
+      {/* 화이트 리디자인(2026-10-14, 시안 FBNew-Phone): 요청 폼과 같은 520px 가운데 열 · 하단 탭 없음. */}
+      <div className="ofw-page">
+        <ComplaintCreate initialLinked={initialLinked} locale={locale} pickRows={pickRows} places={places} />
+      </div>
     </MobileShell>
   );
 }

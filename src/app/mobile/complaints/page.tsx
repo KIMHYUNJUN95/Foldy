@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { ComplaintList } from "@/components/complaints/complaint-list";
-import { ComplaintViewTabs } from "@/components/complaints/complaint-view-tabs";
+import { FeedbackHead } from "@/components/complaints/feedback-head";
 import {
   ReviewList,
   REVIEW_PAGE_SIZE,
   RANGE_PRESET_DAYS,
+  type ReviewStats,
 } from "@/components/complaints/review-list";
 import { ReviewRoomsBoard } from "@/components/complaints/review-rooms-board";
 import { getMobileNavBadges } from "@/lib/nav-badges";
@@ -15,10 +16,15 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getDictionary } from "@/lib/i18n";
 import { getReviewSyncStatus } from "@/lib/beds24/reviews-sync-manual";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { listComplaints, canWriteComplaint, canModerateComplaints } from "@/lib/complaints";
+import { listComplaints, canWriteComplaint } from "@/lib/complaints";
+import { tokyoToday, ymdShift } from "@/lib/tokyo-date";
+import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
 import {
   listExternalReviewPage,
+  listExternalReviews,
+  listReviewBuildingOptions,
   summarizeReviewsByPlace,
+  type BuildingSummary,
   type ReviewListFilter,
   type ReviewProvider,
 } from "@/lib/external-reviews";
@@ -26,31 +32,33 @@ import {
 // 세션 쿠키를 읽어 어차피 동적이지만, «지금»(기본 기간 계산)에 의존하므로 명시한다.
 export const dynamic = "force-dynamic";
 
-/**
- * 문제 객실 뷰의 기본 기간 — 최근 90일(오늘 포함).
- *
- * **컴포넌트 밖에 두는 이유:** 렌더 본문에서 `Date.now()` 를 부르면 «순수하지 않은 호출»로
- * 걸린다. 어드민 컴플레인 페이지의 `defaultRange()` 도 같은 이유로 모듈 스코프에 있다.
- */
-function defaultRoomsRange(): { from: string; to: string } {
-  const now = new Date();
-  return {
-    to: now.toISOString().slice(0, 10),
-    from: new Date(now.getTime() - 89 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-  };
+/** 기본 기간 — 최근 90일(오늘 포함, 도쿄 날짜). 리뷰 · 건물 · 객실별 공통(PC 콘솔과 같다, 화이트 리디자인 2026-10-14). */
+function defaultRange(): { from: string; to: string } {
+  const to = tokyoToday();
+  return { from: ymdShift(to, -89), to };
 }
 
-/** 프리셋과 정확히 맞을 때만 기간 칩에 «90일» 처럼 일수로 표기한다. */
-function matchPresetDays(from: string | null, to: string | null): number | null {
-  if (!from || !to) return null;
-  const end = new Date(`${to}T00:00:00Z`).getTime();
-  const today = new Date().toISOString().slice(0, 10);
-  if (to !== today) return null;
-  return (
-    RANGE_PRESET_DAYS.find(
-      (days) => from === new Date(end - (days - 1) * 864e5).toISOString().slice(0, 10),
-    ) ?? null
-  );
+/** 프리셋과 정확히 맞을 때만 «최근 N일» 로 쓴다. */
+function matchPresetDays(from: string, to: string): number | null {
+  if (to !== tokyoToday()) return null;
+  return RANGE_PRESET_DAYS.find((days) => from === ymdShift(to, -(days - 1))) ?? null;
+}
+
+/** 기간 · 플랫폼 전체 평균 — 건물 집계를 리뷰 수로 가중(PC 콘솔과 같은 계산). */
+function statsOf(summaries: BuildingSummary[]): ReviewStats {
+  const of = (key: "airbnb" | "booking") => {
+    let sum = 0;
+    let n = 0;
+    for (const building of summaries) {
+      const stat = building[key];
+      if (stat.average !== null) {
+        sum += stat.average * stat.reviewCount;
+        n += stat.reviewCount;
+      }
+    }
+    return n ? sum / n : null;
+  };
+  return { airbnb: of("airbnb"), booking: of("booking"), risk: summaries.reduce((acc, b) => acc + b.riskCount, 0) };
 }
 
 type PageProps = {
@@ -59,21 +67,22 @@ type PageProps = {
     provider?: string;
     risk?: string;
     page?: string;
-    /** 객실 미연결 리뷰만 보기 (문제 객실 화면에서 넘어옴). */
+    /** 객실 미연결 리뷰만 보기. */
     unmapped?: string;
-    propertyId?: string;
+    /** 정규화 건물명 · 표시 객실 라벨(화이트 리디자인 2026-10-14). */
+    building?: string;
+    rl?: string;
+    /** 건물 · 객실별 집계 단위. */
+    by?: string;
     /** 포함 (YYYY-MM-DD) */
     from?: string;
     to?: string;
   }>;
 };
 
-// Complaints / 컴플레인 — 2뷰 진입점 (수동 컴플레인 / 외부 리뷰).
-// See docs/product/25-complaint-workflow.md, docs/product/16-mobile-navigation.md.
-//
-// 외부 리뷰 목록의 필터·페이지는 **전부 쿼리스트링**이다. 예전에는 서버가 최신 500건을 통째로
-// 내려보내고 클라이언트가 걸렀는데, 리뷰가 2,400건을 넘으면서 나머지가 화면에 존재하지도 않았고
-// 필터도 그 500건 안에서만 돌았다. 서버에서 필터·정렬·페이지를 끝내야 누락이 없다.
+// 게스트 피드백 — 보기 셋(외부 리뷰 / 수동 컴플레인 / 건물 · 객실별). 화이트 리디자인(2026-10-14, 시안 FB-Phone 외).
+// See docs/product/25-complaint-workflow.md → 「화이트 리디자인」, docs/product/16-mobile-navigation.md.
+// 외부 리뷰의 고르기 · 쪽은 전부 쿼리스트링이고 서버에서 거른다(누락 없음).
 export default async function MobileComplaintsPage({ searchParams }: PageProps) {
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
@@ -91,43 +100,38 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
     redirect("/mobile/unavailable");
   }
 
-  // 들어오면 **외부 리뷰**가 먼저 보인다(2026-10-01 사용자 요청 — 대시보드와 같다). 다른 뷰는 탭(`?view=`)으로.
-  const view =
-    params.view === "manual" || params.view === "rooms" ? params.view : "reviews";
+  const view = params.view === "manual" || params.view === "rooms" ? params.view : "reviews";
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
-  const navBadges = await getMobileNavBadges();
-
   const isDate = (v?: string) => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v));
-  const from = isDate(params.from) ? params.from! : null;
-  const to = isDate(params.to) ? params.to! : null;
-
+  const fallback = defaultRange();
+  const from = isDate(params.from) ? params.from! : fallback.from;
+  const to = isDate(params.to) ? params.to! : fallback.to;
   const rangeDays = matchPresetDays(from, to);
+  const canCreate = canWriteComplaint(session.user.role);
+
+  const [navBadges, complaints] = await Promise.all([getMobileNavBadges(), listComplaints({ session })]);
+  const openCount = complaints.filter((c) => c.status === "open").length;
+
+  const head = (baseParams: Record<string, string>, withRange: boolean) => (
+    <FeedbackHead
+      locale={locale}
+      view={view}
+      openCount={openCount}
+      canCreate={canCreate}
+      range={withRange ? { from, to, days: rangeDays } : null}
+      baseParams={baseParams}
+    />
+  );
 
   if (view === "rooms") {
-    // 집계는 어드민과 같은 함수를 쓴다 — 화면별 집계를 만들면 두 화면의 숫자가 갈라진다.
-    // 기간을 지정하지 않으면 최근 90일. 문제 객실은 «지금 문제인 방»을 보는 화면이라
-    // 전 기간 합계는 오히려 현재 상태를 가린다(외부 리뷰 목록의 기본값과 다른 이유다).
-    const fallback = defaultRoomsRange();
-    const rangeFrom = from ?? fallback.from;
-    const rangeTo = to ?? fallback.to;
-    const summaries = await summarizeReviewsByPlace({
-      session,
-      from: rangeFrom,
-      to: rangeTo,
-      locale,
-    });
+    const summaries = await summarizeReviewsByPlace({ session, from, to, locale });
+    const by = params.by === "room" ? "room" : "building";
     return (
       <MobileShell activeItem="complaints" badges={navBadges} title={dict.complaints.pageTitle} split>
         <SplitList detail="complaints">
-          <ComplaintViewTabs view={view} dict={dict} />
-          <ReviewRoomsBoard
-            locale={locale}
-            summaries={summaries}
-            from={rangeFrom}
-            to={rangeTo}
-            rangeDays={rangeDays ?? (from ? null : 90)}
-          />
+          {head(by === "room" ? { view, by } : { view }, true)}
+          <ReviewRoomsBoard locale={locale} summaries={summaries} from={from} to={to} by={by} />
         </SplitList>
       </MobileShell>
     );
@@ -138,48 +142,65 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
       params.provider === "airbnb" || params.provider === "booking" ? params.provider : undefined;
     const riskOnly = params.risk === "1";
     const page = Math.max(Number(params.page ?? "1") || 1, 1);
+    const canSync = canWriteComplaint(session.user.role);
+
+    const [buildingOptions, summaries, reviewSync] = await Promise.all([
+      listReviewBuildingOptions({ session, locale }),
+      summarizeReviewsByPlace({ session, from, to, locale }),
+      // 「지금 가져오기」 — 작성 권한자에게만(서버 액션이 같은 권한을 다시 본다).
+      canSync ? getReviewSyncStatus(getSupabaseServiceClient(), session.organization.id) : Promise.resolve(null),
+    ]);
+    const building = buildingOptions.find((option) => option.value === params.building?.trim()) ?? null;
+    const buildingSummary = building
+      ? summaries.find((summary) => getCanonicalPropertyName(summary.name) === building.value) ?? null
+      : null;
+    const roomOptions = buildingSummary ? buildingSummary.rooms.map((room) => room.name) : [];
+    const roomLabel = building && params.rl?.trim() && roomOptions.includes(params.rl.trim()) ? params.rl.trim() : null;
 
     const filter: ReviewListFilter = {
       provider,
       riskOnly,
       unmappedOnly: params.unmapped === "1",
-      propertyId: params.propertyId?.trim() || undefined,
-      from: from ?? undefined,
-      to: to ?? undefined,
+      propertyIds: building?.propertyIds,
+      from,
+      to,
     };
 
-    // 카운트 줄의 «문제 N» 은 현재 필터 안의 위험 건수다. `문제만` 이 켜져 있으면 전체가 곧
-    // 문제 건수라 추가 질의를 하지 않는다.
-    const canSync = canWriteComplaint(session.user.role);
-    const [{ rows, total }, riskPage, reviewSync] = await Promise.all([
-      listExternalReviewPage({ session, filter, page, pageSize: REVIEW_PAGE_SIZE }),
-      riskOnly
-        ? Promise.resolve(null)
-        : listExternalReviewPage({
-            session,
-            filter: { ...filter, riskOnly: true },
-            page: 1,
-            pageSize: 1,
-          }),
-      // 「지금 가져오기」 — 작성 권한자에게만(서버 액션이 같은 권한을 다시 본다).
-      canSync ? getReviewSyncStatus(getSupabaseServiceClient(), session.organization.id) : Promise.resolve(null),
-    ]);
+    // 객실은 표시 라벨로 거른다(같은 방을 두 Beds24 어카운트가 나눠 쓴다) — 건물을 고른 뒤라 건수가 작아 메모리에서 쪽을 나눈다.
+    let rows;
+    let total;
+    if (roomLabel) {
+      const all = (await listExternalReviews({ session, filter })).filter((review) => review.displayRoomLabel === roomLabel);
+      total = all.length;
+      rows = all.slice((page - 1) * REVIEW_PAGE_SIZE, page * REVIEW_PAGE_SIZE);
+    } else {
+      ({ rows, total } = await listExternalReviewPage({ session, filter, page, pageSize: REVIEW_PAGE_SIZE }));
+    }
+
+    const keep: Record<string, string> = { view };
+    if (provider) keep.provider = provider;
+    if (riskOnly) keep.risk = "1";
+    if (building) keep.building = building.value;
+    if (roomLabel) keep.rl = roomLabel;
 
     return (
       <MobileShell activeItem="complaints" badges={navBadges} title={dict.complaints.pageTitle} split>
         <SplitList detail="complaints">
-          <ComplaintViewTabs view={view} dict={dict} />
+          {head(keep, true)}
           <ReviewList
             locale={locale}
             reviews={rows}
             total={total}
-            riskTotal={riskOnly ? total : (riskPage?.total ?? 0)}
             page={page}
             provider={provider ?? "all"}
             riskOnly={riskOnly}
             from={from}
             to={to}
-            rangeDays={rangeDays}
+            building={building?.value ?? null}
+            roomLabel={roomLabel}
+            buildingOptions={buildingOptions.map(({ value, label }) => ({ value, label }))}
+            roomOptions={roomOptions}
+            stats={statsOf(summaries)}
             reviewSync={reviewSync}
           />
         </SplitList>
@@ -187,18 +208,11 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
     );
   }
 
-  const complaints = await listComplaints({ session });
   return (
     <MobileShell activeItem="complaints" badges={navBadges} title={dict.complaints.pageTitle} split>
       <SplitList detail="complaints">
-        <ComplaintViewTabs view={view} dict={dict} />
-        <ComplaintList
-          locale={locale}
-          complaints={complaints}
-          canCreate={canWriteComplaint(session.user.role)}
-          currentUserId={session.user.id}
-          canModerate={canModerateComplaints(session.user.role)}
-        />
+        {head({ view }, false)}
+        <ComplaintList locale={locale} complaints={complaints} />
       </SplitList>
     </MobileShell>
   );

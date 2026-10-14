@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { haptic } from "@/lib/haptics";
 
 type InviteCopyButtonProps = {
   code: string;
@@ -9,9 +10,8 @@ type InviteCopyButtonProps = {
 };
 
 /**
- * Copies an invite code to the clipboard. Mirrors the small `.ui-btn--sm` secondary style used by the
- * other invite-card controls, and shows a transient "copied" (or "failed") state for ~1.6s. Uses the
- * async Clipboard API with a legacy `execCommand` fallback for non-secure contexts.
+ * 초대코드 복사 — 화이트 리디자인(2026-10-14, 시안 Invite-PC): 아이콘 버튼(툴팁 · aria-label).
+ * 복사되면 그 자리가 「✓ 복사됨」(체크 그리기)으로 1.6초 바뀐다. 보안 컨텍스트가 아니면 execCommand 로 대신한다.
  */
 export function InviteCopyButton({ code, labels }: InviteCopyButtonProps) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
@@ -35,22 +35,22 @@ export function InviteCopyButton({ code, labels }: InviteCopyButtonProps) {
     } catch {
       ok = false;
     }
+    haptic(ok ? "success" : "error");
     setState(ok ? "copied" : "failed");
     window.setTimeout(() => setState("idle"), 1600);
   }
 
+  if (state !== "idle") {
+    return (
+      <span className="usi-copied" role="status" style={state === "failed" ? { color: "#c5282e" } : undefined}>
+        {state === "copied" ? <Check aria-hidden="true" strokeWidth={2.4} /> : null}
+        {state === "copied" ? labels.copied : labels.failed}
+      </span>
+    );
+  }
   return (
-    <button
-      type="button"
-      className="ui-btn ui-btn--secondary ui-btn--sm"
-      onClick={copy}
-    >
-      <span className="ic">{state === "copied" ? <Check /> : <Copy />}</span>
-      {state === "copied"
-        ? labels.copied
-        : state === "failed"
-          ? labels.failed
-          : labels.copy}
+    <button type="button" className="usi-ib" onClick={copy} aria-label={labels.copy} title={labels.copy}>
+      <Copy aria-hidden="true" />
     </button>
   );
 }

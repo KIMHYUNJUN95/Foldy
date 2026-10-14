@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { hasPermissionOverride } from "@/lib/permission-overrides-server";
-import { Ticket } from "lucide-react";
+import { Ban, RotateCcw } from "lucide-react";
 import {
   activateInviteCode,
   createInviteCode,
@@ -11,7 +11,7 @@ import { InviteDeleteButton } from "@/components/admin/users/invite-delete-butto
 import { AdminShell } from "@/components/shell/admin-shell";
 import { InviteCreateForm } from "@/components/admin/users/invite-create-form";
 import { UsersSectionTabs } from "@/components/admin/users/users-section-tabs";
-import "@/components/admin/users-console.css";
+import "@/components/admin/users/users-white.css";
 import type { OrganizationRole } from "@/config/roles";
 import { officeAdminAssignableRoles } from "@/config/roles";
 import { getDictionary } from "@/lib/i18n";
@@ -45,6 +45,11 @@ const inviteDefaultRoles = [
   "office_admin",
   "field_manager",
 ] as const satisfies readonly OrganizationRole[];
+
+/** 렌더 밖에서 읽는 지금 시각 — 코드 상태(만료) 판정용. */
+function nowMs() {
+  return Date.now();
+}
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -156,149 +161,181 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
   const deleted = firstParam(params.deleted) === "1";
   const errorKey = firstParam(params.error);
 
+  const localeTag = session.user.preferredLanguage;
+  const now = nowMs();
+  const thisYear = today.slice(0, 4);
+  // 올해가 아니면 연도까지 — 「1월 1일까지」가 내년인지 지난해인지 헷갈리지 않게.
+  const dayText = (iso: string) =>
+    new Intl.DateTimeFormat(localeTag, {
+      timeZone: "Asia/Tokyo",
+      ...(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }).slice(0, 4) === thisYear ? {} : { year: "numeric" }),
+      month: "long",
+      day: "numeric",
+    }).format(new Date(iso));
+  // 코드 하나의 상태 — 쓸 수 있음 / 꺼 둠 / 다 씀 / 만료. 끝난 코드는 회색 줄로 내린다.
+  const rows = inviteCodes.map((invite) => {
+    const expired = Boolean(invite.expires_at) && new Date(invite.expires_at as string).getTime() <= now;
+    const usedUp = invite.used_count >= invite.max_uses;
+    const state = !invite.is_active ? "off" : usedUp ? "used" : expired ? "expired" : "live";
+    const until =
+      state === "off"
+        ? tabs.wInvOff
+        : state === "used"
+          ? tabs.wInvUsedUp
+          : state === "expired"
+            ? tabs.wInvExpired.replace("{date}", dayText(invite.expires_at as string))
+            : invite.expires_at
+              ? tabs.wInvUntil.replace("{date}", dayText(invite.expires_at))
+              : "—";
+    return { invite, state, until };
+  });
+  const liveCount = rows.filter((row) => row.state === "live").length;
+  // 탭 숫자 — 멤버 목록 탭과 같은 기준(이 조직의 멤버십 수).
+  const { count: memberCount } =
+    session.organization.id === "platform"
+      ? { count: null }
+      : await getSupabaseServiceClient()
+          .from("memberships")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", session.organization.id);
+  const flash = created
+    ? settings.success.inviteCreated
+    : deactivated
+      ? settings.success.inviteDeactivated
+      : activated
+        ? settings.success.inviteActivated
+        : deleted
+          ? settings.success.inviteDeleted
+          : null;
+
   return (
     <AdminShell activeItem="users" title={settings.inviteCodesTitle}>
-      <UsersSectionTabs
-        active="invites"
-        labels={{ members: tabs.tabMembers, invites: tabs.tabInvites }}
-      />
-
-      <div className="mt-2 grid gap-6 xl:grid-cols-[minmax(0,520px)_1fr]">
-        <section className="ui-card p5">
-          <Ticket className="size-6 text-primary" aria-hidden="true" />
-          <h2 className="ctitle" style={{ marginTop: 18, fontSize: 18 }}>
-            {settings.createInvite}
-          </h2>
-          <p className="chint" style={{ marginTop: 6 }}>
-            {settings.inviteCodesDescription}
-          </p>
-
-          {(created || deactivated || activated || deleted || errorKey) && (
-            <div className="ui-banner" style={{ marginTop: 16 }}>
-              {created && settings.success.inviteCreated}
-              {deactivated && settings.success.inviteDeactivated}
-              {activated && settings.success.inviteActivated}
-              {deleted && settings.success.inviteDeleted}
-              {errorKey &&
-                (settings.errors[errorKey] ?? settings.errors.save_failed)}
+      {/* 화이트 리디자인(2026-10-14, 시안 Invite-PC): 상자 없이 왼쪽 새 코드 폼 · 오른쪽 코드 표. */}
+      <div className="usi">
+        <UsersSectionTabs
+          active="invites"
+          labels={{ members: tabs.tabMembers, invites: tabs.tabInvites }}
+          counts={{ members: memberCount ?? undefined, invites: liveCount }}
+        />
+        <div className="usi-grid">
+          <section aria-labelledby="usi-new">
+            <div className="usi-h">
+              <b id="usi-new">{tabs.wInvNew}</b>
+              <span>{tabs.wInvNewHint}</span>
             </div>
-          )}
+            {flash || errorKey ? (
+              <p className={`usi-msg${errorKey ? " is-bad" : ""}`} role="status">
+                {errorKey ? (settings.errors[errorKey] ?? settings.errors.save_failed) : flash}
+              </p>
+            ) : null}
+            <InviteCreateForm
+              action={createInviteCode}
+              organizations={organizations.map((organization) => ({
+                id: organization.id,
+                name: organization.name,
+                codeSource: organization.slug || organization.name,
+              }))}
+              roles={selectableDefaultRoles.map((role) => ({
+                value: role,
+                label: dictionary.roles[role],
+              }))}
+              today={today}
+              defaultExpiresAt={defaultInviteExpiry(today)}
+              defaultCode={defaultCode}
+              defaultMaxUses={DEFAULT_INVITE_MAX_USES}
+              localeTag={localeTag}
+              copy={{
+                organization: settings.organization,
+                role: settings.inviteRole,
+                advanced: tabs.wInvAdvanced,
+                advancedClose: tabs.wInvAdvancedClose,
+                regenerate: settings.inviteRegenerate,
+                autoName: settings.inviteAutoName,
+                nameLabel: tabs.wInvColName,
+                codeLabel: tabs.wInvColCode,
+                expiresLabel: settings.expiresAt,
+                maxUsesLabel: settings.maxUses,
+                submit: tabs.wInvCreate,
+                datePlaceholder: tabs.datePlaceholder,
+                datePrev: tabs.datePrev,
+                dateNext: tabs.dateNext,
+                dateToday: tabs.dateToday,
+                days: tabs.wInvDays,
+                times: tabs.wInvTimes,
+              }}
+            />
+          </section>
 
-          <InviteCreateForm
-            action={createInviteCode}
-            organizations={organizations.map((organization) => ({
-              id: organization.id,
-              name: organization.name,
-              codeSource: organization.slug || organization.name,
-            }))}
-            roles={selectableDefaultRoles.map((role) => ({
-              value: role,
-              label: dictionary.roles[role],
-            }))}
-            today={today}
-            defaultExpiresAt={defaultInviteExpiry(today)}
-            defaultCode={defaultCode}
-            defaultMaxUses={DEFAULT_INVITE_MAX_USES}
-            localeTag={session.user.preferredLanguage}
-            copy={{
-              organization: settings.organization,
-              role: settings.inviteRole,
-              autoHint: settings.inviteAutoHint,
-              advanced: settings.inviteAdvanced,
-              regenerate: settings.inviteRegenerate,
-              autoName: settings.inviteAutoName,
-              nameLabel: settings.inviteCodeName,
-              codeLabel: settings.inviteCode,
-              expiresLabel: settings.expiresAt,
-              maxUsesLabel: settings.maxUses,
-              submit: settings.create,
-              datePlaceholder: tabs.datePlaceholder,
-              datePrev: tabs.datePrev,
-              dateNext: tabs.dateNext,
-              dateToday: tabs.dateToday,
-            }}
-          />
-        </section>
-
-        <section className="ui-card p5">
-          <h3 className="ctitle" style={{ fontSize: 18 }}>
-            {settings.inviteCodesTitle}
-          </h3>
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-            {inviteCodes.length === 0 && <p className="chint">{settings.emptyInvites}</p>}
-
-            {inviteCodes.map((inviteCode) => (
-              <div
-                key={inviteCode.id}
-                style={{
-                  borderRadius: 14,
-                  border: "1px solid var(--ui-border)",
-                  padding: 16,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-                  <div>
-                    <p style={{ fontWeight: 900, color: "var(--ui-fg)" }}>{inviteCode.code}</p>
-                    <p className="chint" style={{ marginTop: 4 }}>
-                      {inviteCode.name} /{" "}
-                      {organizationNames.get(inviteCode.organization_id) ?? ""}
-                    </p>
-                    <p className="chint" style={{ marginTop: 4 }}>
-                      {dictionary.roles[inviteCode.default_role]} /{" "}
-                      {inviteCode.used_count}/{inviteCode.max_uses}
-                    </p>
-                  </div>
-                  <span
-                    className={`ui-badge ui-badge--${inviteCode.is_active ? "green" : "muted"}`}
-                    style={{ flexShrink: 0 }}
-                  >
-                    {inviteCode.is_active
-                      ? dictionary.common.active
-                      : dictionary.common.inactive}
+          <section aria-labelledby="usi-codes">
+            <div className="usi-h" style={{ flexDirection: "row", alignItems: "baseline", gap: 10, padding: "0 12px" }}>
+              <b id="usi-codes">{tabs.wInvCodes}</b>
+              <span className="num">
+                {tabs.wInvSummary.replace("{a}", String(liveCount)).replace("{b}", String(rows.length - liveCount))}
+              </span>
+            </div>
+            <div className="usi-th" aria-hidden="true">
+              <span>{tabs.wInvColCode}</span>
+              <span>{tabs.wInvColName}</span>
+              <span>{tabs.wInvColRole}</span>
+              <span>{tabs.wInvColUse}</span>
+              <span>{tabs.wInvColUntil}</span>
+              <span />
+            </div>
+            {rows.length === 0 ? <p className="usi-empty">{tabs.wInvEmpty}</p> : null}
+            <div className="usi-rows">
+              {rows.map(({ invite, state, until }) => (
+                <div key={invite.id} className={`usi-tr${state === "live" ? "" : " is-dead"}`}>
+                  <span className="usi-code">{invite.code}</span>
+                  <span title={organizationNames.size > 1 ? organizationNames.get(invite.organization_id) : undefined}>{invite.name}</span>
+                  <span>{dictionary.roles[invite.default_role]}</span>
+                  <span className="usi-use">
+                    <span className="usi-bar">
+                      <i style={{ width: `${Math.min(100, Math.round((invite.used_count / Math.max(invite.max_uses, 1)) * 100))}%` }} />
+                    </span>
+                    <small className="num">
+                      {invite.used_count} / {invite.max_uses}
+                    </small>
+                  </span>
+                  <span className="num">{until}</span>
+                  <span className="usi-acts">
+                    {state === "live" ? (
+                      <InviteCopyButton
+                        code={invite.code}
+                        labels={{ copy: tabs.wInvCopy, copied: tabs.wInvCopied, failed: tabs.wInvCopyFailed }}
+                      />
+                    ) : null}
+                    {state === "live" || state === "off" ? (
+                      <form action={invite.is_active ? deactivateInviteCode : activateInviteCode}>
+                        <input name="inviteCodeId" type="hidden" value={invite.id} />
+                        <input name="organizationId" type="hidden" value={invite.organization_id} />
+                        <button
+                          type="submit"
+                          className="usi-ib"
+                          aria-label={invite.is_active ? tabs.wInvTurnOff : tabs.wInvTurnOn}
+                          title={invite.is_active ? tabs.wInvTurnOff : tabs.wInvTurnOn}
+                        >
+                          {invite.is_active ? <Ban aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
+                        </button>
+                      </form>
+                    ) : null}
+                    <InviteDeleteButton
+                      inviteCodeId={invite.id}
+                      organizationId={invite.organization_id}
+                      labels={{
+                        aria: tabs.wInvDelete,
+                        title: tabs.wInvDeleteTitle,
+                        summary: `${invite.code} · ${invite.name}`,
+                        body: tabs.wInvDeleteBody,
+                        keep: tabs.wKeep,
+                        confirm: tabs.deleteBtn,
+                      }}
+                    />
                   </span>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 8,
-                    marginTop: 12,
-                  }}
-                >
-                  <InviteCopyButton
-                    code={inviteCode.code}
-                    labels={{
-                      copy: settings.copyCode,
-                      copied: settings.copiedCode,
-                      failed: settings.copyFailed,
-                    }}
-                  />
-                  <form action={inviteCode.is_active ? deactivateInviteCode : activateInviteCode}>
-                    <input name="inviteCodeId" type="hidden" value={inviteCode.id} />
-                    <input
-                      name="organizationId"
-                      type="hidden"
-                      value={inviteCode.organization_id}
-                    />
-                    <button type="submit" className="ui-btn ui-btn--secondary ui-btn--sm">
-                      {inviteCode.is_active ? settings.deactivate : settings.activate}
-                    </button>
-                  </form>
-                  <InviteDeleteButton
-                    inviteCodeId={inviteCode.id}
-                    organizationId={inviteCode.organization_id}
-                    labels={{
-                      delete: tabs.deleteBtn,
-                      cancel: tabs.cancel,
-                      confirm: settings.inviteDeleteConfirm,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </AdminShell>
   );

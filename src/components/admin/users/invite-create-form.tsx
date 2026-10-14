@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { buildInviteName, generateInviteCode } from "@/lib/invite-code-gen";
@@ -16,7 +16,7 @@ export type InviteCreateOrganization = {
 export type InviteCreateFormCopy = {
   organization: string;
   role: string;
-  autoHint: string;
+  autoHint?: string;
   advanced: string;
   regenerate: string;
   autoName: string;
@@ -29,6 +29,11 @@ export type InviteCreateFormCopy = {
   datePrev: string;
   dateNext: string;
   dateToday: string;
+  advancedClose: string;
+  /** 「{n}일」 */
+  days: string;
+  /** 「{n}회」 */
+  times: string;
 };
 
 type InviteCreateFormProps = {
@@ -93,54 +98,44 @@ export function InviteCreateForm({
     regenerateCode(nextId);
   }
 
+  const expiresDays = Math.max(
+    0,
+    Math.round((Date.parse(`${expiresAt}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000),
+  );
+  const expiresText = expiresAt
+    ? `${new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`))} (${copy.days.replace("{n}", String(expiresDays))})`
+    : "—";
+
+  // 화이트 리디자인(2026-10-14, 시안 Invite-PC): 이름표 칸 둘(조직 · 역할) → 자동으로 채운 값 요약 → 「세부 설정 바꾸기」로 펼쳐 덮어쓰기.
   return (
-    <form
-      action={action}
-      style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 12 }}
-    >
+    <form action={action} className="usi-form">
       <input type="hidden" name="organizationId" value={organizationId} />
-      <AdmDropdown
-        options={organizations.map((organization) => ({
-          value: organization.id,
-          label: organization.name,
-        }))}
-        value={organizationId}
-        onChange={handleOrganizationChange}
-        placeholder={copy.organization}
-        ariaLabel={copy.organization}
-      />
+      <div className="usi-fd">
+        <span className="usi-fd__l" aria-hidden="true">{copy.organization}</span>
+        <AdmDropdown
+          options={organizations.map((organization) => ({
+            value: organization.id,
+            label: organization.name,
+          }))}
+          value={organizationId}
+          onChange={handleOrganizationChange}
+          placeholder={copy.organization}
+          ariaLabel={copy.organization}
+        />
+      </div>
 
       <input type="hidden" name="defaultRole" value={role} />
-      <AdmDropdown
-        options={roles}
-        value={role}
-        onChange={setRole}
-        placeholder={copy.role}
-        ariaLabel={copy.role}
-      />
+      <div className="usi-fd">
+        <span className="usi-fd__l" aria-hidden="true">{copy.role}</span>
+        <AdmDropdown options={roles} value={role} onChange={setRole} placeholder={copy.role} ariaLabel={copy.role} />
+      </div>
 
-      <p className="chint">{copy.autoHint}</p>
-
-      <button
-        type="button"
-        className={`invf__toggle${advancedOpen ? " is-open" : ""}`}
-        aria-expanded={advancedOpen}
-        onClick={() => setAdvancedOpen((open) => !open)}
-      >
-        <ChevronDown className="size-4" aria-hidden="true" />
-        {copy.advanced}
-      </button>
-
-      {/*
-        닫혀 있을 때도 값은 hidden 으로 실어 보낸다. 자동 생성값이 서버로 가지 않으면 서버가 다시
-        뽑게 되는데, 그러면 화면에 미리 보여준 코드와 실제로 만들어진 코드가 달라진다.
-      */}
       {advancedOpen ? (
-        <div className="invf__adv">
-          <label className="invf__row">
-            <span className="invf__label">{copy.nameLabel}</span>
+        <div className="usi-form" style={{ paddingTop: 12, borderTop: "1px solid #f1f1f4" }}>
+          <div className="usi-fd">
+            <label htmlFor="usi-name">{copy.nameLabel}</label>
             <input
-              className="ui-input"
+              id="usi-name"
               name="name"
               value={nameValue}
               onChange={(event) => {
@@ -148,33 +143,18 @@ export function InviteCreateForm({
                 setName(event.target.value);
               }}
               placeholder={autoName}
+              autoComplete="off"
             />
-          </label>
-
-          <label className="invf__row">
-            <span className="invf__label">{copy.codeLabel}</span>
-            <div className="invf__code">
-              <input
-                className="ui-input"
-                name="code"
-                value={code}
-                spellCheck={false}
-                onChange={(event) => setCode(event.target.value)}
-              />
-              <button
-                type="button"
-                className="ui-btn ui-btn--secondary ui-btn--sm invf__regen"
-                onClick={() => regenerateCode()}
-                title={copy.regenerate}
-                aria-label={copy.regenerate}
-              >
-                <RefreshCw className="size-4" aria-hidden="true" />
-              </button>
-            </div>
-          </label>
-
-          <label className="invf__row">
-            <span className="invf__label">{copy.expiresLabel}</span>
+          </div>
+          <div className="usi-fd" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <label htmlFor="usi-code">{copy.codeLabel}</label>
+            <input id="usi-code" name="code" value={code} spellCheck={false} autoComplete="off" onChange={(event) => setCode(event.target.value)} />
+            <button type="button" className="usi-regen" onClick={() => regenerateCode()} title={copy.regenerate} aria-label={copy.regenerate}>
+              <RefreshCw aria-hidden="true" />
+            </button>
+          </div>
+          <div className="usi-fd">
+            <span className="usi-fd__l" aria-hidden="true">{copy.expiresLabel}</span>
             <AdminDatePicker
               value={expiresAt}
               onChange={setExpiresAt}
@@ -188,31 +168,51 @@ export function InviteCreateForm({
                 today: copy.dateToday,
               }}
             />
-          </label>
-
-          <label className="invf__row">
-            <span className="invf__label">{copy.maxUsesLabel}</span>
-            <input
-              className="ui-input"
-              min={1}
-              type="number"
-              value={maxUses}
-              onChange={(event) => setMaxUses(event.target.value)}
-            />
-          </label>
+          </div>
+          <div className="usi-fd">
+            <label htmlFor="usi-max">{copy.maxUsesLabel}</label>
+            <input id="usi-max" min={1} type="number" inputMode="numeric" value={maxUses} onChange={(event) => setMaxUses(event.target.value)} />
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <dl className="usi-sum" style={{ margin: 0 }}>
+          <div>
+            <dt>{copy.codeLabel}</dt>
+            <dd>
+              <span className="usi-code">{code}</span>
+              <button type="button" className="usi-regen" onClick={() => regenerateCode()} title={copy.regenerate} aria-label={copy.regenerate}>
+                <RefreshCw aria-hidden="true" />
+              </button>
+            </dd>
+          </div>
+          <div>
+            <dt>{copy.nameLabel}</dt>
+            <dd>{nameValue}</dd>
+          </div>
+          <div>
+            <dt>{copy.expiresLabel}</dt>
+            <dd className="num">{expiresText}</dd>
+          </div>
+          <div>
+            <dt>{copy.maxUsesLabel}</dt>
+            <dd className="num">{copy.times.replace("{n}", maxUses)}</dd>
+          </div>
+        </dl>
+      )}
+      <button type="button" className="usw-link" style={{ alignSelf: "flex-start", padding: 0 }} aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((open) => !open)}>
+        {advancedOpen ? copy.advancedClose : copy.advanced}
+      </button>
 
+      {/*
+        닫혀 있을 때도 값은 hidden 으로 실어 보낸다. 자동 생성값이 서버로 가지 않으면 서버가 다시
+        뽑게 되는데, 그러면 화면에 미리 보여준 코드와 실제로 만들어진 코드가 달라진다.
+      */}
       {!advancedOpen && <input type="hidden" name="name" value={nameValue} />}
       {!advancedOpen && <input type="hidden" name="code" value={code} />}
       <input type="hidden" name="expiresAt" value={expiresAt} />
       <input type="hidden" name="maxUses" value={maxUses} />
 
-      <button
-        className="ui-btn ui-btn--primary fw-black"
-        disabled={organizations.length === 0}
-        type="submit"
-      >
+      <button className="usi-submit" disabled={organizations.length === 0} type="submit">
         {copy.submit}
       </button>
     </form>

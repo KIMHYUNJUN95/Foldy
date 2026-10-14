@@ -1,64 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { deleteInviteCode } from "@/app/admin/settings/actions";
 
 type InviteDeleteButtonProps = {
   inviteCodeId: string;
   organizationId: string;
-  labels: { delete: string; cancel: string; confirm: string };
+  labels: { aria: string; title: string; summary: string; body: string; keep: string; confirm: string };
 };
 
 /**
- * Invite-code delete control. Mirrors the users-console `.ovconfirm` inline confirm pattern (same as
- * the guarded member delete): a destructive button that expands into a confirm strip before submitting
- * the `deleteInviteCode` server action. Hard delete — members who already joined keep their memberships.
+ * 초대코드 삭제 — 화이트 리디자인(2026-10-14): 휴지통 아이콘 → 가운데 확인 창(그대로 두기 / 삭제).
+ * 하드 삭제지만 이미 가입한 멤버의 멤버십은 그대로 남는다.
  */
-export function InviteDeleteButton({
-  inviteCodeId,
-  organizationId,
-  labels,
-}: InviteDeleteButtonProps) {
-  const [confirming, setConfirming] = useState(false);
+export function InviteDeleteButton({ inviteCodeId, organizationId, labels }: InviteDeleteButtonProps) {
+  const [open, setOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const keepRef = useRef<HTMLButtonElement>(null);
 
-  if (confirming) {
-    return (
-      <div className="ovconfirm">
-        <span className="ovconfirm__t">{labels.confirm}</span>
-        <div className="ovconfirm__act">
-          <button
-            type="button"
-            className="ui-btn ui-btn--secondary ui-btn--sm"
-            onClick={() => setConfirming(false)}
-          >
-            {labels.cancel}
-          </button>
-          <form action={deleteInviteCode}>
-            <input name="inviteCodeId" type="hidden" value={inviteCodeId} />
-            <input name="organizationId" type="hidden" value={organizationId} />
-            <button type="submit" className="ui-btn ui-btn--destructive ui-btn--sm">
-              <span className="ic">
-                <Trash2 />
-              </span>
-              {labels.delete}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!open) return;
+    keepRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
-    <button
-      type="button"
-      className="ui-btn ui-btn--destructive ui-btn--sm"
-      onClick={() => setConfirming(true)}
-    >
-      <span className="ic">
-        <Trash2 />
-      </span>
-      {labels.delete}
-    </button>
+    <>
+      <button type="button" className="usi-ib is-danger" aria-label={labels.aria} title={labels.aria} onClick={() => setOpen(true)}>
+        <Trash2 aria-hidden="true" />
+      </button>
+      {open ? (
+        <>
+          <div className="modal-scrim on usw-scrim" onClick={sending ? undefined : () => setOpen(false)} />
+          <form action={deleteInviteCode} onSubmit={() => setSending(true)} className="modal on usw-modal" role="dialog" aria-modal="true" aria-labelledby={`usi-del-${inviteCodeId}`}>
+            <input name="inviteCodeId" type="hidden" value={inviteCodeId} />
+            <input name="organizationId" type="hidden" value={organizationId} />
+            <div className="usw-modal__h">
+              <h2 id={`usi-del-${inviteCodeId}`}>{labels.title}</h2>
+              <span>{labels.summary}</span>
+            </div>
+            <p className="usw-modal__b">{labels.body}</p>
+            <div className="usw-modal__f">
+              <button ref={keepRef} type="button" className="usw-btn is-gray" disabled={sending} onClick={() => setOpen(false)}>
+                {labels.keep}
+              </button>
+              <button type="submit" className="usw-btn is-danger" disabled={sending}>
+                {labels.confirm}
+              </button>
+            </div>
+          </form>
+        </>
+      ) : null}
+    </>
   );
 }

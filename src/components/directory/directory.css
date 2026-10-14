@@ -1,0 +1,80 @@
+/* 직원 목록 — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet).
+   흰 바탕 · 상자 없음 · 선택은 옅은 보라 바탕만. 움직임: 줄 차례 등장 · 전화 버튼 누름(살짝 작아짐 + 진동) ·
+   번호 복사됨 체크 그리기 · 프로필 칸 흐림 → 선명. reduced-motion 이면 끈다. */
+.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: #9a97a6; --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f1fd; --drw-line: #f3f3f6; color: var(--drw-ink); }
+.drw .num { font-variant-numeric: tabular-nums; }
+.drw-list { display: flex; flex-direction: column; min-width: 0; padding-bottom: 24px; }
+.drw-h { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.drw-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.drw-h > span { font-size: 13px; color: var(--drw-soft); }
+.drw-search { display: flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 8px 0 14px; border-radius: 12px; background: #f4f4f7; color: #8b8898; }
+.drw-search:focus-within { box-shadow: 0 0 0 2px var(--drw-pri); }
+.drw-search > svg { width: 16px; height: 16px; flex: none; }
+.drw-search input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--drw-ink); outline: none; }
+.drw-search input::-webkit-search-cancel-button { display: none; }
+.drw-search button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--drw-soft); }
+.drw-search button svg { width: 15px; height: 15px; }
+.drw-g { display: flex; flex-direction: column; }
+.drw-gl { margin: 0; padding: 18px 0 4px; font-size: 12px; font-weight: 600; color: var(--drw-soft); }
+.drw-gl b { margin-left: 4px; font-weight: 500; color: var(--drw-faint); }
+.drw-r { display: flex; align-items: center; gap: 12px; min-height: 64px; border-top: 1px solid var(--drw-line); animation: drw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
+.drw-gl + .drw-r { border-top-color: transparent; }
+.drw-r:nth-of-type(2) { animation-delay: 30ms; }
+.drw-r:nth-of-type(3) { animation-delay: 60ms; }
+.drw-r:nth-of-type(n + 4) { animation-delay: 90ms; }
+@keyframes drw-in { from { opacity: 0; transform: translateY(4px); } }
+.drw-r__main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; }
+.drw-av { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--drw-tint); color: var(--drw-pri-ink); font-size: 15px; font-weight: 700; }
+.drw-av.is-lg { width: 56px; height: 56px; font-size: 21px; }
+.drw-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.drw-t b { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drw-t > span { font-size: 13px; color: var(--drw-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drw-me { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: var(--drw-tint); font-size: 11px; font-weight: 600; color: var(--drw-pri-ink); vertical-align: 2px; }
+.drw-ph { display: none; }
+.drw-call { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--drw-tint); color: var(--drw-pri-ink); transition: transform 140ms ease, background 150ms ease; -webkit-tap-highlight-color: transparent; }
+.drw-call svg { width: 18px; height: 18px; }
+.drw-call:active, .drw-call.is-press { transform: scale(.94); background: #e6ddfb; }
+.drw-call:focus-visible, .drw-r__main:focus-visible, .drw-btn:focus-visible { outline: 2px solid var(--drw-pri); outline-offset: 2px; }
+.drw-call-gap { width: 44px; flex: none; }
+.drw-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 16px; font-size: 14px; color: var(--drw-soft); }
+.drw-empty svg { width: 28px; height: 28px; color: var(--drw-faint); }
+
+/* 폴드(≥ 600px): 한 줄에 이름 · 역할 | 번호 | 전화 — 2열로 쪼개면 번호가 꺾인다. */
+@media (min-width: 600px) {
+  .drw-h h1 { font-size: 26px; }
+  .drw-subph { display: none; }
+  .drw-ph { display: block; width: 136px; flex: none; font-size: 14px; color: #3a3746; }
+  .drw-ph.is-none { color: var(--drw-faint); }
+}
+
+/* 태블릿 가로: 목록 380px + 오른쪽 프로필 칸. */
+.drw.is-tablet { display: grid; grid-template-columns: 380px minmax(0, 1fr); column-gap: 40px; align-items: start; min-height: 100%; }
+.drw.is-tablet .drw-subph { display: inline; }
+.drw.is-tablet .drw-ph { display: none; }
+.drw.is-tablet .drw-r { margin: 0 -10px; padding: 0 10px; }
+.drw.is-tablet .drw-r.on { border-radius: 12px; background: var(--drw-sel); border-top-color: transparent; }
+.drw.is-tablet .drw-r.on + .drw-r { border-top-color: transparent; }
+.drw-pane { position: sticky; top: 24px; padding-top: 8px; }
+.drw-hint { margin: 64px 0 0; font-size: 14px; color: var(--drw-soft); }
+.drw-prof { display: flex; flex-direction: column; gap: 22px; max-width: 440px; animation: drw-clear 240ms ease both; }
+@keyframes drw-clear { from { opacity: .3; filter: blur(2px); } }
+.drw-prof__h { display: flex; align-items: center; gap: 14px; }
+.drw-prof__h h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.drw-prof__h div > span { font-size: 14px; color: var(--drw-soft); }
+.drw-prof__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.drw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; font-size: 15px; font-weight: 600; color: #3a3746; text-decoration: none; transition: transform 140ms ease, background 150ms ease; }
+.drw-btn svg { width: 18px; height: 18px; }
+.drw-btn:active { transform: scale(.98); }
+.drw-btn.is-pri { background: var(--drw-pri); color: #fff; }
+.drw-btn.is-done { color: #1f7a4d; }
+.drw-btn.is-done svg path, .drw-btn.is-done svg polyline { stroke-dasharray: 24; animation: drw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes drw-draw { from { stroke-dashoffset: 24; } }
+.drw-btn.is-bad { color: #c5282e; }
+.drw-dl { margin: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 14px; padding-top: 20px; border-top: 1px solid #f1f1f4; font-size: 14px; }
+.drw-dl dt { color: var(--drw-soft); }
+.drw-dl dd { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .drw-r, .drw-prof, .drw-btn.is-done svg path, .drw-btn.is-done svg polyline { animation: none; }
+  .drw-call, .drw-btn { transition: none; }
+}

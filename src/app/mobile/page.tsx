@@ -40,6 +40,8 @@ import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@
 import type { Dictionary, Locale } from "@/lib/i18n";
 import "@/components/mobile/home-screen.css";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
+import { AppSplash } from "@/components/mobile/app-splash";
+import { FoldyLoader } from "@/components/shared/foldy-loader";
 
 type QuickActionItem = {
   colorClass: "a" | "b" | "c" | "d";
@@ -420,28 +422,6 @@ async function HomeBody({
   );
 }
 
-/** Lightweight skeleton shown while HomeBody streams in — reserves the section shapes to avoid
- *  a big layout jump when the real content arrives. Pure Tailwind (animate-pulse), no new CSS. */
-function HomeBodySkeleton() {
-  return (
-    <div aria-hidden="true" className="animate-pulse space-y-4 pt-1">
-      <div className="h-40 rounded-[26px] bg-slate-200/70" />
-      <div className="h-20 rounded-2xl bg-slate-200/55" />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="h-24 rounded-2xl bg-slate-200/55" />
-        <div className="h-24 rounded-2xl bg-slate-200/55" />
-      </div>
-      <div className="h-16 rounded-2xl bg-slate-200/55" />
-      <div className="grid grid-cols-4 gap-2">
-        <div className="h-16 rounded-2xl bg-slate-200/55" />
-        <div className="h-16 rounded-2xl bg-slate-200/55" />
-        <div className="h-16 rounded-2xl bg-slate-200/55" />
-        <div className="h-16 rounded-2xl bg-slate-200/55" />
-      </div>
-      <div className="h-24 rounded-2xl bg-slate-200/55" />
-    </div>
-  );
-}
 
 export default async function MobileHomePage() {
   const session = await getCurrentAppSession();
@@ -467,6 +447,8 @@ export default async function MobileHomePage() {
     // 넓은 화면(폴드 · 태블릿)은 카드를 열로 나눠 쓴다(`home-screen.css` `.hm__grid` — 2026-10-05 시안 6b · 6c).
     <MobileShell activeItem="home" badges={navBadges} title={m.homeTitle} wide>
       <Beds24LiveRefresh organizationId={session.organization.id} />
+      {/* 앱을 켤 때(세션당 한 번) 스플래시 — 시안 Motion-B-Splash-Phone */}
+      <AppSplash tagline={m.splashTagline} />
       <div className="hm pb-2">
         {/* Greeting — renders immediately with the shell (no data reads). */}
         <div className="hm__greet">
@@ -478,7 +460,7 @@ export default async function MobileHomePage() {
 
 
         {/* Data-heavy sections stream in behind a skeleton so first paint stays fast. */}
-        <Suspense fallback={<HomeBodySkeleton />}>
+        <Suspense fallback={<FoldyLoader />}>
           <HomeBody session={session} dictionary={dictionary} />
         </Suspense>
       </div>

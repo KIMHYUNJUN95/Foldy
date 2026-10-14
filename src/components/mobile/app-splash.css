@@ -1,0 +1,37 @@
+/* 앱 스플래시(2026-10-14) — 한 번 재생(forwards). 스프링은 감쇠 진동을 샘플링한 linear(). */
+.spl {
+  --sp: linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000);
+  --sps: linear(0.000,0.027,0.096,0.189,0.294,0.401,0.505,0.600,0.685,0.759,0.822,0.873,0.915,0.947,0.972,0.990,1.003,1.011,1.016,1.019,1.020,1.019,1.018,1.016,1.014,1.012,1.010,1.008,1.006,1.005,1.004,1.003,1.002,1.001,1.001,1.000,1.000,1.000,1.000,1.000,1.000);
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(55% 35% at 28% 22%, rgba(185, 160, 250, .16), rgba(185, 160, 250, 0) 70%), radial-gradient(50% 40% at 82% 74%, rgba(217, 204, 251, .22), rgba(217, 204, 251, 0) 70%), #fff;
+  animation: spl-out 320ms cubic-bezier(.4, 0, 1, 1) 1420ms forwards;
+}
+.spl__c { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -60px; perspective: 700px; animation: spl-away 360ms cubic-bezier(.5, 0, .75, 0) 1300ms forwards; }
+.spl__glow { position: absolute; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: spl-glow 900ms cubic-bezier(.23, 1, .32, 1) 300ms forwards; }
+.spl__tile { position: relative; width: 110px; height: 110px; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: spl-tile 540ms var(--sps) 60ms forwards; }
+.spl__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: spl-fly 800ms var(--sp) forwards; }
+.spl__bar { position: absolute; inset: 0; border-radius: 9px; filter: blur(6px); animation: spl-sharp 460ms cubic-bezier(.23, 1, .32, 1) forwards; }
+.spl__b3 { left: 36px; top: 28px; width: 38px; --sx: -55px; --sy: 108px; --sz: 260px; --rx: 64deg; --ry: -30deg; animation-delay: 120ms; }
+.spl__b3 .spl__bar { background: #b9a0fa; animation-delay: 120ms; }
+.spl__b2 { left: 29px; top: 48px; width: 52px; --sx: 96px; --sy: -70px; --sz: 120px; --rx: -46deg; --ry: 60deg; animation-delay: 190ms; }
+.spl__b2 .spl__bar { background: #8a63f0; animation-delay: 190ms; }
+.spl__b1 { left: 21px; top: 68px; width: 68px; --sx: -118px; --sy: -40px; --sz: -20px; --rx: 20deg; --ry: -76deg; animation-delay: 260ms; }
+.spl__b1 .spl__bar { background: #5b2bd6; animation-delay: 260ms; }
+.spl__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: spl-line 300ms cubic-bezier(.23, 1, .32, 1) 950ms forwards; }
+.spl__ww { margin-top: 28px; overflow: hidden; padding: 0 6px; }
+.spl__word { display: block; font-size: 36px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: transparent; background: linear-gradient(100deg, #16141f 0%, #16141f 40%, #8a63f0 48%, #16141f 56%, #16141f 100%); background-size: 300% 100%; background-position: 160% 0; -webkit-background-clip: text; background-clip: text; transform: translateY(110%); animation: spl-word 700ms var(--sp) 650ms forwards, spl-sweep 900ms cubic-bezier(.77, 0, .175, 1) 900ms forwards; }
+.spl__tag { margin-top: 8px; font-size: 14px; color: #8b8898; opacity: 0; transform: translateY(8px); filter: blur(3px); animation: spl-tag 420ms cubic-bezier(.23, 1, .32, 1) 900ms forwards; }
+@keyframes spl-tile { to { opacity: 1; transform: scale(1); } }
+@keyframes spl-fly {
+  0% { opacity: 0; transform: translate3d(var(--sx), var(--sy), var(--sz)) rotateX(var(--rx)) rotateY(var(--ry)); }
+  8% { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg); }
+}
+@keyframes spl-sharp { to { filter: blur(0); } }
+@keyframes spl-line { to { transform: scaleX(1); } }
+@keyframes spl-glow { to { opacity: 1; } }
+@keyframes spl-word { to { transform: translateY(0); } }
+@keyframes spl-sweep { to { background-position: -60% 0; } }
+@keyframes spl-tag { to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes spl-away { to { opacity: 0; transform: scale(1.35); filter: blur(8px); } }
+@keyframes spl-out { to { opacity: 0; visibility: hidden; } }

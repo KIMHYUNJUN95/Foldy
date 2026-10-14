@@ -1,0 +1,23 @@
+/* 내보내기 버튼 모션(2026-10-14, 시안 Motion-PC-Export-PC) — 누름 반응 · 도는 고리 · 초록 체크 그리기 + 「다운로드됨」 · 2초 뒤 원래대로. */
+.adm .chipbtn.axb { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 200ms ease, color 200ms ease; }
+.adm .chipbtn.axb:active:not(:disabled) { transform: scale(.97); }
+.adm .axb__ic { display: inline-flex; width: 16px; height: 16px; flex: none; align-items: center; justify-content: center; color: var(--adm-muted); animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .axb__ic svg { width: 16px; height: 16px; display: block; }
+.adm .axb__t { display: inline-block; animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes axb-in { from { opacity: 0; filter: blur(2px); transform: scale(.9); } }
+.adm .chipbtn.axb.is-busy { cursor: progress; }
+.adm .chipbtn.axb.is-busy .axb__ic { color: #7a52e6; }
+.adm .axb__ring { animation: axb-spin 800ms linear infinite; }
+.adm .axb__ring circle + circle { stroke-dasharray: 28 100; animation: axb-arc 1400ms cubic-bezier(.65, 0, .35, 1) infinite; }
+@keyframes axb-spin { to { transform: rotate(360deg); } }
+@keyframes axb-arc { 0% { stroke-dasharray: 8 100; } 50% { stroke-dasharray: 60 100; } 100% { stroke-dasharray: 8 100; } }
+.adm .chipbtn.axb.is-done, .adm .chipbtn.axb.is-done:hover { background: #effaf3; color: #1b7f45; }
+.adm .chipbtn.axb.is-done .axb__ic { color: #1f9d55; animation: axb-pop 420ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
+.adm .axb__check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: axb-draw 360ms cubic-bezier(.23, 1, .32, 1) 80ms forwards; }
+@keyframes axb-pop { from { transform: scale(.6); opacity: 0; } }
+@keyframes axb-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .adm .axb__ic, .adm .axb__t, .adm .chipbtn.axb.is-done .axb__ic { animation: none; }
+  .adm .axb__ring { animation-duration: 2400ms; }
+  .adm .axb__check path { animation: none; stroke-dashoffset: 0; }
+}

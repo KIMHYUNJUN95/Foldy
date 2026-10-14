@@ -11,116 +11,128 @@
 // 지금은 새로 들어온 요소도 MutationObserver 로 잡아 같은 시계의 현재 진행 지점부터 이어 간다.
 //
 // 서버에서도 오버레이를 그려(새로 불러올 때만 서버가 그리므로) 첫 화면부터 흰 바탕 — 콘솔이 잠깐 보였다 덮이는 깜빡임이 없다.
+// 시계 · 날아갈 자리 재기 · 콘솔 깔기(`runEntry`)는 오버레이 HTML 바로 뒤의 인라인 스크립트로 **그 자리에서** 돈다 — React 가 화면을
+// 붙이는(하이드레이션) 걸 기다리면 개발 모드 등 느린 환경에선 1.3초를 넘겨, 로고가 자리를 모른 채 엉뚱한 방향으로 날았다
+// (2026-10-14 사용자 지적). 화면을 껐다 켜서 브라우저에서만 다시 그릴 땐 같은 함수를 effect 가 부른다.
 // 동작 줄이기면 보이지 않는다(CSS 로도 숨김).
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { finishEntry, getEntryPlay, getServerEntryPlay, subscribeEntry } from "@/lib/entry-replay";
 import "./admin-entry.css";
 
-const SPRING_OUT = "cubic-bezier(.23, 1, .32, 1)";
-
-type Step = { sel: string; keyframes: Keyframe[]; delay: (i: number, el: Element) => number; duration: number; easing: string };
-
-/** 콘솔이 깔리는 차례 — 시간은 오버레이 시작 기준(ms). 로고는 1300ms 에 날기 시작해 ~1860ms 에 사이드바 로고 자리에 앉는다. */
-const STEPS: Step[] = [
-  { sel: ".adm .side", keyframes: [{ transform: "translateX(-100%)" }, { transform: "none" }], delay: () => 1150, duration: 480, easing: "cubic-bezier(.32, .72, 0, 1)" },
-  {
-    sel: ".adm .side .navi",
-    keyframes: [{ opacity: 0, transform: "translateX(-8px)" }, { opacity: 1, transform: "none" }],
-    delay: (_i, el) => {
-      const grp = el.closest(".navgrp");
-      const n = grp?.parentElement ? Array.prototype.indexOf.call(grp.parentElement.children, grp) : 0;
-      return 1420 + Math.min(n, 3) * 60;
-    },
-    duration: 380,
-    easing: SPRING_OUT,
-  },
-  { sel: ".adm .top", keyframes: [{ opacity: 0, transform: "translateY(-10px)" }, { opacity: 1, transform: "none" }], delay: () => 1380, duration: 420, easing: SPRING_OUT },
-  { sel: ".adm .dh-kpis > *", keyframes: [{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], delay: (i) => 1520 + i * 50, duration: 600, easing: SPRING_OUT },
-  {
-    sel: ".adm .dh > *:not(:first-child), .adm .cwrap > *:not(.dh)",
-    keyframes: [{ opacity: 0, transform: "translateY(18px)" }, { opacity: 1, transform: "none" }],
-    delay: (i) => 1640 + Math.min(i, 4) * 60,
-    duration: 650,
-    easing: SPRING_OUT,
-  },
-];
-const BUILD_END = 2700;
 const FINISH_AT = 2000;
+
+/**
+ * 진입 한 번의 시계 · 자리 재기 · 콘솔 깔기. **혼자 도는 함수**여야 한다 — 인라인 스크립트로 문자열이 되어 서버 HTML 안에서 실행된다
+ * (바깥 변수 · import 를 쓰지 말 것). 시간은 오버레이 시작 기준(ms): 로고는 1300ms 에 날기 시작해 ~1860ms 에 사이드바 로고 자리에 앉는다.
+ */
+function runEntry(logo: HTMLElement | null) {
+  if (!logo || logo.dataset.run) return;
+  logo.dataset.run = "1";
+  const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
+  const t0 = now();
+  const root = document.documentElement;
+  const ease = "cubic-bezier(.23, 1, .32, 1)";
+  type Step = [string, Keyframe[], (i: number, el: Element) => number, number, string];
+  const steps: Step[] = [
+    [".adm .side", [{ transform: "translateX(-100%)" }, { transform: "none" }], () => 1150, 480, "cubic-bezier(.32, .72, 0, 1)"],
+    [
+      ".adm .side .navi",
+      [{ opacity: 0, transform: "translateX(-8px)" }, { opacity: 1, transform: "none" }],
+      (_i, el) => {
+        const grp = el.closest(".navgrp");
+        const n = grp && grp.parentElement ? Array.prototype.indexOf.call(grp.parentElement.children, grp) : 0;
+        return 1420 + Math.min(n, 3) * 60;
+      },
+      380,
+      ease,
+    ],
+    [".adm .top", [{ opacity: 0, transform: "translateY(-10px)" }, { opacity: 1, transform: "none" }], () => 1380, 420, ease],
+    [".adm .dh-kpis > *", [{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], (i) => 1520 + i * 50, 600, ease],
+    [
+      ".adm .dh > *:not(:first-child), .adm .cwrap > *:not(.dh)",
+      [{ opacity: 0, transform: "translateY(18px)" }, { opacity: 1, transform: "none" }],
+      (i) => 1640 + Math.min(i, 4) * 60,
+      650,
+      ease,
+    ],
+  ];
+
+  // 날아갈 자리 = 사이드바 로고(최종 자리 — 들어오는 중인 사이드바의 이동은 뺀다). 로고 쪽은 움직이기 전 자리를 **처음 한 번만** 잰다 —
+  // 느린 환경에서 다시 재기가 늦게 돌면 날고 있는 로고를 재서 뒤로 튀었다.
+  const l = logo.getBoundingClientRect();
+  const lx = l.left + l.width / 2;
+  const ly = l.top + l.height / 2;
+  const measure = () => {
+    const mark = document.querySelector<HTMLElement>(".adm .side__mark");
+    if (!mark) return;
+    const side = mark.closest<HTMLElement>(".side");
+    const tf = side ? getComputedStyle(side).transform : "none";
+    const shift = tf && tf !== "none" ? new DOMMatrixReadOnly(tf).m41 : 0;
+    const m = mark.getBoundingClientRect();
+    logo.style.setProperty("--fx", m.left - shift + m.width / 2 - lx + "px");
+    logo.style.setProperty("--fy", m.top + m.height / 2 - ly + "px");
+    logo.style.setProperty("--fs", String(m.width / l.width));
+  };
+  measure();
+  setTimeout(measure, 1240);
+
+  // 화면 모션(대시보드 숫자 굴림 · 막대 등)은 진입 화면이 걷힐 때(~1450ms) 시작하게 미룬다.
+  root.style.setProperty("--entry-d0", "1450ms");
+  setTimeout(() => root.style.removeProperty("--entry-d0"), 6500);
+
+  // 콘솔 깔기 — 모두 같은 시계(startTime = t0). 늦게 들어온 요소(로딩 → 실제 화면)도 현재 진행 지점부터 이어 간다.
+  const done = new WeakSet<Element>();
+  const apply = () => {
+    const el0 = now() - t0;
+    if (el0 > 2700) return;
+    for (const [sel, keyframes, delayOf, duration, easing] of steps) {
+      document.querySelectorAll(sel).forEach((el, i) => {
+        if (done.has(el)) return;
+        done.add(el);
+        const delay = delayOf(i, el);
+        if (el0 > delay + duration) return;
+        const anim = (el as HTMLElement).animate(keyframes, { delay, duration, easing, fill: "backwards" });
+        anim.startTime = t0;
+      });
+    }
+  };
+  apply();
+  let raf = 0;
+  const mo = new MutationObserver(() => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      apply();
+    });
+  });
+  mo.observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(() => mo.disconnect(), 2700);
+  logo.dataset.t0 = String(t0);
+}
+
+const subscribeNoop = () => () => {};
 
 export function AdminEntry() {
   const play = useSyncExternalStore(subscribeEntry, getEntryPlay, getServerEntryPlay);
+  // 서버 HTML · 하이드레이션 첫 렌더에서만 true — 그때만 인라인 스크립트를 넣는다(브라우저에서 새로 그린 스크립트는 실행되지 않는다).
+  const fromServer = useSyncExternalStore(subscribeNoop, () => false, () => true);
   const logoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!play) return;
     const logo = logoRef.current;
-    const now = () => (document.timeline.currentTime as number | null) ?? performance.now();
-    // 오버레이의 CSS 애니메이션이 시작한 시각 = 모든 움직임의 0ms. (서버에서 그렸으면 페이지가 처음 그려질 때부터 돌고 있다.)
-    const own = logo?.getAnimations().find((a) => typeof a.startTime === "number");
-    const t0 = typeof own?.startTime === "number" ? own.startTime : now();
-
-    // 날아갈 자리 = 사이드바 로고. 날기 직전에 잰다(그때 실제 화면의 사이드바가 들어와 있을 가능성이 높다).
-    const measure = () => {
-      const mark = document.querySelector<HTMLElement>(".adm .side__mark");
-      if (!mark || !logo) return;
-      const side = mark.closest<HTMLElement>(".side");
-      // 사이드바가 들어오는 중이면 transform 을 빼고 최종 자리로 잰다.
-      const sideShift = side ? new DOMMatrixReadOnly(getComputedStyle(side).transform === "none" ? undefined : getComputedStyle(side).transform).m41 : 0;
-      const m = mark.getBoundingClientRect();
-      const l = logo.getBoundingClientRect();
-      logo.style.setProperty("--fx", `${m.left - sideShift + m.width / 2 - (l.left + l.width / 2)}px`);
-      logo.style.setProperty("--fy", `${m.top + m.height / 2 - (l.top + l.height / 2)}px`);
-      logo.style.setProperty("--fs", String(m.width / l.width));
-    };
-    measure();
-    // 화면 모션(대시보드 숫자 굴림 · 막대 등)은 진입 화면이 걷힐 때(~1450ms) 시작하게 미룬다 — 덮인 채 끝나 버리지 않게.
-    const root = document.documentElement;
-    root.style.setProperty("--entry-d0", `${Math.round(Math.max(0, t0 + 1450 - now()))}ms`);
-    const tVar = window.setTimeout(() => root.style.removeProperty("--entry-d0"), Math.max(0, t0 + 6500 - now()));
-    const tMeasure = window.setTimeout(measure, Math.max(0, t0 + 1240 - now()));
-
-    // 콘솔 깔기 — 같은 시계.
-    const done = new WeakSet<Element>();
-    const apply = () => {
-      if (now() - t0 > BUILD_END) return;
-      for (const step of STEPS) {
-        document.querySelectorAll(step.sel).forEach((el, i) => {
-          if (done.has(el)) return;
-          done.add(el);
-          const delay = step.delay(i, el);
-          if (now() - t0 > delay + step.duration) return; // 이미 끝났을 시점에 들어온 건 그냥 보인다
-          const anim = (el as HTMLElement).animate(step.keyframes, { delay, duration: step.duration, easing: step.easing, fill: "backwards" });
-          anim.startTime = t0;
-        });
-      }
-    };
-    apply();
-    let raf = 0;
-    const mo = new MutationObserver(() => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        raf = 0;
-        apply();
-      });
-    });
-    mo.observe(document.body, { childList: true, subtree: true });
-    const tStop = window.setTimeout(() => mo.disconnect(), Math.max(0, t0 + BUILD_END - now()));
-    const tDone = window.setTimeout(() => finishEntry(play), Math.max(0, t0 + FINISH_AT - now()));
-    return () => {
-      window.clearTimeout(tMeasure);
-      window.clearTimeout(tVar);
-      root.style.removeProperty("--entry-d0");
-      window.clearTimeout(tStop);
-      window.clearTimeout(tDone);
-      window.cancelAnimationFrame(raf);
-      mo.disconnect();
-    };
+    runEntry(logo); // 서버 HTML 의 스크립트가 이미 돌았으면 아무것도 안 한다
+    const t0 = Number(logo?.dataset.t0) || performance.now();
+    const elapsed = ((document.timeline && (document.timeline.currentTime as number | null)) || performance.now()) - t0;
+    const tDone = window.setTimeout(() => finishEntry(play), Math.max(0, FINISH_AT - elapsed));
+    return () => window.clearTimeout(tDone);
   }, [play]);
 
   if (!play) return null;
   return (
     <div className="aden" aria-hidden="true" key={play}>
-      <div className="aden__logo" ref={logoRef}>
+      {/* 인라인 스크립트가 하이드레이션 전에 data-run · data-t0 · --fx/--fy/--fs 를 붙이므로 속성 차이는 무시 */}
+      <div className="aden__logo" ref={logoRef} suppressHydrationWarning>
         <span className="aden__glow" />
         <span className="aden__tile">
           <span className="aden__bw aden__b3">
@@ -139,6 +151,13 @@ export function AdminEntry() {
       <span className="aden__ww">
         <span className="aden__word">Foldy</span>
       </span>
+      {/* 마지막에 둔다 — 실행 시점에 글자까지 그려져 있어야 로고 자리를 정확히 잰다. */}
+      {fromServer ? (
+        <script
+          dangerouslySetInnerHTML={{ __html: `(${runEntry.toString()})(document.currentScript.parentElement.querySelector(".aden__logo"))` }}
+          suppressHydrationWarning
+        />
+      ) : null}
     </div>
   );
 }

@@ -31,7 +31,8 @@
 @keyframes aden-word { to { transform: translateY(0); } }
 @keyframes aden-fade { to { opacity: 0; } }
 @keyframes aden-bg { to { background: rgba(255, 255, 255, 0); } }
-@keyframes aden-fly { to { transform: translate(var(--fx, -600px), var(--fy, -380px)) scale(var(--fs, .34)); } }
+/* 자리를 못 잰 경우(사이드바 없음)엔 제자리에서 작아지며 사라진다 — 엉뚱한 방향으로 날지 않게. */
+@keyframes aden-fly { to { transform: translate(var(--fx, 0px), var(--fy, 0px)) scale(var(--fs, .6)); } }
 @keyframes aden-land { to { opacity: 0; } }
 
 /* 콘솔이 차례로 깔리는 움직임은 admin-entry.tsx 의 Web Animations(오버레이와 같은 시계) — 실제 화면이 늦게 들어와 사이드바가 새로 그려져도 이어진다. */

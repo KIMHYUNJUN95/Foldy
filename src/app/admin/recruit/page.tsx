@@ -6,6 +6,7 @@ import { RecruitLiveRefresh } from "@/components/admin/recruit/recruit-live-refr
 import "@/components/admin/recruit/recruit-console.css";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { tokyoToday } from "@/lib/tokyo-date";
 import {
   canReadJobApplications,
   getJobApplication,
@@ -111,6 +112,7 @@ export default async function AdminRecruitPage({
         facets={facets}
         filter={filter}
         selectedId={application?.id ?? null}
+        todayKey={tokyoToday()}
       />
       {application && (
         <ApplicationDetailPanel

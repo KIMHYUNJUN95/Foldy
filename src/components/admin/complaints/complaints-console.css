@@ -1047,7 +1047,7 @@
 .adm .cxw-spin { width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .45); border-top-color: #fff; border-radius: 50%; animation: cxsync-spin .8s linear infinite; }
 
 /* 삭제 확인 창 */
-.adm .cxw-modal { width: 440px; padding: 24px; gap: 14px; border: 0; }
+.adm .modal.cxw-modal { width: 440px; padding: 24px; gap: 14px; border: 0; }
 .adm .cxw-modal__h { display: flex; flex-direction: column; gap: 4px; }
 .adm .cxw-modal__h h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
 .adm .cxw-modal__h span { font-size: 13px; line-height: 1.5; color: #6b6878; }

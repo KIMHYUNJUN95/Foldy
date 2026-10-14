@@ -21,9 +21,10 @@ import type {
 } from "@/lib/recruit/applications";
 import { filterApplicationsBySearch } from "@/lib/recruit/search";
 import { nextStatusOf, type JobApplicationStatus } from "@/lib/recruit/status";
+import { tokyoDateOf } from "@/lib/tokyo-date";
 
 /**
- * 채용 지원서 목록 — 디자인 「Foldy Recruiting Console」 1a·1d·1f 구현.
+ * 채용 지원서 목록 — 디자인 「Foldy Recruiting Console」 1a·1d·1f 구현, 화이트 리디자인(2026-10-14, 시안 Recruit-PC).
  *
  * **표이고 카드가 아니다.** 하루 10건이 몰릴 때 필요한 건 비교와 훑기이고, 카드 그리드는 같은
  * 항목을 눈으로 정렬하기 어렵다. 표가 못 담는 판단 근거(경험·재지원·비자 만료·첨부 없음)는
@@ -50,11 +51,9 @@ type Props = {
   facets: { jobTitles: string[]; employmentTypes: string[] };
   filter: ApplicationFilter;
   selectedId: string | null;
+  /** 도쿄 오늘(YYYY-MM-DD) — 「새 지원」 표시. 서버가 정해 넘겨 하이드레이션이 갈리지 않게 한다. */
+  todayKey: string;
 };
-
-function fmtRecv(value: string | null): string {
-  return value ? value.slice(5, 10) : "—";
-}
 
 export function RecruitConsole({
   copy,
@@ -65,6 +64,7 @@ export function RecruitConsole({
   facets,
   filter,
   selectedId,
+  todayKey,
 }: Props) {
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
@@ -225,15 +225,39 @@ export function RecruitConsole({
   }
 
 
+  const startOfToday = todayKey;
+  const fmtApplied = (iso: string | null) => {
+    if (!iso) return "—";
+    const day = tokyoDateOf(iso);
+    const time = new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+    return day ? `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))} ${time}` : "—";
+  };
+
   return (
-    <div className="rc">
-      <div className="ctoolbar">
-        <div>
-          <h2 className="rc__title" style={{ margin: 0 }}>
-            {copy.title}
-          </h2>
+    <div className="rc rcw">
+      {/* 화이트 리디자인(2026-10-14, 시안 Recruit-PC · Recruit-Bulk-PC): 숫자 카드 넷을 빼고 단계 탭 숫자로 대신한다.
+          1줄 = 단계 탭 · 실시간 · 내보내기, 2줄 = 기간 · 직무 · 고용형태 · 첨부만 · 검색. */}
+      <div className="cviewbar rcw-bar">
+        <div className="lviews" role="tablist" style={{ margin: 0 }}>
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={filter.status === tab.key}
+              className={filter.status === tab.key ? "on" : ""}
+              onClick={() => pushFilter({ status: tab.key === "pending" ? null : tab.key })}
+            >
+              {tab.label}
+              <b className="rcw-tabn">{tab.count}</b>
+            </button>
+          ))}
         </div>
-        <div className="ctoolbar__spacer" />
+        <span className="rcw-live" role="status">
+          <i aria-hidden="true" />
+          {copy.wLive.replace("{n}", String(summary.today))}
+        </span>
+        <span className="rcw-sp" />
         <AdminExportButtons
           onExportXls={() => exportRecruitWorkbook(exportPayload)}
           onExportPdf={() => exportRecruitReport(exportPayload)}
@@ -243,69 +267,7 @@ export function RecruitConsole({
         />
       </div>
 
-      <div className="rc__kpis">
-        <div className="rckpi">
-          <span className="rckpi__k">{copy.kpiPendingLabel}</span>
-          <span className="rckpi__v rckpi__v--pri">{summary.pending}</span>
-          <span className="rckpi__s">{copy.kpiPendingSub}</span>
-        </div>
-        <div className="rckpi">
-          <span className="rckpi__k">{copy.kpiTodayLabel}</span>
-          <span className="rckpi__v">{summary.today}</span>
-          <span className="rckpi__s">{copy.kpiTodaySub.replace("{n}", String(summary.last7))}</span>
-        </div>
-        <div className="rckpi">
-          <span className="rckpi__k">{copy.kpiResumeLabel}</span>
-          <span className="rckpi__v">
-            {summary.withResume}
-            <span className="rckpi__unit"> / {summary.total}</span>
-          </span>
-          <span className="rckpi__s">{copy.kpiResumeSub}</span>
-        </div>
-        <div className="rckpi">
-          {/* 「확인 필요」는 90일 이내 만료만 센다. 날짜로 읽지 못한 값과 영주는 빠진다. */}
-          <span className="rckpi__k">{copy.kpiVisaLabel}</span>
-          <span className="rckpi__v rckpi__v--warn">{summary.visaAttention}</span>
-          <span className="rckpi__s">{copy.kpiVisaSub}</span>
-        </div>
-      </div>
-
-      <div className="rc__filters">
-        <div className="rcseg" role="tablist">
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={filter.status === tab.key}
-              className={`rcseg__b ${filter.status === tab.key ? "on" : ""}`}
-              onClick={() => pushFilter({ status: tab.key === "pending" ? null : tab.key })}
-            >
-              {tab.label} <span className="rcseg__n">{tab.count}</span>
-            </button>
-          ))}
-        </div>
-
-        <AdmDropdown
-          size="sm"
-          ariaLabel={copy.filterJob}
-          value={filter.jobTitle ?? ""}
-          onChange={(value) => pushFilter({ job: value || null })}
-          options={[
-            { value: "", label: `${copy.filterJob} · ${copy.filterAll}` },
-            ...facets.jobTitles.map((title) => ({ value: title, label: title })),
-          ]}
-        />
-        <AdmDropdown
-          size="sm"
-          ariaLabel={copy.filterEmployment}
-          value={filter.employmentType ?? ""}
-          onChange={(value) => pushFilter({ employment: value || null })}
-          options={[
-            { value: "", label: `${copy.filterEmployment} · ${copy.filterAll}` },
-            ...facets.employmentTypes.map((type) => ({ value: type, label: type })),
-          ]}
-        />
+      <div className="rcw-filters">
         <AdminDateRangePicker
           from={filter.from ?? ""}
           to={filter.to ?? ""}
@@ -325,250 +287,232 @@ export function RecruitConsole({
             apply: sharedCopy.dateApply,
           }}
         />
+        <AdmDropdown
+          size="sm"
+          ariaLabel={copy.filterJob}
+          value={filter.jobTitle ?? ""}
+          onChange={(value) => pushFilter({ job: value || null })}
+          options={[{ value: "", label: copy.wAllJobs }, ...facets.jobTitles.map((title) => ({ value: title, label: title }))]}
+        />
+        <AdmDropdown
+          size="sm"
+          ariaLabel={copy.filterEmployment}
+          value={filter.employmentType ?? ""}
+          onChange={(value) => pushFilter({ employment: value || null })}
+          options={[{ value: "", label: copy.wAllEmployment }, ...facets.employmentTypes.map((type) => ({ value: type, label: type }))]}
+        />
         <button
           type="button"
-          className="chipbtn"
-          aria-pressed={filter.withResumeOnly}
+          className="rcw-toggle"
+          role="switch"
+          aria-checked={filter.withResumeOnly}
           onClick={() => pushFilter({ resume: filter.withResumeOnly ? null : "1" })}
         >
-          <span className={`rcsel ${filter.withResumeOnly ? "on" : ""}`} aria-hidden="true">
+          <span className={`rcw-box${filter.withResumeOnly ? " on" : ""}`} aria-hidden="true">
             <Check strokeWidth={3} />
           </span>
           {copy.filterResumeOnly}
         </button>
-
         {/* 제출이 없다. 타이핑이 곧 검색이다 — Enter 로 페이지가 새로 뜨지 않도록 막아만 둔다. */}
-        <form className="rc__spacer" onSubmit={(event) => event.preventDefault()} role="search">
-          <span className="qsearch qsearch--inline">
-            <Search size={15} aria-hidden="true" />
-            <input
-              ref={searchRef}
-              name="q"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
+        <form className="rcw-search" onSubmit={(event) => event.preventDefault()} role="search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            ref={searchRef}
+            name="q"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(0);
+            }}
+            placeholder={copy.wSearch}
+            aria-label={copy.wSearch}
+            autoComplete="off"
+            type="text"
+          />
+          {query ? (
+            <button
+              type="button"
+              className="rcw-search__x"
+              aria-label={copy.searchClear}
+              onClick={() => {
+                setQuery("");
                 setPage(0);
+                searchRef.current?.focus();
               }}
-              placeholder={copy.searchPlaceholder}
-              aria-label={copy.searchPlaceholder}
-              autoComplete="off"
-              /* `type="text"`: 브라우저가 그리는 검색 지우기 버튼이 아래 공용 버튼과 겹쳐 보인다. */
-              type="text"
-            />
-            {query ? (
-              // 지운 뒤 바로 다시 칠 수 있게 포커스를 돌려준다(공용 드롭다운 검색과 같은 동작).
-              <button
-                type="button"
-                className="qsearch__clear"
-                aria-label={copy.searchClear}
-                onClick={() => {
-                  setQuery("");
-                  setPage(0);
-                  searchRef.current?.focus();
-                }}
-              >
-                <span className="ic">
-                  <X aria-hidden="true" />
-                </span>
-              </button>
-            ) : null}
-          </span>
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          ) : null}
         </form>
       </div>
 
-      {picked.length > 0 && (
-        <div className="rcbulk">
-          <span className="rcsel on" aria-hidden="true">
-            <Check strokeWidth={3} />
-          </span>
-          <span className="rcbulk__n">{copy.bulkSelected.replace("{n}", String(picked.length))}</span>
-          <span className="rcbulk__hint">
-            {copy.exportSelectedHint.replace("{n}", String(picked.length))}
-          </span>
-          <span className="rc__spacer" />
-          <button type="button" className="rcbulk__cta" onClick={advancePicked} disabled={pending}>
-            {copy.advanceTo.screening}
+      {picked.length > 0 ? (
+        <div className="rcw-bulk" role="region" aria-label={copy.bulkSelected.replace("{n}", String(picked.length))}>
+          <b>{copy.bulkSelected.replace("{n}", String(picked.length))}</b>
+          <span>{copy.exportSelectedHint.replace("{n}", String(picked.length))}</span>
+          <span className="rcw-sp" />
+          <button type="button" className="rcw-bulk__go" onClick={advancePicked} disabled={pending}>
+            {copy.wBulkAdvance}
           </button>
-          <button type="button" className="rcbulk__ghost" onClick={() => setPicked([])}>
+          <button type="button" className="rcw-bulk__clear" onClick={() => setPicked([])}>
             {copy.bulkClear}
           </button>
         </div>
-      )}
+      ) : null}
 
       {visibleRows.length === 0 ? (
-        <div className="rcempty">
-          <span className="rcempty__ic" aria-hidden="true">
+        <div className="rcw-empty">
+          <span className="rcw-empty__ic" aria-hidden="true">
             <Search size={22} />
           </span>
-          <span className="rcempty__t">
-            {summary.total === 0 ? copy.emptyNoData : copy.emptyTitle}
-          </span>
-          {summary.total > 0 && (
+          <b>{summary.total === 0 ? copy.emptyNoData : copy.emptyTitle}</b>
+          {summary.total > 0 ? (
             <>
               {/* 「없습니다」로 끝내지 않고 어떤 조건이 걸려 0건인지 그 자리에 보여 준다. */}
-              <span className="rcempty__s">{copy.emptyBodyPrefix}</span>
-              <div className="rcempty__acts">
+              <span>{copy.emptyBodyPrefix}</span>
+              <div className="rcw-empty__acts">
                 {activeFilters.map((item) => (
                   <button
                     key={item.label}
                     type="button"
-                    className="rcactive"
+                    className="rcw-active"
                     onClick={() => {
                       if (item.onClear) item.onClear();
                       else if (item.clear) pushFilter(item.clear);
                     }}
                   >
-                    {item.label} ✕
+                    {item.label}
+                    <X size={12} aria-hidden="true" />
                   </button>
                 ))}
               </div>
-              <div className="rcempty__acts">
-                {filter.status !== "pending" && summary.byStatus.pending > 0 && (
-                  <button
-                    type="button"
-                    className="btn btn--pri btn--sm"
-                    onClick={() => pushFilter({ status: null })}
-                  >
+              <div className="rcw-empty__acts">
+                {filter.status !== "pending" && summary.byStatus.pending > 0 ? (
+                  <button type="button" className="rcw-btn is-soft" onClick={() => pushFilter({ status: null })}>
                     {copy.emptyResetOne.replace("{n}", String(summary.byStatus.pending))}
                   </button>
-                )}
+                ) : null}
                 <button
                   type="button"
-                  className="btn btn--ghost btn--sm"
-                  onClick={() =>
-                    pushFilter({
-                      status: null,
-                      job: null,
-                      employment: null,
-                      from: null,
-                      to: null,
-                      resume: null,
-                      q: null,
-                    })
-                  }
+                  className="rcw-btn is-gray"
+                  onClick={() => pushFilter({ status: null, job: null, employment: null, from: null, to: null, resume: null, q: null })}
                 >
                   {copy.emptyResetAll}
                 </button>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       ) : (
-        <div className="rctbl">
-          <div className="rctbl__h">
+        <div className="rcw-tbl">
+          <div className="rcw-th">
             <span aria-hidden="true" />
             <span>{copy.colApplicant}</span>
             <span>{copy.colJob}</span>
-            <span>{copy.colWork}</span>
-            <span>{copy.colStart}</span>
-            <span>{copy.colApplied}</span>
-            <span className="rccol--end">{copy.colStatus}</span>
+            <span>{copy.wColWork}</span>
+            <span className="r">{copy.colApplied}</span>
+            <span aria-hidden="true" />
           </div>
 
-          {pageRows.map((row) => {
-            const next = nextStatusOf(row.status);
-            return (
-              <div
-                key={row.id}
-                className={`rcrow ${selectedId === row.id ? "on" : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => router.push(`/admin/recruit?${detailQuery(row.id)}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    router.push(`/admin/recruit?${detailQuery(row.id)}`);
-                  }
-                }}
-              >
-                <button
-                  type="button"
-                  className={`rcsel ${picked.includes(row.id) ? "on" : ""}`}
-                  aria-label={copy.selectRow}
-                  aria-pressed={picked.includes(row.id)}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    togglePick(row.id);
+          <div className="rcw-rows">
+            {pageRows.map((row) => {
+              const next = nextStatusOf(row.status);
+              const isNew = tokyoDateOf(row.appliedAt) === startOfToday;
+              const on = picked.includes(row.id);
+              const signals = signalsOf(row, copy);
+              return (
+                <div
+                  key={row.id}
+                  className={`rcw-tr${selectedId === row.id ? " on" : ""}${on ? " pk" : ""}${isNew ? " is-new" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/admin/recruit?${detailQuery(row.id)}`)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/admin/recruit?${detailQuery(row.id)}`);
+                    }
                   }}
                 >
-                  <Check strokeWidth={3} aria-hidden="true" />
-                </button>
+                  <button
+                    type="button"
+                    className="rcw-pick"
+                    aria-label={copy.selectRow}
+                    aria-pressed={on}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      togglePick(row.id);
+                    }}
+                  >
+                    <span className={`rcw-box${on ? " on" : ""}`}>
+                      <Check strokeWidth={3} aria-hidden="true" />
+                    </span>
+                  </button>
 
-                <div className="rcrow__cell">
-                  <span className="rcrow__name">
-                    <span className="rcrow__nm">{row.name}</span>
-                    <span className="rcrow__meta">
-                      {[row.age, row.gender].filter(Boolean).join(" · ")}
+                  <span className="rcw-who">
+                    <span className="rcw-who__h">
+                      <b>{row.name}</b>
+                      <span>{[row.age, row.gender].filter(Boolean).join(" · ")}</span>
+                      {isNew ? <em>{copy.wNew}</em> : null}
+                    </span>
+                    <span className="rcw-who__s">
+                      {signals.plain.join(" · ")}
+                      {signals.alert ? (
+                        <b className="is-bad">
+                          {signals.plain.length ? " · " : ""}
+                          {signals.alert}
+                        </b>
+                      ) : null}
                     </span>
                   </span>
-                  <span className="rcrow__chips">
-                    <RowChips row={row} copy={copy} />
+
+                  <span className="rcw-two">
+                    <span>{row.jobTitle ?? copy.notCollected}</span>
+                    {row.employmentType ? <small>{row.employmentType}</small> : null}
+                  </span>
+
+                  <span className="rcw-two">
+                    <span>{row.daysPerWeek ?? "—"}</span>
+                    <small>{[row.workDays.join(" "), row.startDate].filter(Boolean).join(" · ") || "—"}</small>
+                  </span>
+
+                  <span className="rcw-at num">{fmtApplied(row.appliedAt)}</span>
+
+                  <span className="rcw-act">
+                    {next ? (
+                      <button
+                        type="button"
+                        className="rcw-adv"
+                        disabled={pending}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          advance([row.id], next);
+                        }}
+                      >
+                        {copy.wAdvanceShort[next]}
+                        <MoveRight size={13} aria-hidden="true" />
+                      </button>
+                    ) : null}
                   </span>
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="rcrow__cell">
-                  <span className="rcrow__main">{row.jobTitle ?? "—"}</span>
-                  {row.employmentType ? (
-                    <span className="rcemp">{row.employmentType}</span>
-                  ) : (
-                    <span className="rcemp">{copy.notCollected}</span>
-                  )}
-                </div>
-
-                <div className="rcrow__cell">
-                  <span className="rcrow__main">{row.daysPerWeek ?? "—"}</span>
-                  <span className="rcrow__sub">{row.workDays.join(" ") || "—"}</span>
-                </div>
-
-                <span className="rcrow__mono">{row.startDate ?? "—"}</span>
-                <span className="rcrow__mono rcrow__mono--soft">{fmtRecv(row.appliedAt)}</span>
-
-                <div className="rcrow__end">
-                  {next && (
-                    <button
-                      type="button"
-                      className="rcadv"
-                      disabled={pending}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        advance([row.id], next);
-                      }}
-                    >
-                      {copy.advanceTo[next]}
-                      <MoveRight size={12} aria-hidden="true" />
-                    </button>
-                  )}
-                  <span className={`rcstat rcstat--${row.status}`}>{copy.status[row.status]}</span>
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="rcpager">
-            <span className="rcpager__t">
-              <b>
-                {safePage * PAGE_SIZE + 1}–{Math.min(visibleRows.length, (safePage + 1) * PAGE_SIZE)}
-              </b>{" "}
-              / {visibleRows.length}
+          <div className="rcw-pager">
+            <span className="num">
+              {copy.wPage
+                .replace("{from}", String(safePage * PAGE_SIZE + 1))
+                .replace("{to}", String(Math.min(visibleRows.length, (safePage + 1) * PAGE_SIZE)))
+                .replace("{total}", String(visibleRows.length))}
             </span>
-            <span className="rc__spacer" />
-            <button
-              type="button"
-              className="rcpager__b"
-              aria-label={copy.prevPage}
-              disabled={safePage === 0}
-              onClick={() => setPage(Math.max(0, safePage - 1))}
-            >
-              <ChevronLeft size={13} aria-hidden="true" />
+            <span className="rcw-sp" />
+            <button type="button" className="rcw-pg" aria-label={copy.prevPage} disabled={safePage === 0} onClick={() => setPage(Math.max(0, safePage - 1))}>
+              <ChevronLeft size={15} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              className="rcpager__b"
-              aria-label={copy.nextPage}
-              disabled={safePage >= lastPage}
-              onClick={() => setPage(Math.min(lastPage, safePage + 1))}
-            >
-              <ChevronRight size={13} aria-hidden="true" />
+            <button type="button" className="rcw-pg" aria-label={copy.nextPage} disabled={safePage >= lastPage} onClick={() => setPage(Math.min(lastPage, safePage + 1))}>
+              <ChevronRight size={15} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -586,30 +530,19 @@ function detailQuery(id: string): string {
 }
 
 /**
- * 신호 칩 — 표 칸으로는 표현 못 하는 판단 근거.
- *
- * **체류 자격은 만료 기간만 띄운다(90일 이내).** 국적·비자 종류는 패널의 체류 자격 블록에서만
- * 본다. 채용 판단을 바꾸는 것은 만료 시점이고, 국적을 목록에 세우면 국적으로 훑는 화면이 된다.
+ * 신호 한 줄 — 표 칸으로는 표현 못 하는 판단 근거(동종 경험 · 재지원 · 이력서 · 첨부 없음 · 구 폼), 끝에 체류 만료만 빨갛게.
+ * 화이트 리디자인(2026-10-14): 색 칩 대신 글자 한 줄. **체류 자격은 90일 이내 만료만** — 국적 · 비자 종류는 패널에서만 본다.
  */
-function RowChips({ row, copy }: { row: ApplicationListRow; copy: Dictionary["recruit"] }) {
-  return (
-    <>
-      {row.hasIndustryExp && <span className="rcchip rcchip--good">{copy.chipExperience}</span>}
-      {row.repeatCount > 0 && (
-        <span className="rcchip rcchip--info">
-          {copy.chipRepeat.replace("{n}", String(row.repeatCount + 1))}
-        </span>
-      )}
-      {row.visaAlert === "expired" && (
-        <span className="rcchip rcchip--danger">{copy.chipVisaExpired}</span>
-      )}
-      {(row.visaAlert === "critical" || row.visaAlert === "soon") && row.visaDaysLeft !== null && (
-        <span className={`rcchip rcchip--${row.visaAlert === "critical" ? "danger" : "warn"}`}>
-          {copy.chipVisaDays.replace("{n}", String(row.visaDaysLeft))}
-        </span>
-      )}
-      {!row.hasResume && <span className="rcchip">{copy.chipNoResume}</span>}
-      {row.isLegacyForm && <span className="rcchip">{copy.chipLegacy}</span>}
-    </>
-  );
+function signalsOf(row: ApplicationListRow, copy: Dictionary["recruit"]): { plain: string[]; alert: string | null } {
+  const plain: string[] = [];
+  if (row.hasIndustryExp) plain.push(copy.chipExperience);
+  if (row.repeatCount > 0) plain.push(copy.chipRepeat.replace("{n}", String(row.repeatCount + 1)));
+  plain.push(row.hasResume ? copy.colResume : copy.chipNoResume);
+  if (row.isLegacyForm) plain.push(copy.chipLegacy);
+  let alert: string | null = null;
+  if (row.visaAlert === "expired") alert = copy.chipVisaExpired;
+  else if ((row.visaAlert === "critical" || row.visaAlert === "soon") && row.visaDaysLeft !== null) {
+    alert = copy.chipVisaDays.replace("{n}", String(row.visaDaysLeft));
+  }
+  return { plain, alert };
 }

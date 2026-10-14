@@ -1,28 +1,29 @@
 import Link from "next/link";
-import { FileText, Info, X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n";
 import type { ApplicationDetail, ApplicationHistoryRow } from "@/lib/recruit/applications";
-import { JOB_APPLICATION_STATUSES, resumeKindOf } from "@/lib/recruit/status";
-import { ApplicationPrintSheet, RecruitPrintButton } from "./application-print-sheet";
-import { RecruitContactBlock, RecruitNoteBlock, RecruitPanelActions } from "./recruit-panel-client";
+import { resumeKindOf } from "@/lib/recruit/status";
+import { tokyoDateOf } from "@/lib/tokyo-date";
+import { ApplicationPrintSheet } from "./application-print-sheet";
+import {
+  RecruitContactLine,
+  RecruitDeleteButton,
+  RecruitNoteField,
+  RecruitPanelActions,
+  RecruitPrintIcon,
+} from "./recruit-panel-client";
 
 /**
- * 지원서 상세 패널 — 서버 컴포넌트. 디자인 「Foldy Recruiting Console」 1b·1c·1f 구현.
- *
- * **패널 순서는 판단에 쓰이는 순서다:** 근무 조건 → 경험·동기 → 체류 자격 → 첨부 → 기본 정보.
- * 연락처가 맨 아래인 것은 의도다 — 열어보는 이유가 「연락하려고」가 아니라 「검토하려고」이기
- * 때문이고, 어깨너머 노출도 줄어든다.
- *
- * `ComplaintDetailPanel` 과 같은 `.panel` 프리미티브·오버레이를 쓴다. 새 라우트를 만들지 않고
- * `?application=<id>` 쿼리로 연다(CLAUDE.md §4).
+ * 지원서 상세 패널 — 서버 컴포넌트. 화이트 리디자인(2026-10-14, 시안 Recruit-PC 오른쪽 · RecruitDetail-PC · RecruitDelete-PC):
+ * 상태 · 지원 시각 · 재지원 → 이름 → 공고 · 형태 → 연락처 한 줄(가림 · 「연락처 표시」) → 근무 가능 / 시작일 / 체류 / 통근 /
+ * 경험 / 지원 경로 → 지원 동기 → 이전 지원(전화번호 일치) → 이력서 → 검토 메모 → 아래 [되돌리기][다음 단계].
+ * 위 인쇄 · 휴지통(확인 창) · 닫기. `?application=<id>` 쿼리로 열고 공용 `.panel` 을 쓴다(CLAUDE.md §4).
  *
  * 도메인 계약: docs/product/30-recruit-workflow.md
  */
 
 /**
- * 폼이 `work_days` 에 저장한 값 그대로 — **표시용이 아니라 대조용 키다.** 지원자가 고른 요일을
- * 맞춰 보려면 저장된 문자열과 같아야 하므로 번역하지 않는다. 화면에 찍히는 글자는
- * `copy.weekDays` (ko/ja/en)가 만든다.
+ * 폼이 `work_days` 에 저장한 값 그대로 — **표시용이 아니라 대조용 키다.** 화면에 찍히는 글자는 `copy.weekDays` 가 만든다.
  */
 // i18n-ignore-start -- stored form values, matched not displayed
 const WEEK_DAY_KEYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
@@ -36,292 +37,155 @@ type Props = {
   closeHref: string;
 };
 
-function Row({
-  label,
-  value,
-  mono = false,
-  missing = false,
-  missingLabel,
-}: {
-  label: string;
-  value: string | null;
-  mono?: boolean;
-  missing?: boolean;
-  missingLabel?: string;
-}) {
-  return (
-    <>
-      <span className="rckv__k">{label}</span>
-      {value ? (
-        <span className={`rckv__v ${mono ? "rckv__v--mono" : ""}`}>{value}</span>
-      ) : (
-        // 빈 항목은 행을 지우지 않는다 — 「구 폼 미수집」으로 이유를 밝혀야 담당자가
-        // 「입력 안 한 사람」과 「물어보지 않은 항목」을 구분할 수 있다.
-        <span className="rckv__v rckv__v--none">
-          <span className="rckv__v--mono">—</span>
-          {missing && missingLabel ? <span className="rcemp">{missingLabel}</span> : null}
-        </span>
-      )}
-    </>
-  );
+function stamp(iso: string | null): string {
+  if (!iso) return "—";
+  const day = tokyoDateOf(iso);
+  const time = new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" });
+  return day ? `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))} ${time}` : "—";
 }
 
-export function ApplicationDetailPanel({ application, history, resumeUrl, copy, closeHref }: Props) {
-  const resume = resumeKindOf(application.resumeFileName);
-  const stepIndex = JOB_APPLICATION_STATUSES.indexOf(application.status);
+export function ApplicationDetailPanel({ application: a, history, resumeUrl, copy, closeHref }: Props) {
+  const resume = resumeKindOf(a.resumeFileName);
+  const days = WEEK_DAY_KEYS.map((key, index) => (a.workDays.includes(key) ? copy.weekDays[index] : null)).filter(Boolean);
+  const join = (parts: (string | null | undefined | false)[]) => parts.filter(Boolean).join(" · ");
+
+  const visa = (() => {
+    if (!a.visaPeriodRaw) return null;
+    if (a.visaAlert === "expired") return { text: copy.chipVisaExpired, bad: true };
+    if (a.visaDaysLeft !== null && a.visaAlert) return { text: copy.chipVisaDays.replace("{n}", String(a.visaDaysLeft)), bad: true };
+    if (a.visaExpiryDate === null) return { text: `${a.visaPeriodRaw} (${copy.visaUnreadable})`, bad: false };
+    return { text: a.visaPeriodRaw, bad: false };
+  })();
+
+  const rows: [string, React.ReactNode][] = [
+    [copy.wWorkable, join([a.daysPerWeek, days.join(""), a.duration ?? (a.isLegacyForm ? copy.notCollected : null)]) || "—"],
+    [copy.labelStart, a.startDate ?? "—"],
+    [
+      copy.wStay,
+      <>
+        {join([a.nationality, a.visaType]) || (visa ? "" : "—")}
+        {visa ? (
+          <>
+            {a.nationality || a.visaType ? " · " : ""}
+            <b className={visa.bad ? "is-bad" : ""}>{visa.text}</b>
+          </>
+        ) : null}
+      </>,
+    ],
+    [copy.wCommute, join([a.commuteTime, a.uniformSize ? copy.wUniform.replace("{size}", a.uniformSize) : null]) || "—"],
+    [copy.wExperience, join([a.hasIndustryExp ? copy.wExpYes : copy.wExpNo, ...a.industryTasks])],
+  ];
+  if (a.sourceChannel) rows.push([copy.labelSource, a.sourceChannel]);
 
   return (
     <>
       <Link href={closeHref} className="panel-scrim" aria-label={copy.close} data-panel-close />
-      <aside className="panel" role="dialog" aria-label={copy.detailAria}>
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.detailAria}</span>
-            {/* 인쇄는 상태를 바꾸지 않는 보조 동작이라 하단 액션 바에 두지 않는다 — 그 바의
-                왼쪽(파괴)·오른쪽(진행) 자리는 반복 처리 중 오조작을 막으려고 고정돼 있다. */}
-            <RecruitPrintButton copy={copy} />
-            <Link href={closeHref} className="panel__x" aria-label={copy.close} data-panel-close>
-              <X />
-            </Link>
-          </div>
-
-          <div className="panel__title">
-            {application.name}
-            <span className="rcrow__meta" style={{ marginLeft: 9, fontWeight: 400 }}>
-              {[application.age, application.gender].filter(Boolean).join(" · ")}
+      <aside className="panel rcw-panel" role="dialog" aria-label={copy.detailAria}>
+        <div className="rcw-ph">
+          <div className="rcw-ph__main">
+            <span className="rcw-kick">
+              <em>{copy.status[a.status]}</em>
+              <span className="num">{copy.wApplied.replace("{date}", stamp(a.appliedAt))}</span>
+              {a.repeatCount > 0 ? <span>{copy.chipRepeat.replace("{n}", String(a.repeatCount + 1))}</span> : null}
             </span>
+            <h2 className="rcw-name">
+              {a.name}
+              <small>{join([a.age, a.gender])}</small>
+            </h2>
+            <span className="rcw-job">{join([a.jobTitle ?? copy.notCollected, a.employmentType])}</span>
           </div>
-          <div className="panel__chips">
-            <span className={`rcstat rcstat--${application.status}`}>
-              {copy.status[application.status]}
-            </span>
-            {application.jobTitle && <span className="rchip void">{application.jobTitle}</span>}
-            {application.employmentType && (
-              <span className="rchip void">{application.employmentType}</span>
-            )}
-          </div>
+          {/* 인쇄는 상태를 바꾸지 않는 보조 동작 — 아래 진행 버튼 자리와 섞지 않는다. */}
+          <RecruitPrintIcon label={copy.wPrint} />
+          <RecruitDeleteButton
+            applicationId={a.id}
+            closeHref={closeHref}
+            labels={{
+              aria: copy.wDeleteAria,
+              title: copy.wDeleteTitle,
+              summary: join([a.name, a.age, a.jobTitle, stamp(a.appliedAt)]),
+              body: copy.wDeleteBody,
+              warn: copy.wDeleteWarn,
+              keep: copy.wKeep,
+              confirm: copy.deleteConfirm,
+              deleted: copy.deleted,
+              failed: copy.actionFailed,
+            }}
+          />
+          <Link href={closeHref} className="rcw-ph__x" aria-label={copy.close} data-panel-close>
+            <X aria-hidden="true" />
+          </Link>
+        </div>
 
-          {/* 상태 진행 표시 — 지금 어디까지 왔는지가 액션 바보다 먼저 보여야 한다. */}
-          <div className="rcsteps">
-            {JOB_APPLICATION_STATUSES.map((status, index) => (
-              <span key={status} style={{ display: "contents" }}>
-                {index > 0 && <span className="rcsteps__line" />}
-                <span className={`rcsteps__s ${index <= stepIndex ? "on" : ""}`}>
-                  <span className="rcsteps__dot" />
-                  {copy.status[status]}
-                </span>
-              </span>
+        <div className="panel__body rcw-pb">
+          <RecruitContactLine application={a} copy={copy} />
+
+          {a.isLegacyForm ? <p className="rcw-legacy">{`${copy.legacyNoticeTitle} — ${copy.legacyNoticeBody}`}</p> : null}
+
+          <dl className="rcw-dl">
+            {rows.map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{value}</dd>
+              </div>
             ))}
-          </div>
-        </div>
+          </dl>
 
-        <div className="panel__body">
-          {application.isLegacyForm && (
-            <div className="rcinfo">
-              <Info size={14} aria-hidden="true" />
-              <span>
-                <b>{copy.legacyNoticeTitle}</b> {copy.legacyNoticeBody}
-              </span>
-            </div>
-          )}
+          {/* 지원 동기는 접지 않고 전량 — 잘린 문장은 판단에 쓸 수 없다. */}
+          {a.motivation ? (
+            <section className="rcw-sec">
+              <small className="rcw-k">{copy.wMotivation}</small>
+              <p className="rcw-p">{a.motivation}</p>
+            </section>
+          ) : null}
 
-          <div className="pblock">
-            <div className="pblock__t">{copy.sectionWork}</div>
-            <div className="rckv">
-              <span className="rckv__k">{copy.labelWorkDays}</span>
-              <span className="rcdays">
-                {WEEK_DAY_KEYS.map((day, index) => (
-                  <span
-                    key={day}
-                    className={`rcday ${application.workDays.includes(day) ? "on" : ""}`}
-                  >
-                    {copy.weekDays[index]}
-                  </span>
-                ))}
-              </span>
-              <Row label={copy.labelDaysPerWeek} value={application.daysPerWeek} />
-              <Row
-                label={copy.labelDuration}
-                value={application.duration}
-                missing={application.isLegacyForm}
-                missingLabel={copy.notCollected}
-              />
-              <Row label={copy.labelStart} value={application.startDate} mono />
-              <Row label={copy.labelCommute} value={application.commuteTime} />
-              <Row
-                label={copy.labelUniform}
-                value={application.uniformSize}
-                missing={application.isLegacyForm}
-                missingLabel={copy.notCollected}
-              />
-            </div>
-          </div>
-
-          <div className="pblock">
-            <div className="pblock__t">{copy.sectionExperience}</div>
-            <div className="rcrow__chips" style={{ marginBottom: 9 }}>
-              <span className={`rcchip ${application.hasIndustryExp ? "rcchip--good" : ""}`}>
-                {application.hasIndustryExp ? copy.labelExperienceYes : copy.labelExperienceNo}
-              </span>
-              {application.industryTasks.map((task) => (
-                <span key={task} className="rcchip">
-                  {task}
-                </span>
-              ))}
-            </div>
-            {/* 지원 동기는 접지 않고 전량 노출한다 — 패널에 이미 스크롤이 있고, 잘린 문장은
-                판단에 쓸 수 없다. 목록에는 아예 넣지 않는 이유도 같다. */}
-            {application.motivation && <div className="rcnote">{application.motivation}</div>}
-            {application.sourceChannel && (
-              <div className="rckv" style={{ marginTop: 9 }}>
-                <Row label={copy.labelSource} value={application.sourceChannel} />
-              </div>
-            )}
-          </div>
-
-          <div className="pblock">
-            <div className="pblock__t">{copy.sectionVisa}</div>
-            <div className="rckv">
-              <Row label={copy.labelNationality} value={application.nationality} />
-              <Row label={copy.labelVisaType} value={application.visaType} />
-              <span className="rckv__k">{copy.labelVisaPeriod}</span>
-              <span className="rckv__v">
-                {application.visaPeriodRaw ? (
-                  <>
-                    <span className="rckv__v--mono">{application.visaPeriodRaw}</span>
-                    {/* 날짜로 읽지 못한 값은 원문만 보여주고 D-day 를 지어내지 않는다. */}
-                    {application.visaExpiryDate === null && (
-                      <span className="rcemp" style={{ marginLeft: 8 }}>
-                        {copy.visaUnreadable}
-                      </span>
-                    )}
-                    {application.visaDaysLeft !== null && application.visaAlert && (
-                      <span
-                        className={`rcchip rcchip--${
-                          application.visaAlert === "soon" ? "warn" : "danger"
-                        }`}
-                        style={{ marginLeft: 8 }}
-                      >
-                        {application.visaAlert === "expired"
-                          ? copy.chipVisaExpired
-                          : copy.chipVisaDays.replace("{n}", String(application.visaDaysLeft))}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="rckv__v--none">—</span>
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div className="pblock">
-            <div className="pblock__t">{copy.sectionResume}</div>
-            {application.hasResume ? (
-              <div className="rcfile">
-                <div className="rcfile__b">
-                  <div className="rcfile__n">{application.resumeFileName ?? "—"}</div>
-                  <div className="rcfile__m">
-                    <span className={`rcext ${resume.previewable ? "" : "rcext--plain"}`}>
-                      {resume.ext || "file"}
-                    </span>
-                    <span>
-                      {resume.previewable ? copy.resumePreviewable : copy.resumeNotPreviewable}
-                    </span>
-                  </div>
-                  <div className="rcfile__acts">
-                    {/* 열 수 없는 형식에 「열기」를 두면 빈 탭이 뜨고 담당자는 파일이 깨졌다고
-                        판단한다. 컨테이너는 그대로 두고 **액션 라벨만** 바꾼다. */}
-                    {resumeUrl ? (
-                      <a
-                        className="btn btn--pri btn--sm"
-                        href={resumeUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={resume.previewable ? undefined : (application.resumeFileName ?? true)}
-                      >
-                        {resume.previewable ? copy.resumeOpen : copy.resumeDownload}
-                      </a>
-                    ) : (
-                      <span className="rcemp">{copy.resumeUnavailable}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              // 첨부 없음은 결함이 아니라 **다른 검토 경로**다. 경고색을 쓰지 않는다.
-              <div className="rcnofile">
-                <div className="rcnofile__t">
-                  <FileText size={16} aria-hidden="true" />
-                  {copy.noResumeTitle}
-                </div>
-                <div className="rcnofile__s">{copy.noResumeBody}</div>
-              </div>
-            )}
-          </div>
-
-          {history.length > 0 && (
-            <div className="pblock">
-              <div className="pblock__t">
-                {copy.sectionHistory}
-                <span className="rcrow__sub" style={{ marginLeft: 8 }}>
-                  {copy.historyMatchNote}
-                </span>
-              </div>
-              <div className="rchist">
-                <div className="rchist__row">
-                  <span className="rchist__dot on" />
-                  <div className="rchist__b">
-                    <div className="rchist__h">
-                      <span className="rchist__d">
-                        {application.appliedAt?.slice(0, 10) ?? "—"}
-                      </span>
-                      <span className="rcchip rcchip--info">{copy.historyThis}</span>
-                    </div>
-                    <span className="rchist__s">
-                      {[application.jobTitle, application.employmentType, application.daysPerWeek]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
-                    </span>
-                  </div>
-                </div>
+          {history.length > 0 ? (
+            <section className="rcw-sec">
+              <small className="rcw-k">{copy.wPrevApplied}</small>
+              <ol className="rcw-hist">
                 {history.map((row) => (
-                  <div key={row.id} className="rchist__row">
-                    <span className="rchist__dot" />
-                    <div className="rchist__b">
-                      <div className="rchist__h">
-                        <span className="rchist__d">{row.appliedAt?.slice(0, 10) ?? "—"}</span>
-                        <span className="rcchip rcchip--warn">
-                          {copy.historyStoppedAt.replace("{status}", copy.status[row.status])}
-                        </span>
-                      </div>
-                      <span className="rchist__s">
-                        {[row.jobTitle, row.employmentType, row.daysPerWeek]
-                          .filter(Boolean)
-                          .join(" · ") || "—"}
-                      </span>
-                      {/* 이전 판정 사유를 보지 않고 같은 결정을 반복하는 게 가장 큰 손실이다. */}
-                      {row.reviewNote && <span className="rchist__note">{row.reviewNote}</span>}
-                    </div>
-                  </div>
+                  <li key={row.id}>
+                    <span className="rcw-hist__h">
+                      <b className="num">{row.appliedAt?.slice(0, 10).replaceAll("-", ".") ?? "—"}</b>
+                      <span>{join([row.jobTitle, row.employmentType])}</span>
+                      <em>{copy.historyStoppedAt.replace("{status}", copy.status[row.status])}</em>
+                    </span>
+                    {/* 이전 판정 사유를 보지 않고 같은 결정을 반복하는 게 가장 큰 손실이다. */}
+                    {row.reviewNote ? <span className="rcw-hist__note">{row.reviewNote}</span> : null}
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ol>
+            </section>
+          ) : null}
+
+          {a.hasResume ? (
+            resumeUrl ? (
+              <a
+                className="rcw-file"
+                href={resumeUrl}
+                target="_blank"
+                rel="noreferrer"
+                download={resume.previewable ? undefined : (a.resumeFileName ?? true)}
+              >
+                <FileText aria-hidden="true" />
+                <span className="rcw-file__n">{a.resumeFileName ?? "—"}</span>
+                <span className="rcw-file__a">{resume.previewable ? copy.wOpenResume : copy.resumeDownload}</span>
+              </a>
+            ) : (
+              <p className="rcw-legacy">{copy.resumeUnavailable}</p>
+            )
+          ) : (
+            // 첨부 없음은 결함이 아니라 다른 검토 경로 — 경고색을 쓰지 않는다.
+            <p className="rcw-legacy">{`${copy.noResumeTitle} — ${copy.noResumeBody}`}</p>
           )}
 
-          <RecruitContactBlock application={application} copy={copy} />
-          <RecruitNoteBlock application={application} copy={copy} />
+          <RecruitNoteField application={a} copy={copy} />
         </div>
 
-        {/* 액션 바는 본문 **밖**이다 — 안에 두면 내용과 함께 스크롤돼, 긴 지원 동기를 읽는 동안
-            「서류검토로 진행」이 화면 밖으로 밀려난다. `.panel` 이 세로 flex 라 여기 두면 바닥에
-            고정된다. */}
-        <RecruitPanelActions application={application} copy={copy} closeHref={closeHref} />
+        <RecruitPanelActions application={a} copy={copy} />
       </aside>
 
-      {/* 화면에서는 숨어 있고 인쇄할 때만 나타나는 A4 지원서 한 장(`recruit-console.css` 의
-          `@media print`). 休暇届 서식과 같은 방식이다. */}
-      <ApplicationPrintSheet application={application} copy={copy} />
+      {/* 화면에서는 숨어 있고 인쇄할 때만 나타나는 A4 지원서 한 장(`recruit-console.css` 의 `@media print`). */}
+      <ApplicationPrintSheet application={a} copy={copy} />
     </>
   );
 }

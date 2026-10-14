@@ -1,6 +1,5 @@
 "use client";
 
-import { Printer } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n";
 import type { ApplicationDetail } from "@/lib/recruit/applications";
 
@@ -50,15 +49,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="rcps__st">{title}</h2>
       <div className="rcps__grid">{children}</div>
     </section>
-  );
-}
-
-export function RecruitPrintButton({ copy }: { copy: Dictionary["recruit"] }) {
-  return (
-    <button type="button" className="panel__tool" onClick={() => window.print()}>
-      <Printer size={13} aria-hidden="true" />
-      {copy.printAction}
-    </button>
   );
 }
 

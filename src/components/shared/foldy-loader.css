@@ -15,3 +15,6 @@
   .fldr__bars i { animation: none; }
   .fldr__in { animation-duration: 1ms; }
 }
+
+/* PC 로딩 — 내용 칸(.content, 위 줄 아래 스크롤 칸) 정가운데. 60vh 높이로 두면 위에 붙어 가운데보다 높았다(2026-10-14 사용자 지적). */
+.adm .content .fldr:not(.fldr--fill) { position: absolute; inset: 0; min-height: 0; }

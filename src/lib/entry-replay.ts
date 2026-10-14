@@ -15,7 +15,9 @@ const listeners = new Set<() => void>();
 /** 동작 줄이기 · 태블릿 2분할의 상세 칸(같은 출처 프레임, `html[data-pane]`) 안에선 안 나온다 — 칸은 상세를 열 때마다 새로 불러온다. */
 function reducedMotion() {
   try {
-    if (document.documentElement.hasAttribute("data-pane") || window.self !== window.top) return true;
+    // PC 「모바일 보기」 미리보기도 프레임이지만 진짜 앱을 띄우는 거라 스플래시를 보여 준다 — 프레임 전체를 막았더니
+    // 서버 HTML 의 스플래시가 하이드레이션 순간 지워져 「뜰 때도 있고 안 뜰 때도 있음」이 됐다(2026-10-14 사용자 지적).
+    if (document.documentElement.hasAttribute("data-pane")) return true;
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   } catch {
     return true;

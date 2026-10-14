@@ -28,6 +28,8 @@ export type OrderItemVM = {
   memo: string;
   /** imageUrls?.length ?? 0 */
   photos: number;
+  /** 품목 사진 주소(패널 썸네일 · 2026-10-14 화이트 리디자인). */
+  photoUrls: string[];
   /** linkDomain(link) */
   domain: "amazon" | "ikea" | "other" | null;
 };
@@ -154,6 +156,7 @@ export async function getAdminOrders(
       link: item.link,
       memo: item.memo,
       photos: item.imageUrls?.length ?? 0,
+      photoUrls: item.imageUrls ?? [],
       domain: linkDomain(item.link),
     }));
 

@@ -1,22 +1,15 @@
 "use client";
 
-// Admin 주문·비품 console — 배송 예정 캘린더. 주문 처리됨(ordered) 주문의 배송일(단일/기간)을 월간
-// 캘린더에 레인 배치하고, 날짜를 선택하면 우측 dayPanel에 그날 배송 목록을 보여준다.
-// calEvents(orders-console-data.ts)의 그리디 인터벌 패킹을 그대로 사용한다.
-import { ChevronLeft, ChevronRight, MapPin, Truck } from "lucide-react";
-import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
+// Admin 주문·비품 console — 「배송 캘린더」 보기. 화이트 리디자인(2026-10-14, 시안 OrderCal-PC):
+// 월~일 달력(세로선 없음 · 주 사이 가로선만), 칸마다 그날 배송 칩(품목 · 건물), 오늘은 보라 동그라미,
+// 고른 날은 옅은 보라 바탕. 오른쪽에 그날 배송 목록(제목 · 건물 · 신청자 · 상태). 기간 배송은 걸친 날마다 칩.
+// 건물 고르기는 보기 줄(orders-console.tsx)에서 — 여기엔 이미 좁혀진 orders 가 온다.
+import { ChevronLeft, ChevronRight, PackageOpen, TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
-import { calEvents, fmtDate, fmtMonth, iso, WD, dateToNum, sortForBoard } from "./orders-console-data";
-import {
-  ErrorState,
-  OrderIcon,
-  ReporterAvatar,
-  StatusPill,
-  UrgBadge,
-  buildingOptionsOf,
-  type OrdersCopy,
-} from "./orders-console-shared";
+import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { STATUS, dateToNum, delivOnDate, fmtMonth, iso, sortForBoard, tpl, WD } from "./orders-console-data";
+import { copyOf, type OrdersCopy } from "./orders-console-shared";
 
 export type CalMonth = { y: number; m: number };
 
@@ -25,8 +18,6 @@ type CalendarProps = {
   t: OrdersCopy;
   locale: Locale;
   todayKey: string;
-  calProp: string;
-  onCalPropChange: (v: string) => void;
   calMonth: CalMonth;
   onCalMonthChange: (next: CalMonth) => void;
   calSel: string | null;
@@ -36,11 +27,15 @@ type CalendarProps = {
   onRetry: () => void;
 };
 
-const MAX_LANES = 3;
+const MAX_CHIPS = 2;
 
-function shiftMonth(month: CalMonth, delta: number): CalMonth {
-  const total = month.y * 12 + month.m + delta;
-  return { y: Math.floor(total / 12), m: ((total % 12) + 12) % 12 };
+function monthKeyOf(m: CalMonth): string {
+  return `${m.y}-${String(m.m + 1).padStart(2, "0")}`;
+}
+
+function shift(m: CalMonth, delta: number): CalMonth {
+  const key = shiftMonthKey(monthKeyOf(m), delta);
+  return { y: +key.slice(0, 4), m: +key.slice(5, 7) - 1 };
 }
 
 export function OrdersCalendar({
@@ -48,8 +43,6 @@ export function OrdersCalendar({
   t,
   locale,
   todayKey,
-  calProp,
-  onCalPropChange,
   calMonth,
   onCalMonthChange,
   calSel,
@@ -58,203 +51,137 @@ export function OrdersCalendar({
   loadError,
   onRetry,
 }: CalendarProps) {
-  const buildingOptions = buildingOptionsOf(orders);
-  const buildingBar = (
-    <div className="ctoolbar filterbar" style={{ marginBottom: 14 }}>
-      <span style={{ fontSize: 12, fontWeight: 800, color: "var(--adm-muted)", display: "inline-flex", alignItems: "center", gap: 7 }}>
-        <MapPin className="ic" aria-hidden="true" />
-        {t.calBuilding}
-      </span>
-      <AdmDropdown
-        size="sm"
-        value={calProp}
-        onChange={onCalPropChange}
-        ariaLabel={t.calBuilding}
-        options={[{ value: "all", label: t.allProp }, ...buildingOptions.map((b) => ({ value: b.key, label: b.label }))]}
-      />
-      <span className="ctoolbar__spacer" />
-      <span className="robadge">
-        <Truck className="ic" aria-hidden="true" />
-        {t.subtitle.split("·").pop()?.trim() ?? ""}
-      </span>
-    </div>
-  );
-
   if (loadError) {
     return (
-      <>
-        {buildingBar}
-        <ErrorState t={t} onRetry={onRetry} />
-      </>
+      <div className="lfw-empty">
+        <TriangleAlert aria-hidden="true" />
+        <b>{t.errT}</b>
+        <span>{t.errS}</span>
+        <button type="button" className="btn btn--pri btn--sm" onClick={onRetry}>
+          {t.retry}
+        </button>
+      </div>
     );
   }
 
   const { y, m } = calMonth;
-  const { evs, dayMap } = calEvents(orders, calProp);
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const firstDow = new Date(y, m, 1).getDay();
-  const monthFirst = dateToNum(iso(y, m, 1));
-  const weeksCount = Math.ceil((firstDow + daysInMonth) / 7);
+  const ordered = orders.filter((o) => o.status === "ordered" && o.deliv);
+  const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const firstDow = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7; // Mon = 0
+  const cells: ({ key: string; d: number } | null)[] = [
+    ...Array.from({ length: firstDow }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => ({ key: iso(y, m, i + 1), d: i + 1 })),
+  ];
+  while (cells.length % 7) cells.push(null);
+  const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
+  const wd = Array.from({ length: 7 }, (_, i) => WD[locale][(i + 1) % 7]);
 
-  const weeks = Array.from({ length: weeksCount }, (_, w) => {
-    const wStart = monthFirst - firstDow + w * 7;
-    const wEnd = wStart + 6;
-    const cells = Array.from({ length: 7 }, (_, i) => {
-      const n = wStart + i;
-      const dt = new Date(n * 86400000);
-      const val = iso(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
-      const inMonth = dt.getUTCMonth() === m;
-      const hidden = evs.filter((ev) => ev.lane >= MAX_LANES && n >= ev.s && n <= ev.e).length;
-      const cls = ["oday-cell", i === 0 ? "sun" : "", !inMonth ? "oomonth" : "", val === todayKey ? "today" : "", calSel === val ? "sel" : ""]
-        .filter(Boolean)
-        .join(" ");
-      return (
-        <button type="button" key={val} className={cls} onClick={() => onCalSelChange(val)}>
-          <span className="oday-cell__d">{dt.getUTCDate()}</span>
-          {hidden ? <span className="oday-cell__more">+{hidden}</span> : null}
-        </button>
-      );
-    });
-
-    const wkEvs = evs.filter((ev) => ev.e >= wStart && ev.s <= wEnd && ev.lane < MAX_LANES);
-    const bars = wkEvs.map((ev) => {
-      const segS = Math.max(ev.s, wStart);
-      const segE = Math.min(ev.e, wEnd);
-      const c0 = segS - wStart + 1;
-      const c1 = segE - wStart + 2;
-      const contL = segS !== ev.s;
-      const contR = segE !== ev.e;
-      const cl = ["evbar", ev.urgent ? "urg" : "", contL ? "contL" : "", contR ? "contR" : ""].filter(Boolean).join(" ");
-      return (
-        <span
-          key={ev.o.id}
-          className={cl}
-          style={{ gridColumn: `${c0}/${c1}`, gridRow: ev.lane + 1 }}
-          title={ev.o.title}
-          onClick={() => onSelectOrder(ev.o.id)}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="dotm" />
-          <span className="evbar__t">{ev.o.title}</span>
-        </span>
-      );
-    });
-
-    return (
-      <div className="owk" key={wStart}>
-        <div className="owk-cells">{cells}</div>
-        <div className="owk-ev">{bars}</div>
-      </div>
-    );
-  });
-
-  const wd = WD[locale].map((w, i) => (
-    <span key={w} className={i === 0 ? "sun" : ""}>
-      {w}
-    </span>
-  ));
-
-  const grid = (
-    <div className="ocal">
-      <div className="ocal__head">
-        <div className="ocal__nav">
-          <button type="button" className="ocal__navb" onClick={() => onCalMonthChange(shiftMonth(calMonth, -1))}>
-            <ChevronLeft aria-hidden="true" />
-          </button>
-          <button type="button" className="ocal__navb" onClick={() => onCalMonthChange(shiftMonth(calMonth, 1))}>
-            <ChevronRight aria-hidden="true" />
-          </button>
-        </div>
-        <div className="ocal__title">{fmtMonth(y, m, locale)}</div>
-        <button
-          type="button"
-          className="ocal__today"
-          onClick={() => onCalMonthChange({ y: +todayKey.slice(0, 4), m: +todayKey.slice(5, 7) - 1 })}
-        >
-          {t.calToday}
-        </button>
-        <div className="ocal__legend">
-          <span className="ocal__lg">
-            <span className="ocal__lgdot d" />
-            {t.calLegendDeliv}
-          </span>
-          <span className="ocal__lg">
-            <span className="ocal__lgdot u" />
-            {t.calLegendUrgent}
-          </span>
-        </div>
-      </div>
-      <div className="ocal__wd">{wd}</div>
-      <div className="ocal__grid">{weeks}</div>
-    </div>
-  );
-
-  const dayList = calSel ? dayMap[calSel] : null;
-  const dayPanel = (
-    <div className="oday">
-      <div className="oday__h">
-        <Truck className="ic" aria-hidden="true" />
-        {calSel ? (
-          <>
-            <span className="oday__dt">{fmtDate(calSel, locale)}</span>
-            {dayList ? <span className="oday__cnt">{dayList.length}{t.calCount}</span> : null}
-          </>
-        ) : null}
-      </div>
-      {!calSel ? (
-        <div className="oday__empty">
-          <OrderIcon name="caldays" className="ic" />
-          <div className="t">{t.calPickDay}</div>
-        </div>
-      ) : !dayList || !dayList.length ? (
-        <div className="oday__empty">
-          <OrderIcon name="package" className="ic" />
-          <div className="t">{t.calNoDeliv}</div>
-        </div>
-      ) : (
-        <div className="oday__list">
-          {sortForBoard(dayList).map((o) => (
-            <div
-              key={o.id}
-              className={`odrow${o.urgency === "high" ? " is-urgent" : ""}`}
-              onClick={() => onSelectOrder(o.id)}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="odrow__top">
-                <span className="odrow__bldg">
-                  {o.buildingLabel}
-                  {o.room ? ` · ${o.room}` : ""}
-                </span>
-                {o.urgency === "high" ? <UrgBadge t={t} /> : null}
-                {o.deliv?.mode === "range" ? (
-                  <span className="rng">
-                    {t.calRangeTo} {fmtDate(o.deliv.end, locale)}
-                  </span>
-                ) : null}
-              </div>
-              <div className="odrow__title">{o.title}</div>
-              <div className="odrow__meta">
-                <ReporterAvatar id={o.reporterId} name={o.reporterName} className="who__av" />
-                <span>{o.reporterName}</span>
-                <span className="mcard__sp" />
-                <StatusPill status={o.status} t={t} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const dayList = calSel ? sortForBoard(ordered.filter((o) => delivOnDate(o.deliv, calSel))) : [];
+  const diff = calSel ? dateToNum(calSel) - dateToNum(todayKey) : null;
+  const rel = diff === 0 ? t.calToday : diff === 1 ? t.wTomorrow : null;
+  const selLabel = calSel
+    ? new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(
+        new Date(dateToNum(calSel) * 86400000),
+      )
+    : "";
 
   return (
-    <>
-      {buildingBar}
-      <div className="ocalwrap">
-        {grid}
-        {dayPanel}
+    <div className="ow-cal">
+      <div className="ow-cal__main">
+        <div className="ow-cal__head">
+          <button type="button" className="ow-navb" aria-label={t.wPrevMonth} onClick={() => onCalMonthChange(shift(calMonth, -1))}>
+            <ChevronLeft aria-hidden="true" />
+          </button>
+          <b className="num">{fmtMonth(y, m, locale)}</b>
+          <button type="button" className="ow-navb" aria-label={t.wNextMonth} onClick={() => onCalMonthChange(shift(calMonth, 1))}>
+            <ChevronRight aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="ow-link"
+            onClick={() => {
+              onCalMonthChange({ y: +todayKey.slice(0, 4), m: +todayKey.slice(5, 7) - 1 });
+              onCalSelChange(todayKey);
+            }}
+          >
+            {t.calToday}
+          </button>
+        </div>
+        <div className="ow-cal__wd">
+          {wd.map((d, i) => (
+            <span key={i}>{d}</span>
+          ))}
+        </div>
+        {weeks.map((week, wi) => (
+          <div className="ow-cal__wk" key={wi}>
+            {week.map((c, ci) =>
+              c ? (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`ow-day${calSel === c.key ? " on" : ""}${c.key === todayKey ? " is-today" : ""}`}
+                  onClick={() => onCalSelChange(c.key)}
+                >
+                  <span className="ow-day__n num">{c.d}</span>
+                  {(() => {
+                    const list = sortForBoard(ordered.filter((o) => delivOnDate(o.deliv, c.key)));
+                    return (
+                      <>
+                        {list.slice(0, MAX_CHIPS).map((o) => (
+                          <span key={o.id} className={`ow-chip${o.urgency === "high" ? " is-urg" : ""}`}>
+                            {o.items[0]?.name ?? o.title} · {o.buildingLabel}
+                          </span>
+                        ))}
+                        {list.length > MAX_CHIPS ? <span className="ow-day__more">+{list.length - MAX_CHIPS}</span> : null}
+                      </>
+                    );
+                  })()}
+                </button>
+              ) : (
+                <span key={`x${ci}`} className="ow-day is-blank" aria-hidden="true" />
+              ),
+            )}
+          </div>
+        ))}
       </div>
-    </>
+
+      <aside className="ow-cal__side" aria-live="polite">
+        {calSel ? (
+          <>
+            <span className="ow-cal__kick">{t.wDelivKicker}</span>
+            <b className="ow-cal__date">{selLabel}</b>
+            <span className="ow-cal__sub">
+              {tpl(t.wDayCount, { n: dayList.length })}
+              {rel ? ` · ${rel}` : ""}
+            </span>
+            {dayList.length ? (
+              <div className="ow-cal__list">
+                {dayList.map((o) => (
+                  <button key={o.id} type="button" className="ow-cal__row" onClick={() => onSelectOrder(o.id)}>
+                    <b>
+                      {o.urgency === "high" ? <em className="ow-urg">{t.urgent}</em> : null}
+                      {o.title}
+                    </b>
+                    <span>
+                      {o.buildingLabel} · {tpl(t.wReqBy, { who: o.reporterName })} · {copyOf(t, STATUS[o.status].key)}
+                      {o.deliv?.mode === "range"
+                        ? ` · ${+o.deliv.start.slice(5, 7)}/${+o.deliv.start.slice(8)}–${+o.deliv.end.slice(5, 7)}/${+o.deliv.end.slice(8)}`
+                        : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="ow-cal__empty">
+                <PackageOpen aria-hidden="true" />
+                {t.calNoDeliv}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="ow-cal__empty">{t.wCalPick}</div>
+        )}
+      </aside>
+    </div>
   );
 }

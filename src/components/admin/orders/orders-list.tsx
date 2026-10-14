@@ -1,286 +1,97 @@
 "use client";
 
-// Admin 주문·비품 console — 목록·이력 뷰. 전체 4상태(승인 대기/주문 대기/주문 처리됨/종결)를 요청일 범위로
-// 필터링. Mirrors maintenance-list.tsx's "list" scope / lost-found-list.tsx.
-import { Search, X } from "lucide-react";
-import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
-import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
-import type { Dictionary, Locale } from "@/lib/i18n";
+// Admin 주문·비품 console — 「전체 기록」 보기. 화이트 리디자인(2026-10-14, 시안 OrderAll-PC): 상자 없는 표 —
+// 요청일 · 제목(긴급이면 빨간 「긴급」) · 건물 · 요청자 · 상태(거절은 회색) · 배송. 고르기 · 검색 · 기간은
+// 콘솔(orders-console.tsx)이 적용해 행만 넘겨준다. 예전 「완료」 보기는 여기 상태 고르기로 합쳤다.
+import { SearchX, TriangleAlert } from "lucide-react";
+import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
-import { OrdersExportBar } from "./orders-export-bar";
-import { LIST_STATUS, STATUS, fmtDate, fmtDateTime, parseTs } from "./orders-console-data";
-import {
-  EmptyState,
-  ErrorState,
-  ItemSummary,
-  OrderIcon,
-  ReporterAvatar,
-  StatusPill,
-  UrgBadge,
-  buildingOptionsOf,
-  copyOf,
-  localeTagOf,
-  locationLabel,
-  reporterOptionsOf,
-  type OrdersCopy,
-  type OrdersFilters,
-} from "./orders-console-shared";
-import type { OrderStatus } from "./orders-console-data";
+import { STATUS } from "./orders-console-data";
+import { copyOf, type OrdersCopy } from "./orders-console-shared";
 
 type ListProps = {
-  orders: AdminOrderVM[];
-  allOrders: AdminOrderVM[];
+  rows: AdminOrderVM[];
   t: OrdersCopy;
-  sharedLabels: Dictionary["admin"]["shared"];
   locale: Locale;
-  filters: OrdersFilters;
-  onFilterChange: <K extends keyof OrdersFilters>(key: K, value: OrdersFilters[K]) => void;
-  onRangeChange: (from: string, to: string) => void;
-  onClearFilters: () => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onClearFilters: () => void;
   loadError?: boolean;
   onRetry: () => void;
 };
 
-export function OrdersList({
-  orders,
-  allOrders,
-  t,
-  sharedLabels,
-  locale,
-  filters,
-  onFilterChange,
-  onRangeChange,
-  onClearFilters,
-  selectedId,
-  onSelect,
-  loadError,
-  onRetry,
-}: ListProps) {
-  const localeTag = localeTagOf(locale);
-  const buildingOptions = buildingOptionsOf(allOrders);
-  const reporterOptions = reporterOptionsOf(allOrders);
+/** "YYYY-MM-DD" → "10/9" (요일 없는 짧은 표기 · 도쿄 날짜 키 그대로). */
+export function shortDate(d: string): string {
+  return `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
+}
 
-  const toolbar = (
-    <div className="ctoolbar filterbar">
-      <AdminDateRangePicker
-        from={filters.from}
-        to={filters.to}
-        onChange={onRangeChange}
-        localeTag={localeTag}
-        ariaLabel={sharedLabels.pickRange}
-        labels={{
-          prevMonth: sharedLabels.datePrevMonth,
-          nextMonth: sharedLabels.dateNextMonth,
-          thisMonth: sharedLabels.dateThisMonth,
-          reset: sharedLabels.dateReset,
-          typeStart: sharedLabels.dateTypeStart,
-          typeEnd: sharedLabels.dateTypeEnd,
-          pickYear: sharedLabels.datePickYear,
-          pickMonth: sharedLabels.datePickMonth,
-          apply: sharedLabels.dateApply,
-        }}
-      />
-      <AdmDropdown
-        size="sm"
-        value={filters.status}
-        onChange={(v) => onFilterChange("status", v as OrderStatus | "all")}
-        ariaLabel={t.colStatus}
-        options={[
-          { value: "all", label: t.allStatus },
-          ...LIST_STATUS.map((s) => ({ value: s, label: copyOf(t, STATUS[s].key) })),
-        ]}
-      />
-      <AdmDropdown
-        size="sm"
-        value={filters.urgency}
-        onChange={(v) => onFilterChange("urgency", v as OrdersFilters["urgency"])}
-        ariaLabel={t.allUrgency}
-        options={[
-          { value: "all", label: t.allUrgency },
-          { value: "high", label: t.urgent },
-          { value: "normal", label: t.normal },
-        ]}
-      />
-      <AdmDropdown
-        size="sm"
-        value={filters.prop}
-        onChange={(v) => onFilterChange("prop", v)}
-        ariaLabel={t.allProp}
-        options={[
-          { value: "all", label: t.allProp },
-          ...buildingOptions.map((b) => ({ value: b.key, label: b.label })),
-        ]}
-      />
-      <AdmDropdown
-        size="sm"
-        value={filters.reporter}
-        onChange={(v) => onFilterChange("reporter", v)}
-        ariaLabel={t.allReporter}
-        options={[
-          { value: "all", label: t.allReporter },
-          ...reporterOptions.map((r) => ({ value: r.id, label: r.name })),
-        ]}
-      />
-      <div className="qsearch qsearch--inline">
-        <span className="ic">
-          <Search aria-hidden="true" />
-        </span>
-        <input placeholder={t.search} value={filters.query} onChange={(e) => onFilterChange("query", e.target.value)} />
-        {filters.query ? (
-          <button type="button" className="qsearch__clear" onClick={() => onFilterChange("query", "")}>
-            <span className="ic">
-              <X aria-hidden="true" />
-            </span>
-          </button>
-        ) : null}
-      </div>
-      <div className="expbar">
-        <span className="expbar__lb">{t.export}</span>
-        <OrdersExportBar
-          disabled={orders.length === 0}
-          filters={{
-            startDate: filters.from,
-            endDate: filters.to,
-            status: filters.status === "all" ? undefined : filters.status,
-          }}
-          labels={sharedLabels}
-        />
-      </div>
-    </div>
-  );
+export function delivShort(o: AdminOrderVM): string | null {
+  if (!o.deliv) return null;
+  return o.deliv.mode === "range" ? `${shortDate(o.deliv.start)}–${shortDate(o.deliv.end)}` : shortDate(o.deliv.date);
+}
 
+export function OrdersList({ rows, t, selectedId, onSelect, onClearFilters, loadError, onRetry }: ListProps) {
   if (loadError) {
     return (
-      <>
-        {toolbar}
-        <ErrorState t={t} onRetry={onRetry} />
-      </>
+      <div className="lfw-empty">
+        <TriangleAlert aria-hidden="true" />
+        <b>{t.errT}</b>
+        <span>{t.errS}</span>
+        <button type="button" className="btn btn--pri btn--sm" onClick={onRetry}>
+          {t.retry}
+        </button>
+      </div>
     );
   }
 
-  const q = filters.query.trim().toLowerCase();
-  const rows = orders
-    .filter((o) => {
-      const day = o.reqDate;
-      if (day < filters.from || day > filters.to) return false;
-      if (filters.status !== "all" && o.status !== filters.status) return false;
-      if (filters.urgency !== "all" && o.urgency !== filters.urgency) return false;
-      if (filters.prop !== "all" && o.buildingKey !== filters.prop) return false;
-      if (filters.reporter !== "all" && o.reporterId !== filters.reporter) return false;
-      if (
-        q &&
-        !(
-          o.title.toLowerCase().includes(q) ||
-          locationLabel(o, t.buildingWhole).toLowerCase().includes(q) ||
-          o.reporterName.toLowerCase().includes(q) ||
-          o.items.some((it) => it.name.toLowerCase().includes(q))
-        )
-      ) {
-        return false;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const ua = a.urgency === "high";
-      const ub = b.urgency === "high";
-      if (ua !== ub) return ua ? -1 : 1;
-      return (parseTs(b.reqAt) ?? 0) - (parseTs(a.reqAt) ?? 0);
-    });
-
   if (!rows.length) {
     return (
-      <>
-        {toolbar}
-        <EmptyState
-          iconName="clock"
-          title={t.emptyListT}
-          sub={t.emptyListS}
-          actionLabel={t.clearFilter}
-          onAction={onClearFilters}
-        />
-      </>
+      <div className="lfw-empty">
+        <SearchX aria-hidden="true" />
+        <b>{t.emptyListT}</b>
+        <span>{t.emptyListS}</span>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onClearFilters}>
+          {t.clearFilter}
+        </button>
+      </div>
     );
   }
 
   return (
-    <>
-      {toolbar}
-      <div className="hmeta">
-        <b style={{ color: "var(--ink-soft)" }}>
-          {rows.length}
-          {t.calCount}
-        </b>
-        <span className="sep" />
-        {`${fmtDate(filters.from, locale)} – ${fmtDate(filters.to, locale)}`}
+    <div className="lfw-grid ow-grid">
+      <div className="lfw-gh">
+        <span>{t.wColReqDate}</span>
+        <span>{t.colTitle}</span>
+        <span>{t.wColBuilding}</span>
+        <span>{t.colReporter}</span>
+        <span>{t.colStatus}</span>
+        <span className="r">{t.wColDeliv}</span>
       </div>
-      <div className="card" style={{ overflow: "auto" }}>
-        <table className="qtbl mtbl">
-          <thead>
-            <tr>
-              <th style={{ paddingLeft: 16 }}>{t.colLoc}</th>
-              <th>{t.colTitle}</th>
-              <th>{t.colStatus}</th>
-              <th>{t.colReporter}</th>
-              <th>{t.colReqAt}</th>
-              <th>{t.colDeliv}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((o) => (
-              <tr
-                key={o.id}
-                className={[o.urgency === "high" ? "row-urg" : "", selectedId === o.id ? "sel" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => onSelect(o.id)}
-              >
-                <td style={{ paddingLeft: 16 }}>
-                  {o.buildingLabel}
-                  <div className="tt-loc mono">{o.room ?? t.buildingWhole}</div>
-                </td>
-                <td>
-                  <span className="tt-title">
-                    {o.title}
-                    {o.urgency === "high" ? (
-                      <>
-                        {" "}
-                        <UrgBadge t={t} />
-                      </>
-                    ) : null}
-                  </span>
-                  <div className="items-cell">
-                    <OrderIcon name="package" /> <ItemSummary items={o.items} t={t} /> · {t.qtyTotal} {o.totalQty}
-                    {t.qtyUnit}
-                  </div>
-                </td>
-                <td>
-                  <StatusPill status={o.status} t={t} />
-                </td>
-                <td>
-                  <span className="who">
-                    <ReporterAvatar id={o.reporterId} name={o.reporterName} className="who__av" />
-                    <span className="who__nm">{o.reporterName}</span>
-                  </span>
-                </td>
-                <td className="dim-cell mono">{fmtDateTime(o.reqAt, locale)}</td>
-                <td>
-                  {o.deliv ? (
-                    <span className="deliv-cell">
-                      {o.deliv.mode === "range"
-                        ? `${fmtDate(o.deliv.start, locale)} ${t.calRangeTo} ${fmtDate(o.deliv.end, locale)}`
-                        : fmtDate(o.deliv.date, locale)}
-                    </span>
-                  ) : (
-                    <span className="deliv-cell is-tbd">{t.delivTBD}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="lfw-rows">
+        {rows.map((o) => {
+          const deliv = delivShort(o);
+          return (
+            <button
+              key={o.id}
+              type="button"
+              className={`lfw-gr${selectedId === o.id ? " on" : ""}`}
+              onClick={() => onSelect(o.id)}
+            >
+              <b className="num">{shortDate(o.reqDate)}</b>
+              <span className="ell ow-gr__t">
+                {o.urgency === "high" ? <em className="ow-urg">{t.urgent}</em> : null}
+                <span className="strong">{o.title}</span>
+              </span>
+              <span className="ell">{o.buildingLabel}</span>
+              <span className="ell">{o.reporterName}</span>
+              <span className={o.status === "closed" ? "dim" : ""}>
+                {o.status === "closed" ? t.wStClosed : copyOf(t, STATUS[o.status].key)}
+              </span>
+              <span className="r num">{deliv ?? <span className="dim">—</span>}</span>
+            </button>
+          );
+        })}
       </div>
-    </>
+    </div>
   );
 }

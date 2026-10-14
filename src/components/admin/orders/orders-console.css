@@ -238,3 +238,149 @@
 .adm .datepick .v { font-variant-numeric: tabular-nums; }
 .adm .datepick .v.ph { color: var(--faint); font-weight: 600; }
 .adm .datepick:hover { border-color: color-mix(in oklab, var(--adm-primary) 34%, var(--line)); }
+
+/* ── 화이트 리디자인(2026-10-14, 시안 Order-PC · OrderCal-PC · OrderAll-PC · OrderAct-PC · OrderEdit-PC) ──
+   분실물 리디자인(.lfw-* · .lfp · .lfm, lost-found-console.css)을 그대로 쓰고 주문에만 있는 것만 여기에.
+   상자 · 세로선 없음, 선택은 옅은 보라 바탕만, 줄 버튼은 바탕 없는 보라 글자(진한 버튼은 패널 하나만). */
+.adm .ow-viewbar .flex { gap: 2px; }
+.adm .ow-viewbar .chipbtn { height: 34px; padding: 0 8px; border: 0; background: transparent; font-size: 14px; font-weight: 500; color: #3a3746; }
+.adm .ow-viewbar .chipbtn:hover { background: #f4f4f7; }
+.adm .ow-viewbar .chipbtn svg, .adm .ow-viewbar .chipbtn .ic { width: 15px; height: 15px; font-size: 15px; color: #6b6878; }
+.adm .ow-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
+.adm .ow-filters .dd > button { border: 0; background: transparent; box-shadow: none; }
+.adm .ow-search { width: 248px; }
+.adm .ow-filters__count { margin-left: auto; font-size: 12px; color: #6b6878; }
+.adm .ow-urg { margin-right: 6px; font-style: normal; font-size: 12px; font-weight: 600; color: #c5282e; }
+.adm .ow-urg::after { content: "·"; margin-left: 6px; color: #c9c6d3; font-weight: 400; }
+.adm .ow-link { height: 32px; padding: 0 6px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 500; color: #7a52e6; cursor: pointer; }
+.adm .ow-link:hover { background: #f4f1fd; }
+.adm .ow-navb { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 9px; background: none; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .ow-navb:hover { background: #f4f4f7; }
+.adm .ow-navb:active { transform: scale(.94); }
+.adm .ow-navb svg { width: 16px; height: 16px; }
+
+/* 처리 중 — 이번 주 배송 7칸 + 묶음 줄 */
+.adm .ow-queue { display: flex; flex-direction: column; gap: 26px; }
+.adm .ow-sech { display: flex; align-items: center; gap: 10px; }
+.adm .ow-sech b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .ow-sech .num { font-size: 13px; color: #8b8898; }
+.adm .ow-sech .ow-link { margin-left: auto; }
+.adm .ow-week__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.adm .ow-wd { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 78px; padding: 10px 12px; border-radius: 12px; box-sizing: border-box; }
+.adm .ow-wd.is-today { background: #f4f1fd; }
+.adm .ow-wd__h { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: #6b6878; }
+.adm .ow-wd__h b { font-size: 16px; font-weight: 700; color: #16141f; }
+.adm .ow-wd__it { display: block; max-width: 100%; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; line-height: 1.4; color: #3a3746; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.adm .ow-wd__it:hover { color: #5a30cf; }
+.adm .ow-wd__more { font-size: 12px; color: #6b6878; }
+.adm .ow-grp__h { display: flex; align-items: center; gap: 8px; padding: 0 12px 6px; }
+.adm .ow-grp__h b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .ow-grp__h .num { font-size: 13px; color: #8b8898; }
+.adm .ow-grp__hint { margin-left: auto; font-size: 12px; color: #6b6878; }
+.adm .ow-qr { grid-template-columns: minmax(0, 1fr) minmax(96px, 150px) minmax(80px, 110px) 92px auto; column-gap: 16px; }
+.adm .ow-qr__t { display: flex; align-items: center; min-width: 0; }
+.adm .ow-qr__t b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .ow-qr__who { font-size: 13px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .ow-qr__age { font-size: 12px; color: #6b6878; white-space: nowrap; }
+.adm .ow-act { height: 44px; min-width: 72px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .ow-act:hover { background: #ece5fc; }
+.adm .ow-act:active { transform: scale(.97); }
+
+/* 전체 기록 표 */
+.adm .ow-grid .lfw-gh, .adm .ow-grid .lfw-gr { grid-template-columns: 56px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .8fr) 112px 96px; }
+.adm .ow-gr__t { display: flex; align-items: center; }
+
+/* 배송 캘린더 */
+.adm .ow-cal { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
+.adm .ow-cal__head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.adm .ow-cal__head b { min-width: 120px; text-align: center; font-size: 16px; font-weight: 700; color: #16141f; }
+.adm .ow-cal__wd, .adm .ow-cal__wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.adm .ow-cal__wd span { padding: 0 12px 8px; font-size: 12px; color: #8b8898; }
+.adm .ow-cal__wk { border-top: 1px solid #f1f1f4; }
+.adm .ow-day { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; min-height: 96px; padding: 10px 8px 8px; border: 0; border-radius: 12px; background: none; font: inherit; text-align: left; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .ow-day:hover { background: #faf9fc; }
+.adm .ow-day:active { transform: scale(.985); }
+.adm .ow-day.on { background: #f4f1fd; }
+.adm .ow-day.is-blank { cursor: default; }
+.adm .ow-day__n { display: grid; place-items: center; width: 26px; height: 26px; margin-left: 2px; border-radius: 50%; font-size: 13px; font-weight: 600; color: #16141f; }
+.adm .ow-day.is-today .ow-day__n { background: #7a52e6; color: #fff; }
+.adm .ow-chip { display: block; max-width: 100%; box-sizing: border-box; padding: 3px 7px; border-radius: 7px; background: #f4f4f7; font-size: 11.5px; color: #3a3746; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .ow-day.on .ow-chip { background: #fff; }
+.adm .ow-chip.is-urg { color: #c5282e; }
+.adm .ow-day__more { padding-left: 4px; font-size: 11.5px; color: #6b6878; }
+.adm .ow-cal__side { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 4px; }
+.adm .ow-cal__kick { font-size: 12px; color: #6b6878; }
+.adm .ow-cal__date { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .ow-cal__sub { font-size: 13px; color: #6b6878; padding-bottom: 12px; border-bottom: 1px solid #f1f1f4; }
+.adm .ow-cal__list { display: flex; flex-direction: column; }
+.adm .ow-cal__row { display: flex; flex-direction: column; gap: 3px; padding: 12px 8px; border: 0; border-bottom: 1px solid #f3f3f6; background: none; font: inherit; text-align: left; cursor: pointer; border-radius: 0; transition: background 150ms ease; animation: lfw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .ow-cal__row:hover { background: #faf9fc; border-radius: 10px; }
+.adm .ow-cal__row b { display: flex; align-items: center; font-size: 14px; font-weight: 600; color: #16141f; }
+.adm .ow-cal__row span { font-size: 12px; color: #6b6878; }
+.adm .ow-cal__empty { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px 0; font-size: 13px; color: #6b6878; }
+.adm .ow-cal__empty svg { width: 20px; height: 20px; color: #8b8898; }
+
+/* 상세 패널 */
+.adm .owp .ow-items { display: flex; flex-direction: column; }
+.adm .owp .ow-items__h { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 6px; }
+.adm .owp .ow-items__h b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .owp .ow-items__h .num { font-size: 13px; color: #8b8898; }
+.adm .owp .ow-item { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; border-top: 1px solid #f3f3f6; }
+.adm .owp .ow-item__ph { position: relative; display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 10px; overflow: hidden; background: #f2f2f5; color: #8b8898; }
+.adm .owp .ow-item__ph svg { width: 16px; height: 16px; }
+.adm .owp .ow-item__ph img { object-fit: cover; }
+.adm .owp .ow-item__phn { position: absolute; right: 2px; bottom: 2px; padding: 0 4px; border-radius: 6px; background: rgba(22, 20, 31, .62); font-size: 10px; color: #fff; }
+.adm .owp .ow-item__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.adm .owp .ow-item__n { font-size: 14px; font-weight: 500; color: #16141f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .owp .ow-item__s { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: #6b6878; }
+.adm .owp .ow-item__s a { display: inline-flex; align-items: center; gap: 4px; color: #6b6878; flex: none; }
+.adm .owp .ow-item__s a:hover { color: #5a30cf; }
+.adm .owp .ow-item__s svg { width: 12px; height: 12px; }
+.adm .owp .ow-item__s a + .ow-item__m::before { content: "·"; margin-right: 8px; color: #c9c6d3; }
+.adm .owp .ow-item__m { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .owp .ow-item__q { font-size: 14px; font-weight: 600; color: #16141f; }
+.adm .owp .lfp__dl { border-top: 0; padding-top: 0; }
+.adm .owp .ow-two { grid-template-columns: 1fr 1fr; }
+.adm .owp .ow-two .lfp__main { height: 44px; }
+.adm .owp .ow-two .lfp__gray { height: 44px; font-size: 15px; }
+.adm .owp .ow-links { display: grid; grid-template-columns: 1fr 1fr; }
+.adm .owp .ow-note { text-align: center; color: #6b6878; }
+
+/* 처리 창 */
+.adm .modal.lfm.owm { width: 480px; max-height: calc(100vh - 48px); overflow-y: auto; }
+.adm .modal.lfm.owm--edit { width: 600px; }
+.adm .owm .owm-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.adm .owm .owm-lbl { margin: 0; }
+.adm .owm .owm-seg { width: 160px; flex: none; }
+.adm .owm .owm-seg4 { grid-template-columns: repeat(4, 1fr); }
+.adm .owm .owm-grow { flex: 1; min-width: 0; }
+.adm .owm .lfm__nf input[readonly] { cursor: default; }
+.adm .owm-cal { display: flex; flex-direction: column; gap: 6px; }
+.adm .owm-cal__h { display: flex; align-items: center; justify-content: space-between; }
+.adm .owm-cal__h b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .owm-cal__g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
+.adm .owm-cal__wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: #8b8898; }
+.adm .owm-day { position: relative; height: 38px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; color: #16141f; font-variant-numeric: tabular-nums; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.adm .owm-day:hover { background: #f4f4f7; }
+.adm .owm-day:active { transform: scale(.97); }
+.adm .owm-day.is-in { background: #f1ecfd; border-radius: 0; }
+.adm .owm-day.is-sel { background: #7a52e6; color: #fff; font-weight: 600; }
+.adm .owm-day.is-today { font-weight: 600; }
+.adm .owm-day.is-today::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
+.adm .owm-items { display: flex; flex-direction: column; }
+.adm .owm-items__h { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 4px; }
+.adm .owm-items__h b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .owm-items__h .num { font-size: 12px; color: #6b6878; }
+.adm .owm-item { display: flex; flex-direction: column; gap: 14px; padding: 16px 0 4px; border-top: 1px solid #f3f3f6; animation: revIn 200ms ease; }
+.adm .owm-item__top { display: grid; grid-template-columns: minmax(0, 1fr) 76px 40px; gap: 8px; align-items: center; }
+.adm .owm-item__sub { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-right: 48px; }
+.adm .owm .owm-qty input { text-align: center; }
+.adm .owm-rm { display: grid; place-items: center; width: 40px; height: 46px; border: 0; border-radius: 10px; background: none; color: #8b8898; cursor: pointer; }
+.adm .owm-rm:hover { background: #fdecec; color: #c5282e; }
+.adm .owm-rm svg { width: 18px; height: 18px; }
+.adm .owm-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; margin-top: 6px; border: 0; border-radius: 10px; background: none; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; }
+.adm .owm-add:hover { background: #f4f1fd; }
+.adm .owm-add svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .ow-cal__row, .adm .owm-item { animation: none; }
+}

@@ -1,35 +1,18 @@
 "use client";
 
-// Admin 주문·비품 console — 능동 처리·예외 개입 확인 모달 8종(승인/거절/주문 처리/배송일 수정/재오픈/
-// 상태 정정/요청 수정/삭제). 같은 껍데기(cfhead + cfrec + 필드 + foot)를 쓰고 아이콘·문구·필드만 달라진다.
-// 배송일 피커(process/editdeliv)는 CLAUDE.md 4a의 예외 — 어드민 공용 .calpop 크롬을 그대로 재사용하되,
-// 단일/기간 토글이 필요해 AdminDateRangePicker/AdminDatePicker 대신 자체 구현한다(설계 modalCal 1:1 이식).
-// Mirrors lost-found-action-modal.tsx.
-import { useState } from "react";
-import {
-  CalendarDays,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  ShieldCheck,
-  ShoppingCart,
-  Trash2,
-  Undo2,
-  X,
-} from "lucide-react";
+// Admin 주문·비품 console — 처리 창 8종(승인/거절/주문 처리/배송일 수정/다시 열기/상태 정정/요청 수정/삭제).
+// 화이트 리디자인(2026-10-14, 시안 OrderAct-PC · OrderEdit-PC): 분실물 처리 창(.lfm)과 같은 껍데기 — 제목 ·
+// 「제목 · 건물 · 품목 n · 총 m개」 · 설명 한 줄 → 칸 → [취소][확인]. × 없음, 닫기는 「취소」 하나(Esc · 바깥 누르기도 취소).
+// 승인 · 다시 열기 창의 메모 칸은 서버가 받지 않아 뺐다(예전엔 입력해도 버려졌다). 주문 처리 창의 메모도 같은 이유로 뺐다.
+// 배송일(주문 처리 · 배송일 수정)은 CLAUDE.md 4a 의 예외 — 하루/기간 토글이 필요해 창 안에 달력을 직접 그린다
+// (공용 .calpop 과 같은 칸 크기 · 오늘 점 · 보라 선택). 달 이동은 shiftMonthKey().
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
-import { LIST_STATUS, STATUS, fmtDate, fmtMonth, iso, WD, type OrderStatus } from "./orders-console-data";
-import {
-  OrderIcon,
-  StatusPill,
-  UrgBadge,
-  copyOf,
-  locationLabel,
-  type OrdersCopy,
-} from "./orders-console-shared";
+import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { LIST_STATUS, STATUS, dateToNum, fmtMonth, iso, tpl, WD, type OrderStatus } from "./orders-console-data";
+import { copyOf, type OrdersCopy } from "./orders-console-shared";
 import type { OrdActionKind } from "./orders-detail-panel";
 
 export type OrdActionPayload = {
@@ -57,30 +40,30 @@ type ActionModalProps = {
   onValidationError: (message: string) => void;
 };
 
-const KIND_META = {
-  approve: { Icon: Check, kicker: "maKicker", title: "maTitle", body: "maBody", confirm: "maConfirm", foot: "maFoot", btn: "btn--prisolid", icCls: "cficon--approve", footCls: "" },
-  reject: { Icon: X, kicker: "mrKicker", title: "mrTitle", body: "mrBody", confirm: "mrConfirm", foot: "mrFoot", btn: "btn--danger", icCls: "cficon--reject", footCls: "is-danger" },
-  process: { Icon: ShoppingCart, kicker: "mpKicker", title: "mpTitle", body: "mpBody", confirm: "mpConfirm", foot: "mpFoot", btn: "btn--donesolid", icCls: "cficon--process", footCls: "" },
-  editdeliv: { Icon: CalendarDays, kicker: "meKicker", title: "meTitle", body: "meBody", confirm: "meConfirm", foot: "meFoot", btn: "btn--pri", icCls: "cficon--deliv", footCls: "" },
-  reopen: { Icon: Undo2, kicker: "moKicker", title: "moTitle", body: "moBody", confirm: "moConfirm", foot: "moFoot", btn: "btn--pri", icCls: "cficon--reopen", footCls: "" },
-  correct: { Icon: Pencil, kicker: "mcKicker", title: "mcTitle", body: "mcBody", confirm: "mcConfirm", foot: "mcFoot", btn: "btn--pri", icCls: "cficon--reopen", footCls: "" },
-  edit: { Icon: Check, kicker: "mdeKicker", title: "mdeTitle", body: "mdeBody", confirm: "mdeConfirm", foot: "mdeFoot", btn: "btn--pri", icCls: "cficon--reopen", footCls: "" },
-  delete: { Icon: Trash2, kicker: "mxKicker", title: "mxTitle", body: "mxBody", confirm: "mxConfirm", foot: "mxFoot", btn: "btn--danger", icCls: "cficon--del", footCls: "is-danger" },
-} as const;
+const KIND_META: Record<OrdActionKind, { title: string; body: string; confirm: string; tone: "pri" | "danger" }> = {
+  approve: { title: "actApprove", body: "wApproveBody", confirm: "actApprove", tone: "pri" },
+  reject: { title: "actReject", body: "wRejectBody", confirm: "actReject", tone: "danger" },
+  process: { title: "actProcess", body: "wProcessBody", confirm: "actProcess", tone: "pri" },
+  editdeliv: { title: "actEditDeliv", body: "wEditDelivBody", confirm: "meConfirm", tone: "pri" },
+  reopen: { title: "wReopen", body: "wReopenBody", confirm: "wReopen", tone: "pri" },
+  correct: { title: "actCorrect", body: "wCorrectBody", confirm: "mcConfirm", tone: "pri" },
+  edit: { title: "actEdit", body: "", confirm: "wSave", tone: "pri" },
+  delete: { title: "del", body: "wDeleteBody", confirm: "del", tone: "danger" },
+};
 
 type CalMonth = { y: number; m: number };
 
-function shiftCalMonth(month: CalMonth, delta: number): CalMonth {
-  const total = month.y * 12 + month.m + delta;
-  return { y: Math.floor(total / 12), m: ((total % 12) + 12) % 12 };
+function monthOf(key: string): CalMonth {
+  return { y: +key.slice(0, 4), m: +key.slice(5, 7) - 1 };
 }
 
-function daysInMonth(y: number, m: number): number {
-  return new Date(y, m + 1, 0).getDate();
+function dayLabel(key: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(
+    new Date(dateToNum(key) * 86400000),
+  );
 }
 
-// 배송일 피커 — 단일/기간 토글 + 인라인 .calpop. process(주문 처리)·editdeliv(배송일 수정)가 공유한다.
-function DeliveryPickerField({
+function DeliveryCalendar({
   t,
   locale,
   todayKey,
@@ -88,9 +71,7 @@ function DeliveryPickerField({
   date,
   start,
   end,
-  onModeChange,
-  onDateChange,
-  onRangePick,
+  onPick,
 }: {
   t: OrdersCopy;
   locale: Locale;
@@ -99,131 +80,53 @@ function DeliveryPickerField({
   date: string | null;
   start: string | null;
   end: string | null;
-  onModeChange: (mode: "point" | "range") => void;
-  onDateChange: (value: string) => void;
-  onRangePick: (value: string) => void;
+  onPick: (key: string) => void;
 }) {
-  const initSrc = mode === "range" ? (start ?? todayKey) : (date ?? todayKey);
-  const [calOpen, setCalOpen] = useState(false);
-  const [cal, setCal] = useState<CalMonth>(() => ({ y: +initSrc.slice(0, 4), m: +initSrc.slice(5, 7) - 1 }));
-
-  const showGrid = mode === "range" || calOpen;
-  const days = daysInMonth(cal.y, cal.m);
-  const firstDow = new Date(cal.y, cal.m, 1).getDay();
-
-  /** 이 달의 `dayIndex`(0-based) 칸이 구간 띠를 갖는지. 달 밖이면 false — 격자 끝은 끊긴 것으로 본다. */
-  function hasBand(dayIndex: number): boolean {
-    if (dayIndex < 0 || dayIndex >= days || !start || !end) return false;
-    const val = iso(cal.y, cal.m, dayIndex + 1);
-    return val >= start && val <= end;
-  }
-
-  function pick(val: string) {
-    if (mode === "point") {
-      onDateChange(val);
-      setCalOpen(false);
-      return;
-    }
-    onRangePick(val);
-  }
+  const [month, setMonth] = useState<CalMonth>(() => monthOf((mode === "range" ? start : date) ?? todayKey));
+  const days = new Date(Date.UTC(month.y, month.m + 1, 0)).getUTCDate();
+  const first = (new Date(Date.UTC(month.y, month.m, 1)).getUTCDay() + 6) % 7; // Mon = 0
+  const wd = Array.from({ length: 7 }, (_, i) => WD[locale][(i + 1) % 7]);
+  const mk = `${month.y}-${String(month.m + 1).padStart(2, "0")}`;
+  const move = (delta: number) => setMonth(monthOf(`${shiftMonthKey(mk, delta)}-01`));
 
   return (
-    <>
-      <div className="fld">
-        <label className="fld__l">{t.mpMode}</label>
-        <div className="segradio">
-          <button type="button" className={`segopt${mode === "point" ? " on" : ""}`} onClick={() => onModeChange("point")}>
-            <span className="segopt__ic">
-              <OrderIcon name="caldays" />
-            </span>
-            <span className="segopt__t">{t.mpModePoint}</span>
-            <span className="segopt__rd" />
-          </button>
-          <button type="button" className={`segopt${mode === "range" ? " on" : ""}`} onClick={() => onModeChange("range")}>
-            <span className="segopt__ic">
-              <CalendarDays className="ic" aria-hidden="true" />
-            </span>
-            <span className="segopt__t">{t.mpModeRange}</span>
-            <span className="segopt__rd" />
-          </button>
-        </div>
+    <div className="owm-cal">
+      <div className="owm-cal__h">
+        <button type="button" className="ow-navb" aria-label={t.wPrevMonth} onClick={() => move(-1)}>
+          <ChevronLeft aria-hidden="true" />
+        </button>
+        <b className="num">{fmtMonth(month.y, month.m, locale)}</b>
+        <button type="button" className="ow-navb" aria-label={t.wNextMonth} onClick={() => move(1)}>
+          <ChevronRight aria-hidden="true" />
+        </button>
       </div>
-      <div className="fld">
-        <label className="fld__l">{mode === "range" ? t.pDelivRange : t.mpDate}</label>
-        {mode === "range" ? (
-          <div className="rangepick">
-            <div className="datepick" style={{ pointerEvents: "none" }}>
-              <CalendarDays className="ic" aria-hidden="true" />
-              <span className={`v${start ? "" : " ph"}`}>{start ? fmtDate(start, locale) : t.mpStart}</span>
-            </div>
-            <div className="datepick" style={{ pointerEvents: "none" }}>
-              <CalendarDays className="ic" aria-hidden="true" />
-              <span className={`v${end ? "" : " ph"}`}>{end ? fmtDate(end, locale) : t.mpEnd}</span>
-            </div>
-          </div>
-        ) : (
-          <button type="button" className="datepick" style={{ width: "100%" }} onClick={() => setCalOpen((o) => !o)}>
-            <CalendarDays className="ic" aria-hidden="true" />
-            <span className={`v${date ? "" : " ph"}`}>{date ? fmtDate(date, locale) : t.mpDate}</span>
-            <ChevronDown className="ic dd__chev" style={{ marginLeft: "auto" }} aria-hidden="true" />
-          </button>
-        )}
-        {showGrid ? (
-          <div
-            className="calpop"
-            style={{ position: "static", width: "auto", boxShadow: "none", border: "1px solid var(--line)", marginTop: 8 }}
-          >
-            <div className="calpop__head">
-              <button type="button" className="calpop__nav" onClick={() => setCal((c) => shiftCalMonth(c, -1))}>
-                <ChevronLeft aria-hidden="true" />
-              </button>
-              <span className="calpop__title">{fmtMonth(cal.y, cal.m, locale)}</span>
-              <button type="button" className="calpop__nav" onClick={() => setCal((c) => shiftCalMonth(c, 1))}>
-                <ChevronRight aria-hidden="true" />
-              </button>
-            </div>
-            <div className="calpop__wd">
-              {WD[locale].map((w, i) => (
-                <span key={w} className={i === 0 ? "sun" : ""}>
-                  {w}
-                </span>
-              ))}
-            </div>
-            <div className="calpop__grid">
-              {Array.from({ length: firstDow }, (_, i) => (
-                <span key={`pad-${i}`} className="cald cald--pad" />
-              ))}
-              {Array.from({ length: days }, (_, i) => {
-                const d = i + 1;
-                const val = iso(cal.y, cal.m, d);
-                let cls: string;
-                if (mode === "range") {
-                  const isFrom = val === start;
-                  const isTo = val === end;
-                  const inRange = Boolean(start && end && val > start && val < end);
-                  // 띠 마감은 AdminDateRangePicker 와 같은 규칙이다 — 이웃 칸에 띠가 닿지 않는
-                  // 쪽(주 경계·달 첫칸·격자 끝)만 둥글게 막는다.
-                  const gridIndex = firstDow + i;
-                  const isBand = inRange || (isFrom && Boolean(end)) || isTo;
-                  const capLeft = gridIndex % 7 === 0 || !hasBand(i - 1);
-                  const capRight = gridIndex % 7 === 6 || !hasBand(i + 1);
-                  cls = ["cald", isFrom ? "is-from" : "", isTo ? "is-to" : "", isFrom && !end ? "is-single" : "", inRange ? "is-range" : "", isBand ? "is-band" : "", isBand && capLeft ? "is-capl" : "", isBand && capRight ? "is-capr" : "", val === todayKey ? "is-today" : ""]
-                    .filter(Boolean)
-                    .join(" ");
-                } else {
-                  cls = ["cald", val === date ? "is-from is-single" : "", val === todayKey ? "is-today" : ""].filter(Boolean).join(" ");
-                }
-                return (
-                  <button type="button" key={val} className={cls} onClick={() => pick(val)}>
-                    {d}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
+      <div className="owm-cal__g owm-cal__wd">
+        {wd.map((d, i) => (
+          <span key={i}>{d}</span>
+        ))}
       </div>
-    </>
+      <div className="owm-cal__g">
+        {Array.from({ length: first }, (_, i) => (
+          <span key={`b${i}`} />
+        ))}
+        {Array.from({ length: days }, (_, i) => {
+          const key = iso(month.y, month.m, i + 1);
+          const isEnd = mode === "point" ? key === date : key === start || key === end;
+          const inRange = mode === "range" && start && end && key > start && key < end;
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`owm-day${isEnd ? " is-sel" : ""}${inRange ? " is-in" : ""}${key === todayKey ? " is-today" : ""}`}
+              aria-pressed={isEnd}
+              onClick={() => onPick(key)}
+            >
+              {i + 1}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -239,7 +142,7 @@ export function OrdersActionModal({
   onValidationError,
 }: ActionModalProps) {
   const meta = KIND_META[kind];
-  const { Icon } = meta;
+  const isDeliv = kind === "process" || kind === "editdeliv";
 
   const [memo, setMemo] = useState("");
   const [mode, setMode] = useState<"point" | "range">(
@@ -247,7 +150,7 @@ export function OrdersActionModal({
   );
   const [date, setDate] = useState<string | null>(() => {
     if (kind === "process") return todayKey;
-    if (kind === "editdeliv") return order.deliv?.mode === "point" ? order.deliv.date : (order.deliv ? null : todayKey);
+    if (kind === "editdeliv") return order.deliv?.mode === "point" ? order.deliv.date : order.deliv ? null : todayKey;
     return null;
   });
   const [start, setStart] = useState<string | null>(
@@ -262,15 +165,27 @@ export function OrdersActionModal({
   const [reason, setReason] = useState(order.reason);
   const [items, setItems] = useState(() => order.items.map((it) => ({ name: it.name, qty: it.qty, link: it.link, memo: it.memo })));
 
-  function handleRangePick(val: string) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !pending) onCancel();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel, pending]);
+
+  function handlePick(key: string) {
+    if (mode === "point") {
+      setDate(key);
+      return;
+    }
     if (!start || (start && end)) {
-      setStart(val);
+      setStart(key);
       setEnd(null);
-    } else if (val < start) {
+    } else if (key < start) {
       setEnd(start);
-      setStart(val);
+      setStart(key);
     } else {
-      setEnd(val);
+      setEnd(key);
     }
   }
 
@@ -279,16 +194,9 @@ export function OrdersActionModal({
   }
 
   function handleConfirm() {
-    if (kind === "approve" || kind === "reject" || kind === "reopen") {
-      onConfirm(kind, order.id, { memo });
-      return;
-    }
-    if (kind === "delete") {
-      onConfirm(kind, order.id, {});
-      return;
-    }
-    if (kind === "correct") {
-      onConfirm(kind, order.id, { newStatus, memo });
+    if (kind === "reject" || kind === "correct") {
+      if (kind === "reject") onConfirm(kind, order.id, { memo });
+      else onConfirm(kind, order.id, { newStatus, memo });
       return;
     }
     if (kind === "edit") {
@@ -300,250 +208,175 @@ export function OrdersActionModal({
       onConfirm(kind, order.id, { title, urgency, reason, items: cleaned });
       return;
     }
-    // process / editdeliv
-    if (mode === "range") {
-      if (!start || !end) {
+    if (isDeliv) {
+      if (mode === "range" ? !start || !end : !date) {
         onValidationError(t.mpNeedDate);
         return;
       }
-    } else if (!date) {
-      onValidationError(t.mpNeedDate);
+      onConfirm(kind, order.id, {
+        mode,
+        date: date ?? undefined,
+        start: start ?? undefined,
+        end: end ?? undefined,
+      });
       return;
     }
-    onConfirm(kind, order.id, {
-      mode,
-      date: date ?? undefined,
-      start: start ?? undefined,
-      end: end ?? undefined,
-      memo: kind === "process" ? memo : undefined,
-    });
+    onConfirm(kind, order.id, {});
   }
 
-  const wide = kind === "process" || kind === "editdeliv" || kind === "edit";
+  const delivText =
+    mode === "point"
+      ? date
+        ? dayLabel(date, locale)
+        : ""
+      : start
+        ? end
+          ? `${dayLabel(start, locale)} – ${dayLabel(end, locale)}`
+          : `${dayLabel(start, locale)} – ${t.wPickEnd}`
+        : "";
+
+  const sub =
+    kind === "edit"
+      ? `${order.title} · ${order.buildingLabel} · ${order.reporterName}`
+      : tpl(t.wModalSub, { title: order.title, bld: order.buildingLabel, n: order.items.length, q: order.totalQty });
 
   return (
     <>
-      <div className="modal-scrim on" onClick={onCancel} />
-      <div className="modal on" style={{ width: wide ? 560 : 496 }}>
-        <div className="modal__h">
-          <div>
-            <div className="modal__kicker">{t[meta.kicker as keyof OrdersCopy] as string}</div>
-          </div>
-          <button type="button" className="panel__x" onClick={onCancel} aria-label={t.cfCancel}>
-            <X />
-          </button>
+      <div className="modal-scrim on" onClick={pending ? undefined : onCancel} />
+      <div
+        className={`modal on lfm owm${isDeliv ? " owm--deliv" : ""}${kind === "edit" ? " owm--edit" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="owm-title"
+      >
+        <div className="lfm__h">
+          <h2 id="owm-title">{copyOf(t, meta.title)}</h2>
+          <span>{sub}</span>
         </div>
-        <div className="modal__body">
-          <div className="cfhead">
-            <div className={`cficon ${meta.icCls}`}>
-              <span className="ic">
-                <Icon aria-hidden="true" />
-              </span>
-            </div>
-            <div>
-              <div className="cfbody-t">{t[meta.title as keyof OrdersCopy] as string}</div>
-              <div className="cfbody-s">{t[meta.body as keyof OrdersCopy] as string}</div>
-            </div>
-          </div>
+        {meta.body ? <p className="lfm__body">{copyOf(t, meta.body)}</p> : null}
 
-          <div className="cfrec">
-            <span className="cfrec__ic">
-              <OrderIcon name="package" />
-            </span>
-            <div className="cfrec__b">
-              <div className="cfrec__t">
-                {order.title}
-                {order.urgency === "high" ? (
-                  <>
-                    {" "}
-                    <UrgBadge t={t} />
-                  </>
-                ) : null}
-              </div>
-              <div className="cfrec__s">
-                {order.shortId} · {locationLabel(order, t.buildingWhole)} · {t.qtyTotal} {order.totalQty}
-                {t.qtyUnit}
+        {isDeliv ? (
+          <>
+            <div className="owm-row">
+              <span className="lfm__lbl owm-lbl">{t.wDelivDate}</span>
+              <div className="lfm__seg owm-seg" role="radiogroup" aria-label={t.wDelivDate}>
+                {(["point", "range"] as const).map((m) => (
+                  <button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}>
+                    {m === "point" ? t.wDay : t.wRange}
+                  </button>
+                ))}
               </div>
             </div>
-            <StatusPill status={order.status} t={t} />
-          </div>
+            <label className="lfm__nf">
+              <span className="lfm__nl">{mode === "point" ? t.wDateField : t.wRange}</span>
+              <input readOnly value={delivText} />
+            </label>
+            <DeliveryCalendar t={t} locale={locale} todayKey={todayKey} mode={mode} date={date} start={start} end={end} onPick={handlePick} />
+          </>
+        ) : null}
 
-          {kind === "approve" ? (
-            <div className="fld" style={{ marginTop: 14 }}>
-              <label className="fld__l">{t.maMemo}</label>
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.maMemoPh} />
+        {kind === "reject" ? (
+          <label className="lfm__nf">
+            <span className="lfm__nl">{t.mrReason}</span>
+            <textarea rows={2} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.mrReasonPh} />
+          </label>
+        ) : null}
+
+        {kind === "correct" ? (
+          <>
+            <div className="lfm__lbl">{t.mcStatus}</div>
+            <div className="lfm__seg owm-seg4" role="radiogroup" aria-label={t.mcStatus}>
+              {LIST_STATUS.map((s) => (
+                <button key={s} type="button" role="radio" aria-checked={newStatus === s} className={newStatus === s ? "on" : ""} onClick={() => setNewStatus(s)}>
+                  {s === "closed" ? t.wStClosed : copyOf(t, STATUS[s].key)}
+                </button>
+              ))}
             </div>
-          ) : null}
+            <label className="lfm__nf">
+              <span className="lfm__nl">{t.mcMemo}</span>
+              <textarea rows={2} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.mcMemoPh} />
+            </label>
+          </>
+        ) : null}
 
-          {kind === "reject" ? (
-            <div className="fld" style={{ marginTop: 14 }}>
-              <label className="fld__l">{t.mrReason}</label>
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.mrReasonPh} />
-            </div>
-          ) : null}
-
-          {kind === "process" ? (
-            <>
-              <div style={{ marginTop: 14 }}>
-                <DeliveryPickerField
-                  t={t}
-                  locale={locale}
-                  todayKey={todayKey}
-                  mode={mode}
-                  date={date}
-                  start={start}
-                  end={end}
-                  onModeChange={setMode}
-                  onDateChange={setDate}
-                  onRangePick={handleRangePick}
-                />
+        {kind === "edit" ? (
+          <>
+            <div className="owm-row">
+              <label className="lfm__nf owm-grow">
+                <span className="lfm__nl">{t.edTitle}</span>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} />
+              </label>
+              <div className="lfm__seg owm-seg" role="radiogroup" aria-label={t.edUrgency}>
+                {(["normal", "high"] as const).map((u) => (
+                  <button key={u} type="button" role="radio" aria-checked={urgency === u} className={urgency === u ? "on" : ""} onClick={() => setUrgency(u)}>
+                    {u === "normal" ? t.normal : t.urgent}
+                  </button>
+                ))}
               </div>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.mpMemo}</label>
-                <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.mpMemoPh} />
+            </div>
+            <div className="owm-items">
+              <div className="owm-items__h">
+                <b>{t.wItems}</b>
+                <span className="num">{tpl(t.wPhotosKept, { n: items.length })}</span>
               </div>
-            </>
-          ) : null}
-
-          {kind === "editdeliv" ? (
-            <div style={{ marginTop: 14 }}>
-              <DeliveryPickerField
-                t={t}
-                locale={locale}
-                todayKey={todayKey}
-                mode={mode}
-                date={date}
-                start={start}
-                end={end}
-                onModeChange={setMode}
-                onDateChange={setDate}
-                onRangePick={handleRangePick}
-              />
-            </div>
-          ) : null}
-
-          {kind === "reopen" ? (
-            <div className="fld" style={{ marginTop: 14 }}>
-              <label className="fld__l">{t.moReason}</label>
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.moReasonPh} />
-            </div>
-          ) : null}
-
-          {kind === "correct" ? (
-            <>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.mcStatus}</label>
-                <div className="stpick">
-                  {LIST_STATUS.map((s) => (
+              {items.map((it, i) => (
+                <div className="owm-item" key={i}>
+                  <div className="owm-item__top">
+                    <label className="lfm__nf">
+                      <span className="lfm__nl">{t.wItemName}</span>
+                      <input value={it.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder={t.edNamePh} />
+                    </label>
+                    <label className="lfm__nf owm-qty">
+                      <span className="lfm__nl">{t.wQty}</span>
+                      <input inputMode="numeric" value={it.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} placeholder={t.edQtyPh} />
+                    </label>
                     <button
                       type="button"
-                      key={s}
-                      className={`stchip${newStatus === s ? " on" : ""}`}
-                      onClick={() => setNewStatus(s)}
+                      className="owm-rm"
+                      aria-label={t.wRemoveItem}
+                      title={t.wRemoveItem}
+                      onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}
                     >
-                      <OrderIcon name={STATUS[s].icon} />
-                      {copyOf(t, STATUS[s].key)}
+                      <Trash2 aria-hidden="true" />
                     </button>
-                  ))}
-                </div>
-              </div>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.mcMemo}</label>
-                <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.mcMemoPh} />
-              </div>
-            </>
-          ) : null}
-
-          {kind === "edit" ? (
-            <>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.edTitle}</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} />
-              </div>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.edUrgency}</label>
-                <div className="stpick">
-                  <button type="button" className={`stchip${urgency === "normal" ? " on" : ""}`} onClick={() => setUrgency("normal")}>
-                    {t.normal}
-                  </button>
-                  <button type="button" className={`stchip${urgency === "high" ? " on" : ""}`} onClick={() => setUrgency("high")}>
-                    <OrderIcon name="bolt" />
-                    {t.urgent}
-                  </button>
-                </div>
-              </div>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">
-                  {t.edItems} · {items.length}
-                </label>
-                <div className="eitems">
-                  {items.map((it, i) => (
-                    <div className="eitem" key={i}>
-                      <div className="eitem__top">
-                        <input
-                          className="enm"
-                          value={it.name}
-                          onChange={(e) => updateItem(i, "name", e.target.value)}
-                          placeholder={t.edNamePh}
-                        />
-                        <input
-                          className="eqty"
-                          value={it.qty}
-                          onChange={(e) => updateItem(i, "qty", e.target.value)}
-                          placeholder={t.edQtyPh}
-                          inputMode="numeric"
-                        />
-                        <button
-                          type="button"
-                          className="erm"
-                          title={t.del}
-                          onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}
-                        >
-                          <Trash2 className="ic" aria-hidden="true" />
-                        </button>
-                      </div>
+                  </div>
+                  <div className="owm-item__sub">
+                    <label className="lfm__nf">
+                      <span className="lfm__nl">{t.wLink}</span>
                       <input value={it.link} onChange={(e) => updateItem(i, "link", e.target.value)} placeholder={t.edLinkPh} />
+                    </label>
+                    <label className="lfm__nf">
+                      <span className="lfm__nl">{t.wMemo}</span>
                       <input value={it.memo} onChange={(e) => updateItem(i, "memo", e.target.value)} placeholder={t.edMemoPh} />
-                    </div>
-                  ))}
+                    </label>
+                  </div>
                 </div>
+              ))}
+              {items.length < 40 ? (
                 <button
                   type="button"
-                  className="eadd"
+                  className="owm-add"
                   onClick={() => setItems((prev) => [...prev, { name: "", qty: "1", link: "", memo: "" }])}
                 >
-                  <OrderIcon name="cart" />
+                  <Plus aria-hidden="true" />
                   {t.edAddItem}
                 </button>
-              </div>
-              <div className="fld" style={{ marginTop: 14 }}>
-                <label className="fld__l">{t.edReason}</label>
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t.edReasonPh} />
-              </div>
-            </>
-          ) : null}
-
-          {kind === "delete" ? (
-            <div className="fld" style={{ marginTop: 14 }}>
-              <label className="fld__l">{t.pReason}</label>
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t.mrReasonPh} />
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        <div className="modal__foot">
-          <span className={`modal__foot-note ${meta.footCls}`}>
-            <ShieldCheck className="ic" aria-hidden="true" />
-            {t[meta.foot as keyof OrdersCopy] as string}
-          </span>
-          <div style={{ display: "flex", gap: 9 }}>
-            <button type="button" className="btn btn--ghost" onClick={onCancel} disabled={pending}>
-              {t.cfCancel}
-            </button>
-            <button type="button" className={`btn ${meta.btn}`} disabled={pending} onClick={handleConfirm}>
-              <Icon className="ic" aria-hidden="true" />
-              {t[meta.confirm as keyof OrdersCopy] as string}
-            </button>
-          </div>
+            <label className="lfm__nf">
+              <span className="lfm__nl">{t.wReasonOpt}</span>
+              <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t.edReasonPh} />
+            </label>
+          </>
+        ) : null}
+
+        <div className="lfm__foot">
+          <button type="button" className="btn lfm__cancel" onClick={onCancel} disabled={pending}>
+            {t.cfCancel}
+          </button>
+          <button type="button" className={`btn lfm__ok is-${meta.tone}`} disabled={pending} onClick={handleConfirm}>
+            {copyOf(t, meta.confirm)}
+          </button>
         </div>
       </div>
     </>

@@ -1,24 +1,15 @@
 "use client";
 
 // Admin 주문·비품 console — content area for /admin/orders (AdminShell owns the sidebar/topbar).
-// Four views: 현황 보드 / 목록·이력 / 배송 예정 / 완료. 처리형 콘솔: 승인 → 주문 처리 → 배송일 기입 →
-// 캘린더 반영을 사무실에서 직접 진행하고, 예외 개입(요청 수정/상태 정정/재오픈/삭제)도 여기서 한다.
-// Mirrors lost-found-console.tsx / maintenance-console.tsx wiring 1:1.
+// 화이트 리디자인(2026-10-14, 시안 Order-PC · OrderCal-PC · OrderAll-PC): 보기 셋 — 처리 중 / 배송 캘린더 / 전체 기록.
+// 예전 「현황 보드」 · 「완료」는 처리 중 큐와 전체 기록(상태 고르기)으로 합쳤다. 처리형 콘솔: 승인 → 주문 처리 →
+// 배송일 기입 → 캘린더 반영을 사무실에서 직접 진행하고, 예외 개입(요청 수정/상태 정정/다시 열기/삭제)도 여기서 한다.
 // See docs/product/10-order-request-workflow.md.
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CalendarDays,
-  CircleCheck,
-  Clock,
-  Inbox,
-  LayoutGrid,
-  RefreshCw,
-  ShoppingCart,
-  Smartphone,
-  Truck,
-  Zap,
-} from "lucide-react";
+import { Search, X } from "lucide-react";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
+import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
@@ -31,13 +22,27 @@ import {
 import { updateOrderRequestStatus, updateOrderDeliveryDate } from "@/app/mobile/requests/orders/actions";
 import { deleteOrderRequest } from "@/app/mobile/requests/delete-actions";
 import "@/components/admin/maintenance/maintenance-console.css";
+import "@/components/admin/lost-found/lost-found-console.css";
 import "./orders-console.css";
-import { delivStart, inThisMonth, iso, isActiveStatus, isDelivThisWeek } from "./orders-console-data";
-import { ErrorState, type OrdersFilters } from "./orders-console-shared";
-import { OrdersBoard } from "./orders-board";
+import {
+  LIST_STATUS,
+  STATUS,
+  dateToNum,
+  delivOnDate,
+  delivStart,
+  inThisMonth,
+  iso,
+  isActiveStatus,
+  isDelivThisWeek,
+  parseTs,
+  tpl,
+  type OrderStatus,
+} from "./orders-console-data";
+import { buildingOptionsOf, copyOf, localeTagOf, type OrdersFilters } from "./orders-console-shared";
+import { OrdersExportBar } from "./orders-export-bar";
+import { OrdersQueue } from "./orders-queue";
 import { OrdersList } from "./orders-list";
 import { OrdersCalendar, type CalMonth } from "./orders-calendar";
-import { OrdersClosed } from "./orders-closed";
 import { OrdersDetailPanel, type OrdActionKind } from "./orders-detail-panel";
 import { OrdersActionModal, type OrdActionPayload } from "./orders-action-modal";
 
@@ -48,28 +53,28 @@ type OrdersConsoleProps = {
   todayKey: string;
 };
 
-type OrdView = "board" | "list" | "cal" | "closed";
+type OrdView = "queue" | "cal" | "all";
 
-function defaultMonthRange(todayKey: string): { from: string; to: string } {
-  const y = +todayKey.slice(0, 4);
-  const m0 = +todayKey.slice(5, 7) - 1;
-  const days = new Date(y, m0 + 1, 0).getDate();
-  return { from: iso(y, m0, 1), to: iso(y, m0, days) };
+function defaultRange(todayKey: string): { from: string; to: string } {
+  // 전체 기록 기본 기간 = 오늘까지 30일(시안 OrderAll-PC 「9월 10일 – 10월 9일」).
+  const n = dateToNum(todayKey) - 29;
+  const d = new Date(n * 86400000);
+  return { from: iso(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()), to: todayKey };
 }
 
 export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersConsoleProps) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
   const t = dictionary.admin.orders.console;
+  const shared = dictionary.admin.shared;
   const { toast, showToast, dismiss } = useAdminToast();
 
-  const [view, setView] = useState<OrdView>("board");
+  const [view, setView] = useState<OrdView>("queue");
   const [filters, setFilters] = useState<OrdersFilters>(() => {
-    const range = defaultMonthRange(todayKey);
+    const range = defaultRange(todayKey);
     return { status: "all", urgency: "all", prop: "all", reporter: "all", from: range.from, to: range.to, query: "" };
   });
-  const [calProp, setCalProp] = useState("all");
-  const [calSel, setCalSel] = useState<string | null>(null);
+  const [calSel, setCalSel] = useState<string | null>(todayKey);
   const [calMonth, setCalMonth] = useState<CalMonth>(() => ({
     y: +todayKey.slice(0, 4),
     m: +todayKey.slice(5, 7) - 1,
@@ -78,16 +83,28 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
   const [confirm, setConfirm] = useState<{ kind: OrdActionKind; id: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const kpi = useMemo(
-    () => ({
-      requested: orders.filter((o) => o.status === "requested").length,
-      approved: orders.filter((o) => o.status === "approved").length,
-      urgent: orders.filter((o) => o.urgency === "high" && isActiveStatus(o.status)).length,
-      delivWeek: orders.filter((o) => isDelivThisWeek(o, todayKey)).length,
-      orderedMo: orders.filter((o) => o.status === "ordered" && inThisMonth(delivStart(o.deliv), todayKey)).length,
-    }),
-    [orders, todayKey],
+  // 건물 고르기는 처리 중 · 배송 캘린더 · 전체 기록이 함께 쓴다.
+  const scoped = useMemo(
+    () => (filters.prop === "all" ? orders : orders.filter((o) => o.buildingKey === filters.prop)),
+    [orders, filters.prop],
   );
+
+  const kpi = useMemo(() => {
+    const requested = scoped.filter((o) => o.status === "requested");
+    const oldest = requested.reduce<number | null>((min, o) => {
+      const n = dateToNum(o.reqDate);
+      return min === null || n < min ? n : min;
+    }, null);
+    return {
+      requested: requested.length,
+      oldestDays: oldest === null ? null : dateToNum(todayKey) - oldest,
+      approved: scoped.filter((o) => o.status === "approved").length,
+      urgent: scoped.filter((o) => o.urgency === "high" && isActiveStatus(o.status)).length,
+      delivWeek: scoped.filter((o) => isDelivThisWeek(o, todayKey)).length,
+      delivToday: scoped.filter((o) => o.status === "ordered" && delivOnDate(o.deliv, todayKey)).length,
+      orderedMo: scoped.filter((o) => o.status === "ordered" && inThisMonth(delivStart(o.deliv), todayKey)).length,
+    };
+  }, [scoped, todayKey]);
 
   const selected = selectedId ? (orders.find((o) => o.id === selectedId) ?? null) : null;
   const confirmOrder = confirm ? (orders.find((o) => o.id === confirm.id) ?? null) : null;
@@ -115,19 +132,12 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
   /**
    * `router.refresh()` 는 **여기서 섞여 있다** — 액션마다 다르므로 일괄 제거하면 안 된다.
    *
-   * 서버 액션이 `revalidatePath` 로 이 라우트를 재검증하면 응답에 갱신된 RSC 페이로드가 함께
-   * 오므로 추가 새로고침은 두 번째 왕복일 뿐이다. 하지만 이 화면이 부르는 액션 중 일부는
-   * **모바일 경로만** 재검증한다.
-   *
    *   reject / reopen / correct / edit → `revalidateOrders()` 가 /admin/orders 포함  ⇒ 제거함
-   *   deleteOrderRequest               → 재검증을 **추가**해 제거함(아래)             ⇒ 제거함
+   *   deleteOrderRequest               → `revalidateAfterDelete` 가 포함              ⇒ 제거함
    *   updateOrderRequestStatus         → /mobile/requests · /mobile/notifications 만  ⇒ 유지
    *   updateOrderDeliveryDate          → 같음                                        ⇒ 유지
    *
-   * 유지 쪽을 지우면 **처리 후 이 목록이 갱신되지 않는다.** 옳은 해법은 그 액션들이
-   * `/admin/orders` 도 재검증하게 만드는 것인데, 삭제 액션에는 그렇게 했고
-   * (`delete-actions.ts` → `revalidateAfterDelete`), 나머지 둘은 모바일 요청 흐름과 공유하는
-   * 상태 전이 액션이라 영향 범위가 넓어 별도 작업으로 남긴다. (2026-08-11)
+   * 유지 쪽을 지우면 **처리 후 이 목록이 갱신되지 않는다.** (2026-08-11)
    */
   function handleConfirmAction(kind: OrdActionKind, id: string, payload: OrdActionPayload) {
     startTransition(async () => {
@@ -150,44 +160,27 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
           return;
         }
         setConfirm(null);
-        setSelectedId(null);
         showToast(t.tReject);
         return;
       }
 
-      if (kind === "process") {
-        const result = await updateOrderRequestStatus({
-          orderId: id,
-          targetStatus: "ordered",
-          deliveryMode: payload.mode === "range" ? "range" : "exact",
+      if (kind === "process" || kind === "editdeliv") {
+        const delivery = {
+          deliveryMode: payload.mode === "range" ? ("range" as const) : ("exact" as const),
           deliveryDate: payload.date,
           deliveryStartDate: payload.start,
           deliveryEndDate: payload.end,
-        });
+        };
+        const result =
+          kind === "process"
+            ? await updateOrderRequestStatus({ orderId: id, targetStatus: "ordered", ...delivery })
+            : await updateOrderDeliveryDate({ orderId: id, ...delivery });
         if (!result.ok) {
           showToast(t.errS);
           return;
         }
         setConfirm(null);
-        showToast(t.tProcess);
-        router.refresh();
-        return;
-      }
-
-      if (kind === "editdeliv") {
-        const result = await updateOrderDeliveryDate({
-          orderId: id,
-          deliveryMode: payload.mode === "range" ? "range" : "exact",
-          deliveryDate: payload.date,
-          deliveryStartDate: payload.start,
-          deliveryEndDate: payload.end,
-        });
-        if (!result.ok) {
-          showToast(t.errS);
-          return;
-        }
-        setConfirm(null);
-        showToast(t.tEditDeliv);
+        showToast(kind === "process" ? t.tProcess : t.tEditDeliv);
         router.refresh();
         return;
       }
@@ -247,182 +240,218 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
     });
   }
 
+  // 전체 기록 행 — 고르기 · 검색 · 기간을 모두 적용, 요청일 최신 순.
+  const listRows = useMemo(() => {
+    const q = filters.query.trim().toLowerCase();
+    return scoped
+      .filter((o) => {
+        if (o.reqDate < filters.from || o.reqDate > filters.to) return false;
+        if (filters.status !== "all" && o.status !== filters.status) return false;
+        if (filters.urgency !== "all" && o.urgency !== filters.urgency) return false;
+        if (
+          q &&
+          !(
+            o.title.toLowerCase().includes(q) ||
+            o.reporterName.toLowerCase().includes(q) ||
+            o.items.some((it) => it.name.toLowerCase().includes(q))
+          )
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (parseTs(b.reqAt) ?? 0) - (parseTs(a.reqAt) ?? 0));
+  }, [scoped, filters]);
+
   const V = (value: number) => (loadError ? "–" : value);
+  const buildings = buildingOptionsOf(orders);
+  const views: { key: OrdView; label: string }[] = [
+    { key: "queue", label: t.wVQueue },
+    { key: "cal", label: t.wVCal },
+    { key: "all", label: t.wVAll },
+  ];
+
+  const exportBar = (
+    <OrdersExportBar
+      disabled={loadError || (view === "all" && listRows.length === 0)}
+      filters={{
+        startDate: filters.from,
+        endDate: filters.to,
+        status: view === "all" && filters.status !== "all" ? filters.status : undefined,
+      }}
+      labels={shared}
+    />
+  );
 
   return (
     <>
-      <div className="opsbar opsbar--5">
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Inbox />
-            </span>
-            {t.kpiRequested}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.requested > 0 ? " is-progress" : " is-muted"}`}>
-            {V(kpi.requested)}
-          </div>
-          <div className="opscell__sub">
-            {loadError ? (
-              " "
-            ) : kpi.requested ? (
-              <span className="opscell__flag">
-                <span className="ic">
-                  <Inbox />
-                </span>
-                {t.kpiRequestedSub}
-              </span>
-            ) : (
-              <span style={{ color: "var(--done)", fontWeight: 800 }}>{t.clear}</span>
-            )}
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <CircleCheck />
-            </span>
-            {t.kpiApproved}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.approved > 0 ? "" : " is-muted"}`}>{V(kpi.approved)}</div>
-          <div className="opscell__sub">{loadError ? " " : t.kpiApprovedSub}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Zap />
-            </span>
-            {t.kpiUrgent}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.urgent > 0 ? " is-danger" : " is-muted"}`}>
-            {V(kpi.urgent)}
-          </div>
-          <div className="opscell__sub">
-            {loadError ? (
-              " "
-            ) : kpi.urgent ? (
-              <span className="opscell__flag">
-                <span className="ic">
-                  <Zap />
-                </span>
-                {t.kpiUrgentSub}
-              </span>
-            ) : (
-              <span style={{ color: "var(--done)", fontWeight: 800 }}>{t.none}</span>
-            )}
-          </div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <Truck />
-            </span>
-            {t.kpiDelivWeek}
-          </div>
-          <div className={`opscell__v${!loadError && kpi.delivWeek > 0 ? " is-progress" : " is-muted"}`}>
-            {V(kpi.delivWeek)}
-          </div>
-          <div className="opscell__sub">{loadError ? " " : t.kpiDelivWeekSub}</div>
-        </div>
-        <div className="opscell">
-          <div className="opscell__k">
-            <span className="ic">
-              <ShoppingCart />
-            </span>
-            {t.kpiOrderedMo}
-          </div>
-          <div className={`opscell__v${loadError ? " is-muted" : " is-done"}`}>{V(kpi.orderedMo)}</div>
-          <div className="opscell__sub">{loadError ? " " : t.kpiOrderedMoSub}</div>
-        </div>
-      </div>
-
-      <div className="cviewbar">
+      {/* 화이트 리디자인(2026-10-14): 보기 탭 셋(아이콘 없음) + 보기마다 고르기가 한 줄에. */}
+      <div className="cviewbar mw-viewbar lfw-viewbar ow-viewbar">
         <div className="lviews" style={{ margin: 0 }}>
-          <button type="button" className={view === "board" ? "on" : ""} onClick={() => handleViewChange("board")}>
-            <span className="ic">
-              <LayoutGrid />
-            </span>
-            {t.vBoard}
-          </button>
-          <button type="button" className={view === "list" ? "on" : ""} onClick={() => handleViewChange("list")}>
-            <span className="ic">
-              <Clock />
-            </span>
-            {t.vList}
-          </button>
-          <button type="button" className={view === "cal" ? "on" : ""} onClick={() => handleViewChange("cal")}>
-            <span className="ic">
-              <CalendarDays />
-            </span>
-            {t.vCal}
-          </button>
-          <button type="button" className={view === "closed" ? "on" : ""} onClick={() => handleViewChange("closed")}>
-            <span className="ic">
-              <CircleCheck />
-            </span>
-            {t.vClosed}
-          </button>
-        </div>
-        <span style={{ flex: 1 }} />
-        {view === "board" ? (
-          <>
-            <span className="robadge">
-              <span className="ic">
-                <Smartphone />
-              </span>
-              {t.fieldReg}
-            </span>
-            <button type="button" className="syncchip" onClick={handleSync}>
-              <span className="syncchip__dot" />
-              {t.syncLabel} · {t.syncAgo}
-              <span className="ic">
-                <RefreshCw />
-              </span>
+          {views.map((v) => (
+            <button key={v.key} type="button" className={view === v.key ? "on" : ""} onClick={() => handleViewChange(v.key)}>
+              {v.label}
             </button>
-          </>
+          ))}
+        </div>
+        {view === "queue" ? (
+          <button type="button" className="mw-live" onClick={handleSync}>
+            <i aria-hidden="true" />
+            {t.syncLabel} · {t.syncAgo}
+          </button>
         ) : null}
+        {view === "all" ? (
+          <AdminDateRangePicker
+            from={filters.from}
+            to={filters.to}
+            onChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
+            localeTag={localeTagOf(locale)}
+            ariaLabel={shared.pickRange}
+            labels={{
+              prevMonth: shared.datePrevMonth,
+              nextMonth: shared.dateNextMonth,
+              thisMonth: shared.dateThisMonth,
+              reset: shared.dateReset,
+              typeStart: shared.dateTypeStart,
+              typeEnd: shared.dateTypeEnd,
+              pickYear: shared.datePickYear,
+              pickMonth: shared.datePickMonth,
+              apply: shared.dateApply,
+            }}
+          />
+        ) : null}
+        <span className="lfw-viewbar__sp" />
+        {view !== "all" ? (
+          <AdmDropdown
+            size="sm"
+            value={filters.prop}
+            onChange={(v) => handleFilterChange("prop", v)}
+            ariaLabel={t.calBuilding}
+            options={[{ value: "all", label: t.allProp }, ...buildings.map((b) => ({ value: b.key, label: b.label }))]}
+          />
+        ) : null}
+        {view !== "cal" ? exportBar : null}
       </div>
 
-      <div className="cbody">
-        {view === "board" ? (
-          loadError ? (
-            <ErrorState t={t} onRetry={handleSync} />
-          ) : (
-            <OrdersBoard
-              orders={orders}
-              filters={filters}
-              t={t}
-              locale={locale}
-              todayKey={todayKey}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onClearFilters={handleClearFilters}
+      {view === "all" ? (
+        <div className="ow-filters">
+          <div className="qsearch qsearch--inline ow-search">
+            <span className="ic">
+              <Search aria-hidden="true" />
+            </span>
+            <input
+              placeholder={t.search}
+              aria-label={t.search}
+              value={filters.query}
+              onChange={(e) => handleFilterChange("query", e.target.value)}
             />
-          )
-        ) : view === "list" ? (
-          <OrdersList
-            orders={orders}
-            allOrders={orders}
-            t={t}
-            sharedLabels={dictionary.admin.shared}
-            locale={locale}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            onRangeChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
-            onClearFilters={handleClearFilters}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            loadError={loadError}
-            onRetry={handleSync}
+            {filters.query ? (
+              <button type="button" className="qsearch__clear" onClick={() => handleFilterChange("query", "")} aria-label={t.clearFilter}>
+                <span className="ic">
+                  <X aria-hidden="true" />
+                </span>
+              </button>
+            ) : null}
+          </div>
+          <AdmDropdown
+            size="sm"
+            value={filters.status}
+            onChange={(v) => handleFilterChange("status", v as OrderStatus | "all")}
+            ariaLabel={t.colStatus}
+            options={[
+              { value: "all", label: t.allStatus },
+              ...LIST_STATUS.map((s) => ({ value: s, label: s === "closed" ? t.wStClosed : copyOf(t, STATUS[s].key) })),
+            ]}
           />
-        ) : view === "cal" ? (
-          <OrdersCalendar
-            orders={orders}
+          <AdmDropdown
+            size="sm"
+            value={filters.prop}
+            onChange={(v) => handleFilterChange("prop", v)}
+            ariaLabel={t.allProp}
+            options={[{ value: "all", label: t.allProp }, ...buildings.map((b) => ({ value: b.key, label: b.label }))]}
+          />
+          <AdmDropdown
+            size="sm"
+            value={filters.urgency}
+            onChange={(v) => handleFilterChange("urgency", v as OrdersFilters["urgency"])}
+            ariaLabel={t.allUrgency}
+            options={[
+              { value: "all", label: t.allUrgency },
+              { value: "high", label: t.urgent },
+              { value: "normal", label: t.normal },
+            ]}
+          />
+          <span className="ow-filters__count">{loadError ? null : tpl(t.wCountLine, { n: listRows.length })}</span>
+        </div>
+      ) : null}
+
+      {view === "queue" ? (
+        <div className="wkpis lfw-kpis">
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiRequested}</span>
+            <span className="wkpi__v">
+              {V(kpi.requested)}
+              <small>{t.wCountUnit}</small>
+            </span>
+            <span className="wkpi__d">
+              {kpi.oldestDays === null ? t.clear : kpi.oldestDays === 0 ? t.wKpiOldestToday : tpl(t.wKpiOldest, { n: kpi.oldestDays })}
+            </span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiApproved}</span>
+            <span className="wkpi__v">
+              {V(kpi.approved)}
+              <small>{t.wCountUnit}</small>
+            </span>
+            <span className="wkpi__d">{t.wKpiApprovedSub}</span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiUrgent}</span>
+            <span className={`wkpi__v${!loadError && kpi.urgent > 0 ? " is-danger" : ""}`}>
+              {V(kpi.urgent)}
+              <small>{t.wCountUnit}</small>
+            </span>
+            <span className="wkpi__d">{t.wKpiUrgentSub}</span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiDelivWeek}</span>
+            <span className="wkpi__v">
+              {V(kpi.delivWeek)}
+              <small>{t.wCountUnit}</small>
+            </span>
+            <span className="wkpi__d">{tpl(t.wKpiWeekSub, { n: kpi.delivToday })}</span>
+          </div>
+          <div className="wkpi">
+            <span className="wkpi__k">{t.kpiOrderedMo}</span>
+            <span className="wkpi__v">
+              {V(kpi.orderedMo)}
+              <small>{t.wCountUnit}</small>
+            </span>
+            <span className="wkpi__d">{t.wKpiMonthSub}</span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="cbody lfw-body">
+        {view === "queue" ? (
+          <OrdersQueue
+            orders={scoped}
             t={t}
             locale={locale}
             todayKey={todayKey}
-            calProp={calProp}
-            onCalPropChange={setCalProp}
+            selectedId={selectedId}
+            loadError={loadError}
+            onRetry={handleSync}
+            onSelect={setSelectedId}
+            onAction={(kind, id) => setConfirm({ kind, id })}
+            onOpenCalendar={() => handleViewChange("cal")}
+          />
+        ) : view === "cal" ? (
+          <OrdersCalendar
+            orders={scoped}
+            t={t}
+            locale={locale}
+            todayKey={todayKey}
             calMonth={calMonth}
             onCalMonthChange={setCalMonth}
             calSel={calSel}
@@ -432,18 +461,13 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
             onRetry={handleSync}
           />
         ) : (
-          <OrdersClosed
-            orders={orders}
-            allOrders={orders}
+          <OrdersList
+            rows={listRows}
             t={t}
-            sharedLabels={dictionary.admin.shared}
             locale={locale}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            onRangeChange={(from, to) => setFilters((prev) => ({ ...prev, from, to }))}
-            onClearFilters={handleClearFilters}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onClearFilters={handleClearFilters}
             loadError={loadError}
             onRetry={handleSync}
           />

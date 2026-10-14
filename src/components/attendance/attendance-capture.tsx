@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import jsQR from "jsqr";
 import "./attendance.css";
+import "./clock-done.css";
 import { AIc, AttIcon } from "./att-icons";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {
@@ -93,6 +94,7 @@ export function AttendanceCapture({
   qrToken = null,
   qrSiteName = null,
   trustedDeviceName = null,
+  userName = "",
 }: {
   mode?: AttendanceScanMode;
   locale: string;
@@ -105,6 +107,8 @@ export function AttendanceCapture({
    * device instead (iOS Safari path). Shown prominently so nobody clocks in as someone else.
    */
   trustedDeviceName?: string | null;
+  /** 첫 출근 환영 문구에 쓰는 이름. */
+  userName?: string;
 }) {
   const copy = getDictionary(locale).attendance;
   const router = useRouter();
@@ -297,8 +301,11 @@ export function AttendanceCapture({
   // 카메라 위 어두운 막에 사각 구멍(코너 맥박 · 스캔선), 아래 GPS 알약, 결과는 흰 시트. QR 을 잡으면 코너가 보라로
   // 조여지고(잠금) 짧은 진동, 성공이면 체크가 그려진다. 방식 카드(Wi-Fi 준비중) · 1/2 단계 표시는 뺐다.
   const gpsTone = gpsStatus === "ok" ? "ok" : gpsStatus === "pending" ? "wait" : "bad";
+  // 성공이면 흰 화면 한 장(초록 점 → 얇은 큰 시각 → 근무 시작 선, 첫 출근만 환영 한 줄 — 시안 Motion-B2-*), 실패만 시트.
   const resultSheet =
-    phase === "result" && result ? (
+    phase === "result" && result && result.ok ? (
+      <ClockDone result={result} isOut={isOut} userName={userName} locale={locale} onHome={goHome} copy={copy} />
+    ) : phase === "result" && result ? (
       <BottomSheet ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle} className="att att__result-sheet capw-sheet" onClose={onDismiss}>
         <ResultSheet result={result} isOut={isOut} onHome={goHome} onRetry={retry} copy={copy} />
       </BottomSheet>
@@ -483,4 +490,89 @@ function ResultSheet({
     default:
       return fail(copy.resultGenericTitle, [copy.resultGenericSub], "retry", false);
   }
+}
+
+/** 출근 · 퇴근 완료 — 흰 화면 한 장(2026-10-14, 시안 Motion-B2-FirstWin-Phone · Motion-B2-ClockIn-Phone).
+ *  초록 점에서 흰 화면이 퍼지고 → 점이 스프링으로 자리 잡으며 체크 → 시각 자리마다 아래서 올라옴 → 근무 시작 선이 그어짐.
+ *  「첫 출근을 환영해요」는 서버가 firstEver 를 준 출근에만(그 뒤로는 「출근 완료」만). */
+export function ClockDone({
+  result,
+  isOut,
+  userName,
+  locale,
+  onHome,
+  copy,
+}: {
+  result: Extract<AttendanceScanResult, { ok: true }>;
+  isOut: boolean;
+  userName: string;
+  locale: string;
+  onHome: () => void;
+  copy: AttendanceCopy;
+}) {
+  const first = !isOut && result.firstEver === true;
+  const date = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "long" }).format(new Date(result.atIso));
+  const chars = result.timeLabel.split("");
+  return (
+    <div className={`cind${first ? " is-first" : ""}`} role="dialog" aria-modal="true" aria-label={isOut ? copy.resultOutTitle : copy.resultInTitle} data-native-back-overlay>
+      <div className="cind__top">
+        <span className="cind__dotw" aria-hidden="true">
+          <span className="cind__ring" />
+          <span className="cind__dot">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </span>
+          {first ? (
+            <span className="cind__spk">
+              {Array.from({ length: 12 }, (_, i) => (
+                <i key={i} style={{ ["--a" as string]: `${-90 + (i - 5.5) * 14}deg`, ["--r" as string]: `${70 + ((i * 37) % 5) * 14}px`, animationDelay: `${(i % 4) * 30}ms` }} />
+              ))}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="cind__body">
+        {first ? (
+          <>
+            <span className="cind__ln"><span className="cind__k">{copy.cinWelcome}</span></span>
+            <span className="cind__ln cind__d2">
+              <span className="cind__w">
+                <span className="cind__nm">
+                  {copy.cinName.replace("{name}", userName || "")}
+                  <svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M2 7 C 30 3, 60 3, 98 6" pathLength={1} />
+                  </svg>
+                </span>
+              </span>
+            </span>
+            <span className="cind__ln cind__d3"><span className="cind__w">{copy.cinTogether}</span></span>
+          </>
+        ) : (
+          <span className="cind__ln"><span className="cind__k">{isOut ? copy.resultOutTitle : copy.resultInTitle}</span></span>
+        )}
+        <div className="cind__time" aria-label={result.timeLabel}>
+          {chars.map((ch, i) => (
+            <span key={i} className={`cind__d${ch === ":" ? " is-colon" : ""}`}>
+              <span style={{ animationDelay: `${(first ? 1370 : 1230) + i * 60}ms` }}>{ch}</span>
+            </span>
+          ))}
+        </div>
+        <div className="cind__meta">
+          <b>{result.siteName}</b> · {date}
+        </div>
+        <div className="cind__track" aria-hidden={isOut}>
+          <span className="cind__bar"><i /></span>
+          <span className="cind__start" />
+          <span className="cind__tlab">
+            <span>{(isOut ? copy.cinTrackOut : copy.cinTrackIn).replace("{time}", result.timeLabel)}</span>
+            <span>{isOut ? copy.cinDayDone : copy.cinRecording}</span>
+          </span>
+        </div>
+      </div>
+      <button type="button" className="cind__btn" onClick={onHome}>
+        {copy.resultConfirm}
+      </button>
+    </div>
+  );
 }

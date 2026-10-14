@@ -88,6 +88,7 @@ export default async function MobileAttendanceCapturePage({ searchParams }: Page
         qrSiteName={qrSiteName}
         qrToken={token}
         trustedDeviceName={trusted ? trusted.userName : null}
+        userName={authed ? (session!.user.name ?? "") : (trusted?.userName ?? "")}
       />
     </MobileShell>
   );

@@ -73,6 +73,8 @@ export type AttendanceScanSuccess = {
   atIso: string;
   timeLabel: string;
   method: "gps_qr";
+  /** 이 조직에서 이 사람의 첫 출근이면 true — 결과 화면이 「첫 출근을 환영해요」를 한 번만 보여 준다(2026-10-14). */
+  firstEver?: boolean;
 };
 
 export type AttendanceScanFailure = {
@@ -309,9 +311,16 @@ export async function submitAttendanceScan(
     await logAttempt({ success: true, failureReason: null, resolvedSiteId: site.id });
     // 打刻에 성공한 기기만 기억한다(또는 만료를 연장한다) — 실제로 현장에서 쓴 기기라는 증거가 있는 셈.
     await rememberTrustedDevice({ userId, organizationId, userAgent: input.userAgent ?? null });
+    // 첫 출근 = 방금 넣은 것 말고 이 조직에 내 근무 기록이 없음. 세는 데 실패하면 평소 화면(false).
+    const { count: sessionCount } = await service
+      .from("attendance_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId);
     return {
       ok: true,
       kind: "in",
+      firstEver: sessionCount === 1,
       siteName: localizedSiteName(site, locale),
       atIso: nowIso,
       timeLabel: tokyoTimeLabel(nowIso),

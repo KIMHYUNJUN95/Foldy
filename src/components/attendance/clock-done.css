@@ -1,0 +1,60 @@
+/* 출근 · 퇴근 완료 흰 화면(2026-10-14, 시안 Motion-B2-*) — 한 번 재생. 스프링은 감쇠 진동을 샘플링한 linear(). */
+.cind {
+  --sp: linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000);
+  --spb: linear(0.000,0.045,0.160,0.317,0.490,0.657,0.801,0.913,0.989,1.032,1.047,1.042,1.024,1.002,0.982,0.968,0.962,0.962,0.968,0.976,0.985,0.993,0.999,1.003,1.005,1.005,1.004,1.002,1.000,0.999,0.998,0.998,0.998,0.999,0.999,1.000,1.000,1.000,1.000,1.000,1.000);
+  position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; background: #fff; color: #16141f; font-family: "Geist", var(--font-noto-kr), sans-serif;
+  padding: max(env(safe-area-inset-top), 24px) 28px max(env(safe-area-inset-bottom), 24px);
+  clip-path: circle(0px at 50% 30%); animation: cind-open 560ms cubic-bezier(.77, 0, .175, 1) 80ms forwards;
+}
+@keyframes cind-open { to { clip-path: circle(150% at 50% 30%); } }
+.cind__top { display: flex; justify-content: center; margin-top: calc(30vh - 28px - max(env(safe-area-inset-top), 24px)); }
+.cind__dotw { position: relative; width: 56px; height: 56px; }
+.cind__ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid #3dd68c; opacity: 0; animation: cind-ring 740ms cubic-bezier(.23, 1, .32, 1) 560ms; }
+@keyframes cind-ring { from { opacity: .5; transform: scale(1); } to { opacity: 0; transform: scale(3.2); } }
+.cind__dot { position: absolute; inset: 0; border-radius: 50%; background: #22a06b; box-shadow: 0 10px 24px -10px rgba(34, 160, 107, .75); display: flex; align-items: center; justify-content: center; transform: scale(.6); animation: cind-pop 580ms var(--spb) 520ms forwards; }
+@keyframes cind-pop { to { transform: scale(1); } }
+.cind__dot path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: cind-draw 300ms cubic-bezier(.23, 1, .32, 1) 680ms forwards; }
+@keyframes cind-draw { to { stroke-dashoffset: 0; } }
+.cind__spk { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.cind__spk i { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%; background: #b9a0fa; opacity: 0; animation: cind-spk 900ms cubic-bezier(.23, 1, .32, 1) 600ms; }
+.cind__spk i:nth-child(3n) { width: 6px; height: 6px; background: #3dd68c; }
+@keyframes cind-spk {
+  0% { opacity: 0; transform: rotate(var(--a)) translateX(0) scale(.5); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--r)) scale(.6); }
+}
+.cind__body { margin-top: 40px; }
+.cind__ln { display: block; overflow: hidden; }
+.cind__ln > span { display: inline-block; transform: translateY(105%); animation: cind-up 700ms var(--sp) 790ms forwards; }
+.cind__d2 > span { animation-delay: 860ms; }
+.cind__d3 > span { animation-delay: 930ms; margin-top: 0; }
+@keyframes cind-up { to { transform: translateY(0); } }
+.cind__k { font-size: 14px; font-weight: 600; color: #1f7a4d; }
+.cind.is-first .cind__d2 { margin-top: 6px; }
+.cind__w { font-size: 26px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.3; }
+.cind__nm { position: relative; display: inline-block; }
+.cind__nm svg { position: absolute; left: -2px; bottom: -6px; width: calc(100% + 4px); height: 10px; overflow: visible; }
+.cind__nm path { fill: none; stroke: #b9a0fa; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: cind-ul 550ms cubic-bezier(.77, 0, .175, 1) 1350ms forwards; }
+@keyframes cind-ul { to { stroke-dashoffset: 0; } }
+.cind__time { display: flex; align-items: flex-end; margin-top: 10px; font-size: 84px; font-weight: 300; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.cind.is-first .cind__time { margin-top: 18px; }
+.cind__d { display: inline-block; overflow: hidden; height: 1.02em; }
+.cind__d > span { display: inline-block; transform: translateY(100%); animation: cind-up 760ms var(--sp) forwards; }
+.cind__d.is-colon { color: #b4b1bf; margin: 0 2px; }
+.cind__meta { margin-top: 12px; font-size: 15px; color: #6b6878; opacity: 0; transform: translateY(8px); animation: cind-fade 400ms cubic-bezier(.23, 1, .32, 1) 1650ms forwards; }
+.cind__meta b { color: #16141f; font-weight: 600; }
+@keyframes cind-fade { to { opacity: 1; transform: none; } }
+.cind__track { position: relative; margin-top: 34px; height: 30px; opacity: 0; animation: cind-fade 400ms ease 1650ms forwards; }
+.cind__bar { position: absolute; left: 0; right: 0; top: 7px; height: 2px; border-radius: 1px; background: #efeff3; }
+.cind__bar i { position: absolute; inset: 0; border-radius: 1px; background: linear-gradient(90deg, #d9ccfb, #7a52e6); transform: scaleX(0); transform-origin: 0 50%; animation: cind-line 800ms cubic-bezier(.77, 0, .175, 1) 1750ms forwards; }
+@keyframes cind-line { to { transform: scaleX(1); } }
+.cind__start { position: absolute; left: -1px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: #7a52e6; transform: scale(.6); animation: cind-pop 420ms var(--spb) 1750ms forwards; }
+.cind__start::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #b9a0fa; opacity: 0; animation: cind-ring 1000ms cubic-bezier(.23, 1, .32, 1) 2250ms 2; }
+.cind__tlab { position: absolute; left: 0; right: 0; top: 20px; display: flex; justify-content: space-between; font-size: 12px; color: #8b8898; }
+.cind__btn { margin-top: auto; height: 54px; border: 0; border-radius: 16px; background: #7a52e6; box-shadow: 0 14px 28px -16px rgba(91, 43, 214, .8); color: #fff; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; opacity: 0; transform: translateY(16px); animation: cind-btn 600ms var(--sp) 1550ms forwards; transition: transform 140ms ease; }
+.cind__btn:active { transform: scale(.98); }
+@keyframes cind-btn { to { opacity: 1; transform: none; } }
+@media (min-width: 600px) { .cind__body, .cind__btn { width: 100%; max-width: 440px; margin-left: auto; margin-right: auto; } .cind__btn { margin-top: auto; } }
+@media (prefers-reduced-motion: reduce) {
+  .cind, .cind *, .cind *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+}

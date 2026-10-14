@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { MobileCalendarView, type CalendarReservationItem, type CalendarRoomBlock } from "@/components/calendar/mobile-calendar-view";
 import type { PropertyMapMeta } from "@/lib/property-map-links";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { Locale } from "@/lib/i18n";
+import type { Dictionary, Locale } from "@/lib/i18n";
 import { useBeds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 
 type MobileCalendarLiveViewProps = {
+  wcopy: Dictionary["mobile"]["calendarW"];
   copy: {
     calendar: string;
     calendarBuildingChange: string;

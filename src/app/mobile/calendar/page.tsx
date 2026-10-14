@@ -609,6 +609,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
           stayingToday: dictionary.admin.stats.stayingToday,
           today: dictionary.mobile.today,
         }}
+        wcopy={dictionary.mobile.calendarW}
         isOutOfWindow={isOutOfWindow}
         buildingInfos={buildingInfos}
         locale={session.user.preferredLanguage}

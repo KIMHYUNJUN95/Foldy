@@ -1,41 +1,22 @@
 ﻿"use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UIEvent } from "react";
 import { createPortal } from "react-dom";
-
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
-import {
-  BedDouble,
-  Building2,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  Home,
-  List,
-  MapIcon,
-  MapPin,
-  Phone,
-  KeyRound,
-  PlaneLanding,
-  PlaneTakeoff,
-} from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Phone } from "lucide-react";
+import "./mobile-calendar.css";
 import { collectBlockedRooms } from "@/lib/room-blocks";
 import { type PropertyMapMeta, getPropertyAddress } from "@/lib/property-map-links";
 import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import type { Locale } from "@/lib/i18n";
+import { useIsTablet } from "@/components/shell/split-list";
+import type { Dictionary, Locale } from "@/lib/i18n";
+import { formatPhoneDisplay } from "@/lib/phone-format";
+import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import buildingLottie from "@/assets/building-lottie.json";
 
 export type CalendarReservationItem = {
   checkInDate: string;
@@ -55,18 +36,9 @@ export type CalendarReservationItem = {
   status: "cancelled" | "checked_in" | "checked_out" | "confirmed" | "no_show";
 };
 
-function computeEmptyRooms(
-  roomAxisRooms: string[],
-  stayingAtReferenceDate: Pick<CalendarReservationItem, "roomLabel">[],
-  isAuthoritative: boolean,
-): { count: number; isProvisional: boolean } {
-  const occupiedRoomSet = new Set(stayingAtReferenceDate.map((item) => item.roomLabel));
-  const roomSet = new Set(roomAxisRooms);
-  const emptyCount = [...roomSet].filter((room) => !occupiedRoomSet.has(room)).length;
-  return { count: Math.max(0, emptyCount), isProvisional: !isAuthoritative };
-}
-
 type MobileCalendarViewProps = {
+  /** 화이트 리디자인(2026-10-14) 문구 묶음 — `dictionary.mobile.calendarW`. */
+  wcopy: Dictionary["mobile"]["calendarW"];
   copy: {
     calendar: string;
     calendarBuildingChange: string;
@@ -292,10 +264,6 @@ function assignReservationLanes(
 function calendarRowHeightForBars(_bars: ReservationBarLayout[]) {
   return CALENDAR_SINGLE_ROW_HEIGHT;
 }
-const GLASS_PANEL =
-  "rounded-[24px] border border-slate-200/80 bg-surface shadow-[0_18px_34px_-28px_rgba(31,58,95,0.42)] backdrop-blur-none";
-const GLASS_CARD =
-  "rounded-2xl border border-slate-200/80 bg-surface shadow-[0_14px_28px_-24px_rgba(31,58,95,0.38)] backdrop-blur-none";
 // Centered pinned modal card (reservation detail / empty room / area info).
 const RESERVATION_SHEET_TRANSITION_MS = 440;
 
@@ -325,17 +293,6 @@ function normalizeSource(source: string) {
   if (value.includes("booking")) return "booking";
   if (value.includes("airbnb")) return "airbnb";
   return "other";
-}
-
-function sourceClass(source: string) {
-  const normalized = normalizeSource(source);
-  if (normalized === "booking") {
-    return "bg-[linear-gradient(180deg,#5379b8_0%,#39588f_100%)] border-[#39588f]/40 shadow-slate-900/25";
-  }
-  if (normalized === "airbnb") {
-    return "bg-[linear-gradient(180deg,#ff718c_0%,#f05273_100%)] border-rose-200/80 shadow-rose-900/25";
-  }
-  return "bg-[linear-gradient(180deg,#aeb9c8_0%,#8795a8_100%)] border-slate-200/80 shadow-slate-900/20";
 }
 
 function reservationBarLabel(name: string, widthPx: number) {
@@ -395,7 +352,11 @@ function sharedAccessCodeLabel(
     : item.code;
 }
 
+type ListTab = "in" | "out" | "stay" | "empty";
+const LAST_PROPERTY_KEY = "foldy.calendar.lastProperty";
+
 export function MobileCalendarView({
+  wcopy,
   buildingInfos,
   copy,
   isOutOfWindow,
@@ -410,7 +371,6 @@ export function MobileCalendarView({
   selectedProperty: selectedPropertyProp,
   selectedMonth,
   selectedMonthLabel,
-  statusLabels,
   today,
   initialReservationId,
 }: MobileCalendarViewProps) {
@@ -426,39 +386,39 @@ export function MobileCalendarView({
     if (fromUrl && propertyOptions.includes(fromUrl)) return fromUrl;
     return selectedPropertyProp;
   }, [searchParams, propertyOptions, selectedPropertyProp]);
-  const [tokyoNow, setTokyoNow] = useState(() =>
-    new Intl.DateTimeFormat(locale, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Asia/Tokyo",
-    }).format(new Date()),
-  );
-
+  const router = useRouter();
+  const isTablet = useIsTablet();
+  const [isBuildingSheetOpen, setIsBuildingSheetOpen] = useState(false);
+  const [listTab, setListTab] = useState<ListTab>("in");
+  const [paneReservationId, setPaneReservationId] = useState<string | null>(null);
+  const [paneMapName, setPaneMapName] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // 복사하면 그 자리가 1.6초 체크로 바뀐다(따로 알림 창 없음).
+  const flashCopied = useCallback((key: string) => {
+    haptic("success");
+    setCopiedKey(key);
+  }, []);
   useEffect(() => {
-    const formatter = new Intl.DateTimeFormat(locale, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Asia/Tokyo",
-    });
-    const update = () => setTokyoNow(formatter.format(new Date()));
-    update();
-    // The clock only shows HH:MM, so tick every 30s instead of every second — a 1s interval
-    // re-rendered this whole (large) calendar component once per second for no visible gain.
-    const timer = window.setInterval(update, 30000);
-    return () => window.clearInterval(timer);
-  }, [locale]);
-
+    if (!copiedKey) return;
+    const timer = setTimeout(() => setCopiedKey(null), 1600);
+    return () => clearTimeout(timer);
+  }, [copiedKey]);
+  const rememberProperty = (property: string) => {
+    try {
+      window.localStorage.setItem(LAST_PROPERTY_KEY, property);
+    } catch {
+      /* 저장소가 막힌 환경 — 다음에 고르기 화면부터 보일 뿐이다. */
+    }
+  };
   const [mode, setMode] = useState<"overview" | "lists" | "map">("overview");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [isReservationSheetOpen, setIsReservationSheetOpen] = useState(false);
-  const [isEmptyRoomsModalOpen, setIsEmptyRoomsModalOpen] = useState(false);
   const [selectedMapProperty, setSelectedMapProperty] = useState<PropertyMapMeta | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [mapCopyFeedback, setMapCopyFeedback] = useState<string | null>(null);
   const reservationCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isAnyModalOpen =
-    Boolean(selectedReservationId) || isEmptyRoomsModalOpen || Boolean(selectedMapProperty);
+  const isAnyModalOpen = Boolean(selectedReservationId) || Boolean(selectedMapProperty);
   useBodyScrollLock(isAnyModalOpen);
 
   // isOutOfWindow is computed server-side and passed as a prop to keep a single source of truth.
@@ -509,10 +469,6 @@ export function MobileCalendarView({
   nextHref.set("month", nextMonth);
   const buildingPickerHref = new URLSearchParams();
   buildingPickerHref.set("month", selectedMonth);
-  const propertyMetaByName = useMemo(
-    () => new Map(buildingInfos.map((item) => [item.canonicalName, item])),
-    [buildingInfos],
-  );
   const getPropertyCalendarHref = (property: string) => {
     const params = new URLSearchParams();
     params.set("month", selectedMonth);
@@ -571,15 +527,6 @@ export function MobileCalendarView({
     return map;
   }, [dates.length, rangeEndExclusive, rangeStart, roomBlocks]);
 
-  const calendarBodyHeight = useMemo(
-    () =>
-      rooms.reduce(
-        (total, room) =>
-          total + (roomBarLayouts.get(room)?.rowHeight ?? CALENDAR_SINGLE_ROW_HEIGHT),
-        0,
-      ),
-    [roomBarLayouts, rooms],
-  );
 
   // today is passed from server (Asia/Tokyo) -> never recompute on client
   // findIndex (not indexOf) makes the "date === today" predicate explicit
@@ -587,12 +534,6 @@ export function MobileCalendarView({
   const isTodayInView = todayIndex !== -1;
   // Lists mode always uses the real operational "today" snapshot, regardless of selectedMonth.
   const listReferenceDate = today;
-  const fallbackVisibleDateRangeLabel = useMemo(() => {
-    if (dates.length === 0) return formatDateLabel(rangeStart, locale);
-    const firstDate = dates[0];
-    const lastPreviewDate = dates[Math.min(dates.length - 1, 6)] ?? firstDate;
-    return `${formatDateLabel(firstDate, locale)} - ${formatDateLabel(lastPreviewDate, locale)}`;
-  }, [dates, locale, rangeStart]);
 
   const activeRoomSet = useMemo(() => new Set(rooms), [rooms]);
   const activeReservations = useMemo(
@@ -603,10 +544,6 @@ export function MobileCalendarView({
   const checkOutsToday = activeReservations.filter((item) => item.checkOutDate === listReferenceDate);
   const stayingToday = activeReservations.filter(
     (item) => item.checkInDate <= listReferenceDate && item.checkOutDate > listReferenceDate,
-  );
-  const emptyToday = useMemo(
-    () => computeEmptyRooms(rooms, stayingToday, roomMasterRooms !== undefined),
-    [rooms, stayingToday, roomMasterRooms],
   );
   const emptyRoomLabels = useMemo(() => {
     const occupiedRoomSet = new Set(stayingToday.map((item) => item.roomLabel));
@@ -729,6 +666,30 @@ export function MobileCalendarView({
     };
   }, []);
 
+  // 건물을 고르면 기억해 두고, 다음에 건물 없이 들어오면 그 건물로 바로 연다(시안 CalPick-Phone).
+  useEffect(() => {
+    if (selectedProperty) {
+      try {
+        window.localStorage.setItem(LAST_PROPERTY_KEY, selectedProperty);
+      } catch {
+        /* 무시 */
+      }
+      return;
+    }
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(LAST_PROPERTY_KEY);
+    } catch {
+      stored = null;
+    }
+    if (stored && propertyOptions.includes(stored)) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("month", selectedMonth);
+      params.set("property", stored);
+      router.replace(`/mobile/calendar?${params.toString()}`, { scroll: false });
+    }
+  }, [selectedProperty, propertyOptions, router, searchParams, selectedMonth]);
+
   useEffect(() => {
     if (mode !== "overview") return;
     if (!isTodayInView) return;
@@ -758,1048 +719,687 @@ export function MobileCalendarView({
     updateVisibleDateRangeLabel(container.scrollLeft, container.clientWidth);
   }, [mode, selectedMonth, selectedProperty, updateVisibleDateRangeLabel]);
 
+  const w = wcopy;
+  const propertyName = (name: string) => propertyLabelMap[name] ?? name;
+  const channelName = (source: string) => {
+    const normalized = normalizeSource(source);
+    return normalized === "booking" ? "Booking.com" : normalized === "airbnb" ? "Airbnb" : w.channelDirect;
+  };
+  const guestsShort = (item: CalendarReservationItem) => {
+    if (item.adults !== null) {
+      const full = copy.guestBreakdown
+        .replace("{adults}", String(item.adults))
+        .replace("{children}", String(item.children ?? 0));
+      return item.children ? full : full.split(" · ")[0];
+    }
+    return item.guestCount ? `${item.guestCount}${copy.guestCountUnit}` : copy.guestCountUnknown;
+  };
+  const nightsOf = (item: CalendarReservationItem) =>
+    Math.max(0, Math.round((parseDate(item.checkOutDate).getTime() - parseDate(item.checkInDate).getTime()) / 86_400_000));
+  const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+  const longDate = (date: string) =>
+    new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" }).format(parseDate(date));
+
+  // 건물마다 객실 수 · 오늘 빈 방 — 건물 고르기 목록에 쓴다.
+  const buildingRows = propertyOptions.map((property) => {
+    const propertyRooms = propertyRoomsMap?.[property] ?? [];
+    const occupied = new Set(
+      reservations
+        .filter((item) => item.propertyName === property && item.checkInDate <= today && item.checkOutDate > today)
+        .map((item) => item.roomLabel),
+    );
+    return { property, rooms: propertyRooms.length, empty: propertyRooms.filter((room) => !occupied.has(room)).length };
+  });
+
+  const buildingList = (onPick?: () => void) => (
+    <div className="mcw-blist">
+      {buildingRows.map((row) => {
+        const on = row.property === selectedProperty;
+        return (
+          <Link
+            aria-current={on ? "true" : undefined}
+            className={`mcw-brow${on ? " on" : ""}`}
+            href={getPropertyCalendarHref(row.property)}
+            key={row.property}
+            onClick={() => {
+              rememberProperty(row.property);
+              onPick?.();
+            }}
+          >
+            <span className="mcw-brow__t">
+              <b>{propertyName(row.property)}</b>
+              <span className="num">
+                {w.roomsToday.replace("{n}", String(row.rooms)).replace("{e}", row.empty ? String(row.empty) : w.noneEmpty)}
+              </span>
+            </span>
+            {on ? <Check aria-hidden="true" className="mcw-brow__ck" /> : <ChevronRight aria-hidden="true" className="mcw-brow__go" />}
+          </Link>
+        );
+      })}
+    </div>
+  );
+
+  // 건물을 아직 안 고른 첫 화면 — 지난번에 본 건물이 있으면 그리로 바로 간다(시안 CalPick-Phone: 카드 첫 화면 대신 건물 고르기).
   if (!selectedProperty) {
     return (
-      <div className="relative space-y-4 pb-2">
-        {/* Hero sits directly on the ivory canvas — no card chrome. The 3D building
-            illustration edge-fades into the background for a seamless blend. */}
-        <section className="relative min-h-[244px]">
-          <div className="relative z-10 flex items-start justify-between gap-3 px-1 pt-2">
-            <div className="ml-1 text-left">
-              <p className="text-[15px] font-extrabold leading-none text-foreground">
-                {tokyoNow}
-              </p>
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
-                {copy.calendarTokyoNowLabel}
-              </p>
-            </div>
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
-              <CalendarDays className="size-4.5" aria-hidden="true" />
-            </div>
-          </div>
-
-          <div className="absolute inset-x-0 bottom-0 flex justify-center">
-            <div className="relative h-52 w-52">
-              <Lottie
-                animationData={buildingLottie}
-                aria-hidden="true"
-                autoplay
-                className="relative z-10 h-full w-full [mask-image:radial-gradient(78%_78%_at_50%_42%,#000_56%,transparent_84%)] [-webkit-mask-image:radial-gradient(78%_78%_at_50%_42%,#000_56%,transparent_84%)]"
-                loop
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* 넓은 화면(2026-10-06 아이패드 점검): 폰 2열 · 폴드 3열 · 태블릿 가로 4열 — 두 열 그대로면 카드가 크고 비어 보였다. */}
-        <div className="grid grid-cols-2 gap-2.5 fold:grid-cols-3 tablet:grid-cols-4">
-          {propertyOptions.map((property) => {
-            const meta = propertyMetaByName.get(property);
-            const isHouse = meta?.kind === "house" || property.toLowerCase().includes("okubo");
-            const Icon = isHouse ? Home : Building2;
-
-            return (
-              <Link
-                // `h-full` 이 없으면 그리드 칸은 늘어나도 그 안의 카드는 내용 높이에 머문다 —
-                // 같은 줄에서 이름이 두 줄인 카드만 커 보이던 원인이다(STAY ARI Apartment Hotel).
-                className="group block h-full"
-                href={getPropertyCalendarHref(property)}
-                key={property}
-              >
-                <Card className="relative flex h-full flex-col overflow-hidden rounded-[22px] border border-border bg-surface p-3 text-center shadow-[0_16px_30px_-26px_rgba(34,40,60,0.4)] transition-transform duration-200 group-active:scale-[0.98]">
-                  <div className="relative flex flex-col items-center">
-                    <div className="relative flex size-14 items-center justify-center">
-                      <div
-                        className={`absolute inset-0 rounded-full ${isHouse ? "bg-[#4E63B3]/10" : "bg-primary/10"}`}
-                        aria-hidden="true"
-                      />
-                      <div
-                        className={`relative flex size-11 items-center justify-center rounded-2xl ring-1 shadow-[0_12px_24px_-18px_rgba(34,40,60,0.5)] ${
-                          isHouse
-                            ? "bg-[#4E63B3]/10 text-[#4E63B3] ring-[#4E63B3]/20"
-                            : "bg-primary/10 text-primary ring-primary/15"
-                        }`}
-                      >
-                        <Icon className="size-6" strokeWidth={1.8} aria-hidden="true" />
-                      </div>
-                    </div>
-                    {/*
-                      이름 자리를 **두 줄로 고정한다.** 건물 이름 길이는 제각각이고(짧은 「가부키초」
-                      부터 긴 「STAY ARI Apartment Hotel」까지) 앞으로도 그럴 텐데, 줄 수에 따라
-                      카드 높이가 달라지면 격자가 들쭉날쭉해진다. 한 줄짜리 이름은 아래쪽 여백으로
-                      남고 두 줄짜리는 꽉 찬다 — 어느 쪽이든 카드 크기는 같다.
-
-                      `break-keep` 은 한국어 단어가 음절 단위로 쪼개지는 것을 막는다.
-                    */}
-                    <div className="mt-2 flex min-h-[2.5em] items-center justify-center">
-                      {/* 자리를 잡는 쪽(바깥)과 글을 다루는 쪽(안쪽)을 나눈다 — `text-balance` 와
-                          `break-keep` 은 글 상자에 걸려야 먹는다. */}
-                      <p className="break-keep text-balance text-[13px] font-black leading-[1.25] text-foreground">
-                        {propertyLabelMap[property] ?? property}
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-[11px] font-bold text-slate-400">
-                      {isHouse ? copy.calendarBuildingHouseLabel : copy.calendarBuildingHotelLabel}
-                    </p>
-                  </div>
-                </Card>
-              </Link>
-            );
-          })}
+      <div className="mcw">
+        <div className="mcw-h">
+          <span className="mcw-h__k">{w.title}</span>
+          <h1 className="mcw-h__t">{w.pickBuilding}</h1>
         </div>
+        {buildingList()}
       </div>
     );
   }
 
-  const phoneLabel = selectedReservation?.phone?.trim() || null;
-  const dialablePhone = toDialablePhone(phoneLabel);
-  const weekdayFmt = new Intl.DateTimeFormat(locale, { weekday: "short" });
+  const weekdayFmt = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
 
-  return (
-    <div className="relative space-y-4 pb-2">
-      <div className="pointer-events-none absolute inset-x-2 -top-8 h-32 rounded-[28px] bg-[radial-gradient(60%_72%_at_50%_0%,rgba(255,255,255,0.98),transparent_72%)] opacity-85 blur-[2px]" />
-      {roomSourceDebug ? (
-        <Card className="rounded-xl border-dashed border-sky-300/70 bg-sky-50/70 p-3 text-xs text-sky-950 shadow-sm">
-          <p className="font-semibold">Room source debug</p>
-          <p className="mt-1">mode: {roomSourceDebug.mode}</p>
-          <p>active rooms: {roomSourceDebug.activeRoomLabels.length}</p>
-          {roomSourceDebug.fetchWindow ? (
-            <p>
-              fetch window: {roomSourceDebug.fetchWindow.from} -&gt; {roomSourceDebug.fetchWindow.to} (exclusive)
-            </p>
-          ) : null}
-          {roomSourceDebug.reservationsQuery ? (
-            <p>reservations query: {roomSourceDebug.reservationsQuery}</p>
-          ) : null}
-          <p className="break-words">
-            labels: {roomSourceDebug.activeRoomLabels.length > 0 ? roomSourceDebug.activeRoomLabels.join(", ") : "-"}
-          </p>
-        </Card>
-      ) : null}
+  const listTabs: Array<{ key: ListTab; label: string; count: number }> = [
+    { key: "in", label: w.tabCheckIn, count: checkInsToday.length },
+    { key: "out", label: w.tabCheckOut, count: checkOutsToday.length },
+    { key: "stay", label: w.tabStay, count: stayingToday.length },
+    { key: "empty", label: w.tabEmpty, count: emptyRoomLabels.length },
+  ];
+  const listItems = listTab === "in" ? checkInsToday : listTab === "out" ? checkOutsToday : listTab === "stay" ? stayingToday : [];
+  const listSub = (item: CalendarReservationItem) =>
+    listTab === "stay"
+      ? `${guestsShort(item)} · ${w.untilSub.replace("{date}", md(item.checkOutDate))}`
+      : listTab === "out"
+        ? `${guestsShort(item)} · ${md(item.checkInDate)} – ${md(item.checkOutDate)}`
+        : w.staySub
+            .replace("{guests}", guestsShort(item))
+            .replace("{nights}", w.nights.replace("{n}", String(nightsOf(item))))
+            .replace("{channel}", channelName(item.source));
+  const paneReservation = isTablet
+    ? (listItems.find((item) => item.id === paneReservationId) ?? listItems[0] ?? null)
+    : null;
+  const paneMap = isTablet && mode === "map" ? (buildingInfos.find((item) => item.canonicalName === paneMapName) ?? buildingInfos[0] ?? null) : null;
 
-      <Card className={`${GLASS_PANEL} p-2`}>
-        <div className="grid grid-cols-3 gap-1">
+  const reservationBody = (item: CalendarReservationItem, onCopied: (key: string) => void, copiedKey: string | null) => {
+    const phone = item.phone?.trim() || null;
+    const tel = toDialablePhone(phone);
+    return (
+      <>
+        <div className="mcw-dk">
+          <i className={`mcw-dot is-${normalizeSource(item.source)}`} aria-hidden="true" />
+          <span>
+            {channelName(item.source)} · {w.resNo} <span className="mcw-mono">{item.sourceReservationId}</span>
+          </span>
           <button
-            className={`h-9 rounded-xl text-xs font-bold transition-colors ${mode === "overview" ? "bg-white text-primary shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] ring-1 ring-slate-200/70" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setMode("overview")}
+            aria-label={copiedKey === "res" ? w.copied : w.copyResNo}
+            className="mcw-ib is-sm"
+            onClick={async () => {
+              await copyText(item.sourceReservationId);
+              onCopied("res");
+            }}
+            title={w.copyResNo}
             type="button"
           >
-            <span className="inline-flex items-center gap-1">
-              <CalendarDays className="size-3.5" />
-              {copy.calendar}
-            </span>
-          </button>
-          <button
-            className={`h-9 rounded-xl text-xs font-bold transition-colors ${mode === "lists" ? "bg-white text-primary shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] ring-1 ring-slate-200/70" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setMode("lists")}
-            type="button"
-          >
-            <span className="inline-flex items-center gap-1">
-              <List className="size-3.5" />
-              {copy.listView}
-            </span>
-          </button>
-          <button
-            className={`h-9 rounded-xl text-xs font-bold transition-colors ${mode === "map" ? "bg-white text-primary shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] ring-1 ring-slate-200/70" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setMode("map")}
-            type="button"
-          >
-            <span className="inline-flex items-center gap-1">
-              <MapIcon className="size-3.5" />
-              {copy.mapTab}
-            </span>
+            {copiedKey === "res" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
           </button>
         </div>
-      </Card>
-
-      {mode !== "map" ? (
-        <Card className={`${GLASS_PANEL} p-3`}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-[0_12px_24px_-18px_rgba(34,40,60,0.5)] ring-1 ring-primary/15">
-                {(propertyMetaByName.get(selectedProperty)?.kind === "house" || selectedProperty.toLowerCase().includes("okubo")) ? (
-                  <Home className="size-5" aria-hidden="true" />
-                ) : (
-                  <Building2 className="size-5" aria-hidden="true" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-black text-slate-950">
-                  {propertyLabelMap[selectedProperty] ?? selectedProperty}
-                </p>
-                <p className="text-[11px] font-bold text-muted-foreground">
-                  {copy.calendar}
-                </p>
-              </div>
-            </div>
-            <Link
-              className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] transition-colors hover:text-slate-950"
-              href={`/mobile/calendar?${buildingPickerHref.toString()}`}
-            >
-              {copy.calendarBuildingChange}
-            </Link>
+        <div className="mcw-dwho">
+          <h2>{item.guestName}</h2>
+          <span>
+            {propertyName(item.propertyName)} · <b className="mcw-mono">{item.roomLabel}</b> · {guestsShort(item)}
+          </span>
+        </div>
+        <div className="mcw-dstay">
+          <div>
+            <span className="mcw-k">{copy.checkInLabel}</span>
+            <b>{longDate(item.checkInDate)}</b>
+            <span className="mcw-soft">{w.fromTime.replace("{time}", DEFAULT_CHECK_IN_TIME)}</span>
           </div>
-        </Card>
+          <div>
+            <span className="mcw-k">{copy.checkOutLabel}</span>
+            <b>{longDate(item.checkOutDate)}</b>
+            <span className="mcw-soft">
+              {w.untilTime.replace("{time}", DEFAULT_CHECK_OUT_TIME).replace("{nights}", w.nights.replace("{n}", String(nightsOf(item))))}
+            </span>
+          </div>
+        </div>
+        <div className="mcw-dphone">
+          <span className={`num${phone ? "" : " mcw-soft"}`}>{phone ? formatPhoneDisplay(phone) : copy.phoneMissing}</span>
+          {phone ? (
+            <button
+              aria-label={copiedKey === "phone" ? w.copied : w.copyPhone}
+              className={`mcw-sq${copiedKey === "phone" ? " is-done" : ""}`}
+              onClick={async () => {
+                await copyText(phone);
+                onCopied("phone");
+              }}
+              title={w.copyPhone}
+              type="button"
+            >
+              {copiedKey === "phone" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+            </button>
+          ) : null}
+          {tel ? (
+            <a aria-label={w.call} className="mcw-sq is-pri" href={`tel:${tel}`} onClick={() => haptic("light")}>
+              <Phone aria-hidden="true" />
+            </a>
+          ) : null}
+        </div>
+        <div className="mcw-dnote">
+          <span className="mcw-k">{copy.internalNote}</span>
+          <p className={item.internalNote?.trim() ? "" : "mcw-soft"}>{item.internalNote?.trim() || w.noNote}</p>
+        </div>
+      </>
+    );
+  };
+
+  const accessBody = (meta: PropertyMapMeta, onCopied: (key: string) => void, copiedKey: string | null) => {
+    const address = getPropertyAddress(meta, locale);
+    return (
+      <>
+        <div className="mcw-dwho">
+          <h2>{propertyName(meta.canonicalName)}</h2>
+          <span>{address || copy.mapAddressMissing}</span>
+          <span className="mcw-links">
+            <a className="mcw-link" href={meta.googleMapsUrl} rel="noopener noreferrer" target="_blank">
+              {w.openMap}
+              <ExternalLink aria-hidden="true" />
+            </a>
+            {address ? (
+              <button
+                className="mcw-link"
+                onClick={async () => {
+                  await copyText(address);
+                  onCopied("addr");
+                }}
+                type="button"
+              >
+                {copiedKey === "addr" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                {copiedKey === "addr" ? w.copied : w.copyAddress}
+              </button>
+            ) : null}
+          </span>
+        </div>
+        <div className="mcw-codes">
+          {meta.sharedAccess.map((item, index) => {
+            const key = `s${index}`;
+            return (
+              <div className="mcw-code" key={key}>
+                <span className="mcw-code__t">
+                  <span className="mcw-k">{sharedAccessLabel(item, copy)}</span>
+                  <b className="mcw-mono">{sharedAccessCodeLabel(item, copy)}</b>
+                </span>
+                <button
+                  aria-label={copiedKey === key ? w.copied : `${sharedAccessLabel(item, copy)} · ${copy.copyNumber}`}
+                  className={`mcw-sq${copiedKey === key ? " is-done" : ""}`}
+                  onClick={async () => {
+                    await copyText(item.code);
+                    onCopied(key);
+                  }}
+                  type="button"
+                >
+                  {copiedKey === key ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mcw-rcodes">
+          <span className="mcw-k">{w.roomCodes}</span>
+          {meta.roomAccess && meta.roomAccess.length > 0 ? (
+            meta.roomAccess.map((item) => {
+              const key = `r${item.roomLabel}`;
+              return (
+                <button
+                  aria-label={`${item.roomLabel} · ${copy.copyNumber}`}
+                  className="mcw-rcode"
+                  key={item.roomLabel}
+                  onClick={async () => {
+                    await copyText(item.code);
+                    onCopied(key);
+                  }}
+                  type="button"
+                >
+                  <span className="mcw-mono">{item.roomLabel}</span>
+                  {copiedKey === key ? (
+                    <span className="mcw-done">
+                      <Check aria-hidden="true" />
+                      {w.copied}
+                    </span>
+                  ) : (
+                    <span className="mcw-mono mcw-rcode__v">{item.code}</span>
+                  )}
+                </button>
+              );
+            })
+          ) : (
+            <span className="mcw-soft">{copy.mapNoAccessData}</span>
+          )}
+        </div>
+        <div className="mcw-dnote">
+          <span className="mcw-k">{w.opsNote}</span>
+          <p className={meta.note?.trim() ? "" : "mcw-soft"}>{meta.note?.trim() || copy.opsNoteEmpty}</p>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="mcw">
+      {roomSourceDebug ? (
+        <p className="mcw-debug">
+          room source: {roomSourceDebug.mode} · {roomSourceDebug.activeRoomLabels.length}
+        </p>
       ) : null}
 
+      {/* 화이트 리디자인(2026-10-14, 시안 Cal-Phone · Cal-Fold · Cal-Tablet · CalList-* · CalMap-* · CalDetail-Phone · CalPick-Phone):
+          머리 = 「예약 캘린더」 + 건물 이름(누르면 건물 고르기 시트) + 달 이동, 그 아래 캘린더 · 목록 · 지도. */}
+      <div className="mcw-h is-row">
+        <div className="mcw-h__main">
+          <span className="mcw-h__k">{w.title}</span>
+          <button
+            aria-label={w.pickAria.replace("{name}", propertyName(selectedProperty))}
+            className="mcw-h__t mcw-h__pick"
+            onClick={() => setIsBuildingSheetOpen(true)}
+            type="button"
+          >
+            {propertyName(selectedProperty)}
+            <ChevronDown aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mcw-month">
+          <Link aria-label={w.prevMonth} className="mcw-ib" href={`/mobile/calendar?${previousHref.toString()}`}>
+            <ChevronLeft aria-hidden="true" />
+          </Link>
+          <span className="num">{selectedMonthLabel}</span>
+          <Link aria-label={w.nextMonth} className="mcw-ib" href={`/mobile/calendar?${nextHref.toString()}`}>
+            <ChevronRight aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+
+      <div className="mcw-seg" role="tablist" aria-label={w.title}>
+        {(
+          [
+            ["overview", copy.calendar],
+            ["lists", copy.listView],
+            ["map", copy.mapTab],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            aria-selected={mode === key}
+            className={mode === key ? "on" : ""}
+            key={key}
+            onClick={() => setMode(key)}
+            role="tab"
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {mode === "overview" ? (
-        // The grid itself is now the 2-axis native scroll surface (sticky header + sticky
-        // room-label column), so this Card needs overflow-hidden for its rounded corners and a
-        // bounded height so the grid's overflow-auto has somewhere to kick in.
-        <Card
-          className={`flex flex-col overflow-hidden ${GLASS_PANEL}`}
-          style={{ maxHeight: "calc(100dvh - 15rem - env(safe-area-inset-bottom, 0px))" }}
-        >
-          <div className="flex shrink-0 items-center justify-between rounded-t-[24px] border-b border-slate-200/70 bg-surface/70 px-3 py-2.5">
-            <Link
-              className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-muted-foreground shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] transition-colors hover:text-foreground"
-              href={`/mobile/calendar?${previousHref.toString()}`}
-            >
-              <ChevronLeft className="size-4.5" />
-            </Link>
-            <div className="text-center">
-              <p className="text-sm font-black text-slate-800">{selectedMonthLabel}</p>
-              <p className="mt-0.5 text-[10px] font-bold tracking-[-0.01em] text-slate-400">
-                {visibleDateRangeLabel ?? fallbackVisibleDateRangeLabel}
-              </p>
-            </div>
-            <Link
-              className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-muted-foreground shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] transition-colors hover:text-foreground"
-              href={`/mobile/calendar?${nextHref.toString()}`}
-            >
-              <ChevronRight className="size-4.5" />
-            </Link>
+        isOutOfWindow ? (
+          <div className="mcw-empty">
+            <b>{copy.calendarOutOfWindowTitle}</b>
+            <span>{copy.calendarOutOfWindowBody}</span>
           </div>
-          {isOutOfWindow ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center bg-surface/40">
-              <div className="mx-auto mb-3 inline-flex size-10 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-sm">
-                <CalendarDays className="size-5" />
-              </div>
-              <p className="text-sm font-black">{copy.calendarOutOfWindowTitle}</p>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground max-w-xs">{copy.calendarOutOfWindowBody}</p>
-            </div>
-          ) : (
-            <>
-            <div className="mb-3 flex shrink-0 items-center gap-4 rounded-2xl bg-slate-50 px-3 py-2.5">
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] font-bold text-slate-700">
-                <span className="h-3 w-[18px] rounded bg-[linear-gradient(180deg,#ff718c_0%,#f05273_100%)]" aria-hidden="true" />
-                Airbnb
-              </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] font-bold text-slate-700">
-                <span className="h-3 w-[18px] rounded bg-[linear-gradient(180deg,#5379b8_0%,#39588f_100%)]" aria-hidden="true" />
-                Booking
-              </span>
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] font-bold text-slate-700">
-                <span className="h-3 w-[18px] rounded bg-[linear-gradient(180deg,#aeb9c8_0%,#8795a8_100%)]" aria-hidden="true" />
-                {copy.legendDirect}
-              </span>
-            </div>
+        ) : (
+          <>
             <div
-              // Scroll model (2026-07-22): the grid itself is the native 2-axis scroll surface.
-              // The date header uses `position: sticky; top` and the room-label column uses
-              // `position: sticky; left` — both track the native scroll with zero JS sync, so
-              // there is no main-thread lag against the compositor-driven scroll (the old
-              // JS-transform-synced frozen header jittered because it moved a frame behind).
-              // `isolate` keeps the sticky layers from ever painting over the shell's bottom tab bar.
-              className="isolate flex-1 min-h-0 overflow-auto overscroll-contain rounded-b-[24px] bg-surface"
-              onScroll={handleGridScroll}
-              // Stop touches here from bubbling to the shell's pull-to-refresh handlers, and keep the
-              // screen swipe-back off the grid — a horizontal scroll must never navigate back
-              // (docs/product/16-mobile-navigation.md 「뒤로가기 — 화면 스와이프」).
+              className="mcw-grid"
               data-swipe-back="off"
+              onScroll={handleGridScroll}
               onTouchMove={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               ref={scrollRef}
+              style={{ maxHeight: "calc(100dvh - 19rem - env(safe-area-inset-bottom, 0px))" }}
             >
-              {/* Single scroll pane -- room labels and grid rows share identical row heights */}
-              <div
-                className="relative w-max min-w-full"
-                style={{ minWidth: `${ROOM_LABEL_WIDTH + dates.length * DAY_WIDTH}px` }}
-              >
-                <div className="sticky top-0 z-30 flex h-11 bg-surface">
-                  <div
-                    aria-hidden="true"
-                    className="sticky left-0 z-10 shrink-0 border-b border-r border-slate-200/55 bg-surface"
-                    style={{ width: `${ROOM_LABEL_WIDTH}px` }}
-                  />
-                  <div
-                    className="flex border-b border-slate-200/55"
-                    style={{ minWidth: `${dates.length * DAY_WIDTH}px` }}
-                  >
+              <div className="mcw-grid__in" style={{ minWidth: `${ROOM_LABEL_WIDTH + dates.length * DAY_WIDTH}px` }}>
+                {/* 열 바탕 — 세로선 대신 주말은 옅은 회색, 오늘은 옅은 보라(PC 와 같은 규칙). */}
+                <div aria-hidden="true" className="mcw-cols" style={{ left: `${ROOM_LABEL_WIDTH}px` }}>
+                  {dates.map((date) => {
+                    const dow = parseDate(date).getUTCDay();
+                    return (
+                      <span
+                        className={date === today ? "is-today" : dow === 0 || dow === 6 ? "is-we" : ""}
+                        key={`c-${date}`}
+                        style={{ width: `${DAY_WIDTH}px` }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="mcw-head">
+                  <div className="mcw-head__days">
+                    <div className="mcw-corner" style={{ width: `${ROOM_LABEL_WIDTH}px` }} />
                     {dates.map((date) => {
+                      const dow = parseDate(date).getUTCDay();
                       const isToday = date === today;
-                      const dow = parseDate(date).getDay();
-                      const isSat = dow === 6;
-                      const isSun = dow === 0;
                       return (
                         <div
-                          className={cn(
-                            "relative flex shrink-0 flex-col items-center justify-center gap-0.5 border-r border-slate-200/60",
-                            isToday ? "bg-amber-100/60" : isSat || isSun ? "bg-slate-50/70" : "",
-                          )}
+                          className={cn("mcw-day", isToday && "is-today", dow === 6 && "is-sat", dow === 0 && "is-sun")}
                           key={date}
                           style={{ width: `${DAY_WIDTH}px` }}
                         >
-                          <span
-                            className={cn(
-                              "text-[10px] font-bold leading-none",
-                              isToday
-                                ? "text-amber-700"
-                                : isSat
-                                  ? "text-blue-600"
-                                  : isSun
-                                    ? "text-rose-600"
-                                    : "text-slate-500",
-                            )}
-                          >
-                            {weekdayFmt.format(parseDate(date))}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-[15px] font-extrabold leading-none tabular-nums",
-                              isToday ? "text-amber-700" : "text-slate-700",
-                            )}
-                          >
-                            {date.slice(8, 10)}
-                          </span>
-                          {isToday ? (
-                            <span className="absolute bottom-0 whitespace-nowrap rounded-full bg-amber-400 px-1.5 text-[8.5px] font-extrabold leading-[1.35] text-white">
-                              {copy.today}
-                            </span>
-                          ) : null}
+                          <span>{isToday ? copy.today : weekdayFmt.format(parseDate(date))}</span>
+                          <b className="num">{Number(date.slice(8, 10))}</b>
                         </div>
                       );
                     })}
                   </div>
-                </div>
-                <div className="flex">
-                  <div
-                    className="sticky left-0 z-20 shrink-0 border-r border-slate-200/55 bg-surface shadow-[5px_0_10px_-8px_rgba(15,23,42,0.10)]"
-                    style={{ width: `${ROOM_LABEL_WIDTH}px` }}
-                  >
-                    {rooms.map((room, roomIndex) => {
-                      const rowHeight =
-                        roomBarLayouts.get(room)?.rowHeight ?? CALENDAR_SINGLE_ROW_HEIGHT;
-                      return (
-                        <div
-                          className={cn(
-                            "flex items-center justify-center border-b border-slate-200/45 text-[13.5px] font-black tabular-nums text-slate-800",
-                            roomIndex % 2 === 1 && "bg-slate-900/[0.018]",
-                          )}
-                          key={room}
-                          style={{ height: `${rowHeight}px` }}
-                        >
-                          {room}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div
-                    className="relative"
-                    style={{
-                      minWidth: `${dates.length * DAY_WIDTH}px`,
-                      height: `${calendarBodyHeight}px`,
-                    }}
-                  >
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex">
-                      {dates.map((date) => {
-                        const isToday = date === today;
-                        const dow = parseDate(date).getDay();
-                        const isWeekend = dow === 0 || dow === 6;
-                        return (
-                          <div
-                            className={cn(
-                              "relative h-full shrink-0 border-r border-[color:var(--calendar-grid-line)]/60",
-                              isToday ? "bg-amber-100/60" : isWeekend ? "bg-slate-50/50" : "",
-                            )}
-                            key={`grid-${date}`}
-                            style={{ width: `${DAY_WIDTH}px` }}
-                          >
-                            {isToday ? (
-                              <span
-                                aria-hidden="true"
-                                className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-amber-400/55"
-                              />
-                            ) : null}
-                          </div>
-                        );
-                      })}
+                  <div className="mcw-head__empty">
+                    <div className="mcw-corner is-label" style={{ width: `${ROOM_LABEL_WIDTH}px` }}>
+                      {w.emptyRow}
                     </div>
-                    {rooms.map((room, roomIndex) => {
-                      const layout = roomBarLayouts.get(room);
-                      const rowHeight = layout?.rowHeight ?? CALENDAR_SINGLE_ROW_HEIGHT;
-
+                    {dates.map((date) => {
+                      const occupied = new Set(
+                        effectiveReservations
+                          .filter((item) => item.checkInDate <= date && item.checkOutDate > date)
+                          .map((item) => item.roomLabel),
+                      );
+                      const blocked = collectBlockedRooms(roomBlocks, date, (block) => block.roomLabel);
+                      const count = rooms.filter((room) => !occupied.has(room) && !blocked.has(room)).length;
                       return (
-                        <div
-                          className={cn(
-                            "relative z-10 overflow-hidden border-b border-slate-200/45",
-                            roomIndex % 2 === 1 && "bg-slate-900/[0.018]",
-                          )}
-                          key={room}
-                          style={{ height: `${rowHeight}px` }}
-                        >
-                          {(blockBarsByRoom.get(room) ?? []).map((entry) => (
-                            <div
-                              aria-label={copy.blockedRoom}
-                              className="absolute z-[15] flex items-center justify-center overflow-hidden rounded-[9px] border border-dashed border-slate-500/45 bg-[repeating-linear-gradient(135deg,rgba(100,116,139,0.18)_0,rgba(100,116,139,0.18)_5px,rgba(100,116,139,0.05)_5px,rgba(100,116,139,0.05)_10px)] px-1 text-[11px] font-bold text-slate-600"
-                              key={entry.block.id}
-                              style={{
-                                left: `${entry.leftPx + 3}px`,
-                                width: `${Math.max(12, entry.widthPx - 6)}px`,
-                                top: `${CALENDAR_BAR_TOP}px`,
-                                height: `${CALENDAR_BAR_HEIGHT}px`,
-                              }}
-                              title={copy.blockedRoom}
-                            >
-                              {entry.widthPx >= 58 ? copy.blockedRoom : null}
-                            </div>
-                          ))}
-                          {layout?.bars
-                            .toSorted((a, b) => a.laneIndex - b.laneIndex)
-                            .map((bar) => {
-                              const isCompactBar = bar.widthPx < 58;
-                              const hasInternalNote = Boolean(bar.item.internalNote?.trim());
-                              const label = reservationBarLabel(bar.item.guestName, bar.widthPx);
-                              const isOther = normalizeSource(bar.item.source) === "other";
-                              // A reservation that begins/ends outside the visible month gets a
-                              // flat edge (and a "›" overflow hint) on the off-screen side.
-                              const startsInView = bar.item.checkInDate >= rangeStart;
-                              const endsInView = bar.item.checkOutDate < rangeEndExclusive;
-
-                              return (
-                                <button
-                                  aria-label={`${bar.item.guestName}, ${bar.item.roomLabel}`}
-                                  className={cn(
-                                    "absolute z-20 flex items-center overflow-hidden border border-white/25 text-[12px] font-bold shadow-[0_4px_10px_-3px_rgba(15,23,42,0.3)] transition-transform hover:-translate-y-px active:scale-[0.98]",
-                                    isOther ? "text-slate-800" : "text-white",
-                                    isCompactBar ? "justify-center px-1 text-center" : "px-2 text-left",
-                                    startsInView ? "rounded-l-[9px]" : "rounded-l-[3px]",
-                                    endsInView ? "rounded-r-[9px]" : "rounded-r-[3px]",
-                                    sourceClass(bar.item.source),
-                                  )}
-                                  key={bar.id}
-                                  onClick={() => openReservationSheet(bar.id)}
-                                  style={{
-                                    left: `${bar.leftPx + 3}px`,
-                                    width: `${Math.max(12, bar.widthPx - 6)}px`,
-                                    top: `${CALENDAR_BAR_TOP + bar.laneIndex * CALENDAR_COMPACT_LANE_OFFSET}px`,
-                                    height: `${CALENDAR_BAR_HEIGHT}px`,
-                                  }}
-                                  title={
-                                    hasInternalNote
-                                      ? `${bar.item.guestName} · ${copy.internalNote}`
-                                      : bar.item.guestName
-                                  }
-                                  type="button"
-                                >
-                                  {startsInView && bar.widthPx >= 30 ? (
-                                    <span
-                                      className={cn(
-                                        "mr-1 size-1.5 shrink-0 rounded-full",
-                                        isOther ? "bg-slate-600" : "bg-white/90",
-                                      )}
-                                      aria-hidden="true"
-                                    />
-                                  ) : null}
-                                  <span className="block min-w-0 truncate tracking-[-0.02em]">
-                                    {label}
-                                  </span>
-                                  {hasInternalNote && bar.widthPx >= 26 ? (
-                                    <span
-                                      className={cn(
-                                        "ml-1 size-1.5 shrink-0 rounded-full",
-                                        isOther ? "bg-slate-700 ring-2 ring-white/85" : "bg-amber-200 ring-2 ring-white/45",
-                                      )}
-                                      aria-hidden="true"
-                                    />
-                                  ) : null}
-                                  {!endsInView ? (
-                                    <span
-                                      className={cn(
-                                        "ml-0.5 shrink-0 text-[13px] leading-none",
-                                        isOther ? "text-slate-600" : "text-white/80",
-                                      )}
-                                      aria-hidden="true"
-                                    >
-                                      &rsaquo;
-                                    </span>
-                                  ) : null}
-                                </button>
-                              );
-                            })}
-                        </div>
+                        <span className={`num${count ? "" : " is-zero"}`} key={`e-${date}`} style={{ width: `${DAY_WIDTH}px` }}>
+                          {count || "–"}
+                        </span>
                       );
                     })}
                   </div>
                 </div>
+                {rooms.map((room) => {
+                  const layout = roomBarLayouts.get(room);
+                  const rowHeight = layout?.rowHeight ?? CALENDAR_SINGLE_ROW_HEIGHT;
+                  return (
+                    <div className="mcw-row" key={room} style={{ height: `${rowHeight}px` }}>
+                      <div className="mcw-room" style={{ width: `${ROOM_LABEL_WIDTH}px` }}>
+                        {room}
+                      </div>
+                      <div className="mcw-track" style={{ width: `${dates.length * DAY_WIDTH}px` }}>
+                        {(blockBarsByRoom.get(room) ?? []).map((entry) => (
+                          <div
+                            aria-label={copy.blockedRoom}
+                            className="mcw-block"
+                            key={entry.block.id}
+                            style={{
+                              left: `${entry.leftPx + 3}px`,
+                              width: `${Math.max(12, entry.widthPx - 6)}px`,
+                              top: `${CALENDAR_BAR_TOP}px`,
+                              height: `${CALENDAR_BAR_HEIGHT}px`,
+                            }}
+                            title={copy.blockedRoom}
+                          >
+                            {entry.widthPx >= 58 ? copy.blockedRoom : null}
+                          </div>
+                        ))}
+                        {layout?.bars
+                          .toSorted((a, b) => a.laneIndex - b.laneIndex)
+                          .map((bar) => {
+                            const hasInternalNote = Boolean(bar.item.internalNote?.trim());
+                            const label = reservationBarLabel(bar.item.guestName, bar.widthPx);
+                            const startsInView = bar.item.checkInDate >= rangeStart;
+                            const endsInView = bar.item.checkOutDate < rangeEndExclusive;
+                            const withGuests = bar.widthPx >= 150;
+                            return (
+                              <button
+                                aria-label={`${bar.item.guestName}, ${bar.item.roomLabel}, ${channelName(bar.item.source)}`}
+                                className={cn(
+                                  "mcw-bar",
+                                  !startsInView && "is-cut-l",
+                                  !endsInView && "is-cut-r",
+                                  selectedReservationId === bar.id && "is-on",
+                                )}
+                                key={bar.id}
+                                onClick={() => openReservationSheet(bar.id)}
+                                style={{
+                                  left: `${bar.leftPx + 3}px`,
+                                  width: `${Math.max(12, bar.widthPx - 6)}px`,
+                                  top: `${CALENDAR_BAR_TOP + bar.laneIndex * CALENDAR_COMPACT_LANE_OFFSET}px`,
+                                  height: `${CALENDAR_BAR_HEIGHT}px`,
+                                }}
+                                title={hasInternalNote ? `${bar.item.guestName} · ${copy.internalNote}` : bar.item.guestName}
+                                type="button"
+                              >
+                                {bar.widthPx >= 30 ? <i className={`mcw-dot is-${normalizeSource(bar.item.source)}`} aria-hidden="true" /> : null}
+                                <span className="mcw-bar__t">
+                                  {label}
+                                  {withGuests ? ` · ${guestsShort(bar.item)}` : ""}
+                                </span>
+                                {hasInternalNote && bar.widthPx >= 40 ? <Pencil aria-hidden="true" className="mcw-bar__note" /> : null}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            </>
-          )}
-        </Card>
+            <p className="mcw-hint">
+              <span className="mcw-legend">
+                <span>
+                  <i className="mcw-dot is-airbnb" />
+                  Airbnb
+                </span>
+                <span>
+                  <i className="mcw-dot is-booking" />
+                  Booking
+                </span>
+                <span>
+                  <i className="mcw-dot is-other" />
+                  {copy.legendDirect}
+                </span>
+              </span>
+              <span>{visibleDateRangeLabel ? `${visibleDateRangeLabel} · ` : ""}{w.hint}</span>
+            </p>
+          </>
+        )
       ) : null}
 
       {mode === "lists" ? (
         isOutOfWindow ? (
-          <Card className={`border-dashed border-border/70 p-8 text-center ${GLASS_PANEL}`}>
-            <div className="mx-auto mb-3 inline-flex size-10 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-sm">
-              <List className="size-5" />
-            </div>
-            <p className="text-sm font-black">{copy.calendarOutOfWindowTitle}</p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground max-w-xs">{copy.calendarOutOfWindowBody}</p>
-          </Card>
+          <div className="mcw-empty">
+            <b>{copy.calendarOutOfWindowTitle}</b>
+            <span>{copy.calendarOutOfWindowBody}</span>
+          </div>
         ) : (
-          // 넓은 화면(2026-10-05): 폴드 2열 · 태블릿 가로 3열 — 체크인 · 체크아웃 · 숙박 중을 나란히.
-          <div className="space-y-4 fold:grid fold:grid-cols-2 fold:items-start fold:gap-4 fold:space-y-0 tablet:grid-cols-3">
-            <button
-              className="w-full text-left fold:col-span-full"
-              onClick={() => {
-                setIsEmptyRoomsModalOpen(true);
-              }}
-              type="button"
-            >
-              <Card
-                className={
-                  emptyToday.isProvisional
-                    ? "rounded-2xl border-dashed border-amber-300/70 bg-amber-50/80 p-4 text-xs text-amber-900 shadow-[0_14px_28px_-24px_rgba(146,64,14,0.38)]"
-                    : `${GLASS_CARD} p-4 text-xs`
-                }
-              >
-                <p className="mb-2 text-[11px] font-bold text-muted-foreground">
-                  {copy.listReferenceDate}: {formatDateLabel(listReferenceDate, locale)}
-                </p>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-black text-slate-900">{copy.emptyToday}</p>
-                  <Badge className="rounded-full border border-sky-200 bg-sky-50 px-3 text-sky-700">
-                    {emptyToday.count}
-                  </Badge>
-                </div>
-                {emptyToday.isProvisional ? (
-                  <p className="mt-1 text-[11px] leading-4 opacity-90">{copy.emptyAccuracyHint}</p>
-                ) : null}
-              </Card>
-            </button>
-
-            <section className="space-y-2.5">
-              <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex size-7 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-100">
-                  <PlaneLanding className="size-4" />
-                </span>
-                <p className="text-sm font-black text-slate-900">{copy.checkIns}</p>
-                <Badge className="rounded-full border border-sky-200 bg-sky-50 px-3 text-sky-700">
-                  {checkInsToday.length}
-                </Badge>
-              </div>
-              {checkInsToday.length > 0 ? (
-                checkInsToday.map((item) => (
+          <div className={isTablet ? "mcw-split" : ""}>
+            <div className="mcw-listcol">
+              <div className="mcw-tabs" role="tablist" aria-label={copy.listView}>
+                {listTabs.map((tab) => (
                   <button
-                    className="w-full text-left"
-                    key={item.id}
-                    onClick={() => openReservationSheet(item.id)}
+                    aria-selected={listTab === tab.key}
+                    className={listTab === tab.key ? "on" : ""}
+                    key={tab.key}
+                    onClick={() => setListTab(tab.key)}
+                    role="tab"
                     type="button"
                   >
-                    <Card className={`${GLASS_CARD} p-3.5 transition-transform active:scale-[0.99]`}>
-                      <p className="truncate text-sm font-black text-slate-900">{item.guestName}</p>
-                      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                        {propertyLabelMap[item.propertyName] ?? item.propertyName} - {item.roomLabel}
-                      </p>
-                    </Card>
+                    {tab.label}
+                    <b className="num">{tab.count}</b>
                   </button>
-                ))
-              ) : (
-                <Card className="rounded-2xl border-dashed border-slate-200 bg-surface/70 p-3 text-xs font-medium text-muted-foreground">
-                  {copy.noFilterResults}
-                </Card>
-              )}
-            </section>
-
-            <section className="space-y-2.5">
-              <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex size-7 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200">
-                  <PlaneTakeoff className="size-4" />
-                </span>
-                <p className="text-sm font-black text-slate-900">{copy.checkOuts}</p>
-                <Badge className="rounded-full border border-sky-200 bg-sky-50 px-3 text-sky-700">
-                  {checkOutsToday.length}
-                </Badge>
+                ))}
               </div>
-              {checkOutsToday.length > 0 ? (
-                checkOutsToday.map((item) => (
-                  <button
-                    className="w-full text-left"
-                    key={item.id}
-                    onClick={() => openReservationSheet(item.id)}
-                    type="button"
-                  >
-                    <Card className={`${GLASS_CARD} p-3.5 transition-transform active:scale-[0.99]`}>
-                      <p className="truncate text-sm font-black text-slate-900">{item.guestName}</p>
-                      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                        {propertyLabelMap[item.propertyName] ?? item.propertyName} - {item.roomLabel}
-                      </p>
-                    </Card>
-                  </button>
-                ))
-              ) : (
-                <Card className="rounded-2xl border-dashed border-slate-200 bg-surface/70 p-3 text-xs font-medium text-muted-foreground">
-                  {copy.noFilterResults}
-                </Card>
-              )}
-            </section>
-
-            <section className="space-y-2.5">
-              <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex size-7 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-                  <BedDouble className="size-4" />
-                </span>
-                <p className="text-sm font-black text-slate-900">{copy.stayingToday}</p>
-                <Badge className="rounded-full border border-sky-200 bg-sky-50 px-3 text-sky-700">
-                  {stayingToday.length}
-                </Badge>
+              <div className="mcw-list">
+                {listTab === "empty" ? (
+                  emptyRoomLabels.length === 0 ? (
+                    <p className="mcw-none">{copy.noEmptyRooms}</p>
+                  ) : (
+                    emptyRoomLabels.map((roomLabel) => (
+                      <div className="mcw-li" key={roomLabel}>
+                        <span className="mcw-li__room">{roomLabel}</span>
+                        <span className="mcw-li__t">
+                          <b>{propertyName(selectedProperty)}</b>
+                          {blockedRoomsAtReference.has(roomLabel) ? <span>{w.blocked}</span> : null}
+                        </span>
+                      </div>
+                    ))
+                  )
+                ) : listItems.length === 0 ? (
+                  <p className="mcw-none">{w.none}</p>
+                ) : (
+                  listItems.map((item) => {
+                    const tel = toDialablePhone(item.phone?.trim() || null);
+                    const on = isTablet && paneReservation?.id === item.id;
+                    return (
+                      <div className={`mcw-li${on ? " on" : ""}`} key={item.id}>
+                        <button
+                          className="mcw-li__main"
+                          onClick={() => (isTablet ? setPaneReservationId(item.id) : openReservationSheet(item.id))}
+                          type="button"
+                        >
+                          <span className="mcw-li__room">{item.roomLabel}</span>
+                          <span className="mcw-li__t">
+                            <b>{item.guestName}</b>
+                            <span>{listSub(item)}</span>
+                          </span>
+                        </button>
+                        {tel && !isTablet ? (
+                          <a
+                            aria-label={w.callAria.replace("{name}", item.guestName)}
+                            className="mcw-call"
+                            href={`tel:${tel}`}
+                            onClick={() => haptic("light")}
+                          >
+                            <Phone aria-hidden="true" />
+                          </a>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                )}
               </div>
-              {stayingToday.length > 0 ? (
-                stayingToday.map((item) => (
-                  <button
-                    className="w-full text-left"
-                    key={item.id}
-                    onClick={() => openReservationSheet(item.id)}
-                    type="button"
-                  >
-                    <Card className={`${GLASS_CARD} p-3.5 transition-transform active:scale-[0.99]`}>
-                      <p className="truncate text-sm font-black text-slate-900">{item.guestName}</p>
-                      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                        {propertyLabelMap[item.propertyName] ?? item.propertyName} - {item.roomLabel}
-                      </p>
-                    </Card>
-                  </button>
-                ))
-              ) : (
-                <Card className="rounded-2xl border-dashed border-slate-200 bg-surface/70 p-3 text-xs font-medium text-muted-foreground">
-                  {copy.noFilterResults}
-                </Card>
-              )}
-            </section>
+            </div>
+            {isTablet ? (
+              <div className="mcw-pane">
+                {paneReservation ? (
+                  <div className="mcw-detail" key={paneReservation.id}>
+                    {reservationBody(paneReservation, flashCopied, copiedKey)}
+                  </div>
+                ) : (
+                  <p className="mcw-none">{w.pickHint}</p>
+                )}
+              </div>
+            ) : null}
           </div>
         )
       ) : null}
 
       {mode === "map" ? (
-        // 넓은 화면(2026-10-05): 건물 카드 폴드 2열 · 태블릿 가로 3열(머리 줄은 한 줄 전부).
-        <div className="space-y-3 fold:grid fold:grid-cols-2 fold:items-start fold:gap-3 fold:space-y-0 tablet:grid-cols-3">
-          <div className="flex items-center gap-2 px-1 pb-0.5 fold:col-span-full">
-            <span className="inline-flex size-6 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-              <MapPin className="size-3.5" />
-            </span>
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground/80">
-              {copy.calendarMapBuildingCount.replace("{count}", String(buildingInfos.length))}
-            </p>
-          </div>
-          {buildingInfos.map((meta) => {
-            const address = getPropertyAddress(meta, locale);
-            const roomCount = meta.roomAccess?.length ?? 0;
-            const sharedCount = meta.sharedAccess.length;
-            const label = propertyLabelMap[meta.canonicalName] ?? meta.canonicalName;
-            return (
-              <Card
-                key={meta.canonicalName}
-                className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-surface shadow-[0_18px_34px_-28px_rgba(31,58,95,0.42)] transition-transform duration-200 active:scale-[0.99]"
-              >
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white" aria-hidden="true" />
-                <div className="flex items-center gap-3 p-4">
-                  <div
-                    className={`shrink-0 inline-flex size-11 items-center justify-center rounded-2xl shadow-[0_12px_24px_-18px_rgba(31,58,95,0.5)] ring-1 ${
-                      meta.kind === "house"
-                        ? "bg-[#4E63B3]/10 text-[#4E63B3] ring-[#4E63B3]/20"
-                        : "bg-primary/10 text-primary ring-primary/15"
-                    }`}
-                  >
-                    {meta.kind === "house" ? (
-                      <Home className="size-5" />
-                    ) : (
-                      <Building2 className="size-5" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-black text-slate-900">{label}</p>
-                    <p
-                      className={`mt-1 line-clamp-2 text-xs font-medium leading-5 ${
-                        address ? "text-muted-foreground" : "italic text-muted-foreground/40"
-                      }`}
-                    >
-                      {address ?? copy.mapAddressMissing}
-                    </p>
-                    <div className="mt-2.5 flex flex-wrap gap-1.5">
-                      <Badge className="rounded-full border border-slate-200 bg-white px-2.5 text-[10px] text-foreground/80 shadow-sm">
-                        {copy.mapSharedAccessLabel} {sharedCount}
-                      </Badge>
-                      {roomCount > 0 ? (
-                        <Badge className="rounded-full border border-slate-200 bg-white px-2.5 text-[10px] text-foreground/80 shadow-sm">
-                          {copy.mapRoomAccessLabel} {roomCount}
-                        </Badge>
-                      ) : null}
+        <div className={isTablet ? "mcw-split" : ""}>
+          <div className="mcw-listcol">
+            <p className="mcw-soft">{w.mapHint.replace("{n}", String(buildingInfos.length))}</p>
+            <div className="mcw-list">
+              {buildingInfos.map((meta) => {
+                const address = getPropertyAddress(meta, locale);
+                const on = isTablet && paneMap?.canonicalName === meta.canonicalName;
+                return (
+                  <div className={`mcw-mrow${on ? " on" : ""}`} key={meta.canonicalName}>
+                    <div className="mcw-mrow__h">
+                      <b>{propertyName(meta.canonicalName)}</b>
+                      <a className="mcw-link" href={meta.googleMapsUrl} rel="noopener noreferrer" target="_blank">
+                        {w.openMap}
+                        <ExternalLink aria-hidden="true" />
+                      </a>
+                    </div>
+                    <span className="mcw-soft">{address || copy.mapAddressMissing}</span>
+                    <div className="mcw-mrow__f">
+                      <span className="mcw-soft">
+                        {w.sharedEntry} <span className="mcw-mask">••••</span>
+                      </span>
+                      <button
+                        className="mcw-link"
+                        onClick={() => {
+                          if (isTablet) {
+                            setPaneMapName(meta.canonicalName);
+                            return;
+                          }
+                          setMapCopyFeedback(null);
+                          setSelectedMapProperty(meta);
+                        }}
+                        type="button"
+                      >
+                        {w.accessInfo}
+                      </button>
                     </div>
                   </div>
-                  <button
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-[0_10px_22px_-18px_rgba(31,58,95,0.35)] transition-colors hover:text-slate-950"
-                    onClick={() => {
-                      setMapCopyFeedback(null);
-                      setSelectedMapProperty(meta);
-                    }}
-                    type="button"
-                  >
-                    <KeyRound className="size-3" />
-                    {copy.mapOpenAccess}
-                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {isTablet ? (
+            <div className="mcw-pane">
+              {paneMap ? (
+                <div className="mcw-detail" key={paneMap.canonicalName}>
+                  {accessBody(paneMap, flashCopied, copiedKey)}
                 </div>
-                <div className="relative border-t border-slate-200/70 bg-surface/65 px-4 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-bold text-muted-foreground">
-                      {copy.mapAddressLabel}
-                    </p>
-                    <a
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary/80"
-                      href={meta.googleMapsUrl}
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      <ExternalLink className="size-3" />
-                      {copy.mapOpenInMaps}
-                    </a>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
       {typeof document !== "undefined" && selectedReservation
         ? createPortal(
-        <div
-          className={cn(
-            "fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/45 transition-opacity duration-300 ease-out",
-            isReservationSheetOpen ? "opacity-100" : "pointer-events-none opacity-0",
-          )}
-          style={reservationDrag.scrimStyle}
-        >
-          {/* Transparent click-to-close overlay — background color lives on the wrapper above. */}
-          <button
-            aria-label={copy.close}
-            className="absolute inset-0"
-            onClick={closeReservationSheet}
-            type="button"
-          />
-          {/* Bottom sheet — slides up from the bottom edge. */}
-          <div
-            aria-label={selectedReservation.guestName}
-            aria-modal="true"
-            role="dialog"
-            className="relative flex max-h-[88dvh] w-full max-w-[460px] flex-col rounded-t-[24px] bg-surface pb-[max(20px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_44px_-12px_rgba(16,28,27,0.3)] will-change-transform"
-            data-sheet
-            style={
-              reservationDrag.dragging
-                ? reservationDrag.sheetStyle
-                : {
-                    transform: isReservationSheetOpen ? "translateY(0)" : "translateY(110%)",
-                    transition: "transform 420ms cubic-bezier(0.32,0.72,0,1)",
-                  }
-            }
-          >
             <div
-              aria-hidden="true"
-              className="mx-auto mb-1 h-1 w-[38px] shrink-0 rounded-full bg-slate-200"
-              {...reservationDrag.handleProps}
-            />
-            <div
-              className="shrink-0 border-b border-border/40 px-5 pb-4 pt-5"
-              {...reservationDrag.handleProps}
+              className={cn(
+                "fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/45 transition-opacity duration-300 ease-out",
+                isReservationSheetOpen ? "opacity-100" : "pointer-events-none opacity-0",
+              )}
+              style={reservationDrag.scrimStyle}
             >
-              <Badge>{statusLabels[selectedReservation.status] ?? selectedReservation.status}</Badge>
-              <p className="mt-2 text-xl font-black">{selectedReservation.guestName}</p>
-              <p className="text-xs text-muted-foreground">
-                {copy.reservationId} #{selectedReservation.sourceReservationId}
-              </p>
-            </div>
-            <div className="min-h-0 overflow-y-auto space-y-4 px-5 py-5 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <Card className={`${GLASS_CARD} p-3`}>
-                  <div className="mb-2 inline-flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Building2 className="size-4" />
+              <button aria-label={copy.close} className="absolute inset-0" onClick={closeReservationSheet} type="button" />
+              <div
+                aria-label={selectedReservation.guestName}
+                aria-modal="true"
+                role="dialog"
+                className="relative flex max-h-[88dvh] w-full max-w-[460px] flex-col rounded-t-[24px] bg-surface pb-[max(20px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_44px_-12px_rgba(16,28,27,0.3)] will-change-transform tablet:mb-[max(24px,env(safe-area-inset-bottom))] tablet:rounded-[24px]"
+                data-sheet
+                style={
+                  reservationDrag.dragging
+                    ? reservationDrag.sheetStyle
+                    : {
+                        transform: isReservationSheetOpen ? "translateY(0)" : "translateY(110%)",
+                        transition: "transform 420ms cubic-bezier(0.32,0.72,0,1)",
+                      }
+                }
+              >
+                <div aria-hidden="true" className="mx-auto mb-1 h-1 w-[38px] shrink-0 rounded-full bg-slate-200" {...reservationDrag.handleProps} />
+                <div className="mcw mcw-sheet min-h-0 overflow-y-auto" {...reservationDrag.handleProps}>
+                  <div className="mcw-detail">
+                    {reservationBody(selectedReservation, (key) => setCopyFeedback(key), copyFeedback)}
                   </div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.propertyLabel}</p>
-                  <p className="mt-0.5 text-base font-semibold">
-                    {propertyLabelMap[selectedReservation.propertyName] ?? selectedReservation.propertyName}
-                  </p>
-                </Card>
-                <Card className={`${GLASS_CARD} p-3`}>
-                  <div className="mb-2 inline-flex size-8 items-center justify-center rounded-full bg-secondary/15 text-secondary-foreground">
-                    <BedDouble className="size-4" />
-                  </div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.roomLabel}</p>
-                  <p className="mt-0.5 text-base font-semibold">{selectedReservation.roomLabel}</p>
-                </Card>
-                <Card className={`${GLASS_CARD} col-span-2 p-3`}>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.guestCountLabel}</p>
-                  <p className="mt-0.5 text-base font-semibold">
-                    {selectedReservation.adults !== null
-                      ? copy.guestBreakdown
-                          .replace("{adults}", String(selectedReservation.adults))
-                          .replace("{children}", String(selectedReservation.children ?? 0))
-                      : selectedReservation.guestCount
-                        ? `${selectedReservation.guestCount}${copy.guestCountUnit}`
-                        : copy.guestCountUnknown}
-                  </p>
-                </Card>
+                </div>
               </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-              <Card className={`${GLASS_CARD} p-4`}>
-                <div className="relative space-y-4">
-                  <div className="absolute bottom-6 left-3 top-6 w-px bg-border/60" />
-                  <div className="relative flex items-start gap-3">
-                    <div className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full bg-sky-500 text-white shadow-sm">
-                      <PlaneLanding className="size-3.5" />
-                    </div>
-                    <div className="flex flex-1 items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          {copy.checkInLabel}
-                        </p>
-                        <p className="text-base font-semibold">
-                          {formatDateLabel(selectedReservation.checkInDate, locale)}
-                        </p>
-                      </div>
-                      <p className="text-lg font-semibold">{DEFAULT_CHECK_IN_TIME}</p>
-                    </div>
-                  </div>
-                  <div className="relative flex items-start gap-3">
-                    <div className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground shadow-sm">
-                      <PlaneTakeoff className="size-3.5" />
-                    </div>
-                    <div className="flex flex-1 items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          {copy.checkOutLabel}
-                        </p>
-                        <p className="text-base font-semibold">
-                          {formatDateLabel(selectedReservation.checkOutDate, locale)}
-                        </p>
-                      </div>
-                      <p className="text-lg font-semibold">{DEFAULT_CHECK_OUT_TIME}</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className={`${GLASS_CARD} p-4`}>
-                <p className="text-xs text-muted-foreground">{copy.phone}</p>
-                <p className="font-semibold">{phoneLabel ?? copy.phoneMissing}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button
-                    disabled={!phoneLabel}
-                    onClick={async () => {
-                      if (!phoneLabel) return;
-                      await copyText(phoneLabel);
-                      setCopyFeedback(copy.copied);
-                    }}
-                    type="button"
-                    variant="secondary"
-                  >
-                    <Copy className="size-4" />
-                    {copy.copyNumber}
-                  </Button>
-                  <Button
-                    disabled={!dialablePhone}
-                    onClick={() => {
-                      if (!dialablePhone) return;
-                      window.location.href = `tel:${dialablePhone}`;
-                    }}
-                    type="button"
-                    variant="secondary"
-                  >
-                    <Phone className="size-4" />
-                    {copy.call}
-                  </Button>
-                </div>
-                {copyFeedback ? (
-                  <p className="mt-2 text-[11px] text-muted-foreground">{copyFeedback}</p>
-                ) : null}
-              </Card>
-
-              <Card className={`${GLASS_CARD} p-4`}>
-                <p className="text-xs text-muted-foreground">{copy.internalNote}</p>
-                <p className="mt-1 whitespace-pre-wrap break-words font-semibold text-slate-900">
-                  {selectedReservation.internalNote?.trim() || copy.internalNoteEmpty}
-                </p>
-              </Card>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
-
-      {isEmptyRoomsModalOpen && (
+      {isBuildingSheetOpen ? (
         <BottomSheet
-          onClose={() => setIsEmptyRoomsModalOpen(false)}
+          onClose={() => setIsBuildingSheetOpen(false)}
           className="max-h-[82dvh] flex flex-col"
           header={
-            <div className="px-1 pb-3 pt-1">
-              <p className="text-xs text-muted-foreground">
-                {copy.listReferenceDate}: {formatDateLabel(listReferenceDate, locale)}
-              </p>
-              <p className="mt-1 text-lg font-black">{copy.emptyRoomsModalTitle}</p>
+            <div className="px-1 pb-2 pt-1">
+              <p className="text-lg font-bold">{w.pickBuilding}</p>
             </div>
           }
         >
-          <div className="-mx-1 max-h-[60vh] space-y-1 overflow-y-auto px-1 pb-2 pt-1 text-sm">
-            {emptyRoomLabels.length > 0 ? (
-              emptyRoomLabels.map((roomLabel) => (
-                <div
-                  className="flex items-center justify-between gap-2 rounded-xl bg-background px-3 py-3"
-                  key={roomLabel}
-                >
-                  <p className="font-semibold">{roomLabel}</p>
-                  {blockedRoomsAtReference.has(roomLabel) ? (
-                    <span className="shrink-0 rounded-full border border-dashed border-slate-400/70 bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                      {copy.blockedRoom}
-                    </span>
-                  ) : null}
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-border bg-background px-3 py-3 text-xs text-muted-foreground">
-                {copy.noEmptyRooms}
-              </div>
-            )}
-          </div>
+          <div className="mcw -mx-1 max-h-[65vh] overflow-y-auto px-1 pb-2">{buildingList(() => setIsBuildingSheetOpen(false))}</div>
         </BottomSheet>
-      )}
+      ) : null}
 
-      {selectedMapProperty && (
+      {selectedMapProperty ? (
         <BottomSheet
           onClose={() => {
             setSelectedMapProperty(null);
             setMapCopyFeedback(null);
           }}
           className="max-h-[82dvh] flex flex-col"
-          header={
-            <div className="px-1 pb-3 pt-1">
-              <p className="text-xs text-muted-foreground">{copy.mapAccessSheetTitle}</p>
-              <p className="mt-1 text-lg font-black">
-                {propertyLabelMap[selectedMapProperty.canonicalName] ?? selectedMapProperty.canonicalName}
-              </p>
-            </div>
-          }
+          header={<div className="px-1 pt-1" />}
         >
-          <div className="-mx-1 max-h-[65vh] space-y-3 overflow-y-auto px-1 pb-2 pt-1 text-sm">
-              <Card className="rounded-2xl border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-xl">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.mapAddressLabel}</p>
-                <p className="mt-1.5 break-words text-sm font-semibold leading-6">
-                  {getPropertyAddress(selectedMapProperty, locale) || copy.mapAddressMissing}
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={async () => {
-                      const address = getPropertyAddress(selectedMapProperty, locale);
-                      if (!address) return;
-                      await copyText(address);
-                      setMapCopyFeedback(copy.mapCopiedAddress);
-                    }}
-                    type="button"
-                    variant="secondary"
-                  >
-                    <Copy className="size-4" />
-                    {copy.mapAddressCopy}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      window.open(selectedMapProperty.googleMapsUrl, "_blank", "noopener,noreferrer");
-                    }}
-                    type="button"
-                    variant="secondary"
-                  >
-                    <ExternalLink className="size-4" />
-                    {copy.mapOpenInMaps}
-                  </Button>
-                </div>
-              </Card>
-
-              <Card className="rounded-2xl border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-xl">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.opsNote}</p>
-                <p className="mt-1.5 whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-slate-900">
-                  {selectedMapProperty.note?.trim() || copy.opsNoteEmpty}
-                </p>
-              </Card>
-
-              <Card className="rounded-2xl border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-xl">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.mapSharedAccessLabel}</p>
-                <div className="mt-2.5 space-y-2">
-                  {selectedMapProperty.sharedAccess.map((item) => (
-                    <div
-                      className="flex items-center justify-between gap-2 rounded-xl border border-white/55 bg-surface/65 px-3 py-2.5 shadow-sm"
-                      key={`${item.prefixKey ?? "none"}-${item.labelKey}-${item.code}`}
-                    >
-                      <div>
-                        <p className="text-xs text-muted-foreground/90">{sharedAccessLabel(item, copy)}</p>
-                        <p className="mt-0.5 rounded-md bg-black/[0.05] px-1.5 py-0.5 font-mono text-sm font-semibold text-foreground">
-                          {sharedAccessCodeLabel(item, copy)}
-                        </p>
-                      </div>
-                      <Button
-                        className="h-8 rounded-full px-3 text-xs"
-                        onClick={async () => {
-                          await copyText(item.code);
-                          setMapCopyFeedback(copy.mapCopiedCode);
-                        }}
-                        type="button"
-                        variant="secondary"
-                      >
-                        <Copy className="size-3.5" />
-                        {copy.copyNumber}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="rounded-2xl border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-xl">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{copy.mapRoomAccessLabel}</p>
-                <div className="mt-2.5 space-y-2">
-                  {selectedMapProperty.roomAccess && selectedMapProperty.roomAccess.length > 0 ? (
-                    selectedMapProperty.roomAccess.map((item) => (
-                      <div className="flex items-center justify-between gap-2 rounded-xl border border-white/55 bg-surface/65 px-3 py-2.5 shadow-sm" key={item.roomLabel}>
-                        <div>
-                          <p className="text-xs text-muted-foreground/90">{copy.roomLabel} {item.roomLabel}</p>
-                          <p className="mt-0.5 rounded-md bg-black/[0.05] px-1.5 py-0.5 font-mono text-sm font-semibold text-foreground">
-                            {item.code}
-                          </p>
-                        </div>
-                        <Button
-                          className="h-8 rounded-full px-3 text-xs"
-                          onClick={async () => {
-                            await copyText(item.code);
-                            setMapCopyFeedback(copy.mapCopiedCode);
-                          }}
-                          type="button"
-                          variant="secondary"
-                        >
-                          <Copy className="size-3.5" />
-                          {copy.copyNumber}
-                        </Button>
-                      </div>
-                    ))
-                  ) : (
-                    <Card className="rounded-xl border-dashed p-3 text-xs text-muted-foreground">
-                      {copy.mapNoAccessData}
-                    </Card>
-                  )}
-                </div>
-              </Card>
-
-              {mapCopyFeedback ? (
-                <p className="text-[11px] text-muted-foreground">{mapCopyFeedback}</p>
-              ) : null}
-            </div>
+          <div className="mcw -mx-1 max-h-[70vh] overflow-y-auto px-1 pb-2">
+            <div className="mcw-detail">{accessBody(selectedMapProperty, (key) => setMapCopyFeedback(key), mapCopyFeedback)}</div>
+          </div>
         </BottomSheet>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -3835,3 +3835,16 @@
 .att.capw .capw__x { position: absolute; z-index: 4; top: max(12px, env(safe-area-inset-top)); left: 12px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fff; cursor: pointer; transition: transform 140ms ease, background 150ms ease; }
 .att.capw .capw__x:hover { background: rgba(255,255,255,.18); }
 .att.capw .capw__x:active { transform: scale(.94); }
+
+/* 급여 금액 자릿수 굴림 · 막대 스프링(2026-10-14 모션, 시안 Motion-B-PayCount-Phone) */
+.payo { display: inline-flex; align-items: flex-end; }
+.payo__sym { display: inline-block; }
+.payo__col { display: inline-block; height: 1.1em; line-height: 1.1; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent); }
+.payo__strip { display: flex; flex-direction: column; animation-name: payo-roll; animation-fill-mode: both; animation-timing-function: linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000); }
+.payo__strip b { display: block; height: 1.1em; line-height: 1.1; font-weight: inherit; }
+@keyframes payo-roll { 0% { transform: translateY(0); filter: blur(0); } 20% { filter: blur(2.5px); } 62% { filter: blur(0); } 100% { transform: translateY(calc(var(--to) * 1.1)); filter: blur(0); } }
+.att.att--payw .payw-bar i { transform-origin: 50% 100%; animation: payw-grow 900ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; animation-delay: calc(300ms + var(--i, 0) * 22ms); }
+.att.att--payw .payw-bar i.is-now { animation: payw-grow 900ms cubic-bezier(.23, 1, .32, 1) both, payw-glow 1600ms cubic-bezier(.37, 0, .63, 1) 1400ms 2; animation-delay: calc(300ms + var(--i, 0) * 22ms), 1400ms; }
+@keyframes payw-grow { from { transform: scaleY(.04); } }
+@keyframes payw-glow { 50% { box-shadow: 0 0 14px 2px rgba(122, 82, 230, .5); } }
+@media (prefers-reduced-motion: reduce) { .payo__strip, .att.att--payw .payw-bar i { animation-duration: 1ms !important; animation-delay: 0ms !important; } }

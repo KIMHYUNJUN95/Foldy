@@ -240,7 +240,7 @@ export function AttendancePay({
             </button>
           </div>
           <div className={`payw-hero__v${payHidden ? " is-hidden" : ""}`}>
-            ¥{grossAmount.toLocaleString("ja-JP")}
+            {payHidden ? `¥${grossAmount.toLocaleString("ja-JP")}` : <PayOdometer key="shown" text={`¥${grossAmount.toLocaleString("ja-JP")}`} />}
           </div>
           <div className="payw-hero__s">{heroBits.join(" · ")}</div>
           {isFinal ? <div className="payw-hero__note">{copy.payFinalizedNote(view.finalization!.finalizedAtLabel ?? "")}</div> : null}
@@ -315,7 +315,7 @@ export function AttendancePay({
           <div className="payw-bars">
             {bars.map(({ n, date, d, isRunning, isExcluded }) =>
               d ? (
-                <button key={date} type="button" className="payw-bar" onClick={() => setSelectedDate(date)} aria-label={d.dateLabel}>
+                <button key={date} type="button" className="payw-bar" style={{ ["--i" as string]: n }} onClick={() => setSelectedDate(date)} aria-label={d.dateLabel}>
                   <span className="payw-bar__v">{showValues && !isRunning && !isExcluded && d.paidMinutes > 0 ? hm(d.paidMinutes) : ""}</span>
                   <i
                     className={isRunning ? "is-now" : isExcluded ? "is-danger" : undefined}
@@ -481,5 +481,36 @@ export function AttendancePay({
         </BottomSheet>
       )}
     </div>
+  );
+}
+
+/** 급여 금액 자릿수 굴림(2026-10-14, 시안 Motion-B-PayCount-Phone) — 보이게 할 때마다(가림을 걷을 때 다시 마운트) 자리마다 0에서 굴러
+ *  정확한 금액에서 스프링으로 멈춘다. 오른쪽 자리일수록 늦게 · 더 많이 굴린다. 굴릴 때만 살짝 흐림. 화면 읽기 프로그램엔 금액 그대로. */
+function PayOdometer({ text }: { text: string }) {
+  let digitIndex = 0;
+  return (
+    <span className="payo" aria-label={text}>
+      {text.split("").map((ch, i) => {
+        if (!/[0-9]/.test(ch)) {
+          return (
+            <span key={i} className="payo__sym" aria-hidden="true">
+              {ch}
+            </span>
+          );
+        }
+        const n = Number(ch);
+        const idx = digitIndex++;
+        const steps = n + 10 + (idx >= 3 ? 10 : 0);
+        return (
+          <span key={i} className="payo__col" aria-hidden="true">
+            <span className="payo__strip" style={{ ["--to" as string]: `-${steps}em`, animationDelay: `${120 + idx * 70}ms`, animationDuration: `${1000 + idx * 110}ms` }}>
+              {Array.from({ length: 31 }, (_, k) => (
+                <b key={k}>{k % 10}</b>
+              ))}
+            </span>
+          </span>
+        );
+      })}
+    </span>
   );
 }

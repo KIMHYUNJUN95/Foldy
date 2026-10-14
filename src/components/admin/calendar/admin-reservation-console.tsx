@@ -11,28 +11,21 @@ import {
 } from "react";
 import {
   BedDouble,
-  BellRing,
   Building2,
   CalendarDays,
-  Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  Clipboard,
-  DoorClosed,
-  House,
-  Info,
+  Copy,
+  ExternalLink,
   LoaderCircle,
   Lock,
-  MapPinned,
+  Pencil,
+  Phone,
+  Printer,
   RefreshCw,
   Search,
-  Settings2,
-  ShieldAlert,
   Sparkles,
   TriangleAlert,
-  Wrench,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -40,7 +33,9 @@ import {
   savePropertyOperationInfoAction,
   saveReservationInternalNoteAction,
 } from "@/app/admin/calendar/actions";
+import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
+import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 import {
   getPropertyAddress,
   type PropertyAccessInfo,
@@ -122,6 +117,9 @@ export type AdminReservationConsoleProps = {
 const DAY_WIDTH_MIN = 34;
 const LABEL_WIDTH_BASE = 176;
 const PANEL_TRANSITION_MS = 220;
+/** 운영 기본 시각 — 손님별 시각이 아니다(모바일 상세 시트와 같은 값, docs/product/15 「Reservation Detail Modal Policy」). */
+const DEFAULT_CHECK_IN_TIME = "16:00";
+const DEFAULT_CHECK_OUT_TIME = "10:00";
 
 const CHANNEL_STYLE: Record<
   ReservationChannel,
@@ -237,12 +235,6 @@ function buildChannelLabel(
   return copy.channelManual;
 }
 
-function buildChannelShort(channel: ReservationChannel) {
-  if (channel === "airbnb") return "ABB";
-  if (channel === "booking") return "BDC";
-  return "MAN";
-}
-
 function buildAccessLabel(
   access: PropertyAccessInfo,
   dictionary: ReturnType<typeof getDictionary>,
@@ -335,7 +327,6 @@ export function AdminReservationConsole({
 
   const [activeView, setActiveView] = useState<ViewMode>("month");
   const [channelFilter, setChannelFilter] = useState<ReservationChannel | "all">("all");
-  const [isChannelMenuOpen, setIsChannelMenuOpen] = useState(false);
   const [editingBuilding, setEditingBuilding] = useState<string | null>(null);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -351,7 +342,6 @@ export function AdminReservationConsole({
   });
 
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
-  const channelMenuRef = useRef<HTMLDivElement | null>(null);
 
   const uiLocale = initialLocale;
   const dictionary = getDictionary(uiLocale);
@@ -405,6 +395,16 @@ export function AdminReservationConsole({
   });
   const hasReservationNote = (reservationId: string) =>
     Boolean(reservationNotes[reservationId]?.trim());
+  /** 「성인 2」 / 「성인 2 · 어린이 1」 / 합계만 — 막대 · 목록 한 줄용. */
+  const guestShort = (reservation: AdminReservationConsoleProps["reservations"][number]) => {
+    if (reservation.adults !== null) {
+      const full = copy.guestBreakdown
+        .replace("{adults}", String(reservation.adults))
+        .replace("{children}", String(reservation.children ?? 0));
+      return reservation.children ? full : full.split(" · ")[0];
+    }
+    return reservation.guestCount === null ? copy.guestCountUnknown : copy.guestCount(reservation.guestCount);
+  };
 
   const arrivalsToday = activeReservations.filter((reservation) => reservation.checkInDate === today);
   const departuresToday = activeReservations.filter((reservation) => reservation.checkOutDate === today);
@@ -436,20 +436,6 @@ export function AdminReservationConsole({
   const occupancyPercent =
     activeRoomCount > 0 ? Math.round((occupiedKeysToday.size / activeRoomCount) * 100) : 0;
 
-  const groupOccupancy = Object.fromEntries(
-    groupedRows.map((group) => {
-      const roomCount = group.rows.length || group.blocked?.roomCount || 0;
-      const occupied = group.rows.filter((row) => occupiedKeysToday.has(row.key)).length;
-      return [
-        group.propertyName,
-        {
-          occupied,
-          percent: roomCount > 0 ? Math.round((occupied / roomCount) * 100) : 0,
-          roomCount,
-        },
-      ];
-    }),
-  ) as Record<string, { occupied: number; percent: number; roomCount: number }>;
 
   const reservationLookup = Object.fromEntries(
     activeReservations.map((reservation) => [reservation.id, reservation]),
@@ -497,30 +483,6 @@ export function AdminReservationConsole({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [panelSelection]);
-
-  useEffect(() => {
-    if (!isChannelMenuOpen) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (channelMenuRef.current?.contains(target)) return;
-      setIsChannelMenuOpen(false);
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsChannelMenuOpen(false);
-      }
-    };
-
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isChannelMenuOpen]);
 
   function closePanel() {
     setIsPanelVisible(false);
@@ -601,28 +563,6 @@ export function AdminReservationConsole({
     { value: "manual", label: copy.channelManual },
   ];
 
-  const renderPropertyChips = () => (
-    <div className="admcal__chips">
-      <Link
-        className={`admcal__chip${selectedProperty ? "" : " is-active"}`}
-        href={buildCalendarHref(selectedMonth, null)}
-      >
-        <span>{copy.allProperties}</span>
-      </Link>
-      {propertyOptions.map((propertyName) => {
-        return (
-          <Link
-            className={`admcal__chip${selectedProperty === propertyName ? " is-active" : ""}`}
-            href={buildCalendarHref(selectedMonth, propertyName)}
-            key={propertyName}
-          >
-            <span>{localizedPropertyName(propertyName)}</span>
-          </Link>
-        );
-      })}
-    </div>
-  );
-
   const renderMonthView = () => {
     const hasMatchingReservations = visibleReservations.length > 0;
     const visibleGroups = groupedRows
@@ -635,80 +575,35 @@ export function AdminReservationConsole({
       })
       .filter((group) => group.rows.length > 0 || group.blocked);
 
+    // 이번 달 가동률 = 판 밤 / (객실 × 날짜). 빈 방 줄 = 그날 밤 예약도 차단도 없는 방 수(채널 고르기와 무관).
+    const nightTaken = (roomKey: string, date: string) =>
+      activeReservations.some((r) => r.roomKey === roomKey && r.checkInDate <= date && r.checkOutDate > date);
+    const nightBlocked = (roomKey: string, date: string) =>
+      (blocksByRoom.get(roomKey) ?? []).some((block) => block.startDate <= date && block.endDate >= date);
+    const groupStats = (rows: AdminReservationConsoleProps["roomRows"]) => {
+      const empty = dates.map((date) => rows.filter((row) => !nightTaken(row.key, date) && !nightBlocked(row.key, date)).length);
+      const taken = rows.reduce((sum, row) => sum + dates.filter((date) => nightTaken(row.key, date)).length, 0);
+      const percent = rows.length && dates.length ? Math.round((taken / (rows.length * dates.length)) * 100) : 0;
+      return { empty, percent };
+    };
+
     return (
       <>
-        <div className="admcal__toolbar">
-          <div className="admcal__month-nav">
-            <Link aria-label={copy.prevMonth} className="admcal__icon-btn" href={buildCalendarHref(prevMonth, selectedProperty)}>
-              <ChevronLeft className="size-4" />
-            </Link>
-            <div className="admcal__month-label">{buildMonthLabel(selectedMonth, uiLocale)}</div>
-            <Link aria-label={copy.nextMonth} className="admcal__icon-btn" href={buildCalendarHref(nextMonth, selectedProperty)}>
-              <ChevronRight className="size-4" />
-            </Link>
-            {selectedMonth !== currentMonth ? (
-              <Link className="admcal__subtle-btn" href={buildCalendarHref(currentMonth, selectedProperty)}>
-                {copy.thisMonth}
-              </Link>
-            ) : null}
-          </div>
-
-          <div className="admcal__toolbar-actions">
-            <div className="admcal__menu" ref={channelMenuRef}>
-              <button
-                aria-expanded={isChannelMenuOpen}
-                aria-haspopup="menu"
-                className={`admcal__menu-trigger${isChannelMenuOpen ? " is-open" : ""}`}
-                onClick={() => setIsChannelMenuOpen((current) => !current)}
-                type="button"
-              >
-                <span className="admcal__menu-kicker">{copy.channelFilter}</span>
-                <span className="admcal__menu-value">
-                  {channelOptions.find((option) => option.value === channelFilter)?.label}
-                </span>
-                {isChannelMenuOpen ? (
-                  <ChevronUp className="size-4" />
-                ) : (
-                  <ChevronDown className="size-4" />
-                )}
-              </button>
-
-              {isChannelMenuOpen ? (
-                <div className="admcal__menu-popover" role="menu">
-                  {channelOptions.map((option) => {
-                    const isActive = channelFilter === option.value;
-                    return (
-                      <button
-                        aria-checked={isActive}
-                        className={`admcal__menu-item${isActive ? " is-active" : ""}`}
-                        key={option.value}
-                        onClick={() => {
-                          setChannelFilter(option.value);
-                          setIsChannelMenuOpen(false);
-                        }}
-                        role="menuitemradio"
-                        type="button"
-                      >
-                        <span>{option.label}</span>
-                        {isActive ? <Check className="size-4" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-
-            <Link
-              className="admcal__subtle-btn"
-              href={buildCalendarPrintHref(selectedMonth, selectedProperty)}
-              target="_blank"
-            >
-              {copy.exportA4}
-            </Link>
-          </div>
+        <div className="acw-sub">
+          <span>{copy.wSubline.replace("{n}", String(activeRoomCount))}</span>
+          <span className="acw-legend">
+            {(["airbnb", "booking", "manual"] as ReservationChannel[]).map((channel) => (
+              <span key={channel}>
+                <i style={{ background: CHANNEL_STYLE[channel].accent }} />
+                {buildChannelLabel(channel, dictionary)}
+              </span>
+            ))}
+            <span>
+              <i className="is-block" />
+              {copy.wBlockedLegend}
+            </span>
+          </span>
         </div>
-
-        {renderPropertyChips()}
 
         {isOutOfWindow ? (
           <div className="admcal__state-card">
@@ -775,43 +670,31 @@ export function AdminReservationConsole({
                   </div>
 
                   {visibleGroups.map((group) => {
-                    const occupancy = groupOccupancy[group.propertyName] ?? {
-                      occupied: 0,
-                      percent: 0,
-                      roomCount: 0,
-                    };
+                    const stats = groupStats(group.rows);
                     return (
                       <div className="admcal__group" key={group.propertyName}>
-                        <div className="admcal__group-head">
-                          <div className="admcal__group-label">
-                            <span className="admcal__group-icon">
-                              {group.blocked ? <Lock className="size-4" /> : <Building2 className="size-4" />}
-                            </span>
-                            <span className="admcal__group-name">
-                              {localizedPropertyName(group.propertyName)}
-                            </span>
-                            <span className="admcal__group-count">
-                              {copy.roomCount(occupancy.roomCount || group.blocked?.roomCount || 0)}
-                            </span>
-                          </div>
-
-                          <div className="admcal__group-meta">
-                            {group.blocked ? (
-                              <span className="admcal__group-blocked">
-                                <Lock className="size-3.5" />
-                                {copy.blockedProperty}
-                              </span>
-                            ) : (
-                              <>
-                                <span>{copy.groupOccupancy(occupancy.occupied, occupancy.roomCount)}</span>
-                                <span className="admcal__group-bar">
-                                  <span style={{ width: `${occupancy.percent}%` }} />
-                                </span>
-                                <span>{copy.groupPercent(occupancy.percent)}</span>
-                              </>
-                            )}
-                          </div>
+                        <div className="acw-ghead">
+                          <b>{localizedPropertyName(group.propertyName)}</b>
+                          <span className="num">
+                            {group.blocked
+                              ? copy.blockedProperty
+                              : copy.wGroupMeta
+                                  .replace("{n}", String(group.rows.length))
+                                  .replace("{p}", String(stats.percent))}
+                          </span>
                         </div>
+                        {group.blocked ? null : (
+                          <div className="acw-empty-row">
+                            <div className="admcal__room-label">{copy.wEmptyRow}</div>
+                            <div className="acw-empty-row__days">
+                              {stats.empty.map((count, index) => (
+                                <span className={`num${count ? "" : " is-zero"}`} key={dates[index]}>
+                                  {count || "–"}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {group.blocked ? (
                           <div className="admcal__blocked-row">
@@ -946,6 +829,7 @@ export function AdminReservationConsole({
                                             width: `calc(${span} * var(--admcal-day-width) - 6px)`,
                                           } as CSSProperties
                                         }
+                                        aria-label={`${reservation.guestName} · ${buildChannelLabel(reservation.channel, dictionary)}`}
                                         title={`${reservation.guestName} · ${buildChannelLabel(
                                           reservation.channel,
                                           dictionary,
@@ -954,11 +838,12 @@ export function AdminReservationConsole({
                                       >
                                         <span className="admcal__bar-dot" />
                                         {span >= 1.4 ? (
-                                          <span className="admcal__bar-text">{reservation.guestName}</span>
+                                          <span className="admcal__bar-text">
+                                            {reservation.guestName}
+                                            {span >= 3.2 ? ` · ${guestShort(reservation)}` : ""}
+                                          </span>
                                         ) : null}
-                                        {hasInternalNote ? (
-                                          <span className="admcal__bar-note-indicator" aria-hidden="true" />
-                                        ) : null}
+                                        {hasInternalNote ? <Pencil className="acw-bar-note" aria-hidden="true" /> : null}
                                       </button>
                                     );
                                   })}
@@ -974,45 +859,6 @@ export function AdminReservationConsole({
               </div>
             </div>
 
-            <div className="admcal__legend">
-              <div className="admcal__legend-group">
-                <span className="admcal__legend-label">{copy.blockedRoom}</span>
-                <span className="admcal__legend-item">
-                  <span className="admcal__legend-block" aria-hidden="true" />
-                  {copy.legendBlocked}
-                </span>
-              </div>
-              <div className="admcal__legend-group">
-                <span className="admcal__legend-label">{copy.legendChannels}</span>
-                {(["airbnb", "booking", "manual"] as ReservationChannel[]).map((channel) => (
-                  <span className="admcal__legend-item" key={channel}>
-                    <span
-                      className="admcal__legend-swatch"
-                      style={
-                        {
-                          "--admcal-bar-accent": CHANNEL_STYLE[channel].accent,
-                          "--admcal-bar-background": CHANNEL_STYLE[channel].background,
-                        } as CSSProperties
-                      }
-                    />
-                    {buildChannelLabel(channel, dictionary)}
-                  </span>
-                ))}
-              </div>
-
-              <div className="admcal__legend-group">
-                <span className="admcal__legend-label">{copy.legendStatuses}</span>
-                {(["checked_in", "confirmed", "checked_out"] as ReservationStatus[]).map((status) => (
-                  <span className="admcal__legend-item" key={status}>
-                    <span
-                      className="admcal__legend-dot"
-                      style={{ background: STATUS_STYLE[status].dot }}
-                    />
-                    {statusLabels[status]}
-                  </span>
-                ))}
-              </div>
-            </div>
           </>
         )}
       </>
@@ -1020,93 +866,90 @@ export function AdminReservationConsole({
   };
 
   const renderTodayBoard = () => {
-    const cards = [
+    const rangeShort = (r: { checkInDate: string; checkOutDate: string }) =>
+      `${Number(r.checkInDate.slice(5, 7))}/${Number(r.checkInDate.slice(8))} – ${Number(r.checkOutDate.slice(5, 7))}/${Number(r.checkOutDate.slice(8))}`;
+    const vacantTonight = Math.max(0, activeRoomCount - occupiedKeysToday.size - [...blockedRoomKeysToday].filter((key) => !occupiedKeysToday.has(key)).length);
+    const kpis = [
+      { label: copy.kpiArrivals, value: arrivalsToday.length, unit: copy.wUnitCount, sub: copy.wKpiToday },
+      { label: copy.kpiDepartures, value: departuresToday.length, unit: copy.wUnitCount, sub: copy.wKpiToday },
+      { label: copy.kpiSettingTargets, value: settingTargetsToday.length, unit: copy.wUnitCount, sub: copy.wKpiSettingSub },
+      { label: copy.kpiInHouse, value: inHouseToday.length, unit: copy.wUnitRoom, sub: copy.wKpiTonight },
+      { label: copy.wEmptyRow, value: vacantTonight, unit: copy.wUnitRoom, sub: copy.wKpiVacantSub.replace("{p}", String(occupancyPercent)), accent: true },
+    ];
+    const columns: Array<{ title: string; items: typeof arrivalsToday; empty: string; name: (r: (typeof arrivalsToday)[number]) => string; sub: (r: (typeof arrivalsToday)[number]) => string }> = [
       {
-        count: arrivalsToday.length,
-        empty: copy.todayNone,
-        icon: CalendarDays,
-        items: arrivalsToday,
         title: copy.todayArrivalsTitle,
+        items: arrivalsToday,
+        empty: copy.wNone,
+        name: (r) => r.guestName,
+        sub: (r) =>
+          copy.wStaySub
+            .replace("{guests}", guestShort(r))
+            .replace("{nights}", copy.nights(nightsBetween(r.checkInDate, r.checkOutDate)))
+            .replace("{channel}", buildChannelLabel(r.channel, dictionary)),
       },
       {
-        count: departuresToday.length,
-        empty: copy.todayNone,
-        icon: ChevronRight,
-        items: departuresToday,
         title: copy.todayDeparturesTitle,
+        items: departuresToday,
+        empty: copy.wNone,
+        name: (r) => r.guestName,
+        sub: (r) => copy.wDepartSub.replace("{guests}", guestShort(r)).replace("{range}", rangeShort(r)),
       },
       {
-        count: settingTargetsToday.length,
-        empty: copy.todaySettingEmpty,
-        icon: House,
-        items: settingTargetsToday,
         title: copy.todaySettingTitle,
+        items: settingTargetsToday,
+        empty: copy.todaySettingEmpty,
+        name: (r) => copy.wArriving.replace("{name}", r.guestName),
+        sub: () => copy.wSettingSub,
       },
       {
-        count: inHouseToday.length,
-        empty: copy.todayNone,
-        icon: BedDouble,
-        items: inHouseToday,
         title: copy.todayInHouseTitle,
+        items: inHouseToday,
+        empty: copy.wNone,
+        name: (r) => r.guestName,
+        sub: (r) => copy.wUntil.replace("{date}", `${Number(r.checkOutDate.slice(5, 7))}/${Number(r.checkOutDate.slice(8))}`),
       },
-    ] as const;
+    ];
 
     return (
       <>
-        {renderPropertyChips()}
-        <div className="admcal__board-grid">
-          {cards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <section className="admcal__board-card" key={card.title}>
-                <div className="admcal__board-head">
-                  <div className="admcal__board-title">
-                    <span className="admcal__board-icon">
-                      <Icon className="size-4" />
+        <div className="acw-kpis">
+          {kpis.map((kpi) => (
+            <div className="acw-kpi" key={kpi.label}>
+              <span>{kpi.label}</span>
+              <b className={`num${kpi.accent ? " is-accent" : ""}`}>
+                {kpi.value}
+                {kpi.unit ? <small>{kpi.unit}</small> : null}
+              </b>
+              <span>{kpi.sub}</span>
+            </div>
+          ))}
+        </div>
+        <div className="acw-cols">
+          {columns.map((column) => (
+            <section className="acw-col" key={column.title}>
+              <div className="acw-col__h">
+                <b>{column.title}</b>
+                <span className="num">{column.items.length}</span>
+              </div>
+              {column.items.length === 0 ? (
+                <p className="acw-col__empty">{column.empty}</p>
+              ) : (
+                column.items.map((reservation) => (
+                  <button className="acw-row" key={reservation.id} onClick={() => openReservationPanel(reservation.id)} type="button">
+                    <span className="acw-room">{roomLookup[reservation.roomKey]?.displayRoomLabel ?? reservation.roomLabel}</span>
+                    <span className="acw-row__t">
+                      <b>{column.name(reservation)}</b>
+                      <span>
+                        {selectedProperty ? "" : `${localizedPropertyName(reservation.propertyName)} · `}
+                        {column.sub(reservation)}
+                      </span>
                     </span>
-                    <span>{card.title}</span>
-                  </div>
-                  <span className="admcal__board-count">{card.count}</span>
-                </div>
-
-                {card.items.length === 0 ? (
-                  <div className="admcal__board-empty">{card.empty}</div>
-                ) : (
-                  <div className="admcal__board-list">
-                    {card.items.map((reservation) => {
-                      const room = roomLookup[reservation.roomKey];
-                      return (
-                        <button
-                          className="admcal__board-row"
-                          key={reservation.id}
-                          onClick={() => openReservationPanel(reservation.id)}
-                          type="button"
-                        >
-                          <span
-                            className="admcal__board-row-badge"
-                            style={{ background: CHANNEL_STYLE[reservation.channel].badge }}
-                          >
-                            {room?.displayRoomLabel ?? reservation.roomLabel}
-                          </span>
-                          <span className="admcal__board-row-main">
-                            <span className="admcal__board-row-title">{reservation.guestName}</span>
-                            <span className="admcal__board-row-meta">
-                              {localizedPropertyName(reservation.propertyName)} · {reservation.roomLabel}
-                            </span>
-                          </span>
-                          <span className="admcal__board-row-tail">
-                            {reservation.checkInDate === today
-                              ? formatShortDate(reservation.checkOutDate, uiLocale)
-                              : formatShortDate(reservation.checkInDate, uiLocale)}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            );
-          })}
+                  </button>
+                ))
+              )}
+            </section>
+          ))}
         </div>
       </>
     );
@@ -1115,7 +958,6 @@ export function AdminReservationConsole({
   const renderRoomStatusBoard = () => {
     return (
       <>
-        {renderPropertyChips()}
         <div className="admcal__table-card">
           <table className="admcal__table">
             <thead>
@@ -1171,12 +1013,7 @@ export function AdminReservationConsole({
 
     return (
       <>
-        {renderPropertyChips()}
-        <div className="admcal__info-note">
-          <Info className="size-4" />
-          <span>{copy.buildingInfoHint}</span>
-        </div>
-        <div className="admcal__info-grid">
+        <div className="acw-infos">
           {cards.map((card) => {
             const isEditing = editingBuilding === card.propertyName;
             if (card.blocked || !card.info || !card.meta) {
@@ -1197,33 +1034,36 @@ export function AdminReservationConsole({
             }
 
             return (
-              <section className="admcal__info-card" key={card.propertyName}>
-                <div className="admcal__info-head">
-                  <div className="admcal__info-title">
-                    <span className="admcal__info-icon">
-                      {card.info.kind === "house" ? (
-                        <House className="size-4" />
-                      ) : (
-                        <Building2 className="size-4" />
-                      )}
-                    </span>
-                    <span>{localizedPropertyName(card.propertyName)}</span>
-                  </div>
-
-                  <div className="admcal__info-actions">
-                    <a
-                      className="admcal__chip-button"
-                      href={card.info.googleMapsUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      <MapPinned className="size-4" />
+              <section className="acw-info" key={card.propertyName}>
+                <div className="acw-info__a">
+                  <b>{localizedPropertyName(card.propertyName)}</b>
+                  {isEditing ? (
+                    <input
+                      aria-label={copy.address}
+                      className="admcal__input"
+                      onChange={(event) =>
+                        setPropertyDrafts((current) => ({
+                          ...current,
+                          [card.propertyName]: {
+                            ...current[card.propertyName],
+                            address: { ...current[card.propertyName].address, [uiLocale]: event.target.value },
+                          },
+                        }))
+                      }
+                      value={getPropertyAddress({ ...card.meta, address: card.info.address }, uiLocale)}
+                    />
+                  ) : (
+                    <span className="acw-soft">{getPropertyAddress({ ...card.meta, address: card.info.address }, uiLocale)}</span>
+                  )}
+                  <span className="acw-info__links">
+                    <a className="acw-link" href={card.info.googleMapsUrl} rel="noreferrer" target="_blank">
                       {copy.openMap}
+                      <ExternalLink aria-hidden="true" />
                     </a>
                     {isEditing ? (
                       <>
                         <button
-                          className="admcal__chip-button"
+                          className="acw-link is-soft"
                           onClick={() => {
                             setEditingBuilding(null);
                             setPropertyDrafts(cloneBuildingInfos(buildingInfos));
@@ -1233,167 +1073,106 @@ export function AdminReservationConsole({
                           {dictionary.common.cancel}
                         </button>
                         <button
-                          className="admcal__chip-button is-primary"
+                          className="acw-btn is-pri"
                           disabled={savingBuilding === card.propertyName}
                           onClick={() => void handleSaveBuildingInfo(card.propertyName)}
                           type="button"
                         >
-                          {savingBuilding === card.propertyName ? (
-                            <LoaderCircle className="size-4 animate-spin" />
-                          ) : null}
+                          {savingBuilding === card.propertyName ? <LoaderCircle className="size-4 animate-spin" /> : null}
                           {dictionary.common.save}
                         </button>
                       </>
                     ) : (
-                      <button
-                        className="admcal__chip-button"
-                        onClick={() => setEditingBuilding(card.propertyName)}
-                        type="button"
-                      >
-                        <Settings2 className="size-4" />
-                        {copy.editInfo}
+                      <button className="acw-link is-soft" onClick={() => setEditingBuilding(card.propertyName)} type="button">
+                        {copy.wEdit}
                       </button>
                     )}
-                  </div>
+                  </span>
                 </div>
 
-                <div className="admcal__info-body">
-                  <div className="admcal__info-row">
-                    <div className="admcal__info-label">{copy.address}</div>
-                    {isEditing ? (
-                      <input
-                        className="admcal__input"
-                        onChange={(event) =>
-                          setPropertyDrafts((current) => ({
-                            ...current,
-                            [card.propertyName]: {
-                              ...current[card.propertyName],
-                              address: {
-                                ...current[card.propertyName].address,
-                                [uiLocale]: event.target.value,
-                              },
-                            },
-                          }))
-                        }
-                        value={getPropertyAddress(
-                          {
-                            ...card.meta,
-                            address: card.info.address,
-                          },
-                          uiLocale,
-                        )}
-                      />
-                    ) : (
-                      <div className="admcal__info-value">
-                        {getPropertyAddress(
-                          {
-                            ...card.meta,
-                            address: card.info.address,
-                          },
-                          uiLocale,
+                <div className="acw-info__b">
+                  {card.info.sharedAccess.map((access) => {
+                    const labels = buildAccessLabel(access, dictionary);
+                    return (
+                      <div className="acw-code" key={access.id}>
+                        <span className="acw-k">
+                          {labels.label}
+                          {labels.note ? ` · ${labels.note}` : ""}
+                        </span>
+                        {isEditing ? (
+                          <input
+                            aria-label={labels.label}
+                            className="admcal__code-input"
+                            onChange={(event) =>
+                              setPropertyDrafts((current) => ({
+                                ...current,
+                                [card.propertyName]: {
+                                  ...current[card.propertyName],
+                                  sharedAccess: current[card.propertyName].sharedAccess.map((item) =>
+                                    item.id === access.id ? { ...item, code: event.target.value } : item,
+                                  ),
+                                },
+                              }))
+                            }
+                            value={access.code}
+                          />
+                        ) : (
+                          <b className="acw-mono">{access.code}</b>
                         )}
                       </div>
-                    )}
-                  </div>
-
-                  <div className="admcal__info-block">
-                    <div className="admcal__info-block-title">{copy.sharedAccess}</div>
-                    <div className="admcal__access-list">
-                      {card.info.sharedAccess.map((access) => {
-                        const labels = buildAccessLabel(access, dictionary);
-                        return (
-                          <div className="admcal__access-row" key={access.id}>
-                            <span className="admcal__access-name">
-                              {labels.label}
-                              {labels.note ? (
-                                <span className="admcal__access-note">{labels.note}</span>
-                              ) : null}
-                            </span>
-                            {isEditing ? (
-                              <input
-                                className="admcal__code-input"
-                                onChange={(event) =>
-                                  setPropertyDrafts((current) => ({
-                                    ...current,
-                                    [card.propertyName]: {
-                                      ...current[card.propertyName],
-                                      sharedAccess: current[card.propertyName].sharedAccess.map((item) =>
-                                        item.id === access.id
-                                          ? { ...item, code: event.target.value }
-                                          : item,
-                                      ),
-                                    },
-                                  }))
-                                }
-                                value={access.code}
-                              />
-                            ) : (
-                              <span className="admcal__code-chip">{access.code}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="admcal__info-block">
-                    <div className="admcal__info-block-title">{copy.roomAccess}</div>
-                    <div className="admcal__access-list">
-                      {(card.info.roomAccess.length === 0 ? [{ roomLabel: copy.noRoomAccess, code: "" }] : card.info.roomAccess).map((room) => (
-                        <div className="admcal__access-row" key={room.roomLabel}>
-                          <span className="admcal__access-name">{room.roomLabel}</span>
-                          {room.code ? (
-                            isEditing ? (
-                              <input
-                                className="admcal__code-input"
-                                onChange={(event) =>
-                                  setPropertyDrafts((current) => ({
-                                    ...current,
-                                    [card.propertyName]: {
-                                      ...current[card.propertyName],
-                                      roomAccess: current[card.propertyName].roomAccess.map((item) =>
-                                        item.roomLabel === room.roomLabel
-                                          ? { ...item, code: event.target.value }
-                                          : item,
-                                      ),
-                                    },
-                                  }))
-                                }
-                                value={room.code}
-                              />
-                            ) : (
-                              <span className="admcal__code-chip">{room.code}</span>
-                            )
-                          ) : (
-                            <span className="admcal__info-muted">{copy.noRoomAccess}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="admcal__info-block">
-                    <div className="admcal__info-block-title">{copy.opsNote}</div>
+                    );
+                  })}
+                  <div className="acw-code">
+                    <span className="acw-k">{copy.opsNote}</span>
                     {isEditing ? (
                       <textarea
+                        aria-label={copy.opsNote}
                         className="admcal__textarea"
                         onChange={(event) =>
                           setPropertyDrafts((current) => ({
                             ...current,
-                            [card.propertyName]: {
-                              ...current[card.propertyName],
-                              note: event.target.value,
-                            },
+                            [card.propertyName]: { ...current[card.propertyName], note: event.target.value },
                           }))
                         }
                         value={card.info.note}
                       />
                     ) : (
-                      <div className="admcal__note-box">
-                        {card.info.note || copy.opsNotePlaceholder}
-                      </div>
+                      <span className={card.info.note ? "acw-note" : "acw-note is-dim"}>{card.info.note || copy.opsNotePlaceholder}</span>
                     )}
                   </div>
+                </div>
+
+                <div className="acw-info__c">
+                  <span className="acw-k">{copy.wRoomCodes}</span>
+                  {card.info.roomAccess.length === 0 ? (
+                    <span className="acw-note is-dim">{copy.noRoomAccess}</span>
+                  ) : (
+                    card.info.roomAccess.map((room) => (
+                      <div className="acw-rc" key={room.roomLabel}>
+                        <span className="acw-mono">{room.roomLabel}</span>
+                        {isEditing ? (
+                          <input
+                            aria-label={room.roomLabel}
+                            className="admcal__code-input"
+                            onChange={(event) =>
+                              setPropertyDrafts((current) => ({
+                                ...current,
+                                [card.propertyName]: {
+                                  ...current[card.propertyName],
+                                  roomAccess: current[card.propertyName].roomAccess.map((item) =>
+                                    item.roomLabel === room.roomLabel ? { ...item, code: event.target.value } : item,
+                                  ),
+                                },
+                              }))
+                            }
+                            value={room.code}
+                          />
+                        ) : (
+                          <span className="acw-mono">{room.code || copy.none}</span>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </section>
             );
@@ -1404,98 +1183,94 @@ export function AdminReservationConsole({
   };
 
   return (
-    <div className="admcal">
-      <div className="opsbar admcal__opsbar">
-        <button className="opscell" onClick={() => setActiveView("today")} type="button">
-          <div className="opscell__k">
-            <CalendarDays className="size-4" />
-            {copy.kpiArrivals}
-          </div>
-          <div className="opscell__v">{arrivalsToday.length}</div>
-          <div className="opscell__delta flat">{copy.todayArrivalsTitle}</div>
-        </button>
-        <button className="opscell" onClick={() => setActiveView("today")} type="button">
-          <div className="opscell__k">
-            <ChevronRight className="size-4" />
-            {copy.kpiDepartures}
-          </div>
-          <div className="opscell__v">{departuresToday.length}</div>
-          <div className="opscell__delta flat">{copy.todayDeparturesTitle}</div>
-        </button>
-        <button className="opscell" onClick={() => setActiveView("today")} type="button">
-          <div className="opscell__k">
-            <BedDouble className="size-4" />
-            {copy.kpiInHouse}
-          </div>
-          <div className="opscell__v">{inHouseToday.length}</div>
-          <div className="opscell__delta flat">{copy.todayInHouseTitle}</div>
-        </button>
-        <button className="opscell" onClick={() => setActiveView("today")} type="button">
-          <div className="opscell__k">
-            <House className="size-4" />
-            {copy.kpiSettingTargets}
-          </div>
-          <div className="opscell__v">{settingTargetsToday.length}</div>
-          <div className="opscell__delta flat">{copy.todaySettingTitle}</div>
-        </button>
-        <div className="opscell">
-          <div className="opscell__k">
-            <BellRing className="size-4" />
-            {copy.kpiOccupancy}
-          </div>
-          <div className="opscell__v">
-            {occupancyPercent}
-            <small>%</small>
-          </div>
-          <div className="opscell__delta flat">{copy.groupOccupancy(occupiedKeysToday.size, activeRoomCount)}</div>
-        </div>
-      </div>
-
-      <div className="admcal__topline">
-        <div className="admcal__view-tabs">
-          {viewTabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                className={`admcal__view-tab${activeView === tab.key ? " is-active" : ""}`}
-                key={tab.key}
-                onClick={() => {
-                  setActiveView(tab.key);
-                  setIsPanelVisible(false);
-                  setPanelSelection(null);
-                }}
-                type="button"
-              >
-                <Icon className="size-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="admcal__topline-actions">
-          {beds24SyncPaused ? (
-            <div className="admcal__sync-chip is-paused">
-              <span className="admcal__sync-dot" />
-              <span>{copy.syncPausedLabel}</span>
-              <Info className="size-4" />
-            </div>
-          ) : (
+    <div className="admcal acw">
+      {/* 화이트 리디자인(2026-10-14, 시안 Cal-PC · CalOps-PC · CalRooms-PC · CalInfo-PC · CalDetail-PC):
+          위 숫자 카드 다섯은 「오늘 운영」 보기 맨 위로 옮겼다. 한 줄 = 보기 탭 · (월간) 달 이동 · 건물 · (월간) 채널 · 인쇄 · 방금 갱신. */}
+      <div className="acw-bar">
+        <div className="lviews" role="tablist" aria-label={copy.monthView} style={{ margin: 0 }}>
+          {viewTabs.map((tab) => (
             <button
-              className="admcal__sync-chip"
-              onClick={handleSyncRefresh}
+              aria-selected={activeView === tab.key}
+              className={activeView === tab.key ? "on" : ""}
+              key={tab.key}
+              onClick={() => {
+                setActiveView(tab.key);
+                setIsPanelVisible(false);
+                setPanelSelection(null);
+              }}
+              role="tab"
               type="button"
             >
-              <span className="admcal__sync-dot" />
-              <span>{copy.syncPassiveLabel}</span>
-              {isRefreshing ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
+              {tab.label}
             </button>
-          )}
+          ))}
         </div>
+
+        {activeView === "month" ? (
+          <div className="acw-month">
+            <Link aria-label={copy.prevMonth} className="acw-ib" href={buildCalendarHref(prevMonth, selectedProperty)}>
+              <ChevronLeft aria-hidden="true" />
+            </Link>
+            <span className="acw-month__label num">{buildMonthLabel(selectedMonth, uiLocale)}</span>
+            <Link aria-label={copy.nextMonth} className="acw-ib" href={buildCalendarHref(nextMonth, selectedProperty)}>
+              <ChevronRight aria-hidden="true" />
+            </Link>
+            {selectedMonth !== currentMonth ? (
+              <Link className="acw-link" href={buildCalendarHref(currentMonth, selectedProperty)}>
+                {copy.thisMonth}
+              </Link>
+            ) : null}
+          </div>
+        ) : activeView !== "info" ? (
+          <span className="acw-soft num">{copy.wTodayLine.replace("{date}", formatFullDate(today, uiLocale))}</span>
+        ) : (
+          <span className="acw-soft">{copy.wInfoHint}</span>
+        )}
+
+        <span className="acw-sp" />
+        <AdmDropdown
+          size="sm"
+          ariaLabel={copy.wPropertyAria}
+          value={selectedProperty ?? ""}
+          onChange={(value) => router.push(buildCalendarHref(selectedMonth, value || null), { scroll: false })}
+          options={[
+            { value: "", label: copy.wAllProperties },
+            ...propertyOptions.map((propertyName) => ({ value: propertyName, label: localizedPropertyName(propertyName) })),
+          ]}
+        />
+        {activeView === "month" ? (
+          <>
+            <AdmDropdown
+              size="sm"
+              ariaLabel={copy.wChannelAria}
+              value={channelFilter}
+              onChange={(value) => setChannelFilter(value as ReservationChannel | "all")}
+              options={channelOptions}
+            />
+            <Link className="acw-chip" href={buildCalendarPrintHref(selectedMonth, selectedProperty)} target="_blank">
+              <Printer aria-hidden="true" />
+              {copy.wPrint}
+            </Link>
+          </>
+        ) : null}
+        {beds24SyncPaused ? (
+          <span className="acw-fresh is-paused">
+            <i aria-hidden="true" />
+            {copy.syncPausedLabel}
+          </span>
+        ) : (
+          <button
+            aria-label={copy.wFreshAria}
+            className={`acw-fresh${isRefreshing ? " is-spin" : ""}`}
+            onClick={handleSyncRefresh}
+            title={copy.wFreshAria}
+            type="button"
+          >
+            <i aria-hidden="true" />
+            {copy.wFresh}
+            <RefreshCw aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {activeView === "month" && renderMonthView()}
@@ -1505,15 +1280,19 @@ export function AdminReservationConsole({
 
       <div className={`admcal__panel-scrim${isPanelVisible ? " is-visible" : ""}`} onClick={closePanel} />
 
-      <aside className={`admcal__panel${isPanelVisible ? " is-visible" : ""}`}>
+      <aside
+        aria-hidden={!isPanelVisible}
+        aria-label={panelReservation?.guestName ?? panelRoom?.displayRoomLabel ?? copy.closePanel}
+        aria-modal={isPanelVisible || undefined}
+        className={`admcal__panel${isPanelVisible ? " is-visible" : ""}`}
+        role="dialog"
+      >
         {panelReservation ? (
           <ReservationPanel
             beds24Id={panelReservation.beds24Id}
             channelLabel={buildChannelLabel(panelReservation.channel, dictionary)}
-            channelShort={buildChannelShort(panelReservation.channel)}
             channelStyle={CHANNEL_STYLE[panelReservation.channel]}
             copy={copy}
-            dictionary={dictionary}
             note={reservationNotes[panelReservation.id] ?? ""}
             onChangeNote={(value) =>
               setReservationNotes((current) => ({ ...current, [panelReservation.id]: value }))
@@ -1523,6 +1302,14 @@ export function AdminReservationConsole({
               try {
                 await copyText(panelReservation.beds24Id);
                 showToast(copy.beds24CopiedToast);
+              } catch {
+                showToast(copy.copyFailedToast, true);
+              }
+            }}
+            onCopyPhone={async () => {
+              try {
+                await copyText(panelReservation.phone ?? "");
+                showToast(copy.wPhoneCopied);
               } catch {
                 showToast(copy.copyFailedToast, true);
               }
@@ -1541,12 +1328,9 @@ export function AdminReservationConsole({
               }));
               showToast(copy.internalNoteSavedToast);
             }}
-            phoneLabel={panelReservation.phone ?? copy.phoneMissing}
             reservation={panelReservation}
             roomLabel={panelReservation.roomLabel}
             propertyLabel={localizedPropertyName(panelReservation.propertyName)}
-            statusLabel={statusLabels[panelReservation.status]}
-            statusStyle={STATUS_STYLE[panelReservation.status]}
             uiLocale={uiLocale}
           />
         ) : null}
@@ -1573,164 +1357,108 @@ export function AdminReservationConsole({
 function ReservationPanel({
   beds24Id,
   channelLabel,
-  channelShort,
   channelStyle,
   copy,
-  dictionary,
   note,
   onChangeNote,
   onClose,
   onCopyBeds24Id,
+  onCopyPhone,
   onLinkedAction,
   onSaveNote,
-  phoneLabel,
   propertyLabel,
   reservation,
   roomLabel,
-  statusLabel,
-  statusStyle,
   uiLocale,
 }: {
   beds24Id: string;
   channelLabel: string;
-  channelShort: string;
   channelStyle: { accent: string; background: string; badge: string };
   copy: ReturnType<typeof getDictionary>["admin"]["calendar"];
-  dictionary: ReturnType<typeof getDictionary>;
   note: string;
   onChangeNote: (value: string) => void;
   onClose: () => void;
   onCopyBeds24Id: () => void;
+  onCopyPhone: () => void;
   onLinkedAction: (kind: "maintenance" | "complaint" | "lost") => void;
   onSaveNote: (value: string) => Promise<void>;
-  phoneLabel: string;
   propertyLabel: string;
   reservation: AdminReservationConsoleProps["reservations"][number];
   roomLabel: string;
-  statusLabel: string;
-  statusStyle: { badge: string };
   uiLocale: Locale;
 }) {
   // 성인 · 어린이를 나눠 보인다 — 판매 캘린더와 같은 표기(2026-10-05). 성인 수를 모르는 예약만 합계.
   const guestCountLabel =
     reservation.adults !== null
-      ? copy.guestBreakdown
-          .replace("{adults}", String(reservation.adults))
-          .replace("{children}", String(reservation.children ?? 0))
+      ? reservation.children
+        ? copy.guestBreakdown
+            .replace("{adults}", String(reservation.adults))
+            .replace("{children}", String(reservation.children))
+        : copy.guestBreakdown.replace("{adults}", String(reservation.adults)).split(" · ")[0]
       : reservation.guestCount === null
         ? copy.guestCountUnknown
         : copy.guestCount(reservation.guestCount);
-  const activityRows = [
-    {
-      icon: RefreshCw,
-      label: copy.activitySynced,
-      value: reservation.beds24Id,
-    },
-    {
-      icon: CalendarDays,
-      label: copy.activityCheckIn,
-      value: formatFullDate(reservation.checkInDate, uiLocale),
-    },
-    {
-      icon: DoorClosed,
-      label: copy.activityCheckOut,
-      value: formatFullDate(reservation.checkOutDate, uiLocale),
-    },
-  ];
 
+  const nights = copy.nights(nightsBetween(reservation.checkInDate, reservation.checkOutDate));
+  const phoneText = formatPhoneDisplay(reservation.phone);
+  const tel = phoneHref(reservation.phone);
+
+  // 화이트 리디자인(2026-10-14, 시안 CalDetail-PC): 채널 · 예약번호 → 이름 → 체크인/체크아웃 → 연락처 → 내부 메모 → 이 예약으로 등록.
   return (
-    <div className="admcal__panel-inner">
-      <div className="admcal__panel-header">
-        <div className="admcal__panel-kicker">
-          {channelLabel} · {propertyLabel}
-        </div>
-        <button className="admcal__panel-close" onClick={onClose} type="button">
-          <X className="size-4" />
+    <div className="admcal__panel-inner acw-panel">
+      <div className="acw-ph">
+        <span className="acw-kick">
+          <i style={{ background: channelStyle.accent }} />
+          {channelLabel} · {copy.wResNo} <span className="acw-mono">{beds24Id}</span>
+          <button aria-label={copy.wCopyResNo} className="acw-ib is-sm" onClick={onCopyBeds24Id} title={copy.wCopyResNo} type="button">
+            <Copy aria-hidden="true" />
+          </button>
+        </span>
+        <button aria-label={copy.wClose} className="acw-ib acw-ph__x" onClick={onClose} type="button">
+          <X aria-hidden="true" />
         </button>
-        <div className="admcal__panel-title">{reservation.guestName}</div>
-        <div className="admcal__panel-subtitle">
-          {propertyLabel} · {roomLabel}
-        </div>
-        <div className="admcal__panel-pills">
-          <span className={statusStyle.badge}>{statusLabel}</span>
-          <span className="pill pill--muted">
-            {copy.nights(nightsBetween(reservation.checkInDate, reservation.checkOutDate))}
-          </span>
-          <span className="pill pill--muted">{guestCountLabel}</span>
-        </div>
       </div>
+      <div className="admcal__panel-body acw-pb">
+        <div className="acw-who">
+          <h2>{reservation.guestName}</h2>
+          <span>
+            {propertyLabel} · <b className="acw-mono">{roomLabel}</b> · {guestCountLabel}
+          </span>
+        </div>
 
-      <div className="admcal__panel-body">
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.stayPeriod}</div>
-          <div className="admcal__staybar">
-            <div className="admcal__stay-node">
-              <span className="admcal__stay-label">{copy.checkIn}</span>
-              <strong>{formatShortDate(reservation.checkInDate, uiLocale)}</strong>
-              <span>{weekdayLabel(reservation.checkInDate, uiLocale)}</span>
-            </div>
-            <div className="admcal__stay-line">
-              <span>{copy.nights(nightsBetween(reservation.checkInDate, reservation.checkOutDate))}</span>
-            </div>
-            <div className="admcal__stay-node">
-              <span className="admcal__stay-label">{copy.checkOut}</span>
-              <strong>{formatShortDate(reservation.checkOutDate, uiLocale)}</strong>
-              <span>{weekdayLabel(reservation.checkOutDate, uiLocale)}</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.reservationInfo}</div>
-          <div className="admcal__channel-row">
-            <span className="admcal__channel-badge" style={{ background: channelStyle.badge }}>
-              {channelShort}
-            </span>
-            <div>
-              <div className="admcal__channel-name">{channelLabel}</div>
-              <div className="admcal__channel-sub">{copy.beds24IdLabel(beds24Id)}</div>
-            </div>
-          </div>
-          <dl className="admcal__kv-list">
-            <div>
-              <dt>{copy.stayRange}</dt>
-              <dd>
-                {reservation.checkInDate} → {reservation.checkOutDate}
-              </dd>
-            </div>
-            <div>
-              <dt>{copy.guestCountLabel}</dt>
-              <dd>{guestCountLabel}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.guestContact}</div>
-          <dl className="admcal__kv-list">
-            <div>
-              <dt>{copy.guestName}</dt>
-              <dd>{reservation.guestName}</dd>
-            </div>
-            <div>
-              <dt>{copy.phoneLabel}</dt>
-              <dd>{phoneLabel}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="admcal__readonly-box">
-          <Lock className="size-4" />
+        <div className="acw-stay">
           <div>
-            <div className="admcal__readonly-title">{copy.readonlyTitle}</div>
-            <div className="admcal__readonly-body">{copy.readonlyBody}</div>
+            <span className="acw-k">{copy.checkIn}</span>
+            <b>{formatFullDate(reservation.checkInDate, uiLocale)}</b>
+            <span className="acw-soft">{copy.wFromTime.replace("{time}", DEFAULT_CHECK_IN_TIME)}</span>
           </div>
-        </section>
+          <div>
+            <span className="acw-k">{copy.checkOut}</span>
+            <b>{formatFullDate(reservation.checkOutDate, uiLocale)}</b>
+            <span className="acw-soft">{copy.wUntilTime.replace("{time}", DEFAULT_CHECK_OUT_TIME).replace("{nights}", nights)}</span>
+          </div>
+        </div>
 
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.internalNote}</div>
+        <div className="acw-phone">
+          <span className={`num${phoneText ? "" : " acw-soft"}`}>{phoneText || copy.wPhoneMissing}</span>
+          {reservation.phone ? (
+            <>
+              <button aria-label={copy.wCopyPhone} className="acw-sq" onClick={onCopyPhone} title={copy.wCopyPhone} type="button">
+                <Copy aria-hidden="true" />
+              </button>
+              {tel ? (
+                <a aria-label={copy.wCall} className="acw-sq is-pri" href={tel} title={copy.wCall}>
+                  <Phone aria-hidden="true" />
+                </a>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+
+        <div className="acw-nf">
+          <label htmlFor="acw-note">{copy.internalNote}</label>
           <textarea
-            className="admcal__textarea"
+            id="acw-note"
             onChange={(event) => onChangeNote(event.target.value)}
             onBlur={(event) => {
               startTransition(() => {
@@ -1738,63 +1466,26 @@ function ReservationPanel({
               });
             }}
             placeholder={copy.internalNotePlaceholder}
+            rows={3}
             value={note}
           />
-        </section>
+          <span>{copy.wNoteHint}</span>
+        </div>
 
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.linkedActions}</div>
-          <div className="admcal__action-grid">
-            <button className="admcal__action-tile" onClick={() => onLinkedAction("maintenance")} type="button">
-              <span className="admcal__action-icon is-warn">
-                <Wrench className="size-4" />
-              </span>
-              <span className="admcal__action-label">{copy.linkMaintenance}</span>
+        <div className="acw-links">
+          <span className="acw-k">{copy.wRegister}</span>
+          <span>
+            <button className="acw-link" onClick={() => onLinkedAction("maintenance")} type="button">
+              {copy.linkMaintenance}
             </button>
-            <button className="admcal__action-tile" onClick={() => onLinkedAction("complaint")} type="button">
-              <span className="admcal__action-icon is-danger">
-                <ShieldAlert className="size-4" />
-              </span>
-              <span className="admcal__action-label">{copy.linkComplaint}</span>
+            <button className="acw-link" onClick={() => onLinkedAction("complaint")} type="button">
+              {copy.linkComplaint}
             </button>
-            <button className="admcal__action-tile" onClick={() => onLinkedAction("lost")} type="button">
-              <span className="admcal__action-icon is-info">
-                <Info className="size-4" />
-              </span>
-              <span className="admcal__action-label">{copy.linkLostFound}</span>
+            <button className="acw-link" onClick={() => onLinkedAction("lost")} type="button">
+              {copy.linkLostFound}
             </button>
-          </div>
-        </section>
-
-        <section className="admcal__panel-section">
-          <div className="admcal__section-title">{copy.activityLog}</div>
-          <div className="admcal__timeline">
-            {activityRows.map((row) => {
-              const Icon = row.icon;
-              return (
-                <div className="admcal__timeline-row" key={row.label}>
-                  <span className="admcal__timeline-dot">
-                    <Icon className="size-3.5" />
-                  </span>
-                  <div>
-                    <div className="admcal__timeline-title">{row.label}</div>
-                    <div className="admcal__timeline-value">{row.value}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-
-      <div className="admcal__panel-footer">
-        <button className="admcal__subtle-btn is-full" onClick={onClose} type="button">
-          {dictionary.common.close}
-        </button>
-        <button className="admcal__primary-btn is-full" onClick={onCopyBeds24Id} type="button">
-          <Clipboard className="size-4" />
-          {copy.copyBeds24Id}
-        </button>
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1917,8 +1608,24 @@ function FragmentRows({
       <tr className="admcal__table-group">
         <td colSpan={4}>
           <span className="admcal__table-group-title">
-            <Building2 className="size-4" />
             {localizedPropertyName(group.propertyName)}
+            {group.blocked ? null : (
+              <small className="num">
+                {copy.wRoomsGroupMeta
+                  .replace("{n}", String(groupRows.length))
+                  .replace(
+                    "{v}",
+                    String(
+                      groupRows.filter(
+                        (room) =>
+                          !inHouseToday.some((r) => r.roomKey === room.key) && !blockedRoomKeysToday.has(room.key),
+                      ).length,
+                    ),
+                  )
+                  .replace("{i}", String(groupRows.filter((room) => reservations.some((r) => r.roomKey === room.key && r.checkInDate === today)).length))
+                  .replace("{o}", String(groupRows.filter((room) => reservations.some((r) => r.roomKey === room.key && r.checkOutDate === today)).length))}
+              </small>
+            )}
           </span>
         </td>
       </tr>
@@ -1934,10 +1641,9 @@ function FragmentRows({
         groupRows.map((room) => {
           const currentGuest =
             inHouseToday.find((reservation) => reservation.roomKey === room.key) ?? null;
-          const hasDeparture = reservations.some(
-            (reservation) =>
-              reservation.roomKey === room.key && reservation.checkOutDate === today,
-          );
+          const departing =
+            reservations.find((reservation) => reservation.roomKey === room.key && reservation.checkOutDate === today) ?? null;
+          const hasDeparture = Boolean(departing);
           const hasArrival = reservations.some(
             (reservation) =>
               reservation.roomKey === room.key && reservation.checkInDate === today,
@@ -1985,6 +1691,8 @@ function FragmentRows({
                     <span>{currentGuest.guestName}</span>
                     <span>{formatDateRangeShort(currentGuest.checkInDate, currentGuest.checkOutDate, uiLocale)}</span>
                   </div>
+                ) : departing ? (
+                  <span className="admcal__info-muted">{copy.wLeavingToday.replace("{name}", departing.guestName)}</span>
                 ) : (
                   <span className="admcal__info-muted">{copy.none}</span>
                 )}

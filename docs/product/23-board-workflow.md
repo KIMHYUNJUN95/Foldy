@@ -710,6 +710,26 @@ App Store(1.2) · Google Play(UGC 정책)는 사용자 작성 콘텐츠가 있�
 - **관리 콘솔** `/admin/board-reports`(2026-10-06): 같은 데이터 · 같은 서버 액션을 표 + 우측 상세 패널로. 사이드바 「정보」 묶음, `board.moderate` 보유자만 보인다.
 - 알림(관리자에게 「새 신고」)은 붙이지 않았다 — 「알림은 막바지에 일괄 구현」 방침. 그때 함께 붙인다.
 
+#### 화이트 리디자인 — PC (2026-10-15, 시안 「R · 게시판 신고 · PC」)
+- **위 줄**: 굵게 「처리할 신고 **N**」(N 은 빨강 `#c5282e`, 0 이면 검정) + 회색 안내 「같은 글에 들어온 신고는 한 줄로 묶어요」.
+  처리 대기 / 처리 완료 탭은 없다 — 처리한 신고 기록 목록은 만들지 않았다. 페이지 제목은 메뉴 이름 「게시판 신고」.
+- **표**(상자 · 세로선 없음, 가로선 `#f3f3f6` 만): 대상(글/댓글) · 내용(굵은 제목 + 아래 회색 사유 요약 「스팸 · 광고 2 · 부적절한 내용 1」) ·
+  작성자 · 신고(수, 굵게) · 최근 신고(도쿄 `M/D HH:mm`). 선택한 줄은 옅은 보라 바탕(`#f4f1fd`, 둥근 12) — 왼쪽 막대 없음.
+- **상세 패널**(오른쪽 420px 슬라이드, `useAdminPanelA11y` — Esc · 바깥 누르면 닫힘):
+  머리 「신고 N건 · 글/댓글」 + 메타 「작성자 · M/D HH:mm 작성 · 반응 N · 댓글 N」(반응 · 댓글 수는 글일 때만, 못 읽으면 뺀다) +
+  빨간 휴지통(→ 삭제 확인 창) + 닫기. 「원문」: 글 제목 · 본문 전체(줄바꿈 그대로) · 사진 2열(누르면 크게 보기, Esc 로 닫힘) · 태그.
+  댓글이면 제목 대신 「「글 제목」에 달린 댓글」. 구분선 아래 「신고 사유」(사유 → 수, 많은 순) · 「신고 메모」(따옴표 + 신고 시각).
+  맨 아래 넓은 회색 버튼 「문제없음으로 닫기」 + 작은 안내 「삭제는 위 휴지통. 문제없음으로 닫아도 신고한 사람에게는 계속 숨겨져요.」
+  예전 「게시판에서 보기」 링크는 시안에 없어 뺐다(원문이 패널에 다 나온다).
+- **삭제 확인 창**: 「이 글을 삭제할까요?」(댓글이면 「이 댓글을…」) + 설명 · 「그대로 두기」(회색, 첫 초점) / 「삭제」(빨강). Esc 로 닫힘.
+- **빈 상태**: 가운데 조용히 「처리할 신고가 없어요」 + 「새 신고가 들어오면 여기에 보여요.」
+- **움직임**: 줄 차례 등장 · 패널 내용 페이드 · 누름 반응(scale .97) · 사진 확대 · 처리 후 토스트 + 햅틱(성공/실패). 움직임 줄이기면 끈다.
+- **데이터**: `listPendingBoardReports()` 가 패널용 필드를 **덧붙여** 돌려준다(모바일은 기존 필드만 씀) — `postTitle` · `body`(4,000자) ·
+  `imageUrls` · `tags` · `targetCreatedAt` · `reasonCounts`(사유별 수) · `noteItems`(메모 + 시각) · `reactionCount`(반응한 사람 수) · `commentCount`(남은 댓글 수).
+  서버 액션 · 권한(`board.moderate`)은 그대로.
+- 파일: `src/components/admin/board-reports/board-reports-console.tsx` · `board-reports-white.css`(접두 `brw-`, 예전 `board-reports-console.css` 삭제).
+  문구: `dictionary.boardReportsWhite.*`(ko/ja/en), 사유 이름은 `dictionary.board.reason*` 재사용.
+
 ### 차단
 - **진입**: 남의 글 「⋯」 · 남의 댓글 「⋯」 → 「이 사용자 차단」 → 확인 모달(가운데 정렬 — 삭제 확인과 같은 의도된 예외).
 - **효과**: 차단한 사람의 게시판(피드 · 상세 · 댓글 · 안읽음 수)에서 상대의 글 · 댓글이 보이지 않는다. 상대에게 알리지 않는다.
@@ -723,6 +743,72 @@ App Store(1.2) · Google Play(UGC 정책)는 사용자 작성 콘텐츠가 있�
 - 서버 액션: `src/app/mobile/board/moderation-actions.ts` — `reportBoardContent` · `blockBoardUser` · `unblockBoardUser` · `resolveBoardReport` · `withdrawBoardReport`.
   조직 · 대상 존재 · 작성자 · 처리 권한을 모두 서버에서 검사한다.
 - 문구: `dictionary.board.*`(report* · reason* · block* · reports*), `dictionary.accountProfile.blockedUsers*` · `unblock` — ko/ja/en.
+
+## 12-D. 화이트 리디자인 — 모바일 (2026-10-15)
+
+시안: 「R · 게시판」 Board-Phone · Board-Fold · Board-Tablet · BoardPost-Phone · BoardReport-Phone · BoardNew-Phone · BoardReports-Phone.
+공통 규칙: 흰 바탕 · 카드/상자 없음 · 가로 줄만(세로선 없음) · 선택은 옅은 보라 바탕(`#f4f1fd`, 왼쪽 막대 없음) · 보라 `#7a52e6`(글자 `#5a30cf`) ·
+빨강 `#c5282e`. 스타일은 `src/components/board/board-white.css` 한 곳(접두 `bdw-`).
+
+### 피드 `/mobile/board`
+- **머리**: 「게시판」(24px) + 관리자(`board.moderate`)에게만 아래 빨간 글자 링크 「처리할 신고 N건 ›」(대기 0이면 없음) + 오른쪽 보라 글자 「+ 글쓰기」(44px 높이).
+  예전 글 수 배지 · 보라 알약 버튼 · 빨간 칩은 없앴다.
+- **태그**: 글자 탭(「전체 #엑셀 #코인 …」) — 고른 것만 굵은 먹색, 칩 · 상자 없음. 「OO 태그 · N개 결과」 줄은 뺐다(탭이 이미 말해 준다).
+- **글 줄**(카드 없음, 줄 사이 `#f1f1f4` 가는 선): 이니셜 동그라미(`#f1ecfd`/`#5a30cf`) · 이름 · 회색 「역할 · 상대 시각」 · 안 읽음이면 오른쪽 보라 점 →
+  고정이면 보라 「고정」 → 제목 16px(안 읽음 700 · 읽음 600) → 본문 두 줄 → 사진이 있으면 같은 크기 정사각 3칸(둥근 10), 4장 이상이면 셋째 칸에 어두운 「+n」 →
+  아래 줄: 반응 칩(34px · 둥근 17 · 내 반응 옅은 보라) + 「+」 칩, 오른쪽 회색 「#태그 · 파일 n · 댓글 n」(파일은 있을 때만).
+  제목 없는 글은 본문을 제목 자리에 세 줄까지.
+- **피드에서 반응**: 된다. 피드 데이터(`getBoardFeed` → `hydratePosts`)에 이미 반응 배열(수 + 내 반응)이 있어 **서버 · 쿼리 변경 없음**.
+  누르면 낙관적으로 바로 바뀌고 `toggleBoardReaction` 을 부른다 — 액션이 `/mobile/board` 를 재검증하므로 새 props 가 기준이 된다.
+  「+」 를 누르면 아직 없는 반응이 그 줄에서 펼쳐진다. 실패하면 되돌리고 오류 햅틱.
+- 줄 위쪽(작성자 ~ 사진)과 오른쪽 회색 요약은 상세 링크, 반응 칩은 링크 밖 버튼(링크 안에 버튼을 넣지 않는다).
+- **넓은 화면**: 폴드 = 셸 가운데 칸 그대로. 태블릿 가로 = `SplitList` 피드 | 상세 칸. 고른 줄은 `.split-list .bdw-row:has(> a[data-split-active])` 로
+  줄 전체를 옅은 보라 바탕 · 둥근 14로(전역 남색 테두리는 끈다).
+- 「더 보기」는 넓은 회색 버튼. 빈 상태는 가운데 조용한 두 줄.
+
+### 상세 `/mobile/board/[id]`
+- 작성자 줄(40px 이니셜 · 이름 · 「역할 · 시각」 · 오른쪽 「⋯」 — 기존 동작 시트: 수정 · 고정 · 공유 · 삭제 · 신고 · 차단) → 제목 21px → 본문 15px/1.7 →
+  사진(장수가 홀수면 첫 장을 넓게 16:9, 나머지 2열 정사각, 누르면 라이트박스) → 회색 「#태그」 → 첨부 파일 줄(회색 `#f7f7f9` 둥근 줄 · 흰 종류 표시 · 이름 · 「크기 · 누르면 내려받아요」 · 내려받기 아이콘, 서명 URL 다운로드 그대로) →
+  반응 칩 + 「+」 + 오른쪽 「누구 외 N명이 반응했어요」 → 가는 선 → 「댓글 N」 목록(회색 이니셜 · 「이름 시각」 · 본문 · 남의 댓글 「⋯」 / 내 댓글 · 관리자 빨간 「삭제」).
+- **댓글 입력**: 회색 알약 「댓글을 남겨 주세요 · @로 멘션」 + 회색 카메라 동그라미 + 보라 보내기 동그라미(46px). 셸 스크롤 안에서 `sticky` 로 화면 바닥에 붙는다
+  (예전 100dvh 자체 스크롤러를 그만둠 — `16-mobile-navigation.md` 참고). **멘션은 입력칸에 「@」 를 치면 멘션 시트가 열린다**(친 「@」 는 지운다) — 따로 있던 @ 버튼은 시안대로 뺐다.
+  고른 사람은 입력칸 위 보라 알약(누르면 다시 고름 · ✕ 로 비움).
+- 동작 시트는 상자 없는 아이콘 줄 + 회색 「취소」, 삭제 · 차단 확인은 가운데 흰 창(회색 취소 + 빨간 확인, `BoardConfirm`).
+- 태블릿 칸 안에서는 읽기 좋은 폭(680px)으로 묶는다.
+
+### 신고 시트 (`BottomSheet`)
+- 「이 글을 신고할까요?」(댓글이면 「이 댓글을…」) + 회색 「신고하면 나에게는 바로 보이지 않아요. 관리자가 확인해요.」 → 사유 다섯 줄(50px, 고르면 굵게 + 보라 링 라디오) →
+  이름표 칸 「메모 (선택)」(예시 「예) 외부 판매 링크가 있어요」) → 보라 「신고하기」(사유를 골라야 켜짐). 예전 빨간 버튼 → 보라.
+
+### 글쓰기 `/mobile/board/compose` · 수정 `/mobile/board/[id]/edit`
+- **셸 안에서 그린다**(상단 바 · 화면 스와이프 뒤로가기 · 폴드 레일, 아래 탭 숨김). 예전의 자체 헤더(✕ · 제목 · 「게시」 버튼)는 없앴다.
+- 「글쓰기」(수정은 「글 수정」) + 오른쪽 회색 「전 직원에게 보여요」 → 이름표 칸 「제목 (선택)」 · 「본문」 → 「사진 · 파일」: 76px 사진 칸 · 더하기 칸 · 「사진 n / 5」,
+  파일 줄(✕ 로 빼기), 보라 글자 버튼 「파일 첨부 · PDF · Excel · Word 최대 5개」 → 「태그」: 고른 태그(옅은 보라 · ✕) + **조직에서 쓰던 태그**(회색, 누르면 고름 — `getBoardTags`) + 「+ 새 태그」(누르면 그 자리 입력칸) →
+  「맨 위 고정」 스위치 줄(**고정 권한이 있는 사람에게만** — owner · 전무 · office_admin, `createBoardPost` 와 같은 판단. 예전 글쓰기는 모두에게 보였다) → 큰 보라 「올리기」(수정은 「수정 완료」).
+- 글자 수 「n / 1000」 표시는 뺐다(서버 제한이 아니었다).
+- 폴드 · 태블릿은 560px 가운데 폼. 수정 화면은 태블릿에서 2분할 칸 안에 열린다(기존 `SPLIT_DETAIL_PATTERNS.board`).
+
+### 신고 처리 `/mobile/board/reports` (관리자)
+- 「신고 처리」 + 회색 「같은 글에 들어온 신고는 한 줄로 묶어요」 → 묶음마다(카드 없음, 가는 선): 「신고 N건(빨강) · 글/댓글 · 작성자」 + 오른쪽 도쿄 시각 →
+  제목(글이면 글 제목, 없으면 본문 · 댓글이면 댓글 내용) → 「스팸 · 광고 2 · 부적절한 내용 1」(사유별 수, PC 와 같은 `reasonCounts`) → 메모 인용 →
+  회색 「글 보기」 · 옅은 보라 「문제없음」 · 빨간 바탕 휴지통(→ 가운데 확인 창 → 삭제). 폰 1 · 폴드 2 · 태블릿 3열(`wide`) 그대로.
+
+### 움직임 (prefers-reduced-motion 이면 모두 끔)
+- 피드 줄 · 신고 묶음 차례 등장(위로 6px + 페이드) · 상세 · 폼 페이드.
+- 반응 칩 누름(scale .92) + 바뀐 숫자가 아래에서 올라옴(레이아웃 애니메이션 없음) · 「+」 가 45° 돌며 남은 반응이 톡 나타남.
+- 열어 본 글의 안 읽음 점이 그 자리에서 줄어 사라짐(태블릿 칸에 열린 줄도).
+- 신고 사유 고르면 라디오 링이 차오름 · 고정 스위치 미끄러짐 · 사진 · 파일 줄 누름 · 버튼 누름 scale(.97) · 확인 창 · 토스트 살짝 커지며 등장.
+- 햅틱: 반응 · 태그 · 사유 고름 가벼움, 댓글 · 신고 · 글 올리기 · 수정 · 신고 처리 성공/실패.
+- 누르는 것 모두 `touch-action: manipulation` · 탭 하이라이트 없음.
+
+### 파일 · 문구
+- 새로: `board-white.css` · `board-time.ts`(상대 시각 · 「역할 · 시각」) · `board-confirm.tsx` · `board-post-form.tsx`(글쓰기 · 수정 공용 조각).
+  다시 씀: `board-list-row` · `board-reaction-bar` · `board-tag-filter` · `board-empty-state` · `board-image-grid` · `board-file-card` · `board-comment` · `board-composer` ·
+  `board-report-sheet` · `board-action-sheet` · `board-block-confirm` · `board-pin-toggle` · `board-avatar`(그라데이션 → 옅은 보라 하나).
+- 서버 · 쿼리 · 권한 변경 없음. 글쓰기 · 수정 페이지가 `getBoardTags` · `getMobileNavBadges` 를 더 부르고, 글쓰기 페이지가 고정 권한을 계산해 넘긴다.
+- 새 문구(`dictionary.board`, ko/ja/en): `reportsPending` · `reactionAdd` · `feedFiles` · `commentsN` · `commentHint` · `fileTapToDownload` · `reportAskPost` ·
+  `reportAskComment` · `reportSub` · `reportNoteLabel` · `reportNoteExample` · `composeAudience` · `bodyLabel` · `attachSection` · `photoCount` · `fileAddLong` ·
+  `fileRemove` · `tagNew` · `pinRowTitle` · `pinRowSub` · `postSubmit` · `reportsMobileTitle`. 신고 처리 안내 · 사유 수는 PC 와 같은 `boardReportsWhite.hint` · `reasonN` 재사용.
 
 ## 13. 미결 사항
 

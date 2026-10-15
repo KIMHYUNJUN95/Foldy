@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getOnboardingState } from "@/lib/onboarding";
-import { getBoardPost } from "@/lib/board-queries";
+import { getBoardPost, getBoardTags } from "@/lib/board-queries";
+import { getMobileNavBadges } from "@/lib/nav-badges";
+import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
 import { isOrgTopAdmin } from "@/config/roles";
 import { BoardEditClient } from "./board-edit-client";
@@ -22,7 +24,10 @@ type PageProps = {
  */
 export default async function BoardEditPage({ params }: PageProps) {
   const { id } = await params;
-  const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
+  const [state, session] = await Promise.all([
+    getOnboardingState(),
+    getCurrentAppSession(),
+  ]);
 
   if (state.status === "unauthenticated") {
     redirect(`/auth/login?next=/mobile/board/${id}/edit`);
@@ -42,22 +47,32 @@ export default async function BoardEditPage({ params }: PageProps) {
 
   const dictionary = getDictionary(session.user.preferredLanguage);
   // 작성 경로(`createBoardPost`)와 같은 고정 권한. 두 경로가 갈리면 수정으로 우회할 수 있다.
-  const canPin = isOrgTopAdmin(session.user.role) || session.user.role === "office_admin";
+  const canPin =
+    isOrgTopAdmin(session.user.role) || session.user.role === "office_admin";
 
+  const [tags, navBadges] = await Promise.all([
+    getBoardTags(session),
+    getMobileNavBadges(),
+  ]);
+
+  // 화이트 리디자인(2026-10-15): 글쓰기와 같은 셸 안 한 장 폼. 아래 탭은 숨긴다.
   return (
-    <BoardEditClient
-      canPin={canPin}
-      copy={dictionary.board}
-      initial={{
-        title: post.title,
-        content: post.content,
-        tags: post.tags,
-        imageUrls: post.imageUrls,
-        fileAttachments: post.fileAttachments,
-        isPinned: post.isPinned,
-      }}
-      orgId={session.organization.id}
-      postId={post.id}
-    />
+    <MobileShell activeItem="board" badges={navBadges} hideBottomNav title="">
+      <BoardEditClient
+        canPin={canPin}
+        tagSuggestions={tags}
+        copy={dictionary.board}
+        initial={{
+          title: post.title,
+          content: post.content,
+          tags: post.tags,
+          imageUrls: post.imageUrls,
+          fileAttachments: post.fileAttachments,
+          isPinned: post.isPinned,
+        }}
+        orgId={session.organization.id}
+        postId={post.id}
+      />
+    </MobileShell>
   );
 }

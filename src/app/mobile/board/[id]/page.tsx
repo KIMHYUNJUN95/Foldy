@@ -53,7 +53,6 @@ export default async function BoardPostPage({ params }: PageProps) {
       <BoardDetailClient
         post={post}
         viewerId={session.user.id}
-        viewerInitial={session.user.name?.charAt(0) || "·"}
         canManage={MANAGER_ROLES.has(session.user.role)}
         organizationId={session.organization.id}
         locale={session.user.preferredLanguage}

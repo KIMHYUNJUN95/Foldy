@@ -1,7 +1,7 @@
 "use client";
-import { Pin } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
 
+/** 「맨 위 고정」 스위치 줄 — 화이트 리디자인(2026-10-15). 고정 권한이 있는 사람에게만 그린다(부모가 판단). */
 export function BoardPinToggle({
   checked,
   onChange,
@@ -14,35 +14,24 @@ export function BoardPinToggle({
   subtitle: string;
 }) {
   return (
-    <div className="mt-[18px] flex items-center gap-3 rounded-[14px] border border-border bg-surface px-[14px] py-[13px]">
-      <div className="flex flex-1 min-w-0 items-center gap-[11px]">
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[hsl(40_78%_92%)] text-[hsl(38_72%_42%)]">
-          <Pin className="size-[18px]" aria-hidden="true" />
-        </span>
-        <div>
-          <div className="text-[13.5px] font-extrabold tracking-[-0.01em]">{title}</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{subtitle}</div>
-        </div>
-      </div>
+    <label className="bdw-sw-row">
+      <span className="bdw-sw-row__b">
+        <b>{title}</b>
+        <span>{subtitle}</span>
+      </span>
       <button
-        type="button"
-        role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative h-[27px] w-[46px] shrink-0 rounded-full transition-colors duration-150",
-          checked ? "bg-primary" : "bg-[#f4f4f7]",
-        )}
+        aria-label={title}
+        className="bdw-sw"
+        onClick={() => {
+          haptic("light");
+          onChange(!checked);
+        }}
+        role="switch"
+        type="button"
       >
-        <span
-          className={cn(
-            // `left` 이 아니라 `transform` 으로 움직인다 — `left` 는 레이아웃 속성이라 매 프레임
-            // 리플로우가 걸리고, `transform` 은 컴포지터만으로 끝나 저사양 기기에서 차이가 크다.
-            "absolute left-[3px] top-[3px] size-[21px] rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform duration-150",
-            checked ? "translate-x-[19px]" : "translate-x-0",
-          )}
-        />
+        <i aria-hidden="true" />
       </button>
-    </div>
+    </label>
   );
 }

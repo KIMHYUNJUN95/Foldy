@@ -1,8 +1,9 @@
 "use client";
+import "./board-white.css";
 
 import { useState } from "react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
-import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import { boardReasonLabel, type BoardReportReasonCode } from "@/lib/board-report-reasons";
 
@@ -10,23 +11,25 @@ export type { BoardReportReasonCode };
 
 export type BoardReportSheetCopy = Pick<
   Dictionary["board"],
-  | "reportTitle"
-  | "reportBodyPost"
-  | "reportBodyComment"
+  | "reportAskPost"
+  | "reportAskComment"
+  | "reportSub"
   | "reasonSpam"
   | "reasonHarassment"
   | "reasonInappropriate"
   | "reasonPrivacy"
   | "reasonOther"
-  | "reportNotePlaceholder"
+  | "reportNoteLabel"
+  | "reportNoteExample"
   | "reportSubmit"
 >;
 
 const REASONS: BoardReportReasonCode[] = ["spam", "harassment", "inappropriate", "privacy", "other"];
 
 /**
- * 게시판 글 · 댓글 신고 시트 (2026-10-06). 사유 하나(필수) + 메모(선택). 제출은 부모가 서버 액션으로 한다 —
- * 앱 스토어 UGC 요건(신고 수단). 문서: docs/product/23-board-workflow.md → 「신고 · 차단」.
+ * 게시판 글 · 댓글 신고 시트 (2026-10-06, 화이트 리디자인 2026-10-15 — 시안 BoardReport-Phone).
+ * 「이 글을 신고할까요?」 · 사유 하나(필수, 고르면 보라 링이 차오른다) · 이름표 메모(선택) · 보라 「신고하기」(사유를 골라야 켜진다).
+ * 제출은 부모가 서버 액션으로 한다 — 앱 스토어 UGC 요건(신고 수단). 문서: docs/product/23-board-workflow.md → 「신고 · 차단」.
  */
 export function BoardReportSheet({
   targetType,
@@ -43,45 +46,45 @@ export function BoardReportSheet({
 }) {
   const [reason, setReason] = useState<BoardReportReasonCode | null>(null);
   const [note, setNote] = useState("");
+  const title = targetType === "post" ? copy.reportAskPost : copy.reportAskComment;
 
   return (
-    <BottomSheet onClose={onClose} ariaLabel={copy.reportTitle}>
-      <div className="pt-1">
-        <p className="text-[16px] font-black tracking-[-0.01em] text-foreground">{copy.reportTitle}</p>
-        <p className="mt-1 text-[12.5px] font-semibold leading-[1.5] text-muted-foreground">
-          {targetType === "post" ? copy.reportBodyPost : copy.reportBodyComment}
-        </p>
-        <div className="mt-3 flex flex-col" role="radiogroup" aria-label={copy.reportTitle}>
+    <BottomSheet ariaLabel={title} onClose={onClose}>
+      <div className="bdw-sheet">
+        <div>
+          <h2>{title}</h2>
+          <p className="bdw-sheet__sub">{copy.reportSub}</p>
+        </div>
+        <div aria-label={title} className="bdw-rs" role="radiogroup">
           {REASONS.map((code) => (
             <button
               aria-checked={reason === code}
-              className="flex h-[48px] items-center gap-3 border-b border-border/60 px-1 text-left last:border-0"
               key={code}
-              onClick={() => setReason(code)}
+              onClick={() => {
+                if (reason !== code) haptic("light");
+                setReason(code);
+              }}
               role="radio"
               type="button"
             >
-              <span
-                className={cn(
-                  "inline-flex size-[20px] shrink-0 items-center justify-center rounded-full border-2",
-                  reason === code ? "border-primary" : "border-border",
-                )}
-              >
-                {reason === code && <span className="size-[10px] rounded-full bg-primary" />}
-              </span>
-              <span className="text-[14px] font-bold text-foreground">{boardReasonLabel(copy, code)}</span>
+              <span>{boardReasonLabel(copy, code)}</span>
+              <i aria-hidden="true" className="bdw-rd" />
             </button>
           ))}
         </div>
-        <textarea
-          className="mt-3 min-h-[76px] w-full resize-none rounded-[12px] border border-border bg-background px-3 py-2.5 text-[13.5px] font-medium outline-none focus:border-primary"
-          maxLength={500}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder={copy.reportNotePlaceholder}
-          value={note}
-        />
+        <label className="bdw-nf">
+          <span className="bdw-nf__l">{copy.reportNoteLabel}</span>
+          <textarea
+            className="bdw-nf__in is-ta"
+            maxLength={500}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={copy.reportNoteExample}
+            rows={2}
+            value={note}
+          />
+        </label>
         <button
-          className="mt-3 h-[52px] w-full rounded-[14px] bg-[hsl(4_72%_52%)] text-[14.5px] font-extrabold text-white disabled:opacity-50"
+          className="bdw-btn is-pri"
           disabled={!reason || pending}
           onClick={() => reason && onSubmit(reason, note)}
           type="button"

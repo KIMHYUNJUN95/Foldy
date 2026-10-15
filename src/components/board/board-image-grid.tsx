@@ -5,10 +5,8 @@ import { useState } from "react";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 
 /**
- * Board post photos as a compact thumbnail strip. Thumbnails are small fixed-size squares (wrapping
- * rows) so they don't dominate the post; tapping any one opens the shared full-screen `ImageLightbox`
- * (swipeable, original-resolution, portaled) — never `target="_blank"`, per the project image
- * contract (decision-log 2026-06-22).
+ * 글 사진 — 화이트 리디자인(2026-10-15, 시안 BoardPost-Phone). 장수가 홀수면 첫 장을 넓게(16:9), 나머지는 2열 정사각.
+ * 누르면 공용 전체 화면 `ImageLightbox`(넘겨 보기 · 원본) — `target="_blank"` 는 쓰지 않는다(결정 로그 2026-06-22).
  */
 export function BoardImageGrid({
   urls,
@@ -21,34 +19,26 @@ export function BoardImageGrid({
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   if (urls.length === 0) return null;
+  const heroFirst = urls.length % 2 === 1;
 
   return (
-    <div className="mt-[12px] flex flex-wrap gap-[6px]">
-      {urls.map((url, index) => (
-        <button
-          key={url}
-          type="button"
-          onClick={() => setOpenIndex(index)}
-          aria-label={`${viewPhotoLabel} ${index + 1}`}
-          className="group relative size-[76px] overflow-hidden rounded-[10px] border border-border bg-[hsl(40_22%_92%)]"
-        >
-          <Image
-            src={url}
-            alt=""
-            fill
-            sizes="76px"
-            className="object-cover transition-transform duration-300 group-active:scale-[1.05]"
-          />
-          <span className="pointer-events-none absolute inset-0 bg-foreground/0 transition-colors group-active:bg-foreground/10" />
-        </button>
-      ))}
+    <div className="bdw-gal">
+      {urls.map((url, index) => {
+        const hero = heroFirst && index === 0;
+        return (
+          <button
+            aria-label={`${viewPhotoLabel} ${index + 1}`}
+            className={`bdw-gal__ph${hero ? " is-hero" : ""}`}
+            key={url}
+            onClick={() => setOpenIndex(index)}
+            type="button"
+          >
+            <Image alt="" fill sizes={hero ? "(min-width: 1000px) 680px, 100vw" : "(min-width: 1000px) 340px, 50vw"} src={url} />
+          </button>
+        );
+      })}
 
-      <ImageLightbox
-        urls={urls}
-        openIndex={openIndex}
-        onClose={() => setOpenIndex(null)}
-        closeLabel={closeLabel}
-      />
+      <ImageLightbox closeLabel={closeLabel} onClose={() => setOpenIndex(null)} openIndex={openIndex} urls={urls} />
     </div>
   );
 }

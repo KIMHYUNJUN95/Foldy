@@ -1,32 +1,33 @@
 "use client";
-import { cn } from "@/lib/utils";
 
+/** 태그 거르기 — 글자 탭(상자 · 칩 없음). 고른 태그만 굵은 먹색. 「전체」 말고는 앞에 #. */
 export function BoardTagFilter({
   tags,
   selected,
+  allTag,
+  ariaLabel,
   onSelect,
 }: {
   tags: string[];
   selected: string;
+  allTag: string;
+  ariaLabel: string;
   onSelect: (tag: string) => void;
 }) {
   return (
-    <div className="flex gap-[7px] overflow-x-auto px-[18px] py-[1px] pb-[2px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div aria-label={ariaLabel} className="bdw-tabs" role="tablist">
       {tags.map((tag) => {
         const isActive = tag === selected;
         return (
           <button
+            aria-selected={isActive}
+            className={`bdw-tab${isActive ? " is-on" : ""}`}
             key={tag}
-            type="button"
             onClick={() => onSelect(tag)}
-            className={cn(
-              "inline-flex h-8 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border px-[14px] text-[12.5px] font-bold transition-colors",
-              isActive
-                ? "border-primary/[0.26] bg-primary/[0.09] font-extrabold text-primary"
-                : "border-border bg-surface text-[#3a3746]",
-            )}
+            role="tab"
+            type="button"
           >
-            {tag}
+            {tag === allTag ? tag : `#${tag}`}
           </button>
         );
       })}

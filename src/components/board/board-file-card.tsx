@@ -1,118 +1,89 @@
 "use client";
-import { X, Paperclip, Download, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Download, Loader2, X } from "lucide-react";
 
 type FileType = "xls" | "pdf" | "doc" | "generic";
 
 function detectFileType(mimeType: string, name: string): FileType {
-  if (mimeType.includes("spreadsheet") || name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".csv")) return "xls";
-  if (mimeType.includes("pdf") || name.endsWith(".pdf")) return "pdf";
-  if (mimeType.includes("word") || name.endsWith(".docx") || name.endsWith(".doc")) return "doc";
+  const lower = name.toLowerCase();
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || /\.(xlsx|xls|csv)$/.test(lower)) return "xls";
+  if (mimeType.includes("pdf") || lower.endsWith(".pdf")) return "pdf";
+  if (mimeType.includes("word") || /\.(docx|doc)$/.test(lower)) return "doc";
   return "generic";
 }
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-const typeStyles: Record<FileType, { bg: string; text: string; label: string }> = {
-  xls:     { bg: "bg-[hsl(146_44%_92%)]", text: "text-[hsl(150_56%_28%)]", label: "XLS" },
-  pdf:     { bg: "bg-[#fdecec]",   text: "text-[#c5282e]",   label: "PDF" },
-  doc:     { bg: "bg-[hsl(206_66%_93%)]", text: "text-[hsl(206_70%_38%)]", label: "DOC" },
-  generic: { bg: "bg-[hsl(220_12%_92%)]", text: "text-[hsl(220_12%_52%)]", label: "FILE" },
-};
+const typeLabel: Record<FileType, string> = { xls: "XLS", pdf: "PDF", doc: "DOC", generic: "FILE" };
 
+/**
+ * 첨부 파일 한 줄 — 화이트 리디자인(2026-10-15): 회색 둥근 줄 · 흰 종류 표시 · 이름 · 크기.
+ * - 상세(`onDownload`): 줄 전체가 버튼, 서명 URL 로 내려받는다(부모가 처리). 오른쪽은 내려받기 아이콘.
+ * - 글쓰기 · 수정(`onRemove`): 오른쪽 ✕ 로 뺀다.
+ */
 export function BoardFileCard({
   name,
   sizeBytes,
   mimeType,
   onRemove,
+  removeLabel,
   onDownload,
   downloading = false,
   downloadLabel,
+  hint,
 }: {
   name: string;
   sizeBytes: number;
   mimeType: string;
   onRemove?: () => void;
-  // When provided (and no onRemove), the whole card becomes a download button.
+  removeLabel?: string;
   onDownload?: () => void;
   downloading?: boolean;
   downloadLabel?: string;
+  /** 크기 옆 회색 안내(「누르면 내려받아요」). */
+  hint?: string;
 }) {
   const type = detectFileType(mimeType, name);
-  const style = typeStyles[type];
-
   const inner = (
     <>
-      <span className={cn("inline-flex size-[38px] shrink-0 items-center justify-center rounded-[10px] font-mono text-[10px] font-extrabold tracking-[0.02em]", style.bg, style.text)}>
-        {style.label}
+      <span className={`bdw-file__ty is-${type}`}>{typeLabel[type]}</span>
+      <span className="bdw-file__b">
+        <span className="bdw-file__n">{name}</span>
+        <span className="bdw-file__s">{hint ? `${formatSize(sizeBytes)} · ${hint}` : formatSize(sizeBytes)}</span>
       </span>
-      <div className="min-w-0 flex-1 text-left">
-        <div className="truncate text-[13px] font-bold text-foreground">{name}</div>
-        <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{formatSize(sizeBytes)}</div>
-      </div>
     </>
   );
 
-  // Download variant: the entire row is a button (mobile + PC friendly tap target).
   if (onDownload && !onRemove) {
     return (
       <button
-        type="button"
-        onClick={onDownload}
+        aria-label={`${downloadLabel ?? ""} · ${name}`}
+        className="bdw-file"
         disabled={downloading}
-        aria-label={`${downloadLabel ?? "Download"} · ${name}`}
-        className="flex w-full items-center gap-[11px] rounded-[12px] border border-border bg-surface px-3 py-[10px] text-left transition-colors active:bg-[hsl(40_22%_94%)] disabled:opacity-60"
+        onClick={onDownload}
+        type="button"
       >
         {inner}
-        <span className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-primary/[0.10] text-primary">
-          {downloading ? (
-            <Loader2 className="size-[14px] animate-spin" aria-hidden="true" />
-          ) : (
-            <Download className="size-[14px]" aria-hidden="true" />
-          )}
-        </span>
+        {downloading ? (
+          <Loader2 aria-hidden="true" className="bdw-file__i bdw-spin" />
+        ) : (
+          <Download aria-hidden="true" className="bdw-file__i" strokeWidth={1.8} />
+        )}
       </button>
     );
   }
 
   return (
-    <div className="flex w-full items-center gap-[11px] rounded-[12px] border border-border bg-surface px-3 py-[10px]">
+    <div className="bdw-file is-static">
       {inner}
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-[#f4f4f7] text-muted-foreground"
-        >
-          <X className="size-[13px]" aria-hidden="true" />
+      {onRemove ? (
+        <button aria-label={removeLabel ? `${removeLabel} · ${name}` : name} className="bdw-file__x" onClick={onRemove} type="button">
+          <X aria-hidden="true" strokeWidth={1.8} />
         </button>
-      )}
+      ) : null}
     </div>
-  );
-}
-
-export function BoardFileAddButton({
-  onClick,
-  disabled,
-  label,
-}: {
-  onClick?: () => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex h-10 items-center gap-[7px] rounded-[12px] border-[1.5px] border-dashed border-border px-[14px] text-[13px] font-bold text-[#3a3746] disabled:opacity-50"
-    >
-      <Paperclip className="size-[17px]" aria-hidden="true" />
-      {label}
-    </button>
   );
 }

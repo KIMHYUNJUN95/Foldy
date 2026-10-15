@@ -2,36 +2,33 @@
 import { cn } from "@/lib/utils";
 import type { AvatarColor } from "./board-types";
 
-const gradientMap: Record<AvatarColor, string> = {
-  default: "from-[#8a63f0] to-[#5a30cf]",
-  red: "from-[hsl(348_62%_56%)] to-[hsl(346_64%_40%)]",
-  blue: "from-[hsl(200_58%_48%)] to-[hsl(206_64%_34%)]",
-  green: "from-[hsl(158_42%_42%)] to-[hsl(160_48%_28%)]",
-};
-
+/**
+ * 게시판 이니셜 동그라미 — 화이트 리디자인(2026-10-15): 그라데이션 대신 옅은 보라 바탕 + 보라 글자 하나로 통일.
+ * `color` 는 예전 호출부와 맞추려고 받기만 한다.
+ */
 const sizeMap = {
   28: "size-7 text-[11.5px]",
-  32: "size-8 text-[12.5px]",
-  36: "size-9 text-[13.5px]",
-  40: "size-10 text-[14.5px]",
+  30: "size-[30px] text-[12px]",
+  32: "size-8 text-[13px]",
+  36: "size-9 text-[14px]",
+  40: "size-10 text-[15px]",
 } as const;
 
 export function BoardAvatar({
   initial,
-  color = "default",
   size = 40,
   className,
 }: {
   initial: string;
   color?: AvatarColor;
-  size?: 28 | 32 | 36 | 40;
+  size?: keyof typeof sizeMap;
   className?: string;
 }) {
   return (
     <span
+      aria-hidden="true"
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-extrabold text-white bg-gradient-to-br tracking-tight",
-        gradientMap[color],
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-[#f1ecfd] font-bold text-[#5a30cf]",
         sizeMap[size],
         className,
       )}

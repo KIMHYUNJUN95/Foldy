@@ -2,7 +2,6 @@
 import { useEffect, useOptimistic, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
-import { BoardAvatar } from "@/components/board/board-avatar";
 import { BoardReactionBar } from "@/components/board/board-reaction-bar";
 import { BoardComment } from "@/components/board/board-comment";
 import { BoardComposer } from "@/components/board/board-composer";
@@ -12,6 +11,10 @@ import { BoardImageGrid } from "@/components/board/board-image-grid";
 import { BoardMentionSheet } from "@/components/board/board-mention-sheet";
 import { BoardReportSheet, type BoardReportReasonCode } from "@/components/board/board-report-sheet";
 import { BoardBlockConfirm } from "@/components/board/board-block-confirm";
+import { BoardConfirm } from "@/components/board/board-confirm";
+import { boardMetaLine, boardRelativeTime } from "@/components/board/board-time";
+import { haptic } from "@/lib/haptics";
+import "@/components/board/board-white.css";
 import { blockBoardUser, reportBoardContent } from "../moderation-actions";
 import type { ComposerSubmitPayload } from "@/components/board/board-composer";
 import type { MentionableMember } from "@/app/mobile/board/[id]/actions";
@@ -30,30 +33,9 @@ import {
   getBoardAttachmentDownloadUrl,
 } from "./actions";
 
-function relativeTime(iso: string, locale: Locale): string {
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-  const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["second", 60],
-    ["minute", 60],
-    ["hour", 24],
-    ["day", 7],
-    ["week", 4.34524],
-    ["month", 12],
-    ["year", Infinity],
-  ];
-  let value = diffSec;
-  for (const [unit, span] of units) {
-    if (Math.abs(value) < span) return rtf.format(-Math.round(value), unit);
-    value = value / span;
-  }
-  return rtf.format(-Math.round(value), "year");
-}
-
 export function BoardDetailClient({
   post,
   viewerId,
-  viewerInitial,
   canManage,
   organizationId,
   locale,
@@ -61,7 +43,6 @@ export function BoardDetailClient({
 }: {
   post: BoardPostDetail;
   viewerId: string;
-  viewerInitial: string;
   canManage: boolean;
   organizationId: string;
   locale: Locale;
@@ -125,7 +106,8 @@ export function BoardDetailClient({
   function onToggleReaction(emoji: string) {
     startTransition(async () => {
       applyOptimisticToggle(emoji);
-      await toggleBoardReaction(post.id, emoji);
+      const result = await toggleBoardReaction(post.id, emoji);
+      if ("error" in result) haptic("error");
     });
   }
 
@@ -187,10 +169,11 @@ export function BoardDetailClient({
       });
 
       if ("error" in result) {
-        // TODO: composer 에러 표시 경로 — 현재는 console에 기록하고 refresh는 생략
-        console.error("[BoardDetailClient] addBoardComment error:", result.error);
+        haptic("error");
+        flashToast(copy.errSaveFailed);
         return;
       }
+      haptic("success");
 
       // 멘션 상태 초기화
       setMentionedUsers([]);
@@ -224,9 +207,11 @@ export function BoardDetailClient({
       });
       setReportTarget(null);
       if ("error" in result) {
+        haptic("error");
         flashToast(result.error === "already_reported" ? copy.reportAlready : copy.errSaveFailed);
         return;
       }
+      haptic("success");
       flashToast(copy.reportDone);
       // 신고한 글은 나에게 더 이상 보이지 않는다 — 목록으로. 댓글은 재검증된 props 에서 빠진다.
       if (reportTarget.type === "post") router.replace("/mobile/board");
@@ -292,204 +277,118 @@ export function BoardDetailClient({
             .replace("{name}", post.firstReactorName)
             .replace("{count}", String(reactionTotal - 1));
 
-  // This page is its own scroll container (not the body), so a sheet's body-lock can't freeze it.
-  // Freeze the inner scroller directly while any overlay is open so the background can't scroll behind
-  // a sheet (most visible with the mention sheet's scrollable list + keyboard).
-  const overlayOpen =
-    showMentionSheet ||
-    showActionSheet ||
-    showDeleteConfirm ||
-    commentMenu !== null ||
-    reportTarget !== null ||
-    blockTarget !== null;
+  const reactionTrailing = reactionSummary ? <span className="bdw-d__rxsum">{reactionSummary}</span> : null;
 
-  // outer wrapper: MobileShell body has its own padding (`px-5 pt-[84px] pb-8`) and is the
-  // scroll container, so we cancel that padding with negative margins and stretch to its full
-  // height with absolute insets. h-dvh would punch through the top chrome — using `inset-0`
-  // inside the parent's `relative` keeps the detail flush with the MobileShell body.
+  // 셸 스크롤 안에서 그린다 — 댓글 입력은 `.bdw-cmp`(sticky)로 화면 바닥에 붙고, `.bdw-dwrap` 이 셸의 아래 여백을 지운다.
+  // (예전에는 이 화면이 100dvh 짜리 자기 스크롤러를 가지려고 셸 여백을 음수로 지웠는데, 폴드 · 태블릿의 다른 여백과 맞지 않았다.)
   return (
-    <div className="-mx-5 -mb-8 -mt-[84px] flex h-[100dvh] flex-col bg-background">
-      {/* MobileShell chrome 84px 영역 확보.
-          위 `-mt-[84px]` 은 셸의 `pt-[84px]` 을 취소하는데, **그 여백은 장식이 아니라 떠 있는
-          (absolute, h-16) 상단 바를 피하는 자리**다. 취소만 하고 다시 확보하지 않으면 첫 84px 이
-          상단 바 뒤로 들어간다 — 작성자 행(아바타 40 + 여백 12 ≈ 52px)이 통째로 가려져 「⋯」
-          메뉴에 닿을 수 없었다(2026-08-07). 버그 신고 화면 두 곳은 처음부터 이 스페이서를 갖고
-          있었고, 여기만 빠져 있었다. */}
-      <div className="h-[84px] shrink-0" aria-hidden="true" />
+    <div className="bdw bdw-dwrap">
+      <article className="bdw-d">
+        <div className="bdw-who">
+          <span aria-hidden="true" className="bdw-av is-lg">
+            {post.authorName.charAt(0) || "·"}
+          </span>
+          <span className="bdw-who__b">
+            <span className="bdw-who__n">{post.authorName}</span>
+            <span className="bdw-who__m">
+              {boardMetaLine(post.authorRole, hydrated ? boardRelativeTime(post.createdAt, locale) : "")}
+            </span>
+          </span>
+          <button aria-label={copy.postMore} className="bdw-icon" onClick={() => setShowActionSheet(true)} type="button">
+            <MoreHorizontal aria-hidden="true" />
+          </button>
+        </div>
 
-      <div
-        className={overlayOpen ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto"}
-        style={overlayOpen ? { touchAction: "none", overscrollBehavior: "none" } : undefined}
-      >
-        <div className="px-[18px] py-[6px] pb-[18px] flex flex-col">
-          {/* 작성자 헤더 */}
-          <div className="flex items-center gap-[11px] py-[6px]">
-            <BoardAvatar
-              initial={post.authorName.charAt(0) || "·"}
-              color={post.avatarColor}
-              size={40}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-[6px]">
-                <span className="text-[15px] font-extrabold tracking-[-0.01em]">
-                  {post.authorName}
-                </span>
-                {post.authorRole && (
-                  <span className="rounded-full bg-primary/[0.09] px-[7px] py-[1.5px] text-[11px] font-bold text-primary">
-                    {post.authorRole}
-                  </span>
-                )}
-              </div>
-              <div className="mt-0.5 text-[11.5px] font-semibold text-muted-foreground">
-                {hydrated ? relativeTime(post.createdAt, locale) : ""}
-              </div>
+        <div className="bdw-d__main">
+          {post.title ? <h1>{post.title}</h1> : null}
+          <p className="bdw-d__body">{post.content}</p>
+
+          {/* 사진 — 누르면 전체 화면 라이트박스 */}
+          {post.imageUrls.length > 0 ? (
+            <BoardImageGrid closeLabel={copy.close} urls={post.imageUrls} viewPhotoLabel={copy.viewPhoto} />
+          ) : null}
+
+          {post.tags.length > 0 ? (
+            <div className="bdw-d__tags">
+              {post.tags.map((t) => (
+                <span key={t}>#{t}</span>
+              ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setShowActionSheet(true)}
-              aria-label={copy.postMore}
-              className="inline-flex size-[30px] items-center justify-center rounded-[9px] text-[#9a97a6]"
-            >
-              <MoreHorizontal className="size-[18px]" aria-hidden="true" />
-            </button>
-          </div>
+          ) : null}
 
-          {/* 제목 */}
-          {post.title && (
-            <h1 className="mt-4 text-[18px] font-black tracking-[-0.02em]">{post.title}</h1>
-          )}
-
-          {/* 본문 */}
-          <p className="mt-[11px] whitespace-pre-line text-[14px] font-medium leading-[1.72] text-[#3a3746]">
-            {post.content}
-          </p>
-
-          {/* 이미지 그리드 — 탭하면 풀스크린 라이트박스 */}
-          {post.imageUrls.length > 0 && (
-            <BoardImageGrid
-              urls={post.imageUrls}
-              viewPhotoLabel={copy.viewPhoto}
-              closeLabel={copy.close}
-            />
-          )}
-
-          {/* 첨부 파일 — 탭하면 서명 URL로 다운로드 (모바일·PC) */}
-          {post.fileAttachments.length > 0 && (
-            <div className="mt-[14px] flex flex-col gap-2">
+          {/* 첨부 파일 — 누르면 서명 URL 로 내려받기(모바일 · PC) */}
+          {post.fileAttachments.length > 0 ? (
+            <div className="bdw-d__files">
               {post.fileAttachments.map((f) => (
                 <BoardFileCard
-                  key={f.url}
-                  name={f.name}
-                  sizeBytes={f.sizeBytes}
-                  mimeType={f.mimeType}
                   downloadLabel={copy.downloadFile}
                   downloading={downloadingPath === f.url}
+                  hint={copy.fileTapToDownload}
+                  key={f.url}
+                  mimeType={f.mimeType}
+                  name={f.name}
                   onDownload={() => onDownloadFile(f.url)}
+                  sizeBytes={f.sizeBytes}
                 />
               ))}
             </div>
-          )}
-
-          {/* 태그 */}
-          {post.tags.length > 0 && (
-            <div className="mt-[14px] flex flex-wrap gap-[7px]">
-              {post.tags.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-full bg-primary/[0.09] px-3 py-[5px] text-[12.5px] font-bold text-primary"
-                >
-                  #{t}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* 반응 바 */}
-          <BoardReactionBar reactions={reactions} onToggle={onToggleReaction} />
-
-          {/* 반응자 얼굴 */}
-          {reactionSummary && (
-            <div className="mt-[13px] flex items-center">
-              <div className="flex">
-                {post.reactionFaces.map((face, i) => (
-                  <BoardAvatar
-                    key={i}
-                    initial={face.initial}
-                    color={face.color}
-                    size={28}
-                    className={i > 0 ? "-ml-2 ring-2 ring-surface" : undefined}
-                  />
-                ))}
-              </div>
-              <span className="ml-[9px] text-[11.5px] font-bold text-muted-foreground">
-                {reactionSummary}
-              </span>
-            </div>
-          )}
-
-          {/* 구분선 */}
-          <div className="my-[18px] h-px bg-border" />
-
-          {/* 댓글 헤더 */}
-          <div className="mb-1 flex items-center gap-[5px] text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">
-            {copy.commentLabel}{" "}
-            <span className="text-primary">
-              {copy.commentCountSuffix.replace("{count}", String(commentCount))}
-            </span>
-          </div>
-
-          {/* 댓글 목록 */}
-          {commentCount === 0 ? (
-            <div className="py-[18px] text-center text-[12.5px] font-semibold text-muted-foreground">
-              {copy.commentEmpty}
-            </div>
-          ) : (
-            <div>
-              {post.comments.map((c, i) => (
-                <BoardComment
-                  key={c.id}
-                  comment={{
-                    id: c.id,
-                    authorName: c.authorName,
-                    authorInitial: c.authorName.charAt(0) || "·",
-                    avatarColor: c.avatarColor,
-                    role: c.authorRole || undefined,
-                    timeLabel: hydrated ? relativeTime(c.createdAt, locale) : "",
-                    content: c.content,
-                    imageUrls: c.imageUrls,
-                    isOwn: c.isOwn,
-                    canDelete: c.isOwn || canManage,
-                    // 멘션 메타 — BoardCommentDetail 타입 확장 전까지는 빈 배열로 fallback
-                    mentionedUsers: (c as { mentionedUsers?: { id: string; name: string }[] }).mentionedUsers ?? [],
-                    mentionAll: (c as { mentionAll?: boolean }).mentionAll ?? false,
-                  }}
-                  isLast={i === post.comments.length - 1}
-                  onDelete={onDeleteComment}
-                  onMore={onOpenCommentMenu}
-                  copy={copy}
-                  allLabel={copy.mentionAll}
-                />
-              ))}
-            </div>
-          )}
+          ) : null}
         </div>
-      </div>
 
-      {/* 댓글 입력바 */}
+        <BoardReactionBar
+          addLabel={copy.reactionAdd}
+          className="bdw-d__rx"
+          onToggle={onToggleReaction}
+          reactions={reactions}
+          trailing={reactionTrailing}
+        />
+
+        <section aria-label={copy.commentLabel} className="bdw-cm">
+          <b className="num">{copy.commentsN.replace("{n}", String(commentCount))}</b>
+          {commentCount === 0 ? (
+            <p className="bdw-cm__empty">{copy.commentEmpty}</p>
+          ) : (
+            post.comments.map((c) => (
+              <BoardComment
+                allLabel={copy.mentionAll}
+                comment={{
+                  id: c.id,
+                  authorName: c.authorName,
+                  authorInitial: c.authorName.charAt(0) || "·",
+                  avatarColor: c.avatarColor,
+                  role: c.authorRole || undefined,
+                  timeLabel: hydrated ? boardRelativeTime(c.createdAt, locale) : "",
+                  content: c.content,
+                  imageUrls: c.imageUrls,
+                  isOwn: c.isOwn,
+                  canDelete: c.isOwn || canManage,
+                  // 멘션 메타 — BoardCommentDetail 타입 확장 전까지는 빈 배열로 fallback
+                  mentionedUsers: (c as { mentionedUsers?: { id: string; name: string }[] }).mentionedUsers ?? [],
+                  mentionAll: (c as { mentionAll?: boolean }).mentionAll ?? false,
+                }}
+                copy={copy}
+                key={c.id}
+                onDelete={onDeleteComment}
+                onMore={onOpenCommentMenu}
+              />
+            ))
+          )}
+        </section>
+      </article>
+
       <BoardComposer
-        postId={post.id}
-        organizationId={organizationId}
-        myInitial={viewerInitial}
-        disabled={!post.allowComments}
         copy={copy}
-        mentionedUsers={mentionedUsers}
+        disabled={!post.allowComments}
         mentionAll={mentionAll}
-        onOpenMentionSheet={() => setShowMentionSheet(true)}
+        mentionedUsers={mentionedUsers}
         onClearMentions={() => {
           setMentionedUsers([]);
           setMentionAll(false);
         }}
+        onOpenMentionSheet={() => setShowMentionSheet(true)}
         onSubmit={onComposerSubmit}
+        organizationId={organizationId}
+        postId={post.id}
       />
 
       {/* 멘션 선택 시트 — full-screen scrim은 BottomSheet의 fixed inset-0이 상단 헤더까지 자동으로 덮음 */}
@@ -582,44 +481,23 @@ export function BoardDetailClient({
         />
       )}
 
-      {/* 삭제 확인 모달 (center-aligned — 의도된 BottomSheet 예외) */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-8">
-          <div className="w-full max-w-[320px] rounded-[22px] bg-surface p-[22px] text-center shadow-[0_24px_60px_-20px_rgba(15,23,42,0.5)]">
-            <p className="text-[15.5px] font-black tracking-[-0.01em] text-foreground">
-              {copy.deleteConfirmTitle}
-            </p>
-            <p className="mt-[7px] text-[12.5px] font-semibold leading-[1.5] text-muted-foreground">
-              {copy.deleteConfirmBody}
-            </p>
-            <div className="mt-[18px] flex gap-[9px]">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="h-11 flex-1 rounded-[13px] border border-border bg-background text-[13.5px] font-extrabold text-[#3a3746]"
-              >
-                {copy.actionCancel}
-              </button>
-              <button
-                type="button"
-                onClick={onConfirmDelete}
-                className="h-11 flex-1 rounded-[13px] bg-[hsl(4_72%_52%)] text-[13.5px] font-extrabold text-white"
-              >
-                {copy.deleteConfirmCta}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 삭제 확인 — 가운데 확인 창(의도된 BottomSheet 예외) */}
+      {showDeleteConfirm ? (
+        <BoardConfirm
+          body={copy.deleteConfirmBody}
+          cancelLabel={copy.actionCancel}
+          confirmLabel={copy.deleteConfirmCta}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={onConfirmDelete}
+          title={copy.deleteConfirmTitle}
+        />
+      ) : null}
 
-      {/* 토스트 */}
-      {toast && (
-        <div className="fixed inset-x-0 bottom-[88px] z-[70] flex justify-center px-6">
-          <div className="rounded-full bg-foreground/92 px-[18px] py-[9px] text-[12.5px] font-bold text-white shadow-lg">
-            {toast}
-          </div>
+      {toast ? (
+        <div aria-live="polite" className="bdw-toast" role="status">
+          <span>{toast}</span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -88,3 +88,6 @@ export type BoardPostDetail = {
   firstReactorName: string | null;
   comments: BoardCommentDetail[];
 };
+
+/** 게시판 반응 이모지 — 서버(`ALLOWED_EMOJIS` · `REACTION_EMOJIS`)와 같은 순서 · 같은 다섯 개. */
+export const BOARD_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"] as const;

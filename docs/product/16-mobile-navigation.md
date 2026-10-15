@@ -513,9 +513,13 @@ Current rules:
     `pb-[124px]` 을 쓴다. 화면이 `-mb-8` 로 고정해 두면 바텀탭을 띄우는 화면에서 92px 이 남아
     콘텐츠 아래로 빈 공간이 스크롤된다(버그 신고 목록·상세가 그랬다). **자기 화면의
     `hideBottomNav` 설정과 짝을 맞춘다.**
-  - 이 세 화면(게시판 상세 / 버그 신고 목록 / 버그 신고 상세)은 자체 스크롤 영역을 가지므로
+  - 이 화면들(버그 신고 목록 / 버그 신고 상세)은 자체 스크롤 영역을 가지므로
     **상단 바 자동 숨김이 동작하지 않는다** — 셸의 스크롤 컨테이너가 움직이지 않기 때문이다.
     즉 84px 은 상시 필요하다.
+  - **게시판 상세는 2026-10-15 화이트 리디자인에서 이 방식을 그만뒀다.** 셸 스크롤 안에서 그리고, 댓글 입력은
+    `position: sticky; bottom: 0`(`.bdw-cmp`)로 화면 바닥에 붙인다. 셸의 `hideBottomNav` 아래 여백(`pb-8`)만
+    `.bdw-dwrap { margin-bottom: -32px }` 로 지운다. 폴드(`fold:px-7 fold:pt-6`) · 태블릿 칸에서도 음수 여백이 어긋나지 않고,
+    상단 바 자동 숨김도 다시 동작한다. 글이 짧으면 입력칸이 댓글 바로 아래에 온다(시안과 같음).
 - **Layout height**: the outer shell frame uses the live viewport height (`h-dvh`), while the centered max-width wrapper and inner safe-area column inherit that height with `h-full`. Earlier attempts that bound multiple nested containers to viewport units (`h-svh` everywhere, then mixed viewport units) caused real iPhone Safari / standalone gaps under the bottom bar and floating sidebar floors. New shell-height work should keep **one viewport-bound outer frame** and let nested shell boxes inherit from it.
 - **Native standalone touch contract (2026-06-22)**: global rules in `src/app/globals.css` keep the installed PWA feeling native — `-webkit-tap-highlight-color: transparent` (no grey tap-flash), `-webkit-touch-callout: none` + `user-select: none` on UI chrome (buttons / links / labels / `.tabbar` / `.wordmark`; body text and inputs stay selectable), `html, body { overscroll-behavior: none }` (no document rubber-band), and `@media (pointer: coarse) { input/textarea/select { font-size: 16px } }` so iOS never zoom-snaps on focus (oversized fields opt out with `data-keep-font-size`). When adding chrome, don't reintroduce tap-highlight or callouts; new inputs need ≥16px on touch. Tappable controls also get `touch-action: manipulation` (instant taps, no double-tap zoom) and `html` gets `text-size-adjust: 100%` (no iOS landscape text inflation).
 - **Native `<input type="date">` iOS fix (2026-07-17)**: on iOS Safari the native date field ignores the container box — it applies its own `-webkit-appearance` chrome and renders the value through `::-webkit-date-and-time-value` with an intrinsic width, centering, and margin, so the field stretched wide and the text sat off-baseline (reported on the account/profile 생년월일 field, `src/app/account/page.tsx`; onboarding shares the same input). Desktop was unaffected, so it only reproduced on real devices. Global rule in `src/app/globals.css` now resets `input[type="date"]` with `-webkit-appearance: none; appearance: none` (keeping `min-width: 0; max-width: 100%`) and forces `::-webkit-date-and-time-value { text-align: left; margin-inline: 0; margin-block: auto }` + `::-webkit-datetime-edit { padding: 0 }` so the field follows our `h-11 px-3` box and left-aligns the value. **Vertical-centering follow-up (2026-07-17):** the first cut used `margin: 0`, which also killed the UA's block-axis `auto` margin — that margin is what centers the value inside iOS's flex shadow container, so the digits sat high in the h-11 box (reported on 생년월일). Only the inline axis may be zeroed; `margin-block` must stay `auto`. This is the shared standard for any native date input — do not re-style date fields per-page.
@@ -625,12 +629,12 @@ Current rules:
 
   | 상태 | 화면 |
   | --- | --- |
-  | ✅ 폭 전부(`wide`) | 홈 `/mobile` · 판매 캘린더 `/mobile/ops/calendar` · **예약 캘린더** `/mobile/calendar`(격자는 날짜 칸 고정 폭이라 넓을수록 더 많은 날, 목록 = 체크인 · 체크아웃 · 숙박 중 폴드 2열 · 태블릿 3열, 건물 정보 카드 2/3열) · **게시판 신고 처리** `/mobile/board/reports`(카드 폰 1 · 폴드 2 · 태블릿 3열, 2026-10-06) |
+  | ✅ 폭 전부(`wide`) | 홈 `/mobile` · 판매 캘린더 `/mobile/ops/calendar` · **예약 캘린더** `/mobile/calendar`(격자는 날짜 칸 고정 폭이라 넓을수록 더 많은 날, 목록 = 체크인 · 체크아웃 · 숙박 중 폴드 2열 · 태블릿 3열, 건물 정보 카드 2/3열) · **게시판 신고 처리** `/mobile/board/reports`(묶음 줄 폰 1 · 폴드 2 · 태블릿 3열, 2026-10-06 · 화이트 2026-10-15) |
   | ✅ 목록 → 상세 2분할(`split` + `SplitList`) | 할 일(+ 프로젝트) · 요청(+ 처리 끝난 분실물) · 컴플레인 · 공지 · 게시판 · 제안함 · 버그 · 린넨 반품 기록 · **린넨 장부**(기록 → 칸) · **알림**(알림이 가리키는 상세를 칸에 — `SPLIT_DETAIL_PATTERNS.notifications` = 위 상세 주소 전부, `useSplitPush`) |
   | ✅ 칸 직접(`split` + `useIsTablet`) | 룸 링크 · **청소 기록**(기록 \| 상세 칸, 폴드는 날짜 묶음 2열) · **근무 기록**(2026-10-13 리디자인: 태블릿 가로 달력 \| 월 기록, 상세는 시트 · 폴드는 한 줄) · **직원 목록**(2026-10-14 리디자인: 태블릿 가로 목록 \| 프로필 칸, 폴드는 한 줄에 번호까지) · **예약 캘린더 리스트 · 지도**(2026-10-14 리디자인: 태블릿 가로 목록 \| 예약 상세 / 건물 \| 출입 정보) |
   | ✅ 두 칸 배치(`split` + 화면 CSS) | **근태 홈**(태블릿: 링 · 출퇴근 \| 바로가기, 폴드 560px) · **급여**(태블릿: 급여 카드 · 구간 \| 일별 표) · **휴가 달력**(태블릿: 달력 \| 휴가 목록) |
   | ✅ 카드 여러 열(`split`) | **청소**(줄 목록 — 폴드 = 청소 목록 \| 셋팅 목록 + 오늘 기록 2열 · 태블릿 = 3열, 진행 중 링은 태블릿에서 링 \| 버튼, 2026-10-13 화이트) · **린넨 반품 건물 고르기**(폰 2 · 폴드 3 · 태블릿 4열) · **출근자 명단**(출근 중 · 퇴근 완료 섹션 나란히) |
-  | ✅ 한 칼럼이 맞는 화면 | 위 목록들의 상세 · 새로 만들기 · 수정 화면(태블릿에선 2분할 칸 안에 열림), 근태 찍기 · 정정 · 휴가 신청 흐름, **교통비**(청구서 한 장 — 문서형이라 가운데 문서 폭이 맞다) |
+  | ✅ 한 칼럼이 맞는 화면 | 위 목록들의 상세 · 새로 만들기 · 수정 화면(태블릿에선 2분할 칸 안에 열림 — **게시판 글쓰기 · 수정**은 2026-10-15부터 셸 안 560px 가운데 폼), 근태 찍기 · 정정 · 휴가 신청 흐름, **교통비**(청구서 한 장 — 문서형이라 가운데 문서 폭이 맞다) |
   | ⬜ 적용 필요 | — (2026-10-05 기준 없음. 새 화면은 이 표에 넣는다) |
 
   **아이패드 실측 점검(2026-10-06)** — 24개 화면을 가로 1180×820 · 세로 820×1180 로 찍어 고친 것: 룸 링크 가로(사이드바 때문에 가운데

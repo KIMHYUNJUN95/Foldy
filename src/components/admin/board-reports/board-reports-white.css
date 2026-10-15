@@ -1,0 +1,102 @@
+/* 게시판 신고 — 화이트 리디자인(2026-10-15, 시안 「R · 게시판 신고 · PC」).
+   흰 바탕 · 상자 · 세로 구분선 없음 · 선택은 옅은 보라 바탕만(왼쪽 막대 없음).
+   움직임: 줄 차례 등장 · 패널 내용 페이드 · 누름 반응 · 사진 확대. 움직임 줄이기 설정이면 끈다. */
+.adm .brw .num, .adm .brw-panel .num { font-variant-numeric: tabular-nums; }
+.adm .brw .is-red, .adm .brw-panel .is-red { color: #c5282e; }
+.adm .brw-soft { margin: 0; font-size: 12px; line-height: 1.5; color: #6b6878; text-align: center; }
+
+/* 한 줄 요약 */
+.adm .brw-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin: 2px 2px 20px; }
+.adm .brw-top b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .brw-top > span { font-size: 12px; color: #6b6878; }
+
+/* 표 */
+.adm .brw-th, .adm .brw-tr { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(90px, 140px) 64px 96px; column-gap: 16px; align-items: center; padding: 0 12px; }
+.adm .brw-th { padding-bottom: 8px; border-bottom: 1px solid #f1f1f4; font-size: 12px; color: #6b6878; }
+.adm .brw-th .r, .adm .brw-c.r { text-align: right; }
+.adm .brw-rows { display: flex; flex-direction: column; }
+.adm .brw-tr { width: 100%; min-height: 64px; border: 0; border-top: 1px solid #f3f3f6; background: transparent; font: inherit; color: #16141f; text-align: left; cursor: pointer; transition: background 150ms ease; animation: brw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .brw-rows > .brw-tr:first-child { border-top: 0; }
+.adm .brw-rows > .brw-tr:nth-child(2) { animation-delay: 30ms; }
+.adm .brw-rows > .brw-tr:nth-child(3) { animation-delay: 60ms; }
+.adm .brw-rows > .brw-tr:nth-child(4) { animation-delay: 90ms; }
+.adm .brw-rows > .brw-tr:nth-child(n + 5) { animation-delay: 120ms; }
+@keyframes brw-in { from { opacity: 0; transform: translateY(4px); } }
+.adm .brw-tr:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
+.adm .brw-tr.on { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; }
+.adm .brw-tr:hover + .brw-tr, .adm .brw-tr.on + .brw-tr { border-top-color: transparent; }
+.adm .brw-tr:focus-visible { outline: 2px solid #7a52e6; outline-offset: -2px; border-radius: 12px; }
+.adm .brw-ttl { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.adm .brw-ttl b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .brw-ttl span { font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .brw-c { min-width: 0; font-size: 13px; color: #3a3746; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .brw-c.is-soft { font-size: 12px; color: #6b6878; }
+.adm .brw-n { text-align: right; font-size: 15px; font-weight: 700; }
+.adm .brw-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 88px 20px; text-align: center; font-size: 13px; color: #6b6878; animation: brw-fade 260ms ease both; }
+.adm .brw-empty b { font-size: 15px; font-weight: 600; color: #16141f; }
+
+/* 상세 패널 */
+.adm .brw-panel { width: 420px; display: flex; flex-direction: column; background: #fff; }
+.adm .brw-hd { display: flex; align-items: flex-start; gap: 2px; padding: 22px 24px 16px; }
+.adm .brw-hd__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.adm .brw-hd__k { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b6878; }
+.adm .brw-hd__k b { font-weight: 600; }
+.adm .brw-hd__k > * + *::before { content: "·"; margin-right: 6px; color: #c9c6d3; }
+.adm .brw-hd__m { font-size: 13px; color: #6b6878; overflow-wrap: anywhere; }
+.adm .brw-ic { display: grid; place-items: center; width: 40px; height: 40px; flex: none; margin-top: -4px; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .brw-ic svg { width: 20px; height: 20px; }
+.adm .brw-ic:hover { background: #f4f4f7; }
+.adm .brw-ic.is-danger { color: #c5282e; }
+.adm .brw-ic.is-danger:hover { background: #fdecec; }
+.adm .brw-ic:active:not(:disabled) { transform: scale(.94); }
+.adm .brw-hd__x { margin-right: -10px; }
+.adm .brw-pb { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding: 0 24px 24px; animation: brw-fade 220ms ease both; }
+@keyframes brw-fade { from { opacity: 0; } }
+.adm .brw-sec { display: flex; flex-direction: column; gap: 10px; }
+.adm .brw-sec.is-rule { padding-top: 18px; border-top: 1px solid #f1f1f4; }
+.adm .brw-k { font-size: 12px; font-weight: 600; color: #6b6878; }
+.adm .brw-title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.4; letter-spacing: -0.01em; color: #16141f; overflow-wrap: anywhere; }
+.adm .brw-on { font-size: 13px; color: #6b6878; overflow-wrap: anywhere; }
+.adm .brw-body { margin: 0; font-size: 14px; line-height: 1.65; color: #3a3746; white-space: pre-line; overflow-wrap: anywhere; }
+.adm .brw-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.adm .brw-shot { position: relative; aspect-ratio: 4 / 3; overflow: hidden; padding: 0; border: 0; border-radius: 10px; background: #f2f2f5; cursor: zoom-in; transition: transform 140ms ease; }
+.adm .brw-shot img { width: 100%; height: 100%; object-fit: cover; }
+.adm .brw-shot:active { transform: scale(.97); }
+.adm .brw-tags { margin: 0; font-size: 12px; color: #6b6878; overflow-wrap: anywhere; }
+.adm .brw-reasons, .adm .brw-notes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.adm .brw-reasons li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; color: #16141f; }
+.adm .brw-reasons b { font-weight: 700; }
+.adm .brw-notes li { font-size: 13px; line-height: 1.55; color: #3a3746; overflow-wrap: anywhere; }
+.adm .brw-notes q { quotes: "“" "”"; }
+.adm .brw-notes li > span { color: #6b6878; }
+.adm .brw-pf { display: flex; flex-direction: column; gap: 8px; padding: 12px 24px 24px; }
+
+/* 버튼 */
+.adm .brw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 14px; border: 0; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .brw-btn:active:not(:disabled) { transform: scale(.97); }
+.adm .brw-btn:disabled { opacity: .55; cursor: default; }
+.adm .brw-btn.is-gray { background: #f4f4f7; color: #3a3746; }
+.adm .brw-btn.is-gray:hover:not(:disabled) { background: #ececf1; }
+.adm .brw-btn.is-danger { background: #c5282e; color: #fff; }
+.adm .brw-btn.is-danger:hover:not(:disabled) { background: #b02227; }
+
+/* 확인 창 */
+.adm .modal-scrim.brw-scrim { z-index: 70; }
+.adm .modal.brw-modal { z-index: 71; width: 440px; padding: 24px; gap: 12px; border: 0; }
+.adm .brw-modal h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.adm .brw-modal p { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; }
+.adm .brw-modal__f { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 6px; }
+
+/* 사진 크게 보기 */
+.adm .brw-viewer { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 48px; background: rgba(2, 6, 23, .82); cursor: zoom-out; animation: brw-fade 180ms ease both; }
+.adm .brw-viewer img { max-width: 100%; max-height: 100%; border-radius: 12px; object-fit: contain; cursor: default; animation: brw-zoom 220ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes brw-zoom { from { opacity: 0; transform: scale(.96); } }
+.adm .brw-viewer__x { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, .12); color: #fff; cursor: pointer; }
+.adm .brw-viewer__x svg { width: 22px; height: 22px; }
+
+.adm .brw button:focus-visible, .adm .brw-panel button:focus-visible, .adm .brw-modal button:focus-visible, .adm .brw-viewer button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .adm .brw-tr, .adm .brw-pb, .adm .brw-empty, .adm .brw-viewer, .adm .brw-viewer img { animation: none; }
+  .adm .brw-tr, .adm .brw-btn, .adm .brw-ic, .adm .brw-shot { transition: none; }
+}

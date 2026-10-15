@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import type { ReactNode } from "react";
 import { Ban, Flag, Pencil, Pin, PinOff, Share2, Trash2 } from "lucide-react";
 import { BottomSheet, useBottomSheetClose } from "@/components/shell/bottom-sheet";
-import { cn } from "@/lib/utils";
+import "./board-white.css";
 import type { Dictionary } from "@/lib/i18n";
 
 export type BoardActionSheetCopy = Pick<
@@ -20,6 +20,7 @@ export type BoardActionSheetCopy = Pick<
 
 type ActionVariant = "default" | "primary" | "danger";
 
+/** 동작 줄 — 화이트 리디자인(2026-10-15): 상자 없는 아이콘 + 글, 가는 줄로만 나눈다. 고정은 보라, 신고 · 차단 · 삭제는 빨강. */
 function ActionRow({
   icon,
   label,
@@ -33,32 +34,12 @@ function ActionRow({
 }) {
   return (
     <button
-      type="button"
+      className={variant === "primary" ? "is-violet" : variant === "danger" ? "is-red" : undefined}
       onClick={onClick}
-      className="flex h-[54px] w-full items-center gap-[14px] border-b border-border/60 px-1 text-left last:border-0"
+      type="button"
     >
-      <span
-        className={cn(
-          "inline-flex size-[38px] shrink-0 items-center justify-center rounded-[11px]",
-          variant === "primary" && "bg-primary/[0.12] text-primary",
-          variant === "danger" &&
-            "bg-[#fdecec] text-[#c5282e]",
-          variant === "default" &&
-            "bg-[#f4f4f7] text-[#3a3746]",
-        )}
-      >
-        {icon}
-      </span>
-      <span
-        className={cn(
-          "text-[14.5px] font-bold",
-          variant === "primary" && "text-primary",
-          variant === "danger" && "text-[#c5282e]",
-          variant === "default" && "text-foreground",
-        )}
-      >
-        {label}
-      </span>
+      {icon}
+      <span>{label}</span>
     </button>
   );
 }
@@ -97,11 +78,11 @@ function ActionSheetContent({
   const canDelete = showPostActions && (isOwn || canManage);
 
   return (
-    <div className="pt-1">
-      <div className="flex flex-col">
+    <div className="bdw-sheet">
+      <div className="bdw-act">
         {showPostActions && isOwn && (
           <ActionRow
-            icon={<Pencil className="size-[19px]" />}
+            icon={<Pencil strokeWidth={1.8} />}
             label={copy.actionEdit}
             onClick={onEdit ?? close}
           />
@@ -110,9 +91,9 @@ function ActionSheetContent({
           <ActionRow
             icon={
               isPinned ? (
-                <PinOff className="size-[19px]" />
+                <PinOff strokeWidth={1.8} />
               ) : (
-                <Pin className="size-[19px]" />
+                <Pin strokeWidth={1.8} />
               )
             }
             label={isPinned ? copy.actionUnpin : copy.actionPin}
@@ -122,14 +103,14 @@ function ActionSheetContent({
         )}
         {showPostActions && (
           <ActionRow
-            icon={<Share2 className="size-[19px]" />}
+            icon={<Share2 strokeWidth={1.8} />}
             label={copy.actionShare}
             onClick={onShare ?? close}
           />
         )}
         {!isOwn && onReport && (
           <ActionRow
-            icon={<Flag className="size-[19px]" />}
+            icon={<Flag strokeWidth={1.8} />}
             label={copy.actionReport}
             variant="danger"
             onClick={onReport}
@@ -137,7 +118,7 @@ function ActionSheetContent({
         )}
         {!isOwn && onBlock && (
           <ActionRow
-            icon={<Ban className="size-[19px]" />}
+            icon={<Ban strokeWidth={1.8} />}
             label={copy.actionBlock}
             variant="danger"
             onClick={onBlock}
@@ -145,18 +126,14 @@ function ActionSheetContent({
         )}
         {canDelete && (
           <ActionRow
-            icon={<Trash2 className="size-[19px]" />}
+            icon={<Trash2 strokeWidth={1.8} />}
             label={copy.actionDelete}
             variant="danger"
             onClick={onDelete ?? close}
           />
         )}
       </div>
-      <button
-        type="button"
-        onClick={close}
-        className="mt-[10px] h-[52px] w-full rounded-[14px] border border-border bg-background text-[14.5px] font-extrabold text-[#3a3746]"
-      >
+      <button className="bdw-btn is-gray" onClick={close} type="button">
         {copy.actionCancel}
       </button>
     </div>

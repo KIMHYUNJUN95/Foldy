@@ -96,6 +96,23 @@ export type PendingBoardReport = {
   notes: string[];
   count: number;
   latestAt: string;
+  // ↓ PC 신고 콘솔 상세 패널용(2026-10-15, 화이트 리디자인). 모바일은 위 필드만 쓴다.
+  /** 글 제목(댓글이면 그 댓글이 달린 글의 제목). */
+  postTitle: string | null;
+  /** 원문 전체(글 본문 · 댓글 내용), 4,000자까지. */
+  body: string;
+  imageUrls: string[];
+  /** 글의 태그. 댓글이면 빈 배열. */
+  tags: string[];
+  /** 대상(글 · 댓글)이 쓰인 시각. */
+  targetCreatedAt: string;
+  /** 사유별 신고 수(많은 순). */
+  reasonCounts: { reason: BoardReportReason; count: number }[];
+  /** 메모와 그 신고 시각(최신순). */
+  noteItems: { note: string; at: string }[];
+  /** 글에 반응한 사람 수 · 남아 있는 댓글 수. 댓글이 대상이면 null. */
+  reactionCount: number | null;
+  commentCount: number | null;
 };
 
 /**
@@ -124,14 +141,45 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
   );
 
   const [posts, comments, profiles] = await Promise.all([
-    service.from("board_posts").select("id, title, content, deleted_at").in("id", postIds),
+    service
+      .from("board_posts")
+      .select("id, title, content, deleted_at, image_urls, tags, created_at")
+      .in("id", postIds),
     commentIds.length
-      ? service.from("board_comments").select("id, content, deleted_at").in("id", commentIds)
-      : Promise.resolve({ data: [] as { id: string; content: string; deleted_at: string | null }[], error: null }),
+      ? service.from("board_comments").select("id, content, deleted_at, image_urls, created_at").in("id", commentIds)
+      : Promise.resolve({
+          data: [] as {
+            id: string;
+            content: string;
+            deleted_at: string | null;
+            image_urls: string[];
+            created_at: string;
+          }[],
+          error: null,
+        }),
     authorIds.length
       ? service.from("profiles").select("id, name").in("id", authorIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
   ]);
+
+  // 글이 대상인 신고만 — 반응한 사람 수 · 남아 있는 댓글 수(상세 패널 메타 줄). 실패하면 null 로 둔다.
+  const postTargetIds = Array.from(new Set(data.filter((r) => r.target_type !== "comment").map((r) => r.post_id)));
+  const [reactionRows, commentRows] = postTargetIds.length
+    ? await Promise.all([
+        service.from("board_reactions").select("post_id, user_id").in("post_id", postTargetIds),
+        service.from("board_comments").select("post_id").in("post_id", postTargetIds).is("deleted_at", null),
+      ])
+    : [null, null];
+  const reactorsByPost = new Map<string, Set<string>>();
+  for (const row of reactionRows?.error ? [] : (reactionRows?.data ?? [])) {
+    let set = reactorsByPost.get(row.post_id);
+    if (!set) reactorsByPost.set(row.post_id, (set = new Set()));
+    set.add(row.user_id);
+  }
+  const commentsByPost = new Map<string, number>();
+  for (const row of commentRows?.error ? [] : (commentRows?.data ?? [])) {
+    commentsByPost.set(row.post_id, (commentsByPost.get(row.post_id) ?? 0) + 1);
+  }
 
   const postMap = new Map((posts.data ?? []).map((p) => [p.id, p]));
   const commentMap = new Map((comments.data ?? []).map((c) => [c.id, c]));
@@ -167,13 +215,35 @@ export async function listPendingBoardReports(session: AppSession): Promise<Pend
         notes: [],
         count: 0,
         latestAt: r.created_at,
+        postTitle: post?.title || null,
+        body: ((targetType === "comment" ? comment?.content : post?.content) ?? "").slice(0, 4000),
+        imageUrls: (targetType === "comment" ? comment?.image_urls : post?.image_urls) ?? [],
+        tags: targetType === "post" ? (post?.tags ?? []) : [],
+        targetCreatedAt: (targetType === "comment" ? comment?.created_at : post?.created_at) ?? r.created_at,
+        reasonCounts: [],
+        noteItems: [],
+        reactionCount:
+          targetType === "post" && reactionRows && !reactionRows.error
+            ? (reactorsByPost.get(r.post_id)?.size ?? 0)
+            : null,
+        commentCount:
+          targetType === "post" && commentRows && !commentRows.error ? (commentsByPost.get(r.post_id) ?? 0) : null,
       };
       groups.set(key, group);
     }
     group.count += 1;
-    if (isBoardReportReason(r.reason) && !group.reasons.includes(r.reason)) group.reasons.push(r.reason);
-    if (r.note) group.notes.push(r.note);
+    if (isBoardReportReason(r.reason)) {
+      if (!group.reasons.includes(r.reason)) group.reasons.push(r.reason);
+      const hit = group.reasonCounts.find((x) => x.reason === r.reason);
+      if (hit) hit.count += 1;
+      else group.reasonCounts.push({ reason: r.reason, count: 1 });
+    }
+    if (r.note) {
+      group.notes.push(r.note);
+      group.noteItems.push({ note: r.note, at: r.created_at });
+    }
   }
+  for (const group of groups.values()) group.reasonCounts.sort((a, b) => b.count - a.count);
 
   if (goneReportIds.length > 0) {
     // best-effort 정리 — 실패해도 다음 조회에서 다시 걸러진다.

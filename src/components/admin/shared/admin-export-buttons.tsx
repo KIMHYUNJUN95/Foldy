@@ -4,7 +4,15 @@
 // /admin/* renders through this component — do not hand-roll export buttons or reintroduce CSV.
 // Pair it with buildAdminTableWorkbookBase64 / buildAdminTableReportHtml on the server side.
 // See CLAUDE.md → "Admin dashboard shared design contract".
-import { useRef, useState, useTransition } from "react";
+//
+// 모션(2026-10-15, 시안 Motion-PC-Export-PC) — 누름 → 도는 고리 → 결과가 같은 버튼 자리에서:
+// - Excel: 초록 체크 「다운로드됨」 + 버튼 아래 파일 카드(XLS · 파일 이름 · 크기)
+// - PDF: 초록 체크 「새 탭에 열림」 + 카드(문서 제목 · 「새 탭에서 인쇄 → PDF로 저장」)
+// - 실패: 빨간 「다시 시도」(살짝 흔들림) + 카드 · 팝업이 막히면 「팝업 차단됨」 + 허용 안내
+// 카드는 4초 뒤 사라지고(마우스를 올리면 멈춤) 버튼도 원래대로. 다시 누르면 처음부터. 결과는 카드가 알리므로 토스트는
+// 「내보낼 항목 없음」에만 쓴다.
+import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { Download } from "lucide-react";
 import { downloadAdminWorkbook } from "@/components/admin/shared/admin-format";
 import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/admin-export-result";
@@ -24,6 +32,27 @@ type AdminExportButtonsProps = {
   labels: AdminExportLabels;
 };
 
+type Kind = "xls" | "pdf";
+type Result = "done" | "error" | "blocked";
+type Card = { kind: Kind; result: Result; title: string; sub: string; top: number; right: number };
+
+const CARD_MS = 4000;
+
+/** base64 → 실제 바이트 수 → 「48KB」 / 「1.2MB」. */
+function fileSize(base64: string) {
+  const pad = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  const bytes = Math.floor((base64.length * 3) / 4) - pad;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+}
+
+/** 인쇄 화면 HTML 의 <title> — 카드에 문서 이름으로 쓴다. */
+function docTitle(html: string) {
+  const m = /<title>([^<]*)<\/title>/i.exec(html);
+  if (!m) return "";
+  return new DOMParser().parseFromString(`<title>${m[1]}</title>`, "text/html").title;
+}
+
 export function AdminExportButtons({
   onExportXls,
   onExportPdf,
@@ -33,56 +62,133 @@ export function AdminExportButtons({
 }: AdminExportButtonsProps) {
   const [xlsPending, startXlsExport] = useTransition();
   const [pdfPending, startPdfExport] = useTransition();
-  // 누른 뒤 → 도는 고리 → 「다운로드됨 / 새 창에 열림」 체크 → 2초 뒤 원래대로(2026-10-14 모션, 시안 Motion-PC-Export-PC).
-  const [done, setDone] = useState<{ xls: boolean; pdf: boolean }>({ xls: false, pdf: false });
-  const timers = useRef<{ xls?: number; pdf?: number }>({});
-  function flashDone(kind: "xls" | "pdf") {
-    window.clearTimeout(timers.current[kind]);
-    setDone((d) => ({ ...d, [kind]: true }));
-    timers.current[kind] = window.setTimeout(() => setDone((d) => ({ ...d, [kind]: false })), 2000);
+  const [card, setCard] = useState<Card | null>(null);
+  const btns = useRef<{ xls: HTMLButtonElement | null; pdf: HTMLButtonElement | null }>({ xls: null, pdf: null });
+  const timer = useRef<number | undefined>(undefined);
+  const left = useRef(CARD_MS);
+  const startedAt = useRef(0);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  function arm(ms: number) {
+    window.clearTimeout(timer.current);
+    left.current = ms;
+    startedAt.current = Date.now();
+    timer.current = window.setTimeout(() => setCard(null), ms);
+  }
+
+  function show(kind: Kind, result: Result, title: string, sub: string) {
+    const r = btns.current[kind]?.getBoundingClientRect();
+    setCard({ kind, result, title, sub, top: r ? r.bottom + 8 : 72, right: r ? window.innerWidth - r.right : 24 });
+    arm(CARD_MS);
+  }
+
+  function fail(kind: Kind, reason: "forbidden" | "empty" | "error") {
+    if (reason === "empty") {
+      setCard(null);
+      onToast(labels.exportEmpty);
+      return;
+    }
+    show(kind, "error", labels.exportFailedTitle, labels.exportFailedHint);
   }
 
   function handleExportXls() {
     if (xlsPending) return;
+    setCard(null);
     startXlsExport(async () => {
-      const res = await onExportXls();
-      if (res.ok) {
+      try {
+        const res = await onExportXls();
+        if (!res.ok) return fail("xls", res.reason);
         downloadAdminWorkbook(res.base64, res.filename);
-        flashDone("xls");
-        onToast(labels.exportDone);
-        return;
+        show("xls", "done", res.filename, fileSize(res.base64));
+      } catch {
+        fail("xls", "error");
       }
-      onToast(res.reason === "empty" ? labels.exportEmpty : labels.exportFailed);
     });
   }
 
   function handleExportPdf() {
     if (pdfPending) return;
+    setCard(null);
     // Open the tab synchronously (still inside the click handler) so pop-up blockers don't kill it
     // once the server action's await resolves.
     const win = window.open("", "_blank");
     startPdfExport(async () => {
-      const res = await onExportPdf();
-      if (!res.ok) {
+      try {
+        const res = await onExportPdf();
+        if (!res.ok) {
+          win?.close();
+          return fail("pdf", res.reason);
+        }
+        if (!win) {
+          show("pdf", "blocked", labels.exportBlockedShort, labels.exportBlockedHint);
+          return;
+        }
+        win.document.open();
+        win.document.write(res.html);
+        win.document.close();
+        show("pdf", "done", docTitle(res.html) || labels.exportPdf, labels.exportPdfHint);
+      } catch {
         win?.close();
-        onToast(res.reason === "empty" ? labels.exportEmpty : labels.exportFailed);
-        return;
+        fail("pdf", "error");
       }
-      if (!win) {
-        onToast(labels.exportBlocked);
-        return;
-      }
-      win.document.open();
-      win.document.write(res.html);
-      win.document.close();
-      flashDone("pdf");
     });
   }
 
+  const phase = (kind: Kind, busy: boolean) => (busy ? "busy" : card?.kind === kind ? card.result : "idle");
+  const doneLabel = { xls: labels.exportSaved, pdf: labels.exportOpened };
+
   return (
     <>
-      <ExportButton busy={xlsPending} disabled={disabled} done={done.xls} doneLabel={labels.exportSaved} label={labels.exportXls} onClick={handleExportXls} />
-      <ExportButton busy={pdfPending} disabled={disabled} done={done.pdf} doneLabel={labels.exportOpened} label={labels.exportPdf} onClick={handleExportPdf} />
+      <ExportButton
+        btnRef={(el) => { btns.current.xls = el; }}
+        disabled={disabled}
+        label={labels.exportXls}
+        labels={labels}
+        onClick={handleExportXls}
+        phase={phase("xls", xlsPending)}
+        doneLabel={doneLabel.xls}
+      />
+      <ExportButton
+        btnRef={(el) => { btns.current.pdf = el; }}
+        disabled={disabled}
+        label={labels.exportPdf}
+        labels={labels}
+        onClick={handleExportPdf}
+        phase={phase("pdf", pdfPending)}
+        doneLabel={doneLabel.pdf}
+      />
+      {card
+        ? createPortal(
+            <div
+              className={`axcard is-${card.result}`}
+              key={`${card.kind}-${card.result}-${card.title}`}
+              onMouseEnter={() => {
+                window.clearTimeout(timer.current);
+                left.current = Math.max(800, left.current - (Date.now() - startedAt.current));
+              }}
+              onMouseLeave={() => arm(left.current)}
+              role="status"
+              style={{ top: card.top, right: card.right }}
+            >
+              <span aria-hidden="true" className={`axcard__fi axcard__fi--${card.result === "done" ? card.kind : "err"}`}>
+                {card.result === "done" ? (card.kind === "xls" ? "XLS" : "PDF") : "!"}
+              </span>
+              {card.kind === "xls" && card.result === "done" ? (
+                <span className="axcard__b">
+                  <b>{card.title}</b>
+                  <em> · {card.sub}</em>
+                </span>
+              ) : (
+                <span className="axcard__b">
+                  <b>{card.title}</b>
+                  <span className="axcard__sub">{card.sub}</span>
+                </span>
+              )}
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
@@ -90,29 +196,34 @@ export function AdminExportButtons({
 function ExportButton({
   label,
   doneLabel,
-  busy,
-  done,
+  labels,
+  phase,
   disabled,
   onClick,
+  btnRef,
 }: {
   label: string;
   doneLabel: string;
-  busy: boolean;
-  done: boolean;
+  labels: AdminExportLabels;
+  phase: "idle" | "busy" | Result;
   disabled: boolean;
   onClick: () => void;
+  btnRef: (el: HTMLButtonElement | null) => void;
 }) {
-  const phase = busy ? "busy" : done ? "done" : "idle";
+  const busy = phase === "busy";
+  const text =
+    busy ? labels.exportBusy : phase === "done" ? doneLabel : phase === "error" ? labels.exportRetry : phase === "blocked" ? labels.exportBlockedShort : label;
   return (
     <button
       aria-busy={busy || undefined}
       className={`chipbtn axb is-${phase}`}
       disabled={disabled}
       onClick={onClick}
+      ref={btnRef}
       type="button"
     >
       <span aria-hidden="true" className="axb__ic" key={`i-${phase}`}>
-        {phase === "busy" ? (
+        {busy ? (
           <svg className="axb__ring" viewBox="0 0 16 16">
             <circle cx="8" cy="8" fill="none" r="6" stroke="currentColor" strokeOpacity=".18" strokeWidth="2" />
             <circle cx="8" cy="8" fill="none" pathLength="100" r="6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
@@ -121,15 +232,25 @@ function ExportButton({
           <svg className="axb__check" fill="none" viewBox="0 0 16 16">
             <path d="M3.5 8.4l3 3 6-6.6" pathLength="1" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
           </svg>
+        ) : phase === "error" || phase === "blocked" ? (
+          <svg fill="none" viewBox="0 0 16 16">
+            <path d="M2.7 8a5.3 5.3 0 1 0 1.6-3.8" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+            <path d="M2.7 2.7v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+          </svg>
         ) : (
           <Download className="ic" />
         )}
       </span>
-      <span className="axb__t" key={`t-${phase === "done" ? "done" : "label"}`}>
-        {phase === "done" ? doneLabel : label}
-      </span>
-      <span aria-live="polite" className="sr-only">
-        {phase === "done" ? doneLabel : ""}
+      {/* 버튼 폭은 그대로 — 나올 수 있는 글자를 모두 겹쳐 두고 가장 긴 폭을 잡는다. */}
+      <span className="axb__tw">
+        {[label, labels.exportBusy, doneLabel, labels.exportRetry, labels.exportBlockedShort].map((t) => (
+          <span aria-hidden="true" className="axb__sz" key={t}>
+            {t}
+          </span>
+        ))}
+        <span className="axb__t" key={`t-${phase}`}>
+          {text}
+        </span>
       </span>
     </button>
   );

@@ -1,23 +1,59 @@
-/* 내보내기 버튼 모션(2026-10-14, 시안 Motion-PC-Export-PC) — 누름 반응 · 도는 고리 · 초록 체크 그리기 + 「다운로드됨」 · 2초 뒤 원래대로. */
-.adm .chipbtn.axb { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 200ms ease, color 200ms ease; }
+/* 내보내기 버튼 모션(2026-10-15, 시안 Motion-PC-Export-PC) — 누름 반응 · 도는 고리 「만드는 중」 · 결과는 같은 버튼 자리에서
+   (초록 체크 「다운로드됨 / 새 탭에 열림」 · 빨간 「다시 시도 / 팝업 차단됨」 + 흔들림) · 버튼 아래 카드 4초. 버튼 폭은 그대로. */
+.adm .chipbtn.axb { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 200ms ease, color 200ms ease, border-color 200ms ease; }
 .adm .chipbtn.axb:active:not(:disabled) { transform: scale(.97); }
 .adm .axb__ic { display: inline-flex; width: 16px; height: 16px; flex: none; align-items: center; justify-content: center; color: var(--adm-muted); animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .axb__ic svg { width: 16px; height: 16px; display: block; }
+.adm .axb__tw { display: inline-grid; justify-items: start; }
+.adm .axb__sz, .adm .axb__t { grid-area: 1 / 1; white-space: nowrap; }
+.adm .axb__sz { visibility: hidden; }
 .adm .axb__t { display: inline-block; animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
-@keyframes axb-in { from { opacity: 0; filter: blur(2px); transform: scale(.9); } }
-.adm .chipbtn.axb.is-busy { cursor: progress; }
+@keyframes axb-in { from { opacity: 0; filter: blur(2px); transform: translateY(4px); } }
+.adm .chipbtn.axb.is-busy { cursor: progress; color: #5a30cf; }
 .adm .chipbtn.axb.is-busy .axb__ic { color: #7a52e6; }
 .adm .axb__ring { animation: axb-spin 800ms linear infinite; }
 .adm .axb__ring circle + circle { stroke-dasharray: 28 100; animation: axb-arc 1400ms cubic-bezier(.65, 0, .35, 1) infinite; }
 @keyframes axb-spin { to { transform: rotate(360deg); } }
 @keyframes axb-arc { 0% { stroke-dasharray: 8 100; } 50% { stroke-dasharray: 60 100; } 100% { stroke-dasharray: 8 100; } }
-.adm .chipbtn.axb.is-done, .adm .chipbtn.axb.is-done:hover { background: #effaf3; color: #1b7f45; }
+.adm .chipbtn.axb.is-done, .adm .chipbtn.axb.is-done:hover { background: #effaf3; border-color: #bfe3cf; color: #1b7f45; }
 .adm .chipbtn.axb.is-done .axb__ic { color: #1f9d55; animation: axb-pop 420ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
 .adm .axb__check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: axb-draw 360ms cubic-bezier(.23, 1, .32, 1) 80ms forwards; }
+.adm .chipbtn.axb.is-error, .adm .chipbtn.axb.is-error:hover, .adm .chipbtn.axb.is-blocked, .adm .chipbtn.axb.is-blocked:hover { background: #fdedec; border-color: #f4c7c3; color: #c0352b; }
+.adm .chipbtn.axb.is-error .axb__ic, .adm .chipbtn.axb.is-blocked .axb__ic { color: #c0352b; }
+.adm .chipbtn.axb.is-error, .adm .chipbtn.axb.is-blocked { animation: axb-shake 380ms cubic-bezier(.36, .07, .19, .97) both; }
 @keyframes axb-pop { from { transform: scale(.6); opacity: 0; } }
 @keyframes axb-draw { to { stroke-dashoffset: 0; } }
+@keyframes axb-shake { 20% { transform: translateX(-4px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } 100% { transform: none; } }
+
+/* 결과 카드 — body 에 붙는다(툴바가 넘침을 자를 수 있어서). 누른 버튼 바로 아래 · 오른쪽 끝 맞춤. */
+.axcard {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 36px -18px rgba(22, 20, 31, .35), 0 0 0 1px rgba(22, 20, 31, .05);
+  font-size: 13px;
+  color: #16141f;
+  animation: axcard-in 520ms linear(0.0000,0.0286,0.1038,0.2108,0.3366,0.4699,0.6017,0.7251,0.8353,0.9293,1.0057,1.0642,1.1059,1.1322,1.1452,1.1473,1.1409,1.1282,1.1114,1.0924,1.0726,1.0534,1.0357,1.0201,1.0069,0.9964,0.9885,0.9830,0.9797,0.9783,0.9784,0.9796,0.9817,0.9843,0.9872,0.9901,0.9929,0.9954,0.9976,0.9995,1.0009,1.0020,1.0027,1.0031,1.0000) both;
+  transform-origin: 100% 0;
+}
+@keyframes axcard-in { from { opacity: 0; transform: translateY(-10px) scale(.96); } }
+.axcard__fi { width: 30px; height: 30px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
+.axcard__fi--xls { background: #e7f5ee; color: #1f7a4d; }
+.axcard__fi--pdf, .axcard__fi--err { background: #fdedec; color: #c0352b; }
+.axcard__fi--err { font-size: 13px; }
+.axcard__b { min-width: 0; line-height: 1.35; }
+.axcard__b b { font-weight: 600; overflow-wrap: anywhere; }
+.axcard__b em { font-style: normal; color: #8b8898; white-space: nowrap; }
+.axcard__sub { display: block; margin-top: 2px; font-size: 12px; color: #8b8898; }
+
 @media (prefers-reduced-motion: reduce) {
-  .adm .axb__ic, .adm .axb__t, .adm .chipbtn.axb.is-done .axb__ic { animation: none; }
+  .adm .axb__ic, .adm .axb__t, .adm .chipbtn.axb.is-done .axb__ic, .adm .chipbtn.axb.is-error, .adm .chipbtn.axb.is-blocked, .axcard { animation: none; }
   .adm .axb__ring { animation-duration: 2400ms; }
   .adm .axb__check path { animation: none; stroke-dashoffset: 0; }
 }

@@ -664,3 +664,11 @@ select option:focus {
   background: var(--primary);
   color: var(--primary-foreground);
 }
+
+/* 모바일은 스크롤바를 보이지 않는다(2026-10-15 사용자 지시 「항상」). 셸 안 모든 스크롤 영역 + 바텀시트(본문으로 포털돼
+   셸 밖에 있음) 전부 — 스크롤은 그대로 되고 막대만 숨긴다. 화면마다 따로 숨기지 말고 이 규칙에 맡긴다. */
+[data-shell-frame], [data-shell-frame] *, [data-sheet], [data-sheet] * { scrollbar-width: none; -ms-overflow-style: none; }
+[data-shell-frame]::-webkit-scrollbar, [data-shell-frame] *::-webkit-scrollbar,
+[data-sheet]::-webkit-scrollbar, [data-sheet] *::-webkit-scrollbar { display: none; }
+html:has([data-shell-frame]) { scrollbar-width: none; }
+html:has([data-shell-frame])::-webkit-scrollbar { display: none; }

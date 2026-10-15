@@ -9,6 +9,7 @@ import {
   CalendarCheck2,
   CalendarCog,
   CalendarDays,
+  ChartPie,
   CircleDollarSign,
   ClipboardCheck,
   Clock,
@@ -107,6 +108,17 @@ const mobileNavRoomLinks = {
   href: "/mobile/ops/room-links",
   icon: Link2,
   capability: "room_links.access",
+} as const satisfies NavigationItem;
+
+// 가동률(운영 관리자) — 데스크톱 `/admin/ops/occupancy` 의 모바일 요약판(2026-10-15, 시안 Occ-Phone · Fold · Tablet).
+// 데스크톱 페이지가 관리자 웹 역할 + `ops_admin.access` 를 둘 다 요구하므로 모바일도 같다(`MOBILE_ADMIN_WEB_ONLY_IDS`).
+// See docs/product/34-metrics-and-automation.md → 「모바일 가동률」.
+const mobileNavOpsOccupancy = {
+  id: "ops-occupancy",
+  label: localizedNavigationLabels.mobile.opsOccupancy,
+  href: "/mobile/ops/occupancy",
+  icon: ChartPie,
+  capability: "ops_admin.access",
 } as const satisfies NavigationItem;
 
 const mobileNavCleaning = {
@@ -232,6 +244,7 @@ export const mobileSidebarNavigation = [
  * 사이드 구역째 · 후보에서도 사라진다(셸의 `canSeeMobileNavItem`).
  */
 export const mobileOpsAdminNavigation = [
+  mobileNavOpsOccupancy,
   mobileNavOpsCalendar,
   mobileNavRoomLinks,
 ] as const satisfies readonly NavigationItem[];
@@ -261,10 +274,11 @@ export const customizableBottomNavItems = [
 /**
  * 권한 키에 더해 **관리자 웹 역할**도 요구하는 운영 관리자 항목인가(셸이 함께 거른다).
  *
- * 판매 캘린더는 쓰기 액션이 관리자 세션을 거쳐 역할도 본다. **룸 링크는 아니다** — 보기 · 열기 · 복사뿐이라 권한 키만
+ * 판매 캘린더는 쓰기 액션이 관리자 세션을 거쳐 역할도 본다. 가동률은 데스크톱 페이지가 관리자 웹 역할을 요구해서 같다.
+ * **룸 링크는 아니다** — 보기 · 열기 · 복사뿐이라 권한 키만
  * 받으면 현장 역할도 쓴다(2026-10-05, 사용자 상세에서 개인 부여).
  */
-const MOBILE_ADMIN_WEB_ONLY_IDS: ReadonlySet<string> = new Set(["ops-calendar"]);
+const MOBILE_ADMIN_WEB_ONLY_IDS: ReadonlySet<string> = new Set(["ops-calendar", "ops-occupancy"]);
 export function isMobileOpsAdminNavItem(id: string): boolean {
   return MOBILE_ADMIN_WEB_ONLY_IDS.has(id);
 }

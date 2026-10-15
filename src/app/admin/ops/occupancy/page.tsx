@@ -40,7 +40,7 @@ export default async function OpsOccupancyPage({ searchParams }: { searchParams:
   const tab: OccupancyTab = one("tab") === "rooms" ? "rooms" : one("tab") === "forward" ? "forward" : "report";
 
   return (
-    <AdminShell activeItem={opsNavId("occupancy")} title={dictionary.opsAdmin.areaName}>
+    <AdminShell activeItem={opsNavId("occupancy")} title={dictionary.opsOccupancy.title}>
       {/* 예약 웹훅이 들어오면 새로고침 없이 다시 읽는다 — 예약 신호만(요금 · 차단은 숫자에 안 쓴다), 2026-10-08. */}
       <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <OpsOccupancyConsole

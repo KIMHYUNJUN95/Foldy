@@ -1,26 +1,27 @@
 /* 내보내기 버튼 모션(2026-10-15, 시안 Motion-PC-Export-PC) — 누름 반응 · 도는 고리 「만드는 중」 · 결과는 같은 버튼 자리에서
    (초록 체크 「다운로드됨 / 새 탭에 열림」 · 빨간 「다시 시도 / 팝업 차단됨」 + 흔들림) · 버튼 아래 카드 4초. 버튼 폭은 그대로. */
-.adm .chipbtn.axb { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 200ms ease, color 200ms ease, border-color 200ms ease; }
-.adm .chipbtn.axb:active:not(:disabled) { transform: scale(.97); }
+.adm button.axb { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 200ms ease, color 200ms ease, border-color 200ms ease; }
+.adm button.axb:active:not(:disabled) { transform: scale(.97); }
 .adm .axb__ic { display: inline-flex; width: 16px; height: 16px; flex: none; align-items: center; justify-content: center; color: var(--adm-muted); animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .axb__ic svg { width: 16px; height: 16px; display: block; }
 .adm .axb__tw { display: inline-grid; justify-items: start; }
 .adm .axb__sz, .adm .axb__t { grid-area: 1 / 1; white-space: nowrap; }
 .adm .axb__sz { visibility: hidden; }
+.adm button.axb.axb--panel { padding-left: 8px; padding-right: 8px; gap: 5px; }
 .adm .axb__t { display: inline-block; animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes axb-in { from { opacity: 0; filter: blur(2px); transform: translateY(4px); } }
-.adm .chipbtn.axb.is-busy { cursor: progress; color: #5a30cf; }
-.adm .chipbtn.axb.is-busy .axb__ic { color: #7a52e6; }
+.adm button.axb.is-busy { cursor: progress; color: #5a30cf; }
+.adm button.axb.is-busy .axb__ic { color: #7a52e6; }
 .adm .axb__ring { animation: axb-spin 800ms linear infinite; }
 .adm .axb__ring circle + circle { stroke-dasharray: 28 100; animation: axb-arc 1400ms cubic-bezier(.65, 0, .35, 1) infinite; }
 @keyframes axb-spin { to { transform: rotate(360deg); } }
 @keyframes axb-arc { 0% { stroke-dasharray: 8 100; } 50% { stroke-dasharray: 60 100; } 100% { stroke-dasharray: 8 100; } }
-.adm .chipbtn.axb.is-done, .adm .chipbtn.axb.is-done:hover { background: #effaf3; border-color: #bfe3cf; color: #1b7f45; }
-.adm .chipbtn.axb.is-done .axb__ic { color: #1f9d55; animation: axb-pop 420ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
+.adm button.axb.is-done, .adm button.axb.is-done:hover { background: #effaf3; border-color: #bfe3cf; color: #1b7f45; }
+.adm button.axb.is-done .axb__ic { color: #1f9d55; animation: axb-pop 420ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
 .adm .axb__check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: axb-draw 360ms cubic-bezier(.23, 1, .32, 1) 80ms forwards; }
-.adm .chipbtn.axb.is-error, .adm .chipbtn.axb.is-error:hover, .adm .chipbtn.axb.is-blocked, .adm .chipbtn.axb.is-blocked:hover { background: #fdedec; border-color: #f4c7c3; color: #c0352b; }
-.adm .chipbtn.axb.is-error .axb__ic, .adm .chipbtn.axb.is-blocked .axb__ic { color: #c0352b; }
-.adm .chipbtn.axb.is-error, .adm .chipbtn.axb.is-blocked { animation: axb-shake 380ms cubic-bezier(.36, .07, .19, .97) both; }
+.adm button.axb.is-error, .adm button.axb.is-error:hover, .adm button.axb.is-blocked, .adm button.axb.is-blocked:hover { background: #fdedec; border-color: #f4c7c3; color: #c0352b; }
+.adm button.axb.is-error .axb__ic, .adm button.axb.is-blocked .axb__ic { color: #c0352b; }
+.adm button.axb.is-error, .adm button.axb.is-blocked { animation: axb-shake 380ms cubic-bezier(.36, .07, .19, .97) both; }
 @keyframes axb-pop { from { transform: scale(.6); opacity: 0; } }
 @keyframes axb-draw { to { stroke-dashoffset: 0; } }
 @keyframes axb-shake { 20% { transform: translateX(-4px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } 100% { transform: none; } }
@@ -53,7 +54,7 @@
 .axcard__sub { display: block; margin-top: 2px; font-size: 12px; color: #8b8898; }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .axb__ic, .adm .axb__t, .adm .chipbtn.axb.is-done .axb__ic, .adm .chipbtn.axb.is-error, .adm .chipbtn.axb.is-blocked, .axcard { animation: none; }
+  .adm .axb__ic, .adm .axb__t, .adm button.axb.is-done .axb__ic, .adm button.axb.is-error, .adm button.axb.is-blocked, .axcard { animation: none; }
   .adm .axb__ring { animation-duration: 2400ms; }
   .adm .axb__check path { animation: none; stroke-dashoffset: 0; }
 }

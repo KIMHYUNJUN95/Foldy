@@ -9,8 +9,6 @@ import {
   Check,
   CircleAlert,
   CircleCheck,
-  Download,
-  FileText,
   LogOut,
   Shield,
   Wallet,
@@ -26,9 +24,10 @@ import {
   finalizeAttendanceMonth,
   reopenAttendanceMonth,
 } from "@/app/admin/attendance/actions";
+import { AdminExportButtons, type AdminExportLabels } from "../shared/admin-export-buttons";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
-import { downloadAdminWorkbook, formatAdminYen } from "../shared/admin-format";
+import { formatAdminYen } from "../shared/admin-format";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 
@@ -76,13 +75,13 @@ export function AttendancePayrollClient({
   locale: Locale;
   localeTag: string;
 }) {
-  const c = getDictionary(locale).admin.attendanceConsole;
+  const dictionary = getDictionary(locale);
+  const c = dictionary.admin.attendanceConsole;
+  const shared = dictionary.admin.shared;
   const [rows, setRows] = useState(initialRows);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
   const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
-  const [pendingMonthExport, startMonthExport] = useTransition();
-  const [pendingPdfExport, startPdfExport] = useTransition();
   const [exportHourlyOnly, setExportHourlyOnly] = useState(false);
 
   useEffect(() => {
@@ -107,38 +106,6 @@ export function AttendancePayrollClient({
     const m = mins % 60;
     if (h === 0) return `${m}${c.unitMinShort}`;
     return m === 0 ? `${h}${c.unitHourShort}` : c.payHoursFmt.replace("{h}", String(h)).replace("{m}", String(m));
-  }
-
-  function doMonthlyExport() {
-    startMonthExport(async () => {
-      const res = await exportMonthlyPayrollWorkbook(ym, { hourlyOnly: exportHourlyOnly });
-      if (res.ok) {
-        downloadAdminWorkbook(res.base64, res.filename);
-        showToast(c.payActionDoneExport);
-      } else {
-        showToast(c.payActionExportFailed);
-      }
-    });
-  }
-
-  function doPdfExport() {
-    // Open the tab synchronously (on the click) so pop-up blockers don't kill it after the await.
-    const win = window.open("", "_blank");
-    startPdfExport(async () => {
-      const res = await exportMonthlyPayrollReport(ym, { hourlyOnly: exportHourlyOnly });
-      if (!res.ok) {
-        win?.close();
-        showToast(c.payActionExportFailed);
-        return;
-      }
-      if (!win) {
-        showToast(c.payExportPdfBlocked);
-        return;
-      }
-      win.document.open();
-      win.document.write(res.html);
-      win.document.close();
-    });
   }
 
   return (
@@ -200,18 +167,13 @@ export function AttendancePayrollClient({
           </span>
           <span className="export-toggle__label">{c.payExportHourlyOnly}</span>
         </button>
-        <button type="button" className="chipbtn" onClick={doMonthlyExport} disabled={pendingMonthExport}>
-          <Ic>
-            <Download />
-          </Ic>
-          {pendingMonthExport ? c.payActionExporting : c.payExportMonthly}
-        </button>
-        <button type="button" className="chipbtn" onClick={doPdfExport} disabled={pendingPdfExport}>
-          <Ic>
-            <FileText />
-          </Ic>
-          {pendingPdfExport ? c.payActionExporting : c.payExportPdf}
-        </button>
+        <AdminExportButtons
+          onExportXls={() => exportMonthlyPayrollWorkbook(ym, { hourlyOnly: exportHourlyOnly })}
+          onExportPdf={() => exportMonthlyPayrollReport(ym, { hourlyOnly: exportHourlyOnly })}
+          disabled={rows.length === 0}
+          onToast={showToast}
+          labels={shared}
+        />
       </div>
 
       {rows.length === 0 ? (
@@ -306,6 +268,7 @@ export function AttendancePayrollClient({
           ym={ym}
           row={panelRow}
           c={c}
+          shared={shared}
           localeTag={localeTag}
           onClose={() => setPanelId(null)}
           onUpdated={(updated, msg) => {
@@ -328,6 +291,7 @@ function PayrollPanel({
   ym,
   row,
   c,
+  shared,
   localeTag,
   onClose,
   onUpdated,
@@ -335,6 +299,7 @@ function PayrollPanel({
   ym: string;
   row: AdminPayrollRow;
   c: Att;
+  shared: AdminExportLabels;
   localeTag: string;
   onClose: () => void;
   onUpdated: (updated: AdminPayrollRow, toast: string) => void;
@@ -410,39 +375,6 @@ function PayrollPanel({
       }
     });
   }
-  function doUserExcelExport() {
-    setErr(null);
-    startTransition(async () => {
-      const res = await exportUserPayrollWorkbook(row.userId, ym);
-      if (res.ok) {
-        downloadAdminWorkbook(res.base64, res.filename);
-        onUpdated(row, c.payActionDoneExport);
-      } else {
-        setErr(c.payActionExportFailed);
-      }
-    });
-  }
-  function doUserPdfExport() {
-    const win = window.open("", "_blank");
-    setErr(null);
-    startTransition(async () => {
-      const res = await exportUserPayrollReport(row.userId, ym);
-      if (!res.ok) {
-        win?.close();
-        setErr(c.payActionExportFailed);
-        return;
-      }
-      if (!win) {
-        setErr(c.payExportPdfBlocked);
-        return;
-      }
-      win.document.open();
-      win.document.write(res.html);
-      win.document.close();
-      onUpdated(row, c.payActionDoneExport);
-    });
-  }
-
   return (
     <>
       <div className="panel-scrim on" onClick={onClose} />
@@ -772,32 +704,15 @@ function PayrollPanel({
             </Ic>
             {c.staffViewMonthlyDetailShort}
           </Link>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            style={{ flex: 1 }}
-            onClick={doUserPdfExport}
+          <AdminExportButtons
+            onExportXls={() => exportUserPayrollWorkbook(row.userId, ym)}
+            onExportPdf={() => exportUserPayrollReport(row.userId, ym)}
             disabled={pending || !row.finalized}
-            title={!row.finalized ? c.payExportFinalizedNote : undefined}
-          >
-            <Ic>
-              <FileText />
-            </Ic>
-            {c.payPanelPdfShort}
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            style={{ flex: 1 }}
-            onClick={doUserExcelExport}
-            disabled={pending || !row.finalized}
-            title={!row.finalized ? c.payExportFinalizedNote : undefined}
-          >
-            <Ic>
-              <Download />
-            </Ic>
-            {c.payPanelExcelShort}
-          </button>
+            disabledTitle={!row.finalized ? c.payExportFinalizedNote : undefined}
+            onToast={setErr}
+            labels={shared}
+            variant="panel"
+          />
           {row.finalized ? (
             <button
               type="button"

@@ -8,8 +8,6 @@ import {
   Check,
   ChevronDown,
   CircleAlert,
-  Download,
-  FileText,
   LogOut,
   Receipt,
   RotateCcw,
@@ -27,12 +25,12 @@ import {
   type AdminTransportDetailResult,
   type AdminTransportItemView,
 } from "@/app/admin/attendance/actions";
+import { AdminExportButtons } from "../shared/admin-export-buttons";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import {
   adminTransportStatusPill,
-  downloadAdminWorkbook,
   formatAdminYen,
 } from "../shared/admin-format";
 
@@ -87,15 +85,15 @@ export function AttendanceTransportClient({
   locale: Locale;
   localeTag: string;
 }) {
-  const c = getDictionary(locale).admin.attendanceConsole;
+  const dictionary = getDictionary(locale);
+  const c = dictionary.admin.attendanceConsole;
+  const shared = dictionary.admin.shared;
   const [rows, setRows] = useState(initialRows);
   const [panelUserId, setPanelUserId] = useState<string | null>(
     initialUserId && initialRows.some((r) => r.userId === initialUserId) ? initialUserId : null,
   );
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
   const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
-  const [pendingMonthExport, startMonthExport] = useTransition();
-  const [pendingPdfExport, startPdfExport] = useTransition();
 
   useEffect(() => {
     if (!toast) return;
@@ -122,40 +120,6 @@ export function AttendanceTransportClient({
 
   function applyStatus(userId: string, status: TransportReportStatus) {
     setRows((prev) => prev.map((r) => (r.userId === userId ? { ...r, status } : r)));
-  }
-
-  function doMonthlyExport() {
-    startMonthExport(async () => {
-      const res = await exportMonthlyTransportWorkbook(ym);
-      if (res.ok) {
-        downloadAdminWorkbook(res.base64, res.filename);
-        showToast(c.payActionDoneExport);
-      } else if (res.reason === "empty") {
-        showToast(c.trExportEmpty);
-      } else {
-        showToast(c.payActionExportFailed);
-      }
-    });
-  }
-
-  function doPdfExport() {
-    // Open the tab synchronously (on the click) so pop-up blockers don't kill it after the await.
-    const win = window.open("", "_blank");
-    startPdfExport(async () => {
-      const res = await exportMonthlyTransportReport(ym);
-      if (!res.ok) {
-        win?.close();
-        showToast(res.reason === "empty" ? c.trExportEmpty : c.payActionExportFailed);
-        return;
-      }
-      if (!win) {
-        showToast(c.payExportPdfBlocked);
-        return;
-      }
-      win.document.open();
-      win.document.write(res.html);
-      win.document.close();
-    });
   }
 
   // 화이트 리디자인(2026-10-13, 시안 AttTransport-PC): 숫자 줄 대신 상태 탭(검토 대기 · 보완 요청 · 승인 · 반려 · 제출 전)
@@ -193,18 +157,13 @@ export function AttendanceTransportClient({
           })}
         </div>
         <span className="toolbar__spacer" />
-        <button type="button" className="chipbtn" onClick={doMonthlyExport} disabled={pendingMonthExport}>
-          <Ic>
-            <Download />
-          </Ic>
-          {pendingMonthExport ? c.payActionExporting : c.trExportMonthly}
-        </button>
-        <button type="button" className="chipbtn" onClick={doPdfExport} disabled={pendingPdfExport}>
-          <Ic>
-            <FileText />
-          </Ic>
-          {pendingPdfExport ? c.payActionExporting : c.trExportPdf}
-        </button>
+        <AdminExportButtons
+          onExportXls={() => exportMonthlyTransportWorkbook(ym)}
+          onExportPdf={() => exportMonthlyTransportReport(ym)}
+          disabled={rows.length === 0}
+          onToast={showToast}
+          labels={shared}
+        />
       </div>
 
       {rows.length === 0 || visible.length === 0 ? (

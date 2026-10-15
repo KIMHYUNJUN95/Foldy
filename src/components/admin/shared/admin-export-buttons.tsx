@@ -30,11 +30,15 @@ type AdminExportButtonsProps = {
   disabled?: boolean;
   onToast: (message: string) => void;
   labels: AdminExportLabels;
+  /** `"panel"` = 오른쪽 상세 패널 아래쪽의 넓은 버튼 모양(`btn btn--ghost`, 칸을 나눠 가짐). 기본은 툴바의 `chipbtn`. */
+  variant?: "chip" | "panel";
+  /** 막혀 있을 때 마우스를 올리면 보이는 이유(예: 「확정한 뒤 내보낼 수 있어요」). */
+  disabledTitle?: string;
 };
 
 type Kind = "xls" | "pdf";
 type Result = "done" | "error" | "blocked";
-type Card = { kind: Kind; result: Result; title: string; sub: string; top: number; right: number };
+type Card = { kind: Kind; result: Result; title: string; sub: string; top?: number; bottom?: number; right: number };
 
 const CARD_MS = 4000;
 
@@ -59,6 +63,8 @@ export function AdminExportButtons({
   disabled = false,
   onToast,
   labels,
+  variant = "chip",
+  disabledTitle,
 }: AdminExportButtonsProps) {
   const [xlsPending, startXlsExport] = useTransition();
   const [pdfPending, startPdfExport] = useTransition();
@@ -79,7 +85,10 @@ export function AdminExportButtons({
 
   function show(kind: Kind, result: Result, title: string, sub: string) {
     const r = btns.current[kind]?.getBoundingClientRect();
-    setCard({ kind, result, title, sub, top: r ? r.bottom + 8 : 72, right: r ? window.innerWidth - r.right : 24 });
+    const right = r ? window.innerWidth - r.right : 24;
+    // 화면 아래쪽 버튼(패널 아래 줄 등)이면 카드를 버튼 위로 띄운다.
+    const up = !!r && r.bottom + 96 > window.innerHeight;
+    setCard({ kind, result, title, sub, right, ...(up && r ? { bottom: window.innerHeight - r.top + 8 } : { top: r ? r.bottom + 8 : 72 }) });
     arm(CARD_MS);
   }
 
@@ -143,6 +152,8 @@ export function AdminExportButtons({
       <ExportButton
         btnRef={(el) => { btns.current.xls = el; }}
         disabled={disabled}
+        disabledTitle={disabledTitle}
+        variant={variant}
         label={labels.exportXls}
         labels={labels}
         onClick={handleExportXls}
@@ -152,6 +163,8 @@ export function AdminExportButtons({
       <ExportButton
         btnRef={(el) => { btns.current.pdf = el; }}
         disabled={disabled}
+        disabledTitle={disabledTitle}
+        variant={variant}
         label={labels.exportPdf}
         labels={labels}
         onClick={handleExportPdf}
@@ -169,7 +182,7 @@ export function AdminExportButtons({
               }}
               onMouseLeave={() => arm(left.current)}
               role="status"
-              style={{ top: card.top, right: card.right }}
+              style={{ top: card.top, bottom: card.bottom, right: card.right, transformOrigin: card.bottom !== undefined ? "100% 100%" : undefined }}
             >
               <span aria-hidden="true" className={`axcard__fi axcard__fi--${card.result === "done" ? card.kind : "err"}`}>
                 {card.result === "done" ? (card.kind === "xls" ? "XLS" : "PDF") : "!"}
@@ -201,6 +214,8 @@ function ExportButton({
   disabled,
   onClick,
   btnRef,
+  variant,
+  disabledTitle,
 }: {
   label: string;
   doneLabel: string;
@@ -209,15 +224,19 @@ function ExportButton({
   disabled: boolean;
   onClick: () => void;
   btnRef: (el: HTMLButtonElement | null) => void;
+  variant: "chip" | "panel";
+  disabledTitle?: string;
 }) {
   const busy = phase === "busy";
+  // 패널 버튼은 좁아서 글자는 그대로(「Excel / PDF」) — 상태는 아이콘(고리 · 체크 · 다시) + 색으로, 자세한 결과는 카드가 알린다.
   const text =
-    busy ? labels.exportBusy : phase === "done" ? doneLabel : phase === "error" ? labels.exportRetry : phase === "blocked" ? labels.exportBlockedShort : label;
+    variant === "panel" ? label : busy ? labels.exportBusy : phase === "done" ? doneLabel : phase === "error" ? labels.exportRetry : phase === "blocked" ? labels.exportBlockedShort : label;
   return (
     <button
       aria-busy={busy || undefined}
-      className={`chipbtn axb is-${phase}`}
+      className={`${variant === "panel" ? "btn btn--ghost axb axb--panel" : "chipbtn axb"} is-${phase}`}
       disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
       onClick={onClick}
       ref={btnRef}
       type="button"
@@ -241,9 +260,9 @@ function ExportButton({
           <Download className="ic" />
         )}
       </span>
-      {/* 버튼 폭은 그대로 — 나올 수 있는 글자를 모두 겹쳐 두고 가장 긴 폭을 잡는다. */}
+      {/* 버튼 폭은 그대로 — 나올 수 있는 글자를 모두 겹쳐 두고 가장 긴 폭을 잡는다(패널 버튼은 칸을 나눠 가져 폭이 이미 고정 · 넘치면 말줄임). */}
       <span className="axb__tw">
-        {[label, labels.exportBusy, doneLabel, labels.exportRetry, labels.exportBlockedShort].map((t) => (
+        {(variant === "panel" ? [] : [label, labels.exportBusy, doneLabel, labels.exportRetry, labels.exportBlockedShort]).map((t) => (
           <span aria-hidden="true" className="axb__sz" key={t}>
             {t}
           </span>

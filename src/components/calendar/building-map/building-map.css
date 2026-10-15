@@ -1,0 +1,159 @@
+/* 예약 캘린더 건물 지도(2026-10-15, 시안 Motion-D-Map-Phone). 동작 설명: building-map.tsx 머리말. */
+
+.bm {
+  --bm-soft: linear(0, 0.015, 0.053, 0.107, 0.172, 0.242, 0.315, 0.387, 0.457, 0.524, 0.586, 0.643, 0.695, 0.741, 0.783, 0.819, 0.851, 0.878, 0.902, 0.922, 0.938, 0.952, 0.964, 0.974, 0.981, 0.988, 0.992, 0.996, 0.999, 1.001, 1.003, 1.004, 1.005, 1.005, 1.005, 1.005, 1.005, 1.005, 1.004, 1.004, 1);
+  --bm-cam-ease: linear(0, 0.024, 0.085, 0.166, 0.257, 0.351, 0.441, 0.526, 0.603, 0.671, 0.73, 0.782, 0.825, 0.861, 0.891, 0.916, 0.936, 0.951, 0.964, 0.974, 0.981, 0.987, 0.992, 0.995, 0.997, 0.999, 1, 1.001, 1.001, 1.001, 1.002, 1.002, 1);
+  --bm-bounce: linear(0, 0.051, 0.173, 0.331, 0.495, 0.649, 0.781, 0.887, 0.966, 1.02, 1.053, 1.069, 1.073, 1.069, 1.059, 1.048, 1.036, 1.025, 1.015, 1.008, 1.002, 0.998, 0.996, 0.995, 0.995, 0.995, 0.996, 0.997, 0.997, 0.998, 0.999, 0.999, 1);
+  --bm-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --bm-io: cubic-bezier(0.77, 0, 0.175, 1);
+  --bm-move: 780ms var(--bm-cam-ease);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+@supports not (animation-timing-function: linear(0, 1)) {
+  .bm { --bm-soft: cubic-bezier(0.22, 1, 0.36, 1); --bm-cam-ease: cubic-bezier(0.22, 1, 0.36, 1); --bm-bounce: cubic-bezier(0.34, 1.4, 0.64, 1); }
+}
+
+.bm-bg { position: absolute; inset: 0; z-index: 0; padding: 0; border: 0; background: transparent; cursor: default; }
+
+/* 지도 판 — 카메라 + 눕힘을 한 변환으로(선 굵기가 확대와 무관하게 non-scaling-stroke) */
+.bm-cam { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.bm-plane { display: block; overflow: visible; }
+.bm-g {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transform: var(--bm-cam) var(--bm-tilt);
+  transition: transform var(--bm-move);
+}
+.bm-g path { vector-effect: non-scaling-stroke; }
+.bm-gshadow { fill: rgba(70, 40, 160, 0.2); filter: blur(9px); }
+.bm-outline { stroke: #c7b5f8; stroke-width: 1; stroke-dashoffset: 0; }
+.bm-ohead { stroke: #b9a0fa; stroke-width: 3.4; opacity: 0; filter: blur(1.4px); }
+.bm-sheen { transform: translateX(560px) skewX(-18deg); }
+.bm-reveal { transform: scale(1); transform-box: view-box; }
+
+/* 처음 그리는 장면(세션마다 한 번). 끝값 = 평소 값이라 backwards 로만 채운다(끝난 뒤 카메라 전환이 먹도록). */
+.bm--intro .bm-g { animation: bm-tilt 1150ms var(--bm-soft) 1500ms backwards; }
+@keyframes bm-tilt { from { transform: var(--bm-cam) var(--bm-flat); } to { transform: var(--bm-cam) var(--bm-tilt); } }
+.bm--intro .bm-outline { animation: bm-draw 1300ms var(--bm-io) 150ms backwards, bm-oline 1100ms var(--bm-out) 1500ms backwards; }
+@keyframes bm-draw { from { stroke-dashoffset: 1; stroke: #8a63f0; stroke-width: 1.6; } to { stroke-dashoffset: 0; stroke: #8a63f0; stroke-width: 1.6; } }
+@keyframes bm-oline { from { stroke: #8a63f0; stroke-width: 1.6; } to { stroke: #c7b5f8; stroke-width: 1; } }
+.bm--intro .bm-ohead { animation: bm-head 1550ms var(--bm-io) 150ms backwards; }
+@keyframes bm-head { 0% { stroke-dashoffset: 1.03; opacity: 1; } 84% { stroke-dashoffset: 0.03; opacity: 1; } 100% { stroke-dashoffset: 0.03; opacity: 0; } }
+.bm--intro .bm-surf { animation: bm-fade 800ms var(--bm-out) 500ms backwards; }
+.bm--intro .bm-reveal { animation: bm-reveal 1000ms var(--bm-out) 700ms backwards; }
+@keyframes bm-reveal { from { transform: scale(0); } }
+.bm--intro .bm-rails { animation: bm-fade 600ms var(--bm-out) 1500ms backwards; }
+.bm--intro .bm-wall { animation: bm-fade 900ms var(--bm-out) 1900ms backwards; }
+.bm--intro .bm-gshadow { animation: bm-fade 900ms var(--bm-out) 2000ms backwards; }
+.bm--intro .bm-sheen { animation: bm-sheen 1200ms var(--bm-io) 2700ms backwards; }
+@keyframes bm-sheen { from { transform: translateX(-160px) skewX(-18deg); } to { transform: translateX(560px) skewX(-18deg); } }
+@keyframes bm-fade { from { opacity: 0; } }
+
+/* 역 */
+.bm-stations { position: absolute; inset: 0; z-index: 2; overflow: visible; pointer-events: none; }
+.bm-st { transition: transform var(--bm-move), opacity 200ms ease; }
+.bm-st text { font-size: 9.5px; font-weight: 600; fill: #8f89a3; letter-spacing: -0.01em; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
+.bm--intro .bm-st { animation: bm-fade 400ms var(--bm-out) 2300ms backwards; }
+.has-focus .bm-st { opacity: 0; }
+
+/* 건물 블록 */
+.bm-b { position: absolute; left: 0; top: 0; width: 0; height: 0; transition: transform var(--bm-move), opacity 400ms var(--bm-out); }
+.has-focus .bm-b:not(.is-focus) { opacity: 0.28; }
+.bm-b__svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.bm-b__shadow { fill: rgba(70, 40, 160, 0.16); filter: blur(3.5px); animation: bm-fade 600ms var(--bm-out) calc(var(--d) + 100ms) backwards; }
+.bm-b__ripple { fill: none; stroke: #b9a0fa; stroke-width: 1; opacity: 0; transform-box: fill-box; transform-origin: center; animation: bm-ripple 800ms var(--bm-out) calc(var(--d) + 200ms) backwards; }
+@keyframes bm-ripple { 0% { opacity: 0; transform: scale(0.6); } 2% { opacity: 0.5; transform: scale(0.6); } 100% { opacity: 0; transform: scale(2.4); } }
+.bm-b__g { transform-origin: 0 0; animation: bm-rise 900ms var(--bm-bounce) var(--d) backwards; }
+@keyframes bm-rise { from { transform: scaleY(0.02); } }
+.bm-b__ft { fill: #fff; stroke: #e8e0fc; stroke-width: 0.6; stroke-linejoin: round; transition: fill 420ms var(--bm-out); }
+.bm-b__fl { fill: #f1ecfe; stroke: #e4dbfb; stroke-width: 0.5; stroke-linejoin: round; transition: fill 420ms var(--bm-out); }
+.bm-b__fr { fill: #dacefa; stroke: #d1c3f8; stroke-width: 0.5; stroke-linejoin: round; transition: fill 420ms var(--bm-out); }
+.bm-b__floor { fill: none; stroke: rgba(255, 255, 255, 0.75); stroke-width: 0.7; }
+.bm-b__rim { fill: none; stroke: #fff; stroke-width: 0.9; stroke-linecap: round; }
+.bm-b.is-on .bm-b__ft { fill: #a585f5; stroke: #9b78f2; }
+.bm-b.is-on .bm-b__fl { fill: #7a52e6; stroke: #7a52e6; }
+.bm-b.is-on .bm-b__fr { fill: #5b2bd6; stroke: #5b2bd6; }
+.bm-b.is-on .bm-b__rim { stroke: rgba(255, 255, 255, 0.55); }
+.bm-b__ring { fill: none; stroke: #7a52e6; stroke-width: 1.4; opacity: 0; transform-box: fill-box; transform-origin: center; animation: bm-ring 2600ms var(--bm-out) calc(var(--d) + 1000ms) infinite; }
+@keyframes bm-ring { 0% { opacity: 0.7; transform: scale(0.5); } 45%, 100% { opacity: 0; transform: scale(2.6); } }
+.bm-b__beam rect { filter: blur(0.4px); transform-box: fill-box; transform-origin: 50% 100%; animation: bm-beam-in 700ms var(--bm-out) calc(var(--d) + 900ms) backwards, bm-beam 2600ms ease-in-out calc(var(--d) + 1600ms) infinite; }
+.bm-b__beam rect:first-child { filter: blur(2px); }
+@keyframes bm-beam-in { from { opacity: 0; transform: scaleY(0); } }
+@keyframes bm-beam { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.bm-b__dot { fill: #7a52e6; stroke: #fff; stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: bm-pop 500ms var(--bm-bounce) calc(var(--d) + 800ms) backwards; }
+@keyframes bm-pop { from { transform: scale(0); } }
+.bm-b__hit { position: absolute; left: -22px; width: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 12px; }
+.bm-b__hit:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+
+/* 이름표 — 유리 · 짧은 지시선 */
+.bm-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
+  box-shadow: 0 10px 24px -12px rgba(50, 25, 120, 0.45), 0 0 0 0.5px rgba(80, 50, 170, 0.14), inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
+  color: #16141f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  transition: transform var(--bm-move), opacity 300ms var(--bm-out), scale 160ms var(--bm-out);
+  animation: bm-chip-in 520ms var(--bm-soft) var(--d, 0ms) backwards;
+}
+.bm-chip::after { content: ""; position: absolute; left: var(--lead-x, 50%); top: 100%; width: 1px; height: var(--lead, 12px); transition: height var(--bm-move); margin-left: -0.5px; background: linear-gradient(rgba(122, 82, 230, 0.6), rgba(122, 82, 230, 0)); }
+.bm-chip:active { scale: 0.96; }
+.bm-chip:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.bm-chip b { font-weight: 600; }
+.bm-chip em { font-style: normal; font-size: 11px; font-weight: 600; color: #9c99a8; }
+.bm-chip em.v { color: #fff; background: linear-gradient(180deg, #8a63f0, #6a3fe0); border-radius: 8px; padding: 1px 6px; box-shadow: 0 2px 6px -2px rgba(91, 43, 214, 0.6); }
+.bm-chip.is-dim { opacity: 0.35; }
+.bm-chip.is-cta { height: 32px; border-radius: 16px; padding-right: 4px; box-shadow: 0 12px 28px -12px rgba(91, 43, 214, 0.55), 0 0 0 1px rgba(122, 82, 230, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.9); }
+.bm-chip__go { display: inline-flex; align-items: center; gap: 1px; height: 24px; margin-left: 3px; padding: 0 6px 0 10px; border-radius: 12px; background: linear-gradient(180deg, #8a63f0, #6a3fe0); color: #fff; font-style: normal; font-size: 11.5px; font-weight: 600; }
+.bm-chip__go svg { width: 13px; height: 13px; }
+@keyframes bm-chip-in { from { opacity: 0; scale: 0.88; filter: blur(5px); } }
+
+/* 같은 자리라 못 가르는 건물 — 세로로 펼친 이름표 */
+.bm-stack { position: absolute; left: 0; top: 0; z-index: 35; display: flex; flex-direction: column-reverse; gap: 6px; translate: -50% -100%; transition: transform var(--bm-move); }
+.bm-stack .bm-chip { position: relative; left: auto; top: auto; height: 34px; padding: 0 8px 0 13px; animation: bm-chip-in 420ms var(--bm-soft) backwards; }
+.bm-stack .bm-chip:nth-child(2) { animation-delay: 50ms; }
+.bm-stack .bm-chip:nth-child(3) { animation-delay: 100ms; }
+.bm-stack .bm-chip::after { display: none; }
+.bm-chip__chev { width: 15px; height: 15px; color: #8a63f0; }
+
+/* 오른쪽 위 — 전체 보기 · 나침반 */
+.bm-tools { position: absolute; top: 12px; right: 12px; z-index: 40; display: flex; align-items: center; gap: 8px; }
+.bm-reset { height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: rgba(255, 255, 255, 0.86); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 4px 12px -6px rgba(50, 25, 120, 0.4), 0 0 0 0.5px rgba(80, 50, 170, 0.14); color: #5a30cf; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; animation: bm-chip-in 300ms var(--bm-out) backwards; transition: scale 140ms var(--bm-out); }
+.bm-reset:active { scale: 0.96; }
+.bm-north { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.86); box-shadow: 0 4px 12px -6px rgba(50, 25, 120, 0.4), 0 0 0 0.5px rgba(80, 50, 170, 0.12); }
+.bm-north svg { transform: rotate(-14deg); }
+.bm--intro .bm-north svg { animation: bm-north 1150ms var(--bm-soft) 1500ms backwards; }
+@keyframes bm-north { from { transform: rotate(0deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm { --bm-move: 1ms linear; }
+  .bm *, .bm *::after { animation: none !important; }
+  .bm-chip, .bm-b, .bm-st { transition-duration: 1ms !important; }
+}

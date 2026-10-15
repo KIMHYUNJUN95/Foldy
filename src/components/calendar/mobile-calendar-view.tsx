@@ -13,6 +13,7 @@ import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { useIsTablet } from "@/components/shell/split-list";
+import { BuildingPicker } from "@/components/calendar/building-picker";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { formatPhoneDisplay } from "@/lib/phone-format";
 import { haptic } from "@/lib/haptics";
@@ -747,15 +748,13 @@ export function MobileCalendarView({
   );
 
   // 건물을 아직 안 고른 첫 화면 — 지난번에 본 건물이 있으면 그리로 바로 간다(시안 CalPick-Phone: 카드 첫 화면 대신 건물 고르기).
+  // 지도 | 목록(2026-10-15, 시안 Motion-D-Map-Phone) — `building-picker.tsx`.
   if (!selectedProperty) {
     return (
-      <div className="mcw">
-        <div className="mcw-h">
-          <span className="mcw-h__k">{w.title}</span>
-          <h1 className="mcw-h__t">{w.pickBuilding}</h1>
-        </div>
-        {buildingList()}
-      </div>
+      <BuildingPicker
+        rows={buildingRows.map((row) => ({ ...row, label: propertyName(row.property), href: getPropertyCalendarHref(row.property) }))}
+        w={w}
+      />
     );
   }
 

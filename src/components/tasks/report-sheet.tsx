@@ -24,12 +24,6 @@ type SlackStatus =
   | "empty"
   | "error";
 
-/** 보조 액션(다시 생성 · Slack) 공통 스타일 — 한 곳에 두어 두 버튼의 타이포가 갈리지 않게 한다. */
-const secondaryBtn =
-  "inline-flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-border " +
-  "bg-surface text-[13.5px] font-bold tracking-[-0.01em] text-foreground transition-colors " +
-  "active:bg-muted/60 disabled:opacity-50";
-
 // Clipboard write with a legacy fallback (mirrors the calendar's copy util) so it works in
 // non-secure contexts / older webviews.
 async function copyText(value: string) {
@@ -156,8 +150,8 @@ export function ReportSheet({
                 ? copy.reportSlackError
                 : null;
 
+  // PC 업무일지 창과 같은 「10월 15일 (목)」(연도 없이).
   const dateLabel = new Intl.DateTimeFormat(locale, {
-    year: "numeric",
     month: "long",
     day: "numeric",
     weekday: "short",
@@ -188,18 +182,17 @@ export function ReportSheet({
     <BottomSheet
       ariaLabel={copy.reportTitle}
       header={
-        <div className="mb-4 gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-primary/[0.09] text-primary">
-                <FileText className="size-[17px]" aria-hidden="true" />
-              </span>
-              <p className="text-[16px] font-black tracking-[-0.01em] text-foreground">
-                {copy.reportTitle}
-              </p>
-            </div>
-            <p className="ml-10 mt-[3px] text-[12px] font-medium text-muted-foreground">{dateLabel}</p>
-          </div>
+        // 화이트 리디자인(2026-10-15, 시안 TodoReport-Phone) — PC 업무일지 창과 같은 구성: 제목 + 「날짜 · 완료 n건 중 m건 포함」.
+        <div className="tkw-rpt__h">
+          <h2>{copy.reportTitle}</h2>
+          <span>
+            {status === "done"
+              ? copy.mobileWhite.reportSub
+                  .replace("{date}", dateLabel)
+                  .replace("{total}", String(items.length))
+                  .replace("{selected}", String(pickedCount))
+              : dateLabel}
+          </span>
         </div>
       }
       onClose={onClose}
@@ -230,141 +223,85 @@ export function ReportSheet({
                     true,
                   )
                 : (
-                  <div>
-                    {/* 포함할 항목 고르기. 일지에 넣고 싶지 않은 업무를 textarea 에서 직접 지우는
-                        대신 여기서 체크만 풀면 되고, 번호·합계는 자동으로 다시 매겨진다. */}
-                    <div className="mb-3 overflow-hidden rounded-2xl border border-border">
-                      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
-                        <div className="flex min-w-0 items-baseline gap-1.5">
-                          <span className="text-[12.5px] font-extrabold tracking-[-0.01em] text-foreground">
-                            {copy.reportPickTitle}
-                          </span>
-                          <span className="truncate text-[11.5px] font-medium text-muted-foreground">
-                            {copy.reportPickCount
-                              .replace("{selected}", String(pickedCount))
-                              .replace("{total}", String(items.length))}
-                          </span>
-                        </div>
-                        <button
-                          className="shrink-0 rounded-full px-2 py-1 text-[11.5px] font-bold text-primary transition-colors active:bg-primary/10"
-                          onClick={() => applyPick(items.map(() => !allPicked))}
-                          type="button"
-                        >
+                  <div className="tkw-rpt">
+                    {/* 포함할 항목 — 체크만 풀면 번호 · 합계가 다시 매겨진다. */}
+                    <div className="tkw-rpt__pick">
+                      <div className="tkw-rpt__pickh">
+                        <b>{copy.reportPickTitle}</b>
+                        <span>
+                          {copy.reportPickCount
+                            .replace("{selected}", String(pickedCount))
+                            .replace("{total}", String(items.length))}
+                        </span>
+                        <button onClick={() => applyPick(items.map(() => !allPicked))} type="button">
                           {allPicked ? copy.reportPickNone : copy.reportPickAll}
                         </button>
                       </div>
-                      <ul className="max-h-[22vh] overflow-y-auto overscroll-contain">
+                      <ul>
                         {items.map((item, i) => (
-                          <li className="border-b border-border/60 last:border-b-0" key={`${item.text}-${i}`}>
+                          <li key={`${item.text}-${i}`}>
                             <button
-                              aria-pressed={picked[i]}
-                              className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors active:bg-muted/50"
-                              onClick={() =>
-                                applyPick(picked.map((on, idx) => (idx === i ? !on : on)))
-                              }
+                              aria-checked={picked[i]}
+                              className={cn("tkw-rpt__row", picked[i] && "on")}
+                              onClick={() => applyPick(picked.map((on, idx) => (idx === i ? !on : on)))}
+                              role="checkbox"
                               type="button"
                             >
-                              <span
-                                aria-hidden="true"
-                                className={cn(
-                                  "mt-px flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
-                                  picked[i]
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border bg-surface",
-                                )}
-                              >
-                                {picked[i] ? <Check className="size-3" strokeWidth={3} /> : null}
+                              <span aria-hidden="true" className="tkw-rpt__box">
+                                <svg fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.2" viewBox="0 0 24 24">
+                                  <path d="M5 12.5l4.5 4.5L19 7.5" />
+                                </svg>
                               </span>
-                              <span
-                                className={cn(
-                                  "min-w-0 flex-1 text-[13px] leading-snug",
-                                  picked[i]
-                                    ? "font-medium text-foreground"
-                                    : "text-muted-foreground line-through",
-                                )}
-                              >
-                                {item.text}
-                              </span>
+                              <span className="tkw-rpt__label">{item.text}</span>
                             </button>
                           </li>
                         ))}
                       </ul>
                     </div>
-                    <textarea
-                      className="h-[26vh] w-full resize-none rounded-2xl border border-border bg-muted/40 p-3.5 text-[13.5px] leading-relaxed text-foreground outline-none focus:border-primary"
-                      onChange={(e) => {
-                        setText(e.target.value);
-                        setSlackStatus("idle");
-                      }}
-                      placeholder={copy.reportPickEmpty}
-                      value={text}
-                    />
-                    <p className="mt-1.5 px-0.5 text-[11.5px] text-muted-foreground">
-                      {pickedCount === 0
-                        ? copy.reportPickEmpty
-                        : dirty
-                          ? copy.reportPickResetHint
-                          : copy.reportEditHint}
-                    </p>
-                    {/* 전송 결과는 놓치면 안 되는 정보다. 예전에는 11.5px 회색 한 줄이라 성공해도
-                        실패해도 눈에 안 띄어 "안 보내진다"로 읽혔다(2026-08-04). 콘솔은 토스트를
-                        띄우는데 모바일만 조용했다 — 성공/실패를 색으로 갈라 배너로 세운다. */}
+                    <label className="tkw-rpt__nf">
+                      <span>{copy.mobileWhite.reportBody}</span>
+                      <textarea
+                        onChange={(e) => {
+                          setText(e.target.value);
+                          setSlackStatus("idle");
+                        }}
+                        placeholder={copy.reportPickEmpty}
+                        value={text}
+                      />
+                    </label>
+                    <div className="tkw-rpt__hint">
+                      <span>
+                        {pickedCount === 0 ? copy.reportPickEmpty : dirty ? copy.reportPickResetHint : copy.reportEditHint}
+                      </span>
+                      <button onClick={run} type="button">
+                        <RefreshCw aria-hidden="true" />
+                        {copy.reportRegenerate}
+                      </button>
+                    </div>
+                    {/* 전송 결과는 놓치면 안 된다 — 성공(보라) · 실패(빨강) 한 줄. */}
                     {slackMessage ? (
-                      <p
-                        className={cn(
-                          "mt-2.5 flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[12.5px] font-bold leading-snug",
-                          slackStatus === "sent"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-destructive/10 text-destructive",
-                        )}
-                        role="status"
-                      >
+                      <p className={cn("tkw-rpt__msg", slackStatus === "sent" ? "is-ok" : "is-bad")} role="status">
                         {slackStatus === "sent" ? (
-                          <Check className="size-4 shrink-0" strokeWidth={3} aria-hidden="true" />
+                          <Check aria-hidden="true" strokeWidth={3} />
                         ) : (
-                          <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
+                          <TriangleAlert aria-hidden="true" />
                         )}
                         {slackMessage}
                       </p>
                     ) : null}
-                    {/* 액션 3개를 한 줄에 넣으면 각 버튼이 ~125px 라, 가장 긴 라벨("Slack으로
-                        보내기" / "Send to Slack")이 눌려 보이고 그 버튼만 폰트를 줄여야 했다.
-                        → 보조 2개를 위 줄, 주 동작(복사)을 아래 전체 폭으로 나눈다. 라벨이 길어도
-                        여유가 생기고 세 버튼의 타이포를 하나로 통일할 수 있다(2026-08-03). */}
-                    <div className="mt-3 flex flex-col gap-2">
-                      <div className="flex gap-2">
-                        <button
-                          className={cn(secondaryBtn, "flex-1")}
-                          onClick={run}
-                          type="button"
-                        >
-                          <RefreshCw className="size-4 shrink-0" aria-hidden="true" />
-                          {copy.reportRegenerate}
-                        </button>
-                        <button
-                          className={cn(secondaryBtn, "flex-[1.35]")}
-                          disabled={slackStatus === "sending" || !canSubmit}
-                          onClick={onSlackSend}
-                          type="button"
-                        >
-                          {slackStatus === "sending" ? (
-                            <RefreshCw className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-                          ) : (
-                            <Send className="size-4 shrink-0" aria-hidden="true" />
-                          )}
-                          <span className="truncate">
-                            {slackStatus === "sending" ? copy.reportSlackSending : copy.reportSlackSend}
-                          </span>
-                        </button>
-                      </div>
+                    <div className="tkw-rpt__f">
                       <button
-                        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[14px] font-extrabold tracking-[-0.01em] text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-50"
-                        disabled={!canSubmit}
-                        onClick={onCopy}
+                        className="tkw-rpt__btn is-gray"
+                        disabled={slackStatus === "sending" || !canSubmit}
+                        onClick={onSlackSend}
                         type="button"
                       >
-                        <Copy className="size-[17px] shrink-0" aria-hidden="true" />
-                        {copied ? copy.reportCopied : copy.reportCopy}
+                        {slackStatus === "sending" ? <RefreshCw aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+                        <span>{slackStatus === "sending" ? copy.reportSlackSending : copy.reportSlackSend}</span>
+                      </button>
+                      <button className="tkw-rpt__btn is-pri" disabled={!canSubmit} onClick={onCopy} type="button">
+                        {copied ? <Check aria-hidden="true" strokeWidth={3} /> : <Copy aria-hidden="true" />}
+                        <span>{copied ? copy.reportCopied : copy.reportCopy}</span>
                       </button>
                     </div>
                   </div>

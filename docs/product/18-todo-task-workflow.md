@@ -82,6 +82,12 @@
 햅틱(`@/lib/haptics`): 완료 success · 되살림/실행 취소 light · 빠른 추가 success · 길게 누름 medium · 삭제 확정 warning. 누르는 요소는
 `touch-action: manipulation` + 탭 하이라이트 없음.
 
+### 업무일지 시트 (2026-10-15 추가, 시안 TodoReport-Phone)
+
+- PC 업무일지 창과 같은 구성으로 맞췄다(사용자 요청): 제목 「업무일지」 + 「10월 15일 (목) · 완료 n건 중 m건 포함」 → 포함할 항목(줄 · 체크 그리기) →
+  노치 라벨 「본문」 → 안내 한 줄 + 「다시 생성」 → 「Slack으로 보내기 | 전체 복사」 한 줄. Slack 결과는 보라(성공) / 빨강(실패) 한 줄.
+- 문구: 제목 「일일 보고서」 → 「업무일지」, 복사 「복사」 → 「전체 복사」(ko/ja/en, PC와 같게). 새 키 `tasks.mobileWhite.reportSub` · `reportBody`.
+
 ## 2026-08-06 multilingual context and accessibility copy
 
 Direct-booking context labels and task/project accessibility actions (toggle, previous/next month, more actions, remove participant) are dictionary-backed in Korean, Japanese, and English on both mobile and admin task surfaces.

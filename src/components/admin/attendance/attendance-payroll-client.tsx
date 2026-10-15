@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Ban,
-  Check,
   CircleAlert,
   CircleCheck,
   LogOut,
@@ -26,6 +25,7 @@ import {
 } from "@/app/admin/attendance/actions";
 import { AdminExportButtons, type AdminExportLabels } from "../shared/admin-export-buttons";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
+import { AdminUndoToast } from "../shared/admin-undo-toast";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import { formatAdminYen } from "../shared/admin-format";
 
@@ -83,6 +83,11 @@ export function AttendancePayrollClient({
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
   const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
   const [exportHourlyOnly, setExportHourlyOnly] = useState(false);
+  // 한 번 클릭 마감(2026-10-15, 시안 Motion-C-Confirm-PC) — 확인 창 없이 마감 → 다음 직원으로 → 실행 취소 토스트.
+  const [undo, setUndo] = useState<{ stamp: number; items: { userId: string; name: string }[] } | null>(null);
+  const [undoPending, startUndo] = useTransition();
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [advanced, setAdvanced] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -91,6 +96,46 @@ export function AttendancePayrollClient({
   }, [toast]);
 
   const panelRow = panelId ? rows.find((r) => r.userId === panelId) ?? null : null;
+
+  useEffect(() => {
+    if (!fresh) return;
+    const t = setTimeout(() => setFresh(null), 1700);
+    return () => clearTimeout(t);
+  }, [fresh]);
+
+  function openPanel(userId: string | null) {
+    setAdvanced(false);
+    setPanelId(userId);
+  }
+
+  // 마감 → 줄 「확정」 → 표에서 다음에 마감할 수 있는 직원으로(없으면 패널 닫힘) · 토스트에 한 명 더.
+  function handleFinalized(updated: AdminPayrollRow) {
+    const idx = rows.findIndex((r) => r.userId === updated.userId);
+    const order = [...rows.slice(idx + 1), ...rows.slice(0, Math.max(0, idx))];
+    const next = order.find((r) => !r.finalized && r.finalizationEligible && r.employment !== "salaried");
+    applyRow(updated);
+    setFresh(updated.userId);
+    setUndo((prev) => ({
+      stamp: (prev?.stamp ?? 0) + 1,
+      items: [...(prev?.items ?? []), { userId: updated.userId, name: updated.userName }],
+    }));
+    setAdvanced(Boolean(next));
+    setPanelId(next ? next.userId : null);
+  }
+
+  function undoFinalize() {
+    const items = undo?.items ?? [];
+    startUndo(async () => {
+      let failed = false;
+      for (const it of items) {
+        const res = await reopenAttendanceMonth({ userId: it.userId, ym, reason: c.payUndoReason });
+        if (res.ok) setRows((prev) => prev.map((r) => (r.userId === it.userId ? reopenedRow(r) : r)));
+        else failed = true;
+      }
+      setUndo(null);
+      showToast(failed ? c.actionFailed : c.payActionDoneReopen);
+    });
+  }
 
   function applyRow(updated: AdminPayrollRow) {
     setRows((prev) => prev.map((r) => (r.userId === updated.userId ? updated : r)));
@@ -206,7 +251,11 @@ export function AttendancePayrollClient({
               const sel = panelId === r.userId;
               const isSalaried = r.employment === "salaried";
               return (
-                <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => setPanelId(r.userId)}>
+                <tr
+                  key={r.userId}
+                  className={[sel ? "sel" : "", fresh === r.userId ? "cfm-fresh" : ""].join(" ").trim()}
+                  onClick={() => openPanel(r.userId)}
+                >
                   <td style={{ paddingLeft: 16 }}>
                     <div className="who">
                       <span className="uhead__av" style={{ width: 32, height: 32 }}>
@@ -270,7 +319,9 @@ export function AttendancePayrollClient({
           c={c}
           shared={shared}
           localeTag={localeTag}
-          onClose={() => setPanelId(null)}
+          advanced={advanced}
+          onClose={() => openPanel(null)}
+          onFinalized={handleFinalized}
           onUpdated={(updated, msg) => {
             applyRow(updated);
             showToast(msg);
@@ -278,12 +329,47 @@ export function AttendancePayrollClient({
         />
       ) : null}
 
-      {toast ? (
+      {undo ? (
+        <AdminUndoToast
+          stamp={undo.stamp}
+          message={
+            undo.items.length === 1
+              ? c.payUndoOne.replace("{name}", undo.items[0].name)
+              : c.payUndoMany.replace("{n}", String(undo.items.length))
+          }
+          undoLabel={shared.undo}
+          pending={undoPending}
+          onUndo={undoFinalize}
+          onExpire={() => setUndo(null)}
+        />
+      ) : toast ? (
         <div key={toast.id} role="status" className="adm-toast" onClick={() => setToast(null)}>
           {toast.msg}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** 마감이 풀린 줄 — 막는 것이 없으면 다시 마감 가능. */
+function reopenedRow(row: AdminPayrollRow): AdminPayrollRow {
+  const b = row.blockers;
+  return {
+    ...row,
+    finalized: false,
+    finalizationEligible:
+      row.employment !== "salaried" && b.reviewRequired === 0 && b.pendingCorrections === 0 && b.openSessions === 0,
+    blockers: { ...b, alreadyFinalized: false },
+  };
+}
+
+/** 마감 버튼의 자물쇠 — 마감되면 고리가 「딸깍」 내려와 잠김(`.cfm-shackle`). */
+function LockIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2.5" />
+      <path className="cfm-shackle" d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11" />
+    </svg>
   );
 }
 
@@ -293,7 +379,9 @@ function PayrollPanel({
   c,
   shared,
   localeTag,
+  advanced,
   onClose,
+  onFinalized,
   onUpdated,
 }: {
   ym: string;
@@ -301,12 +389,17 @@ function PayrollPanel({
   c: Att;
   shared: AdminExportLabels;
   localeTag: string;
+  advanced: boolean;
   onClose: () => void;
+  onFinalized: (updated: AdminPayrollRow) => void;
   onUpdated: (updated: AdminPayrollRow, toast: string) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
-  const [modal, setModal] = useState<"finalize" | "reopen" | null>(null);
+  const [modal, setModal] = useState<"reopen" | null>(null);
+  // 마감 직후 0.65초 — 버튼이 초록 「마감됨」 · 자물쇠 딸깍을 보여 준 뒤 다음 직원으로 넘어간다.
+  const [doneFor, setDoneFor] = useState<string | null>(null);
+  const done = doneFor === row.userId;
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: modal !== null });
   const pill = payStatusPill(row, c);
   const b = row.blockers;
@@ -323,11 +416,9 @@ function PayrollPanel({
     startTransition(async () => {
       const res = await finalizeAttendanceMonth({ userId: row.userId, ym });
       if (res.ok) {
-        onUpdated(
-          { ...row, finalized: true, finalizationEligible: false },
-          c.payActionDoneFinalize,
-        );
-        onClose();
+        setDoneFor(row.userId);
+        const finalizedRow = { ...row, finalized: true, finalizationEligible: false };
+        setTimeout(() => onFinalized(finalizedRow), 650);
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else if (res.reason === "blocked") {
@@ -352,19 +443,7 @@ function PayrollPanel({
         reason: reason.trim(),
       });
       if (res.ok) {
-        onUpdated(
-          {
-            ...row,
-            finalized: false,
-            finalizationEligible:
-              row.employment !== "salaried" &&
-              b.reviewRequired === 0 &&
-              b.pendingCorrections === 0 &&
-              b.openSessions === 0,
-            blockers: { ...row.blockers, alreadyFinalized: false },
-          },
-          c.payActionDoneReopen,
-        );
+        onUpdated(reopenedRow(row), c.payActionDoneReopen);
         onClose();
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
@@ -380,12 +459,12 @@ function PayrollPanel({
       <div className="panel-scrim on" onClick={onClose} />
       <aside
         ref={panelRef}
-        className="panel on"
+        className={`panel on${advanced ? " cfm-next" : ""}`}
         role="dialog"
         aria-label={c.payPanelKicker}
         tabIndex={-1}
       >
-        <div className="panel__h">
+        <div className="panel__h" key={`h-${row.userId}`}>
           <div className="panel__top">
             <span className="panel__kicker">{c.payPanelKicker}</span>
             <button type="button" className="panel__x" onClick={onClose} aria-label={c.panelClose}>
@@ -428,7 +507,7 @@ function PayrollPanel({
           </div>
         </div>
 
-        <div className="panel__body">
+        <div className="panel__body" key={`b-${row.userId}`}>
           {/* summary */}
           <div className="pblock">
             <div className="pblock__t">{c.payPanelSecSummary}</div>
@@ -713,7 +792,12 @@ function PayrollPanel({
             labels={shared}
             variant="panel"
           />
-          {row.finalized ? (
+          {done ? (
+            <button type="button" className="btn btn--ok cfm-done" style={{ flex: 1.4 }} disabled aria-live="polite">
+              <LockIcon />
+              <span className="cfm-lab">{c.payPanelBtnFinalizedShort}</span>
+            </button>
+          ) : row.finalized ? (
             <button
               type="button"
               className="btn btn--danger-ghost"
@@ -731,33 +815,15 @@ function PayrollPanel({
               type="button"
               className="btn btn--ok"
               style={{ flex: 1.4 }}
-              onClick={() => setModal("finalize")}
+              onClick={doFinalize}
               disabled={pending || !row.finalizationEligible || row.employment === "salaried"}
             >
-              <Ic>
-                <Check />
-              </Ic>
+              <LockIcon />
               {c.payPanelBtnFinalizeShort}
             </button>
           )}
         </div>
       </aside>
-      {modal === "finalize" ? (
-        <AdminReasonModal
-          title={c.payPanelBtnFinalize}
-          description={c.payPromptFinalize}
-          placeholder={c.dialogReasonPlaceholder}
-          confirmLabel={c.payPanelBtnFinalizeShort}
-          cancelLabel={c.dialogCancel}
-          pending={pending}
-          errorText={err}
-          onConfirm={() => {
-            setModal(null);
-            doFinalize();
-          }}
-          onCancel={() => setModal(null)}
-        />
-      ) : null}
       {modal === "reopen" ? (
         <AdminReasonModal
           title={c.payPanelBtnReopen}

@@ -1,0 +1,74 @@
+/* 결정 확정 모션(2026-10-15, 시안 Motion-C-Confirm-PC) — 실행 취소 토스트 · 길게 눌러 확정 · 확정 도장.
+   여러 명을 연달아 누르는 버튼(급여 마감 · 교통비 승인) = 한 번 클릭 → 자물쇠 딸깍 · 다음 사람으로 · 토스트.
+   한 번에 몰리지 않는 결정(연차 승인) = 0.6초 꾹 → 도장. */
+
+/* ── 실행 취소 토스트 ── */
+.adm .adm-undo {
+  position: fixed; left: 50%; bottom: 32px; z-index: 100; translate: -50% 0;
+  display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 8px 0 14px; border-radius: 14px;
+  background: var(--ink, #16141f); color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 18px 36px -16px rgba(22, 20, 31, .55);
+  animation: adm-undo-in 520ms linear(0.0000,0.0286,0.1038,0.2108,0.3366,0.4699,0.6017,0.7251,0.8353,0.9293,1.0057,1.0642,1.1059,1.1322,1.1452,1.1473,1.1409,1.1282,1.1114,1.0924,1.0726,1.0534,1.0357,1.0201,1.0069,0.9964,0.9885,0.9830,0.9797,0.9783,0.9784,0.9796,0.9817,0.9843,0.9872,0.9901,0.9929,0.9954,0.9976,0.9995,1.0009,1.0020,1.0027,1.0031,1.0000) both;
+}
+@keyframes adm-undo-in { from { opacity: 0; transform: translateY(14px) scale(.97); } }
+.adm .adm-undo__ring { flex: none; }
+.adm .adm-undo__arc { stroke-dasharray: 1; stroke-dashoffset: 0; animation: adm-undo-arc 5000ms linear forwards; }
+.adm .adm-undo:hover .adm-undo__arc { animation-play-state: paused; }
+@keyframes adm-undo-arc { to { stroke-dashoffset: 1; } }
+.adm .adm-undo__msg { display: inline-block; overflow: hidden; height: 1.4em; line-height: 1.4em; }
+.adm .adm-undo__t { display: inline-block; animation: adm-undo-roll 420ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes adm-undo-roll { from { transform: translateY(100%); opacity: 0; } }
+.adm .adm-undo__btn {
+  height: 30px; padding: 0 11px; border: 0; border-radius: 9px; background: rgba(255, 255, 255, .12);
+  color: #d9ccfb; font: inherit; font-weight: 700; cursor: pointer; transition: background-color 160ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1);
+}
+.adm .adm-undo__btn:hover { background: rgba(255, 255, 255, .2); }
+.adm .adm-undo__btn:active { transform: scale(.96); }
+.adm .adm-undo__btn:disabled { opacity: .5; cursor: progress; }
+
+/* ── 한 번 클릭 확정: 자물쇠 딸깍 · 초록으로 차오름 ── */
+.adm .cfm-done { position: relative; overflow: hidden; background: #1f9d55 !important; border-color: #1f9d55 !important; color: #fff !important; animation: cfm-pop 420ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .cfm-done::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 0 2px #1f9d55; animation: cfm-ring 600ms cubic-bezier(.23, 1, .32, 1) both; pointer-events: none; }
+.adm .cfm-done .cfm-shackle { animation: cfm-shackle 420ms linear(0.0000,0.0401,0.1459,0.2953,0.4676,0.6448,0.8121,0.9586,1.0776,1.1654,1.2221,1.2496,1.2521,1.2346,1.2027,1.1619,1.1171,1.0728,1.0321,0.9976,0.9705,0.9513,0.9400,0.9357,0.9372,0.9433,0.9525,0.9634,0.9748,0.9858,0.9955,1.0036,1.0097,1.0137,1.0159,1.0163,1.0154,1.0135,1.0110,1.0081,1.0053,1.0026,1.0003,0.9984,1.0000) both; }
+.adm .cfm-done .cfm-lab { display: inline-block; animation: cfm-lab 360ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes cfm-pop { 0% { transform: scale(.96); } 100% { transform: none; } }
+@keyframes cfm-ring { from { opacity: .5; transform: scale(1); } to { opacity: 0; transform: scale(1.12, 1.5); } }
+@keyframes cfm-shackle { from { transform: translateY(-3px); } }
+@keyframes cfm-lab { from { opacity: 0; filter: blur(3px); transform: translateY(6px); } }
+
+/* 처리된 줄 — 옅은 초록으로 한 번 물들고, 상태 알약은 아래에서 굴러 올라옴 */
+.adm tr.cfm-fresh > td { animation: cfm-wash 1600ms cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes cfm-wash { 0%, 30% { background-color: #f0faf4; } 100% { background-color: transparent; } }
+.adm .cfm-fresh .pill { animation: cfm-pill 560ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes cfm-pill { from { transform: translateY(70%); opacity: 0; filter: blur(2px); } }
+
+/* 다음 사람으로 넘어간 패널 — 내용이 오른쪽에서 흐림 → 또렷 */
+.adm .panel.cfm-next .panel__h,
+.adm .panel.cfm-next .panel__body { animation: cfm-next 420ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes cfm-next { from { opacity: 0; transform: translateX(16px); filter: blur(4px); } }
+
+/* ── 길게 눌러 확정 ── */
+.adm button.ahold { position: relative; overflow: hidden; background: #effaf3; border: 1px solid #bfe3cf; color: #1b7f45; touch-action: none; user-select: none; -webkit-user-select: none; transition: transform 160ms cubic-bezier(.23, 1, .32, 1); }
+.adm button.ahold:hover:not(:disabled) { background: #e6f6ec; }
+.adm button.ahold.is-holding { transform: scale(.97); }
+.adm .ahold__lab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.adm .ahold__fill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1f9d55; color: #fff; clip-path: inset(0 100% 0 0); transition: clip-path 260ms cubic-bezier(.23, 1, .32, 1); }
+.adm .ahold.is-holding .ahold__fill { clip-path: inset(0 0 0 0); transition: clip-path var(--ahold-ms, 600ms) linear; }
+
+/* 확정 도장 — 버튼 자리에 체크가 기울어져 톡 내려앉음 */
+.adm .cfm-stamp { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: #1b7f45; }
+.adm .cfm-stamp__d { position: relative; width: 36px; height: 36px; border-radius: 50%; background: #1f9d55; box-shadow: 0 8px 18px -8px rgba(31, 157, 85, .7); display: flex; align-items: center; justify-content: center; animation: cfm-stamp 520ms linear(0.0000,0.0401,0.1459,0.2953,0.4676,0.6448,0.8121,0.9586,1.0776,1.1654,1.2221,1.2496,1.2521,1.2346,1.2027,1.1619,1.1171,1.0728,1.0321,0.9976,0.9705,0.9513,0.9400,0.9357,0.9372,0.9433,0.9525,0.9634,0.9748,0.9858,0.9955,1.0036,1.0097,1.0137,1.0159,1.0163,1.0154,1.0135,1.0110,1.0081,1.0053,1.0026,1.0003,0.9984,1.0000) both; }
+.adm .cfm-stamp__d::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 2px #1f9d55; animation: cfm-ink 620ms cubic-bezier(.23, 1, .32, 1) 140ms both; }
+.adm .cfm-stamp__d path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: cfm-draw 300ms cubic-bezier(.23, 1, .32, 1) 180ms forwards; }
+.adm .cfm-stamp__t { animation: cfm-lab 420ms cubic-bezier(.23, 1, .32, 1) 220ms both; }
+@keyframes cfm-stamp { from { opacity: 0; transform: scale(1.9) rotate(-16deg); } to { opacity: 1; transform: rotate(-6deg); } }
+@keyframes cfm-ink { from { opacity: .55; transform: scale(1); } to { opacity: 0; transform: scale(2); } }
+@keyframes cfm-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .adm .adm-undo, .adm .adm-undo__t, .adm .cfm-done, .adm .cfm-done::after, .adm .cfm-done .cfm-shackle, .adm .cfm-done .cfm-lab,
+  .adm tr.cfm-fresh > td, .adm .cfm-fresh .pill, .adm .panel.cfm-next .panel__h, .adm .panel.cfm-next .panel__body,
+  .adm .cfm-stamp__d, .adm .cfm-stamp__d::after, .adm .cfm-stamp__t { animation: none; }
+  .adm .cfm-stamp__d path { animation: none; stroke-dashoffset: 0; }
+  .adm .ahold__fill, .adm .ahold.is-holding .ahold__fill { transition-timing-function: linear; }
+}

@@ -27,6 +27,7 @@ import {
 } from "@/app/admin/attendance/actions";
 import { AdminExportButtons } from "../shared/admin-export-buttons";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
+import { AdminUndoToast } from "../shared/admin-undo-toast";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import {
@@ -122,6 +123,45 @@ export function AttendanceTransportClient({
     setRows((prev) => prev.map((r) => (r.userId === userId ? { ...r, status } : r)));
   }
 
+  // 한 번 클릭 승인(2026-10-15, 시안 Motion-C-Confirm-PC) — 월말에 여러 명을 연달아 누르는 버튼이라 확인 창 없이
+  // 승인 → 다음 검토 대기 직원으로 → 실행 취소 토스트(되돌리면 다시 검토 대기).
+  const [undo, setUndo] = useState<{ stamp: number; items: { userId: string; name: string; reportId: string }[] } | null>(null);
+  const [undoPending, startUndo] = useTransition();
+  const [advanced, setAdvanced] = useState(false);
+
+  function openPanel(userId: string | null) {
+    setAdvanced(false);
+    setPanelUserId(userId);
+  }
+
+  function handleApproved(row: AdminTransportRow, reportId: string) {
+    const list = rows.filter((r) => trTabOf(r.status) === tab);
+    const idx = list.findIndex((r) => r.userId === row.userId);
+    const order = [...list.slice(idx + 1), ...list.slice(0, Math.max(0, idx))];
+    const next = order.find((r) => r.status === "submitted" || r.status === "reviewing");
+    applyStatus(row.userId, "approved");
+    setUndo((prev) => ({
+      stamp: (prev?.stamp ?? 0) + 1,
+      items: [...(prev?.items ?? []), { userId: row.userId, name: row.userName, reportId }],
+    }));
+    setAdvanced(Boolean(next));
+    setPanelUserId(next ? next.userId : null);
+  }
+
+  function undoApprove() {
+    const items = undo?.items ?? [];
+    startUndo(async () => {
+      let failed = false;
+      for (const it of items) {
+        const res = await setTransportReportReview({ reportId: it.reportId, action: "reopen", note: c.trUndoReason });
+        if (res.ok) applyStatus(it.userId, "submitted");
+        else failed = true;
+      }
+      setUndo(null);
+      showToast(failed ? c.actionFailed : c.trActionDoneReopen);
+    });
+  }
+
   // 화이트 리디자인(2026-10-13, 시안 AttTransport-PC): 숫자 줄 대신 상태 탭(검토 대기 · 보완 요청 · 승인 · 반려 · 제출 전)
   // → 표(직원 · 건수 · 제출 금액 · 증빙 · 제출일). 비활성이던 상태 필터 칩은 탭이 대신한다.
   const TABS: { key: TrTab; label: string }[] = [
@@ -193,7 +233,7 @@ export function AttendanceTransportClient({
               const noReport = r.status === "none";
               const submitted = fmtSubmittedDay(r.submittedAt, localeTag);
               return (
-                <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => setPanelUserId(r.userId)}>
+                <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => openPanel(r.userId)}>
                   <td style={{ paddingLeft: 16 }}>
                     <div className="who">
                       <span className="uhead__av" style={{ width: 32, height: 32 }}>
@@ -233,7 +273,9 @@ export function AttendanceTransportClient({
           row={panelRow}
           c={c}
           localeTag={localeTag}
-          onClose={() => setPanelUserId(null)}
+          advanced={advanced}
+          onClose={() => openPanel(null)}
+          onApproved={handleApproved}
           onStatusChange={(userId, status, msg) => {
             applyStatus(userId, status);
             showToast(msg);
@@ -241,7 +283,20 @@ export function AttendanceTransportClient({
         />
       ) : null}
 
-      {toast ? (
+      {undo ? (
+        <AdminUndoToast
+          stamp={undo.stamp}
+          message={
+            undo.items.length === 1
+              ? c.trUndoOne.replace("{name}", undo.items[0].name)
+              : c.trUndoMany.replace("{n}", String(undo.items.length))
+          }
+          undoLabel={shared.undo}
+          pending={undoPending}
+          onUndo={undoApprove}
+          onExpire={() => setUndo(null)}
+        />
+      ) : toast ? (
         <div key={toast.id} role="status" className="adm-toast" onClick={() => setToast(null)}>
           {toast.msg}
         </div>
@@ -256,7 +311,9 @@ function TransportPanel({
   row,
   c,
   localeTag,
+  advanced,
   onClose,
+  onApproved,
   onStatusChange,
 }: {
   ym: string;
@@ -264,13 +321,18 @@ function TransportPanel({
   row: AdminTransportRow;
   c: Att;
   localeTag: string;
+  advanced: boolean;
   onClose: () => void;
+  onApproved: (row: AdminTransportRow, reportId: string) => void;
   onStatusChange: (userId: string, status: TransportReportStatus, toast: string) => void;
 }) {
   const [detail, setDetail] = useState<AdminTransportDetailResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [modal, setModal] = useState<"approve" | "reject" | "requestFix" | "reopen" | null>(null);
+  const [modal, setModal] = useState<"reject" | "requestFix" | "reopen" | null>(null);
+  // 승인 직후 0.65초 — 버튼이 초록 「승인됨」 + 체크를 보여 준 뒤 다음 직원으로.
+  const [doneFor, setDoneFor] = useState<string | null>(null);
+  const done = doneFor === row.userId;
   const loading = detail === null && err === null;
   const [itemsExpanded, setItemsExpanded] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -330,19 +392,15 @@ function TransportPanel({
       }
     });
   }
-  function submitApprove(comment: string) {
+  function submitApprove() {
     if (!report) return;
     setErr(null);
+    const reportId = report.id;
     startTransition(async () => {
-      const res = await setTransportReportReview({
-        reportId: report.id,
-        action: "approved",
-        note: comment.trim() ? comment.trim() : null,
-      });
+      const res = await setTransportReportReview({ reportId, action: "approved", note: null });
       if (res.ok) {
-        setModal(null);
-        onStatusChange(row.userId, "approved", c.trActionDoneApprove);
-        onClose();
+        setDoneFor(row.userId);
+        setTimeout(() => onApproved(row, reportId), 650);
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else {
@@ -429,12 +487,12 @@ function TransportPanel({
       <div className="panel-scrim on" onClick={onClose} />
       <aside
         ref={panelRef}
-        className="panel on"
+        className={`panel on${advanced ? " cfm-next" : ""}`}
         role="dialog"
         aria-label={c.trPanelKicker(monthLabel)}
         tabIndex={-1}
       >
-        <div className="panel__h">
+        <div className="panel__h" key={`h-${row.userId}`}>
           <div className="panel__top">
             <span className="panel__kicker">{c.trPanelKicker(monthLabel)}</span>
             <button type="button" className="panel__x" onClick={onClose} aria-label={c.panelClose}>
@@ -460,7 +518,7 @@ function TransportPanel({
           </div>
         </div>
 
-        <div className="panel__body">
+        <div className="panel__body" key={`b-${row.userId}`}>
           {loading ? (
             <div className="pblock">
               <div className="state">
@@ -648,15 +706,24 @@ function TransportPanel({
               >
                 {pending ? c.trActionRequestingFix : c.trPanelBtnRequestFix}
               </button>
-              <button
-                type="button"
-                className="btn btn--ok"
-                style={{ flex: 1.2 }}
-                onClick={() => setModal("approve")}
-                disabled={pending || !report}
-              >
-                {pending ? c.trActionApproving : c.trPanelBtnApprove}
-              </button>
+              {done ? (
+                <button type="button" className="btn btn--ok cfm-done" style={{ flex: 1.2 }} disabled aria-live="polite">
+                  <Ic>
+                    <Check />
+                  </Ic>
+                  <span className="cfm-lab">{c.trPanelBtnApprovedShort}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--ok"
+                  style={{ flex: 1.2 }}
+                  onClick={submitApprove}
+                  disabled={pending || !report}
+                >
+                  {pending ? c.trActionApproving : c.trPanelBtnApprove}
+                </button>
+              )}
             </>
           ) : (
             <span style={{ flex: 2.3 }} />
@@ -664,19 +731,6 @@ function TransportPanel({
         </div>
       </aside>
 
-      {modal === "approve" ? (
-        <AdminReasonModal
-          title={c.trPanelBtnApprove}
-          description={c.trPromptApproveComment}
-          placeholder={c.dialogReasonPlaceholder}
-          confirmLabel={pending ? c.trActionApproving : c.trPanelBtnApprove}
-          cancelLabel={c.dialogCancel}
-          pending={pending}
-          errorText={err}
-          onConfirm={submitApprove}
-          onCancel={() => setModal(null)}
-        />
-      ) : null}
       {modal === "reject" ? (
         <AdminReasonModal
           title={c.trPanelBtnReject}

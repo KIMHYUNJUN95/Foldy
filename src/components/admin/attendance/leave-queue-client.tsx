@@ -41,6 +41,7 @@ import {
 } from "@/app/admin/attendance/leave/actions";
 import { loadLeaveApprovalDetail } from "@/app/admin/attendance/leave/detail-actions";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
+import { AdminHoldButton } from "../shared/admin-hold-button";
 import { AdmDropdown } from "../shared/adm-dropdown";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import { LeaveRequestModal } from "./leave-request-modal";
@@ -683,6 +684,8 @@ function LeavePanel({
   onResolved: (msg: string, resolvedId?: string, resolvedStatus?: LeaveStatus) => void;
 }) {
   const [pending, startTransition] = useTransition();
+  // 승인 도장(2026-10-15, 시안 Motion-C-Confirm-PC) — 0.6초 꾹 → 버튼 자리에 체크 도장 → 0.85초 뒤 목록에 반영 · 닫힘.
+  const [stamped, setStamped] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [modal, setModal] = useState<"reject" | "cancel" | null>(null);
   const [detail, setDetail] = useState<LeaveApprovalDetail | null>(null);
@@ -706,9 +709,12 @@ function LeavePanel({
     startTransition(async () => {
       const res = await approveLeaveRequestAction(item.id);
       if (res.ok) {
-        setStatus("approved");
-        onResolved(lc.actionDoneApprove, item.id, "approved");
-        onClose();
+        setStamped(true);
+        setTimeout(() => {
+          setStatus("approved");
+          onResolved(lc.actionDoneApprove, item.id, "approved");
+          onClose();
+        }, 850);
       } else {
         setErr(errLabel(res.error, lc));
       }
@@ -975,7 +981,18 @@ function LeavePanel({
           ) : null}
         </div>
 
-        {canAct ? (
+        {stamped ? (
+          <div className="panel__foot" style={{ justifyContent: "center" }} aria-live="polite">
+            <span className="cfm-stamp">
+              <span className="cfm-stamp__d">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" pathLength={1} />
+                </svg>
+              </span>
+              <span className="cfm-stamp__t">{lc.panelApprovedStamp}</span>
+            </span>
+          </div>
+        ) : canAct ? (
           <div className="panel__foot">
             <button
               type="button"
@@ -989,18 +1006,12 @@ function LeavePanel({
               </Ic>
               {pending ? lc.actionRejecting : lc.panelBtnReject}
             </button>
-            <button
-              type="button"
-              className="btn btn--ok"
-              style={{ flex: 1.4 }}
-              onClick={submitApprove}
-              disabled={pending}
-            >
+            <AdminHoldButton className="btn" style={{ flex: 1.4 }} onConfirm={submitApprove} disabled={pending}>
               <Ic>
                 <Check />
               </Ic>
-              {pending ? lc.actionApproving : lc.panelBtnApprove}
-            </button>
+              {pending ? lc.actionApproving : lc.panelBtnApproveHold}
+            </AdminHoldButton>
           </div>
         ) : null}
         {status === "approved" ? (

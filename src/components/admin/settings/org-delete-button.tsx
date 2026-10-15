@@ -1,48 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import { deleteOrganization } from "@/app/admin/settings/actions";
+import { SettingsConfirm } from "./settings-confirm";
 
 type OrgDeleteButtonProps = {
   organizationId: string;
-  labels: { delete: string; cancel: string; confirm: string };
+  labels: { delete: string; title: string; confirm: string; keep: string; ok: string };
 };
 
 /**
- * Organization delete control (developer-only page). Inline confirm before submitting the
+ * Organization delete control (developer-only page). Confirm modal before submitting the
  * `deleteOrganization` server action. The action itself only allows deleting an EMPTY org (no members)
  * because every org-scoped table cascades on delete — this button just gates the destructive submit.
  */
 export function OrgDeleteButton({ organizationId, labels }: OrgDeleteButtonProps) {
-  const [confirming, setConfirming] = useState(false);
-
-  if (confirming) {
-    return (
-      <div className="setnote setnote--warn" style={{ flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-        <span style={{ flex: 1, minWidth: 160 }}>{labels.confirm}</span>
-        <button className="btn btn--ghost btn--sm" onClick={() => setConfirming(false)} type="button">
-          {labels.cancel}
-        </button>
-        <form action={deleteOrganization}>
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <button className="btn btn--danger btn--sm" type="submit">
-            <span className="ic">
-              <Trash2 aria-hidden="true" />
-            </span>
-            {labels.delete}
-          </button>
-        </form>
-      </div>
-    );
-  }
-
   return (
-    <button className="btn btn--ghost btn--sm" onClick={() => setConfirming(true)} type="button">
-      <span className="ic">
-        <Trash2 aria-hidden="true" />
-      </span>
-      {labels.delete}
-    </button>
+    <SettingsConfirm
+      action={deleteOrganization}
+      fields={{ organizationId }}
+      trigger={labels.delete}
+      triggerClassName="stw-btn is-text is-red"
+      title={labels.title}
+      body={labels.confirm}
+      keep={labels.keep}
+      ok={labels.ok}
+      danger
+    />
   );
 }

@@ -1,16 +1,7 @@
 import Link from "next/link";
 import QRCode from "qrcode";
 import { redirect } from "next/navigation";
-import {
-  Check,
-  Eye,
-  EyeOff,
-  Plus,
-  Printer,
-  QrCode as QrIcon,
-  Smartphone,
-  TriangleAlert,
-} from "lucide-react";
+import { Check, Plus, Printer, TriangleAlert } from "lucide-react";
 import {
   issueAttendanceSiteQr,
   revokeAttendanceTrustedDevice,
@@ -18,8 +9,10 @@ import {
 } from "@/app/admin/settings/attendance/actions";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { SettingsSubnav } from "@/components/admin/settings/settings-subnav";
+import { SettingsConfirm } from "@/components/admin/settings/settings-confirm";
 import { SiteDangerActions } from "@/components/admin/settings/site-danger-actions";
-import "@/components/admin/settings/settings-console.css";
+import { SiteGeoFields } from "@/components/admin/settings/site-geo-fields";
+import "@/components/admin/settings/settings-white.css";
 import { isOrgTopAdminOrPlatform } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { attendanceQrLinkState, buildAttendanceQrValue } from "@/lib/attendance-qr";
@@ -57,7 +50,10 @@ function tokyoDate(iso: string) {
   }).format(new Date(iso));
 }
 
-// Admin · 출퇴근 QR — 마스터·디테일 (2026-07-31 리디자인, 디자인 초안 1b).
+// Admin · 출퇴근 QR — 마스터·디테일 (2026-07-31 리디자인 → 2026-10-15 화이트 리디자인, 시안 Settings-PC).
+//
+// 2026-10-15: 상자 없는 표(현장 · 연결 건물 · 반경 · QR) + 오른쪽 패널(QR 먼저 → 편집 칸 → 변경 저장).
+// 위도·경도·반경 확인은 SiteGeoFields, QR 다시 발급과 삭제는 확인 창(SettingsConfirm)을 거친다.
 //
 // 현장이 여러 곳인 현실을 정면으로 다룬다: 좌측 표에서 **전 현장의 QR 상태를 한눈에** 보고,
 // 우측에서 선택한 한 곳을 관리한다(현장 정보 / QR / 기억된 기기). 린넨·청소 콘솔의
@@ -122,175 +118,281 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
     (siteDeactivated && settings.success.attendanceSiteDeactivated) ||
     (errorKey ? settings.errors[errorKey] ?? settings.errors.save_failed : "");
   const flashIsError = Boolean(errorKey);
-  const missingQr = rows.filter((row) => row.site.is_active && !row.token).length;
+  const w = settings.white;
+  const activeRows = rows.filter((row) => row.site.is_active);
+  const readyCount = activeRows.filter(
+    (row) => row.token && attendanceQrLinkState(buildAttendanceQrValue(row.token.token)) === "ok",
+  ).length;
+  const attentionCount = activeRows.length - readyCount;
+  const propertyLabel = new Map(propertyOptions.map((option) => [option.id, option.label]));
+  const qrStatusOf = (row: (typeof rows)[number]) => {
+    if (!row.site.is_active) return { label: settings.attendanceSiteInactive, cls: "is-off" };
+    if (!row.token) return { label: settings.attendanceQrNone, cls: "is-red" };
+    return attendanceQrLinkState(buildAttendanceQrValue(row.token.token)) === "ok"
+      ? { label: settings.attendanceQrOk, cls: "is-ok" }
+      : { label: settings.attendanceQrNeedsFix, cls: "is-red" };
+  };
+  const selectedStatus = selectedRow ? qrStatusOf(selectedRow) : null;
+  const inactiveHref = showInactive
+    ? // 끄는 링크: 선택 현장이 비활성이면 선택도 함께 해제한다(안 그러면 강제로 다시 켜진다).
+      `/admin/settings/attendance${selectedSite && selectedSite.is_active ? `?site=${selectedSite.id}` : ""}`
+    : `/admin/settings/attendance?inactive=1${selectedSite ? `&site=${selectedSite.id}` : ""}`;
 
   return (
     <AdminShell activeItem="settings" title={settings.attendanceTitle}>
-      <SettingsSubnav
-        active="attendance"
-        settings={settings}
-        showOrganization={session.user.role === "developer_super_admin"}
-      />
+      <div className="stw">
+        <SettingsSubnav
+          active="attendance"
+          settings={settings}
+          showOrganization={session.user.role === "developer_super_admin"}
+        />
 
-      {flashMessage ? (
-        <div
-          className={`setnote ${flashIsError ? "setnote--warn" : "setnote--ok"}`}
-          style={{ marginBottom: 14 }}
-        >
-          <span className="ic">{flashIsError ? <TriangleAlert /> : <Check />}</span>
-          <span>{flashMessage}</span>
-        </div>
-      ) : null}
+        {flashMessage ? (
+          <p className={`stw-flash ${flashIsError ? "is-red" : "is-green"}`} role="status">
+            {flashIsError ? <TriangleAlert aria-hidden="true" /> : <Check aria-hidden="true" />}
+            {flashMessage}
+          </p>
+        ) : null}
 
-      {missingQr > 0 ? (
-        <div className="setnote setnote--warn" style={{ marginBottom: 14 }}>
-          <span className="ic">
-            <TriangleAlert aria-hidden="true" />
-          </span>
-          <span>{settings.attendanceMissingQrWarn.replace("{n}", String(missingQr))}</span>
-        </div>
-      ) : null}
-
-      <div className="setgrid">
-        {/* ── 마스터: 현장 목록 + QR 상태 ── */}
-        <div className="card" style={{ overflow: "hidden" }}>
-          <div className="card__h">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="card__t">
-                {settings.attendanceSiteListTitle} {visibleRows.length}
-              </div>
-              <div className="setsub">{settings.attendanceSiteListDescription}</div>
+        <div className="stw-split">
+          {/* ── 목록 ── */}
+          <div className="stw-sites">
+            <div className="stw-bar">
+              <span className="stw-sum">
+                <span>{w.sitesN.replace("{n}", String(activeRows.length))}</span>
+                <span className="dot">·</span>
+                <span>{w.readyN.replace("{n}", String(readyCount))}</span>
+                {attentionCount > 0 ? (
+                  <>
+                    <span className="dot">·</span>
+                    <span className="is-red">{w.attentionN.replace("{n}", String(attentionCount))}</span>
+                  </>
+                ) : null}
+                {inactiveCount > 0 ? (
+                  <>
+                    <span className="dot">·</span>
+                    <Link className="stw-link" href={inactiveHref}>
+                      {showInactive ? w.hideInactive : w.showInactive.replace("{n}", String(inactiveCount))}
+                    </Link>
+                  </>
+                ) : null}
+              </span>
+              <span className="stw-bar__r">
+                <Link className="stw-chip" href="/admin/settings/attendance/print" target="_blank">
+                  <Printer aria-hidden="true" />
+                  {settings.attendanceQrPrintAll}
+                </Link>
+                <Link className="stw-chip is-pri" href="/admin/settings/attendance?site=new">
+                  <Plus aria-hidden="true" />
+                  {settings.attendanceNewSite}
+                </Link>
+              </span>
             </div>
-            <Link className="chipbtn" href="/admin/settings/attendance/print" target="_blank">
-              <span className="ic">
-                <Printer aria-hidden="true" />
-              </span>
-              {settings.attendanceQrPrintAll}
-            </Link>
-            <Link className="chipbtn" href="/admin/settings/attendance?site=new">
-              <span className="ic">
-                <Plus aria-hidden="true" />
-              </span>
-              {settings.attendanceNewSite}
-            </Link>
+
+            {visibleRows.length === 0 ? (
+              <div className="stw-empty">{settings.attendanceEmptySites}</div>
+            ) : (
+              <>
+                <div className="stw-th" aria-hidden="true">
+                  <span>{w.colSite}</span>
+                  <span>{w.colBuilding}</span>
+                  <span className="r">{w.colRadius}</span>
+                  <span className="r">{w.colQr}</span>
+                </div>
+                <div className="stw-rows">
+                  {visibleRows.map((row) => {
+                    const status = qrStatusOf(row);
+                    const building = row.site.property_id ? propertyLabel.get(row.site.property_id) : null;
+                    return (
+                      <Link
+                        className={`stw-tr${selectedSite?.id === row.site.id ? " on" : ""}${row.site.is_active ? "" : " is-off"}`}
+                        href={`/admin/settings/attendance?site=${row.site.id}${showInactive ? "&inactive=1" : ""}`}
+                        key={row.site.id}
+                        aria-current={selectedSite?.id === row.site.id ? "true" : undefined}
+                      >
+                        <span className="stw-who">
+                          <span className="stw-av" aria-hidden="true">
+                            {Array.from(row.site.name)[0] ?? "·"}
+                          </span>
+                          <span className="stw-who__t">
+                            <b>{row.site.name}</b>
+                            <span>{w.printNameLine.replace("{name}", row.site.print_name || "—")}</span>
+                          </span>
+                        </span>
+                        <span className={building ? undefined : "is-soft"}>{building ?? w.notBuilding}</span>
+                        <span className="r num">{row.site.allowed_radius_meters}m</span>
+                        <span className={`r stw-q ${status.cls}`}>{status.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* 기억된 기기 — 조직 전체 목록이라 현장 패널이 아니라 목록 아래에 둔다. */}
+            <section className="stw-dev" aria-labelledby="stw-dev-t">
+              <h2 id="stw-dev-t">
+                {settings.attendanceDevicesTitle} <span className="num is-soft">{trustedDevices.length}</span>
+              </h2>
+              <p>{settings.attendanceDevicesDescription}</p>
+              {trustedDevices.length === 0 ? (
+                <p className="stw-hint" style={{ margin: "0 2px" }}>{settings.attendanceDevicesEmpty}</p>
+              ) : (
+                <>
+                  <div className="stw-th" aria-hidden="true">
+                    <span>{settings.attendanceDeviceStaff}</span>
+                    <span>{settings.attendanceDeviceLastUsed}</span>
+                    <span>{settings.attendanceDeviceExpires}</span>
+                    <span />
+                  </div>
+                  <div className="stw-rows">
+                    {trustedDevices.map((device) => (
+                      <div className="stw-tr" key={device.id}>
+                        <span className="stw-who__t">
+                          <b>{device.userName}</b>
+                          <span>{device.deviceLabel ?? settings.attendanceDeviceUnknown}</span>
+                        </span>
+                        <span className="num is-soft">{tokyoDate(device.lastUsedAt)}</span>
+                        <span className="num is-soft">{tokyoDate(device.expiresAt)}</span>
+                        <form action={revokeAttendanceTrustedDevice} className="r">
+                          <input name="deviceId" type="hidden" value={device.id} />
+                          <input name="siteId" type="hidden" value={selectedSite?.id ?? ""} />
+                          <button className="stw-link is-red" type="submit">
+                            {settings.attendanceDeviceRevoke}
+                          </button>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
           </div>
 
-          {inactiveCount > 0 ? (
-            <div style={{ padding: "0 16px 12px" }}>
-              <Link
-                className={`chipbtn${showInactive ? " is-on" : ""}`}
-                href={
-                  showInactive
-                    ? // 끄는 링크: 선택 현장이 비활성이면 선택도 함께 해제한다(안 그러면 강제로 다시 켜진다).
-                      `/admin/settings/attendance${
-                        selectedSite && selectedSite.is_active ? `?site=${selectedSite.id}` : ""
-                      }`
-                    : `/admin/settings/attendance?inactive=1${selectedSite ? `&site=${selectedSite.id}` : ""}`
-                }
-              >
-                <span className="ic">{showInactive ? <EyeOff /> : <Eye />}</span>
-                {settings.attendanceShowInactive} {inactiveCount}
-              </Link>
-            </div>
-          ) : null}
-
-          {visibleRows.length === 0 ? (
-            <div className="card__body">
-              <div className="setnote setnote--dim">{settings.attendanceEmptySites}</div>
-            </div>
-          ) : (
-            <div>
-              {visibleRows.map((row) => {
-                const state = row.token
-                  ? attendanceQrLinkState(buildAttendanceQrValue(row.token.token))
-                  : null;
-                return (
-                  <Link
-                    className={`setrow${selectedSite?.id === row.site.id ? " is-sel" : ""}${row.site.is_active ? "" : " is-off"}`}
-                    href={`/admin/settings/attendance?site=${row.site.id}`}
-                    key={row.site.id}
-                  >
-                    <span className="setrow__b">
-                      <span className="setsite__n">{row.site.name}</span>
-                      <span className="setsite__m">
-                        {row.site.latitude}, {row.site.longitude} · {row.site.allowed_radius_meters}m
-                      </span>
-                    </span>
-                    {!row.site.is_active ? (
-                      <span className="pill pill--muted">{settings.attendanceSiteInactive}</span>
-                    ) : !row.token ? (
-                      <span className="pill pill--danger">{settings.attendanceQrNone}</span>
-                    ) : state === "ok" ? (
-                      <span className="pill pill--done">{settings.attendanceQrOk}</span>
-                    ) : (
-                      <span className="pill pill--warn">{settings.attendanceQrNeedsFix}</span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ── 디테일: 선택한 현장 ── */}
-        <div className="setstack">
-          <div className="card">
-            <div className="card__h">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="card__t">
-                  {selectedSite ? selectedSite.name : settings.attendanceCreateSiteTitle}
+          {/* ── 패널: 선택한 현장 / 새 현장 ── */}
+          <aside className="stw-panel" key={selectedSite?.id ?? "new"} aria-label={selectedSite?.name ?? w.newSiteTitle}>
+            <div className="stw-hd">
+              {selectedSite && selectedStatus ? (
+                <div className="stw-meta">
+                  <span className={selectedStatus.cls === "is-red" ? "is-red" : undefined}>
+                    {w.qrStatus.replace("{s}", selectedStatus.label)}
+                  </span>
+                  {selectedSite.is_active ? <span>{w.active}</span> : null}
                 </div>
-                <div className="setsub">
-                  {selectedSite
-                    ? settings.attendanceEditSiteDescription
-                    : settings.attendanceCreateSiteDescription}
+              ) : (
+                <div className="stw-meta">
+                  <span>{w.siteSection}</span>
+                </div>
+              )}
+              <h2>{selectedSite ? selectedSite.name : w.newSiteTitle}</h2>
+              {selectedSite ? null : <span>{w.newSiteHint}</span>}
+            </div>
+
+            {/* QR 먼저 — 이 화면에 들어오는 이유. 인쇄 전에 "지금 뽑아도 되는가"를 알려준다. */}
+            {selectedSite ? (
+              <div className="stw-qr">
+                {activeQr && qrSvg ? (
+                  <div
+                    className={`stw-qr__img${qrLinkState === "ok" ? "" : " is-dim"}`}
+                    role="img"
+                    aria-label={settings.attendanceQrSectionTitle}
+                    dangerouslySetInnerHTML={{ __html: qrSvg }}
+                  />
+                ) : null}
+                <div className="stw-qr__b">
+                  <b className={qrLinkState === "ok" ? "is-green" : "is-red"}>
+                    {!activeQr
+                      ? settings.attendanceQrNone
+                      : qrLinkState === "ok"
+                        ? settings.attendanceQrOk
+                        : settings.attendanceQrNeedsFix}
+                  </b>
+                  <p>
+                    {!activeQr
+                      ? settings.attendanceNoQr
+                      : qrLinkState === "ok"
+                        ? settings.attendanceQrReady
+                        : qrLinkState === "local"
+                          ? settings.attendanceQrWarnLocal
+                          : settings.attendanceQrWarnMissing}
+                  </p>
+                  {activeQr ? <small className="num">{w.qrIssuedOn.replace("{date}", tokyoDate(activeQr.issued_at))}</small> : null}
+                  <div className="stw-qr__acts">
+                    {activeQr ? (
+                      <SettingsConfirm
+                        action={issueAttendanceSiteQr}
+                        fields={{ siteId: selectedSite.id }}
+                        trigger={settings.attendanceReissueQr}
+                        triggerClassName="stw-link"
+                        title={w.reissueTitle}
+                        body={w.reissueBody}
+                        keep={w.keep}
+                        ok={w.reissueOk}
+                      />
+                    ) : (
+                      <form action={issueAttendanceSiteQr}>
+                        <input name="siteId" type="hidden" value={selectedSite.id} />
+                        <button className="stw-link" type="submit">
+                          {settings.attendanceIssueQr}
+                        </button>
+                      </form>
+                    )}
+                    {activeQr && qrLinkState === "ok" ? (
+                      <Link className="stw-link" href={`/admin/settings/attendance/print?site=${selectedSite.id}`} target="_blank">
+                        {w.print}
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="card__body">
-              <form
-                action={saveAttendanceSiteSettings}
-                className="setform"
-                // 현장이 바뀌면 폼을 통째로 다시 마운트한다. 이게 없으면 소프트 내비게이션에서
-                // 이전 현장의 입력값이 남아, 저장 시 다른 현장을 덮어쓴다(2026-07-31 실제 사고).
-                key={selectedSite?.id ?? "new"}
-              >
-                <input name="siteId" type="hidden" value={selectedSite?.id ?? ""} />
-                <div className="fld">
-                  <label className="fld__l" htmlFor="site-name">
-                    {settings.attendanceSiteName}
-                  </label>
-                  <input defaultValue={selectedSite?.name ?? ""} id="site-name" name="name" required />
-                </div>
-                <div className="fld" style={{ marginTop: 11 }}>
-                  <label className="fld__l" htmlFor="site-print-name">
-                    {settings.attendancePrintName}
-                  </label>
-                  <input
-                    defaultValue={selectedSite?.print_name ?? ""}
-                    id="site-print-name"
-                    name="printName"
-                    placeholder={selectedSite?.name ?? ""}
-                  />
-                  <p className="fld__hint">{settings.attendancePrintNameHint}</p>
-                </div>
-                {/*
-                  근무지를 어느 **건물**로 볼지. 이 연결이 없으면 교통비 자동 연결이 건물을 못 찾고
-                  이름으로 더듬어야 한다 — 근무지 이름(`아라키초A`)과 건물 이름(Beds24 원본
-                  `Arakicho A`)은 따로 관리돼 어긋나고, 「스카이」처럼 건물이 개명됐는데 근무지
-                  이름만 남은 경우도 있다.
+            ) : null}
 
-                  사무실처럼 **건물이 아닌 근무지**는 비워 둔다.
-                */}
-                <div className="fld" style={{ marginTop: 11 }}>
-                  <label className="fld__l" htmlFor="site-property">
-                    {settings.attendanceSiteProperty}
-                  </label>
-                  <select
-                    defaultValue={selectedSite?.property_id ?? ""}
-                    id="site-property"
-                    name="propertyId"
-                  >
+            {history.length > 1 ? (
+              <div className="stw-f">
+                <span className="stw-k">{settings.attendanceQrHistory}</span>
+                <ul className="stw-hist">
+                  {history.slice(0, 3).map((token) => (
+                    <li key={token.id}>
+                      {/* 발급 이력은 "토큰 상태"다 — `attendanceQrOk`("준비됨")는 인쇄해도 되는지의 판정 문구라 여기 쓰면 의미가 어긋난다. */}
+                      <span className={token.is_active ? "is-green" : undefined}>
+                        {token.is_active ? settings.attendanceQrActive : settings.attendanceQrRevoked}
+                      </span>
+                      <span className="num">{tokyoDate(token.issued_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <form
+              id="stw-site-form"
+              action={saveAttendanceSiteSettings}
+              className={`stw-form${selectedSite ? "" : " is-top"}`}
+              // 현장이 바뀌면 폼을 통째로 다시 마운트한다. 이게 없으면 소프트 내비게이션에서
+              // 이전 현장의 입력값이 남아, 저장 시 다른 현장을 덮어쓴다(2026-07-31 실제 사고).
+              key={selectedSite?.id ?? "new"}
+            >
+              <input name="siteId" type="hidden" value={selectedSite?.id ?? ""} />
+              <label className="stw-nf">
+                <span>{settings.attendanceSiteName}</span>
+                <input defaultValue={selectedSite?.name ?? ""} name="name" required autoComplete="off" />
+              </label>
+              <div className="stw-f">
+                <label className="stw-nf">
+                  <span>{settings.attendancePrintName}</span>
+                  <input defaultValue={selectedSite?.print_name ?? ""} name="printName" placeholder={selectedSite?.name ?? ""} autoComplete="off" />
+                </label>
+                <span className="stw-hint">{w.printNameHint}</span>
+              </div>
+              {/*
+                근무지를 어느 **건물**로 볼지. 이 연결이 없으면 교통비 자동 연결이 건물을 못 찾고
+                이름으로 더듬어야 한다 — 근무지 이름(`아라키초A`)과 건물 이름(Beds24 원본
+                `Arakicho A`)은 따로 관리돼 어긋난다. 사무실처럼 **건물이 아닌 근무지**는 비워 둔다.
+              */}
+              <div className="stw-f">
+                <label className="stw-nf">
+                  <span>{settings.attendanceSiteProperty}</span>
+                  <select defaultValue={selectedSite?.property_id ?? ""} name="propertyId">
                     <option value="">{settings.attendanceSitePropertyNone}</option>
                     {propertyOptions.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -298,258 +400,57 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                       </option>
                     ))}
                   </select>
-                  <p className="fld__hint">{settings.attendanceSitePropertyHint}</p>
-                </div>
-                <div
-                  style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 11 }}
-                >
-                  <div className="fld">
-                    <label className="fld__l" htmlFor="site-lat">
-                      {settings.attendanceLatitude}
-                    </label>
-                    <input
-                      defaultValue={formatField(selectedSite, "latitude")}
-                      id="site-lat"
-                      inputMode="decimal"
-                      name="latitude"
-                      required
-                      step="any"
-                      type="number"
-                    />
-                  </div>
-                  <div className="fld">
-                    <label className="fld__l" htmlFor="site-lng">
-                      {settings.attendanceLongitude}
-                    </label>
-                    <input
-                      defaultValue={formatField(selectedSite, "longitude")}
-                      id="site-lng"
-                      inputMode="decimal"
-                      name="longitude"
-                      required
-                      step="any"
-                      type="number"
-                    />
-                  </div>
-                </div>
-                <div className="fld" style={{ marginTop: 11 }}>
-                  <label className="fld__l" htmlFor="site-radius">
-                    {settings.attendanceRadius}
-                  </label>
-                  <input
-                    defaultValue={selectedSite?.allowed_radius_meters?.toString() ?? "100"}
-                    id="site-radius"
-                    inputMode="numeric"
-                    min={1}
-                    name="radius"
-                    required
-                    step={1}
-                    type="number"
-                  />
-                  <p className="fld__hint">{settings.attendanceRadiusHint}</p>
-                </div>
-                <button className="btn btn--pri" style={{ marginTop: 14 }} type="submit">
-                  {selectedSite ? settings.attendanceSaveSite : settings.attendanceCreateSiteCta}
-                </button>
-              </form>
+                </label>
+                <span className="stw-hint">{w.buildingHint}</span>
+              </div>
+              <SiteGeoFields
+                initialLat={formatField(selectedSite, "latitude")}
+                initialLng={formatField(selectedSite, "longitude")}
+                initialRadius={selectedSite?.allowed_radius_meters?.toString() ?? "100"}
+                copy={{
+                  latitude: settings.attendanceLatitude,
+                  longitude: settings.attendanceLongitude,
+                  latInvalid: w.latInvalid,
+                  lngInvalid: w.lngInvalid,
+                  mapLink: w.mapLink,
+                  radiusLabel: w.radiusLabel,
+                  radiusCustom: w.radiusCustom,
+                  radiusHint: w.radiusHint,
+                  radiusInvalid: w.radiusInvalid,
+                }}
+              />
+            </form>
 
-              {selectedSite ? (
-                <div
-                  style={{
-                    marginTop: 18,
-                    paddingTop: 16,
-                    borderTop: "1px solid var(--line-soft)",
-                  }}
-                >
+            {/* 맨 아래 한 줄: 비활성화 · 삭제(글자) + 변경 저장. 폼이 겹치지 않게 저장 버튼은 form 속성으로 위 폼을 제출한다. */}
+            <div className="stw-f" style={{ marginTop: "auto" }}>
+              <div className="stw-foot">
+                {selectedSite ? (
                   <SiteDangerActions
                     hasHistory={siteHasHistory}
                     isActive={selectedSite.is_active}
                     labels={{
                       activate: settings.attendanceSiteActivate,
-                      cancel: dictionary.common.cancel,
                       deactivate: settings.attendanceSiteDeactivate,
-                      deactivateHint: settings.attendanceSiteDeactivateHint,
                       delete: settings.attendanceSiteDelete,
+                      deleteTitle: w.deleteSiteTitle,
                       deleteConfirm: settings.attendanceSiteDeleteConfirm,
-                      inUseHint: settings.attendanceSiteInUseHint,
+                      deleteOk: w.deleteOk,
+                      keep: w.keep,
                     }}
                     siteId={selectedSite.id}
                   />
-                </div>
+                ) : null}
+                <button className="stw-btn is-pri" form="stw-site-form" type="submit">
+                  {selectedSite ? w.saveChanges : settings.attendanceCreateSiteCta}
+                </button>
+              </div>
+              {selectedSite ? (
+                <span className="stw-hint">
+                  {siteHasHistory ? settings.attendanceSiteInUseHint : settings.attendanceSiteDeactivateHint}
+                </span>
               ) : null}
             </div>
-          </div>
-
-          {/* QR */}
-          <div className="card">
-            <div className="card__h">
-              <span className="card__ic bg-pri">
-                <span className="ic">
-                  <QrIcon aria-hidden="true" />
-                </span>
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="card__t">{settings.attendanceQrSectionTitle}</div>
-                <div className="setsub">{settings.attendanceQrSectionDescription}</div>
-              </div>
-            </div>
-            <div className="card__body">
-              {!selectedSite ? (
-                <div className="setnote setnote--dim">{settings.attendanceCreateFirstHint}</div>
-              ) : activeQr && qrSvg ? (
-                <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-                  <div className="setqr" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-                  <div style={{ flex: 1, minWidth: 240 }}>
-                    <div
-                      className={`setnote ${qrLinkState === "ok" ? "setnote--ok" : "setnote--warn"}`}
-                    >
-                      <span className="ic">
-                        {qrLinkState === "ok" ? <Check /> : <TriangleAlert />}
-                      </span>
-                      <span>
-                        {qrLinkState === "ok"
-                          ? settings.attendanceQrReady
-                          : qrLinkState === "local"
-                            ? settings.attendanceQrWarnLocal
-                            : settings.attendanceQrWarnMissing}
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 12 }}>
-                      <div className="kv">
-                        <span className="kv__k">{settings.attendanceQrLink}</span>
-                        <span className="kv__v mono" style={{ fontSize: 11 }}>
-                          {qrValue}
-                        </span>
-                      </div>
-                      <div className="kv">
-                        <span className="kv__k">{settings.attendanceToken}</span>
-                        <span className="kv__v mono" style={{ fontSize: 11 }}>
-                          {activeQr.token}
-                        </span>
-                      </div>
-                      <div className="kv">
-                        <span className="kv__k">{settings.attendanceIssuedAt}</span>
-                        <span className="kv__v mono">{tokyoDate(activeQr.issued_at)}</span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-                      {qrLinkState === "ok" ? (
-                        <Link
-                          className="btn btn--pri btn--sm"
-                          href={`/admin/settings/attendance/print?site=${selectedSite.id}`}
-                          target="_blank"
-                        >
-                          <span className="ic">
-                            <Printer aria-hidden="true" />
-                          </span>
-                          {settings.attendanceQrPrintOne}
-                        </Link>
-                      ) : null}
-                      <form action={issueAttendanceSiteQr}>
-                        <input name="siteId" type="hidden" value={selectedSite.id} />
-                        <button className="btn btn--ghost btn--sm" type="submit">
-                          {settings.attendanceReissueQr}
-                        </button>
-                      </form>
-                    </div>
-                    <p className="fld__hint">{settings.attendanceReissueHint}</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="setnote setnote--warn">
-                    <span className="ic">
-                      <TriangleAlert aria-hidden="true" />
-                    </span>
-                    <span>{settings.attendanceNoQr}</span>
-                  </div>
-                  <form action={issueAttendanceSiteQr} style={{ marginTop: 12 }}>
-                    <input name="siteId" type="hidden" value={selectedSite.id} />
-                    <button className="btn btn--pri" type="submit">
-                      {settings.attendanceIssueQr}
-                    </button>
-                  </form>
-                </>
-              )}
-
-              {history.length > 1 ? (
-                <div style={{ marginTop: 16 }}>
-                  <div className="fld__l">{settings.attendanceQrHistory}</div>
-                  {history.map((token) => (
-                    <div className="sethist" key={token.id}>
-                      <span className={token.is_active ? "pill pill--done" : "pill pill--muted"}>
-                        {/* 발급 이력은 "토큰 상태"다 — `attendanceQrOk`("준비됨")는 인쇄해도 되는지의
-                            판정 문구라 여기 쓰면 의미가 어긋난다. */}
-                        {token.is_active ? settings.attendanceQrActive : settings.attendanceQrRevoked}
-                      </span>
-                      <span style={{ flex: 1 }} />
-                      <span className="sethist__d">{tokyoDate(token.issued_at)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {/* 기억된 기기 */}
-          <div className="card">
-            <div className="card__h">
-              <span className="card__ic bg-pri">
-                <span className="ic">
-                  <Smartphone aria-hidden="true" />
-                </span>
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="card__t">
-                  {settings.attendanceDevicesTitle} {trustedDevices.length}
-                </div>
-                <div className="setsub">{settings.attendanceDevicesDescription}</div>
-              </div>
-            </div>
-            {trustedDevices.length === 0 ? (
-              <div className="card__body">
-                <div className="setnote setnote--dim">{settings.attendanceDevicesEmpty}</div>
-              </div>
-            ) : (
-              <table className="qtbl">
-                <thead>
-                  <tr>
-                    <th style={{ paddingLeft: 16 }}>{settings.attendanceDeviceStaff}</th>
-                    <th>{settings.attendanceDeviceLastUsed}</th>
-                    <th>{settings.attendanceDeviceExpires}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {trustedDevices.map((device) => (
-                    <tr key={device.id}>
-                      <td style={{ paddingLeft: 16 }}>
-                        <span className="setsite__n">{device.userName}</span>
-                        <span className="setsite__m">
-                          {device.deviceLabel ?? settings.attendanceDeviceUnknown}
-                        </span>
-                      </td>
-                      <td className="mono" style={{ color: "var(--adm-muted)" }}>
-                        {tokyoDate(device.lastUsedAt)}
-                      </td>
-                      <td className="mono" style={{ color: "var(--adm-muted)" }}>
-                        {tokyoDate(device.expiresAt)}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <form action={revokeAttendanceTrustedDevice}>
-                          <input name="deviceId" type="hidden" value={device.id} />
-                          <input name="siteId" type="hidden" value={selectedSite?.id ?? ""} />
-                          <button className="btn btn--ghost btn--sm" type="submit">
-                            {settings.attendanceDeviceRevoke}
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          </aside>
         </div>
       </div>
     </AdminShell>

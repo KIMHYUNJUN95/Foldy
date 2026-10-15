@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, Check, Plus, TriangleAlert } from "lucide-react";
+import { Check, Plus, TriangleAlert } from "lucide-react";
 import { createOrganization, updateOrganization } from "@/app/admin/settings/actions";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { OrgDeleteButton } from "@/components/admin/settings/org-delete-button";
 import { SettingsSubnav } from "@/components/admin/settings/settings-subnav";
-import "@/components/admin/settings/settings-console.css";
+import "@/components/admin/settings/settings-white.css";
 import { getDictionary } from "@/lib/i18n";
 import { requireAdminSession } from "@/lib/admin-session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -22,13 +22,21 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function statusPillClass(status: OrganizationStatus): string {
-  if (status === "active") return "pill pill--done";
-  if (status === "suspended") return "pill pill--warn";
-  return "pill pill--muted";
+/** 만든 날 — 도쿄 기준 YYYY.MM.DD. */
+function tokyoDot(iso: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date(iso))
+    .replaceAll("-", ".");
 }
 
-// Admin · 조직 설정 — 마스터·디테일 (2026-07-31 리디자인, 디자인 초안 1b).
+// Admin · 조직 설정 — 마스터·디테일 (2026-07-31 리디자인 → 2026-10-15 화이트 리디자인,
+// 시안 SettingsOrg-PC · SettingsOrgNew-PC). 표(조직 · 멤버 · 만든 날) + 오른쪽 패널(이름 저장 · 삭제),
+// 「+ 새 조직」(`?org=new`)은 같은 패널 자리에 만들기 폼을 연다. 슬러그는 만든 뒤 바꾸지 않는다.
 // 좌측에 조직 목록, 우측에 선택한 조직의 편집/삭제와 신규 생성. 출퇴근 QR 화면과 같은 구조라
 // 설정 섹션 안에서 조작 방식이 바뀌지 않는다. 플랫폼 개발자 전용 화면이다.
 export default async function AdminOrganizationSettingsPage({ searchParams }: PageProps) {
@@ -58,9 +66,11 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
   }
 
   const selectedOrgId = firstParam(params.org) ?? "";
+  const creating = selectedOrgId === "new";
   const selected =
     organizations.find((org) => org.id === selectedOrgId) ??
     (selectedOrgId ? null : organizations[0] ?? null);
+  const w = settings.white;
   const selectedMembers = selected ? (memberCounts.get(selected.id) ?? 0) : 0;
 
   const created = firstParam(params.created) === "1";
@@ -79,161 +89,153 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
 
   return (
     <AdminShell activeItem="settings" title={settings.organizationTitle}>
-      <SettingsSubnav active="organization" settings={settings} showOrganization />
+      <div className="stw">
+        <SettingsSubnav active="organization" settings={settings} showOrganization />
 
-      {flashMessage ? (
-        <div
-          className={`setnote ${errorKey ? "setnote--warn" : "setnote--ok"}`}
-          style={{ marginBottom: 14 }}
-        >
-          <span className="ic">{errorKey ? <TriangleAlert /> : <Check />}</span>
-          <span>{flashMessage}</span>
-        </div>
-      ) : null}
+        {flashMessage ? (
+          <p className={`stw-flash ${errorKey ? "is-red" : "is-green"}`} role="status">
+            {errorKey ? <TriangleAlert aria-hidden="true" /> : <Check aria-hidden="true" />}
+            {flashMessage}
+          </p>
+        ) : null}
 
-      <div className="setgrid">
-        {/* ── 마스터: 조직 목록 ── */}
-        <div className="card" style={{ overflow: "hidden" }}>
-          <div className="card__h">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="card__t">
-                {settings.currentOrganizations} {organizations.length}
-              </div>
-            </div>
-            <Link className="chipbtn" href="/admin/settings/organization?org=new">
-              <span className="ic">
-                <Plus aria-hidden="true" />
+        <div className="stw-split">
+          {/* ── 목록 ── */}
+          <div className="stw-orgs">
+            <div className="stw-bar">
+              <span className="stw-sum">{w.orgsSummary.replace("{n}", String(organizations.length))}</span>
+              <span className="stw-bar__r">
+                <Link className="stw-chip is-pri" href="/admin/settings/organization?org=new">
+                  <Plus aria-hidden="true" />
+                  {w.newOrg}
+                </Link>
               </span>
-              {settings.create}
-            </Link>
+            </div>
+
+            {organizations.length === 0 ? (
+              <div className="stw-empty">{settings.emptyOrganizations}</div>
+            ) : (
+              <>
+                <div className="stw-th" aria-hidden="true">
+                  <span>{w.colOrg}</span>
+                  <span className="r">{w.colMembers}</span>
+                  <span className="r">{w.colCreated}</span>
+                </div>
+                <div className="stw-rows">
+                  {organizations.map((org) => (
+                    <Link
+                      className={`stw-tr${selected?.id === org.id && !creating ? " on" : ""}`}
+                      href={`/admin/settings/organization?org=${org.id}`}
+                      key={org.id}
+                      aria-current={selected?.id === org.id && !creating ? "true" : undefined}
+                    >
+                      <span className="stw-who">
+                        <span className="stw-av" aria-hidden="true">
+                          {Array.from(org.name)[0] ?? "·"}
+                        </span>
+                        <span className="stw-who__t">
+                          <b>{org.name}</b>
+                          <span>
+                            {org.slug}
+                            {org.status === "active" ? "" : ` · ${statusLabels[org.status] ?? org.status}`}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="r num">{w.membersN.replace("{n}", String(memberCounts.get(org.id) ?? 0))}</span>
+                      <span className="r num">{tokyoDot(org.created_at)}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          {organizations.length === 0 ? (
-            <div className="card__body">
-              <div className="setnote setnote--dim">{settings.emptyOrganizations}</div>
-            </div>
-          ) : (
-            <div>
-              {organizations.map((org) => (
-                <Link
-                  className={`setrow${selected?.id === org.id ? " is-sel" : ""}`}
-                  href={`/admin/settings/organization?org=${org.id}`}
-                  key={org.id}
-                >
-                  <span className="setrow__b">
-                    <span className="setsite__n">{org.name}</span>
-                    <span className="setsite__m">{org.slug}</span>
-                  </span>
-                  <span className="setrow__side">
-                    <span className={statusPillClass(org.status)}>
-                      {statusLabels[org.status] ?? org.status}
-                    </span>
-                    <span className="setsite__m">
-                      {settings.membersLabel} {memberCounts.get(org.id) ?? 0}
-                    </span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── 디테일 ── */}
-        <div className="setstack">
-          {selected ? (
-            <div className="card">
-              <div className="card__h">
-                <span className="card__ic bg-pri">
-                  <span className="ic">
-                    <Building2 aria-hidden="true" />
-                  </span>
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="card__t">{selected.name}</div>
-                  <div className="setsub">
-                    {selected.slug} · {settings.membersLabel} {selectedMembers}
-                  </div>
+          {/* ── 패널 ── */}
+          {creating ? (
+            <aside className="stw-panel" key="new" aria-label={w.createOrgTitle}>
+              <div className="stw-hd">
+                <div className="stw-meta">
+                  <span>{w.newOrg}</span>
                 </div>
-                <span className={statusPillClass(selected.status)}>
-                  {statusLabels[selected.status] ?? selected.status}
-                </span>
+                <h2>{w.createOrgTitle}</h2>
               </div>
-              <div className="card__body">
-                <form
-                  action={updateOrganization}
-                  className="setform"
-                  // 조직이 바뀌면 폼을 다시 마운트한다 — 근태 현장 폼과 같은 이유(엉뚱한 조직 덮어쓰기 방지).
-                  key={selected.id}
-                >
-                  <input name="organizationId" type="hidden" value={selected.id} />
-                  <div className="fld">
-                    <label className="fld__l" htmlFor="org-name">
-                      {settings.organizationName}
-                    </label>
-                    <div className="setinline">
-                      <div className="fld">
-                        <input defaultValue={selected.name} id="org-name" name="name" required />
-                      </div>
-                      <button className="btn btn--pri" type="submit">
-                        {settings.saveName}
-                      </button>
-                    </div>
-                  </div>
-                </form>
-
-                <div style={{ marginTop: 16 }}>
+              <form action={createOrganization} className="stw-form is-top">
+                <label className="stw-nf">
+                  <span>{settings.organizationName}</span>
+                  <input name="name" required autoComplete="off" autoFocus />
+                </label>
+                <div className="stw-f">
+                  <label className="stw-nf">
+                    <span>{w.slug}</span>
+                    <input className="mono" name="slug" autoComplete="off" spellCheck={false} />
+                  </label>
+                  <span className="stw-hint">{w.slugHint}</span>
+                </div>
+                <label className="stw-check">
+                  <input defaultChecked name="addOwner" type="checkbox" />
+                  <span className="stw-check__box" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12l5 5L20 7" />
+                    </svg>
+                  </span>
+                  {w.ownerMe}
+                </label>
+                <button className="stw-btn is-pri" type="submit">
+                  {w.createOrgTitle}
+                </button>
+              </form>
+            </aside>
+          ) : selected ? (
+            <aside className="stw-panel" key={selected.id} aria-label={selected.name}>
+              <div className="stw-hd">
+                <div className="stw-meta">
+                  <span>{w.orgSection}</span>
+                  {selected.status === "active" ? null : <span>{statusLabels[selected.status] ?? selected.status}</span>}
+                </div>
+                <h2>{selected.name}</h2>
+                <span className="num">{w.createdOn.replace("{date}", tokyoDot(selected.created_at))}</span>
+              </div>
+              <form
+                action={updateOrganization}
+                className="stw-form is-top"
+                // 조직이 바뀌면 폼을 다시 마운트한다 — 근태 현장 폼과 같은 이유(엉뚱한 조직 덮어쓰기 방지).
+                key={selected.id}
+                id="stw-org-form"
+              >
+                <input name="organizationId" type="hidden" value={selected.id} />
+                <label className="stw-nf">
+                  <span>{settings.organizationName}</span>
+                  <input defaultValue={selected.name} name="name" required autoComplete="off" />
+                </label>
+              </form>
+              <dl className="stw-dl">
+                <dt>{w.slug}</dt>
+                <dd className="mono">{selected.slug}</dd>
+                <dt>{w.colMembers}</dt>
+                <dd className="num">{w.membersN.replace("{n}", String(selectedMembers))}</dd>
+              </dl>
+              <div className="stw-f">
+                <div className="stw-foot">
                   {selectedMembers === 0 ? (
                     <OrgDeleteButton
                       labels={{
-                        delete: settings.deleteOrganization,
-                        cancel: dictionary.common.cancel,
+                        delete: w.deleteOrg,
+                        title: w.deleteOrgTitle,
                         confirm: settings.orgDeleteConfirm,
+                        keep: w.keep,
+                        ok: w.deleteOk,
                       }}
                       organizationId={selected.id}
                     />
-                  ) : (
-                    <div className="setnote setnote--dim">{settings.errors.org_not_empty}</div>
-                  )}
+                  ) : null}
+                  <button className="stw-btn is-pri" form="stw-org-form" type="submit">
+                    {w.saveChanges}
+                  </button>
                 </div>
+                {selectedMembers === 0 ? null : <span className="stw-hint">{w.orgNotEmptyHint}</span>}
               </div>
-            </div>
+            </aside>
           ) : null}
-
-          {/* 신규 생성 */}
-          <div className="card">
-            <div className="card__h">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="card__t">{settings.createOrganization}</div>
-                <div className="setsub">{settings.organizationDescription}</div>
-              </div>
-            </div>
-            <div className="card__body">
-              <form action={createOrganization} className="setform">
-                <div className="fld">
-                  <label className="fld__l" htmlFor="new-org-name">
-                    {settings.organizationName}
-                  </label>
-                  <input id="new-org-name" name="name" required />
-                </div>
-                <div className="fld" style={{ marginTop: 11 }}>
-                  <label className="fld__l" htmlFor="new-org-slug">
-                    {settings.organizationSlug}
-                  </label>
-                  <input id="new-org-slug" name="slug" />
-                </div>
-                <label
-                  className="setnote setnote--dim"
-                  style={{ marginTop: 12, cursor: "pointer", alignItems: "center" }}
-                >
-                  <input defaultChecked name="addOwner" type="checkbox" />
-                  <span>{settings.ownerMembership}</span>
-                </label>
-                <button className="btn btn--pri" style={{ marginTop: 14 }} type="submit">
-                  {settings.create}
-                </button>
-              </form>
-            </div>
-          </div>
         </div>
       </div>
     </AdminShell>

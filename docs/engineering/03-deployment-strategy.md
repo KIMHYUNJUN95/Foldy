@@ -316,6 +316,8 @@ Play 에 올릴 AAB 는 **업로드 키**로 서명한다(Play App Signing 이 �
   iOS `AppIcon`(1024, 알파 없음) · `Splash`, Android `mipmap-*`(옛 둥근 네모 · 원형 · 적응형 = 라벤더 배경 층 + 막대 72% 전경) ·
   `drawable-nodpi/splash_icon.png`(960px), 연결 실패 화면 `capacitor-www/icon.png`, 스토어 원본 `store-assets/icon-1024.png` ·
   `play-icon-512.png`, iOS PWA 시작 이미지 `public/splash/*`.
+  **favicon 은 `public/favicon.ico` 하나만 둔다** — `src/app/favicon.ico` 가 있으면 Next 가 그걸 우선해서 쓴다(2026-10-15 까지
+  create-next-app 기본 Vercel 삼각형이 남아 있어 브라우저 탭에 검은 삼각형이 보였다 → 지움).
   - 앱 안에서 로고를 쓰는 곳(웹 시작 화면 · 오프라인 · 404 · 오류 화면 · 관리자 사이드바 마크 · 로그인 브랜드 마크 · 자동화 아바타)은
     전부 `public/icons/icon-192.png` 를 읽으므로 따로 고칠 곳이 없다.
   - 벡터에서 바로 그리므로 1024 스토어 아이콘도 선명하다(예전 회색 문 로고는 512 를 2배로 늘린 것이었다).

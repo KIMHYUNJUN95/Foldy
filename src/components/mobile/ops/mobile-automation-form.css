@@ -1,0 +1,286 @@
+/* 모바일 자동화 — 설정 · 담당자 칸(시안 AutoMSettings-Phone · AutoMAssign-Phone, 2026-10-15).
+   흰 바탕 · 상자 · 테두리 없음 · 세로줄 없음 · 줄 사이는 가는 가로줄(#f3f3f6)만. 고른 것 = 옅은 보라(#f4f1fd).
+   보라 #7a52e6 / #5a30cf, 빨강 #c5282e, 초록 #1f7a4d, 「발송 뒤 바뀜」 호박색 #9a6b00, 회색 #6b6878. 손가락 칸 ≥ 44px.
+   폭은 늘 유동 — 폰(390) · 폴드 칸(≤ 540) · 태블릿 상세 칸(~700) 모두 같은 규칙으로 선다.
+   움직임: 누름 살짝 작아짐 · 요일 채움 톡 · 스위치 손잡이 스프링 · −/+ 숫자 굴림 · 저장 줄 올라옴 · 저장 체크 그리기 ·
+   담당자 줄 차례로 떠오름 · 저장된 이름 칸 초록 체크. transform · opacity 만, reduced-motion 이면 전부 끈다.
+   바텀시트 · 확인 창은 body 로 포털되므로 그 규칙은 `.maf` 밖에 둔다. */
+.maf {
+  --maf-ink: #16141f; --maf-body: #3a3746; --maf-soft: #6b6878; --maf-faint: #8b8898; --maf-mute: #9a97a6;
+  --maf-pri: #7a52e6; --maf-pri-ink: #5a30cf; --maf-sel: #f4f1fd; --maf-sel-ink: #3a2394;
+  --maf-red: #c5282e; --maf-green: #1f7a4d; --maf-amber: #9a6b00;
+  --maf-line: #f3f3f6; --maf-fill: #f7f7f9; --maf-fill2: #f4f4f7;
+  --maf-ease: cubic-bezier(.23, 1, .32, 1);
+  --maf-spring: cubic-bezier(.34, 1.56, .64, 1);
+  display: flex; flex-direction: column; min-width: 0; color: var(--maf-ink);
+}
+.maf button, .maf input, .maf label { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.maf button { font: inherit; }
+.maf button:focus-visible, .maf input:focus-visible { outline: 2px solid var(--maf-pri); outline-offset: 2px; }
+.maf-muted { color: var(--maf-faint); font-size: 13px; }
+
+/* ── 줄 ── */
+.maf-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-top: 1px solid var(--maf-line); min-width: 0; }
+.maf-l { font-size: 14px; color: var(--maf-body); }
+.maf-sl { flex: 1; min-width: 0; font-size: 13px; color: var(--maf-soft); }
+.maf-v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; animation: maf-tick 260ms var(--maf-ease) both; }
+.maf-note { font-size: 12px; line-height: 1.5; color: var(--maf-faint); }
+.maf-txt { font-size: 13px; line-height: 1.55; color: var(--maf-body); }
+.maf-h { padding: 18px 0 6px; font-size: 12px; font-weight: 600; color: var(--maf-mute); }
+.maf-sh { padding: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--maf-mute); }
+.maf-hint { padding-top: 8px; }
+.maf-ro { margin: 0 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--maf-fill); font-size: 13px; color: var(--maf-soft); }
+@keyframes maf-tick { from { opacity: 0; transform: translateY(3px); } }
+
+/* 시각 줄 — 투명한 기기 입력이 줄 전체를 덮는다 */
+.maf-time { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 0; min-height: 44px; border-top: 1px solid var(--maf-line); justify-content: center; }
+.maf-time.is-sub { padding: 0; border-top: 0; }
+.maf-time__top { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.maf-time.is-sub .maf-time__top { min-height: 44px; }
+.maf-time__top .maf-l { flex: 1; min-width: 0; }
+.maf-chev { flex: none; color: #b4b1bf; transition: transform 160ms var(--maf-ease); }
+.maf-time__in {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0;
+  opacity: 0; cursor: pointer; font-size: 16px; /* iOS 확대 방지 */ -webkit-appearance: none; appearance: none;
+}
+.maf-time:not(.is-off):active .maf-chev { transform: translateX(2px); }
+.maf-time:not(.is-off):active .maf-time__top { opacity: .7; }
+
+/* 요일 — 동그라미 40px 일곱 개 */
+.maf-days { display: flex; justify-content: space-between; gap: 4px; max-width: 420px; }
+.maf-day {
+  width: 40px; height: 40px; flex: none; border: 0; border-radius: 50%; position: relative;
+  background: var(--maf-fill2); color: var(--maf-mute); font-size: 13px; font-weight: 600;
+  transition: transform 140ms ease, background 180ms ease, color 180ms ease;
+}
+/* 44px 손가락 칸 — 눈에 보이는 원은 40 */
+.maf-day::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; }
+.maf-day.is-on { background: var(--maf-pri); color: #fff; animation: maf-pop 280ms var(--maf-spring); }
+.maf-day:active { transform: scale(.92); }
+@keyframes maf-pop { 0% { transform: scale(.86); } 100% { transform: scale(1); } }
+
+/* 스위치 */
+.maf-sw-row { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.maf-sw-row__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.maf-switch {
+  position: relative; flex: none; width: 44px; height: 26px; padding: 0; border: 0; border-radius: 13px;
+  background: #dcdae2; transition: background 200ms ease, transform 140ms ease;
+}
+.maf-switch::after { content: ""; position: absolute; inset: -9px -2px; }
+.maf-switch i {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 2px rgba(22, 20, 31, .2); transition: transform 320ms var(--maf-spring);
+}
+.maf-switch.is-on { background: var(--maf-pri); }
+.maf-switch.is-on i { transform: translateX(18px); }
+.maf-switch:active { transform: scale(.96); }
+.maf-resend { gap: 6px; }
+
+/* −/+ */
+.maf-step { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.maf-step__ctl { display: flex; align-items: center; gap: 4px; flex: none; }
+.maf-step__b {
+  position: relative; width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--maf-fill2);
+  font-size: 18px; line-height: 1; color: var(--maf-body); transition: transform 140ms ease, background 150ms ease;
+}
+.maf-step__b::after { content: ""; position: absolute; inset: -4px; }
+.maf-step__b:active:not(:disabled) { transform: scale(.92); background: #ecebf0; }
+.maf-step__b:disabled { color: #c9c6d2; }
+.maf-step__v { display: block; min-width: 52px; overflow: hidden; text-align: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.maf-step__v span { display: inline-block; }
+.maf-step__v span.is-up { animation: maf-roll-up 220ms var(--maf-ease); }
+.maf-step__v span.is-down { animation: maf-roll-down 220ms var(--maf-ease); }
+@keyframes maf-roll-up { from { opacity: 0; transform: translateY(8px); } }
+@keyframes maf-roll-down { from { opacity: 0; transform: translateY(-8px); } }
+
+/* 알약(빼는 건물 · 채널 규칙) — 감싸며 줄바꿈 */
+.maf-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.maf-pill {
+  position: relative; height: 36px; padding: 0 14px; border: 0; border-radius: 18px;
+  background: var(--maf-fill); color: var(--maf-soft); font-size: 13px; white-space: nowrap;
+  transition: transform 140ms ease, background 180ms ease, color 180ms ease;
+}
+.maf-pill::after { content: ""; position: absolute; inset: -4px 0; }
+.maf-pill.is-on { background: var(--maf-sel); color: var(--maf-sel-ink); font-weight: 600; }
+.maf-pill:active { transform: scale(.97); }
+
+/* 받는 곳 */
+.maf-dest { gap: 8px; }
+.maf-dest__n { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; row-gap: 2px; min-width: 0; }
+.maf-dest__n b { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.maf-dest__n span { font-size: 12px; }
+.maf-dest__n .is-ok { color: var(--maf-green); }
+.maf-dest__n .is-bad { color: var(--maf-red); }
+.maf-langs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-width: 480px; }
+.maf-lang {
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 6px; border: 0; border-radius: 12px;
+  background: var(--maf-fill); color: var(--maf-faint); font-size: 13px; font-weight: 600; white-space: nowrap;
+  transition: transform 140ms ease, background 180ms ease, color 180ms ease;
+}
+.maf-lang i {
+  display: flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; border-radius: 5px;
+  background: #fff; box-shadow: inset 0 0 0 1.5px #cfccd8; color: #fff; transition: background 160ms ease, box-shadow 160ms ease;
+}
+.maf-lang.is-on { background: var(--maf-sel); color: var(--maf-sel-ink); }
+.maf-lang.is-on i { background: var(--maf-pri); box-shadow: none; }
+.maf-lang.is-on i svg { animation: maf-pop 240ms var(--maf-spring); }
+.maf-lang:active { transform: scale(.97); }
+
+/* 변경 이력 */
+.maf-log { padding: 6px 0; font-size: 13px; line-height: 1.5; color: #4c4958; overflow-wrap: anywhere; }
+
+/* 꺼진(보기 전용) 손잡이 */
+.maf button:disabled { cursor: default; }
+.maf.is-view .maf-day, .maf.is-view .maf-pill, .maf.is-view .maf-lang, .maf.is-view .maf-switch, .maf .maf-lang:disabled { opacity: .62; }
+.maf.is-view .maf-day.is-on, .maf.is-view .maf-pill.is-on, .maf.is-view .maf-lang.is-on, .maf.is-view .maf-switch.is-on { opacity: .8; }
+
+/* ── 버튼 ── */
+.maf-btn, .maf-cf .maf-btn, .maf-sheet .maf-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px;
+  border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap;
+  transition: transform 140ms ease, background 160ms ease, opacity 160ms ease; -webkit-tap-highlight-color: transparent;
+}
+.maf-btn.is-gray { background: var(--maf-fill2, #f4f4f7); color: var(--maf-body, #3a3746); }
+.maf-btn.is-primary { padding: 0 18px; background: #7a52e6; color: #fff; }
+.maf-btn.is-wide { width: 100%; }
+.maf-btn:active:not(:disabled) { transform: scale(.97); }
+.maf-btn:disabled { opacity: .5; }
+.maf-btn.is-primary.is-done { opacity: 1; background: #1f7a4d; }
+.maf-draw path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: maf-draw 420ms var(--maf-ease, ease) 60ms forwards; }
+@keyframes maf-draw { to { stroke-dashoffset: 0; } }
+
+/* ── 저장 줄 — 화면 맨 아래에 붙는다(useStickyBar 가 셸 스크롤 칸의 아래 패딩을 --maf-pad 로 넣어 준다).
+   폰에서 탭바가 보이면 그 위로 들어 올리고(--maf-lift, 가운데 + 단추가 아래 여백에 겹쳐 앉음) 탭바와 같은 곡선으로 함께 오르내린다. ── */
+.maf-save {
+  position: sticky; bottom: calc(-1 * var(--maf-pad, 124px)); z-index: 10;
+  display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 0 max(14px, env(safe-area-inset-bottom, 0px));
+  transition: transform 400ms cubic-bezier(.22, 1, .36, 1);
+  animation: maf-rise 320ms var(--maf-ease) both;
+}
+.maf-save.is-lifted { transform: translateY(calc(-1 * var(--maf-lift, 0px))); }
+.maf-save::before {
+  content: ""; position: absolute; inset: 0 -28px -48px; z-index: -1;
+  background: #fff; box-shadow: 0 -1px 0 #f1f1f4;
+}
+.maf-save__t { flex: 1; min-width: 0; font-size: 12px; color: var(--maf-soft); }
+.maf-save__t b { color: var(--maf-ink); }
+@keyframes maf-rise { from { opacity: 0; transform: translateY(24px); } }
+
+/* ── 담당자 ── */
+.maf-atool { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.maf-date { position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 0; font-size: 15px; font-weight: 600; color: var(--maf-ink); cursor: pointer; }
+.maf-date svg { flex: none; color: var(--maf-faint); }
+.maf-date__t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.maf-date__in { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; font-size: 16px; }
+.maf-date:active .maf-date__t { opacity: .7; }
+.maf-atool__n { margin-left: auto; flex: none; font-size: 12px; color: var(--maf-faint); white-space: nowrap; }
+
+.maf-band {
+  display: flex; align-items: center; gap: 10px; margin: 8px 0 6px; padding: 8px 8px 8px 12px; border-radius: 12px; background: #fff8e8;
+  animation: maf-tick 280ms var(--maf-ease) both;
+}
+.maf-band__t { flex: 1; min-width: 0; font-size: 13px; color: #6b4b00; }
+.maf-band__b {
+  flex: none; height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: #fff;
+  font-size: 13px; font-weight: 600; color: var(--maf-pri-ink); transition: transform 140ms ease;
+}
+.maf-band__b:active:not(:disabled) { transform: scale(.97); }
+.maf-band__b:disabled { opacity: .5; }
+
+.maf-agroup { display: flex; flex-direction: column; min-width: 0; }
+.maf-ar {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--maf-line); min-width: 0;
+  animation: maf-up 360ms var(--maf-ease) both; animation-delay: calc(var(--i, 0) * 28ms);
+}
+@keyframes maf-up { from { opacity: 0; transform: translateY(6px); } }
+.maf-ar__top { display: flex; align-items: center; gap: 10px; min-height: 24px; min-width: 0; }
+.maf-ar__code { min-width: 40px; flex: none; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.maf-ar__label { flex: 1; min-width: 0; font-size: 13px; color: #4c4958; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.maf-ar__chg { flex: none; font-size: 12px; font-weight: 600; color: var(--maf-amber); white-space: nowrap; }
+.maf-ar__rm {
+  flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -10px -12px -10px 0;
+  border: 0; border-radius: 12px; background: transparent; color: var(--maf-faint); transition: transform 140ms ease, color 150ms ease;
+}
+.maf-ar__rm:active:not(:disabled) { transform: scale(.92); color: var(--maf-red); }
+.maf-ar__field { position: relative; display: block; }
+.maf-ar__ok {
+  position: absolute; right: 12px; top: 50%; display: flex; color: var(--maf-green); pointer-events: none;
+  animation: maf-ok 1400ms var(--maf-ease) both;
+}
+@keyframes maf-ok {
+  0% { opacity: 0; transform: translateY(-50%) scale(.6); }
+  14% { opacity: 1; transform: translateY(-50%) scale(1); }
+  78% { opacity: 1; transform: translateY(-50%) scale(1); }
+  100% { opacity: 0; transform: translateY(-50%) scale(1); }
+}
+
+.maf-input, .maf-sheet .maf-input {
+  display: block; width: 100%; height: 44px; padding: 0 40px 0 14px; border: 0; border-radius: 12px; background: #f7f7f9;
+  font: inherit; font-size: 16px; color: #16141f; box-sizing: border-box; transition: background 160ms ease, box-shadow 160ms ease;
+}
+.maf-input::placeholder { color: #9a97a6; }
+.maf-input:focus { outline: none; background: #fff; box-shadow: inset 0 0 0 1.5px #7a52e6; }
+.maf-input:disabled { color: var(--maf-soft, #6b6878); }
+
+.maf-addrow {
+  display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 1px solid var(--maf-line);
+  background: transparent; font-size: 14px; font-weight: 600; color: var(--maf-pri-ink); text-align: left; transition: opacity 140ms ease;
+}
+.maf-addrow span { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--maf-faint); }
+.maf-addrow:active { opacity: .6; }
+
+.maf-empty { padding: 28px 0 16px; font-size: 14px; color: var(--maf-faint); text-align: center; }
+.maf-foot { padding-top: 14px; }
+.maf-loading { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; }
+.maf-skel { display: block; height: 44px; border-radius: 12px; background: #f4f4f7; animation: maf-breathe 1200ms ease-in-out infinite; }
+.maf-skel:nth-child(3) { animation-delay: 120ms; }
+.maf-skel:nth-child(4) { animation-delay: 240ms; }
+@keyframes maf-breathe { 50% { opacity: .5; } }
+
+/* ── 청소 객실 추가 시트(body 포털) ── */
+.maf-sheet { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 0 20px 8px; color: #16141f; }
+.maf-sheet__h { display: flex; flex-direction: column; gap: 4px; padding: 2px 0 12px; }
+.maf-sheet__h h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.maf-sheet__h span { font-size: 12px; line-height: 1.5; color: #8b8898; }
+.maf-search { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; background: #f7f7f9; color: #8b8898; flex: none; }
+.maf-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 16px; color: #16141f; outline: none; }
+.maf-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.maf-search:focus-within { box-shadow: inset 0 0 0 1.5px #7a52e6; background: #fff; }
+.maf-sheet__list { flex: 1; min-height: 120px; max-height: 46dvh; overflow-y: auto; padding: 6px 0 4px; scrollbar-width: none; }
+.maf-sheet__list::-webkit-scrollbar { display: none; }
+.maf-sheet__none { padding: 24px 0; text-align: center; font-size: 13px; color: #8b8898; }
+.maf-sheet__g { display: flex; flex-direction: column; }
+.maf-sheet .maf-sh { padding: 10px 0 6px; font-size: 12px; font-weight: 600; color: #9a97a6; }
+.maf-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.maf-code {
+  height: 44px; padding: 0 6px; border: 0; border-radius: 12px; background: #f7f7f9; font: inherit; font-size: 14px; font-weight: 600;
+  color: #3a3746; font-variant-numeric: tabular-nums; transition: transform 140ms ease, background 160ms ease, color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.maf-code.is-on { background: #f4f1fd; color: #3a2394; }
+.maf-code:active { transform: scale(.95); }
+.maf-sheet__foot { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; flex: none; }
+.maf-sheet .maf-input { padding-right: 14px; }
+
+/* ── 가운데 확인 창(body 포털) ── */
+.maf-cf {
+  position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(2, 6, 23, .45); animation: maf-fade 200ms ease both;
+}
+.maf-cf__card {
+  width: 100%; max-width: 340px; padding: 22px 20px 16px; border-radius: 20px; background: #fff; color: #16141f;
+  box-shadow: 0 24px 48px -16px rgba(22, 20, 31, .35); animation: maf-card 280ms cubic-bezier(.23, 1, .32, 1) both;
+}
+.maf-cf__card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.maf-cf__card p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: #4c4958; }
+.maf-cf__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@keyframes maf-fade { from { opacity: 0; } }
+@keyframes maf-card { from { opacity: 0; transform: scale(.94); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .maf *, .maf-cf, .maf-cf__card, .maf-sheet * { animation: none !important; transition: none !important; }
+  .maf-save { animation: none !important; transition: none !important; }
+  .maf-draw path { stroke-dashoffset: 0; }
+  .maf-ar__ok { opacity: 1; transform: translateY(-50%); }
+  .maf *:active, .maf-sheet *:active { transform: none !important; }
+}

@@ -1,13 +1,12 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Plus, X } from "lucide-react";
 import {
   addCleaningExtraRoom,
   loadAssigneeBoard,
   loadAutomationRunMessage,
-  previewAutomationMessage,
   removeCleaningExtraRoom,
   saveAutomationJob,
   saveCleaningAssignee,
@@ -19,7 +18,37 @@ import {
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
-import type { AutomationJobView, AutomationPageData, AutomationRunView } from "@/lib/automation/console-data";
+import {
+  aheadWhen,
+  dayLabel,
+  destLineOf,
+  fill,
+  FoldyMark,
+  gateLine,
+  hhmmOf,
+  LANG_LABEL,
+  lastLineOf,
+  MAX_PAST_POINTS,
+  mdOf,
+  messageCountOf,
+  previewDefaultDate,
+  previewFootText,
+  previewSendState,
+  previewStampAt,
+  Rich,
+  runAtText,
+  runReasonText,
+  scheduleLineOf,
+  statusClass,
+  todayRunPoints,
+  tokyoDayOf,
+  upcomingSends,
+  useAutomationPreview,
+  useHydrated,
+  useNowMinute,
+  eventLineOf,
+} from "@/components/admin/ops/automation-shared";
+import type { AutomationJobView, AutomationPageData } from "@/lib/automation/console-data";
 import {
   AUTOMATION_LOCALES,
   DAILY_REPORT_CHANNELS,
@@ -28,10 +57,8 @@ import {
   type AutomationLocale,
   type AutomationSettings,
 } from "@/lib/automation/jobs";
-import type { AlertCard } from "@/lib/automation/messages";
-import { isScheduledSendDue, nextScheduledSend, tokyoClock } from "@/lib/automation/schedule";
+import { isScheduledSendDue } from "@/lib/automation/schedule";
 import type { Dictionary } from "@/lib/i18n";
-import { ymdShift } from "@/lib/tokyo-date";
 import "./automation-white.css";
 
 /**
@@ -46,82 +73,8 @@ import "./automation-white.css";
  */
 
 type Copy = Dictionary["automation"];
-type WhiteCopy = Copy["white"];
 type SharedCopy = Dictionary["admin"]["shared"];
 type Tab = "preview" | "assign" | "history" | "settings";
-type RunStatus = AutomationRunView["status"];
-
-const fill = (template: string, values: Record<string, string | number>) =>
-  Object.entries(values).reduce((out, [key, value]) => out.split(`{${key}}`).join(String(value)), template);
-
-const LANG_LABEL: Record<AutomationLocale, string> = { en: "English", ja: "日本語", ko: "한국어" };
-
-/** `*굵게*` 표시를 나눈다(Slack mrkdwn 과 같은 규칙 — 화면 문구의 강조에도 쓴다). */
-function segments(line: string) {
-  return line.split("*").map((text, index) => ({ bold: index % 2 === 1, text }));
-}
-
-function Rich({ text }: { text: string }) {
-  return (
-    <>
-      {segments(text).map((part, index) => (part.bold ? <b key={index}>{part.text}</b> : <span key={index}>{part.text}</span>))}
-    </>
-  );
-}
-
-const pad = (n: number) => String(n).padStart(2, "0");
-/** 도쿄 "HH:MM". */
-function hhmmOf(iso: string | Date) {
-  const minutes = tokyoClock(typeof iso === "string" ? new Date(iso) : iso).minutes;
-  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
-}
-const tokyoDayOf = (iso: string | Date) => tokyoClock(typeof iso === "string" ? new Date(iso) : iso).date;
-/** "2026-10-09" → "10/9" */
-const mdOf = (ymd: string) => `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`;
-
-/** 날짜 단추 글자 — 10월 14일 (수) · 10月14日(水) · Wed, Oct 14 */
-function dayLabel(ymd: string, localeTag: string) {
-  return new Intl.DateTimeFormat(localeTag, { day: "numeric", month: "long", timeZone: "Asia/Tokyo", weekday: "short" }).format(
-    new Date(`${ymd}T12:00:00+09:00`),
-  );
-}
-
-/** 오늘 06:30 · 어제 06:30 · 10/7 06:30 */
-function relWhen(iso: string | Date, today: string, w: WhiteCopy) {
-  const day = tokyoDayOf(iso);
-  const time = hhmmOf(iso);
-  if (day === today) return fill(w.todayAt, { time });
-  if (day === ymdShift(today, -1)) return fill(w.yesterdayAt, { time });
-  return fill(w.dateAt, { date: mdOf(day), time });
-}
-/** 앞으로의 시각 — 오늘이면 시각만, 내일 06:30, 10/17 06:30 */
-function aheadWhen(at: Date, today: string, w: WhiteCopy) {
-  const day = tokyoDayOf(at);
-  const time = hhmmOf(at);
-  if (day === today) return time;
-  if (day === ymdShift(today, 1)) return fill(w.tomorrowAt, { time });
-  return fill(w.dateAt, { date: mdOf(day), time });
-}
-
-// 지금(분 단위) — 서버에선 null(시각에 기대는 표시는 붙은 뒤에만 그린다 · 하이드레이션 어긋남 방지).
-function subscribeMinute(onChange: () => void) {
-  const id = window.setInterval(onChange, 15_000);
-  return () => window.clearInterval(id);
-}
-const minuteNow = () => Math.floor(Date.now() / 60_000);
-const minuteServer = () => null;
-function useNowMinute(): number | null {
-  return useSyncExternalStore<number | null>(subscribeMinute, minuteNow, minuteServer);
-}
-// 붙었나 — 서버와 브라우저의 Intl(ICU) 결과가 달라(「AM 7:00」 vs 「오전 7:00」) 날짜 · 시각 글자는 붙은 뒤에 Intl 로 바꾼다.
-const noopSubscribe = () => () => {};
-function useHydrated(): boolean {
-  return useSyncExternalStore(noopSubscribe, () => true, () => false);
-}
-
-function statusClass(status: RunStatus) {
-  return status === "sent" ? "is-ok" : status === "failed" ? "is-bad" : "is-warn";
-}
 
 type Draft = {
   sendTime: string;
@@ -146,16 +99,6 @@ function DrawCheck() {
   return (
     <svg aria-hidden="true" className="atw-draw" fill="none" height="16" viewBox="0 0 24 24" width="16">
       <path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.6" />
-    </svg>
-  );
-}
-
-function FoldyMark({ size }: { size: number }) {
-  return (
-    <svg aria-hidden="true" height={size} viewBox="0 0 100 100" width={size}>
-      <rect fill="#5B2BD6" height="17" rx="8.5" width="64" x="18" y="62" />
-      <rect fill="#8A63F0" height="17" rx="8.5" width="50" x="25" y="43" />
-      <rect fill="#B9A0FA" height="17" rx="8.5" width="36" x="32" y="24" />
     </svg>
   );
 }
@@ -199,7 +142,7 @@ export function AutomationConsole({
   const jobName = (key: AutomationJobKey) => copy.jobs[key].name;
   const tabs: Tab[] = selected === "cleaning_list" ? ["preview", "history", "settings", "assign"] : ["preview", "history", "settings"];
   const activeTab: Tab = tabs.includes(tab) ? tab : "preview";
-  const messageCount = job.destinations.reduce((sum, item) => sum + item.locales.length, 0);
+  const messageCount = messageCountOf(job);
 
   const toggle = () => {
     if (view) return;
@@ -225,41 +168,14 @@ export function AutomationConsole({
   };
 
   // ── 상태 줄 ──
-  const gate = data.gate.ok
-    ? { cls: "is-ok", text: fill(w.dataOk, { n: data.gate.ageMinutes ?? 0 }) }
-    : data.gate.ageMinutes === null
-      ? { cls: "is-warn", text: w.dataUnknown }
-      : { cls: "is-bad", text: fill(w.dataStale, { h: Math.round((data.gate.ageMinutes ?? 0) / 60) }) };
+  const gate = gateLine(data, w);
   const validChannels = data.channels.filter((channel) => channel.valid).length;
 
   // ── 목록 줄 ──
   const now = nowMinute === null ? null : new Date(nowMinute * 60_000);
-  const nextOf = (item: AutomationJobView) => (now && item.kind === "scheduled" ? nextScheduledSend(item, now) : null);
-  const scheduleLine = (item: AutomationJobView) => {
-    if (item.kind !== "scheduled") return w.eventLine[item.jobKey as keyof WhiteCopy["eventLine"]] ?? "";
-    const base = fill(copy.whenDaily, { time: item.sendTime });
-    if (!item.enabled) return base;
-    if (item.jobKey === "cleaning_list" && item.settings.resend.enabled) {
-      return `${base} · ${fill(w.correctionUntil, { time: item.settings.resend.until })}`;
-    }
-    const next = nextOf(item);
-    return next ? `${base} · ${fill(w.nextAt, { at: relWhen(next, data.today, w) })}` : base;
-  };
-  const lastLine = (item: AutomationJobView): { text: string; status: RunStatus | null } => {
-    const last = item.runs[0];
-    if (item.jobKey === "failure_alert" && (!last || tokyoDayOf(last.createdAt) !== data.today)) return { status: null, text: w.failureNone };
-    if (!last) return { status: null, text: copy.noRuns };
-    return { status: last.status, text: relWhen(last.createdAt, data.today, w) };
-  };
-
-  const destLine =
-    job.destinations.length === 0
-      ? w.destNone
-      : job.destinations.length === 1
-        ? fill(w.destOne, {
-            name: `${job.destinations[0].channelKey} (${job.destinations[0].locales.map((item) => LANG_LABEL[item]).join(" · ")})`,
-          })
-        : fill(w.destMany, { m: messageCount, n: job.destinations.length });
+  const scheduleLine = (item: AutomationJobView) => scheduleLineOf(item, copy, data.today, now);
+  const lastLine = (item: AutomationJobView) => lastLineOf(item, copy, data.today);
+  const destLine = destLineOf(job, w);
 
   // ── 탭 밑줄(미끄러짐) ──
   const navRef = useRef<HTMLDivElement | null>(null);
@@ -345,7 +261,7 @@ export function AutomationConsole({
             <div className="atw-dh__t">
               <h2>{jobName(job.jobKey)}</h2>
               <p>
-                {job.kind === "scheduled" ? fill(copy.whenDaily, { time: job.sendTime }) : w.eventLine[job.jobKey as keyof WhiteCopy["eventLine"]]}
+                {job.kind === "scheduled" ? fill(copy.whenDaily, { time: job.sendTime }) : eventLineOf(job.jobKey, w)}
                 {" · "}
                 {destLine}
               </p>
@@ -458,52 +374,17 @@ export function AutomationConsole({
 
 // ── 오늘 발송 타임라인 ─────────────────────────────────────────────────────
 
-const MAX_PAST_POINTS = 6;
-const MAX_NEXT_POINTS = 3;
-
 function TodayLine({ data, copy, localeTag, now }: { data: AutomationPageData; copy: Copy; localeTag: string; now: Date | null }) {
   const w = copy.white;
   const today = data.today;
 
-  // 오늘(도쿄) 실제 실행 기록 — 같은 자동화 · 같은 분은 한 점(받는 곳 · 언어마다 한 줄씩 쌓이므로).
-  const { points, sent, failed } = useMemo(() => {
-    const groups = new Map<string, { jobKey: AutomationJobKey; time: string; ts: number; statuses: RunStatus[] }>();
-    let sentCount = 0;
-    let failedCount = 0;
-    for (const item of data.jobs) {
-      for (const run of item.runs) {
-        if (tokyoDayOf(run.createdAt) !== today) continue;
-        if (run.status === "sent") sentCount += 1;
-        if (run.status === "failed") failedCount += 1;
-        const time = hhmmOf(run.createdAt);
-        const key = `${item.jobKey}|${time}`;
-        const ts = new Date(run.createdAt).getTime();
-        const group = groups.get(key) ?? { jobKey: item.jobKey, statuses: [], time, ts };
-        group.statuses.push(run.status);
-        group.ts = Math.min(group.ts, ts);
-        groups.set(key, group);
-      }
-    }
-    const list = [...groups.values()]
-      .sort((a, b) => a.ts - b.ts)
-      .map((group) => ({
-        ...group,
-        status: (group.statuses.includes("sent") ? "sent" : group.statuses.includes("failed") ? "failed" : "skipped") as RunStatus,
-      }));
-    return { failed: failedCount, points: list, sent: sentCount };
-  }, [data.jobs, today]);
+  // 오늘(도쿄) 실제 실행 기록 — 같은 자동화 · 같은 분은 한 점(공용 `todayRunPoints`, 모바일과 같은 규칙).
+  const { points, sent, failed } = useMemo(() => todayRunPoints(data.jobs, today), [data.jobs, today]);
 
   const hidden = Math.max(0, points.length - MAX_PAST_POINTS);
   const past = points.slice(hidden);
 
-  const upcoming = now
-    ? data.jobs
-        .filter((item) => item.kind === "scheduled")
-        .map((item) => ({ at: nextScheduledSend(item, now), jobKey: item.jobKey }))
-        .filter((item): item is { at: Date; jobKey: AutomationJobKey } => item.at !== null)
-        .sort((a, b) => a.at.getTime() - b.at.getTime())
-        .slice(0, MAX_NEXT_POINTS)
-    : [];
+  const upcoming = upcomingSends(data.jobs, now);
 
   const hydrated = useHydrated();
   const dateLabel = hydrated ? dayLabel(today, localeTag) : mdOf(today);
@@ -591,36 +472,14 @@ function PreviewPane({
   userLocale: AutomationLocale;
 }) {
   const w = copy.white;
-  const defaultDate = job.jobKey === "daily_report" ? data.yesterday : data.today;
-  const [date, setDate] = useState(defaultDate);
+  const [date, setDate] = useState(previewDefaultDate(job, data));
   const [lang, setLang] = useState<AutomationLocale>(job.destinations[0]?.locales[0] ?? userLocale);
-  const [preview, setPreview] = useState<{ key: string; text: string | null; card: AlertCard | null } | null>(null);
   const [sending, startSend] = useTransition();
   const [done, setDone] = useState(false);
-  const timed = job.kind === "scheduled";
-  const requestKey = `${job.jobKey}|${date}|${lang}`;
-  // 결과가 지금 고른 조건의 것이 아니면 「만드는 중」 — effect 안에서 상태를 미리 비우지 않는다.
-  const loading = preview?.key !== requestKey;
-  const text = loading ? null : (preview?.text ?? null);
+  const onPreviewError = useCallback((code: string) => flash(errorText(code)), [errorText, flash]);
   // 취소 · 당일예약은 Slack 카드 — 미리보기도 카드로(제목 · 2열 칸 · 회색 줄 · 링크).
-  const card = loading ? null : (preview?.card ?? null);
-
-  useEffect(() => {
-    let alive = true;
-    previewAutomationMessage({ date, jobKey: job.jobKey, locale: lang }).then((result) => {
-      if (!alive) return;
-      setPreview({ card: result.ok ? result.card : null, key: requestKey, text: result.ok ? result.text : null });
-      if (!result.ok) flash(errorText(result.error));
-    });
-    return () => {
-      alive = false;
-    };
-  }, [date, errorText, flash, job.jobKey, lang, requestKey]);
-
-  // 이 날짜 몫을 이미 보냈나(정시 · 재시도 · 손 · 정정본 무엇이든 「보냄」 한 줄).
-  const sentRun = timed ? (job.runs.find((run) => run.targetDate === date && run.status === "sent") ?? null) : null;
-  // 청소 명단은 이미 보냈으면 정정본으로(서버 `correction` — 담당자 탭의 정정본 보내기와 같은 길).
-  const asCorrection = job.jobKey === "cleaning_list" && !!sentRun;
+  const { loading, text, card } = useAutomationPreview(job.jobKey, date, lang, onPreviewError);
+  const { timed, asCorrection } = previewSendState(job, date);
 
   const sendNow = () => {
     if (!window.confirm(copy.preview.sendConfirm)) return;
@@ -637,21 +496,10 @@ function PreviewPane({
   const hydrated = useHydrated();
   const timeFormat = new Intl.DateTimeFormat(localeTag, { hour: "numeric", minute: "2-digit", timeZone: "Asia/Tokyo" });
   const stampOf = (at: Date) => (hydrated ? timeFormat.format(at) : hhmmOf(at));
-  const stamp = sentRun
-    ? stampOf(new Date(sentRun.createdAt))
-    : timed
-      ? stampOf(new Date(`${data.today}T${job.sendTime}:00+09:00`))
-      : job.runs[0]
-        ? stampOf(new Date(job.runs[0].createdAt))
-        : null;
+  const stampAt = previewStampAt(job, date, data.today);
+  const stamp = stampAt ? stampOf(stampAt) : null;
 
-  const footText = timed
-    ? sentRun
-      ? `${fill(w.sentAt, { when: relWhen(sentRun.createdAt, data.today, w) })} · ${asCorrection ? w.sendsCorrection : w.sendsAgain}`
-      : w.notSent
-    : job.jobKey === "failure_alert"
-      ? copy.preview.failureSample
-      : copy.preview.eventSample;
+  const footText = previewFootText(job, date, copy, data.today);
 
   return (
     <div className="atw-preview">
@@ -1030,12 +878,8 @@ function HistoryPane({
       setMessage(result.text || "—");
     });
   };
-  const reasonText = (reason: string | null) => {
-    if (!reason) return "—";
-    if (reason.startsWith("http_")) return fill(copy.history.reasons.http, { code: reason.slice(5) });
-    return (copy.history.reasons as Record<string, string>)[reason] ?? reason;
-  };
-  const at = (iso: string) => `${mdOf(tokyoDayOf(iso))} ${hhmmOf(iso)}`;
+  const reasonText = (reason: string | null) => runReasonText(reason, copy);
+  const at = runAtText;
 
   if (job.runs.length === 0) {
     return (

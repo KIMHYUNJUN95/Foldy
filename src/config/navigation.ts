@@ -132,6 +132,18 @@ const mobileNavOpsRevenue = {
   capability: "ops_admin.access",
 } as const satisfies NavigationItem;
 
+// 자동화(운영 관리자) — 데스크톱 `/admin/ops/automation` 의 모바일판(2026-10-15, 시안 AutoM-Phone · Fold · Tablet).
+// 모바일에서도 PC 와 같은 일을 다 한다(켜기 · 미리보기 · 지금 보내기 · 실행 기록 · 설정 · 담당자). 권한은 가동률 · 매출과 같다 —
+// 관리자 웹 역할 + `ops_admin.access`(`MOBILE_ADMIN_WEB_ONLY_IDS`), 설정 · 발송은 서버 액션이 `automation.manage` 를 다시 본다.
+// 아이콘은 데스크톱 자동화와 같은 Zap. See docs/product/36-automation-control.md → 「모바일 자동화」.
+const mobileNavOpsAutomation = {
+  id: "ops-automation",
+  label: localizedNavigationLabels.mobile.opsAutomation,
+  href: "/mobile/ops/automation",
+  icon: Zap,
+  capability: "ops_admin.access",
+} as const satisfies NavigationItem;
+
 const mobileNavCleaning = {
   id: "cleaning",
   label: localizedNavigationLabels.mobile.cleaning,
@@ -257,6 +269,7 @@ export const mobileSidebarNavigation = [
 export const mobileOpsAdminNavigation = [
   mobileNavOpsOccupancy,
   mobileNavOpsRevenue,
+  mobileNavOpsAutomation,
   mobileNavOpsCalendar,
   mobileNavRoomLinks,
 ] as const satisfies readonly NavigationItem[];
@@ -286,11 +299,11 @@ export const customizableBottomNavItems = [
 /**
  * 권한 키에 더해 **관리자 웹 역할**도 요구하는 운영 관리자 항목인가(셸이 함께 거른다).
  *
- * 판매 캘린더는 쓰기 액션이 관리자 세션을 거쳐 역할도 본다. 가동률 · 매출은 데스크톱 페이지가 관리자 웹 역할을 요구해서 같다.
+ * 판매 캘린더는 쓰기 액션이 관리자 세션을 거쳐 역할도 본다. 가동률 · 매출 · 자동화는 데스크톱 페이지가 관리자 웹 역할을 요구해서 같다.
  * **룸 링크는 아니다** — 보기 · 열기 · 복사뿐이라 권한 키만
  * 받으면 현장 역할도 쓴다(2026-10-05, 사용자 상세에서 개인 부여).
  */
-const MOBILE_ADMIN_WEB_ONLY_IDS: ReadonlySet<string> = new Set(["ops-calendar", "ops-occupancy", "ops-revenue"]);
+const MOBILE_ADMIN_WEB_ONLY_IDS: ReadonlySet<string> = new Set(["ops-calendar", "ops-occupancy", "ops-revenue", "ops-automation"]);
 export function isMobileOpsAdminNavItem(id: string): boolean {
   return MOBILE_ADMIN_WEB_ONLY_IDS.has(id);
 }

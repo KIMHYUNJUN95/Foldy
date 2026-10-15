@@ -777,7 +777,14 @@ function ConfirmModal({ confirm, keep, onClose }: { confirm: Confirm; keep: stri
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="mat-scrim" onClick={busy ? undefined : onClose} role="presentation">
+    <div
+      className="mat-scrim"
+      onClick={busy ? undefined : onClose}
+      // 셸의 마우스 당겨서 새로고침으로 올라가지 않게(포털도 React 트리로는 올라간다).
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerMove={(event) => event.stopPropagation()}
+      role="presentation"
+    >
       <div aria-label={confirm.title} aria-modal="true" className="mat-cf" onClick={(event) => event.stopPropagation()} role="dialog">
         <p className="mat-cf__t">{confirm.title}</p>
         <p className="mat-cf__b">{confirm.body}</p>

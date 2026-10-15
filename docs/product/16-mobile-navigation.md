@@ -562,7 +562,10 @@ Current rules:
   **White redesign (2026-10-15, draft DateSheet-Phone):** borderless ‹ › (44px) beside a left-aligned month name, 44px day
   circles, selection = filled #7a52e6 circle (pops in), today = purple text + dot, Sundays red, a full-width soft-purple
   「오늘 · 10월 15일」 button; horizontal swipe on the grid pages months (`data-swipe-back="off"`) and the new month slides in
-  from that side (off under reduced motion). Mobile automation preview / assignee date now use it instead of a native input. **The
+  from that side (off under reduced motion).
+  **Sheets don't leak pointer gestures (2026-10-15):** portals still bubble React pointer events up the React tree, so the PC
+  「모바일 보기」 mouse pull-to-refresh read a sheet drag-down as a refresh too. `BottomSheet`'s root (and the automation confirm
+  overlays) stop `pointerdown/move/up` propagation; the sheet's own drag uses window listeners and is unaffected. Mobile automation preview / assignee date now use it instead of a native input. **The
   console is separate**: it keeps the `.calpop` `AdminDatePicker` per §4a, and the two are never
   mixed. First caller: the cleaning day switcher; other mobile screens should reuse this rather than
   hand-rolling a calendar.

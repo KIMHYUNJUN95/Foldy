@@ -10,20 +10,29 @@
 /**
  * `mapLabel`: 지도 이름표에 쓸 짧은 이름(목록은 원래 이름 그대로).
  * `floors`: 실제 층수 — 지도 블록 높이(옥상층 포함, 2026-10-15 사용자 제공). `size`: 바닥 가로 · 세로 배율(1 = 보통 빌딩).
+ * `area`: 동네 — 지도에서 블록을 벌릴 때 같은 동네는 가깝게 둔다. `adjoin`: 바로 옆에 붙은 건물끼리 같은 값 — 블록을 맞붙인다.
  */
-export type PropertyLocation = { lat: number; lng: number; floors: number; size?: [number, number]; mapLabel?: string };
+export type PropertyLocation = {
+  lat: number;
+  lng: number;
+  floors: number;
+  size?: [number, number];
+  mapLabel?: string;
+  area?: string;
+  adjoin?: string;
+};
 
 export const PROPERTY_LOCATIONS: Record<string, PropertyLocation> = {
-  아라키초A: { lat: 35.691589, lng: 139.7235419, floors: 8 },
-  아라키초B: { lat: 35.6913069, lng: 139.7242565, floors: 4 },
+  아라키초A: { lat: 35.691589, lng: 139.7235419, floors: 8, area: "아라키초" },
+  아라키초B: { lat: 35.6913069, lng: 139.7242565, floors: 4, area: "아라키초" },
   가부키초: { lat: 35.6979227, lng: 139.7025887, floors: 8 },
   다카다노바바: { lat: 35.7113447, lng: 139.6966335, floors: 9 },
-  // 오쿠보 A · B · C 는 단독주택(2층) — 바닥도 작게.
-  오쿠보A: { lat: 35.7002401, lng: 139.706157, floors: 2, size: [0.72, 0.72] },
-  오쿠보B: { lat: 35.7002401, lng: 139.70603, floors: 2, size: [0.72, 0.72] },
-  오쿠보C: { lat: 35.699386, lng: 139.7038418, floors: 2, size: [0.72, 0.72] },
-  // 3층이지만 옆으로 길어 객실이 많다.
-  "STAY ARI Apartment Hotel": { lat: 35.700054, lng: 139.70488, floors: 3, size: [2.3, 1], mapLabel: "STAY ARI" },
+  // 오쿠보 A · B · C 는 단독주택(2층) — 바닥도 작게. A · B 는 바로 옆에 붙은 집, C 는 조금 떨어져 있다(2026-10-15 사용자).
+  오쿠보A: { lat: 35.7002401, lng: 139.706157, floors: 2, size: [0.72, 0.72], area: "오쿠보", adjoin: "오쿠보AB" },
+  오쿠보B: { lat: 35.7002401, lng: 139.70603, floors: 2, size: [0.72, 0.72], area: "오쿠보", adjoin: "오쿠보AB" },
+  오쿠보C: { lat: 35.699386, lng: 139.7038418, floors: 2, size: [0.72, 0.72], area: "오쿠보" },
+  // 3층이지만 옆으로 길어 객실이 많다. 주소가 오쿠보 1초메라 오쿠보 동네(오쿠보C 와 A 사이).
+  "STAY ARI Apartment Hotel": { lat: 35.700054, lng: 139.70488, floors: 3, size: [2.3, 1], mapLabel: "STAY ARI", area: "오쿠보" },
 };
 
 export function getPropertyLocation(canonicalName: string): PropertyLocation | null {

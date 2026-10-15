@@ -20,7 +20,7 @@ import "./building-map.css";
  */
 
 /** `floors`: 실제 층수(블록 높이) · `size`: 바닥 가로 · 세로 배율(1 = 보통 빌딩, STAY ARI 는 옆으로 길게 · 단독주택은 작게). */
-export type MapBuilding = { id: string; label: string; rooms: number; empty: number; lat: number; lng: number; floors: number; size: [number, number] };
+export type MapBuilding = { id: string; label: string; rooms: number; empty: number; lat: number; lng: number; floors: number; size: [number, number]; area?: string; adjoin?: string };
 export type BuildingMapCopy = {
   mapAria: string;
   emptyN: string;
@@ -195,8 +195,9 @@ export function BuildingMap({
 
   // ── 블록 벌리기(2026-10-15 사용자 결정 「모든 건물이 다 보이게」): 실제 자리끼리 너무 가까우면(오쿠보 · 가부키초 ·
   // STAY ARI 는 300 m 안, 오쿠보A · B 는 같은 집) 블록만 서로 안 겹칠 만큼 밀어 놓는다. 같은 동네(이름 끝 A/B/C 를 뗀
-  // 이름)는 바짝 붙여 한 단지처럼, 다른 동네끼리만 조금 더 띄운다 — 그래서 블록이 거의 제자리라 실제 자리 표시(점 · 선)는
-  // 두지 않는다(2026-10-15 사용자 결정). 지금 카메라 기준으로 계산하므로 다가가면 블록이 실제 자리로 모인다.
+  // 이름)는 가깝게, 다른 동네끼리만 조금 더 띄운다. 바로 옆에 붙은 건물(`adjoin`, 오쿠보A · B)은 맞붙인다. 벌릴 때 바닥이 넓은
+  // 건물(STAY ARI)은 덜 움직이고 작은 집이 비켜난다 — 그래서 블록이 거의 제자리라 실제 자리 표시(점 · 선)는 두지 않는다
+  // (2026-10-15 사용자 결정). 동네 · 붙은 건물은 `property-locations.ts`. 지금 카메라 기준이라 다가가면 블록이 실제 자리로 모인다.
   const spread = useMemo(() => {
     const m = new Map<string, Vec>();
     if (!layout) return m;
@@ -204,12 +205,13 @@ export function BuildingMap({
     const truth = ids.map((id) => screen(worldOf.get(id)!));
     const pos = truth.map((p) => [p[0], p[1]] as Vec);
     const foot = ids.map((id) => (shapes.find((x) => x.id === id)?.foot ?? 18) + 4);
-    const hood = ids.map((id) => id.replace(/[A-Z]$/, ""));
+    const hood = ids.map((id) => byId.get(id)?.area ?? id);
+    const adjoin = ids.map((id) => byId.get(id)?.adjoin ?? null);
     const ys = 0.6; // 블록은 세로로 길어서 옆으로 나란히 떼는 게 잘 보인다(세로 차이는 덜 쳐 줌)
     const push = () => {
       for (let i = 0; i < pos.length; i++) {
         for (let j = i + 1; j < pos.length; j++) {
-          const sep = (foot[i] + foot[j]) / 2 + (hood[i] === hood[j] ? 2 : 14);
+          const sep = (foot[i] + foot[j]) / 2 + (adjoin[i] && adjoin[i] === adjoin[j] ? 0 : hood[i] === hood[j] ? 8 : 14);
           let dx = pos[j][0] - pos[i][0];
           let dy = (pos[j][1] - pos[i][1]) * ys;
           let d = Math.hypot(dx, dy);
@@ -220,11 +222,14 @@ export function BuildingMap({
             dy = Math.sin(a) * 0.4;
             d = Math.hypot(dx, dy);
           }
-          const k = (sep - d) / 2 / d;
-          pos[i][0] -= dx * k;
-          pos[i][1] -= (dy * k) / ys;
-          pos[j][0] += dx * k;
-          pos[j][1] += (dy * k) / ys;
+          // 바닥 넓은 건물은 덜 움직이고 작은 건물이 비켜난다.
+          const k = (sep - d) / d;
+          const wi = foot[j] / (foot[i] + foot[j]);
+          const wj = foot[i] / (foot[i] + foot[j]);
+          pos[i][0] -= dx * k * wi;
+          pos[i][1] -= (dy * k * wi) / ys;
+          pos[j][0] += dx * k * wj;
+          pos[j][1] += (dy * k * wj) / ys;
         }
       }
     };
@@ -236,6 +241,22 @@ export function BuildingMap({
       }
     }
     for (let it = 0; it < 12; it++) push();
+    // 붙은 건물(`adjoin`)은 마지막에 같은 높이로 나란히 맞붙인다(실제 동서 순서대로).
+    const groups = new Map<string, number[]>();
+    adjoin.forEach((g, i) => g && groups.set(g, [...(groups.get(g) ?? []), i]));
+    for (const members of groups.values()) {
+      if (members.length < 2) continue;
+      const cx = members.reduce((a, i) => a + pos[i][0], 0) / members.length;
+      const cy = members.reduce((a, i) => a + pos[i][1], 0) / members.length;
+      const sorted = [...members].sort((a, b) => truth[a][0] - truth[b][0]);
+      const total = sorted.reduce((a, i) => a + foot[i] - 4, 0);
+      let x = cx - total / 2;
+      for (const i of sorted) {
+        const w = foot[i] - 4;
+        pos[i] = [x + w / 2, cy];
+        x += w;
+      }
+    }
     ids.forEach((id, i) => m.set(id, pos[i]));
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,13 +303,14 @@ export function BuildingMap({
       const sb = b.ids.length === 1 && b.ids[0] === selectedId ? 1 : 0;
       return sb - sa || a.top - b.top;
     });
-    // 다른 건물 블록을 가리지 않게 블록 자리도 장애물로
-    const blocks = list.flatMap((c) =>
+    // 다른 건물 블록을 가리지 않게 블록 자리도 장애물로 · 오른쪽 위 「전체 보기」 · 나침반 자리도 비워 둔다
+    const toolsBox = { owner: null as Cl | null, r: [W - (cam.s > 1.01 ? 170 : 64), 0, W, 96] as Placed["r"] };
+    const blocks = [toolsBox, ...list.flatMap((c) =>
       c.ids.map((id) => {
         const p = posOf(id);
-        return { owner: c, r: [p[0] - 13, p[1] - (heightOf.get(id) ?? 20) - 4, p[0] + 13, p[1] + 5] as Placed["r"] };
+        return { owner: c as Cl | null, r: [p[0] - 13, p[1] - (heightOf.get(id) ?? 20) - 4, p[0] + 13, p[1] + 5] as Placed["r"] };
       }),
-    );
+    )];
     for (const cl of sorted) {
       // 겹치지 않는 자리 가운데 지시선이 가장 짧은 곳(위쪽을 조금 더 좋아함). 없으면 배지를 뺀 짧은 이름표로 다시,
       // 그래도 없으면 제자리에 둔다. 건물은 묶지 않는다 — 블록마다 이름표 하나.

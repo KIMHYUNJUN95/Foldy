@@ -39,6 +39,21 @@ function mountSplash(id: number, tagline: string, host: Element | null) {
   const tag = el.querySelector(".spl__tag");
   if (tag) tag.textContent = tagline;
   (host || document.body).appendChild(el);
+  // 로그인 직후(20초 안) — 로그인 버튼이 오므라든 보라 점 자리에서 로고가 떠오른다(시안 Motion-C-Login-Phone).
+  try {
+    const raw = sessionStorage.getItem("foldy.loginRise");
+    sessionStorage.removeItem("foldy.loginRise");
+    const rise = raw ? (JSON.parse(raw) as { t: number; x: number; y: number }) : null;
+    const tile = el.querySelector(".spl__tile");
+    if (rise && tile && Date.now() - rise.t < 20000) {
+      const r = tile.getBoundingClientRect();
+      el.style.setProperty("--rise-x", `${Math.round(rise.x - (r.left + r.width / 2))}px`);
+      el.style.setProperty("--rise-y", `${Math.round(rise.y - (r.top + r.height / 2))}px`);
+      el.classList.add("spl--rise");
+    }
+  } catch {
+    // 저장소를 못 쓰면 평소 스플래시.
+  }
 
   const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
   const t0 = now();

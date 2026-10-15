@@ -1,0 +1,25 @@
+/* 로그인 → 첫 화면(2026-10-15, 시안 Motion-C-Login-Phone) — 이메일 로그인 버튼.
+   누르면 글자가 흐려지고 버튼이 가운데 보라 점(52px)으로 오므라들어, 점 안에서 로고 막대 셋이 숨 쉰다(확인 중).
+   성공하면 모바일 스플래시가 이 점 자리에서 이어받아 로고로 떠오른다(app-splash.css `.spl--rise`).
+   틀려서 돌아오면 버튼이 살짝 흔들린다. */
+.aw-btn.lgm { position: relative; transition: clip-path 380ms cubic-bezier(.77, 0, .175, 1), background-color 160ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1); clip-path: inset(0 0 0 0 round 14px); }
+.aw-btn.lgm:active { transform: scale(.97); }
+.aw-btn.lgm.is-pending, .aw-btn.lgm.is-pending:disabled { clip-path: inset(0 calc(50% - 26px) 0 calc(50% - 26px) round 26px); background: var(--aw-primary); color: #fff !important; cursor: progress; }
+.lgm__t { display: inline-block; transition: opacity 200ms ease, filter 200ms ease, transform 200ms ease; }
+.is-pending .lgm__t { opacity: 0; filter: blur(4px); transform: scale(.94); }
+.lgm__bars { position: absolute; left: 50%; top: 50%; width: 32px; height: 24px; margin: -12px 0 0 -16px; opacity: 0; transition: opacity 180ms ease 260ms; }
+.is-pending .lgm__bars { opacity: 1; }
+.lgm__bars i { position: absolute; left: 50%; height: 5.5px; border-radius: 3px; background: #fff; }
+.lgm__bars i:nth-child(1) { top: 0; width: 15px; margin-left: -7.5px; }
+.lgm__bars i:nth-child(2) { top: 9px; width: 21px; margin-left: -10.5px; }
+.lgm__bars i:nth-child(3) { top: 18px; width: 29px; margin-left: -14.5px; }
+.is-pending .lgm__bars i { animation: lgm-breathe 700ms cubic-bezier(.37, 0, .63, 1) infinite alternate; }
+.is-pending .lgm__bars i:nth-child(2) { animation-delay: 90ms; }
+.is-pending .lgm__bars i:nth-child(3) { animation-delay: 180ms; }
+@keyframes lgm-breathe { to { transform: scaleX(.58); } }
+.aw-btn.lgm.is-failed { animation: lgm-shake 380ms cubic-bezier(.36, .07, .19, .97) both; }
+@keyframes lgm-shake { 20% { transform: translateX(-5px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-2px); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .aw-btn.lgm, .lgm__t, .lgm__bars { transition: none; }
+  .is-pending .lgm__bars i, .aw-btn.lgm.is-failed { animation: none; }
+}

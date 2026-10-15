@@ -399,6 +399,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             initialEmail={params.email ?? ""}
             next={effectiveNext}
             lang={locale}
+            failed={Boolean(errorMessage)}
           />
         </div>
       </AuthFrame>

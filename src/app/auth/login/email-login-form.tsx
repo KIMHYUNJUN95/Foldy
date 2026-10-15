@@ -1,7 +1,8 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useState, useId } from "react";
+import { useEffect, useState, useId } from "react";
+import "./login-motion.css";
 import { signInWithEmailPassword } from "@/app/auth/actions";
 
 function EyeIcon() {
@@ -43,15 +44,25 @@ type EmailLoginFormCopy = {
   hidePassword: string;
 };
 
-function SubmitButton({ label }: { label: string }) {
+// 로그인 → 첫 화면(2026-10-15, 시안 Motion-C-Login-Phone) — 누르면 버튼이 보라 점으로 오므라들어 막대가 숨 쉬고(확인 중),
+// 성공하면 모바일 스플래시가 이 점 자리에서 로고로 떠오른다(점 위치는 sessionStorage `foldy.loginRise` 로 넘김). 틀리면 흔들림.
+const RISE_KEY = "foldy.loginRise";
+
+function SubmitButton({ label, failed }: { label: string; failed: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} aria-busy={pending} className="aw-btn">
-      {pending ? (
-        <span className="size-5 animate-spin rounded-full border-[2.4px] border-white/60 border-t-white" aria-hidden="true" />
-      ) : (
-        label
-      )}
+    <button
+      type="submit"
+      disabled={pending}
+      aria-busy={pending}
+      className={`aw-btn lgm${pending ? " is-pending" : ""}${failed && !pending ? " is-failed" : ""}`}
+    >
+      <span className="lgm__t">{label}</span>
+      <span className="lgm__bars" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
     </button>
   );
 }
@@ -62,18 +73,38 @@ export function EmailLoginForm({
   initialEmail = "",
   next,
   lang,
+  failed = false,
 }: {
   copy: EmailLoginFormCopy;
   forgotHref: string;
   initialEmail?: string;
   next: string;
   lang: string;
+  /** 직전 시도가 틀려서 돌아왔으면 버튼이 한 번 흔들린다. */
+  failed?: boolean;
 }) {
   const fieldId = useId();
   const [showPassword, setShowPassword] = useState(false);
 
+  // 이 화면에 (다시) 왔다 = 지난 시도는 성공 안 함 → 넘겨 둔 점 위치를 지운다.
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(RISE_KEY);
+    } catch {}
+  }, []);
+
   return (
-    <form action={signInWithEmailPassword}>
+    <form
+      action={signInWithEmailPassword}
+      onSubmit={(e) => {
+        const btn = (e.nativeEvent as SubmitEvent).submitter;
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        try {
+          sessionStorage.setItem(RISE_KEY, JSON.stringify({ t: Date.now(), x: r.left + r.width / 2, y: r.top + r.height / 2 }));
+        } catch {}
+      }}
+    >
       <input type="hidden" name="next" value={next} />
       <input type="hidden" name="lang" value={lang} />
 
@@ -121,7 +152,7 @@ export function EmailLoginForm({
         </div>
       </div>
 
-      <SubmitButton label={copy.loginCta} />
+      <SubmitButton label={copy.loginCta} failed={failed} />
     </form>
   );
 }

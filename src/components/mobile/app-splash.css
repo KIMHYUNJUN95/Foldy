@@ -49,3 +49,14 @@ html[data-pane] .spl { display: none; }
 .spl__hold { animation: spl-hold 1400ms cubic-bezier(.37, 0, .63, 1) 1500ms infinite; }
 .spl.is-out .spl__hold { animation: none; }
 @keyframes spl-hold { 50% { opacity: 1; transform: scale(1.08); } }
+
+/* 로그인 직후(2026-10-15, 시안 Motion-C-Login-Phone) — 막대가 3D 로 날아오는 대신, 로그인 버튼이 오므라든 보라 점(52px) 자리에서
+   타일이 스프링으로 떠올라 커지며 보라 덮개가 걷혀 로고가 드러난다. 그 뒤(글자 · 빛 · 걷힘)는 평소와 같다. */
+.spl--rise { background: #fff; }
+.spl--rise .spl__tile { opacity: 1; border-radius: 55px; transform: translate(var(--rise-x, 0), var(--rise-y, 0)) scale(.4727); animation: spl-rise 900ms var(--sps) 80ms forwards, spl-rise-r 520ms cubic-bezier(.23, 1, .32, 1) 80ms forwards; }
+.spl--rise .spl__tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #7a52e6; animation: spl-rise-cover 440ms cubic-bezier(.23, 1, .32, 1) 120ms forwards; }
+.spl--rise .spl__bw { opacity: 1; animation: none; }
+.spl--rise .spl__bar { filter: none; animation: none; }
+@keyframes spl-rise { to { transform: none; } }
+@keyframes spl-rise-r { to { border-radius: 28px; } }
+@keyframes spl-rise-cover { to { opacity: 0; } }

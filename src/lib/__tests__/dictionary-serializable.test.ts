@@ -18,7 +18,7 @@ import { getDictionary, locales } from "@/lib/i18n";
  * 그래서 규칙은: **아래 네임스페이스의 카피는 `{name}` 자리표시자 문자열 + `.replace()`** 로 쓴다.
  * 다른 네임스페이스(서버에서만 읽고 문자열만 넘기는 곳)는 함수형 카피를 계속 써도 된다.
  */
-const CLIENT_PASSED_NAMESPACES = ["tasks", "cleaning", "board", "mobile.suggestions"] as const;
+const CLIENT_PASSED_NAMESPACES = ["tasks", "cleaning", "board", "mobile.suggestions", "mobile.notifications.w"] as const;
 
 /** "a.b.c" 경로로 사전을 판다. */
 function resolve(dictionary: unknown, path: string): unknown {

@@ -141,3 +141,30 @@ export async function markAllNotificationsRead(
 
   return true;
 }
+
+/** 여러 알림을 읽음으로(밀어서 「읽음」 · 묶음 줄) — 내 알림 · 이 조직 · 아직 안 읽은 것만. */
+export async function markNotificationsReadByIds(
+  supabase: SupabaseClient<Database>,
+  notificationIds: string[],
+  scope: NotificationScope,
+): Promise<boolean> {
+  if (notificationIds.length === 0) return true;
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .in("id", notificationIds)
+    .eq("recipient_user_id", scope.userId)
+    .eq("organization_id", scope.organizationId)
+    .is("read_at", null);
+
+  if (error) {
+    if (isNotificationsTableUnavailable(error.message)) {
+      logNotificationsSchemaUnavailable("mark read (ids)", error.message);
+      return false;
+    }
+    console.error("[notifications] mark read (ids) failed", error.message);
+    return false;
+  }
+
+  return true;
+}

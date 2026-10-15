@@ -1,0 +1,216 @@
+/* 알림 — 화이트 리디자인(2026-10-15, 시안 Notif-Phone · NotifSelect-Phone · NotifClear-Phone · Notif-Fold · Notif-Tablet · NotifPop-PC).
+   docs/product/14-notification-design.md 「알림 화면 — 화이트 리디자인」.
+   흰 바탕 · 상자 · 테두리 없음 · 세로 구분선 없음 · 줄 사이는 가는 가로줄(#f3f3f6)만 · 고른 줄은 옅은 보라(#f4f1fd, 왼쪽 막대 없음).
+   보라 #7a52e6 / #5a30cf · 빨강 #c5282e · 회색 #6b6878. 손가락 칸 ≥ 44px. 움직임은 transform · opacity 만(묶음 · 지운 줄 접힘만
+   grid-template-rows), prefers-reduced-motion 이면 전부 끈다. 줄 모양(`.nfw-row`)은 PC 종 팝오버도 같이 쓴다. */
+.nfw, .nfw-pop {
+  --nfw-ink: #16141f; --nfw-ink2: #4c4958; --nfw-soft: #6b6878; --nfw-faint: #8b8898; --nfw-mute: #b4b1bf;
+  --nfw-pri: #7a52e6; --nfw-pri-ink: #5a30cf; --nfw-pri-soft: #f1ecfd; --nfw-sel: #f4f1fd;
+  --nfw-red: #c5282e; --nfw-hair: #f3f3f6; --nfw-field: #f4f4f7;
+  --nfw-ease: cubic-bezier(.23, 1, .32, 1);
+  --nfw-spring: cubic-bezier(.34, 1.36, .64, 1);
+  color: var(--nfw-ink);
+}
+.nfw :where(button), .nfw-pop :where(button, a) { -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.nfw button:focus-visible, .nfw-pop button:focus-visible, .nfw-pop a:focus-visible { outline: 2px solid var(--nfw-pri); outline-offset: 2px; }
+.nfw .sr-only, .nfw-pop .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── 줄 ── */
+.nfw-row {
+  position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; background: #fff;
+  border-radius: 12px; transition: background-color 180ms ease;
+}
+.nfw-hit {
+  position: absolute; inset: 0; z-index: 1; width: 100%; border: 0; border-radius: inherit; background: transparent; padding: 0;
+  cursor: pointer; display: block; color: inherit; text-decoration: none;
+}
+.nfw-hit:disabled { cursor: default; }
+/* 누름 — 줄 내용이 살짝 작아진다(밀기 판은 따로 움직이므로 안쪽만). */
+.nfw-row > :not(.nfw-hit) { transition: transform 160ms var(--nfw-ease); }
+.nfw-row:has(> .nfw-hit:active) > :not(.nfw-hit) { transform: scale(.98); }
+.nfw-ic {
+  width: 36px; height: 36px; flex: none; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--nfw-field); color: var(--nfw-faint); transition: background-color 240ms ease, color 240ms ease;
+}
+.nfw-row[data-unread] .nfw-ic { background: var(--nfw-pri-soft); color: var(--nfw-pri-ink); }
+.nfw-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.nfw-t { font-size: 15px; font-weight: 500; line-height: 1.35; color: var(--nfw-ink); letter-spacing: -0.01em; }
+.nfw-row[data-unread] .nfw-t { font-weight: 700; }
+.nfw-o { max-width: 100%; font-size: 13px; line-height: 1.45; color: var(--nfw-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nfw-m { margin-top: 2px; font-size: 12px; color: var(--nfw-faint); font-variant-numeric: tabular-nums; }
+.nfw-more {
+  position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; margin: -2px -6px -2px;
+  padding: 0 6px; border: 0; border-radius: 8px; background: transparent; font-size: 12px; font-weight: 600; color: var(--nfw-pri-ink); cursor: pointer;
+}
+.nfw-more svg { transition: transform 260ms var(--nfw-ease); }
+.nfw-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.nfw-more::before { content: ""; position: absolute; inset: -8px -4px; } /* 손가락 칸 44px */
+.nfw-dot {
+  width: 8px; height: 8px; margin-top: 7px; flex: none; border-radius: 50%; background: var(--nfw-pri);
+  transition: opacity 220ms ease, transform 220ms var(--nfw-ease);
+}
+/* 「모두 읽음」 — 점이 위에서부터 빠르게 차례로 사라진다. */
+.nfw[data-reading] .nfw-dot, .nfw-pop[data-reading] .nfw-dot {
+  opacity: 0; transform: scale(.2); transition-delay: calc(min(var(--i, 0), 12) * 30ms);
+}
+.nfw[data-reading] .nfw-row[data-unread] .nfw-ic, .nfw-pop[data-reading] .nfw-row[data-unread] .nfw-ic {
+  background: var(--nfw-field); color: var(--nfw-faint);
+}
+
+/* 선택 모드 — 동그란 체크(그려짐) · 고른 줄 옅은 보라. */
+.nfw-row[data-check] { padding-left: 10px; padding-right: 10px; }
+.nfw-row[data-selected] { background: var(--nfw-sel); }
+.nfw-check {
+  width: 22px; height: 22px; margin-top: 7px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 1.5px #cfccd8; background: transparent; transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+.nfw-check path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 220ms var(--nfw-ease) 40ms; }
+.nfw-row[data-selected] .nfw-check { background: var(--nfw-pri); box-shadow: none; }
+.nfw-row[data-selected] .nfw-check path { stroke-dashoffset: 0; }
+
+/* ── 화면 ── */
+.nfw { display: flex; flex-direction: column; gap: 14px; padding-bottom: 24px; }
+@media (min-width: 600px) { .nfw { width: 100%; max-width: 540px; margin: 0 auto; } }
+.nfw-h { display: flex; align-items: flex-start; gap: 8px; }
+.nfw-h__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nfw-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; }
+.nfw-h p { margin: 0; font-size: 13px; color: var(--nfw-faint); }
+.nfw-h p b { font-weight: 700; color: var(--nfw-pri-ink); }
+.nfw-tbtn {
+  flex: none; min-height: 44px; display: flex; align-items: center; padding: 0 8px; border: 0; background: transparent;
+  font-size: 14px; font-weight: 600; color: var(--nfw-soft); white-space: nowrap; cursor: pointer; border-radius: 10px;
+  transition: transform 140ms var(--nfw-ease), opacity 160ms ease;
+}
+.nfw-tbtn:active { transform: scale(.96); }
+.nfw-tbtn[data-tone="pri"] { color: var(--nfw-pri-ink); }
+.nfw-tbtn:disabled { opacity: .45; cursor: default; }
+.nfw-h__acts { display: flex; margin-right: -8px; margin-top: -6px; }
+
+.nfw-tabs {
+  display: flex; gap: 18px; overflow-x: auto; margin: -4px -20px 0; padding: 0 20px; scrollbar-width: none; -ms-overflow-style: none;
+}
+.nfw-tabs::-webkit-scrollbar { display: none; }
+.nfw-tab {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; height: 44px; padding: 0 2px; border: 0; background: transparent;
+  font-size: 14px; color: var(--nfw-faint); white-space: nowrap; cursor: pointer; transition: color 180ms ease;
+}
+.nfw-tab b { font-weight: 500; color: var(--nfw-mute); }
+.nfw-tab[aria-selected="true"] { color: var(--nfw-ink); font-weight: 700; }
+.nfw-tab[aria-selected="true"] b { color: var(--nfw-pri); }
+
+.nfw-list { display: flex; flex-direction: column; }
+.nfw-sec { padding: 14px 0 4px; font-size: 12px; font-weight: 600; color: #9a97a6; }
+.nfw-sec:first-child { padding-top: 0; }
+.nfw-msg { margin: 0; font-size: 13px; color: var(--nfw-red); }
+.nfw-empty { padding: 48px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.nfw-empty b { font-size: 15px; font-weight: 600; color: var(--nfw-ink); }
+.nfw-empty span { font-size: 13px; color: var(--nfw-faint); }
+.nfw-empty__ic { width: 44px; height: 44px; margin-bottom: 6px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--nfw-field); color: var(--nfw-faint); }
+
+/* 줄 하나(접힘 · 밀기 판 포함). 줄 사이 가는 가로줄은 판 위쪽에. 지우면 높이가 접히며 사라진다. */
+.nfw-item { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 260ms var(--nfw-ease), opacity 200ms ease; }
+.nfw-item > .nfw-item__in { min-height: 0; overflow: hidden; }
+.nfw-item[data-gone] { grid-template-rows: 0fr; opacity: 0; }
+.nfw-sw { position: relative; border-top: 1px solid var(--nfw-hair); }
+.nfw-sec + .nfw-item .nfw-sw { border-top-color: var(--nfw-hair); }
+.nfw-item[data-active] .nfw-row { background: var(--nfw-sel); }
+.nfw-item[data-active] .nfw-sw, .nfw-item[data-active] + .nfw-item .nfw-sw,
+.nfw-item:has(.nfw-row[data-selected]) .nfw-sw, .nfw-item:has(.nfw-row[data-selected]) + .nfw-item .nfw-sw { border-top-color: transparent; }
+.nfw-item[data-active] .nfw-row, .nfw-list[data-wide] .nfw-row { padding-left: 10px; padding-right: 10px; }
+.nfw-mv { position: relative; z-index: 1; background: #fff; touch-action: pan-y; will-change: auto; }
+.nfw-mv[data-shifted] { border-radius: 0 16px 16px 0; box-shadow: 6px 0 16px -10px rgba(22, 20, 31, .22); }
+.nfw-mv[data-shifted] .nfw-row { border-radius: 0 16px 16px 0; }
+/* 밀어서 나오는 동작 — 줄 안쪽에 떠 있는 둥근 타일 둘. 미는 만큼 커지며 나타난다(--p 0 → 1). */
+.nfw-acts { position: absolute; top: 0; bottom: 0; right: 0; display: flex; gap: 6px; padding-right: 2px; }
+.nfw-act {
+  width: 64px; margin: 8px 0; border: 0; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; font-size: 12px; font-weight: 600; cursor: pointer;
+  opacity: var(--p, 0); transform: scale(calc(.82 + .18 * var(--p, 0)));
+  transition: opacity 160ms ease, transform 220ms var(--nfw-ease);
+}
+.nfw-sw[data-dragging] .nfw-act { transition: none; }
+.nfw-act[data-kind="read"] { background: var(--nfw-pri-soft); color: var(--nfw-pri-ink); }
+.nfw-act[data-kind="delete"] { background: var(--nfw-red); color: #fff; }
+.nfw-act:active { transform: scale(.94); }
+/* 끝까지 밀면(놓으면 지움) — 읽음 타일이 비키고 지우기 타일이 살짝 커진다. */
+.nfw-sw[data-armed] .nfw-act[data-kind="read"] { opacity: 0; transform: scale(.7); transition: opacity 140ms ease, transform 200ms var(--nfw-ease); }
+.nfw-sw[data-armed] .nfw-act[data-kind="delete"] { transform: scale(1.08); transition: transform 220ms var(--nfw-spring); }
+
+/* 묶음 펼침 — 나머지 줄이 접힌 높이에서 내려온다. */
+.nfw-rest { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 300ms var(--nfw-ease), opacity 220ms ease; }
+.nfw-rest > div { min-height: 0; overflow: hidden; }
+.nfw-rest[data-open] { grid-template-rows: 1fr; opacity: 1; }
+.nfw-rest .nfw-ic { width: 28px; height: 28px; border-radius: 8px; margin: 4px 0 0 8px; } /* 8 + 28 = 36 — 글자가 대표 줄과 같은 선에 */
+.nfw-rest .nfw-ic svg { width: 14px; height: 14px; }
+.nfw-rest .nfw-t { font-size: 14px; }
+
+/* 선택 모드 아래 막대 — 폰은 하단 탭 자리를 덮고, 폴드 · 태블릿은 목록 칸 바닥에 붙는다. */
+.nfw-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: flex; gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: #fff; box-shadow: 0 -1px 0 var(--nfw-hair);
+  animation: nfw-bar-in 280ms var(--nfw-ease);
+}
+@media (min-width: 600px) {
+  .nfw-bar { position: sticky; bottom: 0; margin: 0 -4px; padding: 12px 4px; box-shadow: none; }
+}
+.nfw-bar button {
+  flex: 1; height: 52px; border: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: transform 140ms var(--nfw-ease), opacity 160ms ease;
+}
+.nfw-bar button:active { transform: scale(.97); }
+.nfw-bar button:disabled { opacity: .45; cursor: default; transform: none; }
+.nfw-bar__all { background: var(--nfw-field); color: #3a3746; }
+.nfw-bar__del { background: #e5484d; color: #fff; }
+@keyframes nfw-bar-in { from { transform: translateY(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* 모두 지우기 확인 — 공용 BottomSheet 안(body 로 포털되므로 .nfw 밖 규칙). */
+.nfw-cf { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 4px 4px; text-align: center; color: #16141f; }
+.nfw-cf__ic { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #fdecec; color: #c5282e; margin-bottom: 4px; }
+.nfw-cf h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.nfw-cf p { margin: 0; font-size: 13px; line-height: 1.6; color: #6b6878; }
+.nfw-cf__go {
+  width: 100%; height: 52px; margin-top: 14px; border: 0; border-radius: 14px; background: #e5484d; color: #fff; font: inherit;
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1);
+}
+.nfw-cf__go:active { transform: scale(.97); }
+.nfw-cf__no { width: 100%; height: 48px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #6b6878; cursor: pointer; }
+
+/* 태블릿 가로 2분할 — 목록과 칸 사이 세로줄 없음. */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .split-list[data-split="on"]:has(.nfw) > .split-list__list { border-right: 0; }
+}
+
+/* ── PC 종 팝오버 ── */
+.nfw-pop {
+  position: absolute; top: calc(100% + 10px); right: 0; width: 400px; max-width: calc(100vw - 24px); z-index: 50;
+  background: #fff; border-radius: 16px; box-shadow: 0 0 0 1px #efeff3, 0 24px 60px -24px rgba(22, 20, 31, .35);
+  display: flex; flex-direction: column; overflow: hidden; transform-origin: top right;
+  animation: nfw-pop-in 160ms var(--nfw-ease);
+  font-family: inherit; text-align: left;
+}
+@keyframes nfw-pop-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.nfw-pop__h { display: flex; align-items: center; gap: 8px; padding: 16px 18px 10px; }
+.nfw-pop__h b { font-size: 15px; font-weight: 700; color: var(--nfw-ink); }
+.nfw-pop__h span { font-size: 12px; color: var(--nfw-faint); }
+.nfw-pop__h button { margin-left: auto; min-height: 32px; padding: 0 4px; border: 0; background: transparent; font-size: 13px; font-weight: 600; color: var(--nfw-pri-ink); cursor: pointer; }
+.nfw-pop__h button:disabled { color: var(--nfw-mute); cursor: default; }
+.nfw-pop__list { display: flex; flex-direction: column; padding: 0 8px; max-height: min(520px, calc(100vh - 180px)); overflow-y: auto; scrollbar-width: thin; }
+.nfw-pop__list .nfw-row { padding-left: 10px; padding-right: 10px; }
+.nfw-pop__list .nfw-row:has(> .nfw-hit:hover) { background: #faf9fc; }
+.nfw-pop__list .nfw-item:first-child .nfw-sw { border-top-color: transparent; }
+.nfw-pop__foot {
+  display: flex; align-items: center; justify-content: center; gap: 4px; height: 48px; border-top: 1px solid #f1f1f4;
+  font-size: 13px; font-weight: 600; color: var(--nfw-pri-ink); text-decoration: none;
+}
+.nfw-pop__foot:hover { background: #faf9fc; }
+.nfw-pop__empty { padding: 36px 16px; text-align: center; font-size: 13px; color: var(--nfw-faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nfw *, .nfw-pop, .nfw-pop *, .nfw-cf * { transition: none !important; animation: none !important; }
+  .nfw-bar { animation: none; }
+}
+
+/* 선택 모드 동안 폰의 하단 탭 바(가운데 편집 버튼 포함)를 아래로 내린다 — 막대가 그 자리를 쓴다. */
+@media (max-width: 599px) {
+  [data-swipe-surface]:has(.nfw-bar) .tabbar { transform: translateY(calc(100% + 40px)) !important; pointer-events: none; }
+}

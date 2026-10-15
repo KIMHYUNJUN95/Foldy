@@ -1,5 +1,6 @@
 "use server";
 
+import { getDictionary } from "@/lib/i18n";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -7,18 +8,20 @@ import {
   listNotificationsForUser,
   markAllNotificationsRead,
 } from "@/lib/notifications/queries";
-import { formatNotificationTimestamp, getNotificationDisplay } from "@/lib/notifications/display";
+import { buildNotificationViews, loadNotificationActorNames } from "@/lib/notifications/brief";
+import type { NotificationView } from "@/lib/notifications/grouping";
 
-export type AdminNotifItem = {
-  id: string;
-  title: string;
-  body: string;
-  timeLabel: string;
-  read: boolean;
-  href: string | null;
+/** 종 팝오버 글자 — 로그인한 사람의 언어로 서버에서 정해 함께 보낸다. */
+export type AdminNotifCopy = {
+  unreadShort: string;
+  unread: string;
+  more: string;
+  less: string;
+  objectMore: string;
+  viewAll: string;
 };
 
-export type AdminNotifData = { unread: number; items: AdminNotifItem[] };
+export type AdminNotifData = { unread: number; items: NotificationView[]; copy: AdminNotifCopy | null };
 
 async function scopeFromSession() {
   const session = await getCurrentAppSession();
@@ -29,30 +32,30 @@ async function scopeFromSession() {
   };
 }
 
-// Admin console bell popover — recent notifications + true unread count.
+// Admin console bell popover — recent notifications (white-redesign rows, grouped on the client) + true unread count.
 export async function getAdminNotifications(): Promise<AdminNotifData> {
   const ctx = await scopeFromSession();
-  if (!ctx) return { unread: 0, items: [] };
+  if (!ctx) return { unread: 0, items: [], copy: null };
   const supabase = await getSupabaseServerClient();
+  const w = getDictionary(ctx.locale).mobile.notifications.w;
+  const copy: AdminNotifCopy = {
+    unreadShort: w.unreadShort,
+    unread: w.unread,
+    more: w.more,
+    less: w.less,
+    objectMore: w.objectMore,
+    viewAll: w.viewAll,
+  };
   try {
     const [list, unread] = await Promise.all([
-      listNotificationsForUser(supabase, ctx.scope, { limit: 8 }),
+      listNotificationsForUser(supabase, ctx.scope, { limit: 20 }),
       countUnreadNotifications(supabase, ctx.scope),
     ]);
-    const items: AdminNotifItem[] = list.items.map((n) => {
-      const d = getNotificationDisplay(n, ctx.locale);
-      return {
-        id: n.id,
-        title: d.title,
-        body: d.body,
-        timeLabel: formatNotificationTimestamp(n.created_at, ctx.locale),
-        read: n.read_at != null,
-        href: n.href ?? null,
-      };
-    });
-    return { unread, items };
+    const actorNames = await loadNotificationActorNames(supabase, list.items);
+    const { views } = buildNotificationViews(list.items, { locale: ctx.locale, actorNames });
+    return { unread, items: views, copy };
   } catch {
-    return { unread: 0, items: [] };
+    return { unread: 0, items: [], copy };
   }
 }
 

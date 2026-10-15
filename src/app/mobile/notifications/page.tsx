@@ -3,6 +3,7 @@ import { NotificationList } from "@/components/notifications/notification-list";
 import { SplitList } from "@/components/shell/split-list";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
+import { buildNotificationViews, loadNotificationActorNames } from "@/lib/notifications/brief";
 import { listNotificationsForUser } from "@/lib/notifications/queries";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getMobileNavBadges } from "@/lib/nav-badges";
@@ -37,11 +38,14 @@ export default async function MobileNotificationsPage() {
     }),
     getMobileNavBadges(),
   ]);
+  // 줄 글자(짧은 제목 · 대상 · 시각)는 여기서 만든다 — 클라이언트에 사전을 싣지 않는다(화이트 리디자인 2026-10-15).
+  const actorNames = await loadNotificationActorNames(supabase, items);
+  const { views, todayKey } = buildNotificationViews(items, { locale, actorNames });
 
   return (
-    // 넓은 화면(2026-10-05): 폴드는 가운데 760px 한 줄, 태블릿 가로는 왼쪽 알림 목록 · 오른쪽 그 알림의 상세 칸(`SplitList`).
+    // 넓은 화면(2026-10-05 · 화이트 리디자인 2026-10-15): 폴드는 가운데 540px 한 줄, 태블릿 가로는 왼쪽 알림 목록 · 오른쪽 그 알림의 상세 칸(`SplitList`).
     <MobileShell badges={navBadges} split title={copy.title}>
-      <div className="px-1 pb-6">
+      <div>
         {schemaUnavailable ? (
           <>
             <div className="space-y-1 mb-4">
@@ -59,24 +63,7 @@ export default async function MobileNotificationsPage() {
           </>
         ) : (
           <SplitList detail="notifications">
-          <NotificationList
-            items={items}
-            locale={locale}
-            copy={{
-              title: copy.title,
-              subtitle: copy.subtitle,
-              markAllRead: copy.markAllRead,
-              empty: copy.empty,
-              unread: copy.unread,
-              openDetail: copy.openDetail,
-              deleteMode: copy.deleteMode,
-              cancelSelect: copy.cancelSelect,
-              selectAll: copy.selectAll,
-              deselectAll: copy.deselectAll,
-              deleteSelected: copy.deleteSelected,
-              swipeDeleteBtn: copy.swipeDeleteBtn,
-            }}
-          />
+          <NotificationList copy={{ ...copy.w, title: copy.title }} items={views} todayKey={todayKey} />
           </SplitList>
         )}
       </div>

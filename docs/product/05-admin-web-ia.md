@@ -508,6 +508,14 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
 - 중요 알림 우선 표시
 - 해당 상세 화면 deep link
 
+**종 팝오버 — 화이트 리디자인(2026-10-15, 시안 NotifPop-PC · `src/components/admin/notification-bell.tsx`):**
+위 막대의 종을 누르면 오른쪽 위를 기준으로 커지며(.96 → 1 + 페이드 160ms) 400px 팝오버가 열린다. Esc · 바깥 클릭으로 닫힘,
+종의 안 읽은 수 배지는 그대로. 머리 「알림 · 안 읽음 N · 모두 읽음」(모두 읽음을 누르면 점이 위에서부터 차례로 사라짐), 줄은
+모바일 알림 화면과 **같은 줄 모양**(`NotificationRowBody` — 짧은 제목 · 대상 · 시각 · 어디서 · 안 읽음 점, 같은 날 같은
+종류는 묶어서 「N개 더」로 펼침 — 최근 20건을 묶어 6줄까지), 아래 「알림 전체 보기 →」(`/notifications` → 모바일 알림 화면).
+줄을 누르면 그 알림의 주소로 간다(읽음 처리는 하지 않는다 — 예전과 같음). 줄 글자는 서버 액션 `getAdminNotifications`
+가 로그인한 사람의 언어로 만든다(`src/lib/notifications/brief.ts`). 규칙 전체: `14-notification-design.md` 「알림 화면 — 화이트 리디자인」.
+
 ### List / Detail Pattern
 
 핵심 목록 화면은 아래 패턴을 기본으로 한다.

@@ -11,7 +11,6 @@ import { collectBlockedRooms } from "@/lib/room-blocks";
 import { type PropertyMapMeta, getPropertyAddress } from "@/lib/property-map-links";
 import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
-import { writeCalendarLastPropertyCookie } from "@/lib/calendar-last-property";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { useIsTablet } from "@/components/shell/split-list";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -354,7 +353,6 @@ function sharedAccessCodeLabel(
 }
 
 type ListTab = "in" | "out" | "stay" | "empty";
-const LAST_PROPERTY_KEY = "foldy.calendar.lastProperty";
 
 export function MobileCalendarView({
   wcopy,
@@ -403,14 +401,6 @@ export function MobileCalendarView({
     const timer = setTimeout(() => setCopiedKey(null), 1600);
     return () => clearTimeout(timer);
   }, [copiedKey]);
-  const rememberProperty = (property: string) => {
-    writeCalendarLastPropertyCookie(property);
-    try {
-      window.localStorage.setItem(LAST_PROPERTY_KEY, property);
-    } catch {
-      /* 저장소가 막힌 환경 — 다음에 고르기 화면부터 보일 뿐이다. */
-    }
-  };
   const [mode, setMode] = useState<"overview" | "lists" | "map">("overview");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [isReservationSheetOpen, setIsReservationSheetOpen] = useState(false);
@@ -667,26 +657,8 @@ export function MobileCalendarView({
     };
   }, []);
 
-  // 건물을 고르면 기억해 둔다 — 다음에 건물 없이 들어오면 **서버가** 쿠키를 읽어 바로 그 건물로 연다(page.tsx).
-  // 예전엔 여기서 localStorage 를 읽어 router.replace 했는데, 건물 고르기가 먼저 보이고 몇 초 뒤 혼자 넘어가는 버그였다
-  // (2026-10-15 사용자 보고). 예전 localStorage 값만 있는 사람은 쿠키로 옮겨만 두고 지금 화면은 그대로 둔다.
-  useEffect(() => {
-    if (selectedProperty) {
-      writeCalendarLastPropertyCookie(selectedProperty);
-      try {
-        window.localStorage.setItem(LAST_PROPERTY_KEY, selectedProperty);
-      } catch {
-        /* 무시 */
-      }
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(LAST_PROPERTY_KEY);
-      if (stored && propertyOptions.includes(stored)) writeCalendarLastPropertyCookie(stored);
-    } catch {
-      /* 무시 */
-    }
-  }, [selectedProperty, propertyOptions]);
+  // 건물 없이 들어오면 **늘 건물 고르기 화면**이다(2026-10-15 사용자 결정 — 「건물 고르기 화면 그대로 있어야 해」).
+  // 예전엔 지난번 건물로 저절로 넘겼는데(localStorage → 이후 쿠키), 고르기를 보려는 사람을 가로채서 없앴다.
 
   useEffect(() => {
     if (mode !== "overview") return;
@@ -759,10 +731,7 @@ export function MobileCalendarView({
             className={`mcw-brow${on ? " on" : ""}`}
             href={getPropertyCalendarHref(row.property)}
             key={row.property}
-            onClick={() => {
-              rememberProperty(row.property);
-              onPick?.();
-            }}
+            onClick={() => onPick?.()}
           >
             <span className="mcw-brow__t">
               <b>{propertyName(row.property)}</b>

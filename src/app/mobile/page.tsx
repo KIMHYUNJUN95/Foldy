@@ -19,7 +19,8 @@ import {
 import { HomeElapsedTimer } from "@/components/mobile/home-elapsed-timer";
 import { HomeRefreshButton } from "@/components/mobile/home-refresh-button";
 import { MobileShell } from "@/components/shell/mobile-shell";
-import { getCurrentOpenSession } from "@/lib/attendance-sessions";
+import { getCurrentOpenSession, getTodayWorkState } from "@/lib/attendance-sessions";
+import { GreetingLine } from "@/components/shared/greeting-line";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNotificationBadge } from "@/lib/nav-badges";
 import {
@@ -422,6 +423,12 @@ async function HomeBody({
 }
 
 
+/** 인사말 — 오늘 근무 상태(쿼리 하나)를 기다리는 동안은 예전 문구로 자리만 잡는다(첫 화면은 막지 않음). */
+async function HomeGreeting({ session, locale, name, fallback }: { session: AppSession; locale: Locale; name: string; fallback: string }) {
+  const work = await getTodayWorkState(session.organization.id, session.user.id).catch(() => "none" as const);
+  return <GreetingLine surface="home" locale={locale} name={name} work={work} fallback={fallback} />;
+}
+
 export default async function MobileHomePage() {
   const session = await getCurrentAppSession();
 
@@ -452,7 +459,11 @@ export default async function MobileHomePage() {
         <div className="hm__greet">
           <div>
             <div className="hm__greet-d">{greetDate}</div>
-            <div className="hm__greet-n">{m.homeGreeting(userName)}</div>
+            <div className="hm__greet-n">
+              <Suspense fallback={<span className="gl" aria-hidden="true">{m.homeGreeting(userName)}</span>}>
+                <HomeGreeting session={session} locale={locale} name={userName} fallback={m.homeGreeting(userName)} />
+              </Suspense>
+            </div>
           </div>
         </div>
 

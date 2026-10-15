@@ -1,0 +1,7 @@
+/* 상황별 인사말(2026-10-15) — 고르기 전엔 예전 문구로 자리만(안 보임), 고르면 단어마다 흐림 → 또렷. */
+.gl:not(.is-ready) { visibility: hidden; }
+.gl__w { display: inline-block; animation: gl-in 560ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes gl-in { from { opacity: 0; filter: blur(4px); transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) {
+  .gl__w { animation: none; }
+}

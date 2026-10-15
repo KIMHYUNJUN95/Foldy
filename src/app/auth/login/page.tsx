@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { signInWithGoogle, signOut } from "@/app/auth/actions";
 import { AuthFrame } from "@/app/auth/login/auth-frame";
 import { FoldyMark } from "@/components/brand/foldy-mark";
+import { GreetingLine } from "@/components/shared/greeting-line";
 import { EmailLoginForm } from "@/app/auth/login/email-login-form";
 import { EmailNewPasswordForm } from "@/app/auth/login/email-new-password-form";
 import { EmailResetForm } from "@/app/auth/login/email-reset-form";
@@ -372,7 +373,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <Link href={signupHref} role="tab" aria-selected="false">{t.email.tabSignup}</Link>
         </div>
         <div className="aw-head aw-gap-l">
-          <h1 className="aw-title">{t.email.welcomeTitle}</h1>
+          <h1 className="aw-title"><GreetingLine surface="login" locale={locale} fallback={t.email.welcomeTitle} /></h1>
           <p className="aw-lede">{t.email.loginSubtitle}</p>
         </div>
         {params.sent === "password_updated" && (
@@ -410,7 +411,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <div className="authw__col--center" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
         <div className="aw-hero">
           <span className="aw-hero__mark"><FoldyMark size={56} /></span>
-          <h1 className="aw-title">{c.welcomeTitle}</h1>
+          <h1 className="aw-title"><GreetingLine surface="login" locale={locale} fallback={c.welcomeTitle} /></h1>
           <p className="aw-lede">{c.welcomeLede}</p>
         </div>
         {isAttendanceQrEntry && (

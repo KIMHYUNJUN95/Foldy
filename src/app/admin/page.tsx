@@ -7,6 +7,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession } from "@/lib/session";
 import { getAdminDashboard } from "@/lib/admin-dashboard";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
+import { GreetingLine } from "@/components/shared/greeting-line";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getDashboardOpsSummary } from "@/lib/ops-revenue-server";
 
@@ -44,7 +45,10 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const shared = dictionary.admin.shared;
 
   return (
-    <AdminShell activeItem="dashboard" title={dictionary.admin.console.headerToday}>
+    <AdminShell
+      activeItem="dashboard"
+      title={<GreetingLine surface="admin" locale={locale} name={session.user.name ?? ""} fallback={dictionary.admin.console.headerToday} />}
+    >
       {/* 하루 첫 진입 모션(약 1.8초) — 시안 Motion-PC-Entry-PC */}
       {session.organization ? <Beds24LiveRefresh organizationId={session.organization.id} /> : null}
       <DashboardHome

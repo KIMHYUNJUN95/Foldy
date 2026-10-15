@@ -7,6 +7,7 @@
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { AttendanceSessionRow } from "@/lib/attendance";
+import { tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
 
 // 문자열 리터럴이어야 타입 수준 파싱이 된다(배열 join 은 GenericStringError 로 떨어진다).
 const OPEN_SESSION_SELECT = "id, clock_in_at, clock_in_site_id" as const;
@@ -161,4 +162,24 @@ export async function getCurrentOpenSession(
     closedBreakSeconds: Math.floor(closedBreakSeconds),
     breakCount: breaks.length,
   };
+}
+
+/**
+ * 홈 인사말용 오늘 근무 상태(2026-10-15) — 열린 세션이 있으면 근무 중, 오늘(도쿄) 출근해서 닫혔으면 퇴근,
+ * 아니면 none. 실패하면 none(인사말만 덜 맞을 뿐 홈은 그대로).
+ */
+export async function getTodayWorkState(
+  organizationId: string,
+  userId: string,
+): Promise<"working" | "done" | "none"> {
+  const service = getSupabaseServiceClient();
+  const { data, error } = await service
+    .from("attendance_sessions")
+    .select("status")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .or(`status.eq.open,clock_in_at.gte.${tokyoDayStart(tokyoToday())}`)
+    .limit(5);
+  if (error || !data?.length) return "none";
+  return data.some((r) => r.status === "open") ? "working" : "done";
 }

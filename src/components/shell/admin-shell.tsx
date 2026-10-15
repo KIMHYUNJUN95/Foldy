@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import Link from "next/link";
 import { ChevronDown, Search, Smartphone } from "lucide-react";
@@ -24,7 +24,7 @@ type AdminShellProps = {
   activeItem?: (typeof adminNavigation)[number]["id"];
   children: React.ReactNode;
   mobileHref?: string;
-  title: string;
+  title: ReactNode;
 };
 
 export function AdminShell({ activeItem, children, mobileHref = "/mobile", title }: AdminShellProps) {

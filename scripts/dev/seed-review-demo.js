@@ -14,7 +14,7 @@
  *   node scripts/dev/seed-review-demo.js --apply               # 실제 생성. 비밀번호를 한 번만 출력한다
  *   node scripts/dev/seed-review-demo.js --apply --email review@example.com --password '...'
  *
- * 다시 돌려도 안전하다: 같은 slug 의 조직이 이미 있으면 계정 · 소속만 확인하고 샘플 데이터는 다시 넣지 않는다.
+ * 다시 돌려도 안전하다: 같은 slug 의 조직이 이미 있으면 계정 · 소속만 확인하고, 그 조직에 건물이 있으면 샘플 데이터는 다시 넣지 않는다.
  * 비밀번호를 바꾸려면 --apply --password '<새 비밀번호>' 로 다시 돌린다(심사관 계정만 갱신).
  */
 const { createClient } = require("@supabase/supabase-js");
@@ -179,8 +179,10 @@ async function main() {
     ids[c.key] = u.id;
   }
 
-  if (!orgIsNew) {
-    console.log("샘플 데이터는 조직을 처음 만들 때만 넣는다 — 건너뜀.");
+  // 건물이 하나라도 있으면 샘플은 이미 들어간 것 — 중간에 실패했다면 그 조직의 건물 · 객실을 지우고 다시 돌린다.
+  const { count: propertyCount } = await db.from("properties").select("id", { count: "exact", head: true }).eq("organization_id", org.id);
+  if (propertyCount) {
+    console.log("샘플 데이터가 이미 있다 — 건너뜀.");
   } else {
     await seedContent(db, must, org.id, ids);
   }
@@ -228,6 +230,7 @@ async function seedContent(db, must, orgId, ids) {
         status: "published",
         published_at: now,
         is_pinned: true,
+        is_important: false,
         target_scope: "everyone",
       },
       {
@@ -237,6 +240,7 @@ async function seedContent(db, must, orgId, ids) {
         content: "From this week, if you find any damage during check-out cleaning, please report it from the cleaning screen with a photo so the maintenance team can follow up.",
         status: "published",
         published_at: now,
+        is_pinned: false,
         is_important: true,
         target_scope: "everyone",
       },

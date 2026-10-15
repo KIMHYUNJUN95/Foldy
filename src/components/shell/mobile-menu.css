@@ -1,0 +1,478 @@
+/*
+ * 전체 메뉴(폰 서랍 · 넓은 화면 360px 서랍) + 하단 탭 편집 시트 — 화이트 리디자인(2026-10-15, 시안 Menu-Phone · TabEdit-Phone).
+ * 상자 · 테두리 없음, 고른 줄은 옅은 보라 바탕(#f4f1fd)만, 누르면 .97 로 살짝 눌림. 움직임 줄이기 설정이면 전부 끈다.
+ * docs/product/16-mobile-navigation.md 「전체 메뉴 · 하단 탭 편집 — 화이트 리디자인」
+ */
+
+/* ── 전체 메뉴 ─────────────────────────────────────────────────────────── */
+.mm {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  color: #16141f;
+}
+.mm__top {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.mm__close {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #8b8898;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease;
+}
+.mm__close:active {
+  transform: scale(0.94);
+  background: #f4f4f7;
+}
+.mm__me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 8px;
+  border-radius: 14px;
+  color: #16141f;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease;
+}
+.mm__me:active {
+  transform: scale(0.97);
+  background: #f7f7f9;
+}
+.mm__avatar {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ede7fc;
+  color: #5a30cf;
+  font-size: 18px;
+  font-weight: 700;
+}
+.mm__me-name {
+  display: block;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm__me-sub {
+  display: block;
+  overflow: hidden;
+  margin-top: 1px;
+  color: #8b8898;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm__search {
+  display: flex;
+  height: 46px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: #f4f4f7;
+  color: #8b8898;
+}
+.mm__search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #16141f;
+  font: inherit;
+  /* 16px 아래면 iOS 가 입력할 때 화면을 확대한다. */
+  font-size: 16px;
+  outline: none;
+}
+.mm__search input::placeholder {
+  color: #8b8898;
+}
+.mm__search input::-webkit-search-cancel-button {
+  display: none;
+}
+.mm__clear {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  margin-right: -8px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #8b8898;
+}
+.mm__scroll {
+  min-height: 0;
+  flex: 1;
+  margin: 0 -16px;
+  padding: 0 16px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.mm__scroll::-webkit-scrollbar {
+  display: none;
+}
+.mm__label {
+  display: block;
+  padding: 14px 12px 4px;
+  color: #9a97a6;
+  font-size: 12px;
+  font-weight: 600;
+}
+.mm__freq {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f1f4;
+}
+.mm__freq .mm__label {
+  padding: 16px 8px 12px;
+}
+.mm__freq-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.mm__tile {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #3a3746;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mm__tile-ico {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: #f4f1fd;
+  color: #7a52e6;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.mm__tile:active .mm__tile-ico {
+  transform: scale(0.94);
+}
+.mm__tile-lbl {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm__row {
+  display: flex;
+  height: 50px;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: #16141f;
+  font-size: 16px;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease;
+}
+.mm__row:active {
+  transform: scale(0.97);
+  background: #f7f7f9;
+}
+.mm__row-ico {
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+  color: #8b8898;
+  stroke-width: 1.7;
+}
+.mm__row-lbl {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm__row-count {
+  color: #8b8898;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.mm__row.is-active {
+  background: #f4f1fd;
+  color: #5a30cf;
+  font-weight: 600;
+}
+.mm__row.is-active .mm__row-ico,
+.mm__row.is-active .mm__row-count {
+  color: #7a52e6;
+}
+.mm__empty {
+  padding: 28px 12px;
+  color: #8b8898;
+  font-size: 14px;
+  text-align: center;
+}
+.mm__foot {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  margin: 0 -16px;
+  padding: 12px 16px 0;
+  border-top: 1px solid #f1f1f4;
+}
+.mm__foot-link {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: #3a3746;
+  font-size: 14px;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease;
+}
+.mm__foot-link:first-child {
+  min-width: 0;
+  flex: 1;
+}
+.mm__foot-link:active {
+  transform: scale(0.97);
+  background: #f7f7f9;
+}
+.mm__foot-link.is-active {
+  color: #5a30cf;
+  font-weight: 600;
+}
+.mm__foot-link svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke-width: 1.7;
+}
+
+/* ── 하단 탭 편집 시트 ─────────────────────────────────────────────────── */
+.te-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 18px;
+}
+.te-head__title {
+  margin: 0;
+  color: #16141f;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.te-head__sub {
+  margin: 0;
+  color: #8b8898;
+  font-size: 13px;
+}
+.te {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.te__cur {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 14px 0;
+  border-radius: 16px;
+  background: #faf8ff;
+  touch-action: none;
+}
+.te__slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #3a3746;
+  font-size: 12px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.te__slot.is-dragging {
+  z-index: 2;
+  cursor: grabbing;
+}
+.te__slot.is-dragging .te__ico {
+  transform: scale(1.06);
+  box-shadow: 0 10px 22px -10px rgba(90, 48, 207, 0.45);
+}
+.te__ico {
+  position: relative;
+  display: flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: #f1ecfd;
+  color: #5a30cf;
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 180ms ease;
+}
+.te__lbl {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 「−」 — 검은 점 대신 흰 동그라미(옅은 테두리 + 그림자). 손가락 자리는 44px 로 넓힌다. */
+.te__minus {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.te__minus i {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #e4e2ea, 0 2px 6px -2px rgba(22, 20, 31, 0.25);
+  color: #3a3746;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.te__minus:active i {
+  transform: scale(0.85);
+}
+.te__label {
+  color: #6b6878;
+  font-size: 13px;
+  font-weight: 600;
+}
+.te__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: 16px;
+}
+.te__add {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #3a3746;
+  font: inherit;
+  font-size: 12px;
+}
+.te__add .te__ico {
+  width: 52px;
+  height: 52px;
+  background: #f7f7f9;
+  color: #6b6878;
+}
+.te__add:active .te__ico {
+  transform: scale(0.94);
+}
+.te__add:disabled {
+  opacity: 0.4;
+}
+.te__done {
+  height: 50px;
+  border: 0;
+  border-radius: 14px;
+  background: #7a52e6;
+  color: #ffffff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.te__done:active {
+  transform: scale(0.97);
+}
+.te__scroll {
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  margin: 0 -4px;
+  padding: 0 4px 4px;
+}
+.te__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 빼기 — 타일이 줄어들며 사라진다. 넣기 — 새 자리에서 톡 튀어나온다. */
+.te__slot.is-leaving {
+  animation: te-leave 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+.te-pop {
+  animation: te-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes te-leave {
+  to {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+@keyframes te-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm__close,
+  .mm__me,
+  .mm__tile-ico,
+  .mm__row,
+  .mm__foot-link,
+  .te__ico,
+  .te__minus i,
+  .te__done {
+    transition: none;
+  }
+  .mm__close:active,
+  .mm__me:active,
+  .mm__tile:active .mm__tile-ico,
+  .mm__row:active,
+  .mm__foot-link:active,
+  .te__add:active .te__ico,
+  .te__done:active,
+  .te__slot.is-dragging .te__ico {
+    transform: none;
+  }
+  .te__slot.is-leaving,
+  .te-pop {
+    animation: none;
+  }
+}

@@ -16,9 +16,12 @@ export type MyReportRow = {
 export function MyReportsList({
   reports,
   copy,
+  bare = false,
 }: {
   reports: MyReportRow[];
   copy: { title: string; body: string; empty: string; withdraw: string; unknown: string };
+  /** 모바일 계정 화이트 리디자인 — 공용 BottomSheet 안에 넣을 때: 바깥 상자 · 제목 없이, 버튼은 옅은 회색. */
+  bare?: boolean;
 }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -34,15 +37,15 @@ export function MyReportsList({
   }
 
   return (
-    <div className="rounded-xl border border-border px-4 py-3">
-      <p className="text-sm font-bold">{copy.title}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{copy.body}</p>
+    <div className={bare ? "" : "rounded-xl border border-border px-4 py-3"}>
+      {bare ? null : <p className="text-sm font-bold">{copy.title}</p>}
+      <p className={bare ? "text-[13px] leading-5 text-[#8b8898]" : "mt-0.5 text-xs text-muted-foreground"}>{copy.body}</p>
       {reports.length === 0 ? (
-        <p className="mt-2 text-[13px] font-semibold text-muted-foreground">{copy.empty}</p>
+        <p className={bare ? "py-6 text-center text-[13px] text-[#8b8898]" : "mt-2 text-[13px] font-semibold text-muted-foreground"}>{copy.empty}</p>
       ) : (
-        <ul className="mt-2 divide-y divide-border/70">
+        <ul className={bare ? "mt-2 divide-y divide-[#f3f3f6]" : "mt-2 divide-y divide-border/70"}>
           {reports.map((r) => (
-            <li className="flex items-center justify-between gap-3 py-2" key={r.id}>
+            <li className={bare ? "flex min-h-[56px] items-center justify-between gap-3 py-2" : "flex items-center justify-between gap-3 py-2"} key={r.id}>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{r.preview}</p>
                 <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
@@ -50,7 +53,11 @@ export function MyReportsList({
                 </p>
               </div>
               <button
-                className="shrink-0 rounded-full border border-border px-3 py-1 text-[12.5px] font-bold text-primary disabled:opacity-50"
+                className={
+                  bare
+                    ? "h-10 shrink-0 rounded-full bg-[#f4f4f7] px-4 text-[13px] font-semibold text-[#5a30cf] transition-transform active:scale-[.97] disabled:opacity-50"
+                    : "shrink-0 rounded-full border border-border px-3 py-1 text-[12.5px] font-bold text-primary disabled:opacity-50"
+                }
                 disabled={pendingId === r.id}
                 onClick={() => onWithdraw(r.id)}
                 type="button"

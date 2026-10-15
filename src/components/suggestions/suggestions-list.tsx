@@ -1,125 +1,97 @@
 "use client";
 
 /**
- * Frame 1 — Staff Suggestions main list (제안함).
- * Visual port of `frameList()` from the Feedback Box.html handoff: segmented tabs (보낸/받은/참조)
- * + status filter pills + feedback cards + FAB. Data-driven (Step 3) and fully localized (Step 8).
- * See docs/product/22-staff-suggestions-workflow.md.
+ * 제안함 목록 — 화이트 리디자인(2026-10-15, 시안 Sugg-Phone · Sugg-Fold · Sugg-Tablet).
+ * 머리(제목 · 한 줄 설명 · 「+ 쓰기」) → 글자 탭 받은 · 보낸 · 참조(개수) → 상태 칩 줄 대신 글자 하나 「진행 중만 ⌄」(누르면 공용
+ * BottomSheet 에서 고름) + 옅은 요약 → 줄(상태 글자 · 보낸 → 받는 · 시간 / 굵은 제목). 데이터 · 필터 규칙은 그대로.
+ * 폴드는 가운데 540px 한 줄, 태블릿 가로는 `SplitList` 목록 | 상세 칸(연 줄 옅은 보라).
+ * See docs/product/22-staff-suggestions-workflow.md 「화이트 리디자인 — 모바일」.
  */
 
-import { LiveWash } from "@/components/shared/live-wash";
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { LiveWash } from "@/components/shared/live-wash";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { StaffSuggestionStatus } from "@/lib/suggestions";
 import type { SuggestionListData, SuggestionListItem } from "@/lib/suggestions-queries";
-import "./suggestions.css";
-import { Ic, SgIcon } from "./sg-icons";
-import { MobileFab } from "@/components/shell/mobile-fab";
+import "./suggestions-white.css";
 
 type SgCopy = Dictionary["mobile"]["suggestions"];
+type FilterKey = "active" | "all" | StaffSuggestionStatus;
 
-const STAT_CLS: Record<StaffSuggestionStatus, string> = {
-  submitted: "sub",
-  reviewing: "rev",
-  on_hold: "hold",
-  completed: "done",
-};
+const SEGMENTS = ["received", "sent", "referenced"] as const;
+const FILTERS: FilterKey[] = ["active", "all", "submitted", "reviewing", "on_hold", "completed"];
 
-function StatChip({ k, copy }: { k: StaffSuggestionStatus; copy: SgCopy }) {
-  return (
-    <span className={`stat s-${STAT_CLS[k]}`}>
-      <span className="d" />
-      {copy.status[k]}
-    </span>
-  );
-}
-
-// Relative "x ago" via Intl (locale-correct, no manual strings). Past values use a negative delta.
-function relativeTime(iso: string, locale: Locale): string {
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+/** 2시간 전 · 어제 · 10/6 — 하루 안은 상대 시간, 그 뒤는 짧은 날짜(도쿄). */
+export function suggestionWhen(iso: string, locale: Locale): string {
+  const diffSec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-  const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["second", 60],
-    ["minute", 60],
-    ["hour", 24],
-    ["day", 7],
-    ["week", 4.34524],
-    ["month", 12],
-    ["year", Infinity],
-  ];
-  let value = diffSec;
-  for (const [unit, span] of units) {
-    if (Math.abs(value) < span) return rtf.format(-Math.round(value), unit);
-    value = value / span;
-  }
-  return rtf.format(-Math.round(value), "year");
+  if (diffSec < 60) return rtf.format(0, "second");
+  if (diffSec < 3600) return rtf.format(-Math.floor(diffSec / 60), "minute");
+  if (diffSec < 86400) return rtf.format(-Math.floor(diffSec / 3600), "hour");
+  if (diffSec < 172800) return rtf.format(-1, "day");
+  return new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric", timeZone: "Asia/Tokyo" }).format(new Date(iso));
 }
 
-function matchesFilter(status: StaffSuggestionStatus, filter: string): boolean {
+function matchesFilter(status: StaffSuggestionStatus, filter: FilterKey): boolean {
   if (filter === "all") return true;
   if (filter === "active") return status === "submitted" || status === "reviewing";
   return status === filter;
 }
 
-function Card({
+function Row({
   f,
   segment,
   locale,
   hydrated,
   copy,
+  index,
 }: {
   f: SuggestionListItem;
-  segment: keyof SuggestionListData;
+  segment: (typeof SEGMENTS)[number];
   locale: Locale;
   hydrated: boolean;
   copy: SgCopy;
+  index: number;
 }) {
-  // Show the meaningful counterparty: the recipient on Sent, the author on Received/Referenced.
-  const counterparty = segment === "sent" ? f.recipientName : f.authorName;
-  const counterpartyLabel = segment === "sent" ? copy.recipientLabel : copy.routeFrom;
+  const me = copy.white.meShort;
+  const from = segment === "received" ? f.authorName || "—" : segment === "sent" ? me : f.authorName || "—";
+  const to = segment === "sent" ? f.recipientName || "—" : segment === "received" ? me : f.recipientName || "—";
   return (
-    <Link href={`/mobile/suggestions/${f.id}`} className="fcard" data-live={f.id}>
-      <div className="fcard__top">
-        <StatChip k={f.status} copy={copy} />
-        <span className="fcard__time">{hydrated ? relativeTime(f.createdAt, locale) : ""}</span>
-      </div>
-      <div className="fcard__title">{f.title}</div>
-      <div className="fcard__excerpt">{f.excerpt}</div>
-      <div className="fcard__foot">
-        <span className="dirline">
-          <span className="lbl">{counterpartyLabel}</span>
-          <span className="av av--p av--sm">{(counterparty || "—").slice(0, 1)}</span>
-          {counterparty || "—"}
+    <Link
+      className="sgw-row"
+      data-live={f.id}
+      href={`/mobile/suggestions/${f.id}`}
+      style={{ "--i": index } as CSSProperties}
+    >
+      <span className="sgw-meta">
+        <span className="sgw-st" data-s={f.status}>
+          {copy.status[f.status]}
         </span>
-        <span className="fcard__meta">
-          {f.referencesCount ? (
-            <span className="mi">
-              <Ic>{SgIcon.eye}</Ic>
-              {f.referencesCount}
-            </span>
-          ) : null}
-          {f.commentCount ? (
-            <span className="mi">
-              <Ic>{SgIcon.comment}</Ic>
-              {f.commentCount}
-            </span>
-          ) : null}
+        <span aria-hidden="true" className="sgw-dot">
+          ·
         </span>
-      </div>
+        <span className="sgw-meta__route">
+          {from} → {to}
+        </span>
+        <span className="sgw-meta__time">{hydrated ? suggestionWhen(f.createdAt, locale) : ""}</span>
+      </span>
+      <span className="sgw-row__t">{f.title}</span>
     </Link>
   );
 }
 
-const SEGMENTS = ["sent", "received", "referenced"] as const;
-const FILTERS: { key: string; dot: string | null }[] = [
-  { key: "active", dot: null },
-  { key: "all", dot: null },
-  { key: "submitted", dot: "var(--sub)" },
-  { key: "reviewing", dot: "var(--rev)" },
-  { key: "on_hold", dot: "var(--hold)" },
-  { key: "completed", dot: "var(--done)" },
-];
+const CHEVRON = (
+  <svg aria-hidden="true" fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="14">
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);
+const CHECK = (
+  <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" viewBox="0 0 24 24" width="18">
+    <path d="M5 12.5l4.5 4.5L19 7.5" pathLength={1} />
+  </svg>
+);
 
 export function SuggestionsList({
   data,
@@ -130,8 +102,10 @@ export function SuggestionsList({
   locale: Locale;
   copy: SgCopy;
 }) {
-  const [segment, setSegment] = useState<keyof SuggestionListData>("received");
-  const [filter, setFilter] = useState<string>("active");
+  const w = copy.white;
+  const [segment, setSegment] = useState<(typeof SEGMENTS)[number]>("received");
+  const [filter, setFilter] = useState<FilterKey>("active");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -143,74 +117,108 @@ export function SuggestionsList({
     received: copy.segReceived,
     referenced: copy.segReferenced,
   };
-  const filterLabel = (key: string) =>
-    key === "active"
-      ? copy.filterActive
-      : key === "all"
-        ? copy.filterAll
-        : copy.status[key as StaffSuggestionStatus];
+  const filterLabel = (key: FilterKey) =>
+    key === "active" ? copy.filterActive : key === "all" ? copy.filterAll : copy.status[key];
+  const buttonLabel = filter === "all" ? copy.filterAll : w.only.replace("{label}", filterLabel(filter));
 
   const visible = useMemo(
     () => data[segment].filter((f) => matchesFilter(f.status, filter)),
     [data, segment, filter],
   );
-  const countFor = (key: keyof SuggestionListData) =>
+  const countFor = (key: (typeof SEGMENTS)[number]) =>
     data[key].filter((f) => matchesFilter(f.status, filter)).length;
+  const summary =
+    filter === "active"
+      ? `${copy.status.submitted} · ${copy.status.reviewing}`
+      : w.countLine.replace("{n}", String(visible.length));
 
   return (
-    <div className="sg">
-      <div className="scroll">
-        <div className="ptitle-row">
-          <h1 className="ptitle">{copy.listTitle}</h1>
+    <div className="sgw">
+      <header className="sgw-h">
+        <div className="sgw-h__t">
+          <h1>{copy.listTitle}</h1>
+          <p>{w.sub}</p>
         </div>
-        <div className="seg">
-          {SEGMENTS.map((s) => (
+        <Link className="sgw-tbtn" href="/mobile/suggestions/new">
+          + {w.write}
+        </Link>
+      </header>
+
+      <div aria-label={copy.listTitle} className="sgw-tabs" role="tablist">
+        {SEGMENTS.map((s) => {
+          const n = countFor(s);
+          return (
             <button
+              aria-selected={segment === s}
+              className="sgw-tab"
               key={s}
-              type="button"
-              className={`seg__b${segment === s ? " on" : ""}`}
               onClick={() => setSegment(s)}
-            >
-              {segLabel[s]} <span className="n">{countFor(s)}</span>
-            </button>
-          ))}
-        </div>
-        <div className="fbar">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
+              role="tab"
               type="button"
-              className={`fpill${filter === f.key ? " on" : ""}`}
-              onClick={() => setFilter(f.key)}
             >
-              {f.dot ? <span className="d" style={{ background: f.dot }} /> : null}
-              {filterLabel(f.key)}
+              {segLabel[s]}
+              {n > 0 ? <b>{n}</b> : null}
             </button>
-          ))}
-        </div>
-        <div className="flist">
-          {visible.length === 0 ? (
-            <p
-              style={{
-                padding: "40px 8px",
-                textAlign: "center",
-                color: "var(--muted-foreground, #8a8f98)",
-                fontSize: "13.5px",
-                fontWeight: 600,
-              }}
-            >
-              {copy.empty}
-            </p>
-          ) : (
-            <LiveWash move sig={visible.map((f) => f.id).join(",")}>
-              {visible.map((f) => (
-                <Card key={f.id} f={f} segment={segment} locale={locale} hydrated={hydrated} copy={copy} />
-              ))}
-            </LiveWash>
-          )}
-        </div>
+          );
+        })}
       </div>
-      <MobileFab href="/mobile/suggestions/new" label={copy.fabLabel} />
+
+      <div className="sgw-filter">
+        <button aria-haspopup="dialog" className="sgw-filter__b" onClick={() => setSheetOpen(true)} type="button">
+          {buttonLabel}
+          {CHEVRON}
+        </button>
+        <span className="sgw-filter__s">· {summary}</span>
+      </div>
+
+      <div className="sgw-list" key={`${segment}:${filter}`}>
+        {visible.length === 0 ? (
+          <div className="sgw-empty">
+            <b>{w.emptyTitle}</b>
+            <span>{w.emptySub}</span>
+          </div>
+        ) : (
+          <LiveWash move sig={visible.map((f) => f.id).join(",")}>
+            {visible.map((f, i) => (
+              <Row copy={copy} f={f} hydrated={hydrated} index={i} key={f.id} locale={locale} segment={segment} />
+            ))}
+          </LiveWash>
+        )}
+      </div>
+
+      {sheetOpen ? (
+        <BottomSheet ariaLabel={w.filterTitle} onClose={() => setSheetOpen(false)}>
+          {({ close }) => (
+            <div className="sgw-fs" role="radiogroup" aria-label={w.filterTitle}>
+              <div className="sgw-fs__h">
+                <b>{w.filterTitle}</b>
+                <span>{w.filterHint}</span>
+              </div>
+              {FILTERS.map((key) => {
+                const on = filter === key;
+                const n = data[segment].filter((f) => matchesFilter(f.status, key)).length;
+                return (
+                  <button
+                    aria-checked={on}
+                    className="sgw-fs__o"
+                    key={key}
+                    onClick={() => {
+                      setFilter(key);
+                      close();
+                    }}
+                    role="radio"
+                    type="button"
+                  >
+                    <span>{filterLabel(key)}</span>
+                    <em>{n}</em>
+                    {on ? CHECK : <i aria-hidden="true" style={{ width: 18 }} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
     </div>
   );
 }

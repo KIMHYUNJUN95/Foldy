@@ -269,13 +269,29 @@ Deferred:
 
 - `/mobile/bugs` — list (my reports; all-org list for reviewers)
 - `/mobile/bugs/new` — create form (title + description + screenshots)
-- `/mobile/bugs/[id]` — detail (status KV row → BottomSheet for reviewer status change; delete for author while submitted; edit button hidden in 1차)
+- `/mobile/bugs/[id]` — detail (reviewer status change = inline 4 buttons since the 2026-10-15 white redesign; delete for author while submitted; edit button hidden in 1차)
 
 Empty state:
 
 - shown when list is empty
 - title: "아직 신고가 없어요"
 - subtitle: "버그를 발견하면 알려주세요"
+
+### 화이트 리디자인 — 모바일 (2026-10-15, 시안 BugList-Phone · Bug-Phone)
+
+흰 바탕 · 상자 없음 · 세로 구분선 없음(`src/components/bugs/bugs-white.css`, 접두어 `bgw-`). 상태는 색 글자만 —
+접수 회색 · 검토 중 보라 · 수정 완료 초록 · 종료 옅은 회색.
+
+- **목록** `/mobile/bugs`: 「버그 신고」 · 「내가 보낸 신고 N건」(검토자는 「전체 신고 N건」) · 보라 「+ 신고」 → 줄(굵은 제목 / `BR-xxxx · 10/14`
+  — 번호는 고정폭 글꼴, 검토자에겐 신고자 이름도 · 상태 글자 · ›) → 안내 「대표 · 사무직이 확인해요 · 처리되면 알림이 와요」. 예전 열 머리(ID · 제목 · 상태) 없앰.
+- **새 신고** `/mobile/bugs/new`: 이제 `MobileShell` 안(예전엔 셸 없이 가짜 머리를 그렸다). 「버그 신고」 · 「앱이 이상할 때 알려주세요」 · 오른쪽
+  「내 신고 N」 → 테두리 위에 이름표가 걸친 칸 「어떤 문제인가요?」 · 「자세히」 → 「화면 사진 선택 · n/5」(회색 타일 + 「+」, 압축 · 업로드 순서 그대로)
+  → 꽉 찬 「보내기」(누르면 도는 표시 「보내는 중…」 → 초록 체크가 그려지며 「보냈어요」 → 목록으로) → 안내 한 줄.
+- **상세** `/mobile/bugs/[id]`: `BR-xxxx · 상태` → 제목 → 「신고자 · 역할 신고 · 날짜 시각」 → 설명 → 화면 사진 2열(누르면 새 탭) →
+  검토자만 「상태 바꾸기」 4칸(예전 상태 칩 → 시트 대신, 제안함 상세와 같은 모양) → 작성자 · 접수 상태면 빨간 「삭제」(가운데 확인 창 — 의도된 예외) →
+  (신고자) 안내 한 줄. `BugStatusSheet` · `BugStatusBadge` 는 이제 쓰는 곳이 없다.
+- **폴드** 가운데 540px 한 줄 · **태블릿 가로** `SplitList` 목록 | 상세 칸(연 줄 옅은 보라). 새 신고 폼은 칸이 아니라 화면 이동.
+- 움직임: 줄 · 버튼 누름, 줄 차례로 떠오름, 사진 타일 톡, 보내기 → 체크 그리기. 동작 줄이기면 끔. 문구 `bugs.white.*`(ko/ja/en).
 
 ## Admin Web Surface
 

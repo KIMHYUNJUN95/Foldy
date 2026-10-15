@@ -64,6 +64,24 @@ Implementation note:
 - The page is reachable from the account icon in both admin and mobile shells.
 - Age and profile photo are still deferred.
 
+### 계정 화면 — 화이트 리디자인(모바일) (2026-10-15, 시안 Account-Phone)
+
+`/account` 가 모바일 셸로 열릴 때(`?mode=mobile` — 모바일 머리의 프로필 버튼 · 사이드 메뉴, 또는 기본 모드가 모바일인 사람)만
+새 화면(`src/components/account/account-mobile.tsx` · `account-white.css`, 접두어 `acw-`). **관리 콘솔(PC) 쪽 탭 화면은 그대로.**
+
+- 위: 이니셜 원 · 이름 · 「조직 · 역할」. 저장됨 / 오류 / 프로필 채우기 안내는 옅은 회색 칸 한 줄.
+- 묶음 줄(작은 회색 묶음 이름 + 가는 가로줄, 실제 기능만):
+  - **내 정보** — 이름 · 생년월일 · 전화번호 · 성별: 줄을 누르면 공용 `BottomSheet` 에서 그 칸 하나만 고쳐 「저장」. 비어 있으면 빨간 「입력 안 함」.
+    **언어**는 바로 바뀌는 3칸(한국어 · 日本語 · EN) — 누르면 곧바로 저장되고 화면이 그 언어로 다시 그려진다.
+    저장은 기존 `updateAccountProfile` 그대로 — 이 액션이 이름 · 전화 · 성별 · 언어를 한꺼번에 받으므로 나머지 값은 숨은 칸으로 함께 보낸다.
+  - **조직** — 조직 이름 · 역할(읽기만).
+  - **앱** — 하단 탭 편집(지금 탭 이름들) → 셸의 가운데 편집 버튼이 여는 시트를 그대로 연다(`.tabbar__fab` 를 누름 — 셸 코드를 건드리지 않으려는 연결).
+  - **게시판** — 차단한 사용자 N명 · 내가 신고한 글 · 댓글 N개 → 시트 안에 기존 `BlockedUsersList` · `MyReportsList`(`bare` — 상자 · 제목 없이).
+  - **도움** — 제안함 · 버그 신고 · 이용약관 · 개인정보 처리방침 · 고객지원(시안은 약관 두 개를 한 줄로 묶었지만 앱 심사용 고객지원까지 세 줄로 나눔).
+- 아래: 회색 「로그아웃」(기존 `signOut`) · 작은 빨간 「계정 삭제」(기존 `DeleteAccountSheet` 확인 시트) · 버전(앱이면 「Foldy 1.0.0 (24)」, 웹은 「Foldy · 웹」).
+- 폴드 · 태블릿: 가운데 540px 한 칼럼. 움직임: 묶음이 차례로 떠오름 · 줄 누름 · 언어 손잡이 미끄러짐 · 저장 중 도는 표시. 동작 줄이기면 끔.
+- 문구 `accountProfile.white.*`(ko/ja/en) + 기존 `onboarding` · `common` · `legal` 문구.
+
 Possible future fields:
 
 ```txt

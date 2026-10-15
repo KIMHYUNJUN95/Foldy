@@ -4,23 +4,22 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import type { ReactNode, UIEvent } from "react";
-import { Bell, ChevronRight, LogOut, UserCircle, X } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { MobileMenuPanel } from "@/components/shell/mobile-menu-panel";
 import { MobileSideNav } from "@/components/shell/mobile-side-nav";
+import { TabEditor } from "@/components/shell/tab-editor";
 import { SPLIT_PANE_MESSAGE } from "@/lib/split-pane";
 import { attachSwipeBack } from "@/lib/swipe-back/controller";
 import { isSwipeBackScreen } from "@/lib/swipe-back/history-model";
 import { getHistoryIndex, getHistoryUrl } from "@/lib/swipe-back/history-tracker";
 import { trackScreen } from "@/lib/swipe-back/snapshot-store";
-import { signOut } from "@/app/auth/actions";
 import { updateBottomNavTabs } from "@/app/account/actions";
 import {
-  MAX_BOTTOM_NAV_TABS,
   canSeeNavItem,
   customizableBottomNavItems,
   isMobileOpsAdminNavItem,
-  getNavigationLabel,
   getNavigationTabLabel,
   mobileNavBugs,
   mobileOpsAdminNavigation,
@@ -32,9 +31,6 @@ import { haptic } from "@/lib/haptics";
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import "@/components/shell/pull-refresh.css";
-
-// Capitalized alias so the icon can be used as a JSX tag in the sidebar footer.
-const BugIcon = mobileNavBugs.icon;
 
 type MobileShellProps = {
   // Bug Report is not in the sidebar nav list (it lives in the footer next to Logout), but its
@@ -290,17 +286,6 @@ export function MobileShell({
       sidebarChromeTimerRef.current = null;
     }, SIDEBAR_TRANSITION_MS);
   }, [clearSidebarChromeTimer]);
-
-  function toggleNavTab(id: string) {
-    setNavTabIds((prev) => {
-      if (prev.includes(id)) {
-        const next = prev.filter((x) => x !== id);
-        return next.length > 0 ? next : prev; // keep at least one tab
-      }
-      if (prev.length >= MAX_BOTTOM_NAV_TABS) return prev; // bar is full
-      return [...prev, id];
-    });
-  }
 
   const updateVisibility = useCallback((currentY: number) => {
     const delta = currentY - lastScrollYRef.current;
@@ -609,56 +594,6 @@ export function MobileShell({
 
   // User-customized bottom tabs, split into left / right around the center FAB.
   // 권한이 붙은 항목은 권한이 없으면 하단 바에 고정돼 있어도 그리지 않는다(운영 관리자 메뉴는 애초에 후보가 아니다).
-  // 사이드 메뉴 한 줄 — 일반 메뉴와 운영 관리자 구역이 같은 모양을 쓴다.
-  const renderNavItem = (item: (typeof mobileSidebarNavigation)[number] | (typeof mobileOpsAdminNavigation)[number]) => {
-    const Icon = item.icon;
-    const isActive = item.id === activeItem;
-    const count = badges[item.id] ?? 0;
-
-    return (
-      <Link
-        key={item.id}
-        href={item.href}
-        onClick={closeSidebar}
-        aria-current={isActive ? "page" : undefined}
-        className="group relative flex h-[50px] items-center gap-[14px] px-2"
-      >
-        {isActive && (
-          <span
-            aria-hidden="true"
-            className="absolute -left-[22px] bottom-[13px] top-[13px] w-[3px] rounded-r-[3px] bg-primary"
-          />
-        )}
-        <Icon
-          aria-hidden="true"
-          className={cn(
-            "size-[22px] shrink-0 transition-colors",
-            isActive
-              ? "text-primary"
-              : "text-muted-foreground group-hover:text-foreground",
-          )}
-        />
-        <span
-          className={cn(
-            "flex-1 text-[15px] transition-colors",
-            isActive ? "font-bold text-primary" : "font-medium text-foreground",
-          )}
-        >
-          {getNavigationLabel(item, locale)}
-        </span>
-        {count > 0 && (
-          <span
-            className={cn(
-              "font-mono text-[12.5px] font-semibold tabular-nums",
-              isActive ? "text-primary" : "text-muted-foreground",
-            )}
-          >
-            {count > 99 ? "99+" : count}
-          </span>
-        )}
-      </Link>
-    );
-  };
   // 판매 캘린더 페이지는 권한 키에 더해 **관리자 웹 역할**도 요구한다(쓰기 액션이 `requireAdminSession` 을 거친다).
   // 메뉴도 같은 두 조건으로 거른다 — 키만 받은 현장 역할에게 메뉴를 보여 주면 눌러도 홈으로 튕긴다(2026-10-01).
   const canSeeMobileNavItem = (item: { id: string }) =>
@@ -669,7 +604,6 @@ export function MobileShell({
   const splitAt = Math.ceil(bottomItems.length / 2);
   const leftTabs = bottomItems.slice(0, splitAt);
   const rightTabs = bottomItems.slice(splitAt);
-  const isBarFull = navTabIds.length >= MAX_BOTTOM_NAV_TABS;
   const topChromeVisible = headerVisible && !sidebarChromeLocked;
 
   const renderTab = (item: (typeof bottomItems)[number]) => {
@@ -796,7 +730,7 @@ export function MobileShell({
           // 열려 있을 때만 — 앱(Android) 뒤로가기 버튼이 먼저 메뉴를 닫게 한다(NativeShellBridge, 2026-10-06).
           data-native-back-overlay={sidebarOpen ? "" : undefined}
           className={cn(
-            "absolute inset-y-0 left-0 z-[60] flex w-full flex-col overflow-hidden px-[22px] pb-[18px] pt-[max(24px,env(safe-area-inset-top))] text-foreground",
+            "absolute inset-y-0 left-0 z-[60] flex w-full flex-col overflow-hidden px-4 pb-[18px] pt-[max(24px,env(safe-area-inset-top))] text-foreground",
             // 넓은 화면에서는 왼쪽 360px 서랍(화면 전체를 덮지 않는다).
             "fold:w-[360px] fold:border-r fold:border-border",
             sidebarOpen && "fold:shadow-[24px_0_60px_-30px_rgba(2,6,23,0.45)]",
@@ -808,99 +742,29 @@ export function MobileShell({
             willChange: "transform",
           }}
         >
-          {/* Header */}
-          <div className="flex h-10 items-center justify-between px-0.5">
-            <Link
-              href="/mobile"
-              onClick={closeSidebar}
-              className="wordmark text-[24px] text-foreground"
-            >
-              Foldy
-            </Link>
-            <button
-              aria-label={dictionary.common.menu}
-              className="flex size-[38px] items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-border hover:text-foreground"
-              onClick={closeSidebar}
-              type="button"
-            >
-              <X className="size-4" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* User row — flat, hairline bottom */}
-          <Link
-            href="/account?mode=mobile"
-            onClick={closeSidebar}
-            className="mt-5 flex items-center gap-[13px] border-b border-border px-1 pb-4"
-          >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-              <UserCircle className="size-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-bold tracking-[-0.01em]">
-                {session.user.name}
-              </p>
-              <p className="mt-0.5 text-[12px] font-medium text-muted-foreground">
-                {dictionary.roles[session.user.role]}
-              </p>
-            </div>
-            <ChevronRight className="size-[17px] shrink-0 text-muted-foreground opacity-55" aria-hidden="true" />
-          </Link>
-
-          {/* Nav */}
-          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <p className="mb-1.5 ml-1 mt-[22px] text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-              {dictionary.common.menu}
-            </p>
-            <nav className="flex flex-col">
-              {mobileSidebarNavigation.filter((item) => canSeeNavItem(item, session.capabilities)).map(renderNavItem)}
-            </nav>
-            {/* 운영 관리자 — 일반 메뉴와 섞지 않고 아래에 따로 둔다(데스크톱 사이드바의 「운영 관리자」 묶음과 같다).
-                권한(`ops_admin.access`)이 없으면 구역째 안 보인다. */}
-            {opsNavItems.length > 0 && (
-              <>
-                <p className="mb-1.5 ml-1 mt-[18px] border-t border-border pt-[18px] text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                  {dictionary.admin.console.navGroupOpsAdmin}
-                </p>
-                <nav aria-label={dictionary.admin.console.navGroupOpsAdmin} className="flex flex-col">
-                  {opsNavItems.map(renderNavItem)}
-                </nav>
-              </>
-            )}
-          </div>
-
-          {/* Footer — hairline top, transparent buttons. Account (flex) + Bug Report + Logout. */}
-          <div className="mt-[14px] flex items-center gap-1 border-t border-border pt-[14px]">
-            <Link
-              href="/account?mode=mobile"
-              onClick={closeSidebar}
-              className="flex min-w-0 flex-1 items-center gap-[10px] rounded-[12px] px-2 py-[10px] text-foreground transition-colors hover:bg-muted"
-            >
-              <UserCircle className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="truncate text-[13.5px] font-semibold">{dictionary.common.account}</span>
-            </Link>
-            <Link
-              href={mobileNavBugs.href}
-              onClick={closeSidebar}
-              aria-current={activeItem === mobileNavBugs.id ? "page" : undefined}
-              className={cn(
-                "flex shrink-0 items-center gap-[7px] rounded-[12px] px-[12px] py-[10px] text-[13px] font-semibold transition-colors hover:bg-muted hover:text-foreground",
-                activeItem === mobileNavBugs.id ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              <BugIcon className="size-4 shrink-0" aria-hidden="true" />
-              {getNavigationLabel(mobileNavBugs, locale)}
-            </Link>
-            <form action={signOut} className="shrink-0">
-              <button
-                type="submit"
-                className="flex items-center gap-[7px] rounded-[12px] px-[12px] py-[10px] text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <LogOut className="size-4" aria-hidden="true" />
-                {dictionary.common.logout}
-              </button>
-            </form>
-          </div>
+          <MobileMenuPanel
+            activeItem={activeItem}
+            badges={badges}
+            frequentItems={bottomItems}
+            labels={{
+              accountSettings: dictionary.common.accountSettings,
+              clear: dictionary.common.clear,
+              close: dictionary.common.menu,
+              comms: dictionary.common.menuGroupComms,
+              frequent: dictionary.common.menuFrequent,
+              search: dictionary.common.menuSearch,
+              searchEmpty: dictionary.common.menuSearchEmpty,
+              work: dictionary.common.menuGroupWork,
+            }}
+            locale={locale}
+            menuItems={mobileSidebarNavigation.filter((item) => canSeeNavItem(item, session.capabilities))}
+            onClose={closeSidebar}
+            open={sidebarOpen}
+            opsItems={opsNavItems}
+            opsTitle={dictionary.admin.console.navGroupOpsAdmin}
+            userName={session.user.name}
+            userSub={[session.organization.name, dictionary.roles[session.user.role]].filter(Boolean).join(" · ")}
+          />
         </aside>
 
         <MobileSideNav
@@ -1114,76 +978,25 @@ export function MobileShell({
             <BottomSheet
               ariaLabel={dictionary.common.editBottomBar}
               header={
-                <div className="add-sheet__head">
-                  <div className="add-sheet__head-text">
-                    <p className="add-sheet__title">
-                      {dictionary.common.editBottomBar}
-                      <span className="ml-2 text-[12px] font-bold text-primary">
-                        {navTabIds.length}/{MAX_BOTTOM_NAV_TABS}
-                      </span>
-                    </p>
-                    <p className="add-sheet__sub">
-                      {isBarFull ? dictionary.common.bottomBarFull : dictionary.common.editBottomBarHint}
-                    </p>
-                  </div>
+                <div className="te-head">
+                  <p className="te-head__title">{dictionary.common.tabEditTitle}</p>
+                  <p className="te-head__sub">{dictionary.common.tabEditSub}</p>
                 </div>
               }
               onClose={closeCreate}
             >
-              <div className="add-sheet__scroll">
-                <div className="add-grid">
-                  {customizableBottomNavItems.filter(canSeeMobileNavItem).map((item) => {
-                    const meta = LAUNCHER_META[item.id];
-                    const selected = navTabIds.includes(item.id);
-                    const disabled = !selected && isBarFull;
-                    return (
-                      <button
-                        key={item.id}
-                        aria-pressed={selected}
-                        className="add-tile"
-                        disabled={disabled}
-                        onClick={() => toggleNavTab(item.id)}
-                        style={{
-                          background: selected
-                            ? "color-mix(in oklab, var(--primary) 7%, var(--surface))"
-                            : "var(--surface)",
-                          boxShadow: selected
-                            ? "inset 0 0 0 2px var(--primary)"
-                            : "inset 0 0 0 1px var(--border)",
-                          opacity: disabled ? 0.45 : 1,
-                        }}
-                        type="button"
-                      >
-                        <span
-                          className="add-tile__badge"
-                          style={{
-                            background: selected ? "var(--primary)" : "var(--muted)",
-                            color: selected ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                          }}
-                        >
-                          {meta?.icon ?? FALLBACK_ICON}
-                        </span>
-                        <span className="add-tile__label">{getNavigationLabel(item, locale)}</span>
-                        <span
-                          aria-hidden="true"
-                          className="ml-auto flex size-5 items-center justify-center rounded-full"
-                          style={{
-                            background: selected ? "var(--primary)" : "transparent",
-                            color: "#fff",
-                            border: selected ? "none" : "1.5px solid var(--border)",
-                          }}
-                        >
-                          {selected ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                              <path d="M5 12l4 4 10-10" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          ) : null}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <TabEditor
+                candidates={customizableBottomNavItems.filter(canSeeMobileNavItem)}
+                ids={navTabIds}
+                labels={{
+                  addable: dictionary.common.tabEditAddable,
+                  done: dictionary.common.tabEditDone,
+                  full: dictionary.common.bottomBarFull,
+                  remove: dictionary.common.tabEditRemove,
+                }}
+                locale={locale}
+                setIds={setNavTabIds}
+              />
             </BottomSheet>
           ) : null}
 

@@ -39,7 +39,7 @@ export default async function MobileSuggestionDetailPage({ params }: PageProps) 
   const copy = getDictionary(session.user.preferredLanguage).mobile.suggestions;
 
   return (
-    <MobileShell activeItem="suggestions" badges={navBadges} title={copy.detailTitle} hideBottomNav>
+    <MobileShell activeItem="suggestions" badges={navBadges} title={copy.detailTitle}>
       <SuggestionsDetail
         copy={copy}
         data={detail}

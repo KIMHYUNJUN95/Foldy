@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AccountSettings } from "@/components/account/account-settings";
+import { AccountMobile } from "@/components/account/account-mobile";
 import { DeleteAccountSheet } from "@/components/account/delete-account-sheet";
 import { BlockedUsersList } from "@/components/account/blocked-users-list";
 import { MyReportsList } from "@/components/account/my-reports-list";
@@ -17,7 +18,8 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession } from "@/lib/session";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, localizedNavigationLabels } from "@/lib/i18n";
+import { resolveBottomNavItems } from "@/config/navigation";
 import { adminLocaleTag } from "@/lib/admin-export-meta";
 import { canAccessAdminWeb } from "@/config/roles";
 import { updateAccountProfile } from "@/app/account/actions";
@@ -365,7 +367,103 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   );
 
   if (shellMode === "mobile") {
-    return <MobileShell title={dictionary.common.account}>{content}</MobileShell>;
+    // 모바일 셸 — 화이트 리디자인(2026-10-15, 시안 Account-Phone). 관리 콘솔 쪽(아래 AdminShell)은 그대로.
+    // docs/product/17-user-profile-directory.md 「계정 화면 — 화이트 리디자인(모바일)」.
+    const locale = session.user.preferredLanguage;
+    const reportRows = myReports.map((r) => ({
+      id: r.id,
+      authorName: r.authorName,
+      preview: r.preview,
+      reasonLabel: boardReasonLabel(dictionary.board, r.reason),
+      statusLabel:
+        r.status === "dismissed"
+          ? dictionary.accountProfile.myReportDismissed
+          : dictionary.accountProfile.myReportPending,
+    }));
+    const gender = session.user.gender === "female" || session.user.gender === "male" ? session.user.gender : null;
+    return (
+      <MobileShell title={dictionary.common.account}>
+        <AccountMobile
+          blockedUsers={blockedUsers}
+          bottomTabsLabel={resolveBottomNavItems(session.user.bottomNavTabs)
+            .map((item) => item.label[locale])
+            .join(" · ")}
+          copy={{
+            white: ap.white,
+            name: dictionary.onboarding.fullNamePlaceholder,
+            birthDate: dictionary.onboarding.birthDateLabel,
+            birthDateHint: dictionary.onboarding.birthDateHint,
+            phone: dictionary.onboarding.phonePlaceholder,
+            phoneHint: dictionary.onboarding.phoneHint,
+            gender: dictionary.onboarding.genderLabel,
+            genderHint: ap.genderHint,
+            genderOptions: dictionary.onboarding.genderOptions,
+            language: dictionary.common.language,
+            languages: dictionary.languages,
+            organizationName: dictionary.admin.settings.organizationName,
+            role: dictionary.admin.users.role,
+            logout: dictionary.common.logout,
+            saved: dictionary.onboarding.profileSaved,
+            errorText: errorKey
+              ? (dictionary.onboarding.errors[errorKey] ?? dictionary.onboarding.errors.profile_failed)
+              : null,
+            incomplete: profileIncomplete
+              ? {
+                  title: ap.completionTitle,
+                  body:
+                    !session.user.birthDate && !session.user.gender
+                      ? ap.missingBirthDateAndGenderBody
+                      : !session.user.birthDate
+                        ? ap.missingBirthDateBody
+                        : ap.genderMissingBody,
+                }
+              : null,
+            blockedList: {
+              title: ap.blockedUsersTitle,
+              body: ap.blockedUsersBody,
+              empty: ap.blockedUsersEmpty,
+              unblock: ap.unblock,
+              unknown: dictionary.board.reportsAuthorUnknown,
+            },
+            reportsList: {
+              title: ap.myReportsTitle,
+              body: ap.myReportsBody,
+              empty: ap.myReportsEmpty,
+              withdraw: ap.withdrawReport,
+              unknown: dictionary.board.reportsAuthorUnknown,
+            },
+            deleteSheet: {
+              cancel: dictionary.common.cancel,
+              deleteAccount: dictionary.common.deleteAccount,
+              deleteAccountTitle: dictionary.common.deleteAccountTitle,
+              deleteAccountDesc: dictionary.common.deleteAccountDesc,
+              deleteAccountWarning: dictionary.common.deleteAccountWarning,
+              deleteAccountConfirm: dictionary.common.deleteAccountConfirm,
+            },
+          }}
+          help={[
+            { href: "/mobile/suggestions", label: localizedNavigationLabels.mobile.suggestions[locale] },
+            { href: "/mobile/bugs", label: localizedNavigationLabels.mobile.bugs[locale] },
+            { href: legalHref("terms", locale), label: dictionary.legal.navTerms },
+            { href: legalHref("privacy", locale), label: dictionary.legal.navPrivacy },
+            { href: legalHref("support", locale), label: dictionary.legal.navSupport },
+          ]}
+          myReports={reportRows}
+          organization={{
+            name: session.organization.name,
+            role: dictionary.roles[session.user.role] ?? session.user.role,
+          }}
+          saved={Boolean(savedKey)}
+          user={{
+            name: session.user.name,
+            birthDate: session.user.birthDate ?? null,
+            phoneNumber: session.user.phoneNumber ?? "",
+            gender,
+            language: locale,
+          }}
+        />
+      </MobileShell>
+    );
   }
 
   return <AdminShell title={dictionary.common.account}>{content}</AdminShell>;

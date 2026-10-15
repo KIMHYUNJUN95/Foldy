@@ -1,25 +1,23 @@
 "use client";
 
 /**
- * Frames 3 & 4 — Staff Suggestions detail (role-aware). One component renders all three viewer roles,
- * preserving each finalized treatment from the Feedback Box.html handoff:
- *  - recipient → bottom status bar + status / hold / completion sheets (functional, Step 6)
- *  - all participants → bottom comment composer (functional, Step 5)
- *  - author → read-only suggestion body; no status controls
- *
- * As-built: data via `SuggestionDetail` (Step 4), comments live (Step 5), status workflow live
- * (Step 6), fully localized via `copy` (Step 8). See docs/product/22-staff-suggestions-workflow.md.
+ * 제안 상세 — 화이트 리디자인(2026-10-15, 시안 SuggDetail-Phone · Sugg-Tablet 오른쪽 칸). 보는 사람 역할별로 한 컴포넌트:
+ *  - 위: 상태 글자 · 분류 · 건물 · 객실 / 제목 / 「보낸 → 받는 · 참조 · 날짜」 한 줄 / (작성자 · 접수 상태면) 수정 · 삭제
+ *  - 보류 사유 · 완료 메모(있으면) · 본문 · 사진
+ *  - 「댓글 N」 — 댓글과 상태 바뀜 기록을 시간순으로 같은 자리에(예전 댓글 시트 → 화면 안으로)
+ *  - 받은 사람만 「상태 바꾸기」 4칸(보류 · 완료는 공용 BottomSheet 에서 사유 · 메모를 받는다), 나머지는 안내 한 줄
+ *  - 맨 아래 댓글 입력(기존 SuggestionCommentComposer — 사진 5장까지)
+ * 서버 액션 · 권한은 그대로다. 예전 화면의 하트(좋아요)는 저장되지 않는 화면 장식이라 뺐다.
+ * See docs/product/22-staff-suggestions-workflow.md 「화이트 리디자인 — 모바일」.
  */
 
-import type { CSSProperties } from "react";
-import { useRef, useState, useSyncExternalStore, useTransition } from "react";
-import { createPortal } from "react-dom";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import {
   deleteStaffSuggestion,
   updateStaffSuggestionStatus,
 } from "@/app/mobile/suggestions/actions";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { StaffSuggestionStatus } from "@/lib/suggestions";
 import {
@@ -28,49 +26,23 @@ import {
 } from "@/lib/suggestion-display";
 import type { SuggestionDetail } from "@/lib/suggestions-queries";
 import "./suggestions.css";
-import { Ic, SgIcon } from "./sg-icons";
+import "./suggestions-white.css";
 import { SuggestionCommentComposer } from "./suggestion-comment-composer";
 import { SuggestionCommentItem } from "./suggestion-comment-item";
 
 type SgCopy = Dictionary["mobile"]["suggestions"];
 
-const STAT_CLS: Record<StaffSuggestionStatus, string> = {
-  submitted: "sub",
-  reviewing: "rev",
-  on_hold: "hold",
-  completed: "done",
-};
+const STATUSES: StaffSuggestionStatus[] = ["submitted", "reviewing", "on_hold", "completed"];
 
-function relativeTime(iso: string, locale: Locale): string {
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-  const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["second", 60],
-    ["minute", 60],
-    ["hour", 24],
-    ["day", 7],
-    ["week", 4.34524],
-    ["month", 12],
-    ["year", Infinity],
-  ];
-  let value = diffSec;
-  for (const [unit, span] of units) {
-    if (Math.abs(value) < span) return rtf.format(-Math.round(value), unit);
-    value = value / span;
-  }
-  return rtf.format(-Math.round(value), "year");
+function tokyoStamp(iso: string, locale: Locale, withDate: boolean): string {
+  return new Intl.DateTimeFormat(locale, {
+    ...(withDate ? { month: "numeric", day: "numeric" } : {}),
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo",
+  }).format(new Date(iso));
 }
-
-const STATUS_OPTIONS: {
-  cls: string;
-  status: StaffSuggestionStatus;
-  req?: "hold" | "done";
-}[] = [
-  { cls: "sub", status: "submitted" },
-  { cls: "rev", status: "reviewing" },
-  { cls: "hold", status: "on_hold", req: "hold" },
-  { cls: "done", status: "completed", req: "done" },
-];
 
 export function SuggestionsDetail({
   data,
@@ -85,26 +57,25 @@ export function SuggestionsDetail({
   viewerUserId: string;
   copy: SgCopy;
 }) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [reasonOpen, setReasonOpen] = useState(false);
-  const [completeOpen, setCompleteOpen] = useState(false);
-  // Instagram-style: comments live in their own bottom sheet (distinct from the status sheet).
-  const [commentOpen, setCommentOpen] = useState(false);
-  const [liked, setLiked] = useState(false);
-  // Long-press the heart → a "who liked" sheet (UI only; likes are client-side until a backend exists).
-  const [likeSheetOpen, setLikeSheetOpen] = useState(false);
-  const [heartPop, setHeartPop] = useState(false);
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressedRef = useRef(false);
+  const w = copy.white;
+  const [noteSheet, setNoteSheet] = useState<"hold" | "done" | null>(null);
   const [holdReason, setHoldReason] = useState(data.holdReason ?? "");
   const [completionNote, setCompletionNote] = useState(data.completionNote ?? "");
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [pendingTarget, setPendingTarget] = useState<StaffSuggestionStatus | null>(null);
   const [isStatusPending, startStatus] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, startDelete] = useTransition();
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // Author may edit/delete the main suggestion only while it is still `submitted`.
   const canAuthorEdit = data.viewerRole === "author" && data.status === "submitted";
+  const isRecipient = data.viewerRole === "recipient";
+
   function removeSuggestion() {
     startDelete(async () => {
       const fd = new FormData();
@@ -112,19 +83,16 @@ export function SuggestionsDetail({
       await deleteStaffSuggestion(fd);
     });
   }
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
 
   // Recipient-only status change. Reversible among the four statuses; on_hold/completed carry a note.
   function changeStatus(
     target: StaffSuggestionStatus,
     opts?: { holdReason?: string; completionNote?: string },
+    onDone?: () => void,
   ) {
     if (isStatusPending) return;
     setStatusError(null);
+    setPendingTarget(target);
     startStatus(async () => {
       const fd = new FormData();
       fd.set("suggestionId", data.id);
@@ -132,675 +100,221 @@ export function SuggestionsDetail({
       if (opts?.holdReason) fd.set("holdReason", opts.holdReason);
       if (opts?.completionNote) fd.set("completionNote", opts.completionNote);
       const result = await updateStaffSuggestionStatus(fd);
+      setPendingTarget(null);
       if (!result.ok) {
         setStatusError(copy.errors.save_failed);
         return;
       }
-      setSheetOpen(false);
-      setReasonOpen(false);
-      setCompleteOpen(false);
+      onDone?.();
     });
   }
-  const statusDrag = useSheetDragDismiss({ shown: sheetOpen, onDismiss: () => setSheetOpen(false) });
-  const reasonDrag = useSheetDragDismiss({ shown: reasonOpen, onDismiss: () => setReasonOpen(false) });
-  const completeDrag = useSheetDragDismiss({
-    shown: completeOpen,
-    onDismiss: () => setCompleteOpen(false),
-  });
-  const commentDrag = useSheetDragDismiss({
-    shown: commentOpen,
-    onDismiss: () => setCommentOpen(false),
-  });
-  const likeDrag = useSheetDragDismiss({
-    shown: likeSheetOpen,
-    onDismiss: () => setLikeSheetOpen(false),
-  });
 
-  const isRecipient = data.viewerRole === "recipient";
-  const isReferenced = data.viewerRole === "referenced";
-  const time = hydrated ? relativeTime(data.createdAt, locale) : "";
-  const initial = (name: string) => (name || "—").slice(0, 1);
-  const meTag = (role: SuggestionDetail["viewerRole"]) => (data.viewerRole === role ? ` ${copy.me}` : "");
-  const categoryLabel = localizeSuggestionCategory(data.category, locale);
-  const propertyLabel = localizeSuggestionPropertyName(data.propertyName, locale);
-
-  // Current viewer's display name (for the "who liked" sheet — likes are client-only for now).
-  const viewerName =
-    data.viewerRole === "author"
-      ? data.author.name
-      : data.viewerRole === "recipient"
-        ? data.recipient.name
-        : data.references.find((r) => r.id === viewerUserId)?.name ?? "";
-
-  function startHeartPress() {
-    longPressedRef.current = false;
-    pressTimer.current = setTimeout(() => {
-      longPressedRef.current = true;
-      setLikeSheetOpen(true);
-    }, 450);
-  }
-  function endHeartPress() {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  }
-  function onHeartClick() {
-    // A completed long-press already opened the "who liked" sheet — don't also toggle the like.
-    if (longPressedRef.current) {
-      longPressedRef.current = false;
+  function pickStatus(target: StaffSuggestionStatus) {
+    if (target === "on_hold") {
+      setHoldReason(data.holdReason ?? "");
+      setStatusError(null);
+      setNoteSheet("hold");
       return;
     }
-    // Becoming liked (currently not liked) → play the pop bounce.
-    if (!liked) setHeartPop(true);
-    setLiked((v) => !v);
+    if (target === "completed") {
+      setCompletionNote(data.completionNote ?? "");
+      setStatusError(null);
+      setNoteSheet("done");
+      return;
+    }
+    if (target === data.status) return;
+    changeStatus(target);
   }
-  // Likes are client-only for now, so the only liker is the current viewer when they've liked.
-  // (A real likes backend would replace this with the persisted liker list.)
-  const likers = liked ? [{ id: viewerUserId, name: viewerName || copy.me }] : [];
+
+  const categoryLabel = localizeSuggestionCategory(data.category, locale);
+  const propertyLabel = localizeSuggestionPropertyName(data.propertyName, locale);
+  const kicker = [categoryLabel, propertyLabel, data.roomLabel].filter(Boolean) as string[];
+  const refs = data.references.map((r) => r.name || "—").join(", ");
+  const meta = [
+    `${data.author.name || "—"} → ${data.recipient.name || "—"}`,
+    refs ? w.refLine.replace("{names}", refs) : null,
+    hydrated ? tokyoStamp(data.createdAt, locale, true) : null,
+  ].filter(Boolean);
 
   // Comment thread = comments + status-change events, interleaved by time (events render as a log).
   const timeline = [
     ...data.comments.map((c) => ({ kind: "comment" as const, at: c.createdAt, comment: c })),
     ...data.events.map((e) => ({ kind: "event" as const, at: e.createdAt, event: e })),
   ].sort((a, b) => a.at.localeCompare(b.at));
+  const shownStatus = pendingTarget && pendingTarget !== "on_hold" && pendingTarget !== "completed" ? pendingTarget : data.status;
 
   return (
-    <div className="sg">
-      <div className="scroll" style={{ paddingBottom: "88px" }}>
-        <div className="who">
-          <Ic>{isReferenced ? SgIcon.eye : SgIcon.lock}</Ic>
-          {isReferenced ? (
-            <>
-              <span>{copy.whoReferenced}</span>
-              <span className="sep">·</span>
-              <span>{copy.whoReferencedSub}</span>
-            </>
-          ) : (
-            <>
-              <span>{copy.whoCanView}</span>
-              <span className="sep">·</span>
-              <span>
-                {copy.whoAuthorLabel} {data.author.name || "—"}
-                {meTag("author")} · {copy.whoRecipientLabel} {data.recipient.name || "—"}
-                {meTag("recipient")}
-                {data.references.length ? ` · ${copy.referenceCount.replace("{n}", String(data.references.length))}` : ""}
+    <div className="sg sgw sgw-d">
+      <div className="sgw-dh">
+        <div className="sgw-dh__k">
+          <span className="sgw-st" data-s={data.status}>
+            {copy.status[data.status]}
+          </span>
+          {kicker.map((k) => (
+            <span key={k} style={{ display: "contents" }}>
+              <span aria-hidden="true" className="sgw-dot">
+                ·
               </span>
-            </>
-          )}
+              <span>{k}</span>
+            </span>
+          ))}
         </div>
-
-        <div className="dhero">
-          <div className="dstatus-row">
-            <span className="fcard__time" style={{ marginLeft: 0 }}>
-              {time}
-              {time && data.author.name ? " · " : ""}
-              {data.author.name}
-            </span>
-          </div>
-          <h2 className="dtitle">{data.title}</h2>
-          <div className="route">
-            <div className="route__col">
-              <span
-                className="route__av"
-                style={{ background: "var(--sg-surface)", color: "var(--ink-soft)" }}
-              >
-                {initial(data.author.name)}
-              </span>
-              <div>
-                <div className="route__l">{copy.routeFrom}</div>
-                <div className="route__n">
-                  {data.author.name || "—"}
-                  {meTag("author")}
-                </div>
-              </div>
-            </div>
-            <span className="route__arrow">{SgIcon.arrowR}</span>
-            <div className="route__col">
-              <span className="route__av" style={{ background: "var(--sg-primary)", color: "#fff" }}>
-                {initial(data.recipient.name)}
-              </span>
-              <div>
-                <div className="route__l">{copy.routeTo}</div>
-                <div className="route__n">
-                  {data.recipient.name || "—"}
-                  {meTag("recipient")}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {canAuthorEdit ? (
-          <div style={{ display: "flex", gap: "14px", alignItems: "center", margin: "0 0 14px", padding: "0 2px" }}>
-            <Link
-              href={`/mobile/suggestions/${data.id}/edit`}
-              style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--sg-primary)" }}
-            >
-              {copy.edit}
-            </Link>
-            {confirmDelete ? (
-              <span style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", color: "var(--faint)" }}>{copy.deletePrompt}</span>
-                <button
-                  type="button"
-                  style={{ fontSize: "12.5px", fontWeight: 700, color: "#c0392b" }}
-                  onClick={removeSuggestion}
-                  disabled={isDeleting}
-                >
-                  {copy.delete}
-                </button>
-                <button
-                  type="button"
-                  style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--sg-muted)" }}
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  {copy.cancel}
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--faint)" }}
-                onClick={() => setConfirmDelete(true)}
-              >
-                {copy.delete}
-              </button>
-            )}
-          </div>
-        ) : null}
-
-        {categoryLabel || propertyLabel || data.roomLabel ? (
-          <div className="dtags">
-            {categoryLabel ? <span className="dtag">{categoryLabel}</span> : null}
-            {propertyLabel ? (
-              <span className="dtag">
-                <Ic>{SgIcon.building}</Ic>
-                {propertyLabel}
-              </span>
-            ) : null}
-            {data.roomLabel ? (
-              <span className="dtag">
-                <Ic>{SgIcon.door}</Ic>
-                {data.roomLabel}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        {data.status === "on_hold" && data.holdReason ? (
-          <div className="holdbanner">
-            <Ic>{SgIcon.pause}</Ic>
-            <div>
-              <b>{copy.holdBanner}</b>
-              <p>{data.holdReason}</p>
-            </div>
-          </div>
-        ) : null}
-        {data.status === "completed" && data.completionNote ? (
-          <div
-            className="holdbanner"
-            style={
-              {
-                background: "var(--done-bg)",
-                borderColor: "color-mix(in oklab, var(--done) 26%, transparent)",
-                "--hold": "var(--done)",
-              } as CSSProperties
-            }
-          >
-            <Ic>{SgIcon.check}</Ic>
-            <div>
-              <b style={{ color: "var(--done)" }}>{copy.completionBanner}</b>
-              <p>{data.completionNote}</p>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="dbody">{data.body}</div>
-        {data.imageUrls.length ? (
-          <div className="dphotos">
-            {data.imageUrls.map((url, i) => (
-              <div
-                className="dphoto"
-                key={i}
-                style={{
-                  backgroundImage: `url(${url})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              />
-            ))}
-          </div>
-        ) : null}
-
-        {/* Instagram-style action row — like (visual) + comment (opens the comment sheet). */}
-        <div className="actions">
-          <button
-            type="button"
-            className={`actbtn${liked ? " liked" : ""}`}
-            onClick={onHeartClick}
-            onPointerDown={startHeartPress}
-            onPointerUp={endHeartPress}
-            onPointerLeave={endHeartPress}
-            onPointerCancel={endHeartPress}
-            aria-label={copy.likeAction}
-            aria-pressed={liked}
-          >
-            <span
-              className={`ic${heartPop ? " pop" : ""}`}
-              onAnimationEnd={() => setHeartPop(false)}
-            >
-              {SgIcon.heart}
-            </span>
-          </button>
-          <button
-            type="button"
-            className="actbtn"
-            onClick={() => setCommentOpen(true)}
-            aria-label={copy.thread}
-          >
-            <Ic>{SgIcon.comment}</Ic>
-            <span className="cnt">{data.comments.length}</span>
-          </button>
-        </div>
-        {likers.length > 0 ? (
-          <button type="button" className="likesum" onClick={() => setLikeSheetOpen(true)}>
-            <span className="likesum__faces">
-              {likers.slice(0, 3).map((u) => (
-                <span key={u.id} className="likesum__av">
-                  {(u.name || "—").slice(0, 1)}
-                </span>
-              ))}
-            </span>
-            <span className="likesum__txt">
-              {likers.length === 1
-                ? copy.likeSummaryOne.replace("{name}", likers[0].name)
-                : copy.likeSummaryMany
-                    .replace("{name}", likers[0].name)
-                    .replace("{n}", String(likers.length - 1))}
-            </span>
-          </button>
-        ) : null}
-        <div style={{ height: "8px" }} />
+        <h1>{data.title}</h1>
+        <span className="sgw-dh__m">{meta.join(" · ")}</span>
       </div>
 
-      {/* Bottom chrome — recipient status bar (above) + comment composer (below). */}
-      {hydrated && isRecipient
-        ? createPortal(
-            <div className="sg">
-              {/* STATUS sheet (≠ comment sheet): opened by the bottom status pill; carries the
-                  status / hold-reason / completion sheets. */}
-              <div
-                className={`dim${sheetOpen ? " show" : ""}`}
-                onClick={() => setSheetOpen(false)}
-                style={statusDrag.scrimStyle}
-                aria-hidden="true"
-              />
-              <div
-                className={`sheet${sheetOpen ? " show" : ""}`}
-                data-sheet
-                style={{ ...statusDrag.sheetStyle, opacity: statusDrag.scrimStyle.opacity }}
-                role="dialog"
-                aria-modal="true"
-              >
-                <div {...statusDrag.handleProps}>
-                  <div className="sheet__grab">
-                    <div className="sheet__handle" />
-                  </div>
-                  <p className="sheet__title">{copy.statusSheetTitle}</p>
-                  <p className="sheet__sub">{copy.statusSheetSub}</p>
-                </div>
-                {statusError ? (
-                  <p role="alert" style={{ padding: "0 2px 6px", color: "#c0392b", fontSize: "12px", fontWeight: 700 }}>
-                    {statusError}
-                  </p>
-                ) : null}
-                <div className="statopts">
-                  {STATUS_OPTIONS.map((o) => {
-                    const on = o.status === data.status;
-                    return (
-                      <button
-                        key={o.cls}
-                        type="button"
-                        disabled={isStatusPending}
-                        className={`statopt${on ? " on" : ""}`}
-                        onClick={() => {
-                          if (o.req === "hold") {
-                            setHoldReason(data.holdReason ?? "");
-                            setSheetOpen(false);
-                            setReasonOpen(true);
-                            return;
-                          }
-                          if (o.req === "done") {
-                            setCompletionNote(data.completionNote ?? "");
-                            setSheetOpen(false);
-                            setCompleteOpen(true);
-                            return;
-                          }
-                          changeStatus(o.status);
-                        }}
-                      >
-                        <span className="statopt__d" style={{ background: `var(--${o.cls})` }} />
-                        <div className="statopt__b">
-                          <div className="statopt__n">{copy.status[o.status]}</div>
-                          <div className="statopt__s">
-                            {o.status === "submitted"
-                              ? copy.optSubDesc
-                              : o.status === "reviewing"
-                                ? copy.optRevDesc
-                                : o.status === "on_hold"
-                                  ? copy.optHoldDesc
-                                  : copy.optDoneDesc}
-                          </div>
-                        </div>
-                        {o.req ? (
-                          <span className={`req-note${o.req === "done" ? " done" : ""}`}>
-                            {o.req === "done" ? copy.reqDone : copy.reqHold}
-                          </span>
-                        ) : (
-                          <span className="statopt__chk">{on ? SgIcon.check : null}</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ height: "6px" }} />
-              </div>
+      {canAuthorEdit ? (
+        <div className="sgw-own">
+          <Link href={`/mobile/suggestions/${data.id}/edit`}>{copy.edit}</Link>
+          {confirmDelete ? (
+            <>
+              <span className="sgw-own__q">{copy.deletePrompt}</span>
+              <button data-tone="red" disabled={isDeleting} onClick={removeSuggestion} type="button">
+                {copy.delete}
+              </button>
+              <button onClick={() => setConfirmDelete(false)} type="button">
+                {copy.cancel}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} type="button">
+              {copy.delete}
+            </button>
+          )}
+        </div>
+      ) : null}
 
-              <div
-                className={`dim${reasonOpen ? " show" : ""}`}
-                onClick={() => setReasonOpen(false)}
-                style={reasonDrag.scrimStyle}
-                aria-hidden="true"
-              />
-              <div
-                className={`sheet${reasonOpen ? " show" : ""}`}
-                data-sheet
-                style={{ ...reasonDrag.sheetStyle, opacity: reasonDrag.scrimStyle.opacity }}
-                role="dialog"
-                aria-modal="true"
-              >
-                <div {...reasonDrag.handleProps}>
-                  <div className="sheet__grab">
-                    <div className="sheet__handle" />
-                  </div>
-                  <div className="rsheet-h">
-                    <span className="rsheet-ic hold">{SgIcon.pause}</span>
-                    <div>
-                      <b>{copy.holdSheetTitle}</b>
-                      <p>{copy.holdSheetSub}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rsheet-from">
-                  <span className="pill from">{copy.status[data.status]}</span>
-                  <span className="ar">
-                    <Ic>{SgIcon.arrowR}</Ic>
-                  </span>
-                  <span className="pill to-hold">{copy.status.on_hold}</span>
-                </div>
-                <div className="field">
-                  <div className="field__l">
-                    {copy.holdField} <span className="req">*</span>
-                  </div>
-                  <textarea
-                    className="inp"
-                    rows={3}
-                    placeholder={copy.holdPlaceholder}
-                    value={holdReason}
-                    onChange={(e) => setHoldReason(e.target.value)}
-                  />
-                </div>
-                {statusError ? (
-                  <p role="alert" style={{ padding: "0 2px 6px", color: "#c0392b", fontSize: "12px", fontWeight: 700 }}>
-                    {statusError}
-                  </p>
-                ) : null}
-                <div className="sheet__btns">
-                  <button
-                    type="button"
-                    className="dbar__status"
-                    style={{ flex: "0 0 96px", height: "50px", borderRadius: "14px" }}
-                    onClick={() => setReasonOpen(false)}
-                  >
-                    {copy.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    className="ctxbar__save"
-                    style={{
-                      flex: 1,
-                      height: "50px",
-                      borderRadius: "14px",
-                      fontSize: "14.5px",
-                      opacity: holdReason.trim() && !isStatusPending ? 1 : 0.5,
-                    }}
-                    disabled={!holdReason.trim() || isStatusPending}
-                    onClick={() => changeStatus("on_hold", { holdReason: holdReason.trim() })}
-                  >
-                    {copy.holdConfirm}
-                  </button>
-                </div>
-                <div style={{ height: "4px" }} />
-              </div>
+      {data.status === "on_hold" && data.holdReason ? (
+        <div className="sgw-note">
+          <b>{copy.holdBanner}</b>
+          {data.holdReason}
+        </div>
+      ) : null}
+      {data.status === "completed" && data.completionNote ? (
+        <div className="sgw-note" data-tone="done">
+          <b>{copy.completionBanner}</b>
+          {data.completionNote}
+        </div>
+      ) : null}
 
-              <div
-                className={`dim${completeOpen ? " show" : ""}`}
-                onClick={() => setCompleteOpen(false)}
-                style={completeDrag.scrimStyle}
-                aria-hidden="true"
+      <p className="sgw-body">{data.body}</p>
+      {data.imageUrls.length ? (
+        <div className="sgw-photos">
+          {data.imageUrls.map((url, i) => (
+            <a
+              aria-label={`${w.photosAlt} ${i + 1}`}
+              href={url}
+              key={url}
+              rel="noreferrer"
+              style={{ backgroundImage: `url(${url})` }}
+              target="_blank"
+            />
+          ))}
+        </div>
+      ) : null}
+
+      <section className="sgw-sec">
+        <b>{w.comments.replace("{n}", String(data.comments.length))}</b>
+        {timeline.length === 0 ? (
+          <p className="sgw-nocmt">{copy.noComments}</p>
+        ) : (
+          timeline.map((item) =>
+            item.kind === "comment" ? (
+              <SuggestionCommentItem
+                comment={item.comment}
+                copy={copy}
+                hydrated={hydrated}
+                isOwn={item.comment.authorId === viewerUserId}
+                key={`c-${item.comment.id}`}
+                locale={locale}
               />
-              <div
-                className={`sheet${completeOpen ? " show" : ""}`}
-                data-sheet
-                style={{ ...completeDrag.sheetStyle, opacity: completeDrag.scrimStyle.opacity }}
-                role="dialog"
-                aria-modal="true"
-              >
-                <div {...completeDrag.handleProps}>
-                  <div className="sheet__grab">
-                    <div className="sheet__handle" />
-                  </div>
-                  <div className="rsheet-h">
-                    <span className="rsheet-ic done">{SgIcon.check}</span>
-                    <div>
-                      <b>{copy.doneSheetTitle}</b>
-                      <p>{copy.doneSheetSub}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rsheet-from">
-                  <span className="pill from">{copy.status[data.status]}</span>
-                  <span className="ar">
-                    <Ic>{SgIcon.arrowR}</Ic>
-                  </span>
-                  <span className="pill to-done">{copy.status.completed}</span>
-                </div>
-                <div className="field">
-                  <div className="field__l">
-                    {copy.doneField} <span className="req">*</span>
-                  </div>
-                  <textarea
-                    className="inp"
-                    rows={3}
-                    placeholder={copy.donePlaceholder}
-                    value={completionNote}
-                    onChange={(e) => setCompletionNote(e.target.value)}
-                  />
-                </div>
-                {statusError ? (
-                  <p role="alert" style={{ padding: "0 2px 6px", color: "#c0392b", fontSize: "12px", fontWeight: 700 }}>
-                    {statusError}
-                  </p>
-                ) : null}
-                <div className="sheet__btns">
-                  <button
-                    type="button"
-                    className="dbar__status"
-                    style={{ flex: "0 0 96px", height: "50px", borderRadius: "14px" }}
-                    onClick={() => setCompleteOpen(false)}
-                  >
-                    {copy.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    className="ctxbar__save"
-                    style={{
-                      flex: 1,
-                      height: "50px",
-                      borderRadius: "14px",
-                      fontSize: "14.5px",
-                      background: "var(--done)",
-                      opacity: completionNote.trim() && !isStatusPending ? 1 : 0.5,
-                    }}
-                    disabled={!completionNote.trim() || isStatusPending}
-                    onClick={() => changeStatus("completed", { completionNote: completionNote.trim() })}
-                  >
-                    {copy.doneConfirm}
-                  </button>
-                </div>
-                <div style={{ height: "4px" }} />
+            ) : (
+              <div className="sgw-log" key={`e-${item.event.id}`}>
+                {copy.statusLog
+                  .replace("{name}", item.event.actorName || "—")
+                  .replace("{status}", copy.status[item.event.status])}
+                {hydrated ? ` · ${tokyoStamp(item.event.createdAt, locale, false)}` : ""}
               </div>
-            </div>,
-            document.body,
+            ),
           )
-        : null}
+        )}
+      </section>
 
-      {/* Bottom chrome (all roles): the status control (recipient) or a permission note, plus the
-          COMMENT sheet — a separate bottom sheet from the status sheet above. */}
-      {hydrated
-        ? createPortal(
-            <div className="sg">
-              {isRecipient ? (
-                <div className="statusbar-bottom">
-                  <button
-                    type="button"
-                    className="sbtn"
-                    onClick={() => setSheetOpen(true)}
-                    aria-haspopup="dialog"
-                  >
-                    <span className="sbtn__l">{copy.statusPill}</span>
-                    <span
-                      className="sbtn__cur"
-                      style={{ color: `var(--${STAT_CLS[data.status]})` }}
-                    >
-                      <span className="d" style={{ background: `var(--${STAT_CLS[data.status]})` }} />
-                      {copy.status[data.status]}
-                    </span>
-                    <span className="sbtn__chev">{SgIcon.chevU}</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="permnote-bottom">
-                  <Ic>{SgIcon.lock}</Ic>
-                  {copy.statusBarNote}
-                </div>
-              )}
+      <section className="sgw-sec">
+        {isRecipient ? (
+          <>
+            <span className="sgw-sec__t">{w.statusTitle}</span>
+            <div aria-label={w.statusTitle} className="sgw-seg" role="group">
+              {STATUSES.map((s) => (
+                <button
+                  aria-pressed={shownStatus === s}
+                  disabled={isStatusPending}
+                  key={s}
+                  onClick={() => pickStatus(s)}
+                  type="button"
+                >
+                  {copy.status[s]}
+                </button>
+              ))}
+            </div>
+            {statusError && !noteSheet ? (
+              <p className="sgw-err" role="alert">
+                {statusError}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <span className="sgw-perm">{copy.statusBarNote}</span>
+        )}
+      </section>
 
-              {/* COMMENT sheet (≠ status sheet): tall, header + close, thread + docked composer.
-                  Keep it unmounted while closed so iOS/PWA chrome does not keep sampling the scrim
-                  colour into the top safe-area after the sheet is dismissed. */}
-              {commentOpen ? (
-                <>
-                  <div
-                    className="dim show"
-                    onClick={() => setCommentOpen(false)}
-                    style={commentDrag.scrimStyle}
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="csheet show"
-                    data-sheet
-                    style={{ ...commentDrag.sheetStyle, opacity: commentDrag.scrimStyle.opacity }}
-                    role="dialog"
-                    aria-modal="true"
-                  >
-                    <div className="csheet__grab" {...commentDrag.handleProps}>
-                      <div className="csheet__handle" />
-                      <div className="csheet__head">
-                        <span className="csheet__title">
-                          {copy.thread} {data.comments.length}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="csheet__scroll">
-                      {timeline.length === 0 ? (
-                        <p className="csheet__empty">{copy.noComments}</p>
-                      ) : (
-                        timeline.map((item) =>
-                          item.kind === "comment" ? (
-                            <SuggestionCommentItem
-                              comment={item.comment}
-                              copy={copy}
-                              hydrated={hydrated}
-                              isOwn={item.comment.authorId === viewerUserId}
-                              key={`c-${item.comment.id}`}
-                              locale={locale}
-                            />
-                          ) : (
-                            <div className="clog" key={`e-${item.event.id}`}>
-                              <span className="line" />
-                              <span className="badge">
-                                <span
-                                  className="d"
-                                  style={{ background: `var(--${STAT_CLS[item.event.status]})` }}
-                                />
-                                {copy.statusLog
-                                  .replace("{name}", item.event.actorName || "—")
-                                  .replace("{status}", copy.status[item.event.status])}
-                              </span>
-                              <span className="line" />
-                            </div>
-                          ),
-                        )
-                      )}
-                    </div>
-                    <SuggestionCommentComposer
-                      copy={copy}
-                      organizationId={organizationId}
-                      suggestionId={data.id}
-                    />
-                  </div>
-                </>
-              ) : null}
+      <SuggestionCommentComposer copy={copy} organizationId={organizationId} suggestionId={data.id} />
 
-              {/* "좋아요" (who liked) sheet — long-press the heart to open. UI only for now: likes are
-                  client-side, so the list shows the current viewer when they've liked. */}
-              <div
-                className={`dim${likeSheetOpen ? " show" : ""}`}
-                onClick={() => setLikeSheetOpen(false)}
-                style={likeDrag.scrimStyle}
-                aria-hidden="true"
-              />
-              <div
-                className={`lsheet${likeSheetOpen ? " show" : ""}`}
-                data-sheet
-                style={{ ...likeDrag.sheetStyle, opacity: likeDrag.scrimStyle.opacity }}
-                role="dialog"
-                aria-modal="true"
-              >
-                <div className="lsheet__grab" {...likeDrag.handleProps}>
-                  <div className="sheet__handle" />
-                  <p className="lsheet__title">
-                    {copy.likeAction} {liked ? 1 : 0}
-                  </p>
+      {noteSheet ? (
+        <BottomSheet
+          ariaLabel={noteSheet === "hold" ? copy.holdSheetTitle : copy.doneSheetTitle}
+          onClose={() => setNoteSheet(null)}
+        >
+          {({ close }) => {
+            const isHold = noteSheet === "hold";
+            const value = isHold ? holdReason : completionNote;
+            return (
+              <div className="sgw-rs">
+                <div className="sgw-rs__h">
+                  <b>{isHold ? copy.holdSheetTitle : copy.doneSheetTitle}</b>
+                  <span>{isHold ? copy.holdSheetSub : copy.doneSheetSub}</span>
                 </div>
-                <div className="lsheet__list">
-                  {liked ? (
-                    <div className="lrow">
-                      <span className="lrow__av">{(viewerName || "—").slice(0, 1)}</span>
-                      <span className="lrow__n">{viewerName || copy.me}</span>
-                      <span className="lrow__heart">{SgIcon.heart}</span>
-                    </div>
-                  ) : (
-                    <p className="lsheet__empty">{copy.likeEmpty}</p>
-                  )}
-                </div>
+                <textarea
+                  aria-label={isHold ? copy.holdField : copy.doneField}
+                  onChange={(e) => (isHold ? setHoldReason(e.target.value) : setCompletionNote(e.target.value))}
+                  placeholder={isHold ? copy.holdPlaceholder : copy.donePlaceholder}
+                  rows={4}
+                  value={value}
+                />
+                {statusError ? <p role="alert">{statusError}</p> : null}
+                <button
+                  className="sgw-rs__go"
+                  data-tone={isHold ? undefined : "done"}
+                  disabled={!value.trim() || isStatusPending}
+                  onClick={() =>
+                    changeStatus(
+                      isHold ? "on_hold" : "completed",
+                      isHold ? { holdReason: value.trim() } : { completionNote: value.trim() },
+                      close,
+                    )
+                  }
+                  type="button"
+                >
+                  {isHold ? copy.holdConfirm : copy.doneConfirm}
+                </button>
+                <button className="sgw-rs__no" onClick={close} type="button">
+                  {copy.cancel}
+                </button>
               </div>
-            </div>,
-            document.body,
-          )
-        : null}
+            );
+          }}
+        </BottomSheet>
+      ) : null}
     </div>
   );
 }

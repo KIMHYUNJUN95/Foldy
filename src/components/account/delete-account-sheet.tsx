@@ -15,13 +15,13 @@ type Copy = {
   deleteAccountConfirm: string;
 };
 
-export function DeleteAccountSheet({ copy }: { copy: Copy }) {
+export function DeleteAccountSheet({ copy, triggerClassName }: { copy: Copy; triggerClassName?: string }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <button
-        className="text-sm font-semibold text-destructive hover:underline"
+        className={triggerClassName ?? "text-sm font-semibold text-destructive hover:underline"}
         onClick={() => setOpen(true)}
         type="button"
       >

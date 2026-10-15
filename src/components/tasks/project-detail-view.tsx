@@ -1,20 +1,10 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSplitPush } from "@/components/shell/split-list";
-import {
-  CalendarDays,
-  Check,
-  LogOut,
-  MoreVertical,
-  Plus,
-  Share2,
-  Trash2,
-  UserPlus,
-  X,
-} from "lucide-react";
+import { ChevronLeft, LogOut, MoreHorizontal, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { completeTask, reopenTask } from "@/app/mobile/tasks/[id]/actions";
 import {
   addProjectSection,
@@ -29,11 +19,14 @@ import {
 import { ReorderableSectionList } from "@/components/tasks/reorderable-section-list";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { SharePicker } from "@/components/tasks/share-picker";
+import { CheckMark, contextLabelOf, prioRingClass } from "@/components/tasks/task-card";
+import { haptic } from "@/lib/haptics";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { ProjectDetailData, ProjectSectionInfo } from "@/lib/projects";
 import type { ShareableUser } from "@/lib/tasks";
 import type { TaskRecord } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
+import "./tasks-white.css";
 
 type Copy = Dictionary["tasks"];
 
@@ -47,79 +40,109 @@ function anchorChip(task: TaskRecord, locale: Locale): string | null {
   }).format(new Date(iso));
 }
 
+/** 프로젝트 작업 한 줄 — 투두 줄(`TaskCard`)과 같은 모양(고리 · 제목 · 회색 메타), 완료하면 끝에 완료 날짜. */
 function TaskRow({
+  buildingLabels,
   task,
   locale,
   copy,
+  currentUserId,
   onToggle,
 }: {
+  buildingLabels: Record<string, string>;
   task: TaskRecord;
   locale: Locale;
   copy: Copy;
+  currentUserId: string;
   onToggle: (task: TaskRecord) => void;
 }) {
   const splitPush = useSplitPush();
+  const w = copy.mobileWhite;
+  const [checking, setChecking] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
   const done = task.status === "completed";
   const due = anchorChip(task, locale);
-  const important = task.priority === "important" || task.priority === "urgent";
+  const others = task.participants.filter((p) => p.userId !== currentUserId).length;
+  const meta = [
+    !done && task.priority === "urgent" ? copy.prioUrgent : null,
+    !done && task.priority === "important" ? copy.prioImportant : null,
+    !done ? due : null,
+    contextLabelOf(task, buildingLabels, copy.contextPickerRoomSuffix),
+    task.status === "in_progress" && !done ? copy.statusInProgress : null,
+    task.tags.length ? task.tags.slice(0, 2).map((t) => `#${t}`).join(" ") : null,
+    task.imageUrls.length ? w.photos.replace("{n}", String(task.imageUrls.length)) : null,
+    others > 0 && task.isShared ? w.shared.replace("{n}", String(others)) : null,
+  ].filter(Boolean);
+  const href = `/mobile/tasks/${task.id}?view=projects`;
   return (
-    <div className="flex items-start gap-3 rounded-[14px] border border-border bg-surface px-3.5 py-3">
-      <button
-        aria-label={copy.a11yToggleTask}
-        className={cn(
-          "mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-          done
-            ? "border-primary bg-primary text-primary-foreground"
-            : important
-              ? "border-amber-400"
-              : "border-slate-200",
-        )}
-        onClick={() => onToggle(task)}
-        type="button"
-      >
-        {done ? <Check className="size-3" strokeWidth={3} aria-hidden="true" /> : null}
-      </button>
-      <button
-        className="min-w-0 flex-1 text-left"
-        onClick={() => splitPush(`/mobile/tasks/${task.id}`)}
-        type="button"
-      >
-        <div
-          className={cn(
-            "text-[14px] font-bold leading-snug tracking-[-0.01em]",
-            done ? "text-muted-foreground line-through" : "text-foreground",
-          )}
+    <div className={cn("tkw-row", done && "is-done")}>
+      <div className="tkw-row__in">
+        <button
+          aria-label={done ? copy.reopen : copy.complete}
+          className={cn("tkw-ck", prioRingClass(task.priority), done && "is-done", checking && "is-checking")}
+          onClick={() => {
+            if (checking) return;
+            if (done) {
+              haptic("light");
+              onToggle(task);
+              return;
+            }
+            haptic("success");
+            setChecking(true);
+            timer.current = setTimeout(() => {
+              onToggle(task);
+              timer.current = setTimeout(() => setChecking(false), 1500);
+            }, 340);
+          }}
+          type="button"
         >
-          {task.title}
-        </div>
-        <div className="mt-2 flex items-center gap-1.5">
-          {due ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-[3px] text-[10.5px] font-bold text-amber-700">
-              <CalendarDays className="size-3" aria-hidden="true" />
-              {due}
-            </span>
-          ) : null}
-          <span className="ml-auto inline-flex size-6 items-center justify-center rounded-full bg-slate-100 text-[10px] font-extrabold text-slate-600">
-            {task.authorName.slice(0, 1)}
-          </span>
-        </div>
-      </button>
+          <CheckMark />
+        </button>
+        <a
+          className="tkw-row__b"
+          href={href}
+          onClick={(e) => {
+            e.preventDefault();
+            splitPush(href);
+          }}
+        >
+          <span className="tkw-row__t">{task.title}</span>
+          {meta.length ? <span className="tkw-row__m">{meta.join(" · ")}</span> : null}
+        </a>
+        {done && due ? <span className="tkw-row__tr">{due}</span> : null}
+      </div>
     </div>
   );
 }
 
+/**
+ * 프로젝트 화면 — 화이트 리디자인(2026-10-15, 시안 TodoProj-Phone).
+ * 「‹ 프로젝트 목록」 → 「# 이름」 → 「섹션 n · 작업 n · 사진 최대 20장」 → 멤버(누르면 관리 시트) → 섹션 묶음(주인은 손잡이로
+ * 순서 바꾸기 · 이름 바꾸기 · 삭제) → 「+ 섹션 추가」.
+ */
 export function ProjectDetailView({
+  buildingLabels,
   copy,
+  currentUserId,
   locale,
   project,
   shareableUsers,
 }: {
+  buildingLabels: Record<string, string>;
   copy: Copy;
+  currentUserId: string;
   locale: Locale;
   project: ProjectDetailData;
   shareableUsers: ShareableUser[];
 }) {
   const p = copy.projects;
+  const w = copy.mobileWhite;
   const isOwner = project.viewerIsOwner;
 
   const [, startToggle] = useTransition();
@@ -163,139 +186,93 @@ export function ProjectDetailView({
 
   const unsectioned = project.tasks.filter((t) => !t.sectionId);
   const tasksOf = (sectionId: string) => project.tasks.filter((t) => t.sectionId === sectionId);
-
-  const taskCountOf = (key: string) =>
-    key === "none" ? unsectioned.length : tasksOf(key).length;
+  const taskCountOf = (key: string) => (key === "none" ? unsectioned.length : tasksOf(key).length);
 
   // "작업 추가" opens the full create form (so a project task can link a room/reservation, set a
   // date, priority, etc.), pre-bound to this project and section; createTask returns here on save.
   const addTaskLink = (sectionId: string | null) => (
     <Link
-      className="mb-0.5 mt-2 inline-flex items-center gap-1.5 px-1 py-2 text-[13px] font-bold text-primary"
+      className="tkw-add"
       href={`/mobile/tasks/new?project=${project.id}${sectionId ? `&section=${sectionId}` : ""}`}
     >
-      <Plus className="size-4" aria-hidden="true" />
+      <Plus aria-hidden="true" />
       {p.addTask}
     </Link>
   );
+  const rows = (list: TaskRecord[]) => (
+    <div className="tkw-list">
+      {list.map((t) => (
+        <TaskRow buildingLabels={buildingLabels} copy={copy} currentUserId={currentUserId} key={t.id} locale={locale} onToggle={onToggle} task={t} />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="relative min-h-[60vh] pb-24">
-      {/* Header */}
-      <div className="flex items-center gap-2 py-1.5 pb-4">
-        <span className="min-w-0 flex-1 truncate text-[19px] font-black tracking-[-0.03em] text-foreground">
-          {project.title}
-        </span>
-        <button
-          aria-label={p.memberManage}
-          className="flex shrink-0 items-center transition-opacity active:opacity-70"
-          onClick={openMembers}
-          type="button"
-        >
-          {project.members.slice(0, 3).map((m, i) => (
-            <span
-              className={cn(
-                "inline-flex size-[30px] items-center justify-center rounded-full border-2 border-background text-[11px] font-extrabold",
-                i === 0 ? "ml-0" : "-ml-2",
-                m.role === "owner" ? "bg-primary text-primary-foreground" : "bg-slate-100 text-slate-600",
-              )}
-              key={m.userId}
-            >
+    <div className="tkw relative min-h-[60vh] pb-24" data-wide="projects">
+      <Link className="tkw-back" href="/mobile/tasks?view=projects">
+        <ChevronLeft aria-hidden="true" />
+        {w.backToProjects}
+      </Link>
+
+      <div className="tkw-head" style={{ marginBottom: 12 }}>
+        <div className="tkw-head__b">
+          <h1>
+            <span style={{ color: "#16141f" }}>#</span> {project.title}
+          </h1>
+          <span className="tkw-head__s">
+            {w.projectMeta
+              .replace("{sections}", String(project.sections.length))
+              .replace("{tasks}", String(project.tasks.length))}
+          </span>
+        </div>
+        <div className="relative">
+          <button
+            aria-expanded={menuOpen}
+            aria-label={copy.a11yMoreActions}
+            className="tkw-icon"
+            onClick={() => setMenuOpen(true)}
+            type="button"
+          >
+            <MoreHorizontal aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {project.description ? (
+        <p className="tkw-hint" style={{ margin: "-4px 0 14px" }}>
+          {project.description}
+        </p>
+      ) : null}
+
+      {/* 멤버 — 누르면 관리 시트(주인은 초대 · 내보내기). */}
+      <button aria-label={p.memberManage} className="tkw-pmeta" onClick={openMembers} type="button">
+        <span aria-hidden="true" className="tkw-avs">
+          {project.members.slice(0, 4).map((m) => (
+            <span className="tkw-av" key={m.userId}>
               {m.name.slice(0, 1)}
             </span>
           ))}
-          {project.members.length > 3 ? (
-            <span className="-ml-2 inline-flex size-[30px] items-center justify-center rounded-full border-2 border-background bg-slate-100 text-[11px] font-extrabold text-muted-foreground">
-              +{project.members.length - 3}
-            </span>
-          ) : null}
-        </button>
-        {isOwner ? (
-          <button
-            aria-label={p.inviteLabel}
-            className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600"
-            onClick={() => setPickerOpen(true)}
-            type="button"
-          >
-            <Share2 className="size-[17px]" aria-hidden="true" />
-          </button>
-        ) : null}
-        <div className="relative shrink-0">
-          <button
-            aria-label={copy.a11yMoreActions}
-            className="flex size-[34px] items-center justify-center rounded-full bg-slate-100 text-slate-600"
-            onClick={() => setMenuOpen((v) => !v)}
-            type="button"
-          >
-            <MoreVertical className="size-[17px]" aria-hidden="true" />
-          </button>
-          {menuOpen ? (
-            <>
-              <div className="fixed inset-0 z-[40]" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-[40px] z-[41] w-44 overflow-hidden rounded-2xl border border-border bg-surface py-1 shadow-[0_18px_44px_-16px_rgba(20,16,10,0.4)]">
-                {isOwner ? (
-                  <>
-                    <button
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] font-bold text-foreground active:bg-slate-50"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        openMembers();
-                      }}
-                      type="button"
-                    >
-                      <UserPlus className="size-[16px] text-muted-foreground" aria-hidden="true" />
-                      {p.memberManage}
-                    </button>
-                    <button
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] font-bold text-rose-600 active:bg-rose-50"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setDeleteProjectOpen(true);
-                      }}
-                      type="button"
-                    >
-                      <Trash2 className="size-[16px]" aria-hidden="true" />
-                      {p.deleteProject}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] font-bold text-rose-600 active:bg-rose-50"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setLeaveOpen(true);
-                    }}
-                    type="button"
-                  >
-                    <LogOut className="size-[16px]" aria-hidden="true" />
-                    {p.leave}
-                  </button>
-                )}
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
+          {project.members.length > 4 ? <span className="tkw-av is-gray">+{project.members.length - 4}</span> : null}
+        </span>
+        {w.members.replace("{n}", String(project.members.length))}
+      </button>
 
-      {/* Unsectioned (pinned top) */}
-      <div className="mb-2">
-        <div className="flex items-center gap-1.5 px-0.5 pb-2 pt-3">
-          <span className="whitespace-nowrap text-[13.5px] font-extrabold tracking-[-0.01em] text-foreground">
-            {p.sectionNone}
-          </span>
-          <span className="text-[11.5px] font-bold text-muted-foreground/70">{taskCountOf("none")}</span>
-        </div>
-        <div className="flex flex-col gap-2">
-          {unsectioned.map((t) => (
-            <TaskRow key={t.id} locale={locale} copy={copy} onToggle={onToggle} task={t} />
-          ))}
-        </div>
-        {addTaskLink(null)}
-      </div>
+      {/* 섹션 없는 작업 — 있을 때만(섹션이 하나도 없으면 여기에 작업을 더한다). */}
+      {unsectioned.length > 0 || project.sections.length === 0 ? (
+        <section className="tkw-sec">
+          <div className="tkw-sec__h">
+            <b>{p.sectionNone}</b>
+            <span className="tkw-sec__n">{w.count.replace("{n}", String(taskCountOf("none")))}</span>
+          </div>
+          {rows(unsectioned)}
+          {addTaskLink(null)}
+        </section>
+      ) : null}
 
       {/* Named sections — drag-reorderable by the owner (grip handle). */}
       {project.sections.length > 0 ? (
         <ReorderableSectionList
+          countLabel={w.count}
           countOf={(id) => taskCountOf(id)}
           deleteLabel={copy.deleteAction}
           disabled={!isOwner}
@@ -306,11 +283,7 @@ export function ProjectDetailView({
           onRename={(s) => setRenameTarget(s)}
           renderBody={(section) => (
             <>
-              <div className="flex flex-col gap-2">
-                {tasksOf(section.id).map((t) => (
-                  <TaskRow key={t.id} locale={locale} copy={copy} onToggle={onToggle} task={t} />
-                ))}
-              </div>
+              {rows(tasksOf(section.id))}
               {addTaskLink(section.id)}
             </>
           )}
@@ -322,213 +295,213 @@ export function ProjectDetailView({
       {/* Add section (Owner only) */}
       {isOwner ? (
         addingSection ? (
-          <form action={addProjectSection} className="mt-4 flex items-center gap-2">
+          <form action={addProjectSection} className="tkw-secform" onSubmit={() => haptic("success")}>
             <input name="projectId" type="hidden" value={project.id} />
-            <input
-              autoFocus
-              className="h-11 flex-1 rounded-[14px] border border-border bg-background px-3.5 text-[13.5px] font-medium text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-primary"
-              name="title"
-              placeholder={p.sectionNamePlaceholder}
-              required
-            />
-            <button
-              className="h-11 shrink-0 rounded-[14px] bg-primary px-4 text-[13px] font-extrabold text-primary-foreground"
-              type="submit"
-            >
+            <input aria-label={p.sectionNamePlaceholder} autoFocus name="title" placeholder={p.sectionNamePlaceholder} required />
+            <button className="tkw-btn is-pri" style={{ width: "auto", height: 44, padding: "0 16px", fontSize: 14 }} type="submit">
               {p.add}
             </button>
-            <button
-              aria-label={copy.cancel}
-              className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-slate-100 text-slate-500"
-              onClick={() => setAddingSection(false)}
-              type="button"
-            >
-              <X className="size-4" aria-hidden="true" />
+            <button aria-label={copy.cancel} className="tkw-icon" onClick={() => setAddingSection(false)} style={{ marginRight: -8 }} type="button">
+              <X aria-hidden="true" />
             </button>
           </form>
         ) : (
-          <button
-            className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-[14px] border-[1.4px] border-dashed border-border bg-transparent py-3.5 text-[13.5px] font-bold text-muted-foreground"
-            onClick={() => setAddingSection(true)}
-            type="button"
-          >
-            <Plus className="size-[17px]" aria-hidden="true" />
+          <button className="tkw-add" onClick={() => setAddingSection(true)} type="button">
+            <Plus aria-hidden="true" />
             {p.addSection}
           </button>
         )
       ) : null}
 
+      {/* 더 보기 메뉴 */}
+      {menuOpen ? (
+        <BottomSheet ariaLabel={copy.a11yMoreActions} onClose={() => setMenuOpen(false)}>
+          {({ close }) => (
+            <div className="tkw-sheet">
+              <p className="tkw-sheet__t"># {project.title}</p>
+              <div className="tkw-act">
+                <button
+                  onClick={() => {
+                    close();
+                    openMembers();
+                  }}
+                  type="button"
+                >
+                  <UserPlus aria-hidden="true" />
+                  {p.memberManage}
+                </button>
+                {isOwner ? (
+                  <button
+                    className="is-red"
+                    onClick={() => {
+                      close();
+                      setDeleteProjectOpen(true);
+                    }}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" />
+                    {p.deleteProject}
+                  </button>
+                ) : (
+                  <button
+                    className="is-red"
+                    onClick={() => {
+                      close();
+                      setLeaveOpen(true);
+                    }}
+                    type="button"
+                  >
+                    <LogOut aria-hidden="true" />
+                    {p.leave}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
 
       {/* Section delete confirm */}
       {deleteSection ? (
-        <ConfirmModal
+        <ConfirmSheet
           body={p.deleteSectionBody
             .replace("{name}", deleteSection.title)
             .replace("{count}", String(tasksOf(deleteSection.id).length))}
           cancelLabel={copy.cancel}
-          confirmLabel={copy.deleteAction}
-          icon={<Trash2 className="size-[26px]" aria-hidden="true" />}
           onClose={() => setDeleteSection(null)}
           title={p.deleteSectionTitle}
         >
-          <form action={deleteProjectSection} className="flex-1">
+          <form action={deleteProjectSection}>
             <input name="projectId" type="hidden" value={project.id} />
             <input name="sectionId" type="hidden" value={deleteSection.id} />
-            <button
-              className="h-11 w-full rounded-xl bg-rose-600 text-[14px] font-extrabold text-white"
-              type="submit"
-            >
+            <button className="tkw-btn is-red" type="submit">
               {copy.deleteAction}
             </button>
           </form>
-        </ConfirmModal>
+        </ConfirmSheet>
       ) : null}
 
-      {/* Rename section */}
-      {renameTarget ? (
-        createPortal(
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(20,16,10,0.55)] px-7"
-          onClick={() => setRenameTarget(null)}
-          style={{ animation: "modal-overlay-in 180ms ease-out both" }}
-        >
-          <div
-            className="w-full max-w-[340px] rounded-[22px] bg-surface p-5 shadow-[0_30px_60px_-20px_rgba(16,22,30,0.5)]"
-            onClick={(e) => e.stopPropagation()}
-            style={{ animation: "modal-card-in 240ms cubic-bezier(0.34,1.26,0.64,1) both" }}
-          >
-            <p className="mb-3 text-[16px] font-black text-foreground">{p.renameSectionTitle}</p>
-            <form action={renameProjectSection}>
-              <input name="projectId" type="hidden" value={project.id} />
-              <input name="sectionId" type="hidden" value={renameTarget.id} />
-              <input
-                autoFocus
-                className="h-12 w-full rounded-xl border border-border bg-background px-3.5 text-[15px] font-bold text-foreground outline-none focus:border-primary"
-                defaultValue={renameTarget.title}
-                name="title"
-                required
-              />
-              <div className="mt-4 flex gap-2.5">
-                <button
-                  className="h-11 flex-1 rounded-xl bg-slate-100 text-[14px] font-extrabold text-slate-700"
-                  onClick={() => setRenameTarget(null)}
-                  type="button"
-                >
-                  {copy.cancel}
-                </button>
-                <button
-                  className="h-11 flex-1 rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground"
-                  type="submit"
-                >
-                  {copy.save}
-                </button>
+      {/* Rename section — 가운데 확인 창(의도된 BottomSheet 예외: 짧은 이름 한 칸). */}
+      {renameTarget
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-7"
+              onClick={() => setRenameTarget(null)}
+              style={{ animation: "modal-overlay-in 180ms ease-out both" }}
+            >
+              <div
+                className="tkw-sheet w-full max-w-[340px] rounded-[20px] bg-white p-5"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                style={{ animation: "modal-card-in 240ms cubic-bezier(0.34,1.26,0.64,1) both" }}
+              >
+                <h2>{p.renameSectionTitle}</h2>
+                <form action={renameProjectSection}>
+                  <input name="projectId" type="hidden" value={project.id} />
+                  <input name="sectionId" type="hidden" value={renameTarget.id} />
+                  <label className="tkw-nf">
+                    <input
+                      aria-label={p.renameSectionTitle}
+                      autoFocus
+                      className="tkw-nf__in is-sm"
+                      defaultValue={renameTarget.title}
+                      name="title"
+                      required
+                    />
+                  </label>
+                  <div className="tkw-btns2">
+                    <button className="tkw-btn is-gray" onClick={() => setRenameTarget(null)} type="button">
+                      {copy.cancel}
+                    </button>
+                    <button className="tkw-btn is-pri" type="submit">
+                      {copy.save}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
-          </div>
-        </div>,
-          document.body,
-        )
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* Delete project confirm */}
       {deleteProjectOpen ? (
-        <ConfirmModal
+        <ConfirmSheet
           body={p.deleteProjectBody}
           cancelLabel={copy.cancel}
-          confirmLabel={p.deleteProject}
-          icon={<Trash2 className="size-[26px]" aria-hidden="true" />}
           onClose={() => setDeleteProjectOpen(false)}
           title={p.deleteProjectTitle}
         >
-          <form action={deleteProject} className="flex-1">
+          <form action={deleteProject}>
             <input name="projectId" type="hidden" value={project.id} />
-            <button
-              className="h-11 w-full rounded-xl bg-rose-600 text-[14px] font-extrabold text-white"
-              type="submit"
-            >
+            <button className="tkw-btn is-red" type="submit">
               {p.deleteProject}
             </button>
           </form>
-        </ConfirmModal>
+        </ConfirmSheet>
       ) : null}
 
       {/* Leave project confirm */}
       {leaveOpen ? (
-        <ConfirmModal
+        <ConfirmSheet
           body={p.leaveConfirmBody}
           cancelLabel={copy.cancel}
-          confirmLabel={p.leave}
-          icon={<LogOut className="size-[26px]" aria-hidden="true" />}
           onClose={() => setLeaveOpen(false)}
           title={p.leaveConfirmTitle}
         >
-          <form action={leaveProject} className="flex-1">
+          <form action={leaveProject}>
             <input name="projectId" type="hidden" value={project.id} />
-            <button
-              className="h-11 w-full rounded-xl bg-rose-600 text-[14px] font-extrabold text-white"
-              type="submit"
-            >
+            <button className="tkw-btn is-red" type="submit">
               {p.leave}
             </button>
           </form>
-        </ConfirmModal>
+        </ConfirmSheet>
       ) : null}
 
-      {/* Members management (owner) */}
+      {/* Members management */}
       {membersOpen ? (
         <BottomSheet ariaLabel={p.memberManage} onClose={() => setMembersOpen(false)}>
           {({ close, dragHandleProps }) => (
-            <>
-              <div className="mb-3 flex items-center justify-between" {...dragHandleProps}>
-                <p className="text-[16px] font-black text-foreground">
-                  {p.memberManage}
-                  <span className="ml-1.5 text-[13px] font-bold text-muted-foreground">
-                    {project.members.length}
-                  </span>
-                </p>
+            <div className="tkw-sheet">
+              <div className="flex items-center justify-between" {...dragHandleProps}>
+                <h2>
+                  {p.memberManage} <span className="tkw-sec__n">{project.members.length}</span>
+                </h2>
                 {isOwner ? (
                   <button
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary/[0.08] px-3 py-1.5 text-[12.5px] font-bold text-primary"
+                    className="tkw-tl"
                     onClick={() => {
                       close();
                       setPickerOpen(true);
                     }}
+                    style={{ fontSize: 14, marginTop: -14 }}
                     type="button"
                   >
-                    <UserPlus className="size-3.5" aria-hidden="true" />
-                    {p.inviteLabel}
+                    + {p.inviteLabel}
                   </button>
                 ) : null}
               </div>
-              <div className="flex min-h-[28vh] max-h-[60vh] flex-col gap-1 overflow-y-auto pb-2">
+              <div className="tkw-people max-h-[60vh] overflow-y-auto">
                 {project.members.map((m) => (
-                  <div className="flex items-center gap-3 rounded-2xl px-2 py-2" key={m.userId}>
-                    <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-sm font-extrabold text-primary">
+                  <div key={m.userId}>
+                    <span aria-hidden="true" className="tkw-av">
                       {m.name.slice(0, 1)}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-foreground">{m.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {m.role === "owner" ? p.roleOwner : p.roleMember}
-                      </span>
-                    </span>
+                    <span className="tkw-people__n">{m.name}</span>
+                    <span className="tkw-people__r">{m.role === "owner" ? p.roleOwner : p.roleMember}</span>
                     {isOwner && m.role !== "owner" && m.userId !== project.createdByUserId ? (
                       <form action={removeProjectMember}>
                         <input name="projectId" type="hidden" value={project.id} />
                         <input name="userId" type="hidden" value={m.userId} />
-                        <button
-                          aria-label={copy.deleteAction}
-                          className="flex size-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                          type="submit"
-                        >
-                          <X className="size-4" aria-hidden="true" />
+                        <button aria-label={copy.deleteAction} className="tkw-people__x" type="submit">
+                          <X aria-hidden="true" />
                         </button>
                       </form>
                     ) : null}
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           )}
         </BottomSheet>
       ) : null}
@@ -549,46 +522,31 @@ export function ProjectDetailView({
   );
 }
 
-function ConfirmModal({
+function ConfirmSheet({
   body,
   cancelLabel,
   children,
-  icon,
   onClose,
   title,
 }: {
   body: string;
   cancelLabel: string;
-  confirmLabel: string;
   children: React.ReactNode;
-  icon: React.ReactNode;
   onClose: () => void;
   title: string;
 }) {
   return (
-    <BottomSheet
-      ariaLabel={title}
-      header={
-        <div className="text-center">
-          <span className="mx-auto mb-4 flex size-[52px] items-center justify-center rounded-[15px] bg-rose-50 text-rose-600">
-            {icon}
-          </span>
-          <h3 className="mb-2 text-[18px] font-black tracking-[-0.02em] text-foreground">{title}</h3>
-          <p className="mb-[22px] text-[13.5px] leading-relaxed text-muted-foreground">{body}</p>
-        </div>
-      }
-      onClose={onClose}
-    >
+    <BottomSheet ariaLabel={title} onClose={onClose}>
       {({ close }) => (
-        <div className="flex gap-2.5">
-          <button
-            className="h-11 flex-1 rounded-xl bg-slate-100 text-[14px] font-extrabold text-slate-700"
-            onClick={close}
-            type="button"
-          >
-            {cancelLabel}
-          </button>
-          {children}
+        <div className="tkw-sheet">
+          <h2>{title}</h2>
+          <p className="tkw-sheet__sub">{body}</p>
+          <div className="tkw-btns2">
+            <button className="tkw-btn is-gray" onClick={close} type="button">
+              {cancelLabel}
+            </button>
+            {children}
+          </div>
         </div>
       )}
     </BottomSheet>

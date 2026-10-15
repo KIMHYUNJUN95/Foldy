@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import type { ProjectSectionInfo } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
-// Matches the container's vertical gap (gap-2 = 8px). A crossed block shifts by one dragged "slot"
-// (dragged block height + gap) so the opened gap lines up with the section being moved.
-const GAP = 8;
+// 섹션 사이 간격(`.tkw-sec` 의 아래 여백 22px). 지나친 섹션은 끌고 있는 섹션 높이 + 간격만큼 밀린다.
+const GAP = 22;
 
 type RowMetric = { id: string; top: number; height: number };
 
@@ -33,6 +32,7 @@ export function ReorderableSectionList({
   editLabel,
   deleteLabel,
   countOf,
+  countLabel,
   onRename,
   onDelete,
   onPersist,
@@ -45,6 +45,8 @@ export function ReorderableSectionList({
   editLabel: string;
   deleteLabel: string;
   countOf: (sectionId: string) => number;
+  /** 섹션 머리의 개수 문구(`{n}` 자리). 없으면 숫자만. */
+  countLabel?: string;
   onRename: (section: ProjectSectionInfo) => void;
   onDelete: (section: ProjectSectionInfo) => void;
   onPersist: (orderedIds: string[]) => void;
@@ -156,7 +158,7 @@ export function ReorderableSectionList({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div>
       {order.map((s, i) => {
         const isDragged = s.id === dragId;
         let translateY = 0;
@@ -172,7 +174,7 @@ export function ReorderableSectionList({
         }
         return (
           <div
-            className="relative"
+            className="tkw-sec relative"
             key={s.id}
             ref={(el) => {
               rowRefs.current.set(s.id, el);
@@ -186,47 +188,31 @@ export function ReorderableSectionList({
             <div
               className={cn(
                 isDragged &&
-                  "rounded-[16px] bg-surface shadow-[0_18px_40px_-12px_rgba(20,16,10,0.35)] will-change-transform",
+                  "rounded-[14px] bg-white shadow-[0_18px_40px_-14px_rgba(22,20,31,0.35)] will-change-transform",
               )}
             >
-              <div className="flex items-center gap-1.5 px-0.5 pb-2 pt-3">
+              <div className="tkw-sec__h">
                 {isOwner ? (
                   <button
                     aria-label={reorderHandleLabel}
-                    className="flex size-6 touch-none cursor-grab items-center justify-center text-muted-foreground/50 active:cursor-grabbing"
+                    className="tkw-sech__grip"
+                    data-swipe-back="off"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => beginDrag(e, s)}
-                    data-swipe-back="off"
                     type="button"
                   >
-                    <GripVertical className="size-4" aria-hidden="true" />
+                    <GripVertical aria-hidden="true" />
                   </button>
-                ) : (
-                  <span className="flex text-muted-foreground">
-                    <ChevronDown className="size-4" aria-hidden="true" />
-                  </span>
-                )}
-                <span className="whitespace-nowrap text-[13.5px] font-extrabold tracking-[-0.01em] text-foreground">
-                  {s.title}
-                </span>
-                <span className="text-[11.5px] font-bold text-muted-foreground/70">{countOf(s.id)}</span>
+                ) : null}
+                <b>{s.title}</b>
+                <span className="tkw-sec__n">{countLabel ? countLabel.replace("{n}", String(countOf(s.id))) : countOf(s.id)}</span>
                 {isOwner ? (
-                  <span className="ml-auto flex gap-1">
-                    <button
-                      aria-label={editLabel}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted-foreground/70 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                      onClick={() => onRename(s)}
-                      type="button"
-                    >
-                      <Pencil className="size-[15px]" aria-hidden="true" />
+                  <span className="tkw-sec__acts" style={{ gap: 0 }}>
+                    <button aria-label={editLabel} className="tkw-sech__ic" onClick={() => onRename(s)} type="button">
+                      <Pencil aria-hidden="true" />
                     </button>
-                    <button
-                      aria-label={deleteLabel}
-                      className="flex size-7 items-center justify-center rounded-lg text-muted-foreground/70 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                      onClick={() => onDelete(s)}
-                      type="button"
-                    >
-                      <Trash2 className="size-[15px]" aria-hidden="true" />
+                    <button aria-label={deleteLabel} className="tkw-sech__ic" onClick={() => onDelete(s)} type="button">
+                      <Trash2 aria-hidden="true" />
                     </button>
                   </span>
                 ) : null}

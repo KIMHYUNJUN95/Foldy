@@ -62,6 +62,17 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
   const returnView = ["today", "tomorrow", "calendar"].includes(query.view ?? "")
     ? (query.view as "today" | "tomorrow" | "calendar")
     : "today";
+  // 빵부스러기(「오늘 · 투두이스트」) — 어느 목록에서 열었는지. 모르면 「투두이스트」만.
+  const crumbLabels: Record<string, string> = {
+    today: dict.tasks.viewToday,
+    tomorrow: dict.tasks.viewTomorrow,
+    inbox: dict.tasks.viewInbox,
+    projects: dict.tasks.viewProjects,
+    instr: dict.tasks.viewInstr,
+    completed: dict.tasks.viewCompleted,
+    calendar: dict.tasks.viewCalendar,
+  };
+  const crumbView = crumbLabels[query.view ?? ""] ?? null;
 
   return (
     <MobileShell activeItem="tasks" badges={navBadges} title={dict.tasks.detailTitle}>
@@ -70,6 +81,7 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
         canEditCore={canEditTaskCore(session, task)}
         copy={dict.tasks}
         completedOccurrenceDate={completedOccurrenceDate}
+        crumbView={crumbView}
         currentUserId={session.user.id}
         imgCopy={dict.requestImages}
         locale={locale}

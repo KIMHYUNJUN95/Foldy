@@ -1,25 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Clock,
-  Crown,
-  Flag,
-  ImageIcon,
-  MoreHorizontal,
-  Pencil,
-  Repeat2,
-  RotateCcw,
-  Send,
-  Share2,
-  SkipForward,
-  Trash2,
-  UserMinus,
-} from "lucide-react";
+import { ImageIcon, Pencil, Plus, Send, SkipForward, Trash2, UserMinus, UserPlus } from "lucide-react";
 import {
   addTaskUpdate,
   completeTask,
@@ -35,14 +20,19 @@ import {
   type AnnouncementImageUploaderHandle,
 } from "@/components/announcements/announcement-image-uploader";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { ImageLightbox } from "@/components/shell/image-lightbox";
 import { uploadRequestImages } from "@/components/requests/request-image-upload";
+import { calendarHref } from "@/components/tasks/linked-context-block";
 import { PhotoGallery } from "@/components/tasks/photo-gallery";
-import { LinkedContextBlock } from "@/components/tasks/linked-context-block";
 import { SharePicker } from "@/components/tasks/share-picker";
+import { addMinutesHHMM, CheckMark, contextLabelOf, prioRingClass } from "@/components/tasks/task-card";
+import { haptic } from "@/lib/haptics";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { ShareableUser, TaskDetail } from "@/lib/tasks";
 import { formatCustomWeekdays, isStandardRecurrence } from "@/lib/tasks-recurrence";
+import { tokyoDateOf, tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import { cn } from "@/lib/utils";
+import "./tasks-white.css";
 
 type Copy = Dictionary["tasks"];
 
@@ -54,25 +44,26 @@ function longDate(value: string, locale: Locale): string {
     timeZone: "Asia/Tokyo",
   }).format(new Date(`${value}T00:00:00+09:00`));
 }
-function longDateTime(iso: string, locale: Locale): string {
+function clockTime(iso: string, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, {
-    month: "long",
-    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
     timeZone: "Asia/Tokyo",
   }).format(new Date(iso));
 }
-// Date-only (Tokyo) rendering of a timestamptz — used for all-day due dates so they never
-// render as a misleading "00:00" timed value.
-function longDateOnlyIso(iso: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: "long",
+/** "M/D HH:MM"(도쿄) — 업데이트 기록의 짧은 시각. 로케일 숫자 표기("7. 29. 15:10")보다 읽기 쉽다. */
+function shortDateTime(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    month: "numeric",
     day: "numeric",
-    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
     timeZone: "Asia/Tokyo",
-  }).format(new Date(iso));
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((x) => x.type === type)?.value ?? "";
+  return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
 }
 function repeatLabel(rule: string, copy: Copy, locale: Locale): string {
   // 사용자 지정 요일 반복(`custom:1,3,5`)은 고정 매핑에 없으므로 먼저 처리한다 — 빠뜨리면
@@ -89,12 +80,6 @@ function repeatLabel(rule: string, copy: Copy, locale: Locale): string {
     custom: copy.repeatCustom,
   };
   return map[rule] ?? rule;
-}
-// End of a time block (start "HH:MM" + duration minutes), wrapping within the day.
-function addMinutesHHMM(hhmm: string, mins: number): string {
-  const [h, m] = hhmm.split(":").map(Number);
-  const total = (((h * 60 + m + mins) % 1440) + 1440) % 1440;
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 function durationText(mins: number, copy: Copy): string {
   return mins === 15
@@ -116,11 +101,24 @@ function prioLabel(p: string, copy: Copy): string {
         ? copy.prioMedium
         : copy.prioNormal;
 }
+
+/**
+ * 투두 상세 — 화이트 리디자인(2026-10-15, 시안 TodoDetail-Phone).
+ *
+ * 상자 없이 위에서 아래로: 빵부스러기(「오늘 · 투두이스트」 + 수정 · 삭제) → 큰 고리 + 제목 → 설명 → 상태 세그먼트
+ * 「대기 | 진행 중 | 완료」 → 사진 줄(+ 추가 · 「사진 n / 5」) → 정보 목록(일정 · 반복 · 우선순위 · 연결 · 태그 · 함께) →
+ * 업데이트 기록 + 입력.
+ *
+ * 상태 세그먼트는 예전 동작에 그대로 붙는다: 대기/진행 중 = `setTaskProgress`, 완료 = `completeTask`(반복은 그 회차),
+ * 완료 상태에서 대기 = `reopenTask`, 진행 중 = 되살린 뒤 `setTaskProgress(true)`. 반복인데 회차를 모르면(관리함에서 연
+ * 시리즈) 완료 칸을 막고 안내를 보여 준다 — 앵커로 조용히 폴백하지 않는다.
+ */
 export function TaskDetailView({
   buildingLabels,
   canEditCore,
   completedOccurrenceDate,
   copy,
+  crumbView,
   currentUserId,
   imgCopy,
   locale,
@@ -134,6 +132,8 @@ export function TaskDetailView({
   /** 이 회차가 "완료"로 기록돼 있을 때만 그 날짜(해결 여부와 무관한 `occurrenceDate`와 짝을 이룸). */
   completedOccurrenceDate: string | null;
   copy: Copy;
+  /** 빵부스러기에 쓸 목록 이름(어느 탭에서 열었나). 모르면 「투두이스트」만. */
+  crumbView?: string | null;
   currentUserId: string;
   imgCopy: Dictionary["requestImages"];
   locale: Locale;
@@ -143,40 +143,24 @@ export function TaskDetailView({
   users: ShareableUser[];
 }) {
   const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const w = copy.mobileWhite;
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; name: string } | null>(null);
   const [updatePhotosOpen, setUpdatePhotosOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<number | null>(null);
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isTogglingStatus, startStatusTransition] = useTransition();
   const [isSkippingOccurrence, startSkipTransition] = useTransition();
+  // 누른 상태를 서버 응답 전에 먼저 보여 준다(세그먼트가 미끄러지듯 옮겨 감). 응답이 오면 실제 값으로 맞춰진다.
+  const [pendingStatus, setPendingStatus] = useState<"open" | "in_progress" | "done" | null>(null);
   const updateBodyRef = useRef<HTMLInputElement>(null);
   const updateUploaderRef = useRef<AnnouncementImageUploaderHandle>(null);
   const shareFormRef = useRef<HTMLFormElement>(null);
   const shareInputRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    function closeOnOutsidePress(event: PointerEvent) {
-      if (menuRef.current?.contains(event.target as Node)) return;
-      setMenuOpen(false);
-    }
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
-    }
-
-    document.addEventListener("pointerdown", closeOnOutsidePress);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePress);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [menuOpen]);
 
   const isRecurring = isStandardRecurrence(task.recurrenceRule);
   // 반복 업무는 행 `status` 가 영원히 "open"(2026-07-30 회차 모델) 이라 완료 여부는 그 회차의 기록을
@@ -187,12 +171,24 @@ export function TaskDetailView({
   const actionOccurrenceDate = occurrenceDate ?? completedOccurrenceDate ?? undefined;
   // 상세가 회차 컨텍스트 없이(관리함의 시리즈 행 등, `?occurrence=` 없이) 열린 반복 업무는 어느
   // 날짜를 완료하는지 알 수 없어 앵커로 폴백해 버리면 사용자가 모르는 과거 회차가 완료돼 버린다
-  // (수정 2). 그 경우 완료 버튼 대신 안내만 보여준다.
+  // (수정 2). 그 경우 완료 칸 대신 안내만 보여준다.
   const hasOccurrenceContext = !isRecurring || !!occurrenceDate || !!completedOccurrenceDate;
   const existingParticipantIds = task.participants.map((p) => p.userId);
   const shareableForMore = users.filter((u) => !existingParticipantIds.includes(u.id));
-  const canChooseRecurringDelete =
-    !!occurrenceDate && isStandardRecurrence(task.recurrenceRule);
+  const canChooseRecurringDelete = !!occurrenceDate && isStandardRecurrence(task.recurrenceRule);
+  const serverStatus: "open" | "in_progress" | "done" = done
+    ? "done"
+    : task.status === "in_progress"
+      ? "in_progress"
+      : "open";
+  const shownStatus = pendingStatus ?? serverStatus;
+
+  // 서버 왕복이 끝나면(새 props 와 함께) 낙관적 표시를 내려놓는다 — 실패해도 실제 값으로 돌아온다.
+  useEffect(() => {
+    if (isTogglingStatus) return;
+    const id = requestAnimationFrame(() => setPendingStatus(null));
+    return () => cancelAnimationFrame(id);
+  }, [serverStatus, isTogglingStatus]);
 
   function skipCurrentOccurrence() {
     if (!occurrenceDate || isSkippingOccurrence) return;
@@ -208,29 +204,24 @@ export function TaskDetailView({
     });
   }
 
-  const meta: { icon: typeof Clock; label: string; value: string }[] = [];
-  if (task.scheduledDate) meta.push({ icon: CalendarDays, label: copy.scheduledDate, value: longDate(task.scheduledDate, locale) });
-  if (task.dueAt)
-    meta.push({
-      // Single-date model (A안): the task's one date is stored on due_at; label it neutrally as 일정.
-      icon: CalendarDays,
-      label: copy.scheduleTitle,
-      // All-day dates are stored at 00:00 Tokyo — render them date-only so they don't
-      // contradict the "All day" time row; timed tasks keep date + time.
-      value: task.allDay ? longDateOnlyIso(task.dueAt, locale) : longDateTime(task.dueAt, locale),
+  function changeStatus(next: "open" | "in_progress" | "done") {
+    if (next === shownStatus || isTogglingStatus) return;
+    if (next === "done" && !hasOccurrenceContext) return;
+    haptic(next === "done" ? "success" : "light");
+    setPendingStatus(next);
+    startStatusTransition(async () => {
+      if (next === "done") {
+        await completeTask(task.id, actionOccurrenceDate);
+        return;
+      }
+      if (done) {
+        await reopenTask(task.id, actionOccurrenceDate);
+        if (next === "in_progress") await setTaskProgress(task.id, true);
+        return;
+      }
+      await setTaskProgress(task.id, next === "in_progress");
     });
-  meta.push({
-    icon: Clock,
-    label: copy.sectionTime,
-    // Timed task with a duration → show the block (start – end · length); else just the time or All day.
-    value: task.timeLabel
-      ? task.durationMinutes
-        ? `${task.timeLabel} – ${addMinutesHHMM(task.timeLabel, task.durationMinutes)} · ${durationText(task.durationMinutes, copy)}`
-        : task.timeLabel
-      : copy.allDay,
-  });
-  if (task.recurrenceRule) meta.push({ icon: Repeat2, label: copy.sectionRepeat, value: repeatLabel(task.recurrenceRule, copy, locale) });
-  meta.push({ icon: Flag, label: copy.sectionPriority, value: prioLabel(task.priority, copy) });
+  }
 
   function submitShare(ids: string[]) {
     setPickerOpen(false);
@@ -270,376 +261,281 @@ export function TaskDetailView({
 
     if (updateBodyRef.current) updateBodyRef.current.value = "";
     setUpdatePhotosOpen(false);
+    haptic("light");
     startUpdateTransition(async () => {
       await addTaskUpdate(formData);
     });
   }
 
+  // ── 정보 목록 ────────────────────────────────────────────────────────────────
+  const today = tokyoToday();
+  const anchor = tokyoDateOf(task.dueAt) ?? task.scheduledDate ?? null;
+  const dateWord = (ymd: string) =>
+    ymd === today ? copy.todayLabel : ymd === ymdShift(today, 1) ? copy.viewTomorrow : longDate(ymd, locale);
+  const scheduleText = (() => {
+    const parts: string[] = [];
+    // 반복 회차로 열었으면 그 회차 날짜가 「일정」이다(앵커는 반복의 시작점일 뿐).
+    const day = actionOccurrenceDate ?? anchor;
+    if (day) parts.push(dateWord(day));
+    if (task.timeLabel)
+      parts.push(
+        task.durationMinutes
+          ? `${task.timeLabel} – ${addMinutesHHMM(task.timeLabel, task.durationMinutes)}`
+          : task.timeLabel,
+      );
+    else if (day) parts.push(copy.allDay);
+    const head = parts.join(" ");
+    return task.timeLabel && task.durationMinutes ? `${head} · ${durationText(task.durationMinutes, copy)}` : head;
+  })();
+  const ctxLabel = contextLabelOf(task, buildingLabels, copy.contextPickerRoomSuffix);
+  const ctx = task.resolvedContext;
+  const resHref = ctx ? calendarHref(ctx) : null;
+  const ctxText = ctx
+    ? [ctxLabel, ctx.guestName && ctx.guestName !== ctxLabel ? ctx.guestName : null].filter(Boolean).join(" · ")
+    : "";
+  const maxPhotos = task.projectId ? 20 : 5;
+  const crumb = crumbView ? `${crumbView} · ${copy.title}` : copy.title;
+
   return (
-    <div className="pb-10">
-      {/* Context bar */}
-      <div className="relative flex items-center gap-[11px] px-0.5 pb-3 pt-2">
-        <p className="flex-1 text-[19px] font-black tracking-[-0.03em] text-foreground">
-          {copy.detailTitle}
-        </p>
+    <div className="tkw tkw-d">
+      {/* 빵부스러기 + 수정 · 삭제 */}
+      <div className="tkw-d__crumb">
+        <span>{crumb}</span>
         {canEditCore ? (
-          <div className="relative" ref={menuRef}>
+          <>
+            <Link aria-label={copy.editTask} className="tkw-icon" href={`/mobile/tasks/${task.id}/edit`}>
+              <Pencil aria-hidden="true" />
+            </Link>
             <button
-              aria-label={copy.editTask}
-              className="flex size-9 items-center justify-center rounded-full bg-slate-50 text-slate-700"
-              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={copy.deleteAction}
+              className="tkw-icon is-red"
+              onClick={() => setConfirmDelete(true)}
               type="button"
             >
-              <MoreHorizontal className="size-5" aria-hidden="true" />
+              <Trash2 aria-hidden="true" />
             </button>
-            {menuOpen ? (
-              <div className="absolute right-0 z-50 mt-1.5 w-40 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.55)]">
-                <Link
-                  className="flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                  href={`/mobile/tasks/${task.id}/edit`}
-                >
-                  <Pencil className="size-4" aria-hidden="true" />
-                  {copy.editTask}
-                </Link>
-                <button
-                  className="flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-sm font-bold text-red-600 hover:bg-red-50"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setConfirmDelete(true);
-                  }}
-                  type="button"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  {copy.deleteAction}
-                </button>
-              </div>
-            ) : null}
-          </div>
+          </>
         ) : null}
       </div>
 
-      {/* Header card */}
-      <div className="rounded-[22px] border border-border bg-surface p-5 shadow-[0_18px_70px_hsl(214_37%_12%/0.08)]">
-        {task.priority !== "normal" ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold",
-              task.priority === "urgent"
-                ? "bg-rose-50 text-rose-600"
-                : task.priority === "medium"
-                  ? "bg-blue-50 text-blue-700"
-                  : "bg-amber-50 text-amber-700",
-            )}
-          >
-            <Flag className="size-3" aria-hidden="true" />
-            {prioLabel(task.priority, copy)}
-          </span>
-        ) : null}
-        <h2
-          className={cn(
-            "mt-2 text-[22px] font-black leading-tight tracking-[-0.02em]",
-            done ? "text-slate-400 line-through" : "text-foreground",
-          )}
-        >
-          {task.title}
-        </h2>
-        {task.description ? (
-          <p className="mt-2 text-[14px] leading-6 text-slate-600">{task.description}</p>
-        ) : null}
-        {task.tags.length ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {task.tags.map((tg) => (
-              <span className="rounded-full bg-primary/[0.06] px-2.5 py-1 text-[12px] font-bold text-primary" key={tg}>
-                #{tg}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {task.imageUrls.length ? (
-          <PhotoGallery
-            closeLabel={copy.cancel}
-            size="md"
-            title={imgCopy.attachments}
-            urls={task.imageUrls}
-          />
-        ) : null}
-        <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
-          {meta.map((m, i) => (
-            <div className="flex items-center gap-2 text-[13.5px]" key={i}>
-              <m.icon className="size-4 text-slate-400" aria-hidden="true" />
-              <span className="text-muted-foreground">{m.label}</span>
-              <b className="ml-auto font-bold text-foreground">{m.value}</b>
-            </div>
-          ))}
-        </div>
-        {!canEditCore ? (
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1.5 text-[11.5px] font-semibold text-muted-foreground">
-            <Crown className="size-3.5 text-amber-500" aria-hidden="true" />
-            {copy.coreEditHint.replace("{name}", task.authorName)}
-          </p>
-        ) : null}
-
-        {/* 대기 / 진행 중 — 완료는 아래 전용 버튼이 맡는다(반복 회차·알림 처리가 얽혀 있어서).
-            콘솔의 3상태 모델을 모바일에도 여는 것이고, 완료 상태에서는 숨긴다(다시 열기가 먼저). */}
-        {!done ? (
-          <div className="mt-4 grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1">
-            {([false, true] as const).map((wantProgress) => {
-              const on = (task.status === "in_progress") === wantProgress;
-              return (
-                <button
-                  aria-pressed={on}
-                  className={cn(
-                    "h-10 rounded-xl text-[13px] font-extrabold transition-colors",
-                    on ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground",
-                  )}
-                  disabled={isTogglingStatus}
-                  key={String(wantProgress)}
-                  onClick={() =>
-                    !on &&
-                    startStatusTransition(async () => {
-                      await setTaskProgress(task.id, wantProgress);
-                    })
-                  }
-                  type="button"
-                >
-                  {wantProgress ? copy.statusInProgress : copy.statusOpen}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-
-        {/* Complete / reopen — any participant may toggle their shared task's completion.
-            반복 업무인데 회차 컨텍스트가 없으면(관리함의 시리즈 행 등) 어떤 날짜를 완료하는지 알 수
-            없으므로 버튼 대신 안내만 보여준다 — 앵커로 조용히 폴백하지 않는다(수정 2). */}
+      {/* 큰 고리 + 제목 — 고리를 누르면 완료/되돌리기(상태 세그먼트의 완료와 같은 동작). */}
+      <div className="tkw-d__title">
         {hasOccurrenceContext ? (
           <button
+            aria-label={done ? copy.reopen : copy.complete}
             className={cn(
-              "mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[14px] font-extrabold transition-colors disabled:opacity-60",
-              done
-                ? "border border-border bg-surface text-foreground active:bg-slate-50"
-                : "bg-primary text-primary-foreground active:opacity-90",
+              "tkw-ck",
+              prioRingClass(task.priority),
+              shownStatus === "done" && (done ? "is-done" : "is-checking"),
             )}
             disabled={isTogglingStatus}
-            onClick={() =>
-              startStatusTransition(async () => {
-                if (done) await reopenTask(task.id, actionOccurrenceDate);
-                else await completeTask(task.id, actionOccurrenceDate);
-              })
-            }
+            onClick={() => changeStatus(shownStatus === "done" ? "open" : "done")}
             type="button"
           >
-            {done ? (
-              <>
-                <RotateCcw className="size-4" aria-hidden="true" />
-                {copy.reopen}
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                {copy.complete}
-              </>
-            )}
+            <CheckMark />
           </button>
         ) : (
-          <p className="mt-4 flex h-12 w-full items-center justify-center rounded-2xl border border-dashed border-border px-4 text-center text-[12.5px] font-semibold text-muted-foreground">
-            {copy.completeNeedsOccurrence}
-          </p>
+          <span aria-hidden="true" className={cn("tkw-ck is-static", prioRingClass(task.priority))} />
         )}
+        <h1 className={cn(shownStatus === "done" && "is-done")}>{task.title}</h1>
       </div>
 
-      {/* Linked context */}
-      {task.resolvedContext ? (
-        <LinkedContextBlock
-          buildingLabels={buildingLabels}
-          copy={{
-            contextBuildingOnlyLinked: copy.contextBuildingOnlyLinked,
-            contextChannelDirect: copy.contextChannelDirect,
-            contextGoToReservation: copy.contextGoToReservation,
-            contextLinkedSection: copy.contextLinkedSection,
-            contextPickerNightsUnit: copy.contextPickerNightsUnit,
-            contextPickerRoomSuffix: copy.contextPickerRoomSuffix,
-            contextRoomOnlyLinked: copy.contextRoomOnlyLinked,
-          }}
-          context={task.resolvedContext}
-        />
-      ) : null}
+      {task.description ? <p className="tkw-d__desc">{task.description}</p> : null}
+      {!canEditCore ? <p className="tkw-d__note">{copy.coreEditHint.replace("{name}", task.authorName)}</p> : null}
 
-      {/* Participants / share */}
-      {task.isShared ? (
-        <div className="mt-4 rounded-[22px] border border-border bg-surface p-4">
-          <p className="mb-2.5 flex items-center gap-2 px-0.5 text-[12.5px] font-extrabold text-foreground">
-            {copy.participants}
-            <span className="text-[11px] font-semibold text-slate-400">
-              {copy.participantsCommon.replace("{count}", String(task.participants.length))}
-            </span>
-          </p>
-          <div className="flex flex-col gap-2">
-            {task.participants.map((p) => (
-              <div className="flex items-center gap-2.5" key={p.userId}>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[13px] font-extrabold text-primary">
-                  {p.name.slice(0, 1)}
-                </span>
-                <span className="flex-1 text-sm font-bold text-foreground">
-                  {p.name}
-                  {p.userId === currentUserId ? copy.meSuffix : ""}
-                </span>
-                {p.role === "author" ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-bold text-amber-700">
-                    <Crown className="size-3" aria-hidden="true" />
-                    {copy.roleAuthor}
-                  </span>
-                ) : p.isFirstRecipient ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-600">
-                    {copy.roleFirstRecipient}
-                  </span>
-                ) : null}
-                {canEditCore && p.role !== "author" && p.userId !== currentUserId ? (
-                  <button
-                    aria-label={copy.removeParticipant}
-                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-                    onClick={() => setConfirmRemove({ userId: p.userId, name: p.name })}
-                    type="button"
-                  >
-                    <UserMinus className="size-3.5" aria-hidden="true" />
-                  </button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex gap-2">
-            {/* 참여자 추가는 참여자에게도 열려 있다(Re-sharing 규칙). 남을 빼는 것만 작성자
-                전용이라 아래 참여자 목록의 제거 버튼은 `canEditCore` 로 계속 잠근다. */}
-            <button
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] font-bold text-primary"
-              onClick={() => setPickerOpen(true)}
-              type="button"
-            >
-              <Share2 className="size-3.5" aria-hidden="true" />
-              {copy.shareMore}
-            </button>
-            <button
-              className="inline-flex items-center rounded-full border border-rose-200 px-3 py-1.5 text-[12.5px] font-bold text-rose-600"
-              onClick={() => setConfirmLeave(true)}
-              type="button"
-            >
-              {canEditCore ? copy.leaveWarnAuthor : copy.leaveSelf}
-            </button>
-          </div>
-        </div>
-      ) : task.projectId ? null : (
-        // 프로젝트 작업의 공유는 프로젝트 멤버십이 정한다 — 서버가 거부하므로(`shareTaskWithUsers`)
-        // CTA 자체를 숨긴다. 콘솔도 모든 공유 진입점을 `!t.projectId` 로 가린다.
-        <div className="mt-4">
+      {/* 상태 — 대기 | 진행 중 | 완료 */}
+      <div aria-label={w.status} className="tkw-seg is-full" role="radiogroup">
+        {(
+          [
+            ["open", copy.statusOpen],
+            ["in_progress", copy.statusInProgress],
+            ["done", copy.statusCompleted],
+          ] as const
+        ).map(([key, label]) => (
           <button
-            className="flex w-full items-center gap-2.5 rounded-[22px] border border-border bg-surface px-4 py-3.5 text-left"
-            onClick={() => setPickerOpen(true)}
+            aria-checked={shownStatus === key}
+            className={cn(shownStatus === key && "is-on")}
+            disabled={isTogglingStatus || (key === "done" && !hasOccurrenceContext)}
+            key={key}
+            onClick={() => changeStatus(key)}
+            role="radio"
             type="button"
           >
-            <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Share2 className="size-4" aria-hidden="true" />
-            </span>
-            <span className="flex-1 text-sm font-semibold text-muted-foreground">
-              {copy.privateShareHint}
-            </span>
+            {label}
           </button>
-        </div>
-      )}
+        ))}
+      </div>
+      {!hasOccurrenceContext ? <p className="tkw-d__note">{copy.completeNeedsOccurrence}</p> : null}
 
-      {/* Update log */}
-      <div className="mt-4 rounded-[22px] border border-border bg-surface p-4">
-        <p className="mb-3 px-0.5 text-[12.5px] font-extrabold text-foreground">{copy.updateLog}</p>
-        {task.updates.length === 0 ? (
-          <p className="px-0.5 text-[12.5px] font-medium text-muted-foreground">{copy.noUpdates}</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {task.updates.map((u) =>
-              u.type === "note" ? (
-                <div className="flex gap-2.5" key={u.id}>
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-extrabold text-primary">
-                    {u.byName.slice(0, 1)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <b className="text-[13px] font-bold text-foreground">{u.byName}</b>
-                      <span className="text-[11px] text-muted-foreground">{longDateTime(u.createdAt, locale)}</span>
-                    </div>
-                    {u.body ? <p className="mt-0.5 text-[13.5px] leading-5 text-slate-600">{u.body}</p> : null}
-                    {u.imageUrls.length ? (
-                      <PhotoGallery
-                        closeLabel={copy.cancel}
-                        size="sm"
-                        title={imgCopy.attachments}
-                        urls={u.imageUrls}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 pl-1 text-[11.5px] font-medium text-muted-foreground" key={u.id}>
-                  <span className="size-1.5 rounded-full bg-slate-300" />
-                  {systemLabel(u.type, u.body, copy)} · {longDateTime(u.createdAt, locale)}
-                </div>
-              ),
-            )}
-          </div>
-        )}
-        <div className="mt-3">
-          {updatePhotosOpen ? (
-            <div className="mb-2 rounded-xl border border-border bg-slate-50/60 p-2">
-              <AnnouncementImageUploader
-                addImagesLabel={imgCopy.addPhotos}
-                errorCountExceeded={imgCopy.errorCount}
-                errorSizeExceeded={imgCopy.errorSize}
-                errorTypeInvalid={imgCopy.errorType}
-                imageAttachmentsLabel={imgCopy.attachments}
-                imageLimitLabel={imgCopy.limit}
-                imageRemoveLabel={imgCopy.remove}
-                ref={updateUploaderRef}
-              />
-            </div>
-          ) : null}
-          <form className="flex items-center gap-2" onSubmit={handleUpdateSubmit}>
+      {/* 사진 — 작업 사진은 수정 화면에서 붙인다(+ 칸이 그리로 간다). */}
+      {task.imageUrls.length > 0 || canEditCore ? (
+        <div className="tkw-ph">
+          {task.imageUrls.map((url, i) => (
             <button
-              aria-label={copy.sectionPhotos}
-              className={cn(
-                "flex size-11 shrink-0 items-center justify-center rounded-2xl border transition-colors",
-                updatePhotosOpen
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-surface text-slate-400",
-              )}
-              onClick={() => setUpdatePhotosOpen((v) => !v)}
+              aria-label={`${imgCopy.attachments} ${i + 1}`}
+              className="tkw-imgs__t"
+              key={`${url}-${i}`}
+              onClick={() => setLightbox(i)}
+              style={{ width: 64, height: 64 }}
               type="button"
             >
-              <ImageIcon className="size-4" aria-hidden="true" />
+              <Image alt="" className="object-cover" fill sizes="64px" src={url} />
             </button>
-            <input
-              ref={updateBodyRef}
-              enterKeyHint="send"
-              className="h-11 flex-1 rounded-2xl border border-border bg-background/60 px-3.5 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary"
-              placeholder={copy.updatePlaceholder}
-            />
-            <button
-              aria-label={copy.updateLog}
-              className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground disabled:opacity-60"
-              disabled={isUpdating}
-              type="submit"
-            >
-              <Send className="size-4" aria-hidden="true" />
-            </button>
-          </form>
-          {updateError ? (
-            <p className="mt-1.5 px-0.5 text-xs font-semibold text-rose-500" role="alert">
-              {updateError}
-            </p>
+          ))}
+          {canEditCore && task.imageUrls.length < maxPhotos ? (
+            <Link aria-label={w.addPhoto} className="tkw-ph__add" href={`/mobile/tasks/${task.id}/edit`}>
+              <Plus aria-hidden="true" />
+            </Link>
           ) : null}
+          <span className="tkw-ph__n">
+            {w.photoCount.replace("{n}", String(task.imageUrls.length)).replace("{max}", String(maxPhotos))}
+          </span>
+          <ImageLightbox
+            closeLabel={copy.cancel}
+            onClose={() => setLightbox(null)}
+            openIndex={lightbox}
+            urls={task.imageUrls}
+          />
         </div>
+      ) : null}
+
+      <dl className="tkw-dl">
+        <dt>{copy.scheduleTitle}</dt>
+        <dd className={cn(!scheduleText && "is-muted")}>{scheduleText || copy.scheduleEmpty}</dd>
+        {task.recurrenceRule ? (
+          <>
+            <dt>{copy.sectionRepeat}</dt>
+            <dd>↻ {repeatLabel(task.recurrenceRule, copy, locale)}</dd>
+          </>
+        ) : null}
+        <dt>{copy.sectionPriority}</dt>
+        <dd>
+          <span aria-hidden="true" className={cn("tkw-pdot", prioRingClass(task.priority))} />
+          {prioLabel(task.priority, copy)}
+        </dd>
+        {ctx ? (
+          <>
+            <dt>{w.linked}</dt>
+            <dd>
+              {ctxText || "—"}
+              {resHref ? (
+                <>
+                  {" "}
+                  <Link href={resHref}>{w.reservation}</Link>
+                </>
+              ) : null}
+            </dd>
+          </>
+        ) : null}
+        {task.tags.length ? (
+          <>
+            <dt>{copy.sectionTags}</dt>
+            <dd className="is-muted">{task.tags.map((tg) => `#${tg}`).join(" ")}</dd>
+          </>
+        ) : null}
+        {/* 함께 — 공유 중이면 사람들(누르면 참여자 시트), 개인이면 「공유하기」. 프로젝트 작업의 공유는 프로젝트
+            멤버십이 정한다 — 서버가 거부하므로(`shareTaskWithUsers`) 진입점을 숨긴다. */}
+        {task.isShared ? (
+          <>
+            <dt>{w.with}</dt>
+            <dd>
+              <button className="tkw-with" onClick={() => setPeopleOpen(true)} type="button">
+                <span className="tkw-avs">
+                  {task.participants.slice(0, 4).map((p) => (
+                    <span className="tkw-av" key={p.userId}>
+                      {p.name.slice(0, 1)}
+                    </span>
+                  ))}
+                </span>
+                <span>{task.participants.map((p) => p.name).join(" · ")}</span>
+              </button>
+            </dd>
+          </>
+        ) : !task.projectId ? (
+          <>
+            <dt>{w.with}</dt>
+            <dd>
+              <button className="tkw-link" onClick={() => setPickerOpen(true)} type="button">
+                {w.share}
+              </button>
+            </dd>
+          </>
+        ) : null}
+      </dl>
+
+      {/* 업데이트 기록 */}
+      <div className="tkw-up">
+        <b>{copy.updateLog}</b>
+        {task.updates.length === 0 ? <p className="tkw-up__empty">{copy.noUpdates}</p> : null}
+        {task.updates.map((u) =>
+          u.type === "note" ? (
+            <div className="tkw-up__note" key={u.id}>
+              <span aria-hidden="true" className="tkw-av">
+                {u.byName.slice(0, 1)}
+              </span>
+              <span>
+                <b>{u.byName}</b>
+                <time dateTime={u.createdAt}>
+                  {tokyoDateOf(u.createdAt) === today ? clockTime(u.createdAt, locale) : shortDateTime(u.createdAt)}
+                </time>
+                {u.body ? <p>{u.body}</p> : null}
+                {u.imageUrls.length ? (
+                  <PhotoGallery closeLabel={copy.cancel} size="sm" title={imgCopy.attachments} urls={u.imageUrls} />
+                ) : null}
+              </span>
+            </div>
+          ) : (
+            <div className="tkw-up__sys" key={u.id}>
+              {systemLabel(u.type, u.body, copy)}
+              {u.byName ? ` · ${u.byName}` : ""} · {shortDateTime(u.createdAt)}
+            </div>
+          ),
+        )}
+        {updatePhotosOpen ? (
+          <div className="tkw-up__photos">
+            <AnnouncementImageUploader
+              addImagesLabel={imgCopy.addPhotos}
+              errorCountExceeded={imgCopy.errorCount}
+              errorSizeExceeded={imgCopy.errorSize}
+              errorTypeInvalid={imgCopy.errorType}
+              imageAttachmentsLabel={imgCopy.attachments}
+              imageLimitLabel={imgCopy.limit}
+              imageRemoveLabel={imgCopy.remove}
+              ref={updateUploaderRef}
+            />
+          </div>
+        ) : null}
+        <form className="tkw-up__form" onSubmit={handleUpdateSubmit}>
+          <button
+            aria-label={copy.sectionPhotos}
+            aria-pressed={updatePhotosOpen}
+            className={cn("tkw-up__ib", updatePhotosOpen && "is-on")}
+            onClick={() => setUpdatePhotosOpen((v) => !v)}
+            type="button"
+          >
+            <ImageIcon aria-hidden="true" />
+          </button>
+          <input
+            aria-label={copy.updatePlaceholder}
+            enterKeyHint="send"
+            placeholder={copy.updatePlaceholder}
+            ref={updateBodyRef}
+          />
+          <button aria-label={copy.updateLog} className="tkw-up__ib is-send" disabled={isUpdating} type="submit">
+            <Send aria-hidden="true" />
+          </button>
+        </form>
+        {updateError ? (
+          <p className="tkw-err" role="alert">
+            {updateError}
+          </p>
+        ) : null}
       </div>
 
       {/* Hidden share-more form (submitted by the picker) */}
       <form action={shareTaskWithUsers} className="hidden" ref={shareFormRef}>
         <input name="taskId" type="hidden" value={task.id} />
-        <input name="shareJson" ref={shareInputRef} type="hidden" defaultValue="[]" />
+        <input defaultValue="[]" name="shareJson" ref={shareInputRef} type="hidden" />
       </form>
 
       {pickerOpen ? (
@@ -652,101 +548,121 @@ export function TaskDetailView({
         />
       ) : null}
 
-      {confirmDelete && canChooseRecurringDelete && occurrenceDate ? (
-        <BottomSheet
-          ariaLabel={copy.recurDeleteTitle}
-          header={
-            <div className="text-center">
-              <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Repeat2 className="size-6" aria-hidden="true" />
-              </span>
-              <p className="text-[17px] font-black text-foreground">{copy.recurDeleteTitle}</p>
-              <p className="mt-2 text-sm font-semibold text-muted-foreground">
-                {repeatLabel(task.recurrenceRule ?? "", copy, locale)}
-              </p>
+      {/* 참여자 — 함께 줄을 누르면. 더 부르기는 참여자에게도 열려 있고(Re-sharing), 남을 빼는 것만 작성자 전용. */}
+      {peopleOpen ? (
+        <BottomSheet ariaLabel={copy.participants} onClose={() => setPeopleOpen(false)}>
+          {({ close }) => (
+            <div className="tkw-sheet">
+              <h2>
+                {copy.participants}{" "}
+                <span className="tkw-sec__n">
+                  {copy.participantsCommon.replace("{count}", String(task.participants.length))}
+                </span>
+              </h2>
+              <div className="tkw-people">
+                {task.participants.map((p) => (
+                  <div key={p.userId}>
+                    <span aria-hidden="true" className="tkw-av">
+                      {p.name.slice(0, 1)}
+                    </span>
+                    <span className="tkw-people__n">
+                      {p.name}
+                      {p.userId === currentUserId ? copy.meSuffix : ""}
+                    </span>
+                    {p.role === "author" ? (
+                      <span className="tkw-people__r">{copy.roleAuthor}</span>
+                    ) : p.isFirstRecipient ? (
+                      <span className="tkw-people__r">{copy.roleFirstRecipient}</span>
+                    ) : null}
+                    {canEditCore && p.role !== "author" && p.userId !== currentUserId ? (
+                      <button
+                        aria-label={copy.removeParticipant}
+                        className="tkw-people__x"
+                        onClick={() => {
+                          close();
+                          setConfirmRemove({ userId: p.userId, name: p.name });
+                        }}
+                        type="button"
+                      >
+                        <UserMinus aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className="tkw-act" style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => {
+                    close();
+                    setPickerOpen(true);
+                  }}
+                  type="button"
+                >
+                  <UserPlus aria-hidden="true" />
+                  {copy.shareMore}
+                </button>
+                <button
+                  className="is-red"
+                  onClick={() => {
+                    close();
+                    setConfirmLeave(true);
+                  }}
+                  type="button"
+                >
+                  <UserMinus aria-hidden="true" />
+                  {canEditCore ? copy.leaveWarnAuthor : copy.leaveSelf}
+                </button>
+              </div>
             </div>
-          }
-          onClose={() => setConfirmDelete(false)}
-        >
-          <div className="mt-6 overflow-hidden rounded-[18px] border border-border bg-surface">
-            <button
-              className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors active:bg-slate-50 disabled:opacity-60"
-              disabled={isSkippingOccurrence}
-              onClick={skipCurrentOccurrence}
-              type="button"
-            >
-              <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-primary/10 text-primary">
-                <SkipForward className="size-[17px]" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-extrabold tracking-[-0.01em] text-foreground">
+          )}
+        </BottomSheet>
+      ) : null}
+
+      {confirmDelete && canChooseRecurringDelete && occurrenceDate ? (
+        <BottomSheet ariaLabel={copy.recurDeleteTitle} onClose={() => setConfirmDelete(false)}>
+          <div className="tkw-sheet">
+            <p className="tkw-sheet__t">↻ {repeatLabel(task.recurrenceRule ?? "", copy, locale)}</p>
+            <h2>{copy.recurDeleteTitle}</h2>
+            <div className="tkw-act">
+              <button disabled={isSkippingOccurrence} onClick={skipCurrentOccurrence} type="button">
+                <SkipForward aria-hidden="true" />
+                <span>
                   {copy.recurSkipOne.replace("{date}", longDate(occurrenceDate, locale))}
+                  <span className="tkw-act__s">{copy.recurSkipOneSub}</span>
                 </span>
-                <span className="mt-0.5 block text-[11.5px] font-medium text-muted-foreground">
-                  {copy.recurSkipOneSub}
-                </span>
-              </span>
-            </button>
-            <div className="mx-3.5 h-px bg-border" />
-            <form action={deleteTask}>
+              </button>
+            </div>
+            <form action={deleteTask} className="tkw-act">
               <input name="taskId" type="hidden" value={task.id} />
-              <button
-                className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors active:bg-rose-50"
-                type="submit"
-              >
-                <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-rose-50 text-rose-600">
-                  <Trash2 className="size-[17px]" aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-extrabold tracking-[-0.01em] text-rose-600">
-                    {copy.recurDeleteAll}
-                  </span>
-                  <span className="mt-0.5 block text-[11.5px] font-medium text-muted-foreground">
-                    {copy.recurDeleteAllSub}
-                  </span>
+              <button className="is-red" onClick={() => haptic("warning")} style={{ borderTop: "1px solid #f3f3f6" }} type="submit">
+                <Trash2 aria-hidden="true" />
+                <span>
+                  {copy.recurDeleteAll}
+                  <span className="tkw-act__s">{copy.recurDeleteAllSub}</span>
                 </span>
               </button>
             </form>
           </div>
-          <button
-            className="mt-3 h-12 w-full rounded-2xl text-sm font-bold text-muted-foreground"
-            onClick={() => setConfirmDelete(false)}
-            type="button"
-          >
-            {copy.cancel}
-          </button>
         </BottomSheet>
       ) : null}
 
       {confirmDelete && !canChooseRecurringDelete ? (
-        <BottomSheet
-          ariaLabel={copy.deleteConfirmTitle}
-          header={
-            <div className="text-center">
-              <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-red-50 text-red-500">
-                <Trash2 className="size-6" aria-hidden="true" />
-              </span>
-              <p className="text-[17px] font-black text-foreground">{copy.deleteConfirmTitle}</p>
-              <p className="mt-2 text-sm text-muted-foreground">{copy.deleteConfirmBody}</p>
-            </div>
-          }
-          onClose={() => setConfirmDelete(false)}
-        >
+        <BottomSheet ariaLabel={copy.deleteConfirmTitle} onClose={() => setConfirmDelete(false)}>
           {({ close }) => (
-            <div className="mt-6 flex gap-2.5">
-              <button
-                className="h-12 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700"
-                onClick={close}
-                type="button"
-              >
-                {copy.cancel}
-              </button>
-              <form action={deleteTask} className="flex-1">
-                <input name="taskId" type="hidden" value={task.id} />
-                <button className="h-12 w-full rounded-2xl bg-red-500 text-sm font-extrabold text-white" type="submit">
-                  {copy.confirm}
+            <div className="tkw-sheet">
+              <h2>{copy.deleteConfirmTitle}</h2>
+              <p className="tkw-sheet__sub">{copy.deleteConfirmBody}</p>
+              <div className="tkw-btns2">
+                <button className="tkw-btn is-gray" onClick={close} type="button">
+                  {copy.cancel}
                 </button>
-              </form>
+                <form action={deleteTask}>
+                  <input name="taskId" type="hidden" value={task.id} />
+                  <button className="tkw-btn is-red" onClick={() => haptic("warning")} type="submit">
+                    {copy.confirm}
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </BottomSheet>
@@ -755,48 +671,24 @@ export function TaskDetailView({
       {confirmLeave ? (
         <BottomSheet
           ariaLabel={canEditCore ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}
-          header={
-            <div className="text-center">
-              <span
-                className={cn(
-                  "mx-auto mb-4 flex size-14 items-center justify-center rounded-full",
-                  canEditCore ? "bg-red-50 text-red-500" : "bg-amber-50 text-amber-500",
-                )}
-              >
-                <UserMinus className="size-6" aria-hidden="true" />
-              </span>
-              <p className="text-[17px] font-black text-foreground">
-                {canEditCore ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {canEditCore ? copy.leaveAuthorConfirmBody : copy.leaveConfirmBody}
-              </p>
-            </div>
-          }
           onClose={() => setConfirmLeave(false)}
         >
           {({ close }) => (
-            <div className="mt-6 flex gap-2.5">
-              <button
-                className="h-12 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700"
-                onClick={close}
-                type="button"
-              >
-                {copy.cancel}
-              </button>
-              <form action={removeTaskParticipant} className="flex-1">
-                <input name="taskId" type="hidden" value={task.id} />
-                <input name="userId" type="hidden" value={currentUserId} />
-                <button
-                  className={cn(
-                    "h-12 w-full rounded-2xl text-sm font-extrabold text-white",
-                    canEditCore ? "bg-red-500" : "bg-rose-400",
-                  )}
-                  type="submit"
-                >
-                  {copy.confirm}
+            <div className="tkw-sheet">
+              <h2>{canEditCore ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}</h2>
+              <p className="tkw-sheet__sub">{canEditCore ? copy.leaveAuthorConfirmBody : copy.leaveConfirmBody}</p>
+              <div className="tkw-btns2">
+                <button className="tkw-btn is-gray" onClick={close} type="button">
+                  {copy.cancel}
                 </button>
-              </form>
+                <form action={removeTaskParticipant}>
+                  <input name="taskId" type="hidden" value={task.id} />
+                  <input name="userId" type="hidden" value={currentUserId} />
+                  <button className="tkw-btn is-red" type="submit">
+                    {copy.confirm}
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </BottomSheet>
@@ -805,40 +697,24 @@ export function TaskDetailView({
       {confirmRemove ? (
         <BottomSheet
           ariaLabel={copy.removeParticipantConfirmTitle.replace("{name}", confirmRemove.name)}
-          header={
-            <div className="text-center">
-              <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                <UserMinus className="size-6" aria-hidden="true" />
-              </span>
-              <p className="text-[17px] font-black text-foreground">
-                {copy.removeParticipantConfirmTitle.replace("{name}", confirmRemove.name)}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {copy.removeParticipantConfirmBody.replace("{name}", confirmRemove.name)}
-              </p>
-            </div>
-          }
           onClose={() => setConfirmRemove(null)}
         >
           {({ close }) => (
-            <div className="mt-6 flex gap-2.5">
-              <button
-                className="h-12 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700"
-                onClick={close}
-                type="button"
-              >
-                {copy.cancel}
-              </button>
-              <form action={removeTaskParticipant} className="flex-1">
-                <input name="taskId" type="hidden" value={task.id} />
-                <input name="userId" type="hidden" value={confirmRemove.userId} />
-                <button
-                  className="h-12 w-full rounded-2xl bg-primary text-sm font-extrabold text-primary-foreground"
-                  type="submit"
-                >
-                  {copy.confirm}
+            <div className="tkw-sheet">
+              <h2>{copy.removeParticipantConfirmTitle.replace("{name}", confirmRemove.name)}</h2>
+              <p className="tkw-sheet__sub">{copy.removeParticipantConfirmBody.replace("{name}", confirmRemove.name)}</p>
+              <div className="tkw-btns2">
+                <button className="tkw-btn is-gray" onClick={close} type="button">
+                  {copy.cancel}
                 </button>
-              </form>
+                <form action={removeTaskParticipant}>
+                  <input name="taskId" type="hidden" value={task.id} />
+                  <input name="userId" type="hidden" value={confirmRemove.userId} />
+                  <button className="tkw-btn is-pri" type="submit">
+                    {copy.confirm}
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </BottomSheet>

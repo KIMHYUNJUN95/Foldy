@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Building2, Calendar, ChevronRight, Link2, Pencil, X } from "lucide-react";
+import { Building2, ChevronRight, Link2, X } from "lucide-react";
+import "./tasks-white.css";
 import type { Dictionary } from "@/lib/i18n";
 import { localizePropertyName } from "@/lib/room-label-normalization";
 
@@ -29,25 +30,9 @@ function fmtShortDate(ymd: string, locale: string): string {
   }).format(new Date(`${ymd}T00:00:00+09:00`));
 }
 
-function ChannelBadge({ channel, directLabel }: { channel: LinkedContext["channel"]; directLabel: string }) {
+function channelText(channel: LinkedContext["channel"], directLabel: string): string | null {
   if (!channel) return null;
-  if (channel === "airbnb")
-    return (
-      <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
-        Airbnb
-      </span>
-    );
-  if (channel === "booking")
-    return (
-      <span className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-extrabold text-cyan-700">
-        Booking
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">
-      {directLabel}
-    </span>
-  );
+  return channel === "airbnb" ? "Airbnb" : channel === "booking" ? "Booking" : directLabel;
 }
 
 function calendarHref(value: LinkedContext): string | null {
@@ -74,23 +59,21 @@ export function ContextLinkSection({
   value: LinkedContext | null;
 }) {
   const router = useRouter();
+  // 화이트 리디자인(2026-10-15) — 이름표 칸 모양의 버튼 한 줄. 비어 있으면 「연결하기」, 차 있으면 이름 + 회색 한 줄.
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (!value) {
     return (
-      <button
-        className="flex w-full items-center gap-3 rounded-2xl border-[1.5px] border-dashed border-border bg-background/40 px-4 py-3.5 text-left transition-colors active:bg-slate-50"
-        onClick={onOpenPicker}
-        type="button"
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-[11px] bg-primary/[0.08] text-primary">
-          <Link2 className="size-[19px]" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-bold text-foreground">{copy.contextLinkBtn}</span>
-          <span className="mt-0.5 block text-[11.5px] text-muted-foreground">{copy.contextLinkHint}</span>
-        </span>
-        <ChevronRight className="size-[17px] shrink-0 text-muted-foreground/50" aria-hidden="true" />
-      </button>
+      <span className="tkw-nf">
+        <span className="tkw-nf__l">{copy.contextLink}</span>
+        <button className="tkw-nf__in" onClick={onOpenPicker} type="button">
+          <Link2 aria-hidden="true" />
+          <span className="tkw-nf__v is-ph">
+            {copy.contextLinkBtn}
+            <small>{copy.contextLinkHint}</small>
+          </span>
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </span>
     );
   }
 
@@ -115,84 +98,59 @@ export function ContextLinkSection({
   const contextSummary = value.roomLabel
     ? copy.contextRoomOnlyLinked
     : copy.contextBuildingOnlyLinked;
+  const sub = hasReservation
+    ? [channelText(value.channel, copy.contextChannelDirect), value.guestName, dateStr].filter(Boolean).join(" · ")
+    : contextSummary;
 
   return (
-    <div
-      className="rounded-2xl border bg-gradient-to-br from-primary/[0.07] to-surface shadow-[0_8px_28px_-18px_rgb(122_82_230/0.28)]"
-      style={{ borderColor: "color-mix(in oklab, #7a52e6 22%, #ececf0)" }}
-    >
-      {/* Top row — icon + names + X */}
-      <div className="flex items-start gap-3 p-3.5">
-        <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-[11px] border bg-surface text-primary"
-          style={{ borderColor: "color-mix(in oklab, #7a52e6 18%, #ececf0)" }}
-        >
-          <Building2 className="size-[19px]" aria-hidden="true" />
+    <span className="tkw-nf" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span className="tkw-nf__l">{copy.contextLink}</span>
+      <button className="tkw-nf__in" onClick={onOpenPicker} type="button">
+        <Building2 aria-hidden="true" style={{ color: "#7a52e6" }} />
+        <span className="tkw-nf__v">
+          {nameStr || "—"}
+          {sub ? <small>{sub}</small> : null}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14.5px] font-extrabold tracking-[-0.01em] text-foreground">
-            {nameStr || "—"}
-          </p>
-          {hasReservation ? (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <ChannelBadge channel={value.channel} directLabel={copy.contextChannelDirect} />
-              {value.guestName ? (
-                <span className="text-[11.5px] font-semibold text-muted-foreground">
-                  {value.guestName}
-                </span>
-              ) : null}
-              {dateStr ? (
-                <span className="text-[11.5px] font-semibold text-muted-foreground">{dateStr}</span>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-0.5 text-[11.5px] font-semibold text-muted-foreground">
-              {contextSummary}
-            </p>
-          )}
-        </div>
-        <button
+        <span
           aria-label={copy.contextLinkRemove}
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors active:bg-slate-200"
-          onClick={onClear}
-          type="button"
+          className="tkw-nf__x"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              onClear();
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <X className="size-[13px]" aria-hidden="true" />
-        </button>
-      </div>
-
-      {/* Bottom actions */}
-      <div
-        className="flex gap-2 border-t px-3.5 pb-3.5 pt-2.5"
-        style={{ borderColor: "color-mix(in oklab, #7a52e6 12%, #ececf0)" }}
-      >
-        <button
-          className="flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface text-[12px] font-bold text-muted-foreground transition-colors active:bg-slate-50"
-          onClick={onOpenPicker}
-          type="button"
-        >
-          <Pencil className="size-3" aria-hidden="true" />
+          <X aria-hidden="true" />
+        </span>
+      </button>
+      <span style={{ display: "flex", gap: 14, alignItems: "center" }}>
+        <button className="tkw-tl" onClick={onOpenPicker} type="button">
           {copy.contextLinkChange}
         </button>
         {value.reservationId ? (
           <button
-            className="flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-[9px] border border-border bg-surface text-[12px] font-bold text-muted-foreground transition-colors active:bg-slate-50"
+            className="tkw-tl"
             onClick={() => {
               const href = calendarHref(value);
               if (href) router.push(href);
             }}
             type="button"
           >
-            <Calendar className="size-3" aria-hidden="true" />
             {copy.contextLinkViewRes}
           </button>
         ) : null}
-      </div>
-
-      {/* Hint */}
-      <p className="mx-3.5 mb-3 text-[11px] leading-[1.55] text-muted-foreground/80">
+      </span>
+      <span className="tkw-hint" style={{ fontSize: 12 }}>
         {copy.contextLinkFilledHint}
-      </p>
-    </div>
+      </span>
+    </span>
   );
 }

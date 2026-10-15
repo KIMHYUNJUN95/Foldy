@@ -49,7 +49,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     <MobileShell activeItem="tasks" badges={navBadges} title={dict.tasks.title} split>
       <SplitList detail="tasks">
         <ProjectDetailView
+          buildingLabels={dict.cleaning.buildingLabels}
           copy={dict.tasks}
+          currentUserId={session.user.id}
           locale={locale}
           project={project}
           shareableUsers={shareableUsers}

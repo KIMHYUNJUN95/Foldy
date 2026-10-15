@@ -264,7 +264,9 @@ export function repeatShort(
 }
 
 // 기간(분) — 백엔드는 1–1440 자유값이지만 UI 는 프리셋만 제공. 라벨은 프리셋만 매핑.
-export const DURATION_OPTIONS: { value: number | null; key: keyof AdminTasksDictionary }[] = [
+/** 문자열 문구 키만(`w` 같은 묶음 제외) — `d[key]` 가 늘 문자열이 되게. */
+type StringKey = { [K in keyof AdminTasksDictionary]: AdminTasksDictionary[K] extends string ? K : never }[keyof AdminTasksDictionary];
+export const DURATION_OPTIONS: { value: number | null; key: StringKey }[] = [
   { value: null, key: "durNone" },
   { value: 15, key: "dur15" },
   { value: 30, key: "dur30" },

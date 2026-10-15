@@ -364,6 +364,82 @@ export type AdminTasksDictionary = {
   confirmBulkSharedNote: string;
   tBulkDeleted: string; // "{n}개 …"
   tBulkPartial: string; // "{n}개 삭제, {f}개 실패"
+  /** 화이트 리디자인(2026-10-15) 문구 — 3단(보기 목록 · 목록 · 상세) 콘솔. */
+  w: AdminTasksWhiteCopy;
+};
+
+/** 화이트 리디자인 문구. 자리표시자는 `{n}` 꼴 문자열만(함수 금지). */
+export type AdminTasksWhiteCopy = {
+  navAria: string;
+  projects: string;
+  prioUrgent: string;
+  prioImportant: string;
+  prioMedium: string;
+  prioNone: string;
+  todaySub: string; // "{date} · {total}개 중 {done}개 완료"
+  progressAria: string; // "오늘 {total}개 중 {done}개 완료"
+  dayCount: string; // "{n}개"
+  secDone: string;
+  reschedule: string;
+  odPickDate: string;
+  shareN: string; // "공유 {n}명"
+  photoN: string; // "사진 {n}"
+  dueBy: string; // "{date}까지"
+  fromTo: string; // "{from} → {to}"
+  detailEmpty: string;
+  detailEmptySub: string;
+  close: string;
+  more: string;
+  edit: string;
+  dlSchedule: string;
+  dlPriority: string;
+  dlLinked: string;
+  dlTags: string;
+  dlWith: string;
+  dlProject: string;
+  linkCta: string;
+  shareManage: string;
+  photosCount: string; // "사진 {n} / {max}"
+  photoAdd: string;
+  updates: string;
+  updateInput: string;
+  send: string;
+  weekDone: string; // "이번 주 {n}개 완료"
+  report: string;
+  fieldBadge: string;
+  fieldSub: string;
+  dayToday: string; // "{date} · 오늘"
+  calMore: string; // "+{n}건"
+  calToday: string;
+  instrHint: string;
+  projSub: string; // "섹션 {s} · 작업 {n} · 사진 최대 20장"
+  membersN: string; // "멤버 {n}명"
+  sectionAdd: string;
+  directiveFrom: string; // "{name} 지시"
+  sharedFrom: string; // "{name} 공유"
+  completedAt: string; // "{time} 완료"
+  descMore: string;
+  descLess: string;
+};
+
+const koW: AdminTasksWhiteCopy = {
+  descMore: "더 보기", descLess: "접기",
+  navAria: "투두 보기", projects: "프로젝트",
+  prioUrgent: "긴급", prioImportant: "중요", prioMedium: "보통", prioNone: "없음",
+  todaySub: "{date} · {total}개 중 {done}개 완료", progressAria: "오늘 {total}개 중 {done}개 완료",
+  dayCount: "{n}개", secDone: "완료", reschedule: "날짜 다시 정하기", odPickDate: "날짜 정하기",
+  shareN: "공유 {n}명", photoN: "사진 {n}", dueBy: "{date}까지", fromTo: "{from} → {to}",
+  detailEmpty: "작업을 고르면 여기에 자세히 보여요", detailEmptySub: "목록에서 작업을 누르세요.",
+  close: "닫기", more: "더 보기", edit: "편집",
+  dlSchedule: "일정", dlPriority: "우선순위", dlLinked: "연결", dlTags: "태그", dlWith: "함께", dlProject: "프로젝트",
+  linkCta: "연결하기", shareManage: "관리", photosCount: "사진 {n} / {max}", photoAdd: "사진 추가",
+  updates: "업데이트", updateInput: "업데이트 남기기", send: "보내기",
+  weekDone: "이번 주 {n}개 완료", report: "업무일지", fieldBadge: "현",
+  fieldSub: "자동으로 모여요 · 업무일지에 함께 들어가요",
+  dayToday: "{date} · 오늘", calMore: "+{n}건", calToday: "오늘",
+  instrHint: "매니저가 보낸 업무 · 보낸 지시는 내 일정에 뜨지 않아요",
+  projSub: "섹션 {s} · 작업 {n} · 사진 최대 20장", membersN: "멤버 {n}명", sectionAdd: "섹션 추가",
+  directiveFrom: "{name} 지시", sharedFrom: "{name} 공유", completedAt: "{time} 완료",
 };
 
 const ko: AdminTasksDictionary = {
@@ -474,6 +550,27 @@ const ko: AdminTasksDictionary = {
   confirmBulkSharedNote: "공유·지시받은 작업은 삭제 대신 나만 빠집니다. 이 항목은 실행 취소로 되돌릴 수 없습니다.",
   tBulkDeleted: "{n}개 작업을 삭제했습니다",
   tBulkPartial: "{n}개 삭제, {f}개 실패",
+  w: koW,
+};
+
+const jaW: AdminTasksWhiteCopy = {
+  descMore: "もっと見る", descLess: "閉じる",
+  navAria: "ToDo の表示", projects: "プロジェクト",
+  prioUrgent: "至急", prioImportant: "重要", prioMedium: "普通", prioNone: "なし",
+  todaySub: "{date} · {total}件中{done}件完了", progressAria: "今日 {total}件中{done}件完了",
+  dayCount: "{n}件", secDone: "完了", reschedule: "日付を変更", odPickDate: "日付を選ぶ",
+  shareN: "共有 {n}人", photoN: "写真 {n}", dueBy: "{date}まで", fromTo: "{from} → {to}",
+  detailEmpty: "タスクを選ぶとここに詳細が表示されます", detailEmptySub: "一覧からタスクを選んでください。",
+  close: "閉じる", more: "その他", edit: "編集",
+  dlSchedule: "日程", dlPriority: "優先度", dlLinked: "連携", dlTags: "タグ", dlWith: "メンバー", dlProject: "プロジェクト",
+  linkCta: "連携する", shareManage: "管理", photosCount: "写真 {n} / {max}", photoAdd: "写真を追加",
+  updates: "アップデート", updateInput: "アップデートを残す", send: "送信",
+  weekDone: "今週 {n}件完了", report: "業務日誌", fieldBadge: "現",
+  fieldSub: "自動で集計されます · 業務日誌にも含まれます",
+  dayToday: "{date} · 今日", calMore: "+{n}件", calToday: "今日",
+  instrHint: "マネージャーからの業務 · 送った指示は自分の予定に表示されません",
+  projSub: "セクション {s} · タスク {n} · 写真は最大20枚", membersN: "メンバー {n}人", sectionAdd: "セクションを追加",
+  directiveFrom: "{name}の指示", sharedFrom: "{name}が共有", completedAt: "{time} 完了",
 };
 
 const ja: AdminTasksDictionary = {
@@ -584,6 +681,27 @@ const ja: AdminTasksDictionary = {
   confirmBulkSharedNote: "共有・指示されたタスクは削除ではなく自分だけ抜けます。この項目は元に戻せません。",
   tBulkDeleted: "{n}件のタスクを削除しました",
   tBulkPartial: "{n}件削除、{f}件失敗",
+  w: jaW,
+};
+
+const enW: AdminTasksWhiteCopy = {
+  descMore: "Show more", descLess: "Show less",
+  navAria: "To-do views", projects: "Projects",
+  prioUrgent: "Urgent", prioImportant: "Important", prioMedium: "Normal", prioNone: "None",
+  todaySub: "{date} · {done} of {total} done", progressAria: "{done} of {total} done today",
+  dayCount: "{n} tasks", secDone: "Done", reschedule: "Reschedule", odPickDate: "Pick a date",
+  shareN: "Shared · {n}", photoN: "{n} photos", dueBy: "due {date}", fromTo: "{from} → {to}",
+  detailEmpty: "Select a task to see its details here", detailEmptySub: "Pick a task from the list.",
+  close: "Close", more: "More", edit: "Edit",
+  dlSchedule: "Schedule", dlPriority: "Priority", dlLinked: "Linked", dlTags: "Tags", dlWith: "With", dlProject: "Project",
+  linkCta: "Link", shareManage: "Manage", photosCount: "Photos {n} / {max}", photoAdd: "Add photo",
+  updates: "Updates", updateInput: "Leave an update", send: "Send",
+  weekDone: "{n} done this week", report: "Daily report", fieldBadge: "F",
+  fieldSub: "Collected automatically · included in the daily report",
+  dayToday: "{date} · Today", calMore: "+{n} more", calToday: "Today",
+  instrHint: "Work sent by managers · directives you send don't appear in your schedule",
+  projSub: "{s} sections · {n} tasks · up to 20 photos", membersN: "{n} members", sectionAdd: "Add section",
+  directiveFrom: "Directive from {name}", sharedFrom: "Shared by {name}", completedAt: "Done {time}",
 };
 
 const en: AdminTasksDictionary = {
@@ -694,6 +812,7 @@ const en: AdminTasksDictionary = {
   confirmBulkSharedNote: "Tasks shared with you are left rather than deleted. Those can't be undone.",
   tBulkDeleted: "Deleted {n} tasks",
   tBulkPartial: "{n} deleted, {f} failed",
+  w: enW,
 };
 
 const dictionaries: Record<Locale, AdminTasksDictionary> = { ko, ja, en };

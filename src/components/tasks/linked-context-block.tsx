@@ -22,7 +22,7 @@ type Copy = Pick<
  * name) + `month` (YYYY-MM) — there is no per-reservation highlight — so a linked task lands on its
  * building, scrolled to the reservation's check-in month (or the current month for room-only links).
  */
-function calendarHref(context: LinkedTaskContext): string | null {
+export function calendarHref(context: LinkedTaskContext): string | null {
   if (!context.propertyName) return null;
   const params = new URLSearchParams({ property: context.propertyName });
   if (context.checkinDate) params.set("month", context.checkinDate.slice(0, 7));

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
-import { CalendarDays, ChevronDown, ChevronRight, Clock, Megaphone, Repeat, Share2, Users, X } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronRight, Megaphone, Share2, Users, X } from "lucide-react";
 import { createTask } from "@/app/mobile/tasks/new/actions";
 import { updateTaskCore } from "@/app/mobile/tasks/[id]/actions";
 import { TaskSchedulePicker } from "@/components/tasks/task-schedule-sheet";
@@ -17,6 +17,7 @@ import { ContextPickerSheet } from "@/components/tasks/context-picker-sheet";
 import type { Dictionary } from "@/lib/i18n";
 import type { ShareableUser } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
+import "./tasks-white.css";
 
 type Copy = Dictionary["tasks"];
 
@@ -353,8 +354,6 @@ export function TaskCreateForm({
     });
   }
 
-  const sectionTitle = "mb-2 px-0.5 text-[12.5px] font-extrabold tracking-[-0.01em] text-foreground";
-
   // "더 보기 — 시간 · 우선순위 …" → bold lead + muted hint (every locale uses an em-dash separator).
   const dashIdx = copy.moreToggle.indexOf("—");
   const moreLead = dashIdx === -1 ? copy.moreToggle : copy.moreToggle.slice(0, dashIdx).trim();
@@ -405,86 +404,65 @@ export function TaskCreateForm({
               : "";
 
   return (
-    <form className="space-y-5 pb-10" onSubmit={handleSubmit} ref={formRef}>
+    <form className="tkw tkw-form" onSubmit={handleSubmit} ref={formRef}>
       {/* Project linkage — present only for project-task creation (hidden, read by createTask). */}
       {projectId ? <input name="projectId" type="hidden" value={projectId} /> : null}
       {sectionId ? <input name="sectionId" type="hidden" value={sectionId} /> : null}
-      {/* Header — title + top-right Save (back navigation is via the iOS-style edge swipe). */}
-      <div className="flex items-center gap-2.5">
-        <p className="min-w-0 flex-1 truncate text-[20px] font-black tracking-[-0.03em] text-foreground">
-          {headerTitle}
-        </p>
-        <button
-          className="shrink-0 rounded-xl bg-primary px-4 py-2 text-[14px] font-extrabold text-primary-foreground transition-opacity disabled:opacity-50"
-          disabled={isPending || isSubmitting}
-          type="submit"
-        >
+      {/* 머리 — 제목 + 오른쪽 저장(뒤로가기는 화면 스와이프). 화이트 리디자인(2026-10-15): 이름표 칸 · 칩. */}
+      <div className="tkw-form__head">
+        <h1>{headerTitle}</h1>
+        <button className="tkw-btn is-pri" disabled={isPending || isSubmitting} type="submit">
           {copy.save}
         </button>
       </div>
 
-      {error ? (
-        <p className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">{error}</p>
-      ) : null}
+      {error ? <p className="tkw-form__err">{error}</p> : null}
 
-      <input
-        autoComplete="off"
-        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-[17px] font-extrabold text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-primary"
-        defaultValue={initial?.title ?? defaultTitle ?? ""}
-        name="title"
-        onInput={persistDraft}
-        placeholder={copy.titlePlaceholder}
-        required
-      />
-      <textarea
-        className="min-h-[64px] w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-primary"
-        defaultValue={initial?.description ?? ""}
-        name="description"
-        onInput={persistDraft}
-        placeholder={copy.descPlaceholder}
-        rows={2}
-      />
+      <label className="tkw-nf">
+        <span className="tkw-nf__l">{copy.titlePlaceholder}</span>
+        <input
+          autoComplete="off"
+          className="tkw-nf__in is-title"
+          defaultValue={initial?.title ?? defaultTitle ?? ""}
+          name="title"
+          onInput={persistDraft}
+          required
+        />
+      </label>
+      <label className="tkw-nf">
+        <span className="tkw-nf__l">{copy.descPlaceholder}</span>
+        <textarea
+          className="tkw-nf__in is-ta"
+          defaultValue={initial?.description ?? ""}
+          name="description"
+          onInput={persistDraft}
+          rows={2}
+        />
+      </label>
 
       {/* Schedule — one date + time + repeat, all in a single Todoist-style sheet. */}
-      <div>
-        <p className={sectionTitle}>{copy.scheduleTitle}</p>
-        <button
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition-colors",
-            date ? "border-primary/40 bg-primary/[0.05]" : "border-border bg-surface",
+      <span className="tkw-nf">
+        <span className="tkw-nf__l">{copy.scheduleTitle}</span>
+        <button className="tkw-nf__in" onClick={() => setScheduleOpen(true)} type="button">
+          <CalendarDays aria-hidden="true" style={date ? { color: "#7a52e6" } : undefined} />
+          {date ? (
+            <span className="tkw-nf__v">
+              {fmtDate(date)}
+              {time || repeat ? (
+                <small>
+                  {[time ? `${fmtTime(time)}${durationSummary ? ` · ${durationSummary}` : ""}` : null, repeat ? `↻ ${repeatSummary}` : null]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
+              ) : null}
+            </span>
+          ) : (
+            <span className="tkw-nf__v is-ph">{copy.scheduleEmpty}</span>
           )}
-          onClick={() => setScheduleOpen(true)}
-          type="button"
-        >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <CalendarDays className="size-4" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            {date ? (
-              <span className="flex flex-wrap items-center gap-1.5">
-                <span className="text-sm font-bold text-foreground">{fmtDate(date)}</span>
-                {time ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2 py-0.5 text-[11.5px] font-bold text-primary">
-                    <Clock className="size-3" aria-hidden="true" />
-                    {fmtTime(time)}
-                    {durationSummary ? ` · ${durationSummary}` : ""}
-                  </span>
-                ) : null}
-                {repeat ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2 py-0.5 text-[11.5px] font-bold text-primary">
-                    <Repeat className="size-3" aria-hidden="true" />
-                    {repeatSummary}
-                  </span>
-                ) : null}
-              </span>
-            ) : (
-              <span className="text-sm font-semibold text-muted-foreground/70">{copy.scheduleEmpty}</span>
-            )}
-          </span>
           {date ? (
             <span
               aria-label={copy.clearDate}
-              className="flex size-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100"
+              className="tkw-nf__x"
               onClick={(e) => {
                 e.stopPropagation();
                 setDate("");
@@ -492,139 +470,100 @@ export function TaskCreateForm({
                 setDuration(0);
                 setRepeat("");
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDate("");
+                  setTime("");
+                  setDuration(0);
+                  setRepeat("");
+                }
+              }}
               role="button"
               tabIndex={0}
             >
-              <X className="size-4" aria-hidden="true" />
+              <X aria-hidden="true" />
             </span>
           ) : (
-            <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ChevronRight aria-hidden="true" />
           )}
         </button>
-      </div>
+      </span>
 
       {/* Share — creation only; hidden for project tasks (sharing is governed by the project). */}
       {!isEdit && !projectId ? (
-        <div>
-          <p className={sectionTitle}>{copy.sectionShare}</p>
-          <button
-            className={cn(
-              "flex w-full items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left",
-              shareIds.length ? "border-primary/40 bg-primary/[0.06]" : "border-border bg-surface",
-            )}
-            onClick={() => setPickerOpen(true)}
-            type="button"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-              {shareIds.length ? <Users className="size-4" aria-hidden="true" /> : <Share2 className="size-4" aria-hidden="true" />}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-              {shareNames.length ? shareNames.join(", ") : copy.sharePrivate}
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
-          </button>
+        <div className="tkw-fsec">
+          <span className="tkw-nf">
+            <span className="tkw-nf__l">{copy.sectionShare}</span>
+            <button className="tkw-nf__in" onClick={() => setPickerOpen(true)} type="button">
+              {shareIds.length ? (
+                <Users aria-hidden="true" style={{ color: "#7a52e6" }} />
+              ) : (
+                <Share2 aria-hidden="true" />
+              )}
+              <span className={cn("tkw-nf__v", !shareNames.length && "is-ph")}>
+                {shareNames.length ? shareNames.join(", ") : copy.sharePrivate}
+              </span>
+              <ChevronRight aria-hidden="true" />
+            </button>
+          </span>
           {/* 지시 토글 — 대상을 고른 뒤에만 뜬다. 공유(동료끼리 같이 봄)와 지시(대상자가 수행)는
               다른 행위라 한 화면에서 분명히 갈라 준다. */}
           {shareIds.length ? (
             <button
-              className={cn(
-                "mt-2 flex w-full items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition-colors",
-                directive ? "border-primary/40 bg-primary/[0.06]" : "border-border bg-surface",
-              )}
+              aria-checked={directive}
+              className="tkw-swrow"
               onClick={() => setDirective((v) => !v)}
+              role="switch"
               type="button"
             >
-              <span
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-full",
-                  directive ? "bg-primary text-primary-foreground" : "bg-slate-100 text-slate-500",
-                )}
-              >
-                <Megaphone className="size-4" aria-hidden="true" />
+              <Megaphone aria-hidden="true" className="size-[18px] shrink-0" style={{ color: directive ? "#7a52e6" : "#8b8898" }} />
+              <span className="tkw-swrow__b">
+                <b>{copy.sendAsDirective}</b>
+                <span>{copy.sendAsDirectiveSub}</span>
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-foreground">{copy.sendAsDirective}</span>
-                <span className="mt-0.5 block text-[12px] font-medium leading-snug text-muted-foreground">
-                  {copy.sendAsDirectiveSub}
-                </span>
-              </span>
-              <span
-                className={cn(
-                  "relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors",
-                  directive ? "bg-primary" : "bg-slate-200",
-                )}
-              >
-                <span
-                  className={cn(
-                    // `left` 대신 `transform` — 레이아웃 리플로우 없이 컴포지터에서 처리된다.
-                    "absolute left-[3px] top-[3px] size-5 rounded-full bg-white shadow-sm transition-transform",
-                    directive ? "translate-x-[18px]" : "translate-x-0",
-                  )}
-                />
-              </span>
+              <span aria-hidden="true" className="tkw-sw__t" />
             </button>
           ) : null}
         </div>
       ) : null}
 
       {/* Context link — optional; not available in quick-add, only detailed create/edit. */}
-      <div>
-        <p className={sectionTitle}>{copy.contextLink}</p>
-        <ContextLinkSection
-          buildingLabels={buildingLabels}
-          copy={copy}
-          locale={locale}
-          onClear={() => setLinkedCtx(null)}
-          onOpenPicker={() => setCtxPickerOpen(true)}
-          value={linkedCtx}
-        />
-      </div>
+      <ContextLinkSection
+        buildingLabels={buildingLabels}
+        copy={copy}
+        locale={locale}
+        onClear={() => setLinkedCtx(null)}
+        onOpenPicker={() => setCtxPickerOpen(true)}
+        value={linkedCtx}
+      />
 
-      {/* More — collapsible advanced section (time / priority / tags / photos / repeat). */}
-      <button
-        aria-expanded={more}
-        className="flex w-full items-center gap-2.5 border-t border-border/70 pt-4 text-left"
-        onClick={() => setMore((v) => !v)}
-        type="button"
-      >
-        <ChevronDown
-          aria-hidden="true"
-          className={cn(
-            "size-[18px] shrink-0 text-muted-foreground transition-transform duration-200",
-            more ? "" : "-rotate-90",
-          )}
-        />
-        <span className="flex-1 text-[14px] font-extrabold tracking-[-0.01em] text-foreground">
-          {moreLead}
-          {moreHint ? (
-            <span className="font-semibold text-muted-foreground"> — {moreHint}</span>
-          ) : null}
-        </span>
+      {/* More — collapsible advanced section (priority / tags / photos). */}
+      <button aria-expanded={more} className="tkw-more" onClick={() => setMore((v) => !v)} type="button">
+        <ChevronDown aria-hidden="true" />
+        {moreLead}
+        {moreHint ? <span>— {moreHint}</span> : null}
       </button>
 
       {more ? (
-        <div className="space-y-5">
-          <div>
-            <p className={sectionTitle}>{copy.sectionPriority}</p>
-            <div className="flex gap-2">
+        <>
+          <div className="tkw-fsec">
+            <span className="tkw-fsec__l">{copy.sectionPriority}</span>
+            <div className="tkw-chips" role="radiogroup" aria-label={copy.sectionPriority}>
               {PRIOS.map((p) => (
                 <button
-                  className={cn(
-                    "flex-1 rounded-2xl border py-2 text-[13px] font-bold transition-colors",
-                    priority === p
-                      ? p === "urgent"
-                        ? "border-rose-300 bg-rose-50 text-rose-700"
-                        : p === "important"
-                          ? "border-amber-300 bg-amber-50 text-amber-700"
-                          : p === "medium"
-                            ? "border-blue-300 bg-blue-50 text-blue-700"
-                            : "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-surface text-slate-600",
-                  )}
+                  aria-checked={priority === p}
+                  className={cn("tkw-chip", priority === p && "is-on")}
                   key={p}
                   onClick={() => setPriority(p)}
+                  role="radio"
                   type="button"
                 >
+                  <span
+                    aria-hidden="true"
+                    className={cn("tkw-pdot", p === "urgent" ? "is-u" : p === "important" ? "is-i" : p === "medium" ? "is-m" : "")}
+                  />
                   {p === "urgent"
                     ? copy.prioUrgent
                     : p === "important"
@@ -636,25 +575,29 @@ export function TaskCreateForm({
               ))}
             </div>
           </div>
-          <div>
-            <p className={sectionTitle}>
-              {copy.sectionTags} <span className="text-[11px] font-semibold text-slate-400">{copy.tagsMax}</span>
-            </p>
-            <div className="mb-2 flex flex-wrap gap-2">
-              {tags.map((tg) => (
-                <button
-                  className="rounded-full bg-primary/[0.06] px-2.5 py-1 text-[12.5px] font-bold text-primary"
-                  key={tg}
-                  onClick={() => setTags((p) => p.filter((x) => x !== tg))}
-                  type="button"
-                >
-                  #{tg} ✕
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
+          <div className="tkw-fsec">
+            <span className="tkw-fsec__l">
+              {copy.sectionTags} <small>{copy.tagsMax}</small>
+            </span>
+            {tags.length ? (
+              <div className="tkw-chips">
+                {tags.map((tg) => (
+                  <button
+                    aria-label={`#${tg} · ${imgCopy.remove}`}
+                    className="tkw-chip is-on"
+                    key={tg}
+                    onClick={() => setTags((p) => p.filter((x) => x !== tg))}
+                    type="button"
+                  >
+                    #{tg}
+                    <X aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="tkw-tagin">
               <input
-                className="h-10 flex-1 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-foreground outline-none focus:border-primary"
+                aria-label={copy.tagPlaceholder}
                 onChange={(e) => setTagDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -665,44 +608,34 @@ export function TaskCreateForm({
                 placeholder={copy.tagPlaceholder}
                 value={tagDraft}
               />
-              <button
-                className="rounded-xl border border-border bg-surface px-4 text-[13px] font-bold text-primary"
-                onClick={addTag}
-                type="button"
-              >
+              <button onClick={addTag} type="button">
                 {copy.addTag}
               </button>
             </div>
           </div>
-          <div>
-            <p className={sectionTitle}>
-              {copy.sectionPhotos}{" "}
-              <span className="text-[11px] font-semibold text-slate-400">
-                {maxImages === 20 ? copy.photosMax20 : copy.photosMax}
-              </span>
-            </p>
-            <div className="rounded-2xl border border-border bg-slate-50/60 p-3">
-              {isEdit && existingImgUrls.length > 0 ? (
-                <div className="mb-3 flex items-center gap-3 overflow-x-auto pb-1">
-                  {existingImgUrls.map((url, i) => (
-                    <div
-                      className="relative size-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/20"
-                      key={i}
+          <div className="tkw-fsec">
+            <span className="tkw-fsec__l">
+              {copy.sectionPhotos} <small>{maxImages === 20 ? copy.photosMax20 : copy.photosMax}</small>
+            </span>
+            {isEdit && existingImgUrls.length > 0 ? (
+              <div className="tkw-imgs">
+                {existingImgUrls.map((url, i) => (
+                  <div className="tkw-imgs__t" key={i}>
+                    <Image alt="" aria-hidden="true" className="object-cover" fill sizes="76px" src={url} />
+                    <button
+                      aria-label={imgCopy.remove}
+                      className="tkw-imgs__x"
+                      onClick={() => setExistingImgUrls((p) => p.filter((_, j) => j !== i))}
+                      type="button"
                     >
-                      <Image alt="" aria-hidden="true" className="object-cover" fill sizes="80px" src={url} />
-                      <button
-                        aria-label={imgCopy.remove}
-                        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-white"
-                        onClick={() => setExistingImgUrls((p) => p.filter((_, j) => j !== i))}
-                        type="button"
-                      >
-                        <X className="size-3" aria-hidden="true" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {existingImgUrls.length < maxImages ? (
+                      <X aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {existingImgUrls.length < maxImages ? (
+              <div className="tkw-uploader">
                 <AnnouncementImageUploader
                   addImagesLabel={imgCopy.addPhotos}
                   errorCountExceeded={maxImages === 20 ? copy.photosCountError20 : imgCopy.errorCount}
@@ -714,14 +647,12 @@ export function TaskCreateForm({
                   maxImages={maxImages}
                   ref={uploaderRef}
                 />
-              ) : (
-                <p className="text-[12px] font-semibold text-muted-foreground">
-                  {maxImages === 20 ? copy.photosMax20 : copy.photosMax}
-                </p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <p className="tkw-hint">{maxImages === 20 ? copy.photosMax20 : copy.photosMax}</p>
+            )}
           </div>
-        </div>
+        </>
       ) : null}
 
       {scheduleOpen ? (

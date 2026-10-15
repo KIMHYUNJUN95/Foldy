@@ -1,12 +1,15 @@
 "use client";
 
 // 어드민 Todoist 콘솔(데스크톱). 모바일 코어 패리티 + 매니저 "업무 지시".
-// 셸(사이드바/탑바)은 AdminShell 이 소유하고, 여기서는 서브내비 + 뷰 + 상세/팝오버/모달을 렌더한다.
-// 디자인: Claude Design "Foldy 투두 (admin)" 이식. CSS: admin-tasks-console.css (.adm 스코프).
+// 셸(사이드바/탑바)은 AdminShell 이 소유하고, 여기서는 3단(왼쪽 보기 목록 · 가운데 목록 · 오른쪽 상세)
+// + 팝오버/모달을 렌더한다. 화이트 리디자인(2026-10-15, 시안 Todo-PC · TodoDone/Cal/Dir/Proj-PC):
+// 상자·세로 구분선 없음, 선택은 옅은 보라 바탕만. CSS: admin-tasks-white.css(`atw-`, 레이아웃·목록·상세)
+// + admin-tasks-console.css(팝오버·모달·업로더 — 예전 그대로 쓰는 부분).
 // 서버 액션(@/app/admin/tasks/actions)이 모든 쓰기를 처리하고, revalidatePath + router.refresh() 로 갱신한다.
 // See docs/product/28-admin-todoist-console.md.
 import Image from "next/image";
 import {
+  Fragment,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -23,26 +26,23 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
-  ArrowUpRight,
-  BedDouble,
   Bell,
   Building2,
   CalendarDays,
   CalendarX2,
   Check,
-  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   CloudOff,
-  Crown,
   FileText,
   Flag,
   GripVertical,
   Hash,
   Inbox,
+  Loader2,
   Lock,
   Megaphone,
   MoreHorizontal,
@@ -58,10 +58,10 @@ import {
   Smartphone,
   Sun,
   Sunrise,
-  Ticket,
   Trash2,
   UserPlus,
-  UserRound,
+  Users,
+  SquareCheck,
   X,
 } from "lucide-react";
 import {
@@ -118,10 +118,13 @@ import type { Locale } from "@/lib/i18n";
 import type { ProjectDetailData } from "@/lib/projects";
 import type { OccurrenceStateRecord, TaskDetail, TaskRecord } from "@/lib/tasks";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
+import { haptic } from "@/lib/haptics";
+import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
+import { ProgressRing, TaskRing, ViewNav, type NavItem } from "./atw-parts";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 import {
   addDays,
-  avatarColor,
   completedDateOf,
   ctxItems,
   dateOf,
@@ -146,7 +149,6 @@ import {
   plainShared,
   showsOnTodayList,
   partsOf,
-  prioLabel,
   prioSort,
   dateSort,
   recvInstr,
@@ -176,6 +178,7 @@ import {
   type TaskContextValue,
 } from "@/components/admin/tasks/context-picker-popover";
 import "./admin-tasks-console.css";
+import "./admin-tasks-white.css";
 
 type View = "today" | "tomorrow" | "inbox" | "shared" | "instr" | "completed" | "calendar";
 
@@ -225,7 +228,7 @@ type SharePop = {
 /** 컨텍스트(건물·객실·예약) 연결 팝오버. `src` 는 인라인 추가 드래프트인지 기존 작업인지. */
 type ContextPop = { kind: "context"; src: "add" | "task"; taskId: string | null } & Anchor;
 /** `occ` = 이 행이 렌더된 회차 날짜(반복 작업일 때만). 삭제가 시리즈 전체인지 그 날짜만인지 가른다. */
-type RowMenuPop = { kind: "rowmenu"; taskId: string; occ?: string } & Anchor;
+type RowMenuPop = { kind: "rowmenu"; taskId: string; occ?: string; fromDetail?: boolean } & Anchor;
 type DateFilterPop = { kind: "datefilter" } & Anchor;
 type PrioFilterPop = { kind: "priofilter" } & Anchor;
 type Pop =
@@ -260,7 +263,7 @@ const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : use
 
 // Detail-panel status segments, in display order. The CSS thumb assumes exactly these three, in
 // this order (it translates by whole segment widths) — adding a fourth means updating
-// `.dp__status__thumb` width/offsets in admin-tasks-console.css too.
+// `.atw-status__thumb` width/offsets in admin-tasks-white.css too.
 const STATUS_SEGMENTS = [
   { status: "open", labelKey: "stOpen" },
   { status: "in_progress", labelKey: "stInProgress" },
@@ -275,13 +278,6 @@ const oldestFirst = (a: TaskRecord, b: TaskRecord) => a.createdAt.localeCompare(
 /** 우선순위 먼저, 같으면 만든 순서. 날짜 목록의 기본 정렬. */
 const byPriorityThenOldest = (a: TaskRecord, b: TaskRecord) => prioSort(a, b) || oldestFirst(a, b);
 
-/** 컨텍스트 칩 아이콘 — 상태에 의존하지 않는 상수라 모듈 스코프에 둔다(렌더마다 재생성 방지). */
-const CTX_IC: Record<string, ReactNode> = {
-  building: <Building2 size={14} />,
-  bed: <BedDouble size={14} />,
-  ticket: <Ticket size={14} />,
-  guest: <UserRound size={14} />,
-};
 
 export function AdminTasksConsole({
   locale,
@@ -362,13 +358,23 @@ export function AdminTasksConsole({
     pending: [],
   });
   const [notePhotos, setNotePhotos] = useState<PreviewItem[]>([]);
-  // Panel slide-in/out. `sel` is the open/close intent; `panelTask` is the task actually rendered
-  // and PERSISTS through the exit transition (so content doesn't vanish mid-slide); `panelOn`
-  // toggles the `.dp.on` slide position. The animation timing lives in an effect whose setState
-  // calls are all inside rAF/setTimeout (never synchronous in the effect body).
-  const [panelTask, setPanelTask] = useState<string | null>(null);
-  const [panelOn, setPanelOn] = useState(false);
+  // 오른쪽 상세 칸(2026-10-15 화이트 리디자인) — 예전의 미끄러져 나오는 패널을 대신한다.
+  // `sel` = 사용자가 고른 작업. 고른 게 없으면 목록 보기(오늘·내일·관리함·공유함)는 **첫 작업**을
+  // 보여 준다(아래 `activeId`). ✕ 로 닫으면 `detailClosed` 가 켜져 기본 선택도 쉰다 — 안 그러면
+  // 닫자마자 첫 작업이 다시 열린다.
+  const [detailClosed, setDetailClosed] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
+  /** 완료 체크가 그려지는 중인 줄(`${taskId}|${회차}`). 고리가 차고 체크가 그려진 뒤에 실제로 처리한다. */
+  const [completing, setCompleting] = useState<ReadonlySet<string>>(() => new Set());
+  /** 상세 칸 「사진 추가」 업로드 중인 작업 id. */
+  const [photoBusy, setPhotoBusy] = useState<string | null>(null);
+  /**
+   * 지연 줄 일괄 처리 모드 — 「날짜 다시 정하기」/「지난 미완료 삭제」를 누르면 내 지연 작업이 전부
+   * 담긴 채로 고르기가 켜지고, 빼고 싶은 줄만 풀어서 처리한다(12건 중 3건만 옮기기 — 2026-07-31 계약).
+   */
+  const [odMode, setOdMode] = useState<"reschedule" | "delete" | null>(null);
+  /** 상세 칸에서 긴 설명을 펼친 작업. */
+  const [descOpen, setDescOpen] = useState<string | null>(null);
   const [add, setAdd] = useState<AddDraft | null>(null);
   // 인라인 추가 저장의 동기 재진입 가드 — `saveInlineAdd` 참고.
   /**
@@ -408,7 +414,8 @@ export function AdminTasksConsole({
   const [q, setQ] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilterKey | null>(null);
   const [prioFilter, setPrioFilter] = useState("");
-  const [daySheet, setDaySheet] = useState<string | null>(null);
+  // 캘린더 오른쪽 칸에 펼친 날짜(예전 「날짜 시트」 모달을 대신한다). 기본은 오늘.
+  const [calDay, setCalDay] = useState<string>(() => today);
   const [report, setReport] = useState<{ date: string; text: string; loading: boolean; sending: boolean; error: string | null } | null>(
     null,
   );
@@ -423,6 +430,7 @@ export function AdminTasksConsole({
   // 프로젝트 섹션 편집 — 이름 변경 인라인 드래프트 / 새 섹션 이름 버퍼.
   const [sectionEdit, setSectionEdit] = useState<{ id: string; title: string } | null>(null);
   const [newSection, setNewSection] = useState("");
+  const [secAdding, setSecAdding] = useState(false);
   const [confirm, setConfirm] = useState<{ message: string; confirmLabel: string; onConfirm: () => void } | null>(null);
   /**
    * 반복 삭제 선택 모달 — "이 날짜만 건너뛰기" vs "반복 전체 삭제" (2026-07-30).
@@ -446,7 +454,7 @@ export function AdminTasksConsole({
   // Undo toast (Todoist-style): dark bottom-left toast with a "실행 취소" action, ~6s.
   const [undo, setUndo] = useState<{ id: number; message: string; sub?: string; onUndo: () => void } | null>(null);
 
-  // ── name / role maps ──────────────────────────────────────────────────────────
+  // ── name map ──────────────────────────────────────────────────────────
   const nameMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const u of data.users) m.set(u.id, u.name);
@@ -458,15 +466,7 @@ export function AdminTasksConsole({
     }
     return m;
   }, [data]);
-  const roleMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const u of data.users) m.set(u.id, u.role);
-    m.set(data.me.id, data.me.role);
-    for (const t of data.tasks) for (const p of t.participants) m.set(p.userId, p.role);
-    return m;
-  }, [data]);
   const nameOf = useCallback((id: string) => nameMap.get(id) ?? "", [nameMap]);
-  const roleOf = useCallback((id: string) => roleMap.get(id) ?? "", [roleMap]);
 
   /**
    * 완료 토글의 낙관적 반영 — 모바일 `tasks-workspace.tsx`(2026-08-11 결정)와 같은 모델을 콘솔에
@@ -638,6 +638,7 @@ export function AdminTasksConsole({
           // 확인, 2026-08-25) router.refresh() 는 같은 갱신을 한 번 더 도는 중복 왕복이었다.
         } else {
           opts?.onError?.();
+          haptic("error");
           showToast(errMsg(res.error));
         }
       });
@@ -658,40 +659,30 @@ export function AdminTasksConsole({
     [],
   );
 
-  // ── detail loading (updates + resolved context) ─────────────────────────────────
-  // Load full detail (updates + context) for the open task. `detail` may briefly hold the previous
-  // task's data after `sel` changes; consumers gate on `detail.id === sel` (no sync setState here).
-  useEffect(() => {
-    if (!panelTask) return;
-    let alive = true;
-    getConsoleTaskDetail(panelTask).then((res) => {
-      if (alive && res.ok) setDetail(res.task);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [panelTask, data]);
+  // 상세 불러오기(업데이트 로그 + 연결 정보)는 아래 `activeId` 를 계산한 뒤에 건다 — 기본 선택
+  // (보기의 첫 작업)이 목록 계산에 기대기 때문이다. `detail` 은 잠깐 이전 작업 것을 들고 있을 수
+  // 있어서 읽는 쪽이 `detail.id === activeId` 로 거른다.
 
   const openTask = useCallback((id: string) => {
-    // Opening the detail panel dismisses transient overlays (calendar day sheet, any popover) so
-    // their scrims don't sit on top of the panel and block it.
-    setDaySheet(null);
+    // 상세를 열면 떠 있는 팝오버는 닫는다(스크림이 상세 칸을 덮지 않게).
     setPop(null);
     setNoteDraft("");
     setStatusDraft(null); // never carry a pending segment click into another task
-    setPanelTask(id); // content is ready immediately
-    setSel(id); // intent → the effect below runs the slide-in
+    setSel(id);
+    setDetailClosed(false);
   }, []);
   const closePanel = useCallback(() => {
-    // Keep `detail` during the exit so the panel content persists while it slides out — even after a
-    // delete/leave removes the task from `tasks` (detail is local state, so it survives the refresh).
-    // Both panelTask and detail are cleared together when the exit finishes (effect below).
     setSel(null);
+    setDetailClosed(true);
   }, []);
   const goView = useCallback((v: View) => {
     setProjectId(null);
     setView(v);
     setAdd(null);
+    setSel(null);
+    setDetailClosed(false);
+    setOdMode(null);
+    setOdPicked(new Set());
     // Selection is scoped to the list you can see — leaving the view drops it rather than carrying
     // invisible picks into a bulk delete.
     setSelMode(false);
@@ -811,19 +802,49 @@ export function AdminTasksConsole({
     },
     [run, dict, recurringNextLabel, showUndo, applyTaskOptimistic, resolveOccurrenceOptimistically],
   );
+  /**
+   * 체크박스를 눌렀을 때의 움직임(2026-10-15) — 고리가 차고 체크가 그려지는 걸 **본 다음에** 줄이
+   * 빠진다. 바로 `toggleComplete` 를 부르면 낙관적 제거로 줄이 그 프레임에 사라져 체크가 보이지
+   * 않는다. 되돌리기(완료 → 미완료)와 「움직임 줄이기」 설정은 기다리지 않는다.
+   */
+  const completeWithMotion = useCallback(
+    (t: TaskRecord, occ?: { date: string; done: boolean }) => {
+      const isDone = occ ? occ.done : t.status === "completed";
+      const reduce =
+        typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (isDone || reduce) {
+        haptic(isDone ? "light" : "success");
+        toggleComplete(t, occ);
+        return;
+      }
+      const key = `${t.id}|${occ?.date ?? ""}`;
+      haptic("success");
+      setCompleting((prev) => new Set(prev).add(key));
+      window.setTimeout(() => {
+        setCompleting((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        toggleComplete(t, occ);
+      }, 420);
+    },
+    [toggleComplete],
+  );
   // Immediate (soft) delete + undo toast — replaces the confirm modal for single-task delete.
   const deleteWithUndo = useCallback(
     (t: TaskRecord) => {
       run(() => deleteConsoleTask(t.id), {
         after: () => {
-          if (sel === t.id || panelTask === t.id) closePanel();
+          // 지운 작업을 보고 있었다면 선택만 푼다 — 상세 칸은 보기의 다음 첫 작업으로 넘어간다.
+          setSel((cur) => (cur === t.id ? null : cur));
           showUndo(dict.tDeletedUndoable, () =>
             run(() => restoreConsoleTask(t.id), { after: () => setUndo(null) }),
           );
         },
       });
     },
-    [run, dict, sel, panelTask, closePanel, showUndo],
+    [run, dict, showUndo],
   );
   /**
    * 회차 하나만 건너뛰기 + 실행 취소. `skipped` 는 영구 상태라 되돌릴 경로가 반드시 있어야 한다
@@ -841,26 +862,6 @@ export function AdminTasksConsole({
     },
     [run, dict, locale, showUndo],
   );
-  // Enter/exit animation driven by the open/close intent (`sel`). All setState is deferred into
-  // rAF/setTimeout so nothing runs synchronously in the effect body.
-  useEffect(() => {
-    if (sel) {
-      // Mount is already done (panelTask set by openTask); flip `.on` next frame to slide in.
-      const r = requestAnimationFrame(() => requestAnimationFrame(() => setPanelOn(true)));
-      return () => cancelAnimationFrame(r);
-    }
-    // Slide out, then unmount the content once the transition has finished.
-    const r = requestAnimationFrame(() => setPanelOn(false));
-    const t = setTimeout(() => {
-      setPanelTask(null);
-      setDetail(null);
-    }, 300);
-    return () => {
-      cancelAnimationFrame(r);
-      clearTimeout(t);
-    };
-  }, [sel]);
-
   // ── project detail loading ───────────────────────────────────────────────────────
   // Load project sections+tasks for the project view. Gated on `projectDetail.id === projectId`.
   useEffect(() => {
@@ -880,15 +881,18 @@ export function AdminTasksConsole({
       if (e.key !== "Escape") return;
       if (confirm) setConfirm(null);
       else if (pop) setPop(null);
-      else if (daySheet) setDaySheet(null);
       else if (report) setReport(null);
       else if (newProj) setNewProj(null);
-      else if (sel) closePanel();
+      else if (recurDel) setRecurDel(null);
       else if (add) setAdd(null);
+      else if (odMode) {
+        setOdMode(null);
+        setOdPicked(new Set());
+      } else if (sel) closePanel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [confirm, pop, daySheet, report, newProj, sel, add, closePanel]);
+  }, [confirm, pop, report, newProj, recurDel, sel, add, odMode, closePanel]);
 
   // ── keep the Tokyo operating date live (roll over at Tokyo midnight without a refresh) ──────
   useEffect(() => {
@@ -983,10 +987,9 @@ export function AdminTasksConsole({
   const hasActiveFilter = !!(q || prioFilter || dateFilter);
 
   // ── small building blocks ─────────────────────────────────────────────────────────
+  // 아바타는 한 가지 옅은 보라 톤(화이트 리디자인) — 사람마다 다른 색을 칠하지 않는다.
   const Avatar = ({ id, cls }: { id: string; cls?: string }) => (
-    <span className={cls ? `av ${cls}` : "av"} style={{ background: avatarColor(id, meId) }}>
-      {initial(nameOf(id))}
-    </span>
+    <span className={cls ? `av ${cls}` : "av"}>{initial(nameOf(id))}</span>
   );
   const Avatars = ({ ids }: { ids: string[] }) => (
     <>
@@ -996,23 +999,27 @@ export function AdminTasksConsole({
     </>
   );
 
-  const partsSummary = (t: TaskRecord): string => {
-    const list = (isMine(t, meId) ? partsOf(t) : [t.createdByUserId, ...partsOf(t)]).filter(
-      (id, i, a) => a.indexOf(id) === i && id !== meId,
-    );
-    if (list.length === 0) return dict.sharedWith;
-    if (list.length === 1) return nameOf(list[0]);
-    return fill(dict.andMore, { name: nameOf(list[0]), n: list.length - 1 });
-  };
-
-  const ctxKey: Record<string, string> = {
-    building: dict.ctxBuilding,
-    bed: dict.ctxBed,
-    ticket: dict.ctxTicket,
-    guest: dict.ctxGuest,
-  };
+  /** 우선순위를 낱말로(긴급 · 중요 · 보통 · 없음). 목록 메타와 상세 칸이 같이 쓴다. */
+  const prioWord = (p: string) =>
+    p === "urgent"
+      ? dict.w.prioUrgent
+      : p === "important"
+        ? dict.w.prioImportant
+        : p === "medium"
+          ? dict.w.prioMedium
+          : dict.w.prioNone;
+  /** 나를 뺀 함께하는 사람(작성자 포함). 「공유 n명」과 상세 「함께」가 같은 기준을 쓴다. */
+  const othersOf = (t: TaskRecord): string[] =>
+    [t.createdByUserId, ...partsOf(t)].filter((id, i, a) => a.indexOf(id) === i && id !== meId);
+  /** 짧은 날짜 「10/7」 — 메타 줄에서 쓴다(시안 표기). */
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  /** 날짜 한 칸 — 오늘 · 내일 · 10/14 (화). */
+  const dayLabel = (d: string) =>
+    d === today ? dict.today : d === addDays(today, 1) ? dict.tomorrow : `${md(d)} (${fmtWeekday(d, locale)})`;
 
   // ── TASK ROW ──────────────────────────────────────────────────────────────────────
+  // 한 줄 = 우선순위 고리 · 제목 · 회색 메타 한 줄(지연이면 빨강). 칩·깃발·배지를 늘어놓지 않고
+  // 「긴급 · 15:00 · 가부키초 K302 · #태그 · 진행 중 · 공유 2명」처럼 낱말로 잇는다(시안 Todo-PC).
   const renderRow = (
     t: TaskRecord,
     opts?: {
@@ -1021,65 +1028,37 @@ export function AdminTasksConsole({
       forceDone?: boolean;
       // 반복 회차 행: 이 날짜 회차의 완료 여부로 체크박스/완료 처리(행 status가 아니라).
       occurrence?: { date: string; done: boolean };
-      // 관리함 드래그 재정렬: 왼쪽에 그립 핸들 표시(호버 시).
+      // 드래그 재정렬: 왼쪽에 그립 핸들 표시(호버 시).
       reorder?: boolean;
-      // 지연 일괄 처리 대상 선택. 전역 선택모드와 같은 `.tpick` 체크박스를 쓰되 집합만 다르다.
+      // 지연 일괄 처리 대상 선택. 전역 선택모드와 같은 네모 상자를 쓰되 집합만 다르다.
       pick?: { on: boolean; toggle: () => void };
-      /** 반복 작업이 밀린 회차 수. 0/undefined 면 배지를 달지 않는다(2026-09-08). */
+      /** 반복 작업이 밀린 회차 수. 0/undefined 면 표시하지 않는다(2026-09-08). */
       behindDays?: number;
       /**
-       * 완료 토글을 막는다 — **미리보기 목록**(다가오는 일정)에서 쓴다(2026-09-09).
+       * 완료 토글을 막는다 — **미리보기 목록**(미래 날짜)에서 쓴다(2026-09-09).
        * 미래 회차는 아직 할 수 없는 일이다. 눌리면 그날이 왔을 때 목록에서 사라져, 아무도 안 했는데
        * 기록만 「완료」로 남는다.
        */
       previewOnly?: boolean;
+      /** 메타 줄을 통째로 바꾼다(지시 보기의 「김현준 → 나 · 오늘까지」). */
+      meta?: ReactNode[];
+      /** 오른쪽 끝 숫자(완료 시각 등). */
+      right?: ReactNode;
+      /** 고리를 누를 수 없게(보낸 지시 — 내가 완료할 일이 아니다). */
+      staticRing?: boolean;
     },
   ) => {
     const occ = opts?.occurrence;
     const realDone = occ ? occ.done : t.status === "completed";
+    const motionKey = `${t.id}|${occ?.date ?? ""}`;
+    const completingNow = completing.has(motionKey);
     // forceDone: 완료·기록 탭의 반복 완료 이력(행은 open 으로 롤포워드됨)을 완료 상태로 표시.
-    const done = realDone || !!opts?.forceDone;
-    const overdue = isOverdue(t, today);
-    const selected = sel === t.id;
-    const instr = t.isDirective && !isMine(t, meId) ? t.authorName : null;
-    const received = !isMine(t, meId) && !instr;
-    const pcls = t.priority !== "normal" ? `p-${t.priority}` : "";
+    const done = realDone || !!opts?.forceDone || completingNow;
+    const overdue = !done && isOverdue(t, today);
+    const selected = activeId === t.id;
+    const mine = isMine(t, meId);
     const d = dateOf(t);
-    const cx = ctxItems(t);
-    const trng = timeRange(t.timeLabel, t.durationMinutes);
-
-    const dateText = !d
-      ? ""
-      : overdue
-        ? `${fmtShort(d, locale)} · ${dict.stOverdue}`
-        : d === today
-          ? dict.today
-          : d === addDays(today, 1)
-            ? dict.tomorrow
-            : `${fmtShort(d, locale)} (${fmtWeekday(d, locale)})`;
-    const dateCls = `chip chip--date ${overdue ? "chip--over" : d === today ? "chip--today" : ""}`;
-    // 칩을 눌러 여는 일정 팝오버도 결국 `rescheduleConsoleTask` 라 **작성자 전용**이다. 남의 작업에서는
-    // 눌리지 않는 표시용 칩으로 렌더한다 — 열어 준 뒤 저장에서 "권한이 없습니다"를 띄우지 않도록.
-    const dateChip =
-      !opts?.hideDate && d ? (
-        isMine(t, meId) ? (
-          <button
-            className={`${dateCls} chip--btn`}
-            onClick={(e) => {
-              e.stopPropagation();
-              openSchedulePop(e, t);
-            }}
-          >
-            <CalendarDays size={13} />
-            {dateText}
-          </button>
-        ) : (
-          <span className={dateCls}>
-            <CalendarDays size={13} />
-            {dateText}
-          </span>
-        )
-      ) : null;
+    const pcls = t.priority !== "normal" ? `p-${t.priority}` : "";
 
     // 전역 선택모드가 켜져 있으면 그쪽이 이긴다 — 두 선택 UI 가 한 행에 겹치지 않게.
     const odPick = selMode ? undefined : opts?.pick;
@@ -1087,24 +1066,74 @@ export function AdminTasksConsole({
     const isPicked = odPick ? odPick.on : picked.has(t.id);
     const togglePick = odPick ? odPick.toggle : () => togglePicked(t.id);
 
+    const seg: ReactNode[] = [];
+    if (opts?.meta) {
+      seg.push(...opts.meta);
+    } else {
+      if (!done && (t.priority === "urgent" || t.priority === "important")) seg.push(prioWord(t.priority));
+      if (!opts?.hideDate && d) {
+        const text = overdue ? md(d) : dayLabel(d);
+        // 날짜를 눌러 여는 일정 팝오버도 결국 `rescheduleConsoleTask` 라 **작성자 전용**이다. 남의
+        // 작업에서는 눌리지 않는 글자로 둔다 — 열어 준 뒤 저장에서 「권한이 없습니다」를 띄우지 않도록.
+        seg.push(
+          mine && !done && !picking ? (
+            <button
+              type="button"
+              className="atw-meta-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                openSchedulePop(e, t);
+              }}
+            >
+              {text}
+            </button>
+          ) : (
+            text
+          ),
+        );
+      }
+      const trng = timeRange(t.timeLabel, t.durationMinutes);
+      if (trng) seg.push(trng);
+      if (t.recurrenceRule) seg.push(`↻ ${repeatShort(t.recurrenceRule, dict, locale)}`);
+      if (opts?.behindDays)
+        seg.push(<span className="is-red">{fill(dict.odDaysBehind, { n: String(opts.behindDays) })}</span>);
+      const c = t.resolvedContext;
+      if (c) {
+        const place = [c.propertyName, c.roomLabel].filter(Boolean).join(" ");
+        if (place) seg.push(place);
+        if (c.guestName) seg.push(c.guestName);
+      }
+      if (t.tags.length) seg.push(t.tags.slice(0, 2).map((g) => `#${g}`).join(" "));
+      if (!done && t.status === "in_progress") seg.push(dict.stInProgress);
+      if (t.isDirective && !mine) seg.push(fill(dict.w.directiveFrom, { name: t.authorName || nameOf(t.createdByUserId) }));
+      else if (!mine) seg.push(fill(dict.w.sharedFrom, { name: nameOf(t.createdByUserId) }));
+      const others = othersOf(t);
+      if (isSharedTask(t) && others.length > 0) seg.push(fill(dict.w.shareN, { n: others.length }));
+      if (t.imageUrls.length) seg.push(fill(dict.w.photoN, { n: t.imageUrls.length }));
+      if (opts?.extraByLabel) seg.push(opts.extraByLabel);
+    }
+
+    // 반복 완료 이력(이미 다음 회차로 넘어간 것)은 되돌릴 대상이 아니다 → 고리를 누를 수 없게.
+    const ringLocked = !!opts?.staticRing || (!!opts?.forceDone && !realDone);
+
     return (
       <div
         key={t.id}
         data-task-id={t.id} /* read by 전체 선택 (selectAllVisible) */
-        className={`trow ${done ? "is-done" : ""} ${selected && !picking ? "sel" : ""} ${
-          picking ? "is-picking" : ""
-        } ${isPicked ? "is-picked" : ""} ${opts?.reorder ? "trow--reorder" : ""}`}
+        className={`atw-row ${done ? "is-done" : ""} ${completingNow ? "is-completing" : ""} ${
+          selected && !picking ? "on" : ""
+        } ${picking ? "is-picking" : ""} ${isPicked ? "is-picked" : ""}`}
         onClick={() => (picking ? togglePick() : openTask(t.id))}
       >
         {opts?.reorder && !picking ? (
-          <span className="tgrip" aria-hidden="true">
-            <GripVertical size={16} />
+          <span className="atw-grip" aria-hidden="true">
+            <GripVertical size={15} />
           </span>
         ) : null}
         {picking ? (
           <button
             type="button"
-            className={`tpick ${isPicked ? "on" : ""}`}
+            className={`atw-pick ${isPicked ? "on" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               togglePick();
@@ -1113,120 +1142,42 @@ export function AdminTasksConsole({
             aria-checked={isPicked}
             aria-label={t.title}
           >
-            <Check size={13} />
+            <Check size={13} strokeWidth={3} />
           </button>
         ) : opts?.previewOnly && !done ? (
-          // 미리보기 행(다가오는 일정 · 미래 날짜 시트)은 **점 마커**로 그린다(2026-09-09).
-          // 못 누르는 체크박스를 남겨 두면 고장난 버튼으로 보인다. 24px 자리는 그대로 지켜
-          // 오늘·과거 행과 정렬이 어긋나지 않게 한다.
-          <span className={`tdot ${pcls}`} title={dict.previewOnlyHint} aria-hidden="true" />
+          // 미리보기 행(미래 날짜)은 **점 마커**로 그린다(2026-09-09). 못 누르는 체크박스를 남겨 두면
+          // 고장난 버튼으로 보인다. 자리(22px)는 그대로 지켜 다른 줄과 정렬이 어긋나지 않게 한다.
+          <span className={`atw-dot ${pcls}`} title={dict.previewOnlyHint} aria-hidden="true" />
         ) : (
-          <button
-            className={`tchk ${pcls} ${done ? "is-done" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              // 반복 완료 이력은 이미 다음 회차로 넘어가 있어 되돌릴 대상이 아님 → 토글 금지.
-              if (opts?.forceDone && !realDone) return;
-              toggleComplete(t, occ);
-            }}
-            aria-label={dict.stCompleted}
-          >
-            <Check size={13} />
-          </button>
+          <TaskRing
+            prio={t.priority}
+            done={done}
+            label={t.title}
+            onToggle={ringLocked || completingNow ? undefined : () => completeWithMotion(t, occ)}
+          />
         )}
-        <div className="tbody">
-          <div className="trow__head">
-            {received && (
-              <span className="tfrom">
-                <Avatar id={t.createdByUserId} /> {nameOf(t.createdByUserId)} →
-              </span>
-            )}
-            <span className="ttitle">{t.title}</span>
-          </div>
-          {(dateChip || trng || t.recurrenceRule || t.tags.length || t.imageUrls.length || instr || isSharedTask(t)) && (
-            <div className="tmeta">
-              {dateChip}
-              {trng && (
-                <span className="chip">
-                  <Clock size={13} />
-                  {trng}
-                </span>
-              )}
-              {t.recurrenceRule && (
-                <span className="chip">
-                  <Repeat size={13} />
-                  {repeatShort(t.recurrenceRule, dict, locale)}
-                </span>
-              )}
-              {t.tags.slice(0, 2).map((g) => (
-                <span key={g} className="chip chip--tag">
-                  {g}
-                </span>
+        <div className="atw-row__b">
+          <span className="atw-row__t">{t.title}</span>
+          {seg.length > 0 && (
+            <span className={`atw-row__m ${overdue ? "is-red" : ""}`}>
+              {seg.map((x, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <span className="atw-sep"> · </span>}
+                  {x}
+                </Fragment>
               ))}
-              {instr && (
-                <span className="chip chip--instr">
-                  <Megaphone size={13} />
-                  {fill(dict.instructedBy, { name: instr })}
-                </span>
-              )}
-              {isSharedTask(t) && (
-                <span className="tshare">
-                  <span className="tshare__avs">
-                    <Avatars ids={partsOf(t).filter((id) => id !== meId)} />
-                  </span>
-                  {partsSummary(t)}
-                </span>
-              )}
-            </div>
-          )}
-          {opts?.extraByLabel && <span className="tmid tmid--desc"><span className="tmid__x">{opts.extraByLabel}</span></span>}
-          {!opts?.extraByLabel && cx.length > 0 && (
-            <span className="tmid tmid--ctx">
-              {cx.slice(0, 2).map((c, i) => (
-                <span key={i} className="tmid__c">
-                  {CTX_IC[c.k]}
-                  {c.v}
-                </span>
-              ))}
-            </span>
-          )}
-          {!opts?.extraByLabel && cx.length === 0 && t.description && (
-            <span className="tmid tmid--desc">
-              <span className="tmid__x">{t.description}</span>
             </span>
           )}
         </div>
-        {opts?.behindDays ? (
-          // 반복이 밀렸다는 사실은 **오늘 줄에 배지로만** 남는다 — 지연 섹션에 따로 세우지 않는다
-          // (2026-09-08). 완료하면 서버가 밀린 회차를 흡수해 배지도 사라진다.
-          <span className="pill pill--danger">
-            <span className="d" />
-            {fill(dict.odDaysBehind, { n: String(opts.behindDays) })}
-          </span>
-        ) : null}
-        {overdue ? (
-          <span className="pill pill--danger">
-            <span className="d" />
-            {dict.stOverdue}
-          </span>
-        ) : t.status === "in_progress" ? (
-          <span className="pill pill--open">
-            <span className="d" />
-            {dict.stInProgress}
-          </span>
-        ) : null}
-        {t.priority !== "normal" && (
-          <span className={`tflag ${pcls}`}>
-            <Flag size={14} fill="currentColor" />
-          </span>
-        )}
+        {opts?.right ? <span className="atw-row__r num">{opts.right}</span> : null}
         <button
-          className="trow__dots"
+          type="button"
+          className="atw-row__more"
           onClick={(e) => {
             e.stopPropagation();
             openRowMenu(e, t.id, occ?.date);
           }}
-          aria-label={dict.mPriority}
+          aria-label={dict.w.more}
         >
           <MoreHorizontal size={16} />
         </button>
@@ -1238,23 +1189,23 @@ export function AdminTasksConsole({
     title,
     n,
     mod,
-    listClass,
+    actions,
     children,
   }: {
     title: string;
     n: number;
     mod?: string;
-    listClass?: string;
+    actions?: ReactNode;
     children: ReactNode;
   }) => (
-    <>
-      <div className={`sech ${mod ? `sech--${mod}` : ""}`}>
-        <span className="sech__t">{title}</span>
-        <span className="sech__n">{n}</span>
-        <span className="sech__line" />
+    <section className={`atw-sec ${mod ? `is-${mod}` : ""}`}>
+      <div className="atw-sec__h">
+        <b>{title}</b>
+        <span className="num">{n}</span>
+        {actions ? <span className="atw-sec__acts">{actions}</span> : null}
       </div>
-      <div className={listClass ? `tlist ${listClass}` : "tlist"}>{children}</div>
-    </>
+      <div className="atw-rows">{children}</div>
+    </section>
   );
 
   const EmptyState = ({
@@ -1268,13 +1219,13 @@ export function AdminTasksConsole({
     s: string;
     ctx?: AddDraft["ctx"];
   }) => (
-    <div className="tempty">
-      <div className="tempty__ic">{icon}</div>
-      <p className="tempty__t">{t}</p>
-      <p className="tempty__s">{s}</p>
+    <div className="atw-empty">
+      <span className="atw-empty__ic">{icon}</span>
+      <b>{t}</b>
+      <span>{s}</span>
       {ctx && (
-        <button className="btn btn--pri tempty__cta" onClick={() => openInlineAdd(ctx)}>
-          <Plus size={15} />
+        <button type="button" className="atw-link" onClick={() => openInlineAdd(ctx)}>
+          <Plus size={14} />
           {dict.addTask}
         </button>
       )}
@@ -1428,7 +1379,7 @@ export function AdminTasksConsole({
     const schLabel = add.date
       ? `${fmtShort(add.date, locale)}(${fmtWeekday(add.date, locale)})${add.time ? ` ${add.time}` : ""}`
       : dict.iaSchedule;
-    const prLabel = add.prio === "normal" ? dict.iaPriority : prioLabel(add.prio, dict);
+    const prLabel = add.prio === "normal" ? dict.iaPriority : prioWord(add.prio);
     const tgLabel =
       add.targets.length === 0
         ? dict.iaTarget
@@ -1442,64 +1393,66 @@ export function AdminTasksConsole({
         ? dict.iaSendInstr
         : dict.iaInbox;
     return (
-      <div className="iadd" onClick={(e) => e.stopPropagation()}>
-        <div className="iadd__main">
-          <input
-            className="iadd__title"
-            autoFocus
-            ref={addTitleEl}
-            defaultValue=""
-            placeholder={dict.iaTitle}
-            onChange={(e) => {
-              addTextRef.current.title = e.target.value;
-              // 「비었다↔찼다」가 뒤집힐 때만 상태를 건드린다 — 저장 버튼 활성화에만 쓰인다.
-              const filled = e.target.value.trim().length > 0;
-              if (filled !== addHasTitle) setAddHasTitle(filled);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveInlineAdd();
-            }}
-          />
-          <textarea
-            className="iadd__desc"
-            placeholder={dict.iaDesc}
-            rows={1}
-            ref={addDescEl}
-            defaultValue=""
-            onChange={(e) => {
-              addTextRef.current.desc = e.target.value;
-            }}
-          />
-        </div>
-        <div className="iadd__chips">
+      <div className="atw-iadd" onClick={(e) => e.stopPropagation()}>
+        <input
+          className="atw-iadd__title"
+          autoFocus
+          ref={addTitleEl}
+          defaultValue=""
+          placeholder={dict.iaTitle}
+          onChange={(e) => {
+            addTextRef.current.title = e.target.value;
+            // 「비었다↔찼다」가 뒤집힐 때만 상태를 건드린다 — 저장 버튼 활성화에만 쓰인다.
+            const filled = e.target.value.trim().length > 0;
+            if (filled !== addHasTitle) setAddHasTitle(filled);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveInlineAdd();
+          }}
+        />
+        <textarea
+          className="atw-iadd__desc"
+          placeholder={dict.iaDesc}
+          rows={1}
+          ref={addDescEl}
+          defaultValue=""
+          onChange={(e) => {
+            addTextRef.current.desc = e.target.value;
+          }}
+        />
+        <div className="atw-iadd__chips">
           <button
-            className={`achip ${add.date ? (isOverduePlain(add.date) ? "set set--red" : "set") : ""}`}
+            type="button"
+            className={`atw-achip ${add.date ? (isOverduePlain(add.date) ? "set is-red" : "set") : ""}`}
             onClick={(e) => openSchedulePop(e, null)}
           >
-            <CalendarDays size={13} />
+            <CalendarDays size={14} />
             {schLabel}
           </button>
           <button
-            className={`achip ${add.prio === "urgent" ? "set set--rose" : add.prio === "important" ? "set set--amber" : ""}`}
+            type="button"
+            className={`atw-achip ${add.prio === "urgent" ? "set is-red" : add.prio === "important" ? "set is-amber" : add.prio === "medium" ? "set is-blue" : ""}`}
             onClick={(e) => openPrioPop(e, null)}
           >
-            <Flag size={13} />
+            <Flag size={14} />
             {prLabel}
           </button>
           {add.ctx !== "project" && (
             <button
-              className={`achip ${add.targets.length ? "set" : ""}`}
+              type="button"
+              className={`atw-achip ${add.targets.length ? "set" : ""}`}
               onClick={(e) => openSharePop(e, null, "target")}
             >
-              <UserPlus size={13} />
+              <UserPlus size={14} />
               {tgLabel}
             </button>
           )}
           <button
-            className={`achip ${add.context?.propertyId || add.context?.reservationId ? "set" : ""}`}
+            type="button"
+            className={`atw-achip ${add.context?.propertyId || add.context?.reservationId ? "set" : ""}`}
             onClick={(e) => openContextPop(e, null)}
           >
-            <Building2 size={13} />
+            <Building2 size={14} />
             {[add.context?.propertyName, add.context?.roomLabel].filter(Boolean).join(" · ") ||
               dict.cpTitle}
           </button>
@@ -1514,15 +1467,13 @@ export function AdminTasksConsole({
             onChange={(next) => setAddPhotos(next.pending)}
           />
           {/* 태그는 칩 순서상 마지막(사진 바로 오른쪽). 사진 썸네일은 `order: 99` 라 아래 줄로
-              빠지므로 그 사이를 끊지 않는다. */}
-          <span className="iadd__tagwrap">
-            {/* 태그 — 칩 줄 안에서 바로 입력. 10개 상한은 서버(slice 10)와 동일. */}
+              빠지므로 그 사이를 끊지 않는다. 10개 상한은 서버(slice 10)와 동일. */}
+          <span className="atw-iadd__tags">
             {add.tags.map((g) => (
-              <span key={g} className="chip chip--tag">
-                {g}
+              <span key={g} className="atw-tag">
+                #{g}
                 <button
                   type="button"
-                  className="chip__x"
                   aria-label={`${g} ${dict.iaCancel}`}
                   onClick={() => setAdd({ ...add, tags: add.tags.filter((x) => x !== g) })}
                 >
@@ -1532,7 +1483,7 @@ export function AdminTasksConsole({
             ))}
             {add.tags.length < 10 && (
               <input
-                className="iadd__taginput"
+                className="atw-iadd__tag"
                 ref={addTagEl}
                 defaultValue=""
                 placeholder={dict.dpTagAdd}
@@ -1556,19 +1507,19 @@ export function AdminTasksConsole({
             )}
           </span>
         </div>
-        <div className="iadd__foot">
-          <span className="proj">
+        <div className="atw-iadd__foot">
+          <span className="atw-iadd__where">
             <Hash size={12} />
             {footLabel}
           </span>
-          <span className="sp" />
-          <button className="btn btn--ghost btn--sm" onClick={() => setAdd(null)}>
+          <button type="button" className="atw-btn is-ghost" onClick={() => setAdd(null)}>
             {dict.iaCancel}
           </button>
           {/* 지시 탭에서 시작한 추가는 대상이 없으면 지시가 아니라 내 개인 작업이 되어, 저장 직후
               이 목록에서 사라진다. 그래서 대상을 필수로 건다. */}
           <button
-            className="btn btn--pri btn--sm"
+            type="button"
+            className="atw-btn is-pri"
             // `pending` 으로 막지 않는다 — 저장은 이미 배경에서 돌고 입력은 비워졌으므로, 다음 건을
             // 바로 칠 수 있어야 한다. 중복 제출은 「비워진 입력 + 빈 제목 가드」가 막는다.
             disabled={!addHasTitle || (add.ctx === "instr" && add.targets.length === 0)}
@@ -1586,10 +1537,12 @@ export function AdminTasksConsole({
     if (add && add.ctx === ctx && (ctx !== "project" || add.sectionId === (sectionId ?? null)))
       return InlineAdd();
     return (
-      <button className="iadd-trigger" onClick={() => openInlineAdd(ctx, "", sectionId ?? null)}>
-        <span className="p">
-          <Plus size={14} />
-        </span>
+      <button
+        type="button"
+        className="atw-addrow"
+        onClick={() => openInlineAdd(ctx, ctx === "day" ? calDay : "", sectionId ?? null)}
+      >
+        <Plus size={16} strokeWidth={2.2} />
         {label ?? dict.addTask}
       </button>
     );
@@ -1650,9 +1603,9 @@ export function AdminTasksConsole({
     e.stopPropagation();
     setPop({ kind: "context", src: t ? "task" : "add", taskId: t?.id ?? null, ...anchorFrom(e) });
   };
-  const openRowMenu = (e: ReactMouseEvent, taskId: string, occ?: string) => {
+  const openRowMenu = (e: ReactMouseEvent, taskId: string, occ?: string, fromDetail?: boolean) => {
     e.stopPropagation();
-    setPop({ kind: "rowmenu", taskId, occ, ...anchorFrom(e) });
+    setPop({ kind: "rowmenu", taskId, occ, fromDetail, ...anchorFrom(e) });
   };
 
   // ── SCHEDULE / PRIO / SHARE APPLY ─────────────────────────────────────────────────────
@@ -1772,7 +1725,10 @@ export function AdminTasksConsole({
     if (!title) return;
     run(() => addConsoleProjectSection(projectId, title), {
       toast: dict.tCreated,
-      after: () => setNewSection(""),
+      after: () => {
+        setNewSection("");
+        setSecAdding(false);
+      },
     });
   };
   const saveSectionRename = (projectId: string, draft: { id: string; title: string }) => {
@@ -1808,7 +1764,7 @@ export function AdminTasksConsole({
    *  the user sees — recomputing those seven filter expressions here would be a second source of
    *  truth that silently drifts. This only ever runs from a click, never during render. */
   const selectAllVisible = useCallback(() => {
-    const ids = Array.from(document.querySelectorAll<HTMLElement>(".adm .trow[data-task-id]"))
+    const ids = Array.from(document.querySelectorAll<HTMLElement>(".atw-main .atw-row[data-task-id]"))
       .map((el) => el.dataset.taskId)
       .filter((id): id is string => Boolean(id));
     setPicked(new Set(ids));
@@ -1884,163 +1840,144 @@ export function AdminTasksConsole({
   };
 
   // ── VIEWS ────────────────────────────────────────────────────────────────────────────
-  // 반복 지연 backlog 묶음 행(작업별 1건 · N일 밀림 · [오늘로 가져오기]/[삭제]).
-  const todayView = () => {
+  // 목록 데이터는 화면과 상세 칸의 기본 선택(보기의 첫 작업)이 **같은 순서**를 보도록 함수로 뺀다.
+
+  /**
+   * 오늘/내일 목록 순서 — 일회성과 반복 회차가 **하나의 순서 공간**을 공유한다(2026-07-30 B안).
+   * 드래그 직후에는 낙관적 순서(`dateOrder`)가 먼저다.
+   */
+  const orderDateItems = (arr: TaskRecord[], date: string): TaskRecord[] => {
+    const ranked = sortByDateOrder(arr, date);
+    const pendingIds = dateOrder && dateOrder.date === date ? dateOrder.ids : null;
+    return pendingIds
+      ? pendingIds
+          .map((id) => ranked.find((t) => t.id === id))
+          .filter((t): t is TaskRecord => !!t)
+          .concat(ranked.filter((t) => !pendingIds.includes(t.id)))
+      : ranked;
+  };
+
+  /** 오늘 완료한 내 작업 — 「완료」 묶음과 진행 고리가 같이 쓴다. 반복은 완료 로그에서만 보인다. */
+  const doneTodayRows = (applyFilter: boolean) => {
+    const ok = (t: TaskRecord) =>
+      !applyFilter || (matchQuery(t, deferredQuery, nameOf) && matchPrio(t, prioFilter));
+    const seen = new Set<string>();
+    const rows: { t: TaskRecord; recurring: boolean }[] = [];
+    for (const t of personalTasks) {
+      if (!myOwn(t, meId) || t.status !== "completed" || completedDateOf(t) !== today) continue;
+      if (isStandardRecurrence(t.recurrenceRule) || !ok(t)) continue;
+      seen.add(t.id);
+      rows.push({ t, recurring: false });
+    }
+    for (const r of data.completions) {
+      if (r.day !== today || seen.has(r.taskId)) continue;
+      const t = personalTasks.find((x) => x.id === r.taskId);
+      if (!t || !myOwn(t, meId) || !isStandardRecurrence(t.recurrenceRule) || !ok(t)) continue;
+      seen.add(t.id);
+      rows.push({ t, recurring: true });
+    }
+    return rows;
+  };
+
+  const todayData = () => {
     const odOne = filtered(overdueList).sort((a, b) => dateSort(a, b) || prioSort(a, b));
-    // 반복은 지연 섹션에 세우지 않는다(2026-09-08) — 아래 `recBehind` 로 오늘 줄의 배지가 된다.
-    // 아래 주석의 «네 갈래» 필터 통일 규칙은 그대로 유효하다.
-    // (구) 반복 지연 backlog — 작업별 1건.
+    // 반복은 지연 섹션에 세우지 않는다(2026-09-08) — `recBehind` 로 오늘 줄의 「N일 밀림」이 된다.
     // 필터는 네 갈래(지연/오늘 일회성, 지연/오늘 반복) 모두 `filtered()` 로 통일한다(2026-07-31).
-    // 전에는 반복 행만 matchQuery/matchPrio 로 걸러 날짜 필터를 빠져나갔고, "날짜 없음"을 걸면
-    // 일회성만 사라지고 반복 회차는 남아 필터 결과가 조건과 모순됐다. 모바일도 네 갈래 전부
-    // 같은 `applyFilter` 를 통과시킨다.
-    /** taskId → 밀린 회차 수. 오늘 줄의 「N일 밀림」 배지에 쓴다. */
     const recBehind = new Map<string, number>(
       personalTasks
         .filter((t) => myOwn(t, meId) && isStandardRecurrence(t.recurrenceRule))
         .map((t) => [t.id, overdueOccurrenceDates(t, today, resolvedDatesFor(t.id)).length])
         .filter(([, days]) => (days as number) > 0) as [string, number][],
     );
-    // 오늘 회차 — 일회성(today) + 반복. 반복은 **오늘 회차이거나 밀린 회차가 있으면** 뜬다
-    // (2026-09-08). 밀린 것을 지연 섹션에 따로 세우지 않고 여기 한 줄로 모은다.
+    // 오늘 회차 — 일회성(today) + 반복. 반복은 **오늘 회차이거나 밀린 회차가 있으면** 뜬다(2026-09-08).
     const tdRec = filtered(
       personalTasks.filter(
         (t) => myOwn(t, meId) && showsOnTodayList(t, today, occState, resolvedDatesFor(t.id)),
       ),
     );
-    // 정렬은 renderDateList 가 회차 순서까지 합쳐 처리한다(여기서 미리 정렬하지 않는다).
-    const td = [
-      ...filtered(personalTasks.filter((t) => isTodayTask(t, today) && myOwn(t, meId))),
-      ...tdRec,
-    ];
-    const overdueCount = odOne.length;
-    /* 지연 일괄 처리 대상 선택 — 서버가 "내가 만든 · 일회성 · 진짜 지연"만 처리하므로, 남의 공유
-       작업은 애초에 담을 수 없게 한다(담아 봐야 서버가 조용히 버려 개수만 거짓이 된다).
-       전역 선택모드가 켜져 있으면 그쪽에 자리를 내준다. */
-    const odOwnIds = odOne.filter((t) => isMine(t, meId)).map((t) => t.id);
-    const odPickable = !selMode && odOwnIds.length > 0;
-    const odSelCount = odOwnIds.filter((id) => odPicked.has(id)).length;
-    const odAllSel = odSelCount > 0 && odSelCount === odOwnIds.length;
-    const toggleOd = (id: string) => {
-      const next = new Set(odPicked);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      setOdPicked(next);
-    };
-    const toggleAllOd = () => setOdPicked(odAllSel ? new Set() : new Set(odOwnIds));
-    if (overdueCount === 0 && td.length === 0 && !add)
-      return hasActiveFilter ? (
-        <EmptyState icon={<Search size={26} />} t={dict.emFilter} s={dict.emFilterS} />
-      ) : (
-        <EmptyState icon={<Sun size={26} />} t={dict.emToday} s={dict.emTodayS} ctx="today" />
-      );
-    return (
-      <>
-        {overdueCount > 0 && (
-          <>
-            {odOne.length > 0 && (
-              <div className="odbanner">
-                <div className="odbanner__ic">
-                  <AlertTriangle size={18} />
-                </div>
-                <div className="odbanner__b">
-                  <div className="odbanner__t">{fill(dict.overdueTitle, { n: odOne.length })}</div>
-                  <div className="odbanner__s">
-                    {odSelCount > 0
-                      ? fill(dict.selSelected, { n: odSelCount })
-                      : odPickable
-                        ? dict.odPickHint
-                        : dict.overdueSub}
-                  </div>
-                </div>
-                <div className="odbanner__acts">
-                  {odPickable && (
-                    <button className="od-b od-b--ghost" onClick={toggleAllOd}>
-                      {odAllSel ? dict.selClear : dict.selAll}
-                    </button>
-                  )}
-                  <button
-                    className="od-b"
-                    disabled={odSelCount === 0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const a = anchorFrom(e);
-                      setPop({
-                        kind: "schedule",
-                        src: "overdue",
-                        taskId: null,
-                        draft: { date: today, time: "", dur: null, repeat: "none" },
-                        calMonth: today.slice(0, 7),
-                        expand: null,
-                        ...a,
-                      });
-                    }}
-                  >
-                    {dict.overdueReschedule}
-                  </button>
-                  <button
-                    className="od-b od-b--ghost"
-                    disabled={odSelCount === 0}
-                    onClick={() =>
-                      setConfirm({
-                        message: fill(dict.confirmBulkMsg, { n: odSelCount }),
-                        confirmLabel: dict.confirmDeleteBtn,
-                        onConfirm: clearOverdue,
-                      })
-                    }
-                  >
-                    {dict.overdueClear}
-                  </button>
-                </div>
-              </div>
-            )}
-            {Section({
-              title: dict.secOverdue,
-              n: overdueCount,
-              mod: "over",
-              children: (
-                <>
-                  {odOne.map((t) =>
-                    renderRow(
-                      t,
-                      odPickable && isMine(t, meId)
-                        ? { pick: { on: odPicked.has(t.id), toggle: () => toggleOd(t.id) } }
-                        : undefined,
-                    ),
-                  )}
-                </>
-              ),
-            })}
-          </>
-        )}
-        {Section({
-          title: dict.secToday,
-          n: td.length,
-          children: (
-            <>
-              {renderDateList(td, today, recBehind)}
-              {InlineAddSlot({ ctx: "today" })}
-            </>
-          ),
-        })}
-      </>
+    const td = orderDateItems(
+      [...filtered(personalTasks.filter((t) => isTodayTask(t, today) && myOwn(t, meId))), ...tdRec],
+      today,
+    );
+    return { odOne, td, recBehind, doneRows: doneTodayRows(true) };
+  };
+
+  // 내일 — 일회성(내일 기준일) + 반복(내일 회차, 미완료). 반복은 occurrence 행으로 렌더.
+  const tomorrowItems = () => {
+    const tm = addDays(today, 1);
+    // 오늘 뷰와 같은 이유로 반복 회차도 `filtered()`(검색·우선순위·**날짜**)를 통과시킨다.
+    const rec = filtered(personalTasks.filter((t) => myOwn(t, meId) && openOccursOn(t, tm)));
+    return orderDateItems(
+      [...filtered(personalTasks.filter((t) => isTomorrowTask(t, today) && myOwn(t, meId))), ...rec],
+      tm,
     );
   };
 
-  /**
-   * 오늘/내일 목록 렌더 — 일회성과 반복 회차가 **하나의 순서 공간**을 공유한다(2026-07-30 B안).
-   * 저장은 `reorderConsoleDateTasks` 가 일회성/반복으로 나눠 쓴다. 드래그 방식은 관리함과 동일한
-   * HTML5 draggable 이라 콘솔 안에서 조작 감각이 갈리지 않는다.
-   */
-  const renderDateList = (arr: TaskRecord[], date: string, behind?: Map<string, number>) => {
-    const ranked = sortByDateOrder(arr, date);
-    const pending = dateOrder && dateOrder.date === date ? dateOrder.ids : null;
-    const items = pending
-      ? pending
+  const inboxItems = () => {
+    // 관리함 = 프로젝트 밖 모든 활성 작업(날짜 무관). 수동 드래그 순서 허용(2026-07-30):
+    // 랭크된(sort_order) 작업이 위, 미랭크는 만든 순서. 드래그 직후엔 낙관적 순서.
+    const base = filtered(personalTasks.filter((t) => isActive(t) && myOwn(t, meId)));
+    const ranked = base.slice().sort((a, b) => {
+      const ao = a.sortOrder;
+      const bo = b.sortOrder;
+      // 날짜 목록과 같은 규칙 — 새 작업은 아래(추가 입력창 바로 위)에 붙는다(2026-09-09).
+      if (ao != null && bo != null) return ao !== bo ? ao - bo : oldestFirst(a, b);
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return oldestFirst(a, b);
+    });
+    return inboxOrder
+      ? inboxOrder
           .map((id) => ranked.find((t) => t.id === id))
           .filter((t): t is TaskRecord => !!t)
-          .concat(ranked.filter((t) => !pending.includes(t.id)))
+          .concat(ranked.filter((t) => !inboxOrder.includes(t.id)))
       : ranked;
+  };
+
+  const sharedLists = () => {
+    const all = filtered(personalTasks.filter((t) => isActive(t) && plainShared(t, meId)));
+    return {
+      received: all.filter((t) => !isMine(t, meId)).sort((a, b) => prioSort(a, b) || dateSort(a, b)),
+      sent: all.filter((t) => isMine(t, meId)).sort((a, b) => prioSort(a, b) || dateSort(a, b)),
+    };
+  };
+
+  /** 드래그 재정렬 래퍼 — 관리함과 오늘/내일이 같은 HTML5 draggable 을 쓴다(조작 감각 통일). */
+  const dragWrap = (t: TaskRecord, canDrag: boolean, onDropOn: (targetId: string) => void, row: ReactNode) => (
+    <div
+      key={t.id}
+      className={`atw-drag ${dragId === t.id ? "is-drag" : ""} ${
+        overId === t.id && dragId && dragId !== t.id ? "is-over" : ""
+      }`}
+      draggable={canDrag}
+      onDragStart={canDrag ? () => setDragId(t.id) : undefined}
+      onDragOver={
+        canDrag
+          ? (e) => {
+              e.preventDefault();
+              if (overId !== t.id) setOverId(t.id);
+            }
+          : undefined
+      }
+      onDrop={canDrag ? () => onDropOn(t.id) : undefined}
+      onDragEnd={
+        canDrag
+          ? () => {
+              setDragId(null);
+              setOverId(null);
+            }
+          : undefined
+      }
+    >
+      {row}
+    </div>
+  );
+
+  /**
+   * 오늘/내일 목록 렌더. 저장은 `reorderConsoleDateTasks` 가 일회성/반복으로 나눠 쓴다.
+   * `items` 는 이미 `orderDateItems` 로 정렬돼 있다.
+   */
+  const renderDateList = (items: TaskRecord[], date: string, behind?: Map<string, number>) => {
     // 검색/필터 중엔 부분집합이라 재정렬 비활성(순서가 의미 없음) — 관리함과 같은 규칙.
     const canDrag = !hasActiveFilter && !selMode;
     const onRowDrop = (targetId: string) => {
@@ -2067,83 +2004,186 @@ export function AdminTasksConsole({
         ),
       );
     };
-    return items.map((t) => (
-      <div
-        key={t.id}
-        className={`idrag ${dragId === t.id ? "is-drag" : ""} ${
-          overId === t.id && dragId && dragId !== t.id ? "is-over" : ""
-        }`}
-        draggable={canDrag}
-        onDragStart={canDrag ? () => setDragId(t.id) : undefined}
-        onDragOver={
-          canDrag
-            ? (e) => {
-                e.preventDefault();
-                if (overId !== t.id) setOverId(t.id);
-              }
-            : undefined
-        }
-        onDrop={canDrag ? () => onRowDrop(t.id) : undefined}
-        onDragEnd={canDrag ? () => { setDragId(null); setOverId(null); } : undefined}
-      >
-        {isStandardRecurrence(t.recurrenceRule)
+    return items.map((t) =>
+      dragWrap(
+        t,
+        canDrag,
+        onRowDrop,
+        isStandardRecurrence(t.recurrenceRule)
           ? renderRow(t, {
+              hideDate: true,
               occurrence: { date, done: false },
               reorder: canDrag,
               behindDays: behind?.get(t.id),
             })
-          : renderRow(t, { reorder: canDrag })}
-      </div>
-    ));
+          : renderRow(t, { hideDate: true, reorder: canDrag }),
+      ),
+    );
   };
 
-  // 내일 — 일회성(내일 기준일) + 반복(내일 회차, 미완료). 반복은 occurrence 행으로 렌더.
+  const tokyoTime = (iso: string | null) => {
+    if (!iso) return null;
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return null;
+    return new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Tokyo",
+    }).format(dt);
+  };
+
+  const todayView = () => {
+    const { odOne, td, recBehind, doneRows } = todayData();
+    /* 지연 일괄 처리 대상 — 서버가 "내가 만든 · 일회성 · 진짜 지연"만 처리하므로, 남의 공유
+       작업은 애초에 담을 수 없게 한다(담아 봐야 서버가 조용히 버려 개수만 거짓이 된다). */
+    const odOwnIds = odOne.filter((t) => isMine(t, meId)).map((t) => t.id);
+    const odPicking = !selMode && odMode !== null;
+    const odSelCount = odOwnIds.filter((id) => odPicked.has(id)).length;
+    const odAllSel = odSelCount > 0 && odSelCount === odOwnIds.length;
+    const toggleOd = (id: string) => {
+      const next = new Set(odPicked);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      setOdPicked(next);
+    };
+    const startOd = (mode: "reschedule" | "delete") => {
+      setOdMode(mode);
+      setOdPicked(new Set(odOwnIds));
+    };
+    const cancelOd = () => {
+      setOdMode(null);
+      setOdPicked(new Set());
+    };
+    if (odOne.length === 0 && td.length === 0 && doneRows.length === 0 && !add)
+      return hasActiveFilter ? (
+        <EmptyState icon={<Search size={22} />} t={dict.emFilter} s={dict.emFilterS} />
+      ) : (
+        <EmptyState icon={<Sun size={22} />} t={dict.emToday} s={dict.emTodayS} ctx="today" />
+      );
+    const odActions =
+      odOwnIds.length === 0 || selMode ? null : !odPicking ? (
+        <>
+          <button type="button" className="atw-tl" onClick={() => startOd("reschedule")}>
+            {dict.w.reschedule}
+          </button>
+          <span className="atw-dotsep" aria-hidden="true">
+            ·
+          </span>
+          <button type="button" className="atw-tl is-red" onClick={() => startOd("delete")}>
+            {dict.overdueClear}
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="atw-sec__note num">{fill(dict.selSelected, { n: odSelCount })}</span>
+          <button type="button" className="atw-tl is-muted" onClick={() => setOdPicked(odAllSel ? new Set() : new Set(odOwnIds))}>
+            {odAllSel ? dict.selClear : dict.selAll}
+          </button>
+          <button type="button" className="atw-tl is-muted" onClick={cancelOd}>
+            {dict.iaCancel}
+          </button>
+          {odMode === "reschedule" ? (
+            <button
+              type="button"
+              className="atw-pillbtn"
+              disabled={odSelCount === 0}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPop({
+                  kind: "schedule",
+                  src: "overdue",
+                  taskId: null,
+                  draft: { date: today, time: "", dur: null, repeat: "none" },
+                  calMonth: today.slice(0, 7),
+                  expand: null,
+                  ...anchorFrom(e),
+                });
+              }}
+            >
+              {dict.w.odPickDate}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="atw-pillbtn is-red"
+              disabled={odSelCount === 0}
+              onClick={() =>
+                setConfirm({
+                  message: fill(dict.confirmBulkMsg, { n: odSelCount }),
+                  confirmLabel: dict.confirmDeleteBtn,
+                  onConfirm: clearOverdue,
+                })
+              }
+            >
+              {dict.selDelete}
+            </button>
+          )}
+        </>
+      );
+    return (
+      <>
+        {odOne.length > 0 &&
+          Section({
+            title: dict.secOverdue,
+            n: odOne.length,
+            mod: "over",
+            actions: odActions,
+            children: odOne.map((t) =>
+              renderRow(
+                t,
+                odPicking && isMine(t, meId)
+                  ? { pick: { on: odPicked.has(t.id), toggle: () => toggleOd(t.id) } }
+                  : undefined,
+              ),
+            ),
+          })}
+        {Section({
+          title: dict.secToday,
+          n: td.length,
+          children: (
+            <>
+              {renderDateList(td, today, recBehind)}
+              {InlineAddSlot({ ctx: "today" })}
+            </>
+          ),
+        })}
+        {doneRows.length > 0 &&
+          Section({
+            title: dict.w.secDone,
+            n: doneRows.length,
+            mod: "done",
+            children: doneRows.map(({ t, recurring }) =>
+              renderRow(
+                t,
+                recurring
+                  ? { hideDate: true, forceDone: true }
+                  : { hideDate: true, right: tokyoTime(t.completedAt) },
+              ),
+            ),
+          })}
+      </>
+    );
+  };
+
   const tomorrowView = () => {
     const tm = addDays(today, 1);
-    // 오늘 뷰와 같은 이유로 반복 회차도 `filtered()`(검색·우선순위·**날짜**)를 통과시킨다.
-    const rec = filtered(personalTasks.filter((t) => myOwn(t, meId) && openOccursOn(t, tm)));
-    // 정렬은 renderDateList 가 회차 순서까지 합쳐 처리한다.
-    const items = [
-      ...filtered(personalTasks.filter((t) => isTomorrowTask(t, today) && myOwn(t, meId))),
-      ...rec,
-    ];
+    const items = tomorrowItems();
     if (items.length === 0 && !add)
       return hasActiveFilter ? (
-        <EmptyState icon={<Search size={26} />} t={dict.emFilter} s={dict.emFilterS} />
+        <EmptyState icon={<Search size={22} />} t={dict.emFilter} s={dict.emFilterS} />
       ) : (
-        <EmptyState icon={<Sunrise size={26} />} t={dict.emTomorrow} s={dict.emTomorrowS} ctx="tomorrow" />
+        <EmptyState icon={<Sunrise size={22} />} t={dict.emTomorrow} s={dict.emTomorrowS} ctx="tomorrow" />
       );
-    return Section({
-      title: dict.vTomorrow,
-      n: items.length,
-      children: (
-        <>
-          {renderDateList(items, tm)}
-          {InlineAddSlot({ ctx: "tomorrow" })}
-        </>
-      ),
-    });
+    return (
+      <div className="atw-rows">
+        {renderDateList(items, tm)}
+        {InlineAddSlot({ ctx: "tomorrow" })}
+      </div>
+    );
   };
 
   const inboxView = () => {
-    // 관리함 = 프로젝트 밖 모든 활성 작업(날짜 무관). 수동 드래그 순서 허용(2026-07-30):
-    // 랭크된(sort_order) 작업이 위, 미랭크는 최신순(새 작업 top 유지). 드래그 직후엔 낙관적 순서.
-    const base = filtered(personalTasks.filter((t) => isActive(t) && myOwn(t, meId)));
-    const ranked = base.slice().sort((a, b) => {
-      const ao = a.sortOrder;
-      const bo = b.sortOrder;
-      // 날짜 목록과 같은 규칙 — 새 작업은 아래(추가 입력창 바로 위)에 붙는다(2026-09-09).
-      if (ao != null && bo != null) return ao !== bo ? ao - bo : oldestFirst(a, b);
-      if (ao != null) return -1;
-      if (bo != null) return 1;
-      return oldestFirst(a, b);
-    });
-    const items = inboxOrder
-      ? inboxOrder
-          .map((id) => ranked.find((t) => t.id === id))
-          .filter((t): t is TaskRecord => !!t)
-          .concat(ranked.filter((t) => !inboxOrder.includes(t.id)))
-      : ranked;
+    const items = inboxItems();
     // 검색/필터 중엔 부분집합이라 재정렬 비활성(순서가 의미 없음).
     const canDrag = !hasActiveFilter && !selMode;
     const onRowDrop = (targetId: string) => {
@@ -2162,56 +2202,28 @@ export function AdminTasksConsole({
       setInboxOrder(ids);
       run(() => reorderConsoleTasks(ids));
     };
+    if (items.length === 0 && !add)
+      return hasActiveFilter ? (
+        <EmptyState icon={<Search size={22} />} t={dict.emFilter} s={dict.emFilterS} />
+      ) : (
+        <EmptyState icon={<Inbox size={22} />} t={dict.emInbox} s={dict.emInboxS} ctx="inbox" />
+      );
     return (
-      <>
-        <p className="tempty__s" style={{ textAlign: "left", padding: "0 2px 10px" }}>
-          {dict.inboxNote}
-        </p>
-        {items.length === 0 && !add ? (
-          hasActiveFilter ? (
-            <EmptyState icon={<Search size={26} />} t={dict.emFilter} s={dict.emFilterS} />
-          ) : (
-            <EmptyState icon={<Inbox size={26} />} t={dict.emInbox} s={dict.emInboxS} ctx="inbox" />
-          )
-        ) : (
-          <div className="tlist">
-            {items.map((t) => (
-              <div
-                key={t.id}
-                className={`idrag ${dragId === t.id ? "is-drag" : ""} ${
-                  overId === t.id && dragId && dragId !== t.id ? "is-over" : ""
-                }`}
-                draggable={canDrag}
-                onDragStart={canDrag ? () => setDragId(t.id) : undefined}
-                onDragOver={
-                  canDrag
-                    ? (e) => {
-                        e.preventDefault();
-                        if (overId !== t.id) setOverId(t.id);
-                      }
-                    : undefined
-                }
-                onDrop={canDrag ? () => onRowDrop(t.id) : undefined}
-                onDragEnd={canDrag ? () => { setDragId(null); setOverId(null); } : undefined}
-              >
-                {renderRow(t, { reorder: canDrag })}
-              </div>
-            ))}
-            {InlineAddSlot({ ctx: "inbox" })}
-          </div>
-        )}
-      </>
+      <div className="atw-rows">
+        {items.map((t) => dragWrap(t, canDrag, onRowDrop, renderRow(t, { reorder: canDrag })))}
+        {InlineAddSlot({ ctx: "inbox" })}
+      </div>
     );
   };
 
   const sharedView = () => {
-    const all = filtered(
-      personalTasks.filter((t) => isActive(t) && plainShared(t, meId)),
-    );
-    const received = all.filter((t) => !isMine(t, meId)).sort((a, b) => prioSort(a, b) || dateSort(a, b));
-    const sent = all.filter((t) => isMine(t, meId)).sort((a, b) => prioSort(a, b) || dateSort(a, b));
+    const { received, sent } = sharedLists();
     if (received.length === 0 && sent.length === 0)
-      return <EmptyState icon={<Share2 size={26} />} t={dict.emShared} s={dict.emSharedS} />;
+      return hasActiveFilter ? (
+        <EmptyState icon={<Search size={22} />} t={dict.emFilter} s={dict.emFilterS} />
+      ) : (
+        <EmptyState icon={<Share2 size={22} />} t={dict.emShared} s={dict.emSharedS} />
+      );
     return (
       <>
         {received.length > 0 &&
@@ -2223,22 +2235,44 @@ export function AdminTasksConsole({
   };
 
   // ── INSTR (지시) ─────────────────────────────────────────────────────────────────────
+  /** 지시 줄의 메타 — 「김현준 → 나 · 오늘까지」(받은) / 「나 → 박서영 · 10/10까지 · 미확인」(보낸). */
+  const dirMeta = (t: TaskRecord, side: "recv" | "sent"): ReactNode[] => {
+    const out: ReactNode[] = [];
+    const done = t.status === "completed";
+    if (!done && (t.priority === "urgent" || t.priority === "important")) out.push(prioWord(t.priority));
+    const to =
+      side === "recv"
+        ? dict.dpMe
+        : partsOf(t)
+            .map((id) => nameOf(id))
+            .join(", ");
+    out.push(fill(dict.w.fromTo, { from: side === "recv" ? nameOf(t.createdByUserId) : dict.dpMe, to }));
+    const d = dateOf(t);
+    if (!done) out.push(d ? fill(dict.w.dueBy, { date: d === today ? dict.today : md(d) }) : dict.noDate);
+    const trng = timeRange(t.timeLabel, t.durationMinutes);
+    if (trng && !done) out.push(trng);
+    if (side === "sent" && t.status === "open") out.push(dict.instrUnconfirmed);
+    if (side === "recv") {
+      const others = partsOf(t).filter((id) => id !== meId);
+      if (others.length > 0) out.push(fill(dict.instrCommon, { n: others.length + 1 }));
+    }
+    if (t.imageUrls.length) out.push(fill(dict.w.photoN, { n: t.imageUrls.length }));
+    return out;
+  };
+  const doneDay = (t: TaskRecord) => {
+    const cd = completedDateOf(t);
+    return cd ? md(cd) : null;
+  };
+
   const sentView = () => {
     const all = filtered(personalTasks.filter((t) => sentInstr(t, meId)));
-    const note = (
-      <div className="sentnote">
-        <Megaphone size={15} />
-        <span>{dict.instrSentNote}</span>
-      </div>
-    );
     if (all.length === 0)
       return (
         <>
-          {note}
           {hasActiveFilter ? (
-            <EmptyState icon={<Search size={26} />} t={dict.emFilter} s={dict.emFilterS} />
+            <EmptyState icon={<Search size={22} />} t={dict.emFilter} s={dict.emFilterS} />
           ) : (
-            <EmptyState icon={<Megaphone size={26} />} t={dict.instrEmptySentT} s={dict.instrEmptySentS} />
+            <EmptyState icon={<Megaphone size={22} />} t={dict.instrEmptySentT} s={dict.instrEmptySentS} />
           )}
           {!hasActiveFilter && InlineAddSlot({ ctx: "instr", label: dict.iaSendInstrCta })}
         </>
@@ -2248,77 +2282,13 @@ export function AdminTasksConsole({
     const doneT = all
       .filter((t) => t.status === "completed")
       .sort((a, b) => (completedDateOf(b) ?? "").localeCompare(completedDateOf(a) ?? ""));
-    const srow = (t: TaskRecord) => {
-      const targets = partsOf(t);
-      const d = dateOf(t);
-      const overdue = isOverdue(t, today);
-      const st: [string, string] =
-        t.status === "completed"
-          ? ["done", dict.stCompleted]
-          : overdue
-            ? ["danger", dict.stOverdue]
-            : t.status === "in_progress"
-              ? ["open", dict.stInProgress]
-              : ["muted", dict.instrUnconfirmed];
-      return (
-        <div key={t.id} className={`srow ${t.status === "completed" ? "is-done" : ""}`} onClick={() => openTask(t.id)}>
-          <div className="srow__b">
-            <div className="srow__t">
-              {t.priority !== "normal" && (
-                <span className={`tflag p-${t.priority}`}>
-                  <Flag size={12} fill="currentColor" />
-                </span>
-              )}
-              {t.title}
-            </div>
-            <div className="srow__m">
-              <span className="chip">
-                <UserPlus size={13} />
-                {targets.map((id) => nameOf(id)).join(", ")}
-              </span>
-              {d ? (
-                <span className={`chip ${overdue ? "chip--over" : ""}`}>
-                  <CalendarDays size={13} />
-                  {fmtShort(d, locale)} ({fmtWeekday(d, locale)})
-                </span>
-              ) : (
-                <span className="chip">
-                  <CalendarX2 size={13} />
-                  {dict.noDate}
-                </span>
-              )}
-              {t.imageUrls.length > 0 && (
-                <span className="chip">
-                  <FileText size={13} />
-                  {t.imageUrls.length}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="srow__r">
-            <span className="srow__avs">
-              <Avatars ids={targets} />
-            </span>
-            <span className={`pill pill--${st[0]}`}>
-              <span className="d" />
-              {st[1]}
-            </span>
-            <button
-              className="srow__b2"
-              onClick={(e) => openSharePop(e, t, "share")}
-              title={dict.instrChangeTarget}
-            >
-              <UserPlus size={15} />
-            </button>
-          </div>
-        </div>
-      );
-    };
+    // 보낸 지시는 대상자의 일이다 — 고리는 상태 표시일 뿐 내가 누르지 않는다(예전 콘솔과 같은 경계).
+    const row = (t: TaskRecord) =>
+      renderRow(t, { meta: dirMeta(t, "sent"), staticRing: true, right: t.status === "completed" ? doneDay(t) : undefined });
     const sec = (title: string, list: TaskRecord[]) =>
-      list.length > 0 ? Section({ title, n: list.length, listClass: "slist", children: list.map(srow) }) : null;
+      list.length > 0 ? Section({ title, n: list.length, children: list.map(row) }) : null;
     return (
       <>
-        {note}
         {sec(dict.instrSecUnconfirmed, openT)}
         {sec(dict.instrSecInProgress, progT)}
         {sec(dict.instrSecCompleted, doneT)}
@@ -2329,22 +2299,11 @@ export function AdminTasksConsole({
 
   const recvView = () => {
     const all = filtered(personalTasks.filter((t) => recvInstr(t, meId)));
-    const note = (
-      <div className="sentnote sentnote--recv">
-        <Bell size={15} />
-        <span>{dict.instrRecvNote}</span>
-      </div>
-    );
     if (all.length === 0)
-      return (
-        <>
-          {note}
-          {hasActiveFilter ? (
-            <EmptyState icon={<Search size={26} />} t={dict.emFilter} s={dict.emFilterS} />
-          ) : (
-            <EmptyState icon={<Bell size={26} />} t={dict.instrEmptyRecvT} s={dict.instrEmptyRecvS} />
-          )}
-        </>
+      return hasActiveFilter ? (
+        <EmptyState icon={<Search size={22} />} t={dict.emFilter} s={dict.emFilterS} />
+      ) : (
+        <EmptyState icon={<Bell size={22} />} t={dict.instrEmptyRecvT} s={dict.instrEmptyRecvS} />
       );
     const od = all.filter((t) => isOverdue(t, today));
     const openT = all
@@ -2356,165 +2315,75 @@ export function AdminTasksConsole({
     const doneT = all
       .filter((t) => t.status === "completed")
       .sort((a, b) => (completedDateOf(b) ?? "").localeCompare(completedDateOf(a) ?? ""));
-    const rrow = (t: TaskRecord) => {
-      const others = partsOf(t).filter((id) => id !== meId);
-      const d = dateOf(t);
-      const done = t.status === "completed";
-      const overdue = isOverdue(t, today);
-      const trng = timeRange(t.timeLabel, t.durationMinutes);
-      return (
-        <div key={t.id} className={`srow srow--recv ${done ? "is-done" : ""}`} onClick={() => openTask(t.id)}>
-          <button
-            className={`tchk ${t.priority !== "normal" ? `p-${t.priority}` : ""} ${done ? "is-done" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleComplete(t);
-            }}
-            aria-label={dict.stCompleted}
-          >
-            <Check size={13} />
-          </button>
-          <div className="srow__b">
-            <div className="srow__t">
-              {t.priority !== "normal" && (
-                <span className={`tflag p-${t.priority}`}>
-                  <Flag size={12} fill="currentColor" />
-                </span>
-              )}
-              {t.title}
-            </div>
-            <div className="srow__m">
-              <span className="chip chip--instr">
-                <Megaphone size={13} />
-                {fill(dict.instructedBy, { name: nameOf(t.createdByUserId) })}
-              </span>
-              {d ? (
-                <button
-                  className={`chip chip--btn ${overdue ? "chip--over" : d === today ? "chip--today" : ""}`}
-                  onClick={(e) => openSchedulePop(e, t)}
-                >
-                  <CalendarDays size={13} />
-                  {overdue
-                    ? `${fmtShort(d, locale)} · ${dict.stOverdue}`
-                    : d === today
-                      ? dict.today
-                      : `${fmtShort(d, locale)} (${fmtWeekday(d, locale)})`}
-                </button>
-              ) : (
-                <span className="chip">
-                  <CalendarX2 size={13} />
-                  {dict.noDate}
-                </span>
-              )}
-              {trng && (
-                <span className="chip">
-                  <Clock size={13} />
-                  {trng}
-                </span>
-              )}
-              {others.length > 0 && (
-                <span className="tshare">
-                  <span className="tshare__avs">
-                    <Avatars ids={others} />
-                  </span>
-                  {fill(dict.instrCommon, { n: others.length + 1 })}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="srow__r">
-            {done ? (
-              <span className="pill pill--done">
-                <span className="d" />
-                {dict.stCompleted}
-              </span>
-            ) : (
-              <div className="rstat" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className={t.status === "open" ? "on" : ""}
-                  onClick={() => run(() => setConsoleTaskStatus(t.id, "open"))}
-                >
-                  {dict.stOpen}
-                </button>
-                <button
-                  className={t.status === "in_progress" ? "on" : ""}
-                  onClick={() => run(() => setConsoleTaskStatus(t.id, "in_progress"))}
-                >
-                  {dict.stInProgress}
-                </button>
-              </div>
-            )}
-            <button
-              className="srow__b2"
-              onClick={(e) => {
-                e.stopPropagation();
-                openTask(t.id);
-              }}
-              title={dict.instrReply}
-            >
-              <Send size={15} />
-            </button>
-          </div>
-        </div>
-      );
-    };
+    const row = (t: TaskRecord) =>
+      renderRow(t, { meta: dirMeta(t, "recv"), right: t.status === "completed" ? doneDay(t) : undefined });
     const sec = (title: string, list: TaskRecord[], mod?: string) =>
-      list.length > 0
-        ? Section({ title, n: list.length, mod, listClass: "slist", children: list.map(rrow) })
-        : null;
+      list.length > 0 ? Section({ title, n: list.length, mod, children: list.map(row) }) : null;
     return (
       <>
-        {note}
         {sec(dict.stOverdue, od, "over")}
         {sec(dict.instrSecTodo, openT)}
         {sec(dict.instrSecInProgress, progT)}
-        {sec(dict.instrSecCompleted, doneT)}
+        {sec(dict.instrSecCompleted, doneT, "done")}
       </>
     );
   };
 
   const instrView = () => (
     <>
-      <div className="iseg">
-        <button className={instrTab === "recv" ? "on" : ""} onClick={() => setInstrTab("recv")}>
-          <Bell size={15} />
+      <div className="atw-seg" role="tablist" aria-label={dict.vInstr}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={instrTab === "recv"}
+          className={instrTab === "recv" ? "on" : ""}
+          onClick={() => setInstrTab("recv")}
+        >
           {dict.instrRecv}
-          {recvOpen > 0 && <span className="iseg__n alert">{recvOpen}</span>}
+          <b className="num">{recvOpen}</b>
         </button>
-        <button className={instrTab === "sent" ? "on" : ""} onClick={() => setInstrTab("sent")}>
-          <Megaphone size={15} />
+        <button
+          type="button"
+          role="tab"
+          aria-selected={instrTab === "sent"}
+          className={instrTab === "sent" ? "on" : ""}
+          onClick={() => setInstrTab("sent")}
+        >
           {dict.instrSent}
-          {sentOpen > 0 && <span className="iseg__n">{sentOpen}</span>}
+          <b className="num">{sentOpen}</b>
         </button>
       </div>
-      {instrTab === "sent" ? sentView() : recvView()}
+      <div className="atw-fade" key={instrTab}>
+        {instrTab === "sent" ? sentView() : recvView()}
+      </div>
     </>
   );
 
   // ── COMPLETED ────────────────────────────────────────────────────────────────────────
-  const completedView = () => {
-    // 완료·기록 = task_updates 완료 로그(net) 기준. 반복 완료는 행이 open 으로 롤포워드되어
-    // status=completed 가 아니므로 로그에서만 보인다 → 보고서(같은 소스)와 목록이 일치한다.
-    // 검색/우선순위 필터만 적용(날짜는 완료일 그룹 자체가 담당).
+  /** 완료·기록 = task_updates 완료 로그(net) 기준 — 보고서(같은 소스)와 목록이 일치한다. */
+  const completedRows = () => {
     type CmpRow = { task: TaskRecord; day: string; byUserId: string | null };
     const rows: CmpRow[] = [];
     for (const r of data.completions) {
       const task = tasks.find((t) => t.id === r.taskId);
       if (!task) continue;
-      // 내가 **보낸** 지시를 대상자가 완료한 것은 내 기록이 아니다(2026-09-09) — 나는 지시자이고
-      // 작업자는 그 사람이다. 진행 상황은 「지시 › 보낸 지시」에서 본다. 오늘/내일/관리함/캘린더가
-      // 이미 `myOwn` 으로 보낸 지시를 빼고 있었는데 완료·기록만 빠져 있었다.
-      // 내가 직접 완료한 경우는 남긴다 — 그건 내가 한 일이다.
+      // 내가 **보낸** 지시를 대상자가 완료한 것은 내 기록이 아니다(2026-09-09) — 진행 상황은 「지시 ›
+      // 보낸 지시」에서 본다. 내가 직접 완료한 경우는 남긴다 — 그건 내가 한 일이다.
       if (sentInstr(task, meId) && r.byUserId !== meId) continue;
       if (!(matchQuery(task, deferredQuery, nameOf) && matchPrio(task, prioFilter))) continue;
       rows.push({ task, day: r.day, byUserId: r.byUserId });
     }
+    return rows;
+  };
+  const completedView = () => {
+    // 검색/우선순위 필터만 적용(날짜는 완료일 그룹 자체가 담당).
+    const rows = completedRows();
     // 현장 활동(청소·유지보수·린넨·주문에서 본인이 완료 처리한 것). 투두가 아니라 작업 속성이
     // 없으므로 검색·우선순위 필터가 걸려 있으면 감춘다 — 남겨 두면 필터가 안 먹는 것처럼 보인다.
     const fieldVisible = deferredQuery.trim() || prioFilter ? [] : data.fieldActivities;
     if (rows.length === 0 && fieldVisible.length === 0)
-      return <EmptyState icon={<CheckCircle2 size={26} />} t={dict.emCompleted} s={dict.emCompletedS} />;
-    const byDay = new Map<string, CmpRow[]>();
+      return <EmptyState icon={<CheckCircle2 size={22} />} t={dict.emCompleted} s={dict.emCompletedS} />;
+    const byDay = new Map<string, typeof rows>();
     for (const row of rows) {
       if (!byDay.has(row.day)) byDay.set(row.day, []);
       byDay.get(row.day)!.push(row);
@@ -2534,41 +2403,47 @@ export function AdminTasksConsole({
           const list = byDay.get(day) ?? [];
           const fieldList = fieldByDay.get(day) ?? [];
           const dlabel =
-            day === today ? dict.cmpToday : day === addDays(today, -1) ? dict.cmpYesterday : fmtLong(day, locale);
+            day === today
+              ? `${dict.cmpToday} · ${fmtLong(day, locale)}`
+              : day === addDays(today, -1)
+                ? `${dict.cmpYesterday} · ${fmtLong(day, locale)}`
+                : fmtLong(day, locale);
           return (
-            <div key={day} className="cmp-day">
-              <div className="cmp-h">
-                <span className="cmp-h__d">{dlabel}</span>
-                <span className="cmp-h__n">{fill(dict.cmpDone, { n: list.length + fieldList.length })}</span>
-                <span className="cmp-h__line" />
-                <button className="cmp-h__report" onClick={() => openReport(day)}>
-                  <FileText size={14} />
-                  {dict.cmpReport}
-                </button>
+            <section key={day} className="atw-sec">
+              <div className="atw-sec__h">
+                <b>{dlabel}</b>
+                <span className="num">{fill(dict.w.dayCount, { n: list.length + fieldList.length })}</span>
+                <span className="atw-sec__acts">
+                  <button type="button" className="atw-tl" onClick={() => openReport(day)}>
+                    {dict.w.report}
+                  </button>
+                </span>
               </div>
-              <div className="tlist">
+              <div className="atw-rows">
                 {list.map(({ task, byUserId }) =>
                   renderRow(task, {
                     hideDate: true,
                     forceDone: true,
                     extraByLabel:
-                      byUserId && byUserId !== meId
-                        ? fill(dict.cmpBy, { name: nameOf(byUserId) })
-                        : undefined,
+                      byUserId && byUserId !== meId ? fill(dict.cmpBy, { name: nameOf(byUserId) }) : undefined,
+                    right: completedDateOf(task) === day ? tokyoTime(task.completedAt) : undefined,
                   }),
                 )}
                 {/* 현장 활동 — 읽기 전용. 되돌리기·완료 토글을 붙이지 않는다: 원본은 청소·유지보수
                     화면에 있고, 여기서 되돌릴 수 있게 하면 어느 쪽이 진짜인지 두 화면이 다툰다. */}
                 {fieldList.map((activity, i) => (
-                  <div className="fieldrow" key={`${day}|${activity.kind}|${i}`}>
-                    <span className="fieldrow__ic">
-                      <Check size={12} strokeWidth={3} />
+                  <div className="atw-field" key={`${day}|${activity.kind}|${i}`}>
+                    <span className="atw-field__ic" aria-hidden="true">
+                      {dict.w.fieldBadge}
                     </span>
-                    <span className="fieldrow__label">{activity.label}</span>
+                    <span className="atw-row__b">
+                      <span className="atw-row__t">{activity.label}</span>
+                      <span className="atw-row__m">{dict.w.fieldSub}</span>
+                    </span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           );
         })}
       </>
@@ -2576,11 +2451,11 @@ export function AdminTasksConsole({
   };
 
   // ── CALENDAR ─────────────────────────────────────────────────────────────────────────
+  // 월요일 시작(시안 TodoCal-PC). 칸은 남은 높이를 다 채운다(5~6줄).
   const calendarView = () => {
     const [y, m] = calMonth.split("-").map(Number);
-    const pad = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+    const pad = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
     const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const prevDays = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
     const iso = (dd: number) => `${y}-${String(m).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
     const monthStart = iso(1);
     const monthEnd = iso(days);
@@ -2592,7 +2467,7 @@ export function AdminTasksConsole({
       const a = dateOf(t);
       if (!a) continue;
       if (isStandardRecurrence(t.recurrenceRule)) {
-        if (hideRecurring) continue; // "반복 숨기기" 토글: 고정 반복 회차 제외.
+        if (hideRecurring) continue; // "반복 숨기기": 고정 반복 회차 제외.
         for (const dstr of recurringOccurrencesInRange(t.recurrenceRule, a, monthStart, monthEnd)) {
           if (!occ.has(dstr)) occ.set(dstr, []);
           occ.get(dstr)!.push(t);
@@ -2606,20 +2481,14 @@ export function AdminTasksConsole({
       (occ.get(dstr) ?? [])
         .slice()
         .sort((a, b) => (a.timeLabel ?? "99").localeCompare(b.timeLabel ?? "99") || prioSort(a, b));
-    const monthCount = Array.from(occ.values()).reduce((n, arr) => n + arr.length, 0);
-    const wdHead = ["0", "1", "2", "3", "4", "5", "6"].map((_, i) =>
-      new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
-        weekday: "short",
-        timeZone: "UTC",
-      }).format(new Date(Date.UTC(2024, 0, 7 + i))),
+    const tag = locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR";
+    // 2024-01-08 은 월요일 — 월~일 머리글.
+    const wdHead = Array.from({ length: 7 }, (_, i) =>
+      new Intl.DateTimeFormat(tag, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2024, 0, 8 + i))),
     );
+    const rows = Math.ceil((pad + days) / 7);
     const cells: ReactNode[] = [];
-    for (let i = pad; i > 0; i--)
-      cells.push(
-        <div key={`p${i}`} className="ccell ccell--pad">
-          <span className="ccell__d">{prevDays - i + 1}</span>
-        </div>,
-      );
+    for (let i = 0; i < pad; i++) cells.push(<div key={`p${i}`} className={`atw-cc is-pad ${i >= 5 ? "is-wkend" : ""}`} />);
     for (let dd = 1; dd <= days; dd++) {
       const dstr = iso(dd);
       const wd = weekdayIndex(dstr);
@@ -2627,241 +2496,185 @@ export function AdminTasksConsole({
       cells.push(
         <div
           key={dstr}
-          className={`ccell ${dstr === today ? "ccell--today" : ""} ${wd === 0 ? "ccell--sun" : wd === 6 ? "ccell--sat" : ""}`}
-          onClick={() => setDaySheet(dstr)}
+          role="button"
+          tabIndex={0}
+          aria-pressed={calDay === dstr}
+          className={`atw-cc ${wd === 0 || wd === 6 ? "is-wkend" : ""} ${dstr === today ? "is-today" : ""} ${
+            calDay === dstr ? "is-sel" : ""
+          }`}
+          onClick={() => {
+            setCalDay(dstr);
+            setSel(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setCalDay(dstr);
+              setSel(null);
+            }
+          }}
         >
-          <div className="ccell__h">
-            <span className="ccell__d">{dd}</span>
-            {ev.length > 0 && <span className="ccell__n">{ev.length}</span>}
-          </div>
-          <div className="ccell__ev">
-            {ev.slice(0, 3).map((t) => {
-              const cls = ["cev"];
-              if (isOverdue(t, today)) cls.push("cev--over");
-              else if (t.priority === "urgent") cls.push("cev--urgent");
-              else if (t.priority === "important") cls.push("cev--imp");
-              else if (t.priority === "medium") cls.push("cev--med");
-              if (isSharedTask(t)) cls.push("cev--shared");
-              return (
-                <div
-                  key={t.id}
-                  className={cls.join(" ")}
-                  title={t.title}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openTask(t.id);
-                  }}
-                >
-                  <span className="cev__d" />
-                  {t.timeLabel && <span className="cev__t">{t.timeLabel}</span>}
-                  <span className="cev__x">{t.title}</span>
-                </div>
-              );
-            })}
-            {ev.length > 3 && (
-              <button
-                className="ccell__more"
+          <span className={`atw-cc__d num ${wd === 0 ? "is-sun" : wd === 6 ? "is-sat" : ""}`}>{dd}</span>
+          {ev.slice(0, 3).map((t) => {
+            const tone =
+              isOverdue(t, today) || t.priority === "urgent" ? "is-red" : isSharedTask(t) ? "is-shared" : "";
+            return (
+              <span
+                key={t.id}
+                className={`atw-cev ${tone}`}
+                title={t.title}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDaySheet(dstr);
+                  setCalDay(dstr);
+                  openTask(t.id);
                 }}
               >
-                {fill(dict.calMore, { n: ev.length - 3 })}
-              </button>
-            )}
-          </div>
+                {t.title}
+              </span>
+            );
+          })}
+          {ev.length > 3 && <span className="atw-cc__more num">{fill(dict.w.calMore, { n: ev.length - 3 })}</span>}
         </div>,
       );
     }
-    const tail = (7 - ((pad + days) % 7)) % 7;
-    for (let i = 1; i <= tail; i++)
-      cells.push(
-        <div key={`t${i}`} className="ccell ccell--pad">
-          <span className="ccell__d">{i}</span>
-        </div>,
-      );
-    // "다가오는 일정" = 이달 미래(오늘 제외) — 반복 회차 포함. 그리드와 같은 occ 맵에서 파생해 통일.
-    // (오늘 작업은 그리드 오늘 칸/오늘 탭에.)
-    const agByDay = new Map<string, TaskRecord[]>();
-    let upcomingCount = 0;
-    for (const [d, arr] of Array.from(occ.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
-      if (d <= today) continue;
-      const sorted = arr
-        .slice()
-        .sort((a, b) => (a.timeLabel ?? "99").localeCompare(b.timeLabel ?? "99") || prioSort(a, b));
-      agByDay.set(d, sorted);
-      upcomingCount += sorted.length;
+    const tail = rows * 7 - pad - days;
+    for (let i = 0; i < tail; i++) {
+      const col = (pad + days + i) % 7;
+      cells.push(<div key={`t${i}`} className={`atw-cc is-pad ${col >= 5 ? "is-wkend" : ""}`} />);
     }
-    const shiftMonth = (delta: number) => {
-      const nm = new Date(Date.UTC(y, m - 1 + delta, 1));
-      setCalMonth(`${nm.getUTCFullYear()}-${String(nm.getUTCMonth() + 1).padStart(2, "0")}`);
-    };
+    const shiftMonth = (delta: number) => setCalMonth(shiftMonthKey(calMonth, delta));
     return (
-      <div className="cv">
-        <div className="cal-card">
-          <div className="cal-top">
-            <div className="cal-top__nav">
-              <button onClick={() => shiftMonth(-1)} aria-label={dict.calPreviousMonth}>
-                <ChevronLeft size={16} />
-              </button>
-              <button onClick={() => shiftMonth(1)} aria-label={dict.calNextMonth}>
-                <ChevronRight size={16} />
-              </button>
-            </div>
-            <div className="cal-top__t">
-              <b>{fmtMonthTitle(y, m, locale)}</b>
-              <span>{fill(dict.taskWord, { n: monthCount })}</span>
-            </div>
-            <button className="cal-top__today" onClick={() => setCalMonth(today.slice(0, 7))}>
-              {dict.calThisMonth}
-            </button>
+      <div className="atw-cal">
+        <div className="atw-cal__top">
+          <button type="button" className="atw-icon is-sm" onClick={() => shiftMonth(-1)} aria-label={dict.calPreviousMonth}>
+            <ChevronLeft size={17} />
+          </button>
+          <b className="atw-cal__m num">{fmtMonthTitle(y, m, locale)}</b>
+          <button type="button" className="atw-icon is-sm" onClick={() => shiftMonth(1)} aria-label={dict.calNextMonth}>
+            <ChevronRight size={17} />
+          </button>
+          {calMonth !== today.slice(0, 7) && (
             <button
               type="button"
-              className={`cal-top__rep ${hideRecurring ? "on" : ""}`}
-              onClick={() => setHideRecurring((v) => !v)}
-              aria-pressed={hideRecurring}
-              title={dict.calHideRepeat}
+              className="atw-tl"
+              onClick={() => {
+                setCalMonth(today.slice(0, 7));
+                setCalDay(today);
+              }}
             >
-              <Repeat size={14} />
-              {dict.calHideRepeat}
+              {dict.calThisMonth}
             </button>
-            <div className="cal-top__lg">
-              <span className="lgi">
-                <span className="d" style={{ background: "var(--faint)" }} />
-                {dict.calLegendPersonal}
-              </span>
-              <span className="lgi">
-                <span className="d" style={{ background: "var(--adm-primary)" }} />
-                {dict.calLegendShared}
-              </span>
-              <span className="lgi">
-                <span className="d" style={{ background: "var(--danger)" }} />
-                {dict.calLegendUrgent}
-              </span>
-            </div>
-          </div>
-          <div className="cgrid">
-            {wdHead.map((w, i) => (
-              <div key={i} className={`cgrid__wd ${i === 0 ? "sun" : i === 6 ? "sat" : ""}`}>
-                {w}
-              </div>
-            ))}
-            {cells}
-          </div>
-        </div>
-        <div className="cv__agenda">
-          {add?.ctx === "day" && <div className="tlist">{InlineAdd()}</div>}
-          <div className="sech">
-            <span className="sech__t">{dict.calUpcoming}</span>
-            <span className="sech__n">{upcomingCount}</span>
-            <span className="sech__line" />
-          </div>
-          {agByDay.size === 0 ? (
-            <div className="tempty__s" style={{ padding: "16px 2px", textAlign: "left" }}>
-              {dict.calNoMonth}
-            </div>
-          ) : (
-            Array.from(agByDay.keys())
-              .sort()
-              .map((dd) => (
-                <div key={dd} className="ag-day">
-                  <div className={`ag-h ${dd === today ? "today" : ""}`}>
-                    <b>{dd === today ? dict.today : fmtLong(dd, locale)}</b>
-                    <span>{fill(dict.taskWord, { n: agByDay.get(dd)!.length })}</span>
-                  </div>
-                  <div className="tlist">
-                    {/* 다가오는 일정 = **미리보기**. 미래 회차는 여기서 완료할 수 없다(2026-09-09).
-                        그날 오늘 탭에서 처리한다. 예전에는 체크가 눌렸는데, 회차 날짜를 넘기지 않아
-                        서버가 **시리즈 앵커**로 폴백해 엉뚱한 과거 회차를 완료 처리하고 있었다. */}
-                    {agByDay.get(dd)!.map((t) => renderRow(t, { hideDate: true, previewOnly: true }))}
-                  </div>
-                </div>
-              ))
           )}
+          <span className="atw-cal__lg">
+            <span>
+              <i className="is-amber" />
+              {dict.calLegendPersonal}
+            </span>
+            <span>
+              <i className="is-violet" />
+              {dict.calLegendShared}
+            </span>
+            <span>
+              <i className="is-red" />
+              {dict.calLegendUrgent}
+            </span>
+          </span>
+          <span className="atw-swrow">
+            {dict.calHideRepeat}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hideRecurring}
+              aria-label={dict.calHideRepeat}
+              className={`atw-sw ${hideRecurring ? "on" : ""}`}
+              onClick={() => setHideRecurring((v) => !v)}
+            >
+              <i />
+            </button>
+          </span>
+        </div>
+        <div className="atw-cal__grid" style={{ ["--rows" as string]: String(rows) }}>
+          {wdHead.map((w, i) => (
+            <span key={i} className={`atw-cal__wd ${i >= 5 ? "is-wkend" : ""} ${i === 5 ? "is-sat" : i === 6 ? "is-sun" : ""}`}>
+              {w}
+            </span>
+          ))}
+          {cells}
         </div>
       </div>
     );
   };
 
-  // ── PROJECT ───────────────────────────────────────────────────────────────────────────
-  const projectView = () => {
-    const summary = projectId ? projById.get(projectId) : null;
-    if (!summary) return null;
-    // summary.members 는 owner(=createdByUserId) 행을 이미 포함한다. 별도로 createdByUserId 를
-    // 앞에 덧붙이면 소유자가 중복 표시·중복 카운트되므로(멤버 4명 버그) Set 으로 합쳐 dedup.
-    const memberIds = Array.from(
-      new Set([summary.createdByUserId, ...summary.members.map((mem) => mem.userId)]),
-    );
-    const canDeleteProject = summary.viewerRole === "owner" || summary.createdByUserId === meId;
-    const askDeleteProject = () =>
-      setConfirm({
-        message: fill(dict.pjDeleteMsg, { title: summary.title }),
-        confirmLabel: dict.confirmDeleteBtn,
-        onConfirm: () =>
-          run(() => deleteConsoleProject(summary.id), {
-            toast: dict.pjDeleted,
-            after: () => goView("today"), // 삭제된 프로젝트 뷰에서 빠져나옴
-          }),
-      });
-    const pd = projectDetail && projectDetail.id === projectId ? projectDetail : null;
-    const sections =
-      pd?.sections && pd.sections.length > 0
-        ? pd.sections
-        : [{ id: "__default", title: dict.dpTask, sortOrder: 0 }];
-    const projTasks = filtered(tasks.filter((t) => t.projectId === projectId && isActive(t)));
-    const banner = (
-      <div className="pjbanner">
-        <div className="pjbanner__b">
-          <div className="pjbanner__t">{fill(dict.pjBanner, { n: memberIds.length })}</div>
-          <div className="pjbanner__avs">
-            <div className="row">
-              <Avatars ids={memberIds} />
-            </div>
-            <span className="names">{memberIds.map((id) => nameOf(id)).join(", ")}</span>
+  /** 캘린더 오른쪽 칸 — 고른 날짜의 작업 + 「이 날짜에 작업 추가」(예전 날짜 시트 모달을 대신한다). */
+  const calendarSide = () => {
+    const iso = calDay;
+    // 미래 날짜면 **미리보기**다 — 아직 할 수 없는 일을 완료 처리할 수 없게 한다(2026-09-09).
+    const isFutureDay = iso > today;
+    const list = personalTasks
+      .filter(
+        (t) =>
+          isActive(t) &&
+          myOwn(t, meId) &&
+          occursOn(t, iso) &&
+          !(hideRecurring && isStandardRecurrence(t.recurrenceRule)),
+      )
+      .sort(prioSort);
+    return (
+      <aside className="atw-side is-day" aria-label={fmtLong(iso, locale)} onClick={(e) => e.stopPropagation()}>
+        <div className="atw-fade" key={iso}>
+          <div className="atw-sec__h">
+            <b>{iso === today ? fill(dict.w.dayToday, { date: fmtLong(iso, locale) }) : fmtLong(iso, locale)}</b>
+            <span className="num">{fill(dict.w.dayCount, { n: list.length })}</span>
+          </div>
+          <div className="atw-rows">
+            {list.map((t) =>
+              renderRow(
+                t,
+                // 반복은 **그 날짜 회차**로 완료한다 — 회차 없이 부르면 서버가 시리즈 앵커로 폴백한다.
+                isStandardRecurrence(t.recurrenceRule) && !isFutureDay
+                  ? { hideDate: true, occurrence: { date: iso, done: !!occState(t.id, iso) } }
+                  : { hideDate: true, previewOnly: isFutureDay },
+              ),
+            )}
+            {list.length === 0 && <p className="atw-soft atw-side__none">{dict.calDayEmpty}</p>}
+            {InlineAddSlot({ ctx: "day", label: dict.calAddOnDay })}
           </div>
         </div>
-        {canDeleteProject && (
-          <>
-            <button
-              className="pjbanner__act"
-              onClick={(e) => openProjectMembersPop(e, summary.id, memberIds)}
-              title={dict.pjMembersManage}
-            >
-              <UserPlus size={14} />
-              {dict.pjMembersManage}
-            </button>
-            <button className="pjbanner__del" onClick={askDeleteProject} title={dict.pjDelete}>
-              <Trash2 size={14} />
-              {dict.pjDelete}
-            </button>
-          </>
-        )}
-      </div>
+      </aside>
     );
-    if (projTasks.length === 0 && !hasActiveFilter && !(add && add.ctx === "project")) {
-      return (
-        <>
-          {banner}
-          <EmptyState icon={<Hash size={26} />} t={dict.pjEmptyT} s={dict.pjEmptyS} ctx="project" />
-        </>
-      );
+  };
+
+  // ── PROJECT ───────────────────────────────────────────────────────────────────────────
+  const projectInfo = () => {
+    const summary = projectId ? projById.get(projectId) : null;
+    if (!summary) return null;
+    // summary.members 는 owner(=createdByUserId) 행을 이미 포함한다 — Set 으로 합쳐 dedup(멤버 4명 버그).
+    const memberIds = Array.from(new Set([summary.createdByUserId, ...summary.members.map((mem) => mem.userId)]));
+    const canManage = summary.viewerRole === "owner" || summary.createdByUserId === meId;
+    const pd = projectDetail && projectDetail.id === projectId ? projectDetail : null;
+    const sections =
+      pd?.sections && pd.sections.length > 0 ? pd.sections : [{ id: "__default", title: dict.dpTask, sortOrder: 0 }];
+    const projTasks = filtered(tasks.filter((t) => t.projectId === projectId && isActive(t)));
+    return { summary, memberIds, canManage, sections, projTasks, hasRealSections: !!pd?.sections?.length };
+  };
+
+  const projectView = () => {
+    const info = projectInfo();
+    if (!info) return null;
+    const { summary, canManage, sections, projTasks } = info;
+    if (projTasks.length === 0 && !hasActiveFilter && !(add && add.ctx === "project") && !info.hasRealSections) {
+      return <EmptyState icon={<Hash size={22} />} t={dict.pjEmptyT} s={dict.pjEmptyS} ctx="project" />;
     }
     return (
       <>
-        {banner}
         {sections.map((sec) => {
-          const list = projTasks
-            .filter((t) => (t.sectionId ?? "__default") === sec.id)
-            .sort(prioSort);
+          const list = projTasks.filter((t) => (t.sectionId ?? "__default") === sec.id).sort(prioSort);
           return (
-            <div key={sec.id} className="pjsec">
-              <div className="pjsec-h">
-                <span className="chev">
-                  <ChevronDown size={14} />
-                </span>
+            <section key={sec.id} className="atw-sec">
+              <div className="atw-sec__h">
                 {sectionEdit?.id === sec.id ? (
                   <input
-                    className="pjsec-h__input"
+                    className="atw-sec__input"
                     value={sectionEdit.title}
                     autoFocus
                     onChange={(e) => setSectionEdit({ ...sectionEdit, title: e.target.value })}
@@ -2874,21 +2687,25 @@ export function AdminTasksConsole({
                 ) : (
                   <b>{sec.title}</b>
                 )}
-                <span className="n">{list.length}</span>
+                <span className="num">{list.length}</span>
                 {/* `__default` 는 섹션이 없는 프로젝트의 가상 그룹이라 실제 행이 없다 — 이름 변경·
                     삭제 대상이 될 수 없다. */}
-                {canDeleteProject && sec.id !== "__default" && !sectionEdit && (
-                  <span className="pjsec-h__acts">
+                {canManage && sec.id !== "__default" && !sectionEdit && (
+                  <span className="atw-sec__acts is-hover">
                     <button
-                      className="pjsec-h__b"
+                      type="button"
+                      className="atw-icon is-xs"
                       title={dict.pjSectionRename}
+                      aria-label={dict.pjSectionRename}
                       onClick={() => setSectionEdit({ id: sec.id, title: sec.title })}
                     >
-                      <Pencil size={13} />
+                      <Pencil size={14} />
                     </button>
                     <button
-                      className="pjsec-h__b pjsec-h__b--danger"
+                      type="button"
+                      className="atw-icon is-xs is-red"
                       title={dict.pjSectionDelete}
+                      aria-label={dict.pjSectionDelete}
                       onClick={() =>
                         setConfirm({
                           message: fill(dict.pjSectionDeleteMsg, { title: sec.title }),
@@ -2900,329 +2717,51 @@ export function AdminTasksConsole({
                         })
                       }
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                     </button>
                   </span>
                 )}
               </div>
-              <div className="tlist">{list.map((t) => renderRow(t))}</div>
-              {InlineAddSlot({ ctx: "project", sectionId: sec.id, label: fill(dict.pjAddTaskTo, { name: sec.title }) })}
-            </div>
+              <div className="atw-rows">
+                {list.map((t) => renderRow(t))}
+                {InlineAddSlot({ ctx: "project", sectionId: sec.id })}
+              </div>
+            </section>
           );
         })}
-        {canDeleteProject && (
-          <div className="pjsec-add">
-            <input
-              className="pjsec-add__input"
-              placeholder={dict.pjSectionNamePh}
-              value={newSection}
-              onChange={(e) => setNewSection(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addSection(summary.id);
-              }}
-            />
-            <button
-              className="btn btn--ghost btn--sm"
-              disabled={!newSection.trim() || pending}
-              onClick={() => addSection(summary.id)}
-            >
-              <Plus size={14} />
-              {dict.pjSectionAdd}
+        {canManage &&
+          (secAdding ? (
+            <div className="atw-secadd">
+              <input
+                className="atw-sec__input"
+                placeholder={dict.pjSectionNamePh}
+                value={newSection}
+                autoFocus
+                onChange={(e) => setNewSection(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addSection(summary.id);
+                  else if (e.key === "Escape") setSecAdding(false);
+                }}
+              />
+              <button type="button" className="atw-btn is-ghost" onClick={() => setSecAdding(false)}>
+                {dict.iaCancel}
+              </button>
+              <button
+                type="button"
+                className="atw-btn is-pri"
+                disabled={!newSection.trim() || pending}
+                onClick={() => addSection(summary.id)}
+              >
+                {dict.w.sectionAdd}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="atw-addrow is-sec" onClick={() => setSecAdding(true)}>
+              <Plus size={16} strokeWidth={2.2} />
+              {dict.w.sectionAdd}
             </button>
-          </div>
-        )}
+          ))}
       </>
-    );
-  };
-
-  // ── body routing ───────────────────────────────────────────────────────────────────────
-  const showRail = !projectId ? view !== "completed" && view !== "calendar" : true;
-  const body = projectId
-    ? projectView()
-    : view === "today"
-      ? todayView()
-      : view === "tomorrow"
-        ? tomorrowView()
-        : view === "inbox"
-          ? inboxView()
-          : view === "shared"
-            ? sharedView()
-            : view === "instr"
-              ? instrView()
-              : view === "completed"
-                ? completedView()
-                : calendarView();
-
-  // ── SELECTION BAR ────────────────────────────────────────────────────────────────────────
-  // Built on the same banner skeleton as `.odbanner` (icon tile → text block → right-aligned
-  // actions), tinted primary instead of danger, so selection mode reads as part of this console
-  // rather than a bar borrowed from another screen.
-  const selectionBar = () => {
-    if (!selMode || !filterableView) return null;
-    const n = picked.size;
-    return (
-      <div className="selbar">
-        <div className={`selbar__ic ${n > 0 ? "on" : ""}`} aria-hidden="true">
-          {n > 0 ? <span className="selbar__n">{n}</span> : <CheckCheck size={19} />}
-        </div>
-        <div className="selbar__b">
-          <div className="selbar__t">{n > 0 ? fill(dict.selSelected, { n }) : dict.selEmptyHint}</div>
-          <div className="selbar__s">{dict.selHint}</div>
-        </div>
-        <div className="selbar__acts">
-          <button type="button" className="sel-b" onClick={selectAllVisible}>
-            {dict.selAll}
-          </button>
-          <button type="button" className="sel-b" onClick={clearSel} disabled={n === 0}>
-            {dict.selClear}
-          </button>
-          <button
-            type="button"
-            className="sel-b sel-b--danger"
-            onClick={askBulkDelete}
-            disabled={n === 0 || pending}
-          >
-            <Trash2 size={15} />
-            {dict.selDelete}
-          </button>
-          <button type="button" className="selbar__x" onClick={exitSelMode} aria-label={dict.iaCancel}>
-            <X size={16} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ── RAIL ─────────────────────────────────────────────────────────────────────────────────
-  const rail = () => {
-    /**
-     * 레일의 집계 단위는 **오늘 탭에 실제로 보이는 행 수**다 — 탭 배지(`todayCount`)와 같은 기준.
-     *
-     * 예전엔 `isTodayTask || isOverdue` 만 셌는데, `isTodayTask` 는 반복 작업을 **명시적으로
-     * 제외한다**(helpers.ts — 반복은 회차 헬퍼가 따로 처리). 그래서 오늘 목록이 9건인데 대기가
-     * 2로 뜨는 식으로 반복 회차가 통째로 빠졌다(2026-07-31).
-     *
-     * 한 작업이 오늘 회차와 지연 회차를 동시에 가지면 두 번 세는데, 목록도 그 작업을 두 줄로
-     * 보여주므로(지연 섹션 + 오늘) 화면과 숫자가 일치한다.
-     */
-    const scope = [
-      ...personalTasks.filter((t) => (isTodayTask(t, today) || isOverdue(t, today)) && myOwn(t, meId)),
-      ...personalTasks.filter((t) => myOwn(t, meId) && openOccursOn(t, today)),
-      ...personalTasks.filter(
-        (t) => myOwn(t, meId) && overdueOccurrenceDates(t, today, resolvedDatesFor(t.id)).length > 0,
-      ),
-    ];
-    // 반복 회차에는 회차별 상태가 없으므로 행 status 로 가른다(목록의 상태 칩과 같은 기준).
-    const open = scope.filter((t) => t.status !== "in_progress").length;
-    const prog = scope.filter((t) => t.status === "in_progress").length;
-    // 오늘 완료 = 완료 로그(task_updates net) 기준. 반복 완료는 행이 open 으로 롤포워드되어
-    // status=completed 가 아니므로 로그를 봐야 실제 오늘 완료 건수가 나온다(내 개인 작업 한정).
-    const myPersonalIds = new Set(personalTasks.filter((t) => myOwn(t, meId)).map((t) => t.id));
-    const doneToday = data.completions.filter(
-      (r) => r.day === today && r.byUserId === meId && myPersonalIds.has(r.taskId),
-    ).length;
-    const pct = scope.length + doneToday ? Math.round((doneToday / (scope.length + doneToday)) * 100) : 0;
-    const qrow = (t: TaskRecord, right: ReactNode) => {
-      const cx = ctxItems(t);
-      return (
-        <div key={t.id} className="qrow" onClick={() => openTask(t.id)}>
-          <span
-            className={`qrow__ic ${t.priority === "urgent" ? "bg-danger" : t.priority === "important" ? "bg-warn" : t.priority === "medium" ? "bg-info" : "bg-surf"}`}
-          >
-            {t.priority === "normal" ? <Check size={13} /> : <Flag size={13} fill="currentColor" />}
-          </span>
-          <div className="qrow__b">
-            <div className="qrow__t">{t.title}</div>
-            <div className="qrow__s">
-              {nameOf(t.createdByUserId)}
-              {t.isDirective && !isMine(t, meId) ? ` ${dict.vInstr}` : ""}
-              {cx.length > 0 && (
-                <>
-                  <span className="sep" />
-                  {cx[0].v}
-                </>
-              )}
-            </div>
-          </div>
-          <div className="qrow__meta">{right}</div>
-        </div>
-      );
-    };
-    const inbound = personalTasks
-      .filter((t) => recvInstr(t, meId) && isActive(t))
-      .sort((a, b) => prioSort(a, b) || dateSort(a, b))
-      .slice(0, 4);
-    const up = personalTasks
-      .filter((t) => {
-        const d = dateOf(t);
-        return isActive(t) && myOwn(t, meId) && !!d && d > today;
-      })
-      .sort(dateSort)
-      .slice(0, 4);
-    const byMember = new Map<string, number>();
-    for (const t of personalTasks.filter((t) => isActive(t) && plainShared(t, meId)))
-      for (const id of [t.createdByUserId, ...partsOf(t)]) if (id !== meId) byMember.set(id, (byMember.get(id) ?? 0) + 1);
-    const mem = Array.from(byMember.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    const sent = personalTasks
-      .filter((t) => sentInstr(t, meId) && isActive(t))
-      .sort((a, b) => dateSort(a, b) || prioSort(a, b))
-      .slice(0, 4);
-    const statusPill = (t: TaskRecord, unconfirmedLabel: string) => {
-      const overdue = isOverdue(t, today);
-      const cls = overdue ? "danger" : t.status === "in_progress" ? "open" : "muted";
-      return (
-        <span className={`pill pill--${cls}`}>
-          <span className="d" />
-          {overdue ? dict.stOverdue : t.status === "in_progress" ? dict.stInProgress : unconfirmedLabel}
-        </span>
-      );
-    };
-    return (
-      <aside className="wrail">
-        <div className="card">
-          <div className="card__h">
-            <div className="card__ti">
-              <span className="card__ic bg-done">
-                <CheckCircle2 size={14} />
-              </span>
-              <span className="card__t">{dict.railTodayTitle}</span>
-            </div>
-          </div>
-          <div className="card__body">
-            <div className="minirow">
-              <div className="ministat">
-                <div className="ministat__v">{open}</div>
-                <div className="ministat__k">{dict.stOpen}</div>
-              </div>
-              <div className="minisep" />
-              <div className="ministat">
-                <div className="ministat__v">{prog}</div>
-                <div className="ministat__k">{dict.stInProgress}</div>
-              </div>
-              <div className="minisep" />
-              <div className="ministat">
-                <div className="ministat__v">{doneToday}</div>
-                <div className="ministat__k">{dict.railDoneToday}</div>
-              </div>
-            </div>
-            <div className="railbar">
-              <div className="railbar__k">
-                {dict.railTodayProgress}
-                <b>{pct}%</b>
-              </div>
-              <div className={`pbar ${pct >= 70 ? "done" : ""}`}>
-                <i style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card__h">
-            <div className="card__ti">
-              <span className="card__ic bg-pri">
-                <Bell size={14} />
-              </span>
-              <span className="card__t">{dict.instrRecv}</span>
-            </div>
-            <div className="card__act">
-              <button className="linkmore" onClick={() => { goView("instr"); setInstrTab("recv"); }}>
-                {dict.vInstr}
-                <ChevronRight size={13} />
-              </button>
-            </div>
-          </div>
-          {inbound.length > 0 ? (
-            inbound.map((t) => qrow(t, statusPill(t, dict.instrUnconfirmed)))
-          ) : (
-            <div className="card__body">
-              <div className="railempty">{dict.instrEmptyRecvT}</div>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card__h">
-            <div className="card__ti">
-              <span className="card__ic bg-warn">
-                <Megaphone size={14} />
-              </span>
-              <span className="card__t">{dict.instrSent}</span>
-            </div>
-            <div className="card__act">
-              <button className="linkmore" onClick={() => { goView("instr"); setInstrTab("sent"); }}>
-                {dict.vInstr}
-                <ChevronRight size={13} />
-              </button>
-            </div>
-          </div>
-          {sent.length > 0 ? (
-            sent.map((t) => qrow(t, statusPill(t, dict.instrUnconfirmed)))
-          ) : (
-            <div className="card__body">
-              <div className="railempty">{dict.instrEmptySentT}</div>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card__h">
-            <div className="card__ti">
-              <span className="card__ic bg-info">
-                <CalendarDays size={14} />
-              </span>
-              <span className="card__t">{dict.calUpcoming}</span>
-            </div>
-            <div className="card__act">
-              <button className="linkmore" onClick={() => goView("calendar")}>
-                {dict.vCalendar}
-                <ChevronRight size={13} />
-              </button>
-            </div>
-          </div>
-          {up.length > 0 ? (
-            up.map((t) =>
-              qrow(
-                t,
-                <span className="qrow__time">
-                  {fmtShort(dateOf(t)!, locale)} ({fmtWeekday(dateOf(t)!, locale)})
-                </span>,
-              ),
-            )
-          ) : (
-            <div className="card__body">
-              <div className="railempty">{dict.railUpcomingEmpty}</div>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card__h">
-            <div className="card__ti">
-              <span className="card__ic bg-violet">
-                <Share2 size={14} />
-              </span>
-              <span className="card__t">{dict.vShared}</span>
-            </div>
-          </div>
-          <div className="card__body">
-            {mem.length > 0 ? (
-              mem.map(([id, n]) => (
-                <div key={id} className="memrow">
-                  <Avatar id={id} />
-                  <div className="memrow__b">
-                    <div className="memrow__n">{nameOf(id)}</div>
-                    <div className="memrow__r">{roleOf(id)}</div>
-                  </div>
-                  <span className="memrow__n2">{n}</span>
-                </div>
-              ))
-            ) : (
-              <div className="railempty">{dict.emShared}</div>
-            )}
-          </div>
-        </div>
-      </aside>
     );
   };
 
@@ -3286,8 +2825,8 @@ export function AdminTasksConsole({
   // ── note send ────────────────────────────────────────────────────────────────────────────
   const sendNote = () => {
     // 사진만 있고 본문이 비어도 보낼 수 있다(서버도 같은 규칙).
-    if (!panelTask || (!noteDraft.trim() && notePhotos.length === 0)) return;
-    const id = panelTask;
+    if (!activeId || (!noteDraft.trim() && notePhotos.length === 0)) return;
+    const id = activeId;
     const body = noteDraft;
     const photos = notePhotos;
     run(
@@ -3312,18 +2851,293 @@ export function AdminTasksConsole({
     );
   };
 
+  /**
+   * 상세 칸 「사진 추가」(2026-10-15) — 편집 모드를 거치지 않고 바로 붙인다. 업로드 계약은 편집 저장과
+   * 같다: 클라이언트 압축 → `task-images/` 업로드 → `updateConsoleTaskCore` 에 **전체 집합**을 넘긴다
+   * (기존 사진 + 새 사진이라 지워지는 건 없다). 작성자 전용이고 상한(5 / 프로젝트 20)은 서버도 다시 건다.
+   */
+  const addDetailPhotos = (t: TaskRecord, files: File[]) => {
+    if (files.length === 0 || photoBusy) return;
+    const max = t.projectId ? 20 : 5;
+    const allowed = ["image/gif", "image/jpeg", "image/png", "image/webp"];
+    if (files.some((f) => !allowed.includes(f.type))) return showToast(dict.phInvalidType);
+    if (files.some((f) => f.size > 8 * 1024 * 1024)) return showToast(fill(dict.phTooLarge, { max: 8 }));
+    if (t.imageUrls.length + files.length > max) return showToast(fill(dict.phTooMany, { max }));
+    setPhotoBusy(t.id);
+    run(
+      async () => {
+        try {
+          const pendingItems: PreviewItem[] = await Promise.all(
+            files.map(async (file) => ({
+              id: `${Date.now()}-${Math.random()}`,
+              file: await compressImageFile(file),
+              previewUrl: "",
+            })),
+          );
+          const uploaded = await uploadPendingTaskPhotos({ pending: pendingItems, organizationId, taskId: t.id });
+          return updateConsoleTaskCore({
+            taskId: t.id,
+            title: t.title,
+            desc: t.description ?? "",
+            tags: t.tags,
+            date: dueDateOf(t) ?? t.scheduledDate ?? "",
+            time: t.timeLabel ?? "",
+            durationMinutes: t.durationMinutes,
+            repeat: t.recurrenceRule ?? "none",
+            priority: t.priority,
+            imageUrls: [...t.imageUrls, ...uploaded],
+          });
+        } catch {
+          return { ok: false, error: "save_failed" } as TaskActionResult;
+        }
+      },
+      { toast: dict.tUpdated, after: () => setPhotoBusy(null), onError: () => setPhotoBusy(null) },
+    );
+  };
+
+  // ── 상세 칸: 무엇을 보여 줄지 ─────────────────────────────────────────────────────────────
+  // 목록 보기(오늘·내일·관리함·공유함)는 고른 게 없으면 **보기의 첫 작업**을 보여 준다(시안 Todo-PC).
+  // 완료·기록 · 지시 · 프로젝트는 줄을 눌렀을 때만 칸이 열리고, 캘린더는 그날 목록이 그 자리를 쓴다.
+  const listView =
+    !projectId && (view === "today" || view === "tomorrow" || view === "inbox" || view === "shared");
+  const firstIdOfView = (): string | null => {
+    if (view === "today") {
+      const { odOne, td } = todayData();
+      return odOne[0]?.id ?? td[0]?.id ?? null;
+    }
+    if (view === "tomorrow") return tomorrowItems()[0]?.id ?? null;
+    if (view === "inbox") return inboxItems()[0]?.id ?? null;
+    const { received, sent } = sharedLists();
+    return received[0]?.id ?? sent[0]?.id ?? null;
+  };
+  const defaultId = listView && !detailClosed && !selMode ? firstIdOfView() : null;
+  const activeId = sel ?? defaultId;
+
+  // 상세(업데이트 로그 + 연결 정보) 불러오기. 서버 갱신(`data`)마다 다시 읽는다.
+  useEffect(() => {
+    if (!activeId) return;
+    let alive = true;
+    getConsoleTaskDetail(activeId).then((res) => {
+      if (alive && res.ok) setDetail(res.task);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [activeId, data]);
+
+  // ── 왼쪽 「+ 작업 추가」 — 지금 보기에 맞는 자리에 입력창을 연다 ──────────────────────────
+  const navAdd = () => {
+    if (projectId) {
+      const info = projectInfo();
+      openInlineAdd("project", "", info?.sections[0]?.id ?? "__default");
+      return;
+    }
+    if (view === "today" || view === "tomorrow" || view === "inbox") openInlineAdd(view);
+    else if (view === "instr") {
+      setInstrTab("sent");
+      openInlineAdd("instr");
+    } else if (view === "calendar") {
+      setSel(null);
+      openInlineAdd("day", calDay);
+    } else {
+      goView("today");
+      openInlineAdd("today");
+    }
+  };
+  const goProject = (id: string) => {
+    setProjectId(id);
+    setAdd(null);
+    setSel(null);
+    setDetailClosed(false);
+    setOdMode(null);
+    setSecAdding(false);
+    setSelMode(false);
+    setPicked(new Set());
+  };
+
+  // ── 가운데 머리(제목 · 한 줄 요약) ───────────────────────────────────────────────────────
+  const headBlock = (title: string, sub?: ReactNode, right?: ReactNode, lead?: ReactNode) => (
+    <div className="atw-head">
+      {lead}
+      <div className="atw-head__t">
+        <h1>{title}</h1>
+        {sub ? <span>{sub}</span> : null}
+      </div>
+      {right ? <div className="atw-head__r">{right}</div> : null}
+    </div>
+  );
+  const header = () => {
+    if (projectId) {
+      const info = projectInfo();
+      if (!info) return null;
+      const { summary, memberIds, canManage, sections, projTasks } = info;
+      const askDeleteProject = () =>
+        setConfirm({
+          message: fill(dict.pjDeleteMsg, { title: summary.title }),
+          confirmLabel: dict.confirmDeleteBtn,
+          onConfirm: () =>
+            run(() => deleteConsoleProject(summary.id), {
+              toast: dict.pjDeleted,
+              after: () => goView("today"), // 삭제된 프로젝트 뷰에서 빠져나옴
+            }),
+        });
+      return headBlock(
+        `# ${summary.title}`,
+        fill(dict.w.projSub, { s: info.hasRealSections ? sections.length : 0, n: projTasks.length }),
+        <>
+          <button
+            type="button"
+            className="atw-members"
+            disabled={!canManage}
+            title={canManage ? dict.pjMembersManage : undefined}
+            onClick={canManage ? (e) => openProjectMembersPop(e, summary.id, memberIds) : undefined}
+          >
+            <span className="atw-avs">
+              <Avatars ids={memberIds} />
+            </span>
+            {fill(dict.w.membersN, { n: memberIds.length })}
+          </button>
+          {canManage && (
+            <button type="button" className="atw-tl is-red" onClick={askDeleteProject}>
+              {dict.pjDelete}
+            </button>
+          )}
+        </>,
+      );
+    }
+    if (view === "today") {
+      const total = todayCount + doneTodayRows(false).length;
+      const done = total - todayCount;
+      return headBlock(
+        dict.vToday,
+        fill(dict.w.todaySub, { date: fmtLong(today, locale), total, done }),
+        undefined,
+        <ProgressRing done={done} total={total} label={fill(dict.w.progressAria, { total, done })} />,
+      );
+    }
+    if (view === "tomorrow")
+      return headBlock(
+        dict.vTomorrow,
+        `${fmtLong(addDays(today, 1), locale)} · ${fill(dict.w.dayCount, { n: tomorrowCount })}`,
+      );
+    if (view === "inbox") return headBlock(dict.vInbox, dict.inboxNote);
+    if (view === "shared") return headBlock(dict.vShared, fill(dict.w.dayCount, { n: sharedCount }));
+    if (view === "instr") return headBlock(dict.vInstr, dict.w.instrHint);
+    if (view === "completed") {
+      // 이번 주 = 월요일부터(도쿄). 투두 완료만 센다 — 현장 활동은 날짜 묶음 안에서만 보인다.
+      const weekStart = addDays(today, -((weekdayIndex(today) + 6) % 7));
+      const n = completedRows().filter((r) => r.day >= weekStart).length;
+      return headBlock(dict.vCompleted, fill(dict.w.weekDone, { n }));
+    }
+    return null; // 캘린더는 달 머리가 그 자리를 쓴다.
+  };
+
+  // ── 도구 줄(검색 · 날짜 ▾ · 우선순위 ▾ · 선택) ────────────────────────────────────────────
+  const dateFilterLabel = dateFilter
+    ? dateFilter === "today"
+      ? dict.today
+      : dateFilter === "week"
+        ? dict.filterDate
+        : dateFilter === "overdue"
+          ? dict.stOverdue
+          : dict.noDate
+    : dict.filterDate;
+  const toolbar = () => (
+    <div className="atw-tools">
+      <label className="atw-search">
+        <Search size={15} />
+        <input placeholder={dict.filterSearch} aria-label={dict.filterSearch} value={q} onChange={(e) => setQ(e.target.value)} />
+        {q && (
+          <button type="button" aria-label={dict.selClear} onClick={() => setQ("")}>
+            <X size={13} />
+          </button>
+        )}
+      </label>
+      <button
+        type="button"
+        className={`atw-dd ${dateFilter ? "on" : ""}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setPop({ kind: "datefilter", ...anchorFrom(e) });
+        }}
+      >
+        {dateFilterLabel}
+        <ChevronDown size={14} />
+      </button>
+      <button
+        type="button"
+        className={`atw-dd ${prioFilter ? "on" : ""}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setPop({ kind: "priofilter", ...anchorFrom(e) });
+        }}
+      >
+        {prioFilter ? prioWord(prioFilter) : dict.filterPrio}
+        <ChevronDown size={14} />
+      </button>
+      {(dateFilter || prioFilter) && (
+        <button
+          type="button"
+          className="atw-icon is-xs"
+          aria-label={dict.selClear}
+          onClick={() => {
+            setDateFilter(null);
+            setPrioFilter("");
+          }}
+        >
+          <X size={14} />
+        </button>
+      )}
+      <button
+        type="button"
+        className={`atw-dd is-sel ${selMode ? "on" : ""}`}
+        aria-pressed={selMode}
+        onClick={() => (selMode ? exitSelMode() : setSelMode(true))}
+      >
+        {dict.selMode}
+      </button>
+    </div>
+  );
+
+  // ── 선택 모드 줄(일괄 삭제) ───────────────────────────────────────────────────────────────
+  const selectionBar = () => {
+    if (!selMode || !filterableView) return null;
+    const n = picked.size;
+    return (
+      <div className="atw-selbar">
+        <b className="num">{n > 0 ? fill(dict.selSelected, { n }) : dict.selEmptyHint}</b>
+        <span className="atw-selbar__s">{dict.selHint}</span>
+        <span className="atw-selbar__acts">
+          <button type="button" className="atw-tl" onClick={selectAllVisible}>
+            {dict.selAll}
+          </button>
+          <button type="button" className="atw-tl is-muted" onClick={clearSel} disabled={n === 0}>
+            {dict.selClear}
+          </button>
+          <button type="button" className="atw-pillbtn is-red" onClick={askBulkDelete} disabled={n === 0 || pending}>
+            <Trash2 size={14} />
+            {dict.selDelete}
+          </button>
+          <button type="button" className="atw-icon is-xs" onClick={exitSelMode} aria-label={dict.iaCancel}>
+            <X size={16} />
+          </button>
+        </span>
+      </div>
+    );
+  };
+
   // ── loadError ────────────────────────────────────────────────────────────────────────────
   if (data.loadError) {
     return (
-      <div className="admtasks">
-        <div className="tempty">
-          <div className="tempty__ic">
-            <CloudOff size={26} />
-          </div>
-          <p className="tempty__t">{dict.errT}</p>
-          <p className="tempty__s">{dict.errS}</p>
-          <button className="btn btn--ghost tempty__cta" onClick={() => router.refresh()}>
-            <RotateCcw size={15} />
+      <div className="admtasks atw is-error">
+        <div className="atw-empty">
+          <span className="atw-empty__ic">
+            <CloudOff size={22} />
+          </span>
+          <b>{dict.errT}</b>
+          <span>{dict.errS}</span>
+          <button type="button" className="atw-link" onClick={() => router.refresh()}>
+            <RotateCcw size={14} />
             {dict.retry}
           </button>
         </div>
@@ -3332,152 +3146,97 @@ export function AdminTasksConsole({
   }
 
   const filterableView = view !== "calendar" || !!projectId;
+  const isCal = !projectId && view === "calendar";
+
+  // ── body routing ───────────────────────────────────────────────────────────────────────
+  const body = projectId
+    ? projectView()
+    : view === "today"
+      ? todayView()
+      : view === "tomorrow"
+        ? tomorrowView()
+        : view === "inbox"
+          ? inboxView()
+          : view === "shared"
+            ? sharedView()
+            : view === "instr"
+              ? instrView()
+              : view === "completed"
+                ? completedView()
+                : calendarView();
+
+  // 오른쪽 칸 — 상세 / 캘린더 날짜 목록 / (목록 보기에서 아무것도 없을 때) 안내.
+  const sideNode =
+    isCal && !sel
+      ? calendarSide()
+      : (activeId && DetailPanel()) ||
+        (listView || isCal ? (
+          <aside className="atw-side is-empty" aria-live="polite">
+            <div className="atw-side__empty">
+              <b>{dict.w.detailEmpty}</b>
+              <span>{dict.w.detailEmptySub}</span>
+            </div>
+          </aside>
+        ) : null);
+
+  const navItems: NavItem[] = (
+    [
+      // 「주의」 색은 **지연 섹션에 뭔가 있을 때**만 — 그 섹션은 일회성 전용이다(2026-09-08).
+      ["today", dict.vToday, <Clock key="i" size={17} />, todayCount, overdueList.length > 0],
+      ["tomorrow", dict.vTomorrow, <ArrowRight key="i" size={17} />, tomorrowCount, false],
+      ["inbox", dict.vInbox, <Inbox key="i" size={17} />, inboxCount, false],
+      ["instr", dict.vInstr, <Megaphone key="i" size={17} />, recvOpen, recvOpen > 0],
+      ["shared", dict.vShared, <Users key="i" size={17} />, sharedCount, false],
+      ["completed", dict.vCompleted, <SquareCheck key="i" size={17} />, 0, false],
+      ["calendar", dict.vCalendar, <CalendarDays key="i" size={17} />, 0, false],
+    ] as [View, string, ReactNode, number, boolean][]
+  ).map(([v, label, icon, count, alert]) => ({
+    key: v,
+    label,
+    icon,
+    count,
+    alert,
+    on: !projectId && view === v,
+    onClick: () => goView(v),
+  }));
+  const navProjects: NavItem[] = data.projects.map((p) => ({
+    key: p.id,
+    label: p.title,
+    icon: <Hash size={15} />,
+    count: p.totalTasks - p.completedTasks,
+    on: projectId === p.id,
+    onClick: () => goProject(p.id),
+  }));
 
   return (
-    <div className="admtasks" onClick={() => setPop(null)}>
-      {/* SUBNAV */}
-      <div className="tsubnav">
-        <div className="tsubnav__tabs">
-          {(
-            [
-              // 「주의」 점은 **지연 섹션에 뭔가 있을 때**만 — 그 섹션은 이제 일회성 전용이다
-              // (2026-09-08). 반복 밀림은 오늘 줄의 배지로 보이므로 여기서 또 알릴 필요가 없다.
-              ["today", dict.vToday, <Sun key="i" size={15} />, todayCount, overdueList.length > 0],
-              ["tomorrow", dict.vTomorrow, <Sunrise key="i" size={15} />, tomorrowCount, false],
-              ["inbox", dict.vInbox, <Inbox key="i" size={15} />, inboxCount, false],
-              ["instr", dict.vInstr, <Megaphone key="i" size={15} />, recvOpen + sentOpen, recvOpen > 0],
-              ["shared", dict.vShared, <Share2 key="i" size={15} />, sharedCount, false],
-              ["calendar", dict.vCalendar, <CalendarDays key="i" size={15} />, 0, false],
-              ["completed", dict.vCompleted, <CheckCircle2 key="i" size={15} />, 0, false],
-            ] as [View, string, ReactNode, number, boolean][]
-          ).map(([v, label, icon, count, alert]) => (
-            <button
-              key={v}
-              className={`tab ${!projectId && view === v ? "on" : ""}`}
-              onClick={() => goView(v)}
-            >
-              {icon}
-              {label}
-              {count > 0 && <span className={`tab__n ${alert ? "alert" : ""}`}>{count}</span>}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div
+      className={`admtasks atw ${sideNode ? "has-side" : ""} ${isCal ? "is-cal" : ""}`}
+      onClick={() => setPop(null)}
+    >
+      <ViewNav
+        aria={dict.w.navAria}
+        addLabel={dict.addTask}
+        onAdd={navAdd}
+        items={navItems}
+        projectsLabel={dict.w.projects}
+        projects={navProjects}
+        newProjectLabel={dict.newProject}
+        onNewProject={() => setNewProj({ name: "", members: [], q: "" })}
+      />
 
-      {/* PROJECT CHIPS */}
-      <div className="tsubnav tsubnav--proj">
-        <span className="tsubnav__lbl">{dict.sharedProjects}</span>
-        {data.projects.map((p) => (
-          <button
-            key={p.id}
-            className={`pjchip ${projectId === p.id ? "on" : ""}`}
-            onClick={() => {
-              setProjectId(p.id);
-              setAdd(null);
-              setSelMode(false);
-              setPicked(new Set());
-            }}
-          >
-            <Hash size={13} />
-            <span>{p.title}</span>
-            <span className="pjchip__avs">
-              <Avatars ids={p.members.map((mem) => mem.userId).slice(0, 3)} />
-            </span>
-            <span className="pjchip__n">{p.totalTasks - p.completedTasks}</span>
-          </button>
-        ))}
-        <button className="pjchip pjchip--new" onClick={() => setNewProj({ name: "", members: [], q: "" })}>
-          <Plus size={13} />
-          {dict.newProject}
-        </button>
-      </div>
-
-      {/* FILTER BAR */}
-      {filterableView && (
-        <div className="filt">
-          <div className="filt__search">
-            <span className="ic">
-              <Search size={16} />
-            </span>
-            <input placeholder={dict.filterSearch} value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <button
-            className={`fbtn ${dateFilter ? "on" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setPop({ kind: "datefilter", ...anchorFrom(e) });
-            }}
-          >
-            <CalendarDays size={14} />
-            {dateFilter
-              ? dateFilter === "today"
-                ? dict.today
-                : dateFilter === "week"
-                  ? dict.filterDate
-                  : dateFilter === "overdue"
-                    ? dict.stOverdue
-                    : dict.noDate
-              : dict.filterDate}
-            {dateFilter && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDateFilter(null);
-                }}
-              >
-                <X size={12} />
-              </span>
-            )}
-          </button>
-          <button
-            className={`fbtn ${prioFilter ? "on" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setPop({ kind: "priofilter", ...anchorFrom(e) });
-            }}
-          >
-            <Flag size={14} />
-            {prioFilter ? prioLabel(prioFilter, dict) : dict.filterPrio}
-          </button>
-          {/* Sits inline with the filters, not pushed right: `.filt` spans the full width including
-              the rail column, so a `flex:1` spacer would fling this chip past the task list. */}
-          <button
-            type="button"
-            className={`fbtn ${selMode ? "on" : ""}`}
-            aria-pressed={selMode}
-            onClick={() => (selMode ? exitSelMode() : setSelMode(true))}
-          >
-            <CheckCheck size={14} />
-            {dict.selMode}
-          </button>
-        </div>
-      )}
-
-      {/* BODY — the selection bar lives INSIDE `.wcol` so it lines up with the task list card
-          instead of stretching across the rail like the filter bar does. */}
-      {showRail ? (
-        <div className="tgrid">
-          <div className="wcol">
-            {selectionBar()}
-            {body}
-          </div>
-          {rail()}
-        </div>
-      ) : (
-        <div className="wcol">
+      <main className="atw-main">
+        <div className="atw-fade" key={projectId ?? view}>
+          {header()}
+          {filterableView && toolbar()}
           {selectionBar()}
           {body}
         </div>
-      )}
+      </main>
 
-      {/* DETAIL PANEL */}
-      {panelTask && DetailPanel()}
+      {sideNode}
 
       {/* POPOVERS / SHEETS / MODALS */}
       {pop && PopoverLayer()}
-      {daySheet && DaySheet()}
       {report && ReportModal()}
       {newProj && NewProjectModal()}
       {confirm && ConfirmModal()}
@@ -3515,13 +3274,14 @@ export function AdminTasksConsole({
   );
 
   // ────────────────────────────────────────────────────────────────────────────────────────────
-  // DETAIL PANEL (E)
+  // DETAIL COLUMN — 오른쪽 칸(화이트 리디자인). 예전 슬라이드 패널(.dp)의 로직을 그대로 쓴다.
+  // 작성자 전용 규칙(일정·우선순위·연결·편집·삭제)은 서버와 같은 경계로 화면에서도 가른다.
   // ────────────────────────────────────────────────────────────────────────────────────────────
   function DetailPanel() {
-    const loaded = detail && detail.id === panelTask ? detail : null;
-    const t = loaded ?? tasks.find((x) => x.id === panelTask) ?? null;
+    const loaded = detail && detail.id === activeId ? detail : null;
+    const t = loaded ?? tasks.find((x) => x.id === activeId) ?? null;
     if (!t) return null;
-    const done = t.status === "completed";
+    const done = t.status === "completed" || completing.has(`${t.id}|`);
     // 코어 편집 드래프트가 이 작업의 것일 때만 편집 모드로 렌더한다.
     const editing = coreEdit && coreEdit.id === t.id ? coreEdit : null;
     // What the segmented control shows: the pending click while the data still reads as it did when
@@ -3531,185 +3291,194 @@ export function AdminTasksConsole({
         ? statusDraft.status
         : t.status;
     const mine = isMine(t, meId);
-    const instr = t.isDirective && !mine ? t.authorName : null;
     const proj = t.projectId ? projById.get(t.projectId) : null;
     const d = dueDateOf(t) ?? t.scheduledDate ?? null;
     const trng = timeRange(t.timeLabel, t.durationMinutes);
     const cx = ctxItems(t);
+    const ticket = cx.find((c) => c.k === "ticket");
+    const rc = t.resolvedContext;
+    const linkText =
+      [[rc?.propertyName, rc?.roomLabel].filter(Boolean).join(" "), rc?.guestName]
+        .filter(Boolean)
+        .join(" · ") || (ticket?.v ?? "");
     const shared = isSharedTask(t);
-    const participantIds = [t.createdByUserId, ...partsOf(t)].filter((v, i, a) => a.indexOf(v) === i);
-    const firstRecipient = t.participants.find((p) => p.isFirstRecipient)?.userId ?? null;
+    const withIds = [t.createdByUserId, ...partsOf(t)].filter((v, i, a) => a.indexOf(v) === i);
+    const maxPhotos = t.projectId ? 20 : 5;
+    const busy = photoBusy === t.id;
+    const askLeave = () =>
+      setConfirm({
+        message: dict.confirmLeaveMsg,
+        confirmLabel: dict.dpLeave,
+        onConfirm: () =>
+          run(() => leaveConsoleTask(t.id), {
+            toast: dict.tDeleted,
+            after: () => setSel((cur) => (cur === t.id ? null : cur)),
+          }),
+      });
+    const schedText: ReactNode = d ? (
+      <>
+        {dayLabel(d)}
+        {trng ? ` ${trng}` : ""}
+        {t.durationMinutes && durText(t.durationMinutes) ? ` · ${durText(t.durationMinutes)}` : ""}
+        {isOverdue(t, today) && <span className="is-red"> · {dict.stOverdue}</span>}
+      </>
+    ) : (
+      <span className="is-soft">{dict.dpNoDate}</span>
+    );
 
     return (
-      <>
-        <div className={`dp-scrim ${panelOn ? "on" : ""}`} onClick={closePanel} />
-        <aside className={`dp ${panelOn ? "on" : ""}`} onClick={(e) => e.stopPropagation()}>
-        <div className="dp__top">
-          <span className="dp__crumb">
-            {proj ? (
-              <>
-                <Hash size={14} />
-                <b>{proj.title}</b>
-              </>
-            ) : (
-              <>
-                {t.isInbox ? <Inbox size={14} /> : <Sun size={14} />}
-                <b>{t.isInbox ? dict.dpInbox : dict.dpTask}</b>
-              </>
-            )}
-          </span>
-          <span className="sp" />
-          <Link className="dp__tb" href={`/mobile/tasks/${t.id}`} title={dict.dpMobileDetail}>
-            <Smartphone size={16} />
-          </Link>
-          <button className="dp__tb" onClick={(e) => openRowMenu(e, t.id)} title={dict.mPriority}>
-            <MoreHorizontal size={16} />
-          </button>
-          <button className="dp__tb" onClick={closePanel} title={dict.iaCancel}>
-            <X size={16} />
-          </button>
-        </div>
-        <div className="dp__body">
-          <div className="dp__lead">
+      <aside className="atw-side" aria-label={t.title} onClick={(e) => e.stopPropagation()}>
+        <div className="atw-d" key={t.id}>
+          <div className="atw-d__bar">
             <button
-              className={`tchk ${t.priority !== "normal" ? `p-${t.priority}` : ""} ${done ? "is-done" : ""}`}
-              onClick={() => toggleComplete(t)}
+              type="button"
+              className="atw-icon"
+              onClick={(e) => openRowMenu(e, t.id, undefined, true)}
+              aria-label={dict.w.more}
+              title={dict.w.more}
             >
-              <Check size={13} />
+              <MoreHorizontal size={19} />
             </button>
-            <div className="dp__headwrap">
-              {(t.priority !== "normal" || instr) && (
-                <div className="dp__flags">
-                  {t.priority === "important" && (
-                    <span className="dbadge dbadge--amber">
-                      <Flag size={12} fill="currentColor" />
-                      {dict.prioImportant}
-                    </span>
-                  )}
-                  {t.priority === "urgent" && (
-                    <span className="dbadge dbadge--rose">
-                      <Flag size={12} fill="currentColor" />
-                      {dict.prioUrgent}
-                    </span>
-                  )}
-                  {t.priority === "medium" && (
-                    <span className="dbadge dbadge--blue">
-                      <Flag size={12} fill="currentColor" />
-                      {dict.prioMedium}
-                    </span>
-                  )}
-                  {instr && (
-                    <span className="dbadge dbadge--instr">
-                      <Megaphone size={12} />
-                      {fill(dict.instructedBy, { name: instr })}
-                    </span>
-                  )}
-                </div>
-              )}
-              {editing ? (
-                <div className="dpedit">
-                  <input
-                    className="dpedit__title"
-                    value={editing.title}
-                    placeholder={dict.iaTitle}
-                    autoFocus
-                    onChange={(e) => setCoreEdit({ ...editing, title: e.target.value })}
-                  />
-                  <textarea
-                    className="dpedit__desc"
-                    value={editing.desc}
-                    placeholder={dict.iaDesc}
-                    rows={3}
-                    onChange={(e) => setCoreEdit({ ...editing, desc: e.target.value })}
-                  />
-                  <div className="dpedit__tags">
-                    {editing.tags.map((g) => (
-                      <span key={g} className="chip chip--tag">
-                        {g}
-                        <button
-                          type="button"
-                          className="chip__x"
-                          aria-label={`${g} ${dict.iaCancel}`}
-                          onClick={() =>
-                            setCoreEdit({ ...editing, tags: editing.tags.filter((x) => x !== g) })
-                          }
-                        >
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                    {editing.tags.length < 10 && (
-                      <input
-                        className="dpedit__taginput"
-                        value={editing.tagInput}
-                        placeholder={dict.dpTagAdd}
-                        onChange={(e) => setCoreEdit({ ...editing, tagInput: e.target.value })}
-                        onKeyDown={(e) => {
-                          // Enter/comma commit; Backspace on an empty input pops the last chip.
-                          if (e.key === "Enter" || e.key === ",") {
-                            e.preventDefault();
-                            addCoreTag();
-                          } else if (e.key === "Backspace" && !editing.tagInput && editing.tags.length) {
-                            setCoreEdit({ ...editing, tags: editing.tags.slice(0, -1) });
-                          }
-                        }}
-                        onBlur={addCoreTag}
-                      />
-                    )}
-                  </div>
-                  <TaskPhotoUploader
-                    value={editPhotos.value}
-                    pending={editPhotos.pending}
-                    maxImages={t.projectId ? 20 : 5}
-                    copy={photoCopy}
-                    onChange={setEditPhotos}
-                  />
-                  <div className="dpedit__acts">
-                    <button className="btn btn--ghost btn--sm" onClick={cancelCoreEdit}>
-                      {dict.iaCancel}
-                    </button>
+            {mine && (
+              <button
+                type="button"
+                className={`atw-icon ${editing ? "on" : ""}`}
+                onClick={() => (editing ? cancelCoreEdit() : startCoreEdit(t))}
+                aria-pressed={!!editing}
+                aria-label={dict.w.edit}
+                title={dict.w.edit}
+              >
+                <Pencil size={18} />
+              </button>
+            )}
+            <button
+              type="button"
+              className="atw-icon is-red"
+              onClick={() => (mine ? deleteWithUndo(t) : askLeave())}
+              aria-label={mine ? (shared ? dict.dpUnshareDelete : dict.dpDelete) : dict.dpLeave}
+              title={mine ? (shared ? dict.dpUnshareDelete : dict.dpDelete) : dict.dpLeave}
+            >
+              <Trash2 size={19} />
+            </button>
+            <button type="button" className="atw-icon is-x" onClick={closePanel} aria-label={dict.w.close}>
+              <X size={22} />
+            </button>
+          </div>
+
+          {editing ? (
+            <div className="atw-edit">
+              <input
+                className="atw-edit__title"
+                value={editing.title}
+                placeholder={dict.iaTitle}
+                aria-label={dict.iaTitle}
+                autoFocus
+                onChange={(e) => setCoreEdit({ ...editing, title: e.target.value })}
+              />
+              <textarea
+                className="atw-edit__desc"
+                value={editing.desc}
+                placeholder={dict.iaDesc}
+                aria-label={dict.iaDesc}
+                rows={3}
+                onChange={(e) => setCoreEdit({ ...editing, desc: e.target.value })}
+              />
+              <div className="atw-edit__tags">
+                {editing.tags.map((g) => (
+                  <span key={g} className="atw-tag">
+                    #{g}
                     <button
-                      className="btn btn--pri btn--sm"
-                      disabled={!editing.title.trim() || pending}
-                      onClick={() => saveCoreEdit(t, editing)}
+                      type="button"
+                      aria-label={`${g} ${dict.iaCancel}`}
+                      onClick={() => setCoreEdit({ ...editing, tags: editing.tags.filter((x) => x !== g) })}
                     >
-                      {dict.dpSave}
+                      <X size={11} />
                     </button>
-                  </div>
-                </div>
-              ) : (
+                  </span>
+                ))}
+                {editing.tags.length < 10 && (
+                  <input
+                    className="atw-iadd__tag"
+                    value={editing.tagInput}
+                    placeholder={dict.dpTagAdd}
+                    onChange={(e) => setCoreEdit({ ...editing, tagInput: e.target.value })}
+                    onKeyDown={(e) => {
+                      // Enter/comma commit; Backspace on an empty input pops the last chip.
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        addCoreTag();
+                      } else if (e.key === "Backspace" && !editing.tagInput && editing.tags.length) {
+                        setCoreEdit({ ...editing, tags: editing.tags.slice(0, -1) });
+                      }
+                    }}
+                    onBlur={addCoreTag}
+                  />
+                )}
+              </div>
+              <TaskPhotoUploader
+                value={editPhotos.value}
+                pending={editPhotos.pending}
+                maxImages={maxPhotos}
+                copy={photoCopy}
+                onChange={setEditPhotos}
+              />
+              <div className="atw-edit__acts">
+                <button type="button" className="atw-btn is-ghost" onClick={cancelCoreEdit}>
+                  {dict.iaCancel}
+                </button>
+                <button
+                  type="button"
+                  className="atw-btn is-pri"
+                  disabled={!editing.title.trim() || pending}
+                  onClick={() => saveCoreEdit(t, editing)}
+                >
+                  {dict.dpSave}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="atw-d__head">
+                <TaskRing
+                  size="lg"
+                  prio={t.priority}
+                  done={done}
+                  label={dict.stCompleted}
+                  onToggle={completing.has(`${t.id}|`) ? undefined : () => completeWithMotion(t)}
+                />
+                <h2 className={done ? "is-done" : ""}>{t.title}</h2>
+              </div>
+              {t.description && (
                 <>
-                  <h1 className={`dp__title ${done ? "is-done" : ""}`}>{t.title}</h1>
-                  {t.description && <p className="dp__desc">{t.description}</p>}
-                  {t.tags.length > 0 && (
-                    <div className="dp__tags">
-                      {t.tags.map((g) => (
-                        <span key={g} className="chip chip--tag">
-                          {g}
-                        </span>
-                      ))}
-                    </div>
+                  {/* 긴 설명은 6줄까지만 — 상태·일정이 칸 아래로 밀려나지 않게. 펼치면 전부 보인다. */}
+                  <p className={`atw-d__desc ${descOpen === t.id ? "" : "is-clamp"}`}>{t.description}</p>
+                  {(t.description.length > 220 || t.description.split("\n").length > 6) && (
+                    <button
+                      type="button"
+                      className="atw-a atw-d__more"
+                      onClick={() => setDescOpen(descOpen === t.id ? null : t.id)}
+                    >
+                      {descOpen === t.id ? dict.w.descLess : dict.w.descMore}
+                    </button>
                   )}
                 </>
               )}
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* Segmented control. `shownStatus` is the optimistic value so the thumb slides the instant
-              the button is pressed; the CSS thumb is driven by data-active, not per-button bg. */}
-          <div className="dp__status" data-active={shownStatus} role="group">
-            <span className="dp__status__thumb" aria-hidden="true" />
+          {/* 대기 / 진행 중 / 완료. `shownStatus` 가 낙관적 값이라 누르는 즉시 손잡이가 움직인다. */}
+          <div className="atw-status" data-active={shownStatus} role="group" aria-label={dict.dpStatus}>
+            <span className="atw-status__thumb" aria-hidden="true" />
             {STATUS_SEGMENTS.map((seg) => (
               <button
                 key={seg.status}
                 type="button"
-                className={`${seg.status === "completed" ? "done " : ""}${
-                  shownStatus === seg.status ? "on" : ""
-                }`}
+                className={shownStatus === seg.status ? "on" : ""}
                 aria-pressed={shownStatus === seg.status}
                 onClick={() => {
                   if (shownStatus === seg.status) return;
                   setStatusDraft({ id: t.id, from: t.status, status: seg.status });
+                  if (seg.status === "completed") haptic("success");
                   run(() => setConsoleTaskStatus(t.id, seg.status), {
                     toast: seg.status === "completed" ? dict.tCompleted : undefined,
                     onError: () => setStatusDraft(null),
@@ -3721,254 +3490,224 @@ export function AdminTasksConsole({
             ))}
           </div>
 
-          <div className="dsec">
-            <div className="dsec__t">{dict.dpSchedule}</div>
-            <div className="meta">
-              {d && (
-                <MetaRow icon={<CalendarDays size={14} />} k={dueDateOf(t) ? dict.dpDue : dict.dpSched}>
-                  {fmtLong(d, locale)}
-                  {isOverdue(t, today) && <span className="over"> · {dict.stOverdue}</span>}
-                </MetaRow>
+          {!editing && (mine || t.imageUrls.length > 0) && (
+            <div className="atw-d__photos">
+              {t.imageUrls.map((url, i) => (
+                <button
+                  key={url}
+                  type="button"
+                  className="atw-ph"
+                  onClick={() => setLightbox({ urls: t.imageUrls, index: i })}
+                >
+                  <Image src={url} alt="" width={128} height={128} />
+                </button>
+              ))}
+              {mine && t.imageUrls.length < maxPhotos && (
+                <label className={`atw-ph is-add ${busy ? "is-busy" : ""}`} aria-label={dict.w.photoAdd} title={dict.w.photoAdd}>
+                  <input
+                    type="file"
+                    accept="image/gif,image/jpeg,image/png,image/webp"
+                    multiple
+                    hidden
+                    disabled={busy}
+                    onChange={(e) => {
+                      addDetailPhotos(t, Array.from(e.target.files ?? []));
+                      e.target.value = "";
+                    }}
+                  />
+                  {busy ? <Loader2 size={18} className="atw-spin" /> : <Plus size={18} />}
+                </label>
               )}
-              {trng && (
-                <MetaRow icon={<Clock size={14} />} k={dict.dpTime}>
-                  {trng}
-                  {t.durationMinutes && durText(t.durationMinutes) && (
-                    <span className="sub"> · {durText(t.durationMinutes)}</span>
-                  )}
-                </MetaRow>
+              <span className="atw-d__phn num">
+                {fill(dict.w.photosCount, { n: t.imageUrls.length, max: maxPhotos })}
+              </span>
+            </div>
+          )}
+
+          <dl className="atw-d__dl">
+            <dt>{dict.w.dlSchedule}</dt>
+            <dd>
+              {/* 일정 변경은 **작성자 전용**이다(`rescheduleConsoleTask` 가 서버에서도 거절한다).
+                  참여자는 ⋯ 메뉴의 오늘/내일로 이동만 쓸 수 있다 — 모바일과 같은 경계. */}
+              {mine ? (
+                <button type="button" className="atw-ddbtn" onClick={(e) => openSchedulePop(e, t)}>
+                  {schedText}
+                </button>
+              ) : (
+                schedText
               )}
               {t.recurrenceRule && (
-                <MetaRow icon={<Repeat size={14} />} k={dict.dpRepeat}>
-                  {repeatLabel(t.recurrenceRule, d, today, locale, dict)}
-                </MetaRow>
+                <span className="atw-d__sub">↻ {repeatLabel(t.recurrenceRule, d, today, locale, dict)}</span>
               )}
-              {!d && !trng && !t.recurrenceRule && (
-                <MetaRow icon={<CalendarX2 size={14} />} k={dict.dpSchedule}>
-                  <span className="sub">{dict.dpNoDate}</span>
-                </MetaRow>
-              )}
-              {/* 일정 변경은 **작성자 전용**이다(`rescheduleConsoleTask` 가 서버에서도 거절한다).
-                  참여자는 상단 ⋯ 메뉴의 오늘/내일로 이동만 쓸 수 있다 — 모바일과 같은 경계. */}
-              {mine && (
-                <button
-                  className="dp__sharebtn"
-                  style={{ marginTop: 10 }}
-                  onClick={(e) => openSchedulePop(e, t)}
-                >
-                  <CalendarDays size={14} />
-                  {dict.dpScheduleChange}
+            </dd>
+            <dt>{dict.w.dlPriority}</dt>
+            <dd>
+              {mine ? (
+                <button type="button" className="atw-ddbtn" onClick={(e) => openPrioPop(e, t)}>
+                  <span className={`atw-pdot p-${t.priority}`} aria-hidden="true" />
+                  {prioWord(t.priority)}
                 </button>
+              ) : (
+                <>
+                  <span className={`atw-pdot p-${t.priority}`} aria-hidden="true" />
+                  {prioWord(t.priority)}
+                </>
               )}
-            </div>
-          </div>
+            </dd>
+            {(cx.length > 0 || mine) && (
+              <>
+                <dt>{dict.w.dlLinked}</dt>
+                <dd>
+                  {cx.length > 0 ? (
+                    <>
+                      {mine ? (
+                        <button type="button" className="atw-ddbtn" onClick={(e) => openContextPop(e, t)}>
+                          {linkText}
+                        </button>
+                      ) : (
+                        linkText
+                      )}
+                      {ticket && (
+                        <Link className="atw-a" href="/admin/calendar">
+                          {dict.dpViewResv}
+                        </Link>
+                      )}
+                    </>
+                  ) : (
+                    <button type="button" className="atw-a" onClick={(e) => openContextPop(e, t)}>
+                      {dict.w.linkCta}
+                    </button>
+                  )}
+                </dd>
+              </>
+            )}
+            {t.tags.length > 0 && (
+              <>
+                <dt>{dict.w.dlTags}</dt>
+                <dd className="is-soft">{t.tags.map((g) => `#${g}`).join(" ")}</dd>
+              </>
+            )}
+            {t.isDirective && !mine && (
+              <>
+                <dt>{dict.vInstr}</dt>
+                <dd>{fill(dict.instructedBy, { name: t.authorName || nameOf(t.createdByUserId) })}</dd>
+              </>
+            )}
+            {(shared || (mine && !t.projectId)) && (
+              <>
+                <dt>{dict.w.dlWith}</dt>
+                <dd>
+                  {shared ? (
+                    <>
+                      <span className="atw-avs">
+                        <Avatars ids={withIds} />
+                      </span>
+                      <span className="is-soft">{withIds.map((id) => nameOf(id)).join(" · ")}</span>
+                      {/* 참여자도 사람을 부를 수 있다(Re-sharing) — 서버는 비작성자의 **추가만** 적용한다. */}
+                      {!t.projectId && (
+                        <button type="button" className="atw-a" onClick={(e) => openSharePop(e, t, "share")}>
+                          {dict.w.shareManage}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button type="button" className="atw-a" onClick={(e) => openSharePop(e, t, "share")}>
+                      {dict.dpShareCta}
+                    </button>
+                  )}
+                </dd>
+              </>
+            )}
+            {proj && (
+              <>
+                <dt>{dict.w.dlProject}</dt>
+                <dd>
+                  <button type="button" className="atw-ddbtn" onClick={() => goProject(proj.id)}>
+                    # {proj.title}
+                  </button>
+                </dd>
+              </>
+            )}
+          </dl>
 
-          {cx.length > 0 && (
-            <div className="dsec">
-              <div className="dsec__t">{dict.dpLinked}</div>
-              <div className="ctx">
-                {cx.map((c, i) => (
-                  <div key={i} className="ctxrow">
-                    <div className="ctxrow__ic">{CTX_IC[c.k]}</div>
-                    <div className="ctxrow__b">
-                      <div className="ctxrow__k">{ctxKey[c.k]}</div>
-                      <div className="ctxrow__v">{c.v}</div>
-                    </div>
-                    {c.k === "ticket" && (
-                      <Link className="ctxrow__go" href="/admin/calendar">
-                        {dict.dpViewResv}
-                        <ArrowUpRight size={13} />
-                      </Link>
+          <section className="atw-d__log" aria-label={dict.w.updates}>
+            <b className="atw-d__lt">{dict.w.updates}</b>
+            <div className="atw-sys">{fill(dict.dpLogCreated, { name: nameOf(t.createdByUserId) })}</div>
+            {/* 노트와 시스템 기록(완료·재개·상태변경·공유·수정)을 전부 그린다(2026-07-31) — 관리자 화면에서
+                「누가 언제 완료했다가 다시 열었는지」를 볼 수 있어야 한다. 노트 사진도 여기서 보인다. */}
+            {(loaded?.updates ?? []).map((u) =>
+              u.type === "note" ? (
+                <div key={u.id} className="atw-note">
+                  <Avatar id={u.byUserId ?? ""} />
+                  <div className="atw-note__b">
+                    <span className="atw-note__h">
+                      <b>{u.byName}</b>
+                      <span className="num">{fmtLog(u.createdAt, locale)}</span>
+                    </span>
+                    {u.body && <p>{u.body}</p>}
+                    {u.imageUrls.length > 0 && (
+                      <span className="atw-note__photos">
+                        {u.imageUrls.map((url, i) => (
+                          <button
+                            key={url}
+                            type="button"
+                            className="atw-ph is-sm"
+                            onClick={() => setLightbox({ urls: u.imageUrls, index: i })}
+                          >
+                            <Image src={url} alt="" width={96} height={96} />
+                          </button>
+                        ))}
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {shared ? (
-            <div className="dsec">
-              <div className="dsec__t">{fill(dict.dpParticipants, { n: participantIds.length })}</div>
-              <div className="plist">
-                {participantIds.map((id) => (
-                  <div key={id} className="prow">
-                    <Avatar id={id} />
-                    <div className="prow__b">
-                      <div className="prow__n">
-                        {nameOf(id)}
-                        {id === t.createdByUserId && (
-                          <span className="ptag ptag--author">
-                            <Crown size={11} />
-                            {dict.dpAuthor}
-                          </span>
-                        )}
-                        {id === firstRecipient && id !== t.createdByUserId && (
-                          <span className="ptag">{dict.dpFirstRecipient}</span>
-                        )}
-                        {id === meId && <span className="ptag">{dict.dpMe}</span>}
-                      </div>
-                      <div className="prow__r">{roleOf(id)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {mine && !t.projectId && (
-                <button className="dp__sharebtn" onClick={(e) => openSharePop(e, t, "share")}>
-                  <UserPlus size={14} />
-                  {dict.dpShareManage}
-                </button>
-              )}
-            </div>
-          ) : mine && !t.projectId ? (
-            <div className="dsec">
-              <div className="dsec__t">{dict.dpShare}</div>
-              <button className="dp__sharebtn" onClick={(e) => openSharePop(e, t, "share")}>
-                <UserPlus size={14} />
-                {dict.dpShareCta}
-              </button>
-            </div>
-          ) : null}
-
-          {t.imageUrls.length > 0 && (
-            <div className="dsec">
-              <div className="dsec__t">{fill(dict.dpPhotos, { n: t.imageUrls.length })}</div>
-              <div className="dp__photos">
-                {t.imageUrls.map((url, i) => (
-                  <button
-                    key={url}
-                    type="button"
-                    className="ph ph--btn"
-                    onClick={() => setLightbox({ urls: t.imageUrls, index: i })}
-                  >
-                    <Image src={url} alt="" width={96} height={96} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="dsec">
-            <div className="dsec__t">{dict.dpLog}</div>
-            <div className="log">
-              <div className="log-sys">
-                <span className="log-sys__line" />
-                {fill(dict.dpLogCreated, { name: nameOf(t.createdByUserId) })}
-              </div>
-              {/* 노트만 걸러 내던 것을 시스템 로그까지 전부 렌더한다(2026-07-31). 전에는 완료·재개·
-                  상태변경·공유·수정 기록이 콘솔에서 통째로 안 보여서, "누가 언제 완료했다가 다시
-                  열었는지"를 관리자 화면에서 확인할 수 없었다(모바일 상세에는 계속 보였다).
-                  노트는 카드(.log-note), 시스템은 한 줄 타임라인(.log-sys)으로 시각적으로 가른다.
-                  노트 사진도 여기서 처음으로 보인다 — 콘솔이 업로드는 시키면서 표시는 안 했다. */}
-              {(loaded?.updates ?? []).map((u) =>
-                u.type === "note" ? (
-                  <div key={u.id} className="log-note">
-                    <Avatar id={u.byUserId ?? ""} />
-                    <div className="log-note__b">
-                      <div className="log-note__h">
-                        <b>{u.byName}</b>
-                        <span>{fmtLog(u.createdAt, locale)}</span>
-                      </div>
-                      {u.body && <p className="log-note__p">{u.body}</p>}
-                      {u.imageUrls.length > 0 && (
-                        <div className="log-note__photos">
-                          {u.imageUrls.map((url, i) => (
-                            <button
-                              key={url}
-                              type="button"
-                              className="log-thumb"
-                              onClick={() => setLightbox({ urls: u.imageUrls, index: i })}
-                            >
-                              <Image src={url} alt="" width={64} height={64} />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div key={u.id} className="log-sys">
-                    <span className="log-sys__line" />
-                    {systemLogLabel(u.type, u.body, u.byName, dict)} · {fmtLog(u.createdAt, locale)}
-                  </div>
-                ),
-              )}
-              <div className="log-input">
-                <input
-                  placeholder={dict.dpLogInput}
-                  value={noteDraft}
-                  onChange={(e) => setNoteDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") sendNote();
-                  }}
-                />
-                <button
-                  className="log-send"
-                  onClick={sendNote}
-                  disabled={!noteDraft.trim() && notePhotos.length === 0}
-                >
-                  <Send size={15} />
-                </button>
-              </div>
-              {/* `display: contents` 컴포넌트라 flex 줄을 하나 감싸 준다. */}
-              <div className="log-photos">
-                <TaskPhotoUploader
-                  compact
-                  value={[]}
-                  pending={notePhotos}
-                  maxImages={5}
-                  copy={photoCopy}
-                  onChange={(next) => setNotePhotos(next.pending)}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="dp__foot">
-          {mine ? (
-            <>
+                </div>
+              ) : (
+                <div key={u.id} className="atw-sys">
+                  {systemLogLabel(u.type, u.body, u.byName, dict)} · <span className="num">{fmtLog(u.createdAt, locale)}</span>
+                </div>
+              ),
+            )}
+            <div className="atw-d__input">
+              <input
+                placeholder={dict.w.updateInput}
+                aria-label={dict.w.updateInput}
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) sendNote();
+                }}
+              />
               <button
-                className={`dp__tb ${editing ? "on" : ""}`}
-                onClick={() => (editing ? cancelCoreEdit() : startCoreEdit(t))}
-                title={dict.dpEdit}
-                aria-pressed={!!editing}
+                type="button"
+                className="atw-send"
+                onClick={sendNote}
+                aria-label={dict.w.send}
+                disabled={!noteDraft.trim() && notePhotos.length === 0}
               >
-                <Pencil size={16} />
+                <Send size={15} />
               </button>
-              {!t.projectId && (
-                <button className="dp__tb" onClick={(e) => openSharePop(e, t, "share")} title={dict.dpShare}>
-                  <Share2 size={16} />
-                </button>
-              )}
-              <span className="sp" />
-              <button className="btn btn--warn btn--sm" onClick={() => deleteWithUndo(t)}>
-                <Trash2 size={15} />
-                {shared ? dict.dpUnshareDelete : dict.dpDelete}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="authnote">
-                <Lock size={14} />
-                {fill(dict.dpAuthorOnly, { name: nameOf(t.createdByUserId) })}
-              </div>
-              <span className="sp" />
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() =>
-                  setConfirm({
-                    message: dict.confirmLeaveMsg,
-                    confirmLabel: dict.dpLeave,
-                    onConfirm: () => run(() => leaveConsoleTask(t.id), { toast: dict.tDeleted, after: closePanel }),
-                  })
-                }
-              >
-                {dict.dpLeave}
-              </button>
-            </>
+            </div>
+            {/* `display: contents` 컴포넌트라 flex 줄을 하나 감싸 준다. */}
+            <div className="atw-d__notephotos">
+              <TaskPhotoUploader
+                compact
+                value={[]}
+                pending={notePhotos}
+                maxImages={5}
+                copy={photoCopy}
+                onChange={(next) => setNotePhotos(next.pending)}
+              />
+            </div>
+          </section>
+
+          {!mine && (
+            <p className="atw-soft atw-d__lock">
+              <Lock size={13} />
+              {fill(dict.dpAuthorOnly, { name: nameOf(t.createdByUserId) })}
+            </p>
           )}
         </div>
       </aside>
-      </>
     );
   }
 
@@ -4224,12 +3963,10 @@ export function AdminTasksConsole({
   }
 
   function PrioMenu({ p }: { p: PrioPop }) {
-    const it = (v: string, label: string, color: string, filled: boolean) => (
+    const it = (v: string) => (
       <button className="mitem" onClick={() => applyPrio(p, v)}>
-        <span className="ic" style={{ color }}>
-          <Flag size={15} fill={filled ? "currentColor" : "none"} />
-        </span>
-        {label}
+        <span className={`atw-pdot p-${v}`} aria-hidden="true" />
+        {prioWord(v)}
         {p.cur === v && (
           <span className="ic" style={{ marginLeft: "auto", color: "var(--adm-primary)" }}>
             <Check size={15} />
@@ -4239,10 +3976,10 @@ export function AdminTasksConsole({
     );
     return (
       <div className="pop menu">
-        {it("urgent", dict.prioUrgent, "var(--flag-urgent)", true)}
-        {it("important", dict.prioImportant, "var(--flag-warn)", true)}
-        {it("medium", dict.prioMedium, "var(--flag-medium)", true)}
-        {it("normal", dict.prioNormal, "var(--faint)", false)}
+        {it("urgent")}
+        {it("important")}
+        {it("medium")}
+        {it("normal")}
       </div>
     );
   }
@@ -4457,6 +4194,13 @@ export function AdminTasksConsole({
               {dict.mMoveTomorrow}
             </button>
           ) : null)}
+        {/* 상세 칸의 ⋯ 에서만 — 같은 작업을 모바일 상세로 연다(예전 패널 머리의 휴대폰 단추). */}
+        {p.fromDetail && (
+          <Link className="mitem" href={`/mobile/tasks/${t.id}`} onClick={close}>
+            <Smartphone size={15} />
+            {dict.dpMobileDetail}
+          </Link>
+        )}
         {/* "관리함으로" = 프로젝트에서 빼기. 비프로젝트 작업은 이미 관리함이라 프로젝트 작업에만 노출. */}
         {t.projectId && (
           <button
@@ -4494,7 +4238,10 @@ export function AdminTasksConsole({
                 message: dict.confirmLeaveMsg,
                 confirmLabel: dict.dpLeave,
                 onConfirm: () =>
-                  run(() => leaveConsoleTask(t.id), { toast: dict.tDeleted, after: () => sel === t.id && closePanel() }),
+                  run(() => leaveConsoleTask(t.id), {
+                    toast: dict.tDeleted,
+                    after: () => setSel((cur) => (cur === t.id ? null : cur)),
+                  }),
               });
             }}
           >
@@ -4535,7 +4282,7 @@ export function AdminTasksConsole({
   }
 
   function PrioFilterMenu() {
-    const opt = (k: string, label: string, color: string) => (
+    const opt = (k: string) => (
       <button
         className="mitem"
         onClick={() => {
@@ -4543,10 +4290,8 @@ export function AdminTasksConsole({
           setPop(null);
         }}
       >
-        <span className="ic" style={{ color }}>
-          <Flag size={15} fill="currentColor" />
-        </span>
-        {label}
+        <span className={`atw-pdot p-${k}`} aria-hidden="true" />
+        {prioWord(k)}
         {prioFilter === k && (
           <span className="ic" style={{ marginLeft: "auto", color: "var(--adm-primary)" }}>
             <Check size={15} />
@@ -4556,10 +4301,10 @@ export function AdminTasksConsole({
     );
     return (
       <div className="pop menu">
-        {opt("urgent", dict.prioUrgent, "var(--flag-urgent)")}
-        {opt("important", dict.prioImportant, "var(--flag-warn)")}
-        {opt("medium", dict.prioMedium, "var(--flag-medium)")}
-        {opt("normal", dict.prioNormal, "var(--faint)")}
+        {opt("urgent")}
+        {opt("important")}
+        {opt("medium")}
+        {opt("normal")}
         <div className="msep" />
         <button
           className="mitem"
@@ -4572,67 +4317,6 @@ export function AdminTasksConsole({
           {dict.filterPrio}
         </button>
       </div>
-    );
-  }
-
-  // ── DAY SHEET ────────────────────────────────────────────────────────────────────────────
-  function DaySheet() {
-    if (!daySheet) return null;
-    const iso = daySheet;
-    // 미래 날짜면 **미리보기**다 — 아직 할 수 없는 일을 완료 처리할 수 없게 한다(2026-09-09).
-    // 오늘·과거는 그대로 완료할 수 있다.
-    const isFutureDay = iso > today;
-    const list = personalTasks
-      .filter(
-        (t) =>
-          isActive(t) &&
-          myOwn(t, meId) &&
-          occursOn(t, iso) &&
-          !(hideRecurring && isStandardRecurrence(t.recurrenceRule)),
-      )
-      .sort(prioSort);
-    return (
-      <>
-        <div className="day-scrim" onClick={() => setDaySheet(null)} />
-        <div className="day-wrap" onClick={() => setDaySheet(null)}>
-          <div className="pop" style={{ width: 400, maxWidth: "92vw" }} onClick={(e) => e.stopPropagation()}>
-            <div className="dp__top" style={{ borderBottom: "1px solid var(--line-soft)" }}>
-              <span className="dp__crumb">
-                <CalendarDays size={14} />
-                <b>{fmtLong(iso, locale)}</b>
-              </span>
-              <span className="sp" />
-              <button className="dp__tb" onClick={() => setDaySheet(null)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{ padding: "8px 14px 4px", maxHeight: "52vh", overflowY: "auto" }}>
-              {list.length > 0 ? (
-                <div className="tlist">
-                  {list.map((t) => renderRow(t, { hideDate: true, previewOnly: isFutureDay }))}
-                </div>
-              ) : (
-                <div className="tempty__s" style={{ padding: 24, textAlign: "center" }}>
-                  {dict.calDayEmpty}
-                </div>
-              )}
-            </div>
-            <div className="sch__foot">
-              <button
-                className="btn btn--pri btn--sm"
-                style={{ width: "100%" }}
-                onClick={() => {
-                  setDaySheet(null);
-                  openInlineAdd("day", iso);
-                }}
-              >
-                <Plus size={14} />
-                {dict.calAddOnDay}
-              </button>
-            </div>
-          </div>
-        </div>
-      </>
     );
   }
 
@@ -5018,16 +4702,6 @@ export function AdminTasksConsole({
 }
 
 // ── tiny helpers (module scope) ───────────────────────────────────────────────────────────────
-function MetaRow({ icon, k, children }: { icon: ReactNode; k: string; children: ReactNode }) {
-  return (
-    <div className="meta__r">
-      <span className="meta__ic">{icon}</span>
-      <span className="meta__k">{k}</span>
-      <span className="meta__v">{children}</span>
-    </div>
-  );
-}
-
 function fmtMonthTitle(y: number, m: number, locale: Locale): string {
   return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
     year: "numeric",

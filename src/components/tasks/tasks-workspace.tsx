@@ -19,23 +19,17 @@ import {
   Archive,
   Bell,
   CalendarDays,
-  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  FileText,
-  FolderOpen,
-  History,
-  Inbox,
   ListChecks,
   Megaphone,
+  Pencil,
   Plus,
   Repeat,
   Search,
   SearchX,
   SkipForward,
-  Pencil,
-  SlidersHorizontal,
   Sun,
   Sunrise,
   Trash2,
@@ -60,7 +54,6 @@ import {
 } from "@/app/mobile/tasks/[id]/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { TaskSchedulePicker } from "@/components/tasks/task-schedule-sheet";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { repeatLabel, TaskCard } from "@/components/tasks/task-card";
 import { ReorderableTaskList } from "@/components/tasks/reorderable-task-list";
 import { ReportSheet } from "@/components/tasks/report-sheet";
@@ -77,7 +70,7 @@ import {
   showsOnTodayList,
   prioSort,
 } from "@/lib/task-predicates";
-import { tokyoToday, ymdShift } from "@/lib/tokyo-date";
+import { tokyoDateOf, tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import { ProjectsBoard } from "@/components/tasks/projects-board";
 import { MiniCalendar } from "@/components/tasks/date-time-fields";
 import type { FieldActivityRecord } from "@/lib/field-activity";
@@ -96,7 +89,9 @@ import {
   type OccurrenceState,
   recurringOccurrencesInRange,
 } from "@/lib/tasks-recurrence";
+import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import "./tasks-white.css";
 
 type Copy = Dictionary["tasks"];
 type View =
@@ -107,10 +102,6 @@ type View =
   | "instr"
   | "completed"
   | "calendar";
-
-function stopSheetTouch(e: React.TouchEvent) {
-  e.stopPropagation();
-}
 
 // 반복 회차 카드 리스트(오늘/내일 뷰) — 각 카드는 그 날짜의 회차로 완료 처리(행 status 아님).
 // viewBody(거대 IIFE) 밖으로 빼서 컴포넌트 크기를 낮추고(React Compiler 최적화 유지) 오늘·내일에서
@@ -147,47 +138,27 @@ function QuickAddSubmitButtons({
 }) {
   const { pending } = useFormStatus();
   const disabled = pending || !hasTitle;
+  // 화이트 리디자인(시안 TodoAdd-Phone): 관리함(회색) · 오늘에 추가(보라) · 내일에 추가(옅은 보라) 세 개를 한 줄로.
+  // 관리함이 폼의 기본 제출(엔터)이다 — 예전과 같다.
   return (
     <>
-      <div className="flex gap-2.5">
-        {/* Full organized create — carries any typed title across so the capture isn't lost. */}
-        <Link
-          className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface text-[13.5px] font-bold text-foreground"
-          href="/mobile/tasks/new"
-          onClick={onDetailClick}
-        >
-          <Pencil className="size-4" aria-hidden="true" />
-          {copy.quickAddDetailed}
-        </Link>
-        <button
-          className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[13.5px] font-extrabold text-primary-foreground transition-opacity disabled:opacity-40"
-          disabled={disabled}
-          type="submit"
-        >
-          <Inbox className="size-4" aria-hidden="true" />
-          {copy.quickAddSave}
+      <div className="tkw-qa__btns">
+        <button className="tkw-btn is-gray" disabled={disabled} type="submit">
+          {copy.viewInbox}
         </button>
-      </div>
-      {/* 오늘/내일 탭에 바로 추가 — scheduled_date = today/tomorrow(Tokyo), 해당 탭으로 이동 */}
-      <div className="flex gap-2.5">
-        <button
-          className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-surface text-[13.5px] font-bold text-foreground transition-colors active:bg-slate-50 disabled:opacity-40"
-          disabled={disabled}
-          formAction={quickCreateTodayTask}
-          type="submit"
-        >
-          <Sun className="size-4 text-amber-400" aria-hidden="true" />
+        <button className="tkw-btn is-pri" disabled={disabled} formAction={quickCreateTodayTask} type="submit">
           {copy.quickAddToday}
         </button>
-        <button
-          className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-surface text-[13.5px] font-bold text-foreground transition-colors active:bg-slate-50 disabled:opacity-40"
-          disabled={disabled}
-          formAction={quickCreateTomorrowTask}
-          type="submit"
-        >
-          <Sunrise className="size-4 text-sky-500" aria-hidden="true" />
+        <button className="tkw-btn is-soft" disabled={disabled} formAction={quickCreateTomorrowTask} type="submit">
           {copy.quickAddTomorrow}
         </button>
+      </div>
+      <div className="tkw-qa__foot">
+        <span>{copy.mobileWhite.addKeepOpen}</span>
+        {/* Full organized create — carries any typed title across so the capture isn't lost. */}
+        <Link href="/mobile/tasks/new" onClick={onDetailClick}>
+          {copy.quickAddDetailed} ›
+        </Link>
       </div>
     </>
   );
@@ -260,6 +231,18 @@ export function TasksWorkspace({
   }, []);
 
   const [view, setView] = useState<View>(initialView);
+  // 고른 보기 탭이 가로 띠 밖에 있으면(캘린더 · 완료) 띠만 옆으로 밀어 보이게 한다 — 화면은 세로로 움직이지 않게.
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const strip = tabsRef.current;
+    const on = strip?.querySelector<HTMLElement>(".tkw-tab.is-on");
+    if (!strip || !on) return;
+    const left = on.offsetLeft - strip.offsetLeft;
+    const right = left + on.offsetWidth;
+    if (left < strip.scrollLeft + 8) strip.scrollTo({ left: Math.max(0, left - 20), behavior: "smooth" });
+    else if (right > strip.scrollLeft + strip.clientWidth - 8)
+      strip.scrollTo({ left: right - strip.clientWidth + 20, behavior: "smooth" });
+  }, [view]);
   /** 지시 탭 안의 받은/보낸 세그먼트. */
   const [instrTab, setInstrTab] = useState<"recv" | "sent">("recv");
   /**
@@ -275,12 +258,33 @@ export function TasksWorkspace({
    * 되돌리기를 손으로 관리해야 하는데, `useOptimistic` 은 트랜지션이 끝나 새 props 가 도착하면
    * 스스로 버려진다 — 실패해도 행이 저절로 제자리로 돌아온다.
    */
-  const [visibleTasks, hideTasksOptimistically] = useOptimistic(
+  const [visibleTasks, applyTaskOptimistic] = useOptimistic(
     allTasks,
-    (tasks: TaskRecord[], removedIds: readonly string[]) => {
-      const gone = new Set(removedIds);
-      return tasks.filter((t) => !gone.has(t.id));
+    (
+      tasks: TaskRecord[],
+      action: { type: "hide"; ids: readonly string[] } | { type: "complete"; id: string },
+    ) => {
+      if (action.type === "hide") {
+        const gone = new Set(action.ids);
+        return tasks.filter((t) => !gone.has(t.id));
+      }
+      // 완료 — 목록에서 지우지 않고 **완료 상태로 바꾼다**(2026-10-15 화이트 리디자인). 그래야 같은 순간
+      // 오늘 탭 아래 「완료」 묶음으로 내려앉는다(아래 `optimisticCompletions` 와 짝).
+      return tasks.map((t) =>
+        t.id === action.id
+          ? { ...t, status: "completed" as const, completedAt: new Date().toISOString() }
+          : t,
+      );
     },
+  );
+  const hideTasksOptimistically = useCallback(
+    (ids: readonly string[]) => applyTaskOptimistic({ type: "hide", ids }),
+    [applyTaskOptimistic],
+  );
+  /** 완료 로그의 낙관적 반영 — 오늘 「완료」 묶음 · 진행 링 · 완료·기록이 누른 즉시 바뀐다. */
+  const [visibleCompletions, addCompletionOptimistically] = useOptimistic(
+    completions,
+    (list: TaskCompletionRecord[], added: TaskCompletionRecord) => [...list, added],
   );
   /**
    * 반복은 행이 아니라 **회차**가 완료된다. 완료된 회차는 상태 행이 생기는 순간 목록에서 빠지므로
@@ -308,9 +312,8 @@ export function TasksWorkspace({
     () => visibleTasks.filter((t) => myOwn(t, currentUserId)),
     [visibleTasks, currentUserId],
   );
-  // Split mount vs. visibility so the sheet can play a slide/fade-OUT before unmounting.
-  const [quickMounted, setQuickMounted] = useState(false); // present in the DOM
-  const [quickShown, setQuickShown] = useState(false); // drives the in/out transition
+  // 빠른 추가 시트 — 공용 `BottomSheet`(2026-10-15 화이트 리디자인에서 손으로 짠 시트를 걷어냄).
+  const [quickOpen, setQuickOpen] = useState(false);
   /**
    * 빠른 추가 제목은 **비제어 입력**이다 — 값은 이 참조가 들고 화면은 DOM 이 맡는다.
    *
@@ -327,15 +330,13 @@ export function TasksWorkspace({
   const [hasQuickTitle, setHasQuickTitle] = useState(false);
   const [quickSeed, setQuickSeed] = useState("");
   const openQuick = useCallback(() => {
-    setQuickMounted(true);
-    // Double rAF: let the element mount at translate-y-full, then flip to 0 so it animates.
-    requestAnimationFrame(() => requestAnimationFrame(() => setQuickShown(true)));
+    haptic("light");
+    setQuickOpen(true);
   }, []);
-  const closeQuick = useCallback(() => {
-    // 언마운트 전에 입력값을 담아 둔다 — 다시 열 때 `defaultValue` 로 복원된다.
+  // 시트가 닫히는 애니메이션이 끝난 뒤(`BottomSheet` onClose) — 언마운트 전에 입력값을 담아 둔다.
+  const onQuickClosed = useCallback(() => {
     setQuickSeed(quickInputEl.current?.value ?? "");
-    setQuickShown(false);
-    setTimeout(() => setQuickMounted(false), 380); // must match the sheet transition duration
+    setQuickOpen(false);
   }, []);
   // Body portals (FAB + sheet) are client-only; gate on hydration so server and the
   // first client render agree (avoids a hydration mismatch). false on server, true after mount.
@@ -344,34 +345,18 @@ export function TasksWorkspace({
     () => true,
     () => false,
   );
-  const [calDay, setCalDay] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false); // day sheet present in the DOM
-  const [sheetShown, setSheetShown] = useState(false); // drives its slide in/out
+  // 캘린더에서 고른 날 — 기본은 오늘. 그날 목록이 달력 아래(태블릿은 옆)에 바로 보인다(예전의 하루 시트 대신).
+  const [calDay, setCalDay] = useState<string>(initialToday);
   const [calMonth, setCalMonth] = useState(() => {
     const [ty, tm] = today.split("-").map(Number);
     return { y: ty, m: tm };
   });
   // 캘린더에서 고정 반복(표준 반복) 회차 숨김 — 세션 상태(새로고침 시 초기화), 기본 표시.
   const [hideRecurring, setHideRecurring] = useState(false);
-  const closeDaySheet = useCallback(() => {
-    setSheetShown(false);
-    setTimeout(() => setSheetOpen(false), 320); // matches the day-sheet transition duration
-  }, []);
-
-  // Esc closes the quick-add sheet (scrim tap / X already cover pointer dismissal).
-  useEffect(() => {
-    if (!quickMounted) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeQuick();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [quickMounted, closeQuick]);
 
   // --- Long-press context menu + multi-select (edit/delete convenience).
   const router = useRouter();
   const [pressTask, setPressTask] = useState<TaskRecord | null>(null);
-  const [pressShown, setPressShown] = useState(false);
   // 이동 거절 안내 — 쿼리로 들어온 값을 한 번만 띄우고 URL 을 정리한다(새로고침 시 재노출 방지).
   const [moveNotice, setMoveNotice] = useState<string | null>(moveError ?? null);
   useEffect(() => {
@@ -392,19 +377,9 @@ export function TasksWorkspace({
     (task: TaskRecord, occurrence?: { date: string; done: boolean }) => {
       setPressTask(task);
       setPressOcc(occurrence?.date ?? null);
-      requestAnimationFrame(() => requestAnimationFrame(() => setPressShown(true)));
     },
     [],
   );
-  const closePressMenu = useCallback(() => {
-    setPressShown(false);
-    setTimeout(() => setPressTask(null), 240);
-  }, []);
-
-  // iOS-style drag-to-dismiss for the three bottom sheets (grab handle / header drives the drag).
-  const daySheetDrag = useSheetDragDismiss({ shown: sheetShown, onDismiss: closeDaySheet });
-  const quickDrag = useSheetDragDismiss({ shown: quickShown, onDismiss: closeQuick });
-  const pressDrag = useSheetDragDismiss({ shown: pressShown, onDismiss: closePressMenu });
   const toggleSelect = useCallback((task: TaskRecord) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -429,7 +404,7 @@ export function TasksWorkspace({
     if (ids.length === 0) return;
     if (deleteUndoTimer.current) clearTimeout(deleteUndoTimer.current);
     setDeletedUndoIds(ids);
-    deleteUndoTimer.current = setTimeout(() => setDeletedUndoIds(null), 5500);
+    deleteUndoTimer.current = setTimeout(() => setDeletedUndoIds(null), 6000);
   }, []);
 
   // Commit a delete (single from the menu, or the multi-select batch). Optimistically hide the
@@ -529,14 +504,20 @@ export function TasksWorkspace({
       startComplete(async () => {
         if (complete) {
           if (occurrenceDate) resolveOccurrenceOptimistically({ taskId: task.id, occurrenceDate });
-          else hideTasksOptimistically([task.id]);
+          else applyTaskOptimistic({ type: "complete", id: task.id });
+          addCompletionOptimistically({
+            taskId: task.id,
+            day: tokyoToday(),
+            byUserId: currentUserId,
+            at: new Date().toISOString(),
+          });
           await completeTask(task.id, occurrenceDate);
         } else {
           await reopenTask(task.id, occurrenceDate);
         }
       });
     },
-    [hideTasksOptimistically, resolveOccurrenceOptimistically],
+    [applyTaskOptimistic, addCompletionOptimistically, currentUserId, resolveOccurrenceOptimistically],
   );
   const handleCompleteToggle = useCallback(
     (task: TaskRecord, occurrence?: { date: string; done: boolean }) => {
@@ -546,7 +527,7 @@ export function TasksWorkspace({
       if (complete) {
         setUndoTask(task);
         setUndoOcc(occurrence?.date ?? null);
-        undoTimer.current = setTimeout(() => setUndoTask(null), 4000);
+        undoTimer.current = setTimeout(() => setUndoTask(null), 6000);
       } else {
         setUndoTask(null);
         setUndoOcc(null);
@@ -555,6 +536,7 @@ export function TasksWorkspace({
     [runStatus],
   );
   const handleUndo = useCallback(() => {
+    haptic("light");
     if (undoTask) runStatus(undoTask, false, undoOcc ?? undefined);
     setUndoTask(null);
     setUndoOcc(null);
@@ -609,26 +591,27 @@ export function TasksWorkspace({
       if (quickInputEl.current) quickInputEl.current.value = "";
       setQuickSeed("");
       setHasQuickTitle(false);
-      if (quickMounted) quickInputEl.current?.focus();
+      if (quickOpen) quickInputEl.current?.focus();
       const next = new URLSearchParams(searchParams.toString());
       next.delete("created");
       const query = next.toString();
       router.replace(`/mobile/tasks${query ? `?${query}` : ""}`, { scroll: false });
     });
     return () => cancelAnimationFrame(raf);
-  }, [router, searchParams, quickMounted]);
+  }, [router, searchParams, quickOpen]);
   useEffect(() => {
     const id = searchParams.get("deleted");
     if (!id || processedDelete.current === id) return;
     processedDelete.current = id;
     const raf = requestAnimationFrame(() => setDeletedUndoIds([id]));
-    const t = setTimeout(() => setDeletedUndoIds((cur) => (cur?.[0] === id ? null : cur)), 5500);
+    const t = setTimeout(() => setDeletedUndoIds((cur) => (cur?.[0] === id ? null : cur)), 6000);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t);
     };
   }, [searchParams]);
   const handleRestore = useCallback(() => {
+    haptic("light");
     setDeletedUndoIds((ids) => {
       if (ids?.length)
         startComplete(async () => {
@@ -746,6 +729,8 @@ export function TasksWorkspace({
   // One shared lightweight state across the list views; the date filter reuses the same
   // `anchor()` (due wins over scheduled, Tokyo) used for grouping/listing/calendar.
   const [search, setSearch] = useState("");
+  // 검색 칸(머리의 돋보기로 연다) · 그 안의 날짜 달력.
+  const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [activeDatePicker, setActiveDatePicker] = useState<"single" | "from" | "to">("single");
@@ -820,14 +805,14 @@ export function TasksWorkspace({
     }
   };
 
-  const tabs: { key: View; label: string; icon: typeof Sun }[] = [
-    { key: "today", label: copy.viewToday, icon: Sun },
-    { key: "tomorrow", label: copy.viewTomorrow, icon: Sunrise },
-    { key: "inbox", label: copy.viewInbox, icon: Archive },
-    { key: "projects", label: copy.viewProjects, icon: FolderOpen },
-    { key: "instr", label: copy.viewInstr, icon: Megaphone },
-    { key: "completed", label: copy.viewCompleted, icon: CheckCircle2 },
-    { key: "calendar", label: copy.viewCalendar, icon: CalendarDays },
+  const tabs: { key: View; label: string }[] = [
+    { key: "today", label: copy.viewToday },
+    { key: "tomorrow", label: copy.viewTomorrow },
+    { key: "inbox", label: copy.viewInbox },
+    { key: "projects", label: copy.viewProjects },
+    { key: "instr", label: copy.viewInstr },
+    { key: "completed", label: copy.viewCompleted },
+    { key: "calendar", label: copy.viewCalendar },
   ];
 
   // Swipe defer/pull action per view: Today → push to tomorrow; everywhere else → pull to today
@@ -906,7 +891,7 @@ export function TasksWorkspace({
   const completedTaskById = new Map<string, TaskRecord>();
   for (const t of tasks) completedTaskById.set(t.id, t);
   for (const t of projectCompletedTasks) completedTaskById.set(t.id, t);
-  const completionRows = completions
+  const completionRows = visibleCompletions
     .map((c) => ({ completion: c, task: completedTaskById.get(c.taskId) }))
     .filter((r): r is { completion: TaskCompletionRecord; task: TaskRecord } => !!r.task)
     // 내가 **보낸** 지시를 대상자가 완료한 것은 내 기록이 아니다(2026-09-09) — 나는 지시자이고
@@ -965,51 +950,226 @@ export function TasksWorkspace({
   for (const o of calOccurrences) calByDay.set(o.iso, [...(calByDay.get(o.iso) ?? []), o.task]);
   for (const list of calByDay.values()) list.sort(timeThenPrio);
 
-  const sectionHead = (label: string, n: number, tone?: "over") => (
-    <div className="mb-2.5 mt-1 flex items-center gap-2 px-0.5">
-      <span
-        className={cn(
-          "text-[11px] font-black uppercase tracking-[0.06em]",
-          tone === "over" ? "text-rose-600" : "text-muted-foreground",
-        )}
-      >
-        {label}
-      </span>
-      <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-        {n}
-      </span>
-      <span className="h-px flex-1 bg-border" />
+
+  // ── 화이트 리디자인(2026-10-15) 공용 조각 ─────────────────────────────────────────
+  const w = copy.mobileWhite;
+  const fmt = (ymd: string, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(locale, { ...opts, timeZone: "Asia/Tokyo" }).format(new Date(`${ymd}T00:00:00+09:00`));
+  const yesterdayDate = ymdShift(today, -1);
+  /** 완료 시각(도쿄) "HH:MM". */
+  const clockOf = (iso: string) =>
+    new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tokyo" }).format(
+      new Date(iso),
+    );
+
+  // 오늘 「완료」 묶음 — 오늘(도쿄) 완료 로그 중 일반 작업(프로젝트 작업은 오늘 목록에 없으므로 뺀다). 최신 먼저.
+  const todayDoneRows = completionRows
+    .filter((r) => r.completion.day === today && !r.task.projectId)
+    .sort((a, b) => b.completion.at.localeCompare(a.completion.at));
+  const ringDone = todayDoneRows.length;
+  const ringTotal = ringDone + tabCounts.today;
+  /** 이번 주(월요일 시작, 도쿄) 완료 수 — 완료·기록 머리. */
+  const weekStart = (() => {
+    const [y, m, d] = today.split("-").map(Number);
+    const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // 월=0
+    return ymdShift(today, -dow);
+  })();
+  const weekDoneCount = completionRows.filter((r) => r.completion.day >= weekStart && r.completion.day <= today).length;
+
+  // 지연 일괄 처리 대상 — 선택 모드면 고른 것, 아니면 내 지연 전체(서버도 작성자 것만 받는다).
+  const overdueTargets = overdueSelectMode ? [...overdueSelection] : ownedOverdueIds;
+  const clearOverdue = () =>
+    startOverdue(async () => {
+      await dismissOverdueTasks(overdueTargets);
+      setOverdueConfirm(false);
+      setOverdueSelectMode(false);
+      setOverdueSelection(new Set());
+    });
+
+  const sectionHead = (label: string, n: number, tone?: "over" | "muted", extra?: React.ReactNode) => (
+    <div className="tkw-sec__h">
+      <b className={tone === "over" ? "is-late" : tone === "muted" ? "is-muted" : undefined}>{label}</b>
+      <span className="tkw-sec__n">{w.count.replace("{n}", String(n))}</span>
+      {extra}
     </div>
   );
 
   const emptyState = (Icon: typeof Sun, title: string, sub?: string) => (
-    <div className="flex flex-col items-center px-6 py-16 text-center">
-      <span className="mb-4 flex size-[60px] items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
-        <Icon className="size-7" aria-hidden="true" />
-      </span>
-      <p className="text-[15px] font-extrabold text-foreground">{title}</p>
-      {sub ? <p className="mt-1.5 text-[13px] text-muted-foreground">{sub}</p> : null}
+    <div className="tkw-empty">
+      <Icon aria-hidden="true" />
+      <b>{title}</b>
+      {sub ? <span>{sub}</span> : null}
     </div>
   );
 
   // Shown when a view has tasks but the active search/filter matches none of them —
   // distinct from a genuinely empty view, and offers a one-tap reset.
   const noMatchState = () => (
-    <div className="flex flex-col items-center px-6 py-16 text-center">
-      <span className="mb-4 flex size-[60px] items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
-        <SearchX className="size-7" aria-hidden="true" />
-      </span>
-      <p className="text-[15px] font-extrabold text-foreground">{copy.filterNoResultTitle}</p>
-      <p className="mt-1.5 text-[13px] text-muted-foreground">{copy.filterNoResultSub}</p>
-      <button
-        className="mt-4 rounded-full border border-border bg-surface px-4 py-2 text-[13px] font-bold text-primary"
-        onClick={clearFilters}
-        type="button"
-      >
+    <div className="tkw-empty">
+      <SearchX aria-hidden="true" />
+      <b>{copy.filterNoResultTitle}</b>
+      <span>{copy.filterNoResultSub}</span>
+      <button onClick={clearFilters} type="button">
         {copy.filterClear}
       </button>
     </div>
   );
+
+  const addRow = (
+    <button className="tkw-add" onClick={openQuick} type="button">
+      <Plus aria-hidden="true" />
+      {w.addTask}
+    </button>
+  );
+
+  /** 검색 · 필터 아이콘(머리 오른쪽 44px). 필터가 걸려 있으면 보라 점. */
+  const searchButton = (
+    <button
+      aria-expanded={searchOpen}
+      aria-label={w.searchFilter}
+      className={cn("tkw-icon", (searchOpen || filterActive) && "is-on")}
+      onClick={() => setSearchOpen((v) => !v)}
+      type="button"
+    >
+      <Search aria-hidden="true" />
+      {filterActive && !searchOpen ? <span className="tkw-icon__dot" /> : null}
+    </button>
+  );
+
+  const head = (title: string, sub: string | null, opts?: { ring?: boolean; search?: boolean }) => (
+    <div className="tkw-head">
+      {opts?.ring ? (
+        <div
+          aria-label={w.progress.replace("{total}", String(ringTotal)).replace("{done}", String(ringDone))}
+          className="tkw-ring"
+          role="img"
+        >
+          <svg aria-hidden="true" viewBox="0 0 56 56">
+            <circle className="tkw-ring__track" cx="28" cy="28" r="24" />
+            <circle
+              className="tkw-ring__fill"
+              cx="28"
+              cy="28"
+              r="24"
+              style={{ strokeDashoffset: 150.8 * (1 - (ringTotal > 0 ? ringDone / ringTotal : 0)) }}
+            />
+          </svg>
+          <span className="tkw-ring__n">
+            {ringDone}/{ringTotal}
+          </span>
+        </div>
+      ) : null}
+      <div className="tkw-head__b">
+        <h1>{title}</h1>
+        {sub ? <span className="tkw-head__s">{sub}</span> : null}
+      </div>
+      {opts?.search ? searchButton : null}
+    </div>
+  );
+
+  // 검색 · 날짜 필터 — 머리의 돋보기로 연다. 필터가 걸린 채 닫으면 요약 한 줄만 남는다.
+  const searchPanel =
+    view === "calendar" || view === "projects" || selectMode ? null : searchOpen ? (
+      <div className="tkw-search">
+        <div className="tkw-search__row">
+          <label className="tkw-search__in">
+            <Search aria-hidden="true" />
+            <input
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoFocus
+              enterKeyHint="search"
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={copy.searchPlaceholder}
+              type="search"
+              value={search}
+            />
+            {hasSearch ? (
+              <button aria-label={copy.filterClear} className="tkw-search__clr" onClick={() => setSearch("")} type="button">
+                <X aria-hidden="true" />
+              </button>
+            ) : null}
+          </label>
+          <button
+            aria-expanded={filterOpen}
+            aria-label={copy.filterDate}
+            className={cn("tkw-search__date", (filterOpen || hasDate) && "is-on")}
+            onClick={() => setFilterOpen((v) => !v)}
+            type="button"
+          >
+            <CalendarDays aria-hidden="true" />
+          </button>
+        </div>
+        {filterOpen ? (
+          <div className="tkw-search__cal">
+            <div className="tkw-search__modes">
+              {(["single", "range"] as const).map((m) => (
+                <button
+                  className={cn(dateMode === m && "is-on")}
+                  key={m}
+                  onClick={() => {
+                    setDateMode(m);
+                    setActiveDatePicker(m === "single" ? "single" : "from");
+                  }}
+                  type="button"
+                >
+                  {m === "single" ? copy.filterDateSingle : copy.filterDateRange}
+                </button>
+              ))}
+            </div>
+            {dateMode === "range" ? (
+              <div className="tkw-search__ends">
+                <button
+                  aria-label={copy.filterDateFrom}
+                  className={cn(activeDatePicker === "from" && "is-on")}
+                  onClick={() => setActiveDatePicker("from")}
+                  type="button"
+                >
+                  {dateFrom ? chipDate(dateFrom) : copy.filterDateFrom}
+                </button>
+                –
+                <button
+                  aria-label={copy.filterDateTo}
+                  className={cn(activeDatePicker === "to" && "is-on")}
+                  onClick={() => setActiveDatePicker("to")}
+                  type="button"
+                >
+                  {dateTo ? chipDate(dateTo) : copy.filterDateTo}
+                </button>
+              </div>
+            ) : null}
+            <MiniCalendar
+              copy={copy}
+              locale={locale}
+              onClear={() => setActiveDateValue("")}
+              onSelect={setActiveDateValue}
+              value={activeDateValue}
+            />
+          </div>
+        ) : null}
+        {filterActive ? (
+          <div className="tkw-search__active">
+            {copy.filterActive}
+            {hasSearch ? <b>“{search.trim()}”</b> : null}
+            {hasDate ? <b>{dateLabel}</b> : null}
+            <button onClick={clearFilters} type="button">
+              {copy.filterClear}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    ) : filterActive ? (
+      <div className="tkw-search" style={{ marginTop: -10 }}>
+        <div className="tkw-search__active">
+          {copy.filterActive}
+          {hasSearch ? <b>“{search.trim()}”</b> : null}
+          {hasDate ? <b>{dateLabel}</b> : null}
+          <button onClick={clearFilters} type="button">
+            {copy.filterClear}
+          </button>
+        </div>
+      </div>
+    ) : null;
 
   const viewBody = (() => {
     // Projects tab — separate workspace (own list / create sheet / FAB).
@@ -1018,39 +1178,37 @@ export function TasksWorkspace({
     }
 
     if (view === "today") {
-      if (
-        !todayOverdueBase.length &&
-        !todayBase.length &&
-        !todayRecBase.length
-      )
-        return emptyState(Sun, copy.todayEmptyTitle, copy.todayEmptySub);
+      const doneRows = todayDoneRows.filter(({ task }) => !filterActive || matchesFilter(task));
+      const header = head(
+        copy.viewToday,
+        `${fmt(today, { month: "long", day: "numeric", weekday: "long" })} · ${w.progress
+          .replace("{total}", String(ringTotal))
+          .replace("{done}", String(ringDone))}`,
+        { ring: true, search: true },
+      );
+      if (!todayOverdueBase.length && !todayBase.length && !todayRecBase.length && !todayDoneRows.length)
+        return (
+          <>
+            {header}
+            {searchPanel}
+            {emptyState(Sun, copy.todayEmptyTitle, copy.todayEmptySub)}
+            {addRow}
+          </>
+        );
       const over = applyFilter(todayOverdueBase).sort(orderSort);
       const todays = applyFilter(todayBase).sort(orderSort);
       const recToday = applyFilter(todayRecBase).sort(orderSort);
-      if (!over.length && !todays.length && !recToday.length)
-        return noMatchState();
+      const nothing = !over.length && !todays.length && !recToday.length && !doneRows.length;
       // Drag-reorder is offered only on the plain Today list — disabled while a search/date filter
-      // is active (the list is a subset) or in multi-select mode (the card body owns the tap).
+      // is active (the list is a subset) or in multi-select mode (the row body owns the tap).
       const reorderDisabled = filterActive || selectMode;
-      // Overdue prompt: only the caller's own overdue tasks are actionable (the bulk actions are
+      // Overdue actions: only the caller's own overdue tasks are actionable (the bulk actions are
       // author-scoped server-side). Recurring tasks keep their next occurrence; one-offs move/delete.
       const ownedOverdue = ownedOverdueIds.length;
-      /**
-       * 일괄 처리 대상 (2026-07-31).
-       *
-       * 지연 카드는 예전에 **항상** selectMode 로 렌더돼서, 탭하면 선택 토글이 되고 롱프레스가 죽었다.
-       * 남이 만든 지연 작업은 토글마저 무시돼(작성자만 대상) 카드를 눌러도 아무 반응이 없었다.
-       * 이제 기본은 평범한 카드(탭 → 상세, 롱프레스 → 메뉴)이고, 섹션 헤더의 "전체 선택"으로만
-       * 일괄 선택 모드에 들어간다. 선택 모드가 아니면 프롬프트 버튼은 내 지연 전체를 대상으로 한다 —
-       * 프롬프트 제목("지연된 N건")이 말하는 범위 그대로라, 선택을 안 해도 버튼이 죽지 않는다.
-       */
-      const overdueTargets = overdueSelectMode ? [...overdueSelection] : ownedOverdueIds;
       const selectedCount = overdueSelectMode ? overdueSelection.size : 0;
-
       const toggleOverdueTask = (task: TaskRecord) => {
-        // Only the caller's own overdue tasks are actionable (bulk actions are author-scoped
-        // server-side), so non-owned rows must not enter the selection — otherwise the button
-        // count would include items the server silently ignores.
+        // Only the caller's own overdue tasks are actionable, so non-owned rows must not enter the
+        // selection — otherwise the action count would include items the server silently ignores.
         if (task.createdByUserId !== currentUserId) return;
         const next = new Set(overdueSelection);
         if (next.has(task.id)) next.delete(task.id);
@@ -1067,106 +1225,52 @@ export function TasksWorkspace({
           setOverdueSelection(new Set(ownedOverdueIds));
         }
       };
-
-      const clearOverdue = () =>
-        startOverdue(async () => {
-          await dismissOverdueTasks(overdueTargets);
-          setOverdueConfirm(false);
-          setOverdueSelectMode(false);
-          setOverdueSelection(new Set());
-        });
+      const showOverdueActs = ownedOverdue > 0 && !filterActive && !selectMode;
+      const countSuffix = selectedCount > 0 ? ` ${selectedCount}` : "";
       return (
         <>
-          {ownedOverdue > 0 && !filterActive && !selectMode ? (
-            <div className="mb-3 rounded-[20px] border border-border bg-surface p-4 shadow-[0_18px_44px_-32px_rgba(15,23,42,0.55)]">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-amber-50 text-amber-500">
-                  <History className="size-[18px]" strokeWidth={2.1} aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-extrabold leading-tight tracking-[-0.01em] text-foreground">
-                    {copy.overduePromptTitle.replace("{count}", String(ownedOverdue))}
-                  </p>
-                  <p className="mt-1 text-[11.5px] font-medium leading-[1.45] text-muted-foreground">
-                    {overdueConfirm ? copy.overduePromptConfirm : copy.overduePromptBody}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3.5 flex flex-col gap-2">
-                {overdueConfirm ? (
-                  <>
-                    <button
-                      className="inline-flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl bg-rose-600 px-3 text-[13px] font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-50"
-                      disabled={overduePending}
-                      onClick={clearOverdue}
-                      type="button"
-                    >
-                      <Trash2 className="size-4 shrink-0" strokeWidth={2.1} aria-hidden="true" />
-                      {copy.overduePromptConfirmYes}
-                    </button>
-                    <button
-                      className="inline-flex h-10 w-full items-center justify-center whitespace-nowrap rounded-2xl border border-border bg-background px-3 text-[13px] font-bold text-muted-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
-                      disabled={overduePending}
-                      onClick={() => setOverdueConfirm(false)}
-                      type="button"
-                    >
-                      {copy.overduePromptCancel}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className="inline-flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl bg-primary px-3 text-[13px] font-bold text-primary-foreground shadow-[0_10px_22px_-12px_hsl(var(--primary-hsl)/0.65)] transition-transform active:scale-[0.98] disabled:opacity-50"
-                      disabled={overduePending || overdueTargets.length === 0}
-                      onClick={() => setOverdueRescheduleOpen(true)}
-                      type="button"
-                    >
-                      <CalendarDays className="size-4 shrink-0" strokeWidth={2.1} aria-hidden="true" />
-                      {copy.overduePromptReschedule}
-                      {selectedCount > 0 ? ` ${copy.selectedCountLabel.replace("{count}", String(selectedCount))}` : ""}
-                    </button>
-                    <button
-                      className="inline-flex h-10 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-border bg-background px-3 text-[13px] font-bold text-muted-foreground transition-colors hover:bg-muted/40 disabled:opacity-50"
-                      disabled={overduePending || overdueTargets.length === 0}
-                      onClick={() => setOverdueConfirm(true)}
-                      type="button"
-                    >
-                      <Trash2 className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
-                      {copy.overduePromptDismiss}
-                      {selectedCount > 0 ? ` ${copy.selectedCountLabel.replace("{count}", String(selectedCount))}` : ""}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ) : null}
-
+          {header}
+          {searchPanel}
+          {nothing ? noMatchState() : null}
           {over.length > 0 ? (
-            <>
-              {/* Overdue section header. The button enters/leaves 지연 일괄 선택 모드 — 전역
-                  선택 모드(상단 선택 바)일 때는 그쪽이 목록 전체를 이미 쥐고 있어 숨긴다. */}
-              <div className="mb-2.5 mt-1 flex items-center gap-2 px-0.5">
-                <span className="text-[11px] font-black uppercase tracking-[0.06em] text-rose-600">
-                  {copy.secOverdue}
-                </span>
-                <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-                  {over.length}
-                </span>
-                <span className="h-px flex-1 bg-border" />
-                {/* 검색/날짜 필터 중에는 목록이 부분집합이라 숨긴다 — 안 그러면 화면에 없는
-                    지연 작업까지 선택된다(같은 이유로 위 프롬프트도 이때 숨는다). */}
-                {!selectMode && !filterActive && ownedOverdue > 0 ? (
-                  <button
-                    className="text-[11px] font-bold text-primary transition-opacity active:opacity-60"
-                    onClick={toggleOverdueSelectMode}
-                    type="button"
-                  >
-                    {overdueSelectMode ? copy.overdueDeselectAll : copy.overdueSelectAll}
-                  </button>
-                ) : null}
-              </div>
-              {/* 일괄 선택 모드에서만 체크박스 카드가 된다. 그 밖에는 전역 cardProps 그대로 —
-                  탭하면 상세가 열리고 롱프레스로 메뉴가 뜬다(전역 선택 모드도 그대로 통과). */}
+            <section className="tkw-sec">
+              {sectionHead(
+                copy.secOverdue,
+                over.length,
+                "over",
+                <>
+                  {/* 지연 일괄 선택 — 검색/날짜 필터 중에는 목록이 부분집합이라 숨긴다. */}
+                  {showOverdueActs ? (
+                    <button className="tkw-tl is-gray" onClick={toggleOverdueSelectMode} type="button">
+                      {overdueSelectMode ? w.overdueSelectDone : w.overdueSelect}
+                    </button>
+                  ) : null}
+                  {showOverdueActs ? (
+                    <span className="tkw-sec__acts">
+                      <button
+                        className="tkw-tl"
+                        disabled={overduePending || overdueTargets.length === 0}
+                        onClick={() => setOverdueRescheduleOpen(true)}
+                        type="button"
+                      >
+                        {w.reschedule}
+                        {countSuffix}
+                      </button>
+                      <span aria-hidden="true">·</span>
+                      <button
+                        className="tkw-tl is-red"
+                        disabled={overduePending || overdueTargets.length === 0}
+                        onClick={() => setOverdueConfirm(true)}
+                        type="button"
+                      >
+                        {copy.overduePromptDismiss}
+                        {countSuffix}
+                      </button>
+                    </span>
+                  ) : null}
+                </>,
+              )}
+              {/* 일괄 선택 모드에서만 선택 고리가 된다. 그 밖에는 평범한 줄 — 탭하면 상세, 길게 누르면 메뉴. */}
               <ReorderableTaskList
                 cardProps={
                   overdueSelectMode && !selectMode
@@ -1183,72 +1287,101 @@ export function TasksWorkspace({
                 items={over}
                 onPersist={reorderTasks}
               />
-            </>
+            </section>
           ) : null}
-          {(todays.length > 0 || recToday.length > 0) ? (
-            <div className={over.length ? "mt-4" : ""}>
+          {todays.length > 0 || recToday.length > 0 ? (
+            <section className="tkw-sec">
               {sectionHead(copy.secToday, todays.length + recToday.length)}
-              {/* 일회성과 반복 회차를 **하나의 순서 공간**으로 합쳐 렌더한다(2026-07-30 B안).
-                  전에는 두 목록으로 갈라 반복 카드에만 드래그 핸들이 없었다. */}
+              {/* 일회성과 반복 회차를 **하나의 순서 공간**으로 합쳐 렌더한다(2026-07-30 B안). */}
               <ReorderableTaskList
-                cardProps={cardProps}
+                behindByTask={behindByTask}
+                cardProps={{ ...cardProps, showDate: false }}
                 disabled={reorderDisabled}
                 items={mergeByDateOrder(todays, recToday, today)}
                 occurrenceDate={today}
                 onPersistDate={reorderDateTasks}
-                behindByTask={behindByTask}
               />
-            </div>
+            </section>
           ) : null}
+          {doneRows.length > 0 ? (
+            <section className="tkw-sec">
+              {sectionHead(w.secDone, doneRows.length, "muted")}
+              <div className="tkw-list">
+                {doneRows.map(({ task, completion }) =>
+                  renderDoneRow(task, completion, { trailing: false }),
+                )}
+              </div>
+            </section>
+          ) : null}
+          {addRow}
         </>
       );
     }
 
-    // Tomorrow (내일): same shape/features as Today (drag-reorder, chip layout), filtered to tasks
-    // anchored tomorrow. Swipe here pulls a task back to today (see swipeActionForView).
+    // Tomorrow (내일): same shape/features as Today (drag-reorder), filtered to tasks anchored
+    // tomorrow. Swipe here pulls a task back to today (see swipeActionForView).
     if (view === "tomorrow") {
-      if (tomorrowBase.length === 0 && tomorrowRecBase.length === 0)
-        return emptyState(Sunrise, copy.tomorrowEmptyTitle, copy.tomorrowEmptySub);
+      const total = tomorrowBase.length + tomorrowRecBase.length;
+      const header = head(
+        copy.viewTomorrow,
+        `${fmt(tomorrowDate, { month: "long", day: "numeric", weekday: "long" })} · ${w.taskCount.replace("{n}", String(total))}`,
+        { search: true },
+      );
+      if (total === 0)
+        return (
+          <>
+            {header}
+            {searchPanel}
+            {emptyState(Sunrise, copy.tomorrowEmptyTitle, copy.tomorrowEmptySub)}
+            {addRow}
+          </>
+        );
       const list = applyFilter(tomorrowBase).sort(orderSort);
       const recList = applyFilter(tomorrowRecBase).sort(orderSort);
-      if (list.length === 0 && recList.length === 0) return noMatchState();
       const reorderDisabled = filterActive || selectMode;
       return (
         <>
-          {sectionHead(copy.secTomorrow, list.length + recList.length)}
-          <ReorderableTaskList
-            cardProps={cardProps}
-            disabled={reorderDisabled}
-            items={mergeByDateOrder(list, recList, tomorrowDate)}
-            occurrenceDate={tomorrowDate}
-            onPersistDate={reorderDateTasks}
-          />
+          {header}
+          {searchPanel}
+          {list.length === 0 && recList.length === 0 ? (
+            noMatchState()
+          ) : (
+            <section className="tkw-sec">
+              <ReorderableTaskList
+                cardProps={{ ...cardProps, showDate: false }}
+                disabled={reorderDisabled}
+                items={mergeByDateOrder(list, recList, tomorrowDate)}
+                occurrenceDate={tomorrowDate}
+                onPersistDate={reorderDateTasks}
+              />
+            </section>
+          )}
+          {addRow}
         </>
       );
     }
 
-    // Archive (보관함): every active todo, managed in one place. Newest first.
+    // 관리함: every active todo, managed in one place. 수동 드래그 순서 허용(2026-07-30).
     if (view === "inbox") {
       const base = inboxBase;
-      // 관리함은 수동 드래그 순서를 허용(2026-07-30). 랭크된(드래그된) 작업이 위, 미랭크는 최신순
-      // (새 작업 top 유지). 드래그는 검색/필터·선택 모드가 아닐 때만.
       const list = applyFilter(base).sort(inboxOrderSort);
       const reorderDisabled = filterActive || selectMode;
       return (
         <>
-          <p className="mb-3 px-0.5 text-[12px] font-medium text-muted-foreground">{copy.inboxHint}</p>
+          {head(copy.viewInbox, `${copy.inboxHint} · ${w.taskCount.replace("{n}", String(base.length))}`, {
+            search: true,
+          })}
+          {searchPanel}
           {base.length === 0 ? (
             emptyState(Archive, copy.inboxEmptyTitle, copy.inboxEmptySub)
           ) : list.length === 0 ? (
             noMatchState()
           ) : (
-            <ReorderableTaskList
-              cardProps={cardProps}
-              disabled={reorderDisabled}
-              items={list}
-              onPersist={reorderTasks}
-            />
+            <section className="tkw-sec">
+              <ReorderableTaskList cardProps={cardProps} disabled={reorderDisabled} items={list} onPersist={reorderTasks} />
+            </section>
           )}
+          {addRow}
         </>
       );
     }
@@ -1258,86 +1391,67 @@ export function TasksWorkspace({
     if (view === "instr") {
       const recv = instrTab === "recv";
       const base = recv ? recvInstrTasks : sentInstrTasks;
-      const segment = (
-        <div className="mb-3 grid grid-cols-2 gap-1 rounded-[13px] bg-slate-100 p-1">
-          {(
-            [
-              ["recv", copy.instrRecv, Bell, recvUnconfirmed],
-              ["sent", copy.instrSent, Megaphone, sentInstrTasks.filter((t) => t.status !== "completed").length],
-            ] as const
-          ).map(([key, label, Icon, n]) => (
-            <button
-              className={cn(
-                "inline-flex h-[38px] items-center justify-center gap-1.5 rounded-[9px] text-[12.5px] font-extrabold transition-colors",
-                instrTab === key
-                  ? "bg-surface text-foreground shadow-[0_1px_4px_rgba(20,32,43,0.12)]"
-                  : "text-slate-500",
-              )}
-              key={key}
-              onClick={() => setInstrTab(key)}
-              type="button"
-            >
-              <Icon className="size-[15px]" aria-hidden="true" />
-              {label}
-              {n > 0 ? (
-                <span
-                  className={cn(
-                    "inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10.5px] font-extrabold leading-none tabular-nums",
-                    instrTab === key ? "bg-primary text-primary-foreground" : "bg-slate-200 text-slate-600",
-                  )}
+      const sentOpen = sentInstrTasks.filter((t) => t.status !== "completed").length;
+      const top = (
+        <>
+          {head(copy.viewInstr, recv ? copy.instrRecvNote : copy.instrSentNote, { search: true })}
+          <div className="tkw-instr__seg">
+            <div aria-label={copy.viewInstr} className="tkw-seg" role="tablist">
+              {(
+                [
+                  ["recv", copy.instrRecv, recvUnconfirmed],
+                  ["sent", copy.instrSent, sentOpen],
+                ] as const
+              ).map(([key, label, n]) => (
+                <button
+                  aria-selected={instrTab === key}
+                  className={cn(instrTab === key && "is-on")}
+                  key={key}
+                  onClick={() => setInstrTab(key)}
+                  role="tab"
+                  type="button"
                 >
-                  {n}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      );
-      const note = (
-        <p className="mb-3 px-0.5 text-[12px] font-medium leading-relaxed text-muted-foreground">
-          {recv ? copy.instrRecvNote : copy.instrSentNote}
-        </p>
+                  {label}
+                  {n > 0 ? <b>{n}</b> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+          {searchPanel}
+        </>
       );
       // 보낸 지시 화면에서 바로 지시를 만들 수 있어야 한다 — 상세 생성 폼을 지시 모드로 연다
       // (`?directive=1` → 폼의 "지시로 보내기" 토글이 켜진 채 시작).
       const sendCta = recv ? null : (
-        <Link
-          className="mb-3 flex items-center gap-2.5 rounded-2xl border border-dashed border-primary/40 bg-primary/[0.04] px-3.5 py-3 transition-colors active:bg-primary/10"
-          href="/mobile/tasks/new?directive=1"
-        >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Megaphone className="size-4" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1 text-sm font-extrabold text-foreground">
-            {copy.sendAsDirective}
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-primary/60" aria-hidden="true" />
+        <Link className="tkw-add" href="/mobile/tasks/new?directive=1">
+          <Plus aria-hidden="true" />
+          {copy.sendAsDirective}
         </Link>
       );
       if (!base.length)
         return (
           <>
-            {segment}
-            {sendCta}
+            {top}
             {recv
               ? emptyState(Bell, copy.instrEmptyRecvTitle, copy.instrEmptyRecvSub)
               : emptyState(Megaphone, copy.instrEmptySentTitle, copy.instrEmptySentSub)}
+            {sendCta}
           </>
         );
       const list = applyFilter(base);
       if (!list.length)
         return (
           <>
-            {segment}
+            {top}
             {noMatchState()}
           </>
         );
-      // 받은 지시만 "지연"을 따로 뽑는다. 보낸 지시의 지연은 대상자가 처리할 몫이라 상태 배지로 족하다.
+      // 받은 지시만 "지연"을 따로 뽑는다. 보낸 지시의 지연은 대상자가 처리할 몫이라 상태로 족하다.
       const byDateThenPrio = (a: TaskRecord, b: TaskRecord) =>
         (dueDateOf(a) ?? "9999").localeCompare(dueDateOf(b) ?? "9999") || prioSort(a, b);
       const overdueList = recv ? list.filter((t) => isOverdue(t)) : [];
       const rest = list.filter((t) => !overdueList.includes(t));
-      const groups: { label: string; items: TaskRecord[]; tone?: "over" }[] = [
+      const groups: { label: string; items: TaskRecord[]; tone?: "over" | "muted" }[] = [
         { label: copy.instrSecOverdue, items: overdueList.sort(byDateThenPrio), tone: "over" },
         {
           label: recv ? copy.instrSecTodo : copy.instrSecUnconfirmed,
@@ -1356,14 +1470,12 @@ export function TasksWorkspace({
       ];
       return (
         <>
-          {segment}
-          {sendCta}
-          {note}
+          {top}
           {groups.map(({ label, items, tone }) =>
             items.length ? (
-              <div key={label}>
+              <section className="tkw-sec" key={label}>
                 {sectionHead(label, items.length, tone)}
-                <div className="mb-1 flex flex-col gap-2">
+                <div className="tkw-list">
                   {items.map((t) => (
                     <TaskCard
                       key={t.id}
@@ -1371,173 +1483,128 @@ export function TasksWorkspace({
                       instrMode={recv ? "recv" : "sent"}
                       swipe={false}
                       {...cardProps}
-                      // 보낸 지시는 대상자의 일정이다 — 지시자가 대신 완료 처리하지 않으므로 원을
-                      // 아예 렌더하지 않는다(TaskCard 는 onCompleteToggle 이 없으면 생략).
+                      // 보낸 지시는 대상자의 일정이다 — 지시자가 대신 완료 처리하지 않으므로 고리를
+                      // 정적 표시로 둔다(TaskCard 는 onCompleteToggle 이 없으면 누를 수 없는 고리).
                       onCompleteToggle={recv ? cardProps.onCompleteToggle : undefined}
+                      trailing={
+                        t.status === "completed" && t.completedAt
+                          ? fmt(tokyoDateOf(t.completedAt) ?? today, { month: "numeric", day: "numeric" })
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             ) : null,
           )}
+          {sendCta}
         </>
       );
     }
 
-    // 완료/기록: every completion, grouped by the day it was logged (Tokyo), newest day first. Each
-    // day header carries a 보고서 button that opens the AI daily-report sheet for that date.
+    // 완료·기록: every completion, grouped by the day it was logged (Tokyo), newest day first. Each
+    // day header carries an 업무일지 link that opens the daily-report sheet for that date.
     if (view === "completed") {
+      const top = (
+        <>
+          {head(w.doneTitle, w.doneWeek.replace("{n}", String(weekDoneCount)), { search: true })}
+          {searchPanel}
+          <div className="tkw-ftabs" role="tablist">
+            {(["all", "regular", "project"] as const).map((f) => (
+              <button
+                aria-selected={completedFilter === f}
+                className={cn(completedFilter === f && "is-on")}
+                key={f}
+                onClick={() => setCompletedFilter(f)}
+                role="tab"
+                type="button"
+              >
+                {f === "all" ? copy.projects.filterAll : f === "regular" ? copy.projects.filterRegular : copy.projects.filterProject}
+              </button>
+            ))}
+          </div>
+        </>
+      );
       // 출처는 완료 로그(`completionRows`) — 행 status 가 아니다. 이유는 위 `completionRows` 주석 참고.
-      // 필터 pill 은 일반 작업(프로젝트 밖)과 프로젝트 작업을 가른다.
       if (completionRows.length === 0 && fieldActivities.length === 0)
-        return emptyState(CheckCircle2, copy.completedEmptyTitle, copy.completedEmptySub);
+        return (
+          <>
+            {top}
+            {emptyState(CheckCircle2, copy.completedEmptyTitle, copy.completedEmptySub)}
+          </>
+        );
       const scoped = completionRows.filter(({ task }) =>
-        completedFilter === "project"
-          ? !!task.projectId
-          : completedFilter === "regular"
-            ? !task.projectId
-            : true,
+        completedFilter === "project" ? !!task.projectId : completedFilter === "regular" ? !task.projectId : true,
       );
       const list = scoped.filter(({ task }) => !filterActive || matchesFilter(task));
       const byDay = new Map<string, typeof list>();
       for (const row of list) {
         byDay.set(row.completion.day, [...(byDay.get(row.completion.day) ?? []), row]);
       }
-      // 현장 활동(청소·유지보수·린넨·주문에서 본인이 완료 처리한 것). 투두가 아니므로
-      // 일반/프로젝트 필터 pill 이나 검색·태그 필터가 걸리면 감춘다 — 그 필터들은 작업의 속성으로
-      // 거르는데 현장 활동에는 그런 속성이 없어서, 남겨 두면 필터가 안 먹는 것처럼 보인다.
+      // 현장 활동(청소·유지보수·린넨·주문에서 본인이 완료 처리한 것). 투두가 아니므로 일반/프로젝트
+      // 필터나 검색·태그 필터가 걸리면 감춘다 — 그 필터들은 작업의 속성으로 거르는데 현장 활동에는
+      // 그런 속성이 없어서, 남겨 두면 필터가 안 먹는 것처럼 보인다.
       const fieldVisible = completedFilter === "all" && !filterActive ? fieldActivities : [];
       const fieldByDay = new Map<string, FieldActivityRecord[]>();
       for (const activity of fieldVisible) {
         fieldByDay.set(activity.day, [...(fieldByDay.get(activity.day) ?? []), activity]);
       }
-      // 날짜 그룹은 두 소스의 합집합 — 그날 투두 완료가 없고 청소만 했어도 그룹이 생겨야 한다.
-      const dayKeys = Array.from(new Set([...byDay.keys(), ...fieldByDay.keys()])).sort((a, b) =>
-        b.localeCompare(a),
-      );
-      const filterPills = (
-        <div className="mb-4 flex gap-2">
-          {(["all", "regular", "project"] as const).map((f) => (
-            <button
-              className={cn(
-                "inline-flex h-[34px] items-center whitespace-nowrap rounded-full border px-[15px] text-[12.5px] font-bold transition-colors",
-                completedFilter === f
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-surface text-muted-foreground",
-              )}
-              key={f}
-              onClick={() => setCompletedFilter(f)}
-              type="button"
-            >
-              {f === "all" ? copy.projects.filterAll : f === "regular" ? copy.projects.filterRegular : copy.projects.filterProject}
-            </button>
-          ))}
-        </div>
-      );
+      // 날짜 묶음은 두 소스의 합집합 — 그날 투두 완료가 없고 청소만 했어도 묶음이 생겨야 한다.
+      const dayKeys = Array.from(new Set([...byDay.keys(), ...fieldByDay.keys()])).sort((a, b) => b.localeCompare(a));
       if (list.length === 0 && fieldVisible.length === 0)
         return (
           <>
-            {filterPills}
+            {top}
             {noMatchState()}
           </>
         );
       return (
         <>
-          {filterPills}
-          <div className="flex flex-col gap-5">
-            {dayKeys.map((k) => {
-            const dayLabel = new Intl.DateTimeFormat(locale, {
-              month: "short",
-              day: "numeric",
-              weekday: "short",
-              timeZone: "Asia/Tokyo",
-            }).format(new Date(`${k}T00:00:00+09:00`));
-            const dayIsToday = k === today;
-            // 로그 시각 기준 최신순. 반복 완료는 `completedAt`(행) 이 비어 있으므로 완료 로그의
-            // 타임스탬프를 쓴다 — 행 값으로 정렬하면 반복 완료가 전부 바닥으로 밀린다.
-            const items = (byDay.get(k) ?? [])
-              .slice()
-              .sort((a, b) => b.completion.at.localeCompare(a.completion.at));
+          {top}
+          {dayKeys.map((k) => {
+            const md = fmt(k, { month: "long", day: "numeric" });
+            const dayLabel =
+              k === today
+                ? `${copy.todayLabel} · ${md}`
+                : k === yesterdayDate
+                  ? `${w.yesterday} · ${md}`
+                  : fmt(k, { month: "long", day: "numeric", weekday: "short" });
+            // 로그 시각 기준 최신순. 반복 완료는 `completedAt`(행)이 비어 있으므로 완료 로그의 타임스탬프를 쓴다.
+            const items = (byDay.get(k) ?? []).slice().sort((a, b) => b.completion.at.localeCompare(a.completion.at));
             const fieldItems = fieldByDay.get(k) ?? [];
             return (
-              <div key={k}>
-                <div className="mb-2.5 flex items-center gap-2 px-0.5">
-                  <span
-                    className={cn(
-                      "text-[12px] font-black tracking-[-0.01em]",
-                      dayIsToday ? "text-primary" : "text-foreground",
-                    )}
-                  >
-                    {dayLabel}
-                  </span>
-                  {dayIsToday ? (
-                    <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-bold text-primary">
-                      {copy.todayLabel}
-                    </span>
-                  ) : null}
-                  <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-                    {copy.completedDayCount.replace(
-                      "{count}",
-                      String(items.length + fieldItems.length),
-                    )}
-                  </span>
-                  <span className="h-px flex-1 bg-border" />
-                  <button
-                    className="inline-flex items-center gap-1 rounded-full bg-primary/[0.07] px-2.5 py-1 text-[11.5px] font-bold text-primary transition-colors hover:bg-primary/10"
-                    onClick={() => setReportDate(k)}
-                    type="button"
-                  >
-                    <FileText className="size-3.5" aria-hidden="true" />
-                    {copy.reportButton}
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {items.map(({ task, completion }) => {
-                    // 반복 완료는 행이 계속 `open` 이라 status 로는 완료로 그려지지 않는다. 그 날짜의
-                    // 회차로 넘겨 완료 표시(취소선 + 채운 원)를 살린다. 다만 되돌리기는 붙이지 않는다 —
-                    // 로그의 날짜가 회차 날짜와 다를 수 있어(지난 회차를 오늘 처리) 엉뚱한 회차를
-                    // 되살릴 위험이 있다. 방금 한 완료는 토스트의 "실행 취소"로 되돌린다.
-                    const recurringDone = isStandardRecurrence(task.recurrenceRule);
-                    return (
-                      <TaskCard
-                        key={`${task.id}|${completion.day}`}
-                        task={task}
-                        showDate={false}
-                        swipe={false}
-                        {...cardProps}
-                        {...(recurringDone
-                          ? {
-                              occurrence: { date: completion.day, done: true },
-                              onCompleteToggle: undefined,
-                              // 회차를 넘기면 롱프레스 메뉴가 "그 날짜만 건너뛰기"를 제안하는데,
-                              // 이미 완료된 날짜에는 의미가 없다 — 시리즈 메뉴로만 연다.
-                              onLongPress: (t: TaskRecord) => openPressMenu(t),
-                            }
-                          : null)}
-                      />
-                    );
-                  })}
-                  {/* 현장 활동 — 읽기 전용. 되돌리기·완료 토글·롱프레스 메뉴를 붙이지 않는다:
-                      원본은 청소·유지보수 화면에 있고, 여기서 되돌릴 수 있게 하면 어느 쪽이
-                      진짜인지 두 화면이 다투게 된다. TaskCard 를 쓰지 않는 것도 같은 이유다. */}
-                  {fieldItems.map((activity, i) => (
-                    <div
-                      className="flex items-center gap-2.5 rounded-2xl border border-border/70 bg-surface/60 px-3.5 py-3"
-                      key={`${k}|${activity.kind}|${i}`}
-                    >
-                      <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+              <section className="tkw-sec" key={k}>
+                {sectionHead(
+                  dayLabel,
+                  items.length + fieldItems.length,
+                  undefined,
+                  <span className="tkw-sec__acts">
+                    <button className="tkw-tl" onClick={() => setReportDate(k)} type="button">
+                      {w.report}
+                    </button>
+                  </span>,
+                )}
+                <div className="tkw-list">
+                  {items.map(({ task, completion }) => renderDoneRow(task, completion, { trailing: true }))}
+                  {/* 현장 활동 — 읽기 전용 한 줄. 되돌리기·완료 토글·길게 누름을 붙이지 않는다: 원본은 청소·
+                      유지보수 화면에 있고, 여기서 되돌릴 수 있게 하면 어느 쪽이 진짜인지 두 화면이 다투게 된다. */}
+                  {fieldItems.length > 0 ? (
+                    <div className="tkw-field">
+                      <span aria-hidden="true" className="tkw-field__ic">
+                        {w.fieldMark}
                       </span>
-                      <span className="min-w-0 flex-1 text-[13.5px] font-semibold leading-snug text-muted-foreground">
-                        {activity.label}
+                      <span className="tkw-field__b">
+                        <span className="tkw-field__t">
+                          {w.fieldTitle} · {fieldItems.map((a) => a.label).join(" · ")}
+                        </span>
+                        <span className="tkw-field__s">{w.fieldSub}</span>
                       </span>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
-              </div>
+              </section>
             );
           })}
-          </div>
         </>
       );
     }
@@ -1546,19 +1613,58 @@ export function TasksWorkspace({
     return renderCalendar();
   })();
 
+  /**
+   * 완료 줄 — 오늘의 「완료」 묶음과 완료·기록이 같이 쓴다.
+   * 반복 완료는 행이 계속 `open` 이라 status 로는 완료로 그려지지 않는다. 그 날짜의 회차로 넘겨 완료 표시(취소선 +
+   * 채운 고리)를 살린다. 다만 되돌리기는 붙이지 않는다 — 로그의 날짜가 회차 날짜와 다를 수 있어(지난 회차를 오늘 처리)
+   * 엉뚱한 회차를 되살릴 위험이 있다. 방금 한 완료는 토스트의 「실행 취소」로 되돌린다.
+   */
+  function renderDoneRow(task: TaskRecord, completion: TaskCompletionRecord, opts: { trailing: boolean }) {
+    const recurringDone = isStandardRecurrence(task.recurrenceRule);
+    return (
+      <TaskCard
+        key={`${task.id}|${completion.day}`}
+        task={task}
+        showDate={false}
+        swipe={false}
+        {...cardProps}
+        trailing={opts.trailing ? clockOf(completion.at) : undefined}
+        {...(recurringDone
+          ? {
+              occurrence: { date: completion.day, done: true },
+              onCompleteToggle: undefined,
+              // 회차를 넘기면 길게 누름 메뉴가 "그 날짜만 건너뛰기"를 제안하는데, 이미 완료된 날짜에는
+              // 의미가 없다 — 시리즈 메뉴로만 연다.
+              onLongPress: (t: TaskRecord) => openPressMenu(t),
+            }
+          : null)}
+      />
+    );
+  }
+
+  /** 하루의 작업 — 그리드 · 날짜 목록과 같은 규칙(반복은 그날 회차가 있으면, 정렬은 시각 → 우선순위). */
+  function dayList(iso: string): TaskRecord[] {
+    return tasks
+      .filter((t) => {
+        if (!isActive(t)) return false;
+        const a = anchor(t);
+        if (!a) return false;
+        if (isStandardRecurrence(t.recurrenceRule)) {
+          if (hideRecurring) return false; // "반복 숨기기" 토글과 그리드를 일치시킴.
+          return recurringOccurrencesInRange(t.recurrenceRule, a, iso, iso).length > 0;
+        }
+        return a === iso;
+      })
+      .sort(timeThenPrio);
+  }
+
   function renderCalendar() {
     const { y, m } = calMonth;
     const monthPrefix = calMonthPrefix;
-    const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+    // 월요일 시작(시안 TodoCal-Phone) — 토 파랑 · 일 빨강.
+    const first = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
     const daysIn = calDaysIn;
-    // 회차 계산은 뷰 밖(`calOccurrences` / `calByDay`)에서 한 번만 한다 — 정렬까지 끝난 상태다.
     const onDay = (iso: string) => calByDay.get(iso) ?? [];
-
-    const openDay = (iso: string) => {
-      setCalDay(iso);
-      setSheetOpen(true);
-      requestAnimationFrame(() => requestAnimationFrame(() => setSheetShown(true)));
-    };
     const shiftMonth = (delta: number) =>
       setCalMonth(({ y: cy, m: cm }) => {
         const idx = cy * 12 + (cm - 1) + delta;
@@ -1569,6 +1675,13 @@ export function TasksWorkspace({
       setCalMonth({ y: ty, m: tm });
       setCalDay(today);
     };
+    /** 점 색 — 긴급이나 지난 날짜의 일회성(지연)은 빨강, 공유는 보라, 나머지(개인)는 주황. */
+    const dotTone = (t: TaskRecord, iso: string) =>
+      t.priority === "urgent" || (iso < today && !isStandardRecurrence(t.recurrenceRule))
+        ? "is-r"
+        : t.isShared
+          ? "is-s"
+          : undefined;
 
     const cells: React.ReactNode[] = [];
     for (let i = 0; i < first; i++) cells.push(<span key={`pad-${i}`} />);
@@ -1577,39 +1690,22 @@ export function TasksWorkspace({
       const list = onDay(iso);
       const isT = iso === today;
       const isSel = iso === calDay;
-      const w = (first + d - 1) % 7;
       cells.push(
         <button
-          className={cn(
-            "flex aspect-square flex-col items-center justify-start gap-1 rounded-xl pt-1.5 text-[12.5px] font-bold transition-colors",
-            isSel
-              ? "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_hsl(var(--primary-hsl)/0.7)]"
-              : isT
-                ? "bg-primary/[0.07] text-primary ring-1 ring-inset ring-primary/25"
-                : "text-foreground hover:bg-slate-50",
-          )}
+          aria-label={`${fmt(iso, { month: "long", day: "numeric", weekday: "short" })} · ${w.count.replace("{n}", String(list.length))}`}
+          aria-pressed={isSel}
+          className={cn("tkw-cal__d", isT && "is-today", isSel && "is-sel")}
           key={iso}
-          onClick={() => openDay(iso)}
+          onClick={() => {
+            haptic("light");
+            setCalDay(iso);
+          }}
           type="button"
         >
-          <span
-            className={cn(
-              !isSel && !isT && w === 0 && "text-rose-500",
-              !isSel && !isT && w === 6 && "text-blue-600",
-            )}
-          >
-            {d}
-          </span>
-          {/* Fixed-height marker row keeps every cell on the same vertical rhythm */}
-          <span className="flex h-1.5 items-center gap-0.5">
+          {d}
+          <span aria-hidden="true" className="tkw-cal__dots">
             {list.slice(0, 3).map((t, i) => (
-              <span
-                className={cn(
-                  "size-1 rounded-full",
-                  isSel ? "bg-primary-foreground/80" : t.isShared ? "bg-primary" : "bg-amber-500",
-                )}
-                key={i}
-              />
+              <i className={dotTone(t, iso)} key={i} />
             ))}
           </span>
         </button>,
@@ -1622,333 +1718,116 @@ export function TasksWorkspace({
       timeZone: "Asia/Tokyo",
     }).format(new Date(Date.UTC(y, m - 1, 15)));
     const isCurrentMonth = monthPrefix === today.slice(0, 7);
-    const selectedList = calDay ? onDay(calDay) : [];
-    const selectedLabel = calDay
-      ? new Intl.DateTimeFormat(locale, {
-          month: "long",
-          day: "numeric",
-          weekday: "short",
-          timeZone: "Asia/Tokyo",
-        }).format(new Date(`${calDay}T00:00:00+09:00`))
-      : null;
-
-    // Agenda for the shown month: occurrences grouped by day (recurring tasks expand virtually).
-    // 모바일 아젠다는 **달 전체**를 보여준다(콘솔은 "다가오는 것만"). 지난 날짜를 되짚는 일이 현장에서
-    // 잦아 의도적으로 남긴 차이다.
-    const monthTasks = calOccurrences;
-    const byDay = calByDay;
-    const dayKeys = Array.from(byDay.keys()).sort();
+    const selectedList = dayList(calDay);
+    const selectedLabel = `${fmt(calDay, { month: "long", day: "numeric", weekday: "short" })}${calDay === today ? ` · ${copy.todayLabel}` : ""}`;
+    const weekdays = Array.from({ length: 7 }, (_, i) =>
+      new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2025, 0, 6 + i))),
+    );
 
     return (
-      <div>
-        {/* Calendar card — a calm white surface lifted off the ivory canvas */}
-        <div className="rounded-[22px] border border-border bg-surface p-3.5 shadow-[0_14px_50px_-32px_rgba(15,23,42,0.4)]">
-          {/* Month navigation */}
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <button
-                aria-label={copy.calPrevMonth}
-                className="flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
-                onClick={() => shiftMonth(-1)}
-                type="button"
-              >
-                <ChevronLeft className="size-[18px]" aria-hidden="true" />
+      <div className="tkw-cal">
+        <div className="tkw-cal__grid-wrap">
+          <div className="tkw-cal__top">
+            <button aria-label={copy.calPrevMonth} className="tkw-cal__nav" onClick={() => shiftMonth(-1)} type="button">
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <span className="tkw-cal__m">{monthLabel}</span>
+            <button aria-label={copy.calNextMonth} className="tkw-cal__nav" onClick={() => shiftMonth(1)} type="button">
+              <ChevronRight aria-hidden="true" />
+            </button>
+            {!isCurrentMonth ? (
+              <button className="tkw-cal__today" onClick={goToday} type="button">
+                {copy.todayLabel}
               </button>
-              <span className="min-w-[124px] text-center text-[15px] font-black tracking-[-0.01em] text-foreground">
-                {monthLabel}
-              </span>
-              <button
-                aria-label={copy.calNextMonth}
-                className="flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
-                onClick={() => shiftMonth(1)}
-                type="button"
-              >
-                <ChevronRight className="size-[18px]" aria-hidden="true" />
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                aria-pressed={hideRecurring}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors",
-                  hideRecurring
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-surface text-slate-500 hover:bg-slate-50",
-                )}
-                onClick={() => setHideRecurring((v) => !v)}
-                type="button"
-              >
-                <Repeat className="size-3.5" aria-hidden="true" />
-                {copy.calHideRepeat}
-              </button>
-              {!isCurrentMonth ? (
-                <button
-                  className="inline-flex items-center gap-1 rounded-full bg-primary/[0.07] px-3 py-1.5 text-[12px] font-bold text-primary transition-colors hover:bg-primary/10"
-                  onClick={goToday}
-                  type="button"
-                >
-                  <CalendarDays className="size-3.5" aria-hidden="true" />
-                  {copy.todayLabel}
-                </button>
-              ) : null}
-            </div>
+            ) : null}
+            <button
+              aria-checked={hideRecurring}
+              className="tkw-sw"
+              onClick={() => setHideRecurring((v) => !v)}
+              role="switch"
+              type="button"
+            >
+              {copy.calHideRepeat}
+              <span aria-hidden="true" className="tkw-sw__t" />
+            </button>
           </div>
-
-          {/* Weekday row */}
-          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-muted-foreground">
-            {Array.from({ length: 7 }, (_, i) =>
-              new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(
-                new Date(Date.UTC(2025, 0, 5 + i)),
-              ),
-            ).map((label, i) => (
-              <span className={cn(i === 0 && "text-rose-500", i === 6 && "text-blue-600")} key={i}>
+          <div className="tkw-cal__legend">
+            <span>
+              <i />
+              {copy.calLegendPersonal}
+            </span>
+            <span>
+              <i className="is-s" />
+              {copy.calLegendShared}
+            </span>
+            <span>
+              <i className="is-r" />
+              {w.legendAlert}
+            </span>
+          </div>
+          <div aria-hidden="true" className="tkw-cal__wk">
+            {weekdays.map((label, i) => (
+              <span className={cn(i === 5 && "is-sat", i === 6 && "is-sun")} key={i}>
                 {label}
               </span>
             ))}
           </div>
-          <div className="mt-1.5 grid grid-cols-7 gap-1">{cells}</div>
-
-          {/* Legend — placed by the grid it explains */}
-          {isCurrentMonth ? (
-            <div className="mt-3 flex items-center justify-center gap-4 border-t border-slate-100 pt-2.5 text-[10.5px] font-semibold text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-amber-500" />
-                {copy.calLegendPersonal}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-primary" />
-                {copy.calLegendShared}
-              </span>
-            </div>
-          ) : null}
+          <div className="tkw-cal__grid">{cells}</div>
         </div>
 
-        {calDay ? (
-          <div className="mt-4 rounded-[18px] border border-border bg-surface px-4 py-3 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.42)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10.5px] font-black uppercase tracking-[0.08em] text-muted-foreground">
-                  {copy.calSelectedLabel}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <p className="text-[15px] font-black tracking-[-0.01em] text-foreground">
-                    {selectedLabel}
-                  </p>
-                  <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-                    {copy.calMonthTask.replace("{count}", String(selectedList.length))}
-                  </span>
-                  {calDay === today ? (
-                    <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-bold text-primary">
-                      {copy.todayLabel}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1.5 text-[12px] text-muted-foreground">
-                  {selectedList.length > 0 ? copy.calSelectedHint : copy.calSelectedEmpty}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  className="inline-flex h-9 items-center gap-1 rounded-full bg-primary/[0.07] px-3 text-[12px] font-bold text-primary transition-colors hover:bg-primary/10"
-                  onClick={() => openDay(calDay)}
-                  type="button"
-                >
-                  <CalendarDays className="size-3.5" aria-hidden="true" />
-                  {copy.calOpenDay}
-                </button>
-                <button
-                  aria-label={copy.calClearSelected}
-                  className="flex size-9 items-center justify-center rounded-full bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
-                  onClick={() => setCalDay(null)}
-                  type="button"
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </button>
-              </div>
-            </div>
+        {/* 고른 날의 작업. 미래 날짜는 **미리보기**(점 마커) — 미리 눌리면 그날이 왔을 때 목록에서 사라져, 아무도 안
+            했는데 기록만 「완료」로 남는다(2026-09-09). 그날 오늘 탭에서 처리한다. */}
+        <section className="tkw-sec tkw-cal__day">
+          <div className="tkw-cal__dh">
+            <b>{selectedLabel}</b>
+            <span className="tkw-sec__n">{w.count.replace("{n}", String(selectedList.length))}</span>
           </div>
-        ) : null}
-
-        {/* Month agenda — operational reading of the shown month's dated tasks */}
-        <div className="mt-5">
-          {sectionHead(copy.calAgenda, monthTasks.length)}
-          {dayKeys.length === 0 ? (
-            <div className="flex flex-col items-center rounded-[18px] border border-dashed border-border bg-surface/60 px-6 py-8 text-center">
-              <span className="mb-2.5 flex size-10 items-center justify-center rounded-full bg-slate-50 text-slate-400">
-                <CalendarDays className="size-5" aria-hidden="true" />
-              </span>
-              <p className="text-[12.5px] font-semibold text-muted-foreground">{copy.calMonthEmpty}</p>
-            </div>
+          {selectedList.length === 0 ? (
+            <p className="tkw-hint" style={{ padding: "10px 0 4px" }}>
+              {copy.calNoTask}
+            </p>
           ) : (
-            <div className="flex flex-col gap-3">
-              {dayKeys.map((k) => {
-                const dayLabel = new Intl.DateTimeFormat(locale, {
-                  month: "short",
-                  day: "numeric",
-                  weekday: "short",
-                  timeZone: "Asia/Tokyo",
-                }).format(new Date(`${k}T00:00:00+09:00`));
-                const dayIsToday = k === today;
-                return (
-                  <div key={k}>
-                    <button
-                      className="mb-1.5 flex w-full items-center gap-2 px-0.5 text-left"
-                      onClick={() => openDay(k)}
-                      type="button"
-                    >
-                      <span
-                        className={cn(
-                          "text-[12px] font-black tracking-[-0.01em]",
-                          dayIsToday ? "text-primary" : "text-foreground",
-                        )}
-                      >
-                        {dayLabel}
-                      </span>
-                      {dayIsToday ? (
-                        <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-bold text-primary">
-                          {copy.todayLabel}
-                        </span>
-                      ) : null}
-                      <span className="rounded-full bg-slate-100 px-[7px] py-px font-mono text-[10.5px] font-semibold text-muted-foreground">
-                        {byDay.get(k)!.length}
-                      </span>
-                      <span className="h-px flex-1 bg-border" />
-                    </button>
-                    {/* 미래 날짜는 **미리보기**다 — 체크박스 대신 점 마커를 보여 준다(2026-09-09).
-                        미리 눌리면 그날이 왔을 때 목록에서 사라져, 아무도 안 했는데 기록만 「완료」로
-                        남는다. 그날 오늘 탭에서 처리한다. */}
-                    <div className="flex flex-col gap-2">
-                      {byDay.get(k)!.map((t) => (
-                        <TaskCard
-                          key={t.id}
-                          task={t}
-                          swipe={false}
-                          {...cardProps}
-                          preview={k > today}
-                          {...(isStandardRecurrence(t.recurrenceRule) && !occStateOf(t.id, k)
-                            ? { occurrence: { date: k, done: false } }
-                            : null)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {sheetOpen && calDay ? renderDaySheet(calDay) : null}
-      </div>
-    );
-  }
-
-  function renderDaySheet(iso: string) {
-    // Match the calendar grid/agenda (which show recurring tasks on every virtual occurrence) so the
-    // day sheet isn't empty on a recurring task's future occurrence day. Non-recurring: anchor === iso.
-    // 하루 안 정렬도 그리드/아젠다와 같은 규칙(시각 → 우선순위)을 쓴다.
-    const list = tasks
-      .filter((t) => {
-        if (!isActive(t)) return false;
-        const a = anchor(t);
-        if (!a) return false;
-        if (isStandardRecurrence(t.recurrenceRule)) {
-          if (hideRecurring) return false; // "반복 숨기기" 토글과 그리드/아젠다를 일치시킴.
-          return recurringOccurrencesInRange(t.recurrenceRule, a, iso, iso).length > 0;
-        }
-        return a === iso;
-      })
-      .sort(timeThenPrio);
-    const label = new Intl.DateTimeFormat(locale, {
-      month: "long",
-      day: "numeric",
-      weekday: "short",
-      timeZone: "Asia/Tokyo",
-    }).format(new Date(`${iso}T00:00:00+09:00`));
-    if (!hydrated) return null;
-    return createPortal(
-      <div
-        className={cn(
-          "fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/45 transition-opacity duration-300 motion-reduce:transition-none",
-          sheetShown ? "opacity-100" : "opacity-0",
-        )}
-        onClick={closeDaySheet}
-        style={daySheetDrag.scrimStyle}
-      >
-        <div
-          className={cn(
-            "w-full max-w-[460px] rounded-t-[24px] bg-surface px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3",
-            "transition-transform duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none",
-            sheetShown ? "translate-y-0" : "translate-y-full",
-          )}
-          data-sheet
-          onClick={(e) => e.stopPropagation()}
-          style={daySheetDrag.sheetStyle}
-        >
-          <div
-            className="mx-auto mb-3 h-1 w-[38px] rounded-full bg-slate-200"
-            {...daySheetDrag.handleProps}
-          />
-          <div className="mb-3 flex items-center gap-2" {...daySheetDrag.handleProps}>
-            <p className="text-[16px] font-black text-foreground">{label}</p>
-            {list.length > 0 ? (
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                {copy.calMonthTask.replace("{count}", String(list.length))}
-              </span>
-            ) : null}
-          </div>
-          {list.length === 0 ? (
-            <div className="flex flex-col items-center px-6 py-8 text-center">
-              <span className="mb-2.5 flex size-11 items-center justify-center rounded-full bg-slate-50 text-slate-400">
-                <CalendarDays className="size-5" aria-hidden="true" />
-              </span>
-              <p className="text-[13px] font-semibold text-muted-foreground">{copy.calNoTask}</p>
-            </div>
-          ) : (
-            <div className="-mx-1 flex max-h-[56vh] flex-col gap-2 overflow-y-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {/* 미래 날짜 시트도 미리보기 — 점 마커로 그린다(2026-09-09, 위와 같은 이유). */}
-              {list.map((t) => (
+            <div className="tkw-list" key={calDay}>
+              {selectedList.map((t) => (
                 <TaskCard
                   key={t.id}
                   task={t}
                   swipe={false}
                   {...cardProps}
-                  preview={iso > today}
-                  {...(isStandardRecurrence(t.recurrenceRule) && !occStateOf(t.id, iso)
-                    ? { occurrence: { date: iso, done: false } }
+                  showDate={false}
+                  preview={calDay > today}
+                  {...(isStandardRecurrence(t.recurrenceRule) && !occStateOf(t.id, calDay)
+                    ? { occurrence: { date: calDay, done: false } }
                     : null)}
                 />
               ))}
             </div>
           )}
-          <Link
-            className="mt-3 flex h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-primary/[0.06] text-[13.5px] font-bold text-primary transition-colors hover:bg-primary/10"
-            href={`/mobile/tasks/new?date=${iso}`}
-          >
-            <Plus className="size-4" aria-hidden="true" />
+          <Link className="tkw-add" href={`/mobile/tasks/new?date=${calDay}`}>
+            <Plus aria-hidden="true" />
             {copy.calAddOnDate}
           </Link>
-        </div>
-      </div>,
-      document.body,
+        </section>
+      </div>
     );
   }
 
   /**
-   * "전체 선택" 대상 = **지금 이 탭에 그려진 카드**뿐이다 (2026-07-31).
+   * "전체 선택" 대상 = **지금 이 탭에 그려진 줄**뿐이다 (2026-07-31).
    *
    * 예전엔 `tasks` 전체(내 모든 활성 작업)를 선택해서, 오늘 탭에 3건만 보이는데 관리함의 80건까지
    * 딸려 들어가고 삭제 확인창이 "83건"으로 떴다 — 보이지 않는 작업을 지우는 데이터 손실 경로였다.
-   * 콘솔(`admin-tasks-console.tsx`)은 렌더된 `.trow[data-task-id]` 를 클릭 시점에 읽어 같은 문제를
-   * 막는데, 모바일 카드에는 그런 마커가 없고 `TaskCard` 는 이 화면 소유가 아니다. 대신 각 뷰가
-   * 쓰는 base 목록을 뷰 밖으로 뽑아 **여기와 뷰 본문이 같은 배열**을 보게 했다.
-   *
-   * 지연 반복 backlog(`todayRecOverdueBase`)는 체크박스 없는 전용 행으로 렌더되므로 제외한다.
-   * 프로젝트 탭은 `ProjectsBoard` 가 자체 목록을 그려서 이 선택 바가 닿지 않는다.
+   * 각 뷰가 쓰는 base 목록을 뷰 밖으로 뽑아 **여기와 뷰 본문이 같은 배열**을 보게 했다.
+   * 캘린더는 2026-10-15 부터 고른 날의 목록만 그리므로 그 목록이 대상이다.
    */
   const visibleSelectable: TaskRecord[] =
     view === "today"
-      ? applyFilter([...todayOverdueBase, ...todayBase, ...todayRecBase])
+      ? applyFilter([
+          ...todayOverdueBase,
+          ...todayBase,
+          ...todayRecBase,
+          ...todayDoneRows.map((r) => r.task),
+        ])
       : view === "tomorrow"
         ? applyFilter([...tomorrowBase, ...tomorrowRecBase])
         : view === "inbox"
@@ -1968,215 +1847,57 @@ export function TasksWorkspace({
                   )
                   .map((r) => r.task)
               : view === "calendar"
-                ? Array.from(calByDay.values()).flat()
+                ? dayList(calDay)
                 : [];
-  // 같은 작업이 여러 줄로 렌더될 수 있다(반복 회차·캘린더의 여러 날짜) — 선택은 작업 단위라 중복 제거.
+  // 같은 작업이 여러 줄로 렌더될 수 있다(반복 회차·완료 기록의 여러 날짜) — 선택은 작업 단위라 중복 제거.
   const selectableIds = Array.from(new Set(visibleSelectable.map((t) => t.id)));
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const wide = view === "completed" || view === "instr" || view === "projects" || view === "calendar";
 
   return (
-    <div className="relative min-h-[60vh] pb-24">
-      {/* Selection bar replaces the tab chips while multi-selecting. */}
+    <div className="tkw relative min-h-[60vh] pb-24" data-view={view} data-wide={wide ? view : undefined}>
+      {/* 선택 모드에서는 보기 탭 자리를 선택 줄이 대신한다. */}
       {selectMode ? (
-        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-border bg-surface px-2.5 py-2">
-          <button
-            aria-label={copy.cancel}
-            className="flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-foreground"
-            onClick={exitSelect}
-            type="button"
-          >
-            <X className="size-[18px]" aria-hidden="true" />
+        <div className="tkw-selbar">
+          <button aria-label={copy.cancel} className="tkw-selbar__x" onClick={exitSelect} type="button">
+            <X aria-hidden="true" />
           </button>
-          <span className="flex-1 text-[14px] font-extrabold text-foreground">
-            {copy.selectedCountLabel.replace("{count}", String(selectedIds.size))}
-          </span>
+          <span className="tkw-selbar__n">{copy.selectedCountLabel.replace("{count}", String(selectedIds.size))}</span>
           <button
-            className="rounded-full bg-primary/[0.07] px-3 py-1.5 text-[12.5px] font-bold text-primary transition-colors hover:bg-primary/10"
-            onClick={() =>
-              setSelectedIds(allSelected ? new Set() : new Set(selectableIds))
-            }
+            className="tkw-tl"
+            onClick={() => setSelectedIds(allSelected ? new Set() : new Set(selectableIds))}
+            style={{ fontSize: 14 }}
             type="button"
           >
             {allSelected ? copy.selectClear : copy.selectAllLabel}
           </button>
         </div>
       ) : (
-      /* Chip tabs */
-      <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {tabs.map((t) => (
-          <button
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-bold transition-colors",
-              view === t.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-surface text-slate-600",
-            )}
-            key={t.key}
-            onClick={() => setView(t.key)}
-            type="button"
-          >
-            <t.icon className="size-[15px]" aria-hidden="true" />
-            {t.label}
-            {tabCounts[t.key] > 0 ? (
-              <span
-                className={cn(
-                  "inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10.5px] font-extrabold leading-none tabular-nums",
-                  view === t.key ? "bg-white/20 text-primary-foreground" : "bg-primary/10 text-primary",
-                )}
-              >
-                {tabCounts[t.key]}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
-      )}
-
-      {/* Search / filter — list views only; Calendar + Projects provide their own controls. */}
-      {!selectMode && view !== "calendar" && view !== "projects" ? (
-        <div className="mb-4">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-                aria-hidden="true"
-              />
-              <input
-                className="h-11 w-full rounded-2xl border border-border bg-surface pl-9 pr-9 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary"
-                autoCapitalize="none"
-                autoCorrect="off"
-                enterKeyHint="search"
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={copy.searchPlaceholder}
-                type="search"
-                value={search}
-              />
-              {hasSearch ? (
-                <button
-                  aria-label={copy.filterClear}
-                  className="absolute right-2.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
-                  onClick={() => setSearch("")}
-                  type="button"
-                >
-                  <X className="size-3.5" aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
-            <button
-              aria-label={copy.filterDate}
-              className={cn(
-                "relative flex size-11 shrink-0 items-center justify-center rounded-2xl border transition-colors",
-                filterOpen || hasDate
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-surface text-slate-500",
-              )}
-              onClick={() => setFilterOpen((v) => !v)}
-              type="button"
-            >
-              <SlidersHorizontal className="size-4" aria-hidden="true" />
-              {hasDate ? (
-                <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-primary" />
-              ) : null}
-            </button>
-          </div>
-
-	          {filterOpen ? (
-	            <div className="mt-2 rounded-2xl border border-border bg-surface p-3">
-	              <div className="mb-2.5 flex gap-1.5 rounded-full bg-slate-100 p-1">
-	                {(["single", "range"] as const).map((m) => (
-	                  <button
-	                    className={cn(
-	                      "h-8 flex-1 rounded-full text-[12.5px] font-bold transition-colors",
-	                      dateMode === m ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground",
-	                    )}
-	                    key={m}
-	                    onClick={() => {
-	                      setDateMode(m);
-	                      setActiveDatePicker(m === "single" ? "single" : "from");
-	                    }}
-	                    type="button"
-	                  >
-	                    {m === "single" ? copy.filterDateSingle : copy.filterDateRange}
-	                  </button>
-	                ))}
-	              </div>
-	              <div className="flex items-center gap-2">
-	                <button
-	                  aria-label={dateMode === "range" ? copy.filterDateFrom : copy.filterDateSingle}
-	                  className={cn(
-	                    "h-10 flex-1 rounded-xl border bg-background/60 px-3 text-left text-sm font-bold outline-none transition-colors focus:border-primary",
-	                    activeDatePicker === (dateMode === "single" ? "single" : "from")
-	                      ? "border-primary text-foreground"
-	                      : "border-border text-foreground",
-	                    !dateFrom && "text-muted-foreground",
-	                  )}
-	                  onClick={() => setActiveDatePicker(dateMode === "single" ? "single" : "from")}
-	                  type="button"
-	                >
-	                  {dateFrom ? chipDate(dateFrom) : dateMode === "range" ? copy.filterDateFrom : copy.filterDateSingle}
-	                </button>
-	                {dateMode === "range" ? (
-	                  <>
-	                    <span className="text-sm font-bold text-muted-foreground">–</span>
-	                    <button
-	                      aria-label={copy.filterDateTo}
-	                      className={cn(
-	                        "h-10 flex-1 rounded-xl border bg-background/60 px-3 text-left text-sm font-bold outline-none transition-colors focus:border-primary",
-	                        activeDatePicker === "to" ? "border-primary text-foreground" : "border-border text-foreground",
-	                        !dateTo && "text-muted-foreground",
-	                      )}
-	                      onClick={() => setActiveDatePicker("to")}
-	                      type="button"
-	                    >
-	                      {dateTo ? chipDate(dateTo) : copy.filterDateTo}
-	                    </button>
-	                  </>
-	                ) : null}
-	              </div>
-	              <MiniCalendar
-	                copy={copy}
-	                locale={locale}
-	                onClear={() => setActiveDateValue("")}
-	                onSelect={setActiveDateValue}
-	                value={activeDateValue}
-	              />
-	            </div>
-	          ) : null}
-
-          {filterActive ? (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                {copy.filterActive}
-              </span>
-              {hasSearch ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2.5 py-1 text-[11.5px] font-bold text-primary">
-                  “{search.trim()}”
-                </span>
-              ) : null}
-              {hasDate ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2.5 py-1 text-[11.5px] font-bold text-primary">
-                  <CalendarDays className="size-3" aria-hidden="true" />
-                  {dateLabel}
-                </span>
-              ) : null}
+        <div aria-label={w.views} className="tkw-tabs" ref={tabsRef} role="tablist">
+          {tabs.map((t) => {
+            // 시안처럼 숫자는 오늘 · 내일 · 지시에만(관리함 · 완료는 숫자 없이).
+            const n = t.key === "today" || t.key === "tomorrow" || t.key === "instr" ? tabCounts[t.key] : 0;
+            return (
               <button
-                className="ml-0.5 inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11.5px] font-bold text-slate-500"
-                onClick={clearFilters}
+                aria-selected={view === t.key}
+                className={cn("tkw-tab", view === t.key && "is-on")}
+                key={t.key}
+                onClick={() => setView(t.key)}
+                role="tab"
                 type="button"
               >
-                <X className="size-3" aria-hidden="true" />
-                {copy.filterClear}
+                {t.label}
+                {n > 0 ? <b>{n}</b> : null}
               </button>
-            </div>
-          ) : null}
+            );
+          })}
         </div>
-      ) : null}
+      )}
 
       {viewBody}
 
-      {/* Overdue bulk reschedule — reuses the canonical schedule picker (date variant): quick
-          options (오늘/내일/다음 주/다음 주말) + inline calendar, commit on the 완료 button only.
-          Applies the chosen date to every selected overdue task. */}
+      {/* 지연 일괄 날짜 다시 정하기 — 공용 일정 피커(날짜만): 빠른 선택(오늘/내일/다음 주/다음 주말) + 달력,
+          완료 버튼에서만 확정. 고른 지연(선택 모드가 아니면 내 지연 전체)에 같은 날짜를 적용한다. */}
       {overdueRescheduleOpen && (
         <TaskSchedulePicker
           confirmLabel={copy.overdueRescheduleApply}
@@ -2197,191 +1918,154 @@ export function TasksWorkspace({
         />
       )}
 
-      {/* Quick-add FAB — portaled to body so it stays viewport-fixed (the scroll
-          container has a transform, which would otherwise trap `fixed` and let it
-          drift on scroll/pull). Hidden while multi-selecting (the delete bar owns the bottom)
-          and on the Projects tab (ProjectsBoard renders its own "프로젝트 만들기" FAB). */}
+      {/* 지난 미완료 삭제 확인 — 되돌릴 수 없는 일괄 정리라 확인을 받는다(반복은 다음 일정이 남는다). */}
+      {overdueConfirm && hydrated ? (
+        <BottomSheet ariaLabel={copy.overduePromptDismiss} onClose={() => setOverdueConfirm(false)}>
+          {({ close }) => (
+            <div className="tkw-sheet">
+              <h2>{copy.overduePromptTitle.replace("{count}", String(overdueTargets.length))}</h2>
+              <p className="tkw-sheet__sub">{copy.overduePromptConfirm}</p>
+              <div className="tkw-btns2">
+                <button className="tkw-btn is-gray" onClick={close} type="button">
+                  {copy.overduePromptCancel}
+                </button>
+                <button
+                  className="tkw-btn is-red"
+                  disabled={overduePending || overdueTargets.length === 0}
+                  onClick={() => {
+                    haptic("warning");
+                    clearOverdue();
+                  }}
+                  type="button"
+                >
+                  {copy.overduePromptConfirmYes}
+                </button>
+              </div>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
+
+      {/* 빠른 추가 버튼 — body 로 띄워 화면에 고정(스크롤 컨테이너의 transform 이 `fixed` 를 가두지 않게).
+          선택 모드(아래 삭제 줄이 바닥을 쥔다) · 프로젝트 탭(프로젝트 만들기 버튼을 따로 띄운다)에서는 숨긴다. */}
       {hydrated && !selectMode && view !== "projects"
         ? createPortal(
             <button
               aria-hidden={toastVisible}
-              aria-label={copy.quickAddTitle}
-              className={cn(
-                "fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_16px_30px_-10px_hsl(var(--primary-hsl)/0.5)]",
-                "transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.93] motion-reduce:transition-none",
-                // 토스트는 이 FAB 와 같은 자리를 지난다. 겹쳐 그리면(토스트가 z 상위) FAB 가 잘린
-                // 채로 비쳐 지저분하다. 토스트가 떠 있는 4~6초 동안만 물러나게 한다.
-                toastVisible && "pointer-events-none scale-90 opacity-0",
-              )}
+              aria-label={w.addTask}
+              className={cn("tkw-fab", toastVisible && "is-away")}
               onClick={openQuick}
               type="button"
             >
-              <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+              <Plus aria-hidden="true" strokeWidth={2.2} />
             </button>,
             document.body,
           )
         : null}
 
-      {quickMounted && hydrated
-        ? createPortal(
-            <div
-              className={cn(
-                "fixed inset-0 z-[60] flex items-end justify-center overscroll-contain bg-slate-950/45 transition-opacity duration-300 motion-reduce:transition-none",
-                quickShown ? "opacity-100" : "opacity-0",
-              )}
-              onClick={closeQuick}
-              onTouchEnd={stopSheetTouch}
-              onTouchMove={stopSheetTouch}
-              onTouchStart={stopSheetTouch}
-              style={quickDrag.scrimStyle}
-            >
-              <div
-                className={cn(
-                  "w-full max-w-[460px] rounded-t-[24px] bg-surface px-5 pb-[calc(max(22px,env(safe-area-inset-bottom))+var(--keyboard-inset,0px))] pt-3",
-                  "transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none",
-                  quickShown ? "translate-y-0" : "translate-y-full",
-                )}
-                data-sheet
-                onClick={(e) => e.stopPropagation()}
-                style={quickDrag.sheetStyle}
-              >
-                <div
-                  className="mx-auto mb-3.5 h-1 w-[38px] rounded-full bg-slate-200"
-                  {...quickDrag.handleProps}
-                />
+      {/* 빠른 추가 시트(시안 TodoAdd-Phone) — 추가해도 열려 있다(`?created=1` 처리 참고). */}
+      {quickOpen && hydrated ? (
+        <BottomSheet ariaLabel={w.addTask} onClose={onQuickClosed}>
+          <div className="tkw-sheet">
+            <h2>{w.addTask}</h2>
+            <form action={quickCreateTask} onSubmit={() => haptic("success")}>
+              <input
+                aria-label={w.addTask}
+                autoFocus
+                className="tkw-qa__in"
+                defaultValue={quickSeed}
+                enterKeyHint="done"
+                name="title"
+                onChange={(e) => {
+                  // 「비었다↔찼다」가 뒤집힐 때만 상태를 건드린다 — 버튼 활성화에만 쓰인다.
+                  const filled = e.target.value.trim().length > 0;
+                  if (filled !== hasQuickTitle) setHasQuickTitle(filled);
+                }}
+                placeholder={copy.quickAddPlaceholder}
+                ref={quickInputEl}
+                required
+              />
+              <QuickAddSubmitButtons
+                copy={copy}
+                hasTitle={hasQuickTitle}
+                onDetailClick={(e) => {
+                  const typed = (quickInputEl.current?.value ?? "").trim();
+                  if (!typed) return; // 빈 입력이면 기본 href 그대로
+                  e.preventDefault();
+                  router.push(`/mobile/tasks/new?title=${encodeURIComponent(typed)}`);
+                }}
+              />
+            </form>
+          </div>
+        </BottomSheet>
+      ) : null}
 
-                {/* 헤더 (닫기는 슬라이드/스크림으로 대체) */}
-                <div className="mb-3.5" {...quickDrag.handleProps}>
-                  <p className="text-[16px] font-black text-foreground">{copy.quickAddTitle}</p>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">{copy.quickAddSub}</p>
-                </div>
-
-                <form action={quickCreateTask} className="space-y-3">
-                  <input
-                    autoFocus
-                    className="h-12 w-full rounded-2xl border border-border bg-muted px-4 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary"
-                    defaultValue={quickSeed}
-                    name="title"
-                    onChange={(e) => {
-                      // 「비었다↔찼다」가 뒤집힐 때만 상태를 건드린다 — 버튼 활성화에만 쓰인다.
-                      const filled = e.target.value.trim().length > 0;
-                      if (filled !== hasQuickTitle) setHasQuickTitle(filled);
-                    }}
-                    placeholder={copy.quickAddPlaceholder}
-                    ref={quickInputEl}
-                    required
-                  />
-                  <QuickAddSubmitButtons
-                    copy={copy}
-                    hasTitle={hasQuickTitle}
-                    onDetailClick={(e) => {
-                      const typed = (quickInputEl.current?.value ?? "").trim();
-                      if (!typed) return; // 빈 입력이면 기본 href 그대로
-                      e.preventDefault();
-                      router.push(`/mobile/tasks/new?title=${encodeURIComponent(typed)}`);
-                    }}
-                  />
-                </form>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-
-      {/* Long-press context menu — quick Edit / Select / Delete for a single task. */}
-      {pressTask && hydrated
-        ? createPortal(
-            <div
-              className={cn(
-                "fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 transition-opacity duration-200 motion-reduce:transition-none",
-                pressShown ? "opacity-100" : "opacity-0",
-              )}
-              onClick={closePressMenu}
-              style={pressDrag.scrimStyle}
-            >
-              <div
-                className={cn(
-                  "w-full max-w-[460px] rounded-t-[24px] bg-surface px-3.5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3",
-                  "transition-transform duration-[240ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none",
-                  pressShown ? "translate-y-0" : "translate-y-full",
-                )}
-                data-sheet
-                onClick={(e) => e.stopPropagation()}
-                style={pressDrag.sheetStyle}
-              >
-                <div
-                  className="mx-auto mb-2.5 h-1 w-[38px] rounded-full bg-slate-200"
-                  {...pressDrag.handleProps}
-                />
-                <p
-                  className="mb-1.5 truncate px-2.5 text-[12.5px] font-bold text-muted-foreground"
-                  {...pressDrag.handleProps}
-                >
-                  {pressTask.title}
-                </p>
-                <div className="flex flex-col">
-                  {pressTask.createdByUserId === currentUserId ? (
-                    <button
-                      className="flex w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left text-[14.5px] font-bold text-foreground transition-colors active:bg-slate-50"
-                      onClick={() => {
-                        const id = pressTask.id;
-                        closePressMenu();
-                        router.push(`/mobile/tasks/${id}/edit`);
-                      }}
-                      type="button"
-                    >
-                      <Pencil className="size-[18px] text-muted-foreground" aria-hidden="true" />
-                      {copy.actionEdit}
-                    </button>
-                  ) : null}
+      {/* 길게 누름 메뉴 — 편집 / 선택 / 삭제. */}
+      {pressTask && hydrated ? (
+        <BottomSheet ariaLabel={pressTask.title} onClose={() => setPressTask(null)}>
+          {({ close }) => (
+            <div className="tkw-sheet">
+              <p className="tkw-sheet__t">{pressTask.title}</p>
+              <div className="tkw-act">
+                {pressTask.createdByUserId === currentUserId ? (
                   <button
-                    className="flex w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left text-[14.5px] font-bold text-foreground transition-colors active:bg-slate-50"
                     onClick={() => {
-                      const t = pressTask;
-                      closePressMenu();
-                      enterSelect(t);
+                      const id = pressTask.id;
+                      close();
+                      router.push(`/mobile/tasks/${id}/edit`);
                     }}
                     type="button"
                   >
-                    <ListChecks className="size-[18px] text-muted-foreground" aria-hidden="true" />
-                    {copy.actionSelect}
+                    <Pencil aria-hidden="true" />
+                    {copy.actionEdit}
                   </button>
-                  {pressTask.createdByUserId === currentUserId ? (
-                    <button
-                      className="flex w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left text-[14.5px] font-bold text-rose-600 transition-colors active:bg-rose-50"
-                      onClick={() => {
-                        const t = pressTask;
-                        const occ = pressOcc;
-                        closePressMenu();
-                        // 반복 작업을 **회차로** 보고 있으면 무엇을 지울지 먼저 묻는다. 관리함처럼
-                        // 회차가 아닌 목록에서는 행 자체가 시리즈를 뜻하므로 기존 확인 모달 그대로.
-                        if (occ && isStandardRecurrence(t.recurrenceRule)) setRecurDelete({ task: t, date: occ });
-                        else setConfirmIds([t.id]);
-                      }}
-                      type="button"
-                    >
-                      <Trash2 className="size-[18px]" aria-hidden="true" />
-                      {copy.deleteAction}
-                    </button>
-                  ) : null}
-                </div>
+                ) : null}
+                <button
+                  onClick={() => {
+                    const t = pressTask;
+                    close();
+                    enterSelect(t);
+                  }}
+                  type="button"
+                >
+                  <ListChecks aria-hidden="true" />
+                  {copy.actionSelect}
+                </button>
+                {pressTask.createdByUserId === currentUserId ? (
+                  <button
+                    className="is-red"
+                    onClick={() => {
+                      const t = pressTask;
+                      const occ = pressOcc;
+                      close();
+                      // 반복 작업을 **회차로** 보고 있으면 무엇을 지울지 먼저 묻는다. 관리함처럼 회차가 아닌
+                      // 목록에서는 행 자체가 시리즈를 뜻하므로 기존 확인 그대로.
+                      if (occ && isStandardRecurrence(t.recurrenceRule)) setRecurDelete({ task: t, date: occ });
+                      else setConfirmIds([t.id]);
+                    }}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" />
+                    {copy.deleteAction}
+                  </button>
+                ) : null}
               </div>
-            </div>,
-            document.body,
-          )
-        : null}
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
 
-      {/* Multi-select bottom action bar — batch delete (covers the tab bar). */}
+      {/* 선택 모드 아래 고정 줄 — 일괄 삭제(탭 바를 덮는다). */}
       {selectMode && hydrated
         ? createPortal(
-            <div className="fixed inset-x-0 bottom-0 z-[75] mx-auto flex max-w-[480px] gap-2.5 rounded-t-[22px] border border-b-0 border-border bg-surface px-4 pb-[max(22px,env(safe-area-inset-bottom))] pt-6 shadow-[0_-14px_36px_-12px_rgba(20,16,10,0.32)]">
+            <div className="tkw-selact">
               <button
-                className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-600 text-[14.5px] font-extrabold text-white transition-opacity disabled:opacity-40"
+                className="tkw-btn is-red"
                 disabled={selectedIds.size === 0}
                 onClick={() => setConfirmIds(Array.from(selectedIds))}
                 type="button"
               >
-                <Trash2 className="size-[18px]" aria-hidden="true" />
+                <Trash2 aria-hidden="true" className="size-[18px]" />
                 {copy.deleteAction}
                 {selectedIds.size > 0 ? ` ${selectedIds.size}` : ""}
               </button>
@@ -2390,50 +2074,40 @@ export function TasksWorkspace({
           )
         : null}
 
-      {/* Delete confirm (single from the menu, or the multi-select batch). */}
+      {/* 삭제 확인(메뉴에서 한 건, 또는 선택 모드 일괄). */}
       {confirmIds && hydrated ? (
-        <BottomSheet
-          ariaLabel={copy.bulkDeleteConfirmTitle}
-          header={
-            <>
-              <p className="text-[16px] font-black text-foreground">{copy.bulkDeleteConfirmTitle}</p>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                {copy.bulkDeleteConfirmBody.replace("{count}", String(confirmIds.length))}
-              </p>
-            </>
-          }
-          onClose={() => setConfirmIds(null)}
-        >
+        <BottomSheet ariaLabel={copy.bulkDeleteConfirmTitle} onClose={() => setConfirmIds(null)}>
           {({ close }) => (
-            <div className="mt-5 flex gap-2.5">
-              <button
-                className="h-11 flex-1 rounded-xl border border-border bg-surface text-[14px] font-bold text-foreground"
-                onClick={close}
-                type="button"
-              >
-                {copy.cancel}
-              </button>
-              <button
-                className="h-11 flex-[1.4] rounded-xl bg-rose-600 text-[14px] font-extrabold text-white transition-opacity disabled:opacity-60"
-                disabled={deleting}
-                onClick={() => performDelete(confirmIds)}
-                type="button"
-              >
-                {copy.deleteAction}
-              </button>
+            <div className="tkw-sheet">
+              <h2>{copy.bulkDeleteConfirmTitle}</h2>
+              <p className="tkw-sheet__sub">{copy.bulkDeleteConfirmBody.replace("{count}", String(confirmIds.length))}</p>
+              <div className="tkw-btns2">
+                <button className="tkw-btn is-gray" onClick={close} type="button">
+                  {copy.cancel}
+                </button>
+                <button
+                  className="tkw-btn is-red"
+                  disabled={deleting}
+                  onClick={() => {
+                    haptic("warning");
+                    performDelete(confirmIds);
+                  }}
+                  type="button"
+                >
+                  {copy.deleteAction}
+                </button>
+              </div>
             </div>
           )}
         </BottomSheet>
       ) : null}
 
       {/* 이동 거절 안내 — 반복 작업을 옮기려 했을 때. 서버가 돌려주는 에러 코드별로 문구가 다르다:
-          `recurring_series` = 표준 반복은 애초에 스와이프를 못 연다(카드가 이미 막지만, 콘솔 등
-          다른 경로로 온 값도 대비), `duplicate_occurrence` = 그 날짜에 이미 회차가 있는 레거시
-          케이스. 모르는 값은 더 흔한 duplicate 문구로 안전하게 폴백한다. */}
+          `recurring_series` = 표준 반복은 애초에 스와이프를 못 연다(줄이 이미 막지만, 다른 경로 대비),
+          `duplicate_occurrence` = 그 날짜에 이미 회차가 있는 레거시 케이스. 모르는 값은 duplicate 문구로 폴백. */}
       {moveNotice && hydrated ? (
         <TaskToast
           icon={moveNotice === "save_failed" ? AlertTriangle : Repeat}
-          tone={moveNotice === "save_failed" ? "danger" : "neutral"}
           message={
             moveNotice === "save_failed"
               ? copy.moveSaveFailed
@@ -2441,45 +2115,27 @@ export function TasksWorkspace({
                 ? copy.moveRejectedRecurringSeries
                 : copy.moveDuplicateOccurrence
           }
+          tone={moveNotice === "save_failed" ? "danger" : "neutral"}
         />
       ) : null}
 
-      {/* 반복 삭제 선택 시트 — "이 날짜만 건너뛰기" vs "반복 전체 삭제".
-          두 선택지를 같은 크기의 행으로 놓아 "고르는 화면"으로 읽히게 하고, 되돌릴 수 없는 쪽만
-          danger 톤을 준다(콘솔 `RecurDeleteModal` 과 같은 구성). 헤더에 반복 주기를 함께 보여줘
-          "전체"가 무엇을 뜻하는지 누르기 전에 알 수 있게 했다. */}
+      {/* 반복 삭제 선택 — "이 날짜만 건너뛰기" vs "반복 전체 삭제". 같은 크기의 줄로 놓아 「고르는 화면」으로
+          읽히게 하고, 되돌릴 수 없는 쪽만 빨강. 머리에 반복 주기를 보여 「전체」가 무엇인지 누르기 전에 알 수 있게. */}
       {recurDelete && hydrated ? (
         <BottomSheet ariaLabel={copy.recurDeleteTitle} onClose={() => setRecurDelete(null)}>
-          <div className="px-4 pb-1">
-            <div className="flex items-center gap-1.5 px-1 text-[11px] font-black uppercase tracking-[0.06em] text-muted-foreground">
-              <Repeat className="size-3.5" aria-hidden="true" />
-              {repeatLabel(recurDelete.task.recurrenceRule ?? "", copy, locale)}
-            </div>
-            <p className="mt-2 line-clamp-2 px-1 text-[15px] font-extrabold leading-snug tracking-[-0.01em] text-foreground">
-              {recurDelete.task.title}
-            </p>
-            <div className="mt-4 overflow-hidden rounded-[18px] border border-border bg-surface">
-              <button
-                className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors active:bg-slate-50"
-                onClick={() => runSkipOccurrence(recurDelete.task.id, recurDelete.date)}
-                type="button"
-              >
-                <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-primary/10 text-primary">
-                  <SkipForward className="size-[17px]" aria-hidden="true" />
+          <div className="tkw-sheet">
+            <p className="tkw-sheet__t">↻ {repeatLabel(recurDelete.task.recurrenceRule ?? "", copy, locale)}</p>
+            <h2>{recurDelete.task.title}</h2>
+            <div className="tkw-act">
+              <button onClick={() => runSkipOccurrence(recurDelete.task.id, recurDelete.date)} type="button">
+                <SkipForward aria-hidden="true" />
+                <span>
+                  {copy.recurSkipOne.replace("{date}", shortDateLabel(recurDelete.date))}
+                  <span className="tkw-act__s">{copy.recurSkipOneSub}</span>
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-extrabold tracking-[-0.01em] text-foreground">
-                    {copy.recurSkipOne.replace("{date}", shortDateLabel(recurDelete.date))}
-                  </span>
-                  <span className="mt-0.5 block text-[11.5px] font-medium text-muted-foreground">
-                    {copy.recurSkipOneSub}
-                  </span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-slate-300" aria-hidden="true" />
               </button>
-              <div className="mx-3.5 h-px bg-border" />
               <button
-                className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors active:bg-rose-50"
+                className="is-red"
                 onClick={() => {
                   const id = recurDelete.task.id;
                   setRecurDelete(null);
@@ -2487,18 +2143,11 @@ export function TasksWorkspace({
                 }}
                 type="button"
               >
-                <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-rose-50 text-rose-600">
-                  <Trash2 className="size-[17px]" aria-hidden="true" />
+                <Trash2 aria-hidden="true" />
+                <span>
+                  {copy.recurDeleteAll}
+                  <span className="tkw-act__s">{copy.recurDeleteAllSub}</span>
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-extrabold tracking-[-0.01em] text-rose-600">
-                    {copy.recurDeleteAll}
-                  </span>
-                  <span className="mt-0.5 block text-[11.5px] font-medium text-muted-foreground">
-                    {copy.recurDeleteAllSub}
-                  </span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-slate-300" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -2515,7 +2164,7 @@ export function TasksWorkspace({
         />
       ) : null}
 
-      {/* Undo toast — floats above the tab bar after a complete (status-circle) or a delete. */}
+      {/* 되돌리기 토스트 — 완료(고리) 또는 삭제 뒤 6초. */}
       {(undoTask || deletedUndoIds?.length) && hydrated ? (
         <TaskToast
           action={{ label: copy.undo, onAction: undoTask ? handleUndo : handleRestore }}
@@ -2525,15 +2174,9 @@ export function TasksWorkspace({
         />
       ) : null}
 
-      {/* AI daily-report sheet (완료/기록 tab). Permission is enforced server-side; a non-staff tap
-          surfaces the "권한 없음" popup inside the sheet. */}
+      {/* 업무일지 시트(완료·기록). 권한은 서버가 막고, 권한이 없으면 시트 안에 「권한 없음」이 뜬다. */}
       {reportDate && hydrated ? (
-        <ReportSheet
-          copy={copy}
-          date={reportDate}
-          locale={locale}
-          onClose={() => setReportDate(null)}
-        />
+        <ReportSheet copy={copy} date={reportDate} locale={locale} onClose={() => setReportDate(null)} />
       ) : null}
     </div>
   );

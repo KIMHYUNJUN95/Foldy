@@ -6,9 +6,8 @@ import type { TaskRecord } from "@/lib/tasks";
 import { isStandardRecurrence } from "@/lib/tasks-recurrence";
 import { cn } from "@/lib/utils";
 
-// Matches the list container's `gap-2` (8px). The crossed rows shift by one dragged "slot"
-// (dragged row height + gap) so the opened gap lines up with the card being moved.
-const GAP = 8;
+// 화이트 리디자인(2026-10-15) — 줄 사이 간격 없이 얇은 가로 줄로 나뉜다. 지나친 줄은 끌고 있는 줄 높이만큼 밀린다.
+const GAP = 0;
 
 type CardProps = Omit<
   React.ComponentProps<typeof TaskCard>,
@@ -204,7 +203,7 @@ export function ReorderableTaskList({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="tkw-list">
       {order.map((t, i) => {
         const isDragged = t.id === dragId;
         let translateY = 0;
@@ -231,13 +230,7 @@ export function ReorderableTaskList({
               zIndex: isDragged ? 50 : undefined,
             }}
           >
-            <div
-              className={cn(
-                isDragged &&
-                  "rounded-[18px] shadow-[0_18px_40px_-12px_rgba(20,16,10,0.35)] will-change-transform",
-              )}
-              style={isDragged ? { transform: "scale(1.015)" } : undefined}
-            >
+            <div className={cn(isDragged && "will-change-transform")}>
               {/* 날짜 목록에서 반복 항목은 **그 날짜의 회차**로 렌더해야 한다 — `occurrence` 를
                   빠뜨리면 체크박스가 회차가 아니라 행 전체를 완료 처리한다(TaskCard `done` /
                   `onCompleteToggle` 분기). 스와이프 이동도 회차엔 의미가 없어 끈다. */}

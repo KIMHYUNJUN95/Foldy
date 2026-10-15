@@ -2,24 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSplitPush } from "@/components/shell/split-list";
-import {
-  CalendarDays,
-  Check,
-  Clock,
-  Flag,
-  GripVertical,
-  ImageIcon,
-  Loader,
-  MapPin,
-  Repeat2,
-  Share2,
-  Sun,
-  Sunrise,
-  Users,
-} from "lucide-react";
+import { GripVertical, Sun, Sunrise } from "lucide-react";
 import { moveTaskToToday, moveTaskToTomorrow } from "@/app/mobile/tasks/[id]/actions";
+import { haptic } from "@/lib/haptics";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { localizePropertyName } from "@/lib/room-label-normalization";
+import { recvInstr } from "@/lib/task-directives";
 import type { TaskRecord } from "@/lib/tasks";
 import {
   formatCustomWeekdays,
@@ -28,6 +16,7 @@ import {
 } from "@/lib/tasks-recurrence";
 import { cn } from "@/lib/utils";
 import { tokyoDateOf, ymdShift } from "@/lib/tokyo-date";
+import "./tasks-white.css";
 
 // 날짜 유틸은 순수 모듈 `@/lib/tokyo-date` 가 정본이다(서버·클라이언트 공용).
 const shiftYmd = ymdShift;
@@ -58,31 +47,58 @@ export function repeatLabel(rule: string, copy: Copy, locale: Locale): string {
 }
 
 // End of a time block (start "HH:MM" + duration minutes), wrapping within the day.
-function addMinutesHHMM(hhmm: string, mins: number): string {
+export function addMinutesHHMM(hhmm: string, mins: number): string {
   const [h, m] = hhmm.split(":").map(Number);
   const total = (((h * 60 + m + mins) % 1440) + 1440) % 1440;
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function shareSummary(task: TaskRecord, currentUserId: string): string | null {
-  if (!task.isShared) return null;
-  const others = task.participants
-    .filter((p) => p.userId !== currentUserId)
-    .map((p) => p.name)
-    .filter(Boolean);
-  if (others.length === 0) return null;
-  return others.length === 1 ? others[0] : `${others[0]} +${others.length - 1}`;
+/** 우선순위 → 고리 모양 클래스(화이트 리디자인). 긴급 빨강 · 중요 주황 · 보통 파랑 · 없음 회색. */
+export function prioRingClass(priority: string): string {
+  return priority === "urgent" ? "is-u" : priority === "important" ? "is-i" : priority === "medium" ? "is-m" : "";
 }
 
-// 우선순위 1~4 (Todoist): urgent=빨강, important=주황, medium=파랑, normal=회색(기본).
-const PRIO_RING: Record<string, string> = {
-  urgent: "border-rose-500 text-rose-500",
-  important: "border-amber-500 text-amber-500",
-  medium: "border-blue-500 text-blue-500",
-  normal: "border-slate-300 text-slate-300",
-};
+/** 체크 표시(그리기 애니메이션용 경로 — `stroke-dasharray` 로 그린다). */
+export function CheckMark() {
+  return (
+    <svg aria-hidden="true" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} viewBox="0 0 24 24">
+      <path d="M5 12l5 5 9-10" />
+    </svg>
+  );
+}
 
+/** 맥락(건물 · 객실 · 손님) 한 줄 — 줄의 회색 메타와 상세의 「연결」이 같은 표현을 쓴다. */
+export function contextLabelOf(
+  task: TaskRecord,
+  buildingLabels: Record<string, string>,
+  roomSuffix: string,
+): string | null {
+  const ctx = task.resolvedContext;
+  if (!ctx) return null;
+  return (
+    [
+      ctx.propertyName ? localizePropertyName(ctx.propertyName, buildingLabels) : null,
+      // For Okubo-style buildings, roomLabel === propertyName (canonical); suppress to avoid redundancy.
+      ctx.roomLabel && ctx.roomLabel !== ctx.propertyName ? `${ctx.roomLabel}${roomSuffix}` : null,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    ctx.guestName ||
+    null
+  );
+}
 
+/**
+ * 투두 한 줄 — 화이트 리디자인(2026-10-15, 시안 Todo-Phone).
+ *
+ * 카드 상자 없이 얇은 가로 줄로 나뉜다. 앞의 고리는 우선순위 색(긴급 · 중요 · 보통 · 없음)이고, 누르면 채워지며 체크가
+ * 그려진 뒤 완료된다(낙관적 반영은 워크스페이스가 맡는다). 제목 아래 회색 메타 한 줄 — 「긴급 · / 중요 ·」으로 시작해
+ * 날짜 · 시간 · 연결 · 진행 중 · 지시 · 반복 · 태그 · 사진 · 공유 n명 · N일 밀림 순서. 지연은 메타가 빨강.
+ *
+ * 동작은 전과 같다: 밀어서 오늘로/내일로, 손잡이로 순서 바꾸기, 길게 눌러 메뉴, 선택 모드, 태블릿 2분할에서 오른쪽 칸.
+ * 본문은 **상세 주소를 가진 링크**다 — 태블릿 2분할(`SplitList`)이 고른 줄을 옅은 보라 바탕으로 표시하려면 링크여야 한다.
+ * 길게 누름 · 밀기 뒤에 따라오는 클릭은 `touchend` 에서 막는다(그래야 2분할이 칸을 열지 않는다).
+ */
 export function TaskCard({
   buildingLabels,
   copy,
@@ -108,6 +124,7 @@ export function TaskCard({
   preview = false,
   occurrence,
   detailReturnView,
+  trailing,
 }: {
   buildingLabels: Record<string, string>;
   copy: Copy;
@@ -118,8 +135,7 @@ export function TaskCard({
   showDate?: boolean;
   swipe?: boolean;
   /**
-   * 지시 화면(받은/보낸)에서만 켠다. 카드에서 "누구인지"를 텍스트 접두사가 아니라
-   * 아바타 칩으로 올려, 지시 목록의 첫 관심사(보낸 사람 / 담당자)를 먼저 읽히게 한다.
+   * 지시 화면(받은/보낸)에서만 켠다. 받은 지시는 지시자 이름을, 보낸 지시는 「나 → 대상」을 메타 맨 앞에 둔다.
    */
   instrMode?: "recv" | "sent";
   sentMode?: boolean;
@@ -138,75 +154,78 @@ export function TaskCard({
   // keeps the user on the tab they swiped from.
   swipeAction?: "today" | "tomorrow";
   /**
-   * 반복 작업이 밀린 회차 수. 0/undefined 면 배지를 달지 않는다(2026-09-08).
-   * 밀린 회차를 지연 섹션에 따로 세우지 않고 **오늘 카드의 배지로만** 보여 준다.
+   * 반복 작업이 밀린 회차 수. 0/undefined 면 표시하지 않는다(2026-09-08).
+   * 밀린 회차를 지연 섹션에 따로 세우지 않고 **오늘 줄의 메타로만** 보여 준다.
    */
   behindDays?: number;
   swipeReturnView?: string;
-  // Drag-reorder (Today view): shows a dedicated grip handle. The handle owns its own pointer
-  // gesture and stops propagation, so it never triggers tap / long-press / swipe on the card body.
-  // `reordering` is true on the card currently being dragged (suppresses tap navigation on drop).
+  // Drag-reorder: shows a dedicated grip handle. The handle owns its own pointer gesture and stops
+  // propagation, so it never triggers tap / long-press / swipe on the row body.
+  // `reordering` is true on the row currently being dragged (suppresses tap navigation on drop).
   reorderable?: boolean;
   reordering?: boolean;
   onReorderHandleDown?: (e: React.PointerEvent, task: TaskRecord) => void;
-  // Tapping the leading status circle toggles completion. The button owns its own pointer gesture
-  // (stops propagation) so it never starts the card's tap / long-press / swipe. Active → complete,
-  // completed → reopen. Omit to render the circle as a static indicator (e.g. calendar day sheet).
+  // Tapping the leading ring toggles completion. Active → complete, completed → reopen. Omit to render
+  // the ring as a static indicator.
   onCompleteToggle?: (task: TaskRecord, occurrence?: { date: string; done: boolean }) => void;
-  // 미래 날짜의 미리보기 행(다가오는 일정 · 미래 날짜 시트). 완료 토글을 주지 않을 뿐 아니라
-  // **동그라미 자체를 점 마커로 바꾼다**(2026-09-09) — 못 누르는 체크박스를 남겨 두면 고장난
-  // 버튼으로 보인다. 점은 자리(22px)를 그대로 지켜 오늘·과거 행과 정렬이 어긋나지 않는다.
+  // 미래 날짜의 미리보기 줄. 완료 토글을 주지 않을 뿐 아니라 **고리 자체를 점 마커로 바꾼다**(2026-09-09) — 못 누르는
+  // 체크박스를 남겨 두면 고장난 버튼으로 보인다. 점은 자리(22px)를 그대로 지켜 정렬이 어긋나지 않는다.
   preview?: boolean;
   // Recurring occurrence row (2026-07-30): completion/done state is per this date, not the row's
   // `status` (which stays open). When set, the checkbox toggles this occurrence.
   occurrence?: { date: string; done: boolean };
   /** List tab to restore after a detail action such as skipping one recurring occurrence. */
   detailReturnView?: string;
+  /** 줄 오른쪽 끝 회색 글자(완료 · 기록의 완료 시각 등). */
+  trailing?: string;
 }) {
   // 태블릿 가로 2분할 안이면 오른쪽 칸에 연다(`SplitList`). 아니면 그대로 이동.
   const splitPush = useSplitPush();
   const done = occurrence ? occurrence.done : task.status === "completed";
   const selected = selectMode && !!selectedIds?.has(task.id);
   const dueDate = tokyoDateOf(task.dueAt);
+  const w = copy.mobileWhite;
   /**
    * 반복 업무를 «작업 원본» 행으로 그리는 화면(관리함·지시 등)인가.
    *
    * 오늘/내일 탭은 반복을 회차 행으로 그려 `occurrence` 가 들어오지만, 관리함은 원본 행으로
    * 그린다. 그때 `dueAt` 은 **마감일이 아니라 앵커**(「7/30부터 평일마다」의 시작점)라 늘 과거에
-   * 있다. 이걸 마감일처럼 다루면 반복 업무가 전부 지연으로 보인다 — 2026-08-07 관리함에서
-   * 실제로 그랬고, 어드민 콘솔(`helpers.ts` `isOverdue`)과 이 화면의 탭 분류
-   * (`tasks-workspace.tsx` `isOverdue`)는 둘 다 반복을 제외하고 있었는데 카드만 자체 계산을
-   * 하고 있었다.
+   * 있다. 이걸 마감일처럼 다루면 반복 업무가 전부 지연으로 보인다(2026-08-07).
    */
   const recurringRow = !occurrence && isStandardRecurrence(task.recurrenceRule);
-  // 반복은 앵커 대신 **다음 회차**를 보여 준다. 날짜를 통째로 지우면 반복 칩(「평일」)만 남아
-  // «언제 하는 일인지»가 사라진다.
+  // 반복은 앵커 대신 **다음 회차**를 보여 준다.
   const nextOccurrenceDate = recurringRow
     ? nextRecurringOccurrence(task.recurrenceRule, dueDate ?? task.scheduledDate ?? null, today)
     : null;
-  /**
-   * 지연 판정에서 반복을 뺀다. 반복에도 **진짜 밀린 회차**는 있지만, 그건 회차 상태
-   * (`task_occurrence_state`)를 알아야 셀 수 있어 카드가 판단할 수 없다. 오늘 탭의 「지연」
-   * backlog 가 「N일 밀림」 + 가져오기/건너뛰기까지 이미 담당한다 — 여기서 흉내 내면 근거 없는
-   * 숫자만 하나 더 생긴다.
-   */
+  /** 지연 판정에서 반복을 뺀다 — 반복의 밀림은 「N일 밀림」(behindDays)이 맡는다. */
   const overdue = !occurrence && !recurringRow && !done && !!dueDate && dueDate < today;
 
   // One swipe action (today / tomorrow), revealed at a fixed width sized to its single button.
-  const swipeOpen = 74;
+  const swipeOpen = 70;
   const swipeSnap = swipeOpen / 2;
 
   const [offset, setOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [pressed, setPressed] = useState(false); // "press-down" scale while held
+  // 완료 고리를 누른 직후 — 채움 + 체크 그리기를 보여 준 뒤에 실제 완료를 부른다.
+  const [checking, setChecking] = useState(false);
+  const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startX = useRef(0);
   const startY = useRef(0);
   const dragging = useRef(false);
   const axis = useRef<null | "h" | "v">(null); // direction lock so taps/scrolls don't open swipe
   const didSwipe = useRef(false);
+  const wasOpen = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Tapping anywhere outside an opened card closes its swipe naturally.
+  useEffect(
+    () => () => {
+      if (checkTimer.current) clearTimeout(checkTimer.current);
+    },
+    [],
+  );
+
+  // Tapping anywhere outside an opened row closes its swipe naturally.
   useEffect(() => {
     if (offset === 0) return;
     const onDown = (e: PointerEvent) => {
@@ -216,19 +235,11 @@ export function TaskCard({
     return () => document.removeEventListener("pointerdown", onDown);
   }, [offset]);
 
-  // 스와이프 목적지에 이미 이 작업이 걸려 있으면 스와이프를 내주지 않는다.
-  //
-  // 목적지는 탭으로 정해진다(오늘 탭 → 내일, 그 밖 → 오늘). 반복 작업은 규칙으로 회차가 생기므로
-  // 예컨대 평일 반복은 오늘도 내일도 회차가 있고, 서버(`canMoveRecurringTo`)가 그 이동을
-  // `duplicate_occurrence` 로 거절한다. 즉 스와이프해도 아무 일이 일어나지 않는다.
-  // 콘솔의 「오늘로/내일로 이동」 메뉴도 같은 이유로 감춘다(2026-08-03).
+  // 스와이프 목적지에 이미 이 작업이 걸려 있으면 스와이프를 내주지 않는다(2026-08-03).
   const swipeTarget = swipeAction === "tomorrow" ? shiftYmd(today, 1) : today;
   const anchorDate = tokyoDateOf(task.dueAt) ?? task.scheduledDate ?? null;
-  // 2026-08-25: 표준 반복 업무는 오늘/내일 스와이프 자체를 내주지 않는다. `moveTaskToToday` /
-  // `moveTaskToTomorrow` 가 `recurrence_instance_date`(고정 앵커, 2026-07-30 롤포워드 폐지)를 다시
-  // 쓰기 때문에, 이동을 허용하면 그 순간 시리즈 전체의 반복 위상이 바뀌면서 밀린 회차 백로그가
-  // 통째로 사라진다. 서버가 표준 반복을 `recurring_series` 로 거절하므로, 위 alreadyOnTarget 중복
-  // 방지는 이제 일회성 작업에만 남긴다(반복은 아래에서 이미 스와이프가 꺼진다).
+  // 2026-08-25: 표준 반복 업무는 오늘/내일 스와이프 자체를 내주지 않는다 — 이동이 반복 위상을 바꿔 밀린 회차가
+  // 통째로 사라진다. 서버도 `recurring_series` 로 거절한다.
   const isRecurringTask = isStandardRecurrence(task.recurrenceRule);
   const alreadyOnTarget = !isRecurringTask && anchorDate ? anchorDate === swipeTarget : false;
   const canSwipe = swipe && !done && !selectMode && !isRecurringTask && !alreadyOnTarget;
@@ -243,8 +254,9 @@ export function TaskCard({
     pressStart.current = { x, y };
     pressTimer.current = setTimeout(() => {
       longFired.current = true;
-      setOffset(0); // close any open swipe so the menu opens over a clean card
-      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(10);
+      setPressed(false);
+      setOffset(0); // close any open swipe so the menu opens over a clean row
+      haptic("medium");
       onLongPress(task, occurrence);
     }, 480);
   }
@@ -265,13 +277,14 @@ export function TaskCard({
     const x = e.touches[0].clientX;
     const y = e.touches[0].clientY;
     pressStart.current = { x, y };
+    wasOpen.current = offset !== 0;
+    didSwipe.current = false;
     setPressed(true);
     startPress(x, y);
     if (!canSwipe) return;
-    startX.current = x;
+    startX.current = x - offset;
     startY.current = y;
     axis.current = null;
-    didSwipe.current = false;
     dragging.current = true;
     setIsDragging(true);
   }
@@ -284,335 +297,184 @@ export function TaskCard({
     movePress(x, y);
     if (!dragging.current) return;
     // Lock to an axis only once the finger has clearly moved — a tap or a vertical scroll
-    // must never reveal the swipe actions.
+    // must never reveal the swipe action.
     if (axis.current === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
       axis.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
     }
     if (axis.current !== "h") return;
     didSwipe.current = true;
     const sdx = x - startX.current;
-    // Track the finger 1:1 up to fully-open, then add elastic resistance past it for a premium pull.
-    const next =
-      sdx >= 0
-        ? 0
-        : sdx < -swipeOpen
-          ? -swipeOpen + (sdx + swipeOpen) * 0.18
-          : sdx;
+    // Track the finger 1:1 up to fully-open, then add elastic resistance past it.
+    const next = sdx >= 0 ? 0 : sdx < -swipeOpen ? -swipeOpen + (sdx + swipeOpen) * 0.18 : sdx;
     setOffset(next);
   }
-  function onTouchEnd() {
+  function onTouchEnd(e: React.TouchEvent) {
     setPressed(false);
     cancelPress();
+    // 길게 누름 · 밀기 · 열린 줄 닫기 뒤에 오는 클릭을 없앤다 — 태블릿 2분할이 그 클릭으로 칸을 열지 않게.
+    const swallow = longFired.current || didSwipe.current || (wasOpen.current && !didSwipe.current);
+    if (swallow && e.cancelable) e.preventDefault();
+    if (wasOpen.current && !didSwipe.current) setOffset(0);
     if (!dragging.current) return;
     dragging.current = false;
     setIsDragging(false);
-    setOffset((o) => (o < -swipeSnap ? -swipeOpen : 0));
+    if (didSwipe.current) {
+      const open = offset < -swipeSnap;
+      if (open) haptic("light");
+      setOffset(open ? -swipeOpen : 0);
+    }
   }
 
-  // Card body tap: suppress the click that follows a long-press; toggle in select mode; else open.
-  function onBodyClick() {
+  const detailHref = (() => {
+    const params = new URLSearchParams();
+    if (occurrence && !occurrence.done) params.set("occurrence", occurrence.date);
+    // 상세의 빵부스러기(「오늘 · 투두이스트」)와 회차 건너뛰기 뒤 돌아올 탭.
+    if (detailReturnView) params.set("view", detailReturnView);
+    const query = params.toString();
+    return `/mobile/tasks/${task.id}${query ? `?${query}` : ""}`;
+  })();
+
+  // Row body tap: suppress the click that follows a long-press; toggle in select mode; else open.
+  function onBodyClick(e: React.MouseEvent) {
+    e.preventDefault();
     const wasLong = longFired.current;
     const wasSwipe = didSwipe.current;
     longFired.current = false;
     didSwipe.current = false;
-    // Ignore the synthetic click that can land on the card right after a drag-reorder drop.
+    // Ignore the synthetic click that can land on the row right after a drag-reorder drop.
     if (reordering) return;
     if (selectMode) {
       onToggleSelect?.(task);
       return;
     }
     if (offset !== 0) {
-      setOffset(0); // tap an open card to close it
+      setOffset(0); // tap an open row to close it
       return;
     }
     if (wasLong || wasSwipe) return;
-    if (occurrence && !occurrence.done) {
-      const params = new URLSearchParams({ occurrence: occurrence.date });
-      if (detailReturnView) params.set("view", detailReturnView);
-      splitPush(`/mobile/tasks/${task.id}?${params.toString()}`);
-      return;
-    }
-    splitPush(`/mobile/tasks/${task.id}`);
+    splitPush(detailHref);
   }
 
-  const fromLabel =
-    !sentMode && !instrMode && task.createdByUserId !== currentUserId
-      ? `${task.authorName} → `
-      : "";
-  const summary = shareSummary(task, currentUserId);
-  // 지시 카드의 신원 칩: 받은 지시는 지시자, 보낸 지시는 담당자 수.
-  const targetCount = task.participants.filter((p) => p.userId !== task.createdByUserId).length;
-  const instrChip =
-    instrMode === "recv" ? (
-      <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.09] py-0.5 pl-0.5 pr-2 text-[11px] font-bold text-primary">
-        <span className="flex size-[15px] items-center justify-center rounded-full bg-primary text-[8px] font-extrabold text-primary-foreground">
-          {task.authorName.slice(0, 1)}
-        </span>
-        {task.authorName}
-      </span>
-    ) : instrMode === "sent" && targetCount > 0 ? (
-      <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.09] px-2 py-0.5 text-[11px] font-bold text-primary">
-        <Users className="size-3" aria-hidden="true" />
-        {copy.instrAssigned.replace("{n}", String(targetCount))}
-      </span>
-    ) : null;
+  // ── 회색 메타 한 줄 ─────────────────────────────────────────────────────────
+  type Seg = { text: string; tone?: "late" | "pri" };
+  const segs: Seg[] = [];
+  const ctxLabel = contextLabelOf(task, buildingLabels, copy.contextPickerRoomSuffix);
+  const others = task.participants.filter((p) => p.userId !== currentUserId);
 
-  const dateChip = (() => {
-    if (!showDate) return null;
-    // 반복 원본 행: 앵커(과거 고정)가 아니라 다음 회차를 보여 준다.
-    if (recurringRow)
-      return nextOccurrenceDate ? (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
-            nextOccurrenceDate === today
-              ? "bg-primary/10 text-primary"
-              : "bg-slate-100 text-slate-600",
-          )}
-        >
-          <CalendarDays className="size-3" aria-hidden="true" />
-          {/* 완료 토스트가 쓰는 `nextLabel`("다음: {date}")을 그대로 재사용한다 — 같은 개념
-              (다음 회차)을 두 문구로 두면 화면마다 다르게 읽힌다. */}
-          {nextOccurrenceDate === today
-            ? copy.todayLabel
-            : copy.nextLabel.replace("{date}", shortDate(nextOccurrenceDate))}
-        </span>
-      ) : null;
-    if (overdue && dueDate)
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600">
-          <Clock className="size-3" aria-hidden="true" />
-          {shortDate(dueDate)} {copy.overdueLabel}
-        </span>
-      );
-    if (dueDate)
-      return (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
-            dueDate === today ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-600",
-          )}
-        >
-          <Flag className="size-3" aria-hidden="true" />
-          {dueDate === today ? copy.todayLabel : shortDate(dueDate)} {copy.dueLabel}
-        </span>
-      );
-    if (task.scheduledDate)
-      return (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
-            task.scheduledDate === today
-              ? "bg-primary/10 text-primary"
-              : "bg-slate-100 text-slate-600",
-          )}
-        >
-          <CalendarDays className="size-3" aria-hidden="true" />
-          {task.scheduledDate === today ? copy.todayLabel : shortDate(task.scheduledDate)}
-        </span>
-      );
-    return null;
-  })();
+  if (instrMode === "recv") segs.push({ text: task.authorName });
+  if (instrMode === "sent") {
+    const targets = task.participants.filter((p) => p.userId !== task.createdByUserId);
+    const first = targets[0]?.name;
+    if (first)
+      segs.push({ text: `${w.me} → ${first}${targets.length > 1 ? ` +${targets.length - 1}` : ""}` });
+  }
+  if (!done && task.priority === "urgent") segs.push({ text: copy.prioUrgent, tone: overdue ? "late" : undefined });
+  if (!done && task.priority === "important") segs.push({ text: copy.prioImportant });
 
-  const chip = "inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600";
+  const dayWord = (ymd: string) =>
+    ymd === today ? copy.todayLabel : ymd === shiftYmd(today, 1) ? copy.viewTomorrow : shortDate(ymd);
+  if (showDate) {
+    if (recurringRow) {
+      if (nextOccurrenceDate)
+        segs.push({
+          text: nextOccurrenceDate === today ? copy.todayLabel : copy.nextLabel.replace("{date}", shortDate(nextOccurrenceDate)),
+        });
+    } else if (dueDate || task.scheduledDate) {
+      const ymd = (dueDate ?? task.scheduledDate) as string;
+      const label = instrMode && !done ? w.until.replace("{date}", dayWord(ymd)) : dayWord(ymd);
+      segs.push({ text: label, tone: overdue ? "late" : undefined });
+    }
+  }
+  if (task.timeLabel)
+    segs.push({
+      text: task.durationMinutes
+        ? `${task.timeLabel} – ${addMinutesHHMM(task.timeLabel, task.durationMinutes)}`
+        : task.timeLabel,
+    });
+  if (ctxLabel) segs.push({ text: ctxLabel });
+  if (task.status === "in_progress" && !done) segs.push({ text: copy.statusInProgress, tone: "pri" });
+  if (!instrMode && recvInstr(task, currentUserId)) segs.push({ text: `${copy.viewInstr} · ${task.authorName}` });
+  else if (!instrMode && !sentMode && task.createdByUserId !== currentUserId) segs.push({ text: task.authorName });
+  if (task.recurrenceRule) segs.push({ text: `↻ ${repeatLabel(task.recurrenceRule, copy, locale)}` });
+  if (task.tags.length) segs.push({ text: task.tags.slice(0, 2).map((tg) => `#${tg}`).join(" ") });
+  if (task.imageUrls.length) segs.push({ text: w.photos.replace("{n}", String(task.imageUrls.length)) });
+  if (task.isShared && instrMode !== "sent" && others.length > 0)
+    segs.push({ text: w.shared.replace("{n}", String(others.length)) });
+  if (behindDays) segs.push({ text: copy.odDaysBehind.replace("{n}", String(behindDays)), tone: "late" });
 
-  const ctx = task.resolvedContext;
-  const ctxLabel = ctx
-    ? [
-        ctx.propertyName ? localizePropertyName(ctx.propertyName, buildingLabels) : null,
-        // For Okubo-style buildings, roomLabel === propertyName (canonical); suppress to avoid redundancy.
-        ctx.roomLabel && ctx.roomLabel !== ctx.propertyName
-          ? `${ctx.roomLabel}${copy.contextPickerRoomSuffix}`
-          : null,
-      ].filter(Boolean).join(" · ") ||
-      ctx.guestName ||
-      null
-    : null;
-  const ctxChip = ctxLabel ? (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold text-primary" style={{ background: "rgb(122 82 230 / 0.09)" }}>
-      <MapPin className="size-3" aria-hidden="true" />
-      {ctxLabel}
-    </span>
-  ) : null;
+  const ringCls = prioRingClass(task.priority);
 
-  const cardInner = (
-    <div
-      className={cn(
-        "flex items-start gap-3 rounded-[18px] border bg-surface px-3.5 py-3 shadow-[0_1px_2px_rgba(20,32,43,0.03)] transition-[transform,border-color,background-color] duration-150 ease-out will-change-transform",
-        selectMode && selected ? "border-primary bg-primary/[0.04]" : "border-border",
-        pressed ? "scale-[0.97] bg-primary/[0.03]" : "active:scale-[0.98]",
-      )}
+  function onRingClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!onCompleteToggle || checking) return;
+    if (done) {
+      haptic("light");
+      onCompleteToggle(task, occurrence);
+      return;
+    }
+    // 채움 + 체크 그리기를 먼저 보여 주고(320ms), 그 뒤에 목록에서 빠지며 「완료」로 내려앉는다.
+    haptic("success");
+    setChecking(true);
+    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    checkTimer.current = setTimeout(
+      () => {
+        onCompleteToggle(task, occurrence);
+        // 실패해 줄이 돌아오면 다시 빈 고리로 — 낙관적 반영이 버려져도 체크가 남지 않게.
+        checkTimer.current = setTimeout(() => setChecking(false), 1500);
+      },
+      reduce ? 0 : 340,
+    );
+  }
+
+  const ring = selectMode ? (
+    <button
+      aria-label={copy.actionSelect}
+      aria-pressed={selected}
+      className={cn("tkw-ck is-pick", selected && "is-on")}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        haptic("light");
+        onToggleSelect?.(task);
+      }}
+      type="button"
     >
-      {selectMode ? (
-        <button
-          aria-label={copy.actionSelect}
-          className={cn(
-            "mt-0.5 flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-            selected ? "border-primary bg-primary text-primary-foreground" : "border-slate-300",
-          )}
-          onClick={() => onToggleSelect?.(task)}
-          type="button"
-        >
-          {selected ? <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> : null}
-        </button>
-      ) : preview && !done ? (
-        <span
-          className={cn(
-            "mt-0.5 flex size-[22px] shrink-0 items-center justify-center",
-            PRIO_RING[task.priority] ?? PRIO_RING.normal,
-          )}
-          aria-hidden="true"
-        >
-          <span className="size-[7px] rounded-full bg-current opacity-70" />
+      <CheckMark />
+    </button>
+  ) : preview && !done ? (
+    <span aria-hidden="true" className={cn("tkw-ck is-preview", ringCls)} />
+  ) : onCompleteToggle && !preview ? (
+    <button
+      aria-label={done ? copy.reopen : copy.complete}
+      className={cn("tkw-ck", ringCls, done && "is-done", checking && "is-checking")}
+      onClick={onRingClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      type="button"
+    >
+      <CheckMark />
+    </button>
+  ) : (
+    <span aria-hidden="true" className={cn("tkw-ck is-static", ringCls, done && "is-done")}>
+      <CheckMark />
+    </span>
+  );
+
+  const bodyInner = (
+    <>
+      <span className="tkw-row__t">{task.title}</span>
+      {segs.length ? (
+        <span className={cn("tkw-row__m", overdue && "is-late")}>
+          {segs.map((s, i) => (
+            <span key={i}>
+              {i > 0 ? " · " : ""}
+              <span className={s.tone === "late" ? "is-late" : s.tone === "pri" ? "is-pri" : undefined}>{s.text}</span>
+            </span>
+          ))}
         </span>
-      ) : onCompleteToggle && !preview ? (
-        <button
-          aria-label={done ? copy.reopen : copy.complete}
-          className={cn(
-            "mt-0.5 flex size-[22px] shrink-0 items-center justify-center rounded-full transition-colors",
-            done
-              ? "bg-primary text-primary-foreground"
-              : cn("border-2", PRIO_RING[task.priority] ?? PRIO_RING.normal),
-          )}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onCompleteToggle(task, occurrence);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          type="button"
-        >
-          {done ? <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> : null}
-        </button>
-      ) : done ? (
-        <span className="mt-0.5 flex size-[22px] shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
-        </span>
-      ) : (
-        <span
-          className={cn(
-            "mt-0.5 flex size-[22px] shrink-0 items-center justify-center rounded-full border-2",
-            PRIO_RING[task.priority] ?? PRIO_RING.normal,
-          )}
-        />
-      )}
-
-      <button
-        className="min-w-0 flex-1 text-left"
-        onClick={onBodyClick}
-        type="button"
-      >
-        <p
-          className={cn(
-            "line-clamp-2 break-words text-sm font-extrabold leading-snug tracking-[-0.01em]",
-            done ? "text-slate-400 line-through" : "text-foreground",
-          )}
-        >
-          {fromLabel ? <span className="text-muted-foreground">{fromLabel}</span> : null}
-          {task.title}
-        </p>
-        {dateChip ||
-        ctxChip ||
-        task.timeLabel ||
-        task.recurrenceRule ||
-        task.tags.length ||
-        task.imageUrls.length ||
-        instrChip ||
-        summary ? (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {instrChip}
-            {dateChip}
-            {ctxChip}
-            {/* 진행 중 — 이 칩이 없으면 목록에서 대기 상태와 완전히 똑같이 보인다. 콘솔은 3상태를
-                쓰는데 모바일 목록이 2상태로만 읽히던 격차(2026-07-30). */}
-            {task.status === "in_progress" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                <Loader className="size-3" aria-hidden="true" />
-                {copy.statusInProgress}
-              </span>
-            ) : null}
-            {task.timeLabel ? (
-              <span className={chip}>
-                <Clock className="size-3" aria-hidden="true" />
-                {task.timeLabel}
-                {task.durationMinutes ? `–${addMinutesHHMM(task.timeLabel, task.durationMinutes)}` : ""}
-              </span>
-            ) : null}
-            {task.recurrenceRule ? (
-              <span className={chip}>
-                <Repeat2 className="size-3" aria-hidden="true" />
-                {repeatLabel(task.recurrenceRule, copy, locale)}
-              </span>
-            ) : null}
-            {behindDays ? (
-              // 「N일 밀림」 — 반복이 밀렸다는 사실은 여기에만 남는다(지연 섹션에는 안 뜬다).
-              // 완료하면 서버가 밀린 회차를 흡수하므로 배지도 함께 사라진다.
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-extrabold text-rose-600">
-                {copy.odDaysBehind.replace("{n}", String(behindDays))}
-              </span>
-            ) : null}
-            {task.tags.slice(0, 2).map((tg) => (
-              <span
-                className="rounded-full bg-primary/[0.06] px-2 py-0.5 text-[11px] font-bold text-primary"
-                key={tg}
-              >
-                #{tg}
-              </span>
-            ))}
-            {task.imageUrls.length > 0 ? (
-              <span className={chip}>
-                <ImageIcon className="size-3" aria-hidden="true" />
-                {task.imageUrls.length}
-              </span>
-            ) : null}
-            {summary && instrMode !== "sent" ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-                <Share2 className="size-3" aria-hidden="true" />
-                {sentMode ? `${summary} ${copy.sharedSuffix}` : summary}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </button>
-
-      {task.priority !== "normal" ? (
-        <Flag
-          className={cn(
-            "mt-0.5 size-3.5 shrink-0",
-            task.priority === "urgent"
-              ? "text-rose-500"
-              : task.priority === "medium"
-                ? "text-blue-500"
-                : "text-amber-500",
-          )}
-          aria-hidden="true"
-        />
       ) : null}
-
-      {/* Drag handle (Today view only). Owns its own pointer gesture; stops touch/pointer/click
-          propagation and sets touch-action:none so it never starts the card's tap, long-press,
-          or swipe. `-mr-1` pulls it to the card edge without widening the row. */}
-      {reorderable ? (
-        <button
-          aria-label={copy.reorderHandle}
-          className="-mr-1 -my-1 flex shrink-0 cursor-grab touch-none items-center self-stretch px-1 text-slate-300 transition-colors active:cursor-grabbing active:text-slate-400"
-          data-swipe-back="off"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onReorderHandleDown?.(e, task);
-          }}
-          onTouchStart={(e) => e.stopPropagation()}
-          type="button"
-        >
-          <GripVertical className="size-[18px]" aria-hidden="true" />
-        </button>
-      ) : null}
-    </div>
+    </>
   );
 
   const onContextMenu = (e: React.MouseEvent) => {
@@ -621,80 +483,92 @@ export function TaskCard({
     onLongPress(task, occurrence);
   };
 
-  // 0 → 1 as the card slides open; drives the reveal buttons' scale-in.
-  const revealRatio = Math.min(1, Math.abs(offset) / swipeOpen);
-
-  if (!canSwipe) {
-    return (
-      <div
-        className={cn(done && !selectMode && "opacity-60")}
-        onContextMenu={onContextMenu}
-        onTouchCancel={onTouchEnd}
-        onTouchEnd={onTouchEnd}
-        onTouchMove={onTouchMove}
-        onTouchStart={onTouchStart}
-      >
-        {cardInner}
-      </div>
-    );
-  }
+  const rowInner = (
+    <div
+      className="tkw-row__in"
+      onContextMenu={onContextMenu}
+      onTouchCancel={onTouchEnd}
+      onTouchEnd={onTouchEnd}
+      onTouchMove={onTouchMove}
+      onTouchStart={onTouchStart}
+      style={
+        canSwipe
+          ? {
+              transform: offset ? `translateX(${offset}px)` : undefined,
+              transition: isDragging ? "none" : "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }
+          : undefined
+      }
+    >
+      {ring}
+      {selectMode ? (
+        // 선택 모드에서는 링크가 아니다 — 태블릿 2분할이 탭을 칸 열기로 가로채지 않게.
+        <button className="tkw-row__b" onClick={onBodyClick} type="button">
+          {bodyInner}
+        </button>
+      ) : (
+        <a className="tkw-row__b" draggable={false} href={detailHref} onClick={onBodyClick}>
+          {bodyInner}
+        </a>
+      )}
+      {trailing ? <span className="tkw-row__tr">{trailing}</span> : null}
+      {/* Drag handle. Owns its own pointer gesture; stops touch/pointer/click propagation and sets
+          touch-action:none so it never starts the row's tap, long-press, or swipe. */}
+      {reorderable ? (
+        <button
+          aria-label={copy.reorderHandle}
+          className="tkw-row__grip"
+          data-swipe-back="off"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            haptic("light");
+            onReorderHandleDown?.(e, task);
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
+          type="button"
+        >
+          <GripVertical aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  );
 
   return (
     <div
-      ref={rootRef}
-      className="relative overflow-hidden rounded-[18px]"
-      // 열려 있는 카드에서 오른쪽으로 밀면 카드를 닫는다 — 화면 스와이프 뒤로가기가 가져가지 않게(16-mobile-navigation).
+      className={cn(
+        "tkw-row",
+        done && "is-done",
+        selected && "is-sel",
+        reordering && "is-drag",
+        pressed && !selectMode && "is-press",
+      )}
+      // 열려 있는 줄에서 오른쪽으로 밀면 줄을 닫는다 — 화면 스와이프 뒤로가기가 가져가지 않게(16-mobile-navigation).
       data-swipe-back={offset !== 0 ? "off" : undefined}
+      ref={rootRef}
     >
-      {/* Reveal: floating rounded action buttons. Only visible while actually swiping — never
-          peeks on tap/long-press. Reveal scales/fades in as the card slides for a polished feel. */}
-      <div
-        className={cn(
-          "absolute inset-y-0 right-0 flex items-stretch gap-2 py-1 pl-2.5 pr-2",
-          offset === 0 ? "pointer-events-none opacity-0" : "opacity-100",
-        )}
-        style={{
-          transform: `scale(${0.9 + 0.1 * revealRatio})`,
-          transformOrigin: "right center",
-          transition: isDragging
-            ? "opacity 100ms ease"
-            : "transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease",
-        }}
-      >
-        <form
-          action={swipeAction === "tomorrow" ? moveTaskToTomorrow : moveTaskToToday}
-          className="flex"
+      {canSwipe ? (
+        <div
+          className="tkw-swipe"
+          style={{
+            opacity: Math.min(1, Math.abs(offset) / swipeOpen),
+            pointerEvents: offset === 0 ? "none" : undefined,
+          }}
         >
-          <input name="taskId" type="hidden" value={task.id} />
-          {swipeReturnView ? <input name="view" type="hidden" value={swipeReturnView} /> : null}
-          <button
-            className="flex w-[56px] flex-col items-center justify-center gap-1 rounded-[14px] bg-muted text-muted-foreground shadow-[0_2px_8px_-4px_rgba(20,16,10,0.22)] transition-transform active:scale-[0.93]"
-            type="submit"
-          >
-            {swipeAction === "tomorrow" ? (
-              <Sunrise className="size-4" strokeWidth={2.2} aria-hidden="true" />
-            ) : (
-              <Sun className="size-4" strokeWidth={2.2} aria-hidden="true" />
-            )}
-            <span className="text-[10px] font-bold tracking-tight">
+          <form action={swipeAction === "tomorrow" ? moveTaskToTomorrow : moveTaskToToday}>
+            <input name="taskId" type="hidden" value={task.id} />
+            {swipeReturnView ? <input name="view" type="hidden" value={swipeReturnView} /> : null}
+            <button onClick={() => haptic("light")} type="submit">
+              {swipeAction === "tomorrow" ? <Sunrise aria-hidden="true" /> : <Sun aria-hidden="true" />}
               {swipeAction === "tomorrow" ? copy.swipeTomorrow : copy.swipeToday}
-            </span>
-          </button>
-        </form>
-      </div>
-      <div
-        onContextMenu={onContextMenu}
-        onTouchCancel={onTouchEnd}
-        onTouchEnd={onTouchEnd}
-        onTouchMove={onTouchMove}
-        onTouchStart={onTouchStart}
-        style={{
-          transform: `translateX(${offset}px)`,
-          transition: isDragging ? "none" : "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
-        }}
-      >
-        {cardInner}
-      </div>
+            </button>
+          </form>
+        </div>
+      ) : null}
+      {rowInner}
     </div>
   );
 }

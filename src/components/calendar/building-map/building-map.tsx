@@ -305,18 +305,19 @@ export function BuildingMap({
         let bestCost = Infinity;
         for (const [dx, lift] of tries) {
           const y1 = cl.top - 12 - lift;
-          const cx = cl.bx + dx;
+          // 가장자리에선 자리를 버리지 않고 이름표만 안쪽으로 민다(지시선은 건물을 그대로 가리킨다).
+          const cx = Math.min(Math.max(cl.bx + dx, w / 2 + 8), W - w / 2 - 8);
           const r: Placed["r"] = [cx - w / 2 - 4, y1 - CHIP_H - 3, cx + w / 2 + 4, y1 + 3];
-          if (r[0] < 4 || r[2] > W - 4 || r[1] < 6) continue;
+          if (r[1] < 6) continue;
           if (placed.some((p) => hit(p.r, r))) continue;
           if (blocks.some((b) => b.owner !== cl && hit(b.r, r))) continue;
           const below = lift < 0 && y1 - CHIP_H > cl.by;
           const seg: Placed["seg"] = [cl.bx, below ? cl.by : cl.top, Math.min(Math.max(cl.bx, cx - w / 2 + 14), cx + w / 2 - 14), below ? y1 - CHIP_H : y1];
           const crossings = placed.filter((p) => cross(p.seg, seg)).length;
-          const cost = Math.hypot(dx, lift < 0 ? -lift * 1.25 : lift) + crossings * 160;
+          const cost = Math.hypot(cx - cl.bx, lift < 0 ? -lift * 1.25 : lift) + crossings * 160;
           if (cost < bestCost) {
             bestCost = cost;
-            best = { cl, lift, dx, r, seg };
+            best = { cl, lift, dx: cx - cl.bx, r, seg };
           }
         }
         return { best };

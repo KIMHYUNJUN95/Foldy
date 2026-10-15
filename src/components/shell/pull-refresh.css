@@ -6,6 +6,7 @@
 .ptrb i:nth-child(1) { top: 0; width: 34px; margin-left: -17px; background: #b9a0fa; }
 .ptrb i:nth-child(2) { top: 19px; width: 48px; margin-left: -24px; background: #8a63f0; }
 .ptrb i:nth-child(3) { top: 38px; width: 64px; margin-left: -32px; background: #5b2bd6; }
+.ptrb i:nth-child(3)::after { content: ""; position: absolute; left: 9px; top: 5px; width: 17px; height: 2px; border-radius: 1px; background: #efe7ff; }
 .ptrb-w { display: block; transform: scale(.8); }
 .ptrb-w.is-ready { animation: ptrb-click 380ms cubic-bezier(.23, 1, .32, 1) both; }
 .ptrb.is-busy i { animation: ptrb-a 1700ms cubic-bezier(.37, 0, .63, 1) infinite; }

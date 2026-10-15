@@ -7,6 +7,8 @@
 .fldr__bars i:nth-child(1) { top: 0; width: 34px; margin-left: -17px; background: #b9a0fa; }
 .fldr__bars i:nth-child(2) { top: 19px; width: 48px; margin-left: -24px; background: #8a63f0; animation-name: fldr-b; animation-delay: 110ms; }
 .fldr__bars i:nth-child(3) { top: 38px; width: 64px; margin-left: -32px; background: #5b2bd6; animation-delay: 220ms; }
+/* 맨 아래 막대 안 흰 줄 — 로고와 같은 자리 · 비율(로고 68×18 막대의 14 · 8 · 26 × 2.5 를 12px 높이로 줄임) */
+.fldr__bars i:nth-child(3)::after { content: ""; position: absolute; left: 9px; top: 5px; width: 17px; height: 2px; border-radius: 1px; background: #efe7ff; }
 .fldr__t { font-size: 13px; color: #8b8898; }
 @keyframes fldr-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes fldr-a { 0%, 100% { transform: translateX(0) scaleX(1); } 50% { transform: translateX(10px) scaleX(.55); } }

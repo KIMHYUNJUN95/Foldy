@@ -190,8 +190,9 @@ export function BuildingMap({
   const screen = (w: Vec, c: Cam = cam): Vec => [c.tx + w[0] * c.s, c.ty + w[1] * c.s];
 
   // ── 블록 벌리기(2026-10-15 사용자 결정 「모든 건물이 다 보이게」): 실제 자리끼리 너무 가까우면(오쿠보 · 가부키초 ·
-  // STAY ARI 는 300 m 안, 오쿠보A · B 는 같은 집) 블록만 서로 안 겹칠 만큼 밀어 놓는다. 실제 자리엔 작은 점을 찍고 가는
-  // 선으로 잇는다(관광 지도식). 지금 카메라 기준으로 계산하므로 다가가면 벌린 거리가 줄어 블록이 실제 자리로 모인다.
+  // STAY ARI 는 300 m 안, 오쿠보A · B 는 같은 집) 블록만 서로 안 겹칠 만큼 밀어 놓는다. 같은 동네(이름 끝 A/B/C 를 뗀
+  // 이름)는 바짝 붙여 한 단지처럼, 다른 동네끼리만 조금 더 띄운다 — 그래서 블록이 거의 제자리라 실제 자리 표시(점 · 선)는
+  // 두지 않는다(2026-10-15 사용자 결정). 지금 카메라 기준으로 계산하므로 다가가면 블록이 실제 자리로 모인다.
   const spread = useMemo(() => {
     const m = new Map<string, Vec>();
     if (!layout) return m;
@@ -199,11 +200,12 @@ export function BuildingMap({
     const truth = ids.map((id) => screen(worldOf.get(id)!));
     const pos = truth.map((p) => [p[0], p[1]] as Vec);
     const foot = ids.map((id) => (shapes.find((x) => x.id === id)?.h ?? 8) * 2.5);
+    const hood = ids.map((id) => id.replace(/[A-Z]$/, ""));
     const ys = 0.6; // 블록은 세로로 길어서 옆으로 나란히 떼는 게 잘 보인다(세로 차이는 덜 쳐 줌)
     const push = () => {
       for (let i = 0; i < pos.length; i++) {
         for (let j = i + 1; j < pos.length; j++) {
-          const sep = (foot[i] + foot[j]) / 2 + 34;
+          const sep = (foot[i] + foot[j]) / 2 + (hood[i] === hood[j] ? 2 : 14);
           let dx = pos[j][0] - pos[i][0];
           let dy = (pos[j][1] - pos[i][1]) * ys;
           let d = Math.hypot(dx, dy);
@@ -288,6 +290,7 @@ export function BuildingMap({
         const tries: Vec[] = [
           [0, 0], [0, 34], [-side, 22], [side, 22], [0, 68], [-side, 56], [side, 56], [-far, 22], [far, 22],
           [0, down], [-side, down], [side, down], [-side, 90], [side, 90], [-far, 56], [far, 56], [0, down - 34], [-side, down - 34], [side, down - 34], [0, 102],
+          [-far, down], [far, down], [-far, 90], [far, 90], [-far, down - 34], [far, down - 34], [0, down - 68], [-side, 124], [side, 124], [0, 136],
         ];
         let best: Placed | null = null;
         let bestCost = Infinity;
@@ -496,22 +499,6 @@ export function BuildingMap({
               );
             })}
           </svg>
-
-          {/* 실제 자리 점 · 벌린 블록까지 잇는 선 */}
-          {order.map((b, i) => {
-            const t = screen(worldOf.get(b.id)!);
-            const p = posOf(b.id);
-            const len = Math.hypot(p[0] - t[0], p[1] - t[1]);
-            const off = len < 4;
-            const dim = focusIds && !focusIds.includes(b.id);
-            const d = { "--d": `${riseDelay(i) + 500}ms` } as CSSProperties;
-            return (
-              <span aria-hidden="true" className={`bm-pin-w${off ? " is-off" : ""}${dim ? " is-dim" : ""}`} key={`pin-${b.id}`}>
-                <span className="bm-tie" style={{ ...d, transform: `translate3d(${t[0]}px, ${t[1]}px, 0) rotate(${Math.atan2(p[1] - t[1], p[0] - t[0])}rad)`, width: len }} />
-                <span className="bm-pin" style={{ ...d, transform: `translate3d(${t[0]}px, ${t[1]}px, 0)` }} />
-              </span>
-            );
-          })}
 
           {/* 건물 블록 */}
           {order.map((b, i) => {

@@ -9,6 +9,7 @@ import {
 } from "@/app/admin/settings/attendance/actions";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { SettingsSubnav } from "@/components/admin/settings/settings-subnav";
+import { DdFormSelect } from "@/components/admin/shared/dd-form-select";
 import { SettingsConfirm } from "@/components/admin/settings/settings-confirm";
 import { SiteDangerActions } from "@/components/admin/settings/site-danger-actions";
 import { SiteGeoFields } from "@/components/admin/settings/site-geo-fields";
@@ -390,17 +391,19 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
                 `Arakicho A`)은 따로 관리돼 어긋난다. 사무실처럼 **건물이 아닌 근무지**는 비워 둔다.
               */}
               <div className="stw-f">
-                <label className="stw-nf">
+                {/* 브라우저 기본 목록 대신 공용 드롭다운(.dd) — 숨은 칸 name="propertyId" 로 같은 폼에 실린다. */}
+                <div className="stw-nf is-dd">
                   <span>{settings.attendanceSiteProperty}</span>
-                  <select defaultValue={selectedSite?.property_id ?? ""} name="propertyId">
-                    <option value="">{settings.attendanceSitePropertyNone}</option>
-                    {propertyOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <DdFormSelect
+                    name="propertyId"
+                    defaultValue={selectedSite?.property_id ?? ""}
+                    ariaLabel={settings.attendanceSiteProperty}
+                    options={[
+                      { value: "", label: settings.attendanceSitePropertyNone },
+                      ...propertyOptions.map((option) => ({ value: option.id, label: option.label })),
+                    ]}
+                  />
+                </div>
                 <span className="stw-hint">{w.buildingHint}</span>
               </div>
               <SiteGeoFields

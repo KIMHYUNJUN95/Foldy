@@ -23,7 +23,7 @@ export default async function AutomationPage() {
   const data = await getAutomationPageData(session, locale);
 
   return (
-    <AdminShell activeItem={opsNavId("automation")} title={dictionary.opsAdmin.areaName}>
+    <AdminShell activeItem={opsNavId("automation")} title={dictionary.automation.title}>
       <AutomationConsole
         copy={dictionary.automation}
         data={data}

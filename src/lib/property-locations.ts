@@ -7,7 +7,8 @@
 // 새 건물이 생기면 여기 한 줄을 더한다(없으면 지도엔 안 나오고 목록에만 나온다).
 // 문서: docs/product/15-reservation-calendar.md → 「건물 지도」.
 
-export type PropertyLocation = { lat: number; lng: number };
+/** `mapLabel`: 지도 이름표에 쓸 짧은 이름(목록은 원래 이름 그대로). */
+export type PropertyLocation = { lat: number; lng: number; mapLabel?: string };
 
 export const PROPERTY_LOCATIONS: Record<string, PropertyLocation> = {
   아라키초A: { lat: 35.691589, lng: 139.7235419 },
@@ -17,7 +18,7 @@ export const PROPERTY_LOCATIONS: Record<string, PropertyLocation> = {
   오쿠보A: { lat: 35.7002401, lng: 139.706157 },
   오쿠보B: { lat: 35.7002401, lng: 139.70603 },
   오쿠보C: { lat: 35.699386, lng: 139.7038418 },
-  "STAY ARI Apartment Hotel": { lat: 35.700054, lng: 139.70488 },
+  "STAY ARI Apartment Hotel": { lat: 35.700054, lng: 139.70488, mapLabel: "STAY ARI" },
 };
 
 export function getPropertyLocation(canonicalName: string): PropertyLocation | null {

@@ -93,6 +93,15 @@
 .bm-b__hit { position: absolute; left: -22px; width: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 12px; }
 .bm-b__hit:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 
+/* 벌린 블록 — 실제 자리 점 + 잇는 선(가까이 가면 길이 0 으로 모임) */
+.bm-pin-w { transition: opacity 300ms var(--bm-out); }
+.bm-pin-w.is-dim { opacity: 0.25; }
+.bm-pin { position: absolute; left: -3px; top: -3px; z-index: 2; width: 6px; height: 6px; box-sizing: border-box; border-radius: 50%; background: #fff; border: 1.5px solid #8a63f0; box-shadow: 0 1px 3px rgba(60, 30, 140, 0.3); transition: transform var(--bm-move), opacity 300ms var(--bm-out); animation: bm-pop-s 420ms var(--bm-bounce) var(--d, 0ms) backwards; }
+@keyframes bm-pop-s { from { scale: 0; } }
+.bm-tie { position: absolute; left: 0; top: 0; z-index: 2; height: 1px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(138, 99, 240, 0.75), rgba(138, 99, 240, 0.3)); transition: transform var(--bm-move), width var(--bm-move), opacity 300ms var(--bm-out); animation: bm-draw-x 520ms var(--bm-out) var(--d, 0ms) backwards; }
+.bm-pin-w.is-off .bm-pin, .bm-pin-w.is-off .bm-tie { opacity: 0; }
+@keyframes bm-draw-x { from { scale: 0 1; } }
+
 /* 이름표 — 유리 · 짧은 지시선 */
 .bm-chip {
   position: absolute;
@@ -123,7 +132,9 @@
   transition: transform var(--bm-move), opacity 300ms var(--bm-out), scale 160ms var(--bm-out);
   animation: bm-chip-in 520ms var(--bm-soft) var(--d, 0ms) backwards;
 }
-.bm-chip::after { content: ""; position: absolute; left: var(--lead-x, 50%); top: 100%; width: 1px; height: var(--lead, 12px); transition: height var(--bm-move); margin-left: -0.5px; background: linear-gradient(rgba(122, 82, 230, 0.6), rgba(122, 82, 230, 0)); }
+.bm-lead { position: absolute; left: 0; top: 0; z-index: 29; height: 1px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(122, 82, 230, 0.15), rgba(122, 82, 230, 0.65)); pointer-events: none; transition: transform var(--bm-move), width var(--bm-move), opacity 300ms var(--bm-out); animation: bm-draw-x 480ms var(--bm-out) var(--d, 0ms) backwards; }
+.bm-lead.is-dim { opacity: 0.3; }
+@keyframes bm-lead-in { from { opacity: 0; } }
 .bm-chip:active { scale: 0.96; }
 .bm-chip:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 .bm-chip b { font-weight: 600; }

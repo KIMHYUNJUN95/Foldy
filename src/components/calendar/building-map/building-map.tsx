@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { decideMapIntro } from "./map-intro";
 import { geoToMap, SHINJUKU_GEO as G } from "./shinjuku-geo";
 import "./building-map.css";
 
@@ -38,19 +39,6 @@ const COS = Math.cos(RAD);
 const SIN = Math.sin(RAD);
 const MAX_ZOOM = 9;
 const CHIP_H = 28;
-const INTRO_KEY = "foldy.bmap.intro";
-let introDecision: boolean | null = null;
-function decideIntro() {
-  if (introDecision !== null) return introDecision;
-  try {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    introDecision = !reduce && window.sessionStorage.getItem(INTRO_KEY) !== "1";
-    window.sessionStorage.setItem(INTRO_KEY, "1");
-  } catch {
-    introDecision = false;
-  }
-  return introDecision;
-}
 
 type Vec = [number, number];
 type Cam = { s: number; tx: number; ty: number };
@@ -122,7 +110,7 @@ export function BuildingMap({
   useEffect(() => {
     // 첫 칠하기 전에 정해야 깜빡임이 없다 — 마운트 직후 한 번만(결정은 모듈에 기억 — 개발 모드 이중 실행에도 같은 값).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIntro(decideIntro());
+    setIntro(decideMapIntro());
   }, []);
 
   const [W, H] = size;
@@ -200,21 +188,69 @@ export function BuildingMap({
   const byId = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
 
   const screen = (w: Vec, c: Cam = cam): Vec => [c.tx + w[0] * c.s, c.ty + w[1] * c.s];
+
+  // ── 블록 벌리기(2026-10-15 사용자 결정 「모든 건물이 다 보이게」): 실제 자리끼리 너무 가까우면(오쿠보 · 가부키초 ·
+  // STAY ARI 는 300 m 안, 오쿠보A · B 는 같은 집) 블록만 서로 안 겹칠 만큼 밀어 놓는다. 실제 자리엔 작은 점을 찍고 가는
+  // 선으로 잇는다(관광 지도식). 지금 카메라 기준으로 계산하므로 다가가면 벌린 거리가 줄어 블록이 실제 자리로 모인다.
+  const spread = useMemo(() => {
+    const m = new Map<string, Vec>();
+    if (!layout) return m;
+    const ids = buildings.map((b) => b.id).filter((id) => worldOf.has(id));
+    const truth = ids.map((id) => screen(worldOf.get(id)!));
+    const pos = truth.map((p) => [p[0], p[1]] as Vec);
+    const foot = ids.map((id) => (shapes.find((x) => x.id === id)?.h ?? 8) * 2.5);
+    const ys = 0.6; // 블록은 세로로 길어서 옆으로 나란히 떼는 게 잘 보인다(세로 차이는 덜 쳐 줌)
+    const push = () => {
+      for (let i = 0; i < pos.length; i++) {
+        for (let j = i + 1; j < pos.length; j++) {
+          const sep = (foot[i] + foot[j]) / 2 + 34;
+          let dx = pos[j][0] - pos[i][0];
+          let dy = (pos[j][1] - pos[i][1]) * ys;
+          let d = Math.hypot(dx, dy);
+          if (d >= sep) continue;
+          if (d < 0.01) {
+            const a = (i * 2.399 + j * 1.3) % (Math.PI * 2);
+            dx = Math.cos(a);
+            dy = Math.sin(a) * 0.4;
+            d = Math.hypot(dx, dy);
+          }
+          const k = (sep - d) / 2 / d;
+          pos[i][0] -= dx * k;
+          pos[i][1] -= (dy * k) / ys;
+          pos[j][0] += dx * k;
+          pos[j][1] += (dy * k) / ys;
+        }
+      }
+    };
+    for (let it = 0; it < 90; it++) {
+      push();
+      for (let i = 0; i < pos.length; i++) {
+        pos[i][0] += (truth[i][0] - pos[i][0]) * 0.05;
+        pos[i][1] += (truth[i][1] - pos[i][1]) * 0.05;
+      }
+    }
+    for (let it = 0; it < 12; it++) push();
+    ids.forEach((id, i) => m.set(id, pos[i]));
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, cam, worldOf, buildings, shapes]);
+  const posOf = (id: string): Vec => spread.get(id) ?? screen(worldOf.get(id)!);
   const badgeOf = (ids: string[]) => {
     const empty = ids.reduce((a, id) => a + (byId.get(id)?.empty ?? 0), 0);
     if (empty > 0) return { text: copy.emptyN.replace("{n}", String(empty)), vac: true };
-    if (ids.length === 1) return { text: copy.full, vac: false };
+    // 「만실」은 다가갔을 때만 — 처음 화면은 이름만(빈 방 있는 건물만 배지) 남겨 이름표가 덜 붐비게.
+    if (ids.length === 1) return cam.s > 1.4 || ids[0] === selectedId ? { text: copy.full, vac: false } : null;
     return { text: copy.roomsN.replace("{n}", String(ids.reduce((a, id) => a + (byId.get(id)?.rooms ?? 0), 0))), vac: false };
   };
   const chipWidth = (label: string, badge: string, cta: boolean) =>
     Math.ceil(textWidth(label, 12) + textWidth(badge, 11) + 36 + (cta ? textWidth(copy.open, 11.5) + 34 : 0));
 
-  // ── 이름표 묶기: 지금 카메라에서 이름표끼리 겹치거나 블록이 붙어 있으면 하나로
+  // ── 이름표: 블록마다 하나, 겹치면 콜아웃처럼 옆 · 위 · 아래로 뺀다
   const clusters = useMemo(() => {
-    if (!layout) return [] as Array<{ key: string; ids: string[]; x: number; y: number; lift: number; w: number; label: string; badge: { text: string; vac: boolean } }>;
-    type Cl = { ids: string[]; bx: number; by: number; top: number };
+    if (!layout) return [] as Array<{ key: string; ids: string[]; x: number; y: number; lift: number; dx: number; by: number; w: number; label: string; badge: { text: string; vac: boolean } | null }>;
+    type Cl = { ids: string[]; bx: number; by: number; top: number; compact?: boolean };
     const make = (ids: string[]): Cl => {
-      const ps = ids.map((id) => screen(worldOf.get(id)!));
+      const ps = ids.map((id) => posOf(id));
       return {
         ids,
         bx: ps.reduce((a, p) => a + p[0], 0) / ps.length,
@@ -223,73 +259,76 @@ export function BuildingMap({
       };
     };
     const labelOf = (ids: string[]) => compactLabel(ids.map((id) => byId.get(id)!.label), copy.more);
-    const widthOf = (c: Cl) => chipWidth(labelOf(c.ids), badgeOf(c.ids).text, c.ids.length === 1 && c.ids[0] === selectedId);
-    let list: Cl[] = buildings.filter((b) => b.id !== selectedId).map((b) => make([b.id]));
-    const idOrder = buildings.map((x) => x.id);
-    const mergeAt = (i: number, j: number) => {
-      const ids = [...list[i].ids, ...list[j].ids].sort((p, q) => idOrder.indexOf(p) - idOrder.indexOf(q));
-      list = [...list.slice(0, i), make(ids), ...list.slice(i + 1, j), ...list.slice(j + 1)];
-    };
-    // 1) 땅 위에서 붙어 있는 블록끼리(가장 가까운 짝부터) 묶는다.
-    for (;;) {
-      let best: [number, number, number] | null = null;
-      for (let i = 0; i < list.length; i++) {
-        for (let j = i + 1; j < list.length; j++) {
-          const dist = Math.hypot(list[i].bx - list[j].bx, list[i].by - list[j].by);
-          if (dist < 34 && (!best || dist < best[2])) best = [i, j, dist];
-        }
-      }
-      if (!best) break;
-      mergeAt(best[0], best[1]);
-    }
+    const widthOf = (c: Cl) => chipWidth(labelOf(c.ids), c.compact ? "" : badgeOf(c.ids)?.text ?? "", c.ids.length === 1 && c.ids[0] === selectedId) - (c.compact ? 6 : 0);
+    const list: Cl[] = buildings.filter((b) => b.id !== selectedId).map((b) => make([b.id]));
     if (selectedId && worldOf.has(selectedId)) list.push(make([selectedId]));
-    // 2) 이름표 자리: 아래 것부터 놓고, 겹치면 지시선을 늘려 위로 올린다(34 · 68px). 그래도 안 되면 그 둘을 묶는다.
-    type Placed = { cl: Cl; lift: number; r: [number, number, number, number] };
+    // 이름표 자리: 위쪽 건물부터 놓고, 겹치면 위로 · 옆으로 빼서 비스듬한 지시선으로 잇는다(지도 콜아웃처럼).
+    type Placed = { cl: Cl; lift: number; dx: number; r: [number, number, number, number] };
     const hit = (a: Placed["r"], b: Placed["r"]) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-    let placed: Placed[] = [];
-    for (let guard = 0; guard < 20; guard++) {
-      placed = [];
-      let clash: [Cl, Cl] | null = null;
-      const sorted = [...list].sort((a, b) => {
-        const sa = a.ids.length === 1 && a.ids[0] === selectedId ? 1 : 0;
-        const sb = b.ids.length === 1 && b.ids[0] === selectedId ? 1 : 0;
-        return sb - sa || b.top - a.top;
-      });
-      for (const cl of sorted) {
-        const w = widthOf(cl);
-        let done: Placed | null = null;
-        let firstHit: Placed | undefined;
-        for (const lift of [0, 34, 68]) {
+    const placed: Placed[] = [];
+    const sorted = [...list].sort((a, b) => {
+      const sa = a.ids.length === 1 && a.ids[0] === selectedId ? 1 : 0;
+      const sb = b.ids.length === 1 && b.ids[0] === selectedId ? 1 : 0;
+      return sb - sa || a.top - b.top;
+    });
+    // 다른 건물 블록을 가리지 않게 블록 자리도 장애물로
+    const blocks = list.flatMap((c) =>
+      c.ids.map((id) => {
+        const p = posOf(id);
+        return { owner: c, r: [p[0] - 13, p[1] - (heightOf.get(id) ?? 20) - 4, p[0] + 13, p[1] + 5] as Placed["r"] };
+      }),
+    );
+    for (const cl of sorted) {
+      // 겹치지 않는 자리 가운데 지시선이 가장 짧은 곳(위쪽을 조금 더 좋아함). 없으면 배지를 뺀 짧은 이름표로 다시,
+      // 그래도 없으면 제자리에 둔다. 건물은 묶지 않는다 — 블록마다 이름표 하나.
+      const pick = (w: number) => {
+        const side = w / 2 + 16;
+        const far = side + w / 2 + 12;
+        const down = cl.top - 12 - (cl.by + 18 + CHIP_H);
+        const tries: Vec[] = [
+          [0, 0], [0, 34], [-side, 22], [side, 22], [0, 68], [-side, 56], [side, 56], [-far, 22], [far, 22],
+          [0, down], [-side, down], [side, down], [-side, 90], [side, 90], [-far, 56], [far, 56], [0, down - 34], [-side, down - 34], [side, down - 34], [0, 102],
+        ];
+        let best: Placed | null = null;
+        let bestCost = Infinity;
+        for (const [dx, lift] of tries) {
           const y1 = cl.top - 12 - lift;
-          const r: Placed["r"] = [cl.bx - w / 2 - 4, y1 - CHIP_H - 3, cl.bx + w / 2 + 4, y1 + 3];
-          const other = placed.find((p) => hit(p.r, r));
-          if (!other) {
-            done = { cl, lift, r };
-            break;
+          const cx = cl.bx + dx;
+          const r: Placed["r"] = [cx - w / 2 - 4, y1 - CHIP_H - 3, cx + w / 2 + 4, y1 + 3];
+          if (r[0] < 4 || r[2] > W - 4 || r[1] < 6) continue;
+          if (placed.some((p) => hit(p.r, r))) continue;
+          if (blocks.some((b) => b.owner !== cl && hit(b.r, r))) continue;
+          const cost = Math.hypot(dx, lift < 0 ? -lift * 1.25 : lift);
+          if (cost < bestCost) {
+            bestCost = cost;
+            best = { cl, lift, dx, r };
           }
-          firstHit ??= other;
         }
-        if (!done) {
-          clash = [cl, firstHit!.cl];
-          break;
-        }
-        placed.push(done);
+        return { best };
+      };
+      let { best } = pick(widthOf(cl));
+      if (!best) {
+        cl.compact = true;
+        ({ best } = pick(widthOf(cl)));
       }
-      if (!clash) break;
-      const i = list.indexOf(clash[0]);
-      const j = list.indexOf(clash[1]);
-      if (i < 0 || j < 0) break;
-      mergeAt(Math.min(i, j), Math.max(i, j));
+      if (!best) {
+        const w = widthOf(cl);
+        const y1 = cl.top - 12;
+        best = { cl, lift: 0, dx: 0, r: [cl.bx - w / 2 - 4, y1 - CHIP_H - 3, cl.bx + w / 2 + 4, y1 + 3] };
+      }
+      placed.push(best);
     }
-    return placed.map(({ cl: c, lift }) => ({
+    return placed.map(({ cl: c, lift, dx }) => ({
       key: c.ids.join("|"),
       ids: c.ids,
       x: c.bx,
       y: c.top,
+      by: c.by,
       lift,
+      dx,
       w: widthOf(c),
       label: labelOf(c.ids),
-      badge: badgeOf(c.ids),
+      badge: c.compact ? null : badgeOf(c.ids),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, cam, selectedId, worldOf, heightOf, byId, buildings, copy]);
@@ -316,8 +355,8 @@ export function BuildingMap({
       for (let j = i + 1; j < ids.length; j++) {
         const dx = Math.abs(ws[i][0] - ws[j][0]);
         const dy = Math.abs(ws[i][1] - ws[j][1]);
-        const wi = chipWidth(byId.get(ids[i])!.label, badgeOf([ids[i]]).text, false);
-        const wj = chipWidth(byId.get(ids[j])!.label, badgeOf([ids[j]]).text, false);
+        const wi = chipWidth(byId.get(ids[i])!.label, badgeOf([ids[i]])?.text ?? "", false);
+        const wj = chipWidth(byId.get(ids[j])!.label, badgeOf([ids[j]])?.text ?? "", false);
         const sx = dx > 0.01 ? ((wi + wj) / 2 + 10) / dx : Infinity;
         const sy = dy > 0.01 ? (CHIP_H + 26) / dy : Infinity;
         need = Math.max(need, Math.min(sx, sy));
@@ -359,7 +398,7 @@ export function BuildingMap({
 
   const zoomed = cam.s > 1.01 || cam.tx !== 0 || cam.ty !== 0;
   const focusIds = expanded ?? (selectedId ? [selectedId] : null);
-  const order = [...buildings].filter((b) => worldOf.has(b.id)).sort((a, b) => worldOf.get(a.id)![1] - worldOf.get(b.id)![1]);
+  const order = [...buildings].filter((b) => worldOf.has(b.id)).sort((a, b) => posOf(a.id)[1] - posOf(b.id)[1]);
   const riseDelay = (i: number) => (intro ? 2500 + i * 95 : 60 + i * 45);
   const ready = layout && intro !== null;
 
@@ -458,14 +497,30 @@ export function BuildingMap({
             })}
           </svg>
 
+          {/* 실제 자리 점 · 벌린 블록까지 잇는 선 */}
+          {order.map((b, i) => {
+            const t = screen(worldOf.get(b.id)!);
+            const p = posOf(b.id);
+            const len = Math.hypot(p[0] - t[0], p[1] - t[1]);
+            const off = len < 4;
+            const dim = focusIds && !focusIds.includes(b.id);
+            const d = { "--d": `${riseDelay(i) + 500}ms` } as CSSProperties;
+            return (
+              <span aria-hidden="true" className={`bm-pin-w${off ? " is-off" : ""}${dim ? " is-dim" : ""}`} key={`pin-${b.id}`}>
+                <span className="bm-tie" style={{ ...d, transform: `translate3d(${t[0]}px, ${t[1]}px, 0) rotate(${Math.atan2(p[1] - t[1], p[0] - t[0])}rad)`, width: len }} />
+                <span className="bm-pin" style={{ ...d, transform: `translate3d(${t[0]}px, ${t[1]}px, 0)` }} />
+              </span>
+            );
+          })}
+
           {/* 건물 블록 */}
           {order.map((b, i) => {
             const shape = shapes.find((s) => s.id === b.id)!;
-            const p = screen(worldOf.get(b.id)!);
+            const p = posOf(b.id);
             const on = b.id === selectedId;
             const focus = focusIds?.includes(b.id) ?? false;
             const style = { transform: `translate3d(${p[0]}px, ${p[1]}px, 0)`, zIndex: 3 + i, "--d": `${riseDelay(i)}ms` } as CSSProperties;
-            const badge = badgeOf([b.id]).text;
+            const badge = (badgeOf([b.id]) ?? { text: copy.full }).text;
             return (
               <div className={`bm-b${on ? " is-on" : ""}${focus ? " is-focus" : ""}${b.empty > 0 ? " is-vac" : ""}`} key={b.id} style={style}>
                 <svg aria-hidden="true" className="bm-b__svg" height="1" width="1">
@@ -493,9 +548,7 @@ export function BuildingMap({
                   className="bm-b__hit"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const cl = clusters.find((c) => c.ids.includes(b.id));
-                    if (cl && cl.ids.length > 1) pickCluster(cl.ids);
-                    else pickBuilding(b.id);
+                    pickBuilding(b.id);
                   }}
                   style={{ height: shape.H + 26, top: -shape.H - 16 }}
                   type="button"
@@ -504,17 +557,37 @@ export function BuildingMap({
             );
           })}
 
+          {/* 지시선 — 지붕에서 이름표 아래 가장자리까지(옆으로 뺀 이름표는 비스듬히) */}
+          {clusters.map((c, i) => {
+            if (expanded && expanded.join("|") === c.key) return null;
+            const left = Math.min(Math.max(c.x + c.dx - c.w / 2, 8), W - 8 - c.w);
+            const chipBottom = c.y - 12 - c.lift;
+            const below = chipBottom - CHIP_H > c.by;
+            const sx = c.x;
+            const sy = below ? c.by + 3 : c.y - 2;
+            const ex = Math.min(Math.max(c.x, left + 14), left + c.w - 14);
+            const ey = below ? chipBottom - CHIP_H : chipBottom;
+            const len = Math.hypot(ex - sx, ey - sy);
+            const ang = Math.atan2(ey - sy, ex - sx);
+            return (
+              <span
+                aria-hidden="true"
+                className={`bm-lead${focusIds && !c.ids.some((id) => focusIds.includes(id)) ? " is-dim" : ""}`}
+                key={`lead-${c.key}`}
+                style={{ transform: `translate3d(${sx}px, ${sy}px, 0) rotate(${ang}rad)`, width: len, "--d": `${(intro ? 2900 : 260) + i * 40}ms` } as CSSProperties}
+              />
+            );
+          })}
+
           {/* 이름표 */}
           {clusters.map((c, i) => {
             const cta = c.ids.length === 1 && c.ids[0] === selectedId;
             const isOpen = expanded && expanded.join("|") === c.key;
             // 가장자리에선 이름표만 안쪽으로 밀고, 지시선은 건물을 그대로 가리킨다.
-            const left = Math.min(Math.max(c.x - c.w / 2, 8), W - 8 - c.w);
+            const left = Math.min(Math.max(c.x + c.dx - c.w / 2, 8), W - 8 - c.w);
             const style = {
               transform: `translate3d(${left}px, ${c.y - 12 - c.lift - CHIP_H}px, 0)`,
               width: c.w,
-              "--lead": `${12 + c.lift}px`,
-              "--lead-x": `${c.x - left}px`,
               "--d": `${(intro ? 2900 : 260) + i * 40}ms`,
             } as CSSProperties;
             if (isOpen) {
@@ -522,7 +595,7 @@ export function BuildingMap({
                 <div className="bm-stack" key={`${c.key}-open`} style={{ transform: `translate3d(${c.x}px, ${c.y - 12}px, 0)` }}>
                   {c.ids.map((id) => {
                     const b = byId.get(id)!;
-                    const bd = badgeOf([id]);
+                    const bd = badgeOf([id]) ?? { text: copy.full, vac: false };
                     return (
                       <button className="bm-chip is-row" key={id} onClick={() => onOpen(id)} type="button">
                         <b>{b.label}</b>
@@ -536,7 +609,7 @@ export function BuildingMap({
             }
             return (
               <button
-                aria-label={cta ? `${c.label} · ${c.badge.text} · ${copy.open}` : `${c.label} · ${c.badge.text}`}
+                aria-label={[c.label, c.badge?.text, cta ? copy.open : null].filter(Boolean).join(" · ")}
                 className={`bm-chip${cta ? " is-cta" : ""}${focusIds && !c.ids.some((id) => focusIds.includes(id)) ? " is-dim" : ""}`}
                 key={c.key}
                 onClick={(e) => {
@@ -548,7 +621,7 @@ export function BuildingMap({
                 type="button"
               >
                 <b>{c.label}</b>
-                <em className={c.badge.vac ? "v" : undefined}>{c.badge.text}</em>
+                {c.badge ? <em className={c.badge.vac ? "v" : undefined}>{c.badge.text}</em> : null}
                 {cta ? (
                   <i className="bm-chip__go">
                     {copy.open}

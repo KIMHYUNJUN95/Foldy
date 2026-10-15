@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, List, Map as MapIcon } from "lucide-react";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import type { Dictionary } from "@/lib/i18n";
 import { getPropertyLocation } from "@/lib/property-locations";
 import type { MapBuilding } from "./building-map/building-map";
+import { decideMapIntro } from "./building-map/map-intro";
 import "./building-picker.css";
 
 // 지도(신주쿠구 경계 데이터 포함)는 지도 보기를 열 때만 받는다 — 목록은 바로 뜬다.
@@ -50,12 +51,18 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
   const router = useRouter();
   const view = useSyncExternalStore(subscribe, () => memoryView ?? readView(), () => "map" as View);
   const [selected, setSelected] = useState<string | null>(null);
+  // 지도의 처음 장면과 같은 박자로 목록 판이 올라오고 줄이 차례로 들어온다(세션마다 한 번).
+  const [intro, setIntro] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (view === "map") setIntro(decideMapIntro());
+  }, [view]);
 
   const buildings = useMemo<MapBuilding[]>(
     () =>
       rows.flatMap((r) => {
         const loc = getPropertyLocation(r.property);
-        return loc ? [{ id: r.property, label: r.label, rooms: r.rooms, empty: r.empty, lat: loc.lat, lng: loc.lng }] : [];
+        return loc ? [{ id: r.property, label: loc.mapLabel ?? r.label, rooms: r.rooms, empty: r.empty, lat: loc.lat, lng: loc.lng }] : [];
       }),
     [rows],
   );
@@ -63,7 +70,7 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
 
   const list = (
     <div className="mcw-blist">
-      {rows.map((row) => {
+      {rows.map((row, i) => {
         const on = view === "map" && row.property === selected;
         return (
           <Link
@@ -71,6 +78,7 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
             className={`mcw-brow${on ? " on" : ""}`}
             href={row.href}
             key={row.property}
+            style={{ "--i": i } as CSSProperties}
           >
             <span className="mcw-brow__t">
               <b>{row.label}</b>
@@ -93,7 +101,7 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
   );
 
   return (
-    <div className={`mcw bpk${view === "map" ? " is-map" : ""}`}>
+    <div className={`mcw bpk${view === "map" ? " is-map" : ""}${intro ? " is-intro" : ""}${view === "map" && selected ? " has-sel" : ""}`}>
       <div className="mcw-h is-row">
         <div className="mcw-h__main">
           <span className="mcw-h__k">{w.title}</span>

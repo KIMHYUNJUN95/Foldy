@@ -379,6 +379,7 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
             <div className="dh-empty">{c.resvEmpty}</div>
           ) : (
             <LiveWash
+              move
               sig={[...data.reservations.checkIns.map((r) => `in-${r.id}`), ...data.reservations.checkOuts.map((r) => `out-${r.id}`)].join(",")}
             >
             {[

@@ -9,7 +9,7 @@ import { getRoomLinksPageData } from "@/lib/room-links";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
 /**
- * 모바일 룸 링크 — 데스크톱 `/admin/ops/room-links` 의 폰 화면(2026-10-05, 시안 1a).
+ * 모바일 룸 링크 — 데스크톱 `/admin/ops/room-links` 의 폰 화면(2026-10-05 시안 1a → 2026-10-15 화이트 리디자인).
  *
  * 도메인 계약: `docs/product/35-room-links.md` → 「모바일」
  *
@@ -33,7 +33,7 @@ export default async function MobileRoomLinksPage() {
   const [data, badges] = await Promise.all([getRoomLinksPageData(session, locale), getMobileNavBadges()]);
 
   return (
-    // `split` — 폴드는 가운데 760px, 태블릿 가로는 폭 전부(왼쪽 건물 · 가운데 객실 · 오른쪽 상세 칸을 화면이 직접 그린다).
+    // `split` — 폴드는 화면이 가운데 540px 로, 태블릿 가로는 폭 전부(왼쪽 건물 · 가운데 객실 · 오른쪽 상세 칸을 화면이 직접 그린다).
     <MobileShell activeItem="ops-room-links" badges={badges} split title={dictionary.roomLinks.title}>
       <MobileRoomLinks copy={dictionary.roomLinks} data={data} />
     </MobileShell>

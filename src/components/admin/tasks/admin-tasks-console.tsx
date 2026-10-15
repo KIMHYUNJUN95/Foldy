@@ -4323,149 +4323,119 @@ export function AdminTasksConsole({
   // ── REPORT MODAL ─────────────────────────────────────────────────────────────────────────
   function ReportModal() {
     if (!report) return null;
+    // 화이트 리디자인(2026-10-15, 시안 TodoReport-PC): 제목 + 「날짜 · 완료 n건 중 m건 포함」 → 포함할 항목 → 본문 → 안내 · 원본으로 → 닫기 / Slack / 전체 복사.
+    // 건수는 보고서에 실제로 들어온 항목(reportItems) 기준 — 예전 힌트는 status=completed 만 세서 반복 완료를 놓치고 「완료 0건」이라 했다.
+    const picked = reportPicked.filter(Boolean).length;
+    const allOn = reportItems.length > 0 && picked === reportItems.length;
+    const busy = !!report.error || report.loading;
     return (
       <>
         <div className="day-scrim" onClick={() => setReport(null)} />
         <div className="day-wrap" onClick={() => setReport(null)}>
-          <div className="pop rpt" onClick={(e) => e.stopPropagation()}>
-            <div className="dp__top">
-              <span className="dp__crumb">
-                <FileText size={14} />
-                <b>{fill(dict.rptTitle, { date: fmtLong(report.date, locale) })}</b>
-              </span>
-              <span className="sp" />
-              <button className="dp__tb" onClick={() => setReport(null)}>
-                <X size={16} />
+          <div className="atw-rpt" role="dialog" aria-modal="true" aria-labelledby="atw-rpt-t" onClick={(e) => e.stopPropagation()}>
+            <div className="atw-rpt__h">
+              <div className="atw-rpt__ht">
+                <h2 id="atw-rpt-t">{dict.rptTitle}</h2>
+                <span>
+                  {report.loading || report.error
+                    ? fmtLong(report.date, locale)
+                    : fill(dict.rptSub, { date: fmtLong(report.date, locale), total: reportItems.length, selected: picked })}
+                </span>
+              </div>
+              <button type="button" className="atw-rpt__x" aria-label={dict.rptClose} onClick={() => setReport(null)}>
+                <X size={22} />
               </button>
             </div>
-            <div className="rpt__body">
-              {report.loading ? (
-                <div className="tempty__s" style={{ padding: 24 }}>
-                  …
-                </div>
-              ) : report.error ? (
-                <div className="tempty__s" style={{ padding: 24 }}>
-                  {report.error === "forbidden"
-                    ? dict.errForbidden
-                    : report.error === "empty"
-                      ? dict.emCompleted
-                      : dict.errGeneric}
-                </div>
-              ) : (
-                <>
-                  <div className="rpt__hint">
-                    <Share2 size={14} />
-                    {fill(dict.rptHint, {
-                      // 보고서는 본인 완료만 집계(generateDailyReport) → 힌트 건수도 본인 기준으로 맞춘다.
-                      n: tasks.filter(
-                        (t) =>
-                          t.status === "completed" &&
-                          completedDateOf(t) === report.date &&
-                          t.completedByUserId === meId,
-                      ).length,
-                    })}
-                  </div>
-                  {/* 포함할 항목 고르기 — 일지에 넣고 싶지 않은 업무는 체크만 풀면 되고,
-                      번호와 합계는 선택 기준으로 다시 매겨진다(모바일과 동일). */}
-                  {reportItems.length > 0 ? (
-                    <div className="rptpick">
-                      <div className="rptpick__top">
-                        <b>{dict.rptPickTitle}</b>
-                        <span className="rptpick__n">
-                          {fill(dict.rptPickCount, {
-                            selected: reportPicked.filter(Boolean).length,
-                            total: reportItems.length,
-                          })}
-                        </span>
-                        <span className="sp" />
-                        <button
-                          className="rptpick__all"
-                          onClick={() => {
-                            const all = reportPicked.filter(Boolean).length === reportItems.length;
-                            applyReportPick(reportItems.map(() => !all));
-                          }}
-                          type="button"
-                        >
-                          {reportPicked.filter(Boolean).length === reportItems.length
-                            ? dict.rptPickNone
-                            : dict.rptPickAll}
-                        </button>
-                      </div>
-                      <ul className="rptpick__list">
-                        {reportItems.map((item, i) => (
-                          <li key={`${item.text}-${i}`}>
-                            <button
-                              aria-pressed={reportPicked[i]}
-                              className={`rptpick__row${reportPicked[i] ? " is-on" : ""}`}
-                              onClick={() =>
-                                applyReportPick(
-                                  reportPicked.map((on, idx) => (idx === i ? !on : on)),
-                                )
-                              }
-                              type="button"
-                            >
-                              <span className="rptpick__box">
-                                {reportPicked[i] ? <Check size={12} strokeWidth={3} /> : null}
-                              </span>
-                              <span className="rptpick__label">{item.text}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+            {report.loading ? (
+              <p className="atw-rpt__state">…</p>
+            ) : report.error ? (
+              <p className="atw-rpt__state">
+                {report.error === "forbidden" ? dict.errForbidden : report.error === "empty" ? dict.emCompleted : dict.errGeneric}
+              </p>
+            ) : (
+              <>
+                {/* 포함할 항목 — 체크를 풀면 번호와 합계가 선택 기준으로 다시 매겨진다(모바일과 같음). */}
+                {reportItems.length > 0 ? (
+                  <div className="atw-rpt__pick">
+                    <div className="atw-rpt__pickh">
+                      <b>{dict.rptPickTitle}</b>
+                      <span>{fill(dict.rptPickCount, { selected: picked, total: reportItems.length })}</span>
+                      <button type="button" onClick={() => applyReportPick(reportItems.map(() => !allOn))}>
+                        {allOn ? dict.rptPickNone : dict.rptPickAll}
+                      </button>
                     </div>
-                  ) : null}
-                  {/* 0건이면 무엇이 잘못됐는지, 직접 편집했다면 선택 변경이 그 편집을 덮어쓴다는
-                      사실을 알린다(모바일 ReportSheet 의 힌트 줄과 같은 규칙). */}
-                  {reportItems.length > 0 &&
-                  (reportPicked.every((on) => !on) || reportEdited !== reportBuilt) ? (
-                    <p className="rptpick__note" role="status">
-                      {reportPicked.every((on) => !on)
-                        ? dict.rptPickEmpty
-                        : dict.rptPickResetHint}
-                    </p>
-                  ) : null}
+                    <ul>
+                      {reportItems.map((item, i) => (
+                        <li key={`${item.text}-${i}`}>
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={reportPicked[i]}
+                            className={`atw-rpt__row${reportPicked[i] ? " on" : ""}`}
+                            onClick={() => applyReportPick(reportPicked.map((on, idx) => (idx === i ? !on : on)))}
+                          >
+                            <span className="atw-rpt__box" aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 12.5l4.5 4.5L19 7.5" />
+                              </svg>
+                            </span>
+                            <span className="atw-rpt__label">{item.text}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <label className="atw-rpt__nf">
+                  <span>{dict.rptBodyLabel}</span>
                   <textarea
-                    className="rpt__ta"
                     placeholder={dict.rptPickEmpty}
                     spellCheck={false}
                     value={reportEdited}
                     onChange={(e) => setReportEdited(e.target.value)}
                   />
-                </>
-              )}
-            </div>
-            <div className="sch__foot">
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() => {
-                  // "원본으로"는 편집뿐 아니라 **선택도** 되돌린다 — 둘이 어긋나면 체크는 6/8인데
-                  // 본문은 8건인 상태가 되어 사용자가 무엇이 나갈지 알 수 없게 된다.
-                  setReportEdited(report.text);
-                  setReportBuilt(report.text);
-                  setReportPicked(reportItems.map(() => true));
-                }}
-              >
-                <Repeat size={14} />
-                {dict.rptReset}
+                </label>
+                <div className="atw-rpt__hint">
+                  <span role="status">
+                    {reportItems.length > 0 && reportPicked.every((on) => !on)
+                      ? dict.rptPickEmpty
+                      : reportItems.length > 0 && reportEdited !== reportBuilt
+                        ? dict.rptPickResetHint
+                        : dict.rptHint}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // 「원본으로」는 편집뿐 아니라 선택도 되돌린다 — 둘이 어긋나면 무엇이 나갈지 알 수 없다.
+                      setReportEdited(report.text);
+                      setReportBuilt(report.text);
+                      setReportPicked(reportItems.map(() => true));
+                    }}
+                  >
+                    <Repeat size={13} />
+                    {dict.rptReset}
+                  </button>
+                </div>
+              </>
+            )}
+            <div className="atw-rpt__f">
+              <button type="button" className="atw-rpt__btn is-ghost" onClick={() => setReport(null)}>
+                {dict.rptClose}
               </button>
-              <span className="rpt__spacer" />
-              <div className="rpt__actions">
-                <button className="btn btn--ghost btn--sm" onClick={() => setReport(null)}>
-                  {dict.rptClose}
-                </button>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  onClick={sendReportToSlack}
-                  disabled={!!report.error || report.loading || report.sending || !reportEdited.trim()}
-                >
-                  {report.sending ? <RefreshCw className="spin" size={14} /> : <Send size={14} />}
-                  {report.sending ? dict.rptSlackSending : dict.rptSlackSend}
-                </button>
-                <button className="btn btn--pri btn--sm" onClick={copyReport} disabled={!!report.error || report.loading || !reportEdited.trim()}>
-                  <FileText size={14} />
-                  {dict.rptCopy}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="atw-rpt__btn is-gray"
+                onClick={sendReportToSlack}
+                disabled={busy || report.sending || !reportEdited.trim()}
+                aria-busy={report.sending}
+              >
+                {report.sending ? <RefreshCw className="spin" size={15} /> : <Send size={15} />}
+                {report.sending ? dict.rptSlackSending : dict.rptSlackSend}
+              </button>
+              <button type="button" className="atw-rpt__btn is-pri" onClick={copyReport} disabled={busy || !reportEdited.trim()}>
+                <FileText size={15} />
+                {dict.rptCopy}
+              </button>
             </div>
           </div>
         </div>

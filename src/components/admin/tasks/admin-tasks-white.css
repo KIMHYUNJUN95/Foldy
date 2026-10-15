@@ -571,3 +571,49 @@
   .adm .atw-sw, .adm .atw-sw i, .adm .atw-row, .adm .atw-addrow svg, .adm .atw-send, .adm .atw-nav__i,
   .adm .atw-nav__add, .adm .atw-btn, .adm .atw-pillbtn, .adm .atw-icon, .adm .atw-dd, .adm .atw-achip { transition: none; }
 }
+
+/* 업무일지 창 — 화이트 리디자인(2026-10-15, 시안 TodoReport-PC). 상자 없이 줄과 노치 라벨 본문, 버튼 한 줄(넘치지 않게).
+   움직임: 창 확대 등장 · 체크 그리기 · 누름 반응. 움직임 줄이기 설정이면 끈다. */
+.adm .atw-rpt { width: 600px; max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 24px 24px 20px; border-radius: 18px; background: #fff; color: #16141f; box-shadow: 0 30px 80px -30px rgba(22, 20, 31, .45); animation: atw-rpt-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes atw-rpt-in { from { opacity: 0; transform: scale(.97); } }
+.adm .atw-rpt__h { display: flex; align-items: flex-start; gap: 12px; }
+.adm .atw-rpt__ht { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.adm .atw-rpt__ht h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.adm .atw-rpt__ht span { font-size: 13px; color: #6b6878; font-variant-numeric: tabular-nums; }
+.adm .atw-rpt__x { display: grid; place-items: center; width: 40px; height: 40px; flex: none; margin: -6px -8px 0 0; border: 0; border-radius: 10px; background: transparent; color: #6b6878; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
+.adm .atw-rpt__x:hover { background: #f4f4f7; }
+.adm .atw-rpt__x:active { transform: scale(.94); }
+.adm .atw-rpt__state { margin: 0; padding: 24px 0; text-align: center; font-size: 14px; color: #6b6878; }
+.adm .atw-rpt__pickh { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; }
+.adm .atw-rpt__pickh b { font-size: 13px; color: #3a3746; }
+.adm .atw-rpt__pickh span { font-size: 12px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.adm .atw-rpt__pickh button { margin-left: auto; height: 28px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; }
+.adm .atw-rpt__pick ul { margin: 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
+.adm .atw-rpt__row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 0; border: 0; border-top: 1px solid #f3f3f6; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.adm .atw-rpt__box { display: grid; place-items: center; width: 20px; height: 20px; flex: none; margin-top: 1px; box-sizing: border-box; border-radius: 6px; box-shadow: inset 0 0 0 1.5px #c9c6d3; color: #fff; transition: background 150ms ease, box-shadow 150ms ease; }
+.adm .atw-rpt__box svg { width: 12px; height: 12px; stroke-dasharray: 22; stroke-dashoffset: 22; transition: stroke-dashoffset 240ms cubic-bezier(.23, 1, .32, 1); }
+.adm .atw-rpt__row.on .atw-rpt__box { background: #7a52e6; box-shadow: none; }
+.adm .atw-rpt__row.on .atw-rpt__box svg { stroke-dashoffset: 0; }
+.adm .atw-rpt__label { font-size: 14px; line-height: 1.45; color: #8b8898; }
+.adm .atw-rpt__row.on .atw-rpt__label { color: #16141f; }
+.adm .atw-rpt__row:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; border-radius: 8px; }
+.adm .atw-rpt__nf { position: relative; display: block; }
+.adm .atw-rpt__nf > span { position: absolute; top: -8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; pointer-events: none; }
+.adm .atw-rpt__nf textarea { display: block; width: 100%; height: 230px; box-sizing: border-box; padding: 16px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; line-height: 1.75; color: #16141f; resize: vertical; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.adm .atw-rpt__nf textarea:focus { border-color: #7a52e6; box-shadow: 0 0 0 3px rgba(122, 82, 230, .14); }
+.adm .atw-rpt__nf:focus-within > span { color: #5a30cf; }
+.adm .atw-rpt__hint { display: flex; align-items: center; gap: 8px; margin-top: -6px; font-size: 12px; color: #8b8898; }
+.adm .atw-rpt__hint button { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; height: 28px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 12px; font-weight: 600; color: #6b6878; cursor: pointer; white-space: nowrap; }
+.adm .atw-rpt__f { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+.adm .atw-rpt__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 18px; border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .atw-rpt__btn:active:not(:disabled) { transform: scale(.97); }
+.adm .atw-rpt__btn:disabled { opacity: .5; cursor: default; }
+.adm .atw-rpt__btn.is-ghost { padding: 0 12px; background: transparent; color: #6b6878; }
+.adm .atw-rpt__btn.is-gray { margin-left: auto; background: #f4f4f7; color: #3a3746; }
+.adm .atw-rpt__btn.is-pri { background: #7a52e6; color: #fff; }
+.adm .atw-rpt__btn.is-pri:hover:not(:disabled) { background: #6b43dc; }
+.adm .atw-rpt button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .atw-rpt { animation: none; }
+  .adm .atw-rpt__box, .adm .atw-rpt__box svg, .adm .atw-rpt__btn, .adm .atw-rpt__x { transition: none; }
+}

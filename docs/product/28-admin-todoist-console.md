@@ -89,6 +89,14 @@
 - `src/lib/admin-tasks-i18n.ts` — `dict.w`(ko · ja · en) 추가. `helpers.ts` — `DURATION_OPTIONS` 키를 문자열 문구로 좁힘.
 - 서버 액션 · `src/lib/tasks*` · 데이터 · 권한 변경 없음.
 
+### 업무일지 창 (2026-10-15 추가 다듬기, 시안 TodoReport-PC)
+
+- 사용자 지적(「팝업 모달이 어색하다」)으로 다시 그렸다. 제목 「업무일지」 + 부제 「10월 15일 (목) · 완료 n건 중 m건 포함」 → 포함할 항목(줄 · 체크 그리기 ·
+  전체 선택/해제) → 노치 라벨 「본문」 칸 → 안내 한 줄 + 「원본으로」 → 「닫기 · Slack으로 보내기 · 전체 복사」 한 줄(폭을 넘치지 않음).
+- **건수 버그 수정**: 예전 안내 「완료 n건을 정리한…」은 `status=completed` 작업만 세서 반복 작업 완료(로그로만 남음)를 놓치고 「완료 0건」이라 했다.
+  이제 보고서에 실제로 들어온 항목 수로 센다. 문구는 `rptSub` · `rptBodyLabel`(ko/ja/en), `rptTitle` 은 날짜 없이 「업무일지」.
+- 스타일 `atw-rpt*`(admin-tasks-white.css). 예전 `.rpt` · `.rptpick` 규칙은 지웠다.
+
 ## 2026-08-07 mobile recurring-delete parity
 
 관리 콘솔의 반복 회차 삭제 선택지(이 회차만 건너뛰기 / 반복 전체 삭제)를 모바일 상세에도 맞췄다.

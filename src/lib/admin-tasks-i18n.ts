@@ -275,7 +275,10 @@ export type AdminTasksDictionary = {
   npCreate: string;
   // report
   rptTitle: string; // "업무일지 · {date}"
-  rptHint: string; // "완료 {n}건을 정리한..."
+  rptHint: string;
+  /** 화이트 리디자인(2026-10-15) 업무일지 창 부제 — "{date} · 완료 {total}건 중 {selected}건 포함" */
+  rptSub: string;
+  rptBodyLabel: string;
   rptReset: string;
   rptPickTitle: string;
   rptPickAll: string;
@@ -511,7 +514,8 @@ const ko: AdminTasksDictionary = {
   npTitle: "새 공유 프로젝트", npName: "프로젝트 이름", npNamePh: "예: 성수기 오픈 준비",
   npMembers: "{n}명 · 나 포함", npSearch: "이름 · 직무 검색", npHint: "프로젝트 작업은 멤버 전원이 같은 상태를 공유합니다.",
   npCancel: "취소", npCreate: "프로젝트 만들기",
-  rptTitle: "업무일지 · {date}", rptHint: "완료 {n}건을 정리한 텍스트입니다. 필요한 부분을 직접 수정한 뒤 복사해 붙여 넣으세요.",
+  rptTitle: "업무일지", rptHint: "필요한 부분을 고친 뒤 복사하거나 Slack으로 보내세요",
+  rptSub: "{date} · 완료 {total}건 중 {selected}건 포함", rptBodyLabel: "본문",
   rptPickTitle: "포함할 항목", rptPickAll: "전체 선택", rptPickNone: "전체 해제",
   rptPickCount: "{total}개 중 {selected}개", rptPickEmpty: "최소 한 개는 선택해 주세요.",
   rptPickResetHint: "선택을 바꾸면 편집한 내용이 다시 만들어져요.",
@@ -642,7 +646,8 @@ const ja: AdminTasksDictionary = {
   npTitle: "新規共有プロジェクト", npName: "プロジェクト名", npNamePh: "例: 繁忙期オープン準備",
   npMembers: "{n}名 · 自分含む", npSearch: "名前 · 職務 検索", npHint: "プロジェクトのタスクはメンバー全員が同じ状態を共有します。",
   npCancel: "キャンセル", npCreate: "プロジェクト作成",
-  rptTitle: "業務日報 · {date}", rptHint: "完了{n}件をまとめたテキストです。必要な部分を編集してコピー・貼り付けしてください。",
+  rptTitle: "業務日報", rptHint: "必要な部分を編集してから、コピーまたはSlackへ送信してください",
+  rptSub: "{date} · 完了{total}件中 {selected}件を含む", rptBodyLabel: "本文",
   rptPickTitle: "含める項目", rptPickAll: "すべて選択", rptPickNone: "すべて解除",
   rptPickCount: "{total}件中 {selected}件", rptPickEmpty: "少なくとも1件は選択してください。",
   rptPickResetHint: "選択を変えると編集内容が作り直されます。",
@@ -773,7 +778,8 @@ const en: AdminTasksDictionary = {
   npTitle: "New shared project", npName: "Project name", npNamePh: "e.g. Peak-season opening prep",
   npMembers: "{n} · incl. you", npSearch: "Search name · role", npHint: "Project tasks share one status across all members.",
   npCancel: "Cancel", npCreate: "Create project",
-  rptTitle: "Work log · {date}", rptHint: "A text summary of {n} completed tasks. Edit as needed, then copy and paste.",
+  rptTitle: "Work log", rptHint: "Edit as needed, then copy it or send it to Slack",
+  rptSub: "{date} · {selected} of {total} completed included", rptBodyLabel: "Text",
   rptPickTitle: "Items to include", rptPickAll: "Select all", rptPickNone: "Clear all",
   rptPickCount: "{selected} of {total}", rptPickEmpty: "Select at least one item to include.",
   rptPickResetHint: "Changing the selection rebuilds the text below.",

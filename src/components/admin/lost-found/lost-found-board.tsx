@@ -3,6 +3,7 @@
 // Admin 분실물 console — 「보관 중」 보기. 화이트 리디자인(2026-10-14, 시안 LF-PC): 상태 3칸 보드 대신
 // 자동 폐기까지 남은 날 순으로 한 줄씩 세운 「보관 타임라인」. 줄마다 품목 · 위치 · 보관 경과 막대 · D-day.
 // 종결(반환 · 폐기)은 「반환」 · 「폐기 내역」 보기에서만 본다.
+import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
 import { Search } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
@@ -55,7 +56,7 @@ function Row({
   ].filter(Boolean);
 
   return (
-    <button type="button" className={`lfw-tr${selected ? " on" : ""}`} onClick={() => onSelect(item.id)}>
+    <button type="button" className={`lfw-tr${selected ? " on" : ""}`} onClick={() => onSelect(item.id)} data-live={item.id}>
       <span className="lfw-tr__item">
         <span className="lfw-thumb">
           {item.photos[0] ? (
@@ -113,9 +114,11 @@ export function LostFoundBoard({ items, t, locale, filters, selectedId, onSelect
             <span>{t.colAutoDue}</span>
           </div>
           <div className="lfw-rows">
-            {rows.map((i) => (
-              <Row key={i.id} item={i} t={t} locale={locale} selected={selectedId === i.id} onSelect={onSelect} />
-            ))}
+            <LiveWash move sig={rows.map((i) => i.id).join(",")}>
+              {rows.map((i) => (
+                <Row key={i.id} item={i} t={t} locale={locale} selected={selectedId === i.id} onSelect={onSelect} />
+              ))}
+            </LiveWash>
           </div>
         </>
       ) : (

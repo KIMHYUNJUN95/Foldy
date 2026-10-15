@@ -1,3 +1,4 @@
+import { LiveWash } from "@/components/shared/live-wash";
 import Link from "next/link";
 import { ChevronRight, MessageSquareWarning, Star } from "lucide-react";
 import { ReviewSyncButton, type ReviewSyncButtonLabels } from "@/components/complaints/review-sync-button";
@@ -510,7 +511,7 @@ function ReviewsView({
         </div>
       ) : (
         <div className="cxw-rows">
-          {reviews.map((review) => {
+          <LiveWash move sig={reviews.map((review) => review.id).join(",")}>{reviews.map((review) => {
             const scale = REVIEW_SCALE[review.provider];
             const risk = review.riskLevel === "risk";
             const pos = review.positiveReviewText;
@@ -521,7 +522,7 @@ function ReviewsView({
               <Link
                 className={`cxw-rv${selectedReview?.id === review.id ? " on" : ""}`}
                 href={reviewHref(review.id)}
-                key={review.id}
+                key={review.id} data-live={review.id}
                 scroll={false}
               >
                 <span className="cxw-rv__score">
@@ -562,7 +563,7 @@ function ReviewsView({
                 </span>
               </Link>
             );
-          })}
+          })}</LiveWash>
         </div>
       )}
     </>

@@ -6,6 +6,7 @@
 // design handoff's combined "시작일 – 종료일" trigger 1:1, not two separate date fields). Data is
 // real (src/lib/admin-cleaning.ts) as of 2026-07-14 — the parent owns fetching a fresh range via
 // fetchAdminCleaningHistory; this component only filters/renders whatever range it's given.
+import { LiveWash } from "@/components/shared/live-wash";
 import { Search, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
@@ -322,6 +323,7 @@ export function HistoryBoard({
           <span className="cl-kpi__d">{t.stProxy}</span>
         </div>
       </div>
+      <LiveWash move sig={shown.map((h) => h.id).join(",")}>
       <table className="cl-tbl">
         <thead>
           <tr>
@@ -349,7 +351,7 @@ export function HistoryBoard({
             if (h.note) memo.push(h.note);
             const staffName = staffLabelOf(h.staffId, staffDirectory) || h.staffName;
             return (
-              <tr key={h.id} className={selectedId === h.id ? "sel" : ""} onClick={() => onSelect(h.id)}>
+              <tr key={h.id} data-live={h.id} className={selectedId === h.id ? "sel" : ""} onClick={() => onSelect(h.id)}>
                 <td className="mono b">{shortDate(h.date)}</td>
                 <td>
                   <span className="mono b">{h.room}</span>
@@ -374,6 +376,7 @@ export function HistoryBoard({
           })}
         </tbody>
       </table>
+      </LiveWash>
     </>
   );
 }

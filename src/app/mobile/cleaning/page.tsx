@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import { LiveWash } from "@/components/shared/live-wash";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
@@ -252,6 +253,7 @@ function CleanRow({
   right,
   muted,
   just,
+  live,
 }: {
   room: string;
   title: ReactNode;
@@ -260,9 +262,11 @@ function CleanRow({
   muted?: boolean;
   /** 방금 완료한 줄 — 왼쪽부터 옅은 초록이 차오르고 앞쪽에 빛 선, 체크가 톡(2026-10-14 모션, 시안 Motion-B-RoomDone-Phone). */
   just?: boolean;
+  /** 새 청소 대상이 위에서 내려오는 움직임의 열쇠(`LiveWash move`). */
+  live?: string;
 }) {
   return (
-    <div className={`cln-row${muted ? " is-muted" : ""}${just ? " is-just" : ""}`}>
+    <div className={`cln-row${muted ? " is-muted" : ""}${just ? " is-just" : ""}`} data-live={live}>
       {just ? (
         <>
           <span className="cln-row__fill" aria-hidden="true" />
@@ -643,12 +647,14 @@ export default async function MobileCleaningPage({
             {cleaningTargets === null ? (
               <div className="cln-note is-danger">{copy.loadError}</div>
             ) : cleaningGroups !== null ? (
-              cleaningGroups.map(({ buildingKey, items }) => (
+              <LiveWash move sig={cleaningGroups.flatMap((g) => g.items.map((t) => t.roomKey)).join(",")}>
+              {cleaningGroups.map(({ buildingKey, items }) => (
                 <div className="cln-group" key={buildingKey}>
                   <p className="cln-group__t">{copy.buildingLabels[buildingKey] ?? buildingKey}</p>
                   {items.map((target) => (
                     <CleanRow
                       key={target.roomKey}
+                      live={target.roomKey}
                       room={getRowRoomLabel(target.canonicalPropertyName, target.canonicalRoomLabel, copy)}
                       title={copy.taskOptions.checkout}
                       sub={
@@ -675,7 +681,8 @@ export default async function MobileCleaningPage({
                     />
                   ))}
                 </div>
-              ))
+              ))}
+              </LiveWash>
             ) : (
               <FoldyEmpty title={copy.noCleaningToday} compact />
             )}

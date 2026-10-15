@@ -2,6 +2,7 @@
 
 // Admin 분실물 console — 「전체 기록」 보기. 화이트 리디자인(2026-10-14, 시안 LFAll-PC): 진행 중과 완료를 한 표에.
 // 기간(등록일) · 상태 · 건물 · 신고자 · 검색은 위 보기 줄에서 고른다. 등록일 최신 순.
+import { LiveWash } from "@/components/shared/live-wash";
 import { Search, TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminLostItemVM } from "@/lib/admin-lost-found";
@@ -80,8 +81,8 @@ export function LostFoundList({ items, t, locale, filters, onClearFilters, selec
           <span>{t.colReporter}</span>
           <span className="r">{t.colStatus}</span>
         </div>
-        {rows.map((i) => (
-          <button type="button" key={i.id} className={`lfw-gr${selectedId === i.id ? " on" : ""}`} onClick={() => onSelect(i.id)}>
+        <LiveWash move sig={rows.map((i) => i.id).join(",")}>{rows.map((i) => (
+          <button type="button" key={i.id} data-live={i.id} className={`lfw-gr${selectedId === i.id ? " on" : ""}`} onClick={() => onSelect(i.id)}>
             <b className="num">{fmtDateTime(i.foundAt, locale)}</b>
             <span className="ell strong">{i.itemName}</span>
             <span className="ell">
@@ -91,7 +92,7 @@ export function LostFoundList({ items, t, locale, filters, onClearFilters, selec
             <span className="ell">{i.reporterName}</span>
             <span className={`r st ${STATUS_TONE[i.status]}`}>{statusLabel(i.status, t)}</span>
           </button>
-        ))}
+        ))}</LiveWash>
       </div>
     </>
   );

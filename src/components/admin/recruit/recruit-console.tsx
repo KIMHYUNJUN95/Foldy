@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveWash } from "@/components/shared/live-wash";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, MoveRight, Search, X } from "lucide-react";
@@ -415,14 +416,14 @@ export function RecruitConsole({
           </div>
 
           <div className="rcw-rows">
-            {pageRows.map((row) => {
+            <LiveWash move sig={pageRows.map((row) => row.id).join(",")}>{pageRows.map((row) => {
               const next = nextStatusOf(row.status);
               const isNew = tokyoDateOf(row.appliedAt) === startOfToday;
               const on = picked.includes(row.id);
               const signals = signalsOf(row, copy);
               return (
                 <div
-                  key={row.id}
+                  key={row.id} data-live={row.id}
                   className={`rcw-tr${selectedId === row.id ? " on" : ""}${on ? " pk" : ""}${isNew ? " is-new" : ""}`}
                   role="button"
                   tabIndex={0}
@@ -497,7 +498,7 @@ export function RecruitConsole({
                   </span>
                 </div>
               );
-            })}
+            })}</LiveWash>
           </div>
 
           <div className="rcw-pager">

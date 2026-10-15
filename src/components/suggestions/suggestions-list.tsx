@@ -7,6 +7,7 @@
  * See docs/product/22-staff-suggestions-workflow.md.
  */
 
+import { LiveWash } from "@/components/shared/live-wash";
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -78,7 +79,7 @@ function Card({
   const counterparty = segment === "sent" ? f.recipientName : f.authorName;
   const counterpartyLabel = segment === "sent" ? copy.recipientLabel : copy.routeFrom;
   return (
-    <Link href={`/mobile/suggestions/${f.id}`} className="fcard">
+    <Link href={`/mobile/suggestions/${f.id}`} className="fcard" data-live={f.id}>
       <div className="fcard__top">
         <StatChip k={f.status} copy={copy} />
         <span className="fcard__time">{hydrated ? relativeTime(f.createdAt, locale) : ""}</span>
@@ -201,9 +202,11 @@ export function SuggestionsList({
               {copy.empty}
             </p>
           ) : (
-            visible.map((f) => (
-              <Card key={f.id} f={f} segment={segment} locale={locale} hydrated={hydrated} copy={copy} />
-            ))
+            <LiveWash move sig={visible.map((f) => f.id).join(",")}>
+              {visible.map((f) => (
+                <Card key={f.id} f={f} segment={segment} locale={locale} hydrated={hydrated} copy={copy} />
+              ))}
+            </LiveWash>
           )}
         </div>
       </div>

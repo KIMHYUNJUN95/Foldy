@@ -3,6 +3,7 @@
 // Admin 주문·비품 console — 「전체 기록」 보기. 화이트 리디자인(2026-10-14, 시안 OrderAll-PC): 상자 없는 표 —
 // 요청일 · 제목(긴급이면 빨간 「긴급」) · 건물 · 요청자 · 상태(거절은 회색) · 배송. 고르기 · 검색 · 기간은
 // 콘솔(orders-console.tsx)이 적용해 행만 넘겨준다. 예전 「완료」 보기는 여기 상태 고르기로 합쳤다.
+import { LiveWash } from "@/components/shared/live-wash";
 import { SearchX, TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
@@ -68,11 +69,11 @@ export function OrdersList({ rows, t, selectedId, onSelect, onClearFilters, load
         <span className="r">{t.wColDeliv}</span>
       </div>
       <div className="lfw-rows">
-        {rows.map((o) => {
+        <LiveWash move sig={rows.map((o) => o.id).join(",")}>{rows.map((o) => {
           const deliv = delivShort(o);
           return (
             <button
-              key={o.id}
+              key={o.id} data-live={o.id}
               type="button"
               className={`lfw-gr${selectedId === o.id ? " on" : ""}`}
               onClick={() => onSelect(o.id)}
@@ -90,7 +91,7 @@ export function OrdersList({ rows, t, selectedId, onSelect, onClearFilters, load
               <span className="r num">{deliv ?? <span className="dim">—</span>}</span>
             </button>
           );
-        })}
+        })}</LiveWash>
       </div>
     </div>
   );

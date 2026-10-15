@@ -3,6 +3,7 @@
 // Admin 수리·점검 console — 목록·이력 뷰와 완료 뷰. 두 뷰가 같은 필터바(기간 + 드롭다운 + 검색)를
 // 공유하고, 완료 뷰만 상태 드롭다운을 빼고 완료시각·완료 처리 컬럼을 더 보여준다.
 // Data is real (src/lib/admin-maintenance.ts) as of 2026-07-14.
+import { LiveWash } from "@/components/shared/live-wash";
 import { CheckCircle2, History, Search, TriangleAlert, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
@@ -261,6 +262,7 @@ export function MaintenanceList({
         {scope === "done" ? t.doneHint : `${fmtDate(filters.from, locale)} – ${fmtDate(filters.to, locale)}`}
       </div>
       <div className="card" style={{ overflow: "auto" }}>
+        <LiveWash move sig={rows.map((r) => r.id).join(",")}>
         <table className="qtbl mtbl">
           <thead>
             <tr>
@@ -279,6 +281,7 @@ export function MaintenanceList({
             {rows.map((r) => (
               <tr
                 key={r.id}
+                data-live={r.id}
                 className={[r.status === "cancelled" ? "is-cancelled" : "", selectedId === r.id ? "sel" : ""]
                   .filter(Boolean)
                   .join(" ")}
@@ -352,6 +355,7 @@ export function MaintenanceList({
             ))}
           </tbody>
         </table>
+        </LiveWash>
       </div>
     </>
   );

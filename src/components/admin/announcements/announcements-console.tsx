@@ -4,6 +4,7 @@
 // 게시 중 · 초안 · 보관 탭(숫자 붙음) + 한 줄 요약 + 목록(제목 · 대상 · 작성자 · 날짜 · 읽음 글자) + 오른쪽 상세 패널
 // (본문 · 사진 · 읽음 「안 읽음 | 읽음」 명단 · 관리 버튼). 새 공지 · 수정은 목록 자리에 작성 화면을 펼친다.
 // 흰 바탕 · 상자 · 세로선 없음 · 선택은 옅은 보라 바탕만. See docs/product/11-announcement-workflow.md.
+import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -218,13 +219,13 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
             <span>{w.colRead}</span>
           </div>
           <div className="anw-rows">
-            {rows.map((a) => {
+            <LiveWash move sig={rows.map((a) => a.id).join(",")}>{rows.map((a) => {
               const pop = popupText(a, w);
               const sent = a.status !== "draft";
               const allRead = sent && a.unreadCount === 0 && a.targetTotal > 0;
               return (
                 <button
-                  key={a.id}
+                  key={a.id} data-live={a.id}
                   type="button"
                   className={`anw-tr${selectedId === a.id ? " on" : ""}`}
                   onClick={() => setSelectedId(a.id)}
@@ -260,7 +261,7 @@ export function AnnouncementsConsole({ locale, data }: { locale: Locale; data: A
                   </span>
                 </button>
               );
-            })}
+            })}</LiveWash>
           </div>
         </>
       )}

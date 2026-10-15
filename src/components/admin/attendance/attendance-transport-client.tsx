@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -217,6 +218,7 @@ export function AttendanceTransportClient({
           {rows.length === 0 ? <div className="state__s">{c.trEmptyBody}</div> : null}
         </div>
       ) : (
+        <LiveWash move sig={visible.map((r) => r.userId).join(",")}>
         <table className="qtbl tr-tbl">
           <thead>
             <tr>
@@ -233,7 +235,7 @@ export function AttendanceTransportClient({
               const noReport = r.status === "none";
               const submitted = fmtSubmittedDay(r.submittedAt, localeTag);
               return (
-                <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => openPanel(r.userId)}>
+                <tr key={r.userId} data-live={r.userId} className={sel ? "sel" : ""} onClick={() => openPanel(r.userId)}>
                   <td style={{ paddingLeft: 16 }}>
                     <div className="who">
                       <span className="uhead__av" style={{ width: 32, height: 32 }}>
@@ -264,6 +266,7 @@ export function AttendanceTransportClient({
             })}
           </tbody>
         </table>
+        </LiveWash>
       )}
 
       {panelRow ? (

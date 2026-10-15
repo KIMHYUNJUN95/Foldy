@@ -3,6 +3,7 @@
 // Admin 주문·비품 console — 「처리 중」 보기. 화이트 리디자인(2026-10-14, 시안 Order-PC):
 // 이번 주 배송 7칸(월~일, 오늘 옅은 보라) → 승인 대기 · 주문 대기 두 묶음. 줄은 상자 없이 가로선만,
 // 오른쪽 끝 글자 버튼(승인 · 주문 처리)으로 바로 처리 창을 연다. 진하게 칠한 버튼은 상세 패널에만 둔다.
+import { LiveWash } from "@/components/shared/live-wash";
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import type { AdminOrderVM } from "@/lib/admin-orders";
@@ -116,11 +117,11 @@ export function OrdersQueue({ orders, t, locale, todayKey, selectedId, loadError
                 <span className="ow-grp__hint">{g.hint}</span>
               </div>
               <div className="lfw-rows">
-                {g.rows.map((o) => {
+                <LiveWash move sig={g.rows.map((o) => o.id).join(",")}>{g.rows.map((o) => {
                   const age = ageText(o.reqAt, t);
                   return (
                     <div
-                      key={o.id}
+                      key={o.id} data-live={o.id}
                       className={`lfw-tr ow-qr${selectedId === o.id ? " on" : ""}`}
                       role="button"
                       tabIndex={0}
@@ -158,7 +159,7 @@ export function OrdersQueue({ orders, t, locale, todayKey, selectedId, loadError
                       </button>
                     </div>
                   );
-                })}
+                })}</LiveWash>
               </div>
             </section>
           ))

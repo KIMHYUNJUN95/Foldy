@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveWash } from "@/components/shared/live-wash";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { BugStatusBadge } from "@/components/bugs/bug-status-badge";
@@ -65,9 +66,11 @@ export function BugsListClient({ copy, reports, isReviewer }: Props) {
             {copy.emptyState}
           </p>
         ) : (
-          reports.map((bug) => (
+          <LiveWash move sig={reports.map((b) => b.id).join(",")}>
+          {reports.map((bug) => (
             <Link
               key={bug.id}
+              data-live={bug.id}
               href={`/mobile/bugs/${bug.id}`}
               className="flex items-center gap-3 border-b border-border/60 px-[18px] py-[14px]"
             >
@@ -86,7 +89,8 @@ export function BugsListClient({ copy, reports, isReviewer }: Props) {
                 <BugStatusBadge status={bug.status} label={bugStatusLabel(copy, bug.status)} />
               </span>
             </Link>
-          ))
+          ))}
+          </LiveWash>
         )}
       </div>
     </div>

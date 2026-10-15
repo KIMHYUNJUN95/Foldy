@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { LiveWash } from "@/components/shared/live-wash";
 import "./requests-list.css";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type React from "react";
@@ -325,6 +326,7 @@ const RequestListCard = memo(function RequestListCard({
   statusTone,
   onDelete,
   deleteLabel,
+  live,
 }: {
   kind: ListKind;
   href: string;
@@ -335,9 +337,11 @@ const RequestListCard = memo(function RequestListCard({
   statusTone: "open" | "prog" | "done" | "soon";
   onDelete?: () => void;
   deleteLabel: string;
+  /** 새 줄이 위에서 내려오는 움직임의 열쇠(`LiveWash move`). */
+  live: string;
 }) {
   return (
-    <Link className="rqw-row" href={href}>
+    <Link className="rqw-row" href={href} data-live={live}>
       <span className="rqw-row__ic">{KIND_ICON[kind]}</span>
       <span className="rqw-row__b">
         <span className="rqw-row__t">
@@ -795,6 +799,7 @@ export function RequestsFilterView({
       node: (
         <RequestListCard
           key={item.id}
+          live={`l-${item.id}`}
           kind="lost-found"
           href={`/mobile/requests/lost-found/${item.id}${listQueryString ? `?${listQueryString}` : ""}`}
           title={item.item_name}
@@ -822,6 +827,7 @@ export function RequestsFilterView({
       node: (
         <RequestListCard
           key={report.id}
+          live={`m-${report.id}`}
           kind="maintenance"
           href={`/mobile/requests/maintenance/${report.id}${listQueryString ? `?${listQueryString}` : ""}`}
           title={report.issue_title}
@@ -865,6 +871,7 @@ export function RequestsFilterView({
         node: (
           <RequestListCard
             key={order.id}
+            live={`o-${order.id}`}
             kind="order"
             href={`/mobile/requests/orders/${order.id}${listQueryString ? `?${listQueryString}` : ""}`}
             title={order.title || order.parsedItems[0]?.name || "-"}
@@ -1200,12 +1207,15 @@ export function RequestsFilterView({
 
       {!hasAnyResults ? <FoldyEmpty title={filterLabels.noFilterResults} /> : null}
 
-      {rowGroups.map((group) => (
-        <div key={group.key}>
-          <GroupHeader label={group.label} count={group.items.length} />
-          <div className="rqw-list">{group.items.map((r) => r.node)}</div>
-        </div>
-      ))}
+      {/* 새 요청이 들어오면(실시간 · 당겨서 새로고침) 맨 위에서 내려와 끼어든다 — 탭 · 필터로 통째로 바뀔 땐 그대로. */}
+      <LiveWash move sig={rows.map((r) => r.key).join(",")}>
+        {rowGroups.map((group) => (
+          <div key={group.key}>
+            <GroupHeader label={group.label} count={group.items.length} />
+            <div className="rqw-list">{group.items.map((r) => r.node)}</div>
+          </div>
+        ))}
+      </LiveWash>
 
       {/* ── Delete confirmation sheet ── */}
       {deleteTarget ? (

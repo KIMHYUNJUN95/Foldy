@@ -1,3 +1,4 @@
+import { LiveWash } from "@/components/shared/live-wash";
 import Link from "next/link";
 
 // 수동 컴플레인 목록 — 화이트 리디자인(2026-10-14, 시안 FBManual-PC): 상자 없는 표 한 줄씩
@@ -42,8 +43,8 @@ export function ManualComplaintList({ rows, selectedId, labels }: Props) {
         <span className="r">{labels.colAuthorDate}</span>
       </div>
       <div className="cxw-rows">
-        {rows.map((row) => (
-          <Link key={row.id} href={row.href} className={`cxw-mr${selectedId === row.id ? " on" : ""}`} scroll={false}>
+        <LiveWash move sig={rows.map((row) => row.id).join(",")}>{rows.map((row) => (
+          <Link key={row.id} data-live={row.id} href={row.href} className={`cxw-mr${selectedId === row.id ? " on" : ""}`} scroll={false}>
             <span className={`cxw-st${row.open ? " is-open" : " is-done"}`}>
               <i aria-hidden="true" />
               {row.open ? labels.statusOpen : labels.statusDone}
@@ -56,7 +57,7 @@ export function ManualComplaintList({ rows, selectedId, labels }: Props) {
             <span className="cxw-mr__c">{row.place}</span>
             <span className="cxw-mr__c r num">{row.byline}</span>
           </Link>
-        ))}
+        ))}</LiveWash>
       </div>
     </div>
   );

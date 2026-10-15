@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LiveWash } from "@/components/shared/live-wash";
 import { redirect } from "next/navigation";
 import { ChevronRight, Plus } from "lucide-react";
 import { LinenBuildingSwitch } from "@/components/linen-return/linen-building-switch";
@@ -129,6 +130,7 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
               <span>{copy.listEmptySub}</span>
             </div>
           ) : (
+            <LiveWash move sig={records.map((r) => r.id).join(",")}>
             <div className="lnw-rows">
               {records.map((record) => {
                 const t = tokyoParts(record.registeredAt);
@@ -137,6 +139,7 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
                     className={`lnw-row${record.id === createdId ? " is-new" : ""}`}
                     href={`/mobile/linen-return/record/${record.id}?building=${buildingParam}`}
                     key={record.id}
+                    data-live={record.id}
                   >
                     <span className="lnw-row__d num">
                       <b>{t.md}</b>
@@ -157,6 +160,7 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
                 );
               })}
             </div>
+            </LiveWash>
           )}
 
           <Link className="lnw-fab" href={`/mobile/linen-return/new?building=${buildingParam}`}>

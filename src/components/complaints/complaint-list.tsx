@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LiveWash } from "@/components/shared/live-wash";
 import { MessageSquareWarning } from "lucide-react";
 import "./feedback-mobile.css";
 import { platformName } from "./cx-platform";
@@ -43,7 +44,7 @@ export function ComplaintList({ locale, complaints }: { locale: Locale; complain
       : null;
     const meta = [platformName(c.platform, dict), place, c.authorName].filter(Boolean).join(" · ");
     return (
-      <Link key={c.id} href={`/mobile/complaints/${c.id}`} className="fbw-mr">
+      <Link key={c.id} href={`/mobile/complaints/${c.id}`} className="fbw-mr" data-live={c.id}>
         <i className={c.status === "open" ? "is-open" : "is-done"} aria-hidden="true" />
         <span className="fbw-mr__main">
           <b>{c.title}</b>
@@ -55,6 +56,7 @@ export function ComplaintList({ locale, complaints }: { locale: Locale; complain
   };
 
   return (
+    <LiveWash move sig={[...open, ...done].map((c) => c.id).join(",")}>
     <div className="fbw fbw-manual">
       {open.length > 0 ? (
         <section>
@@ -73,5 +75,6 @@ export function ComplaintList({ locale, complaints }: { locale: Locale; complain
         </section>
       ) : null}
     </div>
+    </LiveWash>
   );
 }

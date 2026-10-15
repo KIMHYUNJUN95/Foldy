@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveWash } from "@/components/shared/live-wash";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Ban,
@@ -552,6 +553,7 @@ export function LeaveQueueClient({
         </div>
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
+          <LiveWash move sig={rows.map((item) => item.id).join(",")}>
           <table className="qtbl">
             <thead>
               <tr>
@@ -575,7 +577,7 @@ export function LeaveQueueClient({
                   .filter(Boolean)
                   .join(" ");
                 return (
-                  <tr key={item.id} className={rowClass} onClick={() => setSelectedId(item.id)}>
+                  <tr key={item.id} data-live={item.id} className={rowClass} onClick={() => setSelectedId(item.id)}>
                     <td style={{ paddingLeft: 16 }}>
                       <div className="who">
                         <span className="avatar" style={{ background: "var(--adm-primary)", color: "#fff" }}>
@@ -631,6 +633,7 @@ export function LeaveQueueClient({
               })}
             </tbody>
           </table>
+          </LiveWash>
         </div>
       )}
 

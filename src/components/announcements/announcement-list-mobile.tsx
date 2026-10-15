@@ -3,6 +3,7 @@
 // 모바일 공지 목록 — 화이트 리디자인(2026-10-15, 시안 Notice-Phone · Notice-Fold · Notice-Tablet).
 // 맨 위 「고정」 묶음(날짜를 meta 에) → 날짜 묶음. 안 읽은 공지는 보라 점 + 굵은 제목. 누르면 점이 바로 사라진다
 // (상세에 들어가면 서버가 읽음으로 남긴다 — 태블릿 2분할에서는 목록을 다시 읽기 전까지 이 화면이 먼저 지운다).
+import { LiveWash } from "@/components/shared/live-wash";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import "./announcements-mobile.css";
@@ -60,6 +61,7 @@ export function AnnouncementListMobile({
           <span>{copy.emptyHint}</span>
         </div>
       ) : (
+        <LiveWash move sig={groups.flatMap((g) => g.items.map((i) => i.id)).join(",")}>
         <div className="ntw-groups">
           {groups.map((group) => (
             <section key={group.key} className="ntw-group" aria-label={group.label}>
@@ -69,6 +71,7 @@ export function AnnouncementListMobile({
                 return (
                   <Link
                     key={item.id}
+                    data-live={item.id}
                     href={`/mobile/announcements/${item.id}`}
                     className={`ntw-row${isUnread ? " is-unread" : ""}`}
                     data-notice-id={item.id}
@@ -96,6 +99,7 @@ export function AnnouncementListMobile({
             </section>
           ))}
         </div>
+        </LiveWash>
       )}
     </div>
   );

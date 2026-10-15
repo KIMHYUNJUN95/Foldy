@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveWash } from "@/components/shared/live-wash";
 import Image from "next/image";
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -749,6 +750,7 @@ export function AttendanceQueueClient({
           </div>
         ) : (
           <div className="card" style={{ overflow: "hidden" }}>
+            <LiveWash move sig={filteredCorrections.map((r) => r.id).join(",")}>
             <table className="qtbl">
               <thead>
                 <tr>
@@ -770,6 +772,7 @@ export function AttendanceQueueClient({
                   return (
                     <tr
                       key={r.id}
+                      data-live={r.id}
                       className={sel ? "sel" : ""}
                       onClick={() => setPanel({ kind: "corr", id: r.id })}
                     >
@@ -846,6 +849,7 @@ export function AttendanceQueueClient({
                 })}
               </tbody>
             </table>
+            </LiveWash>
           </div>
         )
       ) : rows.length === 0 ? (

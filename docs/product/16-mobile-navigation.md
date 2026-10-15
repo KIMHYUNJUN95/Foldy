@@ -257,6 +257,9 @@ Implementation note:
   새로고침이 끝날 때까지 공용 로더(`FoldyLoader`)와 같은 엇갈린 숨 쉬기, 끝나면 흐려지며 사라진다. 막대 묶음은 로더의
   0.8배 크기로 벌어진 틈의 가운데에 놓인다. 글자는 화면 읽기 프로그램용(`sr-only`, aria-live)으로만 남김. 스타일
   `src/components/shell/pull-refresh.css`, 줄인 움직임이면 딸깍 · 숨 쉬기 없음.
+  **PC 「모바일 보기」(2026-10-15):** 미리보기 iframe 안(`window.self !== window.top`, 태블릿 칸 `data-pane` 제외)에서는 마우스로 끌어내려도 같은
+  당겨서 새로고침이 된다 — 마우스 포인터를 손가락과 같은 처리(`handleTouchStart/Move/End`)로 넘김. 끌어내린 뒤 손을 뗀 자리의 링크는 열리지 않는다.
+  진짜 폰 · 태블릿(터치)은 그대로.
 - **`hideBottomNav` (2026-06-15):** `MobileShell` accepts an opt-in `hideBottomNav` prop (default
   `false`) that hides the bottom tab bar for focused **registration / create-edit** flows, so the
   screen reads as a dedicated form (and a sticky submit bar can't overlap the tab bar). Applied to the

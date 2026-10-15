@@ -456,6 +456,40 @@ export function MobileShell({
     }
   }
 
+  // PC 「모바일 보기」(iframe) 안에서는 마우스로 끌어내려도 당겨서 새로고침(2026-10-15 사용자 지적 — 마우스는 터치 이벤트가 없어
+  // 미리보기에서만 안 됐다). 마우스 포인터를 손가락처럼 같은 처리로 넘긴다. 진짜 폰 · 태블릿 칸(data-pane)에는 영향 없음.
+  const mouseDragRef = useRef(false);
+  const suppressClickRef = useRef(false);
+  const inPreviewRef = useRef(false);
+  useEffect(() => {
+    try {
+      inPreviewRef.current = window.self !== window.top && !document.documentElement.hasAttribute("data-pane");
+    } catch {
+      inPreviewRef.current = true; // 다른 출처 부모 — 그래도 미리보기다.
+    }
+  }, []);
+  const asTouch = (e: React.PointerEvent<HTMLDivElement>) =>
+    ({ currentTarget: e.currentTarget, touches: [{ clientX: e.clientX, clientY: e.clientY }] }) as unknown as React.TouchEvent<HTMLDivElement>;
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse" || e.button !== 0 || !inPreviewRef.current) return;
+    mouseDragRef.current = true;
+    suppressClickRef.current = false;
+    handleTouchStart(asTouch(e));
+  }
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!mouseDragRef.current) return;
+    handleTouchMove(asTouch(e));
+    if (isPullingRef.current) {
+      suppressClickRef.current = true;
+      e.preventDefault(); // 끄는 동안 글자 선택 안 되게
+    }
+  }
+  function handlePointerUp() {
+    if (!mouseDragRef.current) return;
+    mouseDragRef.current = false;
+    handleTouchEnd();
+  }
+
   function handleTouchEnd() {
     const wasPulling = isPullingRef.current;
     ptrEligibleRef.current = false;
@@ -1018,6 +1052,19 @@ export function MobileShell({
               onTouchEnd={handleTouchEnd}
               onTouchMove={handleTouchMove}
               onTouchStart={handleTouchStart}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              onClickCapture={(e) => {
+                // 끌어내린 뒤 손을 뗀 자리가 링크여도 열리지 않게.
+                if (suppressClickRef.current) {
+                  suppressClickRef.current = false;
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               ref={scrollElRef}
             >
               {/* 아직 넓은 화면용으로 다듬지 않은 화면은 가운데 760px 한 줄로(폰 화면이 끝없이 늘어나지 않게). `wide` 화면은 폭 전부. */}

@@ -283,10 +283,10 @@ export function BottomSheet({
             scrimArmedRef.current = e.target === e.currentTarget;
             // 포털이어도 React 포인터 이벤트는 React 트리를 따라 셸까지 올라간다 — PC 「모바일 보기」의 마우스 당겨서 새로고침이
             // 시트를 끌어내리는 손짓을 새로고침으로도 읽던 것(2026-10-15 사용자 지적). 시트 안 손짓은 셸로 넘기지 않는다.
+            // **누름(pointerdown)만** 막는다 — 셸은 누름에서만 끌기를 시작하니 이것으로 충분하다. move/up 까지 막으면 React 의
+            // stopPropagation 이 실제 이벤트도 멈춰 window 에서 듣는 시트 끌어내리기(useSheetDragDismiss)가 죽는다(같은 날 확인).
             e.stopPropagation();
           }}
-          onPointerMove={(e) => e.stopPropagation()}
-          onPointerUp={(e) => e.stopPropagation()}
           style={{
             ...drag.scrimStyle,
             transition: drag.dragging

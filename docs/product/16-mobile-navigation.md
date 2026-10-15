@@ -565,7 +565,9 @@ Current rules:
   from that side (off under reduced motion).
   **Sheets don't leak pointer gestures (2026-10-15):** portals still bubble React pointer events up the React tree, so the PC
   「모바일 보기」 mouse pull-to-refresh read a sheet drag-down as a refresh too. `BottomSheet`'s root (and the automation confirm
-  overlays) stop `pointerdown/move/up` propagation; the sheet's own drag uses window listeners and is unaffected. Mobile automation preview / assignee date now use it instead of a native input. **The
+  overlays) stop **`pointerdown` only** — the shell arms its drag on pointerdown, so that is enough. Do NOT stop pointermove/up:
+  React's `stopPropagation` also stops the native event before `window`, which killed the sheet's own drag-to-dismiss
+  (`useSheetDragDismiss` listens on window). Mobile automation preview / assignee date now use it instead of a native input. **The
   console is separate**: it keeps the `.calpop` `AdminDatePicker` per §4a, and the two are never
   mixed. First caller: the cleaning day switcher; other mobile screens should reuse this rather than
   hand-rolling a calendar.

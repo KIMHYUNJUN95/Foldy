@@ -123,7 +123,6 @@ export function MobileConfirm({
         event.stopPropagation(); // 셸의 마우스 당겨서 새로고침으로 올라가지 않게(포털도 React 트리로는 올라간다)
         if (event.target === event.currentTarget && !busy) onKeep();
       }}
-      onPointerMove={(event) => event.stopPropagation()}
     >
       <div aria-describedby="maf-cf-body" aria-labelledby="maf-cf-title" aria-modal="true" className="maf-cf__card" role="alertdialog">
         <h3 id="maf-cf-title">{title}</h3>

@@ -782,7 +782,6 @@ function ConfirmModal({ confirm, keep, onClose }: { confirm: Confirm; keep: stri
       onClick={busy ? undefined : onClose}
       // 셸의 마우스 당겨서 새로고침으로 올라가지 않게(포털도 React 트리로는 올라간다).
       onPointerDown={(event) => event.stopPropagation()}
-      onPointerMove={(event) => event.stopPropagation()}
       role="presentation"
     >
       <div aria-label={confirm.title} aria-modal="true" className="mat-cf" onClick={(event) => event.stopPropagation()} role="dialog">

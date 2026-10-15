@@ -1,6 +1,8 @@
-﻿import { redirect } from "next/navigation";
+﻿import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { CalendarReservationItem } from "@/components/calendar/mobile-calendar-view";
 import { MobileCalendarLiveView } from "@/components/calendar/mobile-calendar-live-view";
+import { CALENDAR_LAST_PROPERTY_COOKIE } from "@/lib/calendar-last-property";
 import { toOriginalReservationId } from "@/lib/beds24/reservation-id";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
@@ -204,6 +206,19 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
 
   if (!hasOrganizationContext(session)) {
     redirect("/mobile/unavailable");
+  }
+
+  // 건물 없이 들어오면 지난번 건물로 **서버에서 바로** 연다(시안 CalPick-Phone). 2026-10-15 까지는 건물 고르기를
+  // 먼저 그린 뒤 브라우저(localStorage)가 몇 초 늦게 주소를 바꿔, 「가만히 있었는데 아라키초A 로 들어가진다」 버그였다.
+  // 쿠키는 클라이언트가 건물을 고를 때 남긴다(`mobile-calendar-view.tsx`). 예약 바로가기(reservationId)는 건드리지 않는다.
+  if (!selectedProperty && !initialReservationId) {
+    const remembered = normalizePropertyParam((await cookies()).get(CALENDAR_LAST_PROPERTY_COOKIE)?.value);
+    if (remembered) {
+      const target = new URLSearchParams();
+      target.set("month", resolveMonth(rawMonth));
+      target.set("property", remembered);
+      redirect(`/mobile/calendar?${target.toString()}`);
+    }
   }
 
   const dictionary = getDictionary(session.user.preferredLanguage);

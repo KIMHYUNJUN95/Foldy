@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UIEvent } from "react";
 import { createPortal } from "react-dom";
@@ -11,6 +11,7 @@ import { collectBlockedRooms } from "@/lib/room-blocks";
 import { type PropertyMapMeta, getPropertyAddress } from "@/lib/property-map-links";
 import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { writeCalendarLastPropertyCookie } from "@/lib/calendar-last-property";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { useIsTablet } from "@/components/shell/split-list";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -386,7 +387,6 @@ export function MobileCalendarView({
     if (fromUrl && propertyOptions.includes(fromUrl)) return fromUrl;
     return selectedPropertyProp;
   }, [searchParams, propertyOptions, selectedPropertyProp]);
-  const router = useRouter();
   const isTablet = useIsTablet();
   const [isBuildingSheetOpen, setIsBuildingSheetOpen] = useState(false);
   const [listTab, setListTab] = useState<ListTab>("in");
@@ -404,6 +404,7 @@ export function MobileCalendarView({
     return () => clearTimeout(timer);
   }, [copiedKey]);
   const rememberProperty = (property: string) => {
+    writeCalendarLastPropertyCookie(property);
     try {
       window.localStorage.setItem(LAST_PROPERTY_KEY, property);
     } catch {
@@ -666,9 +667,12 @@ export function MobileCalendarView({
     };
   }, []);
 
-  // 건물을 고르면 기억해 두고, 다음에 건물 없이 들어오면 그 건물로 바로 연다(시안 CalPick-Phone).
+  // 건물을 고르면 기억해 둔다 — 다음에 건물 없이 들어오면 **서버가** 쿠키를 읽어 바로 그 건물로 연다(page.tsx).
+  // 예전엔 여기서 localStorage 를 읽어 router.replace 했는데, 건물 고르기가 먼저 보이고 몇 초 뒤 혼자 넘어가는 버그였다
+  // (2026-10-15 사용자 보고). 예전 localStorage 값만 있는 사람은 쿠키로 옮겨만 두고 지금 화면은 그대로 둔다.
   useEffect(() => {
     if (selectedProperty) {
+      writeCalendarLastPropertyCookie(selectedProperty);
       try {
         window.localStorage.setItem(LAST_PROPERTY_KEY, selectedProperty);
       } catch {
@@ -676,19 +680,13 @@ export function MobileCalendarView({
       }
       return;
     }
-    let stored: string | null = null;
     try {
-      stored = window.localStorage.getItem(LAST_PROPERTY_KEY);
+      const stored = window.localStorage.getItem(LAST_PROPERTY_KEY);
+      if (stored && propertyOptions.includes(stored)) writeCalendarLastPropertyCookie(stored);
     } catch {
-      stored = null;
+      /* 무시 */
     }
-    if (stored && propertyOptions.includes(stored)) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("month", selectedMonth);
-      params.set("property", stored);
-      router.replace(`/mobile/calendar?${params.toString()}`, { scroll: false });
-    }
-  }, [selectedProperty, propertyOptions, router, searchParams, selectedMonth]);
+  }, [selectedProperty, propertyOptions]);
 
   useEffect(() => {
     if (mode !== "overview") return;

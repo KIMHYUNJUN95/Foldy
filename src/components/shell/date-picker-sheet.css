@@ -1,0 +1,47 @@
+/* 모바일 공용 날짜 고르기 시트 — 화이트 리디자인(2026-10-15, 시안 DateSheet-Phone). */
+.dps-head { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
+.dps-head__m { flex: 1; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
+.dps-nav {
+  width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #3a3746;
+  display: flex; align-items: center; justify-content: center; transition: transform 140ms ease-out, background-color 140ms ease;
+}
+.dps-nav:active { transform: scale(0.92); background: #f4f4f7; }
+
+.dps { padding-bottom: 6px; }
+.dps-dow { display: grid; grid-template-columns: repeat(7, 1fr); }
+.dps-dow span { height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #9a97a6; }
+.dps-dow span.is-sun { color: #c5282e; }
+
+.dps-gridwrap { overflow: hidden; touch-action: pan-y; }
+.dps-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.dps-grid.is-next { animation: dps-in-next 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+.dps-grid.is-prev { animation: dps-in-prev 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes dps-in-next { from { opacity: 0; transform: translateX(28px); } }
+@keyframes dps-in-prev { from { opacity: 0; transform: translateX(-28px); } }
+
+.dps-day {
+  position: relative; width: 44px; height: 44px; margin: 0 auto; border: 0; border-radius: 50%; background: transparent;
+  font: inherit; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; color: #16141f;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 140ms ease-out, background-color 160ms ease, color 160ms ease;
+}
+.dps-day.is-sun { color: #c5282e; }
+.dps-day:active { transform: scale(0.9); background: #f4f1fd; }
+.dps-day.is-sel { background: #7a52e6; color: #ffffff; font-weight: 700; animation: dps-pop 260ms cubic-bezier(0.23, 1, 0.32, 1); }
+.dps-day.is-today { color: #5a30cf; font-weight: 700; }
+.dps-day.is-today::after {
+  content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #7a52e6;
+}
+@keyframes dps-pop { from { transform: scale(0.82); } }
+
+.dps-today {
+  margin-top: 14px; width: 100%; height: 48px; border: 0; border-radius: 12px; background: #f4f1fd;
+  font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; transition: transform 140ms ease-out;
+}
+.dps-today:active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dps-grid.is-next, .dps-grid.is-prev, .dps-day.is-sel { animation: none; }
+  .dps-nav, .dps-day, .dps-today { transition: none; }
+  .dps-nav:active, .dps-day:active, .dps-today:active { transform: none; }
+}

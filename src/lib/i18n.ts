@@ -803,6 +803,9 @@ const FALLBACK_DICTIONARY = {
       correctionBody: "The {date} list was already sent — this posts a correction to {n} recipient(s).",
       sendOk: "Send",
       pickDate: "Pick a date",
+      datePrev: "Previous month",
+      dateNext: "Next month",
+      dateToday: "Today",
       rawAria: "Open the message from {at}",
     },
     // 모바일 자동화 설정 · 담당자(`/mobile/ops/automation`) — 그 밖의 글자는 settings · assign · white 를 그대로 쓴다.
@@ -8237,6 +8240,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       correctionBody: "{date} 명단은 이미 보냈어요 — 받는 곳 {n}곳에 정정본을 보내요.",
       sendOk: "보내기",
       pickDate: "날짜 고르기",
+      datePrev: "이전 달",
+      dateNext: "다음 달",
+      dateToday: "오늘",
       rawAria: "{at} 원문 열기",
     },
     mobileForm: {
@@ -15505,6 +15511,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       correctionBody: "{date}の名簿は送信済みです — 送信先 {n} か所に訂正版を送ります。",
       sendOk: "送る",
       pickDate: "日付を選ぶ",
+      datePrev: "前の月",
+      dateNext: "次の月",
+      dateToday: "今日",
       rawAria: "{at}の原文を開く",
     },
     mobileForm: {

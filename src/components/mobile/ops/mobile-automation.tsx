@@ -44,6 +44,7 @@ import { useIsTablet } from "@/components/shell/split-list";
 import type { AutomationJobView, AutomationPageData } from "@/lib/automation/console-data";
 import { AUTOMATION_LOCALES, isAutomationJobKey, type AutomationJobKey, type AutomationLocale } from "@/lib/automation/jobs";
 import { isScheduledSendDue } from "@/lib/automation/schedule";
+import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { haptic } from "@/lib/haptics";
 import "./mobile-automation.css";
 
@@ -519,6 +520,7 @@ function PreviewPane({
   const [date, setDate] = useState(previewDefaultDate(job, data));
   const [lang, setLang] = useState<AutomationLocale>(job.destinations[0]?.locales[0] ?? userLocale);
   const [done, setDone] = useState(false);
+  const [picking, setPicking] = useState(false);
   const onPreviewError = useCallback((code: string) => flash(errorText(code)), [errorText, flash]);
   const { loading, text, card } = useAutomationPreview(job.jobKey, date, lang, onPreviewError);
   const { timed, asCorrection } = previewSendState(job, date);
@@ -566,21 +568,25 @@ function PreviewPane({
 
   return (
     <div className="mat-preview">
+      {picking ? (
+        <DatePickerSheet
+          labels={{ nextMonth: m.dateNext, prevMonth: m.datePrev, title: m.pickDate, today: m.dateToday }}
+          locale={localeTag}
+          onClose={() => setPicking(false)}
+          onSelect={(next) => {
+            setPicking(false);
+            setDate(next);
+          }}
+          today={data.today}
+          value={date}
+        />
+      ) : null}
       <div className="mat-tool">
         {timed ? (
-          <label className="mat-date">
+          <button aria-label={m.pickDate} className="mat-date" onClick={() => setPicking(true)} type="button">
             <span className="mat-date__t">{dateText}</span>
             <ChevronDown aria-hidden="true" />
-            {/* 모바일은 기기 날짜 고르기(iOS 휠 · Android 달력)를 그대로 쓴다 — 글자 단추 위에 투명하게 겹친다. */}
-            <input
-              aria-label={m.pickDate}
-              onChange={(event) => {
-                if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value);
-              }}
-              type="date"
-              value={date}
-            />
-          </label>
+          </button>
         ) : (
           <span className="mat-tool__sp" />
         )}

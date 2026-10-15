@@ -157,13 +157,11 @@
 .mat-tool { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mat-tool__sp { flex: 1; }
 .mat-date {
-  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; margin-left: -6px; border-radius: 10px;
+  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; margin-left: -6px; border: 0; border-radius: 10px; background: transparent; font-family: inherit;
   font-size: 15px; font-weight: 700; color: var(--mat-ink); white-space: nowrap; cursor: pointer; transition: transform 160ms var(--mat-ease), background-color 160ms ease;
 }
 .mat-date:active { transform: scale(.97); background: var(--mat-field); }
 .mat-date svg { width: 15px; height: 15px; color: var(--mat-faint); }
-.mat-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; font-size: 16px; }
-.mat-date input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .mat-seg { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; }
 .mat-seg > button {
   min-width: 44px; height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; font-size: 14px; color: var(--mat-soft); cursor: pointer;

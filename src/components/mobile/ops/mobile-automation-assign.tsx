@@ -12,6 +12,7 @@ import {
   type CleaningRoomOptionGroup,
 } from "@/app/admin/ops/automation/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import type { AutomationPageData } from "@/lib/automation/console-data";
 import type { AutomationLocale } from "@/lib/automation/jobs";
 import type { Dictionary } from "@/lib/i18n";
@@ -67,6 +68,7 @@ export function MobileAutomationAssign({
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [busy, startBusy] = useTransition();
   const rooms = board?.date === date ? board.rooms : null;
   const sent = board?.date === date ? board.sent : false;
@@ -210,29 +212,26 @@ export function MobileAutomationAssign({
   return (
     <div className="maf maf-assign">
       <div className="maf-atool">
-        <label className="maf-date">
+        <button aria-label={copy.preview.date} className="maf-date" onClick={() => setPicking(true)} type="button">
           <span className="maf-date__t">
             {dateText}
             {rel ? ` · ${rel}` : ""}
           </span>
           <ChevronDown aria-hidden="true" size={14} />
-          <input
-            aria-label={copy.preview.date}
-            className="maf-date__in"
-            onChange={(event) => {
-              if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value);
+        </button>
+        {picking ? (
+          <DatePickerSheet
+            labels={{ nextMonth: copy.mobile.dateNext, prevMonth: copy.mobile.datePrev, title: copy.mobile.pickDate, today: copy.mobile.dateToday }}
+            locale={localeTag}
+            onClose={() => setPicking(false)}
+            onSelect={(next) => {
+              setPicking(false);
+              setDate(next);
             }}
-            onClick={(event) => {
-              try {
-                event.currentTarget.showPicker?.();
-              } catch {
-                /* 기기 기본 동작에 맡긴다 */
-              }
-            }}
-            type="date"
+            today={data.today}
             value={date}
           />
-        </label>
+        ) : null}
         {rooms !== null ? <span className="maf-atool__n">{fill(w.assignCount, counts)}</span> : null}
       </div>
 

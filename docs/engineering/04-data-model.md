@@ -2022,6 +2022,22 @@ pg_cron 잡 `beds24-tick` (`* * * * *`) → `select public.beds24_tick_if_needed
 - `listing_id`(숙소 ID `hotel_id`) · `host_url`(엑스트라넷) · `guest_url`(손님용 페이지) · `memo`(200자) · `updated_by` · 시각들.
 - 유일: `(organization_id, canonical_name, channel)`. 쓰기는 서버 액션 `saveBuildingListingLink` 만.
 
+### 2026-10-15 룸 링크 직접 추가 — `room_link_buildings` · `room_link_rooms` (`202610150002`)
+
+Beds24 에 없는 건물 · 객실을 룸 링크에서만 만든다. 캘린더 · 청소 · 가동률 · 매출은 이 표를 읽지 않는다(`properties` / `rooms` 에 넣지 않음).
+화면 계약: `docs/product/35-room-links.md` → 「건물 · 객실 직접 추가」.
+
+- `room_link_buildings`: `id` · `organization_id → organizations` · `name`(1~40자 체크) · `sort_order int`(기본 0, 새 건물은 최댓값+1) ·
+  `created_by → auth.users` · `created_at` · `updated_at`. 유일 `(organization_id, name)`. Beds24 건물 이름과의 겹침은 서버 액션이 막는다.
+- `room_link_rooms`: `id` · `organization_id` · `manual_building_id → room_link_buildings (on delete cascade)` · `canonical_name text`(Beds24 건물
+  이름) — **정확히 하나**(체크 `room_link_rooms_one_building`) · `name`(1~40자) · `created_by` · 시각들. 유일(부분 인덱스):
+  `(manual_building_id, name)` / `(organization_id, canonical_name, name)`.
+- `room_listing_links.manual_room_id → room_link_rooms (on delete cascade)` 추가, `room_id` 는 null 허용으로 — 체크 `room_listing_links_one_room`
+  (`num_nonnulls(room_id, manual_room_id) = 1`), 유일 `(manual_room_id, channel)`(upsert 용 제약, 기존 `(room_id, channel)` 유지).
+- `building_listing_links.manual_building_id → room_link_buildings (on delete cascade)` 추가, `canonical_name` 은 null 허용으로 — 체크
+  `building_listing_links_one_building`, 유일 `(manual_building_id, channel)`. 이름이 아니라 id 로 붙여 건물 이름을 바꿔도 링크가 따라간다.
+- 직접 추가한 건물을 지우면 그 객실 → 링크까지 연쇄로 지워진다(hard delete). 쓰기는 서버 액션(service-role)만.
+
 ## 2026-10-05 근태 마감 유일 인덱스 · 수기 예약 멱등 키
 
 - `attendance_month_snapshots_one_finalized` — `(organization_id, user_id, target_month) where status = 'finalized'` 부분 유일

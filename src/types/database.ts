@@ -4615,39 +4615,42 @@ export type Database = {
       }
       building_listing_links: {
         Row: {
-          canonical_name: string
+          canonical_name: string | null
           channel: string
           created_at: string
           guest_url: string | null
           host_url: string | null
           id: string
           listing_id: string | null
+          manual_building_id: string | null
           memo: string | null
           organization_id: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          canonical_name: string
+          canonical_name?: string | null
           channel: string
           created_at?: string
           guest_url?: string | null
           host_url?: string | null
           id?: string
           listing_id?: string | null
+          manual_building_id?: string | null
           memo?: string | null
           organization_id: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          canonical_name?: string
+          canonical_name?: string | null
           channel?: string
           created_at?: string
           guest_url?: string | null
           host_url?: string | null
           id?: string
           listing_id?: string | null
+          manual_building_id?: string | null
           memo?: string | null
           organization_id?: string
           updated_at?: string
@@ -4656,6 +4659,99 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "building_listing_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "building_listing_links_manual_building_id_fkey"
+            columns: ["manual_building_id"]
+            isOneToOne: false
+            referencedRelation: "room_link_buildings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_link_buildings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          organization_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_link_buildings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_link_rooms: {
+        Row: {
+          canonical_name: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          manual_building_id: string | null
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          canonical_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          manual_building_id?: string | null
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          canonical_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          manual_building_id?: string | null
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_link_rooms_manual_building_id_fkey"
+            columns: ["manual_building_id"]
+            isOneToOne: false
+            referencedRelation: "room_link_buildings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_link_rooms_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4671,9 +4767,10 @@ export type Database = {
           host_url: string | null
           id: string
           listing_id: string | null
+          manual_room_id: string | null
           memo: string | null
           organization_id: string
-          room_id: string
+          room_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -4684,9 +4781,10 @@ export type Database = {
           host_url?: string | null
           id?: string
           listing_id?: string | null
+          manual_room_id?: string | null
           memo?: string | null
           organization_id: string
-          room_id: string
+          room_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -4697,13 +4795,21 @@ export type Database = {
           host_url?: string | null
           id?: string
           listing_id?: string | null
+          manual_room_id?: string | null
           memo?: string | null
           organization_id?: string
-          room_id?: string
+          room_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "room_listing_links_manual_room_id_fkey"
+            columns: ["manual_room_id"]
+            isOneToOne: false
+            referencedRelation: "room_link_rooms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "room_listing_links_organization_id_fkey"
             columns: ["organization_id"]

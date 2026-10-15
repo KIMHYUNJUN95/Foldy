@@ -21,6 +21,8 @@ import "./mobile-room-links.css";
  * **넓은 화면**(셸의 폭 구간과 같다 — `globals.css` `fold:` · `tablet:`):
  * - 펼친 폴드 · 태블릿 세로(≥ 600): 폰과 같은 한 줄, 가운데 540px. 상세는 바텀시트(셸이 가운데 카드로 띄운다).
  * - 태블릿 가로(≥ 1000 · 높이 ≥ 600): **왼쪽 건물 목록 · 가운데 건물 머리 + 객실 · 오른쪽 상세 칸** — 시트를 쓰지 않는다.
+ *
+ * 대시보드에서 직접 추가한 건물 · 객실(2026-10-15)도 같이 보인다 — 회색 「직접 추가」 표시, 판매 중 대신 링크 유무. 추가 · 고치기는 없다.
  */
 type Copy = Dictionary["roomLinks"];
 
@@ -185,12 +187,13 @@ export function MobileRoomLinks({ data, copy }: { data: RoomLinksPageData; copy:
               <button
                 aria-selected={on}
                 className={`mrl-tab${on ? " is-on" : ""}`}
-                key={item.name}
+                key={item.manualId ? `m:${item.manualId}` : `b:${item.name}`}
                 onClick={() => pickBuilding(index)}
                 role="tab"
                 type="button"
               >
                 <span className="mrl-tab__n">{item.name}</span>
+                {item.manualId && <span className="mrl-tag">{m.manualTag}</span>}
                 <b>{item.rows.reduce((sum, r) => sum + r.units.length, 0)}</b>
               </button>
             );
@@ -210,8 +213,14 @@ export function MobileRoomLinks({ data, copy }: { data: RoomLinksPageData; copy:
             </>
           ) : (
             <>
-              <BuildingHead building={building} copiedKey={copiedKey} copy={copy} key={`h:${building.name}`} onCopy={copyLink} />
-              <div className="mrl-list" key={`b:${building.name}`}>
+              <BuildingHead
+                building={building}
+                copiedKey={copiedKey}
+                copy={copy}
+                key={`h:${building.manualId ?? building.name}`}
+                onCopy={copyLink}
+              />
+              <div className="mrl-list" key={`b:${building.manualId ?? building.name}`}>
                 {building.rows.map((item, index) => row(building, item, index, false))}
                 {building.rows.length === 0 && <div className="mrl-empty">{copy.noRooms}</div>}
               </div>
@@ -297,7 +306,13 @@ function RoomRow({
         <span className="mrl-row__n">{row.label}</span>
         <span className="mrl-row__sub">
           {building && <span className="mrl-row__b">{building} · </span>}
-          {!target ? (
+          {row.manualRoomId ? (
+            // 직접 추가한 객실 — 판매 중 대신 「직접 추가」, 게스트 링크가 없으면 빨강.
+            <>
+              <span className="mrl-tag">{m.manualTag}</span>
+              {!guest && <span className="is-bad"> {noGuest}</span>}
+            </>
+          ) : !target ? (
             <span className="mrl-row__idle">{row.units.map((unit) => unit.unitLabel).join(" · ")}</span>
           ) : guest ? (
             <span className="is-ok">{fill(m.unitSelling, { u: target.unitLabel })}</span>
@@ -335,12 +350,13 @@ function BuildingHead({
 }) {
   const m = copy.mWhite;
   const booking = building.booking;
-  const key = `booking:${building.name}`;
+  const key = `booking:${building.manualId ?? building.name}`;
   const listings = building.rows.reduce((sum, row) => sum + row.units.length, 0);
   return (
     <section className="mrl-bh">
       <div className="mrl-bh__t">
         <h2>{building.name}</h2>
+        {building.manualId && <span className="mrl-tag">{m.manualTag}</span>}
         <span>{fill(m.buildingCounts, { listings, rooms: building.rows.length })}</span>
       </div>
       {building.address && (
@@ -430,8 +446,13 @@ function RoomDetail({
     <div className="mrl-v mrl-d">
       <div className="mrl-d__head">
         <span className="mrl-d__b">{selection.building.name}</span>
-        <b className="mrl-mono">{selection.row.label}</b>
-        <span className="mrl-d__sub">{fill(m.sheetSub, { n: units.length })}</span>
+        <b className="mrl-mono">
+          {selection.row.label}
+          {selection.row.manualRoomId && <span className="mrl-tag">{m.manualTag}</span>}
+        </b>
+        <span className="mrl-d__sub">
+          {selection.row.manualRoomId ? m.manualRoomSub : fill(m.sheetSub, { n: units.length })}
+        </span>
       </div>
       <div className="mrl-d__body">
         {units.map((unit) => {
@@ -444,7 +465,16 @@ function RoomDetail({
             <section className="mrl-u" key={unit.roomId}>
               <div className="mrl-u__t">
                 <b className="mrl-mono">{unit.unitLabel}</b>
-                {unit.selling ? (
+                {unit.manual ? (
+                  guest ? (
+                    <span className="mrl-u__on">
+                      <i aria-hidden="true" />
+                      {m.linkReady}
+                    </span>
+                  ) : (
+                    <span className="mrl-u__off">{m.linkNone}</span>
+                  )
+                ) : unit.selling ? (
                   <span className="mrl-u__on">
                     <i aria-hidden="true" />
                     {m.sellingNow}
@@ -468,7 +498,7 @@ function RoomDetail({
               {guest ? <div className="mrl-u__url">{guest}</div> : <div className="mrl-u__url is-bad">{copy.guestMissing}</div>}
               {guest && (
                 <button
-                  className={`mrl-big${unit.selling ? " is-pri" : ""}${copied ? " is-done" : ""}`}
+                  className={`mrl-big${unit.selling || unit.manual ? " is-pri" : ""}${copied ? " is-done" : ""}`}
                   onClick={() => onCopy(key, guest)}
                   type="button"
                 >

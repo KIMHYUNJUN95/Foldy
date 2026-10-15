@@ -58,11 +58,24 @@ export type RoomLinkUnit = {
    * 판정은 `pickSellingUnits` — 오늘 하루가 아니라 **앞으로 30일 중 활성 밤이 가장 많은 계정**이다.
    */
   selling: boolean;
+  /** 룸 링크에서 직접 추가한 객실(`room_link_rooms`) — Beds24 유닛이 아니다. 이때 `roomId` 는 그 객실의 id. */
+  manual: boolean;
   links: Partial<Record<RoomLinkChannel, RoomLinkRecord>>;
 };
 
-export type RoomLinkRow = { key: string; label: string; units: RoomLinkUnit[] };
-export type RoomLinkBuilding = { name: string; rows: RoomLinkRow[] };
+export type RoomLinkRow = {
+  key: string;
+  label: string;
+  /** 직접 추가한 객실이면 그 id(`room_link_rooms.id`), Beds24 객실이면 `null`. */
+  manualRoomId: string | null;
+  units: RoomLinkUnit[];
+};
+export type RoomLinkBuilding = {
+  name: string;
+  /** 직접 추가한 건물이면 그 id(`room_link_buildings.id`), Beds24 건물이면 `null`. */
+  manualId: string | null;
+  rows: RoomLinkRow[];
+};
 
 /** 캘린더와 같은 객실 이름 순서(숫자 인식). */
 function compareLabels(a: string, b: string) {
@@ -101,8 +114,8 @@ export function groupRoomLinks(args: {
     const building = key.slice(0, separator);
     const label = key.slice(separator + ROOM_AXIS_SEPARATOR.length);
     const rows = rowsByBuilding.get(building) ?? new Map<string, RoomLinkRow>();
-    const row = rows.get(key) ?? { key, label, units: [] };
-    row.units.push({ roomId: unit.id, selling: false, unitLabel: unit.roomLabel, links });
+    const row = rows.get(key) ?? { key, label, manualRoomId: null, units: [] };
+    row.units.push({ links, manual: false, roomId: unit.id, selling: false, unitLabel: unit.roomLabel });
     inputByRoom.set(unit.id, unit);
     rows.set(key, row);
     rowsByBuilding.set(building, rows);
@@ -122,6 +135,7 @@ export function groupRoomLinks(args: {
       return ai !== bi ? ai - bi : a.localeCompare(b, "ko");
     })
     .map(([name, rows]) => ({
+      manualId: null,
       name,
       rows: [...rows.values()]
         .sort((a, b) => compareLabels(a.label, b.label))
@@ -174,6 +188,109 @@ export function findDuplicateListingIds(links: readonly RoomLinkRecord[]): Set<s
     if (rooms.size > 1) duplicates.add(key.slice(key.indexOf(":") + 1));
   }
   return duplicates;
+}
+
+// ── 직접 추가한 건물 · 객실 (2026-10-15) ──────────────────────────────
+
+/** 직접 추가하는 건물 · 객실 이름 최대 길이 — DB 체크 제약(`room_link_*_name_len`)과 같다. */
+export const ROOM_LINK_NAME_MAX = 40;
+
+export type ManualNameError = "name_empty" | "name_long" | "name_taken";
+
+/** 앞뒤 공백을 떼고 안쪽 공백은 하나로. */
+export function normalizeManualName(raw: string | null | undefined): string {
+  return String(raw ?? "").trim().replace(/\s+/g, " ");
+}
+
+/** 같은 이름인가 — 공백 정리 · 대소문자 무시(「Sky 101」 = 「SKY  101」). */
+function nameKey(name: string) {
+  return normalizeManualName(name).toLowerCase();
+}
+
+/**
+ * 직접 추가하는 이름 검사 — 1~40자, `taken`(같은 건물의 객실 이름 · 또는 모든 건물 이름)과 겹치지 않게.
+ * 이름 바꾸기는 호출부가 자기 이름을 `taken` 에서 빼고 부른다.
+ */
+export function validateManualName(
+  raw: string | null | undefined,
+  taken: Iterable<string>,
+): { ok: true; name: string } | { ok: false; error: ManualNameError } {
+  const name = normalizeManualName(raw);
+  if (!name) return { error: "name_empty", ok: false };
+  if (name.length > ROOM_LINK_NAME_MAX) return { error: "name_long", ok: false };
+  const key = nameKey(name);
+  for (const other of taken) {
+    if (nameKey(other) === key) return { error: "name_taken", ok: false };
+  }
+  return { name, ok: true };
+}
+
+export type ManualBuildingInput = { id: string; name: string; sortOrder: number; createdAt: string };
+export type ManualRoomInput = {
+  id: string;
+  name: string;
+  /** Beds24 건물에 붙인 객실이면 그 건물 이름(캘린더와 같은 이름). */
+  canonicalName: string | null;
+  /** 직접 추가한 건물에 붙인 객실이면 그 건물 id. */
+  manualBuildingId: string | null;
+};
+
+/**
+ * Beds24 묶음(`groupRoomLinks`)에 직접 추가한 건물 · 객실을 붙인다. 룸 링크 화면에만 보인다 — 다른 화면은 이 표를 모른다.
+ *
+ * - 직접 추가한 객실은 한 줄 = 유닛 하나(`manual: true`, 판매 중 표시 없음). 링크는 `links` 의 `roomId` 가 그 객실 id 인 것.
+ * - Beds24 건물에 붙인 객실은 그 건물의 Beds24 객실 **뒤**에 이름순(숫자 인식). 객실이 하나도 안 잡힌 Beds24 건물이면
+ *   그 건물을 새로 만들어 `buildingOrder` 자리에 둔다.
+ * - 직접 추가한 건물은 Beds24 건물 **뒤**에 `sortOrder` → 만든 순서 → 이름순.
+ * - 어디에도 붙지 않는 객실(건물이 지워지는 중 등)은 뺀다.
+ */
+export function mergeManualRoomLinks(args: {
+  buildings: readonly RoomLinkBuilding[];
+  manualBuildings: readonly ManualBuildingInput[];
+  manualRooms: readonly ManualRoomInput[];
+  links: readonly RoomLinkRecord[];
+  buildingOrder: readonly string[];
+}): RoomLinkBuilding[] {
+  const linksByRoom = new Map<string, Partial<Record<RoomLinkChannel, RoomLinkRecord>>>();
+  for (const link of args.links) {
+    const bucket = linksByRoom.get(link.roomId) ?? {};
+    bucket[link.channel] = link;
+    linksByRoom.set(link.roomId, bucket);
+  }
+  const toRow = (room: ManualRoomInput): RoomLinkRow => ({
+    key: `manual:${room.id}`,
+    label: room.name,
+    manualRoomId: room.id,
+    units: [{ links: linksByRoom.get(room.id) ?? {}, manual: true, roomId: room.id, selling: false, unitLabel: room.name }],
+  });
+  const byName = (a: ManualRoomInput, b: ManualRoomInput) => compareLabels(a.name, b.name);
+
+  const beds24 = new Map(args.buildings.map((building) => [building.name, { ...building, rows: [...building.rows] }]));
+  for (const room of [...args.manualRooms].sort(byName)) {
+    if (!room.canonicalName) continue;
+    const target = beds24.get(room.canonicalName) ?? { manualId: null, name: room.canonicalName, rows: [] };
+    target.rows.push(toRow(room));
+    beds24.set(room.canonicalName, target);
+  }
+  const orderIndex = new Map(args.buildingOrder.map((name, index) => [name, index]));
+  // `groupRoomLinks` 와 같은 순서 — 새로 생긴 건물도 제자리에 들어간다.
+  const fixed = [...beds24.values()].sort((a, b) => {
+    const ao = orderIndex.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+    const bo = orderIndex.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+    return ao !== bo ? ao - bo : a.name.localeCompare(b.name, "ko");
+  });
+
+  const manual = [...args.manualBuildings]
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, "ko"))
+    .map((building) => ({
+      manualId: building.id,
+      name: building.name,
+      rows: args.manualRooms
+        .filter((room) => room.manualBuildingId === building.id)
+        .sort(byName)
+        .map(toRow),
+    }));
+  return [...fixed, ...manual];
 }
 
 // ── 링크 입력 검증 ─────────────────────────────────────────────────────

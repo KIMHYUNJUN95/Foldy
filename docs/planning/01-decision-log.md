@@ -6780,3 +6780,13 @@ Beds24 재고(가격) 웹훅 URL 칸은 **프로퍼티당 한 줄만** 받는다
   상세의 큰 버튼은 「게스트 링크 복사」 하나(판매 중 계정만 꽉 찬 보라) + 글자 링크 둘.
 - 복사하면 버튼이 1.6초 「✓ 복사됨」으로 바뀐다 — 복사 토스트는 뺐다(화면 읽기용 안내만 남김).
 - 「마지막 수정」은 날짜만 — 링크를 고친 사람은 저장하지 않는다(데이터에 없음). 모바일은 여전히 보기 · 열기 · 복사만(편집은 PC).
+
+## 2026-10-15 룸 링크 — 건물 · 객실 직접 추가
+
+- 사용자 「사용자가 직접 건물을 추가하고 그 건물안에 객실을 추가하는 기능을 만들어야해」. 시안 LinksAdd-PC · LinksNewBld-PC · LinksDelete-PC 승인.
+- **범위는 룸 링크만**(사용자 선택): 새 표 `room_link_buildings` · `room_link_rooms` 에 둔다. `properties` / `rooms` 에 넣지 않아 캘린더 · 청소 ·
+  가동률 · 매출은 Beds24 그대로다. 링크는 기존 `room_listing_links`(`manual_room_id`) · `building_listing_links`(`manual_building_id`)를 넓혀 쓴다.
+- **권한은 `room_links.access`**(사용자 선택) — 서버 액션이 다시 본다. Beds24 건물 · 객실은 지울 수 없고, 직접 추가한 것만 이름 바꾸기 · 지우기
+  (hard delete, 확인 창 「그대로 두기 / 지우기」, 건물을 지우면 그 객실 · 링크도 함께).
+- 마이그레이션 `202610150002_room_link_manual_entries.sql` 을 원격 Supabase 에 적용(2026-10-15, MCP 이름 `room_link_manual_entries`).
+- 모바일은 보기 · 복사만 — 직접 추가한 것도 「직접 추가」 표시로 보인다.

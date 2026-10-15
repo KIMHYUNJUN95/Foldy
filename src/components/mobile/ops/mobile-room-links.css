@@ -21,6 +21,13 @@
 .mrl-mono { font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
 
 .mrl { display: flex; flex-direction: column; gap: 16px; padding-bottom: 24px; }
+/* 대시보드에서 직접 추가한 건물 · 객실(2026-10-15) — 회색 작은 표시. 상세 머리(고정폭 큰 글자) 안에서도 같은 모양. */
+.mrl-v .mrl-tag {
+  display: inline-block; flex: none; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #f2f2f5;
+  font-family: var(--font-sans, sans-serif); font-size: 11px; font-weight: 600; line-height: 1.6; letter-spacing: 0;
+  color: var(--mrl-soft); white-space: nowrap; vertical-align: middle;
+}
+.mrl-v .mrl-row__sub .mrl-tag, .mrl-v .mrl-tab .mrl-tag, .mrl-v .mrl-bh__t .mrl-tag { margin-left: 0; }
 .mrl-empty { padding: 36px 12px; text-align: center; font-size: 13px; color: var(--mrl-faint); }
 .mrl-sec { padding: 6px 0 2px; font-size: 12px; font-weight: 600; color: var(--mrl-faint); }
 

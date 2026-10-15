@@ -3,10 +3,13 @@ import {
   findDuplicateListingIds,
   groupRoomLinks,
   isChannelUrl,
+  mergeManualRoomLinks,
+  normalizeManualName,
   pickSellingUnits,
   parseAirbnbListingId,
   parseRoomLinkInput,
   type RoomLinkRecord,
+  validateManualName,
 } from "@/lib/room-links-model";
 
 /**
@@ -175,5 +178,94 @@ describe("링크 검증", () => {
     expect(parseRoomLinkInput({ channel: "booking", guest: "", host: "javascript:alert(1)", memo: "" })).toEqual({ error: "host_invalid", ok: false });
     expect(parseRoomLinkInput({ channel: "airbnb", guest: "", host: "", memo: "x".repeat(201) })).toEqual({ error: "memo_long", ok: false });
     expect(parseRoomLinkInput({ channel: "airbnb", guest: " ", host: "", memo: "" })).toEqual({ empty: true, ok: true });
+  });
+});
+
+describe("직접 추가한 건물 · 객실 (2026-10-15)", () => {
+  const beds24 = () =>
+    groupRoomLinks({
+      buildingOrder: ["아라키초A", "가부키초"],
+      links: [link("u1", "31627968")],
+      units: [
+        { externalMinimumStay: 2, id: "u1", propertyName: "Arakicho A", roomLabel: "201", status: "active" },
+        { externalMinimumStay: 2, id: "u2", propertyName: "Arakicho A", roomLabel: "1001", status: "active" },
+      ],
+    });
+
+  it("Beds24 건물의 직접 추가 객실은 Beds24 객실 뒤에, 한 줄 = 유닛 하나(판매 중 없음)", () => {
+    const merged = mergeManualRoomLinks({
+      buildingOrder: ["아라키초A", "가부키초"],
+      buildings: beds24(),
+      links: [link("m801", null, "https://airbnb.co.kr/h/abo81")],
+      manualBuildings: [],
+      manualRooms: [
+        { canonicalName: "아라키초A", id: "m801", manualBuildingId: null, name: "801" },
+        { canonicalName: "아라키초A", id: "m10", manualBuildingId: null, name: "10" },
+      ],
+    });
+    expect(merged).toHaveLength(1);
+    expect(merged[0].rows.map((r) => [r.label, r.manualRoomId])).toEqual([
+      ["201", null],
+      ["1001", null],
+      ["10", "m10"],
+      ["801", "m801"],
+    ]);
+    const row = merged[0].rows[3];
+    expect(row.key).toBe("manual:m801");
+    expect(row.units).toEqual([
+      expect.objectContaining({ manual: true, roomId: "m801", selling: false, unitLabel: "801" }),
+    ]);
+    expect(row.units[0].links.airbnb?.guestUrl).toBe("https://airbnb.co.kr/h/abo81");
+  });
+
+  it("객실이 하나도 없던 Beds24 건물은 캘린더 순서 자리에 생긴다", () => {
+    const merged = mergeManualRoomLinks({
+      buildingOrder: ["가부키초", "아라키초A"],
+      buildings: beds24(),
+      links: [],
+      manualBuildings: [],
+      manualRooms: [{ canonicalName: "가부키초", id: "k1", manualBuildingId: null, name: "K901" }],
+    });
+    expect(merged.map((b) => [b.name, b.manualId])).toEqual([
+      ["가부키초", null],
+      ["아라키초A", null],
+    ]);
+  });
+
+  it("직접 추가한 건물은 Beds24 건물 뒤에 순서 · 만든 순서대로, 빈 건물도 남는다", () => {
+    const merged = mergeManualRoomLinks({
+      buildingOrder: ["아라키초A"],
+      buildings: beds24(),
+      links: [],
+      manualBuildings: [
+        { createdAt: "2026-10-15T02:00:00Z", id: "b2", name: "신주쿠 C", sortOrder: 1 },
+        { createdAt: "2026-10-15T01:00:00Z", id: "b1", name: "신주쿠 B", sortOrder: 1 },
+        { createdAt: "2026-10-15T03:00:00Z", id: "b0", name: "가나", sortOrder: 0 },
+      ],
+      manualRooms: [
+        { canonicalName: null, id: "r2", manualBuildingId: "b1", name: "102" },
+        { canonicalName: null, id: "r1", manualBuildingId: "b1", name: "101" },
+        { canonicalName: null, id: "rx", manualBuildingId: "gone", name: "999" },
+      ],
+    });
+    expect(merged.map((b) => [b.name, b.manualId, b.rows.map((r) => r.label)])).toEqual([
+      ["아라키초A", null, ["201", "1001"]],
+      ["가나", "b0", []],
+      ["신주쿠 B", "b1", ["101", "102"]],
+      ["신주쿠 C", "b2", []],
+    ]);
+  });
+
+  it("직접 추가 객실의 리스팅 ID 도 중복 검사에 들어간다", () => {
+    expect([...findDuplicateListingIds([link("u1", "31627968"), link("m801", "31627968")])]).toEqual(["31627968"]);
+  });
+
+  it("이름은 앞뒤 공백을 떼고 1~40자, 같은 건물 안에서 겹치지 않게(공백 · 대소문자 무시)", () => {
+    expect(normalizeManualName("  신주쿠   B ")).toBe("신주쿠 B");
+    expect(validateManualName("  801 ", ["201"])).toEqual({ name: "801", ok: true });
+    expect(validateManualName("   ", [])).toEqual({ error: "name_empty", ok: false });
+    expect(validateManualName("x".repeat(41), [])).toEqual({ error: "name_long", ok: false });
+    expect(validateManualName("x".repeat(40), [])).toMatchObject({ ok: true });
+    expect(validateManualName("sky  101", ["SKY 101"])).toEqual({ error: "name_taken", ok: false });
   });
 });

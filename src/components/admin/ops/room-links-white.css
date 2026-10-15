@@ -56,8 +56,9 @@
 .adm .rlw-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
 .adm .rlw-cols { display: flex; align-items: flex-start; gap: 28px; }
 
-/* 건물 목록 */
-.adm .rlw-blds { width: 196px; flex: none; display: flex; flex-direction: column; gap: 2px; }
+/* 건물 목록 (+ 아래 「건물 추가」) */
+.adm .rlw-side { width: 196px; flex: none; display: flex; flex-direction: column; }
+.adm .rlw-blds { display: flex; flex-direction: column; gap: 2px; }
 .adm .rlw-bld {
   display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; border: 0; border-radius: 10px;
   background: transparent; font: inherit; font-size: 14px; line-height: 1.3; color: var(--rlw-ink2); text-align: left; cursor: pointer;
@@ -209,6 +210,88 @@
 .adm .rlw-err { margin: 0; font-size: 12px; color: var(--rlw-red); }
 .adm .rlw-form__acts { display: flex; align-items: center; gap: 14px; padding-top: 2px; }
 
+/* ── 직접 추가(2026-10-15, 시안 LinksAdd · LinksNewBld · LinksDelete) ── */
+.adm .rlw-tag {
+  flex: none; padding: 2px 7px; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 600; line-height: 1.5;
+  color: var(--rlw-mute); white-space: nowrap;
+}
+.adm .rlw-bh__t .rlw-tag { font-size: 11px; color: var(--rlw-mute); align-self: center; }
+.adm .rlw-bh__t .rlw-grow { flex: 1; }
+.adm .rlw-bh__t .rlw-tbtn { align-self: center; }
+.adm .rlw-bh__t .rlw-tbtn + .rlw-tbtn { margin-left: 4px; }
+.adm .rlw-addlink {
+  display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--rlw-v-ink); cursor: pointer; text-align: left;
+  transition: background-color 160ms ease, transform 140ms var(--rlw-ease);
+}
+.adm .rlw-addlink > span { font-size: 18px; line-height: 1; }
+.adm .rlw-addlink:hover { background: #f8f7fb; }
+.adm .rlw-addlink.is-row { margin-top: 6px; }
+.adm .rlw-badd { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--rlw-line); }
+
+/* 이름 한 칸 폼 — 건물 추가 · 이름 바꾸기 */
+.adm .rlw-nform { display: flex; flex-direction: column; gap: 8px; animation: rlw-drop 240ms var(--rlw-ease) both; }
+.adm .rlw-badd .rlw-nform { padding-top: 6px; }
+.adm .rlw-nform .rlw-field > span { font-size: 11px; font-weight: 400; color: var(--rlw-faint); }
+.adm .rlw-nform__acts { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.adm .rlw-nform__acts .rlw-tbtn { min-height: 40px; padding: 0 14px; }
+.adm .rlw-nform__acts .rlw-btn { height: 40px; min-width: 0; padding: 0 18px; }
+.adm .rlw-nform__note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--rlw-faint); }
+.adm .rlw-nform.is-inline { flex-direction: row; flex-wrap: wrap; align-items: flex-end; max-width: 560px; }
+.adm .rlw-nform.is-inline .rlw-field { flex: 1; min-width: 200px; }
+.adm .rlw-nform.is-inline .rlw-err { flex-basis: 100%; }
+.adm .rlw-nform input:focus, .adm .rlw-radd input:focus { background: #fff; box-shadow: inset 0 0 0 1.5px var(--rlw-v); }
+
+/* 객실 추가 폼 — 표 바로 아래 */
+.adm .rlw-radd {
+  display: flex; flex-direction: column; gap: 10px; margin-top: 6px; padding: 14px 12px; border-radius: 12px; background: #fbfafe;
+  animation: rlw-drop 260ms var(--rlw-ease) both;
+}
+.adm .rlw-radd > b { font-size: 13px; }
+.adm .rlw-radd__fields { display: flex; align-items: flex-end; gap: 10px; }
+.adm .rlw-radd__fields .rlw-field { flex: 1; min-width: 0; gap: 4px; }
+.adm .rlw-radd__fields .rlw-field.is-name { flex: 0 0 120px; }
+.adm .rlw-radd .rlw-field > span { font-size: 11px; font-weight: 400; color: var(--rlw-faint); }
+.adm .rlw-radd__acts { display: flex; align-items: center; gap: 6px; }
+.adm .rlw-radd__acts .rlw-tbtn { min-height: 40px; padding: 0 14px; }
+.adm .rlw-radd__acts .rlw-btn { height: 40px; padding: 0 18px; }
+.adm .rlw-radd__note { flex: 1; font-size: 11px; color: var(--rlw-faint); }
+
+/* 객실이 없는 건물 */
+.adm .rlw-blank { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 0 40px; text-align: center; }
+.adm .rlw-blank b { font-size: 15px; }
+.adm .rlw-blank span { font-size: 13px; color: var(--rlw-faint); }
+.adm .rlw-blank .rlw-btn { height: 40px; padding: 0 18px; }
+
+/* 상세 — 직접 추가한 객실 */
+.adm .rlw-pane__name { display: flex; align-items: center; gap: 8px; }
+.adm .rlw-pane__acts { display: flex; align-items: center; gap: 16px; padding-top: 14px; border-top: 1px solid var(--rlw-line); }
+.adm .rlw-pane__acts .rlw-nform { flex: 1; }
+.adm .rlw-pane.is-empty { padding-top: 8px; font-size: 13px; color: var(--rlw-faint); }
+
+/* 지우기 확인 창 */
+.adm .rlw-scrim {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(2, 6, 23, .45); animation: rlw-fade 180ms ease both;
+}
+.adm .rlw-dialog {
+  width: 400px; max-width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 24px; border-radius: 20px;
+  background: #fff; box-shadow: 0 30px 80px -30px rgba(2, 6, 23, .6); animation: rlw-dialog 260ms var(--rlw-ease) both;
+}
+.adm .rlw-dialog > b { font-size: 17px; }
+.adm .rlw-dialog > p { margin: 0; font-size: 14px; line-height: 1.55; color: #4c4958; }
+.adm .rlw-dialog > p.rlw-err { font-size: 12px; color: var(--rlw-red); }
+.adm .rlw-dialog__acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.adm .rlw-dbtn {
+  height: 46px; border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background-color 160ms ease, transform 140ms var(--rlw-ease);
+}
+.adm .rlw-dbtn.is-keep { background: #f4f4f7; color: var(--rlw-ink2); }
+.adm .rlw-dbtn.is-keep:hover { background: #ececf1; }
+.adm .rlw-dbtn.is-del { background: var(--rlw-red); color: #fff; }
+.adm .rlw-dbtn.is-del:hover { background: #b02127; }
+.adm .rlw-dbtn:disabled { opacity: .6; cursor: default; }
+
 /* ── 토스트(저장 · 비우기) ── */
 .adm .rlw-toast {
   position: fixed; left: 50%; bottom: 28px; z-index: 90; transform: translateX(-50%); padding: 10px 16px; border-radius: 12px;
@@ -216,7 +299,8 @@
 }
 
 /* 누름 반응 */
-.adm .rlw-btn:active:not(:disabled), .adm .rlw-bld:active, .adm .rlw-tbtn:active:not(:disabled) { transform: scale(.97); }
+.adm .rlw-btn:active:not(:disabled), .adm .rlw-bld:active, .adm .rlw-tbtn:active:not(:disabled),
+.adm .rlw-addlink:active, .adm .rlw-dbtn:active:not(:disabled) { transform: scale(.97); }
 
 /* 키보드 초점 — 보라 테두리 하나 */
 .adm .rlw button:focus-visible, .adm .rlw a:focus-visible { outline: 2px solid var(--rlw-v); outline-offset: 2px; }
@@ -226,10 +310,12 @@
 @keyframes rlw-slide { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
 @keyframes rlw-pop { from { transform: scale(.97); } to { transform: none; } }
 @keyframes rlw-draw { to { stroke-dashoffset: 0; } }
+@keyframes rlw-drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes rlw-dialog { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 1380px) {
   .adm .rlw-body, .adm .rlw-cols { gap: 22px; }
-  .adm .rlw-blds { width: 164px; }
+  .adm .rlw-side { width: 164px; }
   .adm .rlw-pane { width: 300px; }
   .adm .rlw-thead, .adm .rlw-row { grid-template-columns: 58px minmax(120px, 170px) minmax(0, 1fr) auto; gap: 10px; }
 }
@@ -239,8 +325,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .rlw-row, .adm .rlw-pane, .adm .rlw-form, .adm .rlw-toast, .adm .rlw-btn.is-done { animation: none; }
+  .adm .rlw-row, .adm .rlw-pane, .adm .rlw-form, .adm .rlw-toast, .adm .rlw-btn.is-done,
+  .adm .rlw-nform, .adm .rlw-radd, .adm .rlw-scrim, .adm .rlw-dialog { animation: none; }
   .adm .rlw-check path { animation: none; stroke-dashoffset: 0; }
-  .adm .rlw-row, .adm .rlw-bld, .adm .rlw-btn, .adm .rlw-tbtn { transition: none; }
-  .adm .rlw-btn:active:not(:disabled), .adm .rlw-bld:active, .adm .rlw-tbtn:active:not(:disabled) { transform: none; }
+  .adm .rlw-row, .adm .rlw-bld, .adm .rlw-btn, .adm .rlw-tbtn, .adm .rlw-addlink, .adm .rlw-dbtn { transition: none; }
+  .adm .rlw-btn:active:not(:disabled), .adm .rlw-bld:active, .adm .rlw-tbtn:active:not(:disabled),
+  .adm .rlw-addlink:active, .adm .rlw-dbtn:active:not(:disabled) { transform: none; }
 }

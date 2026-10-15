@@ -1378,6 +1378,17 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 - 새 권한 키 `room_links.access` 의 `capability_roles` · `capability_policies` 행도 같은 마이그레이션에서 넣는다
   (레지스트리 시드 `202609100001` 의 생성 구역도 갱신 — 새 DB 용).
 
+## 2026-10-15 룸 링크 직접 추가 — `room_link_buildings` · `room_link_rooms`
+
+마이그레이션 `202610150002_room_link_manual_entries.sql`(**운영 적용 전** — 검토 후 적용).
+
+- 두 표 모두 기존 룸 링크 표와 같은 모양: SELECT `to authenticated using (organization_id = any ((select public.capability_organization_ids('room_links.access'))::uuid[]))`
+  (정책 `room links readers can read manual buildings` / `… manual rooms`) · 플랫폼 관리자 FOR ALL(`platform admins can manage manual buildings` / `… rooms`).
+- 일반 사용자 INSERT/UPDATE/DELETE 정책 없음 — 추가 · 이름 바꾸기 · 지우기는 서버 액션(`src/app/admin/ops/room-links/actions.ts`)이
+  `room_links.access` 와 대상의 조직을 다시 확인한 뒤 service-role 로 한다. Beds24 객실(`rooms`)은 이 액션들이 건드리지 않는다.
+- 권한: `select` → `authenticated`, `all` → `service_role`, `anon` 회수.
+- `room_listing_links.manual_room_id` · `building_listing_links.manual_building_id` 는 새 열일 뿐 — 두 표의 기존 정책이 그대로 덮는다(조직 · 권한 판정 같음).
+
 ## 2026-10-06 자동화 — 보기 `ops_admin.access` / 쓰기 `automation.manage`
 
 마이그레이션 `202610060003_automation_control.sql`(운영 적용).

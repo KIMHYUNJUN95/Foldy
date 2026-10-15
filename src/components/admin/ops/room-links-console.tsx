@@ -4,6 +4,13 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState, useTransition
 import { useRouter } from "next/navigation";
 import { ExternalLink, Search } from "lucide-react";
 import {
+  addManualBuilding,
+  addManualRoom,
+  deleteManualBuilding,
+  deleteManualRoom,
+  type ManualEntryResult,
+  renameManualBuilding,
+  renameManualRoom,
   saveBuildingListingLink,
   saveRoomListingLink,
   type SaveRoomLinkResult,
@@ -16,7 +23,7 @@ import type {
   RoomLinkUnitView,
   RoomLinkView,
 } from "@/lib/room-links";
-import type { RoomLinkChannel } from "@/lib/room-links-model";
+import { ROOM_LINK_NAME_MAX, type RoomLinkChannel } from "@/lib/room-links-model";
 import "./room-links-white.css";
 
 /**
@@ -27,6 +34,9 @@ import "./room-links-white.css";
  * 건물 목록 → 가운데 객실 표(객실 · 유닛 · 게스트 링크 · 바로 하기) → 오른쪽 상세. 표에서 판매 중 계정의 게스트 링크를
  * 바로 복사하고, 상세에서 유닛마다 링크를 고친다. Booking.com 은 건물 단위라 가운데 건물 머리에 있다.
  * 저장은 서버 액션이 권한 · 조직 · 입력을 다시 본다 — 여기 검사는 편의다.
+ *
+ * 건물 · 객실 직접 추가(2026-10-15, 시안 LinksAdd · LinksNewBld · LinksDelete): 건물 목록 아래 「+ 건물 추가」, 표 아래
+ * 「+ 객실 추가」. 직접 추가한 것엔 회색 「직접 추가」 표시가 붙고, 이름 바꾸기 · 지우기(확인 창)가 있다. 룸 링크에만 생긴다.
  */
 type Copy = Dictionary["roomLinks"];
 type White = Copy["white"];
@@ -54,15 +64,33 @@ const tokyoMonthDay = new Intl.DateTimeFormat("en-US", { day: "numeric", month: 
 
 const COPY_FEEDBACK_MS = 1600;
 
-type Selection = { building: number; row: number };
-/** 열려 있는 편집 폼 — 건물 Booking.com(`booking:<건물>`) 또는 유닛(roomId). */
+/** 고른 건물 · 객실 — 인덱스가 아니라 키로 들고 있어 추가 · 이름 바꾸기 · 지우기 뒤에도 그대로 남는다. */
+type Selection = { building: string; row: string | null };
+/** 열려 있는 편집 폼 — 건물 Booking.com(`booking:<건물 키>`) 또는 유닛(roomId). */
 type EditTarget = string | null;
+/** 확인 창 — 직접 추가한 건물 · 객실 지우기(되돌릴 수 없음). */
+type ConfirmTarget =
+  | { kind: "building"; id: string; name: string; rooms: number }
+  | { kind: "room"; id: string; name: string };
+
+/** 건물 키 — 직접 추가한 건물은 id(이름을 바꿔도 같은 키), Beds24 건물은 이름. */
+const buildingKey = (building: RoomLinkBuildingView) =>
+  building.manualId ? `m:${building.manualId}` : `b:${building.name}`;
 
 export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy: Copy }) {
   const w = copy.white;
-  const [selection, setSelection] = useState<Selection>({ building: 0, row: 0 });
+  const router = useRouter();
+  const [selection, setSelection] = useState<Selection>(() => ({
+    building: data.buildings[0] ? buildingKey(data.buildings[0]) : "",
+    row: null,
+  }));
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<EditTarget>(null);
+  /** 객실 추가 폼(지금 건물) · 건물 추가 폼 · 이름 바꾸기(`building` / `room`). */
+  const [addingRoom, setAddingRoom] = useState(false);
+  const [addingBuilding, setAddingBuilding] = useState(false);
+  const [renaming, setRenaming] = useState<"building" | "room" | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmTarget | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [live, setLive] = useState("");
   const [toast, setToast] = useState<string | null>(null);
@@ -98,12 +126,10 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
   };
 
   const all = useMemo(
-    () =>
-      data.buildings.flatMap((building, buildingIndex) =>
-        building.rows.map((row, rowIndex) => ({ building, buildingIndex, row, rowIndex })),
-      ),
+    () => data.buildings.flatMap((building) => building.rows.map((row) => ({ building, row }))),
     [data.buildings],
   );
+  // 직접 추가한 객실도 한 줄 = 객실 하나 · 리스팅은 링크가 있는 것만으로 같이 센다.
   const totals = useMemo(() => {
     const units = all.flatMap((entry) => entry.row.units);
     return {
@@ -127,33 +153,34 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
       )
     : [];
 
-  if (data.buildings.length === 0) {
-    return (
-      <div className="rlw">
-        <div className="rlw-empty">{copy.noRooms}</div>
-      </div>
-    );
-  }
-
-  const buildingIndex = Math.min(selection.building, data.buildings.length - 1);
-  const building = data.buildings[buildingIndex];
-  const row: RoomLinkRowView | undefined = building.rows[Math.min(selection.row, building.rows.length - 1)];
+  const building: RoomLinkBuildingView | undefined =
+    data.buildings.find((item) => buildingKey(item) === selection.building) ?? data.buildings[0];
+  const bKey = building ? buildingKey(building) : "";
+  const row: RoomLinkRowView | undefined = building
+    ? (building.rows.find((item) => item.key === selection.row) ?? building.rows[0])
+    : undefined;
 
   const select = (next: Selection) => {
-    if (next.building !== selection.building || next.row !== selection.row) setEditing(null);
+    if (next.building !== bKey || next.row !== (row?.key ?? null)) {
+      setEditing(null);
+      setRenaming(null);
+    }
+    if (next.building !== bKey) setAddingRoom(false);
     setSelection(next);
     setQuery("");
   };
 
+  /** 추가 · 이름 바꾸기 · 지우기가 끝나면 — 알림 한 줄 + 목록 다시 읽기. */
+  const done = (message: string) => {
+    flash(message);
+    router.refresh();
+  };
+
   const isDuplicate = (unit: RoomLinkUnitView) => !!unit.airbnb?.listingId && duplicates.has(unit.airbnb.listingId);
 
-  const renderRow = (
-    entry: { building: RoomLinkBuildingView; buildingIndex: number; row: RoomLinkRowView; rowIndex: number },
-    index: number,
-    showBuilding: boolean,
-  ) => {
-    const target = { building: entry.buildingIndex, row: entry.rowIndex };
-    const on = !needle && entry.buildingIndex === buildingIndex && row?.key === entry.row.key;
+  const renderRow = (entry: { building: RoomLinkBuildingView; row: RoomLinkRowView }, index: number, showBuilding: boolean) => {
+    const target = { building: buildingKey(entry.building), row: entry.row.key };
+    const on = !needle && target.building === bKey && row?.key === entry.row.key;
     const primary = primaryUnit(entry.row);
     const guestUrl = primary?.airbnb?.guestUrl ?? null;
     const hostUrl = primary?.airbnb?.hostUrl ?? null;
@@ -175,18 +202,25 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
           </button>
         </span>
         <span className="rlw-row__units">
-          {sellers.map((unit) => (
-            <span className="rlw-sell" key={unit.roomId}>
-              <i aria-hidden="true" />
-              {fill(w.unitSelling, { u: unit.unitLabel })}
-            </span>
-          ))}
-          {resting.map((unit, restIndex) => (
-            <span className="rlw-rest" key={unit.roomId}>
-              {sellers.length > 0 || restIndex > 0 ? " · " : ""}
-              <span>{fill(w.unitResting, { u: unit.unitLabel })}</span>
-            </span>
-          ))}
+          {entry.row.manualRoomId ? (
+            // 직접 추가한 객실 — Beds24 유닛이 없어 판매 중 표시 대신 「직접 추가」.
+            <span className="rlw-tag">{w.manualTag}</span>
+          ) : (
+            <>
+              {sellers.map((unit) => (
+                <span className="rlw-sell" key={unit.roomId}>
+                  <i aria-hidden="true" />
+                  {fill(w.unitSelling, { u: unit.unitLabel })}
+                </span>
+              ))}
+              {resting.map((unit, restIndex) => (
+                <span className="rlw-rest" key={unit.roomId}>
+                  {sellers.length > 0 || restIndex > 0 ? " · " : ""}
+                  <span>{fill(w.unitResting, { u: unit.unitLabel })}</span>
+                </span>
+              ))}
+            </>
+          )}
         </span>
         <span className="rlw-row__guest">
           {guestUrl ? (
@@ -256,6 +290,48 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
         .at(-1)
     : undefined;
 
+  const buildingAdd = (
+    <div className="rlw-badd">
+      {addingBuilding ? (
+        <NameForm
+          copy={copy}
+          key="add-building"
+          label={w.newBuildingName}
+          note={w.buildingNote}
+          onCancel={() => setAddingBuilding(false)}
+          onDone={(result) => {
+            setAddingBuilding(false);
+            setSelection({ building: `m:${result.id}`, row: null });
+            setQuery("");
+            done(w.addedToast);
+          }}
+          submit={(name) => addManualBuilding({ name })}
+          submitLabel={w.add}
+          variant="stack"
+        />
+      ) : (
+        <button className="rlw-addlink" onClick={() => setAddingBuilding(true)} type="button">
+          <span aria-hidden="true">+</span>
+          {w.addBuilding}
+        </button>
+      )}
+    </div>
+  );
+
+  const roomAddForm = building ? (
+    <RoomAddForm
+      building={building}
+      copy={copy}
+      key={`add-room:${bKey}`}
+      onCancel={() => setAddingRoom(false)}
+      onDone={(result) => {
+        setAddingRoom(false);
+        setSelection({ building: bKey, row: `manual:${result.id}` });
+        done(w.addedToast);
+      }}
+    />
+  ) : null;
+
   return (
     <div className="rlw">
       <div className="rlw-body">
@@ -287,20 +363,28 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
             </label>
           </div>
           <div className="rlw-cols">
-            <nav aria-label={copy.buildings} className="rlw-blds">
-              {data.buildings.map((item, index) => (
-                <button
-                  aria-current={index === buildingIndex && !needle ? "true" : undefined}
-                  className={`rlw-bld${index === buildingIndex && !needle ? " on" : ""}`}
-                  key={item.name}
-                  onClick={() => select({ building: index, row: 0 })}
-                  type="button"
-                >
-                  <span>{item.name}</span>
-                  <span className="rlw-bld__n">{unitTotal(item)}</span>
-                </button>
-              ))}
-            </nav>
+            <div className="rlw-side">
+              <nav aria-label={copy.buildings} className="rlw-blds">
+                {data.buildings.map((item) => {
+                  const key = buildingKey(item);
+                  const on = key === bKey && !needle;
+                  return (
+                    <button
+                      aria-current={on ? "true" : undefined}
+                      className={`rlw-bld${on ? " on" : ""}`}
+                      key={key}
+                      onClick={() => select({ building: key, row: null })}
+                      type="button"
+                    >
+                      <span>{item.name}</span>
+                      {item.manualId && <span className="rlw-tag">{w.manualTag}</span>}
+                      <span className="rlw-bld__n">{unitTotal(item)}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+              {buildingAdd}
+            </div>
 
             <section className="rlw-mid">
               {needle ? (
@@ -320,16 +404,58 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
                     </div>
                   )}
                 </>
+              ) : !building ? (
+                <div className="rlw-empty">{copy.noRooms}</div>
               ) : (
                 <>
                   <header className="rlw-bh">
-                    <div className="rlw-bh__t">
-                      <h2>{building.name}</h2>
-                      <span>
-                        {fill(copy.statRooms, { n: building.rows.length })} ·{" "}
-                        {fill(copy.statListings, { n: unitTotal(building) })}
-                      </span>
-                    </div>
+                    {building.manualId && renaming === "building" ? (
+                      <NameForm
+                        copy={copy}
+                        initial={building.name}
+                        key={`rename:${bKey}`}
+                        label={w.renameAria}
+                        onCancel={() => setRenaming(null)}
+                        onDone={() => {
+                          setRenaming(null);
+                          done(w.renamedToast);
+                        }}
+                        submit={(name) => renameManualBuilding({ id: building.manualId!, name })}
+                        submitLabel={copy.save}
+                        variant="inline"
+                      />
+                    ) : (
+                      <div className="rlw-bh__t">
+                        <h2>{building.name}</h2>
+                        {building.manualId && <span className="rlw-tag">{w.manualTag}</span>}
+                        <span>
+                          {fill(copy.statRooms, { n: building.rows.length })}
+                          {building.manualId ? "" : ` · ${fill(copy.statListings, { n: unitTotal(building) })}`}
+                        </span>
+                        {building.manualId && (
+                          <>
+                            <span className="rlw-grow" />
+                            <button className="rlw-tbtn" onClick={() => setRenaming("building")} type="button">
+                              {w.rename}
+                            </button>
+                            <button
+                              className="rlw-tbtn is-bad"
+                              onClick={() =>
+                                setConfirm({
+                                  id: building.manualId!,
+                                  kind: "building",
+                                  name: building.name,
+                                  rooms: building.rows.length,
+                                })
+                              }
+                              type="button"
+                            >
+                              {w.deleteBuilding}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                     {building.address ? (
                       <p className="rlw-bh__addr">
                         {building.address}
@@ -342,43 +468,67 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
                           </>
                         )}
                       </p>
-                    ) : null /* 주소를 두지 않는 건물(사노 — 사용자 결정 2026-10-02)은 줄 자체를 감춘다. */}
+                    ) : null /* 주소를 두지 않는 건물(사노 — 사용자 결정 2026-10-02) · 직접 추가한 건물은 줄 자체를 감춘다. */}
                     <BookingLine
                       building={building}
                       copiedKey={copiedKey}
                       copy={copy}
-                      editing={editing === `booking:${building.name}`}
+                      editing={editing === `booking:${bKey}`}
+                      editKey={`booking:${bKey}`}
                       onCopy={copyLink}
-                      onEdit={(open) => setEditing(open ? `booking:${building.name}` : null)}
+                      onEdit={(open) => setEditing(open ? `booking:${bKey}` : null)}
                       onSaved={flash}
                     />
                   </header>
-                  {building.rows.length === 0 ? (
-                    <div className="rlw-empty">{w.noRoomsInBuilding}</div>
-                  ) : (
-                    <div className="rlw-table" key={building.name}>
-                      {tableHead}
-                      {building.rows.map((item, index) =>
-                        renderRow({ building, buildingIndex, row: item, rowIndex: index }, index, false),
-                      )}
-                    </div>
-                  )}
+                  <div className="rlw-table" key={bKey}>
+                    {tableHead}
+                    {building.rows.map((item, index) => renderRow({ building, row: item }, index, false))}
+                    {building.rows.length === 0 && !addingRoom && (
+                      <div className="rlw-blank">
+                        <b>{w.emptyTitle}</b>
+                        <span>{w.emptyBody}</span>
+                        <button className="rlw-btn is-save" onClick={() => setAddingRoom(true)} type="button">
+                          + {w.addRoom}
+                        </button>
+                      </div>
+                    )}
+                    {addingRoom
+                      ? roomAddForm
+                      : building.rows.length > 0 && (
+                          <button className="rlw-addlink is-row" onClick={() => setAddingRoom(true)} type="button">
+                            <span aria-hidden="true">+</span>
+                            {w.addRoom}
+                          </button>
+                        )}
+                  </div>
                 </>
               )}
-              <p className="rlw-note">{w.note}</p>
+              {!addingRoom && <p className="rlw-note">{w.note}</p>}
             </section>
           </div>
         </div>
 
-        {row && (
+        {row && building ? (
           <aside className="rlw-pane" key={row.key}>
             <div className="rlw-pane__h">
               <span>{building.name}</span>
-              <b>{row.label}</b>
-              <small>
-                {fill(w.unitCount, { n: row.units.length })}
-                {row.units.length > 1 ? ` · ${w.sellingFirst}` : ""}
-              </small>
+              {row.manualRoomId ? (
+                <>
+                  <div className="rlw-pane__name">
+                    <b>{row.label}</b>
+                    <span className="rlw-tag">{w.manualTag}</span>
+                  </div>
+                  <small>{w.manualRoomSub}</small>
+                </>
+              ) : (
+                <>
+                  <b>{row.label}</b>
+                  <small>
+                    {fill(w.unitCount, { n: row.units.length })}
+                    {row.units.length > 1 ? ` · ${w.sellingFirst}` : ""}
+                  </small>
+                </>
+              )}
             </div>
             {orderUnits(row).map((unit) => (
               <UnitBlock
@@ -393,12 +543,63 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
                 unit={unit}
               />
             ))}
+            {row.manualRoomId &&
+              (renaming === "room" ? (
+                <div className="rlw-pane__acts">
+                  <NameForm
+                    copy={copy}
+                    initial={row.label}
+                    key={`rename:${row.key}`}
+                    label={w.renameAria}
+                    onCancel={() => setRenaming(null)}
+                    onDone={() => {
+                      setRenaming(null);
+                      done(w.renamedToast);
+                    }}
+                    submit={(name) => renameManualRoom({ id: row.manualRoomId!, name })}
+                    submitLabel={copy.save}
+                    variant="stack"
+                  />
+                </div>
+              ) : (
+                <div className="rlw-pane__acts">
+                  <button className="rlw-tbtn" onClick={() => setRenaming("room")} type="button">
+                    {w.rename}
+                  </button>
+                  <button
+                    className="rlw-tbtn is-bad"
+                    onClick={() => setConfirm({ id: row.manualRoomId!, kind: "room", name: row.label })}
+                    type="button"
+                  >
+                    {w.deleteRoom}
+                  </button>
+                </div>
+              ))}
             {lastEdited && (
               <span className="rlw-pane__foot">{fill(w.lastEdited, { d: tokyoMonthDay.format(new Date(lastEdited)) })}</span>
             )}
           </aside>
+        ) : (
+          <aside className="rlw-pane is-empty">
+            <span>{w.pickRoom}</span>
+          </aside>
         )}
       </div>
+
+      {confirm && (
+        <ConfirmDelete
+          copy={copy}
+          onClose={() => setConfirm(null)}
+          onDone={() => {
+            setConfirm(null);
+            if (confirm.kind === "room") setSelection({ building: bKey, row: null });
+            setEditing(null);
+            setRenaming(null);
+            done(w.deletedToast);
+          }}
+          target={confirm}
+        />
+      )}
 
       <span className="rlw-sr" role="status">
         {live}
@@ -457,6 +658,7 @@ function BookingLine({
   copy,
   copiedKey,
   editing,
+  editKey,
   onCopy,
   onEdit,
   onSaved,
@@ -465,13 +667,16 @@ function BookingLine({
   copy: Copy;
   copiedKey: string | null;
   editing: boolean;
+  /** 복사 표시 · 폼 키 — 건물 키(직접 추가한 건물은 id). */
+  editKey: string;
   onCopy: (key: string, text: string) => void;
   onEdit: (open: boolean) => void;
   onSaved: (message: string) => void;
 }) {
   const w = copy.white;
   const link = building.booking;
-  const copyKey = `booking:${building.name}`;
+  const copyKey = editKey;
+  const manual = Boolean(building.manualId);
   return (
     <>
       <div className="rlw-bk">
@@ -481,17 +686,34 @@ function BookingLine({
             {fill(copy.hotelId, { id: "" }).trim()} <span className="rlw-mono">{link.listingId}</span>
           </span>
         )}
-        <span className="rlw-faint">{copy.buildingWide}</span>
-        <span className="rlw-grow" />
-        {!link ? (
+        {!link && manual ? (
+          // 직접 추가한 건물 — 시안 LinksNewBld: 「아직 링크가 없어요」 + 「Booking.com 링크 넣기」.
           <>
-            <span className="rlw-muted">{w.bookingNone}</span>
+            <span className="rlw-muted">{w.bookingEmpty}</span>
+            <span className="rlw-grow" />
             {!editing && (
               <button className="rlw-tbtn is-v" onClick={() => onEdit(true)} type="button">
-                {w.put}
+                {w.bookingPut}
               </button>
             )}
           </>
+        ) : (
+          <>
+            <span className="rlw-faint">{copy.buildingWide}</span>
+            <span className="rlw-grow" />
+          </>
+        )}
+        {!link ? (
+          !manual && (
+            <>
+              <span className="rlw-muted">{w.bookingNone}</span>
+              {!editing && (
+                <button className="rlw-tbtn is-v" onClick={() => onEdit(true)} type="button">
+                  {w.put}
+                </button>
+              )}
+            </>
+          )
         ) : (
           <>
             {link.hostUrl && (
@@ -542,7 +764,14 @@ function BookingLine({
           link={link}
           onClose={() => onEdit(false)}
           onSaved={onSaved}
-          save={(form) => saveBuildingListingLink({ ...form, building: building.name, channel: "booking" })}
+          save={(form) =>
+            saveBuildingListingLink({
+              ...form,
+              building: building.name,
+              channel: "booking",
+              manualBuildingId: building.manualId,
+            })
+          }
         />
       )}
     </>
@@ -576,8 +805,17 @@ function UnitBlock({
     <section className={`rlw-unit${unit.selling ? " is-now" : ""}`}>
       <div className="rlw-unit__h">
         <b className="rlw-mono">{unit.unitLabel}</b>
-        {/* 판매 중 표시는 유닛 하나인 방에도 붙인다(2026-10-02 사용자 지시). */}
-        {unit.selling ? (
+        {/* 판매 중 표시는 유닛 하나인 방에도 붙인다(2026-10-02 사용자 지시). 직접 추가한 객실은 판매 정보가 없어 링크 유무만. */}
+        {unit.manual ? (
+          link?.guestUrl ? (
+            <span className="rlw-sell">
+              <i aria-hidden="true" />
+              {w.linkReady}
+            </span>
+          ) : (
+            <span className="rlw-faint">{w.linkNone}</span>
+          )
+        ) : unit.selling ? (
           <span className="rlw-sell">
             <i aria-hidden="true" />
             {copy.sellingNow}
@@ -600,7 +838,7 @@ function UnitBlock({
           link={link}
           onClose={() => onEdit(false)}
           onSaved={onSaved}
-          save={(form) => saveRoomListingLink({ ...form, channel: "airbnb", roomId: unit.roomId })}
+          save={(form) => saveRoomListingLink({ ...form, channel: "airbnb", manual: unit.manual, roomId: unit.roomId })}
         />
       ) : !link ? (
         <div className="rlw-unit__ch">
@@ -628,7 +866,7 @@ function UnitBlock({
                 done={copiedKey === copyKey}
                 label={copy.copy}
                 onCopy={() => onCopy(copyKey, link.guestUrl!)}
-                variant={unit.selling ? "fill" : "wide"}
+                variant={unit.selling || unit.manual ? "fill" : "wide"}
                 w={w}
               />
             </>
@@ -668,8 +906,16 @@ function UnitBlock({
   );
 }
 
-function errorText(copy: Copy, error: Extract<SaveRoomLinkResult, { ok: false }>["error"]) {
+type ActionError = Extract<SaveRoomLinkResult, { ok: false }>["error"] | Extract<ManualEntryResult, { ok: false }>["error"];
+
+function errorText(copy: Copy, error: ActionError) {
   switch (error) {
+    case "name_empty":
+      return copy.white.errNameEmpty;
+    case "name_long":
+      return copy.white.errNameLong;
+    case "name_taken":
+      return copy.white.errNameTaken;
     case "forbidden":
       return copy.errForbidden;
     case "not_found":
@@ -783,6 +1029,232 @@ function LinkEditor({
         <button className="rlw-btn is-save" disabled={pending} onClick={save} type="button">
           {pending ? copy.saving : copy.save}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 이름 한 칸 폼 — 건물 추가(건물 목록 아래, `stack`) · 건물 이름 바꾸기(건물 머리, `inline`) · 객실 이름 바꾸기(상세, `stack`).
+ * 검사(1~40자 · 겹침)는 서버가 한다 — 여기선 빈 값만 막는다.
+ */
+function NameForm({
+  copy,
+  initial = "",
+  label,
+  note,
+  submit,
+  submitLabel,
+  variant,
+  onCancel,
+  onDone,
+}: {
+  copy: Copy;
+  initial?: string;
+  label: string;
+  note?: string;
+  submit: (name: string) => Promise<ManualEntryResult>;
+  submitLabel: string;
+  variant: "stack" | "inline";
+  onCancel: () => void;
+  onDone: (result: Extract<ManualEntryResult, { ok: true }>) => void;
+}) {
+  const [name, setName] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const send = () => {
+    if (!name.trim() || pending) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await submit(name);
+      if (!result.ok) {
+        setError(errorText(copy, result.error));
+        return;
+      }
+      onDone(result);
+    });
+  };
+  return (
+    <form
+      className={`rlw-nform is-${variant}`}
+      onSubmit={(event) => {
+        event.preventDefault();
+        send();
+      }}
+    >
+      <label className="rlw-field">
+        <span>{label}</span>
+        <input
+          autoFocus
+          maxLength={ROOM_LINK_NAME_MAX}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") onCancel();
+          }}
+          value={name}
+        />
+      </label>
+      <div className="rlw-nform__acts">
+        <button className="rlw-tbtn" disabled={pending} onClick={onCancel} type="button">
+          {copy.cancel}
+        </button>
+        <button className="rlw-btn is-save" disabled={pending || !name.trim()} type="submit">
+          {pending ? copy.saving : submitLabel}
+        </button>
+      </div>
+      {error && <p className="rlw-err">{error}</p>}
+      {note && <p className="rlw-nform__note">{note}</p>}
+    </form>
+  );
+}
+
+/** 객실 추가 — 표 바로 아래(시안 LinksAdd). 이름은 필수, 게스트 · 호스트 링크(리스팅 ID 숫자만도)는 선택. */
+function RoomAddForm({
+  building,
+  copy,
+  onCancel,
+  onDone,
+}: {
+  building: RoomLinkBuildingView;
+  copy: Copy;
+  onCancel: () => void;
+  onDone: (result: Extract<ManualEntryResult, { ok: true }>) => void;
+}) {
+  const w = copy.white;
+  const [form, setForm] = useState({ guest: "", host: "", name: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const send = () => {
+    if (!form.name.trim() || pending) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await addManualRoom({
+        building: building.manualId ? null : building.name,
+        guest: form.guest,
+        host: form.host,
+        manualBuildingId: building.manualId,
+        name: form.name,
+      });
+      if (!result.ok) {
+        setError(errorText(copy, result.error));
+        return;
+      }
+      onDone(result);
+    });
+  };
+  return (
+    <form
+      className="rlw-radd"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onCancel();
+      }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        send();
+      }}
+    >
+      <b>{w.addRoom}</b>
+      <div className="rlw-radd__fields">
+        <label className="rlw-field is-name">
+          <span>{w.roomName}</span>
+          <input
+            autoFocus
+            className="rlw-mono"
+            maxLength={ROOM_LINK_NAME_MAX}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+            value={form.name}
+          />
+        </label>
+        <label className="rlw-field">
+          <span>{w.guestOptional}</span>
+          <input
+            onChange={(event) => setForm({ ...form, guest: event.target.value })}
+            placeholder={w.guestHint}
+            value={form.guest}
+          />
+        </label>
+        <label className="rlw-field">
+          <span>{w.hostOptional}</span>
+          <input
+            onChange={(event) => setForm({ ...form, host: event.target.value })}
+            placeholder={w.hostIdHint}
+            value={form.host}
+          />
+        </label>
+      </div>
+      {error && <p className="rlw-err">{error}</p>}
+      <div className="rlw-radd__acts">
+        <span className="rlw-radd__note">{w.addRoomNote}</span>
+        <button className="rlw-tbtn" disabled={pending} onClick={onCancel} type="button">
+          {copy.cancel}
+        </button>
+        <button className="rlw-btn is-save" disabled={pending || !form.name.trim()} type="submit">
+          {pending ? copy.saving : w.addRoom}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * 지우기 확인 창(시안 LinksDelete) — 「그대로 두기 / 지우기(빨강)」. 첫 초점은 「그대로 두기」(Enter 한 번에 지워지지 않게),
+ * Esc · 바깥 누르기는 닫기. 직접 추가한 건물을 지우면 그 객실 · 링크가 함께 지워진다(되돌릴 수 없음).
+ */
+function ConfirmDelete({
+  copy,
+  target,
+  onClose,
+  onDone,
+}: {
+  copy: Copy;
+  target: ConfirmTarget;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const w = copy.white;
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pending) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, pending]);
+  const title =
+    target.kind === "building" ? fill(w.delBuildingTitle, { name: target.name }) : fill(w.delRoomTitle, { name: target.name });
+  const body =
+    target.kind === "room"
+      ? w.delRoomBody
+      : target.rooms > 0
+        ? fill(w.delBuildingBody, { n: target.rooms })
+        : w.delBuildingBodyEmpty;
+  const run = () => {
+    setError(null);
+    startTransition(async () => {
+      const result =
+        target.kind === "building" ? await deleteManualBuilding({ id: target.id }) : await deleteManualRoom({ id: target.id });
+      if (!result.ok) {
+        setError(errorText(copy, result.error));
+        return;
+      }
+      onDone();
+    });
+  };
+  return (
+    <div className="rlw-scrim" onClick={() => !pending && onClose()}>
+      <div aria-label={title} aria-modal="true" className="rlw-dialog" onClick={(event) => event.stopPropagation()} role="alertdialog">
+        <b>{title}</b>
+        <p>{body}</p>
+        {error && <p className="rlw-err">{error}</p>}
+        <div className="rlw-dialog__acts">
+          <button autoFocus className="rlw-dbtn is-keep" disabled={pending} onClick={onClose} type="button">
+            {w.keep}
+          </button>
+          <button className="rlw-dbtn is-del" disabled={pending} onClick={run} type="button">
+            {pending ? w.deleting : w.confirmDelete}
+          </button>
+        </div>
       </div>
     </div>
   );

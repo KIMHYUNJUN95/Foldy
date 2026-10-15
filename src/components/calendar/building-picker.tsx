@@ -62,7 +62,9 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
     () =>
       rows.flatMap((r) => {
         const loc = getPropertyLocation(r.property);
-        return loc ? [{ id: r.property, label: loc.mapLabel ?? r.label, rooms: r.rooms, empty: r.empty, lat: loc.lat, lng: loc.lng }] : [];
+        return loc
+          ? [{ id: r.property, label: loc.mapLabel ?? r.label, rooms: r.rooms, empty: r.empty, lat: loc.lat, lng: loc.lng, floors: loc.floors, size: loc.size ?? [1, 1] }]
+          : [];
       }),
     [rows],
   );

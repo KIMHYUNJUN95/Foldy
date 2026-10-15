@@ -19,7 +19,8 @@ import "./building-map.css";
  * 처음 그리는 장면(경계선 → 판이 눕고 → 건물이 솟음)은 탭(세션)마다 한 번만, 그 뒤엔 짧게.
  */
 
-export type MapBuilding = { id: string; label: string; rooms: number; empty: number; lat: number; lng: number };
+/** `floors`: 실제 층수(블록 높이) · `size`: 바닥 가로 · 세로 배율(1 = 보통 빌딩, STAY ARI 는 옆으로 길게 · 단독주택은 작게). */
+export type MapBuilding = { id: string; label: string; rooms: number; empty: number; lat: number; lng: number; floors: number; size: [number, number] };
 export type BuildingMapCopy = {
   mapAria: string;
   emptyN: string;
@@ -148,11 +149,14 @@ export function BuildingMap({
   // ── 건물 블록 모양(화면 px · 확대와 무관)
   const shapes = useMemo(() => {
     return buildings.map((b) => {
-      const h = 5.5 + Math.min(b.rooms, 26) * 0.24;
-      const Hh = 14 + Math.min(b.rooms, 30) * 1.8;
-      const base: Vec[] = [lay(-h, -h), lay(h, -h), lay(h, h), lay(-h, h)];
+      // 높이 = 실제 층수(한 층 5.2px + 지붕 턱), 바닥 = 보통 빌딩 7px 반폭 × 건물별 배율(2026-10-15 사용자 제공 층수 · 모양).
+      const hx = 7 * b.size[0];
+      const hy = 7 * b.size[1];
+      const h = (hx + hy) / 2;
+      const Hh = 4 + b.floors * 5.2;
+      const base: Vec[] = [lay(-hx, -hy), lay(hx, -hy), lay(hx, hy), lay(-hx, hy)];
       const faces: Array<{ side: "l" | "r"; pts: string; floors: string[] }> = [];
-      const floorsN = Math.max(2, Math.floor(Hh / 6.5));
+      const floorsN = Math.max(1, b.floors);
       for (let j = 0; j < 4; j++) {
         const p1 = base[j];
         const p2 = base[(j + 1) % 4];
@@ -174,7 +178,7 @@ export function BuildingMap({
         .filter(([a, c]) => (a[1] + c[1]) / 2 > -Hh)
         .map(([a, c]) => `M${a[0].toFixed(1)} ${a[1].toFixed(1)}L${c[0].toFixed(1)} ${c[1].toFixed(1)}`)
         .join("");
-      return { id: b.id, h, H: Hh, faces, top: top.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" "), rim };
+      return { id: b.id, h, foot: Math.max(...base.map((p) => Math.abs(p[0]))) * 2, H: Hh, faces, top: top.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" "), rim };
     });
   }, [buildings]);
 
@@ -199,7 +203,7 @@ export function BuildingMap({
     const ids = buildings.map((b) => b.id).filter((id) => worldOf.has(id));
     const truth = ids.map((id) => screen(worldOf.get(id)!));
     const pos = truth.map((p) => [p[0], p[1]] as Vec);
-    const foot = ids.map((id) => (shapes.find((x) => x.id === id)?.h ?? 8) * 2.5);
+    const foot = ids.map((id) => (shapes.find((x) => x.id === id)?.foot ?? 18) + 4);
     const hood = ids.map((id) => id.replace(/[A-Z]$/, ""));
     const ys = 0.6; // 블록은 세로로 길어서 옆으로 나란히 떼는 게 잘 보인다(세로 차이는 덜 쳐 줌)
     const push = () => {
@@ -265,7 +269,12 @@ export function BuildingMap({
     const list: Cl[] = buildings.filter((b) => b.id !== selectedId).map((b) => make([b.id]));
     if (selectedId && worldOf.has(selectedId)) list.push(make([selectedId]));
     // 이름표 자리: 위쪽 건물부터 놓고, 겹치면 위로 · 옆으로 빼서 비스듬한 지시선으로 잇는다(지도 콜아웃처럼).
-    type Placed = { cl: Cl; lift: number; dx: number; r: [number, number, number, number] };
+    type Placed = { cl: Cl; lift: number; dx: number; r: [number, number, number, number]; seg: [number, number, number, number] };
+    // 지시선끼리 엇갈리면 읽기 어렵다 — 엇갈리는 자리는 비용을 크게 매긴다.
+    const cross = (a: Placed["seg"], b: Placed["seg"]) => {
+      const o = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
+      return o(a[0], a[1], a[2], a[3], b[0], b[1]) * o(a[0], a[1], a[2], a[3], b[2], b[3]) < 0 && o(b[0], b[1], b[2], b[3], a[0], a[1]) * o(b[0], b[1], b[2], b[3], a[2], a[3]) < 0;
+    };
     const hit = (a: Placed["r"], b: Placed["r"]) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
     const placed: Placed[] = [];
     const sorted = [...list].sort((a, b) => {
@@ -301,10 +310,13 @@ export function BuildingMap({
           if (r[0] < 4 || r[2] > W - 4 || r[1] < 6) continue;
           if (placed.some((p) => hit(p.r, r))) continue;
           if (blocks.some((b) => b.owner !== cl && hit(b.r, r))) continue;
-          const cost = Math.hypot(dx, lift < 0 ? -lift * 1.25 : lift);
+          const below = lift < 0 && y1 - CHIP_H > cl.by;
+          const seg: Placed["seg"] = [cl.bx, below ? cl.by : cl.top, Math.min(Math.max(cl.bx, cx - w / 2 + 14), cx + w / 2 - 14), below ? y1 - CHIP_H : y1];
+          const crossings = placed.filter((p) => cross(p.seg, seg)).length;
+          const cost = Math.hypot(dx, lift < 0 ? -lift * 1.25 : lift) + crossings * 160;
           if (cost < bestCost) {
             bestCost = cost;
-            best = { cl, lift, dx, r };
+            best = { cl, lift, dx, r, seg };
           }
         }
         return { best };
@@ -317,7 +329,7 @@ export function BuildingMap({
       if (!best) {
         const w = widthOf(cl);
         const y1 = cl.top - 12;
-        best = { cl, lift: 0, dx: 0, r: [cl.bx - w / 2 - 4, y1 - CHIP_H - 3, cl.bx + w / 2 + 4, y1 + 3] };
+        best = { cl, lift: 0, dx: 0, r: [cl.bx - w / 2 - 4, y1 - CHIP_H - 3, cl.bx + w / 2 + 4, y1 + 3], seg: [cl.bx, cl.top, cl.bx, y1] };
       }
       placed.push(best);
     }

@@ -14,7 +14,7 @@ import {
   type OrderLineItem,
   type OrderLinkDomain,
 } from "@/components/requests/order-item-row";
-import { uploadRequestImages } from "@/components/requests/request-image-upload";
+import { PhotoUploadStrip, usePhotoUpload } from "@/components/requests/photo-upload-progress";
 import type { Dictionary } from "@/lib/i18n";
 import { localizePropertyName } from "@/lib/room-label-normalization";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,8 @@ export function OrderCreateForm({
   const [formMessage, setFormMessage] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // 품목 사진은 「요청 보내기」 때 한 줄로 모아 올리고 확인 시트에서 사진마다 진행 · 실패한 사진만 다시(2026-10-15, 시안 Motion-C-Upload-Phone).
+  const uploads = usePhotoUpload(organizationId, "order-images");
   /** 품목별 사진 목록 (itemId → PreviewItem[]) */
   const [itemPhotos, setItemPhotos] = useState<Record<string, PreviewItem[]>>({});
 
@@ -194,7 +196,7 @@ export function OrderCreateForm({
     setConfirmOpen(true);
   }
 
-  function handleConfirmSubmit() {
+  async function handleConfirmSubmit() {
     const form = formRef.current;
     if (!form) return;
     const nextErrors = validateItems();
@@ -204,37 +206,23 @@ export function OrderCreateForm({
       return;
     }
 
-    const requestId = crypto.randomUUID();
+    const requestId = uploads.requestId();
     const formData = new FormData(form);
     formData.set("id", requestId);
     formData.set("buildingName", building);
     formData.set("urgency", urgency);
     formData.set("reason", reason);
 
+    // 품목별 사진을 한 줄로 모아 올린 뒤 주소를 다시 품목에 나눠 붙인다. 실패하면 시트에 남아 빨간 「다시」.
+    const flat = items.flatMap((item) => (itemPhotos[item.id] ?? []).map((photo) => ({ itemId: item.id, photo })));
+    const urls = flat.length > 0 ? await uploads.run(flat.map((f) => f.photo)) : [];
+    if (!urls) return;
+    const itemsWithPhotos = items.map((item) => {
+      const mine = flat.flatMap((f, i) => (f.itemId === item.id ? [urls[i]] : []));
+      return mine.length > 0 ? { ...item, imageUrls: mine } : item;
+    });
+    formData.set("itemsJson", JSON.stringify(itemsWithPhotos));
     startTransition(async () => {
-      // 품목별 사진 업로드 → URL을 item에 포함
-      // 업로드 실패 시 제출 중단하고 사용자에게 에러 표시
-      let itemsWithPhotos: typeof items;
-      try {
-        itemsWithPhotos = await Promise.all(
-          items.map(async (item) => {
-            const photos = itemPhotos[item.id] ?? [];
-            if (photos.length === 0) return item;
-            const { imageUrls } = await uploadRequestImages({
-              items: photos,
-              organizationId,
-              requestId,
-              requestType: "order-images",
-            });
-            return { ...item, imageUrls };
-          }),
-        );
-      } catch {
-        setConfirmOpen(false);
-        setFormMessage(copy.imageUploadFailed);
-        return;
-      }
-      formData.set("itemsJson", JSON.stringify(itemsWithPhotos));
       await createOrderRequest(formData);
     });
   }
@@ -369,7 +357,14 @@ export function OrderCreateForm({
       </form>
 
       {confirmOpen ? (
-        <BottomSheet ariaLabel={copy.wConfirmTitle} onClose={() => setConfirmOpen(false)}>
+        <BottomSheet
+          ariaLabel={copy.wConfirmTitle}
+          onClose={() => {
+            if (uploads.running) return;
+            uploads.abandon();
+            setConfirmOpen(false);
+          }}
+        >
           {({ close }) => (
             <div className="ofw-sheet">
               <div className="ofw-sheet__h">
@@ -390,12 +385,20 @@ export function OrderCreateForm({
                   <span>{copy.wTotalN.replace("{n}", String(totalQuantity))}</span>
                 </div>
               </div>
+              <PhotoUploadStrip
+                items={uploads.items}
+                states={uploads.states}
+                retryLabel={imgCopy.uploadRetry}
+                progressLabel={imgCopy.uploadProgress}
+                failedLabel={imgCopy.uploadFailed}
+                onRetry={handleConfirmSubmit}
+              />
               <div className="ofw-sheet__btns">
-                <button className="ofw-btn is-gray" onClick={close} type="button">
+                <button className="ofw-btn is-gray" disabled={uploads.running} onClick={close} type="button">
                   {copy.cancel}
                 </button>
-                <button className="ofw-btn is-pri" disabled={isPending} onClick={handleConfirmSubmit} type="button">
-                  {isPending ? <span className="ofw-spin" aria-hidden="true" /> : null}
+                <button className="ofw-btn is-pri" disabled={isPending || uploads.running} onClick={handleConfirmSubmit} type="button">
+                  {isPending || uploads.running ? <span className="ofw-spin" aria-hidden="true" /> : null}
                   {copy.wSubmit}
                 </button>
               </div>

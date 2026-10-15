@@ -10,7 +10,7 @@ import {
 } from "@/components/announcements/announcement-image-uploader";
 import type { UrgencyTone } from "@/components/requests/maintenance-confirm-modal";
 import { ChoiceTiles, ConfirmFormSheet, PickField, ReadonlyField } from "@/components/requests/request-form-kit";
-import { uploadRequestImages } from "@/components/requests/request-image-upload";
+import { PhotoUploadStrip, usePhotoUpload } from "@/components/requests/photo-upload-progress";
 import type { Dictionary } from "@/lib/i18n";
 import { maintenanceCategories } from "@/lib/maintenance-constants";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
@@ -62,6 +62,8 @@ export function MaintenanceCreateForm({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [summary, setSummary] = useState({ item: "", room: "" });
   const [isPending, startTransition] = useTransition();
+  // 사진은 「확인」 때 올리고 확인 시트에서 사진마다 진행 · 실패한 사진만 다시(2026-10-15, 시안 Motion-C-Upload-Phone).
+  const photos = usePhotoUpload(organizationId, "maintenance-reports");
 
   const [selectedCategory, setSelectedCategory] = useState("");
   const [photoCount, setPhotoCount] = useState(0);
@@ -132,7 +134,7 @@ export function MaintenanceCreateForm({
       return;
     }
 
-    const requestId = crypto.randomUUID();
+    const requestId = photos.requestId();
     formData.set("id", requestId);
     formData.set("propertyName", selectedBuilding);
     formData.set("roomLabel", selectedRoom);
@@ -141,21 +143,12 @@ export function MaintenanceCreateForm({
     formData.set("isBuildingOnly", selectedRoom === copy.form.roomBuildingOnly ? "1" : "0");
     formData.set("issueTitle", issueTitle);
 
-    try {
-      const items = uploaderRef.current?.getItems() ?? [];
-      const { imageUrls } = await uploadRequestImages({
-        items,
-        organizationId,
-        requestId,
-        requestType: "maintenance-reports",
-      });
-      for (const url of imageUrls) {
-        formData.append("imageUrls", url);
-      }
-    } catch {
-      setConfirmOpen(false);
-      setValidationError(copy.errors.save_failed);
-      return;
+    const items = uploaderRef.current?.getItems() ?? [];
+    const imageUrls = items.length > 0 ? await photos.run(items) : [];
+    // 실패한 사진이 있으면 시트에 남아 빨간 「다시」 — 다시 누르면 실패한 것만 올린다.
+    if (!imageUrls) return;
+    for (const url of imageUrls) {
+      formData.append("imageUrls", url);
     }
 
     startTransition(async () => {
@@ -262,9 +255,12 @@ export function MaintenanceCreateForm({
         <ConfirmFormSheet
           cancelLabel={copy.wCancel}
           confirmLabel={copy.wSend}
-          onCancel={() => setConfirmOpen(false)}
+          onCancel={() => {
+            photos.abandon();
+            setConfirmOpen(false);
+          }}
           onConfirm={handleConfirm}
-          pending={isPending}
+          pending={isPending || photos.running}
           rows={[
             { k: copy.wLoc, v: summary.room },
             {
@@ -276,7 +272,16 @@ export function MaintenanceCreateForm({
           ]}
           sub={summary.item}
           title={copy.wConfirmTitle}
-        />
+        >
+          <PhotoUploadStrip
+            items={photos.items}
+            states={photos.states}
+            retryLabel={imgCopy.uploadRetry}
+            progressLabel={imgCopy.uploadProgress}
+            failedLabel={imgCopy.uploadFailed}
+            onRetry={handleConfirm}
+          />
+        </ConfirmFormSheet>
       ) : null}
     </>
   );

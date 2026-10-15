@@ -15,6 +15,8 @@ type LostFoundConfirmModalProps = {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** 요약 아래 · 버튼 위(사진 올리기 진행 줄). */
+  children?: React.ReactNode;
 };
 
 export function LostFoundConfirmModal({
@@ -27,6 +29,7 @@ export function LostFoundConfirmModal({
   cancelLabel,
   onConfirm,
   onCancel,
+  children,
 }: LostFoundConfirmModalProps) {
   if (!open) return null;
 
@@ -76,6 +79,7 @@ export function LostFoundConfirmModal({
             </div>
           </div>
 
+          {children}
           <div className="flex flex-col gap-2 pt-1">
             <button
               className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-glass transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"

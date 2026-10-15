@@ -3712,6 +3712,9 @@ const FALLBACK_DICTIONARY = {
     errorType: "Only JPG, PNG, WEBP, and GIF are supported.",
     limit: "Up to 5 photos",
     remove: "Remove photo",
+    uploadRetry: "Retry",
+    uploadProgress: "Uploading photos {done}/{total}",
+    uploadFailed: "{n} photo(s) didn't upload — tap the red photo to retry",
   },
   attendance: {
     pageTitle: "Attendance",
@@ -11019,6 +11022,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       errorType: "JPG, PNG, WEBP, GIF만 지원합니다.",
       limit: "최대 5장",
       remove: "사진 삭제",
+      uploadRetry: "다시",
+      uploadProgress: "사진 올리는 중 {done}/{total}",
+      uploadFailed: "{n}장을 올리지 못했어요 — 빨간 사진을 눌러 다시",
     },
     attendance: {
       pageTitle: "근태",
@@ -18205,6 +18211,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       errorType: "JPG、PNG、WEBP、GIFのみ対応しています。",
       limit: "最大5枚",
       remove: "写真を削除",
+      uploadRetry: "再試行",
+      uploadProgress: "写真をアップロード中 {done}/{total}",
+      uploadFailed: "{n}枚をアップロードできませんでした — 赤い写真をタップして再試行",
     },
     attendance: {
       pageTitle: "勤怠",

@@ -1,0 +1,40 @@
+/* 사진 올리기 진행(2026-10-15, 시안 Motion-C-Upload-Phone) — 확인 시트 안 사진 줄. */
+.pup { margin: 4px 0 14px; }
+.pup__row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pup__t { position: relative; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 12px; overflow: hidden; background: #f2f2f5; cursor: default; animation: pup-in 480ms linear(0.0000,0.0286,0.1038,0.2108,0.3366,0.4699,0.6017,0.7251,0.8353,0.9293,1.0057,1.0642,1.1059,1.1322,1.1452,1.1473,1.1409,1.1282,1.1114,1.0924,1.0726,1.0534,1.0357,1.0201,1.0069,0.9964,0.9885,0.9830,0.9797,0.9783,0.9784,0.9796,0.9817,0.9843,0.9872,0.9901,0.9929,0.9954,0.9976,0.9995,1.0009,1.0020,1.0027,1.0031,1.0000) both; }
+.pup__t:nth-child(2) { animation-delay: 60ms; }
+.pup__t:nth-child(3) { animation-delay: 120ms; }
+.pup__t:nth-child(4) { animation-delay: 180ms; }
+.pup__t:nth-child(5) { animation-delay: 240ms; }
+@keyframes pup-in { from { opacity: 0; transform: scale(.82); } }
+.pup__t img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pup__ov { position: absolute; inset: 0; background: rgba(22, 20, 31, .42); transition: opacity 360ms cubic-bezier(.23, 1, .32, 1), background-color 240ms ease; }
+.pup__ring { position: absolute; left: 50%; top: 50%; margin: -13px 0 0 -13px; transition: opacity 240ms ease, transform 240ms cubic-bezier(.23, 1, .32, 1); }
+.pup__arc { stroke-dasharray: 1; stroke-dashoffset: 1; }
+/* 줄이기 → 올리기: 앞 1/3 은 빨리, 나머지는 천천히 85% 까지(끝은 실제로 다 올라갔을 때) */
+.pup__t.is-up .pup__arc { animation: pup-arc 2400ms cubic-bezier(.2, .7, .3, 1) forwards; }
+@keyframes pup-arc { 0% { stroke-dashoffset: 1; } 15% { stroke-dashoffset: .66; } 100% { stroke-dashoffset: .15; } }
+.pup__t.is-done .pup__arc { stroke-dashoffset: 0; transition: stroke-dashoffset 200ms ease; }
+.pup__t.is-done .pup__ov { opacity: 0; }
+.pup__t.is-done .pup__ring { opacity: 0; transform: scale(.6); transition-delay: 120ms; }
+.pup__bd { position: absolute; right: 5px; top: 5px; width: 18px; height: 18px; border-radius: 50%; background: #1f9d55; box-shadow: 0 0 0 2px #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.4); }
+.pup__bd path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.pup__t.is-done .pup__bd { animation: pup-bd 460ms linear(0.0000,0.0401,0.1459,0.2953,0.4676,0.6448,0.8121,0.9586,1.0776,1.1654,1.2221,1.2496,1.2521,1.2346,1.2027,1.1619,1.1171,1.0728,1.0321,0.9976,0.9705,0.9513,0.9400,0.9357,0.9372,0.9433,0.9525,0.9634,0.9748,0.9858,0.9955,1.0036,1.0097,1.0137,1.0159,1.0163,1.0154,1.0135,1.0110,1.0081,1.0053,1.0026,1.0003,0.9984,1.0000) 160ms forwards; }
+.pup__t.is-done .pup__bd path { animation: pup-draw 260ms cubic-bezier(.23, 1, .32, 1) 300ms forwards; }
+@keyframes pup-bd { to { opacity: 1; transform: none; } }
+@keyframes pup-draw { to { stroke-dashoffset: 0; } }
+.pup__rt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; font-size: 11px; font-weight: 700; opacity: 0; transform: scale(.7); }
+.pup__t.is-error { cursor: pointer; animation: pup-shake 380ms cubic-bezier(.36, .07, .19, .97) both; }
+.pup__t.is-error .pup__ov { background: rgba(192, 53, 43, .55); }
+.pup__t.is-error .pup__ring { opacity: 0; }
+.pup__t.is-error .pup__rt { opacity: 1; transform: none; transition: opacity 260ms ease 120ms, transform 420ms cubic-bezier(.34, 1.56, .64, 1) 120ms; }
+.pup__t.is-error:active { transform: scale(.94); }
+@keyframes pup-shake { 20% { transform: translateX(-5px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-3px); } 100% { transform: none; } }
+.pup__msg { margin: 8px 0 0; font-size: 12.5px; color: #6b6878; }
+.pup__msg.is-bad { color: #c0352b; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  .pup__t, .pup__t.is-up .pup__arc, .pup__t.is-done .pup__bd, .pup__t.is-done .pup__bd path, .pup__t.is-error { animation: none; }
+  .pup__t.is-up .pup__arc { stroke-dashoffset: .5; }
+  .pup__t.is-done .pup__bd { opacity: 1; transform: none; }
+  .pup__t.is-done .pup__bd path { stroke-dashoffset: 0; }
+}

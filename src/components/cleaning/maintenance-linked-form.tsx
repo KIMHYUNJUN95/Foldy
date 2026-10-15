@@ -11,7 +11,7 @@ import {
   MaintenanceConfirmModal,
   type UrgencyTone,
 } from "@/components/requests/maintenance-confirm-modal";
-import { uploadRequestImages } from "@/components/requests/request-image-upload";
+import { PhotoUploadStrip, usePhotoUpload } from "@/components/requests/photo-upload-progress";
 import { Button } from "@/components/ui/button";
 import type { Dictionary } from "@/lib/i18n";
 import { maintenanceCategories } from "@/lib/maintenance-constants";
@@ -79,6 +79,8 @@ export function MaintenanceLinkedForm({
   const [urgency, setUrgency] = useState<UrgencyTone>("normal");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // 사진은 「확인」 때 올리고 확인 창에서 사진마다 진행 · 실패한 사진만 다시(2026-10-15, 시안 Motion-C-Upload-Phone).
+  const photos = usePhotoUpload(organizationId, "maintenance-reports");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -121,27 +123,18 @@ export function MaintenanceLinkedForm({
     }
 
     const formData = new FormData(form);
-    const requestId = crypto.randomUUID();
+    const requestId = photos.requestId();
     formData.set("id", requestId);
     formData.set("propertyName", defaultBuilding);
     formData.set("roomLabel", canonicalRoom);
     formData.set("issueTitle", issueTitle.trim());
 
-    try {
-      const items = uploaderRef.current?.getItems() ?? [];
-      const { imageUrls } = await uploadRequestImages({
-        items,
-        organizationId,
-        requestId,
-        requestType: "maintenance-reports",
-      });
-      for (const url of imageUrls) {
-        formData.append("imageUrls", url);
-      }
-    } catch {
-      setConfirmOpen(false);
-      setValidationError(copy.errors.save_failed);
-      return;
+    const items = uploaderRef.current?.getItems() ?? [];
+    const imageUrls = items.length > 0 ? await photos.run(items) : [];
+    // 실패한 사진이 있으면 창에 남아 빨간 「다시」 — 다시 누르면 실패한 것만 올린다.
+    if (!imageUrls) return;
+    for (const url of imageUrls) {
+      formData.append("imageUrls", url);
     }
 
     startTransition(async () => {
@@ -323,10 +316,14 @@ export function MaintenanceLinkedForm({
         cancelLabel={copy.cancelConfirm}
         confirmLabel={copy.confirmSubmit}
         description={copy.form.confirmDescription}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => {
+          if (photos.running) return;
+          photos.abandon();
+          setConfirmOpen(false);
+        }}
         onConfirm={handleConfirm}
         open={confirmOpen}
-        pending={isPending}
+        pending={isPending || photos.running}
         rows={[
           { label: copy.form.confirmType, value: copy.form.confirmTypeValue },
           {
@@ -339,7 +336,16 @@ export function MaintenanceLinkedForm({
         urgencyLabel={copy.form.confirmUrgency}
         urgencyTone={urgency}
         urgencyValue={copy.form.urgencies[urgency]}
-      />
+      >
+        <PhotoUploadStrip
+          items={photos.items}
+          states={photos.states}
+          retryLabel={imgCopy.uploadRetry}
+          progressLabel={imgCopy.uploadProgress}
+          failedLabel={imgCopy.uploadFailed}
+          onRetry={handleConfirm}
+        />
+      </MaintenanceConfirmModal>
     </>
   );
 }

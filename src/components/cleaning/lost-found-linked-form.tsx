@@ -9,7 +9,7 @@ import {
 } from "@/components/announcements/announcement-image-uploader";
 import { LostFoundConfirmModal } from "@/components/requests/lost-found-confirm-modal";
 import { Button } from "@/components/ui/button";
-import { uploadRequestImages } from "@/components/requests/request-image-upload";
+import { PhotoUploadStrip, usePhotoUpload } from "@/components/requests/photo-upload-progress";
 import type { Dictionary } from "@/lib/i18n";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import { resolveRequestCatalogLocation } from "@/lib/request-location";
@@ -63,6 +63,8 @@ export function LostFoundLinkedForm({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // 사진은 「확인」 때 올리고 확인 창에서 사진마다 진행 · 실패한 사진만 다시(2026-10-15, 시안 Motion-C-Upload-Phone).
+  const photos = usePhotoUpload(organizationId, "lost-items");
 
   const resolvedLocation = resolveRequestCatalogLocation(defaultRoom, roomCatalog, buildingLabels);
   const defaultBuilding = initialPropertyName || resolvedLocation.buildingName || "";
@@ -113,27 +115,18 @@ export function LostFoundLinkedForm({
     }
 
     const formData = new FormData(form);
-    const requestId = crypto.randomUUID();
+    const requestId = photos.requestId();
     formData.set("id", requestId);
     formData.set("propertyName", defaultBuilding);
     formData.set("roomLabel", canonicalRoom);
     formData.set("itemName", itemName.trim());
 
-    try {
-      const items = uploaderRef.current?.getItems() ?? [];
-      const { imageUrls } = await uploadRequestImages({
-        items,
-        organizationId,
-        requestId,
-        requestType: "lost-items",
-      });
-      for (const url of imageUrls) {
-        formData.append("imageUrls", url);
-      }
-    } catch {
-      setConfirmOpen(false);
-      setValidationError(copy.errors.save_failed);
-      return;
+    const items = uploaderRef.current?.getItems() ?? [];
+    const imageUrls = items.length > 0 ? await photos.run(items) : [];
+    // 실패한 사진이 있으면 창에 남아 빨간 「다시」 — 다시 누르면 실패한 것만 올린다.
+    if (!imageUrls) return;
+    for (const url of imageUrls) {
+      formData.append("imageUrls", url);
     }
 
     startTransition(async () => {
@@ -250,10 +243,14 @@ export function LostFoundLinkedForm({
         cancelLabel={copy.cancelConfirm}
         confirmLabel={copy.confirmSubmit}
         description={copy.form.confirmDescription}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => {
+          if (photos.running) return;
+          photos.abandon();
+          setConfirmOpen(false);
+        }}
         onConfirm={handleConfirm}
         open={confirmOpen}
-        pending={isPending}
+        pending={isPending || photos.running}
         rows={[
           { label: copy.form.confirmType, value: copy.form.confirmTypeValue },
           {
@@ -263,7 +260,16 @@ export function LostFoundLinkedForm({
           { label: copy.form.confirmItem, value: itemName.trim() },
         ]}
         title={copy.confirmationTitle}
-      />
+      >
+        <PhotoUploadStrip
+          items={photos.items}
+          states={photos.states}
+          retryLabel={imgCopy.uploadRetry}
+          progressLabel={imgCopy.uploadProgress}
+          failedLabel={imgCopy.uploadFailed}
+          onRetry={handleConfirm}
+        />
+      </LostFoundConfirmModal>
     </>
   );
 }

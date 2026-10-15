@@ -129,6 +129,8 @@
 - Store 용으로 매니페스트에 `lang` · `dir` · `categories`(business · productivity) ·
   `launch_handler`(`navigate-existing` — 아이콘을 다시 눌러도 새 창 대신 열린 창으로) ·
   `prefer_related_applications: false` 를 더했다.
+- 로그아웃 상태의 `/admin` 은 `/auth/login?next=/admin` 으로 넘어간다 — 그 로그인 화면도 관리자 매니페스트를 알린다
+  (`src/app/auth/login/page.tsx` `generateMetadata`, `next` 가 `/admin` 일 때만). 그래야 PWABuilder 가 모바일 「Foldy」를 집지 않는다.
 - 패키지에는 **주소가 박힌다** — 자체 도메인(출시 계획 C1) 뒤에 새 주소로 패키지를 한 번 더 올린다.
 - 단계 · 담당: `docs/planning/17-app-release-plan.md` 「PC 설치 파일」(W 항목).
 

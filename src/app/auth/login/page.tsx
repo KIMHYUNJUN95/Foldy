@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -56,6 +57,17 @@ const UserX = (
 const Power = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v8" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" /><path d="M7.5 6.6a7 7 0 109 0" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" /></svg>
 );
+
+/**
+ * 대시보드에서 넘어온 로그인 화면(`?next=/admin…`)은 대시보드 매니페스트를 알린다(2026-10-15).
+ * 로그아웃 상태의 `/admin` 은 여기로 넘어오므로, 그대로면 PWABuilder(Microsoft Store 패키징) · 브라우저 설치가
+ * 모바일 「Foldy」 매니페스트를 집는다. docs/product/05-admin-web-ia.md 「Windows 설치 파일」.
+ */
+export async function generateMetadata({ searchParams }: LoginPageProps): Promise<Metadata> {
+  const { next } = await searchParams;
+  const nextPath = sanitizeNextPath(next);
+  return nextPath === "/admin" || nextPath.startsWith("/admin/") || nextPath.startsWith("/admin?") ? { manifest: "/manifest-admin.webmanifest" } : {};
+}
 
 function Ic({ children }: { children: React.ReactNode }) {
   return <span className="ic">{children}</span>;

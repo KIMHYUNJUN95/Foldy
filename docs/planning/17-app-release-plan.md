@@ -172,8 +172,8 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | # | 항목 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- | --- |
 | W1 | 매니페스트 Store 준비 — `lang` · `categories` · `launch_handler` 등 | 🤖 | [x] 2026-10-15 | `public/manifest-admin.webmanifest` |
-| W2 | **Microsoft Partner Center 개발자 등록** | 👤 | [ ] | storedeveloper.microsoft.com. 개인 계정은 무료(가입 화면에서 확인). 회사 계정은 게시자 이름이 회사명이지만 비용 · 회사 확인 절차가 있다 |
-| W3 | 앱 이름 예약 「Foldy Admin」 → 제품 ID 값 3개 확인 | 🤝 | [ ] | Partner Center → 앱 → 제품 관리 → 제품 ID: Package ID · Publisher ID · Publisher display name |
+| W2 | **Microsoft Partner Center 개발자 등록** | 👤 | [x] 2026-10-15 개인 계정 | storedeveloper.microsoft.com. 개인 계정은 무료(가입 화면에서 확인). 회사 계정은 게시자 이름이 회사명이지만 비용 · 회사 확인 절차가 있다 |
+| W3 | 앱 이름 예약 「Foldy Admin」 → 제품 ID 값 3개 확인 | 🤝 | [x] 2026-10-15 — Name `Haru95.FoldyAdmin` · Publisher `CN=20214217-1D17-4582-ADB2-3120F7D60408` · 표시 이름 `Haru_95` · Store ID `9P4845FDBTG5` | Partner Center → 앱 → 제품 관리 → 제품 ID: Package ID · Publisher ID · Publisher display name |
 | W4 | PWABuilder 로 패키지 만들기 | 🤝 | [ ] | pwabuilder.com 에 `https://stay-ops-two.vercel.app/admin` → Windows 패키지 → W3 값 3개 입력 → `.msixbundle` 다운로드 |
 | W5 | 제출 — 공개 범위 · 스토어 정보 · 심사 메모 | 🤝 | [ ] | 공개 범위는 비공개(지정 사용자) 또는 검색에 안 나오는 링크 전용(제출 화면에서 확인). 스크린샷 1장 이상. 심사 메모에 심사용 로그인 계정(B6 데모 계정) |
 | W6 | 자체 도메인(C1) 뒤 새 주소로 패키지 재제출 | 🤝 | [ ] | 패키지에 주소가 박힌다. 옛 주소도 계속 열리므로 급하지 않다 |

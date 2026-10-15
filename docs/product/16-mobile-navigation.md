@@ -251,6 +251,12 @@ Implementation note:
   or any inline PTR indicator/gradient curtain. Haptic feedback (`navigator.vibrate(10)`) fires once
   at the pull threshold crossing. On release, the outer shell springs back with
   `cubic-bezier(0.34,1.56,0.64,1)` while the indicator fades/scales out.
+  **로고 막대 표시(2026-10-15, 시안 Motion-C-Pull-Phone — 모든 `/mobile/*` 공용):** 위 패널의 글자(「놓아서 새로고침」 ·
+  「새로고침 중…」)를 로고 세 막대로 바꿨다. 당긴 거리 ÷ 72px 에 따라 위(연보라) → 가운데(보라) → 아래(진보라) 순서로
+  하나씩 나타나고(흐림 + 가로로 펴짐), 72px 을 넘어 다 모이면 묶음이 살짝 커졌다 돌아오며(「딸깍」) 진동 10ms. 놓으면
+  새로고침이 끝날 때까지 공용 로더(`FoldyLoader`)와 같은 엇갈린 숨 쉬기, 끝나면 흐려지며 사라진다. 막대 묶음은 로더의
+  0.8배 크기로 벌어진 틈의 가운데에 놓인다. 글자는 화면 읽기 프로그램용(`sr-only`, aria-live)으로만 남김. 스타일
+  `src/components/shell/pull-refresh.css`, 줄인 움직임이면 딸깍 · 숨 쉬기 없음.
 - **`hideBottomNav` (2026-06-15):** `MobileShell` accepts an opt-in `hideBottomNav` prop (default
   `false`) that hides the bottom tab bar for focused **registration / create-edit** flows, so the
   screen reads as a dedicated form (and a sticky submit bar can't overlap the tab bar). Applied to the

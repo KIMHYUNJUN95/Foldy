@@ -31,6 +31,7 @@ import { canAccessAdminWeb } from "@/config/roles";
 import { haptic } from "@/lib/haptics";
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import "@/components/shell/pull-refresh.css";
 
 // Capitalized alias so the icon can be used as a JSX tag in the sidebar footer.
 const BugIcon = mobileNavBugs.icon;
@@ -696,24 +697,47 @@ export function MobileShell({
         aria-atomic="true"
         aria-live="polite"
         data-ptr-indicator=""
-        className="pointer-events-none fixed inset-x-0 top-0 z-[1] flex flex-col items-center justify-center bg-background"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[1] flex flex-col items-center justify-start bg-background"
         style={{
           height: `calc(env(safe-area-inset-top, 0px) + ${REFRESH_DISPLAY_H}px)`,
           // Push content below the notch/status-bar so it's visible when the shell slides down.
           paddingTop: "env(safe-area-inset-top, 0px)",
         }}
       >
-        <p
-          className="text-[11px] font-semibold tracking-wide text-muted-foreground"
+        {/* 로고 막대(2026-10-15, 시안 Motion-C-Pull-Phone) — 당긴 만큼 위에서부터 하나씩, 다 모이면 딸깍,
+            새로고침 중엔 공용 로더처럼 숨 쉼. 막대 묶음은 벌어진 틈의 가운데에 둔다. */}
+        <span
+          aria-hidden="true"
+          className={cn("ptrb-w", isReadyToRefresh && !isRefreshPending && "is-ready")}
           style={{
-            opacity: (isReadyToRefresh || isRefreshPending) ? 1 : 0,
-            transition: isPulling ? "none" : "opacity 180ms ease",
+            translate: `0 ${Math.max(0, contentOffset / 2 - 25)}px`,
+            transition: isPulling ? "none" : "translate 260ms cubic-bezier(.23, 1, .32, 1)",
           }}
         >
+          <span className={cn("ptrb", isRefreshPending && "is-busy")}>
+            {[0, 1, 2].map((k) => {
+              const p = Math.min(1, pullDistanceState / PULL_THRESHOLD);
+              const v = isRefreshPending ? 1 : Math.max(0, Math.min(1, (p - k * 0.28) / 0.44));
+              return (
+                <i
+                  key={k}
+                  style={{
+                    opacity: v,
+                    transform: `translateY(${(v - 1) * 6}px) scaleX(${0.3 + 0.7 * v})`,
+                    transition: isPulling ? "none" : "opacity 220ms ease, transform 260ms cubic-bezier(.23, 1, .32, 1)",
+                  }}
+                />
+              );
+            })}
+          </span>
+        </span>
+        <span className="sr-only">
           {isRefreshPending
             ? dictionary.mobile.homeRefreshing
-            : dictionary.mobile.homeReleaseToRefresh}
-        </p>
+            : isReadyToRefresh
+              ? dictionary.mobile.homeReleaseToRefresh
+              : ""}
+        </span>
       </div>
 
       {/* 폰 = 430px 한 줄. 넓은 화면(`fold:`)은 폭 전부 — 왼쪽 레일/사이드바 + 본문(2026-10-05 태블릿 · 폴드 적응형). */}

@@ -9,6 +9,7 @@ import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range
 import { AdminExportButtons } from "@/components/admin/shared/admin-export-buttons";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { RollNumber } from "@/components/shared/roll-number";
 import type { Dictionary } from "@/lib/i18n";
 import {
   REVENUE_MODES,
@@ -27,31 +28,39 @@ import {
   type RevenueRange,
 } from "@/lib/ops-revenue";
 import type { OpsRevenueData } from "@/lib/ops-revenue-server";
+import { IncludePicker } from "./ops-include-picker";
 import { compareHref } from "./ops-revenue-compare";
-import "./ops-revenue.css";
+import "./ops-occupancy-white.css";
+import "./ops-revenue-white.css";
 
 /**
- * 매출 화면 — 시안 A v2(보고서형 + 「건물 × 월」 탭, 2026-10-06 사용자 확정).
+ * 매출 화면 — 추이 · 건물별 / 건물 × 월 (2026-10-06 시안 A v2 구현 · 2026-10-15 화이트 리디자인, 시안 Rev-PC · RevMatrix-PC).
  *
- * 도메인 계약: docs/product/34-metrics-and-automation.md 「매출 화면」
+ * 도메인 계약: docs/product/34-metrics-and-automation.md 「매출 화면」 · 시각 규칙: docs/design/05-white-redesign.md
  *
  * 숫자는 서버가 판매 캘린더 「매출 요약」과 같은 식으로 낸 **칸**(건물 × 달 조각)이고, 여기서는 합계에 넣을 건물을
  * 골라 더하고 비율을 다시 나눈다. 기간은 주소(`?mode=…`)라 새로고침 · 공유가 된다. 탭 · 건물 고르기 · 매트릭스
- * 선택은 화면 안 상태다.
+ * 선택은 화면 안 상태다. 화이트 리디자인에서 옛 `orv__*`(`ops-revenue.css`, 2026-10-15 비교 화면까지 옮기며 삭제)를 떼고, 가동률 화면의
+ * `ocw-*` 도구 줄 · 숫자 줄 · 범례를 그대로 쓰며 매출 전용 모양은 `rvw-*`(`ops-revenue-white.css`).
  */
 type Copy = Dictionary["opsRevenue"];
 type SharedCopy = Dictionary["admin"]["shared"];
 type Tab = "report" | "matrix";
 type Metric = "revenue" | "net" | "occupancy" | "adr" | "revpar";
 type Lens = "value" | "yoy";
+type ChannelKey = "airbnb" | "booking" | "direct" | "other";
 
 const fill = (template: string, values: Record<string, string | number>) =>
   Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, String(value)), template);
 
-const VALUE_BG = ["hsl(223 30% 97.5%)", "hsl(223 46% 93%)", "hsl(223 52% 87.5%)", "hsl(223 54% 81%)", "hsl(223 56% 74%)"];
-const YOY_BG = ["hsl(4 74% 89%)", "hsl(4 70% 95%)", "hsl(40 18% 94%)", "hsl(146 44% 91%)", "hsl(146 42% 82%)"];
-const YOY_FG = ["hsl(4 66% 34%)", "hsl(4 56% 40%)", "var(--adm-muted)", "hsl(146 50% 26%)", "hsl(146 56% 22%)"];
-const CHANNEL_COLOR = { airbnb: "var(--orv-abnb)", booking: "var(--orv-bkng)", direct: "var(--orv-dir)", other: "var(--orv-oth)" };
+/** 값 보기 5단계 — 옅은 → 진한 보라(시안 RevMatrix-PC). */
+const VALUE_BG = ["#FAF8FF", "#EFEAFB", "#DCD0FA", "#C2AEF6", "#A688F0"];
+/** 전년 대비 5단계 — 크게 줄어듦(빨강) ~ 그대로(회색) ~ 크게 늘어남(초록). 글자 색도 같이. */
+const YOY_BG = ["#FBE3E4", "#FDF1F1", "#F5F5F7", "#E8F4EC", "#D3EBDD"];
+const YOY_FG = ["#a3202a", "#c5282e", "#6b6878", "#1f7a4d", "#17603c"];
+/** 채널은 보라로 바꾸지 않고 각 회사 색 그대로(시안 Rev-PC). */
+const CHANNEL_COLOR: Record<ChannelKey, string> = { airbnb: "#FF5A5F", booking: "#003B95", direct: "#8B8898", other: "#D9D7E0" };
+const CHANNELS: readonly ChannelKey[] = ["airbnb", "booking", "direct", "other"];
 
 /** 기간 → 주소. 월은 공용 월 선택기(`?ym=`)와 같은 키를 쓴다. */
 export function revenueHref(mode: RevenueMode, range: RevenueRange, tab: Tab): string {
@@ -61,6 +70,12 @@ export function revenueHref(mode: RevenueMode, range: RevenueRange, tab: Tab): s
   if (mode === "custom") query.set("to", range.to);
   if (tab === "matrix") query.set("tab", tab);
   return `/admin/ops/revenue?${query.toString()}`;
+}
+
+/** 다른 모드로 갈 때 — 지금 보던 기간의 끝(오늘보다 뒤면 오늘)이 든 그 모드의 기간으로. 모양은 서버가 바로잡는다. */
+function shiftToMode(mode: RevenueMode, range: RevenueRange, today: string): RevenueRange {
+  const base = range.to > today && range.from <= today ? today : range.to;
+  return mode === "month" ? { from: `${base.slice(0, 7)}-01`, to: base } : { from: base, to: base };
 }
 
 export function OpsRevenueConsole({
@@ -79,9 +94,7 @@ export function OpsRevenueConsole({
   const router = useRouter();
   const [navPending, startNav] = useTransition();
   const [tab, setTab] = useState<Tab>(initialTab);
-  const [included, setIncluded] = useState<Set<string>>(
-    () => new Set(data.properties.filter((p) => !p.defaultExcluded).map((p) => p.name)),
-  );
+  const [included, setIncluded] = useState<Set<string>>(() => new Set(data.properties.filter((p) => !p.defaultExcluded).map((p) => p.name)));
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [metric, setMetric] = useState<Metric>("revenue");
   const [lens, setLens] = useState<Lens>("value");
@@ -91,6 +104,7 @@ export function OpsRevenueConsole({
     property: data.properties.find((p) => !p.defaultExcluded)?.name ?? data.properties[0]?.name ?? null,
   }));
   const [toast, setToast] = useState<string | null>(null);
+  const w = copy.white;
 
   // 탭은 주소에도 적는다 — 기간을 옮겨도(링크) 같은 탭으로 돌아온다.
   useEffect(() => {
@@ -106,18 +120,14 @@ export function OpsRevenueConsole({
   };
   const go = (href: string) => startNav(() => router.push(href));
 
-  // ── 숫자 모양 ──
+  // ── 숫자 모양 ── 금액은 전부 엔 단위 전체 숫자(2026-10-08 사용자). 「건물 × 월」 칸만 좁아서 백만 엔 단위.
   const yen = (value: number) => `¥${Math.round(value).toLocaleString(localeTag)}`;
-  // 화면의 금액은 전부 엔 단위 전체 숫자다(2026-10-08 사용자 — 「M 표시 말고 진짜 전부 숫자로」). 「건물 × 월」 칸만 좁아서
-  // 백만 엔 단위로 줄이고 제목에 단위를 적는다(`short`).
   const pct = (value: number) => `${value.toFixed(1)}%`;
-  const deltaText = (delta: number | null) =>
-    delta === null ? copy.newLabel : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)}%`;
+  const deltaText = (delta: number | null) => (delta === null ? copy.newLabel : `${delta >= 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)}%`);
   const pointText = (current: number, previous: number) => {
     const d = current - previous;
     return `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}${copy.pointSuffix}`;
   };
-  const tone = (delta: number | null) => (delta === null ? "z" : delta >= 0.05 ? "up" : delta <= -0.05 ? "dn" : "z");
   const monthShort = (month: string) =>
     new Intl.DateTimeFormat(localeTag, { month: "short", timeZone: "UTC" }).format(new Date(`${month}-15T00:00:00Z`));
   const monthLong = (month: string) =>
@@ -145,8 +155,8 @@ export function OpsRevenueConsole({
 
   // ── 합 ──
   const isIn = (name: string) => included.has(name);
-  const totalOf = (cells: Record<string, RevenueCell> | undefined) =>
-    sumMetrics(data.properties.filter((p) => isIn(p.name)).map((p) => cells?.[p.name]));
+  const inNames = data.properties.filter((p) => isIn(p.name)).map((p) => p.name);
+  const totalOf = (cells: Record<string, RevenueCell> | undefined) => sumMetrics(inNames.map((name) => cells?.[name]));
   const current = totalOf(data.rangeCells);
   const previous = totalOf(data.previousRangeCells);
   const phase = data.range.to < data.today ? "past" : data.range.from > data.today ? "future" : "current";
@@ -165,9 +175,7 @@ export function OpsRevenueConsole({
     return {
       monthLabels: data.months.map((month) => monthLong(month)),
       monthRangeLabel: `${monthLong(data.months[0])} – ${monthLong(data.months[data.months.length - 1])}`,
-      monthlyTotal: data.months.map((month) =>
-        data.properties.filter((p) => isIn(p.name)).reduce((sum, p) => sum + (data.monthCells[month]?.[p.name]?.revenue ?? 0), 0),
-      ),
+      monthlyTotal: data.months.map((month) => inNames.reduce((sum, name) => sum + (data.monthCells[month]?.[name]?.revenue ?? 0), 0)),
       monthly: data.properties.map((p) => ({
         name: p.name,
         values: data.months.map((month) => {
@@ -185,8 +193,8 @@ export function OpsRevenueConsole({
 
   if (data.properties.length === 0) {
     return (
-      <div className="orv">
-        <div className="orv__empty">{copy.empty}</div>
+      <div className="ocw rvw">
+        <div className="ocw-empty">{copy.empty}</div>
       </div>
     );
   }
@@ -194,13 +202,13 @@ export function OpsRevenueConsole({
   const rangePickerLabels = {
     apply: shared.dateApply,
     nextMonth: shared.dateNextMonth,
+    pickMonth: shared.datePickMonth,
+    pickYear: shared.datePickYear,
     prevMonth: shared.datePrevMonth,
     reset: shared.dateReset,
-    typeStart: shared.dateTypeStart,
-    typeEnd: shared.dateTypeEnd,
-    pickYear: shared.datePickYear,
-    pickMonth: shared.datePickMonth,
     thisMonth: shared.dateThisMonth,
+    typeEnd: shared.dateTypeEnd,
+    typeStart: shared.dateTypeStart,
   };
   const modeLabel: Record<RevenueMode, string> = {
     custom: copy.modeCustom,
@@ -210,49 +218,102 @@ export function OpsRevenueConsole({
     year: copy.modeYear,
   };
 
-  // ── 숫자 6개 ──
-  const dRev = changePct(current.revenue, previous.revenue);
-  const kpis = [
-    { d: deltaText(dRev), hero: true, label: copy.kpiRevenue, sub: fill(copy.lastYearValue, { v: yen(previous.revenue) }), tone: tone(dRev), value: yen(current.revenue) },
+  // ── 숫자 6개 ── 아래 줄은 진짜 전년 대비(줄었으면 그 부분만 빨강).
+  const vs = (delta: number | null): ReactNode =>
+    delta === null ? copy.newLabel : <span className={delta <= -0.05 ? "is-red" : undefined}>{fill(w.vsLastYear, { d: deltaText(delta) })}</span>;
+  const hasPrevOcc = previous.availableNights > 0 && current.availableNights > 0;
+  const occDelta = current.occupancyPct - previous.occupancyPct;
+  const kpis: Array<{ key: string; label: string; value: string; unit?: string; sub: ReactNode; title: string }> = [
     {
-      d: deltaText(changePct(current.commission, previous.commission)),
+      key: "rev",
+      label: copy.kpiRevenue,
+      sub: vs(previous.revenue > 0 ? changePct(current.revenue, previous.revenue) : null),
+      title: fill(copy.lastYearValue, { v: yen(previous.revenue) }),
+      value: yen(current.revenue),
+    },
+    {
+      key: "com",
       label: copy.kpiCommission,
       sub: fill(copy.shareOfRevenue, { v: current.revenue > 0 ? pct((current.commission / current.revenue) * 100) : "—" }),
-      tone: "z",
+      title: fill(copy.lastYearValue, { v: yen(previous.commission) }),
       value: yen(current.commission),
     },
-    { d: deltaText(changePct(current.net, previous.net)), label: copy.kpiNet, sub: fill(copy.lastYearValue, { v: yen(previous.net) }), tone: tone(changePct(current.net, previous.net)), value: yen(current.net) },
     {
-      d: previous.availableNights > 0 ? pointText(current.occupancyPct, previous.occupancyPct) : copy.newLabel,
-      label: copy.kpiOccupancy,
-      sub: fill(copy.nightsOf, { a: current.occupiedNights.toLocaleString(localeTag), b: current.availableNights.toLocaleString(localeTag) }),
-      tone: previous.availableNights > 0 ? tone(current.occupancyPct - previous.occupancyPct) : "z",
-      value: pct(current.occupancyPct),
+      key: "net",
+      label: copy.kpiNet,
+      sub: vs(previous.revenue > 0 ? changePct(current.net, previous.net) : null),
+      title: fill(copy.lastYearValue, { v: yen(previous.net) }),
+      value: yen(current.net),
     },
-    { d: deltaText(changePct(current.adr, previous.adr)), label: copy.kpiAdr, sub: fill(copy.lastYearValue, { v: yen(previous.adr) }), tone: tone(changePct(current.adr, previous.adr)), value: yen(current.adr) },
-    { d: deltaText(changePct(current.revpar, previous.revpar)), label: copy.kpiRevpar, sub: fill(copy.lastYearValue, { v: yen(previous.revpar) }), tone: tone(changePct(current.revpar, previous.revpar)), value: yen(current.revpar) },
+    {
+      key: "occ",
+      label: copy.kpiOccupancy,
+      sub: (
+        <>
+          {fill(copy.nightsOf, { a: current.occupiedNights.toLocaleString(localeTag), b: current.availableNights.toLocaleString(localeTag) })}
+          {hasPrevOcc && (
+            <>
+              {" · "}
+              <span className={occDelta <= -0.05 ? "is-red" : undefined}>{pointText(current.occupancyPct, previous.occupancyPct)}</span>
+            </>
+          )}
+        </>
+      ),
+      title: previous.availableNights > 0 ? fill(copy.lastYearValue, { v: pct(previous.occupancyPct) }) : copy.noLastYear,
+      unit: current.availableNights > 0 ? "%" : undefined,
+      value: current.availableNights > 0 ? current.occupancyPct.toFixed(1) : "—",
+    },
+    {
+      key: "adr",
+      label: copy.colAdr,
+      sub: vs(previous.occupiedNights > 0 && current.occupiedNights > 0 ? changePct(current.adr, previous.adr) : null),
+      title: `${copy.kpiAdr} · ${fill(copy.lastYearValue, { v: yen(previous.adr) })}`,
+      value: current.occupiedNights > 0 ? yen(current.adr) : "—",
+    },
+    {
+      key: "revpar",
+      label: copy.colRevpar,
+      sub: vs(previous.availableNights > 0 && current.availableNights > 0 ? changePct(current.revpar, previous.revpar) : null),
+      title: `${copy.kpiRevpar} · ${fill(copy.lastYearValue, { v: yen(previous.revpar) })}`,
+      value: current.availableNights > 0 ? yen(current.revpar) : "—",
+    },
   ];
 
   const prevRange = shiftRange(data.mode, data.range, -1);
   const nextRange = shiftRange(data.mode, data.range, 1);
+  const excludedNames = data.properties.filter((p) => !isIn(p.name)).map((p) => p.name);
+  const includeSummary =
+    excludedNames.length === 0
+      ? w.includeAll
+      : excludedNames.length <= 3 && inNames.length > 0
+        ? fill(w.includeExcept, { list: excludedNames.join(" · ") })
+        : fill(w.includeCount, { n: inNames.length });
+  const channelName: Record<ChannelKey, string> = {
+    airbnb: copy.channelAirbnb,
+    booking: copy.channelBooking,
+    direct: copy.channelDirect,
+    other: copy.channelOther,
+  };
 
   return (
-    <div className={`orv${navPending ? " is-pending" : ""}`}>
-      <div className="orv__top">
-        <h1 className="orv__title">{copy.title}</h1>
-        <div className="orv__export">
-          <AdminExportButtons
-            disabled={current.revenue === 0 && previous.revenue === 0}
-            labels={shared}
-            onExportPdf={() => exportOpsRevenueReport(exportPayload())}
-            onExportXls={() => exportOpsRevenueWorkbook(exportPayload())}
-            onToast={flash}
-          />
+    <div className={`ocw rvw${navPending ? " is-pending" : ""}`}>
+      <div className="ocw-bar">
+        <div className="ocw-seg" role="tablist" aria-label={copy.title}>
+          {(["report", "matrix"] as const).map((key) => (
+            <button aria-selected={tab === key} className={tab === key ? "on" : ""} key={key} onClick={() => setTab(key)} role="tab" type="button">
+              {key === "report" ? copy.tabReport : copy.tabMatrix}
+            </button>
+          ))}
+          {/* 비교(2026-10-08)는 따로 된 화면 — 지금 보던 기간이 A, 그 전년 같은 기간이 B 로 열린다. */}
+          <Link
+            aria-selected={false}
+            href={compareHref({ mode: data.mode, range: data.range }, { mode: data.mode, range: data.previousRange }, [])}
+            role="tab"
+          >
+            {copy.tabCompare}
+          </Link>
         </div>
-      </div>
-
-      <div className="orv__bar">
-        <div className="orv__seg" role="tablist">
+        <div className="ocw-seg" role="tablist">
           {REVENUE_MODES.map((mode) => (
             <Link
               aria-selected={mode === data.mode}
@@ -265,168 +326,143 @@ export function OpsRevenueConsole({
             </Link>
           ))}
         </div>
-        {data.mode === "month" ? (
-          <AdminMonthPicker
-            basePath="/admin/ops/revenue"
-            labels={{
-              nextMonth: shared.dateNextMonth,
-              nextYear: shared.dateNextYear,
-              open: shared.dateSelect,
-              prevMonth: shared.datePrevMonth,
-              prevYear: shared.datePrevYear,
-              thisMonth: shared.dateThisMonth,
-            }}
-            localeTag={localeTag}
-            preserveQueryKeys={["mode", "tab"]}
-            ym={data.range.from.slice(0, 7)}
-          />
-        ) : data.mode === "custom" ? (
-          <AdminDateRangePicker
-            ariaLabel={shared.pickRange}
-            from={data.range.from}
-            labels={rangePickerLabels}
-            localeTag={localeTag}
-            onChange={(from, to) => {
-              if (from && to) go(revenueHref("custom", { from, to }, tab));
-            }}
-            to={data.range.to}
-          />
-        ) : (
-          <div className="orv__pnav">
-            <Link aria-label={copy.prev} className="orv__arrow" href={revenueHref(data.mode, prevRange, tab)}>
-              <ChevronLeft aria-hidden="true" />
-            </Link>
-            <span className="orv__plabel">{rangeLabel(data.mode, data.range)}</span>
-            <Link aria-label={copy.next} className="orv__arrow" href={revenueHref(data.mode, nextRange, tab)}>
-              <ChevronRight aria-hidden="true" />
-            </Link>
-          </div>
-        )}
-        <span className="orv__cmp">
-          <span className="k">{copy.compare}</span>
-          {fill(copy.compareSame, { range: rangeLabel(data.mode, data.previousRange) })}
-        </span>
-        {phase !== "past" && <span className="orv__pill is-warn">{phase === "current" ? copy.inProgress : copy.futureOnly}</span>}
-      </div>
-
-      <div className="orv__chips">
-        <span className="orv__tag">{copy.includeLabel}</span>
-        {data.properties.map((p) => (
-          <button
-            aria-pressed={isIn(p.name)}
-            className={`orv__chip${isIn(p.name) ? " on" : ""}`}
-            key={p.name}
-            onClick={() =>
-              setIncluded((prev) => {
-                const next = new Set(prev);
-                if (next.has(p.name)) next.delete(p.name);
-                else next.add(p.name);
-                return next;
-              })
-            }
-            type="button"
-          >
-            <span className="ck" aria-hidden="true" />
-            {p.name}
-          </button>
-        ))}
-      </div>
-
-      <div className="orv__kpis">
-        {kpis.map((kpi) => (
-          <div className={`orv__kpi${kpi.hero ? " is-hero" : ""}`} key={kpi.label}>
-            <div className="l">{kpi.label}</div>
-            <div className="v">{kpi.value}</div>
-            <div className="s">
-              <span className={`orv__d ${kpi.tone}`}>{kpi.d}</span>
-              <span>{kpi.sub}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="orv__tabbar">
-        <div className="orv__tabs" role="tablist">
-          {(["report", "matrix"] as const).map((key) => (
-            <button aria-selected={tab === key} className={tab === key ? "on" : ""} key={key} onClick={() => setTab(key)} role="tab" type="button">
-              {key === "report" ? copy.tabReport : copy.tabMatrix}
-            </button>
-          ))}
-          {/* 비교(2026-10-08)는 따로 된 화면 — 지금 보던 기간이 A, 그 전년 같은 기간이 B 로 열린다. */}
-          <Link className="orv__tablink" href={compareHref({ mode: data.mode, range: data.range }, { mode: data.mode, range: data.previousRange }, [])} role="tab">
-            {copy.tabCompare}
-          </Link>
+        <div className="ocw-period">
+          {data.mode === "month" ? (
+            <AdminMonthPicker
+              basePath="/admin/ops/revenue"
+              labels={{
+                nextMonth: shared.dateNextMonth,
+                nextYear: shared.dateNextYear,
+                open: shared.dateSelect,
+                prevMonth: shared.datePrevMonth,
+                prevYear: shared.datePrevYear,
+                thisMonth: shared.dateThisMonth,
+              }}
+              localeTag={localeTag}
+              preserveQueryKeys={["mode", "tab"]}
+              ym={data.range.from.slice(0, 7)}
+            />
+          ) : data.mode === "custom" ? (
+            <AdminDateRangePicker
+              ariaLabel={shared.pickRange}
+              from={data.range.from}
+              labels={rangePickerLabels}
+              localeTag={localeTag}
+              onChange={(from, to) => {
+                if (from && to) go(revenueHref("custom", { from, to }, tab));
+              }}
+              to={data.range.to}
+            />
+          ) : (
+            <>
+              <Link aria-label={copy.prev} className="ocw-arw" href={revenueHref(data.mode, prevRange, tab)}>
+                <ChevronLeft aria-hidden="true" />
+              </Link>
+              <span className="ocw-plabel">{rangeLabel(data.mode, data.range)}</span>
+              <Link aria-label={copy.next} className="ocw-arw" href={revenueHref(data.mode, nextRange, tab)}>
+                <ChevronRight aria-hidden="true" />
+              </Link>
+            </>
+          )}
         </div>
-        {tab === "matrix" && (
-          <div className="orv__mxctl">
-            <div className="orv__seg">
-              {(["revenue", "net", "occupancy", "adr", "revpar"] as const).map((key) => (
-                <button className={metric === key ? "on" : ""} key={key} onClick={() => setMetric(key)} type="button">
-                  {{ adr: copy.metricAdr, net: copy.metricNet, occupancy: copy.metricOccupancy, revenue: copy.metricRevenue, revpar: copy.metricRevpar }[key]}
-                </button>
-              ))}
-            </div>
-            <div className="orv__seg">
-              {(["value", "yoy"] as const).map((key) => (
-                <button className={lens === key ? "on" : ""} key={key} onClick={() => setLens(key)} type="button">
-                  {key === "value" ? copy.lensValue : copy.lensYoy}
-                </button>
-              ))}
-            </div>
+        <div className="ocw-bar__rest">
+          {/* 건물 × 월은 늘 기준 달 앞뒤 15달이라 비교 · 진행 글자를 그리지 않는다(시안 RevMatrix-PC). */}
+          {tab === "report" && (
+            <span className="ocw-cmp">
+              {copy.compare} · {fill(copy.compareSame, { range: rangeLabel(data.mode, data.previousRange) })}
+            </span>
+          )}
+          {tab === "report" && phase !== "past" && (
+            <span className="ocw-phase" title={phase === "current" ? copy.inProgress : copy.futureOnly}>
+              {phase === "current" ? w.phaseNow : w.phaseAhead}
+            </span>
+          )}
+          <div className="ocw-tools">
+            <IncludePicker
+              allLabel={w.includeAllOn}
+              included={included}
+              onSet={setIncluded}
+              properties={data.properties.map((p) => p.name)}
+              summary={includeSummary}
+              title={copy.includeLabel}
+            />
+            <AdminExportButtons
+              disabled={current.revenue === 0 && previous.revenue === 0}
+              labels={shared}
+              onExportPdf={() => exportOpsRevenueReport(exportPayload())}
+              onExportXls={() => exportOpsRevenueWorkbook(exportPayload())}
+              onToast={flash}
+            />
           </div>
-        )}
+        </div>
       </div>
 
-      {tab === "report" ? (
-        <ReportTab
-          copy={copy}
-          current={current}
-          data={data}
-          deltaText={deltaText}
-          go={go}
-          isIn={isIn}
-          monthShort={monthShort}
-          openRow={openRow}
-          pct={pct}
-          rangeText={rangeLabel(data.mode, data.range)}
-          setOpenRow={setOpenRow}
-          tab={tab}
-          tone={tone}
-          yen={yen}
-        />
-      ) : (
-        <MatrixTab
-          copy={copy}
-          data={data}
-          isIn={isIn}
-          lens={lens}
-          metric={metric}
-          monthLong={monthLong}
-          monthShort={monthShort}
-          pick={pick}
-          pointText={pointText}
-          setPick={setPick}
-          deltaText={deltaText}
-          tone={tone}
-          yen={yen}
-          pct={pct}
-        />
-      )}
+      <div className="ocw-body">
+        {tab === "report" && (
+          <div className="ocw-kpis rvw-kpis">
+            {kpis.map((kpi, index) => (
+              <div className="ocw-kpi" key={kpi.key} title={kpi.title}>
+                <span className="l">{kpi.label}</span>
+                <span className="v">
+                  {kpi.value === "—" ? kpi.value : <RollNumber delay={120 + index * 60} text={kpi.value} />}
+                  {kpi.unit && <small>{kpi.unit}</small>}
+                </span>
+                <span className="s">{kpi.sub}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {toast && <div className="orv__toast" role="status">{toast}</div>}
+        <div className="ocw-pane" key={tab}>
+          {tab === "report" ? (
+            <ReportTab
+              channelName={channelName}
+              copy={copy}
+              current={current}
+              data={data}
+              deltaText={deltaText}
+              go={go}
+              inNames={inNames}
+              isIn={isIn}
+              monthShort={monthShort}
+              openRow={openRow}
+              pct={pct}
+              rangeText={data.mode === "month" ? monthShort(data.range.from.slice(0, 7)) : rangeLabel(data.mode, data.range)}
+              setOpenRow={setOpenRow}
+              yen={yen}
+            />
+          ) : (
+            <MatrixTab
+              channelName={channelName}
+              copy={copy}
+              data={data}
+              deltaText={deltaText}
+              inNames={inNames}
+              isIn={isIn}
+              lens={lens}
+              metric={metric}
+              monthLong={monthLong}
+              monthShort={monthShort}
+              pct={pct}
+              pick={pick}
+              pointText={pointText}
+              setLens={setLens}
+              setMetric={setMetric}
+              setPick={setPick}
+              yen={yen}
+            />
+          )}
+        </div>
+
+        <p className="ocw-basis">{copy.basisNote}</p>
+      </div>
+      {toast && (
+        <div className="ocw-toast" role="status">
+          {toast}
+        </div>
+      )}
     </div>
   );
-}
-
-/** 다른 모드로 갈 때 — 지금 보던 기간의 끝(오늘보다 뒤면 오늘)이 든 그 모드의 기간으로. 모양은 서버가 바로잡는다. */
-function shiftToMode(mode: RevenueMode, range: RevenueRange, today: string): RevenueRange {
-  const base = range.to > today && range.from <= today ? today : range.to;
-  switch (mode) {
-    case "month":
-      return { from: `${base.slice(0, 7)}-01`, to: base };
-    default:
-      return { from: base, to: base };
-  }
 }
 
 // ── 추이 · 건물별 ─────────────────────────────────────────────────────────
@@ -435,43 +471,45 @@ type Fmt = {
   yen: (value: number) => string;
   pct: (value: number) => string;
   deltaText: (delta: number | null) => string;
-  tone: (delta: number | null) => string;
 };
+
+type SortKey = "revenue" | "previous" | "change" | "occupancy" | "adr" | "revpar" | "net";
 
 function ReportTab({
   data,
   copy,
   current,
+  inNames,
   isIn,
   openRow,
   setOpenRow,
   monthShort,
   rangeText,
   go,
-  tab,
+  channelName,
   yen,
-  pct,
   deltaText,
-  tone,
 }: Fmt & {
   data: OpsRevenueData;
   copy: Copy;
   current: RevenueMetrics;
+  inNames: string[];
   isIn: (name: string) => boolean;
   openRow: string | null;
   setOpenRow: (name: string | null) => void;
   monthShort: (month: string) => string;
   rangeText: string;
   go: (href: string) => void;
-  tab: Tab;
+  channelName: Record<ChannelKey, string>;
 }) {
+  const w = copy.white;
   /*
    * 머리글 정렬(2026-10-06 사용자 요청) — 누를 때마다 높은순 → 낮은순 → 원래 순서(캘린더 탭 순서). 「건물」 머리글은 바로 원래
    * 순서로. 값이 없는 줄(—)은 방향과 상관없이 맨 아래. 펼친 객실 줄도 같은 기준으로 정렬한다.
    */
   const [sort, setSort] = useState<{ key: SortKey; dir: "desc" | "asc" } | null>(null);
   const cycleSort = (key: SortKey) =>
-    setSort((current) => (current?.key !== key ? { dir: "desc", key } : current.dir === "desc" ? { dir: "asc", key } : null));
+    setSort((cur) => (cur?.key !== key ? { dir: "desc", key } : cur.dir === "desc" ? { dir: "asc", key } : null));
   const sortValue = (key: SortKey, cur: RevenueMetrics, prev: RevenueMetrics): number | null => {
     switch (key) {
       case "revenue":
@@ -490,10 +528,10 @@ function ReportTab({
         return cur.revenue > 0 ? cur.net : null;
     }
   };
-  const sorted = <T,>(items: T[], pick: (item: T) => { cur: RevenueMetrics; prev: RevenueMetrics }) => {
+  const sorted = <T,>(items: T[], pickOf: (item: T) => { cur: RevenueMetrics; prev: RevenueMetrics }) => {
     if (!sort) return items;
     return items
-      .map((item, index) => ({ index, item, value: sortValue(sort.key, pick(item).cur, pick(item).prev) }))
+      .map((item, index) => ({ index, item, value: sortValue(sort.key, pickOf(item).cur, pickOf(item).prev) }))
       .sort((a, b) => {
         if (a.value === null || b.value === null) return a.value === null ? (b.value === null ? a.index - b.index : 1) : -1;
         return sort.dir === "desc" ? b.value - a.value || a.index - b.index : a.value - b.value || a.index - b.index;
@@ -504,262 +542,243 @@ function ReportTab({
     const active = sort?.key === key;
     const next = !active ? copy.sortDesc : sort.dir === "desc" ? copy.sortAsc : copy.sortReset;
     return (
-      <th aria-sort={active ? (sort.dir === "desc" ? "descending" : "ascending") : "none"} scope="col">
-        <button className={`orv__sort${active ? " on" : ""}`} onClick={() => cycleSort(key)} title={next} type="button">
-          {label}
+      <th aria-sort={active ? (sort.dir === "desc" ? "descending" : "ascending") : "none"} className="r" scope="col">
+        <button className={`ocw-sort${active ? " on" : ""}`} onClick={() => cycleSort(key)} title={next} type="button">
           {active && (sort.dir === "desc" ? <ArrowDown aria-hidden="true" /> : <ArrowUp aria-hidden="true" />)}
+          {label}
         </button>
       </th>
     );
   };
-  const inNames = data.properties.filter((p) => isIn(p.name)).map((p) => p.name);
-  const bars = data.months.map((month) => {
-    const cur = sumMetrics(inNames.map((name) => data.monthCells[month]?.[name]));
-    const prev = sumMetrics(inNames.map((name) => data.monthCells[shiftMonthKey(month, -12)]?.[name]));
-    return { cur, month, prev };
-  });
-  const max = Math.max(1, ...bars.map((bar) => Math.max(bar.cur.revenue, bar.prev.revenue))) * 1.08;
-  const step = Math.max(1e6, Math.ceil(max / 4 / 1e7) * 1e7);
-  const top = step * 4;
+
+  const bars = data.months.map((month) => ({
+    cur: sumMetrics(inNames.map((name) => data.monthCells[month]?.[name])),
+    month,
+    prev: sumMetrics(inNames.map((name) => data.monthCells[shiftMonthKey(month, -12)]?.[name])),
+  }));
+  const top = Math.max(1, ...bars.map((bar) => Math.max(bar.cur.revenue, bar.prev.revenue))) * 1.04;
   const todayDay = Number(data.today.slice(8));
   const daysIn = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();
-  const selectedMonths = new Set(
-    data.months.filter((month) => month >= data.range.from.slice(0, 7) && month <= data.range.to.slice(0, 7)),
-  );
+  const selectedMonths = new Set(data.months.filter((month) => month >= data.range.from.slice(0, 7) && month <= data.range.to.slice(0, 7)));
 
-  const channels = (
-    [
-      ["airbnb", current.airbnb, copy.channelAirbnb, copy.channelWithCommission],
-      ["booking", current.booking, copy.channelBooking, copy.channelWithCommission],
-      ["direct", current.direct, copy.channelDirect, copy.channelNoCommission],
-      ["other", current.other, copy.channelOther, copy.channelOtherSub],
-    ] as const
-  ).filter(([, value]) => value > 0);
+  const channels = CHANNELS.map((key) => ({ key, value: current[key] })).filter((c) => c.value > 0);
+  const share = (value: number, total: number) => (value / Math.max(1, total)) * 100;
+
+  const line = (cur: RevenueMetrics, prev: RevenueMetrics, isNew: boolean) => {
+    const delta = changePct(cur.revenue, prev.revenue);
+    return (
+      <>
+        <td className="r num rvw-strong">{cur.revenue > 0 ? yen(cur.revenue) : "—"}</td>
+        <td className="r num ocw-faint">{prev.revenue > 0 ? yen(prev.revenue) : "—"}</td>
+        <td className={`r num${prev.revenue > 0 && delta !== null && delta <= -0.05 ? " is-red" : ""}`}>
+          {prev.revenue > 0 ? deltaText(delta) : isNew && cur.revenue > 0 ? copy.newLabel : "—"}
+        </td>
+        <td className="r num">{cur.availableNights > 0 ? `${cur.occupancyPct.toFixed(0)}%` : "—"}</td>
+        <td className="r num">{cur.occupiedNights > 0 ? yen(cur.adr) : "—"}</td>
+        <td className="r num">{cur.availableNights > 0 ? yen(cur.revpar) : "—"}</td>
+        <td className="r num">{cur.revenue > 0 ? yen(cur.net) : "—"}</td>
+        <td className="rvw-chcell">
+          <ChannelBar cell={cur} />
+        </td>
+      </>
+    );
+  };
+  const total = sumMetrics(inNames.map((name) => data.rangeCells[name]));
+  const totalPrev = sumMetrics(inNames.map((name) => data.previousRangeCells[name]));
 
   return (
     <>
-      <section className="orv__card">
-        <div className="orv__ch">
-          <h2>{copy.chartTitle}</h2>
-          <span className="orv__muted">{copy.chartHint}</span>
-          <span className="orv__grow" />
-          <span className="orv__lg"><i className="b1" />{copy.legendThisYear}</span>
-          <span className="orv__lg"><i className="b0" />{copy.legendLastYear}</span>
-          <span className="orv__lg"><i className="bf" />{copy.legendBooked}</span>
-          <span className="orv__lg"><i className="oc" />{copy.legendOccupancy}</span>
-        </div>
-        <div className="orv__chart">
-          <div className="orv__yax">
-            {[4, 3, 2, 1].map((n) => (
-              <span key={n}>{yen(step * n)}</span>
+      <div className="rvw-top">
+        <div className="rvw-trend">
+          <div className="ocw-sec rvw-sec">
+            <b>{copy.chartTitle}</b>
+            <span className="ocw-lgs">
+              <span>
+                <i className="sel" />
+                {w.legendSelected}
+              </span>
+              <span>
+                <i className="past" />
+                {copy.legendThisYear}
+              </span>
+              <span>
+                <i className="rvw-lg-prev" />
+                {w.legendLastYear}
+              </span>
+              <span>
+                <i className="fut" />
+                {w.legendBooked}
+              </span>
+              <span className="hint">· {w.legendOccHint}</span>
+            </span>
+          </div>
+          <div className="rvw-plot">
+            {bars.map(({ cur, month, prev }, index) => {
+              const p = monthPhase(month, data.today);
+              const sel = selectedMonths.has(month);
+              const tone = p === "future" ? "fut" : p === "current" ? "cur" : sel ? "sel" : "past";
+              return (
+                <button
+                  className={`rvw-col${sel ? " on" : ""}`}
+                  key={month}
+                  onClick={() => go(`/admin/ops/revenue?mode=month&ym=${month}`)}
+                  style={{ "--i": index } as CSSProperties}
+                  title={`${monthShort(month)} · ${yen(cur.revenue)} · ${w.legendLastYear} ${yen(prev.revenue)}`}
+                  type="button"
+                >
+                  <span
+                    className={`rvw-col__b is-${tone}`}
+                    style={
+                      {
+                        height: `${(cur.revenue / top) * 100}%`,
+                        ...(p === "current" ? { "--done": `${Math.round((todayDay / daysIn(month)) * 100)}%` } : {}),
+                      } as CSSProperties
+                    }
+                  />
+                  <span className="rvw-col__p" style={{ height: `${(prev.revenue / top) * 100}%` }} />
+                </button>
+              );
+            })}
+          </div>
+          <div className="rvw-months">
+            {bars.map(({ cur, month }) => (
+              <span className={selectedMonths.has(month) ? "on" : ""} key={month} title={month}>
+                <b className={month.endsWith("-01") ? "y" : undefined}>{monthShort(month)}</b>
+                <small>{cur.availableNights > 0 ? `${cur.occupancyPct.toFixed(0)}%` : "—"}</small>
+              </span>
             ))}
-            <span>0</span>
           </div>
-          {bars.map(({ cur, month, prev }) => {
-            const p = monthPhase(month, data.today);
-            const href = `/admin/ops/revenue?mode=month&ym=${month}${tab === "matrix" ? "&tab=matrix" : ""}`;
-            return (
-              <button
-                className={`orv__col is-${p}${selectedMonths.has(month) ? " on" : ""}`}
-                key={month}
-                onClick={() => go(href)}
-                style={p === "current" ? ({ "--done": `${Math.round((todayDay / daysIn(month)) * 100)}%` } as CSSProperties) : undefined}
-                title={`${month} · ${yen(cur.revenue)}`}
-                type="button"
-              >
-                <span className="bars">
-                  <i className="b0" style={{ height: `${(prev.revenue / top) * 100}%` }} />
-                  <i className="b1" style={{ height: `${(cur.revenue / top) * 100}%` }} />
-                </span>
-                <span className={`ml${month.endsWith("-01") ? " y" : ""}`}>{monthShort(month)}</span>
-                <span className="ocb"><i style={{ width: `${cur.occupancyPct}%` }} /></span>
-                <span className="oc">{cur.availableNights > 0 ? `${cur.occupancyPct.toFixed(0)}%` : "—"}</span>
-              </button>
-            );
-          })}
         </div>
-      </section>
 
-      <div className="orv__split">
-        <section className="orv__card orv__tablecard">
-          <div className="orv__ch">
-            <h2>{copy.tableTitle}</h2>
-            <span className="orv__muted">{rangeText} · {copy.tableHint}</span>
-            <span className="orv__grow" />
-            <span className="orv__lg"><i style={{ background: CHANNEL_COLOR.airbnb }} />{copy.channelAirbnb}</span>
-            <span className="orv__lg"><i style={{ background: CHANNEL_COLOR.booking }} />{copy.channelBooking}</span>
-            <span className="orv__lg"><i style={{ background: CHANNEL_COLOR.direct }} />{copy.channelDirect}</span>
+        <aside className="rvw-side">
+          <div className="rvw-flow">
+            <span className="l">{copy.flowTitle}</span>
+            <b className="v">
+              <RollNumber delay={300} text={yen(current.net)} />
+            </b>
+            <span className="s">{fill(w.flowLine, { com: yen(current.commission), rev: yen(current.revenue) })}</span>
+            <span className="s">{w.flowNote}</span>
           </div>
-          <div className="orv__tablewrap">
-            <table className="orv__table">
-              <thead>
-                <tr>
-                  <th scope="col">
-                    <button className={`orv__sort${sort ? "" : " on"}`} onClick={() => setSort(null)} title={copy.sortReset} type="button">
-                      {copy.colProperty}
-                    </button>
-                  </th>
-                  {sortHead("revenue", copy.colRevenue)}
-                  {sortHead("previous", copy.colLastYear)}
-                  {sortHead("change", copy.colChange)}
-                  {sortHead("occupancy", copy.colOccupancy)}
-                  {sortHead("adr", copy.colAdr)}
-                  {sortHead("revpar", copy.colRevpar)}
-                  {sortHead("net", copy.colNet)}
-                  <th scope="col">{copy.colChannels}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted(data.properties, (property) => ({
-                  cur: metricsOf(data.rangeCells[property.name] ?? sumMetrics([])),
-                  prev: metricsOf(data.previousRangeCells[property.name] ?? sumMetrics([])),
-                })).map((property) => {
-                  const cur = metricsOf(data.rangeCells[property.name] ?? sumMetrics([]));
-                  const prev = metricsOf(data.previousRangeCells[property.name] ?? sumMetrics([]));
-                  const open = openRow === property.name;
-                  const delta = changePct(cur.revenue, prev.revenue);
-                  const rooms = open
-                    ? sorted(
-                        property.rooms.map((room) => ({
-                          cur: metricsOf(data.rangeRoomCells[room.key] ?? sumMetrics([])),
-                          label: room.label,
-                          prev: metricsOf(data.previousRangeRoomCells[room.key] ?? sumMetrics([])),
-                        })),
-                        (room) => room,
-                      )
-                    : [];
-                  return (
-                    <RowGroup key={property.name}>
-                      <tr
-                        aria-expanded={open}
-                        className={`orv__row${open ? " open" : ""}${isIn(property.name) ? "" : " off"}`}
-                        onClick={() => setOpenRow(open ? null : property.name)}
-                      >
-                        <td>
-                          <span className="orv__bn">
-                            <span className="tw" aria-hidden="true" />
-                            {property.name}
-                            {!isIn(property.name) && <span className="orv__pill">{copy.excludedTag}</span>}
-                          </span>
-                        </td>
-                        <td className="num">{cur.revenue > 0 ? yen(cur.revenue) : "—"}</td>
-                        <td className="num faint">{prev.revenue > 0 ? yen(prev.revenue) : copy.newLabel}</td>
-                        <td><span className={`orv__d ${prev.revenue > 0 ? tone(delta) : "z"}`}>{prev.revenue > 0 ? deltaText(delta) : "—"}</span></td>
-                        <td><Occ value={cur.availableNights > 0 ? cur.occupancyPct : null} pct={pct} /></td>
-                        <td className="num">{cur.occupiedNights > 0 ? yen(cur.adr) : "—"}</td>
-                        <td className="num">{cur.availableNights > 0 ? yen(cur.revpar) : "—"}</td>
-                        <td className="num">{cur.revenue > 0 ? yen(cur.net) : "—"}</td>
-                        <td><ChannelBar cell={cur} /></td>
-                      </tr>
-                      {rooms.map((room) => {
-                        const d = changePct(room.cur.revenue, room.prev.revenue);
-                        return (
-                          <tr className="orv__room" key={room.label}>
-                            <td>{room.label}</td>
-                            <td className="num">{room.cur.revenue > 0 ? yen(room.cur.revenue) : "—"}</td>
-                            <td className="num faint">{room.prev.revenue > 0 ? yen(room.prev.revenue) : "—"}</td>
-                            <td><span className={`orv__d ${tone(d)}`}>{room.prev.revenue > 0 ? deltaText(d) : "—"}</span></td>
-                            <td><Occ value={room.cur.availableNights > 0 ? room.cur.occupancyPct : null} pct={pct} /></td>
-                            <td className="num">{room.cur.occupiedNights > 0 ? yen(room.cur.adr) : "—"}</td>
-                            <td className="num">{room.cur.availableNights > 0 ? yen(room.cur.revpar) : "—"}</td>
-                            <td className="num faint">{room.cur.revenue > 0 ? yen(room.cur.net) : "—"}</td>
-                            <td><ChannelBar cell={room.cur} /></td>
-                          </tr>
-                        );
-                      })}
-                    </RowGroup>
-                  );
-                })}
-                <TotalRow copy={copy} data={data} isIn={isIn} yen={yen} pct={pct} deltaText={deltaText} tone={tone} />
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <aside className="orv__side">
-          <section className="orv__card">
-            <div className="orv__ch"><h2>{copy.flowTitle}</h2></div>
-            <div className="orv__pad">
-              <div className="orv__flow">
-                <div><span className="k">{copy.flowRevenue}</span><span className="num">{yen(current.revenue)}</span></div>
-                <div><span className="k">{copy.flowCommission}</span><span className="num bad">− {yen(current.commission)}</span></div>
-                <div className="t"><span>{copy.flowNet}</span><span className="num">{yen(current.net)}</span></div>
-              </div>
-              <p className="orv__note">
-                {fill(copy.flowNote, { rate: current.revenue > 0 ? pct((current.commission / current.revenue) * 100) : "—" })}
-              </p>
-            </div>
-          </section>
-          <section className="orv__card">
-            <div className="orv__ch"><h2>{copy.channelTitle}</h2><span className="orv__muted">{copy.channelBasis}</span></div>
-            <div className="orv__pad">
-              <div className="orv__stack">
-                {channels.map(([key, value]) => (
-                  <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${(value / Math.max(1, current.revenue)) * 100}%` }} />
-                ))}
-              </div>
-              {channels.map(([key, value, name, sub]) => (
-                <div className="orv__chr" key={key}>
-                  <i style={{ background: CHANNEL_COLOR[key] }} />
-                  <span className="nm">{name}</span>
-                  <span className="num">{yen(value)}</span>
-                  <span className="num faint">{pct((value / Math.max(1, current.revenue)) * 100)}</span>
-                  <span className="sub">{sub}</span>
-                </div>
+          <div className="rvw-chan">
+            <span className="l">{copy.channelTitle}</span>
+            <span aria-hidden="true" className="rvw-stack">
+              {channels.map(({ key, value }) => (
+                <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${share(value, current.revenue)}%` }} />
               ))}
-            </div>
-          </section>
-          <p className="orv__note">{copy.basisNote}</p>
+            </span>
+            {channels.map(({ key, value }, index) => (
+              <div className="rvw-chr" key={key} style={{ "--i": index } as CSSProperties}>
+                <i style={{ background: CHANNEL_COLOR[key] }} />
+                <span className="n">{channelName[key]}</span>
+                <span className="a">{yen(value)}</span>
+                <b>{`${share(value, current.revenue).toFixed(0)}%`}</b>
+              </div>
+            ))}
+          </div>
         </aside>
+      </div>
+
+      <div className="ocw-sec">
+        <b>{copy.tableTitle}</b>
+        <span className="hint">
+          {rangeText} · {w.tableHint}
+        </span>
+      </div>
+      <div className="ocw-tablewrap">
+        <table className="ocw-table rvw-table">
+          <colgroup>
+            <col className="c-name" />
+            <col className="c-m" />
+            <col className="c-m" />
+            <col className="c-s" />
+            <col className="c-s" />
+            <col className="c-k" />
+            <col className="c-k" />
+            <col className="c-m" />
+            <col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">
+                <button className={`ocw-sort${sort ? "" : " on"}`} onClick={() => setSort(null)} title={copy.sortReset} type="button">
+                  {copy.colProperty}
+                </button>
+              </th>
+              {sortHead("revenue", copy.colRevenue)}
+              {sortHead("previous", copy.colLastYear)}
+              {sortHead("change", copy.colChange)}
+              {sortHead("occupancy", copy.colOccupancy)}
+              {sortHead("adr", copy.colAdr)}
+              {sortHead("revpar", copy.colRevpar)}
+              {sortHead("net", copy.colNet)}
+              <th className="rvw-chcell" scope="col">
+                {copy.colChannels}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted(data.properties, (property) => ({
+              cur: metricsOf(data.rangeCells[property.name] ?? sumMetrics([])),
+              prev: metricsOf(data.previousRangeCells[property.name] ?? sumMetrics([])),
+            })).map((property) => {
+              const cur = metricsOf(data.rangeCells[property.name] ?? sumMetrics([]));
+              const prev = metricsOf(data.previousRangeCells[property.name] ?? sumMetrics([]));
+              const open = openRow === property.name;
+              const rooms = open
+                ? sorted(
+                    property.rooms.map((room) => ({
+                      cur: metricsOf(data.rangeRoomCells[room.key] ?? sumMetrics([])),
+                      label: room.label,
+                      prev: metricsOf(data.previousRangeRoomCells[room.key] ?? sumMetrics([])),
+                    })),
+                    (room) => room,
+                  )
+                : [];
+              return (
+                <Fragment key={property.name}>
+                  <tr
+                    aria-expanded={open}
+                    className={`ocw-row${open ? " open" : ""}${isIn(property.name) ? "" : " off"}`}
+                    onClick={() => setOpenRow(open ? null : property.name)}
+                  >
+                    <td>
+                      <span className="ocw-bn">
+                        <ChevronRight aria-hidden="true" className="tw" />
+                        <b>{property.name}</b>
+                        {!isIn(property.name) && <span className="ex">{copy.excludedTag}</span>}
+                      </span>
+                    </td>
+                    {line(cur, prev, true)}
+                  </tr>
+                  {rooms.map((room, index) => (
+                    <tr className="ocw-room" key={room.label} style={{ "--i": index } as CSSProperties}>
+                      <td>
+                        <span className="rn">{room.label}</span>
+                      </td>
+                      {line(room.cur, room.prev, false)}
+                    </tr>
+                  ))}
+                </Fragment>
+              );
+            })}
+            <tr className="ocw-total">
+              <td>{fill(copy.totalRow, { n: inNames.length })}</td>
+              {line(total, totalPrev, false)}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </>
   );
 }
 
-type SortKey = "revenue" | "previous" | "change" | "occupancy" | "adr" | "revpar" | "net";
-
-function RowGroup({ children }: { children: ReactNode }) {
-  return <Fragment>{children}</Fragment>;
-}
-
-function TotalRow({ data, copy, isIn, yen, pct, deltaText, tone }: Fmt & { data: OpsRevenueData; copy: Copy; isIn: (name: string) => boolean }) {
-  const names = data.properties.filter((p) => isIn(p.name)).map((p) => p.name);
-  const cur = sumMetrics(names.map((name) => data.rangeCells[name]));
-  const prev = sumMetrics(names.map((name) => data.previousRangeCells[name]));
-  const delta = changePct(cur.revenue, prev.revenue);
-  return (
-    <tr className="orv__total">
-      <td>{fill(copy.totalRow, { n: names.length })}</td>
-      <td className="num">{yen(cur.revenue)}</td>
-      <td className="num faint">{prev.revenue > 0 ? yen(prev.revenue) : "—"}</td>
-      <td><span className={`orv__d ${tone(delta)}`}>{prev.revenue > 0 ? deltaText(delta) : "—"}</span></td>
-      <td className="num">{cur.availableNights > 0 ? pct(cur.occupancyPct) : "—"}</td>
-      <td className="num">{cur.occupiedNights > 0 ? yen(cur.adr) : "—"}</td>
-      <td className="num">{cur.availableNights > 0 ? yen(cur.revpar) : "—"}</td>
-      <td className="num">{yen(cur.net)}</td>
-      <td />
-    </tr>
-  );
-}
-
-function Occ({ value, pct }: { value: number | null; pct: (value: number) => string }) {
-  if (value === null) return <span className="faint">—</span>;
-  return (
-    <span className="orv__occ">
-      <span className="num">{pct(value)}</span>
-      <span className="bar"><i style={{ width: `${Math.min(100, value)}%` }} /></span>
-    </span>
-  );
-}
-
 function ChannelBar({ cell }: { cell: RevenueCell }) {
-  const total = Math.max(1, cell.revenue);
+  if (cell.revenue <= 0) return <span className="ocw-faint">—</span>;
   return (
-    <span className="orv__mini" aria-hidden="true">
-      <i style={{ background: CHANNEL_COLOR.airbnb, width: `${(cell.airbnb / total) * 100}%` }} />
-      <i style={{ background: CHANNEL_COLOR.booking, width: `${(cell.booking / total) * 100}%` }} />
-      <i style={{ background: CHANNEL_COLOR.direct, width: `${(cell.direct / total) * 100}%` }} />
-      <i style={{ background: CHANNEL_COLOR.other, width: `${(cell.other / total) * 100}%` }} />
+    <span aria-hidden="true" className="rvw-stack rvw-stack--row">
+      {CHANNELS.filter((key) => cell[key] > 0).map((key) => (
+        <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${(cell[key] / cell.revenue) * 100}%` }} />
+      ))}
     </span>
   );
 }
@@ -769,32 +788,39 @@ function ChannelBar({ cell }: { cell: RevenueCell }) {
 function MatrixTab({
   data,
   copy,
+  inNames,
   isIn,
   metric,
+  setMetric,
   lens,
+  setLens,
   pick,
   setPick,
   monthShort,
   monthLong,
   pointText,
+  channelName,
   yen,
   pct,
   deltaText,
-  tone,
 }: Fmt & {
   data: OpsRevenueData;
   copy: Copy;
+  inNames: string[];
   isIn: (name: string) => boolean;
   metric: Metric;
+  setMetric: (metric: Metric) => void;
   lens: Lens;
+  setLens: (lens: Lens) => void;
   pick: { property: string | null; month: string };
   setPick: (pick: { property: string | null; month: string }) => void;
   monthShort: (month: string) => string;
   monthLong: (month: string) => string;
   pointText: (current: number, previous: number) => string;
+  channelName: Record<ChannelKey, string>;
 }) {
+  const w = copy.white;
   const months = data.months;
-  const inNames = data.properties.filter((p) => isIn(p.name)).map((p) => p.name);
   const value = (m: RevenueMetrics) =>
     metric === "revenue" ? m.revenue : metric === "net" ? m.net : metric === "occupancy" ? m.occupancyPct : metric === "adr" ? m.adr : m.revpar;
   const short = (v: number) =>
@@ -805,8 +831,8 @@ function MatrixTab({
   const has = (m: RevenueMetrics) => (metric === "revenue" || metric === "net" ? m.revenue > 0 : metric === "adr" ? m.occupiedNights > 0 : m.availableNights > 0);
   const deltaOf = (cur: RevenueMetrics, prev: RevenueMetrics) =>
     metric === "occupancy" ? (prev.availableNights > 0 ? cur.occupancyPct - prev.occupancyPct : null) : has(prev) ? changePct(value(cur), value(prev)) : null;
-  const deltaShort = (d: number | null) =>
-    d === null ? "" : `${Math.abs(d) >= 100 && metric !== "occupancy" ? "100%+" : `${Math.abs(d).toFixed(0)}${metric === "occupancy" ? copy.pointSuffix : "%"}`}`;
+  const deltaShort = (d: number) =>
+    Math.abs(d) >= 100 && metric !== "occupancy" ? "100%+" : `${Math.abs(d).toFixed(0)}${metric === "occupancy" ? copy.pointSuffix : "%"}`;
 
   const rowCells = (names: string[]) =>
     months.map((month) => ({
@@ -814,55 +840,66 @@ function MatrixTab({
       month,
       prev: sumMetrics(names.map((name) => data.monthCells[shiftMonthKey(month, -12)]?.[name])),
     }));
-  const rows = data.properties.map((p) => ({ name: p.name, rooms: p.roomCount, cells: rowCells([p.name]) }));
+  type Cells = ReturnType<typeof rowCells>;
+  const rows = data.properties.map((p) => ({ cells: rowCells([p.name]), name: p.name, rooms: p.roomCount }));
   const totalCells = rowCells(inNames);
-  const pastValues = (cells: ReturnType<typeof rowCells>) => cells.filter((c) => isPast(c.month) && has(c.cur)).map((c) => value(c.cur));
+  const pastValues = (cells: Cells) => cells.filter((c) => isPast(c.month) && has(c.cur)).map((c) => value(c.cur));
   const globalCuts = quintileCuts(rows.flatMap((row) => pastValues(row.cells)));
-  const firstFuture = months.findIndex((month) => !isPast(month));
 
-  const sum12 = (cells: ReturnType<typeof rowCells>) => {
+  const sum12 = (cells: Cells) => {
     const cur = sumMetrics(cells.slice(0, 12).map((c) => c.cur));
     const prev = sumMetrics(cells.slice(0, 12).map((c) => c.prev));
     const v = value(cur);
     const d = deltaOf(cur, prev);
     // 전년 12개월 중 문을 연 달이 절반도 안 되면 증감 대신 「신규」(2026-10-06 — 연 지 얼마 안 된 건물의 +650% 같은 숫자).
-    const prevOpenMonths = cells.slice(0, 12).filter((c) => c.prev.occupiedNights > 0).length;
-    const thin = prevOpenMonths < 6;
+    const thin = cells.slice(0, 12).filter((c) => c.prev.occupiedNights > 0).length < 6;
     return {
       d: thin ? copy.newLabel : metric === "occupancy" ? (d === null ? copy.newLabel : pointText(v, value(prev))) : deltaText(d),
-      tone: thin ? "z" : tone(d),
-      v: metric === "occupancy" ? pct(v) : metric === "adr" || metric === "revpar" ? yen(v) : yen(v),
+      down: !thin && d !== null && d <= -0.05,
+      // 매출 · 수수료 뺀 금액은 칸과 같은 백만 엔 단위(왼쪽 위 단위 글자) — 전체 엔은 툴팁. 단가 지표는 엔 그대로.
+      full: metric === "occupancy" ? pct(v) : yen(v),
+      v: metric === "occupancy" ? pct(v) : perRow ? short(v) : yen(v),
     };
   };
 
-  const cellView = (cur: RevenueMetrics, prev: RevenueMetrics, month: string, cuts: number[], property: string | null) => {
+  const cell = (cur: RevenueMetrics, prev: RevenueMetrics, month: string, cuts: number[], property: string | null, index: number, label: string) => {
     const future = !isPast(month);
     const selected = pick.property === property && pick.month === month;
+    const off = property !== null && !isIn(property);
     if (cur.occupiedNights === 0 && cur.revenue === 0) {
-      return { className: "orv__mc na", style: undefined, sub: "", text: "" };
+      return <span aria-hidden="true" className="rvw-mc na" key={month} style={{ "--c": index } as CSSProperties} />;
     }
     const d = deltaOf(cur, prev);
-    const classes = ["orv__mc", future ? "fut" : "", selected ? "on" : "", property === null ? "tot" : "", months.indexOf(month) === firstFuture ? "edge" : ""];
+    let style: CSSProperties = { "--c": index } as CSSProperties;
+    let text: string;
+    let sub: ReactNode;
     if (lens === "value") {
-      return {
-        className: classes.join(" "),
-        style: { background: VALUE_BG[quintileLevel(value(cur), cuts)] },
-        sub: d === null ? "" : `${d >= 0 ? "▲" : "▼"}${deltaShort(d)}`,
-        subClass: d === null ? "" : d >= 0 ? "u" : "dn",
-        text: short(value(cur)),
-      };
+      if (!future) style = { ...style, background: VALUE_BG[quintileLevel(value(cur), cuts)] };
+      text = short(value(cur));
+      sub = future ? w.bookedTag : d === null ? "" : <span className={d >= 0 ? "u" : "dn"}>{`${d >= 0 ? "▲" : "▼"}${deltaShort(d)}`}</span>;
+    } else {
+      const level = yoyLevel(d);
+      if (!future) style = { ...style, ...(level < 0 ? { background: "#F7F7F9", color: "#8b8898" } : { background: YOY_BG[level], color: YOY_FG[level] }) };
+      text = d === null ? copy.newLabel : `${d >= 0 ? "▲" : "▼"}${deltaShort(d)}`;
+      sub = future ? w.bookedTag : short(value(cur));
     }
-    const level = yoyLevel(d);
-    return {
-      className: classes.join(" "),
-      style: level < 0 ? { background: "var(--surface2)", color: "var(--faint)" } : { background: YOY_BG[level], color: YOY_FG[level] },
-      sub: short(value(cur)),
-      subClass: "",
-      text: d === null ? copy.newLabel : `${d >= 0 ? "+" : "−"}${deltaShort(d)}`,
-    };
+    return (
+      <button
+        aria-label={`${label} ${monthLong(month)}`}
+        aria-pressed={selected}
+        className={`rvw-mc${future ? " fut" : ""}${selected ? " on" : ""}${off ? " off" : ""}`}
+        key={month}
+        onClick={() => setPick({ month, property })}
+        style={style}
+        type="button"
+      >
+        <b>{text}</b>
+        <span className="s">{sub}</span>
+      </button>
+    );
   };
 
-  // 고른 칸
+  // ── 고른 칸 ──
   const pickNames = pick.property === null ? inNames : [pick.property];
   const pickCur = sumMetrics(pickNames.map((name) => data.monthCells[pick.month]?.[name]));
   const pickPrev = sumMetrics(pickNames.map((name) => data.monthCells[shiftMonthKey(pick.month, -12)]?.[name]));
@@ -873,211 +910,176 @@ function MatrixTab({
         .filter((room) => room.m.availableNights > 0)
         .sort((a, b) => a.m.occupancyPct - b.m.occupancyPct)
     : [];
-  const pickDelta = changePct(pickCur.revenue, pickPrev.revenue);
-  const pickChannels = (
-    [
-      ["airbnb", pickCur.airbnb, copy.channelAirbnb],
-      ["booking", pickCur.booking, copy.channelBooking],
-      ["direct", pickCur.direct, copy.channelDirect],
-      ["other", pickCur.other, copy.channelOther],
-    ] as const
-  ).filter(([, v]) => v > 0);
-  const metricName = { adr: copy.metricAdr, net: copy.metricNet, occupancy: copy.metricOccupancy, revenue: copy.metricRevenue, revpar: copy.metricRevpar }[metric];
+  const pickChannels = CHANNELS.map((key) => ({ key, value: pickCur[key] })).filter((c) => c.value > 0);
+  const change = (text: string, delta: number | null) => (
+    <span className={delta !== null && delta <= -0.05 ? "is-red" : "rvw-up"}>{text}</span>
+  );
+  const adrDelta = pickPrev.occupiedNights > 0 && pickCur.occupiedNights > 0 ? changePct(pickCur.adr, pickPrev.adr) : null;
+  const revparDelta = pickPrev.availableNights > 0 && pickCur.availableNights > 0 ? changePct(pickCur.revpar, pickPrev.revpar) : null;
+  const revDelta = pickPrev.revenue > 0 ? changePct(pickCur.revenue, pickPrev.revenue) : null;
+  const arrow = (delta: number | null) => (delta === null ? "" : `${delta >= 0 ? "▲" : "▼"}${Math.abs(delta).toFixed(1)}%`);
+  const metricName: Record<Metric, string> = {
+    adr: copy.metricAdr,
+    net: copy.metricNet,
+    occupancy: copy.metricOccupancy,
+    revenue: copy.metricRevenue,
+    revpar: copy.metricRevpar,
+  };
 
   return (
-    <div className="orv__mxsplit">
-      <section className="orv__card orv__mxcard">
-        <div className="orv__ch">
-          <h2>{fill(lens === "value" ? copy.matrixTitle : copy.matrixTitleYoy, { metric: metricName })}</h2>
-          <span className="orv__unit">{fill(lens === "value" ? copy.unitNote : copy.unitNoteYoy, { unit })}</span>
-          <span className="orv__grow" />
-          <span className="orv__muted">{copy.matrixHint}</span>
+    <>
+      <div className="rvw-mxbar">
+        <div className="ocw-seg" role="tablist" aria-label={copy.tabMatrix}>
+          {(["revenue", "net", "occupancy", "adr", "revpar"] as const).map((key) => (
+            <button aria-selected={metric === key} className={metric === key ? "on" : ""} key={key} onClick={() => setMetric(key)} role="tab" type="button">
+              {metricName[key]}
+            </button>
+          ))}
         </div>
-        <div className="orv__mx">
-          <div className="orv__mg" role="grid">
-            <div />
-            {months.map((month, index) => (
-              <div
-                className={`orv__mh${isPast(month) ? "" : " fut"}${pick.month === month ? " sel" : ""}${index === firstFuture ? " edge" : ""}`}
-                key={month}
-              >
-                <span className="yy">{index === 0 || month.endsWith("-01") ? month.slice(0, 4) : ""}</span>
-                <span className="mm">{monthShort(month)}</span>
-              </div>
-            ))}
-            <div className="orv__mh sum"><span className="yy" /><span className="mm">{copy.sum12}</span></div>
+        <div className="ocw-seg" role="tablist">
+          {(["value", "yoy"] as const).map((key) => (
+            <button aria-selected={lens === key} className={lens === key ? "on" : ""} key={key} onClick={() => setLens(key)} role="tab" type="button">
+              {key === "value" ? copy.lensValue : copy.lensYoy}
+            </button>
+          ))}
+        </div>
+        <span className="hint">{lens === "yoy" ? w.heatHintYoy : perRow ? w.heatHintRow : w.heatHintAll}</span>
+      </div>
 
-            {rows.map((row) => {
-              const cuts = perRow ? quintileCuts(pastValues(row.cells)) : globalCuts;
-              const total = sum12(row.cells);
-              return (
-                <RowGroup key={row.name}>
-                  <div className={`orv__rl${isIn(row.name) ? "" : " off"}${pick.property === row.name ? " sel" : ""}`}>
-                    <span className="n">{row.name}</span>
-                    <span className="s">{fill(copy.roomCount, { n: row.rooms })}</span>
-                  </div>
-                  {row.cells.map(({ cur, prev, month }) => {
-                    const view = cellView(cur, prev, month, cuts, row.name);
-                    return (
-                      <button
-                        aria-label={`${row.name} ${monthLong(month)}`}
-                        className={view.className}
-                        disabled={view.className.endsWith("na")}
-                        key={month}
-                        onClick={() => setPick({ month, property: row.name })}
-                        style={view.style}
-                        type="button"
-                      >
-                        <span className="t">{view.text}</span>
-                        <span className={`s ${view.subClass ?? ""}`}>{view.sub}</span>
-                      </button>
-                    );
-                  })}
-                  <div className="orv__sm">
-                    <span className="v">{total.v}</span>
-                    <span className={`orv__d ${total.tone}`}>{total.d}</span>
-                  </div>
-                </RowGroup>
-              );
-            })}
-            <div className="orv__trow" />
-            <div className={`orv__rl tot${pick.property === null ? " sel" : ""}`}>
-              <span className="n">{copy.totalLabel}</span>
-              <span className="s">{fill(copy.propertyCount, { n: inNames.length })}</span>
-            </div>
-            {totalCells.map(({ cur, prev, month }) => {
-              const view = cellView(cur, prev, month, quintileCuts(pastValues(totalCells)), null);
-              return (
-                <button
-                  aria-label={`${copy.totalLabel} ${monthLong(month)}`}
-                  className={view.className}
-                  disabled={view.className.endsWith("na")}
-                  key={month}
-                  onClick={() => setPick({ month, property: null })}
-                  style={view.style}
-                  type="button"
-                >
-                  <span className="t">{view.text}</span>
-                  <span className={`s ${view.subClass ?? ""}`}>{view.sub}</span>
-                </button>
-              );
-            })}
-            {(() => {
-              const total = sum12(totalCells);
-              return (
-                <div className="orv__sm">
-                  <span className="v">{total.v}</span>
-                  <span className={`orv__d ${total.tone}`}>{total.d}</span>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-        <div className="orv__mfoot">
-          <div className="orv__lgd">
-            {(lens === "value" ? VALUE_BG : YOY_BG).map((bg, index) => (
-              <span key={bg} style={{ background: bg, color: lens === "value" ? undefined : YOY_FG[index] }}>
-                {lens === "value"
-                  ? [copy.legendLow, "", copy.legendMid, "", copy.legendHigh][index]
-                  : ["−15%↓", "−5%", "±5%", "+5%", "+15%↑"][index]}
-              </span>
-            ))}
-          </div>
-          <span className="orv__unit">{lens === "yoy" ? copy.legendYoy : perRow ? copy.legendRow : copy.legendAll}</span>
-          <span className="orv__grow" />
-          <span className="orv__lg"><i className="dash" />{copy.legendBookedCell}</span>
-          <span className="orv__lg"><i className="na" />{copy.legendNotOpen}</span>
-        </div>
-      </section>
-
-      <aside className="orv__side">
-        <section className="orv__card">
-          <div className="orv__ph">
-            <div className="orv__crumb">
-              {(pick.property ?? copy.totalLabel) + " · " + monthLong(pick.month)}
-              {!isPast(pick.month) && ` · ${copy.detailBooked}`}
-            </div>
-            <div className="orv__big">
-              <span className="num">{yen(pickCur.revenue)}</span>
-              <span className={`orv__d ${tone(pickDelta)}`}>
-                {pickPrev.revenue > 0 ? fill(copy.lastYearValue, { v: deltaText(pickDelta) }) : copy.noLastYear}
-              </span>
-            </div>
-            <div className="orv__muted">
-              {fill(copy.detailSold, {
-                a: pickCur.occupiedNights.toLocaleString(),
-                b: pickCur.availableNights.toLocaleString(),
-                c: yen(pickCur.commission),
-              })}
-            </div>
-          </div>
-          <div className="orv__kvg">
-            <div>
-              <span className="l">{copy.kpiOccupancy}</span>
-              <span className="v">
-                {pickCur.availableNights > 0 ? pct(pickCur.occupancyPct) : "—"}
-                {pickPrev.availableNights > 0 && pickCur.availableNights > 0 && (
-                  <span className={`orv__d ${tone(pickCur.occupancyPct - pickPrev.occupancyPct)}`}>
-                    {pointText(pickCur.occupancyPct, pickPrev.occupancyPct)}
-                  </span>
-                )}
-              </span>
-            </div>
-            <div>
-              <span className="l">{copy.colAdr}</span>
-              <span className="v">
-                {pickCur.occupiedNights > 0 ? yen(pickCur.adr) : "—"}
-                {pickPrev.occupiedNights > 0 && pickCur.occupiedNights > 0 && (
-                  <span className={`orv__d ${tone(changePct(pickCur.adr, pickPrev.adr))}`}>{deltaText(changePct(pickCur.adr, pickPrev.adr))}</span>
-                )}
-              </span>
-            </div>
-            <div>
-              <span className="l">{copy.colRevpar}</span>
-              <span className="v">{pickCur.availableNights > 0 ? yen(pickCur.revpar) : "—"}</span>
-            </div>
-            <div>
-              <span className="l">{copy.colNet}</span>
-              <span className="v">{yen(pickCur.net)}</span>
-            </div>
-          </div>
-          <div className="orv__pad">
-            <span className="orv__l">{copy.colChannels}</span>
-            <div className="orv__stack">
-              {pickChannels.map(([key, v]) => (
-                <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${(v / Math.max(1, pickCur.revenue)) * 100}%` }} />
+      <div className="rvw-mxsplit">
+        <div className="rvw-mxmain">
+          <div className="rvw-mxwrap">
+            <div className={`rvw-mx${lens === "yoy" ? " is-yoy" : ""}`} role="grid" aria-label={fill(lens === "value" ? copy.matrixTitle : copy.matrixTitleYoy, { metric: metricName[metric] })}>
+              <span className="rvw-unit">{lens === "value" ? unit : copy.lensYoy}</span>
+              {months.map((month, index) => (
+                <span className={`ocw-mh${pick.month === month ? " on" : ""}`} key={month}>
+                  <span className="yy">{index === 0 || month.endsWith("-01") ? month.slice(0, 4) : ""}</span>
+                  {monthShort(month)}
+                </span>
               ))}
+              <span className="rvw-unit r">{w.sum12}</span>
+
+              {rows.map((row) => {
+                const cuts = perRow ? quintileCuts(pastValues(row.cells)) : globalCuts;
+                const total = sum12(row.cells);
+                const off = !isIn(row.name);
+                return (
+                  <Fragment key={row.name}>
+                    <span className={`rvw-rl${off ? " off" : ""}`} title={row.name}>
+                      <b>{row.name}</b>
+                      <span>{off ? copy.excludedTag : fill(copy.roomCount, { n: row.rooms })}</span>
+                    </span>
+                    {row.cells.map(({ cur, prev, month }, index) => cell(cur, prev, month, cuts, row.name, index, row.name))}
+                    <span className={`rvw-sm${off ? " off" : ""}`} title={total.full}>
+                      <b>{total.v}</b>
+                      <span className={total.down ? "is-red" : undefined}>{total.d}</span>
+                    </span>
+                  </Fragment>
+                );
+              })}
+
+              <span className="rvw-rl tot">
+                <b>{copy.totalLabel}</b>
+                <span>{fill(copy.propertyCount, { n: inNames.length })}</span>
+              </span>
+              {totalCells.map(({ cur, prev, month }, index) =>
+                cell(cur, prev, month, quintileCuts(pastValues(totalCells)), null, index, copy.totalLabel),
+              )}
+              {(() => {
+                const total = sum12(totalCells);
+                return (
+                  <span className="rvw-sm tot" title={total.full}>
+                    <b>{total.v}</b>
+                    <span className={total.down ? "is-red" : undefined}>{total.d}</span>
+                  </span>
+                );
+              })()}
             </div>
-            <span className="orv__muted">
-              {pickChannels.map(([, v, name]) => `${name} ${((v / Math.max(1, pickCur.revenue)) * 100).toFixed(0)}%`).join(" · ")}
+          </div>
+          <p className="ocw-foot">{w.matrixFoot}</p>
+        </div>
+
+        <aside className="rvw-detail" key={`${pick.property ?? ""}|${pick.month}`}>
+          <div className="rvw-dhead">
+            <span className="eyebrow">
+              {copy.tabMatrix}
+              {!isPast(pick.month) && <em> · {copy.detailBooked}</em>}
+            </span>
+            <h2>
+              {pick.property ?? copy.totalLabel} · {monthShort(pick.month)}
+            </h2>
+            <span className="sub">
+              {pickProperty
+                ? fill(w.detailSub, { n: pickCur.occupiedNights.toLocaleString(), rooms: pickProperty.roomCount })
+                : fill(w.detailSubTotal, { n: pickCur.occupiedNights.toLocaleString(), p: inNames.length })}
             </span>
           </div>
+          <dl className="rvw-dl">
+            <dt>{copy.colRevenue}</dt>
+            <dd>
+              {yen(pickCur.revenue)}
+              {revDelta !== null ? <> · {change(arrow(revDelta), revDelta)}</> : <span className="ocw-faint"> · {copy.noLastYear}</span>}
+            </dd>
+            <dt>{copy.colOccupancy}</dt>
+            <dd>
+              {pickCur.availableNights > 0 ? `${pickCur.occupancyPct.toFixed(0)}%` : "—"}
+              {pickPrev.availableNights > 0 && pickCur.availableNights > 0 && (
+                <> · {change(pointText(pickCur.occupancyPct, pickPrev.occupancyPct), pickCur.occupancyPct - pickPrev.occupancyPct)}</>
+              )}
+            </dd>
+            <dt>{copy.colAdr}</dt>
+            <dd>
+              {pickCur.occupiedNights > 0 ? yen(pickCur.adr) : "—"}
+              {adrDelta !== null && <> · {change(arrow(adrDelta), adrDelta)}</>}
+            </dd>
+            <dt>{copy.colRevpar}</dt>
+            <dd>
+              {pickCur.availableNights > 0 ? yen(pickCur.revpar) : "—"}
+              {revparDelta !== null && <> · {change(arrow(revparDelta), revparDelta)}</>}
+            </dd>
+            <dt>{copy.colCommission}</dt>
+            <dd>{yen(pickCur.commission)}</dd>
+            <dt>{copy.colNet}</dt>
+            <dd>{yen(pickCur.net)}</dd>
+          </dl>
+          {pickChannels.length > 0 && (
+            <div className="rvw-dsec">
+              <span className="h">{copy.colChannels}</span>
+              <span aria-hidden="true" className="rvw-stack">
+                {pickChannels.map(({ key, value: v }) => (
+                  <i key={key} style={{ background: CHANNEL_COLOR[key], width: `${(v / Math.max(1, pickCur.revenue)) * 100}%` }} />
+                ))}
+              </span>
+              <span className="rvw-dlg">
+                {pickChannels.map(({ key, value: v }) => (
+                  <span key={key}>
+                    <i style={{ background: CHANNEL_COLOR[key] }} />
+                    {channelName[key]} {((v / Math.max(1, pickCur.revenue)) * 100).toFixed(0)}
+                  </span>
+                ))}
+              </span>
+            </div>
+          )}
           {pickProperty ? (
             pickRooms.length > 0 && (
-              <div className="orv__pad orv__rooms">
-                <span className="orv__l">{copy.detailRooms}</span>
-                {pickRooms.map((room) => (
-                  <div className="orv__rr" key={room.label}>
-                    <span className="n">{room.label}</span>
-                    <span className="bar">
-                      <i
-                        style={{
-                          background: room.m.occupancyPct < 85 ? "hsl(38 70% 52%)" : "hsl(146 40% 42%)",
-                          width: `${Math.min(100, room.m.occupancyPct)}%`,
-                        }}
-                      />
-                    </span>
-                    <span className="num">{yen(room.m.revenue)}</span>
-                    <span className="num faint">{room.m.occupancyPct.toFixed(0)}%</span>
-                  </div>
-                ))}
+              <div className="rvw-dsec">
+                <span className="h">{w.detailRooms}</span>
+                <div className="rvw-rooms">
+                  {pickRooms.map((room, index) => (
+                    <div className="rvw-rr" key={room.label} style={{ "--i": index } as CSSProperties}>
+                      <span className="n">{room.label}</span>
+                      <span className="a">{yen(room.m.revenue)}</span>
+                      <b className={room.m.occupancyPct < 60 ? "is-red" : undefined}>{room.m.occupancyPct.toFixed(0)}%</b>
+                    </div>
+                  ))}
+                </div>
               </div>
             )
           ) : (
-            <p className="orv__pad orv__note">{copy.detailTotalNote}</p>
+            <p className="rvw-dnote">{copy.detailTotalNote}</p>
           )}
-        </section>
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </>
   );
 }

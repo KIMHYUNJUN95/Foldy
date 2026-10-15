@@ -50,7 +50,7 @@ export default async function OpsRevenueComparePage({ searchParams }: { searchPa
   const excludedParam = many("ex");
 
   return (
-    <AdminShell activeItem={opsNavId("revenue")} title={dictionary.opsAdmin.areaName}>
+    <AdminShell activeItem={opsNavId("revenue")} title={dictionary.opsRevenue.title}>
       {/* 예약 웹훅이 들어오면 새로고침 없이 다시 읽는다 — 예약 신호만(2026-10-08, 매출 · 가동률과 같다). */}
       <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <OpsRevenueCompareConsole

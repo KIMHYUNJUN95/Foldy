@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { exportOpsCompareReport, exportOpsCompareWorkbook, type OpsCompareExportPayload } from "@/app/admin/ops/revenue/compare/actions";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { AdminExportButtons } from "@/components/admin/shared/admin-export-buttons";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
+import { RollNumber } from "@/components/shared/roll-number";
 import type { Dictionary } from "@/lib/i18n";
 import {
   REVENUE_MODES,
@@ -22,25 +23,15 @@ import {
   type RevenueMode,
   type RevenueRange,
 } from "@/lib/ops-revenue";
-import {
-  bridgeScale,
-  buildBridge,
-  changePctOrNull,
-  findNewRooms,
-  groupProperties,
-  growthDrivers,
-  newRoomShare,
-  niceUnit,
-  topMover,
-  totalOf,
-  type BridgeStep,
-} from "@/lib/ops-revenue-compare";
+import { changePctOrNull, findNewRooms, groupProperties, growthDrivers, newRoomShare, topMover, totalOf } from "@/lib/ops-revenue-compare";
 import type { OpsRevenueCompareData, OpsRevenueComparePeriod } from "@/lib/ops-revenue-server";
-import "./ops-revenue.css";
-import "./ops-revenue-compare.css";
+import { IncludePicker } from "./ops-include-picker";
+import "./ops-occupancy-white.css";
+import "./ops-revenue-compare-white.css";
 
 /**
- * 매출 비교(A vs B) — 시안 「매출 비교」 1번 v4(아이보리 · 계기판, 2026-10-08 사용자 「이대로 구현」).
+ * 매출 비교(A vs B) — 화이트 리디자인(2026-10-15, 시안 RevCompare-PC). 가동률 화면(`.ocw-*`)의 형제 — 탭 · 고르기 · 합계
+ * 드롭다운 · 움직임을 같이 쓰고, 이 화면만의 모양은 `ops-revenue-compare-white.css`(`.rcw-*`).
  *
  * 도메인 계약: docs/product/34-metrics-and-automation.md 「매출 비교」
  *
@@ -48,12 +39,16 @@ import "./ops-revenue-compare.css";
  * (`ops-revenue-compare.ts`, 순수). 두 기간 · 건물 선택은 주소에 남는다 — 링크로 같은 비교를 공유한다.
  */
 type Copy = Dictionary["opsRevenueCompare"];
+type WhiteCopy = Copy["white"];
 type RevenueCopy = Dictionary["opsRevenue"];
 type SharedCopy = Dictionary["admin"]["shared"];
 type Metric = "revenue" | "occupancy" | "adr" | "revpar";
+type Tone = "up" | "dn" | "z";
 
 const fill = (template: string, values: Record<string, string | number>) =>
   Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, String(value)), template);
+
+const sameRange = (x: RevenueRange, y: RevenueRange) => x.from === y.from && x.to === y.to;
 
 export function compareHref(a: OpsRevenueComparePeriod, b: OpsRevenueComparePeriod, excluded: readonly string[]): string {
   const query = new URLSearchParams({ af: a.range.from, am: a.mode, at: a.range.to, bf: b.range.from, bm: b.mode, bt: b.range.to });
@@ -84,6 +79,7 @@ export function OpsRevenueCompareConsole({
   localeTag: string;
   initialExcluded: string[] | null;
 }) {
+  const w = copy.white;
   const router = useRouter();
   const [navPending, startNav] = useTransition();
   const [included, setIncluded] = useState<Set<string>>(() => {
@@ -108,12 +104,12 @@ export function OpsRevenueCompareConsole({
 
   // ── 글자 모양 ──
   const yen = (v: number) => `¥${Math.round(v).toLocaleString(localeTag)}`;
-  const signedYen = (v: number) => `${v >= 0 ? "+" : "−"}${yen(Math.abs(v))}`;
+  const signedYen = (v: number) => (Math.round(v) === 0 ? yen(0) : `${v > 0 ? "+" : "−"}${yen(Math.abs(v))}`);
   const n = (v: number) => Math.round(v).toLocaleString(localeTag);
   const pct = (v: number) => `${v.toFixed(1)}%`;
   const signedPct = (v: number | null) => (v === null ? rcopy.newLabel : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%`);
   const signedPoint = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}${rcopy.pointSuffix}`;
-  const tone = (v: number | null) => (v === null ? "z" : v > 0.05 ? "up" : v < -0.05 ? "dn" : "z");
+  const tone = (v: number | null): Tone => (v === null ? "z" : v > 0.05 ? "up" : v < -0.05 ? "dn" : "z");
   const dayLabel = (date: string, withYear: boolean) =>
     new Intl.DateTimeFormat(localeTag, { day: "numeric", month: "short", timeZone: "UTC", ...(withYear ? { year: "numeric" } : {}) }).format(
       new Date(`${date}T00:00:00Z`),
@@ -152,11 +148,40 @@ export function OpsRevenueCompareConsole({
   const freshSum = totalOf(groups.fresh, data.aCells).revenue;
   const closedSum = totalOf(groups.closed, data.bCells).revenue;
   const mixChanged = groups.fresh.length > 0 || groups.closed.length > 0;
-  const sameRange = data.a.range.from === data.b.range.from && data.a.range.to === data.b.range.to;
+  const isSameRange = sameRange(data.a.range, data.b.range);
   // 단가 · 가동률 변화는 **같은 방들끼리**(새 객실 뺀 것) — 기여 막대와 같은 기준.
   const same = { a: drivers.existingA, b: drivers.existingB };
   const exAdr = changePctOrNull(same.a.adr, same.b.adr);
   const exOcc = same.a.availableNights > 0 && same.b.availableNights > 0 ? same.a.occupancyPct - same.b.occupancyPct : null;
+  const newRoomsDelta = roomShare ? roomShare.a.revenue - roomShare.b.revenue : 0;
+
+  // B 가 어느 빠른 고르기와 같은가 — 그 버튼 글자만 보라.
+  const lastYearB: OpsRevenueComparePeriod = { mode: data.a.mode, range: previousYearRange(data.a.range) };
+  const prevB: OpsRevenueComparePeriod = { mode: data.a.mode, range: shiftRange(data.a.mode, data.a.range, -1) };
+  const isLastYear = data.b.mode === data.a.mode && sameRange(data.b.range, lastYearB.range);
+  const isPrev = !isLastYear && data.b.mode === data.a.mode && sameRange(data.b.range, prevB.range);
+  const headline = fill(isLastYear ? w.headlineLastYear : isPrev ? w.headlinePrev : w.headlineVs, { a: aLabel, b: bLabel });
+
+  const includeSummary =
+    excluded.length === 0
+      ? w.includeAll
+      : excluded.length <= 3 && inNames.length > 0
+        ? fill(w.includeExcept, { list: excluded.join(" · ") })
+        : fill(w.includeCount, { n: inNames.length });
+
+  const insights = [
+    ...(groups.fresh.length > 0 ? [fill(copy.insNew, { d: signedYen(delta), n: yen(freshSum), names: groups.fresh.join(" · ") })] : []),
+    ...(roomShare && newRoomsDelta !== 0 ? [fill(copy.insNewRooms, { names: roomShare.labels.join(" · "), v: signedYen(newRoomsDelta) })] : []),
+    ...(groups.existing.length > 0 && (mixChanged || roomShare)
+      ? [fill(copy.insExisting, { adr: signedPct(exAdr), n: groups.existing.length, occ: exOcc === null ? "—" : signedPoint(exOcc) })]
+      : []),
+    ...(() => {
+      const mover = topMover(groups.existing, data.aCells, data.bCells);
+      if (!mover) return [];
+      return [fill(mover.delta > 0 ? copy.insTopUp : copy.insTopDown, { d: signedPct(mover.pct), name: mover.name, v: signedYen(mover.delta) })];
+    })(),
+    ...(!mixChanged ? [copy.insSame] : []),
+  ].slice(0, 3);
 
   const exportPayload = (): OpsCompareExportPayload => {
     const side = (m: RevenueMetrics) => ({ available: m.availableNights, occupied: m.occupiedNights, revenue: m.revenue });
@@ -170,283 +195,262 @@ export function OpsRevenueCompareConsole({
     };
   };
 
+  const pickProps = { localeTag, periodLabel, rcopy, shared, today: data.today, w };
+
   return (
-    <div className={`orv orc${navPending ? " is-pending" : ""}`}>
-      <div className="orc__tabs" role="tablist">
-        <Link href="/admin/ops/revenue">{rcopy.tabReport}</Link>
-        <Link href="/admin/ops/revenue?tab=matrix">{rcopy.tabMatrix}</Link>
-        <span aria-current="page" className="on">{rcopy.tabCompare}</span>
+    <div className={`ocw rcw${navPending ? " is-pending" : ""}`}>
+      <div className="ocw-bar">
+        <div aria-label={copy.title} className="ocw-seg rcw-tabs" role="tablist">
+          <Link aria-selected={false} href="/admin/ops/revenue" role="tab">
+            {rcopy.tabReport}
+          </Link>
+          <Link aria-selected={false} href="/admin/ops/revenue?tab=matrix" role="tab">
+            {rcopy.tabMatrix}
+          </Link>
+          <span aria-current="page" aria-selected className="on" role="tab">
+            {rcopy.tabCompare}
+          </span>
+        </div>
       </div>
 
-      <header className="orc__head">
-        <div className="orc__headl">
-          <div className="orc__eyebrow">
-            <span className="live"><i />{copy.live}</span>
-            <span>{copy.eyebrow}</span>
+      <div className="ocw-body">
+        <header className="rcw-head">
+          <div className="rcw-headl">
+            <span className="rcw-live">
+              <i aria-hidden="true" />
+              {w.live}
+            </span>
+            <h1 className="rcw-h1">
+              {headline} <span className={`rcw-n ${tone(growth)}`}><RollNumber delay={80} text={signedPct(growth)} /></span>
+              {mixChanged && groups.existing.length > 0 && (
+                <>
+                  {w.headlineExisting} <span className={`rcw-n ${tone(exGrowth)}`}><RollNumber delay={160} text={signedPct(exGrowth)} /></span>
+                </>
+              )}
+            </h1>
+            {isSameRange && <span className="rcw-warn">{copy.sameRange}</span>}
           </div>
-          <h1 className="orc__h1">
-            <span className="t">{fill(copy.headlineVs, { a: aLabel, b: bLabel })}</span>{" "}
-            <span className={`num ${tone(growth)}`}>{signedPct(growth)}</span>
-            {mixChanged && groups.existing.length > 0 && (
-              <>
-                <span className="t">, {copy.headlineExisting}</span> <span className={`num ${tone(exGrowth)}`}>{signedPct(exGrowth)}</span>
-              </>
-            )}
-          </h1>
-          {sameRange && <span className="orc__warn">{copy.sameRange}</span>}
-        </div>
-        <div className="orc__actions">
-          <button
-            className="orc__pill"
-            onClick={() => {
-              void navigator.clipboard?.writeText(window.location.href).then(() => flash(copy.copied));
-            }}
-            type="button"
-          >
-            {copy.copyLink}
-          </button>
-          <AdminExportButtons
-            disabled={aTot.revenue === 0 && bTot.revenue === 0}
-            labels={shared}
-            onExportPdf={() => exportOpsCompareReport(exportPayload())}
-            onExportXls={() => exportOpsCompareWorkbook(exportPayload())}
-            onToast={flash}
-          />
-        </div>
-      </header>
+          <div className="ocw-tools rcw-tools">
+            <button
+              className="rcw-link"
+              onClick={() => {
+                void navigator.clipboard?.writeText(window.location.href).then(() => flash(copy.copied));
+              }}
+              type="button"
+            >
+              {copy.copyLink}
+            </button>
+            <AdminExportButtons
+              disabled={aTot.revenue === 0 && bTot.revenue === 0}
+              labels={shared}
+              onExportPdf={() => exportOpsCompareReport(exportPayload())}
+              onExportXls={() => exportOpsCompareWorkbook(exportPayload())}
+              onToast={flash}
+            />
+          </div>
+        </header>
 
-      <section className="orc__builder">
-        <Slot
-          copy={copy}
-          label={copy.slotA}
-          localeTag={localeTag}
-          onChange={(next) => go(next, data.b)}
-          period={data.a}
-          periodLabel={periodLabel}
-          rcopy={rcopy}
-          shared={shared}
-          side="a"
-          today={data.today}
-        />
-        <span className="orc__vs">{copy.vs}</span>
-        <Slot
-          copy={copy}
-          label={copy.slotB}
-          localeTag={localeTag}
-          onChange={(next) => go(data.a, next)}
-          period={data.b}
-          periodLabel={periodLabel}
-          rcopy={rcopy}
-          shared={shared}
-          side="b"
-          today={data.today}
-        />
-        <div className="orc__quick">
-          <button className="orc__pill is-primary" onClick={() => go(data.a, { mode: data.a.mode, range: previousYearRange(data.a.range) })} type="button">
-            ⟲ {copy.quickLastYear}
+        <div className="rcw-periods">
+          <PeriodPick {...pickProps} onChange={(next) => go(next, data.b)} period={data.a} side="a" />
+          <span className="rcw-vs">vs</span>
+          <PeriodPick {...pickProps} onChange={(next) => go(data.a, next)} period={data.b} side="b" />
+          <button aria-pressed={isLastYear} className={`rcw-quick${isLastYear ? " on" : ""}`} onClick={() => go(data.a, lastYearB)} type="button">
+            {copy.quickLastYear}
           </button>
-          <button className="orc__pill" onClick={() => go(data.a, { mode: data.a.mode, range: shiftRange(data.a.mode, data.a.range, -1) })} type="button">
+          <button aria-pressed={isPrev} className={`rcw-quick${isPrev ? " on" : ""}`} onClick={() => go(data.a, prevB)} type="button">
             {copy.quickPrev}
           </button>
+          <div className="rcw-inc">
+            <IncludePicker
+              allLabel={w.includeAllOn}
+              included={included}
+              onSet={setIncluded}
+              properties={data.properties.map((p) => p.name)}
+              summary={includeSummary}
+              title={rcopy.includeLabel}
+            />
+          </div>
         </div>
-      </section>
 
-      <div className="orv__chips">
-        <span className="orv__tag">{rcopy.includeLabel}</span>
-        {data.properties.map((p) => (
-          <button
-            aria-pressed={included.has(p.name)}
-            className={`orv__chip${included.has(p.name) ? " on" : ""}`}
-            key={p.name}
-            onClick={() =>
-              setIncluded((prev) => {
-                const next = new Set(prev);
-                if (next.has(p.name)) next.delete(p.name);
-                else next.add(p.name);
-                return next;
-              })
-            }
-            type="button"
-          >
-            <span className="ck" aria-hidden="true" />
-            {p.name}
-          </button>
-        ))}
-      </div>
+        {aTot.revenue === 0 && bTot.revenue === 0 ? (
+          <div className="ocw-empty">{copy.empty}</div>
+        ) : (
+          <>
+            <section className="rcw-hero">
+              <TotalColumn
+                aTotal={aTot.revenue}
+                bTotal={bTot.revenue}
+                closedSum={closedSum}
+                existingCount={groups.existing.length}
+                existingDelta={same.a.revenue - same.b.revenue}
+                freshSum={freshSum}
+                newRoomsDelta={newRoomsDelta}
+                signedYen={signedYen}
+                w={w}
+                yen={yen}
+              />
+              <GrowthColumn
+                aEx={same.a}
+                bEx={same.b}
+                closedNames={groups.closed}
+                copy={copy}
+                drivers={drivers}
+                freshNames={groups.fresh}
+                growth={growth}
+                insights={insights}
+                n={n}
+                newRoomLabels={roomShare?.labels ?? []}
+                signedPct={signedPct}
+                signedPoint={signedPoint}
+                signedYen={signedYen}
+                tone={tone}
+                yen={yen}
+              />
+            </section>
 
-      {aTot.revenue === 0 && bTot.revenue === 0 ? (
-        <div className="orv__empty">{copy.empty}</div>
-      ) : (
-        <>
-          <section className="orc__hero">
-            <TotalPanel
-              aTotal={aTot.revenue}
+            <section className="rcw-kpis">
+              {[
+                {
+                  a: aTot.availableNights > 0 ? pct(aTot.occupancyPct) : "—",
+                  aBar: aTot.occupancyPct / 100,
+                  b: bTot.availableNights > 0 ? pct(bTot.occupancyPct) : "—",
+                  bBar: bTot.occupancyPct / 100,
+                  delta: aTot.availableNights > 0 && bTot.availableNights > 0 ? signedPoint(aTot.occupancyPct - bTot.occupancyPct) : rcopy.newLabel,
+                  key: "occ",
+                  label: rcopy.metricOccupancy,
+                  note: fill(copy.kpiOccNote, { a: n(aTot.occupiedNights), b: n(aTot.availableNights) }),
+                  tone: tone(aTot.occupancyPct - bTot.occupancyPct),
+                },
+                {
+                  a: fill(w.nightsValue, { n: n(aTot.occupiedNights) }),
+                  aBar: aTot.occupiedNights,
+                  b: fill(w.nightsValue, { n: n(bTot.occupiedNights) }),
+                  bBar: bTot.occupiedNights,
+                  delta: signedPct(changePctOrNull(aTot.occupiedNights, bTot.occupiedNights)),
+                  key: "nights",
+                  label: copy.kpiNights,
+                  note: fill(copy.kpiNightsNote, { a: n(aTot.availableNights), b: n(bTot.availableNights) }),
+                  tone: tone(changePctOrNull(aTot.occupiedNights, bTot.occupiedNights)),
+                },
+                {
+                  a: aTot.occupiedNights > 0 ? yen(aTot.adr) : "—",
+                  aBar: aTot.adr,
+                  b: bTot.occupiedNights > 0 ? yen(bTot.adr) : "—",
+                  bBar: bTot.adr,
+                  delta: signedPct(changePctOrNull(aTot.adr, bTot.adr)),
+                  key: "adr",
+                  label: rcopy.metricAdr,
+                  note: copy.kpiAdrNote,
+                  tone: tone(changePctOrNull(aTot.adr, bTot.adr)),
+                },
+                {
+                  a: aTot.availableNights > 0 ? yen(aTot.revpar) : "—",
+                  aBar: aTot.revpar,
+                  b: bTot.availableNights > 0 ? yen(bTot.revpar) : "—",
+                  bBar: bTot.revpar,
+                  delta: signedPct(changePctOrNull(aTot.revpar, bTot.revpar)),
+                  key: "revpar",
+                  label: rcopy.metricRevpar,
+                  note: copy.kpiRevparNote,
+                  tone: tone(changePctOrNull(aTot.revpar, bTot.revpar)),
+                },
+              ].map((kpi, index) => {
+                // 가동률은 0~100% 그대로, 나머지는 둘 중 큰 값에 여유를 둔 비율.
+                const scale = kpi.key === "occ" ? 1 : Math.max(kpi.aBar, kpi.bBar, 1e-9) * 1.08;
+                const width = (v: number) => `${Math.max(0, Math.min(100, (v / scale) * 100))}%`;
+                return (
+                  <div className="rcw-kpi" key={kpi.key} style={{ "--i": index } as CSSProperties} title={kpi.note}>
+                    <span className="l">{kpi.label}</span>
+                    <div className="v">
+                      <b>{kpi.a === "—" ? kpi.a : <RollNumber delay={200 + index * 60} text={kpi.a} />}</b>
+                      <span className={`d ${kpi.tone}`}>{kpi.delta}</span>
+                    </div>
+                    <div className="bars">
+                      <span>
+                        <em>A</em>
+                        <span className="tr"><i className="a" style={{ width: width(kpi.aBar) }} /></span>
+                      </span>
+                      <span>
+                        <em>B</em>
+                        <span className="tr"><i className="b" style={{ width: width(kpi.bBar) }} /></span>
+                      </span>
+                    </div>
+                    <span className="s">B {kpi.b}</span>
+                  </div>
+                );
+              })}
+            </section>
+
+            <Duel
+              aCells={data.aCells}
+              aLabel={aLabel}
+              bCells={data.bCells}
               bLabel={bLabel}
-              bTotal={bTot.revenue}
-              closedSum={closedSum}
               copy={copy}
-              delta={delta}
-              existingCount={groups.existing.length}
-              existingDelta={same.a.revenue - same.b.revenue}
-              newRoomsDelta={roomShare ? roomShare.a.revenue - roomShare.b.revenue : 0}
-              freshSum={freshSum}
-              propertyCount={inNames.length}
-              signedYen={signedYen}
-              yen={yen}
-            />
-            <GrowthPanel
-              aEx={same.a}
-              bEx={same.b}
-              copy={copy}
-              drivers={drivers}
-              newRoomLabels={roomShare?.labels ?? []}
-              freshNames={groups.fresh}
-              closedNames={groups.closed}
-              growth={growth}
-              n={n}
-              signedPoint={signedPoint}
-              signedYen={signedYen}
-              yen={yen}
-              insights={[
-                ...(groups.fresh.length > 0
-                  ? [fill(copy.insNew, { d: signedYen(delta), n: yen(freshSum), names: groups.fresh.join(" · ") })]
-                  : []),
-                ...(roomShare && roomShare.a.revenue - roomShare.b.revenue !== 0
-                  ? [fill(copy.insNewRooms, { names: roomShare.labels.join(" · "), v: signedYen(roomShare.a.revenue - roomShare.b.revenue) })]
-                  : []),
-                ...(groups.existing.length > 0 && (mixChanged || roomShare)
-                  ? [
-                      fill(copy.insExisting, {
-                        adr: signedPct(exAdr),
-                        n: groups.existing.length,
-                        occ: exOcc === null ? "—" : signedPoint(exOcc),
-                      }),
-                    ]
-                  : []),
-                ...(() => {
-                  const mover = topMover(groups.existing, data.aCells, data.bCells);
-                  if (!mover) return [];
-                  return [fill(mover.delta > 0 ? copy.insTopUp : copy.insTopDown, { d: signedPct(mover.pct), name: mover.name, v: signedYen(mover.delta) })];
-                })(),
-                ...(!mixChanged ? [copy.insSame] : []),
-              ].slice(0, 3)}
+              metric={metric}
+              names={inNames}
+              pct={pct}
+              rcopy={rcopy}
+              setMetric={setMetric}
               signedPct={signedPct}
-              tone={tone}
+              signedPoint={signedPoint}
+              yen={yen}
             />
-          </section>
+          </>
+        )}
 
-          <section className="orc__kpis">
-            <Kpi
-              a={aTot.availableNights > 0 ? pct(aTot.occupancyPct) : "—"}
-              aRatio={aTot.occupancyPct}
-              b={bTot.availableNights > 0 ? pct(bTot.occupancyPct) : "—"}
-              bRatio={bTot.occupancyPct}
-              code="OCC"
-              delta={aTot.availableNights > 0 && bTot.availableNights > 0 ? signedPoint(aTot.occupancyPct - bTot.occupancyPct) : rcopy.newLabel}
-              label={rcopy.kpiOccupancy}
-              note={fill(copy.kpiOccNote, { a: n(aTot.occupiedNights), b: n(aTot.availableNights) })}
-              tone={tone(aTot.occupancyPct - bTot.occupancyPct)}
-            />
-            <Kpi
-              a={n(aTot.occupiedNights)}
-              aRatio={aTot.occupiedNights}
-              b={n(bTot.occupiedNights)}
-              bRatio={bTot.occupiedNights}
-              code="ROOM NIGHTS"
-              delta={signedPct(changePctOrNull(aTot.occupiedNights, bTot.occupiedNights))}
-              label={copy.kpiNights}
-              note={fill(copy.kpiNightsNote, { a: n(aTot.availableNights), b: n(bTot.availableNights) })}
-              tone={tone(changePctOrNull(aTot.occupiedNights, bTot.occupiedNights))}
-            />
-            <Kpi
-              a={aTot.occupiedNights > 0 ? yen(aTot.adr) : "—"}
-              aRatio={aTot.adr}
-              b={bTot.occupiedNights > 0 ? yen(bTot.adr) : "—"}
-              bRatio={bTot.adr}
-              code="ADR"
-              delta={signedPct(changePctOrNull(aTot.adr, bTot.adr))}
-              label={rcopy.kpiAdr}
-              note={copy.kpiAdrNote}
-              tone={tone(changePctOrNull(aTot.adr, bTot.adr))}
-            />
-            <Kpi
-              a={aTot.availableNights > 0 ? yen(aTot.revpar) : "—"}
-              aRatio={aTot.revpar}
-              b={bTot.availableNights > 0 ? yen(bTot.revpar) : "—"}
-              bRatio={bTot.revpar}
-              code="RevPAR"
-              delta={signedPct(changePctOrNull(aTot.revpar, bTot.revpar))}
-              label={rcopy.kpiRevpar}
-              note={copy.kpiRevparNote}
-              tone={tone(changePctOrNull(aTot.revpar, bTot.revpar))}
-            />
-          </section>
-
-          <Bridge
-            aLabel={aLabel}
-            bLabel={bLabel}
-            bTotal={bTot.revenue}
-            copy={copy}
-            exAdr={exAdr}
-            exOcc={exOcc}
-            groups={groups}
-            signedPct={signedPct}
-            signedPoint={signedPoint}
-            signedYen={signedYen}
-            steps={buildBridge(groups, data.aCells, data.bCells, 3, roomShare)}
-            yen={yen}
-            aTotal={aTot.revenue}
-          />
-
-          <Duel
-            aCells={data.aCells}
-            aLabel={aLabel}
-            bCells={data.bCells}
-            bLabel={bLabel}
-            copy={copy}
-            metric={metric}
-            names={inNames}
-            pct={pct}
-            rcopy={rcopy}
-            setMetric={setMetric}
-            signedPct={signedPct}
-            signedPoint={signedPoint}
-            yen={yen}
-          />
-        </>
+        <p className="ocw-basis">{copy.basisNote}</p>
+      </div>
+      {toast && (
+        <div className="ocw-toast" role="status">
+          {toast}
+        </div>
       )}
-
-      <p className="orc__basis">{copy.basisNote}</p>
-      {toast && <div className="orv__toast" role="status">{toast}</div>}
     </div>
   );
 }
 
-// ── 기간 고르기 칸(A · B) ─────────────────────────────────────────────────
+// ── A · B 기간 고르기 — 글자 버튼 + 그 자리에서 열리는 작은 창(모드 · 기간) ─────────────
 
-function Slot({
+function PeriodPick({
   side,
-  label,
   period,
   onChange,
   today,
-  copy,
+  w,
   rcopy,
   shared,
   localeTag,
   periodLabel,
 }: {
   side: "a" | "b";
-  label: string;
   period: OpsRevenueComparePeriod;
   onChange: (next: OpsRevenueComparePeriod) => void;
   today: string;
-  copy: Copy;
+  w: WhiteCopy;
   rcopy: RevenueCopy;
   shared: SharedCopy;
   localeTag: string;
   periodLabel: (period: OpsRevenueComparePeriod) => string;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   const modeLabel: Record<RevenueMode, string> = {
     custom: rcopy.modeCustom,
     fiscal: rcopy.modeFiscal,
@@ -454,154 +458,162 @@ function Slot({
     week: rcopy.modeWeek,
     year: rcopy.modeYear,
   };
+  const letter = side.toUpperCase();
+  // 기간을 하나 고르면 닫는다. 모드 바꾸기 · ‹ › 는 열어 둔 채 이어서 고를 수 있게.
+  const pick = (next: OpsRevenueComparePeriod) => {
+    onChange(next);
+    setOpen(false);
+  };
   return (
-    <div className={`orc__slot is-${side}`}>
-      <div className="orc__slothd">
-        <span className="badge">{side.toUpperCase()}</span>
-        <span className="lbl">{label}</span>
-        <span className="sub">{copy.sameProperties}</span>
-      </div>
-      <div className="orc__slotrow">
-        <div className="orv__seg" role="tablist">
-          {REVENUE_MODES.map((mode) => (
-            <button
-              aria-selected={mode === period.mode}
-              className={mode === period.mode ? "on" : ""}
-              key={mode}
-              onClick={() => mode !== period.mode && onChange({ mode, range: rangeForMode(mode, period.range, today) })}
-              role="tab"
-              type="button"
-            >
-              {modeLabel[mode]}
-            </button>
-          ))}
-        </div>
-        {period.mode === "month" ? (
-          <AdminMonthPicker
-            basePath="/admin/ops/revenue/compare"
-            labels={{
-              nextMonth: shared.dateNextMonth,
-              nextYear: shared.dateNextYear,
-              open: shared.dateSelect,
-              prevMonth: shared.datePrevMonth,
-              prevYear: shared.datePrevYear,
-              thisMonth: shared.dateThisMonth,
-            }}
-            localeTag={localeTag}
-            onSelect={(ym) => onChange({ mode: "month", range: { from: `${ym}-01`, to: lastDayOfMonth(ym) } })}
-            ym={period.range.from.slice(0, 7)}
-          />
-        ) : period.mode === "custom" ? (
-          <AdminDateRangePicker
-            ariaLabel={shared.pickRange}
-            from={period.range.from}
-            labels={{
-              apply: shared.dateApply,
-              nextMonth: shared.dateNextMonth,
-              pickMonth: shared.datePickMonth,
-              pickYear: shared.datePickYear,
-              prevMonth: shared.datePrevMonth,
-              reset: shared.dateReset,
-              thisMonth: shared.dateThisMonth,
-              typeEnd: shared.dateTypeEnd,
-              typeStart: shared.dateTypeStart,
-            }}
-            localeTag={localeTag}
-            onChange={(from, to) => {
-              if (from && to) onChange({ mode: "custom", range: { from, to } });
-            }}
-            to={period.range.to}
-          />
-        ) : (
-          <div className="orv__pnav">
-            <button aria-label={rcopy.prev} className="orv__arrow" onClick={() => onChange({ ...period, range: shiftRange(period.mode, period.range, -1) })} type="button">
-              <ChevronLeft aria-hidden="true" />
-            </button>
-            <span className="orv__plabel">{periodLabel(period)}</span>
-            <button aria-label={rcopy.next} className="orv__arrow" onClick={() => onChange({ ...period, range: shiftRange(period.mode, period.range, 1) })} type="button">
-              <ChevronRight aria-hidden="true" />
-            </button>
+    <div className={`rcw-pick is-${side}${open ? " open" : ""}`} ref={rootRef}>
+      <b aria-hidden="true" className="rcw-side">{letter}</b>
+      <button
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={`${letter} · ${w.pickPeriod} · ${modeLabel[period.mode]} · ${periodLabel(period)}`}
+        className="rcw-pick__btn"
+        onClick={() => setOpen((v) => !v)}
+        type="button"
+      >
+        <span className="t">
+          {modeLabel[period.mode]} · {periodLabel(period)}
+        </span>
+        <ChevronDown aria-hidden="true" className="chev" />
+      </button>
+      {open && (
+        <div aria-label={`${letter} · ${w.pickPeriod}`} className="rcw-pop" role="dialog">
+          <div className="ocw-seg" role="tablist">
+            {REVENUE_MODES.map((mode) => (
+              <button
+                aria-selected={mode === period.mode}
+                className={mode === period.mode ? "on" : ""}
+                key={mode}
+                onClick={() => mode !== period.mode && onChange({ mode, range: rangeForMode(mode, period.range, today) })}
+                role="tab"
+                type="button"
+              >
+                {modeLabel[mode]}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+          <div className="ocw-period rcw-pop__period">
+            {period.mode === "month" ? (
+              <AdminMonthPicker
+                basePath="/admin/ops/revenue/compare"
+                labels={{
+                  nextMonth: shared.dateNextMonth,
+                  nextYear: shared.dateNextYear,
+                  open: shared.dateSelect,
+                  prevMonth: shared.datePrevMonth,
+                  prevYear: shared.datePrevYear,
+                  thisMonth: shared.dateThisMonth,
+                }}
+                localeTag={localeTag}
+                onSelect={(ym) => pick({ mode: "month", range: { from: `${ym}-01`, to: lastDayOfMonth(ym) } })}
+                ym={period.range.from.slice(0, 7)}
+              />
+            ) : period.mode === "custom" ? (
+              <AdminDateRangePicker
+                ariaLabel={shared.pickRange}
+                from={period.range.from}
+                labels={{
+                  apply: shared.dateApply,
+                  nextMonth: shared.dateNextMonth,
+                  pickMonth: shared.datePickMonth,
+                  pickYear: shared.datePickYear,
+                  prevMonth: shared.datePrevMonth,
+                  reset: shared.dateReset,
+                  thisMonth: shared.dateThisMonth,
+                  typeEnd: shared.dateTypeEnd,
+                  typeStart: shared.dateTypeStart,
+                }}
+                localeTag={localeTag}
+                onChange={(from, to) => {
+                  if (from && to) pick({ mode: "custom", range: { from, to } });
+                }}
+                to={period.range.to}
+              />
+            ) : (
+              <>
+                <button aria-label={rcopy.prev} className="ocw-arw" onClick={() => onChange({ ...period, range: shiftRange(period.mode, period.range, -1) })} type="button">
+                  <ChevronLeft aria-hidden="true" />
+                </button>
+                <span className="ocw-plabel">{periodLabel(period)}</span>
+                <button aria-label={rcopy.next} className="ocw-arw" onClick={() => onChange({ ...period, range: shiftRange(period.mode, period.range, 1) })} type="button">
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── 01 총매출 ─────────────────────────────────────────────────────────────
+// ── 총매출 — 큰 숫자 · 가는 눈금 선 위 B · A 표식 · 작은 숫자 넷 ─────────────────────
 
-function TotalPanel({
-  copy,
+function TotalColumn({
+  w,
   aTotal,
   bTotal,
-  bLabel,
-  delta,
   freshSum,
   closedSum,
   existingDelta,
   newRoomsDelta,
   existingCount,
-  propertyCount,
   yen,
   signedYen,
 }: {
-  copy: Copy;
+  w: WhiteCopy;
   aTotal: number;
   bTotal: number;
-  bLabel: string;
-  delta: number;
   freshSum: number;
   closedSum: number;
   existingDelta: number;
   newRoomsDelta: number;
   existingCount: number;
-  propertyCount: number;
   yen: (v: number) => string;
   signedYen: (v: number) => string;
 }) {
-  const max = Math.max(aTotal, bTotal, 1);
-  const unit = niceUnit(max / 6);
-  const top = Math.ceil((max * 1.04) / unit) * unit;
+  const top = Math.max(aTotal, bTotal, 1) * 1.1;
   const at = (v: number) => `${Math.max(0, Math.min(100, (v / top) * 100))}%`;
-  const labels = Array.from({ length: Math.round(top / unit) + 1 }, (_, i) => i * unit).filter((_, i, all) => all.length <= 8 || i % 2 === 0);
+  const figs: Array<{ key: string; label: string; value: string; neg?: boolean }> = [
+    { key: "b", label: w.splitB, value: yen(bTotal) },
+    { key: "ex", label: w.splitExisting, neg: existingDelta < 0, value: existingCount > 0 ? signedYen(existingDelta) : "—" },
+    ...(newRoomsDelta !== 0 ? [{ key: "rooms", label: w.splitNewRooms, neg: newRoomsDelta < 0, value: signedYen(newRoomsDelta) }] : []),
+    { key: "fresh", label: w.splitNew, value: signedYen(freshSum) },
+    { key: "closed", label: w.splitClosed, neg: closedSum > 0, value: signedYen(-closedSum) },
+  ];
   return (
-    <div className="orc__total">
-      <i className="cn tl" /><i className="cn tr" /><i className="cn bl" /><i className="cn br" />
-      <div className="orc__code"><span>{copy.secTotal}</span><span>{fill(copy.propertiesCount, { n: propertyCount })}</span></div>
-      <div className="orc__big">
-        <span className="v">{yen(aTotal)}</span>
-        <span className={`d ${delta >= 0 ? "up" : "dn"}`}>{delta >= 0 ? "▲" : "▼"} {signedYen(delta)}</span>
+    <div className="rcw-col">
+      <span className="rcw-k is-a">{w.secTotal}</span>
+      <div className="rcw-big">
+        <b>
+          <RollNumber delay={80} text={yen(aTotal)} />
+        </b>
+        <span className="b">B {yen(bTotal)}</span>
       </div>
-      <div className="orc__ruler">
-        <span className="mk is-b" style={{ left: at(bTotal) }}>B {yen(bTotal)}</span>
-        <span className="mk is-a" style={{ left: at(aTotal) }}>A</span>
-        <div className="track" style={{ "--minor": `${(unit / 5 / top) * 100}%`, "--major": `${(unit / top) * 100}%` } as CSSProperties}>
-          <div className="fill" style={{ width: at(aTotal) }} />
-        </div>
-        <div className="labels">
-          {labels.map((v, i) => (
-            <span key={v} style={{ left: at(v), transform: i === 0 ? "none" : v >= top ? "translateX(-100%)" : "translateX(-50%)" }}>
-              {v === 0 ? "0" : yen(v)}
-            </span>
-          ))}
-        </div>
+      <div aria-hidden="true" className="rcw-scale">
+        <span className="ln" />
+        <span className="mk is-b" style={{ "--x": at(bTotal) } as CSSProperties} />
+        <span className="mk is-a" style={{ "--x": at(aTotal) } as CSSProperties} />
       </div>
-      <div className="orc__split">
-        <div><span className="k">B · {bLabel}</span><span className="v b">{yen(bTotal)}</span></div>
-        {freshSum !== 0 && <div><span className="k">{copy.splitNew}</span><span className="v up">{signedYen(freshSum)}</span></div>}
-        {existingCount > 0 && (
-          <div><span className="k">{fill(copy.splitExisting, { n: existingCount })}</span><span className={`v ${existingDelta >= 0 ? "up" : "dn"}`}>{signedYen(existingDelta)}</span></div>
-        )}
-        {newRoomsDelta !== 0 && <div><span className="k">{copy.splitNewRooms}</span><span className={`v ${newRoomsDelta >= 0 ? "up" : "dn"}`}>{signedYen(newRoomsDelta)}</span></div>}
-        {closedSum !== 0 && <div><span className="k">{copy.splitClosed}</span><span className="v dn">{signedYen(-closedSum)}</span></div>}
+      <div className="rcw-figs">
+        {figs.map((fig) => (
+          <span key={fig.key}>
+            <span className="k">{fig.label}</span>
+            <b className={fig.neg ? "is-red" : ""}>{fig.value}</b>
+          </span>
+        ))}
       </div>
     </div>
   );
 }
 
-// ── 02 증감 — 기여 막대 + 요점 (2026-10-08, 다이얼 대신) ──────────────────
+// ── 증감 — 큰 증감률 · 가운데 0 선에서 자라는 기여 막대 · 요점 ──────────────────────
 
-function GrowthPanel({
+function GrowthColumn({
   copy,
   growth,
   insights,
@@ -622,7 +634,7 @@ function GrowthPanel({
   growth: number | null;
   insights: string[];
   signedPct: (v: number | null) => string;
-  tone: (v: number | null) => string;
+  tone: (v: number | null) => Tone;
   drivers: ReturnType<typeof growthDrivers>;
   aEx: RevenueMetrics;
   bEx: RevenueMetrics;
@@ -634,220 +646,63 @@ function GrowthPanel({
   signedYen: (v: number) => string;
   signedPoint: (v: number) => string;
 }) {
-  const max = Math.max(1e-9, Math.abs(drivers.totalPoints ?? 0), ...drivers.drivers.map((d) => Math.abs(d.points ?? 0)));
+  const w = copy.white;
   const label = (key: (typeof drivers.drivers)[number]["key"]) =>
     ({
-      closed: { name: copy.driverClosed, sub: closedNames.join(" · ") },
-      fresh: { name: copy.driverFresh, sub: freshNames.join(" · ") },
-      newRooms: { name: copy.driverNewRooms, sub: newRoomLabels.join(" · ") },
-      price: { name: copy.driverPrice, sub: fill(copy.driverPriceSub, { a: yen(aEx.adr), b: yen(bEx.adr) }) },
-      volume: { name: copy.driverVolume, sub: fill(copy.driverVolumeSub, { a: n(aEx.occupiedNights), b: n(bEx.occupiedNights) }) },
+      closed: { name: w.driverClosed, sub: closedNames.join(" · ") },
+      fresh: { name: w.driverFresh, sub: freshNames.join(" · ") },
+      newRooms: { name: w.driverNewRooms, sub: newRoomLabels.join(" · ") },
+      price: { name: w.driverPrice, sub: fill(copy.driverPriceSub, { a: yen(aEx.adr), b: yen(bEx.adr) }) },
+      volume: { name: w.driverVolume, sub: fill(copy.driverVolumeSub, { a: n(aEx.occupiedNights), b: n(bEx.occupiedNights) }) },
     })[key];
-  const bar = (points: number | null) => {
-    const w = points === null ? 0 : (Math.abs(points) / max) * 50;
-    return points !== null && points < 0 ? { right: "50%", width: `${w}%` } : { left: "50%", width: `${w}%` };
+  // 0 선 자리 — 뺀 몫이 없으면 왼쪽 30%(시안), 보탠 몫이 없으면 오른쪽 30%, 둘 다 있으면 크기 비율(20~80%).
+  const pos = Math.max(0, ...drivers.drivers.map((d) => d.points ?? 0));
+  const neg = Math.max(0, ...drivers.drivers.map((d) => -(d.points ?? 0)));
+  const zero = neg === 0 ? 0.3 : pos === 0 ? 0.7 : Math.min(0.8, Math.max(0.2, neg / (pos + neg)));
+  const unit = Math.max(pos / (1 - zero), neg / zero, 1e-9);
+  const bar = (points: number | null): CSSProperties => {
+    const width = `${(Math.abs(points ?? 0) / unit) * 100}%`;
+    return (points ?? 0) < 0 ? { right: `${(1 - zero) * 100}%`, width } : { left: `${zero * 100}%`, width };
   };
   return (
-    <div className="orc__growth">
-      <div className="orc__code"><span>{copy.secGrowth}</span><span>B → A</span></div>
-      <div className={`orc__growthv ${tone(growth)}`}>{signedPct(growth)}</div>
-      <div className="orc__drivers">
-        {drivers.drivers.map((d) => {
+    <div className="rcw-col">
+      <span className="rcw-k" title={copy.driverNote}>
+        {w.secGrowth}
+      </span>
+      <b className={`rcw-gv ${tone(growth)}`}>
+        <RollNumber delay={140} text={signedPct(growth)} />
+      </b>
+      <div className="rcw-drv" style={{ "--z": `${zero * 100}%` } as CSSProperties}>
+        {drivers.drivers.map((d, index) => {
           const t = label(d.key);
+          const down = (d.points ?? 0) < 0;
           return (
-            <div className="dr" key={d.key}>
-              <div className="nm"><b>{t.name}</b><span>{t.sub}</span></div>
-              <div className="tr"><i className={(d.points ?? 0) >= 0 ? "up" : "dn"} style={bar(d.points)} /><em /></div>
-              <div className="vv">
-                <span className={`p ${(d.points ?? 0) >= 0 ? "up" : "dn"}`}>{d.points === null ? "—" : signedPoint(d.points)}</span>
-                <span className="y">{signedYen(d.value)}</span>
-              </div>
+            <div className="rcw-dr" key={d.key} style={{ "--i": index } as CSSProperties} title={[t.sub, signedYen(d.value)].filter(Boolean).join(" · ")}>
+              <span className="nm">{t.name}</span>
+              <span className="tr">
+                <i className={down ? "dn" : "up"} style={bar(d.points)} />
+                <em />
+              </span>
+              <b className={down ? "is-red" : ""}>{d.points === null ? "—" : signedPoint(d.points)}</b>
             </div>
           );
         })}
-        <div className="dr total">
-          <div className="nm"><b>{copy.driverTotal}</b></div>
-          <div className="tr"><i className={(drivers.totalPoints ?? 0) >= 0 ? "tot" : "dn"} style={bar(drivers.totalPoints)} /><em /></div>
-          <div className="vv">
-            <span className={`p ${tone(drivers.totalPoints)}`}>{signedPct(drivers.totalPoints)}</span>
-            <span className="y">{signedYen(drivers.total)}</span>
-          </div>
+        <div className="rcw-dr is-total">
+          <b className="nm">{w.driverTotal}</b>
+          <span className="y">{signedYen(drivers.total)}</span>
+          <b className={`rcw-n ${tone(drivers.totalPoints)}`}>{signedPct(drivers.totalPoints)}</b>
         </div>
       </div>
-      <p className="orc__drnote">{copy.driverNote}</p>
-      <ol className="orc__ins">
+      <ul className="rcw-ins">
         {insights.map((text, index) => (
-          <li key={index}>
-            <span className="no">{String(index + 1).padStart(2, "0")}</span>
-            <span>{text}</span>
-          </li>
+          <li key={index}>{text}</li>
         ))}
-      </ol>
+      </ul>
     </div>
   );
 }
 
-// ── 지표 카드 ─────────────────────────────────────────────────────────────
-
-function Kpi({
-  code,
-  label,
-  a,
-  b,
-  aRatio,
-  bRatio,
-  delta,
-  tone,
-  note,
-}: {
-  code: string;
-  label: string;
-  a: string;
-  b: string;
-  aRatio: number;
-  bRatio: number;
-  delta: string;
-  tone: string;
-  note: string;
-}) {
-  const max = Math.max(aRatio, bRatio, 1e-9);
-  return (
-    <div className="orc__kpi">
-      <i className="cn tr" />
-      <span className="code">{code}</span>
-      <div className="row">
-        <span className="v">{a}</span>
-        <span className={`dl ${tone}`}>{delta}</span>
-      </div>
-      <div className="bars">
-        <span className="bar"><b className="tag a">A</b><span className="tr"><i className="a" style={{ width: `${(aRatio / max) * 100}%` }} /></span></span>
-        <span className="bar"><b className="tag b">B</b><span className="tr"><i className="b" style={{ width: `${(bRatio / max) * 100}%` }} /></span></span>
-      </div>
-      <div className="foot"><span className="l">{label}</span><span className="bv">B {b}</span></div>
-      <span className="note">{note}</span>
-    </div>
-  );
-}
-
-// ── 03 차이 분해(브리지) ──────────────────────────────────────────────────
-
-function Bridge({
-  steps,
-  groups,
-  copy,
-  aLabel,
-  bLabel,
-  aTotal,
-  bTotal,
-  exAdr,
-  exOcc,
-  yen,
-  signedYen,
-  signedPct,
-  signedPoint,
-}: {
-  steps: BridgeStep[];
-  groups: ReturnType<typeof groupProperties>;
-  copy: Copy;
-  aLabel: string;
-  bLabel: string;
-  aTotal: number;
-  bTotal: number;
-  exAdr: number | null;
-  exOcc: number | null;
-  yen: (v: number) => string;
-  signedYen: (v: number) => string;
-  signedPct: (v: number | null) => string;
-  signedPoint: (v: number) => string;
-}) {
-  const scale = bridgeScale(steps);
-  const H = 300;
-  const y = (v: number) => Math.max(0, ((v - scale.base) / (scale.top - scale.base)) * H);
-  const text = (step: BridgeStep) => {
-    switch (step.role) {
-      case "totalB":
-        return { label: `B · ${bLabel}`, sub: fill(copy.stepTotalSub, { n: groups.existing.length + groups.closed.length }) };
-      case "totalA":
-        return { label: `A · ${aLabel}`, sub: fill(copy.stepTotalSub, { n: groups.existing.length + groups.fresh.length }) };
-      case "existing":
-        return {
-          label: fill(copy.stepExisting, { n: groups.existing.length }),
-          sub: fill(copy.stepExistingSub, { adr: signedPct(exAdr), occ: exOcc === null ? "—" : signedPoint(exOcc) }),
-        };
-      case "newRooms":
-        return { label: fill(copy.stepNewRooms, { n: step.names.length }), sub: step.names.join(" · ") };
-      case "fresh":
-        return { label: step.names[0], sub: copy.stepFreshSub };
-      case "freshOther":
-        return { label: fill(copy.stepFreshOther, { n: step.names.length }), sub: step.names.join(" · ") };
-      case "closed":
-        return { label: copy.stepClosed, sub: step.names.join(" · ") || copy.stepClosedSub };
-    }
-  };
-  const total = (step: BridgeStep) => step.kind === "A" || step.kind === "B";
-  return (
-    <section className="orc__card">
-      <div className="orc__cardhd">
-        <div><span className="orc__codeline">{copy.secBridge.split(" — ")[0]}</span><h2>{copy.secBridge.split(" — ")[1] ?? copy.secBridge}</h2></div>
-        <span className="orc__hint">{fill(copy.bridgeHint, { a: yen(aTotal), b: yen(bTotal) })}</span>
-      </div>
-      <div className="orc__bridge" style={{ "--cols": steps.length } as CSSProperties}>
-        <div className="axis">
-          {scale.ticks.map((v) => (
-            <span key={v} style={{ bottom: y(v) }}>{yen(v)}</span>
-          ))}
-        </div>
-        <div className="plot">
-          <div className="area">
-            {scale.ticks.map((v, i) => (
-              <div className={`gl${i === 0 ? " base" : ""}`} key={v} style={{ bottom: y(v) }} />
-            ))}
-            <div className="cols">
-              {steps.map((step, index) => {
-                const lo = total(step) ? scale.base : Math.min(step.from, step.to);
-                const hi = Math.max(step.from, step.to);
-                const value = total(step) ? yen(step.to) : signedYen(step.to - step.from);
-                return (
-                  <div className="col" key={`${step.role}-${index}`}>
-                    {!total(step) && <div className="ghost" style={{ height: y(lo) }} />}
-                    <div className={`bar is-${step.kind}`} style={{ bottom: y(lo), height: Math.max(5, y(hi) - y(lo)) }} />
-                    {total(step) && scale.base > 0 && <div className="brk" />}
-                    {index < steps.length - 1 && <div className="link" style={{ bottom: y(step.to) }} />}
-                    <span className={`chip is-${step.kind}`} style={{ bottom: y(hi) + 10 }}>{value}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="labels">
-            {steps.map((step, index) => {
-              const t = text(step);
-              const share = step.role === "totalB" ? copy.shareBase : fill(copy.share, { d: signedPct(changePctOrNull(bTotal + (step.kind === "A" ? step.to - bTotal : step.to - step.from), bTotal)) });
-              return (
-                <div className="lb" key={`${step.role}-${index}`}>
-                  <i className={`dot is-${step.kind}`} />
-                  <b>{t.label}</b>
-                  <span className="sub">{t.sub}</span>
-                  <span className={`share is-${step.kind}`}>{share}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="orc__legend">
-        <span><i className="is-B" />{copy.legendB}</span>
-        <span><i className="is-down" />{copy.legendDown}</span>
-        <span><i className="is-up" />{copy.legendUp}</span>
-        <span><i className="is-A" />{copy.legendA}</span>
-        <span><i className="dash" />{copy.legendRunning}</span>
-        <span className="note">{scale.base > 0 ? fill(copy.axisFrom, { v: yen(scale.base) }) : copy.axisZero}</span>
-      </div>
-    </section>
-  );
-}
-
-// ── 04 건물별 맞대기 ──────────────────────────────────────────────────────
+// ── 건물별 맞대기 ──────────────────────────────────────────────────────────
 
 function Duel({
   names,
@@ -878,6 +733,7 @@ function Duel({
   signedPct: (v: number | null) => string;
   signedPoint: (v: number) => string;
 }) {
+  const w = copy.white;
   const valueOf = (m: RevenueMetrics): number | null => {
     switch (metric) {
       case "revenue":
@@ -900,6 +756,7 @@ function Duel({
     .filter((row) => row.a !== null || row.b !== null)
     .sort((x, y) => (y.a ?? -Infinity) - (x.a ?? -Infinity));
   const max = Math.max(1e-9, ...rows.flatMap((row) => [row.a ?? 0, row.b ?? 0]));
+  const width = (v: number | null) => `${Math.max(0, ((v ?? 0) / max) * 100)}%`;
   const metrics: Array<[Metric, string]> = [
     ["revenue", rcopy.metricRevenue],
     ["occupancy", rcopy.metricOccupancy],
@@ -907,41 +764,51 @@ function Duel({
     ["revpar", rcopy.metricRevpar],
   ];
   return (
-    <section className="orc__card">
-      <div className="orc__cardhd">
-        <div><span className="orc__codeline">{copy.secProperties.split(" — ")[0]}</span><h2>{copy.secProperties.split(" — ")[1] ?? copy.secProperties}</h2></div>
-        <div className="orc__seg">
+    <section className="rcw-duel">
+      <div className="rcw-dbar">
+        <span className="rcw-k">{w.secProperties}</span>
+        <div aria-label={w.secProperties} className="ocw-seg" role="tablist">
           {metrics.map(([key, label]) => (
-            <button className={metric === key ? "on" : ""} key={key} onClick={() => setMetric(key)} type="button">
+            <button aria-selected={metric === key} className={metric === key ? "on" : ""} key={key} onClick={() => setMetric(key)} role="tab" type="button">
               {label}
             </button>
           ))}
         </div>
+        <span className="ocw-lgs rcw-lgs">
+          <span>
+            <i className="a" />A · {aLabel}
+          </span>
+          <span>
+            <i className="b" />B · {bLabel}
+          </span>
+          <span className="hint">· {w.sortHint}</span>
+        </span>
       </div>
-      <div className="orc__duel">
-        <div className="hd"><span>{copy.tableHead}</span><span className="r">A · {aLabel}</span><span className="c">Δ</span><span>B · {bLabel}</span></div>
+      <div className="rcw-dgrid">
+        <div className="rcw-dhd">
+          <span>{copy.tableHead}</span>
+          <span />
+          <span className="r">A</span>
+          <span className="r">B</span>
+          <span className="r">{w.colChange}</span>
+        </div>
         {rows.map((row, index) => {
-          const d =
-            row.a === null || row.b === null ? null : metric === "occupancy" ? row.a - row.b : changePctOrNull(row.a, row.b);
+          const d = row.a === null || row.b === null ? null : metric === "occupancy" ? row.a - row.b : changePctOrNull(row.a, row.b);
+          const t = d === null ? "z" : d > 0.05 ? "up" : d < -0.05 ? "dn" : "z";
           return (
-            <div className="row" key={row.name}>
-              <div className="nm">
-                <span className="no">{String(index + 1).padStart(2, "0")}</span>
-                <b>{row.name}</b>
-                {row.fresh && <span className="tag new">{copy.tagNew}</span>}
-                {row.gone && <span className="tag gone">{copy.tagClosed}</span>}
-              </div>
-              <div className="sa">
-                <span className="v">{fmt(row.a)}</span>
-                <span className="tr"><i style={{ width: `${((row.a ?? 0) / max) * 100}%` }} /></span>
-              </div>
-              <span className={`dl ${d === null ? "z" : d > 0.05 ? "up" : d < -0.05 ? "dn" : "z"}`}>
-                {d === null ? "—" : metric === "occupancy" ? signedPoint(d) : signedPct(d)}
+            <div className="rcw-drow" key={row.name} style={{ "--i": index } as CSSProperties}>
+              <b className="nm" title={row.name}>
+                {row.name}
+              </b>
+              <span aria-hidden="true" className="bars">
+                <i className="a" style={{ width: width(row.a) }} />
+                <i className="b" style={{ width: width(row.b) }} />
               </span>
-              <div className="sb">
-                <span className="tr"><i style={{ width: `${((row.b ?? 0) / max) * 100}%` }} /></span>
-                <span className="v">{fmt(row.b)}</span>
-              </div>
+              <span className="va">{row.gone ? <span className="na">{w.tagNoSale}</span> : fmt(row.a)}</span>
+              <span className="vb">{row.fresh ? w.tagNoSale : fmt(row.b)}</span>
+              <b className={`dl ${row.fresh ? "up" : row.gone ? "dn" : t}`}>
+                {row.fresh ? w.tagNew : row.gone ? w.tagGone : d === null ? "—" : metric === "occupancy" ? signedPoint(d) : signedPct(d)}
+              </b>
             </div>
           );
         })}

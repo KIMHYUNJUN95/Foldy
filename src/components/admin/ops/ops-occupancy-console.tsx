@@ -1,15 +1,16 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, useTransition, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { exportOpsOccupancyReport, exportOpsOccupancyWorkbook, type OpsOccupancyExportPayload } from "@/app/admin/ops/occupancy/actions";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { AdminExportButtons } from "@/components/admin/shared/admin-export-buttons";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { RollNumber } from "@/components/shared/roll-number";
+import { IncludePicker } from "./ops-include-picker";
 import type { Dictionary } from "@/lib/i18n";
 import {
   OCCUPANCY_LINE,
@@ -510,83 +511,6 @@ export function OpsOccupancyConsole({
       {toast && (
         <div className="ocw-toast" role="status">
           {toast}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── 합계에 넣을 건물 — 칩 9개 대신 드롭다운 하나 ─────────────────────────────
-
-function IncludePicker({
-  properties,
-  included,
-  onSet,
-  summary,
-  title,
-  allLabel,
-}: {
-  properties: string[];
-  included: Set<string>;
-  onSet: (update: (prev: Set<string>) => Set<string>) => void;
-  summary: string;
-  title: string;
-  allLabel: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const toggle = (name: string) =>
-    onSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-
-  return (
-    <div className={`ocw-inc${open ? " open" : ""}`} ref={rootRef}>
-      <button aria-expanded={open} aria-haspopup="dialog" className="ocw-inc__btn" onClick={() => setOpen((v) => !v)} title={title} type="button">
-        <span className="t">{summary}</span>
-        <ChevronDown aria-hidden="true" className="chev" />
-      </button>
-      {open && (
-        <div aria-label={title} className="ocw-inc__menu" role="dialog">
-          <div className="ocw-inc__hd">
-            <span>{title}</span>
-            {included.size < properties.length && (
-              <button className="ocw-inc__all" onClick={() => onSet(() => new Set(properties))} type="button">
-                {allLabel}
-              </button>
-            )}
-          </div>
-          {properties.map((name) => {
-            const on = included.has(name);
-            return (
-              <button aria-pressed={on} className={`ocw-inc__opt${on ? " on" : ""}`} key={name} onClick={() => toggle(name)} type="button">
-                <span aria-hidden="true" className="ck">
-                  {on && <Check />}
-                </span>
-                <span className="n">{name}</span>
-              </button>
-            );
-          })}
         </div>
       )}
     </div>

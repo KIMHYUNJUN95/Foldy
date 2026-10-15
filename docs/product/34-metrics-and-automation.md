@@ -206,8 +206,32 @@ roomId 를 같은 이름으로 합친다.
   95% ¥84M). 넣지 않았다.
 - 모바일 화면 — 아직 없다(만들 때 폴드 · 태블릿 규칙 적용).
 
+**화이트 리디자인 — 추이 · 건물별 / 건물 × 월 (2026-10-15 구현 — 시안 Rev-PC · RevMatrix-PC, `docs/design/05-white-redesign.md`)** —
+기능 · 숫자 · 주소 · 내보내기는 그대로, 모양만 가동률 화면(`ocw-*`)의 형제로 바뀌었다:
+
+- 머리 제목이 「운영 관리자」 대신 **「매출」**(로딩 화면도 — `OpsMetricsLoading page="revenue"`). 본문 제목 줄 · 칩 줄은 없앴다.
+- **도구 줄 한 줄**: 탭(추이 · 건물별 | 건물 × 월 | 비교 링크) · 기간 모드 · ‹ 기간 ⌄ › · 회색 비교 글자 · 보라 「진행 중」 · **「합계: 오쿠보A · 사노 제외」
+  드롭다운**(가동률과 같은 `IncludePicker` — `src/components/admin/ops/ops-include-picker.tsx` 로 떼어 가동률 · 매출이 같이 쓴다) ·
+  Excel · PDF. 건물 × 월 탭은 늘 기준 달 앞뒤 15달이라 비교 · 진행 글자를 그리지 않는다.
+- 숫자 6개(추이 탭만): 상자 없이 큰 숫자(공용 `RollNumber`) + 회색 아랫줄 「전년 대비 ±x%」(줄었으면 그 부분만 빨강) · 수수료는 「매출의 x%」 ·
+  가동률은 「판매 / 전체 박 · ±p」. ADR · RevPAR 은 이름만(풀이 · 전년 값은 툴팁).
+- 월별 매출(왼쪽 2/3): 올해 옅은 보라 · 고른 달 진한 보라 · 옆에 가는 회색 전년 막대 · 앞으로 빗금 · 진행 중인 달은 지난 날 진하게 + 빗금,
+  아래 달 이름과 가동률 %. 세로축 금액 눈금은 뺐다(금액은 막대 툴팁). 오른쪽(상자 없음): 「총매출에서 남는 돈」 큰 금액 + 「총매출 − 채널 수수료」 ·
+  「청소비 · 인건비 · 세금은 넣지 않은 값」, 채널 구성 한 줄 막대 + 목록(점 · 이름 · 금액 · %). 채널 색은 각 회사 색(Airbnb #FF5A5F · Booking #003B95 ·
+  직접 회색 · 기타 옅은 회색).
+- 건물별 표: 상자 없이 60px 줄, 매출 굵게 · 전년 회색 · 증감 음수 빨강(전년 없으면 「신규」) · 가동률 % 글자 · 채널 막대. **채널 머리글과 막대는
+  수수료 뺀 금액 열에서 32px 띄운다**(사용자 — 「채널」이 너무 왼쪽). 펼친 줄은 옅은 보라 바탕, 합계 제외 줄은 흐리게, 합계 줄 그대로.
+- 건물 × 월: 지표 · 보기 두 세그먼트 줄 + 오른쪽 회색 설명. 둥근 8px 칸(값 + 작은 ▲ 초록 / ▼ 빨강 %), 값 보기는 보라 5단계, 전년 대비 보기는
+  빨강 ~ 회색 ~ 초록 5단계. 앞으로 달은 빗금 칸 「잡힘」, 문 열기 전은 얇은 테두리 빈 칸, 고른 칸은 보라 테두리. **12개월 합은 매출 · 수수료 뺀 금액이면
+  칸과 같은 백만 엔 단위**(전체 엔은 툴팁 — 92px 열에 ¥143,560,740 이 넘쳤다), 비율 · 단가 지표는 그대로. 오른쪽 상세(상자 없음, 약 1280px 아래에선
+  표 아래로): 건물 · 달 제목, 「객실 N · 판매 N박」, 매출 · 가동률 · ADR · RevPAR(전년 대비) · 수수료 · 수수료 뺀 금액, 채널 막대 + 범례, 객실별 가동률 낮은 순.
+- 움직임(동작 줄이기면 끔): 막대 25ms 차례로 자라기 · 채널 막대 왼→오 · 칸 열마다 차례 등장 · 지표를 바꾸면 칸 색이 200ms 로 옮겨감 · 상세는 칸을 바꿀 때
+  짧게 들어옴 · 탭 바꿈 흐려짐 · 누름 반응. 실시간 새로 고침은 다시 붙이지 않아 등장 움직임이 다시 돌지 않는다.
+
 파일: `src/app/admin/ops/revenue/page.tsx` · `actions.ts`(내보내기) · `src/components/admin/ops/ops-revenue-console.tsx` ·
-`ops-revenue.css` · `src/lib/ops-revenue.ts` · `src/lib/ops-revenue-server.ts` · i18n `opsRevenue`(ko · ja · en).
+`ops-revenue-white.css`(매출 전용 `rvw-*` — 도구 줄 · 숫자 줄 · 표 바탕은 `ops-occupancy-white.css` 의 `ocw-*` 를 같이 쓴다. 옛
+`ops-revenue.css` · `.orv__*` 는 이제 비교 화면만 쓴다) · `ops-include-picker.tsx` · `src/lib/ops-revenue.ts` · `src/lib/ops-revenue-server.ts` ·
+i18n `opsRevenue`(+ 화이트 문구 `opsRevenue.white`, ko · ja · en).
 
 ## 객실 × 월 집계 표 (2026-10-08 — 속도 2단계)
 
@@ -270,9 +294,30 @@ Supabase `ap-northeast-1` 로 둘 다 도쿄라 이보다 빠르다).
 
 아직 없는 것: 「+ C 더하기」(세 기간 이상) · A 와 B 에 다른 건물 묶음 · 모바일 화면. 시안 2번(기수 겹쳐 보기) · 3번(건물끼리)은 보류.
 
-파일: `src/app/admin/ops/revenue/compare/page.tsx` · `actions.ts` · `src/components/admin/ops/ops-revenue-compare.{tsx,css}` ·
+파일: `src/app/admin/ops/revenue/compare/page.tsx` · `actions.ts` · `src/components/admin/ops/ops-revenue-compare.tsx` ·
+`ops-revenue-compare-white.css`(아래 화이트 리디자인 — 옛 `ops-revenue-compare.css` 는 삭제, `ops-revenue.css` 는 더 쓰지 않는다) ·
 `src/lib/ops-revenue-compare.ts` · `src/lib/ops-revenue-server.ts`(`getOpsRevenueCompareData`, 공용 `createRevenueSummarizer`) ·
 i18n `opsRevenueCompare` + `opsRevenue.tabCompare`(ko · ja · en).
+
+**비교 화이트 리디자인 (2026-10-15 구현 — 시안 RevCompare-PC, `docs/design/05-white-redesign.md`)** — 숫자 · 분해 식 · 주소 · 내보내기는
+그대로, 모양만 가동률 화면(`.ocw-*`)의 형제로 바꿨다(이 화면만의 모양은 `.rcw-*`):
+
+- 머리 제목 「매출」(로딩도 같다). 맨 위 탭 세그먼트 「추이 · 건물별 | 건물 × 월 | 비교」. 그 아래 「● 실시간」 + 보통 글꼴 26px 문장
+  「2026년 9월 매출은 전년보다 +44.5%, 기존 건물은 −9.0%」(숫자 보라 = +, 빨강 = −, 굴림) — 세리프 제목이 한글을 □ 로 그리던 문제가 없어졌다.
+  B 가 「전년 같은 기간」이면 「전년보다」, 「바로 전 기간」이면 「바로 전 기간보다」, 그 밖엔 「{B}보다」. 오른쪽 링크 복사 · Excel · PDF.
+- **기간 한 줄**: 「A 월 · 2026년 9월 ⌄ vs B 월 · 2025년 9월 ⌄ 전년 같은 기간 | 바로 전 기간」 + 오른쪽 「합계: …」 드롭다운(가동률과
+  같은 `IncludePicker`). 큰 A · B 상자 대신 글자 버튼 — 누르면 그 자리 작은 창에 모드(기수 · 연 · 월 · 주 · 직접) + 공용 월 · 범위 피커
+  또는 ‹ 기간 ›. 기간을 고르면 닫히고, 모드 바꾸기 · ‹ › 는 열어 둔 채. 바깥 누름 · Esc 로 닫힘. 지금 B 와 같은 빠른 버튼만 보라 글자.
+- 남색 판 · 카드 · 「01 · 02 · 03 · 04」 번호 없음. **총매출**(큰 A · 회색 B · 가는 선 위 B · A 표식 · B 합계 / 기존 건물 / 기존 · 새 객실(0 이 아닐 때) /
+  새로 판 건물 / 없어진 건물) · **증감**(큰 증감률 · 기여 막대 — 0 선에서 + 는 오른쪽 보라, − 는 왼쪽 빨강, 값 글자는 늘 보임, 0 선 자리는
+  뺀 몫이 없으면 30% · 둘 다 있으면 크기 비율 · 총 증감 줄 · 요점 점 목록). 기여 막대 이름 옆 설명(건물 이름 · 박 수 · 단가)과 금액은 툴팁.
+- 지표 넷(가동률 · 판매 박 · ADR · RevPAR — 한글 이름): 값 + 증감(보라/빨강) · A 보라 / B 회색 가는 막대 · 「B …」. 카드 아래 설명은 툴팁.
+- **「무엇이 차이를 만들었나」 브리지 그래프는 뺐다**(05번 결정 — 같은 분해가 증감 칸의 기여 막대에 있다). **건물별 맞대기**: 지표 세그먼트 ·
+  범례 「A · 기간 ■ B · 기간 ■ · A 큰 순」 · 줄 = 건물 · A 막대(보라 8px) 위 B 막대(회색) · A 값 굵게 · B 값 회색 · 증감(보라/빨강),
+  A 에만 판 건물은 B 「판매 없음」 · 증감 「새로」, B 에만 판 건물은 A 「판매 없음」 · 증감 「없어짐」.
+- 움직임(동작 줄이기면 끔, 실시간 새로 고침 때 다시 안 돎): 제목 · 큰 숫자 굴림, 기여 막대가 0 선에서 40ms 차례로 자람, 지표 A/B 막대 채움,
+  건물 막대 차례 채움(지표를 바꾸면 폭이 부드럽게 바뀜), 눈금 선 표식이 미끄러져 들어옴, 작은 창 160ms, 누름 `scale(.97)`.
+- 문구 `opsRevenueCompare.white`(ko · ja · en).
 
 ## 가동률 화면 (2026-10-07 구현 — 시안 A · B · C)
 
@@ -365,6 +410,41 @@ i18n `opsRevenueCompare` + `opsRevenue.tabCompare`(ko · ja · en).
 
 파일: `src/app/mobile/ops/occupancy/page.tsx` · `src/components/mobile/ops/mobile-occupancy.tsx` · `mobile-occupancy.css`(`.moc-*`) ·
 `src/lib/ops-occupancy-summary.ts` · i18n `opsOccupancy.mobile` · 메뉴 라벨 `localizedNavigationLabels.mobile.opsOccupancy`(ko · ja · en).
+
+### 모바일 매출 (2026-10-15 구현 — 시안 Rev-Phone · Rev-Fold · Rev-Tablet)
+
+`/mobile/ops/revenue` — PC 매출 화면(「매출 화면」)의 **요약판**이다. 표 · 건물 × 월 · 비교 · 내보내기 · 합계 건물 고르기는 PC 에서만
+(화면 아래 안내 「자세한 표 · 건물 × 월 · 비교는 PC에서」). 모바일 가동률과 같은 가족(같은 머리 · 달 고르기 · 권한 · 기본 합계 건물).
+
+- **권한** — 모바일 가동률과 같다: `ops_admin.access` + 관리자 웹 역할(`canAccessAdminWeb`). 페이지가 보고 없으면 `/mobile` 로, 메뉴
+  (`ops-revenue`)도 `MOBILE_ADMIN_WEB_ONLY_IDS` 로 같은 두 조건.
+- **기간** — **월 하나만**(`?ym=YYYY-MM`, 없거나 못 읽으면 도쿄 이번 달). `‹ 9월 ⌄ ›` 화살표 = `shiftMonthKey`(햅틱), 가운데 = `BottomSheet`
+  달 목록(앞으로 2달부터 18달). 월별 막대를 눌러도 그 달로 간다.
+- **읽기 · 식** — PC 와 같은 `getOpsRevenueData(session, { mode: "month", range })`(앞으로 칸은 읽지 않는다). 합계 건물은 **기본값 고정**
+  (`defaultIncludedProperties` — 오쿠보A · 사노 제외). 서버가 순수 함수 `buildRevenueSummary`(`src/lib/ops-revenue-summary.ts`)로 요약까지
+  내고 결과만 넘긴다. 식은 PC 콘솔과 같다 — 합계 건물 칸을 `sumMetrics` 로 더해 총매출 · 수수료 · 수수료 뺀 금액(`net`) · 가동률 · ADR
+  (판매 박 0 이면 「—」) · RevPAR(분모 0 이면 「—」), 전년 대비는 `changePct`(전년 0 이면 「전년 없음」). 수수료 줄은 증감 대신 「매출의
+  N%」. 월별은 PC 그래프와 같은 15칸(`data.months` — 기준 달 앞 11 ~ 뒤 3)의 올해 · 전년 같은 달 매출 · 가동률. 채널은 Airbnb ·
+  Booking.com · 직접 · 기타 중 매출이 있는 것만(금액 · 비율). 건물별은 합계 건물 중 그 달 매출이 있는 곳, 높은 순, 전년 대비(`changePct`,
+  전년 0 = 「신규」). PC 콘솔은 같은 계산을 컴포넌트 안에 두고 있어 **지금은 두 벌**이다(가동률 요약과 같은 사정).
+- **화면** — 머리(제목 · 「합계 · {뺀 건물} 제외」) → 총매출(34px) + 「전년 대비 ±N%」(오르면 보라 · 내리면 빨강 · 소수 첫째 자리 반올림 기준)
+  · 가동률 → 숫자 넷 2×2(수수료 뺀 금액 · 수수료(매출의 N%) · ADR · RevPAR, 각 전년 대비) → **월별 매출**(범례 올해 · 전년 · 잡힌 예약,
+  칸마다 올해 막대(옅은 보라 #C2AEF6, 고른 달 진한 보라 · 앞날 빗금 · 진행 중인 달은 지난 날 비율만 진하게 위는 옅게, 고른 달이 진행 중 ·
+  앞날이면 보라 테두리) 옆에 가는 회색 전년 막대, 아래 달 · 가동률 %, 안내 「아래 % = 가동률 · 막대를 누르면 그 달로」) → **채널 구성**
+  (쌓은 막대 + 점 · 이름 · 금액 · %, 색 Airbnb #FF5A5F · Booking #003B95 · 직접 #8B8898 · 기타 #D9D7E0) → **건물별**(이름 · 금액 · 증감
+  — 초록 + · 빨강 − · 보라 「신규」, 아래 최댓값 대비 가는 보라 막대; 줄(≥ 44px)을 누르면 **모바일 판매 캘린더 그 건물 · 그 달(월간)**,
+  가동률과 같은 주소) → 안내. 그 달 매출이 없으면 채널 · 건물별은 빈 문구, 건물이 하나도 없으면 `opsRevenue.empty`.
+- **월별 칸 수** — 15칸을 다 그리고 폭마다 **끝에서** 폰 7 · 폴드 9 · 태블릿 15칸만 보인다(기준 달 −3 ~ +3 / −5 ~ +3 / 전부). 막대 높이는
+  그 창 안의 최댓값(올해 · 전년 중 큰 쪽) 기준 — 칸마다 `--h7` · `--h9` · `--h15` 를 들고 CSS 가 고른다(서버 그림 = 처음 그림).
+- **넓은 화면** — 폴드: 같은 한 줄, 가운데 540px. 태블릿 가로(`split` + 화면 CSS): 왼쪽 총매출 · 숫자 넷 · 채널 | 오른쪽 건물별, 아래 폭
+  전부 월별 매출 15칸.
+- **실시간** — 예약 신호만 받아 다시 읽는다(`Beds24LiveRefresh kinds=["reservations"]`). 같은 달을 다시 읽을 땐 등장 움직임을 되풀이하지
+  않는다(내용 `key` = 달).
+- **움직임** — 총매출 · 숫자 넷 굴림(`RollNumber`) · 월별 막대 아래에서 차오름(30ms 간격) · 채널 막대 왼→오로 펼침 · 건물 막대 차례로
+  차오름 · 달을 바꾸면 크로스페이드 · 누름 `scale(.97)` · 화살표 · 막대 햅틱. `prefers-reduced-motion` 이면 전부 끈다.
+
+파일: `src/app/mobile/ops/revenue/page.tsx` · `src/components/mobile/ops/mobile-revenue.tsx` · `mobile-revenue.css`(`.mrv-*`) ·
+`src/lib/ops-revenue-summary.ts` · i18n `opsRevenue.mobile` · 메뉴 라벨 `localizedNavigationLabels.mobile.opsRevenue`(ko · ja · en).
 
 ## 저쪽과 숫자 대조 (2026-10-07) — 일치
 

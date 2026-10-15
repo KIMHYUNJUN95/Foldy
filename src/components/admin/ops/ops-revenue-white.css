@@ -1,0 +1,163 @@
+/* 매출 화면 — 화이트 리디자인(2026-10-15, 시안 Rev-PC · RevMatrix-PC).
+   docs/product/34-metrics-and-automation.md 「매출 화면」 · docs/design/05-white-redesign.md
+   도구 줄 · 숫자 줄 · 범례 · 표 바탕은 가동률 화면의 `.ocw-*`(ops-occupancy-white.css)를 그대로 쓰고, 여기는 매출만의 모양.
+   루트는 `.ocw.rvw` — 색 변수(--ocw-*) · 초점 테두리 · 동작 줄이기 규칙을 같이 받는다. 옛 `.orv__*`(ops-revenue.css)는 2026-10-15 삭제. */
+
+.adm .rvw .rvw-strong { font-weight: 600; color: var(--ocw-ink); }
+.adm .rvw .rvw-up { color: var(--ocw-ink2); }
+
+/* 숫자 6개 — 금액 칸이 넓다(시안 비율). 좁으면 가동률 화면처럼 3칸. */
+@media (min-width: 1101px) {
+  .adm .rvw .rvw-kpis { grid-template-columns: 1.3fr 1.15fr 1.3fr .9fr .95fr .95fr; column-gap: 8px; }
+}
+.adm .rvw .rvw-kpis .v { font-size: 26px; letter-spacing: -0.02em; }
+.adm .rvw .rvw-kpis .ocw-kpi { cursor: default; }
+
+/* ── 위: 월별 매출(왼쪽 2/3) · 남는 돈 + 채널(오른쪽) ── */
+.adm .rvw-top { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); column-gap: 36px; }
+.adm .rvw-trend { min-width: 0; }
+.adm .rvw .rvw-sec { margin-top: 0; margin-bottom: 18px; justify-content: space-between; }
+.adm .rvw .ocw-lgs i.rvw-lg-prev { width: 5px; border-radius: 2px; background: #e3e3e8; }
+
+.adm .rvw-plot { height: 210px; display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid #e6e6eb; }
+.adm .rvw-col {
+  flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 0; border: 0; background: transparent; cursor: pointer;
+  transition: transform 160ms var(--ocw-ease);
+}
+.adm .rvw-col:active { transform: scale(.97); }
+.adm .rvw-col__b, .adm .rvw-col__p {
+  display: block; transform-origin: bottom; animation: ocw-grow 500ms var(--ocw-ease) both; animation-delay: calc(var(--i, 0) * 25ms);
+  transition: opacity 160ms ease;
+}
+.adm .rvw-col__b { flex: 1; min-width: 0; border-radius: 5px 5px 2px 2px; background: var(--ocw-v-soft); }
+.adm .rvw-col__p { width: 5px; flex: none; border-radius: 3px 3px 1px 1px; background: #e3e3e8; animation-delay: calc(60ms + var(--i, 0) * 25ms); }
+@media (hover: hover) and (pointer: fine) {
+  .adm .rvw-col:hover .rvw-col__b { opacity: .82; }
+}
+.adm .rvw-col__b.is-sel { background: var(--ocw-v); }
+.adm .rvw-col__b.is-fut { background: repeating-linear-gradient(135deg, #dcd0fa 0 4px, #f4f1fd 4px 8px); }
+.adm .rvw-col__b.is-cur {
+  background:
+    linear-gradient(var(--ocw-v) 0 0) bottom / 100% var(--done, 0%) no-repeat,
+    repeating-linear-gradient(135deg, #dcd0fa 0 4px, #f4f1fd 4px 8px);
+}
+.adm .rvw-months { display: flex; gap: 8px; padding-top: 8px; }
+.adm .rvw-months > span { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; white-space: nowrap; }
+.adm .rvw-months b { font-size: 11px; font-weight: 400; color: var(--ocw-faint); }
+.adm .rvw-months b.y { color: var(--ocw-v-ink); }
+.adm .rvw-months small { font-size: 10px; color: var(--ocw-faint); }
+.adm .rvw-months > span.on b { color: var(--ocw-ink); font-weight: 700; }
+
+.adm .rvw-side { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.adm .rvw-flow { display: flex; flex-direction: column; gap: 4px; }
+.adm .rvw-flow .l, .adm .rvw-chan .l { font-size: 13px; color: var(--ocw-mute); }
+.adm .rvw-flow .v { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; color: var(--ocw-ink); }
+.adm .rvw-flow .s { font-size: 12px; line-height: 1.5; color: var(--ocw-faint); }
+.adm .rvw-chan { display: flex; flex-direction: column; gap: 10px; }
+.adm .rvw-stack {
+  display: flex; height: 8px; gap: 2px; border-radius: 4px; overflow: hidden;
+  transform-origin: left; animation: ocw-fill 600ms var(--ocw-ease) both; animation-delay: 160ms;
+}
+.adm .rvw-stack i { display: block; height: 100%; min-width: 2px; }
+.adm .rvw-chr { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ocw-ink); animation: ocw-fade 300ms ease both; animation-delay: calc(200ms + var(--i, 0) * 40ms); }
+.adm .rvw-chr > i { width: 10px; height: 10px; flex: none; border-radius: 3px; }
+.adm .rvw-chr .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .rvw-chr .a { color: var(--ocw-mute); white-space: nowrap; }
+.adm .rvw-chr b { width: 40px; flex: none; text-align: right; font-weight: 600; }
+
+/* ── 건물별 표 ── 채널 머리글 · 막대는 수수료 뺀 금액에서 32px 띄운다(2026-10-15 사용자 — 「채널」이 너무 왼쪽에 붙어 보임). */
+.adm .rvw-table { min-width: 1040px; }
+.adm .rvw-table col.c-name { width: 210px; }
+.adm .rvw-table col.c-m { width: 128px; }
+.adm .rvw-table col.c-s { width: 74px; }
+.adm .rvw-table col.c-k { width: 96px; }
+.adm .rvw-table th.r .ocw-sort { flex-direction: row; }
+.adm .rvw-table .rvw-chcell { padding-left: 44px; }
+.adm .rvw-table td.rvw-chcell { padding-right: 12px; }
+.adm .rvw-stack--row { animation-delay: 120ms; }
+.adm .rvw-table .ocw-row.off .rvw-stack { opacity: .45; }
+.adm .rvw-table .ocw-room .rvw-stack { height: 6px; }
+.adm .rvw-table .ocw-total td { color: var(--ocw-ink); }
+
+/* ── 건물 × 월 ── */
+.adm .rvw-mxbar { margin-top: 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.adm .rvw-mxbar .hint { margin-left: auto; font-size: 12px; color: var(--ocw-faint); }
+.adm .rvw-mxsplit { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 36px; }
+.adm .rvw-mxmain { min-width: 0; }
+.adm .rvw-mxwrap { overflow-x: auto; padding: 2px; }
+.adm .rvw-mx {
+  display: grid; grid-template-columns: 116px repeat(15, minmax(46px, 1fr)) 92px; column-gap: 4px; row-gap: 8px; align-items: stretch; min-width: 960px;
+}
+.adm .rvw-unit { align-self: end; padding-bottom: 4px; font-size: 11px; color: var(--ocw-faint); white-space: nowrap; }
+.adm .rvw-unit.r { text-align: right; }
+.adm .rvw .rvw-mx .ocw-mh { font-size: 12px; }
+.adm .rvw-rl { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding-right: 8px; }
+.adm .rvw-rl b { font-size: 14px; font-weight: 600; color: var(--ocw-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .rvw-rl span { font-size: 11px; color: var(--ocw-faint); white-space: nowrap; }
+.adm .rvw-rl.off b { color: var(--ocw-faint); }
+.adm .rvw-rl.tot, .adm .rvw-sm.tot { margin-top: 10px; }
+.adm .rvw-mc {
+  height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0; border: 0; border-radius: 8px;
+  background: #faf8ff; font: inherit; color: var(--ocw-ink); cursor: pointer;
+  animation: ocw-cell 360ms var(--ocw-ease) both; animation-delay: calc(var(--c, 0) * 22ms);
+  transition: background-color 200ms ease, color 200ms ease, box-shadow 140ms ease, transform 160ms var(--ocw-ease);
+}
+.adm .rvw-mc b { font-size: 13.5px; font-weight: 600; }
+.adm .rvw-mx.is-yoy .rvw-mc b { font-size: 12px; letter-spacing: -0.02em; }
+.adm .rvw-mc .s { font-size: 10px; line-height: 1.2; color: var(--ocw-mute); min-height: 12px; }
+.adm .rvw-mc .s .u { color: #17603c; }
+.adm .rvw-mc .s .dn { color: #a3202a; }
+@media (hover: hover) and (pointer: fine) {
+  .adm .rvw-mc:hover { box-shadow: inset 0 0 0 1.5px rgba(90, 48, 207, .45); }
+}
+.adm .rvw-mc:active { transform: scale(.96); }
+.adm .rvw-mc.fut { background: repeating-linear-gradient(135deg, #f4f1fd 0 4px, #fff 4px 8px); box-shadow: inset 0 0 0 1px #dcd0fa; }
+.adm .rvw-mc.on, .adm .rvw-mc.on:hover { box-shadow: inset 0 0 0 2px var(--ocw-v); }
+.adm .rvw-mc.na { background: transparent; box-shadow: inset 0 0 0 1px #ececf0; cursor: default; }
+.adm .rvw-mc.off { opacity: .45; }
+.adm .rvw-sm { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 0; white-space: nowrap; }
+.adm .rvw-sm b { font-size: 13px; font-weight: 700; color: var(--ocw-ink); }
+.adm .rvw-sm span { font-size: 11px; color: var(--ocw-faint); }
+.adm .rvw-sm.off { opacity: .45; }
+
+/* 오른쪽 상세 — 상자 없이. 칸을 바꾸면 내용만 짧게 흐려졌다 들어온다. */
+.adm .rvw-detail { min-width: 0; display: flex; flex-direction: column; gap: 16px; animation: rvw-in 200ms var(--ocw-ease) both; }
+@keyframes rvw-in { from { opacity: 0; transform: translateY(4px); } }
+.adm .rvw-dhead { display: flex; flex-direction: column; gap: 6px; }
+.adm .rvw-dhead .eyebrow { font-size: 13px; color: var(--ocw-mute); }
+.adm .rvw-dhead .eyebrow em { font-style: normal; font-weight: 600; color: var(--ocw-v-ink); }
+.adm .rvw-dhead h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.35; color: var(--ocw-ink); }
+.adm .rvw-dhead .sub { font-size: 13px; color: var(--ocw-mute); }
+.adm .rvw-dl { margin: 0; padding-top: 14px; border-top: 1px solid var(--ocw-line); display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 10px; font-size: 13px; }
+.adm .rvw-dl dt { color: var(--ocw-faint); }
+.adm .rvw-dl dd { margin: 0; color: var(--ocw-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .rvw-dsec { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--ocw-line); }
+.adm .rvw-dsec .h { font-size: 12px; font-weight: 600; color: var(--ocw-faint); }
+.adm .rvw-dlg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ocw-mute); }
+.adm .rvw-dlg > span { display: inline-flex; align-items: center; gap: 5px; }
+.adm .rvw-dlg i { width: 8px; height: 8px; border-radius: 2px; }
+.adm .rvw-rooms { display: flex; flex-direction: column; }
+.adm .rvw-rr {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #f7f7f9; font-size: 13px;
+  animation: ocw-fade 220ms ease both; animation-delay: calc(80ms + var(--i, 0) * 18ms);
+}
+.adm .rvw-rr .n { flex: 1; min-width: 0; font-family: var(--mono, "Geist Mono", monospace); font-weight: 600; color: var(--ocw-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .rvw-rr .a { color: var(--ocw-faint); white-space: nowrap; }
+.adm .rvw-rr b { width: 44px; text-align: right; font-weight: 700; color: var(--ocw-ink); }
+.adm .rvw-dnote { margin: 0; padding-top: 14px; border-top: 1px solid var(--ocw-line); font-size: 12px; line-height: 1.5; color: var(--ocw-faint); }
+
+@media (max-width: 1280px) {
+  .adm .rvw-mxsplit { grid-template-columns: minmax(0, 1fr); }
+  .adm .rvw-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; align-items: start; }
+  .adm .rvw-detail > .rvw-dhead { grid-column: 1 / -1; }
+}
+@media (max-width: 1100px) {
+  .adm .rvw-top { grid-template-columns: minmax(0, 1fr); row-gap: 28px; }
+  .adm .rvw-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm .rvw-col__b, .adm .rvw-col__p, .adm .rvw-stack, .adm .rvw-chr, .adm .rvw-mc, .adm .rvw-detail, .adm .rvw-rr { animation: none; }
+  .adm .rvw-col, .adm .rvw-col__b, .adm .rvw-col__p, .adm .rvw-mc { transition: none; }
+  .adm .rvw-col:active, .adm .rvw-mc:active { transform: none; }
+}

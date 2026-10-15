@@ -450,3 +450,9 @@ hourly-staff exclusion by real
   (`createAdminLeaveRequest`)도 같은 함수를 쓴다. 테스트 `src/lib/__tests__/annual-leave.test.ts`.
 - 화면 동작은 그대로다 — 폼이 이미 같은 규칙으로 보여 주고 있었다.
 
+## 승인 화면 실시간 갱신 (2026-10-15)
+
+- PC 연차 승인 화면(`/admin/attendance/leave`)은 새로고침 없이 바뀐다 — 직원이 신청 · 취소하거나 다른 승인자가
+  승인 · 반려하면 열어 둔 화면의 목록 · 탭 숫자 · 근태 탭 배지가 바로 갱신된다(새 줄은 LiveWash 로 위에서 끼어든다).
+- 방식: 테이블 변경 신호만 받고 서버 렌더를 다시 받는다(공용 `AdminLiveRefresh`). 클라이언트 목록은 서버 목록이 새로 오면
+  그대로 받는다(서버가 기준). DB: `docs/engineering/04-data-model.md` → 「2026-10-15 `annual_leave_requests` — Realtime 활성화」.

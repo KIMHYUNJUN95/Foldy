@@ -1872,6 +1872,18 @@ Constraints / behavior:
   수동이라 개인정보를 더 흘리는 쪽을 택하지 않았다.
 
 
+### 2026-10-15 `annual_leave_requests` — Realtime 활성화
+
+마이그레이션 `202610150001_enable_annual_leave_requests_realtime.sql` (원격 적용 완료 2026-10-15).
+
+- `supabase_realtime` publication 세 번째 테이블. PC 연차 승인 화면(`/admin/attendance/leave`)이 공용
+  `AdminLiveRefresh`(`src/components/admin/shared/admin-live-refresh.tsx`)로 **신호만** 받아 서버 렌더를 다시 받는다.
+- select RLS(`annual_leave_requests_self_or_approver_select` 등)가 그대로 적용 — 승인자가 아니면 남의 신청 신호는 안 온다.
+- DELETE 는 배달되지 않는다(replica identity 기본값). 지우는 건 승인 화면에 안 뜨는 임시저장(draft)뿐이라 문제없다.
+- **구독 전에 로그인 토큰을 소켓에 싣는다**(`auth.getSession()` → `realtime.setAuth()`). 쿠키 세션이 읽히기 전에 붙으면
+  anon 으로 들어가 `invalid column for filter organization_id` 로 거절되고 신호가 영영 오지 않는다 — anon 은 이 테이블들에
+  열 권한이 없다(2026-10-15 실측). 같은 구조인 캘린더 · 채용 구독도 같은 경합에 걸릴 수 있다.
+
 ## 2026-09-29 `beds24_block_logs` — Beds24 차단 전송 로그
 
 마이그레이션: `supabase/migrations/202609290001_beds24_block_logs.sql` (운영 적용 2026-09-29).

@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/shell/admin-shell";
 import { AttendanceSubnav } from "@/components/admin/attendance/attendance-subnav";
+import { AdminLiveRefresh } from "@/components/admin/shared/admin-live-refresh";
 import { LeaveQueueClient } from "@/components/admin/attendance/leave-queue-client";
 import {
   getAdminLeaveQueue,
@@ -75,6 +76,9 @@ export default async function AdminAttendanceLeavePage({
         }}
       />
       {queue.isApprover ? (
+        <>
+        {/* 새 신청 · 취소 · 다른 승인자 처리가 새로고침 없이 바로 보이게(2026-10-15). */}
+        <AdminLiveRefresh table="annual_leave_requests" organizationId={session.organization.id} />
         <LeaveQueueClient
           initialItems={queue.items}
           summary={queue.summary}
@@ -90,6 +94,7 @@ export default async function AdminAttendanceLeavePage({
           currentUserId={session.user.id}
           currentUserName={session.user.name}
         />
+        </>
       ) : (
         <div className="card">
           <div className="state">

@@ -270,6 +270,12 @@ export function LeaveQueueClient({
   const lc = dictionary.admin.leaveConsole;
   const [view, setView] = useState<LeaveView>("review");
   const [items, setItems] = useState(initialItems);
+  // 실시간 갱신(AdminLiveRefresh → router.refresh)으로 서버 목록이 새로 오면 그대로 받는다 — 서버가 기준.
+  const [seenInitial, setSeenInitial] = useState(initialItems);
+  if (seenInitial !== initialItems) {
+    setSeenInitial(initialItems);
+    setItems(initialItems);
+  }
   const [statusGroup, setStatusGroup] = useState<LeaveStatusGroup>(initialStatusGroup);
   const [typeFilter, setTypeFilter] = useState<LeaveType | null>(initialType);
   const [nameQuery, setNameQuery] = useState(initialSearch);

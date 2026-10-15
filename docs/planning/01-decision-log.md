@@ -2,6 +2,12 @@
 
 This file records important project decisions.
 
+## 2026-10-15 대시보드 PC 설치 파일 — Windows 는 Microsoft Store (사용자 결정)
+
+- 사용자: 「진짜 설치 파일로」 · 「무료로」 → 「윈도우는 추천으로」. PWABuilder 가 관리자 매니페스트를 MSIX 로 감싸 Store 에 낸다 —
+  무료, Store 서명이라 경고 없음, 내용은 웹 배포로 갱신. 2026-07-03 의 「데스크톱 exe 패키징 도입 안 함」을 Windows 에 한해 뒤집는다.
+- 맥은 나중(Tauri + Apple 계정 서명 · 공증). 그전까지 브라우저 주소 · 「Dock에 추가」. 단계 `17-app-release-plan.md` W1~W6.
+
 ## 2026-10-15 청소 화면 건물 순서 = 예약 캘린더 순서 (사용자 결정)
 
 - 앱 · 대시보드 청소의 건물 순서는 예약 캘린더(`CALENDAR_BUILDING_ORDER`)와 같다 — STAY ARI 는 가부키초 바로 다음. 둘 다 STAY ARI 를

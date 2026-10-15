@@ -164,6 +164,20 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | D2 | 「웹을 감싼 앱」 거절(Apple 4.2) 대비 — 네이티브 기능 · 오프라인 동작 보강 | 🤖 | [~] 2026-10-07 연결 실패 화면(`errorPath`, ko/ja/en, 자동 복귀) | 비공개 배포 땐 부담이 작지만 공개 심사는 엄격. 남은 것: 네이티브 푸시(C5) · 공유 등 |
 | D3 | 공개 스토어 페이지 · 마케팅 문구 | 🤝 | [ ] | |
 
+## PC 설치 파일 — 대시보드 (2026-10-15 사용자 결정)
+
+대시보드(`/admin`)를 PC 설치 앱으로. **Windows 먼저 — Microsoft Store**(PWABuilder 로 MSIX 패키징, 무료 · Store 서명이라 경고 없음).
+맥은 나중(Tauri + A2 Apple 계정으로 서명 · 공증) — 그전까지 브라우저 주소 또는 「Dock에 추가」. 상세 `docs/product/05-admin-web-ia.md`.
+
+| # | 항목 | 담당 | 상태 | 비고 |
+| --- | --- | --- | --- | --- |
+| W1 | 매니페스트 Store 준비 — `lang` · `categories` · `launch_handler` 등 | 🤖 | [x] 2026-10-15 | `public/manifest-admin.webmanifest` |
+| W2 | **Microsoft Partner Center 개발자 등록** | 👤 | [ ] | storedeveloper.microsoft.com. 개인 계정은 무료(가입 화면에서 확인). 회사 계정은 게시자 이름이 회사명이지만 비용 · 회사 확인 절차가 있다 |
+| W3 | 앱 이름 예약 「Foldy Admin」 → 제품 ID 값 3개 확인 | 🤝 | [ ] | Partner Center → 앱 → 제품 관리 → 제품 ID: Package ID · Publisher ID · Publisher display name |
+| W4 | PWABuilder 로 패키지 만들기 | 🤝 | [ ] | pwabuilder.com 에 `https://stay-ops-two.vercel.app/admin` → Windows 패키지 → W3 값 3개 입력 → `.msixbundle` 다운로드 |
+| W5 | 제출 — 공개 범위 · 스토어 정보 · 심사 메모 | 🤝 | [ ] | 공개 범위는 비공개(지정 사용자) 또는 검색에 안 나오는 링크 전용(제출 화면에서 확인). 스크린샷 1장 이상. 심사 메모에 심사용 로그인 계정(B6 데모 계정) |
+| W6 | 자체 도메인(C1) 뒤 새 주소로 패키지 재제출 | 🤝 | [ ] | 패키지에 주소가 박힌다. 옛 주소도 계속 열리므로 급하지 않다 |
+
 ---
 
 ## 작업 기록

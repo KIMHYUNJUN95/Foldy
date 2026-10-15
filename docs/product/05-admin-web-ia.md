@@ -116,12 +116,24 @@
 
 제약:
 
-- macOS Safari는 데스크톱 PWA 설치를 지원하지 않는다 → 관리자는 Chrome/Edge로 설치.
+- macOS 는 Chrome/Edge 설치 또는 Safari 17+ 「파일 → Dock에 추가」로 설치한다(맥 설치 파일은 나중 — 아래).
 - `scope "/admin"`이므로 스코프 밖(`/auth`, `/onboarding`) 이동은 standalone 창이 아닌 브라우저
   탭으로 열릴 수 있다. 관리자 셸의 일상 흐름은 `/admin` 내부에서 완결되어 현재 문제 없다.
 
-데스크톱 exe(Electron/Tauri) 패키징은 도입하지 않는다. 로컬 파일시스템 심층 통합이나 브라우저
-비의존 상주가 필요해질 때 재검토하며, 현 분리 구조가 그 전환의 선행 작업이 된다.
+### Windows 설치 파일 — Microsoft Store (2026-10-15)
+
+진짜 설치 파일은 **Windows 먼저, Microsoft Store 로** 낸다(사용자 결정 2026-10-15, 무료 · 경고 없음).
+
+- 같은 매니페스트를 PWABuilder 가 Store 용 MSIX 패키지로 감싼다 — 앱은 배포된 `/admin` 을 띄우므로
+  **웹 배포가 곧 앱 갱신**이다. 서명은 Store 가 해 「알 수 없는 게시자」 경고가 없다.
+- Store 용으로 매니페스트에 `lang` · `dir` · `categories`(business · productivity) ·
+  `launch_handler`(`navigate-existing` — 아이콘을 다시 눌러도 새 창 대신 열린 창으로) ·
+  `prefer_related_applications: false` 를 더했다.
+- 패키지에는 **주소가 박힌다** — 자체 도메인(출시 계획 C1) 뒤에 새 주소로 패키지를 한 번 더 올린다.
+- 단계 · 담당: `docs/planning/17-app-release-plan.md` 「PC 설치 파일」(W 항목).
+
+맥 설치 파일(Tauri + Apple 서명 · 공증)은 나중에 한다. 그전까지 맥은 브라우저 주소 또는 위 방법으로 설치해 쓴다.
+Electron 은 쓰지 않는다(설치 파일이 크다).
 
 ## Core Principles
 

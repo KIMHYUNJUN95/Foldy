@@ -9,6 +9,11 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-15 — 대시보드 Windows 설치 파일 준비 (Microsoft Store)
+
+- 관리자 매니페스트에 Store 용 항목(`lang` · `categories` · `launch_handler` 등). 남은 것: Partner Center 등록 · 이름 예약 · PWABuilder
+  패키징 · 제출(`17-app-release-plan.md` W2~W6). 맥 설치 파일은 나중.
+
 ## 2026-10-15 — 「청소 시작」 무반응 수정
 
 - 아라키초 쉬는 계정(`401` 등)으로 들어온 예약 카드의 시작이 늘 `invalid_selection` 으로 거절되던 것 — 시작 검사 · 「이미 처리한 방」 ·

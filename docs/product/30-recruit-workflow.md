@@ -129,6 +129,9 @@ Body:   { source?: "applications" | "applicants",
 `RECRUIT_ORGANIZATION_ID` 가 있으면 그 조직. 없으면 **유일한 조직**을 쓴다. 조직이 둘 이상인데
 환경변수가 없으면 **추측하지 않고 거부한다** — 남의 조직으로 지원서가 새는 것이 가장 나쁜 실패다.
 
+2026-10-15 스토어 심사용 데모 조직(「Foldy Demo」)이 생겨 운영 DB 의 조직이 둘이 됐다 — 운영 Vercel 에는
+`RECRUIT_ORGANIZATION_ID` 를 Haru 조직으로 **반드시** 지정한다. 없으면 동기화가 매번 거부된다(10-15~16 하루 215회).
+
 ## 4. 지원서 필드
 
 채용 사이트 폼(`ApplicationPage.tsx`)의 제출 객체를 그대로 받는다.

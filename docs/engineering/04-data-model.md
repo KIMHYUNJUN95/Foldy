@@ -1314,7 +1314,10 @@ independently nullable; both may be absent for a valid score-only review.
 The original note "Airbnb exposes no reservation id" was wrong — measured against our own stored
 `raw_payload`, all 2,214 Airbnb reviews carry `reservation_confirmation_code` (e.g. `HMRWNK5RQW`).
 It is not a Beds24 bookingId, hence the miss, but the same code lives on our reservations at
-`raw_payload->>apiReference` (indexed by `reservations_api_reference_idx`). `source_reservation_id`
+`raw_payload->>apiReference` (indexed by `reservations_api_reference_idx`).
+(`source_reservation_id` prefix lookups — `LIKE '<id>::room::%'` in `reservation-lookup.ts` — use
+`reservations_org_source_reservation_id_pattern_idx` on `(organization_id, source_reservation_id text_pattern_ops)`,
+added 2026-10-16; before it every webhook seq-scanned all reservations.) `source_reservation_id`
 stores the provider-native number for both providers and is what the detail screen displays;
 `reservation_id` stays the internal uuid link. The Airbnb match also supplies `guest_display_name`,
 since the review payload itself really does carry no reviewer name (numeric `reviewer_id` only).

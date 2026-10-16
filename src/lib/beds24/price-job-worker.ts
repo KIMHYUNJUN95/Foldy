@@ -1007,9 +1007,11 @@ async function refreshLinkedLocalRates(args: {
     }
     if ("skipped" in result || result.truncated) return;
 
+    // 연결 유닛 가격은 배수로 계산돼 소수가 온다(49784.24) — 칸은 정수라 그대로 넣으면 22P02 로
+    // 통째 실패한다(2026-10-16). 주기 동기화(`room-rates-sync.ts` readInt)와 같게 반올림한다.
     const read = (segment: Record<string, unknown>, key: string) => {
       const value = Number(segment[key]);
-      return segment[key] === undefined || segment[key] === null || !Number.isFinite(value) ? null : value;
+      return segment[key] === undefined || segment[key] === null || !Number.isFinite(value) ? null : Math.round(value);
     };
     const rows: Array<Record<string, unknown>> = [];
     for (const externalRoomId of chunk) {

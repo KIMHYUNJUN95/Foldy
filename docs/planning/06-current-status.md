@@ -9,6 +9,14 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-16 — 판매 캘린더 순간 장애(DB 타임아웃) 대응
+
+- 10-16 08:04~08:07(도쿄) DB 가 8초 제한을 넘겨 판매 캘린더 · Beds24 웹훅 · 자동화가 같이 실패. 주범은 웹훅의 예약 번호
+  앞부분 검색(`LIKE '…::room::%'`)이 매번 예약 전체를 훑던 것 — DB 실행 시간의 절반 이상.
+- 인덱스 `reservations_org_source_reservation_id_pattern_idx` 추가(운영 DB 적용 완료, 인덱스 검색 확인).
+- 요금 동기화 upsert 1,000 → 300행씩. 연결 가격 로컬 반영은 소수 가격을 반올림(정수 칸 22P02 실패 수정).
+- 채용 연동: 리뷰용 데모 조직이 생겨 조직 자동 선택이 안 됨 → Vercel `RECRUIT_ORGANIZATION_ID` 지정 필요(Haru).
+
 ## 2026-10-15 — 대시보드 Windows 설치 파일 준비 (Microsoft Store)
 
 - 관리자 매니페스트에 Store 용 항목(`lang` · `categories` · `launch_handler` 등). 남은 것: Partner Center 등록 · 이름 예약 · PWABuilder

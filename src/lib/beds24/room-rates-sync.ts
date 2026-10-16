@@ -565,11 +565,15 @@ export async function syncBeds24RoomRates(
   // **이번 읽기보다 늦게 쓰인 칸은 건너뛴다**(`upsert_room_daily_rates_if_newer`). Beds24 를 읽은 뒤
   // 여기까지 여러 번 왕복하는 사이 가격 작업이 검증까지 끝낸 값을 쓸 수 있다 — 그 칸을 읽기 전 값으로
   // 되돌리면 안 된다. 실제로 쓴 칸만 돌아온다.
+  //
+  // **쓰기는 300행씩**(2026-10-16). 화면을 열 때 도는 이 경로는 로그인 사용자(8초 제한)로 쓴다 — 1,000행
+  // 한 번은 웹훅이 몰려 DB 가 바쁜 순간 8초를 넘겨 통째 실패했다. 잘게 쪼개면 한 문장이 짧아 버틴다.
   const CHUNK = 1000;
+  const UPSERT_CHUNK = 300;
   const writtenKeys = new Set<string>();
   let upsertFailed = false;
-  for (let index = 0; index < rows.length; index += CHUNK) {
-    const chunk = rows.slice(index, index + CHUNK);
+  for (let index = 0; index < rows.length; index += UPSERT_CHUNK) {
+    const chunk = rows.slice(index, index + UPSERT_CHUNK);
     const result = await supabase.rpc("upsert_room_daily_rates_if_newer", {
       p_rows: chunk as unknown as Json,
     });

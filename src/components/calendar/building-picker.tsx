@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties 
 import type { Dictionary } from "@/lib/i18n";
 import { getPropertyLocation } from "@/lib/property-locations";
 import type { MapBuilding } from "./building-map/building-map";
-import { decideMapIntro } from "./building-map/map-intro";
+import { decideMapIntro, type MapIntro } from "./building-map/map-intro";
 import "./building-picker.css";
 
 // 지도(신주쿠구 경계 데이터 포함)는 지도 보기를 열 때만 받는다 — 목록은 바로 뜬다.
@@ -51,8 +51,8 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
   const router = useRouter();
   const view = useSyncExternalStore(subscribe, () => memoryView ?? readView(), () => "map" as View);
   const [selected, setSelected] = useState<string | null>(null);
-  // 지도의 처음 장면과 같은 박자로 목록 판이 올라오고 줄이 차례로 들어온다(세션마다 한 번).
-  const [intro, setIntro] = useState(false);
+  // 지도의 처음 장면과 같은 박자로 목록 판이 올라오고 줄이 차례로 들어온다(세션 첫 번째는 길게, 그 뒤엔 짧게).
+  const [intro, setIntro] = useState<MapIntro>("none");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (view === "map") setIntro(decideMapIntro());
@@ -103,7 +103,7 @@ export function BuildingPicker({ rows, w }: { rows: BuildingPickerRow[]; w: Dict
   );
 
   return (
-    <div className={`mcw bpk${view === "map" ? " is-map" : ""}${intro ? " is-intro" : ""}${view === "map" && selected ? " has-sel" : ""}`}>
+    <div className={`mcw bpk${view === "map" ? " is-map" : ""}${intro === "full" ? " is-intro" : intro === "short" ? " is-short" : ""}${view === "map" && selected ? " has-sel" : ""}`}>
       <div className="mcw-h is-row">
         <div className="mcw-h__main">
           <span className="mcw-h__k">{w.title}</span>

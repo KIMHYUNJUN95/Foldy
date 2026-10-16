@@ -2,7 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
-import { decideMapIntro } from "./map-intro";
+import { decideMapIntro, resetMapIntro, type MapIntro } from "./map-intro";
 import { geoToMap, SHINJUKU_GEO as G } from "./shinjuku-geo";
 import "./building-map.css";
 
@@ -93,7 +93,7 @@ export function BuildingMap({
   const [size, setSize] = useState<Vec>([0, 0]);
   const [cam, setCam] = useState<Cam>({ s: 1, tx: 0, ty: 0 });
   const [expanded, setExpanded] = useState<string[] | null>(null);
-  const [intro, setIntro] = useState<boolean | null>(null);
+  const [intro, setIntro] = useState<MapIntro | null>(null);
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   useEffect(() => {
@@ -107,11 +107,15 @@ export function BuildingMap({
     return () => ro.disconnect();
   }, []);
 
-  // 처음 그리는 긴 장면은 세션마다 한 번 · 움직임 줄이기면 없음.
+  // 처음 그리는 긴 장면은 세션마다 한 번, 그 뒤 화면을 다시 열면 짧게 펼치기 · 움직임 줄이기면 없음.
   useEffect(() => {
     // 첫 칠하기 전에 정해야 깜빡임이 없다 — 마운트 직후 한 번만(결정은 모듈에 기억 — 개발 모드 이중 실행에도 같은 값).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIntro(decideMapIntro());
+    // 떠날 때 잊는다 — 다음 진입은 짧은 장면. 개발 모드 이중 실행은 같은 틱이라 다음 틱에 지운다.
+    return () => {
+      setTimeout(resetMapIntro, 0);
+    };
   }, []);
 
   const [W, H] = size;
@@ -437,7 +441,8 @@ export function BuildingMap({
   const zoomed = cam.s > 1.01 || cam.tx !== 0 || cam.ty !== 0;
   const focusIds = expanded ?? (selectedId ? [selectedId] : null);
   const order = [...buildings].filter((b) => worldOf.has(b.id)).sort((a, b) => posOf(a.id)[1] - posOf(b.id)[1]);
-  const riseDelay = (i: number) => (intro ? 2500 + i * 95 : 60 + i * 45);
+  const riseDelay = (i: number) => (intro === "full" ? 2500 + i * 95 : intro === "short" ? 420 + i * 55 : 60 + i * 45);
+  const chipBase = intro === "full" ? 2900 : intro === "short" ? 730 : 260;
   const ready = layout && intro !== null;
 
   const rootStyle = { "--bm-cam": `translate(${cam.tx}px, ${cam.ty}px) scale(${cam.s})` } as CSSProperties;
@@ -445,7 +450,7 @@ export function BuildingMap({
   return (
     <div
       aria-label={copy.mapAria}
-      className={`bm${intro ? " bm--intro" : ""}${focusIds ? " has-focus" : ""}`}
+      className={`bm${intro === "full" ? " bm--intro" : intro === "short" ? " bm--short" : ""}${focusIds ? " has-focus" : ""}`}
       ref={rootRef}
       role="group"
       style={rootStyle}
@@ -596,7 +601,7 @@ export function BuildingMap({
                 aria-hidden="true"
                 className={`bm-lead${focusIds && !c.ids.some((id) => focusIds.includes(id)) ? " is-dim" : ""}`}
                 key={`lead-${c.key}`}
-                style={{ transform: `translate3d(${sx}px, ${sy}px, 0) rotate(${ang}rad)`, width: len, "--d": `${(intro ? 2900 : 260) + i * 40}ms` } as CSSProperties}
+                style={{ transform: `translate3d(${sx}px, ${sy}px, 0) rotate(${ang}rad)`, width: len, "--d": `${chipBase + i * 40}ms` } as CSSProperties}
               />
             );
           })}
@@ -610,7 +615,7 @@ export function BuildingMap({
             const style = {
               transform: `translate3d(${left}px, ${c.y - 12 - c.lift - CHIP_H}px, 0)`,
               width: c.w,
-              "--d": `${(intro ? 2900 : 260) + i * 40}ms`,
+              "--d": `${chipBase + i * 40}ms`,
             } as CSSProperties;
             if (isOpen) {
               return (

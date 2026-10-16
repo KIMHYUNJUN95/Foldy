@@ -57,6 +57,18 @@
 @keyframes bm-sheen { from { transform: translateX(-160px) skewX(-18deg); } to { transform: translateX(560px) skewX(-18deg); } }
 @keyframes bm-fade { from { opacity: 0; } }
 
+/* 다시 열 때의 짧은 장면(~1.2초): 판이 살짝 평평하게 → 눕고, 바닥 두께 · 빛 한 번 */
+.bm--short .bm-g { animation: bm-tilt 940ms var(--bm-soft) backwards; }
+.bm--short .bm-outline { animation: bm-oline 910ms var(--bm-out) backwards; }
+.bm--short .bm-surf { animation: bm-fade 470ms var(--bm-out) backwards; }
+.bm--short .bm-reveal { animation: bm-reveal 810ms var(--bm-out) backwards; }
+.bm--short .bm-rails { animation: bm-fade 470ms var(--bm-out) 340ms backwards; }
+.bm--short .bm-wall { animation: bm-fade 600ms var(--bm-out) 290ms backwards; }
+.bm--short .bm-gshadow { animation: bm-fade 600ms var(--bm-out) 340ms backwards; }
+.bm--short .bm-sheen { animation: bm-sheen 1070ms var(--bm-io) 550ms backwards; }
+.bm--short .bm-st { animation: bm-fade 390ms var(--bm-out) 620ms backwards; }
+.bm--short .bm-north svg { animation: bm-north 940ms var(--bm-soft) backwards; }
+
 /* 역 */
 .bm-stations { position: absolute; inset: 0; z-index: 2; overflow: visible; pointer-events: none; }
 .bm-st { transition: transform var(--bm-move), opacity 200ms ease; }

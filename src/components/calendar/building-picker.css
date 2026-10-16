@@ -29,6 +29,9 @@
 .bpk.is-intro .bpk-sheet { animation: bpk-sheet 800ms cubic-bezier(0.22, 1, 0.36, 1) 2600ms backwards; }
 .bpk.is-intro .bpk-sum { animation: bpk-fade 450ms ease 2950ms backwards; }
 .bpk.is-intro .bpk-sheet .mcw-brow { animation: bpk-row 600ms cubic-bezier(0.22, 1, 0.36, 1) calc(3000ms + var(--i, 0) * 70ms) backwards; }
+.bpk.is-short .bpk-sheet { animation: bpk-sheet 680ms cubic-bezier(0.22, 1, 0.36, 1) 340ms backwards; }
+.bpk.is-short .bpk-sum { animation: bpk-fade 390ms ease 570ms backwards; }
+.bpk.is-short .bpk-sheet .mcw-brow { animation: bpk-row 550ms cubic-bezier(0.22, 1, 0.36, 1) calc(600ms + var(--i, 0) * 50ms) backwards; }
 @keyframes bpk-sheet { from { transform: translateY(70px); opacity: 0; } }
 @keyframes bpk-row { from { transform: translateY(14px); opacity: 0; } }
 @keyframes bpk-fade { from { opacity: 0; } }

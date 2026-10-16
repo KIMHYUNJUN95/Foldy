@@ -91,6 +91,15 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Foldy",
   },
+  // Link previews (KakaoTalk · Slack · iMessage). Without og tags KakaoTalk guessed an image and kept
+  // showing a pre-rebrand picture. The image itself is `src/app/opengraph-image.png` (1200×630, current
+  // logo) — Next adds og:image from that file; on Vercel it resolves against the production domain.
+  openGraph: {
+    type: "website",
+    siteName: "Foldy",
+    title: "Foldy",
+    description: "Hotel operations app for field staff and office teams.",
+  },
 };
 
 // viewportFit: "cover" makes the app go edge-to-edge so safe-area-inset-* env()

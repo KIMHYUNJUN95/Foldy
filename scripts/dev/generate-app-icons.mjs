@@ -11,6 +11,7 @@
  * - 원본 SVG `public/brand/logo.svg`(바탕 포함 정사각) · `public/brand/logo-mark.svg`(막대만, 투명)
  * - PWA `public/icons/icon-192.png` · `icon-512.png`(둥근 네모, 모서리 투명) · `maskable-512.png`(꽉 찬 바탕, 안전 영역 안 로고)
  *   · `apple-touch-icon.png`(180, 알파 없음) · `public/favicon.ico`(16 · 32 · 48)
+ * - 링크 미리보기 `src/app/opengraph-image.png`(1200×630, 바탕 + 가운데 로고 — 카카오톡 · 슬랙 공유 카드)
  * - iOS   `AppIcon.appiconset/AppIcon-512@2x.png` (1024, 알파 없음 — App Store 규칙. 모서리는 iOS 가 자기 곡률로 잘라낸다)
  * - iOS   `Splash.imageset/splash-2732x2732*.png` (아이보리 바탕 + 가운데 로고, LaunchScreen 이 aspectFill)
  * - Android `mipmap-*` ic_launcher(둥근 네모) · ic_launcher_round(원) · 적응형 ic_launcher_foreground(막대) + ic_launcher_background(라벤더)
@@ -110,6 +111,17 @@ await out("public/icons/apple-touch-icon.png", await opaque(180));
 await out(
   "public/favicon.ico",
   ico(await Promise.all([16, 32, 48].map(async (size) => ({ size, data: await png(size, { rounded: true }) })))),
+);
+// 링크 미리보기(og:image). 없으면 카카오톡이 옛 그림을 계속 보여준다(2026-10-16).
+await out(
+  "src/app/opengraph-image.png",
+  await sharp(
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="${BG}"/><g transform="translate(375 90) scale(4.5)">${MARK}</g></svg>`,
+    ),
+  )
+    .png()
+    .toBuffer(),
 );
 
 // ── iOS ──────────────────────────────────────────────────────────────

@@ -26,6 +26,11 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 건물마다 오늘 상태 이름표(필터: 오늘 상태 · 청소 · 체크인 · 아웃), 오른쪽 유리 패널(「지금 일어나는 일」 ↔ 건물 상세), 다시 읽을 때 늘어난 건물만 그 자리에서 한 번 움직임.
 - 서버 셈 `src/lib/admin-building-map.ts`, 화면 `src/components/admin/dashboard-building-map.tsx`. 문서: `docs/product/05-admin-web-ia.md` → 「오늘의 건물」. 시안: 캔버스 「모션 D② PC 대시보드 홈」.
 
+## 2026-10-16 — 링크 미리보기 이미지(og:image)
+
+- 카카오톡 링크 카드가 옛 회색 문 그림을 보여주던 것 — og 태그가 없어 카카오가 추측한 그림을 캐시. `src/app/opengraph-image.png`
+  (1200×630, 현재 로고) + `layout.tsx` `openGraph`. 생성은 `scripts/dev/generate-app-icons.mjs`. 카카오 캐시는 공유 디버거로 비워야 바로 바뀐다.
+
 ## 2026-10-16 — 판매 캘린더 순간 장애(DB 타임아웃) 대응
 
 - 10-16 08:04~08:07(도쿄) DB 가 8초 제한을 넘겨 판매 캘린더 · Beds24 웹훅 · 자동화가 같이 실패. 주범은 웹훅의 예약 번호

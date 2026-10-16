@@ -10,6 +10,7 @@ import {
 import { BLOCK_PURPOSE_ORDER, blockErrorText, type BlockPanelCopy } from "@/components/admin/ops/ops-block-panel";
 import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
+import { MswField, MswSuccess, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
 
 /**
  * 모바일 차단 시트 — Claude Design 시안 `4a 최소숙박 · 차단 시트 v3`(4c · 4d · 4e, 2026-10-02 사용자 확정).
@@ -32,6 +33,13 @@ export type MobileBlockSheetCopy = BlockPanelCopy & {
   mbGo: string;
   mbApply: string;
   mpNights: string;
+  scopeClear: string;
+  panelCancel: string;
+  mwBlockTitle: string;
+  mwBlockHead: string;
+  mwMemo: string;
+  mwBack: string;
+  mwDone: string;
 };
 
 export type MobileBlockDone = { mode: "block" | "release"; nights: number; at: string };
@@ -62,6 +70,7 @@ export function MobileOpsBlockSheet({
   const [memo, setMemo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { done, succeed } = useSuccessThen();
 
   const ranges = useMemo(
     () => groupSelectionIntoRanges(cells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey }))),
@@ -84,7 +93,8 @@ export function MobileOpsBlockSheet({
           ? await submitRoomBlock({ cells: targets, memo: memo.trim() || null, purpose })
           : await submitRoomUnblock({ cells: targets });
       if (result.ok) {
-        onDone({ at: result.at, mode, nights: targets.length });
+        // 완료 — 초록 체크(햅틱) 뒤 부모가 선택을 비우고 시트를 닫는다.
+        succeed(() => onDone({ at: result.at, mode, nights: targets.length }));
         return;
       }
       setConfirming(false);
@@ -98,65 +108,65 @@ export function MobileOpsBlockSheet({
     });
   };
 
-  return (
-    <div className="mps mops-vars">
-      <div className="mps-body">
-        <div className="mps-head">
-          <div className="mps-head__t">
-            <h3>{copy.bkTitle}</h3>
-            {scopeSummary && (
-              <p>
-                {scopeSummary.rooms}
-                <br />
-                {scopeSummary.dates}
-              </p>
-            )}
-          </div>
-          <span className="mps-cnt">
-            {copy.bkSummary.replace("{ranges}", String(ranges.length)).replace("{nights}", String(cells.length))}
-          </span>
-        </div>
+  const sub = [scopeSummary?.rooms, nightsLabel(cells.length)].filter(Boolean).join(" · ");
+  const why = [purpose ? copy.bkPurposes[purpose] : null, memo.trim() || null].filter(Boolean).join(" · ");
 
+  return (
+    <div className="msw">
+      <div className="msw-body">
         {confirming ? (
-          <div className="mps-ok danger" role="status">
-            <div className="mps-ok__k">{copy.mbConfirmHead}</div>
-            <div className="mps-ok__big">
-              {copy.bkConfirmBlock.replace("{ranges}", String(ranges.length)).replace("{nights}", String(cells.length))}
+          <div className="msw-step" key="confirm">
+            <div className="msw-head">
+              <div className="msw-head__t">
+                <h3>{copy.mwBlockTitle}</h3>
+                <p>{copy.mbConfirmHead}</p>
+              </div>
             </div>
-            <div className="mps-ok__sm">
-              {ranges.slice(0, 4).map((range) => (
-                <div key={`${range.roomKey}|${range.startDate}`}>
-                  {roomName(range.roomKey)} · {pad(range.startDate)} → {pad(range.endDate)} (
-                  {nightsLabel(nightsBetween(range.startDate, range.endDate))})
+            <div className="msw-sum red" role="status">
+              <div className="msw-blk-h">{copy.mwBlockHead.replace("{n}", String(cells.length))}</div>
+              {ranges.slice(0, 6).map((range) => (
+                <div className="ln" key={`${range.roomKey}|${range.startDate}`}>
+                  <span>
+                    <span className="mono">{roomName(range.roomKey)}</span> · {pad(range.startDate)} → {pad(range.endDate)}
+                  </span>
+                  <span>{nightsLabel(nightsBetween(range.startDate, range.endDate))}</span>
                 </div>
               ))}
-              {ranges.length > 4 && <div>+{ranges.length - 4}</div>}
+              {ranges.length > 6 && <div className="ln">+{ranges.length - 6}</div>}
+              {why && (
+                <div className="why">
+                  {copy.mbReason} · {why}
+                </div>
+              )}
             </div>
-            {(purpose || memo.trim()) && (
-              <div className="mbk-why">
-                {copy.mbReason} · {[purpose ? copy.bkPurposes[purpose] : null, memo.trim() || null].filter(Boolean).join(" — ")}
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
               </div>
             )}
+            <p className="msw-note left">{copy.bkNote}</p>
           </div>
         ) : (
-          <>
-            {/* 이미 막힌 밤이 섞여 있을 때만 — 그 밤들만 바로 푼다. */}
-            {blockedCells.length > 0 && (
-              <div className="mbk-rel">
-                <span>{copy.bkBlockedNote.replace("{nights}", String(blockedCells.length))}</span>
-                <button disabled={pending} onClick={() => run("release")} type="button">
-                  {copy.bkRelease}
-                </button>
+          <div className="msw-step" key="input">
+            <div className="msw-head">
+              <div className="msw-head__t">
+                <h3>{copy.mwBlockTitle}</h3>
+                <p>{sub}</p>
               </div>
-            )}
+              <button className="msw-link" disabled={pending} onClick={onClear} type="button">
+                {copy.scopeClear}
+              </button>
+            </div>
 
-            <div className="mbk-why-box">
-              <div className="mbk-why-box__l">{copy.bkPurposeLabel}</div>
-              <div className="mbk-chips" role="group" aria-label={copy.bkPurposeLabel}>
+            <div className="msw-step-sub">
+              <div className="msw-sec">
+                <span>{copy.bkPurposeLabel}</span>
+              </div>
+              <div className="msw-grid" role="group" aria-label={copy.bkPurposeLabel}>
                 {BLOCK_PURPOSE_ORDER.map((key) => (
                   <button
                     aria-pressed={purpose === key}
-                    className={purpose === key ? "on" : ""}
+                    className={`msw-opt${purpose === key ? " on" : ""}`}
                     disabled={pending}
                     key={key}
                     onClick={() => setPurpose((current) => (current === key ? null : key))}
@@ -166,79 +176,88 @@ export function MobileOpsBlockSheet({
                   </button>
                 ))}
               </div>
-              <input
-                className="mbk-memo"
+            </div>
+
+            <MswField label={copy.mwMemo}>
+              <textarea
+                className="msw-in"
                 disabled={pending}
                 enterKeyHint="done"
                 maxLength={200}
-                onChange={(event) => setMemo(event.target.value)}
+                onChange={(event) => setMemo(event.target.value.replace(/\n/g, " "))}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") event.currentTarget.blur();
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
                 }}
                 placeholder={copy.bkMemoPlaceholder}
-                type="text"
+                rows={2}
                 value={memo}
               />
-            </div>
-          </>
-        )}
+            </MswField>
 
-        {error && (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
-            {error}
-          </div>
-        )}
-
-        <p className="mps-ch">{confirming ? copy.bkNote : copy.bkBody}</p>
-
-        {!confirming && (
-          <section aria-label={copy.mbRanges} className="mps-list">
-            <div className="mps-lh">
-              <b>{copy.mbRanges}</b>
-              <span>
-                {copy.bkSummary.replace("{ranges}", String(ranges.length)).replace("{nights}", String(cells.length))}
-              </span>
-            </div>
-            {ranges.map((range) => (
-              <div className="mbk-r" key={`${range.roomKey}|${range.startDate}`}>
-                <span className="rm">{roomName(range.roomKey)}</span>
-                <span className="d">
-                  {pad(range.startDate)} → {pad(range.endDate)}
-                </span>
-                <span className="n">{nightsLabel(nightsBetween(range.startDate, range.endDate))}</span>
+            <section aria-label={copy.mbRanges} className="msw-list">
+              <div className="msw-list__h">
+                <span>{copy.mbRanges}</span>
+                <small>
+                  {copy.bkSummary.replace("{ranges}", String(ranges.length)).replace("{nights}", String(cells.length))}
+                </small>
               </div>
-            ))}
-          </section>
+              {ranges.map((range) => (
+                <div className="msw-row" key={`${range.roomKey}|${range.startDate}`}>
+                  <span className="rm">{range.roomKey.split("::")[1] ?? range.roomKey}</span>
+                  <span className="d">
+                    {pad(range.startDate)} → {pad(range.endDate)}
+                  </span>
+                  <span className="n">{nightsLabel(nightsBetween(range.startDate, range.endDate))}</span>
+                </div>
+              ))}
+            </section>
+
+            {/* 이미 막힌 밤이 섞여 있을 때만 — 그 밤들만 바로 푼다. */}
+            {blockedCells.length > 0 && (
+              <div className="msw-alert row">
+                <span>{copy.bkBlockedNote.replace("{nights}", String(blockedCells.length))}</span>
+                <button className="msw-press" disabled={pending} onClick={() => run("release")} type="button">
+                  {copy.bkRelease}
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
+              </div>
+            )}
+
+            <p className="msw-note left">{copy.bkBody}</p>
+          </div>
         )}
       </div>
 
-      <div className="mps-foot">
+      <div className={`msw-foot${confirming ? " two" : ""}`}>
         {confirming ? (
           <>
-            <button className="mps-btn ghost" disabled={pending} onClick={() => setConfirming(false)} type="button">
-              {copy.panelCancel}
+            <button className="msw-btn ghost" disabled={pending} onClick={() => setConfirming(false)} type="button">
+              {copy.mwBack}
             </button>
-            <button className="mps-btn main danger" disabled={pending} onClick={() => run("block")} type="button">
+            <button className="msw-btn red" disabled={pending} onClick={() => run("block")} type="button">
               {copy.mbApply.replace("{n}", String(cells.length))}
             </button>
           </>
         ) : (
-          <>
-            <button className="mps-btn ghost" disabled={pending} onClick={onClear} type="button">
-              {copy.scopeClear}
-            </button>
-            <button
-              className="mps-btn main danger"
-              disabled={cells.length === 0 || pending}
-              onClick={() => setConfirming(true)}
-              type="button"
-            >
-              {copy.mbGo.replace("{n}", String(cells.length))}
-            </button>
-          </>
+          <button
+            className="msw-btn red"
+            disabled={cells.length === 0 || pending}
+            onClick={() => setConfirming(true)}
+            type="button"
+          >
+            {copy.mbGo.replace("{n}", String(cells.length))}
+          </button>
         )}
       </div>
+      {done && <MswSuccess label={copy.mwDone} />}
     </div>
   );
 }

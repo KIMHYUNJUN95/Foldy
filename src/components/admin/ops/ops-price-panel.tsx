@@ -20,6 +20,7 @@ import {
   PERCENT_PRESETS,
   type AdjustmentInput,
 } from "@/lib/ops-price-adjustment";
+import "./ops-calendar-panels-white.css";
 
 /**
  * 가격·최소숙박 조작 패널 — **격자 오른쪽 세로 카드**.
@@ -47,7 +48,8 @@ import {
  * 된다. 막지는 않되 **무엇이 몇 칸 바뀌는지 보여주고 한 번 더 묻는다.**
  */
 
-export type PanelCopy = OpsWriteOutcomeCopy & {
+/** 화이트 리디자인 문구(`SpwCopy`)를 같이 싣는다 — 격자의 `Copy` 가 이 타입을 통해 받는다. */
+export type PanelCopy = OpsWriteOutcomeCopy & SpwCopy & {
   panelTitle: string;
   panelAmount: string;
   panelPercent: string;
@@ -100,6 +102,128 @@ export type PanelCell = {
   isGap: boolean;
 };
 
+/**
+ * 화이트 리디자인(2026-10-16, 시안 SalesEdit · SalesMinStay · SalesBlock · SalesNew · SalesResv -PC)이
+ * 쓰는 문구. 데스크톱 패널만 받는다 — 모바일 시트가 쓰는 `PanelCopy` 등은 그대로다.
+ */
+export type SpwCopy = {
+  localeTag: string;
+  /** 「지우기」 — 모바일 가격 시트와 같은 문구. */
+  mpClearInput: string;
+  /** 「{n}박」 · 「{from} → {to}」 — 최소숙박 · 차단 목록. */
+  minStay: string;
+  change: string;
+  spwKicker: string;
+  spwTabPrice: string;
+  spwTabMinStay: string;
+  spwTabBlock: string;
+  spwCells: string;
+  spwCurrentAvg: string;
+  spwAfter: string;
+  spwAmountLabel: string;
+  spwAmountHint: string;
+  spwPercentLabel: string;
+  spwPercentHint: string;
+  spwListCount: string;
+  spwBack: string;
+  spwPriceConfirmKicker: string;
+  spwPriceConfirmSame: string;
+  spwPriceConfirmRange: string;
+  spwPriceConfirmSub: string;
+  spwCheckTitle: string;
+  spwRowChanged: string;
+  spwChangedOf: string;
+  spwRowRooms: string;
+  spwRowDates: string;
+  spwSameValue: string;
+  spwMsTitle: string;
+  spwMsGapLine: string;
+  spwMsCustomPh: string;
+  spwNightUnit: string;
+  spwMsListTitle: string;
+  spwBkTitle: string;
+  spwBkMemoLabel: string;
+  spwBkMemoLimit: string;
+  spwBkRangesTitle: string;
+  spwBkGo: string;
+  spwBkConfirmKicker: string;
+  spwBkConfirmTitle: string;
+  spwBkConfirmHead: string;
+  spwBkConfirmNote: string;
+  spwBkReason: string;
+  spwMbKicker: string;
+  spwOptional: string;
+  spwMinus: string;
+  spwPlus: string;
+  spwNightsTotal: string;
+  spwArrival: string;
+  spwRcConfirmTitle: string;
+  spwRcNumber: string;
+  spwReKicker: string;
+  spwReSub: string;
+};
+
+/** 가격 · 최소숙박 · 차단 — 같은 자리의 세 패널. */
+export type SpwMode = "price" | "minstay" | "block";
+
+/** `2026-10-16` → 「10/16 (금)」 — 도쿄 기준 요일. */
+export function spwDate(date: string, localeTag: string): string {
+  const weekday = new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", weekday: "short" }).format(
+    new Date(`${date}T12:00:00+09:00`),
+  );
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))} (${weekday})`;
+}
+
+/**
+ * 패널 위 「가격 · 최소숙박 · 차단」 탭(시안 `.seg`). 지금 패널이 선택된 탭이다.
+ * 바꾸는 쪽(격자)이 `onSwitchMode` 를 넘길 때만 그린다 — 눌러도 아무 일 없는 탭은 두지 않는다.
+ */
+export function SpwModeTabs({
+  copy,
+  mode,
+  onSwitchMode,
+}: {
+  copy: SpwCopy;
+  mode: SpwMode;
+  onSwitchMode?: (mode: SpwMode) => void;
+}) {
+  if (!onSwitchMode) return null;
+  const tabs: { key: SpwMode; label: string }[] = [
+    { key: "price", label: copy.spwTabPrice },
+    { key: "minstay", label: copy.spwTabMinStay },
+    { key: "block", label: copy.spwTabBlock },
+  ];
+  return (
+    <div aria-label={copy.spwKicker} className="spw-seg" role="tablist">
+      {tabs.map((tab) => (
+        <button
+          aria-selected={tab.key === mode}
+          className={tab.key === mode ? "on" : undefined}
+          key={tab.key}
+          onClick={() => {
+            if (tab.key !== mode) onSwitchMode(tab.key);
+          }}
+          role="tab"
+          type="button"
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 패널 머리 — 작은 윗줄 · 굵은 제목 · 설명(시안 공통). */
+export function SpwHead({ kicker, sub, title }: { kicker: string; sub?: string | null; title: string }) {
+  return (
+    <div className="spw-head">
+      <span className="spw-head__k">{kicker}</span>
+      <b className="spw-head__t">{title}</b>
+      {sub && <span className="spw-head__s">{sub}</span>}
+    </div>
+  );
+}
+
 const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
 
 /** 입력칸 표시용 — 숫자만 남겨 쉼표를 넣는다. 음수 기호는 지킨다. */
@@ -109,9 +233,6 @@ const formatAmountText = (text: string) => {
   if (!digits) return negative ? "-" : "";
   return `${negative ? "-" : ""}${Number(digits).toLocaleString("ja-JP")}`;
 };
-
-/** `2026-10-03` → `10/03`. 목록 줄에서만 쓴다(요일은 격자 머리에 있다). */
-const shortDate = (date: string) => `${date.slice(5, 7)}/${date.slice(8, 10)}`;
 
 type ListRow = { date: string; current: number | null; next: number | null };
 type ListRoom = { key: string; label: string; rows: ListRow[] };
@@ -153,6 +274,10 @@ function groupSelection(
   return buildings;
 }
 
+/**
+ * 선택한 칸 목록 — 시안 SalesEdit-PC: 한 줄에 **객실 · 날짜(요일) · 현재가 → 바뀔 가격**. 가로 헤어라인만.
+ * 건물이 둘 이상이면 건물 이름을 작은 머리로 끊는다(방 번호만으로는 어느 건물인지 모른다).
+ */
 function SelectionList({
   buildings,
   cellCount,
@@ -161,53 +286,43 @@ function SelectionList({
 }: {
   buildings: ListBuilding[];
   cellCount: number;
-  copy: PanelCopy;
+  copy: PanelCopy & SpwCopy;
   showNext: boolean;
 }) {
-  const roomCount = buildings.reduce((sum, building) => sum + building.rooms.length, 0);
+  let index = 0;
   return (
-    <section className="opspl" aria-label={copy.panelListTitle}>
-      <div className="opspl__head">
-        <span className="opspl__title">{copy.panelListTitle}</span>
-        <span className="opspl__count">
-          {copy.panelListRooms.replace("{rooms}", String(roomCount)).replace("{cells}", String(cellCount))}
-        </span>
-      </div>
-      <div className="opspl__scroll">
-        {buildings.map((building) => (
-          <div className="opspl__bld" key={building.name}>
-            {buildings.length > 1 && <div className="opspl__bname">{building.name}</div>}
-            {building.rooms.map((room) => (
-              <div className="opspl__room" key={room.key}>
-                <div className="opspl__rname">{room.label}</div>
-                <ul className="opspl__rows">
-                  {room.rows.map((row) => {
-                    const delta = showNext && row.current !== null && row.next !== null ? row.next - row.current : null;
-                    return (
-                      <li className="opspl__row" key={row.date}>
-                        <span className="opspl__date">{shortDate(row.date)}</span>
-                        {row.current === null ? (
-                          <span className="opspl__none">{copy.panelListNoPrice}</span>
-                        ) : (
-                          <>
-                            <span className={`opspl__cur${delta ? " is-old" : ""}`}>{yen(row.current)}</span>
-                            {delta !== null && delta !== 0 && row.next !== null && (
-                              <>
-                                <span aria-hidden="true" className="opspl__arrow">→</span>
-                                <span className={`opspl__next ${delta > 0 ? "is-up" : "is-dn"}`}>{yen(row.next)}</span>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+    <section aria-label={copy.panelListTitle} className="spw-list">
+      <span className="spw-sec">{copy.spwListCount.replace("{n}", String(cellCount))}</span>
+      {buildings.map((building) => (
+        <div key={building.name}>
+          {buildings.length > 1 && <div className="spw-list__bld">{building.name}</div>}
+          {building.rooms.map((room) =>
+            room.rows.map((row) => {
+              const delta = showNext && row.current !== null && row.next !== null ? row.next - row.current : null;
+              const order = index++;
+              return (
+                <div className="spw-row" key={`${room.key}|${row.date}`} style={{ "--i": Math.min(order, 12) } as React.CSSProperties}>
+                  <span className="spw-row__room">{room.label}</span>
+                  <span className="spw-row__date">{spwDate(row.date, copy.localeTag)}</span>
+                  {row.current === null ? (
+                    <span className="spw-row__none">{copy.panelListNoPrice}</span>
+                  ) : (
+                    <>
+                      <span className={`spw-row__cur${delta ? " is-old" : ""}`}>{yen(row.current)}</span>
+                      {delta !== null && delta !== 0 && row.next !== null && (
+                        <>
+                          <span aria-hidden="true" className="spw-row__arrow">→</span>
+                          <b className="spw-row__next">{yen(row.next)}</b>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            }),
+          )}
+        </div>
+      ))}
     </section>
   );
 }
@@ -244,18 +359,21 @@ export function OpsPricePanel({
   onApplied,
   onClear,
   onFinished,
+  onSwitchMode,
   runWrite,
   scopeSummary,
 }: {
   cells: PanelCell[];
   clearLabel: string;
-  copy: PanelCopy;
+  copy: PanelCopy & SpwCopy;
   /** 쓰기가 반영된 **뒤** 보낸 칸만 선택에서 뺀다(2026-09-30 버그) — 전체를 비우는 `onClear`
    * 와 달리, 왕복하는 동안 사람이 새로 고른 칸은 건드리지 않는다. */
   onApplied: (sentCells: { roomKey: string; date: string }[]) => void;
   onClear: () => void;
   /** 저장이 접수된 뒤(성공) — 모바일 시트가 스스로 닫히는 데 쓴다(2026-10-02). 데스크톱은 넘기지 않는다. */
   onFinished?: () => void;
+  /** 패널 위 「가격 · 최소숙박 · 차단」 탭(2026-10-16 화이트 리디자인). 넘겨야 탭이 그려진다. */
+  onSwitchMode?: (mode: SpwMode) => void;
   /** 격자가 흐린 값 → 접수 → 반영 대기 → 데이터 다시 받기를 맡는다(`ops-write-tracker.ts`). */
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
@@ -396,94 +514,176 @@ export function OpsPricePanel({
     warning === "zero" ? copy.warnZero : warning === "huge_drop" ? copy.warnDrop : copy.warnRise;
 
   const hasSelection = preview.rows.length > 0;
+  const percentLabel = (value: number) => (value > 0 ? `+${value}%` : `${String(value).replace("-", "−")}%`);
+  const nextLabel =
+    deltaPercent !== null ? `${copy.spwAfter} · ${deltaPercent > 0 ? "+" : ""}${deltaPercent}%` : copy.spwAfter;
 
-  return (
-    <aside className={`opsp${cells.length > 0 ? " has-list" : ""}`}>
-      <div className="opsp__head">
-        <div className="opsp__title">{copy.panelTitle}</div>
-        {/* **무엇을 고치는가**를 먼저 적는다. 「9칸」만으로는 어느 방 어느 날인지 모른 채
-            적용하게 되는데, 가격은 채널로 그대로 나간다. */}
-        <div className="opsp__target">
-          {scopeSummary ? (
-            <>
-              {scopeSummary.rooms}
-              <br />
-              {scopeSummary.dates}
-            </>
-          ) : (
-            copy.panelIdle
-          )}
-        </div>
-      </div>
+  /** 경고에 걸린 칸 하나 — 확인 상자에 「어느 칸이 얼마로」를 적는다(시안 SalesPriceConfirm-PC). */
+  const warnedRow = (warning: string) =>
+    preview.rows.find((row) =>
+      warning === "zero"
+        ? row.newPrice <= 0
+        : warning === "huge_drop"
+          ? row.newPrice < row.currentPrice * 0.5
+          : row.newPrice > row.currentPrice * 3,
+    ) ?? null;
 
-      <div className="opsp__body">
-        {/* 현재 평균 → 변경. 이 상자가 패널에서 가장 크다 — 무엇을 바꾸는지 모르고 누르는
-            일을 막는 것이 확인 단계의 전부다. */}
-        <div>
-          <div className="opsp__box">
-            <div className="opsp__cur">
-              <div className="opsp__lbl">{copy.panelCurrent}</div>
-              {hasSelection && currentRange && currentRange.min !== currentRange.max ? (
-                <>
-                  <div className="opsp__curv is-range">
-                    <span>{yen(currentRange.min)}</span>
-                    <span className="opsp__to">~ {yen(currentRange.max)}</span>
-                  </div>
-                  <div className="opsp__avg">{copy.panelAverage.replace("{price}", yen(preview.currentAverage))}</div>
-                </>
-              ) : (
-                <div className="opsp__curv">{hasSelection ? yen(preview.currentAverage) : "—"}</div>
-              )}
-            </div>
-            <div className="opsp__nx">
-              <div className="opsp__lbl">
-                {copy.panelNext}
-                {deltaPercent !== null && (
-                  <span className={`opsp__delta${deltaPercent < 0 ? " dn" : ""}`}>
-                    {deltaPercent > 0 ? `+${deltaPercent}%` : `${deltaPercent}%`}
+  // ── 확인 단계 ── 무엇이 몇 칸 얼마로 바뀌는지 보여주고 한 번 더 묻는다. 탭 · 입력은 숨긴다.
+  if (confirming) {
+    const sameValue = preview.newMin === preview.newMax;
+    const currentText =
+      currentRange && currentRange.min !== currentRange.max
+        ? `${yen(currentRange.min)} – ${yen(currentRange.max)} · ${copy.panelAverage.replace("{price}", yen(preview.currentAverage))}`
+        : yen(preview.currentAverage);
+    const nextText = sameValue
+      ? `${yen(preview.newMin)} · ${copy.spwSameValue}`
+      : `${yen(preview.newMin)} – ${yen(preview.newMax)} · ${copy.spwPercentHint}`;
+    return (
+      <aside aria-label={copy.panelTitle} className="opsp spw">
+        <div className="spw-body spw-anim" key="confirm">
+          <SpwHead
+            kicker={copy.spwPriceConfirmKicker}
+            sub={copy.spwPriceConfirmSub}
+            title={
+              sameValue
+                ? copy.spwPriceConfirmSame.replace("{count}", String(preview.changedCount)).replace("{price}", yen(preview.newMin))
+                : copy.spwPriceConfirmRange.replace("{count}", String(preview.changedCount))
+            }
+          />
+          {warnings.map((warning) => {
+            const row = warnedRow(warning);
+            return (
+              <div className="spw-alert" key={warning} role="alert">
+                <b>{copy.spwCheckTitle.replace("{warning}", warningText(warning))}</b>
+                {row && (
+                  <span>
+                    {row.roomLabel} {spwDate(row.date, copy.localeTag)} {yen(row.currentPrice)} → {yen(row.newPrice)}
                   </span>
                 )}
               </div>
-              {/* 퍼센트는 칸마다 결과가 달라 **범위**로 쓴다. */}
-              {input && hasSelection && preview.newMin !== preview.newMax ? (
-                // 범위는 두 줄로 — 한 줄이면 큰 객실 가격(¥112,860)에서 칸을 넘었다(2026-10-01).
-                <div className="opsp__nxv is-range">
-                  <span>{yen(preview.newMin)}</span>
-                  <span className="opsp__to">~ {yen(preview.newMax)}</span>
-                </div>
-              ) : (
-                <div className="opsp__nxv">{input && hasSelection ? yen(preview.newMin) : "—"}</div>
-              )}
+            );
+          })}
+          <dl className="spw-kv">
+            <div>
+              <dt>{copy.spwRowChanged}</dt>
+              <dd>
+                {copy.spwChangedOf
+                  .replace("{total}", String(preview.rows.length))
+                  .replace("{n}", String(preview.changedCount))}
+              </dd>
             </div>
+            <div>
+              <dt>{copy.panelCurrent}</dt>
+              <dd>{currentText}</dd>
+            </div>
+            <div>
+              <dt>{copy.panelNext}</dt>
+              <dd>{nextText}</dd>
+            </div>
+            {scopeSummary && (
+              <>
+                <div>
+                  <dt>{copy.spwRowRooms}</dt>
+                  <dd>{scopeSummary.rooms}</dd>
+                </div>
+                <div>
+                  <dt>{copy.spwRowDates}</dt>
+                  <dd>{scopeSummary.dates}</dd>
+                </div>
+              </>
+            )}
+          </dl>
+          {preview.skippedNoPrice > 0 && (
+            <p className="spw-note">{copy.panelExcluded.replace("{count}", String(preview.skippedNoPrice))}</p>
+          )}
+          <p className="spw-note">{copy.panelChannelNote}</p>
+        </div>
+        <div className="spw-foot">
+          <button className="spw-btn" onClick={() => setConfirming(false)} type="button">
+            {copy.spwBack}
+          </button>
+          {/* 버튼은 짧게 — 「몇 칸 반영」만(2026-09-29 사용자 요청). 채널로 그대로 나가므로 빨강. */}
+          <button className="spw-btn is-danger" disabled={pending} onClick={apply} type="button">
+            {copy.panelConfirmBody.replace("{count}", String(preview.changedCount))}
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  return (
+    <aside aria-label={copy.panelTitle} className="opsp spw">
+      <div className="spw-body">
+        {/* **무엇을 고치는가**를 먼저 적는다. 「9칸」만으로는 어느 방 어느 날인지 모른 채
+            적용하게 되는데, 가격은 채널로 그대로 나간다. */}
+        <SpwHead
+          kicker={copy.spwKicker}
+          sub={scopeSummary ? copy.spwCells.replace("{dates}", scopeSummary.dates).replace("{n}", String(cells.length)) : null}
+          title={scopeSummary ? scopeSummary.rooms : copy.panelIdle}
+        />
+        <SpwModeTabs copy={copy} mode="price" onSwitchMode={onSwitchMode} />
+
+        {/* 현재 평균 → 변경. 무엇을 바꾸는지 모르고 누르는 일을 막는 것이 확인 단계의 전부다. */}
+        <div className="spw-compare">
+          <div>
+            <span className="spw-compare__l">{copy.spwCurrentAvg}</span>
+            {hasSelection && currentRange && currentRange.min !== currentRange.max ? (
+              <>
+                <b className="spw-compare__v is-cur is-range">
+                  {yen(currentRange.min)}
+                  <span>~ {yen(currentRange.max)}</span>
+                </b>
+                <span className="spw-compare__avg">{copy.panelAverage.replace("{price}", yen(preview.currentAverage))}</span>
+              </>
+            ) : (
+              <b className="spw-compare__v is-cur">{hasSelection ? yen(preview.currentAverage) : "—"}</b>
+            )}
           </div>
-          <div className="opsp__hint">{copy.panelHint}</div>
+          <span aria-hidden="true" className="spw-compare__arrow">→</span>
+          <div>
+            <span className={`spw-compare__l${deltaPercent !== null && deltaPercent < 0 ? " is-dn" : ""}`}>{nextLabel}</span>
+            {/* 퍼센트는 칸마다 결과가 달라 **범위**로 쓴다. */}
+            {input && hasSelection && preview.newMin !== preview.newMax ? (
+              <b className="spw-compare__v is-next is-range" key={`${preview.newMin}-${preview.newMax}`}>
+                {yen(preview.newMin)}
+                <span>~ {yen(preview.newMax)}</span>
+              </b>
+            ) : (
+              <b className="spw-compare__v is-next" key={input && hasSelection ? preview.newMin : "none"}>
+                {input && hasSelection ? yen(preview.newMin) : "—"}
+              </b>
+            )}
+          </div>
         </div>
 
         {/* 금액과 퍼센트는 같은 값을 정하는 **두 가지 방법**이라 한 덩어리로 둔다. */}
-        <div className="opsp__inputs">
-          <label className="opsp__in">
-            <span className="opsp__unit">¥</span>
-            <input
-              aria-label={copy.panelAmount}
-              disabled={!hasSelection}
-              autoComplete="off"
-              enterKeyHint="done"
-              inputMode="numeric"
-              onKeyDown={blurOnEnter}
-              onChange={(event) => onAmount(event.target.value)}
-              placeholder={copy.panelAmount}
-              // 천 단위 쉼표 — 「46600」보다 「46,600」이 한눈에 읽힌다. 파싱은 숫자만 본다(`onAmount`).
-              value={formatAmountText(amountText)}
-            />
-          </label>
-          <label className="opsp__in pct">
+        <div className="spw-amount">
+          <div className="spw-field">
+            <span className="spw-field__l">{copy.spwAmountLabel}</span>
+            <label className="spw-field__box is-money">
+              <span aria-hidden="true" className="spw-field__unit">¥</span>
+              <input
+                aria-label={copy.panelAmount}
+                autoComplete="off"
+                disabled={!hasSelection}
+                enterKeyHint="done"
+                inputMode="numeric"
+                onChange={(event) => onAmount(event.target.value)}
+                onKeyDown={blurOnEnter}
+                placeholder={hasSelection ? formatAmountText(String(Math.round(preview.currentAverage))) : ""}
+                // 천 단위 쉼표 — 「46600」보다 「46,600」이 한눈에 읽힌다. 파싱은 숫자만 본다(`onAmount`).
+                value={formatAmountText(amountText)}
+              />
+            </label>
+          </div>
+          {/* 퍼센트 직접 입력 — 프리셋에 없는 값(예: +7%)도 쓴다. */}
+          <label className="spw-field__box is-pct">
             <input
               aria-label={copy.panelPercent}
-              disabled={!hasSelection}
               autoComplete="off"
+              disabled={!hasSelection}
               enterKeyHint="done"
               inputMode="numeric"
-              onKeyDown={blurOnEnter}
               onChange={(event) => {
                 const value = Number.parseInt(event.target.value.replace(/[^\d-]/g, ""), 10);
                 if (Number.isFinite(value)) onPercent(value);
@@ -492,103 +692,97 @@ export function OpsPricePanel({
                   setInput(null);
                 }
               }}
-              placeholder={copy.panelPercent}
+              onKeyDown={blurOnEnter}
+              placeholder="±"
               value={percentText}
             />
-            <span className="opsp__unit">%</span>
+            <span aria-hidden="true" className="spw-field__unit">%</span>
           </label>
+          <span className="spw-amount__hint">{copy.spwAmountHint}</span>
         </div>
 
-        <div className="opsp__presets">
-          {PERCENT_PRESETS.map((preset) => (
+        <div className="spw-pcts">
+          <div className="spw-pcts__h">
+            <span className="spw-label">{copy.spwPercentLabel}</span>
+            <span className="spw-pcts__hint">{copy.spwPercentHint}</span>
+          </div>
+          <div className="spw-pcts__grid">
+            {PERCENT_PRESETS.map((preset) => {
+              const on = input?.kind === "percent" && input.percent === preset;
+              return (
+                <button
+                  aria-pressed={on}
+                  className={`spw-chip${on ? " on" : ""}`}
+                  disabled={!hasSelection}
+                  key={preset}
+                  // 같은 프리셋을 다시 누르면 푼다(2026-10-01 사용자 요청) — 입력도 같이 비운다.
+                  onClick={() => (on ? clearInput() : onPercent(preset))}
+                  type="button"
+                >
+                  {percentLabel(preset)}
+                </button>
+              );
+            })}
             <button
-              className={`opsp__preset${preset > 0 ? " up" : " dn"}${
-                input?.kind === "percent" && input.percent === preset ? " on" : ""
-              }`}
-              disabled={!hasSelection}
-              key={preset}
-              // 같은 프리셋을 다시 누르면 푼다(2026-10-01 사용자 요청) — 입력도 같이 비운다.
-              onClick={() =>
-                input?.kind === "percent" && input.percent === preset ? clearInput() : onPercent(preset)
-              }
+              className="spw-chip is-quiet"
+              disabled={!hasSelection || (input === null && amountText === "" && percentText === "")}
+              onClick={clearInput}
               type="button"
             >
-              {preset > 0 ? `+${preset}%` : `${preset}%`}
+              {copy.mpClearInput}
             </button>
-          ))}
+          </div>
         </div>
+
+        {/* 채널 규칙을 화면에 적어 둔다 — 「왜 부킹닷컴은 안 바뀌지?」가 나오지 않게. */}
+        <p className="spw-note">{copy.panelChannelNote}</p>
 
         {/* 빠진 칸은 **개수가 아니라 이유**를 적는다 — 「아, 502호가 블록이었지」가 되어야 한다. */}
         {preview.skippedNoPrice > 0 && (
-          <div className="opsp__note warn">
-            <span className="opsp__dot" />
-            <span>{copy.panelExcluded.replace("{count}", String(preview.skippedNoPrice))}</span>
-          </div>
+          <p className="spw-note is-warn">{copy.panelExcluded.replace("{count}", String(preview.skippedNoPrice))}</p>
         )}
-
-        {input !== null && preview.changedCount === 0 && (
-          <div className="opsp__note warn">
-            <span className="opsp__dot" />
-            <span>{copy.panelNoChange}</span>
-          </div>
-        )}
+        {input !== null && preview.changedCount === 0 && <p className="spw-note is-warn">{copy.panelNoChange}</p>}
         {warnings.map((warning) => (
-          <div className="opsp__note danger" key={warning}>
-            <span className="opsp__dot" />
-            <span>{warningText(warning)}</span>
-          </div>
+          <p className="spw-note is-danger" key={warning}>
+            {warningText(warning)}
+          </p>
         ))}
 
-        {/* 남는 세로 공간을 「무엇이 얼마로 바뀌는지」 목록이 쓴다(2026-10-01 사용자 요청). 목록만 안에서 넘긴다. */}
-        {cells.length > 0 ? (
+        {/* 「무엇이 얼마로 바뀌는지」 목록(2026-10-01 사용자 요청). 패널 본문 안에서 넘긴다. */}
+        {cells.length > 0 && (
           <SelectionList buildings={listBuildings} cellCount={cells.length} copy={copy} showNext={input !== null} />
-        ) : (
-          <div className="opsp__grow" />
         )}
 
-        {message && <div className="opsp__msg">{message}</div>}
-        {/* 채널 규칙을 화면에 적어 둔다 — 「왜 부킹닷컴은 안 바뀌지?」가 나오지 않게. */}
-        <div className="opsp__channel">{copy.panelChannelNote}</div>
+        {message && (
+          <p className="spw-msg" role="status">
+            {message}
+          </p>
+        )}
       </div>
 
-      <div className="opsp__foot">
-        {confirming ? (
-          <>
-            <button className="opsp__btn" onClick={() => setConfirming(false)} type="button">
-              {copy.panelCancel}
-            </button>
-            {/* 버튼은 짧게 — 「몇 칸 반영」만(2026-09-29 사용자 요청: 문장이 버튼에 두 줄로 차 거추장스러웠다).
-                채널 규칙은 바로 위 안내 줄이 이미 말한다. */}
-            <button className="opsp__btn go" disabled={pending} onClick={apply} type="button">
-              {copy.panelConfirmBody.replace("{count}", String(preview.changedCount))}
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              className="opsp__btn"
-              disabled={!hasSelection}
-              // 적어 둔 금액도 같이 비운다 — 남겨 두면 다음에 고른 칸에 그 값이 그대로 걸린다.
-              onClick={() => {
-                reset();
-                setMessage(null);
-                onClear();
-              }}
-              title="Esc"
-              type="button"
-            >
-              {clearLabel}
-            </button>
-            <button
-              className="opsp__btn go"
-              disabled={!input || preview.changedCount === 0 || pending}
-              onClick={() => setConfirming(true)}
-              type="button"
-            >
-              {copy.panelGo.replace("{count}", String(preview.changedCount))}
-            </button>
-          </>
-        )}
+      <div className="spw-foot">
+        <button
+          className="spw-btn"
+          disabled={!hasSelection}
+          // 적어 둔 금액도 같이 비운다 — 남겨 두면 다음에 고른 칸에 그 값이 그대로 걸린다.
+          onClick={() => {
+            reset();
+            setMessage(null);
+            onClear();
+          }}
+          title="Esc"
+          type="button"
+        >
+          {clearLabel}
+        </button>
+        <button
+          className="spw-btn is-primary"
+          disabled={!input || preview.changedCount === 0 || pending}
+          onClick={() => setConfirming(true)}
+          type="button"
+        >
+          {copy.panelGo.replace("{count}", String(preview.changedCount))}
+        </button>
       </div>
     </aside>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Check } from "lucide-react";
+import { haptic } from "@/lib/haptics";
 
 /**
  * 모바일 판매 캘린더 알림 — 시안 `3a 가격 시트 v3` 의 3e · 3f(2026-10-02 사용자 확정).
@@ -10,6 +10,9 @@ import { Check } from "lucide-react";
  * 시트를 닫은 뒤 진행 · 결과를 **탭 바 위**에 띄운다. **한 줄짜리 작은 알약**(2026-10-02 사용자 지적 「너무 크고
  * 거추장스럽다」 — 처음엔 폭 전부 · 두 줄이었다). 흐린 값 안내 같은 설명 줄은 두지 않는다. 진행 중에는 남아 있고, 결과는 몇 초 뒤 스스로 사라진다.
  * 몸통을 누르면 바로 닫힌다(진행 중 제외). 행동 버튼: 완료 → 「되돌리기」, 일부 실패 · 실패 → 「이력 보기」.
+ *
+ * 화이트 리디자인(2026-10-16, 시안 SalesToast): 먹색(#16141f) 알약 · 오른쪽 옅은 흰 버튼. 완료는 초록 체크가 **그려지며**
+ * `haptic("success")`, 실패는 `haptic("warning")`. 등장은 아래에서 살짝(ease-out 220ms), reduced-motion 이면 끈다.
  */
 export type MobileToast = {
   id: number;
@@ -69,6 +72,12 @@ export function MobileOpsToast({
     return () => clearTimeout(timer);
   }, [wait, toast.kind]);
 
+  // 반영 완료 · 저장 성공 — 초록 체크가 그려지는 순간 가볍게 울린다(화이트 리디자인 2026-10-16). 실패는 경고.
+  useEffect(() => {
+    if (toast.kind === "done") haptic("success");
+    else if (toast.kind === "failed" || toast.kind === "partial") haptic("warning");
+  }, [toast.kind]);
+
   if (typeof document === "undefined") return null;
   const n = String(toast.count);
   const busy = toast.kind === "pending" || toast.kind === "undoing";
@@ -105,7 +114,9 @@ export function MobileOpsToast({
         <span aria-hidden="true" className="mops-toast__spin" />
       ) : toast.kind === "done" ? (
         <span aria-hidden="true" className="mops-toast__ok">
-          <Check />
+          <svg fill="none" viewBox="0 0 16 16">
+            <path d="M4 8.4l2.6 2.6L12 5.4" />
+          </svg>
         </span>
       ) : null}
       <span className="mops-toast__tx">

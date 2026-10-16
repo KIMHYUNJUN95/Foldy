@@ -1,6 +1,17 @@
 "use client";
 
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import type {
   OpsCalendarBar,
@@ -33,7 +44,10 @@ import {
   prefetchSalesSummary,
   type SalesSummaryCopy,
 } from "@/components/admin/ops/ops-sales-summary-modal";
-import { ChartColumn, Timer } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
+import { buildOpsDaySummaries } from "@/lib/ops-day-summary";
+import { BEDS24_LIVE_STATUS_EVENT, currentBeds24LiveStatus } from "@/components/shared/beds24-live-refresh";
+import { OpsNavLink } from "@/components/admin/ops/ops-nav";
 import { opsUrgentVacantCells } from "@/lib/ops-urgent-vacant";
 import { buildOpsScopeSummary } from "@/lib/ops-scope-summary";
 import { OpsBlockPanel, type BlockPanelCopy } from "@/components/admin/ops/ops-block-panel";
@@ -135,6 +149,10 @@ type Copy = {
 } & PanelCopy &
   MinStayPanelCopy &
   BlockPanelCopy &
+  // 패널들이 문구를 더 받게 되면(화이트 리디자인 등) 여기도 따라간다 — 패널의 실제 prop 타입에서 읽는다.
+  ComponentProps<typeof OpsPricePanel>["copy"] &
+  ComponentProps<typeof OpsMinStayPanel>["copy"] &
+  ComponentProps<typeof OpsBlockPanel>["copy"] &
   BookingPanelCopy & { mbPickCheckout: string } &
   ReservationCardCopy &
   HistoryCopy & { historyMore: string } &
@@ -152,6 +170,36 @@ type Copy = {
     urgentVacantHint: string;
     vacantEmpty: string;
     msMixed: string;
+  } & {
+    /* 화이트 리디자인(2026-10-16) — 도구 줄 · 범례 · 상태 줄이 페이지에서 격자로 옮겨 왔다. */
+    hintCreate: string;
+    gapLabel: string;
+    gapOpenHint: string;
+    legendDirect: string;
+    legendBlock: string;
+    legendOneNight: string;
+    legendLongStay: string;
+    legendMixed: string;
+    legendCancelled: string;
+    liveOff: string;
+    syncedHint: string;
+    priceMissingTitle: string;
+    priceMissingBody: string;
+    scwCancelledOnly: string;
+    scwVacantTonight: string;
+    scwNewBooking: string;
+    scwHistoryFailed: string;
+    scwDayVacant: string;
+    scwDayAvg: string;
+    scwWriting: string;
+    scwTabPrice: string;
+    scwTabMinStay: string;
+    scwTabBlock: string;
+    scwScopeProperty: string;
+    scwScopeAllWeeks: string;
+    scwScopeRoomsSome: string;
+    scwScopeSelected: string;
+    scwScopeDaysPick: string;
   };
 
 
@@ -467,6 +515,7 @@ const OpsGridRow = memo(function OpsGridRow({
       "opsg__cell",
       day.isWeekend ? "we" : "",
       day.date < today ? "past" : "",
+      day.isToday ? "today" : "",
       day.startsMonth ? "m1" : "",
       withRoom && dayFlagAt(row.gap, index) ? "gap" : "",
       withRoom && selected.has(day.date) ? "sel" : "",
@@ -511,7 +560,12 @@ const OpsGridRow = memo(function OpsGridRow({
                 data-hc={hasHistory ? day.date : undefined}
                 key={`p-${day.date}`}
               >
-                <span className={`opsg__price${price === null ? " none" : ""}${pricePending ? " pend" : ""}`}>
+                {/* 반영 중이면 숨쉬듯 깜빡이고(`pend`), 반영이 확인되면 잠깐 보라(`done`) → 원래 색(2026-10-16). */}
+                <span
+                  className={`opsg__price${price === null ? " none" : ""}${pricePending ? " pend" : ""}${
+                    pendingEntry && !pendingEntry.pend ? " done" : ""
+                  }`}
+                >
                   {price === null ? "–" : formatGridPrice(price)}
                 </span>
                 {/* 사람이 손댄 칸이라는 표시. 점 하나면 격자를 어지럽히지 않는다. */}
@@ -549,8 +603,11 @@ const OpsGridRow = memo(function OpsGridRow({
                     : undefined
                 }
               >
-                <span className={`opsg__min${pendingMin?.pend ? " pend" : ""}`}>
-                  {minStay ?? ""}
+                <span className={`opsg__min${pendingMin?.pend ? " pend" : ""}${pendingMin && !pendingMin.pend ? " done" : ""}`}>
+                  {/* 유닛마다 다르면 값들을 함께 적는다(「1·2」, 범례와 같다) — 자세한 유닛별 값은 `title`. */}
+                  {mixed
+                    ? [...new Set(mixed.map((unit) => unit.minStay))].sort((a, b) => a - b).join("·")
+                    : (minStay ?? "")}
                 </span>
               </div>
             );
@@ -696,15 +753,30 @@ function monthLabelOf(year: number, month: number, withYear: boolean, localeTag:
 }
 
 export function OpsCalendarGrid({
+  cancelledHref,
   copy: copyProp,
   days: daysProp,
+  hasRates,
   historyAlerts,
+  navBar,
   properties,
+  propertyPicker,
   rows,
   showCancelled,
+  status,
   today,
 }: {
+  /** 「취소만 보기」를 켜고 끄는 주소(서버가 만든다 — 다른 쿼리는 그대로). */
+  cancelledHref: string;
   copy: Copy;
+  /** 요금이 하나라도 들어왔나. 없으면 격자 위에 안내 한 줄. */
+  hasRates: boolean;
+  /** 도구 줄 왼쪽 — 30일/월간 · 앞뒤 · 날짜 점프 · 오늘(서버가 만든 이동). */
+  navBar: ReactNode;
+  /** 건물 드롭다운(`OpsPropertyTabs`). 평소엔 도구 줄 오른쪽, 편집 중엔 범위 바의 「건물」. */
+  propertyPicker: ReactNode;
+  /** 범례 앞 상태 — 「객실 N · 가격 실시간 반영 중」, 낡았으면 빨강. */
+  status: { label: string; roomTotal: number; stale: boolean };
   days: OpsCalendarDay[];
   /** 최근 7일 Beds24 전송 실패 + 멈춘 대기 작업 수 — 「이력」 버튼에 빨간 숫자로. */
   historyAlerts: number;
@@ -1039,6 +1111,11 @@ export function OpsCalendarGrid({
   const [historyOpen, setHistoryOpen] = useState(false);
   /** 「매출 요약」 모달 — 보고 있는 창 × 고른 건물(2026-09-30). */
   const [salesOpen, setSalesOpen] = useState(false);
+  /**
+   * 「+ 수기 예약」(2026-10-16 화이트 리디자인). 수기 예약은 **격자에서 기간을 고르는 것**이 시작이라(빈 칸 `+` →
+   * 체크아웃) 버튼이 방 · 날짜를 대신 정하지 않는다 — 누르면 고르는 법을 알려 주고 빈 칸의 `+` 를 드러낸다.
+   */
+  const [createHint, setCreateHint] = useState(false);
   // 큰방 위쪽 정렬 — 기본 켜짐(저쪽과 같다). STAY ARI Apartment Hotel 에만 있다(`ops-large-rooms.ts`).
   // **그 건물 하나만 골랐을 때만** 켠다 — 「전체」에서는 토글도 정렬도 없다(2026-09-29 사용자 결정).
   // **이 한 목록을 격자 전체가 쓴다** — 드래그 선택·행 순서가 화면과 어긋나면 안 된다.
@@ -1401,7 +1478,14 @@ export function OpsCalendarGrid({
    * 큰방 위쪽 정렬은 기본 켜짐인 보기 설정이라 끄지 않는다.
    */
   const anyToggleOn =
-    editMode || priceWinsOnly || priceWinsOpen || recentOnly || recentOpen || historyOpen || vacantOnly;
+    editMode ||
+    priceWinsOnly ||
+    priceWinsOpen ||
+    recentOnly ||
+    recentOpen ||
+    historyOpen ||
+    vacantOnly ||
+    createHint;
   const escYields = (editMode && hasSelection) || Boolean(openBar) || Boolean(booking) || Boolean(activeDraft);
   useEffect(() => {
     if (!anyToggleOn || escYields) return;
@@ -1419,6 +1503,7 @@ export function OpsCalendarGrid({
       setHistoryOpen(false);
       // 매출 요약은 자기 Esc 로 닫는다 — 여기서 바로 끄면 닫힘 애니메이션이 끊긴다.
       setVacantOnly(false);
+      setCreateHint(false);
       // 마지막에 누른 툴바 버튼에 포커스가 남아 있으면, 키를 누른 순간 브라우저가 「키보드 조작」으로
       // 보고 포커스 링을 그린다 — 꺼진 버튼에 테두리만 남아 켜진 것처럼 보인다(2026-10-01).
       const focused = document.activeElement;
@@ -1662,7 +1747,10 @@ export function OpsCalendarGrid({
         cancelDraft();
         setOpenBar({ bar, propertyName: room.propertyName, roomIds: room.roomIds, roomLabel: room.displayRoomLabel });
       },
-      startDraft: (room, date) => setBookingDraft({ checkIn: date, room }),
+      startDraft: (room, date) => {
+        setCreateHint(false);
+        setBookingDraft({ checkIn: date, room });
+      },
       toggleRoomRow,
     };
   });
@@ -1670,16 +1758,7 @@ export function OpsCalendarGrid({
   // **원래 객실이 없을 때만** 통째로 비운다. 「오늘 빈방」 필터가 다 걸러내 `rooms` 가 비어도
   // `serverRooms` 는 있는 경우엔 툴바·열린 패널을 그대로 두고 격자 안에서만 빈 상태를 보인다
   // (2026-09-30 버그 — 필터를 끌 수단인 툴바 자체가 사라졌었다).
-  if (serverRooms.length === 0) {
-    return (
-      <div className="opsg">
-        <div className="ops__empty">
-          <h2>{copy.emptyTitle}</h2>
-          <p>{copy.emptyBody}</p>
-        </div>
-      </div>
-    );
-  }
+  // 객실이 하나도 없으면 아래 렌더에서 격자 자리만 빈 상태로 바꾼다 — 도구 줄(이동 · 건물)은 남아야 한다.
 
   const weekdays = copy.weekDaysFromSunday;
   /** 지금 막혀 있는 칸(`roomKey|date`). 블록은 양끝을 포함한다. 「차단 해제」가 이 칸만 푼다. */
@@ -1852,8 +1931,6 @@ export function OpsCalendarGrid({
     })
     .filter((cell): cell is PanelCell => cell !== null);
 
-  const chip = (on: boolean, extra = "") =>
-    `opsg__chip${on ? " on" : ""}${extra ? ` ${extra}` : ""}`;
 
   /**
    * 객실 칩은 **건물이 하나로 좁혀졌을 때만** 늘어놓는다.
@@ -1875,295 +1952,472 @@ export function OpsCalendarGrid({
    */
   const scopeSummary = buildOpsScopeSummary({ andMore: copy.andMore, rooms, selection });
 
+  /** 이 순간 화면에 보이는 값(반영 중이면 보낸 값) — 날짜 열 위 「평균가」가 칸과 어긋나지 않게. */
+  const shownPriceAt = (roomKey: string, date: string) =>
+    pendingPrices.get(selectionCellKey(roomKey, date))?.value ?? rateAt(roomKey, date)?.price ?? null;
+  /**
+   * 날짜 열 위 두 줄 「빈 방 · 평균가」(2026-10-16 화이트 리디자인, 시안 Sales-PC — 사용자 승인 「이대로」).
+   * **지금 보이는 객실**(건물 · 오늘 빈방 필터 반영)에서 계산한다. 규칙은 `ops-day-summary.ts` — 모바일과 같은 함수.
+   */
+  const daySummaries = buildOpsDaySummaries({
+    dates,
+    isBlocked: (roomKey, date) => blockedCellKeys.has(selectionCellKey(roomKey, date)),
+    isSold: (roomKey, date) => soldCells.has(selectionCellKey(roomKey, date)),
+    priceAt: shownPriceAt,
+    roomKeys,
+  });
+  /** 아직 Beds24 에 반영 중인 칸 수(가격 + 최소숙박) — 범례 줄의 「반영 중 · N칸」. */
+  let writingCells = 0;
+  for (const entry of pendingPrices.values()) if (!settledTokens.has(entry.token)) writingCells += 1;
+  for (const entry of pendingMinStay.values()) if (!settledTokens.has(entry.token)) writingCells += 1;
+
+  // 「1박 갭 N」 — 최소 숙박일 모드로 들어가 갭 칸을 전부 고른다(예전 `ops-gap-button` 과 같은 동작).
+  const gapCount = selectableGapCells.length;
+  const firstSelectedRoom = rooms.find((room) => scope.roomKeys.includes(room.key));
+  const roomsScopeLabel =
+    scope.roomKeys.length === 0 || allRoomsInScope
+      ? copy.scopeAll
+      : scope.roomKeys.length === 1
+        ? (firstSelectedRoom?.displayRoomLabel ?? copy.scopeAll)
+        : copy.scwScopeRoomsSome
+            .replace("{first}", firstSelectedRoom?.displayRoomLabel ?? "")
+            .replace("{n}", String(scope.roomKeys.length - 1));
+  const weekLabel = (week: { start: string; end: string }) =>
+    `${Number(week.start.slice(5, 7))}/${Number(week.start.slice(8, 10))}–${Number(week.end.slice(5, 7))}/${Number(week.end.slice(8, 10))}`;
+  const pickedWeeks = weeks.filter((week) => scope.weekStarts.includes(week.start));
+  const weeksScopeLabel =
+    pickedWeeks.length === 0
+      ? copy.scwScopeAllWeeks
+      : pickedWeeks.length === 1
+        ? weekLabel(pickedWeeks[0])
+        : copy.scwScopeRoomsSome.replace("{first}", weekLabel(pickedWeeks[0])).replace("{n}", String(pickedWeeks.length - 1));
+  const weekendOn = scope.weekdays.length === 3 && WEEKEND_WEEKDAYS.every((d) => scope.weekdays.includes(d));
+  const weekdayOn = scope.weekdays.length === 4 && WEEKDAY_WEEKDAYS.every((d) => scope.weekdays.includes(d));
+  /** 프리셋(전체 · 주말 · 평일)이 아닌 요일 조합인가 — 그때만 「하루씩」 목록에 체크가 보인다. */
+  const customDays = scope.weekdays.length > 0 && !weekendOn && !weekdayOn;
+  const customDaysLabel = customDays
+    ? [1, 2, 3, 4, 5, 6, 0]
+        .filter((weekday) => scope.weekdays.includes(weekday))
+        .map((weekday) => weekdays[weekday])
+        .join("·")
+    : null;
+  const prefetchSales = () =>
+    days.length > 0 ? void prefetchSalesSummary(rows, { days: days.length, properties, start: days[0].date }) : undefined;
+
   return (
     /*
      * 편집 모드를 뿌리에 표시한다. 형제 선택자로 흉내 내면 마크업 순서가 바뀌는 날 조용히 깨진다.
      *
-     * ## 조작 패널은 **격자 오른쪽**이다 (2026-09-24, 시안 3-select)
+     * ## 조작 패널은 **격자 오른쪽**이다 (2026-09-24, 시안 3-select · 2026-10-16 SalesEdit-PC)
      *
      * 위에 가로로 두면 그만큼 격자가 아래로 밀리는데, **가격을 고칠 때야말로 객실을 아래까지
-     * 길게 봐야 한다.** 옆에 두면 세로를 0 먹고, 대신 숫자·제외 목록·설명을 세로로 쌓을 수
-     * 있다. 가격은 틀리면 채널로 그대로 나가므로 크게 보이는 편이 낫다.
+     * 길게 봐야 한다.** 화이트 리디자인부터는 도구 줄까지 왼쪽 열에 들어가고, 오른쪽 열은 맨 위부터
+     * 「가격 · 최소숙박 · 차단」 탭 + 패널이다.
      */
-    <div className={`opsw${editMode ? " is-edit" : ""}`}>
-      {/* ── 선택 모드 ────────────────────────────────────────────────────
-          평소에는 읽는 화면이다. 「가격 수정」을 눌러야 칸이 선택 대상이 된다 —
-          저쪽도 `priceMode` 토글로 갈라 놓았다. 읽기만 하려다 실수로 바꾸는 일을 막는다. */}
-      <div className="opsg__edit">
-        {mode === "off" ? (
-          <>
-            <button
-              className="opsg__editbtn"
-              onClick={() => switchEditMode("price")}
-              type="button"
-            >
-              {copy.editMode}
-            </button>
-            <button
-              className="opsg__editbtn"
-              onClick={() => switchEditMode("minstay")}
-              type="button"
-            >
-              {copy.minStayMode}
-            </button>
-            <button
-              className="opsg__editbtn"
-              onClick={() => setMode("block")}
-              type="button"
-            >
-              {copy.blockMode}
-            </button>
-            {/* 가격 개입 성공 — 가격을 바꾸고 48시간 안에 그 방·그 날짜로 들어온 예약. */}
-            <button
-              aria-pressed={priceWinsOnly}
-              className={`opsg__editbtn opsg__pw${priceWinsOnly ? " on" : ""}`}
-              onClick={() => {
-                setPriceWinsOnly((value) => !value);
-                setRecentOnly(false);
-              }}
-              type="button"
-            >
-              {copy.pwToggle}
-              {/* 판정은 격자가 그린 뒤 따로 온다 — 그 사이에는 숫자 대신 말줄임. */}
-              <span className="opsg__pwn">{priceConversions ? priceConversions.length : "…"}</span>
-            </button>
-            <button className="opsg__editbtn" onClick={() => setPriceWinsOpen(true)} type="button">
-              {copy.pwList}
-            </button>
-            {/* 최근 예약 — 가격을 건드리지 않았는데 정한 시간대에 들어온 예약(가격 개입 성공의 반대). */}
-            <button
-              aria-pressed={recentOnly}
-              className={`opsg__editbtn opsg__pw opsg__recent${recentOnly ? " on" : ""}`}
-              onClick={() => {
-                setRecentOnly((value) => !value);
-                setPriceWinsOnly(false);
-              }}
-              type="button"
-            >
-              {copy.rbToggle}
-              <span className="opsg__pwn">{recentBookings ? recentBookings.length : "…"}</span>
-            </button>
-            {recentOnly && (
-              <button className="opsg__editbtn opsg__rbrange" onClick={() => setRecentOpen(true)} type="button">
-                {recent.range ? recentRangeLabel(recent.range, copy.rbNow) : "…"}
-              </button>
-            )}
-            {/* 이력 · 전송 로그 — 변경 이력과 「Beds24 에 제대로 나갔나」. 실패·멈춘 작업이 있으면 숫자. */}
-            <button
-              className={`opsg__editbtn opsg__hist${historyAlerts > 0 ? " alert" : ""}`}
-              onClick={() => setHistoryOpen(true)}
-              title={historyAlerts > 0 ? copy.hsAlertTitle.replace("{n}", String(historyAlerts)) : undefined}
-              type="button"
-            >
-              {copy.hsButton}
-              {historyAlerts > 0 && <span className="opsg__histn">{historyAlerts}</span>}
-            </button>
-            {/* 매출 요약 — 지금 보고 있는 기간 · 건물의 매출 · 수수료 · 가동률 · ADR · 빈방(가운데 모달). */}
-            {days.length > 0 && (
-              <button
-                aria-haspopup="dialog"
-                className="opsg__editbtn opsg__sales"
-                onClick={() => setSalesOpen(true)}
-                // 누르기 전에 미리 부른다 — 올리기·포커스에서 누르기까지의 틈이 곧 로딩 시간이다.
-                onFocus={() => void prefetchSalesSummary(rows, { days: days.length, properties, start: days[0].date })}
-                onPointerEnter={() => void prefetchSalesSummary(rows, { days: days.length, properties, start: days[0].date })}
-                type="button"
-              >
-                <ChartColumn aria-hidden="true" className="opsg__btnic" />
-                {copy.ssButton}
-              </button>
-            )}
-            {todayInView && urgentCells.length > 0 && (
-              <button
-                aria-pressed={urgentPicked}
-                className={`opsg__editbtn opsg__urgent${urgentPicked ? " on" : ""}`}
-                onClick={selectUrgent}
-                title={copy.urgentVacantHint}
-                type="button"
-              >
-                <Timer aria-hidden="true" className="opsg__btnic" />
-                {copy.urgentVacant}
-                <span className="opsg__pwn">{urgentCells.length}</span>
-              </button>
-            )}
-            {todayInView && (
-              <button
-                aria-pressed={vacantOnly}
-                className={`opsg__editbtn opsg__vacant${vacantOnly ? " on" : ""}`}
-                onClick={() => setVacantOnly((value) => !value)}
-                type="button"
-              >
-                {copy.vacantToday}
-                <span className="opsg__pwn">{vacantKeys.size}</span>
-              </button>
-            )}
-            {hasLargeRooms && (
-              <button
-                aria-pressed={largeFirst}
-                className={`opsg__editbtn opsg__large${largeFirst ? " on" : ""}`}
-                onClick={() => setLargeFirst((value) => !value)}
-                type="button"
-              >
-                {copy.largeFirst}
-              </button>
-            )}
-            {/* 체크인만 찍힌 상태. 무엇을 기다리는지 적어 둔다 — 격자만 보면 「왜 칠해지지?」가 된다. */}
-            {activeDraft && (
-              <span className="opsg__draftnote" role="status">
-                {copy.mbPickCheckout
-                  .replace("{room}", activeDraft.room.label)
-                  .replace("{date}", shortDate(activeDraft.checkIn))}
-                <button className="opsg__draftx" onClick={cancelDraft} type="button">
-                  {copy.mbCancel}
-                </button>
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            <span
-              className={`opsg__modepill${mode === "minstay" ? " ms" : ""}${mode === "block" ? " bk" : ""}`}
-            >
-              <span className="opsg__modedot" />
-              {mode === "minstay"
-                ? copy.minStayMode
-                : mode === "block"
-                  ? copy.blockMode
-                  : copy.editMode}
-            </span>
-            <button
-              className="opsg__editbtn"
-              onClick={() => {
-                clearSelection();
-                setMode("off");
-              }}
-              type="button"
-            >
-              {copy.editModeExit}
-            </button>
-          </>
-        )}
-
-        {/* 반영 중인 쓰기. 패널을 닫았거나 다른 칸을 고르는 중에도 「아직 가는 중」임을 안다. */}
-        {writesInFlight > 0 && (
-          <span className="opsg__jobnote" role="status">
-            <span className="opsg__jobspin" aria-hidden />
-            {copy.msQueued}
-          </span>
-        )}
-
-        {/* 갭은 눈에 안 띄는 손실이라 **찾아 주는 것만으로는 부족하다** — 한 번에 고를 수
-            있어야 손이 간다. 격자에서 6칸을 하나씩 찾아 누르게 하면 그냥 안 한다. */}
-        {mode === "minstay" && selectableGapCells.length > 0 && (
-          <button className="opsg__gapsel" onClick={selectAllGaps} type="button">
-            {copy.gapSelectAll}
-            <span className="opsg__gapseln">{selectableGapCells.length}</span>
-          </button>
-        )}
-
-        {editMode && (
-          <>
-            {/* 객실 축 — **칩으로 늘어놓지 않는다.**
-                객실이 26개인 건물에서 칩을 깔면 가로로 넘쳐 오른쪽 축이 잘린다. 격자 왼쪽에
-                이미 객실이 전부 있고 거기가 눈이 가 있는 자리라, **객실명 자체를 축으로 쓴다.**
-                여기 남는 것은 「전부 / 해제」 하나뿐이다. */}
-            <span className="opsg__axis">{copy.scopeRooms}</span>
-            <button
-              className={chip(allRoomsInScope)}
-              onClick={() =>
-                applyScope({ ...scope, roomKeys: allRoomsInScope ? [] : roomKeys })
-              }
-              type="button"
-            >
-              {copy.scopeAll}
-            </button>
-            {scope.roomKeys.length > 0 && !allRoomsInScope && (
-              <span className="opsg__acount">{scope.roomKeys.length}</span>
-            )}
-
-            <span className="opsg__adiv" />
-
-            {/* 기간 축 — **주 단위다.** 요금은 주말가/평일가로 주 단위로 움직인다. */}
-            <span className="opsg__axis">{copy.scopeWeeks}</span>
-            <button
-              className={chip(scope.weekStarts.length === 0)}
-              onClick={() => applyScope({ ...scope, weekStarts: [] })}
-              type="button"
-            >
-              {copy.scopeAll}
-            </button>
-            {weeks.map((week) => (
-              <button
-                className={chip(scope.weekStarts.includes(week.start), "mini")}
-                key={week.start}
-                onClick={() =>
-                  applyScope({
-                    ...scope,
-                    weekStarts: toggleInList(scope.weekStarts, week.start),
-                  })
-                }
-                type="button"
-              >
-                {`${Number(week.start.slice(5, 7))}/${Number(week.start.slice(8, 10))}`}
-                –{`${Number(week.end.slice(5, 7))}/${Number(week.end.slice(8, 10))}`}
-              </button>
-            ))}
-
-            <span className="opsg__adiv" />
-
-            {/* 요일 축 — **사내 주말은 금·토·일이다.** 토·일이 아니다. */}
-            <span className="opsg__axis">{copy.scopeDays}</span>
-            <button
-              className={chip(scope.weekdays.length === 0)}
-              onClick={() => applyScope({ ...scope, weekdays: [] })}
-              type="button"
-            >
-              {copy.scopeAll}
-            </button>
-            <button
-              className={chip(
-                scope.weekdays.length === 3 && WEEKEND_WEEKDAYS.every((d) => scope.weekdays.includes(d)),
-              )}
-              onClick={() =>
-                applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKEND_WEEKDAYS) })
-              }
-              type="button"
-            >
-              {copy.scopeWeekend}
-            </button>
-            <button
-              className={chip(
-                scope.weekdays.length === 4 && WEEKDAY_WEEKDAYS.every((d) => scope.weekdays.includes(d)),
-              )}
-              onClick={() =>
-                applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKDAY_WEEKDAYS) })
-              }
-              type="button"
-            >
-              {copy.scopeWeekday}
-            </button>
-            {[1, 2, 3, 4, 5, 6, 0].map((weekday) => (
-              <button
-                className={chip(scope.weekdays.includes(weekday), "mini")}
-                key={`dow-${weekday}`}
-                onClick={() =>
-                  applyScope({ ...scope, weekdays: toggleInList(scope.weekdays, weekday) })
-                }
-                type="button"
-              >
-                {weekdays[weekday]}
-              </button>
-            ))}
-
-          </>
-        )}
-      </div>
-
-      {/* 격자와 패널이 나란히 선다. 격자가 남는 폭을 전부 갖고, 패널은 고정 폭이다. */}
+    <div className={`opsw scw${editMode ? " is-edit" : ""}${createHint ? " is-hinting" : ""}`}>
       <div className="opsw__body">
+        <div className="scw-main">
+          {/* ── 도구 줄 1 — 이동 · 건물 · 수기 예약 · 가격 수정 ── */}
+          <div className="scw-bar">
+            {navBar}
+            <div className="scw-spacer" />
+            {mode === "off" ? (
+              <>
+                {propertyPicker}
+                {/* 「취소만 보기」에서는 팔린 밤도 빈칸처럼 보여 예약을 만들지 않는다 — 버튼도 숨긴다. */}
+                {!showCancelled && (
+                  <button
+                    aria-pressed={createHint}
+                    className="scw-btn is-soft"
+                    onClick={() => {
+                      cancelDraft();
+                      setCreateHint((value) => !value);
+                    }}
+                    title={copy.hintCreate}
+                    type="button"
+                  >
+                    {copy.scwNewBooking}
+                  </button>
+                )}
+                {/* 평소에는 읽는 화면이다. 「가격 수정」을 눌러야 칸이 선택 대상이 된다 — 읽으려다 실수로 바꾸는 일을 막는다.
+                    최소 숙박일 · 차단은 편집 중 오른쪽 탭에서 고른다. */}
+                <button className="scw-btn is-primary" onClick={() => switchEditMode("price")} type="button">
+                  {copy.editMode}
+                </button>
+              </>
+            ) : (
+              <button
+                className="scw-btn is-dark"
+                onClick={() => {
+                  clearSelection();
+                  setMode("off");
+                }}
+                type="button"
+              >
+                {copy.editModeExit}
+              </button>
+            )}
+          </div>
+
+          {mode === "off" ? (
+            <>
+              {/* ── 도구 줄 2 — 왼쪽은 보기(필터) · 동작, 오른쪽은 패널을 여는 글자 버튼 ── */}
+              <div className="scw-tools">
+                <div className="scw-tools__left">
+                  {/* 1박 갭 — 고를 수 있는 칸(오늘 이후)이 있을 때만. 누르면 최소 숙박일 모드로 갭 칸을 전부 고른다. */}
+                  {gapCount > 0 && (
+                    <button className="scw-tb" onClick={() => openGapsRef.current()} title={copy.gapOpenHint} type="button">
+                      {copy.gapLabel}
+                      <b className="scw-tb__n is-red">{gapCount}</b>
+                    </button>
+                  )}
+                  {/*
+                    임박 빈방 — **필터가 아니라 동작이다**: 오늘부터 3일 안의 안 팔린 밤을 전부 골라 가격 패널을 연다.
+                    그래서 칠하지 않는다(일반 글자 버튼).
+                  */}
+                  {todayInView && urgentCells.length > 0 && (
+                    <button
+                      aria-pressed={urgentPicked}
+                      className="scw-tb"
+                      onClick={selectUrgent}
+                      title={copy.urgentVacantHint}
+                      type="button"
+                    >
+                      {copy.urgentVacant}
+                      <b className="scw-tb__n">{urgentCells.length}</b>
+                    </button>
+                  )}
+                  {todayInView && (
+                    <button
+                      aria-pressed={vacantOnly}
+                      className={`scw-tb is-filter${vacantOnly ? " on" : ""}`}
+                      onClick={() => setVacantOnly((value) => !value)}
+                      type="button"
+                    >
+                      {copy.scwVacantTonight}
+                      <b className="scw-tb__n">{vacantKeys.size}</b>
+                    </button>
+                  )}
+                  {/* 취소만 보기 — 켜면 일반 예약이 사라지고 취소된 것만 남는다(서버가 다시 그린다). */}
+                  <OpsNavLink
+                    aria-pressed={showCancelled}
+                    className={`scw-tb is-filter${showCancelled ? " on" : ""}`}
+                    href={cancelledHref}
+                    role="button"
+                  >
+                    {copy.scwCancelledOnly}
+                  </OpsNavLink>
+                  {hasLargeRooms && (
+                    <button
+                      aria-pressed={largeFirst}
+                      className={`scw-tb is-filter${largeFirst ? " on" : ""}`}
+                      onClick={() => setLargeFirst((value) => !value)}
+                      type="button"
+                    >
+                      {copy.largeFirst}
+                    </button>
+                  )}
+                </div>
+                <div className="scw-tools__right">
+                  {/* 가격 개입 성공 — 가격을 바꾸고 48시간 안에 그 방 · 그 날짜로 들어온 예약. 누르면 목록이 열리고
+                      격자에서 그 예약만 진하게(닫으면 같이 끈다). */}
+                  <button
+                    aria-pressed={priceWinsOnly}
+                    className={`scw-tb is-panel${priceWinsOnly || priceWinsOpen ? " on" : ""}`}
+                    onClick={() => {
+                      const next = !(priceWinsOnly || priceWinsOpen);
+                      setPriceWinsOnly(next);
+                      setPriceWinsOpen(next);
+                      setRecentOnly(false);
+                      setRecentOpen(false);
+                    }}
+                    title={copy.pwList}
+                    type="button"
+                  >
+                    {copy.pwToggle}
+                    {/* 판정은 격자가 그린 뒤 따로 온다 — 그 사이에는 숫자 대신 말줄임. */}
+                    <b className="scw-tb__n">{priceConversions ? priceConversions.length : "…"}</b>
+                  </button>
+                  {/* 최근 예약 — 가격을 건드리지 않았는데 정한 시간대에 들어온 예약. 시간대는 열린 목록에서 바꾼다. */}
+                  <button
+                    aria-pressed={recentOnly}
+                    className={`scw-tb is-panel${recentOnly || recentOpen ? " on" : ""}`}
+                    onClick={() => {
+                      const next = !(recentOnly || recentOpen);
+                      setRecentOnly(next);
+                      setRecentOpen(next);
+                      setPriceWinsOnly(false);
+                      setPriceWinsOpen(false);
+                    }}
+                    title={recent.range ? recentRangeLabel(recent.range, copy.rbNow) : undefined}
+                    type="button"
+                  >
+                    {copy.rbToggle}
+                    <b className="scw-tb__n">{recentBookings ? recentBookings.length : "…"}</b>
+                  </button>
+                  {/* 이력 · 전송 로그 — 실패 · 멈춘 작업이 있으면 빨간 점 + 「실패 N」. */}
+                  <button
+                    className={`scw-tb is-panel${historyOpen ? " on" : ""}`}
+                    onClick={() => setHistoryOpen(true)}
+                    title={historyAlerts > 0 ? copy.hsAlertTitle.replace("{n}", String(historyAlerts)) : undefined}
+                    type="button"
+                  >
+                    {historyAlerts > 0 && <i aria-hidden="true" className="scw-tb__dot" />}
+                    {copy.hsButton}
+                    {historyAlerts > 0 && (
+                      <b className="scw-tb__n is-red">{copy.scwHistoryFailed.replace("{n}", String(historyAlerts))}</b>
+                    )}
+                  </button>
+                  {/* 매출 요약 — 보고 있는 기간 · 건물의 매출 · 수수료 · 가동률 · ADR · 빈방(가운데 모달). */}
+                  {days.length > 0 && (
+                    <button
+                      aria-haspopup="dialog"
+                      className="scw-tb is-panel"
+                      onClick={() => setSalesOpen(true)}
+                      // 누르기 전에 미리 부른다 — 올리기 · 포커스에서 누르기까지의 틈이 곧 로딩 시간이다.
+                      onFocus={prefetchSales}
+                      onPointerEnter={prefetchSales}
+                      type="button"
+                    >
+                      {copy.ssButton}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {/* 체크인만 찍힌 상태 · 「+ 수기 예약」 안내. 무엇을 기다리는지 적어 둔다. */}
+              {(activeDraft || (createHint && !showCancelled)) && (
+                <div className="scw-note" role="status">
+                  <span>
+                    {activeDraft
+                      ? copy.mbPickCheckout
+                          .replace("{room}", activeDraft.room.label)
+                          .replace("{date}", shortDate(activeDraft.checkIn))
+                      : copy.hintCreate}
+                  </span>
+                  <button
+                    className="scw-note__x"
+                    onClick={() => {
+                      cancelDraft();
+                      setCreateHint(false);
+                    }}
+                    type="button"
+                  >
+                    {copy.mbCancel}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* ── 편집 범위 바(시안 SalesEdit-PC) — 건물 · 객실 · 기간 · 요일을 곱해 칸을 고른다 ── */
+            <div className="scw-scope">
+              <span className="scw-scope__k">{copy.scwScopeProperty}</span>
+              {propertyPicker}
+              {/* 객실 축 — 격자의 객실명을 눌러도 된다(같은 상태). 여기서는 목록으로 고른다. */}
+              <span className="scw-scope__k">{copy.scopeRooms}</span>
+              <ScwMenu label={roomsScopeLabel}>
+                <button
+                  aria-pressed={allRoomsInScope}
+                  className={`scw-menu__row${allRoomsInScope ? " on" : ""}`}
+                  onClick={() => applyScope({ ...scope, roomKeys: allRoomsInScope ? [] : roomKeys })}
+                  type="button"
+                >
+                  <span className="scw-menu__ck">
+                    <Check aria-hidden="true" strokeWidth={3.2} />
+                  </span>
+                  {copy.scopeAll}
+                </button>
+                {rooms.map((room) => {
+                  const on = scope.roomKeys.includes(room.key);
+                  return (
+                    <button
+                      aria-pressed={on}
+                      className={`scw-menu__row${on ? " on" : ""}`}
+                      key={room.key}
+                      onClick={() => toggleRoomRow(room.key)}
+                      type="button"
+                    >
+                      <span className="scw-menu__ck">
+                        <Check aria-hidden="true" strokeWidth={3.2} />
+                      </span>
+                      <span className="scw-menu__name">{room.displayRoomLabel}</span>
+                      {properties.length !== 1 && <span className="scw-menu__sub">{room.propertyName}</span>}
+                    </button>
+                  );
+                })}
+              </ScwMenu>
+              {/* 기간 축 — **주 단위다.** 요금은 주말가/평일가로 주 단위로 움직인다. */}
+              <span className="scw-scope__k">{copy.scopeWeeks}</span>
+              <ScwMenu label={weeksScopeLabel}>
+                <button
+                  aria-pressed={scope.weekStarts.length === 0}
+                  className={`scw-menu__row${scope.weekStarts.length === 0 ? " on" : ""}`}
+                  onClick={() => applyScope({ ...scope, weekStarts: [] })}
+                  type="button"
+                >
+                  <span className="scw-menu__ck">
+                    <Check aria-hidden="true" strokeWidth={3.2} />
+                  </span>
+                  {copy.scwScopeAllWeeks}
+                </button>
+                {weeks.map((week) => {
+                  const on = scope.weekStarts.includes(week.start);
+                  return (
+                    <button
+                      aria-pressed={on}
+                      className={`scw-menu__row${on ? " on" : ""}`}
+                      key={week.start}
+                      onClick={() => applyScope({ ...scope, weekStarts: toggleInList(scope.weekStarts, week.start) })}
+                      type="button"
+                    >
+                      <span className="scw-menu__ck">
+                        <Check aria-hidden="true" strokeWidth={3.2} />
+                      </span>
+                      {weekLabel(week)}
+                    </button>
+                  );
+                })}
+              </ScwMenu>
+              {/* 요일 축 — **사내 주말은 금·토·일이다.** 토·일이 아니다(`WEEKEND_WEEKDAYS`). 하루씩도 고를 수 있다. */}
+              <span className="scw-scope__k">{copy.scopeDays}</span>
+              <div className="scw-seg2">
+                <button
+                  className={scope.weekdays.length === 0 ? "on" : ""}
+                  onClick={() => applyScope({ ...scope, weekdays: [] })}
+                  type="button"
+                >
+                  {copy.scopeAll}
+                </button>
+                <button
+                  className={weekendOn ? "on" : ""}
+                  onClick={() => applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKEND_WEEKDAYS) })}
+                  type="button"
+                >
+                  {copy.scopeWeekend}
+                </button>
+                <button
+                  className={weekdayOn ? "on" : ""}
+                  onClick={() => applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKDAY_WEEKDAYS) })}
+                  type="button"
+                >
+                  {copy.scopeWeekday}
+                </button>
+              </div>
+              {/* 하루씩 — 프리셋이 아닌 요일 조합(예: 월 · 수). 범위 바를 한 줄에 두려고 목록으로 접는다. */}
+              <ScwMenu label={customDaysLabel ?? copy.scwScopeDaysPick}>
+                {[1, 2, 3, 4, 5, 6, 0].map((weekday) => {
+                  const on = customDays && scope.weekdays.includes(weekday);
+                  return (
+                    <button
+                      aria-pressed={on}
+                      className={`scw-menu__row${on ? " on" : ""}`}
+                      key={`dow-${weekday}`}
+                      onClick={() => applyScope({ ...scope, weekdays: toggleInList(scope.weekdays, weekday) })}
+                      type="button"
+                    >
+                      <span className="scw-menu__ck">
+                        <Check aria-hidden="true" strokeWidth={3.2} />
+                      </span>
+                      {weekdays[weekday]}
+                    </button>
+                  );
+                })}
+              </ScwMenu>
+              {/* 갭은 눈에 안 띄는 손실이라 한 번에 고를 수 있어야 손이 간다. */}
+              {mode === "minstay" && gapCount > 0 && (
+                <button className="scw-tb" onClick={selectAllGaps} type="button">
+                  {copy.gapSelectAll}
+                  <b className="scw-tb__n is-red">{gapCount}</b>
+                </button>
+              )}
+              <div className="scw-spacer" />
+              <span aria-live="polite" className="scw-scope__count">
+                {copy.scwScopeSelected.replace("{count}", String(selection.length))}
+              </span>
+              <button className="scw-scope__clear" disabled={selection.length === 0} onClick={clearSelection} type="button">
+                {copy.scopeClear}
+              </button>
+            </div>
+          )}
+
+          {/* ── 범례 줄 — 상태(가격 신선도 · 실시간 연결 · 반영 중) + 표시 읽는 법 ── */}
+          {mode === "off" && (
+            <div className="scw-legend">
+              <ScwLiveStatus
+                label={`${copy.roomCount.replace("{count}", String(status.roomTotal))} · ${status.label}`}
+                offLabel={copy.liveOff}
+                stale={status.stale}
+                title={copy.syncedHint}
+              />
+              {writesInFlight > 0 && (
+                <span className="scw-lg is-writing" role="status">
+                  <i className="scw-lg__pulse" />
+                  {writingCells > 0 ? copy.scwWriting.replace("{n}", String(writingCells)) : copy.msQueued}
+                </span>
+              )}
+              <span className="scw-lg">
+                <i className="scw-sw is-abnb" />
+                Airbnb
+              </span>
+              <span className="scw-lg">
+                <i className="scw-sw is-bkng" />
+                Booking.com
+              </span>
+              <span className="scw-lg">
+                <i className="scw-sw is-dir" />
+                {copy.legendDirect}
+              </span>
+              <span className="scw-lg">
+                <i className="scw-sw is-block" />
+                {copy.legendBlock}
+              </span>
+              {/* 1박 갭은 **빨간 숫자** — Airbnb 분홍 막대와 헷갈리지 않게 칸 바탕은 옅게, 숫자로 읽힌다. */}
+              <span className="scw-lg">
+                <b className="scw-mk is-gap">2</b>
+                {copy.gapLabel}
+              </span>
+              {/* 최소숙박은 **2박이 기본**이라 범례에 안 적는다 — 예외만. */}
+              <span className="scw-lg">
+                <b className="scw-mk is-one">1</b>
+                {copy.legendOneNight}
+              </span>
+              <span className="scw-lg">
+                <b className="scw-mk is-many">3</b>
+                {copy.legendLongStay}
+              </span>
+              <span className="scw-lg">
+                <b className="scw-mk is-mixed">1·2</b>
+                {copy.legendMixed}
+              </span>
+              <span className="scw-lg">
+                <i className="scw-sw is-cancel" />
+                <s>{copy.legendCancelled}</s>
+              </span>
+            </div>
+          )}
+
+          {/* 요금이 하나도 안 들어온 경우에만 알린다. 들어와 있으면 안내가 자리만 차지한다. */}
+          {!hasRates && (
+            <div className="scw-notice">
+              <b>{copy.priceMissingTitle}</b>
+              <span>{copy.priceMissingBody}</span>
+            </div>
+          )}
+
+          {/* 원래 객실이 없을 때만 통째로 비운다. 「오늘 빈방」 필터가 다 걸러내 `rooms` 가 비면 격자 안에서만 빈 상태
+              (필터를 끌 도구 줄은 그대로). */}
+          {serverRooms.length === 0 ? (
+            <div className="scw-empty">
+              <b>{copy.emptyTitle}</b>
+              <span>{copy.emptyBody}</span>
+            </div>
+          ) : (
       <div className="opsg">
       <div className="opsg__head">
-        <div className="opsg__corner">{copy.roomsHeader}</div>
+        <div className="opsg__corner">
+          <span className="scw-corner__rooms">{copy.roomsHeader}</span>
+          <span className="scw-corner__k">{copy.scwDayVacant}</span>
+          <span className="scw-corner__k">{copy.scwDayAvg}</span>
+        </div>
         <div className="opsg__heads">
         <div className="opsg__months">
           {monthSegments(days).map((segment, index) => (
@@ -2183,6 +2437,7 @@ export function OpsCalendarGrid({
               "opsg__day",
               day.isWeekend ? "we" : "",
               day.isToday ? "today" : "",
+              day.date < today ? "past" : "",
               day.startsMonth ? "m1" : "",
               editMode && day.date >= today ? "pick" : "",
             ]
@@ -2200,6 +2455,24 @@ export function OpsCalendarGrid({
             <div className="opsg__dw">{weekdays[day.weekday]}</div>
           </div>
         ))}
+        </div>
+        {/* 빈 방 · 평균가 — 보이는 객실에서 바로 센다(`ops-day-summary.ts`). 평균가는 그 밤 가격 있는 칸의 평균. */}
+        <div className="scw-sum is-vacant">
+          {days.map((day, index) => (
+            <div className={`scw-sum__c${day.isWeekend ? " we" : ""}${day.isToday ? " today" : ""}${day.date < today ? " past" : ""}${day.startsMonth ? " m1" : ""}`} key={`sv-${day.date}`}>
+              {daySummaries[index]?.vacant ?? ""}
+            </div>
+          ))}
+        </div>
+        <div className="scw-sum is-avg">
+          {days.map((day, index) => {
+            const avg = daySummaries[index]?.avgPrice ?? null;
+            return (
+              <div className={`scw-sum__c${day.isWeekend ? " we" : ""}${day.isToday ? " today" : ""}${day.date < today ? " past" : ""}${day.startsMonth ? " m1" : ""}`} key={`sa-${day.date}`}>
+                {avg === null ? "–" : formatGridPrice(avg)}
+              </div>
+            );
+          })}
         </div>
         </div>
       </div>
@@ -2260,6 +2533,80 @@ export function OpsCalendarGrid({
           </div>
         ))}
       </div>
+      </div>
+          )}
+        </div>
+
+        {/* 편집 중 오른쪽 열 — 맨 위 「가격 · 최소숙박 · 차단」 탭 + 그 패널(시안 SalesEdit-PC). */}
+        {editMode && (
+          <div className="scw-side">
+            <div aria-label={copy.editMode} className="scw-modetabs" role="tablist">
+              <button
+                aria-selected={mode === "price"}
+                className={mode === "price" ? "on" : ""}
+                onClick={() => switchEditMode("price")}
+                role="tab"
+                type="button"
+              >
+                {copy.scwTabPrice}
+              </button>
+              <button
+                aria-selected={mode === "minstay"}
+                className={mode === "minstay" ? "on" : ""}
+                onClick={() => switchEditMode("minstay")}
+                role="tab"
+                type="button"
+              >
+                {copy.scwTabMinStay}
+              </button>
+              <button
+                aria-selected={mode === "block"}
+                className={mode === "block" ? "on" : ""}
+                onClick={() => setMode("block")}
+                role="tab"
+                type="button"
+              >
+                {copy.scwTabBlock}
+              </button>
+            </div>
+            {mode === "block" && (
+              <OpsBlockPanel
+                blockedKeys={blockedCellKeys}
+                cells={panelCells.map((cell) => ({
+                  date: cell.date,
+                  roomIds: cell.roomIds,
+                  roomKey: cell.roomKey,
+                  roomLabel: cell.roomLabel,
+                }))}
+                copy={copy}
+                onClear={clearSelection}
+                scopeSummary={scopeSummary}
+              />
+            )}
+            {mode === "minstay" && (
+              <OpsMinStayPanel
+                cells={panelCells}
+                copy={copy}
+                gapContext={gapContext}
+                onApplied={(sent) => removeSentCells(sent, "minstay")}
+                onClear={clearSelection}
+                runWrite={runWrite}
+                scopeSummary={scopeSummary}
+              />
+            )}
+            {mode === "price" && (
+              <OpsPricePanel
+                cells={panelCells}
+                clearLabel={copy.scopeClear}
+                copy={copy}
+                onApplied={(sent) => removeSentCells(sent, "price")}
+                onClear={clearSelection}
+                runWrite={runWrite}
+                scopeSummary={scopeSummary}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {hoverCell &&
@@ -2408,45 +2755,6 @@ export function OpsCalendarGrid({
         />
       )}
 
-      {mode === "block" && (
-        <OpsBlockPanel
-          blockedKeys={blockedCellKeys}
-          cells={panelCells.map((cell) => ({
-            date: cell.date,
-            roomIds: cell.roomIds,
-            roomKey: cell.roomKey,
-            roomLabel: cell.roomLabel,
-          }))}
-          copy={copy}
-          onClear={clearSelection}
-          scopeSummary={scopeSummary}
-        />
-      )}
-
-      {mode === "minstay" && (
-        <OpsMinStayPanel
-          cells={panelCells}
-          copy={copy}
-          gapContext={gapContext}
-          onApplied={(sent) => removeSentCells(sent, "minstay")}
-          onClear={clearSelection}
-          runWrite={runWrite}
-          scopeSummary={scopeSummary}
-        />
-      )}
-
-      {mode === "price" && (
-        <OpsPricePanel
-          cells={panelCells}
-          clearLabel={copy.scopeClear}
-          copy={copy}
-          onApplied={(sent) => removeSentCells(sent, "price")}
-          onClear={clearSelection}
-          runWrite={runWrite}
-          scopeSummary={scopeSummary}
-        />
-      )}
-      </div>
     </div>
   );
 }
@@ -2458,4 +2766,81 @@ function opsWindowLabel(days: readonly { date: string }[]): string {
   if (!first || !last) return "";
   const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
   return `${md(first)}–${md(last)}`;
+}
+
+/** 실시간 연결 상태 구독 — `Beds24LiveDot` 과 같은 출처(`beds24-live-refresh`). */
+function subscribeLiveStatus(onChange: () => void) {
+  window.addEventListener(BEDS24_LIVE_STATUS_EVENT, onChange);
+  return () => window.removeEventListener(BEDS24_LIVE_STATUS_EVENT, onChange);
+}
+
+/**
+ * 범례 줄 맨 앞의 상태(시안 SalesStates-PC ①).
+ *
+ * - 평소: 초록 점 「객실 N · 가격 실시간 반영 중」
+ * - 낡았음: 빨간 점 + 빨간 글자 「… 가격 30시간 전 기준 · 오래됐을 수 있음」(`ops-rates-freshness.ts`)
+ * - 실시간 연결이 끊김: 빈 동그라미 「실시간 반영 끊김 — 다시 연결 중」
+ *
+ * 색만으로 뜻을 전하지 않는다 — 셋 다 글자가 다르다.
+ */
+function ScwLiveStatus({
+  label,
+  offLabel,
+  stale,
+  title,
+}: {
+  label: string;
+  offLabel: string;
+  stale: boolean;
+  title: string;
+}) {
+  const live = useSyncExternalStore(subscribeLiveStatus, currentBeds24LiveStatus, () => null);
+  const off = live !== null && live !== "connected";
+  return (
+    <span className={`scw-status${stale ? " is-stale" : ""}${off ? " is-off" : ""}`} role="status" title={title}>
+      <i aria-hidden="true" className="scw-status__dot" />
+      {off ? offLabel : label}
+    </span>
+  );
+}
+
+/**
+ * 편집 범위 바의 작은 드롭다운(객실 · 기간) — 글자 + ⌄ 방아쇠, 체크 목록 팝오버.
+ * 바깥을 누르거나 Esc 로 닫는다(Esc 는 여기서 멈춰 격자의 「선택 해제」까지 가지 않는다).
+ */
+function ScwMenu({ children, label }: { children: ReactNode; label: string }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+  return (
+    <div className="scw-menu" ref={rootRef}>
+      <button
+        aria-expanded={open}
+        aria-haspopup="true"
+        className={`scw-menu__btn${open ? " is-open" : ""}`}
+        onClick={() => setOpen((value) => !value)}
+        type="button"
+      >
+        <span className="scw-menu__label">{label}</span>
+        <ChevronDown aria-hidden="true" className="scw-menu__chev" strokeWidth={2} />
+      </button>
+      {open && <div className="scw-menu__pop">{children}</div>}
+    </div>
+  );
 }

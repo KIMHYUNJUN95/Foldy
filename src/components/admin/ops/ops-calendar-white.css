@@ -1,0 +1,422 @@
+/* 판매 캘린더 PC — 화이트 리디자인(2026-10-16, 시안 Sales-PC · SalesMonth-PC · SalesFilter-PC · SalesStatus-PC ·
+   SalesStates-PC · SalesCancelled-PC · SalesEdit-PC).
+   docs/product/33-calendar-write-features.md · docs/design/05-white-redesign.md
+
+   격자 · 도구 줄 · 범례 · 상태 · 편집 범위 바만 여기서 덮는다(`.scw` 아래로 스코프). 공용 `ops-console.css` 는 장부 화면도
+   쓰므로 고치지 않는다. 패널(가격 · 최소숙박 · 차단 · 예약 · 이력 …) 안쪽은 각 패널 담당이 따로 칠한다.
+   흰 바탕 · 상자/카드 테두리 없음 · 칩 대신 글자 버튼 · 선택은 옅은 보라 바탕만(왼쪽 막대 · inset 테두리 없음).
+   움직임은 transform/opacity 만, 동작 줄이기면 전부 끈다. */
+
+.adm .scw {
+  --scw-ink: #16141f;
+  --scw-ink2: #3a3746;
+  --scw-ink3: #4c4958;
+  --scw-mute: #6b6878;
+  --scw-faint: #8b8898;
+  --scw-ghost: #c9c6d3;
+  --scw-line: #ececf0;
+  --scw-hair: #f1f1f4;
+  --scw-cell: #f3f3f6;
+  --scw-fill: #f4f4f7;
+  --scw-v: #7a52e6;
+  --scw-v-ink: #5a30cf;
+  --scw-v-bg: #f4f1fd;
+  --scw-v-bg2: #f1ecfd;
+  --scw-v-today: #f6f2fe;
+  --scw-red: #c5282e;
+  --scw-we: #fff5f6;
+  --scw-green: #1f7a4d;
+  --scw-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* 격자 치수 — 한 객실 = 가격 22 + 최소숙박 17 + 예약 22 */
+  --ops-track: 22px;
+  --ops-track-min: 17px;
+  --ops-roomcol: 72px;
+  color: var(--scw-ink);
+  font-variant-numeric: tabular-nums;
+  gap: 0;
+}
+.adm .scw .opsw__body { gap: 28px; align-items: flex-start; }
+.adm .scw-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.adm .scw-spacer { flex: 1 1 auto; min-width: 8px; }
+
+/* ── 도구 줄 1 ─────────────────────────────────────────────────────── */
+.adm .scw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 40px; }
+.adm .scw .scw-seg { padding: 3px; gap: 2px; border: 0; border-radius: 10px; background: #f2f2f5; flex: none; }
+.adm .scw .scw-seg .ops__segbtn {
+  height: 30px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 400; color: var(--scw-mute); text-decoration: none;
+  transition: background-color 160ms ease, color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw .scw-seg .ops__segbtn:hover { color: var(--scw-ink); }
+.adm .scw .scw-seg .ops__segbtn:active { transform: scale(0.97); }
+.adm .scw .scw-seg .ops__segbtn.on { background: #fff; color: var(--scw-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.12); }
+
+.adm .scw-period { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; flex: none; }
+.adm .scw-arw {
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px;
+  color: var(--scw-ink2); transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-arw svg { width: 16px; height: 16px; }
+.adm .scw-arw .ops__navspin { position: absolute; margin: 0; width: 8px; height: 8px; transform: translate(9px, -9px); }
+.adm .scw-arw:hover { background: var(--scw-fill); }
+.adm .scw-arw:active { transform: scale(0.94); }
+/* 날짜 점프(공용 `AdminDatePicker`) — 방아쇠만 시안 모양으로. 달력 팝오버(.calpop 계열)는 공용 그대로. */
+.adm .scw .adp .adp__trigger {
+  height: 34px; min-width: 0; padding: 0 11px; border: 0; border-radius: 9px; background: var(--scw-fill);
+  flex-direction: row-reverse; gap: 7px; font-size: 14px; font-weight: 600; color: var(--scw-ink); box-shadow: none;
+  transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw .adp .adp__trigger:hover { background: #ececf1; }
+.adm .scw .adp .adp__trigger:active { transform: scale(0.98); }
+.adm .scw .adp .adp__trigger-ic { width: 15px; height: 15px; color: var(--scw-ink2); }
+/* 월간 — 공용 `AdminMonthPicker`(화살표를 스스로 든다). */
+.adm .scw .amp { gap: 2px; }
+.adm .scw .amp .amp__label {
+  height: 34px; min-width: 0; padding: 0 12px; border: 0; border-radius: 9px; background: var(--scw-fill);
+  font-size: 14px; font-weight: 600; color: var(--scw-ink); box-shadow: none;
+}
+.adm .scw .amp .amp__label:hover { background: #ececf1; }
+.adm .scw .amp .amp__arw {
+  width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--scw-ink2);
+  transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw .amp .amp__arw:hover { background: var(--scw-fill); }
+.adm .scw .amp .amp__arw:active { transform: scale(0.94); }
+.adm .scw-today {
+  height: 32px; display: inline-flex; align-items: center; padding: 0 6px; margin-left: 2px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; color: var(--scw-v); text-decoration: none; transition: transform 140ms var(--scw-ease);
+}
+.adm .scw-today:hover { color: var(--scw-v-ink); }
+.adm .scw-today:active { transform: scale(0.97); }
+
+.adm .scw-btn {
+  height: 36px; padding: 0 15px; border: 0; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600;
+  white-space: nowrap; cursor: pointer; flex: none;
+  transition: background-color 160ms ease, transform 140ms var(--scw-ease), opacity 160ms ease;
+}
+.adm .scw-btn:active:not(:disabled) { transform: scale(0.97); }
+.adm .scw-btn:disabled { opacity: 0.45; cursor: default; }
+.adm .scw-btn.is-soft { background: var(--scw-v-bg); color: var(--scw-v-ink); }
+.adm .scw-btn.is-soft:hover:not(:disabled), .adm .scw-btn.is-soft[aria-pressed="true"] { background: #ebe4fc; }
+.adm .scw-btn.is-primary { background: var(--scw-v); color: #fff; }
+.adm .scw-btn.is-primary:hover { background: #6b40e0; }
+.adm .scw-btn.is-dark { background: var(--scw-ink); color: #fff; padding: 0 18px; }
+.adm .scw-btn.is-dark:hover { background: #2a2735; }
+
+/* ── 건물 드롭다운(`ops-property-tabs.tsx`) ─────────────────────────── */
+.adm .scw-pp, .adm .scw-menu { position: relative; flex: none; }
+.adm .scw-pp__btn, .adm .scw-menu__btn {
+  height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 8px;
+  background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--scw-ink); cursor: pointer;
+  max-width: 280px; transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-pp__btn:hover, .adm .scw-pp__btn.is-open, .adm .scw-menu__btn:hover, .adm .scw-menu__btn.is-open { background: var(--scw-fill); }
+.adm .scw-pp__btn:active, .adm .scw-menu__btn:active { transform: scale(0.98); }
+.adm .scw-pp__label, .adm .scw-menu__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .scw-pp__chev, .adm .scw-menu__chev { width: 13px; height: 13px; color: var(--scw-faint); flex: none; transition: transform 200ms var(--scw-ease); }
+.adm .scw-pp__btn.is-open .scw-pp__chev, .adm .scw-menu__btn.is-open .scw-menu__chev { transform: rotate(180deg); }
+.adm .scw-pp__pop, .adm .scw-menu__pop {
+  position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; width: 264px; padding: 8px;
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 16px 40px -14px rgba(22, 20, 31, 0.28), 0 2px 6px -2px rgba(22, 20, 31, 0.08);
+  transform-origin: top right; animation: scwPop 200ms var(--scw-ease);
+}
+.adm .scw-menu__pop { left: 0; right: auto; width: auto; min-width: 220px; max-height: 360px; overflow-y: auto; transform-origin: top left; scrollbar-width: thin; }
+.adm .scw-scope .scw-pp__pop { left: 0; right: auto; transform-origin: top left; }
+.adm .scw-pp__list { display: flex; flex-direction: column; gap: 2px; max-height: 360px; overflow-y: auto; }
+.adm .scw-pp__row { display: flex; align-items: center; gap: 4px; min-height: 42px; padding: 0 4px; border-radius: 10px; transition: background-color 140ms ease; }
+.adm .scw-pp__row:hover { background: #f7f7f9; }
+.adm .scw-pp__row.on { background: var(--scw-v-bg); }
+.adm .scw-pp__ck, .adm .scw-menu__ck {
+  width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; padding: 0; cursor: pointer; position: relative;
+}
+.adm .scw-pp__ck::before, .adm .scw-menu__ck::before {
+  content: ""; position: absolute; width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--scw-ghost);
+  background: #fff; transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+.adm .scw-pp__ck svg, .adm .scw-menu__ck svg { position: relative; width: 11px; height: 11px; color: #fff; opacity: 0; transform: scale(0.6); transition: opacity 140ms ease, transform 180ms var(--scw-ease); }
+.adm .scw-pp__ck[aria-pressed="true"]::before, .adm .scw-menu__row.on .scw-menu__ck::before { background: var(--scw-v); box-shadow: none; }
+.adm .scw-pp__ck[aria-pressed="true"] svg, .adm .scw-menu__row.on .scw-menu__ck svg { opacity: 1; transform: none; }
+.adm .scw-pp__ck:active::before { transform: scale(0.92); }
+.adm .scw-pp__name {
+  flex: 1 1 auto; min-width: 0; height: 40px; display: flex; align-items: center; padding: 0 6px; font-size: 14px;
+  color: var(--scw-ink); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.adm .scw-pp__row.on .scw-pp__name { font-weight: 600; }
+.adm .scw-pp__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 8px 6px 2px; border-top: 1px solid var(--scw-hair); }
+.adm .scw-pp__all { font-size: 13px; color: var(--scw-mute); text-decoration: none; padding: 6px 4px; }
+.adm .scw-pp__all.on { color: var(--scw-v-ink); font-weight: 600; }
+.adm .scw-pp__done { border: 0; background: transparent; padding: 6px 4px; font: inherit; font-size: 13px; font-weight: 600; color: var(--scw-v-ink); cursor: pointer; transition: transform 140ms var(--scw-ease); }
+.adm .scw-pp__done:active { transform: scale(0.97); }
+.adm .scw-menu__row {
+  width: 100%; display: flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 10px 0 4px; border: 0; border-radius: 10px;
+  background: transparent; font: inherit; font-size: 14px; color: var(--scw-ink); text-align: left; cursor: pointer; white-space: nowrap;
+  transition: background-color 140ms ease;
+}
+.adm .scw-menu__row:hover { background: #f7f7f9; }
+.adm .scw-menu__row.on { background: var(--scw-v-bg); font-weight: 600; }
+.adm .scw-menu__name { flex: 1 1 auto; }
+.adm .scw-menu__sub { font-size: 12px; font-weight: 400; color: var(--scw-faint); margin-left: 10px; }
+
+/* ── 도구 줄 2 — 글자 버튼 ─────────────────────────────────────────── */
+.adm .scw-tools { display: flex; align-items: center; gap: 4px; margin-top: 14px; min-width: 0; }
+.adm .scw-tools__left { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.adm .scw-tools__right { margin-left: auto; display: flex; align-items: center; gap: 2px; flex: none; }
+.adm .scw-tb {
+  height: 32px; flex: none; display: inline-flex; align-items: center; padding: 0 11px; border: 0; border-radius: 9px;
+  background: transparent; font: inherit; font-size: 13px; font-weight: 400; color: var(--scw-ink3); white-space: nowrap;
+  text-decoration: none; cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-tb:hover { background: var(--scw-fill); color: var(--scw-ink); }
+.adm .scw-tb:active { transform: scale(0.97); }
+.adm .scw-tb.is-panel { padding: 0 10px; font-weight: 500; }
+.adm .scw-tb.on { background: var(--scw-v-bg2); color: var(--scw-v-ink); font-weight: 600; }
+.adm .scw-tb__n { margin-left: 4px; font-weight: 700; color: var(--scw-faint); }
+.adm .scw-tb.is-panel .scw-tb__n { margin-left: 5px; }
+.adm .scw-tb.on .scw-tb__n { color: var(--scw-v-ink); }
+.adm .scw-tb__n.is-red, .adm .scw-tb.on .scw-tb__n.is-red { color: var(--scw-red); }
+.adm .scw-tb__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--scw-red); margin-right: 6px; flex: none; }
+.adm .scw-tb .ops__navspin { margin-left: 6px; }
+
+/* 체크인 고르는 중 · 「+ 수기 예약」 안내 */
+.adm .scw-note {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 12px; margin-top: 8px; padding: 5px 5px 5px 12px;
+  border-radius: 10px; background: var(--scw-v-bg); color: var(--scw-v-ink); font-size: 13px; font-weight: 500;
+  animation: scwRise 220ms var(--scw-ease);
+}
+.adm .scw-note__x {
+  height: 28px; padding: 0 11px; border: 0; border-radius: 8px; background: #fff; font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--scw-ink2); cursor: pointer; transition: transform 140ms var(--scw-ease);
+}
+.adm .scw-note__x:active { transform: scale(0.96); }
+
+/* ── 범례 · 상태 ──────────────────────────────────────────────────── */
+.adm .scw-legend {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; padding-bottom: 14px;
+  font-size: 12px; color: var(--scw-mute); white-space: nowrap;
+}
+.adm .scw-lg { display: inline-flex; align-items: center; gap: 5px; }
+.adm .scw-lg s { color: var(--scw-faint); }
+.adm .scw-sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.adm .scw-sw.is-abnb { background: #fbd3d8; }
+.adm .scw-sw.is-bkng { background: #cfddf6; }
+.adm .scw-sw.is-dir { background: #d3eedc; }
+.adm .scw-sw.is-block { background: var(--scw-ink); }
+.adm .scw-sw.is-cancel { width: 14px; background: #f2f2f5; box-shadow: inset 0 -1px 0 #b9b6c4; }
+.adm .scw-mk { padding: 0 5px; border-radius: 3px; font-size: 11px; font-weight: 700; line-height: 15px; }
+.adm .scw-mk.is-gap { padding: 0 4px; background: #fdecec; color: var(--scw-red); }
+.adm .scw-mk.is-one { background: #ddf3e5; color: #237a4b; }
+.adm .scw-mk.is-many { background: #fdf0db; color: #8a5a12; }
+.adm .scw-mk.is-mixed { padding: 0 4px; background: #f2f2f5; color: var(--scw-mute); }
+.adm .scw-status { display: inline-flex; align-items: center; gap: 6px; color: var(--scw-mute); cursor: help; }
+.adm .scw-status__dot { width: 7px; height: 7px; border-radius: 50%; background: #22a06b; flex: none; }
+.adm .scw-status.is-stale { color: var(--scw-red); font-weight: 600; }
+.adm .scw-status.is-stale .scw-status__dot { background: var(--scw-red); }
+.adm .scw-status.is-off { color: #8a5a12; font-weight: 400; }
+.adm .scw-status.is-off .scw-status__dot { background: transparent; box-shadow: inset 0 0 0 1.5px #8a5a12; }
+.adm .scw-lg.is-writing { color: var(--scw-v-ink); font-weight: 600; animation: scwRise 200ms var(--scw-ease); }
+.adm .scw-lg__pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--scw-v); animation: scwBreathe 1.4s ease-in-out infinite; }
+
+.adm .scw-notice {
+  display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin: 0 0 14px; padding: 14px 16px; border-radius: 12px;
+  background: #fff6e5; font-size: 13px; line-height: 1.55;
+}
+.adm .scw-notice b { color: #8a5a12; white-space: nowrap; }
+.adm .scw-notice span { color: #5c4a2a; }
+.adm .scw-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 80px 16px; text-align: center; }
+.adm .scw-empty b { font-size: 15px; font-weight: 700; }
+.adm .scw-empty span { font-size: 13px; color: var(--scw-faint); }
+
+/* ── 격자 ─────────────────────────────────────────────────────────── */
+.adm .scw .opsg { background: #fff; border: 0; border-radius: 0; box-shadow: none; }
+.adm .scw .opsg__head { background: #fff; border-bottom: 1px solid var(--scw-line); box-shadow: none; }
+.adm .scw .opsg__corner {
+  border-right: 0; padding: 0; flex-direction: column; align-items: stretch; justify-content: flex-end;
+  font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--scw-faint);
+}
+.adm .scw .scw-corner__rooms { flex: 1 1 auto; display: flex; align-items: center; padding: 22px 0 0 12px; }
+.adm .scw .scw-corner__k { height: 24px; line-height: 24px; padding-left: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.adm .scw .opsg__months { height: 22px; border-bottom: 0; }
+.adm .scw .opsg__month { align-items: flex-end; }
+.adm .scw .opsg__month span { padding: 0 6px 4px; font-size: 11px; font-weight: 700; color: var(--scw-ink); }
+.adm .scw .opsg__month.m1 { box-shadow: inset 2px 0 0 var(--scw-v); }
+.adm .scw .opsg__day { padding: 6px 0 5px; line-height: 1.25; }
+.adm .scw .opsg__dn { font-size: 13px; font-weight: 700; color: var(--scw-ink); }
+.adm .scw .opsg__dw { font-size: 10px; font-weight: 400; color: var(--scw-faint); margin-top: 1px; }
+.adm .scw .opsg__day.we { background: var(--scw-we); }
+.adm .scw .opsg__day.we .opsg__dn { color: #d8455a; }
+.adm .scw .opsg__day.we .opsg__dw { color: #e08a97; }
+.adm .scw .opsg__day.past .opsg__dn, .adm .scw .opsg__day.past .opsg__dw { color: var(--scw-ghost); }
+.adm .scw .opsg__day.today { background: var(--scw-v); border-radius: 8px 8px 0 0; }
+.adm .scw .opsg__day.today .opsg__dn, .adm .scw .opsg__day.today .opsg__dw { color: #fff; }
+.adm .scw .opsg__day.m1 { box-shadow: inset 2px 0 0 var(--scw-v); }
+.adm .scw .opsg__day.pick:hover:not(.today) { background: var(--scw-v-bg); }
+
+/* 빈 방 · 평균가 두 줄 */
+.adm .scw-sum { display: flex; height: 24px; animation: scwFade 240ms var(--scw-ease); }
+.adm .scw-sum__c {
+  flex: 1 1 0; min-width: 0; text-align: center; line-height: 24px; font-size: 10px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; letter-spacing: -0.02em;
+}
+.adm .scw-sum.is-vacant .scw-sum__c { color: var(--scw-v-ink); }
+.adm .scw-sum.is-avg .scw-sum__c { color: var(--scw-ink2); }
+.adm .scw-sum__c.we { background: var(--scw-we); }
+.adm .scw-sum__c.today { background: var(--scw-v-today); }
+.adm .scw-sum .scw-sum__c.past { color: var(--scw-ghost); }
+.adm .scw-sum__c.m1 { box-shadow: inset 2px 0 0 var(--scw-v); }
+
+.adm .scw .opsg__group {
+  height: 28px; padding: 0 12px; gap: 6px; background: #fff; border-bottom: 1px solid var(--scw-hair);
+  font-size: 12px; font-weight: 700; color: var(--scw-ink);
+}
+.adm .scw .opsg__gcount { font-size: 11px; font-weight: 400; color: var(--scw-faint); }
+.adm .scw .opsg__row { border-bottom: 1px solid var(--scw-hair); }
+.adm .scw .opsg__row + .opsg__row { border-top: 0; }
+.adm .scw .opsg__label { border-right: 0; background: #fff; padding: 0 8px 0 12px; }
+.adm .scw .opsg__rn { font-size: 14px; font-weight: 700; color: var(--scw-ink); }
+.adm .scw .opsg__label.pick:hover { background: #f7f7f9; }
+.adm .scw .opsg__label.on { background: var(--scw-v-bg); }
+.adm .scw .opsg__label.on .opsg__rn { color: var(--scw-v-ink); }
+.adm .scw .opsg__label.pick { padding-left: 10px; }
+
+/* 칸 — 가는 세로 결(시안), 주말 장밋빛, 오늘 옅은 보라, 지난 날은 글자만 흐리게. */
+.adm .scw .opsg__track { height: var(--ops-track); }
+.adm .scw .opsg__track.min { height: var(--ops-track-min); }
+.adm .scw .opsg__cell { box-shadow: inset 1px 0 0 var(--scw-cell); }
+.adm .scw .opsg__cell.we { background: var(--scw-we); }
+.adm .scw .opsg__cell.today { background: var(--scw-v-today); }
+.adm .scw .opsg__cell.past { opacity: 1; }
+.adm .scw .opsg__cell.m1 { box-shadow: inset 2px 0 0 var(--scw-v); }
+.adm .scw .opsg__cell.gap { background: #fdecec; }
+.adm .scw .opsg__price { font-size: 11px; font-weight: 500; letter-spacing: -0.02em; color: var(--scw-ink2); padding-top: 4px; }
+.adm .scw .opsg__cell.past .opsg__price { color: var(--scw-ghost); }
+.adm .scw .opsg__price.none { color: #d9d7e0; font-weight: 400; }
+.adm .scw .opsg__min {
+  display: block; width: calc(100% - 2px); height: 14px; line-height: 14px; border-radius: 3px; text-align: center;
+  font-size: 10px; font-weight: 400; color: #a9a6b4;
+}
+.adm .scw .opsg__cell.past .opsg__min { color: #d9d7e0; }
+.adm .scw .opsg__cell.ms1 { background: transparent; }
+.adm .scw .opsg__cell.ms3 { background: transparent; }
+.adm .scw .opsg__cell.ms1.we, .adm .scw .opsg__cell.ms3.we { background: var(--scw-we); }
+.adm .scw .opsg__cell.ms1.today, .adm .scw .opsg__cell.ms3.today { background: var(--scw-v-today); }
+.adm .scw .opsg__cell.ms1 .opsg__min { background: #ddf3e5; color: #237a4b; font-weight: 700; }
+.adm .scw .opsg__cell.ms3 .opsg__min { background: #fdf0db; color: #8a5a12; font-weight: 700; }
+.adm .scw .opsg__cell.mixed::after { display: none; }
+.adm .scw .opsg__cell.mixed .opsg__min { background: #f2f2f5; color: var(--scw-mute); font-weight: 700; letter-spacing: -0.04em; }
+/* 1박 갭 — 칸은 옅은 빨강, 최소숙박 숫자는 빨간 굵은 글자(분홍 Airbnb 막대와 구분). */
+.adm .scw .opsg__cell.gap .opsg__min { background: transparent; color: var(--scw-red); font-weight: 700; }
+.adm .scw .opsg__gap { display: none; }
+.adm .scw .opsg__hdot { background: var(--scw-faint); }
+
+/* 예약 막대 · BLOCK */
+.adm .scw .opsg__bar {
+  height: 15px; top: 3px; border-radius: 4px; padding: 0 5px; font-size: 10px; font-weight: 500; line-height: 15px;
+  text-overflow: ellipsis; box-shadow: none; transition: opacity 200ms ease, background-color 200ms ease;
+}
+.adm .scw .opsg__bar.airbnb { background: #fbd3d8; color: #8a1f2e; box-shadow: none; }
+.adm .scw .opsg__bar.booking { background: #cfddf6; color: #1f3f7a; box-shadow: none; }
+.adm .scw .opsg__bar.manual { background: #d3eedc; color: #1f6b3d; box-shadow: none; }
+.adm .scw .opsg__bar.cancelled { background: #efeff3; color: var(--scw-faint); box-shadow: none; text-decoration: line-through; }
+.adm .scw .opsg__bar.pw-dim { opacity: 0.35; }
+.adm .scw .opsg__bar.pw-win { background: var(--scw-v); color: #fff; font-weight: 600; box-shadow: none; }
+.adm .scw .opsg__bar:active { transform: scale(0.99); }
+.adm .scw .opsg__block {
+  height: 15px; top: 3px; border-radius: 8px; background: var(--scw-ink); font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+}
+.adm .scw .opsg__blocklane { border-top-color: var(--scw-hair); }
+
+/* 빈 칸의 `+` — 평소에는 거의 안 보이게, 「+ 수기 예약」을 누르면 드러난다. */
+.adm .scw .opsg__plus { color: #e4e2ea; border-radius: 6px; transition: color 160ms ease, background-color 160ms ease; }
+.adm .scw .opsg__plus:hover { color: var(--scw-v); background: var(--scw-v-bg); box-shadow: none; }
+.adm .scw.is-hinting .opsg__plus { color: var(--scw-v); animation: scwBreathe 1.6s ease-in-out infinite; }
+.adm .scw.is-hinting .opsg__plus:hover { animation: none; }
+
+/* 편집 — 고른 칸은 옅은 보라 바탕 + 보라 숫자(테두리 없음). */
+.adm .scw .opsg__cell.sel, .adm .scw .opsg__cell.sel.we { background: #ece6fc; box-shadow: inset 1px 0 0 #e2d9fb; }
+.adm .scw .opsg__cell.sel .opsg__price { color: var(--scw-v-ink); font-weight: 600; }
+.adm .scw .opsg__cell.sold { background-color: transparent; }
+
+/* 반영 중인 칸 — 숨쉬듯 깜빡이고, 반영이 확인되면 잠깐 보라 → 원래 색. */
+.adm .scw .opsg__price.pend, .adm .scw .opsg__cell .opsg__min.pend {
+  color: #9a97a6; font-weight: 600; text-decoration: none; animation: scwBreathe 1.4s ease-in-out infinite;
+}
+.adm .scw .opsg__price.done, .adm .scw .opsg__cell .opsg__min.done { animation: scwSettle 1.2s var(--scw-ease) both; }
+
+/* ── 편집 범위 바(SalesEdit-PC) ───────────────────────────────────── */
+.adm .scw-scope {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin: 14px 0 16px; padding: 6px 14px; border-radius: 12px;
+  background: #f7f7f9; animation: scwRise 220ms var(--scw-ease);
+}
+.adm .scw-scope__k { font-size: 13px; color: var(--scw-faint); margin-left: 6px; }
+.adm .scw-scope__k:first-child { margin-left: 0; }
+.adm .scw-scope .scw-pp__btn:hover, .adm .scw-scope .scw-menu__btn:hover,
+.adm .scw-scope .scw-pp__btn.is-open, .adm .scw-scope .scw-menu__btn.is-open { background: #ececf1; }
+.adm .scw-seg2 { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: #ececf0; }
+.adm .scw-seg2 button {
+  height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px;
+  color: var(--scw-mute); white-space: nowrap; cursor: pointer; transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-seg2 button:active { transform: scale(0.97); }
+.adm .scw-seg2 button.on { background: #fff; color: var(--scw-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.12); }
+.adm .scw-days { display: inline-flex; gap: 1px; }
+.adm .scw-day {
+  width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 12px; color: var(--scw-mute);
+  cursor: pointer; transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-day.we { color: #d8455a; }
+.adm .scw-day:hover { background: #ececf1; }
+.adm .scw-day:active { transform: scale(0.94); }
+.adm .scw-day.on { background: var(--scw-v-bg2); color: var(--scw-v-ink); font-weight: 600; }
+.adm .scw-scope__count { font-size: 14px; font-weight: 700; color: var(--scw-v-ink); white-space: nowrap; }
+.adm .scw-scope__clear {
+  height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; color: var(--scw-mute);
+  cursor: pointer; transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-scope__clear:hover:not(:disabled) { background: #ececf1; color: var(--scw-ink); }
+.adm .scw-scope__clear:active:not(:disabled) { transform: scale(0.97); }
+.adm .scw-scope__clear:disabled { opacity: 0.4; cursor: default; }
+
+/* ── 편집 중 오른쪽 열 — 탭 + 패널 ───────────────────────────────── */
+.adm .scw-side {
+  width: 328px; flex: 0 0 328px; position: sticky; top: 12px; align-self: flex-start;
+  display: flex; flex-direction: column; gap: 16px; max-height: calc(100dvh - 86px); min-height: 0;
+  animation: scwSideIn 240ms var(--scw-ease);
+}
+.adm .scw-side:has(> .opsp.has-list) { height: calc(100dvh - 86px); }
+/* 패널은 원래 혼자 sticky 였다 — 이 열 안에서는 열이 붙어 다니고 패널은 남는 높이를 채운다. */
+.adm .scw .scw-side > .opsp {
+  position: static; top: auto; width: auto; flex: 1 1 auto; max-height: none; min-height: 0; align-self: stretch;
+}
+.adm .scw .scw-side > .opsp.has-list { height: auto; }
+.adm .scw-modetabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 4px; border-radius: 12px; background: #f2f2f5; flex: none; }
+.adm .scw-modetabs button {
+  height: 36px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; color: var(--scw-mute);
+  cursor: pointer; transition: background-color 160ms ease, color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-modetabs button:hover { color: var(--scw-ink); }
+.adm .scw-modetabs button:active { transform: scale(0.97); }
+.adm .scw-modetabs button.on { background: #fff; color: var(--scw-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.12); }
+
+/* ── 움직임 ───────────────────────────────────────────────────────── */
+@keyframes scwPop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes scwRise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes scwFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scwSideIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+@keyframes scwBreathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes scwSettle {
+  0% { color: var(--scw-v-ink); background: var(--scw-v-bg2); }
+  60% { color: var(--scw-v-ink); background: var(--scw-v-bg2); }
+  100% { color: inherit; background: transparent; }
+}
+.adm .scw .opsg__price.done { border-radius: 4px; padding: 3px 3px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .adm .scw *, .adm .scw *::before, .adm .scw *::after { animation: none !important; transition: none !important; }
+}
+
+/* 편집 중에는 오른쪽 열만큼 격자가 좁아진다 — 가격 글자를 한 단계 줄여 칸 안에 담는다. */
+.adm .scw.is-edit .opsg__price { font-size: 9.5px; letter-spacing: -0.05em; }
+.adm .scw.is-edit .scw-sum__c { font-size: 9px; letter-spacing: -0.05em; }

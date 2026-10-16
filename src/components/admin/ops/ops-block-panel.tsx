@@ -9,6 +9,14 @@ import {
   type BlockPurpose,
 } from "@/app/admin/ops/calendar/actions";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
+import {
+  SpwHead,
+  SpwModeTabs,
+  spwDate,
+  type SpwCopy,
+  type SpwMode,
+} from "@/components/admin/ops/ops-price-panel";
+import "./ops-calendar-panels-white.css";
 
 /** 사유 칩 순서. 코드는 DB 체크 제약과 같다(`202610010001_block_log_purpose.sql`). */
 export const BLOCK_PURPOSE_ORDER: readonly BlockPurpose[] = ["repair", "cleaning", "owner", "other"];
@@ -116,13 +124,16 @@ export function OpsBlockPanel({
   cells,
   copy,
   onClear,
+  onSwitchMode,
   scopeSummary,
 }: {
   /** 지금 막혀 있는 칸(`roomKey|date`). 「차단 해제」는 이 칸들에만 간다. */
   blockedKeys: ReadonlySet<string>;
   cells: BlockChangeCell[];
-  copy: BlockPanelCopy;
+  copy: BlockPanelCopy & SpwCopy;
   onClear: () => void;
+  /** 패널 위 「가격 · 최소숙박 · 차단」 탭(2026-10-16 화이트 리디자인). 넘겨야 탭이 그려진다. */
+  onSwitchMode?: (mode: SpwMode) => void;
   scopeSummary: { rooms: string; dates: string } | null;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -177,143 +188,179 @@ export function OpsBlockPanel({
   const summary = copy.bkSummary
     .replace("{ranges}", String(ranges.length))
     .replace("{nights}", String(cells.length));
+  /** 행 키는 `건물::방` 이다 — 그대로 보이면 내부 키가 드러난다. 고른 칸의 방 이름을 쓴다. */
+  const labelByRoom = new Map(cells.map((cell) => [cell.roomKey, cell.roomLabel]));
+  const roomName = (roomKey: string) => labelByRoom.get(roomKey) ?? roomKey.replace("::", " ");
+  /** 구간은 **밤** 기준(끝 = 마지막 밤)이다. 화면은 예약처럼 「첫 밤 → 다음 날 아침」으로 적는다. */
+  const rangeText = (range: { startDate: string; endDate: string }) =>
+    `${spwDate(range.startDate, copy.localeTag)} → ${spwDate(nextDay(range.endDate), copy.localeTag)}`;
+  const rangeNights = (range: { startDate: string; endDate: string }) =>
+    Math.round((Date.parse(`${range.endDate}T00:00:00Z`) - Date.parse(`${range.startDate}T00:00:00Z`)) / 86_400_000) + 1;
+  /** 이미 막힌 밤을 구간으로 — 「302 10/26 – 10/28 은 이미 막혀 있어요」. */
+  const blockedRanges = useMemo(
+    () => groupSelectionIntoRanges(blockedCells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey }))),
+    [blockedCells],
+  );
+  const rangeList = (limit: number) => (
+    <>
+      {ranges.slice(0, limit).map((range, order) => (
+        <div className="spw-row" key={`${range.roomKey}|${range.startDate}`} style={{ "--i": Math.min(order, 12) } as React.CSSProperties}>
+          <span className="spw-row__room is-wide">{roomName(range.roomKey)}</span>
+          <span className="spw-row__date">{rangeText(range)}</span>
+          <b className="spw-row__nights">{copy.minStay.replace("{n}", String(rangeNights(range)))}</b>
+        </div>
+      ))}
+      {ranges.length > limit && <span className="spw-more-count">+{ranges.length - limit}</span>}
+    </>
+  );
+
+  // ── 확인 단계 ── 막는 순간 채널에서 내려간다. 무엇이 몇 구간 몇 박인지 보여주고 한 번 더 묻는다.
+  if (confirming) {
+    const reason = [purpose ? copy.bkPurposes[purpose] : null, memo.trim() || null].filter(Boolean).join(" · ");
+    return (
+      <aside aria-label={copy.bkTitle} className="opsp spw">
+        <div className="spw-body spw-anim" key="confirm">
+          <SpwHead
+            kicker={copy.spwBkConfirmKicker}
+            sub={summary}
+            title={copy.spwBkConfirmTitle
+              .replace("{rooms}", scopeSummary?.rooms ?? "")
+              .replace("{nights}", String(cells.length))}
+          />
+          <div className="spw-alert is-block" role="alert">
+            <b>{copy.spwBkConfirmHead.replace("{nights}", String(cells.length))}</b>
+            <div className="spw-alert__rows">{rangeList(8)}</div>
+            {reason && <span className="spw-alert__sub">{copy.spwBkReason.replace("{text}", reason)}</span>}
+          </div>
+          <p className="spw-note">{copy.spwBkConfirmNote}</p>
+          <p className="spw-note">{copy.bkNote}</p>
+        </div>
+        <div className="spw-foot">
+          <button className="spw-btn" onClick={() => setConfirming(false)} type="button">
+            {copy.spwBack}
+          </button>
+          <button className="spw-btn is-danger" disabled={pending} onClick={() => run("block")} type="button">
+            {copy.bkConfirmBlock.replace("{ranges}", String(ranges.length)).replace("{nights}", String(cells.length))}
+          </button>
+        </div>
+      </aside>
+    );
+  }
 
   return (
-    <aside className="opsp opsp--bk">
-      <div className="opsp__head">
-        <div className="opsp__title">{copy.bkTitle}</div>
-        <div className="opsp__target">
-          {scopeSummary ? (
-            <>
-              {scopeSummary.rooms}
-              <br />
-              {scopeSummary.dates}
-            </>
-          ) : (
-            copy.bkEmptyTitle
-          )}
-        </div>
-      </div>
+    <aside aria-label={copy.bkTitle} className="opsp spw">
+      <div className="spw-body">
+        <SpwHead kicker={copy.spwKicker} sub={scopeSummary ? scopeSummary.rooms : copy.bkEmptyTitle} title={copy.spwBkTitle} />
+        <SpwModeTabs copy={copy} mode="block" onSwitchMode={onSwitchMode} />
 
-      <div className="opsp__body">
-        {hasSelection ? (
-          <div className="opsbk__box">
-            {/* 「9칸」보다 「2구간 · 9박」이 정확하다 — 끊긴 구간은 나뉘어 쓰인다. */}
-            <div className="opsbk__sum">{summary}</div>
-            <ul className="opsbk__list">
-              {ranges.slice(0, 8).map((range) => (
-                <li key={`${range.roomKey}|${range.startDate}`}>
-                  {/* 행 키는 `건물::방` 이다 — 그대로 보이면 내부 키가 드러난다. */}
-                  <span className="opsbk__rm">{range.roomKey.replace("::", " ")}</span>
-                  <span className="opsbk__dt">
-                    {range.startDate.slice(5)} → {range.endDate.slice(5)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {ranges.length > 8 && <div className="opsbk__more">+{ranges.length - 8}</div>}
-          </div>
-        ) : (
-          <div className="opsbk__empty">{copy.bkEmptyBody}</div>
+        {/* 사유(선택) — BLOCK 막대에 같이 보인다. 「이 방 왜 막혀 있지?」를 묻지 않게(2026-10-01). */}
+        {hasSelection && (
+          <>
+            <div className="spw-group">
+              <span className="spw-label">{copy.bkPurposeLabel}</span>
+              <div aria-label={copy.bkPurposeLabel} className="spw-pills" role="group">
+                {BLOCK_PURPOSE_ORDER.map((key) => (
+                  <button
+                    aria-pressed={purpose === key}
+                    className={`spw-pill${purpose === key ? " on" : ""}`}
+                    disabled={pending}
+                    key={key}
+                    onClick={() => setPurpose((current) => (current === key ? null : key))}
+                    type="button"
+                  >
+                    {copy.bkPurposes[key]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="spw-field">
+              <span className="spw-field__l">
+                {copy.spwBkMemoLabel} <span className="spw-field__lq">· {copy.spwBkMemoLimit}</span>
+              </span>
+              <textarea
+                aria-label={copy.spwBkMemoLabel}
+                className="spw-field__area"
+                disabled={pending}
+                maxLength={200}
+                onChange={(event) => setMemo(event.target.value)}
+                placeholder={copy.bkMemoPlaceholder}
+                rows={2}
+                value={memo}
+              />
+            </div>
+          </>
         )}
 
-        {/* 이미 막힌 밤이 섞여 있을 때만 — 그 밤들만 푼다. */}
-        {blockedCells.length > 0 && !confirming && (
-          <div className="opsbk__release">
-            <span>{copy.bkBlockedNote.replace("{nights}", String(blockedCells.length))}</span>
-            <button
-              className="opsp__btn"
-              disabled={pending}
-              onClick={() => run("release")}
-              type="button"
-            >
+        {hasSelection ? (
+          <div className="spw-list">
+            {/* 「9칸」보다 「2구간 · 9박」이 정확하다 — 끊긴 구간은 나뉘어 쓰인다. */}
+            <span className="spw-sec">
+              {copy.spwBkRangesTitle}
+              <span className="spw-sec__n">{summary}</span>
+            </span>
+            {rangeList(12)}
+          </div>
+        ) : (
+          <p className="spw-note">{copy.bkEmptyBody}</p>
+        )}
+
+        {/* 이미 막힌 밤이 섞여 있을 때만 — 그 밤들만 푼다. 푸는 것은 다시 파는 쪽이라 확인 없이 바로 한다. */}
+        {blockedCells.length > 0 && (
+          <div className="spw-release">
+            <span>
+              {blockedRanges.slice(0, 3).map((range) => (
+                <span className="spw-release__r" key={`${range.roomKey}|${range.startDate}`}>
+                  <b>{roomName(range.roomKey)}</b> {spwDate(range.startDate, copy.localeTag)} – {spwDate(range.endDate, copy.localeTag)}
+                </span>
+              ))}
+              <span className="spw-release__t">{copy.bkBlockedNote.replace("{nights}", String(blockedCells.length))}</span>
+            </span>
+            <button className="spw-release__btn" disabled={pending} onClick={() => run("release")} type="button">
               {copy.bkRelease}
             </button>
           </div>
         )}
 
-        {/* 사유(선택) — BLOCK 막대에 같이 보인다. 「이 방 왜 막혀 있지?」를 묻지 않게(2026-10-01). */}
-        {hasSelection && (
-          <div className="opsbk__why">
-            <div className="opsbk__whyLabel">{copy.bkPurposeLabel}</div>
-            <div className="opsbk__chips" role="group" aria-label={copy.bkPurposeLabel}>
-              {BLOCK_PURPOSE_ORDER.map((key) => (
-                <button
-                  aria-pressed={purpose === key}
-                  className={`opsbk__chip${purpose === key ? " is-on" : ""}`}
-                  disabled={pending}
-                  key={key}
-                  onClick={() => setPurpose((current) => (current === key ? null : key))}
-                  type="button"
-                >
-                  {copy.bkPurposes[key]}
-                </button>
-              ))}
-            </div>
-            <input
-              className="opsbk__memo"
-              disabled={pending}
-              maxLength={200}
-              onChange={(event) => setMemo(event.target.value)}
-              placeholder={copy.bkMemoPlaceholder}
-              type="text"
-              value={memo}
-            />
-          </div>
-        )}
-
         {/* 막는다는 것이 무슨 뜻인지 화면에 적는다 — 「왜 예약이 안 들어오지?」가 안 나오게. */}
-        <div className="opsbk__note">{copy.bkBody}</div>
-
-        <div className="opsp__grow" />
-
-        {message && <div className="opsp__msg">{message}</div>}
-        <div className="opsp__channel">{copy.bkNote}</div>
+        <p className="spw-note">{copy.bkBody}</p>
+        <p className="spw-note">{copy.bkNote}</p>
+        {message && (
+          <p className="spw-msg" role="status">
+            {message}
+          </p>
+        )}
       </div>
 
-      <div className="opsp__foot">
-        {confirming ? (
-          <>
-            <button className="opsp__btn" onClick={() => setConfirming(false)} type="button">
-              {copy.panelCancel}
-            </button>
-            <button
-              className="opsp__btn go danger"
-              disabled={pending}
-              onClick={() => run("block")}
-              type="button"
-            >
-              {copy.bkConfirmBlock
-                .replace("{ranges}", String(ranges.length))
-                .replace("{nights}", String(cells.length))}
-            </button>
-          </>
-        ) : (
-          <>
-            {/* 화면의 선택만 비운다 — Beds24 에는 아무것도 안 보낸다. */}
-            <button
-              className="opsp__btn"
-              disabled={!hasSelection || pending}
-              onClick={() => {
-                setMessage(null);
-                onClear();
-              }}
-              title="Esc"
-              type="button"
-            >
-              {copy.scopeClear}
-            </button>
-            <button
-              className="opsp__btn go danger"
-              disabled={!hasSelection || pending}
-              onClick={() => setConfirming(true)}
-              type="button"
-            >
-              {copy.bkApply}
-            </button>
-          </>
-        )}
+      <div className="spw-foot">
+        {/* 화면의 선택만 비운다 — Beds24 에는 아무것도 안 보낸다. */}
+        <button
+          className="spw-btn"
+          disabled={!hasSelection || pending}
+          onClick={() => {
+            setMessage(null);
+            onClear();
+          }}
+          title="Esc"
+          type="button"
+        >
+          {copy.scopeClear}
+        </button>
+        <button
+          className="spw-btn is-danger"
+          disabled={!hasSelection || pending}
+          onClick={() => setConfirming(true)}
+          type="button"
+        >
+          {copy.spwBkGo.replace("{nights}", String(cells.length))}
+        </button>
       </div>
     </aside>
   );
+}
+
+/** `YYYY-MM-DD` 다음 날. 시간대에 안 흔들리도록 UTC 정오로 고정한다. */
+function nextDay(date: string): string {
+  const at = new Date(`${date}T12:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + 1);
+  return at.toISOString().slice(0, 10);
 }

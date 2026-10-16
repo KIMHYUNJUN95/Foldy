@@ -9,7 +9,15 @@ import {
   type BookingPanelRoom,
 } from "@/components/admin/ops/ops-booking-panel";
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
-import { MobileStayDates, MobileStepper } from "@/components/mobile/ops/mobile-ops-form";
+import {
+  MobileStayDates,
+  MobileStepper,
+  MswField,
+  MswPhoneInput,
+  MswSuccess,
+  mdWeekday,
+  useSuccessThen,
+} from "@/components/mobile/ops/mobile-ops-form";
 import { stayNights, validateManualBooking } from "@/lib/ops-manual-booking";
 
 /**
@@ -27,7 +35,13 @@ export type MobileBookingSheetCopy = BookingPanelCopy & {
   mbkAllFree: string;
   mOptional: string;
   today: string;
+  mwBookTitle: string;
+  mwRatesTotal: string;
+  mwDone: string;
 };
+
+/** 「요금으로 채우기」 뒤 조정 % — 데스크톱 수기 예약 패널과 같은 값. */
+const ADJUST_PRESETS = [-10, -5, 0, 5, 10] as const;
 
 type Channel = "airbnb" | "booking";
 
@@ -60,6 +74,7 @@ export function MobileOpsBookingSheet({
   const [guestName, setGuestName] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
   const [filledFrom, setFilledFrom] = useState<Channel | null>(null);
+  const [percent, setPercent] = useState(0);
   const [numAdult, setNumAdult] = useState(1);
   const [numChild, setNumChild] = useState(0);
   const [guestEmail, setGuestEmail] = useState("");
@@ -67,6 +82,7 @@ export function MobileOpsBookingSheet({
   const [comments, setComments] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { done, succeed } = useSuccessThen();
 
   const nights = useMemo(() => stayNights(arrival, departure), [arrival, departure]);
   const availability = useRoomAvailability({
@@ -83,7 +99,7 @@ export function MobileOpsBookingSheet({
       const known = rows.filter((row) => row[channel] !== null);
       return { partial: known.length !== rows.length, total: known.reduce((acc, row) => acc + (row[channel] ?? 0), 0) };
     };
-    return { airbnb: sum("airbnb"), booking: sum("booking") };
+    return { airbnb: sum("airbnb"), booking: sum("booking"), rows };
   }, [nights, rateAt]);
 
   const parsedPrice = totalPrice.trim() === "" ? null : Number(totalPrice);
@@ -102,7 +118,8 @@ export function MobileOpsBookingSheet({
         roomIds: room.roomIds,
       });
       if (result.ok) {
-        onCreated({ guestName: guestName.trim(), nights: nights.length, reservationId: result.reservationId });
+        // 만들어짐 — 초록 체크(햅틱) 뒤 부모가 시트를 닫고 알림(「열기」).
+        succeed(() => onCreated({ guestName: guestName.trim(), nights: nights.length, reservationId: result.reservationId }));
         return;
       }
       setError(bookingErrorText(copy, result));
@@ -111,37 +128,30 @@ export function MobileOpsBookingSheet({
 
   const fill = (channel: Channel) => {
     setFilledFrom(channel);
+    setPercent(0);
     setTotalPrice(String(rates[channel].total));
   };
-  const chip = (channel: Channel) => {
-    const rate = rates[channel];
-    if (rate.total <= 0) return null;
-    return (
-      <button
-        aria-pressed={filledFrom === channel}
-        className={`mbs-fill${filledFrom === channel ? " on" : ""}`}
-        key={channel}
-        onClick={() => fill(channel)}
-        type="button"
-      >
-        <i className={channel === "airbnb" ? "a" : "k"} aria-hidden="true" />
-        {channel === "airbnb" ? copy.mbAirbnb : copy.mbBooking} ¥{rate.total.toLocaleString("ja-JP")}
-        {rate.partial ? "*" : ""}
-      </button>
-    );
+  const adjust = (next: number) => {
+    setPercent(next);
+    if (filledFrom) setTotalPrice(String(Math.round(rates[filledFrom].total * (1 + next / 100))));
   };
+  const money = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
+  const anyRate = rates.airbnb.total > 0 || rates.booking.total > 0;
+  const anyPartial = rates.airbnb.partial || rates.booking.partial;
+  const optional = (label: string) => `${label} · ${copy.mOptional}`;
 
   return (
-    <div className="mps mops-vars">
-      <div className="mps-body">
-        <div className="mps-head">
-          <div className="mps-head__t">
-            <h3>{copy.mbTitle}</h3>
+    <div className="msw">
+      <div className="msw-body">
+        <div className="msw-head">
+          <div className="msw-head__t">
+            <h3>{copy.mwBookTitle}</h3>
             <p>
-              <b>{room.propertyName}</b> {room.label}
+              {[room.propertyName, room.label, `${arrival.slice(5).replace("-", "/")} → ${departure.slice(5).replace("-", "/")}`, copy.mbNights.replace("{n}", String(nights.length))]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
-          <span className="mps-cnt">{copy.mbNights.replace("{n}", String(nights.length))}</span>
         </div>
 
         <MobileStayDates
@@ -155,105 +165,170 @@ export function MobileOpsBookingSheet({
             setArrival(from);
             setDeparture(to);
             setFilledFrom(null);
+            setPercent(0);
           }}
           today={today}
         />
         {taken.length > 0 ? (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
+          <div className="msw-alert" role="alert">
             {copy.mbErrNightsTaken.replace("{dates}", taken.map((night) => night.slice(5).replace("-", "/")).join(", "))}
           </div>
         ) : availability.failed ? (
-          <div className="mps-note warn">
-            <i aria-hidden="true" />
-            {copy.mbAvailFailed}
-          </div>
+          <div className="msw-alert warn">{copy.mbAvailFailed}</div>
         ) : (
-          <div className="mbs-ok">
-            <i aria-hidden="true" />
-            {copy.mbkAllFree.replace("{n}", String(nights.length))}
-          </div>
+          <div className="msw-okline">{copy.mbkAllFree.replace("{n}", String(nights.length))}</div>
         )}
 
-        <label className="mfm-field">
-          <span className="mfm-l">{copy.mbGuest}</span>
+        <MswField label={copy.mbGuest}>
           <input
-            className="mfm-in"
+            autoComplete="off"
+            className="msw-in"
             enterKeyHint="next"
             onChange={(event) => setGuestName(event.target.value)}
             placeholder={copy.mbGuestPlaceholder}
             type="text"
             value={guestName}
           />
-        </label>
-        <div className="mfm-two">
+        </MswField>
+
+        <div className="msw-steps">
           <MobileStepper label={copy.mbAdults} min={1} onChange={setNumAdult} value={numAdult} />
           <MobileStepper label={copy.mbChildren} min={0} onChange={setNumChild} value={numChild} />
         </div>
 
-        <div className="mfm-field">
-          <span className="mfm-l">
-            {copy.mbTotal} — {copy.mbFillFrom}
-          </span>
-          {(rates.airbnb.total > 0 || rates.booking.total > 0) && (
-            <div className="mbs-fills">
-              {chip("airbnb")}
-              {chip("booking")}
+        <div className="msw-two">
+          <MswField label={optional(copy.mbEmail)}>
+            <input
+              autoComplete="email"
+              className="msw-in"
+              enterKeyHint="next"
+              inputMode="email"
+              onChange={(event) => setGuestEmail(event.target.value)}
+              placeholder="name@mail.com"
+              type="email"
+              value={guestEmail}
+            />
+          </MswField>
+          <MswField label={optional(copy.mbPhone)}>
+            {/* 입력하며 자동 하이픈. 보내는 값은 숫자와 맨 앞 + 만. */}
+            <MswPhoneInput onChange={setGuestPhone} placeholder="+81" value={guestPhone} />
+          </MswField>
+        </div>
+
+        {nights.length > 0 && anyRate && (
+          <div className="msw-step-sub">
+            <div className="msw-sec">
+              <span>{copy.mbFillFrom}</span>
+              <small>{copy.mwRatesTotal.replace("{n}", String(nights.length))}</small>
             </div>
-          )}
-          <span className="mfm-money">
-            <span aria-hidden="true">¥</span>
+            <div className="msw-fills">
+              {(["airbnb", "booking"] as const).map((channel) => {
+                const rate = rates[channel];
+                const disabled = rate.total <= 0;
+                return (
+                  <button
+                    aria-pressed={filledFrom === channel}
+                    className={`msw-fill${filledFrom === channel ? " on" : ""}`}
+                    disabled={disabled}
+                    key={channel}
+                    onClick={() => fill(channel)}
+                    type="button"
+                  >
+                    <span>{channel === "airbnb" ? copy.mbAirbnb : copy.mbBooking}</span>
+                    <b>
+                      {disabled ? "—" : money(rate.total)}
+                      {rate.partial && !disabled ? "*" : ""}
+                    </b>
+                  </button>
+                );
+              })}
+            </div>
+            {filledFrom && (
+              <div className="msw-adj">
+                <span>{copy.mbAdjust}</span>
+                <div className="msw-grid five">
+                  {ADJUST_PRESETS.map((preset) => (
+                    <button
+                      aria-pressed={percent === preset}
+                      className={`msw-opt${percent === preset ? " on" : ""}`}
+                      key={preset}
+                      onClick={() => adjust(preset)}
+                      type="button"
+                    >
+                      {preset > 0 ? `+${preset}` : preset < 0 ? `−${Math.abs(preset)}` : "0"}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {anyPartial && <span className="msw-field__hint">{copy.mbRatesPartial}</span>}
+            {/* 밤별 내역은 2박 이상일 때만, 접어서(데스크톱과 같다). */}
+            {nights.length > 1 && (
+              <details className="msw-nightly">
+                <summary>
+                  {copy.mbRates} · {copy.mbNights.replace("{n}", String(nights.length))}
+                </summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th />
+                      <th>{copy.mbAirbnb}</th>
+                      <th>{copy.mbBooking}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rates.rows.map((row) => (
+                      <tr key={row.night}>
+                        <td>{mdWeekday(row.night, localeTag)}</td>
+                        <td>{row.airbnb === null ? "—" : money(row.airbnb)}</td>
+                        <td>{row.booking === null ? "—" : money(row.booking)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
+          </div>
+        )}
+
+        <MswField hint={copy.mbTotalHint} label={copy.mbTotal}>
+          <span className="msw-money sm">
             <input
               inputMode="numeric"
               onChange={(event) => {
-                setTotalPrice(event.target.value);
+                setTotalPrice(event.target.value.replace(/[^\d]/g, ""));
                 setFilledFrom(null);
+                setPercent(0);
               }}
               placeholder={copy.mbTotalPlaceholder}
-              type="number"
-              value={totalPrice}
+              type="text"
+              value={totalPrice === "" ? "" : Number(totalPrice).toLocaleString("ja-JP")}
             />
           </span>
-          <span className="mfm-hint">
-            {copy.mbTotalHint}
-            {rates.airbnb.partial || rates.booking.partial ? ` ${copy.mbRatesPartial}` : ""}
-          </span>
-        </div>
+        </MswField>
 
-        <div className="mfm-two">
-          <label className="mfm-field">
-            <span className="mfm-l">{copy.mbPhone}</span>
-            <input className="mfm-in" onChange={(event) => setGuestPhone(event.target.value)} placeholder={copy.mOptional} type="tel" value={guestPhone} />
-          </label>
-          <label className="mfm-field">
-            <span className="mfm-l">{copy.mbEmail}</span>
-            <input className="mfm-in" onChange={(event) => setGuestEmail(event.target.value)} placeholder={copy.mOptional} type="email" value={guestEmail} />
-          </label>
-        </div>
-        <label className="mfm-field">
-          <span className="mfm-l">{copy.mbComments}</span>
+        <MswField label={optional(copy.mbComments)}>
           <textarea
-            className="mfm-in area"
+            className="msw-in"
             onChange={(event) => setComments(event.target.value)}
             placeholder={copy.mbCommentsPlaceholder}
             rows={2}
             value={comments}
           />
-        </label>
+        </MswField>
 
         {error && (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
+          <div className="msw-alert" role="alert">
             {error}
           </div>
         )}
       </div>
-      <div className="mps-foot">
-        <button className="mps-btn ghost" disabled={pending} onClick={onCancel} type="button">
+      <div className="msw-foot two">
+        <button className="msw-btn ghost" disabled={pending} onClick={onCancel} type="button">
           {copy.mbCancel}
         </button>
         <button
-          className="mps-btn main"
+          className="msw-btn"
           disabled={pending || localInvalid !== null || taken.length > 0}
           onClick={submit}
           type="button"
@@ -261,6 +336,7 @@ export function MobileOpsBookingSheet({
           {copy.mbSubmit}
         </button>
       </div>
+      {done && <MswSuccess label={copy.mwDone} />}
     </div>
   );
 }

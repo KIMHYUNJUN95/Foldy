@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { submitManualBooking, type ManualBookingResult } from "@/app/admin/ops/calendar/actions";
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import { MAX_STAY_NIGHTS, stayNights, validateManualBooking } from "@/lib/ops-manual-booking";
+import { formatPhoneInput } from "@/lib/phone-format";
+import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
+import "./ops-calendar-panels-white.css";
 
 /**
  * 수동 예약 생성 — **오른쪽 사이드 패널.**
@@ -167,7 +170,7 @@ export function OpsBookingPanel({
 }: {
   checkIn: string;
   checkOut: string;
-  copy: BookingPanelCopy;
+  copy: BookingPanelCopy & SpwCopy;
   localeTag: string;
   onClose: () => void;
   /** 그 방 그 밤의 요금. 격자가 이미 들고 있는 값을 그대로 넘긴다. */
@@ -278,6 +281,39 @@ export function OpsBookingPanel({
   const money = (value: number) => `¥${value.toLocaleString()}`;
   const channelLabel = (channel: Channel) => (channel === "airbnb" ? copy.mbAirbnb : copy.mbBooking);
   const anyPartial = rates.airbnb.partial || rates.booking.partial;
+  const nightsText = copy.mbNights.replace("{n}", String(nights.length));
+  /** 총액 칸 표시 — 「118500」보다 「118,500」. 저장 값은 숫자만(`totalPrice`). */
+  const totalDisplay = totalPrice === "" ? "" : Number(totalPrice).toLocaleString("ja-JP");
+
+  /** 성인 · 어린이 — 숫자칸 대신 − / + (시안 SalesNew-PC). 성인은 1명부터. */
+  const stepper = (label: string, value: number, min: number, set: (next: number) => void) => (
+    <div className="spw-step">
+      <span>{label}</span>
+      <span className="spw-step__ctl">
+        <button
+          aria-label={copy.spwMinus.replace("{label}", label)}
+          className="spw-step__btn"
+          disabled={pending || value <= min}
+          onClick={() => set(Math.max(min, value - 1))}
+          type="button"
+        >
+          −
+        </button>
+        <b aria-live="polite" className="spw-step__v" key={value}>
+          {value}
+        </b>
+        <button
+          aria-label={copy.spwPlus.replace("{label}", label)}
+          className="spw-step__btn"
+          disabled={pending}
+          onClick={() => set(value + 1)}
+          type="button"
+        >
+          +
+        </button>
+      </span>
+    </div>
+  );
 
   return (
     <>
@@ -285,37 +321,38 @@ export function OpsBookingPanel({
       <aside
         aria-label={copy.mbTitle}
         aria-modal="true"
-        className="panel opsbk"
+        className="panel spw-panel"
         ref={panelRef}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.mbTitle}</span>
-            <button
-              aria-label={copy.mbClose}
-              className="panel__x"
-              disabled={pending}
-              onClick={onClose}
-              type="button"
-            >
-              <X />
-            </button>
+        <div className="spw-phead">
+          <div className="spw-head">
+            <span className="spw-head__k">{copy.spwMbKicker}</span>
+            <b className="spw-head__t">
+              {room.propertyName} · {room.label}
+            </b>
+            <span className="spw-head__s">{nightsText}</span>
           </div>
-          <div className="panel__title">
-            <span className="panel__room">{room.label}</span>
-            <span className="panel__sub">{room.propertyName}</span>
-          </div>
+          <button aria-label={copy.mbClose} className="spw-x" disabled={pending} onClick={onClose} type="button">
+            <X aria-hidden="true" />
+          </button>
         </div>
 
-        <div className="panel__body opsbk__body">
-          {/* **숙박은 기간이다.** 격자에서 고른 값이 들어와 있고, 여기서는 고친다.
-              공용 범위 피커를 쓴다(CLAUDE.md §4a). */}
-          <div className="fld">
-            <span className="fld__l">
-              {copy.mbCheckIn} → {copy.mbCheckOut}
-            </span>
+        <div className="spw-pbody">
+          {/* **숙박은 기간이다.** 격자에서 고른 값이 들어와 있고, 아래 피커로 고친다(CLAUDE.md §4a). */}
+          <div className="spw-stay">
+            <div>
+              <b>{spwDate(arrival, localeTag)}</b>
+              <span>{copy.mbCheckIn}</span>
+            </div>
+            <span className="spw-stay__n">{nightsText}</span>
+            <div className="is-end">
+              <b>{spwDate(departure, localeTag)}</b>
+              <span>{copy.mbCheckOut}</span>
+            </div>
+          </div>
+          <div className="spw-group">
             <AdminDateRangePicker
               ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
               from={arrival}
@@ -332,28 +369,27 @@ export function OpsBookingPanel({
               onMonthChange={loadMonths}
               to={departure}
             />
-            <span className="opsbk__nights">
-              {copy.mbNights.replace("{n}", String(nights.length))}
-              {/* 버튼만 흐려 두면 왜 안 되는지 알 수 없다 — 그 자리에 적는다. */}
-              {localInvalid === "bad_dates" && <em>{copy.mbErrBadDates}</em>}
-              {localInvalid === "past_arrival" && <em>{copy.mbErrPastArrival}</em>}
-              {takenInStay.length > 0 && (
-                <em>
-                  {copy.mbErrNightsTaken.replace(
-                    "{dates}",
-                    takenInStay.map((night) => night.slice(5).replace("-", "/")).join(", "),
-                  )}
-                </em>
-              )}
-            </span>
-            <span className="opsbk__hint">{availFailed ? copy.mbAvailFailed : copy.mbAvailHint}</span>
+            {/* 버튼만 흐려 두면 왜 안 되는지 알 수 없다 — 그 자리에 적는다. */}
+            {localInvalid === "bad_dates" && <p className="spw-note is-danger">{copy.mbErrBadDates}</p>}
+            {localInvalid === "past_arrival" && <p className="spw-note is-danger">{copy.mbErrPastArrival}</p>}
+            {takenInStay.length > 0 && (
+              <p className="spw-note is-danger">
+                {copy.mbErrNightsTaken.replace(
+                  "{dates}",
+                  takenInStay.map((night) => night.slice(5).replace("-", "/")).join(", "),
+                )}
+              </p>
+            )}
+            <p className="spw-note">{availFailed ? copy.mbAvailFailed : copy.mbAvailHint}</p>
           </div>
 
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsbk-guest">
-              {copy.mbGuest} <span className="req">*</span>
+          <div className="spw-field">
+            <label className="spw-field__l" htmlFor="opsbk-guest">
+              {copy.mbGuest}
             </label>
             <input
+              aria-required="true"
+              className="spw-field__in"
               id="opsbk-guest"
               onChange={(event) => setGuestName(event.target.value)}
               placeholder={copy.mbGuestPlaceholder}
@@ -362,77 +398,96 @@ export function OpsBookingPanel({
             />
           </div>
 
-          {/* ── 금액 ─────────────────────────────────────────────────
-              입력칸이 주인공이고, 카드 두 장은 그걸 채우는 **바로가기**다. */}
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsbk-total">
-              {copy.mbTotal} <span className="req">*</span>
-            </label>
-            <div className="opsbk__money">
-              <span aria-hidden>¥</span>
-              <input
-                id="opsbk-total"
-                inputMode="numeric"
-                min={0}
-                onChange={(event) => {
-                  setTotalPrice(event.target.value);
-                  setBasePrice(null);
-                  setPercent(0);
-                }}
-                placeholder={copy.mbTotalPlaceholder}
-                type="number"
-                value={totalPrice}
-              />
-            </div>
-            <span className="opsbk__hint">{copy.mbTotalHint}</span>
+          <div>
+            {stepper(copy.mbAdults, numAdult, 1, setNumAdult)}
+            {stepper(copy.mbChildren, numChild, 0, setNumChild)}
           </div>
 
+          <div className="spw-two">
+            <div className="spw-field">
+              <label className="spw-field__l" htmlFor="opsbk-email">
+                {copy.spwOptional.replace("{label}", copy.mbEmail)}
+              </label>
+              <input
+                autoComplete="off"
+                className="spw-field__in is-sm"
+                id="opsbk-email"
+                onChange={(event) => setGuestEmail(event.target.value)}
+                placeholder="name@mail.com"
+                type="email"
+                value={guestEmail}
+              />
+            </div>
+            <div className="spw-field">
+              <label className="spw-field__l" htmlFor="opsbk-phone">
+                {copy.spwOptional.replace("{label}", copy.mbPhone)}
+              </label>
+              {/* 치는 대로 하이픈 — `+1-415-555-0142` · `090-1234-5678`(phone-format.ts). */}
+              <input
+                autoComplete="off"
+                className="spw-field__in is-sm is-mono"
+                id="opsbk-phone"
+                inputMode="tel"
+                onChange={(event) => setGuestPhone(formatPhoneInput(event.target.value))}
+                placeholder="+81"
+                type="tel"
+                value={guestPhone}
+              />
+            </div>
+          </div>
+
+          {/* ── 요금으로 채우기 ── 카드 두 장은 총액 칸을 채우는 **바로가기**다. */}
           {nights.length > 0 && (
-            <div className="opsbk__fill">
-              <span className="fld__l">{copy.mbFillFrom}</span>
-              <div className="opsbk__opts">
+            <>
+              <div className="spw-pcts__h">
+                <span className="spw-label">{copy.mbFillFrom}</span>
+                <span className="spw-pcts__hint">{copy.spwNightsTotal.replace("{n}", String(nights.length))}</span>
+              </div>
+              <div className="spw-fill">
                 {(["airbnb", "booking"] as const).map((channel) => {
                   const sum = rates[channel];
                   const disabled = sum.partial || sum.total <= 0;
+                  const on = basePrice?.channel === channel;
                   return (
                     <button
-                      aria-pressed={basePrice?.channel === channel}
-                      className={`opsbk__opt ${channel}${basePrice?.channel === channel ? " on" : ""}`}
-                      disabled={disabled}
+                      aria-pressed={on}
+                      className={`spw-fill__opt${on ? " on" : ""}`}
+                      disabled={disabled || pending}
                       key={channel}
                       onClick={() => applyBase(channel)}
                       type="button"
                     >
-                      <span className="opsbk__optl">{channelLabel(channel)}</span>
-                      <span className="opsbk__optv">{disabled ? "—" : money(sum.total)}</span>
+                      <span>{channelLabel(channel)}</span>
+                      <b>{disabled ? "—" : money(sum.total)}</b>
                     </button>
                   );
                 })}
               </div>
 
-              {basePrice && (
-                <div className="opsbk__pct">
-                  <span className="opsbk__pctl">{copy.mbAdjust}</span>
-                  {PERCENT_PRESETS.map((preset) => (
-                    <button
-                      className={`opsbk__pctbtn${percent === preset ? " on" : ""}`}
-                      key={preset}
-                      onClick={() => applyPercent(preset)}
-                      type="button"
-                    >
-                      {preset > 0 ? `+${preset}` : preset}%
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* 조정 % — 채널 합계를 고른 뒤에 쓴다(그 전에는 기준이 없다). */}
+              <div className="spw-adjust">
+                <span className="spw-adjust__l">{copy.mbAdjust}</span>
+                {PERCENT_PRESETS.map((preset) => (
+                  <button
+                    aria-pressed={!!basePrice && percent === preset}
+                    className={`spw-chip is-sm${basePrice && percent === preset ? " on" : ""}`}
+                    disabled={!basePrice || pending}
+                    key={preset}
+                    onClick={() => applyPercent(preset)}
+                    type="button"
+                  >
+                    {preset > 0 ? `+${preset}` : String(preset).replace("-", "−")}%
+                  </button>
+                ))}
+              </div>
 
-              {anyPartial && <div className="opsbk__warn">{copy.mbRatesPartial}</div>}
+              {anyPartial && <p className="spw-note is-warn">{copy.mbRatesPartial}</p>}
 
-              {/* 밤별 내역은 **2박 이상일 때만**, 접어서. 1박이면 합계가 곧 그 밤이다. */}
+              {/* 밤별 내역은 **2박 이상일 때만**. 1박이면 합계가 곧 그 밤이다. */}
               {nights.length > 1 && (
-                <details className="opsbk__nightly">
+                <details className="spw-nightly" open>
                   <summary>
-                    {copy.mbRates} · {copy.mbNights.replace("{n}", String(nights.length))}
+                    {copy.mbRates} · {nightsText}
                   </summary>
                   <table>
                     <thead>
@@ -445,7 +500,7 @@ export function OpsBookingPanel({
                     <tbody>
                       {rates.rows.map((row) => (
                         <tr key={row.night}>
-                          <td>{row.night.slice(5).replace("-", "/")}</td>
+                          <td>{spwDate(row.night, localeTag)}</td>
                           <td>{row.airbnb === null ? "—" : money(row.airbnb)}</td>
                           <td>{row.booking === null ? "—" : money(row.booking)}</td>
                         </tr>
@@ -454,66 +509,38 @@ export function OpsBookingPanel({
                   </table>
                 </details>
               )}
-            </div>
+            </>
           )}
 
-          <div className="opsbk__row2">
-            <div className="fld">
-              <label className="fld__l" htmlFor="opsbk-adults">
-                {copy.mbAdults}
-              </label>
-              <input
-                id="opsbk-adults"
-                min={1}
-                onChange={(event) => setNumAdult(Number(event.target.value))}
-                type="number"
-                value={numAdult}
-              />
-            </div>
-            <div className="fld">
-              <label className="fld__l" htmlFor="opsbk-children">
-                {copy.mbChildren}
-              </label>
-              <input
-                id="opsbk-children"
-                min={0}
-                onChange={(event) => setNumChild(Number(event.target.value))}
-                type="number"
-                value={numChild}
-              />
-            </div>
+          {/* ── 총액 ── 1박 단가가 아니라 숙박 전체. */}
+          <div className="spw-field">
+            <label className="spw-field__l" htmlFor="opsbk-total">
+              {copy.mbTotal}
+            </label>
+            <input
+              aria-required="true"
+              autoComplete="off"
+              className="spw-field__in is-mono"
+              id="opsbk-total"
+              inputMode="numeric"
+              onChange={(event) => {
+                setTotalPrice(event.target.value.replace(/[^\d]/g, ""));
+                setBasePrice(null);
+                setPercent(0);
+              }}
+              placeholder={copy.mbTotalPlaceholder}
+              type="text"
+              value={totalDisplay}
+            />
+            <span className="spw-field__hint">{copy.mbTotalHint}</span>
           </div>
 
-          <div className="opsbk__row2">
-            <div className="fld">
-              <label className="fld__l" htmlFor="opsbk-email">
-                {copy.mbEmail}
-              </label>
-              <input
-                id="opsbk-email"
-                onChange={(event) => setGuestEmail(event.target.value)}
-                type="email"
-                value={guestEmail}
-              />
-            </div>
-            <div className="fld">
-              <label className="fld__l" htmlFor="opsbk-phone">
-                {copy.mbPhone}
-              </label>
-              <input
-                id="opsbk-phone"
-                onChange={(event) => setGuestPhone(event.target.value)}
-                type="tel"
-                value={guestPhone}
-              />
-            </div>
-          </div>
-
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsbk-comments">
-              {copy.mbComments}
+          <div className="spw-field">
+            <label className="spw-field__l" htmlFor="opsbk-comments">
+              {copy.spwOptional.replace("{label}", copy.mbComments)}
             </label>
             <textarea
+              className="spw-field__area"
               id="opsbk-comments"
               onChange={(event) => setComments(event.target.value)}
               placeholder={copy.mbCommentsPlaceholder}
@@ -522,20 +549,23 @@ export function OpsBookingPanel({
             />
           </div>
 
-          {message && <p className="opsbk__msg">{message}</p>}
+          {message && (
+            <p className="spw-msg" role="status">
+              {message}
+            </p>
+          )}
         </div>
 
-        <div className="panel__foot">
-          <button className="btn btn--subtle" disabled={pending} onClick={onClose} type="button">
+        <div className="spw-foot is-panel">
+          <button className="spw-btn" disabled={pending} onClick={onClose} type="button">
             {copy.mbCancel}
           </button>
           <button
-            className="btn btn--pri"
+            className="spw-btn is-primary"
             disabled={!!localInvalid || takenInStay.length > 0 || pending}
             onClick={submit}
             type="button"
           >
-            <Check aria-hidden="true" />
             {copy.mbSubmit}
           </button>
         </div>

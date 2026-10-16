@@ -7,6 +7,7 @@ import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import type { RunOpsWrite } from "@/components/admin/ops/ops-write-tracker";
 import type { MobilePriceSubmitted } from "@/components/mobile/ops/mobile-ops-price-sheet";
 import type { GapContextEntry } from "@/lib/ops-gap-context";
+import { MswSuccess, mdWeekday, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
 
 /**
  * 모바일 최소숙박 시트 — Claude Design 시안 `4a 최소숙박 · 차단 시트 v3`(4a · 4b, 2026-10-02 사용자 확정).
@@ -31,6 +32,16 @@ export type MobileMinStaySheetCopy = MinStayPanelCopy & {
   mpNights: string;
   panelListTitle: string;
   panelListRooms: string;
+  panelGo: string;
+  panelCurrent: string;
+  panelNext: string;
+  mwGapHero: string;
+  mwNightUnit: string;
+  mwChangeHead: string;
+  mwChangedCells: string;
+  mwOfCells: string;
+  mwBack: string;
+  mwDone: string;
 };
 
 export type MobileMinStayCell = {
@@ -44,13 +55,6 @@ export type MobileMinStayCell = {
 
 const MIN_STAY_MAX = 30;
 
-const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-const pad = (date: string) => `${date.slice(5, 7)}/${date.slice(8, 10)}`;
-function weekdayLabel(date: string, localeTag: string): string {
-  return new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", weekday: "short" }).format(
-    new Date(`${date}T12:00:00+09:00`),
-  );
-}
 
 /** 기기 키보드의 「완료」(Enter)로 키보드를 내린다. */
 const blurOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -81,6 +85,8 @@ export function MobileOpsMinStaySheet({
   const [custom, setCustom] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const { done, succeed } = useSuccessThen();
 
   // 고른 칸 중 1박 갭인 것(데스크톱 패널과 같은 판정 — 격자가 넘겨 준 갭 맥락).
   const gapRows = useMemo(() => {
@@ -143,142 +149,207 @@ export function MobileOpsMinStaySheet({
           }),
       );
       if (!result.ok) {
+        setConfirming(false);
         setError(copy.msFailed.replace("{error}", minStayErrorText(copy, result.error)));
         return;
       }
-      onApplied(targets.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })));
-      onSubmitted({ count: targets.length, jobId: result.jobId, nights: value, settled });
+      // 접수 — 초록 체크(햅틱) 뒤 부모가 시트를 닫고 알림.
+      succeed(() => {
+        onApplied(targets.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })));
+        onSubmitted({ count: targets.length, jobId: result.jobId, nights: value, settled });
+      });
     });
   };
 
-  return (
-    <div className="mps mops-vars">
-      <div className="mps-body">
-        <div className="mps-head">
-          <div className="mps-head__t">
-            <h3>{copy.minStayTitle}</h3>
-            {scopeSummary && (
-              <p>
-                {scopeSummary.rooms}
-                <br />
-                {scopeSummary.dates}
-              </p>
-            )}
-          </div>
-          <span className="mps-cnt">{copy.mSelCount.replace("{n}", String(cells.length))}</span>
-        </div>
+  const minStayByKey = new Map(cells.map((cell) => [`${cell.roomKey}|${cell.date}`, cell.minStay]));
+  const changedCount = cells.filter((cell) => cell.minStay !== nights).length;
+  const buildingNames = [...new Set(cells.map((cell) => cell.roomKey.split("::")[0]).filter(Boolean))];
+  const sub = [buildingNames.join(" · "), copy.mSelCount.replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
+  const valueRow = (current: number | null) => (
+    <>
+      <span className="c">{current === null ? "—" : current}</span>
+      <span aria-hidden="true" className="ar">
+        →
+      </span>
+      <b className="nx ok">{nightsLabel(nights)}</b>
+    </>
+  );
 
-        {gapMode ? (
-          <div className="mms-hero">
-            <div className="mms-hero__n">
-              <b>{gapRows.length}</b>
-              <span>{copy.msGapCount}</span>
+  return (
+    <div className="msw">
+      <div className="msw-body">
+        {confirming ? (
+          <div className="msw-step" key="confirm">
+            <div className="msw-head">
+              <div className="msw-head__t">
+                <h3>{copy.mwChangeHead.replace("{n}", String(changedCount))}</h3>
+                <p>{[scopeSummary?.rooms, scopeSummary?.dates].filter(Boolean).join(" · ")}</p>
+              </div>
             </div>
-            <p>{copy.msGapBody}</p>
-          </div>
-        ) : (
-          <div className="mms-hero cur">
-            <div className="mms-hero__n">
-              <b>{distribution.length > 0 ? nightsLabel(distribution[0][0]) : "—"}</b>
-              <span>{copy.mmCurrent}</span>
+            <div className="msw-sum" role="status">
+              <div className="msw-kv">
+                <span className="k">{copy.mwChangedCells}</span>
+                <span className="v">
+                  {copy.mwOfCells.replace("{total}", String(cells.length)).replace("{n}", String(changedCount))}
+                </span>
+              </div>
+              <div className="msw-kv">
+                <span className="k">{copy.panelCurrent}</span>
+                <span className="v">
+                  {distribution.length > 0
+                    ? distribution.map(([value, count]) => `${nightsLabel(value)} ×${count}`).join(" · ")
+                    : "—"}
+                </span>
+              </div>
+              <div className="msw-kv">
+                <span className="k">{copy.panelNext}</span>
+                <span className="v">
+                  <b className="vi">{nightsLabel(nights)}</b>
+                </span>
+              </div>
             </div>
-            {distribution.length > 1 && (
-              <div className="mms-dist">
-                {distribution.map(([value, count]) => (
-                  <span key={value}>
-                    {nightsLabel(value)} <em>×{count}</em>
-                  </span>
-                ))}
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
               </div>
             )}
           </div>
-        )}
+        ) : (
+          <div className="msw-step" key="input">
+            <div className="msw-head">
+              <div className="msw-head__t">
+                <h3>{copy.minStayTitle}</h3>
+                <p>{sub}</p>
+              </div>
+              <button className="msw-link" onClick={onClear} type="button">
+                {copy.scopeClear}
+              </button>
+            </div>
 
-        <div className="mms-seg" role="group" aria-label={copy.minStayTitle}>
-          <button aria-pressed={!customActive && nights === 1} className={!customActive && nights === 1 ? "on" : ""} onClick={() => pick(1)} type="button">
-            {copy.msOneNight}
-          </button>
-          <button aria-pressed={!customActive && nights === 2} className={!customActive && nights === 2 ? "on" : ""} onClick={() => pick(2)} type="button">
-            {copy.msTwoNights}
-          </button>
-          <label className={`mms-cust${customActive ? " on" : ""}`}>
-            <input
-              aria-label={copy.msCustom}
-              autoComplete="off"
-              enterKeyHint="done"
-              inputMode="numeric"
-              max={MIN_STAY_MAX}
-              min={1}
-              onChange={(event) => pickCustom(event.target.value)}
-              onKeyDown={blurOnEnter}
-              placeholder={copy.msCustomPlaceholder}
-              type="number"
-              value={custom}
-            />
-          </label>
-        </div>
+            {gapMode ? (
+              <>
+                <div className="msw-hero">
+                  <b>{gapRows.length}</b>
+                  <span>{copy.mwGapHero}</span>
+                </div>
+                <p className="msw-hero__p">{copy.msGapBody}</p>
+              </>
+            ) : (
+              <div className="msw-hero cur">
+                <b>{distribution.length > 0 ? nightsLabel(distribution[0][0]) : "—"}</b>
+                <span>{copy.mmCurrent}</span>
+                {distribution.length > 1 && (
+                  <small>{distribution.map(([value, count]) => `${nightsLabel(value)} ×${count}`).join(" · ")}</small>
+                )}
+              </div>
+            )}
 
-        {!gapMode && (
-          <div className="mps-note warn">
-            <i aria-hidden="true" />
-            {copy.mmNoGap}
-          </div>
-        )}
+            <div className="msw-seg" role="group" aria-label={copy.minStayTitle}>
+              <button
+                aria-pressed={!customActive && nights === 1}
+                className={`msw-opt${!customActive && nights === 1 ? " on" : ""}`}
+                onClick={() => pick(1)}
+                type="button"
+              >
+                {nightsLabel(1)}
+              </button>
+              <button
+                aria-pressed={!customActive && nights === 2}
+                className={`msw-opt${!customActive && nights === 2 ? " on" : ""}`}
+                onClick={() => pick(2)}
+                type="button"
+              >
+                {nightsLabel(2)}
+              </button>
+              <label className={`msw-cust${customActive ? " on" : ""}`}>
+                <input
+                  aria-label={copy.msCustom}
+                  autoComplete="off"
+                  enterKeyHint="done"
+                  inputMode="numeric"
+                  max={MIN_STAY_MAX}
+                  min={1}
+                  onChange={(event) => pickCustom(event.target.value)}
+                  onKeyDown={blurOnEnter}
+                  placeholder={copy.msCustom}
+                  type="number"
+                  value={custom}
+                />
+                <span>{copy.mwNightUnit}</span>
+              </label>
+            </div>
 
-        {error && (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
-            {error}
-          </div>
-        )}
+            {!gapMode && <p className="msw-note left">{copy.mmNoGap}</p>}
 
-        <section aria-label={gapMode ? copy.mmGapList : copy.panelListTitle} className="mps-list">
-          <div className="mps-lh">
-            <b>{gapMode ? copy.mmGapList : copy.panelListTitle}</b>
-            <span>
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
+              </div>
+            )}
+
+            <section aria-label={gapMode ? copy.mmGapList : copy.panelListTitle} className="msw-list">
+              <div className="msw-list__h">
+                <span>{gapMode ? copy.mmGapList : copy.panelListTitle}</span>
+                <small>
+                  {gapMode
+                    ? copy.mSelCount.replace("{n}", String(gapRows.length))
+                    : copy.panelListRooms.replace("{rooms}", String(rooms.length)).replace("{cells}", String(cells.length))}
+                </small>
+              </div>
               {gapMode
-                ? copy.mSelCount.replace("{n}", String(gapRows.length))
-                : copy.panelListRooms.replace("{rooms}", String(rooms.length)).replace("{cells}", String(cells.length))}
-            </span>
-          </div>
-          {gapMode
-            ? gapRows.map((entry) => (
-                <div className="mms-r" key={`${entry.roomKey}|${entry.date}`}>
-                  <span className="b">{entry.propertyName}</span>
-                  <span className="rm">{entry.roomLabel}</span>
-                  <span className="d">
-                    {shortDate(entry.date)}
-                    <small>{weekdayLabel(entry.date, copy.localeTag)}</small>
-                  </span>
-                </div>
-              ))
-            : rooms.map(([key, room]) => (
-                <div key={key}>
-                  <div className="mps-rn">{room.label}</div>
-                  {room.rows.map((cell) => {
-                    const changed = cell.minStay !== nights;
-                    return (
-                      <div className="mps-r" key={cell.date}>
-                        <span className="d">{pad(cell.date)}</span>
-                        <span className={`c${changed ? " old" : ""}`}>{cell.minStay === null ? "—" : nightsLabel(cell.minStay)}</span>
-                        <i aria-hidden="true">{changed ? "→" : ""}</i>
-                        <b>{changed ? nightsLabel(nights) : ""}</b>
+                ? gapRows.map((entry) => (
+                    <div className="msw-row" key={`${entry.roomKey}|${entry.date}`}>
+                      <span className="rm">{entry.roomLabel}</span>
+                      <span className="d">
+                        {buildingNames.length > 1 ? `${entry.propertyName} · ` : ""}
+                        {mdWeekday(entry.date, copy.localeTag)}
+                      </span>
+                      {valueRow(minStayByKey.get(`${entry.roomKey}|${entry.date}`) ?? null)}
+                    </div>
+                  ))
+                : rooms.flatMap(([key, room]) =>
+                    room.rows.map((cell) => (
+                      <div className="msw-row" key={`${key}|${cell.date}`}>
+                        <span className="rm">{room.label}</span>
+                        <span className="d">{mdWeekday(cell.date, copy.localeTag)}</span>
+                        {cell.minStay !== nights ? (
+                          valueRow(cell.minStay)
+                        ) : (
+                          <span className="c">{nightsLabel(nights)}</span>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
-        </section>
+                    )),
+                  )}
+            </section>
+          </div>
+        )}
       </div>
 
-      <div className="mps-foot">
-        <button className="mps-btn ghost" onClick={onClear} type="button">
-          {copy.scopeClear}
-        </button>
-        <button className="mps-btn main" disabled={cells.length === 0 || pending} onClick={apply} type="button">
-          {copy.msSave.replace("{count}", String(cells.length))}
-        </button>
+      <div className={`msw-foot${confirming ? " two" : ""}`}>
+        {confirming ? (
+          <>
+            <button className="msw-btn ghost" disabled={pending} onClick={() => setConfirming(false)} type="button">
+              {copy.mwBack}
+            </button>
+            <button className="msw-btn" disabled={cells.length === 0 || pending} onClick={apply} type="button">
+              {copy.msSave.replace("{count}", String(cells.length))}
+            </button>
+          </>
+        ) : (
+          <button
+            className="msw-btn"
+            disabled={cells.length === 0 || pending}
+            onClick={() => {
+              setError(null);
+              setConfirming(true);
+            }}
+            type="button"
+          >
+            {copy.panelGo.replace("{count}", String(cells.length))}
+          </button>
+        )}
       </div>
+      {done && <MswSuccess label={copy.mwDone} />}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check } from "lucide-react";
 import {
   submitReservationEdit,
   type ReservationEditResult,
@@ -18,6 +17,9 @@ import {
 } from "@/lib/ops-booking-edit";
 import { MAX_STAY_NIGHTS, stayNights } from "@/lib/ops-manual-booking";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
+import { formatPhoneDisplay, formatPhoneInput } from "@/lib/phone-format";
+import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
+import "./ops-calendar-panels-white.css";
 
 /**
  * 예약 수정 — 예약 상세 패널 안에서 **본문과 하단을 바꿔 끼운다.**
@@ -142,7 +144,7 @@ export function OpsReservationEditForm({
   today,
 }: {
   channel: BookingEditChannel;
-  copy: ReservationEditCopy;
+  copy: ReservationEditCopy & SpwCopy & { rpGuests: string };
   detail: OpsReservationDetail;
   localeTag: string;
   onDiscard: () => void;
@@ -160,7 +162,8 @@ export function OpsReservationEditForm({
     notes: detail.internalNotes ?? "",
     numAdult: detail.numAdult ?? 1,
     numChild: detail.numChild ?? 0,
-    phone: detail.phone ?? "",
+    // 보이는 모양(하이픈)으로 시작한다 — 원래 값과 같은 기준으로 비교하니 손대지 않으면 안 보낸다.
+    phone: detail.phone ? formatPhoneDisplay(detail.phone) : "",
     totalPrice: detail.price,
   };
   const [draft, setDraft] = useState<BookingEditDraft>(original);
@@ -202,170 +205,197 @@ export function OpsReservationEditForm({
     });
   };
 
+  /** 총액 칸 표시 — 쉼표. 저장 값은 숫자만. */
+  const priceDisplay = priceText === "" ? "" : Number(priceText).toLocaleString("ja-JP");
+
+  const stepper = (label: string, value: number, min: number, key: "numAdult" | "numChild") => (
+    <div className="spw-step">
+      <span>{label}</span>
+      <span className="spw-step__ctl">
+        <button
+          aria-label={copy.spwMinus.replace("{label}", label)}
+          className="spw-step__btn"
+          disabled={pending || value <= min}
+          onClick={() => set(key, Math.max(min, value - 1))}
+          type="button"
+        >
+          −
+        </button>
+        <b aria-live="polite" className="spw-step__v" key={value}>
+          {value}
+        </b>
+        <button
+          aria-label={copy.spwPlus.replace("{label}", label)}
+          className="spw-step__btn"
+          disabled={pending}
+          onClick={() => set(key, value + 1)}
+          type="button"
+        >
+          +
+        </button>
+      </span>
+    </div>
+  );
+
   return (
     <>
-      <div className="panel__body opsrp__body">
-        <section className="opsrp__sec">
-          <h3 className="opsrp__h">{copy.reTitle}</h3>
+      <div className="spw-pbody">
+        {/* ── 숙박 ── 직접·수기 예약만. 채널 예약은 이유를 적고, 날짜는 흐린 칸으로만 보인다. */}
+        {stayEditable ? (
+          <div className="spw-group">
+            <span className="spw-label">
+              {copy.mbCheckIn} → {copy.mbCheckOut}
+            </span>
+            <AdminDateRangePicker
+              ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
+              from={draft.arrival}
+              isDateDisabled={availability.isDateDisabled}
+              labels={{
+                apply: copy.dateApply,
+                nextMonth: copy.dateNext,
+                prevMonth: copy.datePrev,
+                reset: copy.dateReset,
+                thisMonth: copy.dateThisMonth,
+              }}
+              localeTag={localeTag}
+              onChange={(from, to) => {
+                set("arrival", from);
+                set("departure", to > from ? to : draft.departure);
+              }}
+              onMonthChange={availability.loadMonths}
+              to={draft.departure}
+            />
+            <p className="spw-note">
+              {copy.mbNights.replace("{n}", String(nights.length))}
+              {takenInStay.length > 0 && (
+                <span className="spw-note__danger">
+                  {" "}
+                  {copy.mbErrNightsTaken.replace(
+                    "{dates}",
+                    takenInStay.map((night) => night.slice(5).replace("-", "/")).join(", "),
+                  )}
+                </span>
+              )}
+            </p>
+            <p className="spw-note">{availability.failed ? copy.mbAvailFailed : copy.mbAvailHint}</p>
+          </div>
+        ) : (
+          <>
+            <p className="spw-info">{copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel])}</p>
+            <div className="spw-two">
+              <div className="spw-field">
+                <span className="spw-field__l">{copy.mbCheckIn}</span>
+                <input aria-label={copy.mbCheckIn} className="spw-field__in" disabled readOnly value={spwDate(draft.arrival, localeTag)} />
+              </div>
+              <div className="spw-field">
+                <span className="spw-field__l">{copy.mbCheckOut}</span>
+                <input aria-label={copy.mbCheckOut} className="spw-field__in" disabled readOnly value={spwDate(draft.departure, localeTag)} />
+              </div>
+            </div>
+          </>
+        )}
 
-          {/* ── 숙박 ── 직접·수기 예약만. 채널 예약은 이유를 적는다. */}
-          {stayEditable ? (
-            <div className="fld">
-              <span className="fld__l">
-                {copy.mbCheckIn} → {copy.mbCheckOut}
-              </span>
-              <AdminDateRangePicker
-                ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
-                from={draft.arrival}
-                isDateDisabled={availability.isDateDisabled}
-                labels={{
-                  apply: copy.dateApply,
-                  nextMonth: copy.dateNext,
-                  prevMonth: copy.datePrev,
-                  reset: copy.dateReset,
-                  thisMonth: copy.dateThisMonth,
-                }}
-                localeTag={localeTag}
-                onChange={(from, to) => {
-                  set("arrival", from);
-                  set("departure", to > from ? to : draft.departure);
-                }}
-                onMonthChange={availability.loadMonths}
-                to={draft.departure}
-              />
-              <span className="opsbk__nights">
-                {copy.mbNights.replace("{n}", String(nights.length))}
-                {takenInStay.length > 0 && (
-                  <em>
-                    {copy.mbErrNightsTaken.replace(
-                      "{dates}",
-                      takenInStay.map((night) => night.slice(5).replace("-", "/")).join(", "),
-                    )}
-                  </em>
-                )}
-              </span>
-              <span className="opsbk__hint">
-                {availability.failed ? copy.mbAvailFailed : copy.mbAvailHint}
-              </span>
-            </div>
-          ) : (
-            <p className="opsrp__lock">{copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel])}</p>
-          )}
+        <div className="spw-field">
+          <label className="spw-field__l" htmlFor="opsre-guest">
+            {copy.mbGuest}
+          </label>
+          <input
+            className="spw-field__in"
+            id="opsre-guest"
+            onChange={(event) => set("guestName", event.target.value)}
+            type="text"
+            value={draft.guestName}
+          />
+        </div>
+        <div className="spw-field">
+          <label className="spw-field__l" htmlFor="opsre-email">
+            {copy.mbEmail}
+          </label>
+          <input
+            className="spw-field__in"
+            id="opsre-email"
+            onChange={(event) => set("email", event.target.value)}
+            type="email"
+            value={draft.email}
+          />
+        </div>
+        <div className="spw-field">
+          <label className="spw-field__l" htmlFor="opsre-phone">
+            {copy.mbPhone}
+          </label>
+          {/* 치는 대로 하이픈. 손대지 않으면 받은 값 그대로 남는다(바뀐 것만 보낸다). */}
+          <input
+            className="spw-field__in is-mono"
+            id="opsre-phone"
+            inputMode="tel"
+            onChange={(event) => set("phone", formatPhoneInput(event.target.value))}
+            type="tel"
+            value={draft.phone}
+          />
+        </div>
 
-          {/* ── 총액 ── 모든 예약. 채널 예약은 「손님 청구액은 안 바뀐다」를 적는다. */}
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsre-total">
-              {copy.mbTotal}
-            </label>
-            <div className="opsbk__money">
-              <span aria-hidden>¥</span>
-              <input
-                id="opsre-total"
-                inputMode="numeric"
-                min={0}
-                onChange={(event) => {
-                  setPriceText(event.target.value);
-                  const trimmed = event.target.value.trim();
-                  set("totalPrice", trimmed === "" ? null : Number(trimmed));
-                }}
-                type="number"
-                value={priceText}
-              />
-            </div>
-            {!stayEditable && (
-              <span className="opsrp__warnline">
-                {copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel])}
-              </span>
-            )}
-          </div>
-
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsre-guest">
-              {copy.mbGuest}
-            </label>
-            <input
-              id="opsre-guest"
-              onChange={(event) => set("guestName", event.target.value)}
-              type="text"
-              value={draft.guestName}
-            />
-          </div>
-          <div className="opsbk__row2">
-            <div className="fld">
-              <label className="fld__l" htmlFor="opsre-adults">
-                {copy.mbAdults}
-              </label>
-              <input
-                id="opsre-adults"
-                min={1}
-                onChange={(event) => set("numAdult", Number(event.target.value))}
-                type="number"
-                value={draft.numAdult}
-              />
-            </div>
-            <div className="fld">
-              <label className="fld__l" htmlFor="opsre-children">
-                {copy.mbChildren}
-              </label>
-              <input
-                id="opsre-children"
-                min={0}
-                onChange={(event) => set("numChild", Number(event.target.value))}
-                type="number"
-                value={draft.numChild}
-              />
-            </div>
-          </div>
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsre-email">
-              {copy.mbEmail}
-            </label>
-            <input
-              id="opsre-email"
-              onChange={(event) => set("email", event.target.value)}
-              type="email"
-              value={draft.email}
-            />
-          </div>
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsre-phone">
-              {copy.mbPhone}
-            </label>
-            <input
-              id="opsre-phone"
-              onChange={(event) => set("phone", event.target.value)}
-              type="tel"
-              value={draft.phone}
-            />
-          </div>
-          <div className="fld">
-            <label className="fld__l" htmlFor="opsre-notes">
-              {copy.rpNotes}
-            </label>
-            <textarea
-              id="opsre-notes"
-              onChange={(event) => set("notes", event.target.value)}
-              rows={3}
-              value={draft.notes}
-            />
-            <span className="opsbk__hint">{copy.reNotesHint}</span>
-          </div>
+        <section className="spw-sect">
+          <span className="spw-sec">{copy.rpGuests}</span>
+          {stepper(copy.mbAdults, draft.numAdult, 1, "numAdult")}
+          {stepper(copy.mbChildren, draft.numChild, 0, "numChild")}
         </section>
 
-        {message && <p className="opsrp__err">{message}</p>}
+        {/* ── 총액 ── 모든 예약. 채널 예약은 「손님 청구액은 안 바뀐다」를 적는다. */}
+        <div className="spw-field">
+          <label className="spw-field__l" htmlFor="opsre-total">
+            {copy.mbTotal}
+          </label>
+          <input
+            autoComplete="off"
+            className="spw-field__in is-mono"
+            id="opsre-total"
+            inputMode="numeric"
+            onChange={(event) => {
+              const digits = event.target.value.replace(/[^\d]/g, "");
+              setPriceText(digits);
+              set("totalPrice", digits === "" ? null : Number(digits));
+            }}
+            type="text"
+            value={priceDisplay}
+          />
+          {!stayEditable && (
+            <span className="spw-field__hint is-warn">
+              {copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel])}
+            </span>
+          )}
+        </div>
+
+        <div className="spw-field">
+          <label className="spw-field__l" htmlFor="opsre-notes">
+            {copy.rpNotes}
+          </label>
+          <textarea
+            className="spw-field__area"
+            id="opsre-notes"
+            onChange={(event) => set("notes", event.target.value)}
+            rows={2}
+            value={draft.notes}
+          />
+          <span className="spw-field__hint">{copy.reNotesHint}</span>
+        </div>
+
+        {message && (
+          <p className="spw-msg is-err" role="status">
+            {message}
+          </p>
+        )}
       </div>
 
-      <div className="panel__foot">
-        <button className="btn btn--subtle" disabled={pending} onClick={onDiscard} type="button">
+      <div className="spw-foot is-panel">
+        <button className="spw-btn" disabled={pending} onClick={onDiscard} type="button">
           {copy.reDiscard}
         </button>
         <button
-          className="btn btn--pri"
+          className="spw-btn is-primary"
           disabled={pending || localError === "no_changes" || takenInStay.length > 0}
           onClick={save}
           type="button"
         >
-          <Check aria-hidden="true" />
           {copy.reSave}
         </button>
       </div>

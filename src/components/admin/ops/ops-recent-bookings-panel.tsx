@@ -5,7 +5,15 @@ import { X } from "lucide-react";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { OpsRecentBooking } from "@/lib/ops-calendar";
-import { RECENT_BOOKINGS_MAX_SPAN_DAYS, tokyoDateOf, tokyoMs, tokyoParts } from "@/lib/ops-recent-bookings-range";
+import {
+  RECENT_BOOKINGS_DEFAULT_HOURS,
+  RECENT_BOOKINGS_MAX_SPAN_DAYS,
+  tokyoDateOf,
+  tokyoMs,
+  tokyoParts,
+} from "@/lib/ops-recent-bookings-range";
+import { ListLoading } from "./ops-price-wins-panel";
+import "./ops-calendar-tools-white.css";
 
 /**
  * 최근 예약 목록 — 오른쪽 사이드 패널(모바일은 같은 것을 하단 시트에 담는다). 2026-10-05.
@@ -16,6 +24,10 @@ import { RECENT_BOOKINGS_MAX_SPAN_DAYS, tokyoDateOf, tokyoMs, tokyoParts } from 
  * 채널 · 손님 · 금액 · 몇 시간 전) · 누르면 예약 상세. 머리의 「기간 바꾸기」로 시작 · 끝(도쿄 날짜 + 시각)을 정한다
  * — **날짜만**(콘솔 공용 범위 달력 `AdminDateRangePicker`): 시작일 0시부터 끝날 24시까지, 끝이 오늘이면 지금까지
  * (2026-10-05 사용자 결정 「시각은 자정으로 통일」).
+ *
+ * 화이트 리디자인(2026-10-16, 시안 SalesRecent-PC · Phone): 머리 「N건 · 24시간」 + 빠른 시간대 탭(1 · 6 · 24 · 48시간 ·
+ * 3일 — 48시간 = 기본) + 날짜로 고르기(기존 범위 달력). 빠른 탭은 「지금부터 N시간 전 ~ 지금」을 직접 지정으로 보낸다
+ * (`onApplyRange` — 서버가 끝을 지금으로 자른다). 줄 = 채널 점 · 손님 · 금액 / 객실 · 숙박 · 몇 분(시간) 전 / 채널 · 예약 시각.
  */
 
 export type RecentBookingsCopy = {
@@ -30,6 +42,9 @@ export type RecentBookingsCopy = {
   rbEmpty: string;
   rbAgo: string;
   rbScopeNote: string;
+  rbAgoMin: string;
+  rbPresetHours: string;
+  rbPresetDays: string;
   pwAllProperties: string;
   pwLoading: string;
   pwBookedAt: string;
@@ -68,6 +83,24 @@ export function recentRangeLabel(range: RecentRange, nowLabel: string): string {
 /** 끝(배타 — 다음 날 0시)의 하루 전 = 끝날. */
 function lastDayOf(range: RecentRange): string {
   return tokyoDateOf(Date.parse(range.to) - 1);
+}
+
+/** 빠른 시간대(시간). 48 = 기본(서버 기본 창). */
+const PRESET_HOURS = [1, 6, 24, RECENT_BOOKINGS_DEFAULT_HOURS, 72] as const;
+
+/** 「지금부터 N시간 전 ~ 지금」 — 끝은 한 시간 넉넉히 보내고 서버가 지금으로 자른다(`endsNow` 가 참이 되게). */
+function presetRange(hours: number): { from: string; to: string } {
+  const now = Date.now();
+  return { from: new Date(now - hours * 3_600_000).toISOString(), to: new Date(now + 3_600_000).toISOString() };
+}
+
+/** 지금 범위가 빠른 탭 중 하나인가 — 기본이면 48, 직접 지정이 「N시간 전 ~ 지금」이면 N(몇 분 오차 허용). */
+function activePreset(range: RecentRange | null): number | null {
+  if (!range) return null;
+  if (range.isDefault) return RECENT_BOOKINGS_DEFAULT_HOURS;
+  if (!range.endsNow) return null;
+  const hours = (Date.parse(range.to) - Date.parse(range.from)) / 3_600_000;
+  return PRESET_HOURS.find((preset) => Math.abs(preset - hours) < 0.1) ?? null;
 }
 
 export function OpsRecentBookingsPanel({
@@ -117,25 +150,64 @@ export function OpsRecentBookingsPanel({
   const pickerTo = range ? (range.endsNow ? today : lastDayOf(range)) : "";
   // 「N시간 전」의 기준 — 패널을 연 순간(렌더마다 시계를 읽지 않는다).
   const [nowMs] = useState(() => Date.now());
+  const preset = activePreset(range);
+  const presetLabel = (hours: number) =>
+    hours >= 72 ? copy.rbPresetDays.replace("{n}", String(hours / 24)) : copy.rbPresetHours.replace("{n}", String(hours));
+  /** 빠른 탭 — 48시간은 기본으로, 나머지는 「지금부터 N시간 전 ~ 지금」. 끝은 넉넉히 보내고 서버가 지금으로 자른다. */
+  const applyPreset = (hours: number) => {
+    setInvalid(false);
+    if (hours === RECENT_BOOKINGS_DEFAULT_HOURS) {
+      onResetRange();
+      return;
+    }
+    const { from, to } = presetRange(hours);
+    onApplyRange(from, to);
+  };
+  const ago = (iso: string) => {
+    const minutes = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60_000));
+    if (minutes < 60) return copy.rbAgoMin.replace("{m}", String(minutes));
+    return copy.rbAgo.replace("{h}", String(Math.round((minutes / 60) * 10) / 10));
+  };
 
   return (
     <>
       <div className="panel-scrim" onClick={onClose} />
-      <aside aria-label={copy.rbTitle} aria-modal="true" className="panel opspw opsrb" ref={panelRef} role="dialog" tabIndex={-1}>
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.rbTitle}</span>
-            <button aria-label={copy.rcClose} className="panel__x" onClick={onClose} type="button">
+      <aside aria-label={copy.rbTitle} aria-modal="true" className="panel stw-panel stw-rb" ref={panelRef} role="dialog" tabIndex={-1}>
+        <div className="panel__h stw-h">
+          <div className="stw-h__row">
+            <div className="stw-h__txt">
+              <span className="stw-h__kicker">
+                {copy.rbTitle} · {propertyName ?? copy.pwAllProperties}
+              </span>
+              <b className="stw-h__title">
+                {bookings ? copy.rbCount.replace("{n}", String(list.length)) : copy.pwLoading}
+                {range && (
+                  <span className="stw-h__aside">
+                    {" · "}
+                    {preset !== null ? presetLabel(preset) : recentRangeLabel(range, copy.rbNow)}
+                  </span>
+                )}
+              </b>
+              <span className="stw-h__sub">{range ? recentRangeLabel(range, copy.rbNow) : "…"}</span>
+            </div>
+            <button aria-label={copy.rcClose} className="panel__x stw-x" onClick={onClose} type="button">
               <X />
             </button>
           </div>
-          <div className="opspw__head">
-            <strong>{bookings ? copy.rbCount.replace("{n}", String(list.length)) : copy.pwLoading}</strong>
+          <div className="stw-seg is-fill" role="group" aria-label={copy.rbEdit}>
+            {PRESET_HOURS.map((hours) => (
+              <button
+                aria-pressed={preset === hours}
+                className={preset === hours ? "on" : undefined}
+                key={hours}
+                onClick={() => applyPreset(hours)}
+                type="button"
+              >
+                {presetLabel(hours)}
+              </button>
+            ))}
           </div>
-          <div className="opspw__sub">
-            {propertyName ?? copy.pwAllProperties} · {range ? recentRangeLabel(range, copy.rbNow) : "…"}
-          </div>
-          <div className="opsrb__rangebar">
+          <div className="stw-rb__range">
             <AdminDateRangePicker
               ariaLabel={copy.rbEdit}
               from={pickerFrom}
@@ -152,58 +224,49 @@ export function OpsRecentBookingsPanel({
               to={pickerTo}
             />
             {range && !range.isDefault && (
-              <button className="opsrb__btn" onClick={onResetRange} type="button">
+              <button className="stw-link" onClick={onResetRange} type="button">
                 {copy.rbReset}
               </button>
             )}
           </div>
           {invalid && (
-            <p className="opsrb__err" role="alert">
+            <p className="stw-msg is-warn" role="alert">
               {copy.rbInvalid}
             </p>
           )}
         </div>
 
-        <div className="panel__body opspw__body">
+        <div className="panel__body stw-body">
           {bookings === null ? (
-            <p aria-live="polite" className="opspw__empty">
-              {copy.pwLoading}
-            </p>
+            <ListLoading label={copy.pwLoading} />
           ) : list.length === 0 ? (
-            <p className="opspw__empty">{copy.rbEmpty}</p>
+            <p className="stw-empty">{copy.rbEmpty}</p>
           ) : (
-            <ul className="opspw__list">
-              {list.map((row) => {
-                const hours = Math.max(0, Math.round(((nowMs - Date.parse(row.bookedAt)) / 3_600_000) * 10) / 10);
-                return (
-                  <li key={row.reservationId}>
-                    <button className="opspw__row" onClick={() => onOpenReservation(row)} type="button">
-                      <span className="opspw__main">
-                        <span className="opspw__room">
-                          {row.propertyName} {row.roomLabel}
-                          <span className="opspw__dates">
-                            {shortDate(row.checkIn)}–{shortDate(row.checkOut)}
-                          </span>
-                        </span>
-                        <span className="opspw__guest">
-                          <span className={`opspw__chan ${row.channel}`}>{CHANNEL_LABEL[row.channel] ?? row.channel}</span>
-                          {row.guestName}
-                        </span>
+            <ul className="stw-list">
+              {list.map((row, index) => (
+                <li className="stw-item is-row" key={row.reservationId} style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
+                  <button className="stw-row has-dot" onClick={() => onOpenReservation(row)} type="button">
+                    <i aria-hidden="true" className={`stw-chdot is-${row.channel}`} />
+                    <span className="stw-row__l">
+                      <b className="stw-row__name">{row.guestName}</b>
+                      <span className="stw-row__sub">
+                        {row.propertyName} {row.roomLabel} · {shortDate(row.checkIn)} → {shortDate(row.checkOut)}
                       </span>
-                      <span className="opspw__price">
-                        <span className="opspw__delta">{row.amount > 0 ? money(row.amount) : "—"}</span>
+                      <span className="stw-row__meta">
+                        {CHANNEL_LABEL[row.channel] ?? row.channel} ·{" "}
+                        {copy.pwBookedAt.replace("{time}", stamp(row.bookedAt, localeTag))}
                       </span>
-                      <span className="opspw__time">
-                        <strong>{copy.rbAgo.replace("{h}", String(hours))}</strong>
-                        <span className="opspw__meta">{copy.pwBookedAt.replace("{time}", stamp(row.bookedAt, localeTag))}</span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
+                    </span>
+                    <span className="stw-row__r">
+                      <b className="stw-row__amt">{row.amount > 0 ? money(row.amount) : "—"}</b>
+                      <span className="stw-row__time">{ago(row.bookedAt)}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
-          <p className="opspw__note">
+          <p className="stw-note">
             {range && !range.isDefault ? copy.rbCustomNote : copy.rbDefaultNote} {copy.rbScopeNote}
           </p>
         </div>

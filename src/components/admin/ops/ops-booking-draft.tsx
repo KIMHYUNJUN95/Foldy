@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { checkoutCandidates, resolveDraftCheckout, stayNights } from "@/lib/ops-manual-booking";
+import "./ops-calendar-panels-white.css";
 
 /**
  * 수동 예약 — 체크인을 찍은 **그 방의 예약 줄** 위에 깔리는 기간 고르기 레이어.
@@ -141,7 +142,7 @@ export function OpsBookingDraft({
       tabIndex={0}
     >
       {ghost && (
-        <div aria-hidden className={`opsg__draft${checkOut ? " has-out" : ""}`} style={ghost}>
+        <div aria-hidden className={`opsg__draft spw-draft${checkOut ? " has-out" : ""}`} style={ghost}>
           {checkOut
             ? `${nightsLabel.replace("{n}", String(stayNights(checkIn, checkOut).length))} · ${checkOut
                 .slice(5)

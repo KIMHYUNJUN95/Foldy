@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Copy, Mail, Phone } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import {
   loadReservationDetail,
   submitReservationCancel,
@@ -10,7 +10,16 @@ import {
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
 import { reservationCancelErrorText, type ReservationCardCopy } from "@/components/admin/ops/ops-reservation-panel";
 import { CHANNEL_NAME, reservationEditErrorText } from "@/components/admin/ops/ops-reservation-edit";
-import { MobileStayDates, MobileStepper } from "@/components/mobile/ops/mobile-ops-form";
+import {
+  MobileStayDates,
+  MobileStepper,
+  MswField,
+  MswPhoneInput,
+  MswSuccess,
+  mdWeekday,
+  useSuccessThen,
+} from "@/components/mobile/ops/mobile-ops-form";
+import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 import {
   canEditStay,
   diffBookingEdit,
@@ -49,17 +58,15 @@ export type MobileReservationSheetCopy = ReservationCardCopy & {
   dateNext: string;
   datePrev: string;
   today: string;
+  mwCancelAsk: string;
+  mwRoom: string;
+  mwDone: string;
 };
 
 const CHANNEL_LABEL: Record<string, string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Direct" };
 const money = (value: number) => `¥${Math.round(value).toLocaleString("ja-JP")}`;
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
-function weekday(date: string, localeTag: string) {
-  return new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", weekday: "short" }).format(
-    new Date(`${date}T12:00:00+09:00`),
-  );
-}
 function stamp(iso: string, localeTag: string) {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return iso;
@@ -110,11 +117,11 @@ export function MobileOpsReservationSheet({
   const [mode, setMode] = useState<"view" | "edit" | "cancel">("view");
   const [detail, setDetail] = useState<OpsReservationDetail | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [open, setOpen] = useState<{ guest: boolean; booking: boolean }>({ booking: false, guest: false });
   const [copied, setCopied] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { done, succeed } = useSuccessThen();
 
   useEffect(() => {
     let alive = true;
@@ -129,14 +136,12 @@ export function MobileOpsReservationSheet({
   }, [bar.id]);
 
   const channelName = detail?.channelName ?? CHANNEL_LABEL[bar.channel] ?? bar.channel;
-  const chClass = bar.channel === "airbnb" ? "abnb" : bar.channel === "booking" ? "bkng" : "dir";
   const guests =
     detail && detail.numAdult !== null
       ? copy.rpGuestsValue.replace("{adults}", String(detail.numAdult)).replace("{children}", String(detail.numChild ?? 0))
       : null;
   const net = detail && detail.price !== null && detail.commission !== null ? detail.price - detail.commission : null;
   const perNight = detail && detail.price !== null && nights > 0 ? detail.price / nights : null;
-  const phone = detail?.phone || detail?.mobile || null;
   const reference = detail?.channelReference || detail?.beds24Id || null;
   const leadDays = detail?.bookedAt ? daysBetween(detail.bookedAt, bar.checkIn) : null;
 
@@ -152,28 +157,13 @@ export function MobileOpsReservationSheet({
     startTransition(async () => {
       const result = await submitReservationCancel({ reason, reservationId: bar.id });
       if (result.ok) {
-        onCancelled();
+        succeed(onCancelled);
         return;
       }
       setError(reservationCancelErrorText(copy, result));
       setMode("view");
     });
   };
-
-  const head = (
-    <div className="mrs-head">
-      <h3>{bar.guestName}</h3>
-      <p>
-        {propertyName} {roomLabel}
-      </p>
-      <div className="mrs-tags">
-        <span className={chClass}>{channelName}</span>
-        {bar.isCancelled && <span className="cxl">{copy.rcCancelled}</span>}
-        <span>{copy.rcNights.replace("{n}", String(nights))}</span>
-        {guests && <span>{guests}</span>}
-      </div>
-    </div>
-  );
 
   if (mode === "edit" && detail) {
     return (
@@ -193,254 +183,219 @@ export function MobileOpsReservationSheet({
     );
   }
 
-  const row = (key: string, label: string, value: string | null, copyText?: string | null) =>
+  /** 한 줄 — 값이 없으면 줄을 그리지 않는다. 복사는 글자 버튼(아이콘만 있는 버튼 금지). */
+  const row = (
+    key: string,
+    label: string,
+    value: React.ReactNode | null,
+    copyText?: string | null,
+  ) =>
     value ? (
-      <div className="mrs-kv" key={key}>
+      <div className="msw-kv" key={key}>
         <span className="k">{label}</span>
-        <span className="v">{value}</span>
-        {copyText && (
-          <button className="cp" onClick={() => copyValue(key, copyText)} type="button">
-            {copied === key ? copy.rpCopied : copy.rpCopy}
-          </button>
-        )}
+        <span className="v">
+          {value}
+          {copyText && (
+            <button
+              className={`cp${copied === key ? " on" : ""}`}
+              onClick={() => copyValue(key, copyText)}
+              type="button"
+            >
+              {copied === key ? copy.rpCopied : copy.rpCopy}
+            </button>
+          )}
+        </span>
       </div>
     ) : null;
+  const tel = (raw: string | null) => (raw ? <a href={phoneHref(raw)}>{formatPhoneDisplay(raw)}</a> : null);
+  const mono = (text: string | null) => (text ? <span className="mono">{text}</span> : null);
 
   const countryText = detail?.countryCode ? displayName(detail.countryCode, localeTag, "region") : (detail?.countryText ?? null);
   const languageText = detail?.language ? displayName(detail.language, localeTag, "language") : null;
+  const sub = [channelName, `${propertyName} ${roomLabel}`.trim(), copy.rcNights.replace("{n}", String(nights)), guests]
+    .filter(Boolean)
+    .join(" · ");
 
-  return (
-    <div className="mps mops-vars">
-      <div className="mps-body">
-        {head}
-
-        {mode === "cancel" ? (
-          <>
-            <div className="mrs-warn" role="alert">
-              <div className="k">{copy.mrCancelHead}</div>
-              <div className="big">{copy.mrCancelBig.replace("{channel}", channelName)}</div>
-              <p>{copy.rcCancelWarning}</p>
+  if (mode === "cancel") {
+    return (
+      <div className="msw">
+        <div className="msw-body">
+          <div className="msw-step" key="cancel">
+            <span aria-hidden="true" className="msw-cxl-ic">
+              <TriangleAlert size={24} strokeWidth={1.8} />
+            </span>
+            <h3 className="msw-cxl-t">{copy.mwCancelAsk}</h3>
+            <div className="msw-sum gray">
+              {row("g", copy.rpSectionGuest, <b>{bar.guestName}</b>)}
+              {row("r", copy.mwRoom, `${propertyName} · ${roomLabel}`)}
+              {row("s", copy.rpSectionStay, `${md(bar.checkIn)} → ${md(bar.checkOut)} · ${copy.rcNights.replace("{n}", String(nights))}`)}
+              {row("n", copy.mrRefCopy, mono(reference))}
             </div>
-            <label className="mfm-field">
-              <span className="mfm-l">{copy.rcReason}</span>
-              <input
-                className="mfm-in"
+            <MswField label={copy.rcReason}>
+              <textarea
+                className="msw-in"
                 enterKeyHint="done"
                 onChange={(event) => setReason(event.target.value)}
                 placeholder={copy.rcReasonPlaceholder}
-                type="text"
+                rows={2}
                 value={reason}
               />
-            </label>
-          </>
-        ) : (
-          <>
-            <div className="mrs-stay">
-              <div className="node">
-                <span className="l">{copy.rpCheckIn}</span>
-                <span className="v">{md(bar.checkIn)}</span>
-                <span className="w">
-                  {weekday(bar.checkIn, localeTag)}
+            </MswField>
+            <p className="msw-cxl-w">{copy.rcCancelWarning}</p>
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="msw-foot">
+          <button className="msw-btn red" disabled={pending} onClick={cancel} type="button">
+            {copy.rcCancelConfirm}
+          </button>
+          <button className="msw-btn text" disabled={pending} onClick={() => setMode("view")} type="button">
+            {copy.rcKeep}
+          </button>
+        </div>
+        {done && <MswSuccess label={copy.mwDone} />}
+      </div>
+    );
+  }
+
+  return (
+    <div className="msw">
+      <div className="msw-body">
+        <div className="msw-step" key="view">
+          <div className="msw-head">
+            <div className="msw-head__t">
+              <h3>{bar.guestName}</h3>
+              <p>
+                {bar.isCancelled && <span className="cxl">{copy.rcCancelled} · </span>}
+                {sub}
+              </p>
+            </div>
+          </div>
+
+          <div className="msw-sect">
+            <span className="h">{copy.rpSectionStay}</span>
+            <div className="msw-stay">
+              <div>
+                <b>{mdWeekday(bar.checkIn, localeTag)}</b>
+                <small>
+                  {copy.rpCheckIn}
                   {detail?.arrivalTime ? ` · ${copy.mrArrival.replace("{time}", detail.arrivalTime)}` : ""}
-                </span>
+                </small>
               </div>
-              <div className="mid">
-                {copy.rcNights.replace("{n}", String(nights))}
-                <i aria-hidden="true" />
-              </div>
-              <div className="node end">
-                <span className="l">{copy.rpCheckOut}</span>
-                <span className="v">{md(bar.checkOut)}</span>
-                <span className="w">{weekday(bar.checkOut, localeTag)}</span>
+              <i aria-hidden="true">
+                <span>{copy.rcNights.replace("{n}", String(nights))}</span>
+              </i>
+              <div className="end">
+                <b>{mdWeekday(bar.checkOut, localeTag)}</b>
+                <small>{copy.rpCheckOut}</small>
               </div>
             </div>
-
-            {!detail && !loadFailed && (
-              // 최종 배치와 같은 자리표시 — 다 와도 튀지 않는다.
-              <>
-                <div aria-busy="true" className="mrs-sk">
-                  <span className="mrs-bone" style={{ height: 12, width: "30%" }} />
-                  <span className="mrs-bone" style={{ height: 24, width: "55%" }} />
-                  <span className="mrs-bone" style={{ height: 40 }} />
-                </div>
-                <div className="mrs-sk three">
-                  <span className="mrs-bone" style={{ height: 42 }} />
-                  <span className="mrs-bone" style={{ height: 42 }} />
-                  <span className="mrs-bone" style={{ height: 42 }} />
-                </div>
-              </>
+            {leadDays !== null && leadDays >= 0 && (
+              <span className="msw-lead">{copy.rpLeadTime.replace("{n}", String(leadDays))}</span>
             )}
-            {loadFailed && (
-              <div className="mps-note danger" role="alert">
-                <i aria-hidden="true" />
-                {copy.rpLoadFailed}
-              </div>
-            )}
-
-            {detail && (
-              <>
-                {detail.price !== null && (
-                  <div className="mrs-money">
-                    <div className="tot">
-                      <span>{copy.rpTotal}</span>
-                      <b>{money(detail.price)}</b>
-                    </div>
-                    <div className="row">
-                      <div className="neg">
-                        <span>{copy.rpCommission}</span>
-                        <b>{detail.commission !== null ? `−${money(detail.commission)}` : "—"}</b>
-                      </div>
-                      <div>
-                        <span>{copy.rpNet}</span>
-                        <b>{net !== null ? money(net) : "—"}</b>
-                      </div>
-                      <div>
-                        <span>{copy.rpPerNight}</span>
-                        <b>{perNight !== null ? money(perNight) : "—"}</b>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {bar.isCancelled && detail.price === 0 && <p className="mps-ch">{copy.rpMoneyCancelled}</p>}
-
-                {/* 빠른 연락 — 없는 값은 흐리게(누를 수 없음). */}
-                <div className="mrs-act">
-                  {phone ? (
-                    <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}>
-                      <Phone aria-hidden="true" />
-                      {copy.rpPhone}
-                    </a>
-                  ) : (
-                    <span className="off">
-                      <Phone aria-hidden="true" />
-                      {copy.rpPhone}
-                    </span>
-                  )}
-                  {detail.email ? (
-                    <a href={`mailto:${detail.email}`}>
-                      <Mail aria-hidden="true" />
-                      {copy.rpEmail}
-                    </a>
-                  ) : (
-                    <span className="off">
-                      <Mail aria-hidden="true" />
-                      {copy.rpEmail}
-                    </span>
-                  )}
-                  <button disabled={!reference} onClick={() => reference && copyValue("ref", reference)} type="button">
-                    <Copy aria-hidden="true" />
-                    {copied === "ref" ? copy.rpCopied : copy.mrRefCopy}
-                  </button>
-                </div>
-
-                {detail.guestComments && (
-                  <div className="mrs-msg">
-                    <span className="l">{copy.rpComments}</span>
-                    <p>{detail.guestComments}</p>
-                  </div>
-                )}
-
-                <div className="mrs-fold">
-                  <button aria-expanded={open.guest} onClick={() => setOpen((o) => ({ ...o, guest: !o.guest }))} type="button">
-                    <span>
-                      {copy.mrGuestInfo}
-                      <small>{[countryText, languageText].filter(Boolean).join(" · ")}</small>
-                    </span>
-                    <i aria-hidden="true">{open.guest ? "⌃" : "›"}</i>
-                  </button>
-                  {open.guest && (
-                    <div className="b">
-                      {row("email", copy.rpEmail, detail.email, detail.email)}
-                      {row("phone", copy.rpPhone, detail.phone, detail.phone)}
-                      {row("mobile", copy.rpMobile, detail.mobile, detail.mobile)}
-                      {row(
-                        "country",
-                        copy.rpCountry,
-                        countryText
-                          ? `${countryText}${detail.countrySource === "phone" ? ` · ${copy.rpCountryFromPhone}` : ""}`
-                          : null,
-                      )}
-                      {row("lang", copy.rpLanguage, languageText)}
-                      {row("addr", copy.rpAddress, detail.address)}
-                      {detail.internalNotes && (
-                        <div className="mrs-msg note">
-                          <span className="l">{copy.rpNotes}</span>
-                          <p>{detail.internalNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mrs-fold">
-                  <button aria-expanded={open.booking} onClick={() => setOpen((o) => ({ ...o, booking: !o.booking }))} type="button">
-                    <span>
-                      {copy.mrBookingInfo}
-                      {detail.bookedAt && (
-                        <small>
-                          {leadDays !== null
-                            ? copy.mrBookedSummary
-                                .replace("{at}", stamp(detail.bookedAt, localeTag))
-                                .replace("{n}", String(leadDays))
-                            : stamp(detail.bookedAt, localeTag)}
-                        </small>
-                      )}
-                    </span>
-                    <i aria-hidden="true">{open.booking ? "⌃" : "›"}</i>
-                  </button>
-                  {open.booking && (
-                    <div className="b">
-                      {row("chan", copy.rcChannel, channelName)}
-                      {row("ref", copy.rpChannelRef, detail.channelReference, detail.channelReference)}
-                      {row("b24", copy.rpBeds24Id, detail.beds24Id, detail.beds24Id)}
-                      {row("group", copy.rpGroup, detail.groupMasterId)}
-                      {row("flag", copy.rpFlag, detail.flagText)}
-                      {row("booked", copy.rpBookedAt, detail.bookedAt ? stamp(detail.bookedAt, localeTag) : null)}
-                      {row("mod", copy.rpModifiedAt, detail.modifiedAt ? stamp(detail.modifiedAt, localeTag) : null)}
-                      {row("cxl", copy.rpCancelledAt, detail.cancelledAt ? stamp(detail.cancelledAt, localeTag) : null)}
-                      {detail.channelMessage && (
-                        <div className="mrs-msg note">
-                          <span className="l">{copy.rpChannelMessage}</span>
-                          <p>{detail.channelMessage}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {error && (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
-            {error}
           </div>
-        )}
+
+          {!detail && !loadFailed && (
+            // 최종 배치와 같은 자리표시 — 다 와도 튀지 않는다.
+            <div aria-busy="true" className="msw-sect">
+              <span className="msw-bone" style={{ height: 12, width: "24%", marginBottom: 10 }} />
+              <span className="msw-bone" style={{ height: 18, marginBottom: 10 }} />
+              <span className="msw-bone" style={{ height: 18, marginBottom: 10 }} />
+              <span className="msw-bone" style={{ height: 18, width: "70%" }} />
+            </div>
+          )}
+          {loadFailed && (
+            <div className="msw-alert" role="alert">
+              {copy.rpLoadFailed}
+            </div>
+          )}
+
+          {detail && (
+            <>
+              {detail.price !== null && (
+                <div className="msw-sect">
+                  <span className="h">{copy.rpSectionMoney}</span>
+                  {row("tot", copy.rpTotal, <b>{money(detail.price)}</b>)}
+                  {row("com", copy.rpCommission, detail.commission !== null ? `−${money(detail.commission)}` : "—")}
+                  {row("net", copy.rpNet, net !== null ? money(net) : "—")}
+                  {row("avg", copy.rpPerNight, perNight !== null ? money(perNight) : "—")}
+                  {bar.isCancelled && detail.price === 0 && <p>{copy.rpMoneyCancelled}</p>}
+                </div>
+              )}
+
+              <div className="msw-sect">
+                <span className="h">{copy.rpSectionGuest}</span>
+                {/* 이메일 · 전화는 누르면 바로 메일 쓰기 · 전화 걸기(예전 「빠른 연락」 버튼 대신). 전화는 하이픈으로 끊어 보인다. */}
+                {row("email", copy.rpEmail, detail.email ? <a href={`mailto:${detail.email}`}>{detail.email}</a> : null, detail.email)}
+                {row("phone", copy.rpPhone, tel(detail.phone), detail.phone)}
+                {row("mobile", copy.rpMobile, tel(detail.mobile), detail.mobile)}
+                {row(
+                  "country",
+                  copy.rpCountry,
+                  countryText ? (
+                    <>
+                      {countryText}
+                      {detail.countrySource === "phone" && <small> · {copy.rpCountryFromPhone}</small>}
+                    </>
+                  ) : null,
+                )}
+                {row("lang", copy.rpLanguage, languageText)}
+                {row("addr", copy.rpAddress, detail.address)}
+              </div>
+
+              {(detail.guestComments || detail.internalNotes || detail.channelMessage) && (
+                <div className="msw-sect">
+                  <span className="h">{copy.rpSectionMessages}</span>
+                  {detail.guestComments && <p>{detail.guestComments}</p>}
+                  {detail.internalNotes && (
+                    <>
+                      <span className="sub">{copy.rpNotes}</span>
+                      <p>{detail.internalNotes}</p>
+                    </>
+                  )}
+                  {detail.channelMessage && (
+                    <>
+                      <span className="sub">{copy.rpChannelMessage}</span>
+                      <p>{detail.channelMessage}</p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className="msw-sect">
+                <span className="h">{copy.rpSectionBooking}</span>
+                {row("chan", copy.rcChannel, channelName)}
+                {row("ref", copy.rpChannelRef, mono(detail.channelReference), detail.channelReference)}
+                {row("b24", copy.rpBeds24Id, mono(detail.beds24Id), detail.beds24Id)}
+                {row("group", copy.rpGroup, detail.groupMasterId)}
+                {row("flag", copy.rpFlag, detail.flagText)}
+                {row("booked", copy.rpBookedAt, detail.bookedAt ? stamp(detail.bookedAt, localeTag) : null)}
+                {row("mod", copy.rpModifiedAt, detail.modifiedAt ? stamp(detail.modifiedAt, localeTag) : null)}
+                {row("cxl", copy.rpCancelledAt, detail.cancelledAt ? stamp(detail.cancelledAt, localeTag) : null)}
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="msw-alert" role="alert">
+              {error}
+            </div>
+          )}
+        </div>
       </div>
 
       {!bar.isCancelled && (
-        <div className="mps-foot">
-          {mode === "cancel" ? (
-            <>
-              <button className="mps-btn ghost" disabled={pending} onClick={() => setMode("view")} type="button">
-                {copy.rcKeep}
-              </button>
-              <button className="mps-btn main danger" disabled={pending} onClick={cancel} type="button">
-                {copy.rcCancelConfirm}
-              </button>
-            </>
-          ) : (
-            <div className="mrs-foot2">
-              <button className="mps-btn ghost" disabled={!detail} onClick={() => setMode("edit")} type="button">
-                {copy.reEdit}
-              </button>
-              <button className="mps-btn dg" onClick={() => setMode("cancel")} type="button">
-                {copy.rcCancel}
-              </button>
-            </div>
-          )}
+        <div className="msw-foot even">
+          <button className="msw-btn soft" disabled={!detail} onClick={() => setMode("edit")} type="button">
+            {copy.reTitle}
+          </button>
+          <button className="msw-btn soft-red" onClick={() => setMode("cancel")} type="button">
+            {copy.rcCancel}
+          </button>
         </div>
       )}
     </div>
@@ -489,6 +444,7 @@ function MobileReservationEdit({
   const [priceText, setPriceText] = useState(original.totalPrice === null ? "" : String(original.totalPrice));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { done, succeed } = useSuccessThen();
   const stayEditable = canEditStay(channel);
   const availability = useRoomAvailability({
     allowedStart: original.arrival < today ? original.arrival : undefined,
@@ -514,112 +470,100 @@ function MobileReservationEdit({
     startTransition(async () => {
       const result = await submitReservationEdit({ changes, reservationId: bar.id, roomIds, roomKey });
       if (result.ok) {
-        onSaved();
+        succeed(onSaved);
         return;
       }
       setError(reservationEditErrorText(copy, result.error, result.conflictDates, channel));
     });
   };
 
-  const field = (label: string, input: React.ReactNode, hint?: string | null) => (
-    <label className="mfm-field">
-      <span className="mfm-l">{label}</span>
-      {input}
-      {hint && <span className="mfm-hint">{hint}</span>}
-    </label>
-  );
-
   return (
-    <div className="mps mops-vars">
-      <div className="mps-body">
-        <div className="mps-head">
-          <div className="mps-head__t">
-            <h3>{copy.reTitle}</h3>
-            <p>
-              <b>{bar.guestName}</b> · {propertyName} {roomLabel}
-            </p>
+    <div className="msw">
+      <div className="msw-body">
+        <div className="msw-step" key="edit">
+          <div className="msw-head">
+            <div className="msw-head__t">
+              <h3>{copy.reTitle}</h3>
+              <p>
+                {bar.guestName} · {CHANNEL_NAME[channel]} · {propertyName} {roomLabel}
+              </p>
+            </div>
           </div>
-          <span className="mps-cnt">{CHANNEL_NAME[channel]}</span>
-        </div>
 
-        {stayEditable ? (
-          <div className="mfm-field">
-            <span className="mfm-l">
-              {copy.mbCheckIn} → {copy.mbCheckOut} · {copy.mbNights.replace("{n}", String(nights.length))}
+          {/* 채널 예약은 날짜 잠김 — 날짜는 보이되 고를 수 없다. */}
+          {!stayEditable && (
+            <div className="msw-lock">{copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel])}</div>
+          )}
+          <MobileStayDates
+            arrival={draft.arrival}
+            checkInLabel={copy.mbCheckIn}
+            checkOutLabel={copy.mbCheckOut}
+            departure={draft.departure}
+            disabled={!stayEditable}
+            labels={{ nextMonth: copy.dateNext, prevMonth: copy.datePrev, today: copy.today }}
+            locale={localeTag}
+            onChange={(arrival, departure) => setDraft((previous) => ({ ...previous, arrival, departure }))}
+            today={today}
+          />
+          {stayEditable && taken.length > 0 && (
+            <span className="msw-field__hint bad">
+              {copy.mbErrNightsTaken.replace("{dates}", taken.map((night) => night.slice(5).replace("-", "/")).join(", "))}
             </span>
-            <MobileStayDates
-              arrival={draft.arrival}
-              checkInLabel={copy.mbCheckIn}
-              checkOutLabel={copy.mbCheckOut}
-              departure={draft.departure}
-              labels={{ nextMonth: copy.dateNext, prevMonth: copy.datePrev, today: copy.today }}
-              locale={localeTag}
-              onChange={(arrival, departure) => setDraft((previous) => ({ ...previous, arrival, departure }))}
-              today={today}
-            />
-            {taken.length > 0 && (
-              <span className="mfm-hint bad">
-                {copy.mbErrNightsTaken.replace("{dates}", taken.map((night) => night.slice(5).replace("-", "/")).join(", "))}
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="mrs-lock">
-            <b>{copy.mrDates}</b>
-            <span>
-              {md(detail.checkIn)} → {md(detail.checkOut)} · {copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel])}
-            </span>
-          </div>
-        )}
+          )}
 
-        {field(
-          copy.mbGuest,
-          <input className="mfm-in" onChange={(event) => set("guestName", event.target.value)} type="text" value={draft.guestName} />,
-        )}
-        <div className="mfm-two">
-          <MobileStepper label={copy.mbAdults} min={1} onChange={(value) => set("numAdult", value)} value={draft.numAdult} />
-          <MobileStepper label={copy.mbChildren} min={0} onChange={(value) => set("numChild", value)} value={draft.numChild} />
-        </div>
-        {field(
-          copy.mbTotal,
-          <span className="mfm-money">
-            <span aria-hidden="true">¥</span>
+          <MswField label={copy.mbGuest}>
+            <input className="msw-in" onChange={(event) => set("guestName", event.target.value)} type="text" value={draft.guestName} />
+          </MswField>
+          <MswField label={copy.mbEmail}>
             <input
-              inputMode="numeric"
-              onChange={(event) => {
-                setPriceText(event.target.value);
-                const trimmed = event.target.value.trim();
-                set("totalPrice", trimmed === "" ? null : Number(trimmed));
-              }}
-              type="number"
-              value={priceText}
+              className="msw-in"
+              inputMode="email"
+              onChange={(event) => set("email", event.target.value)}
+              type="email"
+              value={draft.email}
             />
-          </span>,
-          stayEditable ? null : copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel]),
-        )}
-        <div className="mfm-two">
-          {field(copy.mbPhone, <input className="mfm-in" onChange={(event) => set("phone", event.target.value)} type="tel" value={draft.phone} />)}
-          {field(copy.mbEmail, <input className="mfm-in" onChange={(event) => set("email", event.target.value)} type="email" value={draft.email} />)}
-        </div>
-        {field(
-          copy.rpNotes,
-          <textarea className="mfm-in area" onChange={(event) => set("notes", event.target.value)} rows={3} value={draft.notes} />,
-          copy.reNotesHint,
-        )}
-
-        {error && (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
-            {error}
+          </MswField>
+          <MswField label={copy.mbPhone}>
+            <MswPhoneInput onChange={(value) => set("phone", value)} value={draft.phone} />
+          </MswField>
+          <div className="msw-steps">
+            <MobileStepper label={copy.mbAdults} min={1} onChange={(value) => set("numAdult", value)} value={draft.numAdult} />
+            <MobileStepper label={copy.mbChildren} min={0} onChange={(value) => set("numChild", value)} value={draft.numChild} />
           </div>
-        )}
+          <MswField
+            hint={stayEditable ? null : copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel])}
+            label={copy.mbTotal}
+          >
+            <span className="msw-money sm">
+              <input
+                inputMode="numeric"
+                onChange={(event) => {
+                  const digits = event.target.value.replace(/[^\d]/g, "");
+                  setPriceText(digits);
+                  set("totalPrice", digits === "" ? null : Number(digits));
+                }}
+                type="text"
+                value={priceText === "" ? "" : Number(priceText).toLocaleString("ja-JP")}
+              />
+            </span>
+          </MswField>
+          <MswField hint={copy.reNotesHint} label={copy.rpNotes}>
+            <textarea className="msw-in" onChange={(event) => set("notes", event.target.value)} rows={3} value={draft.notes} />
+          </MswField>
+
+          {error && (
+            <div className="msw-alert" role="alert">
+              {error}
+            </div>
+          )}
+        </div>
       </div>
-      <div className="mps-foot">
-        <button className="mps-btn ghost" disabled={pending} onClick={onDiscard} type="button">
+      <div className="msw-foot two">
+        <button className="msw-btn ghost" disabled={pending} onClick={onDiscard} type="button">
           {copy.reDiscard}
         </button>
         <button
-          className="mps-btn main"
+          className="msw-btn"
           disabled={pending || localError === "no_changes" || taken.length > 0}
           onClick={save}
           type="button"
@@ -627,6 +571,7 @@ function MobileReservationEdit({
           {copy.reSave}
         </button>
       </div>
+      {done && <MswSuccess label={copy.mwDone} />}
     </div>
   );
 }

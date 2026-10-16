@@ -9,6 +9,14 @@ import {
   type OpsWriteOutcomeCopy,
   type RunOpsWrite,
 } from "@/components/admin/ops/ops-write-tracker";
+import {
+  SpwHead,
+  SpwModeTabs,
+  spwDate,
+  type SpwCopy,
+  type SpwMode,
+} from "@/components/admin/ops/ops-price-panel";
+import "./ops-calendar-panels-white.css";
 
 /**
  * 최소 숙박일 패널 — 격자 오른쪽 세로 카드.
@@ -87,20 +95,6 @@ export function minStayErrorText(copy: MinStayPanelCopy, error: PriceChangeError
   }
 }
 
-/** `2026-12-03` → `12/3`. 목록이 좁아서 연도는 뺀다 — 창이 1년을 넘지 않는다. */
-/** 요일 — 도쿄 기준. 주말 갭인지가 가격 판단에 바로 걸린다. */
-function weekdayLabel(date: string, localeTag: string): string {
-  return new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", weekday: "short" }).format(
-    new Date(`${date}T12:00:00+09:00`),
-  );
-}
-
-function shortDate(date: string): string {
-  const [, month, day] = date.split("-");
-  return `${Number(month)}/${Number(day)}`;
-}
-
-
 /** 기기 키보드의 「완료」(Enter)로 키보드를 내린다 — 모바일 시트에서 다음 버튼이 키보드에 가리지 않게(2026-10-02). */
 const blurOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
   if (event.key === "Enter") event.currentTarget.blur();
@@ -112,11 +106,12 @@ export function OpsMinStayPanel({
   onApplied,
   onClear,
   onFinished,
+  onSwitchMode,
   runWrite,
   scopeSummary,
 }: {
   cells: MinStayPanelCell[];
-  copy: MinStayPanelCopy;
+  copy: MinStayPanelCopy & SpwCopy;
   gapContext: GapContextEntry[];
   /** 쓰기가 반영된 **뒤** 보낸 칸만 선택에서 뺀다(2026-09-30 버그) — 전체를 비우는 `onClear`
    * 와 달리, 왕복하는 동안 사람이 새로 고른 칸은 건드리지 않는다. */
@@ -124,6 +119,8 @@ export function OpsMinStayPanel({
   onClear: () => void;
   /** 저장이 접수된 뒤(성공) — 모바일 시트가 스스로 닫히는 데 쓴다(2026-10-02). 데스크톱은 넘기지 않는다. */
   onFinished?: () => void;
+  /** 패널 위 「가격 · 최소숙박 · 차단」 탭(2026-10-16 화이트 리디자인). 넘겨야 탭이 그려진다. */
+  onSwitchMode?: (mode: SpwMode) => void;
   /** 격자가 흐린 값 → 접수 → 반영 대기 → 데이터 다시 받기를 맡는다(`ops-write-tracker.ts`). */
   runWrite: RunOpsWrite;
   scopeSummary: { rooms: string; dates: string } | null;
@@ -184,118 +181,109 @@ export function OpsMinStayPanel({
     if (Number.isInteger(parsed) && parsed >= 1 && parsed <= MIN_STAY_MAX) setNights(parsed);
   };
 
-  return (
-    <aside className="opsp opsp--ms">
-      <div className="opsp__head">
-        <div className="opsp__title">{copy.minStayTitle}</div>
-        <div className="opsp__target">
-          {scopeSummary ? (
-            <>
-              {scopeSummary.rooms}
-              <br />
-              {scopeSummary.dates}
-            </>
-          ) : (
-            copy.msEmptyTitle
-          )}
-        </div>
-      </div>
+  const multiBuilding = new Set(rows.map((entry) => entry.propertyName)).size > 1;
+  const nightsText = (n: number) => copy.minStay.replace("{n}", String(n));
 
-      <div className="opsp__body">
+  return (
+    <aside aria-label={copy.minStayTitle} className="opsp spw">
+      <div className="spw-body">
+        <SpwHead kicker={copy.spwKicker} sub={scopeSummary ? scopeSummary.rooms : copy.msEmptyTitle} title={copy.spwMsTitle} />
+        <SpwModeTabs copy={copy} mode="minstay" onSwitchMode={onSwitchMode} />
+
         {/* 갭 개수를 크게 적는다 — 눈에 안 띄는 손실이라 숫자가 작으면 손이 안 간다. */}
-        <div className="opsms__box">
-          <div className="opsms__num">
-            <strong>{rows.length}</strong>
-            <span>{copy.msGapCount}</span>
-          </div>
-          <p className="opsms__desc">{copy.msGapBody}</p>
+        <div className={`spw-gap${rows.length === 0 ? " is-zero" : ""}`}>
+          <b>{rows.length}</b>
+          <span>{copy.spwMsGapLine}</span>
         </div>
 
         {/* 1박이 기본이다. 2박·직접 입력은 되돌리거나 다른 값으로 바꿀 때 쓴다. */}
-        <div className="opsms__acts">
-          <button
-            className={`opsms__act${nights === 1 ? " on" : ""}`}
-            onClick={() => {
-              setNights(1);
-              setCustom("");
-            }}
-            type="button"
-          >
-            {copy.msOneNight}
-          </button>
-          <button
-            className={`opsms__act${nights === 2 ? " on" : ""}`}
-            onClick={() => {
-              setNights(2);
-              setCustom("");
-            }}
-            type="button"
-          >
-            {copy.msTwoNights}
-          </button>
-          <input
-            aria-label={copy.msCustom}
-            className={`opsms__custom${nights > 2 ? " on" : ""}`}
-            autoComplete="off"
-            enterKeyHint="done"
-            inputMode="numeric"
-            onKeyDown={blurOnEnter}
-            max={MIN_STAY_MAX}
-            min={1}
-            onChange={(event) => pickCustom(event.target.value)}
-            placeholder={copy.msCustomPlaceholder}
-            type="number"
-            value={custom}
-          />
+        <div className="spw-group">
+          <span className="spw-label">{copy.minStayTitle}</span>
+          <div className="spw-nights">
+            {[1, 2].map((value) => (
+              <button
+                aria-pressed={nights === value}
+                className={`spw-choice${nights === value ? " on" : ""}`}
+                key={value}
+                onClick={() => {
+                  setNights(value);
+                  setCustom("");
+                }}
+                type="button"
+              >
+                {nightsText(value)}
+              </button>
+            ))}
+            <label className={`spw-choice is-input${nights > 2 ? " on" : ""}`}>
+              <input
+                aria-label={copy.msCustom}
+                autoComplete="off"
+                enterKeyHint="done"
+                inputMode="numeric"
+                max={MIN_STAY_MAX}
+                min={1}
+                onChange={(event) => pickCustom(event.target.value)}
+                onKeyDown={blurOnEnter}
+                placeholder={copy.spwMsCustomPh}
+                type="number"
+                value={custom}
+              />
+              <span aria-hidden="true">{copy.spwNightUnit}</span>
+            </label>
+          </div>
         </div>
 
         {rows.length > 0 ? (
-          <div className="opsms__tbl">
-            {rows.map((entry) => (
-              // **어느 건물 · 어느 방 · 어느 날**만 적는다. 앞뒤 예약의 채널 칩을 달았었는데
-              // 최소 숙박일을 정하는 데는 필요 없고, 「Airbnb ▸ 1박 ▸ Airbnb」가 플랫폼이 두 번
-              // 찍힌 것처럼 읽혔다(2026-09-28 지적). 건물이 없으면 방 번호만으로는 모른다.
-              <div className="opsms__trw" key={`${entry.roomKey}|${entry.date}`}>
-                <span className="opsms__bld">{entry.propertyName}</span>
-                <span className="opsms__rm">{entry.roomLabel}</span>
-                <span className="opsms__dt">
-                  {shortDate(entry.date)}
-                  <span className="opsms__wd">{weekdayLabel(entry.date, copy.localeTag)}</span>
+          <div className="spw-list">
+            <span className="spw-sec">{copy.spwMsListTitle}</span>
+            {rows.map((entry, order) => (
+              // **어느 건물 · 어느 방 · 어느 날**만 적는다. 앞뒤 예약의 채널 칩은 최소 숙박일을 정하는 데
+              // 필요 없고 플랫폼이 두 번 찍힌 것처럼 읽혔다(2026-09-28 지적). 건물이 여럿이면 건물도 적는다.
+              <div className="spw-row" key={`${entry.roomKey}|${entry.date}`} style={{ "--i": Math.min(order, 12) } as React.CSSProperties}>
+                <span className="spw-row__room is-wide">{entry.roomLabel}</span>
+                <span className="spw-row__date">
+                  {multiBuilding && <span className="spw-row__bld">{entry.propertyName}</span>}
+                  {spwDate(entry.date, copy.localeTag)}
+                </span>
+                {/* 갭은 최소 숙박일이 정확히 2일 때만 잡힌다(감지 기준 ②). */}
+                <span className="spw-row__cur">
+                  {copy.change.replace("{from}", "2").replace("{to}", "")}
+                  <b className={nights < 2 ? "is-ok" : undefined}>{nightsText(nights)}</b>
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="opsms__empty">{copy.msEmptyBody}</div>
+          <p className="spw-note">{copy.msEmptyBody}</p>
         )}
 
-        {/* 「왜 이건 갭이 아니지?」가 반드시 나온다. 규칙을 숨기면 그때마다 코드를 열어야 한다. */}
-        <div className="opsms__rule">
-          <strong>{copy.msRuleTitle}</strong>
-          {copy.msRuleBody}
-          <span className="opsms__rulenote">{copy.msRuleNote}</span>
-        </div>
+        {/* 「왜 이건 갭이 아니지?」가 반드시 나온다. 규칙을 숨기면 그때마다 코드를 열어야 한다 — 접어 둔다. */}
+        <details className="spw-more">
+          <summary>{copy.msRuleTitle}</summary>
+          <p>
+            {copy.msGapBody}
+            {copy.msRuleBody}
+            <br />
+            {copy.msRuleNote}
+          </p>
+        </details>
 
-        <div className="opsp__grow" />
-
-        {message && <div className="opsp__msg">{message}</div>}
-        <div className="opsp__channel">
+        <p className="spw-note">
           {copy.msFootnote.replace("{count}", String(cells.length)).replace("{n}", String(nights))}
-        </div>
+        </p>
+        {message && (
+          <p className="spw-msg" role="status">
+            {message}
+          </p>
+        )}
       </div>
 
-      <div className="opsp__foot">
-        <button
-          className="opsp__btn"
-          disabled={cells.length === 0}
-          onClick={onClear}
-          title="Esc"
-          type="button"
-        >
+      <div className="spw-foot">
+        <button className="spw-btn" disabled={cells.length === 0} onClick={onClear} title="Esc" type="button">
           {copy.scopeClear}
         </button>
         <button
-          className="opsp__btn go"
+          className="spw-btn is-primary"
           disabled={cells.length === 0 || pending}
           onClick={apply}
           type="button"

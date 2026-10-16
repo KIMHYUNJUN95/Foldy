@@ -15,6 +15,9 @@ import {
 } from "@/components/admin/ops/ops-reservation-edit";
 import type { OpsCalendarBar } from "@/lib/ops-calendar";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
+import { formatPhoneDisplay } from "@/lib/phone-format";
+import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
+import "./ops-calendar-panels-white.css";
 
 /**
  * 예약 상세 — 막대를 누르면 **오른쪽 사이드 패널**로 뜬다. **취소는 여기서만** 한다.
@@ -136,24 +139,20 @@ export function reservationCancelErrorText(copy: ReservationCardCopy, result: Ex
   }
 }
 
-/** `YYYY-MM-DD` → 「10월 11일 (일)」 — 도쿄 기준. */
-function stayDate(date: string, localeTag: string): { day: string; weekday: string } {
-  const at = new Date(`${date}T12:00:00+09:00`);
-  return {
-    day: new Intl.DateTimeFormat(localeTag, { day: "numeric", month: "short", timeZone: "Asia/Tokyo" }).format(at),
-    weekday: new Intl.DateTimeFormat(localeTag, { timeZone: "Asia/Tokyo", weekday: "short" }).format(at),
-  };
-}
-
 /** ISO 시각(UTC) → 도쿄 시각. Beds24 는 UTC 로 준다 — 그대로 보이면 9시간 틀린다. */
 function stamp(iso: string, localeTag: string): string {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return iso;
-  return new Intl.DateTimeFormat(localeTag, {
-    dateStyle: "medium",
-    timeStyle: "short",
+  // 「9/24 (수) 21:14」 — 시안 SalesResv-PC. 연도가 다르면 앞에 붙인다.
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(at);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
     timeZone: "Asia/Tokyo",
   }).format(at);
+  const thisYear = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric" }).format(new Date());
+  return `${day.slice(0, 4) === thisYear ? "" : `${day.slice(0, 4)}/`}${spwDate(day, localeTag)} ${time}`;
 }
 
 /** 도쿄 날짜 사이의 일수. 예약이 체크인 며칠 전에 들어왔는가. */
@@ -181,11 +180,6 @@ function languageName(code: string, localeTag: string): string {
   }
 }
 
-/** `KR` → 🇰🇷. 국가를 글자보다 먼저 알아보게 한다. */
-function flagEmoji(code: string): string {
-  return String.fromCodePoint(...[...code].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65));
-}
-
 const money = (value: number) => `¥${Math.round(value).toLocaleString()}`;
 
 export function OpsReservationPanel({
@@ -201,7 +195,7 @@ export function OpsReservationPanel({
   today,
 }: {
   bar: OpsCalendarBar;
-  copy: ReservationCardCopy;
+  copy: ReservationCardCopy & SpwCopy;
   localeTag: string;
   nights: number;
   onClose: () => void;
@@ -224,14 +218,15 @@ export function OpsReservationPanel({
   const [detail, setDetail] = useState<OpsReservationDetail | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const cancelBoxRef = useRef<HTMLElement | null>(null);
+  const cancelBoxRef = useRef<HTMLDivElement | null>(null);
 
-  // 확인 상자는 본문 맨 아래에 생긴다. 스크롤이 위에 있으면 눌러도 아무 일 없는 것처럼 보인다.
+  // 취소 확인은 가운데 창이다(시안 SalesResvCancel-PC). 뜨면 사유 칸에 바로 쓸 수 있게 초점을 옮긴다.
   useEffect(() => {
-    if (confirming) cancelBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (confirming) cancelBoxRef.current?.querySelector<HTMLElement>("textarea")?.focus({ preventScroll: true });
   }, [confirming]);
-  // Esc · 포커스 · 스크롤 잠금은 콘솔 패널 공용 훅이 한다. 취소를 보내는 중에는 닫히지 않는다.
-  const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: pending || editing });
+  // Esc · 포커스 · 스크롤 잠금은 콘솔 패널 공용 훅이 한다. 취소를 보내는 중 · 확인 창이 떠 있는 동안은
+  // 패널을 닫지 않는다(확인 창의 Esc 는 창만 닫는다).
+  const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: pending || editing || confirming });
 
   // 누른 한 건만 읽는다. 머리글은 격자 값으로 먼저 그려 두었으므로 기다리는 동안도 비지 않는다.
   useEffect(() => {
@@ -268,16 +263,16 @@ export function OpsReservationPanel({
   };
 
   /** 값이 있는 줄만. 복사가 필요한 값(연락처·번호)에는 복사 버튼을 붙인다. */
-  const row = (key: string, label: string, value: ReactNode, copyText?: string | null) =>
+  const row = (key: string, label: string, value: ReactNode, copyText?: string | null, mono = false) =>
     value === null || value === undefined || value === "" ? null : (
-      <div className="opsrp__row" key={key}>
+      <div key={key}>
         <dt>{label}</dt>
         <dd>
-          <span className="opsrp__val">{value}</span>
+          <span className={mono ? "spw-mono" : undefined}>{value}</span>
           {copyText && (
             <button
               aria-label={`${copy.rpCopy} ${label}`}
-              className={`opsrp__copy${copied === key ? " on" : ""}`}
+              className={`spw-copy${copied === key ? " on" : ""}`}
               onClick={() => copyValue(key, copyText)}
               title={copied === key ? copy.rpCopied : copy.rpCopy}
               type="button"
@@ -289,8 +284,6 @@ export function OpsReservationPanel({
       </div>
     );
 
-  const checkIn = stayDate(bar.checkIn, localeTag);
-  const checkOut = stayDate(bar.checkOut, localeTag);
   const channelName = detail?.channelName ?? CHANNEL_LABEL[bar.channel] ?? bar.channel;
   const guestCount =
     detail && detail.numAdult !== null
@@ -303,41 +296,43 @@ export function OpsReservationPanel({
       ? detail.price - detail.commission
       : null;
   const leadDays = detail?.bookedAt ? daysBetween(detail.bookedAt, bar.checkIn) : null;
+  const nightsText = copy.rcNights.replace("{n}", String(nights));
+  const shortDay = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
   return (
     <>
-      <div className="panel-scrim" onClick={pending ? undefined : onClose} />
+      <div className="panel-scrim" onClick={pending || confirming ? undefined : onClose} />
       <aside
         aria-label={copy.rpTitle}
         aria-modal="true"
-        className="panel opsrp"
+        className="panel spw-panel"
         ref={panelRef}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.rpTitle}</span>
-            <button
-              aria-label={copy.rcClose}
-              className="panel__x"
-              disabled={pending}
-              onClick={onClose}
-              type="button"
-            >
-              <X />
-            </button>
-          </div>
-          <div className="opsrp__name">{bar.guestName}</div>
-          <div className="opsrp__where">
-            {propertyName} · {roomLabel}
-          </div>
-          <div className="panel__chips">
-            <span className={`opsrp__chan ${bar.channel}`}>{channelName}</span>
-            {bar.isCancelled && <span className="opsrp__tag cancelled">{copy.rcCancelled}</span>}
-            <span className="opsrp__tag">{copy.rcNights.replace("{n}", String(nights))}</span>
-            {guestCount && <span className="opsrp__tag">{guestCount}</span>}
-          </div>
+        <div className="spw-phead">
+          {editing && detail ? (
+            <div className="spw-head">
+              <span className="spw-head__k">{copy.spwReKicker.replace("{channel}", channelName)}</span>
+              <b className="spw-head__t">{bar.guestName}</b>
+              <span className="spw-head__s">{copy.spwReSub}</span>
+            </div>
+          ) : (
+            <div className="spw-head">
+              <span className="spw-head__k">
+                <i aria-hidden="true" className={`spw-dot is-${bar.channel}`} />
+                {channelName} · {propertyName} · {roomLabel}
+              </span>
+              <b className="spw-head__t">{bar.guestName}</b>
+              <span className="spw-head__s">
+                {bar.isCancelled && <span className="spw-tag">{copy.rcCancelled}</span>}
+                {[nightsText, guestCount].filter(Boolean).join(" · ")}
+              </span>
+            </div>
+          )}
+          <button aria-label={copy.rcClose} className="spw-x" disabled={pending} onClick={onClose} type="button">
+            <X aria-hidden="true" />
+          </button>
         </div>
 
         {editing && detail ? (
@@ -361,148 +356,128 @@ export function OpsReservationPanel({
           />
         ) : (
         <>
-        <div className="panel__body opsrp__body">
+        <div className="spw-pbody">
           {/* ── 숙박 ── 격자 값만으로 그린다. 읽기를 기다리지 않는다. */}
-          <section className="opsrp__sec">
-            <div className="opsrp__stay">
-              <div className="opsrp__node">
-                <span className="opsrp__nl">{copy.rpCheckIn}</span>
-                <strong>{checkIn.day}</strong>
-                <span className="opsrp__wd">{checkIn.weekday}</span>
+          <section className="spw-sect">
+            <span className="spw-sec">{copy.rpSectionStay}</span>
+            <div className="spw-stay is-line">
+              <div>
+                <b>{spwDate(bar.checkIn, localeTag)}</b>
+                <span>
+                  {detail?.arrivalTime
+                    ? copy.spwArrival.replace("{label}", copy.rpCheckIn).replace("{time}", detail.arrivalTime)
+                    : copy.rpCheckIn}
+                </span>
               </div>
-              <div className="opsrp__line">
-                <span>{copy.rcNights.replace("{n}", String(nights))}</span>
-              </div>
-              <div className="opsrp__node">
-                <span className="opsrp__nl">{copy.rpCheckOut}</span>
-                <strong>{checkOut.day}</strong>
-                <span className="opsrp__wd">{checkOut.weekday}</span>
+              <span className="spw-stay__n">
+                <span>{nightsText}</span>
+              </span>
+              <div className="is-end">
+                <b>{spwDate(bar.checkOut, localeTag)}</b>
+                <span>{copy.rpCheckOut}</span>
               </div>
             </div>
-            {detail && (
-              <dl className="opsrp__kv">
-                {row("arrival", copy.rpArrivalTime, detail.arrivalTime)}
-                {row("guests", copy.rpGuests, guestCount)}
-              </dl>
-            )}
             {/* 며칠 전에 잡았나 — 막판 예약인지가 가격 판단에 바로 걸린다. */}
             {leadDays !== null && leadDays >= 0 && (
-              <p className="opsrp__note">{copy.rpLeadTime.replace("{n}", String(leadDays))}</p>
+              <p className="spw-note">{copy.rpLeadTime.replace("{n}", String(leadDays))}</p>
             )}
           </section>
 
           {!detail && !loadFailed && (
-            <div aria-busy className="opsrp__loading">
-              <span className="opsrp__spin" aria-hidden />
+            <div aria-busy className="spw-loading">
+              <span aria-hidden className="spw-spin" />
               {copy.rpLoading}
             </div>
           )}
-          {loadFailed && <p className="opsrp__err">{copy.rpLoadFailed}</p>}
+          {loadFailed && <p className="spw-msg is-err">{copy.rpLoadFailed}</p>}
 
           {detail && (
             <>
               {/* ── 금액 ── */}
               {(detail.price !== null || detail.rateDescription) && (
-                <section className="opsrp__sec">
-                  <h3 className="opsrp__h">{copy.rpSectionMoney}</h3>
+                <section className="spw-sect">
+                  <span className="spw-sec">{copy.rpSectionMoney}</span>
                   {detail.price !== null && (
-                    <div className="opsrp__money">
-                      <div className="opsrp__total">
-                        <span>{copy.rpTotal}</span>
-                        <strong>{money(detail.price)}</strong>
-                      </div>
-                      <dl className="opsrp__kv">
-                        {row(
-                          "commission",
-                          copy.rpCommission,
-                          detail.commission !== null ? `− ${money(detail.commission)}` : null,
-                        )}
-                        {row("net", copy.rpNet, net !== null ? money(net) : null)}
-                        {row(
-                          "per",
-                          copy.rpPerNight,
-                          nights > 0 && detail.price > 0 ? money(detail.price / nights) : null,
-                        )}
-                      </dl>
-                    </div>
+                    <dl className="spw-kv">
+                      {row("total", copy.rpTotal, <b>{money(detail.price)}</b>)}
+                      {row("commission", copy.rpCommission, detail.commission !== null ? money(detail.commission) : null)}
+                      {row("net", copy.rpNet, net !== null ? money(net) : null)}
+                      {row("per", copy.rpPerNight, nights > 0 && detail.price > 0 ? money(detail.price / nights) : null)}
+                    </dl>
                   )}
                   {/* 취소되면 Beds24 가 금액을 0 으로 바꾼다 — 0원 매출로 오해하지 않게 적는다. */}
-                  {bar.isCancelled && detail.price === 0 && (
-                    <p className="opsrp__note">{copy.rpMoneyCancelled}</p>
-                  )}
+                  {bar.isCancelled && detail.price === 0 && <p className="spw-note">{copy.rpMoneyCancelled}</p>}
                   {detail.rateDescription && (
-                    <details className="opsrp__more">
+                    <details className="spw-more">
                       <summary>{copy.rpRate}</summary>
-                      <p className="opsrp__pre">{detail.rateDescription}</p>
+                      <p className="spw-pre">{detail.rateDescription}</p>
                     </details>
                   )}
                 </section>
               )}
 
-              {/* ── 손님 ── */}
-              <section className="opsrp__sec">
-                <h3 className="opsrp__h">{copy.rpSectionGuest}</h3>
-                <dl className="opsrp__kv">
+              {/* ── 손님 ── 전화는 하이픈으로 끊어 보이고, 복사는 받은 값 그대로. */}
+              <section className="spw-sect">
+                <span className="spw-sec">{copy.rpSectionGuest}</span>
+                <dl className="spw-kv">
                   {row("email", copy.rpEmail, detail.email, detail.email)}
-                  {row("phone", copy.rpPhone, detail.phone, detail.phone)}
-                  {row("mobile", copy.rpMobile, detail.mobile, detail.mobile)}
+                  {row("phone", copy.rpPhone, detail.phone ? formatPhoneDisplay(detail.phone) : null, detail.phone)}
+                  {row("mobile", copy.rpMobile, detail.mobile ? formatPhoneDisplay(detail.mobile) : null, detail.mobile)}
                   {row(
                     "country",
                     copy.rpCountry,
                     detail.countryCode ? (
                       <>
-                        {flagEmoji(detail.countryCode)} {regionName(detail.countryCode, localeTag)}
+                        {regionName(detail.countryCode, localeTag)}
                         {/* 채널이 안 준 국가는 전화번호로 추정한 것이다 — 국적과 다를 수 있다. */}
                         {detail.countrySource === "phone" && (
-                          <span className="opsrp__est">{copy.rpCountryFromPhone}</span>
+                          <span className="spw-muted"> · {copy.rpCountryFromPhone}</span>
                         )}
                       </>
                     ) : (
                       detail.countryText
                     ),
                   )}
-                  {row(
-                    "lang",
-                    copy.rpLanguage,
-                    detail.language ? languageName(detail.language, localeTag) : null,
-                  )}
+                  {row("lang", copy.rpLanguage, detail.language ? languageName(detail.language, localeTag) : null)}
                   {row("address", copy.rpAddress, detail.address, detail.address)}
                 </dl>
               </section>
 
-              {/* ── 메시지 ── 길다. 손님 요청이 제일 자주 쓰이므로 펼쳐 두고 나머지는 접는다. */}
+              {/* ── 메시지 ── 손님 요청이 제일 자주 쓰이므로 펼쳐 두고 채널 메시지는 접는다. */}
               {(detail.guestComments || detail.internalNotes || detail.channelMessage) && (
-                <section className="opsrp__sec">
-                  <h3 className="opsrp__h">{copy.rpSectionMessages}</h3>
+                <section className="spw-sect">
+                  <span className="spw-sec">{copy.rpSectionMessages}</span>
                   {detail.guestComments && (
-                    <div className="opsrp__msgbox">
-                      <span className="opsrp__ml">{copy.rpComments}</span>
-                      <p className="opsrp__pre">{detail.guestComments}</p>
+                    <div className="spw-msgbox">
+                      {(detail.internalNotes || detail.channelMessage) && (
+                        <span className="spw-msgbox__l">{copy.rpComments}</span>
+                      )}
+                      <p className="spw-pre">{detail.guestComments}</p>
                     </div>
                   )}
                   {detail.internalNotes && (
-                    <div className="opsrp__msgbox note">
-                      <span className="opsrp__ml">{copy.rpNotes}</span>
-                      <p className="opsrp__pre">{detail.internalNotes}</p>
+                    <div className="spw-msgbox">
+                      <span className="spw-msgbox__l">{copy.rpNotes}</span>
+                      <p className="spw-pre">{detail.internalNotes}</p>
                     </div>
                   )}
                   {detail.channelMessage && (
-                    <details className="opsrp__more">
+                    <details className="spw-more">
                       <summary>{copy.rpChannelMessage}</summary>
-                      <p className="opsrp__pre">{detail.channelMessage}</p>
+                      <p className="spw-pre">{detail.channelMessage}</p>
                     </details>
                   )}
                 </section>
               )}
 
               {/* ── 예약 ── 채널·Beds24 와 이야기할 때 쓰는 번호들. */}
-              <section className="opsrp__sec">
-                <h3 className="opsrp__h">{copy.rpSectionBooking}</h3>
-                <dl className="opsrp__kv">
+              <section className="spw-sect">
+                <span className="spw-sec">{copy.rpSectionBooking}</span>
+                <dl className="spw-kv">
                   {row("chan", copy.rcChannel, channelName)}
-                  {row("ref", copy.rpChannelRef, detail.channelReference, detail.channelReference)}
-                  {row("b24", copy.rpBeds24Id, detail.beds24Id, detail.beds24Id)}
-                  {row("group", copy.rpGroup, detail.groupMasterId)}
+                  {row("ref", copy.rpChannelRef, detail.channelReference, detail.channelReference, true)}
+                  {row("b24", copy.rpBeds24Id, detail.beds24Id, detail.beds24Id, true)}
+                  {row("group", copy.rpGroup, detail.groupMasterId, null, true)}
                   {row("flag", copy.rpFlag, detail.flagText)}
                   {row("booked", copy.rpBookedAt, detail.bookedAt ? stamp(detail.bookedAt, localeTag) : null)}
                   {row(
@@ -522,70 +497,116 @@ export function OpsReservationPanel({
             </>
           )}
 
-          {/* 무엇이 취소되는지 그 자리에 적는다 — 브라우저 기본 확인창에는 안 들어간다. */}
-          {confirming && (
-            <section className="opsrp__sec opsrp__cancelbox" ref={cancelBoxRef}>
-              <div className="opsrp__warn">{copy.rcCancelWarning}</div>
-              <div className="fld">
-                <label className="fld__l" htmlFor="opsrp-reason">
-                  {copy.rcReason}
-                </label>
-                <input
-                  id="opsrp-reason"
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder={copy.rcReasonPlaceholder}
-                  type="text"
-                  value={reason}
-                />
-              </div>
-            </section>
-          )}
-
           {message && (
-            <p className={message === copy.reSaved ? "opsrp__ok" : "opsrp__err"}>{message}</p>
+            <p className={`spw-msg${message === copy.reSaved ? " is-ok" : " is-err"}`} role="status">
+              {message}
+            </p>
           )}
         </div>
 
-        <div className="panel__foot">
-          {confirming ? (
-            <>
-              <button className="btn btn--subtle" disabled={pending} onClick={() => setConfirming(false)} type="button">
-                {copy.rcKeep}
-              </button>
-              <button className="btn opsrp__danger" disabled={pending} onClick={cancel} type="button">
-                {copy.rcCancelConfirm}
-              </button>
-            </>
+        <div className="spw-foot is-panel is-even">
+          {/* 취소된 예약은 고치지도, 다시 취소하지도 않는다 — 닫기만. */}
+          {bar.isCancelled ? (
+            <button className="spw-btn is-wide" onClick={onClose} type="button">
+              {copy.rcClose}
+            </button>
           ) : (
             <>
-              {/* 취소된 예약은 고치지도, 다시 취소하지도 않는다 — 닫기만. */}
-              {bar.isCancelled ? (
-                <button className="btn btn--subtle" onClick={onClose} type="button">
-                  {copy.rcClose}
-                </button>
-              ) : (
-                <>
-                  <button
-                    className="btn btn--subtle"
-                    // 원래 값이 있어야 무엇이 바뀌었는지 안다 — 상세를 읽은 뒤에만.
-                    disabled={!detail}
-                    onClick={() => {
-                      setMessage(null);
-                      setEditing(true);
-                    }}
-                    type="button"
-                  >
-                    {copy.reEdit}
-                  </button>
-                  <button className="btn btn--danger-ghost" onClick={() => setConfirming(true)} type="button">
-                    {copy.rcCancel}
-                  </button>
-                </>
-              )}
+              <button
+                className="spw-btn is-soft"
+                // 원래 값이 있어야 무엇이 바뀌었는지 안다 — 상세를 읽은 뒤에만.
+                disabled={!detail}
+                onClick={() => {
+                  setMessage(null);
+                  setEditing(true);
+                }}
+                type="button"
+              >
+                {/* 「예약 수정」 — 시안 SalesResv-PC. 짧은 「수정」(reEdit)은 모바일 시트가 쓴다. */}
+                {copy.reTitle}
+              </button>
+              <button className="spw-btn is-soft-danger" onClick={() => setConfirming(true)} type="button">
+                {copy.rcCancel}
+              </button>
             </>
           )}
         </div>
         </>
+        )}
+
+        {/* 무엇이 취소되는지 그 자리에 적는다 — 브라우저 기본 확인창에는 안 들어간다(시안 SalesResvCancel-PC). */}
+        {confirming && (
+          <div className="spw-modal">
+            <div className="spw-modal__scrim" onClick={pending ? undefined : () => setConfirming(false)} />
+            <div
+              aria-label={copy.spwRcConfirmTitle}
+              className="spw-modal__card"
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && !pending) {
+                  event.stopPropagation();
+                  setConfirming(false);
+                }
+              }}
+              ref={cancelBoxRef}
+              role="alertdialog"
+            >
+              <b className="spw-modal__t">{copy.spwRcConfirmTitle}</b>
+              <dl className="spw-kv is-box">
+                <div>
+                  <dt>{copy.rpSectionGuest}</dt>
+                  <dd>
+                    <b>{bar.guestName}</b>
+                  </dd>
+                </div>
+                <div>
+                  <dt>{copy.rcTitle}</dt>
+                  <dd>
+                    {propertyName} · {roomLabel}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{copy.rpSectionStay}</dt>
+                  <dd>
+                    {shortDay(bar.checkIn)} → {shortDay(bar.checkOut)} · {nightsText}
+                  </dd>
+                </div>
+                {detail?.beds24Id && (
+                  <div>
+                    <dt>{copy.spwRcNumber}</dt>
+                    <dd className="spw-mono">{detail.beds24Id}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="spw-field">
+                <label className="spw-field__l" htmlFor="opsrp-reason">
+                  {copy.rcReason}
+                </label>
+                <textarea
+                  className="spw-field__area"
+                  disabled={pending}
+                  id="opsrp-reason"
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder={copy.rcReasonPlaceholder}
+                  rows={2}
+                  value={reason}
+                />
+              </div>
+              <p className="spw-note is-danger">{copy.rcCancelWarning}</p>
+              {message && message !== copy.reSaved && (
+                <p className="spw-msg" role="status">
+                  {message}
+                </p>
+              )}
+              <div className="spw-foot is-even">
+                <button className="spw-btn" disabled={pending} onClick={() => setConfirming(false)} type="button">
+                  {copy.rcKeep}
+                </button>
+                <button className="spw-btn is-danger" disabled={pending} onClick={cancel} type="button">
+                  {copy.rcCancelConfirm}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </aside>
     </>

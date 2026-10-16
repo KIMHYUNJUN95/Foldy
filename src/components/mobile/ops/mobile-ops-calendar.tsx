@@ -4,19 +4,7 @@ import { memo, useEffect, useMemo, useRef, useState, useTransition } from "react
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Ban,
-  CalendarDays,
-  CalendarPlus,
-  ChartColumn,
-  ChevronLeft,
-  ChevronRight,
-  History,
-  JapaneseYen,
-  MoonStar,
-  SlidersHorizontal,
-  Timer,
-} from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   loadOpsCellHistory,
   loadOpsPriceConversions,
@@ -81,6 +69,7 @@ import {
   type OpsSelectionCell,
   type OpsSelectionScope,
 } from "@/lib/ops-calendar-selection";
+import { buildOpsDaySummaries } from "@/lib/ops-day-summary";
 import { buildGapContext } from "@/lib/ops-gap-context";
 import { hasOpsLargeRooms, orderOpsLargeRoomsFirst } from "@/lib/ops-large-rooms";
 import type { CellHistory } from "@/lib/ops-price-history";
@@ -88,6 +77,7 @@ import { buildOpsScopeSummary } from "@/lib/ops-scope-summary";
 import { opsUrgentVacantCells } from "@/lib/ops-urgent-vacant";
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
 import "./mobile-ops-calendar.css";
+import "./mobile-ops-calendar-white.css";
 
 /**
  * 모바일 판매 캘린더 격자(2026-10-01, 시안 1a v2).
@@ -148,13 +138,16 @@ const BASE_PATH = "/mobile/ops/calendar";
 const CELL_W = 46;
 const TOP_H = 34;
 const LANE_H = 22;
+/** 막대를 줄 안에서 조금 내린다(화이트 리디자인 — 막대 높이 16px 을 22px 줄 가운데에). */
+const BAR_DY = 3;
 /** 길게 누르기 판정. iOS 기본 콜아웃(약 500ms)보다 짧아야 그쪽이 먼저 뜨지 않는다. */
 const LONG_PRESS_MS = 380;
 /** 이만큼 움직이면 스크롤로 본다 — 길게 누르기를 취소한다. */
 const MOVE_SLOP = 8;
 /** 끌다가 격자 가장자리에 이만큼 다가가면 그쪽으로 저절로 넘긴다. */
 const EDGE = 36;
-const HEAD_H = 60;
+/** 붙어 있는 머리 높이 — 달 줄 22 + 날짜 40 + 빈 방 24 + 평균가 24 + 선 1. CSS `.mops-head` 와 짝. */
+const HEAD_H = 111;
 const ROOM_W = 56;
 
 function dropTokens(map: Map<string, Pending>, tokens: ReadonlySet<number>): Map<string, Pending> {
@@ -176,7 +169,7 @@ function shortDate(date: string): string {
   return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 }
 
-/** BLOCK 막대 시트의 「누가 · 언제」 — 도쿄 시각. */
+/** BLOCK 막대 시트의 「누가 · 언제」 — 도쿄 시각 「10/08 14:22」. */
 function tokyoStamp(iso: string): string {
   return new Intl.DateTimeFormat("sv-SE", {
     day: "2-digit",
@@ -185,7 +178,10 @@ function tokyoStamp(iso: string): string {
     month: "2-digit",
     timeZone: "Asia/Tokyo",
     year: "numeric",
-  }).format(new Date(iso));
+  })
+    .format(new Date(iso))
+    .slice(5)
+    .replace("-", "/");
 }
 
 export function MobileOpsCalendar({
@@ -588,6 +584,28 @@ export function MobileOpsCalendar({
         : current,
     );
   };
+
+  /*
+   * ── 날짜 열 위 「빈 방」 · 「평균가」(화이트 리디자인 2026-10-16, 데스크톱과 같은 `buildOpsDaySummaries`) ──
+   * 보이는 객실(필터 반영) × 보이는 날짜에서 계산한다. 반영 중인 가격은 새 값으로 센다(칸이 보여 주는 값과 같게).
+   */
+  const daySummaries = useMemo(
+    () =>
+      buildOpsDaySummaries({
+        dates,
+        isBlocked: (roomKey, date) => blockedCells.has(selectionCellKey(roomKey, date)),
+        isSold: (roomKey, date) => soldCells.has(selectionCellKey(roomKey, date)),
+        priceAt: (roomKey, date) =>
+          pendingPrices.get(selectionCellKey(roomKey, date))?.value ?? rateAt(roomKey, date)?.price ?? null,
+        roomKeys,
+      }),
+    [blockedCells, dates, pendingPrices, rateAt, roomKeys, soldCells],
+  );
+  /** 달 줄 「2026년 10월」 — 첫 열과 달이 바뀌는 열에만. 문구 대신 기기 언어 형식(`localeTag`)을 쓴다. */
+  const monthLabel = useMemo(() => {
+    const format = new Intl.DateTimeFormat(copy.localeTag, { month: "long", timeZone: "UTC", year: "numeric" });
+    return (date: string) => format.format(new Date(`${date.slice(0, 7)}-01T00:00:00Z`));
+  }, [copy.localeTag]);
 
   // ── 패널에 넘길 모양 ───────────────────────────────────────────────────────
   const panelCells: PanelCell[] = selection
@@ -1021,7 +1039,7 @@ export function MobileOpsCalendar({
       const row = rowByKey.get(rowKey);
       const block = row?.blocks.find((candidate) => candidate.id === blockElement.dataset.block);
       if (row && block) {
-        setOverlay({ block, kind: "blockInfo", roomTitle: `${row.room.propertyName} ${row.room.displayRoomLabel}` });
+        setOverlay({ block, kind: "blockInfo", roomTitle: `${row.room.propertyName} · ${row.room.displayRoomLabel}` });
       }
       return;
     }
@@ -1264,13 +1282,17 @@ export function MobileOpsCalendar({
     for (const date of dates) flags += keys.has(selectionCellKey(roomKey, date)) ? "1" : "0";
     return flags.includes("1") ? flags : "";
   };
+  /*
+   * 반영 중 칸 — 접수 뒤 Beds24 에 가는 동안은 숨 쉬듯 깜빡이고(`pend`), 반영이 끝나 다시 읽기를 기다리는 동안은 보라(`pend ok`),
+   * 새 값이 오면 원래 색으로 천천히 돌아간다(화이트 리디자인 2026-10-16). `settled` 는 `p:날짜` · `m:날짜`.
+   */
   const pendingByRoom = useMemo(() => {
-    const byRoom = new Map<string, { price: Map<string, number>; minStay: Map<string, number> }>();
+    const byRoom = new Map<string, { price: Map<string, number>; minStay: Map<string, number>; settled: Set<string> }>();
     const bucket = (key: string) => {
       const roomKey = key.slice(0, key.indexOf("|"));
       let entry = byRoom.get(roomKey);
       if (!entry) {
-        entry = { minStay: new Map(), price: new Map() };
+        entry = { minStay: new Map(), price: new Map(), settled: new Set() };
         byRoom.set(roomKey, entry);
       }
       return { date: key.slice(key.indexOf("|") + 1), entry };
@@ -1278,13 +1300,15 @@ export function MobileOpsCalendar({
     for (const [key, item] of pendingPrices) {
       const { date, entry } = bucket(key);
       entry.price.set(date, item.value);
+      if (settledTokens.has(item.token)) entry.settled.add(`p:${date}`);
     }
     for (const [key, item] of pendingMinStay) {
       const { date, entry } = bucket(key);
       entry.minStay.set(date, item.value);
+      if (settledTokens.has(item.token)) entry.settled.add(`m:${date}`);
     }
     return byRoom;
-  }, [pendingMinStay, pendingPrices]);
+  }, [pendingMinStay, pendingPrices, settledTokens]);
 
   const groups: { property: string; rooms: OpsCalendarRoom[] }[] = [];
   for (const room of rooms) {
@@ -1324,15 +1348,21 @@ export function MobileOpsCalendar({
 
   return (
     <div aria-busy={navPending ? true : undefined} className={`mops${navPending ? " is-nav" : ""}`} ref={rootRef}>
-      {/* 건물 — 누르면 그 건물만, 동그라미는 함께 보기(데스크톱의 체크 동그라미 · Ctrl+클릭과 같다). */}
+      {/* 건물 — 옅은 보라 선택 글자 탭(화이트 리디자인 2026-10-16). 모바일은 한 건물씩 — 누르면 그 건물**만** 본다
+          (2026-10-05: 예전 「함께 보기」 동그라미가 칩 옆에 붙어 있어 잘못 누르면 이전 건물이 남았다). */}
       <div className="mops-pills" role="group" aria-label={copy.propertyGroupLabel}>
-        <Link className={`mops-pill${allSelected ? " on" : ""}`} href={nav.allHref} onNavigate={markNav(nav.allHref)} scroll={false}>
+        <Link
+          aria-current={allSelected ? "page" : undefined}
+          className={`mops-pill${allSelected ? " on" : ""}`}
+          href={nav.allHref}
+          onNavigate={markNav(nav.allHref)}
+          scroll={false}
+        >
           {copy.allProperties}
         </Link>
-        {/* 모바일은 한 건물씩 — 칩을 누르면 그 건물**만** 본다(2026-10-05: 예전 「함께 보기」 동그라미가 칩 이름 옆에
-            붙어 있어 잘못 누르면 이전 건물이 남았다). */}
         {properties.map((property) => (
           <Link
+            aria-current={property.selected ? "page" : undefined}
             className={`mops-pill${property.selected ? " on" : ""}`}
             href={property.href}
             key={property.name}
@@ -1344,7 +1374,8 @@ export function MobileOpsCalendar({
         ))}
       </div>
 
-      {/* 기간 — 범위 라벨을 누르면 날짜로 바로 이동(데스크톱 범위 라벨 달력 · 월 선택기와 같은 자리). */}
+      {/* 기간 — 30일/월간 · ‹ 기간 ›. 기간 칩 = 앱 공용 날짜 시트(데스크톱 범위 라벨 달력 · 월 선택기와 같은 자리).
+          「오늘」 버튼은 줄에서 뺐다(폭 360px · 영어에서 기간이 잘렸다) — 날짜 시트 안 「오늘」이 같은 곳으로 간다. */}
       <div className="mops-bar">
         <div className="mops-seg">
           <Link className={nav.isRolling ? "on" : ""} href={nav.rollingHref} onNavigate={markNav(nav.rollingHref)} scroll={false}>
@@ -1354,8 +1385,6 @@ export function MobileOpsCalendar({
             {copy.viewMonthly}
           </Link>
         </div>
-        {/* ‹ 기간 › — 기간 칩을 이동 화살표 사이에(2026-10-02). 「오늘」 버튼은 줄에서 뺐다: 폭 360px 폰 · 영어에서 기간이
-            잘렸다(실측). 오늘로 가기는 날짜 시트 안의 「오늘」이 같은 곳(30일 = 어제부터)으로 간다. 칩 = 앱 공용 날짜 시트. */}
         <div className="mops-move">
           <Link aria-label={copy.prev} className="mops-nav" href={nav.prevHref} onNavigate={markNav(nav.prevHref)} scroll={false}>
             <ChevronLeft aria-hidden="true" />
@@ -1370,12 +1399,12 @@ export function MobileOpsCalendar({
         </div>
       </div>
 
-      {/* 빠른 칩 — 데스크톱과 같은 순서: 위 줄의 취소 보기 · 1박 갭 → 격자 도구줄의 가격 개입 성공 · 목록 · 이력 ·
-          매출 요약 · 임박 빈방 · 오늘 빈방만 · 큰방 위로 → 편집 모드의 범위 축(모바일은 「범위 선택」 시트). */}
-      <div className="mops-chips">
-        <Link className={`mops-chip${nav.showCancelled ? " on" : ""}`} href={nav.cancelledHref} onNavigate={markNav(nav.cancelledHref)} scroll={false}>
-          {nav.showCancelled ? copy.showCancelledOn : copy.showCancelled}
-        </Link>
+      {/*
+        도구 — 글자만 있는 가로 스크롤 줄(화이트 리디자인 2026-10-16, 예전 테두리 알약 칩). 기능은 전부 그대로:
+        자주 쓰는 고르기(1박 갭 · 임박 빈방 · 오늘 빈방만 · 범위 선택) → 보기 · 목록(가격 개입 성공 · 목록 · 최근 예약 ·
+        이력 · 매출 요약) → 보기 필터(취소만 보기 · 큰방 위로). 숫자는 글자와 함께(색만으로 뜻을 전하지 않는다).
+      */}
+      <div className="mops-chips" role="toolbar" aria-label={copy.mwTools}>
         {selectableGaps.length > 0 && (
           <button
             aria-pressed={gapsPicked}
@@ -1388,6 +1417,39 @@ export function MobileOpsCalendar({
             <b>{selectableGaps.length}</b>
           </button>
         )}
+        {todayInView && (
+          <button
+            aria-pressed={urgentPicked}
+            className={`mops-chip urg${urgentPicked ? " on" : ""}`}
+            disabled={urgentCells.length === 0}
+            onClick={() => (urgentPicked ? clearSelection() : openWith(urgentCells, "price"))}
+            title={copy.urgentVacantHint}
+            type="button"
+          >
+            {copy.urgentVacant}
+            <b>{urgentCells.length}</b>
+          </button>
+        )}
+        {todayInView && (
+          <button
+            aria-pressed={vacantOnly}
+            className={`mops-chip${vacantOnly ? " on" : ""}`}
+            onClick={() => setVacantOnly((value) => !value)}
+            type="button"
+          >
+            {copy.vacantToday}
+            <b>{vacantKeys.size}</b>
+          </button>
+        )}
+        <button
+          aria-haspopup="dialog"
+          aria-pressed={scopeActive}
+          className={`mops-chip${scopeActive ? " on" : ""}`}
+          onClick={() => setOverlay({ kind: "scope" })}
+          type="button"
+        >
+          {copy.mScope}
+        </button>
         <button
           aria-pressed={priceWinsOnly}
           className={`mops-chip${priceWinsOnly ? " on" : ""}`}
@@ -1400,7 +1462,7 @@ export function MobileOpsCalendar({
           {copy.pwToggle}
           <b>{priceConversions ? priceConversions.length : "…"}</b>
         </button>
-        <button className="mops-chip" onClick={() => setOverlay({ kind: "wins" })} type="button">
+        <button aria-haspopup="dialog" className="mops-chip" onClick={() => setOverlay({ kind: "wins" })} type="button">
           {copy.pwList}
         </button>
         {/* 최근 예약 — 가격을 건드리지 않았는데 정한 시간대에 들어온 예약. 켜면 시간대 칩(누르면 목록 · 기간 바꾸기). */}
@@ -1417,51 +1479,35 @@ export function MobileOpsCalendar({
           <b>{recentBookings ? recentBookings.length : "…"}</b>
         </button>
         {recentOnly && (
-          <button className="mops-chip dashed" onClick={() => setOverlay({ kind: "recent" })} type="button">
+          <button aria-haspopup="dialog" className="mops-chip dashed" onClick={() => setOverlay({ kind: "recent" })} type="button">
             {recent.range ? recentRangeLabel(recent.range, copy.rbNow) : "…"}
           </button>
         )}
+        {/* 이력 — 최근 7일 전송 실패 · 멈춘 작업이 있으면 빨간 점 + 「실패 N」(데스크톱 `opsg__hist.alert`). */}
         <button
+          aria-haspopup="dialog"
           className={`mops-chip${historyAlerts > 0 ? " alert" : ""}`}
           onClick={() => setOverlay({ kind: "history" })}
           title={historyAlerts > 0 ? copy.hsAlertTitle.replace("{n}", String(historyAlerts)) : undefined}
           type="button"
         >
-          <History aria-hidden="true" />
+          {historyAlerts > 0 && <i aria-hidden="true" className="mops-chip__dot" />}
           {copy.hsButton}
-          {historyAlerts > 0 && <b>{historyAlerts}</b>}
+          {historyAlerts > 0 && <b>{copy.mwHistoryFailed.replace("{n}", String(historyAlerts))}</b>}
         </button>
         {days.length > 0 && (
           <button aria-haspopup="dialog" className="mops-chip" onClick={() => setSalesOpen(true)} type="button">
-            <ChartColumn aria-hidden="true" />
             {copy.ssButton}
           </button>
         )}
-        {todayInView && (
-          <button
-            aria-pressed={urgentPicked}
-            className={`mops-chip urg${urgentPicked ? " on" : ""}`}
-            disabled={urgentCells.length === 0}
-            onClick={() => (urgentPicked ? clearSelection() : openWith(urgentCells, "price"))}
-            title={copy.urgentVacantHint}
-            type="button"
-          >
-            <Timer aria-hidden="true" />
-            {copy.urgentVacant}
-            <b>{urgentCells.length}</b>
-          </button>
-        )}
-        {todayInView && (
-          <button
-            aria-pressed={vacantOnly}
-            className={`mops-chip${vacantOnly ? " on" : ""}`}
-            onClick={() => setVacantOnly((value) => !value)}
-            type="button"
-          >
-            {copy.vacantToday}
-            <b>{vacantKeys.size}</b>
-          </button>
-        )}
+        <Link
+          className={`mops-chip${nav.showCancelled ? " on" : ""}`}
+          href={nav.cancelledHref}
+          onNavigate={markNav(nav.cancelledHref)}
+          scroll={false}
+        >
+          {nav.showCancelled ? copy.showCancelledOn : copy.showCancelled}
+        </Link>
         {hasLargeRooms && (
           <button
             aria-pressed={largeFirst}
@@ -1472,13 +1518,10 @@ export function MobileOpsCalendar({
             {copy.largeFirst}
           </button>
         )}
-        <button className={`mops-chip${scopeActive ? " on" : ""}`} onClick={() => setOverlay({ kind: "scope" })} type="button">
-          <SlidersHorizontal aria-hidden="true" />
-          {copy.mScope}
-        </button>
       </div>
 
-      {/* 상태 · 범례 한 줄 — 가격 신선도 · 실시간 점 · 반영 중 · 범례(데스크톱 위 줄 오른쪽 + 범례 줄). */}
+      {/* 상태 · 범례 한 줄 — 가격 신선도 · 실시간 점 · 반영 중 · 범례(데스크톱 위 줄 오른쪽 + 범례 줄). 넓은 화면에서도
+          이 한 줄뿐이다(예전 범례를 따로 두지 않는다). */}
       <div aria-label={copy.mLegend} className="mops-meta">
         <span className={`mops-sync${staleRates ? " stale" : ""}`} title={copy.syncedHint}>
           <Beds24LiveDot offLabel={copy.liveOff} onLabel={copy.liveOn} />
@@ -1511,6 +1554,10 @@ export function MobileOpsCalendar({
           {copy.legendOneNight}
         </span>
         <span className="mops-lg">
+          <em className="msg">2</em>
+          {copy.gapLabel}
+        </span>
+        <span className="mops-lg">
           <em className="ms3">3</em>
           {copy.legendLongStay}
         </span>
@@ -1534,21 +1581,59 @@ export function MobileOpsCalendar({
         role="grid"
         style={{ "--mops-cols": days.length } as React.CSSProperties}
       >
+        {/* 붙어 있는 머리 — 달 줄 · 날짜 · 빈 방 · 평균가(화이트 리디자인 2026-10-16). 높이는 `HEAD_H` 와 짝. */}
         <div className="mops-head">
-          <div className="mops-corner">{copy.roomsHeader}</div>
-          {days.map((day, index) => (
-            <button
-              className={`mops-d${day.isWeekend ? " we" : ""}${day.isToday ? " today" : ""}${day.startsMonth ? " m1" : ""}${day.date < today ? " past" : ""}`}
-              data-day={day.date}
-              data-di={index}
-              key={day.date}
-              type="button"
-            >
-              {day.startsMonth && <em>{Number(day.date.slice(5, 7))}/</em>}
-              <b>{day.day}</b>
-              <span>{copy.weekDaysFromSunday[day.weekday]}</span>
-            </button>
-          ))}
+          <div aria-hidden="true" className="mops-head__months">
+            <div className="mops-corner" />
+            {days.map((day, index) => (
+              <div className="mops-mo" key={day.date}>
+                {(index === 0 || day.startsMonth) && <span>{monthLabel(day.date)}</span>}
+              </div>
+            ))}
+          </div>
+          <div className="mops-head__days">
+            <div className="mops-corner">{copy.roomsHeader}</div>
+            {days.map((day, index) => (
+              <button
+                className={`mops-d${day.isWeekend ? " we" : ""}${day.isToday ? " today" : ""}${day.startsMonth ? " m1" : ""}${day.date < today ? " past" : ""}`}
+                data-day={day.date}
+                data-di={index}
+                key={day.date}
+                type="button"
+              >
+                <b>{day.day}</b>
+                <span>{copy.weekDaysFromSunday[day.weekday]}</span>
+              </button>
+            ))}
+          </div>
+          <div aria-label={copy.mwDaySummaryLabel} className="mops-head__sum" role="group">
+            <div className="mops-corner">{copy.mwDayVacant}</div>
+            {daySummaries.map((summary, index) => {
+              const day = days[index];
+              return (
+                <div
+                  className={`mops-s v${day?.isWeekend ? " we" : ""}${day?.isToday ? " today" : ""}${summary.date < today ? " past" : ""}`}
+                  key={summary.date}
+                >
+                  {summary.vacant}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mops-head__sum avg">
+            <div className="mops-corner">{copy.mwDayAvg}</div>
+            {daySummaries.map((summary, index) => {
+              const day = days[index];
+              return (
+                <div
+                  className={`mops-s${day?.isWeekend ? " we" : ""}${day?.isToday ? " today" : ""}${summary.date < today ? " past" : ""}`}
+                  key={summary.date}
+                >
+                  {summary.avgPrice !== null ? formatGridPrice(summary.avgPrice) : "–"}
+                </div>
+              );
+            })}
+          </div>
         </div>
         {rooms.length === 0 && <div className="mops-empty">{vacantActive ? copy.vacantEmpty : copy.emptyBody}</div>}
         {groups.map((group) => (
@@ -1614,9 +1699,13 @@ export function MobileOpsCalendar({
               ...(bookingDraft
                 ? [
                     {
-                      icon: <CalendarPlus aria-hidden="true" />,
                       key: "book",
-                      label: copy.mBook,
+                      label: copy.mwBookNights.replace(
+                        "{n}",
+                        String(
+                          Math.round((Date.parse(bookingDraft.checkOut) - Date.parse(bookingDraft.checkIn)) / 86_400_000),
+                        ),
+                      ),
                       onClick: () => setOverlay({ kind: "booking", ...bookingDraft }),
                     },
                   ]
@@ -1624,7 +1713,6 @@ export function MobileOpsCalendar({
               ...(historyCell
                 ? [
                     {
-                      icon: <History aria-hidden="true" />,
                       key: "history",
                       label: copy.mCellHistory,
                       onClick: () => setOverlay({ date: historyCell.date, kind: "cellHistory", roomKey: historyCell.roomKey }),
@@ -1635,9 +1723,11 @@ export function MobileOpsCalendar({
             labels={{ block: copy.mActBlock, clear: copy.mClearSel, minStay: copy.mActMinStay, price: copy.mActPrice }}
             onClear={clearSelection}
             onOpen={(kind) => setOverlay({ kind })}
-            summary={copy.mSelSummary
-              .replace("{rooms}", String(selRoomCount))
-              .replace("{dates}", scopeSummary?.dates ?? "")}
+            summary={
+              scopeSummary
+                ? `${scopeSummary.rooms} · ${scopeSummary.dates}`
+                : copy.mSelSummary.replace("{rooms}", String(selRoomCount)).replace("{dates}", "")
+            }
           />,
           document.body,
         )}
@@ -1769,106 +1859,154 @@ export function MobileOpsCalendar({
       )}
 
       {overlay?.kind === "scope" && (
+        // 범위로 고르기(화이트 리디자인 2026-10-16, 시안 SalesScope) — 데스크톱 편집 모드의 세 축(객실 × 기간 × 요일)을
+        // 그대로 곱한다. 기간 축은 **주 단위**(요금이 주 단위로 움직인다 — `buildSelectableWeeks`)라 시안의 「부터 · 까지」
+        // 입력 대신 주 버튼을 여러 개 고른다. 바닥에서 바로 가격 · 최소숙박 · 차단 시트로 넘어간다.
         <BottomSheet ariaLabel={copy.mScopeTitle} className="flex max-h-[88dvh] flex-col" onClose={() => setOverlay(null)}>
-          {({ close }) => (
-            <div className="mops-scope mops-vars">
-              <div className="mops-scope__head">
-                <b>{copy.mScopeTitle}</b>
-                <span>{copy.mScopeHint}</span>
-              </div>
-              <div className="mops-scope__body">
-                <div className="mops-scope__axis">
-                  <span className="mops-scope__label">{copy.scopeRooms}</span>
-                  <div className="mops-scope__chips">
-                    <button
-                      className={`mops-chip${allRoomsInScope ? " on" : ""}`}
-                      onClick={() => applyScope({ ...scope, roomKeys: allRoomsInScope ? [] : roomKeys })}
-                      type="button"
-                    >
-                      {copy.mScopeRoomsAll}
-                    </button>
-                    {scope.roomKeys.length > 0 && !allRoomsInScope && (
-                      <span className="mops-scope__note">
-                        {copy.mScopeRoomsPicked.replace("{n}", String(scope.roomKeys.length))}
-                      </span>
-                    )}
-                  </div>
+          <div className="mops-scope mops-vars">
+            <div className="mops-scope__head">
+              <b>{copy.mScopeTitle}</b>
+              <span>{copy.mScopeHint}</span>
+            </div>
+            <div className="mops-scope__body">
+              <div className="mops-scope__axis">
+                <span className="mops-scope__label">{copy.scopeRooms}</span>
+                <div className="mops-wseg" role="group" aria-label={copy.scopeRooms}>
+                  <button
+                    aria-pressed={allRoomsInScope}
+                    className={allRoomsInScope ? "on" : ""}
+                    onClick={() => applyScope({ ...scope, roomKeys: allRoomsInScope ? [] : roomKeys })}
+                    type="button"
+                  >
+                    {copy.mScopeRoomsAll}
+                  </button>
+                  <button
+                    aria-pressed={scope.roomKeys.length > 0 && !allRoomsInScope}
+                    className={scope.roomKeys.length > 0 && !allRoomsInScope ? "on" : ""}
+                    disabled={scope.roomKeys.length === 0 || allRoomsInScope}
+                    onClick={() => applyScope({ ...scope, roomKeys: [] })}
+                    title={copy.mScopeRoomsPicked.replace("{n}", String(scope.roomKeys.length))}
+                    type="button"
+                  >
+                    {copy.mwScopeRoomsPicked.replace("{n}", String(allRoomsInScope ? 0 : scope.roomKeys.length))}
+                  </button>
                 </div>
-                <div className="mops-scope__axis">
-                  <span className="mops-scope__label">{copy.scopeWeeks}</span>
-                  <div className="mops-scope__chips">
-                    <button
-                      className={`mops-chip${scope.weekStarts.length === 0 ? " on" : ""}`}
-                      onClick={() => applyScope({ ...scope, weekStarts: [] })}
-                      type="button"
-                    >
-                      {copy.scopeAll}
-                    </button>
-                    {weeks.map((week) => (
+              </div>
+              <div className="mops-scope__axis">
+                <span className="mops-scope__label">
+                  {copy.scopeWeeks}
+                  <em>{opsWindowLabel(days).replace("–", " – ")}</em>
+                </span>
+                <div className="mops-wseg wrap" role="group" aria-label={copy.scopeWeeks}>
+                  <button
+                    aria-pressed={scope.weekStarts.length === 0}
+                    className={scope.weekStarts.length === 0 ? "on" : ""}
+                    onClick={() => applyScope({ ...scope, weekStarts: [] })}
+                    type="button"
+                  >
+                    {copy.scopeAll}
+                  </button>
+                  {weeks.map((week) => {
+                    const on = scope.weekStarts.includes(week.start);
+                    return (
                       <button
-                        className={`mops-chip${scope.weekStarts.includes(week.start) ? " on" : ""}`}
+                        aria-pressed={on}
+                        className={on ? "on" : ""}
                         key={week.start}
                         onClick={() => applyScope({ ...scope, weekStarts: toggleInList(scope.weekStarts, week.start) })}
                         type="button"
                       >
-                        {shortDate(week.start)}–{shortDate(week.end)}
+                        {shortDate(week.start)} – {shortDate(week.end)}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-                <div className="mops-scope__axis">
-                  <span className="mops-scope__label">{copy.scopeDays}</span>
-                  <div className="mops-scope__chips">
-                    <button
-                      className={`mops-chip${scope.weekdays.length === 0 ? " on" : ""}`}
-                      onClick={() => applyScope({ ...scope, weekdays: [] })}
-                      type="button"
-                    >
-                      {copy.scopeAll}
-                    </button>
-                    <button
-                      className={`mops-chip${
-                        scope.weekdays.length === 3 && WEEKEND_WEEKDAYS.every((d) => scope.weekdays.includes(d)) ? " on" : ""
-                      }`}
-                      onClick={() => applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKEND_WEEKDAYS) })}
-                      type="button"
-                    >
-                      {copy.scopeWeekend}
-                    </button>
-                    <button
-                      className={`mops-chip${
-                        scope.weekdays.length === 4 && WEEKDAY_WEEKDAYS.every((d) => scope.weekdays.includes(d)) ? " on" : ""
-                      }`}
-                      onClick={() => applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKDAY_WEEKDAYS) })}
-                      type="button"
-                    >
-                      {copy.scopeWeekday}
-                    </button>
-                  </div>
-                  <div className="mops-scope__days">
-                    {[1, 2, 3, 4, 5, 6, 0].map((weekday) => (
+              </div>
+              <div className="mops-scope__axis">
+                <span className="mops-scope__label">{copy.scopeDays}</span>
+                <div className="mops-wseg" role="group" aria-label={copy.scopeDays}>
+                  {(() => {
+                    const weekendOn =
+                      scope.weekdays.length === 3 && WEEKEND_WEEKDAYS.every((d) => scope.weekdays.includes(d));
+                    const weekdayOn =
+                      scope.weekdays.length === 4 && WEEKDAY_WEEKDAYS.every((d) => scope.weekdays.includes(d));
+                    return (
+                      <>
+                        <button
+                          aria-pressed={scope.weekdays.length === 0}
+                          className={scope.weekdays.length === 0 ? "on" : ""}
+                          onClick={() => applyScope({ ...scope, weekdays: [] })}
+                          type="button"
+                        >
+                          {copy.scopeAll}
+                        </button>
+                        <button
+                          aria-pressed={weekendOn}
+                          className={weekendOn ? "on" : ""}
+                          onClick={() => applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKEND_WEEKDAYS) })}
+                          type="button"
+                        >
+                          {copy.scopeWeekend}
+                        </button>
+                        <button
+                          aria-pressed={weekdayOn}
+                          className={weekdayOn ? "on" : ""}
+                          onClick={() => applyScope({ ...scope, weekdays: toggleWeekdayPreset(scope.weekdays, WEEKDAY_WEEKDAYS) })}
+                          type="button"
+                        >
+                          {copy.scopeWeekday}
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+                <div className="mops-scope__days">
+                  {[1, 2, 3, 4, 5, 6, 0].map((weekday) => {
+                    const on = scope.weekdays.includes(weekday);
+                    return (
                       <button
-                        className={`mops-chip${scope.weekdays.includes(weekday) ? " on" : ""}${weekday === 0 || weekday >= 5 ? " we" : ""}`}
+                        aria-pressed={on}
+                        className={`${on ? "on" : ""}${weekday === 0 || weekday >= 5 ? " we" : ""}`}
                         key={weekday}
                         onClick={() => applyScope({ ...scope, weekdays: toggleInList(scope.weekdays, weekday) })}
                         type="button"
                       >
                         {copy.weekDaysFromSunday[weekday]}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="mops-scope__foot">
-                <button className="mops-scope__btn" onClick={clearSelection} type="button">
+            </div>
+            <div className="mops-scope__foot">
+              <div className="mops-scope__sum">
+                <p>
+                  <b>{copy.mSelCount.replace("{n}", String(selCount))}</b>
+                  {selCount > 0 && (
+                    <span>
+                      {copy.mwScopeCount
+                        .replace("{rooms}", String(selRoomCount))
+                        .replace("{days}", String(new Set(selection.map((cell) => cell.date)).size))}
+                    </span>
+                  )}
+                </p>
+                <button disabled={selCount === 0 && !scopeActive} onClick={clearSelection} type="button">
                   {copy.scopeClear}
                 </button>
-                <button className="mops-scope__btn go" onClick={close} type="button">
-                  {copy.mSelCount.replace("{n}", String(selCount))} · {copy.editModeExit}
+              </div>
+              <div className="mops-dock__acts">
+                <button className="mops-dock__act go" disabled={selCount === 0} onClick={() => setOverlay({ kind: "price" })} type="button">
+                  {copy.mActPrice}
+                </button>
+                <button className="mops-dock__act ms" disabled={selCount === 0} onClick={() => setOverlay({ kind: "minstay" })} type="button">
+                  {copy.mActMinStay}
+                </button>
+                <button className="mops-dock__act blk" disabled={selCount === 0} onClick={() => setOverlay({ kind: "block" })} type="button">
+                  {copy.mActBlock}
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </BottomSheet>
       )}
 
@@ -2060,13 +2198,19 @@ export function MobileOpsCalendar({
         })()}
 
       {overlay?.kind === "blockInfo" && (
+        // 차단 정보(화이트 리디자인 2026-10-16, 시안 SalesBlockInfo) — 제목 · 「건물 · 객실 · 기간 · N박」 · 가는 가로줄 목록.
         <BottomSheet ariaLabel={copy.mBlockInfoTitle} onClose={() => setOverlay(null)}>
           <div className="mops-binfo mops-vars">
             <div className="mops-binfo__head">
-              <span className="mops-binfo__tag">{copy.blockLabel}</span>
-              <b>{overlay.roomTitle}</b>
+              <b>{copy.mBlockInfoTitle}</b>
               <span>
-                {shortDate(overlay.block.startDate)} → {shortDate(addDays(overlay.block.endDate, 1))}
+                {overlay.roomTitle} · {shortDate(overlay.block.startDate)} → {shortDate(addDays(overlay.block.endDate, 1))} ·{" "}
+                {copy.mwNights.replace(
+                  "{n}",
+                  String(
+                    Math.round((Date.parse(overlay.block.endDate) - Date.parse(overlay.block.startDate)) / 86_400_000) + 1,
+                  ),
+                )}
               </span>
             </div>
             {overlay.block.purpose || overlay.block.memo || overlay.block.by || overlay.block.at ? (
@@ -2098,6 +2242,7 @@ export function MobileOpsCalendar({
             ) : (
               <p className="mops-binfo__none">{copy.mBlockNoInfo}</p>
             )}
+            <p className="mops-binfo__hint">{copy.mwBlockUnblockHint}</p>
           </div>
         </BottomSheet>
       )}
@@ -2128,12 +2273,14 @@ export function MobileOpsCalendar({
   );
 }
 
-type DockExtra = { key: string; label: string; icon: React.ReactNode; onClick: () => void };
+type DockExtra = { key: string; label: string; onClick: () => void };
 
 /**
- * 선택 도구줄. **아래로 밀면 선택을 푼다**(시트의 끌어서 닫기와 같은 손짓 · 같은 문턱) — 그래서 위에 손잡이를 단다.
- * 버튼 위에서 시작해도 밀 수 있다. 조금이라도 끌었으면 그 손짓 끝의 click 은 버튼에 보내지 않는다.
- * 가격 · 최소숙박 · 차단은 늘 있고, 상황에 맞으면 「예약」(한 객실의 이어진 빈 밤) · 「이력」(한 칸)이 붙는다.
+ * 선택 도구줄(화이트 리디자인 2026-10-16, 시안 SalesSelect · SalesBook). 흰 바탕 · 위 22px 둥근 모서리 · 아이콘 없는 글자 버튼.
+ * 위 줄 = **몇 칸**(보라) · 어디 · 「선택 해제」. 가운데 = 가격(채움) · 최소숙박(옅은 보라) · 차단(옅은 빨강).
+ * 상황에 맞으면 아래 줄에 「예약 만들기 · N박」(한 객실의 이어진 빈 밤) · 「이력」(한 칸)이 붙는다.
+ * **아래로 밀면 선택을 푼다**(시트의 끌어서 닫기와 같은 손짓 · 같은 문턱) — 버튼 위에서 시작해도 밀 수 있다. 조금이라도
+ * 끌었으면 그 손짓 끝의 click 은 버튼에 보내지 않는다.
  */
 function MobileOpsDock({
   count,
@@ -2199,34 +2346,35 @@ function MobileOpsDock({
       role="toolbar"
       style={{ transform: leaving ? "translateY(110%)" : dragY > 0 ? `translateY(${dragY}px)` : undefined }}
     >
-      <div aria-hidden="true" className="mops-dock__grab" title={labels.clear} />
       <div className="mops-dock__info">
-        <b>{count}</b>
-        <span>{summary}</span>
+        <p>
+          <b>{count}</b>
+          <span>{summary}</span>
+        </p>
+        <button className="mops-dock__clear" onClick={onClear} type="button">
+          {labels.clear}
+        </button>
       </div>
-      <div
-        className={`mops-dock__acts${extras.length > 0 ? " many" : ""}`}
-        style={{ gridTemplateColumns: `repeat(${3 + extras.length}, minmax(0, 1fr))` }}
-      >
+      <div className="mops-dock__acts">
         <button className="mops-dock__act go" onClick={() => onOpen("price")} type="button">
-          <JapaneseYen aria-hidden="true" />
           {labels.price}
         </button>
-        <button className="mops-dock__act" onClick={() => onOpen("minstay")} type="button">
-          <MoonStar aria-hidden="true" />
+        <button className="mops-dock__act ms" onClick={() => onOpen("minstay")} type="button">
           {labels.minStay}
         </button>
-        <button className="mops-dock__act" onClick={() => onOpen("block")} type="button">
-          <Ban aria-hidden="true" />
+        <button className="mops-dock__act blk" onClick={() => onOpen("block")} type="button">
           {labels.block}
         </button>
-        {extras.map((extra) => (
-          <button className="mops-dock__act" key={extra.key} onClick={extra.onClick} type="button">
-            {extra.icon}
-            {extra.label}
-          </button>
-        ))}
       </div>
+      {extras.length > 0 && (
+        <div className="mops-dock__more" style={{ gridTemplateColumns: `repeat(${extras.length}, minmax(0, 1fr))` }}>
+          {extras.map((extra) => (
+            <button className="mops-dock__act more" key={extra.key} onClick={extra.onClick} type="button">
+              {extra.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2252,7 +2400,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
 }: {
   copy: { blockLabel: string; bkPurposes: Record<string, string> };
   days: OpsCalendarDay[];
-  pending: { price: Map<string, number>; minStay: Map<string, number> } | undefined;
+  pending: { price: Map<string, number>; minStay: Map<string, number>; settled: Set<string> } | undefined;
   priceWinsOnly: boolean;
   row: OpsGridRowData;
   rowIndex: number;
@@ -2285,7 +2433,10 @@ const MobileOpsRow = memo(function MobileOpsRow({
   const height = TOP_H + laneCount * LANE_H + 4;
 
   return (
-    <div className={`mops-row${solo ? " solo" : ""}`} data-r={rowIndex} style={{ height }}>
+    <div className={`mops-row${solo ? " solo" : ""}`} data-r={rowIndex}
+      // 줄 차례로 살짝 떠오름(건물을 바꿔 새 줄이 붙을 때만 — 실시간 새로고침은 같은 줄이라 다시 안 뜬다).
+      style={{ height, "--mops-i": Math.min(rowIndex, 12) } as React.CSSProperties}
+    >
       <button className={`mops-room${solo ? " solo" : ""}${scopeOn ? " on" : ""}`} data-room={row.room.key} type="button">
         {solo ? (
           <>
@@ -2305,6 +2456,8 @@ const MobileOpsRow = memo(function MobileOpsRow({
           const minStay = pending?.minStay.get(day.date) ?? rate?.minStay ?? null;
           const isPendingPrice = pending?.price.has(day.date) ?? false;
           const isPendingMin = pending?.minStay.has(day.date) ?? false;
+          const priceDone = isPendingPrice && (pending?.settled.has(`p:${day.date}`) ?? false);
+          const minDone = isPendingMin && (pending?.settled.has(`m:${day.date}`) ?? false);
           const selected = selFlags !== "" && dayFlagAt(selFlags, index);
           const urgent = urgFlags !== "" && dayFlagAt(urgFlags, index);
           const gap = dayFlagAt(row.gap, index);
@@ -2316,9 +2469,9 @@ const MobileOpsRow = memo(function MobileOpsRow({
               key={day.date}
             >
               {dayFlagAt(row.history, index) && <i className="mops-hdot" />}
-              {price !== null && <span className={`mops-p${isPendingPrice ? " pend" : ""}`}>{formatGridPrice(price)}</span>}
+              {price !== null && <span className={`mops-p${isPendingPrice ? (priceDone ? " pend ok" : " pend") : ""}`}>{formatGridPrice(price)}</span>}
               {minStay !== null && (
-                <span className={`mops-m${msClass}${isPendingMin ? " pend" : ""}`}>
+                <span className={`mops-m${msClass}${isPendingMin ? (minDone ? " pend ok" : " pend") : ""}`}>
                   {/* 숫자만 적는다(데스크톱 격자와 같다) — 「2박」은 46px 칸에서 가격과 겹쳐 읽힌다. */}
                   {minStay}
                   {rate?.minStayByUnit && <sup>•</sup>}
@@ -2340,7 +2493,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
               className={`mops-bar-r ${channel}${startIndex < 0 ? " open-l" : ""}${bar.isCancelled ? " cxl" : ""}${winClass}`}
               data-bar={bar.id}
               key={bar.id}
-              style={{ left, top: TOP_H + lane * LANE_H, width: Math.max(12, right - left) }}
+              style={{ left, top: TOP_H + lane * LANE_H + BAR_DY, width: Math.max(12, right - left) }}
             >
               {bar.guestName}
             </span>
@@ -2357,7 +2510,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
               key={block.id}
               style={{
                 left: startIndex * CELL_W + 2,
-                top: TOP_H + lane * LANE_H,
+                top: TOP_H + lane * LANE_H + BAR_DY,
                 width: (endIndex - startIndex + 1) * CELL_W - 4,
               }}
             >

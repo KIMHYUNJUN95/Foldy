@@ -12,6 +12,7 @@ import {
   PERCENT_PRESETS,
   type AdjustmentInput,
 } from "@/lib/ops-price-adjustment";
+import { MswField, MswSuccess, mdWeekday, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
 
 /**
  * 모바일 가격 시트 — Claude Design 시안 `3a 가격 시트 v3`(2026-10-02 사용자 확정).
@@ -22,11 +23,14 @@ import {
  * 같은 경고(`findAdjustmentWarnings`), 같은 서버 액션(`submitPriceChange`) · 같은 쓰기 추적(`runWrite`). 모양만
  * 모바일 시안으로 다시 그렸다:
  *
- * - 머리: 무엇을 고치는가(건물 · 객실 / 날짜 · 박) + 칸 수.
- * - 현재 · 변경 상자: 둘 다 범위(최저 ~ 최고) + 평균.
- * - 금액 | % 두 칸 + 프리셋 4 × 2(8번째 = 「지우기」). 같은 프리셋을 다시 누르면 해제.
+ * - **화이트 리디자인(2026-10-16, 시안 `SalesPrice-Phone` · `SalesPriceConfirm-Phone`)** — 클래스 `msw-*`
+ *   (`mobile-ops-sheets-white.css`). 머리 = 고른 객실 / 날짜 · 칸 수 + 「선택 해제」 글자 버튼.
+ * - 현재 · 변경 상자: 둘 다 범위(최저 – 최고) + 평균.
+ * - 「가격 직접 입력」 한 칸 + 「퍼센트로 조정」 프리셋 4 × 2(8번째 = 「지우기」) · 제목 줄 오른쪽에 직접 % 칸.
+ *   같은 프리셋을 다시 누르면 해제.
  * - 입력 전에도 **같은 「다음 · N칸 확인」 버튼을 흐리게**(문구를 바꾸지 않는다 — 사용자 지시).
- * - 확인 단계: 위에 요약 카드(경고가 있으면 빨강 · 버튼도 빨강).
+ * - 확인 단계: 「N칸이 바뀌어요」 + 요약 상자(바뀌는 칸 · 현재 · 변경 · 평균). 경고가 있으면 빨강 · 버튼도 빨강.
+ * - 접수되면 초록 체크를 그리고(`haptic("success")`) 잠깐 뒤 부모에게 넘긴다.
  * - 키보드가 떠도 프리셋은 그대로 둔다(2026-10-02 사용자 지시 — 시안 3d 의 「접기」는 뺐다). 시트 높이는 고정이라 값이
  *   바뀌어도 위 끝이 오르내리지 않는다(부모가 `h-[88dvh]`).
  * - **「1박으로」는 없다** — 1박 갭 고치기는 최소숙박 시트에서만(2026-10-02 사용자 지시).
@@ -42,6 +46,20 @@ export type MobilePriceSheetCopy = PanelCopy & {
   mpPerCell: string;
   mpSkipped: string;
   scopeClear: string;
+  localeTag: string;
+  mwPriceInput: string;
+  mwPriceInputHint: string;
+  mwPctTitle: string;
+  mwPctHint: string;
+  mwPctCustom: string;
+  mwChangeHead: string;
+  mwChangedCells: string;
+  mwOfCells: string;
+  mwAverage: string;
+  mwSameValue: string;
+  mwPerCellValue: string;
+  mwBack: string;
+  mwDone: string;
 };
 
 export type MobilePriceSubmitted = {
@@ -58,7 +76,6 @@ const formatAmountText = (text: string) => {
   return digits ? Number(digits).toLocaleString("ja-JP") : "";
 };
 
-const shortDate = (date: string) => `${date.slice(5, 7)}/${date.slice(8, 10)}`;
 const signedPercent = (value: number) => (value > 0 ? `+${value}%` : value < 0 ? `−${Math.abs(value)}%` : "0%");
 
 /** 기기 키보드의 「완료」(Enter)로 키보드를 내린다. */
@@ -141,6 +158,7 @@ export function MobileOpsPriceSheet({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { done, succeed } = useSuccessThen();
 
   const preview = useMemo(
     () =>
@@ -226,100 +244,111 @@ export function MobileOpsPriceSheet({
         setError(copy.panelFailed.replace("{error}", errorText(copy, result.error)));
         return;
       }
-      onApplied(cellsToSend.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })));
-      onSubmitted({ count, jobId: result.jobId, settled });
+      // 접수 — 초록 체크를 그리고(햅틱) 잠깐 뒤 부모가 시트를 닫고 알림을 띄운다.
+      succeed(() => {
+        onApplied(cellsToSend.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })));
+        onSubmitted({ count, jobId: result.jobId, settled });
+      });
     });
   };
 
-  const range = (min: number, max: number) => (min === max ? yen(min) : `${yen(min)} ~ ${yen(max)}`);
-  const confirmDetail = [
-    deltaPercent !== null ? copy.mpAvgDelta.replace("{pct}", signedPercent(deltaPercent)) : null,
-    input?.kind === "amount"
-      ? copy.mpSameValue.replace("{n}", String(preview.changedCount))
-      : input?.kind === "percent"
-        ? copy.mpPerCell
-        : null,
-    preview.skippedNoPrice > 0 ? copy.mpSkipped.replace("{n}", String(preview.skippedNoPrice)) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const range = (min: number, max: number) => (min === max ? yen(min) : `${yen(min)} – ${yen(max)}`);
   const warningText = (warning: string) =>
     warning === "zero" ? copy.warnZero : warning === "huge_drop" ? copy.warnDrop : copy.warnRise;
+  const pctOn = input?.kind === "percent" && !PERCENT_PRESETS.some((preset) => preset === input.percent);
+  const sub = [scopeSummary?.dates, copy.mSelCount.replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
 
   return (
-    <div className="mps mops-vars">
-      <div className="mps-body">
-        <div className="mps-head">
-          <div className="mps-head__t">
-            <h3>{copy.panelTitle}</h3>
-            {scopeSummary && (
-              <p>
-                {scopeSummary.rooms}
-                <br />
-                {scopeSummary.dates}
-              </p>
-            )}
-          </div>
-          <span className="mps-cnt">{copy.mSelCount.replace("{n}", String(cells.length))}</span>
-        </div>
-
+    <div className="msw">
+      <div className="msw-body">
         {confirming && input ? (
-          <>
-            <div className={`mps-ok${danger ? " danger" : ""}`} role="status">
-              <div className="mps-ok__k">
-                {copy.mpConfirmHead
-                  .replace("{total}", String(cells.length))
-                  .replace("{n}", String(preview.changedCount))}
+          <div className="msw-step" key="confirm">
+            <div className="msw-head">
+              <div className="msw-head__t">
+                <h3>{copy.mwChangeHead.replace("{n}", String(preview.changedCount))}</h3>
+                <p>{[scopeSummary?.rooms, scopeSummary?.dates].filter(Boolean).join(" · ")}</p>
               </div>
-              <div className="mps-ok__big">
-                {currentRange ? range(currentRange.min, currentRange.max) : "—"} → {range(preview.newMin, preview.newMax)}
+            </div>
+            <div className={`msw-sum${danger ? " red" : ""}`} role="status">
+              <div className="msw-kv">
+                <span className="k">{copy.mwChangedCells}</span>
+                <span className="v">
+                  {copy.mwOfCells.replace("{total}", String(cells.length)).replace("{n}", String(preview.changedCount))}
+                </span>
               </div>
-              {confirmDetail && <div className="mps-ok__sm">{confirmDetail}</div>}
+              <div className="msw-kv">
+                <span className="k">{copy.panelCurrent}</span>
+                <span className="v">{currentRange ? range(currentRange.min, currentRange.max) : "—"}</span>
+              </div>
+              <div className="msw-kv">
+                <span className="k">{copy.panelNext}</span>
+                <span className="v">
+                  <b className="vi">{range(preview.newMin, preview.newMax)}</b>
+                </span>
+              </div>
+              <div className="msw-kv">
+                <span className="k">{copy.mwAverage}</span>
+                <span className="v">
+                  {[
+                    deltaPercent !== null ? signedPercent(deltaPercent) : null,
+                    input.kind === "amount" ? copy.mwSameValue : copy.mwPerCellValue,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </div>
+              {preview.skippedNoPrice > 0 && (
+                <div className="msw-kv">
+                  <span className="k" />
+                  <span className="v">{copy.mpSkipped.replace("{n}", String(preview.skippedNoPrice))}</span>
+                </div>
+              )}
             </div>
             {warnings.map((warning) => (
-              <div className="mps-note danger" key={warning}>
-                <i aria-hidden="true" />
+              <div className="msw-alert" key={warning} role="alert">
                 {warningText(warning)}
               </div>
             ))}
-          </>
-        ) : (
-          <>
-            <div className="mps-box">
-              <div className="cur">
-                <div className="mps-l">{copy.panelCurrent}</div>
-                {/* 줄 수를 늘 같게(값 · 범위 끝 · 평균) — 값이 생기거나 범위가 하나로 모여도 상자 높이가 안 바뀐다
-                    (2026-10-02 사용자 지적 「퍼센트를 누르면 위아래로 움직인다」). 빈 줄은 자리만 지킨다. */}
-                <div className={`mps-v${currentRange ? "" : " dash"}`}>{currentRange ? yen(currentRange.min) : "—"}</div>
-                <div className="mps-v2">
-                  {currentRange && currentRange.max !== currentRange.min ? `~ ${yen(currentRange.max)}` : "\u00a0"}
-                </div>
-                <div className="mps-a">
-                  {currentRange ? copy.panelAverage.replace("{price}", yen(preview.currentAverage)) : "\u00a0"}
-                </div>
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
               </div>
-              <div className="nx">
-                <div className="mps-l">
+            )}
+            <p className="msw-note">{copy.panelChannelNote}</p>
+          </div>
+        ) : (
+          <div className="msw-step" key="input">
+            <div className="msw-head">
+              <div className="msw-head__t">
+                <h3>{scopeSummary?.rooms || copy.panelTitle}</h3>
+                <p>{sub}</p>
+              </div>
+              {/* 「선택 해제」 — 선택을 비우고 시트를 닫는다(기존 기능 유지 · 시안엔 없는 글자 버튼). */}
+              <button className="msw-link" onClick={onClear} type="button">
+                {copy.scopeClear}
+              </button>
+            </div>
+
+            <div className="msw-cmp">
+              <div>
+                <span>{copy.panelCurrent}</span>
+                {/* 늘 같은 줄 수 — 값이 생기거나 범위가 하나로 모여도 상자 높이가 안 바뀐다(2026-10-02 사용자 지적). */}
+                <b className={currentRange ? "" : "dash"}>{currentRange ? range(currentRange.min, currentRange.max) : "—"}</b>
+                <span>{currentRange ? copy.panelAverage.replace("{price}", yen(preview.currentAverage)) : "\u00a0"}</span>
+              </div>
+              <div className={`nx${deltaPercent !== null && deltaPercent < 0 ? " dn" : ""}`}>
+                <span>
                   {copy.panelNext}
-                  {deltaPercent !== null && (
-                    <span className={`mps-dl${deltaPercent < 0 ? " dn" : ""}`}>{signedPercent(deltaPercent)}</span>
-                  )}
-                </div>
-                <div className={`mps-v${input && hasPriced ? "" : " dash"}`}>
-                  {input && hasPriced ? yen(preview.newMin) : "—"}
-                </div>
-                <div className="mps-v2">
-                  {input && hasPriced && preview.newMax !== preview.newMin ? `~ ${yen(preview.newMax)}` : "\u00a0"}
-                </div>
-                <div className="mps-a">
-                  {input && hasPriced ? copy.panelAverage.replace("{price}", yen(preview.newAverage)) : "\u00a0"}
-                </div>
+                  {deltaPercent !== null ? ` · ${signedPercent(deltaPercent)}` : ""}
+                </span>
+                <b className={input && hasPriced ? "" : "dash"}>{input && hasPriced ? range(preview.newMin, preview.newMax) : "—"}</b>
+                <span>{input && hasPriced ? copy.panelAverage.replace("{price}", yen(preview.newAverage)) : "\u00a0"}</span>
               </div>
             </div>
 
-            <div className="mps-in">
-              <label className="mps-fi">
-                <span className="u">¥</span>
+            <MswField hint={copy.mwPriceInputHint} className="hint-end" label={copy.mwPriceInput}>
+              <span className="msw-money">
+                <span aria-hidden="true">¥</span>
                 <input
                   aria-label={copy.panelAmount}
                   autoComplete="off"
@@ -328,150 +357,143 @@ export function MobileOpsPriceSheet({
                   inputMode="numeric"
                   onChange={(event) => onAmount(event.target.value)}
                   onKeyDown={blurOnEnter}
-                  placeholder={copy.panelAmount}
+                  placeholder={currentRange ? yen(preview.currentAverage).slice(1) : "0"}
                   value={formatAmountText(amountText)}
                 />
-              </label>
-              <label className="mps-fi pct">
-                <input
-                  aria-label={copy.panelPercent}
-                  autoComplete="off"
-                  disabled={!hasPriced}
-                  enterKeyHint="done"
-                  inputMode="numeric"
-                  onChange={(event) => {
-                    const value = Number.parseInt(event.target.value.replace(/[^\d-]/g, ""), 10);
-                    if (Number.isFinite(value)) onPercent(value);
-                    else {
-                      setPercentText(event.target.value);
-                      setInput(null);
-                    }
-                  }}
-                  onKeyDown={blurOnEnter}
-                  placeholder="0"
-                  value={percentText}
-                />
-                <span className="u">%</span>
-              </label>
-            </div>
-            {/* 안내는 늘 둔다 — 입력하자마자 사라지면 그만큼 아래가 위로 튀었다. */}
-            <p className="mps-hint">{copy.panelHint}</p>
+              </span>
+            </MswField>
 
-            <div className="mps-pre">
-              {PERCENT_PRESETS.map((preset) => {
-                const on = input?.kind === "percent" && input.percent === preset;
-                return (
-                  <button
-                    aria-pressed={on}
-                    className={`${preset > 0 ? "up" : "dn"}${on ? " on" : ""}`}
+            <div className="msw-step-sub">
+              <div className="msw-sec">
+                <span>{copy.mwPctTitle}</span>
+                {/* 직접 % — 기존 퍼센트 입력칸(프리셋 밖의 값). */}
+                <label className={`msw-pctin${pctOn ? " on" : ""}`}>
+                  <input
+                    aria-label={copy.panelPercent}
+                    autoComplete="off"
                     disabled={!hasPriced}
-                    key={preset}
-                    // 같은 프리셋을 다시 누르면 푼다(2026-10-01 사용자 요청).
-                    onClick={() => (on ? clearInput() : onPercent(preset))}
-                    type="button"
-                  >
-                    {signedPercent(preset)}
-                  </button>
-                );
-              })}
-              <button className="clr" disabled={!input} onClick={clearInput} type="button">
-                {copy.mpClearInput}
-              </button>
+                    enterKeyHint="done"
+                    inputMode="numeric"
+                    onChange={(event) => {
+                      const value = Number.parseInt(event.target.value.replace(/[^\d-]/g, ""), 10);
+                      if (Number.isFinite(value)) onPercent(value);
+                      else {
+                        setPercentText(event.target.value);
+                        setInput(null);
+                      }
+                    }}
+                    onKeyDown={blurOnEnter}
+                    placeholder={copy.mwPctCustom}
+                    // 프리셋을 누른 동안엔 비운다(프리셋 버튼이 이미 보라) — 직접 값 · 금액에서 나온 % 만 보인다.
+                    value={input?.kind === "percent" && !pctOn ? "" : percentText}
+                  />
+                  <span>%</span>
+                </label>
+              </div>
+              <div className="msw-grid">
+                {PERCENT_PRESETS.map((preset) => {
+                  const on = input?.kind === "percent" && input.percent === preset;
+                  return (
+                    <button
+                      aria-pressed={on}
+                      className={`msw-opt${on ? " on" : ""}`}
+                      disabled={!hasPriced}
+                      key={preset}
+                      // 같은 프리셋을 다시 누르면 푼다(2026-10-01 사용자 요청).
+                      onClick={() => (on ? clearInput() : onPercent(preset))}
+                      type="button"
+                    >
+                      {signedPercent(preset)}
+                    </button>
+                  );
+                })}
+                <button className="msw-opt mute" disabled={!input} onClick={clearInput} type="button">
+                  {copy.mpClearInput}
+                </button>
+              </div>
+              <span className="msw-field__hint end">{copy.mwPctHint}</span>
             </div>
 
             {preview.skippedNoPrice > 0 && (
-              <div className="mps-note warn">
-                <i aria-hidden="true" />
-                {copy.panelExcluded.replace("{count}", String(preview.skippedNoPrice))}
-              </div>
+              <div className="msw-alert warn">{copy.panelExcluded.replace("{count}", String(preview.skippedNoPrice))}</div>
             )}
             {input !== null && hasPriced && preview.changedCount === 0 && (
-              <div className="mps-note warn">
-                <i aria-hidden="true" />
-                {copy.panelNoChange}
-              </div>
+              <div className="msw-alert warn">{copy.panelNoChange}</div>
             )}
             {warnings.map((warning) => (
-              <div className="mps-note danger" key={warning}>
-                <i aria-hidden="true" />
+              <div className="msw-alert" key={warning} role="alert">
                 {warningText(warning)}
               </div>
             ))}
-          </>
-        )}
+            {error && (
+              <div className="msw-alert" role="alert">
+                {error}
+              </div>
+            )}
 
-        {error && (
-          <div className="mps-note danger" role="alert">
-            <i aria-hidden="true" />
-            {error}
-          </div>
-        )}
+            <p className="msw-note">{copy.panelChannelNote}</p>
 
-        <p className="mps-ch">{copy.panelChannelNote}</p>
-
-        <section aria-label={copy.panelListTitle} className="mps-list">
-          <div className="mps-lh">
-            <b>{copy.panelListTitle}</b>
-            <span>
-              {copy.panelListRooms.replace("{rooms}", String(roomCount)).replace("{cells}", String(cells.length))}
-            </span>
-          </div>
-          {listBuildings.map((building) => (
-            <div key={building.name}>
-              {listBuildings.length > 1 && <div className="mps-bn">{building.name}</div>}
-              {building.rooms.map((room) => (
-                <div key={room.key}>
-                  <div className="mps-rn">{room.label}</div>
-                  {room.rows.map((row) => {
-                    const changed = row.current !== null && row.next !== null && row.next !== row.current;
-                    return (
-                      <div className="mps-r" key={row.date}>
-                        <span className="d">{shortDate(row.date)}</span>
-                        {row.current === null ? (
-                          <span className="none">{copy.panelListNoPrice}</span>
-                        ) : (
-                          <>
-                            <span className={`c${changed ? " old" : ""}`}>{yen(row.current)}</span>
-                            <i aria-hidden="true">{changed ? "→" : ""}</i>
-                            {changed && row.next !== null ? (
-                              <b className={row.next > row.current ? "up" : "dn"}>{yen(row.next)}</b>
-                            ) : (
-                              <b />
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
+            <section aria-label={copy.panelListTitle} className="msw-list">
+              <div className="msw-list__h">
+                <span>{copy.panelListTitle}</span>
+                <small>
+                  {copy.panelListRooms.replace("{rooms}", String(roomCount)).replace("{cells}", String(cells.length))}
+                </small>
+              </div>
+              {listBuildings.map((building) => (
+                <div className="msw-list" key={building.name}>
+                  {listBuildings.length > 1 && <div className="msw-list__b">{building.name}</div>}
+                  {building.rooms.flatMap((room) =>
+                    room.rows.map((row) => {
+                      const changed = row.current !== null && row.next !== null && row.next !== row.current;
+                      return (
+                        <div className="msw-row" key={`${room.key}|${row.date}`}>
+                          <span className="rm">{room.label}</span>
+                          <span className="d">{mdWeekday(row.date, copy.localeTag)}</span>
+                          {row.current === null ? (
+                            <span className="none">{copy.panelListNoPrice}</span>
+                          ) : (
+                            <>
+                              <span className="c">{yen(row.current)}</span>
+                              {changed && row.next !== null && (
+                                <>
+                                  <span aria-hidden="true" className="ar">
+                                    →
+                                  </span>
+                                  <b className={`nx${row.next < row.current ? " dn" : ""}`}>{yen(row.next)}</b>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    }),
+                  )}
                 </div>
               ))}
-            </div>
-          ))}
-        </section>
+            </section>
+          </div>
+        )}
       </div>
 
-      <div className="mps-foot">
+      <div className={`msw-foot${confirming ? " two" : ""}`}>
         {confirming ? (
           <>
-            <button className="mps-btn ghost" disabled={pending} onClick={() => setConfirming(false)} type="button">
-              {copy.panelCancel}
+            <button className="msw-btn ghost" disabled={pending} onClick={() => setConfirming(false)} type="button">
+              {copy.mwBack}
             </button>
-            <button className={`mps-btn main${danger ? " danger" : ""}`} disabled={!canGo} onClick={apply} type="button">
+            <button className={`msw-btn${danger ? " red" : ""}`} disabled={!canGo} onClick={apply} type="button">
               {copy.panelConfirmBody.replace("{count}", String(preview.changedCount))}
             </button>
           </>
         ) : (
-          <>
-            <button className="mps-btn ghost" onClick={onClear} type="button">
-              {copy.scopeClear}
-            </button>
-            {/* 입력 전에도 같은 버튼 · 같은 문구를 흐리게(사용자 지시) — 입력하면 그 자리에서 진해진다. */}
-            <button className="mps-btn main" disabled={!canGo} onClick={() => setConfirming(true)} type="button">
-              {copy.panelGo.replace("{count}", String(goCount))}
-            </button>
-          </>
+          // 입력 전에도 같은 버튼 · 같은 문구를 흐리게(사용자 지시) — 입력하면 그 자리에서 진해진다.
+          <button className="msw-btn" disabled={!canGo} onClick={() => setConfirming(true)} type="button">
+            {copy.panelGo.replace("{count}", String(goCount))}
+          </button>
         )}
       </div>
+      {done && <MswSuccess label={copy.mwDone} />}
     </div>
   );
 }

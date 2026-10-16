@@ -1,13 +1,13 @@
-import { Beds24LiveDot } from "@/components/shared/beds24-live-dot";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { OpsCalendarGrid } from "@/components/admin/ops/ops-calendar-grid";
 import { OpsCalendarJump } from "@/components/admin/ops/ops-calendar-jump";
 import { OpsNavLink, OpsNavScope } from "@/components/admin/ops/ops-nav";
-import { OpsGapButton } from "@/components/admin/ops/ops-gap-button";
 import { OpsPropertyTabs } from "@/components/admin/ops/ops-property-tabs";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import "@/components/admin/ops/ops-console.css";
+import "@/components/admin/ops/ops-calendar-white.css";
 import { countOpsHistoryAlerts } from "@/lib/beds24/ops-history-alerts";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -168,175 +168,119 @@ export default async function OpsCalendarPage({
         }}
       />
       <OpsNavScope>
-        <div className="ops__bar">
-          {/* 건물 탭 — 그냥 누르면 그 건물만, 체크 동그라미 · Ctrl/⌘ + 클릭은 여러 건물 함께(2026-09-30). */}
-          <OpsPropertyTabs
-            allHref={hrefWith({ property: undefined })}
-            copy={{
-              allProperties: copy.allProperties,
-              propertyAdd: copy.propertyAdd,
-              propertyClear: copy.propertyClear,
-              propertyGroupLabel: copy.propertyGroupLabel,
-              propertyRemove: copy.propertyRemove,
-              propertySelectedCount: copy.propertySelectedCount,
-              propertyTabHint: copy.propertyTabHint,
-            }}
-            tabs={propertyTabs}
-          />
-          <div className="ops__spacer" />
-          {/*
-            **얼마나 오래된 값인지 적는다.**
-
-            이 화면에서 제일 위험한 것이 「몇 시간 된 가격인지 모른 채 퍼센트 조정」이다.
-            시안에도 같은 자리에 있다(`객실 22 · 판매중 20 · 동기화 3분 전`).
-          */}
-          <div className={`ops__meta${staleRates ? " stale" : ""}`}>
-            {copy.roomCount.replace("{count}", String(data.roomTotal))}
-            <span className="ops__dot2" />
-            {/* 「N시간 전 동기화」는 예약까지 늦는 것처럼 읽혔다(2026-09-30 사용자) — 무엇이 몇 시간 전인지
-                라벨에 적고, 기준(가장 오래된 칸 · 예약·차단은 실시간)은 마우스를 올리면 보인다. */}
-            <span title={copy.syncedHint}>{syncedLabel}</span>
-            <Beds24LiveDot offLabel={copy.liveOff} onLabel={copy.liveOn} />
-          </div>
-        </div>
-
-        <div className="ops__bar">
-          <div className="ops__seg">
-            <OpsNavLink
-              className={`ops__segbtn${isRolling ? " on" : ""}`}
-              href={hrefWith({ mode: "rolling", start: undefined, ym: undefined })}
-            >
-              {copy.viewRolling}
-            </OpsNavLink>
-            <OpsNavLink
-              className={`ops__segbtn${isRolling ? "" : " on"}`}
-              href={hrefWith({ mode: "monthly", start: undefined })}
-            >
-              {copy.viewMonthly}
-            </OpsNavLink>
-          </div>
-          {/*
-            화살표는 30일(또는 한 달)씩 옮긴다. **먼 날짜로 가려면 여러 번 눌러야 하므로**
-            라벨 자체를 달력으로 만든다 — 2027년 4월 가격을 보려면 일곱 번 누르던 것이 한 번이
-            된다. 달력은 콘솔 **공용 프리미티브**를 그대로 쓴다(CLAUDE.md §4a):
-            30일 뷰는 **날짜**를 고르므로 `AdminDatePicker`, 월간 뷰는 **달**을 고르므로
-            `AdminMonthPicker`. 월 선택기는 화살표를 스스로 들고 있어 그쪽에서는 겹치지 않게
-            우리 화살표를 접는다.
-          */}
-          {isRolling ? (
-            <>
-              <div className="ops__nav">
-                <OpsNavLink href={prevHref}>‹</OpsNavLink>
-                <OpsNavLink href={todayHref}>{copy.today}</OpsNavLink>
-                <OpsNavLink href={nextHref}>›</OpsNavLink>
-              </div>
-              <OpsCalendarJump
-                ariaLabel={dictionary.admin.shared.dateSelect}
-                display={rangeLabel}
-                labels={{
-                  nextMonth: dictionary.admin.shared.dateNextMonth,
-                  prevMonth: dictionary.admin.shared.datePrevMonth,
-                  today: dictionary.admin.shared.dateToday,
-                }}
-                localeTag={localeTag}
-                params={{
-                  cancelled: showCancelled ? "1" : undefined,
-                  mode: data.mode,
-                  property: data.selectedProperties,
-                }}
-                start={data.start}
-              />
-            </>
-          ) : (
-            <>
-              <AdminMonthPicker
-                basePath="/admin/ops/calendar"
-                labels={{
-                  nextMonth: dictionary.admin.shared.dateNextMonth,
-                  nextYear: dictionary.admin.shared.dateNextYear,
-                  open: dictionary.admin.shared.dateSelect,
-                  prevMonth: dictionary.admin.shared.datePrevMonth,
-                  prevYear: dictionary.admin.shared.datePrevYear,
-                  thisMonth: dictionary.admin.shared.dateThisMonth,
-                }}
-                localeTag={localeTag}
-                preserveQueryKeys={["mode", "property", "cancelled"]}
-                ym={data.month}
-              />
-              <OpsNavLink className="ops__btn" href={todayHref}>
-                {copy.today}
-              </OpsNavLink>
-            </>
-          )}
-          <div className="ops__div" />
-          <OpsNavLink
-            className={`ops__btn${showCancelled ? " on" : ""}`}
-            href={hrefWith({ cancelled: showCancelled ? undefined : "1" })}
-          >
-            {/* 켠 뒤에는 **무엇이 보이는 중인지**를 적는다 — 「취소 보기」인 채로 두면
-                일반 예약이 왜 사라졌는지 알 수 없다. 저쪽도 켜면 「Cancelled Only」로 바뀐다. */}
-            {showCancelled ? copy.showCancelledOn : copy.showCancelled}
-          </OpsNavLink>
-          {/* 1박 갭 — 고를 수 있는 칸(오늘 이후)이 있을 때만 뜬다. 지난 날짜 갭은 눌러도 골라지지 않는다. */}
-          {data.selectableGapCount > 0 && (
-            <OpsGapButton count={data.selectableGapCount} hint={copy.gapOpenHint} label={copy.gapLabel} />
-          )}
-        </div>
-
-        {/* 요금이 하나도 안 들어온 경우에만 알린다. 들어와 있으면 안내가 자리만 차지한다. */}
-        {!data.hasRates && (
-          <div className="ops__notice">
-            <span>
-              <strong>{copy.priceMissingTitle}</strong>
-              <br />
-              {copy.priceMissingBody}
-            </span>
-          </div>
-        )}
-
-        <div className="ops__hint">
-          <span className="ops__lg" style={{ color: "hsl(348 58% 48%)" }}>
-            <span className="ops__dot" />
-            Airbnb
-          </span>
-          <span className="ops__lg" style={{ color: "hsl(219 58% 45%)" }}>
-            <span className="ops__dot" />
-            Booking.com
-          </span>
-          <span className="ops__lg" style={{ color: "hsl(146 46% 30%)" }}>
-            <span className="ops__dot" />
-            {copy.legendDirect}
-          </span>
-          <span className="ops__lg">
-            <span className="ops__hatch" />
-            {copy.legendBlock}
-          </span>
-          {/* 최소숙박은 **2박이 기본**이라 범례에 안 적는다 — 예외 둘만 적는다.
-              12,412칸이 2박이고 1박은 388칸뿐이다(2026-09-25 실측). */}
-          <span className="ops__lg ops__lgms">
-            <span className="ops__msk one">1</span>
-            {copy.legendOneNight}
-          </span>
-          <span className="ops__lg ops__lgms">
-            <span className="ops__msk many">3</span>
-            {copy.legendLongStay}
-          </span>
-          {/* 운영 중 유닛끼리 최소숙박이 다른 칸(2026-09-30) — 칸에는 짧은 값이 보이고 모서리 표시가 붙는다. */}
-          <span className="ops__lg ops__lgms">
-            <span className="ops__msk mixed">1</span>
-            {copy.legendMixed}
-          </span>
-        </div>
-
+        {/*
+          2026-10-16 화이트 리디자인(시안 Sales-PC) — 도구 줄 · 범례 · 상태 줄은 **격자가 그린다.** 「가격 수정」 ·
+          「+ 수기 예약」 · 필터 · 편집 범위 바가 격자의 상태(모드 · 선택 · 반영 중)를 쥐고 있어서다. 서버가 만드는
+          이동(30일/월간 · 앞뒤 · 날짜 점프 · 건물)은 여기서 만들어 자리(slot)로 넘긴다.
+        */}
         {/* 격자에는 **행 단위** 데이터만 간다(`ops-calendar-rows.ts`) — 칸 이력 목록과 가격 개입 판정은
             격자가 필요할 때 서버 액션으로 따로 받는다(2026-09-30 속도). */}
         <OpsCalendarGrid
+          cancelledHref={hrefWith({ cancelled: showCancelled ? undefined : "1" })}
           copy={copy}
           days={data.days}
+          hasRates={data.hasRates}
           historyAlerts={historyAlerts}
+          navBar={
+            <>
+              <div className="ops__seg scw-seg">
+                <OpsNavLink
+                  className={`ops__segbtn${isRolling ? " on" : ""}`}
+                  href={hrefWith({ mode: "rolling", start: undefined, ym: undefined })}
+                >
+                  {copy.viewRolling}
+                </OpsNavLink>
+                <OpsNavLink
+                  className={`ops__segbtn${isRolling ? "" : " on"}`}
+                  href={hrefWith({ mode: "monthly", start: undefined })}
+                >
+                  {copy.viewMonthly}
+                </OpsNavLink>
+              </div>
+              {/*
+                화살표는 30일(또는 한 달)씩 옮긴다. **먼 날짜로 가려면 여러 번 눌러야 하므로**
+                라벨 자체를 달력으로 만든다. 달력은 콘솔 **공용 프리미티브**를 그대로 쓴다(CLAUDE.md §4a):
+                30일 뷰는 **날짜**를 고르므로 `AdminDatePicker`, 월간 뷰는 **달**을 고르므로
+                `AdminMonthPicker`. 월 선택기는 화살표를 스스로 들고 있어 그쪽에서는 우리 화살표를 접는다.
+              */}
+              {isRolling ? (
+                <div className="scw-period">
+                  <OpsNavLink aria-label={copy.prev} className="scw-arw" href={prevHref}>
+                    <ChevronLeft aria-hidden="true" strokeWidth={2} />
+                  </OpsNavLink>
+                  <OpsCalendarJump
+                    ariaLabel={dictionary.admin.shared.dateSelect}
+                    display={rangeLabel}
+                    labels={{
+                      nextMonth: dictionary.admin.shared.dateNextMonth,
+                      prevMonth: dictionary.admin.shared.datePrevMonth,
+                      today: dictionary.admin.shared.dateToday,
+                    }}
+                    localeTag={localeTag}
+                    params={{
+                      cancelled: showCancelled ? "1" : undefined,
+                      mode: data.mode,
+                      property: data.selectedProperties,
+                    }}
+                    start={data.start}
+                  />
+                  <OpsNavLink aria-label={copy.next} className="scw-arw" href={nextHref}>
+                    <ChevronRight aria-hidden="true" strokeWidth={2} />
+                  </OpsNavLink>
+                </div>
+              ) : (
+                <div className="scw-period">
+                  <AdminMonthPicker
+                    basePath="/admin/ops/calendar"
+                    labels={{
+                      nextMonth: dictionary.admin.shared.dateNextMonth,
+                      nextYear: dictionary.admin.shared.dateNextYear,
+                      open: dictionary.admin.shared.dateSelect,
+                      prevMonth: dictionary.admin.shared.datePrevMonth,
+                      prevYear: dictionary.admin.shared.datePrevYear,
+                      thisMonth: dictionary.admin.shared.dateThisMonth,
+                    }}
+                    localeTag={localeTag}
+                    preserveQueryKeys={["mode", "property", "cancelled"]}
+                    ym={data.month}
+                  />
+                </div>
+              )}
+              <OpsNavLink className="scw-today" href={todayHref}>
+                {copy.today}
+              </OpsNavLink>
+            </>
+          }
           properties={data.selectedProperties}
+          propertyPicker={
+            /* 건물 — 그냥 누르면 그 건물만, 체크 · Ctrl/⌘ + 클릭은 여러 건물 함께(2026-09-30). */
+            <OpsPropertyTabs
+              allHref={hrefWith({ property: undefined })}
+              copy={{
+                allProperties: copy.allProperties,
+                propertyAdd: copy.propertyAdd,
+                propertyClear: copy.propertyClear,
+                propertyGroupLabel: copy.propertyGroupLabel,
+                propertyRemove: copy.propertyRemove,
+                propertySelectedCount: copy.propertySelectedCount,
+                propertyTabHint: copy.propertyTabHint,
+                scwPropertyShow: copy.scwPropertyShow,
+                scwScopeRoomsSome: copy.scwScopeRoomsSome,
+              }}
+              tabs={propertyTabs}
+            />
+          }
           rows={data.rows}
           showCancelled={showCancelled}
+          status={{
+            // 「N시간 전 기준」일 때만 「오래됐을 수 있음」을 붙인다(시안 SalesStates-PC ①).
+            label:
+              staleRates && !data.ratesPendingRefresh && data.ratesAgeMinutes !== null
+                ? `${syncedLabel} · ${copy.syncedStale}`
+                : syncedLabel,
+            roomTotal: data.roomTotal,
+            stale: staleRates,
+          }}
           today={data.today}
         />
       </OpsNavScope>

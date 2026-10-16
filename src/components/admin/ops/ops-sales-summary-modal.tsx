@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, BedDouble, Check, ChevronDown, ChevronRight, Info, ReceiptText, Tag, TrendingUp, Wallet, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { loadOpsSalesSummary, type OpsSalesSummaryResult } from "@/app/admin/ops/calendar/actions";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -15,6 +15,7 @@ import {
   type SalesRoomRow,
 } from "@/lib/ops-sales-summary";
 import { buildSalesYoy, type SalesYoy } from "@/lib/ops-sales-yoy";
+import "./ops-calendar-tools-white.css";
 
 /**
  * 판매 캘린더 「매출 요약」 모달 — **보고 있는 창 × 고른 건물**(2026-09-30).
@@ -99,6 +100,10 @@ export type SalesSummaryCopy = {
   ssIncludeHint: string;
   ssExcludedTitle: string;
   ssExcludedNote: string;
+  ssPropCount: string;
+  ssConfirmedOnly: string;
+  ssSortHint: string;
+  ssRoomsOpen: string;
 };
 
 type Loaded = Extract<OpsSalesSummaryResult, { ok: true }>["summary"];
@@ -152,11 +157,6 @@ export type Fmt = {
   pct: (value: number) => string;
   nights: (value: number) => string;
 };
-
-/** 가동률 등급 — 저쪽 포트폴리오 표와 같은 80 / 60 경계. 색만이 아니라 숫자가 늘 옆에 있다. */
-function occLevel(value: number): "hi" | "mid" | "lo" {
-  return value >= 80 ? "hi" : value >= 60 ? "mid" : "lo";
-}
 
 const CLOSE_MS = 150;
 
@@ -250,11 +250,18 @@ function useSalesSummary({ copy, days, properties, scope, start }: Omit<SalesSum
   };
 
   const end = addDays(start, days - 1);
-  const period = `${start} → ${end.slice(0, 4) === start.slice(0, 4) ? end.slice(5) : end}`;
+  // 「10/09 → 11/07」 — 해가 바뀌면 연도를 붙인다.
+  const md = (date: string) => `${date.slice(5, 7)}/${date.slice(8, 10)}`;
+  const period =
+    end.slice(0, 4) === start.slice(0, 4) ? `${md(start)} → ${md(end)}` : `${start.slice(0, 4)}/${md(start)} → ${end.slice(0, 4)}/${md(end)}`;
   return { fmt, period, retry, state };
 }
 
-/** 머리 + 본문 — 모달과 시트가 같은 마크업을 쓴다(닫기 X 는 모달에만, 시트는 손잡이 · 스크림으로 닫는다). */
+/**
+ * 머리 + 본문 — 모달과 시트가 같은 마크업을 쓴다(닫기 X 는 모달에만, 시트는 손잡이 · 스크림으로 닫는다).
+ * 화이트 리디자인(2026-10-16, 시안 SalesSummary-PC): 머리 「매출 요약」 + 「기간 · N일 · 건물 N곳 · 확정 예약만」.
+ * 시트(폰)는 같은 내용을 세로로 쌓는다(2026-10-16 사용자 승인 — 예전 간단 시트 대신 PC 와 같은 내용).
+ */
 function SalesSummaryContent({
   closeButton,
   copy,
@@ -270,67 +277,33 @@ function SalesSummaryContent({
   summary: ReturnType<typeof useSalesSummary>;
   titleId: string;
 }) {
-  const basisId = useId();
-  const [basisOpen, setBasisOpen] = useState(false);
+  const scopeText =
+    properties.length === 0
+      ? copy.ssAllProperties
+      : properties.length === 1
+        ? properties[0]
+        : copy.ssPropCount.replace("{n}", String(properties.length));
   return (
     <>
-      <header className="opsss__head">
-        <div className="opsss__headmain">
-          <div className="opsss__titlerow">
-            <h2 className="opsss__title" id={titleId}>
-              {copy.ssTitle}
-            </h2>
-            <span className="opsss__range">{period}</span>
-            <span className="opsss__days">{copy.ssDays.replace("{n}", String(days))}</span>
-          </div>
-          <div className="opsss__chips">
-            {properties.length === 0 ? (
-              <span className="opsss__chip all">{copy.ssAllProperties}</span>
-            ) : (
-              properties.map((name) => (
-                <span className="opsss__chip" key={name}>
-                  {name}
-                </span>
-              ))
-            )}
-          </div>
+      <header className="stw-ss__head">
+        <div className="stw-ss__headtxt">
+          <h2 className="stw-ss__title" id={titleId}>
+            {copy.ssTitle}
+          </h2>
+          <span className="stw-ss__sub" title={properties.length > 1 ? properties.join(" · ") : undefined}>
+            {[period, copy.ssDays.replace("{n}", String(days)), scopeText, copy.ssConfirmedOnly].join(" · ")}
+          </span>
         </div>
-        <div className="opsss__headtools">
-          <button
-            aria-controls={basisId}
-            aria-expanded={basisOpen}
-            className={`opsss__basisbtn${basisOpen ? " on" : ""}`}
-            onClick={() => setBasisOpen((value) => !value)}
-            type="button"
-          >
-            <Info aria-hidden="true" />
-            {copy.ssBasisTitle}
-          </button>
-          {closeButton}
-        </div>
-        {basisOpen && (
-          <div className="opsss__basis" id={basisId} role="note">
-            <ul>
-              <li>{copy.ssBasisRevenue}</li>
-              <li>{copy.ssBasisStatus}</li>
-              <li>{copy.ssBasisOccupancy}</li>
-              <li>{copy.ssBasisCommission}</li>
-              {state.status === "ready" && state.summary.zeroPriceCount > 0 && (
-                <li>{copy.ssZeroNote.replace("{n}", fmt.count(state.summary.zeroPriceCount))}</li>
-              )}
-            </ul>
-            <p>{copy.ssBasisLegacy}</p>
-          </div>
-        )}
+        {closeButton}
       </header>
 
-      <div className="opsss__body">
+      <div className="stw-ss__body">
         {state.status === "loading" && <SummarySkeleton label={copy.ssLoading} />}
         {state.status === "error" && (
-          <div className="opsss__state" role="alert">
-            <p>{state.forbidden ? copy.ssErrForbidden : copy.ssError}</p>
+          <div className="stw-state" role="alert">
+            <span>{state.forbidden ? copy.ssErrForbidden : copy.ssError}</span>
             {!state.forbidden && (
-              <button className="opsss__retry" onClick={retry} type="button">
+              <button className="stw-link" onClick={retry} type="button">
                 {copy.ssRetry}
               </button>
             )}
@@ -354,12 +327,12 @@ export function OpsSalesSummaryModal({ copy, days, onClose, properties, scope, s
   const summary = useSalesSummary({ copy, days, properties, scope, start });
 
   return createPortal(
-    <div className={`adm opsss-root${closing ? " is-closing" : ""}`}>
-      <div aria-hidden="true" className="opsss__scrim" onClick={requestClose} />
-      <div aria-labelledby={titleId} aria-modal="true" className="opsss" ref={panelRef} role="dialog" tabIndex={-1}>
+    <div className={`adm stw-ssroot${closing ? " is-closing" : ""}`}>
+      <div aria-hidden="true" className="stw-ssroot__scrim" onClick={requestClose} />
+      <div aria-labelledby={titleId} aria-modal="true" className="stw-ss" ref={panelRef} role="dialog" tabIndex={-1}>
         <SalesSummaryContent
           closeButton={
-            <button aria-label={copy.rcClose} className="opsss__x" onClick={requestClose} type="button">
+            <button aria-label={copy.rcClose} className="stw-x" onClick={requestClose} type="button">
               <X aria-hidden="true" />
             </button>
           }
@@ -384,8 +357,8 @@ export function OpsSalesSummarySheet({ copy, days, onClose, properties, scope, s
   const summary = useSalesSummary({ copy, days, properties, scope, start });
   return (
     <BottomSheet ariaLabelledBy={titleId} className="flex max-h-[92dvh] flex-col" onClose={onClose}>
-      <div className="adm opsss-root opsss-root--sheet">
-        <div className="opsss">
+      <div className="adm stw-sswrap">
+        <div className="stw-ss stw-ss--sheet">
           <SalesSummaryContent copy={copy} days={days} properties={properties} summary={summary} titleId={titleId} />
         </div>
       </div>
@@ -396,210 +369,44 @@ export function OpsSalesSummarySheet({ copy, days, onClose, properties, scope, s
 /** 최종 배치와 같은 골격 — 뜨는 순간 자리가 바뀌지 않는다. */
 function SummarySkeleton({ label }: { label: string }) {
   return (
-    <div aria-busy="true" aria-live="polite" className="opsss__top sk">
-      <span className="opsss__sronly">{label}</span>
-      <div className="opsss__left">
-        <div className="opsss__flow sk">
-          <span className="opsss__bone w30" />
-          <span className="opsss__bone huge" />
-          <span className="opsss__bone w60" />
-        </div>
-        <div className="opsss__tiles">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div className="opsss__tile sk" key={index}>
-              <span className="opsss__bone w40" />
-              <span className="opsss__bone big" />
-              <span className="opsss__bone w60" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="opsss__card sk">
-        <span className="opsss__bone w30" />
-        <span className="opsss__bone bar" />
-        {Array.from({ length: 4 }, (_, index) => (
-          <span className="opsss__bone row" key={index} />
-        ))}
-      </div>
-      <div className="opsss__card sk wide">
-        <span className="opsss__bone w30" />
+    <div aria-busy="true" aria-live="polite" className="stw-ss__skel">
+      <span className="stw-sronly">{label}</span>
+      <div className="stw-ss__kpis">
         {Array.from({ length: 6 }, (_, index) => (
-          <span className="opsss__bone row" key={index} />
+          <div className="stw-ss__kpi" key={index}>
+            <span className="stw-bone w40" />
+            <span className="stw-bone big" />
+            <span className="stw-bone w60" />
+          </div>
         ))}
       </div>
+      <span className="stw-bone strip" />
+      {Array.from({ length: 6 }, (_, index) => (
+        <span className="stw-bone row" key={index} />
+      ))}
     </div>
-  );
-}
-
-/** 가동률 게이지 — 숫자를 원 안에 둔다. */
-function Gauge({ value }: { value: number }) {
-  const radius = 25;
-  const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(100, value));
-  return (
-    <span className={`opsss__gauge ${occLevel(value)}`}>
-      <svg aria-hidden="true" viewBox="0 0 64 64">
-        <circle className="track" cx="32" cy="32" r={radius} />
-        <circle
-          className="fill"
-          cx="32"
-          cy="32"
-          r={radius}
-          strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`}
-        />
-      </svg>
-      <span className="opsss__gaugev">{value.toFixed(1)}%</span>
-    </span>
-  );
-}
-
-function OccCell({ fmt, value }: { fmt: Fmt; value: number }) {
-  return (
-    <span className="opsss__occcell">
-      <span aria-hidden="true" className={`opsss__minibar ${occLevel(value)}`}>
-        <span style={{ width: `${Math.min(100, value)}%` }} />
-      </span>
-      {fmt.pct(value)}
-    </span>
-  );
-}
-
-const shortRange = (start: string, endExclusive: string) => {
-  const end = addDays(endExclusive, -1);
-  return `${start} → ${end.slice(0, 4) === start.slice(0, 4) ? end.slice(5) : end}`;
-};
-
-/** 증감 — 올라가면 빨강 ▲, 내려가면 파랑 ▼(저쪽 매출 대시보드와 같은 색 규칙). 비교 불가면 그리지 않는다. */
-function Change({ value }: { value: number | null }) {
-  if (value === null) return null;
-  const up = value >= 0;
-  return (
-    <span className={`opsss__chg ${up ? "up" : "down"}`}>
-      {up ? "▲" : "▼"} {Math.abs(value).toFixed(1)}%
-    </span>
-  );
-}
-
-/**
- * 전년 동기(2026-10-05 사용자 요청) — 총매출 밑에 작게: 「전년 동기 ¥X ▲ n%」. 전년에 매출이 없던 객실이 있으면 그 줄을
- * 눌러 펼친다 — 차이 분해(기존 객실 증감 + 전년 매출 없던 객실), 건물별로 「운영 전 · 첫 손님」/「운영 중 · 그 기간 매출
- * 없음」, 객실과 지금 매출(= 차이).
- */
-function YoyLine({
-  copy,
-  fmt,
-  onToggle,
-  open,
-  panelId,
-  yoy,
-}: {
-  copy: SalesSummaryCopy;
-  fmt: Fmt;
-  onToggle: () => void;
-  open: boolean;
-  panelId: string;
-  yoy: SalesYoy;
-}) {
-  return (
-    <div className="opsss__yoy">
-      <div className="opsss__yoyline">
-        <span className="opsss__yoyk" title={shortRange(yoy.previousStart, yoy.previousEndExclusive)}>
-          {copy.ssYoyLabel}
-        </span>
-        {yoy.previousRevenue > 0 ? (
-          <>
-            <span className="opsss__yoyv">{fmt.yen(yoy.previousRevenue)}</span>
-            <Change value={yoy.changePct} />
-          </>
-        ) : (
-          <span className="opsss__yoyv dim">{copy.ssYoyNone}</span>
-        )}
-      </div>
-      {yoy.newRooms.count > 0 && (
-        <button
-          aria-controls={panelId}
-          aria-expanded={open}
-          className={`opsss__yoynew${open ? " on" : ""}`}
-          onClick={onToggle}
-          type="button"
-        >
-          {copy.ssYoyNewRooms.replace("{n}", fmt.count(yoy.newRooms.count)).replace("{amount}", fmt.yen(yoy.newRooms.revenue))}
-          <ChevronDown aria-hidden="true" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** 펼친 내용 — 총매출 카드 바로 밑 흰 카드. */
-function YoyPanel({ copy, fmt, panelId, yoy }: { copy: SalesSummaryCopy; fmt: Fmt; panelId: string; yoy: SalesYoy }) {
-  const signed = (value: number) => `${value >= 0 ? "+" : ""}${fmt.yen(value)}`;
-  return (
-    <section aria-label={copy.ssYoyLabel} className="opsss__yoypanel" id={panelId}>
-      <p className="opsss__yoydiff">
-        {copy.ssYoyDiff
-          .replace("{diff}", signed(yoy.currentRevenue - yoy.previousRevenue))
-          .replace("{a}", signed(yoy.comparable.current - yoy.comparable.previous))
-          .replace("{b}", signed(yoy.newRooms.revenue))}
-      </p>
-      {yoy.comparable.roomCount > 0 && (
-        <p className="opsss__yoycmp">
-          <span>{copy.ssYoyComparable.replace("{n}", fmt.count(yoy.comparable.roomCount))}</span>
-          <b>
-            {fmt.yen(yoy.comparable.previous)} → {fmt.yen(yoy.comparable.current)}
-          </b>
-          <Change value={yoy.comparable.changePct} />
-        </p>
-      )}
-      <ul className="opsss__yoygroups">
-        {yoy.newRooms.groups.map((group) => (
-          <li key={group.propertyName}>
-            <div className="opsss__yoyg">
-              <b className="opsss__ellip">{group.propertyName}</b>
-              <span className={`opsss__yoytag ${group.reason}`}>
-                {group.reason === "not_open" ? copy.ssYoyNotOpen.replace("{date}", group.firstStay ?? "—") : copy.ssYoyNoSales}
-              </span>
-              <span className="opsss__yoyamt">{signed(group.revenue)}</span>
-            </div>
-            <div className="opsss__yoyrooms">
-              {group.wholeBuilding ? (
-                <span>{copy.ssYoyWholeBuilding.replace("{n}", fmt.count(group.rooms.length))}</span>
-              ) : (
-                group.rooms.map((room) => (
-                  <span key={room.key}>
-                    {room.label} <em>{signed(room.revenue)}</em>
-                  </span>
-                ))
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 
 const MIX_ORDER: readonly SalesChannel[] = ["airbnb", "booking", "direct", "other"];
 
-/**
- * 채널 비중 막대(2026-10-05 사용자 요청 「객실별로도 부킹 · 에어비앤비 비중」) — 매출 기준, 위 채널 카드와 같은 색.
- * 넓은 조각(25% 이상)에만 숫자를 넣고, 전체는 마우스오버 · 스크린리더 라벨로.
- */
+/** 채널 비중 막대(건물 · 객실 줄) — 매출 기준, 위 채널 표와 같은 색. 전체는 글자 라벨로(색만으로 전하지 않는다). */
 function ChannelMix({ label, mix }: { label: (channel: SalesChannel) => string; mix: Record<SalesChannel, number> }) {
   const total = MIX_ORDER.reduce((sum, channel) => sum + mix[channel], 0);
-  if (total <= 0) return <span className="dim">–</span>;
+  if (total <= 0) return null;
   const parts = MIX_ORDER.filter((channel) => mix[channel] > 0).map((channel) => ({
     channel,
     pct: (mix[channel] / total) * 100,
   }));
   const text = parts.map((part) => `${label(part.channel)} ${Math.round(part.pct)}%`).join(" · ");
   return (
-    <span aria-label={text} className="opsss__mix" role="img" title={text}>
-      {parts.map((part) => (
-        <span className={`opsss__seg ${part.channel}`} key={part.channel} style={{ flexGrow: part.pct }}>
-          {part.pct >= 25 && <span className="opsss__mixpct">{Math.round(part.pct)}</span>}
-        </span>
-      ))}
+    <span className="stw-ss__mix">
+      <span aria-hidden="true" className="stw-ss__mixbar">
+        {parts.map((part) => (
+          <i className={`is-${part.channel}`} key={part.channel} style={{ flexGrow: part.pct }} />
+        ))}
+      </span>
+      <span className="stw-ss__mixtxt">{text}</span>
     </span>
   );
 }
@@ -632,6 +439,51 @@ const mixOfRows = (rows: readonly { channel: SalesChannel; revenue: number }[]):
   return mix;
 };
 
+/** 증감 % — 오르면 초록 +, 내리면 빨강 −(부호 글자를 늘 같이). 비교 불가면 「전년 매출 없음」. */
+function YoyPct({ copy, current, previous }: { copy: SalesSummaryCopy; current: number; previous: number }) {
+  if (previous <= 0) return <span className="stw-ss__dim">{copy.ssYoyNone}</span>;
+  const pct = ((current - previous) / previous) * 100;
+  return (
+    <span className={pct >= 0 ? "stw-ss__up" : "stw-ss__down"}>
+      {pct >= 0 ? "+" : "−"}
+      {Math.abs(pct).toFixed(1)}%
+    </span>
+  );
+}
+
+/** 전년 매출 없던 객실 — 건물마다 「운영 전 · 첫 손님」/「운영 중 · 그 기간 매출 없음」, 객실과 지금 매출(= 차이). */
+function YoyPanel({ copy, fmt, panelId, yoy }: { copy: SalesSummaryCopy; fmt: Fmt; panelId: string; yoy: SalesYoy }) {
+  const signed = (value: number) => `${value >= 0 ? "+" : ""}${fmt.yen(value)}`;
+  return (
+    <section aria-label={copy.ssYoyLabel} className="stw-ss__yoypanel" id={panelId}>
+      <ul>
+        {yoy.newRooms.groups.map((group) => (
+          <li key={group.propertyName}>
+            <div className="stw-ss__yoyg">
+              <b>{group.propertyName}</b>
+              <span className="stw-ss__dim">
+                {group.reason === "not_open" ? copy.ssYoyNotOpen.replace("{date}", group.firstStay ?? "—") : copy.ssYoyNoSales}
+              </span>
+              <span className="stw-ss__up">{signed(group.revenue)}</span>
+            </div>
+            <div className="stw-ss__yoyrooms">
+              {group.wholeBuilding ? (
+                <span>{copy.ssYoyWholeBuilding.replace("{n}", fmt.count(group.rooms.length))}</span>
+              ) : (
+                group.rooms.map((room) => (
+                  <span key={room.key}>
+                    {room.label} <em>{signed(room.revenue)}</em>
+                  </span>
+                ))
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function SummaryContent({
   copy,
   fmt,
@@ -646,7 +498,8 @@ export function SummaryContent({
 }) {
   /*
    * **합계에 넣을 건물**(2026-10-05 사용자 지시) — 오쿠보A · 사노는 기본으로 합계(총매출 · 가동률 · 채널)에서 빼고 아래에
-   * 따로 보인다. 위 칩으로 넣고 뺄 수 있다. 숫자는 건물별 몫을 다시 더해 낸다(`combineSalesSummary` — 서버 재요청 없음).
+   * 따로 보인다. 건물 표의 체크로 넣고 뺄 수 있다(2026-10-16 화이트 — 칩 줄 대신 표 안 체크). 숫자는 건물별 몫을 다시
+   * 더해 낸다(`combineSalesSummary` — 서버 재요청 없음).
    */
   const propertyNames = useMemo(() => summary.byProperty.map((row) => row.propertyName), [summary]);
   const [excluded, setExcluded] = useState<Set<string>>(() => readExcluded(propertyNames));
@@ -666,10 +519,20 @@ export function SummaryContent({
     () => buildSalesYoy({ current: summary, included: (name) => !excluded.has(name), previous: summary.previous }),
     [excluded, summary],
   );
+  /** 전년 동기 — 건물 · 객실마다(같은 1년 전 창의 객실 매출을 더한 값). */
+  const previousBy = useMemo(() => {
+    const byProperty = new Map<string, number>();
+    const byRoom = new Map<string, number>();
+    for (const room of summary.previous.rooms) {
+      byProperty.set(room.propertyName, (byProperty.get(room.propertyName) ?? 0) + room.revenue);
+      byRoom.set(room.key, (byRoom.get(room.key) ?? 0) + room.revenue);
+    }
+    return { byProperty, byRoom };
+  }, [summary]);
   const [yoyOpen, setYoyOpen] = useState(false);
   const yoyPanelId = useId();
-  const includedRows = summary.byProperty.filter((row) => !excluded.has(row.propertyName));
-  const excludedRows = summary.byProperty.filter((row) => excluded.has(row.propertyName));
+  const basisId = useId();
+  const [basisOpen, setBasisOpen] = useState(false);
 
   const totals: SalesMetrics = combined.totals;
   const channelLabel = (channel: SalesChannel) =>
@@ -689,7 +552,7 @@ export function SummaryContent({
         ? new Set([summary.byProperty[0].propertyName])
         : new Set(),
   );
-  const toggle = (name: string) =>
+  const toggleOpen = (name: string) =>
     setOpen((previous) => {
       const next = new Set(previous);
       if (next.has(name)) next.delete(name);
@@ -697,54 +560,8 @@ export function SummaryContent({
       return next;
     });
 
-  const cells = (row: SalesMetrics, mix: Record<SalesChannel, number>, offCatalog = false) => (
-    <>
-      <td className="c-occ" data-label={copy.ssOccupancyCol}>
-        {offCatalog ? <span className="dim">–</span> : <OccCell fmt={fmt} value={row.occupancyPct} />}
-      </td>
-      <td className="c-num" data-label={copy.ssNightsCol}>
-        {offCatalog ? "–" : fmt.count(row.occupiedNights)}
-      </td>
-      <td className="c-num dim" data-label={copy.ssVacantCol}>
-        {offCatalog ? "–" : fmt.count(row.vacantNights)}
-      </td>
-      <td className="c-num" data-label="ADR">
-        {fmt.yen(row.adr)}
-      </td>
-      <td className="c-num dim" data-label="RevPAR">
-        {offCatalog ? "–" : fmt.yen(row.revpar)}
-      </td>
-      <td className="c-mix" data-label={copy.ssMixCol}>
-        <ChannelMix label={channelLabel} mix={mix} />
-      </td>
-      <td className="c-num strong" data-label={copy.ssRevenueCol}>
-        {fmt.yen(row.revenue)}
-      </td>
-      <td className="c-num dim" data-label={copy.ssCommissionCol}>
-        {fmt.yen(row.commission)}
-      </td>
-      <td className="c-num" data-label={copy.ssNetCol}>
-        {fmt.yen(row.net)}
-      </td>
-    </>
-  );
-
-  const roomRow = (room: SalesRoomRow) => (
-    <tr className="is-room" key={room.key}>
-      <th className="c-name" scope="row">
-        <span className="opsss__roomname" title={room.inCatalog ? room.label : `${room.label} — ${copy.ssOffCatalogHint}`}>
-          {room.label}
-          {!room.inCatalog && <span className="opsss__offcat">*</span>}
-        </span>
-      </th>
-      <td className="c-rooms" data-label={copy.ssRoomsCol} />
-      {cells(room, room.channelRevenue, !room.inCatalog)}
-    </tr>
-  );
-
-  const totalMix = mixOfRows(combined.byChannel);
   /*
-   * **머리글로 정렬**(2026-10-05 사용자 요청) — 가동률 · 판매 박 · 빈방 · ADR · 매출을 누르면 높은순, 다시 누르면 낮은순.
+   * **머리글로 정렬**(2026-10-05 사용자 요청) — 매출 · 가동률 · 판매 박 · 빈방 · ADR 을 누르면 높은순, 다시 누르면 낮은순.
    * 「객실」 머리글은 원래 순서(탭 · 캘린더 행 순서)로 되돌린다. 건물 줄과 펼친 객실 줄이 함께 정렬된다.
    */
   const [sort, setSort] = useState<SortState>(null);
@@ -754,308 +571,371 @@ export function SummaryContent({
     const active = sort?.key === key;
     const nextDir = active && sort.dir === "desc" ? "asc" : "desc";
     return (
-      <th aria-sort={active ? (sort.dir === "desc" ? "descending" : "ascending") : "none"} scope="col">
+      <th aria-sort={active ? (sort.dir === "desc" ? "descending" : "ascending") : "none"} className="r" scope="col">
         <button
-          className={`opsss__sort${active ? " on" : ""}`}
+          className={`stw-ss__sort${active ? " on" : ""}`}
           onClick={() => sortBy(key)}
           title={nextDir === "desc" ? copy.ssSortDesc : copy.ssSortAsc}
           type="button"
         >
           {label}
-          {active && (sort.dir === "desc" ? <ArrowDown aria-hidden="true" /> : <ArrowUp aria-hidden="true" />)}
+          {active && <span aria-hidden="true">{sort.dir === "desc" ? " ↓" : " ↑"}</span>}
         </button>
       </th>
     );
   };
-  const propertyTable = (rows: SalesPropertyRow[], total: SalesMetrics | null) => (
-    <table className="opsss__table opsss__ptable">
-      <colgroup>
-        <col className="w-pname" />
-        <col className="w-rooms" />
-        <col className="w-occ" />
-        <col className="w-n" />
-        <col className="w-n" />
-        <col className="w-yen" />
-        <col className="w-yen" />
-        <col className="w-mix" />
-        <col className="w-yen-l" />
-        <col className="w-yen" />
-        <col className="w-yen-l" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th scope="col">{copy.ssPropertyCol}</th>
-          <th aria-sort={sort ? "none" : undefined} scope="col">
-            <button className={`opsss__sort${sort ? "" : " on"}`} onClick={() => setSort(null)} title={copy.ssSortReset} type="button">
-              {copy.ssRoomsCol}
-            </button>
-          </th>
-          {sortHead("occupancyPct", copy.ssOccupancyCol)}
-          {sortHead("occupiedNights", copy.ssNightsCol)}
-          {sortHead("vacantNights", copy.ssVacantCol)}
-          {sortHead("adr", "ADR")}
-          <th scope="col">RevPAR</th>
-          <th className="c-mix" scope="col">{copy.ssMixCol}</th>
-          {sortHead("revenue", copy.ssRevenueCol)}
-          <th scope="col">{copy.ssCommissionCol}</th>
-          <th scope="col">{copy.ssNetCol}</th>
-        </tr>
-      </thead>
-      {sortRows(rows, sort).map((row) => {
-        const expanded = open.has(row.propertyName);
-        return (
-          // 건물마다 `<tbody>` 하나 — 건물 줄과 펼친 객실 줄이 한 묶음이다.
-          <tbody className={`opsss__group${expanded ? " is-open" : ""}`} key={row.propertyName}>
-            <tr className="is-prop">
-              <th className="c-name" scope="row">
-                <button
-                  aria-expanded={expanded}
-                  className="opsss__expand"
-                  onClick={() => toggle(row.propertyName)}
-                  title={row.propertyName}
-                  type="button"
-                >
-                  <ChevronRight aria-hidden="true" className="opsss__chev" />
-                  <span className="opsss__ellip">{row.propertyName}</span>
-                </button>
-              </th>
-              <td className="c-rooms c-num" data-label={copy.ssRoomsCol}>
-                {fmt.count(row.roomCount)}
-              </td>
-              {cells(row, mixOfRows(row.channels))}
-            </tr>
-            {expanded && sortRows(row.rooms, sort).map(roomRow)}
-          </tbody>
-        );
-      })}
-      {total && (
-        <tfoot>
-          <tr>
-            <th scope="row">{copy.ssTotal}</th>
-            <td className="c-rooms c-num" data-label={copy.ssRoomsCol}>
-              {fmt.count(total.roomCount)}
-            </td>
-            {cells(total, totalMix)}
-          </tr>
-        </tfoot>
-      )}
-    </table>
+
+  const includedRows = sortRows(
+    summary.byProperty.filter((row) => !excluded.has(row.propertyName)),
+    sort,
   );
+  const excludedRows = sortRows(
+    summary.byProperty.filter((row) => excluded.has(row.propertyName)),
+    sort,
+  );
+  const lastIncluded = includedRows.length === 1;
 
-  return (
+  /** 건물 · 객실 줄이 같이 쓰는 숫자 칸. 목록 밖 방은 가동률 · 판매 박 · 빈방을 「–」. */
+  const metricCells = (row: SalesMetrics, previous: number, offCatalog = false) => (
     <>
-      {propertyNames.length > 1 && (
-        <section aria-label={copy.ssIncludeTitle} className="opsss__pick">
-          <span className="opsss__picklabel">{copy.ssIncludeTitle}</span>
-          <div className="opsss__pickchips">
-            {propertyNames.map((name) => {
-              const on = !excluded.has(name);
-              return (
-                <button
-                  aria-pressed={on}
-                  className={`opsss__pickchip${on ? " on" : ""}`}
-                  key={name}
-                  onClick={() => toggleIncluded(name)}
-                  type="button"
-                >
-                  {on && <Check aria-hidden="true" />}
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-          <span className="opsss__pickhint">{copy.ssIncludeHint}</span>
-        </section>
-      )}
-      <div className="opsss__top">
-        <div className="opsss__left">
-          {/* 총매출 → − 수수료 → = 순매출: 한 흐름으로 읽힌다. */}
-          <section className="opsss__flow" aria-label={copy.ssGross}>
-            <div className="opsss__flowmain">
-              <span className="opsss__klabel">
-                <Wallet aria-hidden="true" />
-                {copy.ssGross}
-              </span>
-              <span className="opsss__heroval">{fmt.yen(totals.revenue)}</span>
-              <span className="opsss__knote">{copy.ssGrossNote.replace("{n}", fmt.count(combined.reservationCount))}</span>
-              <YoyLine
-                copy={copy}
-                fmt={fmt}
-                onToggle={() => setYoyOpen((value) => !value)}
-                open={yoyOpen}
-                panelId={yoyPanelId}
-                yoy={yoy}
-              />
-            </div>
-            <div className="opsss__flowsteps">
-              <div className="opsss__flowstep">
-                <span aria-hidden="true" className="opsss__op">−</span>
-                <span className="opsss__flowtext">
-                  <span className="opsss__klabel">
-                    <ReceiptText aria-hidden="true" />
-                    {copy.ssCommission}
-                  </span>
-                  <span className="opsss__flowval">{fmt.yen(totals.commission)}</span>
-                  <span className="opsss__knote">{copy.ssCommissionNote}</span>
-                </span>
-              </div>
-              <div className="opsss__flowstep net">
-                <span aria-hidden="true" className="opsss__op">=</span>
-                <span className="opsss__flowtext">
-                  <span className="opsss__klabel">{copy.ssNet}</span>
-                  <span className="opsss__flowval">{fmt.yen(totals.net)}</span>
-                </span>
-              </div>
-            </div>
-          </section>
-          {yoyOpen && yoy.newRooms.count > 0 && <YoyPanel copy={copy} fmt={fmt} panelId={yoyPanelId} yoy={yoy} />}
-
-          <div className="opsss__tiles">
-            <div className="opsss__tile occ">
-              <Gauge value={totals.occupancyPct} />
-              <span className="opsss__tiletext">
-                <span className="opsss__klabel">{copy.ssOccupancy}</span>
-                <span className="opsss__knote">
-                  {copy.ssOccupancyNote
-                    .replace("{sold}", fmt.count(totals.occupiedNights))
-                    .replace("{total}", fmt.count(totals.availableNights))}
-                </span>
-              </span>
-            </div>
-            <div className="opsss__tile">
-              <span className="opsss__klabel">
-                <Tag aria-hidden="true" />
-                {copy.ssAdr}
-              </span>
-              <span className="opsss__kval">{fmt.yen(totals.adr)}</span>
-              <span className="opsss__knote">{copy.ssAdrNote}</span>
-            </div>
-            <div className="opsss__tile">
-              <span className="opsss__klabel">
-                <TrendingUp aria-hidden="true" />
-                {copy.ssRevpar}
-              </span>
-              <span className="opsss__kval">{fmt.yen(totals.revpar)}</span>
-              <span className="opsss__knote">{copy.ssRevparNote}</span>
-            </div>
-            <div className="opsss__tile" title={copy.ssVacantHint}>
-              <span className="opsss__klabel">
-                <BedDouble aria-hidden="true" />
-                {copy.ssVacant}
-              </span>
-              <span className="opsss__kval">{fmt.nights(totals.vacantNights)}</span>
-              <span className="opsss__knote">{copy.ssVacantNote}</span>
-              <span className="opsss__kfuture">
-                {combined.futureVacancy.days > 0
-                  ? copy.ssFutureVacant.replace("{n}", fmt.count(combined.futureVacancy.vacantNights))
-                  : copy.ssFutureNone}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ── 채널별 ── */}
-        <section className="opsss__card opsss__channels">
-          <div className="opsss__cardhead">
-            <h3 className="opsss__h3">{copy.ssChannels}</h3>
-            <div className="opsss__legend">
-              {channels.map((row) => (
-                <span className="opsss__lchip" key={row.channel}>
-                  <span className={`opsss__sw ${row.channel}`} />
-                  {channelLabel(row.channel)}
-                  <span className="opsss__lpct">{fmt.pct(share(row.revenue))}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-          {channelRevenue > 0 && (
-            <div
-              aria-label={channels.map((row) => `${channelLabel(row.channel)} ${fmt.pct(share(row.revenue))}`).join(", ")}
-              className="opsss__stack"
-              role="img"
-            >
-              {channels
-                .filter((row) => row.revenue > 0)
-                .map((row) => (
-                  <span
-                    className={`opsss__seg ${row.channel}`}
-                    key={row.channel}
-                    style={{ flexGrow: row.revenue }}
-                    title={`${channelLabel(row.channel)} · ${fmt.yen(row.revenue)} · ${fmt.pct(share(row.revenue))}`}
-                  >
-                    {share(row.revenue) >= 9 && <span className="opsss__segpct">{Math.round(share(row.revenue))}%</span>}
-                  </span>
-                ))}
-            </div>
-          )}
-          <table className="opsss__table opsss__chtable">
-            <colgroup>
-              <col className="w-name" />
-              <col />
-              <col />
-              <col />
-              <col className="w-small" />
-              <col className="w-small" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">{copy.ssChannelCol}</th>
-                <th scope="col">{copy.ssRevenueCol}</th>
-                <th scope="col">{copy.ssCommissionCol}</th>
-                <th scope="col">{copy.ssNetCol}</th>
-                <th scope="col">{copy.ssNightsCol}</th>
-                <th scope="col">{copy.ssArrivalsCol}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {channels.map((row) => (
-                <tr key={row.channel}>
-                  <th className="c-name" scope="row">
-                    <span className={`opsss__sw ${row.channel}`} />
-                    <span className="opsss__ellip" title={channelLabel(row.channel)}>
-                      {channelLabel(row.channel)}
-                    </span>
-                  </th>
-                  <td className="c-num strong">{fmt.yen(row.revenue)}</td>
-                  <td className="c-num dim">
-                    {row.channel === "airbnb" || row.channel === "booking" ? fmt.yen(row.commission) : "–"}
-                  </td>
-                  <td className="c-num">{fmt.yen(row.net)}</td>
-                  <td className="c-num dim">{fmt.count(row.nights)}</td>
-                  <td className="c-num dim">{fmt.count(row.arrivals)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row">{copy.ssTotal}</th>
-                <td className="c-num">{fmt.yen(totals.revenue)}</td>
-                <td className="c-num">{fmt.yen(totals.commission)}</td>
-                <td className="c-num">{fmt.yen(totals.net)}</td>
-                <td className="c-num">{fmt.count(channels.reduce((sum, row) => sum + row.nights, 0))}</td>
-                <td className="c-num">{fmt.count(channels.reduce((sum, row) => sum + row.arrivals, 0))}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </section>
-      </div>
-
-      {/* ── 건물별 — 줄을 누르면 그 건물의 객실이 아래로 펼쳐진다(여럿 동시에). ── */}
-      <section className="opsss__card opsss__props">
-        <h3 className="opsss__h3">{copy.ssProperties}</h3>
-        {propertyTable(includedRows, totals)}
-      </section>
-
-      {/* ── 합계에서 뺀 건물 — 따로 본다(합계 · 가동률 · 채널에 안 들어간다). ── */}
-      {excludedRows.length > 0 && (
-        <section className="opsss__card opsss__props is-excluded">
-          <div className="opsss__cardhead">
-            <h3 className="opsss__h3">{copy.ssExcludedTitle}</h3>
-            <span className="opsss__exnote">{copy.ssExcludedNote}</span>
-          </div>
-          {propertyTable(excludedRows, null)}
-        </section>
-      )}
+      <td className="r" data-label={copy.ssRevenueCol}>
+        {fmt.yen(row.revenue)}
+      </td>
+      <td className="r" data-label={copy.ssOccupancyCol}>
+        {offCatalog ? "–" : fmt.pct(row.occupancyPct)}
+      </td>
+      <td className="r" data-label={copy.ssNightsCol}>
+        {offCatalog ? "–" : fmt.count(row.occupiedNights)}
+      </td>
+      <td className="r" data-label={copy.ssVacantCol}>
+        {offCatalog ? "–" : fmt.nights(row.vacantNights)}
+      </td>
+      <td className="r" data-label="ADR">
+        {fmt.yen(row.adr)}
+      </td>
+      <td className="r" data-label={copy.ssYoyLabel}>
+        <YoyPct copy={copy} current={row.revenue} previous={previous} />
+      </td>
     </>
   );
+
+  const propertyRow = (row: SalesPropertyRow, index: number, isExcluded: boolean) => {
+    const expanded = open.has(row.propertyName);
+    const locked = !isExcluded && lastIncluded;
+    return (
+      <tbody className={`stw-ss__grp${isExcluded ? " is-off" : ""}${expanded ? " is-open" : ""}`} key={row.propertyName}>
+        <tr className="stw-ss__prow" style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
+          <th className="stw-ss__name" scope="row">
+            <button
+              aria-pressed={!isExcluded}
+              className="stw-ss__inc"
+              disabled={locked}
+              onClick={() => toggleIncluded(row.propertyName)}
+              title={copy.ssIncludeHint}
+              type="button"
+            >
+              <span aria-hidden="true" className={`stw-ck${isExcluded ? "" : " on"}`}>
+                {!isExcluded && (
+                  <svg viewBox="0 0 16 16">
+                    <path d="M3.5 8.5l3 3 6-7" />
+                  </svg>
+                )}
+              </span>
+              <span className="stw-ss__pname">{row.propertyName}</span>
+            </button>
+          </th>
+          <td className="r" data-label={copy.ssRoomsCol}>
+            {fmt.count(row.roomCount)}
+          </td>
+          {metricCells(row, previousBy.byProperty.get(row.propertyName) ?? 0)}
+          <td className="r stw-ss__opencell">
+            <button aria-expanded={expanded} className="stw-ss__open" onClick={() => toggleOpen(row.propertyName)} type="button">
+              {copy.ssRoomsOpen}
+              <ChevronDown aria-hidden="true" />
+            </button>
+          </td>
+        </tr>
+        {expanded && (
+          <>
+            <tr className="stw-ss__detail">
+              <td colSpan={9}>
+                <span>
+                  {copy.ssCommissionCol} <b>{fmt.yen(row.commission)}</b>
+                </span>
+                <span>
+                  {copy.ssNetCol} <b>{fmt.yen(row.net)}</b>
+                </span>
+                <span>
+                  RevPAR <b>{fmt.yen(row.revpar)}</b>
+                </span>
+                <ChannelMix label={channelLabel} mix={mixOfRows(row.channels)} />
+              </td>
+            </tr>
+            {sortRows(row.rooms, sort).map((room: SalesRoomRow) => (
+              <tr className="stw-ss__rrow" key={room.key}>
+                <th className="stw-ss__name" scope="row">
+                  <span
+                    className="stw-ss__rname"
+                    title={room.inCatalog ? room.label : `${room.label} — ${copy.ssOffCatalogHint}`}
+                  >
+                    {room.label}
+                    {!room.inCatalog && <span className="stw-ss__offcat">*</span>}
+                  </span>
+                  <ChannelMix label={channelLabel} mix={room.channelRevenue} />
+                </th>
+                <td className="r" />
+                {metricCells(room, previousBy.byRoom.get(room.key) ?? 0, !room.inCatalog)}
+                <td />
+              </tr>
+            ))}
+          </>
+        )}
+      </tbody>
+    );
+  };
+
+  const signed = (value: number) => `${value >= 0 ? "+" : "−"}${fmt.yen(Math.abs(value))}`;
+  const yoyDiff = yoy.currentRevenue - yoy.previousRevenue;
+  const excludedNames = summary.byProperty.filter((row) => excluded.has(row.propertyName)).map((row) => row.propertyName);
+
+  const kpis: { label: string; value: string; note: string; hero?: boolean }[] = [
+    {
+      hero: true,
+      label: copy.ssGross,
+      note: copy.ssGrossNote.replace("{n}", fmt.count(combined.reservationCount)),
+      value: fmt.yen(totals.revenue),
+    },
+    { label: copy.ssCommission, note: copy.ssCommissionNote, value: fmt.yen(totals.commission) },
+    { label: copy.ssNet, note: "", value: fmt.yen(totals.net) },
+    {
+      label: copy.ssOccupancy,
+      note: copy.ssOccupancyNote
+        .replace("{sold}", fmt.count(totals.occupiedNights))
+        .replace("{total}", fmt.count(totals.availableNights)),
+      value: fmt.pct(totals.occupancyPct),
+    },
+    { label: copy.ssAdr, note: copy.ssAdrNote, value: fmt.yen(totals.adr) },
+    { label: copy.ssRevpar, note: copy.ssRevparNote, value: fmt.yen(totals.revpar) },
+  ];
+
+  return (
+    <div className="stw-ss__content">
+      <div className="stw-ss__kpis">
+        {kpis.map((kpi, index) => (
+          <div className={`stw-ss__kpi${kpi.hero ? " is-hero" : ""}`} key={kpi.label} style={{ "--i": index } as React.CSSProperties}>
+            <span className="l">{kpi.label}</span>
+            <b className="v">{kpi.value}</b>
+            {kpi.note && <span className="n">{kpi.note}</span>}
+          </div>
+        ))}
+      </div>
+
+      <div className="stw-ss__strip">
+        <span title={copy.ssVacantHint}>
+          {copy.ssVacant} <b>{fmt.nights(totals.vacantNights)}</b> <span className="stw-ss__dim">· {copy.ssVacantNote}</span>
+        </span>
+        <span>
+          {combined.futureVacancy.days > 0 ? (
+            <>
+              {copy.ssFutureVacant.split("{n}")[0]}
+              <b className="stw-ss__v">{fmt.count(combined.futureVacancy.vacantNights)}</b>
+              {copy.ssFutureVacant.split("{n}")[1]}
+            </>
+          ) : (
+            <span className="stw-ss__dim">{copy.ssFutureNone}</span>
+          )}
+        </span>
+        <span className="stw-ss__yoy" title={shortRange(yoy.previousStart, yoy.previousEndExclusive)}>
+          {copy.ssYoyLabel}{" "}
+          {yoy.previousRevenue > 0 ? (
+            <>
+              <b>{fmt.yen(yoy.previousRevenue)}</b>{" "}
+              <b className={yoyDiff >= 0 ? "stw-ss__up" : "stw-ss__down"}>{signed(yoyDiff)}</b>
+              {yoy.changePct !== null && (
+                <span className={yoyDiff >= 0 ? "stw-ss__up" : "stw-ss__down"}>
+                  {" "}
+                  ({yoy.changePct >= 0 ? "+" : "−"}
+                  {Math.abs(yoy.changePct).toFixed(1)}%)
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="stw-ss__dim">{copy.ssYoyNone}</span>
+          )}
+        </span>
+      </div>
+
+      {(yoy.previousRevenue > 0 || yoy.newRooms.count > 0) && (
+        <div className="stw-ss__yoyline">
+          <span>
+            {copy.ssYoyDiff
+              .replace("{diff}", signed(yoyDiff))
+              .replace("{a}", signed(yoy.comparable.current - yoy.comparable.previous))
+              .replace("{b}", signed(yoy.newRooms.revenue))}
+            {yoy.comparable.roomCount > 0 && (
+              <>
+                {" · "}
+                {copy.ssYoyComparable.replace("{n}", fmt.count(yoy.comparable.roomCount))}{" "}
+                {fmt.yen(yoy.comparable.previous)} → {fmt.yen(yoy.comparable.current)}
+              </>
+            )}
+          </span>
+          {yoy.newRooms.count > 0 && (
+            <button
+              aria-controls={yoyPanelId}
+              aria-expanded={yoyOpen}
+              className="stw-link"
+              onClick={() => setYoyOpen((value) => !value)}
+              type="button"
+            >
+              {copy.ssYoyNewRooms.replace("{n}", fmt.count(yoy.newRooms.count)).replace("{amount}", fmt.yen(yoy.newRooms.revenue))}
+              <ChevronDown aria-hidden="true" className={yoyOpen ? "is-open" : undefined} />
+            </button>
+          )}
+        </div>
+      )}
+      {yoyOpen && yoy.newRooms.count > 0 && <YoyPanel copy={copy} fmt={fmt} panelId={yoyPanelId} yoy={yoy} />}
+
+      {/* ── 채널별 ── */}
+      <section className="stw-ss__sec">
+        <h3 className="stw-ss__h3">{copy.ssChannels}</h3>
+        <table className="stw-ss__table stw-ss__ch">
+          <thead>
+            <tr>
+              <th scope="col">{copy.ssChannelCol}</th>
+              <th className="r" scope="col">{copy.ssRevenueCol}</th>
+              <th className="r" scope="col">{copy.ssCommissionCol}</th>
+              <th className="r" scope="col">{copy.ssNetCol}</th>
+              <th className="r" scope="col">{copy.ssNightsCol}</th>
+              <th className="r" scope="col">{copy.ssArrivalsCol}</th>
+              <th className="r" scope="col">{copy.ssMixCol}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {channels.map((row, index) => (
+              <tr key={row.channel} style={{ "--i": index } as React.CSSProperties}>
+                <th className="stw-ss__name" scope="row">
+                  <i aria-hidden="true" className={`stw-ss__sw is-${row.channel}`} />
+                  {channelLabel(row.channel)}
+                </th>
+                <td className="r stw-ss__chrev" data-label={copy.ssRevenueCol}>
+                  {fmt.yen(row.revenue)}
+                </td>
+                <td className="r" data-label={copy.ssCommissionCol}>
+                  {row.channel === "airbnb" || row.channel === "booking" ? fmt.yen(row.commission) : "—"}
+                </td>
+                <td className="r" data-label={copy.ssNetCol}>
+                  {fmt.yen(row.net)}
+                </td>
+                <td className="r" data-label={copy.ssNightsCol}>
+                  {fmt.count(row.nights)}
+                </td>
+                <td className="r" data-label={copy.ssArrivalsCol}>
+                  {fmt.count(row.arrivals)}
+                </td>
+                <td className="r stw-ss__sharecell" data-label={copy.ssMixCol}>
+                  <span className="stw-ss__share">
+                    <i aria-hidden="true">
+                      <i className={`is-${row.channel}`} style={{ width: `${share(row.revenue)}%` }} />
+                    </i>
+                    {Math.round(share(row.revenue))}%
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">{copy.ssTotal}</th>
+              <td className="r stw-ss__chrev" data-label={copy.ssRevenueCol}>
+                {fmt.yen(totals.revenue)}
+              </td>
+              <td className="r" data-label={copy.ssCommissionCol}>
+                {fmt.yen(totals.commission)}
+              </td>
+              <td className="r" data-label={copy.ssNetCol}>
+                {fmt.yen(totals.net)}
+              </td>
+              <td className="r" data-label={copy.ssNightsCol}>
+                {fmt.count(channels.reduce((sum, row) => sum + row.nights, 0))}
+              </td>
+              <td className="r" data-label={copy.ssArrivalsCol}>
+                {fmt.count(channels.reduce((sum, row) => sum + row.arrivals, 0))}
+              </td>
+              <td className="stw-ss__sharecell" />
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      {/* ── 건물별 — 체크 = 합계에 넣기, 「객실」 = 그 건물의 객실 펼치기, 머리글 = 정렬. ── */}
+      <section className="stw-ss__sec">
+        <div className="stw-ss__sechead">
+          <h3 className="stw-ss__h3">{copy.ssProperties}</h3>
+          <span className="stw-ss__hint">
+            {propertyNames.length > 1 ? `${copy.ssIncludeHint} · ${copy.ssSortHint}` : copy.ssSortHint}
+          </span>
+        </div>
+        <table className="stw-ss__table stw-ss__props">
+          <thead>
+            <tr>
+              <th scope="col">{copy.ssPropertyCol}</th>
+              <th aria-sort={sort ? "none" : undefined} className="r" scope="col">
+                <button className={`stw-ss__sort${sort ? "" : " on"}`} onClick={() => setSort(null)} title={copy.ssSortReset} type="button">
+                  {copy.ssRoomsCol}
+                </button>
+              </th>
+              {sortHead("revenue", copy.ssRevenueCol)}
+              {sortHead("occupancyPct", copy.ssOccupancyCol)}
+              {sortHead("occupiedNights", copy.ssNightsCol)}
+              {sortHead("vacantNights", copy.ssVacantCol)}
+              {sortHead("adr", "ADR")}
+              <th className="r" scope="col">{copy.ssYoyLabel}</th>
+              <th scope="col">
+                <span className="stw-sronly">{copy.ssRoomsOpen}</span>
+              </th>
+            </tr>
+          </thead>
+          {includedRows.map((row, index) => propertyRow(row, index, false))}
+          {excludedRows.map((row, index) => propertyRow(row, includedRows.length + index, true))}
+        </table>
+      </section>
+
+      <div className="stw-ss__foot">
+        <div className="stw-ss__footnotes">
+          {excludedNames.length > 0 && (
+            <span>
+              {copy.ssExcludedTitle}: {excludedNames.join(" · ")} — {copy.ssExcludedNote}
+            </span>
+          )}
+          {combined.zeroPriceCount > 0 && <span>{copy.ssZeroNote.replace("{n}", fmt.count(combined.zeroPriceCount))}</span>}
+        </div>
+        <button
+          aria-controls={basisId}
+          aria-expanded={basisOpen}
+          className="stw-link"
+          onClick={() => setBasisOpen((value) => !value)}
+          type="button"
+        >
+          {copy.ssBasisTitle}
+        </button>
+      </div>
+      {basisOpen && (
+        <div className="stw-ss__basis" id={basisId} role="note">
+          <ul>
+            <li>{copy.ssBasisRevenue}</li>
+            <li>{copy.ssBasisStatus}</li>
+            <li>{copy.ssBasisOccupancy}</li>
+            <li>{copy.ssBasisCommission}</li>
+          </ul>
+          <p>{copy.ssBasisLegacy}</p>
+        </div>
+      )}
+    </div>
+  );
 }
+
+const shortRange = (start: string, endExclusive: string) => {
+  const end = addDays(endExclusive, -1);
+  return `${start} → ${end.slice(0, 4) === start.slice(0, 4) ? end.slice(5) : end}`;
+};

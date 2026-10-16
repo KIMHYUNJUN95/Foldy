@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, RefreshCw, Undo2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   loadOpsChangeHistory,
@@ -23,7 +23,9 @@ import {
   type SendEntry,
   type ValueRange,
 } from "@/lib/ops-history";
+import { haptic } from "@/lib/haptics";
 import { formatHistoryWhen } from "@/lib/ops-price-history";
+import "./ops-calendar-tools-white.css";
 
 /**
  * 판매 캘린더 「이력」 — 오른쪽 사이드 패널, 탭 둘.
@@ -39,10 +41,21 @@ import { formatHistoryWhen } from "@/lib/ops-price-history";
  *   「지금 보내기」를 준다. 대기·진행 중인 줄이 있으면 몇 초마다 다시 읽는다.
  *   Beds24 쿨다운(429 · 크레딧 부족)으로 기다리는 대기는 멈춘 게 아니라서 주황 「Beds24 한도 대기」와
  *   사유 · 자동 재전송 시각으로 보여준다(`isSendStalled` 가 빼 준다).
+ *
+ * 화이트 리디자인(2026-10-16, 시안 SalesHistory · SalesSend): 줄 하나 = 「종류 · 객실(외 N)」 + 오른쪽 상태 글자,
+ * 값 줄, 누가 · 언제 + 오른쪽 글자 동작(칸 보기 · 되돌리기). 모양은 `ops-calendar-tools-white.css` 의 `stw-*`.
+ * PC 옆 패널과 모바일 하단 시트(`mobile-ops-calendar.tsx` 의 `.mops-side`)가 같은 마크업을 쓴다.
  */
 
 export type HistoryPanelCopy = {
   hsTitle: string;
+  hsButton: string;
+  hsSendTitle: string;
+  hsChangesSub: string;
+  hsSendSub: string;
+  hsAlertCount: string;
+  hsRoomsMore: string;
+  hsFromBeds24: string;
   hsTabChanges: string;
   hsTabSend: string;
   hsSourceApp: string;
@@ -172,26 +185,22 @@ function CellRunsTable({ copy, group }: { copy: HistoryPanelCopy; group: ChangeG
   const show = (value: number | null, field: ChangeField) => (value === null ? "—" : formatValue(value, field, copy));
   const multiField = group.fields.length > 1;
   return (
-    <table className="opshs__cells">
+    <table className="stw-cells">
       <tbody>
         {runs.map((run) => (
           <tr key={`${run.property}-${run.room}-${run.field}-${run.dateFrom}`}>
             <th scope="row">
               {singleProperty ? run.room : [run.property, run.room].filter(Boolean).join(" ")}
-              {multiField && (
-                <span className={`opshs__cellkind is-${run.field}`}>
-                  {kindOf(run.field, copy)}
-                </span>
-              )}
+              {multiField && <span className="stw-cells__kind">{kindOf(run.field, copy)}</span>}
             </th>
-            <td className="opshs__cdate">
+            <td className="stw-cells__date">
               {dateSpan(run.dateFrom, run.dateTo)}
-              {run.nights > 1 && <span className="opshs__cdays">{copy.hsDays.replace("{n}", String(run.nights))}</span>}
+              {run.nights > 1 && <span className="stw-cells__days">{copy.hsDays.replace("{n}", String(run.nights))}</span>}
             </td>
-            <td className="opshs__cval">
-              <span className="opshs__from">{show(run.from, run.field)}</span>
-              <span aria-hidden="true" className="opshs__arrow">→</span>
-              <strong>{show(run.to, run.field)}</strong>
+            <td className="stw-cells__val">
+              <s>{show(run.from, run.field)}</s>
+              <span aria-hidden="true"> → </span>
+              <b>{show(run.to, run.field)}</b>
             </td>
           </tr>
         ))}
@@ -206,6 +215,26 @@ function CellRunsTable({ copy, group }: { copy: HistoryPanelCopy; group: ChangeG
     </table>
   );
 }
+
+/** 「가부키초 202 외 4」 — 줄 머리용 짧은 객실 표기. 전체는 `roomsText` 로 `title` 에 둔다. */
+function compactRooms(rooms: string[], copy: HistoryPanelCopy): string {
+  if (rooms.length === 0) return "";
+  if (rooms.length === 1) return rooms[0];
+  return copy.hsRoomsMore.replace("{first}", rooms[0]).replace("{n}", String(rooms.length - 1));
+}
+
+/** 「¥41,980 → ¥44,080 (+5%)」 — 한 종류의 바뀐 값. 앞뒤가 한 값이고 가격이면 % 를 붙인다(같은 두 값에서 계산). */
+function changeText(summary: ChangeGroup["fields"][number], copy: HistoryPanelCopy): string {
+  const text = `${formatRange(summary.from, summary.field, copy)} → ${formatRange(summary.to, summary.field, copy)}`;
+  const { from, to } = summary;
+  if (summary.field !== "price" || !from || !to || from.min !== from.max || to.min !== to.max || from.min <= 0) return text;
+  const pct = Math.round(((to.min - from.min) / from.min) * 1000) / 10;
+  if (pct === 0) return text;
+  return `${text} (${pct > 0 ? "+" : "−"}${Math.abs(pct)}%)`;
+}
+
+/** 「10-16 10:42」 → 「10/16 10:42」. */
+const whenText = (at: string) => formatHistoryWhen(at).replace(/^(\d\d)-(\d\d)/, "$1/$2");
 
 type Loadable<T> = { status: "idle" | "loading" | "ready" | "error"; data: T };
 
@@ -313,6 +342,10 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
 
   // Beds24 한도 대기(`waitReason`)는 멈춘 게 아니다 — 빨간 띠 · 탭 점에 넣지 않는다.
   const stalled = sends.data.entries.some(isSendStalled);
+  /** 빨간 알림 줄 — 읽어 온 줄 중 실패 · 일부 실패 · 멈춤(한도 대기는 뺀다). */
+  const troubleCount = sends.data.entries.filter(
+    (entry) => entry.status === "failed" || entry.status === "partial" || isSendStalled(entry),
+  ).length;
 
   // 첫 작업은 서버가 기다렸다 결과를 준다 — 반응이 없는 것처럼 보이면 사람은 계속 누른다.
   const sendNow = async () => {
@@ -323,7 +356,9 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
       "{n}",
       String(result.cooldownSec ?? 0),
     );
-    setSendResult({ text, tone: result.outcome === "sent" || result.outcome === "empty" ? "ok" : "warn" });
+    const ok = result.outcome === "sent" || result.outcome === "empty";
+    if (ok) haptic("success");
+    setSendResult({ text, tone: ok ? "ok" : "warn" });
     await loadSends(null);
     setKicking(false);
   };
@@ -343,6 +378,7 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
         text: result.skippedChanged > 0 ? `${done} ${copy.hsRevertSkipped.replace("{n}", String(result.skippedChanged))}` : done,
         tone: "ok",
       };
+      haptic("success");
     } else {
       next = { text: result.error === "nothing_to_revert" ? copy.hsRevertNothing : copy.hsRevertFailed, tone: "warn" };
     }
@@ -366,22 +402,33 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
       queued: copy.hsStatusQueued,
       succeeded: copy.hsStatusSucceeded,
     })[entry.status];
+  const toggleCells = (id: string) =>
+    setOpenGroups((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <>
       <div className="panel-scrim" onClick={onClose} />
-      <aside aria-label={copy.hsTitle} aria-modal="true" className="panel opshs" ref={panelRef} role="dialog" tabIndex={-1}>
-        <div className="panel__h">
-          <div className="panel__top">
-            <span className="panel__kicker">{copy.hsTitle}</span>
-            <button aria-label={copy.rcClose} className="panel__x" onClick={onClose} type="button">
+      <aside aria-label={copy.hsTitle} aria-modal="true" className="panel stw-panel stw-hs" ref={panelRef} role="dialog" tabIndex={-1}>
+        <div className="panel__h stw-h">
+          <div className="stw-h__row">
+            <div className="stw-h__txt">
+              <span className="stw-h__kicker">{copy.hsButton}</span>
+              <b className="stw-h__title">{tab === "changes" ? copy.hsTabChanges : copy.hsSendTitle}</b>
+              <span className="stw-h__sub">{tab === "changes" ? copy.hsChangesSub : copy.hsSendSub}</span>
+            </div>
+            <button aria-label={copy.rcClose} className="panel__x stw-x" onClick={onClose} type="button">
               <X />
             </button>
           </div>
-          <div className="seg opshs__tabs" role="tablist">
+          <div className="stw-seg" role="tablist">
             <button
               aria-selected={tab === "changes"}
-              className={`segb${tab === "changes" ? " on" : ""}`}
+              className={tab === "changes" ? "on" : undefined}
               onClick={() => setTab("changes")}
               role="tab"
               type="button"
@@ -390,201 +437,195 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
             </button>
             <button
               aria-selected={tab === "send"}
-              className={`segb${tab === "send" ? " on" : ""}`}
+              className={tab === "send" ? "on" : undefined}
               onClick={openSendTab}
               role="tab"
               type="button"
             >
               {copy.hsTabSend}
-              {stalled && <span aria-hidden="true" className="opshs__alertdot" />}
+              {stalled && <i aria-hidden="true" className="stw-dot is-red stw-breathe" />}
             </button>
           </div>
         </div>
 
-        <div className="panel__body opshs__body">
+        <div className="panel__body stw-body">
           {tab === "changes" ? (
-            <>
+            <div className="stw-pane" key="changes">
               {changes.status === "error" && (
-                <div className="opshs__state">
-                  {copy.hsLoadFailed}
-                  <button className="opshs__link" onClick={() => reloadChanges(null)} type="button">
+                <div className="stw-state">
+                  <span>{copy.hsLoadFailed}</span>
+                  <button className="stw-link" onClick={() => reloadChanges(null)} type="button">
                     {copy.hsRetry}
                   </button>
                 </div>
               )}
-              {changes.data.truncated && <p className="opshs__note">{copy.hsTruncated}</p>}
-              <ol className="opshs__list">
-                {changes.data.groups.map((group) => {
+              {changes.data.truncated && <p className="stw-note">{copy.hsTruncated}</p>}
+              <ol className="stw-list">
+                {changes.data.groups.map((group, index) => {
                   const open = openGroups.has(group.id);
+                  const revert = reverts[group.id];
+                  const kinds = group.fields.map((summary) => kindOf(summary.field, copy)).join(" · ");
                   return (
-                    <li className="opshs__item" key={group.id}>
-                      <div className="opshs__meta">
-                        <span className="opshs__when">{formatHistoryWhen(group.at)}</span>
-                        {/* Beds24 에서 바뀐 줄은 작성자도 「Beds24」라 배지 하나로 충분하다. */}
-                        {group.source === "app" && <span className="opshs__by">{group.by ?? copy.unknownUser}</span>}
-                        <span className={`opshs__src is-${group.source}`}>
-                          {group.source === "beds24" ? copy.hsSourceBeds24 : copy.hsSourceApp}
+                    <li className="stw-item" key={group.id} style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
+                      <div className="stw-item__top">
+                        <b className="stw-item__t" title={roomsText(group.rooms, copy)}>
+                          {kinds} · {compactRooms(group.rooms, copy)}
+                        </b>
+                        <span className="stw-st is-mute">
+                          {group.source === "beds24" ? copy.hsFromBeds24 : copy.hsSourceApp}
                         </span>
                       </div>
-                      {group.fields.map((summary) => (
-                        <div className="opshs__change" key={summary.field}>
-                          <span className={`opshs__kind is-${summary.field}`}>{kindOf(summary.field, copy)}</span>
-                          <span className="opshs__from">{formatRange(summary.from, summary.field, copy)}</span>
-                          <span aria-hidden="true" className="opshs__arrow">→</span>
-                          <strong>{formatRange(summary.to, summary.field, copy)}</strong>
-                        </div>
-                      ))}
-                      <div className="opshs__scope">
-                        {roomsText(group.rooms, copy)} · {dateSpan(group.dateFrom, group.dateTo)} ·{" "}
-                        {copy.hsCells.replace("{n}", String(group.cellCount))}
+                      <div className="stw-item__v">
+                        {[
+                          dateSpan(group.dateFrom, group.dateTo),
+                          ...group.fields.map((summary) => changeText(summary, copy)),
+                          copy.hsCells.replace("{n}", String(group.cellCount)),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </div>
-                      {isRevertibleGroup(group) && (
-                        <div className="opshs__revert">
-                          {reverts[group.id] === "ask" ? (
-                            <>
-                              <span className="opshs__revertAsk">
-                                {group.source === "beds24" ? copy.hsRevertAskBeds24 : copy.hsRevertAsk}
-                              </span>
-                              <span className="opshs__revertBtns">
-                                <button
-                                  className="opshs__revertBtn"
-                                  onClick={() =>
-                                    setReverts((previous) => {
-                                      const next = { ...previous };
-                                      delete next[group.id];
-                                      return next;
-                                    })
-                                  }
-                                  type="button"
-                                >
-                                  {copy.panelCancel}
-                                </button>
-                                <button
-                                  className="opshs__revertBtn is-go"
-                                  onClick={() => void runRevert(group.id)}
-                                  type="button"
-                                >
-                                  {copy.hsRevertConfirm}
-                                </button>
-                              </span>
-                            </>
-                          ) : reverts[group.id] === "pending" ? (
-                            <span className="opshs__revertAsk">{copy.bkPending}</span>
-                          ) : typeof reverts[group.id] === "object" ? (
-                            <span className={`opshs__revertMsg is-${(reverts[group.id] as { tone: string }).tone}`}>
-                              {(reverts[group.id] as { text: string }).text}
-                            </span>
+                      <div className="stw-item__meta">
+                        <span className="stw-item__who">
+                          {group.source === "beds24" ? (
+                            <span className="stw-tag">{copy.hsSourceBeds24}</span>
                           ) : (
+                            <span>{group.by ?? copy.unknownUser}</span>
+                          )}
+                          <span className="stw-sep" aria-hidden="true">·</span>
+                          <span>{whenText(group.at)}</span>
+                        </span>
+                        <span className="stw-acts">
+                          <button aria-expanded={open} className="stw-link is-mute" onClick={() => toggleCells(group.id)} type="button">
+                            {open ? copy.hsHideCells : copy.hsShowCells}
+                          </button>
+                          {isRevertibleGroup(group) && revert === undefined && (
                             <button
-                              className="opshs__revertBtn"
+                              className="stw-link"
                               onClick={() => setReverts((previous) => ({ ...previous, [group.id]: "ask" }))}
                               type="button"
                             >
-                              <Undo2 aria-hidden="true" />
                               {copy.hsRevert}
                             </button>
                           )}
+                        </span>
+                      </div>
+                      {revert === "ask" && (
+                        <div className="stw-ask" role="group">
+                          <p>{group.source === "beds24" ? copy.hsRevertAskBeds24 : copy.hsRevertAsk}</p>
+                          <div className="stw-ask__btns">
+                            <button
+                              className="stw-btn is-ghost"
+                              onClick={() =>
+                                setReverts((previous) => {
+                                  const next = { ...previous };
+                                  delete next[group.id];
+                                  return next;
+                                })
+                              }
+                              type="button"
+                            >
+                              {copy.panelCancel}
+                            </button>
+                            <button className="stw-btn is-pri" onClick={() => void runRevert(group.id)} type="button">
+                              {copy.hsRevertConfirm}
+                            </button>
+                          </div>
                         </div>
                       )}
-                      <button
-                        aria-expanded={open}
-                        className="opshs__toggle"
-                        onClick={() =>
-                          setOpenGroups((previous) => {
-                            const next = new Set(previous);
-                            if (next.has(group.id)) next.delete(group.id);
-                            else next.add(group.id);
-                            return next;
-                          })
-                        }
-                        type="button"
-                      >
-                        {open ? copy.hsHideCells : copy.hsShowCells}
-                        <ChevronDown className={open ? "is-open" : undefined} />
-                      </button>
-                      {open && (
-                        <CellRunsTable copy={copy} group={group} />
+                      {revert === "pending" && (
+                        <p className="stw-msg is-wait" role="status">
+                          <i aria-hidden="true" className="stw-dot is-v stw-breathe" />
+                          {copy.bkPending}
+                        </p>
                       )}
+                      {typeof revert === "object" && (
+                        <p className={`stw-msg is-${revert.tone}`} role="status">
+                          {revert.tone === "ok" && <DrawCheck />}
+                          {revert.text}
+                        </p>
+                      )}
+                      {open && <CellRunsTable copy={copy} group={group} />}
                     </li>
                   );
                 })}
               </ol>
               {changes.status === "ready" && changes.data.groups.length === 0 && changes.data.windowFrom && (
-                <p className="opshs__empty">
+                <p className="stw-empty">
                   {copy.hsEmptyWindow.replace("{from}", shortDate(changes.data.windowFrom.slice(0, 10)))}
                 </p>
               )}
-              {changes.status === "loading" && <div className="opshs__loading" />}
+              {changes.status === "loading" && <ListSkeleton />}
               {changes.status === "ready" && changes.data.nextBefore && (
-                <button
-                  className="opshs__more"
-                  onClick={() => reloadChanges(changes.data.nextBefore)}
-                  type="button"
-                >
+                <button className="stw-more" onClick={() => reloadChanges(changes.data.nextBefore)} type="button">
                   {copy.hsMore}
                 </button>
               )}
-            </>
+            </div>
           ) : (
-            <>
+            <div className="stw-pane" key="send">
               {sends.status === "error" && (
-                <div className="opshs__state">
-                  {copy.hsLoadFailed}
-                  <button className="opshs__link" onClick={() => reloadSends(null)} type="button">
+                <div className="stw-state">
+                  <span>{copy.hsLoadFailed}</span>
+                  <button className="stw-link" onClick={() => reloadSends(null)} type="button">
                     {copy.hsRetry}
                   </button>
                 </div>
               )}
+              {troubleCount > 0 && (
+                <div className="stw-alert" role="status">
+                  <i aria-hidden="true" className="stw-dot is-red stw-breathe" />
+                  <span>{copy.hsAlertCount.replace("{n}", String(troubleCount))}</span>
+                </div>
+              )}
               {stalled && (
-                <div className="opshs__stall" role="status">
+                <div className="stw-stall" role="status">
                   <span>{copy.hsStalled.replace("{n}", String(SEND_STALL_MINUTES))}</span>
-                  <button className="opshs__sendnow" disabled={kicking} onClick={() => void sendNow()} type="button">
-                    <RefreshCw className={kicking ? "is-spin" : undefined} />
+                  <button className="stw-btn is-pri is-sm" disabled={kicking} onClick={() => void sendNow()} type="button">
                     {kicking ? copy.hsSending : copy.hsSendNow}
                   </button>
                 </div>
               )}
               {sendResult && (
-                <p className={`opshs__result is-${sendResult.tone}`} role="status">
+                <p className={`stw-msg is-${sendResult.tone}`} role="status">
+                  {sendResult.tone === "ok" && <DrawCheck />}
                   {sendResult.text}
                 </p>
               )}
-              <ol className="opshs__list">
-                {sends.data.entries.map((entry) => {
+              <ol className="stw-list">
+                {sends.data.entries.map((entry, index) => {
                   const stuck = isSendStalled(entry);
                   const cooling = entry.waitReason !== null;
-                  const flag = stuck ? " is-stuck" : cooling ? " is-cooldown" : "";
+                  const tone = stuck || entry.status === "failed" || entry.status === "partial"
+                    ? "red"
+                    : cooling
+                      ? "amber"
+                      : entry.status === "succeeded"
+                        ? "green"
+                        : "mute";
+                  const active = !stuck && !cooling && (entry.status === "queued" || entry.status === "processing");
                   return (
-                    <li className={`opshs__item is-send is-${entry.status}${flag}`} key={entry.id}>
-                      <div className="opshs__head">
-                        <span className={`opshs__status is-${entry.status}${flag}`}>
+                    <li className="stw-item" key={entry.id} style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
+                      <div className="stw-item__top">
+                        <b className="stw-item__t" title={roomsText(entry.rooms, copy)}>
+                          {kindLabel(entry)} · {compactRooms(entry.rooms, copy)}
+                        </b>
+                        <span className={`stw-st is-${tone}`}>
+                          {active && <i aria-hidden="true" className="stw-dot is-v stw-breathe" />}
                           {cooling ? copy.hsStatusCooldown : statusLabel(entry)}
-                          {entry.waitingMinutes !== null && entry.waitingMinutes > 0 && (
-                            <em>{entry.waitingMinutes}′</em>
-                          )}
+                          {entry.waitingMinutes !== null && entry.waitingMinutes > 0 && ` · ${entry.waitingMinutes}′`}
                         </span>
-                        <span className={`opshs__kind is-${entry.kind}`}>{kindLabel(entry)}</span>
-                        {entry.values && (
-                          <strong className="opshs__value">
-                            {formatRange(entry.values, entry.kind === "minStay" ? "minStay" : "price", copy)}
-                          </strong>
-                        )}
                       </div>
-                      <div className="opshs__scope">
-                        {roomsText(entry.rooms, copy)} · {dateSpan(entry.dateFrom, entry.dateTo)} ·{" "}
-                        {copy.hsCells.replace("{n}", String(entry.cellCount))}
-                      </div>
-                      <div className="opshs__meta">
-                        <span className="opshs__when">{formatHistoryWhen(entry.at)}</span>
-                        <span className="opshs__by">{entry.by ?? copy.unknownUser}</span>
-                        {entry.finishedAt && entry.source === "job" && (
-                          <span className="opshs__done">
-                            {copy.hsFinished.replace("{time}", formatHistoryWhen(entry.finishedAt).slice(6))}
-                          </span>
-                        )}
+                      <div className="stw-item__v">
+                        {[
+                          dateSpan(entry.dateFrom, entry.dateTo),
+                          entry.values ? formatRange(entry.values, entry.kind === "minStay" ? "minStay" : "price", copy) : "",
+                          copy.hsCells.replace("{n}", String(entry.cellCount)),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </div>
                       {entry.waitReason && (
-                        <p className="opshs__wait">
+                        <p className="stw-item__wait">
                           {entry.waitReason === "low_credit" ? copy.hsWaitLowCredit : copy.hsWaitRateLimit}
                           {" · "}
                           {entry.retryAt
@@ -593,18 +634,14 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
                         </p>
                       )}
                       {(entry.error || entry.failures.length > 0) && (
-                        <div className="opshs__errors">
+                        <div className="stw-item__errs">
                           {entry.error && (
-                            <div className="opshs__err">
+                            <p>
                               {copy.hsReasons[entry.error] ?? entry.error}
-                              {entry.detail && (
-                                <span className="opshs__errdetail">
-                                  {localizeSendDetail(entry.detail, copy.hsFailures)}
-                                </span>
-                              )}
-                            </div>
+                              {entry.detail && <span> · {localizeSendDetail(entry.detail, copy.hsFailures)}</span>}
+                            </p>
                           )}
-                          {entry.failures.map((failure, index) => {
+                          {entry.failures.map((failure, failureIndex) => {
                             const described = describeSendFailure(
                               failure,
                               copy.hsFailures,
@@ -612,28 +649,36 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
                               (value, field) => formatValue(value, field, copy),
                             );
                             return (
-                              <div className="opshs__err" key={`${failure.room}-${index}`}>
-                                <b>{failure.room}</b>
-                                <span>{described.text}</span>
-                                {described.detail && (
-                                  <span className="opshs__errdetail">{described.detail}</span>
-                                )}
-                              </div>
+                              <p key={`${failure.room}-${failureIndex}`}>
+                                <b>{failure.room}</b> {described.text}
+                                {described.detail && <span> · {described.detail}</span>}
+                              </p>
                             );
                           })}
                         </div>
                       )}
+                      <div className="stw-item__meta">
+                        <span className="stw-item__who">
+                          <span>{entry.by ?? copy.unknownUser}</span>
+                          <span className="stw-sep" aria-hidden="true">·</span>
+                          <span>{whenText(entry.at)}</span>
+                          {entry.finishedAt && entry.source === "job" && (
+                            <>
+                              <span className="stw-sep" aria-hidden="true">·</span>
+                              <span>{copy.hsFinished.replace("{time}", formatHistoryWhen(entry.finishedAt).slice(6))}</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
                     </li>
                   );
                 })}
               </ol>
-              {sends.status === "ready" && sends.data.entries.length === 0 && (
-                <p className="opshs__empty">{copy.hsEmptySend}</p>
-              )}
-              {sends.status === "loading" && <div className="opshs__loading" />}
+              {sends.status === "ready" && sends.data.entries.length === 0 && <p className="stw-empty">{copy.hsEmptySend}</p>}
+              {sends.status === "loading" && <ListSkeleton />}
               {sends.status === "ready" && sends.data.nextBefore && (
                 <button
-                  className="opshs__more"
+                  className="stw-more"
                   onClick={() => {
                     sendPagesRef.current += 1;
                     reloadSends(sends.data.nextBefore);
@@ -643,10 +688,34 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
                   {copy.hsMoreSend}
                 </button>
               )}
-            </>
+            </div>
           )}
         </div>
       </aside>
     </>
+  );
+}
+
+/** 성공 — 초록 체크를 그린다(선이 그어지며 나타남). */
+function DrawCheck() {
+  return (
+    <svg aria-hidden="true" className="stw-check" viewBox="0 0 16 16">
+      <path d="M3.5 8.5l3 3 6-7" />
+    </svg>
+  );
+}
+
+/** 불러오는 동안 — 줄 모양 뼈대 셋(최종 줄과 같은 높이). */
+function ListSkeleton() {
+  return (
+    <div aria-busy="true" className="stw-skel">
+      {[0, 1, 2].map((index) => (
+        <div className="stw-skel__row" key={index}>
+          <span className="w60" />
+          <span className="w80" />
+          <span className="w40" />
+        </div>
+      ))}
+    </div>
   );
 }

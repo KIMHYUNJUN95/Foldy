@@ -66,7 +66,7 @@ function breakCell(entry: RosterEntry, localeTag: string): string {
   return `${Math.round(entry.closedBreakSeconds / 60)}${minUnit(localeTag)}`;
 }
 function minUnit(localeTag: string): string {
-  return localeTag.startsWith("ja") ? "分" : localeTag.startsWith("en") ? "m" : "분";
+  return localeTag.startsWith("ja") ? "分" : localeTag.startsWith("en") ? "m" : "분"; // i18n-ignore — 분 단위 기호만(로케일 태그로 고름)
 }
 
 const STATUS_ORDER: RosterStatusKey[] = ["working", "on_break", "needs_review", "done", "void"];

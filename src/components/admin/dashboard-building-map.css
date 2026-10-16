@@ -13,7 +13,7 @@
 .dhm-map { position: absolute; inset: 0; }
 
 /* 왼쪽 위 — 실시간 · 요약 · 필터 */
-.dhm-hd { position: absolute; left: 30px; top: 26px; z-index: 50; pointer-events: none; animation: dhm-in 600ms var(--dhm-out) 200ms backwards; }
+.dhm-hd { position: absolute; left: 30px; top: 26px; z-index: 50; pointer-events: none; animation: dhm-in 800ms var(--dhm-out) 300ms backwards; }
 .dhm-hd > * { pointer-events: auto; }
 .dhm-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #1e8a55; }
 .dhm-live i { width: 7px; height: 7px; border-radius: 50%; background: #2bb673; box-shadow: 0 0 0 3px rgba(43, 182, 115, 0.18); animation: dhm-live 1.6s ease-in-out infinite; }
@@ -37,7 +37,7 @@
   backdrop-filter: blur(18px) saturate(1.6);
   box-shadow: 0 24px 50px -28px rgba(50, 25, 120, 0.45), 0 0 0 0.5px rgba(80, 50, 170, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   overflow: hidden;
-  animation: dhm-panel 700ms var(--dhm-out) 300ms backwards;
+  animation: dhm-panel 900ms var(--dhm-out) 1100ms backwards;
 }
 @keyframes dhm-panel { from { opacity: 0; transform: translateX(14px); } }
 @keyframes dhm-in { from { opacity: 0; transform: translateY(6px); } }
@@ -49,7 +49,8 @@
 .dhm-empty { margin: 8px 0 0; font-size: 13px; color: #8b8898; }
 
 .dhm-feed { list-style: none; margin: 0 -10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.dhm-fd { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 10px; border: 0; border-radius: 14px; background: transparent; font: inherit; text-align: left; cursor: pointer; transition: background 160ms ease, scale 140ms var(--dhm-out); animation: dhm-in 420ms var(--dhm-out) calc(400ms + var(--i, 0) * 50ms) backwards; }
+.dhm-fd { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 10px; border: 0; border-radius: 14px; background: transparent; font: inherit; text-align: left; cursor: pointer; transition: background 160ms ease, scale 140ms var(--dhm-out); animation: dhm-in 520ms var(--dhm-out) calc(1500ms + var(--i, 0) * 80ms) backwards; }
+.dhm-panel.is-swapped .dhm-fd { animation-delay: calc(120ms + var(--i, 0) * 40ms); }
 .dhm-fd:hover { background: rgba(122, 82, 230, 0.06); }
 .dhm-fd:active { scale: 0.98; }
 .dhm-fd:focus-visible { outline: 2px solid #7a52e6; outline-offset: -2px; }

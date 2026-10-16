@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { BuildingMapCopy, MapBadge, MapBuilding, MapPulse } from "@/components/calendar/building-map/building-map";
 import type { DashboardBuildingMap as MapData, DashBuilding, DashFeedItem } from "@/lib/admin-building-map";
 import type { Dictionary } from "@/lib/i18n";
@@ -24,6 +24,8 @@ const PANEL_W = 344;
 const PANEL_GAP = 18;
 /** 왼쪽 위 제목 · 필터 자리 — 이름표가 피한다. */
 const HEAD_BOX: [number, number, number, number] = [0, 0, 470, 150];
+/** 화면 자리 보정(px) — STAY ARI 를 오쿠보 집들 위로(2026-10-16 사용자 「스테이아리가 더 위쪽이어야 함」, 시안 배치). */
+const NUDGE: Record<string, [number, number]> = { "STAY ARI Apartment Hotel": [-10, -56] };
 
 /**
  * 대시보드 홈 「오늘의 건물」(2026-10-16, 시안 Motion-D-MapDash-PC).
@@ -36,7 +38,38 @@ const HEAD_BOX: [number, number, number, number] = [0, 0, 470, 150];
  */
 export function DashboardBuildingMap({ data, c, mapCopy, locale }: { data: MapData; c: Console; mapCopy: BuildingMapCopy; locale: string }) {
   const [filter, setFilter] = useState<Filter>("status");
-  const [selected, setSelected] = useState<string | null>(null);
+  // 홈 아래쪽 카드라 열자마자 그리면 처음 장면이 안 보는 사이에 끝난다(2026-10-16 사용자 「모션이 너무 빠름」) —
+  // 카드가 화면에 들어올 때 지도 · 제목 · 패널을 마운트하고, 그때마다 긴 장면(경계선 → 판이 눕고 → 건물이 솟음)을 보여 준다.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  const [motion, setMotion] = useState<"full" | "none">("full");
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMotion("none");
+      setShown(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setShown(true);
+        io.disconnect();
+      },
+      { threshold: 0.45 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const [selected, setSelectedRaw] = useState<string | null>(null);
+  // 처음 소식 줄은 지도 장면 뒤에 차례로, 건물 상세 ↔ 소식을 오갈 땐 바로.
+  const [swapped, setSwapped] = useState(false);
+  const setSelected = (id: string | null) => {
+    setSwapped(true);
+    setSelectedRaw(id);
+  };
 
   const byProperty = useMemo(() => new Map(data.buildings.map((b) => [b.property, b])), [data.buildings]);
   const mapBuildings = useMemo<MapBuilding[]>(
@@ -95,57 +128,63 @@ export function DashboardBuildingMap({ data, c, mapCopy, locale }: { data: MapDa
   }, [data]);
 
   return (
-    <div className="dhm">
-      <div className="dhm-map">
-        <BuildingMap
-          avoid={[HEAD_BOX]}
-          badges={badges}
-          blockScale={1.4}
-          buildings={mapBuildings}
-          copy={mapCopy}
-          cta={false}
-          focusZoom={1.5}
-          insetRight={PANEL_W + PANEL_GAP * 2}
-          insetTop={110}
-          onOpen={() => {}}
-          onSelect={setSelected}
-          pulses={pulses}
-          selectedId={selected}
-        />
-      </div>
+    <div className="dhm" ref={rootRef}>
+      {shown ? (
+        <>
+          <div className="dhm-map">
+            <BuildingMap
+              avoid={[HEAD_BOX]}
+              badges={badges}
+              blockScale={1.4}
+              buildings={mapBuildings}
+              copy={mapCopy}
+              cta={false}
+              focusZoom={1.5}
+              insetRight={PANEL_W + PANEL_GAP * 2}
+              insetTop={110}
+              introMode={motion}
+              nudge={NUDGE}
+              onOpen={() => {}}
+              onSelect={setSelected}
+              pulses={pulses}
+              selectedId={selected}
+            />
+          </div>
 
-      <div className="dhm-hd">
-        <span className="dhm-live">
-          <i aria-hidden="true" />
-          {c.dhRealtime}
-        </span>
-        <h3 className="dhm-sum">
-          {sumA}
-          <em>{totalEmpty}</em>
-          {sumB}
-        </h3>
-        <div aria-label={c.dhMapFilterAria} className="dhm-flt" role="radiogroup">
-          {(
-            [
-              ["status", c.dhMapFilterStatus],
-              ["cleaning", c.dhMapFilterCleaning],
-              ["inout", c.dhMapFilterInOut],
-            ] as const
-          ).map(([key, label]) => (
-            <button aria-checked={filter === key} className={filter === key ? "on" : undefined} key={key} onClick={() => setFilter(key)} role="radio" type="button">
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="dhm-hd">
+            <span className="dhm-live">
+              <i aria-hidden="true" />
+              {c.dhRealtime}
+            </span>
+            <h3 className="dhm-sum">
+              {sumA}
+              <em>{totalEmpty}</em>
+              {sumB}
+            </h3>
+            <div aria-label={c.dhMapFilterAria} className="dhm-flt" role="radiogroup">
+              {(
+                [
+                  ["status", c.dhMapFilterStatus],
+                  ["cleaning", c.dhMapFilterCleaning],
+                  ["inout", c.dhMapFilterInOut],
+                ] as const
+              ).map(([key, label]) => (
+                <button aria-checked={filter === key} className={filter === key ? "on" : undefined} key={key} onClick={() => setFilter(key)} role="radio" type="button">
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <aside className="dhm-panel" style={{ width: PANEL_W, top: PANEL_GAP, right: PANEL_GAP, bottom: PANEL_GAP }}>
-        {sel ? (
-          <BuildingDetail b={sel} c={c} key={sel.property} name={shortName(sel.property)} onBack={() => setSelected(null)} />
-        ) : (
-          <Feed c={c} feed={data.feed} fresh={fresh} locale={locale} name={shortName} nowAt={nowAt} onPick={(p) => setSelected(p)} />
-        )}
-      </aside>
+          <aside className={`dhm-panel${swapped ? " is-swapped" : ""}`} style={{ width: PANEL_W, top: PANEL_GAP, right: PANEL_GAP, bottom: PANEL_GAP }}>
+            {sel ? (
+              <BuildingDetail b={sel} c={c} key={sel.property} name={shortName(sel.property)} onBack={() => setSelected(null)} />
+            ) : (
+              <Feed c={c} feed={data.feed} fresh={fresh} locale={locale} name={shortName} nowAt={nowAt} onPick={(p) => setSelected(p)} />
+            )}
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }

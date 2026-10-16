@@ -21,7 +21,7 @@ import "./building-map.css";
  * PC 대시보드 홈 「오늘의 건물」(2026-10-16, 시안 Motion-D-MapDash-PC)도 이 지도를 쓴다 — 바깥에서 주는 것:
  * `badges`(이름표 오른쪽 오늘 상태) · `pulses`(그 건물 자리에서 한 번 움직임 — 청소 완료 초록 물결 · 새 예약 보라 빛기둥) ·
  * `insetRight`(오른쪽을 덮는 패널 폭만큼 배치 · 도구를 왼쪽으로) · `insetTop`(위 제목 자리만큼 아래로) · `focusZoom`(고를 때 배율) · `avoid`(이름표가 피할 칸) · `blockScale`(큰 화면 블록) ·
- * `cta={false}`(고른 건물 이름표에 「달력 보기」 없이 — 패널이 대신한다).
+ * `cta={false}`(고른 건물 이름표에 「달력 보기」 없이 — 패널이 대신한다) · `nudge`(건물별 화면 자리 보정 px) · `introMode`(처음 장면을 바깥에서 정함).
  */
 
 /** `floors`: 실제 층수(블록 높이) · `size`: 바닥 가로 · 세로 배율(1 = 보통 빌딩, STAY ARI 는 옆으로 길게 · 단독주택은 작게). */
@@ -100,6 +100,8 @@ export function BuildingMap({
   avoid,
   blockScale = 1,
   cta: ctaOn = true,
+  nudge,
+  introMode,
 }: {
   buildings: MapBuilding[];
   copy: BuildingMapCopy;
@@ -114,6 +116,8 @@ export function BuildingMap({
   avoid?: Array<[number, number, number, number]>;
   blockScale?: number;
   cta?: boolean;
+  nudge?: Record<string, [number, number]>;
+  introMode?: MapIntro;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Vec>([0, 0]);
@@ -135,13 +139,19 @@ export function BuildingMap({
 
   // 처음 그리는 긴 장면은 세션마다 한 번, 그 뒤 화면을 다시 열면 짧게 펼치기 · 움직임 줄이기면 없음.
   useEffect(() => {
+    // 바깥에서 정해 주면 그대로(PC 홈은 카드가 보일 때 마운트하고 늘 긴 장면).
+    if (introMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIntro(introMode);
+      return;
+    }
     // 첫 칠하기 전에 정해야 깜빡임이 없다 — 마운트 직후 한 번만(결정은 모듈에 기억 — 개발 모드 이중 실행에도 같은 값).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIntro(decideMapIntro());
     // 떠날 때 잊는다 — 다음 진입은 짧은 장면. 개발 모드 이중 실행은 같은 틱이라 다음 틱에 지운다.
     return () => {
       setTimeout(resetMapIntro, 0);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [W, H] = size;
@@ -233,7 +243,12 @@ export function BuildingMap({
     const m = new Map<string, Vec>();
     if (!layout) return m;
     const ids = buildings.map((b) => b.id).filter((id) => worldOf.has(id));
-    const truth = ids.map((id) => screen(worldOf.get(id)!));
+    // `nudge`: 화면에서 이 건물만 조금 옮겨 세울 자리(px) — PC 홈에서 STAY ARI 를 오쿠보 집들 위로(2026-10-16 사용자).
+    const truth = ids.map((id) => {
+      const p = screen(worldOf.get(id)!);
+      const n = nudge?.[id];
+      return (n ? [p[0] + n[0], p[1] + n[1]] : p) as Vec;
+    });
     const pos = truth.map((p) => [p[0], p[1]] as Vec);
     const foot = ids.map((id) => (shapes.find((x) => x.id === id)?.foot ?? 18) + 4);
     const hood = ids.map((id) => byId.get(id)?.area ?? id);
@@ -291,7 +306,7 @@ export function BuildingMap({
     ids.forEach((id, i) => m.set(id, pos[i]));
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, cam, worldOf, buildings, shapes]);
+  }, [layout, cam, worldOf, buildings, shapes, nudge]);
   const posOf = (id: string): Vec => spread.get(id) ?? screen(worldOf.get(id)!);
   const badgeOf = (ids: string[]): BadgeOut | null => {
     if (badges && ids.length === 1) {

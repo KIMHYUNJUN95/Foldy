@@ -121,9 +121,10 @@
   box-shadow: 0 16px 40px -14px rgba(22, 20, 31, 0.28), 0 2px 6px -2px rgba(22, 20, 31, 0.08);
   transform-origin: top right; animation: scwPop 200ms var(--scw-ease);
 }
-.adm .scw-menu__pop { left: 0; right: auto; width: auto; min-width: 220px; max-height: 360px; overflow-y: auto; transform-origin: top left; scrollbar-width: thin; }
+.adm .scw-menu__pop { left: 0; right: auto; width: auto; min-width: 220px; max-height: 360px; overflow-y: auto; transform-origin: top left; scrollbar-width: none; }
 .adm .scw-scope .scw-pp__pop { left: 0; right: auto; transform-origin: top left; }
-.adm .scw-pp__list { display: flex; flex-direction: column; gap: 2px; max-height: 360px; overflow-y: auto; }
+.adm .scw-pp__list { display: flex; flex-direction: column; gap: 2px; max-height: 360px; overflow-y: auto; scrollbar-width: none; }
+.adm .scw-pp__list::-webkit-scrollbar, .adm .scw-menu__pop::-webkit-scrollbar { display: none; }
 .adm .scw-pp__row { display: flex; align-items: center; gap: 4px; min-height: 42px; padding: 0 4px; border-radius: 10px; transition: background-color 140ms ease; }
 .adm .scw-pp__row:hover { background: #f7f7f9; }
 .adm .scw-pp__row.on { background: var(--scw-v-bg); }

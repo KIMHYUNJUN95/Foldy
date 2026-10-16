@@ -438,6 +438,7 @@ raw_payload jsonb                  -- original Beds24 webhook payload for recove
 created_at timestamptz not null
 updated_at timestamptz not null
 unique (organization_id, source, source_reservation_id)
+-- original_reservation_id text generated always as (split_part(source_reservation_id, '::room::', 1)) stored  (2026-10-16)
 ```
 
 Status values (reservation_status enum):
@@ -1315,9 +1316,10 @@ The original note "Airbnb exposes no reservation id" was wrong — measured agai
 `raw_payload`, all 2,214 Airbnb reviews carry `reservation_confirmation_code` (e.g. `HMRWNK5RQW`).
 It is not a Beds24 bookingId, hence the miss, but the same code lives on our reservations at
 `raw_payload->>apiReference` (indexed by `reservations_api_reference_idx`).
-(`source_reservation_id` prefix lookups — `LIKE '<id>::room::%'` in `reservation-lookup.ts` — use
-`reservations_org_source_reservation_id_pattern_idx` on `(organization_id, source_reservation_id text_pattern_ops)`,
-added 2026-10-16; before it every webhook seq-scanned all reservations.) `source_reservation_id`
+(Same-booking lookups in `reservation-lookup.ts` use the stored generated column
+`reservations.original_reservation_id = split_part(source_reservation_id, '::room::', 1)` with index
+`(organization_id, original_reservation_id)` — migration `202610160002`. The earlier
+`LIKE '<id>::room::%'` + `text_pattern_ops` index still seq-scanned under PostgREST's parameterised plans.) `source_reservation_id`
 stores the provider-native number for both providers and is what the detail screen displays;
 `reservation_id` stays the internal uuid link. The Airbnb match also supplies `guest_display_name`,
 since the review payload itself really does carry no reviewer name (numeric `reviewer_id` only).

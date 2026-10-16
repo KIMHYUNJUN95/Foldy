@@ -184,8 +184,13 @@ function fakeSupabase(rows: Row[]) {
         mode = "delete";
         return api;
       },
-      eq(column: keyof Row, value: unknown) {
-        filters.push((row) => row[column] === value);
+      eq(column: keyof Row | "original_reservation_id", value: unknown) {
+        // `original_reservation_id` 는 DB 생성 열(`::room::` 앞부분)이라 여기서 계산한다.
+        filters.push((row) =>
+          column === "original_reservation_id"
+            ? row.source_reservation_id.split("::room::")[0] === value
+            : row[column] === value,
+        );
         return api;
       },
       in(column: keyof Row, values: unknown[]) {

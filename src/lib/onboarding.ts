@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { cache } from "react";
 import type { Role } from "@/config/roles";
 import { defaultsToAdminSurface } from "@/config/roles";
 import { isLocale, type Locale } from "@/lib/i18n";
@@ -105,7 +106,10 @@ export function getDefaultRouteForRole(role: Role) {
   return defaultsToAdminSurface(role) ? "/admin" : "/mobile";
 }
 
-export async function getOnboardingState(): Promise<OnboardingState> {
+// 한 렌더 안에서 레이아웃 · 페이지 · 어드민 가드가 각자 부르므로 `cache()` 로 한 번으로 접는다
+// (요청을 넘어 캐시하지 않는다). 여기만은 `getUser()` 를 유지한다 — 계정 정지(`banned_until`)는
+// Auth 서버의 최신 사용자 정보에만 있다(2026-10-16 성능 점검).
+export const getOnboardingState = cache(async (): Promise<OnboardingState> => {
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
@@ -251,7 +255,7 @@ export async function getOnboardingState(): Promise<OnboardingState> {
     profile: profileSnapshot,
     user,
   };
-}
+});
 
 export async function setLastUsedOrganization(
   userId: string,

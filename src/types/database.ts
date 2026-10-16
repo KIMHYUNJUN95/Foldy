@@ -4340,6 +4340,7 @@ export type Database = {
           id: string
           last_known_amount: number | null
           organization_id: string
+          original_reservation_id: string
           property_name: string
           raw_payload: Json
           room_label: string
@@ -4356,6 +4357,7 @@ export type Database = {
           id?: string
           last_known_amount?: number | null
           organization_id: string
+          original_reservation_id?: never
           property_name: string
           raw_payload?: Json
           room_label: string
@@ -4372,6 +4374,7 @@ export type Database = {
           id?: string
           last_known_amount?: number | null
           organization_id?: string
+          original_reservation_id?: never
           property_name?: string
           raw_payload?: Json
           room_label?: string

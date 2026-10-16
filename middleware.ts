@@ -140,9 +140,10 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // `getClaims()` — 접근 토큰 서명을 여기서 검증한다(ES256 공개키 캐시). 만료가 가까우면 갱신해
+  // 쿠키를 다시 쓴다. 예전 `getUser()` 는 요청마다 Auth 서버에 왕복했다(2026-10-16 성능 점검).
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null;
 
   if (isProtectedPath(pathname) && !user) {
     return NextResponse.redirect(buildLoginRedirect(request));

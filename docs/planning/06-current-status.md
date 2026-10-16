@@ -9,6 +9,17 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-16 — 성능 점검: DB · 로그인 확인 병목 3곳
+
+- **웹훅 예약 찾기**: 같은 날 넣은 `text_pattern_ops` 인덱스는 PostgREST 의 매개변수 계획에서 LIKE 를 못 타 여전히 예약 전체를
+  훑었다(같은 조건 재현 5.1초). 생성 열 `reservations.original_reservation_id`(`::room::` 앞부분) + 인덱스를 두고 `=` 한 번으로
+  찾는다(`reservation-lookup.ts`). 마이그레이션 `202610160002`.
+- **RLS 정책**: `has_active_membership(organization_id)` 가 행마다 돌던 정책을 `organization_id = ANY(내 조직 배열)` 로 —
+  `current_user_active_organization_ids()` 를 쿼리당 한 번만 계산. 감싸지 않은 `is_platform_admin()` · `auth.uid()` 도 감쌌다.
+  판매가 한 달 조회(관리자 계정) 263ms → 4ms. 권한 결과는 계정 4명 × 표 84개 행 수로 전후 동일 확인. 마이그레이션 `202610160003`.
+- **로그인 확인**: 미들웨어 · 세션의 `auth.getUser()`(렌더마다 Auth 서버 왕복, 평균 174ms, 미들웨어와 세션이 한 번씩)를
+  `getClaims()`(ES256 서명 로컬 검증)로. 계정 정지 확인이 필요한 `getOnboardingState()` 는 `getUser()` 를 유지하되 `cache()` 로 렌더당 한 번.
+- 운영 DB 적용 완료. 남은 것: 어드바이저의 중복 인덱스 1 · 안 쓰는 인덱스 20(정리만).
 ## 2026-10-16 — 대시보드 홈 「오늘의 건물」 지도 카드
 
 - PC 대시보드 홈의 매출 · 가동률 · 최근 6개월(운영 관리자가 아니면 숫자 줄) 아래, 큐 위에 예약 캘린더와 같은 모형 지도 카드를 더했다. 기존 구역은 그대로.

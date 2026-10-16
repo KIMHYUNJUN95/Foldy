@@ -48,32 +48,21 @@ export async function findReservationRowsByOriginalBookingId(
   const originalId = toOriginalReservationId(sourceReservationId).trim();
   if (!originalId) return [];
 
-  const prefix = `${originalId}::room::`;
-  const [exactResult, prefixedResult] = await Promise.all([
-    supabase
-      .from("reservations")
-      .select(LOOKUP_SELECT)
-      .eq("organization_id", organizationId)
-      .eq("source_reservation_id", originalId),
-    supabase
-      .from("reservations")
-      .select(LOOKUP_SELECT)
-      .eq("organization_id", organizationId)
-      .like("source_reservation_id", `${prefix}%`),
-  ]);
+  // `original_reservation_id` = `::room::` 앞부분(생성 열 · 202610160002). 정확한 번호 행과
+  // `<번호>::room::*` 행을 한 번의 `=` 로 찾는다 — 예전 `LIKE '<번호>::room::%'` 는 PostgREST 의
+  // 매개변수 계획에서 인덱스를 못 써 예약 전체를 훑었다(웹훅마다 0.3~5초).
+  const { data, error } = await supabase
+    .from("reservations")
+    .select(LOOKUP_SELECT)
+    .eq("organization_id", organizationId)
+    .eq("original_reservation_id", originalId);
 
-  if (exactResult.error) {
-    throw new Error(`reservation exact lookup failed: ${exactResult.error.message}`);
-  }
-  if (prefixedResult.error) {
-    throw new Error(`reservation prefix lookup failed: ${prefixedResult.error.message}`);
+  if (error) {
+    throw new Error(`reservation lookup failed: ${error.message}`);
   }
 
   const byId = new Map<string, ReservationLookupRow>();
-  for (const row of [
-    ...((exactResult.data ?? []) as unknown as ReservationLookupDbRow[]),
-    ...((prefixedResult.data ?? []) as unknown as ReservationLookupDbRow[]),
-  ]) {
+  for (const row of (data ?? []) as unknown as ReservationLookupDbRow[]) {
     const { raw_book_id, raw_id, ...rest } = row;
     byId.set(row.id, { ...rest, bookingId: raw_book_id?.trim() || raw_id?.trim() || null });
   }

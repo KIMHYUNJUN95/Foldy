@@ -33,6 +33,15 @@ Core condition:
 exists active membership for auth.uid() and row.organization_id
 ```
 
+Policy form (2026-10-16, migration `202610160003`): write the condition as
+`organization_id = ANY ((( SELECT current_user_active_organization_ids() ))::uuid[])`, not
+`has_active_membership(organization_id)`. Both answer the same question, but the SECURITY DEFINER helper is not
+inlined, so the old form ran a memberships lookup **per row** (a month of room rates = thousands of calls). The array
+form becomes an InitPlan evaluated once per query. Likewise always wrap `is_platform_admin()` and `auth.uid()` in
+`( SELECT … )`. `has_active_membership(x)` is still fine inside a correlated sub-select on another table
+(e.g. `has_active_membership(a.organization_id)`). Existing policies were rewritten in place by that migration; the
+visible row counts for four role-different accounts across 84 tables were identical before and after.
+
 ## 2. Platform Admin Access
 
 Developer/Super Admin users are stored in `platform_admins`.

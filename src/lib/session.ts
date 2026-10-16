@@ -122,14 +122,17 @@ export const getCurrentAppSession = cache(
   async (): Promise<AppSession | null> => {
   try {
     const supabase = await getSupabaseServerClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    // `getClaims()` 는 접근 토큰 서명을 **서버 안에서** 검증한다(이 프로젝트는 ES256 비대칭 키 —
+    // 공개키 목록만 한 번 받아 캐시). 예전 `getUser()` 는 렌더마다 Auth 서버에 왕복했고(평균 174ms ·
+    // 하루 1.9만 회), 미들웨어도 같은 왕복을 한 번 더 했다(2026-10-16 성능 점검).
+    // 토큰이 곧 만료되면 먼저 갱신한다. 서명 · 만료가 틀리면 error 로 온다.
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+    const claims = claimsData?.claims;
 
-    if (userError || !user) {
+    if (claimsError || !claims?.sub) {
       return null;
     }
+    const user = { id: claims.sub, email: typeof claims.email === "string" ? claims.email : undefined };
 
     // 이 읽기들은 `user.id` 에만 의존하므로 **한 배치로** 돈다. 모바일·어드민 모든 렌더가 지나는
     // 공통 경로라, 직렬 왕복을 줄이는 것이 첫 바이트에 가장 크게 듣는다.

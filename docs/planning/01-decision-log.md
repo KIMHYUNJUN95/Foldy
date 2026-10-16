@@ -2,6 +2,14 @@
 
 This file records important project decisions.
 
+## 2026-10-16 RLS 조직 소속 판정은 「내 조직 배열」로, 로그인 확인은 `getClaims()` (사용자 지시 「전부 다 수정」)
+
+- 성능 점검 결과 세 가지를 고쳤다(06 같은 날 항목). 새 정책 · 새 표는 **`has_active_membership(organization_id)` 대신
+  `organization_id = ANY ((( SELECT current_user_active_organization_ids() ))::uuid[])`** 를 쓴다 — 행마다가 아니라 쿼리당 한 번.
+  `is_platform_admin()` · `auth.uid()` 는 항상 `( SELECT … )` 로 감싼다.
+- 화면 렌더 경로의 사용자 확인은 `auth.getClaims()`(로컬 서명 검증). 대가: 지운 · 정지한 계정의 토큰이 만료(최대 1시간)까지
+  세션으로 통한다 — 정지 확인은 `getOnboardingState()` 의 `getUser()` 가 계속 맡고, 쓰기 서버 액션의 `getUser()` 도 그대로 둔다.
+
 ## 2026-10-15 대시보드 PC 설치 파일 — Windows 는 Microsoft Store (사용자 결정)
 
 - 사용자: 「진짜 설치 파일로」 · 「무료로」 → 「윈도우는 추천으로」. PWABuilder 가 관리자 매니페스트를 MSIX 로 감싸 Store 에 낸다 —

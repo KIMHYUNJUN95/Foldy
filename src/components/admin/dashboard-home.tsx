@@ -2,6 +2,9 @@ import Link from "next/link";
 import "./admin-console.css";
 import "./dashboard-home.css";
 import { CleaningLiveCard } from "./cleaning-live-card";
+import { DashboardBuildingMap, type MapCardCopy } from "./dashboard-building-map";
+import type { BuildingMapCopy } from "@/components/calendar/building-map/building-map";
+import { getPropertyLocation } from "@/lib/property-locations";
 import { LiveWash } from "@/components/shared/live-wash";
 import { RollNumber } from "@/components/shared/roll-number";
 import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
@@ -52,6 +55,13 @@ function monthLabel(key: string, localeTag: string): string {
   return new Intl.DateTimeFormat(localeTag, { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
+/** 지도 카드에 넘길 문구만 — 콘솔 사전엔 함수 값(`occupancyRate`)이 있어 통째로 클라이언트에 못 넘긴다. */
+function pickMapCardCopy(c: Console): MapCardCopy {
+  return Object.fromEntries(
+    Object.entries(c).filter(([k, v]) => typeof v === "string" && (k.startsWith("dhMap") || k === "dhRealtime" || k === "dhCleaningLink")),
+  ) as MapCardCopy;
+}
+
 export type DashboardOpsBlock = {
   summary: DashboardOpsSummary;
   monthPickerLabels: AdminMonthPickerLabels;
@@ -62,17 +72,21 @@ export type DashboardOpsBlock = {
  * - 운영 관리자: 숫자 줄 → 매출 · 가동률(달 고르기) → 최근 6개월
  * - 그 밖: 숫자 줄 → 즉시 처리해야 하는 큐(진행 중 청소 · 즉시 처리 큐) → 오늘 할 일 · 예약 현황
  * 「이상 근태 · 정정 요청」 · 「중요 공지」 구역은 두 시안 모두에 없어 뺐다(근태 · 공지 화면에 있다).
+ * 「오늘의 건물」 지도 카드(2026-10-16, 시안 Motion-D-MapDash-PC)는 매출 · 가동률(없으면 숫자 줄) 바로 아래, 큐 위에 더했다 —
+ * 위의 구역은 하나도 빼지 않는다(사용자 결정).
  */
 export function DashboardHome({
   data,
   c,
   locale,
   ops,
+  mapCopy,
 }: {
   data: AdminDashboardData;
   c: Console;
   locale: string;
   ops?: DashboardOpsBlock | null;
+  mapCopy?: BuildingMapCopy;
 }) {
   const mCount = data.queue.filter((q) => q.kind === "maintenance").length;
   const lCount = data.queue.filter((q) => q.kind === "lost").length;
@@ -93,6 +107,9 @@ export function DashboardHome({
     },
   ];
 
+  // 지도에 세울 건물(좌표가 있는 건물)이 하나도 없으면 카드를 뺀다.
+  const showMap = Boolean(mapCopy && data.buildingMap?.buildings.some((b) => getPropertyLocation(b.property)));
+
   return (
     <div className="dh">
       <div className="dh-kpis">
@@ -110,7 +127,18 @@ export function DashboardHome({
 
       {/* 운영 관리자는 매출 · 가동률 아래에 큐 · 할 일 · 예약까지 전부, 그 밖의 관리자는 매출 · 가동률 없이 큐부터. */}
       {ops ? <OpsBlock c={c} locale={locale} ops={ops} /> : null}
-      <QueueBlock c={c} data={data} divided={Boolean(ops)} locale={locale} />
+      {showMap && data.buildingMap && mapCopy ? (
+        <>
+          <div className={ops ? "dh-sec dh-sec--line" : "dh-sec"}>
+            <b>{c.dhMapTitle}</b>
+            <span className="dh-cc">{c.dhMapNote}</span>
+          </div>
+          <div className="dh-grid">
+            <DashboardBuildingMap c={pickMapCardCopy(c)} data={data.buildingMap} locale={locale} mapCopy={mapCopy} />
+          </div>
+        </>
+      ) : null}
+      <QueueBlock c={c} data={data} divided={Boolean(ops) || showMap} locale={locale} />
     </div>
   );
 }

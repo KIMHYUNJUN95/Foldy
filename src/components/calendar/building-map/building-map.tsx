@@ -17,10 +17,19 @@ import "./building-map.css";
  * 누름: 겹친 건물 이름표 → 갈라질 만큼 다가감 · 건물 하나 → 고름(보라 · 이름표에 「달력 보기」) → 한 번 더 → 그 건물 달력.
  * 더 다가가도 안 갈라지는 건물(같은 자리 오쿠보 A·B)은 이름표가 세로 목록으로 펼쳐진다. 빈 곳 → 처음 화면.
  * 처음 그리는 장면(경계선 → 판이 눕고 → 건물이 솟음)은 탭(세션)마다 한 번만, 그 뒤엔 짧게.
+ *
+ * PC 대시보드 홈 「오늘의 건물」(2026-10-16, 시안 Motion-D-MapDash-PC)도 이 지도를 쓴다 — 바깥에서 주는 것:
+ * `badges`(이름표 오른쪽 오늘 상태) · `pulses`(그 건물 자리에서 한 번 움직임 — 청소 완료 초록 물결 · 새 예약 보라 빛기둥) ·
+ * `insetRight`(오른쪽을 덮는 패널 폭만큼 배치 · 도구를 왼쪽으로) · `insetTop`(위 제목 자리만큼 아래로) · `focusZoom`(고를 때 배율) · `avoid`(이름표가 피할 칸) · `blockScale`(큰 화면 블록) ·
+ * `cta={false}`(고른 건물 이름표에 「달력 보기」 없이 — 패널이 대신한다).
  */
 
 /** `floors`: 실제 층수(블록 높이) · `size`: 바닥 가로 · 세로 배율(1 = 보통 빌딩, STAY ARI 는 옆으로 길게 · 단독주택은 작게). */
 export type MapBuilding = { id: string; label: string; rooms: number; empty: number; lat: number; lng: number; floors: number; size: [number, number]; area?: string; adjoin?: string };
+/** 이름표 오른쪽 작은 표시. `v` 빈 방(보라 채움) · `in` 체크인 · `clean` 청소 · `out` 체크아웃 · 없으면 회색. */
+export type MapBadge = { text: string; tone?: "v" | "in" | "clean" | "out" };
+/** 건물 자리에서 한 번 움직임 — `n` 이 바뀔 때마다 다시 뛴다. */
+export type MapPulse = { kind: "clean" | "in"; n: number };
 export type BuildingMapCopy = {
   mapAria: string;
   emptyN: string;
@@ -42,6 +51,7 @@ const MAX_ZOOM = 9;
 const CHIP_H = 28;
 
 type Vec = [number, number];
+type BadgeOut = { text: string; vac: boolean; tone?: MapBadge["tone"] };
 type Cam = { s: number; tx: number; ty: number };
 
 /** 판 좌표 차이 → 눕힌 뒤 차이(배율 1). */
@@ -82,12 +92,28 @@ export function BuildingMap({
   selectedId,
   onSelect,
   onOpen,
+  badges,
+  pulses,
+  insetRight = 0,
+  insetTop = 0,
+  focusZoom = 2.2,
+  avoid,
+  blockScale = 1,
+  cta: ctaOn = true,
 }: {
   buildings: MapBuilding[];
   copy: BuildingMapCopy;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onOpen: (id: string) => void;
+  badges?: Record<string, MapBadge | null>;
+  pulses?: Record<string, MapPulse>;
+  insetRight?: number;
+  insetTop?: number;
+  focusZoom?: number;
+  avoid?: Array<[number, number, number, number]>;
+  blockScale?: number;
+  cta?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Vec>([0, 0]);
@@ -127,20 +153,21 @@ export function BuildingMap({
     const F: Vec = pts.length
       ? [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length]
       : [G.box[0] / 2, G.box[1] / 2];
-    const C: Vec = [W / 2, H * 0.52];
+    const VW = W - insetRight;
+    const C: Vec = [VW / 2, insetTop + (H - insetTop) * 0.52];
     const laid = pts.map((p) => lay(p[0] - F[0], p[1] - F[1]));
     const xs = laid.map((p) => p[0]);
     const ys = laid.map((p) => p[1]);
     const spanX = Math.max(1, Math.max(...xs, 0) - Math.min(...xs, 0));
     const spanY = Math.max(1, Math.max(...ys, 0) - Math.min(...ys, 0));
-    const marginX = Math.min(150, Math.max(70, W * 0.3));
-    const s = Math.min(Math.max(1.1, Math.min((W - marginX) / spanX, (H - 210) / spanY)), 6);
+    const marginX = Math.min(150, Math.max(70, VW * 0.3));
+    const s = Math.min(Math.max(1.1, Math.min((VW - marginX) / spanX, (H - insetTop - 210) / spanY)), 6);
     const world = (p: Vec): Vec => {
       const v = lay(p[0] - F[0], p[1] - F[1]);
       return [C[0] + v[0] * s, C[1] + v[1] * s];
     };
-    const s0 = Math.min((W * 0.9) / G.box[0], (H * 0.86) / G.box[1]);
-    const flat = `translate(${W / 2}px, ${H / 2}px) scale(${s0}) scaleY(1) rotate(0deg) translate(${-G.box[0] / 2}px, ${-G.box[1] / 2}px)`;
+    const s0 = Math.min((VW * 0.9) / G.box[0], (H * 0.86) / G.box[1]);
+    const flat = `translate(${VW / 2}px, ${H / 2}px) scale(${s0}) scaleY(1) rotate(0deg) translate(${-G.box[0] / 2}px, ${-G.box[1] / 2}px)`;
     const tilt = `translate(${C[0]}px, ${C[1]}px) scale(${s}) scaleY(${KY}) rotate(${ROT}deg) translate(${-F[0]}px, ${-F[1]}px)`;
     // 화면에서 「똑바로 아래」 d px 이 되는 판 좌표 벡터(두께 · 바닥 그림자)
     const down = (d: number): Vec => {
@@ -148,16 +175,16 @@ export function BuildingMap({
       return [w * SIN, w * COS];
     };
     return { F, C, s, world, flat, tilt, down };
-  }, [W, H, buildings]);
+  }, [W, H, buildings, insetRight, insetTop]);
 
   // ── 건물 블록 모양(화면 px · 확대와 무관)
   const shapes = useMemo(() => {
     return buildings.map((b) => {
       // 높이 = 실제 층수(한 층 5.2px + 지붕 턱), 바닥 = 보통 빌딩 7px 반폭 × 건물별 배율(2026-10-15 사용자 제공 층수 · 모양).
-      const hx = 7 * b.size[0];
-      const hy = 7 * b.size[1];
+      const hx = 7 * b.size[0] * blockScale;
+      const hy = 7 * b.size[1] * blockScale;
       const h = (hx + hy) / 2;
-      const Hh = 4 + b.floors * 5.2;
+      const Hh = (4 + b.floors * 5.2) * blockScale;
       const base: Vec[] = [lay(-hx, -hy), lay(hx, -hy), lay(hx, hy), lay(-hx, hy)];
       const faces: Array<{ side: "l" | "r"; pts: string; floors: string[] }> = [];
       const floorsN = Math.max(1, b.floors);
@@ -184,7 +211,7 @@ export function BuildingMap({
         .join("");
       return { id: b.id, h, foot: Math.max(...base.map((p) => Math.abs(p[0]))) * 2, H: Hh, faces, top: top.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" "), rim };
     });
-  }, [buildings]);
+  }, [buildings, blockScale]);
 
   const worldOf = useMemo(() => {
     const m = new Map<string, Vec>();
@@ -266,7 +293,11 @@ export function BuildingMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, cam, worldOf, buildings, shapes]);
   const posOf = (id: string): Vec => spread.get(id) ?? screen(worldOf.get(id)!);
-  const badgeOf = (ids: string[]) => {
+  const badgeOf = (ids: string[]): BadgeOut | null => {
+    if (badges && ids.length === 1) {
+      const given = badges[ids[0]];
+      return given ? { text: given.text, vac: given.tone === "v", tone: given.tone } : null;
+    }
     const empty = ids.reduce((a, id) => a + (byId.get(id)?.empty ?? 0), 0);
     if (empty > 0) return { text: copy.emptyN.replace("{n}", String(empty)), vac: true };
     // 「만실」은 다가갔을 때만 — 처음 화면은 이름만(빈 방 있는 건물만 배지) 남겨 이름표가 덜 붐비게.
@@ -278,7 +309,7 @@ export function BuildingMap({
 
   // ── 이름표: 블록마다 하나, 겹치면 콜아웃처럼 옆 · 위 · 아래로 뺀다
   const clusters = useMemo(() => {
-    if (!layout) return [] as Array<{ key: string; ids: string[]; x: number; y: number; lift: number; dx: number; by: number; w: number; label: string; badge: { text: string; vac: boolean } | null }>;
+    if (!layout) return [] as Array<{ key: string; ids: string[]; x: number; y: number; lift: number; dx: number; by: number; w: number; label: string; badge: BadgeOut | null }>;
     type Cl = { ids: string[]; bx: number; by: number; top: number; compact?: boolean };
     const make = (ids: string[]): Cl => {
       const ps = ids.map((id) => posOf(id));
@@ -290,7 +321,7 @@ export function BuildingMap({
       };
     };
     const labelOf = (ids: string[]) => compactLabel(ids.map((id) => byId.get(id)!.label), copy.more);
-    const widthOf = (c: Cl) => chipWidth(labelOf(c.ids), c.compact ? "" : badgeOf(c.ids)?.text ?? "", c.ids.length === 1 && c.ids[0] === selectedId) - (c.compact ? 6 : 0);
+    const widthOf = (c: Cl) => chipWidth(labelOf(c.ids), c.compact ? "" : badgeOf(c.ids)?.text ?? "", ctaOn && c.ids.length === 1 && c.ids[0] === selectedId) - (c.compact ? 6 : 0);
     const list: Cl[] = buildings.filter((b) => b.id !== selectedId).map((b) => make([b.id]));
     if (selectedId && worldOf.has(selectedId)) list.push(make([selectedId]));
     // 이름표 자리: 위쪽 건물부터 놓고, 겹치면 위로 · 옆으로 빼서 비스듬한 지시선으로 잇는다(지도 콜아웃처럼).
@@ -308,8 +339,9 @@ export function BuildingMap({
       return sb - sa || a.top - b.top;
     });
     // 다른 건물 블록을 가리지 않게 블록 자리도 장애물로 · 오른쪽 위 「전체 보기」 · 나침반 자리도 비워 둔다
-    const toolsBox = { owner: null as Cl | null, r: [W - (cam.s > 1.01 ? 170 : 64), 0, W, 96] as Placed["r"] };
-    const blocks = [toolsBox, ...list.flatMap((c) =>
+    const toolsBox = { owner: null as Cl | null, r: [W - insetRight - (cam.s > 1.01 ? 170 : 64), 0, W - insetRight, 96] as Placed["r"] };
+    const extra = (avoid ?? []).map((r) => ({ owner: null as Cl | null, r: r as Placed["r"] }));
+    const blocks = [toolsBox, ...extra, ...list.flatMap((c) =>
       c.ids.map((id) => {
         const p = posOf(id);
         return { owner: c as Cl | null, r: [p[0] - 13, p[1] - (heightOf.get(id) ?? 20) - 4, p[0] + 13, p[1] + 5] as Placed["r"] };
@@ -332,7 +364,7 @@ export function BuildingMap({
         for (const [dx, lift] of tries) {
           const y1 = cl.top - 12 - lift;
           // 가장자리에선 자리를 버리지 않고 이름표만 안쪽으로 민다(지시선은 건물을 그대로 가리킨다).
-          const cx = Math.min(Math.max(cl.bx + dx, w / 2 + 8), W - w / 2 - 8);
+          const cx = Math.min(Math.max(cl.bx + dx, w / 2 + 8), W - insetRight - w / 2 - 8);
           const r: Placed["r"] = [cx - w / 2 - 4, y1 - CHIP_H - 3, cx + w / 2 + 4, y1 + 3];
           if (r[1] < 6) continue;
           if (placed.some((p) => hit(p.r, r))) continue;
@@ -373,12 +405,12 @@ export function BuildingMap({
       badge: c.compact ? null : badgeOf(c.ids),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, cam, selectedId, worldOf, heightOf, byId, buildings, copy]);
+  }, [layout, cam, selectedId, worldOf, heightOf, byId, buildings, copy, badges, insetRight, avoid, ctaOn]);
 
   const baseCam: Cam = { s: 1, tx: 0, ty: 0 };
   const focusAt = (w: Vec, s: number) => {
     if (!layout) return;
-    setCam({ s, tx: layout.C[0] - w[0] * s, ty: H * 0.54 - w[1] * s });
+    setCam({ s, tx: layout.C[0] - w[0] * s, ty: insetTop + (H - insetTop) * 0.54 - w[1] * s });
   };
 
   function reset() {
@@ -417,13 +449,13 @@ export function BuildingMap({
 
   function pickBuilding(id: string) {
     if (selectedId === id) {
-      onOpen(id);
+      if (ctaOn) onOpen(id);
       return;
     }
     setExpanded(null);
     onSelect(id);
     const w = worldOf.get(id);
-    if (w) focusAt(w, Math.max(cam.s, 2.2));
+    if (w) focusAt(w, Math.max(cam.s, focusZoom));
   }
 
   // 목록에서 고른 건물이 바뀌면(바깥에서) 그 건물로
@@ -431,10 +463,15 @@ export function BuildingMap({
   useEffect(() => {
     if (lastSel.current === selectedId) return;
     lastSel.current = selectedId;
-    if (!selectedId) return;
+    // 바깥에서 고름을 풀면(PC 패널의 「소식 보기」) 처음 화면으로 물러난다.
+    if (!selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExpanded(null);
+      setCam({ s: 1, tx: 0, ty: 0 });
+      return;
+    }
     const w = worldOf.get(selectedId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (w && layout) setCam({ s: Math.max(cam.s, 2.2), tx: layout.C[0] - w[0] * Math.max(cam.s, 2.2), ty: H * 0.54 - w[1] * Math.max(cam.s, 2.2) });
+    if (w && layout) setCam({ s: Math.max(cam.s, focusZoom), tx: layout.C[0] - w[0] * Math.max(cam.s, focusZoom), ty: insetTop + (H - insetTop) * 0.54 - w[1] * Math.max(cam.s, focusZoom) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
@@ -548,12 +585,19 @@ export function BuildingMap({
             const focus = focusIds?.includes(b.id) ?? false;
             const style = { transform: `translate3d(${p[0]}px, ${p[1]}px, 0)`, zIndex: 3 + i, "--d": `${riseDelay(i)}ms` } as CSSProperties;
             const badge = (badgeOf([b.id]) ?? { text: copy.full }).text;
+            const pulse = pulses?.[b.id];
             return (
               <div className={`bm-b${on ? " is-on" : ""}${focus ? " is-focus" : ""}${b.empty > 0 ? " is-vac" : ""}`} key={b.id} style={style}>
                 <svg aria-hidden="true" className="bm-b__svg" height="1" width="1">
                   <ellipse className="bm-b__shadow" cx="7" cy="3" rx={shape.h * 2.4 + 5} ry={shape.h * 1.1 + 2.5} />
                   <ellipse className="bm-b__ripple" rx={shape.h * 2.2} ry={shape.h * 1.1} />
                   {b.empty > 0 ? <ellipse className="bm-b__ring" rx="13" ry="6.5" /> : null}
+                  {pulse?.kind === "clean" ? (
+                    <g className="bm-b__pulse is-clean" key={`c${pulse.n}`}>
+                      <ellipse rx={shape.h * 2.2} ry={shape.h * 1.1} />
+                      <ellipse rx={shape.h * 2.2} ry={shape.h * 1.1} />
+                    </g>
+                  ) : null}
                   <g className="bm-b__g">
                     {shape.faces.map((f, k) => (
                       <polygon className={`bm-b__f${f.side}`} key={k} points={f.pts} />
@@ -562,6 +606,24 @@ export function BuildingMap({
                     <polygon className="bm-b__ft" points={shape.top} />
                     <path className="bm-b__rim" d={shape.rim} />
                   </g>
+                  {pulse?.kind === "clean" ? (
+                    <g className="bm-b__tint" key={`t${pulse.n}`}>
+                      {shape.faces.map((f, k) => (
+                        <polygon key={k} points={f.pts} />
+                      ))}
+                      <polygon points={shape.top} />
+                    </g>
+                  ) : null}
+                  {pulse?.kind === "in" ? (
+                    <g className="bm-b__pulse is-in" key={`i${pulse.n}`}>
+                      <ellipse rx={shape.h * 2.2} ry={shape.h * 1.1} />
+                      <ellipse rx={shape.h * 2.2} ry={shape.h * 1.1} />
+                      <g style={{ transform: `translateY(${-shape.H}px)` }}>
+                        <rect fill={`url(#${uid}b)`} height="78" width="10" x="-5" y="-78" />
+                        <rect fill={`url(#${uid}b)`} height="70" width="1.4" x="-.7" y="-70" />
+                      </g>
+                    </g>
+                  ) : null}
                   {b.empty > 0 ? (
                     <g className="bm-b__beam" style={{ transform: `translateY(${-shape.H}px)` }}>
                       <rect fill={`url(#${uid}b)`} height="64" width="8" x="-4" y="-64" />
@@ -587,7 +649,7 @@ export function BuildingMap({
           {/* 지시선 — 지붕에서 이름표 아래 가장자리까지(옆으로 뺀 이름표는 비스듬히) */}
           {clusters.map((c, i) => {
             if (expanded && expanded.join("|") === c.key) return null;
-            const left = Math.min(Math.max(c.x + c.dx - c.w / 2, 8), W - 8 - c.w);
+            const left = Math.min(Math.max(c.x + c.dx - c.w / 2, 8), W - insetRight - 8 - c.w);
             const chipBottom = c.y - 12 - c.lift;
             const below = chipBottom - CHIP_H > c.by;
             const sx = c.x;
@@ -608,10 +670,10 @@ export function BuildingMap({
 
           {/* 이름표 */}
           {clusters.map((c, i) => {
-            const cta = c.ids.length === 1 && c.ids[0] === selectedId;
+            const cta = ctaOn && c.ids.length === 1 && c.ids[0] === selectedId;
             const isOpen = expanded && expanded.join("|") === c.key;
             // 가장자리에선 이름표만 안쪽으로 밀고, 지시선은 건물을 그대로 가리킨다.
-            const left = Math.min(Math.max(c.x + c.dx - c.w / 2, 8), W - 8 - c.w);
+            const left = Math.min(Math.max(c.x + c.dx - c.w / 2, 8), W - insetRight - 8 - c.w);
             const style = {
               transform: `translate3d(${left}px, ${c.y - 12 - c.lift - CHIP_H}px, 0)`,
               width: c.w,
@@ -622,11 +684,11 @@ export function BuildingMap({
                 <div className="bm-stack" key={`${c.key}-open`} style={{ transform: `translate3d(${c.x}px, ${c.y - 12}px, 0)` }}>
                   {c.ids.map((id) => {
                     const b = byId.get(id)!;
-                    const bd = badgeOf([id]) ?? { text: copy.full, vac: false };
+                    const bd: BadgeOut = badgeOf([id]) ?? { text: copy.full, vac: false };
                     return (
                       <button className="bm-chip is-row" key={id} onClick={() => onOpen(id)} type="button">
                         <b>{b.label}</b>
-                        <em className={bd.vac ? "v" : undefined}>{bd.text}</em>
+                        <em className={bd.tone ?? (bd.vac ? "v" : undefined)}>{bd.text}</em>
                         <ChevronRight aria-hidden="true" className="bm-chip__chev" />
                       </button>
                     );
@@ -648,7 +710,11 @@ export function BuildingMap({
                 type="button"
               >
                 <b>{c.label}</b>
-                {c.badge ? <em className={c.badge.vac ? "v" : undefined}>{c.badge.text}</em> : null}
+                {c.badge ? (
+                  <em className={c.badge.tone ?? (c.badge.vac ? "v" : undefined)} key={c.badge.text}>
+                    {c.badge.text}
+                  </em>
+                ) : null}
                 {cta ? (
                   <i className="bm-chip__go">
                     {copy.open}
@@ -659,7 +725,7 @@ export function BuildingMap({
             );
           })}
 
-          <div className="bm-tools">
+          <div className="bm-tools" style={insetRight ? { right: 12 + insetRight } : undefined}>
             {zoomed ? (
               <button className="bm-reset" onClick={reset} type="button">
                 {copy.reset}

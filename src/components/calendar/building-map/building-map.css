@@ -102,6 +102,17 @@
 @keyframes bm-beam { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .bm-b__dot { fill: #7a52e6; stroke: #fff; stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: bm-pop 500ms var(--bm-bounce) calc(var(--d) + 800ms) backwards; }
 @keyframes bm-pop { from { transform: scale(0); } }
+/* 바깥에서 주는 한 번 움직임(PC 홈 「오늘의 건물」) — 청소 완료: 초록 물결 두 번 + 블록이 잠깐 초록 · 새 예약: 보라 빛기둥 + 고리 두 번 */
+.bm-b__pulse ellipse { fill: none; stroke-width: 1.6; opacity: 0; transform-box: fill-box; transform-origin: center; animation: bm-pulse 1300ms var(--bm-out) both; }
+.bm-b__pulse ellipse:nth-child(2) { animation-delay: 380ms; }
+.bm-b__pulse.is-clean ellipse { stroke: #2bb673; }
+.bm-b__pulse.is-in ellipse { stroke: #7a52e6; }
+@keyframes bm-pulse { 0% { opacity: 0.85; transform: scale(0.5); } 100% { opacity: 0; transform: scale(2.8); } }
+.bm-b__pulse rect { transform-box: fill-box; transform-origin: 50% 100%; opacity: 0; animation: bm-shoot 1700ms var(--bm-out) both; }
+.bm-b__pulse rect:first-of-type { filter: blur(2px); }
+@keyframes bm-shoot { 0% { opacity: 0; transform: scaleY(0); } 18% { opacity: 1; } 55% { opacity: 1; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(1); } }
+.bm-b__tint polygon { fill: #2bb673; opacity: 0; animation: bm-tint 1500ms var(--bm-out) both; }
+@keyframes bm-tint { 0% { opacity: 0; } 20% { opacity: 0.42; } 100% { opacity: 0; } }
 .bm-b__hit { position: absolute; left: -22px; width: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 12px; }
 .bm-b__hit:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 
@@ -145,6 +156,11 @@
 .bm-chip b { font-weight: 600; }
 .bm-chip em { font-style: normal; font-size: 11px; font-weight: 600; color: #9c99a8; }
 .bm-chip em.v { color: #fff; background: linear-gradient(180deg, #8a63f0, #6a3fe0); border-radius: 8px; padding: 1px 6px; box-shadow: 0 2px 6px -2px rgba(91, 43, 214, 0.6); }
+.bm-chip em.in { color: #5a30cf; }
+.bm-chip em.clean { color: #1e8a55; }
+.bm-chip em.out { color: #6b6878; }
+.bm-chip em { animation: bm-badge 420ms var(--bm-soft) backwards; }
+@keyframes bm-badge { from { opacity: 0; translate: 0 4px; } }
 .bm-chip.is-dim { opacity: 0.35; }
 .bm-chip.is-cta { height: 32px; border-radius: 16px; padding-right: 4px; box-shadow: 0 12px 28px -12px rgba(91, 43, 214, 0.55), 0 0 0 1px rgba(122, 82, 230, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.9); }
 .bm-chip__go { display: inline-flex; align-items: center; gap: 1px; height: 24px; margin-left: 3px; padding: 0 6px 0 10px; border-radius: 12px; background: linear-gradient(180deg, #8a63f0, #6a3fe0); color: #fff; font-style: normal; font-size: 11.5px; font-weight: 600; }

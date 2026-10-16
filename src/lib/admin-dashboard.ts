@@ -19,6 +19,12 @@ import {
 } from "@/lib/home";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { getDictionary } from "@/lib/i18n";
+import {
+  buildDashboardBuildingMap,
+  fetchBuildingMapSource,
+  type DashboardBuildingMap,
+} from "@/lib/admin-building-map";
 
 /**
  * Admin dashboard home aggregation — the desktop operations console reads every
@@ -84,6 +90,8 @@ export type AdminDashboardData = {
     checkIns: HomeReservationRow[];
     checkOuts: HomeReservationRow[];
   };
+  /** 「오늘의 건물」 지도 카드 — 읽기 실패면 null(카드를 숨긴다). */
+  buildingMap: DashboardBuildingMap | null;
 };
 
 const EMPTY: AdminDashboardData = {
@@ -94,6 +102,7 @@ const EMPTY: AdminDashboardData = {
   notices: [],
   todos: [],
   reservations: { checkIns: [], checkOuts: [] },
+  buildingMap: null,
 };
 
 async function safe<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
@@ -145,6 +154,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     checkCounts,
     reservations,
     occupancy,
+    buildingSource,
   ] = await Promise.all([
     safe("cleaning", () => getCleaningSessionsForDate(session, today), []),
     safe("maintenance", () => getOrgMaintenanceReports(session), []),
@@ -160,6 +170,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       { status: "ok" as const, data: { checkIns: [], checkOuts: [] } },
     ),
     safe("occupancy", () => getOccupancy(session.organization.id, today), { occupied: 0, total: 0 }),
+    safe("buildingMap", () => fetchBuildingMapSource(session, today), null),
   ]);
 
   // 진행 중 청소
@@ -253,5 +264,13 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     notices,
     todos,
     reservations: resvLists,
+    buildingMap: buildingSource
+      ? buildDashboardBuildingMap(
+          buildingSource,
+          cleaningSessions,
+          today,
+          getDictionary(session.user.preferredLanguage).cleaning.buildingLabels,
+        )
+      : null,
   };
 }

@@ -55,6 +55,17 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         c={dictionary.admin.console}
         data={data}
         locale={localeTag}
+        mapCopy={{
+          mapAria: dictionary.mobile.calendarW.mapAria,
+          emptyN: dictionary.mobile.calendarW.mapEmptyN,
+          full: dictionary.mobile.calendarW.mapFull,
+          roomsN: dictionary.mobile.calendarW.mapRoomsN,
+          open: dictionary.mobile.calendarW.mapOpen,
+          more: dictionary.mobile.calendarW.mapMore,
+          reset: dictionary.mobile.calendarW.mapReset,
+          stationShinjuku: dictionary.mobile.calendarW.stationShinjuku,
+          stationYotsuya: dictionary.mobile.calendarW.stationYotsuya,
+        }}
         ops={
           opsSummary
             ? {

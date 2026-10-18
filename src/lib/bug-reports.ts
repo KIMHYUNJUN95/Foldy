@@ -14,6 +14,7 @@ import type { AppSession } from "@/lib/session";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import {
   notifyBugReportCreated,
   notifyBugReportStatusChanged,
@@ -172,15 +173,17 @@ async function fetchReporterInfo(
     .in("user_id", ids);
   if (error) return map;
 
+  const devIds = await fetchPlatformDeveloperIds(ids);
   for (const m of (data ?? []) as Array<{
     user_id: string;
     role: string;
     profiles: { name: string } | { name: string }[] | null;
   }>) {
     const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+    const role = displayRoleKey(m.role, m.user_id, devIds);
     map.set(m.user_id, {
       name: profile?.name ?? "",
-      roleLabel: roles[m.role] ?? m.role ?? null,
+      roleLabel: roles[role] ?? role ?? null,
     });
   }
   return map;

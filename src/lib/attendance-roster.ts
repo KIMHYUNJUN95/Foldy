@@ -4,6 +4,7 @@
 import "server-only";
 import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { AttendanceReviewState, AttendanceSessionRow } from "@/lib/attendance";
 
 // 문자열 리터럴이어야 타입 수준 파싱이 된다(배열 join 은 GenericStringError 로 떨어진다).
@@ -155,6 +156,7 @@ export async function getAttendanceRoster(
   }
 
   // 3. 엔트리 조합
+  const devIds = await fetchPlatformDeveloperIds(sessions.map((s) => s.user_id));
   const allEntries: RosterEntry[] = sessions.map((session) => {
     const profile = profileMap.get(session.user_id);
     const roleCode = membershipMap.get(session.user_id) ?? "";
@@ -181,7 +183,7 @@ export async function getAttendanceRoster(
       userId: session.user_id,
       name: rawName || "?",
       avatarInitial: rawName ? rawName.slice(0, 1) : "?",
-      role: roleDisplayLabel(roleCode, locale),
+      role: roleDisplayLabel(displayRoleKey(roleCode, session.user_id, devIds), locale),
       roleCode,
       phoneNumber: profile?.phone_number ?? null,
       siteName: siteMap.get(session.clock_in_site_id ?? "") ?? "",

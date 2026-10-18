@@ -10,6 +10,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSuggestionDetail } from "@/lib/suggestions-queries";
 import { getShareableUsers } from "@/lib/tasks";
+import { withDisplayRoles } from "@/lib/platform-developers";
 
 type PageProps = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> };
 
@@ -43,7 +44,7 @@ export default async function MobileSuggestionEditPage({ params, searchParams }:
   }
 
   const dict = getDictionary(session.user.preferredLanguage);
-  const [users, navBadges] = await Promise.all([getShareableUsers(session), getMobileNavBadges()]);
+  const [users, navBadges] = await Promise.all([getShareableUsers(session).then(withDisplayRoles), getMobileNavBadges()]);
   const byId = new Map(users.map((u) => [u.id, u]));
 
   const initial: SuggestionComposeInitial = {

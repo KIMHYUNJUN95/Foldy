@@ -7,6 +7,7 @@
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { AppSession } from "@/lib/session";
 import { tokyoToday } from "@/lib/annual-leave";
 import { getMyAnnualLeaveSummary } from "@/lib/annual-leave-server";
@@ -160,7 +161,10 @@ async function rolesByUser(
     .select("user_id, role")
     .eq("organization_id", organizationId)
     .in("user_id", Array.from(new Set(userIds)));
-  ((data ?? []) as { user_id: string; role: string }[]).forEach((r) => map.set(r.user_id, r.role));
+  const rows = (data ?? []) as { user_id: string; role: string }[];
+  // 화면 표시용(연차 큐의 역할 글자) — 플랫폼 개발자는 「개발자」.
+  const devIds = await fetchPlatformDeveloperIds(rows.map((r) => r.user_id));
+  rows.forEach((r) => map.set(r.user_id, displayRoleKey(r.role, r.user_id, devIds)));
   return map;
 }
 

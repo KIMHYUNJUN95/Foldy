@@ -18,6 +18,7 @@ import type {
   FileAttachment,
 } from "@/components/board/board-types";
 import { getDictionary } from "@/lib/i18n";
+import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { bestEffortWrite } from "@/lib/db-write-guard";
@@ -79,15 +80,17 @@ async function fetchAuthorInfo(
     .in("user_id", ids);
   if (error) return map;
 
+  const devIds = await fetchPlatformDeveloperIds(ids);
   for (const m of (data ?? []) as Array<{
     user_id: string;
     role: string;
     profiles: { name: string } | { name: string }[] | null;
   }>) {
     const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+    const role = displayRoleKey(m.role, m.user_id, devIds);
     map.set(m.user_id, {
       name: profile?.name ?? "",
-      roleLabel: roles[m.role] ?? m.role,
+      roleLabel: roles[role] ?? role,
     });
   }
   return map;
@@ -484,14 +487,16 @@ export async function searchMentionableMembers(
     role: string;
     profiles: { name: string } | { name: string }[] | null;
   }>;
+  const devIds = await fetchPlatformDeveloperIds(rows.map((r) => r.user_id));
 
   return rows
     .map((r) => {
       const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+      const role = displayRoleKey(r.role, r.user_id, devIds);
       return {
         id: r.user_id,
         name: profile?.name ?? "",
-        role: roles[r.role] ?? r.role,
+        role: roles[role] ?? role,
         avatarColor: avatarColorFor(r.user_id),
       } satisfies MentionableMember;
     })

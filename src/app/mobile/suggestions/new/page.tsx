@@ -6,6 +6,7 @@ import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getShareableUsers } from "@/lib/tasks";
+import { withDisplayRoles } from "@/lib/platform-developers";
 
 type PageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -34,7 +35,7 @@ export default async function MobileSuggestionsNewPage({ searchParams }: PagePro
   const dict = getDictionary(locale);
 
   const [users, navBadges] = await Promise.all([
-    getShareableUsers(session),
+    getShareableUsers(session).then(withDisplayRoles),
     getMobileNavBadges(),
   ]);
 

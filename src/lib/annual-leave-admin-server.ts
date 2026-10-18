@@ -45,7 +45,7 @@ function daysBetweenISO(fromIso: string, toIso: string): number {
 }
 
 // Platform super-admins (developer_super_admin) outrank any org role. In the admin tables we surface
-// them by their platform role ("개발자 / 최고 관리자") instead of their incidental membership role
+// them by their platform role ("개발자") instead of their incidental membership role
 // (e.g. owner/"대표"), matching how the session resolves role everywhere else.
 const PLATFORM_ADMIN_ROLE = "developer_super_admin";
 

@@ -7596,7 +7596,7 @@ const FALLBACK_DICTIONARY = {
   },
   roles: {
     cs_staff: "CS Staff",
-    developer_super_admin: "Developer / Super Admin",
+    developer_super_admin: "Developer",
     field_manager: "Field Manager",
     office_admin: "Office Admin",
     owner: "Owner",
@@ -15306,7 +15306,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     },
     roles: {
       cs_staff: "CS 직원",
-      developer_super_admin: "개발자 / 최고 관리자",
+      developer_super_admin: "개발자",
       field_manager: "현장 관리자",
       office_admin: "오피스 관리자",
       owner: "대표",
@@ -22980,7 +22980,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     },
     roles: {
       cs_staff: "CSスタッフ",
-      developer_super_admin: "開発者 / 最高管理者",
+      developer_super_admin: "開発者",
       field_manager: "現場管理者",
       office_admin: "オフィス管理者",
       owner: "代表",

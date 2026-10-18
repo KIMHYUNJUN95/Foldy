@@ -6,6 +6,7 @@ import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { Database } from "@/types/database";
 
 type MembershipRow = Database["public"]["Tables"]["memberships"]["Row"];
@@ -51,9 +52,10 @@ export default async function MobileDirectoryPage() {
   const userIds = memberships.map((m) => m.user_id);
   const teamIds = [...new Set(memberships.map((m) => m.team_id).filter((id): id is string => Boolean(id)))];
 
-  const [{ data: profileData }, { data: teamData }] = await Promise.all([
+  const [{ data: profileData }, { data: teamData }, devIds] = await Promise.all([
     userIds.length > 0 ? service.from("profiles").select("id, name, phone_number").in("id", userIds) : Promise.resolve({ data: [] }),
     teamIds.length > 0 ? service.from("teams").select("id, kind").in("id", teamIds) : Promise.resolve({ data: [] }),
+    fetchPlatformDeveloperIds(userIds),
   ]);
 
   const profileMap = new Map(((profileData ?? []) as Pick<ProfileRow, "id" | "name" | "phone_number">[]).map((p) => [p.id, p]));
@@ -66,7 +68,7 @@ export default async function MobileDirectoryPage() {
         membershipId: m.id,
         name: profile?.name ?? "—",
         role: m.role,
-        roleLabel: roles[m.role] ?? m.role,
+        roleLabel: roles[displayRoleKey(m.role, m.user_id, devIds)] ?? m.role,
         teamKind: m.team_id ? teamKind.get(m.team_id) ?? null : null,
         phone: profile?.phone_number ?? "",
         joinedAt: m.joined_at,

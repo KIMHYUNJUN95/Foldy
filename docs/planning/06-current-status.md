@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-16 — 플랫폼 개발자는 어디서나 「개발자」
+
+- 모바일 직원 목록 · 게시판 · 버그 신고 · 근태 출근자 명단 · 연차 승인 큐 · 제안함 고르기 · 사용자 삭제 확인에서 개발자 계정이
+  「대표」(멤버십 `owner`)로 보이던 것을 「개발자」로(`src/lib/platform-developers.ts`, 표시 전용 — 권한 그대로).
+  역할 글자 「개발자 / 최고 관리자」 → 「개발자」. 결정: 01-decision-log 2026-10-16.
+
 ## 2026-10-16 — 성능 점검: DB · 로그인 확인 병목 3곳
 
 - **웹훅 예약 찾기**: 같은 날 넣은 `text_pattern_ops` 인덱스는 PostgREST 의 매개변수 계획에서 LIKE 를 못 타 여전히 예약 전체를
@@ -20,6 +26,7 @@ and the major mobile/admin operations modules are implemented and being hardened
 - **로그인 확인**: 미들웨어 · 세션의 `auth.getUser()`(렌더마다 Auth 서버 왕복, 평균 174ms, 미들웨어와 세션이 한 번씩)를
   `getClaims()`(ES256 서명 로컬 검증)로. 계정 정지 확인이 필요한 `getOnboardingState()` 는 `getUser()` 를 유지하되 `cache()` 로 렌더당 한 번.
 - 운영 DB 적용 완료. 남은 것: 어드바이저의 중복 인덱스 1 · 안 쓰는 인덱스 20(정리만).
+
 ## 2026-10-16 — 대시보드 홈 「오늘의 건물」 지도 카드
 
 - PC 대시보드 홈의 매출 · 가동률 · 최근 6개월(운영 관리자가 아니면 숫자 줄) 아래, 큐 위에 예약 캘린더와 같은 모형 지도 카드를 더했다. 기존 구역은 그대로.

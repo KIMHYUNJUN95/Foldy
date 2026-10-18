@@ -688,7 +688,7 @@ function MemberPanel({
       {confirm ? (
         <ConfirmModal
           kind={confirm}
-          summary={[m.name, roleLabel(role), m.email].filter(Boolean).join(" · ")}
+          summary={[m.name, m.isDeveloper ? c.devRole : roleLabel(role), m.email].filter(Boolean).join(" · ")}
           dict={dict}
           pending={pending}
           onCancel={() => setConfirm(null)}

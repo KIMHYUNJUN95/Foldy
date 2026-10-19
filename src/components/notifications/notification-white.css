@@ -214,3 +214,25 @@
 @media (max-width: 599px) {
   [data-swipe-surface]:has(.nfw-bar) .tabbar { transform: translateY(calc(100% + 40px)) !important; pointer-events: none; }
 }
+
+/* ══ HIG 다듬기 2차 (2026-10-19, 시안 A2Notif-Phone · Fold · Tablet) — 모바일 알림 화면(.nfw)만. PC 종 팝오버(.nfw-pop)는 PC 글자 기준이라 그대로.
+   줄 16 / 15 / 13 · 날짜 묶음 제목 17/600(높이 44, 투두 · 근태 · 청소 구역 제목과 같은 단계) · 위 줄 · 탭 15 · 체크 24 · 버튼 50. */
+.nfw .nfw-row { padding-top: 12px; padding-bottom: 12px; }
+.nfw .nfw-t { font-size: 16px; }
+.nfw .nfw-o { font-size: 15px; }
+.nfw .nfw-m { font-size: 13px; }
+.nfw .nfw-more { font-size: 13px; }
+.nfw .nfw-rest .nfw-t { font-size: 15px; }
+.nfw .nfw-check { width: 24px; height: 24px; margin-top: 6px; }
+.nfw .nfw-act { font-size: 13px; }
+.nfw .nfw-h p { font-size: 15px; }
+.nfw .nfw-tbtn { font-size: 15px; }
+.nfw .nfw-tab { font-size: 15px; }
+.nfw .nfw-sec { display: flex; align-items: center; min-height: 44px; padding: 12px 0 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--nfw-ink); }
+.nfw .nfw-sec:first-child { padding-top: 0; }
+.nfw .nfw-empty b { font-size: 17px; }
+.nfw .nfw-empty span { font-size: 15px; }
+.nfw .nfw-bar button { height: 50px; }
+.nfw-cf p { font-size: 15px; }
+.nfw-cf__go { height: 50px; }
+.nfw-cf__no { font-size: 15px; }

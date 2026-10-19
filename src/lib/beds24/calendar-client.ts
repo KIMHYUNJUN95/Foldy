@@ -117,6 +117,8 @@ export type CalendarFetchResult = {
  */
 export async function fetchBeds24Calendar(
   query: CalendarQuery,
+  /** `timeoutMs` — 사람이 기다리는 경로(수기 예약 가용 재확인)만 준다. 넘으면 `AbortSignal` 이 던진다. */
+  options?: { timeoutMs?: number },
 ): Promise<CalendarFetchResult | { skipped: string }> {
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
@@ -128,7 +130,11 @@ export async function fetchBeds24Calendar(
   let pages = 0;
 
   while (url && pages < CALENDAR_MAX_PAGES) {
-    const response: Response = await fetch(url, { cache: "no-store", headers });
+    const response: Response = await fetch(url, {
+      cache: "no-store",
+      headers,
+      signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
+    });
     credit = readCreditSignal(response.headers);
     if (!response.ok) {
       throw new Beds24HttpError(response.status, credit.resetInSec, response.status === 429);
@@ -284,6 +290,11 @@ export type BookingCreatePayload = {
  */
 export async function postBeds24Booking(
   payload: BookingCreatePayload,
+  /**
+   * `timeoutMs` — 넘으면 `AbortSignal` 이 던진다. **던졌다고 안 만들어진 것은 아니다**(요청은 이미 갔을 수 있다) —
+   * 부르는 쪽이 「모름」으로 다뤄야 한다(`classifyBookingCreateError`).
+   */
+  options?: { timeoutMs?: number },
 ): Promise<BookingCreateResult | { skipped: string }> {
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
@@ -291,6 +302,7 @@ export async function postBeds24Booking(
   const response = await fetch(`${resolved.base}/bookings`, {
     body: JSON.stringify([payload]),
     cache: "no-store",
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
     headers: {
       accept: "application/json",
       "content-type": "application/json",
@@ -433,12 +445,14 @@ export async function postBeds24BookingUpdate(
  */
 export async function fetchBeds24BookingById(
   bookingId: string,
+  options?: { timeoutMs?: number },
 ): Promise<{ ok: true; booking: JsonRecord } | { ok: false; error: string } | { skipped: string }> {
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
 
   const response = await fetch(`${resolved.base}/bookings?id=${encodeURIComponent(bookingId)}`, {
     cache: "no-store",
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
     headers: { accept: "application/json", token: resolved.token },
   });
   const credit = readCreditSignal(response.headers);

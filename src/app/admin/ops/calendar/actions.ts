@@ -7,17 +7,26 @@ import { enqueueBeds24PriceJob, type PriceJobCellRequest } from "@/lib/beds24/pr
 import {
   Beds24HttpError,
   fetchBeds24BookingById,
+  fetchBeds24Calendar,
   postBeds24Booking,
   postBeds24BookingCancel,
   postBeds24BookingUpdate,
 } from "@/lib/beds24/calendar-client";
 import { resolveReservationStatusFromBeds24Record } from "@/lib/beds24/reservation-status";
 import { processBeds24WebhookBooking } from "@/lib/beds24/process-webhook-booking";
-import { activateBeds24Cooldown, getBeds24Cooldown } from "@/lib/beds24/sync-locks";
+import {
+  acquireBeds24Lock,
+  activateBeds24Cooldown,
+  getBeds24Cooldown,
+  releaseBeds24Lock,
+} from "@/lib/beds24/sync-locks";
 import { isActiveUnitMinStay } from "@/lib/ops-gap-detection";
 import { mergeOpsRateUnits, type OpsRateUnit } from "@/lib/ops-rate-merge";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import {
+  beds24UnsellableNights,
+  classifyBookingCreateError,
+  manualBookingLockName,
   readBeds24CancelTargetId,
   resolveStayUnit,
   splitGuestName,
@@ -62,7 +71,7 @@ import {
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { signalBeds24Change } from "@/lib/beds24/live-signal";
 import { recordBlockLog } from "@/lib/beds24/block-log";
-import { planRevertCells, type RevertField } from "@/lib/ops-revert";
+import { chunkCellsByRanges, planRevertCells, type RevertField } from "@/lib/ops-revert";
 import { kickPriceJobWorker } from "@/lib/beds24/price-job-kick";
 import {
   groupChangeRows,
@@ -326,11 +335,23 @@ export type BlockChangeResult =
    * `appliedRanges` — 실패 **앞에서** 이미 Beds24 에 반영된 구간 수. 0 이 아니면 일부는 막혔다(풀렸다)는 뜻이라
    * 화면이 그렇게 알려야 한다 — 「실패」만 보면 사람은 전부 안 된 줄 알고 다시 누른다(2026-10-01).
    */
-  | { ok: false; error: BlockChangeError; detail?: string; appliedRanges?: number }
+  | {
+      ok: false;
+      error: BlockChangeError;
+      detail?: string;
+      appliedRanges?: number;
+      /**
+       * 반영되지 **않은** 구간 — 실패한 구간과 그 뒤 손대지 않은 구간(2026-10-19). 둘 다 우리 표 · Beds24 모두 누르기 전
+       * 그대로다(실패 구간은 `block-write.ts` 가 되돌린다). 화면이 「어느 방 · 며칠」인지 적어 다시 고르게 한다.
+       */
+      unappliedRanges?: BlockUnappliedRange[];
+    }
   /** `at` — 이 한 번의 누름이 이력에 남긴 시각(`price_change_logs.created_at`). 알림의 「되돌리기」가 그대로 넘긴다(`revertBlockChange`). */
   | { ok: true; ranges: number; nights: number; at: string };
 
 export type BlockChangeCell = { roomKey: string; roomLabel: string; roomIds: string[]; date: string };
+
+export type BlockUnappliedRange = { roomKey: string; roomLabel: string; startDate: string; endDate: string };
 
 /** 한 번에 처리하는 구간 수. 실수로 격자 전체를 고르고 누르는 것을 서버에서도 막는다. */
 const MAX_BLOCK_RANGES = 60;
@@ -416,15 +437,20 @@ async function runBlockChange(
     if (!row.ok) return { error: "unknown_room", ok: false };
   }
 
+  const unitsOfRange = (roomKey: string) =>
+    (roomIdsByKey.get(roomKey) ?? [])
+      .map((id) => unitById.get(id))
+      .filter((row): row is BlockRoomRow => !!row && !!row.external_room_id);
+  // 쓸 수 없는 방은 **아무것도 쓰기 전에** 거절한다 — 중간에 멈추면 앞 구간만 반영된다.
+  if (ranges.some((range) => unitsOfRange(range.roomKey).length === 0)) return { error: "unknown_room", ok: false };
+
   let nights = 0;
   let appliedRanges = 0;
+  const labelByKey = new Map(args.cells.map((cell) => [cell.roomKey, cell.roomLabel]));
   // 한 번 누른 것은 **같은 시각**으로 남긴다 — 변경 이력이 이 시각으로 한 줄로 묶는다(`groupChangeRows`).
   const actedAt = new Date().toISOString();
   for (const range of ranges) {
-    const units = (roomIdsByKey.get(range.roomKey) ?? [])
-      .map((id) => unitById.get(id))
-      .filter((row): row is BlockRoomRow => !!row && !!row.external_room_id);
-    if (units.length === 0) return { error: "unknown_room", ok: false };
+    const units = unitsOfRange(range.roomKey);
 
     const property = Array.isArray(units[0].properties) ? units[0].properties[0] : units[0].properties;
     const shared = {
@@ -488,7 +514,13 @@ async function runBlockChange(
     // 예전에는 여기서 바로 돌아가 앞 구간이 막힌 것이 격자에 안 보였다(2026-10-01).
     if (!result.ok) {
       if (appliedRanges > 0) revalidateOpsCalendars();
-      return { appliedRanges, detail: result.detail, error: result.reason, ok: false };
+      const unappliedRanges = ranges.slice(appliedRanges).map((item) => ({
+        endDate: item.endDate,
+        roomKey: item.roomKey,
+        roomLabel: labelByKey.get(item.roomKey) ?? item.roomKey,
+        startDate: item.startDate,
+      }));
+      return { appliedRanges, detail: result.detail, error: result.reason, ok: false, unappliedRanges };
     }
     nights += result.nights;
     appliedRanges += 1;
@@ -545,7 +577,11 @@ export type ManualBookingResult =
         /** 이미 예약·블록이 있는 밤이 끼어 있다 — `conflictDates` 에 그 밤이 담긴다. */
         | "occupied"
         /** 같은 요청 키가 아직 처리 중이다 — 두 번 눌렀다. */
-        | "duplicate_request";
+        | "duplicate_request"
+        /** 같은 방에 다른 수기 예약을 만드는 중이다(방 잠금, 2026-10-19). 잠시 뒤 다시. */
+        | "room_busy"
+        /** Beds24 가 제때 답하지 않아 **만들어졌는지 모른다**(2026-10-19). Beds24 에서 확인해야 한다 — 그냥 다시 누르면 두 번 생길 수 있다. */
+        | "unconfirmed";
       /** 유닛이 갈리거나 팔 수 없는 밤. 화면이 날짜를 적어 준다. */
       conflictDates?: string[];
       detail?: string;
@@ -609,6 +645,13 @@ export async function loadRoomAvailability(args: {
     return { error: "read_failed", ok: false };
   }
 }
+
+/** 수기 예약 Beds24 호출 시간 제한. 생성은 보통 2~4초 — 넘으면 「모름」으로 다룬다(`classifyBookingCreateError`). */
+const MANUAL_BOOKING_CREATE_TIMEOUT_MS = 20_000;
+/** 가용 재확인 · 생성 뒤 다시 읽기. */
+const MANUAL_BOOKING_READ_TIMEOUT_MS = 10_000;
+/** 방 잠금 수명 — 위 두 호출의 최악(읽기 10 + 생성 20 + 다시 읽기 10초)과 DB 쓰기를 넉넉히 덮는다. 함수가 죽어도 이만큼 뒤에 풀린다. */
+const MANUAL_BOOKING_LOCK_TTL_MS = 90_000;
 
 export async function submitManualBooking(args: {
   input: ManualBookingInput;
@@ -690,150 +733,230 @@ export async function submitManualBooking(args: {
     activeByNight.set(night, active);
   }
 
-  // **겹침은 서버가 한 번 더 막는다.** 패널이 회색으로 칠해 두지만 화면은 몇 초 전의 사정이다
-  // — 그 사이에 채널 예약이 들어올 수 있고, Beds24 는 수기 예약의 겹침을 막아 주지 않는다.
-  // 격자와 **같은 매칭**(`readOpsRoomUnavailableNights`)으로 본다.
-  let unavailable: Awaited<ReturnType<typeof readOpsRoomUnavailableNights>>;
-  try {
-    unavailable = await readOpsRoomUnavailableNights({
-      from: args.input.arrival,
-      organizationId: session.organization.id,
-      roomIds: units.map((unit) => unit.id),
-      roomKey: row.roomKey,
-      supabase,
-      toExclusive: args.input.departure,
-    });
-  } catch (error) {
-    // 확인을 못 했으면 만들지 않는다 — 「비어 있을 것이다」로 보내면 그대로 초과예약이다.
-    return { detail: (error as Error).message, error: "beds24_failed", ok: false };
-  }
-  if (unavailable.booked.length > 0) {
-    return { conflictDates: unavailable.booked, error: "occupied", ok: false };
-  }
-
-  const resolved = resolveStayUnit(activeByNight);
-  if (!resolved.ok) {
-    return { conflictDates: resolved.conflictDates, error: resolved.reason, ok: false };
-  }
-
-  const target = units.find((unit) => String(unit.external_room_id) === resolved.externalRoomId);
-  const property = Array.isArray(target?.properties) ? target?.properties[0] : target?.properties;
-  const propertyId = Number(property?.external_property_id ?? "");
-  if (!target || !Number.isInteger(propertyId)) return { error: "unknown_room", ok: false };
-
-  // **Beds24 를 부르기 전에 요청 키를 잡는다.** 이미 있으면 — 만든 예약이 있으면 그것을 돌려주고(우리 표 반영이
-  // 실패해 화면에 안 보여 다시 누른 경우), 아직 처리 중이면 거절한다. 전에는 다시 누르면 같은 예약이 또 생겼다.
-  const claim = await supabase
+  // 같은 요청 키를 **먼저** 본다 — 이미 만든 예약이면 그것을 돌려준다. 아래 겹침 확인보다 앞이어야 한다: 방금 만든 그 예약이
+  // 자기 밤을 「찬 밤」으로 만들어, 다시 누른 사람에게 「이미 예약 있음」이 떴다(2026-10-19).
+  const priorKey = await supabase
     .from("ops_manual_booking_requests")
-    .insert({ created_by: session.user.id, organization_id: session.organization.id, request_key: requestKey });
-  if (claim.error) {
-    if (claim.error.code !== "23505") return { detail: claim.error.message, error: "beds24_failed", ok: false };
-    const prior = await supabase
-      .from("ops_manual_booking_requests")
-      .select("booking_id, reservation_id")
-      .eq("organization_id", session.organization.id)
-      .eq("request_key", requestKey)
-      .maybeSingle();
-    const priorBooking = prior.data as { booking_id: string | null; reservation_id: string | null } | null;
-    if (priorBooking?.booking_id) {
-      return { bookingId: priorBooking.booking_id, ok: true, reservationId: priorBooking.reservation_id };
-    }
-    return { error: "duplicate_request", ok: false };
-  }
-  // Beds24 가 만들지 않았다고 답한 경우에만 키를 놓아 다시 시도할 수 있게 한다.
-  const releaseClaim = () =>
-    supabase
-      .from("ops_manual_booking_requests")
-      .delete()
-      .eq("organization_id", session.organization.id)
-      .eq("request_key", requestKey)
-      .is("booking_id", null);
-
-  const { firstName, lastName } = splitGuestName(args.input.guestName);
-  let created: Awaited<ReturnType<typeof postBeds24Booking>>;
-  try {
-    created = await postBeds24Booking({
-      apiSource: "Direct",
-      arrival: args.input.arrival,
-      comments: args.comments.trim(),
-      departure: args.input.departure,
-      email: args.guestEmail.trim(),
-      firstName,
-      lastName,
-      numAdult: args.input.numAdult,
-      numChild: args.input.numChild,
-      phone: args.guestPhone.trim(),
-      price: args.input.totalPrice ?? 0,
-      propertyId,
-      roomId: Number(resolved.externalRoomId),
-    });
-  } catch (error) {
-    await releaseClaim();
-    if (error instanceof Beds24HttpError && error.isRateLimit) {
-      await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
-      return { error: "cooldown", ok: false };
-    }
-    return {
-      detail: error instanceof Error ? error.message : "unknown",
-      error: "beds24_failed",
-      ok: false,
-    };
-  }
-
-  if ("skipped" in created || !created.ok) {
-    await releaseClaim();
-    return { detail: "skipped" in created ? created.skipped : created.error, error: "beds24_failed", ok: false };
-  }
-  // 만들어졌다 — 키에 예약번호를 단다. 이후 같은 키는 이 예약을 돌려받는다.
-  const marked = await supabase
-    .from("ops_manual_booking_requests")
-    .update({ booking_id: created.bookingId })
+    .select("booking_id, reservation_id")
     .eq("organization_id", session.organization.id)
-    .eq("request_key", requestKey);
-  if (marked.error) console.error("[ops/manual-booking] request key mark failed", marked.error);
+    .eq("request_key", requestKey)
+    .maybeSingle();
+  const priorKeyRow = priorKey.data as { booking_id: string | null; reservation_id: string | null } | null;
+  if (priorKeyRow?.booking_id) {
+    return { bookingId: priorKeyRow.booking_id, ok: true, reservationId: priorKeyRow.reservation_id };
+  }
+  if (priorKeyRow) return { error: "duplicate_request", ok: false };
 
-  // **웹훅을 기다리지 않는다.** 방금 만든 예약이 화면에 안 보이면 사람은 또 만든다 — 게다가 API 로 만든
-  // 예약은 Beds24 가 웹훅을 보내지 않는다(2026-10-01 실측). 예약 웹훅과 **같은 처리기**를 태운다.
-  //
-  // **만든 예약을 예약번호로 다시 읽어서** 넣는다(예약 수정과 같다). 생성 응답(`created.raw`)은 보낸
-  // 필드 + id 뿐이라 처리기가 필수값 부족으로 조용히 건너뛰었다 — 가부키초 502 11/19 예약이 Beds24 에만
-  // 있고 우리 표에 없던 원인(2026-10-01). 다시 읽기에 실패하면 생성 응답으로라도 시도한다.
-  let reservationId: string | null = null;
-  try {
-    let payload = created.raw;
-    try {
-      const fetched = await fetchBeds24BookingById(created.bookingId);
-      if (!("skipped" in fetched) && fetched.ok) payload = fetched.booking;
-      else console.warn("[ops/manual-booking] re-read failed; using create response", { bookingId: created.bookingId });
-    } catch (error) {
-      console.warn("[ops/manual-booking] re-read threw; using create response", { bookingId: created.bookingId, error });
-    }
-    const saved = await processBeds24WebhookBooking({
-      organizationIdDefault: session.organization.id,
-      payload,
-      supabase,
-    });
-    // 건너뛰어도 던지지 않는다 — 결과를 보고 **소리 내서** 남긴다. 다음 정합성(매일)이 맞출 때까지 화면에 없다.
-    if (!saved.ok) {
-      console.error("[ops/manual-booking] local upsert skipped", { bookingId: created.bookingId, result: saved });
-    } else {
-      reservationId = saved.reservationId ?? null;
-    }
-  } catch (error) {
-    // 만들어진 것은 사실이다. 우리 표에 늦게 들어올 뿐이라 실패로 돌리지 않는다.
-    console.error("[ops/manual-booking] local upsert failed", { bookingId: created.bookingId, error });
+  // **같은 방의 수기 예약은 한 번에 하나만**(2026-10-19). 가용 확인 → 생성 사이에 다른 요청이 끼면 둘 다 「비어 있음」을 보고
+  // 둘 다 만든다 — Beds24 는 수기 예약의 겹침을 막아 주지 않는다. 방 단위 잠금(`beds24_try_lock`)을 잡고 그 안에서 확인 · 생성한다.
+  const lockName = manualBookingLockName(session.organization.id, row.roomKey);
+  const lock = await acquireBeds24Lock(supabase, lockName, session.user.id, MANUAL_BOOKING_LOCK_TTL_MS);
+  if (!lock.acquired) {
+    return lock.reason === "busy"
+      ? { error: "room_busy", ok: false }
+      : { detail: "lock_error", error: "beds24_failed", ok: false };
   }
 
-  if (reservationId) {
-    await supabase
+  const createLocked = async (): Promise<ManualBookingResult> => {
+    // **겹침은 서버가 한 번 더 막는다.** 패널이 회색으로 칠해 두지만 화면은 몇 초 전의 사정이다
+    // — 그 사이에 채널 예약이 들어올 수 있고, Beds24 는 수기 예약의 겹침을 막아 주지 않는다.
+    // 격자와 **같은 매칭**(`readOpsRoomUnavailableNights`)으로 본다.
+    let unavailable: Awaited<ReturnType<typeof readOpsRoomUnavailableNights>>;
+    try {
+      unavailable = await readOpsRoomUnavailableNights({
+        from: args.input.arrival,
+        organizationId: session.organization.id,
+        roomIds: units.map((unit) => unit.id),
+        roomKey: row.roomKey,
+        supabase,
+        toExclusive: args.input.departure,
+      });
+    } catch (error) {
+      // 확인을 못 했으면 만들지 않는다 — 「비어 있을 것이다」로 보내면 그대로 초과예약이다.
+      return { detail: (error as Error).message, error: "beds24_failed", ok: false };
+    }
+    if (unavailable.booked.length > 0) {
+      return { conflictDates: unavailable.booked, error: "occupied", ok: false };
+    }
+
+    const resolved = resolveStayUnit(activeByNight);
+    if (!resolved.ok) {
+      return { conflictDates: resolved.conflictDates, error: resolved.reason, ok: false };
+    }
+
+    const target = units.find((unit) => String(unit.external_room_id) === resolved.externalRoomId);
+    const property = Array.isArray(target?.properties) ? target?.properties[0] : target?.properties;
+    const propertyId = Number(property?.external_property_id ?? "");
+    if (!target || !Number.isInteger(propertyId)) return { error: "unknown_room", ok: false };
+
+    // **Beds24 에서 한 번 더 본다**(2026-10-19). 우리 표는 웹훅 · 동기화를 거친 값이라, 방금 들어온 채널 예약이나 방금 만든
+    // 수기 예약(API 로 만든 예약은 웹훅이 오지 않는다 — 시간 초과로 결과를 모르는 것 포함)을 모를 수 있다. 그 유닛 · 그 밤만
+    // 읽는다(요청 한 번). 확인을 못 하면 만들지 않는다.
+    const cooldown = await getBeds24Cooldown(supabase);
+    if (cooldown.active) return { error: "cooldown", ok: false };
+    let live: Awaited<ReturnType<typeof fetchBeds24Calendar>>;
+    try {
+      live = await fetchBeds24Calendar(
+        {
+          endDate: nights[nights.length - 1],
+          externalRoomIds: [resolved.externalRoomId],
+          includeNumAvail: true,
+          includeOverride: true,
+          startDate: nights[0],
+        },
+        { timeoutMs: MANUAL_BOOKING_READ_TIMEOUT_MS },
+      );
+    } catch (error) {
+      if (error instanceof Beds24HttpError && error.isRateLimit) {
+        await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+        return { error: "cooldown", ok: false };
+      }
+      return { detail: "availability_check_failed", error: "beds24_failed", ok: false };
+    }
+    if ("skipped" in live || live.truncated) {
+      return { detail: "availability_check_failed", error: "beds24_failed", ok: false };
+    }
+    const liveTaken = beds24UnsellableNights(live.roomsById.get(resolved.externalRoomId)?.calendar ?? [], nights);
+    if (liveTaken.length > 0) return { conflictDates: liveTaken, error: "occupied", ok: false };
+
+    // **Beds24 를 부르기 전에 요청 키를 잡는다.** 이미 있으면 — 만든 예약이 있으면 그것을 돌려주고(우리 표 반영이
+    // 실패해 화면에 안 보여 다시 누른 경우), 아직 처리 중이면 거절한다. 전에는 다시 누르면 같은 예약이 또 생겼다.
+    const claim = await supabase
       .from("ops_manual_booking_requests")
-      .update({ reservation_id: reservationId })
+      .insert({ created_by: session.user.id, organization_id: session.organization.id, request_key: requestKey });
+    if (claim.error) {
+      if (claim.error.code !== "23505") return { detail: claim.error.message, error: "beds24_failed", ok: false };
+      const prior = await supabase
+        .from("ops_manual_booking_requests")
+        .select("booking_id, reservation_id")
+        .eq("organization_id", session.organization.id)
+        .eq("request_key", requestKey)
+        .maybeSingle();
+      const priorBooking = prior.data as { booking_id: string | null; reservation_id: string | null } | null;
+      if (priorBooking?.booking_id) {
+        return { bookingId: priorBooking.booking_id, ok: true, reservationId: priorBooking.reservation_id };
+      }
+      return { error: "duplicate_request", ok: false };
+    }
+    // Beds24 가 만들지 않았다고 답한 경우에만 키를 놓아 다시 시도할 수 있게 한다.
+    const releaseClaim = () =>
+      supabase
+        .from("ops_manual_booking_requests")
+        .delete()
+        .eq("organization_id", session.organization.id)
+        .eq("request_key", requestKey)
+        .is("booking_id", null);
+
+    const { firstName, lastName } = splitGuestName(args.input.guestName);
+    let created: Awaited<ReturnType<typeof postBeds24Booking>>;
+    try {
+      created = await postBeds24Booking(
+        {
+          apiSource: "Direct",
+          arrival: args.input.arrival,
+          comments: args.comments.trim(),
+          departure: args.input.departure,
+          email: args.guestEmail.trim(),
+          firstName,
+          lastName,
+          numAdult: args.input.numAdult,
+          numChild: args.input.numChild,
+          phone: args.guestPhone.trim(),
+          price: args.input.totalPrice ?? 0,
+          propertyId,
+          roomId: Number(resolved.externalRoomId),
+        },
+        { timeoutMs: MANUAL_BOOKING_CREATE_TIMEOUT_MS },
+      );
+    } catch (error) {
+      // **안 만들어진 게 확실할 때만** 키를 놓는다(`classifyBookingCreateError`). 시간 초과 · 연결 끊김은 이미 만들어졌을 수
+      // 있다 — 키를 놓으면 다시 눌러 같은 예약이 두 번 생긴다. 키는 붙잡아 두고(같은 키 = 「처리 중」) 확인을 요청한다.
+      // 다른 키로 다시 만들려 해도 위의 Beds24 재확인이 그 밤을 막는다.
+      if (classifyBookingCreateError(error) === "unknown") {
+        console.error("[ops/manual-booking] create outcome unknown", {
+          error: error instanceof Error ? error.name : "unknown",
+          roomId: resolved.externalRoomId,
+        });
+        return { error: "unconfirmed", ok: false };
+      }
+      await releaseClaim();
+      if (error instanceof Beds24HttpError && error.isRateLimit) {
+        await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+        return { error: "cooldown", ok: false };
+      }
+      return {
+        detail: error instanceof Error ? error.message : "unknown",
+        error: "beds24_failed",
+        ok: false,
+      };
+    }
+
+    // 응답을 읽지 못했거나 성공인데 예약번호가 없으면 **만들어졌을 수 있다** — 위와 같이 키를 붙잡아 둔다.
+    if (!("skipped" in created) && !created.ok && ["unexpected_response", "missing_booking_id"].includes(created.error)) {
+      return { error: "unconfirmed", ok: false };
+    }
+    if ("skipped" in created || !created.ok) {
+      await releaseClaim();
+      return { detail: "skipped" in created ? created.skipped : created.error, error: "beds24_failed", ok: false };
+    }
+    // 만들어졌다 — 키에 예약번호를 단다. 이후 같은 키는 이 예약을 돌려받는다.
+    const marked = await supabase
+      .from("ops_manual_booking_requests")
+      .update({ booking_id: created.bookingId })
       .eq("organization_id", session.organization.id)
       .eq("request_key", requestKey);
-  }
+    if (marked.error) console.error("[ops/manual-booking] request key mark failed", marked.error);
 
-  revalidateOpsCalendars();
-  return { bookingId: created.bookingId, ok: true, reservationId };
+    // **웹훅을 기다리지 않는다.** 방금 만든 예약이 화면에 안 보이면 사람은 또 만든다 — 게다가 API 로 만든
+    // 예약은 Beds24 가 웹훅을 보내지 않는다(2026-10-01 실측). 예약 웹훅과 **같은 처리기**를 태운다.
+    //
+    // **만든 예약을 예약번호로 다시 읽어서** 넣는다(예약 수정과 같다). 생성 응답(`created.raw`)은 보낸
+    // 필드 + id 뿐이라 처리기가 필수값 부족으로 조용히 건너뛰었다 — 가부키초 502 11/19 예약이 Beds24 에만
+    // 있고 우리 표에 없던 원인(2026-10-01). 다시 읽기에 실패하면 생성 응답으로라도 시도한다.
+    let reservationId: string | null = null;
+    try {
+      let payload = created.raw;
+      try {
+        const fetched = await fetchBeds24BookingById(created.bookingId, { timeoutMs: MANUAL_BOOKING_READ_TIMEOUT_MS });
+        if (!("skipped" in fetched) && fetched.ok) payload = fetched.booking;
+        else console.warn("[ops/manual-booking] re-read failed; using create response", { bookingId: created.bookingId });
+      } catch (error) {
+        console.warn("[ops/manual-booking] re-read threw; using create response", { bookingId: created.bookingId, error });
+      }
+      const saved = await processBeds24WebhookBooking({
+        organizationIdDefault: session.organization.id,
+        payload,
+        supabase,
+      });
+      // 건너뛰어도 던지지 않는다 — 결과를 보고 **소리 내서** 남긴다. 다음 정합성(매일)이 맞출 때까지 화면에 없다.
+      if (!saved.ok) {
+        console.error("[ops/manual-booking] local upsert skipped", { bookingId: created.bookingId, result: saved });
+      } else {
+        reservationId = saved.reservationId ?? null;
+      }
+    } catch (error) {
+      // 만들어진 것은 사실이다. 우리 표에 늦게 들어올 뿐이라 실패로 돌리지 않는다.
+      console.error("[ops/manual-booking] local upsert failed", { bookingId: created.bookingId, error });
+    }
+
+    if (reservationId) {
+      await supabase
+        .from("ops_manual_booking_requests")
+        .update({ reservation_id: reservationId })
+        .eq("organization_id", session.organization.id)
+        .eq("request_key", requestKey);
+    }
+
+    revalidateOpsCalendars();
+    return { bookingId: created.bookingId, ok: true, reservationId };
+
+  };
+
+  try {
+    return await createLocked();
+  } finally {
+    await releaseBeds24Lock(supabase, lockName, lock.lockId);
+  }
 }
 
 /**
@@ -1322,21 +1445,28 @@ async function revertLogsOfField(
   const dates = [...new Set(logs.map((log) => log.stay_date))];
   if (roomIds.length === 0) return { cells: 0, ok: true, skippedChanged: 0 };
 
-  const ratesResult = await supabase
-    .from("room_daily_rates")
-    .select("room_id, stay_date, price1, min_stay, override_kind")
-    .eq("organization_id", session.organization.id)
-    .in("room_id", roomIds)
-    .in("stay_date", dates);
-  if (ratesResult.error) return { error: "not_found", ok: false };
-  const current = new Map<string, number | null>();
-  for (const row of (ratesResult.data ?? []) as Array<{
+  // **쪽을 나눠 끝까지** 읽는다(2026-10-19) — 1,000행에서 잘리면 뒤쪽 칸의 지금 값이 없어 「그 뒤에 바뀐 칸」으로
+  // 건너뛰었다. 1,000칸 넘는 수정의 되돌리기가 일부만 돌아온 원인이다.
+  const ratesResult = await readAllPages<{
     room_id: string;
     stay_date: string;
     price1: number | null;
     min_stay: number | null;
     override_kind: string | null;
-  }>) {
+  }>((from, to) =>
+    supabase
+      .from("room_daily_rates")
+      .select("room_id, stay_date, price1, min_stay, override_kind")
+      .eq("organization_id", session.organization.id)
+      .in("room_id", roomIds)
+      .in("stay_date", dates)
+      .order("room_id", { ascending: true })
+      .order("stay_date", { ascending: true })
+      .range(from, to),
+  );
+  if (ratesResult.error) return { error: "not_found", ok: false };
+  const current = new Map<string, number | null>();
+  for (const row of ratesResult.data) {
     const value =
       field === "price1"
         ? row.price1
@@ -1357,18 +1487,22 @@ async function revertLogsOfField(
     // **그 방의 유닛 전부**로 보낸다(2026-10-01) — 차단은 활성 · 비활성(최소숙박 잠금) 유닛을 가리지 않고 모두에
     // 거는 것이 규칙인데(`runBlockChange`), 이력은 방당 유닛 하나만 적는다. 예전에는 그 한 유닛만 되돌려서
     // 두 유닛짜리 방(302 + 302_2 등)은 하나만 풀리고 하나는 막힌 채 남았다.
-    const unitsResult = await supabase
-      .from("rooms")
-      .select("id, room_label, properties(name)")
-      .eq("organization_id", session.organization.id);
-    if (unitsResult.error) return { error: "not_found", ok: false };
-    const keyById = new Map<string, { roomKey: string; label: string }>();
-    const unitIdsByKey = new Map<string, string[]>();
-    for (const unit of (unitsResult.data ?? []) as Array<{
+    const unitsResult = await readAllPages<{
       id: string;
       room_label: string;
       properties: { name: string } | { name: string }[] | null;
-    }>) {
+    }>((from, to) =>
+      supabase
+        .from("rooms")
+        .select("id, room_label, properties(name)")
+        .eq("organization_id", session.organization.id)
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+    if (unitsResult.error) return { error: "not_found", ok: false };
+    const keyById = new Map<string, { roomKey: string; label: string }>();
+    const unitIdsByKey = new Map<string, string[]>();
+    for (const unit of unitsResult.data) {
       const property = Array.isArray(unit.properties) ? unit.properties[0] : unit.properties;
       const roomKey = opsUnitRoomKey({ propertyName: property?.name, roomLabel: unit.room_label });
       if (!roomKey) continue;
@@ -1392,9 +1526,12 @@ async function revertLogsOfField(
       if (cells.length === 0) continue;
       // 그 행의 유닛 전부 — 걸기/풀기와 같은 범위(활성 · 비활성 모두).
       for (const cell of cells) cell.roomIds = unitIdsByKey.get(cell.roomKey) ?? cell.roomIds;
-      // 이전이 열림(0)이면 푼다, 막힘(1)이면 다시 건다.
-      const result = await runBlockChange({ cells }, target === 0 ? "unblock" : "block");
-      if (!result.ok) return { error: "block_failed", ok: false };
+      // 이전이 열림(0)이면 푼다, 막힘(1)이면 다시 건다. 구간 상한(`MAX_BLOCK_RANGES`) 안으로 나눠 보낸다 — 큰 묶음이
+      // 통째로 거절되지 않게(2026-10-19).
+      for (const chunk of chunkCellsByRanges(cells, MAX_BLOCK_RANGES)) {
+        const result = await runBlockChange({ cells: chunk }, target === 0 ? "unblock" : "block");
+        if (!result.ok) return { error: "block_failed", ok: false };
+      }
     }
     return { cells: plan.cells.length, ok: true, skippedChanged: plan.skippedChanged };
   }
@@ -1460,17 +1597,19 @@ export async function revertPriceJob(args: { jobId: string }): Promise<RevertPri
   if (!["completed", "partial_failed"].includes(job.status)) return { error: "not_revertible", ok: false };
 
   const field: RevertField = job.job_type === "price" ? "price1" : "min_stay";
-  const logsResult = await supabase
-    .from("price_change_logs")
-    .select("room_id, room_label, stay_date, old_value, new_value")
-    .eq("organization_id", session.organization.id)
-    .eq("job_id", job.id)
-    .eq("field", field)
-    .limit(5000);
+  // 칸 이력은 **쪽을 나눠 전부** 읽는다(2026-10-19) — `.limit(5000)` 이어도 PostgREST 는 1,000행에서 자른다.
+  const logsResult = await readAllPages<RevertLogRow>((from, to) =>
+    supabase
+      .from("price_change_logs")
+      .select("room_id, room_label, stay_date, old_value, new_value")
+      .eq("organization_id", session.organization.id)
+      .eq("job_id", job.id)
+      .eq("field", field)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (logsResult.error) return { error: "not_found", ok: false };
-  return mergeRevertResults([
-    await revertLogsOfField(session, supabase, field, (logsResult.data ?? []) as RevertLogRow[]),
-  ]);
+  return mergeRevertResults([await revertLogsOfField(session, supabase, field, logsResult.data)]);
 }
 
 /**
@@ -1486,16 +1625,19 @@ export async function revertBeds24Change(args: { at: string }): Promise<RevertPr
   if (Number.isNaN(Date.parse(args.at))) return { error: "not_found", ok: false };
   const supabase = getSupabaseServiceClient();
 
-  const logsResult = await supabase
-    .from("price_change_logs")
-    .select("room_id, room_label, stay_date, field, old_value, new_value")
-    .eq("organization_id", session.organization.id)
-    .eq("adjust_mode", "beds24")
-    .eq("created_at", args.at)
-    .in("field", ["price1", "min_stay", "blackout"])
-    .limit(5000);
+  const logsResult = await readAllPages<RevertLogRow & { field: string }>((from, to) =>
+    supabase
+      .from("price_change_logs")
+      .select("room_id, room_label, stay_date, field, old_value, new_value")
+      .eq("organization_id", session.organization.id)
+      .eq("adjust_mode", "beds24")
+      .eq("created_at", args.at)
+      .in("field", ["price1", "min_stay", "blackout"])
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (logsResult.error) return { error: "not_found", ok: false };
-  const rows = (logsResult.data ?? []) as Array<RevertLogRow & { field: string }>;
+  const rows = logsResult.data;
   if (rows.length === 0) return { error: "not_found", ok: false };
 
   const results = [];
@@ -1520,16 +1662,19 @@ export async function revertBlockChange(args: { at: string }): Promise<RevertPri
   if (Number.isNaN(Date.parse(args.at))) return { error: "not_found", ok: false };
   const supabase = getSupabaseServiceClient();
 
-  const logsResult = await supabase
-    .from("price_change_logs")
-    .select("room_id, room_label, stay_date, old_value, new_value")
-    .eq("organization_id", session.organization.id)
-    .eq("adjust_mode", "block")
-    .eq("field", "blackout")
-    .eq("created_at", args.at)
-    .limit(5000);
+  const logsResult = await readAllPages<RevertLogRow>((from, to) =>
+    supabase
+      .from("price_change_logs")
+      .select("room_id, room_label, stay_date, old_value, new_value")
+      .eq("organization_id", session.organization.id)
+      .eq("adjust_mode", "block")
+      .eq("field", "blackout")
+      .eq("created_at", args.at)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (logsResult.error) return { error: "not_found", ok: false };
-  const logs = (logsResult.data ?? []) as RevertLogRow[];
+  const logs = logsResult.data;
   if (logs.length === 0) return { error: "not_found", ok: false };
   return mergeRevertResults([await revertLogsOfField(session, supabase, "blackout", logs)]);
 }

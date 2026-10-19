@@ -32,6 +32,7 @@ import {
 } from "@/lib/beds24/sync-locks";
 import { encodePriceJobWait, type PriceJobWaitReason } from "@/lib/beds24/price-job-wait";
 import type { Database } from "@/types/database";
+import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { signalBeds24Change } from "@/lib/beds24/live-signal";
 
 /**
@@ -602,18 +603,26 @@ export async function runNextPriceJob(
         ...new Set(roomUpdates.flatMap((update) => Object.keys(update.dates ?? {}))),
       ];
       if (roomUuids.length > 0 && stayDates.length > 0) {
-        const before = await supabase
-          .from("room_daily_rates")
-          .select("room_id, stay_date, price1, min_stay")
-          .eq("organization_id", job.organization_id)
-          .in("room_id", roomUuids)
-          .in("stay_date", stayDates);
-        for (const rowValue of (before.data ?? []) as Array<{
+        // 쪽을 나눠 끝까지 — 1,000칸 넘는 작업은 뒤쪽 칸의 「이전 값」이 비어 이력이 「없음 → 새 값」으로 남았고,
+        // 그 칸은 되돌리기에서도 빠졌다(2026-10-19).
+        const before = await readAllPages<{
           room_id: string;
           stay_date: string;
           price1: number | null;
           min_stay: number | null;
-        }>) {
+        }>((from, to) =>
+          supabase
+            .from("room_daily_rates")
+            .select("room_id, stay_date, price1, min_stay")
+            .eq("organization_id", job.organization_id)
+            .in("room_id", roomUuids)
+            .in("stay_date", stayDates)
+            .order("room_id", { ascending: true })
+            .order("stay_date", { ascending: true })
+            .range(from, to),
+        );
+        if (before.error) console.error("[beds24/price-job] 이전 값 읽기 실패", before.error);
+        for (const rowValue of before.data) {
           beforeByCell.set(`${rowValue.room_id}|${rowValue.stay_date}`, {
             minStay: rowValue.min_stay,
             price1: rowValue.price1,

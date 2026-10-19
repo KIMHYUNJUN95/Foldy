@@ -9,6 +9,7 @@ import {
   resolvePriceWriteRoomIds,
   type WriteTargetUnit,
 } from "@/lib/beds24/write-target-room";
+import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
 /**
@@ -83,26 +84,39 @@ export async function enqueueBeds24PriceJob(args: {
   }
 
   const allRoomIds = [...new Set(args.cells.flatMap((cell) => cell.roomIds))];
-  const unitsResult = await args.supabase
-    .from("rooms")
-    .select(
-      "id, external_room_id, external_price_source_room_id, property_id, preferred_min_stay_room_id",
-    )
-    .eq("organization_id", args.organizationId)
-    .in("id", allRoomIds);
+  const unitsResult = await readAllPages<RoomUnitRow>((from, to) =>
+    args.supabase
+      .from("rooms")
+      .select(
+        "id, external_room_id, external_price_source_room_id, property_id, preferred_min_stay_room_id",
+      )
+      .eq("organization_id", args.organizationId)
+      .in("id", allRoomIds)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (unitsResult.error) return { error: "enqueue_failed", ok: false };
 
   const unitByRoomId = new Map<string, RoomUnitRow>();
-  for (const row of (unitsResult.data ?? []) as RoomUnitRow[]) unitByRoomId.set(row.id, row);
+  for (const row of unitsResult.data) unitByRoomId.set(row.id, row);
 
   // 그 날짜의 minStay 를 알아야 「운영 중인 유닛」을 고를 수 있다.
+  //
+  // **쪽을 나눠 끝까지 읽는다**(2026-10-19). 한 번에 읽으면 1,000행에서 잘려(`read-all-pages.ts`), 1,000칸 넘는 수정은
+  // 뒤쪽 칸의 minStay 가 비어 「운영 중인 유닛 없음」으로 빠지거나 엉뚱한 유닛을 골랐다 — 최소숙박이 일부만 나갔다.
   const stayDates = [...new Set(args.cells.map((cell) => cell.stayDate))];
-  const ratesResult = await args.supabase
-    .from("room_daily_rates")
-    .select("room_id, stay_date, min_stay")
-    .eq("organization_id", args.organizationId)
-    .in("room_id", allRoomIds)
-    .in("stay_date", stayDates);
+  const ratesResult = await readAllPages<{ room_id: string; stay_date: string; min_stay: number | null }>(
+    (from, to) =>
+      args.supabase
+        .from("room_daily_rates")
+        .select("room_id, stay_date, min_stay")
+        .eq("organization_id", args.organizationId)
+        .in("room_id", allRoomIds)
+        .in("stay_date", stayDates)
+        .order("room_id", { ascending: true })
+        .order("stay_date", { ascending: true })
+        .range(from, to),
+  );
   if (ratesResult.error) {
     // 못 읽은 채 진행하면 모든 유닛의 minStay 가 null 이 되어 「운영 중인 유닛」을 잘못 고른다 —
     // 최소숙박이 엉뚱한 유닛에 써진다.
@@ -110,11 +124,7 @@ export async function enqueueBeds24PriceJob(args: {
     return { error: "enqueue_failed", ok: false };
   }
   const minStayByKey = new Map<string, number | null>();
-  for (const row of (ratesResult.data ?? []) as Array<{
-    room_id: string;
-    stay_date: string;
-    min_stay: number | null;
-  }>) {
+  for (const row of ratesResult.data) {
     minStayByKey.set(`${row.room_id}|${row.stay_date}`, row.min_stay);
   }
 

@@ -35,10 +35,15 @@
 import { trimBlockRows } from "@/lib/beds24/block-trim";
 import {
   type BlockRange,
+  type BlockSnapshotRow,
+  buildBlockNightSegments,
   buildBlockSegments,
   buildUnblockSegments,
   diffBlockReadback,
   eachNight,
+  mergeSnapshotNumAvail,
+  planSnapshotTrim,
+  preBlockNumAvailOf,
   validateBlockRange,
 } from "@/lib/beds24/block-write-payload";
 import {
@@ -69,7 +74,11 @@ export type BlockWriteFailure =
   | "verify_mismatch"
   | "readback_truncated"
   | "save_failed_rolled_back"
-  | "save_failed_not_rolled_back";
+  | "save_failed_not_rolled_back"
+  /** 막기 전 재고 기록(스냅샷)을 못 읽었다 — 복원 없이 풀면 재고가 틀어지므로 풀지 않았다. */
+  | "snapshot_read_failed"
+  /** 해제가 확인되지 않았고, 우리 표에 맞춰 차단으로 되돌리지도 못했다 — Beds24 에서 직접 확인해야 한다. */
+  | "unblock_not_restored";
 
 export type BlockWriteResult =
   | { ok: true; nights: number; roomIds: string[] }
@@ -106,19 +115,30 @@ function readCalendarNights(room: CalendarRoomData | undefined): {
 }
 
 async function readNights(args: {
+  supabase: Client;
   externalRoomIds: string[];
   range: BlockRange;
 }): Promise<
   | { ok: true; byRoom: Map<string, { overrides: NightOverrides; numAvail: NightNumAvail }> }
   | { ok: false; reason: BlockWriteFailure; detail?: string }
 > {
-  const fetched = await fetchBeds24Calendar({
-    externalRoomIds: args.externalRoomIds,
-    startDate: args.range.startDate,
-    endDate: args.range.endDate,
-    includeNumAvail: true,
-    includeOverride: true,
-  });
+  let fetched: Awaited<ReturnType<typeof fetchBeds24Calendar>>;
+  try {
+    fetched = await fetchBeds24Calendar({
+      externalRoomIds: args.externalRoomIds,
+      startDate: args.range.startDate,
+      endDate: args.range.endDate,
+      includeNumAvail: true,
+      includeOverride: true,
+    });
+  } catch (error) {
+    // 던지면 쓰기 뒤 되읽기에서 보상 롤백을 건너뛴 채 액션이 터진다 — 실패로 돌려 호출부가 되돌리게 한다(2026-10-19).
+    if (error instanceof Beds24HttpError && error.isRateLimit) {
+      await activateBeds24Cooldown(args.supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+      return { ok: false, reason: "cooldown" };
+    }
+    return { ok: false, reason: "beds24_unavailable", detail: error instanceof Error ? error.message : "unknown" };
+  }
   if ("skipped" in fetched) {
     return { ok: false, reason: "beds24_unavailable", detail: fetched.skipped };
   }
@@ -136,7 +156,11 @@ async function readNights(args: {
 async function postWithCooldownGuard(
   supabase: Client,
   payload: { roomId: number; calendar: unknown[] }[],
-): Promise<{ ok: true; rejected: string[] } | { ok: false; reason: BlockWriteFailure; detail?: string }> {
+): Promise<
+  | { ok: true; rejected: string[] }
+  /** `acceptedRoomIds` — 거절이 섞였을 때 **받아들여진** 방. 그 방은 이미 바뀌었으니 호출부가 되돌린다. */
+  | { ok: false; reason: BlockWriteFailure; detail?: string; acceptedRoomIds?: string[] }
+> {
   try {
     const result = await postBeds24Calendar(payload);
     if ("skipped" in result) {
@@ -145,6 +169,7 @@ async function postWithCooldownGuard(
     const rejected = result.items.filter((item) => !item.accepted);
     if (rejected.length > 0) {
       return {
+        acceptedRoomIds: result.items.filter((item) => item.accepted).map((item) => item.externalRoomId),
         ok: false,
         reason: "beds24_rejected",
         detail: rejected.map((item) => `${item.externalRoomId}:${item.error ?? "?"}`).join(", "),
@@ -200,19 +225,38 @@ export async function createRoomBlock(args: {
   }
 
   // ① 막기 전 상태 — 되돌릴 numAvail 을 여기서 찍는다.
-  const before = await readNights({ externalRoomIds: roomIds, range: args.range });
+  const before = await readNights({ externalRoomIds: roomIds, range: args.range, supabase: args.supabase });
   if (!before.ok) return before;
 
   const payload = buildBlockSegments({ externalRoomIds: roomIds, range: args.range });
   if (payload.length === 0) return { ok: false, reason: "invalid_room_id" };
 
+  // ②~③ 이 실패하면 **우리 표에는 아무것도 안 남는다.** 그런데 Beds24 에 일부라도 들어갔으면 「화면엔 없는데 판매 정지」인
+  // 고아 블록이다 — 그래서 들어갔을 수 있는 방은 막기 전으로 되돌린다(2026-10-19). 되돌리지 못하면 사람이 Beds24 에서
+  // 직접 확인해야 하므로 그렇게 알린다(`save_failed_not_rolled_back`).
+  const undo = async (
+    failure: { reason: BlockWriteFailure; detail?: string },
+    touchedRoomIds: string[],
+  ): Promise<BlockWriteResult> => {
+    if (touchedRoomIds.length === 0) return { ok: false, reason: failure.reason, detail: failure.detail };
+    const rolledBack = await rollbackBlackout({
+      before: before.byRoom,
+      range: args.range,
+      roomIds: touchedRoomIds,
+      supabase: args.supabase,
+    });
+    return rolledBack
+      ? { ok: false, reason: failure.reason, detail: failure.detail }
+      : { ok: false, reason: "save_failed_not_rolled_back", detail: failure.detail ?? failure.reason };
+  };
+
   // ② 쓰기
   const posted = await postWithCooldownGuard(args.supabase, payload);
-  if (!posted.ok) return posted;
+  if (!posted.ok) return undo(posted, posted.acceptedRoomIds ?? []);
 
   // ③ 되읽기 — Beds24 는 아무것도 안 들어가도 success 를 준다.
-  const after = await readNights({ externalRoomIds: roomIds, range: args.range });
-  if (!after.ok) return after;
+  const after = await readNights({ externalRoomIds: roomIds, range: args.range, supabase: args.supabase });
+  if (!after.ok) return undo(after, roomIds);
 
   const mismatched: string[] = [];
   for (const roomId of roomIds) {
@@ -224,23 +268,48 @@ export async function createRoomBlock(args: {
     if (missing.length > 0) mismatched.push(`${roomId}:${missing.length}`);
   }
   if (mismatched.length > 0) {
-    return { ok: false, reason: "verify_mismatch", detail: mismatched.join(", ") };
+    return undo({ detail: mismatched.join(", "), reason: "verify_mismatch" }, roomIds);
   }
 
   // ④ 로컬 저장
+  //
+  // 같은 구간 스냅샷이 이미 있으면(같은 차단을 다시 건 경우) **그 값이 먼저다** — 이번에 읽은 재고는 막힌 동안의 값일 수 있다.
+  // 이미 막혀 있던 밤의 재고도 넣지 않는다(`preBlockNumAvailOf`, 2026-10-19).
   const nowIso = new Date().toISOString();
-  const snapshotRows = roomIds.map((roomId) => ({
-    organization_id: args.organizationId,
-    external_room_id: roomId,
-    start_date: args.range.startDate,
-    end_date: args.range.endDate,
-    pre_block_num_avail: before.byRoom.get(roomId)?.numAvail ?? {},
-    created_by_user_id: args.actorUserId ?? null,
-  }));
-
-  const snapshotSaved = await args.supabase
+  const existing = await args.supabase
     .from("room_block_snapshots")
-    .upsert(snapshotRows, { onConflict: "organization_id,external_room_id,start_date,end_date" });
+    .select("external_room_id, pre_block_num_avail")
+    .eq("organization_id", args.organizationId)
+    .in("external_room_id", roomIds)
+    .eq("start_date", args.range.startDate)
+    .eq("end_date", args.range.endDate);
+  const existingByRoom = new Map<string, Record<string, number>>();
+  for (const row of (existing.data ?? []) as Array<{ external_room_id: string; pre_block_num_avail: unknown }>) {
+    const value = row.pre_block_num_avail;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      existingByRoom.set(row.external_room_id, value as Record<string, number>);
+    }
+  }
+  const snapshotRows = roomIds.map((roomId) => {
+    const read = before.byRoom.get(roomId);
+    return {
+      organization_id: args.organizationId,
+      external_room_id: roomId,
+      start_date: args.range.startDate,
+      end_date: args.range.endDate,
+      pre_block_num_avail: {
+        ...(read ? preBlockNumAvailOf(read) : {}),
+        ...(existingByRoom.get(roomId) ?? {}),
+      },
+      created_by_user_id: args.actorUserId ?? null,
+    };
+  });
+
+  const snapshotSaved = existing.error
+    ? existing
+    : await args.supabase
+        .from("room_block_snapshots")
+        .upsert(snapshotRows, { onConflict: "organization_id,external_room_id,start_date,end_date" });
 
   if (snapshotSaved.error) {
     // ⑤ 보상 롤백 — Beds24 에는 걸렸는데 우리는 되돌릴 값을 잃었다. 그대로 두면 고아 블록이다.
@@ -287,7 +356,11 @@ export async function createRoomBlock(args: {
   return { ok: true, nights: nights.length, roomIds };
 }
 
-/** Beds24 만 되돌린다. 성공 여부를 돌려주되 **던지지 않는다** — 롤백 실패도 보고할 사실이다. */
+/**
+ * Beds24 만 되돌린다. 성공 여부를 돌려주되 **던지지 않는다** — 롤백 실패도 보고할 사실이다.
+ *
+ * **막기 전에 이미 막혀 있던 밤은 풀지 않는다**(2026-10-19) — 다른 차단과 겹친 밤까지 풀면 되돌리기가 남의 차단을 지운다.
+ */
 async function rollbackBlackout(args: {
   supabase: Client;
   roomIds: string[];
@@ -295,16 +368,22 @@ async function rollbackBlackout(args: {
   before: Map<string, { overrides: NightOverrides; numAvail: NightNumAvail }>;
 }): Promise<boolean> {
   try {
+    const nights = eachNight(args.range);
     const payload = args.roomIds
-      .map((roomId) =>
-        buildUnblockSegments({
+      .map((roomId) => {
+        const read = args.before.get(roomId);
+        const wasOpen = nights.filter((night) => read?.overrides.get(night) !== "blackout");
+        if (wasOpen.length === 0) return null;
+        return buildUnblockSegments({
           externalRoomId: roomId,
+          onlyNights: wasOpen,
           range: args.range,
-          preBlockNumAvail: args.before.get(roomId)?.numAvail ?? null,
-        }),
-      )
+          preBlockNumAvail: read?.numAvail ?? null,
+        });
+      })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-    if (payload.length === 0) return false;
+    // 되돌릴 밤이 없다 = 전부 원래 막혀 있었다. Beds24 는 막기 전 그대로다.
+    if (payload.length === 0) return true;
     const result = await postBeds24Calendar(payload);
     return !("skipped" in result) && result.items.every((item) => item.accepted);
   } catch {
@@ -339,24 +418,19 @@ export async function clearRoomBlock(args: {
     return { ok: false, reason: "cooldown", detail: `${cooldown.remainingSec}s` };
   }
 
+  // 이 구간과 **겹치는** 스냅샷 전부(2026-10-19) — 일부만 풀거나 여러 구간으로 나눠 풀어도 밤마다 막기 전 재고를 찾는다
+  // (`mergeSnapshotNumAvail`). 전에는 시작일 · 종료일이 똑같은 것만 찾아, 일부 해제는 재고를 복원하지 않았다.
+  // 못 읽었으면 **풀지 않는다** — 복원 없이 풀면 막을 때 줄어든 재고가 남아 방이 안 팔릴 수 있다.
   const snapshots = await args.supabase
     .from("room_block_snapshots")
-    .select("external_room_id, pre_block_num_avail")
+    .select("id, external_room_id, start_date, end_date, created_at, pre_block_num_avail")
     .eq("organization_id", args.organizationId)
     .in("external_room_id", roomIds)
-    .eq("start_date", args.range.startDate)
-    .eq("end_date", args.range.endDate);
-
-  const restoreByRoom = new Map<string, Record<string, number>>();
-  for (const row of (snapshots.data ?? []) as Array<{
-    external_room_id: string;
-    pre_block_num_avail: unknown;
-  }>) {
-    const value = row.pre_block_num_avail;
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      restoreByRoom.set(row.external_room_id, value as Record<string, number>);
-    }
-  }
+    .lte("start_date", args.range.endDate)
+    .gte("end_date", args.range.startDate);
+  if (snapshots.error) return { ok: false, reason: "snapshot_read_failed", detail: snapshots.error.message };
+  const snapshotRows = (snapshots.data ?? []) as BlockSnapshotRow[];
+  const restoreByRoom = mergeSnapshotNumAvail(snapshotRows, args.range);
 
   const payload = roomIds
     .map((roomId) =>
@@ -369,34 +443,64 @@ export async function clearRoomBlock(args: {
     .filter((item): item is NonNullable<typeof item> => item !== null);
   if (payload.length === 0) return { ok: false, reason: "invalid_room_id" };
 
-  const posted = await postWithCooldownGuard(args.supabase, payload);
-  if (!posted.ok) return posted;
-
   const nights = eachNight(args.range);
-  const after = await readNights({ externalRoomIds: roomIds, range: args.range });
-  if (!after.ok) return after;
+
+  // 해제가 확인되지 않으면 **우리 표는 「막힘」 그대로**다(스냅샷 · room_blocks · 요금 표 모두 손대지 않는다). 그런데 Beds24 에서
+  // 일부라도 풀렸으면 「화면엔 막힘, 실제로는 판매 중」이 된다 — 그래서 풀렸을 수 있는 밤을 다시 막아 둘을 맞춘다(2026-10-19).
+  // 다시 막지도 못하면 상태를 모르므로 사람에게 Beds24 확인을 요청한다(`unblock_not_restored`).
+  const reblock = async (
+    failure: { reason: BlockWriteFailure; detail?: string },
+    nightsByRoom: Map<string, string[]>,
+  ): Promise<BlockWriteResult> => {
+    const reblockPayload = [...nightsByRoom]
+      .map(([roomId, list]) => buildBlockNightSegments({ externalRoomId: roomId, nights: list }))
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+    if (reblockPayload.length === 0) return { ok: false, reason: failure.reason, detail: failure.detail };
+    try {
+      const result = await postBeds24Calendar(reblockPayload);
+      if (!("skipped" in result) && result.items.every((item) => item.accepted)) {
+        return { ok: false, reason: failure.reason, detail: failure.detail };
+      }
+    } catch {
+      // 아래에서 알린다.
+    }
+    return { ok: false, reason: "unblock_not_restored", detail: failure.detail ?? failure.reason };
+  };
+  const allNights = (ids: readonly string[]) => new Map(ids.map((roomId) => [roomId, nights]));
+
+  const posted = await postWithCooldownGuard(args.supabase, payload);
+  if (!posted.ok) return reblock(posted, allNights(posted.acceptedRoomIds ?? []));
+
+  const after = await readNights({ externalRoomIds: roomIds, range: args.range, supabase: args.supabase });
+  if (!after.ok) return reblock(after, allNights(roomIds));
 
   const stillBlocked: string[] = [];
+  const cleared = new Map<string, string[]>();
   for (const roomId of roomIds) {
-    const remaining = diffBlockReadback({
-      nights,
-      actual: after.byRoom.get(roomId)?.overrides ?? new Map(),
-      expect: "cleared",
-    });
+    const actual = after.byRoom.get(roomId)?.overrides ?? new Map<string, string | null>();
+    const remaining = diffBlockReadback({ nights, actual, expect: "cleared" });
     if (remaining.length > 0) stillBlocked.push(`${roomId}:${remaining.length}`);
+    const blockedSet = new Set(remaining);
+    cleared.set(roomId, nights.filter((night) => !blockedSet.has(night)));
   }
   if (stillBlocked.length > 0) {
-    return { ok: false, reason: "verify_mismatch", detail: stillBlocked.join(", ") };
+    return reblock({ detail: stillBlocked.join(", "), reason: "verify_mismatch" }, cleared);
   }
 
-  // 풀렸으면 스냅샷은 쓸모가 없다. 남겨두면 다음에 같은 구간을 막을 때 **옛 재고**를 복원한다.
-  await args.supabase
-    .from("room_block_snapshots")
-    .delete()
-    .eq("organization_id", args.organizationId)
-    .in("external_room_id", roomIds)
-    .eq("start_date", args.range.startDate)
-    .eq("end_date", args.range.endDate);
+  // 풀렸으면 **푼 밤의** 스냅샷은 쓸모가 없다. 남겨두면 다음에 같은 밤을 막을 때 **옛 재고**를 복원한다. 구간 앞 · 뒤에 남는
+  // 밤은 그 밤의 재고만 들고 남긴다 — 나머지를 풀 때 복원할 값이다(`planSnapshotTrim`).
+  const snapshotTrim = planSnapshotTrim(snapshotRows, args.range);
+  if (snapshotTrim.deleteIds.length > 0) {
+    const removed = await args.supabase.from("room_block_snapshots").delete().in("id", snapshotTrim.deleteIds);
+    if (removed.error) console.error("[beds24/block] snapshot trim delete failed", removed.error.message);
+    else if (snapshotTrim.keep.length > 0) {
+      const kept = await args.supabase.from("room_block_snapshots").upsert(
+        snapshotTrim.keep.map((row) => ({ ...row, organization_id: args.organizationId })),
+        { onConflict: "organization_id,external_room_id,start_date,end_date" },
+      );
+      if (kept.error) console.error("[beds24/block] snapshot trim keep failed", kept.error.message);
+    }
+  }
 
   // `room_blocks` 에서 **푼 밤만 잘라 낸다 — 그 방의 유닛 전부**(`trimBlockRows`, 2026-10-06). 전에는 시작일이 같고 첫 유닛
   // 이름인 줄만 지워, 구간 일부 해제 · 두 번째 유닛 줄이 남아 수기 예약 겹침 검사가 푼 밤을 막았다.

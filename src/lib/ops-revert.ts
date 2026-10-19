@@ -11,6 +11,8 @@
  * - 차단(`blackout`)은 1 = 막힘 · 0 = 열림. 지금 값도 같은 0/1 로 넘긴다.
  * - 같은 (유닛, 날짜)가 여러 번 나오면 첫 줄만 쓴다.
  */
+import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
+
 export type RevertField = "price1" | "min_stay" | "blackout";
 
 export type RevertLog = {
@@ -51,4 +53,34 @@ export function planRevertCells(args: {
     cells.push({ roomId: log.room_id, roomLabel: log.room_label, stayDate: log.stay_date, value: log.old_value });
   }
   return { cells, skippedChanged };
+}
+
+/**
+ * 차단 되돌리기 칸을 **구간 상한(`runBlockChange` 의 60)** 안으로 나눈다 — 큰 묶음(1,000칸 넘는 Beds24 변경 등)이 한 번에
+ * 넘어가면 상한에 걸려 통째로 거절됐다(2026-10-19). 구간은 차단 쓰기와 같은 규칙으로 센다(`groupSelectionIntoRanges`).
+ * 한 구간은 쪼개지 않는다.
+ */
+export function chunkCellsByRanges<T extends { roomKey: string; date: string }>(
+  cells: readonly T[],
+  maxRanges: number,
+): T[][] {
+  const byRoom = new Map<string, T[]>();
+  for (const cell of cells) {
+    const list = byRoom.get(cell.roomKey);
+    if (list) list.push(cell);
+    else byRoom.set(cell.roomKey, [cell]);
+  }
+  const ranges = groupSelectionIntoRanges(cells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })));
+  const size = Math.max(1, maxRanges);
+  const chunks: T[][] = [];
+  for (let index = 0; index < ranges.length; index += size) {
+    const chunk: T[] = [];
+    for (const range of ranges.slice(index, index + size)) {
+      for (const cell of byRoom.get(range.roomKey) ?? []) {
+        if (cell.date >= range.startDate && cell.date <= range.endDate) chunk.push(cell);
+      }
+    }
+    chunks.push(chunk);
+  }
+  return chunks;
 }

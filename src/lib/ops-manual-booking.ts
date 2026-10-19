@@ -210,3 +210,49 @@ export function readBeds24CancelTargetId(rawPayload: unknown): string | null {
   }
   return null;
 }
+
+/**
+ * 같은 방(격자 한 행)의 수기 예약을 **한 번에 하나만** 만들게 하는 잠금 이름(2026-10-19) — `beds24_try_lock`
+ * (`sync-locks.ts`) 으로 잡는다. 기간이 아니라 **방 단위**다: 10/1~10/3 과 10/2~10/4 처럼 겹치는 두 요청도 같은 잠금을 다툰다.
+ * Beds24 는 수기 예약의 겹침을 막아 주지 않아, 두 사람이 동시에 누르면 둘 다 만들어졌다.
+ */
+export function manualBookingLockName(organizationId: string, roomKey: string): string {
+  return `manual_booking:${organizationId}:${roomKey}`;
+}
+
+/**
+ * Beds24 달력(되읽기)에서 **팔 수 없는 밤** — 재고 0 또는 차단(2026-10-19). 우리 표는 웹훅 · 동기화를 거친 값이라 방금 들어온
+ * 채널 예약이나 방금 만든 수기 예약(API 로 만든 예약은 웹훅이 안 온다)을 모를 수 있다 — 만들기 직전에 Beds24 를 한 번 더 본다.
+ * 갭 감지와 같은 기준이다(`numAvail <= 0` = 막힘, `ops-gap-detection.ts`). 값이 없는 밤은 판단하지 않는다.
+ */
+export function beds24UnsellableNights(
+  calendar: ReadonlyArray<Record<string, unknown>>,
+  nights: readonly string[],
+): string[] {
+  const blocked = new Set<string>();
+  for (const entry of calendar) {
+    const from = typeof entry.from === "string" ? entry.from : null;
+    const to = typeof entry.to === "string" ? entry.to : from;
+    if (!from || !to) continue;
+    const soldOut = typeof entry.numAvail === "number" && entry.numAvail <= 0;
+    const blackout = entry.override === "blackout";
+    if (!soldOut && !blackout) continue;
+    for (const night of nights) if (night >= from && night <= to) blocked.add(night);
+  }
+  return nights.filter((night) => blocked.has(night));
+}
+
+/**
+ * 예약 생성 호출이 던졌을 때 — **안 만들어진 게 확실한가**(2026-10-19).
+ *
+ * - `not_created` — Beds24 가 4xx 로 거절했다(429 포함). 요청 키를 놓아 다시 시도하게 한다.
+ * - `unknown` — 시간 초과 · 연결 끊김 · 5xx · 응답 해석 실패. 요청은 이미 갔을 수 있다. 키를 놓으면 다시 눌러 **두 번 만든다**
+ *   — 키를 붙잡아 두고 사람에게 Beds24 에서 확인하라고 한다.
+ */
+export function classifyBookingCreateError(error: unknown): "not_created" | "unknown" {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = Number((error as { status: unknown }).status);
+    if (Number.isInteger(status) && status >= 400 && status < 500) return "not_created";
+  }
+  return "unknown";
+}

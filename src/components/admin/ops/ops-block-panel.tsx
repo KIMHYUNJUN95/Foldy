@@ -88,6 +88,10 @@ export type BlockPanelCopy = {
   errBkNotRolledBack: string;
   errBkUnknownRoom: string;
   errBkPastDate: string;
+  errBkSnapshotRead: string;
+  errBkNotRestored: string;
+  /** 반영 안 된 구간 목록. `{ranges}` = 「302 10/26 → 10/29, …」. */
+  bkUnapplied: string;
 };
 
 export function blockErrorText(copy: BlockPanelCopy, error: BlockChangeError): string {
@@ -114,6 +118,11 @@ export function blockErrorText(copy: BlockPanelCopy, error: BlockChangeError): s
       return copy.errBkNotRolledBack;
     case "past_date":
       return copy.errBkPastDate;
+    case "snapshot_read_failed":
+      return copy.errBkSnapshotRead;
+    // 해제가 일부만 됐을 수 있고 되돌리지도 못했다 — 사람이 Beds24 에서 확인해야 한다.
+    case "unblock_not_restored":
+      return copy.errBkNotRestored;
     default:
       return copy.errBkUnknownRoom;
   }
@@ -174,13 +183,25 @@ export function OpsBlockPanel({
         return;
       }
       // 앞 구간이 이미 반영됐으면 그렇다고 말한다 — 「실패」만 보면 전부 안 된 줄 알고 다시 누른다.
-      setMessage(
-        result.appliedRanges
-          ? copy.bkPartialFailed
-              .replace("{done}", String(result.appliedRanges))
-              .replace("{error}", blockErrorText(copy, result.error))
-          : copy.bkFailed.replace("{error}", blockErrorText(copy, result.error)),
-      );
+      // 반영 안 된 구간(실패 + 손대지 않은 뒤 구간)은 방 · 날짜로 적는다 — 무엇을 다시 골라야 하는지 보이게(2026-10-19).
+      const failed = result.appliedRanges
+        ? copy.bkPartialFailed
+            .replace("{done}", String(result.appliedRanges))
+            .replace("{error}", blockErrorText(copy, result.error))
+        : copy.bkFailed.replace("{error}", blockErrorText(copy, result.error));
+      const unapplied =
+        result.appliedRanges && result.unappliedRanges?.length
+          ? copy.bkUnapplied.replace(
+              "{ranges}",
+              result.unappliedRanges
+                .map(
+                  (range) =>
+                    `${range.roomLabel} ${spwDate(range.startDate, copy.localeTag)} → ${spwDate(nextDay(range.endDate), copy.localeTag)}`,
+                )
+                .join(", "),
+            )
+          : null;
+      setMessage(unapplied ? `${failed} ${unapplied}` : failed);
     });
   };
 

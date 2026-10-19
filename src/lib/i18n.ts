@@ -1604,6 +1604,9 @@ const FALLBACK_DICTIONARY = {
       mbErrBeds24: "Beds24 rejected the request. Nothing was created.",
       mbErrCooldown: "Beds24 credits are cooling down. Try again shortly.",
       mbErrDuplicate: "This booking is already being created. Check the calendar in a moment.",
+      mbErrRoomBusy: "Another booking is being created for this room right now. Try again in a moment.",
+      mbErrUnconfirmed:
+        "Beds24 did not answer in time, so we could not confirm whether the booking was created. Check Beds24 before trying again.",
       mbErrOccupied: "{dates} already has a reservation.",
       mbErrNightsTaken: "{dates} cannot be booked (reserved or not on sale).",
       mbAvailHint: "Greyed-out dates are booked, blocked, or not on sale.",
@@ -1638,6 +1641,10 @@ const FALLBACK_DICTIONARY = {
         "Saving failed AND the rollback failed. The room may still be blocked in Beds24 - please check there.",
       errBkUnknownRoom: "That room could not be resolved.",
       errBkPastDate: "Past nights can't be blocked — pick from today onward.",
+      errBkSnapshotRead: "Could not read the pre-block availability record, so nothing was released. Try again shortly.",
+      errBkNotRestored:
+        "The release could not be confirmed and the block could not be put back either. Check this range in Beds24 directly.",
+      bkUnapplied: "Not applied: {ranges}",
       gapSelectAll: "Select all 1-night gaps",
       msGapCount: "cells with a 1-night gap",
       msGapBody:
@@ -9443,6 +9450,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       mbErrBeds24: "Beds24 가 요청을 거부했습니다. 아무것도 만들어지지 않았습니다.",
       mbErrCooldown: "Beds24 크레딧이 쉬는 중입니다. 잠시 후 다시 시도하세요.",
       mbErrDuplicate: "이 예약은 이미 만드는 중입니다. 잠시 후 캘린더를 확인해 주세요.",
+      mbErrRoomBusy: "이 방에 다른 예약을 만드는 중입니다. 잠시 후 다시 시도해 주세요.",
+      mbErrUnconfirmed: "Beds24 응답이 늦어 예약이 만들어졌는지 확인하지 못했습니다. 다시 누르기 전에 Beds24 에서 확인해 주세요.",
       mbErrOccupied: "{dates} 에 이미 예약이 있습니다.",
       mbErrNightsTaken: "{dates} 는 예약할 수 없는 날입니다 (예약 있음 · 판매 중지).",
       mbAvailHint: "회색 날짜는 예약·차단이 있거나 판매하지 않는 날입니다.",
@@ -9477,6 +9486,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         "저장도 실패하고 되돌리기도 실패했습니다. Beds24 에 차단이 남아 있을 수 있으니 직접 확인해 주세요.",
       errBkUnknownRoom: "그 객실을 찾지 못했습니다.",
       errBkPastDate: "지난 날짜는 차단할 수 없습니다 — 오늘부터 골라 주세요.",
+      errBkSnapshotRead: "차단 전 재고 기록을 읽지 못해 풀지 않았습니다. 잠시 후 다시 시도해 주세요.",
+      errBkNotRestored: "해제를 확인하지 못했고 차단 상태로 되돌리지도 못했습니다. Beds24 에서 이 구간을 직접 확인해 주세요.",
+      bkUnapplied: "반영 안 된 구간: {ranges}",
       gapSelectAll: "1박 갭 자동 선택",
       msGapCount: "칸의 1박 갭",
       msGapBody:
@@ -17122,6 +17134,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       mbErrBeds24: "Beds24 がリクエストを拒否しました。何も作成されていません。",
       mbErrCooldown: "Beds24 のクレジットが回復待ちです。しばらくしてから再試行してください。",
       mbErrDuplicate: "この予約はすでに作成中です。しばらくしてからカレンダーを確認してください。",
+      mbErrRoomBusy: "この部屋で別の予約を作成中です。少し待ってからもう一度お試しください。",
+      mbErrUnconfirmed: "Beds24 の応答が遅く、予約が作成されたか確認できませんでした。もう一度押す前に Beds24 で確認してください。",
       mbErrOccupied: "{dates} は既に予約があります。",
       mbErrNightsTaken: "{dates} は予約できない日です（予約あり・販売停止）。",
       mbAvailHint: "グレーの日付は予約・ブロック済み、または販売していない日です。",
@@ -17156,6 +17170,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         "保存も巻き戻しも失敗しました。Beds24 にブロックが残っている可能性があるため直接ご確認ください。",
       errBkUnknownRoom: "その客室を特定できませんでした。",
       errBkPastDate: "過去の日付はブロックできません — 今日以降を選んでください。",
+      errBkSnapshotRead: "ブロック前の在庫記録を読み込めなかったため、解除していません。少し待ってからもう一度お試しください。",
+      errBkNotRestored: "解除を確認できず、ブロック状態にも戻せませんでした。Beds24 でこの区間を直接確認してください。",
+      bkUnapplied: "未反映の区間: {ranges}",
       gapSelectAll: "1泊ギャップを一括選択",
       msGapCount: "セルの1泊ギャップ",
       msGapBody:

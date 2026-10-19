@@ -106,11 +106,16 @@ export function buildUnblockSegments(args: {
   externalRoomId: string;
   range: BlockRange;
   preBlockNumAvail?: Record<string, number> | null;
+  /** 이 밤들만 푼다(구간 안). 보상 롤백이 **원래 막혀 있지 않던 밤**만 되돌릴 때 쓴다. 없으면 구간 전부. */
+  onlyNights?: readonly string[];
 }): Beds24RoomCalendarPayload | null {
   const numeric = Number(String(args.externalRoomId ?? "").trim());
   if (!Number.isInteger(numeric) || numeric <= 0) return null;
 
-  const perNight: CalendarSegment[] = eachNight(args.range).map((night) => {
+  const only = args.onlyNights ? new Set(args.onlyNights) : null;
+  const nights = eachNight(args.range).filter((night) => !only || only.has(night));
+  if (nights.length === 0) return null;
+  const perNight: CalendarSegment[] = nights.map((night) => {
     const restored = args.preBlockNumAvail?.[night];
     const segment: CalendarSegment = { from: night, to: night, override: "none" };
     if (typeof restored === "number" && Number.isInteger(restored) && restored >= 0) {
@@ -142,4 +147,132 @@ export function diffBlockReadback(args: {
     if (args.expect === "blackout" ? !isBlackout : isBlackout) mismatched.push(night);
   }
   return mismatched;
+}
+
+/**
+ * 특정 밤들만 다시 막는 페이로드 — 해제가 일부만 들어갔을 때 **풀린 밤을 차단으로 되돌린다**(2026-10-19).
+ * 우리 표는 아직 그 구간을 「막힘」으로 들고 있으므로, Beds24 를 그쪽에 맞춰야 둘이 어긋나지 않는다.
+ */
+export function buildBlockNightSegments(args: {
+  externalRoomId: string;
+  nights: readonly string[];
+}): Beds24RoomCalendarPayload | null {
+  const numeric = Number(String(args.externalRoomId ?? "").trim());
+  if (!Number.isInteger(numeric) || numeric <= 0 || args.nights.length === 0) return null;
+  return {
+    calendar: consolidateCalendarRanges(
+      [...new Set(args.nights)].map((night) => ({ from: night, override: "blackout", to: night })),
+    ),
+    roomId: numeric,
+  };
+}
+
+/**
+ * 막기 전 스냅샷에 넣을 재고 — **이미 막혀 있던 밤은 뺀다**(2026-10-19). 막힌 동안 읽은 재고는 「막기 전 재고」가 아니라,
+ * 겹쳐 건 차단을 풀 때 그 값을 복원하면 재고가 막힌 상태 값으로 고정된다.
+ */
+export function preBlockNumAvailOf(args: {
+  overrides: ReadonlyMap<string, string | null>;
+  numAvail: Readonly<Record<string, number>>;
+}): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [night, value] of Object.entries(args.numAvail)) {
+    if (args.overrides.get(night) === "blackout") continue;
+    result[night] = value;
+  }
+  return result;
+}
+
+export type BlockSnapshotRow = {
+  id: string;
+  external_room_id: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  pre_block_num_avail: unknown;
+};
+
+function readNumAvailMap(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, number> = {};
+  for (const [night, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 0) result[night] = raw;
+  }
+  return result;
+}
+
+/**
+ * 해제할 구간과 **겹치는** 스냅샷들 → 방별 · 밤별 복원 재고(2026-10-19).
+ *
+ * 전에는 시작일 · 종료일이 **똑같은** 스냅샷만 찾았다. 그래서 10/1~10/5 차단에서 10/2~10/3 만 풀거나, 끊긴 날짜가 여러
+ * 구간으로 나뉘어 풀리면 스냅샷을 못 찾아 재고를 복원하지 않았다 — 막을 때 Beds24 가 줄인 재고가 그대로 남아 방이 안 팔릴
+ * 수 있었다. 이제 밤 단위로 맞춘다. 같은 밤이 여러 스냅샷에 있으면 **먼저 만든 것**(막기 전에 더 가까운 값)을 쓴다.
+ */
+export function mergeSnapshotNumAvail(
+  rows: readonly BlockSnapshotRow[],
+  range: BlockRange,
+): Map<string, Record<string, number>> {
+  const sorted = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  const byRoom = new Map<string, Record<string, number>>();
+  for (const row of sorted) {
+    const values = readNumAvailMap(row.pre_block_num_avail);
+    const target = byRoom.get(row.external_room_id) ?? {};
+    for (const [night, value] of Object.entries(values)) {
+      if (night < range.startDate || night > range.endDate) continue;
+      if (night < row.start_date || night > row.end_date) continue;
+      if (night in target) continue;
+      target[night] = value;
+    }
+    byRoom.set(row.external_room_id, target);
+  }
+  return byRoom;
+}
+
+function shiftDate(date: string, days: number): string {
+  const at = new Date(`${date}T12:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+}
+
+/**
+ * 해제가 끝난 뒤 스냅샷에서 **푼 밤만 잘라 낸다**(`room_blocks` 의 `trimBlockRows` 와 같은 규칙, 2026-10-19).
+ * 겹친 줄은 지우고, 구간 앞 · 뒤에 남는 밤이 있으면 그 밤의 재고만 들고 새 줄로 남긴다 — 나머지 밤을 나중에 풀 때 복원할 값이다.
+ */
+export function planSnapshotTrim(
+  rows: readonly BlockSnapshotRow[],
+  range: BlockRange,
+): {
+  deleteIds: string[];
+  keep: Array<{
+    external_room_id: string;
+    start_date: string;
+    end_date: string;
+    created_at: string;
+    pre_block_num_avail: Record<string, number>;
+  }>;
+} {
+  const deleteIds: string[] = [];
+  const keep: ReturnType<typeof planSnapshotTrim>["keep"] = [];
+  for (const row of rows) {
+    if (row.end_date < range.startDate || row.start_date > range.endDate) continue;
+    deleteIds.push(row.id);
+    const values = readNumAvailMap(row.pre_block_num_avail);
+    const pieces: Array<{ start: string; end: string }> = [];
+    if (row.start_date < range.startDate) pieces.push({ end: shiftDate(range.startDate, -1), start: row.start_date });
+    if (row.end_date > range.endDate) pieces.push({ end: row.end_date, start: shiftDate(range.endDate, 1) });
+    for (const piece of pieces) {
+      const kept: Record<string, number> = {};
+      for (const [night, value] of Object.entries(values)) {
+        if (night >= piece.start && night <= piece.end) kept[night] = value;
+      }
+      keep.push({
+        created_at: row.created_at,
+        end_date: piece.end,
+        external_room_id: row.external_room_id,
+        pre_block_num_avail: kept,
+        start_date: piece.start,
+      });
+    }
+  }
+  return { deleteIds, keep };
 }

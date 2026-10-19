@@ -98,6 +98,9 @@ export type BookingPanelCopy = {
   mbErrBeds24: string;
   mbErrCooldown: string;
   mbErrDuplicate: string;
+  mbErrRoomBusy: string;
+  /** 만들어졌는지 모른다 — Beds24 에서 확인하라고 한다. 그냥 다시 누르면 두 번 생길 수 있다. */
+  mbErrUnconfirmed: string;
   mbErrOccupied: string;
   /** 패널 안에서 쓴다 — 예약·블록뿐 아니라 판매 중지 밤도 포함하므로 문구가 더 넓다. */
   mbErrNightsTaken: string;
@@ -153,6 +156,10 @@ export function bookingErrorText(copy: BookingPanelCopy, result: Extract<ManualB
       return copy.mbErrCooldown;
     case "duplicate_request":
       return copy.mbErrDuplicate;
+    case "room_busy":
+      return copy.mbErrRoomBusy;
+    case "unconfirmed":
+      return copy.mbErrUnconfirmed;
     default:
       return copy.mbErrBeds24;
   }

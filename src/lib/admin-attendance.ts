@@ -6,12 +6,8 @@ import {
   isAttendancePayrollAdmin,
   type ReviewQueueItem,
 } from "@/lib/attendance-review";
-import { getMonthlyPayView } from "@/lib/attendance-pay";
-import {
-  getCurrentFinalizedSnapshot,
-  getFinalizationEligibility,
-  type FinalizationBlockers,
-} from "@/lib/attendance-finalization";
+import type { AllowanceType } from "@/lib/attendance-pay";
+import type { FinalizationBlockers, FinalizationEligibility } from "@/lib/attendance-finalization";
 import {
   getTransportReport,
   getTransportItems,
@@ -30,7 +26,20 @@ import type {
   AttendanceSessionRow,
 } from "@/lib/attendance";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { breakSecondsBySession, type BreakInterval } from "@/lib/attendance-pay-calculation";
+import {
+  allowanceCalculatedExact,
+  breakSecondsBySession,
+  dailyGrossExact,
+  paidSecondsForSession,
+  resolveEffective,
+  roundToNearest10,
+  type BreakInterval,
+} from "@/lib/attendance-pay-calculation";
+import { resolveLocale } from "@/lib/i18n";
+import { readAllPages } from "@/lib/supabase/read-all-pages";
+import { chunk } from "@/lib/utils";
+
+type Service = ReturnType<typeof getSupabaseServiceClient>;
 
 const TZ = "Asia/Tokyo";
 
@@ -292,26 +301,36 @@ export async function getAdminAttendanceOverview(
 
   let review: ReviewQueueItem[] = [];
   let corrections: AdminCorrectionRow[] = [];
+  let corrOpenCount = 0;
   let payrollKpi = EMPTY_PAYROLL_KPI;
   let transportKpi = EMPTY_TRANSPORT_KPI;
   // Scope the review queue to the selected month so the overview reflects that month's data.
   const monthFrom = `${ym}-01`;
   const monthTo = lastDayOfYm(ym);
+  const organizationId = session.organization.id;
 
-  const [reviewResult, correctionsResult, payrollResult, transportResult] =
+  // 요약 숫자에 필요한 것만 읽는다(2026-10-19): 검토 큐는 review_required 세션만, 정정은 건수 + 앞 5건,
+  // 교통비는 신청서 요약만. 전에는 그 달 세션 전부 · 정정 200건 상세 · 교통비 표 전체를 만들었다.
+  const [reviewResult, correctionsResult, corrCountResult, payrollResult, transportResult] =
     await Promise.allSettled([
       getAttendanceReviewQueue(
-        session.organization.id,
+        organizationId,
         {
+          filter: "review_required",
           limit: 5000,
           from: monthFrom,
           to: monthTo,
         },
         localeTag,
       ),
-      getAdminAttendanceCorrections(session, localeTag),
+      getAdminAttendanceCorrections(session, localeTag, OVERVIEW_SAMPLE_SIZE),
+      service
+        .from("attendance_correction_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .in("status", ["requested", "in_review"]),
       getAdminAttendancePayroll(session, ym, localeTag),
-      getAdminAttendanceTransport(session, ym, localeTag),
+      getTransportReportSummaryForAdmin(service, organizationId, monthFrom),
     ]);
 
   if (reviewResult.status === "fulfilled") {
@@ -324,13 +343,19 @@ export async function getAdminAttendanceOverview(
   } else {
     console.warn("[admin-attendance] corrections overview failed", correctionsResult.reason);
   }
+  if (corrCountResult.status === "fulfilled") {
+    // 정정 탭(`getAdminAttendanceCorrections`)이 최대 200건을 보여 주므로 같은 상한을 둔다.
+    corrOpenCount = Math.min(corrCountResult.value.count ?? 0, CORRECTION_LIST_LIMIT);
+  } else {
+    console.warn("[admin-attendance] corrections count failed", corrCountResult.reason);
+  }
   if (payrollResult.status === "fulfilled") {
     payrollKpi = payrollResult.value.kpi;
   } else {
     console.warn("[admin-attendance] payroll overview failed", payrollResult.reason);
   }
   if (transportResult.status === "fulfilled") {
-    transportKpi = transportResult.value.kpi;
+    transportKpi = transportKpiOf(transportResult.value);
   } else {
     console.warn("[admin-attendance] transport overview failed", transportResult.reason);
   }
@@ -358,7 +383,7 @@ export async function getAdminAttendanceOverview(
     kpi: {
       reviewSessions: reviewRequiredRows.length,
       urgent,
-      corrOpen: correctionOpenRows.length,
+      corrOpen: corrOpenCount,
       payEstimated: payrollKpi.hourlyTarget,
       payTotal: payrollKpi.expectedTotal,
       payExcluded: payrollKpi.excludedTotal,
@@ -366,8 +391,8 @@ export async function getAdminAttendanceOverview(
       trTotal: transportKpi.submittedTotal,
       trMissing: transportKpi.missingEvidence,
     },
-    reviewSample: reviewRequiredRows.slice(0, 5),
-    correctionSample: correctionOpenRows.slice(0, 5),
+    reviewSample: reviewRequiredRows.slice(0, OVERVIEW_SAMPLE_SIZE),
+    correctionSample: correctionOpenRows.slice(0, OVERVIEW_SAMPLE_SIZE),
   };
 }
 
@@ -429,6 +454,9 @@ export type AdminAttendanceCorrectionsData = {
   items: AdminCorrectionRow[];
 };
 
+const CORRECTION_LIST_LIMIT = 200;
+const OVERVIEW_SAMPLE_SIZE = 5;
+
 function pickPrimaryField(row: AttendanceCorrectionRequestRow): AdminCorrectionField {
   if (row.desired_clock_in_at != null) return "clock_in";
   if (row.desired_clock_out_at != null) return "clock_out";
@@ -439,6 +467,7 @@ function pickPrimaryField(row: AttendanceCorrectionRequestRow): AdminCorrectionF
 export async function getAdminAttendanceCorrections(
   session: AppSession,
   localeTag: string,
+  limit: number = CORRECTION_LIST_LIMIT,
 ): Promise<AdminAttendanceCorrectionsData> {
   const monthLabel = tokyoMonthLabel(localeTag);
   if (session.organization.id === "platform") {
@@ -460,7 +489,7 @@ export async function getAdminAttendanceCorrections(
     .eq("organization_id", session.organization.id)
     .in("status", ["requested", "in_review"])
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(limit);
   const requests = (requestsRes.data ?? []) as AttendanceCorrectionRequestRow[];
   if (requests.length === 0) {
     return { isPrivileged: true, monthLabel, items: [] };
@@ -606,8 +635,9 @@ export async function getAdminAttendanceCorrections(
 /**
  * Slice 4 — admin payroll review for the `/admin/attendance/payroll` page.
  *
- * Fans out the existing `getMonthlyPayView` + `getFinalizationEligibility` per
- * active org member, then aggregates KPI totals. Honest empty defaults when the
+ * Reads the month's sessions · breaks · rates · snapshots once per org and computes each member with
+ * `computePayrollMonth` (same rules as `getMonthlyPayView` + `getFinalizationEligibility`), then
+ * aggregates KPI totals. Honest empty defaults when the
  * caller is not an attendance-payroll admin or the org has no members. No new
  * schema, no new server actions.
  */
@@ -696,6 +726,469 @@ export function currentTokyoYm(): string {
   return `${y}-${m}`;
 }
 
+// ── 급여 한 달치 — 조직 단위로 한 번에 읽고 사람별로 계산 ──────────────────────────
+// 급여 화면은 직원마다 `getMonthlyPayView` · `getFinalizationEligibility` · `getCurrentFinalizedSnapshot` 를 불러
+// 직원 11명이면 약 140쿼리였다(2026-10-19). 같은 행을 조직 단위로 한 번 읽고 아래에서 사람별로 나눠 계산한다.
+// **계산 규칙은 `getMonthlyPayView`(src/lib/attendance-pay.ts) · `getFinalizationEligibility` 와 같아야 한다** —
+// 한쪽을 바꾸면 다른 쪽도 바꾼다. `src/lib/__tests__/admin-payroll-batch.test.ts` 가 같은 입력으로 두 길의 결과를
+// 1엔 단위까지 비교한다.
+
+const PAYROLL_SESSION_SELECT =
+  "id, user_id, operating_date, clock_in_at, clock_out_at, status, review_state, clock_in_site_id, clock_out_site_id" as const;
+
+type PayrollSessionRow = {
+  id: string;
+  user_id: string;
+  operating_date: string;
+  clock_in_at: string | null;
+  clock_out_at: string | null;
+  status: string;
+  review_state: string;
+  clock_in_site_id: string | null;
+  clock_out_site_id: string | null;
+};
+
+type PayrollRateRow = {
+  user_id: string;
+  hourly_rate: number;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+type PayrollEmploymentRow = {
+  user_id: string;
+  employment_type: string;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+type PayrollAllowanceRow = {
+  id: string;
+  target_date: string;
+  target_user_id: string | null;
+  allowance_type: string;
+  amount_yen: number;
+  category: string;
+  memo: string | null;
+};
+
+type PayrollSnapshotRow = {
+  user_id: string;
+  status: string;
+  gross_amount: number;
+  total_paid_minutes: number;
+  finalized_at: string | null;
+};
+
+type PayrollCorrectionRow = {
+  session_id: string | null;
+  requested_by_user_id: string;
+  status: string;
+  created_at: string;
+};
+
+/** 세션과 무관한 한 달치 행 — 1단계(모두 동시에). */
+type PayrollMonthBase = {
+  /** operating_date ↑, clock_in_at ↑(NULL 마지막) — `getMonthlyPayView` 와 같은 순서. */
+  sessions: PayrollSessionRow[];
+  rates: PayrollRateRow[];
+  employment: PayrollEmploymentRow[];
+  allowances: PayrollAllowanceRow[];
+  /** 그 달 스냅샷, 상태 무관. */
+  snapshots: PayrollSnapshotRow[];
+  /** 세션 없는 예외 정정 중 처리 대기(requested · in_review), 그 달 대상. */
+  sessionlessPending: { requested_by_user_id: string }[];
+};
+
+/** 세션 id 로 읽는 행 — 2단계. */
+type PayrollMonthLinks = {
+  breaks: BreakInterval[];
+  /** 그 달 세션에 걸린 정정 요청 전부(요청자 · 상태 무관), created_at ↓. */
+  corrections: PayrollCorrectionRow[];
+};
+
+export type PayrollMonthInputs = PayrollMonthBase & PayrollMonthLinks;
+
+const PAYROLL_SESSION_ID_CHUNK = 200;
+
+async function loadPayrollMonthBase(
+  service: Service,
+  organizationId: string,
+  ym: string,
+  userId?: string,
+): Promise<PayrollMonthBase> {
+  const firstDay = `${ym}-01`;
+  const lastDay = lastDayOfYm(ym);
+  const sessionsPage = (from: number, to: number) => {
+    let query = service
+      .from("attendance_sessions")
+      .select(PAYROLL_SESSION_SELECT)
+      .eq("organization_id", organizationId)
+      .gte("operating_date", firstDay)
+      .lte("operating_date", lastDay);
+    if (userId) query = query.eq("user_id", userId);
+    return query
+      .order("operating_date", { ascending: true })
+      .order("clock_in_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+  };
+  let rateQuery = service
+    .from("hourly_rate_history")
+    .select("user_id, hourly_rate, effective_from, effective_to")
+    .eq("organization_id", organizationId);
+  let empQuery = service
+    .from("employment_type_history")
+    .select("user_id, employment_type, effective_from, effective_to")
+    .eq("organization_id", organizationId);
+  let snapQuery = service
+    .from("attendance_month_snapshots")
+    .select("user_id, status, gross_amount, total_paid_minutes, finalized_at")
+    .eq("organization_id", organizationId)
+    .eq("target_month", firstDay);
+  let sessionlessQuery = service
+    .from("attendance_correction_requests")
+    .select("requested_by_user_id")
+    .eq("organization_id", organizationId)
+    .in("status", ["requested", "in_review"])
+    .is("session_id", null)
+    .eq("target_month", firstDay);
+  if (userId) {
+    rateQuery = rateQuery.eq("user_id", userId);
+    empQuery = empQuery.eq("user_id", userId);
+    snapQuery = snapQuery.eq("user_id", userId);
+    sessionlessQuery = sessionlessQuery.eq("requested_by_user_id", userId);
+  }
+
+  const [sessRes, rateRes, empRes, allowRes, snapRes, sessionlessRes] = await Promise.all([
+    readAllPages<PayrollSessionRow>(sessionsPage),
+    rateQuery,
+    empQuery,
+    service
+      .from("attendance_pay_allowances")
+      .select("id, target_date, target_user_id, allowance_type, amount_yen, category, memo")
+      .eq("organization_id", organizationId)
+      .eq("status", "active")
+      .gte("target_date", firstDay)
+      .lte("target_date", lastDay),
+    snapQuery,
+    sessionlessQuery,
+  ]);
+
+  return {
+    sessions: sessRes.data,
+    rates: (rateRes.data ?? []) as PayrollRateRow[],
+    employment: (empRes.data ?? []) as PayrollEmploymentRow[],
+    allowances: (allowRes.data ?? []) as PayrollAllowanceRow[],
+    snapshots: (snapRes.data ?? []) as PayrollSnapshotRow[],
+    sessionlessPending: (sessionlessRes.data ?? []) as { requested_by_user_id: string }[],
+  };
+}
+
+async function loadPayrollMonthLinks(
+  service: Service,
+  organizationId: string,
+  sessions: readonly { id: string }[],
+): Promise<PayrollMonthLinks> {
+  if (sessions.length === 0) return { breaks: [], corrections: [] };
+  const idChunks = chunk(
+    sessions.map((s) => s.id),
+    PAYROLL_SESSION_ID_CHUNK,
+  );
+  const [breakPages, correctionPages] = await Promise.all([
+    Promise.all(
+      idChunks.map((ids) =>
+        service.from("attendance_breaks").select("session_id, started_at, ended_at").in("session_id", ids),
+      ),
+    ),
+    Promise.all(
+      idChunks.map((ids) =>
+        service
+          .from("attendance_correction_requests")
+          .select("session_id, requested_by_user_id, status, created_at")
+          .eq("organization_id", organizationId)
+          .in("session_id", ids),
+      ),
+    ),
+  ]);
+  const corrections = correctionPages
+    .flatMap((res) => (res.data ?? []) as PayrollCorrectionRow[])
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return {
+    breaks: breakPages.flatMap((res) => (res.data ?? []) as BreakInterval[]),
+    corrections,
+  };
+}
+
+/** 한 사람의 그 달 급여 — 급여 화면 · 직원 상세가 쓰는 값만. 값은 `getMonthlyPayView` 와 같다. */
+export type PayrollPaySummary = {
+  hourlyEligible: boolean;
+  salariedOnly: boolean;
+  /** 근무한 날 중 월급제인 날이 있다(`days.some(employmentType === "salaried")`). */
+  hasSalariedDay: boolean;
+  totalPaidMinutes: number;
+  expectedGross: number;
+  allowanceTotal: number;
+  allowanceRegularTotal: number;
+  allowanceSpecialTotal: number;
+  excludedCount: number;
+  /** `rateSegments[0].rate` — 급여가 잡힌 시급 중 가장 낮은 것. 없으면 null. */
+  primaryRate: number | null;
+  /** 인정 분이 있는 날 수. */
+  workDays: number;
+  finalization: { gross: number; paidMinutes: number; finalizedAtLabel: string | null } | null;
+};
+
+export type PayrollUserMonth = {
+  pay: PayrollPaySummary;
+  eligibility: FinalizationEligibility;
+  finalized: boolean;
+};
+
+function payLocaleTag(locale: string): string {
+  const resolved = resolveLocale(locale);
+  if (resolved === "ko") return "ko-KR";
+  if (resolved === "ja") return "ja-JP";
+  return "en-US";
+}
+
+/** `attendance-pay.ts` 의 `excludeReasonFor` 와 같은 판정 — null 이면 급여에 넣는다. */
+function payExcludeReason(s: PayrollSessionRow, correctionStatus: string | null): string | null {
+  if (s.status === "invalid") return "invalid";
+  if (s.status === "abandoned") return "abandoned";
+  if (s.status === "open" || s.status === "reopened") return "open";
+  if (!s.clock_in_at || !s.clock_out_at) return "open";
+  if (correctionStatus === "requested" || correctionStatus === "in_review") return "pending_correction";
+  if (s.review_state !== "normal" && s.review_state !== "approved_correction") return "review_required";
+  return null;
+}
+
+function groupByUser<T extends { user_id: string }>(rows: readonly T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = map.get(row.user_id);
+    if (list) list.push(row);
+    else map.set(row.user_id, [row]);
+  }
+  return map;
+}
+
+/**
+ * 한 달치 입력에서 사람별 급여 · 마감 가능 여부 · 마감 여부를 계산한다(DB 를 읽지 않는다).
+ * `userIds` 에 든 사람마다 하나씩 돌려준다 — 그 달 기록이 없는 사람도 0 으로 채운다.
+ */
+export function computePayrollMonth(
+  inputs: PayrollMonthInputs,
+  ym: string,
+  locale: string,
+  userIds: readonly string[],
+): Map<string, PayrollUserMonth> {
+  const firstDay = `${ym}-01`;
+  const lastDay = lastDayOfYm(ym);
+  const sessionsByUser = groupByUser(inputs.sessions);
+  const ratesByUser = groupByUser(inputs.rates);
+  const employmentByUser = groupByUser(inputs.employment);
+  const sessionOwner = new Map(inputs.sessions.map((s) => [s.id, s.user_id]));
+  const breakSecs = breakSecondsBySession(inputs.breaks, inputs.sessions);
+
+  // 급여 쪽 정정 상태 — 세션 주인이 낸 요청 중 가장 최근 것(`getMonthlyPayView` 의 requested_by 필터).
+  const ownCorrectionStatus = new Map<string, string>();
+  // 마감 차단 — 세션 주인이 낸 처리 대기 요청 수(행 단위).
+  const pendingLinkedByUser = new Map<string, number>();
+  for (const c of inputs.corrections) {
+    if (!c.session_id) continue;
+    const owner = sessionOwner.get(c.session_id);
+    if (!owner || owner !== c.requested_by_user_id) continue;
+    if (!ownCorrectionStatus.has(c.session_id)) ownCorrectionStatus.set(c.session_id, c.status);
+    if (c.status === "requested" || c.status === "in_review") {
+      pendingLinkedByUser.set(owner, (pendingLinkedByUser.get(owner) ?? 0) + 1);
+    }
+  }
+  const pendingSessionlessByUser = new Map<string, number>();
+  for (const c of inputs.sessionlessPending) {
+    pendingSessionlessByUser.set(
+      c.requested_by_user_id,
+      (pendingSessionlessByUser.get(c.requested_by_user_id) ?? 0) + 1,
+    );
+  }
+  const finalizedByUser = new Map<string, PayrollSnapshotRow>();
+  for (const snap of inputs.snapshots) {
+    if (snap.status === "finalized" && !finalizedByUser.has(snap.user_id)) {
+      finalizedByUser.set(snap.user_id, snap);
+    }
+  }
+
+  const out = new Map<string, PayrollUserMonth>();
+  for (const userId of userIds) {
+    const sessions = sessionsByUser.get(userId) ?? [];
+    const rateRows = ratesByUser.get(userId) ?? [];
+    const empRows = employmentByUser.get(userId) ?? [];
+
+    const allowancesByDate = new Map<string, PayrollAllowanceRow[]>();
+    for (const a of inputs.allowances) {
+      if (a.target_user_id !== null && a.target_user_id !== userId) continue;
+      const list = allowancesByDate.get(a.target_date) ?? [];
+      list.push(a);
+      allowancesByDate.set(a.target_date, list);
+    }
+
+    const byDate = new Map<string, PayrollSessionRow[]>();
+    for (const s of sessions) {
+      const list = byDate.get(s.operating_date) ?? [];
+      list.push(s);
+      byDate.set(s.operating_date, list);
+    }
+
+    let totalPaidMinutes = 0;
+    let totalGrossExact = 0;
+    let totalAllowanceExact = 0;
+    let totalAllowanceRegularExact = 0;
+    let totalAllowanceSpecialExact = 0;
+    let excludedCount = 0;
+    let hourlyEligible = false;
+    let hasSalariedDay = false;
+    let workDays = 0;
+    const segmentRates = new Set<number>();
+
+    for (const date of Array.from(byDate.keys()).sort()) {
+      const dayRate = resolveEffective(rateRows, date)?.hourly_rate ?? null;
+      const empType = resolveEffective(empRows, date)?.employment_type ?? null;
+      const isHourly = empType === "hourly";
+      if (isHourly) hourlyEligible = true;
+      if (empType === "salaried") hasSalariedDay = true;
+
+      let dayPaidMinutes = 0;
+      let dayGrossExact = 0;
+      for (const s of byDate.get(date)!) {
+        const breakTotalSec = breakSecs.get(s.id) ?? 0;
+        const usable = payExcludeReason(s, ownCorrectionStatus.get(s.id) ?? null) === null;
+        if (isHourly && usable && dayRate != null && s.clock_in_at && s.clock_out_at) {
+          const paidSec = paidSecondsForSession(s.clock_in_at, s.clock_out_at, breakTotalSec);
+          const paidMinutes = Math.floor(paidSec / 60);
+          const grossExact = dailyGrossExact(paidMinutes, dayRate);
+          dayPaidMinutes += paidMinutes;
+          dayGrossExact += grossExact;
+          segmentRates.add(dayRate);
+        } else if (isHourly && !usable) {
+          excludedCount += 1;
+        }
+      }
+
+      let dayAllowanceExact = 0;
+      let dayAllowanceRegularExact = 0;
+      let dayAllowanceSpecialExact = 0;
+      if (isHourly && dayPaidMinutes > 0) {
+        for (const a of allowancesByDate.get(date) ?? []) {
+          const calculated = allowanceCalculatedExact(
+            a.allowance_type as AllowanceType,
+            a.amount_yen,
+            dayPaidMinutes,
+          );
+          if (calculated <= 0) continue;
+          dayAllowanceExact += calculated;
+          if (a.category === "special") dayAllowanceSpecialExact += calculated;
+          else dayAllowanceRegularExact += calculated;
+        }
+      }
+      totalAllowanceExact += dayAllowanceExact;
+      totalAllowanceRegularExact += dayAllowanceRegularExact;
+      totalAllowanceSpecialExact += dayAllowanceSpecialExact;
+      totalPaidMinutes += dayPaidMinutes;
+      totalGrossExact += dayGrossExact;
+      if (dayPaidMinutes > 0) workDays += 1;
+    }
+
+    // 출근 기록이 없는 날의 수당(시급제 · 정액만) — `getMonthlyPayView` 의 allowance-only days.
+    for (const [date, allowsForDate] of allowancesByDate) {
+      if (byDate.has(date)) continue;
+      if (resolveEffective(empRows, date)?.employment_type !== "hourly") continue;
+      let dayAllowanceExact = 0;
+      let dayAllowanceRegularExact = 0;
+      let dayAllowanceSpecialExact = 0;
+      let applied = 0;
+      for (const a of allowsForDate) {
+        const calculated = allowanceCalculatedExact(a.allowance_type as AllowanceType, a.amount_yen, 0);
+        if (calculated <= 0) continue;
+        dayAllowanceExact += calculated;
+        if (a.category === "special") dayAllowanceSpecialExact += calculated;
+        else dayAllowanceRegularExact += calculated;
+        applied += 1;
+      }
+      if (applied === 0) continue;
+      hourlyEligible = true;
+      totalAllowanceExact += dayAllowanceExact;
+      totalAllowanceRegularExact += dayAllowanceRegularExact;
+      totalAllowanceSpecialExact += dayAllowanceSpecialExact;
+    }
+
+    const snap = finalizedByUser.get(userId) ?? null;
+    const allowanceRegularTotal = Math.round(totalAllowanceRegularExact);
+    const allowanceSpecialTotal = Math.round(totalAllowanceSpecialExact);
+    const pay: PayrollPaySummary = {
+      hourlyEligible,
+      salariedOnly:
+        !hourlyEligible &&
+        empRows.some(
+          (r) =>
+            r.employment_type === "salaried" &&
+            r.effective_from <= lastDay &&
+            (r.effective_to == null || r.effective_to >= firstDay),
+        ),
+      hasSalariedDay,
+      totalPaidMinutes,
+      expectedGross: roundToNearest10(totalGrossExact + totalAllowanceExact),
+      allowanceRegularTotal,
+      allowanceSpecialTotal,
+      allowanceTotal: allowanceRegularTotal + allowanceSpecialTotal,
+      excludedCount,
+      primaryRate: segmentRates.size > 0 ? Array.from(segmentRates).sort((a, b) => a - b)[0] : null,
+      workDays,
+      finalization: snap
+        ? {
+            gross: snap.gross_amount,
+            paidMinutes: snap.total_paid_minutes,
+            finalizedAtLabel: snap.finalized_at
+              ? new Intl.DateTimeFormat(payLocaleTag(locale), {
+                  timeZone: TZ,
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                }).format(new Date(snap.finalized_at))
+              : null,
+          }
+        : null,
+    };
+
+    const reviewRequired = sessions.filter((s) => s.review_state === "review_required").length;
+    const openSessions = sessions.filter(
+      (s) =>
+        s.status !== "invalid" &&
+        (s.status === "open" || s.status === "reopened" || s.status === "abandoned" || !s.clock_out_at),
+    ).length;
+    const pendingCorrections =
+      (sessions.length > 0 ? (pendingLinkedByUser.get(userId) ?? 0) : 0) +
+      (pendingSessionlessByUser.get(userId) ?? 0);
+    const alreadyFinalized = snap != null;
+    out.set(userId, {
+      pay,
+      eligibility: {
+        eligible: reviewRequired === 0 && pendingCorrections === 0 && openSessions === 0 && !alreadyFinalized,
+        blockers: { reviewRequired, pendingCorrections, openSessions, alreadyFinalized },
+      },
+      finalized: alreadyFinalized,
+    });
+  }
+  return out;
+}
+
+function payrollEmploymentOf(pay: PayrollPaySummary): AdminPayrollEmployment {
+  if (pay.salariedOnly) return "salaried";
+  if (pay.hourlyEligible) return pay.hasSalariedDay ? "mixed" : "hourly";
+  return "none";
+}
+
 export async function getAdminAttendancePayroll(
   session: AppSession,
   ym: string,
@@ -704,99 +1197,58 @@ export async function getAdminAttendancePayroll(
   const monthLabel = monthLabelForYm(ym, localeTag);
   const prevYm = shiftYm(ym, -1);
   const nextYm = shiftYm(ym, 1);
-  if (session.organization.id === "platform") {
-    return {
-      isPrivileged: false,
-      ym,
-      monthLabel,
-      prevYm,
-      nextYm,
-      kpi: EMPTY_PAYROLL_KPI,
-      rows: [],
-    };
-  }
+  const empty: AdminAttendancePayrollData = {
+    isPrivileged: false,
+    ym,
+    monthLabel,
+    prevYm,
+    nextYm,
+    kpi: EMPTY_PAYROLL_KPI,
+    rows: [],
+  };
+  if (session.organization.id === "platform") return empty;
+  const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
-  if (!privileged) {
-    return {
-      isPrivileged: false,
-      ym,
-      monthLabel,
-      prevYm,
-      nextYm,
-      kpi: EMPTY_PAYROLL_KPI,
-      rows: [],
-    };
-  }
+  const privileged = await isAttendancePayrollAdmin(service, organizationId, session.user.id);
+  if (!privileged) return empty;
 
-  const membersRes = await service
-    .from("memberships")
-    .select("user_id, role, status")
-    .eq("organization_id", session.organization.id);
-  const membershipRows = (membersRes.data ?? []) as {
-    user_id: string;
-    role: string;
-    status: string;
-  }[];
   const firstDay = `${ym}-01`;
-  const lastDay = lastDayOfYm(ym);
-  const [sessionUsersRes, snapshotUsersRes] = await Promise.all([
-    service
-      .from("attendance_sessions")
-      .select("user_id")
-      .eq("organization_id", session.organization.id)
-      .gte("operating_date", firstDay)
-      .lte("operating_date", lastDay),
-    service
-      .from("attendance_month_snapshots")
-      .select("user_id")
-      .eq("organization_id", session.organization.id)
-      .eq("target_month", firstDay),
-  ]);
-  const candidateUserIds = new Set<string>();
-  for (const m of membershipRows) {
-    if (m.status === "active") candidateUserIds.add(m.user_id);
-  }
-  const sessionUserIds = new Set<string>();
-  for (const row of (sessionUsersRes.data ?? []) as { user_id: string }[]) {
-    candidateUserIds.add(row.user_id);
-    sessionUserIds.add(row.user_id);
-  }
-  for (const row of (snapshotUsersRes.data ?? []) as { user_id: string }[]) {
-    candidateUserIds.add(row.user_id);
-  }
-  const members = Array.from(candidateUserIds).map((userId) => {
-    const membership = membershipRows.find((m) => m.user_id === userId);
-    return { user_id: userId, role: membership?.role ?? null };
-  });
-  if (members.length === 0) {
-    return {
-      isPrivileged: true,
-      ym,
-      monthLabel,
-      prevYm,
-      nextYm,
-      kpi: EMPTY_PAYROLL_KPI,
-      rows: [],
-    };
-  }
-
-  const userIds = members.map((m) => m.user_id);
-  const [profilesRes, transportRes] = await Promise.all([
-    service.from("profiles").select("id, name").in("id", userIds),
+  const [membersRes, base, transportRes] = await Promise.all([
+    service.from("memberships").select("user_id, role, status").eq("organization_id", organizationId),
+    loadPayrollMonthBase(service, organizationId, ym),
     // Approved transport reimbursement total per user for the month — same source/filter the payroll
     // export uses (approved status, target_month = 'YYYY-MM-01', total_amount_cached), so the panel
     // summary cannot drift from the exported PDF/Excel totals.
     service
       .from("transport_reimbursement_reports")
       .select("user_id, total_amount_cached, status")
-      .eq("organization_id", session.organization.id)
+      .eq("organization_id", organizationId)
       .eq("target_month", firstDay)
       .eq("status", "approved"),
+  ]);
+  const membershipRows = (membersRes.data ?? []) as {
+    user_id: string;
+    role: string;
+    status: string;
+  }[];
+  const roleByUser = new Map<string, string>();
+  const candidateUserIds = new Set<string>();
+  for (const m of membershipRows) {
+    if (!roleByUser.has(m.user_id)) roleByUser.set(m.user_id, m.role);
+    if (m.status === "active") candidateUserIds.add(m.user_id);
+  }
+  const sessionUserIds = new Set<string>();
+  for (const row of base.sessions) {
+    candidateUserIds.add(row.user_id);
+    sessionUserIds.add(row.user_id);
+  }
+  for (const row of base.snapshots) candidateUserIds.add(row.user_id);
+  const userIds = Array.from(candidateUserIds);
+  if (userIds.length === 0) return { ...empty, isPrivileged: true };
+
+  const [links, profilesRes] = await Promise.all([
+    loadPayrollMonthLinks(service, organizationId, base.sessions),
+    service.from("profiles").select("id, name").in("id", userIds),
   ]);
   const nameById = new Map<string, string>();
   for (const row of (profilesRes.data ?? []) as { id: string; name: string }[]) {
@@ -810,62 +1262,35 @@ export async function getAdminAttendancePayroll(
     transportByUser.set(row.user_id, (transportByUser.get(row.user_id) ?? 0) + (row.total_amount_cached ?? 0));
   }
 
-  const rows: AdminPayrollRow[] = await Promise.all(
-    members.map(async (m) => {
-      const [pay, elig, snapshot] = await Promise.all([
-        getMonthlyPayView(session.organization.id, m.user_id, ym, localeTag).catch(() => null),
-        getFinalizationEligibility(session.organization.id, m.user_id, ym).catch(() => null),
-        getCurrentFinalizedSnapshot(service, session.organization.id, m.user_id, ym).catch(
-          () => null,
-        ),
-      ]);
-
-      const employment: AdminPayrollEmployment = !pay
-        ? "none"
-        : pay.salariedOnly
-          ? "salaried"
-          : pay.hourlyEligible
-            ? pay.days.some((d) => d.employmentType === "salaried")
-              ? "mixed"
-              : "hourly"
-            : "none";
-
-      const primaryRate = pay && pay.rateSegments.length > 0 ? pay.rateSegments[0].rate : 0;
-      const finalized = Boolean(snapshot);
-      const finalizedAtLabel = pay?.finalization?.finalizedAtLabel ?? null;
-      const effectivePaidMinutes = pay?.finalization?.paidMinutes ?? pay?.totalPaidMinutes ?? 0;
-      const effectiveGross = pay?.finalization?.gross ?? pay?.expectedGross ?? 0;
-      const workDays = pay ? pay.days.filter((d) => d.paidMinutes > 0).length : 0;
-
-      return {
-        userId: m.user_id,
-        userName: nameById.get(m.user_id) ?? "—",
-        role: m.role,
-        employment,
-        employmentMissing: employment === "none" && sessionUserIds.has(m.user_id),
-        totalPaidMinutes: effectivePaidMinutes,
-        recognizedLabel: fmtPaidMinutes(effectivePaidMinutes),
-        workDays,
-        primaryRate,
-        expectedGross: effectiveGross,
-        allowanceTotal: pay?.allowanceTotal ?? 0,
-        allowanceRegularTotal: pay?.allowanceRegularTotal ?? 0,
-        allowanceSpecialTotal: pay?.allowanceSpecialTotal ?? 0,
-        baseGross: effectiveGross - (pay?.allowanceTotal ?? 0),
-        transportApproved: transportByUser.get(m.user_id) ?? 0,
-        excludedCount: pay?.excludedCount ?? 0,
-        finalized,
-        finalizedAtLabel,
-        finalizationEligible: elig?.eligible ?? false,
-        blockers: elig?.blockers ?? {
-          reviewRequired: 0,
-          pendingCorrections: 0,
-          openSessions: 0,
-          alreadyFinalized: finalized,
-        },
-      };
-    }),
-  );
+  const computed = computePayrollMonth({ ...base, ...links }, ym, localeTag, userIds);
+  const rows: AdminPayrollRow[] = userIds.map((userId) => {
+    const { pay, eligibility, finalized } = computed.get(userId)!;
+    const employment = payrollEmploymentOf(pay);
+    const effectivePaidMinutes = pay.finalization?.paidMinutes ?? pay.totalPaidMinutes;
+    const effectiveGross = pay.finalization?.gross ?? pay.expectedGross;
+    return {
+      userId,
+      userName: nameById.get(userId) ?? "—",
+      role: roleByUser.get(userId) ?? null,
+      employment,
+      employmentMissing: employment === "none" && sessionUserIds.has(userId),
+      totalPaidMinutes: effectivePaidMinutes,
+      recognizedLabel: fmtPaidMinutes(effectivePaidMinutes),
+      workDays: pay.workDays,
+      primaryRate: pay.primaryRate ?? 0,
+      expectedGross: effectiveGross,
+      allowanceTotal: pay.allowanceTotal,
+      allowanceRegularTotal: pay.allowanceRegularTotal,
+      allowanceSpecialTotal: pay.allowanceSpecialTotal,
+      baseGross: effectiveGross - pay.allowanceTotal,
+      transportApproved: transportByUser.get(userId) ?? 0,
+      excludedCount: pay.excludedCount,
+      finalized,
+      finalizedAtLabel: pay.finalization?.finalizedAtLabel ?? null,
+      finalizationEligible: eligibility.eligible,
+      blockers: eligibility.blockers,
+    };
+  });
 
   rows.sort((a, b) => a.userName.localeCompare(b.userName));
 
@@ -1057,6 +1482,26 @@ const EMPTY_TRANSPORT_KPI = {
   missingEvidence: 0,
 };
 
+/**
+ * 교통비 KPI — 표의 사람별 행에서 셈한 값과 같다(신청서가 없는 사람은 상태 none · 0엔이라 더해지지 않는다).
+ * 한 사람에게 요약이 둘 이상이면 표처럼 마지막 것을 쓴다.
+ */
+function transportKpiOf(
+  summaries: readonly TransportReportAdminSummary[],
+): AdminAttendanceTransportData["kpi"] {
+  const byUser = new Map<string, TransportReportAdminSummary>();
+  for (const s of summaries) byUser.set(s.userId, s);
+  const rows = Array.from(byUser.values());
+  return {
+    pendingReview: rows.filter((r) => r.status === "submitted" || r.status === "reviewing").length,
+    submittedTotal: rows
+      .filter((r) => r.status === "submitted" || r.status === "reviewing" || r.status === "approved")
+      .reduce((s, r) => s + r.totalAmount, 0),
+    approvedTotal: rows.filter((r) => r.status === "approved").length,
+    missingEvidence: rows.reduce((s, r) => s + r.missingCount, 0),
+  };
+}
+
 export async function getAdminAttendanceTransport(
   session: AppSession,
   ym: string,
@@ -1170,16 +1615,7 @@ export async function getAdminAttendanceTransport(
   });
   rows.sort((a, b) => a.userName.localeCompare(b.userName));
 
-  const kpi = {
-    pendingReview: rows.filter((r) => r.status === "submitted" || r.status === "reviewing").length,
-    submittedTotal: rows
-      .filter((r) => r.status === "submitted" || r.status === "reviewing" || r.status === "approved")
-      .reduce((s, r) => s + r.totalAmount, 0),
-    approvedTotal: rows.filter((r) => r.status === "approved").length,
-    missingEvidence: rows.reduce((s, r) => s + r.missingCount, 0),
-  };
-
-  return { isPrivileged: true, ym, monthLabel, prevYm, nextYm, kpi, rows };
+  return { isPrivileged: true, ym, monthLabel, prevYm, nextYm, kpi: transportKpiOf(summaries), rows };
 }
 
 // ── Per-staff monthly receipt review (desktop master-detail viewer) ──────────
@@ -1447,118 +1883,67 @@ export async function getAdminStaffDetail(
     stats: { totalDays: 0, doneSessions: 0, issueSessions: 0 },
   };
   if (session.organization.id === "platform") return baseEmpty;
+  const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
-  if (!privileged) return baseEmpty;
+  const targetMonthDate = `${ym}-01`;
 
-  // Verify membership
-  const memberRes = await service
-    .from("memberships")
-    .select("role")
-    .eq("organization_id", session.organization.id)
-    .eq("user_id", userId)
-    .maybeSingle();
+  // 권한 · 멤버 · 이름 · 그 달 급여 입력 · 교통비 신청서를 한 번에 시작한다. 결과는 권한 확인 뒤에만 쓴다.
+  const [privileged, memberRes, profileRes, base, trReport] = await Promise.all([
+    isAttendancePayrollAdmin(service, organizationId, session.user.id),
+    service
+      .from("memberships")
+      .select("role")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    service.from("profiles").select("name").eq("id", userId).maybeSingle(),
+    loadPayrollMonthBase(service, organizationId, ym, userId),
+    getTransportReport(service, organizationId, userId, targetMonthDate).catch(() => null),
+  ]);
+  if (!privileged) return baseEmpty;
   const member = (memberRes.data as { role: string } | null) ?? null;
   if (!member) return { ...baseEmpty, isPrivileged: true };
-
-  const profileRes = await service
-    .from("profiles")
-    .select("name")
-    .eq("id", userId)
-    .maybeSingle();
   const userName = (profileRes.data as { name: string } | null)?.name ?? "—";
 
-  const firstDay = `${ym}-01`;
-  const [y, m] = ym.split("-").map(Number);
-  const lastDayNum = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const lastDay = `${ym}-${String(lastDayNum).padStart(2, "0")}`;
-
-  // Pay + finalized
-  const [payView, finalized] = await Promise.all([
-    getMonthlyPayView(session.organization.id, userId, ym, localeTag).catch(() => null),
-    getCurrentFinalizedSnapshot(service, session.organization.id, userId, ym).catch(() => null),
-  ]);
-
-  // Sessions raw + sites (for the day ledger). NOTE: breaks live in `attendance_breaks`
-  // (there is no `break_total_sec` column on the session) — totals are summed separately below.
-  const sessRes = await service
-    .from("attendance_sessions")
-    .select(
-      "id, operating_date, status, review_state, clock_in_at, clock_out_at, clock_in_site_id, clock_out_site_id",
-    )
-    .eq("organization_id", session.organization.id)
-    .eq("user_id", userId)
-    .gte("operating_date", firstDay)
-    .lte("operating_date", lastDay)
-    .order("operating_date", { ascending: false })
-    .order("clock_in_at", { ascending: false });
-  type SessRow = {
-    id: string;
-    operating_date: string;
-    status: string;
-    review_state: string;
-    clock_in_at: string | null;
-    clock_out_at: string | null;
-    clock_in_site_id: string | null;
-    clock_out_site_id: string | null;
-  };
-  const sessRows = (sessRes.data ?? []) as SessRow[];
-
-  // Correction status per session
-  const sessionIds = sessRows.map((r) => r.id);
-
-  // 세션별 급여 차감 휴게 초 — 근무 시간 안으로 자르고, 닫힌 세션의 열린 휴게는 퇴근까지(`breakSecondsBySession`).
-  let breakBySession = new Map<string, number>();
-  if (sessionIds.length > 0) {
-    const bRes = await service
-      .from("attendance_breaks")
-      .select("session_id, started_at, ended_at")
-      .in("session_id", sessionIds);
-    breakBySession = breakSecondsBySession((bRes.data ?? []) as BreakInterval[], sessRows);
-  }
-  const corrBySession = new Map<string, string>();
-  if (sessionIds.length > 0) {
-    const cRes = await service
-      .from("attendance_correction_requests")
-      .select("session_id, status, created_at")
-      .eq("organization_id", session.organization.id)
-      .in("session_id", sessionIds)
-      .order("created_at", { ascending: false });
-    for (const r of (cRes.data ?? []) as {
-      session_id: string;
-      status: string;
-      created_at: string;
-    }[]) {
-      if (r.session_id && !corrBySession.has(r.session_id)) {
-        corrBySession.set(r.session_id, r.status);
-      }
-    }
-  }
-
-  // Site names
+  // NOTE: breaks live in `attendance_breaks` (there is no `break_total_sec` column on the session).
+  const sessionsAsc = base.sessions;
   const siteIds = Array.from(
     new Set(
-      sessRows
+      sessionsAsc
         .flatMap((r) => [r.clock_in_site_id, r.clock_out_site_id])
         .filter((id): id is string => Boolean(id)),
     ),
   );
+  const [links, sitesRes, trItems] = await Promise.all([
+    loadPayrollMonthLinks(service, organizationId, sessionsAsc),
+    siteIds.length > 0
+      ? service
+          .from("attendance_sites")
+          .select("id, name, properties(display_name_ko, display_name_ja, display_name_en)")
+          .eq("organization_id", organizationId)
+          .in("id", siteIds)
+      : Promise.resolve({ data: [] as (AttendanceSiteDisplayRow & { id: string })[] }),
+    trReport ? getTransportItems(service, trReport.id).catch(() => []) : Promise.resolve([]),
+  ]);
+
+  const { pay: payView, finalized } = computePayrollMonth(
+    { ...base, ...links },
+    ym,
+    localeTag,
+    [userId],
+  ).get(userId)!;
+
+  // 원장은 최근 날짜 먼저 — 급여 계산용 오름차순을 뒤집는다.
+  const sessRows = [...sessionsAsc].reverse();
+  const breakBySession = breakSecondsBySession(links.breaks, sessionsAsc);
+  // 원장의 정정 표시는 요청자와 관계없이 세션마다 가장 최근 요청.
+  const corrBySession = new Map<string, string>();
+  for (const r of links.corrections) {
+    if (r.session_id && !corrBySession.has(r.session_id)) corrBySession.set(r.session_id, r.status);
+  }
   const siteNameById = new Map<string, string>();
-  if (siteIds.length > 0) {
-    const sRes = await service
-      .from("attendance_sites")
-      .select(
-        "id, name, properties(display_name_ko, display_name_ja, display_name_en)",
-      )
-      .eq("organization_id", session.organization.id)
-      .in("id", siteIds);
-    for (const row of (sRes.data ?? []) as (AttendanceSiteDisplayRow & { id: string })[]) {
-      siteNameById.set(row.id, localizeAttendanceSiteName(row, localeTag));
-    }
+  for (const row of (sitesRes.data ?? []) as (AttendanceSiteDisplayRow & { id: string })[]) {
+    siteNameById.set(row.id, localizeAttendanceSiteName(row, localeTag));
   }
 
   // Compose day groups (most recent first)
@@ -1617,26 +2002,6 @@ export async function getAdminStaffDetail(
   // Day order: most recent first (already sorted by query)
   const days = Array.from(daysMap.values());
 
-  // Pay derived
-  const employment: AdminPayrollEmployment = !payView
-    ? "none"
-    : payView.salariedOnly
-      ? "salaried"
-      : payView.hourlyEligible
-        ? payView.days.some((d) => d.employmentType === "salaried")
-          ? "mixed"
-          : "hourly"
-        : "none";
-  const primaryRate = payView && payView.rateSegments.length > 0 ? payView.rateSegments[0].rate : 0;
-
-  // Transport summary
-  const targetMonthDate = `${ym}-01`;
-  const trReport = await getTransportReport(
-    service,
-    session.organization.id,
-    userId,
-    targetMonthDate,
-  ).catch(() => null);
   let trItemCount = 0;
   let trLinkedCount = 0;
   let trMissingCount = 0;
@@ -1645,10 +2010,9 @@ export async function getAdminStaffDetail(
   if (trReport) {
     trStatus = trReport.status;
     trTotal = trReport.totalAmountCached;
-    const items = await getTransportItems(service, trReport.id).catch(() => []);
-    trItemCount = items.length;
-    trLinkedCount = items.filter((i) => i.entryMode === "linked").length;
-    trMissingCount = items.filter((i) => i.imageCount === 0).length;
+    trItemCount = trItems.length;
+    trLinkedCount = trItems.filter((i) => i.entryMode === "linked").length;
+    trMissingCount = trItems.filter((i) => i.imageCount === 0).length;
   }
 
   return {
@@ -1659,12 +2023,12 @@ export async function getAdminStaffDetail(
     nextYm,
     user: { id: userId, name: userName, role: member.role },
     pay: {
-      employment,
-      recognizedLabel: fmtPaidMinutes(payView?.finalization?.paidMinutes ?? payView?.totalPaidMinutes ?? 0),
-      expectedGross: payView?.finalization?.gross ?? payView?.expectedGross ?? 0,
-      excludedCount: payView?.excludedCount ?? 0,
-      primaryRate,
-      finalized: Boolean(finalized),
+      employment: payrollEmploymentOf(payView),
+      recognizedLabel: fmtPaidMinutes(payView.finalization?.paidMinutes ?? payView.totalPaidMinutes),
+      expectedGross: payView.finalization?.gross ?? payView.expectedGross,
+      excludedCount: payView.excludedCount,
+      primaryRate: payView.primaryRate ?? 0,
+      finalized,
     },
     transport: {
       status: trStatus,

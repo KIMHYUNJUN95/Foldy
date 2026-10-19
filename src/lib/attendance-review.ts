@@ -9,6 +9,7 @@
 // before exposing org-wide data; the write actions (admin-actions) enforce it themselves.
 
 import "server-only";
+import { cache } from "react";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { SUPABASE_PAGE_SIZE } from "@/lib/supabase/read-all-pages";
 import { chunk } from "@/lib/utils";
@@ -35,26 +36,30 @@ type Service = ReturnType<typeof getSupabaseServiceClient>;
 /**
  * Server-side privilege gate for org-wide attendance/payroll review. True for platform admins and for
  * active members who are the org `owner` or carry the `attendance_payroll_admin` flag.
+ *
+ * `cache()` — 한 화면이 배지 · 본문 · 하위 조회에서 여러 번 부른다(최대 4번). 요청 안에서는 한 번만 읽는다.
  */
-export async function isAttendancePayrollAdmin(
+export const isAttendancePayrollAdmin = cache(async function isAttendancePayrollAdmin(
   service: Service,
   organizationId: string,
   userId: string,
 ): Promise<boolean> {
-  const pa = await service
-    .from("platform_admins")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .maybeSingle();
+  const [pa, m] = await Promise.all([
+    service
+      .from("platform_admins")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle(),
+    service
+      .from("memberships")
+      .select("role, attendance_payroll_admin, status")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
   if (pa.data) return true;
 
-  const m = await service
-    .from("memberships")
-    .select("role, attendance_payroll_admin, status")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .maybeSingle();
   const row = m.data as { role: string; attendance_payroll_admin: boolean; status: string } | null;
   return (
     !!row &&
@@ -62,7 +67,7 @@ export async function isAttendancePayrollAdmin(
     // 전무(senior_managing_director) is owner-equivalent.
     (row.role === "owner" || row.role === "senior_managing_director" || row.attendance_payroll_admin === true)
   );
-}
+});
 
 /**
  * The user ids of org members who should receive privileged attendance admin alerts: active `owner` or

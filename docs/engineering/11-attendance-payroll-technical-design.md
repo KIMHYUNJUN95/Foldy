@@ -803,7 +803,8 @@ The desktop admin attendance console now consumes the attendance/payroll/transpo
 directly instead of rendering placeholder dashboard values.
 
 - **Overview aggregation** (`src/lib/admin-attendance.ts`): `getAdminAttendanceOverview` pulls from the
-  same review queue, correction-request, payroll, and transport helpers used by the detail pages. KPI
+  same review queue, correction-request, payroll, and transport helpers used by the detail pages (since
+  2026-10-19 it reads only the slices its numbers need — see "Admin attendance read path — batched"). KPI
   values therefore represent the current queue/payroll/transport data instead of safe-zero placeholders.
   Transport KPI includes real missing-receipt evidence count derived from reimbursement items with no
   image rows.
@@ -1343,6 +1344,31 @@ Admin dashboard aggregation performance rule (2026-07-03):
 - Overview queue links must preserve the selected `ym`; session deep links use
   `/admin/attendance/queue?ym=YYYY-MM&sessionId=...` so past-month rows do not open an empty current-month
   queue.
+
+Admin attendance read path — batched (2026-10-19):
+
+- **Payroll is computed per org, not per person.** `getAdminAttendancePayroll` reads the month once —
+  sessions (`readAllPages`), `hourly_rate_history`, `employment_type_history`, `attendance_pay_allowances`,
+  `attendance_month_snapshots`, session-less pending corrections, then breaks + session corrections by
+  session id (200-id chunks) — and `computePayrollMonth` (`src/lib/admin-attendance.ts`) splits it per user
+  in memory. It replaced the per-member fan-out of `getMonthlyPayView` + `getFinalizationEligibility` +
+  `getCurrentFinalizedSnapshot` (≈12 queries per member → ~140 for 11 staff; now ~13 queries, 3 serial
+  steps, independent of staff count).
+- **`computePayrollMonth` must follow the same rules as `getMonthlyPayView` and
+  `getFinalizationEligibility`.** Changing a pay rule in `src/lib/attendance-pay.ts` means changing it
+  here too. `src/lib/__tests__/admin-payroll-batch.test.ts` runs both paths over one in-memory DB and
+  compares every payroll row field (yen, minutes, blockers, finalized label) in ko/ja/en.
+- **Staff detail** (`getAdminStaffDetail`) uses the same single-user batch: privilege · membership ·
+  profile · month inputs · transport report start together, then breaks · corrections · sites · transport
+  items. The ledger reuses the pay sessions (newest first) instead of reading sessions, breaks, and
+  corrections a second time. ~12 serial steps → 2 (+ the privilege check inside step 1).
+- **Overview** reads only what its numbers need: the review queue with `filter: "review_required"` (not
+  every session of the month), the open-correction **count** (`head` count, capped at the corr tab's
+  200) plus the first 5 for the sample, the batched payroll KPI, and the transport KPI straight from
+  `getTransportReportSummaryForAdmin` (`transportKpiOf`, same numbers as the transport table). ~11 serial
+  steps / ~170 queries → ~5 / ~27.
+- **`isAttendancePayrollAdmin` is `cache()`d** (React request cache) and its two lookups run together, so
+  a page that calls it from the badge helper, the body, and nested helpers pays for it once.
 - The admin correction queue is an open-work queue: it loads `requested` / `in_review` rows only and
   removes rows from client state after approval/rejection.
 - Transport "submitted total" KPI excludes draft, rejected, and changes-requested reports; it only sums

@@ -48,7 +48,7 @@
   flex-direction: column;
   gap: 14px;
   padding: 4px 4px 12px 8px;
-  animation: spw-in 220ms var(--spw-ease) both;
+  animation: spw-in 220ms var(--spw-ease) backwards;
 }
 
 /* ── 머리 ── */
@@ -443,7 +443,8 @@
   flex-direction: column;
   gap: 14px;
   padding: 8px 24px 16px;
-  animation: spw-in 220ms var(--spw-ease) both;
+  /* backwards — 끝난 뒤 transform 을 붙잡아 두면(both) 이 칸이 position:fixed 의 기준이 돼 날짜 달력이 패널 밖으로 밀린다(2026-10-19). */
+  animation: spw-in 220ms var(--spw-ease) backwards;
 }
 .adm .spw-sect { display: flex; flex-direction: column; padding-top: 12px; border-top: 0.5px solid var(--separator); }
 .adm .spw-sect:first-child { padding-top: 4px; border-top: 0; }

@@ -36,7 +36,7 @@ import {
   setTaskSortOrders,
   skipOccurrences,
 } from "@/lib/task-occurrences";
-import { cleanupRemovedTaskImages, sanitizeTaskImageUrls } from "@/lib/task-images";
+import { cleanupRemovedTaskImages, mergeTaskImageUrls } from "@/lib/task-images";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
@@ -267,8 +267,13 @@ export async function updateTaskCore(formData: FormData) {
     .map((t) => t.trim())
     .filter(Boolean)
     .slice(0, 10);
-  // Project tasks allow up to 20 photos; regular tasks keep the standard 5.
-  const imageUrls = sanitizeTaskImageUrls(formData.getAll("imageUrls").map(String), !!task.projectId);
+  // Project tasks allow up to 20 photos; regular tasks keep the standard 5. Photos the task already
+  // has survive the cap (e.g. moved out of a project) — only new additions are capped.
+  const imageUrls = mergeTaskImageUrls(
+    task.imageUrls,
+    formData.getAll("imageUrls").map(String),
+    !!task.projectId,
+  );
   const ctxPropertyId = cleanText(formData.get("ctxPropertyId")) || null;
   const ctxRoomId = cleanText(formData.get("ctxRoomId")) || null;
   const ctxReservationId = cleanText(formData.get("ctxReservationId")) || null;
@@ -454,7 +459,9 @@ function recurringAnchorDate(task: TaskRecord): string {
 // given occurrence date in `task_occurrence_state` (no roll-forward), so every scheduled date stays
 // visible and independently completable. ONE-OFF: sets status + completion stamps as before. Both
 // log a `completed` update + notify participants. Programmatic (list card / detail view / calendar).
-export async function completeTask(taskId: string, occurrenceDate?: string) {
+// Returns the occurrence date a recurring completion actually recorded (it differs from the passed
+// date on a non-occurrence day) — undo must reopen that date.
+export async function completeTask(taskId: string, occurrenceDate?: string): Promise<string | undefined> {
   const id = String(taskId ?? "").trim();
   if (!id) return;
   const { session, task } = await requireSessionAndTask(id);
@@ -503,7 +510,7 @@ export async function completeTask(taskId: string, occurrenceDate?: string) {
     revalidatePath("/mobile/tasks");
     revalidatePath(detailPath(id));
     revalidateProjectPath(task.projectId);
-    return;
+    return occ;
   }
 
   await supabase

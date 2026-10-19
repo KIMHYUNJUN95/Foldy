@@ -67,10 +67,42 @@ export async function cleanupRemovedTaskImages(
   }
 }
 
-/** Keep only http(s) URLs, capped at the per-task limit. Applied server-side on every write. */
+function isHttpUrl(u: string): boolean {
+  return u.startsWith("https://") || u.startsWith("http://");
+}
+
+/** Keep only http(s) URLs, capped at the per-task limit. For creates — edits use `mergeTaskImageUrls`. */
 export function sanitizeTaskImageUrls(urls: string[], isProjectTask: boolean): string[] {
   return urls
     .map((v) => String(v))
-    .filter((u) => u.startsWith("https://") || u.startsWith("http://"))
+    .filter(isHttpUrl)
     .slice(0, taskImageLimit(isProjectTask));
+}
+
+/**
+ * The image set an edit stores. Photos the task **already has** are never cut by the cap — a project
+ * task with 15 photos moved out of its project (cap 20 → 5) keeps all 15. Only newly added URLs are
+ * capped, and only while the total is under the limit. Without this the cap sliced the list and the
+ * edit hard-deleted the "removed" overflow from storage.
+ */
+export function mergeTaskImageUrls(
+  previous: string[],
+  requested: string[],
+  isProjectTask: boolean,
+): string[] {
+  const limit = taskImageLimit(isProjectTask);
+  const had = new Set(previous);
+  const out: string[] = [];
+  for (const raw of requested) {
+    const u = String(raw);
+    if (!isHttpUrl(u) || out.includes(u)) continue;
+    if (had.has(u)) out.push(u);
+  }
+  for (const raw of requested) {
+    const u = String(raw);
+    if (!isHttpUrl(u) || had.has(u) || out.includes(u)) continue;
+    if (out.length >= limit) break;
+    out.push(u);
+  }
+  return out;
 }

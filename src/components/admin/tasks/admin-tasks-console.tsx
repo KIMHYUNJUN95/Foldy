@@ -326,6 +326,8 @@ export function AdminTasksConsole({
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectDetail, setProjectDetail] = useState<ProjectDetailData | null>(null);
   const [sel, setSel] = useState<string | null>(null);
+  /** 상세를 연 줄의 회차 날짜 — 반복 작업의 상태 · 완료는 이 회차가 대상이다(없으면 완료를 막는다). */
+  const [selOcc, setSelOcc] = useState<string | null>(null);
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   // Optimistic status for the detail panel's 대기/진행 중/완료 segmented control. `setConsoleTaskStatus`
   // + `router.refresh()` is a full server round-trip, so without this the segment sits frozen on the
@@ -663,12 +665,13 @@ export function AdminTasksConsole({
   // (보기의 첫 작업)이 목록 계산에 기대기 때문이다. `detail` 은 잠깐 이전 작업 것을 들고 있을 수
   // 있어서 읽는 쪽이 `detail.id === activeId` 로 거른다.
 
-  const openTask = useCallback((id: string) => {
+  const openTask = useCallback((id: string, occurrenceDate?: string) => {
     // 상세를 열면 떠 있는 팝오버는 닫는다(스크림이 상세 칸을 덮지 않게).
     setPop(null);
     setNoteDraft("");
     setStatusDraft(null); // never carry a pending segment click into another task
     setSel(id);
+    setSelOcc(occurrenceDate ?? null);
     setDetailClosed(false);
   }, []);
   const closePanel = useCallback(() => {
@@ -791,11 +794,15 @@ export function AdminTasksConsole({
           occDate
             ? resolveOccurrenceOptimistically({ taskId: t.id, occurrenceDate: occDate })
             : applyTaskOptimistic({ kind: "remove", ids: [t.id] }),
-        after: () =>
+        // 실행 취소는 서버가 **실제로 기록한** 회차로 — 회차가 아닌 날 완료하면 가장 오래된 밀린 회차로
+        // 정산되므로, 누른 날짜로 되돌리면 아무것도 풀리지 않는다.
+        after: (res) =>
           showUndo(
             dict.tCompleted,
             () =>
-              run(() => toggleConsoleComplete(t.id, false, occDate), { after: () => setUndo(null) }),
+              run(() => toggleConsoleComplete(t.id, false, res.occurrenceDate ?? occDate), {
+                after: () => setUndo(null),
+              }),
             sub,
           ),
       });
@@ -1123,7 +1130,7 @@ export function AdminTasksConsole({
         className={`atw-row ${done ? "is-done" : ""} ${completingNow ? "is-completing" : ""} ${
           selected && !picking ? "on" : ""
         } ${picking ? "is-picking" : ""} ${isPicked ? "is-picked" : ""}`}
-        onClick={() => (picking ? togglePick() : openTask(t.id))}
+        onClick={() => (picking ? togglePick() : openTask(t.id, occ?.date))}
       >
         {opts?.reorder && !picking ? (
           <span className="atw-grip" aria-hidden="true">
@@ -2526,7 +2533,7 @@ export function AdminTasksConsole({
                 onClick={(e) => {
                   e.stopPropagation();
                   setCalDay(dstr);
-                  openTask(t.id);
+                  openTask(t.id, dstr <= today ? dstr : undefined);
                 }}
               >
                 {t.title}
@@ -2913,6 +2920,14 @@ export function AdminTasksConsole({
   };
   const defaultId = listView && !detailClosed && !selMode ? firstIdOfView() : null;
   const activeId = sel ?? defaultId;
+  // 기본 선택(오늘 · 내일의 첫 줄)은 그 목록의 날짜가 회차다 — 줄을 눌러 연 것과 같게.
+  const activeOcc = sel
+    ? selOcc
+    : view === "today"
+      ? today
+      : view === "tomorrow"
+        ? addDays(today, 1)
+        : null;
 
   // 상세(업데이트 로그 + 연결 정보) 불러오기. 서버 갱신(`data`)마다 다시 읽는다.
   useEffect(() => {
@@ -3219,15 +3234,30 @@ export function AdminTasksConsole({
     const loaded = detail && detail.id === activeId ? detail : null;
     const t = loaded ?? tasks.find((x) => x.id === activeId) ?? null;
     if (!t) return null;
-    const done = t.status === "completed" || completing.has(`${t.id}|`);
+    // 반복은 행 status 가 늘 open 이라 완료 여부는 **연 회차**의 기록을 본다(모바일 상세와 같은 규칙).
+    // 회차를 모르고 열린 반복(관리함 · 프로젝트 등)은 완료할 날짜를 알 수 없어 완료를 막는다 —
+    // 예전엔 서버가 시리즈 앵커(첫 회차)로 폴백해 엉뚱한 과거 회차가 완료됐다.
+    const recurring = isStandardRecurrence(t.recurrenceRule);
+    const occ = recurring ? activeOcc : null;
+    const canComplete = !recurring || !!occ;
+    const occDone = !!occ && occState(t.id, occ) === "completed";
+    const motionKey = `${t.id}|${occ ?? ""}`;
+    const realStatus: "open" | "in_progress" | "completed" = recurring
+      ? occDone
+        ? "completed"
+        : t.status === "in_progress"
+          ? "in_progress"
+          : "open"
+      : (t.status as "open" | "in_progress" | "completed");
+    const done = realStatus === "completed" || completing.has(motionKey);
     // 코어 편집 드래프트가 이 작업의 것일 때만 편집 모드로 렌더한다.
     const editing = coreEdit && coreEdit.id === t.id ? coreEdit : null;
     // What the segmented control shows: the pending click while the data still reads as it did when
     // the click happened, else server truth.
     const shownStatus =
-      statusDraft && statusDraft.id === t.id && t.status === statusDraft.from
+      statusDraft && statusDraft.id === t.id && realStatus === statusDraft.from
         ? statusDraft.status
-        : t.status;
+        : realStatus;
     const mine = isMine(t, meId);
     const proj = t.projectId ? projById.get(t.projectId) : null;
     const d = dueDateOf(t) ?? t.scheduledDate ?? null;
@@ -3379,7 +3409,11 @@ export function AdminTasksConsole({
                   prio={t.priority}
                   done={done}
                   label={dict.stCompleted}
-                  onToggle={completing.has(`${t.id}|`) ? undefined : () => completeWithMotion(t)}
+                  onToggle={
+                    !canComplete || completing.has(motionKey)
+                      ? undefined
+                      : () => completeWithMotion(t, occ ? { date: occ, done: occDone } : undefined)
+                  }
                 />
                 <h2 className={done ? "is-done" : ""}>{t.title}</h2>
               </div>
@@ -3410,20 +3444,35 @@ export function AdminTasksConsole({
                 type="button"
                 className={shownStatus === seg.status ? "on" : ""}
                 aria-pressed={shownStatus === seg.status}
+                disabled={seg.status === "completed" && !canComplete}
                 onClick={() => {
                   if (shownStatus === seg.status) return;
-                  setStatusDraft({ id: t.id, from: t.status, status: seg.status });
+                  if (seg.status === "completed" && !canComplete) return;
+                  setStatusDraft({ id: t.id, from: realStatus, status: seg.status });
                   if (seg.status === "completed") haptic("success");
-                  run(() => setConsoleTaskStatus(t.id, seg.status), {
-                    toast: seg.status === "completed" ? dict.tCompleted : undefined,
-                    onError: () => setStatusDraft(null),
-                  });
+                  const occArg = occ ?? undefined;
+                  // 완료된 반복 회차를 「진행 중」으로: 그 회차를 먼저 되살린다(모바일 상세와 같은 순서).
+                  const reopenFirst = recurring && occDone && seg.status === "in_progress";
+                  run(
+                    async () => {
+                      if (reopenFirst) {
+                        const r = await setConsoleTaskStatus(t.id, "open", occArg);
+                        if (!r.ok) return r;
+                      }
+                      return setConsoleTaskStatus(t.id, seg.status, occArg);
+                    },
+                    {
+                      toast: seg.status === "completed" ? dict.tCompleted : undefined,
+                      onError: () => setStatusDraft(null),
+                    },
+                  );
                 }}
               >
                 {dict[seg.labelKey]}
               </button>
             ))}
           </div>
+          {!canComplete && <p className="atw-soft atw-d__lock">{dict.dpCompleteNeedsOccurrence}</p>}
 
           {!editing && (mine || t.imageUrls.length > 0) && (
             <div className="atw-d__photos">

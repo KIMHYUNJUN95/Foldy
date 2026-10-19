@@ -86,6 +86,8 @@ export type AdminTasksDictionary = {
   dpTask: string;
   dpInbox: string;
   dpStatus: string;
+  /** 회차 없이 연 반복 작업 — 완료를 막고 띄우는 안내. */
+  dpCompleteNeedsOccurrence: string;
   dpSchedule: string;
   dpScheduleChange: string;
   dpDue: string;
@@ -465,7 +467,7 @@ const ko: AdminTasksDictionary = {
   today: "오늘", tomorrow: "내일", noDate: "날짜 없음", instructedBy: "{name} 지시", sharedWith: "공유됨", andMore: "{name} 외 {n}명",
   iaTitle: "작업 이름", iaDesc: "설명", iaSchedule: "일정", iaPriority: "우선순위", iaTarget: "대상 (지시)",
   iaAttach: "첨부", iaAttachN: "사진 {n}", iaCancel: "취소", iaSave: "작업 추가", iaInbox: "관리함", iaSendInstr: "지시로 전송", iaSendInstrCta: "지시 보내기",
-  dpTask: "작업", dpInbox: "관리함", dpStatus: "상태", dpSchedule: "일정", dpScheduleChange: "일정 변경",
+  dpTask: "작업", dpInbox: "관리함", dpStatus: "상태", dpCompleteNeedsOccurrence: "반복 작업은 오늘 · 내일 · 캘린더에서 열어야 그 날짜를 완료할 수 있어요", dpSchedule: "일정", dpScheduleChange: "일정 변경",
   dpDue: "마감", dpSched: "예정", dpTime: "시간", dpRepeat: "반복", dpNoDate: "일정 없음",
   dpLinked: "연결됨", dpViewResv: "예약 보기", dpParticipants: "참여자 · {n}명 · 상태 공통",
   dpAuthor: "작성자", dpFirstRecipient: "최초 수신", dpMe: "나", dpShareManage: "멤버 추가 / 공유 관리",
@@ -597,7 +599,7 @@ const ja: AdminTasksDictionary = {
   today: "今日", tomorrow: "明日", noDate: "日付なし", instructedBy: "{name} 指示", sharedWith: "共有中", andMore: "{name} 他 {n}名",
   iaTitle: "タスク名", iaDesc: "説明", iaSchedule: "日程", iaPriority: "優先度", iaTarget: "対象 (指示)",
   iaAttach: "添付", iaAttachN: "写真 {n}", iaCancel: "キャンセル", iaSave: "タスク追加", iaInbox: "管理箱", iaSendInstr: "指示で送信", iaSendInstrCta: "指示を送る",
-  dpTask: "タスク", dpInbox: "管理箱", dpStatus: "状態", dpSchedule: "日程", dpScheduleChange: "日程変更",
+  dpTask: "タスク", dpInbox: "管理箱", dpStatus: "状態", dpCompleteNeedsOccurrence: "繰り返しタスクは今日・明日・カレンダーから開くと、その日付を完了にできます", dpSchedule: "日程", dpScheduleChange: "日程変更",
   dpDue: "締切", dpSched: "予定", dpTime: "時間", dpRepeat: "繰り返し", dpNoDate: "日程なし",
   dpLinked: "リンク", dpViewResv: "予約を見る", dpParticipants: "参加者 · {n}名 · 状態共通",
   dpAuthor: "作成者", dpFirstRecipient: "最初の受信", dpMe: "自分", dpShareManage: "メンバー追加 / 共有管理",
@@ -729,7 +731,7 @@ const en: AdminTasksDictionary = {
   today: "Today", tomorrow: "Tomorrow", noDate: "No date", instructedBy: "{name} directive", sharedWith: "Shared", andMore: "{name} +{n}",
   iaTitle: "Task name", iaDesc: "Description", iaSchedule: "Schedule", iaPriority: "Priority", iaTarget: "Target (directive)",
   iaAttach: "Attach", iaAttachN: "{n} photos", iaCancel: "Cancel", iaSave: "Add task", iaInbox: "Inbox", iaSendInstr: "Send as directive", iaSendInstrCta: "Send a directive",
-  dpTask: "Task", dpInbox: "Inbox", dpStatus: "Status", dpSchedule: "Schedule", dpScheduleChange: "Reschedule",
+  dpTask: "Task", dpInbox: "Inbox", dpStatus: "Status", dpCompleteNeedsOccurrence: "Open a recurring task from Today, Tomorrow, or Calendar to complete a specific date.", dpSchedule: "Schedule", dpScheduleChange: "Reschedule",
   dpDue: "Due", dpSched: "Scheduled", dpTime: "Time", dpRepeat: "Repeat", dpNoDate: "No date",
   dpLinked: "Linked", dpViewResv: "View reservation", dpParticipants: "Participants · {n} · shared status",
   dpAuthor: "Author", dpFirstRecipient: "First recipient", dpMe: "You", dpShareManage: "Add member / manage sharing",

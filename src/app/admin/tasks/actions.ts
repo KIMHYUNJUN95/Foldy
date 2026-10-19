@@ -38,12 +38,13 @@ import {
   releaseAbsorbedOccurrences,
   resolveCompletionOccurrence,
   completeOccurrence,
+  occurrenceStatesForTask,
   setOccurrenceOrders,
   setTaskSortOrders,
   skipOccurrences,
 } from "@/lib/task-occurrences";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-import { cleanupRemovedTaskImages, sanitizeTaskImageUrls } from "@/lib/task-images";
+import { cleanupRemovedTaskImages, mergeTaskImageUrls, sanitizeTaskImageUrls } from "@/lib/task-images";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
 import type { Database } from "@/types/database";
@@ -54,6 +55,8 @@ export type TaskActionResult =
       id?: string;
       /** 「오늘로 가져오기」 결과 — 호출부가 무슨 일이 일어났는지 토스트로 말하는 데 쓴다. */
       carry?: { moved: number; carried: boolean };
+      /** 반복 완료가 실제로 기록한 회차 — 넘긴 날짜가 회차가 아니면 달라진다. 실행 취소는 이 날짜로. */
+      occurrenceDate?: string;
     }
   | { ok: false; error: string };
 
@@ -316,8 +319,13 @@ function recurringAnchorDate(task: TaskDetail): string {
 // Shared completion (2026-07-30): RECURRING tasks record the given occurrence date in
 // `task_occurrence_state` and never touch the row (no roll-forward); ONE-OFFs are stamped completed.
 // Both log `completed` + notify participants.
-async function completeInternal(session: Session, task: TaskDetail, occurrenceDate?: string) {
+async function completeInternal(
+  session: Session,
+  task: TaskDetail,
+  occurrenceDate?: string,
+): Promise<string | undefined> {
   const supabase = getSupabaseServiceClient();
+  let recorded: string | undefined;
   if (isStandardRecurrence(task.recurrenceRule)) {
     // 화면이 넘긴 날짜가 규칙상 회차가 아니면(월수금 반복을 화요일에 보는 경우) 가장 오래된
     // 미해결 회차로 정산한다 — 실제로 하는 일은 「밀린 그날 몫」이다(2026-09-08).
@@ -341,6 +349,7 @@ async function completeInternal(session: Session, task: TaskDetail, occurrenceDa
       anchor: taskAnchorDate(task),
       completedDate: occ,
     });
+    recorded = occ;
   } else {
     await supabase
       .from("tasks")
@@ -370,6 +379,7 @@ async function completeInternal(session: Session, task: TaskDetail, occurrenceDa
     task.title,
     `task_completed:${task.id}:${Date.now()}`,
   );
+  return recorded;
 }
 
 // Shared reopen: RECURRING clears that occurrence's recorded state; ONE-OFF clears completion
@@ -413,15 +423,20 @@ export async function setConsoleTaskStatus(
   const { session, task } = resolved;
 
   if (status === "completed") {
-    await completeInternal(session, task, occurrenceDate);
+    const recorded = await completeInternal(session, task, occurrenceDate);
     revalidatePath(CONSOLE_PATH);
-    return { ok: true };
+    return { ok: true, occurrenceDate: recorded };
   }
-  // Reopening a recurring occurrence (status→open) clears that occurrence's state, not the row.
+  // Reopening a completed recurring occurrence (status→open) clears that occurrence's state, not the
+  // row. An open occurrence going 진행 중 → 대기 is a row change and falls through below.
   if (status === "open" && isStandardRecurrence(task.recurrenceRule)) {
-    await reopenInternal(session, task, occurrenceDate);
-    revalidatePath(CONSOLE_PATH);
-    return { ok: true };
+    const occ = String(occurrenceDate ?? "").trim();
+    const states = occ ? await occurrenceStatesForTask(task.id) : null;
+    if (!occ || states?.get(occ) === "completed" || task.status !== "in_progress") {
+      await reopenInternal(session, task, occurrenceDate);
+      revalidatePath(CONSOLE_PATH);
+      return { ok: true };
+    }
   }
 
   const supabase = getSupabaseServiceClient();
@@ -457,10 +472,11 @@ export async function toggleConsoleComplete(
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
   if (complete) {
-    await completeInternal(session, task, occurrenceDate);
-  } else {
-    await reopenInternal(session, task, occurrenceDate);
+    const recorded = await completeInternal(session, task, occurrenceDate);
+    revalidatePath(CONSOLE_PATH);
+    return { ok: true, occurrenceDate: recorded };
   }
+  await reopenInternal(session, task, occurrenceDate);
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
 }
@@ -585,7 +601,7 @@ export async function updateConsoleTaskCore(input: {
   const nextImageUrls =
     input.imageUrls === undefined
       ? null
-      : sanitizeTaskImageUrls(input.imageUrls, !!task.projectId);
+      : mergeTaskImageUrls(task.imageUrls, input.imageUrls, !!task.projectId);
   if (nextImageUrls) update.image_urls = nextImageUrls;
   if (input.context !== undefined) Object.assign(update, normalizeContext(input.context));
 

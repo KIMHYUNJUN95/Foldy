@@ -491,6 +491,9 @@ export function TasksWorkspace({
   const [undoTask, setUndoTask] = useState<TaskRecord | null>(null);
   const [undoOcc, setUndoOcc] = useState<string | null>(null); // 반복 완료 undo 시 회차 날짜
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 마지막 완료 요청 — 실행 취소는 서버가 **실제로 기록한** 회차로 되돌린다. 회차가 아닌 날 완료하면
+  // 가장 오래된 밀린 회차로 정산되므로, 누른 날짜로 되돌리면 아무것도 풀리지 않는다.
+  const lastCompletion = useRef<Promise<string | undefined> | null>(null);
   /**
    * 완료/되돌리기 실행. 완료는 **누른 즉시** 목록에서 빠지고, 서버 왕복은 그 뒤에 따라온다.
    *
@@ -511,7 +514,9 @@ export function TasksWorkspace({
             byUserId: currentUserId,
             at: new Date().toISOString(),
           });
-          await completeTask(task.id, occurrenceDate);
+          const pending = completeTask(task.id, occurrenceDate);
+          lastCompletion.current = pending;
+          await pending;
         } else {
           await reopenTask(task.id, occurrenceDate);
         }
@@ -537,7 +542,18 @@ export function TasksWorkspace({
   );
   const handleUndo = useCallback(() => {
     haptic("light");
-    if (undoTask) runStatus(undoTask, false, undoOcc ?? undefined);
+    if (undoTask) {
+      const task = undoTask;
+      const pending = undoOcc ? lastCompletion.current : null;
+      if (pending) {
+        startComplete(async () => {
+          const recorded = await pending.catch(() => undefined);
+          await reopenTask(task.id, recorded ?? undoOcc ?? undefined);
+        });
+      } else {
+        runStatus(task, false, undoOcc ?? undefined);
+      }
+    }
     setUndoTask(null);
     setUndoOcc(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);

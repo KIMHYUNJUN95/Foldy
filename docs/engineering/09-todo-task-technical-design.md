@@ -966,6 +966,16 @@ Task-level images:
   `createTask` (`linkedProjectId ? 20 : 5`) and `updateTaskCore` (`task.projectId ? 20 : 5`). No
   storage/RLS change — the `request-images` policy validates per-file path only, not row count.
   i18n: `tasks.photosMax20` / `tasks.photosCountError20` (ko/ja/en).
+- **Existing photos are never cut by the cap (2026-10-19).** Edits (`updateTaskCore` /
+  `updateConsoleTaskCore`) store `mergeTaskImageUrls(previous, requested, isProjectTask)`
+  (`src/lib/task-images.ts`): URLs the task already has are kept even above the cap, only *new* URLs are
+  capped (accepted while the total is under the limit). Before this, moving a project task with 15 photos
+  to 관리함 (`moveConsoleToInbox` → cap 20 → 5) and then editing anything sliced the list to 5 and
+  `cleanupRemovedTaskImages` hard-deleted the other 10 from storage. Storage deletion now only happens
+  for photos the author actually removed. The uploaders already hide "add" at/over the cap, so an
+  over-cap task keeps its photos and simply can't take more. `sanitizeTaskImageUrls` (plain cap) is for
+  creates only. The only storage delete path for task photos is `cleanupRemovedTaskImages`.
+  Regression: `src/lib/__tests__/task-images-merge.test.ts`, `task-occurrence-status-undo.test.ts`.
 
 Update-log images:
 

@@ -24,8 +24,9 @@ describe("abandoned attendance session contract", () => {
 
   it("급여 집계에서 abandoned 를 제외한다", async () => {
     const src = await import("fs").then((fs) =>
-      fs.readFileSync("src/lib/attendance-pay.ts", "utf8"),
+      fs.readFileSync("src/lib/attendance-pay-calculation.ts", "utf8"),
     );
+    // 판정은 급여 공용 계산(`payExcludeReason`) 한 곳에 있다(2026-10-19).
     expect(src).toContain('if (s.status === "abandoned") return "abandoned"');
   });
 

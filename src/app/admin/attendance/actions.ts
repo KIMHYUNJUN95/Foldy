@@ -90,10 +90,15 @@ import {
 import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
+import { hasOverlappingSession } from "@/lib/attendance-overlap";
 
 export type ReviewActionResult =
   | { ok: true }
-  | { ok: false; reason: "forbidden" | "not_found" | "invalid" | "comment_required" | "error" };
+  | {
+      ok: false;
+      /** `overlap` = 같은 사람의 다른 유효 세션과 근무 시간이 겹친다(이중 지급 방지). */
+      reason: "forbidden" | "not_found" | "invalid" | "comment_required" | "overlap" | "error";
+    };
 
 /** Admin-confirmed final values on approval (default to the requester's proposals when omitted). */
 export type ApproveCorrectionInput = {
@@ -251,6 +256,17 @@ export async function approveCorrectionRequest(
     if (await isFinalizedUserMonth(service, organizationId, s.user_id, ymdToYm(s.operating_date))) {
       return { ok: false, reason: "invalid" };
     }
+    if (s.status !== "invalid" && resultingIn) {
+      const overlap = await hasOverlappingSession(
+        service,
+        organizationId,
+        s.user_id,
+        { clockInAt: resultingIn, clockOutAt: resultingOut },
+        s.id,
+      );
+      if (overlap === null) return { ok: false, reason: "error" };
+      if (overlap) return { ok: false, reason: "overlap" };
+    }
     // `abandoned`(퇴근 미기록 후 운영일 경과)도 여기서 닫힌다 — 관리자가 실제 퇴근 시각을 넣으면
     // completed 로 올라가고 급여에 포함된다. 이 전이를 빼면 방치 세션을 정리할 방법이 없다.
     if ((s.status === "open" || s.status === "abandoned") && resultingIn && resultingOut) {
@@ -318,6 +334,12 @@ export async function approveCorrectionRequest(
     if (await isFinalizedUserMonth(service, organizationId, request.requested_by_user_id, ymdToYm(operatingDate))) {
       return { ok: false, reason: "invalid" };
     }
+    const overlap = await hasOverlappingSession(service, organizationId, request.requested_by_user_id, {
+      clockInAt: finalInAt,
+      clockOutAt: finalOutAt,
+    });
+    if (overlap === null) return { ok: false, reason: "error" };
+    if (overlap) return { ok: false, reason: "overlap" };
     const insertFields = {
       organization_id: organizationId,
       user_id: request.requested_by_user_id,
@@ -504,7 +526,19 @@ export async function rejectCorrectionRequest(
 
 export type ManualSessionResult =
   | { ok: true; id: string }
-  | { ok: false; reason: "forbidden" | "invalid" | "reason_required" | "target_invalid" | "open_conflict" | "not_found" | "finalized_locked" | "error" };
+  | {
+      ok: false;
+      reason:
+        | "forbidden"
+        | "invalid"
+        | "reason_required"
+        | "target_invalid"
+        | "open_conflict"
+        | "overlap"
+        | "not_found"
+        | "finalized_locked"
+        | "error";
+    };
 
 export type SimpleManualResult =
   | { ok: true }
@@ -516,6 +550,7 @@ export type SimpleManualResult =
         | "reason_required"
         | "not_found"
         | "open_conflict"
+        | "overlap"
         | "incomplete"
         | "finalized_locked"
         | "error";
@@ -645,6 +680,12 @@ export async function createManualAttendanceSession(
     : null;
   if (input.clockOutTime && !clockOutAt) return { ok: false, reason: "invalid" };
   if (!validClockOrder(clockInAt, clockOutAt)) return { ok: false, reason: "invalid" };
+  const overlap = await hasOverlappingSession(service, organizationId, input.userId, {
+    clockInAt,
+    clockOutAt,
+  });
+  if (overlap === null) return { ok: false, reason: "error" };
+  if (overlap) return { ok: false, reason: "overlap" };
 
   const status = clockOutAt ? "completed" : "open";
   // An open manual session would collide with the worker's existing open session (partial unique).
@@ -783,6 +824,17 @@ export async function updateAttendanceSessionAdmin(
     const resultingIn = clockInChanged ? (update.clock_in_at as string | null) : s.clock_in_at;
     const resultingOut = clockOutChanged ? (update.clock_out_at as string | null) : s.clock_out_at;
     if (!validClockOrder(resultingIn, resultingOut)) return { ok: false, reason: "invalid" };
+    if (resultingIn) {
+      const overlap = await hasOverlappingSession(
+        service,
+        organizationId,
+        s.user_id,
+        { clockInAt: resultingIn, clockOutAt: resultingOut },
+        s.id,
+      );
+      if (overlap === null) return { ok: false, reason: "error" };
+      if (overlap) return { ok: false, reason: "overlap" };
+    }
     if (resultingIn && resultingOut) {
       update.status = "completed";
       // 방치(abandoned)였던 세션을 닫으면 방치 표시도 지운다 — 정정 승인 경로와 같다(2026-10-01).
@@ -924,6 +976,16 @@ export async function restoreAttendanceSession(
   // silently leave an incomplete session that never counts toward pay.
   if (!s.clock_in_at || !s.clock_out_at) return { ok: false, reason: "incomplete" };
   if (!validClockOrder(s.clock_in_at, s.clock_out_at)) return { ok: false, reason: "invalid" };
+  // 무효 처리 뒤 같은 시간대에 대신 넣은 세션이 있으면 복구하면 두 번 지급된다.
+  const overlap = await hasOverlappingSession(
+    service,
+    organizationId,
+    s.user_id,
+    { clockInAt: s.clock_in_at, clockOutAt: s.clock_out_at },
+    s.id,
+  );
+  if (overlap === null) return { ok: false, reason: "error" };
+  if (overlap) return { ok: false, reason: "overlap" };
 
   const before = {
     status: s.status,

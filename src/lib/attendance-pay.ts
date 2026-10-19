@@ -18,13 +18,14 @@ import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import {
-  allowanceCalculatedExact,
   breakSecondsBySession,
+  calculateMonthlyPay,
   dailyGrossExact,
   paidSecondsForSession,
   resolveEffective,
   roundToNearest10,
   type BreakInterval,
+  type PayExcludeReason,
   type SessionWindow,
 } from "@/lib/attendance-pay-calculation";
 import type {
@@ -43,14 +44,7 @@ export { dailyGrossExact, paidSecondsForSession, resolveEffective, roundToNeares
 
 // ── View types ───────────────────────────────────────────────────────────────
 
-export type PayExcludeReason =
-  | "open"
-  /** 퇴근을 찍지 않은 채 운영일이 넘어간 세션(2026-08-04). 급여에서 빠지고 월 마감을 막는다. */
-  | "abandoned"
-  | "invalid"
-  | "review_required"
-  | "pending_correction"
-  | null;
+export type { PayExcludeReason };
 
 export type PayDaySessionView = {
   sessionId: string;
@@ -179,21 +173,6 @@ function lastDayOfMonth(ym: string): string {
   return `${ym}-${String(last).padStart(2, "0")}`;
 }
 
-function excludeReasonFor(
-  s: AttendanceSessionRow,
-  correctionStatus: AttendanceCorrectionStatus | null,
-): PayExcludeReason {
-  if (s.status === "invalid") return "invalid";
-  // `abandoned` 는 퇴근 시각이 비어 있어 아래 조건에도 걸리지만, 사유를 따로 돌려줘야 화면에서
-  // "아직 근무 중"과 "퇴근을 안 찍고 넘어감"을 구분해 보여줄 수 있다.
-  if (s.status === "abandoned") return "abandoned";
-  if (s.status === "open" || s.status === "reopened") return "open";
-  if (!s.clock_in_at || !s.clock_out_at) return "open";
-  if (correctionStatus === "requested" || correctionStatus === "in_review") return "pending_correction";
-  if (s.review_state !== "normal" && s.review_state !== "approved_correction") return "review_required";
-  return null; // usable
-}
-
 // ── Monthly self-pay view ────────────────────────────────────────────────────
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
@@ -316,193 +295,46 @@ export async function getMonthlyPayView(
     category: string;
     memo: string | null;
   }[];
-  // Keep only allowances applicable to this user (org-wide null-target, or explicitly this user), then
-  // group by Tokyo operating date.
-  const allowancesByDate = new Map<string, typeof allowanceRows>();
-  for (const a of allowanceRows) {
-    if (a.target_user_id !== null && a.target_user_id !== userId) continue;
-    const list = allowancesByDate.get(a.target_date) ?? [];
-    list.push(a);
-    allowancesByDate.set(a.target_date, list);
-  }
-
   const sessionIds = sessions.map((s) => s.id);
   const [breakSecs, correctionStatuses] = await Promise.all([
     loadClosedBreakSeconds(service, sessions),
     loadCorrectionStatuses(service, organizationId, userId, sessionIds),
   ]);
 
-  // Group sessions by operating date.
-  const byDate = new Map<string, AttendanceSessionRow[]>();
-  for (const s of sessions) {
-    const list = byDate.get(s.operating_date) ?? [];
-    list.push(s);
-    byDate.set(s.operating_date, list);
-  }
-
-  const days: PayDayView[] = [];
-  let totalPaidMinutes = 0;
-  let totalGrossExact = 0;
-  let totalAllowanceExact = 0;
-  let totalAllowanceRegularExact = 0;
-  let totalAllowanceSpecialExact = 0;
-  let excludedCount = 0;
-  let hourlyEligible = false;
-  const segments = new Map<number, { paidMinutes: number; gross: number }>();
-  const monthlyAllowances: AppliedAllowanceView[] = [];
-
-  for (const date of Array.from(byDate.keys()).sort()) {
-    const dayRate = resolveEffective(rateRows, date)?.hourly_rate ?? null;
-    const empType = (resolveEffective(empRows, date)?.employment_type as EmploymentType | null) ?? null;
-    const isHourly = empType === "hourly";
-    if (isHourly) hourlyEligible = true;
-
-    let dayPaidMinutes = 0;
-    let dayGrossExact = 0;
-    const sessionViews: PayDaySessionView[] = [];
-
-    for (const s of byDate.get(date)!) {
-      const breakTotalSec = breakSecs.get(s.id) ?? 0;
-      const reason = excludeReasonFor(s, correctionStatuses.get(s.id) ?? null);
-      const usable = reason === null;
-
-      let paidMinutes = 0;
-      let grossExact = 0;
-      // Pay only applies to hourly days with a known rate and a usable session.
-      if (isHourly && usable && dayRate != null && s.clock_in_at && s.clock_out_at) {
-        const paidSec = paidSecondsForSession(s.clock_in_at, s.clock_out_at, breakTotalSec);
-        paidMinutes = Math.floor(paidSec / 60);
-        grossExact = dailyGrossExact(paidMinutes, dayRate);
-        dayPaidMinutes += paidMinutes;
-        dayGrossExact += grossExact;
-        const seg = segments.get(dayRate) ?? { paidMinutes: 0, gross: 0 };
-        seg.paidMinutes += paidMinutes;
-        seg.gross += grossExact;
-        segments.set(dayRate, seg);
-      } else if (isHourly && !usable) {
-        excludedCount += 1;
-      }
-
-      sessionViews.push({
-        sessionId: s.id,
-        clockInLabel: tokyoTimeLabel(s.clock_in_at, locale),
-        clockOutLabel: tokyoTimeLabel(s.clock_out_at, locale),
-        breakTotalSec,
-        paidMinutes,
-        dailyGrossExact: grossExact,
-        included: isHourly && usable && dayRate != null,
-        excludeReason: reason,
-      });
-    }
-
-    // Attendance allowances apply only to hourly days that have recognized paid work. daily_fixed pays
-    // its flat amount once for the day (regardless of session count); hourly_extra scales with the day's
-    // recognized paid minutes. Base rates in hourly_rate_history are never touched.
-    const dayAllowances: AppliedAllowanceView[] = [];
-    let dayAllowanceExact = 0;
-    let dayAllowanceRegularExact = 0;
-    let dayAllowanceSpecialExact = 0;
-    if (isHourly && dayPaidMinutes > 0) {
-      for (const a of allowancesByDate.get(date) ?? []) {
-        const type = a.allowance_type as AllowanceType;
-        const category = (a.category === "special" ? "special" : "regular") as AllowanceCategory;
-        const calculated = allowanceCalculatedExact(type, a.amount_yen, dayPaidMinutes);
-        if (calculated <= 0) continue;
-        dayAllowanceExact += calculated;
-        if (category === "special") dayAllowanceSpecialExact += calculated;
-        else dayAllowanceRegularExact += calculated;
-        dayAllowances.push({
-          allowanceId: a.id,
-          date,
-          type,
-          category,
-          memo: a.memo,
-          amountYen: a.amount_yen,
-          paidMinutes: dayPaidMinutes,
-          calculatedAmount: calculated,
-        });
-      }
-    }
-    totalAllowanceExact += dayAllowanceExact;
-    totalAllowanceRegularExact += dayAllowanceRegularExact;
-    totalAllowanceSpecialExact += dayAllowanceSpecialExact;
-    monthlyAllowances.push(...dayAllowances);
-
-    totalPaidMinutes += dayPaidMinutes;
-    totalGrossExact += dayGrossExact;
-    days.push({
-      date,
-      dateLabel: dayLabelOf(date, locale),
-      employmentType: empType,
-      hourlyRate: dayRate,
-      paidMinutes: dayPaidMinutes,
-      grossExact: dayGrossExact,
-      allowanceExact: dayAllowanceExact,
-      allowanceRegularExact: dayAllowanceRegularExact,
-      allowanceSpecialExact: dayAllowanceSpecialExact,
-      allowances: dayAllowances,
-      sessions: sessionViews,
-    });
-  }
-
-  // Allowance-only days: an allowance can target a date the worker didn't clock in (off-site or an
-  // unrecorded shift — the field always has variables). A `daily_fixed` allowance still applies as a flat
-  // grant for an hourly worker on that date; `hourly_extra` needs recognized minutes, so it can't apply
-  // without a session (0 minutes → 0). These days carry no base wage, only the allowance.
-  for (const [date, allowsForDate] of allowancesByDate) {
-    if (byDate.has(date)) continue; // days with sessions were handled above
-    const empType = (resolveEffective(empRows, date)?.employment_type as EmploymentType | null) ?? null;
-    if (empType !== "hourly") continue;
-
-    const dayAllowances: AppliedAllowanceView[] = [];
-    let dayAllowanceExact = 0;
-    let dayAllowanceRegularExact = 0;
-    let dayAllowanceSpecialExact = 0;
-    for (const a of allowsForDate) {
-      const type = a.allowance_type as AllowanceType;
-      const category = (a.category === "special" ? "special" : "regular") as AllowanceCategory;
-      const calculated = allowanceCalculatedExact(type, a.amount_yen, 0); // no minutes: hourly_extra → 0
-      if (calculated <= 0) continue; // hourly_extra without a session does not apply
-      dayAllowanceExact += calculated;
-      if (category === "special") dayAllowanceSpecialExact += calculated;
-      else dayAllowanceRegularExact += calculated;
-      dayAllowances.push({
-        allowanceId: a.id,
-        date,
-        type,
-        category,
-        memo: a.memo,
-        amountYen: a.amount_yen,
-        paidMinutes: 0,
-        calculatedAmount: calculated,
-      });
-    }
-    if (dayAllowances.length === 0) continue;
-
-    hourlyEligible = true;
-    totalAllowanceExact += dayAllowanceExact;
-    totalAllowanceRegularExact += dayAllowanceRegularExact;
-    totalAllowanceSpecialExact += dayAllowanceSpecialExact;
-    monthlyAllowances.push(...dayAllowances);
-    days.push({
-      date,
-      dateLabel: dayLabelOf(date, locale),
-      employmentType: empType,
-      hourlyRate: resolveEffective(rateRows, date)?.hourly_rate ?? null,
-      paidMinutes: 0,
-      grossExact: 0,
-      allowanceExact: dayAllowanceExact,
-      allowanceRegularExact: dayAllowanceRegularExact,
-      allowanceSpecialExact: dayAllowanceSpecialExact,
-      allowances: dayAllowances,
-      sessions: [],
-    });
-  }
-  days.sort((a, b) => a.date.localeCompare(b.date));
-
-  const rateSegments: RateSegmentView[] = Array.from(segments.entries())
-    .map(([rate, v]) => ({ rate, paidMinutes: v.paidMinutes, gross: Math.round(v.gross) }))
-    .sort((a, b) => a.rate - b.rate);
+  // 계산 규칙은 `calculateMonthlyPay` 한 곳 — 관리자 급여(`computePayrollMonth`)도 같은 함수를 쓴다.
+  const calc = calculateMonthlyPay({
+    userId,
+    firstDay,
+    lastDay,
+    sessions,
+    rates: rateRows,
+    employment: empRows,
+    allowances: allowanceRows,
+    breakSecondsBySession: breakSecs,
+    correctionStatusOf: (sessionId) => correctionStatuses.get(sessionId) ?? null,
+  });
+  const days: PayDayView[] = calc.days.map((d) => ({
+    date: d.date,
+    dateLabel: dayLabelOf(d.date, locale),
+    employmentType: d.employmentType as EmploymentType | null,
+    hourlyRate: d.hourlyRate,
+    paidMinutes: d.paidMinutes,
+    grossExact: d.grossExact,
+    allowanceExact: d.allowanceExact,
+    allowanceRegularExact: d.allowanceRegularExact,
+    allowanceSpecialExact: d.allowanceSpecialExact,
+    allowances: d.allowances,
+    sessions: d.sessions.map((r) => ({
+      sessionId: r.session.id,
+      clockInLabel: tokyoTimeLabel(r.session.clock_in_at, locale),
+      clockOutLabel: tokyoTimeLabel(r.session.clock_out_at, locale),
+      breakTotalSec: r.breakTotalSec,
+      paidMinutes: r.paidMinutes,
+      dailyGrossExact: r.grossExact,
+      included: r.included,
+      excludeReason: r.excludeReason,
+    })),
+  }));
 
   // Reflect a finalized snapshot (Step 11): when present, the screen shows the locked finalized pay.
   const snap = finalizedRow.data as {
@@ -514,34 +346,17 @@ export async function getMonthlyPayView(
   return {
     ym,
     monthLabel: monthLabelOf(ym, locale),
-    hourlyEligible,
-    // salariedOnly: 세션 유무와 관계없이 고용 유형 이력으로만 판단.
-    // 해당 월과 겹치는 employment_type_history 레코드 중 salaried가 하나라도 있고
-    // hourly 날이 없는(hourlyEligible === false) 경우에 true.
-    // 세션이 0개인 신입 월급제 직원 첫 달도 올바르게 true가 됨.
-    salariedOnly:
-      !hourlyEligible &&
-      empRows.some(
-        (r) =>
-          r.employment_type === "salaried" &&
-          r.effective_from <= lastDay &&
-          (r.effective_to == null || r.effective_to >= firstDay),
-      ),
-    totalPaidMinutes,
-    // Monthly ceiling to 10 yen applies once, AFTER base wage + allowance are summed (design rule).
-    expectedGross: roundToNearest10(totalGrossExact + totalAllowanceExact),
-    // Each bucket rounds to the nearest yen; allowanceTotal is their sum and base absorbs the 10-yen
-    // monthly ceiling so base + 추가수당 + 특별수당 always sum back to expectedGross exactly.
-    allowanceRegularTotal: Math.round(totalAllowanceRegularExact),
-    allowanceSpecialTotal: Math.round(totalAllowanceSpecialExact),
-    allowanceTotal: Math.round(totalAllowanceRegularExact) + Math.round(totalAllowanceSpecialExact),
-    baseGross:
-      roundToNearest10(totalGrossExact + totalAllowanceExact) -
-      Math.round(totalAllowanceRegularExact) -
-      Math.round(totalAllowanceSpecialExact),
-    allowances: monthlyAllowances,
-    excludedCount,
-    rateSegments,
+    hourlyEligible: calc.hourlyEligible,
+    salariedOnly: calc.salariedOnly,
+    totalPaidMinutes: calc.totalPaidMinutes,
+    expectedGross: calc.expectedGross,
+    allowanceRegularTotal: calc.allowanceRegularTotal,
+    allowanceSpecialTotal: calc.allowanceSpecialTotal,
+    allowanceTotal: calc.allowanceTotal,
+    baseGross: calc.baseGross,
+    allowances: calc.allowances,
+    excludedCount: calc.excludedCount,
+    rateSegments: calc.rateSegments,
     days,
     finalization: snap
       ? {

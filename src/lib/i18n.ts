@@ -2266,6 +2266,8 @@ const FALLBACK_DICTIONARY = {
       actionRestoring: "Restoring…",
       actionOpenConflict:
         "Can't restore — this worker already has a different open session.",
+      actionOverlap:
+        "Can't save — this overlaps another session of the same worker. Fix or invalidate that session first.",
       actionRestoreDefaultReason: "Restored after confirming the original attendance was valid.",
       actionDoneInvalidate: "Session invalidated.",
       actionDoneApprove: "Marked as reviewed.",
@@ -10101,6 +10103,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         actionApproving: "처리 중…",
         actionRestoring: "복구 중…",
         actionOpenConflict: "복구할 수 없습니다 — 이 직원은 이미 다른 진행 중인 세션이 있습니다.",
+        actionOverlap:
+          "저장할 수 없습니다 — 같은 직원의 다른 근무와 시간이 겹칩니다. 그 근무를 먼저 고치거나 무효 처리하세요.",
         actionRestoreDefaultReason: "원본 출퇴근 기록이 정상임을 확인하여 복구함.",
         actionDoneInvalidate: "세션을 무효 처리했습니다.",
         actionDoneApprove: "검토 완료로 표시했습니다.",
@@ -17785,6 +17789,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         actionApproving: "処理中…",
         actionRestoring: "復元中…",
         actionOpenConflict: "復元できません — このスタッフには他に進行中のセッションがあります。",
+        actionOverlap:
+          "保存できません — 同じスタッフの別の勤務と時間が重なっています。先にその勤務を修正するか無効化してください。",
         actionRestoreDefaultReason: "元の出退勤記録が正当であることを確認し復元しました。",
         actionDoneInvalidate: "セッションを無効化しました。",
         actionDoneApprove: "レビュー完了として記録しました。",

@@ -317,15 +317,15 @@ export function LeaveTeamCalendar({
                     type="button"
                     key={`${sg.leave.id}-${sg.startDow}`}
                     className={`ttbar${sg.contL ? " cl" : ""}${sg.contR ? " cr" : ""}`}
-                    style={{
-                      left: `calc(${left}% + 4px)`,
-                      width: `calc(${width}% - 8px)`,
-                      top: 30 + sg.lane * 26,
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      ["--c" as any]: accent.c,
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      ["--b" as any]: accent.b,
-                    }}
+                    style={
+                      {
+                        left: `calc(${left}% + 4px)`,
+                        width: `calc(${width}% - 8px)`,
+                        top: 30 + sg.lane * 26,
+                        "--c": accent.c,
+                        "--b": accent.b,
+                      } as React.CSSProperties
+                    }
                     title={`${sg.leave.name} · ${typeLabel(sg.leave.type, lc)}`}
                     onClick={() => onSelect(sg.leave.id)}
                   >

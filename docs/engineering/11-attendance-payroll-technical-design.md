@@ -100,15 +100,18 @@ flow could be tested before a dashboard existed.
 - **Atomic QR issuance** — migration 202606170002_issue_attendance_qr_fn.sql adds the plpgsql
   issue_attendance_qr(p_org, p_site, p_created_by, p_token) SECURITY DEFINER function (service_role
   only): deactivates the current active token, inserts the new active one, and links
-  eplaced_by_token_id — all in one transaction, so the "one active token per site" partial-unique
+  
+eplaced_by_token_id — all in one transaction, so the "one active token per site" partial-unique
   guarantee always holds and the reissue audit chain is intact.
 - **Backend helpers** — src/lib/attendance-sites.ts (server-only, service-role; caller-agnostic):
   reads listAttendanceSites / getAttendanceSite / getActiveQrToken / getQrTokenHistory; writes
   createAttendanceSite / updateAttendanceSite / setAttendanceSiteActive / issueAttendanceQr
-  (via the RPC) / evokeAttendanceQr; generateAttendanceQrToken() makes a site-specific
+  (via the RPC) / 
+evokeAttendanceQr; generateAttendanceQrToken() makes a site-specific
   tt_<base64url> token. Every helper is **organization-scoped**. They DO NOT check the caller —
   **owner-only enforcement is the caller's responsibility** and is deferred to the web-dashboard server
-  actions (ole === 'owner', server-side). Wi-Fi SSIDs are stored on the site; Wi-Fi attendance stays
+  actions (
+ole === 'owner', server-side). Wi-Fi SSIDs are stored on the site; Wi-Fi attendance stays
   inactive.
 - **Dev temp-QR tool** — GET /api/dev/attendance/temp-qr (gated by
   NODE_ENV=development + ENABLE_LOCAL_DEV_TOOLS=true + local/LAN host; 404 otherwise). Resolves the
@@ -347,7 +350,9 @@ stays owner-only.
   - `createManualAttendanceSession({ userId, operatingDate, clockInTime, clockOutTime, clockInSiteId,
     clockOutSiteId, reason })` -> target must be an **active member**; sites validated against the org;
     times combine with the Tokyo `operatingDate`; `clockOutTime` present -> `completed`, else `open`
-    (guarded against the one-open-session collision). Stores `manual_created = true`,
+    (guarded against the one-open-session collision). **Rejects `overlap`** when the new
+    [clock-in, clock-out) range overlaps another non-`invalid` session of the same worker (see "Same-worker
+    time overlap" below). Stores `manual_created = true`,
     `manual_created_by_user_id`, `manual_created_reason`, methods `manual`. Audit `manual_create`.
   - `updateAttendanceSessionAdmin({ sessionId, reason, clockInTime?, clockOutTime?, clockInSiteId?,
     clockOutSiteId?, reviewState? })` -> per-field tri-state (omit = keep, null = clear, value = set);
@@ -375,6 +380,17 @@ stays owner-only.
     just renders. Powers the queue session panel's "변경 내역" (change history) section — the first UI
     surface for the audit trail (previously written-only). Loaded on-demand when the panel opens and
     re-fetched after a successful manual edit.
+- **Same-worker time overlap (2026-10-19)** — `src/lib/attendance-overlap.ts`
+  (`findOverlappingSession` pure + `hasOverlappingSession` org-scoped lookup). Before saving,
+  `createManualAttendanceSession`, `updateAttendanceSessionAdmin` (only when clock-in/out changes on a
+  non-invalid session), `restoreAttendanceSession`, and `approveCorrectionRequest` (session-linked on a
+  non-invalid session, and session-less exception → new session) return `overlap` if the resulting
+  half-open range [in, out) overlaps another session of the same worker that is not `invalid`. Touching
+  ranges (prior out = next in) are allowed. An `open`/`reopened` session counts as open-ended; an
+  `abandoned` one (no clock-out) counts as a single point at its clock-in. Admin UI maps `overlap` to
+  `actionOverlap` (ko/ja/en). Why: two usable overlapping sessions are both paid → double payment.
+  Not covered: worker self clock-in/out (mobile) and concurrent admin writes (app-level check, not a DB
+  constraint — no exclusion constraint yet, pending a production overlap scan).
 - **Reflection (no UI change):** manual/invalidated sessions already render in the existing flows -> the
   review-queue layer (`manual` filter, `manual_created` marker, `invalid` status), and the worker's own
   history (?섎룞 chip via `manualCreated`, 臾댄슚 chip via `invalid` status). Invalidated records remain
@@ -400,7 +416,16 @@ data. **No admin PC/web dashboard** (explicit scope rule). The pay screen is **n
     closed-break subtraction, exact daily gross, monthly 10-yen ceiling, and personal-export daily
     reconciliation are regression-tested.
   - `paidSecondsForSession` (worked - closed breaks, never negative), `roundToNearest10` (10-yen
-    **ceiling** at the monthly final layer only).
+    **ceiling** at the monthly final layer only). **Float noise is settled first (2026-10-19):**
+    `settleYen` rounds the exact sum to 6 decimals before the ceiling — summing per-minute fractions in
+    floating point gave e.g. 100.00000000000001 (1,000円 × 1分 × 6日) and the ceiling paid 110. Real amounts
+    are multiples of 1/60 yen, so the settle never changes a legitimate value. The per-bucket
+    `Math.round` (추가수당 · 특별수당) and rate-segment rounding use the same settle.
+  - **One shared pure calculation (2026-10-19):** `calculateMonthlyPay(...)` in
+    `attendance-pay-calculation.ts` (also `payExcludeReason`, the usable-session rule) computes the whole
+    user-month (days, sessions, allowances, totals, buckets, segments). `getMonthlyPayView` (self view,
+    finalize snapshot, exports) and `computePayrollMonth` (admin payroll / overview / staff detail) both
+    call it and only add labels / snapshot info — a pay rule now changes in one place.
   - **Usable session** = `completed` + both clock ends + `review_state in {normal, approved_correction}`
     + correction status not in {requested, in_review}. Excluded: open/reopened/invalid, review_required,
     pending correction. Paid minutes in **1-minute units**; breaks excluded; no premiums.
@@ -558,7 +583,12 @@ the worker's own pay screen showing the finalized number + badge.
   server-side) -> finalize is **blocked** while any unresolved item remains for that user-month:
   `review_required` sessions, **pending correction requests** (requested/in_review on the month's
   sessions), **open/incomplete** sessions, or an already-finalized snapshot (must reopen first). Returns
-  `{ eligible, blockers }`.
+  `{ eligible, blockers }`. Session counts come from `countBlockingSessions` (shared with
+  `computePayrollMonth`); **`invalid` sessions never count** — invalidating is the admin's resolution
+  (2026-10-19). Before that, a session invalidated while still `review_required` kept blocking the month
+  forever (restore was the only UI exit, which re-validated it). The review queue `review_required`
+  filter, the 근태 badge, the overview "검토 필요" KPI, the queue 검토 tab, and staff-detail abnormal
+  marks exclude `invalid` the same way; invalid sessions stay visible in 전체 with the 무효 pill.
 - **Finalize** `finalizeAttendanceMonth({ userId, ym })` (`src/app/admin/attendance/actions.ts`,
   privilege-gated): target must be an active member; eligibility must pass; the month must be hourly
   (`getMonthlyPayView.hourlyEligible`, else `not_hourly`). Computes the final gross from the **same
@@ -1354,9 +1384,8 @@ Admin attendance read path — batched (2026-10-19):
   in memory. It replaced the per-member fan-out of `getMonthlyPayView` + `getFinalizationEligibility` +
   `getCurrentFinalizedSnapshot` (≈12 queries per member → ~140 for 11 staff; now ~13 queries, 3 serial
   steps, independent of staff count).
-- **`computePayrollMonth` must follow the same rules as `getMonthlyPayView` and
-  `getFinalizationEligibility`.** Changing a pay rule in `src/lib/attendance-pay.ts` means changing it
-  here too. `src/lib/__tests__/admin-payroll-batch.test.ts` runs both paths over one in-memory DB and
+- **`computePayrollMonth` and `getMonthlyPayView` share `calculateMonthlyPay`** and both finalize paths
+  share `countBlockingSessions` (2026-10-19), so pay / blocker rules live in one place each. `src/lib/__tests__/admin-payroll-batch.test.ts` runs both paths over one in-memory DB and
   compares every payroll row field (yen, minutes, blockers, finalized label) in ko/ja/en.
 - **Staff detail** (`getAdminStaffDetail`) uses the same single-user batch: privilege · membership ·
   profile · month inputs · transport report start together, then breaks · corrections · sites · transport

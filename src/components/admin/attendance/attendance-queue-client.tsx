@@ -100,7 +100,9 @@ function methodLabel(method: string | null, c: Att): string {
 
 function isUrgent(item: ReviewQueueItem): boolean {
   return (
-    item.reviewState === "review_required" && (item.isAbnormal || !item.clockOutLabel)
+    item.reviewState === "review_required" &&
+    item.status !== "invalid" &&
+    (item.isAbnormal || !item.clockOutLabel)
   );
 }
 
@@ -250,7 +252,7 @@ function SessionRow({
 }
 
 function isReviewRow(item: ReviewQueueItem): boolean {
-  return item.reviewState === "review_required" && !isPending(item);
+  return item.reviewState === "review_required" && item.status !== "invalid" && !isPending(item);
 }
 
 function filterRows(items: ReviewQueueItem[], f: Filter): ReviewQueueItem[] {
@@ -1162,6 +1164,8 @@ function SessionPanel({
         setErr(c.actionReasonRequired);
       } else if (res.reason === "invalid") {
         setErr(c.actionInvalidTime);
+      } else if (res.reason === "overlap") {
+        setErr(c.actionOverlap);
       } else {
         setErr(c.actionFailed);
       }
@@ -1214,6 +1218,8 @@ function SessionPanel({
           setErr(c.restoreNeedsCompleteNote);
         } else if (res.reason === "open_conflict") {
           setErr(c.actionOpenConflict);
+        } else if (res.reason === "overlap") {
+          setErr(c.actionOverlap);
         } else {
           setErr(c.actionFailed);
         }
@@ -1734,6 +1740,8 @@ function CorrectionPanel({
         onClose();
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
+      } else if (res.reason === "overlap") {
+        setErr(c.actionOverlap);
       } else {
         setErr(c.actionFailed);
       }

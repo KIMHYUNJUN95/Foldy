@@ -453,6 +453,7 @@ describe("admin attendance overview KPI = detail pages", () => {
     const reviewRows = review.filter(
       (r) =>
         r.reviewState === "review_required" &&
+        r.status !== "invalid" &&
         !(r.correctionStatus === "requested" || r.correctionStatus === "in_review"),
     );
     const corrections = (await getAdminAttendanceCorrections(adminSession, "ko-KR")).items.filter(

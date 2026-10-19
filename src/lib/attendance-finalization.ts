@@ -36,6 +36,28 @@ export type FinalizationEligibility = {
 };
 
 /**
+ * 마감을 막는 세션 수 — 자기 마감(`getFinalizationEligibility`)과 관리자 급여(`computePayrollMonth`)가 같이 쓴다.
+ * **무효(`invalid`) 세션은 어느 쪽에도 세지 않는다** — 무효 처리 자체가 관리자의 해소 결정이다. 전에는 「검토 필요」로
+ * 표시된 채 무효 처리된 세션이 검토 수에 계속 잡혀, 복구(=다시 유효로) 말고는 마감을 풀 방법이 없었다(2026-10-19).
+ */
+export function countBlockingSessions(
+  sessions: readonly { status: string; review_state: string; clock_out_at: string | null }[],
+): { reviewRequired: number; openSessions: number } {
+  let reviewRequired = 0;
+  let openSessions = 0;
+  for (const s of sessions) {
+    if (s.status === "invalid") continue;
+    if (s.review_state === "review_required") reviewRequired += 1;
+    // `abandoned`(퇴근 미기록 후 운영일 경과)도 미해소로 센다 — 출근은 막지 않되 **마감은 막아야**
+    // 누군가 반드시 정리하게 된다. 정리 경로는 정정 요청 승인 / 관리자 직접 수정 / 무효 처리.
+    if (s.status === "open" || s.status === "reopened" || s.status === "abandoned" || !s.clock_out_at) {
+      openSessions += 1;
+    }
+  }
+  return { reviewRequired, openSessions };
+}
+
+/**
  * The current FINALIZED snapshot for a user-month, or null. After a reopen the row becomes `reopened`
  * (no `finalized` row), so this returns null and expected-pay resumes.
  */
@@ -84,14 +106,7 @@ export async function getFinalizationEligibility(
     clock_out_at: string | null;
   }[];
 
-  const reviewRequired = sessions.filter((s) => s.review_state === "review_required").length;
-  const openSessions = sessions.filter(
-    // `abandoned`(퇴근 미기록 후 운영일 경과)도 미해소로 센다 — 출근은 막지 않되 **마감은 막아야**
-    // 누군가 반드시 정리하게 된다. 정리 경로는 정정 요청 승인 / 관리자 직접 수정 / 무효 처리.
-    (s) =>
-      s.status !== "invalid" &&
-      (s.status === "open" || s.status === "reopened" || s.status === "abandoned" || !s.clock_out_at),
-  ).length;
+  const { reviewRequired, openSessions } = countBlockingSessions(sessions);
 
   const sessionIds = sessions.map((s) => s.id);
   let pendingCorrections = 0;

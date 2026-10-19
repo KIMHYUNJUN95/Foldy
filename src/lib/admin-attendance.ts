@@ -6,8 +6,11 @@ import {
   isAttendancePayrollAdmin,
   type ReviewQueueItem,
 } from "@/lib/attendance-review";
-import type { AllowanceType } from "@/lib/attendance-pay";
-import type { FinalizationBlockers, FinalizationEligibility } from "@/lib/attendance-finalization";
+import {
+  countBlockingSessions,
+  type FinalizationBlockers,
+  type FinalizationEligibility,
+} from "@/lib/attendance-finalization";
 import {
   getTransportReport,
   getTransportItems,
@@ -27,12 +30,8 @@ import type {
 } from "@/lib/attendance";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
-  allowanceCalculatedExact,
   breakSecondsBySession,
-  dailyGrossExact,
-  paidSecondsForSession,
-  resolveEffective,
-  roundToNearest10,
+  calculateMonthlyPay,
   type BreakInterval,
 } from "@/lib/attendance-pay-calculation";
 import { resolveLocale } from "@/lib/i18n";
@@ -180,6 +179,8 @@ export async function getAdminAttendanceBadgeStats(
         .select("id, clock_out_at, status")
         .eq("organization_id", session.organization.id)
         .eq("review_state", "review_required")
+        // 무효 처리한 세션은 해소된 것으로 본다 — 검토 큐 · 마감 판정과 같다(2026-10-19).
+        .neq("status", "invalid")
         .gte("operating_date", monthFrom)
         .lte("operating_date", monthTo)
         .limit(5000),
@@ -253,7 +254,7 @@ export async function getAdminAttendanceBadgeStats(
     isPrivileged: true,
     ym,
     queueOpen: reviewRows.length + (correctionsRes.count ?? 0),
-    queueUrgent: reviewRows.filter((row) => row.status === "invalid" || !row.clock_out_at).length,
+    queueUrgent: reviewRows.filter((row) => !row.clock_out_at).length,
     payrollTargets,
     transportPending: transportRes.count ?? 0,
   };
@@ -952,17 +953,6 @@ function payLocaleTag(locale: string): string {
   return "en-US";
 }
 
-/** `attendance-pay.ts` 의 `excludeReasonFor` 와 같은 판정 — null 이면 급여에 넣는다. */
-function payExcludeReason(s: PayrollSessionRow, correctionStatus: string | null): string | null {
-  if (s.status === "invalid") return "invalid";
-  if (s.status === "abandoned") return "abandoned";
-  if (s.status === "open" || s.status === "reopened") return "open";
-  if (!s.clock_in_at || !s.clock_out_at) return "open";
-  if (correctionStatus === "requested" || correctionStatus === "in_review") return "pending_correction";
-  if (s.review_state !== "normal" && s.review_state !== "approved_correction") return "review_required";
-  return null;
-}
-
 function groupByUser<T extends { user_id: string }>(rows: readonly T[]): Map<string, T[]> {
   const map = new Map<string, T[]>();
   for (const row of rows) {
@@ -1024,125 +1014,31 @@ export function computePayrollMonth(
     const rateRows = ratesByUser.get(userId) ?? [];
     const empRows = employmentByUser.get(userId) ?? [];
 
-    const allowancesByDate = new Map<string, PayrollAllowanceRow[]>();
-    for (const a of inputs.allowances) {
-      if (a.target_user_id !== null && a.target_user_id !== userId) continue;
-      const list = allowancesByDate.get(a.target_date) ?? [];
-      list.push(a);
-      allowancesByDate.set(a.target_date, list);
-    }
-
-    const byDate = new Map<string, PayrollSessionRow[]>();
-    for (const s of sessions) {
-      const list = byDate.get(s.operating_date) ?? [];
-      list.push(s);
-      byDate.set(s.operating_date, list);
-    }
-
-    let totalPaidMinutes = 0;
-    let totalGrossExact = 0;
-    let totalAllowanceExact = 0;
-    let totalAllowanceRegularExact = 0;
-    let totalAllowanceSpecialExact = 0;
-    let excludedCount = 0;
-    let hourlyEligible = false;
-    let hasSalariedDay = false;
-    let workDays = 0;
-    const segmentRates = new Set<number>();
-
-    for (const date of Array.from(byDate.keys()).sort()) {
-      const dayRate = resolveEffective(rateRows, date)?.hourly_rate ?? null;
-      const empType = resolveEffective(empRows, date)?.employment_type ?? null;
-      const isHourly = empType === "hourly";
-      if (isHourly) hourlyEligible = true;
-      if (empType === "salaried") hasSalariedDay = true;
-
-      let dayPaidMinutes = 0;
-      let dayGrossExact = 0;
-      for (const s of byDate.get(date)!) {
-        const breakTotalSec = breakSecs.get(s.id) ?? 0;
-        const usable = payExcludeReason(s, ownCorrectionStatus.get(s.id) ?? null) === null;
-        if (isHourly && usable && dayRate != null && s.clock_in_at && s.clock_out_at) {
-          const paidSec = paidSecondsForSession(s.clock_in_at, s.clock_out_at, breakTotalSec);
-          const paidMinutes = Math.floor(paidSec / 60);
-          const grossExact = dailyGrossExact(paidMinutes, dayRate);
-          dayPaidMinutes += paidMinutes;
-          dayGrossExact += grossExact;
-          segmentRates.add(dayRate);
-        } else if (isHourly && !usable) {
-          excludedCount += 1;
-        }
-      }
-
-      let dayAllowanceExact = 0;
-      let dayAllowanceRegularExact = 0;
-      let dayAllowanceSpecialExact = 0;
-      if (isHourly && dayPaidMinutes > 0) {
-        for (const a of allowancesByDate.get(date) ?? []) {
-          const calculated = allowanceCalculatedExact(
-            a.allowance_type as AllowanceType,
-            a.amount_yen,
-            dayPaidMinutes,
-          );
-          if (calculated <= 0) continue;
-          dayAllowanceExact += calculated;
-          if (a.category === "special") dayAllowanceSpecialExact += calculated;
-          else dayAllowanceRegularExact += calculated;
-        }
-      }
-      totalAllowanceExact += dayAllowanceExact;
-      totalAllowanceRegularExact += dayAllowanceRegularExact;
-      totalAllowanceSpecialExact += dayAllowanceSpecialExact;
-      totalPaidMinutes += dayPaidMinutes;
-      totalGrossExact += dayGrossExact;
-      if (dayPaidMinutes > 0) workDays += 1;
-    }
-
-    // 출근 기록이 없는 날의 수당(시급제 · 정액만) — `getMonthlyPayView` 의 allowance-only days.
-    for (const [date, allowsForDate] of allowancesByDate) {
-      if (byDate.has(date)) continue;
-      if (resolveEffective(empRows, date)?.employment_type !== "hourly") continue;
-      let dayAllowanceExact = 0;
-      let dayAllowanceRegularExact = 0;
-      let dayAllowanceSpecialExact = 0;
-      let applied = 0;
-      for (const a of allowsForDate) {
-        const calculated = allowanceCalculatedExact(a.allowance_type as AllowanceType, a.amount_yen, 0);
-        if (calculated <= 0) continue;
-        dayAllowanceExact += calculated;
-        if (a.category === "special") dayAllowanceSpecialExact += calculated;
-        else dayAllowanceRegularExact += calculated;
-        applied += 1;
-      }
-      if (applied === 0) continue;
-      hourlyEligible = true;
-      totalAllowanceExact += dayAllowanceExact;
-      totalAllowanceRegularExact += dayAllowanceRegularExact;
-      totalAllowanceSpecialExact += dayAllowanceSpecialExact;
-    }
+    const calc = calculateMonthlyPay({
+      userId,
+      firstDay,
+      lastDay,
+      sessions,
+      rates: rateRows,
+      employment: empRows,
+      allowances: inputs.allowances,
+      breakSecondsBySession: breakSecs,
+      correctionStatusOf: (sessionId) => ownCorrectionStatus.get(sessionId) ?? null,
+    });
 
     const snap = finalizedByUser.get(userId) ?? null;
-    const allowanceRegularTotal = Math.round(totalAllowanceRegularExact);
-    const allowanceSpecialTotal = Math.round(totalAllowanceSpecialExact);
     const pay: PayrollPaySummary = {
-      hourlyEligible,
-      salariedOnly:
-        !hourlyEligible &&
-        empRows.some(
-          (r) =>
-            r.employment_type === "salaried" &&
-            r.effective_from <= lastDay &&
-            (r.effective_to == null || r.effective_to >= firstDay),
-        ),
-      hasSalariedDay,
-      totalPaidMinutes,
-      expectedGross: roundToNearest10(totalGrossExact + totalAllowanceExact),
-      allowanceRegularTotal,
-      allowanceSpecialTotal,
-      allowanceTotal: allowanceRegularTotal + allowanceSpecialTotal,
-      excludedCount,
-      primaryRate: segmentRates.size > 0 ? Array.from(segmentRates).sort((a, b) => a - b)[0] : null,
-      workDays,
+      hourlyEligible: calc.hourlyEligible,
+      salariedOnly: calc.salariedOnly,
+      hasSalariedDay: calc.days.some((d) => d.employmentType === "salaried"),
+      totalPaidMinutes: calc.totalPaidMinutes,
+      expectedGross: calc.expectedGross,
+      allowanceRegularTotal: calc.allowanceRegularTotal,
+      allowanceSpecialTotal: calc.allowanceSpecialTotal,
+      allowanceTotal: calc.allowanceTotal,
+      excludedCount: calc.excludedCount,
+      primaryRate: calc.rateSegments[0]?.rate ?? null,
+      workDays: calc.days.filter((d) => d.paidMinutes > 0).length,
       finalization: snap
         ? {
             gross: snap.gross_amount,
@@ -1161,12 +1057,7 @@ export function computePayrollMonth(
         : null,
     };
 
-    const reviewRequired = sessions.filter((s) => s.review_state === "review_required").length;
-    const openSessions = sessions.filter(
-      (s) =>
-        s.status !== "invalid" &&
-        (s.status === "open" || s.status === "reopened" || s.status === "abandoned" || !s.clock_out_at),
-    ).length;
+    const { reviewRequired, openSessions } = countBlockingSessions(sessions);
     const pendingCorrections =
       (sessions.length > 0 ? (pendingLinkedByUser.get(userId) ?? 0) : 0) +
       (pendingSessionlessByUser.get(userId) ?? 0);
@@ -1961,7 +1852,7 @@ export async function getAdminStaffDetail(
     const clockOutLabel = timeLabelOf(r.clock_out_at, localeTag);
     const corrStatus = corrBySession.get(r.id) ?? null;
     const isAbnormal =
-      r.review_state === "review_required" || (!r.clock_out_at && r.status !== "invalid");
+      r.status !== "invalid" && (r.review_state === "review_required" || !r.clock_out_at);
     const issueKey = classifyDayIssue({
       status: r.status,
       clockOutLabel,

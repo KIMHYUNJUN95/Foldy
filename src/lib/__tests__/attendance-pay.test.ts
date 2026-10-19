@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateMonthlyPay,
   dailyGrossExact,
   paidSecondsForSession,
   reconcileDailyPaysToTotal,
@@ -56,5 +57,33 @@ describe("attendance hourly pay calculation", () => {
 
     expect(reconciled.map((row) => row.dailyPay)).toEqual([21, 29, 0]);
     expect(reconciled.reduce((sum, row) => sum + row.dailyPay, 0)).toBe(50);
+  });
+
+  it("does not overpay 10 yen from floating-point noise before the monthly ceiling (2026-10-19)", () => {
+    // 1,000엔 × 1분 = 16.666…엔, 6일이면 정확히 100엔. 부동소수 합은 100.00000000000001 → 전에는 110엔.
+    expect(roundToNearest10(100.00000000000001)).toBe(100);
+    expect(roundToNearest10(100.0001)).toBe(110);
+    const sessions = Array.from({ length: 6 }, (_, i) => ({
+      id: `s${i}`,
+      operating_date: `2026-09-0${i + 1}`,
+      clock_in_at: `2026-09-0${i + 1}T09:00:00+09:00`,
+      clock_out_at: `2026-09-0${i + 1}T09:01:00+09:00`,
+      status: "completed",
+      review_state: "normal",
+    }));
+    const calc = calculateMonthlyPay({
+      userId: "u",
+      firstDay: "2026-09-01",
+      lastDay: "2026-09-30",
+      sessions,
+      rates: [{ hourly_rate: 1000, effective_from: "2026-01-01", effective_to: null }],
+      employment: [{ employment_type: "hourly", effective_from: "2026-01-01", effective_to: null }],
+      allowances: [],
+      breakSecondsBySession: new Map(),
+      correctionStatusOf: () => null,
+    });
+    expect(calc.totalPaidMinutes).toBe(6);
+    expect(calc.expectedGross).toBe(100);
+    expect(calc.baseGross).toBe(100);
   });
 });

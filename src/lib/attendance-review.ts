@@ -238,7 +238,8 @@ export async function getAttendanceReviewQueue(
 
     switch (params.filter) {
       case "review_required":
-        query = query.eq("review_state", "review_required");
+        // 무효 처리한 세션은 해소된 것으로 본다 — 마감 판정(`countBlockingSessions`)과 같다(2026-10-19).
+        query = query.eq("review_state", "review_required").neq("status", "invalid");
         break;
       case "incomplete":
         query = query.is("clock_out_at", null).neq("status", "invalid");

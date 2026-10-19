@@ -61,6 +61,8 @@ export function ManualSessionModal({
         return c.manualErrTarget;
       case "open_conflict":
         return c.manualErrOpenConflict;
+      case "overlap":
+        return c.actionOverlap;
       case "finalized_locked":
         return c.manualErrFinalized;
       default:

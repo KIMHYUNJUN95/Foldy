@@ -43,7 +43,7 @@ by the current status above and the later as-built sections.
 > **Step 11 (2026-06-18):** per-person **monthly finalization** + reopen is live as a privileged backend
 > (`finalizeAttendanceMonth` / `reopenAttendanceMonth`, owner / `attendance_payroll_admin` only).
 > Finalize is **blocked** while review-required / pending-correction / open sessions remain (or already
-> finalized); it stores a `finalized` snapshot (paid minutes, rate breakdown, gross, finalizer, time).
+> finalized) — **invalidated sessions never block** (2026-10-19: invalidating is the resolution); it stores a `finalized` snapshot (paid minutes, rate breakdown, gross, finalizer, time).
 > **Reopen requires a reason**, flips the snapshot to `reopened` (expected pay resumes), and **never
 > destroys prior history** (superseded chain + `audit_logs`). The worker self pay screen shows the
 > finalized number + finalized badge when finalized. The admin attendance/payroll console is now implemented. See
@@ -543,7 +543,11 @@ Deferred targeting:
 - planned attendance allowances apply only to days that otherwise have recognized paid work
 - `daily_fixed` allowances apply once per worker per date, even if the worker has multiple sessions
 - `hourly_extra` allowances are calculated from recognized paid minutes for that date
-- final gross amount is rounded **up** to the nearest `10 yen` (ceiling — e.g. 93→100, 95→100; not round-half)
+- final gross amount is rounded **up** to the nearest `10 yen` (ceiling — e.g. 93→100, 95→100; not round-half).
+  The ceiling applies to the **exact** sum — floating-point noise is settled first, so an exact 100.00 is 100,
+  not 110 (2026-10-19)
+- the same worker's sessions may not overlap in time; admin manual add / edit / restore and correction
+  approval reject an overlapping range so one hour is never paid twice (2026-10-19)
 
 Planned daily formula:
 

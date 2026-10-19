@@ -574,6 +574,9 @@
 
 /* 업무일지 창 — 화이트 리디자인(2026-10-15, 시안 TodoReport-PC). 상자 없이 줄과 노치 라벨 본문, 버튼 한 줄(넘치지 않게).
    움직임: 창 확대 등장 · 체크 그리기 · 누름 반응. 움직임 줄이기 설정이면 끈다. */
+/* 틀(.day-wrap)은 클릭을 통과시키고 안의 창만 받는다(.pop 규칙, admin-tasks-console.css). 업무일지 창은 2026-10-15 화이트로
+   다시 그리며 .pop 이 빠져 창 전체가 클릭을 통과시켰다 — 버튼 · 체크 · 입력칸을 누르면 뒤 배경막이 받아 아무것도 안 됐다(2026-10-19 사용자 신고). */
+.adm .day-wrap .atw-rpt { pointer-events: auto; }
 .adm .atw-rpt { width: 600px; max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 24px 24px 20px; border-radius: 18px; background: #fff; color: #16141f; box-shadow: 0 30px 80px -30px rgba(22, 20, 31, .45); animation: atw-rpt-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes atw-rpt-in { from { opacity: 0; transform: scale(.97); } }
 .adm .atw-rpt__h { display: flex; align-items: flex-start; gap: 12px; }

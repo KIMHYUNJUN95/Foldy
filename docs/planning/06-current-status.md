@@ -39,6 +39,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 투두 지연 머리 「날짜 다시 정하기」 + 「⋯」 시트(일정변경 · 선택 · 지난 미완료 삭제 → 확인), 버튼 누르는 영역 44px. 모바일 홈 상태 · 공지 알약 제거.
 - 글자 크기 설정은 기존 `@capacitor/text-zoom`(0.85~1.15) 유지. 시안: 별도 캔버스 「Foldy HIG 다듬기 시안」.
 
+## 2026-10-19 — PC 업무일지 창이 조작되지 않던 것
+
+- 투두 PC 「완료 · 기록」의 업무일지 창이 열리기는 하지만 체크 · 입력 · 복사 · Slack · 닫기가 전부 안 눌렸다. 창을 감싸는 `.day-wrap` 은
+  클릭을 통과시키고 안의 `.pop` 만 받는데, 2026-10-15 화이트 리디자인에서 창을 `.atw-rpt` 로 다시 그리며 `.pop` 이 빠졌다 → 뒤 배경막이 받음.
+  `.adm .day-wrap .atw-rpt { pointer-events: auto }`(admin-tasks-white.css). 같은 틀의 다른 창 3개(새 프로젝트 · 확인 · 반복 삭제)는 `.pop` 이 있어 정상.
+
 ## 2026-10-19 — 하단 시트 전부 공용으로
 
 - 공용 `BottomSheet` 를 쓰지 않고 따로 짠 시트 3곳(할 일 컨텍스트 연결 · 사진 목록 · 모바일 예약 캘린더 예약 상세)을 공용으로 바꿨다.

@@ -9,6 +9,25 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — 점검 목록 버그 · 보안 수정 (18건 중 17건 + 남은 작업)
+
+- **보안**: 채용 이력서 복사 SSRF 차단(채용 버킷 Firebase 주소만 · 리다이렉트 안 따름 · 20초 · 10MB), 채용 전량 동기화는 크론 비밀값 필요.
+  사용자 콘솔 — 대표 · 전무 계정은 그 조직의 대표 · 전무 · 개발자만, 개발자 계정은 개발자만 변경, 마지막 활성 대표 보호,
+  삭제는 이 조직 멤버십만(다른 조직 멤버십 없을 때만 계정 삭제), 로그인 차단은 어느 조직에도 활성 멤버십이 없을 때만(`user-management-guard.ts`).
+  건물 정보(출입 비밀번호) 저장은 owner · 전무 · office_admin · cs_staff · 플랫폼만(`canEditPropertyOperationInfo`).
+- **근태 · 급여**: 무효 처리한 검토 필요 세션이 마감을 막지 않음(`countBlockingSessions`), 같은 직원 근무 시간 겹침 거절(`attendance-overlap.ts`),
+  부동소수 합으로 생기던 10엔 과지급 수정(`settleYen`, 마감된 달 영향 없음), 급여 계산을 `calculateMonthlyPay` 하나로 통합. 운영: 막힌 세션 0 · 겹친 세션 0.
+- **판매 캘린더**: 1,000칸 넘는 수정의 이력 · 되돌리기 · 최소숙박 전부 처리, 차단 일부 · 여러 구간 해제 시 밤별 재고 복원,
+  한 구간 실패 시 Beds24 를 우리 표에 맞춰 되돌림 + 반영 안 된 구간 표시, 수기 예약 방 잠금 · 직전 Beds24 재확인 · 20초 제한 · 결과 모르면 재시도 막음.
+- **자동화**: 발송 도중 죽은 「보내는 중」 줄을 진행 중으로 세고 리스 만료 뒤 재시도, 정정본은 받는 곳 × 언어마다 마지막 발송과 비교(A→B→A→B 도 나감).
+  웹훅 처리 시간 `duration_ms` 기록 시작.
+- **청소 · 캘린더**: 강제 완료가 보고 있던 운영일로 저장(운영 기록 0건이라 잘못된 데이터 없음), 모바일 예약 캘린더는 예약 · 차단 신호만 · 보고 있는 달 + 오늘 걸친 예약만 클라이언트로.
+- **할 일**: 콘솔 상세 상태 버튼이 연 회차를 대상으로, 회차 아닌 날 완료의 실행 취소, 프로젝트 → 관리함 이동 뒤 수정해도 기존 사진 유지(`mergeTaskImageUrls`).
+- **공통**: 미들웨어가 앱의 `?error=` 를 로그인 콜백으로 오인해 오류 안내를 지우던 것, 현장 저장 · QR 발급 성공이 실패로 뜨던 것(try 안 redirect),
+  린넨 관리자 수정 시 품목 소실(추가 → 수정 → 삭제 + 실패 시 되돌림, INSERT 정책 `202610190014` 적용 완료), 게스트 피드백 사진 클라이언트 압축 · PC 리뷰 목록 50건씩 「더 보기」.
+- 고치지 않음: 알림 읽음의 `revalidatePath`(빼면 밀어서 읽음 · 태블릿 · 뒤로가기에서 배지가 틀어짐).
+- 남은 결정: 투두 목록 체크박스의 반복 회차 기준, 도어 코드 field_manager 허용 여부, 근태 겹침 DB 제약, 프로젝트 삭제 시 사진 정리.
+
 ## 2026-10-19 — 주문 처리 권한 바로잡기
 
 - 관리자 주문 콘솔의 거절 · 다시 열기 · 상태 정정 · 요청 수정이 청소 강제완료 게이트를 써서, 현장 관리자는 되고 CS 직원은 막혀 있었다(문서 10 과 반대).

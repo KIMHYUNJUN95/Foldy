@@ -26,7 +26,7 @@ import type { Json } from "@/types/database";
  * 변환은 `ingestJobApplication` 을 그대로 쓴다 — 웹훅·백필과 **같은 코드**다. 나중에 Cloud Function
  * 을 붙여도 재전송이 안전하므로(유니크 + 지원자 정보만 갱신) 두 경로가 겹쳐도 중복이 생기지 않는다.
  *
- * **시크릿이 없다.** 이 경로는 외부 입력을 받지 않는다 — 하는 일이 「공개 Firestore 를 읽어 우리
+ * **최신분은 시크릿이 없다(전량은 있다 — `authorizeFullSync`).** 이 경로는 외부 입력을 받지 않는다 — 하는 일이 「공개 Firestore 를 읽어 우리
  * DB 에 넣는다」로 고정이라 호출자가 데이터를 위조할 수 없다. 남는 위험은 남용(Firestore 무료 읽기
  * 한도 소진)이고, `recruit_sync_state` 의 마지막 실행 시각으로 창을 두어 막는다. 창 안의 재호출은
  * **Firestore 를 읽지 않고** 돌아간다.
@@ -143,8 +143,29 @@ async function ingestAll(records: FirestoreRecord[], source: RecruitSource, summ
   }
 }
 
+/**
+ * 전량 훑기(`?mode=full`)만 시크릿을 받는다 (2026-10-19).
+ *
+ * 최신분 호출은 콘솔을 열 때도 부르고 60초 창이 남용을 막지만, 전량 훑기는 창이 없어 반복 호출로 Firestore 무료
+ * 읽기를 소진시킬 수 있었다. 다른 크론과 같은 비밀값(`CRON_SECRET` 또는 `BEDS24_WEBHOOK_SECRET`)을
+ * `Authorization: Bearer` 나 `x-recruit-sync-secret` 헤더로 받는다. 서버에 둘 다 없으면 닫는다.
+ */
+function authorizeFullSync(request: NextRequest): boolean {
+  const allowed = [process.env.CRON_SECRET?.trim(), process.env.BEDS24_WEBHOOK_SECRET?.trim()].filter(
+    (value): value is string => Boolean(value),
+  );
+  if (allowed.length === 0) return false;
+  const provided =
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+    request.headers.get("x-recruit-sync-secret");
+  return Boolean(provided) && allowed.includes(provided as string);
+}
+
 export async function POST(request: NextRequest) {
   const mode = request.nextUrl.searchParams.get("mode") === "full" ? "full" : "recent";
+  if (mode === "full" && !authorizeFullSync(request)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   const apiKey = process.env.RECRUIT_FIRESTORE_API_KEY?.trim() || null;
 
   const { lastRunAt, lastSuccessAt } = await readState();

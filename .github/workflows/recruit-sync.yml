@@ -67,14 +67,20 @@ jobs:
           SYNC_URL: https://stay-ops-two.vercel.app/api/recruit/sync
           # 19:20 UTC 스케줄과 수동 full 실행만 전량으로 돈다.
           FULL: ${{ inputs.full == true || github.event.schedule == '20 19 * * *' }}
+          # 전량 훑기만 시크릿을 요구한다(2026-10-19) — 다른 크론과 같은 저장소 시크릿.
+          SYNC_SECRET: ${{ secrets.BEDS24_WEBHOOK_SECRET }}
         run: |
           set -uo pipefail
 
           url="${SYNC_URL}"
           if [ "${FULL}" = "true" ]; then url="${url}?mode=full"; fi
 
+          auth=()
+          if [ "${FULL}" = "true" ]; then auth=(-H "x-recruit-sync-secret: ${SYNC_SECRET}"); fi
+
           code=$(curl -sS -o /tmp/recruit-sync.json -w '%{http_code}' \
             -X POST "${url}" \
+            "${auth[@]}" \
             --max-time 120)
           echo "HTTP ${code} (${url})"
           cat /tmp/recruit-sync.json || true

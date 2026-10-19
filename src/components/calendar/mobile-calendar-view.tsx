@@ -4,14 +4,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UIEvent } from "react";
-import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Phone } from "lucide-react";
 import "./mobile-calendar.css";
 import { collectBlockedRooms } from "@/lib/room-blocks";
 import { type PropertyMapMeta, getPropertyAddress } from "@/lib/property-map-links";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
-import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { useIsTablet } from "@/components/shell/split-list";
 import { BuildingPicker } from "@/components/calendar/building-picker";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -266,7 +263,6 @@ function calendarRowHeightForBars(_bars: ReservationBarLayout[]) {
   return CALENDAR_SINGLE_ROW_HEIGHT;
 }
 // Centered pinned modal card (reservation detail / empty room / area info).
-const RESERVATION_SHEET_TRANSITION_MS = 440;
 
 function parseDate(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
@@ -404,14 +400,12 @@ export function MobileCalendarView({
   }, [copiedKey]);
   const [mode, setMode] = useState<"overview" | "lists" | "map">("overview");
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
-  const [isReservationSheetOpen, setIsReservationSheetOpen] = useState(false);
   const [selectedMapProperty, setSelectedMapProperty] = useState<PropertyMapMeta | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [mapCopyFeedback, setMapCopyFeedback] = useState<string | null>(null);
-  const reservationCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isAnyModalOpen = Boolean(selectedReservationId) || Boolean(selectedMapProperty);
-  useBodyScrollLock(isAnyModalOpen);
+  // 바탕 잠금은 두 시트(예약 상세 · 건물 지도) 모두 공용 BottomSheet 가 한다(2026-10-19). 여기서 따로 잠그면 잠금이 두 겹이
+  // 되어, 닫을 때 바깥 잠금이 「잠긴 값」을 되돌려 바탕이 안 넘어갈 수 있었다(BottomSheet 의 참조 수 잠금 주석 참고).
 
   // isOutOfWindow is computed server-side and passed as a prop to keep a single source of truth.
   // Server already passes reservations=[] when out-of-window; this guard is a defensive layer.
@@ -599,34 +593,11 @@ export function MobileCalendarView({
     [updateVisibleDateRangeLabel],
   );
 
+  // 예약 상세 시트 — 공용 BottomSheet(2026-10-19). 고르면 띄우고, 시트가 미끄러져 나간 뒤 onClose 에서 비운다.
   const openReservationSheet = useCallback((reservationId: string) => {
-    if (reservationCloseTimeoutRef.current) {
-      clearTimeout(reservationCloseTimeoutRef.current);
-      reservationCloseTimeoutRef.current = null;
-    }
     setCopyFeedback(null);
     setSelectedReservationId(reservationId);
-    setIsReservationSheetOpen(false);
-    window.requestAnimationFrame(() => setIsReservationSheetOpen(true));
   }, []);
-
-  const closeReservationSheet = useCallback(() => {
-    setIsReservationSheetOpen(false);
-    if (reservationCloseTimeoutRef.current) {
-      clearTimeout(reservationCloseTimeoutRef.current);
-    }
-    reservationCloseTimeoutRef.current = setTimeout(() => {
-      setCopyFeedback(null);
-      setSelectedReservationId(null);
-      reservationCloseTimeoutRef.current = null;
-    }, RESERVATION_SHEET_TRANSITION_MS);
-  }, []);
-
-  // iOS-style drag-to-dismiss on the grab handle / header of the reservation detail sheet.
-  const reservationDrag = useSheetDragDismiss({
-    shown: isReservationSheetOpen,
-    onDismiss: closeReservationSheet,
-  });
 
   // Auto-open the reservation sheet when arriving via deep-link from a task context.
   // Read the reservationId from the live URL (useSearchParams) rather than the server prop, for the
@@ -650,13 +621,6 @@ export function MobileCalendarView({
     return () => cancelAnimationFrame(raf);
   }, [deepLinkReservationId, reservations, openReservationSheet]);
 
-  useEffect(() => {
-    return () => {
-      if (reservationCloseTimeoutRef.current) {
-        clearTimeout(reservationCloseTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // 건물 없이 들어오면 **늘 건물 고르기 화면**이다(2026-10-15 사용자 결정 — 「건물 고르기 화면 그대로 있어야 해」).
   // 예전엔 지난번 건물로 저절로 넘겼는데(localStorage → 이후 쿠키), 고르기를 보려는 사람을 가로채서 없앴다.
@@ -1302,42 +1266,23 @@ export function MobileCalendarView({
         </div>
       ) : null}
 
-      {typeof document !== "undefined" && selectedReservation
-        ? createPortal(
-            <div
-              className={cn(
-                "fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/45 transition-opacity duration-300 ease-out",
-                isReservationSheetOpen ? "opacity-100" : "pointer-events-none opacity-0",
-              )}
-              style={reservationDrag.scrimStyle}
-            >
-              <button aria-label={copy.close} className="absolute inset-0" onClick={closeReservationSheet} type="button" />
-              <div
-                aria-label={selectedReservation.guestName}
-                aria-modal="true"
-                role="dialog"
-                className="relative flex max-h-[88dvh] w-full max-w-[460px] flex-col rounded-t-[24px] bg-surface pb-[max(20px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_44px_-12px_rgba(16,28,27,0.3)] will-change-transform tablet:mb-[max(24px,env(safe-area-inset-bottom))] tablet:rounded-[24px]"
-                data-sheet
-                style={
-                  reservationDrag.dragging
-                    ? reservationDrag.sheetStyle
-                    : {
-                        transform: isReservationSheetOpen ? "translateY(0)" : "translateY(110%)",
-                        transition: "transform 420ms cubic-bezier(0.32,0.72,0,1)",
-                      }
-                }
-              >
-                <div aria-hidden="true" className="mx-auto mb-1 h-1 w-[38px] shrink-0 rounded-full bg-slate-200" {...reservationDrag.handleProps} />
-                <div className="mcw mcw-sheet min-h-0 overflow-y-auto" {...reservationDrag.handleProps}>
-                  <div className="mcw-detail">
-                    {reservationBody(selectedReservation, (key) => setCopyFeedback(key), copyFeedback)}
-                  </div>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {selectedReservation ? (
+        <BottomSheet
+          ariaLabel={selectedReservation.guestName}
+          className="flex max-h-[88dvh] flex-col"
+          onClose={() => {
+            setCopyFeedback(null);
+            setSelectedReservationId(null);
+          }}
+          zIndexClassName="z-[200]"
+        >
+          <div className="mcw mcw-sheet min-h-0 overflow-y-auto" style={{ paddingInline: 0 }}>
+            <div className="mcw-detail">
+              {reservationBody(selectedReservation, (key) => setCopyFeedback(key), copyFeedback)}
+            </div>
+          </div>
+        </BottomSheet>
+      ) : null}
 
       {isBuildingSheetOpen ? (
         <BottomSheet

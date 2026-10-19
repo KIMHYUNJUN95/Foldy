@@ -853,6 +853,12 @@ bottom sheet looks identical. The reference design is the home check-in/out shee
 - **Keyboard (2026-10-02)**: device keyboard only (no custom keypads). The sheet's bottom padding already absorbs
   `--keyboard-inset` inside its max height; on `focusin` of a field the sheet scrolls it into view after the keyboard
   settles (320ms). Fields inside sheets must be ≥16px (iOS zoom).
+- **손으로 만든 시트 0곳(2026-10-19)**: 공용 부품을 흉내 내 따로 짠 시트 3곳을 `BottomSheet` 로 바꿨다 —
+  할 일 「컨텍스트 연결」(`context-picker-sheet.tsx`, 단계 화면은 안쪽 `ContextPickerBody` 가 `useBottomSheetClose()` 로 닫음),
+  사진 목록(`photo-gallery.tsx`, 전체 화면 라이트박스는 시트가 아니라 그대로 — Esc 는 캡처 단계에서 라이트박스만 닫음),
+  모바일 예약 캘린더 예약 상세(`mobile-calendar-view.tsx`, `z-[200]` 유지). 이제 셋도 태블릿 가로에서 가운데 카드 · 같은 끌어 닫기 ·
+  참조 수 바탕 잠금을 쓴다. 예약 캘린더는 따로 걸던 `useBodyScrollLock` 을 뺐다(공용 잠금과 두 겹이 되면 닫을 때 바탕이 잠긴 채 남을 수 있음).
+  `rounded-t-[24px]` 를 `bottom-sheet.tsx` 밖에서 쓰는 곳이 생기면 손으로 만든 시트이니 공용으로 바꾼다.
 - **Dismiss**: drag past threshold, scrim tap, or Esc. **No top-right X button.**
 - **Lifecycle**: portals to `<body>`, locks body scroll, closes on Esc.
 - **Drag performance (2026-06-23)**: live drag distance updates are coalesced with `requestAnimationFrame`; refs still track every pointer sample for threshold/velocity accuracy, but React renders at most once per frame.

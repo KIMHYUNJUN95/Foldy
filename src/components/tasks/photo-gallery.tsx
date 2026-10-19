@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
  * live counter). Matches the app concept — ivory/white surfaces, deep-ink-navy accent, and selective
  * Liquid-Glass chrome on the dark lightbox overlay. Both overlays portal to <body> so the mobile
  * shell's transformed scroll container can't trap their `position: fixed`.
+ *
+ * The list is the shared `BottomSheet`(2026-10-19 — 손으로 만든 시트를 공용으로: 태블릿 가운데 카드 · 끌어 닫기 ·
+ * 바탕 잠금이 다른 시트와 같다). The lightbox is a full-screen overlay, not a sheet, so it stays here.
  */
 export function PhotoGallery({
   urls,
@@ -29,23 +32,10 @@ export function PhotoGallery({
   title: string;
   closeLabel: string;
 }) {
-  const [sheetMounted, setSheetMounted] = useState(false);
-  const [sheetShown, setSheetShown] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-
-  const openSheet = useCallback(() => {
-    setSheetMounted(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => setSheetShown(true)));
-  }, []);
-  const closeSheet = useCallback(() => {
-    setSheetShown(false);
-    setTimeout(() => setSheetMounted(false), 320);
-  }, []);
-
-  // iOS-style drag-to-dismiss on the grab handle / header (lightbox carousel excluded).
-  const drag = useSheetDragDismiss({ shown: sheetShown, onDismiss: closeSheet });
 
   const openLightbox = useCallback((index: number) => {
     setActiveIndex(index);
@@ -53,19 +43,22 @@ export function PhotoGallery({
   }, []);
   const closeLightbox = useCallback(() => setLightbox(null), []);
 
-  useBodyScrollLock(sheetMounted || lightbox !== null);
+  // 시트의 바탕 잠금은 BottomSheet 가 한다. 라이트박스만 따로 잠근다.
+  useBodyScrollLock(lightbox !== null);
 
-  // Esc closes the topmost overlay (lightbox first, then sheet).
+  // Esc 는 맨 위 겹만 닫는다 — 라이트박스가 열려 있으면 라이트박스만. BottomSheet 도 window 에서 Esc 를 듣기 때문에
+  // 캡처 단계에서 먼저 받아 멈춘다(안 그러면 Esc 한 번에 라이트박스와 시트가 함께 닫힌다).
   useEffect(() => {
-    if (!sheetMounted && lightbox === null) return;
+    if (lightbox === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (lightbox !== null) closeLightbox();
-      else closeSheet();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      closeLightbox();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sheetMounted, lightbox, closeLightbox, closeSheet]);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [lightbox, closeLightbox]);
 
   // After mount / index change, scroll the lightbox rail to the active slide (no smooth jump on open).
   useEffect(() => {
@@ -102,7 +95,7 @@ export function PhotoGallery({
       <button
         aria-label={title}
         className="mt-2 flex items-center gap-1.5"
-        onClick={openSheet}
+        onClick={() => setSheetOpen(true)}
         type="button"
       >
         {shown.map((url, i) => (
@@ -123,64 +116,44 @@ export function PhotoGallery({
         ))}
       </button>
 
-      {/* Bottom sheet — full attachment list. */}
-      {sheetMounted && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className={cn(
-                "fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 transition-opacity duration-300 motion-reduce:transition-none",
-                sheetShown ? "opacity-100" : "opacity-0",
-              )}
-              onClick={closeSheet}
-              style={drag.scrimStyle}
-            >
-              <div
-                className={cn(
-                  "w-full max-w-[460px] rounded-t-[24px] bg-surface px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3",
-                  "transition-transform duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none",
-                  sheetShown ? "translate-y-0" : "translate-y-full",
-                )}
-                data-sheet
-                onClick={(e) => e.stopPropagation()}
-                style={drag.sheetStyle}
+      {/* Bottom sheet — full attachment list(공용 BottomSheet). */}
+      {sheetOpen ? (
+        <BottomSheet
+          ariaLabel={title}
+          header={
+            <div className="mb-3 flex items-center gap-2">
+              <p className="text-[16px] font-black text-foreground">{title}</p>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                {urls.length}
+              </span>
+            </div>
+          }
+          onClose={() => setSheetOpen(false)}
+        >
+          <div className="-mx-1 grid max-h-[60vh] grid-cols-3 gap-2 overflow-y-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {urls.map((url, i) => (
+              <button
+                className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted/30 transition-transform active:scale-[0.97]"
+                key={i}
+                onClick={() => openLightbox(i)}
+                type="button"
               >
-                <div
-                  className="mx-auto mb-3 h-1 w-[38px] rounded-full bg-slate-200"
-                  {...drag.handleProps}
+                <Image
+                  alt=""
+                  aria-hidden="true"
+                  className="object-cover transition-transform duration-300 group-active:scale-105"
+                  fill
+                  sizes="33vw"
+                  src={url}
                 />
-                <div className="mb-3 flex items-center gap-2" {...drag.handleProps}>
-                  <p className="text-[16px] font-black text-foreground">{title}</p>
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                    {urls.length}
-                  </span>
-                </div>
-                <div className="-mx-1 grid max-h-[60vh] grid-cols-3 gap-2 overflow-y-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {urls.map((url, i) => (
-                    <button
-                      className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted/30 transition-transform active:scale-[0.97]"
-                      key={i}
-                      onClick={() => openLightbox(i)}
-                      type="button"
-                    >
-                      <Image
-                        alt=""
-                        aria-hidden="true"
-                        className="object-cover transition-transform duration-300 group-active:scale-105"
-                        fill
-                        sizes="33vw"
-                        src={url}
-                      />
-                      <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-slate-950/55 text-[10px] font-bold text-white backdrop-blur-[2px]">
-                        {i + 1}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+                <span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-slate-950/55 text-[10px] font-bold text-white backdrop-blur-[2px]">
+                  {i + 1}
+                </span>
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
+      ) : null}
 
       {/* Full-screen swipeable lightbox. */}
       {lightbox !== null && typeof document !== "undefined"

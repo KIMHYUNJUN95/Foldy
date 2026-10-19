@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Building2,
   Check,
@@ -19,7 +18,7 @@ import {
   CANONICAL_TO_BUILDING_KEY,
   localizePropertyName,
 } from "@/lib/room-label-normalization";
-import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
+import { BottomSheet, useBottomSheetClose, useBottomSheetDragHandle } from "@/components/shell/bottom-sheet";
 import type { LinkedContext } from "@/components/tasks/context-link-section";
 import {
   fetchPickerBuildings,
@@ -393,20 +392,37 @@ function AltButton({
 }
 
 // ── Main component ───────────────────────────────────────────────────────────────────────────
-export function ContextPickerSheet({
-  buildingLabels,
-  copy,
-  initialPropertyName,
-  onClose,
-  onSelect,
-}: {
+type ContextPickerProps = {
   buildingLabels: Record<string, string>;
   copy: Copy;
   initialPropertyName?: string;
   onClose: () => void;
   onSelect?: (ctx: LinkedContext) => void;
-}) {
-  const [shown, setShown] = useState(false);
+};
+
+/**
+ * 건물 → 객실 → 예약 고르기 시트. 틀은 공용 `BottomSheet`(2026-10-19 — 손으로 만든 시트를 공용으로: 끌어 닫기 · 태블릿
+ * 가운데 카드 · 바탕 잠금 · Esc 가 다른 시트와 같다). 안의 단계 화면은 `ContextPickerBody`.
+ */
+export function ContextPickerSheet({ onClose, ...props }: ContextPickerProps) {
+  return (
+    <BottomSheet
+      ariaLabel={props.copy.contextPickerTitle}
+      className="flex max-h-[92dvh] flex-col"
+      onClose={onClose}
+      zIndexClassName="z-[70]"
+    >
+      <ContextPickerBody {...props} />
+    </BottomSheet>
+  );
+}
+
+function ContextPickerBody({
+  buildingLabels,
+  copy,
+  initialPropertyName,
+  onSelect,
+}: Omit<ContextPickerProps, "onClose">) {
   const [step, setStep] = useState<Step>("building");
   const [buildings, setBuildings] = useState<PickerBuilding[]>([]);
   const [buildingsLoading, setBuildingsLoading] = useState(true);
@@ -431,17 +447,9 @@ export function ContextPickerSheet({
     () => false,
   );
 
-  const dismiss = useCallback(() => {
-    setShown(false);
-    setTimeout(onClose, 380);
-  }, [onClose]);
-
-  // iOS-style drag-to-dismiss on the grab handle.
-  const drag = useSheetDragDismiss({ shown, onDismiss: dismiss });
-
-  useEffect(() => {
-    requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
-  }, []);
+  // 고르면 시트를 닫는다 — 공용 시트가 미끄러져 나간 뒤 부모의 onClose 를 부른다.
+  const dismiss = useBottomSheetClose();
+  const dragHandleProps = useBottomSheetDragHandle();
 
   useEffect(() => {
     fetchPickerBuildings()
@@ -463,14 +471,6 @@ export function ContextPickerSheet({
       .catch(() => setBuildings([]))
       .finally(() => setBuildingsLoading(false));
   }, [initialPropertyName]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") dismiss();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [dismiss]);
 
   // Focus search when entering building step
   useEffect(() => {
@@ -656,35 +656,11 @@ export function ContextPickerSheet({
       ? copy.contextPickerGuestSub
       : copy.contextPickerHint;
 
-  return createPortal(
-    <div
-      className={cn(
-        "fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 transition-opacity duration-300 motion-reduce:transition-none",
-        shown ? "opacity-100" : "opacity-0",
-      )}
-      onClick={dismiss}
-      style={drag.scrimStyle}
-    >
-      <div
-        className={cn(
-          "flex w-full max-w-[460px] flex-col rounded-t-[24px] bg-surface",
-          "transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform motion-reduce:transition-none",
-          shown ? "translate-y-0" : "translate-y-full",
-        )}
-        data-sheet
-        style={{ maxHeight: "92%", ...drag.sheetStyle }}
-        onClick={(e) => e.stopPropagation()}
-      >
+  return (
+    <>
         {/* ── Fixed header ── */}
-        <div className="shrink-0 px-[18px] pb-0 pt-2">
-          <div
-            className="-mx-[18px] flex min-h-[44px] cursor-grab items-center justify-center px-[18px] active:cursor-grabbing"
-            {...drag.handleProps}
-          >
-            <div className="h-1 w-[38px] rounded-full bg-slate-200" />
-          </div>
-
-          <div className="mb-3.5 flex items-start gap-3">
+        <div className="shrink-0">
+          <div className="mb-3.5 flex items-start gap-3" {...dragHandleProps}>
             {step !== "building" ? (
               <button
                 aria-label={copy.backToList}
@@ -760,7 +736,7 @@ export function ContextPickerSheet({
         </div>
 
         {/* ── Scrollable body ── */}
-        <div className="flex-1 overflow-y-auto px-[18px] pb-5 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto pb-5 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
           {/* ── Step: Building ── */}
           {step === "building" ? (
@@ -989,7 +965,7 @@ export function ContextPickerSheet({
 
         {/* ── Sticky footer CTA — room step only ── */}
         {isRoomStep ? (
-          <div className="shrink-0 border-t border-border/60 bg-surface px-[18px] pb-[max(18px,env(safe-area-inset-bottom))] pt-3">
+          <div className="-mx-5 shrink-0 border-t border-border/60 bg-surface px-5 pt-3">
             <button
               className={cn(
                 "flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] text-[14.5px] font-extrabold transition-colors",
@@ -1006,8 +982,6 @@ export function ContextPickerSheet({
             </button>
           </div>
         ) : null}
-      </div>
-    </div>,
-    document.body,
+    </>
   );
 }

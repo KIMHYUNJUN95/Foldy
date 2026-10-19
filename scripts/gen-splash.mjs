@@ -13,14 +13,13 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const ICON_PATH = path.join(ROOT, "public/icons/icon-192.png");
+const ICON_PATH = path.join(ROOT, "public/icons/icon-512.png");
 const OUT_DIR = path.join(ROOT, "public/splash");
 
-// Ivory canvas color (#f7f4ee = hsl(42 36% 95%))
-const BG = { r: 247, g: 244, b: 238, alpha: 1 };
-
-// Icon size in the splash image (px). Kept at 192 to match the 60pt @3x guideline.
-const ICON_PX = 192;
+// 2026-10-19: 웹 진입 화면(app-splash 의 짧은 쪽)과 똑같이 — 흰 바탕, 로고 110pt 를 화면 정가운데. 시작 이미지 → 웹의 모인 로고 →
+// 홈으로 끊김 없이 이어지게 한다. 로고 크기는 기기 배율(dpr)마다 110pt × dpr 픽셀. 바꾸면 `.spl__tile`(110px)도 같이.
+const BG = { r: 255, g: 255, b: 255, alpha: 1 };
+const ICON_PT = 110;
 
 // All unique physical-pixel dimensions for modern iPhones (portrait).
 // media query → (device-width: Wpt) and (device-height: Hpt) and (-webkit-device-pixel-ratio: R)
@@ -43,11 +42,9 @@ if (!fs.existsSync(ICON_PATH)) {
   process.exit(1);
 }
 
-const iconBuf = await sharp(ICON_PATH)
-  .resize(ICON_PX, ICON_PX, { fit: "cover" })
-  .toBuffer();
-
 for (const { w, h, dw, dh, dpr } of SIZES) {
+  const ICON_PX = ICON_PT * dpr;
+  const iconBuf = await sharp(ICON_PATH).resize(ICON_PX, ICON_PX, { fit: "cover" }).toBuffer();
   const left = Math.round((w - ICON_PX) / 2);
   const top  = Math.round((h - ICON_PX) / 2);
   const file = path.join(OUT_DIR, `apple-splash-${w}-${h}.png`);
@@ -66,5 +63,5 @@ console.log(`\nDone — ${SIZES.length} splash images written to public/splash/`
 console.log("\n--- <link> tags for layout.tsx ---");
 for (const { w, h, dw, dh, dpr } of SIZES) {
   const media = `(device-width: ${dw}px) and (device-height: ${dh}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`;
-  console.log(`  <link rel="apple-touch-startup-image" media="${media}" href="/splash/apple-splash-${w}-${h}.png" />`);
+  console.log(`  <link rel="apple-touch-startup-image" media="${media}" href="/splash/apple-splash-${w}-${h}.png?v=2" />`);
 }

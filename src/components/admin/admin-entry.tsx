@@ -2,7 +2,7 @@
 
 // PC 진입 모션(2026-10-14, 시안 Motion-PC-Entry-PC) — 관리자 콘솔을 새로 불러올 때마다(새로고침 · 다시 접속 · 화면 껐다 30초 넘어 돌아옴,
 // `entry-replay`). 콘솔 안에서 화면을 옮길 땐 다시 안 나온다. 2026-10-19 줄임: 로고 모션(약 1.1초)은 **하루 첫 진입 · 로그인 직후만**,
-// 그 외엔 흰 바탕만 0.3초 페이드.
+// 그 외엔 이미 모인 로고가 화면 가운데 0.4초 → 사이드바 로고 자리로 짧게 날아가 앉는다(콘솔 깔기 없음, 2026-10-19).
 // 흰 화면 가운데에서 로고 세 막대가 3D 로 모이고 「Foldy」 → 로고가 작아지며 사이드바 로고 자리로 날아가 앉고,
 // 그사이 사이드바 · 위 줄 · 본문이 차례로 깔린다.
 //
@@ -57,7 +57,8 @@ function mountEntry(id: number, host: Element | null) {
   setTimeout(remove, 4000); // 무슨 일이 있어도 4초 뒤엔 치운다
 
   // 로고 모션은 하루 첫 진입 · 로그인 직후(20초 안)만(2026-10-19). 그 외(새로고침 · 30초 넘어 돌아옴 · 같은 날 두 번째부터)는
-  // 흰 바탕만 0.3초에 걷고 콘솔 깔기도 없다. 날짜는 도쿄 기준. 저장소를 못 쓰면 짧은 쪽.
+  // 짧은 쪽 — 이미 모인 로고(글자 없음)가 가운데 0.4초 있다가 사이드바 로고 자리로 420ms 에 날아가 앉고, 콘솔 깔기는 없다.
+  // 흰 바탕만 걷히던 때는 흰 콘솔 위라 아무것도 안 보였다(사용자 「아무리 빨라도 로고는 좀 보여야」). 날짜는 도쿄 기준. 저장소를 못 쓰면 짧은 쪽.
   let full = false;
   try {
     const raw = sessionStorage.getItem("foldy.loginRise");
@@ -71,14 +72,10 @@ function mountEntry(id: number, host: Element | null) {
   } catch {
     // 짧은 쪽으로.
   }
-  if (!full) {
-    overlay.classList.add("aden--quick");
-    requestAnimationFrame(() => {
-      overlay.classList.add("is-out");
-      setTimeout(remove, 350);
-    });
-    return;
-  }
+  // 글자를 숨긴 뒤에 로고 자리를 재야 가운데에서 출발한다(아래 측정보다 먼저).
+  if (!full) overlay.classList.add("aden--quick");
+  const flyMs = full ? 560 : 420;
+  const holdMs = full ? 680 : 250;
 
   const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
   const t0 = now();
@@ -127,12 +124,13 @@ function mountEntry(id: number, host: Element | null) {
       const m = mark.getBoundingClientRect();
       to = "translate(" + (m.left + m.width / 2 - lx) + "px, " + (m.top + m.height / 2 - ly) + "px) scale(" + m.width / l.width + ")";
     }
-    logo.animate([{ transform: "translate(0px, 0px) scale(1)" }, { transform: to }], { duration: 560, easing: "cubic-bezier(.5, 0, .1, 1)", fill: "forwards" });
-    logo.animate([{ opacity: 1 }, { opacity: 0 }], { delay: 500, duration: 140, easing: "ease-out", fill: "forwards" });
+    logo.animate([{ transform: "translate(0px, 0px) scale(1)" }, { transform: to }], { duration: flyMs, easing: "cubic-bezier(.5, 0, .1, 1)", fill: "forwards" });
+    logo.animate([{ opacity: 1 }, { opacity: 0 }], { delay: flyMs - 60, duration: 140, easing: "ease-out", fill: "forwards" });
     overlay.classList.add("is-out");
     root.style.setProperty("--entry-d0", Math.round(L - t0 + 150) + "ms");
     setTimeout(() => root.style.removeProperty("--entry-d0"), 6500);
-    setTimeout(remove, 760);
+    setTimeout(remove, flyMs + 200);
+    if (!full) return;
 
     // 콘솔 깔기 — 모두 같은 시계(startTime = L). 걷는 동안 늦게 들어온 요소도 현재 진행 지점부터 이어 간다.
     const done = new WeakSet<Element>();
@@ -173,7 +171,7 @@ function mountEntry(id: number, host: Element | null) {
     }
     lift();
   };
-  setTimeout(check, Math.max(0, t0 + 680 - now()));
+  setTimeout(check, Math.max(0, t0 + holdMs - now()));
 }
 
 // 진입 화면이 붙는 빈 상자 — React 는 이 상자의 안(innerHTML)을 한 번 넣고 다시 건드리지 않는다(값이 안 바뀌므로). 그래서 스크립트가

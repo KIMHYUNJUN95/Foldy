@@ -47,6 +47,10 @@
 @keyframes aden-hold { 50% { opacity: 1; transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .aden { display: none; } }
 
-/* 다시 들어올 때(2026-10-19) — 하루 첫 진입 · 로그인 직후가 아니면 로고 없이 흰 바탕만 0.3초에 걷힌다(콘솔 깔기도 없음). */
-.aden--quick .aden__logo, .aden--quick .aden__ww { display: none; }
-.aden--quick.is-out::before { animation: aden-out 300ms cubic-bezier(.23, 1, .32, 1) forwards; }
+/* 다시 들어올 때(2026-10-19) — 하루 첫 진입 · 로그인 직후가 아니면 막대가 날아와 모이지 않고 **이미 모인 로고**가 가운데 0.4초 있다가
+   사이드바 로고 자리로 짧게 날아가 앉는다(admin-entry.tsx, 콘솔 깔기 없음). 글자 · 빛은 뺀다. 흰 바탕 걷기는 평소와 같다. */
+.aden--quick .aden__ww, .aden--quick .aden__glow { display: none; }
+.aden--quick .aden__tile { opacity: 1; transform: none; animation: none; }
+.aden--quick .aden__bw { opacity: 1; animation: none; }
+.aden--quick .aden__bar { filter: none; animation: none; }
+.aden--quick .aden__b1 i { transform: none; animation: none; }

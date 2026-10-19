@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — 빠른 진입에도 로고가 보이게 (모바일 · PC)
+
+- 같은 날 두 번째부터의 진입(흰 바탕 0.3초)이 흰 화면 위라 안 보였다(아이폰 홈 화면 앱에서 사용자 지적). 이제 이미 모인 로고를 가운데 약 0.4초 →
+  모바일은 다가오며 흐려지고, PC 는 사이드바 로고 자리로 날아가 앉는다(`.spl--quick` · `.aden--quick`). 하루 첫 실행 · 로그인 직후의 긴 모션은 그대로.
+- 아이폰 시작 이미지를 흰 바탕 · 로고 110pt 정가운데로 다시 만듦 — 웹 진입 로고와 같은 자리 · 크기(헤드리스 크롬으로 위치 일치 확인). 설치된 기기는 다시 추가해야 바뀔 수 있다.
+
 ## 2026-10-19 — 배포 뒤 첫 실행에 진입 모션이 두 번 뜨던 것 (서비스 워커)
 
 - 증상: Edge 에 설치한 「Foldy Admin」을 켜면 진입 모션이 연달아 두 번. 원인: SW 가 저장해 둔 **옛 배포의 화면**을 먼저 그림 →

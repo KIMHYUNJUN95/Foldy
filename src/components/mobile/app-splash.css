@@ -61,7 +61,14 @@ html[data-pane] .spl { display: none; }
 @keyframes spl-rise-r { to { border-radius: 28px; } }
 @keyframes spl-rise-cover { to { opacity: 0; } }
 
-/* 다시 들어올 때(2026-10-19, 시안 Motion-B-Reentry-Phone) — 하루 첫 실행 · 로그인 직후가 아니면 로고 없이 흰 바탕만 0.3초에 걷힌다. */
+/* 다시 들어올 때(2026-10-19) — 하루 첫 실행 · 로그인 직후가 아니면 막대가 날아와 모이지 않고, **이미 모인 로고**가 화면 정가운데에
+   0.4초 있다가 평소처럼 다가오며 흐려지고 걷힌다(약 0.8초). 글자 · 한 줄 소개 · 빛은 뺀다. 자리 · 크기는 아이폰 시작 이미지
+   (`scripts/gen-splash.mjs` — 흰 바탕 · 110pt 정가운데)와 같아 시작 이미지 → 로고 → 홈이 끊기지 않는다.
+   걷기 규칙(.spl.is-out · .spl.is-out .spl__c)은 특이도가 더 높아 그대로 적용된다. */
 .spl--quick { background: #fff; }
-.spl--quick .spl__c { display: none; }
-.spl--quick.is-out { animation: spl-out2 300ms cubic-bezier(.23, 1, .32, 1) forwards; }
+.spl--quick .spl__c { margin-top: 0; animation: none; }
+.spl--quick .spl__glow, .spl--quick .spl__ww, .spl--quick .spl__tag { display: none; }
+.spl--quick .spl__tile { opacity: 1; transform: none; animation: none; }
+.spl--quick .spl__bw { opacity: 1; animation: none; }
+.spl--quick .spl__bar { filter: none; animation: none; }
+.spl--quick .spl__b1 i { transform: none; animation: none; }

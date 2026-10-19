@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import {
   beds24LastNightToCheckout,
   isLikelyNumericRoomLabel,
@@ -7,7 +8,7 @@ import {
   toBeds24IsoDate,
   type Beds24JsonRecord,
 } from "@/lib/beds24/booking-payload";
-import { syncBeds24InventoryMinimumStay } from "@/lib/beds24/inventory-sync";
+import { syncBeds24InventoryMinimumStayThrottled } from "@/lib/beds24/inventory-sync";
 import {
   cancelReservationRowsByOriginalBookingId,
   finalizeCancelledBookingConsistency,
@@ -56,6 +57,24 @@ export type ProcessWebhookBookingResult =
       missing?: string[];
       error?: string;
     };
+
+/**
+ * 응답 뒤로 미룬다(`after()`). 요청 밖(스크립트 · 테스트)에서 불리면 `after()` 가 던지므로 그때는 바로 기다린다.
+ */
+async function runAfterResponse(label: string, task: () => Promise<unknown>) {
+  const guarded = async () => {
+    try {
+      await task();
+    } catch (error) {
+      console.error(`[beds24/webhook] deferred ${label} failed`, error);
+    }
+  };
+  try {
+    after(guarded);
+  } catch {
+    await guarded();
+  }
+}
 
 function sanitizeRawPayload(value: unknown) {
   try {
@@ -484,7 +503,11 @@ export async function processBeds24WebhookBooking(params: {
     console.log("[beds24/webhook] room sync skipped", roomSync.skipped);
   }
 
-  await syncBeds24InventoryMinimumStay(organizationId, syncFields.externalPropertyId, supabase);
+  // 최소숙박은 예약과 무관하다 — 응답 뒤에, 건물마다 10분에 한 번만 돈다(`inventory-sync.ts`).
+  const externalPropertyIdForInventory = syncFields.externalPropertyId;
+  await runAfterResponse("inventory sync", () =>
+    syncBeds24InventoryMinimumStayThrottled(organizationId, externalPropertyIdForInventory, supabase),
+  );
 
   // Resolve the reservation's property_name from the operator-controlled property
   // MASTER (by the just-synced property id), preferring it over the payload propName.
@@ -610,8 +633,9 @@ export async function processBeds24WebhookBooking(params: {
     keepReservationId: saved.id,
   });
 
-  // 열려 있는 캘린더·홈·청소 화면이 새로고침 없이 다시 읽는다(`src/lib/beds24-live.ts`).
-  await signalBeds24Change(organizationId, "reservations");
+  // 열려 있는 캘린더·홈·청소 화면이 새로고침 없이 다시 읽는다(`src/lib/beds24-live.ts`). 예약은 이미 저장됐으니
+  // 신호는 응답 뒤에 보내도 순서가 같다(저장 → 신호).
+  await runAfterResponse("live signal", () => signalBeds24Change(organizationId, "reservations"));
 
   return {
     ok: true,

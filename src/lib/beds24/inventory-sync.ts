@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getOptionalBeds24ApiEnv } from "@/lib/env";
 import { classifyBeds24Room } from "@/lib/beds24/room-sync";
+import { acquireBeds24Lock } from "@/lib/beds24/sync-locks";
 import type { Database } from "@/types/database";
 
 type JsonRecord = Record<string, unknown>;
@@ -348,6 +349,72 @@ async function fetchInventoryMinimumStays(propId: string): Promise<InventoryFetc
   };
 }
 
+/**
+ * 어느 방을 써야 하나 — **순수 함수**. 우리 표에 있는 방(`matchedRooms`) 중 최소숙박이나 상태가 실제로 다른
+ * 방만 고른다. 같은 `external_room_id` 행이 여럿이면 하나라도 다르면 쓴다(예전과 같은 조건으로 전부 갱신).
+ */
+export function planInventoryRoomUpdates(
+  minimumStayByExternalRoomId: Map<string, number>,
+  currentRows: Array<{ external_room_id: string | null; external_minimum_stay: number | null; status: string }>,
+): {
+  matchedRooms: number;
+  updates: Array<{ externalRoomId: string; minimumStay: number; status: "active" | "inactive" }>;
+} {
+  const rowsByExternalId = new Map<string, Array<{ external_minimum_stay: number | null; status: string }>>();
+  for (const row of currentRows) {
+    if (!row.external_room_id) continue;
+    rowsByExternalId.set(row.external_room_id, [...(rowsByExternalId.get(row.external_room_id) ?? []), row]);
+  }
+  let matchedRooms = 0;
+  const updates: Array<{ externalRoomId: string; minimumStay: number; status: "active" | "inactive" }> = [];
+  for (const [externalRoomId, minimumStay] of minimumStayByExternalRoomId) {
+    const rows = rowsByExternalId.get(externalRoomId);
+    if (!rows || rows.length === 0) continue;
+    matchedRooms += 1;
+    const status = classifyBeds24Room(minimumStay);
+    if (rows.some((row) => row.external_minimum_stay !== minimumStay || row.status !== status)) {
+      updates.push({ externalRoomId, minimumStay, status });
+    }
+  }
+  return { matchedRooms, updates };
+}
+
+/**
+ * 예약 웹훅이 부르는 최소숙박 동기화의 간격 — 건물마다 이 시간에 한 번만 돈다.
+ *
+ * 최소숙박은 예약과 무관한 값이라 웹훅마다(하루 400~540건) Beds24 를 부를 이유가 없다. 반영은 이 간격만큼
+ * 늦어질 수 있다(그 건물에 다음 예약 웹훅이 들어오는 때까지 — 예전에도 이 경로만 최소숙박을 갱신했다).
+ */
+export const INVENTORY_WEBHOOK_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+
+export function inventoryWebhookSyncLockName(organizationId: string, externalPropertyId: string) {
+  return `inventory_min_stay:${organizationId}:${externalPropertyId}`;
+}
+
+/**
+ * 웹훅용 — 건물별 간격 제한을 건 `syncBeds24InventoryMinimumStay`.
+ *
+ * 간격은 `beds24_sync_locks` 의 만료 시각으로 잰다(`beds24_try_lock`, DB 한 문장). **놓지 않는다** — 만료가
+ * 곧 「다음에 돌아도 되는 시각」이다. 인스턴스가 여럿이어도 한 건물에 한 번만 돈다.
+ */
+export async function syncBeds24InventoryMinimumStayThrottled(
+  organizationId: string,
+  externalPropertyId: string | null,
+  supabase: SupabaseClient<Database>,
+): Promise<Beds24InventorySyncResult | null> {
+  if (!externalPropertyId || !getOptionalBeds24ApiEnv()) {
+    return syncBeds24InventoryMinimumStay(organizationId, externalPropertyId, supabase);
+  }
+  const lock = await acquireBeds24Lock(
+    supabase,
+    inventoryWebhookSyncLockName(organizationId, externalPropertyId),
+    "beds24-webhook",
+    INVENTORY_WEBHOOK_SYNC_INTERVAL_MS,
+  );
+  if (!lock.acquired) return null;
+  return syncBeds24InventoryMinimumStay(organizationId, externalPropertyId, supabase);
+}
+
 export async function syncBeds24InventoryMinimumStay(
   organizationId: string,
   externalPropertyId: string | null,
@@ -390,33 +457,47 @@ export async function syncBeds24InventoryMinimumStay(
     deduped.set(row.externalRoomId, row.minimumStay);
   }
 
-  let matchedRooms = 0;
+  // 지금 값을 한 번에 읽고 **바뀐 방만** 쓴다(2026-10-19). 예전엔 웹훅마다 그 건물 방 전부(평균 10, 최대 26)를
+  // 값이 같아도 하나씩 UPDATE 해서 rooms 96행에 49만 번 갱신이 쌓였다.
+  const currentResult = await supabase
+    .from("rooms")
+    .select("external_room_id, external_minimum_stay, status")
+    .eq("organization_id", organizationId)
+    .eq("external_provider", "beds24")
+    .in("external_room_id", [...deduped.keys()]);
+  if (currentResult.error) {
+    console.error("[beds24/inventory] room read failed", { error: currentResult.error });
+    return {
+      attempted: true,
+      endpointTried,
+      matchedRooms: 0,
+      updatedRooms: 0,
+      skipped: ["inventory:room-read-failed"],
+    };
+  }
+  const currentRows = (currentResult.data ?? []) as Array<{
+    external_room_id: string | null;
+    external_minimum_stay: number | null;
+    status: string;
+  }>;
+
+  const changes = planInventoryRoomUpdates(deduped, currentRows);
+  const matchedRooms = changes.matchedRooms;
   let updatedRooms = 0;
-  for (const [externalRoomId, minimumStay] of deduped.entries()) {
-    const status = classifyBeds24Room(minimumStay);
+  for (const { externalRoomId, minimumStay, status } of changes.updates) {
     const result = await supabase
       .from("rooms")
-      .update(
-        {
-          external_minimum_stay: minimumStay,
-          status,
-        },
-      )
+      .update({ external_minimum_stay: minimumStay, status })
       .eq("organization_id", organizationId)
       .eq("external_provider", "beds24")
       .eq("external_room_id", externalRoomId)
-      .select("id")
-      .maybeSingle();
+      .select("id");
 
     if (result.error) {
       console.error("[beds24/inventory] room update failed", { externalRoomId, minimumStay, error: result.error });
       continue;
     }
-
-    if (result.data) {
-      matchedRooms += 1;
-      updatedRooms += 1;
-    }
+    updatedRooms += (result.data ?? []).length;
   }
 
   return {

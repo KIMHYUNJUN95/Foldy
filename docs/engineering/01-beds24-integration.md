@@ -421,6 +421,22 @@ Implementation update (2026-05-24, same day):
   - inventory sync failures do not block reservation upsert
   - webhook response now includes `inventorySync` metadata for local/dev verification
 
+DB 부하 정리 (2026-10-19):
+
+- 예약 웹훅의 최소숙박 동기화는 **응답 뒤**(`after()`)에, **건물마다 10분에 한 번만** 돈다
+  (`syncBeds24InventoryMinimumStayThrottled`). 간격은 `beds24_sync_locks` 의 `inventory_min_stay:<조직>:<건물>` 행 만료
+  시각으로 잰다(`beds24_try_lock`, 놓지 않음 — 만료가 곧 다음 실행 가능 시각). 최소숙박 반영은 예전보다 **최대 10분**
+  늦어질 수 있다(그 건물의 다음 예약 웹훅 때 반영되는 것은 예전과 같다). 개발용 백필(`backfill-inventory`)은 간격 제한이 없다.
+- 방은 한 번에 읽어(`rooms` SELECT 1회) **최소숙박이나 상태가 실제로 다른 방만** UPDATE 한다(`planInventoryRoomUpdates`).
+  `updatedRooms` 는 이제 「실제로 바뀐 방 수」다(예전엔 매칭된 방 수와 같았다).
+- 실시간 신호(`signalBeds24Change`)와 `beds24_webhook_events` 기록도 응답 뒤로 미뤘다. 예약을 저장한 다음에 신호를 보내는
+  순서는 그대로다.
+- 웹훅 한 건(기존 예약 수정 · 방/건물 이미 있음) 응답 전 DB 왕복: 약 23회(최대 39) → 약 12회. Beds24 API 호출은 응답 전 0회.
+- 예약 방 이름 복구(`recoverReservationsRoomLabels`)는 `raw_payload` 통째 대신 방 번호 키 4개만 뽑아 `id >` 키셋으로 읽는다.
+  고칠 행만 원문을 따로 읽는다. 판정 결과는 같다.
+- `beds24_webhook_events.duration_ms` 열 마이그레이션(`202610190005_beds24_webhook_duration.sql`)을 준비했다. 기록 코드는
+  열을 적용한 뒤에 붙인다(먼저 나가면 insert 가 실패한다).
+
 ### Later Goal: Write Data
 
 Writing data back to Beds24 should not be part of the first integration unless absolutely necessary.

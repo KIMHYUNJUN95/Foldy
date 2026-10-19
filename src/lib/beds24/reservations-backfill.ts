@@ -1122,6 +1122,10 @@ export async function recoverReservationsRoomLabels(
   // 오류 없이. 예약이 3,505건인 상태에서 복구를 돌렸더니 앞의 1,000건만 보고 나머지는 손도 대지
   // 못했다(2026-09-11, 스테이아리 건물 데이터를 채우다 발견). 복구는 「고칠 게 없다」와 「보지
   // 못했다」가 겉보기에 같아서, 상한에 걸린 줄 모르고 넘어가기 쉽다.
+  //
+  // **필요한 키만, 키셋으로 읽는다**(2026-10-19). 예전엔 `raw_payload` 통째(17k행 · 25MB)를 OFFSET 1000행씩
+  // 읽었다 — 매 실행 18번 직렬, 뒤 페이지일수록 앞 행을 다시 훑었다. 방 번호 키만 뽑고 `id > 마지막` 으로 넘긴다.
+  // 고칠 행(드물다)만 원문을 따로 읽어 Beds24 예약번호를 꺼낸다.
   const PAGE = 1000;
   const reservationRows: Array<{
     id: string;
@@ -1129,29 +1133,60 @@ export async function recoverReservationsRoomLabels(
     source: string;
     source_reservation_id: string;
     room_label: string;
-    raw_payload: unknown;
+    raw_room_id: string | null;
   }> = [];
 
-  for (let offset = 0; ; offset += PAGE) {
+  let lastId: string | null = null;
+  for (;;) {
     let resQuery = supabase
       .from("reservations")
-      .select("id, organization_id, source, source_reservation_id, room_label, raw_payload")
+      .select(
+        "id, organization_id, source, source_reservation_id, room_label, " +
+          "k1:raw_payload->roomId, k2:raw_payload->room_id, k3:raw_payload->unitId, k4:raw_payload->unit_id",
+      )
       .not("raw_payload", "is", null)
-      // 페이지를 넘기려면 순서가 안정적이어야 한다. 정렬이 없으면 같은 행을 두 번 보거나 건너뛴다.
       .order("id", { ascending: true })
-      .range(offset, offset + PAGE - 1);
+      .limit(PAGE);
 
     if (organizationId) {
       resQuery = resQuery.eq("organization_id", organizationId);
+    }
+    if (lastId) {
+      resQuery = resQuery.gt("id", lastId);
     }
 
     const page = await resQuery;
     if (page.error) {
       return { processed: 0, recovered: 0, errors: [page.error.message] };
     }
-    const rows = (page.data ?? []) as typeof reservationRows;
-    reservationRows.push(...rows);
+    const rows = (page.data ?? []) as unknown as Array<{
+      id: string;
+      organization_id: string;
+      source: string;
+      source_reservation_id: string;
+      room_label: string;
+      k1: unknown;
+      k2: unknown;
+      k3: unknown;
+      k4: unknown;
+    }>;
+    for (const row of rows) {
+      reservationRows.push({
+        id: row.id,
+        organization_id: row.organization_id,
+        source: row.source,
+        source_reservation_id: row.source_reservation_id,
+        room_label: row.room_label,
+        raw_room_id: readString({ roomId: row.k1, room_id: row.k2, unitId: row.k3, unit_id: row.k4 }, [
+          "roomId",
+          "room_id",
+          "unitId",
+          "unit_id",
+        ]),
+      });
+    }
     if (rows.length < PAGE) break;
+    lastId = rows[rows.length - 1].id;
   }
 
   let processed = 0;
@@ -1159,16 +1194,20 @@ export async function recoverReservationsRoomLabels(
   const errors: string[] = [];
   for (const res of reservationRows) {
     processed++;
-    const raw = asRecord(res.raw_payload);
-    if (!raw) continue;
-
     // Historical rows may have mixed payload shapes, but the joinable room key
     // is roomId when present. Keep unitId as a last-resort fallback only.
-    const rawRoomId = readString(raw, ["roomId", "room_id", "unitId", "unit_id"]);
+    const rawRoomId = res.raw_room_id;
     if (!rawRoomId) continue;
 
     const expectedRoomLabel = roomMap.get(`${res.organization_id}:${rawRoomId}`);
     if (expectedRoomLabel && expectedRoomLabel !== res.room_label) {
+      const rawResult = await supabase.from("reservations").select("raw_payload").eq("id", res.id).maybeSingle();
+      if (rawResult.error) {
+        errors.push(`Failed to read raw payload for ${res.id}: ${rawResult.error.message}`);
+        continue;
+      }
+      const raw = asRecord((rawResult.data as { raw_payload: unknown } | null)?.raw_payload);
+      if (!raw) continue;
       // Compute the corrected source_reservation_id using the resolved room label.
       // This prevents duplicate rows: if we only fix room_label but leave source_reservation_id
       // as "...::room::(unknown)", the next backfill/webhook will create a new "...::room::5F"

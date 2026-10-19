@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
 
   const organizationIdDefault = process.env.BEDS24_DEFAULT_ORGANIZATION_ID?.trim() ?? null;
 
-  const results = [];
+  const results: Awaited<ReturnType<typeof processBeds24WebhookBooking>>[] = [];
   for (const payload of bookingPayloads) {
     const result = await processBeds24WebhookBooking({
       payload,
@@ -265,20 +265,23 @@ export async function POST(request: NextRequest) {
   }
 
   // Observability: persist the batch result so a dropped/failed booking is traceable
-  // (see public.beds24_webhook_events). Never blocks the webhook response.
+  // (see public.beds24_webhook_events). Written after the response (`after()`) so it
+  // never adds a DB round-trip to the webhook latency.
   // When some bookings failed to process, keep their raw body for replay/debug.
   const anyFailed = failed > 0;
-  await recordBeds24WebhookEvent({
-    supabase,
-    httpStatus: anyFailed ? 207 : 200,
-    results,
-    rawBody: anyFailed ? body : undefined,
-    contentType: anyFailed ? contentType : undefined,
-  });
+  after(() =>
+    recordBeds24WebhookEvent({
+      supabase,
+      httpStatus: anyFailed ? 207 : 200,
+      results,
+      rawBody: anyFailed ? body : undefined,
+      contentType: anyFailed ? contentType : undefined,
+    }),
+  );
 
-  // Always ACK with 2xx once we have durably recorded the outcome, so Beds24 does
-  // not treat a partially-failed batch as a delivery failure and retry-storm; the
-  // failed rows are captured above and healed by reconciliation.
+  // Always ACK with 2xx, so Beds24 does not treat a partially-failed batch as a
+  // delivery failure and retry-storm; the failed rows are recorded above (after the
+  // response) and healed by reconciliation.
   return NextResponse.json(
     {
       ok: !anyFailed,

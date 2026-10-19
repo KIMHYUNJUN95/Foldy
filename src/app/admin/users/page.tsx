@@ -7,7 +7,8 @@ import {
   type PermRowVM,
 } from "@/components/admin/users/users-console";
 import { requireAdminSession } from "@/lib/admin-session";
-import { actorCanOpenUserManagement } from "@/lib/user-management-access";
+import { actorCanOpenUserManagement, isDeveloper } from "@/lib/user-management-access";
+import { canChangeTarget, removesLastOwner, targetLock } from "@/lib/user-management-guard";
 import { isOrgTopAdmin, type Role } from "@/config/roles";
 import { CAPABILITY_KEYS, canBeDenied, capabilityPolicy, evaluateCapability } from "@/config/capabilities";
 import { getDictionary } from "@/lib/i18n";
@@ -131,7 +132,15 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     const isSelf = selected.user_id === session.user.id;
     const keys = dictionary.admin.users.console.keys;
 
-    const [{ data: flagData }, teams, overrides, effective] = await Promise.all([
+    // 서버 액션과 같은 판정 — 화면은 막힌 이유를 보여 주기만 하고, 최종 판단은 액션이 한다.
+    const targetLevel = targetLock({ role: selected.role, isDeveloper: devIds.has(selected.user_id) });
+    const actorStanding = {
+      isDeveloper: isDeveloper(session.user.role),
+      topAdminInOrg: isOrgTopAdmin(session.user.role) && selected.organization_id === session.organization.id,
+    };
+    const lock = canChangeTarget(actorStanding, targetLevel) ? null : targetLevel;
+
+    const [{ data: flagData }, teams, overrides, effective, ownerCount, otherOrgCounts] = await Promise.all([
       service
         .from("memberships")
         .select("attendance_payroll_admin, leave_approver_role")
@@ -142,13 +151,32 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       canManagePermissions && !isSelf
         ? resolveCapabilities({ organizationId: selected.organization_id, userId: selected.user_id, role: selected.role })
         : Promise.resolve([]),
+      selected.role === "owner" && selected.status === "active"
+        ? service
+            .from("memberships")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", selected.organization_id)
+            .eq("role", "owner")
+            .eq("status", "active")
+            .then(({ count }) => count ?? 0)
+        : Promise.resolve(0),
+      service
+        .from("memberships")
+        .select("status")
+        .eq("user_id", selected.user_id)
+        .neq("organization_id", selected.organization_id)
+        .then(({ data }) => {
+          const rows = (data ?? []) as { status: string }[];
+          return { any: rows.length, active: rows.filter((row) => row.status === "active").length };
+        }),
     ]);
+    const lastOwner = removesLastOwner({ target: selected, change: { delete: true }, activeOwnerCount: ownerCount });
     const flags = flagData as Pick<MembershipRow, "attendance_payroll_admin" | "leave_approver_role"> | null;
 
     // 한 목록 안에서 「역할로 받음 · 개인 부여 · 개인 차단 · 꺼짐」을 줄마다 한 줄 글로 보여 준다. 판정식(역할 + 부여 − 차단)은
     // 서버가 계산한 최종값(`resolveCapabilities`)을 그대로 쓴다 — 화면이 따로 계산하면 언젠가 어긋난다.
     const perms: PermRowVM[] = [];
-    if (canManagePermissions && !isSelf) {
+    if (canManagePermissions && !isSelf && !lock) {
       for (const key of CAPABILITY_KEYS) {
         const policy = capabilityPolicy(key);
         if (policy.systemOnly) continue;
@@ -199,6 +227,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
       perms,
       canManagePermissions,
       isDeveloperViewer: isSuperAdmin,
+      lock,
+      lastOwner,
+      otherOrgs: otherOrgCounts.any > 0,
+      otherOrgsActive: otherOrgCounts.active > 0,
     };
   }
 

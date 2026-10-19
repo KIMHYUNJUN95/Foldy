@@ -132,7 +132,7 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
 - Table: 이름+이메일 (「나」 on yourself) · 역할 · 소속 · 전화 · 상태 · 가입일. No save buttons in rows anymore.
 - Clicking a row opens the **right panel** (`?member=<membershipId>`, shared `.panel`). The old profile page `/admin/users/[id]` now redirects there.
 - Panel: avatar · name · `역할 · 소속`, trash (delete member → confirm modal) · close. 이메일 / 전화 / 가입. Then 역할 (dropdown) · 소속 (segment of the org's teams) · 상태 (활성 · 비활성).
-  - Role and team **save immediately** with a toast. Choosing 비활성 opens a confirm modal (그대로 두기 / 비활성으로 바꾸기) because it blocks sign-in (auth ban). 활성 saves immediately.
+  - Role and team **save immediately** with a toast. Choosing 비활성 opens a confirm modal (그대로 두기 / 비활성으로 바꾸기) because it blocks sign-in (auth ban — only when no other org keeps an active membership, see below). 활성 saves immediately.
   - Office admins only see roles they may assign (`officeAdminAssignableRoles`); the server still enforces it.
 - 권한 — one list of switches (owner/전무/developer only; others see a one-line note). Each row says where it comes from: 역할로 받음 · 개인 부여(· 기한) · 개인 차단 · 꺼짐. Rules (server contract unchanged, `27-permission-override-workflow.md`):
   - off → on: grant override; on (from role) → off: deny override (only when the key allows deny and the role isn't deny-immune — otherwise the switch is disabled 「역할로 받음 · 끌 수 없음」).
@@ -142,6 +142,12 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
   - Also in the list: 급여 담당 · 연차 결재자 (membership flags), 일일 보고서 — 파트타임 허용 (only for part-time, `profiles.can_generate_report`), 개발자 지정 (developer viewer only). Developer-only keys (`user.manage`) are hidden from non-developers.
 - Your own row: no role/status/permission controls (「내 역할 · 권한은 여기서 바꿀 수 없어요.」), no delete.
 - Delete member: confirm modal (그대로 두기 / 삭제). Blocked with a message when the member has attendance / cleaning / leave history (deactivate instead).
+- **보호 대상 · 마지막 대표 · 삭제/비활성 범위 (2026-10-19)** — 판정은 순수 함수 `src/lib/user-management-guard.ts`, 서버 액션(`src/app/admin/users/actions.ts`)이 최종 판단. 회귀 테스트 `src/lib/__tests__/user-management-guard.test.ts`.
+  - 대상이 **owner · 전무**면 역할 · 소속 · 상태 · 권한 · 플래그 · 삭제 등 패널의 모든 변경은 **그 조직의 owner · 전무 또는 개발자만**. 대상이 **개발자**(`platform_admins` 활성)면 **개발자만**. `user.manage` 위임만 받은 사람은 불가(`protected_member`). 패널은 그런 대상에 컨트롤 · 휴지통을 숨기고 한 줄 안내(「대표 · 전무 계정은 …」 / 「개발자 계정은 개발자만 …」)를 보여 준다.
+  - 역할 변경의 「줄 수 있는 역할」(`officeAdminAssignableRoles` 밖)도 **대상 조직의** owner · 전무인지로 판정한다(세션 역할이 다른 조직 것일 수 있다).
+  - **마지막 활성 owner** 는 owner 가 아닌 역할로 바꾸기 · 비활성 · 삭제가 막힌다(`last_owner`). 패널은 역할 드롭다운 · 「비활성」 · 휴지통을 막고 안내 문구를 띄운다. 전무는 owner 수에 세지 않는다.
+  - **삭제**는 이 조직 멤버십만 지운다. 그 사람에게 **다른 조직 멤버십(상태 무관)** 이 있으면 profile · 로그인 계정은 남긴다. 다른 조직 멤버십이 없을 때만 계정 전체(멤버십 → profile → auth) 삭제. 활동 기록 검사(근태 · 청소 · 연차)는 예전처럼 조직 무관.
+  - **비활성(auth ban)** 기준은 「바뀐 뒤 어느 조직에도 활성 멤버십이 없으면 로그인 차단」 하나. 다른 조직에 활성 멤버십이 있으면 이 조직 멤버십 상태만 바뀌고 로그인은 막지 않는다. 활성으로 바꾸면 항상 차단 해제. 확인 창 문구도 그 경우 「이 조직에서만 …」으로 바뀐다.
 - Motion: rows rise in order, switch knob slide, expiry row unfolds, button press. Off under reduced motion.
 - Code: `src/components/admin/users/users-console.tsx` + `users-white.css` (`usw-*`). Scope guard: the list is org-scoped; the panel only opens for a membership in that list.
 

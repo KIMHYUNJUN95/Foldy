@@ -139,6 +139,13 @@ admin 페이지 14개의 게이트를 전수 확인한 결과:
 벌이 된다 — `actorCanOpenUserManagement` 가 `user.manage` 부여도 함께 인정한다. 레거시 플래그는
 위임 UI 를 권한 부여로 옮기는 5단계까지 남겨 둔다(0명이라 당장 문제는 없다).
 
+**`user.manage` 는 대표급 · 개발자 계정에 닿지 않는다(2026-10-19).** 위임받은 사람이 owner · 전무를
+정지 · 강등 · 삭제할 수 있으면 위임이 곧 권한 상승이다. 사용자 콘솔의 모든 변경 액션은
+`guardProtectedTarget` 을 거친다 — 대상이 owner · 전무면 그 조직의 owner · 전무 또는 개발자만,
+대상이 개발자면 개발자만(`developerOnly` 와 같은 결). 마지막 활성 owner 는 강등 · 비활성 · 삭제 불가.
+삭제 · 비활성은 다른 조직 멤버십이 있으면 이 조직 멤버십에서 멈춘다(로그인 계정은 조직 공용).
+판정: `src/lib/user-management-guard.ts`, 화면 규칙: `docs/product/17-user-profile-directory.md`.
+
 ### 3-0. 기존 오버라이드 키 4개는 이름을 유지한다
 
 `order_processor` · `maintenance_status_change` · `property_room_manage` · `can_generate_report` 는

@@ -80,6 +80,14 @@ export type MemberPanelVM = {
   perms: PermRowVM[];
   canManagePermissions: boolean;
   isDeveloperViewer: boolean;
+  /** 이 사람을 바꿀 수 없는 이유 — 대표급(owner·전무) 또는 개발자 계정. 바꿀 수 있으면 null. */
+  lock: "top" | "dev" | null;
+  /** 조직의 마지막 활성 owner — 역할 변경 · 비활성 · 삭제가 막힌다. */
+  lastOwner: boolean;
+  /** 다른 조직 멤버십이 있다(상태 무관) — 삭제해도 로그인 계정은 남는다. */
+  otherOrgs: boolean;
+  /** 다른 조직에 활성 멤버십이 있다 — 비활성으로 바꿔도 로그인은 막히지 않는다. */
+  otherOrgsActive: boolean;
 };
 
 type Dict = ReturnType<typeof getDictionary>;
@@ -102,6 +110,10 @@ function errorText(code: string | undefined, dict: Dict): string {
       return dict.admin.users.errors.self_update_blocked;
     case "has_activity":
       return c.errHasActivity;
+    case "protected_member":
+      return c.errProtected;
+    case "last_owner":
+      return c.errLastOwner;
     case "min_one_approver":
       return c.errMinApprover;
     case "hourly_excluded":
@@ -325,6 +337,7 @@ function MemberPanel({
   const [optStatus, setOptStatus] = useState<string | null>(null);
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: confirm !== null || pending });
   const today = tokyoToday();
+  const readOnly = m.isSelf || panel.lock !== null;
 
   const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.payrollAdmin, m.leaveApprover, m.reportAccess, m.isDeveloper, panel.perms]);
   const lastKey = useRef(dataKey);
@@ -373,7 +386,7 @@ function MemberPanel({
   const expiryText = (iso: string) => shortDate(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }));
   const daysLeft = (iso: string) => Math.ceil((new Date(iso).getTime() - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000) - 1;
 
-  if (!m.isSelf) {
+  if (!readOnly) {
     for (const p of panel.perms) {
       const on = optimistic[p.key] ?? p.on;
       let src: string = c.wSrcOff;
@@ -517,7 +530,7 @@ function MemberPanel({
             </h2>
             <span>{[m.isDeveloper ? c.devRole : roleLabel(role), teamText].filter(Boolean).join(" · ")}</span>
           </div>
-          {!m.isSelf ? (
+          {!readOnly && !panel.lastOwner ? (
             <button type="button" className="usw-ic is-danger" aria-label={c.wDeleteAria} title={c.wDeleteAria} onClick={() => setConfirm("delete")}>
               <Trash2 aria-hidden="true" />
             </button>
@@ -537,8 +550,8 @@ function MemberPanel({
             <dd className="num">{longDate(m.joinedAt)}</dd>
           </dl>
 
-          {m.isSelf ? (
-            <p className="usw-note">{c.wSelfNote}</p>
+          {readOnly ? (
+            <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>
           ) : (
             <div className="usw-set">
               <span className="usw-set__k">{u.role}</span>
@@ -546,7 +559,7 @@ function MemberPanel({
                 options={roleOptions}
                 value={role}
                 ariaLabel={u.role}
-                disabled={pending}
+                disabled={pending || panel.lastOwner}
                 onChange={(value) => {
                   if (value === role) return;
                   const before = optRole;
@@ -600,7 +613,7 @@ function MemberPanel({
                   role="radio"
                   aria-checked={status !== "active"}
                   className={status !== "active" ? "on" : ""}
-                  disabled={pending}
+                  disabled={pending || (panel.lastOwner && status === "active")}
                   onClick={() => {
                     if (status !== "active") return;
                     setConfirm("deactivate");
@@ -609,10 +622,11 @@ function MemberPanel({
                   {c.statusInactive}
                 </button>
               </div>
+              {panel.lastOwner ? <p className="usw-note">{c.wLastOwnerNote}</p> : null}
             </div>
           )}
 
-          {!m.isSelf ? (
+          {!readOnly ? (
             <section className="usw-perm" aria-label={c.permTitle}>
               <div className="usw-perm__h">
                 <b>{c.permTitle}</b>
@@ -687,6 +701,7 @@ function MemberPanel({
       {confirm ? (
         <ConfirmModal
           kind={confirm}
+          sharedAccount={confirm === "delete" ? panel.otherOrgs : panel.otherOrgsActive}
           summary={[m.name, m.isDeveloper ? c.devRole : roleLabel(role), m.email].filter(Boolean).join(" · ")}
           dict={dict}
           pending={pending}
@@ -719,6 +734,7 @@ function MemberPanel({
 
 function ConfirmModal({
   kind,
+  sharedAccount,
   summary,
   dict,
   pending,
@@ -726,6 +742,8 @@ function ConfirmModal({
   onConfirm,
 }: {
   kind: "deactivate" | "delete";
+  /** 다른 조직에서도 쓰는 로그인 계정이라 이 조직 멤버십만 바뀐다. */
+  sharedAccount: boolean;
   summary: string;
   dict: Dict;
   pending: boolean;
@@ -752,7 +770,13 @@ function ConfirmModal({
           <h2 id="usw-confirm-t">{title}</h2>
           <span>{summary}</span>
         </div>
-        <p className="usw-modal__b">{kind === "delete" ? c.wDeleteBody : c.wDeactBody}</p>
+        <p className="usw-modal__b">{kind === "delete"
+            ? sharedAccount
+              ? c.wDeleteBodyShared
+              : c.wDeleteBody
+            : sharedAccount
+              ? c.wDeactBodyShared
+              : c.wDeactBody}</p>
         {kind === "delete" ? <p className="usw-modal__b is-warn">{c.wDeleteWarn}</p> : null}
         <div className="usw-modal__f">
           {/* 첫 초점은 「그대로 두기」 — Enter 한 번에 되돌릴 수 없는 일이 일어나지 않게. */}

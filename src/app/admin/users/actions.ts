@@ -17,6 +17,13 @@ import {
   type CapabilityEffect,
 } from "@/config/capabilities";
 import { actorCanManageUsersInOrg, isDeveloper } from "@/lib/user-management-access";
+import {
+  authBanAction,
+  canChangeTarget,
+  deleteScope,
+  removesLastOwner,
+  targetLock,
+} from "@/lib/user-management-guard";
 import type { Database } from "@/types/database";
 
 type MembershipRow = Database["public"]["Tables"]["memberships"]["Row"];
@@ -66,30 +73,91 @@ async function getMembership(membershipId: string): Promise<TargetMembership | n
   return (data as TargetMembership | null) ?? null;
 }
 
-/** Top org admin (owner/전무, of the target org) or platform admin. Gates payroll / approver / overrides. */
-async function canManagePermissions(actorUserId: string, actorRole: Role, membership: TargetMembership) {
-  if (actorRole === "developer_super_admin") return true;
+/** Is the actor an active owner/전무 of THIS org? (The session role may come from another org.) */
+async function isTopAdminInOrg(actorUserId: string, actorRole: Role, organizationId: string) {
   if (!isOrgTopAdmin(actorRole)) return false;
   const { data } = await getSupabaseServiceClient()
     .from("memberships")
     .select("id")
     .eq("user_id", actorUserId)
-    .eq("organization_id", membership.organization_id)
+    .eq("organization_id", organizationId)
     .eq("status", "active")
     .in("role", ["owner", "senior_managing_director"])
     .maybeSingle();
   return Boolean(data);
 }
 
-function canAssignRole(actorRole: Role, nextRole: OrganizationRole) {
-  if (actorRole === "developer_super_admin" || isOrgTopAdmin(actorRole)) return true;
+/** Top org admin (owner/전무, of the target org) or platform admin. Gates payroll / approver / overrides. */
+async function canManagePermissions(actorUserId: string, actorRole: Role, membership: TargetMembership) {
+  if (isDeveloper(actorRole)) return true;
+  return isTopAdminInOrg(actorUserId, actorRole, membership.organization_id);
+}
+
+function canAssignRole(actorIsTopOrDeveloper: boolean, nextRole: OrganizationRole) {
+  if (actorIsTopOrDeveloper) return true;
   return (officeAdminAssignableRoles as readonly OrganizationRole[]).includes(nextRole);
+}
+
+type ResolvedActor = { actorUserId: string; actorRole: Role; membership: TargetMembership };
+
+/**
+ * 보호 대상(대표급 · 개발자) 변경 게이트 — 사용자 콘솔의 모든 변경 액션이 부른다. `user.manage` 위임만으로는
+ * 대표급 · 개발자 계정을 바꿀 수 없다(판정: `canChangeTarget`).
+ */
+async function guardProtectedTarget(ctx: ResolvedActor): Promise<"protected_member" | null> {
+  const { data } = await getSupabaseServiceClient()
+    .from("platform_admins")
+    .select("user_id")
+    .eq("user_id", ctx.membership.user_id)
+    .eq("is_active", true)
+    .maybeSingle();
+  const lock = targetLock({ role: ctx.membership.role, isDeveloper: Boolean(data) });
+  if (!lock) return null;
+  const actor = {
+    isDeveloper: isDeveloper(ctx.actorRole),
+    topAdminInOrg: await isTopAdminInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id),
+  };
+  return canChangeTarget(actor, lock) ? null : "protected_member";
+}
+
+async function countActiveOwners(organizationId: string): Promise<number> {
+  const { count } = await getSupabaseServiceClient()
+    .from("memberships")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("role", "owner")
+    .eq("status", "active");
+  return count ?? 0;
+}
+
+async function guardLastOwner(
+  membership: TargetMembership,
+  change: { role?: string; status?: string; delete?: boolean },
+): Promise<"last_owner" | null> {
+  if (membership.role !== "owner" || membership.status !== "active") return null;
+  const activeOwnerCount = await countActiveOwners(membership.organization_id);
+  return removesLastOwner({ target: membership, change, activeOwnerCount }) ? "last_owner" : null;
+}
+
+/** The user's memberships in OTHER orgs — `activeOnly` for the auth-ban decision, any status for delete. */
+async function countOtherOrgMemberships(membership: TargetMembership, activeOnly: boolean): Promise<number | null> {
+  let query = getSupabaseServiceClient()
+    .from("memberships")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", membership.user_id)
+    .neq("organization_id", membership.organization_id);
+  if (activeOnly) query = query.eq("status", "active");
+  const { count, error } = await query;
+  if (error) return null;
+  return count ?? 0;
 }
 
 const LIST_PATH = "/admin/users";
 
 /** Resolves the acting user + target membership + revalidates, shared by every action. */
-async function resolveActor(membershipId: string) {
+async function resolveActor(
+  membershipId: string,
+): Promise<ResolvedActor | { error: "unauthenticated" | "forbidden" | "invalid_member" }> {
   const actorUserId = await getCurrentUserId();
   if (!actorUserId) return { error: "unauthenticated" as const };
   const actorRole = await getCurrentRole(actorUserId);
@@ -109,12 +177,15 @@ export async function setMemberRole(membershipId: string, role: string): Promise
   if ("error" in ctx) return { ok: false, error: ctx.error };
   if (!(organizationRoles as readonly string[]).includes(role)) return { ok: false, error: "invalid_member" };
   if (ctx.membership.user_id === ctx.actorUserId) return { ok: false, error: "self_update_blocked" };
-  if (
-    !(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id)) ||
-    !canAssignRole(ctx.actorRole, role as OrganizationRole)
-  ) {
+  if (!(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id))) {
     return { ok: false, error: "forbidden" };
   }
+  const actorIsTopOrDeveloper =
+    isDeveloper(ctx.actorRole) ||
+    (await isTopAdminInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id));
+  if (!canAssignRole(actorIsTopOrDeveloper, role as OrganizationRole)) return { ok: false, error: "forbidden" };
+  const blocked = (await guardProtectedTarget(ctx)) ?? (await guardLastOwner(ctx.membership, { role }));
+  if (blocked) return { ok: false, error: blocked };
   const { error } = await getSupabaseServiceClient()
     .from("memberships")
     .update({ role: role as OrganizationRole })
@@ -132,6 +203,11 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
   if (!(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = (await guardProtectedTarget(ctx)) ?? (await guardLastOwner(ctx.membership, { status }));
+  if (blocked) return { ok: false, error: blocked };
+  const otherActive = await countOtherOrgMemberships(ctx.membership, true);
+  if (otherActive === null) return { ok: false, error: "save_failed" };
+
   const service = getSupabaseServiceClient();
   const { error } = await service
     .from("memberships")
@@ -139,12 +215,15 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
     .eq("id", membershipId);
   if (error) return { ok: false, error: "save_failed" };
 
-  // Full deactivation: block login at the auth layer too, not just org-context loss. Active → unban,
-  // any inactive status → ban. Self-status is already blocked above, so an actor can't ban themselves.
-  const { error: banError } = await service.auth.admin.updateUserById(ctx.membership.user_id, {
-    ban_duration: status === "active" ? "none" : "876000h",
-  });
-  if (banError) return { ok: false, error: "save_failed" };
+  // The auth login is shared across orgs — ban it only when no org has an active membership left
+  // (`authBanAction`). Self-status is already blocked above, so an actor can't ban themselves.
+  const ban = authBanAction(status, otherActive);
+  if (ban !== "keep") {
+    const { error: banError } = await service.auth.admin.updateUserById(ctx.membership.user_id, {
+      ban_duration: ban === "unban" ? "none" : "876000h",
+    });
+    if (banError) return { ok: false, error: "save_failed" };
+  }
 
   revalidateMember(membershipId);
   return { ok: true };
@@ -161,6 +240,8 @@ export async function setMemberTeam(membershipId: string, teamId: string | null)
   if (!(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = await guardProtectedTarget(ctx);
+  if (blocked) return { ok: false, error: blocked };
 
   const service = getSupabaseServiceClient();
   if (teamId) {
@@ -189,6 +270,8 @@ export async function setMemberReportAccess(membershipId: string, grant: boolean
   if (!(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = await guardProtectedTarget(ctx);
+  if (blocked) return { ok: false, error: blocked };
   const { error } = await getSupabaseServiceClient()
     .from("profiles")
     .update({ can_generate_report: grant })
@@ -204,6 +287,8 @@ export async function setMemberPayrollAdmin(membershipId: string, grant: boolean
   if (!(await canManagePermissions(ctx.actorUserId, ctx.actorRole, ctx.membership))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = await guardProtectedTarget(ctx);
+  if (blocked) return { ok: false, error: blocked };
   const { error } = await getSupabaseServiceClient()
     .from("memberships")
     .update({ attendance_payroll_admin: grant })
@@ -219,6 +304,8 @@ export async function setMemberLeaveApprover(membershipId: string, grant: boolea
   if (!(await canManagePermissions(ctx.actorUserId, ctx.actorRole, ctx.membership))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = await guardProtectedTarget(ctx);
+  if (blocked) return { ok: false, error: blocked };
   const result = await setLeaveApprover({
     organizationId: ctx.membership.organization_id,
     actorUserId: ctx.actorUserId,
@@ -244,6 +331,8 @@ export async function grantPermissionOverrideAction(input: {
   if (!(await canManagePermissions(ctx.actorUserId, ctx.actorRole, ctx.membership))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = await guardProtectedTarget(ctx);
+  if (blocked) return { ok: false, error: blocked };
   if (ctx.membership.user_id === ctx.actorUserId) return { ok: false, error: "self_grant_blocked" };
   // 개발자만 줄 수 있는 키가 있다 — 사용자 관리 위임이 그렇다. 위임받은 사람이 다시 위임하면
   // 권한이 무한히 번진다(2026-07-13 결정). 화면도 그 키를 숨기지만, 막는 것은 여기다.
@@ -279,6 +368,8 @@ export async function revokePermissionOverrideAction(input: {
   if (!(await canManagePermissions(ctx.actorUserId, ctx.actorRole, ctx.membership))) {
     return { ok: false, error: "forbidden" };
   }
+  const blocked = await guardProtectedTarget(ctx);
+  if (blocked) return { ok: false, error: blocked };
   // 줄 수 있는 사람만 뺄 수 있다. 부여만 개발자 전용으로 막고 회수를 열어 두면, 대표가 개발자의
   // 위임을 되돌린 뒤 자기가 다시 줄 수는 없는 어긋난 상태가 된다.
   {
@@ -344,8 +435,9 @@ export async function assignDeveloper(membershipId: string, grant: boolean): Pro
  * Guarded hard delete of a member (2026-07-13 model rework). Deactivation is the default; hard delete
  * is only for erroneous / never-active accounts. BLOCKS deletion when the user has any operational or
  * financial history (attendance / cleaning / annual-leave) — deleting would cascade-destroy those
- * records. When allowed, removes memberships + profile + the auth login (full account removal).
- * Developer / manage_users gated; can't delete yourself.
+ * records. When allowed, removes this org's membership — plus profile + auth login only when the user has
+ * no membership in any other org. Developer / manage_users gated; protected targets (owner/전무 ·
+ * developer) and the last active owner are guarded; can't delete yourself.
  */
 export async function deleteMember(membershipId: string): Promise<ActionResult> {
   const ctx = await resolveActor(membershipId);
@@ -354,6 +446,8 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
     return { ok: false, error: "forbidden" };
   }
   if (ctx.membership.user_id === ctx.actorUserId) return { ok: false, error: "cannot_delete_self" };
+  const blocked = (await guardProtectedTarget(ctx)) ?? (await guardLastOwner(ctx.membership, { delete: true }));
+  if (blocked) return { ok: false, error: blocked };
 
   const service = getSupabaseServiceClient();
   const userId = ctx.membership.user_id;
@@ -369,9 +463,17 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
     return { ok: false, error: "has_activity" };
   }
 
-  // No history → safe to fully remove. Delete explicitly (memberships → profile) then the auth login,
-  // so cleanup doesn't depend on a particular FK cascade config.
-  await service.from("memberships").delete().eq("user_id", userId);
+  // Profile + auth login are shared across orgs: if the user belongs to any other org (any status),
+  // remove only THIS org's membership. Otherwise remove the whole account explicitly (membership →
+  // profile → auth login) so cleanup doesn't depend on a particular FK cascade config.
+  const otherOrgs = await countOtherOrgMemberships(ctx.membership, false);
+  if (otherOrgs === null) return { ok: false, error: "delete_failed" };
+  const { error: membershipError } = await service.from("memberships").delete().eq("id", membershipId);
+  if (membershipError) return { ok: false, error: "delete_failed" };
+  if (deleteScope(otherOrgs) === "membership") {
+    revalidatePath(LIST_PATH);
+    return { ok: true };
+  }
   await service.from("profiles").delete().eq("id", userId);
   const { error } = await service.auth.admin.deleteUser(userId);
   if (error) return { ok: false, error: "delete_failed" };

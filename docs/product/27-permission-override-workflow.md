@@ -107,6 +107,9 @@ every time a new exception need comes up.
 - **Who can grant**: `owner`, `senior_managing_director`(전무, owner-equivalent since 2026-07-13), and
   `developer_super_admin` only (matches the "개발자, 최고관리자" scope given in conversation).
   `office_admin` cannot grant overrides, unlike role changes where it has partial authority.
+  **Developer targets (2026-10-19):** a member who is an active platform developer can only receive or
+  lose overrides from a developer — owner/전무 are refused (`protected_member`, same guard as the rest of
+  the user console; `docs/product/17-user-profile-directory.md`).
 - **Adoption is a two-layer change, not just RLS (corrected 2026-07-09).** A lot of Foldy'
   real authorization logic lives in **TypeScript, not pure RLS** — e.g. `ORDER_PROCESSOR_ROLES`
   (`src/app/mobile/requests/orders/actions.ts`), `canGenerateDailyReport()` /

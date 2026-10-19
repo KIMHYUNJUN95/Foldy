@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — 주문 처리 권한 바로잡기
+
+- 관리자 주문 콘솔의 거절 · 다시 열기 · 상태 정정 · 요청 수정이 청소 강제완료 게이트를 써서, 현장 관리자는 되고 CS 직원은 막혀 있었다(문서 10 과 반대).
+  모바일 처리와 같은 `canProcessOrders`(`src/lib/order-permissions.ts`)로 통일.
+- 요청자 · 현장 관리자가 DB 에 직접 PATCH 해 상태 · 배송일 · 관리자 메모를 바꿀 수 있던 것 — 트리거 `order_requests_processing_guard`
+  (마이그레이션 `202610190006`, 적용 완료)로 막았다. 롤백 블록으로 요청자 상태 변경 거부 · 제목 수정 허용 · 사무실 허용 확인.
+
 ## 2026-10-19 — 성능 2차: 화면 대기 · DB 부하 · 리뷰 집계 버그
 
 - **DB 사양**: Supabase Free(Nano) → Pro + Micro(메모리 0.5 → 1GB). 08:00 · 11:40 몰림 때 DB 가 몇 분씩 멈추던 것 대응. 효과는 다음 몰림 때 재확인.

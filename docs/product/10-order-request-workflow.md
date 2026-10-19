@@ -386,7 +386,8 @@ which the console also reuses.
   `updateOrderDeliveryDate`(배송일 수정) · `deleteOrderRequest`(삭제, delete-actions) 재사용.
 - **신규 서버 액션 4종** (`src/app/admin/orders/actions.ts`, 구현 완료 — 계획했던 "재오픈 1종"에서
   범위가 커졌다): `rejectOrder` · `reopenOrder` · `correctOrderStatus` · `editOrder`. 모두
-  `requireAdminSession()` + 역할 게이트(`canForceCompleteCleaning(role)`) + 조직 스코프 + UUID 검증,
+  `requireAdminSession()` + 역할 게이트(`canProcessOrders` — `src/lib/order-permissions.ts`, 모바일 처리와 같은 사무실 쪽 역할 +
+  `order_processor` 예외. 2026-10-19 전까지 청소 강제완료 게이트를 잘못 써서 현장 관리자는 되고 CS 직원은 막혔다) + 조직 스코프 + UUID 검증,
   반환 `{ok:true}|{ok:false, reason:"forbidden"|"invalid"|"not_found"|"failed"}`. 상세는 아래
   "능동 처리 · 예외 개입 액션".
 - **DB 스키마 변경 있음(구현 완료).** 마이그레이션 `202607190001_orders_console.sql`이
@@ -510,6 +511,12 @@ Cannot change status:
 - Field Manager
 - Staff
 - Part-time Staff
+
+Enforcement (2026-10-19): app gate `canProcessOrders` (`src/lib/order-permissions.ts`) is shared by the mobile
+processing actions and the admin console's reject / reopen / correct / edit actions. The DB trigger
+`order_requests_processing_guard` (migration `202610190006`) blocks changes to `status`, `delivery_*` and `admin_memo`
+by anyone else even through a direct API call — the row-level UPDATE policy alone let the requester and Field Manager
+change them.
 
 Important:
 

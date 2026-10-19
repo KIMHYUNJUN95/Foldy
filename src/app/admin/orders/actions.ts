@@ -11,8 +11,8 @@ import {
   type AdminTableColumn,
   type AdminTableSheet,
 } from "@/lib/admin-table-workbook";
-import { canForceCompleteCleaning } from "@/lib/cleaning";
 import { getDictionary } from "@/lib/i18n";
+import { canProcessOrders } from "@/lib/order-permissions";
 import {
   getOrgOrderRequests,
   orderRequestStatuses,
@@ -178,7 +178,9 @@ export async function exportOrdersReport(
 // 일반 처리(승인/주문처리/배송일수정/삭제)는 기존 액션을 콘솔 클라이언트가 직접 재사용한다:
 // updateOrderRequestStatus·updateOrderDeliveryDate(src/app/mobile/requests/orders/actions.ts),
 // deleteOrderRequest(src/app/mobile/requests/delete-actions.ts). 아래는 관리자 예외 경로다.
-// 청소 강제완료와 같은 역할 게이트(canForceCompleteCleaning)를 쓴다.
+// 권한은 모바일 주문 처리와 같은 `canProcessOrders`(사무실 쪽 역할 + `order_processor` 예외)다.
+// 2026-10-19 까지는 청소 강제완료 게이트(canForceCompleteCleaning)를 잘못 써서 현장 관리자는 거절·정정이
+// 되고 CS 직원은 막혀 있었다(문서 10 과 반대).
 // See docs/product/10-order-request-workflow.md.
 
 type OrderActionResult =
@@ -197,7 +199,7 @@ function revalidateOrders() {
 // 예외 개입의 공통 진입 가드: 세션 · 역할 게이트 · UUID.
 async function requireOrderAction(orderId: string) {
   const session = await requireAdminSession();
-  if (!canForceCompleteCleaning(session.user.role)) {
+  if (!(await canProcessOrders(session.organization.id, session.user.id, session.user.role))) {
     return { ok: false as const, result: { ok: false, reason: "forbidden" } as OrderActionResult };
   }
   if (!isValidUUID(orderId)) {

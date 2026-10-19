@@ -498,6 +498,13 @@ Process status (approve / reject / mark as ordered):
 - Owner
 - Office Admin
 - CS Staff
+- (`order_processor` permission override)
+
+Enforced by trigger `order_requests_processing_guard` (migration `202610190006`, 2026-10-19): the UPDATE policy is
+row-level, so it lets the creator and Field Manager write any column. The BEFORE UPDATE trigger rejects (42501)
+changes to `status` · `delivery_date` · `delivery_start_date` · `delivery_end_date` · `admin_memo` unless the caller is a
+platform admin, owner / senior_managing_director, office_admin, cs_staff, or holds `order_processor`, and rejects any
+change to `organization_id` / `reported_by_user_id`. Service-role paths (no `auth.uid()`) pass.
 
 Cannot process status:
 

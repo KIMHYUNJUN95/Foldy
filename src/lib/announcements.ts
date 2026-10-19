@@ -181,12 +181,10 @@ export async function getVisibleAnnouncements(session: AppSession) {
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   const announcements = (data ?? []) as AnnouncementRow[];
-  const authorNames = await getAuthorNames([
-    ...new Set(announcements.map((announcement) => announcement.created_by_user_id)),
+  const [authorNames, commentCounts] = await Promise.all([
+    getAuthorNames([...new Set(announcements.map((announcement) => announcement.created_by_user_id))]),
+    getAnnouncementCommentCounts(announcements.map((announcement) => announcement.id)),
   ]);
-  const commentCounts = await getAnnouncementCommentCounts(
-    announcements.map((announcement) => announcement.id),
-  );
 
   return withAnnouncementMeta(
     announcements,
@@ -240,8 +238,10 @@ export async function getVisibleAnnouncementById(
     return null;
   }
 
-  const authorNames = await getAuthorNames([announcement.created_by_user_id]);
-  const commentCounts = await getAnnouncementCommentCounts([announcement.id]);
+  const [authorNames, commentCounts] = await Promise.all([
+    getAuthorNames([announcement.created_by_user_id]),
+    getAnnouncementCommentCounts([announcement.id]),
+  ]);
   const [readerAnnouncement] = withAnnouncementMeta(
     [announcement],
     authorNames,

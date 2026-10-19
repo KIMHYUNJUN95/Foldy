@@ -114,7 +114,7 @@ URL: `/mobile/announcements/[id]`
 Current implementation:
 
 - `getVisibleAnnouncementById(session, id)` 로 공지를 조회하며 대상/조직 권한이 확인된다.
-- 페이지 진입 시 `ensureAnnouncementRead(announcement, session.user.id)` 가 서버에서 자동으로 읽음 처리한다 (반환값은 UI에 표시하지 않음).
+- 페이지 진입 시 `ensureAnnouncementRead(announcement, session.user.id)` 가 서버에서 자동으로 읽음 처리한다 (반환값은 UI에 표시하지 않음). 모바일 상세는 이것을 **응답을 보낸 뒤**(`after()`) 쓰고, 공지 조회와 함께 읽어 둔 「이미 읽었나」로 이 화면의 메뉴 배지에서 그 공지를 하나 뺀다 — 열자마자 배지가 줄어드는 동작은 그대로다(2026-10-19 속도).
 - 공지가 존재하지 않거나 표시 권한이 없으면 `notFound()` 처리된다.
 
 ### 팝업
@@ -231,7 +231,7 @@ Current implementation:
 
 - `announcement_reads` 테이블에 공지별·사용자별 읽음 레코드 1건이 저장된다.
 - `(announcement_id, user_id)` unique pair로 최초 읽음 시각을 보존한다.
-- 상세 페이지 진입 시 `ensureAnnouncementRead()` server function 이 자동으로 읽음 처리한다 (mobile 및 admin 공통).
+- 상세 페이지 진입 시 `ensureAnnouncementRead()` server function 이 자동으로 읽음 처리한다 (mobile 및 admin 공통). 모바일은 `after()` 로 응답 뒤에 쓴다(위 참고).
 - 모바일 상세 화면에는 읽음 확인 UI 블록을 표시하지 않는다 (2026-06-26 제거). 읽음 처리는 백그라운드 서버 로직으로만 동작한다.
 - Admin 공지 상세에서 읽음/미읽음 카운트 및 대상 사용자 목록 (역할·읽음 시각 포함) 조회가 가능하다.
 - 팝업 닫기는 읽음 처리가 아님. 읽음 추적은 상세 페이지 진입에만 연결된다.

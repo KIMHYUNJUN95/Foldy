@@ -17,6 +17,7 @@ type PageProps = { params: Promise<{ id: string }>; searchParams: Promise<{ erro
 // Staff Suggestions — author edit of a `submitted` suggestion. Reuses the compose form in edit mode.
 // Guard: only the author may edit, and only while status is `submitted`; otherwise bounce to detail.
 export default async function MobileSuggestionEditPage({ params, searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, sp] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -44,7 +45,7 @@ export default async function MobileSuggestionEditPage({ params, searchParams }:
   }
 
   const dict = getDictionary(session.user.preferredLanguage);
-  const [users, navBadges] = await Promise.all([getShareableUsers(session).then(withDisplayRoles), getMobileNavBadges()]);
+  const [users, navBadges] = await Promise.all([getShareableUsers(session).then(withDisplayRoles), navBadgesPromise]);
   const byId = new Map(users.map((u) => [u.id, u]));
 
   const initial: SuggestionComposeInitial = {

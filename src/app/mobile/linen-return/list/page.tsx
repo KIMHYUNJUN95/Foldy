@@ -45,6 +45,7 @@ function linesText(record: LinenReturnRecord): string {
 }
 
 export default async function LinenReturnListPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -77,7 +78,7 @@ export default async function LinenReturnListPage({ searchParams }: PageProps) {
 
   const [records, navBadges, allBuildings, stats] = await Promise.all([
     getLinenReturnsByBuilding(session, building),
-    getMobileNavBadges(),
+    navBadgesPromise,
     getLinenBuildings(session),
     getLinenBuildingStats(session),
   ]);

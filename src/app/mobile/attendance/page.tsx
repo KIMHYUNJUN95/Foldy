@@ -25,6 +25,7 @@ const PREVIEW_STATES = ["idle", "open", "break", "loading"] as const;
 // Attendance / 근태 — home (ring-hero clock). Step 3: wired to real open-session state.
 // See docs/product/24-attendance-workflow.md and docs/product/21-attendance-payroll-workflow.md.
 export default async function MobileAttendancePage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -41,7 +42,7 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
     redirect("/mobile/unavailable");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   // Explicit `?state=` keeps the design-preview switcher working (static visuals, no real data).
   const previewState = PREVIEW_STATES.includes((params.state ?? "") as (typeof PREVIEW_STATES)[number])

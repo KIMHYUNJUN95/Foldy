@@ -11,6 +11,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function MobileNotificationsPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -36,7 +37,7 @@ export default async function MobileNotificationsPage() {
       userId: session.user.id,
       organizationId: session.organization.id,
     }),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
   // 줄 글자(짧은 제목 · 대상 · 시각)는 여기서 만든다 — 클라이언트에 사전을 싣지 않는다(화이트 리디자인 2026-10-15).
   const actorNames = await loadNotificationActorNames(supabase, items);

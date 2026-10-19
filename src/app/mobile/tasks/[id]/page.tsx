@@ -15,6 +15,7 @@ type PageProps = {
 };
 
 export default async function MobileTaskDetailPage({ params, searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, query] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -47,7 +48,7 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
   );
   const [users, navBadges, occurrenceStates] = await Promise.all([
     getShareableUsers(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
     // 이 작업 한 건의 회차 상태만 읽어, 아래 두 값을 같은 결과에서 뽑는다. 조직 전체 회차 상태를
     // 끌어오면 날짜 한 건을 알려고 400일치 org 데이터를 읽게 된다.
     matchesRule ? occurrenceStatesForTask(task.id) : Promise.resolve(new Map<string, string>()),

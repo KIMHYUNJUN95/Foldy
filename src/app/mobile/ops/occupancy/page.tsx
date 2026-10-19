@@ -34,6 +34,7 @@ const LIVE_KINDS = ["reservations"] as const;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function MobileOccupancyPage({ searchParams }: { searchParams: SearchParams }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([getOnboardingState(), getCurrentAppSession(), searchParams]);
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent(BASE_PATH)}`);
   if (state.status !== "ready" || !session) redirect("/onboarding");
@@ -48,7 +49,7 @@ export default async function MobileOccupancyPage({ searchParams }: { searchPara
 
   const [data, badges] = await Promise.all([
     getOpsRevenueData(session, { forward: FORWARD_MONTHS, mode: "month", range }),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
   const summary = buildOccupancySummary(data, defaultIncludedProperties(data));
 

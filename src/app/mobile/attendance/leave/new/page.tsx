@@ -16,6 +16,7 @@ export default async function MobileLeaveNewPage({
 }: {
   searchParams: Promise<{ id?: string }>;
 }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -32,7 +33,7 @@ export default async function MobileLeaveNewPage({
     redirect("/mobile/unavailable");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const dict = getDictionary(session.user.preferredLanguage);
   const userName = session.user.name?.trim() || dict.attendance.userFallback;
 

@@ -23,6 +23,7 @@ type PageProps = {
 };
 
 export default async function MobileRequestsPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -61,7 +62,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
     getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
   ]);
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={dictionary.mobile.requestsTitle} split>

@@ -15,6 +15,7 @@ type PageProps = {
 };
 
 export default async function LinenReturnNewPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -45,7 +46,7 @@ export default async function LinenReturnNewPage({ searchParams }: PageProps) {
 
   const [items, navBadges, allBuildings, stats] = await Promise.all([
     getActiveLinenItems(session, building),
-    getMobileNavBadges(),
+    navBadgesPromise,
     getLinenBuildings(session),
     getLinenBuildingStats(session),
   ]);

@@ -9,6 +9,7 @@ import { MobileShell } from "@/components/shell/mobile-shell";
 import { BoardComposeClient } from "./board-compose-client";
 
 export default async function BoardComposePage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -26,7 +27,7 @@ export default async function BoardComposePage() {
   const dictionary = getDictionary(session.user.preferredLanguage);
   // 작성 경로(`createBoardPost`)와 같은 고정 권한 — 권한 없는 사람에게는 스위치를 그리지 않는다.
   const canPin = isOrgTopAdmin(session.user.role) || session.user.role === "office_admin";
-  const [tags, navBadges] = await Promise.all([getBoardTags(session), getMobileNavBadges()]);
+  const [tags, navBadges] = await Promise.all([getBoardTags(session), navBadgesPromise]);
 
   // 화이트 리디자인(2026-10-15): 셸 안에서 그린다(상단 바 · 화면 스와이프 뒤로가기 · 폴드 레일). 아래 탭은 숨긴다.
   return (

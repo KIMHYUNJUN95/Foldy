@@ -12,6 +12,7 @@ type PageProps = { params: Promise<{ id: string }> };
 export default async function MobileBugDetailPage({ params }: PageProps) {
   const { id } = await params;
 
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -36,7 +37,7 @@ export default async function MobileBugDetailPage({ params }: PageProps) {
   const viewerIsAuthor = bug.reportedByUserId === session.user.id;
   const copy = getDictionary(session.user.preferredLanguage).bugs;
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   return (
     <MobileShell activeItem="bugs" badges={navBadges} title={copy.title}>

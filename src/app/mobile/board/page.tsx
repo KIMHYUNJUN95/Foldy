@@ -16,6 +16,7 @@ type PageProps = {
 };
 
 export default async function MobileBoardPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -39,7 +40,7 @@ export default async function MobileBoardPage({ searchParams }: PageProps) {
   const [feed, tags, navBadges, pendingReportCount] = await Promise.all([
     getBoardFeed({ session, category, limit: PAGE_SIZE }),
     getBoardTags(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
     countPendingBoardReports(session),
   ]);
 

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 import {
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
@@ -297,10 +298,32 @@ const ROOM_CATALOG_PAGE_SIZE = 1000;
  * 판매 캘린더는 같은 행으로 카탈로그와 「유닛 → 캘린더 행」 매핑을 둘 다 만든다 — 예전에는 `rooms` 를
  * 두 번 읽었다(2026-09-30 속도). PostgREST 1,000행 제한에 걸리지 않게 쪽을 나눠 읽는다.
  */
-export async function fetchRoomCatalogRows(
+export function fetchRoomCatalogRows(
   organizationId: string,
   supabase: SupabaseClient<Database>,
-): Promise<{ data: RoomCatalogRow[]; error: { message: string } | null }> {
+): Promise<RoomCatalogRowsResult> {
+  const slot = roomCatalogRowsSlot(organizationId);
+  slot.current ??= readRoomCatalogRows(organizationId, supabase);
+  return slot.current;
+}
+
+type RoomCatalogRowsResult = { data: RoomCatalogRow[]; error: { message: string } | null };
+
+// 한 렌더 안에서 여러 화면 조각(카탈로그 · 라벨 · 판매 캘린더 매핑 · 링크)이 같은 조직의 `rooms` 를 각자 읽는다 —
+// 요청당 한 번으로 접는다. 키는 조직 id 하나다: 호출하는 쪽이 모두 세션 조직(구성원이라 RLS 로도 조직 전체가
+// 보인다)이라 사용자 · service 클라이언트 결과가 같다. 렌더 밖(cron · 웹훅)에서는 `cache()` 가 매번 새로 읽는다.
+// 돌려준 행 배열은 읽기만 한다(공유된다).
+const roomCatalogRowsSlot = cache(
+  (organizationId: string): { organizationId: string; current: Promise<RoomCatalogRowsResult> | null } => ({
+    organizationId,
+    current: null,
+  }),
+);
+
+async function readRoomCatalogRows(
+  organizationId: string,
+  supabase: SupabaseClient<Database>,
+): Promise<RoomCatalogRowsResult> {
   const rows: RoomCatalogRow[] = [];
   for (let offset = 0; ; offset += ROOM_CATALOG_PAGE_SIZE) {
     const page = await supabase

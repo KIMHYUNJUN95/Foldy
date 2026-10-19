@@ -275,6 +275,11 @@ markBoardPostRead(postId: string): Promise<void>
 // 상세 페이지 진입 시 자동 호출 (서버 컴포넌트에서)
 ```
 
+> 현재 구현(2026-10-19 속도): 함수 이름은 `ensureBoardPostRead(session, postId)` (`src/lib/board-queries.ts`). 모바일 상세는
+> 글과 함께 `hasReadBoardPost()` 로 「이미 읽었나」를 읽고, 기록은 응답 뒤 `after()` 로 쓴다. 메뉴 배지는 기록 전에 셌으므로
+> 남의 글 · 안 읽음이었으면 이 화면의 배지에서 하나 뺀다 — 열자마자 배지가 줄어드는 동작은 그대로다. 안 읽은 글 수
+> (`getBoardUnreadCount`)는 글 · 숨김 · 읽음(`board_posts!inner` 로 조직 · 삭제 여부를 거름) 세 읽기를 한 번에 한다.
+
 ---
 
 ## 6. 쿼리 모듈

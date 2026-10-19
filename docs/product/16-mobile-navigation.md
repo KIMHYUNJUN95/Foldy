@@ -730,7 +730,7 @@ Current rules:
 
 ### Side-menu operational badge counts
 
-The side-menu nav rows can show an unprocessed-work count badge. Counts are computed server-side by `getMobileNavBadges()` (`src/lib/nav-badges.ts`) and passed into `MobileShell` via the `badges` prop (keyed by nav id). Each mobile page fetches them with `const navBadges = await getMobileNavBadges()` and renders `<MobileShell badges={navBadges} ...>`.
+The side-menu nav rows can show an unprocessed-work count badge. Counts are computed server-side by `getMobileNavBadges()` (`src/lib/nav-badges.ts`) and passed into `MobileShell` via the `badges` prop (keyed by nav id). Each mobile page **starts** them before its auth gate — `const navBadgesPromise = getMobileNavBadges()` right above the `getOnboardingState()` / `getCurrentAppSession()` batch — and awaits `navBadgesPromise` at the end, then renders `<MobileShell badges={navBadges} ...>` (2026-10-19 속도: the badge fan-out now overlaps the Auth-server `getUser()` round trip and the page's own data instead of running after them). The function is `cache()`d and never rejects (session errors fall back to `{}`). The announcement and board unread counts each run as **one** parallel batch: the read rows are joined to "published announcements of this org" / "non-deleted posts of this org" (`announcements!inner` / `board_posts!inner`) instead of waiting for the id list, and `getBoardHiddenFor` is request-cached (`board-moderation.ts`) so the board feed/detail and the badge share one read. Detail screens that mark an item read (announcement / board post) write the read row in `after()` and subtract that item from the badge they render, so the badge still drops the moment the screen opens.
 
 Current count definitions (org-scoped, RLS-enforced; each fails closed to 0 so a missing table/migration never breaks the shell):
 
@@ -740,6 +740,7 @@ Current count definitions (org-scoped, RLS-enforced; each fails closed to 0 so a
 | `requests` | unapproved `order_requests` (`status = requested`) + unprocessed `maintenance_reports` (`open`/`in_progress`) + `lost_items` (`status = registered`) registered today (Tokyo) |
 | `linen-return` | today's (Tokyo) `linen_return_records` registered by anyone in the org (organization-wide shared count) |
 | `announcements` | published announcements the user has not read (`announcement_reads`); clears on read |
+| `board` | org board posts not authored by the user, not hidden by report/block, without a `board_post_reads` row; clears on open |
 | `notifications` | unread notifications (`read_at is null`) — via `countUnreadNotifications` (placeholder, to be revisited) |
 
 `home`, `calendar`, and `directory` intentionally show no badge.

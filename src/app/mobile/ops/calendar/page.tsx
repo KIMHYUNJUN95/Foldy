@@ -49,6 +49,7 @@ function addDays(date: string, days: number): string {
 }
 
 export default async function MobileOpsCalendarPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([getOnboardingState(), getCurrentAppSession(), searchParams]);
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent(BASE_PATH)}`);
   if (state.status !== "ready" || !session) redirect("/onboarding");
@@ -73,7 +74,7 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
       showCancelled,
       start: params.start,
     }),
-    getMobileNavBadges(),
+    navBadgesPromise,
     // 「이력」 칩의 빨간 숫자(최근 7일 전송 실패 + 멈춘 작업) — 데스크톱과 같은 셈.
     countOpsHistoryAlerts(getSupabaseServiceClient(), session.organization.id),
   ]);

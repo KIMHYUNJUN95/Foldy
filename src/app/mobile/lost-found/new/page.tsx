@@ -34,6 +34,7 @@ type ReservationPrefill = {
 };
 
 export default async function LostFoundNewPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -125,7 +126,7 @@ export default async function LostFoundNewPage({ searchParams }: PageProps) {
         : null
       : null;
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} hideBottomNav title={copy.mobileTitle}>

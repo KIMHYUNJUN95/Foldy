@@ -27,6 +27,7 @@ function dayDiff(todayKey: string, key: string): number {
 }
 
 export default async function DisposedLostFoundPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
 
   if (state.status === "unauthenticated") {
@@ -46,7 +47,7 @@ export default async function DisposedLostFoundPage() {
   const [items, roomCatalog, navBadges] = await Promise.all([
     getDisposedLostItems(session),
     getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   const todayKey = tokyoDateKey(new Date().toISOString());

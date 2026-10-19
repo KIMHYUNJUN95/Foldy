@@ -20,6 +20,7 @@ type PageProps = {
 };
 
 export default async function MobileTaskNewPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -50,7 +51,7 @@ export default async function MobileTaskNewPage({ searchParams }: PageProps) {
 
   const [users, navBadges] = await Promise.all([
     getShareableUsers(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   return (

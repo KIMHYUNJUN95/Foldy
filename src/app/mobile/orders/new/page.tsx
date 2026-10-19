@@ -14,6 +14,7 @@ type PageProps = {
 };
 
 export default async function MobileOrderNewPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -54,7 +55,7 @@ export default async function MobileOrderNewPage({ searchParams }: PageProps) {
   const catalog = (await getActiveRoomCatalogServer(session.organization.id)) ?? [];
   const buildings = Array.from(new Set(catalog.map((item) => item.propertyName))).sort();
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} hideBottomNav title={copy.title}>

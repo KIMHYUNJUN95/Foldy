@@ -23,6 +23,7 @@ function formatDay(iso: string, locale: Locale): string {
 }
 
 export default async function LinenReturnEditPage({ params, searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, query] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -56,7 +57,7 @@ export default async function LinenReturnEditPage({ params, searchParams }: Page
 
   const [items, navBadges] = await Promise.all([
     getActiveLinenItems(session, record.buildingName),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   const serverError = query.error ? copy.errors[query.error] ?? copy.errors.save_failed : null;

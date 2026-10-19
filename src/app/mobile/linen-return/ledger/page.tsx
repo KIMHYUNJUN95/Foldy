@@ -49,6 +49,7 @@ function rangeLabel(start: string, end: string, locale: Locale): string {
 }
 
 export default async function LinenReturnLedgerPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -106,7 +107,7 @@ export default async function LinenReturnLedgerPage({ searchParams }: PageProps)
     rangeValue = {};
   }
 
-  const [navBadges, catalog] = await Promise.all([getMobileNavBadges(), getActiveLinenItems(session, building)]);
+  const [navBadges, catalog] = await Promise.all([navBadgesPromise, getActiveLinenItems(session, building)]);
   // Do not allow paging into the future beyond the current Tokyo month.
   const canGoNext =
     baseMonth.year < current.year ||

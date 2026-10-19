@@ -3,6 +3,7 @@ import { cache } from "react";
 import type { Role } from "@/config/roles";
 import { defaultsToAdminSurface } from "@/config/roles";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { getIdentityRows, sortMembershipsByJoinedAt } from "@/lib/identity-rows";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
@@ -81,26 +82,6 @@ export function isProfileGender(value: string): value is ProfileGender {
   return PROFILE_GENDER_VALUES.includes(value as ProfileGender);
 }
 
-type ProfileRow = {
-  id: string;
-  name: string;
-  birth_date: string | null;
-  gender: ProfileGender | null;
-  phone_number: string;
-  preferred_language: Locale;
-  last_used_organization_id: string | null;
-};
-
-type MembershipRow = {
-  organization_id: string;
-  role: Role;
-  status: string;
-};
-
-type PlatformAdminRow = {
-  role: Role;
-};
-
 export function getDefaultRouteForRole(role: Role) {
   // Default landing (field roles → /mobile even though they can also access /admin).
   return defaultsToAdminSurface(role) ? "/admin" : "/mobile";
@@ -137,57 +118,26 @@ export const getOnboardingState = cache(async (): Promise<OnboardingState> => {
     }
   }
 
-  const [{ data: profileResult, error: profileError }, { count: platformAdminCount }] =
-    await Promise.all([
-      service
-        .from("profiles")
-        .select(
-          "id, name, birth_date, gender, phone_number, preferred_language, last_used_organization_id",
-        )
-        .eq("id", user.id)
-        .maybeSingle(),
-      service.from("platform_admins").select("id", { count: "exact", head: true }),
-    ]);
-
-  let profile = profileResult as ProfileRow | null;
-  if (profileError) {
-    const { data: fallbackProfile } = await service
-      .from("profiles")
-      .select(
-        "id, name, birth_date, phone_number, preferred_language, last_used_organization_id",
-      )
-      .eq("id", user.id)
-      .maybeSingle();
-    profile = fallbackProfile
-      ? ({ ...(fallbackProfile as Omit<ProfileRow, "gender">), gender: null } as ProfileRow)
-      : null;
-  }
-  const canClaimPlatformAdmin = (platformAdminCount ?? 0) === 0;
-
-  const [{ data: platformAdminResult }, { data: membershipResults }] =
-    await Promise.all([
-      service
-        .from("platform_admins")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle(),
-      service
-        .from("memberships")
-        .select("organization_id, role, status")
-        .eq("user_id", user.id)
-        .neq("status", "invited")
-        .order("joined_at", { ascending: false, nullsFirst: false }),
-    ]);
-
-  const platformAdmin = platformAdminResult as PlatformAdminRow | null;
-  const memberships = (membershipResults ?? []) as MembershipRow[];
+  // 프로필 · 플랫폼 관리자 · 멤버십은 세션과 같이 쓰는 한 배치(요청당 한 번)에서 온다. 세션이 먼저 시작해 두면
+  // 여기서는 `getUser()` 왕복만 기다린다.
+  const identity = await getIdentityRows(user.id);
+  const profile = identity.profile;
+  const platformAdminRole = identity.platformAdminRole;
+  const memberships = sortMembershipsByJoinedAt(identity.memberships, "desc");
   const activeMemberships = memberships.filter((m) => m.status === "active");
+
+  // 「처음 쓰는 사람이 플랫폼 관리자를 가져갈 수 있는가」는 준비가 안 된 경우에만 화면에 쓰인다 — 그때만 센다.
+  const countCanClaimPlatformAdmin = async () => {
+    const { count } = await service
+      .from("platform_admins")
+      .select("id", { count: "exact", head: true });
+    return (count ?? 0) === 0;
+  };
 
   if (!profile) {
     return {
       status: "needs_profile",
-      canClaimPlatformAdmin,
+      canClaimPlatformAdmin: await countCanClaimPlatformAdmin(),
       user,
     };
   }
@@ -209,18 +159,18 @@ export const getOnboardingState = cache(async (): Promise<OnboardingState> => {
     preferredLanguage: profile.preferred_language,
   };
 
-  if (!isProfileComplete && !platformAdmin?.role && activeMemberships.length === 0) {
+  if (!isProfileComplete && !platformAdminRole && activeMemberships.length === 0) {
     return {
       status: "needs_profile",
-      canClaimPlatformAdmin,
+      canClaimPlatformAdmin: await countCanClaimPlatformAdmin(),
       user,
     };
   }
 
-  if (platformAdmin?.role) {
+  if (platformAdminRole) {
     return {
       status: "ready",
-      redirectTo: getDefaultRouteForRole(platformAdmin.role),
+      redirectTo: getDefaultRouteForRole(platformAdminRole),
       user,
     };
   }
@@ -251,7 +201,7 @@ export const getOnboardingState = cache(async (): Promise<OnboardingState> => {
 
   return {
     status: "needs_membership",
-    canClaimPlatformAdmin,
+    canClaimPlatformAdmin: await countCanClaimPlatformAdmin(),
     profile: profileSnapshot,
     user,
   };

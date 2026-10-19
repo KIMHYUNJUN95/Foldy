@@ -15,6 +15,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 type PageProps = { searchParams: Promise<{ pick?: string }> };
 
 export default async function LinenReturnPickerPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -48,7 +49,7 @@ export default async function LinenReturnPickerPage({ searchParams }: PageProps)
   const [buildings, stats, navBadges] = await Promise.all([
     getLinenBuildings(session),
     getLinenBuildingStats(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   return (

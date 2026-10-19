@@ -24,6 +24,7 @@ const ROLE_ORDER: Record<string, number> = {
 };
 
 export default async function MobileDirectoryPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
 
   if (state.status === "unauthenticated") {
@@ -77,7 +78,7 @@ export default async function MobileDirectoryPage() {
     })
     .sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99) || a.name.localeCompare(b.name, locale));
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   return (
     // 화이트 리디자인(2026-10-14): 폰 = 역할 묶음 목록, 폴드 = 한 줄에 번호까지, 태블릿 가로 = 목록 + 프로필 칸.

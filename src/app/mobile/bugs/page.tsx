@@ -13,6 +13,7 @@ import { getDictionary } from "@/lib/i18n";
 import { BugsListClient } from "./bugs-list-client";
 
 export default async function MobileBugsPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -33,7 +34,7 @@ export default async function MobileBugsPage() {
 
   const [reports, navBadges] = await Promise.all([
     isReviewer ? getOrgBugReports(session) : getMyBugReports(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   return (

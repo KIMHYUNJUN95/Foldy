@@ -6,9 +6,9 @@ import { defaultsToAdminSurface } from "@/config/roles";
 import type { Role } from "@/config/roles";
 import { computeCapabilities, isActiveOverrideRow } from "@/lib/capabilities-server";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { getIdentityRows, sortMembershipsByJoinedAt } from "@/lib/identity-rows";
 import type { ProfileGender } from "@/lib/onboarding";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 export type OrganizationSummary = {
   id: string;
@@ -54,21 +54,6 @@ type ActiveMembership = {
   role: Role;
   /** 임베드로 함께 읽는다 — 별도 왕복을 없애려는 것이다. */
   organizations: { id: string; name: string } | null;
-};
-
-type OverrideRow = {
-  organization_id: string;
-  permission_key: string;
-  effect: string;
-  expires_at: string | null;
-};
-
-type CurrentProfile = {
-  birth_date: string | null;
-  gender: ProfileGender | null;
-  name: string;
-  phone_number: string;
-  preferred_language: Locale;
 };
 
 type CurrentOrganization = {
@@ -137,80 +122,27 @@ export const getCurrentAppSession = cache(
     // 이 읽기들은 `user.id` 에만 의존하므로 **한 배치로** 돈다. 모바일·어드민 모든 렌더가 지나는
     // 공통 경로라, 직렬 왕복을 줄이는 것이 첫 바이트에 가장 크게 듣는다.
     //
-    // 2026-09-11 성능 점검에서 뒤따르던 두 단을 마저 접었다:
-    // - **조직**은 멤버십에 임베드한다(`organizations(id, name)`). 예전에는 멤버십을 받은 뒤에야
-    //   조직을 물어서 한 왕복이 더 들었다.
-    // - **개인 부여·차단**은 조직을 몰라도 `user_id` 로 읽을 수 있다. 조직 필터는 아래에서 한다.
-    //   권한을 세션에 실으면서 요청마다 왕복이 하나 늘어나 있었다(내가 얹은 것이다).
+    // 2026-09-11: 조직은 멤버십에 임베드, 개인 부여·차단은 `user_id` 로 같은 배치에서 읽는다(`인증 → [병렬]` 두 단).
+    // 2026-10-19: 온보딩 판정(`getOnboardingState`)과 **같은 배치를 함께 쓴다**(`getIdentityRows`, 요청당 한 번 —
+    // service 로 읽는다. 이유는 그 파일 머리). 예전에는 같은 표를 세션은 사용자 클라이언트로, 온보딩은 service 로
+    // 따로 읽어 페이지마다 profiles 2~3 · platform_admins 2~3 · memberships 2번이 나갔다.
     //
-    // 결과: `인증 → [5개 병렬]` 두 단. 예전에는 `인증 → [4개 병렬] → 조직 → 권한` 네 단이었다.
-    const [profileRes, platformAdminRes, membershipRes, navRes, overrideRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, name, birth_date, gender, phone_number, preferred_language")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("platform_admins")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle(),
-      supabase
-        .from("memberships")
-        .select("organization_id, role, organizations(id, name)")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .order("joined_at", { ascending: true, nullsFirst: false })
-        .limit(1)
-        .maybeSingle(),
-      // Per-user bottom-bar customization + report-access flag, read defensively (these columns
-      // may not exist on projects where the migration has not been applied).
-      supabase
-        .from("profiles")
-        .select("bottom_nav_tabs, can_generate_report")
-        .eq("id", user.id)
-        .maybeSingle(),
-      // 개인 부여·차단. 조직을 몰라도 읽을 수 있다(사용자당 조직이 한둘이라 행이 적다) —
-      // 조직 필터는 아래에서 한다.
-      //
-      // **service-role 로 읽어야 한다.** 이 표에는 RLS 정책이 하나도 없고 RLS 는 켜져 있다 —
-      // 즉 `authenticated` 로 읽으면 조용히 **0행**이 온다. 사용자 클라이언트로 읽었다가 개인
-      // 부여가 통째로 무시돼, 권한을 받은 사람에게 메뉴가 안 뜨고 페이지도 막혔다
-      // (2026-09-11 회귀 — 세션 워터폴을 접으면서 클라이언트를 잘못 바꿨다).
-      //
-      // 부여 자체는 서버 액션이 권한을 확인하고 쓰므로, 여기서 service-role 로 읽는 것은
-      // 「내 세션의 내 권한을 계산한다」는 용도에 한정된다.
-      getSupabaseServiceClient()
-        .from("membership_permission_overrides")
-        .select("organization_id, permission_key, effect, expires_at")
-        .eq("user_id", user.id)
-        .is("revoked_at", null),
-    ]);
-
-    let profile = profileRes.data as CurrentProfile | null;
-
-    if (profileRes.error) {
-      const { data: fallbackProfile, error: fallbackProfileError } = await supabase
-        .from("profiles")
-        .select("id, name, birth_date, phone_number, preferred_language")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (fallbackProfileError || !fallbackProfile) {
-        return null;
-      }
-      profile = {
-        ...(fallbackProfile as Omit<CurrentProfile, "gender">),
-        gender: null,
-      };
-    }
+    // 개인 부여·차단 표는 RLS 는 켜져 있고 정책이 없어 **service-role 로만 읽힌다**(2026-09-11 회귀 — 사용자
+    // 클라이언트로 읽으면 조용히 0행). 부여 자체는 서버 액션이 권한을 확인하고 쓰므로, 여기서 service 로 읽는 것은
+    // 「내 세션의 내 권한을 계산한다」는 용도에 한정된다.
+    const identity = await getIdentityRows(user.id);
+    const profile = identity.profile;
 
     if (!profile) {
       return null;
     }
 
-    const platformAdmin = platformAdminRes.data as ActivePlatformAdmin | null;
-    const membership = membershipRes.data as ActiveMembership | null;
+    const platformAdmin: ActivePlatformAdmin | null = identity.platformAdminRole
+      ? { role: identity.platformAdminRole }
+      : null;
+    const membership = (sortMembershipsByJoinedAt(identity.memberships, "asc").find(
+      (row) => row.status === "active",
+    ) ?? null) as ActiveMembership | null;
 
     if (!membership && !platformAdmin) {
       return null;
@@ -232,7 +164,7 @@ export const getCurrentAppSession = cache(
     // 실패해도 세션을 깨뜨리지 않는다 — 빈 목록은 「권한 없음」이고, 잘못 열어 주는 것보다 낫다.
     //
     // 행은 위 배치에서 이미 읽었다. 조직 스코프와 만료 판정만 여기서 한다.
-    const activeOverrides = ((overrideRes.data ?? []) as OverrideRow[])
+    const activeOverrides = identity.overrides
       .filter((row) => !membership || row.organization_id === membership.organization_id)
       .filter((row) => isActiveOverrideRow(row))
       // DB 의 text 컬럼이라 값이 무엇이든 올 수 있다. 모르는 값은 부여로 보지 않는다 —
@@ -243,21 +175,12 @@ export const getCurrentAppSession = cache(
       }));
     const capabilities = computeCapabilities(role, activeOverrides);
 
-    // Applied from the concurrent read above; any error falls back to defaults rather than
-    // breaking the session (the columns may not exist on un-migrated projects).
-    let bottomNavTabs: string[] = [...defaultBottomNavTabIds];
-    let canGenerateReport = false;
-    const { data: navResult, error: navError } = navRes;
-    if (!navError && navResult) {
-      const raw = (navResult as { bottom_nav_tabs?: string[] | null })
-        .bottom_nav_tabs;
-      if (Array.isArray(raw) && raw.length > 0) {
-        bottomNavTabs = raw;
-      }
-      canGenerateReport = Boolean(
-        (navResult as { can_generate_report?: boolean | null }).can_generate_report,
-      );
-    }
+    // 컬럼이 없는 프로젝트(마이그레이션 전)에서는 기본값으로 둔다.
+    const bottomNavTabs =
+      Array.isArray(profile.bottom_nav_tabs) && profile.bottom_nav_tabs.length > 0
+        ? profile.bottom_nav_tabs
+        : [...defaultBottomNavTabIds];
+    const canGenerateReport = Boolean(profile.can_generate_report);
 
     return {
       organization: organization ?? {

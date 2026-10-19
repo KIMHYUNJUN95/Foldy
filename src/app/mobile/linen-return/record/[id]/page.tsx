@@ -30,6 +30,7 @@ function formatDateTime(iso: string, locale: Locale): string {
 }
 
 export default async function LinenReturnDetailPage({ params, searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, query] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -59,7 +60,7 @@ export default async function LinenReturnDetailPage({ params, searchParams }: Pa
   const canManage = canManageLinenRecord(session, record);
   const errorMessage = query.error ? copy.errors[query.error] ?? null : null;
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   const editHref = `/mobile/linen-return/record/${record.id}/edit?building=${encodeURIComponent(record.buildingName)}`;
 

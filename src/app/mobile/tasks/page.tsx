@@ -34,6 +34,7 @@ const VIEWS = [
 ] as const;
 
 export default async function MobileTasksPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -72,7 +73,7 @@ export default async function MobileTasksPage({ searchParams }: PageProps) {
     getVisibleTasks(session),
     getVisibleProjects(session),
     getShareableUsers(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
     getOccurrenceStates(session),
     getOccurrenceOrders(session),
     getTaskCompletions(session),

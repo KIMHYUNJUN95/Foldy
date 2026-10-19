@@ -24,6 +24,7 @@ type PageProps = {
  */
 export default async function BoardEditPage({ params }: PageProps) {
   const { id } = await params;
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -52,7 +53,7 @@ export default async function BoardEditPage({ params }: PageProps) {
 
   const [tags, navBadges] = await Promise.all([
     getBoardTags(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   // 화이트 리디자인(2026-10-15): 글쓰기와 같은 셸 안 한 장 폼. 아래 탭은 숨긴다.

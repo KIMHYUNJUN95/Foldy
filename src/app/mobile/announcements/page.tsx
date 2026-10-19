@@ -46,6 +46,7 @@ function targetLabel(
 }
 
 export default async function MobileAnnouncementsPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -69,10 +70,13 @@ export default async function MobileAnnouncementsPage() {
   const popupCandidates = announcements.filter(
     (announcement) => announcement.show_popup_on_app_open,
   );
-  const dismissals = await getPopupDismissals(
-    session.user.id,
-    popupCandidates.map((a) => a.id),
-  );
+  const [dismissals, readIds] = await Promise.all([
+    getPopupDismissals(
+      session.user.id,
+      popupCandidates.map((a) => a.id),
+    ),
+    getReadAnnouncementIds(session.user.id, announcements.map((a) => a.id)),
+  ]);
   const popupAnnouncements = popupCandidates
     .filter(
       (announcement) =>
@@ -89,10 +93,9 @@ export default async function MobileAnnouncementsPage() {
       title: announcement.title,
     }));
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   const locale = session.user.preferredLanguage;
-  const readIds = await getReadAnnouncementIds(session.user.id, announcements.map((a) => a.id));
 
   // 화이트 리디자인(2026-10-15): 고정 공지는 맨 위 「고정」 묶음(날짜를 meta 에), 나머지는 도쿄 게시일 묶음.
   const toRow = (ann: (typeof announcements)[number], withDate: boolean) => ({

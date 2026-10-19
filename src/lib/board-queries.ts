@@ -285,15 +285,27 @@ export async function getBoardUnreadCount(session: AppSession): Promise<number> 
     const orgId = session.organization.id;
     const uid = session.user.id;
 
-    const { data: posts, error: postsError } = await supabase
-      .from("board_posts")
-      .select("id, created_by_user_id")
-      .eq("organization_id", orgId)
-      .is("deleted_at", null)
-      .returns<{ id: string; created_by_user_id: string }[]>();
+    // 글 · 숨김 · 읽음 세 읽기를 한 번에 — 읽음은 글 id 목록을 기다리지 않고 「이 조직의 지워지지 않은 글」로
+    // 조인해 거른다(결과는 예전 `.in(candidateIds)` 와 같다).
+    const [postsRes, hidden, readsRes] = await Promise.all([
+      supabase
+        .from("board_posts")
+        .select("id, created_by_user_id")
+        .eq("organization_id", orgId)
+        .is("deleted_at", null)
+        .returns<{ id: string; created_by_user_id: string }[]>(),
+      getBoardHiddenFor(session),
+      supabase
+        .from("board_post_reads")
+        .select("post_id, board_posts!inner(id)")
+        .eq("user_id", uid)
+        .eq("board_posts.organization_id", orgId)
+        .is("board_posts.deleted_at", null)
+        .returns<{ post_id: string }[]>(),
+    ]);
+    const { data: posts, error: postsError } = postsRes;
     if (postsError) return 0;
 
-    const hidden = await getBoardHiddenFor(session);
     const candidateIds = (posts ?? [])
       .filter(
         (p) =>
@@ -304,12 +316,7 @@ export async function getBoardUnreadCount(session: AppSession): Promise<number> 
       .map((p) => p.id);
     if (candidateIds.length === 0) return 0;
 
-    const { data: reads, error: readsError } = await supabase
-      .from("board_post_reads")
-      .select("post_id")
-      .eq("user_id", uid)
-      .in("post_id", candidateIds)
-      .returns<{ post_id: string }[]>();
+    const { data: reads, error: readsError } = readsRes;
     if (readsError) return 0;
 
     const readSet = new Set((reads ?? []).map((r) => r.post_id));
@@ -548,10 +555,26 @@ export async function getActiveOrgMemberIds(session: AppSession): Promise<string
     .filter((id) => id && id !== session.user.id);
 }
 
+/** 이 사람이 이 글을 이미 읽었는지 — 상세 화면이 메뉴 배지를 맞추는 데 쓴다. 읽지 못하면 `null`(모름). */
+export async function hasReadBoardPost(session: AppSession, postId: string): Promise<boolean | null> {
+  try {
+    const supabase = await getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("board_post_reads")
+      .select("post_id")
+      .eq("post_id", postId)
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    return error ? null : Boolean(data);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Mark a post read for the current user (idempotent upsert). Service-role write; no revalidation
- * (called during the detail page render, mirroring ensureAnnouncementRead). The nav unread badge
- * recomputes on the next request.
+ * Mark a post read for the current user (idempotent upsert). Service-role write; no revalidation.
+ * The detail page runs it in `after()` (post-response) and subtracts the post from the badge it
+ * already computed, so the badge still clears on open.
  */
 export async function ensureBoardPostRead(session: AppSession, postId: string): Promise<void> {
   try {

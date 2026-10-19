@@ -19,6 +19,7 @@ type PageProps = {
 // of the user's own sessions; without it, it's a session-less exception request. Self-scoped.
 // See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
 export default async function MobileAttendanceCorrectionPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -40,7 +41,7 @@ export default async function MobileAttendanceCorrectionPage({ searchParams }: P
   const bcp47Locale = localeMap[session.user.preferredLanguage] ?? "ko-KR";
   const sessionId = params.sessionId?.trim() || null;
   const [navBadges, sites, myRequests, context] = await Promise.all([
-    getMobileNavBadges(),
+    navBadgesPromise,
     listActiveAttendanceSites(session.organization.id, bcp47Locale),
     listMyCorrectionRequests(session.organization.id, session.user.id, bcp47Locale),
     sessionId

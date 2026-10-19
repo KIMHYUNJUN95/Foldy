@@ -15,6 +15,7 @@ export default async function MobileLeaveDonePage({
 }: {
   searchParams: Promise<{ id?: string }>;
 }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -35,7 +36,7 @@ export default async function MobileLeaveDonePage({
     redirect("/mobile/attendance/leave");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const request = await getMyLeaveRequest(
     getSupabaseServiceClient(),

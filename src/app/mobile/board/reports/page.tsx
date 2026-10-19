@@ -13,6 +13,7 @@ import { BoardReportsClient } from "./board-reports-client";
  * 문서: docs/product/23-board-workflow.md → 「신고 · 차단」.
  */
 export default async function BoardReportsPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
 
   if (state.status === "unauthenticated") redirect("/auth/login?next=/mobile/board/reports");
@@ -20,7 +21,7 @@ export default async function BoardReportsPage() {
   if (!hasOrganizationContext(session)) redirect("/mobile/unavailable");
   if (!canModerateBoard(session)) redirect("/mobile/board");
 
-  const [reports, navBadges] = await Promise.all([listPendingBoardReports(session), getMobileNavBadges()]);
+  const [reports, navBadges] = await Promise.all([listPendingBoardReports(session), navBadgesPromise]);
   const dictionary = getDictionary(session.user.preferredLanguage);
   const copy = dictionary.board;
 

@@ -14,6 +14,7 @@ import { getDictionary } from "@/lib/i18n";
 // 스티키 액션 바(달력 · 연차 신청하기)를 쓰므로 앱 하단 탭바는 hideBottomNav로 숨긴다.
 // 입사일/잔여 baseline이 없으면(Phase 1 백엔드, migration 202607060001) LeaveException(missing)을 대신 렌더.
 export default async function MobileLeavePage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
 
   if (state.status === "unauthenticated") {
@@ -26,7 +27,7 @@ export default async function MobileLeavePage() {
     redirect("/mobile/unavailable");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const service = getSupabaseServiceClient();
   const summary = await getMyAnnualLeaveSummary(service, session.organization.id, session.user.id);

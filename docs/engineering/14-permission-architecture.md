@@ -520,7 +520,8 @@ RLS 는 켜져 있다 — `authenticated` 로 읽으면 오류가 아니라 **�
 서로 다른 답을 내는데 한쪽만 보고 있었다.**
 
 **수정.** 세션도 service-role 로 읽는다. 「내 세션의 내 권한을 계산한다」는 용도에 한정되고, 부여
-자체는 서버 액션이 권한을 확인한 뒤에만 쓴다.
+자체는 서버 액션이 권한을 확인한 뒤에만 쓴다. (2026-10-19 부터 이 읽기는 프로필 · 멤버십과 함께
+`getIdentityRows()` — `src/lib/identity-rows.ts` — 한 배치에서 온보딩 판정과 같이 쓴다.)
 
 **남은 불일치.** `27-permission-override-workflow.md` 는 이 표에 「owner/platform-admin 읽기 전용
 RLS」가 있다고 적고 있으나 **정책이 존재하지 않는다.** 지금은 service-role 로만 읽으므로 동작에는

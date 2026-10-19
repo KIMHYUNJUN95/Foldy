@@ -13,6 +13,7 @@ export default async function MobileLeaveExceptionPage({
 }: {
   searchParams: Promise<{ state?: string }>;
 }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -29,7 +30,7 @@ export default async function MobileLeaveExceptionPage({
     redirect("/mobile/unavailable");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const variant = params.state === "waiting" ? "waiting" : "missing";
 

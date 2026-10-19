@@ -27,6 +27,7 @@ type PageProps = {
 //                   this app still requires a real session.
 // See docs/product/24-attendance-workflow.md → "QR Deep Link" / "Trusted Device".
 export default async function MobileAttendanceCapturePage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -65,7 +66,7 @@ export default async function MobileAttendanceCapturePage({ searchParams }: Page
   const dict = getDictionary(locale);
   // The bottom nav is hidden on this screen anyway; skip the badge queries on the trusted-device
   // path since there is no session to scope them with.
-  const navBadges = authed ? await getMobileNavBadges() : undefined;
+  const navBadges = authed ? await navBadgesPromise : undefined;
 
   // Display-only lookup: it tells the staff member which building they just scanned. Every real
   // check (active token, active site, same org, GPS inside the radius) still runs in the submit

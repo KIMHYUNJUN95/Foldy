@@ -51,6 +51,7 @@ function shortDate(ymd: string) {
 }
 
 export default async function MobileLostItemDetailPage({ params, searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, query] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -97,7 +98,7 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
   const roomText = location.roomLabel && location.roomLabel !== "-" ? location.roomLabel : null;
   const showCreatedBanner = query.created === "1";
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   // 화이트 리디자인(2026-10-14, 시안 LFDetail-Phone · LFDone-Phone): 한 줄 머리 · 제목 · 사진 · 「자동 폐기까지 D-n」 막대 ·
   // 정보 줄 · 아래로 현장 처리(진행 중) 또는 처리 기록(완료). 상자 · 칩 · 아이콘 타일 없음.

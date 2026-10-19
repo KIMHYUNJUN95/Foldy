@@ -24,6 +24,7 @@ type PageProps = {
 };
 
 export default async function AttendanceRosterPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [onboardingState, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -63,7 +64,7 @@ export default async function AttendanceRosterPage({ searchParams }: PageProps) 
   const bcp47Locale = localeMap[locale] ?? "ko-KR";
 
   const [navBadges, rosterDay] = await Promise.all([
-    getMobileNavBadges(),
+    navBadgesPromise,
     getAttendanceRoster(session.organization.id, operatingDate, bcp47Locale),
   ]);
 

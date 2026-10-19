@@ -14,6 +14,7 @@ type PageProps = {
 };
 
 export default async function ProjectDetailPage({ params }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { projectId }] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -37,7 +38,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const [project, shareableUsers, navBadges] = await Promise.all([
     getProjectDetail(session, projectId),
     getShareableUsers(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   // Not a participant (or missing project) → back to the Projects tab.

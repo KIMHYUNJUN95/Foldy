@@ -16,6 +16,7 @@ export default async function MobileLeaveCalendarPage({
 }: {
   searchParams: Promise<{ ym?: string }>;
 }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -32,7 +33,7 @@ export default async function MobileLeaveCalendarPage({
     redirect("/mobile/unavailable");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const today = tokyoToday();
   const ym = params.ym && /^\d{4}-\d{2}$/.test(params.ym) ? params.ym : today.slice(0, 7);

@@ -13,6 +13,7 @@ type PageProps = { params: Promise<{ id: string }> };
 // data; the single detail component renders the recipient / author / referenced treatments.
 // See docs/product/22-staff-suggestions-workflow.md.
 export default async function MobileSuggestionDetailPage({ params }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -35,7 +36,7 @@ export default async function MobileSuggestionDetailPage({ params }: PageProps) 
     redirect("/mobile/suggestions");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).mobile.suggestions;
 
   return (

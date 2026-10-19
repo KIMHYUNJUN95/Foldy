@@ -4,6 +4,7 @@
 // `getBoardHiddenFor()` 결과로 「내가 신고한 글 · 댓글」과 「내가 차단한 사람의 글 · 댓글」을 걸러 낸다.
 // 문서: docs/product/23-board-workflow.md → 「신고 · 차단」.
 
+import { cache } from "react";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -27,11 +28,15 @@ const EMPTY_HIDDEN: BoardHiddenSet = {
 };
 
 /** 이 사용자에게 숨길 것: 내가 차단한 사람 · 내가 신고한 글 · 댓글. 실패하면 아무것도 숨기지 않는다(게시판이 비면 안 된다). */
-export async function getBoardHiddenFor(session: AppSession): Promise<BoardHiddenSet> {
+export function getBoardHiddenFor(session: AppSession): Promise<BoardHiddenSet> {
+  return loadBoardHidden(session.organization.id, session.user.id);
+}
+
+// 피드 · 상세와 메뉴 배지(안 읽은 글 수)가 한 렌더에서 각자 부른다 — 요청 안에서 한 번만 읽는다.
+// 돌려준 Set 은 읽기만 한다(공유된다).
+const loadBoardHidden = cache(async (orgId: string, uid: string): Promise<BoardHiddenSet> => {
   try {
     const service = getSupabaseServiceClient();
-    const orgId = session.organization.id;
-    const uid = session.user.id;
     const [blocks, reports] = await Promise.all([
       service
         .from("user_blocks")
@@ -61,7 +66,7 @@ export async function getBoardHiddenFor(session: AppSession): Promise<BoardHidde
   } catch {
     return EMPTY_HIDDEN;
   }
-}
+});
 
 /** 신고 처리 권한 — 권한 키 `board.moderate`(기본 owner · office_admin, 개인 부여 · 차단 가능). */
 export function canModerateBoard(session: AppSession): boolean {

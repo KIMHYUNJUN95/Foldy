@@ -15,6 +15,7 @@ type PageProps = {
 // Staff Suggestions / Feedback Box — Frame 2 (compose). Step 2 (2026-06-16): wired to a real create
 // flow via createStaffSuggestion. See docs/product/22-staff-suggestions-workflow.md.
 export default async function MobileSuggestionsNewPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -36,7 +37,7 @@ export default async function MobileSuggestionsNewPage({ searchParams }: PagePro
 
   const [users, navBadges] = await Promise.all([
     getShareableUsers(session).then(withDisplayRoles),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   return (

@@ -30,6 +30,7 @@ export default async function MobileTransportPage({
 }: {
   searchParams: Promise<{ ym?: string }>;
 }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
 
   if (state.status === "unauthenticated") {
@@ -54,7 +55,7 @@ export default async function MobileTransportPage({
   const service = getSupabaseServiceClient();
 
   const [navBadges, dict, report] = await Promise.all([
-    getMobileNavBadges(),
+    navBadgesPromise,
     Promise.resolve(getDictionary(locale)),
     getOrCreateTransportReport(service, organizationId, userId, targetMonthDate),
   ]);

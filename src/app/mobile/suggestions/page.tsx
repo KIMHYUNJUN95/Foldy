@@ -11,6 +11,7 @@ import { getSuggestionListData } from "@/lib/suggestions-queries";
 // Staff Suggestions / Feedback Box — Frame 1 (main list). Step 3 (2026-06-16): wired to real
 // Sent / Received / Referenced data. See docs/product/22-staff-suggestions-workflow.md.
 export default async function MobileSuggestionsPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -31,7 +32,7 @@ export default async function MobileSuggestionsPage() {
 
   const [data, navBadges] = await Promise.all([
     getSuggestionListData(session),
-    getMobileNavBadges(),
+    navBadgesPromise,
   ]);
 
   return (

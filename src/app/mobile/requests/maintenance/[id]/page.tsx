@@ -45,6 +45,7 @@ function formatDateTime(value: string, locale: Locale) {
 }
 
 export default async function MobileMaintenanceDetailPage({ params, searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, query] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -92,7 +93,7 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
   );
   const showCreatedBanner = query.created === "1";
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   // 화이트 리디자인(2026-10-13, 시안 ReqDetail-Phone · Req-Tablet): 카드 · 아이콘 상자 · 배지 대신 위 한 줄(우선순위 · 상태 · 분류) →
   // 제목 → 「호실 · 건물 · 신고자 · 시각」 → (연결된 예약) → 사진 → 설명 → 정보 줄 → 처리 결과 → 현장 처리.

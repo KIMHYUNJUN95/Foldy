@@ -12,6 +12,7 @@ export default async function MobileLeaveCancelDonePage({
 }: {
   searchParams: Promise<{ start?: string; end?: string; days?: string }>;
 }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -28,7 +29,7 @@ export default async function MobileLeaveCancelDonePage({
     redirect("/mobile/unavailable");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const copy = getDictionary(session.user.preferredLanguage).leave;
   const days = Number(params.days ?? 0);
 

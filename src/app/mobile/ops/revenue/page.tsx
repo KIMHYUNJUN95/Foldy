@@ -33,6 +33,7 @@ const LIVE_KINDS = ["reservations"] as const;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function MobileRevenuePage({ searchParams }: { searchParams: SearchParams }) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([getOnboardingState(), getCurrentAppSession(), searchParams]);
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent(BASE_PATH)}`);
   if (state.status !== "ready" || !session) redirect("/onboarding");
@@ -45,7 +46,7 @@ export default async function MobileRevenuePage({ searchParams }: { searchParams
   const ym = typeof params.ym === "string" ? params.ym : undefined;
   const range = normalizeRange("month", { ym }, today);
 
-  const [data, badges] = await Promise.all([getOpsRevenueData(session, { mode: "month", range }), getMobileNavBadges()]);
+  const [data, badges] = await Promise.all([getOpsRevenueData(session, { mode: "month", range }), navBadgesPromise]);
   const summary = buildRevenueSummary(data, defaultIncludedProperties(data));
 
   return (

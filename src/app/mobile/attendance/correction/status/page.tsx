@@ -15,6 +15,7 @@ type PageProps = {
 // (or the latest). Self-scoped server-side; an id that isn't the user's resolves to null → no leak.
 // See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
 export default async function MobileAttendanceCorrectionStatusPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -47,7 +48,7 @@ export default async function MobileAttendanceCorrectionStatusPage({ searchParam
     redirect("/mobile/attendance/correction");
   }
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
 
   return (
     <MobileShell activeItem="attendance" badges={navBadges} title={dict.attendance.corrStatusPageTitle} hideBottomNav>

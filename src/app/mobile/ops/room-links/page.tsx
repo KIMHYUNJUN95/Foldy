@@ -22,6 +22,7 @@ export const dynamic = "force-dynamic";
 const BASE_PATH = "/mobile/ops/room-links";
 
 export default async function MobileRoomLinksPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent(BASE_PATH)}`);
   if (state.status !== "ready" || !session) redirect("/onboarding");
@@ -30,7 +31,7 @@ export default async function MobileRoomLinksPage() {
 
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
-  const [data, badges] = await Promise.all([getRoomLinksPageData(session, locale), getMobileNavBadges()]);
+  const [data, badges] = await Promise.all([getRoomLinksPageData(session, locale), navBadgesPromise]);
 
   return (
     // `split` — 폴드는 화면이 가운데 540px 로, 태블릿 가로는 폭 전부(왼쪽 건물 · 가운데 객실 · 오른쪽 상세 칸을 화면이 직접 그린다).

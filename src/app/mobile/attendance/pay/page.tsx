@@ -25,6 +25,7 @@ function currentTokyoYm(): string {
 // authenticated user server-side. New screen in the existing design language (no 급여 frame existed).
 // See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
 export default async function MobileAttendancePayPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -47,7 +48,7 @@ export default async function MobileAttendancePayPage({ searchParams }: PageProp
   // 미래 월 직접 입력 차단: 현재 Tokyo 월보다 큰 경우 현재 월로 clamp
   const ym = rawYm > currentYm ? currentYm : rawYm;
   const [navBadges, view] = await Promise.all([
-    getMobileNavBadges(),
+    navBadgesPromise,
     getMonthlyPayView(session.organization.id, session.user.id, ym, session.user.preferredLanguage),
   ]);
 

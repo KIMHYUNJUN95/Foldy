@@ -143,6 +143,7 @@ export default async function MobileOrderRequestDetailPage({
   params,
   searchParams,
 }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, query] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -193,7 +194,7 @@ export default async function MobileOrderRequestDetailPage({
   // -1 when closed so every i <= currentIdx check is false -> all bars muted.
   const currentIdx = progressStatus !== null ? TIMELINE_STATUSES.indexOf(progressStatus) : -1;
 
-  const navBadges = await getMobileNavBadges();
+  const navBadges = await navBadgesPromise;
   const statusLabel = statusLabels[displayStatus];
   const todayKey = tokyoToday();
   const deliv = order.delivery_start_date && order.delivery_end_date

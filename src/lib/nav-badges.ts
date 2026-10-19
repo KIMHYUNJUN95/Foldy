@@ -53,35 +53,39 @@ async function countUnreadAnnouncements(
   userId: string,
 ): Promise<number> {
   try {
-    const { data: published, error: publishedError } = await supabase
-      .from("announcements")
-      .select("id")
-      .eq("organization_id", orgId)
-      .eq("status", "published")
-      .returns<{ id: string }[]>();
+    // 게시 목록과 읽음을 한 번에 — 읽음은 id 목록을 기다리지 않고 「이 조직의 게시된 공지」로 조인해 거른다
+    // (결과는 예전 `.in(ids)` 와 같다).
+    const [publishedRes, readsRes] = await Promise.all([
+      supabase
+        .from("announcements")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("status", "published")
+        .returns<{ id: string }[]>(),
+      supabase
+        .from("announcement_reads")
+        .select("announcement_id, announcements!inner(id)")
+        .eq("organization_id", orgId)
+        .eq("user_id", userId)
+        .eq("announcements.organization_id", orgId)
+        .eq("announcements.status", "published")
+        .returns<{ announcement_id: string }[]>(),
+    ]);
 
-    if (publishedError) {
+    if (publishedRes.error) {
       return 0;
     }
 
-    const ids = (published ?? []).map((row) => row.id);
+    const ids = (publishedRes.data ?? []).map((row) => row.id);
     if (ids.length === 0) {
       return 0;
     }
 
-    const { data: reads, error: readsError } = await supabase
-      .from("announcement_reads")
-      .select("announcement_id")
-      .eq("organization_id", orgId)
-      .eq("user_id", userId)
-      .in("announcement_id", ids)
-      .returns<{ announcement_id: string }[]>();
-
-    if (readsError) {
+    if (readsRes.error) {
       return 0;
     }
 
-    const readIds = new Set((reads ?? []).map((row) => row.announcement_id));
+    const readIds = new Set((readsRes.data ?? []).map((row) => row.announcement_id));
     return ids.filter((id) => !readIds.has(id)).length;
   } catch {
     return 0;
@@ -93,7 +97,8 @@ async function countUnreadAnnouncements(
  * `cache()` dedupes repeated calls within a single server request.
  */
 export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
-  const session = await getCurrentAppSession();
+  // 페이지가 인증 확인 전에 미리 시작해 두고 끝에서 await 한다 — 여기서 던지면 처리되지 않은 거부가 된다.
+  const session = await getCurrentAppSession().catch(() => null);
   if (!session || session.organization.id === "platform") {
     return {};
   }

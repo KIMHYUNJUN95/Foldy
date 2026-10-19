@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { AnnouncementImageGrid } from "@/components/announcements/announcement-image-grid";
 import "@/components/announcements/announcements-mobile.css";
@@ -6,6 +7,7 @@ import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getAnnouncementDictionary } from "@/lib/announcement-i18n";
 import {
   ensureAnnouncementRead,
+  getAnnouncementReadAt,
   getVisibleAnnouncementById,
 } from "@/lib/announcements";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -40,6 +42,7 @@ function targetLabel(
 export default async function MobileAnnouncementDetailPage({
   params,
 }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, routeParams] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -59,16 +62,26 @@ export default async function MobileAnnouncementDetailPage({
   }
 
   const copy = getAnnouncementDictionary(session.user.preferredLanguage);
-  const announcement = await getVisibleAnnouncementById(session, routeParams.id);
+  const [announcement, existingReadAt] = await Promise.all([
+    getVisibleAnnouncementById(session, routeParams.id),
+    getAnnouncementReadAt(routeParams.id, session.user.id),
+  ]);
 
   if (!announcement) {
     notFound();
   }
 
-  // 읽음 처리 — 결과값은 사용하지 않음
-  await ensureAnnouncementRead(announcement, session.user.id);
+  // 읽음 기록은 응답을 보낸 뒤에 쓴다(`after`). 메뉴 배지는 그 전에 셌으므로, 이 공지가 안 읽음이었다면
+  // 이 화면의 배지에서 하나 빼 — 열자마자 배지가 줄어드는 동작은 그대로다.
+  const userId = session.user.id;
+  if (!existingReadAt) {
+    after(() => ensureAnnouncementRead(announcement, userId));
+  }
 
-  const navBadges = await getMobileNavBadges();
+  const rawNavBadges = await navBadgesPromise;
+  const navBadges = existingReadAt
+    ? rawNavBadges
+    : { ...rawNavBadges, announcements: Math.max(0, (rawNavBadges.announcements ?? 0) - 1) };
   const locale = session.user.preferredLanguage;
 
   return (

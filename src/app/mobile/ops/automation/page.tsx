@@ -27,6 +27,7 @@ export const dynamic = "force-dynamic";
 const BASE_PATH = "/mobile/ops/automation";
 
 export default async function MobileAutomationPage() {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent(BASE_PATH)}`);
   if (state.status !== "ready" || !session) redirect("/onboarding");
@@ -35,7 +36,7 @@ export default async function MobileAutomationPage() {
 
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
-  const [data, badges] = await Promise.all([getAutomationPageData(session, locale), getMobileNavBadges()]);
+  const [data, badges] = await Promise.all([getAutomationPageData(session, locale), navBadgesPromise]);
 
   return (
     // `split` — 폴드는 가운데 760px(화면이 다시 540px 로 모은다), 태블릿 가로는 폭 전부를 화면 CSS 가 목록 330px | 상세로 나눈다.

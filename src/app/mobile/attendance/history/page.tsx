@@ -26,6 +26,7 @@ function currentTokyoYm(): string {
 // param (Tokyo) selects the operating month; defaults to the current month.
 // See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
 export default async function MobileAttendanceHistoryPage({ searchParams }: PageProps) {
+  const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
     getOnboardingState(),
     getCurrentAppSession(),
@@ -52,7 +53,7 @@ export default async function MobileAttendanceHistoryPage({ searchParams }: Page
   const bcp47Locale = localeMap[session.user.preferredLanguage] ?? "ko-KR";
 
   const [navBadges, summary, sessions] = await Promise.all([
-    getMobileNavBadges(),
+    navBadgesPromise,
     getAttendanceTodaySummary(session.organization.id, session.user.id),
     getAttendanceHistory(session.organization.id, session.user.id, ym, 60, bcp47Locale),
   ]);

@@ -68,7 +68,7 @@ export function LegalLink({
         >
           {({ close }) => (
             <LegalBody copy={copy} documents={documents} onTab={setTab} tab={tab}>
-              <div className="-mx-5 border-t border-[#f1f1f4] px-5 pt-3">
+              <div className="-mx-5 border-t border-[var(--separator)] px-5 pt-3">
                 <button
                   className="h-[52px] w-full rounded-[14px] bg-primary text-[16px] font-semibold text-white"
                   onClick={close}
@@ -110,7 +110,7 @@ function LegalBody({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {header ?? <p className="pb-3 text-[18px] font-bold text-foreground">{copy.title}</p>}
-      <div className={`${gutter} flex gap-6 border-b border-[#f1f1f4]`} role="tablist">
+      <div className={`${gutter} flex gap-6 border-b border-[var(--separator)]`} role="tablist">
         {(["terms", "privacy"] as const).map((key) => (
           <button
             aria-selected={tab === key}
@@ -216,7 +216,7 @@ function LegalModal({
           onTab={onTab}
           tab={tab}
         >
-          <div className="-mx-7 flex items-center justify-between border-t border-[#f1f1f4] px-7 py-4">
+          <div className="-mx-7 flex items-center justify-between border-t border-[var(--separator)] px-7 py-4">
             <a className="flex items-center gap-1.5 text-[14px] text-[#6b6878] hover:text-foreground" href={hrefs[tab]} rel="noreferrer" target="_blank">
               {copy.openNew}
               <svg aria-hidden="true" fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="14">

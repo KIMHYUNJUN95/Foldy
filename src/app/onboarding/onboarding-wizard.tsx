@@ -793,7 +793,7 @@ function ReviewRow({
   return (
     <div
       className={`flex items-center gap-3 py-[14px] ${
-        divider ? "border-t border-[#f1f1f4]" : ""
+        divider ? "border-t border-[var(--separator)]" : ""
       }`}
     >
       <span className="w-[78px] flex-none text-[12px] font-bold text-muted-foreground">

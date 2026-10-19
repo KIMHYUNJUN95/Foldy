@@ -14,7 +14,7 @@
   --msw-muted: #6b6878;
   --msw-faint: var(--text-3);
   --msw-ghost: #b4b1bf;
-  --msw-line: #f1f1f4;
+  --msw-line: var(--separator);
   --msw-field: #e0e0e6;
   --msw-fill: #f4f4f7;
   --msw-fill2: #f7f7f9;

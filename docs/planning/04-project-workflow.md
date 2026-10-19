@@ -232,7 +232,9 @@ No major feature should be implemented only in code without documentation.
 
 All mobile screens that use `MobileShell` must inherit the unified mobile shell contract.
 
-- Top chrome: three-line hamburger menu trigger (shorter middle line), centered `Foldy` wordmark, notification bell, and profile link.
+- Top chrome: three-line hamburger menu trigger (shorter middle line), notification bell, and profile link. **2026-10-19 (HIG 다듬기 2차):** the
+  `Foldy` wordmark is gone — the center shows the screen's compact title only after its large title (`[data-large-title]` or first `h1`) scrolls
+  under the bar. List screens use a 34/41 large title. Separators everywhere use `--separator` with the shared inset rule (docs/design/05).
 - Top chrome is scroll-aware: it hides on downward scroll and returns on upward scroll.
 - Side menu: the top-left menu trigger opens a full-screen left slide-in navigation sheet. The old 78%-width drawer pattern is retired because exposed dimmed slivers repeatedly caused iOS Safari / standalone PWA status-bar and seam artifacts.
 - Bottom navigation: the current shared contract is the solid warm-ivory bottom-attached tab bar with a raised center squircle FAB, not a floating capsule.

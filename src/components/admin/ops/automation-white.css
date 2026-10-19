@@ -9,8 +9,8 @@
   --atw-ink3: #4c4958;
   --atw-mute: #6b6878;
   --atw-faint: var(--text-3);
-  --atw-line: #f1f1f4;
-  --atw-hair: #f3f3f6;
+  --atw-line: var(--separator);
+  --atw-hair: var(--separator);
   --atw-field: #f4f4f7;
   --atw-v: #7a52e6;
   --atw-v-ink: #5a30cf;

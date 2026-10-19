@@ -11,7 +11,7 @@
   --ink: #16141f;
   --adm-muted: #6b6878;
   --line: #e0e0e6;
-  --line-soft: #f1f1f4;
+  --line-soft: var(--separator);
   --primary-ink: #5a30cf;
   --primary-soft: #f1ecfd;
   --authx-primary: #7a52e6;

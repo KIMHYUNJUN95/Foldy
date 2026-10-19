@@ -22,6 +22,12 @@
 - **손쉬운 사용 설정.** 「대비 높이기」(`prefers-contrast: more`)면 `--text-3` · `--text-done` → `#5A5767`, `--muted-foreground` · `--border` 한 단계 진하게.
   「투명도 줄이기」(`prefers-reduced-transparency`)면 흐림을 끄고 반투명 밝은 면(`bg-surface/…` · `bg-background/…`)을 불투명 흰색으로. `globals.css`.
 - **버튼 둥글기 2단계.** 높이 28~40px 버튼 10px, 44px 이상 14px. 입력칸 12px · 시트 24px · 탭 바 FAB 18px · 분할 컨트롤 안쪽 칸 · 원형 · 알약은 그대로.
+- **구분선 하나(2차, 2026-10-19 — 모든 화면 공용).** 색 `--separator` `#EFEFF3` 하나, 두께 1px(대비 높이기 때 `#D6D5DE`). 예전 `#F1F1F4` ·
+  `#F3F3F6` · `#F0EFF4` · `#EBEAF0` 는 모두 이 토큰으로 바꿨다. 시작점: 앞에 아이콘 · 고리가 있는 줄은 **글자 시작점부터**
+  (`border-image: linear-gradient(90deg, transparent <글자 시작>px, var(--separator) <글자 시작>px) 1`), 없는 줄은 내용 여백부터. 끝은 늘 내용 여백까지.
+  적용: 투두 줄(38px) · 투두 · 게시판 시트 동작 목록(36px) · 알림 줄(48px) · 홈 오늘 기록(20px). 새 목록도 이 규칙을 따른다.
+- **큰 제목(2차).** 목록 첫 화면 제목 34/41 · 700 · -0.02em, 위 줄에는 스크롤 뒤 작은 제목만(16-mobile-navigation). 섹션 제목 17 반굵게,
+  목록 줄 제목 16 · 아래 설명 13(iOS Callout · Footnote). 고른 탭은 채운 아이콘.
 - **누르는 영역 44px.** 작은 글자 버튼 · 아이콘 버튼은 보이는 크기를 두고 음수 여백이나 `::before` 로 영역만 넓힌다(투두 지연 머리 · 검색 지우기).
 - 시안: 별도 캔버스 「Foldy HIG 다듬기 시안」 https://claude.ai/artifact/7Ccw2CDN1gaVY9eoxTAhUY (메인 캔버스에는 섞지 않는다).
 - 채널은 회사 색: Airbnb `#FF5A5F` · Booking.com `#003B95` · 직접 `#8B8898` · 기타 `#D9D7E0`.

@@ -198,6 +198,10 @@ summary,
   --text-done: #76737f;
   --surface: #ffffff;
   --border: #ececf0;
+  /* 구분선 하나(HIG 다듬기 2차, 2026-10-19) — 모든 화면의 1px 가로선(목록 줄 · 구역 나눔)이 같은 색을 쓴다.
+     시작점: 앞에 아이콘 · 고리가 있는 줄은 글자 시작점부터, 없는 줄은 내용 여백부터. 끝은 늘 내용 여백까지.
+     예전에 섞여 있던 #F1F1F4 · #F3F3F6 · #F0EFF4 · #EBEAF0 을 대신한다. */
+  --separator: #efeff3;
   /* Brand accent: soft violet (pressed #5A30CF). Replaces the former deep navy. */
   --primary: #7a52e6;
   --primary-foreground: #ffffff;
@@ -236,6 +240,7 @@ summary,
     --text-done: #5a5767;
     --muted-foreground: #55525f;
     --border: #d6d5de;
+    --separator: #d6d5de;
   }
 }
 /* 「투명도 줄이기」: 흐림을 끄고, 반투명 밝은 면은 불투명 흰색으로. 어두운 오버레이(사진 보기 등)는 그대로 둔다. */
@@ -611,6 +616,59 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   font-style: normal;
   font-weight: 700;
   letter-spacing: -0.03em;
+}
+
+/* 위 줄 작은 제목(HIG 다듬기 2차) — 큰 제목이 스크롤로 사라지면 가운데에 17px 반굵게 떠오른다. mobile-shell.tsx. */
+.shell-title {
+  position: absolute;
+  left: 72px;
+  right: 104px;
+  top: 8px;
+  height: 48px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--dur-fast) ease, transform var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+.shell-title.is-on {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-title { transition: opacity var(--dur-fast) ease; transform: none; }
+}
+
+/* 고른 탭은 채운 아이콘(HIG 다듬기 2차 — SF Symbols 의 fill 변형처럼). 아이콘 안 [data-fill] 은 속을 채우고,
+   [data-knock] 은 채운 면 위에 바탕색으로 비워 보이게, [data-on] 은 고른 때만 나타난다. 하단 탭 · 레일 · 사이드바 공용. */
+.tabbar__item svg [data-fill],
+[aria-current="page"] svg [data-fill] {
+  transition: fill var(--dur-fast) ease;
+}
+.tabbar__item.is-active svg [data-fill],
+[aria-current="page"] svg [data-fill] {
+  fill: currentColor;
+}
+.tabbar__item.is-active svg [data-knock],
+[aria-current="page"] svg [data-knock] {
+  stroke: var(--knock, var(--background));
+}
+svg [data-on] {
+  opacity: 0;
+}
+.tabbar__item.is-active svg [data-on],
+[aria-current="page"] svg [data-on] {
+  opacity: 1;
 }
 
 @keyframes modal-overlay-in {

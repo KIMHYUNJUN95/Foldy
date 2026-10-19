@@ -8,8 +8,8 @@
   --ocw-ink2: #3a3746;
   --ocw-mute: #6b6878;
   --ocw-faint: var(--text-3);
-  --ocw-line: #f1f1f4;
-  --ocw-hair: #f3f3f6;
+  --ocw-line: var(--separator);
+  --ocw-hair: var(--separator);
   --ocw-v: #7a52e6;
   --ocw-v-ink: #5a30cf;
   --ocw-v-soft: #c2aef6;

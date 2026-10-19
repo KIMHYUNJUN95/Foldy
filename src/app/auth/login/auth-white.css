@@ -12,7 +12,7 @@
   --aw-muted: #6b6878;
   --aw-faint: var(--text-3);
   --aw-line: #e0e0e6;
-  --aw-hair: #f1f1f4;
+  --aw-hair: var(--separator);
   --aw-primary: #7a52e6;
   --aw-primary-press: #5a30cf;
   --aw-ring: #eee8fc;

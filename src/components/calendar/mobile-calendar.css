@@ -1,7 +1,7 @@
 /* 모바일 예약 캘린더 — 화이트 리디자인(2026-10-14, 시안 Cal-Phone · Cal-Fold · Cal-Tablet · CalDetail-Phone · CalPick-Phone ·
    CalList-* · CalMap-*). 흰 바탕 · 상자 · 세로 구분선 없음 — 날짜는 주말 열 옅은 회색 · 오늘 열 옅은 보라. 막대는 회색 바탕 + 채널 색 점.
    움직임: 막대 차례 펼침 · 막대/전화 누름 반응 · 시트 올라옴(공용) · 복사됨 체크 그리기 · 칸 내용 흐림 → 선명. reduced-motion 이면 끈다. */
-.mcw { --mcw-ink: #16141f; --mcw-soft: #6b6878; --mcw-faint: var(--text-done); --mcw-pri: #7a52e6; --mcw-pri-ink: #5a30cf; --mcw-sel: #f4f1fd; --mcw-tint: #f1ecfd; --mcw-line: #f3f3f6;
+.mcw { --mcw-ink: #16141f; --mcw-soft: #6b6878; --mcw-faint: var(--text-done); --mcw-pri: #7a52e6; --mcw-pri-ink: #5a30cf; --mcw-sel: #f4f1fd; --mcw-tint: #f1ecfd; --mcw-line: var(--separator);
   display: flex; flex-direction: column; gap: 14px; color: var(--mcw-ink); }
 .mcw .num { font-variant-numeric: tabular-nums; }
 .mcw-mono { font-family: var(--font-mono, ui-monospace), monospace; font-weight: 600; }
@@ -75,7 +75,7 @@
 .mcw-empty span { font-size: 13px; color: var(--mcw-soft); }
 
 /* 목록 */
-.mcw-tabs { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid #f1f1f4; }
+.mcw-tabs { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--separator); }
 .mcw-tabs::-webkit-scrollbar { display: none; }
 .mcw-tabs button { display: flex; align-items: center; gap: 5px; height: 40px; padding: 0 2px; border: 0; background: none; font: inherit; font-size: 14px; color: var(--mcw-soft); white-space: nowrap; cursor: pointer; box-shadow: inset 0 0 0 transparent; transition: box-shadow 200ms ease, color 150ms ease; }
 .mcw-tabs button b { font-weight: 600; color: var(--mcw-faint); }
@@ -122,10 +122,10 @@
 .mcw-dwho h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; overflow-wrap: anywhere; }
 .mcw-dwho > span { font-size: 14px; color: var(--mcw-soft); }
 .mcw-dwho b { color: var(--mcw-ink); }
-.mcw-dstay { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.mcw-dstay { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 16px; border-top: 1px solid var(--separator); }
 .mcw-dstay > div { display: flex; flex-direction: column; gap: 2px; }
 .mcw-dstay b { font-size: 18px; font-weight: 700; }
-.mcw-dphone { display: flex; align-items: center; gap: 8px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.mcw-dphone { display: flex; align-items: center; gap: 8px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .mcw-dphone > span { flex: 1; min-width: 0; font-size: 15px; }
 .mcw-sq { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: #f4f4f7; color: #4c4958; cursor: pointer; transition: transform 140ms ease, background 150ms ease; -webkit-tap-highlight-color: transparent; }
 .mcw-sq svg { width: 18px; height: 18px; }
@@ -134,13 +134,13 @@
 .mcw-sq.is-done { color: #1f7a4d; }
 .mcw-sq.is-done svg path, .mcw-sq.is-done svg polyline, .mcw-done svg path, .mcw-done svg polyline, .mcw-link svg polyline { stroke-dasharray: 24; animation: mcw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes mcw-draw { from { stroke-dashoffset: 24; } }
-.mcw-dnote { display: flex; flex-direction: column; gap: 4px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.mcw-dnote { display: flex; flex-direction: column; gap: 4px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .mcw-dnote p { margin: 0; font-size: 14px; line-height: 1.55; color: #3a3746; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mcw-codes { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.mcw-codes { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .mcw-code { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .mcw-code__t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mcw-code__t b { font-size: 20px; overflow-wrap: anywhere; }
-.mcw-rcodes { display: flex; flex-direction: column; padding-top: 12px; border-top: 1px solid #f1f1f4; }
+.mcw-rcodes { display: flex; flex-direction: column; padding-top: 12px; border-top: 1px solid var(--separator); }
 .mcw-rcodes > .mcw-k { padding-bottom: 6px; }
 .mcw-rcode { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0; border: 0; border-top: 1px solid #f7f7f9; background: none; font: inherit; font-size: 14px; color: inherit; text-align: left; cursor: pointer; }
 .mcw-rcode:active .mcw-rcode__v { opacity: .6; }

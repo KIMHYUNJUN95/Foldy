@@ -15,7 +15,7 @@
   --scw-faint: var(--text-3);
   --scw-ghost: #c9c6d3;
   --scw-line: #ececf0;
-  --scw-hair: #f1f1f4;
+  --scw-hair: var(--separator);
   --scw-cell: #f3f3f6;
   --scw-fill: #f4f4f7;
   --scw-v: #7a52e6;

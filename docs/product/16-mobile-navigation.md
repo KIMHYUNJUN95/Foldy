@@ -506,6 +506,13 @@ Current rules:
 - **화이트 리디자인(2026-10-09)**: 워드마크는 세리프 이탤릭 대신 **Geist 700**(`.wordmark`), 세 줄 메뉴 바로 오른쪽에 **왼쪽 정렬**(가운데 정렬 아님),
   메뉴 버튼은 동그란 회색 바탕 없이 줄만, 오른쪽 프로필은 사람 아이콘 대신 **옅은 보라 동그라미 이니셜**. 레일(폴드)은 옅은 면(`#F7F7F9`) · 테두리 없음 ·
   선택 = 흰 칸 · 편집 버튼 = 흰 네모(테두리 1px), 사이드바(태블릿)는 테두리 없음 · 로고 마크 + 워드마크 · 선택 = 옅은 보라 면.
+- **HIG 다듬기 2차(2026-10-19) — 큰 제목 · 작은 제목 · 채운 아이콘**: 폰 위 줄의 「Foldy」 글자를 뺐다(HIG 「Don't title windows with your app name」).
+  화면의 큰 제목(`[data-large-title]` 또는 첫 `h1`)이 위 줄 아래로 스크롤돼 사라지면 위 줄 가운데에 그 제목(`data-compact-title` 이 있으면 그 값 — 홈은
+  「홈」)이 17px 반굵게 떠오르고, 맨 위로 돌아오면 숨는다(`IntersectionObserver`, `.shell-title`). 큰 제목이 없는 화면은 위 줄 가운데가 비어 있다.
+  목록 첫 화면 제목은 모두 **34/41 · 700**(iOS Large Title — 투두 · 알림 · 청소 · 요청 · 공지 · 게시판 · 직원 · 제안 · 버그 · 게스트 피드백 · 연차 · 근태 홈 ·
+  가동률 · 매출 · 룸 링크 · 자동화 · 홈 인사말). 상세 · 작성 화면 제목은 그대로(20~24px).
+  하단 탭 · 레일 · 사이드바는 같은 아이콘 모음(`src/components/shell/nav-glyphs.tsx`)을 쓰고, **고른 항목은 채운 아이콘**(`[data-fill]` 채움 ·
+  `[data-knock]` 바탕색으로 비움 · `[data-on]` 고른 때만 — `globals.css`). 사이드바 줄은 44px · 15px.
 - **Top chrome surface**: the header bar is flat/borderless — no capsule outline, ring, glass blur, or shadow. Menu, notification, profile controls and the centered wordmark sit over the shared ivory chrome.
 - **Buttons**: the menu button is a 38px muted circle; notification and profile controls use the same 38px touch target and muted icon color. The menu icon is a 3-line SVG with a shorter middle line; the profile icon is a person SVG.
 - **Right**: the notification bell links to `/mobile/notifications` and can show the unread badge; the profile button links to `/account?mode=mobile`. Accessible labels use the shared dictionary.

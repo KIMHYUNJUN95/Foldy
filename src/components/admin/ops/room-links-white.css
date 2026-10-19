@@ -9,8 +9,8 @@
   --rlw-mute: #6b6878;
   --rlw-faint: var(--text-3);
   --rlw-faint2: #9a97a6;
-  --rlw-line: #f1f1f4;
-  --rlw-hair: #f3f3f6;
+  --rlw-line: var(--separator);
+  --rlw-hair: var(--separator);
   --rlw-field: #f4f4f7;
   --rlw-v: #7a52e6;
   --rlw-v-ink: #5a30cf;

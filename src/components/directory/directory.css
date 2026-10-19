@@ -1,11 +1,11 @@
 /* 직원 목록 — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet).
    흰 바탕 · 상자 없음 · 선택은 옅은 보라 바탕만. 움직임: 줄 차례 등장 · 전화 버튼 누름(살짝 작아짐 + 진동) ·
    번호 복사됨 체크 그리기 · 프로필 칸 흐림 → 선명. reduced-motion 이면 끈다. */
-.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: var(--text-done); --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f1fd; --drw-line: #f3f3f6; color: var(--drw-ink); }
+.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: var(--text-done); --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f1fd; --drw-line: var(--separator); color: var(--drw-ink); }
 .drw .num { font-variant-numeric: tabular-nums; }
 .drw-list { display: flex; flex-direction: column; min-width: 0; padding-bottom: 24px; }
 .drw-h { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
-.drw-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.drw-h h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .drw-h > span { font-size: 13px; color: var(--drw-soft); }
 .drw-search { display: flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 8px 0 14px; border-radius: 12px; background: #f4f4f7; color: var(--text-3); }
 .drw-search:focus-within { box-shadow: 0 0 0 2px var(--drw-pri); }
@@ -41,7 +41,7 @@
 
 /* 폴드(≥ 600px): 한 줄에 이름 · 역할 | 번호 | 전화 — 2열로 쪼개면 번호가 꺾인다. */
 @media (min-width: 600px) {
-  .drw-h h1 { font-size: 26px; }
+  .drw-h h1 { font-size: 34px; }
   .drw-subph { display: none; }
   .drw-ph { display: block; width: 136px; flex: none; font-size: 14px; color: #3a3746; }
   .drw-ph.is-none { color: var(--drw-faint); }
@@ -70,7 +70,7 @@
 .drw-btn.is-done svg path, .drw-btn.is-done svg polyline { stroke-dasharray: 24; animation: drw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes drw-draw { from { stroke-dashoffset: 24; } }
 .drw-btn.is-bad { color: #c5282e; }
-.drw-dl { margin: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 14px; padding-top: 20px; border-top: 1px solid #f1f1f4; font-size: 14px; }
+.drw-dl { margin: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 14px; padding-top: 20px; border-top: 1px solid var(--separator); font-size: 14px; }
 .drw-dl dt { color: var(--drw-soft); }
 .drw-dl dd { margin: 0; }
 

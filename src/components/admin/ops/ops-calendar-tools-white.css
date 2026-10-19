@@ -13,7 +13,7 @@
   --stw-mute: #6b6878;
   --stw-faint: var(--text-3);
   --stw-faint2: #9a97a6;
-  --stw-line: #f3f3f6;
+  --stw-line: var(--separator);
   --stw-soft: #f7f7f9;
   --stw-seg: #f2f2f5;
   --stw-v: #7a52e6;

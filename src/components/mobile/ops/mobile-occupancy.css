@@ -4,7 +4,7 @@
    reduced-motion 이면 전부 끈다. 바텀시트는 body 로 포털되므로 시트 안 규칙은 `.moc` 밖에 둔다. */
 .moc {
   --moc-ink: #16141f; --moc-soft: #6b6878; --moc-faint: var(--text-3); --moc-pri: #7a52e6; --moc-pri-ink: #5a30cf;
-  --moc-ring: #efeafb; --moc-track: #efeff3; --moc-red: #c5282e; --moc-red-bar: #e5484d; --moc-line: #f1f1f4;
+  --moc-ring: #efeafb; --moc-track: #efeff3; --moc-red: #c5282e; --moc-red-bar: #e5484d; --moc-line: var(--separator);
   --moc-ease: cubic-bezier(.23, 1, .32, 1);
   color: var(--moc-ink);
   padding-bottom: 24px;
@@ -23,7 +23,7 @@
 /* ── 머리 ── */
 .moc-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .moc-h__t { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.moc-h__t h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.moc-h__t h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .moc-h__t > span { font-size: 13px; color: var(--moc-faint); }
 .moc-mnav { display: flex; align-items: center; gap: 2px; flex: none; }
 .moc-arrow, .moc-mlabel {

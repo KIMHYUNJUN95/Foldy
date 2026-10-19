@@ -140,7 +140,7 @@
 
 /* 상세 패널 */
 .adm .lnp .lnp-lines { display: flex; flex-direction: column; }
-.adm .lnp .lnp-line { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-top: 1px solid #f3f3f6; font-size: 14px; color: #16141f; }
+.adm .lnp .lnp-line { display: flex; align-items: center; justify-content: space-between; min-height: 48px; border-top: 1px solid var(--separator); font-size: 14px; color: #16141f; }
 .adm .lnp .lnp-line:first-child { border-top: 0; }
 .adm .lnp .lnp-line b { font-weight: 700; }
 .adm .lnp .lnp-line.is-total { min-height: 52px; border-top-color: #e6e6eb; }
@@ -150,7 +150,7 @@
 .adm .modal.lfm.lnm { width: 520px; }
 .adm .lnm .lnm-bld .dd > button { width: 100%; height: 48px; border-radius: 12px; }
 .adm .lnm-steps { display: flex; flex-direction: column; }
-.adm .lnm-step { display: flex; align-items: center; gap: 6px; min-height: 46px; border-top: 1px solid #f3f3f6; }
+.adm .lnm-step { display: flex; align-items: center; gap: 6px; min-height: 46px; border-top: 1px solid var(--separator); }
 .adm .lnm-step:first-child { border-top: 0; }
 .adm .lnm-step > span { flex: 1; min-width: 0; font-size: 14px; color: #6b6878; }
 .adm .lnm-step.has > span { color: #16141f; font-weight: 600; }

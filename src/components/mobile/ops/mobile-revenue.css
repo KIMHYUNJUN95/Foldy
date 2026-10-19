@@ -5,7 +5,7 @@
 .mrv {
   --mrv-ink: #16141f; --mrv-soft: #6b6878; --mrv-faint: var(--text-3); --mrv-pri: #7a52e6; --mrv-pri-ink: #5a30cf;
   --mrv-cur: #c2aef6; --mrv-light: #dcd0fa; --mrv-prev: #e3e2e8; --mrv-track: #efeff3;
-  --mrv-red: #c5282e; --mrv-green: #1f7a4d; --mrv-line: #f1f1f4; --mrv-line2: #f3f3f6;
+  --mrv-red: #c5282e; --mrv-green: #1f7a4d; --mrv-line: var(--separator); --mrv-line2: var(--separator);
   --mrv-stripe: repeating-linear-gradient(135deg, #dcd0fa 0 4px, #f4f1fd 4px 8px);
   --mrv-ease: cubic-bezier(.23, 1, .32, 1);
   color: var(--mrv-ink);
@@ -25,7 +25,7 @@
 /* ── 머리 ── */
 .mrv-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .mrv-h__t { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.mrv-h__t h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.mrv-h__t h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .mrv-h__t > span { font-size: 13px; color: var(--mrv-faint); }
 .mrv-mnav { display: flex; align-items: center; gap: 2px; flex: none; }
 .mrv-arrow, .mrv-mlabel {

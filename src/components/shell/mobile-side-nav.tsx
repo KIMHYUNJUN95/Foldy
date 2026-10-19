@@ -8,6 +8,7 @@ import { signOut } from "@/app/auth/actions";
 import { getNavigationLabel, getNavigationTabLabel, mobileNavBugs, type NavigationItem } from "@/config/navigation";
 import type { Locale } from "@/lib/i18n";
 import { FoldyMark } from "@/components/brand/foldy-mark";
+import { NAV_GLYPHS } from "@/components/shell/nav-glyphs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -123,7 +124,12 @@ export function MobileSideNav({
             active ? "text-[#5a30cf]" : "text-[#6b6878]",
           )}
         >
-          <Icon aria-hidden="true" className="size-[21px]" />
+          {/* 하단 탭과 같은 그림(고르면 채운 모양) — 없으면 메뉴 아이콘 그대로. */}
+          {NAV_GLYPHS[item.id] ? (
+            <span className="flex [&>svg]:size-[22px]">{NAV_GLYPHS[item.id]}</span>
+          ) : (
+            <Icon aria-hidden="true" className="size-[21px]" />
+          )}
         </span>
         <span className="max-w-full truncate px-0.5">{getNavigationTabLabel(item, locale)}</span>
         {count > 0 && (
@@ -143,13 +149,18 @@ export function MobileSideNav({
       <Link
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex h-[38px] shrink-0 items-center gap-[11px] rounded-[11px] px-2.5 text-[13.5px] transition-colors",
-          active ? "bg-[#f1ecfd] font-semibold text-[#5a30cf]" : "text-[#3a3746] hover:bg-[#f7f7f9]",
+          // HIG 다듬기 2차: 줄 높이 44px(누르는 영역) · 글자 15px. 고른 줄의 채운 아이콘은 옅은 보라 바탕으로 비워 보인다(--knock).
+          "flex h-11 shrink-0 items-center gap-3 rounded-[10px] px-2.5 text-[15px] transition-colors",
+          active ? "bg-[#f1ecfd] font-semibold text-[#5a30cf] [--knock:#f1ecfd]" : "text-[#3a3746] hover:bg-[#f7f7f9]",
         )}
         href={item.href}
         key={item.id}
       >
-        <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-[#7a52e6]" : "text-text-3")} />
+        {NAV_GLYPHS[item.id] ? (
+          <span className={cn("flex shrink-0 [&>svg]:size-5", active ? "text-[#7a52e6]" : "text-text-3")}>{NAV_GLYPHS[item.id]}</span>
+        ) : (
+          <Icon aria-hidden="true" className={cn("size-5 shrink-0", active ? "text-[#7a52e6]" : "text-text-3")} />
+        )}
         <span className="min-w-0 flex-1 truncate">{getNavigationLabel(item, locale)}</span>
         {count > 0 && (
           <span

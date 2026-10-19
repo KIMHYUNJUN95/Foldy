@@ -1565,7 +1565,7 @@
 .adm .acw .admcal__day-week { font-size: 11px; font-weight: 500; }
 .adm .acw .admcal__day-number { font-family: inherit; font-size: 14px; font-weight: 700; color: #16141f; }
 .adm .acw .admcal__day-head.is-today .admcal__day-number { color: #5a30cf; }
-.adm .acw .admcal__group { border-top: 1px solid #f1f1f4; }
+.adm .acw .admcal__group { border-top: 1px solid var(--separator); }
 .adm .acw-ghead { position: sticky; left: 0; z-index: 5; display: flex; align-items: baseline; gap: 8px; width: max-content; padding: 12px 12px 2px; }
 .adm .acw-ghead b { font-size: 14px; font-weight: 700; color: #16141f; }
 .adm .acw-ghead span { font-size: 12px; color: #6b6878; }
@@ -1574,7 +1574,7 @@
 .adm .acw-empty-row__days { display: grid; grid-template-columns: repeat(var(--admcal-day-count), var(--admcal-day-width)); align-items: center; }
 .adm .acw-empty-row__days span { text-align: center; font-size: 12px; font-weight: 600; color: #5a30cf; }
 .adm .acw-empty-row__days span.is-zero { color: #c9c6d3; }
-.adm .acw .admcal__room-row { min-height: 44px; border-bottom: 0; border-top: 1px solid #f3f3f6; }
+.adm .acw .admcal__room-row { min-height: 44px; border-bottom: 0; border-top: 1px solid var(--separator); }
 .adm .acw .admcal__room-label { border-right: 0; background: #fff; font-weight: 600; font-size: 13px; color: #16141f; }
 .adm .acw .admcal__cell { border-right: 0; }
 .adm .acw .admcal__cell.is-sat, .adm .acw .admcal__cell.is-sun { background: #fafafc; }
@@ -1593,7 +1593,7 @@
 .adm .acw .admcal__state-card { border: 0; box-shadow: none; background: #fafafc; }
 
 /* 오늘 운영 */
-.adm .acw-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px 0 20px; border-bottom: 1px solid #f1f1f4; }
+.adm .acw-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px 0 20px; border-bottom: 1px solid var(--separator); }
 .adm .acw-kpi { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
 .adm .acw-kpi > span { font-size: 13px; color: #6b6878; }
 .adm .acw-kpi > span:last-child { font-size: 12px; }
@@ -1602,7 +1602,7 @@
 .adm .acw-kpi small { margin-left: 3px; font-size: 13px; font-weight: 500; color: #6b6878; }
 .adm .acw-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 28px; margin-top: 8px; }
 .adm .acw-col { display: flex; flex-direction: column; min-width: 0; }
-.adm .acw-col__h { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #f1f1f4; }
+.adm .acw-col__h { display: flex; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--separator); }
 .adm .acw-col__h b { font-size: 15px; font-weight: 700; color: #16141f; }
 .adm .acw-col__h span { font-size: 12px; color: #6b6878; }
 .adm .acw-col__empty { margin: 0; padding: 20px 0; font-size: 13px; color: var(--text-done); }
@@ -1617,8 +1617,8 @@
 
 /* 객실 상태 */
 .adm .acw .admcal__table-card { border: 0; border-radius: 0; box-shadow: none; background: #fff; }
-.adm .acw .admcal__table th { background: #fff; border-bottom: 1px solid #f1f1f4; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: #6b6878; }
-.adm .acw .admcal__table td { border-bottom: 0; border-top: 1px solid #f3f3f6; font-size: 13px; }
+.adm .acw .admcal__table th { background: #fff; border-bottom: 1px solid var(--separator); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: #6b6878; }
+.adm .acw .admcal__table td { border-bottom: 0; border-top: 1px solid var(--separator); font-size: 13px; }
 .adm .acw .admcal__table-group td { background: #fff; border-top: 0; padding-top: 18px; }
 .adm .acw .admcal__table-group-title { display: inline-flex; align-items: baseline; gap: 10px; font-size: 16px; font-weight: 700; color: #16141f; }
 .adm .acw .admcal__table-group-title small { font-size: 12px; font-weight: 400; color: #6b6878; }
@@ -1631,7 +1631,7 @@
 
 /* 건물 정보 */
 .adm .acw-infos { display: flex; flex-direction: column; }
-.adm .acw-info { display: grid; grid-template-columns: 260px 260px minmax(0, 1fr); column-gap: 40px; padding: 22px 12px; border-top: 1px solid #f1f1f4; }
+.adm .acw-info { display: grid; grid-template-columns: 260px 260px minmax(0, 1fr); column-gap: 40px; padding: 22px 12px; border-top: 1px solid var(--separator); }
 .adm .acw-info__a { display: flex; flex-direction: column; gap: 6px; }
 .adm .acw-info__a > b { font-size: 16px; font-weight: 700; color: #16141f; }
 .adm .acw-info__links { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
@@ -1670,21 +1670,21 @@
 .adm .acw-who h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; overflow-wrap: anywhere; }
 .adm .acw-who > span { font-size: 14px; color: #6b6878; }
 .adm .acw-who b { color: #16141f; }
-.adm .acw-stay { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.adm .acw-stay { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 16px; border-top: 1px solid var(--separator); }
 .adm .acw-stay > div { display: flex; flex-direction: column; gap: 2px; }
 .adm .acw-stay b { font-size: 18px; font-weight: 700; color: #16141f; }
-.adm .acw-phone { display: flex; align-items: center; gap: 8px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.adm .acw-phone { display: flex; align-items: center; gap: 8px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .adm .acw-phone > span { flex: 1; min-width: 0; font-size: 15px; color: #16141f; }
 .adm .acw-sq { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: #f4f4f7; color: #4c4958; cursor: pointer; transition: transform 140ms ease, background 150ms ease; }
 .adm .acw-sq svg { width: 18px; height: 18px; }
 .adm .acw-sq:active { transform: scale(.95); }
 .adm .acw-sq.is-pri { background: #7a52e6; color: #fff; }
-.adm .acw-nf { position: relative; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.adm .acw-nf { position: relative; padding-top: 16px; border-top: 1px solid var(--separator); }
 .adm .acw-nf label { position: absolute; top: 8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; }
 .adm .acw-nf textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #e0e0e6; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; line-height: 1.5; color: #16141f; resize: vertical; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
 .adm .acw-nf textarea:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
 .adm .acw-nf > span { display: block; margin-top: 4px; font-size: 12px; color: #6b6878; text-align: right; }
-.adm .acw-links { display: flex; flex-direction: column; gap: 4px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.adm .acw-links { display: flex; flex-direction: column; gap: 4px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .adm .acw-links > span:last-child { display: flex; gap: 14px; }
 .adm .acw-panel button:focus-visible, .adm .acw-panel a:focus-visible, .adm .acw-bar button:focus-visible, .adm .acw-bar a:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 

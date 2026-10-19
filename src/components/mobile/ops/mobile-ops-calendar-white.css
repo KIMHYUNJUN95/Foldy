@@ -26,8 +26,8 @@
   --mw-red-bg: #fdecec;
   --mw-green: #1f7a4d;
   --mw-line: #ececf0;
-  --mw-line2: #f1f1f4;
-  --mw-line3: #f3f3f6;
+  --mw-line2: var(--separator);
+  --mw-line3: var(--separator);
   --mw-ease: cubic-bezier(0.23, 1, 0.32, 1);
   gap: 10px;
   color: var(--mw-ink);
@@ -516,12 +516,12 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 0;
-  border-top: 1px solid #f3f3f6;
+  border-top: 1px solid var(--separator);
   font-size: 14px;
 }
 .mops-binfo .mops-binfo__list dt { flex: none; font-weight: 400; color: #6b6878; }
 .mops-binfo .mops-binfo__list dd { font-weight: 400; color: #16141f; text-align: right; font-variant-numeric: tabular-nums; }
-.mops-binfo .mops-binfo__none { padding: 12px 0; border-top: 1px solid #f3f3f6; font-size: 14px; font-weight: 400; color: #6b6878; }
+.mops-binfo .mops-binfo__none { padding: 12px 0; border-top: 1px solid var(--separator); font-size: 14px; font-weight: 400; color: #6b6878; }
 .mops-binfo__hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 
 /* ── 반영 알림(탭 바 위 먹색 알약) ──────────────────────────────────────────── */

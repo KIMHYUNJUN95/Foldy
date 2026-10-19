@@ -6,7 +6,7 @@
 .acw {
   --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: var(--text-3); --w-mute: #b4b1bf; --w-sec: var(--text-done);
   --w-pri: #7a52e6; --w-pri-ink: #5a30cf; --w-pri-soft: #ede7fc; --w-red: #c5282e; --w-green: #1f7a4d;
-  --w-hair: #f3f3f6; --w-field: #f4f4f7;
+  --w-hair: var(--separator); --w-field: #f4f4f7;
   --w-ease: cubic-bezier(.23, 1, .32, 1);
   display: flex; flex-direction: column; padding-bottom: 28px; color: var(--w-ink);
 }

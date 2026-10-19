@@ -13,8 +13,8 @@
   --spw-mute: #6b6878;
   --spw-faint: var(--text-3);
   --spw-dim: #b4b1bf;
-  --spw-line: #f1f1f4;
-  --spw-line2: #f3f3f6;
+  --spw-line: var(--separator);
+  --spw-line2: var(--separator);
   --spw-field: #e0e0e6;
   --spw-gray: #f4f4f7;
   --spw-v: #7a52e6;

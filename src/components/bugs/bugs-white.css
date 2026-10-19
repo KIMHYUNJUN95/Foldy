@@ -6,7 +6,7 @@
 .bgw {
   --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: var(--text-3); --w-mute: #b4b1bf;
   --w-pri: #7a52e6; --w-pri-ink: #5a30cf; --w-sel: #f4f1fd; --w-red: #c5282e; --w-green: #1f7a4d;
-  --w-hair: #f3f3f6; --w-field: #f4f4f7; --w-line: #e4e2ea;
+  --w-hair: var(--separator); --w-field: #f4f4f7; --w-line: #e4e2ea;
   --w-ease: cubic-bezier(.23, 1, .32, 1);
   display: flex; flex-direction: column; gap: 16px; padding-bottom: 28px; color: var(--w-ink);
 }
@@ -17,7 +17,7 @@
 
 .bgw-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .bgw-h__t { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.bgw-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; }
+.bgw-h h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .bgw-h p { margin: 0; font-size: 13px; color: var(--w-faint); }
 .bgw-cta {
   flex: none; height: 44px; display: inline-flex; align-items: center; gap: 2px; padding: 0 16px; border-radius: 14px; background: var(--w-pri);
@@ -118,7 +118,7 @@
 .bgw-body { margin: 0; font-size: 15px; line-height: 1.7; color: var(--w-ink2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .bgw-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .bgw-shots a { position: relative; display: block; height: 140px; overflow: hidden; border-radius: 12px; background: var(--w-field); }
-.bgw-sec { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f1f4; }
+.bgw-sec { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .bgw-sec__t { font-size: 13px; font-weight: 600; color: var(--w-ink2); }
 .bgw-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .bgw-seg button {

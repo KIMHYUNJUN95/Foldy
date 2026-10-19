@@ -459,11 +459,12 @@ export default async function MobileHomePage() {
         <div className="hm__greet">
           <div>
             <div className="hm__greet-d">{greetDate}</div>
-            <div className="hm__greet-n">
+            {/* 큰 제목(HIG 다듬기 2차) — 스크롤해 사라지면 셸 위 줄에 「홈」이 작게 뜬다(data-compact-title). */}
+            <h1 className="hm__greet-n" data-compact-title={m.homeTitle} data-large-title="">
               <Suspense fallback={<span className="gl" aria-hidden="true">{m.homeGreeting(userName)}</span>}>
                 <HomeGreeting session={session} locale={locale} name={userName} fallback={m.homeGreeting(userName)} />
               </Suspense>
-            </div>
+            </h1>
           </div>
         </div>
 

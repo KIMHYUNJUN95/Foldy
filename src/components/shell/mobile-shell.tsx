@@ -8,6 +8,7 @@ import { Bell } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { MobileMenuPanel } from "@/components/shell/mobile-menu-panel";
+import { FALLBACK_GLYPH, NAV_GLYPHS } from "@/components/shell/nav-glyphs";
 import { MobileSideNav } from "@/components/shell/mobile-side-nav";
 import { TabEditor } from "@/components/shell/tab-editor";
 import { SPLIT_PANE_MESSAGE } from "@/lib/split-pane";
@@ -90,106 +91,19 @@ const EDIT_ICON = (
  * Colours fix lightness/chroma and vary only hue → a unified palette.
  */
 const LAUNCHER_META: Record<string, { hue: number; icon: ReactNode }> = {
-  home: {
-    hue: 185,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 11.5L12 5l8 6.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 10.5V19h12v-8.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  calendar: {
-    hue: 250,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="4" y="5.5" width="16" height="14" rx="3" stroke="currentColor" strokeWidth="1.9" />
-        <path d="M4 9.5h16M8 4v3M16 4v3" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  cleaning: {
-    hue: 155,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 4l1.4 3.6L17 9l-3.6 1.4L12 14l-1.4-3.6L7 9l3.6-1.4L12 4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        <path d="M18 14l.7 1.8 1.8.7-1.8.7L18 19l-.7-1.8-1.8-.7 1.8-.7L18 14z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  requests: {
-    hue: 70,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="5.5" y="4.5" width="13" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.9" />
-        <path d="M9 3.5h6v3H9z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
-        <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  announcements: {
-    hue: 30,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 10v4h3l6 4V6l-6 4H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M17.5 9.2a3.6 3.6 0 010 5.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  "ops-calendar": {
-    hue: 225,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="4" y="5.5" width="16" height="14" rx="3" stroke="currentColor" strokeWidth="1.9" />
-        <path d="M4 9.5h16M8 4v3M16 4v3" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        <path d="M13.6 12.4h-2.1a1.2 1.2 0 000 2.4h1a1.2 1.2 0 010 2.4H10.4M12 11.6v.8M12 17.2v.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  notifications: {
-    hue: 305,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M6 10a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M10 19.5a2 2 0 004 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  directory: {
-    hue: 225,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="9" cy="8.5" r="3.1" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M3.6 19c.9-2.6 3-4 5.4-4s4.5 1.4 5.4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M16.3 6.3a2.8 2.8 0 010 5M18.2 18.8c-.3-1.3-.8-2.4-1.6-3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  suggestions: {
-    hue: 345,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 13l2.2-7.2A2 2 0 018.1 4.4h7.8a2 2 0 011.9 1.4L20 13v4.5a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 17.5V13z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M4 13h4l1.2 2.2h5.6L16 13h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  attendance: {
-    hue: 200,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.9" />
-        <path d="M12 7.5v5l3.2 2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
+  home: { hue: 185, icon: NAV_GLYPHS.home },
+  calendar: { hue: 250, icon: NAV_GLYPHS.calendar },
+  cleaning: { hue: 155, icon: NAV_GLYPHS.cleaning },
+  requests: { hue: 70, icon: NAV_GLYPHS.requests },
+  announcements: { hue: 30, icon: NAV_GLYPHS.announcements },
+  "ops-calendar": { hue: 225, icon: NAV_GLYPHS["ops-calendar"] },
+  notifications: { hue: 305, icon: NAV_GLYPHS.notifications },
+  directory: { hue: 225, icon: NAV_GLYPHS.directory },
+  suggestions: { hue: 345, icon: NAV_GLYPHS.suggestions },
+  attendance: { hue: 200, icon: NAV_GLYPHS.attendance },
 };
 
-const FALLBACK_ICON = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.8" />
-  </svg>
-);
+const FALLBACK_ICON = FALLBACK_GLYPH;
 
 
 /** Rubber-band resistance: fast start, asymptotic ceiling at MAX_DISPLAY_H. */
@@ -241,6 +155,13 @@ export function MobileShell({
   const [contentKey, setContentKey] = useState(0);
   const pathname = usePathname();
   const scrollElRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * 위 줄 작은 제목(HIG 다듬기 2차, 2026-10-19 — iOS Large Title). 화면의 큰 제목(`[data-large-title]` 또는 첫 `h1`)이
+   * 위 줄 아래로 스크롤돼 사라지면, 위 줄 가운데에 그 제목(`data-compact-title` 이 있으면 그 값)을 작게 띄운다.
+   * 맨 위로 돌아오면 다시 숨긴다. 앱 이름(「Foldy」)은 위 줄에 쓰지 않는다 — HIG 「Don't title windows with your app name」.
+   */
+  const [compactTitle, setCompactTitle] = useState("");
+  const [largeTitleGone, setLargeTitleGone] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const touchStartYRef = useRef(0);
@@ -255,6 +176,43 @@ export function MobileShell({
   // state setter fires at most once per animation frame (avoids a full subtree re-render at ~120Hz).
   const pullRafRef = useRef(0);
   const { session } = useSession();
+
+  // 큰 제목 관찰 — 화면이 바뀌거나(경로 · 탭 다시 누름) 내용이 늦게 들어와도(스트리밍) 찾을 때까지 몇 번 다시 본다.
+  useEffect(() => {
+    const root = scrollElRef.current;
+    if (!root || typeof IntersectionObserver === "undefined") return;
+    let io: IntersectionObserver | null = null;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const attach = () => {
+      const el = root.querySelector<HTMLElement>("[data-large-title], h1");
+      if (!el) {
+        // 새 화면에 큰 제목이 (아직) 없다 — 앞 화면의 작은 제목을 남기지 않는다.
+        setCompactTitle("");
+        setLargeTitleGone(false);
+        return false;
+      }
+      setCompactTitle((el.dataset.compactTitle ?? el.textContent ?? "").trim());
+      // 위 줄(64px) 아래로 완전히 지나가면 「사라짐」.
+      io = new IntersectionObserver(([entry]) => setLargeTitleGone(!entry.isIntersecting), {
+        root,
+        rootMargin: "-64px 0px 0px 0px",
+      });
+      io.observe(el);
+      return true;
+    };
+    // 첫 시도도 타이머로 — 효과 본문에서 바로 setState 하지 않는다(react-hooks/set-state-in-effect).
+    for (const ms of [0, 120, 400, 1200]) {
+      timers.push(
+        setTimeout(() => {
+          if (!io) attach();
+        }, ms),
+      );
+    }
+    return () => {
+      timers.forEach(clearTimeout);
+      io?.disconnect();
+    };
+  }, [pathname, contentKey]);
 
   // Per-user bottom-bar tabs (customized via the center "추가" editor sheet).
   const initialNavIds = resolveBottomNavItems(session?.user.bottomNavTabs).map(
@@ -843,7 +801,14 @@ export function MobileShell({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[linear-gradient(180deg,var(--background)_0%,color-mix(in_oklab,var(--background)_82%,transparent)_55%,transparent_100%)]"
               />
-              {/* 화이트 리디자인(2026-10-09): 세 줄 메뉴(가운데 짧게) · 왼쪽 「Foldy」 · 알림 · 내 이니셜 동그라미. */}
+              {/* 세 줄 메뉴(가운데 짧게) · 가운데 작은 제목(큰 제목이 스크롤로 사라졌을 때만) · 알림 · 내 이니셜 동그라미.
+                  예전 왼쪽 「Foldy」 글자는 뺐다(HIG 다듬기 2차 — 위 줄에는 앱 이름 대신 화면 이름). */}
+              <span
+                aria-hidden={!largeTitleGone}
+                className={cn("shell-title", largeTitleGone && compactTitle && "is-on")}
+              >
+                {compactTitle}
+              </span>
               <div className="relative flex h-12 w-full items-center justify-between pr-1">
                 <div className="relative z-10 flex items-center gap-1">
                   <button
@@ -856,9 +821,6 @@ export function MobileShell({
                       <path d="M3 6h18M3 12h12M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                   </button>
-                  <Link href="/mobile" className="wordmark whitespace-nowrap text-[19px] text-foreground">
-                    Foldy
-                  </Link>
                 </div>
 
                 {/* Notification bell — top-bar shortcut, left of profile */}

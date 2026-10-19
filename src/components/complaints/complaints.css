@@ -13,7 +13,7 @@
   --cx-muted: #6b6878;
   --faint: var(--text-done);
   --line: #ececf0;
-  --line-soft: #f1f1f4;
+  --line-soft: var(--separator);
   --cx-surface: #f4f4f7;
   --cx-primary: #7a52e6;
   --primary-ink: #5a30cf;

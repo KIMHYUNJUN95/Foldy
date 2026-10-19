@@ -14,7 +14,7 @@
   --mops-muted: #6b6878;
   --mops-faint: var(--text-done);
   --mops-line: #ececf0;
-  --mops-line-soft: #f1f1f4;
+  --mops-line-soft: var(--separator);
   --mops-bg2: #f7f7f9;
   --mops-we: hsl(6 70% 97.5%);
   --mops-danger: hsl(4 62% 46%);

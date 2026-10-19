@@ -18,7 +18,7 @@
   --sg-muted: #6b6878;
   --faint: var(--text-done);
   --line: #ececf0;
-  --line-soft: #f1f1f4;
+  --line-soft: var(--separator);
   --sg-surface: #f4f4f7;
   --sg-primary: #7a52e6;
   --primary-soft: color-mix(in oklab, #7a52e6 9%, #ffffff);

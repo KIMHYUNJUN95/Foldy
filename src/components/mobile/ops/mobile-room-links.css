@@ -8,7 +8,7 @@
   --mrl-ink: #16141f; --mrl-ink2: #3a3746; --mrl-soft: #6b6878; --mrl-faint: var(--text-3); --mrl-mute: #b4b1bf;
   --mrl-pri: #7a52e6; --mrl-pri-ink: #5a30cf; --mrl-sel: #f4f1fd;
   --mrl-red: #c5282e; --mrl-green: #1f7a4d; --mrl-green-bg: #e9f5ee;
-  --mrl-line: #f1f1f4; --mrl-hair: #f3f3f6; --mrl-field: #f4f4f7;
+  --mrl-line: var(--separator); --mrl-hair: var(--separator); --mrl-field: #f4f4f7;
   --mrl-ease: cubic-bezier(.23, 1, .32, 1);
   color: var(--mrl-ink);
   font-variant-numeric: tabular-nums;
@@ -34,7 +34,7 @@
 /* ── 머리 · 검색 ── */
 .mrl-h { display: flex; flex-direction: column; gap: 16px; }
 .mrl-h__t { display: flex; flex-direction: column; gap: 4px; }
-.mrl-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.mrl-h h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .mrl-h p { margin: 0; font-size: 13px; color: var(--mrl-soft); }
 .mrl-h p b { font-weight: 700; }
 .mrl-search {

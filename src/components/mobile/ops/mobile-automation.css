@@ -9,7 +9,7 @@
   --mat-ink: #16141f; --mat-ink2: #3a3746; --mat-soft: #6b6878; --mat-faint: var(--text-3); --mat-mute: #9a97a6;
   --mat-pri: #7a52e6; --mat-pri-ink: #5a30cf; --mat-pri-line: #dcd0fa; --mat-sel: #f4f1fd;
   --mat-red: #c5282e; --mat-green: #1f7a4d; --mat-dot-green: #22a06b; --mat-amber: #9a6b00;
-  --mat-line: #f1f1f4; --mat-hair: #f3f3f6; --mat-field: #f4f4f7;
+  --mat-line: var(--separator); --mat-hair: var(--separator); --mat-field: #f4f4f7;
   --mat-ease: cubic-bezier(.23, 1, .32, 1);
   --mat-spring: cubic-bezier(.34, 1.56, .64, 1);
   position: relative;
@@ -31,7 +31,7 @@
 
 /* ── 머리 · 상태 줄 ── */
 .mat-h { display: flex; flex-direction: column; gap: 10px; }
-.mat-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.mat-h h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .mat-status { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--mat-ink2); }
 .mat-hp { display: inline-flex; align-items: center; gap: 6px; color: var(--mat-ink2) !important; white-space: nowrap; }
 .mat-hp i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--mat-dot-green); }

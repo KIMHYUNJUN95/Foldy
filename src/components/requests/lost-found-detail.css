@@ -23,7 +23,7 @@
 .lfd-sheet__ic svg { width: 24px; height: 24px; }
 .lfd-sheet h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
 .lfd-sheet p { margin: 0; font-size: 14px; line-height: 1.55; color: #6b6878; }
-.lfd-sheet dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 10px; margin: 8px 0 6px; padding-top: 14px; border-top: 1px solid #f1f1f4; font-size: 14px; text-align: left; }
+.lfd-sheet dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 10px; margin: 8px 0 6px; padding-top: 14px; border-top: 1px solid var(--separator); font-size: 14px; text-align: left; }
 .lfd-sheet dt { color: var(--text-3); }
 .lfd-sheet dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
 .lfd-sheet dd b { color: #5a30cf; }

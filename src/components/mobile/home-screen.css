@@ -11,7 +11,7 @@
   --hm-muted: #6b6878;
   --hm-faint: var(--text-done);
   --hm-line: #ececf0;
-  --hm-line-soft: #f1f1f4;
+  --hm-line-soft: var(--separator);
   --hm-surface: #f4f4f7;
   --hm-primary: #7a52e6;
   --hm-primary-ink: #5a30cf;
@@ -46,14 +46,17 @@
   margin: 2px 0 18px;
 }
 .hm__greet-d {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-3);
 }
+/* 큰 제목(iOS Large Title 34/41, HIG 다듬기 2차). 인사말이 길면 두 줄로 고르게 나눈다. */
 .hm__greet-n {
-  font-size: 24px;
+  margin: 2px 0 0;
+  font-size: 34px;
+  line-height: 41px;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  margin-top: 4px;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 /* attendance hero — no card: state pill, big timer, site/time tiles, full-width button (white redesign 2026-10-09) */
@@ -107,7 +110,7 @@
   margin-top: 4px;
 }
 .hm__ch-big--timer {
-  font-size: 44px;
+  font-size: 52px;
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -156,9 +159,11 @@
 }
 
 /* sections — one sheet, a hairline between blocks */
+/* 섹션 제목 — iOS Headline(17 반굵게), HIG 다듬기 2차. */
 .hm__sectt {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0 0 12px;
 }
 .hm__sectt-row {
@@ -171,7 +176,7 @@
   margin: 0;
 }
 .hm__more {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--hm-primary);
   display: inline-flex;
@@ -200,11 +205,11 @@
 }
 .hm__stat-k {
   order: -1;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--hm-muted);
 }
 .hm__stat-v {
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -453,9 +458,9 @@
   transform: scale(0.97);
 }
 .hm__qa-ic {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -463,11 +468,11 @@
   color: var(--hm-primary);
 }
 .hm__qa-ic svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 .hm__qa-lbl {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--hm-ink-soft);
   text-align: center;
@@ -478,10 +483,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 48px;
+  min-height: 52px;
 }
 .hm__log-r + .hm__log-r {
-  border-top: 1px solid #f3f3f6;
+  border-top: 1px solid var(--separator);
+  border-image: linear-gradient(90deg, transparent 20px, var(--separator) 20px) 1;
 }
 .hm__log-ic {
   width: 8px;
@@ -501,18 +507,18 @@
   min-width: 0;
 }
 .hm__log-t {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
 }
 .hm__log-s {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--hm-muted);
   margin-top: 2px;
 }
 .hm__log-time {
   font-family: var(--hm-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 13px;
   flex: 0 0 auto;
   color: var(--text-3);
 }
@@ -538,7 +544,7 @@
   .hm__blk + .hm__blk:not(:empty) {
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid #f1f1f4;
+    border-top: 1px solid var(--separator);
   }
   .hm__blk--notice:empty {
     display: none;
@@ -629,8 +635,8 @@
   .hm__blk--stats .hm__stats { grid-template-columns: 1fr; gap: 18px; }
   .hm__blk--stats .hm__stat { display: grid; grid-template-columns: 1fr auto; align-items: center; }
   .hm__blk--stats .hm__stat-k { grid-row: 1; }
-  .hm__blk--stats .hm__stat-v { grid-row: 1; grid-column: 2; font-size: 30px; }
-  .hm__blk--log { margin-top: 22px; padding-top: 4px; border-top: 1px solid #f1f1f4; }
+  .hm__blk--stats .hm__stat-v { grid-row: 1; grid-column: 2; font-size: 34px; }
+  .hm__blk--log { margin-top: 22px; padding-top: 4px; border-top: 1px solid var(--separator); }
 }
 
 @media (min-width: 1000px) and (min-height: 600px) {

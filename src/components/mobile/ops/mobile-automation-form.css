@@ -9,7 +9,7 @@
   --maf-ink: #16141f; --maf-body: #3a3746; --maf-soft: #6b6878; --maf-faint: var(--text-3); --maf-mute: #9a97a6;
   --maf-pri: #7a52e6; --maf-pri-ink: #5a30cf; --maf-sel: #f4f1fd; --maf-sel-ink: #3a2394;
   --maf-red: #c5282e; --maf-green: #1f7a4d; --maf-amber: #9a6b00;
-  --maf-line: #f3f3f6; --maf-fill: #f7f7f9; --maf-fill2: #f4f4f7;
+  --maf-line: var(--separator); --maf-fill: #f7f7f9; --maf-fill2: #f4f4f7;
   --maf-ease: cubic-bezier(.23, 1, .32, 1);
   --maf-spring: cubic-bezier(.34, 1.56, .64, 1);
   display: flex; flex-direction: column; min-width: 0; color: var(--maf-ink);
@@ -160,7 +160,7 @@
 .maf-save.is-lifted { transform: translateY(calc(-1 * var(--maf-lift, 0px))); }
 .maf-save::before {
   content: ""; position: absolute; inset: 0 -28px -48px; z-index: -1;
-  background: #fff; box-shadow: 0 -1px 0 #f1f1f4;
+  background: #fff; box-shadow: 0 -1px 0 var(--separator);
 }
 .maf-save__t { flex: 1; min-width: 0; font-size: 12px; color: var(--maf-soft); }
 .maf-save__t b { color: var(--maf-ink); }

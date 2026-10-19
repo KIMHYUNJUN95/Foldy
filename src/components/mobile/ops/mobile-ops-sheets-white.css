@@ -580,3 +580,88 @@ details.msw-nightly[open] > summary::before { transform: rotate(90deg); }
 .msw-mv-row.on { background: #f4f1fd; }
 .msw-mv-row.on span { color: #5a30cf; }
 .msw-mv-ck { width: 18px; height: 18px; color: #7a52e6; stroke-width: 2.6; }
+
+/* ── 객실 · 날짜 옮기기(2026-10-19, 시안 「예약 옮기기 · 모바일 날짜 시안」) ───────────────────────────── */
+/* 날짜 줄 — 누르면 같은 시트 안에서 달력. 바뀌었거나 펼친 동안은 옅은 보라, 채널 예약은 자물쇠 · 회색. */
+.msw-mv-date {
+  display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 8px 0 14px; border: 0; border-radius: 14px;
+  background: #f7f7f9; font: inherit; text-align: left; color: #16141f; width: 100%;
+  transition: background-color 160ms ease, transform 120ms ease;
+}
+button.msw-mv-date:active { transform: scale(0.99); }
+.msw-mv-date.is-on { background: #f4f1fd; }
+.msw-mv-date__ic { flex: none; width: 18px; height: 18px; color: #6b6878; }
+.msw-mv-date.is-on .msw-mv-date__ic { color: #7a52e6; }
+.msw-mv-date__tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.msw-mv-date__tx b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.msw-mv-date.is-on .msw-mv-date__tx b { color: #5a30cf; }
+.msw-mv-date__tx span { font-size: 12px; color: #6b6878; }
+.msw-mv-date__tx s { color: #8b8898; }
+.msw-mv-date__act { flex: none; display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px; font-size: 13px; font-weight: 600; color: #5a30cf; }
+.msw-mv-date__act svg { width: 16px; height: 16px; stroke-width: 2.2; }
+.msw-mv-date.is-locked .msw-mv-date__ic,
+.msw-mv-date.is-locked .msw-mv-date__act { color: #8b8898; font-weight: 500; }
+.msw-mv-date.is-locked .msw-mv-date__tx b { color: #3a3746; }
+
+/* 목록 머리 — 「옮길 객실」 + 어느 날짜 기준인지. */
+.msw-mv-sec { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 0.5px solid var(--separator); }
+.msw-mv-sec span:first-child { font-size: 13px; font-weight: 600; color: #6b6878; }
+.msw-mv-sec span:last-child { font-size: 12px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.msw-mv-sec span.is-on { color: #5a30cf; font-weight: 600; }
+/* 다시 확인하는 동안 — 최종 줄과 같은 높이의 자리표시(목록이 튀지 않게). */
+.msw-mv-row.is-skel b { color: #c9c7d1; }
+.msw-mv-row.is-skel i { height: 10px; border-radius: 5px; background: linear-gradient(90deg, #f1f0f5, #e8e6ef, #f1f0f5); background-size: 200% 100%; animation: msw-skel 1.2s ease-in-out infinite; }
+@keyframes msw-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+/* 보내는 동안 — 목록을 잠그고 버튼 안에 스피너. */
+.msw-mv-list.is-sending { opacity: 0.55; pointer-events: none; transition: opacity 160ms ease; }
+.msw-mv-spin { width: 16px; height: 16px; margin-right: 8px; border-radius: 50%; border: 2px solid rgb(255 255 255 / 0.35); border-top-color: #fff; animation: msw-spin 0.8s linear infinite; vertical-align: -3px; display: inline-block; }
+@keyframes msw-spin { to { transform: rotate(360deg); } }
+
+/* 시트 안 달력 — 공용 날짜 시트(.dps)와 같은 44px 날 · 일요일 빨강 · 오늘 점, 체크인 보라 원 · 체크아웃 테두리 원 · 사이 띠. */
+.msw-mc { display: flex; flex-direction: column; gap: 4px; }
+.msw-mc-head { display: flex; align-items: center; justify-content: space-between; }
+.msw-mc-head b { font-size: 16px; letter-spacing: -0.01em; }
+.msw-mc-nav {
+  width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #3a3746;
+  display: flex; align-items: center; justify-content: center; transition: transform 140ms ease-out, background-color 140ms ease;
+}
+.msw-mc-nav:active { transform: scale(0.92); background: #f4f4f7; }
+.msw-mc-nav:disabled { color: #c9c7d1; }
+.msw-mc-dow { display: grid; grid-template-columns: repeat(7, 1fr); }
+.msw-mc-dow span { height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--text-done); }
+.msw-mc-dow span.is-sun { color: #c5282e; }
+.msw-mc-wrap { overflow: hidden; touch-action: pan-y; }
+.msw-mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.msw-mc-grid.is-next { animation: msw-mc-next 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+.msw-mc-grid.is-prev { animation: msw-mc-prev 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes msw-mc-next { from { opacity: 0; transform: translateX(28px); } }
+@keyframes msw-mc-prev { from { opacity: 0; transform: translateX(-28px); } }
+.msw-mc-cell { position: relative; height: 44px; display: flex; align-items: center; justify-content: center; }
+.msw-mc-band { position: absolute; top: 4px; bottom: 4px; left: 50%; right: 50%; background: #f4f1fd; }
+.msw-mc-band.l { left: 0; }
+.msw-mc-band.r { right: 0; }
+.msw-mc-day {
+  position: relative; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; padding: 0;
+  font: inherit; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; color: #16141f;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 140ms ease-out, background-color 160ms ease, color 160ms ease;
+}
+.msw-mc-day.is-sun { color: #c5282e; }
+.msw-mc-day.is-stay { color: #5a30cf; font-weight: 600; }
+.msw-mc-day:not(:disabled):active { transform: scale(0.9); }
+.msw-mc-day:disabled { color: #c9c7d1; }
+.msw-mc-day.is-in { background: #7a52e6; color: #fff; font-weight: 700; animation: msw-mc-pop 260ms cubic-bezier(0.23, 1, 0.32, 1); }
+.msw-mc-day.is-out { background: #fff; color: #5a30cf; font-weight: 700; box-shadow: inset 0 0 0 1.5px #7a52e6; }
+.msw-mc-day.is-today::after { content: ""; position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #7a52e6; }
+.msw-mc-day.is-in.is-today::after { background: #fff; }
+@keyframes msw-mc-pop { from { transform: scale(0.82); } }
+.msw-mc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12px; color: #6b6878; }
+.msw-mc-legend span { display: flex; align-items: center; gap: 6px; }
+.msw-mc-legend__in { width: 14px; height: 14px; border-radius: 50%; background: #7a52e6; }
+.msw-mc-legend b { font-size: 13px; font-weight: 500; color: #c9c7d1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .msw-mc-grid.is-next, .msw-mc-grid.is-prev, .msw-mc-day.is-in, .msw-mv-row.is-skel i { animation: none; }
+  .msw-mc-day, .msw-mc-nav, .msw-mv-date { transition: none; }
+  .msw-mc-day:not(:disabled):active, .msw-mc-nav:active, button.msw-mv-date:active { transform: none; }
+}

@@ -562,6 +562,12 @@
   stroke-dashoffset: 12;
   animation: mw-draw 0.32s 0.08s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
+.mops-toast.mops-toast:has(.mops-toast__life) { overflow: hidden; }
+.mops-toast .mops-toast__life {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #9b7bf0;
+  transform-origin: left center; animation: mw-life linear forwards;
+}
+@keyframes mw-life { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @keyframes mw-toast-in { from { transform: translate(-50%, 10px) scale(0.98); opacity: 0; } }
 @keyframes mw-draw { to { stroke-dashoffset: 0; } }
 /* 폴드 · 태블릿은 하단 탭 바가 없다(왼쪽 레일 · 사이드바) — 화면 바닥 가까이. */
@@ -598,6 +604,7 @@
   .mops .mops-p.pend,
   .mops .mops-m.pend { animation: none; opacity: 0.45; }
   .mops-toast .mops-toast__ok svg { animation: none; stroke-dashoffset: 0; }
+  .mops-toast .mops-toast__life { animation: none; opacity: 0; }
   .mops .mops-pill,
   .mops .mops-chip,
   .mops .mops-p,

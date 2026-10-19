@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, TriangleAlert } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, ChevronUp, Lock, TriangleAlert } from "lucide-react";
 import {
+  loadReservationMoveMonth,
   loadReservationMoveTargets,
   submitReservationMove,
   type ReservationMoveTarget,
@@ -38,6 +39,7 @@ import {
 } from "@/lib/ops-booking-edit";
 import type { OpsCalendarBar } from "@/lib/ops-calendar";
 import { stayNights } from "@/lib/ops-manual-booking";
+import { MobileMoveCalendar, addDaysKey } from "@/components/mobile/ops/mobile-move-calendar";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
 
 /**
@@ -71,6 +73,24 @@ export type MobileReservationSheetCopy = ReservationCardCopy & {
   mwCancelAsk: string;
   mwRoom: string;
   mwDone: string;
+  mvFreeHere: string;
+  mvRoomsHead: string;
+  mvDateChange: string;
+  mvDateRepick: string;
+  mvDateFold: string;
+  mvDateSame: string;
+  mvDateWas: string;
+  mvDatePicking: string;
+  mvDateLocked: string;
+  mvDateFixed: string;
+  mvCalHint: string;
+  mvCalFull: string;
+  mvCalApply: string;
+  mvCalCancel: string;
+  mvListBasis: string;
+  mvListChecking: string;
+  mvSending: string;
+  mvSubmitDate: string;
 };
 
 const CHANNEL_LABEL: Record<string, string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Direct" };
@@ -238,11 +258,13 @@ export function MobileOpsReservationSheet({
         bar={bar}
         copy={copy}
         currentRoom={moveRooms.find((room) => room.roomKey === roomKey) ?? { label: roomLabel, roomIds, roomKey }}
+        localeTag={localeTag}
         nights={nights}
         onDiscard={() => setMode("view")}
         onMoved={onMoved}
         propertyName={propertyName}
         rooms={moveRooms}
+        today={today}
       />
     );
   }
@@ -613,61 +635,113 @@ function MobileReservationEdit({
 }
 
 /**
- * 객실 옮기기 — 모바일 시트(2026-10-19, 시안 SalesMovePick-Phone). 같은 날짜에 비어 있는 같은 건물 객실로만(날짜 옮기기는 PC
- * 패널 — 모바일 날짜 고르기 시안 확정 전). 서버 동작 · 문구는 PC 와 같다(`submitReservationMove` · `reservationMoveErrorText`).
+ * 객실 옮기기 — 모바일 시트(2026-10-19, 시안 SalesMovePick-Phone · 「예약 옮기기 · 모바일 날짜 시안」).
+ *
+ * - 맨 위 **날짜 줄**: 직접 · 수기 예약은 누르면 같은 시트 안에서 달력이 펼쳐진다(`MobileMoveCalendar` — 체크인만 누르면 박수만큼
+ *   띠, 빈 객실이 하나도 없는 날은 흐리게). 「정하기」를 누르면 달력이 접히고 객실 목록을 그 날짜로 다시 확인한다(그동안 자리표시).
+ *   채널 예약은 자물쇠 · 「날짜 고정」 — 객실만.
+ * - 날짜를 옮기면 지금 객실도 후보다(「비어 있음 · 지금 객실」).
+ * - 실패하면 이유를 아래에 두고 목록을 다시 읽는다(그사이 찬 객실이 그대로 보이게). 서버 동작 · 문구는 PC 와 같다
+ *   (`submitReservationMove` · `reservationMoveErrorText`).
  */
 function MobileMoveForm({
   bar,
   copy,
   currentRoom,
+  localeTag,
   nights,
   onDiscard,
   onMoved,
   propertyName,
   rooms,
+  today,
 }: {
   bar: OpsCalendarBar;
   copy: MobileReservationSheetCopy;
   currentRoom: MoveRoom;
+  localeTag: string;
   nights: number;
   onDiscard: () => void;
   onMoved: (moved: MovedReservation) => void;
   propertyName: string;
   rooms: MoveRoom[];
+  today: string;
 }) {
-  const [targets, setTargets] = useState<Map<string, ReservationMoveTarget> | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const manual = bar.channel === "manual";
+  const [arrival, setArrival] = useState(bar.checkIn);
+  const departure = addDaysKey(arrival, nights);
+  const datesChanged = arrival !== bar.checkIn;
+  // 달력 — 펼친 동안 고르는 체크인과 보고 있는 달, 달마다 막힌 날.
+  const [calendar, setCalendar] = useState<{ draft: string; month: string } | null>(null);
+  const [fullByMonth, setFullByMonth] = useState<Map<string, Set<string>>>(() => new Map());
+  const [loaded, setLoaded] = useState<{ key: string; targets: Map<string, ReservationMoveTarget> | null } | null>(null);
+  const [reloadSeq, setReloadSeq] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // 후보 줄 — 날짜가 바뀌면 그 날짜로 다시. 날짜를 옮기면 지금 줄도 다른 날짜의 후보라 「지금 객실」로 묶지 않는다.
+  const targetsKey = `${arrival}|${reloadSeq}`;
   useEffect(() => {
     let alive = true;
     void loadReservationMoveTargets({
-      arrival: bar.checkIn,
-      currentRoomKey: currentRoom.roomKey,
-      departure: bar.checkOut,
+      arrival,
+      currentRoomKey: datesChanged ? "" : currentRoom.roomKey,
+      departure,
       reservationId: bar.id,
       rows: rooms.map((room) => ({ roomIds: room.roomIds, roomKey: room.roomKey })),
     }).then((result) => {
       if (!alive) return;
-      setTargets(result.ok ? new Map(result.targets.map((target) => [target.roomKey, target])) : new Map());
-      setLoadFailed(!result.ok);
+      setLoaded({ key: targetsKey, targets: result.ok ? new Map(result.targets.map((target) => [target.roomKey, target])) : null });
     });
     return () => {
       alive = false;
     };
-  }, [bar.id, bar.checkIn, bar.checkOut, currentRoom.roomKey, rooms]);
+  }, [arrival, departure, datesChanged, bar.id, currentRoom.roomKey, rooms, targetsKey]);
+  const checking = loaded?.key !== targetsKey;
+  const targets = checking ? null : (loaded?.targets ?? null);
+  const loadFailed = !checking && loaded?.targets === null;
+
+  // 달력이 보여 주는 달의 막힌 날 — 한 번 읽은 달은 다시 읽지 않는다.
+  const viewMonth = calendar?.month ?? null;
+  useEffect(() => {
+    if (!viewMonth || fullByMonth.has(viewMonth)) return;
+    let alive = true;
+    void loadReservationMoveMonth({
+      month: viewMonth,
+      nights,
+      reservationId: bar.id,
+      rows: rooms.map((room) => ({ roomIds: room.roomIds, roomKey: room.roomKey })),
+    }).then((result) => {
+      if (!alive || !result.ok) return;
+      setFullByMonth((previous) => new Map(previous).set(viewMonth, new Set(result.fullDays)));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [viewMonth, fullByMonth, nights, bar.id, rooms]);
 
   const pickedRoom = rooms.find((room) => room.roomKey === picked) ?? null;
   const pickedOk = !!pickedRoom && targets?.get(pickedRoom.roomKey)?.state === "free";
-  const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-  const stateText = (target: ReservationMoveTarget | undefined) => {
+  const short = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+  const range = (from: string, to: string) => `${short(from)} → ${short(to)}`;
+  const stateText = (room: MoveRoom, target: ReservationMoveTarget | undefined) => {
     if (!target) return copy.mvChecking;
     if (target.state === "current") return copy.mvCurrent;
-    if (target.state === "free") return copy.mvFree;
+    if (target.state === "free") return datesChanged && room.roomKey === currentRoom.roomKey ? copy.mvFreeHere : copy.mvFree;
     if (target.state === "unsellable") return copy.mvUnsellable;
     return target.clashGuest ? copy.mvBooked.replace("{guest}", target.clashGuest) : copy.mvBookedNoName;
+  };
+  /** 「원래 {dates}」 — 원래 날짜만 취소선. */
+  const was = (template: string) => {
+    const [before, after = ""] = template.replace("{n}", String(nights)).split("{dates}");
+    return (
+      <>
+        {before}
+        <s>{range(bar.checkIn, bar.checkOut)}</s>
+        {after}
+      </>
+    );
   };
 
   const submit = () => {
@@ -675,6 +749,8 @@ function MobileMoveForm({
     setError(null);
     startTransition(async () => {
       const result = await submitReservationMove({
+        arrival,
+        departure,
         reservationId: bar.id,
         targetRoomIds: pickedRoom.roomIds,
         targetRoomKey: pickedRoom.roomKey,
@@ -684,74 +760,204 @@ function MobileMoveForm({
           from: { arrival: bar.checkIn, departure: bar.checkOut, room: currentRoom },
           guestName: bar.guestName,
           reservationId: bar.id,
-          to: { arrival: bar.checkIn, departure: bar.checkOut, room: pickedRoom },
+          to: { arrival, departure, room: pickedRoom },
         });
         return;
       }
       setError(reservationMoveErrorText(copy, result, bar.channel));
+      // 그사이 찬 객실이 목록에 그대로 보이게 다시 읽고, 고른 것은 푼다.
+      setPicked(null);
+      setReloadSeq((seq) => seq + 1);
     });
   };
+
+  const draftOut = calendar ? addDaysKey(calendar.draft, nights) : departure;
+  const opened = calendar !== null;
+  const shownIn = opened ? calendar.draft : arrival;
+  const shownOut = opened ? draftOut : departure;
+  const moved = opened ? calendar.draft !== bar.checkIn : datesChanged;
 
   return (
     <div className="msw">
       <div className="msw-body">
         <div className="msw-step" key="move">
           <div className="msw-mv-head">
-            <b>{copy.mvTitle.replace("{guest}", bar.guestName)}</b>
+            <b>{(manual ? copy.mvTitleManual : copy.mvTitle).replace("{guest}", bar.guestName)}</b>
             <span>
-              {[CHANNEL_NAME[bar.channel] || null, `${propertyName} ${currentRoom.label}`, `${md(bar.checkIn)} → ${md(bar.checkOut)}`, copy.mvKeepDates.replace("{in} → {out} · ", "").replace("{n}", String(nights))]
+              {[CHANNEL_NAME[bar.channel] || null, `${propertyName} ${currentRoom.label}`, range(bar.checkIn, bar.checkOut), copy.rcNights.replace("{n}", String(nights))]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
           </div>
-          <p className="msw-mv-note">{bar.channel === "manual" ? copy.mvManualNote : copy.mvChannelNote}</p>
-          <div aria-label={copy.mvPick} className="msw-mv-list" role="radiogroup">
-            {rooms.map((room) => {
-              const target = targets?.get(room.roomKey);
-              const free = target?.state === "free";
-              const on = free && picked === room.roomKey;
-              return free ? (
-                <button
-                  aria-checked={on}
-                  className={`msw-mv-row is-free${on ? " on" : ""}`}
-                  disabled={pending}
-                  key={room.roomKey}
-                  onClick={() => setPicked(room.roomKey)}
-                  role="radio"
-                  type="button"
-                >
-                  <b>{room.label}</b>
-                  <span>{stateText(target)}</span>
-                  {on && <Check aria-hidden className="msw-mv-ck" />}
-                </button>
-              ) : (
-                <div aria-disabled="true" className="msw-mv-row" key={room.roomKey}>
-                  <b>{room.label}</b>
-                  <span>{stateText(target)}</span>
-                </div>
-              );
-            })}
-          </div>
-          {loadFailed && (
-            <div className="msw-alert" role="alert">
-              {copy.mvErrLoad}
+
+          {manual ? (
+            <button
+              aria-expanded={opened}
+              className={`msw-mv-date${opened || datesChanged ? " is-on" : ""}`}
+              disabled={pending}
+              onClick={() => {
+                setCalendar(opened ? null : { draft: arrival, month: arrival.slice(0, 7) < today.slice(0, 7) ? today.slice(0, 7) : arrival.slice(0, 7) });
+                setError(null);
+              }}
+              type="button"
+            >
+              <CalendarDays aria-hidden className="msw-mv-date__ic" />
+              <span className="msw-mv-date__tx">
+                <b>
+                  {mdWeekday(shownIn, localeTag)} → {mdWeekday(shownOut, localeTag)}
+                </b>
+                <span>{opened ? (moved ? was(copy.mvDatePicking) : copy.mvDateSame.replace("{n}", String(nights))) : datesChanged ? was(copy.mvDateWas) : copy.mvDateSame.replace("{n}", String(nights))}</span>
+              </span>
+              <span className="msw-mv-date__act">
+                {opened ? copy.mvDateFold : datesChanged ? copy.mvDateRepick : copy.mvDateChange}
+                {opened ? <ChevronUp aria-hidden /> : <ChevronRight aria-hidden />}
+              </span>
+            </button>
+          ) : (
+            <div aria-disabled="true" className="msw-mv-date is-locked">
+              <Lock aria-hidden className="msw-mv-date__ic" />
+              <span className="msw-mv-date__tx">
+                <b>
+                  {mdWeekday(bar.checkIn, localeTag)} → {mdWeekday(bar.checkOut, localeTag)}
+                </b>
+                <span>{copy.mvDateLocked.replace("{channel}", CHANNEL_NAME[bar.channel] || bar.channel)}</span>
+              </span>
+              <span className="msw-mv-date__act">{copy.mvDateFixed}</span>
             </div>
           )}
-          {error && (
-            <div className="msw-alert" role="alert">
-              {error}
-            </div>
+
+          {opened ? (
+            <>
+              <MobileMoveCalendar
+                arrival={calendar.draft}
+                fullDays={fullByMonth.get(calendar.month) ?? null}
+                labels={{
+                  checkIn: copy.mbCheckIn,
+                  checkOut: copy.mbCheckOut,
+                  full: copy.mvCalFull,
+                  nextMonth: copy.dateNext,
+                  prevMonth: copy.datePrev,
+                }}
+                locale={localeTag}
+                month={calendar.month}
+                nights={nights}
+                onMonth={(month) => setCalendar((current) => (current ? { ...current, month } : current))}
+                onPick={(draft) => setCalendar((current) => (current ? { ...current, draft } : current))}
+                today={today}
+              />
+              <div className="msw-mc-legend">
+                <span>
+                  <i aria-hidden className="msw-mc-legend__in" />
+                  {copy.mvCalHint.replace("{n}", String(nights))}
+                </span>
+                <span>
+                  <b aria-hidden>14</b>
+                  {copy.mvCalFull}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="msw-mv-sec">
+                <span>{copy.mvRoomsHead}</span>
+                <span className={datesChanged && !checking ? "is-on" : undefined} role={checking ? "status" : undefined}>
+                  {(checking ? copy.mvListChecking : copy.mvListBasis).replace("{dates}", range(arrival, departure))}
+                </span>
+              </div>
+              <div aria-busy={checking || pending} aria-label={copy.mvPick} className={`msw-mv-list${pending ? " is-sending" : ""}`} role="radiogroup">
+                {rooms.map((room, index) => {
+                  if (checking) {
+                    return (
+                      <div aria-hidden className="msw-mv-row is-skel" key={room.roomKey}>
+                        <b>{room.label}</b>
+                        <i style={{ width: 70 + (index % 3) * 24 }} />
+                      </div>
+                    );
+                  }
+                  const target = targets?.get(room.roomKey);
+                  const free = target?.state === "free";
+                  const on = free && picked === room.roomKey;
+                  return free ? (
+                    <button
+                      aria-checked={on}
+                      className={`msw-mv-row is-free${on ? " on" : ""}`}
+                      disabled={pending}
+                      key={room.roomKey}
+                      onClick={() => {
+                        setPicked(room.roomKey);
+                        setError(null);
+                      }}
+                      role="radio"
+                      type="button"
+                    >
+                      <b>{room.label}</b>
+                      <span>{stateText(room, target)}</span>
+                      {on && <Check aria-hidden className="msw-mv-ck" />}
+                    </button>
+                  ) : (
+                    <div aria-disabled="true" className="msw-mv-row" key={room.roomKey}>
+                      <b>{room.label}</b>
+                      <span>{stateText(room, target)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {loadFailed && (
+                <div className="msw-alert" role="alert">
+                  {copy.mvErrLoad}
+                </div>
+              )}
+              {error && (
+                <div className="msw-alert" role="alert">
+                  {error}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
-      <div className="msw-foot even">
-        <button className="msw-btn ghost" disabled={pending} onClick={onDiscard} type="button">
-          {copy.mvKeep}
-        </button>
-        <button className="msw-btn" disabled={pending || !pickedOk} onClick={submit} type="button">
-          {pending ? copy.mvPending : pickedRoom ? copy.mvSubmit.replace("{room}", pickedRoom.label) : copy.mvPick}
-        </button>
-      </div>
+      {opened ? (
+        <div className="msw-foot two">
+          <button className="msw-btn ghost" onClick={() => setCalendar(null)} type="button">
+            {copy.mvCalCancel}
+          </button>
+          <button
+            className="msw-btn"
+            onClick={() => {
+              if (calendar.draft !== arrival) {
+                setArrival(calendar.draft);
+                setPicked(null);
+              }
+              setCalendar(null);
+            }}
+            type="button"
+          >
+            {copy.mvCalApply.replace("{dates}", range(calendar.draft, draftOut))}
+          </button>
+        </div>
+      ) : (
+        <div className="msw-foot two">
+          <button className="msw-btn ghost" disabled={pending} onClick={onDiscard} type="button">
+            {copy.mvKeep}
+          </button>
+          <button className="msw-btn" disabled={pending || checking || !pickedOk} onClick={submit} type="button">
+            {pending ? (
+              <>
+                <span aria-hidden className="msw-mv-spin" />
+                {copy.mvSending}
+              </>
+            ) : pickedRoom && pickedOk ? (
+              datesChanged ? (
+                copy.mvSubmitDate.replace("{room}", pickedRoom.label).replace("{in}", short(arrival))
+              ) : (
+                copy.mvSubmit.replace("{room}", pickedRoom.label)
+              )
+            ) : (
+              copy.mvPick
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

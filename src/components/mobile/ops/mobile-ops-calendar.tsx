@@ -8,7 +8,9 @@ import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   revertBlockChange,
   revertPriceJob,
+  submitReservationMove,
 } from "@/app/admin/ops/calendar/actions";
+import { reservationMoveErrorText, type MovedReservation } from "@/components/admin/ops/ops-reservation-move";
 import { fetchOpsCellHistory, fetchOpsPriceConversions } from "@/components/admin/ops/ops-reads";
 import { MobileOpsBlockSheet } from "@/components/mobile/ops/mobile-ops-block-sheet";
 import { MobileOpsBookingSheet } from "@/components/mobile/ops/mobile-ops-booking-sheet";
@@ -546,6 +548,24 @@ export function MobileOpsCalendar({
    * 한 번에 하나 — 새 쓰기가 오면 그걸로 바뀐다.
    */
   const [toast, setToast] = useState<MobileToast | null>(null);
+  // 예약 옮기기 되돌리기 — 원래 객실 · 날짜로 같은 서버 동작을 한 번 더(PC 격자의 undoMove 와 같다).
+  const undoMove = (moved: MovedReservation) => {
+    showToast({ kind: "undoing", text: copy.mvPending });
+    void submitReservationMove({
+      arrival: moved.from.arrival,
+      departure: moved.from.departure,
+      reservationId: moved.reservationId,
+      targetRoomIds: moved.from.room.roomIds,
+      targetRoomKey: moved.from.room.roomKey,
+    }).then((result) => {
+      if (result.ok) {
+        showToast({ kind: "done", text: copy.mvUndone });
+        startRefresh(() => router.refresh());
+      } else {
+        showToast({ kind: "info", text: copy.mvUndoFailed.replace("{reason}", reservationMoveErrorText(copy, result, "manual")) });
+      }
+    });
+  };
   const toastSeqRef = useRef(0);
   /** 결과 한 줄(되돌리기 없는 것 — 예약 저장 · 취소 · 만듦). */
   const showToast = (next: Omit<MobileToast, "id" | "count"> & { count?: number }) => {
@@ -1841,6 +1861,8 @@ export function MobileOpsCalendar({
                     if (result.ok) setOverlay({ kind: "reservation", placement: result.placement });
                   });
                 }
+              : toast.kind === "done" && toast.move
+              ? () => undoMove(toast.move!)
               : toast.kind === "done" && (toast.jobId || toast.blockAt)
               ? () => void undoWrite({ blockAt: toast.blockAt, jobId: toast.jobId }, toast.count)
               : toast.kind === "partial" || toast.kind === "failed"
@@ -2139,12 +2161,15 @@ export function MobileOpsCalendar({
               moveRooms={moveRooms}
               onMoved={(moved) => {
                 close();
+                const datesMoved = moved.to.arrival !== moved.from.arrival;
                 showToast({
                   kind: "done",
-                  text: copy.mvDone
+                  move: moved,
+                  text: (datesMoved ? copy.mvDoneDate : copy.mvDone)
                     .replace("{guest}", moved.guestName)
                     .replace("{from}", moved.from.room.label)
-                    .replace("{to}", moved.to.room.label),
+                    .replace("{to}", moved.to.room.label)
+                    .replace("{in}", `${Number(moved.to.arrival.slice(5, 7))}/${Number(moved.to.arrival.slice(8, 10))}`),
                 });
                 startRefresh(() => router.refresh());
               }}

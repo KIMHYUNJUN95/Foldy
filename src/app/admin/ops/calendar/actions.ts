@@ -27,6 +27,7 @@ import {
   beds24UnsellableNights,
   classifyBookingCreateError,
   manualBookingLockName,
+  MAX_STAY_NIGHTS,
   readBeds24CancelTargetId,
   resolveStayUnit,
   splitGuestName,
@@ -1328,6 +1329,71 @@ export async function loadReservationMoveTargets(args: {
     };
   } catch (error) {
     console.error("[ops/reservation-move] targets read failed", error);
+    return { error: "read_failed", ok: false };
+  }
+}
+
+/**
+ * 모바일 「객실 · 날짜 옮기기」 달력 — 한 달 동안 **그날 체크인하면 박수만큼 비어 있는 객실이 하나도 없는 날**(2026-10-19,
+ * 시안 「예약 옮기기 · 모바일 날짜 시안」). 같은 건물 줄 전부(지금 줄 포함 — 날짜를 옮기면 지금 객실도 후보)를 본다.
+ * 지난 날은 화면이 막는다. 미리 보여 주기일 뿐, 최종 판정은 `submitReservationMove`.
+ */
+export async function loadReservationMoveMonth(args: {
+  reservationId: string;
+  /** `YYYY-MM`. */
+  month: string;
+  nights: number;
+  rows: Array<{ roomKey: string; roomIds: string[] }>;
+}): Promise<{ ok: true; fullDays: string[] } | { ok: false; error: "forbidden" | "bad_range" | "read_failed" }> {
+  const session = await requireOpsWriter();
+  if (!session) return { error: "forbidden", ok: false };
+  if (!/^\d{4}-\d{2}$/.test(args.month) || !Number.isInteger(args.nights) || args.nights < 1 || args.nights > MAX_STAY_NIGHTS) {
+    return { error: "bad_range", ok: false };
+  }
+  if (args.rows.length === 0 || args.rows.length > 80) return { error: "bad_range", ok: false };
+  const [year, month] = args.month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const from = `${args.month}-01`;
+  // 날짜 문자열끼리만 더한다(도쿄 운영일 — 정오 UTC 로 두면 하루가 밀리지 않는다).
+  const addDays = (date: string, days: number) => {
+    const at = new Date(`${date}T12:00:00Z`);
+    at.setUTCDate(at.getUTCDate() + days);
+    return at.toISOString().slice(0, 10);
+  };
+  const toExclusive = addDays(`${args.month}-${String(lastDay).padStart(2, "0")}`, args.nights);
+  const supabase = getSupabaseServiceClient();
+  const owned = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("organization_id", session.organization.id)
+    .in("id", [...new Set(args.rows.flatMap((row) => row.roomIds))]);
+  if (owned.error) return { error: "read_failed", ok: false };
+  const ownedIds = new Set((owned.data ?? []).map((row) => row.id as string));
+  const rows = args.rows
+    .map((row) => ({ roomIds: row.roomIds.filter((id) => ownedIds.has(id)), roomKey: row.roomKey }))
+    .filter((row) => row.roomIds.length > 0);
+  try {
+    const byKey = await readOpsMoveTargets({
+      excludeReservationId: args.reservationId,
+      from,
+      organizationId: session.organization.id,
+      rows,
+      supabase,
+      toExclusive,
+    });
+    const taken = rows.map((row) => {
+      const info = byKey.get(row.roomKey);
+      return new Set([...(info?.booked ?? []), ...(info?.unsellable ?? [])]);
+    });
+    const fullDays: string[] = [];
+    for (let day = 1; day <= lastDay; day += 1) {
+      const arrival = `${args.month}-${String(day).padStart(2, "0")}`;
+      const stay = stayNights(arrival, addDays(arrival, args.nights));
+      if (!taken.some((set) => stay.every((night) => !set.has(night)))) fullDays.push(arrival);
+    }
+    return { fullDays, ok: true };
+  } catch (error) {
+    console.error("[ops/reservation-move] month read failed", error);
     return { error: "read_failed", ok: false };
   }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { haptic } from "@/lib/haptics";
+import type { MovedReservation } from "@/components/admin/ops/ops-reservation-move";
 
 /**
  * 모바일 판매 캘린더 알림 — 시안 `3a 가격 시트 v3` 의 3e · 3f(2026-10-02 사용자 확정).
@@ -28,6 +29,8 @@ export type MobileToast = {
   doneText?: string;
   /** 방금 만든 예약 — 완료 알림의 「열기」가 그 상세를 연다. */
   openReservationId?: string;
+  /** 방금 옮긴 예약 — 완료 알림의 「되돌리기」가 원래 객실 · 날짜로 다시 옮긴다(`submitReservationMove`). */
+  move?: MovedReservation;
 };
 
 export type MobileToastCopy = {
@@ -134,6 +137,10 @@ export function MobileOpsToast({
           {action}
         </button>
       )}
+      {/* 되돌릴 수 있는 시간 — 알약 아래 가는 줄이 사라질 때까지 줄어든다(완료 + 되돌리기일 때만). */}
+      {toast.kind === "done" && action === copy.undo && wait ? (
+        <i aria-hidden="true" className="mops-toast__life" style={{ animationDuration: `${wait}ms` }} />
+      ) : null}
     </div>,
     document.body,
   );

@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — 모바일 예약 옮기기: 날짜도 옮기기 · 되돌리기
+
+- 판매 캘린더 모바일 「객실 옮기기」 시트에 날짜 줄 → 같은 시트 안 달력(체크인만 누르면 박수만큼 띠 · 빈 객실 없는 날 흐리게 · 다른 달로 넘김).
+  직접 · 수기 예약만, 채널 예약은 「날짜 고정」. 날짜를 정하면 객실 목록을 그 날짜로 다시 확인. 폰 · 폴드 · 태블릿(가운데 카드) 같은 흐름.
+- 완료 알림에 「되돌리기」(6초, 알약 아래 줄어드는 줄). 서버: `loadReservationMoveMonth`(달마다 막힌 체크인 날). 시안 https://claude.ai/artifact/2xEDVTLf9KbjQEDkPqKCCm.
+  상세: `docs/product/33-calendar-write-features.md` → 「예약 옮기기」.
+
 ## 2026-10-19 — 빠른 진입에도 로고가 보이게 (모바일 · PC)
 
 - 같은 날 두 번째부터의 진입(흰 바탕 0.3초)이 흰 화면 위라 안 보였다(아이폰 홈 화면 앱에서 사용자 지적). 이제 이미 모인 로고를 가운데 약 0.4초 →

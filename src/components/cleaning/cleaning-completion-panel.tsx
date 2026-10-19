@@ -102,7 +102,7 @@ export function CleaningCompletionPanel({
         <div className="cln-active__ringwrap">
           <div className="cln-ring">
             <svg aria-hidden="true" viewBox="0 0 200 200">
-              <circle cx="100" cy="100" fill="none" r="88" stroke="#ede7fc" strokeWidth="12" />
+              <circle cx="100" cy="100" fill="none" r="88" stroke="#ede7fc" strokeWidth="10" />
               <circle
                 cx="100"
                 cy="100"
@@ -111,7 +111,7 @@ export function CleaningCompletionPanel({
                 stroke="#7a52e6"
                 strokeDasharray={`${ringFill} ${RING}`}
                 strokeLinecap="round"
-                strokeWidth="12"
+                strokeWidth="10"
                 transform="rotate(-90 100 100)"
               />
             </svg>

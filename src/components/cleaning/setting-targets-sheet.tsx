@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, useSyncExternalStore } from "react";
+import { ChevronRight } from "lucide-react";
 import { startCleaningSession } from "@/app/mobile/cleaning/actions";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -58,8 +59,10 @@ export function SettingTargetsSheet({
         onClick={() => setOpen(true)}
         type="button"
       >
-        <span className="text-2xl font-black leading-none tracking-[-0.04em] text-slate-950 underline decoration-2 underline-offset-4">
+        {/* HIG 2차(2026-10-19): 밑줄 대신 회색 › — 숫자를 누르면 목록이 열린다는 표시 */}
+        <span className="inline-flex items-center gap-0.5">
           {count}
+          <ChevronRight className="size-4 text-[#b4b1bf]" strokeWidth={2.4} aria-hidden="true" />
         </span>
       </button>
 

@@ -62,7 +62,7 @@ export function LostFoundConfirmModal({
       {() => (
         <>
           <div className="py-3">
-            <div className="divide-y divide-border/70 rounded-2xl border border-white/45 bg-background/55 shadow-[inset_0_1px_1px_rgba(255,255,255,0.62)] backdrop-blur-sm">
+            <div className="divide-y-[0.5px] divide-[var(--separator)] rounded-2xl border border-white/45 bg-background/55 shadow-[inset_0_1px_1px_rgba(255,255,255,0.62)] backdrop-blur-sm">
               {rows.map((row) => (
                 <div
                   className="flex items-center justify-between gap-3 px-3.5 py-2.5"

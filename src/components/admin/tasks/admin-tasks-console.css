@@ -29,7 +29,7 @@
 
 .adm .tempty__s { font-size: 13px; color: var(--adm-muted); margin: 7px 0 0; line-height: 1.6; max-width: 340px; }
 
-.adm .dp__top { display: flex; align-items: center; gap: 8px; padding: 13px 18px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.adm .dp__top { display: flex; align-items: center; gap: 8px; padding: 13px 18px; border-bottom: 0.5px solid var(--separator); flex: 0 0 auto; }
 .adm .dp__crumb { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--adm-muted); display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .adm .dp__crumb .ic { font-size: 15px; }
 .adm .dp__crumb b { color: var(--ink-soft); }
@@ -109,7 +109,7 @@
 .adm .undobar__x:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
 @media (prefers-reduced-motion: reduce) { .adm .undobar { animation: none; } }
 .adm .sch { width: 320px; transform-origin: top left; }
-.adm .sch__label { padding: 14px 16px 10px; text-align: center; border-bottom: 1px solid var(--line-soft); }
+.adm .sch__label { padding: 14px 16px 10px; text-align: center; border-bottom: 0.5px solid var(--separator); }
 .adm .sch__label b { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; }
 .adm .sch__label span { display: block; font-size: 11.5px; font-weight: 600; color: var(--adm-muted); margin-top: 2px; }
 .adm .sch__quick { padding: 6px; }
@@ -124,7 +124,7 @@
 .adm .qopt--none .qopt__ic { color: var(--faint); }
 .adm .qopt__t { flex: 1; }
 .adm .qopt__d { font-size: 12px; font-weight: 700; color: var(--faint); font-variant-numeric: tabular-nums; }
-.adm .sch__cal { padding: 6px 12px 10px; border-top: 1px solid var(--line-soft); }
+.adm .sch__cal { padding: 6px 12px 10px; border-top: 0.5px solid var(--separator); }
 .adm .cal-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px 8px; }
 .adm .cal-head b { font-size: 13.5px; font-weight: 800; letter-spacing: -0.01em; }
 .adm .cal-nav { width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; }
@@ -144,7 +144,7 @@
 .adm .cal-c.today::after { content: ""; position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 999px; background: var(--adm-primary); }
 .adm .cal-c.sel { background: var(--adm-primary); color: #fff; font-weight: 800; }
 .adm .cal-c.sel::after { display: none; }
-.adm .sch__exp { border-top: 1px solid var(--line-soft); }
+.adm .sch__exp { border-top: 0.5px solid var(--separator); }
 .adm .exp-h { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 16px; border: none; background: transparent; text-align: left; font-size: 13px; font-weight: 700; }
 .adm .exp-h:hover { background: var(--adm-surface); }
 .adm .exp-h .ic { font-size: 17px; color: var(--adm-muted); flex: 0 0 auto; }
@@ -190,7 +190,7 @@
 .adm .wdchip:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: 2px; }
 .adm .wdpick__hint { margin: 8px 2px 0; font-size: 11.5px; font-weight: 600; color: var(--adm-muted); }
 @media (prefers-reduced-motion: reduce) { .adm .wdchip:active { transform: none; } }
-.adm .sch__foot { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line-soft); background: var(--card2); }
+.adm .sch__foot { display: flex; gap: 8px; padding: 10px 12px; border-top: 0.5px solid var(--separator); background: var(--card2); }
 .adm .sch__foot .btn { flex: 1; }
 .adm .shp { width: 320px; transform-origin: top left; }
 .adm .shp__h { padding: 13px 16px 6px; }
@@ -213,7 +213,7 @@
 .adm .ucheck svg { width: 12px; height: 12px; opacity: 0; }
 .adm .urow.on .ucheck { background: var(--adm-primary); border-color: var(--adm-primary); }
 .adm .urow.on .ucheck svg { opacity: 1; }
-.adm .shp__foot { padding: 10px 12px; border-top: 1px solid var(--line-soft); background: var(--card2); }
+.adm .shp__foot { padding: 10px 12px; border-top: 0.5px solid var(--separator); background: var(--card2); }
 .adm .shp__foot .btn { width: 100%; }
 .adm .shp__hint { display: flex; align-items: flex-start; gap: 8px; margin: 2px 16px 8px; padding: 8px 10px; border-radius: 10px; background: var(--primary-soft); font-size: 11px; font-weight: 600; color: var(--primary-ink); line-height: 1.45; }
 .adm .shp__hint .ic { font-size: 14px; flex: 0 0 auto; margin-top: 1px; }
@@ -223,7 +223,7 @@
 .adm .mitem .ic { font-size: 17px; color: var(--adm-muted); flex: 0 0 auto; }
 .adm .mitem--warn { color: var(--danger); }
 .adm .mitem--warn .ic { color: var(--danger); }
-.adm .msep { height: 1px; background: var(--line-soft); margin: 5px 6px; }
+.adm .msep { height: 0.5px; background: var(--separator); margin: 5px 6px; }
 
 /* ── 토스트 ── */
 .adm #toastLayer { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: 8px; align-items: center; }
@@ -391,10 +391,10 @@
    콘솔의 `.mitem` 메뉴와 같은 계열로 보이되, 부제·셰브런이 있어 한 단계 더 무겁게 읽힌다. */
 .adm .rcm { width: 372px; max-width: 92vw; overflow: hidden; }
 .adm .rcm__title { margin: 0; padding: 14px 18px 12px; font-size: 14.5px; font-weight: 800; line-height: 1.4; letter-spacing: -0.01em; color: var(--ink); }
-.adm .rcm__opts { border-top: 1px solid var(--line-soft); }
+.adm .rcm__opts { border-top: 0.5px solid var(--separator); }
 
 .adm .rcopt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 18px; border: none; background: transparent; text-align: left; cursor: pointer; color: var(--ink); transition: background .14s ease; }
-.adm .rcopt + .rcopt { border-top: 1px solid var(--line-soft); }
+.adm .rcopt + .rcopt { border-top: 0.5px solid var(--separator); }
 .adm .rcopt:hover { background: var(--adm-surface); }
 
 .adm .rcopt__ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--adm-primary); transition: background .14s ease, color .14s ease; }

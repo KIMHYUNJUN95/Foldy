@@ -382,7 +382,7 @@
   display: flex;
   /* **불투명해야 한다.** 붙어 있는 동안 아래 객실 줄이 비쳐 보이면 숫자가 겹쳐 읽힌다. */
   background: var(--card2);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0.5px solid var(--separator);
   position: sticky;
   top: 0;
   z-index: 6;
@@ -448,7 +448,7 @@
 .opsg__months {
   display: flex;
   height: 22px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0.5px solid var(--separator);
 }
 /* **칸에는 여백을 주지 않는다** — `flex-basis: 0` 이어도 좌우 padding 은 비율 계산 전에 먼저 잡혀,
    짧은 달(2일)이 날짜 칸보다 넓어지고 경계선이 몇 px 어긋났다(2026-09-30). 여백은 글씨(span)에. */
@@ -489,7 +489,7 @@
   gap: 7px;
   padding: 5px 11px;
   background: var(--bg2);
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
   font-size: 10.5px;
   font-weight: 800;
   color: var(--adm-muted);
@@ -499,7 +499,7 @@
 .opsg__gcount { color: var(--faint); font-weight: 600; }
 
 .opsg__row { display: flex; }
-.opsg__row + .opsg__row { border-top: 1px solid #f7f7f9; }
+.opsg__row + .opsg__row { border-top: 0.5px solid var(--separator); }
 
 .opsg__label {
   width: var(--ops-roomcol);
@@ -696,7 +696,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px solid #f7f7f9;
+  border-top: 0.5px solid var(--separator);
   pointer-events: none;
 }
 .opsg__block {
@@ -1052,7 +1052,7 @@
   overflow: hidden;
 }
 
-.opsp__head { padding: 13px 15px 12px; border-bottom: 1px solid var(--line-soft); }
+.opsp__head { padding: 13px 15px 12px; border-bottom: 0.5px solid var(--separator); }
 .opsp__title { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; }
 /* **무엇을 고치는가.** 「9칸」만으로는 어느 방 어느 날인지 모른 채 적용하게 된다. */
 .opsp__target {
@@ -1096,7 +1096,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 9px 11px 7px;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
   background: var(--card);
 }
 .opspl__title { font-size: 11.5px; font-weight: 800; color: var(--ink); }
@@ -1315,7 +1315,7 @@
 /* 가격 패널의 「1박으로」 버튼은 없앴다(2026-10-02 사용자 지시 — 가격 수정에는 있으면 안 되고 최소숙박 패널에만). */
 
 /* 두 버튼은 **크기가 다르다** — 나아가는 쪽이 커야 어느 쪽이 기본인지 읽힌다. */
-.opsp__foot { display: flex; gap: 8px; padding: 12px 15px; border-top: 1px solid var(--line-soft); }
+.opsp__foot { display: flex; gap: 8px; padding: 12px 15px; border-top: 0.5px solid var(--separator); }
 .opsp__btn {
   flex: 1;
   height: 38px;
@@ -1541,7 +1541,7 @@
   padding: 7px 10px;
   font-size: 11px;
 }
-.opsms__trw + .opsms__trw { border-top: 1px solid var(--line-soft); }
+.opsms__trw + .opsms__trw { border-top: 0.5px solid var(--separator); }
 /* 건물 → 방 → 날짜. 건물은 흐리게, 방이 주인공이다. */
 .opsms__bld {
   flex: 1 1 auto;
@@ -2041,7 +2041,7 @@
   font-size: 10.5px;
   font-weight: 800;
   color: var(--muted);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0.5px solid var(--separator);
 }
 .opsbk__nightly td {
   padding: 4px 0;
@@ -2179,7 +2179,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 7px 0;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
 }
 .opsrp__row:last-child { border-bottom: none; }
 .opsrp__row dt { flex: 0 0 104px; font-size: 12px; font-weight: 700; color: var(--muted); }
@@ -2421,7 +2421,7 @@
   gap: 12px;
   padding: 10px 4px;
   border: none;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
   background: none;
   text-align: left;
   cursor: pointer;
@@ -2497,7 +2497,7 @@
   flex-direction: column;
   gap: 6px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
 }
 .opshc__where { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .opshc__room {
@@ -2705,7 +2705,7 @@
 .opshs__item {
   position: relative;
   padding: 12px 2px 12px 14px;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
 }
 .opshs__item:last-child { border-bottom: none; }
 /* 왼쪽 가는 막대 — 출처(변경 이력) 또는 상태(전송)를 한눈에 */
@@ -2942,7 +2942,7 @@
 .opshs__cells th,
 .opshs__cells td {
   padding: 5px 6px;
-  border-top: 1px solid var(--line-soft);
+  border-top: 0.5px solid var(--separator);
   vertical-align: baseline;
   font-variant-numeric: tabular-nums;
 }
@@ -3171,7 +3171,7 @@ button.ops__gapbtn:focus-visible { outline: 2px solid var(--danger); outline-off
   gap: 12px;
   padding: 16px 18px 14px 24px;
   background: var(--card);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0.5px solid var(--separator);
 }
 .opsss__headmain { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 auto; }
 .opsss__titlerow { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
@@ -3429,7 +3429,7 @@ button.ops__gapbtn:focus-visible { outline: 2px solid var(--danger); outline-off
   flex: 1 1 0;
   padding: 11px 16px;
 }
-.opsss__flowstep + .opsss__flowstep { border-top: 1px solid var(--line-soft); }
+.opsss__flowstep + .opsss__flowstep { border-top: 0.5px solid var(--separator); }
 .opsss__flowstep.net { background: var(--primary-soft); }
 .opsss__op {
   flex: none;
@@ -3560,7 +3560,7 @@ button.ops__gapbtn:focus-visible { outline: 2px solid var(--danger); outline-off
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
 }
 .opsss__table th:first-child,
 .opsss__table td:first-child { padding-left: 4px; text-align: left; }
@@ -3784,7 +3784,7 @@ button.ops__gapbtn:focus-visible { outline: 2px solid var(--danger); outline-off
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2px 14px;
     padding: 10px 4px;
-    border-bottom: 1px solid var(--line-soft);
+    border-bottom: 0.5px solid var(--separator);
   }
   .opsss__ptable tr > * { border: none !important; padding: 2px 0 !important; text-align: right; }
   .opsss__ptable tr > .c-name { grid-column: 1 / -1; text-align: left; padding-bottom: 4px !important; }

@@ -338,7 +338,7 @@ export function TaskSchedulePicker({
             </div>
 
             {/* Inline month calendar */}
-            <div className="mt-2 border-t border-slate-100 pt-3">
+            <div className="mt-2 border-t-[0.5px] border-[var(--separator)] pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <button
                   aria-label={copy.calPrevMonth}
@@ -372,7 +372,7 @@ export function TaskSchedulePicker({
             {!isDate ? (
               <>
             {/* Time */}
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t-[0.5px] border-[var(--separator)] pt-3">
               <button
                 aria-expanded={timeOpen}
                 className={cn(rowBtn, !hasDate && "opacity-50")}
@@ -500,7 +500,7 @@ export function TaskSchedulePicker({
             </div>
 
             {/* Repeat */}
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t-[0.5px] border-[var(--separator)] pt-3">
               <button
                 aria-expanded={repeatOpen}
                 className={cn(rowBtn, !hasDate && "opacity-50")}

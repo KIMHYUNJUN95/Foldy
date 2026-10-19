@@ -103,7 +103,7 @@
 .adm .rcw-dr .tr i { position: absolute; top: 0; bottom: 0; animation: ocw-fill 600ms var(--ocw-ease) both; animation-delay: calc(160ms + var(--i, 0) * 40ms); }
 .adm .rcw-dr .tr i.up { border-radius: 0 5px 5px 0; background: var(--ocw-v); transform-origin: left center; }
 .adm .rcw-dr .tr i.dn { border-radius: 5px 0 0 5px; background: var(--ocw-red-bar); transform-origin: right center; }
-.adm .rcw-dr.is-total { padding-top: 10px; border-top: 1px solid #e6e6eb; }
+.adm .rcw-dr.is-total { padding-top: 10px; border-top: 0.5px solid var(--separator); }
 .adm .rcw-dr.is-total .nm { font-weight: 700; color: var(--ocw-ink); }
 .adm .rcw-dr.is-total .y { text-align: right; font-size: 12px; color: var(--ocw-faint); white-space: nowrap; }
 .adm .rcw-dr.is-total .rcw-n.z { color: var(--ocw-ink); }
@@ -111,7 +111,7 @@
 
 /* ── 지표 넷 ── */
 .adm .rcw-kpis { margin-top: 20px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
-.adm .rcw-kpi { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid var(--ocw-line); min-width: 0; }
+.adm .rcw-kpi { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 0.5px solid var(--separator); min-width: 0; }
 .adm .rcw-kpi .l { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--ocw-faint); }
 .adm .rcw-kpi .v { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }
 .adm .rcw-kpi .v b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
@@ -140,7 +140,7 @@
 .adm .rcw-dhd, .adm .rcw-drow { display: grid; grid-template-columns: 170px minmax(0, 1fr) 130px 130px 76px; column-gap: 18px; align-items: center; }
 .adm .rcw-dhd { padding-bottom: 4px; font-size: 12px; color: var(--ocw-faint); }
 .adm .rcw-dhd .r, .adm .rcw-drow .va, .adm .rcw-drow .vb, .adm .rcw-drow .dl { text-align: right; white-space: nowrap; }
-.adm .rcw-drow { padding: 12px 0; border-top: 1px solid var(--ocw-hair); animation: ocw-fade 300ms ease both; animation-delay: calc(var(--i, 0) * 30ms); }
+.adm .rcw-drow { padding: 12px 0; border-top: 0.5px solid var(--separator); animation: ocw-fade 300ms ease both; animation-delay: calc(var(--i, 0) * 30ms); }
 .adm .rcw-drow .nm { font-size: 14px; font-weight: 700; color: var(--ocw-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .rcw-drow .bars { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .adm .rcw-drow .bars i {

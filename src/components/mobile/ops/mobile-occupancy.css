@@ -63,7 +63,7 @@
 .moc-nums dd.is-low { color: var(--moc-red); }
 
 /* ── 섹션 ── */
-.moc-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; border-top: 1px solid var(--moc-line); min-width: 0; }
+.moc-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; border-top: 0.5px solid var(--separator); min-width: 0; }
 .moc-sec h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .moc-sec__h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .moc-sec__h.is-start { justify-content: flex-start; }
@@ -108,7 +108,7 @@
 
 /* 월별 추이 — 태블릿 가로에서만 */
 .moc-trend { display: none; }
-.moc-chart { --plot: 1.3px; position: relative; height: 152px; display: flex; align-items: flex-end; gap: 8px; border-bottom: 1px solid #e6e6eb; }
+.moc-chart { --plot: 1.3px; position: relative; height: 152px; display: flex; align-items: flex-end; gap: 8px; border-bottom: 0.5px solid var(--separator); }
 .moc-chart__line { position: absolute; left: 0; right: 0; bottom: calc(var(--h) * var(--plot)); border-top: 1.5px dashed var(--moc-red-bar); pointer-events: none; z-index: 1; }
 .moc-col {
   position: relative; flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px;

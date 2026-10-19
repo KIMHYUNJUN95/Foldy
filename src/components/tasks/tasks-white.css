@@ -69,7 +69,7 @@
 .tkw-search__date { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: none; border: 0; border-radius: 22px; background: #f4f4f7; color: #4c4958; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
 .tkw-search__date svg { width: 17px; height: 17px; }
 .tkw-search__date.is-on { background: #f1ecfd; color: #5a30cf; }
-.tkw-search__cal { padding: 12px 0 2px; border-top: 1px solid var(--separator); }
+.tkw-search__cal { padding: 12px 0 2px; border-top: 0.5px solid var(--separator); }
 .tkw-search__cal > div:last-child { margin-top: 4px; padding: 0; border: 0; box-shadow: none; background: transparent; }
 .tkw-search__modes { display: flex; gap: 18px; margin-bottom: 8px; }
 .tkw-search__modes button, .tkw-search__ends button { height: 32px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text-3); cursor: pointer; }
@@ -104,7 +104,7 @@
 
 /* ── 작업 줄 ── */
 /* 구분선은 글자 시작점부터(고리 24 + 간격 14 = 38px) — 공용 규칙, globals.css --separator. */
-.tkw-row { position: relative; border-top: 1px solid var(--separator); border-image: linear-gradient(90deg, transparent 38px, var(--separator) 38px) 1; animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
+.tkw-row { position: relative; border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 38px, var(--separator) 38px) 1; animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
 .tkw-list > :nth-child(2) .tkw-row, .tkw-list > .tkw-row:nth-child(2) { animation-delay: 30ms; }
 .tkw-list > :nth-child(3) .tkw-row, .tkw-list > .tkw-row:nth-child(3) { animation-delay: 60ms; }
 .tkw-list > :nth-child(4) .tkw-row, .tkw-list > .tkw-row:nth-child(4) { animation-delay: 85ms; }
@@ -202,7 +202,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-hint { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-3); }
 
 /* 완료 · 기록 — 현장 활동 줄 */
-.tkw-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--separator); animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
+.tkw-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 0.5px solid var(--separator); animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
 .tkw-field__ic { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 700; color: #6b6878; }
 .tkw-field__b { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .tkw-field__t { font-size: 15px; line-height: 1.4; }
@@ -243,7 +243,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-cal__dh b { font-size: 14px; font-weight: 700; }
 
 /* ── 프로젝트 ── */
-.tkw-prow { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--separator); color: inherit; text-decoration: none; animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; transition: transform 140ms ease; }
+.tkw-prow { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 0.5px solid var(--separator); color: inherit; text-decoration: none; animation: tkw-in 320ms cubic-bezier(.23, 1, .32, 1) both; transition: transform 140ms ease; }
 .tkw-prow:active { transform: scale(.99); }
 .tkw-prow__top { display: flex; align-items: center; gap: 10px; }
 .tkw-prow__t { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -296,7 +296,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-qa__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 12px; color: var(--text-3); }
 .tkw-qa__foot a { flex: none; font-size: 13px; font-weight: 600; color: #5a30cf; text-decoration: none; }
 .tkw-act { display: flex; flex-direction: column; }
-.tkw-act button { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 2px; border: 0; border-top: 1px solid var(--separator); border-image: linear-gradient(90deg, transparent 36px, var(--separator) 36px) 1; background: transparent; font: inherit; font-size: 15px; color: #16141f; text-align: left; cursor: pointer; transition: background 150ms ease; }
+.tkw-act button { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 2px; border: 0; border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 36px, var(--separator) 36px) 1; background: transparent; font: inherit; font-size: 15px; color: #16141f; text-align: left; cursor: pointer; transition: background 150ms ease; }
 .tkw-act button:first-child { border-top: 0; }
 .tkw-act button:active { background: #faf9fc; }
 .tkw-act button svg { width: 20px; height: 20px; flex: none; color: #6b6878; }
@@ -329,7 +329,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-ph__add:active { transform: scale(.96); }
 .tkw-ph__add svg { width: 16px; height: 16px; }
 .tkw-ph__n { margin-left: 4px; font-size: 12px; color: var(--text-3); }
-.tkw-dl { display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 12px; margin: 0; padding-top: 16px; border-top: 1px solid var(--separator); font-size: 14px; }
+.tkw-dl { display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 12px; margin: 0; padding-top: 16px; border-top: 0.5px solid var(--separator); font-size: 14px; }
 .tkw-dl dt { color: var(--text-3); }
 .tkw-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .tkw-dl dd.is-muted { color: #6b6878; }
@@ -340,7 +340,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-pdot.is-m { box-shadow: inset 0 0 0 2px #2f6fde; }
 .tkw-with { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .tkw-with > span:last-child { font-size: 13px; color: #6b6878; }
-.tkw-up { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--separator); }
+.tkw-up { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .tkw-up > b { font-size: 14px; }
 .tkw-up__note { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; animation: tkw-in 280ms cubic-bezier(.23, 1, .32, 1) both; }
 .tkw-up__note > span:last-child { flex: 1; min-width: 0; }
@@ -363,7 +363,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-up__photos { padding: 10px; border-radius: 14px; background: #f7f7f9; }
 .tkw-err { margin: 0; font-size: 12px; font-weight: 600; color: #c5282e; }
 .tkw-people { display: flex; flex-direction: column; }
-.tkw-people > div { display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid var(--separator); }
+.tkw-people > div { display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 0.5px solid var(--separator); }
 .tkw-people > div:first-child { border-top: 0; }
 .tkw-people__n { flex: 1; min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tkw-people__r { font-size: 12px; color: var(--text-3); }
@@ -405,7 +405,7 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-tagin input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; box-sizing: border-box; border: 1px solid #e0e0e6; border-radius: 10px; background: #fff; font: inherit; font-size: 14px; color: #16141f; outline: none; }
 .tkw-tagin input:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
 .tkw-tagin button { height: 40px; padding: 0 14px; border: 0; border-radius: 10px; background: #f1ecfd; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; }
-.tkw-more { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 1px solid var(--separator); background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #16141f; text-align: left; cursor: pointer; }
+.tkw-more { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #16141f; text-align: left; cursor: pointer; }
 .tkw-more svg { width: 17px; height: 17px; color: var(--text-3); transition: transform 200ms ease; }
 .tkw-more[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .tkw-more span { font-weight: 400; color: var(--text-3); }
@@ -449,7 +449,7 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-rpt__pickh span { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .tkw-rpt__pickh button { margin-left: auto; min-height: 36px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; }
 .tkw-rpt__pick ul { margin: 0; padding: 0; list-style: none; max-height: 24vh; overflow-y: auto; overscroll-behavior: contain; }
-.tkw-rpt__row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 11px 0; border: 0; border-top: 1px solid var(--separator); background: transparent; font: inherit; text-align: left; }
+.tkw-rpt__row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 11px 0; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; text-align: left; }
 .tkw-rpt__box { display: grid; place-items: center; width: 20px; height: 20px; flex: none; margin-top: 1px; box-sizing: border-box; border-radius: 6px; box-shadow: inset 0 0 0 1.5px #c9c6d3; color: #fff; transition: background 150ms ease, box-shadow 150ms ease; }
 .tkw-rpt__box svg { width: 12px; height: 12px; stroke-dasharray: 22; stroke-dashoffset: 22; transition: stroke-dashoffset 240ms cubic-bezier(.23, 1, .32, 1); }
 .tkw-rpt__row.on .tkw-rpt__box { background: #7a52e6; box-shadow: none; }

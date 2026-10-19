@@ -157,7 +157,7 @@ export function BoardMentionSheet({
                 onClick={() => toggleUser(m)}
                 className={cn(
                   "flex w-full items-center gap-[11px] px-[14px] py-[9px] text-left",
-                  idx > 0 && "border-t border-border/60",
+                  idx > 0 && "border-t-[0.5px] border-[var(--separator)]",
                   selected && "bg-primary/[0.07]",
                 )}
               >

@@ -191,7 +191,7 @@ export function CleaningRecordsView({
       </>
   );
   const detailBody = (selected: CleaningRecordItem) => (
-    <dl className="mt-4 flex flex-col gap-2.5 border-t border-border pt-4">
+    <dl className="mt-4 flex flex-col gap-2.5 border-t-[0.5px] border-[var(--separator)] pt-4">
       {field(r.staffLabel, selected.staffName || "-")}
       {field(r.dateLabel, dayLabel(selected.dateKey))}
       {field(r.startLabel, fmtTime(selected.startedAt) || "-")}
@@ -236,7 +236,7 @@ export function CleaningRecordsView({
             <ChevronRight className="size-5" aria-hidden="true" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 divide-x divide-border border-t border-border bg-background/40">
+        <div className="grid grid-cols-2 divide-x divide-border border-t-[0.5px] border-[var(--separator)] bg-background/40">
           <div className="flex items-center gap-2.5 px-4 py-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <ListChecks className="size-[18px]" aria-hidden="true" />
@@ -354,7 +354,7 @@ export function CleaningRecordsView({
                     <button
                       className={cn(
                         "flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition-colors active:bg-slate-50",
-                        i > 0 && "border-t border-border/70",
+                        i > 0 && "border-t-[0.5px] border-[var(--separator)]",
                         isTablet && paneRecord?.id === rec.id && "bg-primary/[0.06] shadow-[inset_3px_0_0_var(--primary)]",
                       )}
                       key={rec.id}

@@ -105,8 +105,8 @@
   align-items: end;
   gap: 10px;
   padding: 14px 0;
-  border-top: 1px solid var(--spw-line);
-  border-bottom: 1px solid var(--spw-line);
+  border-top: 0.5px solid var(--separator);
+  border-bottom: 0.5px solid var(--separator);
 }
 .adm .spw-compare > div { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .adm .spw-compare__l { font-size: 12px; color: var(--spw-faint); }
@@ -223,7 +223,7 @@
   gap: 10px;
   min-height: 34px;
   font-size: 13px;
-  border-top: 1px solid var(--spw-line2);
+  border-top: 0.5px solid var(--separator);
   font-variant-numeric: tabular-nums;
   animation: spw-rise 200ms var(--spw-ease) both;
   animation-delay: calc(var(--i, 0) * 18ms);
@@ -444,9 +444,9 @@
   padding: 8px 24px 16px;
   animation: spw-in 220ms var(--spw-ease) both;
 }
-.adm .spw-sect { display: flex; flex-direction: column; padding-top: 12px; border-top: 1px solid var(--spw-line); }
+.adm .spw-sect { display: flex; flex-direction: column; padding-top: 12px; border-top: 0.5px solid var(--separator); }
 .adm .spw-sect:first-child { padding-top: 4px; border-top: 0; }
-.adm .spw-stay { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0 10px; border-bottom: 1px solid var(--spw-line2); }
+.adm .spw-stay { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0 10px; border-bottom: 0.5px solid var(--separator); }
 .adm .spw-stay > div { display: flex; flex-direction: column; min-width: 0; }
 .adm .spw-stay > div.is-end { align-items: flex-end; text-align: right; }
 .adm .spw-stay b { font-size: 15px; font-weight: 700; }

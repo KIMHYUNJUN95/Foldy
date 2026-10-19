@@ -965,7 +965,7 @@ function ContextPickerBody({
 
         {/* ── Sticky footer CTA — room step only ── */}
         {isRoomStep ? (
-          <div className="-mx-5 shrink-0 border-t border-border/60 bg-surface px-5 pt-3">
+          <div className="-mx-5 shrink-0 border-t-[0.5px] border-[var(--separator)] bg-surface px-5 pt-3">
             <button
               className={cn(
                 "flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] text-[14.5px] font-extrabold transition-colors",

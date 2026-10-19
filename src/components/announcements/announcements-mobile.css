@@ -14,8 +14,8 @@
 .ntw-head h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .ntw-head span { font-size: 13px; color: #6b6878; }
 .ntw-groups { display: flex; flex-direction: column; gap: 18px; }
-.ntw-group h2 { margin: 0 0 2px; padding-bottom: 6px; border-bottom: 1px solid var(--separator); font-size: 12px; font-weight: 600; color: #6b6878; }
-.ntw-row { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 10px 0; box-sizing: border-box; border-top: 1px solid var(--separator); color: #16141f; text-decoration: none; transition: background 150ms ease, transform 140ms ease; animation: ntw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
+.ntw-group h2 { margin: 0 0 2px; padding-bottom: 6px; border-bottom: 0.5px solid var(--separator); font-size: 12px; font-weight: 600; color: #6b6878; }
+.ntw-row { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 10px 0; box-sizing: border-box; border-top: 0.5px solid var(--separator); color: #16141f; text-decoration: none; transition: background 150ms ease, transform 140ms ease; animation: ntw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
 .ntw-group h2 + .ntw-row { border-top: 0; }
 .ntw-group:nth-child(2) .ntw-row { animation-delay: 40ms; }
 .ntw-group:nth-child(3) .ntw-row { animation-delay: 70ms; }
@@ -43,7 +43,7 @@
 .ntw-d__tags span + span::before { content: "·"; margin-right: 6px; color: #c9c6d3; font-weight: 400; }
 .ntw-d h1 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.35; letter-spacing: -0.03em; text-wrap: balance; overflow-wrap: anywhere; }
 .ntw-d__meta { margin: 0; font-size: 13px; color: #6b6878; }
-.ntw-d__body { margin: 10px 0 0; padding-top: 18px; border-top: 1px solid var(--separator); font-size: 16px; line-height: 1.7; color: #3a3746; white-space: pre-line; overflow-wrap: anywhere; }
+.ntw-d__body { margin: 10px 0 0; padding-top: 18px; border-top: 0.5px solid var(--separator); font-size: 16px; line-height: 1.7; color: #3a3746; white-space: pre-line; overflow-wrap: anywhere; }
 .ntw-d__photos { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .ntw-d__hint { font-size: 12px; color: #6b6878; }
 

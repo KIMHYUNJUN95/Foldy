@@ -19,7 +19,7 @@
 .adm .rvw .rvw-sec { margin-top: 0; margin-bottom: 18px; justify-content: space-between; }
 .adm .rvw .ocw-lgs i.rvw-lg-prev { width: 5px; border-radius: 2px; background: #e3e3e8; }
 
-.adm .rvw-plot { height: 210px; display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid #e6e6eb; }
+.adm .rvw-plot { height: 210px; display: flex; align-items: stretch; gap: 8px; border-bottom: 0.5px solid var(--separator); }
 .adm .rvw-col {
   flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 0; border: 0; background: transparent; cursor: pointer;
   transition: transform 160ms var(--ocw-ease);
@@ -128,23 +128,23 @@
 .adm .rvw-dhead .eyebrow em { font-style: normal; font-weight: 600; color: var(--ocw-v-ink); }
 .adm .rvw-dhead h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.35; color: var(--ocw-ink); }
 .adm .rvw-dhead .sub { font-size: 13px; color: var(--ocw-mute); }
-.adm .rvw-dl { margin: 0; padding-top: 14px; border-top: 1px solid var(--ocw-line); display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 10px; font-size: 13px; }
+.adm .rvw-dl { margin: 0; padding-top: 14px; border-top: 0.5px solid var(--separator); display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 10px; font-size: 13px; }
 .adm .rvw-dl dt { color: var(--ocw-faint); }
 .adm .rvw-dl dd { margin: 0; color: var(--ocw-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.adm .rvw-dsec { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--ocw-line); }
+.adm .rvw-dsec { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
 .adm .rvw-dsec .h { font-size: 12px; font-weight: 600; color: var(--ocw-faint); }
 .adm .rvw-dlg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ocw-mute); }
 .adm .rvw-dlg > span { display: inline-flex; align-items: center; gap: 5px; }
 .adm .rvw-dlg i { width: 8px; height: 8px; border-radius: 2px; }
 .adm .rvw-rooms { display: flex; flex-direction: column; }
 .adm .rvw-rr {
-  display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #f7f7f9; font-size: 13px;
+  display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 0.5px solid var(--separator); font-size: 13px;
   animation: ocw-fade 220ms ease both; animation-delay: calc(80ms + var(--i, 0) * 18ms);
 }
 .adm .rvw-rr .n { flex: 1; min-width: 0; font-family: var(--mono, "Geist Mono", monospace); font-weight: 600; color: var(--ocw-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .rvw-rr .a { color: var(--ocw-faint); white-space: nowrap; }
 .adm .rvw-rr b { width: 44px; text-align: right; font-weight: 700; color: var(--ocw-ink); }
-.adm .rvw-dnote { margin: 0; padding-top: 14px; border-top: 1px solid var(--ocw-line); font-size: 12px; line-height: 1.5; color: var(--ocw-faint); }
+.adm .rvw-dnote { margin: 0; padding-top: 14px; border-top: 0.5px solid var(--separator); font-size: 12px; line-height: 1.5; color: var(--ocw-faint); }
 
 @media (max-width: 1280px) {
   .adm .rvw-mxsplit { grid-template-columns: minmax(0, 1fr); }

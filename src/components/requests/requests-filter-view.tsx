@@ -1183,7 +1183,7 @@ export function RequestsFilterView({
                 </div>
 
                 {/* Footer — action buttons */}
-                <div className="flex shrink-0 items-center gap-2 border-t border-slate-100 px-1 pt-4">
+                <div className="flex shrink-0 items-center gap-2 border-t-[0.5px] border-[var(--separator)] px-1 pt-4">
                   <button
                     className="h-11 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700 shadow-[0_8px_16px_-14px_rgba(34,40,60,0.3)] transition-colors hover:bg-muted/60 disabled:opacity-40"
                     disabled={activeFilterCount === 0}

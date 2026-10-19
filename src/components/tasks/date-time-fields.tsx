@@ -107,7 +107,7 @@ export function MiniCalendar({
         ))}
       </div>
       <div className="mt-1 grid grid-cols-7 gap-0.5">{cells}</div>
-      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5">
+      <div className="mt-2.5 flex items-center justify-between border-t-[0.5px] border-[var(--separator)] pt-2.5">
         <button
           className="rounded-full px-2.5 py-1 text-[12px] font-bold text-muted-foreground transition-colors hover:bg-slate-100"
           onClick={onClear}

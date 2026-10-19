@@ -58,7 +58,7 @@
 .mrv-nums dd.mrv-nums__s { font-size: 12px; font-weight: 400; letter-spacing: 0; }
 
 /* ── 섹션 ── */
-.mrv-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; border-top: 1px solid var(--mrv-line); min-width: 0; }
+.mrv-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; border-top: 0.5px solid var(--separator); min-width: 0; }
 .mrv-sec h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .mrv-sec__h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .mrv-sec__h > span { font-size: 12px; color: var(--mrv-faint); text-align: right; }
@@ -84,7 +84,7 @@
 .mrv-col:active { transform: scale(.97); }
 /* 막대 자리 — 칸마다 가는 바닥줄을 이어 하나의 축처럼(칸 사이 8px 도 줄이 이어지게 좌우로 늘린다). */
 .mrv-col__bars { position: relative; width: 100%; height: var(--bars); display: flex; align-items: flex-end; gap: 2px; margin-bottom: 6px; }
-.mrv-col__bars::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: 0; border-bottom: 1px solid #e6e6eb; }
+.mrv-col__bars::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: 0; border-bottom: 0.5px solid var(--separator); }
 .mrv-col__b, .mrv-col__p {
   position: relative; z-index: 1; display: block; transform-origin: bottom center;
   animation: mrv-grow 600ms var(--mrv-ease) both; animation-delay: calc(120ms + var(--i, 0) * 30ms);
@@ -118,7 +118,7 @@
 .mrv-bld { gap: 2px; }
 .mrv-bld .mrv-sec__h { margin-bottom: 6px; }
 .mrv-bld ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.mrv-bld li { border-top: 1px solid var(--mrv-line2); }
+.mrv-bld li { border-top: 0.5px solid var(--separator); }
 .mrv-row {
   display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 44px; padding: 10px 0;
   color: var(--mrv-ink); text-decoration: none; border-radius: 8px;

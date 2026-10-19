@@ -181,7 +181,7 @@
 .aw-btn .ic { font-size: 18px; }
 
 .aw-or { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-done); margin: 4px 0; }
-.aw-or::before, .aw-or::after { content: ""; flex: 1; height: 1px; background: #efeff3; }
+.aw-or::before, .aw-or::after { content: ""; flex: 1; height: 0.5px; background: var(--separator); }
 
 .aw-help { font-size: 14px; color: var(--aw-muted); text-align: center; margin-top: 4px; }
 .aw-help a { font-weight: 600; margin-left: 6px; }
@@ -191,7 +191,7 @@
 .aw-feats span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--aw-primary); }
 
 /* tabs (로그인 | 가입) */
-.aw-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--aw-hair); }
+.aw-tabs { display: flex; gap: 24px; border-bottom: 0.5px solid var(--separator); }
 .aw-tabs a, .aw-tabs span {
   height: 44px;
   display: flex;

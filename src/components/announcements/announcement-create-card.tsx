@@ -126,7 +126,7 @@ export function AnnouncementCreateCard({ copy, organizations }: Props) {
 
   return (
     <Card className="rounded-lg p-5 shadow-sm">
-      <div className="flex items-start gap-3 border-b border-border/70 pb-4">
+      <div className="flex items-start gap-3 border-b-[0.5px] border-[var(--separator)] pb-4">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Megaphone aria-hidden="true" className="size-5" />
         </div>

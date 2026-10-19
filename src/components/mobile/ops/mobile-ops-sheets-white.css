@@ -306,7 +306,7 @@ textarea.msw-in { min-height: 64px; padding: 12px 14px; line-height: 1.45; resiz
   align-items: center;
   gap: 10px;
   min-height: 42px;
-  border-top: 1px solid var(--msw-line);
+  border-top: 0.5px solid var(--separator);
   font-size: 14px;
   animation: msw-in 240ms var(--msw-ease) both;
 }
@@ -387,7 +387,7 @@ textarea.msw-in { min-height: 64px; padding: 12px 14px; line-height: 1.45; resiz
 .msw-sum .why { padding-top: 6px; font-size: 13px; color: var(--msw-muted); }
 
 /* ── 예약 상세 섹션 ── */
-.msw-sect { display: flex; flex-direction: column; padding-top: 12px; border-top: 1px solid var(--msw-line); }
+.msw-sect { display: flex; flex-direction: column; padding-top: 12px; border-top: 0.5px solid var(--separator); }
 .msw-sect > .h { padding-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--msw-faint); }
 .msw-sect > p { margin: 0; padding: 4px 0; font-size: 13px; line-height: 1.55; color: var(--msw-soft); white-space: pre-wrap; }
 .msw-sect > .sub { padding-top: 6px; font-size: 12px; font-weight: 600; color: var(--msw-faint); }
@@ -396,7 +396,7 @@ textarea.msw-in { min-height: 64px; padding: 12px 14px; line-height: 1.45; resiz
 .msw-stay > div.end { align-items: flex-end; text-align: right; }
 .msw-stay b { font-size: 16px; font-weight: 700; }
 .msw-stay small { font-size: 12px; color: var(--msw-faint); }
-.msw-stay > i { flex: 1; height: 1px; background: #e6e6eb; position: relative; font-style: normal; }
+.msw-stay > i { flex: 1; height: 0.5px; background: var(--separator); position: relative; font-style: normal; }
 .msw-stay > i > span {
   position: absolute;
   left: 50%;
@@ -520,7 +520,7 @@ details.msw-nightly > summary::before { content: "▸"; font-size: 11px; color: 
 details.msw-nightly[open] > summary::before { transform: rotate(90deg); }
 .msw-nightly table { width: 100%; border-collapse: collapse; font-size: 13px; animation: msw-in 200ms var(--msw-ease) both; }
 .msw-nightly th { font-size: 11px; font-weight: 500; color: var(--msw-faint); text-align: right; padding: 0 0 4px; }
-.msw-nightly td { padding: 7px 0; text-align: right; border-top: 1px solid var(--msw-line); }
+.msw-nightly td { padding: 7px 0; text-align: right; border-top: 0.5px solid var(--separator); }
 .msw-nightly td:first-child,
 .msw-nightly th:first-child { text-align: left; color: var(--msw-muted); }
 

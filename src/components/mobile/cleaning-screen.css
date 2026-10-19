@@ -6,7 +6,7 @@
 .cln { display: flex; flex-direction: column; gap: 16px; color: #16141f; padding-bottom: 8px; }
 
 /* 제목 · 숫자 */
-.cln-head { display: flex; flex-direction: column; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--separator); }
+.cln-head { display: flex; flex-direction: column; gap: 16px; padding-bottom: 18px; border-bottom: 0.5px solid var(--separator); }
 .cln-head__t h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .cln-head__t p { margin: 4px 0 0; font-size: 13px; color: var(--text-3); }
 .cln-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -34,7 +34,7 @@
 .cln-h__c { font-size: 13px; font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
 /* 진행 중인 청소 */
-.cln-active { padding-bottom: 20px; border-bottom: 1px solid var(--separator); }
+.cln-active { padding-bottom: 20px; border-bottom: 0.5px solid var(--separator); }
 .cln-active__grid { display: flex; flex-direction: column; gap: 18px; }
 .cln-active__ringwrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .cln-ring { position: relative; width: 188px; height: 188px; }
@@ -57,12 +57,12 @@
 /* 목록 */
 .cln-cols { display: flex; flex-direction: column; gap: 22px; }
 .cln-side { display: flex; flex-direction: column; gap: 22px; }
-.cln-col + .cln-col, .cln-side > .cln-col, .cln-manual { padding-top: 20px; border-top: 1px solid var(--separator); }
+.cln-col + .cln-col, .cln-side > .cln-col, .cln-manual { padding-top: 20px; border-top: 0.5px solid var(--separator); }
 .cln-side > .cln-col + .cln-col { margin-top: 0; }
 .cln-group + .cln-group { margin-top: 14px; }
 .cln-group__t { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--text-3); }
 .cln-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; }
-.cln-row + .cln-row { border-top: 1px solid var(--separator); }
+.cln-row + .cln-row { border-top: 0.5px solid var(--separator); }
 .cln-row__rm { flex: 0 0 auto; min-width: 58px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono, ui-monospace), monospace; font-size: 14px; font-weight: 700; }
 .cln-row__b { flex: 1; min-width: 0; }
 .cln-row__t { margin: 0; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

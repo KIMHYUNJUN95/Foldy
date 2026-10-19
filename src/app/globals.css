@@ -198,10 +198,11 @@ summary,
   --text-done: #76737f;
   --surface: #ffffff;
   --border: #ececf0;
-  /* 구분선 하나(HIG 다듬기 2차, 2026-10-19) — 모든 화면의 1px 가로선(목록 줄 · 구역 나눔)이 같은 색을 쓴다.
+  /* 구분선 하나(HIG 다듬기 2차, 2026-10-19) — 모든 화면 · 모든 시안의 가로선(목록 줄 · 구역 나눔)이 같은 값을 쓴다.
+     두께 0.5px(레티나 기기 1픽셀 헤어라인) · 이 색. 화면마다 다르게 두지 않는다 — 새 선도 `0.5px solid var(--separator)`.
      시작점: 앞에 아이콘 · 고리가 있는 줄은 글자 시작점부터, 없는 줄은 내용 여백부터. 끝은 늘 내용 여백까지.
-     예전에 섞여 있던 #F1F1F4 · #F3F3F6 · #F0EFF4 · #EBEAF0 을 대신한다. */
-  --separator: #efeff3;
+     회색 면으로 구분된 칸 아래에는 긋지 않는다. 예전의 #F1F1F4 · #F3F3F6 · #F7F7F9 · #E6E6EB · #ECECF0 가로선을 대신한다. */
+  --separator: #e4e3e9;
   /* Brand accent: soft violet (pressed #5A30CF). Replaces the former deep navy. */
   --primary: #7a52e6;
   --primary-foreground: #ffffff;
@@ -408,7 +409,7 @@ body:lang(ja) {
   }
   .split-list[data-split="on"] > .split-list__list::-webkit-scrollbar { display: none; }
   .split-list__pane { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
-  .split-list__bar { flex: none; position: relative; display: flex; justify-content: flex-end; align-items: center; height: 44px; padding: 0 12px; border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent); }
+  .split-list__bar { flex: none; position: relative; display: flex; justify-content: flex-end; align-items: center; height: 44px; padding: 0 12px; border-bottom: 0.5px solid var(--separator); }
   .split-list__close { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--muted-foreground); }
   .split-list__close:hover { background: var(--muted); color: var(--foreground); }
   .split-list__close svg { width: 17px; height: 17px; }

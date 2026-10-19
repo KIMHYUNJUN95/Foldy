@@ -29,7 +29,7 @@
 .acw-grp { display: flex; flex-direction: column; animation: acw-up 360ms var(--w-ease) both; animation-delay: calc(min(var(--i, 0), 8) * 40ms); }
 .acw-sec { padding: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--w-sec); }
 .acw-row {
-  display: flex; align-items: center; gap: 10px; min-height: 52px; width: 100%; padding: 0; border: 0; border-top: 1px solid var(--w-hair);
+  display: flex; align-items: center; gap: 10px; min-height: 52px; width: 100%; padding: 0; border: 0; border-top: 0.5px solid var(--separator);
   background: transparent; color: var(--w-ink); text-decoration: none; text-align: left; font-size: 15px; cursor: pointer;
 }
 .acw-row:is(div) { cursor: default; }

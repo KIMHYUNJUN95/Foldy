@@ -22,7 +22,7 @@
   gap: 8px;
   flex-wrap: wrap;
   padding: 11px 16px 13px;
-  border-top: 1px solid var(--line-soft);
+  border-top: 0.5px solid var(--separator);
   font-size: 11.5px;
   font-weight: 700;
   color: var(--adm-muted);
@@ -147,7 +147,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0.5px solid var(--separator);
   text-decoration: none;
   color: inherit;
 }
@@ -877,7 +877,7 @@
 
 /* 리뷰 줄 */
 .adm .cxw-rows { display: flex; flex-direction: column; }
-.adm .cxw-rv { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 16px; align-items: start; padding: 16px 12px; border-top: 1px solid var(--separator); color: #16141f; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
+.adm .cxw-rv { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 16px; align-items: start; padding: 16px 12px; border-top: 0.5px solid var(--separator); color: #16141f; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
 .adm .cxw-rows > :first-child { border-top: 0; }
 .adm .cxw-rv:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
 .adm .cxw-rv:hover + .cxw-rv, .adm .cxw-rv.on + .cxw-rv { border-top-color: transparent; }
@@ -911,9 +911,9 @@
 
 /* 수동 컴플레인 표 */
 .adm .cxw-mh, .adm .cxw-mr { display: grid; grid-template-columns: 100px minmax(0, 1fr) minmax(90px, 140px) minmax(120px, 190px) minmax(110px, 150px); column-gap: 20px; align-items: center; padding: 0 12px; }
-.adm .cxw-mh { padding-bottom: 10px; border-bottom: 1px solid var(--separator); font-size: 12px; color: #6b6878; }
+.adm .cxw-mh { padding-bottom: 10px; border-bottom: 0.5px solid var(--separator); font-size: 12px; color: #6b6878; }
 .adm .cxw-mh .r, .adm .cxw-mr .r { text-align: right; }
-.adm .cxw-mr { min-height: 64px; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid var(--separator); color: #16141f; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
+.adm .cxw-mr { min-height: 64px; padding-top: 10px; padding-bottom: 10px; border-top: 0.5px solid var(--separator); color: #16141f; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
 .adm .cxw-mr:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
 .adm .cxw-mr:hover + .cxw-mr, .adm .cxw-mr.on + .cxw-mr { border-top-color: transparent; }
 .adm .cxw-mr:active { transform: scale(.997); }
@@ -930,9 +930,9 @@
 
 /* 건물 · 객실별 */
 .adm .cxw-rh, .adm .cxw-rr { display: grid; grid-template-columns: minmax(0, 1fr) 200px 200px minmax(180px, 300px) 56px; column-gap: 24px; align-items: center; padding: 0 12px; }
-.adm .cxw-rh { margin-top: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--separator); font-size: 12px; color: #6b6878; white-space: nowrap; }
+.adm .cxw-rh { margin-top: 18px; padding-bottom: 10px; border-bottom: 0.5px solid var(--separator); font-size: 12px; color: #6b6878; white-space: nowrap; }
 .adm .cxw-rh small { font-size: 11px; }
-.adm .cxw-rr { min-height: 54px; border-top: 1px solid var(--separator); }
+.adm .cxw-rr { min-height: 54px; border-top: 0.5px solid var(--separator); }
 .adm .cxw-rr.is-building { min-height: 60px; cursor: pointer; list-style: none; }
 .adm .cxw-rr.is-building::-webkit-details-marker { display: none; }
 .adm .cxw-rr.is-building:hover { background: #faf9fc; border-radius: 12px; }
@@ -992,7 +992,7 @@
 .adm .cxw-ph__del:hover { background: #fdecec; }
 .adm .cxw-ph__x:active, .adm .cxw-ph__del:active { transform: scale(.94); }
 .adm .cxw-pb { display: flex; flex-direction: column; gap: 18px; padding: 4px 24px 24px; }
-.adm .cxw-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; border-top: 1px solid var(--separator); }
+.adm .cxw-sec { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .adm .cxw-k, .adm .cxw-part small { font-size: 12px; font-weight: 600; color: #6b6878; }
 .adm .cxw-part { display: flex; flex-direction: column; gap: 4px; }
 .adm .cxw-part p { margin: 0; font-size: 14px; line-height: 1.6; color: #16141f; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -1033,7 +1033,7 @@
 .adm .cxw-send:disabled { opacity: .4; cursor: default; }
 .adm .cxw-send:not(:disabled):active { transform: scale(.94); }
 .adm .cxw-err { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: #c5282e; }
-.adm .cxw-pf { display: flex; flex-direction: column; gap: 8px; padding: 16px 24px 24px; border-top: 1px solid var(--separator); }
+.adm .cxw-pf { display: flex; flex-direction: column; gap: 8px; padding: 16px 24px 24px; border-top: 0.5px solid var(--separator); }
 .adm .cxw-pf__form { display: flex; flex-direction: column; gap: 8px; }
 .adm .cxw-pf__note { font-size: 12px; line-height: 1.5; color: #6b6878; }
 .adm .cxw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }

@@ -7,7 +7,7 @@
 .adm .dh-kpis {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  border-bottom: 1px solid var(--separator);
+  border-bottom: 0.5px solid var(--separator);
 }
 .adm .dh-kpi {
   display: flex;
@@ -27,7 +27,7 @@
 
 .adm .dh-sec { display: flex; align-items: center; gap: 10px; margin-top: 32px; margin-bottom: 14px; }
 .adm .dh-sec b { font-size: 16px; font-weight: 700; color: #16141f; }
-.adm .dh-sec--line { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--separator); }
+.adm .dh-sec--line { margin-top: 36px; padding-top: 24px; border-top: 0.5px solid var(--separator); }
 .adm .dh-cc { font-size: 13px; color: var(--text-3); }
 .adm .dh-sec__end { margin-left: auto; }
 
@@ -52,7 +52,7 @@
 .adm .dh-axis { display: flex; flex-direction: column; justify-content: space-between; height: 160px; width: 72px; font-size: 11px; color: var(--text-done); text-align: right; font-variant-numeric: tabular-nums; }
 .adm .dh-plot { flex: 1; position: relative; height: 160px; }
 .adm .dh-plot__lines { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
-.adm .dh-plot__lines span { height: 1px; background: #f1f1f4; }
+.adm .dh-plot__lines span { height: 0.5px; background: var(--separator); }
 .adm .dh-plot__lines span:last-child { background: #e6e6eb; }
 .adm .dh-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 4px; }
 .adm .dh-bar { flex: 1; min-height: 2px; border-radius: 4px 4px 0 0; background: #cdbbfb; }
@@ -76,11 +76,11 @@
 .adm .dh-bld__v { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: #16141f; font-weight: 600; }
 
 /* 최근 6개월 */
-.adm .dh-months { grid-column: span 12; padding-top: 24px; border-top: 1px solid var(--separator); display: flex; flex-direction: column; gap: 14px; }
+.adm .dh-months { grid-column: span 12; padding-top: 24px; border-top: 0.5px solid var(--separator); display: flex; flex-direction: column; gap: 14px; }
 .adm .dh-months__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; }
 .adm .dh-months__col { display: flex; flex-direction: column; gap: 10px; }
 .adm .dh-months__k { font-size: 13px; color: #6b6878; }
-.adm .dh-mbars { height: 150px; display: flex; align-items: flex-end; gap: 14px; border-bottom: 1px solid #e6e6eb; }
+.adm .dh-mbars { height: 150px; display: flex; align-items: flex-end; gap: 14px; border-bottom: 0.5px solid var(--separator); }
 .adm .dh-mbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
 .adm .dh-mbar span { font-size: 11px; color: #6b6878; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .dh-mbar i { width: 100%; max-width: 56px; border-radius: 6px 6px 0 0; background: #7a52e6; }
@@ -98,7 +98,7 @@
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  border-top: 1px solid var(--separator);
+  border-top: 0.5px solid var(--separator);
   text-decoration: none;
   color: inherit;
   cursor: pointer;
@@ -112,8 +112,8 @@
 .adm .dh-qic .ic { font-size: 16px; }
 .adm .dh-urgent { font-size: 12px; font-weight: 600; color: #c5282e; }
 .adm .dh-kind { font-size: 12px; color: #6b6878; white-space: nowrap; }
-.adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-3); border-top: 1px solid var(--separator); }
-.adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 1px solid var(--separator); font-size: 14px; color: #16141f; }
+.adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-3); border-top: 0.5px solid var(--separator); }
+.adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 0.5px solid var(--separator); font-size: 14px; color: #16141f; }
 .adm .dh-todo__box { width: 20px; height: 20px; flex: none; box-sizing: border-box; border-radius: 6px; border: 1.5px solid #d0cfd8; display: flex; align-items: center; justify-content: center; color: #fff; }
 .adm .dh-todo__box .ic { font-size: 12px; }
 .adm .dh-todo.is-done { color: var(--text-done); text-decoration: line-through; }

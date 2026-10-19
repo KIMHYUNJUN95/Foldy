@@ -216,7 +216,7 @@
 .adm .atw-row {
   position: relative; display: flex; align-items: flex-start; gap: 12px;
   margin: 0 -10px; padding: 12px 10px;
-  border-top: 1px solid var(--separator); border-radius: 0; cursor: pointer;
+  border-top: 0.5px solid var(--separator); border-radius: 0; cursor: pointer;
   transition: background 150ms ease, border-radius 150ms ease, opacity 320ms ease 100ms;
 }
 .adm .atw-row:hover { background: #faf9fc; border-radius: 12px; border-top-color: transparent; }
@@ -305,7 +305,7 @@
 .adm .atw-pdot.p-urgent { box-shadow: inset 0 0 0 2px #d8455a; }
 
 /* 현장 활동 줄(읽기 전용) */
-.adm .atw-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--separator); }
+.adm .atw-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 0.5px solid var(--separator); }
 .adm .atw-field__ic { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 6px; background: #f2f2f5; font-size: 11px; font-weight: 700; color: #6b6878; }
 
 /* 「+ 작업 추가」 줄 */
@@ -359,7 +359,7 @@
 .adm .atw-iadd__tag { width: 96px; height: 28px; padding: 0 6px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 12.5px; color: #16141f; outline: none; }
 .adm .atw-iadd__tag::placeholder { color: #b4b1bf; }
 .adm .atw-iadd__tag:focus { background: #f4f4f7; }
-.adm .atw-iadd__foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--separator); }
+.adm .atw-iadd__foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--separator); }
 .adm .atw-iadd__where { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-3); }
 
 /* 빈 상태 */
@@ -435,7 +435,7 @@
 @keyframes atw-spin { to { transform: rotate(360deg); } }
 
 /* 정의 목록 */
-.adm .atw-d__dl { display: grid; grid-template-columns: 72px minmax(0, 1fr); column-gap: 8px; row-gap: 12px; margin: 0; padding-top: 16px; border-top: 1px solid var(--separator); font-size: 14px; }
+.adm .atw-d__dl { display: grid; grid-template-columns: 72px minmax(0, 1fr); column-gap: 8px; row-gap: 12px; margin: 0; padding-top: 16px; border-top: 0.5px solid var(--separator); font-size: 14px; }
 .adm .atw-d__dl dt { line-height: 24px; color: var(--text-3); }
 .adm .atw-d__dl dd { min-width: 0; min-height: 24px; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; line-height: 1.45; color: #16141f; overflow-wrap: anywhere; }
 .adm .atw-d__sub { flex-basis: 100%; font-size: 12px; color: #6b6878; }
@@ -447,7 +447,7 @@
 .adm .atw-ddbtn:hover { background: #f4f4f7; }
 
 /* 업데이트 */
-.adm .atw-d__log { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--separator); }
+.adm .atw-d__log { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 0.5px solid var(--separator); }
 .adm .atw-d__lt { font-size: 14px; font-weight: 700; color: #16141f; }
 .adm .atw-sys { padding-left: 36px; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .adm .atw-note { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; animation: atw-in 240ms cubic-bezier(.23, 1, .32, 1) both; }
@@ -511,7 +511,7 @@
 .adm .atw-cal__wd { padding: 0 10px 8px; font-size: 12px; color: #6b6878; }
 .adm .atw-cc {
   min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 3px;
-  padding: 8px 8px 6px; border-top: 1px solid var(--separator); cursor: pointer; outline: none;
+  padding: 8px 8px 6px; border-top: 0.5px solid var(--separator); cursor: pointer; outline: none;
   transition: background 150ms ease;
   animation: atw-fade 260ms ease both;
 }
@@ -559,7 +559,7 @@
   .adm .atw-nav__grp { display: none; }
   .adm .atw-main,
   .adm .atw:not(.has-side) .atw-main { padding: 20px; }
-  .adm .atw-side { position: static; max-height: none; padding: 20px; border-top: 1px solid var(--separator); }
+  .adm .atw-side { position: static; max-height: none; padding: 20px; border-top: 0.5px solid var(--separator); }
   .adm .atw.is-cal .atw-main { height: auto; }
 }
 
@@ -592,7 +592,7 @@
 .adm .atw-rpt__pickh span { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .adm .atw-rpt__pickh button { margin-left: auto; height: 28px; padding: 0 2px; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; }
 .adm .atw-rpt__pick ul { margin: 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
-.adm .atw-rpt__row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 0; border: 0; border-top: 1px solid var(--separator); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.adm .atw-rpt__row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 0; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .adm .atw-rpt__box { display: grid; place-items: center; width: 20px; height: 20px; flex: none; margin-top: 1px; box-sizing: border-box; border-radius: 6px; box-shadow: inset 0 0 0 1.5px #c9c6d3; color: #fff; transition: background 150ms ease, box-shadow 150ms ease; }
 .adm .atw-rpt__box svg { width: 12px; height: 12px; stroke-dasharray: 22; stroke-dashoffset: 22; transition: stroke-dashoffset 240ms cubic-bezier(.23, 1, .32, 1); }
 .adm .atw-rpt__row.on .atw-rpt__box { background: #7a52e6; box-shadow: none; }

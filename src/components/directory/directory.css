@@ -17,7 +17,7 @@
 .drw-g { display: flex; flex-direction: column; }
 .drw-gl { margin: 0; padding: 18px 0 4px; font-size: 12px; font-weight: 600; color: var(--drw-soft); }
 .drw-gl b { margin-left: 4px; font-weight: 500; color: var(--drw-faint); }
-.drw-r { display: flex; align-items: center; gap: 12px; min-height: 64px; border-top: 1px solid var(--drw-line); animation: drw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
+.drw-r { display: flex; align-items: center; gap: 12px; min-height: 64px; border-top: 0.5px solid var(--separator); animation: drw-in 300ms cubic-bezier(.23, 1, .32, 1) both; }
 .drw-gl + .drw-r { border-top-color: transparent; }
 .drw-r:nth-of-type(2) { animation-delay: 30ms; }
 .drw-r:nth-of-type(3) { animation-delay: 60ms; }
@@ -70,7 +70,7 @@
 .drw-btn.is-done svg path, .drw-btn.is-done svg polyline { stroke-dasharray: 24; animation: drw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes drw-draw { from { stroke-dashoffset: 24; } }
 .drw-btn.is-bad { color: #c5282e; }
-.drw-dl { margin: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 14px; padding-top: 20px; border-top: 1px solid var(--separator); font-size: 14px; }
+.drw-dl { margin: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr); row-gap: 14px; padding-top: 20px; border-top: 0.5px solid var(--separator); font-size: 14px; }
 .drw-dl dt { color: var(--drw-soft); }
 .drw-dl dd { margin: 0; }
 

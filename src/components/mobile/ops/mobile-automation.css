@@ -78,12 +78,12 @@
 .mat-list { display: flex; flex-direction: column; }
 .mat-group { padding: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--mat-mute); }
 .mat-job {
-  display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 10px 0; border: 0; border-top: 1px solid var(--mat-hair);
+  display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 10px 0; border: 0; border-top: 0.5px solid var(--separator);
   border-radius: 0; background: transparent; color: var(--mat-ink); text-align: left; cursor: pointer;
   animation: mat-rise 340ms var(--mat-ease) both; animation-delay: calc(140ms + var(--i, 0) * 40ms);
   transition: transform 160ms var(--mat-ease), background-color 160ms ease, border-radius 160ms ease;
 }
-.mat-job:last-child { border-bottom: 1px solid var(--mat-hair); }
+.mat-job:last-child { border-bottom: 0.5px solid var(--separator); }
 .mat-job:active { transform: scale(.97); }
 .mat-job__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .mat-job__t b { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
@@ -119,7 +119,7 @@
 .mat-switch:disabled { cursor: not-allowed; opacity: .55; }
 .mat-ro { margin: 8px 0 0; font-size: 12px; color: var(--mat-soft); }
 
-.mat-tabs { position: relative; display: flex; gap: 22px; margin-top: 14px; border-bottom: 1px solid var(--mat-line); overflow-x: auto; scrollbar-width: none; }
+.mat-tabs { position: relative; display: flex; gap: 22px; margin-top: 14px; border-bottom: 0.5px solid var(--separator); overflow-x: auto; scrollbar-width: none; }
 .mat-tabs::-webkit-scrollbar { display: none; }
 .mat-tab {
   flex: none; height: 44px; padding: 0; border: 0; background: transparent; font-size: 14px; color: var(--mat-soft); cursor: pointer; white-space: nowrap;
@@ -203,7 +203,7 @@
 /* ── 실행 기록 ── */
 .mat-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .mat-run {
-  display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 0; border-top: 1px solid var(--mat-hair);
+  display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 0; border-top: 0.5px solid var(--separator);
   animation: mat-rise 300ms var(--mat-ease) both; animation-delay: calc(var(--i, 0) * 30ms);
 }
 .mat-run:first-child { border-top: 0; }

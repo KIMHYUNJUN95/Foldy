@@ -41,7 +41,7 @@ export default async function SupportPage({ searchParams }: PageProps) {
 
         <section className="mt-8">
           <h2 className="text-[16px] font-extrabold">{content.faqHeading}</h2>
-          <dl className="mt-3 divide-y divide-border/70">
+          <dl className="mt-3 divide-y-[0.5px] divide-[var(--separator)]">
             {content.faqs.map((faq) => (
               <div className="py-3.5" key={faq.q}>
                 <dt className="text-[14px] font-bold">{faq.q}</dt>

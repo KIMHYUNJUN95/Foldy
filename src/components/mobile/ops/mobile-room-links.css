@@ -66,7 +66,7 @@
 .mrl-tab:active { transform: scale(.97); }
 
 /* ── 건물 머리 ── */
-.mrl-bh { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--mrl-line); animation: mrl-fade 220ms ease both; }
+.mrl-bh { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 0.5px solid var(--separator); animation: mrl-fade 220ms ease both; }
 .mrl-bh__t { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
 .mrl-bh h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
 .mrl-bh__t span { font-size: 13px; color: var(--mrl-faint); }
@@ -96,7 +96,7 @@
 /* ── 객실 줄 ── */
 .mrl-list { display: flex; flex-direction: column; }
 .mrl-row {
-  position: relative; display: flex; align-items: center; gap: 10px; min-height: 64px; border-top: 1px solid var(--mrl-hair);
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 64px; border-top: 0.5px solid var(--separator);
   animation: mrl-rise 320ms var(--mrl-ease) both; animation-delay: calc(var(--i, 0) * 30ms);
 }
 .mrl-row:first-child { border-top: 0; }
@@ -129,13 +129,13 @@
 
 /* ── 상세(바텀시트 안 · 태블릿 오른쪽 칸) ── */
 .mrl-d { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.mrl-d__head { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 12px; border-bottom: 1px solid var(--mrl-line); }
+.mrl-d__head { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 12px; border-bottom: 0.5px solid var(--separator); }
 .mrl-d__b { font-size: 13px; color: var(--mrl-soft); }
 .mrl-d__head > b { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
 .mrl-d__sub { font-size: 12px; color: var(--mrl-faint); }
 .mrl-d__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding-bottom: 8px; }
 .mrl-d__body::-webkit-scrollbar { display: none; }
-.mrl-u { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-top: 1px solid var(--mrl-line); }
+.mrl-u { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-top: 0.5px solid var(--separator); }
 .mrl-u:first-child { border-top: 0; }
 .mrl-u__t { display: flex; align-items: center; gap: 10px; }
 .mrl-u__t b { font-size: 15px; font-weight: 700; }
@@ -156,7 +156,7 @@
 .mrl-big:active { transform: scale(.97); }
 .mrl-u__links { display: flex; flex-wrap: wrap; gap: 0 22px; margin-bottom: -8px; }
 .mrl-u__memo { margin: 4px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--mrl-field); font-size: 12.5px; line-height: 1.5; color: var(--mrl-ink2); }
-.mrl-d__foot { margin: 0; padding-top: 12px; border-top: 1px solid var(--mrl-line); font-size: 12px; color: var(--mrl-faint); }
+.mrl-d__foot { margin: 0; padding-top: 12px; border-top: 0.5px solid var(--separator); font-size: 12px; color: var(--mrl-faint); }
 
 /* ── 펼친 폴드 · 태블릿 세로(≥ 600) — 폰과 같은 한 줄, 가운데 540px. 상세는 그대로 바텀시트. ── */
 @media (min-width: 600px) {

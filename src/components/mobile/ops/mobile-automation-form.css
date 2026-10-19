@@ -20,7 +20,7 @@
 .maf-muted { color: var(--maf-faint); font-size: 13px; }
 
 /* ── 줄 ── */
-.maf-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-top: 1px solid var(--maf-line); min-width: 0; }
+.maf-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-top: 0.5px solid var(--separator); min-width: 0; }
 .maf-l { font-size: 14px; color: var(--maf-body); }
 .maf-sl { flex: 1; min-width: 0; font-size: 13px; color: var(--maf-soft); }
 .maf-v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; animation: maf-tick 260ms var(--maf-ease) both; }
@@ -33,7 +33,7 @@
 @keyframes maf-tick { from { opacity: 0; transform: translateY(3px); } }
 
 /* 시각 줄 — 투명한 기기 입력이 줄 전체를 덮는다 */
-.maf-time { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 0; min-height: 44px; border-top: 1px solid var(--maf-line); justify-content: center; }
+.maf-time { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 0; min-height: 44px; border-top: 0.5px solid var(--separator); justify-content: center; }
 .maf-time.is-sub { padding: 0; border-top: 0; }
 .maf-time__top { display: flex; align-items: center; gap: 8px; min-height: 28px; }
 .maf-time.is-sub .maf-time__top { min-height: 44px; }
@@ -160,7 +160,7 @@
 .maf-save.is-lifted { transform: translateY(calc(-1 * var(--maf-lift, 0px))); }
 .maf-save::before {
   content: ""; position: absolute; inset: 0 -28px -48px; z-index: -1;
-  background: #fff; box-shadow: 0 -1px 0 var(--separator);
+  background: #fff; box-shadow: 0 -0.5px 0 var(--separator);
 }
 .maf-save__t { flex: 1; min-width: 0; font-size: 12px; color: var(--maf-soft); }
 .maf-save__t b { color: var(--maf-ink); }
@@ -188,7 +188,7 @@
 
 .maf-agroup { display: flex; flex-direction: column; min-width: 0; }
 .maf-ar {
-  display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--maf-line); min-width: 0;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 0.5px solid var(--separator); min-width: 0;
   animation: maf-up 360ms var(--maf-ease) both; animation-delay: calc(var(--i, 0) * 28ms);
 }
 @keyframes maf-up { from { opacity: 0; transform: translateY(6px); } }
@@ -222,7 +222,7 @@
 .maf-input:disabled { color: var(--maf-soft, #6b6878); }
 
 .maf-addrow {
-  display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 1px solid var(--maf-line);
+  display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 0.5px solid var(--separator);
   background: transparent; font-size: 14px; font-weight: 600; color: var(--maf-pri-ink); text-align: left; transition: opacity 140ms ease;
 }
 .maf-addrow span { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--maf-faint); }

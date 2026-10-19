@@ -114,7 +114,7 @@
 .adm .cl-group button.on { background: #f1ecfd; color: #5a30cf; font-weight: 600; }
 
 /* KPI 줄 — 라벨 · 큰 숫자 · 단위, 칸 사이 선 없음, 아래 가는 줄 하나 */
-.adm .cl-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; padding: 20px 22px 22px; border-bottom: 1px solid var(--separator); margin-bottom: 8px; }
+.adm .cl-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; padding: 20px 22px 22px; border-bottom: 0.5px solid var(--separator); margin-bottom: 8px; }
 .adm .cl-kpis--5 { grid-template-columns: 1fr 1.4fr 1fr 1fr 1fr; padding-top: 12px; }
 .adm .cl-kpi { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .adm .cl-kpi__k { font-size: 13px; color: #6b6878; }
@@ -169,11 +169,11 @@
 @media (max-width: 1180px) { .adm .cl-bk, .adm .cl-bk--4 { grid-template-columns: 1fr; } }
 
 /* 셋팅 대상 | 직원별 요약 — 두 칸 */
-.adm .cl-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--separator); }
+.adm .cl-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; margin-top: 30px; padding-top: 26px; border-top: 0.5px solid var(--separator); }
 .adm .cl-split:not(:has(.cl-split__col)) { display: none; }
 .adm .cl-sub { font-size: 13px; color: var(--text-3); margin: -6px 0 10px; }
 .adm .cl-list { display: flex; flex-direction: column; }
-.adm .cl-setrow { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 6px 8px; margin: 0 -8px; border-top: 1px solid var(--separator); border-radius: 10px; cursor: pointer; }
+.adm .cl-setrow { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 6px 8px; margin: 0 -8px; border-top: 0.5px solid var(--separator); border-radius: 10px; cursor: pointer; }
 .adm .cl-setrow:hover { background: #f7f7f9; }
 .adm .cl-setrow.sel { background: #f1ecfd; }
 .adm .cl-setrow__rm { font-size: 14px; font-weight: 700; min-width: 64px; color: #16141f; }
@@ -207,8 +207,8 @@
 .adm .ctoolbar .dd.dd { width: auto; flex: 0 0 auto; }
 .adm .ctoolbar .qsearch { min-width: 180px; }
 .adm .cl-tbl { width: 100%; border-collapse: collapse; font-size: 14px; color: #16141f; }
-.adm .cl-tbl th { text-align: left; font-size: 12px; font-weight: 500; color: var(--text-3); padding: 10px 12px; border-bottom: 1px solid #ececf0; white-space: nowrap; }
-.adm .cl-tbl td { padding: 14px 12px; border-bottom: 1px solid var(--separator); vertical-align: middle; white-space: nowrap; }
+.adm .cl-tbl th { text-align: left; font-size: 12px; font-weight: 500; color: var(--text-3); padding: 10px 12px; border-bottom: 0.5px solid var(--separator); white-space: nowrap; }
+.adm .cl-tbl td { padding: 14px 12px; border-bottom: 0.5px solid var(--separator); vertical-align: middle; white-space: nowrap; }
 .adm .cl-tbl .r { text-align: right; }
 .adm .cl-tbl .b { font-weight: 700; }
 .adm .cl-tbl .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }

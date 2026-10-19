@@ -40,7 +40,7 @@ export function MyReportsList({
       {reports.length === 0 ? (
         <p className={bare ? "py-6 text-center text-[13px] text-text-3" : "mt-2 text-[13px] font-semibold text-muted-foreground"}>{copy.empty}</p>
       ) : (
-        <ul className={bare ? "mt-2 divide-y divide-[var(--separator)]" : "mt-2 divide-y divide-border/70"}>
+        <ul className={bare ? "mt-2 divide-y-[0.5px] divide-[var(--separator)]" : "mt-2 divide-y-[0.5px] divide-[var(--separator)]"}>
           {reports.map((r) => (
             <li className={bare ? "flex min-h-[56px] items-center justify-between gap-3 py-2" : "flex items-center justify-between gap-3 py-2"} key={r.id}>
               <div className="min-w-0">

@@ -106,7 +106,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   const profilePanel = (
     <div className={panelCard}>
-      <div className="border-b border-border/70 px-5 py-3.5">
+      <div className="border-b-[0.5px] border-[var(--separator)] px-5 py-3.5">
         <span className="text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">
           {ap.tabProfile}
         </span>
@@ -114,7 +114,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       <form action={updateAccountProfile} className="grid gap-3.5 p-5">
         <input name="mode" type="hidden" value={shellMode} />
         {/* 신원 행 — 폼 맨 위에서 "누구의 계정을 고치는 중인지"를 먼저 보여준다. */}
-        <div className="flex items-center gap-3 border-b border-border/70 pb-4">
+        <div className="flex items-center gap-3 border-b-[0.5px] border-[var(--separator)] pb-4">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-primary text-[17px] font-extrabold text-primary-foreground">
             {session.user.name.slice(0, 1)}
           </span>
@@ -234,7 +234,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   const organizationPanel = (
     <div className={panelCard}>
-      <div className="border-b border-border/70 px-5 py-3.5">
+      <div className="border-b-[0.5px] border-[var(--separator)] px-5 py-3.5">
         <span className="text-[11px] font-black uppercase tracking-[0.05em] text-muted-foreground">
           {ap.tabOrganization}
         </span>

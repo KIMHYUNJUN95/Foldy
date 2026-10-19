@@ -282,7 +282,7 @@
   padding: 13px 2px;
 }
 .hm__cio-row + .hm__cio-row {
-  border-top: 1px solid var(--hm-line-soft);
+  border-top: 0.5px solid var(--separator);
 }
 .hm__cio-b {
   flex: 1;
@@ -486,7 +486,7 @@
   min-height: 52px;
 }
 .hm__log-r + .hm__log-r {
-  border-top: 1px solid var(--separator);
+  border-top: 0.5px solid var(--separator);
   border-image: linear-gradient(90deg, transparent 20px, var(--separator) 20px) 1;
 }
 .hm__log-ic {
@@ -544,7 +544,7 @@
   .hm__blk + .hm__blk:not(:empty) {
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid var(--separator);
+    border-top: 0.5px solid var(--separator);
   }
   .hm__blk--notice:empty {
     display: none;
@@ -636,7 +636,7 @@
   .hm__blk--stats .hm__stat { display: grid; grid-template-columns: 1fr auto; align-items: center; }
   .hm__blk--stats .hm__stat-k { grid-row: 1; }
   .hm__blk--stats .hm__stat-v { grid-row: 1; grid-column: 2; font-size: 34px; }
-  .hm__blk--log { margin-top: 22px; padding-top: 4px; border-top: 1px solid var(--separator); }
+  .hm__blk--log { margin-top: 22px; padding-top: 4px; border-top: 0.5px solid var(--separator); }
 }
 
 @media (min-width: 1000px) and (min-height: 600px) {

@@ -344,7 +344,7 @@ function CalendarPanel({
             </div>
           ) : null}
 
-          <div className="mt-2 flex items-center gap-2 border-t border-border/70 pt-4">
+          <div className="mt-2 flex items-center gap-2 border-t-[0.5px] border-[var(--separator)] pt-4">
             <button
               className="h-11 flex-1 rounded-xl border border-border bg-background/70 text-sm font-bold text-foreground transition-colors hover:bg-muted/60"
               onClick={handleClear}

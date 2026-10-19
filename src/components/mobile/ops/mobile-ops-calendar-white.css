@@ -172,12 +172,12 @@
 /* ── 격자 ─────────────────────────────────────────────────────────────── */
 .mops .mops-grid { border: 0; background: #fff; }
 /* 붙어 있는 머리 — 달 줄(22) · 날짜(40) · 빈 방(24) · 평균가(24) + 아래 선. 높이는 TSX `HEAD_H` 와 짝. */
-.mops .mops-head { flex-direction: column; background: #fff; border-bottom: 1px solid var(--mw-line); }
+.mops .mops-head { flex-direction: column; background: #fff; border-bottom: 0.5px solid var(--separator); }
 .mops .mops-head__months,
 .mops .mops-head__days,
 .mops .mops-head__sum { display: flex; flex: none; }
 .mops .mops-head__months { height: 22px; }
-.mops .mops-head__days { border-bottom: 1px solid var(--mw-line); }
+.mops .mops-head__days { border-bottom: 0.5px solid var(--separator); }
 .mops .mops-head__sum { height: 24px; }
 .mops .mops-corner {
   justify-content: flex-start;
@@ -247,14 +247,14 @@
 .mops .mops-group {
   padding: 10px 12px 6px 8px;
   background: #fff;
-  border-bottom: 1px solid var(--mw-line2);
+  border-bottom: 0.5px solid var(--separator);
   font-size: 11px;
   font-weight: 400;
   color: var(--mw-faint);
 }
 .mops .mops-group__name { font-size: 12px; font-weight: 700; color: var(--mw-ink); }
 .mops .mops-row {
-  border-bottom: 1px solid var(--mw-line2);
+  border-bottom: 0.5px solid var(--separator);
   animation: mw-row-in 0.26s var(--mw-ease) both;
   animation-delay: calc(var(--mops-i, 0) * 16ms);
 }
@@ -516,12 +516,12 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 0;
-  border-top: 1px solid var(--separator);
+  border-top: 0.5px solid var(--separator);
   font-size: 14px;
 }
 .mops-binfo .mops-binfo__list dt { flex: none; font-weight: 400; color: #6b6878; }
 .mops-binfo .mops-binfo__list dd { font-weight: 400; color: #16141f; text-align: right; font-variant-numeric: tabular-nums; }
-.mops-binfo .mops-binfo__none { padding: 12px 0; border-top: 1px solid var(--separator); font-size: 14px; font-weight: 400; color: #6b6878; }
+.mops-binfo .mops-binfo__none { padding: 12px 0; border-top: 0.5px solid var(--separator); font-size: 14px; font-weight: 400; color: #6b6878; }
 .mops-binfo__hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 
 /* ── 반영 알림(탭 바 위 먹색 알약) ──────────────────────────────────────────── */

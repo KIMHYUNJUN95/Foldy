@@ -84,7 +84,7 @@ export function SettingTargetsSheet({
               {items.length > 0 ? (
                 items.map((item, idx) => (
                   <div
-                    className={`flex items-start justify-between gap-3 py-3.5 ${idx < items.length - 1 ? "border-b border-border/50" : ""}`}
+                    className={`flex items-start justify-between gap-3 py-3.5 ${idx < items.length - 1 ? "border-b-[0.5px] border-[var(--separator)]" : ""}`}
                     key={item.roomLabel}
                   >
                     <div className="min-w-0 flex-1">

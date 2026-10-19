@@ -102,7 +102,7 @@
 }
 /* 구역은 상자 없이 — 두 번째 구역부터 옅은 가로선 하나. */
 .obd__sec { margin-top: 28px; }
-.obd__sec + .obd__sec { margin-top: 26px; padding-top: 28px; border-top: 1px solid var(--line-soft); }
+.obd__sec + .obd__sec { margin-top: 26px; padding-top: 28px; border-top: 0.5px solid var(--separator); }
 .obd__sech { display: none; }
 .obd__grid {
   display: grid;

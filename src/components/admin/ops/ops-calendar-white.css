@@ -145,7 +145,7 @@
   color: var(--scw-ink); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .adm .scw-pp__row.on .scw-pp__name { font-weight: 600; }
-.adm .scw-pp__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 8px 6px 2px; border-top: 1px solid var(--scw-hair); }
+.adm .scw-pp__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 8px 6px 2px; border-top: 0.5px solid var(--separator); }
 .adm .scw-pp__all { font-size: 13px; color: var(--scw-mute); text-decoration: none; padding: 6px 4px; }
 .adm .scw-pp__all.on { color: var(--scw-v-ink); font-weight: 600; }
 .adm .scw-pp__done { border: 0; background: transparent; padding: 6px 4px; font: inherit; font-size: 13px; font-weight: 600; color: var(--scw-v-ink); cursor: pointer; transition: transform 140ms var(--scw-ease); }
@@ -232,7 +232,7 @@
 
 /* ── 격자 ─────────────────────────────────────────────────────────── */
 .adm .scw .opsg { background: #fff; border: 0; border-radius: 0; box-shadow: none; }
-.adm .scw .opsg__head { background: #fff; border-bottom: 1px solid var(--scw-line); box-shadow: none; }
+.adm .scw .opsg__head { background: #fff; border-bottom: 0.5px solid var(--separator); box-shadow: none; }
 .adm .scw .opsg__corner {
   border-right: 0; padding: 0; flex-direction: column; align-items: stretch; justify-content: flex-end;
   font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--scw-faint);
@@ -269,11 +269,11 @@
 .adm .scw-sum__c.m1 { box-shadow: inset 2px 0 0 var(--scw-v); }
 
 .adm .scw .opsg__group {
-  height: 28px; padding: 0 12px; gap: 6px; background: #fff; border-bottom: 1px solid var(--scw-hair);
+  height: 28px; padding: 0 12px; gap: 6px; background: #fff; border-bottom: 0.5px solid var(--separator);
   font-size: 12px; font-weight: 700; color: var(--scw-ink);
 }
 .adm .scw .opsg__gcount { font-size: 11px; font-weight: 400; color: var(--scw-faint); }
-.adm .scw .opsg__row { border-bottom: 1px solid var(--scw-hair); }
+.adm .scw .opsg__row { border-bottom: 0.5px solid var(--separator); }
 .adm .scw .opsg__row + .opsg__row { border-top: 0; }
 .adm .scw .opsg__label { border-right: 0; background: #fff; padding: 0 8px 0 12px; }
 .adm .scw .opsg__rn { font-size: 14px; font-weight: 700; color: var(--scw-ink); }

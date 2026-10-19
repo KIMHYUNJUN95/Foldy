@@ -213,7 +213,7 @@ export function MaintenanceLinkedForm({
                   />
                 </button>
                 {categoryOpen && (
-                  <ul className="absolute left-0 z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-glass backdrop-blur-xl divide-y divide-border/20">
+                  <ul className="absolute left-0 z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-glass backdrop-blur-xl divide-y-[0.5px] divide-[var(--separator)]">
                     {maintenanceCategories.map((key) => (
                       <li
                         className={cn(

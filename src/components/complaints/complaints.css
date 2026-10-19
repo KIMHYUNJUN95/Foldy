@@ -472,7 +472,7 @@
   padding: 10px 0;
 }
 .cx-meta__row + .cx-meta__row {
-  border-top: 1px solid var(--line-soft);
+  border-top: 0.5px solid var(--separator);
 }
 .cx-meta__l {
   display: inline-flex;
@@ -1838,7 +1838,7 @@ textarea.cx-fld {
   align-items: center;
   gap: 5px;
   padding-top: 10px;
-  border-top: 1px solid var(--line-soft);
+  border-top: 0.5px solid var(--separator);
   font-size: 11px;
   font-weight: 600;
   color: var(--cx-muted);
@@ -2227,7 +2227,7 @@ textarea.cx-fld {
   justify-content: space-between;
   gap: 12px;
   padding: 9px 0;
-  border-top: 1px solid var(--line-soft);
+  border-top: 0.5px solid var(--separator);
 }
 .cx-kvrow:first-child {
   border-top: none;

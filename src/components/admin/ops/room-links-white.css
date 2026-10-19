@@ -71,7 +71,7 @@
 
 /* 가운데 */
 .adm .rlw-mid { flex: 1; min-width: 0; }
-.adm .rlw-bh { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--rlw-line); }
+.adm .rlw-bh { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 0.5px solid var(--separator); }
 .adm .rlw-bh__t { display: flex; align-items: baseline; gap: 10px; }
 .adm .rlw-bh__t h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
 .adm .rlw-bh__t span { font-size: 13px; color: var(--rlw-faint); }
@@ -141,10 +141,10 @@
 .adm .rlw-thead, .adm .rlw-row {
   display: grid; grid-template-columns: 70px minmax(150px, 190px) minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 0 12px;
 }
-.adm .rlw-thead { height: 38px; font-size: 12px; color: var(--rlw-faint); border-bottom: 1px solid var(--rlw-line); }
+.adm .rlw-thead { height: 38px; font-size: 12px; color: var(--rlw-faint); border-bottom: 0.5px solid var(--separator); }
 .adm .rlw-thead span:last-child { text-align: right; min-width: 150px; }
 .adm .rlw-row {
-  min-height: 60px; padding-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--rlw-hair); border-radius: 0; cursor: pointer;
+  min-height: 60px; padding-top: 8px; padding-bottom: 8px; border-bottom: 0.5px solid var(--separator); border-radius: 0; cursor: pointer;
   transition: background-color 200ms ease;
   animation: rlw-rise 320ms var(--rlw-ease) both; animation-delay: calc(var(--i, 0) * 28ms);
 }
@@ -182,7 +182,7 @@
 .adm .rlw-pane__h small { font-size: 12px; color: var(--rlw-faint); }
 .adm .rlw-pane__foot { padding-top: 14px; font-size: 12px; color: var(--rlw-faint); }
 
-.adm .rlw-unit { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; border-top: 1px solid var(--rlw-line); }
+.adm .rlw-unit { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; border-top: 0.5px solid var(--separator); }
 .adm .rlw-unit__h { display: flex; align-items: center; gap: 10px; }
 .adm .rlw-unit__h > b { font-size: 15px; }
 .adm .rlw-unit__h .rlw-sell { font-size: 12px; }
@@ -227,7 +227,7 @@
 .adm .rlw-addlink > span { font-size: 18px; line-height: 1; }
 .adm .rlw-addlink:hover { background: #f8f7fb; }
 .adm .rlw-addlink.is-row { margin-top: 6px; }
-.adm .rlw-badd { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--rlw-line); }
+.adm .rlw-badd { margin-top: 6px; padding-top: 4px; border-top: 0.5px solid var(--separator); }
 
 /* 이름 한 칸 폼 — 건물 추가 · 이름 바꾸기 */
 .adm .rlw-nform { display: flex; flex-direction: column; gap: 8px; animation: rlw-drop 240ms var(--rlw-ease) both; }
@@ -265,7 +265,7 @@
 
 /* 상세 — 직접 추가한 객실 */
 .adm .rlw-pane__name { display: flex; align-items: center; gap: 8px; }
-.adm .rlw-pane__acts { display: flex; align-items: center; gap: 16px; padding-top: 14px; border-top: 1px solid var(--rlw-line); }
+.adm .rlw-pane__acts { display: flex; align-items: center; gap: 16px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
 .adm .rlw-pane__acts .rlw-nform { flex: 1; }
 .adm .rlw-pane.is-empty { padding-top: 8px; font-size: 13px; color: var(--rlw-faint); }
 

@@ -117,7 +117,7 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
         </div>
 
         <div className="panel__body rcw-pb">
-          <RecruitContactLine application={a} copy={copy} />
+          <RecruitContactLine key={a.id} application={a} copy={copy} />
 
           {a.isLegacyForm ? <p className="rcw-legacy">{`${copy.legacyNoticeTitle} — ${copy.legacyNoticeBody}`}</p> : null}
 
@@ -178,7 +178,8 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
             <p className="rcw-legacy">{`${copy.noResumeTitle} — ${copy.noResumeBody}`}</p>
           )}
 
-          <RecruitNoteField application={a} copy={copy} />
+          {/* key: 지원자를 바꾸면 입력값을 새로 받는다. 없으면 이전 지원자 메모가 남아 blur 때 새 지원자에게 저장된다. */}
+          <RecruitNoteField key={a.id} application={a} copy={copy} />
         </div>
 
         <RecruitPanelActions application={a} copy={copy} />

@@ -1,5 +1,7 @@
 import "server-only";
+import { resolveFirestoreProjectId } from "@/lib/recruit/firestore";
 import { normalizeApplication, type NormalizedApplication, type RecruitSource } from "@/lib/recruit/payload";
+import { isAllowedResumeSourceUrl } from "@/lib/recruit/resume-source";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -16,6 +18,10 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
  */
 
 export const RESUME_BUCKET = "recruit-resumes";
+
+/** 버킷 `file_size_limit` 과 같다. 넘는 파일은 어차피 올라가지 않으므로 받지도 않는다. */
+const RESUME_MAX_BYTES = 10 * 1024 * 1024;
+const RESUME_FETCH_TIMEOUT_MS = 20_000;
 
 export type IngestResult =
   | { ok: true; id: string; created: boolean; resumeStored: boolean }
@@ -61,12 +67,39 @@ function storageFileName(name: string | null): string {
   return ext ? `resume.${ext}` : "resume";
 }
 
+/** content-length 가 없거나 거짓이어도 상한을 넘기면 끊는다. 넘으면 null. */
+async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+  if (!response.body) return new Uint8Array(await response.arrayBuffer());
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 /**
  * 이력서 파일을 Foldy 비공개 버킷으로 복사한다.
  *
  * **왜 링크만 저장하지 않나.** 원본은 토큰이 박힌 Firebase 다운로드 URL이라 URL 을 아는 사람이면
  * 누구나 열 수 있고, 채용 사이트를 접거나 파일을 지우면 링크가 죽는다. 지원서는 채용 이력으로
  * 남아야 하므로 사본을 갖는다.
+ *
+ * **허용된 주소만 받는다**(`isAllowedResumeSourceUrl`) — 주소는 지원자가 마음대로 넣을 수 있다.
  *
  * 실패해도 지원서 수신 자체는 성공으로 둔다 — 접수 기록을 잃는 것이 훨씬 큰 손해다.
  * `resume_source_url` 은 남으므로 나중에 재시도할 수 있다(`job_applications_resume_pending_idx`).
@@ -77,14 +110,31 @@ async function copyResumeToStorage(args: {
   sourceUrl: string;
   fileName: string | null;
 }): Promise<string | null> {
+  if (!isAllowedResumeSourceUrl(args.sourceUrl, resolveFirestoreProjectId())) {
+    console.warn(`[recruit/ingest] resume source not allowed for ${args.applicationId}`);
+    return null;
+  }
   try {
-    const response = await fetch(args.sourceUrl);
-    if (!response.ok) {
+    // 리다이렉트를 따라가면 허용 검사를 우회할 수 있다. Firebase 다운로드 URL 은 바로 200 을 준다.
+    const response = await fetch(args.sourceUrl, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(RESUME_FETCH_TIMEOUT_MS),
+    });
+    if (response.status !== 200) {
       console.warn(`[recruit/ingest] resume fetch failed (${response.status}) for ${args.applicationId}`);
       return null;
     }
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > RESUME_MAX_BYTES) {
+      console.warn(`[recruit/ingest] resume too large (${declared}) for ${args.applicationId}`);
+      return null;
+    }
     const contentType = response.headers.get("content-type") ?? "application/octet-stream";
-    const body = new Uint8Array(await response.arrayBuffer());
+    const body = await readCapped(response, RESUME_MAX_BYTES);
+    if (!body) {
+      console.warn(`[recruit/ingest] resume exceeded size cap for ${args.applicationId}`);
+      return null;
+    }
     const path = `${args.organizationId}/${args.applicationId}/${storageFileName(args.fileName)}`;
 
     const supabase = getSupabaseServiceClient();

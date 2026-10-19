@@ -9,6 +9,26 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — 성능 2차: 화면 대기 · DB 부하 · 리뷰 집계 버그
+
+- **DB 사양**: Supabase Free(Nano) → Pro + Micro(메모리 0.5 → 1GB). 08:00 · 11:40 몰림 때 DB 가 몇 분씩 멈추던 것 대응. 효과는 다음 몰림 때 재확인.
+- **리뷰(버그)**: 목록 `limit(500)`(90일 512건 중 12건 누락)과 집계의 1,000행 상한(365일 1,700건 중 1,000건만 셈)을 고쳐 기간 내 전부 읽는다.
+  PC · 모바일 기본 기간은 `defaultReviewRange`(도쿄, 오늘 포함 90일)로 통일. 문서 25.
+- **공통 경로**: 세션 · 온보딩 · 관리자 게이트가 같은 사용자 행을 따로 읽던 것(화면당 약 10쿼리)을 `getIdentityRows()` 한 배치(4쿼리)로.
+  모바일 56개 화면이 메뉴 배지를 먼저 시작, 게시판 · 공지 안 읽음 수 1단, rooms · 게시판 숨김 요청 캐시, 공지 · 게시판 읽음 기록 `after()`.
+  `getUser()`(계정 정지 확인)는 유지.
+- **근태 · 급여**: 급여 N+1(직원 11명 ≈ 140쿼리) → 조직 단위 한 번(13쿼리, `computePayrollMonth`). 운영 데이터 70건 1엔 단위 동일 확인.
+  근태 개요 약 170 → 27쿼리, 직원 상세 12 → 2단계. 급여 규칙이 `getMonthlyPayView` 와 `computePayrollMonth` 두 곳 — `admin-payroll-batch.test.ts` 가 일치를 지킨다.
+- **관리자 홈 · 캘린더 · 청소**: 예약 읽기 9 → 6, 캘린더 · 청소는 `raw_payload` 필요한 키만(`reservation-payload-slim.ts`, 약 2MB → 수십 KB),
+  메모 5번 직렬 → 1번, 모바일 청소 9단계 → 1번. 홈 · 청소는 예약 신호만, `/admin/calendar` 는 예약 · 차단 신호만 받는다.
+  첫 체크인 RPC 두 개 + 부분 인덱스(마이그레이션 `202610190004`, 적용 완료).
+- **Beds24 웹훅**: 최소숙박 동기화를 응답 뒤로 · 건물별 10분에 한 번 · 바뀐 방만 UPDATE(방 활성 판정용 값, 최대 10분 늦게 반영). 신호 · 이벤트 기록도 응답 뒤.
+  응답 전 DB 왕복 약 23 → 12, Beds24 호출 0. 방 이름 복구는 방 번호 키만 키셋으로. `duration_ms` 열 추가(`202610190005`, 적용 완료 — 기록 코드는 다음).
+- **판매 캘린더**: 읽기 조회 5개(작업 상태 · 전송 기록 · 칸 이력 · 가격 개입 · 최근 예약)를 서버 액션 → `GET /api/ops/calendar/*` 로 옮겨, 폴링이 저장 · 상세 열기를 막지 않는다.
+- **화면 쪽**: revalidate 하는 액션 뒤 `router.refresh()` 약 30곳 제거, React Compiler 가 건너뛰던 투두 · 예약 콘솔 등 복구,
+  Noto Sans KR/JP 가변 폰트 한 벌(@font-face 744 → 124), 모바일 예약 캘린더 갱신 채널 하나로.
+- 남은 것: 요금 동기화 「바뀐 칸만 쓰기」(신선도 표 먼저), 다국어 사전 클라이언트 번들 분리, 진입 모션 단축(디자인 결정), 리뷰 365일 목록 페이지 나누기.
+
 ## 2026-10-16 — 플랫폼 개발자는 어디서나 「개발자」
 
 - 모바일 직원 목록 · 게시판 · 버그 신고 · 근태 출근자 명단 · 연차 승인 큐 · 제안함 고르기 · 사용자 삭제 확인에서 개발자 계정이

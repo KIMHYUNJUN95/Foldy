@@ -14,7 +14,7 @@
   --mw-soft: #3a3746;
   --mw-body: #4c4958;
   --mw-muted: #6b6878;
-  --mw-faint: #8b8898;
+  --mw-faint: var(--text-3);
   --mw-ghost: #c9c6d3;
   --mw-pri: #7a52e6;
   --mw-pri-ink: #5a30cf;
@@ -115,7 +115,7 @@
   padding: 0 10px;
   gap: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
   font-size: 13px;
   font-weight: 500;
@@ -398,7 +398,7 @@
   font-variant-numeric: tabular-nums;
 }
 .mops-dock .mops-dock__info p span::before,
-.mops-scope__sum p span::before { content: "·"; margin: 0 6px; color: #8b8898; }
+.mops-scope__sum p span::before { content: "·"; margin: 0 6px; color: var(--text-3); }
 .mops-dock__clear,
 .mops-scope__sum > button {
   flex: none;
@@ -462,7 +462,7 @@
   letter-spacing: 0;
   color: #6b6878;
 }
-.mops-scope__label em { font-style: normal; font-weight: 400; color: #8b8898; font-variant-numeric: tabular-nums; }
+.mops-scope__label em { font-style: normal; font-weight: 400; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .mops-wseg { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: #f2f2f5; }
 .mops-wseg.wrap { flex-wrap: wrap; }
 .mops-wseg > button {
@@ -491,7 +491,7 @@
 .mops-scope__days > button {
   height: 40px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
   font-size: 13px;
   font-weight: 500;
@@ -522,7 +522,7 @@
 .mops-binfo .mops-binfo__list dt { flex: none; font-weight: 400; color: #6b6878; }
 .mops-binfo .mops-binfo__list dd { font-weight: 400; color: #16141f; text-align: right; font-variant-numeric: tabular-nums; }
 .mops-binfo .mops-binfo__none { padding: 12px 0; border-top: 1px solid #f3f3f6; font-size: 14px; font-weight: 400; color: #6b6878; }
-.mops-binfo__hint { margin: 0; font-size: 12px; line-height: 1.5; color: #8b8898; }
+.mops-binfo__hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 
 /* ── 반영 알림(탭 바 위 먹색 알약) ──────────────────────────────────────────── */
 .mops-toast.mops-toast {

@@ -19,7 +19,7 @@
 .fem__sh { width: 96px; height: 12px; margin-top: -2px; border-radius: 50%; background: radial-gradient(closest-side, rgba(122, 82, 230, .26), rgba(122, 82, 230, 0)); animation: fem-sh 6s cubic-bezier(.37, 0, .63, 1) infinite; }
 .fem__t { margin-top: 20px; font-size: 17px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
 .fem--compact .fem__t { margin-top: 12px; font-size: 15px; }
-.fem__s { margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: #8b8898; }
+.fem__s { margin: 6px 0 0; font-size: 13px; line-height: 1.55; color: var(--text-3); }
 @keyframes fem-f0 { 50% { transform: translateY(-4px); } }
 @keyframes fem-f1 { 50% { transform: translateY(-9px); } }
 @keyframes fem-f2 { 50% { transform: translateY(-14px) rotate(-1.2deg); } }

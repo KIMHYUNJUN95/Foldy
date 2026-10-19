@@ -478,7 +478,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--adm-muted);
@@ -847,7 +847,7 @@
 /* ═══ 화이트 리디자인 (2026-10-14, 시안 FB-PC · FBManual-PC · FBNewCx-PC · FBDelete-PC · FBRooms-PC) ═══
    흰 바탕 · 상자 · 세로 구분선 없음 · 선택은 옅은 보라 바탕만. 움직임: 줄 차례 등장 · 막대 채움 · 누름 반응 ·
    처리 완료 체크 그리기. prefers-reduced-motion 이면 모두 끈다. */
-.adm .cxw { --cx-ink: #16141f; --cx-sub: #6b6878; --cx-mute: #8b8898; --cx-line: #f3f3f6; --cx-pri: #7a52e6; --cx-pri-ink: #5a30cf; --cx-bad: #c5282e; --cx-ok: #1f7a4d; }
+.adm .cxw { --cx-ink: #16141f; --cx-sub: #6b6878; --cx-mute: var(--text-3); --cx-line: #f3f3f6; --cx-pri: #7a52e6; --cx-pri-ink: #5a30cf; --cx-bad: #c5282e; --cx-ok: #1f7a4d; }
 .adm .cxw .num, .adm .cxw-panel .num { font-variant-numeric: tabular-nums; }
 .adm .cxw-viewbar { flex-wrap: wrap; row-gap: 8px; margin-bottom: 6px; }
 .adm .cxw-viewbar__sp { flex: 1; }
@@ -870,7 +870,7 @@
 .adm .cxw-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: #f2f2f5; }
 .adm .cxw-seg a { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 13px; color: #6b6878; text-decoration: none; white-space: nowrap; transition: background 150ms ease, color 150ms ease; }
 .adm .cxw-seg a.on { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
-.adm .cxw-more { display: flex; align-items: center; justify-content: center; height: 48px; margin-top: 8px; border-radius: 12px; background: #f4f2f8; color: #4b4659; font-size: 14px; font-weight: 600; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
+.adm .cxw-more { display: flex; align-items: center; justify-content: center; height: 48px; margin-top: 8px; border-radius: 14px; background: #f4f2f8; color: #4b4659; font-size: 14px; font-weight: 600; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
 .adm .cxw-more:hover { background: #ebe8f3; }
 .adm .cxw-more:active { transform: scale(.98); }
 .adm .cxw-count { margin-left: auto; font-size: 13px; color: #6b6878; }
@@ -944,14 +944,14 @@
 .adm .cxw-rr__name b { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .cxw-rr.is-building .cxw-rr__name b { font-size: 15px; }
 .adm .cxw-rr__name small { font-size: 12px; color: #6b6878; white-space: nowrap; }
-.adm .cxw-chev { width: 14px; height: 14px; flex: none; color: #8b8898; transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
+.adm .cxw-chev { width: 14px; height: 14px; flex: none; color: var(--text-3); transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
 .adm .cxw-chev-sp { width: 14px; flex: none; }
 .adm .cxw-bd[open] .cxw-chev { transform: rotate(90deg); }
 .adm .cxw-rc { font-size: 13px; color: #6b6878; white-space: nowrap; }
 .adm .cxw-rc b { font-weight: 700; color: #16141f; }
 .adm .cxw-rc b.is-bad { color: #c5282e; }
 .adm .cxw-rc b.is-zero { font-weight: 500; color: #6b6878; }
-.adm .cxw-rc.is-none { color: #8b8898; }
+.adm .cxw-rc.is-none { color: var(--text-3); }
 .adm .cxw-bar { display: block; height: 6px; border-radius: 3px; background: #efeff3; overflow: hidden; }
 .adm .cxw-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: cxw-fill 700ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .cxw-bar i.is-hot { background: #c5282e; }
@@ -1036,7 +1036,7 @@
 .adm .cxw-pf { display: flex; flex-direction: column; gap: 8px; padding: 16px 24px 24px; border-top: 1px solid #f1f1f4; }
 .adm .cxw-pf__form { display: flex; flex-direction: column; gap: 8px; }
 .adm .cxw-pf__note { font-size: 12px; line-height: 1.5; color: #6b6878; }
-.adm .cxw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border: 0; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .cxw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
 .adm .cxw-btn:active:not(:disabled) { transform: scale(.98); }
 .adm .cxw-btn:disabled { opacity: .55; cursor: default; }
 .adm .cxw-btn.is-pri { background: #7a52e6; color: #fff; }

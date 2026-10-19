@@ -22,13 +22,13 @@
 .adm .dh-kpi:hover .dh-kpi__v { color: #5a30cf; }
 .adm .dh-kpi__k { font-size: 13px; color: #6b6878; }
 .adm .dh-kpi__v { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: #16141f; }
-.adm .dh-kpi__v small { font-size: 14px; font-weight: 500; color: #8b8898; margin-left: 4px; }
-.adm .dh-kpi__d { font-size: 12px; color: #8b8898; }
+.adm .dh-kpi__v small { font-size: 14px; font-weight: 500; color: var(--text-3); margin-left: 4px; }
+.adm .dh-kpi__d { font-size: 12px; color: var(--text-3); }
 
 .adm .dh-sec { display: flex; align-items: center; gap: 10px; margin-top: 32px; margin-bottom: 14px; }
 .adm .dh-sec b { font-size: 16px; font-weight: 700; color: #16141f; }
 .adm .dh-sec--line { margin-top: 36px; padding-top: 24px; border-top: 1px solid #f1f1f4; }
-.adm .dh-cc { font-size: 13px; color: #8b8898; }
+.adm .dh-cc { font-size: 13px; color: var(--text-3); }
 .adm .dh-sec__end { margin-left: auto; }
 
 .adm .dh-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); row-gap: 8px; }
@@ -49,7 +49,7 @@
 .adm .dh-legend span { display: flex; align-items: center; gap: 6px; }
 .adm .dh-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .adm .dh-chart { display: flex; gap: 10px; }
-.adm .dh-axis { display: flex; flex-direction: column; justify-content: space-between; height: 160px; width: 72px; font-size: 11px; color: #9a97a6; text-align: right; font-variant-numeric: tabular-nums; }
+.adm .dh-axis { display: flex; flex-direction: column; justify-content: space-between; height: 160px; width: 72px; font-size: 11px; color: var(--text-done); text-align: right; font-variant-numeric: tabular-nums; }
 .adm .dh-plot { flex: 1; position: relative; height: 160px; }
 .adm .dh-plot__lines { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
 .adm .dh-plot__lines span { height: 1px; background: #f1f1f4; }
@@ -59,7 +59,7 @@
 .adm .dh-bar.is-actual { background: #7a52e6; }
 .adm .dh-bar.is-today { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #7a52e6; }
 .adm .dh-xlabels { display: flex; gap: 10px; margin-top: -6px; }
-.adm .dh-xlabels > div { flex: 1; display: flex; gap: 4px; font-size: 11px; color: #9a97a6; }
+.adm .dh-xlabels > div { flex: 1; display: flex; gap: 4px; font-size: 11px; color: var(--text-done); }
 .adm .dh-xlabels span { flex: 1; text-align: center; white-space: nowrap; }
 .adm .dh-xlabels span.is-today { color: #5a30cf; font-weight: 600; }
 
@@ -85,7 +85,7 @@
 .adm .dh-mbar span { font-size: 11px; color: #6b6878; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .dh-mbar i { width: 100%; max-width: 56px; border-radius: 6px 6px 0 0; background: #7a52e6; }
 .adm .dh-mbar i.is-current { background: #cdbbfb; }
-.adm .dh-mlbl { display: flex; gap: 14px; font-size: 11px; color: #9a97a6; }
+.adm .dh-mlbl { display: flex; gap: 14px; font-size: 11px; color: var(--text-done); }
 .adm .dh-mlbl span { flex: 1; text-align: center; }
 
 /* 큐 · 할 일 · 예약 — 줄 목록 */
@@ -106,17 +106,17 @@
 .adm .dh-row:hover { background: #fafafb; }
 .adm .dh-room { font-family: var(--mono); font-size: 13px; font-weight: 600; width: 64px; flex: none; color: #16141f; }
 .adm .dh-rt { font-size: 14px; font-weight: 600; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm .dh-rs { font-size: 12px; color: #8b8898; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-rs { font-size: 12px; color: var(--text-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm .dh-rb { flex: 1; min-width: 0; }
 .adm .dh-qic { width: 32px; height: 32px; flex: none; border-radius: 9px; background: #f4f4f7; color: #6b6878; display: flex; align-items: center; justify-content: center; }
 .adm .dh-qic .ic { font-size: 16px; }
 .adm .dh-urgent { font-size: 12px; font-weight: 600; color: #c5282e; }
 .adm .dh-kind { font-size: 12px; color: #6b6878; white-space: nowrap; }
-.adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: #8b8898; border-top: 1px solid #f3f3f6; }
+.adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-3); border-top: 1px solid #f3f3f6; }
 .adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 1px solid #f3f3f6; font-size: 14px; color: #16141f; }
 .adm .dh-todo__box { width: 20px; height: 20px; flex: none; box-sizing: border-box; border-radius: 6px; border: 1.5px solid #d0cfd8; display: flex; align-items: center; justify-content: center; color: #fff; }
 .adm .dh-todo__box .ic { font-size: 12px; }
-.adm .dh-todo.is-done { color: #9a97a6; text-decoration: line-through; }
+.adm .dh-todo.is-done { color: var(--text-done); text-decoration: line-through; }
 .adm .dh-todo.is-done .dh-todo__box { background: #7a52e6; border-color: #7a52e6; }
 .adm .dh-sel { background: #f4f1fd; }
 
@@ -132,7 +132,7 @@
 .adm .dh-line__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .adm .dh-line__dot { position: absolute; width: 10px; height: 10px; box-sizing: border-box; border: 2px solid #7a52e6; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); }
 .adm .dh-line__dot.is-now { background: #7a52e6; box-shadow: 0 0 0 3px #ede7fc; }
-.adm .dh-line__v { position: absolute; transform: translate(-50%, calc(-100% - 10px)); font-size: 12px; font-weight: 500; color: #8b8898; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .dh-line__v { position: absolute; transform: translate(-50%, calc(-100% - 10px)); font-size: 12px; font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .dh-line__v.is-now { color: #16141f; font-weight: 700; }
 
 /* 대시보드 모션(2026-10-14, 시안 Motion-Dash-D1~D4 · Motion-B-Chart-PC) — 처음 그릴 때 한 번(실시간 새로 고침 땐 다시 안 함).

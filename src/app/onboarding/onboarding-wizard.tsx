@@ -308,7 +308,7 @@ function ChecklistRow({
       </span>
       <div className="min-w-0">
         <div className="text-[15px] font-semibold text-foreground">{title}</div>
-        <div className="text-[13px] text-[#8b8898]">{sub}</div>
+        <div className="text-[13px] text-text-3">{sub}</div>
       </div>
     </div>
   );
@@ -358,7 +358,7 @@ function ProgressHeader({
             />
           ))}
         </div>
-        <span className="flex-none text-[13px] tabular-nums text-[#8b8898]">
+        <span className="flex-none text-[13px] tabular-nums text-text-3">
           {step}/{TOTAL_STEPS}
         </span>
       </div>
@@ -632,7 +632,7 @@ function Wheel({
                 ? "font-extrabold text-foreground"
                 : Math.abs(i - active) === 1
                   ? "font-semibold text-muted-foreground"
-                  : "font-semibold text-[#9a97a6]"
+                  : "font-semibold text-text-done"
             }`}
             style={{ height: ITEM_H, lineHeight: `${ITEM_H}px` }}
           >
@@ -761,7 +761,7 @@ function DateCell({
 }) {
   return (
     <div className={grow ? "flex-[1.4]" : "flex-1"}>
-      <div className="mb-[6px] text-center text-[11px] font-extrabold uppercase tracking-[0.05em] t-eyebrow text-[#9a97a6]">
+      <div className="mb-[6px] text-center text-[11px] font-extrabold uppercase tracking-[0.05em] t-eyebrow text-text-done">
         {label}
       </div>
       <button
@@ -770,7 +770,7 @@ function DateCell({
         className="h-[54px] w-full rounded-[14px] border border-border bg-surface text-center text-[16px] font-semibold text-foreground"
       >
         {value ?? (
-          <span className="font-medium text-[#9a97a6]">{placeholder}</span>
+          <span className="font-medium text-text-done">{placeholder}</span>
         )}
       </button>
     </div>
@@ -1481,7 +1481,7 @@ export function OnboardingWizard({
                 // Oversized segmented code field (19px) — opt out of the touch ≥16px rule so it
                 // keeps its intended large size (still ≥16px, so it never triggers iOS focus zoom).
                 data-keep-font-size
-                className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-bold tracking-[0.12em] text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-[#9a97a6] ${
+                className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-bold tracking-[0.12em] text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-text-done ${
                   inviteStatus === "error"
                     ? "border-[#c5282e]"
                     : "border-border focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
@@ -1502,7 +1502,7 @@ export function OnboardingWizard({
                   </div>
                 </div>
               ) : (
-                <p className="mt-[14px] text-[11.5px] font-semibold text-[#9a97a6]">
+                <p className="mt-[14px] text-[11.5px] font-semibold text-text-done">
                   {join.caseHint}
                 </p>
               )}
@@ -1582,7 +1582,7 @@ export function OnboardingWizard({
                     {selectedCountry.flag}
                   </span>
                   {selectedCountry.dial}
-                  <span className="text-[#9a97a6]">
+                  <span className="text-text-done">
                     <ChevronDownIcon />
                   </span>
                 </button>
@@ -1604,10 +1604,10 @@ export function OnboardingWizard({
                     goTo(5);
                   }}
                   placeholder={steps.phoneInputPlaceholder}
-                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[#9a97a6] focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
+                  className="h-[54px] flex-1 rounded-[14px] border border-border bg-surface px-[15px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:border-primary focus:ring-[3.5px] focus:ring-primary/15"
                 />
               </div>
-              <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-[#9a97a6]">
+              <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-text-done">
                 {steps.phoneHint}
               </p>
               {phoneErrorKey ? (
@@ -1701,7 +1701,7 @@ export function OnboardingWizard({
                 onClick={() => setDobSheet(true)}
               />
             </div>
-            <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-[#9a97a6]">
+            <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-text-done">
               {steps.dobHint}
             </p>
           </div>
@@ -1774,7 +1774,7 @@ export function OnboardingWizard({
                   />
                 ))}
               </div>
-              <p className="mt-3 text-[11.5px] font-semibold leading-[1.5] text-[#9a97a6]">
+              <p className="mt-3 text-[11.5px] font-semibold leading-[1.5] text-text-done">
                 {steps.genderHint}
               </p>
             </div>
@@ -1832,7 +1832,7 @@ export function OnboardingWizard({
                     e.preventDefault();
                     goTo(2);
                   }}
-                  className={`h-[54px] w-full rounded-[14px] border bg-surface px-[15px] pr-[46px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[#9a97a6] focus:ring-[3.5px] focus:ring-primary/15 ${
+                  className={`h-[54px] w-full rounded-[14px] border bg-surface px-[15px] pr-[46px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:ring-[3.5px] focus:ring-primary/15 ${
                     isGood ? "border-[hsl(146_50%_32%)]" : "border-border focus:border-primary"
                   }`}
                 />
@@ -1842,7 +1842,7 @@ export function OnboardingWizard({
                   </span>
                 )}
               </div>
-              <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-[#9a97a6]">
+              <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-text-done">
                 {steps.nameHint}
               </p>
             </div>

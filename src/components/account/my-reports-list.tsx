@@ -36,9 +36,9 @@ export function MyReportsList({
   return (
     <div className={bare ? "" : "rounded-xl border border-border px-4 py-3"}>
       {bare ? null : <p className="text-sm font-bold">{copy.title}</p>}
-      <p className={bare ? "text-[13px] leading-5 text-[#8b8898]" : "mt-0.5 text-xs text-muted-foreground"}>{copy.body}</p>
+      <p className={bare ? "text-[13px] leading-5 text-text-3" : "mt-0.5 text-xs text-muted-foreground"}>{copy.body}</p>
       {reports.length === 0 ? (
-        <p className={bare ? "py-6 text-center text-[13px] text-[#8b8898]" : "mt-2 text-[13px] font-semibold text-muted-foreground"}>{copy.empty}</p>
+        <p className={bare ? "py-6 text-center text-[13px] text-text-3" : "mt-2 text-[13px] font-semibold text-muted-foreground"}>{copy.empty}</p>
       ) : (
         <ul className={bare ? "mt-2 divide-y divide-[#f3f3f6]" : "mt-2 divide-y divide-border/70"}>
           {reports.map((r) => (

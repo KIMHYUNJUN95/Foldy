@@ -10,7 +10,7 @@
   --aw-ink: #16141f;
   --aw-soft: #3a3746;
   --aw-muted: #6b6878;
-  --aw-faint: #8b8898;
+  --aw-faint: var(--text-3);
   --aw-line: #e0e0e6;
   --aw-hair: #f1f1f4;
   --aw-primary: #7a52e6;
@@ -180,7 +180,7 @@
 .aw-btn--line:hover { background: #fafafb; }
 .aw-btn .ic { font-size: 18px; }
 
-.aw-or { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #9a97a6; margin: 4px 0; }
+.aw-or { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-done); margin: 4px 0; }
 .aw-or::before, .aw-or::after { content: ""; flex: 1; height: 1px; background: #efeff3; }
 
 .aw-help { font-size: 14px; color: var(--aw-muted); text-align: center; margin-top: 4px; }
@@ -337,7 +337,7 @@
   .aw-hero { align-items: flex-start; text-align: left; gap: 10px; }
   .aw-hero__mark { display: none; }
   .aw-title { font-size: 28px; }
-  .aw-btn { height: 50px; border-radius: 12px; font-size: 15px; }
+  .aw-btn { height: 50px; border-radius: 14px; font-size: 15px; }
   .authw .inp input { height: 50px; font-size: 15px; }
   .authw .inp__eye { top: 3px; }
   .aw-note--mobile { display: none; }

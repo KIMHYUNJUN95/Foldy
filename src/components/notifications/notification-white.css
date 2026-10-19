@@ -4,7 +4,7 @@
    보라 #7a52e6 / #5a30cf · 빨강 #c5282e · 회색 #6b6878. 손가락 칸 ≥ 44px. 움직임은 transform · opacity 만(묶음 · 지운 줄 접힘만
    grid-template-rows), prefers-reduced-motion 이면 전부 끈다. 줄 모양(`.nfw-row`)은 PC 종 팝오버도 같이 쓴다. */
 .nfw, .nfw-pop {
-  --nfw-ink: #16141f; --nfw-ink2: #4c4958; --nfw-soft: #6b6878; --nfw-faint: #8b8898; --nfw-mute: #b4b1bf;
+  --nfw-ink: #16141f; --nfw-ink2: #4c4958; --nfw-soft: #6b6878; --nfw-faint: var(--text-3); --nfw-mute: #b4b1bf;
   --nfw-pri: #7a52e6; --nfw-pri-ink: #5a30cf; --nfw-pri-soft: #f1ecfd; --nfw-sel: #f4f1fd;
   --nfw-red: #c5282e; --nfw-hair: #f3f3f6; --nfw-field: #f4f4f7;
   --nfw-ease: cubic-bezier(.23, 1, .32, 1);
@@ -40,7 +40,7 @@
 .nfw-m { margin-top: 2px; font-size: 12px; color: var(--nfw-faint); font-variant-numeric: tabular-nums; }
 .nfw-more {
   position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; margin: -2px -6px -2px;
-  padding: 0 6px; border: 0; border-radius: 8px; background: transparent; font-size: 12px; font-weight: 600; color: var(--nfw-pri-ink); cursor: pointer;
+  padding: 0 6px; border: 0; border-radius: 10px; background: transparent; font-size: 12px; font-weight: 600; color: var(--nfw-pri-ink); cursor: pointer;
 }
 .nfw-more svg { transition: transform 260ms var(--nfw-ease); }
 .nfw-more[aria-expanded="true"] svg { transform: rotate(180deg); }
@@ -78,7 +78,7 @@
 .nfw-h p b { font-weight: 700; color: var(--nfw-pri-ink); }
 .nfw-tbtn {
   flex: none; min-height: 44px; display: flex; align-items: center; padding: 0 8px; border: 0; background: transparent;
-  font-size: 14px; font-weight: 600; color: var(--nfw-soft); white-space: nowrap; cursor: pointer; border-radius: 10px;
+  font-size: 14px; font-weight: 600; color: var(--nfw-soft); white-space: nowrap; cursor: pointer; border-radius: 14px;
   transition: transform 140ms var(--nfw-ease), opacity 160ms ease;
 }
 .nfw-tbtn:active { transform: scale(.96); }
@@ -94,12 +94,12 @@
   flex: none; display: inline-flex; align-items: center; gap: 5px; height: 44px; padding: 0 2px; border: 0; background: transparent;
   font-size: 14px; color: var(--nfw-faint); white-space: nowrap; cursor: pointer; transition: color 180ms ease;
 }
-.nfw-tab b { font-weight: 500; color: var(--nfw-mute); }
+.nfw-tab b { font-weight: 500; color: var(--text-done); }
 .nfw-tab[aria-selected="true"] { color: var(--nfw-ink); font-weight: 700; }
 .nfw-tab[aria-selected="true"] b { color: var(--nfw-pri); }
 
 .nfw-list { display: flex; flex-direction: column; }
-.nfw-sec { padding: 14px 0 4px; font-size: 12px; font-weight: 600; color: #9a97a6; }
+.nfw-sec { padding: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--text-done); }
 .nfw-sec:first-child { padding-top: 0; }
 .nfw-msg { margin: 0; font-size: 13px; color: var(--nfw-red); }
 .nfw-empty { padding: 48px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }

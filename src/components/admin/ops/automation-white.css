@@ -8,7 +8,7 @@
   --atw-ink2: #3a3746;
   --atw-ink3: #4c4958;
   --atw-mute: #6b6878;
-  --atw-faint: #8b8898;
+  --atw-faint: var(--text-3);
   --atw-line: #f1f1f4;
   --atw-hair: #f3f3f6;
   --atw-field: #f4f4f7;
@@ -82,7 +82,7 @@
 /* ── 본문: 목록 + 상세 ── */
 .adm .atw-body { display: flex; gap: 32px; margin-top: 6px; align-items: flex-start; }
 .adm .atw-list { width: 330px; flex: none; display: flex; flex-direction: column; }
-.adm .atw-group { font-size: 12px; font-weight: 600; color: #9a97a6; padding: 0 12px 6px; }
+.adm .atw-group { font-size: 12px; font-weight: 600; color: var(--text-done); padding: 0 12px 6px; }
 .adm .atw-job {
   display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 8px 12px; border: 0; border-top: 1px solid var(--atw-hair);
   border-radius: 0; background: transparent; font: inherit; color: var(--atw-ink); text-align: left; cursor: pointer;
@@ -101,7 +101,7 @@
 .adm .atw-job__st { flex: none; font-size: 12px; font-weight: 600; color: var(--atw-faint); }
 .adm .atw-job__st.is-on { color: var(--atw-green); }
 .adm .atw-later { margin-top: 18px; padding: 14px 12px 0; border-top: 1px solid var(--atw-line); display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--atw-faint); }
-.adm .atw-later__h { font-weight: 600; color: #9a97a6; }
+.adm .atw-later__h { font-weight: 600; color: var(--text-done); }
 .adm .atw-later__tz { margin-top: 10px; }
 
 .adm .atw-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -139,7 +139,7 @@
 
 /* ── 공용 조각 ── */
 .adm .atw-btn {
-  height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 9px;
+  height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 10px;
   background: var(--atw-field); font: inherit; font-size: 13px; font-weight: 600; color: var(--atw-ink2); white-space: nowrap; cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms var(--atw-ease), opacity 160ms ease;
 }
@@ -259,7 +259,7 @@
 .adm .atw-day:disabled { cursor: default; }
 .adm .atw-chips { flex-wrap: wrap; gap: 6px; }
 .adm .atw-chip {
-  height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: var(--atw-field); font: inherit; font-size: 13px; color: var(--atw-ink3);
+  height: 32px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--atw-field); font: inherit; font-size: 13px; color: var(--atw-ink3);
   cursor: pointer; transition: background-color 160ms ease, color 160ms ease, transform 160ms var(--atw-ease);
 }
 .adm .atw-chip.is-on { background: var(--atw-v-bg); color: var(--atw-v-ink); font-weight: 600; }

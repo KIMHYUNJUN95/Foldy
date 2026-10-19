@@ -5,7 +5,7 @@
 .lfd-clock__h { display: flex; align-items: baseline; justify-content: space-between; font-size: 13px; color: #6b6878; }
 .lfd-clock__h b { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; font-variant-numeric: tabular-nums; }
 .lfd-clock__h b.is-soon { color: #c5282e; }
-.lfd-clock__s { font-size: 12px; line-height: 1.5; color: #8b8898; font-variant-numeric: tabular-nums; }
+.lfd-clock__s { font-size: 12px; line-height: 1.5; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .lfd-bar { display: block; height: 6px; border-radius: 3px; background: #e6e6eb; overflow: hidden; }
 .lfd-bar i { display: block; height: 100%; border-radius: 3px; background: #16141f; transform-origin: left center; animation: lfd-fill 800ms cubic-bezier(.23, 1, .32, 1) 120ms both; }
 .lfd-bar i.is-ext { background: #b4b1bf; }
@@ -24,7 +24,7 @@
 .lfd-sheet h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
 .lfd-sheet p { margin: 0; font-size: 14px; line-height: 1.55; color: #6b6878; }
 .lfd-sheet dl { display: grid; grid-template-columns: 84px minmax(0, 1fr); row-gap: 10px; margin: 8px 0 6px; padding-top: 14px; border-top: 1px solid #f1f1f4; font-size: 14px; text-align: left; }
-.lfd-sheet dt { color: #8b8898; }
+.lfd-sheet dt { color: var(--text-3); }
 .lfd-sheet dd { margin: 0; color: #16141f; overflow-wrap: anywhere; }
 .lfd-sheet dd b { color: #5a30cf; }
 .lfd-sheet__back { height: 46px; border: 0; border-radius: 14px; background: none; font: inherit; font-size: 15px; font-weight: 600; color: #6b6878; cursor: pointer; }

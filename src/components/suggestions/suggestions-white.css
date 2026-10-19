@@ -4,7 +4,7 @@
    보라 #7a52e6 / #5a30cf · 빨강 #c5282e · 초록 #1f7a4d · 회색 #6b6878. 손가락 칸 ≥ 44px. 움직임은 transform · opacity 만,
    prefers-reduced-motion 이면 전부 끈다. 댓글 줄 · 입력은 기존 `.sg` 부품(SuggestionCommentItem · Composer)을 `.sgw` 안에서 다시 칠한다. */
 .sgw {
-  --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: #8b8898; --w-mute: #c9c6d3;
+  --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: var(--text-3); --w-mute: #c9c6d3;
   --w-pri: #7a52e6; --w-pri-ink: #5a30cf; --w-sel: #f4f1fd; --w-red: #c5282e; --w-green: #1f7a4d;
   --w-hair: #f3f3f6; --w-field: #f4f4f7;
   --w-ease: cubic-bezier(.23, 1, .32, 1);
@@ -20,7 +20,7 @@
 .sgw-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; }
 .sgw-h p { margin: 0; font-size: 13px; color: var(--w-faint); }
 .sgw-tbtn {
-  flex: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; margin-right: -8px; border-radius: 10px;
+  flex: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; margin-right: -8px; border-radius: 14px;
   font-size: 14px; font-weight: 600; color: var(--w-pri-ink); white-space: nowrap; text-decoration: none;
   transition: transform 140ms var(--w-ease);
 }
@@ -33,7 +33,7 @@
   font-size: 15px; color: var(--w-faint); cursor: pointer; transition: color 180ms ease, transform 140ms var(--w-ease);
 }
 .sgw-tab:active { transform: scale(.97); }
-.sgw-tab b { font-weight: 500; color: #b4b1bf; }
+.sgw-tab b { font-weight: 500; color: var(--text-done); }
 .sgw-tab[aria-selected="true"] { color: var(--w-ink); font-weight: 700; }
 .sgw-tab[aria-selected="true"] b { color: var(--w-pri); }
 
@@ -81,7 +81,7 @@
 .sgw-fs { display: flex; flex-direction: column; color: #16141f; padding-bottom: 6px; }
 .sgw-fs__h { display: flex; flex-direction: column; gap: 2px; padding: 0 2px 10px; }
 .sgw-fs__h b { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-.sgw-fs__h span { font-size: 13px; color: #8b8898; }
+.sgw-fs__h span { font-size: 13px; color: var(--text-3); }
 .sgw-fs__o {
   display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent;
   font: inherit; font-size: 15px; color: #16141f; text-align: left; cursor: pointer;
@@ -90,7 +90,7 @@
 .sgw-fs__o:active { transform: scale(.98); }
 .sgw-fs__o[aria-checked="true"] { background: #f4f1fd; font-weight: 600; }
 .sgw-fs__o span { flex: 1; }
-.sgw-fs__o em { font-style: normal; font-size: 13px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.sgw-fs__o em { font-style: normal; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .sgw-fs__o svg { color: #5a30cf; }
 .sgw-fs__o svg path { stroke-dasharray: 1; stroke-dashoffset: 0; animation: sgw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }
 
@@ -154,7 +154,7 @@
 .sgw-rs { display: flex; flex-direction: column; gap: 12px; color: #16141f; padding-bottom: 4px; }
 .sgw-rs__h { display: flex; flex-direction: column; gap: 2px; }
 .sgw-rs__h b { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-.sgw-rs__h span { font-size: 13px; color: #8b8898; }
+.sgw-rs__h span { font-size: 13px; color: var(--text-3); }
 .sgw-rs textarea {
   width: 100%; min-height: 108px; padding: 13px 14px; border: 0; border-radius: 14px; background: #f4f4f7; resize: none;
   font: inherit; font-size: 16px; line-height: 1.55; color: #16141f; outline: none; box-shadow: inset 0 0 0 1.5px transparent; transition: box-shadow 160ms ease;

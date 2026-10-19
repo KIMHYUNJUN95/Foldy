@@ -3,7 +3,7 @@
    움직임: 총매출 · 숫자 굴림 · 월별 막대 아래에서 차례로(30ms) · 채널 막대 왼→오 · 건물 막대 차례로 · 달 바꾸면 크로스페이드 ·
    누름 살짝 작아짐. reduced-motion 이면 전부 끈다. 바텀시트는 body 로 포털되므로 시트 규칙은 `.mrv` 밖에 둔다. */
 .mrv {
-  --mrv-ink: #16141f; --mrv-soft: #6b6878; --mrv-faint: #8b8898; --mrv-pri: #7a52e6; --mrv-pri-ink: #5a30cf;
+  --mrv-ink: #16141f; --mrv-soft: #6b6878; --mrv-faint: var(--text-3); --mrv-pri: #7a52e6; --mrv-pri-ink: #5a30cf;
   --mrv-cur: #c2aef6; --mrv-light: #dcd0fa; --mrv-prev: #e3e2e8; --mrv-track: #efeff3;
   --mrv-red: #c5282e; --mrv-green: #1f7a4d; --mrv-line: #f1f1f4; --mrv-line2: #f3f3f6;
   --mrv-stripe: repeating-linear-gradient(135deg, #dcd0fa 0 4px, #f4f1fd 4px 8px);

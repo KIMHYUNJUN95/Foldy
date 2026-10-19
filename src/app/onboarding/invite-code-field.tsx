@@ -21,7 +21,7 @@ export type InviteCodeFieldCopy = {
 const GRADIENT = "linear-gradient(165deg, #8a63f0, #5a30cf)";
 
 const inputClass =
-  "h-[54px] w-full rounded-[14px] border border-border bg-surface px-[15px] text-base font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-[#9a97a6] focus:border-primary focus:ring-[3.5px] focus:ring-primary/15";
+  "h-[54px] w-full rounded-[14px] border border-border bg-surface px-[15px] text-base font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:border-primary focus:ring-[3.5px] focus:ring-primary/15";
 
 type Status = "idle" | "verifying" | "ok" | "error";
 

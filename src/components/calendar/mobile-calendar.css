@@ -1,7 +1,7 @@
 /* 모바일 예약 캘린더 — 화이트 리디자인(2026-10-14, 시안 Cal-Phone · Cal-Fold · Cal-Tablet · CalDetail-Phone · CalPick-Phone ·
    CalList-* · CalMap-*). 흰 바탕 · 상자 · 세로 구분선 없음 — 날짜는 주말 열 옅은 회색 · 오늘 열 옅은 보라. 막대는 회색 바탕 + 채널 색 점.
    움직임: 막대 차례 펼침 · 막대/전화 누름 반응 · 시트 올라옴(공용) · 복사됨 체크 그리기 · 칸 내용 흐림 → 선명. reduced-motion 이면 끈다. */
-.mcw { --mcw-ink: #16141f; --mcw-soft: #6b6878; --mcw-faint: #9a97a6; --mcw-pri: #7a52e6; --mcw-pri-ink: #5a30cf; --mcw-sel: #f4f1fd; --mcw-tint: #f1ecfd; --mcw-line: #f3f3f6;
+.mcw { --mcw-ink: #16141f; --mcw-soft: #6b6878; --mcw-faint: var(--text-done); --mcw-pri: #7a52e6; --mcw-pri-ink: #5a30cf; --mcw-sel: #f4f1fd; --mcw-tint: #f1ecfd; --mcw-line: #f3f3f6;
   display: flex; flex-direction: column; gap: 14px; color: var(--mcw-ink); }
 .mcw .num { font-variant-numeric: tabular-nums; }
 .mcw-mono { font-family: var(--font-mono, ui-monospace), monospace; font-weight: 600; }
@@ -15,13 +15,13 @@
 .mcw-h__k { font-size: 13px; color: var(--mcw-soft); }
 .mcw-h__t { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--mcw-ink); }
 .mcw-h__pick { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0; border: 0; background: none; font-family: inherit; text-align: left; cursor: pointer; transition: transform 140ms ease; }
-.mcw-h__pick svg { width: 16px; height: 16px; flex: none; color: #8b8898; }
+.mcw-h__pick svg { width: 16px; height: 16px; flex: none; color: var(--text-3); }
 .mcw-h__pick:active { transform: scale(.98); }
 .mcw-month { display: flex; align-items: center; gap: 2px; flex: none; font-size: 14px; font-weight: 600; }
 .mcw-ib { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border: 0; border-radius: 10px; background: transparent; color: #3a3746; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .mcw-ib svg { width: 16px; height: 16px; }
 .mcw-ib:active { transform: scale(.94); background: #f4f4f7; }
-.mcw-ib.is-sm { width: 28px; height: 28px; color: #8b8898; }
+.mcw-ib.is-sm { width: 28px; height: 28px; color: var(--text-3); }
 .mcw-ib.is-sm svg { width: 14px; height: 14px; }
 
 .mcw-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 10px; background: #f2f2f5; }
@@ -61,7 +61,7 @@
 .mcw-bar.is-cut-l { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .mcw-bar.is-cut-r { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .mcw-bar__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.mcw-bar__note { width: 11px; height: 11px; flex: none; color: #8b8898; }
+.mcw-bar__note { width: 11px; height: 11px; flex: none; color: var(--text-3); }
 .mcw-block { position: absolute; z-index: 15; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px; background: repeating-linear-gradient(135deg, rgba(100, 116, 139, .16) 0 5px, rgba(100, 116, 139, .05) 5px 10px); font-size: 11px; font-weight: 600; color: var(--mcw-soft); }
 @keyframes mcw-bar-in { from { opacity: 0; transform: scaleX(.92); } }
 .mcw-dot { display: inline-block; width: 6px; height: 6px; flex: none; border-radius: 50%; background: #9a97a6; }

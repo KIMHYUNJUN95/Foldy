@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — HIG 다듬기 (글자 대비 · 접근성 설정 · 버튼 둥글기 · 누르는 영역)
+
+- 글자용 옅은 회색 → `--text-3` `#6F6C7C` · `--text-done` `#76737F`(CSS 63개 파일 400곳 · TSX 10개). 탭 개수 숫자도 `--text-done`.
+- `globals.css`: 「대비 높이기」 · 「투명도 줄이기」 대응. 버튼 둥글기 84개 규칙 정리(작은 10 · 큰 14).
+- 투두 지연 머리 「날짜 다시 정하기」 + 「⋯」 시트(일정변경 · 선택 · 지난 미완료 삭제 → 확인), 버튼 누르는 영역 44px. 모바일 홈 상태 · 공지 알약 제거.
+- 글자 크기 설정은 기존 `@capacitor/text-zoom`(0.85~1.15) 유지. 시안: 별도 캔버스 「Foldy HIG 다듬기 시안」.
+
 ## 2026-10-19 — 점검 목록 버그 · 보안 수정 (18건 중 17건 + 남은 작업)
 
 - **보안**: 채용 이력서 복사 SSRF 차단(채용 버킷 Firebase 주소만 · 리다이렉트 안 따름 · 20초 · 10MB), 채용 전량 동기화는 크론 비밀값 필요.

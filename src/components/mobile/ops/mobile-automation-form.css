@@ -6,7 +6,7 @@
    담당자 줄 차례로 떠오름 · 저장된 이름 칸 초록 체크. transform · opacity 만, reduced-motion 이면 전부 끈다.
    바텀시트 · 확인 창은 body 로 포털되므로 그 규칙은 `.maf` 밖에 둔다. */
 .maf {
-  --maf-ink: #16141f; --maf-body: #3a3746; --maf-soft: #6b6878; --maf-faint: #8b8898; --maf-mute: #9a97a6;
+  --maf-ink: #16141f; --maf-body: #3a3746; --maf-soft: #6b6878; --maf-faint: var(--text-3); --maf-mute: #9a97a6;
   --maf-pri: #7a52e6; --maf-pri-ink: #5a30cf; --maf-sel: #f4f1fd; --maf-sel-ink: #3a2394;
   --maf-red: #c5282e; --maf-green: #1f7a4d; --maf-amber: #9a6b00;
   --maf-line: #f3f3f6; --maf-fill: #f7f7f9; --maf-fill2: #f4f4f7;
@@ -137,7 +137,7 @@
 /* ── 버튼 ── */
 .maf-btn, .maf-cf .maf-btn, .maf-sheet .maf-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px;
-  border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap;
+  border: 0; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap;
   transition: transform 140ms ease, background 160ms ease, opacity 160ms ease; -webkit-tap-highlight-color: transparent;
 }
 .maf-btn.is-gray { background: var(--maf-fill2, #f4f4f7); color: var(--maf-body, #3a3746); }
@@ -240,16 +240,16 @@
 .maf-sheet { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 0 20px 8px; color: #16141f; }
 .maf-sheet__h { display: flex; flex-direction: column; gap: 4px; padding: 2px 0 12px; }
 .maf-sheet__h h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.maf-sheet__h span { font-size: 12px; line-height: 1.5; color: #8b8898; }
-.maf-search { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; background: #f7f7f9; color: #8b8898; flex: none; }
+.maf-sheet__h span { font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.maf-search { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; background: #f7f7f9; color: var(--text-3); flex: none; }
 .maf-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 16px; color: #16141f; outline: none; }
 .maf-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .maf-search:focus-within { box-shadow: inset 0 0 0 1.5px #7a52e6; background: #fff; }
 .maf-sheet__list { flex: 1; min-height: 120px; max-height: 46dvh; overflow-y: auto; padding: 6px 0 4px; scrollbar-width: none; }
 .maf-sheet__list::-webkit-scrollbar { display: none; }
-.maf-sheet__none { padding: 24px 0; text-align: center; font-size: 13px; color: #8b8898; }
+.maf-sheet__none { padding: 24px 0; text-align: center; font-size: 13px; color: var(--text-3); }
 .maf-sheet__g { display: flex; flex-direction: column; }
-.maf-sheet .maf-sh { padding: 10px 0 6px; font-size: 12px; font-weight: 600; color: #9a97a6; }
+.maf-sheet .maf-sh { padding: 10px 0 6px; font-size: 12px; font-weight: 600; color: var(--text-done); }
 .maf-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
 .maf-code {
   height: 44px; padding: 0 6px; border: 0; border-radius: 12px; background: #f7f7f9; font: inherit; font-size: 14px; font-weight: 600;

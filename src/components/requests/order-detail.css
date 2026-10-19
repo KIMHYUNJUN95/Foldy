@@ -15,7 +15,7 @@
 .odw-items__h span { font-size: 12px; color: #6b6878; }
 .odw-item { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 0; border-top: 1px solid #f3f3f6; animation: odw-in 320ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes odw-in { from { opacity: 0; transform: translateY(4px); } }
-.odw-item__ph { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 10px; overflow: hidden; background: #f2f2f5; color: #8b8898; }
+.odw-item__ph { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 10px; overflow: hidden; background: #f2f2f5; color: var(--text-3); }
 .odw-item__ph.is-none svg { width: 16px; height: 16px; }
 .odw-item__thumbs, .odw-item__thumbs > button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; }
 .odw-item__thumbs > button:nth-of-type(n + 2) { display: none; }
@@ -38,7 +38,7 @@
 .odw-steps__bars i { position: relative; display: block; height: 4px; border-radius: 2px; background: #ecebf0; overflow: hidden; }
 .odw-steps__bars i.on::after { content: ""; position: absolute; inset: 0; border-radius: 2px; background: #7a52e6; transform-origin: left center; animation: odw-fill 520ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: inherit; }
 @keyframes odw-fill { from { transform: scaleX(0); } }
-.odw-steps__lbs span { font-size: 12px; color: #8b8898; }
+.odw-steps__lbs span { font-size: 12px; color: var(--text-3); }
 .odw-steps__lbs span.is-done { color: #6b6878; }
 .odw-steps__lbs span.is-cur { color: #16141f; font-weight: 600; }
 .odw-closed { margin: 2px 0 0; font-size: 12px; color: #6b6878; }
@@ -71,18 +71,18 @@
 .odw-sheet__sum { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid #f1f1f4; }
 .odw-sheet__sum span { font-size: 13px; color: #6b6878; }
 .odw-sheet__sum b { font-size: 16px; font-weight: 700; color: #16141f; text-align: right; }
-.odw-sheet__sum b.is-dim { font-weight: 500; color: #8b8898; }
+.odw-sheet__sum b.is-dim { font-weight: 500; color: var(--text-3); }
 .odw-btn.is-lg { width: 100%; }
 .odw-sheet .mdw-nf { margin-top: 8px; }
 
 .odw-cal { display: flex; flex-direction: column; gap: 6px; }
 .odw-cal__h { display: flex; align-items: center; justify-content: space-between; }
 .odw-cal__h b { font-size: 15px; font-weight: 700; color: #16141f; }
-.odw-cal__h button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none; color: #6b6878; cursor: pointer; }
+.odw-cal__h button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 14px; background: none; color: #6b6878; cursor: pointer; }
 .odw-cal__h button:active { background: #f4f4f7; }
 .odw-cal__h svg { width: 18px; height: 18px; }
 .odw-cal__g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
-.odw-cal__wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: #8b8898; }
+.odw-cal__wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: var(--text-3); }
 .odw-day { position: relative; height: 44px; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; color: #16141f; font-variant-numeric: tabular-nums; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
 .odw-day:active { transform: scale(.94); }
 .odw-day.is-in { background: #f1ecfd; border-radius: 0; }
@@ -101,12 +101,12 @@
 .odc-h span { font-size: 13px; color: #6b6878; }
 .odc-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .odc-nav b { font-size: 15px; font-weight: 700; color: #16141f; }
-.odc-nav button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none; color: #6b6878; }
+.odc-nav button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 14px; background: none; color: #6b6878; }
 .odc-nav button:active { background: #f4f4f7; }
 .odc-nav svg { width: 18px; height: 18px; }
 .odc-nav .odc-today { width: auto; padding: 0 10px; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; }
 .odc-g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
-.odc-wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: #8b8898; }
+.odc-wd span { padding-bottom: 4px; text-align: center; font-size: 12px; color: var(--text-3); }
 .odc-day { position: relative; height: 44px; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; color: #16141f; font-variant-numeric: tabular-nums; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
 .odc-day:active { transform: scale(.94); }
 .odc-day.is-today { font-weight: 700; }

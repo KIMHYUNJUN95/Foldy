@@ -11,7 +11,7 @@
   --ink: #16141f;
   --ink-soft: #3a3746;
   --cx-muted: #6b6878;
-  --faint: #9a97a6;
+  --faint: var(--text-done);
   --line: #ececf0;
   --line-soft: #f1f1f4;
   --cx-surface: #f4f4f7;
@@ -1486,7 +1486,7 @@ textarea.cx-fld {
   gap: 4px;
   height: 38px;
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--ink);
@@ -1569,7 +1569,7 @@ textarea.cx-fld {
   gap: 6px;
   height: 36px;
   padding: 0 11px;
-  border-radius: 11px;
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--card);
   color: var(--ink);
@@ -2051,7 +2051,7 @@ textarea.cx-fld {
   gap: 6px;
   height: 32px;
   padding: 0 12px;
-  border-radius: 11px;
+  border-radius: 10px;
   border: 1px solid color-mix(in oklab, var(--cx-primary) 30%, transparent);
   background: color-mix(in oklab, var(--cx-primary) 7%, transparent);
   color: var(--cx-primary);

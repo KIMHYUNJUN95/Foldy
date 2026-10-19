@@ -12,7 +12,7 @@
   --scw-ink2: #3a3746;
   --scw-ink3: #4c4958;
   --scw-mute: #6b6878;
-  --scw-faint: #8b8898;
+  --scw-faint: var(--text-3);
   --scw-ghost: #c9c6d3;
   --scw-line: #ececf0;
   --scw-hair: #f1f1f4;
@@ -342,7 +342,7 @@
 
 /* 반영 중인 칸 — 숨쉬듯 깜빡이고, 반영이 확인되면 잠깐 보라 → 원래 색. */
 .adm .scw .opsg__price.pend, .adm .scw .opsg__cell .opsg__min.pend {
-  color: #9a97a6; font-weight: 600; text-decoration: none; animation: scwBreathe 1.4s ease-in-out infinite;
+  color: var(--text-done); font-weight: 600; text-decoration: none; animation: scwBreathe 1.4s ease-in-out infinite;
 }
 .adm .scw .opsg__price.done, .adm .scw .opsg__cell .opsg__min.done { animation: scwSettle 1.2s var(--scw-ease) both; }
 

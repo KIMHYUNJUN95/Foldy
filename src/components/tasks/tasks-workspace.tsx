@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ListChecks,
+  MoreHorizontal,
   Megaphone,
   Pencil,
   Plus,
@@ -478,6 +479,8 @@ export function TasksWorkspace({
   // --- Overdue prompt (Today tab): reschedule / clear past unfinished.
   const [overduePending, startOverdue] = useTransition();
   const [overdueConfirm, setOverdueConfirm] = useState(false);
+  /** 지연 묶음 「⋯」 시트 — 지우기처럼 무거운 동작은 머리 줄에 두지 않고 여기로(HIG 다듬기 06). */
+  const [overdueMenuOpen, setOverdueMenuOpen] = useState(false);
   const [overdueRescheduleOpen, setOverdueRescheduleOpen] = useState(false);
   const [overdueSelection, setOverdueSelection] = useState<Set<string>>(new Set());
   /**
@@ -1230,16 +1233,6 @@ export function TasksWorkspace({
         else next.add(task.id);
         setOverdueSelection(next);
       };
-      // 진입 시 내 지연을 전부 선택해 둔다(가장 흔한 의도). 빠질 것만 탭으로 해제하면 된다.
-      const toggleOverdueSelectMode = () => {
-        if (overdueSelectMode) {
-          setOverdueSelectMode(false);
-          setOverdueSelection(new Set());
-        } else {
-          setOverdueSelectMode(true);
-          setOverdueSelection(new Set(ownedOverdueIds));
-        }
-      };
       const showOverdueActs = ownedOverdue > 0 && !filterActive && !selectMode;
       const countSuffix = selectedCount > 0 ? ` ${selectedCount}` : "";
       return (
@@ -1254,12 +1247,8 @@ export function TasksWorkspace({
                 over.length,
                 "over",
                 <>
-                  {/* 지연 일괄 선택 — 검색/날짜 필터 중에는 목록이 부분집합이라 숨긴다. */}
-                  {showOverdueActs ? (
-                    <button className="tkw-tl is-gray" onClick={toggleOverdueSelectMode} type="button">
-                      {overdueSelectMode ? w.overdueSelectDone : w.overdueSelect}
-                    </button>
-                  ) : null}
+                  {/* 지연 묶음 동작 — 검색/날짜 필터 중에는 목록이 부분집합이라 숨긴다. 자주 쓰는 「날짜 다시 정하기」만
+                      머리 줄에 두고, 선택 · 지난 미완료 삭제는 「⋯」 시트로(HIG 다듬기 05 · 06 — 누르는 영역 44px, 지우기를 옆에 붙이지 않는다). */}
                   {showOverdueActs ? (
                     <span className="tkw-sec__acts">
                       <button
@@ -1271,15 +1260,14 @@ export function TasksWorkspace({
                         {w.reschedule}
                         {countSuffix}
                       </button>
-                      <span aria-hidden="true">·</span>
                       <button
-                        className="tkw-tl is-red"
-                        disabled={overduePending || overdueTargets.length === 0}
-                        onClick={() => setOverdueConfirm(true)}
+                        aria-label={w.overdueMore}
+                        className="tkw-more"
+                        disabled={overduePending}
+                        onClick={() => setOverdueMenuOpen(true)}
                         type="button"
                       >
-                        {copy.overduePromptDismiss}
-                        {countSuffix}
+                        <MoreHorizontal aria-hidden="true" />
                       </button>
                     </span>
                   ) : null}
@@ -1932,6 +1920,61 @@ export function TasksWorkspace({
           variant="date"
         />
       )}
+
+      {/* 지연 묶음 「⋯」 시트 — 일정변경 · 선택 · (맨 아래 빨간 줄) 지난 미완료 삭제 → 확인 시트. */}
+      {overdueMenuOpen && hydrated ? (
+        <BottomSheet ariaLabel={w.overdueMore} onClose={() => setOverdueMenuOpen(false)}>
+          {({ close }) => (
+            <div className="tkw-sheet">
+              <h2>{copy.overduePromptTitle.replace("{count}", String(overdueTargets.length))}</h2>
+              <p className="tkw-sheet__sub">{copy.overduePromptBody}</p>
+              <div className="tkw-act">
+                <button
+                  disabled={overdueTargets.length === 0}
+                  onClick={() => {
+                    close();
+                    setOverdueRescheduleOpen(true);
+                  }}
+                  type="button"
+                >
+                  <CalendarDays aria-hidden="true" />
+                  {w.reschedule}
+                </button>
+                <button
+                  onClick={() => {
+                    close();
+                    // 머리 줄의 선택 전환과 같다 — 들어갈 때 내 지연을 전부 골라 둔다.
+                    if (overdueSelectMode) {
+                      setOverdueSelectMode(false);
+                      setOverdueSelection(new Set());
+                    } else {
+                      setOverdueSelectMode(true);
+                      setOverdueSelection(new Set(ownedOverdueIds));
+                    }
+                  }}
+                  type="button"
+                >
+                  <ListChecks aria-hidden="true" />
+                  {overdueSelectMode ? w.overdueSelectDone : w.overdueSelect}
+                </button>
+                <button
+                  className="is-red"
+                  disabled={overdueTargets.length === 0}
+                  onClick={() => {
+                    close();
+                    setOverdueConfirm(true);
+                  }}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" />
+                  {copy.overduePromptDismiss}
+                  {overdueSelectMode && overdueSelection.size > 0 ? ` ${overdueSelection.size}` : ""}
+                </button>
+              </div>
+            </div>
+          )}
+        </BottomSheet>
+      ) : null}
 
       {/* 지난 미완료 삭제 확인 — 되돌릴 수 없는 일괄 정리라 확인을 받는다(반복은 다음 일정이 남는다). */}
       {overdueConfirm && hydrated ? (

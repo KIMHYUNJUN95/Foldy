@@ -12,7 +12,7 @@
   --msw-ink: #16141f;
   --msw-soft: #3a3746;
   --msw-muted: #6b6878;
-  --msw-faint: #8b8898;
+  --msw-faint: var(--text-3);
   --msw-ghost: #b4b1bf;
   --msw-line: #f1f1f4;
   --msw-field: #e0e0e6;
@@ -287,7 +287,7 @@ textarea.msw-in { min-height: 64px; padding: 12px 14px; line-height: 1.45; resiz
   min-height: 36px;
   padding: 0 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   background: #fff;
   font-size: 13px;
   font-weight: 700;

@@ -4,7 +4,7 @@
    보라 #7a52e6 / #5a30cf · 빨강 #c5282e · 회색 #6b6878. 손가락 칸 ≥ 44px. 움직임은 transform · opacity 만,
    prefers-reduced-motion 이면 전부 끈다. 관리 콘솔(PC) 쪽 계정 화면은 그대로다. */
 .acw {
-  --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: #8b8898; --w-mute: #b4b1bf; --w-sec: #9a97a6;
+  --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: var(--text-3); --w-mute: #b4b1bf; --w-sec: var(--text-done);
   --w-pri: #7a52e6; --w-pri-ink: #5a30cf; --w-pri-soft: #ede7fc; --w-red: #c5282e; --w-green: #1f7a4d;
   --w-hair: #f3f3f6; --w-field: #f4f4f7;
   --w-ease: cubic-bezier(.23, 1, .32, 1);
@@ -68,13 +68,13 @@
 .acw-sh { display: flex; flex-direction: column; gap: 12px; color: #16141f; padding-bottom: 4px; }
 .acw-sh__h { display: flex; flex-direction: column; gap: 2px; }
 .acw-sh__h b { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-.acw-sh__h span { font-size: 13px; color: #8b8898; line-height: 1.5; }
+.acw-sh__h span { font-size: 13px; color: var(--text-3); line-height: 1.5; }
 .acw-sh input:not([type="hidden"]) {
   display: block; width: 100%; height: 52px; padding: 0 14px; border: 0; border-radius: 14px; background: #f4f4f7; font: inherit; font-size: 16px;
   color: #16141f; outline: none; box-shadow: inset 0 0 0 1.5px transparent; transition: box-shadow 160ms ease; -webkit-appearance: none; appearance: none;
 }
 .acw-sh input:focus { box-shadow: inset 0 0 0 1.5px #7a52e6; }
-.acw-sh__hint { font-size: 12px; line-height: 1.5; color: #8b8898; }
+.acw-sh__hint { font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .acw-sh__g { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .acw-sh__g button {
   height: 52px; border: 0; border-radius: 14px; background: #f4f4f7; font: inherit; font-size: 15px; font-weight: 600; color: #3a3746; cursor: pointer;

@@ -115,7 +115,7 @@ function LegalBody({
           <button
             aria-selected={tab === key}
             className={`-mb-px h-11 border-b-2 text-[15px] ${
-              tab === key ? "border-foreground font-semibold text-foreground" : "border-transparent text-[#8b8898]"
+              tab === key ? "border-foreground font-semibold text-foreground" : "border-transparent text-text-3"
             }`}
             key={key}
             onClick={() => onTab(key)}

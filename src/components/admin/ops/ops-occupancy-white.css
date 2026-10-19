@@ -7,7 +7,7 @@
   --ocw-ink: #16141f;
   --ocw-ink2: #3a3746;
   --ocw-mute: #6b6878;
-  --ocw-faint: #8b8898;
+  --ocw-faint: var(--text-3);
   --ocw-line: #f1f1f4;
   --ocw-hair: #f3f3f6;
   --ocw-v: #7a52e6;
@@ -76,7 +76,7 @@
 /* 합계 건물 드롭다운 */
 .adm .ocw-inc { position: relative; }
 .adm .ocw-inc__btn {
-  height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent;
+  height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent;
   font: inherit; font-size: 14px; color: var(--ocw-ink2); cursor: pointer; max-width: 340px;
   transition: background-color 160ms ease, transform 160ms var(--ocw-ease);
 }

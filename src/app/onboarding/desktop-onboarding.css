@@ -24,7 +24,7 @@
   --danger-bg: #fdecec;
   --done: #1f7a47;
   --done-bg: #e6f4ec;
-  --faint: #9a97a6;
+  --faint: var(--text-done);
   --ink-soft: #3a3746;
   --primary-lift: #8a63f0;
   --sh-pop: 0 12px 40px -8px rgba(22, 20, 31, 0.22);
@@ -57,7 +57,7 @@
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  color: #8b8898;
+  color: var(--text-3);
   box-shadow: inset 0 0 0 1.5px #e0e0e6;
 }
 .obd__rn svg { width: 13px; height: 13px; }
@@ -65,7 +65,7 @@
 .obd__rs.on .obd__rn { background: #16141f; color: #fff; box-shadow: none; }
 .obd__rt { font-size: 14px; font-weight: 600; color: #16141f; line-height: 24px; }
 .obd__rs.done .obd__rt, .obd__rs.todo .obd__rt { font-weight: 400; color: #6b6878; }
-.obd__rsub { font-size: 12px; color: #8b8898; }
+.obd__rsub { font-size: 12px; color: var(--text-3); }
 @media (max-width: 1199px) {
   .obd__rail { display: none; }
   .obd .authw__brand { display: flex; }
@@ -336,7 +336,7 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid var(--line);
   background: #fff;
   font: inherit;
@@ -359,7 +359,7 @@
 .obd__btn--lg {
   height: 50px;
   padding: 0 28px;
-  border-radius: 12px;
+  border-radius: 14px;
   font-size: 15px;
   font-weight: 600;
 }

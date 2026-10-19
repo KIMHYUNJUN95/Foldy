@@ -29,7 +29,7 @@
 .qrsheet__bar { display: flex; justify-content: center; margin-bottom: 20px; }
 .qrsheet__btn {
   display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px;
-  border-radius: 11px; border: none; color: #fff; font: inherit; font-size: 13px; font-weight: 800;
+  border-radius: 10px; border: none; color: #fff; font: inherit; font-size: 13px; font-weight: 800;
   background: linear-gradient(165deg, #8a63f0, #5a30cf); cursor: pointer;
 }
 .qrsheet__btn svg { width: 16px; height: 16px; }

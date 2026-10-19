@@ -9,7 +9,7 @@
   --hm-ink: #16141f;
   --hm-ink-soft: #3a3746;
   --hm-muted: #6b6878;
-  --hm-faint: #9a97a6;
+  --hm-faint: var(--text-done);
   --hm-line: #ececf0;
   --hm-line-soft: #f1f1f4;
   --hm-surface: #f4f4f7;
@@ -47,7 +47,7 @@
 }
 .hm__greet-d {
   font-size: 13px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__greet-n {
   font-size: 24px;
@@ -72,33 +72,33 @@
   align-items: center;
   justify-content: space-between;
 }
+/* 상태는 색 알약 대신 점 + 글자(HIG 다듬기 08 — 「상태는 회색 글자, 색 알약 금지」 규칙). 근무 중이면 점에 옅은 보라 고리. */
 .hm__ch-state {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 28px;
   font-size: 13px;
   font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--hm-surface);
   color: var(--hm-muted);
 }
 .hm__ch-state i {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #b4b1bf;
+  transition: background var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 .hm__ch-state.is-on {
-  background: #f1ecfd;
   color: var(--hm-primary-ink);
 }
 .hm__ch-state.is-on i {
   background: var(--hm-primary);
+  box-shadow: 0 0 0 4px #f1ecfd;
 }
 .hm__ch-tag {
   font-size: 12px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__ch-big {
   font-size: 26px;
@@ -131,7 +131,7 @@
 }
 .hm__ch-meta-k {
   font-size: 12px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__ch-meta-v {
   font-size: 14px;
@@ -256,7 +256,7 @@
 }
 .hm__cio-count {
   font-size: 13px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__cio-list {
   display: flex;
@@ -298,7 +298,7 @@
 .hm__cio-src {
   flex: 0 0 auto;
   font-size: 12px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__cio-empty {
   padding: 34px 4px;
@@ -325,12 +325,18 @@
 }
 .hm__notice-cat {
   font-size: 12px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__notice-badge {
   font-size: 12px;
   font-weight: 600;
   color: #c5282e;
+}
+.hm__notice-cat + .hm__notice-badge::before {
+  content: "·";
+  margin-right: 7px;
+  font-weight: 400;
+  color: #c9c6d3;
 }
 .hm__notice-t {
   font-size: 15px;
@@ -380,7 +386,7 @@
 }
 .hm__task-s {
   font-size: 13px;
-  color: #8b8898;
+  color: var(--text-3);
   margin-top: 2px;
 }
 .hm__task-right {
@@ -389,7 +395,7 @@
 }
 .hm__task-rk {
   font-size: 11px;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__task-rv {
   font-family: var(--hm-mono);
@@ -508,7 +514,7 @@
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   flex: 0 0 auto;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .hm__log-empty,
 .hm__state-msg {
@@ -618,7 +624,7 @@
   .hm__notice { padding: 12px 14px; border-radius: 12px; background: #f7f7f9; margin-bottom: 4px; }
   .hm__notice-h { margin: 0; }
   .hm__notice-b { display: flex; align-items: center; gap: 10px; }
-  .hm__notice-badge { padding: 2px 8px; border-radius: 999px; background: #fdecec; }
+  .hm__notice-badge { flex: none; font-size: 13px; }
   .hm__notice-cat { display: none; }
   .hm__blk--stats .hm__stats { grid-template-columns: 1fr; gap: 18px; }
   .hm__blk--stats .hm__stat { display: grid; grid-template-columns: 1fr auto; align-items: center; }

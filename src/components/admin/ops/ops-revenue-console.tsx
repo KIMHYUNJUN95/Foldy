@@ -879,7 +879,7 @@ function MatrixTab({
       sub = future ? w.bookedTag : d === null ? "" : <span className={d >= 0 ? "u" : "dn"}>{`${d >= 0 ? "▲" : "▼"}${deltaShort(d)}`}</span>;
     } else {
       const level = yoyLevel(d);
-      if (!future) style = { ...style, ...(level < 0 ? { background: "#F7F7F9", color: "#8b8898" } : { background: YOY_BG[level], color: YOY_FG[level] }) };
+      if (!future) style = { ...style, ...(level < 0 ? { background: "#F7F7F9", color: "#6f6c7c" } : { background: YOY_BG[level], color: YOY_FG[level] }) };
       text = d === null ? copy.newLabel : `${d >= 0 ? "▲" : "▼"}${deltaShort(d)}`;
       sub = future ? w.bookedTag : short(value(cur));
     }

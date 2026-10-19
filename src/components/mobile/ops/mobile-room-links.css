@@ -5,7 +5,7 @@
    움직임: 누름 살짝 작아짐 · 복사 체크 그리기 · 건물 바꾸면 줄 차례로 떠오름 · 탭 색 바뀜 · 상세 칸 바뀌어 들어옴.
    transform · opacity 만, reduced-motion 이면 전부 끈다. 바텀시트는 body 로 포털되므로 상세 규칙(`.mrl-d`)은 `.mrl` 밖에 둔다. */
 .mrl-v {
-  --mrl-ink: #16141f; --mrl-ink2: #3a3746; --mrl-soft: #6b6878; --mrl-faint: #8b8898; --mrl-mute: #b4b1bf;
+  --mrl-ink: #16141f; --mrl-ink2: #3a3746; --mrl-soft: #6b6878; --mrl-faint: var(--text-3); --mrl-mute: #b4b1bf;
   --mrl-pri: #7a52e6; --mrl-pri-ink: #5a30cf; --mrl-sel: #f4f1fd;
   --mrl-red: #c5282e; --mrl-green: #1f7a4d; --mrl-green-bg: #e9f5ee;
   --mrl-line: #f1f1f4; --mrl-hair: #f3f3f6; --mrl-field: #f4f4f7;
@@ -60,7 +60,7 @@
   font-size: 14px; color: var(--mrl-faint); white-space: nowrap; cursor: pointer;
   transition: color 180ms ease, transform 160ms var(--mrl-ease);
 }
-.mrl-tab b { font-weight: 500; color: var(--mrl-mute); transition: color 180ms ease; }
+.mrl-tab b { font-weight: 500; color: var(--text-done); transition: color 180ms ease; }
 .mrl-tab.is-on { color: var(--mrl-ink); font-weight: 700; }
 .mrl-tab.is-on b { color: var(--mrl-pri); }
 .mrl-tab:active { transform: scale(.97); }

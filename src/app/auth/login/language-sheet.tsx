@@ -177,7 +177,7 @@ export function LanguageSheet({ locale, next, view }: LanguageSheetProps) {
                     </span>
                     <span className="min-w-0">
                       <span className="block text-[15px] font-bold text-foreground">{o.name}</span>
-                      <span className="mt-px block text-[11.5px] font-semibold text-[#9a97a6]">
+                      <span className="mt-px block text-[11.5px] font-semibold text-text-done">
                         {o.roman}
                       </span>
                     </span>

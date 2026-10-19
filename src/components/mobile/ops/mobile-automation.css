@@ -6,7 +6,7 @@
    누름 살짝 작아짐 · 보낸 뒤 체크 그리기 · 메시지 바뀌면 살짝 떠오름. transform · opacity 만, reduced-motion 이면 전부 끈다.
    확인 창 · 알림 · 바텀시트는 body 로 포털되므로 그 규칙은 `.mat` 밖에 둔다. */
 .mat {
-  --mat-ink: #16141f; --mat-ink2: #3a3746; --mat-soft: #6b6878; --mat-faint: #8b8898; --mat-mute: #9a97a6;
+  --mat-ink: #16141f; --mat-ink2: #3a3746; --mat-soft: #6b6878; --mat-faint: var(--text-3); --mat-mute: #9a97a6;
   --mat-pri: #7a52e6; --mat-pri-ink: #5a30cf; --mat-pri-line: #dcd0fa; --mat-sel: #f4f1fd;
   --mat-red: #c5282e; --mat-green: #1f7a4d; --mat-dot-green: #22a06b; --mat-amber: #9a6b00;
   --mat-line: #f1f1f4; --mat-hair: #f3f3f6; --mat-field: #f4f4f7;
@@ -134,7 +134,7 @@
 
 /* ── 공용 버튼 ── */
 .mat-btn {
-  flex: 1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; border: 0; border-radius: 12px;
+  flex: 1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; border: 0; border-radius: 14px;
   background: var(--mat-field); font-size: 15px; font-weight: 700; color: var(--mat-ink2); white-space: nowrap; cursor: pointer;
   transition: transform 160ms var(--mat-ease), background-color 160ms ease, opacity 160ms ease;
 }
@@ -251,7 +251,7 @@
 .mat-cf__w { margin: 0; font-size: 13px; line-height: 1.5; color: #9a6b00; }
 .mat-cf__f { display: flex; gap: 8px; margin-top: 6px; }
 .mat-cf .mat-btn {
-  flex: 1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: #f4f4f7;
+  flex: 1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 14px; background: #f4f4f7;
   font: inherit; font-size: 15px; font-weight: 700; color: #3a3746; cursor: pointer; transition: transform 160ms cubic-bezier(.23, 1, .32, 1), opacity 160ms ease;
   -webkit-tap-highlight-color: transparent;
 }

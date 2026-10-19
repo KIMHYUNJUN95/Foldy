@@ -50,8 +50,8 @@
 .axcard__fi--err { font-size: 13px; }
 .axcard__b { min-width: 0; line-height: 1.35; }
 .axcard__b b { font-weight: 600; overflow-wrap: anywhere; }
-.axcard__b em { font-style: normal; color: #8b8898; white-space: nowrap; }
-.axcard__sub { display: block; margin-top: 2px; font-size: 12px; color: #8b8898; }
+.axcard__b em { font-style: normal; color: var(--text-3); white-space: nowrap; }
+.axcard__sub { display: block; margin-top: 2px; font-size: 12px; color: var(--text-3); }
 
 @media (prefers-reduced-motion: reduce) {
   .adm .axb__ic, .adm .axb__t, .adm button.axb.is-done .axb__ic, .adm button.axb.is-error, .adm button.axb.is-blocked, .axcard { animation: none; }

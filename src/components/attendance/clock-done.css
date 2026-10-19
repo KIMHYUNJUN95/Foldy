@@ -50,8 +50,8 @@
 @keyframes cind-line { to { transform: scaleX(1); } }
 .cind__start { position: absolute; left: -1px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: #7a52e6; transform: scale(.6); animation: cind-pop 420ms var(--spb) 1750ms forwards; }
 .cind__start::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #b9a0fa; opacity: 0; animation: cind-ring 1000ms cubic-bezier(.23, 1, .32, 1) 2250ms 2; }
-.cind__tlab { position: absolute; left: 0; right: 0; top: 20px; display: flex; justify-content: space-between; font-size: 12px; color: #8b8898; }
-.cind__btn { margin-top: auto; height: 54px; border: 0; border-radius: 16px; background: #7a52e6; box-shadow: 0 14px 28px -16px rgba(91, 43, 214, .8); color: #fff; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; opacity: 0; transform: translateY(16px); animation: cind-btn 600ms var(--sp) 1550ms forwards; transition: transform 140ms ease; }
+.cind__tlab { position: absolute; left: 0; right: 0; top: 20px; display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); }
+.cind__btn { margin-top: auto; height: 54px; border: 0; border-radius: 14px; background: #7a52e6; box-shadow: 0 14px 28px -16px rgba(91, 43, 214, .8); color: #fff; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; opacity: 0; transform: translateY(16px); animation: cind-btn 600ms var(--sp) 1550ms forwards; transition: transform 140ms ease; }
 .cind__btn:active { transform: scale(.98); }
 @keyframes cind-btn { to { opacity: 1; transform: none; } }
 @media (min-width: 600px) { .cind__body, .cind__btn { width: 100%; max-width: 440px; margin-left: auto; margin-right: auto; } .cind__btn { margin-top: auto; } }

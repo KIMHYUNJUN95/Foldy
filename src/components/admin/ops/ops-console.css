@@ -602,7 +602,7 @@
 .opsg__min {
   font-size: 9.5px;
   font-weight: 300;
-  color: #9a97a6;
+  color: var(--text-done);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1320,7 +1320,7 @@
   flex: 1;
   height: 38px;
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: 10px;
   background: var(--surface2);
   color: var(--soft);
   font-size: 12.5px;
@@ -2366,7 +2366,7 @@
   height: 36px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--card);
   color: var(--ink-soft);
   font: inherit;

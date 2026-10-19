@@ -46,7 +46,7 @@
 @keyframes dhm-swap { from { opacity: 0; filter: blur(4px); transform: translateY(6px); } }
 .dhm-ph { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .dhm-ph b { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
-.dhm-empty { margin: 8px 0 0; font-size: 13px; color: #8b8898; }
+.dhm-empty { margin: 8px 0 0; font-size: 13px; color: var(--text-3); }
 
 .dhm-feed { list-style: none; margin: 0 -10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .dhm-fd { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 10px; border: 0; border-radius: 14px; background: transparent; font: inherit; text-align: left; cursor: pointer; transition: background 160ms ease, scale 140ms var(--dhm-out); animation: dhm-in 520ms var(--dhm-out) calc(1500ms + var(--i, 0) * 80ms) backwards; }
@@ -57,7 +57,7 @@
 .dhm-fd > i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .dhm-fd > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .dhm-fd b { font-size: 13.5px; font-weight: 600; letter-spacing: -0.02em; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dhm-fd small { font-size: 12px; color: #8b8898; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dhm-fd small { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dhm-fd time { flex: none; font-size: 12px; color: #9c99a8; font-variant-numeric: tabular-nums; }
 /* 새로 들어온 소식 — 위에서 끼어들며 잠깐 옅은 보라 */
 .dhm-fd.is-new { animation: dhm-new 1800ms var(--dhm-out) backwards; }
@@ -69,11 +69,11 @@
 .dhm-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 2px; margin: -4px 0 10px -6px; padding: 4px 8px 4px 4px; border: 0; border-radius: 10px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: #7a52e6; cursor: pointer; }
 .dhm-back svg { width: 14px; height: 14px; transform: rotate(180deg); }
 .dhm-back:hover { background: rgba(122, 82, 230, 0.06); }
-.dhm-bh small { font-size: 12.5px; color: #8b8898; }
+.dhm-bh small { font-size: 12.5px; color: var(--text-3); }
 .dhm-bh b { display: block; margin-top: 4px; font-size: 24px; font-weight: 700; letter-spacing: -0.035em; color: #16141f; }
 .dhm-bst { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 18px 0 20px; }
 .dhm-bst span { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; background: rgba(122, 82, 230, 0.05); }
-.dhm-bst small { font-size: 12px; color: #8b8898; }
+.dhm-bst small { font-size: 12px; color: var(--text-3); }
 .dhm-bst b { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; font-variant-numeric: tabular-nums; }
 .dhm-bst span.v { background: linear-gradient(180deg, #8a63f0, #6a3fe0); box-shadow: 0 10px 20px -12px rgba(91, 43, 214, 0.8); }
 .dhm-bst span.v small { color: rgba(255, 255, 255, 0.75); }

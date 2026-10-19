@@ -9,7 +9,7 @@
 
 .dps { padding-bottom: 6px; }
 .dps-dow { display: grid; grid-template-columns: repeat(7, 1fr); }
-.dps-dow span { height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #9a97a6; }
+.dps-dow span { height: 32px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--text-done); }
 .dps-dow span.is-sun { color: #c5282e; }
 
 .dps-gridwrap { overflow: hidden; touch-action: pan-y; }

@@ -36,8 +36,8 @@
 .ofw-dd { z-index: 5; }
 .ofw-dd.is-open { z-index: 30; }
 .ofw-dd__btn { justify-content: space-between; text-align: left; cursor: pointer; }
-.ofw-dd__btn.is-ph span { color: #8b8898; }
-.ofw-dd__btn svg { width: 16px; height: 16px; color: #8b8898; transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
+.ofw-dd__btn.is-ph span { color: var(--text-3); }
+.ofw-dd__btn svg { width: 16px; height: 16px; color: var(--text-3); transition: transform 200ms cubic-bezier(.23, 1, .32, 1); }
 .ofw-dd.is-open .ofw-dd__btn svg { transform: rotate(180deg); }
 .ofw-dd__menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: 264px; margin: 0; padding: 6px; list-style: none; overflow-y: auto; border-radius: 14px; background: #fff; box-shadow: 0 18px 40px -18px rgba(22, 20, 31, .35), 0 0 0 1px rgba(22, 20, 31, .05); transform-origin: top center; animation: ofw-menu 180ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes ofw-menu { from { opacity: 0; transform: translateY(-4px) scale(.98); } }

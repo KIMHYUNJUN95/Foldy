@@ -3,7 +3,7 @@
    움직임: 링 그리기 · 가운데 숫자 굴림 · 건물 막대 차례로 차오름 · 앞으로 막대 차오름 · 달 바꾸면 내용 크로스페이드 · 누름 살짝 작아짐.
    reduced-motion 이면 전부 끈다. 바텀시트는 body 로 포털되므로 시트 안 규칙은 `.moc` 밖에 둔다. */
 .moc {
-  --moc-ink: #16141f; --moc-soft: #6b6878; --moc-faint: #8b8898; --moc-pri: #7a52e6; --moc-pri-ink: #5a30cf;
+  --moc-ink: #16141f; --moc-soft: #6b6878; --moc-faint: var(--text-3); --moc-pri: #7a52e6; --moc-pri-ink: #5a30cf;
   --moc-ring: #efeafb; --moc-track: #efeff3; --moc-red: #c5282e; --moc-red-bar: #e5484d; --moc-line: #f1f1f4;
   --moc-ease: cubic-bezier(.23, 1, .32, 1);
   color: var(--moc-ink);

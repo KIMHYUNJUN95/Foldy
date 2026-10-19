@@ -592,7 +592,7 @@
 .trn-dacts button {
   flex: 1;
   height: 46px;
-  border-radius: 12px;
+  border-radius: 14px;
   font: inherit;
   font-size: 13.5px;
   font-weight: 800;
@@ -716,7 +716,7 @@
 }
 .trn-confirm-acts button {
   height: 48px;
-  border-radius: 12px;
+  border-radius: 14px;
   font: inherit;
   font-size: 14px;
   font-weight: 800;
@@ -1195,25 +1195,25 @@
 /* 교통비 정산 화이트 리디자인 — 제목 · 합계 · 날짜 줄 · 제출(2026-10-13 시안 AttTransportM-Phone · Fold · Tablet) */
 .trnw .ptitle-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .trnw .ptitle { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; }
-.trnw .ptitle__sub { margin-top: 4px; font-size: 13px; color: #8b8898; }
+.trnw .ptitle__sub { margin-top: 4px; font-size: 13px; color: var(--text-3); }
 .trnw .ptitle__sub b { font-weight: 600; color: #6b6878; }
 .trnw .ptitle__sub b.is-danger { color: #c5282e; }
 .trnw .trnw-add { height: 36px; padding: 0 2px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: #7a52e6; cursor: pointer; white-space: nowrap; }
 .trnw .trnw-note { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; padding-bottom: 14px; border-bottom: 1px solid #f1f1f4; }
-.trnw .trnw-note span { font-size: 12px; color: #8b8898; }
+.trnw .trnw-note span { font-size: 12px; color: var(--text-3); }
 .trnw .trnw-note p { margin: 0; font-size: 14px; line-height: 1.5; color: #16141f; overflow-wrap: anywhere; }
 .trnw .trnw-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
 .trnw .trnw-total span { font-size: 13px; color: #6b6878; }
 .trnw .trnw-total b { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; color: #16141f; font-variant-numeric: tabular-nums; }
 .trnw .trnw-right { margin-top: 12px; }
 .trnw .trnw-right__h { display: none; }
-.trnw .trnw-empty { margin: 28px 0; text-align: center; font-size: 14px; color: #8b8898; }
+.trnw .trnw-empty { margin: 28px 0; text-align: center; font-size: 14px; color: var(--text-3); }
 .trnw .trnw-line { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 0; border: 0; border-top: 1px solid #f3f3f6; background: none; font: inherit; text-align: left; color: inherit; cursor: pointer; }
 .trnw .trnw-line:active { background: #faf9fc; }
-.trnw .trnw-line__d { width: 44px; flex: none; font-size: 13px; color: #8b8898; font-variant-numeric: tabular-nums; }
+.trnw .trnw-line__d { width: 44px; flex: none; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .trnw .trnw-line__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .trnw .trnw-line__t { font-size: 15px; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trnw .trnw-line__s { font-size: 12px; color: #8b8898; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trnw .trnw-line__s { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trnw .trnw-line__s.is-danger { color: #c5282e; }
 .trnw .trnw-line__v { font-size: 15px; font-weight: 700; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .trnw .trnw-actions { order: 3; }
@@ -1223,7 +1223,7 @@
 .trnw .trnw-submit:hover { background: #6b40e0; }
 .trnw .trnw-submit:active { transform: scale(0.98); }
 .trnw .trnw-submit:disabled { opacity: .5; cursor: default; }
-.trnw .trnw-locked { margin: 18px 0 0; font-size: 13px; color: #8b8898; text-align: center; }
+.trnw .trnw-locked { margin: 18px 0 0; font-size: 13px; color: var(--text-3); text-align: center; }
 .trnw .trnw-add-wide { display: none; }
 /* 폰 · 폴드: 제목 → 메모 → 합계 → 날짜 줄 → 안내 · 제출 순서(한 줄) */
 .trnw { display: flex; flex-direction: column; }
@@ -1242,7 +1242,7 @@
   .trnw .trnw-right { margin-top: 0; }
   .trnw .trnw-right__h { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0 10px; }
   .trnw .trnw-right__h b { font-size: 17px; font-weight: 700; color: #16141f; }
-  .trnw .trnw-right__h span { font-size: 12px; color: #8b8898; }
+  .trnw .trnw-right__h span { font-size: 12px; color: var(--text-3); }
 }
 /* 리디자인 틀은 셸 여백을 그대로 쓴다(옛 정산서 카드의 -14px 끌어당김 없앰). */
 .trn.trnw { margin: 0; padding: 0 0 24px; }

@@ -149,7 +149,7 @@ export function MobileSideNav({
         href={item.href}
         key={item.id}
       >
-        <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-[#7a52e6]" : "text-[#8b8898]")} />
+        <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-[#7a52e6]" : "text-text-3")} />
         <span className="min-w-0 flex-1 truncate">{getNavigationLabel(item, locale)}</span>
         {count > 0 && (
           <span
@@ -157,7 +157,7 @@ export function MobileSideNav({
               "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-mono text-[10.5px] font-extrabold tabular-nums",
               item.id === "notifications" || item.id === "requests"
                 ? "bg-[#e5484d] text-white"
-                : "text-[#8b8898]",
+                : "text-text-3",
             )}
           >
             {badgeText(count)}
@@ -272,7 +272,7 @@ export function MobileSideNav({
           {menuItems.map(sideLink)}
           {opsItems.length > 0 && (
             <>
-              <p className="px-2.5 pb-1 pt-3 text-[12px] font-semibold text-[#8b8898]">
+              <p className="px-2.5 pb-1 pt-3 text-[12px] font-semibold text-text-3">
                 {opsTitle}
               </p>
               {opsItems.map(sideLink)}

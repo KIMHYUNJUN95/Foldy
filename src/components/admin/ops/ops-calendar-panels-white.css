@@ -11,7 +11,7 @@
   --spw-ink: #16141f;
   --spw-ink2: #3a3746;
   --spw-mute: #6b6878;
-  --spw-faint: #8b8898;
+  --spw-faint: var(--text-3);
   --spw-dim: #b4b1bf;
   --spw-line: #f1f1f4;
   --spw-line2: #f3f3f6;
@@ -154,7 +154,7 @@
 .adm .spw-field__in { height: 48px; padding: 0 14px; }
 .adm .spw-field__in.is-sm { height: 44px; }
 .adm .spw-field__in.is-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.adm .spw-field__in:disabled { color: #9a97a6; background: #fff; cursor: not-allowed; }
+.adm .spw-field__in:disabled { color: var(--text-done); background: #fff; cursor: not-allowed; }
 .adm .spw-field__area { min-height: 60px; padding: 12px 14px; resize: none; line-height: 1.5; }
 .adm .spw-field__in::placeholder, .adm .spw-field__area::placeholder, .adm .spw-field__box input::placeholder { color: var(--spw-dim); font-weight: 400; }
 .adm .spw-field__in:focus, .adm .spw-field__area:focus, .adm .spw-field__box:focus-within {
@@ -203,7 +203,7 @@
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease, transform 140ms var(--spw-ease);
 }
-.adm .spw-chip.is-sm { flex: 1; height: 34px; border-radius: 9px; font-size: 13px; font-weight: 600; }
+.adm .spw-chip.is-sm { flex: 1; height: 34px; border-radius: 10px; font-size: 13px; font-weight: 600; }
 .adm .spw-chip.is-quiet { color: var(--spw-faint); }
 .adm .spw-chip.on { background: var(--spw-v); color: #fff; font-weight: 700; }
 .adm .spw-chip:disabled { opacity: 0.45; cursor: default; }
@@ -319,7 +319,7 @@
   height: 32px;
   padding: 0 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   background: #fff;
   font: inherit;
   font-size: 13px;
@@ -383,7 +383,7 @@
   min-width: 0;
   padding: 0 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--spw-gray);
   font: inherit;
   font-size: 15px;

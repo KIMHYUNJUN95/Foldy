@@ -23,7 +23,7 @@
 .spl__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: spl-line 180ms cubic-bezier(.23, 1, .32, 1) 570ms forwards; }
 .spl__ww { margin-top: 28px; overflow: hidden; padding: 0 6px; }
 .spl__word { display: block; font-size: 36px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: transparent; background: linear-gradient(100deg, #16141f 0%, #16141f 40%, #8a63f0 48%, #16141f 56%, #16141f 100%); background-size: 300% 100%; background-position: 160% 0; -webkit-background-clip: text; background-clip: text; transform: translateY(110%); animation: spl-word 420ms var(--sp) 390ms forwards, spl-sweep 540ms cubic-bezier(.77, 0, .175, 1) 540ms forwards; }
-.spl__tag { margin-top: 8px; font-size: 14px; color: #8b8898; opacity: 0; transform: translateY(8px); filter: blur(3px); animation: spl-tag 250ms cubic-bezier(.23, 1, .32, 1) 540ms forwards; }
+.spl__tag { margin-top: 8px; font-size: 14px; color: var(--text-3); opacity: 0; transform: translateY(8px); filter: blur(3px); animation: spl-tag 250ms cubic-bezier(.23, 1, .32, 1) 540ms forwards; }
 @keyframes spl-tile { to { opacity: 1; transform: scale(1); } }
 @keyframes spl-fly {
   0% { opacity: 0; transform: translate3d(var(--sx), var(--sy), var(--sz)) rotateX(var(--rx)) rotateY(var(--ry)); }

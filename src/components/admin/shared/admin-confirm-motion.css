@@ -19,7 +19,7 @@
 .adm .adm-undo__t { display: inline-block; animation: adm-undo-roll 420ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes adm-undo-roll { from { transform: translateY(100%); opacity: 0; } }
 .adm .adm-undo__btn {
-  height: 30px; padding: 0 11px; border: 0; border-radius: 9px; background: rgba(255, 255, 255, .12);
+  height: 30px; padding: 0 11px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, .12);
   color: #d9ccfb; font: inherit; font-weight: 700; cursor: pointer; transition: background-color 160ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1);
 }
 .adm .adm-undo__btn:hover { background: rgba(255, 255, 255, .2); }

@@ -7,7 +7,7 @@
   --rlw-ink: #16141f;
   --rlw-ink2: #3a3746;
   --rlw-mute: #6b6878;
-  --rlw-faint: #8b8898;
+  --rlw-faint: var(--text-3);
   --rlw-faint2: #9a97a6;
   --rlw-line: #f1f1f4;
   --rlw-hair: #f3f3f6;
@@ -118,7 +118,7 @@
 .adm .rlw-btn.is-soft:hover { background: var(--rlw-v-bg2); }
 .adm .rlw-btn.is-add { background: var(--rlw-red-bg); color: var(--rlw-red); }
 .adm .rlw-btn.is-add:hover { background: #ffe6e6; }
-.adm .rlw-btn.is-fill, .adm .rlw-btn.is-wide { width: 100%; height: 48px; border-radius: 12px; font-size: 14px; }
+.adm .rlw-btn.is-fill, .adm .rlw-btn.is-wide { width: 100%; height: 48px; border-radius: 14px; font-size: 14px; }
 .adm .rlw-btn.is-fill { background: var(--rlw-v); color: #fff; }
 .adm .rlw-btn.is-fill:hover { background: #6c43dc; }
 .adm .rlw-btn.is-wide { height: 42px; background: var(--rlw-v-bg); color: var(--rlw-v-ink); }
@@ -283,7 +283,7 @@
 .adm .rlw-dialog > p.rlw-err { font-size: 12px; color: var(--rlw-red); }
 .adm .rlw-dialog__acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .adm .rlw-dbtn {
-  height: 46px; border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  height: 46px; border: 0; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
   transition: background-color 160ms ease, transform 140ms var(--rlw-ease);
 }
 .adm .rlw-dbtn.is-keep { background: #f4f4f7; color: var(--rlw-ink2); }

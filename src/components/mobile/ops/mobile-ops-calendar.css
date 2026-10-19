@@ -12,7 +12,7 @@
   --mops-ink: #16141f;
   --mops-soft: #3a3746;
   --mops-muted: #6b6878;
-  --mops-faint: #9a97a6;
+  --mops-faint: var(--text-done);
   --mops-line: #ececf0;
   --mops-line-soft: #f1f1f4;
   --mops-bg2: #f7f7f9;
@@ -898,7 +898,7 @@ a.mops-pill { padding-inline: 14px; }
 .mps-pre { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .mps-pre button {
   height: 38px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--mops-line);
   background: var(--mops-bg2);
   font-size: 13px;

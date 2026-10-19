@@ -189,6 +189,13 @@ summary,
   --foreground: #16141f;
   --muted: #f4f4f7;
   --muted-foreground: #6b6878;
+  /* Text roles (HIG 다듬기 2026-10-19 · docs/design/05-white-redesign.md). Small text needs 4.5:1 on white —
+     the old #8B8898 (3.46:1) and #9A97A6 (2.86:1) failed it. #8B8898 · #B4B1BF · #C9C6D3 stay for icons,
+     「·」 separators and chevrons only, never for text.
+       --text-3     dates · meta lines · times · unselected tabs (5.11:1)
+       --text-done  completed (struck-through) text · tab counts · group headings (4.64:1) */
+  --text-3: #6f6c7c;
+  --text-done: #76737f;
   --surface: #ffffff;
   --border: #ececf0;
   /* Brand accent: soft violet (pressed #5A30CF). Replaces the former deep navy. */
@@ -221,11 +228,37 @@ summary,
   --destructive-bg: #fdecec;
 }
 
+/* 손쉬운 사용 설정 (HIG 다듬기 04, 2026-10-19). 움직임 줄이기는 화면마다 이미 지킨다 — 나머지 두 설정.
+   「대비 높이기」(iOS 손쉬운 사용 · prefers-contrast): 글자 회색 · 선을 한 단계 진하게. */
+@media (prefers-contrast: more) {
+  :root {
+    --text-3: #5a5767;
+    --text-done: #5a5767;
+    --muted-foreground: #55525f;
+    --border: #d6d5de;
+  }
+}
+/* 「투명도 줄이기」: 흐림을 끄고, 반투명 밝은 면은 불투명 흰색으로. 어두운 오버레이(사진 보기 등)는 그대로 둔다. */
+@media (prefers-reduced-transparency: reduce) {
+  *,
+  *::before,
+  *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  [class*="bg-surface/"],
+  [class*="bg-background/"] {
+    background-color: var(--surface) !important;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-text-3: var(--text-3);
+  --color-text-done: var(--text-done);
   --color-surface: var(--surface);
   --color-border: var(--border);
   --color-primary: var(--primary);

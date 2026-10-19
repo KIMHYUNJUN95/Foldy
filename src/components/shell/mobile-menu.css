@@ -27,7 +27,7 @@
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: #8b8898;
+  color: var(--text-3);
   transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease;
 }
 .mm__close:active {
@@ -74,7 +74,7 @@
   display: block;
   overflow: hidden;
   margin-top: 1px;
-  color: #8b8898;
+  color: var(--text-3);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -89,7 +89,7 @@
   padding: 0 14px;
   border-radius: 14px;
   background: #f4f4f7;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .mm__search input {
   min-width: 0;
@@ -118,7 +118,7 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #8b8898;
+  color: var(--text-3);
 }
 .mm__scroll {
   min-height: 0;
@@ -135,7 +135,7 @@
 .mm__label {
   display: block;
   padding: 14px 12px 4px;
-  color: #9a97a6;
+  color: var(--text-done);
   font-size: 12px;
   font-weight: 600;
 }
@@ -199,7 +199,7 @@
   width: 21px;
   height: 21px;
   flex-shrink: 0;
-  color: #8b8898;
+  color: var(--text-3);
   stroke-width: 1.7;
 }
 .mm__row-lbl {
@@ -210,7 +210,7 @@
   white-space: nowrap;
 }
 .mm__row-count {
-  color: #8b8898;
+  color: var(--text-3);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
@@ -225,7 +225,7 @@
 }
 .mm__empty {
   padding: 28px 12px;
-  color: #8b8898;
+  color: var(--text-3);
   font-size: 14px;
   text-align: center;
 }
@@ -283,7 +283,7 @@
 }
 .te-head__sub {
   margin: 0;
-  color: #8b8898;
+  color: var(--text-3);
   font-size: 13px;
 }
 .te {

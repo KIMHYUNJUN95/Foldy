@@ -1,18 +1,18 @@
 /* 직원 목록 — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet).
    흰 바탕 · 상자 없음 · 선택은 옅은 보라 바탕만. 움직임: 줄 차례 등장 · 전화 버튼 누름(살짝 작아짐 + 진동) ·
    번호 복사됨 체크 그리기 · 프로필 칸 흐림 → 선명. reduced-motion 이면 끈다. */
-.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: #9a97a6; --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f1fd; --drw-line: #f3f3f6; color: var(--drw-ink); }
+.drw { --drw-ink: #16141f; --drw-soft: #6b6878; --drw-faint: var(--text-done); --drw-pri: #7a52e6; --drw-pri-ink: #5a30cf; --drw-tint: #f1ecfd; --drw-sel: #f4f1fd; --drw-line: #f3f3f6; color: var(--drw-ink); }
 .drw .num { font-variant-numeric: tabular-nums; }
 .drw-list { display: flex; flex-direction: column; min-width: 0; padding-bottom: 24px; }
 .drw-h { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
 .drw-h h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
 .drw-h > span { font-size: 13px; color: var(--drw-soft); }
-.drw-search { display: flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 8px 0 14px; border-radius: 12px; background: #f4f4f7; color: #8b8898; }
+.drw-search { display: flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 8px 0 14px; border-radius: 12px; background: #f4f4f7; color: var(--text-3); }
 .drw-search:focus-within { box-shadow: 0 0 0 2px var(--drw-pri); }
 .drw-search > svg { width: 16px; height: 16px; flex: none; }
 .drw-search input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--drw-ink); outline: none; }
 .drw-search input::-webkit-search-cancel-button { display: none; }
-.drw-search button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--drw-soft); }
+.drw-search button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 10px; background: none; color: var(--drw-soft); }
 .drw-search button svg { width: 15px; height: 15px; }
 .drw-g { display: flex; flex-direction: column; }
 .drw-gl { margin: 0; padding: 18px 0 4px; font-size: 12px; font-weight: 600; color: var(--drw-soft); }
@@ -62,7 +62,7 @@
 .drw-prof__h h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .drw-prof__h div > span { font-size: 14px; color: var(--drw-soft); }
 .drw-prof__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.drw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; font-size: 15px; font-weight: 600; color: #3a3746; text-decoration: none; transition: transform 140ms ease, background 150ms ease; }
+.drw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border: 0; border-radius: 14px; background: #f4f4f7; font: inherit; font-size: 15px; font-weight: 600; color: #3a3746; text-decoration: none; transition: transform 140ms ease, background 150ms ease; }
 .drw-btn svg { width: 18px; height: 18px; }
 .drw-btn:active { transform: scale(.98); }
 .drw-btn.is-pri { background: var(--drw-pri); color: #fff; }

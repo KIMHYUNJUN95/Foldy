@@ -72,7 +72,7 @@
 .adm .brw-pf { display: flex; flex-direction: column; gap: 8px; padding: 12px 24px 24px; }
 
 /* 버튼 */
-.adm .brw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 14px; border: 0; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .brw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 14px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
 .adm .brw-btn:active:not(:disabled) { transform: scale(.97); }
 .adm .brw-btn:disabled { opacity: .55; cursor: default; }
 .adm .brw-btn.is-gray { background: #f4f4f7; color: #3a3746; }

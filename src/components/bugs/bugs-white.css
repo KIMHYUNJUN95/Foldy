@@ -4,7 +4,7 @@
    상태는 색 글자만 — 접수 회색 · 검토 중 보라 · 수정 완료 초록 · 종료 옅은 회색. 손가락 칸 ≥ 44px.
    움직임은 transform · opacity 만, prefers-reduced-motion 이면 전부 끈다. */
 .bgw {
-  --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: #8b8898; --w-mute: #b4b1bf;
+  --w-ink: #16141f; --w-ink2: #3a3746; --w-soft: #6b6878; --w-faint: var(--text-3); --w-mute: #b4b1bf;
   --w-pri: #7a52e6; --w-pri-ink: #5a30cf; --w-sel: #f4f1fd; --w-red: #c5282e; --w-green: #1f7a4d;
   --w-hair: #f3f3f6; --w-field: #f4f4f7; --w-line: #e4e2ea;
   --w-ease: cubic-bezier(.23, 1, .32, 1);

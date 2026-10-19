@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { loadOpsRecentBookings } from "@/app/admin/ops/calendar/actions";
+import { fetchOpsRecentBookings } from "./ops-reads";
 import type { OpsRecentBooking } from "@/lib/ops-calendar";
 import { msUntilNextTokyoMidnight, tokyoDateOf } from "@/lib/ops-recent-bookings-range";
 
@@ -58,7 +58,7 @@ export function useRecentBookings(args: {
     requestRef.current += 1;
     const requestId = requestRef.current;
     if (!windowStart) return;
-    void loadOpsRecentBookings({
+    void fetchOpsRecentBookings({
       days,
       from: activeCustom?.from ?? null,
       properties: propertyKey ? propertyKey.split("\n") : [],

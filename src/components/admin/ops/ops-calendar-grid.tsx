@@ -29,7 +29,7 @@ import {
   sameOpsDays,
   type OpsGridRowData,
 } from "@/lib/ops-calendar-rows";
-import { loadOpsCellHistory, loadOpsPriceConversions } from "@/app/admin/ops/calendar/actions";
+import { fetchOpsCellHistory, fetchOpsPriceConversions } from "@/components/admin/ops/ops-reads";
 import { OpsPriceWinsPanel, type PriceWinsCopy } from "@/components/admin/ops/ops-price-wins-panel";
 import {
   OpsRecentBookingsPanel,
@@ -1245,7 +1245,7 @@ export function OpsCalendarGrid({
     if (historyRequestsRef.current.has(requestKey)) return;
     historyRequestsRef.current.add(requestKey);
     const generation = refreshGeneration;
-    void loadOpsCellHistory({ date: hoverCell.date, roomIds }).then((result) => {
+    void fetchOpsCellHistory({ date: hoverCell.date, roomIds }).then((result) => {
       historyRequestsRef.current.delete(requestKey);
       // 실패하면 남겨 두지 않는다 — 카드는 「불러오는 중」으로 남고, 다음 호버가 다시 받는다.
       if (!result.ok) return;
@@ -1278,7 +1278,7 @@ export function OpsCalendarGrid({
     conversionsRequestRef.current += 1;
     const requestId = conversionsRequestRef.current;
     if (!windowStart) return;
-    void loadOpsPriceConversions({
+    void fetchOpsPriceConversions({
       days: days.length,
       properties: propertyKey ? propertyKey.split("\n") : [],
       start: windowStart,

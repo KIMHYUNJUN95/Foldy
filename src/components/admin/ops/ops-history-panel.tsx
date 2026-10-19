@@ -4,13 +4,13 @@ import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   loadOpsChangeHistory,
-  loadOpsSendLog,
   revertBeds24Change,
   revertBlockChange,
   revertPriceJob,
   sendPendingPriceJobs,
 } from "@/app/admin/ops/calendar/actions";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
+import { fetchOpsSendLog } from "@/components/admin/ops/ops-reads";
 import {
   appendChangeGroups,
   collapseCellRuns,
@@ -291,7 +291,7 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
   const sendPagesRef = useRef(1);
 
   const loadSends = useCallback(async (before: string | null) => {
-    const result = await loadOpsSendLog({ before });
+    const result = await fetchOpsSendLog({ before });
     if (!result.ok) {
       setSends((previous) => ({ ...previous, status: "error" }));
       return;

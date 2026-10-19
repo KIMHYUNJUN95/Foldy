@@ -1,6 +1,7 @@
 "use client";
 
-import { getPriceJobStatus, type PriceChangeResult } from "@/app/admin/ops/calendar/actions";
+import type { PriceChangeResult } from "@/app/admin/ops/calendar/actions";
+import { fetchPriceJobStatus } from "./ops-reads";
 
 /**
  * 판매 캘린더 쓰기(가격 · 최소숙박)의 **접수 → 반영 → 화면 갱신**을 잇는다.
@@ -12,7 +13,7 @@ import { getPriceJobStatus, type PriceChangeResult } from "@/app/admin/ops/calen
  * 가격·최소숙박은 **큐**로 간다(`submitPriceChange` → `beds24_price_jobs` → 워커). 서버 액션은
  * 접수만 하고 바로 돌아오므로, 그때 다시 그린 화면은 **아직 반영 전 값**이다. 워커가 몇 초 뒤
  * Beds24 에 쓰고 `room_daily_rates` 를 고쳐도 화면은 그걸 몰라 **새로고침해야** 보였다
- * (사용자 지적). 상태 조회(`getPriceJobStatus`)는 만들어 두고 부르는 곳이 없었다.
+ * (사용자 지적). 상태 조회는 만들어 두고 부르는 곳이 없었다.
  *
  * 그래서 격자가 ① 누르는 즉시 새 값을 흐리게 그리고(낙관적 표시) ② 작업이 끝날 때까지 상태를
  * 묻고 ③ 끝나면 `router.refresh()` 로 **서버 데이터만** 다시 받아 확정 값으로 바꾼다.
@@ -57,7 +58,7 @@ export async function watchOpsWriteJob(jobId: string): Promise<OpsWriteOutcome> 
   while (Date.now() - started < WATCH_LIMIT_MS) {
     await sleep(delay);
     try {
-      const status = await getPriceJobStatus(jobId);
+      const status = await fetchPriceJobStatus(jobId);
       if (status && TERMINAL.has(status.status)) return status.status as OpsWriteOutcome;
     } catch {
       // 한 번 못 물었다고 포기하지 않는다 — 다음 차례에 다시 묻는다.

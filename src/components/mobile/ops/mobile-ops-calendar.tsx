@@ -6,11 +6,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  loadOpsCellHistory,
-  loadOpsPriceConversions,
   revertBlockChange,
   revertPriceJob,
 } from "@/app/admin/ops/calendar/actions";
+import { fetchOpsCellHistory, fetchOpsPriceConversions } from "@/components/admin/ops/ops-reads";
 import { MobileOpsBlockSheet } from "@/components/mobile/ops/mobile-ops-block-sheet";
 import { MobileOpsBookingSheet } from "@/components/mobile/ops/mobile-ops-booking-sheet";
 import { MobileOpsReservationSheet } from "@/components/mobile/ops/mobile-ops-reservation-sheet";
@@ -416,7 +415,7 @@ export function MobileOpsCalendar({
     conversionsRequestRef.current += 1;
     const requestId = conversionsRequestRef.current;
     if (!windowStart) return;
-    void loadOpsPriceConversions({
+    void fetchOpsPriceConversions({
       days: days.length,
       properties: propertyKey ? propertyKey.split("\n") : [],
       start: windowStart,
@@ -679,7 +678,7 @@ export function MobileOpsCalendar({
     const room = rowByKey.get(cellHistoryTarget.roomKey)?.room;
     if (!room || room.roomIds.length === 0) return;
     let live = true;
-    void loadOpsCellHistory({ date: cellHistoryTarget.date, roomIds: room.roomIds }).then((result) => {
+    void fetchOpsCellHistory({ date: cellHistoryTarget.date, roomIds: room.roomIds }).then((result) => {
       if (live && result.ok) setCellHistory({ history: result.history, key: cellHistoryKey });
     });
     return () => {

@@ -30,7 +30,7 @@ POST /bookings                   예약 생성 · 수정 · 취소
 | `createBooking` | 예약 생성 | `/bookings` |
 | `updateBooking` | 예약 수정 | `/bookings` |
 | `cancelBooking` | 예약 취소 | `/bookings` |
-| `getPriceJobStatus` · `triggerPriceJobNow` | 작업 큐 조회·즉시 실행 | — |
+| `getPriceJobStatus`(지금은 `GET /api/ops/calendar/job-status`) · `triggerPriceJobNow` | 작업 큐 조회·즉시 실행 | — |
 
 > **정정 (2026-09-25).** 이 표는 `BuildingCalendar.jsx` 가 **부르는 함수 이름**만 센 것이라,
 > 그 함수 안에서 갈라지는 것을 놓쳤다. 아래가 실제 동작이다.
@@ -1757,6 +1757,22 @@ must continue to target the active roomId."*
 - 패널을 닫아도 툴바에 **「Beds24 에 보내는 중…」** 표시가 반영이 끝날 때까지 남는다.
 - 블록은 큐가 아니라 **동기**로 쓰므로(아래 「차단」) 응답이 올 때 이미 반영돼 있다 — 이 흐름이
   필요 없다.
+
+#### 읽기는 서버 액션 큐 밖 — 폴링이 저장을 막지 않는다 (2026-10-19)
+
+Next App Router 는 서버 액션과 `router.refresh` 를 **한 줄로 하나씩** 처리한다. 예전에는 작업 상태 폴링 ·
+전송 기록 폴링 · 가격 개입 · 최근 예약 · 칸 이력 조회가 전부 서버 액션이라 같은 줄에 섰고, 사용자의
+저장 · 예약 상세 열기 · 호버 카드가 그 뒤에서 기다렸다(실측: 로드 뒤 액션 POST 3회 × 약 0.8초, 화면이
+7.5초에야 조용해짐). 읽기 전용 조회 5개를 `GET /api/ops/calendar/{job-status|send-log|cell-history|price-conversions|recent-bookings}`
+(`src/app/api/ops/calendar/[read]/route.ts`)로 옮겨 **병렬**로 돈다. 클라이언트는 `ops-reads.ts` 의 `fetch*`.
+
+- 권한은 서버에서 같은 조건으로 본다(`route-auth.ts`): 로그인 + 활성 멤버십 + 어드민 웹 역할 + `ops_admin.access`,
+  조직은 세션이 정한다. 쿼리 로직은 `reads.ts` 로 옮겼을 뿐 그대로다(조직 조건 · 입력 재검증 포함).
+- 차이 하나: 액션은 `auth.getUser()`(Auth 왕복, 계정 정지 `banned_until` 최신 확인)를 한 번 더 탔다. GET 은
+  `getCurrentAppSession`(JWT 서명 서버 검증, `getClaims`)만 쓴다. 정지된 계정이 토큰 만료(최대 1시간)까지 이
+  읽기를 볼 수 있다. **쓰기는 그대로 액션 + `getUser()`** 다.
+- 폴링 간격은 그대로(작업 상태 0.5초 → 최대 1.5초, 전송 기록 4초) — 「전송 중 → 완료」 표시는 늦어지지 않는다.
+  폴링은 이제 줄 밖이라 사용자 동작을 막지 않는다. 저장 · 예약 상세 · 되돌리기는 서버 액션 그대로.
 
 #### 속도 — 누르고 진하게 바뀔 때까지 (2026-09-28)
 

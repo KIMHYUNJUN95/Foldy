@@ -28,6 +28,7 @@ import {
   localizePropertyName,
 } from "@/lib/room-label-normalization";
 import { getDictionary } from "@/lib/i18n";
+import { readAllReviewPages, type ReviewPageResult } from "@/lib/external-review-pages";
 import type { Database } from "@/types/database";
 
 // The generated Database type does not line up with postgrest's select-string inference for
@@ -248,26 +249,32 @@ function applyReviewFilter<T>(query: T, filter: ReviewListFilter): T {
   return q as never as T;
 }
 
+/**
+ * 조건에 맞는 리뷰 **전부**(PC 콘솔 목록 · 모바일 객실 고르기). 예전엔 `.limit(500)` 이라 최근
+ * 90일 511건 중 11건이 목록에서 사라졌다(2026-10-19) — 1,000건 쪽으로 나눠 끝까지 읽는다.
+ */
 export async function listExternalReviews(input: {
   session: AppSession;
   filter?: ReviewListFilter;
-  limit?: number;
 }): Promise<ExternalReview[]> {
   const { session, filter = {} } = input;
   const organizationId = requireOrg(session);
 
   const supabase = await getSupabaseServerClient();
-  const query = applyReviewFilter(
-    untyped(supabase).from("external_reviews").select(REVIEW_COLS).eq("organization_id", organizationId),
-    filter,
+  const data = await readAllReviewPages<ReviewRow>((start, end, withCount) =>
+    applyReviewFilter(
+      untyped(supabase)
+        .from("external_reviews")
+        .select(REVIEW_COLS, withCount ? { count: "exact" } : undefined)
+        .eq("organization_id", organizationId),
+      filter,
+    )
+      .order("reviewed_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(start, end) as unknown as PromiseLike<ReviewPageResult<ReviewRow>>,
   );
 
-  const { data, error } = await query
-    .order("reviewed_at", { ascending: false })
-    .limit(input.limit ?? 500);
-  if (error) throw error;
-
-  const rows = ((data ?? []) as unknown as ReviewRow[]).map(mapReview);
+  const rows = data.map(mapReview);
   // 최신 리뷰 우선(reviewed_at desc). 위험도·낮은 점수는 별도 `문제만` 토글과 `문제 객실` 뷰가 맡는다.
   // 날짜가 없는 리뷰(reviewed_at null)는 빈 문자열로 취급돼 맨 뒤로 간다.
   return rows.sort((a, b) => (b.reviewedAt ?? "").localeCompare(a.reviewedAt ?? ""));
@@ -276,9 +283,8 @@ export async function listExternalReviews(input: {
 /**
  * 외부 리뷰 목록 **한 페이지**.
  *
- * `listExternalReviews` 는 `.limit(500)` 으로 잘라 왔다. 조직 리뷰가 2,464건인 지금, 모바일
- * 목록은 **최신 500건만** 받고 나머지는 화면에 존재하지도 않았다 — 게다가 건물·플랫폼 필터가
- * 클라이언트 쪽이라 그 500건 안에서만 걸러졌다. 조용한 누락이다.
+ * 예전 모바일 목록은 최신 500건만 받아 클라이언트에서 걸렀다 — 나머지는 화면에 존재하지도
+ * 않았다. 조용한 누락이다.
  *
  * 그래서 목록은 **서버에서 필터·정렬·페이지**를 끝내고 한 페이지만 내려보낸다. 전체 건수를 함께
  * 주어야 화면이 «몇 페이지인지»를 알 수 있으므로 `count: "exact"` 를 쓴다.
@@ -429,7 +435,33 @@ export type BuildingSummary = PlaceSummary & {
 
 type Acc = { sum: number; n: number; risk: number };
 
-function pushStat(acc: Acc, review: ExternalReview): void {
+/** 집계에 필요한 컬럼만 — 본문(리뷰당 ~2KB)은 읽지 않는다. `id` 는 쪽 정렬 · 중복 거르기용. */
+const STAT_COLS = "id, provider, rating_value, risk_level, reviewed_at, property_id, property_name, room_id, room_label";
+
+type StatRow = {
+  id: string;
+  provider: ReviewProvider;
+  rating_value: number | null;
+  risk_level: ReviewRiskLevel;
+  reviewed_at: string | null;
+  property_id: string | null;
+  property_name: string | null;
+  room_id: string | null;
+  room_label: string | null;
+};
+
+type StatReview = {
+  provider: ReviewProvider;
+  ratingValue: number | null;
+  riskLevel: ReviewRiskLevel;
+  reviewedAt: string | null;
+  propertyId: string | null;
+  propertyName: string | null;
+  roomId: string | null;
+  roomLabel: string | null;
+};
+
+function pushStat(acc: Acc, review: StatReview): void {
   acc.n += 1;
   if (review.riskLevel === "risk") acc.risk += 1;
   if (review.ratingValue !== null && review.riskLevel !== "unrated") acc.sum += review.ratingValue;
@@ -465,18 +497,35 @@ export async function summarizeReviewsByPlace(input: {
   const organizationId = requireOrg(session);
   const buildingLabels = getDictionary(input.locale).cleaning.buildingLabels;
 
-  const reviews = await listExternalReviews({
-    session,
-    filter: { from, to },
-    limit: 5000,
-  });
-
   const supabase = await getSupabaseServerClient();
-  const { data: propertyRows, error: propertyError } = await untyped(supabase)
-    .from("properties")
-    .select("id, name")
-    .eq("organization_id", organizationId);
+  // 예전엔 `listExternalReviews({ limit: 5000 })` 로 본문까지 읽었는데, PostgREST 가 1,000행에서
+  // 조용히 잘라 365일(1,702건) 합계가 틀렸다(2026-10-19). 필요한 컬럼만 쪽으로 나눠 전부 읽는다.
+  const [statRows, { data: propertyRows, error: propertyError }] = await Promise.all([
+    readAllReviewPages<StatRow>((start, end, withCount) =>
+      applyReviewFilter(
+        untyped(supabase)
+          .from("external_reviews")
+          .select(STAT_COLS, withCount ? { count: "exact" } : undefined)
+          .eq("organization_id", organizationId),
+        { from, to },
+      )
+        .order("reviewed_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(start, end) as unknown as PromiseLike<ReviewPageResult<StatRow>>,
+    ),
+    untyped(supabase).from("properties").select("id, name").eq("organization_id", organizationId),
+  ]);
   if (propertyError) throw propertyError;
+  const reviews: StatReview[] = statRows.map((row) => ({
+    provider: row.provider,
+    ratingValue: row.rating_value,
+    riskLevel: row.risk_level,
+    reviewedAt: row.reviewed_at,
+    propertyId: row.property_id,
+    propertyName: row.property_name,
+    roomId: row.room_id,
+    roomLabel: row.room_label,
+  }));
 
   const nameById = new Map<string, string>();
   const properties = (propertyRows ?? []) as { id: string; name: string }[];

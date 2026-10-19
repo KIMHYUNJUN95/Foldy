@@ -29,6 +29,7 @@ import { reviewSyncLabels } from "@/lib/review-sync-labels";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { defaultReviewRange } from "@/lib/external-review-pages";
 
 // 컴플레인 콘솔 — 수동 컴플레인 + Beds24 외부 리뷰 통합 검토.
 // 뷰 전환과 기간/필터는 전부 쿼리스트링으로 다뤄, 서버 렌더 한 번으로 끝난다.
@@ -64,14 +65,6 @@ type SearchParams = {
   tr?: string;
 };
 
-/** 기본 기간은 최근 90일 — Beds24 초기 수집 범위와 같은 창을 본다. */
-function defaultRange(): { from: string; to: string } {
-  const now = new Date();
-  const to = now.toISOString().slice(0, 10);
-  const from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  return { from, to };
-}
-
 export default async function AdminComplaintsPage({
   searchParams,
 }: {
@@ -81,7 +74,8 @@ export default async function AdminComplaintsPage({
   const params = await searchParams;
   const dictionary = getDictionary(session.user.preferredLanguage);
 
-  const fallback = defaultRange();
+  // 기본 기간은 최근 90일(오늘 포함, 도쿄 날짜) — Beds24 초기 수집 범위 · 모바일과 같은 창.
+  const fallback = defaultReviewRange();
   const from = params.from?.trim() || fallback.from;
   const to = params.to?.trim() || fallback.to;
 
@@ -92,28 +86,47 @@ export default async function AdminComplaintsPage({
       : "reviews";
 
   // 건물 고르기는 정규화 이름 하나가 여러 property_id 에 대응한다(Beds24 원본 표기가 여럿) — 마스터에서 묶는다.
-  const buildingOptions = await listReviewBuildingOptions({ session, locale: session.user.preferredLanguage });
-  const building = buildingOptions.find((option) => option.value === params.building?.trim()) ?? null;
-  const roomLabel = building ? params.rl?.trim() || null : null;
-
-  const filter: ReviewListFilter = {
-    from,
-    to,
-    riskOnly: params.risk === "1",
-    provider: params.provider === "airbnb" || params.provider === "booking" ? params.provider : undefined,
-    propertyId: params.property?.trim() || undefined,
-    propertyIds: building ? building.propertyIds : undefined,
-    roomId: params.room?.trim() || undefined,
-  };
+  // 리뷰 목록만 건물 마스터를 기다린다. 나머지(집계 · 수동 컴플레인 · 상세 패널 …)는 처음부터 동시에 돈다.
+  const buildingOptionsPromise = listReviewBuildingOptions({ session, locale: session.user.preferredLanguage });
+  const filterPromise = buildingOptionsPromise.then((buildingOptions) => {
+    const building = buildingOptions.find((option) => option.value === params.building?.trim()) ?? null;
+    const filter: ReviewListFilter = {
+      from,
+      to,
+      riskOnly: params.risk === "1",
+      provider: params.provider === "airbnb" || params.provider === "booking" ? params.provider : undefined,
+      propertyId: params.property?.trim() || undefined,
+      propertyIds: building ? building.propertyIds : undefined,
+      roomId: params.room?.trim() || undefined,
+    };
+    return { buildingOptions, building, filter };
+  });
 
   // 세 뷰가 같은 KPI 줄을 공유하므로 집계는 항상 계산한다. 리뷰 목록은 뷰와 무관하게
   // 미전환 건수 계산에 쓰이므로 함께 가져온다.
   // 등록 패널의 선택지는 작성 권한자에게만 필요하다 — 권한이 없으면 두 쿼리를 아예 돌리지 않는다.
   const canWrite = canWriteComplaint(session.user.role);
 
-  const [complaints, allReviews, summaries, createReservations, createPlaces, reviewSync] = await Promise.all([
+  // 상세 패널은 ?review=<id> 쿼리로만 연다 — 콘솔의 나머지 상태와 같은 서버 렌더 한 번으로 끝난다.
+  const reviewId = params.review?.trim() || null;
+  // 수동 컴플레인 상세도 같은 규약으로 연다 — 새 라우트를 파지 않는다(콘솔 공유 계약).
+  const complaintId = params.complaint?.trim() || null;
+  const showTranslation = params.tr === "1";
+
+  const [
+    { buildingOptions, building, filter },
+    complaints,
+    allReviews,
+    summaries,
+    createReservations,
+    createPlaces,
+    reviewSync,
+    reviewDetail,
+    complaintDetail,
+  ] = await Promise.all([
+    filterPromise,
     listComplaints({ session }),
-    listExternalReviews({ session, filter }),
+    filterPromise.then(({ filter }) => listExternalReviews({ session, filter })),
     summarizeReviewsByPlace({ session, from, to, locale: session.user.preferredLanguage }),
     canWrite
       ? listComplaintPickerReservations(session.organization.id, session.user.preferredLanguage)
@@ -123,31 +136,31 @@ export default async function AdminComplaintsPage({
       : Promise.resolve([]),
     // 「지금 가져오기」 — 작성 권한자에게만 보인다(서버 액션이 같은 권한을 다시 본다).
     canWrite ? getReviewSyncStatus(getSupabaseServiceClient(), session.organization.id) : Promise.resolve(null),
+    reviewId
+      ? getExternalReview({ session, id: reviewId }).then(async (review) => ({
+          review,
+          translations:
+            review && showTranslation
+              ? await getStoredTranslations({
+                  externalReviewId: reviewId,
+                  targetLocale: session.user.preferredLanguage,
+                })
+              : ({} as Partial<Record<TranslationPart, string>>),
+        }))
+      : Promise.resolve(null),
+    complaintId
+      ? getComplaint({ session, id: complaintId }).then(async (complaint) => ({
+          complaint,
+          comments: complaint ? await listComplaintComments({ session, complaintId }) : ([] as ComplaintComment[]),
+        }))
+      : Promise.resolve(null),
   ]);
 
-  // 상세 패널은 ?review=<id> 쿼리로만 연다 — 콘솔의 나머지 상태와 같은 서버 렌더 한 번으로 끝난다.
-  const reviewId = params.review?.trim() || null;
-  // 수동 컴플레인 상세도 같은 규약으로 연다 — 새 라우트를 파지 않는다(콘솔 공유 계약).
-  const complaintId = params.complaint?.trim() || null;
-  let selectedComplaint: Complaint | null = null;
-  let selectedReview: ExternalReviewDetail | null = null;
-  let translations: Partial<Record<TranslationPart, string>> = {};
-  const showTranslation = params.tr === "1";
-  if (reviewId) {
-    selectedReview = await getExternalReview({ session, id: reviewId });
-    if (selectedReview && showTranslation) {
-      translations = await getStoredTranslations({
-        externalReviewId: reviewId,
-        targetLocale: session.user.preferredLanguage,
-      });
-    }
-  }
-
-  let comments: ComplaintComment[] = [];
-  if (complaintId) {
-    selectedComplaint = await getComplaint({ session, id: complaintId });
-    if (selectedComplaint) comments = await listComplaintComments({ session, complaintId });
-  }
+  const roomLabel = building ? params.rl?.trim() || null : null;
+  const selectedReview: ExternalReviewDetail | null = reviewDetail?.review ?? null;
+  const translations: Partial<Record<TranslationPart, string>> = reviewDetail?.translations ?? {};
+  const selectedComplaint: Complaint | null = complaintDetail?.complaint ?? null;
+  const comments: ComplaintComment[] = complaintDetail?.comments ?? [];
 
   // 객실은 표시 라벨로 거른다 — 같은 방을 두 Beds24 어카운트가 나눠 쓰므로 room_id 하나로는 모자란다.
   const reviews = roomLabel ? allReviews.filter((review) => review.displayRoomLabel === roomLabel) : allReviews;

@@ -9,6 +9,7 @@ import {
 } from "@/lib/room-label-normalization";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { getReservationGuests } from "@/lib/reservation-guests";
+import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -34,6 +35,11 @@ function addCalendarDays(dateStr: string, days: number) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
+
+const BASE_COLUMNS = "id, check_in_date, check_out_date, guest_name, property_name, room_label";
+// 도착 예약은 인원(`getPax` · `getReservationGuests`)만 원본에서 읽는다 — 키만 받는다(2026-10-19 속도, 30일 429행 약 890KB 였다).
+// 떠나는 예약은 원본을 읽지 않는다.
+const ARRIVAL_SELECT = `${BASE_COLUMNS}, ${slimPayloadSelect(GUEST_PAYLOAD_KEYS)}`;
 
 type ResRow = {
   id: string;
@@ -107,13 +113,13 @@ export async function getCleaningTargets(
   const [depResult, arrResult] = await Promise.all([
     supabase
       .from("reservations")
-      .select("id, check_in_date, check_out_date, guest_name, property_name, room_label, raw_payload")
+      .select(BASE_COLUMNS)
       .eq("organization_id", organizationId)
       .eq("status", "confirmed")
       .eq("check_out_date", targetDate),
     supabase
       .from("reservations")
-      .select("id, check_in_date, check_out_date, guest_name, property_name, room_label, raw_payload")
+      .select(ARRIVAL_SELECT)
       .eq("organization_id", organizationId)
       .eq("status", "confirmed")
       .gte("check_in_date", targetDate)
@@ -144,8 +150,20 @@ export async function getCleaningTargets(
     return { cp, cr, key: buildRoomKey(cp, cr), physicalKey };
   }
 
-  const departures = ((depResult.data ?? []) as ResRow[]).filter((r) => !excluded(r));
-  const arrivals = ((arrResult.data ?? []) as ResRow[]).filter((r) => !excluded(r));
+  const departures = ((depResult.data ?? []) as unknown as Omit<ResRow, "raw_payload">[])
+    .map((r): ResRow => ({ ...r, raw_payload: null }))
+    .filter((r) => !excluded(r));
+  const arrivals = ((arrResult.data ?? []) as unknown as Record<string, unknown>[])
+    .map((r): ResRow => ({
+      check_in_date: r.check_in_date as string,
+      check_out_date: r.check_out_date as string,
+      guest_name: r.guest_name as string,
+      id: r.id as string,
+      property_name: r.property_name as string,
+      raw_payload: slimPayloadOf(r, GUEST_PAYLOAD_KEYS),
+      room_label: r.room_label as string,
+    }))
+    .filter((r) => !excluded(r));
 
   // Map: physicalKey → first departure row (edge-case: multiple checkouts same physical room)
   const departureMap = new Map<string, { row: ResRow; cp: string; cr: string }>();

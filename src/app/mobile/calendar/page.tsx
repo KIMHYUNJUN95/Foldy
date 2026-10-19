@@ -7,7 +7,8 @@ import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { listPropertyMapMeta } from "@/lib/property-operation-info";
-import { listReservationInternalNotes } from "@/lib/reservation-internal-notes";
+import { listReservationInternalNotesInWindow, pickReservationNotes } from "@/lib/reservation-internal-notes";
+import { CALENDAR_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import {
   CALENDAR_BUILDING_ORDER,
   getCanonicalPropertyName,
@@ -20,7 +21,6 @@ import {
   type ActiveRoomCatalogItem,
   buildPropertyRoomLookups,
   getActiveRoomCatalog,
-  getActiveRoomLabels,
 } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -46,6 +46,32 @@ type ReservationRow = Pick<
   | "status"
   | "raw_payload"
 >;
+
+// `raw_payload` 는 쓰는 키만(`reservation-payload-slim.ts`) — 통째면 두 달 창 954행에 약 2MB 였다.
+const RESERVATION_SELECT = [
+  "id, check_in_date, check_out_date, guest_name, property_name, room_label, source, source_reservation_id, status",
+  slimPayloadSelect(CALENDAR_PAYLOAD_KEYS),
+].join(", ");
+
+function toReservationRow(raw: Record<string, unknown>): ReservationRow {
+  return {
+    check_in_date: raw.check_in_date as string,
+    check_out_date: raw.check_out_date as string,
+    guest_name: raw.guest_name as string,
+    id: raw.id as string,
+    property_name: raw.property_name as string,
+    raw_payload: slimPayloadOf(raw, CALENDAR_PAYLOAD_KEYS) as ReservationRow["raw_payload"],
+    room_label: raw.room_label as string,
+    source: raw.source as ReservationRow["source"],
+    source_reservation_id: raw.source_reservation_id as ReservationRow["source_reservation_id"],
+    status: raw.status as ReservationRow["status"],
+  };
+}
+
+/** `getActiveRoomLabels`(rooms.ts)와 같은 값 — 이미 받은 카탈로그에서 만든다(`rooms` 를 두 번 읽지 않게). */
+function roomLabelsOf(catalog: ActiveRoomCatalogItem[] | undefined): string[] | undefined {
+  return catalog === undefined ? undefined : [...new Set(catalog.map((item) => item.roomLabel))];
+}
 
 function toJstDateString(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -238,22 +264,35 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
   let roomMasterRooms: string[] | undefined;
   let roomCatalog: ActiveRoomCatalogItem[] | undefined;
 
+  // 서로 기다릴 필요 없는 읽기(객실 · 예약 · 메모 · 차단 · 건물 정보 · 배지)는 한 번에 시작한다(2026-10-19 속도 — 전에는
+  // 메모 5번 · 차단 · 배지가 차례로 붙어 약 13단계였다).
+  const roomBlocksPromise = readAllPages((from, to) =>
+    supabase
+      .from("room_blocks")
+      .select("id, property_name, room_label, start_date, end_date")
+      .eq("organization_id", session.organization.id)
+      .lt("start_date", operationalWindowEnd)
+      .gte("end_date", operationalMonthStart)
+      .order("start_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  const sidePromise = Promise.all([getMobileNavBadges(), listPropertyMapMeta(session)]);
+  // 첫 await 전에 거절돼도 처리되지 않은 거절로 남지 않게 — 실제 오류는 아래 await 가 그대로 던진다.
+  roomBlocksPromise.catch(() => undefined);
+  sidePromise.catch(() => undefined);
+
   if (isOutOfWindow) {
-    const [rooms, catalog] = await Promise.all([
-      getActiveRoomLabels(session.organization.id, supabase),
-      getActiveRoomCatalog(session.organization.id, supabase),
-    ]);
-    roomMasterRooms = rooms;
+    const catalog = await getActiveRoomCatalog(session.organization.id, supabase);
+    roomMasterRooms = roomLabelsOf(catalog);
     roomCatalog = catalog;
   } else {
-    const [{ data, error }, rooms, catalog] = await Promise.all([
+    const [{ data, error }, catalog, notesInWindow] = await Promise.all([
       // 1,000행 상한을 넘으면 조용히 잘린다 — 페이지로 끝까지 읽는다(`read-all-pages.ts`).
-      readAllPages<ReservationRow>((from, to) =>
+      readAllPages<Record<string, unknown>>((from, to) =>
         supabase
           .from("reservations")
-          .select(
-            "id, check_in_date, check_out_date, guest_name, property_name, room_label, source, source_reservation_id, status, raw_payload",
-          )
+          .select(RESERVATION_SELECT)
           .eq("organization_id", session.organization.id)
           .lt("check_in_date", operationalWindowEnd)
           .gte("check_out_date", operationalMonthStart)
@@ -261,16 +300,20 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
           .neq("status", "no_show")
           .order("check_in_date", { ascending: true })
           .order("id", { ascending: true })
-          .range(from, to),
+          .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,
       ),
-      getActiveRoomLabels(session.organization.id, supabase),
       getActiveRoomCatalog(session.organization.id, supabase),
+      listReservationInternalNotesInWindow(session, {
+        checkInBefore: operationalWindowEnd,
+        checkOutFrom: operationalMonthStart,
+      }),
     ]);
 
     if (error) {
       throw new Error(error.message);
     }
 
+    const rooms = roomLabelsOf(catalog);
     roomMasterRooms = rooms;
     roomCatalog = catalog;
     const roomLookups = buildPropertyRoomLookups(roomCatalog ?? []);
@@ -356,7 +399,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       return normalizedRoomLabel;
     };
 
-    const filteredRows = ((data ?? []) as ReservationRow[]).filter(
+    const filteredRows = data.map(toReservationRow).filter(
       (item) =>
         !isExcludedOperationalProperty(item.property_name) &&
         !isExcludedOperationalRoom(item.property_name, item.room_label),
@@ -398,11 +441,8 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
     // added to the room axis (canonicalRoomMasterRooms / propertyRoomsMap) below so their
     // bars still render instead of silently disappearing.
     reservations = filteredRows.map(mapToCalendarItem);
-  }
-
-  if (reservations.length > 0) {
-    const reservationNotes = await listReservationInternalNotes(
-      session,
+    const reservationNotes = pickReservationNotes(
+      notesInWindow,
       reservations.map((item) => item.id),
     );
     reservations = reservations.map((item) => ({
@@ -447,17 +487,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
         );
   // Beds24 캘린더 블락. 예약이 아니라 인벤토리 오버라이드라 별도 테이블에서 온다.
   // 방 축은 예약과 같은 표시 라벨을 쓴다 — 어긋나면 그릴 행이 없다.
-  const roomBlocksResult = await readAllPages((from, to) =>
-    supabase
-      .from("room_blocks")
-      .select("id, property_name, room_label, start_date, end_date")
-      .eq("organization_id", session.organization.id)
-      .lt("start_date", operationalWindowEnd)
-      .gte("end_date", operationalMonthStart)
-      .order("start_date", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
+  const roomBlocksResult = await roomBlocksPromise;
   if (roomBlocksResult.error) {
     console.error("[mobile/calendar] room block read failed", roomBlocksResult.error);
   }
@@ -524,10 +554,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       }
     : null;
 
-  const [navBadges, buildingInfos] = await Promise.all([
-    getMobileNavBadges(),
-    listPropertyMapMeta(session),
-  ]);
+  const [navBadges, buildingInfos] = await sidePromise;
 
   return (
     // 넓은 화면(2026-10-05): 폭 전부(`wide`) — 격자는 날짜 칸이 고정 폭이라 넓을수록 더 많은 날을 한 번에 본다. 목록 · 건물

@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { toJstDateString } from "@/lib/admin-calendar-dashboard";
 import { readOpsSalesInputs } from "@/lib/ops-calendar";
 import {
@@ -194,25 +196,27 @@ export async function getOpsRevenueCompareData(
   const bPieces = splitByMonth(args.b.range);
   const everything: Piece[] = [...aPieces, ...bPieces];
   const organizationId = session.organization.id;
-  const { inputs, summarize, supabase } = await createRevenueSummarizer(organizationId, everything, today);
+  const supabase = getSupabaseServiceClient();
+  // 첫 달 읽기는 요약기와 동시에(2026-10-19 속도 — 전에는 요약기 뒤에 직렬로 붙었다).
+  const [{ inputs, summarize }, firstMonth] = await Promise.all([
+    createRevenueSummarizer(organizationId, everything, today),
+    firstReservationMonth(supabase, organizationId),
+  ]);
   const sum = (pieces: Piece[], level: "properties" | "rooms") => {
     const out = new Map<string, RevenueCell>();
     for (const piece of pieces) for (const [key, cell] of summarize(piece)[level]) addCell(out.get(key) ?? setNew(out, key), cell);
     return Object.fromEntries(out) as OpsRevenueCells;
   };
   // 객실 첫 판매일 = 집계 표 모든 달의 「그 달 첫 체크인」 최솟값 — 예약 기록 첫 달부터 늦은 쪽 기간까지 표를 최신으로 맞춘 뒤.
-  const roomFirstSale: Record<string, string> = {};
-  const firstMonth = await firstReservationMonth(supabase, organizationId);
+  let roomFirstSale: Record<string, string> = {};
   const lastMonth = [args.a.range.to, args.b.range.to].sort()[1].slice(0, 7);
   if (firstMonth && firstMonth <= lastMonth) {
     const history: string[] = [];
     for (let month = firstMonth; month <= lastMonth; month = shiftMonthKey(month, 1)) history.push(month);
-    await ensureOpsStatsMonths(supabase, organizationId, history);
-    for (const row of await readOpsStatsRows(supabase, organizationId, history)) {
-      if (!row.firstCheckIn) continue;
-      const seen = roomFirstSale[row.roomKey];
-      if (!seen || row.firstCheckIn < seen) roomFirstSale[row.roomKey] = row.firstCheckIn;
-    }
+    // 표가 이미 최신이면(대개 그렇다) 확인과 읽기를 동시에 — 확인이 달을 새로 계산했으면 그 뒤에 한 번 더 읽는다.
+    const read = () => readRoomFirstSale(supabase, organizationId, history);
+    const [built, firstRead] = await Promise.all([ensureOpsStatsMonths(supabase, organizationId, history), read()]);
+    roomFirstSale = built > 0 ? await read() : firstRead;
   }
   const rooms: Record<string, Array<{ key: string; label: string }>> = {};
   for (const room of inputs.rooms) {
@@ -236,6 +240,42 @@ export async function getOpsRevenueCompareData(
     })),
     today,
   };
+}
+
+/** RPC 가 아직 DB 에 없다(마이그레이션 적용 전) — PostgREST 스키마 캐시에 없음 · Postgres 함수 없음. */
+function isMissingRpc(error: { code?: string } | null): boolean {
+  return error?.code === "PGRST202" || error?.code === "42883";
+}
+
+/**
+ * 객실 첫 판매일 = 집계 표 `history` 달들의 「그 달 첫 체크인」 최솟값.
+ * DB 함수 `ops_room_first_check_ins`(마이그레이션 `202610190004`)가 객실마다 최솟값만(~100행) 돌려준다 — 전에는 약 48개월
+ * `select *`(~3,200행)를 받아 여기서 구했다. 함수가 아직 없으면 예전 방식으로 읽는다(결과는 같다).
+ */
+async function readRoomFirstSale(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  organizationId: string,
+  history: readonly string[],
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  const rpc = await (supabase as unknown as SupabaseClient).rpc("ops_room_first_check_ins", {
+    p_from_month: `${history[0]}-01`,
+    p_organization_id: organizationId,
+    p_to_month_exclusive: `${shiftMonthKey(history[history.length - 1], 1)}-01`,
+  });
+  if (!rpc.error) {
+    for (const row of (rpc.data ?? []) as Array<{ room_key: string; first_check_in: string | null }>) {
+      if (row.first_check_in) result[row.room_key] = row.first_check_in;
+    }
+    return result;
+  }
+  if (!isMissingRpc(rpc.error)) throw new Error(`ops room first check-in: ${rpc.error.message}`);
+  for (const row of await readOpsStatsRows(supabase, organizationId, history)) {
+    if (!row.firstCheckIn) continue;
+    const seen = result[row.roomKey];
+    if (!seen || row.firstCheckIn < seen) result[row.roomKey] = row.firstCheckIn;
+  }
+  return result;
 }
 
 // ── 대시보드 홈(화이트 리디자인 2026-10-09) ───────────────────────────────
@@ -284,7 +324,16 @@ export async function getDashboardOpsSummary(session: AppSession, monthArg?: str
   if (toDatePiece) pieces.push(toDatePiece);
   if (prevToDatePiece) pieces.push(prevToDatePiece);
   const organizationId = session.organization.id;
-  const { inputs, summarize, supabase } = await createRevenueSummarizer(organizationId, pieces, today);
+  // 날짜별 막대용 그 달 예약 읽기는 요약기와 **동시에** 시작하고, 요약기의 「1일 ~ 오늘」 조각도 같은 읽기로 계산한다
+  // (2026-10-19 속도 — 전에는 요약기가 끝난 뒤에야 시작했고, 이번 달 조각을 따로 한 번 더 읽었다). 창 밖 예약은 그 조각에
+  // 밤이 없어 아무것도 더하지 않으므로 숫자는 같다(`ops-revenue-shared-window.test.ts`).
+  const monthWindow = monthPiece(month);
+  const supabase = getSupabaseServiceClient();
+  const monthInputs = readOpsSalesInputs({ concurrency: 4, organizationId, properties: [], supabase, window: monthWindow, withBlocks: false });
+  const [{ inputs, summarize }, raw] = await Promise.all([
+    createRevenueSummarizer(organizationId, pieces, today, { inputs: monthInputs, window: monthWindow }),
+    monthInputs,
+  ]);
   const excluded = new Set(defaultSalesExcluded(inputs.properties));
   const included = inputs.properties.filter((name) => !excluded.has(name));
   const total = (piece: Piece | null) => {
@@ -306,8 +355,6 @@ export async function getDashboardOpsSummary(session: AppSession, monthArg?: str
   const currentResult = summarize(monthPiece(month));
 
   // 날짜별 매출 — 그 달 예약을 한 번만 읽는다.
-  const monthWindow = monthPiece(month);
-  const raw = await readOpsSalesInputs({ concurrency: 4, organizationId, properties: [], supabase, window: monthWindow, withBlocks: false });
   const reservations = raw.reservations.map((r) => ({ ...r, raw: r.raw as SalesRawPayload }));
   const daily: DashboardOpsSummary["daily"] = [];
   for (let day = 1; day <= lastDay; day += 1) {
@@ -348,6 +395,8 @@ export async function getDashboardOpsSummary(session: AppSession, monthArg?: str
   };
 }
 
+type SalesInputs = Awaited<ReturnType<typeof readOpsSalesInputs>>;
+
 /**
  * 조각들의 매출 요약을 미리 모아 두고 꺼내 주는 함수 — 매출 화면 · 가동률 · 비교가 같이 쓴다(2026-10-08 집계 표).
  *
@@ -357,8 +406,15 @@ export async function getDashboardOpsSummary(session: AppSession, monthArg?: str
  * 조각마다 그 달 판매가 없는 건물은 분모(객실박)를 0 으로 둔다(「문 열기 전」). `raw` 면 그 규칙 없이(「앞으로」 탭).
  * 화면 게이트(`requireOpsAdminPage`)를 지난 뒤에만 부른다 — 서버 전용 service role 로 읽는다(집계 표는 RLS 정책이 없다).
  */
-async function createRevenueSummarizer(organizationId: string, pieces: readonly Piece[], today: string) {
+async function createRevenueSummarizer(
+  organizationId: string,
+  pieces: readonly Piece[],
+  today: string,
+  /** 이미 시작한 예약 읽기 — 이 창 안에 드는 달 일부 조각은 따로 읽지 않고 이것으로 계산한다(대시보드 홈). */
+  shared?: { window: Piece; inputs: Promise<SalesInputs> },
+) {
   const supabase = getSupabaseServiceClient();
+  const within = (piece: Piece, window: Piece) => piece.start >= window.start && piece.endExclusive <= window.endExclusive;
   const isFullMonth = (piece: Piece) => piece.start.endsWith("-01") && piece.endExclusive === `${shiftMonthKey(piece.start.slice(0, 7), 1)}-01`;
   const fullMonths = [...new Set(pieces.filter(isFullMonth).map((piece) => piece.start.slice(0, 7)))];
   const partial = [...new Map(pieces.filter((piece) => !isFullMonth(piece)).map((piece) => [`${piece.start}|${piece.endExclusive}`, piece])).values()];
@@ -371,7 +427,10 @@ async function createRevenueSummarizer(organizationId: string, pieces: readonly 
   })();
   const livePromise = Promise.all(
     partial.map(async (piece) => {
-      const inputs = await readOpsSalesInputs({ concurrency: 4, organizationId, properties: [], supabase, window: piece, withBlocks: false });
+      const inputs =
+        shared && within(piece, shared.window)
+          ? await shared.inputs
+          : await readOpsSalesInputs({ concurrency: 4, organizationId, properties: [], supabase, window: piece, withBlocks: false });
       const summary = buildOpsSalesSummary({
         blocks: [],
         endExclusive: piece.endExclusive,

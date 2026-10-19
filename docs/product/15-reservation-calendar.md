@@ -46,6 +46,21 @@
   (상세 주소가 없어 `useIsTablet()` 으로 칸을 직접 그린다).
 - 움직임: 막대 차례 펼침 · 막대/전화/건물 누름 반응 · 시트 올라옴(공용) · 복사됨 체크 그리기 · 칸 내용 흐림 → 선명. 움직임 줄이기 설정에서는 끈다.
 
+## 읽기 속도 (2026-10-19)
+
+화면 · 숫자는 그대로, 서버 읽기만 줄였다(관리자 `getAdminCalendarDashboardData` · 모바일 `src/app/mobile/calendar/page.tsx`).
+
+- **`raw_payload` 는 쓰는 키만** 받는다 — 객실 매칭 · 인원 · 전화 · 예약 번호 키(`src/lib/reservation-payload-slim.ts`
+  `CALENDAR_PAYLOAD_KEYS`, PostgREST `raw_payload->key`). 두 달 창 954행에 약 2MB 였다. **매칭 · 인원 · 전화 · 예약 번호를 읽는
+  함수가 새 키를 보게 되면 이 목록에도 넣는다** — 회귀 테스트 `reservation-payload-slim.test.ts` 가 인원 · 예약 번호 키 목록을 원본
+  파일과 대조한다.
+- **내부 메모**: 예약 id 를 200개씩 잘라 차례로 묻던 것(954건 = 5번 직렬)을 **캘린더와 같은 날짜 창 한 번**으로 바꿨다
+  (`listReservationInternalNotesInWindow` — 메모 → 예약 `!inner` 조인). 예약 · 객실 · 차단 읽기와 **동시에** 시작하고, 결과는 화면에
+  그리는 예약 id 로 다시 거른다(`pickReservationNotes`).
+- 모바일: 차단 · 건물 정보 · 배지도 처음에 함께 시작하고, 객실 이름 목록은 이미 받은 카탈로그에서 만든다(`rooms` 를 두 번 읽지 않는다).
+- 실시간: `/admin/calendar` 는 예약 · 차단 신호만 받는다(`Beds24LiveRefresh kinds={["reservations","blocks"]}`) — 요금 동기화로
+  두 달 예약을 다시 읽지 않는다. `/mobile/calendar` 는 아직 전부 받는다(구독이 `mobile-calendar-live-view.tsx` 안에 있다).
+
 ## 인원 표기 — 성인 · 어린이 (2026-10-05)
 
 현장용 예약 캘린더(`/mobile/calendar` 예약 상세)와 관리자 예약 캘린더(`/admin/calendar` 예약 패널)는 인원을 **「성인 N · 어린이 N」**

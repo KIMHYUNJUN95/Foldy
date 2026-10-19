@@ -11,6 +11,9 @@ import { GreetingLine } from "@/components/shared/greeting-line";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getDashboardOpsSummary } from "@/lib/ops-revenue-server";
 
+// 홈은 예약에서 나온 숫자만 보인다 — 요금 · 차단 신호마다 홈 전체(36쿼리)를 다시 읽지 않는다(2026-10-19).
+const LIVE_KINDS = ["reservations"] as const;
+
 // Admin operations console — desktop dashboard home. Top-priority blocks wired to
 // real domain data (cleaning / requests / attendance / announcements / tasks /
 // reservations). See docs/product/05-admin-web-ia.md → "Dashboard Home Screen".
@@ -50,7 +53,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       title={<GreetingLine surface="admin" locale={locale} name={session.user.name ?? ""} fallback={dictionary.admin.console.headerToday} />}
     >
       {/* 하루 첫 진입 모션(약 1.8초) — 시안 Motion-PC-Entry-PC */}
-      {session.organization ? <Beds24LiveRefresh organizationId={session.organization.id} /> : null}
+      {session.organization ? <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} /> : null}
       <DashboardHome
         c={dictionary.admin.console}
         data={data}

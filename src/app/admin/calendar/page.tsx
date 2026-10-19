@@ -14,6 +14,9 @@ type PageProps = {
   }>;
 };
 
+// 예약 막대 · 차단 구간만 그린다 — 요금 동기화 신호로 두 달 예약을 다시 읽지 않는다(2026-10-19).
+const LIVE_KINDS = ["reservations", "blocks"] as const;
+
 function buildMobileCalendarHref(month: string, property: string | null) {
   const params = new URLSearchParams({ month });
   if (property) {
@@ -32,7 +35,7 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
       mobileHref={buildMobileCalendarHref(data.selectedMonth, data.selectedProperty)}
       title={buildMonthLabel(data.selectedMonth, data.locale)}
     >
-      <Beds24LiveRefresh organizationId={session.organization.id} />
+      <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <AdminReservationConsole
         beds24SyncPaused={data.beds24SyncPaused}
         blockedProperties={[]}

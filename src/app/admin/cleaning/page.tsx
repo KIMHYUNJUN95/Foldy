@@ -8,6 +8,9 @@ import { getDictionary } from "@/lib/i18n";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 
+// 청소 · 셋팅 대상은 예약에서만 나온다 — 요금 · 차단 신호로 다시 읽지 않는다(2026-10-19).
+const LIVE_KINDS = ["reservations"] as const;
+
 // Admin · Cleaning — 오늘 현황 (real-time board) / 기록 (filterable history) console. Real
 // cleaning_sessions + reservation data (see src/lib/admin-cleaning.ts) as of 2026-07-14 — replaces
 // the earlier design-implementation mock. See docs/product/07-cleaning-workflow.md →
@@ -30,19 +33,19 @@ export default async function AdminCleaningPage({
 
   const [ty, tm] = operatingToday.split("-").map(Number);
   const range = monthRange(ty, tm - 1);
-  const [today, roomCatalog] = await Promise.all([
+  // 기록은 객실 목록만 기다린다 — 오늘 현황과 동시에 읽는다.
+  const [today, history] = await Promise.all([
     getAdminCleaningToday(session, viewDate),
-    getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
+    getActiveRoomCatalogServer(session.organization.id)
+      .catch(() => undefined)
+      .then((roomCatalog) =>
+        getAdminCleaningHistory(session, { startDate: range.from, endDate: range.to }, roomCatalog),
+      ),
   ]);
-  const history = await getAdminCleaningHistory(
-    session,
-    { startDate: range.from, endDate: range.to },
-    roomCatalog,
-  );
 
   return (
     <AdminShell activeItem="cleaning" title={dictionary.cleaning.adminTitle}>
-      <Beds24LiveRefresh organizationId={session.organization.id} />
+      <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <CleaningConsole
         locale={locale}
         viewDate={viewDate}

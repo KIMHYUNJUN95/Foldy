@@ -3,7 +3,8 @@ import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
 import { readBeds24BookingId } from "@/lib/beds24/reservation-status";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { listPropertyMapMeta } from "@/lib/property-operation-info";
-import { listReservationInternalNotes } from "@/lib/reservation-internal-notes";
+import { listReservationInternalNotesInWindow, pickReservationNotes } from "@/lib/reservation-internal-notes";
+import { CALENDAR_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import {
   CALENDAR_BUILDING_ORDER,
   getCanonicalPropertyName,
@@ -47,6 +48,26 @@ type ReservationRow = Pick<
   | "source_reservation_id"
   | "status"
 >;
+
+const RESERVATION_SELECT = [
+  "id, check_in_date, check_out_date, guest_name, property_name, room_label, source, source_reservation_id, status",
+  slimPayloadSelect(CALENDAR_PAYLOAD_KEYS),
+].join(", ");
+
+function toReservationRow(raw: Record<string, unknown>): ReservationRow {
+  return {
+    check_in_date: raw.check_in_date as string,
+    check_out_date: raw.check_out_date as string,
+    guest_name: raw.guest_name as string,
+    id: raw.id as string,
+    property_name: raw.property_name as string,
+    raw_payload: slimPayloadOf(raw, CALENDAR_PAYLOAD_KEYS) as ReservationRow["raw_payload"],
+    room_label: raw.room_label as string,
+    source: raw.source as ReservationRow["source"],
+    source_reservation_id: raw.source_reservation_id as ReservationRow["source_reservation_id"],
+    status: raw.status as ReservationStatus,
+  };
+}
 
 export type AdminCalendarReservation = {
   beds24Id: string;
@@ -207,16 +228,15 @@ export async function getAdminCalendarDashboardData(
   const operationalWindowEnd = `${shiftMonth(currentMonth, 2)}-01`;
 
   const supabase = await getSupabaseServerClient();
-  const [roomCatalog, buildingInfos, reservationsResult, roomBlocksResult] = await Promise.all([
+  const [roomCatalog, buildingInfos, reservationsResult, roomBlocksResult, notesInWindow] = await Promise.all([
     getActiveRoomCatalog(session.organization.id, supabase),
     listPropertyMapMeta(session),
     // 1,000행 상한을 넘으면 조용히 잘린다 — 페이지로 끝까지 읽는다(`read-all-pages.ts`).
-    readAllPages<ReservationRow>((from, to) =>
+    // `raw_payload` 는 쓰는 키만(`reservation-payload-slim.ts`) — 통째면 954행에 약 2MB 였다.
+    readAllPages<Record<string, unknown>>((from, to) =>
       supabase
         .from("reservations")
-        .select(
-          "id, check_in_date, check_out_date, guest_name, property_name, raw_payload, room_label, source, source_reservation_id, status",
-        )
+        .select(RESERVATION_SELECT)
         .eq("organization_id", session.organization.id)
         .lt("check_in_date", operationalWindowEnd)
         .gte("check_out_date", operationalWindowStart)
@@ -224,7 +244,7 @@ export async function getAdminCalendarDashboardData(
         .neq("status", "no_show")
         .order("check_in_date", { ascending: true })
         .order("id", { ascending: true })
-        .range(from, to),
+        .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,
     ),
     readAllPages((from, to) =>
       supabase
@@ -238,6 +258,10 @@ export async function getAdminCalendarDashboardData(
         .order("id", { ascending: true })
         .range(from, to),
     ),
+    listReservationInternalNotesInWindow(session, {
+      checkInBefore: operationalWindowEnd,
+      checkOutFrom: operationalWindowStart,
+    }),
   ]);
 
   if (reservationsResult.error) {
@@ -258,7 +282,7 @@ export async function getAdminCalendarDashboardData(
     });
   }
 
-  for (const row of reservationsResult.data) {
+  for (const row of reservationsResult.data.map(toReservationRow)) {
     if (isExcludedOperationalProperty(row.property_name)) continue;
     if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
 
@@ -348,8 +372,8 @@ export async function getAdminCalendarDashboardData(
   const effectiveSelectedProperty =
     selectedProperty && propertyOptions.includes(selectedProperty) ? selectedProperty : null;
   const roomRows = sortRoomRows([...roomRowsByKey.values()]);
-  const reservationNotes = await listReservationInternalNotes(
-    session,
+  const reservationNotes = pickReservationNotes(
+    notesInWindow,
     reservations.map((reservation) => reservation.id),
   );
 

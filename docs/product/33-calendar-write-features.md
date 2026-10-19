@@ -540,7 +540,9 @@ V2(POST) {"roomId":440617,"action":"PRICE_CHANGE","propId":176430}
 
 | 듣는 화면 | 방식 |
 | --- | --- |
-| `/admin` 대시보드 · `/admin/calendar` · `/admin/ops/calendar` · `/admin/cleaning` · `/mobile` 홈 · `/mobile/cleaning` | `<Beds24LiveRefresh>` (`src/components/shared/beds24-live-refresh.tsx`) |
+| `/admin/ops/calendar` · `/mobile` 홈 | `<Beds24LiveRefresh>` (`src/components/shared/beds24-live-refresh.tsx`) |
+| `/admin` 대시보드 · `/admin/cleaning` · `/mobile/cleaning` (2026-10-19) | `<Beds24LiveRefresh kinds={["reservations"]}>` — 예약에서 나온 숫자 · 목록만 보인다 |
+| `/admin/calendar` (2026-10-19) | `<Beds24LiveRefresh kinds={["reservations", "blocks"]}>` — 예약 막대 · 차단 구간만 그린다(요금은 안 보인다) |
 | `/mobile/calendar` | 기존 예약 구독과 **같은** 디바운스에 신호 채널을 붙였다 — 예약 변경에 두 번 읽지 않는다 |
 | `/admin/ops/revenue` · `/admin/ops/occupancy` (2026-10-08) | `<Beds24LiveRefresh kinds={["reservations"]}>` — **예약 신호만** 받는다(`kinds`). 숫자는 예약으로만 만들고 한 번 읽는 데 2년 넘는 예약을 읽으므로, 요금 · 차단 동기화마다 다시 읽지 않는다. 끊김 따라잡기는 그대로 |
 
@@ -2646,7 +2648,8 @@ Supabase 브로드캐스트는 **저장되지 않는다** — 절전·와이파�
 - 건물별 — 그 건물 첫 손님(취소 제외 첫 체크인)이 1년 전 창 끝 이후면 **「운영 전 · 첫 손님 날짜」**(건물이 없었다),
   아니면 **「운영 중 · 그 기간 매출 없음」**. 금액(= 차이, 전년 0원이라), 객실 목록(건물 전체면 「객실 N실 전부」로 접는다).
 - 합계에 넣을 건물 칩을 따른다(뺀 건물은 전년 · 지금 둘 다 빠진다). 서버(`getOpsSalesSummary`)가 지금 창 · 1년 전 창 ·
-  건물별 첫 손님을 **동시에** 읽고 1년 전 객실별 매출만 넘긴다(`previous`). 비교는 화면이 한다 — `buildSalesYoy`
+  건물별 첫 손님을 **동시에** 읽고 1년 전 객실별 매출만 넘긴다(`previous`). 첫 손님은 DB 함수 `reservation_first_check_ins` 한 번
+  (2026-10-19 — 마이그레이션 `202610190004`, 부분 인덱스로 건물마다 한 칸; 함수가 없으면 예전처럼 건물마다 한 줄 조회). 비교는 화면이 한다 — `buildSalesYoy`
   (`src/lib/ops-sales-yoy.ts`, 테스트 `ops-sales-yoy.test.ts`). 문구 `ssYoy*`(ko/ja/en).
 
 **다카다노바바 `401_2` · 마이너스 금액 (2026-10-07)**: 운영에서 뺀 유닛 `401_2` 의 지난 예약은 버리지 않고 401호로 센다

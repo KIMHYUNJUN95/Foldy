@@ -12,17 +12,12 @@ import { getOrgOrderRequests } from "@/lib/order-requests";
 import { getAttendanceReviewQueue, type ReviewQueueItem } from "@/lib/attendance-review";
 import { getVisibleAnnouncements } from "@/lib/announcements";
 import { getVisibleTasks } from "@/lib/tasks";
-import {
-  getHomeCheckInOutCounts,
-  getHomeCheckInOutReservations,
-  type HomeReservationRow,
-} from "@/lib/home";
-import { getActiveRoomCatalogServer } from "@/lib/rooms";
-import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { getHomeCheckInOutReservations, type HomeReservationRow } from "@/lib/home";
 import { getDictionary } from "@/lib/i18n";
 import {
   buildDashboardBuildingMap,
   fetchBuildingMapSource,
+  type BuildingMapSource,
   type DashboardBuildingMap,
 } from "@/lib/admin-building-map";
 
@@ -114,28 +109,28 @@ async function safe<T>(label: string, run: () => Promise<T>, fallback: T): Promi
   }
 }
 
-// 재실 객실(점유율): 오늘 체크인~체크아웃 사이의 예약이 점유한 객실 수 / 활성 객실 총수.
-async function getOccupancy(
-  organizationId: string,
-  today: string,
-): Promise<{ occupied: number; total: number }> {
-  const service = getSupabaseServiceClient();
-  const [resvRes, rooms] = await Promise.all([
-    service
-      .from("reservations")
-      .select("room_label, status")
-      .eq("organization_id", organizationId)
-      .lte("check_in_date", today)
-      .gt("check_out_date", today),
-    getActiveRoomCatalogServer(organizationId),
-  ]);
-  const rows = (resvRes.data ?? []) as { room_label: string | null; status: string }[];
+const NOT_STAYING = new Set(["cancelled", "no_show"]);
+
+/**
+ * 숫자 줄(재실 · 체크인 · 체크아웃)은 「오늘의 건물」 지도가 이미 읽은 예약(체크인 ≤ 오늘 ≤ 체크아웃)에서 센다(2026-10-19 속도).
+ * 전에는 같은 날의 예약을 건수용 · 재실용으로 따로 두 번 더 읽었다. 그 둘의 조건은 모두 이 범위 안이라 숫자는 같다.
+ * - 재실 객실: 오늘 밤 묵는(체크인 ≤ 오늘 < 체크아웃) 살아 있는 예약의 객실 수 / 활성 객실 총수.
+ * - 체크인 · 체크아웃: 오늘 들어오는 · 나가는 살아 있는 예약 수(홈의 건수 카드와 같은 규칙 — 건물 제외는 하지 않는다).
+ */
+function countToday(source: BuildingMapSource | null, today: string) {
+  if (!source) return { checkIns: 0, checkOuts: 0, occupied: 0, total: 0 };
+  const live = source.reservations.filter((r) => !NOT_STAYING.has(r.status));
   const occupiedRooms = new Set(
-    rows
-      .filter((r) => r.status !== "cancelled" && r.status !== "no_show" && r.room_label)
+    live
+      .filter((r) => r.check_in_date <= today && r.check_out_date > today && r.room_label)
       .map((r) => r.room_label as string),
   );
-  return { occupied: occupiedRooms.size, total: rooms?.length ?? 0 };
+  return {
+    checkIns: live.filter((r) => r.check_in_date === today).length,
+    checkOuts: live.filter((r) => r.check_out_date === today).length,
+    occupied: occupiedRooms.size,
+    total: source.catalog?.length ?? 0,
+  };
 }
 
 export async function getAdminDashboard(session: AppSession): Promise<AdminDashboardData> {
@@ -151,9 +146,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     review,
     announcements,
     tasks,
-    checkCounts,
     reservations,
-    occupancy,
     buildingSource,
   ] = await Promise.all([
     safe("cleaning", () => getCleaningSessionsForDate(session, today), []),
@@ -163,13 +156,11 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     safe("attendanceReview", () => getAttendanceReviewQueue(session.organization.id, { limit: 8 }), []),
     safe("announcements", () => getVisibleAnnouncements(session), []),
     safe("tasks", () => getVisibleTasks(session), []),
-    safe("checkCounts", () => getHomeCheckInOutCounts(session), { status: "empty" as const }),
     safe(
       "reservations",
       () => getHomeCheckInOutReservations(session),
       { status: "ok" as const, data: { checkIns: [], checkOuts: [] } },
     ),
-    safe("occupancy", () => getOccupancy(session.organization.id, today), { occupied: 0, total: 0 }),
     safe("buildingMap", () => fetchBuildingMapSource(session, today), null),
   ]);
 
@@ -243,17 +234,16 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     }))
     .slice(0, 6);
 
-  const checkIns = checkCounts.status === "ok" ? checkCounts.data.checkIns : 0;
-  const checkOuts = checkCounts.status === "ok" ? checkCounts.data.checkOuts : 0;
+  const todayCounts = countToday(buildingSource, today);
   const resvLists =
     reservations.status === "ok" ? reservations.data : { checkIns: [], checkOuts: [] };
 
   return {
     ops: {
-      occupiedRooms: occupancy.occupied,
-      totalRooms: occupancy.total,
-      checkIns,
-      checkOuts,
+      occupiedRooms: todayCounts.occupied,
+      totalRooms: todayCounts.total,
+      checkIns: todayCounts.checkIns,
+      checkOuts: todayCounts.checkOuts,
       cleaningInProgress: cleaning.length,
       openRequests: queue.length,
       attendanceReview: review.length,

@@ -329,6 +329,9 @@ function RowRight({
   return null;
 }
 
+// 청소 · 셋팅 대상은 예약에서만 나온다 — 요금 · 차단 신호로 다시 읽지 않는다(2026-10-19).
+const LIVE_KINDS = ["reservations"] as const;
+
 export default async function MobileCleaningPage({
   searchParams,
 }: MobileCleaningPageProps) {
@@ -368,11 +371,22 @@ export default async function MobileCleaningPage({
   const canSeeAllSessions = canReadAllCleaningSessions(session.user.role);
   const isFuture = viewDate > operatingToday;
 
-  const sessions = await getMyTodayCleaningSessions(session);
+  // 서로 기다릴 필요 없는 읽기는 한 번에 시작한다(2026-10-19 속도 — 전에는 9단계 직렬). 배지(`getMobileNavBadges`)도 함께.
+  // 과거 날짜에서 담당자 이름을 그리려면 이름표가 필요하다. 오늘만 볼 때는 부르지 않는다.
+  // roomCatalog is always fetched (not gated on activeSession) because it serves
+  // both the catalog-based room label resolver and the manual form options.
+  const [sessions, activeSession, staffOptions, cleaningTargets, roomCatalog, orgTodaySessions, navBadges] = await Promise.all([
+    getMyTodayCleaningSessions(session),
+    getMyActiveCleaningSession(session),
+    isToday ? Promise.resolve([]) : getCleaningStaffOptions(session.organization.id).catch(() => []),
+    getCleaningTargets(session.organization.id, viewDate).catch(() => null),
+    getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
+    getOrgTodayCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
+    getMobileNavBadges(),
+  ]);
   // 진행 중인 세션은 **오늘 목록이 아니라 날짜 무관 조회**로 잡는다. 유니크 인덱스가 날짜를 보지
   // 않으므로, 지난 날짜의 미완료 세션이 남아 있으면 그것이 새 시작을 막는다 — 화면에 안 보이면
   // 사용자가 풀 방법이 없어 교착이다(2026-08-04). 자세한 배경은 getMyActiveCleaningSession 참고.
-  const activeSession = await getMyActiveCleaningSession(session);
   const staleActiveDate =
     activeSession && activeSession.cleaning_date !== getCleaningOperatingDateKey()
       ? activeSession.cleaning_date
@@ -393,23 +407,7 @@ export default async function MobileCleaningPage({
     ? (copy.errors[params.error] ?? copy.errors.start_failed ?? params.error)
     : null;
 
-  // Fetch cleaning targets, room catalog, and org-wide today sessions in parallel.
-  // roomCatalog is always fetched (not gated on activeSession) because it serves
-  // both the catalog-based room label resolver and the manual form options.
-  let cleaningTargets: Awaited<ReturnType<typeof getCleaningTargets>> | null = null;
-  let roomCatalog: ActiveRoomCatalogItem[] | undefined = undefined;
-  let orgTodaySessions: Awaited<ReturnType<typeof getOrgTodayCleaningRoomLabels>> = [];
-  // 과거 날짜에서 담당자 이름을 그리려면 이름표가 필요하다. 오늘만 볼 때는 부르지 않는다.
-  const staffOptions = isToday
-    ? []
-    : await getCleaningStaffOptions(session.organization.id).catch(() => []);
   const staffNameById = new Map(staffOptions.map((o) => [o.id, o.name] as const));
-
-  [cleaningTargets, roomCatalog, orgTodaySessions] = await Promise.all([
-    getCleaningTargets(session.organization.id, viewDate).catch(() => null),
-    getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
-    getOrgTodayCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
-  ]);
 
   // Catalog-based map is the primary resolver (covers all active room master entries).
   // Fallback: canonical prefix parse for legacy labels.
@@ -487,8 +485,6 @@ export default async function MobileCleaningPage({
   // Org-wide in_progress count — same scope as the queue filter for KPI consistency
   const inProgressCount = orgTodaySessions.filter((s) => s.status === "in_progress").length;
 
-  const navBadges = await getMobileNavBadges();
-
   // 진행 중인 청소가 있으면 새로 시작할 수 없다(유니크 인덱스) — 목록은 보여 주되 시작 버튼은 감춘다(2026-10-13).
   const startable = isToday && !activeSession;
   const viewDateLong = new Intl.DateTimeFormat(locale, {
@@ -507,7 +503,7 @@ export default async function MobileCleaningPage({
     // 화이트 리디자인(2026-10-13, 시안 Clean-Phone · Fold · Tablet): 상자 없는 한 장 — 제목 · 숫자 3개, 진행 중인 청소(링),
     // 청소 목록 | 셋팅 목록 · 오늘 기록. 폴드 2열 · 태블릿 가로 3열(폭 전부). 스타일: components/mobile/cleaning-screen.css
     <MobileShell activeItem="cleaning" appearance="cleaning" badges={navBadges} split title={copy.mobileTitle}>
-      <Beds24LiveRefresh organizationId={session.organization.id} />
+      <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <div className="cln">
         <header className="cln-head">
           <div className="cln-head__t">

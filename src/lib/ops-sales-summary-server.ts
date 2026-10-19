@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { toJstDateString } from "@/lib/admin-calendar-dashboard";
 import { opsCalendarWindow, readOpsSalesInputs } from "@/lib/ops-calendar";
 import { buildOpsSalesSummary, type OpsSalesSummary, type SalesRawPayload } from "@/lib/ops-sales-summary";
@@ -78,11 +80,37 @@ export async function getOpsSalesSummary(
   };
 }
 
-/** 건물(예약 원본 이름)마다 첫 손님 체크인 — 취소 제외. 건물 수만큼 한 줄짜리 조회를 동시에. */
+/** RPC 가 아직 DB 에 없다(마이그레이션 적용 전) — PostgREST 스키마 캐시에 없음 · Postgres 함수 없음. */
+function isMissingRpc(error: { code?: string } | null): boolean {
+  return error?.code === "PGRST202" || error?.code === "42883";
+}
+
+/**
+ * 건물(예약 원본 이름)마다 첫 손님 체크인 — 취소 제외.
+ *
+ * DB 함수 `reservation_first_check_ins`(마이그레이션 `202610190004`) 한 번으로 묻는다 — 건물마다 부분 인덱스 한 칸만 읽는다
+ * (2026-10-19 속도, 전에는 건물 수만큼 조회를 동시에 보내 예약이 없는 건물은 표 전체를 훑었다). 함수가 아직 없으면 예전
+ * 방식(건물마다 한 줄 조회)으로 읽는다 — 결과는 같다.
+ */
 async function readFirstStays(supabase: SupabaseServer, organizationId: string): Promise<Map<string, string>> {
   const { data: properties, error } = await supabase.from("properties").select("name").eq("organization_id", organizationId);
   if (error) throw new Error(error.message);
   const names = [...new Set((properties ?? []).map((row) => row.name))];
+  const result = new Map<string, string>();
+  if (names.length === 0) return result;
+
+  const rpc = await (supabase as unknown as SupabaseClient).rpc("reservation_first_check_ins", {
+    p_organization_id: organizationId,
+    p_property_names: names,
+  });
+  if (!rpc.error) {
+    for (const row of (rpc.data ?? []) as Array<{ property_name: string; first_check_in: string | null }>) {
+      if (row.first_check_in) result.set(row.property_name, row.first_check_in);
+    }
+    return result;
+  }
+  if (!isMissingRpc(rpc.error)) throw new Error(rpc.error.message);
+
   const firsts = await Promise.all(
     names.map(async (name) => {
       const { data, error: readError } = await supabase
@@ -98,7 +126,6 @@ async function readFirstStays(supabase: SupabaseServer, organizationId: string):
       return [name, data?.check_in_date ?? null] as const;
     }),
   );
-  const result = new Map<string, string>();
   for (const [name, date] of firsts) if (date) result.set(name, date);
   return result;
 }

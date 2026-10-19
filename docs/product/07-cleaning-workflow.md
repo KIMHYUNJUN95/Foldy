@@ -117,6 +117,11 @@ Rooms with a confirmed `check_in_date = today` whose **physical room** does NOT 
 
 Turnover detection (Cleaning List) and setting exclusion (Setting List) match on the **physical room**, not the raw Beds24 `room_label`. In Arakicho every physical room carries **two Beds24 listings** — one per channel (e.g. `501` on Airbnb, `501_2` on Booking.com) with distinct `external_room_id`s. A single same-day turnover of that one room can therefore land under two different `room_label`s: the checkout under `501_2`, the check-in under `501`.
 
+**읽기 (2026-10-19 속도)**: 떠나는 예약은 `raw_payload` 를 받지 않고, 도착 예약(30일)은 인원 키만 받는다
+(`GUEST_PAYLOAD_KEYS`, `src/lib/reservation-payload-slim.ts` — 통째면 429행에 약 890KB 였다). `/mobile/cleaning` 은 내 세션 ·
+진행 중 세션 · 담당자 이름표 · 대상 · 카탈로그 · 조직 세션 · 배지를 **한 번에** 읽고(전에는 9단계 직렬), `/admin/cleaning` 은 기록을
+오늘 현황과 동시에 읽는다. 두 화면 모두 예약 신호만 받아 다시 읽는다(`Beds24LiveRefresh kinds={["reservations"]}`).
+
 `getCleaningTargets()` (`src/lib/cleaning-targets.ts`) keys departures and arrivals by a **physical-room key** (`buildRoomKey(property, getDisplayRoomLabel(...))`, which strips the Arakicho `_N` sub-listing suffix — `501 / 501_2 → 501`). This means:
 
 - A same-day checkout+check-in of the same physical room across two listings is correctly a **turnover in the Cleaning List**, not a phantom **Setting** entry.

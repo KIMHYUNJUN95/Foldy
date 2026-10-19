@@ -94,6 +94,19 @@ export function getCleaningOperatingDateKey(date = new Date()) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+/**
+ * 강제 완료를 저장할 운영일. 콘솔이 보고 있던 날짜(도쿄 YYYY-MM-DD)가 실제 날짜이고 미래가 아니어야 한다 —
+ * 아직 일어나지 않은 청소는 완료로 만들 수 없다.
+ */
+export function resolveForceCompleteDate(raw: string, operatingToday: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return null;
+  const [, y, m, d] = match.map(Number);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return null;
+  return raw <= operatingToday ? raw : null;
+}
+
 export function formatDuration(totalSeconds: number | null) {
   if (totalSeconds === null) {
     return "-";

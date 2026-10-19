@@ -5,6 +5,9 @@ import type { PropertyMapMeta } from "@/lib/property-map-links";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { useBeds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 
+// 예약 막대 · 차단 구간만 그린다 — 요금 동기화 신호로 두 달 예약을 다시 읽지 않는다(관리자 캘린더와 같다).
+const LIVE_KINDS = ["reservations", "blocks"] as const;
+
 type MobileCalendarLiveViewProps = {
   wcopy: Dictionary["mobile"]["calendarW"];
   copy: {
@@ -106,6 +109,6 @@ export function MobileCalendarLiveView(props: MobileCalendarLiveViewProps) {
   // `reservations` 의 postgres_changes 채널을 따로 열어 같은 변경에 refresh 가 두 번 돌았다(2026-10-19 제거).
   // `reservation_internal_notes` 는 realtime publication 에 없어 그 리스너는 한 번도 울리지 않았다 — 메모는
   // 저장한 기기가 액션의 revalidatePath 로 갱신하고, 다른 기기는 다음 읽기 때 반영된다.
-  useBeds24LiveRefresh(props.organizationId);
+  useBeds24LiveRefresh(props.organizationId, undefined, null, LIVE_KINDS);
   return <MobileCalendarView {...props} />;
 }

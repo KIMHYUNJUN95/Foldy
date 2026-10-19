@@ -1105,6 +1105,11 @@ AND status = 'submitted'
 - `SELECT`: active organization members in the same org, plus platform/developer super admins
 - `INSERT / UPDATE / DELETE`: `owner`, `office_admin`, `cs_staff`, plus platform/developer super admins
 - purpose: shared calendar building metadata consumed by both admin and mobile reservation calendar
+- app-level write gate (2026-10-19): the only write path is `savePropertyOperationInfoAction`
+  (`src/app/admin/calendar/actions.ts`), which writes with the **service-role** client (RLS bypassed). It now
+  rejects any role outside `canEditPropertyOperationInfo` (`src/lib/admin-calendar-dashboard.ts` —
+  developer_super_admin · owner · senior_managing_director · office_admin · cs_staff, the same set as the RLS
+  policy above). Before this, `requireAdminSession` alone let `field_manager` / `staff` overwrite door codes.
 
 ## 2026-07-14 teams (소속: 현장/사무실)
 

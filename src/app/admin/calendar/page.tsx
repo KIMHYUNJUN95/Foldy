@@ -3,6 +3,7 @@ import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { AdminShell } from "@/components/shell/admin-shell";
 import {
   buildMonthLabel,
+  canEditPropertyOperationInfo,
   getAdminCalendarDashboardData,
 } from "@/lib/admin-calendar-dashboard";
 import { requireAdminSession } from "@/lib/admin-session";
@@ -40,6 +41,7 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
         beds24SyncPaused={data.beds24SyncPaused}
         blockedProperties={[]}
         buildingInfos={data.buildingInfos}
+        canEditBuildingInfo={canEditPropertyOperationInfo(session.user.role)}
         currentMonth={data.currentMonth}
         dates={data.dates}
         initialLocale={data.locale}

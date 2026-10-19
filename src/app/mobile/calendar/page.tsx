@@ -399,10 +399,17 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       return normalizedRoomLabel;
     };
 
+    // 화면이 쓰는 예약만 넘긴다(2026-10-19 — HTML 약 470KB 의 대부분이 두 달 창 예약 목록이었다). 격자 · 빈 방 줄 ·
+    // 예약 시트는 **보고 있는 달**, 목록 탭 · 건물 고르기의 「오늘 빈 방」은 **오늘** 만 본다. 다른 달은 그 달로 넘어가면
+    // 서버가 다시 읽는다. 작업의 예약 딥링크는 체크인 달(`month`)을 같이 실어 보내 보고 있는 달에 들어 있다.
+    const [selYear, selMonthNumber] = selectedMonth.split("-").map(Number);
+    const selectedMonthEndExclusive = new Date(Date.UTC(selYear, selMonthNumber, 1)).toISOString().slice(0, 10);
     const filteredRows = data.map(toReservationRow).filter(
       (item) =>
         !isExcludedOperationalProperty(item.property_name) &&
-        !isExcludedOperationalRoom(item.property_name, item.room_label),
+        !isExcludedOperationalRoom(item.property_name, item.room_label) &&
+        ((item.check_in_date < selectedMonthEndExclusive && item.check_out_date > monthStart) ||
+          (item.check_in_date <= today && item.check_out_date >= today)),
     );
 
     const mapToCalendarItem = (item: ReservationRow): CalendarReservationItem => {

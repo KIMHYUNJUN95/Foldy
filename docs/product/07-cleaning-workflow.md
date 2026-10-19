@@ -1063,8 +1063,13 @@ UI 컴포넌트 · i18n · DB 스키마 변경 없음.
 ### 동작 차이
 
 - **미래 날짜**: 대리 완료(강제완료)를 노출하지 않는다 — 아직 일어나지 않은 청소를 완료로 만들 수
-  있으면 안 된다. 서버 권한 검사가 최종 방어선이고 이건 UI 게이트다.
+  있으면 안 된다. 서버도 막는다 — 오늘(도쿄 운영일)보다 뒤의 날짜면 `invalid`(2026-10-19).
 - **과거·오늘**: 기존과 동일.
+- **강제완료는 보고 있던 운영일로 저장된다(2026-10-19 버그 수정).** 콘솔이 `viewDate` 를 `cleaningDate` 로 넘기고
+  서버(`forceCompleteCleaningSession`)가 형식 · 미래 여부를 확인한다(`resolveForceCompleteDate`, `src/lib/cleaning.ts`).
+  새 세션(INSERT)은 `cleaning_date` = 그 날짜, 시작 · 완료 시각도 그 날짜의 도쿄 시각. 이미 있는 세션(UPDATE)은 **세션 자신의
+  `cleaning_date`** 를 따른다(클라이언트 값보다 우선). 예전에는 둘 다 **오늘**로 저장돼, 과거 화면에서 대리 완료한 방이 오늘
+  청소 큐에서 「완료」로 빠졌다. 회귀 테스트: `src/lib/__tests__/cleaning-force-complete-date.test.ts`.
 
 ### 날짜 컨트롤
 

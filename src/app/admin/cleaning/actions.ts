@@ -7,7 +7,11 @@ import {
   type AdminCleaningHistoryItem,
   type AdminCleaningStatus,
 } from "@/lib/admin-cleaning";
-import { canForceCompleteCleaning, getCleaningOperatingDateKey } from "@/lib/cleaning";
+import {
+  canForceCompleteCleaning,
+  getCleaningOperatingDateKey,
+  resolveForceCompleteDate,
+} from "@/lib/cleaning";
 import {
   buildAdminExportMeta,
   compactRangePart,
@@ -233,6 +237,11 @@ export type ForceCompleteCleaningInput = {
   start: string; // "HH:MM"
   end: string; // "HH:MM"
   note: string;
+  /**
+   * 콘솔이 보고 있던 운영일(도쿄, YYYY-MM-DD). 과거 날짜 화면에서 강제 완료하면 그날로 저장돼야 한다 —
+   * 오늘로 저장하면 오늘 청소 큐에서 같은 방이 「완료」로 빠진다. 기존 세션은 세션의 cleaning_date 를 따른다.
+   */
+  cleaningDate: string;
 };
 
 export type ForceCompleteCleaningResult =
@@ -245,9 +254,9 @@ function taskTypeToTaskLabel(type: CleaningTaskType): string {
   return "checkout";
 }
 
-function tokyoDateTimeIso(hhmm: string): string | null {
+function tokyoDateTimeIso(dateKey: string, hhmm: string): string | null {
   if (!/^\d{2}:\d{2}$/.test(hhmm)) return null;
-  return `${getCleaningOperatingDateKey()}T${hhmm}:00+09:00`;
+  return `${dateKey}T${hhmm}:00+09:00`;
 }
 
 /**
@@ -280,19 +289,36 @@ export async function forceCompleteCleaningSession(
     return { ok: false, reason: "forbidden" };
   }
 
-  const startIso = tokyoDateTimeIso(input.start);
-  const endIso = tokyoDateTimeIso(input.end);
   const roomLabel = canonicalizeSessionRoomLabel(input.sessionRoomLabel);
-  if (!startIso || !endIso || !input.staffId || !roomLabel) {
+  const viewDate = resolveForceCompleteDate(input.cleaningDate, getCleaningOperatingDateKey());
+  if (!input.staffId || !roomLabel || !viewDate) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const service = getSupabaseServiceClient();
+  const organizationId = session.organization.id;
+
+  let cleaningDate = viewDate;
+  if (input.sessionId) {
+    const existing = await service
+      .from("cleaning_sessions")
+      .select("cleaning_date")
+      .eq("id", input.sessionId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (!existing.data) return { ok: false, reason: "invalid" };
+    cleaningDate = existing.data.cleaning_date;
+  }
+
+  const startIso = tokyoDateTimeIso(cleaningDate, input.start);
+  const endIso = tokyoDateTimeIso(cleaningDate, input.end);
+  if (!startIso || !endIso) {
     return { ok: false, reason: "invalid" };
   }
   const durationSeconds = Math.max(
     0,
     Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 1000),
   );
-
-  const service = getSupabaseServiceClient();
-  const organizationId = session.organization.id;
 
   // Staff must be a real, active member of this org — never trust a client-supplied id blindly.
   const membership = await service
@@ -333,7 +359,7 @@ export async function forceCompleteCleaningSession(
     room_label: roomLabel,
     task_label: taskTypeToTaskLabel(input.taskType),
     staff_user_id: input.staffId,
-    cleaning_date: getCleaningOperatingDateKey(),
+    cleaning_date: cleaningDate,
     status: "completed",
     started_at: startIso,
     completed_at: endIso,

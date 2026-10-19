@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { canEditPropertyOperationInfo } from "@/lib/admin-calendar-dashboard";
 import { requireAdminSession } from "@/lib/admin-session";
 import type { PropertyMapMeta } from "@/lib/property-map-links";
 import { savePropertyOperationInfo } from "@/lib/property-operation-info";
@@ -41,6 +42,9 @@ export async function savePropertyOperationInfoAction(input: {
   data: Pick<PropertyMapMeta, "address" | "note" | "roomAccess" | "sharedAccess">;
 }): Promise<{ ok: true } | { error: string; ok: false }> {
   const session = await requireAdminSession();
+  if (!canEditPropertyOperationInfo(session.user.role)) {
+    return { error: "forbidden", ok: false };
+  }
 
   try {
     await savePropertyOperationInfo({

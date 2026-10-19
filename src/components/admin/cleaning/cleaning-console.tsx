@@ -194,7 +194,7 @@ export function CleaningConsole({
   function handleForceCompleteConfirm(result: ForceCompleteResult) {
     const roomLabel = modalTask?.room ?? "";
     startForceComplete(async () => {
-      const res = await forceCompleteCleaningSession(result);
+      const res = await forceCompleteCleaningSession({ ...result, cleaningDate: viewDate });
       if (res.ok) {
         showToast(`${t.tDone} · ${roomLabel}`);
         setModalTask(null);

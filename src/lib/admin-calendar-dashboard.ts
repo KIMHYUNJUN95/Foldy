@@ -1,3 +1,4 @@
+import type { Role } from "@/config/roles";
 import { toOriginalReservationId } from "@/lib/beds24/reservation-id";
 import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
 import { readBeds24BookingId } from "@/lib/beds24/reservation-status";
@@ -25,6 +26,24 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 import { getReservationGuests, type ReservationGuests } from "@/lib/reservation-guests";
+
+/**
+ * 건물 정보(주소 · 출입 비밀번호 · 운영 메모 — `property_operation_infos`)를 고칠 수 있는 역할.
+ * 쓰기는 서비스 키라 RLS 를 거치지 않으므로 서버 액션이 이 목록으로 막는다 — RLS 정책
+ * (202607100002: owner · office_admin · cs_staff + 플랫폼 관리자, `has_org_role` 이 전무를 owner 와 같이 본다)과 같다.
+ * 문서: docs/engineering/05-rls-permissions.md → 「2026-07-10 Property Operation Info Permissions」.
+ */
+const PROPERTY_OPERATION_INFO_EDITOR_ROLES: readonly Role[] = [
+  "developer_super_admin",
+  "owner",
+  "senior_managing_director",
+  "office_admin",
+  "cs_staff",
+];
+
+export function canEditPropertyOperationInfo(role: Role): boolean {
+  return PROPERTY_OPERATION_INFO_EDITOR_ROLES.includes(role);
+}
 
 /** 예약 캘린더 인원 — 합계 + 성인 · 어린이(2026-10-05, `reservation-guests.ts`). */
 function guestFields(guests: ReservationGuests) {

@@ -68,6 +68,8 @@ export type AdminReservationConsoleProps = {
     roomCount: number;
   }>;
   buildingInfos: PropertyMapMeta[];
+  /** 건물 정보 편집 권한 — 서버(`canEditPropertyOperationInfo`)가 정한다. UI 게이트일 뿐, 서버 액션이 다시 막는다. */
+  canEditBuildingInfo: boolean;
   currentMonth: string;
   dates: string[];
   initialLocale: Locale;
@@ -326,6 +328,7 @@ export function AdminReservationConsole({
   beds24SyncPaused,
   blockedProperties,
   buildingInfos,
+  canEditBuildingInfo,
   currentMonth,
   dates,
   initialLocale,
@@ -1103,11 +1106,11 @@ export function AdminReservationConsole({
                           {dictionary.common.save}
                         </button>
                       </>
-                    ) : (
+                    ) : canEditBuildingInfo ? (
                       <button className="acw-link is-soft" onClick={() => setEditingBuilding(card.propertyName)} type="button">
                         {copy.wEdit}
                       </button>
-                    )}
+                    ) : null}
                   </span>
                 </div>
 

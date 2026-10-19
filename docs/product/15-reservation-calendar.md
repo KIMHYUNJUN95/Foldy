@@ -15,7 +15,9 @@
 - **객실 상태**: 건물 머리줄에 「객실 N · 빈 방 · 체크인 · 체크아웃」 수. 상태는 배지 대신 글자(빈 객실 보라 · 오늘 체크인 초록). 체크아웃하는 방은
   「○○ · 오늘 나감」.
 - **건물 정보**: 건물마다 한 줄 3칸(이름 · 주소 · 「지도 열기 ↗ · 수정」 / 공용 출입 코드 · 운영 메모 / 객실 출입 코드 — 넓은 화면에서 여러 열로 흐른다). 공용 · 객실 출입 코드는 누르면 복사되고 그 자리가 1.6초 「✓ 복사됨」(사용자 요청). 편집은 그 건물의 「수정」
-  → 칸이 입력칸으로 바뀌고 「취소 · 저장」(서버 액션 그대로).
+  → 칸이 입력칸으로 바뀌고 「취소 · 저장」(서버 액션 그대로). **「수정」은 owner · 전무 · office_admin · cs_staff · 플랫폼 관리자만** 보이고,
+  서버 액션(`savePropertyOperationInfoAction` → `canEditPropertyOperationInfo`)도 같은 역할만 받는다 — 쓰기가 서비스 키라 RLS 를
+  거치지 않으므로 앱이 막는다(2026-10-19 보안 수정: 전에는 관리자 웹에 들어오는 field_manager · staff 도 출입 비밀번호를 덮어쓸 수 있었다).
 - **예약 상세 패널**: 채널 · 예약번호(복사) → 이름 → 「건물 · 객실 · 인원」 → 체크인 · 체크아웃(「16:00부터 · 10:00까지 · N박」 = 운영 기본 시각)
   → 전화번호(복사 · 걸기) → 내부 메모(칸을 떠나면 저장) → 「이 예약으로 등록: 수리/점검 · 컴플레인 · 분실물」. 읽기 전용 안내 · 활동 기록 · 아래
   버튼 줄은 뺐다.
@@ -58,8 +60,12 @@
   (`listReservationInternalNotesInWindow` — 메모 → 예약 `!inner` 조인). 예약 · 객실 · 차단 읽기와 **동시에** 시작하고, 결과는 화면에
   그리는 예약 id 로 다시 거른다(`pickReservationNotes`).
 - 모바일: 차단 · 건물 정보 · 배지도 처음에 함께 시작하고, 객실 이름 목록은 이미 받은 카탈로그에서 만든다(`rooms` 를 두 번 읽지 않는다).
-- 실시간: `/admin/calendar` 는 예약 · 차단 신호만 받는다(`Beds24LiveRefresh kinds={["reservations","blocks"]}`) — 요금 동기화로
-  두 달 예약을 다시 읽지 않는다. `/mobile/calendar` 는 아직 전부 받는다(구독이 `mobile-calendar-live-view.tsx` 안에 있다).
+- 실시간: `/admin/calendar` 와 `/mobile/calendar` 모두 예약 · 차단 신호만 받는다(관리자 `Beds24LiveRefresh kinds={["reservations","blocks"]}`,
+  모바일 `mobile-calendar-live-view.tsx` 의 `useBeds24LiveRefresh(…, LIVE_KINDS)`) — 요금 동기화로 두 달 예약을 다시 읽지 않는다.
+- 모바일이 화면에 넘기는 예약(2026-10-19): 서버는 여전히 두 달 창을 읽지만, 클라이언트로는 **보고 있는 달과 겹치는 예약 + 오늘
+  걸친 예약(체크인 ≤ 오늘 ≤ 체크아웃)** 만 넘긴다. 격자 · 빈 방 줄 · 예약 시트는 보고 있는 달, 목록 탭 · 건물 고르기의 오늘 빈 방은
+  오늘만 쓰기 때문이다. HTML 약 470KB 의 대부분이 예약 목록(행마다 14칸 ≈ 350B)이었다. 작업의 예약 딥링크는 체크인 달을
+  `month` 로 같이 보내 보고 있는 달에 들어 있다.
 
 ## 인원 표기 — 성인 · 어린이 (2026-10-05)
 
@@ -207,7 +213,7 @@ Query:
 Key behaviors:
 - Guests currently staying (checked in before today) are always included.
 - Next month's upcoming reservations are always included.
-- The UI's selected month (prev/next navigation) controls which month the Overview grid renders — it does not change what data is fetched.
+- The UI's selected month (prev/next navigation) controls which month the Overview grid renders — it does not change what data is fetched. (2026-10-19: on `/mobile/calendar` it does narrow what is *sent to the client* — reservations overlapping the selected month plus those spanning today; see 「읽기 속도 (2026-10-19)」 above.)
 - The Lists mode (Check-in Today / Check-out Today / Staying Today) always shows today's operational snapshot, regardless of which month the user is browsing, as long as `selectedMonth` is within the operational window.
 - **Out-of-Window Policy (Implemented 2026-05-26 - Option A)**: If the user navigates to a month beyond the operational window (e.g., July or later, or prior months), the server skips the reservations DB query entirely (no unnecessary read), passes `reservations = []`, and the client shows a clear, localized usability warning banner: *"Out of operational window" / "현재 운영 조회 범위 밖"* under both Overview and Lists mode. This avoids fragmented/misleading crossover bookings (e.g. end-of-June check-in persisting into July). Month navigation is kept operational so users can easily tap back. The `isOutOfWindow` boolean is computed server-side and passed as a prop — the client does not recompute it independently.
 

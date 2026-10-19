@@ -2,7 +2,8 @@
 
 // 앱 스플래시(2026-10-14, 시안 Motion-B-Splash-Phone) — 앱을 켤 때마다(새로고침 · 다시 접속 · 화면 껐다 켬, `entry-replay`) 흰 바탕 위에서
 // 로고 세 막대가 3D 로 흩어졌다 흐릿하게 날아와 스프링으로 모이고, 「Foldy」 글자 속으로 빛이 지나간 뒤,
-// 로고가 다가오며 흐려지고(초점 빠짐) 뒤의 홈이 드러난다. 약 1.8초. 동작 줄이기면 보여 주지 않는다.
+// 로고가 다가오며 흐려지고(초점 빠짐) 뒤의 홈이 드러난다. 약 1.1초 — **하루 첫 실행 · 로그인 직후만**, 그 외엔 흰 바탕 0.3초
+// 페이드(2026-10-19 줄임). 동작 줄이기면 보여 주지 않는다.
 // 붙는 곳은 `src/app/mobile/layout.tsx`(모든 모바일 화면, 내용보다 앞 — 로딩 화면보다 먼저).
 //
 // **스플래시 화면은 React 바깥에 있다**(admin-entry 와 같은 이유) — 서버 HTML 의 인라인 스크립트(`mountSplash`)가 body 에 직접
@@ -14,7 +15,7 @@ import "./app-splash.css";
 /**
  * 스플래시 한 번 — 화면 만들기 · 걷기 · 지우기. **혼자 도는 함수** — 인라인 스크립트로 서버 HTML 안에서 바로 실행된다(바깥 변수 쓰지 말 것).
  * 로고가 모이는 앞부분만 CSS 시간표, **걷히는 건 이 스크립트가 `is-out` 을 붙일 때만**. 로딩 중(.fldr)이면 로더가 두 번 연달아
- * 안 보일 때까지 기다린다(최대 ~5.3초 + CSS 안전장치 6초 + 8초엔 무조건 치움). `id` 는 재생 번호(같은 번호는 두 번 안 띄움).
+ * 안 보일 때까지 기다린다(시작부터 최대 2초 + CSS 안전장치 3초 + 4초엔 무조건 치움). `id` 는 재생 번호(같은 번호는 두 번 안 띄움).
  */
 function mountSplash(id: number, tagline: string, host: Element | null) {
   const w = window as unknown as { __foldySplashLast?: number };
@@ -54,27 +55,47 @@ function mountSplash(id: number, tagline: string, host: Element | null) {
   } catch {
     // 저장소를 못 쓰면 평소 스플래시.
   }
+  // 로고 모션은 하루 첫 실행 · 로그인 직후만(2026-10-19). 그 외(새로고침 · 화면 껐다 켬 · 같은 날 두 번째부터)는 흰 바탕만
+  // 0.3초에 걷는다(시안 Motion-B-Reentry-Phone). 날짜는 도쿄 기준. 저장소를 못 쓰면 짧은 쪽.
+  let full = el.classList.contains("spl--rise");
+  try {
+    const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    if (localStorage.getItem("foldy.entryDay.mobile") !== day) full = true;
+    if (full) localStorage.setItem("foldy.entryDay.mobile", day);
+  } catch {
+    // 짧은 쪽으로.
+  }
 
-  const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
-  const t0 = now();
   let removed = false;
   const remove = () => {
     if (removed) return;
     removed = true;
     el.remove();
   };
-  setTimeout(remove, 8000);
+  setTimeout(remove, 4000);
+  if (!full) {
+    el.classList.add("spl--quick");
+    requestAnimationFrame(() => {
+      el.classList.add("is-out");
+      setTimeout(remove, 350);
+    });
+    return;
+  }
+
+  // 로고가 모이는 약 0.7초 뒤 걷는다. 로딩 중이면 기다리되 시작부터 2초까지만(그 뒤엔 로딩 화면이 직접 보인다).
+  const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
+  const t0 = now();
   let clear = 0;
   const check = () => {
     clear = document.querySelector(".fldr") ? 0 : clear + 1;
-    if (clear < 2 && now() - t0 < 5300) {
+    if (clear < 2 && now() - t0 < 2000) {
       setTimeout(check, 120);
       return;
     }
     el.classList.add("is-out");
     setTimeout(remove, 500);
   };
-  setTimeout(check, Math.max(0, t0 + 1180 - now()));
+  setTimeout(check, Math.max(0, t0 + 680 - now()));
 }
 
 // 스플래시가 붙는 빈 상자 — React 는 안(innerHTML)을 한 번 넣고 다시 건드리지 않는다(admin-entry 와 같은 방식). 안의 스크립트는

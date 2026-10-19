@@ -6,24 +6,24 @@
   background: transparent;
 }
 /* 흰 바탕은 ::before 의 opacity 로 걷는다(배경색 애니메이션은 메인 스레드라 바쁠 때 멈춘다). 날기 · 착지는 admin-entry.tsx 의 Web Animations. */
-.aden::before { content: ""; position: absolute; inset: 0; z-index: -1; background: #fff; animation: aden-fade 380ms cubic-bezier(.4, 0, .2, 1) 6000ms forwards; }
+.aden::before { content: ""; position: absolute; inset: 0; z-index: -1; background: #fff; animation: aden-fade 230ms cubic-bezier(.4, 0, .2, 1) 3000ms forwards; }
 .aden.is-out::before { animation: aden-out 380ms cubic-bezier(.4, 0, .2, 1) forwards; }
 .aden__logo { position: relative; width: 110px; height: 110px; perspective: 700px; will-change: transform, opacity; }
-.aden__glow { position: absolute; left: -75px; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: aden-glow 700ms cubic-bezier(.23, 1, .32, 1) 400ms forwards, aden-fade 200ms ease 6000ms forwards; }
+.aden__glow { position: absolute; left: -75px; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: aden-glow 420ms cubic-bezier(.23, 1, .32, 1) 240ms forwards, aden-fade 120ms ease 3000ms forwards; }
 .aden.is-out .aden__glow { animation: aden-glow 700ms cubic-bezier(.23, 1, .32, 1) 400ms forwards, aden-out 200ms ease forwards; }
-.aden__tile { position: absolute; inset: 0; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: aden-tile 540ms var(--sps) 60ms forwards; }
-.aden__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: aden-assemble 800ms var(--sp) forwards; }
-.aden__bar { position: absolute; inset: 0; border-radius: 9px; filter: blur(6px); animation: aden-sharp 460ms cubic-bezier(.23, 1, .32, 1) forwards; }
-.aden__b3 { left: 36px; top: 28px; width: 38px; --sx: -60px; --sy: 120px; --sz: 260px; --rx: 64deg; --ry: -30deg; animation-delay: 120ms; }
-.aden__b3 .aden__bar { background: #b9a0fa; animation-delay: 120ms; }
-.aden__b2 { left: 29px; top: 48px; width: 52px; --sx: 110px; --sy: -80px; --sz: 120px; --rx: -46deg; --ry: 60deg; animation-delay: 190ms; }
-.aden__b2 .aden__bar { background: #8a63f0; animation-delay: 190ms; }
-.aden__b1 { left: 21px; top: 68px; width: 68px; --sx: -130px; --sy: -44px; --sz: -20px; --rx: 20deg; --ry: -76deg; animation-delay: 260ms; }
-.aden__b1 .aden__bar { background: #5b2bd6; animation-delay: 260ms; }
-.aden__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: aden-line 300ms cubic-bezier(.23, 1, .32, 1) 950ms forwards; }
-.aden__ww { margin-top: 28px; overflow: hidden; padding: 0 6px; animation: aden-fade 150ms ease 6000ms forwards; }
+.aden__tile { position: absolute; inset: 0; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: aden-tile 320ms var(--sps) 40ms forwards; }
+.aden__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: aden-assemble 480ms var(--sp) forwards; }
+.aden__bar { position: absolute; inset: 0; border-radius: 9px; filter: blur(6px); animation: aden-sharp 280ms cubic-bezier(.23, 1, .32, 1) forwards; }
+.aden__b3 { left: 36px; top: 28px; width: 38px; --sx: -60px; --sy: 120px; --sz: 260px; --rx: 64deg; --ry: -30deg; animation-delay: 70ms; }
+.aden__b3 .aden__bar { background: #b9a0fa; animation-delay: 70ms; }
+.aden__b2 { left: 29px; top: 48px; width: 52px; --sx: 110px; --sy: -80px; --sz: 120px; --rx: -46deg; --ry: 60deg; animation-delay: 110ms; }
+.aden__b2 .aden__bar { background: #8a63f0; animation-delay: 110ms; }
+.aden__b1 { left: 21px; top: 68px; width: 68px; --sx: -130px; --sy: -44px; --sz: -20px; --rx: 20deg; --ry: -76deg; animation-delay: 160ms; }
+.aden__b1 .aden__bar { background: #5b2bd6; animation-delay: 160ms; }
+.aden__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: aden-line 180ms cubic-bezier(.23, 1, .32, 1) 570ms forwards; }
+.aden__ww { margin-top: 28px; overflow: hidden; padding: 0 6px; animation: aden-fade 90ms ease 3000ms forwards; }
 .aden.is-out .aden__ww { animation: aden-out 150ms ease forwards; }
-.aden__word { display: block; font-family: "Geist", var(--font-noto-kr), sans-serif; font-size: 34px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: #16141f; transform: translateY(110%); animation: aden-word 600ms var(--sp) 650ms forwards; }
+.aden__word { display: block; font-family: "Geist", var(--font-noto-kr), sans-serif; font-size: 34px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: #16141f; transform: translateY(110%); animation: aden-word 360ms var(--sp) 390ms forwards; }
 @keyframes aden-tile { to { opacity: 1; transform: scale(1); } }
 @keyframes aden-assemble {
   0% { opacity: 0; transform: translate3d(var(--sx), var(--sy), var(--sz)) rotateX(var(--rx)) rotateY(var(--ry)); }
@@ -40,9 +40,13 @@
 
 /* 콘솔이 차례로 깔리는 움직임은 admin-entry.tsx 의 Web Animations(오버레이와 같은 시계) — 실제 화면이 늦게 들어와 사이드바가 새로 그려져도 이어진다. */
 /* 걷히지 않고 기다리는 동안(로딩 중 · 스크립트가 아직 못 돎) — 모인 로고 뒤에서 빛이 천천히 숨 쉰다. 걷히면(is-out) 멈춤.
-   보통은 1300ms 에 걷혀 1500ms 부터인 이 숨은 보이지 않는다. */
+   보통은 780ms 에 걷혀 900ms 부터인 이 숨은 보이지 않는다. */
 .aden__hold { position: absolute; inset: -16px; border-radius: 40px; background: radial-gradient(circle, rgba(185, 160, 250, .45), rgba(185, 160, 250, 0) 70%); opacity: 0; pointer-events: none; }
-.aden__hold { animation: aden-hold 1400ms cubic-bezier(.37, 0, .63, 1) 1500ms infinite; }
+.aden__hold { animation: aden-hold 1400ms cubic-bezier(.37, 0, .63, 1) 900ms infinite; }
 .aden.is-out .aden__hold { animation: none; }
 @keyframes aden-hold { 50% { opacity: 1; transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .aden { display: none; } }
+
+/* 다시 들어올 때(2026-10-19) — 하루 첫 진입 · 로그인 직후가 아니면 로고 없이 흰 바탕만 0.3초에 걷힌다(콘솔 깔기도 없음). */
+.aden--quick .aden__logo, .aden--quick .aden__ww { display: none; }
+.aden--quick.is-out::before { animation: aden-out 300ms cubic-bezier(.23, 1, .32, 1) forwards; }

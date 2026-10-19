@@ -4,26 +4,26 @@
   --sps: linear(0.000,0.027,0.096,0.189,0.294,0.401,0.505,0.600,0.685,0.759,0.822,0.873,0.915,0.947,0.972,0.990,1.003,1.011,1.016,1.019,1.020,1.019,1.018,1.016,1.014,1.012,1.010,1.008,1.006,1.005,1.004,1.003,1.002,1.001,1.001,1.000,1.000,1.000,1.000,1.000,1.000);
   position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
   background: radial-gradient(55% 35% at 28% 22%, rgba(185, 160, 250, .16), rgba(185, 160, 250, 0) 70%), radial-gradient(50% 40% at 82% 74%, rgba(217, 204, 251, .22), rgba(217, 204, 251, 0) 70%), #fff;
-  animation: spl-out 320ms cubic-bezier(.4, 0, 1, 1) 6000ms forwards;
+  animation: spl-out 190ms cubic-bezier(.4, 0, 1, 1) 3000ms forwards;
 }
-/* 걷기는 스크립트가 is-out 을 붙일 때만(위 6초는 스크립트가 끝내 못 돌 때의 안전장치). 이름을 따로 둬야 새로 시작한다. */
+/* 걷기는 스크립트가 is-out 을 붙일 때만(위 3초는 스크립트가 끝내 못 돌 때의 안전장치). 이름을 따로 둬야 새로 시작한다. */
 .spl.is-out { animation: spl-out2 320ms cubic-bezier(.4, 0, 1, 1) 120ms forwards; }
 .spl.is-out .spl__c { animation: spl-away2 360ms cubic-bezier(.5, 0, .75, 0) forwards; }
-.spl__c { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -60px; perspective: 700px; animation: spl-away 360ms cubic-bezier(.5, 0, .75, 0) 5900ms forwards; }
-.spl__glow { position: absolute; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: spl-glow 900ms cubic-bezier(.23, 1, .32, 1) 300ms forwards; }
-.spl__tile { position: relative; width: 110px; height: 110px; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: spl-tile 540ms var(--sps) 60ms forwards; }
-.spl__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: spl-fly 800ms var(--sp) forwards; }
-.spl__bar { position: absolute; inset: 0; border-radius: 9px; filter: blur(6px); animation: spl-sharp 460ms cubic-bezier(.23, 1, .32, 1) forwards; }
-.spl__b3 { left: 36px; top: 28px; width: 38px; --sx: -55px; --sy: 108px; --sz: 260px; --rx: 64deg; --ry: -30deg; animation-delay: 120ms; }
-.spl__b3 .spl__bar { background: #b9a0fa; animation-delay: 120ms; }
-.spl__b2 { left: 29px; top: 48px; width: 52px; --sx: 96px; --sy: -70px; --sz: 120px; --rx: -46deg; --ry: 60deg; animation-delay: 190ms; }
-.spl__b2 .spl__bar { background: #8a63f0; animation-delay: 190ms; }
-.spl__b1 { left: 21px; top: 68px; width: 68px; --sx: -118px; --sy: -40px; --sz: -20px; --rx: 20deg; --ry: -76deg; animation-delay: 260ms; }
-.spl__b1 .spl__bar { background: #5b2bd6; animation-delay: 260ms; }
-.spl__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: spl-line 300ms cubic-bezier(.23, 1, .32, 1) 950ms forwards; }
+.spl__c { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -60px; perspective: 700px; animation: spl-away 220ms cubic-bezier(.5, 0, .75, 0) 2900ms forwards; }
+.spl__glow { position: absolute; top: -75px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(185, 160, 250, .34), rgba(185, 160, 250, 0) 65%); opacity: 0; animation: spl-glow 540ms cubic-bezier(.23, 1, .32, 1) 180ms forwards; }
+.spl__tile { position: relative; width: 110px; height: 110px; border-radius: 28px; background: linear-gradient(155deg, #f4eeff, #eae0fe); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 24px 48px -22px rgba(91, 43, 214, .45); transform-style: preserve-3d; opacity: 0; transform: scale(.92); animation: spl-tile 320ms var(--sps) 40ms forwards; }
+.spl__bw { position: absolute; height: 18px; transform-style: preserve-3d; opacity: 0; animation: spl-fly 480ms var(--sp) forwards; }
+.spl__bar { position: absolute; inset: 0; border-radius: 9px; filter: blur(6px); animation: spl-sharp 280ms cubic-bezier(.23, 1, .32, 1) forwards; }
+.spl__b3 { left: 36px; top: 28px; width: 38px; --sx: -55px; --sy: 108px; --sz: 260px; --rx: 64deg; --ry: -30deg; animation-delay: 70ms; }
+.spl__b3 .spl__bar { background: #b9a0fa; animation-delay: 70ms; }
+.spl__b2 { left: 29px; top: 48px; width: 52px; --sx: 96px; --sy: -70px; --sz: 120px; --rx: -46deg; --ry: 60deg; animation-delay: 110ms; }
+.spl__b2 .spl__bar { background: #8a63f0; animation-delay: 110ms; }
+.spl__b1 { left: 21px; top: 68px; width: 68px; --sx: -118px; --sy: -40px; --sz: -20px; --rx: 20deg; --ry: -76deg; animation-delay: 160ms; }
+.spl__b1 .spl__bar { background: #5b2bd6; animation-delay: 160ms; }
+.spl__b1 i { position: absolute; left: 14px; top: 8px; width: 26px; height: 2.5px; border-radius: 2px; background: #efe7ff; transform: scaleX(0); transform-origin: 0 50%; animation: spl-line 180ms cubic-bezier(.23, 1, .32, 1) 570ms forwards; }
 .spl__ww { margin-top: 28px; overflow: hidden; padding: 0 6px; }
-.spl__word { display: block; font-size: 36px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: transparent; background: linear-gradient(100deg, #16141f 0%, #16141f 40%, #8a63f0 48%, #16141f 56%, #16141f 100%); background-size: 300% 100%; background-position: 160% 0; -webkit-background-clip: text; background-clip: text; transform: translateY(110%); animation: spl-word 700ms var(--sp) 650ms forwards, spl-sweep 900ms cubic-bezier(.77, 0, .175, 1) 900ms forwards; }
-.spl__tag { margin-top: 8px; font-size: 14px; color: #8b8898; opacity: 0; transform: translateY(8px); filter: blur(3px); animation: spl-tag 420ms cubic-bezier(.23, 1, .32, 1) 900ms forwards; }
+.spl__word { display: block; font-size: 36px; font-weight: 800; letter-spacing: -0.05em; line-height: 1.2; color: transparent; background: linear-gradient(100deg, #16141f 0%, #16141f 40%, #8a63f0 48%, #16141f 56%, #16141f 100%); background-size: 300% 100%; background-position: 160% 0; -webkit-background-clip: text; background-clip: text; transform: translateY(110%); animation: spl-word 420ms var(--sp) 390ms forwards, spl-sweep 540ms cubic-bezier(.77, 0, .175, 1) 540ms forwards; }
+.spl__tag { margin-top: 8px; font-size: 14px; color: #8b8898; opacity: 0; transform: translateY(8px); filter: blur(3px); animation: spl-tag 250ms cubic-bezier(.23, 1, .32, 1) 540ms forwards; }
 @keyframes spl-tile { to { opacity: 1; transform: scale(1); } }
 @keyframes spl-fly {
   0% { opacity: 0; transform: translate3d(var(--sx), var(--sy), var(--sz)) rotateX(var(--rx)) rotateY(var(--ry)); }
@@ -44,19 +44,24 @@
 /* 서버에서도 그리므로(첫 화면부터 흰 바탕) 동작 줄이기 · 태블릿 상세 칸(프레임)에선 CSS 로도 숨긴다. */
 @media (prefers-reduced-motion: reduce) { .spl { display: none; } }
 html[data-pane] .spl { display: none; }
-/* 걷히지 않고 기다리는 동안(로딩 중 · 스크립트가 아직 못 돎) — 모인 로고 뒤 빛이 천천히 숨 쉰다. 보통은 1300ms 에 걷혀 안 보임. */
+/* 걷히지 않고 기다리는 동안(로딩 중 · 스크립트가 아직 못 돎) — 모인 로고 뒤 빛이 천천히 숨 쉰다. 보통은 0.7초쯤 걷혀 안 보임. */
 .spl__hold { position: absolute; top: -16px; width: 142px; height: 142px; border-radius: 44px; background: radial-gradient(circle, rgba(185, 160, 250, .45), rgba(185, 160, 250, 0) 70%); opacity: 0; pointer-events: none; }
-.spl__hold { animation: spl-hold 1400ms cubic-bezier(.37, 0, .63, 1) 1500ms infinite; }
+.spl__hold { animation: spl-hold 1400ms cubic-bezier(.37, 0, .63, 1) 900ms infinite; }
 .spl.is-out .spl__hold { animation: none; }
 @keyframes spl-hold { 50% { opacity: 1; transform: scale(1.08); } }
 
 /* 로그인 직후(2026-10-15, 시안 Motion-C-Login-Phone) — 막대가 3D 로 날아오는 대신, 로그인 버튼이 오므라든 보라 점(52px) 자리에서
    타일이 스프링으로 떠올라 커지며 보라 덮개가 걷혀 로고가 드러난다. 그 뒤(글자 · 빛 · 걷힘)는 평소와 같다. */
 .spl--rise { background: #fff; }
-.spl--rise .spl__tile { opacity: 1; border-radius: 55px; transform: translate(var(--rise-x, 0), var(--rise-y, 0)) scale(.4727); animation: spl-rise 900ms var(--sps) 80ms forwards, spl-rise-r 520ms cubic-bezier(.23, 1, .32, 1) 80ms forwards; }
-.spl--rise .spl__tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #7a52e6; animation: spl-rise-cover 440ms cubic-bezier(.23, 1, .32, 1) 120ms forwards; }
+.spl--rise .spl__tile { opacity: 1; border-radius: 55px; transform: translate(var(--rise-x, 0), var(--rise-y, 0)) scale(.4727); animation: spl-rise 540ms var(--sps) 50ms forwards, spl-rise-r 310ms cubic-bezier(.23, 1, .32, 1) 50ms forwards; }
+.spl--rise .spl__tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #7a52e6; animation: spl-rise-cover 260ms cubic-bezier(.23, 1, .32, 1) 70ms forwards; }
 .spl--rise .spl__bw { opacity: 1; animation: none; }
 .spl--rise .spl__bar { filter: none; animation: none; }
 @keyframes spl-rise { to { transform: none; } }
 @keyframes spl-rise-r { to { border-radius: 28px; } }
 @keyframes spl-rise-cover { to { opacity: 0; } }
+
+/* 다시 들어올 때(2026-10-19, 시안 Motion-B-Reentry-Phone) — 하루 첫 실행 · 로그인 직후가 아니면 로고 없이 흰 바탕만 0.3초에 걷힌다. */
+.spl--quick { background: #fff; }
+.spl--quick .spl__c { display: none; }
+.spl--quick.is-out { animation: spl-out2 300ms cubic-bezier(.23, 1, .32, 1) forwards; }

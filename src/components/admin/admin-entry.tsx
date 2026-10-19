@@ -1,7 +1,8 @@
 "use client";
 
 // PC 진입 모션(2026-10-14, 시안 Motion-PC-Entry-PC) — 관리자 콘솔을 새로 불러올 때마다(새로고침 · 다시 접속 · 화면 껐다 30초 넘어 돌아옴,
-// `entry-replay`) 약 2초. 콘솔 안에서 화면을 옮길 땐 다시 안 나온다.
+// `entry-replay`). 콘솔 안에서 화면을 옮길 땐 다시 안 나온다. 2026-10-19 줄임: 로고 모션(약 1.1초)은 **하루 첫 진입 · 로그인 직후만**,
+// 그 외엔 흰 바탕만 0.3초 페이드.
 // 흰 화면 가운데에서 로고 세 막대가 3D 로 모이고 「Foldy」 → 로고가 작아지며 사이드바 로고 자리로 날아가 앉고,
 // 그사이 사이드바 · 위 줄 · 본문이 차례로 깔린다.
 //
@@ -20,9 +21,9 @@ import "./admin-entry.css";
  * 진입 한 번 — 화면 만들기 · 시계 · 걷기 · 콘솔 깔기 · 지우기. **혼자 도는 함수**여야 한다 — 인라인 스크립트로 문자열이 되어
  * 서버 HTML 안에서 실행된다(바깥 변수 · import 를 쓰지 말 것). `id` 는 재생 번호(같은 번호는 두 번 안 띄움).
  *
- * 로고가 모이는 앞부분(0~1300ms)만 CSS 시간표이고 **걷히는 건 이 스크립트가 `lift()` 할 때만**(.aden.is-out) — 혼자 걷히게 두면
+ * 로고가 모이는 앞부분(0~약 700ms)만 CSS 시간표이고 **걷히는 건 이 스크립트가 `lift()` 할 때만**(.aden.is-out) — 혼자 걷히게 두면
  * 느린 환경에서 하이드레이션이 메인 스레드를 붙잡는 동안 걷혀 로더가 비쳤다. 로딩 중(.fldr)이면 로더가 두 번 연달아(≈0.25초)
- * 안 보일 때까지 모인 로고를 든 채 기다린다(뒤 빛이 숨 쉼, 최대 ~5.3초 + CSS 안전장치 6초 + 8초엔 무조건 치움).
+ * 안 보일 때까지 모인 로고를 든 채 기다린다(뒤 빛이 숨 쉼, 시작부터 최대 2초 + CSS 안전장치 3초 + 4초엔 무조건 치움).
  */
 function mountEntry(id: number, host: Element | null) {
   const w = window as unknown as { __foldyEntryLast?: number };
@@ -47,17 +48,42 @@ function mountEntry(id: number, host: Element | null) {
   (host || document.body).appendChild(overlay);
   const logo = overlay.firstChild as HTMLElement;
 
-  const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
-  const t0 = now();
-  const root = document.documentElement;
-  const ease = "cubic-bezier(.23, 1, .32, 1)";
   let removed = false;
   const remove = () => {
     if (removed) return;
     removed = true;
     overlay.remove();
   };
-  setTimeout(remove, 8000); // 무슨 일이 있어도 8초 뒤엔 치운다
+  setTimeout(remove, 4000); // 무슨 일이 있어도 4초 뒤엔 치운다
+
+  // 로고 모션은 하루 첫 진입 · 로그인 직후(20초 안)만(2026-10-19). 그 외(새로고침 · 30초 넘어 돌아옴 · 같은 날 두 번째부터)는
+  // 흰 바탕만 0.3초에 걷고 콘솔 깔기도 없다. 날짜는 도쿄 기준. 저장소를 못 쓰면 짧은 쪽.
+  let full = false;
+  try {
+    const raw = sessionStorage.getItem("foldy.loginRise");
+    if (raw) {
+      sessionStorage.removeItem("foldy.loginRise");
+      full = Date.now() - (JSON.parse(raw) as { t: number }).t < 20000;
+    }
+    const day = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    if (localStorage.getItem("foldy.entryDay.admin") !== day) full = true;
+    if (full) localStorage.setItem("foldy.entryDay.admin", day);
+  } catch {
+    // 짧은 쪽으로.
+  }
+  if (!full) {
+    overlay.classList.add("aden--quick");
+    requestAnimationFrame(() => {
+      overlay.classList.add("is-out");
+      setTimeout(remove, 350);
+    });
+    return;
+  }
+
+  const now = () => (document.timeline && (document.timeline.currentTime as number | null)) || performance.now();
+  const t0 = now();
+  const root = document.documentElement;
+  const ease = "cubic-bezier(.23, 1, .32, 1)";
   // 화면 모션(대시보드 숫자 굴림 · 막대 등)은 걷힐 때까지 미뤄 둔다(걷을 때 실제 값으로 바꿈).
   root.style.setProperty("--entry-d0", "60s");
 
@@ -137,17 +163,17 @@ function mountEntry(id: number, host: Element | null) {
     setTimeout(() => mo.disconnect(), 1400);
   };
 
-  // 1300ms 쯤 걷는다 — 로더가 두 번 연달아(≈0.25초) 안 보일 때. 로딩 중이면 기다린다(최대 ~5.3초).
+  // 0.7초쯤 걷는다 — 로더가 두 번 연달아(≈0.25초) 안 보일 때. 로딩 중이면 기다리되 시작부터 2초까지만.
   let clear = 0;
   const check = () => {
     clear = document.querySelector(".fldr") ? 0 : clear + 1;
-    if (clear < 2 && now() - t0 < 5300) {
+    if (clear < 2 && now() - t0 < 2000) {
       setTimeout(check, 120);
       return;
     }
     lift();
   };
-  setTimeout(check, Math.max(0, t0 + 1180 - now()));
+  setTimeout(check, Math.max(0, t0 + 680 - now()));
 }
 
 // 진입 화면이 붙는 빈 상자 — React 는 이 상자의 안(innerHTML)을 한 번 넣고 다시 건드리지 않는다(값이 안 바뀌므로). 그래서 스크립트가

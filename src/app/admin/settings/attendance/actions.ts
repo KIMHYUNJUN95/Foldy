@@ -55,6 +55,7 @@ export async function saveAttendanceSiteSettings(formData: FormData) {
     redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=invalid_radius`);
   }
 
+  let savedSiteId: string;
   try {
     const site = siteId
       ? await updateAttendanceSite(organizationId, siteId, {
@@ -74,10 +75,11 @@ export async function saveAttendanceSiteSettings(formData: FormData) {
           propertyId,
           isActive: true,
         });
-    redirect(`/admin/settings/attendance?site=${site.id}&saved=1`);
+    savedSiteId = site.id;
   } catch {
     redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=site_save_failed`);
   }
+  redirect(`/admin/settings/attendance?site=${savedSiteId}&saved=1`);
 }
 
 export async function issueAttendanceSiteQr(formData: FormData) {
@@ -89,21 +91,30 @@ export async function issueAttendanceSiteQr(formData: FormData) {
     redirect("/admin/settings/attendance?error=invalid_site");
   }
 
+  let site: Awaited<ReturnType<typeof getAttendanceSite>>;
   try {
-    const site = await getAttendanceSite(organizationId, siteId);
-    if (!site) {
-      redirect("/admin/settings/attendance?error=invalid_site");
-    }
-    const hadActive = Boolean(await getActiveQrToken(organizationId, siteId));
+    site = await getAttendanceSite(organizationId, siteId);
+  } catch {
+    redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=qr_issue_failed`);
+  }
+  if (!site) {
+    redirect("/admin/settings/attendance?error=invalid_site");
+  }
+
+  // 성공 redirect 는 try 밖 — 안에서 부르면 NEXT_REDIRECT 가 catch 에 잡혀 「발급 실패」로 보이고,
+  // 그걸 믿고 다시 발급하면 이미 인쇄한 QR 이 무효가 된다.
+  let hadActive: boolean;
+  try {
+    hadActive = Boolean(await getActiveQrToken(organizationId, siteId));
     await issueAttendanceQr({
       organizationId,
       siteId,
       createdByUserId: session.user.id,
     });
-    redirect(`/admin/settings/attendance?site=${siteId}&${hadActive ? "reissued" : "issued"}=1`);
   } catch {
     redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&error=qr_issue_failed`);
   }
+  redirect(`/admin/settings/attendance?site=${encodeURIComponent(siteId)}&${hadActive ? "reissued" : "issued"}=1`);
 }
 
 /**

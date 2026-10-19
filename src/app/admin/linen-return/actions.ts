@@ -29,6 +29,7 @@ import {
   type AdminTableSheet,
 } from "@/lib/admin-table-workbook";
 import { getDictionary } from "@/lib/i18n";
+import { replaceLinenRecordLines } from "@/lib/linen-return-lines";
 import { revalidateLinenReturnPaths } from "@/lib/linen-returns";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { hasOrganizationContext, type AppSession } from "@/lib/session";
@@ -194,30 +195,8 @@ export async function updateAdminLinenRecord(input: {
     .eq("organization_id", session.organization.id);
   if (headerError) return { ok: false, reason: "error" };
 
-  // 품목 행은 통째로 교체한다 — (record, item) 유니크 제약을 지키는 가장 단순하고 정확한 경로.
-  const { data: beforeLines } = await supabase
-    .from("linen_return_record_items")
-    .select("linen_item_id, quantity")
-    .eq("return_record_id", record.id);
-
-  const { error: deleteError } = await supabase
-    .from("linen_return_record_items")
-    .delete()
-    .eq("return_record_id", record.id);
-  if (deleteError) return { ok: false, reason: "error" };
-
-  const inserts: Database["public"]["Tables"]["linen_return_record_items"]["Insert"][] = lines.map(
-    (line, index) => ({
-      return_record_id: record.id,
-      linen_item_id: line.itemId,
-      quantity: line.quantity,
-      sort_order: index,
-    }),
-  );
-  const { error: insertError } = await supabase
-    .from("linen_return_record_items")
-    .insert(inserts);
-  if (insertError) return { ok: false, reason: "error" };
+  const replaced = await replaceLinenRecordLines(supabase, record.id, lines);
+  if (!replaced.ok) return { ok: false, reason: "error" };
 
   await writeAudit({
     organizationId: session.organization.id,
@@ -229,10 +208,7 @@ export async function updateAdminLinenRecord(input: {
         building_name: record.building_name,
         note: record.note,
         photo_count: (record.image_urls ?? []).length,
-        lines: ((beforeLines ?? []) as Array<Pick<LineRow, "linen_item_id" | "quantity">>).map((l) => ({
-          item_id: l.linen_item_id,
-          quantity: l.quantity,
-        })),
+        lines: replaced.before.map((l) => ({ item_id: l.linen_item_id, quantity: l.quantity })),
       },
       after: {
         building_name: building,

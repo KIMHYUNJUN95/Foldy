@@ -56,23 +56,21 @@ function buildLoginRedirect(request: NextRequest) {
  * Supabase 가 OAuth/매직링크 결과를 잘못된 경로(사이트 루트 등)로 돌려보내는 경우를 `/auth/callback`
  * 으로 다시 보내주기 위한 판정이다.
  *
- * **`/auth/login` 은 예외다.** 그 페이지는 `?error=` 를 **자기 것으로** 쓴다 — 로그인 실패는
- * `signInWithEmailPassword` 이 `/auth/login?view=email&...&error=invalid_credentials` 로 되돌린다.
- * 예전에는 그 URL 이 여기서 콜백으로 오인돼 `/auth/callback` 으로 끌려갔고, 거기엔 `code` 가 없으니
- * 다시 `/auth/login` 으로 튕겼다 — **에러 파라미터를 잃은 채로.** 그래서 사용자는 비밀번호가 틀려도
- * 아무 문구 없이 초기 로그인 화면만 반복해서 보게 됐다(2026-09-04 사용자 제보로 발견).
- *
  * 진짜 Supabase 콜백은 `code`(성공) 또는 `error_description`/`error_code`(실패)를 반드시 함께
- * 싣는다. 앱이 스스로 붙이는 것은 `error` 하나뿐이므로, 로그인 페이지에서는 그 둘을 기준으로 가른다.
+ * 싣는다. **`error` 하나만으로는 콜백으로 보지 않는다** — 앱이 스스로 `?error=` 를 쓴다
+ * (로그인 실패 `/auth/login?...&error=invalid_credentials`, 관리자 설정 · 모바일 등록 화면의
+ * `?error=save_failed` 등). 예전에는 그 URL 이 콜백으로 오인돼 `/auth/callback` → 원래 화면으로
+ * 돌아가면서 **오류 파라미터가 지워졌고**, 사용자는 실패 안내 없이 화면만 다시 보게 됐다
+ * (로그인 2026-09-04, 그 밖의 화면 2026-10-19 발견). `/auth/callback` 도 `error` 단독은 쓰지 않는다.
  */
-function hasSupabaseCallbackParams(request: NextRequest) {
-  const params = request.nextUrl.searchParams;
-  if (request.nextUrl.pathname === "/auth/login") {
-    return (
-      params.has("code") || params.has("error_code") || params.has("error_description")
-    );
-  }
-  return supabaseCallbackParams.some((param) => params.has(param));
+export function isMisroutedSupabaseCallback(
+  pathname: string,
+  params: URLSearchParams,
+) {
+  if (pathname === "/auth/callback") return false;
+  return (
+    params.has("code") || params.has("error_code") || params.has("error_description")
+  );
 }
 
 function buildAuthCallbackRedirect(request: NextRequest) {
@@ -96,7 +94,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const surface = getDeviceSurfaceFromHeaders(request.headers);
 
-  if (pathname !== "/auth/callback" && hasSupabaseCallbackParams(request)) {
+  if (isMisroutedSupabaseCallback(pathname, request.nextUrl.searchParams)) {
     return NextResponse.redirect(buildAuthCallbackRedirect(request));
   }
 

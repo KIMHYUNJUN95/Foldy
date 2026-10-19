@@ -125,8 +125,11 @@ authorization.
   equivalent), re-derives the selectable item set (global items + that building's items) from the DB,
   and enforces positive-integer quantities, no duplicate item, at least one line, and ≤5 photos.
   The header update payload contains **only** `building_name`, `note`, `image_urls` — the evidence
-  columns are structurally excluded. Line items are replaced wholesale (delete + insert), the same
-  approach the mobile edit uses, which keeps the `(record, item)` unique constraint satisfied.
+  columns are structurally excluded. Line items are reconciled by `replaceLinenRecordLines`
+  (`src/lib/linen-return-lines.ts`, shared with the mobile edit): **insert new → update changed →
+  delete removed**, and a failure in a later step undoes the earlier ones. (Until 2026-10-19 this was
+  delete-all + insert; with the author-only INSERT policy an admin editing someone else's record lost
+  every line. Migration `202610190014` aligns the INSERT policy with update/delete.)
 - `deleteAdminLinenRecord` — hard delete of the header; line items cascade.
 - Both write `audit_logs` through the service-role client with
   `action = linen_return_console_update | linen_return_console_delete`,

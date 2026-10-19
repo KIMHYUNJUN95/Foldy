@@ -670,6 +670,9 @@ Not required in first slice:
 - authors can edit their own records
 - non-authors cannot edit other users' records
 - admin-capable roles can edit all records
+- saving an edit never leaves a record without its items: lines are added and changed first and removed
+  last, and a failed save keeps the previous items (2026-10-19 — before that, an admin editing another
+  user's record could wipe all of its items)
 
 ### Delete
 

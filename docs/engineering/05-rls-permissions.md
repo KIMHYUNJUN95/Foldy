@@ -619,6 +619,9 @@ Implemented.
 
 - Read: follows parent `linen_return_records` visibility.
 - Create / update / delete: same mutation rule as the parent record (author or admin-capable roles).
+  - 2026-10-19: 초기 마이그레이션(202606100002)의 INSERT 정책만 「작성자 본인」으로 좁아 문서와 달랐다 —
+    관리자가 남의 기록 품목을 고치면 DELETE 만 되고 INSERT 가 막혀 품목이 사라졌다. `202610190014` 가
+    INSERT 를 UPDATE · DELETE 와 같은 범위(작성자 + 관리 역할 + 플랫폼 관리자)로 맞춘다.
 
 ## tasks
 

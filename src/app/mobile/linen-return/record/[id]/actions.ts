@@ -7,6 +7,7 @@ import {
   getLinenReturnRecordById,
   revalidateLinenReturnPaths,
 } from "@/lib/linen-returns";
+import { replaceLinenRecordLines } from "@/lib/linen-return-lines";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -152,26 +153,8 @@ export async function updateLinenReturnRecord(formData: FormData) {
     redirect(editPath(recordId, building, "save_failed"));
   }
 
-  // Replace all line items (simplest correct path for the unique-per-item rule).
-  const { error: deleteError } = await supabase
-    .from("linen_return_record_items")
-    .delete()
-    .eq("return_record_id", recordId);
-  if (deleteError) {
-    redirect(editPath(recordId, building, "save_failed"));
-  }
-
-  const lineInserts: Database["public"]["Tables"]["linen_return_record_items"]["Insert"][] =
-    lines.map((line, index) => ({
-      return_record_id: recordId,
-      linen_item_id: line.itemId,
-      quantity: line.quantity,
-      sort_order: index,
-    }));
-  const { error: insertError } = await supabase
-    .from("linen_return_record_items")
-    .insert(lineInserts);
-  if (insertError) {
+  const replaced = await replaceLinenRecordLines(supabase, recordId, lines);
+  if (!replaced.ok) {
     redirect(editPath(recordId, building, "save_failed"));
   }
 

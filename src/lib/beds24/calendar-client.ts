@@ -403,6 +403,8 @@ export async function postBeds24BookingCancel(args: {
  */
 export async function postBeds24BookingUpdate(
   payload: Record<string, unknown>,
+  /** `timeoutMs` — 넘으면 `AbortSignal` 이 던진다(예약 옮기기, 2026-10-19). 던졌다고 안 바뀐 것은 아니다 — 호출부가 다시 읽는다. */
+  options?: { timeoutMs?: number },
 ): Promise<{ ok: true } | { ok: false; error: string } | { skipped: string }> {
   const resolved = await resolveBase();
   if ("skipped" in resolved) return resolved;
@@ -416,6 +418,7 @@ export async function postBeds24BookingUpdate(
       token: resolved.token,
     },
     method: "POST",
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
   const credit = readCreditSignal(response.headers);
   if (!response.ok) {

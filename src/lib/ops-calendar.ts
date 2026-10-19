@@ -534,6 +534,84 @@ export async function readOpsRoomUnavailableNights(args: {
 }
 
 /**
+ * 예약 옮기기 후보 — 여러 줄의 겹침을 **한 번 읽어** 줄마다 센다(2026-10-19). `readOpsRoomUnavailableNights` 를 줄마다
+ * 부르면 같은 예약 표를 줄 수만큼 다시 읽는다. 같은 매칭(`makeReservationRoomAxis`)을 쓴다. 겹친 예약의 손님 이름을 하나
+ * 돌려줘 화면이 「겹침 · 누구」로 적는다. 판매 안 함(최소숙박 50↑) 밤도 센다 — 그 줄은 고를 수 없다.
+ */
+export async function readOpsMoveTargets(args: {
+  organizationId: string;
+  supabase: SupabaseClient<Database>;
+  rows: Array<{ roomKey: string; roomIds: string[] }>;
+  from: string;
+  toExclusive: string;
+  excludeReservationId: string;
+}): Promise<Map<string, { booked: string[]; unsellable: string[]; clashGuest: string | null }>> {
+  const { organizationId, supabase } = args;
+  const allRoomIds = [...new Set(args.rows.flatMap((row) => row.roomIds))];
+  const [roomCatalog, reservationsResult, ratesResult] = await Promise.all([
+    getActiveRoomCatalog(organizationId, supabase, { includeNonOperationalProperties: true }),
+    readAllPages<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("reservations")
+        .select(RESERVATION_SELECT)
+        .eq("organization_id", organizationId)
+        .lt("check_in_date", args.toExclusive)
+        .gt("check_out_date", args.from)
+        .order("check_in_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as SlimReservationPage,
+    ).then(toReservationRows),
+    allRoomIds.length === 0
+      ? Promise.resolve({ data: [] as Array<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind">>, error: null })
+      : readAllPages<Pick<RateRow, "room_id" | "stay_date" | "min_stay" | "override_kind">>((from, to) =>
+          supabase
+            .from("room_daily_rates")
+            .select("room_id, stay_date, min_stay, override_kind")
+            .eq("organization_id", organizationId)
+            .in("room_id", allRoomIds)
+            .gte("stay_date", args.from)
+            .lt("stay_date", args.toExclusive)
+            .order("room_id", { ascending: true })
+            .order("stay_date", { ascending: true })
+            .range(from, to),
+        ),
+  ]);
+  if (reservationsResult.error) throw new Error(reservationsResult.error.message);
+  if (ratesResult.error) throw new Error(ratesResult.error.message);
+
+  const nights: string[] = [];
+  for (let cursor = args.from; cursor < args.toExclusive; cursor = addDays(cursor, 1)) nights.push(cursor);
+  const axis = makeReservationRoomAxis(roomCatalog);
+  const out = new Map<string, { booked: string[]; unsellable: string[]; clashGuest: string | null }>();
+  for (const target of args.rows) {
+    const booked = new Set<string>();
+    let clashGuest: string | null = null;
+    for (const row of reservationsResult.data) {
+      if (row.status === "cancelled" || row.status === "no_show") continue;
+      if (row.id === args.excludeReservationId) continue;
+      if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
+      if (axis(row).roomKey !== target.roomKey) continue;
+      for (const night of nights) {
+        if (night >= row.check_in_date && night < row.check_out_date) {
+          booked.add(night);
+          clashGuest ??= row.guest_name;
+        }
+      }
+    }
+    const ids = new Set(target.roomIds);
+    const activeNights = new Set(
+      ratesResult.data.filter((rate) => ids.has(rate.room_id) && isActiveUnitMinStay(rate.min_stay)).map((rate) => rate.stay_date),
+    );
+    out.set(target.roomKey, {
+      booked: nights.filter((night) => booked.has(night)),
+      clashGuest,
+      unsellable: nights.filter((night) => !booked.has(night) && !activeNights.has(night)),
+    });
+  }
+  return out;
+}
+
+/**
  * `rooms` 행 → 「우리 `rooms.id` → 캘린더 행 키」 등. 캘린더와 가격 개입 판정이 같은 매핑을 쓴다.
  * 운영 종료 유닛도 넣는다 — 한 행 뒤의 유닛 후보 전부가 필요하다(쓰기·이력·판정).
  */

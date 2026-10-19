@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+  OpsReservationMoveForm,
+  type MovedReservation,
+  type MoveRoom,
+  type ReservationMoveCopy,
+} from "@/components/admin/ops/ops-reservation-move";
 import { Check, Copy, X } from "lucide-react";
 import {
   loadReservationDetail,
@@ -50,7 +56,7 @@ import "./ops-calendar-panels-white.css";
  * 다시 눌러 봐야 주석만 덧씌워진다. 「취소만 보기」에서 열면 상세만 보인다.
  */
 
-export type ReservationCardCopy = ReservationEditCopy & {
+export type ReservationCardCopy = ReservationEditCopy & ReservationMoveCopy & {
   reEdit: string;
   reSaved: string;
   rcTitle: string;
@@ -186,8 +192,10 @@ export function OpsReservationPanel({
   bar,
   copy,
   localeTag,
+  moveRooms,
   nights,
   onClose,
+  onMoved,
   propertyName,
   roomIds,
   roomKey,
@@ -197,8 +205,12 @@ export function OpsReservationPanel({
   bar: OpsCalendarBar;
   copy: ReservationCardCopy & SpwCopy;
   localeTag: string;
+  /** 같은 건물의 줄 전부 — 「객실 옮기기」 후보. 비면 버튼을 숨긴다. */
+  moveRooms?: MoveRoom[];
   nights: number;
   onClose: () => void;
+  /** 옮긴 뒤 — 격자가 토스트 · 되돌리기를 띄운다. */
+  onMoved?: (moved: MovedReservation) => void;
   propertyName: string;
   /** 예약 수정의 겹침 검사가 쓴다 — 그 행의 우리 `rooms.id`. */
   roomIds: string[];
@@ -209,6 +221,8 @@ export function OpsReservationPanel({
   const router = useRouter();
   /** 보기 / 고치기. 고치는 동안은 본문·하단을 편집 폼이 차지한다. */
   const [editing, setEditing] = useState(false);
+  /** 객실 옮기기(2026-10-19). 옮기는 동안은 본문 · 하단을 옮기기 폼이 차지한다. */
+  const [moving, setMoving] = useState(false);
   /** 고친 뒤 상세를 다시 읽게 하는 신호. */
   const [reloadKey, setReloadKey] = useState(0);
   const [confirming, setConfirming] = useState(false);
@@ -226,7 +240,7 @@ export function OpsReservationPanel({
   }, [confirming]);
   // Esc · 포커스 · 스크롤 잠금은 콘솔 패널 공용 훅이 한다. 취소를 보내는 중 · 확인 창이 떠 있는 동안은
   // 패널을 닫지 않는다(확인 창의 Esc 는 창만 닫는다).
-  const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: pending || editing || confirming });
+  const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: pending || editing || moving || confirming });
 
   // 누른 한 건만 읽는다. 머리글은 격자 값으로 먼저 그려 두었으므로 기다리는 동안도 비지 않는다.
   useEffect(() => {
@@ -311,7 +325,17 @@ export function OpsReservationPanel({
         tabIndex={-1}
       >
         <div className="spw-phead">
-          {editing && detail ? (
+          {moving ? (
+            <div className="spw-head">
+              <span className="spw-head__k">
+                <i aria-hidden="true" className={`spw-dot is-${bar.channel}`} />
+                {channelName} · {propertyName} · {roomLabel}
+              </span>
+              <b className="spw-head__t">
+                {(bar.channel === "manual" ? copy.mvTitleManual : copy.mvTitle).replace("{guest}", bar.guestName)}
+              </b>
+            </div>
+          ) : editing && detail ? (
             <div className="spw-head">
               <span className="spw-head__k">{copy.spwReKicker.replace("{channel}", channelName)}</span>
               <b className="spw-head__t">{bar.guestName}</b>
@@ -335,7 +359,17 @@ export function OpsReservationPanel({
           </button>
         </div>
 
-        {editing && detail ? (
+        {moving && moveRooms && onMoved ? (
+          <OpsReservationMoveForm
+            bar={bar}
+            copy={copy}
+            currentRoom={moveRooms.find((room) => room.roomKey === roomKey) ?? { label: roomLabel, roomIds, roomKey }}
+            localeTag={localeTag}
+            onDiscard={() => setMoving(false)}
+            onMoved={onMoved}
+            rooms={moveRooms}
+          />
+        ) : editing && detail ? (
           <OpsReservationEditForm
             channel={bar.channel}
             copy={copy}
@@ -525,6 +559,18 @@ export function OpsReservationPanel({
                 {/* 「예약 수정」 — 시안 SalesResv-PC. 짧은 「수정」(reEdit)은 모바일 시트가 쓴다. */}
                 {copy.reTitle}
               </button>
+              {moveRooms && moveRooms.length > 1 && onMoved && (
+                <button
+                  className="spw-btn is-primary"
+                  onClick={() => {
+                    setMessage(null);
+                    setMoving(true);
+                  }}
+                  type="button"
+                >
+                  {copy.mvButton}
+                </button>
+              )}
               <button className="spw-btn is-soft-danger" onClick={() => setConfirming(true)} type="button">
                 {copy.rcCancel}
               </button>

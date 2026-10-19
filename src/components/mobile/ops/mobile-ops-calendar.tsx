@@ -314,6 +314,14 @@ export function MobileOpsCalendar({
       scopeKeys: previous.scopeKeys,
     }));
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  /** 「객실 옮기기」 후보 — 연 예약과 같은 건물 줄(2026-10-19). 시트가 다시 읽지 않게 같은 배열을 유지한다. */
+  const moveRooms = useMemo(() => {
+    if (overlay?.kind !== "reservation") return [];
+    const propertyName = overlay.placement.propertyName;
+    return serverRooms
+      .filter((room) => room.propertyName === propertyName && room.roomIds.length > 0)
+      .map((room) => ({ label: room.displayRoomLabel, roomIds: room.roomIds, roomKey: room.key }));
+  }, [overlay, serverRooms]);
   const [salesOpen, setSalesOpen] = useState(false);
 
   // 예약 바로 열기 — 다른 화면에서 `?resv=<id>` 로 넘어오면 그 예약 상세 시트를 연다(데스크톱과 같다).
@@ -2126,6 +2134,18 @@ export function MobileOpsCalendar({
               onSaved={() => {
                 close();
                 showToast({ kind: "done", text: copy.mtSaved.replace("{name}", overlay.placement.bar.guestName) });
+                startRefresh(() => router.refresh());
+              }}
+              moveRooms={moveRooms}
+              onMoved={(moved) => {
+                close();
+                showToast({
+                  kind: "done",
+                  text: copy.mvDone
+                    .replace("{guest}", moved.guestName)
+                    .replace("{from}", moved.from.room.label)
+                    .replace("{to}", moved.to.room.label),
+                });
                 startRefresh(() => router.refresh());
               }}
               propertyName={overlay.placement.propertyName}

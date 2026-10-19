@@ -99,6 +99,12 @@ import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
 import { OPS_GAP_OPEN_EVENT } from "@/components/admin/ops/ops-gap-button";
 import { OPS_OPEN_RESERVATION_EVENT } from "@/components/shell/admin-guest-search";
 import { loadOpsReservationPlacement } from "@/app/admin/ops/calendar/search-actions";
+import { submitReservationMove } from "@/app/admin/ops/calendar/actions";
+import {
+  reservationMoveErrorText,
+  type MovedReservation,
+  type MoveRoom,
+} from "@/components/admin/ops/ops-reservation-move";
 
 /**
  * 판매 캘린더 격자.
@@ -381,6 +387,19 @@ type GridRowActions = {
   cancelDraft: () => void;
   commitDraft: (room: BookingPanelRoom, checkIn: string, checkOut: string) => void;
   openBar: (bar: OpsCalendarBar, room: OpsCalendarRoom) => void;
+  /** 막대를 누름 — 0.4초 꾹 누르면 끌어 옮기기가 시작된다(2026-10-19). 짧게 누르면 지금처럼 상세. */
+  holdBar: (bar: OpsCalendarBar, room: OpsCalendarRoom, event: React.PointerEvent<HTMLDivElement>) => void;
+  /** 끌기를 막 끝낸 뒤의 click 은 상세를 열지 않는다 — true 면 무시. */
+  consumeClick: () => boolean;
+};
+
+/** 끌어 옮기는 막대가 이 줄 위에 있을 때 그리는 것(2026-10-19). */
+type MoveGhost = {
+  geometry: { left: string; width: string };
+  channel: string;
+  guest: string;
+  label: string;
+  ok: boolean;
 };
 
 type GridRowProps = {
@@ -413,6 +432,12 @@ type GridRowProps = {
   pendingMinStay: Map<string, PendingCell>;
   drafting: { room: BookingPanelRoom; checkIn: string } | null;
   actions: { current: GridRowActions };
+  /** 끌어 옮기는 중인 막대 id — 원래 자리에서 흐리게(그 막대가 있는 줄만, 나머지는 빈 문자열). */
+  moveFadeId: string;
+  /** 끄는 막대가 이 줄 위에 있으면 그 자리 · 놓을 수 있나. */
+  moveGhost: MoveGhost | null;
+  /** 채널 예약을 끄는 동안 — 같은 날짜에 비어 있는 같은 건물 줄의 옅은 보라 띠. */
+  moveBand: { left: string; width: string } | null;
 };
 
 /**
@@ -444,6 +469,9 @@ const OpsGridRow = memo(function OpsGridRow({
   showCancelled,
   today,
   winIds,
+  moveFadeId,
+  moveGhost,
+  moveBand,
 }: GridRowProps) {
   const { room } = row;
   const allRoomBars = row.bars;
@@ -709,10 +737,19 @@ const OpsGridRow = memo(function OpsGridRow({
               <div
                 className={`opsg__bar ${bar.channel}${bar.isCancelled ? " cancelled" : ""}${
                   priceWinsOnly && !showCancelled ? (wins.has(bar.id) ? " pw-win" : " pw-dim") : ""
-                }`}
+                }${bar.id === moveFadeId ? " is-moving-from" : ""}`}
                 key={bar.id}
                 // 편집 모드에서는 칸 선택이 먼저다 — 막대를 누르다 상세가 뜨면 드래그 선택이 끊긴다.
-                onClick={editMode ? undefined : () => actions.current.openBar(bar, room)}
+                onClick={
+                  editMode
+                    ? undefined
+                    : () => {
+                        if (actions.current.consumeClick()) return;
+                        actions.current.openBar(bar, room);
+                      }
+                }
+                // 꾹(0.4초) 누르면 끌어 옮기기(2026-10-19). 취소 막대 · 편집 모드는 제외.
+                onPointerDown={editMode || bar.isCancelled ? undefined : (event) => actions.current.holdBar(bar, room, event)}
                 style={lane > 0 ? { ...geometry, top: `calc(3px + ${lane * OPS_LANE_STEP_PX}px)` } : geometry}
                 // 브라우저 툴팁(이름 · 기간)은 두지 않는다(2026-10-01 사용자) — 막대를 지나갈 때마다 떠서 격자를
                 // 가린다. 자세한 것은 눌러서 예약 상세로.
@@ -721,6 +758,16 @@ const OpsGridRow = memo(function OpsGridRow({
               </div>
             );
           })}
+          {moveBand && <div aria-hidden="true" className="opsg__moveband" style={moveBand} />}
+          {moveGhost && (
+            <div aria-hidden="true" className="opsg__ghostwrap" style={moveGhost.geometry}>
+              {moveGhost.ok && <div className="opsg__moveband is-hover" />}
+              <div className={`opsg__bar ${moveGhost.channel} opsg__ghost${moveGhost.ok ? "" : " is-blocked"}`}>
+                {moveGhost.guest}
+              </div>
+              <span className={`opsg__ghostchip${moveGhost.ok ? "" : " is-blocked"}`}>{moveGhost.label}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1311,6 +1358,250 @@ export function OpsCalendarGrid({
     propertyName: string;
     roomIds: string[];
   } | null>(null);
+  /** 「객실 옮기기」 후보 — 연 예약과 같은 건물의 줄(2026-10-19). 패널이 다시 읽지 않게 같은 배열을 유지한다. */
+  const moveRooms = useMemo<MoveRoom[]>(
+    () =>
+      openBar
+        ? serverRooms
+            .filter((room) => room.propertyName === openBar.propertyName && room.roomIds.length > 0)
+            .map((room) => ({ label: room.displayRoomLabel, roomIds: room.roomIds, roomKey: room.key }))
+        : [],
+    [openBar, serverRooms],
+  );
+  /** 옮긴 뒤 토스트 — 되돌리기는 원래 줄 · 날짜로 다시 옮긴다. */
+  const [moveToast, setMoveToast] = useState<{ moved: MovedReservation; phase: "done" | "undoing" | "undone"; error?: string } | null>(null);
+  useEffect(() => {
+    if (!moveToast || moveToast.phase === "undoing") return;
+    const timer = window.setTimeout(() => setMoveToast(null), moveToast.phase === "done" ? 8000 : 3000);
+    return () => window.clearTimeout(timer);
+  }, [moveToast]);
+  const undoMove = (moved: MovedReservation) => {
+    setMoveToast({ moved, phase: "undoing" });
+    void submitReservationMove({
+      arrival: moved.from.arrival,
+      departure: moved.from.departure,
+      reservationId: moved.reservationId,
+      targetRoomIds: moved.from.room.roomIds,
+      targetRoomKey: moved.from.room.roomKey,
+    }).then((result) => {
+      if (result.ok) setMoveToast({ moved, phase: "undone" });
+      else setMoveToast({ error: reservationMoveErrorText(copy, result, "manual"), moved, phase: "done" });
+    });
+  };
+
+  // ── 꾹 눌러 끌어 옮기기(2026-10-19 사용자 확정 · 시안 SalesMoveHold · SalesMove · SalesMoveBlocked · SalesMoveConfirm-PC) ──
+  // 0.4초 누르면 막대가 들리고, 같은 건물의 다른 줄로 끌어 놓는다. 채널 예약은 날짜 고정(위아래만), 직접 · 수기는 날짜도.
+  // 예약 · 차단이 있는 자리엔 놓을 수 없다(놓으면 원래 자리로). 놓으면 그 자리에서 확인 → `submitReservationMove`.
+  type MoveDragTarget = { roomKey: string; arrival: string; departure: string; ok: boolean; clashGuest: string | null };
+  type MoveDragState = { bar: OpsCalendarBar; room: OpsCalendarRoom; grabCol: number; target: MoveDragTarget | null };
+  const [moveDrag, setMoveDrag] = useState<MoveDragState | null>(null);
+  const moveDragRef = useRef<MoveDragState | null>(null);
+  const holdRef = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const suppressClickRef = useRef(0);
+  const [moveConfirm, setMoveConfirm] = useState<{
+    bar: OpsCalendarBar;
+    from: OpsCalendarRoom;
+    to: OpsCalendarRoom;
+    arrival: string;
+    departure: string;
+    x: number;
+    y: number;
+    pending: boolean;
+    error: string | null;
+  } | null>(null);
+  const moveFns = useRef<{
+    hold: GridRowActions["holdBar"];
+    update: (x: number, y: number) => void;
+    finish: () => void;
+  }>({ finish: () => undefined, hold: () => undefined, update: () => undefined });
+
+  const isoPlus = (date: string, days: number) => {
+    const at = new Date(`${date}T12:00:00Z`);
+    at.setUTCDate(at.getUTCDate() + days);
+    return at.toISOString().slice(0, 10);
+  };
+  /** 그 줄 그 숙박에 겹치는 살아 있는 예약 · 차단(격자가 가진 창 안만 — 창 밖은 서버가 다시 본다). */
+  const moveClash = (roomKey: string, arrival: string, departure: string, excludeId: string) => {
+    for (const bar of bars) {
+      if (bar.roomKey !== roomKey || bar.isCancelled || bar.id === excludeId) continue;
+      if (bar.checkIn < departure && bar.checkOut > arrival) return { blocked: true, guest: bar.guestName as string | null };
+    }
+    for (const block of blocks) {
+      if (block.roomKey !== roomKey) continue;
+      if (block.startDate < departure && block.endDate >= arrival) return { blocked: true, guest: null };
+    }
+    return { blocked: false, guest: null };
+  };
+  const cancelHold = () => {
+    if (holdRef.current) window.clearTimeout(holdRef.current.timer);
+    holdRef.current = null;
+  };
+  const endMoveDrag = () => {
+    cancelHold();
+    moveDragRef.current = null;
+    setMoveDrag(null);
+    document.documentElement.classList.remove("is-moving-bar");
+  };
+  const holdBarForMove: GridRowActions["holdBar"] = (bar, room, event) => {
+    if (editMode || event.button !== 0 || event.pointerType === "touch" || bar.isCancelled || room.roomIds.length === 0) return;
+    const hit = hitTest(event.clientX, event.clientY);
+    if (!hit) return;
+    cancelHold();
+    const timer = window.setTimeout(() => {
+      holdRef.current = null;
+      const state: MoveDragState = { bar, grabCol: hit.col, room, target: null };
+      moveDragRef.current = state;
+      setMoveDrag(state);
+      document.documentElement.classList.add("is-moving-bar");
+      window.getSelection()?.removeAllRanges();
+    }, 400);
+    holdRef.current = { timer, x: event.clientX, y: event.clientY };
+  };
+  const updateMoveTarget = (x: number, y: number) => {
+    const drag = moveDragRef.current;
+    if (!drag) return;
+    const hit = hitTest(x, y);
+    let target: MoveDragTarget | null = null;
+    if (hit) {
+      const room = rooms[hit.row];
+      const nights = stayNights(drag.bar.checkIn, drag.bar.checkOut).length;
+      const arrival = drag.bar.channel === "manual" ? isoPlus(drag.bar.checkIn, hit.col - drag.grabCol) : drag.bar.checkIn;
+      const departure = isoPlus(arrival, nights);
+      const samePlace = room.key === drag.room.key && arrival === drag.bar.checkIn;
+      if (room.propertyName === drag.room.propertyName && room.roomIds.length > 0 && !samePlace) {
+        const clash = moveClash(room.key, arrival, departure, drag.bar.id);
+        const pastArrival = arrival !== drag.bar.checkIn && arrival < today;
+        target = { arrival, clashGuest: clash.guest, departure, ok: !clash.blocked && !pastArrival, roomKey: room.key };
+      }
+    }
+    const prev = drag.target;
+    if (prev?.roomKey === target?.roomKey && prev?.arrival === target?.arrival && prev?.ok === target?.ok) return;
+    const next = { ...drag, target };
+    moveDragRef.current = next;
+    setMoveDrag(next);
+  };
+  const finishMoveDrag = () => {
+    const drag = moveDragRef.current;
+    if (!drag) return;
+    suppressClickRef.current = Date.now() + 500;
+    const target = drag.target;
+    const toRoom = target?.ok ? rooms.find((room) => room.key === target.roomKey) : undefined;
+    const point = lastPointerRef.current;
+    endMoveDrag();
+    if (target && toRoom) {
+      setMoveConfirm({
+        arrival: target.arrival,
+        bar: drag.bar,
+        departure: target.departure,
+        error: null,
+        from: drag.room,
+        pending: false,
+        to: toRoom,
+        x: point.x,
+        y: point.y,
+      });
+    }
+  };
+  const lastPointerRef = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      lastPointerRef.current = { x: event.clientX, y: event.clientY };
+      const hold = holdRef.current;
+      if (hold && !moveDragRef.current) {
+        if (Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > 6) cancelHold();
+        return;
+      }
+      if (moveDragRef.current) {
+        event.preventDefault();
+        moveFns.current.update(event.clientX, event.clientY);
+      }
+    };
+    const onUp = () => {
+      if (holdRef.current) cancelHold();
+      if (moveDragRef.current) moveFns.current.finish();
+    };
+    const onCancel = () => endMoveDrag();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && moveDragRef.current) {
+        event.stopPropagation();
+        endMoveDrag();
+      }
+    };
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("keydown", onKey, true);
+    };
+    // 등록은 한 번 — 최신 동작은 moveFns 로 읽는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /** 채널 예약을 끄는 동안 같은 날짜에 비어 있는 같은 건물 줄 — 끌기를 시작할 때 한 번 센다. */
+  const moveBands = useMemo(() => {
+    if (!moveDrag || moveDrag.bar.channel === "manual") return null;
+    const geometry = barGeometry(days, moveDrag.bar.checkIn, moveDrag.bar.checkOut);
+    if (!geometry) return null;
+    const out = new Map<string, { left: string; width: string }>();
+    for (const room of rooms) {
+      if (room.propertyName !== moveDrag.room.propertyName || room.key === moveDrag.room.key || room.roomIds.length === 0) continue;
+      if (!moveClash(room.key, moveDrag.bar.checkIn, moveDrag.bar.checkOut, moveDrag.bar.id).blocked) out.set(room.key, geometry);
+    }
+    return out;
+    // 끌기마다 한 번(막대 · 줄이 같으면 다시 안 센다).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveDrag?.bar.id, moveDrag?.room.key, days, rooms]);
+  const moveGhostFor = (roomKey: string): MoveGhost | null => {
+    const target = moveDrag?.target;
+    if (!moveDrag || !target || target.roomKey !== roomKey) return null;
+    const geometry = barGeometry(days, target.arrival, target.departure);
+    if (!geometry) return null;
+    const room = rooms.find((candidate) => candidate.key === roomKey);
+    const nights = stayNights(target.arrival, target.departure).length;
+    const short = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+    const label = target.ok
+      ? moveDrag.bar.channel === "manual"
+        ? `${room?.displayRoomLabel ?? ""} · ${short(target.arrival)} → ${short(target.departure)} · ${copy.rcNights.replace("{n}", String(nights))}`
+        : `${room?.displayRoomLabel ?? ""} · ${copy.mvKeepDates.replace("{in}", short(target.arrival)).replace("{out}", short(target.departure)).replace("{n}", String(nights))}`
+      : target.clashGuest
+        ? copy.mvBooked.replace("{guest}", target.clashGuest)
+        : copy.mvBookedNoName;
+    return { channel: moveDrag.bar.channel, geometry, guest: moveDrag.bar.guestName, label, ok: target.ok };
+  };
+  const submitMoveConfirm = () => {
+    const confirm = moveConfirm;
+    if (!confirm || confirm.pending) return;
+    setMoveConfirm({ ...confirm, error: null, pending: true });
+    const fromRoom: MoveRoom = { label: confirm.from.displayRoomLabel, roomIds: confirm.from.roomIds, roomKey: confirm.from.key };
+    const toRoom: MoveRoom = { label: confirm.to.displayRoomLabel, roomIds: confirm.to.roomIds, roomKey: confirm.to.key };
+    void submitReservationMove({
+      arrival: confirm.arrival,
+      departure: confirm.departure,
+      reservationId: confirm.bar.id,
+      targetRoomIds: toRoom.roomIds,
+      targetRoomKey: toRoom.roomKey,
+    }).then((result) => {
+      if (result.ok) {
+        setMoveConfirm(null);
+        setMoveToast({
+          moved: {
+            from: { arrival: confirm.bar.checkIn, departure: confirm.bar.checkOut, room: fromRoom },
+            guestName: confirm.bar.guestName,
+            reservationId: confirm.bar.id,
+            to: { arrival: confirm.arrival, departure: confirm.departure, room: toRoom },
+          },
+          phase: "done",
+        });
+        return;
+      }
+      setMoveConfirm((current) =>
+        current ? { ...current, error: reservationMoveErrorText(copy, result, confirm.bar.channel), pending: false } : current,
+      );
+    });
+  };
 
   // 상단 검색(`AdminGuestSearch`)에서 고른 예약 — 이 화면 위에서는 이벤트로, 다른 화면에서
   // 넘어왔으면 `?resv=` 로 받는다. 창 밖 숙박이라도 상세는 열린다(가격 성과 목록과 같다).
@@ -1729,6 +2020,8 @@ export function OpsCalendarGrid({
   const rowActions = useRef<GridRowActions>({
     cancelDraft: () => undefined,
     commitDraft: () => undefined,
+    consumeClick: () => false,
+    holdBar: () => undefined,
     openBar: () => undefined,
     startDraft: () => undefined,
     toggleRoomRow: () => undefined,
@@ -1752,7 +2045,16 @@ export function OpsCalendarGrid({
         setBookingDraft({ checkIn: date, room });
       },
       toggleRoomRow,
+      holdBar: (bar, room, event) => moveFns.current.hold(bar, room, event),
+      consumeClick: () => {
+        if (Date.now() < suppressClickRef.current) {
+          suppressClickRef.current = 0;
+          return true;
+        }
+        return false;
+      },
     };
+    moveFns.current = { finish: finishMoveDrag, hold: holdBarForMove, update: updateMoveTarget };
   });
 
   // **원래 객실이 없을 때만** 통째로 비운다. 「오늘 빈방」 필터가 다 걸러내 `rooms` 가 비어도
@@ -2520,6 +2822,9 @@ export function OpsCalendarGrid({
                 selectedDates={selectedDatesByRoom.get(room.key) ?? ""}
                 showCancelled={showCancelled}
                 today={today}
+                moveFadeId={moveDrag && moveDrag.room.key === room.key ? moveDrag.bar.id : ""}
+                moveGhost={moveGhostFor(room.key)}
+                moveBand={moveBands?.get(room.key) ?? null}
                 winIds={
                   priceWinsOnly
                     ? (winIdsByRoom.get(room.key) ?? "")
@@ -2735,8 +3040,129 @@ export function OpsCalendarGrid({
             stayNights(openBar.bar.checkIn, openBar.bar.checkOut).length
           }
           onClose={() => setOpenBar(null)}
+          moveRooms={moveRooms}
+          onMoved={(moved) => {
+            setOpenBar(null);
+            setMoveToast({ moved, phase: "done" });
+          }}
           roomLabel={openBar.roomLabel}
         />
+      )}
+
+      {moveDrag && (
+        <div className="spw-toast is-hint" role="status">
+          {moveDrag.target && !moveDrag.target.ok ? (
+            <span className="spw-toast__t">
+              {moveDrag.target.clashGuest
+                ? copy.mvDragBlocked.replace("{guest}", moveDrag.target.clashGuest)
+                : copy.mvBookedNoName}
+            </span>
+          ) : (
+            <>
+              <span className="spw-toast__t">{copy.mvDragging.replace("{guest}", moveDrag.bar.guestName)}</span>
+              <span className="spw-toast__s">{moveDrag.bar.channel === "manual" ? copy.mvDragManual : copy.mvDragChannel}</span>
+            </>
+          )}
+          <span className="spw-toast__s is-faint">{copy.mvDragEsc}</span>
+        </div>
+      )}
+
+      {moveConfirm && (
+        <>
+          <div className="spw-movepop__scrim" onClick={moveConfirm.pending ? undefined : () => setMoveConfirm(null)} />
+          <div
+            aria-label={copy.mvConfirmTitle.replace("{guest}", moveConfirm.bar.guestName)}
+            className="spw-movepop"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !moveConfirm.pending) {
+                event.stopPropagation();
+                setMoveConfirm(null);
+              }
+            }}
+            role="dialog"
+            style={{
+              left: `${Math.max(16, Math.min(moveConfirm.x - 24, (typeof window === "undefined" ? 1440 : window.innerWidth) - 376))}px`,
+              top: `${Math.max(16, Math.min(moveConfirm.y + 18, (typeof window === "undefined" ? 900 : window.innerHeight) - 360))}px`,
+            }}
+          >
+            <b className="spw-movepop__t">{copy.mvConfirmTitle.replace("{guest}", moveConfirm.bar.guestName)}</b>
+            <div className="spw-movepop__cmp">
+              <div>
+                <span>{copy.mvNow}</span>
+                <b>{moveConfirm.from.displayRoomLabel}</b>
+                {moveConfirm.bar.channel === "manual" && (
+                  <small>
+                    {moveConfirm.bar.checkIn.slice(5).replace("-", "/")} → {moveConfirm.bar.checkOut.slice(5).replace("-", "/")}
+                  </small>
+                )}
+              </div>
+              <span aria-hidden="true" className="spw-movepop__arrow">→</span>
+              <div className="is-to">
+                <span>{copy.mvTo}</span>
+                <b>{moveConfirm.to.displayRoomLabel}</b>
+                {moveConfirm.bar.channel === "manual" && (
+                  <small>
+                    {moveConfirm.arrival.slice(5).replace("-", "/")} → {moveConfirm.departure.slice(5).replace("-", "/")}
+                  </small>
+                )}
+              </div>
+            </div>
+            <p className="spw-movepop__note">
+              {moveConfirm.bar.channel === "manual"
+                ? copy.mvConfirmNoteManual
+                : copy.mvConfirmNote.replace("{room}", moveConfirm.to.displayRoomLabel)}
+            </p>
+            {moveConfirm.error && (
+              <p className="spw-msg is-err" role="status">
+                {moveConfirm.error}
+              </p>
+            )}
+            <div className="spw-movepop__btns">
+              <button className="spw-btn" disabled={moveConfirm.pending} onClick={() => setMoveConfirm(null)} type="button">
+                {copy.mvKeep}
+              </button>
+              <button
+                autoFocus
+                className="spw-btn is-primary"
+                disabled={moveConfirm.pending}
+                onClick={submitMoveConfirm}
+                type="button"
+              >
+                {moveConfirm.pending ? copy.mvPending : copy.mvSubmit.replace("{room}", moveConfirm.to.displayRoomLabel)}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {moveToast && (
+        <div className="spw-toast" role="status">
+          {moveToast.error ? (
+            <span className="spw-toast__t">{moveToast.error}</span>
+          ) : moveToast.phase === "undone" ? (
+            <span className="spw-toast__t">{copy.mvUndone}</span>
+          ) : (
+            <>
+              <span aria-hidden className="spw-toast__ok">
+                <Check />
+              </span>
+              <span className="spw-toast__t">
+                {copy.mvDone
+                  .replace("{guest}", moveToast.moved.guestName)
+                  .replace("{from}", moveToast.moved.from.room.label)
+                  .replace("{to}", moveToast.moved.to.room.label)}
+              </span>
+              <button
+                className="spw-toast__btn"
+                disabled={moveToast.phase === "undoing"}
+                onClick={() => undoMove(moveToast.moved)}
+                type="button"
+              >
+                {moveToast.phase === "undoing" ? copy.mvPending : copy.mvUndo}
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {booking && (

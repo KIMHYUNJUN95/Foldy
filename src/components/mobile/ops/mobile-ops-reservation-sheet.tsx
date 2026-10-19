@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { TriangleAlert } from "lucide-react";
+import { Check, TriangleAlert } from "lucide-react";
+import {
+  loadReservationMoveTargets,
+  submitReservationMove,
+  type ReservationMoveTarget,
+} from "@/app/admin/ops/calendar/actions";
+import {
+  reservationMoveErrorText,
+  type MovedReservation,
+  type MoveRoom,
+} from "@/components/admin/ops/ops-reservation-move";
 import {
   loadReservationDetail,
   submitReservationCancel,
@@ -91,8 +101,10 @@ export function MobileOpsReservationSheet({
   bar,
   copy,
   localeTag,
+  moveRooms,
   nights,
   onCancelled,
+  onMoved,
   onSaved,
   propertyName,
   roomIds,
@@ -108,13 +120,17 @@ export function MobileOpsReservationSheet({
   onCancelled: () => void;
   /** 수정 저장 — 부모가 시트를 닫고 알림. */
   onSaved: () => void;
+  /** 같은 건물 줄 — 「객실 옮기기」 후보(2026-10-19). 비면 버튼을 숨긴다. */
+  moveRooms?: MoveRoom[];
+  /** 옮긴 뒤 — 부모가 시트를 닫고 알림. */
+  onMoved?: (moved: MovedReservation) => void;
   propertyName: string;
   roomIds: string[];
   roomKey: string;
   roomLabel: string;
   today: string;
 }) {
-  const [mode, setMode] = useState<"view" | "edit" | "cancel">("view");
+  const [mode, setMode] = useState<"view" | "edit" | "cancel" | "move">("view");
   const [detail, setDetail] = useState<OpsReservationDetail | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -215,6 +231,21 @@ export function MobileOpsReservationSheet({
   const sub = [channelName, `${propertyName} ${roomLabel}`.trim(), copy.rcNights.replace("{n}", String(nights)), guests]
     .filter(Boolean)
     .join(" · ");
+
+  if (mode === "move" && moveRooms && onMoved) {
+    return (
+      <MobileMoveForm
+        bar={bar}
+        copy={copy}
+        currentRoom={moveRooms.find((room) => room.roomKey === roomKey) ?? { label: roomLabel, roomIds, roomKey }}
+        nights={nights}
+        onDiscard={() => setMode("view")}
+        onMoved={onMoved}
+        propertyName={propertyName}
+        rooms={moveRooms}
+      />
+    );
+  }
 
   if (mode === "cancel") {
     return (
@@ -389,10 +420,15 @@ export function MobileOpsReservationSheet({
       </div>
 
       {!bar.isCancelled && (
-        <div className="msw-foot even">
+        <div className={`msw-foot even${moveRooms && moveRooms.length > 1 && onMoved ? " three" : ""}`}>
           <button className="msw-btn soft" disabled={!detail} onClick={() => setMode("edit")} type="button">
             {copy.reTitle}
           </button>
+          {moveRooms && moveRooms.length > 1 && onMoved && (
+            <button className="msw-btn soft" onClick={() => setMode("move")} type="button">
+              {copy.mvButton}
+            </button>
+          )}
           <button className="msw-btn soft-red" onClick={() => setMode("cancel")} type="button">
             {copy.rcCancel}
           </button>
@@ -572,6 +608,150 @@ function MobileReservationEdit({
         </button>
       </div>
       {done && <MswSuccess label={copy.mwDone} />}
+    </div>
+  );
+}
+
+/**
+ * 객실 옮기기 — 모바일 시트(2026-10-19, 시안 SalesMovePick-Phone). 같은 날짜에 비어 있는 같은 건물 객실로만(날짜 옮기기는 PC
+ * 패널 — 모바일 날짜 고르기 시안 확정 전). 서버 동작 · 문구는 PC 와 같다(`submitReservationMove` · `reservationMoveErrorText`).
+ */
+function MobileMoveForm({
+  bar,
+  copy,
+  currentRoom,
+  nights,
+  onDiscard,
+  onMoved,
+  propertyName,
+  rooms,
+}: {
+  bar: OpsCalendarBar;
+  copy: MobileReservationSheetCopy;
+  currentRoom: MoveRoom;
+  nights: number;
+  onDiscard: () => void;
+  onMoved: (moved: MovedReservation) => void;
+  propertyName: string;
+  rooms: MoveRoom[];
+}) {
+  const [targets, setTargets] = useState<Map<string, ReservationMoveTarget> | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let alive = true;
+    void loadReservationMoveTargets({
+      arrival: bar.checkIn,
+      currentRoomKey: currentRoom.roomKey,
+      departure: bar.checkOut,
+      reservationId: bar.id,
+      rows: rooms.map((room) => ({ roomIds: room.roomIds, roomKey: room.roomKey })),
+    }).then((result) => {
+      if (!alive) return;
+      setTargets(result.ok ? new Map(result.targets.map((target) => [target.roomKey, target])) : new Map());
+      setLoadFailed(!result.ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [bar.id, bar.checkIn, bar.checkOut, currentRoom.roomKey, rooms]);
+
+  const pickedRoom = rooms.find((room) => room.roomKey === picked) ?? null;
+  const pickedOk = !!pickedRoom && targets?.get(pickedRoom.roomKey)?.state === "free";
+  const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+  const stateText = (target: ReservationMoveTarget | undefined) => {
+    if (!target) return copy.mvChecking;
+    if (target.state === "current") return copy.mvCurrent;
+    if (target.state === "free") return copy.mvFree;
+    if (target.state === "unsellable") return copy.mvUnsellable;
+    return target.clashGuest ? copy.mvBooked.replace("{guest}", target.clashGuest) : copy.mvBookedNoName;
+  };
+
+  const submit = () => {
+    if (!pickedRoom || !pickedOk) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await submitReservationMove({
+        reservationId: bar.id,
+        targetRoomIds: pickedRoom.roomIds,
+        targetRoomKey: pickedRoom.roomKey,
+      });
+      if (result.ok) {
+        onMoved({
+          from: { arrival: bar.checkIn, departure: bar.checkOut, room: currentRoom },
+          guestName: bar.guestName,
+          reservationId: bar.id,
+          to: { arrival: bar.checkIn, departure: bar.checkOut, room: pickedRoom },
+        });
+        return;
+      }
+      setError(reservationMoveErrorText(copy, result, bar.channel));
+    });
+  };
+
+  return (
+    <div className="msw">
+      <div className="msw-body">
+        <div className="msw-step" key="move">
+          <div className="msw-mv-head">
+            <b>{copy.mvTitle.replace("{guest}", bar.guestName)}</b>
+            <span>
+              {[CHANNEL_NAME[bar.channel] || null, `${propertyName} ${currentRoom.label}`, `${md(bar.checkIn)} → ${md(bar.checkOut)}`, copy.mvKeepDates.replace("{in} → {out} · ", "").replace("{n}", String(nights))]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </div>
+          <p className="msw-mv-note">{bar.channel === "manual" ? copy.mvManualNote : copy.mvChannelNote}</p>
+          <div aria-label={copy.mvPick} className="msw-mv-list" role="radiogroup">
+            {rooms.map((room) => {
+              const target = targets?.get(room.roomKey);
+              const free = target?.state === "free";
+              const on = free && picked === room.roomKey;
+              return free ? (
+                <button
+                  aria-checked={on}
+                  className={`msw-mv-row is-free${on ? " on" : ""}`}
+                  disabled={pending}
+                  key={room.roomKey}
+                  onClick={() => setPicked(room.roomKey)}
+                  role="radio"
+                  type="button"
+                >
+                  <b>{room.label}</b>
+                  <span>{stateText(target)}</span>
+                  {on && <Check aria-hidden className="msw-mv-ck" />}
+                </button>
+              ) : (
+                <div aria-disabled="true" className="msw-mv-row" key={room.roomKey}>
+                  <b>{room.label}</b>
+                  <span>{stateText(target)}</span>
+                </div>
+              );
+            })}
+          </div>
+          {loadFailed && (
+            <div className="msw-alert" role="alert">
+              {copy.mvErrLoad}
+            </div>
+          )}
+          {error && (
+            <div className="msw-alert" role="alert">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="msw-foot even">
+        <button className="msw-btn ghost" disabled={pending} onClick={onDiscard} type="button">
+          {copy.mvKeep}
+        </button>
+        <button className="msw-btn" disabled={pending || !pickedOk} onClick={submit} type="button">
+          {pending ? copy.mvPending : pickedRoom ? copy.mvSubmit.replace("{room}", pickedRoom.label) : copy.mvPick}
+        </button>
+      </div>
     </div>
   );
 }

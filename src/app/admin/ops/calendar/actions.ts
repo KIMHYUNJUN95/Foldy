@@ -51,6 +51,7 @@ import type { SalesYoyPrevious } from "@/lib/ops-sales-yoy";
 import {
   OPS_CALENDAR_ROLLING_DAYS,
   opsChannelOf,
+  readOpsMoveTargets,
   readOpsRoomUnavailableNights,
 } from "@/lib/ops-calendar";
 import {
@@ -63,6 +64,13 @@ import {
   type BookingEditError,
 } from "@/lib/ops-booking-edit";
 import { buildOpsReservationDetail, type OpsReservationDetail } from "@/lib/ops-reservation-detail";
+import {
+  buildBeds24BookingMove,
+  diffMoveReadback,
+  moveTargetNights,
+  validateReservationMove,
+  type ReservationMoveError,
+} from "@/lib/ops-booking-move";
 import {
   buildAdjustmentPreview,
   type AdjustmentInput,
@@ -1227,6 +1235,326 @@ export async function submitReservationEdit(args: {
     return { detail: notApplied.join(","), error: "not_applied", ok: false };
   }
   return { ok: true };
+}
+
+export type ReservationMoveResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error:
+        | ReservationMoveError
+        | "forbidden"
+        | "not_found"
+        | "cancelled"
+        | "no_booking_id"
+        | "unknown_room"
+        /** 다른 건물로는 옮기지 않는다 — Beds24 예약은 건물(프로퍼티)에 묶여 있다. */
+        | "other_building"
+        | "occupied"
+        | "no_active_unit"
+        | "unit_changes"
+        | "room_busy"
+        | "beds24_failed"
+        /** Beds24 가 받았지만 다시 읽으니 객실 · 날짜가 안 바뀌었다. `detail` = 항목 코드. */
+        | "not_applied"
+        | "cooldown";
+      conflictDates?: string[];
+      detail?: string;
+    };
+
+export type ReservationMoveTarget = {
+  roomKey: string;
+  /** free = 그 날짜에 비어 있고 팔고 있음 · booked = 예약 있음 · unsellable = 판매 안 함(최소숙박 50↑ 등) · current = 지금 객실. */
+  state: "free" | "booked" | "unsellable" | "current";
+  clashGuest: string | null;
+};
+
+/**
+ * 「객실 옮기기」 패널의 후보 줄 — 같은 건물 줄마다 그 날짜에 옮길 수 있는가(2026-10-19). 화면이 주는 줄은 **조직 소속을
+ * 확인한 유닛만** 쓴다. 최종 판정은 `submitReservationMove` 가 다시 한다(이건 미리 보여 주기).
+ */
+export async function loadReservationMoveTargets(args: {
+  reservationId: string;
+  currentRoomKey: string;
+  arrival: string;
+  departure: string;
+  rows: Array<{ roomKey: string; roomIds: string[] }>;
+}): Promise<{ ok: true; targets: ReservationMoveTarget[] } | { ok: false; error: "forbidden" | "bad_range" | "read_failed" }> {
+  const session = await requireOpsWriter();
+  if (!session) return { error: "forbidden", ok: false };
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(args.arrival) || !datePattern.test(args.departure) || args.departure <= args.arrival) {
+    return { error: "bad_range", ok: false };
+  }
+  if (stayNights(args.arrival, args.departure).length > AVAILABILITY_MAX_DAYS || args.rows.length > 80) {
+    return { error: "bad_range", ok: false };
+  }
+  const supabase = getSupabaseServiceClient();
+  const owned = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("organization_id", session.organization.id)
+    .in("id", [...new Set(args.rows.flatMap((row) => row.roomIds))]);
+  if (owned.error) return { error: "read_failed", ok: false };
+  const ownedIds = new Set((owned.data ?? []).map((row) => row.id as string));
+  const rows = args.rows.map((row) => ({ roomIds: row.roomIds.filter((id) => ownedIds.has(id)), roomKey: row.roomKey }));
+  try {
+    const byKey = await readOpsMoveTargets({
+      excludeReservationId: args.reservationId,
+      from: args.arrival,
+      organizationId: session.organization.id,
+      rows,
+      supabase,
+      toExclusive: args.departure,
+    });
+    const today = toJstDateString(new Date());
+    return {
+      ok: true,
+      targets: rows.map((row) => {
+        const info = byKey.get(row.roomKey);
+        const ahead = (nights: string[] | undefined) => (nights ?? []).filter((night) => night >= today);
+        const state: ReservationMoveTarget["state"] =
+          row.roomKey === args.currentRoomKey
+            ? "current"
+            : row.roomIds.length === 0
+              ? "unsellable"
+              : ahead(info?.booked).length > 0
+                ? "booked"
+                : ahead(info?.unsellable).length > 0
+                  ? "unsellable"
+                  : "free";
+        return { clashGuest: state === "booked" ? (info?.clashGuest ?? null) : null, roomKey: row.roomKey, state };
+      }),
+    };
+  } catch (error) {
+    console.error("[ops/reservation-move] targets read failed", error);
+    return { error: "read_failed", ok: false };
+  }
+}
+
+/** 옮기기 Beds24 호출 시간 제한 · 방 잠금 수명 — 수기 예약과 같은 값. */
+const MOVE_WRITE_TIMEOUT_MS = 20_000;
+const MOVE_READ_TIMEOUT_MS = 10_000;
+const MOVE_LOCK_TTL_MS = 90_000;
+
+/**
+ * 예약 옮기기 — 같은 예약의 객실(과 직접 · 수기면 날짜)을 바꾼다(2026-10-19 사용자 확정).
+ *
+ * 도메인 계약: `docs/product/33-calendar-write-features.md` → 「예약 옮기기」. 규칙: `src/lib/ops-booking-move.ts`.
+ *
+ * 1. 옮길 줄은 **서버가 다시 계산한다**(`resolveOpsRowRoomKey`) — 다른 조직 유닛 · 어긋난 키는 거절. 같은 건물만.
+ * 2. **옮길 줄을 잠그고**(수기 예약과 같은 잠금 이름 — 그 줄의 수기 예약 생성과도 서로 막는다) 그 안에서
+ *    우리 표 겹침(`readOpsRoomUnavailableNights`, 이 예약 자신은 뺀다) → 그 밤에 팔고 있는 유닛 고르기 → Beds24 가용 재확인.
+ * 3. `POST /bookings` 로 **같은 예약**의 `roomId`(·날짜)만 바꾸고, 다시 읽어 옮겨졌는지 확인한 뒤 우리 표를 웹훅 처리기로 맞춘다.
+ */
+export async function submitReservationMove(args: {
+  reservationId: string;
+  /** 옮길 줄의 행 키와 그 줄의 우리 `rooms.id` 전부. Beds24 roomId 는 서버가 고른다. */
+  targetRoomKey: string;
+  targetRoomIds: string[];
+  /** 새 체크인 · 체크아웃 — 채널 예약은 원래 날짜와 같아야 한다. 비우면 그대로. */
+  arrival?: string;
+  departure?: string;
+}): Promise<ReservationMoveResult> {
+  const session = await requireOpsWriter();
+  if (!session) return { error: "forbidden", ok: false };
+
+  const supabase = getSupabaseServiceClient();
+  const found = await supabase
+    .from("reservations")
+    .select("id, status, source, check_in_date, check_out_date, raw_payload")
+    .eq("organization_id", session.organization.id)
+    .eq("id", args.reservationId)
+    .maybeSingle();
+  if (found.error || !found.data) return { error: "not_found", ok: false };
+  const row = found.data as {
+    id: string;
+    status: string;
+    source: string;
+    check_in_date: string;
+    check_out_date: string;
+    raw_payload: unknown;
+  };
+  if (row.status === "cancelled" || row.status === "no_show") return { error: "cancelled", ok: false };
+  const bookingId = readBeds24CancelTargetId(row.raw_payload);
+  if (!bookingId) return { error: "no_booking_id", ok: false };
+  const raw =
+    row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)
+      ? (row.raw_payload as Record<string, unknown>)
+      : {};
+  const currentRoomId = String(raw.roomId ?? "");
+  const currentPropertyId = String(raw.propertyId ?? "");
+
+  const original = { arrival: row.check_in_date, departure: row.check_out_date };
+  const next = { arrival: args.arrival ?? original.arrival, departure: args.departure ?? original.departure };
+
+  const unitsResult = await supabase
+    .from("rooms")
+    .select("id, room_label, external_room_id, properties(name, external_property_id)")
+    .eq("organization_id", session.organization.id)
+    .in("id", args.targetRoomIds);
+  if (unitsResult.error) return { error: "unknown_room", ok: false };
+  type UnitProperty = { name: string | null; external_property_id: string | null };
+  type UnitRow = { id: string; room_label: string; external_room_id: string | null; properties: UnitProperty | UnitProperty[] | null };
+  const unitRows = (unitsResult.data ?? []) as unknown as UnitRow[];
+  const target = resolveOpsRowRoomKey({
+    clientRoomKey: args.targetRoomKey,
+    ownedUnits: unitRows.map((unit) => ({
+      id: unit.id,
+      propertyName: (Array.isArray(unit.properties) ? unit.properties[0] : unit.properties)?.name,
+      roomLabel: unit.room_label,
+    })),
+    requestedRoomIds: args.targetRoomIds,
+  });
+  if (!target.ok) return { error: "unknown_room", ok: false };
+  const units = unitRows.filter((unit) => !!unit.external_room_id);
+  if (units.length === 0) return { error: "unknown_room", ok: false };
+  const propertyOf = (unit: UnitRow) => (Array.isArray(unit.properties) ? unit.properties[0] : unit.properties);
+  if (currentPropertyId && units.some((unit) => String(propertyOf(unit)?.external_property_id ?? "") !== currentPropertyId)) {
+    return { error: "other_building", ok: false };
+  }
+  const sameRow = units.some((unit) => String(unit.external_room_id) === currentRoomId);
+
+  const today = toJstDateString(new Date());
+  const invalid = validateReservationMove({ channel: opsChannelOf(row.source), next, original, sameRow, today });
+  if (invalid) return { error: invalid, ok: false };
+
+  // 옮긴 숙박의 남은 밤(오늘부터) — 이 밤에 팔고 있는 유닛이어야 한다. 같은 줄이면 지금 유닛을 우선 쓴다.
+  const stayAhead = stayNights(next.arrival, next.departure).filter((night) => night >= today);
+  const ratesResult = await supabase
+    .from("room_daily_rates")
+    .select("room_id, stay_date, min_stay")
+    .eq("organization_id", session.organization.id)
+    .in("room_id", units.map((unit) => unit.id))
+    .in("stay_date", stayAhead);
+  if (ratesResult.error) return { detail: ratesResult.error.message, error: "beds24_failed", ok: false };
+  const minStayByKey = new Map<string, number | null>();
+  for (const rate of (ratesResult.data ?? []) as Array<{ room_id: string; stay_date: string; min_stay: number | null }>) {
+    minStayByKey.set(`${rate.room_id}|${rate.stay_date}`, rate.min_stay);
+  }
+  const activeByNight = new Map<string, string[]>();
+  for (const night of stayAhead) {
+    activeByNight.set(
+      night,
+      units.filter((unit) => isActiveUnitMinStay(minStayByKey.get(`${unit.id}|${night}`) ?? null)).map((unit) => String(unit.external_room_id)),
+    );
+  }
+  const keepCurrent = sameRow && stayAhead.every((night) => (activeByNight.get(night) ?? []).includes(currentRoomId));
+  let targetRoomId = currentRoomId;
+  if (!keepCurrent) {
+    const resolved = resolveStayUnit(activeByNight);
+    if (!resolved.ok) return { conflictDates: resolved.conflictDates, error: resolved.reason, ok: false };
+    targetRoomId = resolved.externalRoomId;
+  }
+
+  const lockName = manualBookingLockName(session.organization.id, target.roomKey);
+  const lock = await acquireBeds24Lock(supabase, lockName, session.user.id, MOVE_LOCK_TTL_MS);
+  if (!lock.acquired) {
+    return lock.reason === "busy" ? { error: "room_busy", ok: false } : { detail: "lock_error", error: "beds24_failed", ok: false };
+  }
+
+  const moveLocked = async (): Promise<ReservationMoveResult> => {
+    // 우리 표 — 이 예약 자신은 「찬 밤」으로 세지 않는다.
+    const newNights = moveTargetNights({ next, original, sameRow, today });
+    if (newNights.length > 0) {
+      let unavailable: Awaited<ReturnType<typeof readOpsRoomUnavailableNights>>;
+      try {
+        unavailable = await readOpsRoomUnavailableNights({
+          excludeReservationId: row.id,
+          from: newNights[0],
+          organizationId: session.organization.id,
+          roomIds: units.map((unit) => unit.id),
+          roomKey: target.roomKey,
+          supabase,
+          toExclusive: next.departure,
+        });
+      } catch (error) {
+        return { detail: (error as Error).message, error: "beds24_failed", ok: false };
+      }
+      const wanted = new Set(newNights);
+      const clash = unavailable.booked.filter((night) => wanted.has(night));
+      if (clash.length > 0) return { conflictDates: clash, error: "occupied", ok: false };
+    }
+
+    // Beds24 에서 한 번 더 — 그 유닛 · 그 밤만. 같은 유닛이면 원래 묵던 밤은 이 예약 자신이 차지한 밤이라 뺀다.
+    const liveNights = targetRoomId === currentRoomId ? newNights : stayAhead;
+    if (liveNights.length > 0) {
+      const cooldown = await getBeds24Cooldown(supabase);
+      if (cooldown.active) return { error: "cooldown", ok: false };
+      const sorted = [...liveNights].sort();
+      let live: Awaited<ReturnType<typeof fetchBeds24Calendar>>;
+      try {
+        live = await fetchBeds24Calendar(
+          {
+            endDate: sorted[sorted.length - 1],
+            externalRoomIds: [targetRoomId],
+            includeNumAvail: true,
+            includeOverride: true,
+            startDate: sorted[0],
+          },
+          { timeoutMs: MOVE_READ_TIMEOUT_MS },
+        );
+      } catch (error) {
+        if (error instanceof Beds24HttpError && error.isRateLimit) {
+          await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+          return { error: "cooldown", ok: false };
+        }
+        return { detail: "availability_check_failed", error: "beds24_failed", ok: false };
+      }
+      if ("skipped" in live || live.truncated) return { detail: "availability_check_failed", error: "beds24_failed", ok: false };
+      const taken = beds24UnsellableNights(live.roomsById.get(targetRoomId)?.calendar ?? [], sorted);
+      if (taken.length > 0) return { conflictDates: taken, error: "occupied", ok: false };
+    }
+
+    const payload = buildBeds24BookingMove(bookingId, { next, original, roomId: targetRoomId });
+    let posted: Awaited<ReturnType<typeof postBeds24BookingUpdate>>;
+    try {
+      posted = await postBeds24BookingUpdate(payload, { timeoutMs: MOVE_WRITE_TIMEOUT_MS });
+    } catch (error) {
+      if (error instanceof Beds24HttpError && error.isRateLimit) {
+        await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+        return { error: "cooldown", ok: false };
+      }
+      // 시간 초과 · 연결 끊김 — **이미 옮겨졌을 수 있다.** 다시 읽어 옮겨졌으면 성공으로 이어 간다(아니면 실패 — 다시 눌러도
+      // 같은 예약을 고치는 것이라 중복이 생기지 않는다).
+      posted = { ok: false, error: error instanceof Error ? error.message : "unknown" };
+      try {
+        const check = await fetchBeds24BookingById(bookingId, { timeoutMs: MOVE_READ_TIMEOUT_MS });
+        if (!("skipped" in check) && check.ok && diffMoveReadback(payload, check.booking).length === 0) posted = { ok: true };
+      } catch {
+        // 확인 못 함 — 실패로 둔다.
+      }
+    }
+    if ("skipped" in posted) return { detail: posted.skipped, error: "beds24_failed", ok: false };
+    if (!posted.ok) return { detail: posted.error, error: "beds24_failed", ok: false };
+
+    // 다시 읽어 옮겨졌는지 보고 우리 표를 맞춘다(예약 수정과 같다). 다시 읽기 자체가 안 되면 Beds24 가 받은 대로 성공 —
+    // 정합성이 곧 맞춘다.
+    let notApplied: string[] = [];
+    try {
+      const fetched = await fetchBeds24BookingById(bookingId, { timeoutMs: MOVE_READ_TIMEOUT_MS });
+      if (!("skipped" in fetched) && fetched.ok) {
+        notApplied = diffMoveReadback(payload, fetched.booking);
+        await processBeds24WebhookBooking({ organizationIdDefault: session.organization.id, payload: fetched.booking, supabase });
+      }
+    } catch (error) {
+      console.error("[ops/reservation-move] local refresh failed", error);
+    }
+
+    revalidateOpsCalendars();
+    await signalBeds24Change(session.organization.id, "reservations");
+    if (notApplied.length > 0) {
+      console.error("[ops/reservation-move] Beds24 readback mismatch", { bookingId, fields: notApplied });
+      return { detail: notApplied.join(","), error: "not_applied", ok: false };
+    }
+    return { ok: true };
+  };
+
+  try {
+    return await moveLocked();
+  } finally {
+    await releaseBeds24Lock(supabase, lockName, lock.lockId);
+  }
 }
 
 export type CancelReservationResult =

@@ -562,3 +562,21 @@ details.msw-nightly[open] > summary::before { transform: rotate(90deg); }
 
 .msw-step-sub { display: flex; flex-direction: column; gap: 8px; }
 .msw-field.hint-end .msw-field__hint { align-self: flex-end; }
+
+/* 객실 옮기기(2026-10-19, 시안 SalesMove-Phone · SalesMovePick-Phone · Fold · Tablet). 고른 줄 = 옅은 보라 면만. */
+.msw-foot.even.three { grid-template-columns: 1fr 1fr 1fr; }
+.msw-foot.even.three .msw-btn { font-size: 14px; }
+.msw-mv-head { display: flex; flex-direction: column; gap: 3px; }
+.msw-mv-head b { font-size: 18px; letter-spacing: -0.02em; }
+.msw-mv-head span { font-size: 13px; color: var(--msw-muted); }
+.msw-mv-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: #f7f7f9; font-size: 12px; line-height: 1.5; color: #8b8898; }
+.msw-mv-list { display: flex; flex-direction: column; gap: 2px; }
+.msw-mv-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; font: inherit; text-align: left; color: #b4b1bf; }
+.msw-mv-row b { width: 56px; flex-shrink: 0; font-size: 15px; }
+.msw-mv-row span { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msw-mv-row.is-free { color: #16141f; transition: background-color 160ms ease, transform 120ms ease; }
+.msw-mv-row.is-free span { color: #1f7a4d; font-weight: 600; }
+.msw-mv-row.is-free:active { transform: scale(0.985); }
+.msw-mv-row.on { background: #f4f1fd; }
+.msw-mv-row.on span { color: #5a30cf; }
+.msw-mv-ck { width: 18px; height: 18px; color: #7a52e6; stroke-width: 2.6; }

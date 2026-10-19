@@ -7,7 +7,8 @@
    공용 ops-console.css 는 장부 화면도 쓰므로 고치지 않고 여기서 덮는다. */
 
 .adm .spw,
-.adm .spw-panel {
+.adm .spw-panel,
+.adm .spw-movepop {
   --spw-ink: #16141f;
   --spw-ink2: #3a3746;
   --spw-mute: #6b6878;
@@ -554,3 +555,59 @@
   .adm .spw-copy:active, .adm .spw-x:active, .adm .spw-step__btn:active, .adm .spw-fill__opt:active,
   .adm .spw-release__btn:active { transform: none; }
 }
+
+/* ── 예약 옮기기(2026-10-19, 시안 SalesMovePick-PC · SalesMoveDone-PC) ──
+   같은 건물 줄 목록. 고를 수 있는 줄만 버튼 — 고른 줄은 옅은 보라 면(테두리 · 왼쪽 막대 없음), 겹치는 줄은 이유와 함께 흐리게. */
+.adm .spw-move { display: flex; flex-direction: column; gap: 2px; }
+.adm .spw-move__row { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; font: inherit; text-align: left; color: #b4b1bf; }
+.adm .spw-move__row b { width: 56px; flex-shrink: 0; font-size: 15px; }
+.adm .spw-move__row span { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .spw-move__row.is-free { color: #16141f; cursor: pointer; transition: background-color 160ms ease, transform 120ms ease; }
+.adm .spw-move__row.is-free span { color: #1f7a4d; font-weight: 600; }
+@media (hover: hover) and (pointer: fine) { .adm .spw-move__row.is-free:hover { background: #f7f7f9; } }
+.adm .spw-move__row.is-free:active { transform: scale(.985); }
+.adm .spw-move__row.on, .adm .spw-move__row.on:hover { background: #f4f1fd; }
+.adm .spw-move__row.on span { color: #5a30cf; }
+.adm .spw-move__ck { width: 18px; height: 18px; color: #7a52e6; stroke-width: 2.6; }
+.adm .spw-move__row:focus-visible { outline: 2px solid #7a52e6; outline-offset: -2px; }
+
+/* 옮긴 뒤 토스트 — 아래 가운데 어두운 알약, 되돌리기 버튼. 들어올 때만 짧게. */
+.adm .spw-toast { position: fixed; left: 50%; bottom: 28px; z-index: 90; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; min-height: 44px; max-width: calc(100vw - 48px); box-sizing: border-box; padding: 6px 8px 6px 16px; border-radius: 22px; background: #16141f; color: #fff; font-size: 13px; box-shadow: 0 16px 40px -16px rgba(22, 20, 31, .55); animation: spw-toast-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .spw-toast__t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .spw-toast__ok { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; background: #1f7a4d; display: inline-flex; align-items: center; justify-content: center; }
+.adm .spw-toast__ok svg { width: 13px; height: 13px; stroke-width: 3; }
+.adm .spw-toast__btn { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: rgba(255, 255, 255, .14); font: inherit; font-size: 13px; font-weight: 600; color: #fff; cursor: pointer; transition: transform 120ms ease; }
+.adm .spw-toast__btn:active { transform: scale(.97); }
+.adm .spw-toast__btn:disabled { opacity: .6; cursor: default; }
+@keyframes spw-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@media (prefers-reduced-motion: reduce) { .adm .spw-toast { animation: none; } }
+
+/* 끌어 옮기기 — 들린 막대 · 놓을 자리 · 원래 자리(2026-10-19, 시안 SalesMoveHold · SalesMove · SalesMoveBlocked-PC). */
+html.is-moving-bar, html.is-moving-bar * { cursor: grabbing !important; user-select: none; }
+.adm .scw .opsg__bar.is-moving-from { opacity: .35; }
+.adm .opsg__moveband { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: rgba(122, 82, 230, .08); pointer-events: none; z-index: 1; }
+.adm .opsg__moveband.is-hover { left: 0; right: 0; background: rgba(122, 82, 230, .16); }
+.adm .opsg__ghostwrap { position: absolute; top: 0; bottom: 0; z-index: 6; pointer-events: none; }
+.adm .scw .opsg__ghost { position: absolute; left: 0; right: 0; top: 3px; transform: translateY(-2px) scale(1.04); transform-origin: 20% 50%; box-shadow: 0 0 0 2px #7a52e6, 0 12px 24px -8px rgba(22, 20, 31, .4); transition: transform 140ms cubic-bezier(.23, 1, .32, 1); }
+.adm .scw .opsg__ghost.is-blocked { opacity: .92; box-shadow: 0 0 0 2px #c5282e, 0 12px 24px -8px rgba(22, 20, 31, .35); }
+.adm .opsg__ghostchip { position: absolute; left: calc(100% + 8px); top: 1px; height: 20px; padding: 0 7px; border-radius: 6px; background: #16141f; color: #fff; font-size: 11px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.adm .opsg__ghostchip.is-blocked { background: #c5282e; }
+.adm .spw-toast.is-hint { padding: 0 18px; gap: 12px; animation: none; }
+.adm .spw-toast__s { color: #b4b1bf; white-space: nowrap; }
+.adm .spw-toast__s.is-faint { color: #8b8898; }
+
+/* 놓은 자리의 확인 팝오버 — 놓은 곳에서 펼쳐진다(가운데 창이 아니라). 같은 이름 버튼 없음 · 닫기는 「그대로 두기」 한 곳. */
+.adm .spw-movepop__scrim { position: fixed; inset: 0; z-index: 88; }
+.adm .spw-movepop { position: fixed; z-index: 89; width: 360px; box-sizing: border-box; padding: 18px 18px 16px; border-radius: 16px; background: #fff; color: #16141f; box-shadow: 0 24px 56px -20px rgba(22, 20, 31, .4), 0 2px 8px rgba(22, 20, 31, .06); display: flex; flex-direction: column; gap: 12px; transform-origin: 8% 0; animation: spw-pop-in 180ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .spw-movepop__t { font-size: 16px; letter-spacing: -0.02em; }
+.adm .spw-movepop__cmp { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid #f1f1f4; border-bottom: 1px solid #f1f1f4; }
+.adm .spw-movepop__cmp > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adm .spw-movepop__cmp span { font-size: 12px; color: #8b8898; }
+.adm .spw-movepop__cmp b { font-size: 18px; color: #6b6878; }
+.adm .spw-movepop__cmp small { font-size: 12px; color: #6b6878; }
+.adm .spw-movepop__cmp .is-to b, .adm .spw-movepop__cmp .is-to small { color: #5a30cf; font-weight: 600; }
+.adm .spw-movepop__arrow { font-size: 16px; color: #b4b1bf !important; }
+.adm .spw-movepop__note { margin: 0; font-size: 12px; line-height: 1.5; color: #8b8898; }
+.adm .spw-movepop__btns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+@keyframes spw-pop-in { from { opacity: 0; transform: scale(.96); } }
+@media (prefers-reduced-motion: reduce) { .adm .spw-movepop { animation: none; } .adm .scw .opsg__ghost { transform: none; transition: none; } }

@@ -52,6 +52,14 @@ import {
   toAutomationReservation,
   type AutomationReservation,
 } from "@/lib/automation/reservation-fields";
+import {
+  claimConflictKind,
+  isScheduledRunDone,
+  latestSentByTarget,
+  planFollowUpTargets,
+  targetKey,
+  type SentRunRow,
+} from "@/lib/automation/delivery-state";
 import { computeNextWake, hhmmToMinutes, isPastRetryDeadline, isScheduledSendDue, tokyoClock } from "@/lib/automation/schedule";
 import { acquireBeds24Lock, releaseBeds24Lock } from "@/lib/beds24/sync-locks";
 import { getDictionary } from "@/lib/i18n";
@@ -111,7 +119,7 @@ type Delivery = {
 /** Slack 로 보내는 모양 — `text` = 알림 한 줄, `blocks` = 카드. */
 export type SlackPayload = { text: string; blocks: Array<Record<string, unknown>> };
 
-type DeliveryResult = "sent" | "failed" | "duplicate";
+type DeliveryResult = "sent" | "failed" | "duplicate" | "in_flight";
 
 async function deliver(supabase: Client, item: Delivery): Promise<DeliveryResult> {
   const base = {
@@ -128,14 +136,23 @@ async function deliver(supabase: Client, item: Delivery): Promise<DeliveryResult
     trigger: item.trigger,
   };
 
-  // 줄을 먼저 잡는다(`sending` 실패로) → 보낸 뒤 결과로 고친다. 이미 있으면 다른 틱이 처리했다.
+  // 줄을 먼저 잡는다(`sending` 실패로) → 보낸 뒤 결과로 고친다. 이미 있으면 다른 틱이 처리했거나 아직 보내는 중이다.
   const claimed = await supabase
     .from("automation_runs")
     .insert({ ...base, dedupe_key: item.dedupeKey ?? null, reason: "sending", status: "failed" })
     .select("id")
     .single();
   if (claimed.error) {
-    if (claimed.error.code === "23505") return "duplicate";
+    if (claimed.error.code === "23505" && item.dedupeKey) {
+      // 「보내는 중」으로 남은 줄(함수가 죽었을 수도)을 「이미 보냄」으로 치면 정시 발송이 그 한 통을 빼고 오늘을 끝낸다.
+      const holder = await supabase
+        .from("automation_runs")
+        .select("status")
+        .eq("organization_id", item.organizationId)
+        .eq("dedupe_key", item.dedupeKey)
+        .maybeSingle();
+      return claimConflictKind(holder.data?.status);
+    }
     console.error("[automation] run claim failed", { code: claimed.error.code, job: item.jobKey });
     return "failed";
   }
@@ -174,6 +191,7 @@ function failedDedupeKey(dedupeKey: string, runId: string): string {
 /**
  * 보내는 도중에 함수가 죽으면(시간 초과 · 배포 교체) 줄이 「보내는 중」(`reason = sending`)으로 남아 키를 쥔 채 재시도를 막는다.
  * 틱마다 오래된 것을 「중단됨」 실패로 바꾸고 키를 놓는다 — 정시 발송은 다음 재시도가, 이벤트는 실패분 재시도가 다시 보낸다.
+ * 키를 쥐는 발송은 틱(`maxDuration` 60초) 안에서만 일어나므로 5분이 지난 「보내는 중」은 살아 있는 함수의 것일 수 없다.
  */
 const STUCK_CLAIM_MS = 5 * 60 * 1000;
 
@@ -551,17 +569,21 @@ async function sendBuilt(
   jobKey: AutomationJobKey,
   destinations: AutomationDestination[],
   built: BuiltMessages,
-  input: { trigger: RunTrigger; dedupeSuffix: string | null; actorId?: string | null },
-): Promise<{ sent: number; failed: number }> {
+  /** `plan` = 받는 곳 × 언어 → 중복 방지 꼬리(`planFollowUpTargets`). 있으면 거기 있는 곳에만 보낸다. */
+  input: { trigger: RunTrigger; dedupeSuffix: string | null; plan?: Map<string, string>; actorId?: string | null },
+): Promise<{ sent: number; failed: number; inFlight: number }> {
   let sent = 0;
   let failed = 0;
+  let inFlight = 0;
   for (const destination of destinations) {
     for (const locale of destination.locales) {
       const text = built.byLocale[locale];
       if (!text) continue;
+      const suffix = input.plan ? input.plan.get(targetKey(destination.channelKey, locale)) : input.dedupeSuffix;
+      if (input.plan && !suffix) continue;
       const result = await deliver(supabase, {
         actorId: input.actorId,
-        dedupeKey: input.dedupeSuffix ? `${jobKey}:${built.targetDate}:${input.dedupeSuffix}:${destination.channelKey}:${locale}` : null,
+        dedupeKey: suffix ? `${jobKey}:${built.targetDate}:${suffix}:${destination.channelKey}:${locale}` : null,
         destination,
         jobKey,
         locale,
@@ -574,33 +596,37 @@ async function sendBuilt(
       });
       if (result === "sent") sent += 1;
       if (result === "failed") failed += 1;
+      if (result === "in_flight") inFlight += 1;
     }
   }
-  return { failed, sent };
+  return { failed, inFlight, sent };
 }
 
-/** 그날 마지막으로 **보낸** 줄의 meta(재전송 · 정정본 비교 기준). */
+/** 그날 **보낸** 줄 — 가장 최근 meta(재전송 메시지의 「변동」 기준) · 받는 곳 × 언어마다 마지막 줄(재전송 · 정정본 판정 기준). */
 async function lastSentMeta(
   supabase: Client,
   organizationId: string,
   jobKey: AutomationJobKey,
   targetDate: string,
-): Promise<{ meta: Record<string, unknown>; resendsToday: number } | null> {
+): Promise<{ meta: Record<string, unknown>; byTarget: Map<string, SentRunRow>; resendsToday: number } | null> {
   const result = await supabase
     .from("automation_runs")
-    .select("meta, trigger, created_at")
+    .select("id, channel_key, locale, meta, trigger, created_at")
     .eq("organization_id", organizationId)
     .eq("job_key", jobKey)
     .eq("target_date", targetDate)
     .eq("status", "sent")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(300);
   const rows = result.data ?? [];
   if (rows.length === 0) return null;
   const resendsToday = new Set(
     rows.filter((row) => row.trigger === "resend" || row.trigger === "correction").map((row) => row.created_at.slice(0, 16)),
   ).size;
-  return { meta: (rows[0].meta ?? {}) as Record<string, unknown>, resendsToday };
+  const byTarget = latestSentByTarget(
+    rows.map((row) => ({ channel_key: row.channel_key, id: row.id, locale: row.locale, meta: (row.meta ?? {}) as Record<string, unknown> })),
+  );
+  return { byTarget, meta: (rows[0].meta ?? {}) as Record<string, unknown>, resendsToday };
 }
 
 function snapshotFrom(meta: Record<string, unknown>): DailySnapshot | null {
@@ -674,7 +700,7 @@ async function runScheduledJob(supabase: Client, organizationId: string, job: St
     await notifyAutomationFailure(supabase, organizationId, { date: targetDate, issues, kind: "data_issue" });
   }
 
-  const done = result.failed === 0 || isPastRetryDeadline(job, now);
+  const done = isScheduledRunDone({ failed: result.failed, inFlight: result.inFlight, pastDeadline: isPastRetryDeadline(job, now) });
   if (result.failed > 0) {
     await notifyAutomationFailure(supabase, organizationId, { date: targetDate, failed: result.failed, jobKey, kind: "send_failed", sent: result.sent });
   }
@@ -710,23 +736,42 @@ async function recheckJob(supabase: Client, organizationId: string, job: StoredJ
     return "no_destination";
   }
   const locales = allLocales(destinations);
+  const targets = destinations.flatMap((destination) => destination.locales.map((locale) => ({ channelKey: destination.channelKey, locale })));
 
   if (jobKey === "daily_report") {
     const previous = snapshotFrom(last.meta);
     const { built, stats } = await buildDaily(supabase, organizationId, job, targetDate, locales, previous);
-    if (!previous || sameSnapshot(previous, dailySnapshotOf(stats))) {
+    const current = dailySnapshotOf(stats);
+    const plan = planFollowUpTargets({
+      differs: (meta) => {
+        const sent = snapshotFrom(meta);
+        return sent !== null && !sameSnapshot(sent, current);
+      },
+      fingerprint: hashOf(JSON.stringify(current)).slice(0, 12),
+      latest: last.byTarget,
+      prefix: "resend",
+      targets,
+    });
+    if (plan.size === 0) {
       await next();
       return "unchanged";
     }
-    const suffix = `resend:${hashOf(JSON.stringify(dailySnapshotOf(stats))).slice(0, 12)}`;
-    await sendBuilt(supabase, organizationId, jobKey, destinations, built, { dedupeSuffix: suffix, trigger: "resend" });
+    await sendBuilt(supabase, organizationId, jobKey, destinations, built, { dedupeSuffix: null, plan, trigger: "resend" });
     await next();
     return "resent";
   }
 
   const { built } = await buildCleaning(supabase, organizationId, job, targetDate, locales, true);
   const structureKey = String(built.meta.structureKey);
-  if (structureKey === last.meta.structureKey) {
+  // 「마지막으로 보낸 내용과 다른가」 — 받는 곳 × 언어마다(한 곳만 못 받았으면 그곳만 다시).
+  const plan = planFollowUpTargets({
+    differs: (meta) => meta.structureKey !== structureKey,
+    fingerprint: structureKey.slice(0, 12),
+    latest: last.byTarget,
+    prefix: "correction",
+    targets,
+  });
+  if (plan.size === 0) {
     await next();
     return "unchanged";
   }
@@ -756,10 +801,7 @@ async function recheckJob(supabase: Client, organizationId: string, job: StoredJ
     await next();
     return "correction_pending";
   }
-  await sendBuilt(supabase, organizationId, jobKey, destinations, built, {
-    dedupeSuffix: `correction:${structureKey.slice(0, 12)}`,
-    trigger: "correction",
-  });
+  await sendBuilt(supabase, organizationId, jobKey, destinations, built, { dedupeSuffix: null, plan, trigger: "correction" });
   await next();
   return "corrected";
 }

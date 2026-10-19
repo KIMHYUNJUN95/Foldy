@@ -23,6 +23,8 @@ export async function recordBeds24WebhookEvent(params: {
   // Content-Type are persisted so a failed booking can be re-processed/debugged.
   rawBody?: unknown;
   contentType?: string | null;
+  /** 요청을 받은 때부터 응답 직전까지(ms). 응답 뒤 작업(after)은 포함하지 않는다. */
+  durationMs?: number | null;
 }): Promise<void> {
   try {
     const { results } = params;
@@ -56,6 +58,7 @@ export async function recordBeds24WebhookEvent(params: {
       // 웹훅 원문은 임의 구조라 `unknown` 으로 들고 다니다가 저장 시점에만 Json 으로 좁힌다.
       raw_payload: rawPayload as Json,
       content_type: params.contentType ?? null,
+      duration_ms: params.durationMs ?? null,
       error_message: params.errorMessage ?? null,
     });
   } catch (error) {

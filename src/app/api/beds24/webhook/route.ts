@@ -181,6 +181,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = performance.now();
   if (isBeds24SyncPaused()) {
     return NextResponse.json({ ok: true, paused: true }, { status: 202 });
   }
@@ -269,9 +270,11 @@ export async function POST(request: NextRequest) {
   // never adds a DB round-trip to the webhook latency.
   // When some bookings failed to process, keep their raw body for replay/debug.
   const anyFailed = failed > 0;
+  const durationMs = Math.round(performance.now() - startedAt);
   after(() =>
     recordBeds24WebhookEvent({
       supabase,
+      durationMs,
       httpStatus: anyFailed ? 207 : 200,
       results,
       rawBody: anyFailed ? body : undefined,

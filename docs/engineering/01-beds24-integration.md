@@ -434,8 +434,10 @@ DB 부하 정리 (2026-10-19):
 - 웹훅 한 건(기존 예약 수정 · 방/건물 이미 있음) 응답 전 DB 왕복: 약 23회(최대 39) → 약 12회. Beds24 API 호출은 응답 전 0회.
 - 예약 방 이름 복구(`recoverReservationsRoomLabels`)는 `raw_payload` 통째 대신 방 번호 키 4개만 뽑아 `id >` 키셋으로 읽는다.
   고칠 행만 원문을 따로 읽는다. 판정 결과는 같다.
-- `beds24_webhook_events.duration_ms` 열 마이그레이션(`202610190005_beds24_webhook_duration.sql`)을 준비했다. 기록 코드는
-  열을 적용한 뒤에 붙인다(먼저 나가면 insert 가 실패한다).
+- `beds24_webhook_events.duration_ms` — 예약 웹훅 한 배치의 처리 시간(ms). 라우트가 `POST` 들어온 순간부터 응답 직전까지 재서
+  `recordBeds24WebhookEvent({ durationMs })` 로 넘긴다(기록 자체는 응답 뒤 `after()` 라 포함되지 않는다). 마이그레이션
+  `202610190005_beds24_webhook_duration.sql`(운영 적용 2026-10-19) 뒤에 코드를 붙였다. 가격 웹훅 · 예약 없는 배달(`recordBeds24WebhookRejection`)
+  · 재조정 행은 null.
 
 ### Later Goal: Write Data
 

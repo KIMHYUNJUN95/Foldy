@@ -1618,6 +1618,7 @@ export type Database = {
           booking_summary: Json
           content_type: string | null
           created_at: string
+          duration_ms: number | null
           error_message: string | null
           failed_count: number
           http_status: number | null
@@ -1634,6 +1635,7 @@ export type Database = {
           booking_summary?: Json
           content_type?: string | null
           created_at?: string
+          duration_ms?: number | null
           error_message?: string | null
           failed_count?: number
           http_status?: number | null
@@ -1650,6 +1652,7 @@ export type Database = {
           booking_summary?: Json
           content_type?: string | null
           created_at?: string
+          duration_ms?: number | null
           error_message?: string | null
           failed_count?: number
           http_status?: number | null

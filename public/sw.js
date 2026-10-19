@@ -14,6 +14,8 @@
  *     — or hard-reloads if the revalidation redirected. So the user sees content instantly AND it
  *     self-corrects to fresh within a moment. Client-side (RSC) navigations inside the running app
  *     are NOT touched by this handler, so in-app data stays live as before.
+ *   - A cached copy from an OLDER deployment is never painted (2026-10-19): the SW compares the copy's
+ *     `x-foldy-build` header with `/api/build` and waits for the network document when they differ.
  * Bump the cache names to invalidate old caches on deploy. */
 const STATIC_CACHE = "stayops-static-v4"; // v3·v4 (2026-10-09): 로고 교체 · 흰 줄 복원 — /icons 는 cache-first 라 올려야 새 아이콘이 보인다
 const NAV_CACHE = "stayops-nav-v3"; // v3 (2026-10-09): 이름 교체(Foldy) — 이름 바꾸기 전 화면 저장본(「Stay Ops」)을 버린다
@@ -59,6 +61,31 @@ async function offlineFallback() {
 
 /** 캐시 사본이 "방금 담은 것"으로 볼 수 있는 시간. 이 안쪽이면 새로고침 신호를 보내지 않는다. */
 const NAV_FRESH_MS = 30_000;
+
+/** 지금 배포의 이름표를 묻는 시간 한도. 넘기면(느린 망 · 오프라인) 확인을 포기하고 저장본을 그대로 내준다. */
+const BUILD_CHECK_MS = 1500;
+
+/**
+ * 지금 배포의 이름표(`/api/build`, 문서 헤더 `x-foldy-build` 와 같은 값). 못 받으면 null.
+ *
+ * 저장본이 **옛 배포**의 화면이면 내주지 않는다(2026-10-19). 옛 화면을 먼저 그리면 곧이은 `router.refresh()` 에서
+ * Next 가 빌드 차이를 보고 페이지를 통째로 다시 불러와, 진입 모션(admin-entry · app-splash)이 두 번 돌았다
+ * (Edge 설치 앱에서 사용자 지적). 그 화면 안의 진입 코드도 저장 당시 버전이라 고친 동작이 첫 번째엔 안 보였다.
+ */
+async function liveBuild() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), BUILD_CHECK_MS);
+  try {
+    const res = await fetch("/api/build", { cache: "no-store", signal: ctrl.signal });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return typeof body.build === "string" ? body.build : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** 담은 시각을 헤더에 실어 저장한다(Response 에는 저장 시각이 남지 않는다). */
 async function putNavCached(cache, req, res) {
@@ -123,6 +150,15 @@ self.addEventListener("fetch", (event) => {
           .catch(() => null);
 
         if (cached) {
+          // 옛 배포의 저장본이면 그리지 않고 새 문서를 기다린다(처음 켤 때와 같음). 이름표가 없는 예전 사본도 옛 것으로 본다.
+          // 이름표를 못 받으면(오프라인 · 1.5초 초과) 확인 없이 저장본 — 빨리 켜지는 쪽과 오프라인에서 열리는 쪽을 지킨다.
+          // 새 문서 요청(revalidate)은 이미 출발해 있어, 같은 배포일 때 늘어나는 건 작은 이름표 요청 한 번뿐이다.
+          const live = await liveBuild();
+          if (live && live !== cached.headers.get("x-foldy-build")) {
+            const res = await revalidate;
+            return res || cached;
+          }
+
           // 방금 담은 사본이면 굳이 화면을 새로고침하지 않는다(2026-08-04).
           //
           // 예전에는 캐시로 그린 **모든** 내비게이션마다 `router.refresh()` 를 걸었다. 앱을

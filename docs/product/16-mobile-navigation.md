@@ -164,7 +164,7 @@ Implementation note:
     탭**하면 켜고 끈다(그 기기 localStorage `stayops:swipe-debug`). 화면 위에 빌드(`NEXT_PUBLIC_BUILD_SHA` — Vercel 커밋 앞 7자리) ·
     standalone 여부 · 기록 번호 · 돌아갈 곳 · 최근 터치 8개를 왜 받았는지/안 받았는지(메뉴 첫 화면 · 열린 시트 · 막힌 대상 · 갈 곳 없음 · 앱 밖으로 나감 ·
     판정 전 놓음 · 세로로 거절 · 막을 수 없는 touchmove · 놓을 때 거리/속도)를 띄운다. 개발자용이라 번역하지 않는다. 꺼져 있으면 비용 0.
-    홈 화면 앱은 SW 가 HTML 을 stale-while-revalidate 로 내줘 **배포 뒤 첫 실행은 옛 빌드**다 — 빌드 표시로 먼저 확인한다.
+    홈 화면 앱은 SW 가 HTML 을 stale-while-revalidate 로 내준다. 2026-10-19 부터 옛 배포의 저장본은 그리지 않지만, 이름표 확인이 1.5초를 넘기면(느린 망) 옛 빌드가 뜰 수 있어 빌드 표시로 먼저 확인한다.
   - 순수 판정(`history-model.ts` — 갈 곳 · 방향 잠금 · 놓을 때 판정 · 마무리 시간)은 `src/lib/__tests__/swipe-back.test.ts`.
   - 셸: 스크롤 영역에 `touch-action: pan-y pinch-zoom`(가로 이동은 브라우저가 쓰지 않아 touchmove 를 언제나 막을 수 있다), 스크롤
     위치 복원을 `useLayoutEffect` 로(첫 프레임부터 밑그림과 같은 자리).
@@ -552,6 +552,12 @@ Current rules:
   elsewhere" and triggered a full `window.location.reload()` — a second, harder flash. Cache
   entries now carry an `x-so-cached-at` header (`NAV_CACHE` bumped to `stayops-nav-v2`; entries
   without the header read as stale, which is the safe direction).
+- **No stale-build paint — fixed (2026-10-19)**: a cached document from an **older deployment** was painted first; the
+  follow-up `router.refresh()` then hit Next's build-id check and did a full reload, so the entry motion (`admin-entry` ·
+  `app-splash`) played twice (Edge-installed admin app). Every response now carries `x-foldy-build` (deployment id,
+  `next.config.ts`) and static `/api/build` returns the same value. Before painting a cached copy the SW asks `/api/build`
+  (1.5s cap); on mismatch — or a copy without the header — it waits for the network document instead. If the check fails
+  (offline · slow) it paints the cached copy as before.
 - **Shared date-picker bottom sheet (2026-08-04)**: `src/components/shell/date-picker-sheet.tsx` —
   the one mobile calendar. Arrow-only navigation can't reach a date weeks away, and the native
   `<input type="date">` used briefly rendered the OS calendar, which neither matches the app's visual

@@ -9,6 +9,16 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-19 — 배포 뒤 첫 실행에 진입 모션이 두 번 뜨던 것 (서비스 워커)
+
+- 증상: Edge 에 설치한 「Foldy Admin」을 켜면 진입 모션이 연달아 두 번. 원인: SW 가 저장해 둔 **옛 배포의 화면**을 먼저 그림 →
+  `sw-nav-fresh` 의 `router.refresh()` 에서 Next 가 빌드 차이로 페이지를 통째로 다시 불러옴 → 진입 스크립트가 다시 돎. 옛 화면 안의 진입 코드도
+  저장 당시 버전이라 「진입 모션 줄이기」(3020f064) 이전 사본이면 첫 번째는 늘 긴 로고 모션이었다.
+- 수정: 배포마다 이름표(`VERCEL_DEPLOYMENT_ID` → 커밋 → `dev`)를 문서 헤더 `x-foldy-build` 와 정적 `/api/build` 로 낸다(`next.config.ts`).
+  SW 는 저장본을 그리기 전에 `/api/build` 를 묻고(1.5초 한도), 다르면 저장본 대신 새 문서를 기다린다. 못 물으면(오프라인 · 느림) 예전처럼 저장본.
+- 확인: 프로덕션 빌드 2개(이름표 다름)로 헤드리스 크롬 — 같은 배포면 저장본 1회, 배포가 바뀐 뒤 첫 실행은 새 문서 1회(다시 불러오기 없음).
+- 이 수정이 올라가는 배포 자체는 `sw.js` 가 바뀌어 새 SW 설치 → 한 번 새로고침될 수 있다(그다음부터 해당 없음).
+
 ## 2026-10-19 — HIG 다듬기 (글자 대비 · 접근성 설정 · 버튼 둥글기 · 누르는 영역)
 
 - 글자용 옅은 회색 → `--text-3` `#6F6C7C` · `--text-done` `#76737F`(CSS 63개 파일 400곳 · TSX 10개). 탭 개수 숫자도 `--text-done`.

@@ -17,6 +17,14 @@ const SUPABASE_HOSTNAME = (() => {
   }
 })();
 
+/**
+ * 이 배포의 이름표(2026-10-19). 문서 응답마다 `x-foldy-build` 헤더로 싣고 `/api/build` 가 같은 값을 돌려준다.
+ * 서비스 워커는 저장해 둔 화면의 이름표가 지금 배포와 다르면 그 화면을 내주지 않는다(`public/sw.js`) — 옛 화면을
+ * 먼저 그렸다가 Next 가 빌드 차이로 페이지를 통째로 다시 불러와 **진입 모션이 두 번 돌던 것**(Edge 설치 앱)을 막는다.
+ * 같은 커밋을 다시 배포해도 Next 빌드는 달라지므로 커밋보다 배포 id 를 먼저 쓴다.
+ */
+const DEPLOY_ID = process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
+
 const nextConfig: NextConfig = {
   // React Compiler — 자동 메모이제이션.
   //
@@ -31,7 +39,10 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   // 지금 기기에서 도는 빌드를 진단 표시(화면 스와이프 — `src/lib/swipe-back/debug.ts`)에 띄우려는 것. 홈 화면 앱은 옛
   // 빌드가 캐시에서 한 번 더 뜨므로 「고친 코드가 실제로 돌고 있는가」부터 확인해야 한다(2026-10-09).
-  env: { NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 7) },
+  env: { NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 7), FOLDY_DEPLOY_ID: DEPLOY_ID },
+  async headers() {
+    return [{ source: "/:path*", headers: [{ key: "x-foldy-build", value: DEPLOY_ID }] }];
+  },
   // Allow dev resource access (HMR + client chunks) when the app is opened via
   // the WSL network IP instead of localhost. Dev-only; no effect on production.
   // `*.trycloudflare.com` covers Cloudflare quick tunnels (random subdomain each

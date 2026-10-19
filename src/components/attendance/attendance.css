@@ -3384,23 +3384,23 @@
 }
 
 /* ── 넓은 화면(2026-10-05 — 모든 모바일 화면 폴드 · 태블릿 대응) ─────────────────────────────────────────────
- * 근태 홈: 폴드 · 태블릿 세로는 셸 가운데 760px 안에서 링 · 버튼이 한없이 넓어지지 않게 560px. 태블릿 가로(≥ 1000 · 높이 ≥ 600)는
- * 두 칸 — 왼쪽 인사 · 링 · 출퇴근 버튼, 오른쪽 바로가기 목록(따라 내려옴). 폭 구간은 셸(`globals.css` `fold:` · `tablet:`)과 같다. */
+ * 근태 홈: 폴드 · 태블릿 세로는 셸 가운데 760px 안에서 링 · 버튼이 한없이 넓어지지 않게 520px. 태블릿 가로(≥ 1000 · 높이 ≥ 600)는
+ * 제목 아래 두 칸 — 왼쪽 `.att-main`(링 · 현장/시각 · 출퇴근 버튼), 오른쪽 `.att-side`(바로가기 · 오늘 기록, 따라 내려옴).
+ * HIG 2차 시안 A2Att-Fold · A2Att-Tablet(2026-10-19). 폭 구간은 셸(`globals.css` `fold:` · `tablet:`)과 같다. */
 @media (min-width: 600px) {
-  .att.att--home { max-width: 560px; margin-inline: auto; }
+  .att.att--home { max-width: 520px; margin-inline: auto; }
 }
 @media (min-width: 1000px) and (min-height: 600px) {
   .att.att--home {
     max-width: 1080px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
-    column-gap: 40px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 48px;
     align-items: start;
-    align-content: start;
   }
-  .att.att--home > * { grid-column: 1; }
-  .att.att--home > .seclbl { grid-column: 2; grid-row: 1; margin-top: 6px; }
-  .att.att--home > .entrylist { grid-column: 2; grid-row: 2 / span 40; position: sticky; top: 12px; }
+  .att.att--home > .greet { grid-column: 1 / -1; }
+  .att.att--home > .att-side { position: sticky; top: 12px; }
+  .att.att--home > .att-side > .seclbl:first-child { margin-top: 6px; }
 }
 
 /* 급여: 태블릿 가로는 왼쪽 급여 카드 · 시급 구간 · 수당(따라 내려옴) | 오른쪽 일별 표. */
@@ -3441,8 +3441,6 @@
 .att.att--home .ring__big .sec { font-size: inherit; color: inherit; font-weight: inherit; opacity: 1; }
 .att.att--home .ring__lbl { font-size: 13px; font-weight: 400; color: var(--text-3); letter-spacing: 0; text-transform: none; }
 .att.att--home .methods { display: flex; justify-content: center; gap: 8px; margin: 10px 0 18px; }
-.att.att--home .methodpill { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px; background: #f4f4f7; color: var(--text-3); font-size: 12px; font-weight: 500; }
-.att.att--home .methodpill.on { background: #f1ecfd; color: #5a30cf; font-weight: 600; }
 .att.att--home .infostrip { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; background: none; box-shadow: none; }
 .att.att--home .infocell { padding: 12px 14px; border: 0; border-radius: 14px; background: #f7f7f9; text-align: left; }
 .att.att--home .infocell__k { justify-content: flex-start; }
@@ -3468,9 +3466,6 @@
 .att.att--home .entryrow__new { background: #f1ecfd; color: #5a30cf; }
 .att.att--home .eyemini { background: none; }
 .att.att--home .att-warn { border: 0; border-radius: 14px; background: #fdf3e6; }
-@media (min-width: 1000px) and (min-height: 600px) {
-  .att.att--home > .seclbl { border-top: 0; padding-top: 0; margin-top: 58px; }
-}
 /* 출근 현장 · 출근 시각 — 홈과 같은 테두리 이름표 칸(2026-10-13 시안 컨펌) */
 .att.att--home .infostrip { margin-top: 6px; }
 .att.att--home .infocell { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 0 16px; box-sizing: border-box; border: 1px solid #e0e0e6; background: #ffffff; }
@@ -3488,7 +3483,52 @@
   .att .att-todaylog__r.is-now i { background: #7a52e6; }
   .att .att-todaylog__r span { flex: 1; min-width: 0; }
   .att .att-todaylog__r time { font-size: 12px; color: var(--text-3); }
-  .att.att--home > .att-todaylog { grid-column: 1; }
+}
+
+/* ══ HIG 다듬기 2차 (2026-10-19) — 근태 홈 (시안 A2Att-Phone · Fold · Tablet) ═══════════════════════════
+   링 240 · 두께 12 · 가운데 시간 34(숫자가 링에 닿지 않게) · 상태 15 · 방법은 색 알약 대신 회색 글자 한 줄 ·
+   버튼 50 · 구역 제목 17/600(위 구분선 없음) · 바로가기 줄 16/13 · 최소 62 · 아이콘 36 · 오른쪽 › ·
+   구분선은 공용 규칙(0.5px · 글자 시작점 48부터, docs/design/05). */
+.att.att--home .att-gap { height: 22px; }
+.att.att--home .greet--title .greet__d { margin-top: 2px; font-size: 15px; }
+.att.att--home .hero { padding: 0; margin-bottom: 0; }
+.att.att--home .att-ring { width: 240px; height: 240px; }
+.att.att--home .att-ring svg circle { stroke-width: 12; }
+.att.att--home .ring__center { gap: 6px; }
+.att.att--home .ring__state { gap: 8px; margin: 0; font-size: 15px; }
+.att.att--home .ring__state.open { color: #5a30cf; }
+.att.att--home .ring__state .pulse { width: 8px; height: 8px; }
+.att.att--home .ring__state.open .pulse { background: #7a52e6; box-shadow: 0 0 0 4px #f1ecfd; animation: none; }
+.att.att--home .ring__big { font-size: 34px; line-height: 1; }
+.att.att--home .ring__big .sec { color: #8b8898; }
+.att.att--home .ring__lbl { margin-top: 0; }
+.att.att--home .methods { display: block; margin: 12px 0 22px; text-align: center; font-size: 13px; color: var(--text-3); }
+.att.att--home .infostrip { margin: 0 0 12px; gap: 10px; }
+.att.att--home .infocell { min-height: 54px; border-radius: 12px; }
+.att.att--home .infocell__v { font-size: 16px; font-weight: 600; }
+.att.att--home .att-actions { gap: 10px; }
+.att.att--home .clockbtn, .att.att--home .breakbtn { height: 50px; }
+.att.att--home .seclbl { display: flex; align-items: center; min-height: 44px; margin: 24px 0 0; padding-top: 0; border-top: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.att.att--home a.entryrow { gap: 12px; padding: 8px 0; transition: background-color 0.14s; }
+.att.att--home a.entryrow:active { transform: none; background: #f7f7f9; }
+.att.att--home .entryrow + .entryrow { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 48px, var(--separator) 48px) 1; }
+.att.att--home .entryrow__ic { width: 36px; height: 36px; border-radius: 10px; background: #f4f1fd !important; color: #5a30cf !important; }
+.att.att--home .entryrow__ic svg { width: 19px; height: 19px; }
+.att.att--home .entryrow__t { font-size: 16px; font-weight: 500; letter-spacing: 0; }
+.att.att--home .entryrow__s { font-size: 13px; margin-top: 2px; }
+.att.att--home .entryrow__val { font-size: 15px; font-weight: 500; color: var(--text-3); }
+.att.att--home .entryrow__chev { display: inline-flex; flex: none; color: #b4b1bf; }
+.att.att--home .entryrow__chev svg { width: 16px; height: 16px; }
+.att.att--home .entryrow__r { gap: 4px; }
+/* 금액 가리기 눈 — 보이는 원은 28 그대로, 누르는 자리는 44(HIG 최소 누름 영역) */
+.att.att--home .eyemini { position: relative; color: var(--text-3); }
+.att.att--home .eyemini::before { content: ""; position: absolute; inset: -8px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--home .att-todaylog { margin-top: 0; }
+  .att.att--home .att-todaylog__t { margin: 22px 0 0 !important; }
+  .att .att-todaylog__r { min-height: 52px; font-size: 16px; border-top: 0; }
+  .att .att-todaylog__r + .att-todaylog__r { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 20px, var(--separator) 20px) 1; }
+  .att .att-todaylog__r time { font-size: 13px; }
 }
 
 /* 급여(모바일) 화이트 리디자인 — 큰 총액 · 숫자 셋 · 날짜별 막대 · 날짜 줄(2026-10-13 시안 AttPay-Phone · Fold · Tablet) */

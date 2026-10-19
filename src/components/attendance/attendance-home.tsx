@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import "./attendance.css";
 import { AIc, AttIcon, AttRingDefs } from "./att-icons";
@@ -29,7 +29,8 @@ function resolveBreakErrorMsg(reason: string, copy: AttendanceCopy): string {
 
 export type HomeState = "idle" | "open" | "break" | "loading";
 
-const RADIUS = 105;
+// HIG 2차(2026-10-19): 링 240 · 두께 12 · 가운데 시간 34 — 숫자가 링에 닿지 않게.
+const RADIUS = 110;
 const CIRC = 2 * Math.PI * RADIUS;
 
 function Ring({
@@ -53,13 +54,13 @@ function Ring({
   return (
     <div className="hero">
       <div className="att-ring">
-        <svg width="252" height="252" viewBox="0 0 252 252">
-          <circle className="ring__track" cx="126" cy="126" r={RADIUS} />
+        <svg width="240" height="240" viewBox="0 0 240 240">
+          <circle className="ring__track" cx="120" cy="120" r={RADIUS} />
           {variant !== "idle" ? (
             <circle
               className={`ring__prog ${cls}`}
-              cx="126"
-              cy="126"
+              cx="120"
+              cy="120"
               r={RADIUS}
               strokeDasharray={CIRC}
               strokeDashoffset={off}
@@ -261,14 +262,11 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
 }
 
 function Methods({ copy }: { copy: AttendanceCopy }) {
-  // 화이트 리디자인(2026-10-13): 링 아래 작은 글자 두 개 — 쓸 수 있는 방법(보라) · 준비 중(회색).
+  // HIG 2차(2026-10-19): 색 알약 대신 링 아래 회색 글자 한 줄 — 「GPS+QR · Wi-Fi 준비 중」.
   return (
-    <div className="methods">
-      <span className="methodpill on">{copy.methodGpsQr}</span>
-      <span className="methodpill">
-        {copy.methodWifi} {copy.methodWifiSoon}
-      </span>
-    </div>
+    <p className="methods">
+      {copy.methodGpsQr} · {copy.methodWifi} {copy.methodWifiSoon}
+    </p>
   );
 }
 
@@ -401,9 +399,10 @@ export function AttendanceHome({
       </div>
     ) : null;
 
-  // Shortcut entry list (idle only)
-  const entryList = (
-    <>
+  // 바로가기 + (근무 중일 때) 오늘 기록 — 태블릿 가로에서는 오른쪽 칸(HIG 2차 시안 A2Att-Tablet).
+  const chev = <span className="entryrow__chev" aria-hidden="true">{AttIcon.chevR}</span>;
+  const sideColumn = (log: ReactNode = null) => (
+    <div className="att-side">
       <div className="seclbl">{copy.homeShortcutLabel}</div>
       <div className="entrylist">
         <Link href="/mobile/attendance/history" className="entryrow hist">
@@ -414,6 +413,7 @@ export function AttendanceHome({
           </div>
           <div className="entryrow__r">
             <span className="entryrow__val">{monthHours ?? "00:00"}</span>
+            {chev}
           </div>
         </Link>
         <Link href="/mobile/attendance/pay" className="entryrow pay">
@@ -437,6 +437,7 @@ export function AttendanceHome({
             >
               <AIc>{payMasked ? AttIcon.eyeOff : AttIcon.eye}</AIc>
             </button>
+            {chev}
           </div>
         </Link>
         <Link href="/mobile/attendance/leave" className="entryrow leave">
@@ -445,6 +446,7 @@ export function AttendanceHome({
             <div className="entryrow__t">{copy.homeLeaveTitle}</div>
             <div className="entryrow__s">{copy.homeLeaveSub}</div>
           </div>
+          {chev}
         </Link>
         {canSeeRoster && (
           <Link href="/mobile/attendance/roster" className="entryrow roster">
@@ -453,6 +455,7 @@ export function AttendanceHome({
               <div className="entryrow__t">{copy.homeRosterTitle}</div>
               <div className="entryrow__s">{copy.homeRosterSub}</div>
             </div>
+            {chev}
           </Link>
         )}
         <Link href="/mobile/attendance/transport" className="entryrow transport">
@@ -461,9 +464,11 @@ export function AttendanceHome({
             <div className="entryrow__t">{dict.transport.homeTransportTitle}</div>
             <div className="entryrow__s">{dict.transport.homeTransportSubNow}</div>
           </div>
+          {chev}
         </Link>
       </div>
-    </>
+      {log}
+    </div>
   );
 
   if (showLoading) {
@@ -474,7 +479,7 @@ export function AttendanceHome({
           <div className="skel" style={{ width: "140px", height: "22px", marginTop: "8px" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "center", margin: "8px 0 18px" }}>
-          <div className="skel" style={{ width: "252px", height: "252px", borderRadius: "999px" }} />
+          <div className="skel" style={{ width: "240px", height: "240px", borderRadius: "999px" }} />
         </div>
         <div className="skel" style={{ height: "60px", borderRadius: "18px", marginBottom: "11px" }} />
         <div className="skel" style={{ height: "52px", borderRadius: "14px" }} />
@@ -489,45 +494,46 @@ export function AttendanceHome({
       <div className="att att--home">
         <AttRingDefs />
         {greet}
-        <div className="att-gap" />
-        {openSession ? (
-          <LiveOpenRing clockInAt={openSession.clockInAt} copy={copy} />
-        ) : (
-          <Ring variant="open" cls="open" state={copy.ringWorking} big="04:38" sec="12" lbl={`${copy.ringAccumLabel} · ${copy.ringScaleNote}`} pct={0.58} />
-        )}
-        <Methods copy={copy} />
-        <div className="infostrip">
-          <div className="infocell">
-            <div className="infocell__k">{copy.clockInSite}</div>
-            <div className="infocell__v">{siteName}</div>
-          </div>
-          <div className="infocell">
-            <div className="infocell__k">{copy.clockInTime}</div>
-            <div className="infocell__v mono">{clockInLabel}</div>
-          </div>
-        </div>
-        {/* 휴게 시작(옅은 보라) | 퇴근(꽉 찬 보라) — 시안 Att-Phone */}
-        <div className="att-actions">
+        <div className="att-main">
+          <div className="att-gap" />
           {openSession ? (
-            <button type="button" className="breakbtn" onClick={onStartBreak} disabled={busy}>
-              {copy.startBreak}
-            </button>
+            <LiveOpenRing clockInAt={openSession.clockInAt} copy={copy} />
           ) : (
-            <Link href="/mobile/attendance?state=break" className="breakbtn">
-              {copy.startBreak}
-            </Link>
+            <Ring variant="open" cls="open" state={copy.ringWorking} big="04:38" sec="12" lbl={`${copy.ringAccumLabel} · ${copy.ringScaleNote}`} pct={0.58} />
           )}
-          <Link href="/mobile/attendance/capture?mode=out" className="clockbtn clockbtn--out">
-            {copy.clockOut}
-          </Link>
+          <Methods copy={copy} />
+          <div className="infostrip">
+            <div className="infocell">
+              <div className="infocell__k">{copy.clockInSite}</div>
+              <div className="infocell__v">{siteName}</div>
+            </div>
+            <div className="infocell">
+              <div className="infocell__k">{copy.clockInTime}</div>
+              <div className="infocell__v mono">{clockInLabel}</div>
+            </div>
+          </div>
+          {/* 휴게 시작(옅은 보라) | 퇴근(꽉 찬 보라) — 시안 Att-Phone */}
+          <div className="att-actions">
+            {openSession ? (
+              <button type="button" className="breakbtn" onClick={onStartBreak} disabled={busy}>
+                {copy.startBreak}
+              </button>
+            ) : (
+              <Link href="/mobile/attendance?state=break" className="breakbtn">
+                {copy.startBreak}
+              </Link>
+            )}
+            <Link href="/mobile/attendance/capture?mode=out" className="clockbtn clockbtn--out">
+              {copy.clockOut}
+            </Link>
+          </div>
+          {errorMsg ? (
+            <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
+          ) : null}
+          {/* 근무 중 상태에서도 이력·급여로 바로 이동할 수 있도록 주요 액션 아래에 배치 */}
+          {abandonedBanner}
         </div>
-        {openSession ? <TodayLog session={openSession} copy={copy} /> : null}
-        {errorMsg ? (
-          <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
-        ) : null}
-        {/* 근무 중 상태에서도 이력·급여로 바로 이동할 수 있도록 주요 액션 아래에 배치 */}
-        {abandonedBanner}
-        {entryList}
+        {sideColumn(openSession ? <TodayLog session={openSession} copy={copy} /> : null)}
         {reminderOpenSessionId ? <ReminderPrompt sessionId={reminderOpenSessionId} copy={copy} /> : null}
       </div>
     );
@@ -538,52 +544,54 @@ export function AttendanceHome({
       <div className="att att--home">
         <AttRingDefs />
         {greet}
-        <div className="att-gap" />
-        {openSession ? (
-          <LiveBreakBody
-            clockInAt={openSession.clockInAt}
-            openBreakStartedAt={openSession.openBreakStartedAt}
-            closedBreakSeconds={openSession.closedBreakSeconds}
-            breakCount={openSession.breakCount}
-            onEndBreak={onEndBreak}
-            busy={busy}
-            copy={copy}
-          />
-        ) : (
-          <>
-            <div className="breakbanner">
-              <AIc>{AttIcon.coffee}</AIc>
-              <div>
-                <b>{copy.ringOnBreak}</b>
-                <p>{copy.breakWarning}</p>
+        <div className="att-main">
+          <div className="att-gap" />
+          {openSession ? (
+            <LiveBreakBody
+              clockInAt={openSession.clockInAt}
+              openBreakStartedAt={openSession.openBreakStartedAt}
+              closedBreakSeconds={openSession.closedBreakSeconds}
+              breakCount={openSession.breakCount}
+              onEndBreak={onEndBreak}
+              busy={busy}
+              copy={copy}
+            />
+          ) : (
+            <>
+              <div className="breakbanner">
+                <AIc>{AttIcon.coffee}</AIc>
+                <div>
+                  <b>{copy.ringOnBreak}</b>
+                  <p>{copy.breakWarning}</p>
+                </div>
+                <span className="t mono">00:23</span>
               </div>
-              <span className="t mono">00:23</span>
-            </div>
-            <Ring variant="break" cls="break" state={copy.ringOnBreak} big="04:15" lbl={copy.ringWorkLabel} pct={0.52} />
-            <div className="infostrip">
-              <div className="infocell">
-                <div className="infocell__k">{copy.breakTotal}</div>
-                <div className="infocell__v mono">00:48</div>
+              <Ring variant="break" cls="break" state={copy.ringOnBreak} big="04:15" lbl={copy.ringWorkLabel} pct={0.52} />
+              <div className="infostrip">
+                <div className="infocell">
+                  <div className="infocell__k">{copy.breakTotal}</div>
+                  <div className="infocell__v mono">00:48</div>
+                </div>
+                <div className="infocell">
+                  <div className="infocell__k">{copy.breakCount}</div>
+                  <div className="infocell__v">{copy.breakCountOrdinal(2)}</div>
+                </div>
               </div>
-              <div className="infocell">
-                <div className="infocell__k">{copy.breakCount}</div>
-                <div className="infocell__v">{copy.breakCountOrdinal(2)}</div>
-              </div>
-            </div>
-            <button type="button" className="clockbtn clockbtn--disabled">
-              <AIc>{AttIcon.logout}</AIc>{copy.clockOutDisabled}
-            </button>
-            <Link href="/mobile/attendance?state=open" className="breakbtn breakbtn--active">
-              <AIc>{AttIcon.play}</AIc>{copy.endBreak}
-            </Link>
-          </>
-        )}
-        {errorMsg ? (
-          <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
-        ) : null}
-        {/* 휴게 중 상태에서도 이력·급여 바로가기 유지 */}
-        {abandonedBanner}
-        {entryList}
+              <button type="button" className="clockbtn clockbtn--disabled">
+                <AIc>{AttIcon.logout}</AIc>{copy.clockOutDisabled}
+              </button>
+              <Link href="/mobile/attendance?state=open" className="breakbtn breakbtn--active">
+                <AIc>{AttIcon.play}</AIc>{copy.endBreak}
+              </Link>
+            </>
+          )}
+          {errorMsg ? (
+            <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
+          ) : null}
+          {/* 휴게 중 상태에서도 이력·급여 바로가기 유지 */}
+          {abandonedBanner}
+        </div>
+        {sideColumn()}
         {reminderOpenSessionId ? <ReminderPrompt sessionId={reminderOpenSessionId} copy={copy} /> : null}
       </div>
     );
@@ -594,13 +602,15 @@ export function AttendanceHome({
     <div className="att att--home">
       <AttRingDefs />
       {greet}
-      <div className="att-gap" />
-      <Ring variant="idle" state={copy.ringIdle} lbl={copy.ringIdleLabel} />
-      <Methods copy={copy} />
-      <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in">
-        <AIc>{AttIcon.qr}</AIc>{copy.clockIn}
-      </Link>
-      {entryList}
+      <div className="att-main">
+        <div className="att-gap" />
+        <Ring variant="idle" state={copy.ringIdle} lbl={copy.ringIdleLabel} />
+        <Methods copy={copy} />
+        <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in">
+          <AIc>{AttIcon.qr}</AIc>{copy.clockIn}
+        </Link>
+      </div>
+      {sideColumn()}
     </div>
   );
 }

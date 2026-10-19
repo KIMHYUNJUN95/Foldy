@@ -50,7 +50,7 @@ export function AdminHoldButton({
     <button
       type="button"
       className={`ahold ${holding ? "is-holding" : ""} ${className}`}
-      style={{ ...style, ["--ahold-ms" as string]: `${durationMs}ms` }}
+      style={{ ...style, "--ahold-ms": `${durationMs}ms` } as React.CSSProperties}
       disabled={disabled}
       onPointerDown={(e) => {
         if (e.button !== 0) return;

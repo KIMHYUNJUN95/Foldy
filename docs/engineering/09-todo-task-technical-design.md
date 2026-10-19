@@ -1242,3 +1242,15 @@ myOwn(t, meId)      // !sentInstr — 내 일정 뷰(오늘/내일/관리함/캘
 완료는 작업 행 하나에만 있다(`status` / `completed_at` / `completed_by_user_id`). 그래서 보낸 지시
 카드의 "2 / 3 완료" 같은 담당자별 진행률은 **구현 불가**이며, 필요해지면
 `task_participants.completed_at` 추가 + 완료 의미 변경이라는 별도 결정이 선행되어야 한다.
+
+## React Compiler 가 큰 화면을 통째로 건너뛰는 패턴 (2026-10-19)
+
+`reactCompiler: true` 인데도 컴포넌트 하나가 아래 중 하나만 있으면 그 컴포넌트는 **컴파일에서 빠지고 아무 경고도 없다**
+(`babel-plugin-react-compiler` 의 `logger.logEvent` 로 `CompileError` 를 보면 보인다). 투두 콘솔(4,700줄) · 예약 콘솔(1,790줄) ·
+온보딩이 그렇게 빠져 있었다.
+
+- `style={{ ["--x" as string]: v }}` — 계산된 키 안의 `as`. `style={{ "--x": v } as React.CSSProperties}` 로.
+- `try { }` 안의 `??` · `||` · 삼항 — 값을 try 밖에서 계산해 넘긴다.
+- 옵셔널 체이닝이 든 논리식(`a?.b || c?.d ? x : y`, `[a?.x, a?.y].filter().join() || z`) 이 JSX · 정렬 콜백 안에 — 모듈 함수로 뺀다.
+- 함수 안의 `x++`(람다가 잡은 변수) — 인덱스를 값으로 계산한다.
+- `return` 뒤에 선언한 함수 선언 · 쓰기 전에 선언하지 않은 함수(`closePanel`) — 쓰는 곳보다 위로 올린다.

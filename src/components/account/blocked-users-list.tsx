@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { unblockBoardUser } from "@/app/mobile/board/moderation-actions";
 
 /** 계정 → 보안 「차단한 사용자」 — 게시판 차단 해제(2026-10-06). */
@@ -15,14 +14,12 @@ export function BlockedUsersList({
   /** 모바일 계정 화이트 리디자인 — 공용 BottomSheet 안에 넣을 때: 바깥 상자 · 제목 없이, 버튼은 옅은 회색. */
   bare?: boolean;
 }) {
-  const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   async function onUnblock(id: string) {
     setPendingId(id);
     try {
-      await unblockBoardUser(id);
-      router.refresh();
+      await unblockBoardUser(id); // 액션이 /account 를 revalidate — refresh 중복 금지
     } finally {
       setPendingId(null);
     }

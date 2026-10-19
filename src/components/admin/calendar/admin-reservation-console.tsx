@@ -492,6 +492,14 @@ export function AdminReservationConsole({
     return () => observer.disconnect();
   }, [activeView, dates.length, isOutOfWindow]);
 
+  // 선언 순서: Esc 효과가 쓰기 전에 있어야 React Compiler 가 이 콘솔을 컴파일한다.
+  function closePanel() {
+    setIsPanelVisible(false);
+    window.setTimeout(() => {
+      setPanelSelection((current) => (current ? null : current));
+    }, PANEL_TRANSITION_MS);
+  }
+
   useEffect(() => {
     if (!panelSelection) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -502,13 +510,6 @@ export function AdminReservationConsole({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [panelSelection]);
-
-  function closePanel() {
-    setIsPanelVisible(false);
-    window.setTimeout(() => {
-      setPanelSelection((current) => (current ? null : current));
-    }, PANEL_TRANSITION_MS);
-  }
 
   const handleSyncRefresh = () => {
     if (beds24SyncPaused) return;
@@ -1342,8 +1343,9 @@ export function AdminReservationConsole({
               }
             }}
             onCopyPhone={async () => {
+              const phone = panelReservation.phone ?? ""; // try 안의 ?? 는 React Compiler 가 거부한다
               try {
-                await copyText(panelReservation.phone ?? "");
+                await copyText(phone);
                 showToast(copy.wPhoneCopied);
               } catch {
                 showToast(copy.copyFailedToast, true);

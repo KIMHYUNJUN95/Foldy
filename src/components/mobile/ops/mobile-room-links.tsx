@@ -301,7 +301,7 @@ function RoomRow({
   const dup = row.units.some((unit) => unit.airbnb?.listingId && duplicates.has(unit.airbnb.listingId));
   const copied = target ? copiedKey === unitKey(target) : false;
   return (
-    <div className={`mrl-row${on ? " is-on" : ""}`} style={{ ["--i" as string]: Math.min(index, 12) }}>
+    <div className={`mrl-row${on ? " is-on" : ""}`} style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
       <button aria-pressed={on} className="mrl-row__open" onClick={onOpen} type="button">
         <span className="mrl-row__n">{row.label}</span>
         <span className="mrl-row__sub">

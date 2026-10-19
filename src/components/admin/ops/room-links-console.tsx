@@ -1,7 +1,6 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { ExternalLink, Search } from "lucide-react";
 import {
   addManualBuilding,
@@ -79,7 +78,6 @@ const buildingKey = (building: RoomLinkBuildingView) =>
 
 export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy: Copy }) {
   const w = copy.white;
-  const router = useRouter();
   const [selection, setSelection] = useState<Selection>(() => ({
     building: data.buildings[0] ? buildingKey(data.buildings[0]) : "",
     row: null,
@@ -170,10 +168,9 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
     setQuery("");
   };
 
-  /** 추가 · 이름 바꾸기 · 지우기가 끝나면 — 알림 한 줄 + 목록 다시 읽기. */
+  /** 추가 · 이름 바꾸기 · 지우기가 끝나면 — 알림 한 줄. 목록은 액션의 revalidatePath 가 다시 읽는다(refresh 중복 금지). */
   const done = (message: string) => {
     flash(message);
-    router.refresh();
   };
 
   const isDuplicate = (unit: RoomLinkUnitView) => !!unit.airbnb?.listingId && duplicates.has(unit.airbnb.listingId);
@@ -954,7 +951,6 @@ function LinkEditor({
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
-  const router = useRouter();
   const [form, setForm] = useState<LinkForm>({
     guest: link?.guestUrl ?? "",
     host: link?.hostUrl ?? "",
@@ -974,7 +970,6 @@ function LinkEditor({
       }
       onClose();
       onSaved(result.removed ? copy.removedToast : copy.savedToast);
-      router.refresh();
     });
   };
 

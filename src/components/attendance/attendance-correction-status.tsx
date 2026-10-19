@@ -10,7 +10,6 @@
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { cancelAttendanceCorrectionRequest } from "@/app/mobile/attendance/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
@@ -47,7 +46,6 @@ export function AttendanceCorrectionStatus({
   locale: string;
 }) {
   const copy = getDictionary(locale).attendance;
-  const router = useRouter();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, startCancel] = useTransition();
   const [cancelErr, setCancelErr] = useState(false);
@@ -57,8 +55,8 @@ export function AttendanceCorrectionStatus({
     startCancel(async () => {
       const r = await cancelAttendanceCorrectionRequest(request.id);
       setConfirmCancel(false);
-      if (r.ok) router.refresh();
-      else setCancelErr(true);
+      // 성공은 액션의 revalidatePath 가 갱신한다 — router.refresh() 중복 금지
+      if (!r.ok) setCancelErr(true);
     });
 
   const editHref = request.sessionId

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import "./transport.css";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { CalendarPanel } from "./transport-date-sheet";
@@ -1050,7 +1049,6 @@ export function TransportStatement({
   const dict = getDictionary(locale);
   const t = dict.transport;
   const localeTag = locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR";
-  const router = useRouter();
 
   const [items, setItems] = useState<TransportItem[]>(() => initialItems.map(mapItemRow));
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -1095,10 +1093,9 @@ export function TransportStatement({
             : it,
         ),
       );
-      setToast({ message: t.toastSaved, tone: "ok" });
-      router.refresh();
+      setToast({ message: t.toastSaved, tone: "ok" }); // 액션이 revalidatePath — refresh 중복 금지
     },
-    [selectedId, t.toastSaved, router],
+    [selectedId, t.toastSaved],
   );
 
   const handleDelete = useCallback(() => {
@@ -1112,10 +1109,9 @@ export function TransportStatement({
       if (result.ok) {
         setItems((prev) => prev.filter((it) => it.id !== id));
         setToast({ message: t.toastDeleted, tone: "del" });
-        router.refresh();
       }
     }, 340);
-  }, [selectedId, t.toastDeleted, router]);
+  }, [selectedId, t.toastDeleted]);
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -1130,7 +1126,6 @@ export function TransportStatement({
       return;
     }
     setToast({ message: t.submitSuccess, tone: "ok" });
-    router.refresh();
   }
 
   // draft 이외 status 표시용 칩 라벨
@@ -1251,7 +1246,6 @@ export function TransportStatement({
           onClose={() => setShowAddSheet(false)}
           onCreated={(item) => {
             setItems((prev) => [...prev, item]);
-            router.refresh();
           }}
         />
       )}

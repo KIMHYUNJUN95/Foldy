@@ -421,7 +421,8 @@ Status: **Implemented (2026-07-27).** 이 문서는 대시보드(어드민 웹) 
 - **`run()` 의 `router.refresh()` 를 제거했다.** `src/app/admin/tasks/actions.ts` 의 모든 쓰기
   액션이 `revalidatePath(CONSOLE_PATH)` 를 호출함을 전수 확인했으므로 중복 왕복이었다. 읽기 전용
   (`getConsoleTaskDetail` 등)과 목록을 건드리지 않는 보고서 액션만 revalidate 가 없다.
-  `run()` 밖에서 자체 `startTransition` 을 쓰는 일괄 삭제·지난 정리 2곳은 아직 그대로다.
+  `run()` 밖에서 자체 `startTransition` 을 쓰는 일괄 삭제·지난 정리 2곳도 2026-10-19 에 `router.refresh()` 를 걷어 냈다
+  (`bulkDeleteConsoleTasks` · `dismissConsoleOverdue` 둘 다 성공 경로에서 revalidate). 남은 `router.refresh()` 는 오류 화면의 「다시 시도」 버튼뿐.
 - **인라인 추가 더블 제출 차단.** `saveInlineAdd` 는 동기 ref 잠금을 쓰고(state 는 리렌더가 늦어
   첫 두 탭을 못 막는다) 성공·실패 양쪽 콜백에서 해제한다. 저장 버튼은 전송 중 비활성.
   Enter-to-save 도 같은 함수를 타므로 함께 보호된다.

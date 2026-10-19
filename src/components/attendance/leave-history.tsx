@@ -267,9 +267,9 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
                 onOpenEdit={() => router.push(`/mobile/attendance/leave/new?id=${r.id}`)}
                 onDelete={async () => {
                   setDeletingId(r.id);
-                  const result = await deleteLeaveRequestDraftAction(r.id);
+                  // 액션이 revalidatePath 한다 — router.refresh() 중복 금지
+                  await deleteLeaveRequestDraftAction(r.id);
                   setDeletingId(null);
-                  if (result.ok) router.refresh();
                 }}
               />
             </div>

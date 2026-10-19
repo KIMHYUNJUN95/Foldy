@@ -5,7 +5,7 @@
 // + 팝오버/모달을 렌더한다. 화이트 리디자인(2026-10-15, 시안 Todo-PC · TodoDone/Cal/Dir/Proj-PC):
 // 상자·세로 구분선 없음, 선택은 옅은 보라 바탕만. CSS: admin-tasks-white.css(`atw-`, 레이아웃·목록·상세)
 // + admin-tasks-console.css(팝오버·모달·업로더 — 예전 그대로 쓰는 부분).
-// 서버 액션(@/app/admin/tasks/actions)이 모든 쓰기를 처리하고, revalidatePath + router.refresh() 로 갱신한다.
+// 서버 액션(@/app/admin/tasks/actions)이 모든 쓰기를 처리하고, revalidatePath 로 갱신한다(성공 뒤 router.refresh() 를 더 부르지 않는다 — 이중 렌더).
 // See docs/product/28-admin-todoist-console.md.
 import Image from "next/image";
 import {
@@ -1449,12 +1449,11 @@ export function AdminTasksConsole({
           )}
           <button
             type="button"
-            className={`atw-achip ${add.context?.propertyId || add.context?.reservationId ? "set" : ""}`}
+            className={`atw-achip ${addContextSet(add.context) ? "set" : ""}`}
             onClick={(e) => openContextPop(e, null)}
           >
             <Building2 size={14} />
-            {[add.context?.propertyName, add.context?.roomLabel].filter(Boolean).join(" · ") ||
-              dict.cpTitle}
+            {addContextLabel(add.context) || dict.cpTitle}
           </button>
           {/* 칩 줄의 마지막 칩. `display: contents` 라 드롭존과 썸네일이 이 flex 줄의 직접 자식이
               되어, 사진이 없으면 칩 하나, 있으면 아래 줄로 자연스럽게 감긴다. */}
@@ -1792,10 +1791,9 @@ export function AdminTasksConsole({
           showToast(fill(dict.tBulkDeleted, { n: removed }));
         }
         onDone?.();
-        router.refresh();
       });
     },
-    [dict, errMsg, run, router, showToast, showUndo],
+    [dict, errMsg, run, showToast, showUndo],
   );
 
   const askBulkDelete = () => {
@@ -1835,7 +1833,6 @@ export function AdminTasksConsole({
       } else {
         showToast(dict.tDeleted);
       }
-      router.refresh();
     });
   };
 
@@ -2480,7 +2477,10 @@ export function AdminTasksConsole({
     const tasksOn = (dstr: string) =>
       (occ.get(dstr) ?? [])
         .slice()
-        .sort((a, b) => (a.timeLabel ?? "99").localeCompare(b.timeLabel ?? "99") || prioSort(a, b));
+        .sort((a, b) => {
+          const byTime = (a.timeLabel ?? "99").localeCompare(b.timeLabel ?? "99");
+          return byTime !== 0 ? byTime : prioSort(a, b);
+        });
     const tag = locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR";
     // 2024-01-08 은 월요일 — 월~일 머리글.
     const wdHead = Array.from({ length: 7 }, (_, i) =>
@@ -2593,7 +2593,7 @@ export function AdminTasksConsole({
             </button>
           </span>
         </div>
-        <div className="atw-cal__grid" style={{ ["--rows" as string]: String(rows) }}>
+        <div className="atw-cal__grid" style={{ "--rows": String(rows) } as React.CSSProperties}>
           {wdHead.map((w, i) => (
             <span key={i} className={`atw-cal__wd ${i >= 5 ? "is-wkend" : ""} ${i === 5 ? "is-sat" : i === 6 ? "is-sun" : ""}`}>
               {w}
@@ -2864,6 +2864,18 @@ export function AdminTasksConsole({
     if (files.some((f) => f.size > 8 * 1024 * 1024)) return showToast(fill(dict.phTooLarge, { max: 8 }));
     if (t.imageUrls.length + files.length > max) return showToast(fill(dict.phTooMany, { max }));
     setPhotoBusy(t.id);
+    // try 안에 조건식(??)을 두면 React Compiler 가 콘솔 전체를 건너뛴다 — 본문은 밖에서 만든다.
+    const core = {
+      taskId: t.id,
+      title: t.title,
+      desc: t.description ?? "",
+      tags: t.tags,
+      date: dueDateOf(t) ?? t.scheduledDate ?? "",
+      time: t.timeLabel ?? "",
+      durationMinutes: t.durationMinutes,
+      repeat: t.recurrenceRule ?? "none",
+      priority: t.priority,
+    };
     run(
       async () => {
         try {
@@ -2875,18 +2887,7 @@ export function AdminTasksConsole({
             })),
           );
           const uploaded = await uploadPendingTaskPhotos({ pending: pendingItems, organizationId, taskId: t.id });
-          return updateConsoleTaskCore({
-            taskId: t.id,
-            title: t.title,
-            desc: t.description ?? "",
-            tags: t.tags,
-            date: dueDateOf(t) ?? t.scheduledDate ?? "",
-            time: t.timeLabel ?? "",
-            durationMinutes: t.durationMinutes,
-            repeat: t.recurrenceRule ?? "none",
-            priority: t.priority,
-            imageUrls: [...t.imageUrls, ...uploaded],
-          });
+          return updateConsoleTaskCore({ ...core, imageUrls: [...t.imageUrls, ...uploaded] });
         } catch {
           return { ok: false, error: "save_failed" } as TaskActionResult;
         }
@@ -3208,70 +3209,7 @@ export function AdminTasksConsole({
     onClick: () => goProject(p.id),
   }));
 
-  return (
-    <div
-      className={`admtasks atw ${sideNode ? "has-side" : ""} ${isCal ? "is-cal" : ""}`}
-      onClick={() => setPop(null)}
-    >
-      <ViewNav
-        aria={dict.w.navAria}
-        addLabel={dict.addTask}
-        onAdd={navAdd}
-        items={navItems}
-        projectsLabel={dict.w.projects}
-        projects={navProjects}
-        newProjectLabel={dict.newProject}
-        onNewProject={() => setNewProj({ name: "", members: [], q: "" })}
-      />
-
-      <main className="atw-main">
-        <div className="atw-fade" key={projectId ?? view}>
-          {header()}
-          {filterableView && toolbar()}
-          {selectionBar()}
-          {body}
-        </div>
-      </main>
-
-      {sideNode}
-
-      {/* POPOVERS / SHEETS / MODALS */}
-      {pop && PopoverLayer()}
-      {report && ReportModal()}
-      {newProj && NewProjectModal()}
-      {confirm && ConfirmModal()}
-      {recurDel && RecurDeleteModal()}
-
-      {toast && <AdminToast message={toast.message} onDismiss={dismiss} />}
-      {undo && (
-        <div className="undobar" role="status" onClick={(e) => e.stopPropagation()}>
-          <div className="undobar__txt">
-            <span className="undobar__msg">{undo.message}</span>
-            {undo.sub && <span className="undobar__sub">{undo.sub}</span>}
-          </div>
-          <button
-            className="undobar__act"
-            onClick={() => {
-              undo.onUndo();
-            }}
-          >
-            {dict.undoBtn}
-          </button>
-          <button className="undobar__x" onClick={() => setUndo(null)} aria-label={dict.iaCancel}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
-      {/* 사진 확대 — 근태(교통비 영수증)와 같은 공용 뷰어를 쓴다. 콘솔용 별도 라이트박스는 만들지 않는다. */}
-      <ImageLightbox
-        closeLabel={dict.rptClose}
-        onClose={() => setLightbox(null)}
-        openIndex={lightbox ? lightbox.index : null}
-        urls={lightbox?.urls ?? []}
-      />
-      {pending && <span className="sr-only" aria-live="polite" />}
-    </div>
-  );
+  // 아래 보조 함수들은 return 앞에 선언한다 — return 뒤 선언은 React Compiler 가 「도달 불가 코드의 호이스팅 선언」으로 거부해 이 콘솔 전체가 컴파일에서 빠진다.
 
   // ────────────────────────────────────────────────────────────────────────────────────────────
   // DETAIL COLUMN — 오른쪽 칸(화이트 리디자인). 예전 슬라이드 패널(.dp)의 로직을 그대로 쓴다.
@@ -3297,10 +3235,7 @@ export function AdminTasksConsole({
     const cx = ctxItems(t);
     const ticket = cx.find((c) => c.k === "ticket");
     const rc = t.resolvedContext;
-    const linkText =
-      [[rc?.propertyName, rc?.roomLabel].filter(Boolean).join(" "), rc?.guestName]
-        .filter(Boolean)
-        .join(" · ") || (ticket?.v ?? "");
+    const linkText = contextLinkText(rc, ticket?.v);
     const shared = isSharedTask(t);
     const withIds = [t.createdByUserId, ...partsOf(t)].filter((v, i, a) => a.indexOf(v) === i);
     const maxPhotos = t.projectId ? 20 : 5;
@@ -4669,9 +4604,89 @@ export function AdminTasksConsole({
       </>
     );
   }
+  return (
+    <div
+      className={`admtasks atw ${sideNode ? "has-side" : ""} ${isCal ? "is-cal" : ""}`}
+      onClick={() => setPop(null)}
+    >
+      <ViewNav
+        aria={dict.w.navAria}
+        addLabel={dict.addTask}
+        onAdd={navAdd}
+        items={navItems}
+        projectsLabel={dict.w.projects}
+        projects={navProjects}
+        newProjectLabel={dict.newProject}
+        onNewProject={() => setNewProj({ name: "", members: [], q: "" })}
+      />
+
+      <main className="atw-main">
+        <div className="atw-fade" key={projectId ?? view}>
+          {header()}
+          {filterableView && toolbar()}
+          {selectionBar()}
+          {body}
+        </div>
+      </main>
+
+      {sideNode}
+
+      {/* POPOVERS / SHEETS / MODALS */}
+      {pop && PopoverLayer()}
+      {report && ReportModal()}
+      {newProj && NewProjectModal()}
+      {confirm && ConfirmModal()}
+      {recurDel && RecurDeleteModal()}
+
+      {toast && <AdminToast message={toast.message} onDismiss={dismiss} />}
+      {undo && (
+        <div className="undobar" role="status" onClick={(e) => e.stopPropagation()}>
+          <div className="undobar__txt">
+            <span className="undobar__msg">{undo.message}</span>
+            {undo.sub && <span className="undobar__sub">{undo.sub}</span>}
+          </div>
+          <button
+            className="undobar__act"
+            onClick={() => {
+              undo.onUndo();
+            }}
+          >
+            {dict.undoBtn}
+          </button>
+          <button className="undobar__x" onClick={() => setUndo(null)} aria-label={dict.iaCancel}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
+      {/* 사진 확대 — 근태(교통비 영수증)와 같은 공용 뷰어를 쓴다. 콘솔용 별도 라이트박스는 만들지 않는다. */}
+      <ImageLightbox
+        closeLabel={dict.rptClose}
+        onClose={() => setLightbox(null)}
+        openIndex={lightbox ? lightbox.index : null}
+        urls={lightbox?.urls ?? []}
+      />
+      {pending && <span className="sr-only" aria-live="polite" />}
+    </div>
+  );
 }
 
 // ── tiny helpers (module scope) ───────────────────────────────────────────────────────────────
+// 옵셔널 체이닝이 든 논리식을 JSX 안에 두면 React Compiler 가 이 콘솔 전체를 건너뛴다 — 함수로 뺀다.
+function addContextSet(c: AddDraft["context"]): boolean {
+  return Boolean(c && (c.propertyId || c.reservationId));
+}
+function addContextLabel(c: AddDraft["context"]): string {
+  return c ? [c.propertyName, c.roomLabel].filter(Boolean).join(" · ") : "";
+}
+
+function contextLinkText(rc: TaskRecord["resolvedContext"], ticketValue: string | undefined): string {
+  const joined = rc
+    ? [[rc.propertyName, rc.roomLabel].filter(Boolean).join(" "), rc.guestName].filter(Boolean).join(" · ")
+    : "";
+  return joined || (ticketValue ?? "");
+}
+
+// ── (이어서) ───────────────────────────────────────────────────────────────
 function fmtMonthTitle(y: number, m: number, locale: Locale): string {
   return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
     year: "numeric",

@@ -615,12 +615,11 @@ export function TasksWorkspace({
     setDeletedUndoIds((ids) => {
       if (ids?.length)
         startComplete(async () => {
-          await restoreTasksInList(ids);
-          router.refresh();
+          await restoreTasksInList(ids); // 액션이 revalidatePath 한다 — refresh 중복 금지
         });
       return null;
     });
-  }, [router]);
+  }, []);
 
   // 완료/기록 tab: daily-report sheet target date (the day-group whose 보고서 button was tapped).
   const [reportDate, setReportDate] = useState<string | null>(null);

@@ -202,11 +202,10 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
   const onStillWorking = useCallback(async () => {
     if (busy) return;
     setBusy(true);
-    const res = await respondOpenSessionReminder("still_working");
+    await respondOpenSessionReminder("still_working"); // 액션이 revalidatePath 한다 — router.refresh() 중복 금지
     setBusy(false);
     setOpen(false);
-    if (res.ok) router.refresh();
-  }, [busy, router]);
+  }, [busy]);
 
   const onLeftWork = useCallback(async () => {
     if (busy) return;
@@ -345,7 +344,6 @@ export function AttendanceHome({
   const fullDict = getDictionary(locale);
   const copy = fullDict.attendance;
   const dict = fullDict;
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Default hidden (true). Persisted across sessions; shared key with attendance-pay.
@@ -360,12 +358,9 @@ export function AttendanceHome({
     setErrorMsg(null);
     const res = await startBreak();
     setBusy(false);
-    if (res.ok) {
-      router.refresh();
-    } else {
-      setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
-    }
-  }, [busy, copy, router]);
+    // 성공은 액션의 revalidatePath 가 화면을 갱신한다 — router.refresh() 중복 금지
+    if (!res.ok) setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
+  }, [busy, copy]);
 
   const onEndBreak = useCallback(async () => {
     if (busy) return;
@@ -373,12 +368,9 @@ export function AttendanceHome({
     setErrorMsg(null);
     const res = await endBreak();
     setBusy(false);
-    if (res.ok) {
-      router.refresh();
-    } else {
-      setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
-    }
-  }, [busy, copy, router]);
+    // 성공은 액션의 revalidatePath 가 화면을 갱신한다 — router.refresh() 중복 금지
+    if (!res.ok) setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
+  }, [busy, copy]);
 
   const [booting, setBooting] = useState(true);
   useEffect(() => {

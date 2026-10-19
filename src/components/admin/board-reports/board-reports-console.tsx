@@ -6,7 +6,6 @@
 // 흰 바탕 · 상자 · 세로선 없음 · 선택은 옅은 보라 바탕만. docs/product/23-board-workflow.md §12-C
 import "./board-reports-white.css";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
@@ -47,7 +46,6 @@ function reasonSummary(r: PendingBoardReport, copy: Copy, w: W): string {
 }
 
 export function BoardReportsConsole({ reports, copy, w }: { reports: PendingBoardReport[]; copy: Copy; w: W }) {
-  const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = reports.find((r) => r.key === selectedKey) ?? null;
@@ -110,7 +108,6 @@ export function BoardReportsConsole({ reports, copy, w }: { reports: PendingBoar
             showToast(message);
             if (ok) {
               setSelectedKey(null);
-              router.refresh();
             }
           }}
         />

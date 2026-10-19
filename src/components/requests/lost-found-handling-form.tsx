@@ -8,7 +8,6 @@
 // BottomSheet로 한 번 더 확인한다(오조작 방지). 그 외 상태 변경은 확인 없이 바로 저장한다.
 // part_time_staff는 렌더 자체를 안 하고, 서버 액션과 RLS가 최종 게이트다.
 import { useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Lock } from "lucide-react";
 import {
   AnnouncementImageUploader,
@@ -52,7 +51,6 @@ export function LostFoundHandlingForm({
   organizationId,
 }: LostFoundHandlingFormProps) {
   const t = copy.handling;
-  const router = useRouter();
   const [status, setStatus] = useState<LostItemStatus>(initialStatus);
   const [memo, setMemo] = useState(initialMemo);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +102,6 @@ export function LostFoundHandlingForm({
         setSaved(true);
         haptic("success");
         window.setTimeout(() => setSaved(false), 2200);
-        router.refresh();
         return;
       }
       setError(

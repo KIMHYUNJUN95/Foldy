@@ -354,7 +354,6 @@ function MemberPanel({
       if (result.ok) {
         haptic("success");
         onToast(success);
-        router.refresh();
       } else {
         haptic("error");
         rollback?.();
@@ -706,7 +705,6 @@ function MemberPanel({
                 haptic("success");
                 onToast(c.wToastDeleted);
                 router.push("/admin/users", { scroll: false });
-                router.refresh();
               } else {
                 haptic("error");
                 onToast(errorText(result.error, dict));

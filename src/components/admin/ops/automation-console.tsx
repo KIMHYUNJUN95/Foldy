@@ -1,7 +1,6 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Check, Plus, X } from "lucide-react";
 import {
   addCleaningExtraRoom,
@@ -116,7 +115,6 @@ export function AutomationConsole({
   locale: AutomationLocale;
   localeTag: string;
 }) {
-  const router = useRouter();
   const w = copy.white;
   const [selected, setSelected] = useState<AutomationJobKey>("daily_report");
   const [tab, setTab] = useState<Tab>("preview");
@@ -154,7 +152,6 @@ export function AutomationConsole({
       const result = await setAutomationEnabled(job.jobKey, false);
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.toggleOffDone);
-      router.refresh();
     });
   };
   const confirmEnable = () => {
@@ -163,7 +160,6 @@ export function AutomationConsole({
       setConfirmOn(false);
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.toggleOnDone);
-      router.refresh();
     });
   };
 
@@ -966,7 +962,6 @@ function SettingsPane({
   justSaved: boolean;
   onSaved: (jobKey: AutomationJobKey) => void;
 }) {
-  const router = useRouter();
   const w = copy.white;
   const original = useMemo(() => draftOf(job), [job]);
   const [draft, setDraft] = useState<Draft>(original);
@@ -1024,7 +1019,6 @@ function SettingsPane({
       if (!result.ok) return flash(errorText(result.error));
       flash(copy.settings.saved);
       onSaved(job.jobKey);
-      router.refresh();
     });
   };
 

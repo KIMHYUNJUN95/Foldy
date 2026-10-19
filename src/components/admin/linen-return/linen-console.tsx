@@ -216,7 +216,6 @@ export function LinenReturnConsole({
       }
       setEditOpen(false);
       showToast(t.tSaved);
-      router.refresh();
     });
   }
 
@@ -231,7 +230,6 @@ export function LinenReturnConsole({
       setConfirmId(null);
       setSelectedId(null);
       showToast(t.tDeleted);
-      router.refresh();
     });
   }
 

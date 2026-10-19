@@ -199,7 +199,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
                     className={`dh-bar${d.actual ? " is-actual" : ""}${d.today ? " is-today" : ""}`}
                     data-tip={c.dhDayTip.replace("{day}", String(d.day)).replace("{amount}", yen(d.revenue))}
                     key={d.day}
-                    style={{ height: `${Math.max(0, (d.revenue / max) * 100)}%`, ["--i" as string]: i }}
+                    style={{ height: `${Math.max(0, (d.revenue / max) * 100)}%`, "--i": i } as React.CSSProperties}
                   />
                 ))}
               </div>
@@ -236,11 +236,11 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
                 strokeDasharray={`${(Math.min(s.occupancyPct, 100) / 100) * circ} ${circ}`}
                 strokeLinecap="round"
                 strokeWidth="10"
-                style={{ ["--len" as string]: (Math.min(s.occupancyPct, 100) / 100) * circ, ["--circ" as string]: circ }}
+                style={{ "--len": (Math.min(s.occupancyPct, 100) / 100) * circ, "--circ": circ } as React.CSSProperties}
                 transform="rotate(-90 52 52)"
               />
               {s.occupancyPct > 0 ? (
-                <g className="dh-occ__cap" style={{ ["--deg" as string]: `${(Math.min(s.occupancyPct, 100) / 100) * 360}deg` }}>
+                <g className="dh-occ__cap" style={{ "--deg": `${(Math.min(s.occupancyPct, 100) / 100) * 360}deg` } as React.CSSProperties}>
                   <circle cx="52" cy="8" fill="#fff" r="3" />
                 </g>
               ) : null}
@@ -257,7 +257,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
             {s.buildings.map((b, i) => (
               <div className="dh-bld__row" key={b.name}>
                 <span className="dh-bld__n" title={b.name}>{b.name}</span>
-                <span className="dh-meter"><i style={{ width: `${Math.min(b.pct, 100)}%`, ["--i" as string]: i }} /></span>
+                <span className="dh-meter"><i style={{ width: `${Math.min(b.pct, 100)}%`, "--i": i } as React.CSSProperties} /></span>
                 <span className="dh-bld__v">{pct(b.pct)}</span>
               </div>
             ))}
@@ -276,7 +276,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
               <span className="dh-months__k">{c.dhMonthRevenue}</span>
               <div className="dh-mbars">
                 {s.months.map((m, i) => (
-                  <div className="dh-mbar" key={m.month} style={{ ["--i" as string]: i }}>
+                  <div className="dh-mbar" key={m.month} style={{ "--i": i } as React.CSSProperties}>
                     <span>{yen(m.revenue)}</span>
                     <i className={m.month === thisMonth ? "is-current" : undefined} style={{ height: `${(m.revenue / mMax) * 100}%` }} />
                   </div>
@@ -320,7 +320,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
                   const last = i === linePoints.length - 1;
                   const pos = { left: `${(p.x / 480) * 100}%`, top: `${(p.y / 130) * 100}%` };
                   return (
-                    <span aria-hidden="true" key={p.x} style={{ ["--i" as string]: i }}>
+                    <span aria-hidden="true" key={p.x} style={{ "--i": i } as React.CSSProperties}>
                       <i className={`dh-line__dot${last ? " is-now" : ""}`} style={pos} />
                       <b className={`dh-line__v${last ? " is-now" : ""}`} style={pos}>
                         {pct(p.v)}

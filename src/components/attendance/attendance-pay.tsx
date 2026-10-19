@@ -315,7 +315,7 @@ export function AttendancePay({
           <div className="payw-bars">
             {bars.map(({ n, date, d, isRunning, isExcluded }) =>
               d ? (
-                <button key={date} type="button" className="payw-bar" style={{ ["--i" as string]: n }} onClick={() => setSelectedDate(date)} aria-label={d.dateLabel}>
+                <button key={date} type="button" className="payw-bar" style={{ "--i": n } as React.CSSProperties} onClick={() => setSelectedDate(date)} aria-label={d.dateLabel}>
                   <span className="payw-bar__v">{showValues && !isRunning && !isExcluded && d.paidMinutes > 0 ? hm(d.paidMinutes) : ""}</span>
                   <i
                     className={isRunning ? "is-now" : isExcluded ? "is-danger" : undefined}
@@ -487,7 +487,6 @@ export function AttendancePay({
 /** 급여 금액 자릿수 굴림(2026-10-14, 시안 Motion-B-PayCount-Phone) — 보이게 할 때마다(가림을 걷을 때 다시 마운트) 자리마다 0에서 굴러
  *  정확한 금액에서 스프링으로 멈춘다. 오른쪽 자리일수록 늦게 · 더 많이 굴린다. 굴릴 때만 살짝 흐림. 화면 읽기 프로그램엔 금액 그대로. */
 function PayOdometer({ text }: { text: string }) {
-  let digitIndex = 0;
   return (
     <span className="payo" aria-label={text}>
       {text.split("").map((ch, i) => {
@@ -499,11 +498,11 @@ function PayOdometer({ text }: { text: string }) {
           );
         }
         const n = Number(ch);
-        const idx = digitIndex++;
+        const idx = text.slice(0, i).replace(/[^0-9]/g, "").length;
         const steps = n + 10 + (idx >= 3 ? 10 : 0);
         return (
           <span key={i} className="payo__col" aria-hidden="true">
-            <span className="payo__strip" style={{ ["--to" as string]: `-${steps}em`, animationDelay: `${120 + idx * 70}ms`, animationDuration: `${1000 + idx * 110}ms` }}>
+            <span className="payo__strip" style={{ "--to": `-${steps}em`, animationDelay: `${120 + idx * 70}ms`, animationDuration: `${1000 + idx * 110}ms` } as React.CSSProperties}>
               {Array.from({ length: 31 }, (_, k) => (
                 <b key={k}>{k % 10}</b>
               ))}

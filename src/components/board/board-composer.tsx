@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Camera, X } from "lucide-react";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { uploadBoardImage } from "@/lib/board";
@@ -57,7 +56,6 @@ export function BoardComposer({
   // 사진 업로드가 끝난 최종 내용을 부모로(서버 액션 호출은 부모 담당)
   onSubmit?: (payload: ComposerSubmitPayload) => void;
 }) {
-  const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [photos, setPhotos] = useState<Preview[]>([]);
@@ -146,7 +144,6 @@ export function BoardComposer({
           setError(copy.errSaveFailed);
           return;
         }
-        router.refresh();
       }
 
       photos.forEach((p) => URL.revokeObjectURL(p.url));

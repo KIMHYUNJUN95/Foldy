@@ -120,7 +120,6 @@ export function RecruitConsole({
       showToast(result.ok ? copy.statusChanged : copy.actionFailed);
       if (result.ok) {
         setPicked([]);
-        router.refresh();
       }
     });
   }
@@ -144,7 +143,6 @@ export function RecruitConsole({
       );
       showToast(results.every((r) => r.ok) ? copy.statusChanged : copy.actionFailed);
       setPicked([]);
-      router.refresh();
     });
   }
 

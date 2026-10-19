@@ -53,7 +53,6 @@ export function RecruitContactLine({ application, copy }: { application: Applica
 
 /** 검토 메모 — 이름표 칸. 칸을 떠날 때 바뀌었으면 저장한다(따로 누르는 저장 버튼 없음). 재지원하면 이력에 그대로 뜬다. */
 export function RecruitNoteField({ application, copy }: { application: ApplicationDetail; copy: Dictionary["recruit"] }) {
-  const router = useRouter();
   const [note, setNote] = useState(application.reviewNote ?? "");
   const [saved, setSaved] = useState(application.reviewNote ?? "");
   const [state, setState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
@@ -67,7 +66,6 @@ export function RecruitNoteField({ application, copy }: { application: Applicati
       if (result.ok) {
         setSaved(note);
         setState("saved");
-        router.refresh();
       } else {
         setState("failed");
         haptic("error");
@@ -147,7 +145,6 @@ export function RecruitDeleteButton({ applicationId, closeHref, labels }: { appl
         showToast(labels.deleted);
         setOpen(false);
         router.push(closeHref);
-        router.refresh();
         return;
       }
       haptic("error");
@@ -188,7 +185,6 @@ export function RecruitDeleteButton({ applicationId, closeHref, labels }: { appl
 
 /** 아래 고정 — [되돌리기][다음 단계]. 되돌리기는 여기(상세)에만 있고 일괄에는 없다. */
 export function RecruitPanelActions({ application, copy }: { application: ApplicationDetail; copy: Dictionary["recruit"] }) {
-  const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [pending, startTransition] = useTransition();
   const next = nextStatusOf(application.status);
@@ -200,7 +196,6 @@ export function RecruitPanelActions({ application, copy }: { application: Applic
       const result = await setApplicationStatus([application.id], target);
       showToast(result.ok ? copy.statusChanged : copy.actionFailed);
       haptic(result.ok ? "success" : "error");
-      if (result.ok) router.refresh();
     });
   }
 

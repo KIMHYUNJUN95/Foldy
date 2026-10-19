@@ -1059,6 +1059,12 @@ When Beds24 sends a Japanese property name (e.g. `"荒木町A"`) in the reservat
   않는 신호는 무시한다. 지금 이 범위를 실제로 거는 것은 판매 캘린더(`/admin/ops/calendar`)뿐이고, 이
   모바일 예약 캘린더를 포함한 나머지 구독은 **범위 없이 그대로 전부** 받는다(바뀌지 않았다). 계기와 상세:
   `docs/product/33-calendar-write-features.md` → 「판매 캘린더가 스스로 무한 새로고침을 돌던 것」.
+- **2026-10-19 — 웹훅 한 건에 다시 읽기 한 번.** `mobile-calendar-live-view.tsx` 가 `reservations` 의 `postgres_changes`
+  채널(`calendar-reservations:<조직>`)을 따로 열어 두어, 같은 웹훅이 이 채널과 Beds24 broadcast 두 길로 와서 `router.refresh()` 가
+  두 번 돌았다(타이머 250ms · 600ms 가 따로). 그 채널을 지우고 공용 `useBeds24LiveRefresh` 하나로 통일했다 — 위 「예약 구독」
+  설명은 이 broadcast 신호(`kind: "reservations"`, 웹훅 처리 `process-webhook-booking.ts` 가 발신)로 읽는다. 메모
+  (`reservation_internal_notes`)는 위 참고대로 원래 실시간이 아니며, 저장한 기기는 액션의 `revalidatePath("/mobile/calendar")` 로
+  갱신하고 다른 기기는 다음 읽기 때 본다.
 - **2026-10-09 — 놓친 변경 따라잡기(판매 캘린더와 같은 공용 장치).** Beds24 신호 구독을 직접 짜던 것을 공용
   `useBeds24LiveRefresh`(`src/components/shared/beds24-live-refresh.tsx`)로 바꿨다. 실시간 신호는 저장되지 않아서, 폰 잠금 ·
   와이파이 전환 · 오래 가려 둔 화면으로 연결이 끊긴 동안 온 예약은 다음 변경이나 새로고침까지 안 보였다. 이제 ① Beds24 채널이 끊겼다

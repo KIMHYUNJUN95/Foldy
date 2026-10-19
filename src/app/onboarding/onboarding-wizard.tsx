@@ -1010,37 +1010,38 @@ export function OnboardingWizard({
   async function submit() {
     setSubmitting(true);
     setSubmitErrorKey(null);
+    // try 안의 삼항은 React Compiler 가 컴포넌트째 건너뛰는 원인 — 밖에서 계산한다.
+    const code = preview ? inviteCode.trim() : "";
+    let result: Awaited<ReturnType<typeof submitOnboardingProfile>>;
     try {
-      const result = await submitOnboardingProfile({
+      result = await submitOnboardingProfile({
         name: name.trim(),
         birthDate,
         gender,
         phoneNumber: phoneE164,
         preferredLanguage: profile.locale,
-        inviteCode: preview ? inviteCode.trim() : "",
+        inviteCode: code,
         next: profile.safeNext,
       });
-      if (result.ok) {
-        setDest(result.redirectTo);
-        setSubmitting(false);
-        goTo(8);
-      } else {
-        if (
-          result.errorKey === "phone_duplicate" ||
-          result.errorKey === "phone_invalid"
-        ) {
-          setPhoneErrorKey(result.errorKey);
-          setSubmitting(false);
-          goTo(4);
-          return;
-        }
-        setSubmitErrorKey(result.errorKey);
-        setSubmitting(false);
-      }
     } catch {
       setSubmitErrorKey("network_error");
       setSubmitting(false);
+      return;
     }
+    if (result.ok) {
+      setDest(result.redirectTo);
+      setSubmitting(false);
+      goTo(8);
+      return;
+    }
+    if (result.errorKey === "phone_duplicate" || result.errorKey === "phone_invalid") {
+      setPhoneErrorKey(result.errorKey);
+      setSubmitting(false);
+      goTo(4);
+      return;
+    }
+    setSubmitErrorKey(result.errorKey);
+    setSubmitting(false);
   }
 
   async function submitMembership() {
@@ -1182,7 +1183,7 @@ export function OnboardingWizard({
         <header className="h-[48px] flex-none" />
         <span className="obd__dust" aria-hidden="true">
           {Array.from({ length: 10 }, (_, i) => (
-            <i key={i} style={{ ["--x" as string]: `${Math.round(Math.cos(i * 2.39996) * 130)}px`, animationDelay: `${900 + i * 90}ms` }} />
+            <i key={i} style={{ "--x": `${Math.round(Math.cos(i * 2.39996) * 130)}px`, animationDelay: `${900 + i * 90}ms` } as React.CSSProperties} />
           ))}
         </span>
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
@@ -1190,7 +1191,7 @@ export function OnboardingWizard({
             <span className="obd__ic mb-6" aria-hidden="true">
               <span className="obd__glow" />
               {Array.from({ length: 8 }, (_, i) => (
-                <span key={i} className="obd__ray" style={{ ["--r" as string]: `${i * 45}deg` }} />
+                <span key={i} className="obd__ray" style={{ "--r": `${i * 45}deg` } as React.CSSProperties} />
               ))}
               <span className="obd__dot">
                 <svg viewBox="0 0 24 24" width="36" height="36" fill="none">

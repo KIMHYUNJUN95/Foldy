@@ -79,7 +79,7 @@ export function ProgressRing({ done, total, label }: { done: number; total: numb
           strokeDasharray={RING_C}
           strokeDashoffset={RING_C * (1 - p)}
           transform="rotate(-90 28 28)"
-          style={{ ["--atw-ring-c" as string]: String(RING_C) }}
+          style={{ "--atw-ring-c": String(RING_C) } as React.CSSProperties}
         />
       </svg>
       <span className="atw-pring__n num">

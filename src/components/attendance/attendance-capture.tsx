@@ -526,7 +526,7 @@ export function ClockDone({
           {first ? (
             <span className="cind__spk">
               {Array.from({ length: 12 }, (_, i) => (
-                <i key={i} style={{ ["--a" as string]: `${-90 + (i - 5.5) * 14}deg`, ["--r" as string]: `${70 + ((i * 37) % 5) * 14}px`, animationDelay: `${(i % 4) * 30}ms` }} />
+                <i key={i} style={{ "--a": `${-90 + (i - 5.5) * 14}deg`, "--r": `${70 + ((i * 37) % 5) * 14}px`, animationDelay: `${(i % 4) * 30}ms` } as React.CSSProperties} />
               ))}
             </span>
           ) : null}

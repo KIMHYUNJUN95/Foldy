@@ -35,7 +35,6 @@ export function RollNumber({ text, delay = 0, delta = false }: { text: string; d
     if (ended.current.count >= digitCount) setSettled(bump.n);
   };
 
-  let digitIndex = 0;
   const start = bump.n === 0 ? delay : 0;
   const isSettled = settled === bump.n;
   return (
@@ -56,12 +55,12 @@ export function RollNumber({ text, delay = 0, delta = false }: { text: string; d
           );
         }
         const n = Number(ch);
-        const idx = digitIndex++;
+        const idx = text.slice(0, i).replace(/[^0-9]/g, "").length;
         return (
           <span aria-hidden="true" className="rolln__col" key={i}>
             <span
               className="rolln__strip"
-              style={{ ["--to" as string]: `-${n + 10}`, animationDelay: bump.n === 0 ? `calc(var(--entry-d0, 0ms) + ${start + idx * 60}ms)` : `${idx * 60}ms`, animationDuration: `${900 + idx * 90}ms` }}
+              style={{ "--to": `-${n + 10}`, animationDelay: bump.n === 0 ? `calc(var(--entry-d0, 0ms) + ${start + idx * 60}ms)` : `${idx * 60}ms`, animationDuration: `${900 + idx * 90}ms` } as React.CSSProperties}
             >
               {Array.from({ length: 20 }, (_, k) => (
                 <b key={k}>{k % 10}</b>

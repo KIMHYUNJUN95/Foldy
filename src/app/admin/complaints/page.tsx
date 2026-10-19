@@ -29,7 +29,7 @@ import { reviewSyncLabels } from "@/lib/review-sync-labels";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
-import { defaultReviewRange } from "@/lib/external-review-pages";
+import { REVIEW_LIST_STEP, defaultReviewRange } from "@/lib/external-review-pages";
 
 // 컴플레인 콘솔 — 수동 컴플레인 + Beds24 외부 리뷰 통합 검토.
 // 뷰 전환과 기간/필터는 전부 쿼리스트링으로 다뤄, 서버 렌더 한 번으로 끝난다.
@@ -61,6 +61,8 @@ type SearchParams = {
   review?: string;
   /** 상세 패널을 여는 수동 컴플레인 id (`review` 와 같은 방식, 2026-09-08). */
   complaint?: string;
+  /** 목록에 펼칠 리뷰 수 — 「더 보기」가 한 걸음(REVIEW_LIST_STEP)씩 올린다. */
+  n?: string;
   /** "1"이면 저장된 번역을 원문 대신 보여준다. */
   tr?: string;
 };
@@ -163,7 +165,13 @@ export default async function AdminComplaintsPage({
   const comments: ComplaintComment[] = complaintDetail?.comments ?? [];
 
   // 객실은 표시 라벨로 거른다 — 같은 방을 두 Beds24 어카운트가 나눠 쓰므로 room_id 하나로는 모자란다.
-  const reviews = roomLabel ? allReviews.filter((review) => review.displayRoomLabel === roomLabel) : allReviews;
+  const filteredReviews = roomLabel ? allReviews.filter((review) => review.displayRoomLabel === roomLabel) : allReviews;
+  // 365일이면 본문 포함 1,700건 안팎 — 처음엔 한 걸음만 클라이언트로 보내고 나머지는 「더 보기」로 받는다.
+  const requestedLimit = Number.parseInt(params.n ?? "", 10);
+  const reviewLimit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, REVIEW_LIST_STEP), 5000)
+    : REVIEW_LIST_STEP;
+  const reviews = filteredReviews.slice(0, reviewLimit);
 
   return (
     <AdminShell activeItem="complaints" title={dictionary.complaints.adminTitle}>
@@ -194,6 +202,8 @@ export default async function AdminComplaintsPage({
         createReservations={createReservations}
         createPlaces={createPlaces}
         reviews={reviews}
+        reviewTotal={filteredReviews.length}
+        reviewLimit={reviewLimit}
         summaries={summaries}
         selectedReview={selectedReview}
         selectedComplaint={selectedComplaint}

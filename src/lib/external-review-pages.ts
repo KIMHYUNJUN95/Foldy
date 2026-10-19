@@ -60,3 +60,6 @@ export async function readAllReviewPages<R extends { id: string }>(
 export function defaultReviewRange(today: string = tokyoToday()): { from: string; to: string } {
   return { from: ymdShift(today, -89), to: today };
 }
+
+/** PC 콘솔 리뷰 목록이 한 번에 펼치는 건수 — 「더 보기」 한 번에 이만큼 늘어난다. */
+export const REVIEW_LIST_STEP = 50;

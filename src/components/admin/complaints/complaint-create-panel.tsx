@@ -16,6 +16,7 @@
 import Image from "next/image";
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import { Camera, Star, X } from "lucide-react";
+import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { AdmDropdown, type AdmOption } from "@/components/admin/shared/adm-dropdown";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import {
@@ -143,12 +144,13 @@ export function ComplaintCreatePanel({ labels, reservations, places, onClose }: 
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
     event.target.value = "";
+    if (!file || images.length >= MAX_IMAGES) return;
 
     startTransition(async () => {
+      // 서버 액션 본문 상한(1MB)을 넘지 않도록 업로드 전에 압축한다 (CLAUDE.md §8).
+      const formData = new FormData();
+      formData.append("file", await compressImageFile(file).catch(() => file));
       const result = await uploadManualComplaintImageAction(draftId, formData);
       if ("url" in result) setImages((current) => [...current, result.url]);
       else setError(labels.createFailed);

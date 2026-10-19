@@ -13,6 +13,7 @@ import type { PlacePickRow, ReservationPickRow } from "@/lib/complaint-reservati
 import { Camera, ChevronDown, Star, X } from "lucide-react";
 import { ChoiceTiles, ConfirmFormSheet, PickField } from "@/components/requests/request-form-kit";
 import { haptic } from "@/lib/haptics";
+import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { ImageLightbox } from "./image-lightbox";
 import { type LinkTarget, type PlatformKey } from "./complaint-mock";
 import { CIc, CxIcon } from "./cx-icons";
@@ -140,13 +141,13 @@ export function ComplaintCreate({
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
     event.target.value = "";
+    if (!file || uploadedImages.length >= MAX_IMAGES) return;
 
     startTransition(async () => {
+      // 서버 액션 본문 상한(1MB)을 넘지 않도록 업로드 전에 압축한다 (CLAUDE.md §8).
+      const formData = new FormData();
+      formData.append("file", await compressImageFile(file).catch(() => file));
       const result = await uploadComplaintImageAction(draftId, formData);
       if ("url" in result) {
         setUploadedImages((current) => [...current, result.url]);

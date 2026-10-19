@@ -22,6 +22,7 @@ import type {
 } from "@/lib/external-reviews";
 import { reviewRoomFallbackLabel } from "@/lib/external-review-rules";
 import { REVIEW_SCALE } from "@/lib/external-reviews";
+import { REVIEW_LIST_STEP } from "@/lib/external-review-pages";
 import type { TranslationPart } from "@/lib/review-translate";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
@@ -56,6 +57,10 @@ type Props = {
   createReservations: ReservationPickRow[];
   createPlaces: PlacePickRow[];
   reviews: ExternalReview[];
+  /** 필터를 적용한 전체 리뷰 수 — `reviews` 는 그중 앞쪽 일부만 담는다. */
+  reviewTotal: number;
+  /** 목록에 펼친 리뷰 수 한도(`?n=`). 필터를 바꾸면 기본값으로 돌아간다. */
+  reviewLimit: number;
   summaries: BuildingSummary[];
   buildingOptions: Option[];
   building: string | null;
@@ -194,8 +199,10 @@ export function ComplaintsConsole(props: Props) {
     return `/admin/complaints${text ? `?${text}` : ""}`;
   };
 
-  const closeHref = href({});
-  const reviewHref = (reviewId: string) => href({ review: reviewId });
+  // 패널을 열고 닫아도 펼쳐 둔 목록이 접히지 않게 한도를 유지한다.
+  const keepLimit = props.reviewLimit > REVIEW_LIST_STEP ? String(props.reviewLimit) : null;
+  const closeHref = href({ n: keepLimit });
+  const reviewHref = (reviewId: string) => href({ review: reviewId, n: keepLimit });
   const complaintHref = (complaintId: string) => href({ view: "manual", complaint: complaintId, st: null, mp: null, author: null });
 
   const buildingLabelOf = (name: string | null) =>
@@ -423,6 +430,8 @@ function ReviewsView({
   copy,
   filter,
   reviews,
+  reviewTotal,
+  reviewLimit,
   airbnb,
   booking,
   openComplaints,
@@ -498,7 +507,7 @@ function ReviewsView({
             {copy.riskOnly}
           </Link>
         </div>
-        <span className="cxw-count">{fill(copy.wNewestCount, { n: reviews.length })}</span>
+        <span className="cxw-count">{fill(copy.wNewestCount, { n: reviewTotal })}</span>
       </div>
 
       {reviews.length === 0 ? (
@@ -564,6 +573,15 @@ function ReviewsView({
               </Link>
             );
           })}</LiveWash>
+          {reviewTotal > reviews.length ? (
+            <Link
+              className="cxw-more"
+              href={href({ n: String(reviewLimit + REVIEW_LIST_STEP) })}
+              scroll={false}
+            >
+              {fill(copy.wLoadMore, { n: reviewTotal - reviews.length })}
+            </Link>
+          ) : null}
         </div>
       )}
     </>

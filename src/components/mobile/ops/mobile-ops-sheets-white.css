@@ -662,3 +662,74 @@ button.msw-mv-date:active { transform: scale(0.99); }
   .msw-mc-day, .msw-mc-nav, .msw-mv-date { transition: none; }
   .msw-mc-day:not(:disabled):active, .msw-mc-nav:active, button.msw-mv-date:active { transform: none; }
 }
+
+/* ── HIG 다듬기 2차(2026-10-20, 시안 A2Sheet-*) — 크기 · 대비만, 배치 · 동작은 그대로. ───────────────────── */
+.msw-head h3 { font-size: 17px; font-weight: 600; }
+.msw-head p { font-size: 15px; }
+.msw-link { font-size: 15px; }
+.msw-cmp span { font-size: 13px; }
+.msw-cmp b { font-size: 20px; }
+.msw-field__l { font-size: 13px; }
+.msw-field__hint { font-size: 13px; }
+.msw-sec > b,
+.msw-sec > span:first-child,
+.msw-sec > small { font-size: 13px; }
+.msw-opt { font-size: 15px; }
+.msw-adj .msw-opt { font-size: 15px; }
+/* 「직접 %」 칸 — 보이는 36, 입력칸만 위아래로 44(투명이라 보이지 않는다). */
+.msw-pctin { height: 36px; }
+.msw-pctin input { height: 44px; margin-block: -4px; font-size: 16px; } /* 16 — iOS 확대 방지 */
+.msw-note { font-size: 13px; }
+.msw-alert { font-size: 15px; }
+.msw-alert.row > button { min-height: 44px; }
+.msw-okline { font-size: 15px; }
+/* 선택한 칸 목록 — 줄 44/15, 선은 줄 사이에만. 「예약된 밤 — 빼고 저장」 #b4b1bf(2.0:1) → muted(5.3:1). */
+.msw-list__h,
+.msw-list__h small,
+.msw-list__b { font-size: 13px; }
+.msw-row { min-height: 44px; font-size: 15px; border-top: 0; }
+.msw-row + .msw-row { border-top: 0.5px solid var(--separator); }
+.msw-row .none { font-size: 15px; color: var(--msw-muted); }
+.msw-hero span { font-size: 15px; }
+.msw-hero small,
+.msw-hero__p { font-size: 13px; }
+/* 확인 상자 줄 — 15 · 높이 44. 「복사」 13, 누르는 자리 44. */
+.msw-kv { min-height: 44px; font-size: 15px; }
+.msw-kv .cp { position: relative; font-size: 13px; }
+.msw-kv .cp::before { content: ""; position: absolute; inset: -6px 0; }
+.msw-sum .ln { font-size: 15px; }
+/* 예약 상세 */
+.msw-sect > .h,
+.msw-sect > .sub { font-size: 13px; }
+.msw-sect > p { font-size: 15px; }
+.msw-stay b { font-size: 17px; font-weight: 600; }
+.msw-stay small,
+.msw-stay > i > span,
+.msw-lead { font-size: 13px; }
+.msw-lock,
+.msw-cxl-w { font-size: 15px; }
+/* 입력 · 요금 */
+.msw-stepper__l { font-size: 15px; }
+.msw-fill span { font-size: 13px; }
+details.msw-nightly > summary { font-size: 15px; }
+.msw-nightly table { font-size: 15px; }
+.msw-nightly th { font-size: 13px; }
+/* 바닥 버튼 — 50 · 17/600. 옅은 버튼도 17. */
+.msw-btn { height: 50px; font-size: 17px; }
+.msw-btn.ghost,
+.msw-btn.soft,
+.msw-btn.soft-red { font-size: 17px; }
+.msw-foot.even.three .msw-btn { font-size: 15px; }
+/* 객실 · 날짜 옮기기 — 같은 규칙. 흐린 #8b8898(3.4:1) → muted. */
+.msw-mv-head b { font-size: 17px; font-weight: 600; }
+.msw-mv-head span { font-size: 15px; }
+.msw-mv-note { font-size: 13px; color: var(--msw-muted); }
+.msw-mv-row span { font-size: 15px; }
+.msw-mv-date__tx span { font-size: 13px; }
+.msw-mv-date__tx s { color: var(--msw-muted); }
+.msw-mv-date__act { font-size: 15px; }
+.msw-mv-sec span:first-child,
+.msw-mv-sec span:last-child { font-size: 13px; }
+.msw-mv-sec span:last-child:not(.is-on) { color: var(--msw-muted); }
+.msw-mc-dow span,
+.msw-mc-legend { font-size: 13px; }

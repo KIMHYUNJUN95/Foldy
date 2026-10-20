@@ -14,6 +14,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - Hotelsmart 의 청소 배정(시프트 신청자 → 체크아웃 객실)을 Foldy 로 옮기기로 하고 기획 초안 작성 — `docs/product/37-cleaning-shift-assignment.md`.
   체크인(여관업법 · 태블릿)은 Hotelsmart 유지. 「월말 = 사람 정하기, 매일 = 방 자동 나누기」로 분리. 코드 미착수, 「정할 것」 12개 답 대기.
 
+## 2026-10-20 — HIG 다듬기 2차 · 모바일 판매 캘린더 2(시트)
+
+- 가격 · 최소숙박 · 차단 · 수기 예약 · 예약 상세 · 객실 옮기기 · 범위로 고르기 · 차단 정보 시트 크기 다듬기 — 제목 17/600 · 설명 15 · 작은 글자 13 ·
+  고르는 버튼 15 · 목록 줄 44/15(선은 줄 사이에만) · 확인 줄 44/15 · 나눔 36(누르는 자리 44) · 요일 44 · 바닥 버튼 50/17 · 흐린 글자 진하게.
+  HIG 캔버스 A2Sheet-*. 상세 `docs/product/33-calendar-write-features.md` 「HIG 다듬기 2차」 → 「시트」.
+
 ## 2026-10-20 — HIG 다듬기 2차 · 모바일 판매 캘린더 1(본 화면)
 
 - `/mobile/ops/calendar` 본 화면 크기 다듬기 — 건물 탭 · 기간 · 도구 줄 15 · 범례 13 · 요일 · 빈 방 · 평균가 11 · 최소숙박 11 진하게 · 칸 세로선 없앰 ·

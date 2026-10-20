@@ -640,6 +640,26 @@
 .mops-toast.mops-toast { height: 44px; border-radius: 22px; font-size: 15px; }
 .mops-toast .mops-toast__act { position: relative; height: 32px; border-radius: 16px; font-size: 15px; }
 .mops-toast .mops-toast__act::before { content: ""; position: absolute; inset: -6px 0; }
+/* 범위로 고르기 · 차단 정보 시트(2차 시안 A2Sheet-*) — 제목 17/600 · 설명 15 · 라벨 13 · 나눔 36(누르는 자리 44)/15 · 요일 44/15 ·
+   아래 줄 15 · 버튼 50. 차단 정보 줄은 16 · 44, 선은 줄 사이에만. */
+.mops-scope .mops-scope__head b,
+.mops-binfo .mops-binfo__head b { font-size: 17px; font-weight: 600; }
+.mops-scope .mops-scope__head span,
+.mops-binfo .mops-binfo__head span { font-size: 15px; }
+.mops-scope .mops-scope__label { font-size: 13px; }
+/* 누르는 자리(::before)가 잘리지 않게 overflow 를 연다 — ko/ja/en 가장 긴 글자(「表で選んだ客室 N室」)도 폰 반 칸에 들어간다. */
+.mops-wseg > button { position: relative; height: 36px; font-size: 15px; overflow: visible; text-overflow: clip; }
+.mops-wseg > button::before { content: ""; position: absolute; inset: -4px 0; }
+.mops-scope__days > button { height: 44px; font-size: 15px; }
+.mops-scope__sum p,
+.mops-scope__sum p b,
+.mops-scope__sum p span,
+.mops-scope__sum > button { font-size: 15px; }
+.mops-scope .mops-dock__act { height: 50px; }
+.mops-binfo .mops-binfo__list div { align-items: center; min-height: 44px; font-size: 16px; }
+.mops-binfo .mops-binfo__list div:first-child { border-top: 0; }
+.mops-binfo .mops-binfo__none { font-size: 15px; border-top: 0; }
+.mops-binfo__hint { font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) {
   .mops .mops-row,

@@ -294,3 +294,37 @@ a.fbw-pct { display: inline-flex; align-items: center; justify-content: flex-end
 .fbw-pickwrap { position: relative; }
 .fbw-pickbtn.has-x { padding-right: 48px; }
 .fbw-pickwrap > .fbw-pickbtn__x { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 10px; background: none; cursor: pointer; }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2FB-* · 지금 A2FBNow-*) — 기능 · 배치 그대로.
+   기간 줄 15 · 44 · 등록 15 · 보기 나눔 버튼 15 · 평점 칸 이름 13 · 고르기 15 · 건수 줄 13 · 지금 가져오기 44/15 ·
+   줄 사이 선은 공용 규칙(리뷰 = 점수 칸 44 + 간격 12 → 56, 수동 = 점 7 + 간격 12 → 19, 줄 사이에만) · 리뷰 줄 13/16/15 · 「/ 10」 12 ·
+   묶음 제목 17/600 · 44 · 수동 줄 16/13 · 건물별 객실 16 · 작은 글자 13 · 나눔 버튼 15 · 빈 화면 17/15. */
+.fbw-rangeline { min-height: 44px; font-size: 15px; }
+.fbw-head__new { font-size: 15px; }
+.fbw-tabs a { font-size: 15px; }
+.fbw-stat span, .fbw-stat b small { font-size: 13px; }
+.fbw-dd__btn { font-size: 15px; }
+.fbw-countrow, .fbw .cx-sync__s { font-size: 13px; }
+.fbw .cx-sync__btn { height: 44px; font-size: 15px; }
+.fbw-rv { border-image: linear-gradient(90deg, transparent 56px, var(--separator) 56px) 1; }
+.fbw-rv__score span { font-size: 12px; }
+.fbw-rv__meta { font-size: 13px; }
+.fbw-rv__hl { font-size: 16px; }
+.fbw-rv__body { font-size: 15px; }
+.fbw-pager__pos { font-size: 15px; }
+.fbw-empty b { font-size: 17px; }
+.fbw-empty span { font-size: 15px; }
+.fbw-manual { gap: 10px; }
+.fbw-grp { align-items: center; min-height: 44px; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.fbw-grp span { font-size: 15px; }
+.fbw-mr { border-top: 0; }
+.fbw-mr + .fbw-mr { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 19px, var(--separator) 19px) 1; }
+.fbw-mr__main b { font-size: 16px; }
+.fbw-mr__main span, .fbw-mr time { font-size: 13px; }
+.fbw-rooms__ctl > span { font-size: 13px; }
+.fbw-seg a { font-size: 15px; }
+.fbw-bld__name small, .fbw-room__name small, .fbw-room__sub, .fbw-bld__sub { font-size: 13px; }
+.fbw-room__name b { font-size: 16px; }
+.split-list a.fbw-rv[data-split-active], .split-list a.fbw-mr[data-split-active],
+.split-list a.fbw-rv[data-split-active] + .fbw-rv, .split-list a.fbw-mr[data-split-active] + .fbw-mr { border-image: none; border-top-color: transparent; }
+

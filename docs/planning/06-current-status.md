@@ -9,6 +9,11 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 시프트 신청 · 청소 배정 기획 시작
+
+- Hotelsmart 의 청소 배정(시프트 신청자 → 체크아웃 객실)을 Foldy 로 옮기기로 하고 기획 초안 작성 — `docs/product/37-cleaning-shift-assignment.md`.
+  체크인(여관업법 · 태블릿)은 Hotelsmart 유지. 「월말 = 사람 정하기, 매일 = 방 자동 나누기」로 분리. 코드 미착수, 「정할 것」 12개 답 대기.
+
 ## 2026-10-20 — HIG 다듬기 2차 · 모바일 판매 캘린더 1(본 화면)
 
 - `/mobile/ops/calendar` 본 화면 크기 다듬기 — 건물 탭 · 기간 · 도구 줄 15 · 범례 13 · 요일 · 빈 방 · 평균가 11 · 최소숙박 11 진하게 · 칸 세로선 없앰 ·

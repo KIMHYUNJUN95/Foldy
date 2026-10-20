@@ -167,15 +167,25 @@ Properties/rooms listed in `isExcludedOperationalProperty` / `isExcludedOperatio
 
 ### Manual / Other Section
 
-A cascading building + room select form is always shown below the two auto-detected lists, for exceptions such as long-stay maintenance cleans that have no checkout event.
+The 「기타」 section below the auto-detected lists is for exceptions such as long-stay maintenance cleans that have no checkout event.
 
 **Data source**: `rooms` table active room catalog (`getActiveRoomCatalogServer`). Same room master used by the reservation calendar.
 
-**UX flow**:
-1. Staff selects a building from the first dropdown.
-2. Room dropdown becomes enabled and lists only rooms in the selected building (disabled until building is selected).
-3. Staff selects task type.
-4. Submit -> `startCleaningSession` server action.
+**UX flow (HIG 2차, 2026-10-20 — HIG canvas 「A2CleanMan3-*」; replaced the old glass dropdowns + `#315F91` button)**:
+1. The page shows one row only: 「다른 객실 고르기 ›」 (`manualOpen` / `manualOpenSub`). The page length no longer depends on how
+   many rooms a building has (STAY ARI has 26).
+2. Tapping it opens the shared `BottomSheet` 「다른 객실 청소」 (`manualSheetTitle`). Inside:
+   - Building text tabs (same look as the sales calendar / room links). The building last picked **on this device** is preselected
+     (`localStorage` key `foldy.cleaning.manualBuilding`, read/write wrapped in try/catch; falls back to the first building).
+   - Room number buttons only — no floor grouping (user decision). Phone 5 columns, tablet centred card 6 columns, 44 tall.
+   - **Dimmed, not pressable rooms** (`ManualRoomEntry.blocked`): rooms already on today's cleaning list (start them from the list) and
+     rooms with an `in_progress` / `completed` session today (the server would reject them with `already_processed_today`). Matched by
+     physical room key (`physicalRoomKeyOfSessionLabel`, falling back to the catalog map), same as the list filter. A one-line
+     reason (`manualBlockedHint`) shows under the sheet title when any room is dimmed.
+   - Task as a 3-way segmented control (`manualTaskShort`: 체크아웃 · 장기 투숙 · 간단), default checkout.
+   - The button says what it will do: grey 「객실을 고르세요」 (`manualPickRoom`) until a room is picked, then violet
+     「{room} 청소 시작」 (`manualStartRoom`).
+3. Submit -> `startCleaningSession` server action (unchanged). Styles: `cleaning-screen.css` `.cln-mo` / `.cln-ms*`.
 
 **Room master unavailable**: If no classified room rows exist (catalog returns `undefined`), the form is replaced with an informational message (`copy.manualRoomMasterUnavailable`). There is no free-text fallback.
 

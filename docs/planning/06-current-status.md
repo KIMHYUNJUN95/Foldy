@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 청소 「기타」 다시 그림 (HIG 2차)
+
+- `/mobile/cleaning` 아래 「기타」 — 화이트 리디자인 때 빠져 옛 유리 드롭다운 · 파랑 버튼이 남아 있던 곳. 화면엔 「다른 객실 고르기 ›」 한 줄,
+  고르기는 공용 아래 시트: 건물 글자 탭(마지막 건물 기억) · 객실 번호 버튼(층 묶음 없음) · 작업 나눔 3칸 · 「{객실} 청소 시작」.
+  이미 청소 목록에 잡힌 방 · 오늘 시작한 방은 흐리게 · 못 누름. 새 문구 ko/ja/en. HIG 캔버스 A2CleanMan3-*. 상세 `docs/product/07-cleaning-workflow.md`.
+
 ## 2026-10-20 — 시프트 신청 · 청소 배정 기획 시작
 
 - Hotelsmart 의 청소 배정(시프트 신청자 → 체크아웃 객실)을 Foldy 로 옮기기로 하고 기획 초안 작성 — `docs/product/37-cleaning-shift-assignment.md`.

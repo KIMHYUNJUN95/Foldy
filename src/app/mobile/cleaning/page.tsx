@@ -472,7 +472,16 @@ export default async function MobileCleaningPage({
     filteredSettingList.length > 0
       ? groupByBuilding(filteredSettingList)
       : null;
-  const manualBuildingOptions = buildManualRoomOptions(roomCatalog);
+  // 「기타」 시트에서 흐리게 둘 방 — 이미 청소 목록에 잡힌 방(그 목록의 「시작」으로) + 오늘 이미 시작 · 완료한 방(서버가
+  // 「오늘 이미 처리된 객실」로 막는다). 같은 실제 방 키로 맞춘다(2026-10-20, 시안 A2CleanMan3).
+  const manualBlockedKeys = new Set<string>([...filteredCleaningList.map(roomKeyOfTarget), ...processedRoomKeys]);
+  const manualBuildingOptions = buildManualRoomOptions(roomCatalog).map((group) => ({
+    ...group,
+    rooms: group.rooms.map((room) => {
+      const key = physicalRoomKeyOfSessionLabel(room.sessionRoomLabel) ?? catalogLabelMap.get(room.sessionRoomLabel);
+      return key && manualBlockedKeys.has(key) ? { ...room, blocked: true } : room;
+    }),
+  }));
   const cleaningTargetCount = filteredCleaningList.length;
   const settingTargetCount = filteredSettingList.length;
   const settingSheetItems: SettingTargetSheetItem[] = filteredSettingList.map((target) => ({
@@ -692,16 +701,17 @@ export default async function MobileCleaningPage({
                     buildings={manualBuildingOptions}
                     buildingLabels={copy.buildingLabels}
                     labels={{
-                      buildingLabel: copy.manualBuildingLabel,
-                      buildingPlaceholder: copy.manualBuildingPlaceholder,
-                      room: copy.room,
-                      roomPlaceholder: copy.manualRoomSelectPlaceholder,
-                      start: copy.start,
+                      open: copy.manualOpen,
+                      openSub: copy.manualOpenSub,
+                      sheetTitle: copy.manualSheetTitle,
+                      blockedHint: copy.manualBlockedHint,
+                      pickRoom: copy.manualPickRoom,
+                      startRoom: copy.manualStartRoom,
                       task: copy.task,
                     }}
                     taskOptions={cleaningTaskKeys.map((key) => ({
                       key,
-                      label: copy.taskOptions[key],
+                      label: copy.manualTaskShort[key],
                     }))}
                   />
                 ) : (

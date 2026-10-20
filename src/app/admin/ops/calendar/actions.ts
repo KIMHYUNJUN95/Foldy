@@ -45,7 +45,7 @@ import {
 } from "@/lib/beds24/block-write";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
 import { parsePropertyParam } from "@/lib/ops-calendar-properties";
-import { canAccessOpsAdmin } from "@/lib/ops-admin";
+import { canAccessOpsAdmin, canWriteOpsCalendar } from "@/lib/ops-admin";
 import { getOpsSalesSummary } from "@/lib/ops-sales-summary-server";
 import type { OpsSalesSummary } from "@/lib/ops-sales-summary";
 import type { SalesYoyPrevious } from "@/lib/ops-sales-yoy";
@@ -139,9 +139,20 @@ export type PriceChangeCell = {
   currentPrice: number | null;
 };
 
-async function requireOpsWriter() {
+/** 보기(읽기) — 운영 관리자 영역에 들어올 수 있으면 된다(`ops_admin.access`). */
+async function requireOpsReader() {
   const session = await requireAdminSession();
   if (!canAccessOpsAdmin(session)) return null;
+  return session;
+}
+
+/**
+ * 바꾸기(쓰기) — 가격 · 최소숙박 · 차단 · 수기 예약 · 예약 수정 · 옮기기 · 취소 · 되돌리기 · 대기 가격 보내기. 보기 권한에 더해
+ * `ops_calendar.write` 가 있어야 한다(2026-10-20 권한 정리 5-1 — 채널로 바로 나가는 쓰기를 따로 잠근다. 기본은 대표 · 전무라 지금과 같다).
+ */
+async function requireOpsWriter() {
+  const session = await requireOpsReader();
+  if (!session || !canWriteOpsCalendar(session)) return null;
   return session;
 }
 
@@ -617,7 +628,7 @@ export async function loadRoomAvailability(args: {
   /** 예약 수정에서 — 그 예약 자신은 「이미 찬 밤」으로 세지 않는다. */
   excludeReservationId?: string;
 }): Promise<RoomAvailabilityResult> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
 
   const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -995,7 +1006,7 @@ export async function submitManualBooking(args: {
 export async function loadReservationDetail(
   reservationId: string,
 ): Promise<{ ok: true; detail: OpsReservationDetail } | { ok: false; error: "forbidden" | "not_found" }> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
 
   const result = await getSupabaseServiceClient()
@@ -1281,7 +1292,7 @@ export async function loadReservationMoveTargets(args: {
   departure: string;
   rows: Array<{ roomKey: string; roomIds: string[] }>;
 }): Promise<{ ok: true; targets: ReservationMoveTarget[] } | { ok: false; error: "forbidden" | "bad_range" | "read_failed" }> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
   const datePattern = /^\d{4}-\d{2}-\d{2}$/;
   if (!datePattern.test(args.arrival) || !datePattern.test(args.departure) || args.departure <= args.arrival) {
@@ -1345,7 +1356,7 @@ export async function loadReservationMoveMonth(args: {
   nights: number;
   rows: Array<{ roomKey: string; roomIds: string[] }>;
 }): Promise<{ ok: true; fullDays: string[] } | { ok: false; error: "forbidden" | "bad_range" | "read_failed" }> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
   if (!/^\d{4}-\d{2}$/.test(args.month) || !Number.isInteger(args.nights) || args.nights < 1 || args.nights > MAX_STAY_NIGHTS) {
     return { error: "bad_range", ok: false };
@@ -1721,7 +1732,7 @@ export type OpsChangeHistoryResult =
 
 /** 변경 이력 — `before` 직전 7일. 처음엔 지금부터. */
 export async function loadOpsChangeHistory(args: { before?: string | null }): Promise<OpsChangeHistoryResult> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
   const supabase = getSupabaseServiceClient();
   const before = args.before ? new Date(args.before) : new Date();
@@ -2123,7 +2134,7 @@ export async function loadOpsSalesSummary(args: {
   days: number;
   properties?: readonly string[] | null;
 }): Promise<OpsSalesSummaryResult> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
   const start = typeof args.start === "string" ? args.start : "";
   const days = typeof args.days === "number" && Number.isInteger(args.days) ? args.days : 0;

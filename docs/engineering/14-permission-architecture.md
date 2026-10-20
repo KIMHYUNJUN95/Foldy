@@ -491,12 +491,11 @@ using (has_capability(organization_id, (select auth.uid()), 'job_application.rea
 
 ## 10-1. 미룬 설계 (2026-10-20 권한 정리 ⑤)
 
-### 판매 캘린더 보기 / 바꾸기 나누기 — 하지 않는다
+### 판매 캘린더 보기 / 바꾸기 — 나눴다 (5-1)
 
-`ops_admin.access` 하나가 가동률 · 매출 보기와 판매 캘린더 쓰기(가격 · 최소숙박 · 차단 · 수기 예약 · 옮기기 · 취소)를 같이 연다. 나누는 안
-(`ops_calendar.write`)을 검토했지만 **사용자 결정으로 하지 않는다** — 판매 캘린더에 들어오는 사람이 관리자뿐이고, 그 밖의 사람은 볼 일이
-없다(2026-09-16 「키 하나가 영역 전체를 연다」 결정과 같은 이유, `src/lib/ops-admin.ts`). 보기만 필요한 사람이 실제로 생기면 그때
-쓰기 액션 13개(`submit*` · `revert*` · `sendPendingPriceJobs`)를 새 키로 묶는다 — 전부 서버 액션(service role · Beds24)이라 RLS 는 안 바뀐다.
+처음엔 사용자가 「들어오는 사람이 관리자뿐」이라 하지 않기로 했다가, 같은 날 「미래를 위해 안전」하게 하기로 바꿨다. `ops_calendar.write`
+(기본 대표 · 전무 = `ops_admin.access` 와 같음, 개인 부여 · 차단 가능)가 쓰기 액션 11개(`submit*` · `revert*` · `sendPendingPriceJobs`)와
+화면의 쓰기 단추를 연다. 전부 서버 액션(service role · Beds24)이라 RLS 는 안 바뀐다. 상세 `docs/product/32-ops-admin-area.md` 「진입점」.
 
 ### 건물 단위 권한 — 필요할 때 이 설계로
 

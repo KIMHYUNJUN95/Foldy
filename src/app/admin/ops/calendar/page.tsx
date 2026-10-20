@@ -14,7 +14,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getOpsCalendarData, OPS_CALENDAR_ROLLING_DAYS } from "@/lib/ops-calendar";
 import { scheduleOpsCalendarOpenRefresh } from "@/lib/ops-calendar-open-refresh";
 import { resolveOpsCalendarMode } from "@/lib/ops-calendar-mode-preference";
-import { opsNavId } from "@/lib/ops-admin";
+import { canWriteOpsCalendar, opsNavId } from "@/lib/ops-admin";
 import { isOpsRatesStale, opsRatesSyncedLabel } from "@/lib/ops-rates-freshness";
 import {
   buildOpsCalendarHref,
@@ -176,6 +176,7 @@ export default async function OpsCalendarPage({
         {/* 격자에는 **행 단위** 데이터만 간다(`ops-calendar-rows.ts`) — 칸 이력 목록과 가격 개입 판정은
             격자가 필요할 때 서버 액션으로 따로 받는다(2026-09-30 속도). */}
         <OpsCalendarGrid
+          canWrite={canWriteOpsCalendar(session)}
           cancelledHref={hrefWith({ cancelled: showCancelled ? undefined : "1" })}
           copy={copy}
           days={data.days}

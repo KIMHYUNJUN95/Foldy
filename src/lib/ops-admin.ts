@@ -18,6 +18,17 @@ export function canAccessOpsAdmin(session: AppSession): boolean {
 }
 
 /**
+ * 판매 캘린더를 **바꿀** 수 있는가 — 가격 · 최소숙박 · 차단 · 수기 예약 · 예약 수정 · 옮기기 · 취소 · 되돌리기 · 대기 가격 보내기.
+ *
+ * 2026-10-20 권한 정리 5-1 에서 위 「키 하나가 영역 전체」에서 쓰기만 떼었다(`ops_calendar.write`). 기본 역할은 `ops_admin.access` 와 같은
+ * 대표 · 전무라 지금 쓰는 사람에게는 달라지는 게 없다. 나중에 「보기만 할 사람」에게 영역을 열어도 채널로 바로 나가는 쓰기는 잠겨 있게 하려는 것.
+ * 없으면 판매 캘린더가 보기 전용(PC · 모바일), 서버 액션도 `forbidden`.
+ */
+export function canWriteOpsCalendar(session: AppSession): boolean {
+  return canAccessOpsAdmin(session) && session.capabilities.includes("ops_calendar.write");
+}
+
+/**
  * 룸 링크(`/admin/ops/room-links`)를 쓸 수 있는가 — 운영 관리자 묶음에 있지만 **판매 캘린더와 따로 준다**
  * (2026-10-02 사용자 결정). 리스팅 확인은 가격을 만지지 않는 사람도 한다. docs/product/35-room-links.md
  */

@@ -119,6 +119,7 @@ function displayName(code: string, localeTag: string, type: "region" | "language
 
 export function MobileOpsReservationSheet({
   bar,
+  canWrite = true,
   copy,
   localeTag,
   moveRooms,
@@ -133,6 +134,8 @@ export function MobileOpsReservationSheet({
   today,
 }: {
   bar: OpsCalendarBar;
+  /** 판매 캘린더를 바꿀 수 있나(`ops_calendar.write`) — 없으면 수정 · 옮기기 · 취소 단추가 없다(서버도 막는다). */
+  canWrite?: boolean;
   copy: MobileReservationSheetCopy;
   localeTag: string;
   nights: number;
@@ -441,7 +444,7 @@ export function MobileOpsReservationSheet({
         </div>
       </div>
 
-      {!bar.isCancelled && (
+      {!bar.isCancelled && canWrite && (
         <div className={`msw-foot even${moveRooms && moveRooms.length > 1 && onMoved ? " three" : ""}`}>
           <button className="msw-btn soft" disabled={!detail} onClick={() => setMode("edit")} type="button">
             {copy.reTitle}

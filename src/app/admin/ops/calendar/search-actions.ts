@@ -37,7 +37,7 @@ export type ReservationSearchResult =
   | { ok: true; results: OpsReservationPlacement[] }
   | { ok: false; error: "forbidden" };
 
-async function requireOpsWriter() {
+async function requireOpsReader() {
   const session = await requireAdminSession();
   if (!canAccessOpsAdmin(session)) return null;
   return session;
@@ -48,7 +48,7 @@ function dayDistance(a: string, b: string): number {
 }
 
 export async function searchOpsReservations(rawQuery: string): Promise<ReservationSearchResult> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
 
   const plan = buildGuestSearchPlan(rawQuery);
@@ -176,7 +176,7 @@ export async function searchOpsReservations(rawQuery: string): Promise<Reservati
 export async function loadOpsReservationPlacement(
   reservationId: string,
 ): Promise<{ ok: true; placement: OpsReservationPlacement } | { ok: false; error: "forbidden" | "not_found" }> {
-  const session = await requireOpsWriter();
+  const session = await requireOpsReader();
   if (!session) return { error: "forbidden", ok: false };
   if (!/^[0-9a-f-]{36}$/i.test(reservationId)) return { error: "not_found", ok: false };
 

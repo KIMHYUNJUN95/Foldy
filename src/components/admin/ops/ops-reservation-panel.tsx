@@ -190,6 +190,7 @@ const money = (value: number) => `¥${Math.round(value).toLocaleString()}`;
 
 export function OpsReservationPanel({
   bar,
+  canWrite = true,
   copy,
   localeTag,
   moveRooms,
@@ -203,6 +204,8 @@ export function OpsReservationPanel({
   today,
 }: {
   bar: OpsCalendarBar;
+  /** 판매 캘린더를 바꿀 수 있나(`ops_calendar.write`) — 없으면 수정 · 옮기기 · 취소 없이 닫기만(서버도 막는다). */
+  canWrite?: boolean;
   copy: ReservationCardCopy & SpwCopy;
   localeTag: string;
   /** 같은 건물의 줄 전부 — 「객실 옮기기」 후보. 비면 버튼을 숨긴다. */
@@ -539,8 +542,8 @@ export function OpsReservationPanel({
         </div>
 
         <div className="spw-foot is-panel is-even">
-          {/* 취소된 예약은 고치지도, 다시 취소하지도 않는다 — 닫기만. */}
-          {bar.isCancelled ? (
+          {/* 취소된 예약은 고치지도, 다시 취소하지도 않는다 — 닫기만. 바꾸기 권한이 없어도 닫기만(2026-10-20). */}
+          {bar.isCancelled || !canWrite ? (
             <button className="spw-btn is-wide" onClick={onClose} type="button">
               {copy.rcClose}
             </button>

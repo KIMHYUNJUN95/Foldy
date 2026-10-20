@@ -186,6 +186,7 @@ function tokyoStamp(iso: string): string {
 }
 
 export function MobileOpsCalendar({
+  canWrite,
   copy: copyProp,
   days: daysProp,
   historyAlerts,
@@ -198,6 +199,11 @@ export function MobileOpsCalendar({
   syncedLabel,
   today,
 }: {
+  /**
+   * 판매 캘린더를 바꿀 수 있나(`ops_calendar.write`, 2026-10-20 권한 정리 5-1). 없으면 보기 전용 — 칸을 골라도 가격 · 최소숙박 · 차단 ·
+   * 예약 만들기가 없고(칸 이력은 본다), 예약 시트의 수정 · 옮기기 · 취소, 이력의 되돌리기 · 지금 보내기가 없다. 서버도 같은 키로 막는다.
+   */
+  canWrite: boolean;
   copy: Copy;
   days: OpsCalendarDay[];
   historyAlerts: number;
@@ -405,7 +411,7 @@ export function MobileOpsCalendar({
   const urgentPicked = isExactCellSelection(selectedKeys, selection.length, urgentCells);
   const gapsPicked = isExactCellSelection(selectedKeys, selection.length, selectableGaps);
   const openWith = (cells: OpsSelectionCell[], kind: PanelKind) => {
-    if (cells.length === 0) return;
+    if (cells.length === 0 || !canWrite) return;
     setScope(EMPTY_SCOPE);
     setSelState({ cells, scopeKeys: new Set() });
     setOverlay({ kind });
@@ -1723,7 +1729,7 @@ export function MobileOpsCalendar({
           <MobileOpsDock
             count={copy.mSelCount.replace("{n}", String(selCount))}
             extras={[
-              ...(bookingDraft
+              ...(bookingDraft && canWrite
                 ? [
                     {
                       key: "book",
@@ -1747,6 +1753,7 @@ export function MobileOpsCalendar({
                   ]
                 : []),
             ]}
+            canWrite={canWrite}
             labels={{ block: copy.mActBlock, clear: copy.mClearSel, minStay: copy.mActMinStay, price: copy.mActPrice }}
             onClear={clearSelection}
             onOpen={(kind) => setOverlay({ kind })}
@@ -1760,7 +1767,7 @@ export function MobileOpsCalendar({
         )}
 
       {/* ── 시트들 — 전부 공용 `BottomSheet`, 내용은 데스크톱 패널 그대로 ─────────────────────── */}
-      {panelKind && (
+      {panelKind && canWrite && (
         <BottomSheet
           ariaLabel={panelKind === "price" ? copy.panelTitle : panelKind === "minstay" ? copy.minStayTitle : copy.bkTitle}
           // 시트는 **높이 고정** — 값을 넣을 때마다 줄 수가 바뀌어 시트 위 끝이 오르내렸다(2026-10-02 사용자 지적).
@@ -2023,17 +2030,19 @@ export function MobileOpsCalendar({
                   {copy.scopeClear}
                 </button>
               </div>
-              <div className="mops-dock__acts">
-                <button className="mops-dock__act go" disabled={selCount === 0} onClick={() => setOverlay({ kind: "price" })} type="button">
-                  {copy.mActPrice}
-                </button>
-                <button className="mops-dock__act ms" disabled={selCount === 0} onClick={() => setOverlay({ kind: "minstay" })} type="button">
-                  {copy.mActMinStay}
-                </button>
-                <button className="mops-dock__act blk" disabled={selCount === 0} onClick={() => setOverlay({ kind: "block" })} type="button">
-                  {copy.mActBlock}
-                </button>
-              </div>
+              {canWrite && (
+                <div className="mops-dock__acts">
+                  <button className="mops-dock__act go" disabled={selCount === 0} onClick={() => setOverlay({ kind: "price" })} type="button">
+                    {copy.mActPrice}
+                  </button>
+                  <button className="mops-dock__act ms" disabled={selCount === 0} onClick={() => setOverlay({ kind: "minstay" })} type="button">
+                    {copy.mActMinStay}
+                  </button>
+                  <button className="mops-dock__act blk" disabled={selCount === 0} onClick={() => setOverlay({ kind: "block" })} type="button">
+                    {copy.mActBlock}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </BottomSheet>
@@ -2043,7 +2052,7 @@ export function MobileOpsCalendar({
         <BottomSheet ariaLabel={copy.hsTitle} className="flex h-[88dvh] flex-col" onClose={() => setOverlay(null)}>
           {({ close }) => (
           <div className="adm ops mops-panel mops-side">
-            <OpsHistoryPanel copy={copy} onClose={close} />
+            <OpsHistoryPanel canWrite={canWrite} copy={copy} onClose={close} />
           </div>
           )}
         </BottomSheet>
@@ -2140,6 +2149,7 @@ export function MobileOpsCalendar({
         <BottomSheet ariaLabel={copy.rpTitle} className="flex h-[88dvh] flex-col" onClose={() => setOverlay(null)}>
           {({ close }) => (
             <MobileOpsReservationSheet
+              canWrite={canWrite}
               bar={overlay.placement.bar}
               copy={copy}
               key={overlay.placement.bar.id}
@@ -2327,6 +2337,7 @@ type DockExtra = { key: string; label: string; onClick: () => void };
  * 끌었으면 그 손짓 끝의 click 은 버튼에 보내지 않는다.
  */
 function MobileOpsDock({
+  canWrite,
   count,
   extras,
   labels,
@@ -2334,6 +2345,8 @@ function MobileOpsDock({
   onOpen,
   summary,
 }: {
+  /** 없으면 가격 · 최소숙박 · 차단 단추를 숨긴다(칸 이력 같은 보기 단추만). */
+  canWrite: boolean;
   count: string;
   extras: DockExtra[];
   labels: { price: string; minStay: string; block: string; clear: string };
@@ -2399,17 +2412,19 @@ function MobileOpsDock({
           {labels.clear}
         </button>
       </div>
-      <div className="mops-dock__acts">
-        <button className="mops-dock__act go" onClick={() => onOpen("price")} type="button">
-          {labels.price}
-        </button>
-        <button className="mops-dock__act ms" onClick={() => onOpen("minstay")} type="button">
-          {labels.minStay}
-        </button>
-        <button className="mops-dock__act blk" onClick={() => onOpen("block")} type="button">
-          {labels.block}
-        </button>
-      </div>
+      {canWrite && (
+        <div className="mops-dock__acts">
+          <button className="mops-dock__act go" onClick={() => onOpen("price")} type="button">
+            {labels.price}
+          </button>
+          <button className="mops-dock__act ms" onClick={() => onOpen("minstay")} type="button">
+            {labels.minStay}
+          </button>
+          <button className="mops-dock__act blk" onClick={() => onOpen("block")} type="button">
+            {labels.block}
+          </button>
+        </div>
+      )}
       {extras.length > 0 && (
         <div className="mops-dock__more" style={{ gridTemplateColumns: `repeat(${extras.length}, minmax(0, 1fr))` }}>
           {extras.map((extra) => (

@@ -16,7 +16,7 @@ vi.mock("@/lib/admin-session", () => ({
     user: { id: "user-1", name: "Tester" },
   })),
 }));
-vi.mock("@/lib/ops-admin", () => ({ canAccessOpsAdmin: () => true }));
+vi.mock("@/lib/ops-admin", () => ({ canAccessOpsAdmin: () => true, canWriteOpsCalendar: () => true }));
 vi.mock("@/app/api/ops/calendar/reads", () => ({ readRoomNames: vi.fn() }));
 vi.mock("@/lib/beds24/process-webhook-booking", () => ({
   processBeds24WebhookBooking: vi.fn(async () => ({ ok: true, reservationId: "res-1" })),

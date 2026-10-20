@@ -3940,6 +3940,10 @@ const FALLBACK_DICTIONARY = {
             label: "Bug reports — review",
             desc: "Review bug reports and get notified of new ones",
           },
+          "ops_calendar.write": {
+            label: "Sales calendar — make changes",
+            desc: "Change prices, min stay, blocks, manual bookings, edit · move · cancel reservations, undo",
+          },
           "board.manage": {
             label: "Board — manage posts",
             desc: "Delete or pin posts and comments by others",
@@ -11916,6 +11920,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
               label: "버그 신고 — 검토",
               desc: "버그 신고 검토 · 새 신고 알림 받기",
             },
+            "ops_calendar.write": {
+              label: "판매 캘린더 — 바꾸기",
+              desc: "가격 · 최소숙박 · 차단 · 수기 예약 · 예약 수정 · 옮기기 · 취소 · 되돌리기",
+            },
             "board.manage": {
               label: "게시판 — 글 관리",
               desc: "남이 쓴 게시글 · 댓글 삭제 · 고정",
@@ -19763,6 +19771,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "bug.review": {
               label: "バグ報告 — レビュー",
               desc: "バグ報告のレビュー・新しい報告の通知",
+            },
+            "ops_calendar.write": {
+              label: "販売カレンダー — 変更",
+              desc: "料金・最低泊数・ブロック・手動予約・予約の修正・移動・キャンセル・取り消し",
             },
             "board.manage": {
               label: "掲示板 — 投稿の管理",

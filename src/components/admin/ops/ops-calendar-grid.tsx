@@ -418,6 +418,8 @@ type GridRowProps = {
   /** 차단 모드 — 팔린 밤도 고른다(`canSelect` 와 같다). */
   blockMode: boolean;
   showCancelled: boolean;
+  /** 판매 캘린더를 바꿀 수 있나 — 없으면 빈칸 `+`(수기 예약 시작)를 띄우지 않는다. */
+  canWrite: boolean;
   priceWinsOnly: boolean;
   /** 큰방 강조선(`ops-large-rooms.ts`). */
   large: boolean;
@@ -467,6 +469,7 @@ const OpsGridRow = memo(function OpsGridRow({
   scopeOn,
   selectedDates,
   showCancelled,
+  canWrite,
   today,
   winIds,
   moveFadeId,
@@ -535,7 +538,7 @@ const OpsGridRow = memo(function OpsGridRow({
   const nightTaken = (date: string) => sold.has(date) || !dayFlagAt(row.rates.has, dayIndex.get(date) ?? -1);
   // 빈 칸의 `+`. **「취소만 보기」에서는 숨긴다** — 그 모드에서는 일반 막대가 안 보여
   // 팔린 밤도 빈칸처럼 보이는데, 거기에 `+` 가 뜨면 이미 찬 방에 예약을 넣으려 하게 된다.
-  const canStart = (date: string) => !editMode && !showCancelled && !nightTaken(date) && date >= today;
+  const canStart = (date: string) => canWrite && !editMode && !showCancelled && !nightTaken(date) && date >= today;
   const startDraft = (date: string) => actions.current.startDraft(bookingRoom, date);
 
   const cellClass = (day: OpsCalendarDay, index: number, withRoom: boolean) => {
@@ -800,6 +803,7 @@ function monthLabelOf(year: number, month: number, withYear: boolean, localeTag:
 }
 
 export function OpsCalendarGrid({
+  canWrite,
   cancelledHref,
   copy: copyProp,
   days: daysProp,
@@ -813,6 +817,11 @@ export function OpsCalendarGrid({
   status,
   today,
 }: {
+  /**
+   * 판매 캘린더를 바꿀 수 있나(`ops_calendar.write`, 2026-10-20 권한 정리 5-1). 없으면 보기 전용 — 「수기 예약」 · 「가격 수정」 버튼, 빈칸 끌어
+   * 예약 만들기, 막대 꾹 끌어 옮기기, 예약 패널의 수정 · 옮기기 · 취소, 이력의 되돌리기 · 지금 보내기가 없다. 서버 액션도 같은 키로 막는다.
+   */
+  canWrite: boolean;
   /** 「취소만 보기」를 켜고 끄는 주소(서버가 만든다 — 다른 쿼리는 그대로). */
   cancelledHref: string;
   copy: Copy;
@@ -1908,7 +1917,7 @@ export function OpsCalendarGrid({
     openGapsRef.current = () => {
       // 갭이 하나도 없으면 아무것도 안 한다 — 모드를 바꾸고 선택을 비우면 방금 하던
       // 작업(가격 선택 등)이 이유 없이 날아간다(2026-09-30 버그).
-      if (selectableGapCells.length === 0) return;
+      if (selectableGapCells.length === 0 || !canWrite) return;
       setMode("minstay");
       selectAllGaps();
       // 화면 맨 위 갭으로 스크롤한다. `selectableGapCells` 는 `Set` 을 돈 순서라 삽입 순서일
@@ -2032,6 +2041,7 @@ export function OpsCalendarGrid({
     rowActions.current = {
       cancelDraft,
       commitDraft: (room, checkIn, checkOut) => {
+        if (!canWrite) return;
         setBooking({ checkIn, checkOut, room });
         cancelDraft();
       },
@@ -2041,11 +2051,14 @@ export function OpsCalendarGrid({
         setOpenBar({ bar, propertyName: room.propertyName, roomIds: room.roomIds, roomLabel: room.displayRoomLabel });
       },
       startDraft: (room, date) => {
+        if (!canWrite) return;
         setCreateHint(false);
         setBookingDraft({ checkIn: date, room });
       },
       toggleRoomRow,
-      holdBar: (bar, room, event) => moveFns.current.hold(bar, room, event),
+      holdBar: (bar, room, event) => {
+        if (canWrite) moveFns.current.hold(bar, room, event);
+      },
       consumeClick: () => {
         if (Date.now() < suppressClickRef.current) {
           suppressClickRef.current = 0;
@@ -2095,7 +2108,7 @@ export function OpsCalendarGrid({
       clearSelection();
       return;
     }
-    if (urgentCells.length === 0) return;
+    if (urgentCells.length === 0 || !canWrite) return;
     setMode("price");
     setScope(EMPTY_SCOPE);
     setDateAnchor(null);
@@ -2326,8 +2339,8 @@ export function OpsCalendarGrid({
             {mode === "off" ? (
               <>
                 {propertyPicker}
-                {/* 「취소만 보기」에서는 팔린 밤도 빈칸처럼 보여 예약을 만들지 않는다 — 버튼도 숨긴다. */}
-                {!showCancelled && (
+                {/* 「취소만 보기」에서는 팔린 밤도 빈칸처럼 보여 예약을 만들지 않는다 — 버튼도 숨긴다. 바꾸기 권한이 없어도 숨긴다. */}
+                {canWrite && !showCancelled && (
                   <button
                     aria-pressed={createHint}
                     className="scw-btn is-soft"
@@ -2343,9 +2356,11 @@ export function OpsCalendarGrid({
                 )}
                 {/* 평소에는 읽는 화면이다. 「가격 수정」을 눌러야 칸이 선택 대상이 된다 — 읽으려다 실수로 바꾸는 일을 막는다.
                     최소 숙박일 · 차단은 편집 중 오른쪽 탭에서 고른다. */}
-                <button className="scw-btn is-primary" onClick={() => switchEditMode("price")} type="button">
-                  {copy.editMode}
-                </button>
+                {canWrite && (
+                  <button className="scw-btn is-primary" onClick={() => switchEditMode("price")} type="button">
+                    {copy.editMode}
+                  </button>
+                )}
               </>
             ) : (
               <button
@@ -2820,6 +2835,7 @@ export function OpsCalendarGrid({
                 row={row}
                 scopeOn={scope.roomKeys.includes(room.key)}
                 selectedDates={selectedDatesByRoom.get(room.key) ?? ""}
+                canWrite={canWrite}
                 showCancelled={showCancelled}
                 today={today}
                 moveFadeId={moveDrag && moveDrag.room.key === room.key ? moveDrag.bar.id : ""}
@@ -2942,7 +2958,7 @@ export function OpsCalendarGrid({
           );
         })()}
 
-      {historyOpen && <OpsHistoryPanel copy={copy} onClose={() => setHistoryOpen(false)} />}
+      {historyOpen && <OpsHistoryPanel canWrite={canWrite} copy={copy} onClose={() => setHistoryOpen(false)} />}
       {salesOpen && days.length > 0 && (
         <OpsSalesSummaryModal
           copy={copy}
@@ -3029,6 +3045,7 @@ export function OpsCalendarGrid({
       {openBar && (
         <OpsReservationPanel
           bar={openBar.bar}
+          canWrite={canWrite}
           key={openBar.bar.id}
           localeTag={copy.localeTag}
           propertyName={openBar.propertyName}

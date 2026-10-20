@@ -20,6 +20,8 @@ const EXPECTED: Partial<Record<Capability, readonly string[]>> = {
   "request.delete_any": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "bug.review": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   "board.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
+  // 판매 캘린더 바꾸기(5-1) — 보기(`ops_admin.access`)와 같은 기본 역할.
+  "ops_calendar.write": ["developer_super_admin", "owner", "senior_managing_director"],
   // 주문 처리 — 앱 게이트 `canProcessOrders` 의 역할 부분(개인 부여는 따로).
   order_processor: ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
 };
@@ -34,7 +36,7 @@ describe("역할 × 기능 표 (권한 정리 ③)", () => {
 
   it("역할로만 정한 키는 개인 부여 · 차단이 닫혀 있다(열면 RLS 도 같이 — 3b)", () => {
     for (const capability of Object.keys(EXPECTED) as Capability[]) {
-      if (capability === "order_processor") continue;
+      if (capability === "order_processor" || capability === "ops_calendar.write") continue;
       expect(CAPABILITIES[capability].individualGrant, capability).toBe(false);
       expect(CAPABILITIES[capability].individualDeny, capability).toBe(false);
     }
@@ -43,5 +45,8 @@ describe("역할 × 기능 표 (권한 정리 ③)", () => {
   it("DB 조회용 역할 목록은 개발자를 빼고 전무를 넣는다", () => {
     expect(rolesWithCapability("bug.review")).toEqual(["owner", "senior_managing_director", "office_admin"]);
     expect(rolesWithCapability("cleaning.work")).not.toContain("developer_super_admin");
+  });
+  it("판매 캘린더 바꾸기는 보기와 기본 역할이 같다(5-1 — 오늘 쓰는 사람은 그대로)", () => {
+    for (const role of roles) expect(roleCan(role, "ops_calendar.write"), role).toBe(roleCan(role, "ops_admin.access"));
   });
 });

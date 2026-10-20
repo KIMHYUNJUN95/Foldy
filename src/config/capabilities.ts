@@ -269,6 +269,20 @@ export const CAPABILITIES = {
     developerOnly: false,
   },
   /**
+   * 판매 캘린더 **바꾸기**(2026-10-20 권한 정리 5-1) — 가격 · 최소숙박 · 차단 · 수기 예약 · 예약 수정 · 옮기기 · 취소 · 되돌리기 · 대기 가격 보내기.
+   * 보기는 `ops_admin.access`. 기본 역할이 같아(대표 · 전무) 지금과 달라지는 건 없다. 전부 서버 액션(service role · Beds24)이라 RLS 와
+   * 상관없어 개인 부여 · 차단을 연다(「보되 못 바꾸는 사람」 · 「가격만 맡기는 사람」). docs/product/32-ops-admin-area.md
+   */
+  "ops_calendar.write": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /**
    * 룸 링크 — 객실별 Airbnb · Booking.com 리스팅 링크(호스트 편집 화면 · 손님용 링크) 보기 · 편집 (2026-10-02).
    *
    * 사이드바 맨 아래 「운영 관리자」 묶음에 있지만 **판매 캘린더와 따로 준다**(사용자 결정 — 「이것도 사용자에서

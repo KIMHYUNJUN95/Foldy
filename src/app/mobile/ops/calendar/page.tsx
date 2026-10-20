@@ -11,7 +11,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
-import { canAccessOpsAdmin } from "@/lib/ops-admin";
+import { canAccessOpsAdmin, canWriteOpsCalendar } from "@/lib/ops-admin";
 import { getOpsCalendarData, OPS_CALENDAR_ROLLING_DAYS } from "@/lib/ops-calendar";
 import { scheduleOpsCalendarOpenRefresh } from "@/lib/ops-calendar-open-refresh";
 import { resolveOpsCalendarMode } from "@/lib/ops-calendar-mode-preference";
@@ -111,6 +111,7 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
         }}
       />
       <MobileOpsCalendar
+        canWrite={canWriteOpsCalendar(session)}
         copy={copy}
         days={data.days}
         historyAlerts={historyAlerts}

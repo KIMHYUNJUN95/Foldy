@@ -9,9 +9,11 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
-## 2026-10-20 — 권한 정리 ⑤: 판매 캘린더 분리는 안 함 · 건물 단위 권한은 설계만
+## 2026-10-20 — 권한 정리 ⑤: 판매 캘린더 「바꾸기」 분리 · 건물 단위 권한은 설계만
 
-- 판매 캘린더 보기/쓰기 분리는 사용자 결정으로 하지 않는다(들어오는 사람이 관리자뿐). 건물 단위 권한 설계는 `14-permission-architecture.md` §10-1.
+- `ops_calendar.write`(기본 대표 · 전무 = 지금과 같음) — 없으면 판매 캘린더 보기 전용(PC · 모바일), 쓰기 서버 액션 `forbidden`. 마이그레이션 `202610200004`.
+  처음엔 하지 않기로 했다가 같은 날 사용자가 「미래를 위해 안전」하게 하기로 바꿈. 상세 `docs/product/32-ops-admin-area.md` 「진입점」.
+- 건물 단위 권한 설계는 `14-permission-architecture.md` §10-1.
 
 ## 2026-10-20 — 권한 정리 ④: 변경 기록 · 비활성 때 개인 지정 회수
 

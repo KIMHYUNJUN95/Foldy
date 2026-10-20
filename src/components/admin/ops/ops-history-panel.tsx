@@ -263,7 +263,8 @@ function applyChanges(
   };
 }
 
-export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onClose: () => void }) {
+/** `canWrite` — 판매 캘린더를 바꿀 수 있나(`ops_calendar.write`). 없으면 되돌리기 · 지금 보내기를 숨긴다(기록은 본다, 서버도 막는다). */
+export function OpsHistoryPanel({ canWrite = true, copy, onClose }: { canWrite?: boolean; copy: HistoryPanelCopy; onClose: () => void }) {
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { quietRestore: true });
   const [tab, setTab] = useState<"changes" | "send">("changes");
 
@@ -498,7 +499,7 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
                           <button aria-expanded={open} className="stw-link is-mute" onClick={() => toggleCells(group.id)} type="button">
                             {open ? copy.hsHideCells : copy.hsShowCells}
                           </button>
-                          {isRevertibleGroup(group) && revert === undefined && (
+                          {canWrite && isRevertibleGroup(group) && revert === undefined && (
                             <button
                               className="stw-link"
                               onClick={() => setReverts((previous) => ({ ...previous, [group.id]: "ask" }))}
@@ -580,9 +581,11 @@ export function OpsHistoryPanel({ copy, onClose }: { copy: HistoryPanelCopy; onC
               {stalled && (
                 <div className="stw-stall" role="status">
                   <span>{copy.hsStalled.replace("{n}", String(SEND_STALL_MINUTES))}</span>
-                  <button className="stw-btn is-pri is-sm" disabled={kicking} onClick={() => void sendNow()} type="button">
-                    {kicking ? copy.hsSending : copy.hsSendNow}
-                  </button>
+                  {canWrite && (
+                    <button className="stw-btn is-pri is-sm" disabled={kicking} onClick={() => void sendNow()} type="button">
+                      {kicking ? copy.hsSending : copy.hsSendNow}
+                    </button>
+                  )}
                 </div>
               )}
               {sendResult && (

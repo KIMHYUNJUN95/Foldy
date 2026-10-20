@@ -20,6 +20,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - Beds24 새 객실 `601`(745422, 파는 쪽 2박) · `601_2`(745475, 99박 = 끔, 가격은 601 을 따름)을 `rooms` 에 넣고 최소 숙박 · 상태 · 요금 12개월을 맞췄다.
   방 마스터 백필은 꺼 둔 방을 뒤집어서 쓰지 않았다. 도어 비밀번호는 나중에. 순서 `docs/engineering/01-beds24-integration.md` 「기존 건물에 새 객실 넣기」.
 
+## 2026-10-20 — HIG 다듬기 2차 · 모바일 자동화
+
+- `/mobile/ops/automation` 크기 다듬기 — 상태 줄 15 · 오늘 발송 17/600 높이 44 · 타임라인 15 · 「Slack」 묶음 13 진한 회색 · 줄 선은 줄 사이에만 · 켜짐 15 ·
+  상세 제목 28/34 · 스위치 51×31 · 탭 15 밑 선 없음 · 언어 나눔 36 · 버튼 50 · 실행 기록 16/13/15 · 설정 · 담당자 작은 글자 13. HIG 캔버스 A2Auto-*.
+  상세 `docs/product/36-automation-control.md` 「모바일 자동화」 → 「HIG 다듬기 2차」.
+
 ## 2026-10-20 — HIG 다듬기 2차 · 모바일 매출
 
 - `/mobile/ops/revenue` 크기를 가동률과 맞춤 — 아래 줄 15 · 달 이동 누르는 자리 44 · 총매출 이름 · 아래 줄 15 · 숫자 넷 13/20/13 · 묶음 제목 17/600 높이 44 ·

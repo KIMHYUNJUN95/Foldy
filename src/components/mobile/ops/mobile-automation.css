@@ -280,6 +280,40 @@
   padding: 14px; border-radius: 14px; background: #f7f7f9;
 }
 
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Auto-* · 지금 A2AutoNow-*): 상태 줄 15 · 오늘 발송 제목 17/600 높이 44 · 타임라인 15 ·
+   「Slack」 묶음 13 진한 회색(옅은 #9a97a6 은 2.8:1) · 자동화 줄 선은 줄 사이에만 · 켜짐 15/600 · 안내 13 · 상세 제목 28/34 · 스위치 51×31 ·
+   탭 15 밑 선 없음 · 언어 나눔 36(누르는 자리 44) · 버튼 50 · 실행 기록 16/13/15 · 원문 시트 17/600. */
+.mat-status { font-size: 15px; }
+.mat-today { gap: 6px; }
+.mat-today__h { align-items: center; gap: 0 10px; }
+.mat-today__h b { display: flex; align-items: center; min-height: 44px; font-size: 17px; font-weight: 600; }
+.mat-today__h span { font-size: 13px; }
+.mat-pt { grid-template-columns: 14px minmax(86px, max-content) minmax(0, 1fr); }
+.mat-pt__time, .mat-pt__name { font-size: 15px; }
+.mat-group { font-size: 13px; color: var(--mat-soft); }
+.mat-job { border-top: 0; }
+.mat-job:last-child { border-bottom: 0; }
+.mat-job + .mat-job { border-top: 0.5px solid var(--separator); }
+.mat-job__t b { font-weight: 600; }
+.mat-job__st { font-size: 15px; font-weight: 600; }
+.mat-foot { font-size: 13px; }
+.mat-dh__t h2 { font-size: 28px; line-height: 34px; }
+.mat-dh__t p { font-size: 15px; }
+.mat-sw { margin-top: -2px; font-size: 15px; font-weight: 600; }
+.mat-switch { width: 51px; height: 31px; border-radius: 16px; }
+.mat-switch i { width: 25px; height: 25px; }
+.mat-switch.is-on i { transform: translateX(20px); }
+.mat-ro { font-size: 13px; }
+.mat-tabs { border-bottom: 0; }
+.mat-tab { font-size: 15px; }
+.mat-seg > button { position: relative; height: 30px; font-size: 15px; }
+.mat-seg > button::before { content: ""; position: absolute; inset: -7px 0; }
+.mat-btn, .mat-cf .mat-btn { min-height: 50px; }
+.mat-run__at { font-size: 16px; }
+.mat-run__d { font-size: 13px; }
+.mat-run__st, .mat-link { font-size: 15px; }
+.mat-sheet__h { font-size: 17px; font-weight: 600; }
+
 @keyframes mat-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes mat-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
 @keyframes mat-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

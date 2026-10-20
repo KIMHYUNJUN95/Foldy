@@ -283,3 +283,7 @@
   .maf-ar__ok { opacity: 1; transform: translateY(-50%); }
   .maf *:active, .maf-sheet *:active { transform: none !important; }
 }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Auto-Notes 11): 칸 이름 15 · 작은 글자(안내 · 소제목 · 저장 줄 · 발송 뒤 바뀜 등) 12 → 13. */
+.maf-l { font-size: 15px; }
+.maf-note, .maf-h, .maf-sh, .maf-dest__n span, .maf-save__t, .maf-atool__n, .maf-ar__chg, .maf-addrow span, .maf-sheet__h span, .maf-sheet .maf-sh { font-size: 13px; }

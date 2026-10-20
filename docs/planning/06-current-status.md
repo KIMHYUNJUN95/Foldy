@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 개인 권한을 무기한으로 줄 수 있다
+
+- 사용자 콘솔 권한 줄의 기한 고르기 맨 앞에 「무기한」(켜기 · 끄기 둘 다). 예외성 권한 4개(주문 처리 · 수리 상태 변경 · 건물 · 객실 관리 ·
+  일일 리포트 생성)도 기한 없이 줄 수 있다. 서버 `expiry_required` 거부 삭제, 레지스트리 `requiresExpiry` → `asksExpiry`. 기본 칩은 1개월 그대로.
+  상세: `docs/product/27-permission-override-workflow.md` 머리말 · `17-user-profile-directory.md`.
+- 모바일 사용자 관리 시안(새 캔버스) https://claude.ai/artifact/UsmRsgn8tB5DGr4tDwaX7E — 컨펌 대기, 기한 줄에 같은 「무기한」 반영.
+
 ## 2026-10-19 — 모바일 예약 옮기기: 날짜도 옮기기 · 되돌리기
 
 - 판매 캘린더 모바일 「객실 옮기기」 시트에 날짜 줄 → 같은 시트 안 달력(체크인만 누르면 박수만큼 띠 · 빈 객실 없는 날 흐리게 · 다른 달로 넘김).

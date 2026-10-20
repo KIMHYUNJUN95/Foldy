@@ -19,7 +19,7 @@ export type MemberOverride = {
   /** 부여(grant) 인지 차단(deny) 인지. 차단이 부여를 이긴다. */
   effect: CapabilityEffect;
   reason: string;
-  /** ISO. `null` 이면 무기한 — 상시 업무 지정에서만 허용된다(레지스트리의 requiresExpiry). */
+  /** ISO. `null` 이면 무기한(2026-10-20 부터 모든 키에서 고를 수 있다). */
   expires: string | null;
   granted: string; // ISO (created_at)
   by: string; // granter display name ("—" if unknown)
@@ -158,10 +158,9 @@ export async function grantMemberOverride(input: {
     if (!Number.isFinite(expiresMs)) return { ok: false, error: "invalid_expiry" };
     if (expiresMs <= Date.now()) return { ok: false, error: "expiry_in_past" };
     expiresIso = new Date(expiresMs).toISOString();
-  } else if (policy.requiresExpiry) {
-    // 일시적 예외에는 기한이 필수다(27-permission-override-workflow.md 의 결정).
-    return { ok: false, error: "expiry_required" };
   }
+  // 기한을 비우면 무기한이다 — 기한을 묻는 권한도 「무기한」을 고를 수 있다(2026-10-20 사용자 결정,
+  // 27-permission-override-workflow.md). DB 는 2026-09-10 부터 NULL 을 허용한다.
 
   // DB 제약도 자기부여를 막지만, 깔끔한 오류를 위해 먼저 거른다.
   if (input.grantedByUserId === input.userId) return { ok: false, error: "self_grant_blocked" };

@@ -8,6 +8,10 @@
 > 바뀌는 것 둘:
 > - **「모든 부여에 기한 필수, 무기한 없음」**(아래 Goal 절)은 폐기가 아니라 **키별 정책**이 된다.
 >   기존 예외성 권한은 그대로 기한 필수이고, 상시 업무 지정(채용 담당자 등)만 무기한을 허용한다.
+> - **2026-10-20 사용자 결정 — 기한 필수 폐지, 모든 키에서 무기한을 고를 수 있다.** 「기간 상관없이 무제한으로
+>   권한을 줄 수 있도록 설정할 수 있어야 한다.」 예외성 권한(주문 처리 · 수리 상태 변경 · 건물 · 객실 관리 · 일일
+>   리포트 생성)은 켤 때 여전히 기한 줄이 펼쳐지지만 맨 앞에 **「무기한」** 칩이 있다(차단도 같다). 서버는 기한을
+>   비우면 무기한으로 저장한다(`expiry_required` 거부 삭제). 레지스트리 필드는 `requiresExpiry` → `asksExpiry`(「묻는가」).
 > - `permission_key` 화이트리스트(`src/config/permission-overrides.ts`)는 권한 레지스트리
 >   (`src/config/capabilities.ts`)로 흡수된다.
 >
@@ -95,7 +99,7 @@ every time a new exception need comes up.
   `src/config/roles.ts`), never a free-text string. It can never contain `"role"` itself — this system
   cannot be used to reassign `owner`/`office_admin`/etc.; that stays exclusively on the existing
   role-change flow.
-- **Time-bound by default.** Every grant requires an `expires_at`. No permanent/indefinite grants
+- ~~**Time-bound by default.** Every grant requires an `expires_at`.~~ (2026-10-20: 무기한 허용 — 위 머리말.) No permanent/indefinite grants
   through this system — if something needs to be permanent, that's a signal it should become a real
   per-feature flag (like the existing three) or a role change, not an override.
 - **Requester ≠ approver**, at minimum: the person who requests/needs the exception cannot also be the

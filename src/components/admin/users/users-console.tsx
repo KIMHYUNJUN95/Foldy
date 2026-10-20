@@ -305,7 +305,8 @@ export function UsersConsole({
   );
 }
 
-type Picker = { key: string; effect: "grant" | "deny"; preset: "week" | "month" | "month3" | "date"; date: string };
+/** `forever` = 무기한(기한 없이 켬 · 끔, 2026-10-20 사용자 결정). */
+type Picker = { key: string; effect: "grant" | "deny"; preset: "forever" | "week" | "month" | "month3" | "date"; date: string };
 
 function MemberPanel({
   panel,
@@ -499,7 +500,7 @@ function MemberPanel({
     if (!p) return;
     const label = p.label;
     const key = picker.key;
-    const expiresAt = `${picker.date}T23:59:59+09:00`;
+    const expiresAt = picker.preset === "forever" ? null : `${picker.date}T23:59:59+09:00`;
     setOptimistic((prev) => ({ ...prev, [key]: picker.effect === "grant" }));
     setPicker(null);
     run(
@@ -658,6 +659,14 @@ function MemberPanel({
                       {isOpen ? (
                         <div className="usw-xp">
                           <div className="usw-xp__q">
+                            <button
+                              type="button"
+                              className={picker.preset === "forever" ? "on" : ""}
+                              aria-pressed={picker.preset === "forever"}
+                              onClick={() => setPicker({ ...picker, preset: "forever" })}
+                            >
+                              {c.wForever}
+                            </button>
                             {presets.map((preset) => (
                               <button
                                 key={preset.id}
@@ -684,7 +693,11 @@ function MemberPanel({
                               {c.cancel}
                             </button>
                             <button type="button" className="usw-btn is-pri" onClick={submitPicker} disabled={pending}>
-                              {(picker.effect === "grant" ? c.wGrantUntil : c.wDenyUntil).replace("{date}", shortDate(picker.date))}
+                              {picker.preset === "forever"
+                                ? picker.effect === "grant"
+                                  ? c.wGrantForever
+                                  : c.wDenyForever
+                                : (picker.effect === "grant" ? c.wGrantUntil : c.wDenyUntil).replace("{date}", shortDate(picker.date))}
                             </button>
                           </div>
                         </div>

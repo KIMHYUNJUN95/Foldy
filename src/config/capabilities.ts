@@ -44,14 +44,15 @@ export type CapabilityPolicy = {
    */
   individualDeny: boolean;
   /**
-   * 부여에 기한이 반드시 필요한가.
+   * 켤 때 기한을 묻는가(기한 줄이 펼쳐진다).
    *
-   * `27-permission-override-workflow.md` 의 「모든 부여는 시한부」 결정을 **키별 정책으로
-   * 일반화**한 것이다. 일시적 예외는 `true` 로 두어 그 결정을 그대로 지키고, 상시 업무 지정
-   * (채용 담당자처럼 계속 그 일을 하는 사람)만 `false` 로 무기한을 허용한다. 상시 업무에 기한을
-   * 걸면 어느 날 조용히 만료돼 담당자가 일을 못 하게 된다.
+   * 원래는 「부여에 기한이 반드시 필요한가」였다(`27-permission-override-workflow.md` 의 「모든 부여는
+   * 시한부」 결정). **2026-10-20 사용자 결정으로 무기한도 고를 수 있게 바뀌었다** — 기한 줄 맨 앞에
+   * 「무기한」 칩이 있다. 그래서 이제는 「묻는가」만 정한다: 일시적 예외는 `true`(1주 · 1개월 · 3개월 ·
+   * 날짜 · 무기한 중 고름), 상시 업무 지정(채용 담당자처럼 계속 그 일을 하는 사람)은 `false`(누르면 바로
+   * 무기한으로 켜짐).
    */
-  requiresExpiry: boolean;
+  asksExpiry: boolean;
   /** 플랫폼 개발자(`developer_super_admin`)가 역할·부여와 무관하게 통과하는가. */
   platformBypass: boolean;
   /**
@@ -90,7 +91,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director"],
     individualGrant: false,
     individualDeny: false,
-    requiresExpiry: true,
+    asksExpiry: true,
     platformBypass: true,
     systemOnly: true,
     developerOnly: false,
@@ -114,7 +115,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director"],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -123,7 +124,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director"],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -132,7 +133,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director"],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -153,7 +154,7 @@ export const CAPABILITIES = {
     roles: [],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     // 위임받은 사람이 다시 위임하면 권한이 무한히 번진다(2026-07-13 결정).
@@ -176,7 +177,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
     individualGrant: true,
     individualDeny: true,
-    requiresExpiry: true,
+    asksExpiry: true,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -194,7 +195,7 @@ export const CAPABILITIES = {
     ],
     individualGrant: true,
     individualDeny: true,
-    requiresExpiry: true,
+    asksExpiry: true,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -210,7 +211,7 @@ export const CAPABILITIES = {
     roles: [],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: true,
+    asksExpiry: true,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -232,7 +233,7 @@ export const CAPABILITIES = {
     ],
     individualGrant: true,
     individualDeny: true,
-    requiresExpiry: true,
+    asksExpiry: true,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -249,7 +250,7 @@ export const CAPABILITIES = {
    * 다르다 — 그래서 역할로는 대표·전무만 받고, 나머지는 **개인 지정**으로만 연다.
    * 현장 직원은 역할로는 절대 들어오지 못한다.
    *
-   * `requiresExpiry: false` — 가격을 다루는 사람은 그 일을 계속 한다. 기한을 걸면 어느 날 조용히
+   * `asksExpiry: false` — 가격을 다루는 사람은 그 일을 계속 한다. 기한을 걸면 어느 날 조용히
    * 만료돼 그날 가격을 못 고친다(채용 담당자와 같은 이유).
    *
    * 차단은 켜지 않는다. 역할로 받는 사람이 대표·전무뿐인데 그 둘은 차단 면역이라 뺄 대상이 없다.
@@ -260,7 +261,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director"],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -278,7 +279,7 @@ export const CAPABILITIES = {
     roles: ["owner", "senior_managing_director"],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -296,7 +297,7 @@ export const CAPABILITIES = {
     roles: [],
     individualGrant: true,
     individualDeny: false,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,
@@ -313,7 +314,7 @@ export const CAPABILITIES = {
     roles: ["owner", "office_admin"],
     individualGrant: true,
     individualDeny: true,
-    requiresExpiry: false,
+    asksExpiry: false,
     platformBypass: true,
     systemOnly: false,
     developerOnly: false,

@@ -202,7 +202,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           expires: (deny ?? grant)?.expires ?? null,
           overrideId: (deny ?? grant)?.id ?? null,
           canToggle,
-          needsExpiry: policy.requiresExpiry,
+          needsExpiry: policy.asksExpiry,
         });
       }
     }

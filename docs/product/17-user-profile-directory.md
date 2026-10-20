@@ -143,7 +143,7 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
 - 권한 — one list of switches (owner/전무/developer only; others see a one-line note). Each row says where it comes from: 역할로 받음 · 개인 부여(· 기한) · 개인 차단 · 꺼짐. Rules (server contract unchanged, `27-permission-override-workflow.md`):
   - off → on: grant override; on (from role) → off: deny override (only when the key allows deny and the role isn't deny-immune — otherwise the switch is disabled 「역할로 받음 · 끌 수 없음」).
   - grant/deny override → toggle back: revoke that override.
-  - Keys that require an expiry expand the row: 1주 · 1개월 · 3개월 · 날짜 고르기 (shared `AdminDatePicker`) → [M월 D일까지 켜기/끄기]. Expiry = end of that Tokyo day. Reason is left empty (optional since 2026-09-30).
+  - Keys that ask for an expiry (`asksExpiry`) expand the row: **무기한** · 1주 · 1개월 · 3개월 · 날짜 고르기 (shared `AdminDatePicker`) → [무기한으로 켜기/끄기] or [M월 D일까지 켜기/끄기]. Expiry = end of that Tokyo day; 무기한 = no `expires_at` (2026-10-20 사용자 결정, `27-permission-override-workflow.md`). Default chip stays 1개월. Reason is left empty (optional since 2026-09-30).
   - Expiry within 7 days and personal blocks are red; everything else grey.
   - Also in the list: 급여 담당 · 연차 결재자 (membership flags), 일일 보고서 — 파트타임 허용 (only for part-time, `profiles.can_generate_report`), 개발자 지정 (developer viewer only). Developer-only keys (`user.manage`) are hidden from non-developers.
 - Your own row: no role/status/permission controls (「내 역할 · 권한은 여기서 바꿀 수 없어요.」), no delete.

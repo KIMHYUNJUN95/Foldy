@@ -220,14 +220,14 @@ RLS 에서도 같은 키로 판정한다: `beds24_price_jobs` · `price_change_l
   roles: [],                  // 역할로는 아무도 안 받는다 → 지정된 개인만
   individualGrant: true,
   individualDeny: false,      // 역할 부여가 없으므로 차단할 대상이 없다
-  requiresExpiry: false,      // 상시 업무 → 무기한 지정 허용
+  asksExpiry: false,          // 상시 업무 → 누르면 바로 무기한
   platformBypass: true,
 },
 order_processor: {
   roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   individualGrant: true,
   individualDeny: true,       // 「사무직인데 이 사람만 제외」
-  requiresExpiry: true,       // 기존 시한부 정책 유지
+  asksExpiry: true,           // 켤 때 기한 줄(무기한 · 1주 · 1개월 · 3개월 · 날짜)
   platformBypass: true,
 },
 ```
@@ -237,7 +237,7 @@ order_processor: {
 | `roles` | 이 역할이면 기본으로 받는다. **빈 배열이면 「지정된 개인만」**이 된다 |
 | `individualGrant` | 개인에게 추가 부여할 수 있는가 |
 | `individualDeny` | 역할로 받은 것을 개인에게서 뺄 수 있는가 |
-| `requiresExpiry` | 부여에 기한이 반드시 필요한가 |
+| `asksExpiry` | 켤 때 기한을 묻는가(2026-10-20 전 이름 `requiresExpiry` = 기한 필수. 지금은 무기한도 고를 수 있다) |
 | `platformBypass` | 플랫폼 개발자(`developer_super_admin`)가 통과하는가 |
 | `systemOnly` | 관리 화면에 **노출조차 하지 않는다**(권한 관리 자체) |
 
@@ -245,6 +245,9 @@ order_processor: {
 없음」을 확정 결정으로 적고 있다. 이 설계는 그것을 **키별 정책으로 일반화**한다 — 기존 예외성
 권한은 `requiresExpiry: true` 로 그대로 두고, 상시 업무 지정(채용 담당자 등)만 무기한을 허용한다.
 결정이 뒤집히는 것이 아니라 적용 범위가 명시된다.
+
+**2026-10-20 개정 — 기한 필수 폐지.** 사용자 결정으로 모든 키에서 무기한을 고를 수 있다. 예외성 권한도 켤 때 기한
+줄이 펼쳐지지만 맨 앞에 「무기한」 칩이 있고, 서버는 기한을 비우면 무기한으로 저장한다. 필드 이름도 `asksExpiry` 로 바꿨다.
 
 ### 3-3. 판정식
 
@@ -294,7 +297,7 @@ create table public.capability_roles (
 | 변경 | 내용 |
 | --- | --- |
 | `effect` 컬럼 추가 | `'grant' | 'deny'`, 기본 `'grant'` |
-| `expires_at` NULL 허용 | NULL = 무기한. 키 정책이 `requiresExpiry: true` 면 서버가 거부 |
+| `expires_at` NULL 허용 | NULL = 무기한. (2026-10-20 부터 모든 키에서 허용 — 서버 거부 없음) |
 | 부분 유니크 인덱스 | 활성 행 기준 `(organization_id, user_id, permission_key, effect)` 중복 방지 |
 
 행이 0건이므로 **데이터 이전이 없다.** 표 이름은 유지한다(참조가 여러 곳이고 의미는 그대로다).
@@ -386,8 +389,7 @@ using (has_capability(organization_id, (select auth.uid()), 'job_application.rea
 
 - 부여 드롭다운은 **레지스트리가 정한 것만** 낸다. i18n 사전에 라벨이 남아 있어도 개인 부여가
   불가능한 키는 뜨지 않는다.
-- 기한 필드의 필수 표시가 **키 정책을 따른다**(`requiresExpiry`). 비우면 무기한이고, 기한이 필요한
-  키에서 비우면 서버가 거부한다.
+- 기한을 묻는지는 **키 정책을 따른다**(`asksExpiry`). 비우면 무기한 — 2026-10-20 부터 모든 키에서 허용된다.
 - 차단 버튼은 「역할로 받은 권한」 칩 옆에 붙는다 — 뺄 대상이 눈앞에 있어야 조작이 자연스럽다.
   owner·전무·개발자에게는 버튼이 뜨지 않고, 서버도 같은 규칙으로 거부한다(이중 방어).
 - 부여·차단·회수 후 `router.refresh()` 로 **최종 유효 권한을 서버가 다시 계산**한다. 클라이언트가

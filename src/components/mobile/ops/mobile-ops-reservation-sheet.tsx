@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CalendarDays, Check, ChevronRight, ChevronUp, Lock, TriangleAlert } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, ChevronUp, TriangleAlert } from "lucide-react";
 import {
   loadReservationMoveMonth,
   loadReservationMoveTargets,
@@ -32,8 +32,8 @@ import {
 } from "@/components/mobile/ops/mobile-ops-form";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 import {
-  canEditStay,
   diffBookingEdit,
+  isChannelBooking,
   validateBookingEdit,
   type BookingEditDraft,
 } from "@/lib/ops-booking-edit";
@@ -81,8 +81,6 @@ export type MobileReservationSheetCopy = ReservationCardCopy & {
   mvDateSame: string;
   mvDateWas: string;
   mvDatePicking: string;
-  mvDateLocked: string;
-  mvDateFixed: string;
   mvCalHint: string;
   mvCalFull: string;
   mvCalApply: string;
@@ -506,7 +504,7 @@ function MobileReservationEdit({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { done, succeed } = useSuccessThen();
-  const stayEditable = canEditStay(channel);
+  const channelBooking = isChannelBooking(channel);
   const availability = useRoomAvailability({
     allowedStart: original.arrival < today ? original.arrival : undefined,
     excludeReservationId: bar.id,
@@ -518,13 +516,13 @@ function MobileReservationEdit({
   const set = <K extends keyof BookingEditDraft>(key: K, value: BookingEditDraft[K]) =>
     setDraft((previous) => ({ ...previous, [key]: value }));
   const nights = stayNights(draft.arrival, draft.departure);
-  const taken = stayEditable ? availability.takenIn(nights) : [];
+  const taken = availability.takenIn(nights);
   const changes = diffBookingEdit(original, draft);
-  const localError = validateBookingEdit({ changes, channel, original, today });
+  const localError = validateBookingEdit({ changes, original, today });
 
   const save = () => {
     if (localError) {
-      setError(reservationEditErrorText(copy, localError, [], channel));
+      setError(reservationEditErrorText(copy, localError, []));
       return;
     }
     setError(null);
@@ -534,7 +532,7 @@ function MobileReservationEdit({
         succeed(onSaved);
         return;
       }
-      setError(reservationEditErrorText(copy, result.error, result.conflictDates, channel));
+      setError(reservationEditErrorText(copy, result.error, result.conflictDates));
     });
   };
 
@@ -551,22 +549,21 @@ function MobileReservationEdit({
             </div>
           </div>
 
-          {/* 채널 예약은 날짜 잠김 — 날짜는 보이되 고를 수 없다. */}
-          {!stayEditable && (
-            <div className="msw-lock">{copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel])}</div>
+          {/* 채널 예약도 날짜를 바꾼다(2026-10-20 — 전엔 잠갔다). 채널 쪽 예약은 그대로라 「채널에서도 바꿔 주세요」. */}
+          {channelBooking && (
+            <div className="msw-lock">{copy.reChannelDates.replaceAll("{channel}", CHANNEL_NAME[channel])}</div>
           )}
           <MobileStayDates
             arrival={draft.arrival}
             checkInLabel={copy.mbCheckIn}
             checkOutLabel={copy.mbCheckOut}
             departure={draft.departure}
-            disabled={!stayEditable}
             labels={{ nextMonth: copy.dateNext, prevMonth: copy.datePrev, today: copy.today }}
             locale={localeTag}
             onChange={(arrival, departure) => setDraft((previous) => ({ ...previous, arrival, departure }))}
             today={today}
           />
-          {stayEditable && taken.length > 0 && (
+          {taken.length > 0 && (
             <span className="msw-field__hint bad">
               {copy.mbErrNightsTaken.replace("{dates}", taken.map((night) => night.slice(5).replace("-", "/")).join(", "))}
             </span>
@@ -592,7 +589,7 @@ function MobileReservationEdit({
             <MobileStepper label={copy.mbChildren} min={0} onChange={(value) => set("numChild", value)} value={draft.numChild} />
           </div>
           <MswField
-            hint={stayEditable ? null : copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel])}
+            hint={channelBooking ? copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel]) : null}
             label={copy.mbTotal}
           >
             <span className="msw-money sm">
@@ -767,7 +764,7 @@ function MobileMoveForm({
         });
         return;
       }
-      setError(reservationMoveErrorText(copy, result, bar.channel));
+      setError(reservationMoveErrorText(copy, result));
       // 그사이 찬 객실이 목록에 그대로 보이게 다시 읽고, 고른 것은 푼다.
       setPicked(null);
       setReloadSeq((seq) => seq + 1);
@@ -785,7 +782,7 @@ function MobileMoveForm({
       <div className="msw-body">
         <div className="msw-step" key="move">
           <div className="msw-mv-head">
-            <b>{(manual ? copy.mvTitleManual : copy.mvTitle).replace("{guest}", bar.guestName)}</b>
+            <b>{copy.mvTitleManual.replace("{guest}", bar.guestName)}</b>
             <span>
               {[CHANNEL_NAME[bar.channel] || null, `${propertyName} ${currentRoom.label}`, range(bar.checkIn, bar.checkOut), copy.rcNights.replace("{n}", String(nights))]
                 .filter(Boolean)
@@ -793,40 +790,31 @@ function MobileMoveForm({
             </span>
           </div>
 
-          {manual ? (
-            <button
-              aria-expanded={opened}
-              className={`msw-mv-date${opened || datesChanged ? " is-on" : ""}`}
-              disabled={pending}
-              onClick={() => {
-                setCalendar(opened ? null : { draft: arrival, month: arrival.slice(0, 7) < today.slice(0, 7) ? today.slice(0, 7) : arrival.slice(0, 7) });
-                setError(null);
-              }}
-              type="button"
-            >
-              <CalendarDays aria-hidden className="msw-mv-date__ic" />
-              <span className="msw-mv-date__tx">
-                <b>
-                  {mdWeekday(shownIn, localeTag)} → {mdWeekday(shownOut, localeTag)}
-                </b>
-                <span>{opened ? (moved ? was(copy.mvDatePicking) : copy.mvDateSame.replace("{n}", String(nights))) : datesChanged ? was(copy.mvDateWas) : copy.mvDateSame.replace("{n}", String(nights))}</span>
-              </span>
-              <span className="msw-mv-date__act">
-                {opened ? copy.mvDateFold : datesChanged ? copy.mvDateRepick : copy.mvDateChange}
-                {opened ? <ChevronUp aria-hidden /> : <ChevronRight aria-hidden />}
-              </span>
-            </button>
-          ) : (
-            <div aria-disabled="true" className="msw-mv-date is-locked">
-              <Lock aria-hidden className="msw-mv-date__ic" />
-              <span className="msw-mv-date__tx">
-                <b>
-                  {mdWeekday(bar.checkIn, localeTag)} → {mdWeekday(bar.checkOut, localeTag)}
-                </b>
-                <span>{copy.mvDateLocked.replace("{channel}", CHANNEL_NAME[bar.channel] || bar.channel)}</span>
-              </span>
-              <span className="msw-mv-date__act">{copy.mvDateFixed}</span>
-            </div>
+          {/* 날짜는 모든 예약이 옮긴다(2026-10-20 — 채널 예약 잠금을 풀었다). */}
+          <button
+            aria-expanded={opened}
+            className={`msw-mv-date${opened || datesChanged ? " is-on" : ""}`}
+            disabled={pending}
+            onClick={() => {
+              setCalendar(opened ? null : { draft: arrival, month: arrival.slice(0, 7) < today.slice(0, 7) ? today.slice(0, 7) : arrival.slice(0, 7) });
+              setError(null);
+            }}
+            type="button"
+          >
+            <CalendarDays aria-hidden className="msw-mv-date__ic" />
+            <span className="msw-mv-date__tx">
+              <b>
+                {mdWeekday(shownIn, localeTag)} → {mdWeekday(shownOut, localeTag)}
+              </b>
+              <span>{opened ? (moved ? was(copy.mvDatePicking) : copy.mvDateSame.replace("{n}", String(nights))) : datesChanged ? was(copy.mvDateWas) : copy.mvDateSame.replace("{n}", String(nights))}</span>
+            </span>
+            <span className="msw-mv-date__act">
+              {opened ? copy.mvDateFold : datesChanged ? copy.mvDateRepick : copy.mvDateChange}
+              {opened ? <ChevronUp aria-hidden /> : <ChevronRight aria-hidden />}
+            </span>
+          </button>
+          {!manual && (
+            <div className="msw-lock">{copy.mvChannelNote.replaceAll("{channel}", CHANNEL_NAME[bar.channel] || bar.channel)}</div>
           )}
 
           {opened ? (

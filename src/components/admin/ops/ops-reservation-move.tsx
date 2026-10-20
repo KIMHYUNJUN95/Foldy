@@ -18,7 +18,6 @@ import type { OpsCalendarBar } from "@/lib/ops-calendar";
 
 export type ReservationMoveCopy = {
   mvButton: string;
-  mvTitle: string;
   mvTitleManual: string;
   mvChannelNote: string;
   mvManualNote: string;
@@ -44,6 +43,8 @@ export type ReservationMoveCopy = {
   mvNow: string;
   mvTo: string;
   mvConfirmNote: string;
+  /** 채널 예약의 날짜를 옮길 때(2026-10-20) — 채널 쪽 예약은 그대로라 거기서도 바꿔 달라고 적는다. */
+  mvConfirmNoteChannelDates: string;
   mvConfirmNoteManual: string;
   mvHoldHint: string;
   mvDragging: string;
@@ -61,7 +62,7 @@ export type ReservationMoveCopy = {
   mbErrPastArrival: string;
   mbErrBadDates: string;
   mbErrStayTooLong: string;
-  reChannelLocked: string;
+  reChannelDates: string;
   reErrNotApplied: string;
   reErrCancelled: string;
   rcErrForbidden: string;
@@ -89,17 +90,19 @@ export type MovedReservation = {
 
 const CHANNEL_NAME: Record<string, string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "", other: "" };
 
+/** 채널 이름(「Airbnb」 · 「Booking.com」) — 끌어 옮기기 확인 상자도 쓴다. 없으면 받은 값 그대로. */
+export function channelDisplayName(channel: string): string {
+  return CHANNEL_NAME[channel] || channel;
+}
+
 export function reservationMoveErrorText(
   copy: ReservationMoveCopy,
   result: Extract<ReservationMoveResult, { ok: false }>,
-  channel: string,
 ): string {
   const list = (result.conflictDates ?? []).map((date) => date.slice(5).replace("-", "/")).join(", ");
   switch (result.error) {
     case "same_place":
       return copy.mvErrSamePlace;
-    case "channel_locked":
-      return copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel] || channel);
     case "other_building":
       return copy.mvErrOtherBuilding;
     case "past_stay":
@@ -162,7 +165,7 @@ export function OpsReservationMoveForm({
   /** 같은 건물의 줄 전부(지금 줄 포함). */
   rooms: MoveRoom[];
 }) {
-  const manual = bar.channel === "manual";
+  const channelName = CHANNEL_NAME[bar.channel] || bar.channel;
   const nights = stayNights(bar.checkIn, bar.checkOut).length;
   const [arrival, setArrival] = useState(bar.checkIn);
   const departure = addDays(arrival, nights);
@@ -221,7 +224,7 @@ export function OpsReservationMoveForm({
         });
         return;
       }
-      setMessage(reservationMoveErrorText(copy, result, bar.channel));
+      setMessage(reservationMoveErrorText(copy, result));
     });
   };
 
@@ -236,34 +239,33 @@ export function OpsReservationMoveForm({
   return (
     <>
       <div className="spw-pbody">
-        {manual ? (
-          <div className="spw-group">
-            <span className="spw-label">
-              {copy.mbCheckIn} → {copy.mbCheckOut}
-            </span>
-            <AdminDateRangePicker
-              ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
-              from={arrival}
-              labels={{
-                apply: copy.dateApply,
-                nextMonth: copy.dateNext,
-                prevMonth: copy.datePrev,
-                reset: copy.dateReset,
-                thisMonth: copy.dateThisMonth,
-              }}
-              localeTag={localeTag}
-              // 박수는 그대로 — 고른 첫날을 체크인으로, 체크아웃은 같은 박수만큼 뒤.
-              onChange={(from) => {
-                setArrival(from);
-                setMessage(null);
-              }}
-              to={departure}
-            />
-            <p className="spw-info">{copy.mvManualNote}</p>
-          </div>
-        ) : (
-          <p className="spw-info">{copy.mvChannelNote}</p>
-        )}
+        {/* 날짜는 모든 예약이 옮긴다(2026-10-20 — 채널 예약 잠금을 풀었다). 채널 예약은 「채널에서도 바꿔 주세요」. */}
+        <div className="spw-group">
+          <span className="spw-label">
+            {copy.mbCheckIn} → {copy.mbCheckOut}
+          </span>
+          <AdminDateRangePicker
+            ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
+            from={arrival}
+            labels={{
+              apply: copy.dateApply,
+              nextMonth: copy.dateNext,
+              prevMonth: copy.datePrev,
+              reset: copy.dateReset,
+              thisMonth: copy.dateThisMonth,
+            }}
+            localeTag={localeTag}
+            // 박수는 그대로 — 고른 첫날을 체크인으로, 체크아웃은 같은 박수만큼 뒤.
+            onChange={(from) => {
+              setArrival(from);
+              setMessage(null);
+            }}
+            to={departure}
+          />
+          <p className="spw-info">
+            {bar.channel === "manual" ? copy.mvManualNote : copy.mvChannelNote.replaceAll("{channel}", channelName)}
+          </p>
+        </div>
         <p className="spw-note">
           {copy.mvKeepDates
             .replace("{in}", shortDay(arrival))

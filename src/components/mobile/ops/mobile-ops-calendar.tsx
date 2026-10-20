@@ -568,7 +568,7 @@ export function MobileOpsCalendar({
         showToast({ kind: "done", text: copy.mvUndone });
         startRefresh(() => router.refresh());
       } else {
-        showToast({ kind: "info", text: copy.mvUndoFailed.replace("{reason}", reservationMoveErrorText(copy, result, "manual")) });
+        showToast({ kind: "info", text: copy.mvUndoFailed.replace("{reason}", reservationMoveErrorText(copy, result)) });
       }
     });
   };

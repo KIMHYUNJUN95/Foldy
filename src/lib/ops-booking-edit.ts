@@ -6,11 +6,11 @@ import { MAX_STAY_NIGHTS, splitGuestName, stayNights } from "@/lib/ops-manual-bo
  * 도메인 계약: `docs/product/33-calendar-write-features.md` → 「예약 수정」
  * 원본: STAY ARI Manager `ReservationDetailModal.handleUpdate` + `functions/index.js` → `updateBooking`
  *
- * ## 채널 예약은 날짜를 못 바꾼다 (2026-09-29 사용자 결정)
+ * ## 채널 예약도 날짜를 바꾼다 — 대신 경고한다 (2026-10-20 사용자 결정, 2026-09-29 잠금을 풀었다)
  *
- * 저쪽은 모든 예약의 날짜·금액을 고칠 수 있었다. 그런데 Airbnb·Booking.com 예약은 **채널이
- * 주인**이다 — Beds24 에서 날짜를 바꿔도 채널 쪽 예약은 그대로라 손님이 받은 예약 내용과
- * 어긋나고, 채널이 변경을 보내면 그대로 덮인다. 그래서 채널 예약의 **날짜는 잠근다.**
+ * Beds24 처럼 Airbnb·Booking.com 예약도 날짜를 고친다. 다만 **채널이 주인**이라 Beds24 에서 날짜를
+ * 바꿔도 채널 쪽 예약은 그대로다 — 화면이 「{채널}에서도 같은 날짜로 바꿔 주세요」를 적는다
+ * (`reChannelDates`). 채널이 나중에 변경을 보내면 그 값으로 덮인다.
  *
  * **총액은 채널 예약도 고친다**(같은 날 두 번째 결정). 바꿔도 **손님 청구액은 안 바뀐다** —
  * Beds24 기록, 즉 우리 매출 계산만 바뀐다. 매출 기록을 바로잡는 용도라 화면이 그 사실을 적는다.
@@ -45,7 +45,6 @@ export type BookingEditChanges = Partial<BookingEditDraft>;
 
 export type BookingEditError =
   | "no_changes"
-  | "channel_locked"
   | "no_guest_name"
   | "bad_occupancy"
   | "bad_dates"
@@ -53,13 +52,10 @@ export type BookingEditError =
   | "stay_too_long"
   | "bad_price";
 
-/** 날짜를 고칠 수 있는가 — 직접·수기 예약만. 총액은 모든 예약이 고친다. */
-export function canEditStay(channel: BookingEditChannel): boolean {
-  return channel === "manual";
+/** 채널 예약인가 — 날짜를 바꾸면 채널 쪽 예약은 그대로라 화면이 경고한다(2026-10-20). */
+export function isChannelBooking(channel: BookingEditChannel): boolean {
+  return channel !== "manual";
 }
-
-/** 채널 예약에서 잠그는 필드. */
-const STAY_FIELDS: ReadonlyArray<keyof BookingEditDraft> = ["arrival", "departure"];
 
 const same = (a: unknown, b: unknown) =>
   typeof a === "string" && typeof b === "string" ? a.trim() === b.trim() : a === b;
@@ -79,17 +75,11 @@ export function diffBookingEdit(original: BookingEditDraft, next: BookingEditDra
 export function validateBookingEdit(args: {
   original: BookingEditDraft;
   changes: BookingEditChanges;
-  channel: BookingEditChannel;
   today: string;
 }): BookingEditError | null {
   const { changes, original } = args;
   const keys = Object.keys(changes) as Array<keyof BookingEditDraft>;
   if (keys.length === 0) return "no_changes";
-
-  // 서버에서도 막는다 — 화면이 칸을 숨겨도 요청은 누구나 만들 수 있다.
-  if (!canEditStay(args.channel) && keys.some((key) => STAY_FIELDS.includes(key))) {
-    return "channel_locked";
-  }
 
   if ("guestName" in changes && !(changes.guestName ?? "").trim()) return "no_guest_name";
 

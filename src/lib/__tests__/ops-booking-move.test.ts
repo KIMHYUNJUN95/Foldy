@@ -11,38 +11,37 @@ const today = "2026-10-19";
 
 describe("validateReservationMove", () => {
   it("같은 줄 · 같은 날짜는 옮길 것이 없다", () => {
-    expect(validateReservationMove({ channel: "booking", next: original, original, sameRow: true, today: "2026-10-01" })).toBe("same_place");
+    expect(validateReservationMove({ next: original, original, sameRow: true, today: "2026-10-01" })).toBe("same_place");
   });
 
-  it("채널 예약은 다른 객실 · 같은 날짜만 된다", () => {
-    expect(validateReservationMove({ channel: "booking", next: original, original, sameRow: false, today: "2026-10-01" })).toBeNull();
+  it("채널 예약도 날짜를 옮긴다(2026-10-20 — 전엔 잠갔다)", () => {
+    expect(validateReservationMove({ next: original, original, sameRow: false, today: "2026-10-01" })).toBeNull();
     expect(
       validateReservationMove({
-        channel: "airbnb",
         next: { arrival: "2026-10-18", departure: "2026-10-22" },
         original,
         sameRow: false,
         today: "2026-10-01",
       }),
-    ).toBe("channel_locked");
+    ).toBeNull();
   });
 
   it("직접 · 수기 예약은 날짜도 옮긴다 — 체크인을 과거로 옮기는 것만 막는다", () => {
     const next = { arrival: "2026-10-25", departure: "2026-10-27" };
-    expect(validateReservationMove({ channel: "manual", next, original, sameRow: true, today })).toBeNull();
+    expect(validateReservationMove({ next, original, sameRow: true, today })).toBeNull();
     expect(
-      validateReservationMove({ channel: "manual", next: { arrival: "2026-10-18", departure: "2026-10-20" }, original, sameRow: false, today }),
+      validateReservationMove({ next: { arrival: "2026-10-18", departure: "2026-10-20" }, original, sameRow: false, today }),
     ).toBe("past_arrival");
   });
 
   it("묵고 있는 손님을 다른 방으로 — 체크인은 그대로라 과거여도 된다", () => {
-    expect(validateReservationMove({ channel: "booking", next: original, original, sameRow: false, today })).toBeNull();
+    expect(validateReservationMove({ next: original, original, sameRow: false, today })).toBeNull();
   });
 
   it("끝난 숙박 · 뒤집힌 날짜는 거절", () => {
-    expect(validateReservationMove({ channel: "booking", next: original, original, sameRow: false, today: "2026-10-21" })).toBe("past_stay");
+    expect(validateReservationMove({ next: original, original, sameRow: false, today: "2026-10-21" })).toBe("past_stay");
     expect(
-      validateReservationMove({ channel: "manual", next: { arrival: "2026-10-25", departure: "2026-10-25" }, original, sameRow: false, today }),
+      validateReservationMove({ next: { arrival: "2026-10-25", departure: "2026-10-25" }, original, sameRow: false, today }),
     ).toBe("bad_dates");
   });
 });

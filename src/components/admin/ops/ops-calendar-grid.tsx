@@ -101,6 +101,7 @@ import { OPS_OPEN_RESERVATION_EVENT } from "@/components/shell/admin-guest-searc
 import { loadOpsReservationPlacement } from "@/app/admin/ops/calendar/search-actions";
 import { submitReservationMove } from "@/app/admin/ops/calendar/actions";
 import {
+  channelDisplayName,
   reservationMoveErrorText,
   type MovedReservation,
   type MoveRoom,
@@ -439,7 +440,6 @@ type GridRowProps = {
   /** 끄는 막대가 이 줄 위에 있으면 그 자리 · 놓을 수 있나. */
   moveGhost: MoveGhost | null;
   /** 채널 예약을 끄는 동안 — 같은 날짜에 비어 있는 같은 건물 줄의 옅은 보라 띠. */
-  moveBand: { left: string; width: string } | null;
 };
 
 /**
@@ -474,7 +474,6 @@ const OpsGridRow = memo(function OpsGridRow({
   winIds,
   moveFadeId,
   moveGhost,
-  moveBand,
 }: GridRowProps) {
   const { room } = row;
   const allRoomBars = row.bars;
@@ -761,7 +760,6 @@ const OpsGridRow = memo(function OpsGridRow({
               </div>
             );
           })}
-          {moveBand && <div aria-hidden="true" className="opsg__moveband" style={moveBand} />}
           {moveGhost && (
             <div aria-hidden="true" className="opsg__ghostwrap" style={moveGhost.geometry}>
               {moveGhost.ok && <div className="opsg__moveband is-hover" />}
@@ -1394,7 +1392,7 @@ export function OpsCalendarGrid({
       targetRoomKey: moved.from.room.roomKey,
     }).then((result) => {
       if (result.ok) setMoveToast({ moved, phase: "undone" });
-      else setMoveToast({ error: reservationMoveErrorText(copy, result, "manual"), moved, phase: "done" });
+      else setMoveToast({ error: reservationMoveErrorText(copy, result), moved, phase: "done" });
     });
   };
 
@@ -1474,7 +1472,8 @@ export function OpsCalendarGrid({
     if (hit) {
       const room = rooms[hit.row];
       const nights = stayNights(drag.bar.checkIn, drag.bar.checkOut).length;
-      const arrival = drag.bar.channel === "manual" ? isoPlus(drag.bar.checkIn, hit.col - drag.grabCol) : drag.bar.checkIn;
+      // 채널 예약도 날짜를 옮긴다(2026-10-20 — 전엔 같은 날짜만).
+      const arrival = isoPlus(drag.bar.checkIn, hit.col - drag.grabCol);
       const departure = isoPlus(arrival, nights);
       const samePlace = room.key === drag.room.key && arrival === drag.bar.checkIn;
       if (room.propertyName === drag.room.propertyName && room.roomIds.length > 0 && !samePlace) {
@@ -1549,20 +1548,6 @@ export function OpsCalendarGrid({
     // 등록은 한 번 — 최신 동작은 moveFns 로 읽는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  /** 채널 예약을 끄는 동안 같은 날짜에 비어 있는 같은 건물 줄 — 끌기를 시작할 때 한 번 센다. */
-  const moveBands = useMemo(() => {
-    if (!moveDrag || moveDrag.bar.channel === "manual") return null;
-    const geometry = barGeometry(days, moveDrag.bar.checkIn, moveDrag.bar.checkOut);
-    if (!geometry) return null;
-    const out = new Map<string, { left: string; width: string }>();
-    for (const room of rooms) {
-      if (room.propertyName !== moveDrag.room.propertyName || room.key === moveDrag.room.key || room.roomIds.length === 0) continue;
-      if (!moveClash(room.key, moveDrag.bar.checkIn, moveDrag.bar.checkOut, moveDrag.bar.id).blocked) out.set(room.key, geometry);
-    }
-    return out;
-    // 끌기마다 한 번(막대 · 줄이 같으면 다시 안 센다).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moveDrag?.bar.id, moveDrag?.room.key, days, rooms]);
   const moveGhostFor = (roomKey: string): MoveGhost | null => {
     const target = moveDrag?.target;
     if (!moveDrag || !target || target.roomKey !== roomKey) return null;
@@ -1572,9 +1557,7 @@ export function OpsCalendarGrid({
     const nights = stayNights(target.arrival, target.departure).length;
     const short = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
     const label = target.ok
-      ? moveDrag.bar.channel === "manual"
-        ? `${room?.displayRoomLabel ?? ""} · ${short(target.arrival)} → ${short(target.departure)} · ${copy.rcNights.replace("{n}", String(nights))}`
-        : `${room?.displayRoomLabel ?? ""} · ${copy.mvKeepDates.replace("{in}", short(target.arrival)).replace("{out}", short(target.departure)).replace("{n}", String(nights))}`
+      ? `${room?.displayRoomLabel ?? ""} · ${short(target.arrival)} → ${short(target.departure)} · ${copy.rcNights.replace("{n}", String(nights))}`
       : target.clashGuest
         ? copy.mvBooked.replace("{guest}", target.clashGuest)
         : copy.mvBookedNoName;
@@ -1607,7 +1590,7 @@ export function OpsCalendarGrid({
         return;
       }
       setMoveConfirm((current) =>
-        current ? { ...current, error: reservationMoveErrorText(copy, result, confirm.bar.channel), pending: false } : current,
+        current ? { ...current, error: reservationMoveErrorText(copy, result), pending: false } : current,
       );
     });
   };
@@ -2840,7 +2823,6 @@ export function OpsCalendarGrid({
                 today={today}
                 moveFadeId={moveDrag && moveDrag.room.key === room.key ? moveDrag.bar.id : ""}
                 moveGhost={moveGhostFor(room.key)}
-                moveBand={moveBands?.get(room.key) ?? null}
                 winIds={
                   priceWinsOnly
                     ? (winIdsByRoom.get(room.key) ?? "")
@@ -3107,27 +3089,26 @@ export function OpsCalendarGrid({
               <div>
                 <span>{copy.mvNow}</span>
                 <b>{moveConfirm.from.displayRoomLabel}</b>
-                {moveConfirm.bar.channel === "manual" && (
-                  <small>
-                    {moveConfirm.bar.checkIn.slice(5).replace("-", "/")} → {moveConfirm.bar.checkOut.slice(5).replace("-", "/")}
-                  </small>
-                )}
+                <small>
+                  {moveConfirm.bar.checkIn.slice(5).replace("-", "/")} → {moveConfirm.bar.checkOut.slice(5).replace("-", "/")}
+                </small>
               </div>
               <span aria-hidden="true" className="spw-movepop__arrow">→</span>
               <div className="is-to">
                 <span>{copy.mvTo}</span>
                 <b>{moveConfirm.to.displayRoomLabel}</b>
-                {moveConfirm.bar.channel === "manual" && (
-                  <small>
-                    {moveConfirm.arrival.slice(5).replace("-", "/")} → {moveConfirm.departure.slice(5).replace("-", "/")}
-                  </small>
-                )}
+                <small>
+                  {moveConfirm.arrival.slice(5).replace("-", "/")} → {moveConfirm.departure.slice(5).replace("-", "/")}
+                </small>
               </div>
             </div>
             <p className="spw-movepop__note">
               {moveConfirm.bar.channel === "manual"
                 ? copy.mvConfirmNoteManual
-                : copy.mvConfirmNote.replace("{room}", moveConfirm.to.displayRoomLabel)}
+                : moveConfirm.arrival !== moveConfirm.bar.checkIn
+                  ? // 채널 예약의 날짜를 옮김 — 채널 쪽 예약은 그대로라 거기서도 바꿔야 한다(2026-10-20).
+                    copy.mvConfirmNoteChannelDates.replaceAll("{channel}", channelDisplayName(moveConfirm.bar.channel))
+                  : copy.mvConfirmNote.replace("{room}", moveConfirm.to.displayRoomLabel)}
             </p>
             {moveConfirm.error && (
               <p className="spw-msg is-err" role="status">

@@ -335,7 +335,7 @@ export function OpsReservationPanel({
                 {channelName} · {propertyName} · {roomLabel}
               </span>
               <b className="spw-head__t">
-                {(bar.channel === "manual" ? copy.mvTitleManual : copy.mvTitle).replace("{guest}", bar.guestName)}
+                {copy.mvTitleManual.replace("{guest}", bar.guestName)}
               </b>
             </div>
           ) : editing && detail ? (

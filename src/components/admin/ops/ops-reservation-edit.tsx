@@ -8,7 +8,7 @@ import {
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
 import {
-  canEditStay,
+  isChannelBooking,
   diffBookingEdit,
   validateBookingEdit,
   type BookingEditChannel,
@@ -18,7 +18,7 @@ import {
 import { MAX_STAY_NIGHTS, stayNights } from "@/lib/ops-manual-booking";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
 import { formatPhoneDisplay, formatPhoneInput } from "@/lib/phone-format";
-import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
+import type { SpwCopy } from "@/components/admin/ops/ops-price-panel";
 import "./ops-calendar-panels-white.css";
 
 /**
@@ -40,7 +40,7 @@ export type ReservationEditCopy = {
   reSave: string;
   reDiscard: string;
   reNotesHint: string;
-  reChannelLocked: string;
+  reChannelDates: string;
   /** 채널 예약의 총액을 고칠 때 — 손님 청구액은 안 바뀐다. */
   reChannelPriceNote: string;
   reErrNoChanges: string;
@@ -90,14 +90,11 @@ export function reservationEditErrorText(
   copy: ReservationEditCopy,
   error: BookingEditError | Extract<ReservationEditResult, { ok: false }>["error"],
   dates: string[] = [],
-  channel: BookingEditChannel,
 ): string {
   const list = dates.map((date) => date.slice(5).replace("-", "/")).join(", ");
   switch (error) {
     case "no_changes":
       return copy.reErrNoChanges;
-    case "channel_locked":
-      return copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel]);
     case "no_guest_name":
       return copy.mbErrNoGuestName;
     case "bad_occupancy":
@@ -170,7 +167,7 @@ export function OpsReservationEditForm({
   const [priceText, setPriceText] = useState(original.totalPrice === null ? "" : String(original.totalPrice));
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const stayEditable = canEditStay(channel);
+  const channelBooking = isChannelBooking(channel);
 
   const availability = useRoomAvailability({
     allowedStart: original.arrival < today ? original.arrival : undefined,
@@ -185,13 +182,13 @@ export function OpsReservationEditForm({
     setDraft((previous) => ({ ...previous, [key]: value }));
 
   const nights = stayNights(draft.arrival, draft.departure);
-  const takenInStay = stayEditable ? availability.takenIn(nights) : [];
+  const takenInStay = availability.takenIn(nights);
   const changes = diffBookingEdit(original, draft);
-  const localError = validateBookingEdit({ changes, channel, original, today });
+  const localError = validateBookingEdit({ changes, original, today });
 
   const save = () => {
     if (localError) {
-      setMessage(reservationEditErrorText(copy, localError, [], channel));
+      setMessage(reservationEditErrorText(copy, localError, []));
       return;
     }
     setMessage(copy.rcPending);
@@ -201,7 +198,7 @@ export function OpsReservationEditForm({
         onSaved();
         return;
       }
-      setMessage(reservationEditErrorText(copy, result.error, result.conflictDates, channel));
+      setMessage(reservationEditErrorText(copy, result.error, result.conflictDates));
     });
   };
 
@@ -240,60 +237,47 @@ export function OpsReservationEditForm({
   return (
     <>
       <div className="spw-pbody">
-        {/* ── 숙박 ── 직접·수기 예약만. 채널 예약은 이유를 적고, 날짜는 흐린 칸으로만 보인다. */}
-        {stayEditable ? (
-          <div className="spw-group">
-            <span className="spw-label">
-              {copy.mbCheckIn} → {copy.mbCheckOut}
-            </span>
-            <AdminDateRangePicker
-              ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
-              from={draft.arrival}
-              isDateDisabled={availability.isDateDisabled}
-              labels={{
-                apply: copy.dateApply,
-                nextMonth: copy.dateNext,
-                prevMonth: copy.datePrev,
-                reset: copy.dateReset,
-                thisMonth: copy.dateThisMonth,
-              }}
-              localeTag={localeTag}
-              onChange={(from, to) => {
-                set("arrival", from);
-                set("departure", to > from ? to : draft.departure);
-              }}
-              onMonthChange={availability.loadMonths}
-              to={draft.departure}
-            />
-            <p className="spw-note">
-              {copy.mbNights.replace("{n}", String(nights.length))}
-              {takenInStay.length > 0 && (
-                <span className="spw-note__danger">
-                  {" "}
-                  {copy.mbErrNightsTaken.replace(
-                    "{dates}",
-                    takenInStay.map((night) => night.slice(5).replace("-", "/")).join(", "),
-                  )}
-                </span>
-              )}
-            </p>
-            <p className="spw-note">{availability.failed ? copy.mbAvailFailed : copy.mbAvailHint}</p>
-          </div>
-        ) : (
-          <>
-            <p className="spw-info">{copy.reChannelLocked.replaceAll("{channel}", CHANNEL_NAME[channel])}</p>
-            <div className="spw-two">
-              <div className="spw-field">
-                <span className="spw-field__l">{copy.mbCheckIn}</span>
-                <input aria-label={copy.mbCheckIn} className="spw-field__in" disabled readOnly value={spwDate(draft.arrival, localeTag)} />
-              </div>
-              <div className="spw-field">
-                <span className="spw-field__l">{copy.mbCheckOut}</span>
-                <input aria-label={copy.mbCheckOut} className="spw-field__in" disabled readOnly value={spwDate(draft.departure, localeTag)} />
-              </div>
-            </div>
-          </>
+        {/* ── 숙박 ── 모든 예약(2026-10-20 — 채널 예약 잠금을 풀었다). 채널 예약은 「채널에서도 바꿔 주세요」를 먼저 적는다. */}
+        {channelBooking && (
+          <p className="spw-info">{copy.reChannelDates.replaceAll("{channel}", CHANNEL_NAME[channel])}</p>
         )}
+        <div className="spw-group">
+          <span className="spw-label">
+            {copy.mbCheckIn} → {copy.mbCheckOut}
+          </span>
+          <AdminDateRangePicker
+            ariaLabel={`${copy.mbCheckIn} → ${copy.mbCheckOut}`}
+            from={draft.arrival}
+            isDateDisabled={availability.isDateDisabled}
+            labels={{
+              apply: copy.dateApply,
+              nextMonth: copy.dateNext,
+              prevMonth: copy.datePrev,
+              reset: copy.dateReset,
+              thisMonth: copy.dateThisMonth,
+            }}
+            localeTag={localeTag}
+            onChange={(from, to) => {
+              set("arrival", from);
+              set("departure", to > from ? to : draft.departure);
+            }}
+            onMonthChange={availability.loadMonths}
+            to={draft.departure}
+          />
+          <p className="spw-note">
+            {copy.mbNights.replace("{n}", String(nights.length))}
+            {takenInStay.length > 0 && (
+              <span className="spw-note__danger">
+                {" "}
+                {copy.mbErrNightsTaken.replace(
+                  "{dates}",
+                  takenInStay.map((night) => night.slice(5).replace("-", "/")).join(", "),
+                )}
+              </span>
+            )}
+          </p>
+          <p className="spw-note">{availability.failed ? copy.mbAvailFailed : copy.mbAvailHint}</p>
+        </div>
 
         <div className="spw-field">
           <label className="spw-field__l" htmlFor="opsre-guest">
@@ -358,7 +342,7 @@ export function OpsReservationEditForm({
             type="text"
             value={priceDisplay}
           />
-          {!stayEditable && (
+          {channelBooking && (
             <span className="spw-field__hint is-warn">
               {copy.reChannelPriceNote.replaceAll("{channel}", CHANNEL_NAME[channel])}
             </span>

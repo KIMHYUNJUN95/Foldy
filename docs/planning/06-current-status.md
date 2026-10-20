@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 채널 예약도 날짜 변경 · 객실 이동 때 날짜 변경
+
+- 예약 수정(PC · 모바일)과 객실 옮기기(PC 패널 · 꾹 끌기 · 모바일)에서 Airbnb · Booking.com 예약도 날짜를 바꾼다. 날짜 칸 위에 「{채널}에서도
+  같은 날짜로 바꿔 주세요」 안내, 끌기 확인 상자도 같은 안내. 서버 잠금(`channel_locked`) 제거 · 테스트 갱신.
+- 같은 날 먼저 만든 「가격 수정 범위(기간 · 요일 · 객실)」는 요청을 잘못 이해한 것이라 되돌렸다(`95f103c9`).
+
 ## 2026-10-20 — 권한 정리 ⑤: 판매 캘린더 「바꾸기」 분리 · 건물 단위 권한은 설계만
 
 - `ops_calendar.write`(기본 대표 · 전무 = 지금과 같음) — 없으면 판매 캘린더 보기 전용(PC · 모바일), 쓰기 서버 액션 `forbidden`. 마이그레이션 `202610200004`.

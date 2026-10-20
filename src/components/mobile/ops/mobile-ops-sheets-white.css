@@ -599,9 +599,6 @@ button.msw-mv-date:active { transform: scale(0.99); }
 .msw-mv-date__tx s { color: #8b8898; }
 .msw-mv-date__act { flex: none; display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px; font-size: 13px; font-weight: 600; color: #5a30cf; }
 .msw-mv-date__act svg { width: 16px; height: 16px; stroke-width: 2.2; }
-.msw-mv-date.is-locked .msw-mv-date__ic,
-.msw-mv-date.is-locked .msw-mv-date__act { color: #8b8898; font-weight: 500; }
-.msw-mv-date.is-locked .msw-mv-date__tx b { color: #3a3746; }
 
 /* 목록 머리 — 「옮길 객실」 + 어느 날짜 기준인지. */
 .msw-mv-sec { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 0.5px solid var(--separator); }

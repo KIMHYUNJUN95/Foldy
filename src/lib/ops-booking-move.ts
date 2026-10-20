@@ -1,5 +1,4 @@
 import { MAX_STAY_NIGHTS, stayNights } from "@/lib/ops-manual-booking";
-import type { BookingEditChannel } from "@/lib/ops-booking-edit";
 
 /**
  * 예약 옮기기 — **순수 규칙만.** Beds24 왕복 · DB 는 호출부(`submitReservationMove`)가 한다.
@@ -9,14 +8,13 @@ import type { BookingEditChannel } from "@/lib/ops-booking-edit";
  *
  * - **같은 예약을 고친다**(Beds24 `POST /bookings` 에 `id` + `roomId`). 지우고 새로 만들지 않는다 — 채널 예약을 지우면 채널에
  *   취소가 나가 손님 예약이 실제로 취소될 수 있고, 예약번호 · 결제 · 채널 연결이 끊긴다.
- * - **채널 예약은 날짜를 못 바꾼다**(`canEditStay` 와 같은 이유 — 날짜의 주인은 채널). 같은 날짜 안에서 객실만.
- * - 직접 · 수기 예약은 객실과 날짜를 함께 옮길 수 있다. **박수 · 금액은 그대로**(금액은 「수정」에서).
+ * - 객실과 날짜를 함께 옮길 수 있다. **박수 · 금액은 그대로**(금액은 「수정」에서). **채널 예약도 날짜를 옮긴다**(2026-10-20
+ *   사용자 결정 — 전엔 잠갔다). 채널 쪽 예약은 그대로라 화면이 「{채널}에서도 바꿔 주세요」를 적는다.
  * - 예약이 있는 자리에는 놓을 수 없다 — 서버가 우리 표 + Beds24 로 다시 막는다.
  */
 
 export type ReservationMoveError =
   | "same_place"
-  | "channel_locked"
   | "bad_dates"
   | "past_arrival"
   | "stay_too_long"
@@ -33,7 +31,6 @@ export function moveChangesDates(original: StayRange, next: StayRange): boolean 
 }
 
 export function validateReservationMove(args: {
-  channel: BookingEditChannel;
   original: StayRange;
   next: StayRange;
   /** 옮길 곳이 지금 줄과 같은가(서버가 다시 계산한 행 키 기준). */
@@ -43,7 +40,6 @@ export function validateReservationMove(args: {
   const { original, next } = args;
   const datesChanged = moveChangesDates(original, next);
   if (args.sameRow && !datesChanged) return "same_place";
-  if (datesChanged && args.channel !== "manual") return "channel_locked";
   if (!DATE.test(next.arrival) || !DATE.test(next.departure) || next.departure <= next.arrival) return "bad_dates";
   if (next.departure <= args.today) return "past_stay";
   // 체크인을 **옮길 때만** 과거를 막는다(예약 수정과 같다). 묵고 있는 손님을 다른 방으로 옮기는 것은 정상이다.

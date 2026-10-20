@@ -51,7 +51,6 @@ import type { OpsSalesSummary } from "@/lib/ops-sales-summary";
 import type { SalesYoyPrevious } from "@/lib/ops-sales-yoy";
 import {
   OPS_CALENDAR_ROLLING_DAYS,
-  opsChannelOf,
   readOpsMoveTargets,
   readOpsRoomUnavailableNights,
 } from "@/lib/ops-calendar";
@@ -1124,12 +1123,7 @@ export async function submitReservationEdit(args: {
   }
 
   const today = toJstDateString(new Date());
-  const invalid = validateBookingEdit({
-    changes,
-    channel: opsChannelOf(row.source),
-    original,
-    today,
-  });
+  const invalid = validateBookingEdit({ changes, original, today });
   if (invalid) return { error: invalid, ok: false };
 
   const newNights = addedNights(original, changes).filter((night) => night >= today);
@@ -1493,7 +1487,7 @@ export async function submitReservationMove(args: {
   const sameRow = units.some((unit) => String(unit.external_room_id) === currentRoomId);
 
   const today = toJstDateString(new Date());
-  const invalid = validateReservationMove({ channel: opsChannelOf(row.source), next, original, sameRow, today });
+  const invalid = validateReservationMove({ next, original, sameRow, today });
   if (invalid) return { error: invalid, ok: false };
 
   // 옮긴 숙박의 남은 밤(오늘부터) — 이 밤에 팔고 있는 유닛이어야 한다. 같은 줄이면 지금 유닛을 우선 쓴다.

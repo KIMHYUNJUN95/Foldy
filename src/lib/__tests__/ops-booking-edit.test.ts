@@ -40,25 +40,24 @@ describe("diffBookingEdit — 바뀐 것만", () => {
 });
 
 describe("validateBookingEdit", () => {
-  const run = (changes: Partial<BookingEditDraft>, channel: "airbnb" | "booking" | "manual" = "manual") =>
-    validateBookingEdit({ changes, channel, original, today: TODAY });
+  const run = (changes: Partial<BookingEditDraft>) => validateBookingEdit({ changes, original, today: TODAY });
 
   it("바뀐 것이 없으면 보내지 않는다", () => {
     expect(run({})).toBe("no_changes");
   });
 
-  it("채널 예약은 날짜를 못 바꾼다 — 서버에서도 막는다", () => {
-    expect(run({ departure: "2026-10-13" }, "airbnb")).toBe("channel_locked");
-    expect(run({ arrival: "2026-10-11" }, "booking")).toBe("channel_locked");
+  it("채널 예약도 날짜를 바꾼다(2026-10-20 — 전엔 잠갔다)", () => {
+    expect(run({ departure: "2026-10-13" })).toBeNull();
+    expect(run({ arrival: "2026-10-11" })).toBeNull();
   });
 
   it("채널 예약도 총액은 바꾼다 — 매출 기록 보정용(손님 청구액은 안 바뀐다)", () => {
-    expect(run({ totalPrice: 60000 }, "booking")).toBeNull();
-    expect(run({ totalPrice: 60000 }, "airbnb")).toBeNull();
+    expect(run({ totalPrice: 60000 })).toBeNull();
+    expect(run({ totalPrice: 60000 })).toBeNull();
   });
 
   it("채널 예약도 이름·연락처·인원·내부 메모는 바꾼다", () => {
-    expect(run({ email: "b@example.com", notes: "VIP", numAdult: 3 }, "airbnb")).toBeNull();
+    expect(run({ email: "b@example.com", notes: "VIP", numAdult: 3 })).toBeNull();
   });
 
   it("직접·수기 예약은 날짜·금액까지", () => {
@@ -82,7 +81,7 @@ describe("validateBookingEdit", () => {
     expect(run({ arrival: "2026-09-30" })).toBe("past_arrival");
     const inHouse = { ...original, arrival: "2026-09-28" };
     expect(
-      validateBookingEdit({ changes: { departure: "2026-10-05" }, channel: "manual", original: inHouse, today: TODAY }),
+      validateBookingEdit({ changes: { departure: "2026-10-05" }, original: inHouse, today: TODAY }),
     ).toBeNull();
   });
 

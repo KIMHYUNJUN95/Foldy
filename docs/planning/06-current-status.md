@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — HIG 다듬기 2차 · 모바일 판매 캘린더 1(본 화면)
+
+- `/mobile/ops/calendar` 본 화면 크기 다듬기 — 건물 탭 · 기간 · 도구 줄 15 · 범례 13 · 요일 · 빈 방 · 평균가 11 · 최소숙박 11 진하게 · 칸 세로선 없앰 ·
+  막대 11 · 묶음 머리 15/600 · 선택 도구줄 15 · 버튼 50 · 반영 알림 44/15. 가격 11 · 칸 폭 46 그대로. 시트는 다음 차례. HIG 캔버스 A2Sales-*.
+  상세 `docs/product/33-calendar-write-features.md` 「모바일 판매 캘린더」 → 「HIG 다듬기 2차」.
+
 ## 2026-10-20 — 채용 지원서 보기
 
 - `/admin/recruit` 상세 패널 위 인쇄 왼쪽에 「지원서 보기」 — 인쇄용 A4 지원서를 가운데 큰 창에 그대로 띄운다(창 안에서 인쇄도). 프린터가 없으면

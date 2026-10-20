@@ -597,6 +597,50 @@
   .mops .mops-chip { height: 30px; }
 }
 
+/* ── HIG 다듬기 2차(2026-10-20, 시안 A2Sales-*) — 본 화면 · 선택 도구줄 · 반영 알림. 크기 · 대비만, 배치 · 동작은 그대로.
+ * 가격 11 · 칸 폭 46 은 30일을 한 화면에 담느라 그대로 둔다. 시트는 다음 차례. ── */
+.mops .mops-pill,
+.mops a.mops-pill { font-size: 15px; }
+.mops .mops-seg a { font-size: 15px; }
+.mops .mops-range { font-size: 15px; }
+.mops .mops-chip,
+.mops .mops-chip.gap,
+.mops .mops-chip.urg,
+.mops .mops-chip.dashed,
+.mops .mops-chip b,
+.mops .mops-chip.urg b,
+.mops .mops-chip.gap b,
+.mops .mops-chip.alert b { font-size: 15px; }
+.mops .mops-meta { font-size: 13px; }
+.mops .mops-lg i,
+.mops .mops-lg.blk i { width: 10px; height: 10px; }
+.mops .mops-lg em { font-size: 13px; }
+/* 날짜 머리 — 요일 · 빈 방 · 평균가 10 → 11(최소 글자). 주말 요일 #e08a97(2.9:1) → #c2475a(5.0:1). 높이(HEAD_H)는 그대로. */
+.mops .mops-d span { font-size: 11px; line-height: 13px; }
+.mops .mops-d.we span { color: #c2475a; }
+.mops .mops-d.today span { color: #fff; }
+.mops .mops-d.past span { color: var(--mw-ghost); }
+.mops .mops-s { font-size: 11px; }
+/* 칸 — 최소숙박 10 → 11, #a9a6b4(2.4:1) → #6b6878(5.3:1). 칸 사이 세로선은 없앤다(세로 구분선 금지 — 가로 줄 사이 공용 구분선만). */
+.mops .mops-c { border-left: 0; }
+.mops .mops-m { font-size: 11px; color: var(--mw-muted); }
+/* 막대 — 예약 이름 10 → 11, 차단 9 → 11. 높이 16 그대로. */
+.mops .mops-bar-r { font-size: 11px; }
+.mops .mops-blk { font-size: 11px; letter-spacing: 0.02em; }
+/* 건물 묶음 머리 — 이름 12/700 → 15/600, 옆 글자 11 → 13. */
+.mops .mops-group { font-size: 13px; }
+.mops .mops-group__name { font-size: 15px; font-weight: 600; }
+/* 선택 도구줄 — 위 글자 14 → 15, 「선택 해제」 13 → 15, 버튼 48 → 50. */
+.mops-dock .mops-dock__info p,
+.mops-dock .mops-dock__info p b,
+.mops-dock .mops-dock__info p span { font-size: 15px; }
+.mops-dock__clear { font-size: 15px; }
+.mops-dock .mops-dock__act { height: 50px; }
+/* 반영 알림 — 38 → 44, 글자 13 → 15. 「되돌리기」 28 → 32, 누르는 자리 44. */
+.mops-toast.mops-toast { height: 44px; border-radius: 22px; font-size: 15px; }
+.mops-toast .mops-toast__act { position: relative; height: 32px; border-radius: 16px; font-size: 15px; }
+.mops-toast .mops-toast__act::before { content: ""; position: absolute; inset: -6px 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .mops .mops-row,
   .mops-dock.mops-dock,

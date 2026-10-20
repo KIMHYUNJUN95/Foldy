@@ -114,7 +114,7 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | N8 | 링크를 길게 누르면 **브라우저 메뉴**(Copy link address · Download link · Open in Chrome browser + 주소) | 메뉴 없음(입력칸의 붙여넣기는 유지) | [x] 2026-10-08 앱에서 `contextmenu` 차단(입력칸 제외) + iOS `allowsLinkPreview: false` — 재설치 후 확인 |
 | N9 | 로그인 안내 · 권한 없음 문구가 「개발자에게 문의」 | 실제 직원 · 심사관 기준 「소속 조직 관리자에게」 | [x] 2026-10-08 ko/ja/en 문구 수정 |
 | N10 | **Google 로그인이 앱으로 돌아오지 않음** — 앱 안 브라우저(Custom Tab)에서 웹이 로그인된 채 열리고, 그 안에서 계속 쓰게 됨(카메라도 Chrome 팝업) | 로그인 후 브라우저가 닫히고 앱 화면으로 복귀 | [x] 2026-10-08 원인: `redirectTo` 에 `?next=` 를 붙여 Supabase 등록 주소와 불일치 → Site URL 로 대체됨(auth 로그 확인). 쿼리 없이 보냄. **원인 2**: 앱 복귀 주소 판정이 `new URL()` 에 기대 예전 WebView 에서 늘 실패 → 로그인 코드가 버려지고 로그인 화면에 머묾 → 문자열 판정으로(`nativeCallbackToWebPath`) — 재확인 |
-| N12 | 뒤로가기가 **가장자리에서만**(Android 시스템 제스처) · iOS 앱은 뒤로 제스처 자체가 없음(WKWebView 기본값 꺼짐) | 화면 어디서든 밀어서 뒤로(인스타그램 · iOS 26), 이전 화면이 아래에서 따라 들어옴 | [~] 2026-10-08 웹 엔진 완료(`16` 「뒤로가기 — 화면 스와이프」) — 남은 것: Android 예측 뒤로가기 미리보기 연결, iOS · Android 앱 · 설치한 PWA 실기기 확인 |
+| N12 | 뒤로가기가 **가장자리에서만**(Android 시스템 제스처) · iOS 앱은 뒤로 제스처 자체가 없음(WKWebView 기본값 꺼짐) | 화면 어디서든 밀어서 뒤로(인스타그램 · iOS 26), 이전 화면이 아래에서 따라 들어옴 | [~] 2026-10-08 웹 엔진 완료(`16` 「뒤로가기 — 화면 스와이프」) · 2026-10-20 다듬기(놓은 뒤 속도 · 둥근 판 · 기록 없으면 위 화면) · **Android 예측 뒤로가기 연결**(`PredictiveBackPlugin` — 가장자리 제스처도 같은 엔진, 갈 곳 없으면 OS 홈 미리보기) — 남은 것: iOS · Android 앱 · 설치한 PWA 실기기 손맛 확인(Android 는 새 앱 빌드 필요) |
 | N13 | 아이폰 키보드 위 **「‹ › 완료」 막대**(웹 입력칸 티) | 막대 없음 | [x] 2026-10-09 `@capacitor/keyboard` 로 숨김 — iOS 실기기 확인(C8) |
 | N14 | 기기 **글자 크기**를 키우면 Android WebView 가 제한 없이 따라가 화면이 깨질 수 있음 · iOS 앱은 아예 무시 | 기기 설정을 따르되 깨지지 않는 범위 | [x] 2026-10-09 `@capacitor/text-zoom` 0.85~1.15 배 — 에뮬레이터에서 글자 크기 최대로 확인 |
 | N15 | **iOS 앱에 진동이 전혀 없음**(Vibration API 미지원) | 탭 · 완료 · 오류에 Taptic 피드백 | [x] 2026-10-09 `@capacitor/haptics`(`haptic()` 호출부 그대로) |
@@ -227,3 +227,5 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | 2026-10-09 | (이 커밋) | N5 앱 안 브라우저 툴바 아이보리 · B1-3 iOS 서명 + TestFlight 업로드 워크플로(Mac 없이, 수동 실행) |
 | 2026-10-09 | (이 커밋) | N12 메뉴 첫 화면에서도 스와이프 뒤로가기(사용자 결정) — 돌아갈 곳이 앱 밖이면 받지 않음 |
 | 2026-10-20 | (이 커밋) | TestFlight 전 iOS 점검 — 위치 권한 키 `NSLocationAlwaysAndWhenInUseUsageDescription` 추가(Info.plist · ko/ja/en), WebView 바탕색 주석 정정 |
+| 2026-10-20 | `6c71878` | N12 화면 스와이프 다듬기 — 놓은 뒤 손가락 속도 이어받기 · 둥근 판 · 검색칸 예외 · 밑그림 저장 · 기록 없으면 위 화면 |
+| 2026-10-20 | (이 커밋) | N12 Android 예측 뒤로가기 → 같은 스와이프 엔진(`PredictiveBackPlugin`, App 뒤로 처리 끔) · 디버그 APK 컴파일 확인 — **새 앱 빌드 필요**, 실기기 미확인 |

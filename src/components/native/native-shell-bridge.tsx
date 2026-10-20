@@ -7,6 +7,7 @@ import { hasOpenOverlay } from "@/lib/swipe-back/controller";
 import { isSwipeBackScreen, parentScreen } from "@/lib/swipe-back/history-model";
 import { getBackTarget } from "@/lib/swipe-back/history-tracker";
 import { MOBILE_SCREENS } from "@/lib/swipe-back/mobile-screens";
+import { attachPredictiveBack } from "@/lib/swipe-back/native-predictive-back";
 
 /**
  * 앱(Capacitor) WebView 보정 (2026-10-06, 앱 출시 준비 B3). 루트 레이아웃에 한 번만 둔다. 브라우저 · PWA 에서는 아무것도 안 한다.
@@ -137,7 +138,8 @@ export function NativeShellBridge() {
       if (disposed) void resume.remove();
       else removeResume = () => void resume.remove();
       let lastEscapeAt = 0;
-      const listener = await App.addListener("backButton", ({ canGoBack }) => {
+      /** 미리보기 없이 확정된 뒤로 — 열린 시트 닫기 → 이전 화면 → 위 화면 → 앱 내리기. */
+      const goBack = (canGoBack: boolean) => {
         // Esc 를 받지 않는 대화상자도 있다 — 1.2초 안에 다시 눌렀는데도 그대로면 화면 이동으로 넘어간다(먹통 방지).
         const now = Date.now();
         if (hasOpenOverlay() && now - lastEscapeAt > 1200) {
@@ -152,7 +154,18 @@ export function NativeShellBridge() {
         if (!(back && isSwipeBackScreen(back.url)) && parent) routerRef.current.replace(parent);
         else if (canGoBack) window.history.back();
         else void App.minimizeApp();
-      });
+      };
+
+      // Android 예측 뒤로가기(2026-10-20) — 시스템 가장자리 제스처를 화면 스와이프 엔진으로. 이 플러그인이 있는 앱 빌드는
+      // App 플러그인의 뒤로 처리가 꺼져 있다(capacitor.config.ts). 옛 앱 빌드는 아래 `backButton` 그대로.
+      if (nativePlatform() === "android" && hasNativePlugin("PredictiveBack")) {
+        const detach = await attachPredictiveBack(() => goBack(getBackTarget() !== null));
+        if (disposed) detach();
+        else removeBack = detach;
+        return;
+      }
+
+      const listener = await App.addListener("backButton", ({ canGoBack }) => goBack(canGoBack));
       if (disposed) void listener.remove();
       else removeBack = () => void listener.remove();
     })();

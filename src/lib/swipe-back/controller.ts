@@ -82,6 +82,26 @@ const BLOCKED_TARGET_SELECTOR = [
   '[role="slider"]',
 ].join(", ");
 
+/**
+ * 손가락 대신 **바깥에서 진행을 넣는** 제스처 — Android 예측 뒤로가기(시스템 가장자리 제스처, `NativeShellBridge` ←
+ * `PredictiveBackPlugin`). 같은 엔진 · 같은 밑그림 · 같은 마무리를 쓴다. 지금 붙어 있는 화면의 엔진 하나만 있다.
+ */
+export type ExternalBackGesture = {
+  /** 시작 — 받을 수 있는 화면 · 상태면 true. `direction` 1 = 왼쪽 가장자리(판이 오른쪽으로), -1 = 오른쪽 가장자리(거울). */
+  begin: (direction: 1 | -1) => boolean;
+  /** 시작점에서 손가락이 움직인 거리(CSS px, 양수). */
+  move: (distance: number) => void;
+  cancel: () => void;
+  /** OS 가 뒤로가기를 확정했다 — 시작한 제스처가 있으면 마저 넘기고 true. */
+  commit: () => boolean;
+};
+
+let externalGesture: ExternalBackGesture | null = null;
+
+export function getExternalBackGesture(): ExternalBackGesture | null {
+  return externalGesture;
+}
+
 export type SwipeBackOptions = {
   /** 화면 루트(`MobileShell` 의 `<main>`) — 미는 동안 바탕을 투명하게 해 아래 밑그림이 보이게 한다. */
   main: HTMLElement;
@@ -148,20 +168,23 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
   let observer: MutationObserver | null = null;
   let target: Destination | null = null;
   let corner = 0;
+  /** 1 = 판이 오른쪽으로(보통), -1 = 왼쪽으로(Android 오른쪽 가장자리 제스처). */
+  let direction: 1 | -1 = 1;
   const hidden: HTMLElement[] = [];
 
   function reset() {
     phase = "idle";
     samples = [];
     target = null;
+    direction = 1;
   }
 
   function render() {
     frame = 0;
     if (!layer) return;
     const progress = width > 0 ? Math.min(1, offset / width) : 0;
-    surface.style.translate = `${offset}px 0`;
-    if (layer.content) layer.content.style.transform = `translate3d(${-PARALLAX * width * (1 - progress)}px, 0, 0)`;
+    surface.style.translate = `${direction * offset}px 0`;
+    if (layer.content) layer.content.style.transform = `translate3d(${-direction * PARALLAX * width * (1 - progress)}px, 0, 0)`;
     layer.dim.style.opacity = String(DIM_MAX * (1 - progress));
   }
 
@@ -238,7 +261,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     }
     surface.style.transition = "none";
     surface.style.willChange = "translate";
-    surface.style.boxShadow = "-12px 0 32px -8px rgba(15, 23, 42, 0.22)";
+    surface.style.boxShadow = `${-12 * direction}px 0 32px -8px rgba(15, 23, 42, 0.22)`;
     // 미는 동안만 둥근 판(인스타그램처럼) — 판은 이미 overflow: hidden 이라 내용도 같이 잘린다.
     surface.style.borderRadius = `${corner}px`;
     if (layer.content) layer.content.style.transition = "none";
@@ -335,27 +358,42 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     return dt > 0 ? (last.x - first.x) / dt : 0;
   }
 
+  /** 갈 곳 — 앱 안 이전 화면, 없으면(알림 · 링크로 바로 들어옴) 위 화면. 홈이면 갈 곳이 없다. */
+  function pickDestination(): Destination | null {
+    const back = getBackTarget();
+    if (back && isSwipeBackScreen(back.url)) return back;
+    const parent = parentScreen(window.location.pathname, MOBILE_SCREENS);
+    if (parent) return { delta: 0, index: -1, replace: true, url: parent };
+    swipeDebug(back ? `start: skip — back leaves the app (${back.url})` : "start: skip — no back target");
+    return null;
+  }
+
+  /** 이 화면이 지금 뒤로 미는 제스처를 받을 수 있는가(손가락 · 바깥 진행 공통). */
+  function canBegin(): boolean {
+    const why = dirty
+      ? "typed on this screen"
+      : !isSwipeScreen()
+        ? "not an app screen"
+        : document.documentElement.hasAttribute("data-pane") || isSplitPaneOpen()
+          ? "split pane"
+          : hasOpenOverlay()
+            ? "overlay open"
+            : null;
+    if (why) swipeDebug(`start: skip — ${why}`);
+    return why === null;
+  }
+
   function onTouchStart(event: TouchEvent) {
     if (phase === "settling" || phase === "navigating") return;
     reset();
     if (event.touches.length !== 1) return;
-    if (dirty) return swipeDebug("start: skip — typed on this screen");
-    if (!isSwipeScreen()) return swipeDebug("start: skip — not an app screen");
-    if (document.documentElement.hasAttribute("data-pane") || isSplitPaneOpen()) return swipeDebug("start: skip — split pane");
-    if (hasOpenOverlay()) return swipeDebug("start: skip — overlay open");
+    if (!canBegin()) return;
     const touch = event.touches[0];
     const element = event.target instanceof Element ? event.target : null;
     if (element?.closest(BLOCKED_TARGET_SELECTOR)) return swipeDebug("start: skip — blocked target");
     if (touch.clientX < SAFARI_EDGE && isIosSafariTab()) return swipeDebug("start: skip — safari edge");
-    const back = getBackTarget();
-    if (back && isSwipeBackScreen(back.url)) {
-      target = back;
-    } else {
-      // 앱 안 이전 기록이 없다(알림 · 링크로 바로 들어옴) — 위 화면으로. 홈이면 갈 곳이 없다.
-      const parent = parentScreen(window.location.pathname, MOBILE_SCREENS);
-      if (!parent) return swipeDebug(back ? `start: skip — back leaves the app (${back.url})` : "start: skip — no back target");
-      target = { delta: 0, index: -1, replace: true, url: parent };
-    }
+    target = pickDestination();
+    if (!target) return;
     startX = touch.clientX;
     startY = touch.clientY;
     phase = "pending";
@@ -440,6 +478,41 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     if (destination && isSwipeBackScreen(destination.url) && getSnapshot(destination.index, destination.url)) prepareLayer(destination);
   });
 
+  const external: ExternalBackGesture = {
+    begin(nextDirection) {
+      if (phase === "settling" || phase === "navigating") return false;
+      reset();
+      if (!canBegin()) return false;
+      target = pickDestination();
+      if (!target) return false;
+      direction = nextDirection;
+      phase = "dragging";
+      offset = 0;
+      beginDrag();
+      swipeDebug(`external: begin (${direction === 1 ? "left" : "right"} edge)`);
+      return true;
+    },
+    move(distance) {
+      if (phase !== "dragging") return;
+      offset = Math.max(0, distance);
+      samples.push({ t: performance.now(), x: offset });
+      if (samples.length > 12) samples.shift();
+      scheduleRender();
+    },
+    cancel() {
+      if (phase !== "dragging") return;
+      swipeDebug("external: cancel");
+      settle(0, 0, () => teardown(true));
+    },
+    commit() {
+      if (phase !== "dragging") return false;
+      swipeDebug(`external: commit at ${Math.round(offset)}/${Math.round(width)}`);
+      settle(width, Math.max(0, velocity()), navigate, NAVIGATE_AT_PROGRESS);
+      return true;
+    },
+  };
+  externalGesture = external;
+
   surface.addEventListener("touchstart", onTouchStart, { passive: true });
   surface.addEventListener("touchmove", onTouchMove, { passive: false });
   surface.addEventListener("touchend", onTouchEnd);
@@ -453,6 +526,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     surface.removeEventListener("touchcancel", onTouchEnd);
     surface.removeEventListener("input", onInput, true);
     if (idleHandle) cancelIdle(idleHandle);
+    if (externalGesture === external) externalGesture = null;
     // 이동 중이면 밑그림은 MutationObserver 가 걷는다(이 화면이 빠지는 커밋에서 이미 걷혔다).
     if (phase !== "navigating") teardown();
   };

@@ -4,10 +4,14 @@
     <!-- 백업 끔(2026-10-09): 앱 데이터에는 WebView 로그인 쿠키가 있다. 클라우드 백업 · 기기 이전으로 다른 기기에 로그인 상태가 복원되지 않게
          allowBackup=false(Android 11 이하) + dataExtractionRules(12 이상, 클라우드 · 기기 이전 모두 제외). 새 기기에서는 다시 로그인한다. -->
 
+    <!-- 예측 뒤로가기(2026-10-20): OS 가 뒤로 제스처의 진행을 앱에 알린다 → PredictiveBackPlugin 이 웹 스와이프 엔진으로 넘긴다.
+         targetSdk 36 은 기본값이 켜짐이지만 명시해 둔다. -->
+
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

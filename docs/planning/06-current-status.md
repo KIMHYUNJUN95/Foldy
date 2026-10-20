@@ -14,6 +14,8 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 점검 측정 후 전부 고침: 놓은 뒤 손가락 속도 이어받기(전엔 첫 프레임 77px 튐) · 미는 동안 둥근 판(인스타그램) · 검색칸 입력이 스와이프를
   끄지 않음 · 새로고침 뒤에도 아래에 이전 화면(sessionStorage) · 알림 · 링크로 바로 들어온 화면은 위 화면으로(Android 뒤로가기 버튼도) ·
   태블릿 넘어가는 거리 상한 220px · 이동 조금 일찍 · 손가락에 붙기. 실기기 손맛 확인은 남음. 상세 `docs/product/16-mobile-navigation.md`.
+- Android 앱: 시스템 가장자리 제스처를 **예측 뒤로가기**로 받아 같은 엔진으로(`PredictiveBackPlugin`) — 가장자리에서 밀어도 손가락을 따라 밀림,
+  홈에서는 OS 「홈으로 나가기」 미리보기. 새 앱 빌드(디버그 APK 컴파일 확인)부터 적용.
 
 ## 2026-10-20 — 청소 「기타」 다시 그림 (HIG 2차)
 

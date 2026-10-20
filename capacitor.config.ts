@@ -39,6 +39,12 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
   },
   plugins: {
+    // 뒤로가기(2026-10-20): Android 는 앱 플러그인 `PredictiveBack`(MainActivity 가 등록)이 예측 뒤로가기 제스처를 받아 웹 스와이프
+    // 엔진으로 넘긴다. App 플러그인의 뒤로 처리는 늘 켜져 있어 OS 미리보기(홈으로 나가기)를 막으므로 끈다. 플러그인이 없는 옛 앱
+    // 빌드는 이 설정도 옛것이라 `backButton` 으로 그대로 동작한다(NativeShellBridge).
+    App: {
+      disableBackButtonHandler: true,
+    },
     // Android 15+ 는 앱을 상태바 · 내비게이션 바 아래까지 그린다(edge-to-edge). 웹은 이미 `viewport-fit=cover` +
     // `env(safe-area-inset-*)` 로 여백을 잡으므로 Capacitor 권장값 `native` 를 쓰고, 첫 화면이 튀지 않게 cover 힌트를 준다.
     SystemBars: {

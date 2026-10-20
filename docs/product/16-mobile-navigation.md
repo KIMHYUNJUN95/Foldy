@@ -201,8 +201,22 @@ Implementation note:
   `history.back()`, 앱 안 이전 기록이 없으면 위 화면(`parentScreen`, 2026-10-20), 홈이면 앱 최소화. Esc 를 안 받는 대화상자에서 막히지 않게 1.2초 안에 다시 누르면 화면 이동. 셸 쪽 표식 —
   사이드 메뉴 `<aside>` 가 열려 있을 때 `data-native-back-overlay`, `ImageLightbox` 루트에 같은 표식.
 
-  **남은 일(앱 출시 계획 17번 N12).** Android 시스템 가장자리 제스처의 「예측 뒤로가기」 미리보기 연결(네이티브 진행률 → 같은 엔진),
-  iOS 앱 · Android 앱 · 설치한 PWA 실기기 확인.
+  **Android 예측 뒤로가기 (2026-10-20, 17번 N12).** Android 는 화면 양쪽 가장자리 밀기를 OS 가 먼저 가져간다 — 구글 지침상 앱이
+  가로채면 안 되고 가로챌 수 있는 길이도 한쪽 200dp 뿐이라, 가장자리를 우리 터치로 받지 않는다. 대신 OS 가 알려 주는 제스처의
+  시작 · 진행(손가락 위치) · 취소 · 확정을 **같은 엔진에 손가락 대신 넣는다** — 가장자리에서 밀어도 지금 화면이 손가락을 따라
+  밀리고 아래에 이전 화면이 보이며, 놓으면 같은 마무리(손가락 속도 이어받기 · 둥근 판)로 넘어간다. 오른쪽 가장자리에서 밀면 거울처럼
+  판이 왼쪽으로. 화면 가운데에서 미는 것은 그대로 웹 터치.
+  - 네이티브: `android/.../PredictiveBackPlugin.java`(MainActivity 가 등록) — `OnBackPressedCallback` 의 `handleOnBackStarted` ·
+    `Progressed` · `Cancelled` · `Pressed` 를 웹 이벤트로. 매니페스트 `enableOnBackInvokedCallback="true"`.
+  - 웹: `src/lib/swipe-back/native-predictive-back.ts` → `getExternalBackGesture()`(엔진의 begin · move · cancel · commit).
+  - **켜고 끄기**: OS 는 제스처가 시작되기 전에 누가 받을지 정한다. 그래서 「뒤로 갈 곳이 있는가」(`wantsBack` — 열린 시트, 앱 안
+    이전 화면, 위 화면)를 이동 · 시트 열림/닫힘마다 미리 알린다. 갈 곳이 없으면(홈) 꺼 두어 **OS 기본 — 홈 화면으로 나가는 미리보기**가
+    나온다. 그래서 Capacitor App 플러그인의 뒤로 처리는 끈다(`capacitor.config.ts` `App.disableBackButtonHandler` — 늘 가로채서 OS
+    미리보기를 막았다).
+  - 미리보기 없이 확정되는 뒤로(3버튼 내비게이션 버튼, 열린 시트, 입력 중인 화면, 2분할 칸)는 위 하드웨어 뒤로가기와 같은 순서로 처리.
+  - 옛 앱 빌드(플러그인 없음)는 설정도 옛것이라 `backButton` 으로 예전처럼 동작한다.
+
+  **남은 일(앱 출시 계획 17번 N12).** iOS 앱 · Android 앱 · 설치한 PWA 실기기 손맛 확인.
 
   <details><summary>과거 서술 — 2026-09-11 「직접 구현하지 않는다」 결정과 그 전의 엣지 스와이프 (코드에 없음)</summary>
 

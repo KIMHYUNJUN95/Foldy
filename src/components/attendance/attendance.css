@@ -3735,6 +3735,51 @@
   .att.att--corrst { max-width: 640px; }
 }
 
+/* HIG 다듬기 2차 — 근무 기록 · 정정 요청 · 정정 요청 상태(2026-10-20, HIG 캔버스 A2AttHist-* · A2AttCorr-* · 지금 *Now-*). 기능 · 배치 그대로. */
+.att.att--histw .ptitle, .att.att--corrw .ptitle, .att.att--corrst .ptitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.att.att--histw .ptitle__sub, .att.att--corrw .ptitle__sub, .att.att--corrst .ptitle__sub { margin-top: 4px; font-size: 15px; font-weight: 400; color: var(--text-3); }
+/* 달 넘기기(공용 — 급여 화면도 같이): 동그라미 30 → 36 · 누르는 자리 44 · 달 글자 15 */
+.att .msw__arrow { position: relative; width: 36px; height: 36px; }
+.att .msw__arrow::before { content: ""; position: absolute; inset: -4px; }
+.att .msw__label { min-height: 36px; font-size: 15px; font-weight: 600; }
+/* 근무 기록: 검토 필요 44 · 범례 · 요일 13 · 날짜 16 · 날짜 묶음 제목 17/600 · 44 · 줄 사이에만 선 · 줄 16/13 · +1 11 */
+.att.att--histw .atth-review { min-height: 44px; margin-top: 0; font-size: 15px; }
+.att.att--histw .atth-legend { font-size: 13px; }
+.att.att--histw .atth-cal__wd { font-size: 13px; }
+.att.att--histw .atth-day { font-size: 16px; }
+.att.att--histw .atth-group { padding-top: 8px; }
+.att.att--histw .atth-group__d { display: flex; align-items: center; min-height: 44px; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.att.att--histw .atth-row { border-top: 0; }
+.att.att--histw .atth-row + .atth-row { border-top: 0.5px solid var(--separator); }
+.att.att--histw .atth-row__io { font-size: 16px; }
+.att.att--histw .atth-row__io sup { font-size: 11px; }
+.att.att--histw .atth-row__m { font-size: 13px; }
+.att.att--histw .atth-row__r b { font-size: 16px; }
+.att.att--histw .atth-row__r span { font-size: 13px; }
+.att.att--histw .atth-empty { font-size: 15px; }
+/* 정정 요청: 입력 글자 16(iOS 확대 방지) · 칸 50 · 칸 이름 13 · 묻는 줄 15 · 사유 칩 44/15 · 고른 칩 옅은 보라 · ✕ 누르는 자리 44 · 안내 13 */
+.att .nf__l { font-size: 13px; }
+.att .nf__in { min-height: 50px; font-size: 16px; }
+.att.att--corrw .corrw-q { font-size: 15px; }
+.att.att--corrw .corrw-chip { height: 44px; border-radius: 22px; font-size: 15px; }
+.att.att--corrw .corrw-chip.on { background: #f1ecfd; color: #5a30cf; }
+.att.att--corrw .corrw-thumb button::before { content: ""; position: absolute; inset: -11px; }
+.att.att--corrw .corrw-help { font-size: 13px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--histw .atth-right__h { align-items: center; min-height: 44px; padding: 0; }
+  .att.att--histw .atth-right__h b { font-weight: 600; }
+  .att.att--histw .atth-right__h span { font-size: 13px; }
+  .att.att--histw .atth-group__d { font-size: 17px; }
+  .att.att--corrw .corrw-mine__h { align-items: center; min-height: 44px; padding: 0 0 4px; }
+  .att.att--corrw .corrw-mine__h b { font-weight: 600; }
+  .att.att--corrw .corrw-mine__h span { font-size: 13px; }
+  .att.att--corrw .corrw-mine__empty { font-size: 15px; }
+  .att.att--corrw .corrw-mine__row { border-top: 0; }
+  .att.att--corrw .corrw-mine__row + .corrw-mine__row { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 12px, var(--separator) 12px) 1; }
+  .att.att--corrw .corrw-mine__b b { font-size: 16px; font-weight: 500; }
+  .att.att--corrw .corrw-mine__b span { font-size: 13px; }
+}
+
 /* 출근자 명단(모바일) 화이트 리디자인 — 날짜 줄 · 상태 막대 · 줄(2026-10-13 시안 AttRosterM-Phone · Fold · Tablet) */
 .att.att--rosterw .ro-live i { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: #7a52e6; vertical-align: 1px; }
 .att.att--rosterw .ro-daterow { display: flex; align-items: center; gap: 4px; margin-top: 16px; }

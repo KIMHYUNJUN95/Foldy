@@ -1,0 +1,56 @@
+name: CI
+
+# WHY THIS EXISTS (2026-10-20)
+# ---------------------------------------------------------------------------
+# 세션 여러 개가 main 에 바로 푸시하는데, 깨진 커밋은 Vercel 배포가 실패한 뒤에야 알았다(2026-10-19 배포 ERROR).
+# 푸시마다 CLAUDE.md 의 기본 검증(lint · 타입 · 테스트 · build)을 돌려 몇 분 안에 알린다. 배포를 막지는 않는다 —
+# Vercel 은 따로 배포한다. 실패하면 깃허브 커밋 옆에 ✗ 가 붙고 메일이 온다.
+#
+# - 비밀값은 쓰지 않는다. build 는 공개 값 자리에 가짜 값만 넣어도 끝까지 돈다(2026-10-20, .env 없는 깨끗한 복사본에서 확인).
+# - 문서만 바뀐 커밋은 건너뛴다. 공개 저장소라 리눅스 러너는 무료.
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # Vercel 프로젝트와 같은 버전
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

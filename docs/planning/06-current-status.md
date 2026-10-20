@@ -14,6 +14,13 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 사용자 관리의 모든 변경(역할 · 상태 · 소속 · 플래그 · 개발자 지정 · 개인 부여/차단/회수 · 삭제)과 초대코드 변경을 `audit_logs` 에 남김(`src/lib/user-audit.ts`).
   멤버 상세(PC 패널 · 모바일) 맨 아래 「최근 변경」 10개.
 - 비활성 · 삭제 때 그 사람의 이 조직 개인 부여 · 차단 전부 회수(`revokeAllMemberOverrides`) — 재활성해도 안 살아남. 확인 창 문구 ko/ja/en. DB 구조 변경 없음.
+## 2026-10-20 — 이름 Foldy 로 · 푸시 검사(CI) · 비밀값 검사 · AI 스킬
+
+- 깃허브 저장소 `Stay-Ops` → `Foldy`, Vercel 프로젝트 `stay-ops` → `foldy`. 앱 주소 `stay-ops-two.vercel.app` 은 새 도메인 살 때 한 번에 옮김.
+- 새 워크플로 `ci.yml`(lint · 타입 · 테스트 · build, 푸시 · PR 마다) · `secret-scan.yml`(gitleaks) + `.gitleaksignore`(오탐 3건).
+  상세: `docs/engineering/03-deployment-strategy.md` → 「저장소 · 프로젝트 이름과 푸시 검사」.
+- AI 작업용 스킬을 사용자 전역(`~/.claude/skills`)에 설치: Supabase 공식 `supabase` · `supabase-postgres-best-practices`,
+  Vercel `vercel-react-best-practices` — 마이그레이션 · RLS · 성능 작업 때 참고.
 
 ## 2026-10-20 — 권한 정리 ③: 흩어진 역할 목록을 권한 키로
 

@@ -2,6 +2,13 @@
 
 This file records important project decisions.
 
+## 2026-10-20 저장소 · Vercel 이름 Foldy, 앱 주소는 새 도메인 때 한 번에 · 푸시마다 CI · 비밀값 검사 (사용자 결정)
+
+- 깃허브 저장소 → `Foldy`, Vercel 프로젝트 → `foldy`. 앱 주소(`stay-ops-two.vercel.app`)는 **지금 vercel.app 주소로 따로 옮기지 않는다** —
+  출시 전 새 도메인을 살 예정이라, 두 번 옮기면 설치 앱 재설치 · 재로그인 · 앱 재빌드 · 외부 설정 변경을 두 번 해야 한다(`foldy.vercel.app` 은 남이 씀).
+- 푸시마다 `ci.yml`(lint · 타입 · 테스트 · build)과 `secret-scan.yml`(gitleaks)을 돌린다. 배포는 막지 않고 알리기만 한다 — main 직접 푸시 흐름은 그대로.
+  저장소가 공개라 비밀값 검사는 필수로 본다.
+
 ## 2026-10-16 RLS 조직 소속 판정은 「내 조직 배열」로, 로그인 확인은 `getClaims()` (사용자 지시 「전부 다 수정」)
 
 - 성능 점검 결과 세 가지를 고쳤다(06 같은 날 항목). 새 정책 · 새 표는 **`has_active_membership(organization_id)` 대신

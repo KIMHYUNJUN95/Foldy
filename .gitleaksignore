@@ -1,0 +1,6 @@
+# gitleaks 예외(2026-10-20 전체 이력 검사에서 확인한 오탐) — 진짜 비밀값이 아님을 확인한 것만 넣는다.
+# vault 비밀값 「이름」(beds24_tick_url · beds24_tick_token)일 뿐 값이 아님
+c614aef1b86820e07f56da3baae9b1dae1bc0622:supabase/migrations/202609300004_beds24_tick_cron.sql:generic-api-key:38
+c614aef1b86820e07f56da3baae9b1dae1bc0622:supabase/migrations/202609300004_beds24_tick_cron.sql:generic-api-key:121
+# 테스트용 가짜 QR 토큰 — DB attendance_qr_tokens 에 없음(해시로 대조, 0건)
+ddf5b060cd53e83b870777936a59eee9e32de536:src/lib/__tests__/attendance-qr.test.ts:generic-api-key:10

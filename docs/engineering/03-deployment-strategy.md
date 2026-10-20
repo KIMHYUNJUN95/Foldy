@@ -332,6 +332,19 @@ Play 에 올릴 AAB 는 **업로드 키**로 서명한다(Play App Signing 이 �
   애니메이션)으로 로고가 순간 이동 · 흐려 보였다(N11). 브라우저 · PWA 에서는 웹 시작 화면이 그대로 뜬다.
 - 아이콘 · 시작 화면을 바꾸면 `npm run cap:android:win` 후 ▶ Run(네이티브 그림이라 재설치 필요).
 
+## 저장소 · 프로젝트 이름과 푸시 검사 (2026-10-20)
+
+- **이름:** 깃허브 저장소 `KIMHYUNJUN95/Stay-Ops` → **`KIMHYUNJUN95/Foldy`**, Vercel 프로젝트 `stay-ops` → **`foldy`** (사용자 지시).
+  깃허브는 옛 주소를 새 주소로 넘겨 주므로 옛 `origin` 으로도 push · fetch 된다(새로 받는 곳은 `https://github.com/KIMHYUNJUN95/Foldy.git`).
+  **앱 주소 `stay-ops-two.vercel.app` 은 그대로** — 출시 전 새 도메인을 사면 그때 한 번에 옮긴다(바꿀 곳: `capacitor.config.ts` ·
+  `.github/workflows` 의 예약 작업 5개 · Supabase pg_cron 3개 · Supabase Auth 주소 · Beds24 웹훅 · 구글 OAuth). 아래 「Initial Web Hosting」.
+- **`.github/workflows/ci.yml` — 푸시마다 검사:** main 푸시 · PR 마다 `npm ci` → lint → `tsc --noEmit` → `npm test` → `npm run build`
+  (Node 24, Vercel 과 같음). 비밀값 없이 공개 값 자리에 가짜 값만 넣는다 — .env 없는 깨끗한 복사본에서 끝까지 도는 것 확인.
+  문서(`docs/**` · `*.md`)만 바뀐 커밋은 건너뛴다. **배포를 막지는 않는다**(Vercel 은 따로 배포) — 깨진 커밋을 몇 분 안에 알리는 용도.
+- **`.github/workflows/secret-scan.yml` — 비밀값 유출 검사:** 저장소가 **공개**라 푸시 · PR 마다 gitleaks 로 새 커밋을 검사한다.
+  걸리면 커밋을 되돌리는 것으로는 부족하다 — 이력에 남으므로 **그 비밀값을 바로 교체**한다. 오탐은 `.gitleaksignore` 에 지문으로,
+  진짜 비밀값이 아님을 확인한 것만 넣는다. 2026-10-20 전체 이력 1,031 커밋 검사: 진짜 유출 0건 · 오탐 3건(vault 비밀값 이름 2 · 테스트용 가짜 QR 토큰 1, DB 대조 0건).
+
 ## Initial Web Hosting
 
 Decision:

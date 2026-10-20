@@ -887,6 +887,9 @@
 .adm .rcw-viewer__h .rcw-btn { height: 40px; }
 .adm .rcw-viewer__h .rcw-ph__x { margin-right: -6px; }
 .adm .rcw-viewer__b { flex: 1; overflow: auto; padding: 28px 24px 40px; overscroll-behavior: contain; }
+/* 스크롤은 되지만 막대는 안 보이게(2026-10-20 사용자 지시) — 종이 옆에 굵은 막대가 서 있으면 문서 미리보기 느낌이 깨진다. */
+.adm .rcw-viewer__b { scrollbar-width: none; }
+.adm .rcw-viewer__b::-webkit-scrollbar { display: none; }
 .adm .rcw-viewer button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 .adm .rcw button:focus-visible, .adm .rcw a:focus-visible, .adm .rcw-panel button:focus-visible, .adm .rcw-panel a:focus-visible, .adm .rcw-modal button:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
 

@@ -489,6 +489,30 @@ using (has_capability(organization_id, (select auth.uid()), 'job_application.rea
 | 정지훈 | 사무직 + 개인 지정 | ✓ | ✓ | **✗** |
 | 테스트 계정 | 파트타임 | ✗ | ✗ | ✗ |
 
+## 10-1. 미룬 설계 (2026-10-20 권한 정리 ⑤)
+
+### 판매 캘린더 보기 / 바꾸기 나누기 — 하지 않는다
+
+`ops_admin.access` 하나가 가동률 · 매출 보기와 판매 캘린더 쓰기(가격 · 최소숙박 · 차단 · 수기 예약 · 옮기기 · 취소)를 같이 연다. 나누는 안
+(`ops_calendar.write`)을 검토했지만 **사용자 결정으로 하지 않는다** — 판매 캘린더에 들어오는 사람이 관리자뿐이고, 그 밖의 사람은 볼 일이
+없다(2026-09-16 「키 하나가 영역 전체를 연다」 결정과 같은 이유, `src/lib/ops-admin.ts`). 보기만 필요한 사람이 실제로 생기면 그때
+쓰기 액션 13개(`submit*` · `revert*` · `sendPendingPriceJobs`)를 새 키로 묶는다 — 전부 서버 액션(service role · Beds24)이라 RLS 는 안 바뀐다.
+
+### 건물 단위 권한 — 필요할 때 이 설계로
+
+지금 모든 권한은 조직 전체에 적용된다. 「이 현장 관리자는 오쿠보 건물만」이 필요해지면(건물이 늘고 담당이 나뉠 때) 이렇게 한다.
+
+| 무엇 | 설계 |
+| --- | --- |
+| 저장 | `membership_buildings(membership_id, building_id)` 새 표. **행이 없으면 조직 전체**(지금과 같음) — 기존 사람은 아무것도 안 바뀐다 |
+| 적용 범위 | 권한 키마다 `buildingScoped: boolean` 정책 추가. 건물이 정해진 사람은 그 키를 **그 건물 안에서만** 쓴다. 대표 · 전무 · 개발자는 항상 전체 |
+| 앱 판정 | `roleCan(role, key)` → `canInBuilding(session, key, buildingId)` 로 넓힌다. 목록 조회는 「내 건물 목록」을 한 번 읽어 `.in("building_id", …)` |
+| DB 판정 | `has_capability` 옆에 `has_building_access(org, uid, building_id)` SQL 함수. 건물 열이 있는 표(청소 · 요청 · 예약 · 판매 캘린더 읽기)의 RLS 에 조건 추가 |
+| 화면 | 사용자 상세에 「담당 건물」 줄(비면 「전체」). 건물 고르기 시트 |
+| 순서 | ① 표 · 판정 함수 · 테스트 → ② 청소 · 요청(현장 관리자가 쓰는 곳) → ③ 예약 · 판매 캘린더 → ④ 화면 |
+
+가장 큰 공사다(거의 모든 조회 · RLS). 지금은 담당이 건물별로 나뉘지 않아 쓸 곳이 없어 미룬다.
+
 ## 11. 남은 미결
 
 - 기존 개인 단위 장치 3종(`attendance_payroll_admin` · `leave_approver_role` ·

@@ -9,6 +9,10 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 권한 정리 ⑤: 판매 캘린더 분리는 안 함 · 건물 단위 권한은 설계만
+
+- 판매 캘린더 보기/쓰기 분리는 사용자 결정으로 하지 않는다(들어오는 사람이 관리자뿐). 건물 단위 권한 설계는 `14-permission-architecture.md` §10-1.
+
 ## 2026-10-20 — 권한 정리 ④: 변경 기록 · 비활성 때 개인 지정 회수
 
 - 사용자 관리의 모든 변경(역할 · 상태 · 소속 · 플래그 · 개발자 지정 · 개인 부여/차단/회수 · 삭제)과 초대코드 변경을 `audit_logs` 에 남김(`src/lib/user-audit.ts`).

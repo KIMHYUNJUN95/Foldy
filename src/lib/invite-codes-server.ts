@@ -6,6 +6,7 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { DEFAULT_INVITE_MAX_USES, buildInviteName, defaultInviteExpiry, generateInviteCode } from "@/lib/invite-code-gen";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isYmd, tokyoToday } from "@/lib/tokyo-date";
+import { INVITE_AUDIT_TARGET, logUserAudit } from "@/lib/user-audit";
 import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import type { Database } from "@/types/database";
 
@@ -113,8 +114,18 @@ export async function createInviteCodeAs(
       name,
       organization_id: organizationId,
     };
-    const { error } = await service.from("invite_codes").insert(invite);
-    if (!error) return { ok: true };
+    const { data: created, error } = await service.from("invite_codes").insert(invite).select("id").single();
+    if (!error) {
+      await logUserAudit({
+        organizationId,
+        actorUserId: actor.userId,
+        action: "invite.create",
+        targetType: INVITE_AUDIT_TARGET,
+        targetId: (created as { id: string } | null)?.id ?? null,
+        metadata: { code, role: defaultRole, expires: expiresAt, max_uses: maxUses },
+      });
+      return { ok: true };
+    }
     if (error.code === "23505") {
       if (isAutoCode) continue;
       return { ok: false, error: "duplicate_code" };
@@ -139,7 +150,16 @@ export async function setInviteCodeActiveAs(
     .update({ is_active: input.active })
     .eq("id", input.inviteCodeId)
     .eq("organization_id", input.organizationId);
-  return error ? { ok: false, error: "save_failed" } : { ok: true };
+  if (error) return { ok: false, error: "save_failed" };
+  await logUserAudit({
+    organizationId: input.organizationId,
+    actorUserId: actor.userId,
+    action: "invite.active",
+    targetType: INVITE_AUDIT_TARGET,
+    targetId: input.inviteCodeId,
+    metadata: { to: input.active },
+  });
+  return { ok: true };
 }
 
 export async function deleteInviteCodeAs(
@@ -157,7 +177,15 @@ export async function deleteInviteCodeAs(
     .delete()
     .eq("id", input.inviteCodeId)
     .eq("organization_id", input.organizationId);
-  return error ? { ok: false, error: "save_failed" } : { ok: true };
+  if (error) return { ok: false, error: "save_failed" };
+  await logUserAudit({
+    organizationId: input.organizationId,
+    actorUserId: actor.userId,
+    action: "invite.delete",
+    targetType: INVITE_AUDIT_TARGET,
+    targetId: input.inviteCodeId,
+  });
+  return { ok: true };
 }
 
 type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];

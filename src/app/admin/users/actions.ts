@@ -8,6 +8,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { setLeaveApprover } from "@/lib/annual-leave-admin-server";
 import {
   grantMemberOverride,
+  revokeAllMemberOverrides,
   revokeMemberOverride,
   type MemberOverride,
 } from "@/lib/permission-overrides-server";
@@ -24,6 +25,7 @@ import {
   removesLastOwner,
   targetLock,
 } from "@/lib/user-management-guard";
+import { logUserAudit } from "@/lib/user-audit";
 import type { Database } from "@/types/database";
 
 type MembershipRow = Database["public"]["Tables"]["memberships"]["Row"];
@@ -196,6 +198,13 @@ export async function setMemberRole(membershipId: string, role: string): Promise
     .update({ role: role as OrganizationRole })
     .eq("id", membershipId);
   if (error) return { ok: false, error: "save_failed" };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.role",
+    targetId: membershipId,
+    metadata: { from: ctx.membership.role, to: role },
+  });
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -230,6 +239,19 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
     if (banError) return { ok: false, error: "save_failed" };
   }
 
+  // 비활성 · 정지면 이 조직의 개인 부여 · 차단을 전부 회수한다(권한 정리 ④ B) — 다시 활성으로 돌려도 예전 권한이 조용히 살아나지 않게.
+  const audit = { organizationId: ctx.membership.organization_id, actorUserId: ctx.actorUserId, targetId: membershipId };
+  await logUserAudit({ ...audit, action: "member.status", metadata: { from: ctx.membership.status, to: status } });
+  if (status !== "active") {
+    const revoked = await revokeAllMemberOverrides({
+      organizationId: ctx.membership.organization_id,
+      userId: ctx.membership.user_id,
+      revokedByUserId: ctx.actorUserId,
+    });
+    if (revoked.ok && revoked.revoked.length > 0) {
+      await logUserAudit({ ...audit, action: "member.permissions_auto_revoke", metadata: { keys: revoked.revoked.map((row) => row.key) } });
+    }
+  }
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -260,11 +282,19 @@ export async function setMemberTeam(membershipId: string, teamId: string | null)
     }
   }
 
+  const { data: beforeRow } = await service.from("memberships").select("team_id").eq("id", membershipId).maybeSingle();
   const { error } = await service
     .from("memberships")
     .update({ team_id: teamId })
     .eq("id", membershipId);
   if (error) return { ok: false, error: "save_failed" };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.team",
+    targetId: membershipId,
+    metadata: { from: (beforeRow as { team_id: string | null } | null)?.team_id ?? null, to: teamId },
+  });
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -282,6 +312,13 @@ export async function setMemberReportAccess(membershipId: string, grant: boolean
     .update({ can_generate_report: grant })
     .eq("id", ctx.membership.user_id);
   if (error) return { ok: false, error: "save_failed" };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.report_access",
+    targetId: membershipId,
+    metadata: { to: grant },
+  });
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -299,6 +336,13 @@ export async function setMemberPayrollAdmin(membershipId: string, grant: boolean
     .update({ attendance_payroll_admin: grant })
     .eq("id", membershipId);
   if (error) return { ok: false, error: "save_failed" };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.payroll_admin",
+    targetId: membershipId,
+    metadata: { to: grant },
+  });
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -318,6 +362,13 @@ export async function setMemberLeaveApprover(membershipId: string, grant: boolea
     isApprover: grant,
   });
   if (!result.ok) return { ok: false, error: result.error };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.leave_approver",
+    targetId: membershipId,
+    metadata: { to: grant },
+  });
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -360,6 +411,13 @@ export async function grantPermissionOverrideAction(input: {
     targetRole: ctx.membership.role as Role,
   });
   if (!result.ok) return { ok: false, error: result.error };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.permission_grant",
+    targetId: input.membershipId,
+    metadata: { key: input.permissionKey, effect: input.effect === "deny" ? "deny" : "grant", expires: input.expiresAt ?? null },
+  });
   revalidateMember(input.membershipId);
   return { ok: true, override: result.override };
 }
@@ -375,6 +433,7 @@ export async function revokePermissionOverrideAction(input: {
   }
   const blocked = await guardProtectedTarget(ctx);
   if (blocked) return { ok: false, error: blocked };
+  let revokedKey: string | null = null;
   // 줄 수 있는 사람만 뺄 수 있다. 부여만 개발자 전용으로 막고 회수를 열어 두면, 대표가 개발자의
   // 위임을 되돌린 뒤 자기가 다시 줄 수는 없는 어긋난 상태가 된다.
   {
@@ -386,6 +445,7 @@ export async function revokePermissionOverrideAction(input: {
       .eq("organization_id", ctx.membership.organization_id)
       .maybeSingle();
     const key = (data as { permission_key: string } | null)?.permission_key;
+    revokedKey = key ?? null;
     if (key && isCapability(key) && capabilityPolicy(key).developerOnly && !isDeveloper(ctx.actorRole)) {
       return { ok: false, error: "forbidden" };
     }
@@ -396,6 +456,13 @@ export async function revokePermissionOverrideAction(input: {
     revokedByUserId: ctx.actorUserId,
   });
   if (!result.ok) return { ok: false, error: result.error };
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.permission_revoke",
+    targetId: input.membershipId,
+    metadata: { key: revokedKey },
+  });
   revalidateMember(input.membershipId);
   return { ok: true };
 }
@@ -432,6 +499,13 @@ export async function assignDeveloper(membershipId: string, grant: boolean): Pro
       .insert({ user_id: ctx.membership.user_id, role: "developer_super_admin", is_active: true });
     if (error) return { ok: false, error: "save_failed" };
   }
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.developer",
+    targetId: membershipId,
+    metadata: { to: grant },
+  });
   revalidateMember(membershipId);
   return { ok: true };
 }
@@ -471,6 +545,20 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
   // Profile + auth login are shared across orgs: if the user belongs to any other org (any status),
   // remove only THIS org's membership. Otherwise remove the whole account explicitly (membership →
   // profile → auth login) so cleanup doesn't depend on a particular FK cascade config.
+  // 삭제 전에 이 조직의 개인 부여 · 차단을 회수하고(멤버십만 지우면 행이 남는다) 기록을 남긴다 — 멤버십이 사라져 화면에선 안 보이지만
+  // audit_logs 에는 남는다(권한 정리 ④).
+  await revokeAllMemberOverrides({
+    organizationId: ctx.membership.organization_id,
+    userId,
+    revokedByUserId: ctx.actorUserId,
+  });
+  await logUserAudit({
+    organizationId: ctx.membership.organization_id,
+    actorUserId: ctx.actorUserId,
+    action: "member.delete",
+    targetId: membershipId,
+    metadata: { user_id: userId, role: ctx.membership.role },
+  });
   const otherOrgs = await countOtherOrgMemberships(ctx.membership, false);
   if (otherOrgs === null) return { ok: false, error: "delete_failed" };
   const { error: membershipError } = await service.from("memberships").delete().eq("id", membershipId);

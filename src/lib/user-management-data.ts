@@ -5,6 +5,7 @@ import { CAPABILITY_KEYS, canBeDenied, capabilityPolicy, evaluateCapability } fr
 import { resolveCapabilities } from "@/lib/capabilities-server";
 import { getDictionary } from "@/lib/i18n";
 import { listMemberOverrides } from "@/lib/permission-overrides-server";
+import { loadMemberHistory, type MemberHistoryItem } from "@/lib/user-audit";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getOrgTeams } from "@/lib/teams";
@@ -77,6 +78,8 @@ export type MemberPanelVM = {
   otherOrgs: boolean;
   /** 다른 조직에 활성 멤버십이 있다 — 비활성으로 바꿔도 로그인은 막히지 않는다. */
   otherOrgsActive: boolean;
+  /** 최근 변경(audit_logs, 최신 10개) — 2026-10-20 권한 정리 ④. */
+  history: MemberHistoryItem[];
 };
 
 /** 지금 쓸 수 있는 초대코드 수(켜져 있고 · 기한 전 · 남은 횟수 있음) — 탭 숫자. */
@@ -188,7 +191,7 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
   };
   const lock = canChangeTarget(actorStanding, targetLevel) ? null : targetLevel;
 
-  const [{ data: flagData }, teams, overrides, effective, ownerCount, otherOrgCounts] = await Promise.all([
+  const [{ data: flagData }, teams, overrides, effective, ownerCount, otherOrgCounts, history] = await Promise.all([
     service.from("memberships").select("attendance_payroll_admin, leave_approver_role").eq("id", selected.id).maybeSingle(),
     getOrgTeams(selected.organization_id),
     canManagePermissions && !isSelf ? listMemberOverrides(selected.organization_id, selected.user_id) : Promise.resolve([]),
@@ -213,6 +216,7 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
         const rows = (data ?? []) as { status: string }[];
         return { any: rows.length, active: rows.filter((row) => row.status === "active").length };
       }),
+    loadMemberHistory(selected.organization_id, selected.id),
   ]);
   const lastOwner = removesLastOwner({ target: selected, change: { delete: true }, activeOwnerCount: ownerCount });
   const flags = flagData as Pick<MembershipRow, "attendance_payroll_admin" | "leave_approver_role"> | null;
@@ -275,6 +279,7 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
     lastOwner,
     otherOrgs: otherOrgCounts.any > 0,
     otherOrgsActive: otherOrgCounts.active > 0,
+    history,
   };
 }
 

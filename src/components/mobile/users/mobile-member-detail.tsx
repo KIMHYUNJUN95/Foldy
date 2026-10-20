@@ -23,6 +23,7 @@ import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/tokyo-date";
 import type { MemberPanelVM } from "@/lib/user-management-data";
+import { formatMemberHistory } from "@/components/admin/users/member-history";
 import { MobileUsersToast, type UsersToast } from "./mobile-users-toast";
 import "./mobile-users.css";
 
@@ -279,6 +280,7 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
     }
   }
   const onCount = rows.filter((row) => row.on).length;
+  const history = formatMemberHistory(panel.history, { dict, locale, teams: panel.teams });
 
   function submitPicker() {
     if (!picker) return;
@@ -510,6 +512,22 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
           </section>
         </>
       )}
+
+      <section aria-label={c.histTitle}>
+        <h2 className="muw-sec">{c.histTitle}</h2>
+        {history.length === 0 ? (
+          <p className="muw-note">{c.histEmpty}</p>
+        ) : (
+          <ol className="muw-hist">
+            {history.map((line) => (
+              <li key={line.id}>
+                <span>{line.text}</span>
+                <span className="num">{line.meta}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       {dateOpen && picker ? (
         <DatePickerSheet

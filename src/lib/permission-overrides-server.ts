@@ -219,3 +219,27 @@ export async function revokeMemberOverride(input: {
   if (error) return { ok: false, error: "revoke_failed" };
   return { ok: true };
 }
+
+/**
+ * 한 사람의 이 조직 개인 부여 · 차단을 **전부** 회수한다(2026-10-20 권한 정리 ④ B) — 비활성 · 삭제 때. 다시 활성으로 돌려도 예전 권한이
+ * 조용히 살아나지 않게 한다(필요한 것만 다시 켠다). 회수한 키 목록을 돌려준다(변경 기록용).
+ */
+export async function revokeAllMemberOverrides(input: {
+  organizationId: string;
+  userId: string;
+  revokedByUserId: string;
+}): Promise<{ ok: true; revoked: { key: string; effect: string }[] } | { ok: false; error: string }> {
+  const { data, error } = await getSupabaseServiceClient()
+    .from("membership_permission_overrides")
+    .update({ revoked_at: new Date().toISOString(), revoked_by_user_id: input.revokedByUserId })
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", input.userId)
+    .is("revoked_at", null)
+    .select("permission_key, effect");
+  if (error) return { ok: false, error: "revoke_failed" };
+  return {
+    ok: true,
+    revoked: ((data ?? []) as { permission_key: string; effect: string }[]).map((row) => ({ key: row.permission_key, effect: row.effect })),
+  };
+}
+

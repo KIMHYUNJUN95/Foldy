@@ -186,3 +186,13 @@
   .adm .usw-tr, .adm .usw-pb, .adm .usw-xp, .adm .usi-tr, .adm .usi-bar i, .adm .usi-copied svg path, .adm .usi-copied svg polyline { animation: none; }
   .adm .usw-sw, .adm .usw-sw i, .adm .usw-seg button, .adm .usw-btn, .adm .usw-ic, .adm .usi-ib, .adm .usi-regen, .adm .usi-submit, .adm .usw-tr { transition: none; }
 }
+
+/* 멤버 「최근 변경」(2026-10-20 권한 정리 ④) — 패널 맨 아래, 상자 없이 줄만. */
+.adm .usw-hist { display: flex; flex-direction: column; gap: 6px; margin-top: 18px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
+.adm .usw-hist > b { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .usw-hist ol { margin: 0; padding: 0; list-style: none; }
+.adm .usw-hist li { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+.adm .usw-hist li + li { border-top: 0.5px solid var(--separator); }
+.adm .usw-hist li span:first-child { font-size: 13px; color: #16141f; }
+.adm .usw-hist li span + span { font-size: 12px; color: #6b6878; }
+

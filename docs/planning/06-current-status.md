@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 권한 정리 ④: 변경 기록 · 비활성 때 개인 지정 회수
+
+- 사용자 관리의 모든 변경(역할 · 상태 · 소속 · 플래그 · 개발자 지정 · 개인 부여/차단/회수 · 삭제)과 초대코드 변경을 `audit_logs` 에 남김(`src/lib/user-audit.ts`).
+  멤버 상세(PC 패널 · 모바일) 맨 아래 「최근 변경」 10개.
+- 비활성 · 삭제 때 그 사람의 이 조직 개인 부여 · 차단 전부 회수(`revokeAllMemberOverrides`) — 재활성해도 안 살아남. 확인 창 문구 ko/ja/en. DB 구조 변경 없음.
+
 ## 2026-10-20 — 권한 정리 ③: 흩어진 역할 목록을 권한 키로
 
 - 기능 파일 15곳 남짓의 역할 목록 → 레지스트리 키 13개(`announcement.*` · `cleaning.*` · `linen.manage` · `property_info.edit` · `complaint.*` ·

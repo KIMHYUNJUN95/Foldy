@@ -145,6 +145,13 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
   - grant/deny override → toggle back: revoke that override.
   - Keys that ask for an expiry (`asksExpiry`) expand the row: **무기한** · 1주 · 1개월 · 3개월 · 날짜 고르기 (shared `AdminDatePicker`) → [무기한으로 켜기/끄기] or [M월 D일까지 켜기/끄기]. Expiry = end of that Tokyo day; 무기한 = no `expires_at` (2026-10-20 사용자 결정, `27-permission-override-workflow.md`). Default chip stays 1개월. Reason is left empty (optional since 2026-09-30).
   - Expiry within 7 days and personal blocks are red; everything else grey.
+  - **최근 변경(2026-10-20 권한 정리 ④ A)** — 패널 맨 아래(모바일 상세도 맨 아래)에 최근 10개: 「역할 직원 → CS 직원」 · 「급여 담당 켬」 ·
+    「주문 처리 개인 부여 · 무기한」 · 「비활성 · 개인 지정 2개 회수」 + 「10/20 12:15 · 누가」. 기록은 기존 `audit_logs`(target_type `membership`,
+    `src/lib/user-audit.ts`), 글은 보는 사람 언어로 `member-history.ts` 가 만든다. 사용자 관리의 모든 변경(역할 · 상태 · 소속 · 플래그 · 개발자 지정 ·
+    개인 부여/차단/회수 · 삭제)과 초대코드(만들기 · 끄기/켜기 · 삭제, target_type `invite_code` — 화면엔 아직 없음)가 남는다. 기록 실패는 본 동작을 되돌리지 않는다.
+  - **비활성 · 삭제 시 개인 지정 자동 회수(2026-10-20 권한 정리 ④ B)** — 상태를 활성이 아닌 것으로 바꾸거나 삭제하면 그 사람의 이 조직 개인 부여 · 차단을
+    전부 회수한다(`revokeAllMemberOverrides`, 기록 남김). 다시 활성으로 돌려도 살아나지 않는다 — 필요한 것만 다시 켠다. 역할 변경 때는 그대로 둔다.
+    비활성 확인 창 문구에 「개인 부여 · 차단은 회수돼요」.
   - Role-only feature gates (2026-10-20 권한 정리 ③ — 공지 작성, 청소 기록 보기, 컴플레인, 린넨, 요청 삭제, 버그 검토, 게시판 관리 등) also appear
     when the member's role has them, as 「역할로 받음 · 끌 수 없음」 — so the list shows what the person can actually do. They cannot be granted or blocked individually yet.
   - Also in the list: 급여 담당 · 연차 결재자 (membership flags), 일일 보고서 — 파트타임 허용 (only for part-time, `profiles.can_generate_report`), 개발자 지정 (developer viewer only). Developer-only keys (`user.manage`) are hidden from non-developers.

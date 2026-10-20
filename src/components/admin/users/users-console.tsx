@@ -9,6 +9,7 @@ import { AdminDatePicker } from "../shared/admin-date-picker";
 import { AdminToast, useAdminToast } from "../shared/admin-toast";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import { UsersSectionTabs } from "./users-section-tabs";
+import { formatMemberHistory } from "./member-history";
 import {
   assignDeveloper,
   deleteMember,
@@ -440,6 +441,7 @@ function MemberPanel({
     }
   }
   const onCount = rows.filter((row) => row.on).length;
+  const history = formatMemberHistory(panel.history, { dict, locale, teams: panel.teams });
 
   function submitPicker() {
     if (!picker) return;
@@ -655,6 +657,22 @@ function MemberPanel({
               </div>
             </section>
           ) : null}
+
+          <section className="usw-hist" aria-label={c.histTitle}>
+            <b>{c.histTitle}</b>
+            {history.length === 0 ? (
+              <p className="usw-note">{c.histEmpty}</p>
+            ) : (
+              <ol>
+                {history.map((line) => (
+                  <li key={line.id}>
+                    <span>{line.text}</span>
+                    <span className="num">{line.meta}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
         </div>
       </aside>
 

@@ -104,9 +104,7 @@ export async function enqueueBeds24PriceJob(args: {
   //
   // **쪽을 나눠 끝까지 읽는다**(2026-10-19). 한 번에 읽으면 1,000행에서 잘려(`read-all-pages.ts`), 1,000칸 넘는 수정은
   // 뒤쪽 칸의 minStay 가 비어 「운영 중인 유닛 없음」으로 빠지거나 엉뚱한 유닛을 골랐다 — 최소숙박이 일부만 나갔다.
-  // 날짜는 처음 ~ 끝 **범위로** 거른다(2026-10-20) — 가격 패널에서 기간을 1년까지 넓히면 날짜 목록 `in` 이 주소를 수천 자로
-  // 만든다. 범위 안의 남는 날은 아래 `minStayByKey` 대조에서 쓰이지 않는다.
-  const stayDates = [...new Set(args.cells.map((cell) => cell.stayDate))].sort();
+  const stayDates = [...new Set(args.cells.map((cell) => cell.stayDate))];
   const ratesResult = await readAllPages<{ room_id: string; stay_date: string; min_stay: number | null }>(
     (from, to) =>
       args.supabase
@@ -114,8 +112,7 @@ export async function enqueueBeds24PriceJob(args: {
         .select("room_id, stay_date, min_stay")
         .eq("organization_id", args.organizationId)
         .in("room_id", allRoomIds)
-        .gte("stay_date", stayDates[0])
-        .lte("stay_date", stayDates[stayDates.length - 1])
+        .in("stay_date", stayDates)
         .order("room_id", { ascending: true })
         .order("stay_date", { ascending: true })
         .range(from, to),

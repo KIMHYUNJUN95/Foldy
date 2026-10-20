@@ -180,17 +180,6 @@ export default async function OpsCalendarPage({
           cancelledHref={hrefWith({ cancelled: showCancelled ? undefined : "1" })}
           copy={copy}
           days={data.days}
-          pickerLabels={{
-            apply: dictionary.admin.shared.dateApply,
-            nextMonth: dictionary.admin.shared.dateNextMonth,
-            pickMonth: dictionary.admin.shared.datePickMonth,
-            pickYear: dictionary.admin.shared.datePickYear,
-            prevMonth: dictionary.admin.shared.datePrevMonth,
-            reset: dictionary.admin.shared.dateReset,
-            thisMonth: dictionary.admin.shared.dateThisMonth,
-            typeEnd: dictionary.admin.shared.dateTypeEnd,
-            typeStart: dictionary.admin.shared.dateTypeStart,
-          }}
           hasRates={data.hasRates}
           historyAlerts={historyAlerts}
           navBar={

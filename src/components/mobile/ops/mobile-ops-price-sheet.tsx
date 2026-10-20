@@ -13,7 +13,6 @@ import {
   type AdjustmentInput,
 } from "@/lib/ops-price-adjustment";
 import { MswField, MswSuccess, mdWeekday, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
-import { PriceScopeEditor, usePriceScope, type PriceScopeRoom } from "@/components/admin/ops/ops-price-scope";
 
 /**
  * 모바일 가격 시트 — Claude Design 시안 `3a 가격 시트 v3`(2026-10-02 사용자 확정).
@@ -61,9 +60,6 @@ export type MobilePriceSheetCopy = PanelCopy & {
   mwPerCellValue: string;
   mwBack: string;
   mwDone: string;
-  dateNext: string;
-  datePrev: string;
-  today: string;
 };
 
 export type MobilePriceSubmitted = {
@@ -137,26 +133,15 @@ function groupSelection(cells: readonly PanelCell[], nextByCell: ReadonlyMap<str
 }
 
 export function MobileOpsPriceSheet({
-  cells: selectedCells,
+  cells,
   copy,
-  exclude,
   onApplied,
   onClear,
   onSubmitted,
-  priceAt,
-  rooms,
   runWrite,
-  scopeSummary: selectionSummary,
-  today,
+  scopeSummary,
 }: {
-  /** 격자에서 고른 칸 — 범위의 처음 값. 시트에서 기간 · 요일 · 객실을 고치면 그 범위로 바뀐다(데스크톱과 같은 `usePriceScope`). */
   cells: PanelCell[];
-  /** 범위를 펼칠 때 뺄 칸 — 팔린 밤(격자에 보이는 날만 안다). */
-  exclude: (roomKey: string, date: string) => boolean;
-  /** 격자가 아는 지금 가격 — 격자 창 밖이면 `undefined`(서버에서 읽는다). */
-  priceAt: (roomKey: string, date: string) => number | null | undefined;
-  rooms: readonly PriceScopeRoom[];
-  today: string;
   copy: MobilePriceSheetCopy;
   /** 보낸 칸만 선택에서 뺀다(데스크톱과 같다). */
   onApplied: (sentCells: { roomKey: string; date: string }[]) => void;
@@ -167,17 +152,6 @@ export function MobileOpsPriceSheet({
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
 }) {
-  const scope = usePriceScope({
-    andMore: copy.andMore,
-    cells: selectedCells,
-    exclude,
-    priceAt,
-    rooms,
-    summary: selectionSummary,
-    today,
-  });
-  const cells = scope.cells;
-  const scopeSummary = scope.summary;
   const [input, setInput] = useState<AdjustmentInput | null>(null);
   const [amountText, setAmountText] = useState("");
   const [percentText, setPercentText] = useState("");
@@ -216,8 +190,7 @@ export function MobileOpsPriceSheet({
   const roomCount = listBuildings.reduce((sum, building) => sum + building.rooms.length, 0);
   // 버튼 숫자 — 입력 전에는 「바꿀 수 있는 칸」(요금 있는 칸), 입력 뒤에는 실제로 바뀌는 칸.
   const goCount = input ? preview.changedCount : preview.rows.length;
-  // 격자 밖 칸의 지금 가격을 아직 못 읽었으면 기다린다(데스크톱과 같다).
-  const canGo = input !== null && preview.changedCount > 0 && !pending && !scope.loading && !scope.failed;
+  const canGo = input !== null && preview.changedCount > 0 && !pending;
   const danger = warnings.length > 0;
 
   const onAmount = (text: string) => {
@@ -355,17 +328,6 @@ export function MobileOpsPriceSheet({
                 {copy.scopeClear}
               </button>
             </div>
-
-            {/* 범위 — 기간 · 요일 · 객실(2026-10-20, Beds24 와 같이). 처음 값은 격자에서 고른 칸. */}
-            <PriceScopeEditor
-              copy={copy}
-              localeTag={copy.localeTag}
-              mobileDateLabels={{ nextMonth: copy.dateNext, prevMonth: copy.datePrev, today: copy.today }}
-              rooms={rooms}
-              state={scope}
-              today={today}
-              variant="mobile"
-            />
 
             <div className="msw-cmp">
               <div>

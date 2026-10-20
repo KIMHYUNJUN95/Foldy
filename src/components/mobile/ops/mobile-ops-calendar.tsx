@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { memo, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -656,19 +656,6 @@ export function MobileOpsCalendar({
       };
     })
     .filter((cell): cell is PanelCell => cell !== null);
-  /** 가격 시트 범위(기간 · 요일 · 객실, 2026-10-20) — 격자 창 밖 날짜는 `undefined`(시트가 서버에서 읽는다). */
-  const dateSet = useMemo(() => new Set(dates), [dates]);
-  const scopePriceAt = useCallback(
-    (roomKey: string, date: string): number | null | undefined => {
-      if (!dateSet.has(date)) return undefined;
-      return pendingPrices.get(selectionCellKey(roomKey, date))?.value ?? rateAt(roomKey, date)?.price ?? null;
-    },
-    [dateSet, pendingPrices, rateAt],
-  );
-  const isSoldCell = useCallback(
-    (roomKey: string, date: string) => soldCells.has(selectionCellKey(roomKey, date)),
-    [soldCells],
-  );
   /** 가격 · 최소숙박 시트에 넘기는 칸 — 팔린 밤은 뺀다(차단 시트는 `panelCells` 전부). */
   const editableCells = panelCells.filter((cell) => !soldCells.has(selectionCellKey(cell.roomKey, cell.date)));
   const scopeSummary = buildOpsScopeSummary({ andMore: copy.andMore, rooms, selection });
@@ -1795,7 +1782,6 @@ export function MobileOpsCalendar({
               <MobileOpsPriceSheet
                 cells={editableCells}
                 copy={copy}
-                exclude={isSoldCell}
                 onApplied={removeSentCells}
                 onClear={() => {
                   clearSelection();
@@ -1805,11 +1791,8 @@ export function MobileOpsCalendar({
                   close();
                   trackJobWrite(submitted);
                 }}
-                priceAt={scopePriceAt}
-                rooms={rooms}
                 runWrite={runWrite}
                 scopeSummary={scopeSummary}
-                today={today}
               />
             ) : panelKind === "minstay" ? (
               <MobileOpsMinStaySheet

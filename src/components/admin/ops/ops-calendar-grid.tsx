@@ -2,7 +2,6 @@
 
 import {
   memo,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -57,7 +56,6 @@ import {
   type MinStayPanelCopy,
 } from "@/components/admin/ops/ops-minstay-panel";
 import { OpsPricePanel, type PanelCopy, type PanelCell } from "@/components/admin/ops/ops-price-panel";
-import type { AdminDateRangePickerLabels } from "@/components/admin/shared/admin-date-range-picker";
 import { stayNights } from "@/lib/ops-manual-booking";
 import { OpsBookingDraft } from "@/components/admin/ops/ops-booking-draft";
 import {
@@ -812,7 +810,6 @@ export function OpsCalendarGrid({
   hasRates,
   historyAlerts,
   navBar,
-  pickerLabels,
   properties,
   propertyPicker,
   rows,
@@ -825,8 +822,6 @@ export function OpsCalendarGrid({
    * 예약 만들기, 막대 꾹 끌어 옮기기, 예약 패널의 수정 · 옮기기 · 취소, 이력의 되돌리기 · 지금 보내기가 없다. 서버 액션도 같은 키로 막는다.
    */
   canWrite: boolean;
-  /** 가격 패널의 「기간」 달력 문구(`dictionary.admin.shared` — 공용 범위 달력, 2026-10-20). */
-  pickerLabels: AdminDateRangePickerLabels;
   /** 「취소만 보기」를 켜고 끄는 주소(서버가 만든다 — 다른 쿼리는 그대로). */
   cancelledHref: string;
   copy: Copy;
@@ -2251,19 +2246,6 @@ export function OpsCalendarGrid({
     })
     .filter((cell): cell is PanelCell => cell !== null);
 
-  /**
-   * 가격 패널 범위(기간 · 요일 · 객실, 2026-10-20)가 쓰는 지금 가격. **격자 창 밖 날짜는 `undefined`** — 패널이 서버에서
-   * 읽는다. 창 안인데 요금이 없으면 `null`(빈 칸 — 대상에서 빠진다). 반영 중이면 보낸 값.
-   */
-  const dateSet = useMemo(() => new Set(dates), [dates]);
-  const scopePriceAt = useCallback(
-    (roomKey: string, date: string): number | null | undefined => {
-      if (!dateSet.has(date)) return undefined;
-      return pendingPrices.get(selectionCellKey(roomKey, date))?.value ?? rateAt(roomKey, date)?.price ?? null;
-    },
-    [dateSet, pendingPrices, rateAt],
-  );
-
 
   /**
    * 객실 칩은 **건물이 하나로 좁혀졌을 때만** 늘어놓는다.
@@ -2940,12 +2922,8 @@ export function OpsCalendarGrid({
                 copy={copy}
                 onApplied={(sent) => removeSentCells(sent, "price")}
                 onClear={clearSelection}
-                pickerLabels={pickerLabels}
-                priceAt={scopePriceAt}
-                rooms={rooms}
                 runWrite={runWrite}
                 scopeSummary={scopeSummary}
-                today={today}
               />
             )}
           </div>

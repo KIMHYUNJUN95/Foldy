@@ -15,6 +15,8 @@ and the major mobile/admin operations modules are implemented and being hardened
   바뀐 내용으로 예약 · 「완료 · 기록」 날짜 줄의 「19:00 예약 / 보냄 / 보내지 못함」. 버튼 순서: 복사 왼쪽 회색 · 보내기 오른쪽 보라.
 - 표 `task_report_schedules` + pg_cron 매 분 틱(`/api/tasks/report-tick`, Vault 토큰) — 마이그레이션 `202610200005`(운영 DB 적용). 앱 알림은 「막바지 일괄」 규칙으로 보류.
   시안 https://claude.ai/artifact/SL1oygg2h9bs8CLpCJzjtC. 상세 `docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」.
+- PC 대시보드(`/admin/tasks`) 업무일지 창도 같은 예약 — 아래 한 줄(보낼 시각 칩 · 전체 복사 · 보내기, 닫기 글자 버튼 뺌) + 칩 위 작은 창(← → · Space · Esc),
+  예약됨 줄 · 날짜 줄 표시. 시안 https://claude.ai/artifact/N2XxQQtMQZA3NQqgBsHVBD.
 
 ## 2026-10-20 — 채널 예약도 날짜 변경 · 객실 이동 때 날짜 변경
 

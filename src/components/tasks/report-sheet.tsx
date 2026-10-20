@@ -17,26 +17,8 @@ import {
 } from "@/lib/daily-report";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
-import { tokyoToday } from "@/lib/tokyo-date";
+import { LEAD_MIN, MINUTES, QUICK_TIMES, openHours, toMinutes, tokyoHHMM, tokyoNowMinutes, tokyoTodayIso } from "@/lib/report-schedule-time";
 import { cn } from "@/lib/utils";
-
-// ── 업무일지 예약 보내기(2026-10-20, 시안 「업무일지 예약 보내기 · 시안」 A안) ──────────────────────────
-// 시각은 **오늘(도쿄)** 하루 안에서 고른다 — 빠른 선택 18:00 · 19:00 · 20:00 + 「직접」(시 · 15분 단위). 지난 시각은 막는다(서버도 1분 뒤부터만 받는다).
-const QUICK_TIMES = ["18:00", "19:00", "20:00"] as const;
-const MINUTES = ["00", "15", "30", "45"] as const;
-const LEAD_MIN = 2;
-
-function tokyoNowMinutes(): number {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24;
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-  return hour * 60 + minute;
-}
-const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
-/** 예약 시각(ISO) → 도쿄 「HH:MM」. */
-function tokyoHHMM(iso: string): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
-}
 
 type Copy = Dictionary["tasks"];
 type Status = "loading" | "done" | "forbidden" | "empty" | "error";
@@ -187,9 +169,7 @@ export function ReportSheet({
   const activeTime = active && schedule ? tokyoHHMM(schedule.sendAt) : null;
   const changed = active && (text !== scheduledText || whenTime !== activeTime);
   const slotOk = (hhmm: string) => toMinutes(hhmm) >= nowMin + LEAD_MIN;
-  const customHours = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")).filter((h) =>
-    MINUTES.some((m) => slotOk(`${h}:${m}`)),
-  );
+  const customHours = openHours(nowMin);
 
   const pickTime = (next: string | null) => {
     haptic("light");
@@ -207,7 +187,7 @@ export function ReportSheet({
     }
     setScheduleBusy(true);
     setScheduleMsg(null);
-    const result = await scheduleDailyReport(date, text, `${tokyoToday()}T${whenTime}:00+09:00`);
+    const result = await scheduleDailyReport(date, text, tokyoTodayIso(whenTime));
     setScheduleBusy(false);
     if (result.ok) {
       haptic("success");

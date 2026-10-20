@@ -137,6 +137,7 @@ export async function scheduleDailyReport(date: string, editedText: string, send
     return { ok: false, reason: "error" };
   }
   revalidatePath("/mobile/tasks");
+  revalidatePath("/admin/tasks");
   return { ok: true, schedule: view(data as Row) };
 }
 
@@ -152,5 +153,6 @@ export async function cancelDailyReportSchedule(date: string): Promise<{ ok: boo
     .eq("status", "scheduled");
   if (error) return { ok: false };
   revalidatePath("/mobile/tasks");
+  revalidatePath("/admin/tasks");
   return { ok: true };
 }

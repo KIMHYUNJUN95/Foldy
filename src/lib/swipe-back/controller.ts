@@ -14,14 +14,29 @@
  * 3. 가로 스크롤 영역이 아직 왼쪽으로 더 갈 수 있으면 스크롤이 먼저, 왼쪽 끝에 닿아 있으면 뒤로가기.
  * 4. 세로 · 왼쪽으로 먼저 움직였으면 그 터치는 끝까지 스크롤 몫.
  * 5. 입력을 시작한 화면(작성 · 수정 폼)에서는 받지 않는다 — 실수로 밀어 쓰던 내용을 잃지 않게. 그런 화면은 OS 뒤로가기만.
+ *    검색칸 · 체크 · 선택은 「쓰던 내용」이 아니므로 세지 않는다(2026-10-20 — 검색 한 번에 그 화면 스와이프가 꺼졌다).
  * 6. iOS Safari 탭에서는 왼쪽 가장자리를 Safari 가 쓰므로 비켜 준다(설치한 PWA · 앱은 가장자리도 우리가 받는다).
+ *
+ * 앱 안 이전 기록이 없으면(알림 · 링크로 바로 들어옴) **위 화면**(`parentScreen` — 상세 → 목록 → 메뉴 첫 화면 → 홈)으로 간다.
+ * 2026-10-20 다듬기: 미는 동안 판 모서리를 화면 모서리처럼 둥글게(인스타그램), 놓은 뒤엔 손가락 속도를 이어받아(`settleMotion`)
+ * 튀지 않게, 넘어가는 움직임이 거의 끝날 때 이동을 시작해 새 화면이 빨리 살아나게.
  */
 
 import { clearNavDirection, setNavDirection } from "@/lib/nav-direction";
 import { getBackTarget } from "./history-tracker";
-import { decideCommit, decideLock, isSwipeBackScreen, settleDuration } from "./history-model";
+import {
+  NAVIGATE_AT_PROGRESS,
+  decideCommit,
+  decideLock,
+  followOffset,
+  isSwipeBackScreen,
+  parentScreen,
+  settleMotion,
+  timeForProgress,
+} from "./history-model";
+import { MOBILE_SCREENS } from "./mobile-screens";
 import { swipeDebug } from "./debug";
-import { getSnapshot, restoreSnapshotScroll } from "./snapshot-store";
+import { getSnapshot, getSnapshotByUrl, restoreSnapshotScroll } from "./snapshot-store";
 
 /** 이전 화면이 시작하는 자리 — 화면 폭의 30% 왼쪽(iOS 내비게이션 전환과 같다). */
 const PARALLAX = 0.3;
@@ -31,6 +46,18 @@ const DIM_MAX = 0.12;
 const SAFARI_EDGE = 24;
 /** 뒤로 갔는데 새 화면이 이 시간 안에 안 그려지면(이동 실패) 화면을 제자리로 되돌린다. */
 const NAVIGATION_TIMEOUT_MS = 4000;
+/**
+ * 미는 동안 판의 모서리 반경(px) — 기기 화면 모서리에 맞춘다. 웹에서는 기기 곡률을 읽을 수 없어 `--screen-corner`(앱 셸이 정해 줄
+ * 수 있다)가 없으면 iPhone(홈 버튼 없는 기종 39~62pt)은 44, 그 밖은 28. 쉬는 동안엔 각진 판이라 화면 모서리와 맞물려 안 보인다.
+ */
+function screenCorner(): number {
+  const custom = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--screen-corner"));
+  if (Number.isFinite(custom)) return custom;
+  const ua = navigator.userAgent;
+  return /iP(hone|od)/.test(ua) ? 44 : 28;
+}
+/** 「쓰던 내용」이 아닌 입력 — 화면 스와이프를 끄지 않는다. */
+const NON_DRAFT_INPUT_TYPES = new Set(["search", "checkbox", "radio", "range", "color", "hidden"]);
 
 const OVERLAY_SELECTOR = '[aria-modal="true"], [role="dialog"], [data-native-back-overlay]';
 const UNDERLAY_SELECTOR = "[data-swipe-back-underlay]";
@@ -62,7 +89,12 @@ export type SwipeBackOptions = {
   surface: HTMLElement;
   /** 이 화면이 스와이프를 받는 화면인가(`/mobile` 화면). */
   isSwipeScreen: () => boolean;
+  /** 앱 안 이전 기록이 없을 때 위 화면으로 — 기록을 바꿔치기한다(Next `router.replace`). */
+  replace: (url: string) => void;
 };
+
+/** 갈 곳 — 이전 기록(`history.go`) 또는 기록이 없을 때의 위 화면(`replace`). */
+type Destination = { delta: number; index: number; url: string; replace?: boolean };
 
 type Phase = "idle" | "pending" | "dragging" | "settling" | "navigating";
 
@@ -100,7 +132,7 @@ function isSplitPaneOpen(): boolean {
   return document.querySelector('.split-list[data-split="on"] iframe') !== null;
 }
 
-export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptions): () => void {
+export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: SwipeBackOptions): () => void {
   let phase: Phase = "idle";
   let dirty = false;
   let startX = 0;
@@ -114,7 +146,8 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
   let settleTimer = 0;
   let navigationTimer = 0;
   let observer: MutationObserver | null = null;
-  let target: ReturnType<typeof getBackTarget> = null;
+  let target: Destination | null = null;
+  let corner = 0;
   const hidden: HTMLElement[] = [];
 
   function reset() {
@@ -140,7 +173,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
    * 밑그림 층을 **미리** 깔아 둔다(보이지 않게). 붙여 배치하는 비용(긴 화면은 수십 ms)을 드래그 첫 프레임이 아니라
    * 화면이 뜬 뒤 한가할 때 치른다. `contain: strict` 라 이 층은 지금 화면의 배치에 끼어들지 않는다.
    */
-  function prepareLayer(destination: NonNullable<typeof target>): Layer {
+  function prepareLayer(destination: Destination): Layer {
     if (layer && layer.url === destination.url && layer.root.isConnected) return layer;
     removeLayer();
     const startedAt = performance.now();
@@ -154,7 +187,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
       "position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;contain:strict;visibility:hidden;background:var(--background);";
 
     let content: HTMLElement | null = null;
-    const snapshot = getSnapshot(destination.index, destination.url);
+    const snapshot = destination.replace ? getSnapshotByUrl(destination.url) : getSnapshot(destination.index, destination.url);
     if (snapshot) {
       content = snapshot.node;
       root.appendChild(content);
@@ -183,7 +216,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
   function showLayer(current: Layer) {
     const rect = surface.getBoundingClientRect();
     // 판(본문) 자리만 보이게 자른다 — 폴드 · 태블릿에서 레일 · 사이드바는 진짜가 그 자리에 그대로 있다.
-    current.root.style.clipPath = `inset(${Math.max(0, rect.top)}px ${Math.max(0, window.innerWidth - rect.right)}px ${Math.max(0, window.innerHeight - rect.bottom)}px ${Math.max(0, rect.left)}px)`;
+    current.root.style.clipPath = `inset(${Math.max(0, rect.top)}px ${Math.max(0, window.innerWidth - rect.right)}px ${Math.max(0, window.innerHeight - rect.bottom)}px ${Math.max(0, rect.left)}px round ${corner}px)`;
     current.root.style.visibility = "visible";
     if (current.content) current.content.style.willChange = "transform";
   }
@@ -192,6 +225,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
     const startedAt = performance.now();
     width = surface.getBoundingClientRect().width;
     if (!target) return;
+    corner = screenCorner();
     showLayer(prepareLayer(target));
     if (!layer) return;
     // 화면 루트 · body 의 바탕 · 당겨서 새로고침 띠는 판보다 아래, 밑그림(z-index -1)보다는 위에 그려진다 — 판이 비키면
@@ -205,6 +239,8 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
     surface.style.transition = "none";
     surface.style.willChange = "translate";
     surface.style.boxShadow = "-12px 0 32px -8px rgba(15, 23, 42, 0.22)";
+    // 미는 동안만 둥근 판(인스타그램처럼) — 판은 이미 overflow: hidden 이라 내용도 같이 잘린다.
+    surface.style.borderRadius = `${corner}px`;
     if (layer.content) layer.content.style.transition = "none";
     layer.dim.style.transition = "none";
     render();
@@ -238,19 +274,24 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
     surface.style.transition = "";
     surface.style.willChange = "";
     surface.style.boxShadow = "";
+    surface.style.borderRadius = "";
     reset();
   }
 
-  function settle(to: number, duration: number, done: () => void) {
+  /**
+   * 남은 거리를 마저 간다. `velocity` 는 가는 방향 기준 손가락 속도(px/ms) — 곡선이 그 속도로 출발한다.
+   * `doneAt`(0~1 진행률)에 `done` 을 부른다 — 넘어갈 때는 거의 끝났을 때 이동을 시작한다.
+   */
+  function settle(to: number, velocity: number, done: () => void, doneAt = 1) {
     phase = "settling";
-    const easing = "cubic-bezier(0.2, 0.9, 0.3, 1)";
+    const { curve, duration, easing } = settleMotion(to - offset, velocity);
     surface.style.transition = `translate ${duration}ms ${easing}`;
     if (layer?.content) layer.content.style.transition = `transform ${duration}ms ${easing}`;
     if (layer) layer.dim.style.transition = `opacity ${duration}ms ${easing}`;
     offset = to;
     if (frame) window.cancelAnimationFrame(frame);
     render();
-    settleTimer = window.setTimeout(done, duration + 20);
+    settleTimer = window.setTimeout(done, doneAt >= 1 ? duration + 20 : duration * timeForProgress(curve, doneAt));
   }
 
   function navigate() {
@@ -275,11 +316,13 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
         teardown();
         return;
       }
-      settle(0, 260, () => teardown(true));
+      window.clearTimeout(settleTimer);
+      settle(0, 0, () => teardown(true));
     }, NAVIGATION_TIMEOUT_MS);
     // 화면이 이미 손가락으로 넘어갔다 — 새 화면은 전환 애니메이션 없이 그 자리에 나타난다.
     setNavDirection("none");
-    window.history.go(destination.delta);
+    if (destination.replace) replace(destination.url);
+    else window.history.go(destination.delta);
   }
 
   function velocity(): number {
@@ -304,12 +347,14 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
     const element = event.target instanceof Element ? event.target : null;
     if (element?.closest(BLOCKED_TARGET_SELECTOR)) return swipeDebug("start: skip — blocked target");
     if (touch.clientX < SAFARI_EDGE && isIosSafariTab()) return swipeDebug("start: skip — safari edge");
-    target = getBackTarget();
-    if (!target) return swipeDebug("start: skip — no back target");
-    if (!isSwipeBackScreen(target.url)) {
-      swipeDebug(`start: skip — back leaves the app (${target.url})`);
-      target = null;
-      return;
+    const back = getBackTarget();
+    if (back && isSwipeBackScreen(back.url)) {
+      target = back;
+    } else {
+      // 앱 안 이전 기록이 없다(알림 · 링크로 바로 들어옴) — 위 화면으로. 홈이면 갈 곳이 없다.
+      const parent = parentScreen(window.location.pathname, MOBILE_SCREENS);
+      if (!parent) return swipeDebug(back ? `start: skip — back leaves the app (${back.url})` : "start: skip — no back target");
+      target = { delta: 0, index: -1, replace: true, url: parent };
     }
     startX = touch.clientX;
     startY = touch.clientY;
@@ -320,7 +365,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
   function onTouchMove(event: TouchEvent) {
     if (phase !== "pending" && phase !== "dragging") return;
     if (event.touches.length !== 1) {
-      if (phase === "dragging") settle(0, 200, () => teardown(true));
+      if (phase === "dragging") settle(0, 0, () => teardown(true));
       else reset();
       return;
     }
@@ -351,7 +396,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
     }
 
     if (event.cancelable) event.preventDefault();
-    offset = Math.max(0, dx - lockDx);
+    offset = followOffset(dx, lockDx);
     const now = performance.now();
     samples.push({ t: now, x: offset });
     if (samples.length > 12) samples.shift();
@@ -369,14 +414,18 @@ export function attachSwipeBack({ main, surface, isSwipeScreen }: SwipeBackOptio
     const commit = event.type === "touchend" && decideCommit(offset, speed, width);
     swipeDebug(`${event.type}: offset ${Math.round(offset)}/${Math.round(width)} v ${speed.toFixed(2)} → ${commit ? "back" : "cancel"}`);
     if (commit) {
-      settle(width, settleDuration(width - offset, speed), navigate);
+      settle(width, Math.max(0, speed), navigate, NAVIGATE_AT_PROGRESS);
     } else {
-      settle(0, settleDuration(offset, speed), () => teardown(true));
+      settle(0, Math.max(0, -speed), () => teardown(true));
     }
   }
 
-  // 입력을 시작한 화면은 스와이프를 받지 않는다(쓰던 내용 보호).
-  function onInput() {
+  // 입력을 시작한 화면은 스와이프를 받지 않는다(쓰던 내용 보호). 검색 · 체크 · 선택은 쓰던 내용이 아니다.
+  function onInput(event: Event) {
+    const element = event.target;
+    if (element instanceof HTMLInputElement && NON_DRAFT_INPUT_TYPES.has(element.type)) return;
+    if (element instanceof HTMLSelectElement) return;
+    if (element instanceof Element && element.closest('[role="search"]')) return;
     dirty = true;
   }
 

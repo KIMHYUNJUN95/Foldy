@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { hasNativePlugin, IN_APP_BROWSER_OPTIONS, isNativeApp, nativePlatform } from "@/lib/native-app";
 import { hasOpenOverlay } from "@/lib/swipe-back/controller";
+import { isSwipeBackScreen, parentScreen } from "@/lib/swipe-back/history-model";
+import { getBackTarget } from "@/lib/swipe-back/history-tracker";
+import { MOBILE_SCREENS } from "@/lib/swipe-back/mobile-screens";
 
 /**
  * 앱(Capacitor) WebView 보정 (2026-10-06, 앱 출시 준비 B3). 루트 레이아웃에 한 번만 둔다. 브라우저 · PWA 에서는 아무것도 안 한다.
@@ -39,6 +43,13 @@ async function syncTextZoom() {
 }
 
 export function NativeShellBridge() {
+  // 효과는 한 번만 붙인다 — 최신 router 는 ref 로 본다.
+  const router = useRouter();
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
+
   useEffect(() => {
     if (!isNativeApp()) return;
 
@@ -135,7 +146,11 @@ export function NativeShellBridge() {
           return;
         }
         lastEscapeAt = 0;
-        if (canGoBack) window.history.back();
+        // 앱 안 이전 기록이 없으면(알림 · 링크로 바로 들어옴) 화면 스와이프와 같이 위 화면으로(2026-10-20). 홈이면 앱을 내린다.
+        const back = getBackTarget();
+        const parent = parentScreen(window.location.pathname, MOBILE_SCREENS);
+        if (!(back && isSwipeBackScreen(back.url)) && parent) routerRef.current.replace(parent);
+        else if (canGoBack) window.history.back();
         else void App.minimizeApp();
       });
       if (disposed) void listener.remove();

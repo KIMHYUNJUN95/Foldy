@@ -490,6 +490,12 @@ export function MobileShell({
 
   useEffect(() => () => clearSidebarChromeTimer(), [clearSidebarChromeTimer]);
 
+  // 스와이프 엔진은 화면마다 한 번 붙는다 — 최신 router · 사용자는 ref 로 본다.
+  const swipeDepsRef = useRef({ router, userId: session?.user.id ?? "" });
+  useEffect(() => {
+    swipeDepsRef.current = { router, userId: session?.user.id ?? "" };
+  });
+
   // 화면 스와이프 뒤로가기(2026-10-08) — 제스처 엔진을 붙이고, 이 화면의 복제본을 한가할 때 만들어 두었다가 떠날 때 맡긴다
   // (다음 화면에서 밀 때 아래에 깔린다). 뒤로 떠날 때(기록 번호가 줄었을 때)는 맡기지 않는다 — 그 화면으로 다시 「뒤로」 올
   // 일이 없다. 2분할 칸 안에서는 둘 다 하지 않는다. docs/product/16-mobile-navigation.md 「뒤로가기 — 화면 스와이프」
@@ -499,10 +505,11 @@ export function MobileShell({
     if (!main || !surface || document.documentElement.hasAttribute("data-pane")) return;
     const ownIndex = getHistoryIndex();
     const ownUrl = getHistoryUrl(ownIndex);
-    const capture = trackScreen(main);
+    const capture = trackScreen(main, swipeDepsRef.current.userId);
     const detach = attachSwipeBack({
       isSwipeScreen: () => isSwipeBackScreen(window.location.pathname),
       main,
+      replace: (url) => swipeDepsRef.current.router.replace(url),
       surface,
     });
     return () => {

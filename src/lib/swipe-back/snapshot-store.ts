@@ -16,6 +16,9 @@
  * - `<iframe>`(2분할 칸)은 다시 불러오므로 빈 칸으로, `<canvas>` 는 그림을 옮겨 그린다, `<svg>` 는 통째로.
  * - 같은 번호의 다른 주소(대체 이동 · 기록이 갈라진 뒤)는 주소를 대조해 쓰지 않는다.
  * - 메모리 — 최근 `MAX_SNAPSHOTS` 개만 둔다.
+ * - **새로고침 · 앱을 다시 연 뒤에도 쓰게(2026-10-20 점검)** — 맡긴 복제본을 한가할 때 HTML 로 sessionStorage 에도 둔다(최근
+ *   `MAX_STORED` 개, 사용자별). 전에는 메모리에만 있어서 새로고침 뒤나 5단계보다 깊이 갔다 돌아올 때 밀면 아래가 빈 회색 판이었다.
+ *   스크롤 위치는 복제본 요소의 `data-sb-scroll` 에 적어 두어 HTML 로 되살려도 맞춘다.
  */
 
 type ScrollMark = [element: HTMLElement, top: number, left: number];
@@ -27,6 +30,13 @@ export type ScreenSnapshot = {
 };
 
 const MAX_SNAPSHOTS = 5;
+const MAX_STORED = 10;
+/** 한 화면 HTML 이 이보다 크면 저장하지 않는다(sessionStorage 는 보통 5MB). */
+const MAX_STORED_CHARS = 600_000;
+const STORAGE_KEY = "stayops:swipe-snapshots";
+const SCROLL_ATTR = "data-sb-scroll";
+/** 지금 로그인한 사용자 — 저장본은 이 사용자 것만 쓴다(같은 탭에서 다른 계정으로 바뀌어도 남의 화면이 깔리지 않게). */
+let owner = "";
 /** 화면 밖이라도 이 거리(px) 안이면 복제한다 — 경계에 걸친 줄의 그림자 · 테두리가 잘리지 않게. */
 const MARGIN = 48;
 const snapshots = new Map<number, ScreenSnapshot>();
@@ -80,6 +90,7 @@ function cloneVisible(source: Element, view: Viewport, scrolls: ScrollMark[]): E
   }
   if (source instanceof HTMLElement && (source.scrollTop !== 0 || source.scrollLeft !== 0)) {
     scrolls.push([copy as HTMLElement, source.scrollTop, source.scrollLeft]);
+    copy.setAttribute(SCROLL_ATTR, `${source.scrollTop},${source.scrollLeft}`);
   }
 
   const mergeable = source.childElementCount > 8 && isBlockFlow(source);
@@ -166,7 +177,66 @@ export type ScreenCapture = {
  * - 링크를 누르는 순간(클릭 capture — 아직 배치가 깨끗하다) 복제본이 오래됐으면 그때 복제한다.
  * - 떠날 때는 만들어 둔 것을 맡기기만 한다. 그래도 오래됐으면(버튼으로 이동 직전에 내용이 바뀐 경우) 그 자리에서 복제한다.
  */
-export function trackScreen(root: HTMLElement): ScreenCapture {
+type StoredSnapshot = { index: number; url: string; owner: string; html: string };
+
+function readStored(): StoredSnapshot[] {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? (parsed as StoredSnapshot[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStored(entries: StoredSnapshot[]) {
+  // 자리가 모자라면 오래된 것부터 버리고 다시.
+  for (let list = entries; list.length > 0; list = list.slice(1)) {
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      return;
+    } catch {
+      // 계속 줄인다.
+    }
+  }
+}
+
+/** 맡긴 복제본을 한가할 때 HTML 로 저장한다. */
+function persist(index: number, url: string, node: HTMLElement) {
+  const idle = window.requestIdleCallback ?? ((callback: () => void) => window.setTimeout(callback, 200));
+  const who = owner;
+  idle(() => {
+    const html = node.outerHTML;
+    if (html.length > MAX_STORED_CHARS) return;
+    const entries = readStored().filter((entry) => entry.index !== index && entry.owner === who);
+    entries.push({ html, index, owner: who, url });
+    writeStored(entries.slice(-MAX_STORED));
+  });
+}
+
+/** 저장해 둔 HTML 로 복제본을 되살린다(`index` 가 null 이면 그 주소의 가장 최근 것). 스크립트는 들어 있지 않지만 혹시 몰라 걷어 낸다. */
+function restoreStored(index: number | null, url: string): ScreenSnapshot | null {
+  const entry = readStored()
+    .filter((item) => (index === null || item.index === index) && item.url === url && item.owner === owner)
+    .pop();
+  if (!entry) return null;
+  const template = document.createElement("template");
+  template.innerHTML = entry.html;
+  const node = template.content.firstElementChild;
+  if (!(node instanceof HTMLElement)) return null;
+  for (const script of node.querySelectorAll("script")) script.remove();
+  const scrolls: ScrollMark[] = [];
+  for (const element of [node, ...node.querySelectorAll<HTMLElement>(`[${SCROLL_ATTR}]`)]) {
+    const mark = element.getAttribute(SCROLL_ATTR);
+    if (!mark) continue;
+    const [top, left] = mark.split(",").map(Number);
+    scrolls.push([element, top || 0, left || 0]);
+  }
+  return { node, scrolls, url };
+}
+
+/** `ownerId` — 지금 사용자(저장본을 사용자별로 가른다). */
+export function trackScreen(root: HTMLElement, ownerId: string): ScreenCapture {
+  owner = ownerId;
   let latest: Omit<ScreenSnapshot, "url"> | null = null;
   let stale = true;
   let lastBuiltAt = 0;
@@ -245,6 +315,7 @@ export function trackScreen(root: HTMLElement): ScreenCapture {
       snapshots.delete(index);
       snapshots.set(index, { ...latest, url });
       while (snapshots.size > MAX_SNAPSHOTS) snapshots.delete(snapshots.keys().next().value as number);
+      persist(index, url, latest.node);
     },
     dispose() {
       observer.disconnect();
@@ -257,10 +328,13 @@ export function trackScreen(root: HTMLElement): ScreenCapture {
   };
 }
 
-/** 기록 번호 `index` 의 밑그림 — 주소가 다르면(그 번호에 다른 화면이 들어섰으면) 없다. */
+/** 기록 번호 `index` 의 밑그림 — 주소가 다르면(그 번호에 다른 화면이 들어섰으면) 없다. 메모리에 없으면 저장본에서 되살린다. */
 export function getSnapshot(index: number, url: string): ScreenSnapshot | null {
   const snapshot = snapshots.get(index);
-  return snapshot && snapshot.url === url ? snapshot : null;
+  if (snapshot) return snapshot.url === url ? snapshot : null;
+  const stored = restoreStored(index, url);
+  if (stored) snapshots.set(index, stored);
+  return stored;
 }
 
 /** 복제본을 붙인 뒤 스크롤 위치를 되돌린다(붙어 있어야 scrollTop 이 먹는다). */
@@ -269,4 +343,11 @@ export function restoreSnapshotScroll(snapshot: ScreenSnapshot): void {
     element.scrollTop = top;
     element.scrollLeft = left;
   }
+}
+
+/** 기록 번호 없이 주소로 — 앱 안 이전 기록이 없어 위 화면으로 갈 때, 그 화면을 이 탭에서 본 적이 있으면 그 모습을 깐다. */
+export function getSnapshotByUrl(url: string): ScreenSnapshot | null {
+  let found: ScreenSnapshot | null = null;
+  for (const snapshot of snapshots.values()) if (snapshot.url === url) found = snapshot;
+  return found ?? restoreStored(null, url);
 }

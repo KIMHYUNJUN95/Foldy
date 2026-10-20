@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 화면 스와이프 뒤로가기 다듬기 (앱 출시 전 점검)
+
+- 점검 측정 후 전부 고침: 놓은 뒤 손가락 속도 이어받기(전엔 첫 프레임 77px 튐) · 미는 동안 둥근 판(인스타그램) · 검색칸 입력이 스와이프를
+  끄지 않음 · 새로고침 뒤에도 아래에 이전 화면(sessionStorage) · 알림 · 링크로 바로 들어온 화면은 위 화면으로(Android 뒤로가기 버튼도) ·
+  태블릿 넘어가는 거리 상한 220px · 이동 조금 일찍 · 손가락에 붙기. 실기기 손맛 확인은 남음. 상세 `docs/product/16-mobile-navigation.md`.
+
 ## 2026-10-20 — 청소 「기타」 다시 그림 (HIG 2차)
 
 - `/mobile/cleaning` 아래 「기타」 — 화이트 리디자인 때 빠져 옛 유리 드롭다운 · 파랑 버튼이 남아 있던 곳. 화면엔 「다른 객실 고르기 ›」 한 줄,

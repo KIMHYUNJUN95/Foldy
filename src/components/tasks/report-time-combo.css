@@ -1,0 +1,16 @@
+/* 업무일지 「보낼 시각」 칸 하나 + 목록(report-time-combo.tsx) — PC 업무일지 창의 작은 창. 시안: https://claude.ai/artifact/7SR7V8JauKj1rStKt1AEWM P1
+   새 색 없음 — 투두 보라(#7a52e6 / #5a30cf) · 회색만. 고른 줄은 옅은 보라 배경만(왼쪽 막대 없음). 목록 이동엔 움직임 없음(자주 쓰는 조작). */
+.rtc { display: flex; flex-direction: column; gap: 8px; }
+.rtc__in { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 12px; background: #fff; box-shadow: 0 0 0 2px #7a52e6; }
+.rtc__in.is-err { box-shadow: 0 0 0 2px #d9483d; }
+.rtc__in > svg { width: 18px; height: 18px; flex: none; color: #3a3746; }
+.rtc__in input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 20px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; caret-color: #7a52e6; }
+.rtc__in input::placeholder { font-size: 14px; font-weight: 400; color: #8b8898; }
+.rtc__hint { flex: none; font-size: 13px; color: #6b6878; font-variant-numeric: tabular-nums; }
+.rtc__hint.is-bad { color: #c0352b; font-weight: 600; }
+.rtc__list { display: flex; flex-direction: column; max-height: 296px; margin: 0 -6px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.rtc__opt { display: flex; align-items: center; gap: 12px; flex: none; height: 38px; padding: 0 12px; border-radius: 9px; font-size: 15px; color: #16141f; cursor: pointer; }
+.rtc__opt small { margin-left: auto; font-size: 13px; color: #6b6878; }
+.rtc__opt.is-act { background: #f1edfc; color: #5a30cf; font-weight: 600; }
+.rtc__opt.is-act small { color: #6b5bb0; font-weight: 500; }
+.rtc .num { font-variant-numeric: tabular-nums; }

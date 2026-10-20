@@ -7027,4 +7027,8 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 - **2차 — 1분 단위 직접 입력(사용자, 같은 날):** 「직접」(시 칩 + 15분 4칸)은 숫자를 칠 수 없고 15분 단위라 불편 → 「오늘 [시]:[분]」 칸을 늘 보이게
   (키보드: 숫자 · ↑↓ · Enter / 마우스: ▲▼ 꾹 · 휠 · 클릭). 빠른 선택에 30분 뒤 · 1시간 뒤를 더함. 예약됨 줄에 남은 시간 + 시각 바꾸기 · 예약 취소,
   취소는 확인 없이 + 되돌리기. 시안 PC https://claude.ai/artifact/HBVDqUS4au8anMtD5NexwD · 모바일 https://claude.ai/artifact/R1dhvKv7yDyzwNCU6vAvJJ (① 채택).
+- **3차 — 휠 · 칸 하나 + 목록(사용자, 같은 날):** 2차 칸을 써 보니 불편(특히 모바일 — 한 시트에 다 쌓이고 키패드가 버튼을 덮음) → 대안 시안 중 추천안 채택.
+  모바일 = 「보낼 시각」 한 줄 + 누르면 시각만 담은 시트(빠른 선택 한 줄 · 큰 시각 · 시/분 휠, 지난 시각은 흐리게 두고 멈추면 가장 이른 시각으로 돌아감).
+  PC = 칩 위 작은 창에 칸 하나 + 15분 간격 목록(아무렇게나 친 글자를 알아들음, Enter = 예약). 휴대폰 기본 시각 선택 · 타임라인 자는 택하지 않음.
+  겹친 시트에서 Esc 는 맨 위 시트만 닫는다(공용 BottomSheet). 시안 모바일 https://claude.ai/artifact/JnZtYSQ8TyC1mwHAdKPWu6 · PC https://claude.ai/artifact/7SR7V8JauKj1rStKt1AEWM.
 

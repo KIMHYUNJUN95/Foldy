@@ -1,6 +1,6 @@
 // 업무일지 예약 보내기(2026-10-20) — 모바일 시트(`report-sheet.tsx`)와 PC 업무일지 창(`admin-tasks-console.tsx`)이 같이 쓰는 시각 계산.
-// 시각은 **오늘(도쿄)** 하루 안에서 **1분 단위**로 고른다(2026-10-20 2차 — 시안 HBVDqUS4 · R1dhvKv7). 빠른 선택은 지금 바로 · 30분 뒤 ·
-// 1시간 뒤 · 18:00 · 19:00 · 20:00, 그 아래 「오늘 [시]:[분]」 칸은 늘 보인다. 지난 시각은 막는다(서버도 1분 뒤부터만 받는다).
+// 시각은 **오늘(도쿄)** 하루 안에서 **1분 단위**로 고른다. 3차(2026-10-20, 시안 JnZtYSQ8 A · 7SR7V8Ja P1): 모바일은 시각만 담은
+// 시트의 시 · 분 휠(위에 빠른 선택), PC 는 칸 하나 + 15분 간격 목록(아무렇게나 친 글자를 알아듣는다). 지난 시각은 막는다(서버도 1분 뒤부터만 받는다).
 import { tokyoToday } from "@/lib/tokyo-date";
 
 export const QUICK_TIMES = ["18:00", "19:00", "20:00"] as const;
@@ -46,33 +46,74 @@ export function offsetTime(nowMin: number, offset: number): string | null {
   return at > DAY_LAST_MIN ? null : fromMinutes(at);
 }
 
+/** 지금부터 고를 수 있는 시각 목록 — 가장 이른 시각을 `step` 분 단위로 올린 것부터 23:45 까지(PC 목록). */
+export function slotTimes(nowMin: number, step = 15): string[] {
+  const first = earliestMinute(nowMin);
+  if (first === null) return [];
+  const out: string[] = [];
+  for (let m = Math.ceil(first / step) * step; m <= DAY_LAST_MIN; m += step) out.push(fromMinutes(m));
+  return out;
+}
+
+const FULL_WIDTH = /[０-９：]/g;
+
 /**
- * 시 · 분 칸 한 칸 올리기 / 내리기. 분은 59 → 00 이면 시도 넘어가고, 시는 23 ↔ 00 으로 돈다(오늘 안).
- * 칸이 비어 있으면(지금 바로) 가장 이른 시각을 5분 단위로 올린 값에서 시작한다.
+ * 친 글자 → 오늘의 분(0~1439). 못 알아들으면 null. 지난 시각도 그대로 돌려준다(막는 건 부르는 쪽).
+ * - 「1837」 「937」 「18」 「18:37」 「18.37」
+ * - 「6시37분」 「6시 반」 「6時37分」 「午後6時」 「오후 6시」 「6pm」 「6:30 pm」
+ * - 「30분 뒤」 「+30」 「1시간 뒤」 「30分後」 「in 30 min」 = 지금부터
+ * 오전 · 오후 표시가 없고 1~11시가 이미 지났으면 오후로 본다(16시에 「6시37분」 = 18:37).
  */
-export function stepTime(value: string | null, part: "hour" | "minute", delta: number, nowMin: number): string {
-  if (!value) {
-    const base = earliestMinute(nowMin) ?? DAY_LAST_MIN;
-    return fromMinutes(Math.min(DAY_LAST_MIN, Math.ceil(base / 5) * 5));
+export function parseTimeText(raw: string, nowMin: number): number | null {
+  const text = raw
+    .replace(FULL_WIDTH, (c) => (c === "：" ? ":" : String.fromCharCode(c.charCodeAt(0) - 0xfee0)))
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  if (!text) return null;
+
+  const rel = /^(?:\+|in )?\s*(\d{1,3})\s*(분|分|m|min|mins|minutes?|시간|時間|h|hr|hrs|hours?)?\s*(뒤|후|後|later)?$/.exec(text);
+  if (rel && (text.startsWith("+") || text.startsWith("in ") || rel[3])) {
+    const n = Number(rel[1]);
+    const hours = rel[2] !== undefined && /^(시간|時間|h|hr|hrs|hour|hours)$/.test(rel[2]);
+    const at = nowMin + n * (hours ? 60 : 1);
+    return at <= DAY_LAST_MIN ? at : null;
   }
-  const min = toMinutes(value);
-  if (part === "hour") {
-    const hour = (Math.floor(min / 60) + delta + 24 * 10) % 24;
-    return fromMinutes(hour * 60 + (min % 60));
+
+  const pm = /(오후|午後|pm|p\.m\.)/.test(text);
+  const am = /(오전|午前|am|a\.m\.)/.test(text);
+  const body = text.replace(/(오후|午後|오전|午前|p\.m\.|a\.m\.|pm|am)/g, "").trim();
+
+  let h: number | null = null;
+  let m = 0;
+  const colon = /^(\d{1,2})\s*[:.]\s*(\d{1,2})$/.exec(body);
+  const word = /^(\d{1,2})\s*(?:시|時)\s*(?:(\d{1,2})\s*(?:분|分)?|(반|半))?$/.exec(body);
+  const digits = /^\d{1,4}$/.test(body) ? body : null;
+  if (colon) {
+    h = Number(colon[1]);
+    m = Number(colon[2]);
+  } else if (word) {
+    h = Number(word[1]);
+    m = word[3] ? 30 : word[2] ? Number(word[2]) : 0;
+  } else if (digits) {
+    if (digits.length <= 2) h = Number(digits);
+    else {
+      h = Number(digits.slice(0, digits.length - 2));
+      m = Number(digits.slice(-2));
+    }
   }
-  return fromMinutes((min + delta + 1440 * 10) % 1440);
+  if (h === null || m > 59) return null;
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  if (h > 23) return null;
+  const at = h * 60 + m;
+  const first = nowMin + LEAD_MIN;
+  if (!pm && !am && h >= 1 && h <= 11 && at < first && at + 720 <= DAY_LAST_MIN) return at + 720;
+  return at;
 }
 
-/** 두 자리까지 친 숫자 → 유효한 시(0~23) · 분(0~59)이면 숫자, 아니면 null. */
-export function parsePart(raw: string, part: "hour" | "minute"): number | null {
-  if (!/^\d{1,2}$/.test(raw)) return null;
-  const n = Number(raw);
-  return n <= (part === "hour" ? 23 : 59) ? n : null;
-}
-
-/** 첫 자리만으로 칸이 끝났나 — 시는 3~9, 분은 6~9 로 시작하면 두 번째 자리가 올 수 없다. */
-export const partDone = (raw: string, part: "hour" | "minute") =>
-  raw.length >= 2 || (raw.length === 1 && Number(raw) > (part === "hour" ? 2 : 5));
+/** 휠 · 목록에서 이 분(0~1439)이 이미 지났나(가장 이른 시각보다 앞). */
+export const minuteGone = (minutes: number, nowMin: number) => minutes < nowMin + LEAD_MIN;
 
 /**
  * 남은 시간 문구 — 「1시간 12분」 · 「1시간」 · 「12분」. 템플릿은 문구 사전에서 받는다(`{h}` · `{m}`).

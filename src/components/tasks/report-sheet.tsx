@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronRight, ChevronUp, Clock, Copy, FileText, Lock, RefreshCw, Send, TriangleAlert } from "lucide-react";
+import { Check, ChevronRight, Clock, Copy, FileText, Lock, RefreshCw, Send, TriangleAlert } from "lucide-react";
 import { generateDailyReport, sendDailyReportToSlack } from "@/app/mobile/tasks/report-actions";
 import {
   cancelDailyReportSchedule,
@@ -18,18 +18,16 @@ import {
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
 import {
-  QUICK_TIMES,
   durationLabel,
   earliestMinute,
   fromMinutes,
-  offsetTime,
   slotOpen,
   toMinutes,
   tokyoHHMM,
   tokyoNowMinutes,
   tokyoTodayIso,
 } from "@/lib/report-schedule-time";
-import { ReportTimeField } from "./report-time-field";
+import { ReportTimeSheet } from "./report-time-sheet";
 import { cn } from "@/lib/utils";
 
 type Copy = Dictionary["tasks"];
@@ -185,26 +183,22 @@ export function ReportSheet({
   const changed = active && (text !== scheduledText || whenTime !== activeTime);
   const whenInvalid = whenTime !== null && !slotOpen(whenTime, nowMin);
   const earliest = earliestMinute(nowMin);
-  const in30 = offsetTime(nowMin, 30);
-  const in60 = offsetTime(nowMin, 60);
-  const quick: { key: string; label: string; time: string | null }[] = [
-    { key: "now", label: copy.reportWhenNow, time: null },
-    { key: "in30", label: copy.reportWhenIn30, time: in30 },
-    { key: "in60", label: copy.reportWhenIn60, time: in60 },
-    ...QUICK_TIMES.map((t) => ({ key: t, label: t, time: t })),
-  ];
   const dur = (minutes: number) =>
     durationLabel(minutes, { hm: copy.reportDurHM, h: copy.reportDurH, m: copy.reportDurM });
 
-  // 고르는 동안 「지금」이 흘러간다 — 지난 시각 판정 · 30분 뒤 · 남은 시간이 맞게 30초마다 다시 잰다.
+  // 고르는 동안 · 고른 뒤 「지금」이 흘러간다 — 지난 시각 판정 · 30분 뒤 · 남은 시간이 맞게 30초마다 다시 잰다.
   useEffect(() => {
-    if (!whenOpen && !(schedule?.status === "scheduled")) return;
+    if (!whenOpen && !whenTime && !(schedule?.status === "scheduled")) return;
     const id = setInterval(() => setNowMin(tokyoNowMinutes()), 30_000);
     return () => clearInterval(id);
-  }, [whenOpen, schedule?.status]);
+  }, [whenOpen, whenTime, schedule?.status]);
 
-  const pickTime = (next: string | null, feel = true) => {
-    if (feel) haptic("light");
+  const openWhen = () => {
+    setNowMin(tokyoNowMinutes());
+    setWhenOpen(true);
+  };
+
+  const pickTime = (next: string | null) => {
     setWhenTime(next);
     setScheduleMsg(null);
     setSlackStatus("idle");
@@ -426,7 +420,7 @@ export function ReportSheet({
                         </span>
                         {active ? (
                           <span className="tkw-rpt__bannera">
-                            <button disabled={scheduleBusy} onClick={() => setWhenOpen(true)} type="button">
+                            <button disabled={scheduleBusy} onClick={openWhen} type="button">
                               {copy.reportScheduleChangeTime}
                             </button>
                             <button disabled={scheduleBusy} onClick={() => void onCancelSchedule()} type="button">
@@ -490,74 +484,36 @@ export function ReportSheet({
                         {copy.reportRegenerate}
                       </button>
                     </div>
-                    {/* 보낼 시각 — 고른 값이 아래 큰 버튼 글자를 정한다(지금 바로 → 「Slack으로 보내기」, 19:00 → 「19:00에 보내기」). */}
-                    <button
-                      aria-expanded={whenOpen}
-                      className="tkw-rpt__when"
-                      onClick={() => setWhenOpen((open) => !open)}
-                      type="button"
-                    >
+                    {/* 보낼 시각 — 한 줄만(2026-10-20 3차 시안 A). 누르면 시각만 담은 시트가 위에 한 장 더 뜬다(휠). 고른 값이 아래 큰 버튼 글자를 정한다. */}
+                    <button aria-haspopup="dialog" className="tkw-rpt__when" onClick={openWhen} type="button">
                       <Clock aria-hidden="true" />
                       <span>{copy.reportWhen}</span>
                       <b className={whenTime ? "on" : undefined}>
-                        {whenTime ? copy.reportWhenToday.replace("{time}", whenTime) : copy.reportWhenNow}
+                        {whenTime
+                          ? whenInvalid
+                            ? copy.reportWhenToday.replace("{time}", whenTime)
+                            : `${copy.reportWhenToday.replace("{time}", whenTime)} · ${copy.reportWhenIn.replace("{dur}", dur(toMinutes(whenTime) - nowMin))}`
+                          : copy.reportWhenNow}
                       </b>
-                      {whenOpen ? <ChevronUp aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+                      <ChevronRight aria-hidden="true" />
                     </button>
+                    {whenInvalid ? (
+                      <p className="tkw-rpt__msg is-bad" role="alert">
+                        <TriangleAlert aria-hidden="true" />
+                        {earliest === null
+                          ? copy.reportWhenNoSlots
+                          : copy.reportWhenEarliest.replace("{time}", fromMinutes(earliest))}
+                      </p>
+                    ) : null}
                     {whenOpen ? (
-                      <div className="tkw-rpt__whenx">
-                        {/* 빠른 선택 6개(3칸 두 줄) — 누르면 아래 칸에 그 시각이 채워진다. 지난 시각은 흐림 + 줄 그음. */}
-                        <div aria-label={copy.reportWhen} className="tkw-rpt__chips" role="radiogroup">
-                          {quick.map((q) => (
-                            <button
-                              aria-checked={q.key === "now" ? whenTime === null : q.time !== null && whenTime === q.time}
-                              className="tkw-rpt__chip num"
-                              disabled={q.key !== "now" && (!q.time || !slotOpen(q.time, nowMin))}
-                              key={q.key}
-                              onClick={() => pickTime(q.time)}
-                              role="radio"
-                              type="button"
-                            >
-                              {q.label}
-                            </button>
-                          ))}
-                        </div>
-                        <span className="tkw-rpt__whenl">{copy.reportWhenManual}</span>
-                        {/* 오늘 [시]:[분] — 1분 단위, 숫자 키패드 · ▲▼(꾹 = 계속). */}
-                        <ReportTimeField
-                          aside={
-                            whenTime && !whenInvalid ? (
-                              <b>{copy.reportWhenIn.replace("{dur}", dur(toMinutes(whenTime) - nowMin))}</b>
-                            ) : null
-                          }
-                          describedBy={whenInvalid ? "tkw-rpt-when-err" : undefined}
-                          invalid={whenInvalid}
-                          labels={{
-                            group: copy.reportWhenGroup,
-                            today: copy.reportWhenToday.replace("{time}", "").trim(),
-                            hour: copy.reportWhenHour,
-                            minute: copy.reportWhenMinute,
-                            hourUp: copy.reportWhenHourUp,
-                            hourDown: copy.reportWhenHourDown,
-                            minuteUp: copy.reportWhenMinuteUp,
-                            minuteDown: copy.reportWhenMinuteDown,
-                          }}
-                          nowMin={nowMin}
-                          onChange={(next) => pickTime(next, false)}
-                          onStep={() => haptic("light")}
-                          onSubmit={() => (document.activeElement as HTMLElement | null)?.blur()}
-                          size="lg"
-                          value={whenTime}
-                        />
-                        {whenInvalid ? (
-                          <p className="tkw-rpt__msg is-bad" id="tkw-rpt-when-err" role="alert">
-                            <TriangleAlert aria-hidden="true" />
-                            {earliest === null
-                              ? copy.reportWhenNoSlots
-                              : copy.reportWhenEarliest.replace("{time}", fromMinutes(earliest))}
-                          </p>
-                        ) : null}
-                      </div>
+                      <ReportTimeSheet
+                        copy={copy}
+                        dateLabel={dateLabel}
+                        nowMin={nowMin}
+                        onApply={pickTime}
+                        onClose={() => setWhenOpen(false)}
+                        value={whenTime}
+                      />
                     ) : null}
                     {active && changed ? (
                       <p className="tkw-rpt__msg is-info" role="status">

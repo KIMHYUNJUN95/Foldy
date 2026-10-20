@@ -489,14 +489,19 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-rpt__when span { font-size: 15px; }
 .tkw-rpt__when b { margin-left: auto; font-size: 15px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; transition: color 160ms ease; }
 .tkw-rpt__when b.on { color: #5a30cf; }
-.tkw-rpt__whenx { display: flex; flex-direction: column; gap: 10px; margin-top: -8px; animation: tkw-rpt-open 220ms cubic-bezier(.23, 1, .32, 1) both; }
-@keyframes tkw-rpt-open { from { opacity: 0; transform: translateY(-4px); } }
-.tkw-rpt__chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.tkw-rpt__whenl { margin-top: 2px; font-size: 13px; font-weight: 600; color: #6b6878; }
-.tkw-rpt__chip { min-width: 0; white-space: nowrap; height: 44px; padding: 0 11px; border: 0; border-radius: 12px; background: #f2f2f5; font: inherit; font-size: 15px; color: #3a3746; cursor: pointer; transition: background 120ms ease, color 120ms ease, transform 120ms ease; }
-.tkw-rpt__chip:active:not(:disabled) { transform: scale(.97); }
-.tkw-rpt__chip[aria-checked="true"] { background: #7a52e6; color: #fff; font-weight: 600; }
-.tkw-rpt__chip:disabled { background: #f7f7f9; color: #c9c7d1; text-decoration: line-through; cursor: default; }
+/* 보낼 시각 시트(2026-10-20 3차, 시안 JnZtYSQ8 A — report-time-sheet.tsx) — 빠른 선택 한 줄 · 큰 시각 · 휠(report-time-wheel.css) · 정하기. */
+.tkw-when { display: flex; flex-direction: column; gap: 14px; }
+.tkw-when .num { font-variant-numeric: tabular-nums; }
+.tkw-when__q { display: flex; gap: 6px; margin: 0 -20px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.tkw-when__q::-webkit-scrollbar { display: none; }
+.tkw-when__chip { flex: none; height: 40px; padding: 0 14px; border: 0; border-radius: 20px; background: #f2f2f5; font: inherit; font-size: 15px; color: #3a3746; white-space: nowrap; cursor: pointer; transition: background 120ms ease, color 120ms ease, transform 120ms ease; }
+.tkw-when__chip:active:not(:disabled) { transform: scale(.97); }
+.tkw-when__chip[aria-checked="true"] { background: #7a52e6; color: #fff; font-weight: 600; }
+.tkw-when__chip:disabled { background: #f7f7f9; color: #c9c7d1; text-decoration: line-through; cursor: default; }
+.tkw-when__rd { display: flex; align-items: baseline; gap: 10px; margin: 0; min-height: 48px; }
+.tkw-when__rd b { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: #16141f; }
+.tkw-when__rd span { font-size: 15px; color: #6b6878; }
+.tkw-when > .tkw-rpt__btn { width: 100%; }
 .tkw-rpt__banner { display: flex; align-items: center; gap: 10px; padding: 0 6px 0 14px; min-height: 48px; border-radius: 14px; background: #f4f1fd; color: #5a30cf; font-size: 14px; animation: tkw-rpt-banner 200ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes tkw-rpt-banner { from { opacity: 0; transform: translateY(-8px); } }
 .tkw-rpt__banner > svg { width: 18px; height: 18px; flex: none; }
@@ -511,6 +516,6 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-rpt .num { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   .tkw-rpt__box, .tkw-rpt__box svg, .tkw-rpt__btn { transition: none; }
-  .tkw-rpt__whenx, .tkw-rpt__banner { animation: none; }
-  .tkw-rpt__chip, .tkw-rpt__when b { transition: none; }
+  .tkw-rpt__banner { animation: none; }
+  .tkw-when__chip, .tkw-rpt__when b { transition: none; }
 }

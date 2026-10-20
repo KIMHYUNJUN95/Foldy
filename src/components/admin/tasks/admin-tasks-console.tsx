@@ -20,7 +20,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -118,18 +118,16 @@ import {
   type ReportScheduleView,
 } from "@/app/mobile/tasks/report-schedule-actions";
 import {
-  QUICK_TIMES,
   durationLabel,
   earliestMinute,
   fromMinutes,
-  offsetTime,
   slotOpen,
   toMinutes,
   tokyoHHMM,
   tokyoNowMinutes,
   tokyoTodayIso,
 } from "@/lib/report-schedule-time";
-import { ReportTimeField } from "@/components/tasks/report-time-field";
+import { ReportTimeCombo } from "@/components/tasks/report-time-combo";
 import type { FieldActivityRecord } from "@/lib/field-activity";
 import {
   buildDailyReportText,
@@ -3029,15 +3027,6 @@ export function AdminTasksConsole({
     }
     sendReportToSlack();
   };
-  /** 칩 줄 안에서 ← → 로 포커스만 옮긴다 — 고르기는 Space · Enter(라디오 묶음 관례). */
-  const rptRoving = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
-    const at = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (at < 0 || items.length === 0) return;
-    e.preventDefault();
-    items[(at + (e.key === "ArrowRight" ? 1 : -1) + items.length) % items.length]?.focus();
-  };
   useEffect(() => {
     reportDateRef.current = report?.date ?? null;
   }, [report?.date]);
@@ -4532,16 +4521,6 @@ export function AdminTasksConsole({
     const allOn = reportItems.length > 0 && picked === reportItems.length;
     const busy = !!report.error || report.loading;
     const earliest = earliestMinute(rptNowMin);
-    const in30 = offsetTime(rptNowMin, 30);
-    const in60 = offsetTime(rptNowMin, 60);
-    const quick: { key: string; label: string; time: string | null }[] = [
-      { key: "now", label: dict.rptWhenNow, time: null },
-      { key: "in30", label: dict.rptWhenIn30, time: in30 },
-      { key: "in60", label: dict.rptWhenIn60, time: in60 },
-      ...QUICK_TIMES.map((t) => ({ key: t, label: t as string, time: t as string })),
-    ];
-    const quickOn = (q: { key: string; time: string | null }) => (q.key === "now" ? rptWhen === null : q.time !== null && rptWhen === q.time);
-    const quickFocusKey = (quick.find(quickOn) ?? quick[0]).key;
     return (
       <>
         <div className="day-scrim" onClick={() => setReport(null)} />
@@ -4671,6 +4650,12 @@ export function AdminTasksConsole({
                 {dict.rptScheduleChanged}
               </p>
             ) : null}
+            {!busy && rptInvalid ? (
+              <p className="atw-rpt__msg is-bad" role="alert">
+                <TriangleAlert size={15} aria-hidden="true" />
+                {earliest === null ? dict.rptWhenNoSlots : fill(dict.rptWhenEarliest, { time: fromMinutes(earliest) })}
+              </p>
+            ) : null}
             {rptMsg ? (
               <p className={`atw-rpt__msg ${rptMsg.tone === "ok" ? "is-ok" : "is-bad"}`} role="status">
                 {rptMsg.tone === "ok" ? <Check size={15} strokeWidth={3} aria-hidden="true" /> : <TriangleAlert size={15} aria-hidden="true" />}
@@ -4691,58 +4676,34 @@ export function AdminTasksConsole({
             <div className="atw-rpt__f">
               {rptWhenOpen && !busy ? (
                 <div className="atw-rpt__pop" role="dialog" aria-label={dict.rptWhen}>
-                  <span className="atw-rpt__popt">{dict.rptWhenAsk}</span>
-                  {/* 빠른 선택 6개(3칸 두 줄) — 누르면 아래 칸에 그 시각이 채워진다. 「직접」 칩은 없앴다(2026-10-20 2차 시안 ①). */}
-                  <div className="atw-rpt__chips" role="radiogroup" aria-label={dict.rptWhen} onKeyDown={rptRoving}>
-                    {quick.map((q) => (
-                      <button
-                        key={q.key}
-                        type="button"
-                        role="radio"
-                        aria-checked={quickOn(q)}
-                        tabIndex={q.key === quickFocusKey ? 0 : -1}
-                        className="atw-rpt__chip num"
-                        disabled={q.key !== "now" && (!q.time || !slotOpen(q.time, rptNowMin))}
-                        onClick={() => rptPickTime(q.time)}
-                      >
-                        {q.label}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="atw-rpt__popl">{dict.rptWhenManual}</span>
-                  {/* 오늘 [시]:[분] — 1분 단위. 숫자 · ↑↓ · Enter(보내기), ▲▼ 꾹 · 휠. */}
-                  <ReportTimeField
-                    autoFocus
+                  {/* 칸 하나 + 목록(2026-10-20 3차 시안 P1) — 클릭 = 고르기, 아무렇게나 친 뒤 Enter = 그 시각으로 예약. */}
+                  <ReportTimeCombo
                     value={rptWhen}
                     nowMin={rptNowMin}
-                    invalid={rptInvalid}
-                    describedBy={rptInvalid ? "atw-rpt-when-err" : undefined}
-                    onChange={(next) => rptPickTime(next)}
+                    whenIn={(minutes) => fill(dict.rptWhenIn, { dur: rptDur(Math.max(1, minutes)) })}
+                    labels={{
+                      input: dict.rptWhenInput,
+                      list: dict.rptWhenAsk,
+                      placeholder: dict.rptWhenPlaceholder,
+                      now: dict.rptWhenNow,
+                      earliest: dict.rptWhenEarliestItem,
+                      past: dict.rptWhenPast,
+                      noMatch: dict.rptWhenNoMatch,
+                    }}
+                    onPick={(next) => {
+                      rptPickTime(next);
+                      setRptWhenOpen(false);
+                      rptChipRef.current?.focus();
+                    }}
                     onSubmit={(at) => {
+                      rptPickTime(at);
                       setRptWhenOpen(false);
                       rptChipRef.current?.focus();
                       if (!at) return;
                       if (rptActive && at === rptActiveTime && reportEdited === rptSchedText) return;
                       void scheduleReport(at);
                     }}
-                    aside={rptWhen && !rptInvalid ? <b>{fill(dict.rptWhenIn, { dur: rptDur(toMinutes(rptWhen) - rptNowMin) })}</b> : null}
-                    labels={{
-                      group: dict.rptWhenGroup,
-                      today: fill(dict.rptWhenToday, { time: "" }).trim(),
-                      hour: dict.rptWhenHour,
-                      minute: dict.rptWhenMinute,
-                      hourUp: dict.rptWhenHourUp,
-                      hourDown: dict.rptWhenHourDown,
-                      minuteUp: dict.rptWhenMinuteUp,
-                      minuteDown: dict.rptWhenMinuteDown,
-                    }}
                   />
-                  {rptInvalid ? (
-                    <p className="atw-rpt__msg is-bad" id="atw-rpt-when-err" role="alert">
-                      <TriangleAlert size={15} aria-hidden="true" />
-                      {earliest === null ? dict.rptWhenNoSlots : fill(dict.rptWhenEarliest, { time: fromMinutes(earliest) })}
-                    </p>
-                  ) : null}
                 </div>
               ) : null}
               <button

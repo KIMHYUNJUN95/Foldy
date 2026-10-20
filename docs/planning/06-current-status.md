@@ -70,6 +70,7 @@ and the major mobile/admin operations modules are implemented and being hardened
   예약됨 줄 · 날짜 줄 표시. 시안 https://claude.ai/artifact/N2XxQQtMQZA3NQqgBsHVBD.
 - 수정: 예약이 저장되지 않던 문제 — 표에 service_role 권한이 없었다(`permission denied for table task_report_schedules`). 마이그레이션 `202610200006`(운영 DB 적용).
 - 2차: 보낼 시각 **1분 단위 직접 입력** — 「오늘 [시]:[분]」 칸(키보드 숫자 · ↑↓ · Enter / 마우스 ▲▼ 꾹 · 휠), 빠른 선택에 30분 뒤 · 1시간 뒤, 지난 시각은 칸 아래 이유, 예약됨 줄에 남은 시간 + 시각 바꾸기 · 예약 취소(확인 없이 + 되돌리기). PC · 모바일 공용 `report-time-field.tsx`. 시안 HBVDqUS4(PC) · R1dhvKv7(모바일).
+- 3차(2차가 불편해서 교체): 모바일은 「보낼 시각」 한 줄 + 시각 시트(빠른 선택 · 시/분 휠 `report-time-wheel.tsx`, 키패드 없음, 지난 시각은 멈추면 가장 이른 시각으로), PC 는 칸 하나 + 15분 목록(`report-time-combo.tsx`, 「1837」 「6시 반」 「30분 뒤」 다 알아들음). `report-time-field.tsx` 삭제. 공용 BottomSheet 는 겹쳤을 때 Esc 가 맨 위 시트만 닫는다. 시안 JnZtYSQ8(모바일) · 7SR7V8Ja(PC).
 
 ## 2026-10-20 — 채널 예약도 날짜 변경 · 객실 이동 때 날짜 변경
 

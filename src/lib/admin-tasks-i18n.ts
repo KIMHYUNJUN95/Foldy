@@ -301,19 +301,14 @@ export type AdminTasksDictionary = {
   rptWhen: string;
   rptWhenNow: string;
   rptWhenToday: string;
-  rptWhenHour: string;
-  rptWhenMinute: string;
   rptWhenNoSlots: string;
-  rptWhenIn30: string;
-  rptWhenIn60: string;
-  rptWhenManual: string;
-  rptWhenGroup: string;
-  rptWhenHourUp: string;
-  rptWhenHourDown: string;
-  rptWhenMinuteUp: string;
-  rptWhenMinuteDown: string;
   rptWhenIn: string;
   rptWhenEarliest: string;
+  rptWhenInput: string;
+  rptWhenPlaceholder: string;
+  rptWhenEarliestItem: string;
+  rptWhenPast: string;
+  rptWhenNoMatch: string;
   rptDurHM: string;
   rptDurH: string;
   rptDurM: string;
@@ -565,7 +560,7 @@ const ko: AdminTasksDictionary = {
   rptReset: "원본으로", rptClose: "닫기", rptCopy: "전체 복사", rptCopied: "복사했습니다.",
   rptSlackSend: "Slack으로 보내기", rptSlackSending: "전송 중…", rptSlackSent: "Slack으로 보냈습니다.",
   rptSlackNotConfigured: "Slack 전송이 아직 설정되지 않았습니다.", rptSlackTooLong: "보고서가 너무 길어 Slack으로 보낼 수 없습니다.", rptSlackError: "Slack으로 보내지 못했습니다. 다시 시도해 주세요.",
-  rptWhen: "보낼 시각", rptWhenNow: "지금 바로", rptWhenToday: "오늘 {time}", rptWhenHour: "시", rptWhenMinute: "분", rptWhenNoSlots: "오늘은 더 고를 시각이 없어요", rptWhenIn30: "30분 뒤", rptWhenIn60: "1시간 뒤", rptWhenManual: "직접 입력", rptWhenGroup: "보낼 시각 직접 입력", rptWhenHourUp: "1시간 늦게", rptWhenHourDown: "1시간 이르게", rptWhenMinuteUp: "1분 늦게", rptWhenMinuteDown: "1분 이르게", rptWhenIn: "{dur} 뒤", rptWhenEarliest: "지난 시각이에요 · {time}부터 고를 수 있어요", rptDurHM: "{h}시간 {m}분", rptDurH: "{h}시간", rptDurM: "{m}분", rptScheduleLeft: "{dur} 남음 · 창을 닫아도 서버가 보내요", rptScheduleChangeTime: "시각 바꾸기", rptScheduleCancelledAt: "{time} 예약을 취소했어요", rptScheduleUndo: "되돌리기", rptWhenAsk: "오늘 언제 보낼까요?", rptSendAt: "{time}에 보내기", rptScheduledBtn: "{time} 예약됨", rptReschedule: "바뀐 내용으로 예약", rptScheduledBanner: "오늘 {time}에 Slack으로 보내요", rptScheduleCancel: "예약 취소", rptScheduling: "예약하는 중…", rptScheduledToast: "{time}에 보내도록 예약했어요", rptScheduleChanged: "바뀐 내용은 아직 예약에 반영되지 않았어요", rptScheduleSent: "{time}에 Slack으로 보냈어요", rptScheduleFailed: "{time} 예약을 보내지 못했어요", rptScheduleCancelled: "예약을 취소했어요", rptSchedulePast: "지난 시각이에요. 다시 골라 주세요", rptScheduleBusy: "지금 보내는 중이에요. 잠시 뒤 다시 확인해 주세요", rptListScheduled: "{time} 예약", rptListSent: "{time} 보냄", rptListFailed: "보내지 못함",
+  rptWhen: "보낼 시각", rptWhenNow: "지금 바로", rptWhenInput: "보낼 시각 입력", rptWhenPlaceholder: "18:30 · 6시 반 · 30분 뒤", rptWhenEarliestItem: "가장 이른 시각", rptWhenPast: "지난 시각", rptWhenNoMatch: "알아듣지 못했어요", rptWhenToday: "오늘 {time}", rptWhenNoSlots: "오늘은 더 고를 시각이 없어요", rptWhenIn: "{dur} 뒤", rptWhenEarliest: "지난 시각이에요 · {time}부터 고를 수 있어요", rptDurHM: "{h}시간 {m}분", rptDurH: "{h}시간", rptDurM: "{m}분", rptScheduleLeft: "{dur} 남음 · 창을 닫아도 서버가 보내요", rptScheduleChangeTime: "시각 바꾸기", rptScheduleCancelledAt: "{time} 예약을 취소했어요", rptScheduleUndo: "되돌리기", rptWhenAsk: "오늘 언제 보낼까요?", rptSendAt: "{time}에 보내기", rptScheduledBtn: "{time} 예약됨", rptReschedule: "바뀐 내용으로 예약", rptScheduledBanner: "오늘 {time}에 Slack으로 보내요", rptScheduleCancel: "예약 취소", rptScheduling: "예약하는 중…", rptScheduledToast: "{time}에 보내도록 예약했어요", rptScheduleChanged: "바뀐 내용은 아직 예약에 반영되지 않았어요", rptScheduleSent: "{time}에 Slack으로 보냈어요", rptScheduleFailed: "{time} 예약을 보내지 못했어요", rptScheduleCancelled: "예약을 취소했어요", rptSchedulePast: "지난 시각이에요. 다시 골라 주세요", rptScheduleBusy: "지금 보내는 중이에요. 잠시 뒤 다시 확인해 주세요", rptListScheduled: "{time} 예약", rptListSent: "{time} 보냄", rptListFailed: "보내지 못함",
   emToday: "오늘 처리할 일이 없습니다", emTodayS: "관리함을 정리하거나 새 작업을 추가해 보세요.",
   emTomorrow: "내일 예정된 작업이 없습니다", emTomorrowS: "일정을 잡아두면 여기에서 미리 볼 수 있어요.",
   emInbox: "관리함이 비어 있습니다", emInboxS: "프로젝트 밖의 작업이 여기에 모두 모입니다.",
@@ -698,7 +693,7 @@ const ja: AdminTasksDictionary = {
   rptReset: "元に戻す", rptClose: "閉じる", rptCopy: "全体コピー", rptCopied: "コピーしました。",
   rptSlackSend: "Slackへ送る", rptSlackSending: "送信中…", rptSlackSent: "Slackへ送信しました。",
   rptSlackNotConfigured: "Slack送信はまだ設定されていません。", rptSlackTooLong: "レポートが長すぎてSlackへ送信できません。", rptSlackError: "Slackへ送信できませんでした。もう一度お試しください。",
-  rptWhen: "送信時刻", rptWhenNow: "今すぐ", rptWhenToday: "今日 {time}", rptWhenHour: "時", rptWhenMinute: "分", rptWhenNoSlots: "今日はもう選べる時刻がありません", rptWhenIn30: "30分後", rptWhenIn60: "1時間後", rptWhenManual: "直接入力", rptWhenGroup: "送信時刻を直接入力", rptWhenHourUp: "1時間遅く", rptWhenHourDown: "1時間早く", rptWhenMinuteUp: "1分遅く", rptWhenMinuteDown: "1分早く", rptWhenIn: "{dur}後", rptWhenEarliest: "過ぎた時刻です · {time}から選べます", rptDurHM: "{h}時間{m}分", rptDurH: "{h}時間", rptDurM: "{m}分", rptScheduleLeft: "残り{dur} · 閉じてもサーバーが送信します", rptScheduleChangeTime: "時刻を変更", rptScheduleCancelledAt: "{time} の予約を取り消しました", rptScheduleUndo: "元に戻す", rptWhenAsk: "今日いつ送りますか？", rptSendAt: "{time}に送信", rptScheduledBtn: "{time} 予約済み", rptReschedule: "変更内容で予約", rptScheduledBanner: "今日 {time} にSlackへ送信します", rptScheduleCancel: "予約取消", rptScheduling: "予約中…", rptScheduledToast: "{time} に送信するよう予約しました", rptScheduleChanged: "変更内容はまだ予約に反映されていません", rptScheduleSent: "{time} にSlackへ送信しました", rptScheduleFailed: "{time} の予約を送信できませんでした", rptScheduleCancelled: "予約を取り消しました", rptSchedulePast: "過ぎた時刻です。もう一度選んでください", rptScheduleBusy: "今送信中です。少し後でもう一度確認してください", rptListScheduled: "{time} 予約", rptListSent: "{time} 送信済み", rptListFailed: "送信できず",
+  rptWhen: "送信時刻", rptWhenNow: "今すぐ", rptWhenInput: "送信時刻を入力", rptWhenPlaceholder: "18:30 · 6時半 · 30分後", rptWhenEarliestItem: "最も早い時刻", rptWhenPast: "過ぎた時刻", rptWhenNoMatch: "読み取れませんでした", rptWhenToday: "今日 {time}", rptWhenNoSlots: "今日はもう選べる時刻がありません", rptWhenIn: "{dur}後", rptWhenEarliest: "過ぎた時刻です · {time}から選べます", rptDurHM: "{h}時間{m}分", rptDurH: "{h}時間", rptDurM: "{m}分", rptScheduleLeft: "残り{dur} · 閉じてもサーバーが送信します", rptScheduleChangeTime: "時刻を変更", rptScheduleCancelledAt: "{time} の予約を取り消しました", rptScheduleUndo: "元に戻す", rptWhenAsk: "今日いつ送りますか？", rptSendAt: "{time}に送信", rptScheduledBtn: "{time} 予約済み", rptReschedule: "変更内容で予約", rptScheduledBanner: "今日 {time} にSlackへ送信します", rptScheduleCancel: "予約取消", rptScheduling: "予約中…", rptScheduledToast: "{time} に送信するよう予約しました", rptScheduleChanged: "変更内容はまだ予約に反映されていません", rptScheduleSent: "{time} にSlackへ送信しました", rptScheduleFailed: "{time} の予約を送信できませんでした", rptScheduleCancelled: "予約を取り消しました", rptSchedulePast: "過ぎた時刻です。もう一度選んでください", rptScheduleBusy: "今送信中です。少し後でもう一度確認してください", rptListScheduled: "{time} 予約", rptListSent: "{time} 送信済み", rptListFailed: "送信できず",
   emToday: "今日やることはありません", emTodayS: "管理箱を整理するか新しいタスクを追加しましょう。",
   emTomorrow: "明日の予定はありません", emTomorrowS: "日程を入れておくとここで先に見られます。",
   emInbox: "管理箱が空です", emInboxS: "プロジェクト外のタスクがすべてここに集まります。",
@@ -831,7 +826,7 @@ const en: AdminTasksDictionary = {
   rptReset: "Reset", rptClose: "Close", rptCopy: "Copy all", rptCopied: "Copied.",
   rptSlackSend: "Send to Slack", rptSlackSending: "Sending…", rptSlackSent: "Sent to Slack.",
   rptSlackNotConfigured: "Slack sending is not configured yet.", rptSlackTooLong: "This report is too long to send to Slack.", rptSlackError: "Couldn't send to Slack. Please try again.",
-  rptWhen: "Send time", rptWhenNow: "Right now", rptWhenToday: "Today {time}", rptWhenHour: "Hour", rptWhenMinute: "Minute", rptWhenNoSlots: "No more times left today", rptWhenIn30: "In 30 min", rptWhenIn60: "In 1 hour", rptWhenManual: "Type a time", rptWhenGroup: "Type a send time", rptWhenHourUp: "1 hour later", rptWhenHourDown: "1 hour earlier", rptWhenMinuteUp: "1 minute later", rptWhenMinuteDown: "1 minute earlier", rptWhenIn: "in {dur}", rptWhenEarliest: "That time has passed · pick {time} or later", rptDurHM: "{h} h {m} min", rptDurH: "{h} h", rptDurM: "{m} min", rptScheduleLeft: "{dur} left · sends even if you close this", rptScheduleChangeTime: "Change time", rptScheduleCancelledAt: "Cancelled the {time} send", rptScheduleUndo: "Undo", rptWhenAsk: "When should it go out today?", rptSendAt: "Send at {time}", rptScheduledBtn: "Scheduled {time}", rptReschedule: "Schedule with changes", rptScheduledBanner: "Sends to Slack today at {time}", rptScheduleCancel: "Cancel", rptScheduling: "Scheduling…", rptScheduledToast: "Scheduled to send at {time}", rptScheduleChanged: "Your changes aren’t in the scheduled report yet", rptScheduleSent: "Sent to Slack at {time}", rptScheduleFailed: "The {time} send didn’t go through", rptScheduleCancelled: "Schedule cancelled", rptSchedulePast: "That time has passed. Pick another", rptScheduleBusy: "It’s sending right now. Check again shortly", rptListScheduled: "{time} scheduled", rptListSent: "{time} sent", rptListFailed: "Not sent",
+  rptWhen: "Send time", rptWhenNow: "Right now", rptWhenInput: "Type a send time", rptWhenPlaceholder: "18:30 · 6:30 pm · in 30 min", rptWhenEarliestItem: "Earliest time", rptWhenPast: "Already passed", rptWhenNoMatch: "Couldn’t read that", rptWhenToday: "Today {time}", rptWhenNoSlots: "No more times left today", rptWhenIn: "in {dur}", rptWhenEarliest: "That time has passed · pick {time} or later", rptDurHM: "{h} h {m} min", rptDurH: "{h} h", rptDurM: "{m} min", rptScheduleLeft: "{dur} left · sends even if you close this", rptScheduleChangeTime: "Change time", rptScheduleCancelledAt: "Cancelled the {time} send", rptScheduleUndo: "Undo", rptWhenAsk: "When should it go out today?", rptSendAt: "Send at {time}", rptScheduledBtn: "Scheduled {time}", rptReschedule: "Schedule with changes", rptScheduledBanner: "Sends to Slack today at {time}", rptScheduleCancel: "Cancel", rptScheduling: "Scheduling…", rptScheduledToast: "Scheduled to send at {time}", rptScheduleChanged: "Your changes aren’t in the scheduled report yet", rptScheduleSent: "Sent to Slack at {time}", rptScheduleFailed: "The {time} send didn’t go through", rptScheduleCancelled: "Schedule cancelled", rptSchedulePast: "That time has passed. Pick another", rptScheduleBusy: "It’s sending right now. Check again shortly", rptListScheduled: "{time} scheduled", rptListSent: "{time} sent", rptListFailed: "Not sent",
   emToday: "Nothing due today", emTodayS: "Clear your inbox or add a new task.",
   emTomorrow: "No tasks scheduled for tomorrow", emTomorrowS: "Schedule tasks to preview them here.",
   emInbox: "Your inbox is empty", emInboxS: "Every task outside a project collects here.",

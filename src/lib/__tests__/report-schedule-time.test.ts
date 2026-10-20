@@ -3,36 +3,29 @@ import {
   durationLabel,
   earliestMinute,
   fromMinutes,
+  minuteGone,
   offsetTime,
-  parsePart,
-  partDone,
+  parseTimeText,
   slotOpen,
-  stepTime,
+  slotTimes,
   toMinutes,
 } from "@/lib/report-schedule-time";
 
-/** 업무일지 「보낼 시각」 직접 입력(1분 단위, 2026-10-20 2차) — 칸 계산 규칙. */
+/** 업무일지 「보낼 시각」(2026-10-20 3차 — 모바일 휠 · PC 칸 하나 + 목록) — 시각 계산 규칙. */
 describe("report schedule time", () => {
   const at = (hhmm: string) => toMinutes(hhmm);
-
-  it("분은 59 → 00 이면 시도 넘어가고, 시는 23 ↔ 00 으로 돈다", () => {
-    expect(stepTime("17:59", "minute", 1, at("09:00"))).toBe("18:00");
-    expect(stepTime("18:00", "minute", -1, at("09:00"))).toBe("17:59");
-    expect(stepTime("23:10", "hour", 1, at("09:00"))).toBe("00:10");
-    expect(stepTime("00:10", "hour", -1, at("09:00"))).toBe("23:10");
-    expect(stepTime("17:30", "minute", 10, at("09:00"))).toBe("17:40");
-  });
-
-  it("빈 칸(지금 바로)에서 올리면 고를 수 있는 가장 이른 시각을 5분 단위로 올린 값부터", () => {
-    expect(stepTime(null, "minute", 1, at("16:25"))).toBe("16:30"); // 16:27 → 16:30
-    expect(stepTime(null, "hour", 1, at("16:28"))).toBe("16:30");
-  });
+  const parse = (raw: string, now = "16:25") => {
+    const min = parseTimeText(raw, at(now));
+    return min === null ? null : fromMinutes(min);
+  };
 
   it("지금 + 2분부터, 오늘 23:59 까지만", () => {
     expect(slotOpen("16:27", at("16:25"))).toBe(true);
     expect(slotOpen("16:26", at("16:25"))).toBe(false);
     expect(earliestMinute(at("16:25"))).toBe(at("16:27"));
     expect(earliestMinute(at("23:58"))).toBeNull();
+    expect(minuteGone(at("16:26"), at("16:25"))).toBe(true);
+    expect(minuteGone(at("16:27"), at("16:25"))).toBe(false);
   });
 
   it("「30분 뒤 · 1시간 뒤」는 오늘을 넘으면 없다", () => {
@@ -40,16 +33,47 @@ describe("report schedule time", () => {
     expect(offsetTime(at("23:40"), 30)).toBeNull();
   });
 
-  it("치는 숫자 — 시 3~9 · 분 6~9 로 시작하면 한 자리로 끝, 범위 밖은 null", () => {
-    expect(partDone("1", "hour")).toBe(false);
-    expect(partDone("3", "hour")).toBe(true);
-    expect(partDone("5", "minute")).toBe(false);
-    expect(partDone("7", "minute")).toBe(true);
-    expect(parsePart("23", "hour")).toBe(23);
-    expect(parsePart("24", "hour")).toBeNull();
-    expect(parsePart("59", "minute")).toBe(59);
-    expect(parsePart("6a", "minute")).toBeNull();
-    expect(fromMinutes(at("07:05"))).toBe("07:05");
+  it("PC 목록 — 가장 이른 시각을 15분 단위로 올린 것부터 23:45 까지", () => {
+    const slots = slotTimes(at("16:25"));
+    expect(slots[0]).toBe("16:30");
+    expect(slots.at(-1)).toBe("23:45");
+    expect(slotTimes(at("16:14"))[0]).toBe("16:30"); // 16:16 → 16:30
+    expect(slotTimes(at("23:50"))).toEqual([]);
+  });
+
+  it("친 글자 — 숫자 · 콜론 · 시/分 · 반 · 오전/오후", () => {
+    expect(parse("1837")).toBe("18:37");
+    expect(parse("937", "08:00")).toBe("09:37");
+    expect(parse("18")).toBe("18:00");
+    expect(parse("18:37")).toBe("18:37");
+    expect(parse("１８：３７")).toBe("18:37");
+    expect(parse("18.5")).toBe("18:05");
+    expect(parse("6시37분")).toBe("18:37"); // 6:37 은 지났으니 오후
+    expect(parse("6시 반")).toBe("18:30");
+    expect(parse("6時37分")).toBe("18:37");
+    expect(parse("午後6時")).toBe("18:00");
+    expect(parse("오후 6시 반")).toBe("18:30");
+    expect(parse("6:30 pm")).toBe("18:30");
+    expect(parse("9am", "08:00")).toBe("09:00");
+    expect(parse("9", "08:00")).toBe("09:00"); // 아직 안 지났으면 그대로
+    expect(parse("16:10")).toBe("16:10"); // 지난 시각도 돌려준다(막는 건 화면)
+  });
+
+  it("친 글자 — 「n분 뒤」 · 「+n」 · 「n時間後」 = 지금부터", () => {
+    expect(parse("30분 뒤")).toBe("16:55");
+    expect(parse("+45")).toBe("17:10");
+    expect(parse("1시간 뒤")).toBe("17:25");
+    expect(parse("30分後")).toBe("16:55");
+    expect(parse("in 2 hours")).toBe("18:25");
+    expect(parse("30분 뒤", "23:50")).toBeNull();
+  });
+
+  it("못 알아들으면 null", () => {
+    expect(parse("")).toBeNull();
+    expect(parse("30")).toBeNull();
+    expect(parse("2460")).toBeNull();
+    expect(parse("18:75")).toBeNull();
+    expect(parse("abc")).toBeNull();
   });
 
   it("남은 시간 문구", () => {

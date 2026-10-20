@@ -867,7 +867,7 @@ bottom sheet looks identical. The reference design is the home check-in/out shee
   참조 수 바탕 잠금을 쓴다. 예약 캘린더는 따로 걸던 `useBodyScrollLock` 을 뺐다(공용 잠금과 두 겹이 되면 닫을 때 바탕이 잠긴 채 남을 수 있음).
   `rounded-t-[24px]` 를 `bottom-sheet.tsx` 밖에서 쓰는 곳이 생기면 손으로 만든 시트이니 공용으로 바꾼다.
 - **Dismiss**: drag past threshold, scrim tap, or Esc. **No top-right X button.**
-- **Lifecycle**: portals to `<body>`, locks body scroll, closes on Esc.
+- **Lifecycle**: portals to `<body>`, locks body scroll, closes on Esc. **겹친 시트(2026-10-20):** 시트 위에 시트를 띄우면(`zIndexClassName="z-[90]"`, 예: 업무일지 → 보낼 시각) Esc 는 **맨 위 시트만** 닫는다(열린 순서를 쌓아 둔다).
 - **Drag performance (2026-06-23)**: live drag distance updates are coalesced with `requestAnimationFrame`; refs still track every pointer sample for threshold/velocity accuracy, but React renders at most once per frame.
 - **Sheet content must be self-contained (2026-07-22)**: because `BottomSheet` portals to `<body>`,
   a sheet's content leaves its page DOM subtree — so **page-scoped CSS does not reach it**. The

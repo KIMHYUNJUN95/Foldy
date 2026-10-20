@@ -107,6 +107,13 @@ function unlockBodyScroll() {
   window.scrollTo(0, saved.scrollY);
 }
 
+/*
+ * ── 겹친 시트의 Esc — **맨 위 시트만** 닫는다(2026-10-20) ──
+ * 시트 위에 시트가 한 장 더 뜨면(업무일지 → 보낼 시각) 둘 다 window 에서 Esc 를 들어 한 번에 둘 다 닫혔다. 열린 순서를 쌓아 두고
+ * 맨 위 것만 반응한다.
+ */
+const openSheets: symbol[] = [];
+
 const BottomSheetDragContext = createContext<HandleProps>({} as HandleProps);
 const BottomSheetCloseContext = createContext<() => void>(() => {});
 
@@ -247,14 +254,17 @@ export function BottomSheet({
     };
   }, []);
 
-  // Body scroll lock + Esc-to-close while mounted.
+  // Body scroll lock + Esc-to-close while mounted (맨 위 시트만).
   useEffect(() => {
+    const id = Symbol("sheet");
+    openSheets.push(id);
     lockBodyScroll();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape" && openSheets[openSheets.length - 1] === id) close();
     };
     window.addEventListener("keydown", onKey);
     return () => {
+      openSheets.splice(openSheets.indexOf(id), 1);
       unlockBodyScroll();
       window.removeEventListener("keydown", onKey);
     };

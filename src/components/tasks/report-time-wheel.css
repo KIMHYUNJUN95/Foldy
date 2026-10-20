@@ -1,0 +1,18 @@
+/* 업무일지 「보낼 시각」 휠(report-time-wheel.tsx) — 모바일 시각 시트. 시안: https://claude.ai/artifact/JnZtYSQ8TyC1mwHAdKPWu6 A
+   새 색 없음 — 투두 보라(#7a52e6 / #5a30cf) · 회색만. 가운데 띠 = 고른 값, 위아래는 옅어진다(mask). */
+.rtw { position: relative; display: flex; justify-content: center; align-items: center; gap: 4px; height: 220px; border-radius: 16px; background: #fafafb; overflow: hidden; }
+.rtw__band { position: absolute; left: 10px; right: 10px; top: 88px; height: 44px; border-radius: 12px; background: #f1edfc; pointer-events: none; }
+.rtw__col { position: relative; width: 92px; height: 220px; padding: 88px 0; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; touch-action: pan-y; scrollbar-width: none; outline: none; -webkit-tap-highlight-color: transparent; -webkit-mask-image: linear-gradient(transparent, #000 34%, #000 66%, transparent); mask-image: linear-gradient(transparent, #000 34%, #000 66%, transparent); }
+.rtw__col::-webkit-scrollbar { display: none; }
+.rtw__col:focus-visible { box-shadow: inset 0 0 0 2px #7a52e6; border-radius: 12px; }
+.rtw__item { display: flex; align-items: center; justify-content: center; height: 44px; scroll-snap-align: center; font-size: 22px; font-weight: 500; color: #3a3746; font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; transition: color 120ms ease; }
+.rtw__item.is-sel { font-size: 28px; font-weight: 700; color: #5a30cf; }
+.rtw__item.is-gone { color: #d3d1da; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.rtw__item.is-sel.is-gone { color: #b4b1bf; }
+.rtw.is-idle .rtw__item.is-sel { color: #8b8898; }
+.rtw.is-idle .rtw__band { background: #f2f2f5; }
+.rtw__colon { position: relative; margin-top: -2px; font-size: 26px; font-weight: 700; color: #5a30cf; pointer-events: none; }
+.rtw.is-idle .rtw__colon { color: #8b8898; }
+@media (prefers-reduced-motion: reduce) {
+  .rtw__item { transition: none; }
+}

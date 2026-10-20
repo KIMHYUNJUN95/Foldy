@@ -1,4 +1,6 @@
 import {
+  CalendarRange,
+  DoorOpen,
   BedDouble,
   Bell,
   BellRing,
@@ -152,6 +154,24 @@ const mobileNavCleaning = {
   icon: Sparkles,
 } as const satisfies NavigationItem;
 
+// 내 시프트 · 오늘 내 방(2026-10-20) — 알바가 일할 날을 신청하고, 배정된 방을 본다. 청소 작업자(`cleaning.work`)만.
+// See docs/product/37-cleaning-shift-assignment.md.
+const mobileNavShift = {
+  id: "shift",
+  label: localizedNavigationLabels.mobile.shift,
+  href: "/mobile/shift",
+  icon: CalendarRange,
+  capability: "cleaning.work",
+} as const satisfies NavigationItem;
+
+const mobileNavMyRooms = {
+  id: "my-rooms",
+  label: localizedNavigationLabels.mobile.myRooms,
+  href: "/mobile/shift/today",
+  icon: DoorOpen,
+  capability: "cleaning.work",
+} as const satisfies NavigationItem;
+
 const mobileNavRequests = {
   id: "requests",
   label: localizedNavigationLabels.mobile.requests,
@@ -245,6 +265,8 @@ export const mobileSidebarNavigation = [
   mobileNavHome,
   mobileNavCalendar,
   mobileNavCleaning,
+  mobileNavShift,
+  mobileNavMyRooms,
   mobileNavTasks,
   mobileNavRequests,
   mobileNavAttendance,
@@ -392,6 +414,14 @@ export const adminNavigation = [
     label: localizedNavigationLabels.admin.cleaning,
     href: "/admin/cleaning",
     icon: SprayCan,
+  },
+  {
+    // 청소 배정(2026-10-20) — 시프트 신청자를 그날 방에 넣기 · 월 배정 · 배정 설정 · 월 비교표. 배정 담당만.
+    id: "cleaning-assign",
+    capability: "cleaning.assign",
+    label: localizedNavigationLabels.admin.cleaningAssign,
+    href: "/admin/cleaning-assign",
+    icon: CalendarRange,
   },
   {
     id: "maintenance",
@@ -542,6 +572,7 @@ export const adminNavGroupOf: Record<string, AdminNavGroupKey> = {
   // 운영
   dashboard: "operations",
   cleaning: "operations",
+  "cleaning-assign": "operations",
   maintenance: "operations",
   "lost-found": "operations",
   "linen-return": "operations",

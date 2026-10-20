@@ -11,6 +11,8 @@ const EXPECTED: Partial<Record<Capability, readonly string[]>> = {
   "announcement.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   "cleaning.work": ["developer_super_admin", "owner", "senior_managing_director", "field_manager", "staff", "part_time_staff"],
   "cleaning.read_all": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+  // 청소 배정(2026-10-20) — 대표 · 전무 · 현장 매니저 + 개인 부여.
+  "cleaning.assign": ["developer_super_admin", "owner", "senior_managing_director", "field_manager"],
   "cleaning.force_complete": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "field_manager"],
   "linen.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "property_info.edit": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
@@ -36,7 +38,7 @@ describe("역할 × 기능 표 (권한 정리 ③)", () => {
 
   it("역할로만 정한 키는 개인 부여 · 차단이 닫혀 있다(열면 RLS 도 같이 — 3b)", () => {
     for (const capability of Object.keys(EXPECTED) as Capability[]) {
-      if (capability === "order_processor" || capability === "ops_calendar.write") continue;
+      if (capability === "order_processor" || capability === "ops_calendar.write" || capability === "cleaning.assign") continue;
       expect(CAPABILITIES[capability].individualGrant, capability).toBe(false);
       expect(CAPABILITIES[capability].individualDeny, capability).toBe(false);
     }

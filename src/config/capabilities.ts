@@ -383,6 +383,20 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /**
+   * 청소 배정(2026-10-20) — 시프트 신청자를 그날 방에 넣기 · 배정 설정(제안 규칙 · 건물별 고정 인력 · 사람별) · 대신 넣기 ·
+   * 취소 요청 처리 · 못 한 방 미루기. 배정 담당이 건물마다 2명 정도라 역할 기본값에 개인 부여 · 차단을 연다.
+   * docs/product/37-cleaning-shift-assignment.md
+   */
+  "cleaning.assign": {
+    roles: ["owner", "senior_managing_director", "field_manager"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
   /** 청소 강제 완료(예전 `cleaningForceCompleteRoles`). */
   "cleaning.force_complete": {
     roles: ["owner", "senior_managing_director", "office_admin", "field_manager"],

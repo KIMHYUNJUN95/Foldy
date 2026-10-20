@@ -9,6 +9,18 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-21 — 시프트 신청 · 청소 배정 구현 (Hotelsmart 청소 배정 대체)
+
+- DB 8표 + 권한 키 `cleaning.assign`(대표 · 전무 · 현장 매니저 + 개인 부여 · 차단) — `202610200007`, 운영 적용.
+- PC `/admin/cleaning-assign`: 하루 보기(미배정 방 · 신청자 상태 · 방 ↔ 사람 강조 · 넣기/빼기 방 한 건씩 · 고정 인력 먼저 · 방 추가 · 미루기/처리 끝 ·
+  대신 넣기 · 그날 취소 · 취소 요청 처리) · 월 보기(자동 제안 → 미배정 방만 반영, 지난 날은 경고 안 함) · `/settings`(제안 규칙 · 건물별 고정 인력 · 사람별 · 큰 방) ·
+  `/compare` 월 비교표(급여 열람 권한도 필요, **Excel · PDF** — 화면과 같은 계산 `computeCompare`).
+- 모바일 `/mobile/shift` 내 시프트(날짜 눌러 신청 · 취소, 배정된 날 취소 요청, 관리자가 취소한 날은 다시 신청 못 함) · `/mobile/shift/today` 오늘 내 방
+  (어젯밤 바뀜 · 같이 일하는 사람 — 내가 배정된 날 오늘 · 내일만 서버가 내려 줌). 폰 · 폴드 · 태블릿 세 폭.
+- Slack 청소 명단 담당자 = 배정 이름 우선(수기 입력은 배정 없는 방만). ko/ja/en. 테스트 `cleaning-assign-suggest` · `cleaning-assign-compare`.
+- 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
+  상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
+
 ## 2026-10-21 — 역할 표시 이름 정리 · 시급제 = 아르바이트 · 아르바이트 리더
 
 - 표시 이름만 변경(내부 이름 · 권한 그대로, ko/ja/en): `cs_staff` CS 관리자 · `field_manager` 현장 관리자(월급제) ·

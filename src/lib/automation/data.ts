@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadAssignedNamesByRoom } from "@/lib/cleaning-assign/data";
 import {
   AUTOMATION_JOB_KEYS,
   defaultJobConfig,
@@ -246,10 +247,6 @@ export async function loadCleaningListModel(
     loadExtraRooms(supabase, organizationId, targetDate),
     findCleaningDataIssues(supabase, organizationId, targetDate),
   ]);
-  const physicalOf = (room: { propertyName: string; roomKey: string }) => {
-    const roomPart = room.roomKey.slice(room.propertyName.length + 1);
-    return buildRoomKey(room.propertyName, getDisplayRoomLabel(room.propertyName, roomPart));
-  };
   const listed = new Set(cleaning.map(physicalOf));
   for (const extra of extras) {
     if (excluded.has(extra.propertyName) || listed.has(extra.roomKey)) continue;
@@ -264,6 +261,35 @@ export async function loadCleaningListModel(
     });
   }
   return { cleaning, dataIssues, setting, targetDate };
+}
+
+/** 명단 방 키 → 물리 객실 키(아라키초 `_2` 접음) — 수기 추가 방 · 청소 배정과 같은 기준. */
+function physicalOf(room: { propertyName: string; roomKey: string }): string {
+  const roomPart = room.roomKey.slice(room.propertyName.length + 1);
+  return buildRoomKey(room.propertyName, getDisplayRoomLabel(room.propertyName, roomPart));
+}
+
+/**
+ * Slack 청소 명단 담당자 — 수기 입력(`cleaning_list_assignees`)에 **청소 배정**(2026-10-20, docs/product/37)을 겹친다. 그날 그 방에 배정이 있으면
+ * 배정한 사람 이름이 이긴다(배정 화면이 원본). 배정이 없는 방 · 날은 지금처럼 수기 이름.
+ */
+export async function loadAssigneesForModel(
+  supabase: Client,
+  organizationId: string,
+  date: string,
+  model: CleaningListModel,
+): Promise<Map<string, string>> {
+  const [manual, assigned] = await Promise.all([
+    loadAssignees(supabase, organizationId, date),
+    loadAssignedNamesByRoom(supabase, organizationId, date),
+  ]);
+  if (assigned.size === 0) return manual;
+  const out = new Map(manual);
+  for (const room of model.cleaning) {
+    const names = assigned.get(physicalOf(room)) ?? assigned.get(room.roomKey);
+    if (names) out.set(room.roomKey, names);
+  }
+  return out;
 }
 
 export type CleaningExtraRoom = { roomKey: string; propertyName: string; roomLabel: string; note: string | null };

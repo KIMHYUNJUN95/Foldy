@@ -236,6 +236,7 @@ Electron 은 쓰지 않는다(설치 파일이 크다).
 
 - Dashboard Home (홈)
 - Cleaning (청소)
+- Cleaning Assignment (청소 배정, `/admin/cleaning-assign` — 2026-10-21, `cleaning.assign` 만 보임. 하루 · 월 보기, `/settings` 배정 설정, `/compare` 월 비교표(급여 열람 권한도 필요, Excel · PDF). `docs/product/37-cleaning-shift-assignment.md`)
 - Maintenance (정비·시설)
 - Lost & Found (분실물)
 - Orders (주문·비품)

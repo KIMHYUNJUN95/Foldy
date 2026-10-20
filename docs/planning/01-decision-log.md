@@ -2,6 +2,13 @@
 
 This file records important project decisions.
 
+## 2026-10-21 청소 배정을 Foldy 로 — 배정 = 확정, 권한 키 `cleaning.assign` (사용자 결정 2026-10-20 · 구현 2026-10-21)
+
+- Hotelsmart 청소 배정을 Foldy 로 옮긴다(체크인은 Hotelsmart 유지). 확정 단계 없음 — 방에 넣는 순간 확정. 저장은 방 한 건씩, 같은 사람 · 같은 방 중복은 DB 유일 제약.
+- 새 권한 키 `cleaning.assign`: 역할 기본 대표 · 전무 · 현장 매니저, 개인 부여 · 차단 열림(배정 담당이 건물마다 2명 정도). 건물로 나누지 않음(메인 건물 = 보기 기본값).
+- 알바는 `cleaning.work` 로 본인 시프트만. 동료 배정은 내가 배정된 날 중 오늘 · 내일만 서버가 준다. 월 비교표는 급여 열람 권한도 있어야.
+- Slack 청소 명단 담당자는 배정 이름이 수기 입력보다 먼저. 상세 `docs/product/37-cleaning-shift-assignment.md`.
+
 ## 2026-10-20 채널 예약도 날짜를 바꾼다 — 예약 수정 · 객실 옮기기 (사용자 결정, 2026-09-29 잠금 해제)
 
 - Airbnb · Booking.com 예약도 예약 수정과 객실 옮기기(PC 패널 · 끌기 · 모바일)에서 날짜를 바꾼다(Beds24 와 같이). 서버 잠금(`channel_locked`) 제거.

@@ -2116,3 +2116,20 @@ Beds24 에 없는 건물 · 객실을 룸 링크에서만 만든다. 캘린더 �
 RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules` · `task_report_tick_if_needed` · `task_report_tick_token_ok`(service role 만). 마이그레이션 `202610200005`.
 상세 `docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」.
 
+## 2026-10-21 시프트 신청 · 청소 배정 — `cleaning_*` 8개
+
+마이그레이션 `202610200007_cleaning_shift_assignment.sql`(운영 적용 2026-10-20). 계약: `docs/product/37-cleaning-shift-assignment.md`.
+방 키는 모두 **물리 객실 키**(「건물_표시 객실」, 아라키초 `_2` 접음 — `cleaning_list_extra_rooms` 와 같음).
+
+| 표 | 한 줄 | 주요 컬럼 |
+| --- | --- | --- |
+| `cleaning_shift_applications` | 사람 × 날짜(PK) | `source`(self/admin — 대신 넣음) · `start_time`(그날만 다른 출근) · `cancelled_at/by`(관리자가 그날 일정 취소 → 「배정 없음」) · `cancel_requested_at` · `cancel_request_note`(배정된 날 본인 취소 요청) |
+| `cleaning_assignments` | 날짜 × 방 × 사람 한 줄 | 유일 `(organization_id, work_date, room_key, user_id)` — 같은 사람을 같은 방에 두 번 못 넣음(동시 수정 보호). `property_name` · `room_label` · `created_by/at`. 배정 = 확정 |
+| `cleaning_room_holds` | 방 × 원래 날짜(PK) | `kind` defer(`until_date` 까지 숨김) / resolved(처리 끝) · `reason`(1~120) — 못 한 방은 다음 날 미배정 맨 위로 계속 뜨고, 이 줄이 있으면 숨김 |
+| `cleaning_assign_settings` | 조직 × 1 | `rules jsonb`(제안 규칙 켜기 · 순서, 키는 `src/lib/cleaning-assign/rules.ts`) · `flag_threshold`(월 비교표 기준 %, 기본 25) |
+| `cleaning_assign_setting_logs` | 설정 변경 한 번 | `changes jsonb`(area rules/fixed/staff/room) · `actor_id` |
+| `cleaning_fixed_staff` | 건물 × 사람(PK) | `tier`(1~9순위) · `position` |
+| `cleaning_staff_profiles` | 사람 × 1 | `priority`(우선 배정) · `trainee` · `trainee_check_at`(처음 6, 「계속 견습」이면 +2) · `trainer` · `default_start_time` · `memo`(비공개, ≤200) · `main_properties text[]`(하루 보기 기본 필터) |
+| `cleaning_room_settings` | 방 × 1 | `usual_headcount`(1~5, 큰 방 2). 1이면 줄을 지운다 |
+
+- 삭제는 하드 삭제(신청 취소 · 배정 빼기). 권한 키 `cleaning.assign` 의 DB 사본도 같은 마이그레이션.

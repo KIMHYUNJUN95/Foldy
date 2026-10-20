@@ -7,6 +7,7 @@ import { listAutomationChannels } from "@/lib/automation/channels";
 import {
   AUTOMATION_BUILDING_ORDER,
   loadAssignees,
+  loadAssigneesForModel,
   loadCleaningRoomOptions,
   loadCleaningListModel,
   loadDestinations,
@@ -128,9 +129,8 @@ export async function loadAssigneeBoard(
   const organizationId = session.organization.id;
   try {
     const jobs = await loadJobs(supabase, organizationId);
-    const [model, names, labeler, lastSent, options] = await Promise.all([
+    const [model, labeler, lastSent, options] = await Promise.all([
       loadCleaningListModel(supabase, organizationId, date, jobs.cleaning_list.settings.excludedProperties),
-      loadAssignees(supabase, organizationId, date),
       loadPropertyLabeler(supabase, organizationId),
       supabase
         .from("automation_runs")
@@ -144,6 +144,8 @@ export async function loadAssigneeBoard(
         .maybeSingle(),
       loadCleaningRoomOptions(supabase, organizationId),
     ]);
+    // 청소 배정이 있는 방은 배정한 이름(Slack 명단과 같은 값 — docs/product/37).
+    const names = await loadAssigneesForModel(supabase, organizationId, date, model);
     const label = (name: string) => labeler(name, locale);
     // 건물 제목 · 순서는 Slack 청소 명단과 같게(「오쿠보A (B동)」, 다카다노바바 → 오쿠보 → 스테이아리).
     const messageCopy = getDictionary(locale).automationMessages;

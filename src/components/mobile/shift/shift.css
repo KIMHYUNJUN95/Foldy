@@ -1,0 +1,143 @@
+/* 내 시프트 · 오늘 내 방 — 모바일(폰 · 폴드 ≥ 600 · 태블릿 가로 ≥ 1000 × 600). 화이트 리디자인 · HIG 2차 크기(큰 제목 34 · 본문 17 · 보조 15 · 작은 글 13).
+   칸 색: 배정 연보라 · 신청(배정 전) 연노랑 · 배정 없음 연회색 — 글자와 같이 구분. docs/product/37-cleaning-shift-assignment.md */
+
+.shf { display: flex; gap: 0; min-height: 100%; color: #16141f; background: #fff; }
+.shf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 8px 16px 24px; }
+.shf-sp { flex: 1; }
+.shf-title { margin: 0; font-size: 34px; font-weight: 700; line-height: 41px; letter-spacing: -.02em; }
+.shf-date { font-size: 15px; color: #6b6878; }
+.shf-banner { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; border-radius: 14px; background: #f4f1fd; color: #3b2a7a; font-size: 15px; }
+.shf-banner span { flex: 1; }
+.shf-banner a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; color: #5a30cf; text-decoration: none; }
+.shf-nav { display: flex; align-items: center; gap: 2px; }
+.shf-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: #6b6878; }
+.shf-icon svg { width: 22px; height: 22px; }
+.shf-month { font-size: 20px; font-weight: 700; white-space: nowrap; }
+.shf-sum { font-size: 13px; color: #6b6878; white-space: nowrap; }
+
+.shf-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 4px; }
+.shf-wd { height: 28px; display: grid; place-items: center; font-size: 13px; color: #6b6878; }
+.shf-wd.is-weekend { color: #8e8a99; }
+.shf-day { display: flex; flex-direction: column; align-items: center; gap: 3px; height: 56px; margin: 0 2px; padding: 6px 0 0; border: 0; border-radius: 14px; background: transparent; font: inherit; color: #16141f; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 140ms ease, background 180ms ease; }
+.shf-day:active:not(:disabled) { transform: scale(.95); }
+.shf-day:disabled { cursor: default; }
+.shf-day__n { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.shf-day__m { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.shf-day.is-past .shf-day__n { color: #bdbac6; }
+.shf-day.is-worked .shf-day__n, .shf-day.is-worked .shf-day__m { color: #8e8a99; font-weight: 500; }
+.shf-day.is-assigned { background: #ede7fc; }
+.shf-day.is-assigned .shf-day__n { color: #3b2a7a; }
+.shf-day.is-assigned .shf-day__m { color: #5a30cf; font-weight: 700; }
+.shf-day.is-waiting { background: #fff1cf; }
+.shf-day.is-waiting .shf-day__n { color: #5c3b00; }
+.shf-day.is-waiting .shf-day__m { color: #8a5a00; }
+.shf-day.is-none { background: #f4f4f7; }
+.shf-day.is-none .shf-day__n, .shf-day.is-none .shf-day__m { color: #6b6878; }
+.shf-day.is-none .shf-day__m { font-size: 10px; }
+.shf-day.is-today { box-shadow: inset 0 0 0 2px #7a52e6; }
+.shf-day.is-sel { box-shadow: inset 0 0 0 2px #3b2a7a; }
+.shf-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; color: #3a3746; }
+.shf-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.shf-legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.shf-legend i.is-assigned { background: #ede7fc; }
+.shf-legend i.is-waiting { background: #fff1cf; }
+.shf-legend i.is-none { background: #f4f4f7; }
+.shf-hint { margin: 0; font-size: 13px; line-height: 18px; color: #6b6878; }
+.shf-msg { margin: 0; padding: 10px 12px; border-radius: 12px; background: #fdecec; color: #8a1d22; font-size: 15px; }
+
+.shf-up { display: flex; flex-direction: column; }
+.shf-up h2, .shf-mates h2 { margin: 6px 0 4px; font-size: 20px; font-weight: 700; }
+.shf-uprow { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 6px 0; border: 0; border-bottom: .5px solid #e4e3e9; background: transparent; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+.shf-uprow__d { width: 52px; display: flex; flex-direction: column; align-items: center; flex: none; }
+.shf-uprow__d small { font-size: 13px; color: #6b6878; }
+.shf-uprow__d b { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.shf-uprow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shf-uprow__main b { font-size: 17px; font-weight: 600; }
+.shf-uprow__main b.is-wait { color: #8a5a00; font-weight: 500; }
+.shf-uprow__main b.is-none { color: #6b6878; font-weight: 500; }
+.shf-uprow__main span { font-size: 13px; color: #6b6878; }
+
+.shf-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 20px; border: 0; border-radius: 14px; font: inherit; font-size: 17px; font-weight: 600; text-decoration: none; cursor: pointer; transition: transform 140ms ease, opacity 150ms ease; }
+.shf-btn:active:not(:disabled) { transform: scale(.97); }
+.shf-btn:disabled { opacity: .5; }
+.shf-btn.is-pri { background: #7a52e6; color: #fff; min-height: 44px; }
+.shf-btn.is-gray { background: #f4f4f7; color: #3a3746; }
+.shf-btn.is-danger { background: #f4f4f7; color: #b4232a; width: 100%; }
+
+.shf-sheet { padding: 4px 20px 28px; }
+.shf-detail { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.shf-detail__day { font-size: 15px; color: #6b6878; }
+.shf-detail__title { font-size: 28px; font-weight: 700; letter-spacing: -.01em; }
+.shf-detail__big { font-size: 34px; font-weight: 700; letter-spacing: -.02em; }
+.shf-detail__line { font-size: 17px; color: #3a3746; }
+.shf-detail__rooms { display: flex; flex-direction: column; }
+.shf-detail__room { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: .5px solid #e4e3e9; }
+.shf-detail__room b { font-size: 17px; font-weight: 600; }
+.shf-detail__room span { font-size: 13px; color: #6b6878; }
+.shf-detail__mates { font-size: 15px; color: #3a3746; }
+.shf-detail__note { font-size: 13px; color: #6b6878; text-align: center; margin-top: -4px; }
+.shf-detail__pending { font-size: 15px; color: #8a4b00; }
+.shf-detail__code { display: flex; flex-direction: column; gap: 2px; }
+.shf-detail__code small { font-size: 13px; color: #6b6878; }
+.shf-detail__code b { font-size: 22px; font-weight: 700; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
+.shf-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 17px; font-weight: 600; color: #5a30cf; text-decoration: none; }
+
+.shf-head { display: flex; align-items: baseline; gap: 10px; }
+.shf-head b { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.shf-head span { font-size: 17px; color: #3a3746; }
+.shf-changed { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 14px; background: #fff1dc; color: #5c3300; }
+.shf-changed b { font-size: 13px; font-weight: 700; white-space: nowrap; padding-top: 1px; }
+.shf-changed span { font-size: 15px; line-height: 20px; }
+.shf-rooms { display: flex; flex-direction: column; }
+.shf-room { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-bottom: .5px solid #e4e3e9; }
+.shf-room.is-sel { padding: 14px 12px; border-radius: 14px; background: #f4f1fd; }
+.shf-room__top { display: flex; align-items: center; gap: 12px; }
+.shf-room__n { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #ede7fc; color: #3b2a7a; font-size: 15px; font-weight: 700; }
+.shf-room__n.is-done { background: #f4f4f7; color: #8e8a99; }
+.shf-room__id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shf-room__id small { font-size: 13px; color: #6b6878; }
+.shf-room__id b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.shf-room__id em { margin-left: 8px; font-style: normal; font-size: 15px; font-weight: 500; color: #6b6878; }
+.shf-room__st { padding: 4px 8px; border-radius: 8px; background: #ede7fc; color: #4a2bb8; font-size: 13px; font-weight: 600; }
+.shf-room__st.is-done { background: #f4f4f7; color: #6b6878; }
+.shf-room__info { display: flex; flex-direction: column; gap: 4px; padding-left: 40px; font-size: 15px; line-height: 20px; color: #3a3746; }
+.shf-room__info .is-dim { color: #6b6878; }
+.shf-room__act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-left: 40px; }
+.shf-door { font-size: 15px; }
+.shf-door summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; font-weight: 600; color: #5a30cf; cursor: pointer; list-style: none; }
+.shf-door summary::-webkit-details-marker { display: none; }
+.shf-door[open] { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.shf-door b { font-size: 17px; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.shf-door a { color: #5a30cf; font-weight: 600; text-decoration: none; }
+.shf-mates { display: flex; flex-direction: column; }
+.shf-mate { display: flex; align-items: center; gap: 12px; min-height: 48px; border-bottom: .5px solid #e4e3e9; }
+.shf-mate b { min-width: 92px; font-size: 17px; font-weight: 600; }
+.shf-mate span { flex: 1; font-size: 15px; color: #6b6878; }
+.shf-tomorrow { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 14px; border-radius: 14px; background: #f4f4f7; font-size: 15px; }
+.shf-tomorrow b { font-weight: 600; }
+.shf-tomorrow.is-waiting { background: #fff1cf; color: #5c3b00; }
+.shf-tomorrow.is-assigned { background: #ede7fc; color: #3b2a7a; }
+.shf-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 32px 0 16px; }
+.shf-empty b { font-size: 22px; font-weight: 700; }
+.shf-empty span { font-size: 15px; line-height: 21px; color: #6b6878; }
+.shf-empty a { display: inline-flex; align-items: center; min-height: 44px; font-size: 17px; font-weight: 600; color: #5a30cf; text-decoration: none; }
+.shf-pane { display: none; }
+.shf-up__empty { margin: 4px 0 0; font-size: 15px; line-height: 21px; color: #6b6878; }
+
+.shf button:focus-visible, .shf a:focus-visible, .shf summary:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+
+/* 폴드(≥ 600) — 가운데 넓게, 칸 키우기 */
+@media (min-width: 600px) {
+  .shf-main { max-width: 680px; margin: 0 auto; padding: 24px 28px 32px; }
+  .shf-day { height: 64px; }
+}
+/* 태블릿 가로(≥ 1000 × 600) — 달력 · 목록 + 오른쪽 칸 */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .shf-main { max-width: none; margin: 0; padding: 32px 36px; }
+  .shf-pane { display: flex; flex-direction: column; width: 380px; flex: none; box-sizing: border-box; padding: 36px 28px; }
+  .shf-room { cursor: pointer; }
+  .shf-sum { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shf-day, .shf-btn { transition: none; }
+}

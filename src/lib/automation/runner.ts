@@ -9,7 +9,7 @@ import {
   AUTOMATION_BUILDING_ORDER,
   checkReservationGate,
   cleaningRoomCode,
-  loadAssignees,
+  loadAssigneesForModel,
   loadCleaningListModel,
   loadDailyReportReservations,
   loadDestinations,
@@ -455,11 +455,12 @@ async function buildCleaning(
   locales: AutomationLocale[],
   correction: boolean,
 ): Promise<{ built: BuiltMessages; model: CleaningListModel }> {
-  const [model, names, label] = await Promise.all([
+  const [model, label] = await Promise.all([
     loadCleaningListModel(supabase, organizationId, targetDate, job.settings.excludedProperties),
-    loadAssignees(supabase, organizationId, targetDate),
     loadPropertyLabeler(supabase, organizationId),
   ]);
+  // 청소 배정이 있으면 배정한 이름이 수기 담당자보다 먼저(docs/product/37).
+  const names = await loadAssigneesForModel(supabase, organizationId, targetDate, model);
   const byLocale: Partial<Record<AutomationLocale, string>> = {};
   for (const locale of locales) {
     const copy = getDictionary(locale).automationMessages;

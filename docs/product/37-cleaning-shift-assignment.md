@@ -1,7 +1,7 @@
-# 37 · 시프트 신청 · 청소 배정 (기획 중)
+# 37 · 시프트 신청 · 청소 배정
 
-> 상태: **기획 초안 (2026-10-20)** — 사용자와 함께 다듬는 중. 코드 작업은 아직 시작하지 않았다.
-> 「정할 것」은 2026-10-20 에 모두 답을 받았다. 다음은 시안(8번) → 승인 → 구현.
+> 상태: **구현 (2026-10-21)** — 기획 · 시안 6개 확정(2026-10-20) 뒤 구현. 실제 구조는 「10. 구현」.
+> 남은 것: 실제 알바 데이터로 동작 확인 · 알림(막바지 일괄) · 처음 2주 한 건물 Hotelsmart 병행(6번).
 
 ## 1. 왜 만드나
 
@@ -292,7 +292,32 @@
 - 시안 캔버스: https://claude.ai/artifact/Fz6ux5HZDwHtDQ5CmDBV64 — 1차(2026-10-20) ③ 배정 하루 보기(기본 · 사람을 고른 상태) + 지금 PC 청소 현황(비교용).
   배정은 끌기 말고도 **사람을 고른 채 방을 누르는 것**으로 된다(끌기만 되면 키보드 · 한 손 조작이 막힌다). 컨펌 대기.
 
+## 10. 구현 (2026-10-21)
+
+| 층 | 어디 |
+| --- | --- |
+| DB | `supabase/migrations/202610200007_cleaning_shift_assignment.sql` — 표 8개(`docs/engineering/04-data-model.md` 「2026-10-21」), RLS 켜고 정책 없음(service-role 전용) |
+| 권한 | `cleaning.assign`(`src/config/capabilities.ts`) · 알바는 `cleaning.work` — `docs/engineering/05-rls-permissions.md` 「2026-10-21」 |
+| 계산(순수) | `src/lib/cleaning-assign/rules.ts`(제안 규칙 키 · 처음 값) · `suggest.ts`(자동 제안) · `day-state.ts`(「배정 없음」 판정 · 날짜) · `compare.ts`(월 비교표 — 화면 · 내보내기 공용) |
+| 데이터 | `src/lib/cleaning-assign/rooms.ts`(그날 방 = 체크아웃 + 수기 추가 + 어제부터 밀린 방, 미루기 반영) · `data.ts`(하루 · 월 · 내 시프트 · 오늘 내 방 · 설정 · 비교표 · Slack 이름) |
+| 서버 액션 | 관리자 `src/app/admin/cleaning-assign/actions.ts` · 비교표 내보내기 `compare/actions.ts` · 알바 `src/app/mobile/shift/actions.ts` |
+| PC | `/admin/cleaning-assign`(하루 · `?view=month` 월) · `/settings` · `/compare` — `src/components/admin/cleaning-assign/*` |
+| 모바일 | `/mobile/shift` · `/mobile/shift/today` — `src/components/mobile/shift/*`, 사이드 메뉴 「내 시프트」 · 「오늘 내 방」(`cleaning.work`) |
+| Slack | `loadAssigneesForModel`(`src/lib/automation/data.ts`) — 배정 이름이 수기 담당자보다 먼저 |
+| 문구 | `src/lib/cleaning-assign-i18n.ts`(ko/ja/en) + 메뉴 이름 `src/lib/i18n.ts` |
+| 테스트 | `cleaning-assign-suggest.test.ts` · `cleaning-assign-compare.test.ts` · `role-matrix` · `capability-registry` |
+
+구현하며 정한 것:
+- **관리자가 취소한 날은 알바가 스스로 다시 신청할 수 없다** — 눌러도 「관리자가 취소한 날이에요」(신청 줄을 지우면 관리자 취소가 풀리기 때문).
+- 월 보기에서 **지난 날은 「미배정」 · 「신청 0」을 빨갛게 하지 않는다**(기록일 뿐 할 일이 아님, 흐린 회색).
+- 월 비교표 Excel · PDF 는 서버가 화면과 같은 계산(`computeCompare`)을 다시 한다(클라이언트 숫자를 받지 않음). 고른 기준 % · 「견습 · 직원 빼고」 그대로.
+- 신청 가능 범위: 오늘 ~ 92일 뒤. 관리자 배정 가능 범위: 어제(기록 정리) ~ 120일 뒤.
+- 태블릿 오른쪽 칸과 본문 사이 세로줄 없음(리디자인 규칙) — 여백으로만 나눈다.
+
 ## 9. 기록
+
+- 2026-10-21 — **구현**(10번). 끊긴 세션(2026-10-20) 작업을 이어 lint · build · 화면 세 폭 확인. 추가로 고친 것: 관리자 취소 날 재신청 막기,
+  월 비교표 Excel · PDF(빠져 있었음), 월 보기 지난 날 경고 끔, 폰 달 제목 줄바꿈, 태블릿 빈 「다가오는 일정」 문구, 영어 툴바 줄넘침(라벨 줄임).
 
 - 2026-10-20 — 제안 기준을 **관리자가 직접 정하는 「배정 설정」**(4-5) 추가(사용자 제안): 규칙 켜기/끄기 · 순서, 건물별 1 · 2 · 3순위 고정 인력
   직접 넣기, 하루 보기 「고정 인력 먼저 넣기」. 사람 쪽 「아직」 → 「배정 전」.

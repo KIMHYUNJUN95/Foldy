@@ -9,6 +9,8 @@ export const localizedNavigationLabels = {
     attendance: { ko: "근태", ja: "勤怠", en: "Attendance" },
     calendar: { ko: "예약 캘린더", ja: "予約カレンダー", en: "Calendar" },
     cleaning: { ko: "청소", ja: "清掃", en: "Cleaning" },
+    // 청소 배정(2026-10-20) — 시프트 신청자를 그날 방에 넣기. docs/product/37-cleaning-shift-assignment.md
+    cleaningAssign: { ko: "청소 배정", ja: "清掃割り当て", en: "Cleaning Assignment" },
     // 이 화면은 수동 컴플레인뿐 아니라 Airbnb·Booking 리뷰(좋은 평 포함)와 문제 객실 집계를
     // 함께 다룬다. 「컴플레인」은 그중 하나만 가리켜 이름이 좁았다 (2026-08-11).
     // 어드민 사이드바는 폭이 넉넉해 풀네임을 쓴다 — 모바일은 아래 축약형.
@@ -39,6 +41,9 @@ export const localizedNavigationLabels = {
     bugs: { ko: "버그 신고", ja: "バグ報告", en: "Bug Report" },
     calendar: { ko: "캘린더", ja: "カレンダー", en: "Calendar" },
     cleaning: { ko: "청소", ja: "清掃", en: "Cleaning" },
+    // 내 시프트 · 오늘 내 방(2026-10-20) — 알바 시프트 신청 · 배정된 방. docs/product/37-cleaning-shift-assignment.md
+    shift: { ko: "내 시프트", ja: "マイシフト", en: "My Shifts" },
+    myRooms: { ko: "오늘 내 방", ja: "今日の部屋", en: "My Rooms Today" },
     directory: { ko: "직원 목록", ja: "スタッフ一覧", en: "Staff Directory" },
     users: { ko: "사용자", ja: "ユーザー", en: "Users" },
     home: { ko: "홈", ja: "ホーム", en: "Home" },
@@ -3949,6 +3954,10 @@ const FALLBACK_DICTIONARY = {
           "ops_calendar.write": {
             label: "Sales calendar — make changes",
             desc: "Change prices, min stay, blocks, manual bookings, edit · move · cancel reservations, undo",
+          },
+          "cleaning.assign": {
+            label: "Cleaning — assign rooms",
+            desc: "Put applicants into rooms, assignment settings, add on behalf, handle cancel requests",
           },
           "board.manage": {
             label: "Board — manage posts",
@@ -11983,6 +11992,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
               label: "판매 캘린더 — 바꾸기",
               desc: "가격 · 최소숙박 · 차단 · 수기 예약 · 예약 수정 · 옮기기 · 취소 · 되돌리기",
             },
+            "cleaning.assign": {
+              label: "청소 — 방 배정",
+              desc: "시프트 신청자를 방에 넣기 · 배정 설정 · 대신 넣기 · 취소 요청 처리",
+            },
             "board.manage": {
               label: "게시판 — 글 관리",
               desc: "남이 쓴 게시글 · 댓글 삭제 · 고정",
@@ -19885,6 +19898,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "ops_calendar.write": {
               label: "販売カレンダー — 変更",
               desc: "料金・最低泊数・ブロック・手動予約・予約の修正・移動・キャンセル・取り消し",
+            },
+            "cleaning.assign": {
+              label: "清掃 — 部屋の割り当て",
+              desc: "申請者を部屋に入れる・割り当て設定・代わりに入れる・取り消し依頼の処理",
             },
             "board.manage": {
               label: "掲示板 — 投稿の管理",

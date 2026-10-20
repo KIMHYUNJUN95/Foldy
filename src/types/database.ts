@@ -2332,6 +2332,264 @@ export type Database = {
           },
         ]
       }
+      cleaning_assign_setting_logs: {
+        Row: {
+          actor_id: string | null
+          changes: Json
+          created_at: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          changes: Json
+          created_at?: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          changes?: Json
+          created_at?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
+      cleaning_assign_settings: {
+        Row: {
+          flag_threshold: number
+          organization_id: string
+          rules: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          flag_threshold?: number
+          organization_id: string
+          rules?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          flag_threshold?: number
+          organization_id?: string
+          rules?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      cleaning_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          property_name: string
+          room_key: string
+          room_label: string
+          user_id: string
+          work_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          property_name: string
+          room_key: string
+          room_label: string
+          user_id: string
+          work_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          property_name?: string
+          room_key?: string
+          room_label?: string
+          user_id?: string
+          work_date?: string
+        }
+        Relationships: []
+      }
+      cleaning_fixed_staff: {
+        Row: {
+          organization_id: string
+          position: number
+          property_name: string
+          tier: number
+          user_id: string
+        }
+        Insert: {
+          organization_id: string
+          position?: number
+          property_name: string
+          tier: number
+          user_id: string
+        }
+        Update: {
+          organization_id?: string
+          position?: number
+          property_name?: string
+          tier?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cleaning_room_holds: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          kind: string
+          organization_id: string
+          origin_date: string
+          property_name: string
+          reason: string | null
+          room_key: string
+          room_label: string
+          until_date: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          kind: string
+          organization_id: string
+          origin_date: string
+          property_name: string
+          reason?: string | null
+          room_key: string
+          room_label: string
+          until_date?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          kind?: string
+          organization_id?: string
+          origin_date?: string
+          property_name?: string
+          reason?: string | null
+          room_key?: string
+          room_label?: string
+          until_date?: string | null
+        }
+        Relationships: []
+      }
+      cleaning_room_settings: {
+        Row: {
+          organization_id: string
+          room_key: string
+          updated_at: string
+          updated_by: string | null
+          usual_headcount: number
+        }
+        Insert: {
+          organization_id: string
+          room_key: string
+          updated_at?: string
+          updated_by?: string | null
+          usual_headcount?: number
+        }
+        Update: {
+          organization_id?: string
+          room_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          usual_headcount?: number
+        }
+        Relationships: []
+      }
+      cleaning_shift_applications: {
+        Row: {
+          cancel_request_note: string | null
+          cancel_requested_at: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          created_by: string | null
+          organization_id: string
+          source: string
+          start_time: string | null
+          updated_at: string
+          user_id: string
+          work_date: string
+        }
+        Insert: {
+          cancel_request_note?: string | null
+          cancel_requested_at?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          organization_id: string
+          source?: string
+          start_time?: string | null
+          updated_at?: string
+          user_id: string
+          work_date: string
+        }
+        Update: {
+          cancel_request_note?: string | null
+          cancel_requested_at?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          organization_id?: string
+          source?: string
+          start_time?: string | null
+          updated_at?: string
+          user_id?: string
+          work_date?: string
+        }
+        Relationships: []
+      }
+      cleaning_staff_profiles: {
+        Row: {
+          default_start_time: string | null
+          main_properties: string[]
+          memo: string | null
+          organization_id: string
+          priority: boolean
+          trainee: boolean
+          trainee_check_at: number
+          trainer: boolean
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          default_start_time?: string | null
+          main_properties?: string[]
+          memo?: string | null
+          organization_id: string
+          priority?: boolean
+          trainee?: boolean
+          trainee_check_at?: number
+          trainer?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          default_start_time?: string | null
+          main_properties?: string[]
+          memo?: string | null
+          organization_id?: string
+          priority?: boolean
+          trainee?: boolean
+          trainee_check_at?: number
+          trainer?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       cleaning_sessions: {
         Row: {
           cleaning_date: string

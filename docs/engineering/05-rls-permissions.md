@@ -1450,3 +1450,16 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - SELECT: 본인 행만(`(select auth.uid()) = user_id`). INSERT · UPDATE · DELETE 정책 없음 — 서버 액션 · 틱 라우트가 service role 로 쓴다.
 - 예약 · 보내기 모두 업무일지 권한(`canGenerateDailyReport` 또는 `can_generate_report` 개인 지정)을 다시 본다 — 보낼 때도(퇴사 · 비활성 대비).
 
+## 2026-10-21 시프트 신청 · 청소 배정 — service-role 전용 + `cleaning.assign`
+
+마이그레이션 `202610200007_cleaning_shift_assignment.sql`(운영 적용). 계약 `docs/product/37-cleaning-shift-assignment.md` 「5」.
+
+- `cleaning_shift_applications` · `cleaning_assignments` · `cleaning_room_holds` · `cleaning_assign_settings` · `cleaning_assign_setting_logs` ·
+  `cleaning_fixed_staff` · `cleaning_staff_profiles` · `cleaning_room_settings`: RLS 를 켜고 **정책 없음**, `anon` · `authenticated` 권한 회수.
+  읽기 · 쓰기는 모두 서버(service-role)가 권한 키와 조직을 다시 확인한 뒤.
+- 새 권한 키 **`cleaning.assign`** — 역할 기본 대표 · 전무 · 현장 매니저(+ 개발자 통과), **개인 부여 · 차단 열림**(배정 담당이 건물마다 2명 정도).
+  배정 · 방 추가 · 미루기/처리 끝 · 대신 넣기 · 그날 일정 취소 · 취소 요청 처리 · 출근 시각 · 배정 설정(`src/app/admin/cleaning-assign/actions.ts`).
+- 알바 쪽(`src/app/mobile/shift/actions.ts`)은 `cleaning.work` + **본인 것만**. 오늘~92일 뒤만 신청 · 취소, 배정된 날은 스스로 못 지움(취소 요청),
+  **관리자가 취소한 날도 스스로 다시 신청 못 함**(지우면 관리자 취소가 풀리므로 — 다시 넣기는 관리자).
+- 동료 배정은 **내가 배정된 날 중 오늘 · 내일만** 서버가 내려 준다(`loadMyShift` · `loadTodayRooms`) — 화면에서 숨기는 게 아니라 데이터를 안 준다.
+- 월 비교표 · 그 Excel/PDF 는 `cleaning.assign` **그리고** 급여 열람(`isAttendancePayrollAdmin`)이 둘 다 있어야 한다.

@@ -289,6 +289,29 @@
 .bdw-btn.is-trash { width: 40px; padding: 0; background: #fdecec; color: #c5282e; }
 .bdw-btn.is-trash svg { width: 18px; height: 18px; }
 
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Board-*) — 글 줄은 아바타 · 글이 모두 왼쪽 끝(0)에서 시작하므로 끝까지 긋는 선이
+   공용 규칙 그대로. 태그 탭 44/15 · 작성자 15/13 · 제목 17 · 본문 15 · 반응 칩은 보이는 34 그대로 누르는 자리 44 · 칩 글자 15 ·
+   오른쪽 요약 13 · 글쓰기 · 신고 15 · 더 보기 50/15 · 상세 본문 16 · 「⋯」 44. */
+.bdw-head__rep { font-size: 15px; }
+.bdw-head__rep svg { width: 14px; height: 14px; }
+.bdw-compose { font-size: 15px; }
+.bdw-compose svg { width: 16px; height: 16px; }
+.bdw-tab { height: 44px; font-size: 15px; }
+.bdw-who__n { font-size: 15px; }
+.bdw-who__m { font-size: 13px; min-height: 18px; }
+.bdw-pin { font-size: 13px; }
+.bdw-title { font-size: 17px; }
+.bdw-body { font-size: 15px; }
+.bdw-rx { position: relative; font-size: 15px; }
+.bdw-rx::before { content: ""; position: absolute; inset: -5px -2px; }
+.bdw-foot__meta { font-size: 13px; }
+.bdw-more { height: 50px; font-size: 15px; }
+.bdw-err { font-size: 13px; }
+.bdw-empty { font-size: 15px; }
+.bdw-empty b { font-size: 17px; }
+.bdw-d__body { font-size: 16px; }
+.bdw-icon { width: 44px; height: 44px; margin-right: -10px; }
+
 /* 넓은 화면 — 폴드는 셸 가운데 칸(760px). 태블릿: 피드 | 상세 2분할(SplitList), 상세는 읽기 좋은 폭으로. 신고 처리는 2 · 3열. */
 @media (min-width: 600px) {
   .bdw-cmp { margin: 0 -28px; padding-left: 28px; padding-right: 28px; }

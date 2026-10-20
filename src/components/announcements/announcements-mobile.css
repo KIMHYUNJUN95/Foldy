@@ -77,6 +77,24 @@
 .ntw-btn.is-gray { background: #f4f4f7; color: #3a3746; }
 .ntw-btn.is-pri { background: #7a52e6; color: #fff; }
 
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Notice-*) — 줄 사이 선은 공용 규칙(글자 시작점 = 점 8 + 간격 12 → 20, 줄 사이에만) ·
+   날짜 묶음 제목 17/600 · 높이 44(아래 줄 없음) · 줄 16/13 · 위 줄 15 · 사진 표시 18 · 팝업 체크 15 · 상세 안내 13. */
+.ntw-head span { font-size: 15px; }
+.ntw-groups { gap: 10px; }
+.ntw-group h2 { display: flex; align-items: center; min-height: 44px; margin: 0; padding-bottom: 0; border-bottom: 0; font-size: 17px; font-weight: 600; color: #16141f; letter-spacing: -0.01em; }
+.ntw-row { border-image: linear-gradient(90deg, transparent 20px, var(--separator) 20px) 1; }
+.split-list a.ntw-row[data-split-active], .split-list a.ntw-row[data-split-active] + .ntw-row { border-image: none; }
+.ntw-tag { font-size: 13px; }
+.ntw-row__t { font-size: 16px; }
+.ntw-row.is-unread .ntw-row__t { font-weight: 600; }
+.ntw-row__m { font-size: 13px; }
+.ntw-pic { width: 18px; height: 18px; }
+.ntw-empty { font-size: 15px; }
+.ntw-empty b { font-size: 17px; }
+.ntw-d__hint { font-size: 13px; }
+.ntw-pop__n { font-size: 13px; }
+.ntw-check { font-size: 15px; }
+
 /* 넓은 화면 — 폴드는 셸 가운데 칸, 태블릿 2분할 칸 안 상세는 읽기 좋은 폭(640px)으로 묶는다. */
 @media (min-width: 1000px) and (min-height: 600px) {
   .ntw-d { max-width: 640px; }

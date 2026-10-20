@@ -6,7 +6,7 @@
  * Salaried → document icon empty state.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import "./attendance.css";
 import { AIc, AttIcon } from "./att-icons";
@@ -107,6 +107,19 @@ export function AttendancePay({
   const copy = getDictionary(locale).attendance;
   const isCurrentMonth = view.ym === currentYm;
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // HIG 2차(2026-10-20): 막대 칸 폭을 정수 px 로 내림 — 폭 ÷ 날 수가 소수점이면 막대마다 굵기가 1px씩 달라 보였다.
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [colPx, setColPx] = useState<number | null>(null);
+  const dayCount = new Date(Number(view.ym.slice(0, 4)), Number(view.ym.slice(5, 7)), 0).getDate();
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el || dayCount === 0) return;
+    const measure = () => setColPx(Math.max(1, Math.floor(el.clientWidth / dayCount)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [dayCount, view]);
   const selected = view.days.find((d) => d.date === selectedDate) ?? null;
   const close = () => setSelectedDate(null);
   const [excludedOpen, setExcludedOpen] = useState(false);
@@ -307,7 +320,7 @@ export function AttendancePay({
       </div>
 
       <div className="att-pay__main">
-        <div className="payw-chart">
+        <div className="payw-chart" ref={chartRef} style={colPx ? ({ "--col": `${colPx}px` } as React.CSSProperties) : undefined}>
           <div className="payw-chart__h">
             <b>{copy.payChartTitle}</b>
             <span>{copy.payChartLegend}</span>

@@ -3598,6 +3598,38 @@
   .att.att--payw .payw-bars { height: 168px; }
 }
 
+/* HIG 다듬기 2차 — 급여(2026-10-20, HIG 캔버스 A2Pay-* · 지금 A2PayNow-*). 기능 · 배치 그대로.
+   큰 제목 34/700 · 금액 위아래 15 · 가리기 44 · 요약 이름 13 · 묶음 제목 17/600 · 44 · 줄 사이에만 선 · 줄 16/13 · 날짜 줄 50 · 합계 17 ·
+   차트 제목 17/600 · 범례 13 · 막대 위 시간(8일 이하일 때만) · 아래 날짜 11 · 막대 굵기 정수(폰 6 · 폴드 이상 10) + 칸 폭 정수 내림(--col, JS). */
+.att.att--payw .ptitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.att.att--payw .ptitle__sub { margin-top: 4px; font-size: 15px; font-weight: 400; color: var(--text-3); }
+.att.att--payw .payw-hero__k { font-size: 15px; }
+.att.att--payw .payw-eye { width: 44px; height: 44px; margin: -12px -6px; }
+.att.att--payw .payw-hero__s { font-size: 15px; }
+.att.att--payw .payw-hero__note { font-size: 13px; }
+.att.att--payw .payw-stat__k { font-size: 13px; }
+.att.att--payw .payw-sec__t { align-items: center; min-height: 44px; margin-bottom: 0; font-size: 17px; letter-spacing: -0.01em; }
+.att.att--payw .payw-sec__t span { font-size: 15px; }
+.att.att--payw .payw-row { border-bottom: 0; }
+.att.att--payw .payw-row + .payw-row { border-top: 0.5px solid var(--separator); }
+.att.att--payw .payw-row__t { font-size: 16px; }
+.att.att--payw .payw-row__s { font-size: 13px; }
+.att.att--payw .payw-row__v { font-size: 16px; }
+.att.att--payw .payw-chart__h b { font-size: 17px; }
+.att.att--payw .payw-chart__h span { font-size: 13px; }
+.att.att--payw .payw-bars, .att.att--payw .payw-days { gap: 0; }
+.att.att--payw .payw-chart[style] .payw-bar, .att.att--payw .payw-chart[style] .payw-days span { flex: 0 0 var(--col); }
+.att.att--payw .payw-bar i { width: 6px; max-width: none; border-radius: 3px 3px 1px 1px; }
+.att.att--payw .payw-bar__v { font-size: 11px; line-height: 13px; min-height: 13px; }
+.att.att--payw .payw-days span { font-size: 11px; }
+.att.att--payw .payw-line { min-height: 50px; border-bottom: 0; }
+.att.att--payw .payw-line + .payw-line { border-top: 0.5px solid var(--separator); }
+.att.att--payw .payw-line__t, .att.att--payw .payw-line__v { font-size: 16px; }
+.att.att--payw .payw-line--foot .payw-line__v { font-size: 17px; }
+@media (min-width: 600px) {
+  .att.att--payw .payw-bar i { width: 10px; }
+}
+
 /* 근무 기록 화이트 리디자인 — 달력 + 날짜별 줄(2026-10-13 시안 AttHist-Phone · Fold · Tablet) */
 .att.att--histw .atth-review { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #c5282e; cursor: pointer; white-space: nowrap; }
 .att.att--histw .atth-review i { width: 6px; height: 6px; border-radius: 50%; background: #e5484d; }

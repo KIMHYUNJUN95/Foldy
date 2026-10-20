@@ -176,3 +176,25 @@
 /* 모바일 목록 · 메뉴는 스크롤바를 보이지 않는다(스크롤은 그대로). */
 .lnw-blist, .lnw-fmenu__list { scrollbar-width: none; -ms-overflow-style: none; }
 .lnw-blist::-webkit-scrollbar, .lnw-fmenu__list::-webkit-scrollbar { display: none; }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Linen-* · 지금 A2LinenNow-*) — 기능 · 배치 그대로.
+   건물 이름(큰 제목) 26 → 34/700 · 위 줄 15 · 장부 보기 15 · 줄 16/13 · 날짜 15 · 시각 · 장 13 · 빈 화면 17/15 ·
+   상세 품목 16 · 정보 15 · 등록 품목 · 합계 16 · 작은 안내 13 · 장부 나눔 버튼 · 고르기 15. 줄 사이 선은 이미 줄 사이에만. */
+.lnw-kick, .lnw-sub { font-size: 15px; }
+.lnw-bld { font-size: 34px; line-height: 41px; letter-spacing: -0.02em; }
+.lnw-link { font-size: 15px; }
+.lnw-row__d b { font-size: 15px; }
+.lnw-row__d span, .lnw-row__b span, .lnw-row__q small { font-size: 13px; }
+.lnw-row__b b { font-size: 16px; }
+.lnw-empty-state { font-size: 15px; }
+.lnw-empty-state b { font-size: 17px; }
+.lnw-empty { font-size: 15px; }
+.lnw-blist em { font-size: 13px; }
+.lnw-step__n { font-size: 16px; }
+.lnw-step.is-total b { font-size: 16px; }
+.lnw-submit span, .lnw-detail__foot span, .lnw-note, .lnw-done__back { font-size: 13px; }
+.lnw-line { font-size: 16px; }
+.lnw-line b small { font-size: 13px; }
+.lnw-dl { font-size: 15px; }
+.lnw-seg button, .lnw-fbtn { font-size: 15px; }
+

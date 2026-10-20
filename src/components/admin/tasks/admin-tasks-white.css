@@ -628,24 +628,20 @@
 .adm .atw-rpt__wchip.on { background: #f4f1fd; }
 .adm .atw-rpt__wchip.on:hover:not(:disabled) { background: #ece6fc; }
 .adm .atw-rpt__wchip.on b { color: #5a30cf; }
-.adm .atw-rpt__pop { position: absolute; left: 0; bottom: 54px; z-index: 2; display: flex; flex-direction: column; gap: 10px; min-width: 330px; max-width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; background: #fff; box-shadow: 0 12px 32px -8px rgba(22, 20, 31, .28), 0 0 0 0.5px rgba(22, 20, 31, .06); transform-origin: left bottom; animation: atw-rpt-pop 160ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .atw-rpt__pop { position: absolute; left: 0; bottom: 54px; z-index: 2; display: flex; flex-direction: column; gap: 12px; width: 372px; max-width: 100%; box-sizing: border-box; padding: 14px; border-radius: 16px; background: #fff; box-shadow: 0 12px 32px -8px rgba(22, 20, 31, .28), 0 0 0 0.5px rgba(22, 20, 31, .06); transform-origin: left bottom; animation: atw-rpt-pop 160ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes atw-rpt-pop { from { opacity: 0; transform: translateY(4px) scale(.97); } }
-.adm .atw-rpt__popt { font-size: 12px; font-weight: 600; color: #6b6878; }
-.adm .atw-rpt__popk { font-size: 12px; color: var(--text-3); }
-.adm .atw-rpt__chips, .adm .atw-rpt__hours { display: flex; flex-wrap: wrap; gap: 6px; }
-.adm .atw-rpt__chip { display: inline-flex; align-items: center; justify-content: center; height: 36px; min-width: 56px; padding: 0 12px; box-sizing: border-box; border: 0; border-radius: 10px; background: #f2f2f5; color: #3a3746; font: inherit; font-size: 14px; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 140ms ease; }
-.adm .atw-rpt__hours .atw-rpt__chip { min-width: 44px; padding: 0 8px; }
+.adm .atw-rpt__popt { font-size: 13px; font-weight: 600; color: #3a3746; }
+.adm .atw-rpt__popl { margin-bottom: -4px; font-size: 12px; font-weight: 600; color: #6b6878; }
+.adm .atw-rpt__chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.adm .atw-rpt__chip { display: inline-flex; align-items: center; justify-content: center; height: 36px; min-width: 0; padding: 0 10px; box-sizing: border-box; white-space: nowrap; border: 0; border-radius: 10px; background: #f2f2f5; color: #3a3746; font: inherit; font-size: 14px; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 140ms ease; }
 .adm .atw-rpt__chip:hover:not(:disabled):not([aria-checked="true"]) { background: #eaeaef; }
 .adm .atw-rpt__chip:active:not(:disabled) { transform: scale(.96); }
 .adm .atw-rpt__chips .atw-rpt__chip[aria-checked="true"] { background: #7a52e6; color: #fff; font-weight: 600; }
-.adm .atw-rpt__hours .atw-rpt__chip[aria-checked="true"] { background: #f4f1fd; color: #5a30cf; font-weight: 600; }
 .adm .atw-rpt__chip:disabled { background: #f7f7f9; color: #c9c7d1; text-decoration: line-through; cursor: default; }
-.adm .atw-rpt__mins { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 10px; background: #f2f2f5; }
-.adm .atw-rpt__mins button { height: 32px; border: 0; border-radius: 8px; background: transparent; color: #6b6878; font: inherit; font-size: 14px; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
-.adm .atw-rpt__mins button[aria-checked="true"] { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
-.adm .atw-rpt__mins button:disabled { color: #c9c7d1; cursor: default; }
 .adm .atw-rpt__banner { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 6px 0 14px; border-radius: 12px; background: #f4f1fd; color: #5a30cf; font-size: 14px; font-variant-numeric: tabular-nums; }
-.adm .atw-rpt__banner button { margin-left: auto; height: 36px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; transition: background 150ms ease; }
+.adm .atw-rpt__bannert { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
+.adm .atw-rpt__bannert small { font-size: 12px; color: #6b5bb0; }
+.adm .atw-rpt__banner button { height: 36px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; transition: background 150ms ease; }
 .adm .atw-rpt__banner button:hover:not(:disabled) { background: rgba(122, 82, 230, .1); }
 .adm .atw-rpt__msg { display: flex; align-items: center; gap: 6px; margin: -6px 0 0; font-size: 13px; font-weight: 600; }
 .adm .atw-rpt__msg.is-ok { color: #5a30cf; }

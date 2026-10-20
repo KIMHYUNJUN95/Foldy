@@ -117,7 +117,19 @@ import {
   scheduleDailyReport,
   type ReportScheduleView,
 } from "@/app/mobile/tasks/report-schedule-actions";
-import { LEAD_MIN, MINUTES, QUICK_TIMES, openHours, toMinutes, tokyoHHMM, tokyoNowMinutes, tokyoTodayIso } from "@/lib/report-schedule-time";
+import {
+  QUICK_TIMES,
+  durationLabel,
+  earliestMinute,
+  fromMinutes,
+  offsetTime,
+  slotOpen,
+  toMinutes,
+  tokyoHHMM,
+  tokyoNowMinutes,
+  tokyoTodayIso,
+} from "@/lib/report-schedule-time";
+import { ReportTimeField } from "@/components/tasks/report-time-field";
 import type { FieldActivityRecord } from "@/lib/field-activity";
 import {
   buildDailyReportText,
@@ -444,13 +456,12 @@ export function AdminTasksConsole({
   const [rptSchedText, setRptSchedText] = useState<string | null>(null);
   const [rptWhen, setRptWhen] = useState<string | null>(null);
   const [rptWhenOpen, setRptWhenOpen] = useState(false);
-  const [rptCustom, setRptCustom] = useState(false);
-  const [rptHour, setRptHour] = useState<string | null>(null);
   const [rptSchedBusy, setRptSchedBusy] = useState(false);
   const [rptMsg, setRptMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   const [rptNowMin, setRptNowMin] = useState(0);
-  const rptPopRef = useRef<HTMLDivElement>(null);
   const rptChipRef = useRef<HTMLButtonElement>(null);
+  // 취소 「되돌리기」가 나중에 눌릴 때 창이 아직 그 날짜인지 본다.
+  const reportDateRef = useRef<string | null>(null);
   // 「완료 · 기록」 날짜 줄의 「19:00 예약」 · 「19:00 보냄」 · 「보내지 못함」.
   const [reportSchedules, setReportSchedules] = useState<Record<string, ReportScheduleView>>({});
   const [newProj, setNewProj] = useState<{ name: string; members: string[]; q: string } | null>(null);
@@ -2814,7 +2825,6 @@ export function AdminTasksConsole({
     setRptSchedText(null);
     setRptWhen(null);
     setRptWhenOpen(false);
-    setRptCustom(false);
     setRptMsg(null);
     setRptNowMin(tokyoNowMinutes());
     Promise.all([generateConsoleReport(date), getReportSchedule(date)]).then(([res, sched]) => {
@@ -2902,7 +2912,8 @@ export function AdminTasksConsole({
   const rptActive = rptSched?.status === "scheduled";
   const rptActiveTime = rptActive && rptSched ? tokyoHHMM(rptSched.sendAt) : null;
   const rptChanged = rptActive && (reportEdited !== rptSchedText || rptWhen !== rptActiveTime);
-  const rptSlotOk = (hhmm: string) => toMinutes(hhmm) >= rptNowMin + LEAD_MIN;
+  const rptInvalid = rptWhen !== null && !slotOpen(rptWhen, rptNowMin);
+  const rptDur = (minutes: number) => durationLabel(minutes, { hm: dict.rptDurHM, h: dict.rptDurH, m: dict.rptDurM });
   const rptPickTime = (next: string | null) => {
     setRptWhen(next);
     setRptMsg(null);
@@ -2921,15 +2932,17 @@ export function AdminTasksConsole({
               : reason === "not_configured"
                 ? dict.rptSlackNotConfigured
                 : dict.rptSlackError;
-  const scheduleReport = async () => {
-    if (!report || !rptWhen) return;
+  /** `at` — 시각 칸에서 Enter 로 확정한 값(상태가 아직 안 바뀐 순간이라 직접 받는다). */
+  const scheduleReport = async (at?: string) => {
+    const time = at ?? rptWhen;
+    if (!report || !time) return;
     const { date } = report;
-    if (!rptSlotOk(rptWhen)) {
-      setRptNowMin(tokyoNowMinutes());
-      setRptMsg({ tone: "bad", text: dict.rptSchedulePast });
+    const now = tokyoNowMinutes();
+    setRptNowMin(now);
+    if (!slotOpen(time, now)) {
+      setRptWhenOpen(true); // 칸 아래 이유 줄을 보여 준다.
       return;
     }
-    const time = rptWhen;
     setRptSchedBusy(true);
     setRptMsg(null);
     const res = await scheduleDailyReport(date, reportEdited, tokyoTodayIso(time));
@@ -2938,8 +2951,8 @@ export function AdminTasksConsole({
       haptic("success");
       setRptSched(res.schedule);
       setRptSchedText(reportEdited);
+      setRptWhen(time);
       setRptWhenOpen(false);
-      setRptCustom(false);
       setReportSchedules((m) => ({ ...m, [date]: res.schedule }));
       showToast(fill(dict.rptScheduledToast, { time }));
       return;
@@ -2947,9 +2960,15 @@ export function AdminTasksConsole({
     haptic("error");
     setRptMsg({ tone: "bad", text: rptFailText(res.reason) });
   };
+  /**
+   * 예약 취소 — 확인 창 없이 바로, 대신 토스트 「되돌리기」가 같은 본문 · 시각으로 다시 예약한다(2026-10-20 2차 시안 ⑦,
+   * 「꾹 확정은 드문 결정만」 규칙). 그 사이 시각이 지났으면 서버가 막고 창 안 한 줄로 이유를 보여 준다.
+   */
   const cancelReportSchedule = async () => {
     if (!report) return;
     const { date } = report;
+    const undoTime = rptActiveTime;
+    const undoBody = rptSchedText;
     setRptSchedBusy(true);
     const res = await cancelDailyReportSchedule(date);
     setRptSchedBusy(false);
@@ -2960,13 +2979,33 @@ export function AdminTasksConsole({
     setRptSched(null);
     setRptSchedText(null);
     setRptWhen(null);
+    setRptWhenOpen(false);
     setRptMsg(null);
     setReportSchedules((m) => {
       const next = { ...m };
       delete next[date];
       return next;
     });
-    showToast(dict.rptScheduleCancelled);
+    if (!undoTime || !undoBody) {
+      showToast(dict.rptScheduleCancelled);
+      return;
+    }
+    showUndo(fill(dict.rptScheduleCancelledAt, { time: undoTime }), () => {
+      void scheduleDailyReport(date, undoBody, tokyoTodayIso(undoTime)).then((again) => {
+        if (!again.ok) {
+          showToast(rptFailText(again.reason));
+          return;
+        }
+        setReportSchedules((m) => ({ ...m, [date]: again.schedule }));
+        // 창이 아직 그 날짜로 열려 있으면 예약됨 상태로 되돌린다.
+        if (reportDateRef.current === date) {
+          setRptSched(again.schedule);
+          setRptSchedText(undoBody);
+          setRptWhen(undoTime);
+          setReportEdited(undoBody);
+        }
+      });
+    });
   };
   /** 큰 버튼 하나가 고른 시각을 따른다 — 지금 바로면 지금 보내기(예약이 있었으면 취소하고), 시각이면 예약. */
   const reportPrimary = async () => {
@@ -2999,15 +3038,15 @@ export function AdminTasksConsole({
     e.preventDefault();
     items[(at + (e.key === "ArrowRight" ? 1 : -1) + items.length) % items.length]?.focus();
   };
-  // 작은 창이 열리면 고른 칩으로 포커스 — 키보드로 바로 이어서 고른다.
   useEffect(() => {
-    if (!rptWhenOpen) return;
-    const id = requestAnimationFrame(() => {
-      const root = rptPopRef.current;
-      (root?.querySelector<HTMLButtonElement>('[aria-checked="true"]:not(:disabled)') ?? root?.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [rptWhenOpen]);
+    reportDateRef.current = report?.date ?? null;
+  }, [report?.date]);
+  // 고르는 동안 · 예약해 둔 동안 「지금」이 흘러간다 — 지난 시각 판정 · 30분 뒤 · 남은 시간이 맞게 30초마다 다시 잰다.
+  useEffect(() => {
+    if (!report || (!rptWhenOpen && rptSched?.status !== "scheduled")) return;
+    const id = setInterval(() => setRptNowMin(tokyoNowMinutes()), 30_000);
+    return () => clearInterval(id);
+  }, [report, rptWhenOpen, rptSched?.status]);
 
   // ── note send ────────────────────────────────────────────────────────────────────────────
   const sendNote = () => {
@@ -4492,7 +4531,17 @@ export function AdminTasksConsole({
     const picked = reportPicked.filter(Boolean).length;
     const allOn = reportItems.length > 0 && picked === reportItems.length;
     const busy = !!report.error || report.loading;
-    const customHours = openHours(rptNowMin);
+    const earliest = earliestMinute(rptNowMin);
+    const in30 = offsetTime(rptNowMin, 30);
+    const in60 = offsetTime(rptNowMin, 60);
+    const quick: { key: string; label: string; time: string | null }[] = [
+      { key: "now", label: dict.rptWhenNow, time: null },
+      { key: "in30", label: dict.rptWhenIn30, time: in30 },
+      { key: "in60", label: dict.rptWhenIn60, time: in60 },
+      ...QUICK_TIMES.map((t) => ({ key: t, label: t as string, time: t as string })),
+    ];
+    const quickOn = (q: { key: string; time: string | null }) => (q.key === "now" ? rptWhen === null : q.time !== null && rptWhen === q.time);
+    const quickFocusKey = (quick.find(quickOn) ?? quick[0]).key;
     return (
       <>
         <div className="day-scrim" onClick={() => setReport(null)} />
@@ -4524,7 +4573,20 @@ export function AdminTasksConsole({
             {rptActive && rptActiveTime ? (
               <div className="atw-rpt__banner" role="status">
                 <Clock size={17} aria-hidden="true" />
-                <span>{fill(dict.rptScheduledBanner, { time: rptActiveTime })}</span>
+                <span className="atw-rpt__bannert">
+                  <span>{fill(dict.rptScheduledBanner, { time: rptActiveTime })}</span>
+                  <small>{fill(dict.rptScheduleLeft, { dur: rptDur(Math.max(1, toMinutes(rptActiveTime) - rptNowMin)) })}</small>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRptNowMin(tokyoNowMinutes());
+                    setRptWhenOpen(true);
+                  }}
+                  disabled={rptSchedBusy}
+                >
+                  {dict.rptScheduleChangeTime}
+                </button>
                 <button type="button" onClick={() => void cancelReportSchedule()} disabled={rptSchedBusy}>
                   {dict.rptScheduleCancel}
                 </button>
@@ -4628,102 +4690,59 @@ export function AdminTasksConsole({
             {/* 아래 한 줄(2026-10-20 시안) — 왼쪽 「보낼 시각」 칩(누르면 위로 작은 창), 오른쪽 전체 복사 · 보내기. 닫기는 위 X · Esc. */}
             <div className="atw-rpt__f">
               {rptWhenOpen && !busy ? (
-                <div className="atw-rpt__pop" ref={rptPopRef} role="dialog" aria-label={dict.rptWhen}>
+                <div className="atw-rpt__pop" role="dialog" aria-label={dict.rptWhen}>
                   <span className="atw-rpt__popt">{dict.rptWhenAsk}</span>
+                  {/* 빠른 선택 6개(3칸 두 줄) — 누르면 아래 칸에 그 시각이 채워진다. 「직접」 칩은 없앴다(2026-10-20 2차 시안 ①). */}
                   <div className="atw-rpt__chips" role="radiogroup" aria-label={dict.rptWhen} onKeyDown={rptRoving}>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={rptWhen === null && !rptCustom}
-                      tabIndex={rptWhen === null && !rptCustom ? 0 : -1}
-                      className="atw-rpt__chip"
-                      onClick={() => {
-                        setRptCustom(false);
-                        rptPickTime(null);
-                      }}
-                    >
-                      {dict.rptWhenNow}
-                    </button>
-                    {QUICK_TIMES.map((t) => (
+                    {quick.map((q) => (
                       <button
-                        key={t}
+                        key={q.key}
                         type="button"
                         role="radio"
-                        aria-checked={rptWhen === t && !rptCustom}
-                        tabIndex={rptWhen === t && !rptCustom ? 0 : -1}
+                        aria-checked={quickOn(q)}
+                        tabIndex={q.key === quickFocusKey ? 0 : -1}
                         className="atw-rpt__chip num"
-                        disabled={!rptSlotOk(t)}
-                        onClick={() => {
-                          setRptCustom(false);
-                          rptPickTime(t);
-                        }}
+                        disabled={q.key !== "now" && (!q.time || !slotOpen(q.time, rptNowMin))}
+                        onClick={() => rptPickTime(q.time)}
                       >
-                        {t}
+                        {q.label}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={rptCustom}
-                      tabIndex={rptCustom ? 0 : -1}
-                      className="atw-rpt__chip"
-                      disabled={customHours.length === 0}
-                      onClick={() => {
-                        const h = rptWhen && customHours.includes(rptWhen.slice(0, 2)) ? rptWhen.slice(0, 2) : customHours[0] ?? null;
-                        setRptCustom(true);
-                        setRptHour(h);
-                        const m = h ? MINUTES.find((mm) => rptSlotOk(`${h}:${mm}`)) : undefined;
-                        if (h && m && !(rptWhen && rptWhen.startsWith(h))) rptPickTime(`${h}:${m}`);
-                      }}
-                    >
-                      {dict.rptWhenCustom}
-                    </button>
                   </div>
-                  {rptCustom ? (
-                    <>
-                      <div className="atw-rpt__hours" role="radiogroup" aria-label={dict.rptWhenHour} onKeyDown={rptRoving}>
-                        {customHours.map((h) => (
-                          <button
-                            key={h}
-                            type="button"
-                            role="radio"
-                            aria-checked={rptHour === h}
-                            tabIndex={rptHour === h ? 0 : -1}
-                            className="atw-rpt__chip num"
-                            onClick={() => {
-                              setRptHour(h);
-                              const m = MINUTES.find((mm) => rptSlotOk(`${h}:${mm}`));
-                              if (m) rptPickTime(`${h}:${m}`);
-                            }}
-                          >
-                            {h}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="atw-rpt__mins" role="radiogroup" aria-label={dict.rptWhenMinute} onKeyDown={rptRoving}>
-                        {MINUTES.map((m) => {
-                          const t = rptHour ? `${rptHour}:${m}` : null;
-                          const on = Boolean(t) && rptWhen === t;
-                          const anyOn = MINUTES.some((mm) => rptHour && rptWhen === `${rptHour}:${mm}`);
-                          return (
-                            <button
-                              key={m}
-                              type="button"
-                              role="radio"
-                              aria-checked={on}
-                              tabIndex={on || (!anyOn && m === "00") ? 0 : -1}
-                              className="num"
-                              disabled={!t || !rptSlotOk(t)}
-                              onClick={() => t && rptPickTime(t)}
-                            >
-                              :{m}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
+                  <span className="atw-rpt__popl">{dict.rptWhenManual}</span>
+                  {/* 오늘 [시]:[분] — 1분 단위. 숫자 · ↑↓ · Enter(보내기), ▲▼ 꾹 · 휠. */}
+                  <ReportTimeField
+                    autoFocus
+                    value={rptWhen}
+                    nowMin={rptNowMin}
+                    invalid={rptInvalid}
+                    describedBy={rptInvalid ? "atw-rpt-when-err" : undefined}
+                    onChange={(next) => rptPickTime(next)}
+                    onSubmit={(at) => {
+                      setRptWhenOpen(false);
+                      rptChipRef.current?.focus();
+                      if (!at) return;
+                      if (rptActive && at === rptActiveTime && reportEdited === rptSchedText) return;
+                      void scheduleReport(at);
+                    }}
+                    aside={rptWhen && !rptInvalid ? <b>{fill(dict.rptWhenIn, { dur: rptDur(toMinutes(rptWhen) - rptNowMin) })}</b> : null}
+                    labels={{
+                      group: dict.rptWhenGroup,
+                      today: fill(dict.rptWhenToday, { time: "" }).trim(),
+                      hour: dict.rptWhenHour,
+                      minute: dict.rptWhenMinute,
+                      hourUp: dict.rptWhenHourUp,
+                      hourDown: dict.rptWhenHourDown,
+                      minuteUp: dict.rptWhenMinuteUp,
+                      minuteDown: dict.rptWhenMinuteDown,
+                    }}
+                  />
+                  {rptInvalid ? (
+                    <p className="atw-rpt__msg is-bad" id="atw-rpt-when-err" role="alert">
+                      <TriangleAlert size={15} aria-hidden="true" />
+                      {earliest === null ? dict.rptWhenNoSlots : fill(dict.rptWhenEarliest, { time: fromMinutes(earliest) })}
+                    </p>
                   ) : null}
-                  {customHours.length === 0 ? <span className="atw-rpt__popk">{dict.rptWhenNoSlots}</span> : null}
                 </div>
               ) : null}
               <button
@@ -4751,7 +4770,7 @@ export function AdminTasksConsole({
                 type="button"
                 className={`atw-rpt__btn ${rptActive && !rptChanged ? "is-soft" : "is-pri"}`}
                 onClick={() => void reportPrimary()}
-                disabled={busy || report.sending || rptSchedBusy || !reportEdited.trim() || (rptActive && !rptChanged)}
+                disabled={busy || report.sending || rptSchedBusy || !reportEdited.trim() || (rptActive && !rptChanged) || rptInvalid}
                 aria-busy={report.sending || rptSchedBusy}
               >
                 {report.sending || rptSchedBusy ? (

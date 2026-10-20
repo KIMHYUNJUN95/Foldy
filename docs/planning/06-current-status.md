@@ -52,6 +52,7 @@ and the major mobile/admin operations modules are implemented and being hardened
 - PC 대시보드(`/admin/tasks`) 업무일지 창도 같은 예약 — 아래 한 줄(보낼 시각 칩 · 전체 복사 · 보내기, 닫기 글자 버튼 뺌) + 칩 위 작은 창(← → · Space · Esc),
   예약됨 줄 · 날짜 줄 표시. 시안 https://claude.ai/artifact/N2XxQQtMQZA3NQqgBsHVBD.
 - 수정: 예약이 저장되지 않던 문제 — 표에 service_role 권한이 없었다(`permission denied for table task_report_schedules`). 마이그레이션 `202610200006`(운영 DB 적용).
+- 2차: 보낼 시각 **1분 단위 직접 입력** — 「오늘 [시]:[분]」 칸(키보드 숫자 · ↑↓ · Enter / 마우스 ▲▼ 꾹 · 휠), 빠른 선택에 30분 뒤 · 1시간 뒤, 지난 시각은 칸 아래 이유, 예약됨 줄에 남은 시간 + 시각 바꾸기 · 예약 취소(확인 없이 + 되돌리기). PC · 모바일 공용 `report-time-field.tsx`. 시안 HBVDqUS4(PC) · R1dhvKv7(모바일).
 
 ## 2026-10-20 — 채널 예약도 날짜 변경 · 객실 이동 때 날짜 변경
 

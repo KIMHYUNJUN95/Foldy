@@ -17,7 +17,19 @@ import {
 } from "@/lib/daily-report";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
-import { LEAD_MIN, MINUTES, QUICK_TIMES, openHours, toMinutes, tokyoHHMM, tokyoNowMinutes, tokyoTodayIso } from "@/lib/report-schedule-time";
+import {
+  QUICK_TIMES,
+  durationLabel,
+  earliestMinute,
+  fromMinutes,
+  offsetTime,
+  slotOpen,
+  toMinutes,
+  tokyoHHMM,
+  tokyoNowMinutes,
+  tokyoTodayIso,
+} from "@/lib/report-schedule-time";
+import { ReportTimeField } from "./report-time-field";
 import { cn } from "@/lib/utils";
 
 type Copy = Dictionary["tasks"];
@@ -84,10 +96,13 @@ export function ReportSheet({
   const [scheduledText, setScheduledText] = useState<string | null>(null);
   const [whenTime, setWhenTime] = useState<string | null>(null);
   const [whenOpen, setWhenOpen] = useState(false);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customHour, setCustomHour] = useState<string | null>(null);
   const [scheduleBusy, setScheduleBusy] = useState(false);
-  const [scheduleMsg, setScheduleMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  // 결과 한 줄. 예약 취소면 「되돌리기」로 같은 본문 · 시각을 다시 예약한다(확인 창 없이 취소 + 되돌리기 — 2026-10-20 2차 시안).
+  const [scheduleMsg, setScheduleMsg] = useState<{
+    tone: "ok" | "bad";
+    text: string;
+    undo?: { time: string; body: string };
+  } | null>(null);
   const [nowMin, setNowMin] = useState(() => tokyoNowMinutes());
 
   const run = useCallback(() => {
@@ -168,11 +183,28 @@ export function ReportSheet({
   const active = schedule?.status === "scheduled";
   const activeTime = active && schedule ? tokyoHHMM(schedule.sendAt) : null;
   const changed = active && (text !== scheduledText || whenTime !== activeTime);
-  const slotOk = (hhmm: string) => toMinutes(hhmm) >= nowMin + LEAD_MIN;
-  const customHours = openHours(nowMin);
+  const whenInvalid = whenTime !== null && !slotOpen(whenTime, nowMin);
+  const earliest = earliestMinute(nowMin);
+  const in30 = offsetTime(nowMin, 30);
+  const in60 = offsetTime(nowMin, 60);
+  const quick: { key: string; label: string; time: string | null }[] = [
+    { key: "now", label: copy.reportWhenNow, time: null },
+    { key: "in30", label: copy.reportWhenIn30, time: in30 },
+    { key: "in60", label: copy.reportWhenIn60, time: in60 },
+    ...QUICK_TIMES.map((t) => ({ key: t, label: t, time: t })),
+  ];
+  const dur = (minutes: number) =>
+    durationLabel(minutes, { hm: copy.reportDurHM, h: copy.reportDurH, m: copy.reportDurM });
 
-  const pickTime = (next: string | null) => {
-    haptic("light");
+  // 고르는 동안 「지금」이 흘러간다 — 지난 시각 판정 · 30분 뒤 · 남은 시간이 맞게 30초마다 다시 잰다.
+  useEffect(() => {
+    if (!whenOpen && !(schedule?.status === "scheduled")) return;
+    const id = setInterval(() => setNowMin(tokyoNowMinutes()), 30_000);
+    return () => clearInterval(id);
+  }, [whenOpen, schedule?.status]);
+
+  const pickTime = (next: string | null, feel = true) => {
+    if (feel) haptic("light");
     setWhenTime(next);
     setScheduleMsg(null);
     setSlackStatus("idle");
@@ -180,11 +212,9 @@ export function ReportSheet({
 
   const onSchedule = async () => {
     if (!whenTime) return;
-    if (!slotOk(whenTime)) {
-      setNowMin(tokyoNowMinutes());
-      setScheduleMsg({ tone: "bad", text: copy.reportSchedulePast });
-      return;
-    }
+    const now = tokyoNowMinutes();
+    setNowMin(now);
+    if (!slotOpen(whenTime, now)) return; // 칸 아래 이유 줄이 이미 보인다.
     setScheduleBusy(true);
     setScheduleMsg(null);
     const result = await scheduleDailyReport(date, text, tokyoTodayIso(whenTime));
@@ -194,7 +224,6 @@ export function ReportSheet({
       setSchedule(result.schedule);
       setScheduledText(text);
       setWhenOpen(false);
-      setCustomOpen(false);
       setScheduleMsg({ tone: "ok", text: copy.reportScheduledToast.replace("{time}", whenTime) });
       return;
     }
@@ -217,6 +246,7 @@ export function ReportSheet({
   };
 
   const onCancelSchedule = async () => {
+    const undo = activeTime && scheduledText ? { time: activeTime, body: scheduledText } : undefined;
     setScheduleBusy(true);
     const result = await cancelDailyReportSchedule(date);
     setScheduleBusy(false);
@@ -225,10 +255,36 @@ export function ReportSheet({
       setSchedule(null);
       setScheduledText(null);
       setWhenTime(null);
-      setScheduleMsg({ tone: "ok", text: copy.reportScheduleCancelled });
+      setWhenOpen(false);
+      setScheduleMsg({
+        tone: "ok",
+        text: undo ? copy.reportScheduleCancelledAt.replace("{time}", undo.time) : copy.reportScheduleCancelled,
+        undo,
+      });
     } else {
       setScheduleMsg({ tone: "bad", text: copy.reportSlackError });
     }
+  };
+
+  /** 취소 되돌리기 — 같은 본문 · 시각으로 다시 예약(그 사이 시각이 지났으면 서버가 막고 이유를 보여 준다). */
+  const onUndoCancel = async (undo: { time: string; body: string }) => {
+    setScheduleBusy(true);
+    setScheduleMsg(null);
+    const result = await scheduleDailyReport(date, undo.body, tokyoTodayIso(undo.time));
+    setScheduleBusy(false);
+    if (result.ok) {
+      haptic("success");
+      setSchedule(result.schedule);
+      setScheduledText(undo.body);
+      setText(undo.body);
+      setWhenTime(undo.time);
+      return;
+    }
+    haptic("error");
+    setScheduleMsg({
+      tone: "bad",
+      text: result.reason === "past" || result.reason === "too_far" ? copy.reportSchedulePast : copy.reportSlackError,
+    });
   };
 
   /** 큰 버튼 하나가 고른 시각을 따른다 — 지금 바로면 지금 보내기(예약이 있었으면 취소하고), 시각이면 예약. */
@@ -256,7 +312,7 @@ export function ReportSheet({
       : whenTime
         ? copy.reportSendAt.replace("{time}", whenTime)
         : copy.reportSlackSend;
-  const primaryDisabled = !canSubmit || scheduleBusy || slackStatus === "sending" || (active && !changed);
+  const primaryDisabled = !canSubmit || scheduleBusy || slackStatus === "sending" || (active && !changed) || whenInvalid;
   const failedReason = (code: string | null) =>
     code === "not_configured"
       ? copy.reportSlackNotConfigured
@@ -356,15 +412,27 @@ export function ReportSheet({
                     {active || schedule?.status === "sending" ? (
                       <div className="tkw-rpt__banner" role="status">
                         <Clock aria-hidden="true" />
-                        <span>
-                          {schedule?.status === "sending"
-                            ? copy.reportScheduleBusy
-                            : copy.reportScheduledBanner.replace("{time}", activeTime ?? "")}
+                        <span className="tkw-rpt__bannert">
+                          <span>
+                            {schedule?.status === "sending"
+                              ? copy.reportScheduleBusy
+                              : copy.reportScheduledBanner.replace("{time}", activeTime ?? "")}
+                          </span>
+                          {active && activeTime ? (
+                            <small>
+                              {copy.reportScheduleLeft.replace("{dur}", dur(Math.max(1, toMinutes(activeTime) - nowMin)))}
+                            </small>
+                          ) : null}
                         </span>
                         {active ? (
-                          <button disabled={scheduleBusy} onClick={() => void onCancelSchedule()} type="button">
-                            {copy.reportScheduleCancel}
-                          </button>
+                          <span className="tkw-rpt__bannera">
+                            <button disabled={scheduleBusy} onClick={() => setWhenOpen(true)} type="button">
+                              {copy.reportScheduleChangeTime}
+                            </button>
+                            <button disabled={scheduleBusy} onClick={() => void onCancelSchedule()} type="button">
+                              {copy.reportScheduleCancel}
+                            </button>
+                          </span>
                         ) : null}
                       </div>
                     ) : null}
@@ -438,51 +506,56 @@ export function ReportSheet({
                     </button>
                     {whenOpen ? (
                       <div className="tkw-rpt__whenx">
+                        {/* 빠른 선택 6개(3칸 두 줄) — 누르면 아래 칸에 그 시각이 채워진다. 지난 시각은 흐림 + 줄 그음. */}
                         <div aria-label={copy.reportWhen} className="tkw-rpt__chips" role="radiogroup">
-                          <button aria-checked={whenTime === null && !customOpen} className="tkw-rpt__chip" onClick={() => { setCustomOpen(false); pickTime(null); }} role="radio" type="button">
-                            {copy.reportWhenNow}
-                          </button>
-                          {QUICK_TIMES.map((t) => (
+                          {quick.map((q) => (
                             <button
-                              aria-checked={whenTime === t && !customOpen}
+                              aria-checked={q.key === "now" ? whenTime === null : q.time !== null && whenTime === q.time}
                               className="tkw-rpt__chip num"
-                              disabled={!slotOk(t)}
-                              key={t}
-                              onClick={() => { setCustomOpen(false); pickTime(t); }}
+                              disabled={q.key !== "now" && (!q.time || !slotOpen(q.time, nowMin))}
+                              key={q.key}
+                              onClick={() => pickTime(q.time)}
                               role="radio"
                               type="button"
                             >
-                              {t}
+                              {q.label}
                             </button>
                           ))}
-                          <button aria-checked={customOpen} className="tkw-rpt__chip" disabled={customHours.length === 0} onClick={() => { const h = whenTime && customHours.includes(whenTime.slice(0, 2)) ? whenTime.slice(0, 2) : customHours[0] ?? null; setCustomOpen(true); setCustomHour(h); const m = h ? MINUTES.find((mm) => slotOk(`${h}:${mm}`)) : undefined; if (h && m && !(whenTime && whenTime.startsWith(h))) pickTime(`${h}:${m}`); }} role="radio" type="button">
-                            {copy.reportWhenCustom}
-                          </button>
                         </div>
-                        {customOpen ? (
-                          customHours.length === 0 ? (
-                            <p className="tkw-rpt__hint"><span>{copy.reportWhenNoSlots}</span></p>
-                          ) : (
-                            <div className="tkw-rpt__custom">
-                              <div aria-label={copy.reportWhenHour} className="tkw-rpt__hours" data-swipe-back="off" role="radiogroup">
-                                {customHours.map((h) => (
-                                  <button aria-checked={customHour === h} className="tkw-rpt__chip num" key={h} onClick={() => { setCustomHour(h); const m = MINUTES.find((mm) => slotOk(`${h}:${mm}`)); if (m) pickTime(`${h}:${m}`); }} role="radio" type="button">
-                                    {h}
-                                  </button>
-                                ))}
-                              </div>
-                              <div aria-label={copy.reportWhenMinute} className="tkw-rpt__mins" role="radiogroup">
-                                {MINUTES.map((m) => {
-                                  const t = customHour ? `${customHour}:${m}` : null;
-                                  return (
-                                    <button aria-checked={Boolean(t) && whenTime === t} className="num" disabled={!t || !slotOk(t)} key={m} onClick={() => t && pickTime(t)} role="radio" type="button">
-                                      :{m}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )
+                        <span className="tkw-rpt__whenl">{copy.reportWhenManual}</span>
+                        {/* 오늘 [시]:[분] — 1분 단위, 숫자 키패드 · ▲▼(꾹 = 계속). */}
+                        <ReportTimeField
+                          aside={
+                            whenTime && !whenInvalid ? (
+                              <b>{copy.reportWhenIn.replace("{dur}", dur(toMinutes(whenTime) - nowMin))}</b>
+                            ) : null
+                          }
+                          describedBy={whenInvalid ? "tkw-rpt-when-err" : undefined}
+                          invalid={whenInvalid}
+                          labels={{
+                            group: copy.reportWhenGroup,
+                            today: copy.reportWhenToday.replace("{time}", "").trim(),
+                            hour: copy.reportWhenHour,
+                            minute: copy.reportWhenMinute,
+                            hourUp: copy.reportWhenHourUp,
+                            hourDown: copy.reportWhenHourDown,
+                            minuteUp: copy.reportWhenMinuteUp,
+                            minuteDown: copy.reportWhenMinuteDown,
+                          }}
+                          nowMin={nowMin}
+                          onChange={(next) => pickTime(next, false)}
+                          onStep={() => haptic("light")}
+                          onSubmit={() => (document.activeElement as HTMLElement | null)?.blur()}
+                          size="lg"
+                          value={whenTime}
+                        />
+                        {whenInvalid ? (
+                          <p className="tkw-rpt__msg is-bad" id="tkw-rpt-when-err" role="alert">
+                            <TriangleAlert aria-hidden="true" />
+                            {earliest === null
+                              ? copy.reportWhenNoSlots
+                              : copy.reportWhenEarliest.replace("{time}", fromMinutes(earliest))}
+                          </p>
                         ) : null}
                       </div>
                     ) : null}
@@ -497,6 +570,16 @@ export function ReportSheet({
                       <p className={cn("tkw-rpt__msg", scheduleMsg.tone === "ok" ? "is-ok" : "is-bad")} role="status">
                         {scheduleMsg.tone === "ok" ? <Check aria-hidden="true" strokeWidth={3} /> : <TriangleAlert aria-hidden="true" />}
                         {scheduleMsg.text}
+                        {scheduleMsg.undo ? (
+                          <button
+                            className="tkw-rpt__undo"
+                            disabled={scheduleBusy}
+                            onClick={() => scheduleMsg.undo && void onUndoCancel(scheduleMsg.undo)}
+                            type="button"
+                          >
+                            {copy.reportScheduleUndo}
+                          </button>
+                        ) : null}
                       </p>
                     ) : slackMessage ? (
                       <p className={cn("tkw-rpt__msg", slackStatus === "sent" ? "is-ok" : "is-bad")} role="status">

@@ -1,5 +1,5 @@
 /* 요청 목록 화이트 리디자인(2026-10-13, 시안 Req-Phone · Fold · Tablet) — 글자 탭 · 토글 · 한 줄 행 */
-.rqw-tabs { display: flex; gap: 20px; border-bottom: 0.5px solid var(--separator); overflow-x: auto; scrollbar-width: none; }
+.rqw-tabs { display: flex; gap: 20px; /* HIG 2차(2026-10-20): 탭 아래 끝까지 긋던 선 없음 — 고른 탭 밑줄만 */ overflow-x: auto; scrollbar-width: none; }
 .rqw-tabs::-webkit-scrollbar { display: none; }
 .rqw-tabs button { flex: none; height: 40px; padding: 0; border: 0; background: none; font: inherit; font-size: 15px; color: var(--text-3); cursor: pointer; white-space: nowrap; transition: color 150ms ease; }
 .rqw-tabs button { height: 44px; }

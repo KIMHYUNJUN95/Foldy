@@ -1242,23 +1242,24 @@
 .lvw .lvw-empty { margin: 18px 0; font-size: 14px; color: var(--text-3); }
 .lvw .lvw-rules-h, .lvw .lvw-rules { display: none; }
 .lvw .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-/* HIG 다듬기 2차 — 연차 홈만(2026-10-20, HIG 캔버스 A2Leave-* · 지금 A2LeaveNow-*). 캘린더 · 내역 · 신청서는 다음 시안이라 `.lvw--home` 으로 묶는다.
-   줄 사이 선은 줄 사이에만(앞 아이콘 없는 줄 → 끝까지, 묶음 첫 줄 위 선 없음) · 묶음 제목 17/600 · 높이 44 · 줄 16/13 · 오른쪽 숫자 15 ·
-   큰 숫자 주변 15 · 범례 13 · 링크 15 · 누르는 자리 44 · 부여 규칙 16 · 빈 화면 15. 큰 숫자 40 그대로. */
-.lvw--home .lvw-title span { font-size: 15px; }
-.lvw--home .lvw-hero__k, .lvw--home .lvw-hero__s { font-size: 15px; }
-.lvw--home .lvw-legend { font-size: 13px; }
-.lvw--home .lvw-row { border-top: 0; }
-.lvw--home .lvw-row + .lvw-row { border-top: 0.5px solid var(--separator); }
-.lvw--home .lvw-row__t { font-size: 16px; }
-.lvw--home .lvw-row__s { font-size: 13px; }
-.lvw--home .lvw-row__n { font-size: 15px; }
-.lvw--home .lvw-links { margin-top: 6px; }
-.lvw--home .lvw-links a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
-.lvw--home .lvw-sec { align-items: center; min-height: 44px; margin-top: 18px; padding-bottom: 0; }
-.lvw--home .lvw-sec b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-.lvw--home .lvw-sec a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
-.lvw--home .lvw-empty { font-size: 15px; }
+/* HIG 다듬기 2차 — 연차 화면 공용(2026-10-20, HIG 캔버스 A2Leave-* · A2LeaveForm-* · A2LeaveHist-* · A2LeaveCal-*, 지금 *Now-*).
+   홈 · 신청서 · 신청 내역 · 캘린더가 같은 줄 · 제목 · 글자 단계를 쓴다.
+   줄 사이 선은 줄 사이에만(앞 아이콘 없는 줄 → 끝까지, 묶음 첫 줄 위 선 없음 — 내역 줄은 아래 .lvw--hist 규칙) · 묶음 제목 17/600 · 높이 44 ·
+   줄 16/13 · 오른쪽 숫자 15 · 위 줄 15 · 범례 13 · 링크 15 · 누르는 자리 44 · 빈 화면 15. 큰 숫자 40 · 34 그대로. */
+.lvw .lvw-title span { font-size: 15px; }
+.lvw .lvw-hero__k, .lvw .lvw-hero__s { font-size: 15px; }
+.lvw .lvw-legend { font-size: 13px; }
+.lvw div.lvw-row, .lvw a.lvw-row { border-top: 0; }
+.lvw .lvw-row + .lvw-row { border-top: 0.5px solid var(--separator); }
+.lvw .lvw-row__t { font-size: 16px; }
+.lvw .lvw-row__s { font-size: 13px; }
+.lvw .lvw-row__n { font-size: 15px; }
+.lvw .lvw-links { margin-top: 6px; }
+.lvw .lvw-links a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
+.lvw .lvw-sec { align-items: center; min-height: 44px; margin-top: 18px; padding-bottom: 0; }
+.lvw .lvw-sec b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.lvw .lvw-sec a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
+.lvw .lvw-empty { font-size: 15px; }
 
 @media (min-width: 1000px) and (min-height: 600px) {
   .lv.lvw { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 36px; align-items: start; }
@@ -1341,9 +1342,39 @@
 .lvw .lvw-cal__dot i { width: 5px; height: 5px; border-radius: 50%; background: #7a52e6; }
 .lvw .lvw-cal__dot i.is-past { background: #c9c6d3; }
 .lvw .lvw-cal__d.is-today .lvw-cal__dot i { background: #fff; }
-.lvw .lvw-sec__n { font-size: 12px !important; font-weight: 500 !important; color: var(--text-3) !important; }
+.lvw .lvw-sec__n { font-size: 15px !important; font-weight: 500 !important; color: var(--text-3) !important; }
 /* 내역 줄은 상자 없는 줄 — 밀어서 삭제 틀의 둥근 모서리 · 빨간 바탕이 줄 가장자리에 비치지 않게(삭제 버튼은 열릴 때만 보임) */
 .lvw--hist .lswipe { border-radius: 0; }
 .lvw--hist .lswipe__del { opacity: 0; transition: opacity 120ms ease; }
 .lvw--hist .lswipe:has(.lswipe__content[data-swipe-back="off"]) .lswipe__del,
 .lvw--hist .lswipe:active .lswipe__del { opacity: 1; }
+
+/* HIG 다듬기 2차 — 신청서 · 신청 내역 · 캘린더 (2026-10-20, 시안 A2LeaveForm-* · A2LeaveHist-* · A2LeaveCal-*) */
+/* 신청서: 입력 글자 16(16 미만이면 iOS 가 누르는 순간 확대) · 칸 50 · 칸 이름 13 · 묻는 줄 15 · 작은 글자 바닥 13 */
+.lvw .lnf__l { font-size: 13px; }
+.lvw .lnf__in { min-height: 50px; font-size: 16px; }
+.lvw .lnf__count { font-size: 12px; }
+.lvw .lvw-q { font-size: 15px; }
+.lvw .lvw-days span { font-size: 15px; }
+.lvw .lvw-days b { font-size: 17px; }
+.lvw .lvw-err, .lvw .lvw-hint { font-size: 13px; }
+.lvw .lvw-after span { font-size: 15px; }
+/* 종류 · 단위: 보라 알약 칩 → 나눔 버튼(회색 판 위 흰 칸 하나 — 요청 「전체 | 내 요청」과 같은 모양). 보이는 36 · 누르는 자리 44 · 15.
+   칸 폭은 글자에 맞추고 남는 폭을 나눈다(en 「Bereavement」도 한 줄). */
+.lvw .lvw-chips { display: flex; flex-wrap: nowrap; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; }
+.lvw .lvw-chip { position: relative; flex: 1 1 auto; min-width: 0; height: 36px; padding: 0 8px; border-radius: 9px; background: transparent; font-size: 15px; color: #6b6878; white-space: nowrap; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.lvw .lvw-chip::before { content: ""; position: absolute; inset: -4px 0; }
+.lvw .lvw-chip.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
+/* 신청 내역: 탭 44 · 15 · 탭 아래 끝까지 긋던 선 없음(고른 탭 밑줄만) · 「+ 신청」 15 · 누르는 자리 44 */
+.lvw .lvw-tabs { border-bottom: 0; }
+.lvw .lvw-tabs button { height: 44px; font-size: 15px; }
+.lvw .lvw-addlink { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
+/* 캘린더: 달 넘기기 36 · 누르는 자리 44 · 달 글자 15 · 날짜 16 · 요일 13 */
+.lvw .lvw-mpill a { position: relative; width: 36px; height: 36px; }
+.lvw .lvw-mpill a::before { content: ""; position: absolute; inset: -4px; }
+.lvw .lvw-mpill b { height: 36px; font-size: 15px; }
+.lvw .lvw-cal__wd { font-size: 13px; }
+.lvw .lvw-cal__d { font-size: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .lvw .lvw-chip { transition: none; }
+}

@@ -43,7 +43,7 @@ export type ReservationMoveCopy = {
   mvNow: string;
   mvTo: string;
   mvConfirmNote: string;
-  /** 채널 예약의 날짜를 옮길 때(2026-10-20) — 채널 쪽 예약은 그대로라 거기서도 바꿔 달라고 적는다. */
+  /** 채널 예약의 날짜를 옮길 때(2026-10-20) — 채널 예약 내용은 그대로라는 사실을 적는다. */
   mvConfirmNoteChannelDates: string;
   mvConfirmNoteManual: string;
   mvHoldHint: string;
@@ -239,7 +239,7 @@ export function OpsReservationMoveForm({
   return (
     <>
       <div className="spw-pbody">
-        {/* 날짜는 모든 예약이 옮긴다(2026-10-20 — 채널 예약 잠금을 풀었다). 채널 예약은 「채널에서도 바꿔 주세요」. */}
+        {/* 날짜는 모든 예약이 옮긴다(2026-10-20 — 채널 예약 잠금을 풀었다). 채널 예약은 「채널 예약 내용은 그대로」. */}
         <div className="spw-group">
           <span className="spw-label">
             {copy.mbCheckIn} → {copy.mbCheckOut}

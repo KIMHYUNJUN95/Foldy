@@ -237,7 +237,7 @@ export function OpsReservationEditForm({
   return (
     <>
       <div className="spw-pbody">
-        {/* ── 숙박 ── 모든 예약(2026-10-20 — 채널 예약 잠금을 풀었다). 채널 예약은 「채널에서도 바꿔 주세요」를 먼저 적는다. */}
+        {/* ── 숙박 ── 모든 예약(2026-10-20 — 채널 예약 잠금을 풀었다). 채널 예약은 「Beds24 · 캘린더만 바뀌고 채널 예약 내용은 그대로」를 먼저 적는다(조기 퇴실로 남은 밤 열기). */}
         {channelBooking && (
           <p className="spw-info">{copy.reChannelDates.replaceAll("{channel}", CHANNEL_NAME[channel])}</p>
         )}

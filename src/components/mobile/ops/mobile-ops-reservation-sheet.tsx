@@ -549,7 +549,7 @@ function MobileReservationEdit({
             </div>
           </div>
 
-          {/* 채널 예약도 날짜를 바꾼다(2026-10-20 — 전엔 잠갔다). 채널 쪽 예약은 그대로라 「채널에서도 바꿔 주세요」. */}
+          {/* 채널 예약도 날짜를 바꾼다(2026-10-20 — 전엔 잠갔다). 채널 예약 내용은 그대로라 그 사실을 적는다(조기 퇴실로 남은 밤 열기). */}
           {channelBooking && (
             <div className="msw-lock">{copy.reChannelDates.replaceAll("{channel}", CHANNEL_NAME[channel])}</div>
           )}

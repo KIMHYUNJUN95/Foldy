@@ -3106,7 +3106,7 @@ export function OpsCalendarGrid({
               {moveConfirm.bar.channel === "manual"
                 ? copy.mvConfirmNoteManual
                 : moveConfirm.arrival !== moveConfirm.bar.checkIn
-                  ? // 채널 예약의 날짜를 옮김 — 채널 쪽 예약은 그대로라 거기서도 바꿔야 한다(2026-10-20).
+                  ? // 채널 예약의 날짜를 옮김 — Beds24 · 캘린더만 바뀌고 채널 예약 내용은 그대로(2026-10-20).
                     copy.mvConfirmNoteChannelDates.replaceAll("{channel}", channelDisplayName(moveConfirm.bar.channel))
                   : copy.mvConfirmNote.replace("{room}", moveConfirm.to.displayRoomLabel)}
             </p>

@@ -5,7 +5,7 @@ This file records important project decisions.
 ## 2026-10-20 채널 예약도 날짜를 바꾼다 — 예약 수정 · 객실 옮기기 (사용자 결정, 2026-09-29 잠금 해제)
 
 - Airbnb · Booking.com 예약도 예약 수정과 객실 옮기기(PC 패널 · 끌기 · 모바일)에서 날짜를 바꾼다(Beds24 와 같이). 서버 잠금(`channel_locked`) 제거.
-- 채널 쪽 예약은 그대로라는 사실은 남아 화면이 「{채널}에서도 같은 날짜로 바꿔 주세요」를 적는다. 상세: `33-calendar-write-features.md`.
+- 주 용도는 **조기 퇴실로 남은 밤 열기** — Beds24 는 예약 변경을 채널로 보내지 않고 빈방 수만 보낸다. 화면은 「Beds24 · 캘린더만 바뀌고 {채널} 예약 내용은 그대로」를 적는다. Airbnb 가 다시 덮는지는 실측 필요. 상세: `33-calendar-write-features.md`.
 
 ## 2026-10-20 저장소 · Vercel 이름 Foldy, 앱 주소는 새 도메인 때 한 번에 · 푸시마다 CI · 비밀값 검사 (사용자 결정)
 

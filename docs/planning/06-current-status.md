@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 판매 캘린더 가격 수정: 기간 · 요일 · 객실을 패널에서 고친다
+
+- 가격 패널(PC) · 가격 시트(모바일)에 「범위」 — 기간(오늘 ~ 1년 뒤) · 요일 7칸 · 객실(건물별). 처음 값은 격자 선택, 고치면
+  객실 × 기간 × 요일이 대상. 격자 밖 날짜의 지금 가격은 서버에서 읽고(`loadPriceScopePrices`), 보낼 때는 서버가 다시 계산.
+- 상세: `docs/product/33-calendar-write-features.md` → 「가격 수정 범위 — 기간 · 요일 · 객실」. 테스트 `ops-price-scope.test.ts` 6건.
+
 ## 2026-10-20 — 권한 정리 ⑤: 판매 캘린더 「바꾸기」 분리 · 건물 단위 권한은 설계만
 
 - `ops_calendar.write`(기본 대표 · 전무 = 지금과 같음) — 없으면 판매 캘린더 보기 전용(PC · 모바일), 쓰기 서버 액션 `forbidden`. 마이그레이션 `202610200004`.

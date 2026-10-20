@@ -166,15 +166,18 @@ async function readServerCellPrices(
   cells: readonly PriceChangeCell[],
 ): Promise<Map<string, number | null> | null> {
   const roomIds = [...new Set(cells.flatMap((cell) => cell.roomIds))];
-  const dates = [...new Set(cells.map((cell) => cell.date))];
+  const dates = [...new Set(cells.map((cell) => cell.date))].sort();
   if (roomIds.length === 0 || dates.length === 0) return new Map();
+  // 날짜는 **처음 ~ 끝 범위로** 거른다(2026-10-20). 패널에서 기간을 1년까지 넓힐 수 있게 되면서 날짜 목록을 `in` 으로 보내면
+  // 주소가 수천 자가 된다. 범위 안의 남는 날은 아래 칸 대조에서 버려진다.
   const rates = await readAllPages<OpsRateUnit & { room_id: string; stay_date: string }>((from, to) =>
     supabase
       .from("room_daily_rates")
       .select("room_id, stay_date, price1, price2, price3, min_stay, max_stay, num_avail, override_kind")
       .eq("organization_id", organizationId)
       .in("room_id", roomIds)
-      .in("stay_date", dates)
+      .gte("stay_date", dates[0])
+      .lte("stay_date", dates[dates.length - 1])
       .order("room_id", { ascending: true })
       .order("stay_date", { ascending: true })
       .range(from, to),
@@ -189,6 +192,34 @@ async function readServerCellPrices(
     prices.set(`${cell.roomKey}|${cell.date}`, mergeOpsRateUnits(units)?.price ?? null);
   }
   return prices;
+}
+
+/** 패널이 한 번에 물을 수 있는 칸 상한 — 객실 100개 × 1년이 조금 넘는다. 그 이상은 잘못 만든 요청이다. */
+const MAX_SCOPE_CELLS = 40_000;
+
+export type PriceScopeCellRequest = { roomKey: string; roomIds: string[]; date: string };
+export type PriceScopePricesResult =
+  | { ok: false; error: "forbidden" | "too_many" | "read_failed" }
+  | { ok: true; prices: Record<string, number | null> };
+
+/**
+ * 가격 패널에서 **기간 · 요일 · 객실을 고쳤을 때**(2026-10-20), 격자에 안 보이는 칸의 지금 가격을 읽는다. 미리보기용이다 —
+ * 실제로 보낼 때는 `submitPriceChange` 가 같은 함수(`readServerCellPrices`)로 다시 읽어 계산한다.
+ * 키는 `roomKey|date`. 요금 칸이 없으면 `null`(격자의 빈 칸과 같다 — 대상에서 빠진다).
+ */
+export async function loadPriceScopePrices(args: { cells: PriceScopeCellRequest[] }): Promise<PriceScopePricesResult> {
+  const session = await requireOpsWriter();
+  if (!session) return { error: "forbidden", ok: false };
+  if (args.cells.length > MAX_SCOPE_CELLS) return { error: "too_many", ok: false };
+  if (args.cells.length === 0) return { ok: true, prices: {} };
+  const supabase = getSupabaseServiceClient();
+  const prices = await readServerCellPrices(
+    supabase,
+    session.organization.id,
+    args.cells.map((cell) => ({ currentPrice: null, date: cell.date, roomIds: cell.roomIds, roomKey: cell.roomKey, roomLabel: "" })),
+  );
+  if (!prices) return { error: "read_failed", ok: false };
+  return { ok: true, prices: Object.fromEntries(prices) };
 }
 
 /**

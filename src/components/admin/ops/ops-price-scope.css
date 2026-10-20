@@ -1,0 +1,115 @@
+/* 가격 수정 범위 편집기(2026-10-20) — 데스크톱 가격 패널 · 모바일 가격 시트 공용. 패널 칩(`.spw-chip`)과 같은 회색 칸이지만
+   **고른 것은 옅은 보라 바탕 + 보라 글자**(기본이 「요일 전부」라 진한 채움이면 7칸이 다 꽉 차 무겁다 — 선택 표시는 옅은 바탕만 규칙).
+   세로 구분선 없음 · 가로 헤어라인은 공용 `--separator`. */
+.psc {
+  --psc-ink: #16141f;
+  --psc-ink2: #3a3746;
+  --psc-mute: #6b6878;
+  --psc-faint: var(--text-3);
+  --psc-gray: #f4f4f7;
+  --psc-v: #7a52e6;
+  --psc-v-ink: #5a30cf;
+  --psc-v-soft: #efe9fd;
+  --psc-warn: #b4540a;
+  --psc-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 0.5px solid var(--separator);
+  border-bottom: 0.5px solid var(--separator);
+  color: var(--psc-ink);
+}
+/* 데스크톱 패널은 다음 덩어리(현재 → 변경)가 위 헤어라인을 이미 긋는다 — 두 줄 겹치지 않게. */
+.psc--desktop { border-bottom: 0; padding-bottom: 0; }
+.psc__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; color: var(--psc-faint); }
+.psc__row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.psc__label { flex: none; width: 36px; font-size: 13px; font-weight: 600; color: var(--psc-mute); }
+.psc__rooms { flex: 1; min-width: 0; font-size: 14px; color: var(--psc-ink2); }
+.psc__link {
+  flex: none;
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--psc-v-ink);
+  cursor: pointer;
+  transition: transform 140ms var(--psc-ease), opacity 140ms ease;
+}
+.psc__link:active { transform: scale(0.97); opacity: 0.7; }
+
+/* 요일 — 7칸 한 줄. 일 · 토는 글자색만 살짝(빨강 · 파랑은 고르지 않았을 때만). */
+.psc__days { flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; min-width: 0; }
+.psc__day,
+.psc__chip,
+.psc__bldname {
+  border: 0;
+  border-radius: 9px;
+  background: var(--psc-gray);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--psc-ink2);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 140ms var(--psc-ease);
+}
+.psc__day { height: 32px; min-width: 0; padding: 0; }
+.psc__day,
+.psc__chip { color: var(--psc-faint); }
+.psc__day.on,
+.psc__chip.on,
+.psc__bldname.on { background: var(--psc-v-soft); color: var(--psc-v-ink); font-weight: 600; }
+.psc__day:active,
+.psc__chip:active,
+.psc__bldname:active { transform: scale(0.96); }
+
+/* 모바일 날짜 두 칸 */
+.psc__dates { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--psc-faint); }
+.psc__date {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--psc-gray);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--psc-ink);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  transition: transform 140ms var(--psc-ease);
+}
+.psc__date small { font-size: 11px; font-weight: 500; color: var(--psc-faint); }
+.psc__date:active { transform: scale(0.98); }
+
+/* 객실 고르기 — 건물마다 「건물 · 전체」 + 객실 칸. 펼칠 때 부드럽게. */
+.psc__picker { display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; padding: 2px 0; animation: psc-in 200ms var(--psc-ease); scrollbar-width: none; }
+.psc__picker::-webkit-scrollbar { display: none; }
+.psc__bld { display: flex; flex-direction: column; gap: 6px; }
+.psc__bldname { align-self: flex-start; height: 30px; padding: 0 10px; font-size: 12px; font-weight: 600; }
+.psc__chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.psc__chip { height: 30px; padding: 0 10px; font-variant-numeric: tabular-nums; }
+@keyframes psc-in { from { opacity: 0; transform: translateY(-4px); } }
+
+.psc__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--psc-faint); }
+.psc__note.is-warn { color: var(--psc-warn); }
+
+/* 모바일은 손가락 크기 — 누르는 자리 44 */
+.psc--mobile .psc__day { height: 40px; font-size: 14px; }
+.psc--mobile .psc__chip,
+.psc--mobile .psc__bldname { height: 40px; padding: 0 12px; font-size: 14px; }
+.psc--mobile .psc__link { min-height: 44px; }
+.psc--mobile .psc__picker { max-height: 240px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .psc__picker { animation: none; }
+}

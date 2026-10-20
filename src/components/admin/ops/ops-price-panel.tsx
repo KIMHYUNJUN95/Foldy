@@ -20,6 +20,13 @@ import {
   PERCENT_PRESETS,
   type AdjustmentInput,
 } from "@/lib/ops-price-adjustment";
+import {
+  PriceScopeEditor,
+  usePriceScope,
+  type PriceScopeCopy,
+  type PriceScopeRoom,
+} from "@/components/admin/ops/ops-price-scope";
+import type { AdminDateRangePickerLabels } from "@/components/admin/shared/admin-date-range-picker";
 import "./ops-calendar-panels-white.css";
 
 /**
@@ -49,7 +56,7 @@ import "./ops-calendar-panels-white.css";
  */
 
 /** 화이트 리디자인 문구(`SpwCopy`)를 같이 싣는다 — 격자의 `Copy` 가 이 타입을 통해 받는다. */
-export type PanelCopy = OpsWriteOutcomeCopy & SpwCopy & {
+export type PanelCopy = OpsWriteOutcomeCopy & SpwCopy & PriceScopeCopy & {
   panelTitle: string;
   panelAmount: string;
   panelPercent: string;
@@ -353,16 +360,21 @@ const blurOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
   if (event.key === "Enter") event.currentTarget.blur();
 };
 export function OpsPricePanel({
-  cells,
+  cells: selectedCells,
   clearLabel,
   copy,
   onApplied,
   onClear,
   onFinished,
   onSwitchMode,
+  pickerLabels,
+  priceAt,
+  rooms,
   runWrite,
-  scopeSummary,
+  scopeSummary: selectionSummary,
+  today,
 }: {
+  /** 격자에서 고른 칸 — 범위의 처음 값. 패널에서 기간 · 요일 · 객실을 고치면 그 범위로 바뀐다(`usePriceScope`). */
   cells: PanelCell[];
   clearLabel: string;
   copy: PanelCopy & SpwCopy;
@@ -375,9 +387,26 @@ export function OpsPricePanel({
   /** 패널 위 「가격 · 최소숙박 · 차단」 탭(2026-10-16 화이트 리디자인). 넘겨야 탭이 그려진다. */
   onSwitchMode?: (mode: SpwMode) => void;
   /** 격자가 흐린 값 → 접수 → 반영 대기 → 데이터 다시 받기를 맡는다(`ops-write-tracker.ts`). */
+  /** 공용 범위 달력 문구(`dictionary.admin.shared`). */
+  pickerLabels: AdminDateRangePickerLabels;
+  /** 격자가 아는 지금 가격 — 격자 창 밖이면 `undefined`(서버에서 읽는다). */
+  priceAt: (roomKey: string, date: string) => number | null | undefined;
+  /** 범위에 넣을 수 있는 객실(격자 행). */
+  rooms: readonly PriceScopeRoom[];
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
+  today: string;
 }) {
+  const scope = usePriceScope({
+    andMore: copy.andMore,
+    cells: selectedCells,
+    priceAt,
+    rooms,
+    summary: selectionSummary,
+    today,
+  });
+  const cells = scope.cells;
+  const scopeSummary = scope.summary;
   const [input, setInput] = useState<AdjustmentInput | null>(null);
   const [amountText, setAmountText] = useState("");
   const [percentText, setPercentText] = useState("");
@@ -622,6 +651,16 @@ export function OpsPricePanel({
           title={scopeSummary ? scopeSummary.rooms : copy.panelIdle}
         />
         <SpwModeTabs copy={copy} mode="price" onSwitchMode={onSwitchMode} />
+        {/* 범위 — 기간 · 요일 · 객실을 여기서 고친다(2026-10-20, Beds24 와 같이). 처음 값은 격자에서 고른 칸. */}
+        <PriceScopeEditor
+          copy={copy}
+          localeTag={copy.localeTag}
+          pickerLabels={pickerLabels}
+          rooms={rooms}
+          state={scope}
+          today={today}
+          variant="desktop"
+        />
 
         {/* 현재 평균 → 변경. 무엇을 바꾸는지 모르고 누르는 일을 막는 것이 확인 단계의 전부다. */}
         <div className="spw-compare">
@@ -777,7 +816,8 @@ export function OpsPricePanel({
         </button>
         <button
           className="spw-btn is-primary"
-          disabled={!input || preview.changedCount === 0 || pending}
+          // 격자 밖 칸의 지금 가격을 아직 못 읽었으면 기다린다 — 모른 채 넘기면 그 칸이 「요금 없음」으로 빠져 보인다.
+          disabled={!input || preview.changedCount === 0 || pending || scope.loading || scope.failed}
           onClick={() => setConfirming(true)}
           type="button"
         >

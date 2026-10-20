@@ -1,4 +1,5 @@
 /* iOS 권한 안내 문구 (계획 C6). Info.plist 의 같은 키는 대체값 — 문구를 바꾸면 en/ko/ja 와 Info.plist 를 함께 고친다. */
 "NSCameraUsageDescription" = "Foldy uses the camera to scan the attendance QR code and to take photos you attach to work records such as maintenance and lost & found reports.";
 "NSLocationWhenInUseUsageDescription" = "Foldy checks your location only at the moment you clock in or out, to confirm you are at the work site. Location is never tracked in the background.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Foldy checks your location only at the moment you clock in or out, to confirm you are at the work site. Location is never tracked in the background.";
 "NSPhotoLibraryUsageDescription" = "Foldy lets you choose photos from your library to attach to work records.";

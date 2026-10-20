@@ -152,7 +152,7 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | C3 | **Apple 로그인** | 🤝 | [ ] | Google 로그인이 있으므로 iOS 필수(Apple 4.8). Supabase Apple provider + Services ID · 키 |
 | C4 | **서명 · 번들 ID(iOS) · 패키지명(Android)** | 🤝 | [ ] | 한 번 정하면 못 바꿈. **ID 확정 `com.harutokyo.foldy`(2026-10-09)** — 남은 것: 서명 키 |
 | C5 | **네이티브 푸시** — iOS APNs · Android FCM | 🤖 | [ ] | 「알림은 막바지에 일괄 구현」 방침과 같은 배치로 |
-| C6 | **권한 설명 문구 · 개인정보 신고** — Info.plist(카메라 · 위치 · 사진, ko/ja/en), `PrivacyInfo.xcprivacy`, App Store 개인정보 라벨, Google Play 데이터 보안 양식 | 🤖 (+👤 제출) | [~] 2026-10-07 준비 완료 · 콘솔 제출 남음 | 답안: `18-store-review-kit.md`. `src/lib/legal-content.ts` 수집 항목과 일치해야 함. iOS 빌드 확인은 B1-3 |
+| C6 | **권한 설명 문구 · 개인정보 신고** — Info.plist(카메라 · 위치 · 사진, ko/ja/en), `PrivacyInfo.xcprivacy`, App Store 개인정보 라벨, Google Play 데이터 보안 양식 | 🤖 (+👤 제출) | [~] 2026-10-07 준비 완료 · 콘솔 제출 남음 · 2026-10-20 빠진 위치 키 `NSLocationAlwaysAndWhenInUseUsageDescription` 추가(TestFlight 업로드 ITMS-90683 방지) | 답안: `18-store-review-kit.md`. `src/lib/legal-content.ts` 수집 항목과 일치해야 함. iOS 빌드 확인은 B1-3 |
 | C7 | **스토어 등록 자료** — 아이콘 1024px, 스크린샷(아이폰 · 아이패드 · 안드로이드 폰 · 태블릿), 3개 언어 설명문, 연령 등급, 카테고리 | 🤖 (+👤 제출) | [~] 2026-10-07 아이콘 · 3개 언어 문구 · 카테고리 · 연령 등급 답안 완료 · 스크린샷 남음 | `18-store-review-kit.md` §7. 스크린샷은 에뮬레이터(B1-1) + 데모 데이터(B6)로 |
 | C8 | **내부 테스트** — TestFlight · Google Play 내부 테스트 트랙 | 🤝 | [ ] | 실기기에서 로그인 · 출퇴근 QR · 사진 업로드 · 푸시 |
 | C9 | **비공개 배포** — Custom/Unlisted App · Play 비공개 트랙 | 🤝 | [ ] | 심사 제출 · 대응 |
@@ -226,3 +226,4 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | 2026-10-09 | (이 커밋) | 앱 ID `com.harutokyo.stayops` → `com.harutokyo.foldy` (Android 패키지 · iOS 번들 · 앱 스킴) — Supabase Redirect URL 재등록 필요 |
 | 2026-10-09 | (이 커밋) | N5 앱 안 브라우저 툴바 아이보리 · B1-3 iOS 서명 + TestFlight 업로드 워크플로(Mac 없이, 수동 실행) |
 | 2026-10-09 | (이 커밋) | N12 메뉴 첫 화면에서도 스와이프 뒤로가기(사용자 결정) — 돌아갈 곳이 앱 밖이면 받지 않음 |
+| 2026-10-20 | (이 커밋) | TestFlight 전 iOS 점검 — 위치 권한 키 `NSLocationAlwaysAndWhenInUseUsageDescription` 추가(Info.plist · ko/ja/en), WebView 바탕색 주석 정정 |

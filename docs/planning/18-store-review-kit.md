@@ -9,7 +9,7 @@
 | 권한 | 언제 쓰나 | 위치 |
 | --- | --- | --- |
 | 카메라 | 출퇴근 QR 스캔, 유지보수 · 분실물 등 업무 기록 사진 촬영(청소 완료 자체에는 사진 없음) | iOS `NSCameraUsageDescription` · Android `CAMERA` |
-| 위치(사용 중) | 출퇴근을 기록하는 순간 한 번. 백그라운드 추적 없음. **출퇴근 인증에는 필수**(근무지 반경 확인 — `submitAttendanceScan`), 거부하면 출퇴근만 못 하고 다른 기능은 그대로 | iOS `NSLocationWhenInUseUsageDescription` · Android `ACCESS_FINE/COARSE_LOCATION` |
+| 위치(사용 중) | 출퇴근을 기록하는 순간 한 번. 백그라운드 추적 없음. **출퇴근 인증에는 필수**(근무지 반경 확인 — `submitAttendanceScan`), 거부하면 출퇴근만 못 하고 다른 기능은 그대로 | iOS `NSLocationWhenInUseUsageDescription`(+ `NSLocationAlwaysAndWhenInUseUsageDescription` 같은 문구 — 플러그인 하위 라이브러리 때문에 Apple 이 요구, 「항상 허용」 팝업은 뜨지 않음) · Android `ACCESS_FINE/COARSE_LOCATION` |
 | 사진 보관함 | 업무 기록에 첨부할 사진 선택 | iOS `NSPhotoLibraryUsageDescription` |
 
 - iOS 문구는 `ios/App/App/{en,ko,ja}.lproj/InfoPlist.strings` 에 3개 언어로 있다. `Info.plist` 의 같은 키는 영어 대체값이다.

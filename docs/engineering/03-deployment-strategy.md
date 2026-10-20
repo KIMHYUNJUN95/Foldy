@@ -267,6 +267,7 @@ Google 은 앱 내 WebView 의 OAuth 를 막는다(`403 disallowed_useragent`). 
 
 **보안 · 스토어 설정**
 - Android 백업 끔: `allowBackup="false"` + `dataExtractionRules`(클라우드 · 기기 이전 모두 제외). 앱 데이터에 WebView 로그인 쿠키가 있어 다른 기기로 로그인 상태가 복원될 수 있었다.
+- iOS 위치 권한 문구는 `NSLocationWhenInUseUsageDescription` 과 `NSLocationAlwaysAndWhenInUseUsageDescription` 두 키 모두(같은 문구, ko/ja/en). `@capacitor/geolocation` 이 쓰는 `ion-ios-geolocation` 이 백그라운드 위치 API 를 포함해 Apple 이 두 번째 키를 요구한다 — 없으면 업로드 처리에서 ITMS-90683(권한 문구 누락)으로 빌드가 거부된다. 앱은 사용 중 권한만 요청하므로 「항상 허용」 팝업은 뜨지 않는다(2026-10-20).
 - iOS `ITSAppUsesNonExemptEncryption = false` — HTTPS 외 자체 암호화가 없다. TestFlight 업로드마다 수출 규정 질문을 받지 않는다.
 
 ### Android 릴리스 서명 (2026-10-09)

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { MoveRight, Printer, Trash2 } from "lucide-react";
+import { Eye, MoveRight, Printer, Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import {
   deleteApplication,
@@ -103,6 +103,68 @@ export function RecruitPrintIcon({ label }: { label: string }) {
     <button type="button" className="rcw-ph__ic" aria-label={label} title={label} onClick={() => window.print()}>
       <Printer aria-hidden="true" />
     </button>
+  );
+}
+
+/**
+ * 위 「지원서 보기」 → 가운데 큰 창에 인쇄용 A4 지원서를 그대로 띄운다(2026-10-20). 프린터가 없으면 종이 모양 지원서를
+ * 볼 방법이 없었다. 종이는 서버가 그린 `ApplicationPrintSheet variant="screen"` 을 `children` 으로 받는다 — 인쇄 시트와 한 벌이다.
+ * 창 안 「인쇄」는 패널의 인쇄와 같은 `window.print()`(숨은 `#rcSheet` 가 나간다). Esc · 바깥 누르기 · ✕ 로 닫고, Esc 는 패널까지 닫지 않는다.
+ */
+export function RecruitViewSheet({ labels, children }: { labels: { view: string; print: string; close: string }; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const trigger = triggerRef.current;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      trigger?.focus();
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="rcw-ph__ic"
+        aria-label={labels.view}
+        title={labels.view}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+      >
+        <Eye aria-hidden="true" />
+      </button>
+      {open ? (
+        <>
+          <div className="modal-scrim on rcw-viewer-scrim" onClick={() => setOpen(false)} />
+          <div className="modal on rcw-viewer" role="dialog" aria-modal="true" aria-labelledby="rcw-view-t">
+            <div className="rcw-viewer__h">
+              <h2 id="rcw-view-t">{labels.view}</h2>
+              <button type="button" className="rcw-btn is-soft" onClick={() => window.print()}>
+                <Printer aria-hidden="true" />
+                {labels.print}
+              </button>
+              <button ref={closeRef} type="button" className="rcw-ph__x" aria-label={labels.close} onClick={() => setOpen(false)}>
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <div className="rcw-viewer__b">{children}</div>
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 

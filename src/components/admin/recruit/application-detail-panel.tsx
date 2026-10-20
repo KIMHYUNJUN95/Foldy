@@ -11,13 +11,14 @@ import {
   RecruitNoteField,
   RecruitPanelActions,
   RecruitPrintIcon,
+  RecruitViewSheet,
 } from "./recruit-panel-client";
 
 /**
  * 지원서 상세 패널 — 서버 컴포넌트. 화이트 리디자인(2026-10-14, 시안 Recruit-PC 오른쪽 · RecruitDetail-PC · RecruitDelete-PC):
  * 상태 · 지원 시각 · 재지원 → 이름 → 공고 · 형태 → 연락처 한 줄(가림 · 「연락처 표시」) → 근무 가능 / 시작일 / 체류 / 통근 /
  * 경험 / 지원 경로 → 지원 동기 → 이전 지원(전화번호 일치) → 이력서 → 검토 메모 → 아래 [되돌리기][다음 단계].
- * 위 인쇄 · 휴지통(확인 창) · 닫기. `?application=<id>` 쿼리로 열고 공용 `.panel` 을 쓴다(CLAUDE.md §4).
+ * 위 지원서 보기(A4 그대로 가운데 창) · 인쇄 · 휴지통(확인 창) · 닫기. `?application=<id>` 쿼리로 열고 공용 `.panel` 을 쓴다(CLAUDE.md §4).
  *
  * 도메인 계약: docs/product/30-recruit-workflow.md
  */
@@ -94,7 +95,10 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
             </h2>
             <span className="rcw-job">{join([a.jobTitle ?? copy.notCollected, a.employmentType])}</span>
           </div>
-          {/* 인쇄는 상태를 바꾸지 않는 보조 동작 — 아래 진행 버튼 자리와 섞지 않는다. */}
+          {/* 보기 · 인쇄는 상태를 바꾸지 않는 보조 동작 — 아래 진행 버튼 자리와 섞지 않는다. */}
+          <RecruitViewSheet labels={{ view: copy.wView, print: copy.wPrintShort, close: copy.close }}>
+            <ApplicationPrintSheet application={a} copy={copy} variant="screen" />
+          </RecruitViewSheet>
           <RecruitPrintIcon label={copy.wPrint} />
           <RecruitDeleteButton
             applicationId={a.id}

@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 채용 지원서 보기
+
+- `/admin/recruit` 상세 패널 위 인쇄 왼쪽에 「지원서 보기」 — 인쇄용 A4 지원서를 가운데 큰 창에 그대로 띄운다(창 안에서 인쇄도). 프린터가 없으면
+  종이 모양 지원서를 볼 방법이 없었다. 인쇄 시트와 한 컴포넌트 · 한 CSS. ko/ja/en `wView` · `wPrintShort`. 시안 없이 진행(사용자 지시).
+  상세 `docs/product/30-recruit-workflow.md` 「지원서 보기」.
+
 ## 2026-10-20 — 아라키초A 601호 연동
 
 - Beds24 새 객실 `601`(745422, 파는 쪽 2박) · `601_2`(745475, 99박 = 끔, 가격은 601 을 따름)을 `rooms` 에 넣고 최소 숙박 · 상태 · 요금 12개월을 맞췄다.

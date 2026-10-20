@@ -26,6 +26,11 @@ import type { ApplicationDetail } from "@/lib/recruit/applications";
 type Props = {
   application: ApplicationDetail;
   copy: Dictionary["recruit"];
+  /**
+   * `print`(기본) = 화면에선 숨고 인쇄 때만 나오는 시트(`#rcSheet`). `screen` = 「지원서 보기」 창 안에
+   * 같은 종이를 그대로 보여 준다(2026-10-20) — 프린터가 없으면 지원서 모양을 볼 방법이 없었다.
+   */
+  variant?: "print" | "screen";
 };
 
 /** 값이 없는 칸은 지우지 않고 「—」로 남긴다 — 종이에서 칸이 비면 「안 물어봤다」와 구분이 안 된다. */
@@ -52,7 +57,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function ApplicationPrintSheet({ application, copy }: Props) {
+export function ApplicationPrintSheet({ application, copy, variant = "print" }: Props) {
   // 출력일은 인쇄 시점이 아니라 렌더 시점이다. 초 단위 정확도가 필요한 값이 아니고, 인쇄
   // 다이얼로그를 여는 순간 DOM 을 건드리면 브라우저마다 반영 시점이 갈린다.
   const printedOn = new Date().toISOString().slice(0, 10);
@@ -61,7 +66,11 @@ export function ApplicationPrintSheet({ application, copy }: Props) {
   const tasks = application.industryTasks.length > 0 ? application.industryTasks.join(" · ") : null;
 
   return (
-    <div id="rcSheet" className="rcps" aria-hidden="true">
+    <div
+      id={variant === "print" ? "rcSheet" : undefined}
+      className={variant === "print" ? "rcps" : "rcps rcps--screen"}
+      aria-hidden={variant === "print" ? true : undefined}
+    >
       <header className="rcps__h">
         <div className="rcps__ht">
           <h1 className="rcps__title">{copy.printTitle}</h1>

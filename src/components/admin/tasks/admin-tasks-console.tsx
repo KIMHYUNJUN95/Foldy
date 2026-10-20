@@ -4723,7 +4723,7 @@ export function AdminTasksConsole({
                       </div>
                     </>
                   ) : null}
-                  {customHours.length === 0 ? <span className="atw-rpt__popk">{dict.rptWhenNoSlots}</span> : <span className="atw-rpt__popk">{dict.rptWhenKeys}</span>}
+                  {customHours.length === 0 ? <span className="atw-rpt__popk">{dict.rptWhenNoSlots}</span> : null}
                 </div>
               ) : null}
               <button

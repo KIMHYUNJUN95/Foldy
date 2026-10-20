@@ -12,7 +12,7 @@ and the major mobile/admin operations modules are implemented and being hardened
 ## 2026-10-20 — 시프트 신청 · 청소 배정 기획 시작
 
 - Hotelsmart 의 청소 배정(시프트 신청자 → 체크아웃 객실)을 Foldy 로 옮기기로 하고 기획 초안 작성 — `docs/product/37-cleaning-shift-assignment.md`.
-  체크인(여관업법 · 태블릿)은 Hotelsmart 유지. 「월말 = 사람 정하기, 매일 = 방 자동 나누기」로 분리. 코드 미착수, 「정할 것」 답을 받는 중(2026-10-20 Q1 · Q3 · Q4 · Q7 반영 — 배정 = 확정).
+  체크인(여관업법 · 태블릿)은 Hotelsmart 유지. 「월말 = 사람 정하기, 매일 = 방 자동 나누기」로 분리. 코드 미착수, 「정할 것」 답을 받는 중(2026-10-20 Q1 · Q2 · Q3 · Q4 · Q7 · Q9 · Q13 · Q14 반영 — 배정 = 확정, 매일 추가 배정이 본업, 셋팅 제외, 동시 수정은 방 단위 저장 + 중복 금지).
 
 ## 2026-10-20 — HIG 다듬기 2차 · 모바일 판매 캘린더 2(시트)
 

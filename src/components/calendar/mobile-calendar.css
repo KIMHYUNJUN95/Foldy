@@ -172,3 +172,38 @@
   .mcw-bar, .mcw-li, .mcw-pane .mcw-detail, .mcw-sq.is-done svg path, .mcw-sq.is-done svg polyline, .mcw-done svg path, .mcw-done svg polyline { animation: none; }
   .mcw-bar, .mcw-ib, .mcw-sq, .mcw-call, .mcw-brow, .mcw-h__pick { transition: none; }
 }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Cal-*): 큰 제목 34 · 달 이동은 위 줄 오른쪽 · 나눔 버튼 36/15 · 격자 글자 15/13 ·
+   목록 고르기 44/15(밑 선 없음) · 줄 16/13 · 상세 28/20/17/16 · 지도 줄 링크 15(누르는 자리 44) · 건물 줄 16/13. */
+.mcw-h__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.mcw-h__k { font-size: 15px; }
+.mcw-h__t { font-size: 34px; line-height: 41px; letter-spacing: -0.02em; }
+.mcw-h__pick { height: auto; min-height: 44px; overflow-wrap: anywhere; }
+.mcw-h__pick svg { width: 20px; height: 20px; }
+.mcw-month { font-size: 15px; }
+.mcw-ib { position: relative; }
+.mcw-ib::before { content: ""; position: absolute; inset: -4px; }
+.mcw-ib.is-sm::before { inset: -8px; }
+.mcw-seg button { height: 36px; font-size: 15px; }
+.mcw-day b { font-size: 15px; }
+.mcw-head__empty > span { font-size: 13px; }
+.mcw-bar { font-size: 13px; }
+.mcw-hint { font-size: 13px; }
+.mcw-empty b { font-size: 17px; }
+.mcw-empty span { font-size: 15px; }
+.mcw-tabs { border-bottom: 0; }
+.mcw-tabs button { height: 44px; font-size: 15px; }
+.mcw-li__t b { font-size: 16px; }
+.mcw-none { font-size: 15px; }
+.mcw-link { position: relative; font-size: 15px; }
+.mcw-link::before { content: ""; position: absolute; inset: -6px 0; }
+.mcw-link svg { width: 15px; height: 15px; }
+.mcw-k { font-size: 13px; }
+.mcw-dwho h2 { font-size: 28px; line-height: 34px; letter-spacing: -0.02em; }
+.mcw-dwho > span { font-size: 15px; }
+.mcw-dstay b { font-size: 20px; }
+.mcw-dphone > span { font-size: 17px; }
+.mcw-dnote p { font-size: 16px; }
+.mcw-rcode { font-size: 16px; }
+.mcw-brow__t b { font-size: 16px; }
+.mcw-brow__t span { font-size: 13px; }

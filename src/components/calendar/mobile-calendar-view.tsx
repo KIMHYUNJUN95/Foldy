@@ -919,28 +919,29 @@ export function MobileCalendarView({
 
       {/* 화이트 리디자인(2026-10-14, 시안 Cal-Phone · Cal-Fold · Cal-Tablet · CalList-* · CalMap-* · CalDetail-Phone · CalPick-Phone):
           머리 = 「예약 캘린더」 + 건물 이름(누르면 건물 고르기 시트) + 달 이동, 그 아래 캘린더 · 목록 · 지도. */}
-      <div className="mcw-h is-row">
-        <div className="mcw-h__main">
+      {/* HIG 2차(2026-10-20): 건물 이름이 큰 제목 34 라 달 이동은 「예약 캘린더」 줄 오른쪽으로. */}
+      <div className="mcw-h">
+        <div className="mcw-h__top">
           <span className="mcw-h__k">{w.title}</span>
-          <button
-            aria-label={w.pickAria.replace("{name}", propertyName(selectedProperty))}
-            className="mcw-h__t mcw-h__pick"
-            onClick={() => setIsBuildingSheetOpen(true)}
-            type="button"
-          >
-            {propertyName(selectedProperty)}
-            <ChevronDown aria-hidden="true" />
-          </button>
+          <div className="mcw-month">
+            <Link aria-label={w.prevMonth} className="mcw-ib" href={`/mobile/calendar?${previousHref.toString()}`}>
+              <ChevronLeft aria-hidden="true" />
+            </Link>
+            <span className="num">{selectedMonthLabel}</span>
+            <Link aria-label={w.nextMonth} className="mcw-ib" href={`/mobile/calendar?${nextHref.toString()}`}>
+              <ChevronRight aria-hidden="true" />
+            </Link>
+          </div>
         </div>
-        <div className="mcw-month">
-          <Link aria-label={w.prevMonth} className="mcw-ib" href={`/mobile/calendar?${previousHref.toString()}`}>
-            <ChevronLeft aria-hidden="true" />
-          </Link>
-          <span className="num">{selectedMonthLabel}</span>
-          <Link aria-label={w.nextMonth} className="mcw-ib" href={`/mobile/calendar?${nextHref.toString()}`}>
-            <ChevronRight aria-hidden="true" />
-          </Link>
-        </div>
+        <button
+          aria-label={w.pickAria.replace("{name}", propertyName(selectedProperty))}
+          className="mcw-h__t mcw-h__pick"
+          onClick={() => setIsBuildingSheetOpen(true)}
+          type="button"
+        >
+          {propertyName(selectedProperty)}
+          <ChevronDown aria-hidden="true" />
+        </button>
       </div>
 
       <div className="mcw-seg" role="tablist" aria-label={w.title}>
@@ -979,7 +980,7 @@ export function MobileCalendarView({
               onTouchMove={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               ref={scrollRef}
-              style={{ maxHeight: "calc(100dvh - 19rem - env(safe-area-inset-bottom, 0px))" }}
+              style={{ maxHeight: "calc(100dvh - 21rem - env(safe-area-inset-bottom, 0px))" }}
             >
               <div className="mcw-grid__in" style={{ minWidth: `${ROOM_LABEL_WIDTH + dates.length * DAY_WIDTH}px` }}>
                 {/* 열 바탕 — 세로선 대신 주말은 옅은 회색, 오늘은 옅은 보라(PC 와 같은 규칙). */}

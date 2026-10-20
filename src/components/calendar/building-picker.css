@@ -53,3 +53,12 @@
 @media (prefers-reduced-motion: reduce) {
   .bpk-go, .bpk-sheet, .bpk-sum, .bpk .mcw-brow { animation: none !important; }
 }
+
+/* HIG 다듬기 2차(2026-10-20): 지도|목록 나눔 버튼 36/15(누르는 자리 44) · 요약 · 「보기」 13 · 제목 34 가 길면 버튼이 아래 줄로. */
+.bpk > .mcw-h.is-row { flex-wrap: wrap; align-items: center; }
+.bpk-seg { height: 36px; }
+.bpk-seg button { position: relative; font-size: 15px; }
+.bpk-seg button::before { content: ""; position: absolute; inset: -7px 0; }
+.bpk-seg button svg { width: 15px; height: 15px; }
+.bpk-sum { font-size: 13px; }
+.bpk-go { font-size: 13px; }

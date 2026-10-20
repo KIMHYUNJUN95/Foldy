@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { hasPermissionOverride } from "@/lib/permission-overrides-server";
 import { Ban, RotateCcw } from "lucide-react";
 import {
   activateInviteCode,
@@ -12,8 +11,7 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { InviteCreateForm } from "@/components/admin/users/invite-create-form";
 import { UsersSectionTabs } from "@/components/admin/users/users-section-tabs";
 import "@/components/admin/users/users-white.css";
-import type { OrganizationRole } from "@/config/roles";
-import { officeAdminAssignableRoles } from "@/config/roles";
+import { listManageableOrganizations, selectableInviteRoles } from "@/lib/invite-codes-server";
 import { getDictionary } from "@/lib/i18n";
 import {
   DEFAULT_INVITE_MAX_USES,
@@ -30,21 +28,8 @@ type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
 type InviteCodeRow = Database["public"]["Tables"]["invite_codes"]["Row"];
-type MembershipRow = Pick<
-  Database["public"]["Tables"]["memberships"]["Row"],
-  "organization_id"
->;
 
-// Keep in sync with the identically-named allow-list in actions.ts (owner/cs_staff excluded — see
-// comment there).
-const inviteDefaultRoles = [
-  "staff",
-  "part_time_staff",
-  "office_admin",
-  "field_manager",
-] as const satisfies readonly OrganizationRole[];
 
 /** 렌더 밖에서 읽는 지금 시각 — 코드 상태(만료) 판정용. */
 function nowMs() {
@@ -53,54 +38,6 @@ function nowMs() {
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
-}
-
-// Ported from the old settings/invite-codes page — the org list shown for picking an invite's
-// organization. Kept as-is; the actual create/deactivate permission gate now lives in
-// canManageInvites (actions.ts), which checks developer/manage_users independently of this list.
-async function getManageableOrganizations(
-  userId: string,
-  role: string,
-): Promise<OrganizationRow[]> {
-  const service = getSupabaseServiceClient();
-
-  if (role === "developer_super_admin") {
-    const { data } = await service
-      .from("organizations")
-      .select("id, name, slug, status, created_at, updated_at")
-      .order("created_at", { ascending: false });
-
-    return (data ?? []) as OrganizationRow[];
-  }
-
-  // 초대를 만들 수 있는 조직 = `user.manage` 를 위임받은 조직(개발자는 위에서 처리되어 전부 본다).
-  // 액션 게이트 `actorCanManageUsersInOrg` 와 같은 판정을 써야 조직 선택기·페이지 접근·서버 액션이
-  // 서로 어긋나지 않는다. 2026-09-10 에 위임 수단이 `manage_users` 불리언에서 권한 키로 바뀌었다.
-  const { data: membershipData } = await service
-    .from("memberships")
-    .select("organization_id")
-    .eq("user_id", userId)
-    .eq("status", "active");
-
-  const memberships = (membershipData ?? []) as MembershipRow[];
-  const organizationIds: string[] = [];
-  for (const membership of memberships) {
-    if (await hasPermissionOverride(membership.organization_id, userId, "user.manage")) {
-      organizationIds.push(membership.organization_id);
-    }
-  }
-
-  if (organizationIds.length === 0) {
-    return [];
-  }
-
-  const { data } = await service
-    .from("organizations")
-    .select("id, name, slug, status, created_at, updated_at")
-    .in("id", organizationIds)
-    .order("created_at", { ascending: false });
-
-  return (data ?? []) as OrganizationRow[];
 }
 
 export default async function AdminUsersInvitesPage({ searchParams }: PageProps) {
@@ -117,19 +54,9 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
 
   // office_admin can't grant office_admin-or-above via invite code (matches canAssignRole's manual
   // role-change tiering) — hide the option instead of letting them pick it and get rejected server-side.
-  const selectableDefaultRoles =
-    session.user.role === "developer_super_admin" ||
-    session.user.role === "owner" ||
-    session.user.role === "senior_managing_director"
-      ? inviteDefaultRoles
-      : inviteDefaultRoles.filter((role) =>
-          (officeAdminAssignableRoles as readonly OrganizationRole[]).includes(role),
-        );
+  const selectableDefaultRoles = selectableInviteRoles(session.user.role);
 
-  const organizations = await getManageableOrganizations(
-    session.user.id,
-    session.user.role,
-  );
+  const organizations = await listManageableOrganizations(session.user.id, session.user.role);
   const organizationIds = organizations.map((organization) => organization.id);
   const organizationNames = new Map(
     organizations.map((organization) => [organization.id, organization.name]),

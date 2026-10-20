@@ -33,62 +33,9 @@ import { tokyoToday } from "@/lib/tokyo-date";
  * 서버 계약은 그대로(`/admin/users/actions.ts`). docs/product/23-user-management.md
  */
 
-export type DirectoryMemberVM = {
-  membershipId: string;
-  userId: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: string;
-  status: string;
-  joinedAt: string | null;
-  isSelf: boolean;
-  isDeveloper: boolean;
-  teamKind: string | null;
-};
-
-export type PermRowVM = {
-  kind: "cap";
-  key: string;
-  label: string;
-  /** 서버가 계산한 최종값(역할 + 부여 − 차단). */
-  on: boolean;
-  source: "role" | "grant" | "deny" | "off";
-  expires: string | null;
-  overrideId: string | null;
-  canToggle: boolean;
-  needsExpiry: boolean;
-};
-
-export type MemberPanelVM = {
-  member: {
-    membershipId: string;
-    name: string;
-    email: string;
-    phone: string;
-    role: string;
-    status: string;
-    joinedAt: string | null;
-    isSelf: boolean;
-    isDeveloper: boolean;
-    teamId: string | null;
-    reportAccess: boolean;
-    payrollAdmin: boolean;
-    leaveApprover: boolean;
-  };
-  teams: { id: string; name: string; kind: string }[];
-  perms: PermRowVM[];
-  canManagePermissions: boolean;
-  isDeveloperViewer: boolean;
-  /** 이 사람을 바꿀 수 없는 이유 — 대표급(owner·전무) 또는 개발자 계정. 바꿀 수 있으면 null. */
-  lock: "top" | "dev" | null;
-  /** 조직의 마지막 활성 owner — 역할 변경 · 비활성 · 삭제가 막힌다. */
-  lastOwner: boolean;
-  /** 다른 조직 멤버십이 있다(상태 무관) — 삭제해도 로그인 계정은 남는다. */
-  otherOrgs: boolean;
-  /** 다른 조직에 활성 멤버십이 있다 — 비활성으로 바꿔도 로그인은 막히지 않는다. */
-  otherOrgsActive: boolean;
-};
+// 화면 데이터 모양은 서버 공용 로더와 같다(모바일 `/mobile/users` 도 같이 쓴다).
+export type { DirectoryMemberVM, MemberPanelVM, PermRowVM } from "@/lib/user-management-data";
+import type { DirectoryMemberVM, MemberPanelVM } from "@/lib/user-management-data";
 
 type Dict = ReturnType<typeof getDictionary>;
 

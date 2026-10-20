@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 모바일 사용자 관리
+
+- `/mobile/users`(멤버 목록 · 검색 · 거르기 시트) · `/mobile/users/{id}`(연락처 · 역할 시트 · 소속 · 상태 · 권한 스위치 · 기한 줄(무기한 포함) · 삭제)
+  · `/mobile/users/invites`(초대코드 만들기 · 복사 · 끄기 · 삭제). 폰 · 폴드 · 태블릿(목록 \| 상세 칸). 메뉴 「사용자」는 `user.manage` 만.
+- 서버는 대시보드와 같다 — 데이터 `src/lib/user-management-data.ts`, 초대코드 본체 `src/lib/invite-codes-server.ts` 로 빼서 둘이 같이 쓴다.
+  시안 https://claude.ai/artifact/UsmRsgn8tB5DGr4tDwaX7E. 상세: `docs/product/17-user-profile-directory.md` 「모바일 사용자 관리」.
+
 ## 2026-10-20 — 개인 권한을 무기한으로 줄 수 있다
 
 - 사용자 콘솔 권한 줄의 기한 고르기 맨 앞에 「무기한」(켜기 · 끄기 둘 다). 예외성 권한 4개(주문 처리 · 수리 상태 변경 · 건물 · 객실 관리 ·

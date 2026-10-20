@@ -1,35 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import type { OrganizationRole, Role } from "@/config/roles";
-import { officeAdminAssignableRoles } from "@/config/roles";
-import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
-import {
-  DEFAULT_INVITE_MAX_USES,
-  buildInviteName,
-  defaultInviteExpiry,
-  generateInviteCode,
-} from "@/lib/invite-code-gen";
-import { isYmd, tokyoToday } from "@/lib/tokyo-date";
-import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
+import type { Role } from "@/config/roles";
+import { createInviteCodeAs, deleteInviteCodeAs, setInviteCodeActiveAs } from "@/lib/invite-codes-server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
-// Owner and cs_staff are deliberately excluded from self-service invite-code creation (2026-07-09):
-// owner needs a separate single-use flow not built yet, and cs_staff has no invite category at all
-// (admin-assigned only, src/config/roles.ts). office_admin/field_manager were added here to close a
-// gap — src/config/roles.ts already defined their invite categories, but this UI never exposed them.
-const inviteDefaultRoles = [
-  "staff",
-  "part_time_staff",
-  "office_admin",
-  "field_manager",
-] as const satisfies readonly OrganizationRole[];
-
 type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
 type MembershipInsert = Database["public"]["Tables"]["memberships"]["Insert"];
-type InviteInsert = Database["public"]["Tables"]["invite_codes"]["Insert"];
 
 function normalizeSlug(value: string) {
   return value
@@ -37,14 +16,6 @@ function normalizeSlug(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function normalizeInviteCode(value: string) {
-  return value.trim().toUpperCase().replace(/\s+/g, "-");
-}
-
-function dateToExpiry(value: string) {
-  return new Date(`${value}T23:59:59.000Z`).toISOString();
 }
 
 async function getCurrentUserId() {
@@ -81,25 +52,6 @@ async function getCurrentRole(userId: string): Promise<Role | null> {
 
   const membership = membershipResult as { role: Role } | null;
   return membership?.role ?? null;
-}
-
-/** 자동 생성되는 초대코드 이름을 만든 사람의 표시 언어로 쓰기 위한 조회. */
-async function getActorLocale(userId: string): Promise<Locale> {
-  const { data } = await getSupabaseServiceClient()
-    .from("profiles")
-    .select("preferred_language")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const preferred = (data as { preferred_language: string } | null)?.preferred_language;
-  return isLocale(preferred) ? preferred : "ko";
-}
-
-// Invite-code management is gated the same way as /admin/users: developer, or the org-scoped
-// `manage_users` delegate flag (see src/lib/user-management-access.ts). This also fixes a prior bug
-// where senior_managing_director (전무) was locked out by a hardcoded owner/office_admin role check.
-async function canManageInvites(userId: string, organizationId: string, role: Role) {
-  return actorCanManageUsersInOrg(userId, role, organizationId);
 }
 
 export async function createOrganization(formData: FormData) {
@@ -231,216 +183,52 @@ export async function deleteOrganization(formData: FormData) {
   redirect("/admin/settings/organization?deleted=1");
 }
 
-export async function createInviteCode(formData: FormData) {
+/** 대시보드 폼 액션 — 본체는 `src/lib/invite-codes-server.ts`(모바일과 같음), 결과를 주소 쿼리로 넘긴다. */
+async function inviteActorOrRedirect() {
   const userId = await getCurrentUserId();
-  if (!userId) {
-    redirect("/auth/login?next=/admin/users/invites");
-  }
-
+  if (!userId) redirect("/auth/login?next=/admin/users/invites");
   const role = await getCurrentRole(userId);
-  if (!role) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
+  if (!role) redirect("/admin/users/invites?error=forbidden");
+  return { userId, role };
+}
 
-  const organizationId = String(formData.get("organizationId") ?? "");
-  const defaultRole = String(formData.get("defaultRole") ?? "") as OrganizationRole;
-  // 이름 / 코드 / 만료일 / 최대 사용 횟수는 폼에서 비워 보낼 수 있다. 비면 여기서 자동으로 채운다
-  // (2026-09-09) — 폼은 조직과 역할만 고르게 바뀌었고, "세부 설정"을 펼쳤을 때만 이 값들이 온다.
-  const rawCode = String(formData.get("code") ?? "").trim();
-  const rawName = String(formData.get("name") ?? "").trim();
-  const rawExpiresAt = String(formData.get("expiresAt") ?? "").trim();
-  const rawMaxUses = String(formData.get("maxUses") ?? "").trim();
+export async function createInviteCode(formData: FormData) {
+  const actor = await inviteActorOrRedirect();
+  const result = await createInviteCodeAs(actor, {
+    organizationId: String(formData.get("organizationId") ?? ""),
+    defaultRole: String(formData.get("defaultRole") ?? ""),
+    code: String(formData.get("code") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    expiresAt: String(formData.get("expiresAt") ?? ""),
+    maxUses: String(formData.get("maxUses") ?? ""),
+  });
+  redirect(result.ok ? "/admin/users/invites?created=1" : `/admin/users/invites?error=${result.error}`);
+}
 
-  if (
-    !organizationId ||
-    !(inviteDefaultRoles as readonly OrganizationRole[]).includes(defaultRole)
-  ) {
-    redirect("/admin/users/invites?error=invalid_invite");
-  }
-
-  if (!(await canManageInvites(userId, organizationId, role))) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  // office_admin may not hand out office_admin-or-above access via invite code — mirrors the same
-  // tiering already enforced for manual role changes (canAssignRole, src/app/admin/users/actions.ts).
-  // Without this, an office_admin could self-service-promote anyone to office_admin by creating an
-  // office_admin-default invite code, bypassing a restriction that manual role assignment enforces.
-  const canGrantDefaultRole =
-    role === "developer_super_admin" ||
-    role === "owner" ||
-    role === "senior_managing_director" ||
-    (officeAdminAssignableRoles as readonly OrganizationRole[]).includes(defaultRole);
-  if (!canGrantDefaultRole) {
-    redirect("/admin/users/invites?error=invalid_invite");
-  }
-
-  const service = getSupabaseServiceClient();
-
-  // 코드 앞자리(HARU-…)와 자동 이름의 역할 라벨을 만들려면 조직과 작성자 언어가 필요하다.
-  const { data: organizationResult } = await service
-    .from("organizations")
-    .select("name, slug")
-    .eq("id", organizationId)
-    .maybeSingle();
-  const organization = organizationResult as Pick<
-    OrganizationRow,
-    "name" | "slug"
-  > | null;
-
-  if (!organization) {
-    redirect("/admin/users/invites?error=invalid_invite");
-  }
-
-  const today = tokyoToday();
-  const expiresAt = isYmd(rawExpiresAt) ? rawExpiresAt : defaultInviteExpiry(today);
-  const parsedMaxUses = Number(rawMaxUses);
-  const maxUses =
-    Number.isInteger(parsedMaxUses) && parsedMaxUses >= 1
-      ? parsedMaxUses
-      : DEFAULT_INVITE_MAX_USES;
-
-  const dictionary = getDictionary(await getActorLocale(userId));
-  const name =
-    rawName ||
-    buildInviteName(
-      dictionary.admin.settings.inviteAutoName,
-      dictionary.roles[defaultRole],
-      today,
-    );
-
-  const codeSource = organization.slug || organization.name;
-  const isAutoCode = !rawCode;
-
-  // `invite_codes.code` 는 전역 unique 다. 자동 생성 코드가 부딪히면 조용히 다시 뽑고, 사용자가
-  // 직접 넣은 코드가 부딪히면 그 사실을 알려준다 — 말없이 다른 코드로 바꿔치기하면 안 된다.
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const code = isAutoCode
-      ? generateInviteCode(codeSource)
-      : normalizeInviteCode(rawCode);
-
-    const invite: InviteInsert = {
-      code,
-      created_by_user_id: userId,
-      default_role: defaultRole,
-      expires_at: dateToExpiry(expiresAt),
-      max_uses: maxUses,
-      name,
-      organization_id: organizationId,
-    };
-
-    const { error } = await service.from("invite_codes").insert(invite);
-
-    if (!error) {
-      redirect("/admin/users/invites?created=1");
-    }
-
-    if (error.code === "23505") {
-      if (isAutoCode) continue;
-      redirect("/admin/users/invites?error=duplicate_code");
-    }
-
-    redirect("/admin/users/invites?error=save_failed");
-  }
-
-  redirect("/admin/users/invites?error=save_failed");
+async function toggleInvite(formData: FormData, active: boolean) {
+  const actor = await inviteActorOrRedirect();
+  const result = await setInviteCodeActiveAs(actor, {
+    inviteCodeId: String(formData.get("inviteCodeId") ?? ""),
+    organizationId: String(formData.get("organizationId") ?? ""),
+    active,
+  });
+  if (!result.ok) redirect(`/admin/users/invites?error=${result.error}`);
+  redirect(active ? "/admin/users/invites?activated=1" : "/admin/users/invites?deactivated=1");
 }
 
 export async function deactivateInviteCode(formData: FormData) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    redirect("/auth/login?next=/admin/users/invites");
-  }
-
-  const role = await getCurrentRole(userId);
-  const inviteCodeId = String(formData.get("inviteCodeId") ?? "");
-  const organizationId = String(formData.get("organizationId") ?? "");
-
-  if (!role || !inviteCodeId || !organizationId) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  if (!(await canManageInvites(userId, organizationId, role))) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  const { error } = await getSupabaseServiceClient()
-    .from("invite_codes")
-    .update({ is_active: false })
-    .eq("id", inviteCodeId)
-    // Org-scope the write like activate/delete do — canManageInvites only proves the caller may
-    // manage THIS org's invites, not that the given code belongs to it, so without this an invite
-    // manager could deactivate another org's code by id.
-    .eq("organization_id", organizationId);
-
-  if (error) {
-    redirect("/admin/users/invites?error=save_failed");
-  }
-
-  redirect("/admin/users/invites?deactivated=1");
+  await toggleInvite(formData, false);
 }
 
 export async function activateInviteCode(formData: FormData) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    redirect("/auth/login?next=/admin/users/invites");
-  }
-
-  const role = await getCurrentRole(userId);
-  const inviteCodeId = String(formData.get("inviteCodeId") ?? "");
-  const organizationId = String(formData.get("organizationId") ?? "");
-
-  if (!role || !inviteCodeId || !organizationId) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  if (!(await canManageInvites(userId, organizationId, role))) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  const { error } = await getSupabaseServiceClient()
-    .from("invite_codes")
-    .update({ is_active: true })
-    .eq("id", inviteCodeId)
-    .eq("organization_id", organizationId);
-
-  if (error) {
-    redirect("/admin/users/invites?error=save_failed");
-  }
-
-  redirect("/admin/users/invites?activated=1");
+  await toggleInvite(formData, true);
 }
 
 export async function deleteInviteCode(formData: FormData) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    redirect("/auth/login?next=/admin/users/invites");
-  }
-
-  const role = await getCurrentRole(userId);
-  const inviteCodeId = String(formData.get("inviteCodeId") ?? "");
-  const organizationId = String(formData.get("organizationId") ?? "");
-
-  if (!role || !inviteCodeId || !organizationId) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  if (!(await canManageInvites(userId, organizationId, role))) {
-    redirect("/admin/users/invites?error=forbidden");
-  }
-
-  // Hard delete (MVP deletion policy). Org-scoped so a code can only be deleted from within its own
-  // organization. Members who already joined with this code keep their memberships — only the code
-  // record is removed.
-  const { error } = await getSupabaseServiceClient()
-    .from("invite_codes")
-    .delete()
-    .eq("id", inviteCodeId)
-    .eq("organization_id", organizationId);
-
-  if (error) {
-    redirect("/admin/users/invites?error=save_failed");
-  }
-
-  redirect("/admin/users/invites?deleted=1");
+  const actor = await inviteActorOrRedirect();
+  const result = await deleteInviteCodeAs(actor, {
+    inviteCodeId: String(formData.get("inviteCodeId") ?? ""),
+    organizationId: String(formData.get("organizationId") ?? ""),
+  });
+  redirect(result.ok ? "/admin/users/invites?deleted=1" : `/admin/users/invites?error=${result.error}`);
 }

@@ -167,9 +167,14 @@ async function resolveActor(
   return { actorUserId, actorRole, membership };
 }
 
+/** 모바일 사용자 관리(2026-10-20)도 같은 액션을 쓴다 — 두 화면을 같이 새로 그린다. */
+const MOBILE_LIST_PATH = "/mobile/users";
+
 function revalidateMember(membershipId: string) {
   revalidatePath(LIST_PATH);
   revalidatePath(`${LIST_PATH}/${membershipId}`);
+  revalidatePath(MOBILE_LIST_PATH);
+  revalidatePath(`${MOBILE_LIST_PATH}/${membershipId}`);
 }
 
 export async function setMemberRole(membershipId: string, role: string): Promise<ActionResult> {
@@ -472,6 +477,7 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
   if (membershipError) return { ok: false, error: "delete_failed" };
   if (deleteScope(otherOrgs) === "membership") {
     revalidatePath(LIST_PATH);
+    revalidatePath(MOBILE_LIST_PATH);
     return { ok: true };
   }
   await service.from("profiles").delete().eq("id", userId);
@@ -479,5 +485,6 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
   if (error) return { ok: false, error: "delete_failed" };
 
   revalidatePath(LIST_PATH);
+  revalidatePath(MOBILE_LIST_PATH);
   return { ok: true };
 }

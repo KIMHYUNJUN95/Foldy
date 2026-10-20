@@ -28,6 +28,7 @@ import {
   SprayCan,
   TrendingUp,
   Undo2,
+  UserCog,
   UserSearch,
   Users,
   Wrench,
@@ -257,6 +258,15 @@ export const mobileSidebarNavigation = [
     label: localizedNavigationLabels.mobile.directory,
     href: "/mobile/directory",
     icon: Users,
+  },
+  // 사용자 관리(2026-10-20) — 데스크톱 `/admin/users` 의 모바일판(멤버 · 권한 · 초대코드). 대시보드 메뉴와 같은 키
+  // `user.manage`(개발자 + 위임받은 사람)로만 보인다. See docs/product/17-user-profile-directory.md → 「모바일 사용자 관리」.
+  {
+    id: "users",
+    label: localizedNavigationLabels.mobile.users,
+    href: "/mobile/users",
+    icon: UserCog,
+    capability: "user.manage",
   },
 ] as const satisfies readonly NavigationItem[];
 

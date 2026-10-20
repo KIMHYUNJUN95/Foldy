@@ -47,6 +47,8 @@ const FEATURE_DETAIL_PATTERNS = {
   requests: /^\/mobile\/requests\/(maintenance|lost-found|orders)\/(?!new$|disposed$|returned$)[^/]+$/,
   suggestions: /^\/mobile\/suggestions\/(?!new$|referenced$)[^/]+(\/edit)?$/,
   tasks: /^\/mobile\/tasks\/(?!new$|projects$)[^/]+(\/edit)?$/,
+  /** 사용자 관리(2026-10-20) — 멤버 상세. 초대코드 탭은 상세가 아니다. */
+  users: /^\/mobile\/users\/(?!invites$)[^/]+$/,
 } as const satisfies Record<string, RegExp>;
 
 export const SPLIT_DETAIL_PATTERNS = {

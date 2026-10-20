@@ -23,7 +23,7 @@ import "@/components/shell/mobile-menu.css";
 
 // 묶음 — 시안 순서. 여기 없는 새 메뉴는 「업무」 끝에 붙는다(빠뜨리지 않게).
 const COMMS_IDS: readonly string[] = ["announcements", "board", "complaints", "suggestions", "directory"];
-const WORK_ORDER: readonly string[] = ["home", "calendar", "cleaning", "requests", "tasks", "attendance", "linen-return"];
+const WORK_ORDER: readonly string[] = ["home", "calendar", "cleaning", "requests", "tasks", "attendance", "linen-return", "users"];
 const LOCALES: readonly Locale[] = ["ko", "ja", "en"];
 
 function orderBy(items: NavigationItem[], order: readonly string[]) {

@@ -59,6 +59,14 @@ export const NAV_GLYPHS: Record<string, ReactNode> = {
       <path d="M16.3 6.3a2.8 2.8 0 010 5M18.2 18.8c-.3-1.3-.8-2.4-1.6-3.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   ),
+  users: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle data-fill="" cx="10" cy="8.5" r="3.3" stroke="currentColor" strokeWidth="1.8" />
+      <path data-fill="" d="M3.8 19.2c.9-2.8 3.3-4.4 6.2-4.4 1.1 0 2.1.2 3 .6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="17.5" cy="17" r="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M17.5 13.4v1.2M17.5 19.4v1.2M21.1 17h-1.2M15.1 17h-1.2M20 14.5l-.8.8M15.8 18.7l-.8.8M20 19.5l-.8-.8M15.8 15.3l-.8-.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
   suggestions: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path data-fill="" d="M4 13l2.2-7.2A2 2 0 018.1 4.4h7.8a2 2 0 011.9 1.4L20 13v4.5a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 17.5V13z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />

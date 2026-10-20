@@ -197,3 +197,35 @@ Admin-capable roles should be able to:
 - Deactivate user
 
 Regular users should not be able to change another user's role or status.
+
+## 모바일 사용자 관리 (2026-10-20)
+
+시안 「사용자 관리 · 모바일 시안」 https://claude.ai/artifact/UsmRsgn8tB5DGr4tDwaX7E (보드 25, 스킬 ui-ux-pro-max · apple-hig ·
+emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패널 · 멤버 초대)의 모바일판이다. **새 권한도, 새 서버 판정도 없다.**
+
+| 무엇 | 어디 |
+| --- | --- |
+| 입장 | 대시보드와 같은 문 — 개발자이거나 `user.manage` 위임(`actorCanOpenUserManagement`, `src/app/mobile/users/gate.ts`). 아니면 `/mobile` 로. 메뉴 「사용자」(사이드 메뉴 · 레일 · 사이드바 · 하단 탭 후보)도 같은 키로만 보인다(`src/config/navigation.ts`) |
+| 데이터 | `src/lib/user-management-data.ts`(`loadUserDirectory` · `loadMemberPanel` · `loadUsableInviteCount`) — 대시보드 페이지에서 빼서 둘이 같이 쓴다 |
+| 멤버 액션 | `src/app/admin/users/actions.ts` 그대로(역할 · 소속 · 상태 · 권한 · 플래그 · 개발자 지정 · 삭제). 바꾸면 `/admin/users` · `/mobile/users` 둘 다 다시 그린다 |
+| 초대코드 액션 | 본체 `src/lib/invite-codes-server.ts`(만들기 · 끄기/켜기 · 삭제 · 줄 수 있는 역할 · 고를 수 있는 조직). 대시보드 폼 액션(`/admin/settings/actions.ts`)은 결과를 주소 쿼리로, 모바일 액션(`src/app/mobile/users/actions.ts`)은 결과를 그대로 돌려준다 |
+
+화면(`src/components/mobile/users/*`, `mobile-users.css`):
+
+- **목록** `/mobile/users` — 큰 제목 34 · 「멤버 · 초대코드」 탭(주소가 다른 두 화면) · 검색(이름 · 이메일 · 전화 2자리 이상) ·
+  「역할 · 소속 · 상태 ⌄」 버튼 하나 → 거르기 시트(칩 · 「n명 보기」, 고른 값이 버튼 글자가 됨) · 활성 / 비활성 묶음(17). 줄 = 이름(나) / 역할 · 소속.
+  결과가 없으면 「조건에 맞는 멤버가 없어요」 + 조건 지우기.
+- **상세** `/mobile/users/{membershipId}` — 이름 · 역할 · 소속, 빨간 휴지통(바꿀 수 있고 마지막 대표가 아닐 때만) → 연락처(전화는 하이픈 표시 · 누르면 걸기)
+  → 역할 ›(역할 시트 — 체크, 고르면 바로 저장 + 알림 「되돌리기」 6초 줄) · 소속 · 상태(비활성은 확인 시트, 먹색 버튼 — 다시 켤 수 있어서;
+  바꾼 뒤 「되돌리기」) → 권한 스위치(둘째 줄 = 역할로 받음 · 개인 부여 · 기한 · 개인 차단, 7일 안 만료 · 차단은 빨강). 기한을 묻는 권한은 그 줄이
+  옅은 보라로 펼쳐져 **무기한** · 1주 · 1개월 · 3개월 · 날짜(공용 날짜 시트, 내일부터). 삭제 확인은 빨간 버튼 + 「되돌릴 수 없어요」.
+  나 · 대표/전무 · 개발자 계정은 자물쇠 안내 + 값만.
+- **초대코드** `/mobile/users/invites` — 새 초대코드(조직이 여럿일 때만 조직 줄 · 역할 › · 코드 ↻ · 기한 · 횟수, 「세부 설정 바꾸기」로 코드 · 이름 ·
+  기한(날짜 시트) · 횟수를 덮어씀) → 코드 목록(고정폭 코드 · 「역할 · 사용 / 최대회 · 기한」 · 복사 → 「✓ 복사됨」 1.5초 · 「⋯」 = 끄기/다시 켜기 · 삭제 → 확인).
+  만든 직후에는 목록이 위로 오고 새 코드가 옅은 보라.
+- **넓은 화면** — 폴드: 레일 + 셸 가운데 칸. 태블릿 가로: 목록 \| 상세 칸(`SplitList`, `SPLIT_DETAIL_PATTERNS.users`, 고른 줄 옅은 보라 · 테두리 없음).
+  초대코드는 상세 주소가 없어 한 단. 시트는 태블릿에서 가운데 카드(공용 BottomSheet).
+- **알림** — 한 줄 알약(판매 캘린더와 같은 모양): 역할 · 상태 = 「되돌리기」 + 6초 줄, 스위치 · 소속 = 글만 2초(스위치가 곧 되돌리기), 실패 = 빨간 기운 + 이유 5초
+  (낙관적으로 넘어갔던 스위치 · 값은 제자리로).
+
+시안과 다르게 둔 것: 불러오는 중 · 불러오지 못함(시안 ⑮ ⑯)은 앱 공용 로더(`/mobile/loading.tsx`) · 공용 오류 화면을 쓴다. 상세 위 줄은 셸 머리 그대로(시안의 작은 「멤버」 제목 없음).

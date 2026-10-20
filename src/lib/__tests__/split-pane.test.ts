@@ -23,6 +23,12 @@ describe("split pane detail patterns", () => {
     expect(matchesDetail(P.bugs, "/mobile/bugs")).toBe(false);
   });
 
+  it("users opens a member detail, not the invites tab (2026-10-20)", () => {
+    expect(matchesDetail(P.users, "/mobile/users/cb934ba7-66b2-49a9-abdc-3fff26fa80ab")).toBe(true);
+    expect(matchesDetail(P.users, "/mobile/users/invites")).toBe(false);
+    expect(matchesDetail(P.users, "/mobile/users")).toBe(false);
+  });
+
   it("notifications open any feature detail in the pane, nothing else (2026-10-05)", () => {
     expect(matchesDetail(P.notifications, "/mobile/requests/maintenance/abc?from=notif")).toBe(true);
     expect(matchesDetail(P.notifications, "/mobile/tasks/123")).toBe(true);

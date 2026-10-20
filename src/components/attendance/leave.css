@@ -1242,6 +1242,24 @@
 .lvw .lvw-empty { margin: 18px 0; font-size: 14px; color: var(--text-3); }
 .lvw .lvw-rules-h, .lvw .lvw-rules { display: none; }
 .lvw .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* HIG 다듬기 2차 — 연차 홈만(2026-10-20, HIG 캔버스 A2Leave-* · 지금 A2LeaveNow-*). 캘린더 · 내역 · 신청서는 다음 시안이라 `.lvw--home` 으로 묶는다.
+   줄 사이 선은 줄 사이에만(앞 아이콘 없는 줄 → 끝까지, 묶음 첫 줄 위 선 없음) · 묶음 제목 17/600 · 높이 44 · 줄 16/13 · 오른쪽 숫자 15 ·
+   큰 숫자 주변 15 · 범례 13 · 링크 15 · 누르는 자리 44 · 부여 규칙 16 · 빈 화면 15. 큰 숫자 40 그대로. */
+.lvw--home .lvw-title span { font-size: 15px; }
+.lvw--home .lvw-hero__k, .lvw--home .lvw-hero__s { font-size: 15px; }
+.lvw--home .lvw-legend { font-size: 13px; }
+.lvw--home .lvw-row { border-top: 0; }
+.lvw--home .lvw-row + .lvw-row { border-top: 0.5px solid var(--separator); }
+.lvw--home .lvw-row__t { font-size: 16px; }
+.lvw--home .lvw-row__s { font-size: 13px; }
+.lvw--home .lvw-row__n { font-size: 15px; }
+.lvw--home .lvw-links { margin-top: 6px; }
+.lvw--home .lvw-links a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
+.lvw--home .lvw-sec { align-items: center; min-height: 44px; margin-top: 18px; padding-bottom: 0; }
+.lvw--home .lvw-sec b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.lvw--home .lvw-sec a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
+.lvw--home .lvw-empty { font-size: 15px; }
+
 @media (min-width: 1000px) and (min-height: 600px) {
   .lv.lvw { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 36px; align-items: start; }
   .lvw .lvw-left { position: sticky; top: 12px; }

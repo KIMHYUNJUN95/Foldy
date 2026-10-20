@@ -80,7 +80,7 @@ export function LeaveHome({
   // 화이트 리디자인(2026-10-13, 시안 AttLeaveHomeM-Phone · Fold · Tablet): 큰 「사용 가능 n일」 → 부여 · 사용 · 대기 한 줄 + 막대 →
   // 다음 자동 부여 · 4년 보너스 줄 → 연차 신청하기 · 캘린더 · 신청 내역 → 최근 신청. 태블릿 가로는 오른쪽에 최근 신청 · 부여 규칙.
   return (
-    <div className="lv lvw">
+    <div className="lv lvw lvw--home">
       <div className="lvw-left">
         <div className="lvw-title">
           <h1>{c.homeTitle}</h1>

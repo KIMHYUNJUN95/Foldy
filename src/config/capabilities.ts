@@ -172,9 +172,14 @@ export const CAPABILITIES = {
    * 화면이 「역할로 받은 권한」을 보여줄 때 사실과 달라지면 안 되기 때문이다.
    */
 
-  /** `order_requests` UPDATE 정책. 본인이 올린 건은 역할과 무관하게 수정 가능(행 단위라 여기 없다). */
+  /**
+   * 주문 처리(승인 · 주문 · 거절 · 배송일 · 관리자 메모). 처음엔 `order_requests` UPDATE 정책(행 단위)을 그대로 옮겨 field_manager 가
+   * 들어 있었지만, 처리 칸은 사무실 쪽만 바꾼다 — 문서 10번 「Status Change Permission」 · 앱 게이트 `canProcessOrders` · DB 트리거
+   * `enforce_order_request_processing`(202610190006) 셋 다 field_manager 를 뺀다. 그래서 **2026-10-20 여기서도 뺐다**(사용자 화면이
+   * 「역할로 받음 · 켜짐」으로 잘못 보였다). 현장 관리자 중 맡길 사람은 개인 부여로.
+   */
   order_processor: {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff"],
     individualGrant: true,
     individualDeny: true,
     asksExpiry: true,

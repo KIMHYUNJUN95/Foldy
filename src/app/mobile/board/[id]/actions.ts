@@ -30,7 +30,7 @@ export type MentionableMember = {
 };
 
 const ALLOWED_EMOJIS = new Set(["👍", "❤️", "😂", "😮", "😢"]);
-const MANAGER_ROLES = new Set(["owner", "office_admin"]);
+const MANAGER_ROLES = new Set(["owner", "senior_managing_director", "office_admin"]);
 
 type ActionResult = { ok: true } | { error: string };
 

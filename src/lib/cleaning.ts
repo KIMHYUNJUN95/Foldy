@@ -28,6 +28,7 @@ export const cleaningOperatingTimeZone = "Asia/Tokyo";
 export const cleaningMobileAccessRoles = [
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "field_manager",
   "staff",
   "part_time_staff",
@@ -56,6 +57,7 @@ export const cleaningForceCompleteRoles = [
 export const cleaningReadAllRoles = [
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
   "field_manager",

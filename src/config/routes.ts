@@ -12,6 +12,7 @@ export type RouteAccess = {
 const allRoles = [
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
   "field_manager",
@@ -22,6 +23,7 @@ const allRoles = [
 const adminRoles = [
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
 ] as const satisfies readonly Role[];

@@ -20,6 +20,7 @@ import type { Database } from "@/types/database";
 export const announcementCreatorRoles = [
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
   "field_manager",

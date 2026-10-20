@@ -23,7 +23,7 @@ type ItemRow = Database["public"]["Tables"]["linen_items"]["Row"];
 type LineRow = Database["public"]["Tables"]["linen_return_record_items"]["Row"];
 
 /** Admin-capable roles may edit/delete ANY record (mirrors the RLS policy set). */
-const ADMIN_CAPABLE_ROLES: readonly Role[] = ["owner", "office_admin", "cs_staff", "field_manager"];
+const ADMIN_CAPABLE_ROLES: readonly Role[] = ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"];
 
 export type AdminLinenLine = {
   itemId: string;

@@ -30,7 +30,7 @@ const BUG_STATUSES: ReadonlySet<BugStatus> = new Set([
   "closed",
 ]);
 
-const REVIEWER_ROLES: ReadonlySet<string> = new Set(["owner", "office_admin"]);
+const REVIEWER_ROLES: ReadonlySet<string> = new Set(["owner", "senior_managing_director", "office_admin"]);
 
 const REQUEST_IMAGES_BUCKET = "request-images";
 const MAX_IMAGES = 5;

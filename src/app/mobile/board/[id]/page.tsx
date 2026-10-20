@@ -12,7 +12,7 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-const MANAGER_ROLES = new Set(["owner", "office_admin"]);
+const MANAGER_ROLES = new Set(["owner", "senior_managing_director", "office_admin"]);
 
 export default async function BoardPostPage({ params }: PageProps) {
   const { id } = await params;

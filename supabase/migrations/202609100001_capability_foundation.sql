@@ -72,7 +72,6 @@ insert into public.capability_roles (capability, role) values
   ('order_processor', 'senior_managing_director'::organization_role),
   ('order_processor', 'office_admin'::organization_role),
   ('order_processor', 'cs_staff'::organization_role),
-  ('order_processor', 'field_manager'::organization_role),
   ('maintenance_status_change', 'owner'::organization_role),
   ('maintenance_status_change', 'senior_managing_director'::organization_role),
   ('maintenance_status_change', 'office_admin'::organization_role),

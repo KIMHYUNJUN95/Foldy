@@ -518,6 +518,11 @@ processing actions and the admin console's reject / reopen / correct / edit acti
 by anyone else even through a direct API call — the row-level UPDATE policy alone let the requester and Field Manager
 change them.
 
+Permission registry (2026-10-20): the `order_processor` capability's role defaults no longer include `field_manager`
+(`src/config/capabilities.ts` + `capability_roles`, migration `202610200001`). Before this, the user-management screen showed
+Field Managers as 「역할로 받음 · 켜짐」 for 주문 처리 although every real gate refused them. A specific Field Manager can still be
+given 주문 처리 by individual grant. Owner-equivalent 전무 processes orders like Owner.
+
 Important:
 
 - Part-time Staff can register and view order requests but cannot approve, reject, or mark as ordered.

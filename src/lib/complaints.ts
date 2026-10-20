@@ -43,10 +43,11 @@ const COMPLAINT_PLATFORMS: ReadonlySet<ComplaintPlatform> = new Set([
   "other",
 ]);
 
-// 작성 가능: developer_super_admin, owner, office_admin, cs_staff
+// 작성 가능: developer_super_admin, owner · 전무(대표와 같음, 2026-10-20), office_admin, cs_staff
 const WRITE_COMPLAINT_ROLES: ReadonlySet<string> = new Set([
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
 ]);
@@ -58,6 +59,7 @@ const NO_COMMENT_ROLES: ReadonlySet<string> = new Set(["part_time_staff"]);
 const COMPLAINT_ADMIN_ROLES: ReadonlySet<string> = new Set([
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
 ]);
 

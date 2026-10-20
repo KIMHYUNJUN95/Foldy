@@ -103,6 +103,11 @@ An organization role fully equivalent to `owner` in every organization-scoped pe
   `docs/planning/01-decision-log.md` → 2026-07-13.
 - See `docs/planning/01-decision-log.md` → 2026-07-13 ("사용자/권한 모델 개편") for the full decision
   record.
+- **App-code role lists follow the same rule (2026-10-20).** DB helpers already treat 전무 as owner, but six
+  features kept hand-written role lists without 전무 — 공지 작성, 청소(모바일 사용 · 남의 기록 보기), 컴플레인 작성 · 관리,
+  린넨 반품 관리, 버그 신고 검토 · 알림, 게시판 남의 글 · 댓글 삭제, 요청 목록의 「남의 것 삭제」 버튼. All now include
+  `senior_managing_director`. Wherever a feature doc says "owner/office_admin", read it as "owner · 전무 · office_admin".
+  Regression test `src/lib/__tests__/senior-director-parity.test.ts` fails if any role list in `src/` names `owner` without 전무.
 
 ### Office Admin
 

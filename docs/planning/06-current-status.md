@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 권한 정리 ①: 전무 누락 · 주문 처리 불일치
+
+- 전무가 빠져 있던 앱 역할 목록에 전무 추가: 공지 작성 · 청소(모바일 · 남의 기록) · 컴플레인 작성/관리 · 린넨 관리 · 버그 검토/알림 · 게시판 삭제 ·
+  요청 「남의 것 삭제」 버튼. 회귀 테스트 `senior-director-parity.test.ts`.
+- 주문 처리 권한 키에서 현장 관리자 제거(레지스트리 + `capability_roles` 마이그레이션 `202610200001`) — 문서 · 앱 · DB 트리거와 맞춤. 개인 부여는 그대로.
+
 ## 2026-10-20 — 모바일 사용자 관리
 
 - `/mobile/users`(멤버 목록 · 검색 · 거르기 시트) · `/mobile/users/{id}`(연락처 · 역할 시트 · 소속 · 상태 · 권한 스위치 · 기한 줄(무기한 포함) · 삭제)

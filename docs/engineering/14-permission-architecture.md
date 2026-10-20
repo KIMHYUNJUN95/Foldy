@@ -224,7 +224,7 @@ RLS 에서도 같은 키로 판정한다: `beds24_price_jobs` · `price_change_l
   platformBypass: true,
 },
 order_processor: {
-  roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+  roles: ["owner", "senior_managing_director", "office_admin", "cs_staff"], // 2026-10-20 field_manager 뺌(문서 10 · 앱 · DB 트리거와 맞춤)
   individualGrant: true,
   individualDeny: true,       // 「사무직인데 이 사람만 제외」
   asksExpiry: true,           // 켤 때 기한 줄(무기한 · 1주 · 1개월 · 3개월 · 날짜)

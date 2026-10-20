@@ -14,7 +14,7 @@ import type {
 } from "@/lib/notifications/types";
 import type { Database } from "@/types/database";
 
-const BUG_REPORT_REVIEWER_ROLES = ["owner", "office_admin"] as const;
+const BUG_REPORT_REVIEWER_ROLES = ["owner", "senior_managing_director", "office_admin"] as const;
 
 type TaskNotificationType =
   | "task_shared"

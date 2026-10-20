@@ -392,6 +392,7 @@ type EnrichedMaintenance = MaintenanceReportWithReporter & { location: RequestLo
 const DELETE_ANY_ROLES: ReadonlySet<Role> = new Set([
   "developer_super_admin",
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
   "field_manager",

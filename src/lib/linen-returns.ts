@@ -48,6 +48,7 @@ type ProfileName = { id: string; name: string };
 // Admin-capable roles can edit/delete any record (mirrors the RLS policy set).
 const ADMIN_CAPABLE_ROLES: readonly Role[] = [
   "owner",
+  "senior_managing_director",
   "office_admin",
   "cs_staff",
   "field_manager",

@@ -185,4 +185,35 @@
   .mrv-arrow:active, .mrv-mlabel:active, .mrv-row:active, .mrv-col:active, .mrv-sheet__m:active { transform: none; }
 }
 .mrv a, .mrv button { touch-action: manipulation; }
-.mrv a, .mrv button { touch-action: manipulation; }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Rev-* · 지금 A2RevNow-*): 가동률과 같은 크기 — 아래 줄 15 · 달 이동 누르는 자리 44 ·
+   총매출 이름 · 아래 줄 15 · 숫자 넷 13/20/13 · 묶음 제목 17/600 높이 44 · 범례 · 달 13(좁으면 범례가 아래 줄로) · 가동률 % 11 ·
+   채널 줄 16 · 건물 줄 16/13 · 선은 줄 사이에만 · 건물 막대 회색 바탕 없음(1등 기준 상대 길이라 목표처럼 보였다) · 시트 17/16. */
+.mrv-h__t > span { font-size: 15px; color: var(--mrv-soft); }
+.mrv-arrow, .mrv-mlabel { position: relative; }
+.mrv-arrow::before, .mrv-mlabel::before { content: ""; position: absolute; inset: -4px; }
+.mrv-hero__l, .mrv-hero__s, .mrv-hero__s .mrv-d { font-size: 15px; }
+.mrv-d { font-size: 13px; }
+.mrv-nums dt, .mrv-nums dd.mrv-nums__s { font-size: 13px; }
+.mrv-nums dd { font-size: 20px; }
+.mrv-sec { gap: 8px; padding-top: 10px; }
+.mrv-sec h2 { display: flex; align-items: center; min-height: 44px; font-size: 17px; font-weight: 600; }
+.mrv-sec__h { flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.mrv-sec__h > span { font-size: 13px; }
+.mrv-lg { font-size: 13px !important; }
+.mrv-col__m { font-size: 13px; }
+.mrv-col__o { font-size: 11px; }
+.mrv-note { font-size: 13px; }
+.mrv-ch ul { gap: 14px; }
+.mrv-ch li { font-size: 16px; }
+.mrv-ch li > b { width: 44px; }
+.mrv-bld li { border-top: 0; }
+.mrv-bld li + li { border-top: 0.5px solid var(--separator); }
+.mrv-row { padding: 12px 0; }
+.mrv-row__top { font-size: 16px; }
+.mrv-row__d { width: 64px; font-size: 13px; }
+.mrv-row__bar { background: transparent; }
+.mrv-sheet__h { font-size: 17px; font-weight: 600; }
+.mrv-sheet__m { font-size: 16px; }
+.mrv-sheet__m span { font-size: 13px; }
+@media (min-width: 1000px) and (min-height: 600px) { .mrv-bld { padding-top: 0; } }

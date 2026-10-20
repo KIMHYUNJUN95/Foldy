@@ -14,6 +14,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - Beds24 새 객실 `601`(745422, 파는 쪽 2박) · `601_2`(745475, 99박 = 끔, 가격은 601 을 따름)을 `rooms` 에 넣고 최소 숙박 · 상태 · 요금 12개월을 맞췄다.
   방 마스터 백필은 꺼 둔 방을 뒤집어서 쓰지 않았다. 도어 비밀번호는 나중에. 순서 `docs/engineering/01-beds24-integration.md` 「기존 건물에 새 객실 넣기」.
 
+## 2026-10-20 — HIG 다듬기 2차 · 모바일 매출
+
+- `/mobile/ops/revenue` 크기를 가동률과 맞춤 — 아래 줄 15 · 달 이동 누르는 자리 44 · 총매출 이름 · 아래 줄 15 · 숫자 넷 13/20/13 · 묶음 제목 17/600 높이 44 ·
+  범례 · 달 13 · 가동률 % 11 · 채널 줄 16 · 건물 줄 16/13 · 선은 줄 사이에만 · 건물 막대 회색 바탕 뺌(1등 기준 상대 길이) · 시트 17/16. HIG 캔버스 A2Rev-*.
+  상세 `docs/product/34-metrics-and-automation.md` 「모바일 매출」 → 「HIG 다듬기 2차」.
+
 ## 2026-10-20 — HIG 다듬기 2차 · 모바일 가동률
 
 - `/mobile/ops/occupancy` 크기 다듬기 — 아래 줄 15 · 달 이동 누르는 자리 44 · 고리 132 → 152(영어 전년 표시가 고리에 안 닿게, 가운데 32) · 이름표 13 ·

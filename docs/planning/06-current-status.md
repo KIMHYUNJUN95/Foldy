@@ -34,6 +34,7 @@ and the major mobile/admin operations modules are implemented and being hardened
   시안 https://claude.ai/artifact/SL1oygg2h9bs8CLpCJzjtC. 상세 `docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」.
 - PC 대시보드(`/admin/tasks`) 업무일지 창도 같은 예약 — 아래 한 줄(보낼 시각 칩 · 전체 복사 · 보내기, 닫기 글자 버튼 뺌) + 칩 위 작은 창(← → · Space · Esc),
   예약됨 줄 · 날짜 줄 표시. 시안 https://claude.ai/artifact/N2XxQQtMQZA3NQqgBsHVBD.
+- 수정: 예약이 저장되지 않던 문제 — 표에 service_role 권한이 없었다(`permission denied for table task_report_schedules`). 마이그레이션 `202610200006`(운영 DB 적용).
 
 ## 2026-10-20 — 채널 예약도 날짜 변경 · 객실 이동 때 날짜 변경
 

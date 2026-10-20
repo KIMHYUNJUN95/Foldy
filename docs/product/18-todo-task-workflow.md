@@ -1219,7 +1219,8 @@ Task completion was re-introduced (it had been removed in the 2026-06-12 IA clea
 | PC 콘솔 (2026-10-20, 시안 https://claude.ai/artifact/N2XxQQtMQZA3NQqgBsHVBD) | 가운데 업무일지 창의 **아래 한 줄**: 왼쪽 「🕒 보낼 시각 · 지금 바로 ⌄」 칩(시각을 고르면 옅은 보라 「오늘 19:00」), 오른쪽 「전체 복사」(회색) · 보내기(보라). 「닫기」 글자 버튼은 뺐다 — 위 X · Esc · 바깥 누르기. 칩을 누르면 **칩 위로 작은 창** 「오늘 언제 보낼까요?」 — 지금 바로 · 18:00 · 19:00 · 20:00 · 직접(시 칩 줄 + 분 4칸). 키보드: Tab 으로 칩 줄에 들어가 ← → 이동 · Space/Enter 고르기 · Esc 는 작은 창부터 닫는다(화면에 키 안내 글은 넣지 않는다 — 사용자 결정). 예약됨 줄(제목 아래) · 「19:00 예약됨」/「바뀐 내용으로 예약」 · 결과 한 줄 · 「완료 · 기록」 날짜 줄 표시는 모바일과 같다. 지금 보내기 · 예약 · 취소 결과는 콘솔 토스트, 실패 · 바뀐 내용 · 예약이 보냄/못 보냄은 창 안 한 줄. 같은 서버 액션(`report-schedule-actions.ts` — `/admin/tasks` 도 다시 그린다), 시각 계산은 `src/lib/report-schedule-time.ts` 를 모바일과 같이 쓴다. 문구 `admin-tasks-i18n.ts` `rptWhen*` · `rptSchedule*` · `rptList*`(ko/ja/en). |
 
 서버:
-- 표 `task_report_schedules`(마이그레이션 `202610200005`) — 본인만 읽기(RLS), 쓰기는 서버(service role). 한 사람 · 한 날짜에 살아 있는 예약 하나(부분 유니크) —
+- 표 `task_report_schedules`(마이그레이션 `202610200005`) — 본인만 읽기(RLS), 쓰기는 서버(service role). **표 권한(GRANT)은 `202610200006`** — 0005 가 빠뜨려 첫날 예약이 `permission denied` 로 저장되지 않고 「Slack으로 보내지 못했습니다」가 떴다(2026-10-20 수정).
+  새 표를 만들 땐 `grant all … to service_role` · 필요하면 `grant select … to authenticated` 를 같이 적는다 — 이 프로젝트는 기본 권한으로 DML 이 붙지 않는다. 한 사람 · 한 날짜에 살아 있는 예약 하나(부분 유니크) —
   다시 예약하면 이전 것을 취소하고 새로 넣는다. 액션 `src/app/mobile/tasks/report-schedule-actions.ts`(`scheduleDailyReport` · `cancelDailyReportSchedule` ·
   `getReportSchedule` · `listReportSchedules`). 예약할 때 권한 · 빈 일지는 지금 보내기와 같은 판정(`generateDailyReport`).
 - 보내기: pg_cron 이 **매 분** `task_report_tick_if_needed()` — 보낼 때가 된 예약이 있을 때만 pg_net 으로 `/api/tasks/report-tick`(토큰은 Vault

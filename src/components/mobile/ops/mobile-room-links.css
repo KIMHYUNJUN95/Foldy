@@ -201,3 +201,28 @@
   .mrl-tab, .mrl-tab b, .mrl-copy, .mrl-big, .mrl-tl { transition: none !important; }
   .mrl-tab:active, .mrl-copy:active, .mrl-big:active, .mrl-tl:active { transform: none !important; }
 }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Links-* · 지금 A2LinksNow-*): 아래 줄 15 · 건물 탭 15 · 건물 이름 22 · 주소 15 · Booking 줄 13 ·
+   링크 글자 15 · 객실 아래 줄 13 · 복사 15 · 상세 28/34 · 유닛 17/600 · 작은 글자 13 · 링크 주소 15 · 큰 복사 50 · 메모 15. */
+.mrl-h p { font-size: 15px; }
+.mrl-empty { font-size: 15px; }
+.mrl-sec { font-size: 13px; }
+.mrl-tab { font-size: 15px; }
+.mrl-bh h2 { font-size: 22px; }
+.mrl-bh__addr, .mrl-bk__miss { font-size: 15px; }
+.mrl-bk, .mrl-ch { font-size: 13px; }
+.mrl-tl { font-size: 15px; }
+.mrl-tl svg { width: 15px; height: 15px; }
+.mrl-row__sub, .mrl-row__dup { font-size: 13px; }
+.mrl-copy { font-size: 15px; }
+.mrl-copy.is-sm::before { content: ""; position: absolute; inset: -4px 0; }
+.mrl-d__b { font-size: 15px; }
+.mrl-d__head > b { font-size: 28px; line-height: 34px; }
+.mrl-d__sub, .mrl-u__on, .mrl-u__off, .mrl-u__l, .mrl-d__foot { font-size: 13px; }
+.mrl-u__t b { font-size: 17px; font-weight: 600; }
+.mrl-u__url { font-size: 15px; }
+.mrl-big { height: 50px; }
+.mrl-u__memo { font-size: 15px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .mrl-tab b { font-size: 13px; }
+}

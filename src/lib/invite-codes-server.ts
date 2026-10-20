@@ -6,7 +6,6 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { DEFAULT_INVITE_MAX_USES, buildInviteName, defaultInviteExpiry, generateInviteCode } from "@/lib/invite-code-gen";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isYmd, tokyoToday } from "@/lib/tokyo-date";
-import { hasPermissionOverride } from "@/lib/permission-overrides-server";
 import { actorCanManageUsersInOrg } from "@/lib/user-management-access";
 import type { Database } from "@/types/database";
 
@@ -164,7 +163,7 @@ export async function deleteInviteCodeAs(
 type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
 
 /**
- * 초대를 만들 수 있는 조직 — 개발자는 전부, 그 밖은 `user.manage` 를 위임받은 조직. 액션 게이트 `actorCanManageUsersInOrg` 와 같은
+ * 초대를 만들 수 있는 조직 — 개발자는 전부, 그 밖은 대표 · 전무인 조직(2026-10-20)이나 `user.manage` 를 위임받은 조직. 액션 게이트 `actorCanManageUsersInOrg` 와 같은
  * 판정이라 조직 선택기 · 페이지 접근 · 서버 액션이 서로 어긋나지 않는다.
  */
 export async function listManageableOrganizations(userId: string, role: string): Promise<OrganizationRow[]> {
@@ -176,7 +175,7 @@ export async function listManageableOrganizations(userId: string, role: string):
   const { data: membershipData } = await service.from("memberships").select("organization_id").eq("user_id", userId).eq("status", "active");
   const organizationIds: string[] = [];
   for (const membership of (membershipData ?? []) as { organization_id: string }[]) {
-    if (await hasPermissionOverride(membership.organization_id, userId, "user.manage")) organizationIds.push(membership.organization_id);
+    if (await actorCanManageUsersInOrg(userId, role as Role, membership.organization_id)) organizationIds.push(membership.organization_id);
   }
   if (organizationIds.length === 0) return [];
   const { data } = await service

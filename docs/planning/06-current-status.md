@@ -9,6 +9,11 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 권한 정리 ②: 대표 · 전무는 사용자 관리에 기본으로
+
+- `user.manage` 를 대표 · 전무에게 역할로(레지스트리 + `capability_roles` 마이그레이션 `202610200002`). 입장 판정이 그 조직 멤버십 역할로 레지스트리를 본다.
+  위임(개인 부여)은 개발자만 그대로. 메뉴 「사용자」(PC · 모바일)도 대표 · 전무에게 보인다.
+
 ## 2026-10-20 — 권한 정리 ①: 전무 누락 · 주문 처리 불일치
 
 - 전무가 빠져 있던 앱 역할 목록에 전무 추가: 공지 작성 · 청소(모바일 · 남의 기록) · 컴플레인 작성/관리 · 린넨 관리 · 버그 검토/알림 · 게시판 삭제 ·

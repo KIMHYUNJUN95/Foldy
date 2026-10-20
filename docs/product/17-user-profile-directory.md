@@ -205,7 +205,7 @@ emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패�
 
 | 무엇 | 어디 |
 | --- | --- |
-| 입장 | 대시보드와 같은 문 — 개발자이거나 `user.manage` 위임(`actorCanOpenUserManagement`, `src/app/mobile/users/gate.ts`). 아니면 `/mobile` 로. 메뉴 「사용자」(사이드 메뉴 · 레일 · 사이드바 · 하단 탭 후보)도 같은 키로만 보인다(`src/config/navigation.ts`) |
+| 입장 | 대시보드와 같은 문 — 개발자 · 대표 · 전무(역할, 2026-10-20)이거나 `user.manage` 개인 부여(`actorCanOpenUserManagement`, `src/app/mobile/users/gate.ts`). 아니면 `/mobile` 로. 메뉴 「사용자」(사이드 메뉴 · 레일 · 사이드바 · 하단 탭 후보)도 같은 키로만 보인다(`src/config/navigation.ts`) |
 | 데이터 | `src/lib/user-management-data.ts`(`loadUserDirectory` · `loadMemberPanel` · `loadUsableInviteCount`) — 대시보드 페이지에서 빼서 둘이 같이 쓴다 |
 | 멤버 액션 | `src/app/admin/users/actions.ts` 그대로(역할 · 소속 · 상태 · 권한 · 플래그 · 개발자 지정 · 삭제). 바꾸면 `/admin/users` · `/mobile/users` 둘 다 다시 그린다 |
 | 초대코드 액션 | 본체 `src/lib/invite-codes-server.ts`(만들기 · 끄기/켜기 · 삭제 · 줄 수 있는 역할 · 고를 수 있는 조직). 대시보드 폼 액션(`/admin/settings/actions.ts`)은 결과를 주소 쿼리로, 모바일 액션(`src/app/mobile/users/actions.ts`)은 결과를 그대로 돌려준다 |

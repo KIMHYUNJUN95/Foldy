@@ -140,18 +140,15 @@ export const CAPABILITIES = {
   },
 
   /**
-   * 사용자 관리 화면(`/admin/users`) — **지정된 개인만**.
+   * 사용자 관리 화면(`/admin/users` · `/mobile/users`) — 대표 · 전무 + 개발자 + 위임받은 개인.
    *
-   * 원래부터 그런 권한이었다: 기본은 플랫폼 개발자뿐이고, 개발자가 개인에게 위임한다
-   * (2026-07-13 모델). 위임은 지금까지 `memberships.manage_users` 불리언이었는데, 감사 기록이
-   * 없고 관리 화면도 따로였다 — 이 레지스트리가 대체한다. 2026-09-10 기준 그 플래그 보유자는
-   * **0명**이라 이전할 데이터가 없다.
-   *
-   * `roles: []` 라서 어떤 역할도 기본으로 받지 않는다. 개발자는 `platformBypass` 로 통과한다 —
-   * 그래서 위임 목록이 비어도 잠기지 않는다.
+   * 2026-07-13 모델은 「개발자가 기본, 개인에게 위임」이었다(`roles: []`). **2026-10-20 사용자 결정으로 대표 · 전무가 역할로 기본
+   * 포함**된다 — 권한을 바꾸는 자격(`permission.manage`)은 이미 대표 · 전무에게 있는데 화면 입장권이 없어 개발자가 열어 줘야 했다
+   * (권한 조사 ②). 위임(개인 부여)은 여전히 **개발자만** 줄 수 있다(`developerOnly` — 위임받은 사람이 다시 위임하면 번진다).
+   * 보호 규칙은 그대로: 대표 · 전무 · 개발자 계정은 대표 · 전무 · 개발자만, 마지막 대표 보호, 자기 자신 불가(`user-management-guard.ts`).
    */
   "user.manage": {
-    roles: [],
+    roles: ["owner", "senior_managing_director"],
     individualGrant: true,
     individualDeny: false,
     asksExpiry: false,

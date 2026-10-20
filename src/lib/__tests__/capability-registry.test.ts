@@ -125,21 +125,29 @@ describe("판정식", () => {
   });
 
   it("역할이 비어 있는 키는 개인 지정으로만 열린다", () => {
-    // `user.manage` — 조직 역할로는 아무도 받지 않고(개발자만 통과), 개인 부여로만 열린다.
+    // `automation.manage` — 조직 역할로는 아무도 받지 않고(개발자만 통과), 개인 부여로만 열린다.
     for (const role of organizationRoles) {
       expect(
-        evaluateCapability({ capability: "user.manage", role, granted: false, denied: false }),
+        evaluateCapability({ capability: "automation.manage", role, granted: false, denied: false }),
         `${role}`,
       ).toBe(false);
     }
     expect(
       evaluateCapability({
-        capability: "user.manage",
+        capability: "automation.manage",
         role: "field_manager",
         granted: true,
         denied: false,
       }),
     ).toBe(true);
+  });
+
+  it("사용자 관리는 대표 · 전무가 기본, 나머지는 개인 부여로만 (2026-10-20)", () => {
+    for (const role of organizationRoles) {
+      const expected = role === "owner" || role === "senior_managing_director";
+      expect(evaluateCapability({ capability: "user.manage", role, granted: false, denied: false }), `${role}`).toBe(expected);
+    }
+    expect(evaluateCapability({ capability: "user.manage", role: "office_admin", granted: true, denied: false })).toBe(true);
   });
 
   it("채용 열람은 대표·전무 + 지정된 개인만", () => {

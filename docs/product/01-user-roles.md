@@ -74,10 +74,10 @@ The company representative or business owner.
 Can:
 
 - Manage organization settings
-- Manage all staff (**note, 2026-07-13:** the `/admin/users` user-management screen itself — list,
-  detail, invites — is gated to **developer default + `manage_users` delegation**; an owner without an
-  explicit delegation cannot open it. See "Senior Managing Director (전무)" below and
-  `docs/product/27-permission-override-workflow.md`.)
+- Manage all staff — `/admin/users` · `/mobile/users` (list, detail, invites). **2026-10-20:** owner and 전무 get
+  `user.manage` by role (before: developer default + delegation only, so an owner needed a developer to open it).
+  Other roles still need an individual `user.manage` grant, which only developers can give. Protected-target rules
+  (owner · 전무 · developer accounts, last owner, self) are unchanged. See `docs/product/27-permission-override-workflow.md`.
 - View all records
 - Configure permissions
 - Access admin web
@@ -96,8 +96,7 @@ An organization role fully equivalent to `owner` in every organization-scoped pe
 - Introduced via migrations `202607130002` (enum value) and `202607130003` (`has_org_role` redefined so
   every RLS policy that already checks for `owner` automatically also passes for 전무, with no per-policy
   changes needed).
-- Has every capability listed under Owner above, including the same 2026-07-13 user-management-access
-  caveat.
+- Has every capability listed under Owner above, including user management by role (2026-10-20).
 - Is the **default 연차(annual leave) approver role** (`DEFAULT_APPROVER_ROLE`), replacing the earlier
   `department_head` default — see `docs/product/26-annual-leave-workflow.md` and
   `docs/planning/01-decision-log.md` → 2026-07-13.
@@ -118,9 +117,8 @@ Can:
 - Use admin web
 - View operational records
 - Create and manage announcements
-- Manage staff invitations (**note, 2026-07-13:** invite management now lives at `/admin/users/invites`
-  and shares the same developer-default + `manage_users`-delegation gate as `/admin/users`; office_admin
-  does not get this automatically without a delegation)
+- Manage staff invitations — `/admin/users/invites` · `/mobile/users/invites`, same gate as `/admin/users`
+  (owner · 전무 by role since 2026-10-20; office_admin only with a developer-given `user.manage` grant)
 - Assign or update tasks
 - Manage inventory and order requests
 - View calendar and reservation data

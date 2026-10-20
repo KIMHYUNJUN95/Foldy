@@ -128,7 +128,7 @@ admin 페이지 14개의 게이트를 전수 확인한 결과:
 | --- | --- | --- |
 | 대부분(청소·수리·주문·분실물·근태·업무 등) | `requireAdminPageSession` 뿐(어드민 웹 접근) | **숨기지 않는다** |
 | `/admin/settings` | 페이지는 열리고 내부 섹션만 역할로 막는다 | 숨기지 않는다 |
-| `/admin/users` | 개발자 **또는** `manage_users` 위임 | **`user.manage`** |
+| `/admin/users` · `/mobile/users` | 개발자 · 대표 · 전무(역할, 2026-10-20) **또는** `user.manage` 개인 부여 | **`user.manage`** |
 | `/admin/recruit` | `canReadJobApplications(role)` | 5단계에서 전환 후 적용 |
 
 `/admin/users` 가 첫 적용 대상이 된 이유: 위임 플래그 보유자가 **0명**이라 실제로는 플랫폼
@@ -138,6 +138,11 @@ admin 페이지 14개의 게이트를 전수 확인한 결과:
 **페이지 게이트도 같은 키를 보게 했다.** 사이드바만 키를 보고 페이지는 플래그만 보면 판정이 두
 벌이 된다 — `actorCanOpenUserManagement` 가 `user.manage` 부여도 함께 인정한다. 레거시 플래그는
 위임 UI 를 권한 부여로 옮기는 5단계까지 남겨 둔다(0명이라 당장 문제는 없다).
+
+**대표 · 전무는 `user.manage` 를 역할로 받는다(2026-10-20 사용자 결정, 권한 정리 ②).** 권한을 바꾸는 자격(`permission.manage`)은
+대표 · 전무에게 있는데 화면 입장권이 없어 개발자가 열어 줘야 했다. 레지스트리 `roles` + `capability_roles`(마이그레이션
+`202610200002`) + 입장 판정 `actorCanOpenUserManagement` · `actorCanManageUsersInOrg`(이제 그 조직의 멤버십 역할로 `evaluateCapability`
+— 예전엔 개인 부여만 봤다). 개인 부여(위임)는 여전히 개발자만(`developerOnly`).
 
 **`user.manage` 는 대표급 · 개발자 계정에 닿지 않는다(2026-10-19).** 위임받은 사람이 owner · 전무를
 정지 · 강등 · 삭제할 수 있으면 위임이 곧 권한 상승이다. 사용자 콘솔의 모든 변경 액션은

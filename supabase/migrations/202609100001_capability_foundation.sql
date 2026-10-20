@@ -68,6 +68,8 @@ insert into public.capability_roles (capability, role) values
   ('job_application.triage', 'senior_managing_director'::organization_role),
   ('job_application.delete', 'owner'::organization_role),
   ('job_application.delete', 'senior_managing_director'::organization_role),
+  ('user.manage', 'owner'::organization_role),
+  ('user.manage', 'senior_managing_director'::organization_role),
   ('order_processor', 'owner'::organization_role),
   ('order_processor', 'senior_managing_director'::organization_role),
   ('order_processor', 'office_admin'::organization_role),

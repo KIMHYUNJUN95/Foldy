@@ -125,6 +125,12 @@ Mobile directory (`/mobile/directory`) — 화이트 리디자인(2026-10-14, �
 - Tablet landscape: list 380px + right profile pane drawn by the screen itself with `useIsTablet()` (no detail URL). Pane: avatar · name · `역할 · 소속`, [전화] [번호 복사 → ✓ 복사됨], then 전화 / 역할 / 소속 / 가입. Before picking: a hint line.
 - Motion: rows rise in order, call press, check draw on 복사됨, pane blur → sharp. Off under reduced motion.
 - Uses service-role query to load memberships, profiles and teams (bypasses RLS for directory visibility).
+- **HIG 다듬기 2차 (2026-10-20, 시안 A2Dir-* · 지금 A2DirNow-* 나란히)** — 기능 · 배치는 그대로, `directory.css` 끝 블록만:
+  - 줄 사이 선: 화면 끝(0)부터 긋던 것 → **글자 시작점 52부터**(이니셜 40 + 간격 12, 공용 구분선 규칙 · 태블릿은 줄 안쪽 여백 10 을 더해 62). 묶음 첫 줄 · 고른 줄 위아래는 선 없음.
+  - 묶음 제목 12/600 회색 → **17/600 먹색 · 높이 44**, 인원수 15. 이름 15/600 → 16/500.
+  - 「나」: 옅은 보라 상자 11 → **상자 없는 보라 글자 13**(색 알약 금지).
+  - 검색 「✕」 누르는 자리 44(보이는 32) · 돋보기 17. 입력 글자 16 그대로(iOS 확대 방지).
+  - 「조직 · N명」 · 빈 화면 · 폴드 번호 15. 태블릿 프로필: 역할 줄 15 · 버튼 48 → 50 · 정보 줄 이름 15 / 값 16 · 안내 15.
 
 Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, 시안 Users-PC · UsersGrant-PC · UsersDeact-PC):
 

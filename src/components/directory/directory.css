@@ -74,6 +74,31 @@
 .drw-dl dt { color: var(--drw-soft); }
 .drw-dl dd { margin: 0; }
 
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Dir-* · 지금 A2DirNow-*) — 줄 사이 선은 공용 규칙(글자 시작점 = 이니셜 40 + 간격 12 → 52,
+   태블릿은 줄 안쪽 여백 10 을 더해 62) · 묶음 제목 17/600 · 높이 44 · 이름 16/500 · 「나」 상자 없는 보라 글자 13 · 검색 지우기 44 ·
+   위 줄 · 빈 화면 · 폴드 번호 15 · 프로필 역할 15 · 버튼 50 · 정보 줄 15/16 · 안내 15. */
+.drw-h > span { font-size: 15px; }
+.drw-search > svg { width: 17px; height: 17px; }
+.drw-search button { position: relative; }
+.drw-search button::before { content: ""; position: absolute; inset: -6px; }
+.drw-gl { display: flex; align-items: center; min-height: 44px; margin-top: 10px; padding: 0; font-size: 17px; color: var(--drw-ink); letter-spacing: -0.01em; }
+.drw-gl b { font-size: 15px; }
+.drw-r { border-image: linear-gradient(90deg, transparent 52px, var(--separator) 52px) 1; }
+.drw-gl + .drw-r { border-image: none; }
+.drw.is-tablet .drw-r { border-image: linear-gradient(90deg, transparent 62px, var(--separator) 62px) 1; }
+.drw.is-tablet .drw-gl + .drw-r, .drw.is-tablet .drw-r.on, .drw.is-tablet .drw-r.on + .drw-r { border-image: none; }
+.drw-t b { font-size: 16px; font-weight: 500; }
+.drw-me { padding: 0; border-radius: 0; background: none; font-size: 13px; vertical-align: 0; }
+.drw-empty { font-size: 15px; }
+@media (min-width: 600px) {
+  .drw-ph { font-size: 15px; }
+}
+.drw-hint { font-size: 15px; }
+.drw-prof__h div > span { font-size: 15px; }
+.drw-btn { height: 50px; }
+.drw-dl { font-size: 16px; }
+.drw-dl dt { font-size: 15px; }
+
 @media (prefers-reduced-motion: reduce) {
   .drw-r, .drw-prof, .drw-btn.is-done svg path, .drw-btn.is-done svg polyline { animation: none; }
   .drw-call, .drw-btn { transition: none; }

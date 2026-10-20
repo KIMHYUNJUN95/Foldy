@@ -3809,6 +3809,33 @@
   .att.att--rosterw .ro-right__h span { font-size: 12px; color: var(--text-3); }
 }
 
+/* HIG 다듬기 2차 — 출근자 명단(2026-10-20, HIG 캔버스 A2Roster-* · 지금 A2RosterNow-*). 기능 · 배치 그대로.
+   큰 제목 34/700(다른 화면과 같게) · 아래 줄 15 · 날짜 화살표 · 「오늘」 44 · 줄 사이 선은 공용 규칙(이니셜 38 + 간격 12 → 50, 줄 사이에만) ·
+   이름 16/500 · 역할 · 시각 13 · 전화 44 · 태블릿 달력 ‹ › 44 · 달 17/600 · 요일 13 · 날짜 16 · 요약 줄 44 · 오른쪽 제목 17/600 · 44. */
+.att.att--rosterw .ptitle { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.att.att--rosterw .ptitle__sub { margin-top: 4px; font-size: 15px; font-weight: 400; color: var(--text-3); }
+.att.att--rosterw .ro-daterow__arrow { width: 44px; height: 44px; }
+.att.att--rosterw .ro-daterow__d { height: 44px; font-weight: 600; }
+.att.att--rosterw .ro-daterow__today { height: 44px; font-size: 15px; }
+.att.att--rosterw .ro-line { border-top: 0; }
+.att.att--rosterw .ro-line + .ro-line { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 50px, var(--separator) 50px) 1; }
+.att.att--rosterw .ro-line__t { font-size: 16px; font-weight: 500; }
+.att.att--rosterw .ro-line__t small { font-size: 13px; }
+.att.att--rosterw .ro-line__m { font-size: 13px; }
+.att.att--rosterw .ro-line__call { width: 44px; height: 44px; }
+.att.att--rosterw .ro-line__call.is-empty { width: 44px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .att.att--rosterw .ro-cal__h b { font-size: 17px; font-weight: 600; }
+  .att.att--rosterw .ro-cal__h button { width: 44px; height: 44px; }
+  .att.att--rosterw .ro-cal__h .ro-cal__today { height: 44px; font-size: 15px; }
+  .att.att--rosterw .ro-cal__wd { font-size: 13px; }
+  .att.att--rosterw .ro-cal__d { font-size: 16px; }
+  .att.att--rosterw .ro-legend span { min-height: 44px; }
+  .att.att--rosterw .ro-right__h { align-items: center; min-height: 44px; padding: 0 0 4px; }
+  .att.att--rosterw .ro-right__h b { font-weight: 600; }
+  .att.att--rosterw .ro-right__h span { font-size: 13px; }
+}
+
 /* 출근 QR 화이트 리디자인 — 화면 전체 어두운 스캔 · 사각 구멍 · 코너 맥박 · 잠금 · 체크 그리기(2026-10-13 시안 AttQR*) */
 .att.capw { position: fixed; inset: 0; z-index: 90; overflow: hidden; background: #0e0d13; color: #fff; display: flex; flex-direction: column; align-items: center; padding: max(56px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); }
 .att.capw .capw__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }

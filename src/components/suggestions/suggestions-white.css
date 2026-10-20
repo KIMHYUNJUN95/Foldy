@@ -177,3 +177,28 @@
 @media (prefers-reduced-motion: reduce) {
   .sgw *, .sgw-fs *, .sgw-rs * { animation: none !important; transition: none !important; }
 }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Sugg-* · 지금 A2SuggNow-*) — 기능 · 배치 그대로.
+   위 줄 15 · 고르기 15/13 · 줄 사이 선은 줄 사이에만(상태 글자가 왼쪽 끝 → 끝까지) · 줄 13/16 · 상세 본문 16 · 수정 · 삭제 44/15 ·
+   댓글 제목 17/600 · 댓글 15/13 · 댓글 「⋯」 44 · 메모 · 처리 기록 13 · 빈 화면 17/15. */
+.sgw-h p { font-size: 15px; }
+.sgw-tbtn { font-size: 15px; }
+.sgw-filter__b { font-size: 15px; }
+.sgw-filter__s { font-size: 13px; }
+.sgw-row { border-top: 0; }
+.sgw-row + .sgw-row { border-top: 0.5px solid var(--separator); }
+.split-list .sgw a.sgw-row[data-split-active], .split-list .sgw a.sgw-row[data-split-active] + .sgw-row { border-top-color: transparent; }
+.sgw-meta { font-size: 13px; }
+.sgw-row__t { font-size: 16px; }
+.sgw-empty b { font-size: 17px; }
+.sgw-empty span { font-size: 15px; }
+.sgw-body { font-size: 16px; }
+.sgw-own a, .sgw-own button { min-height: 44px; font-size: 15px; }
+.sgw-note b, .sgw-log { font-size: 13px; }
+.sgw-note { font-size: 15px; }
+.sgw-sec > b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.sg.sgw .cmt__body { font-size: 15px; }
+.sg.sgw .role-pill, .sg.sgw .cmt__t { font-size: 13px; }
+.sg.sgw .cmt button { position: relative; }
+.sg.sgw .cmt button::before { content: ""; position: absolute; inset: -6px; }
+

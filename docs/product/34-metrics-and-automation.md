@@ -411,6 +411,21 @@ i18n `opsRevenueCompare` + `opsRevenue.tabCompare`(ko · ja · en).
 파일: `src/app/mobile/ops/occupancy/page.tsx` · `src/components/mobile/ops/mobile-occupancy.tsx` · `mobile-occupancy.css`(`.moc-*`) ·
 `src/lib/ops-occupancy-summary.ts` · i18n `opsOccupancy.mobile` · 메뉴 라벨 `localizedNavigationLabels.mobile.opsOccupancy`(ko · ja · en).
 
+#### HIG 다듬기 2차 (2026-10-20, HIG 캔버스 A2Occ-* · 지금 A2OccNow-*)
+
+기능 · 배치는 그대로, 크기만 맞췄다(`mobile-occupancy.css` 끝 블록 + 링 기하는 TSX).
+
+- 큰 제목 아래 줄 13 옅은 회색 → **15** 보통 회색. 큰 제목 34/41 그대로.
+- 달 이동 ‹ › · 「10월 ⌄」 보이는 크기 36 그대로, 누르는 자리 **44**(`::before` inset -4).
+- **고리 132 → 152**(반지름 58 → 68, 안쪽 지름 106 → 126) — 영어 「vs last year +3.2p」가 고리에 거의 닿았다. 가운데 숫자 28 → 32,
+  전년 표시 12 → 13.
+- 숫자 넷 이름표 12 → 13(값 20 그대로).
+- 묶음 제목(건물별 · 앞으로 3달 · 월별 추이) 15/700 → **17/600 · 높이 44**, 옆 안내 12 → 13. 묶음 위 여백 18 → 10, 안 간격 12 → 8.
+- 건물 줄 높이 31 · 글자 13 → **44 · 15**(값 15). 막대 · 60% 눈금 그대로, 줄 선 없음 그대로.
+- 앞으로 3달 달 12 → 13, 「빈 박 n」 11 → 13, PC 안내 12 → 13.
+- 태블릿 월별 추이 막대 위 값 · 아래 달 10 → 11(최소 글자).
+- 달 고르기 시트 제목 15/700 → 17/600, 달 줄 15 → 16, 「진행 중」 12 → 13.
+
 ### 모바일 매출 (2026-10-15 구현 — 시안 Rev-Phone · Rev-Fold · Rev-Tablet)
 
 `/mobile/ops/revenue` — PC 매출 화면(「매출 화면」)의 **요약판**이다. 표 · 건물 × 월 · 비교 · 내보내기 · 합계 건물 고르기는 PC 에서만

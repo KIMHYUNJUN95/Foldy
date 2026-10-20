@@ -24,7 +24,7 @@ import "./mobile-occupancy.css";
 type Copy = Dictionary["opsOccupancy"]["mobile"];
 
 const BASE_PATH = "/mobile/ops/occupancy";
-const RING_R = 58;
+const RING_R = 68;
 const RING_C = 2 * Math.PI * RING_R;
 /** 달 고르기 시트 — 앞으로 2달부터 거꾸로 이만큼. */
 const PICKER_MONTHS = 18;
@@ -155,17 +155,17 @@ export function MobileOccupancy({
             <svg
               aria-label={fill(copy.ringAria, { month: monthLabel(summary.month), v: hasMonth ? `${ringPct.toFixed(1)}%` : "—" })}
               role="img"
-              viewBox="0 0 132 132"
+              viewBox="0 0 152 152"
             >
-              <circle className="moc-ring__track" cx="66" cy="66" r={RING_R} />
+              <circle className="moc-ring__track" cx="76" cy="76" r={RING_R} />
               {hasMonth && ringPct > 0 && (
                 <circle
                   className="moc-ring__arc"
-                  cx="66"
-                  cy="66"
+                  cx="76"
+                  cy="76"
                   r={RING_R}
                   style={{ "--c": RING_C, "--off": RING_C * (1 - Math.min(100, ringPct) / 100) } as CSSProperties}
-                  transform="rotate(-90 66 66)"
+                  transform="rotate(-90 76 76)"
                 />
               )}
             </svg>

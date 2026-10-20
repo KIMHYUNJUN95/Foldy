@@ -9,6 +9,12 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — HIG 다듬기 2차 · 모바일 가동률
+
+- `/mobile/ops/occupancy` 크기 다듬기 — 아래 줄 15 · 달 이동 누르는 자리 44 · 고리 132 → 152(영어 전년 표시가 고리에 안 닿게, 가운데 32) · 이름표 13 ·
+  묶음 제목 17/600 높이 44 · 건물 줄 44/15 · 작은 글자 13 · 추이 11 · 달 시트 17/16. 기능 · 배치 그대로. HIG 캔버스 A2Occ-* (https://claude.ai/artifact/7Ccw2CDN1gaVY9eoxTAhUY).
+  상세 `docs/product/34-metrics-and-automation.md` 「모바일 가동률」 → 「HIG 다듬기 2차」.
+
 ## 2026-10-20 — 업무일지 예약 보내기
 
 - 투두 업무일지 시트에 「보낼 시각」(지금 바로 · 18/19/20시 · 직접) — 고른 시각에 서버가 Slack 으로 보낸다(앱이 꺼져 있어도). 예약됨 줄 · 예약 취소 ·

@@ -9,6 +9,11 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 아라키초A 601호 연동
+
+- Beds24 새 객실 `601`(745422, 파는 쪽 2박) · `601_2`(745475, 99박 = 끔, 가격은 601 을 따름)을 `rooms` 에 넣고 최소 숙박 · 상태 · 요금 12개월을 맞췄다.
+  방 마스터 백필은 꺼 둔 방을 뒤집어서 쓰지 않았다. 도어 비밀번호는 나중에. 순서 `docs/engineering/01-beds24-integration.md` 「기존 건물에 새 객실 넣기」.
+
 ## 2026-10-20 — HIG 다듬기 2차 · 모바일 가동률
 
 - `/mobile/ops/occupancy` 크기 다듬기 — 아래 줄 15 · 달 이동 누르는 자리 44 · 고리 132 → 152(영어 전년 표시가 고리에 안 닿게, 가운데 32) · 이름표 13 ·

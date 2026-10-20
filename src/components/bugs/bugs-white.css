@@ -156,3 +156,28 @@
   .bgw-send svg path { stroke-dashoffset: 0; }
   .bgw-spin { border-color: #fff; }
 }
+
+/* HIG 다듬기 2차(2026-10-20, HIG 캔버스 A2Bug-* · 지금 A2BugNow-*) — 기능 · 배치 그대로.
+   「+ 신고」는 제목 묶음 아래쪽에 맞춘 보라 글자 버튼(꽉 찬 버튼이 위 줄 아이콘에 너무 가까웠다 — 게시판 「+ 글쓰기」 · 제안함 「+ 쓰기」와 같게) ·
+   위 줄 15 · 줄 사이에만 선 · 줄 16/13 · 안내 13 · 빈 화면 17/15 · 상세 본문 16 · 상태 바꾸기 15 · 지우기 15 · 확인 창 버튼 50/15 ·
+   새 신고 칸 이름 13 · 사진 줄 15/600 · 사진 ✕ 누르는 자리 44. */
+.bgw-h:has(> .bgw-cta) { align-items: flex-end; }
+.bgw-h p { font-size: 15px; }
+.bgw-cta { padding: 0; margin-bottom: -2px; border-radius: 0; background: none; box-shadow: none; color: var(--w-pri-ink); font-size: 15px; font-weight: 600; }
+.bgw-row { border-top: 0; }
+.bgw-row + .bgw-row { border-top: 0.5px solid var(--separator); }
+.split-list .bgw a.bgw-row[data-split-active], .split-list .bgw a.bgw-row[data-split-active] + .bgw-row { border-top-color: transparent; }
+.bgw-row__t { font-size: 16px; }
+.bgw-row__m { font-size: 13px; }
+.bgw-note { font-size: 13px; }
+.bgw-empty b { font-size: 17px; }
+.bgw-empty span { font-size: 15px; }
+.bgw-body { font-size: 16px; }
+.bgw-sec__t { font-size: 15px; }
+.bgw-seg button { font-size: 15px; }
+.bgw-del { font-size: 15px; }
+.bgw-cf__a button { height: 50px; font-size: 15px; }
+.bgw-fl > span { font-size: 13px; }
+.bgw-ph__l { font-size: 15px; font-weight: 600; }
+.bgw-tile button::before { content: ""; position: absolute; inset: -9px; }
+

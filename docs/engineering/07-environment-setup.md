@@ -302,6 +302,16 @@ Beds24 URL 을 저쪽 주소로 되돌리면 즉시 원상복구된다. 그 사�
 - 크론 `ops-stats-daily`(04:10 도쿄) — 모든 달을 dirty 로(안전망). 실행 결과는 `cron.job_run_details.return_message`(`idle` · `not_configured` · `fired`).
 - 틱이 멈춰도 숫자는 틀리지 않는다 — 화면이 읽기 전에 dirty 달을 스스로 계산한다(느려질 뿐).
 
+### 업무일지 예약 틱 (pg_cron + pg_net + Vault, 2026-10-20)
+
+업무일지 예약 보내기(`docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」)를 그 시각에 Slack 으로 보낸다. Beds24 틱과 같은 방식.
+
+- 마이그레이션 `202610200005_task_report_schedules.sql` 이 표 · 함수 3개 · Vault 시크릿 2개 · pg_cron 잡 `task-report-tick`(매 분)을 만든다. **새 환경변수 없음**
+  (Slack 은 기존 `SLACK_DAILY_REPORT_WEBHOOK_URL`). 손으로 부를 때는 `CRON_SECRET`.
+- Vault `task_report_tick_token`(SQL 안에서 난수, 출력하지 않음) · `task_report_tick_url` = `https://stay-ops-two.vercel.app/api/tasks/report-tick`.
+- 할 일이 없으면 `idle` 을 돌려주고 Vercel 함수는 뜨지 않는다. 확인: `cron.job_run_details` 에서 jobname `task-report-tick`(idle / not_configured / fired).
+- 도메인이 바뀌면 `vault.update_secret` 으로 `task_report_tick_url` 을 같이 바꾼다(Beds24 틱 주소와 함께).
+
 ### Beds24 틱 (pg_cron + pg_net + Vault, 2026-09-30)
 
 쿨다운(429·크레딧 부족)이 풀린 뒤 대기 가격 작업과 미뤄 둔 웹훅 재조회를 **1분 안에** 이어받는다.

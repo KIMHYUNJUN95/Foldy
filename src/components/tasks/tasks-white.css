@@ -93,6 +93,10 @@
 /* 누르는 영역 44px(HIG 다듬기 05) — 보이는 글자 줄은 그대로, 위아래 음수 여백으로 줄 높이를 늘리지 않는다. */
 .tkw-tl { height: 44px; margin: -8px 0; padding: 0 6px; border: 0; background: transparent; font: inherit; font-size: 12px; font-weight: 600; color: #5a30cf; white-space: nowrap; cursor: pointer; text-decoration: none; transition: opacity 150ms ease; }
 .tkw-tl:active { opacity: .6; }
+/* 업무일지 예약 상태(2026-10-20) — 「업무일지」 앞 짧은 글. 예약은 옅은 보라, 보냄은 회색, 못 보냄은 빨강. */
+.tkw-rtag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #6b6878; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tkw-rtag.is-on { background: #f4f1fd; color: #5a30cf; }
+.tkw-rtag.is-bad { color: #c5282e; }
 .tkw-more { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -8px -12px -8px 0; border: 0; border-radius: 14px; background: transparent; color: #4c4958; cursor: pointer; transition: transform 140ms var(--ease-out), background 150ms ease; }
 .tkw-more svg { width: 18px; height: 18px; }
 .tkw-more:active { transform: scale(.94); background: #f4f4f7; }
@@ -468,7 +472,7 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-rpt__msg svg { width: 16px; height: 16px; flex: none; }
 .tkw-rpt__msg.is-ok { color: #5a30cf; }
 .tkw-rpt__msg.is-bad { color: #c5282e; }
-.tkw-rpt__f { display: grid; grid-template-columns: 1.25fr 1fr; gap: 8px; }
+.tkw-rpt__f { display: grid; grid-template-columns: 1fr 1.25fr; gap: 8px; }
 .tkw-rpt__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: 50px; padding: 0 12px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; transition: transform 140ms ease, opacity 150ms ease; }
 .tkw-rpt__btn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tkw-rpt__btn svg { width: 17px; height: 17px; flex: none; }
@@ -476,6 +480,39 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-rpt__btn:disabled { opacity: .5; }
 .tkw-rpt__btn.is-gray { background: #f4f4f7; color: #3a3746; }
 .tkw-rpt__btn.is-pri { background: #7a52e6; color: #fff; }
+.tkw-rpt__btn.is-soft { background: #f4f1fd; color: #5a30cf; }
+.tkw-rpt__btn.is-soft:disabled { opacity: 1; }
+/* 업무일지 예약 보내기(2026-10-20, 시안 「업무일지 예약 보내기 · 시안」) — 보낼 시각 줄은 위아래 구분선 없이(사용자 지시). */
+.tkw-rpt__when { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 52px; margin: -2px 0; padding: 0 4px; border: 0; background: transparent; font: inherit; color: #3a3746; text-align: left; cursor: pointer; }
+.tkw-rpt__when > svg { width: 18px; height: 18px; flex: none; }
+.tkw-rpt__when > svg:last-child { width: 16px; height: 16px; color: #b4b1bf; }
+.tkw-rpt__when span { font-size: 15px; }
+.tkw-rpt__when b { margin-left: auto; font-size: 15px; font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; transition: color 160ms ease; }
+.tkw-rpt__when b.on { color: #5a30cf; }
+.tkw-rpt__whenx { display: flex; flex-direction: column; gap: 10px; margin-top: -8px; animation: tkw-rpt-open 220ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes tkw-rpt-open { from { opacity: 0; transform: translateY(-4px); } }
+.tkw-rpt__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tkw-rpt__chip { flex: none; min-width: 54px; height: 44px; padding: 0 11px; border: 0; border-radius: 12px; background: #f2f2f5; font: inherit; font-size: 15px; color: #3a3746; cursor: pointer; transition: background 120ms ease, color 120ms ease, transform 120ms ease; }
+.tkw-rpt__chip:active:not(:disabled) { transform: scale(.97); }
+.tkw-rpt__chip[aria-checked="true"] { background: #7a52e6; color: #fff; font-weight: 600; }
+.tkw-rpt__chip:disabled { background: #f7f7f9; color: #c9c7d1; text-decoration: line-through; cursor: default; }
+.tkw-rpt__custom { display: flex; flex-direction: column; gap: 8px; }
+.tkw-rpt__hours { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tkw-rpt__hours::-webkit-scrollbar { display: none; }
+.tkw-rpt__hours .tkw-rpt__chip[aria-checked="true"] { background: #f4f1fd; color: #5a30cf; }
+.tkw-rpt__mins { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; }
+.tkw-rpt__mins button { height: 38px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 15px; color: #6b6878; cursor: pointer; }
+.tkw-rpt__mins button[aria-checked="true"] { background: #fff; color: #16141f; font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
+.tkw-rpt__mins button:disabled { color: #c9c7d1; cursor: default; }
+.tkw-rpt__banner { display: flex; align-items: center; gap: 10px; padding: 0 6px 0 14px; min-height: 48px; border-radius: 14px; background: #f4f1fd; color: #5a30cf; font-size: 14px; animation: tkw-rpt-banner 200ms cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes tkw-rpt-banner { from { opacity: 0; transform: translateY(-8px); } }
+.tkw-rpt__banner > svg { width: 18px; height: 18px; flex: none; }
+.tkw-rpt__banner span { flex: 1; min-width: 0; }
+.tkw-rpt__banner button { flex: none; min-height: 44px; padding: 0 10px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; }
+.tkw-rpt__msg.is-info { color: #5a30cf; }
+.tkw-rpt .num { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   .tkw-rpt__box, .tkw-rpt__box svg, .tkw-rpt__btn { transition: none; }
+  .tkw-rpt__whenx, .tkw-rpt__banner { animation: none; }
+  .tkw-rpt__chip, .tkw-rpt__when b { transition: none; }
 }

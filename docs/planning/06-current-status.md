@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 업무일지 예약 보내기
+
+- 투두 업무일지 시트에 「보낼 시각」(지금 바로 · 18/19/20시 · 직접) — 고른 시각에 서버가 Slack 으로 보낸다(앱이 꺼져 있어도). 예약됨 줄 · 예약 취소 ·
+  바뀐 내용으로 예약 · 「완료 · 기록」 날짜 줄의 「19:00 예약 / 보냄 / 보내지 못함」. 버튼 순서: 복사 왼쪽 회색 · 보내기 오른쪽 보라.
+- 표 `task_report_schedules` + pg_cron 매 분 틱(`/api/tasks/report-tick`, Vault 토큰) — 마이그레이션 `202610200005`(운영 DB 적용). 앱 알림은 「막바지 일괄」 규칙으로 보류.
+  시안 https://claude.ai/artifact/SL1oygg2h9bs8CLpCJzjtC. 상세 `docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」.
+
 ## 2026-10-20 — 채널 예약도 날짜 변경 · 객실 이동 때 날짜 변경
 
 - 예약 수정(PC · 모바일)과 객실 옮기기(PC 패널 · 꾹 끌기 · 모바일)에서 Airbnb · Booking.com 예약도 날짜를 바꾼다. 날짜 칸 위에 「{채널}에서도

@@ -2090,3 +2090,11 @@ Beds24 에 없는 건물 · 객실을 룸 링크에서만 만든다. 캘린더 �
 `ops_stats_months`: PK (`organization_id`, `month`), `version`(앱 `OPS_STATS_VERSION`), `dirty` · `dirty_at`, `built_at`. 트리거가 dirty 를 적는다 —
 `reservations` 행의 전 · 후 날짜의 달(`ops_stats_mark_reservation`, 관련 칸이 실제로 바뀔 때만), `rooms` 의 목록 판정 칸 변경 · 추가 · 삭제와
 `properties.name` 변경은 조직 전체(`ops_stats_mark_room` · `ops_stats_mark_property`).
+
+## 2026-10-20 `task_report_schedules` — 업무일지 예약 보내기
+
+`organization_id` · `user_id`(profiles) · `report_date`(도쿄 날짜) · `body`(예약 순간의 본문, 1~40,000자) · `send_at` · `status`(scheduled → sending → sent | failed, cancelled) ·
+`error`(이유 코드만) · `claimed_at` · `sent_at`. 부분 유니크 `(user_id, report_date) where status in ('scheduled','sending')`, 보낼 것 찾기 부분 인덱스 `(send_at) where status = 'scheduled'`.
+RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules` · `task_report_tick_if_needed` · `task_report_tick_token_ok`(service role 만). 마이그레이션 `202610200005`.
+상세 `docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」.
+

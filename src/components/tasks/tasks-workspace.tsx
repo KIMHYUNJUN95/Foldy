@@ -90,6 +90,7 @@ import {
   type OccurrenceState,
   recurringOccurrencesInRange,
 } from "@/lib/tasks-recurrence";
+import { listReportSchedules, type ReportScheduleView } from "@/app/mobile/tasks/report-schedule-actions";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import "./tasks-white.css";
@@ -919,6 +920,35 @@ export function TasksWorkspace({
       (r) => !(sentInstr(r.task, currentUserId) && r.completion.byUserId !== currentUserId),
     );
 
+  // 업무일지 예약 상태(2026-10-20) — 「완료 · 기록」 날짜 줄의 「19:00 예약」 · 「19:00 보냄」. 그 탭을 볼 때와 시트를 닫은 뒤에 다시 읽는다.
+  const reportDaysKey = Array.from(new Set([...completionRows.map((r) => r.completion.day), ...fieldActivities.map((a) => a.day)]))
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, 62)
+    .join(",");
+  const [reportSchedules, setReportSchedules] = useState<Record<string, ReportScheduleView>>({});
+  useEffect(() => {
+    if (view !== "completed" || reportDate !== null || !reportDaysKey) return;
+    let alive = true;
+    void listReportSchedules(reportDaysKey.split(",")).then((map) => {
+      if (alive) setReportSchedules(map);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [view, reportDate, reportDaysKey]);
+  const reportTag = (day: string) => {
+    const sched = reportSchedules[day];
+    if (!sched) return null;
+    const hhmm = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(
+      new Date(sched.status === "sent" ? sched.sentAt ?? sched.sendAt : sched.sendAt),
+    );
+    if (sched.status === "scheduled" || sched.status === "sending")
+      return <span className="tkw-rtag is-on">{copy.reportListScheduled.replace("{time}", hhmm)}</span>;
+    if (sched.status === "sent") return <span className="tkw-rtag">{copy.reportListSent.replace("{time}", hhmm)}</span>;
+    if (sched.status === "failed") return <span className="tkw-rtag is-bad">{copy.reportListFailed}</span>;
+    return null;
+  };
+
   // Per-tab counts (same base lists as each view).
   const tabCounts: Record<View, number> = {
     // 목록의 **줄 수**와 맞춘다. 2026-09-08 부터 반복은 (오늘 회차든 밀린 것이든) 한 줄이므로
@@ -1582,6 +1612,7 @@ export function TasksWorkspace({
                   items.length + fieldItems.length,
                   undefined,
                   <span className="tkw-sec__acts">
+                    {reportTag(k)}
                     <button className="tkw-tl" onClick={() => setReportDate(k)} type="button">
                       {w.report}
                     </button>

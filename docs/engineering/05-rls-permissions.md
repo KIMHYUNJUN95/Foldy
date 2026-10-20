@@ -1435,3 +1435,9 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 마이그레이션 `202610080002`. RLS 를 켜고 정책을 두지 않는다 — `anon` · `authenticated` 권한 회수, `service_role` 에 명시 grant(이 프로젝트는 새 표에
 service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission denied` 로 확인). 매출 · 가동률 · 비교 서버 읽기(`ops-revenue-server.ts`)는 화면 게이트
 (`requireOpsAdminPage`) 뒤에서만 service role 로 읽고 쓴다(조직 필터 명시). 트리거 함수는 `security definer`, `search_path = ''`.
+
+## task_report_schedules (2026-10-20)
+
+- SELECT: 본인 행만(`(select auth.uid()) = user_id`). INSERT · UPDATE · DELETE 정책 없음 — 서버 액션 · 틱 라우트가 service role 로 쓴다.
+- 예약 · 보내기 모두 업무일지 권한(`canGenerateDailyReport` 또는 `can_generate_report` 개인 지정)을 다시 본다 — 보낼 때도(퇴사 · 비활성 대비).
+

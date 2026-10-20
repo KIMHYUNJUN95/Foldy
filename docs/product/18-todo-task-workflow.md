@@ -1204,6 +1204,29 @@ Task completion was re-introduced (it had been removed in the 2026-06-12 IA clea
   update log, and fans out a `task_completed` notification to other participants; reopening clears
   those fields and writes a `reopened` log row. Both revalidate the list and detail.
 
+## 업무일지 예약 보내기 (2026-10-20, 시안 https://claude.ai/artifact/SL1oygg2h9bs8CLpCJzjtC A안)
+
+업무일지 시트는 그대로(포함할 항목 → 본문) 두고, 버튼 위에 **「보낼 시각」 줄 하나**를 더했다. 그 줄이 아래 큰 버튼 글자를 정한다.
+
+| 무엇 | 동작 |
+| --- | --- |
+| 보낼 시각 | 「지금 바로 ›」 → 누르면 시트 안에서 펼침: 지금 바로 · 18:00 · 19:00 · 20:00 · 직접(시 칩 가로로 넘김 + 분 00 · 15 · 30 · 45). **오늘(도쿄)** 안에서만, 지금+2분 전 시각은 흐리고 줄 그음(서버는 1분 뒤 ~ 48시간 안만 받음). 줄 위아래 구분선 없음(사용자 지시) |
+| 버튼 | 왼쪽 회색 「전체 복사」, 오른쪽 보라 = 지금 바로면 「Slack으로 보내기」, 시각이면 「19:00에 보내기」(2026-10-20 순서를 바꿈 — 예전엔 보내기가 왼쪽 회색) |
+| 예약됨 | 시트 맨 위 옅은 보라 줄 「오늘 19:00에 Slack으로 보내요 · 예약 취소」, 버튼은 「19:00 예약됨」(눌리지 않음). **그 순간의 본문을 저장해 그대로 보낸다** — 다시 열면 예약해 둔 본문이 보인다 |
+| 예약 뒤 수정 | 본문 · 항목 · 시각을 바꾸면 「바뀐 내용은 아직 예약에 반영되지 않았어요」 + 버튼 「바뀐 내용으로 예약」. 「지금 바로」로 바꾸고 누르면 예약을 취소하고 바로 보낸다 |
+| 결과 | 시트 한 줄 「19:00에 Slack으로 보냈어요」 / 「19:00 예약을 보내지 못했어요 · 이유」(Slack 설정 없음 · 권한 없음 · 그 밖). 투두 「완료 · 기록」 날짜 줄의 「업무일지」 앞에 「19:00 예약」(옅은 보라) · 「19:00 보냄」(회색) · 「보내지 못함」(빨강) |
+| 앱 알림 | 붙이지 않았다 — 「알림은 개발 막바지에 전 기능 일괄」 규칙. 시안 ⑦ 보드에 적어 둠 |
+| PC 콘솔 | 업무일지 창은 지금 보내기만(예약은 모바일 · 폴드 · 태블릿 시트). |
+
+서버:
+- 표 `task_report_schedules`(마이그레이션 `202610200005`) — 본인만 읽기(RLS), 쓰기는 서버(service role). 한 사람 · 한 날짜에 살아 있는 예약 하나(부분 유니크) —
+  다시 예약하면 이전 것을 취소하고 새로 넣는다. 액션 `src/app/mobile/tasks/report-schedule-actions.ts`(`scheduleDailyReport` · `cancelDailyReportSchedule` ·
+  `getReportSchedule` · `listReportSchedules`). 예약할 때 권한 · 빈 일지는 지금 보내기와 같은 판정(`generateDailyReport`).
+- 보내기: pg_cron 이 **매 분** `task_report_tick_if_needed()` — 보낼 때가 된 예약이 있을 때만 pg_net 으로 `/api/tasks/report-tick`(토큰은 Vault
+  `task_report_tick_token`, 주소 `task_report_tick_url`). 라우트는 `claim_due_task_report_schedules`(원자적으로 'sending', `for update skip locked`)로 가져가
+  **보내기 직전에 권한을 다시 보고**(`canSendDailyReport` — 퇴사 · 비활성 · 역할 변경) Slack 으로 보낸다. 'sending' 에서 10분 넘게 멈춘 것은 다시 보내지 않고
+  실패(stuck) — 두 번 나가는 것보다 「못 보냄」이 낫다. Slack 보내기 본체는 지금 보내기와 같은 `src/lib/daily-report-slack.ts`. 감사 기록 `scheduled: true`.
+
 ## Daily Report (업무일지) — as-built (2026-06-13)
 
 Each day-group header in the **Completed (완료/기록)** tab has a **보고서 (Report)** button that opens

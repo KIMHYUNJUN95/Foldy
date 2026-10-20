@@ -5296,6 +5296,66 @@ export type Database = {
           },
         ]
       }
+      task_report_schedules: {
+        Row: {
+          body: string
+          claimed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          organization_id: string
+          report_date: string
+          send_at: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          claimed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          organization_id: string
+          report_date: string
+          send_at: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          claimed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          organization_id?: string
+          report_date?: string
+          send_at?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_report_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_report_schedules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_updates: {
         Row: {
           body: string | null
@@ -5812,6 +5872,25 @@ export type Database = {
       automation_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
       beds24_tick_if_needed: { Args: never; Returns: string }
       beds24_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
+      claim_due_task_report_schedules: {
+        Args: { p_limit?: number }
+        Returns: {
+          body: string
+          claimed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          organization_id: string
+          report_date: string
+          send_at: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      task_report_tick_if_needed: { Args: never; Returns: string }
+      task_report_tick_token_ok: { Args: { p_token: string }; Returns: boolean }
       beds24_try_lock: {
         Args: {
           p_lock_id: string

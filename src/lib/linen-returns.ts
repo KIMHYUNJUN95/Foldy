@@ -1,3 +1,4 @@
+import { roleCan } from "@/config/capabilities";
 import { revalidatePath } from "next/cache";
 import { organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -45,22 +46,13 @@ type ItemRow = Database["public"]["Tables"]["linen_items"]["Row"];
 type LineRow = Database["public"]["Tables"]["linen_return_record_items"]["Row"];
 type ProfileName = { id: string; name: string };
 
-// Admin-capable roles can edit/delete any record (mirrors the RLS policy set).
-const ADMIN_CAPABLE_ROLES: readonly Role[] = [
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-  "field_manager",
-];
-
 /** Author of the record, or an admin-capable org role, may edit/delete it. */
 export function canManageLinenRecord(
   session: AppSession,
   record: { registeredByUserId: string },
 ): boolean {
   if (session.user.id === record.registeredByUserId) return true;
-  return ADMIN_CAPABLE_ROLES.includes(session.user.role);
+  return roleCan(session.user.role, "linen.manage");
 }
 
 function isOrganizationRole(role: Role): boolean {

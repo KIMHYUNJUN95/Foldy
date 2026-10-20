@@ -1,31 +1,10 @@
 import "server-only";
+import { roleCan } from "@/config/capabilities";
 
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import type { OrganizationRole, Role } from "@/config/roles";
+import type { OrganizationRole } from "@/config/roles";
 import type { Database } from "@/types/database";
-
-/**
- * Roles allowed to CREATE an announcement. Single source of truth — the server
- * actions in `src/app/admin/announcements/actions.ts` import this list to gate
- * `canCreateInOrganization`, and the console uses it to decide whether the
- * "새 공지" button is rendered at all. Keep the two in lockstep: a role that can
- * see the button but is rejected by the action produces a silent forbidden.
- *
- * NOTE: this list intentionally differs from the manage/edit gate
- * (`canManageAnnouncement`), which also accepts `senior_managing_director`.
- * Widening creation rights is a role-permission change and needs explicit
- * product approval — do not add roles here on your own.
- */
-export const announcementCreatorRoles = [
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-  "field_manager",
-  "staff",
-] as const satisfies readonly Role[];
 
 type AnnouncementRow = Database["public"]["Tables"]["announcements"]["Row"];
 type OrganizationRow = Pick<
@@ -97,12 +76,6 @@ export type AdminAnnouncementsData = {
 
 const announcementSelect =
   "id, organization_id, title, content, created_by_user_id, target_scope, target_roles, status, is_important, is_pinned, show_popup_on_app_open, popup_until, allow_comments, image_urls, published_at, archived_at, created_at, updated_at";
-
-const TOP_ADMIN_ROLES: readonly OrganizationRole[] = [
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-];
 
 function splitBody(content: string): string[] {
   const paragraphs = content
@@ -195,7 +168,7 @@ export async function getAdminAnnouncements(
           const role = membershipRoleByOrgId.get(org);
           return (
             role !== undefined &&
-            (announcementCreatorRoles as readonly Role[]).includes(role)
+            roleCan(role, "announcement.create")
           );
         });
 
@@ -297,7 +270,7 @@ export async function getAdminAnnouncements(
         isPlatformAdmin ||
         (role !== undefined &&
           role !== "part_time_staff" &&
-          (TOP_ADMIN_ROLES.includes(role) || isAuthor));
+          (roleCan(role, "announcement.manage") || isAuthor));
 
       return {
         id: row.id,

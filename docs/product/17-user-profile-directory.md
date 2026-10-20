@@ -145,6 +145,8 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
   - grant/deny override → toggle back: revoke that override.
   - Keys that ask for an expiry (`asksExpiry`) expand the row: **무기한** · 1주 · 1개월 · 3개월 · 날짜 고르기 (shared `AdminDatePicker`) → [무기한으로 켜기/끄기] or [M월 D일까지 켜기/끄기]. Expiry = end of that Tokyo day; 무기한 = no `expires_at` (2026-10-20 사용자 결정, `27-permission-override-workflow.md`). Default chip stays 1개월. Reason is left empty (optional since 2026-09-30).
   - Expiry within 7 days and personal blocks are red; everything else grey.
+  - Role-only feature gates (2026-10-20 권한 정리 ③ — 공지 작성, 청소 기록 보기, 컴플레인, 린넨, 요청 삭제, 버그 검토, 게시판 관리 등) also appear
+    when the member's role has them, as 「역할로 받음 · 끌 수 없음」 — so the list shows what the person can actually do. They cannot be granted or blocked individually yet.
   - Also in the list: 급여 담당 · 연차 결재자 (membership flags), 일일 보고서 — 파트타임 허용 (only for part-time, `profiles.can_generate_report`), 개발자 지정 (developer viewer only). Developer-only keys (`user.manage`) are hidden from non-developers.
 - Your own row: no role/status/permission controls (「내 역할 · 권한은 여기서 바꿀 수 없어요.」), no delete.
 - Delete member: confirm modal (그대로 두기 / 삭제). Blocked with a message when the member has attendance / cleaning / leave history (deactivate instead).

@@ -3877,6 +3877,58 @@ const FALLBACK_DICTIONARY = {
             label: "Board — handle reports",
             desc: "Review reported board posts and comments, then delete or dismiss",
           },
+          "announcement.create": {
+            label: "Announcements — post",
+            desc: "Write and publish announcements",
+          },
+          "announcement.manage": {
+            label: "Announcements — manage all",
+            desc: "Change status of or delete announcements written by others",
+          },
+          "cleaning.work": {
+            label: "Cleaning — do cleaning",
+            desc: "Start and finish cleaning in the app; appears in the cleaner list",
+          },
+          "cleaning.read_all": {
+            label: "Cleaning — see everyone's records",
+            desc: "See cleaning records of other staff",
+          },
+          "cleaning.force_complete": {
+            label: "Cleaning — force complete",
+            desc: "Finish a cleaning on someone else's behalf",
+          },
+          "linen.manage": {
+            label: "Linen returns — manage all",
+            desc: "Edit or delete linen return records by others",
+          },
+          "property_info.edit": {
+            label: "Buildings — edit operation info",
+            desc: "Edit entry instructions, door codes and other building operation info",
+          },
+          "complaint.write": {
+            label: "Guest feedback — write",
+            desc: "Add guest feedback records",
+          },
+          "complaint.manage": {
+            label: "Guest feedback — manage all",
+            desc: "Change status of or delete feedback written by others",
+          },
+          "complaint.comment": {
+            label: "Guest feedback — comment",
+            desc: "Comment on guest feedback",
+          },
+          "request.delete_any": {
+            label: "Requests — delete others'",
+            desc: "Delete repair, lost item and order requests posted by others",
+          },
+          "bug.review": {
+            label: "Bug reports — review",
+            desc: "Review bug reports and get notified of new ones",
+          },
+          "board.manage": {
+            label: "Board — manage posts",
+            desc: "Delete or pin posts and comments by others",
+          },
         } as Record<string, { label: string; desc: string }>,
       },
     },
@@ -11786,6 +11838,58 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
               label: "게시판 — 신고 처리",
               desc: "신고된 게시글 · 댓글 확인 후 삭제 또는 문제없음 처리",
             },
+            "announcement.create": {
+              label: "공지 — 작성",
+              desc: "공지를 쓰고 게시",
+            },
+            "announcement.manage": {
+              label: "공지 — 전체 관리",
+              desc: "남이 쓴 공지도 상태 변경 · 삭제",
+            },
+            "cleaning.work": {
+              label: "청소 — 작업",
+              desc: "앱에서 청소 시작 · 완료, 청소 담당자 목록에 나옴",
+            },
+            "cleaning.read_all": {
+              label: "청소 — 모든 기록 보기",
+              desc: "다른 직원의 청소 기록 보기",
+            },
+            "cleaning.force_complete": {
+              label: "청소 — 강제 완료",
+              desc: "다른 사람의 청소를 대신 완료",
+            },
+            "linen.manage": {
+              label: "린넨 반품 — 전체 관리",
+              desc: "남이 등록한 린넨 반품 기록도 수정 · 삭제",
+            },
+            "property_info.edit": {
+              label: "건물 — 운영 정보 편집",
+              desc: "출입 방법 · 비밀번호 등 건물 운영 정보 편집",
+            },
+            "complaint.write": {
+              label: "게스트 피드백 — 작성",
+              desc: "게스트 피드백 기록 추가",
+            },
+            "complaint.manage": {
+              label: "게스트 피드백 — 전체 관리",
+              desc: "남이 쓴 피드백도 상태 변경 · 삭제",
+            },
+            "complaint.comment": {
+              label: "게스트 피드백 — 댓글",
+              desc: "게스트 피드백에 댓글",
+            },
+            "request.delete_any": {
+              label: "요청 — 남의 것 삭제",
+              desc: "남이 올린 수리 · 분실물 · 주문 요청 삭제",
+            },
+            "bug.review": {
+              label: "버그 신고 — 검토",
+              desc: "버그 신고 검토 · 새 신고 알림 받기",
+            },
+            "board.manage": {
+              label: "게시판 — 글 관리",
+              desc: "남이 쓴 게시글 · 댓글 삭제 · 고정",
+            },
           },
         },
       },
@@ -19566,6 +19670,58 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "board.moderate": {
               label: "掲示板 — 報告の対応",
               desc: "報告された投稿 · コメントを確認し、削除または問題なしとして処理",
+            },
+            "announcement.create": {
+              label: "お知らせ — 作成",
+              desc: "お知らせを書いて掲載",
+            },
+            "announcement.manage": {
+              label: "お知らせ — 全体管理",
+              desc: "他の人のお知らせも状態変更・削除",
+            },
+            "cleaning.work": {
+              label: "清掃 — 作業",
+              desc: "アプリで清掃の開始・完了、清掃担当リストに表示",
+            },
+            "cleaning.read_all": {
+              label: "清掃 — 全員の記録を見る",
+              desc: "他のスタッフの清掃記録を見る",
+            },
+            "cleaning.force_complete": {
+              label: "清掃 — 強制完了",
+              desc: "他の人の清掃を代わりに完了",
+            },
+            "linen.manage": {
+              label: "リネン返却 — 全体管理",
+              desc: "他の人のリネン返却記録も修正・削除",
+            },
+            "property_info.edit": {
+              label: "建物 — 運営情報の編集",
+              desc: "入館方法・暗証番号など建物の運営情報を編集",
+            },
+            "complaint.write": {
+              label: "ゲストフィードバック — 作成",
+              desc: "ゲストフィードバックの記録を追加",
+            },
+            "complaint.manage": {
+              label: "ゲストフィードバック — 全体管理",
+              desc: "他の人のフィードバックも状態変更・削除",
+            },
+            "complaint.comment": {
+              label: "ゲストフィードバック — コメント",
+              desc: "ゲストフィードバックにコメント",
+            },
+            "request.delete_any": {
+              label: "リクエスト — 他の人の分を削除",
+              desc: "他の人の修理・忘れ物・注文リクエストを削除",
+            },
+            "bug.review": {
+              label: "バグ報告 — レビュー",
+              desc: "バグ報告のレビュー・新しい報告の通知",
+            },
+            "board.manage": {
+              label: "掲示板 — 投稿の管理",
+              desc: "他の人の投稿・コメントを削除・固定",
             },
           },
         },

@@ -9,6 +9,13 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-20 — 권한 정리 ③: 흩어진 역할 목록을 권한 키로
+
+- 기능 파일 15곳 남짓의 역할 목록 → 레지스트리 키 13개(`announcement.*` · `cleaning.*` · `linen.manage` · `property_info.edit` · `complaint.*` ·
+  `request.delete_any` · `bug.review` · `board.manage`) + `roleCan` / `rolesWithCapability`. 동작 그대로(역할로만, 개인 부여 · 차단 닫힘),
+  `role-matrix.test.ts` 가 옮기기 전 표를 못박음. 바뀐 건 개발자가 넷(공지 전체 관리 · 린넨 · 버그 검토 · 게시판 관리)에 새로 들어간 것뿐.
+  사용자 화면 권한 목록에 「역할로 받음 · 끌 수 없음」으로 보인다. DB 사본 마이그레이션 `202610200003`. 상세 `docs/engineering/14-permission-architecture.md` §3-1-1.
+
 ## 2026-10-20 — 권한 정리 ②: 대표 · 전무는 사용자 관리에 기본으로
 
 - `user.manage` 를 대표 · 전무에게 역할로(레지스트리 + `capability_roles` 마이그레이션 `202610200002`). 입장 판정이 그 조직 멤버십 역할로 레지스트리를 본다.

@@ -1,3 +1,4 @@
+import { rolesWithCapability } from "@/config/capabilities";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OrganizationRole } from "@/config/roles";
 import { isNotificationsTableUnavailable } from "@/lib/notifications/schema";
@@ -13,8 +14,6 @@ import type {
   TaskNotificationPayload,
 } from "@/lib/notifications/types";
 import type { Database } from "@/types/database";
-
-const BUG_REPORT_REVIEWER_ROLES = ["owner", "senior_managing_director", "office_admin"] as const;
 
 type TaskNotificationType =
   | "task_shared"
@@ -338,7 +337,7 @@ export async function notifyBugReportCreated(params: {
     .select("user_id")
     .eq("organization_id", params.organizationId)
     .eq("status", "active")
-    .in("role", BUG_REPORT_REVIEWER_ROLES);
+    .in("role", rolesWithCapability("bug.review"));
   if (error) {
     console.error("[notifications] bug report reviewers failed", {
       reportId: params.reportId,

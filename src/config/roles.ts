@@ -89,27 +89,11 @@ export function canAccessFieldOperations(role: Role) {
   return (fieldOperationRoles as readonly Role[]).includes(role);
 }
 
-/**
- * Manager/office roles that may view OTHER people's cleaning records in the app (and the admin web).
- * Mirrors the `cleaning_sessions` RLS read policy (own OR these roles). Regular `staff` and
- * `part_time_staff` see only their own records.
- */
-export const cleaningRecordViewerRoles = [
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-  "field_manager",
-] as const satisfies readonly Role[];
-
-export function canViewOthersCleaning(role: Role) {
-  return (cleaningRecordViewerRoles as readonly Role[]).includes(role);
-}
+// 남의 청소 기록 보기(예전 `cleaningRecordViewerRoles` · `canViewOthersCleaning`)는 권한 키 `cleaning.read_all` 로 옮겼다(2026-10-20).
 
 /**
  * All org members may view the attendance roster (who is at work today).
- * Separate from cleaningRecordViewerRoles — roster is not a privileged view.
+ * Separate from `cleaning.read_all` — roster is not a privileged view.
  */
 export const rosterViewerRoles = roles as readonly Role[];
 

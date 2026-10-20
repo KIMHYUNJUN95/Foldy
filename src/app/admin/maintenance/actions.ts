@@ -5,9 +5,10 @@
 // 내보내기(Excel/PDF)는 없다 — 사용자 결정(2026-07-14): 수리·점검은 내보낼 일이 없다. 이는
 // `docs/product/05-admin-web-ia.md` §"Excel + PDF 내보내기 — 절대 규칙"의 명시적 예외다.
 // See docs/product/08-maintenance-workflow.md → "2026-07-14 어드민 수리·점검 대시보드".
+import { roleCan } from "@/config/capabilities";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { isOrgTopAdmin, type Role } from "@/config/roles";
+import type { Role } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { canForceCompleteCleaning } from "@/lib/cleaning";
 import { maintenanceStatuses, type MaintenanceStatus } from "@/lib/maintenance-reports";
@@ -121,20 +122,8 @@ export async function applyMaintenanceException(input: {
   return { ok: true };
 }
 
-// 삭제는 DELETE RLS 정책과 같은 기준 — 작성자 본인 또는 관리 역할. `requireAdminSession()`만으로는
-// staff/part_time_staff까지 통과해(어드민 웹 접근 자체는 허용된 역할이다) 감사 흔적이 남는 무효 처리는
-// 못 하면서 흔적이 없는 하드 삭제만 성공하게 된다. RLS: 202605210007 + has_org_role(202607130003).
-const DELETE_ANY_ROLES: readonly Role[] = [
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-  "field_manager",
-];
-
 function canDeleteAnyMaintenanceReport(role: Role): boolean {
-  return isOrgTopAdmin(role) || DELETE_ANY_ROLES.includes(role);
+  return roleCan(role, "request.delete_any");
 }
 
 export async function deleteMaintenanceReportById(

@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { roleCan } from "@/config/capabilities";
 import { LiveWash } from "@/components/shared/live-wash";
 import "./requests-list.css";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -80,9 +81,6 @@ const activeMaintenanceStatuses = new Set<MaintenanceStatus>(["open", "in_progre
 // active: requested/approved/ordered, closed: received/closed
 const activeOrderStatuses = new Set<OrderStatus>(["requested", "approved", "ordered"]);
 
-
-
-
 // ── Date grouping (Tokyo operating date) ─────────────────────────────────────
 // Requests are bucketed into Today / Yesterday / Earlier using the Asia/Tokyo
 // calendar date so grouping is stable regardless of the server/runner timezone.
@@ -113,7 +111,6 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
     </div>
   );
 }
-
 
 // delivery_date is date-only; use 03:00 UTC (= noon JST) + explicit Asia/Tokyo
 // so the calendar day is always stable regardless of runner timezone.
@@ -389,14 +386,6 @@ type EnrichedLostItem = LostItemWithReporter & { location: RequestLocationDispla
 type EnrichedMaintenance = MaintenanceReportWithReporter & { location: RequestLocationDisplay };
 
 /** Roles that can delete ANY record (not just their own). Matches the DB RLS policy. */
-const DELETE_ANY_ROLES: ReadonlySet<Role> = new Set([
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-  "field_manager",
-]);
 
 type ListKind = "lost-found" | "maintenance" | "order";
 
@@ -438,7 +427,7 @@ export function RequestsFilterView({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
 
-  const canDeleteAny = DELETE_ANY_ROLES.has(currentUserRole);
+  const canDeleteAny = roleCan(currentUserRole, "request.delete_any");
 
   const openDelete = useCallback((target: DeleteTarget) => {
     setDeleteTarget(target);
@@ -728,7 +717,6 @@ export function RequestsFilterView({
     },
     [todayKey, yesterdayKey, filterLabels.groupToday, filterLabels.groupYesterday, filterLabels.groupEarlier],
   );
-
 
   const hasDateFilter = hasCustomRange || datePreset !== "all";
   const presetLabel =

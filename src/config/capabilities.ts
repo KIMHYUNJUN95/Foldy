@@ -321,6 +321,144 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+
+  // ── 역할로만 정해지는 기능 게이트 (2026-10-20 권한 정리 ③) ─────────────────────────────────────────
+  //
+  // 예전엔 기능 파일마다 역할 목록을 따로 들고 있었다(15곳 남짓) — 「전무 = 대표」 규칙이 여섯 곳에서 빠진 원인. 이제 여기 한 곳에
+  // 두고 기능 코드는 `roleCan(role, key)` 로 본다. **옮기기만 했다 — 누가 무엇을 할 수 있는지는 그대로**(`role-matrix.test.ts` 가
+  // 옮기기 전 목록을 못박는다). 개인 부여 · 차단은 닫아 둔다: 열면 RLS(역할 배열)도 같이 고쳐야 「앱은 허용, DB 는 거부」가 안 생긴다.
+  // 열 때는 키 하나씩(3b). `platformBypass` 는 전부 켠다 — 「개발자는 모든 권한」(2026-09-10 사용자 결정). 예전 목록 중 공지 전체 관리 ·
+  // 린넨 · 버그 검토 · 게시판 관리 넷은 개발자가 빠져 있었는데(앞의 하나는 따로 통과시켰다) 이번에 그 결정에 맞췄다 — 바뀐 건 개발자뿐.
+  /** 공지 작성 — 파트타임 빼고 전부(예전 `announcementCreatorRoles`). docs/product/11-announcement-workflow.md */
+  "announcement.create": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 남이 쓴 공지 상태 변경 · 삭제(예전 `TOP_ADMIN_ROLES`, 멤버십 역할로 본다 — 개발자는 따로 통과). */
+  "announcement.manage": {
+    roles: ["owner", "senior_managing_director", "office_admin"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 청소 작업자 — 모바일 청소 · 청소 담당자 고르기 목록(예전 `cleaningMobileAccessRoles`). docs/product/07-cleaning-workflow.md */
+  "cleaning.work": {
+    roles: ["owner", "senior_managing_director", "field_manager", "staff", "part_time_staff"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 남의 청소 기록 보기(예전 `cleaningReadAllRoles` · `cleaningRecordViewerRoles` — 같은 목록 둘이 합쳐졌다). */
+  "cleaning.read_all": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 청소 강제 완료(예전 `cleaningForceCompleteRoles`). */
+  "cleaning.force_complete": {
+    roles: ["owner", "senior_managing_director", "office_admin", "field_manager"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 린넨 반품 기록을 남의 것까지 고치기 · 지우기(예전 `ADMIN_CAPABLE_ROLES` 두 곳). docs/product/19-linen-defect-workflow.md */
+  "linen.manage": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 건물 운영 정보(출입 · 비밀번호 등) 편집(예전 `PROPERTY_OPERATION_INFO_EDITOR_ROLES`). docs/product/15-reservation-calendar.md */
+  "property_info.edit": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 게스트 피드백 작성(예전 `WRITE_COMPLAINT_ROLES`). docs/product/25-complaint-workflow.md */
+  "complaint.write": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 게스트 피드백 상태 변경 · 삭제(남의 것까지, 예전 `COMPLAINT_ADMIN_ROLES`). */
+  "complaint.manage": {
+    roles: ["owner", "senior_managing_director", "office_admin"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 게스트 피드백 댓글 — 파트타임만 빠진다(예전 `NO_COMMENT_ROLES` 의 반대). */
+  "complaint.comment": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 남이 쓴 요청(수리 · 분실물 · 주문) 삭제(예전 `DELETE_ANY_ROLES` 네 곳). docs/product/10 · 08 · 09 */
+  "request.delete_any": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 버그 신고 검토 · 새 신고 알림 받기(예전 `REVIEWER_ROLES` · `BUG_REPORT_REVIEWER_ROLES`). docs/product/25-bug-report-workflow.md */
+  "bug.review": {
+    roles: ["owner", "senior_managing_director", "office_admin"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 게시판 남의 글 · 댓글 삭제 · 고정(예전 `MANAGER_ROLES` 두 곳). 신고 처리 `board.moderate` 와는 따로다. docs/product/23-board-workflow.md */
+  "board.manage": {
+    roles: ["owner", "senior_managing_director", "office_admin"],
+    individualGrant: false,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
 } as const satisfies Record<string, CapabilityPolicy>;
 
 export type Capability = keyof typeof CAPABILITIES;
@@ -406,4 +544,19 @@ function roleHasCapability(role: Role, roles: readonly OrganizationRole[]): bool
   const list = roles as readonly string[];
   if (list.includes(role)) return true;
   return role === "senior_managing_director" && list.includes("owner");
+}
+
+/**
+ * 역할만으로 이 권한을 갖는가 — 개인 부여 · 차단은 보지 않는다. 역할로만 정해지는 기능 게이트(위 「권한 정리 ③」 키들)와
+ * 「역할 기본값」 판단에 쓴다. 개발자는 `platformBypass`, 전무는 owner 를 물려받는다(`evaluateCapability` 와 같은 규칙).
+ */
+export function roleCan(role: string, capability: Capability): boolean {
+  return evaluateCapability({ capability, role: role as Role, granted: false, denied: false });
+}
+
+/** 이 권한을 역할로 받는 조직 역할(전무 포함, 개발자 제외) — DB `.in("role", …)` 조회용. */
+export function rolesWithCapability(capability: Capability): OrganizationRole[] {
+  const roles = new Set<OrganizationRole>(capabilityPolicy(capability).roles);
+  if (roles.has("owner")) roles.add("senior_managing_director");
+  return [...roles];
 }

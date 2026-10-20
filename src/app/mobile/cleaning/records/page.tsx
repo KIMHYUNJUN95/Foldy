@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { CleaningRecordsView } from "@/components/cleaning/cleaning-records-view";
-import { canViewOthersCleaning } from "@/config/roles";
+import { roleCan } from "@/config/capabilities";
 import {
   canAccessMobileCleaning,
   getCleaningOperatingDateKey,
@@ -57,7 +57,7 @@ export default async function CleaningRecordsPage({ searchParams }: PageProps) {
   const locale = session.user.preferredLanguage;
   const dict = getDictionary(locale);
 
-  const canViewOthers = canViewOthersCleaning(session.user.role);
+  const canViewOthers = roleCan(session.user.role, "cleaning.read_all");
   const monthKey = /^\d{4}-\d{2}$/.test(params.month ?? "")
     ? params.month!
     : getCleaningOperatingDateKey().slice(0, 7);

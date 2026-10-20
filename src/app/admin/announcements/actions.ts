@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import type { OrganizationRole, Role } from "@/config/roles";
 import { organizationRoles } from "@/config/roles";
-import { announcementCreatorRoles } from "@/lib/admin-announcements";
+import { roleCan } from "@/config/capabilities";
 import { getPublicSupabaseEnv } from "@/lib/env";
 import { getAnnouncementReadSummary } from "@/lib/announcements";
 import { createImportantAnnouncementNotifications } from "@/lib/notifications/create";
@@ -93,7 +93,7 @@ async function canCreateInOrganization(
 
   return Boolean(
     membership &&
-      (announcementCreatorRoles as readonly Role[]).includes(membership.role),
+      roleCan(membership.role, "announcement.create"),
   );
 }
 

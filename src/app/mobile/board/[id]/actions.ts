@@ -1,5 +1,6 @@
 "use server";
 
+import { roleCan } from "@/config/capabilities";
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -30,7 +31,6 @@ export type MentionableMember = {
 };
 
 const ALLOWED_EMOJIS = new Set(["👍", "❤️", "😂", "😮", "😢"]);
-const MANAGER_ROLES = new Set(["owner", "senior_managing_director", "office_admin"]);
 
 type ActionResult = { ok: true } | { error: string };
 
@@ -277,7 +277,7 @@ export async function deleteBoardComment(commentId: string): Promise<ActionResul
   if (comment.organization_id !== session.organization.id) return { error: "forbidden" };
 
   const isAuthor = comment.created_by_user_id === session.user.id;
-  const canManage = MANAGER_ROLES.has(session.user.role);
+  const canManage = roleCan(session.user.role, "board.manage");
   if (!isAuthor && !canManage) return { error: "forbidden" };
 
   const { error: delError } = await service
@@ -340,7 +340,7 @@ async function setPinned(postId: string, pinned: boolean): Promise<ActionResult>
   if (!post) return { error: "not_found" };
 
   const isAuthor = post.created_by_user_id === session.user.id;
-  const canManage = MANAGER_ROLES.has(session.user.role);
+  const canManage = roleCan(session.user.role, "board.manage");
   if (!isAuthor && !canManage) return { error: "forbidden" };
 
   const service = getSupabaseServiceClient();
@@ -448,7 +448,7 @@ export async function deleteBoardPost(postId: string): Promise<ActionResult> {
   if (!post) return { error: "not_found" };
 
   const isAuthor = post.created_by_user_id === session.user.id;
-  const canManage = MANAGER_ROLES.has(session.user.role);
+  const canManage = roleCan(session.user.role, "board.manage");
   if (!isAuthor && !canManage) return { error: "forbidden" };
 
   const service = getSupabaseServiceClient();

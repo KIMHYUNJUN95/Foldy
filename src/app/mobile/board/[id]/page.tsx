@@ -1,3 +1,4 @@
+import { roleCan } from "@/config/capabilities";
 import { after } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -11,8 +12,6 @@ import { BoardDetailClient } from "./board-detail-client";
 type PageProps = {
   params: Promise<{ id: string }>;
 };
-
-const MANAGER_ROLES = new Set(["owner", "senior_managing_director", "office_admin"]);
 
 export default async function BoardPostPage({ params }: PageProps) {
   const { id } = await params;
@@ -61,7 +60,7 @@ export default async function BoardPostPage({ params }: PageProps) {
       <BoardDetailClient
         post={post}
         viewerId={session.user.id}
-        canManage={MANAGER_ROLES.has(session.user.role)}
+        canManage={roleCan(session.user.role, "board.manage")}
         organizationId={session.organization.id}
         locale={session.user.preferredLanguage}
         copy={copy}

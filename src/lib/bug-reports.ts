@@ -6,6 +6,7 @@
 // `{organization_id}/bug-reports/{report_id}/{filename}` so a malicious client can't write under
 // another org or another report.
 
+import { roleCan } from "@/config/capabilities";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -29,8 +30,6 @@ const BUG_STATUSES: ReadonlySet<BugStatus> = new Set([
   "fixed",
   "closed",
 ]);
-
-const REVIEWER_ROLES: ReadonlySet<string> = new Set(["owner", "senior_managing_director", "office_admin"]);
 
 const REQUEST_IMAGES_BUCKET = "request-images";
 const MAX_IMAGES = 5;
@@ -68,7 +67,7 @@ type BugReportRow = {
 };
 
 export function isBugReportReviewer(session: AppSession): boolean {
-  return REVIEWER_ROLES.has(session.user.role);
+  return roleCan(session.user.role, "bug.review");
 }
 
 function requireOrg(session: AppSession): string {

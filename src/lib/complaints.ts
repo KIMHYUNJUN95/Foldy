@@ -11,6 +11,7 @@
 // NOTE: `customer_complaints` / `complaint_comments` are not yet in the generated Database types, so
 // table access goes through an untyped client view and row shapes are cast explicitly.
 
+import { roleCan } from "@/config/capabilities";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -41,26 +42,6 @@ const COMPLAINT_PLATFORMS: ReadonlySet<ComplaintPlatform> = new Set([
   "rakuten",
   "direct",
   "other",
-]);
-
-// 작성 가능: developer_super_admin, owner · 전무(대표와 같음, 2026-10-20), office_admin, cs_staff
-const WRITE_COMPLAINT_ROLES: ReadonlySet<string> = new Set([
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-]);
-
-// 댓글 작성: part_time_staff 제외 전원
-const NO_COMMENT_ROLES: ReadonlySet<string> = new Set(["part_time_staff"]);
-
-// 전체 컴플레인 상태 변경 / 삭제 가능한 관리 역할 (작성자 본인은 별도로 허용)
-const COMPLAINT_ADMIN_ROLES: ReadonlySet<string> = new Set([
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
 ]);
 
 const REQUEST_IMAGES_BUCKET = "request-images";
@@ -160,11 +141,11 @@ function requireOrg(session: AppSession): string {
 }
 
 export function canWriteComplaint(role: string): boolean {
-  return WRITE_COMPLAINT_ROLES.has(role);
+  return roleCan(role, "complaint.write");
 }
 
 export function canWriteComment(role: string): boolean {
-  return !NO_COMMENT_ROLES.has(role);
+  return roleCan(role, "complaint.comment");
 }
 
 /** 상태 변경(resolve/reopen): 작성자 본인 또는 owner/office_admin/super-admin. */
@@ -174,7 +155,7 @@ export function canChangeStatus(
 ): boolean {
   return (
     complaint.createdByUserId === session.user.id ||
-    COMPLAINT_ADMIN_ROLES.has(session.user.role)
+    roleCan(session.user.role, "complaint.manage")
   );
 }
 
@@ -183,11 +164,11 @@ export function canChangeStatus(
  * 변경 버튼을 보여줄지" 판단하는 용도다. 실제 삭제 권한은 `deleteComplaint`가 서버에서 다시 검증한다.
  */
 export function canModerateComplaints(role: string): boolean {
-  return COMPLAINT_ADMIN_ROLES.has(role);
+  return roleCan(role, "complaint.manage");
 }
 
 function isComplaintAdmin(session: AppSession): boolean {
-  return COMPLAINT_ADMIN_ROLES.has(session.user.role);
+  return roleCan(session.user.role, "complaint.manage");
 }
 
 function validateTitle(value: string): string {

@@ -218,6 +218,34 @@ RLS 에서도 같은 키로 판정한다: `beds24_price_jobs` · `price_change_l
 읽기와 쓰기를 나누는 이유: 「보기만 되는 사람」과 「처리까지 되는 사람」이 실제로 다르다. 지금은
 채용에서 볼 수 있으면 삭제까지 된다.
 
+### 3-1-1. 역할로만 정해지는 기능 게이트 13개 (2026-10-20, 권한 정리 ③)
+
+기능 파일마다 따로 있던 역할 목록(15곳 남짓 — 「전무 = 대표」가 여섯 곳에서 빠졌던 원인)을 레지스트리 키로 옮겼다. 기능 코드는
+`roleCan(role, key)`, DB 조회용 역할 목록은 `rolesWithCapability(key)`(개발자 빼고 전무 넣음)로 본다. **누가 무엇을 하는지는 그대로**
+— 옮기기 전 목록은 `src/lib/__tests__/role-matrix.test.ts` 가 못박는다. 개인 부여 · 차단은 닫았다(RLS 는 지금처럼 역할 배열로 판정 —
+열면 「앱 허용, DB 거부」가 생기므로 열 때는 키 하나씩 RLS 와 같이, 3b). 사용자 화면에는 「역할로 받음 · 끌 수 없음」으로 보인다.
+
+| 키 | 역할 | 예전 자리 |
+| --- | --- | --- |
+| `announcement.create` | 대표 · 전무 · 오피스 · CS · 현장관리자 · 직원 | `announcementCreatorRoles` |
+| `announcement.manage` | 대표 · 전무 · 오피스 | `TOP_ADMIN_ROLES`(admin-announcements) |
+| `cleaning.work` | 대표 · 전무 · 현장관리자 · 직원 · 파트타임 | `cleaningMobileAccessRoles` |
+| `cleaning.read_all` | 대표 · 전무 · 오피스 · CS · 현장관리자 | `cleaningReadAllRoles` + `cleaningRecordViewerRoles`(같은 목록 둘) |
+| `cleaning.force_complete` | 대표 · 전무 · 오피스 · 현장관리자 | `cleaningForceCompleteRoles` |
+| `linen.manage` | 대표 · 전무 · 오피스 · CS · 현장관리자 | `ADMIN_CAPABLE_ROLES` ×2 |
+| `property_info.edit` | 대표 · 전무 · 오피스 · CS | `PROPERTY_OPERATION_INFO_EDITOR_ROLES` |
+| `complaint.write` | 대표 · 전무 · 오피스 · CS | `WRITE_COMPLAINT_ROLES` |
+| `complaint.manage` | 대표 · 전무 · 오피스 | `COMPLAINT_ADMIN_ROLES` |
+| `complaint.comment` | 파트타임 빼고 전부 | `NO_COMMENT_ROLES`(반대) |
+| `request.delete_any` | 대표 · 전무 · 오피스 · CS · 현장관리자 | `DELETE_ANY_ROLES` ×4 |
+| `bug.review` | 대표 · 전무 · 오피스 | `REVIEWER_ROLES` · `BUG_REPORT_REVIEWER_ROLES` |
+| `board.manage` | 대표 · 전무 · 오피스 | `MANAGER_ROLES` ×2(신고 처리 `board.moderate` 와 따로) |
+
+`order_processor` 의 앱 게이트 역할 부분(`ORDER_PROCESSOR_ROLES`)도 키의 역할 기본값으로 바꿨다. 개발자는 전부 통과(`platformBypass`) —
+예전 목록에서 개발자가 빠져 있던 공지 전체 관리 · 린넨 · 버그 검토 · 게시판 관리 넷은 「개발자는 모든 권한」(2026-09-10)에 맞춰 들어갔다
+(버그 신고 **알림 받는 사람**은 `rolesWithCapability` 라 그대로 대표 · 전무 · 오피스). DB 사본: 마이그레이션 `202610200003`.
+남겨 둔 것: 관리자 웹 접속 · 현장 모드 전환(`src/config/roles.ts`) — 권한이 아니라 앱 구성이다.
+
 ### 3-2. 키마다 정책을 갖는다
 
 ```ts

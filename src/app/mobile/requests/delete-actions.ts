@@ -1,7 +1,8 @@
 "use server";
 
+import { roleCan } from "@/config/capabilities";
 import { revalidatePath } from "next/cache";
-import { isOrgTopAdmin, type Role } from "@/config/roles";
+import type { Role } from "@/config/roles";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -19,33 +20,8 @@ function revalidateAfterDelete(kind: "lost-found" | "maintenance" | "orders") {
 
 type DeleteResult = { ok: true } | { ok: false; error: "unauthorized" | "not_found" | "delete_failed" };
 
-/**
- * 요청 3종(분실물 · 수리·점검 · 주문·비품)의 DELETE 권한 — DB의 DELETE RLS 정책과 같은 기준을
- * 서버 액션에서도 먼저 강제한다.
- *
- * RLS(202605210006 / 202605210007 / 202606010001):
- *   reported_by_user_id = auth.uid()
- *   OR is_platform_admin()
- *   OR has_org_role(org, ['owner','office_admin','cs_staff','field_manager'])
- * `has_org_role`은 senior_managing_director를 owner-equivalent로 처리하므로(202607130003)
- * `isOrgTopAdmin`으로 함께 커버한다.
- *
- * 앱 게이트가 없으면 RLS가 유일한 방어선이 되고, 감사 흔적이 남는 "무효 처리/상태 정정"은 막히는
- * 역할(staff · part_time_staff)이 흔적이 남지 않는 하드 삭제만 성공하는 역전이 생긴다.
- * 참고: field_manager가 남의 기록을 지울 수 있는지는 docs/engineering/05-rls-permissions.md의
- * Open Question으로 남아 있다 — 여기서는 현재 RLS와 동일하게(허용) 맞춰 두고 변경하지 않는다.
- */
-const DELETE_ANY_ROLES: readonly Role[] = [
-  "developer_super_admin",
-  "owner",
-  "senior_managing_director",
-  "office_admin",
-  "cs_staff",
-  "field_manager",
-];
-
 function canDeleteAnyRequestRecord(role: Role): boolean {
-  return isOrgTopAdmin(role) || DELETE_ANY_ROLES.includes(role);
+  return roleCan(role, "request.delete_any");
 }
 
 function isValidUuid(value: string) {

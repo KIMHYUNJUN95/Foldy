@@ -107,6 +107,9 @@ An organization role fully equivalent to `owner` in every organization-scoped pe
   린넨 반품 관리, 버그 신고 검토 · 알림, 게시판 남의 글 · 댓글 삭제, 요청 목록의 「남의 것 삭제」 버튼. All now include
   `senior_managing_director`. Wherever a feature doc says "owner/office_admin", read it as "owner · 전무 · office_admin".
   Regression test `src/lib/__tests__/senior-director-parity.test.ts` fails if any role list in `src/` names `owner` without 전무.
+- **Since 2026-10-20 those feature gates are registry keys** (`src/config/capabilities.ts` → 「권한 정리 ③」, e.g. `announcement.create`,
+  `cleaning.read_all`, `complaint.manage`, `request.delete_any`), checked with `roleCan`. The full role × feature table lives in
+  `docs/engineering/14-permission-architecture.md` §3-1-1 and is pinned by `src/lib/__tests__/role-matrix.test.ts`.
 
 ### Office Admin
 

@@ -22,11 +22,12 @@ import {
   localizeAttendanceSiteName,
   type AttendanceSiteDisplayRow,
 } from "@/lib/attendance-site-display";
-import type {
-  AttendanceCorrectionReason,
-  AttendanceCorrectionRequestRow,
-  AttendanceCorrectionStatus,
-  AttendanceSessionRow,
+import {
+  gapFillMinFrom,
+  type AttendanceCorrectionReason,
+  type AttendanceCorrectionRequestRow,
+  type AttendanceCorrectionStatus,
+  type AttendanceSessionRow,
 } from "@/lib/attendance";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
@@ -1065,8 +1066,13 @@ export function computePayrollMonth(
     out.set(userId, {
       pay,
       eligibility: {
-        eligible: reviewRequired === 0 && pendingCorrections === 0 && openSessions === 0 && !alreadyFinalized,
-        blockers: { reviewRequired, pendingCorrections, openSessions, alreadyFinalized },
+        eligible:
+          reviewRequired === 0 &&
+          pendingCorrections === 0 &&
+          openSessions === 0 &&
+          calc.unpricedCount === 0 &&
+          !alreadyFinalized,
+        blockers: { reviewRequired, pendingCorrections, openSessions, missingPayInfo: calc.unpricedCount, alreadyFinalized },
       },
       finalized: alreadyFinalized,
     });
@@ -1983,6 +1989,8 @@ export type AdminAttendanceWagesData = {
   defaultEffectiveFrom: string;
   /** Earliest selectable effective-from (today, Tokyo) — matches the server's no-past-dates rule. */
   minEffectiveFrom: string;
+  /** 앞쪽 빈 날 채우기의 가장 이른 날(지난달 1일, `gapFillMinFrom`) — 그 사람의 이력이 이 날보다 늦게 시작할 때만 쓴다. */
+  gapFillMinFrom: string;
   rows: AdminWageRow[];
 };
 
@@ -2015,8 +2023,9 @@ export async function getAdminAttendanceWages(
 ): Promise<AdminAttendanceWagesData> {
   const defaultEffectiveFrom = firstOfNextTokyoMonth();
   const minEffectiveFrom = todayTokyo();
+  const gapMin = gapFillMinFrom(minEffectiveFrom);
   if (session.organization.id === "platform") {
-    return { isPrivileged: false, defaultEffectiveFrom, minEffectiveFrom, rows: [] };
+    return { isPrivileged: false, defaultEffectiveFrom, minEffectiveFrom, gapFillMinFrom: gapMin, rows: [] };
   }
   const service = getSupabaseServiceClient();
   const privileged = await isAttendancePayrollAdmin(
@@ -2025,7 +2034,7 @@ export async function getAdminAttendanceWages(
     session.user.id,
   );
   if (!privileged) {
-    return { isPrivileged: false, defaultEffectiveFrom, minEffectiveFrom, rows: [] };
+    return { isPrivileged: false, defaultEffectiveFrom, minEffectiveFrom, gapFillMinFrom: gapMin, rows: [] };
   }
 
   const membersRes = await service
@@ -2035,7 +2044,7 @@ export async function getAdminAttendanceWages(
     .eq("status", "active");
   const members = (membersRes.data ?? []) as { user_id: string; role: string }[];
   if (members.length === 0) {
-    return { isPrivileged: true, defaultEffectiveFrom, minEffectiveFrom, rows: [] };
+    return { isPrivileged: true, defaultEffectiveFrom, minEffectiveFrom, gapFillMinFrom: gapMin, rows: [] };
   }
 
   const userIds = members.map((m) => m.user_id);
@@ -2155,7 +2164,7 @@ export async function getAdminAttendanceWages(
   });
   rows.sort((a, b) => a.userName.localeCompare(b.userName));
 
-  return { isPrivileged: true, defaultEffectiveFrom, minEffectiveFrom, rows };
+  return { isPrivileged: true, defaultEffectiveFrom, minEffectiveFrom, gapFillMinFrom: gapMin, rows };
 }
 
 export async function getAdminAttendanceQueue(

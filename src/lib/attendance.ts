@@ -226,3 +226,15 @@ export const ATTENDANCE_OPEN_SESSION_REMINDER_MINUTE = 30;
 export function isStaleOpenSession(operatingDate: string, today: string): boolean {
   return operatingDate < today;
 }
+
+/**
+ * 시급 · 고용형태를 「빈 날 채우기」로 넣을 수 있는 가장 이른 날 — 지난달 1일(도쿄, 2026-10-21).
+ *
+ * 시급 · 고용형태는 원래 오늘 이후로만 넣는다(이미 지난 날의 금액을 바꾸지 않는다). 그런데 등록이 첫 출근보다 늦으면
+ * 그 사이 근무가 0원으로 남고 마감도 막힌다. 그래서 **아직 값이 없는 날만** 지난 날짜로 채울 수 있게 했다 — 정정 요청이
+ * 받는 범위(이번 달 · 지난달)와 같다. 이미 값이 있는 날을 바꾸는 소급은 여전히 막는다.
+ */
+export function gapFillMinFrom(todayTokyo: string): string {
+  const [y, m] = todayTokyo.split("-").map(Number);
+  return m <= 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, "0")}-01`;
+}

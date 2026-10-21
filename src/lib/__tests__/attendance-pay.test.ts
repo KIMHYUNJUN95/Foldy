@@ -7,6 +7,7 @@ import {
   resolveEffective,
   roundToNearest10,
 } from "../attendance-pay-calculation";
+import { gapFillMinFrom } from "../attendance";
 
 describe("attendance hourly pay calculation", () => {
   it("uses the rate effective on the Tokyo operating date boundary", () => {
@@ -85,5 +86,58 @@ describe("attendance hourly pay calculation", () => {
     expect(calc.totalPaidMinutes).toBe(6);
     expect(calc.expectedGross).toBe(100);
     expect(calc.baseGross).toBe(100);
+  });
+});
+
+// 2026-10-21 — 시급 · 고용형태 등록이 첫 출근보다 늦으면 그 사이 근무가 조용히 0원이 되고 마감도 통과됐다.
+describe("unpricedCount — 고용형태 · 시급이 없어 0원이 된 근무", () => {
+  const session = (date: string) => ({
+    id: date,
+    operating_date: date,
+    clock_in_at: `${date}T09:00:00+09:00`,
+    clock_out_at: `${date}T18:00:00+09:00`,
+    status: "completed",
+    review_state: "normal",
+  });
+  const base = {
+    userId: "u",
+    firstDay: "2026-10-01",
+    lastDay: "2026-10-31",
+    allowances: [],
+    breakSecondsBySession: new Map<string, number>(),
+    correctionStatusOf: () => null,
+  };
+
+  it("고용형태가 없는 날 · 시급이 없는 시급제 날을 센다", () => {
+    const calc = calculateMonthlyPay({
+      ...base,
+      sessions: [session("2026-10-01"), session("2026-10-03"), session("2026-10-06")],
+      // 고용형태는 10/3 부터, 시급은 10/5 부터 — 10/1(고용형태 없음) · 10/3(시급 없음)이 0원.
+      employment: [{ employment_type: "hourly", effective_from: "2026-10-03", effective_to: null }],
+      rates: [{ hourly_rate: 1000, effective_from: "2026-10-05", effective_to: null }],
+    });
+    expect(calc.unpricedCount).toBe(2);
+    expect(calc.totalPaidMinutes).toBe(9 * 60);
+  });
+
+  it("월급제 날 · 검토 필요 같은 이미 막히는 근무는 세지 않는다", () => {
+    const calc = calculateMonthlyPay({
+      ...base,
+      sessions: [session("2026-10-01"), { ...session("2026-10-02"), review_state: "review_required" }],
+      employment: [
+        { employment_type: "salaried", effective_from: "2026-01-01", effective_to: "2026-10-01" },
+        { employment_type: "hourly", effective_from: "2026-10-02", effective_to: null },
+      ],
+      rates: [{ hourly_rate: 1000, effective_from: "2026-10-02", effective_to: null }],
+    });
+    expect(calc.unpricedCount).toBe(0);
+    expect(calc.excludedCount).toBe(1);
+  });
+});
+
+describe("gapFillMinFrom — 빈 날 채우기는 지난달 1일부터", () => {
+  it("지난달 1일, 1월이면 작년 12월 1일", () => {
+    expect(gapFillMinFrom("2026-10-21")).toBe("2026-09-01");
+    expect(gapFillMinFrom("2027-01-05")).toBe("2026-12-01");
   });
 });

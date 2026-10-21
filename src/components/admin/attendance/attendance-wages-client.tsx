@@ -48,6 +48,7 @@ export function AttendanceWagesClient({
   ym,
   defaultEffectiveFrom,
   minEffectiveFrom,
+  gapFillMinFrom,
   locale,
   localeTag,
 }: {
@@ -55,6 +56,7 @@ export function AttendanceWagesClient({
   ym: string;
   defaultEffectiveFrom: string;
   minEffectiveFrom: string;
+  gapFillMinFrom: string;
   locale: Locale;
   localeTag: string;
 }) {
@@ -226,6 +228,7 @@ export function AttendanceWagesClient({
           localeTag={localeTag}
           defaultEffectiveFrom={defaultEffectiveFrom}
           minEffectiveFrom={minEffectiveFrom}
+          gapFillMinFrom={gapFillMinFrom}
           onClose={() => setPanelId(null)}
           onApplied={(updated, toastMsg) => {
             applyRow(updated);
@@ -251,6 +254,7 @@ function WagePanel({
   localeTag,
   defaultEffectiveFrom,
   minEffectiveFrom,
+  gapFillMinFrom,
   onClose,
   onApplied,
 }: {
@@ -260,10 +264,17 @@ function WagePanel({
   localeTag: string;
   defaultEffectiveFrom: string;
   minEffectiveFrom: string;
+  gapFillMinFrom: string;
   onClose: () => void;
   onApplied: (updated: AdminWageRow, toastMsg?: string) => void;
 }) {
   const router = useRouter();
+  // 앞쪽 빈 날 채우기(2026-10-21) — 이력이 없거나 지난달 1일보다 늦게 시작하면 그 앞 빈 날도 고를 수 있다.
+  // 이미 값이 있는 날 · 마감된 달은 서버(`planPastGapFill`)가 다시 거른다.
+  const earliestRateFrom = row.history.reduce<string | null>((m, h) => (!m || h.from < m ? h.from : m), null);
+  const earliestEmpFrom = row.employmentHistory.reduce<string | null>((m, h) => (!m || h.from < m ? h.from : m), null);
+  const rateMinFrom = !earliestRateFrom || earliestRateFrom > gapFillMinFrom ? gapFillMinFrom : minEffectiveFrom;
+  const empMinFrom = !earliestEmpFrom || earliestEmpFrom > gapFillMinFrom ? gapFillMinFrom : minEffectiveFrom;
   const salaried = row.employment === "salaried";
   const currentEmp: "hourly" | "salaried" | "unknown" = row.employment;
   const [empType, setEmpType] = useState<"hourly" | "salaried">(
@@ -293,11 +304,15 @@ function WagePanel({
       if (res.ok) {
         setEmpConfirm(false);
         router.refresh();
-        onApplied({ ...row, employment: empType }, c.wageActionEmploymentDone);
+        // 빈 날 채우기는 지난 구간만 채운다 — 이미 유형이 있으면 지금 유형은 그대로다.
+        const filledPastOnly = empDate < minEffectiveFrom && currentEmp !== "unknown";
+        onApplied(filledPastOnly ? row : { ...row, employment: empType }, c.wageActionEmploymentDone);
       } else if (res.reason === "forbidden") {
         setEmpErr(c.wageActionForbidden);
       } else if (res.reason === "future_required") {
         setEmpErr(c.wageActionFutureRequired);
+      } else if (res.reason === "month_finalized") {
+        setEmpErr(c.wageActionMonthFinalized);
       } else if (res.reason === "no_change") {
         setEmpErr(c.wagePanelEmpSame);
       } else {
@@ -332,7 +347,23 @@ function WagePanel({
         effectiveFrom: date,
         note: reason.trim() ? reason.trim() : null,
       });
-      if (res.ok) {
+      if (res.ok && date < minEffectiveFrom && earliestRateFrom) {
+        // 앞쪽 빈 날 채우기 — 기존 이력은 그대로, 가장 이른 이력 전날까지 닫힌 행 하나가 맨 뒤(가장 오래된 쪽)에 붙는다.
+        onApplied({
+          ...row,
+          history: [
+            ...row.history,
+            {
+              id: res.id,
+              rate: Math.round(parsedRate),
+              from: date,
+              to: shiftDay(earliestRateFrom, -1),
+              locked: true,
+              note: reason.trim() ? reason.trim() : null,
+            },
+          ],
+        });
+      } else if (res.ok) {
         const newEntry = {
           id: res.id,
           rate: Math.round(parsedRate),
@@ -365,6 +396,8 @@ function WagePanel({
         setErr(c.wageActionRateRequired);
       } else if (res.reason === "future_required") {
         setErr(c.wageActionFutureRequired);
+      } else if (res.reason === "month_finalized") {
+        setErr(c.wageActionMonthFinalized);
       } else if (res.reason === "salaried_member") {
         setErr(c.wageActionSalaried);
       } else if (res.reason === "invalid") {
@@ -468,7 +501,7 @@ function WagePanel({
                 <AdminDatePicker
                   value={empDate}
                   onChange={setEmpDate}
-                  min={minEffectiveFrom}
+                  min={empMinFrom}
                   localeTag={localeTag}
                   ariaLabel={c.wagePanelFieldDate}
                   labels={{
@@ -652,7 +685,7 @@ function WagePanel({
                       <AdminDatePicker
                         value={date}
                         onChange={setDate}
-                        min={minEffectiveFrom}
+                        min={rateMinFrom}
                         localeTag={localeTag}
                         ariaLabel={c.wagePanelFieldDate}
                         labels={{

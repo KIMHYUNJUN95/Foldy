@@ -457,7 +457,10 @@ data. **No admin PC/web dashboard** (explicit scope rule). The pay screen is **n
   (`attendance-wages-client.tsx`). Hourly rate → `setHourlyRate`; employment type (시급↔정규직) →
   `setEmploymentType` (2026-07-08) — both privileged server actions in `src/app/admin/attendance/actions.ts`
   that write `hourly_rate_history` / `employment_type_history` as no-retroactive interval changes (close
-  the active period at effective_from−1, delete a still-future pending row, insert the new open period),
+  the active period at effective_from−1, delete a still-future pending row, insert the new open period;
+  **exception 2026-10-21:** a past `effective_from` is accepted only as a leading gap-fill — before the
+  user's earliest row, not before the 1st of last month, not over a finalized month — inserted as a closed
+  row ending the day before the earliest row, existing rows untouched (`planPastGapFill`)),
   with an `audit_logs` entry. The 시급 관리 panel now has a "고용 형태 변경" section (시급/정규직 segmented
   control + effective date + reason) above the rate editor, available for both hourly and salaried members;
   switching type leaves the rate history untouched (pay branches on the active employment type). The

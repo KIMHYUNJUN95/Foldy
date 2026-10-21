@@ -186,6 +186,12 @@ export type PayCalcMonth<S extends PayCalcSession> = {
   /** 세션 있는 날(날짜 ↑) → 출근 없는 날 순서 — 마감 스냅샷 `allowance_breakdown` 이 이 순서다. */
   allowances: PayCalcAllowanceResult[];
   excludedCount: number;
+  /**
+   * 급여에 넣을 수 있는 근무인데 그날 **고용형태가 없거나, 시급제인데 시급이 없어** 0원이 된 세션 수(2026-10-21).
+   * 시급 · 고용형태는 오늘 이후로만 넣을 수 있어서, 등록이 첫 출근보다 늦으면 그 사이 근무가 조용히 0원이 됐다 —
+   * 마감이 이걸 막아야 0원이 마감 금액으로 굳지 않는다. 월급제 날은 세지 않는다(급여가 Foldy 밖).
+   */
+  unpricedCount: number;
   rateSegments: { rate: number; paidMinutes: number; gross: number }[];
   /** 날짜 ↑. 세션 있는 날 + 출근 없는 날의 정액 수당. */
   days: PayCalcDay<S>[];
@@ -260,6 +266,7 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
 
   const days: PayCalcDay<S>[] = [];
   let excludedCount = 0;
+  let unpricedCount = 0;
   let hourlyEligible = false;
   const segments = new Map<number, { paidMinutes: number; gross: number }>();
 
@@ -323,6 +330,8 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
         segments.set(dayRate, seg);
       } else if (isHourly && !usable) {
         excludedCount += 1;
+      } else if (usable && (empType == null || (isHourly && dayRate == null))) {
+        unpricedCount += 1;
       }
       sessionResults.push({
         session: s,
@@ -396,6 +405,7 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
     allowanceSpecialTotal,
     allowances,
     excludedCount,
+    unpricedCount,
     rateSegments: Array.from(segments.entries())
       .map(([rate, v]) => ({ rate, paidMinutes: v.paidMinutes, gross: Math.round(settleYen(v.gross)) }))
       .sort((a, b) => a.rate - b.rate),

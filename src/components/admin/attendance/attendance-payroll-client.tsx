@@ -358,7 +358,11 @@ function reopenedRow(row: AdminPayrollRow): AdminPayrollRow {
     ...row,
     finalized: false,
     finalizationEligible:
-      row.employment !== "salaried" && b.reviewRequired === 0 && b.pendingCorrections === 0 && b.openSessions === 0,
+      row.employment !== "salaried" &&
+      b.reviewRequired === 0 &&
+      b.pendingCorrections === 0 &&
+      b.openSessions === 0 &&
+      b.missingPayInfo === 0,
     blockers: { ...b, alreadyFinalized: false },
   };
 }
@@ -407,6 +411,7 @@ function PayrollPanel({
     b.reviewRequired > 0 ||
     b.pendingCorrections > 0 ||
     b.openSessions > 0 ||
+    b.missingPayInfo > 0 ||
     b.alreadyFinalized;
   const blockerHref = (f: "review" | "corr") =>
     `/admin/attendance/queue?ym=${ym}&filter=${f}&q=${encodeURIComponent(row.userName)}`;
@@ -700,6 +705,28 @@ function PayrollPanel({
                     </span>
                     <div>
                       <div className="errbar__t">{c.payPanelBlockerOpen(b.openSessions)}</div>
+                    </div>
+                    <span className="errbar__a">
+                      <Ic>
+                        <ArrowUpRight />
+                      </Ic>
+                    </span>
+                  </Link>
+                ) : null}
+                {b.missingPayInfo > 0 ? (
+                  <Link
+                    className="errbar is-warn errbar--link"
+                    style={{ margin: 0 }}
+                    href="/admin/attendance/wages"
+                    title={c.payPanelBlockerMissingPayGo}
+                  >
+                    <span className="errbar__ic">
+                      <Ic>
+                        <AlertTriangle />
+                      </Ic>
+                    </span>
+                    <div>
+                      <div className="errbar__t">{c.payPanelBlockerMissingPay(b.missingPayInfo)}</div>
                     </div>
                     <span className="errbar__a">
                       <Ic>

@@ -78,6 +78,7 @@ export default async function AdminAttendanceWagesPage({
             ym={carriedYm}
             defaultEffectiveFrom={wages.defaultEffectiveFrom}
             minEffectiveFrom={wages.minEffectiveFrom}
+            gapFillMinFrom={wages.gapFillMinFrom}
             locale={locale}
             localeTag={localeTag}
           />

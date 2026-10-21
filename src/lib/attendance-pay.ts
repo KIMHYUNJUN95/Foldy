@@ -126,6 +126,8 @@ export type MonthlyPayView = {
   allowances: AppliedAllowanceView[];
   /** Count of hourly-day sessions excluded from pay (unresolved / pending / open / invalid). */
   excludedCount: number;
+  /** 고용형태 · 시급이 없어 0원이 된 근무 수 — 마감을 막는다(`PayCalcMonth.unpricedCount`). */
+  unpricedCount: number;
   rateSegments: RateSegmentView[];
   days: PayDayView[];
   /** Present when the user-month is finalized — the screen shows finalized (locked) pay (Step 11). */
@@ -356,6 +358,7 @@ export async function getMonthlyPayView(
     baseGross: calc.baseGross,
     allowances: calc.allowances,
     excludedCount: calc.excludedCount,
+    unpricedCount: calc.unpricedCount,
     rateSegments: calc.rateSegments,
     days,
     finalization: snap

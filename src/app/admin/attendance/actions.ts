@@ -37,6 +37,7 @@ import {
 } from "@/lib/transport-reimbursement";
 import {
   ATTENDANCE_REVIEW_STATES,
+  gapFillMinFrom,
   type AttendanceCorrectionRequestRow,
   type AttendanceMonthSnapshotRow,
   type AttendanceReviewState,
@@ -1072,10 +1073,9 @@ export async function finalizeAttendanceMonth(input: {
     .maybeSingle();
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
-  const elig = await getFinalizationEligibility(organizationId, input.userId, input.ym);
-  if (!elig.eligible) return { ok: false, reason: "blocked", blockers: elig.blockers };
-
   const pay = await getMonthlyPayView(organizationId, input.userId, input.ym);
+  const elig = await getFinalizationEligibility(organizationId, input.userId, input.ym, pay.unpricedCount);
+  if (!elig.eligible) return { ok: false, reason: "blocked", blockers: elig.blockers };
   if (!pay.hourlyEligible) return { ok: false, reason: "not_hourly" };
 
   const firstDay = monthFirstDay(input.ym);
@@ -1121,7 +1121,7 @@ export async function finalizeAttendanceMonth(input: {
     return {
       ok: false,
       reason: "blocked",
-      blockers: { alreadyFinalized: true, openSessions: 0, pendingCorrections: 0, reviewRequired: 0 },
+      blockers: { alreadyFinalized: true, openSessions: 0, pendingCorrections: 0, reviewRequired: 0, missingPayInfo: 0 },
     };
   }
   if (ins.error || !ins.data) return { ok: false, reason: "error" };
@@ -1796,10 +1796,59 @@ export type SetHourlyRateResult =
         | "invalid"
         | "rate_required"
         | "future_required"
+        | "month_finalized"
         | "salaried_member"
         | "target_invalid"
         | "error";
     };
+
+/**
+ * 지난 날짜로 시급 · 고용형태를 넣는 요청 = **빈 날 채우기**만 허용(2026-10-21, 사용자 결정).
+ *
+ * 그 사람의 가장 이른 이력보다 **앞쪽 빈 구간**만 채운다 — 새 행은 [effectiveFrom, 가장 이른 이력 전날] 로 닫혀 들어가고
+ * (이력이 아예 없으면 열린 행), 기존 행은 하나도 건드리지 않는다. 그래서 이미 계산되던 날의 금액은 바뀌지 않고 0원이던
+ * 근무만 계산된다. 지난달 1일보다 이른 날(`gapFillMinFrom`), 이미 값이 있는 날, 마감된 달에 걸리는 날은 거절한다.
+ */
+async function planPastGapFill(
+  service: ReturnType<typeof getSupabaseServiceClient>,
+  table: "hourly_rate_history" | "employment_type_history",
+  organizationId: string,
+  userId: string,
+  effectiveFrom: string,
+  todayTokyo: string,
+): Promise<{ ok: true; effectiveTo: string | null } | { ok: false; reason: "future_required" | "month_finalized" | "error" }> {
+  if (effectiveFrom < gapFillMinFrom(todayTokyo)) return { ok: false, reason: "future_required" };
+  const earliestRes = await service
+    .from(table)
+    .select("effective_from")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .order("effective_from", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (earliestRes.error) return { ok: false, reason: "error" };
+  const earliest = (earliestRes.data as { effective_from: string } | null)?.effective_from ?? null;
+  // 그날 이미 값이 있다 — 지난 금액을 바꾸는 소급이라 막는다.
+  if (earliest && earliest <= effectiveFrom) return { ok: false, reason: "future_required" };
+  const effectiveTo = earliest
+    ? new Date(new Date(`${earliest}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10)
+    : null;
+
+  // 채우는 구간(오늘 전까지)에 마감된 달이 있으면 거절 — 스냅샷과 이력이 어긋난다.
+  const lastFilled = effectiveTo && effectiveTo < todayTokyo ? effectiveTo : todayTokyo;
+  const finalizedRes = await service
+    .from("attendance_month_snapshots")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("status", "finalized")
+    .gte("target_month", `${effectiveFrom.slice(0, 7)}-01`)
+    .lte("target_month", `${lastFilled.slice(0, 7)}-01`)
+    .limit(1);
+  if (finalizedRes.error) return { ok: false, reason: "error" };
+  if ((finalizedRes.data ?? []).length > 0) return { ok: false, reason: "month_finalized" };
+  return { ok: true, effectiveTo };
+}
 
 export async function setHourlyRate(input: {
   userId: string;
@@ -1824,14 +1873,25 @@ export async function setHourlyRate(input: {
   }
   // Disallow retroactive changes: effective_from must be today or later (Tokyo). Past dates would
   // reinterpret a day that's already happened; today itself is fine since the day isn't over yet.
+  // 예외: 아직 시급이 없는 앞쪽 빈 날 채우기(`planPastGapFill`, 2026-10-21).
   const todayTokyo = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  let gapFill: { effectiveTo: string | null } | null = null;
   if (input.effectiveFrom < todayTokyo) {
-    return { ok: false, reason: "future_required" };
+    const plan = await planPastGapFill(
+      service,
+      "hourly_rate_history",
+      organizationId,
+      input.userId,
+      input.effectiveFrom,
+      todayTokyo,
+    );
+    if (!plan.ok) return { ok: false, reason: plan.reason };
+    gapFill = { effectiveTo: plan.effectiveTo };
   }
 
   // Target must be an active member of this org.
@@ -1878,7 +1938,8 @@ export async function setHourlyRate(input: {
     .eq("user_id", input.userId)
     .is("effective_to", null);
   if (openRes.error) return { ok: false, reason: "error" };
-  const openRows = (openRes.data ?? []) as { id: string; effective_from: string }[];
+  // 빈 날 채우기는 기존 행을 닫거나 지우지 않는다 — 앞쪽 빈 구간에 닫힌 행 하나만 넣는다.
+  const openRows = gapFill ? [] : ((openRes.data ?? []) as { id: string; effective_from: string }[]);
 
   const pendingIds = openRows
     .filter((r) => r.effective_from >= input.effectiveFrom)
@@ -1909,7 +1970,7 @@ export async function setHourlyRate(input: {
       user_id: input.userId,
       hourly_rate: input.hourlyRate,
       effective_from: input.effectiveFrom,
-      effective_to: null,
+      effective_to: gapFill?.effectiveTo ?? null,
       created_by_user_id: actorId,
     })
     .select("id")
@@ -1949,7 +2010,14 @@ export type SetEmploymentTypeResult =
   | { ok: true; id: string }
   | {
       ok: false;
-      reason: "forbidden" | "invalid" | "future_required" | "target_invalid" | "no_change" | "error";
+      reason:
+        | "forbidden"
+        | "invalid"
+        | "future_required"
+        | "month_finalized"
+        | "target_invalid"
+        | "no_change"
+        | "error";
     };
 
 export async function setEmploymentType(input: {
@@ -1979,8 +2047,19 @@ export async function setEmploymentType(input: {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  // 지난 날짜는 앞쪽 빈 날 채우기만(`planPastGapFill`, 2026-10-21).
+  let gapFill: { effectiveTo: string | null } | null = null;
   if (input.effectiveFrom < todayTokyo) {
-    return { ok: false, reason: "future_required" };
+    const plan = await planPastGapFill(
+      service,
+      "employment_type_history",
+      organizationId,
+      input.userId,
+      input.effectiveFrom,
+      todayTokyo,
+    );
+    if (!plan.ok) return { ok: false, reason: plan.reason };
+    gapFill = { effectiveTo: plan.effectiveTo };
   }
 
   const member = await service
@@ -1993,6 +2072,7 @@ export async function setEmploymentType(input: {
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
   // Current active type — block a redundant same-type change (null = never set, so any type is a change).
+  // 빈 날 채우기는 오늘 유형과 같아도 된다(10/5 부터 시급제인 사람의 10/1~10/4 를 시급제로 채우는 경우).
   const cur = await service
     .from("employment_type_history")
     .select("employment_type")
@@ -2004,7 +2084,7 @@ export async function setEmploymentType(input: {
     .limit(1)
     .maybeSingle();
   const curType = (cur.data as { employment_type: string } | null)?.employment_type ?? null;
-  if (curType === input.employmentType) return { ok: false, reason: "no_change" };
+  if (!gapFill && curType === input.employmentType) return { ok: false, reason: "no_change" };
 
   const fromDate = new Date(`${input.effectiveFrom}T00:00:00Z`);
   const closeIso = new Date(fromDate.getTime() - 86400000).toISOString().slice(0, 10);
@@ -2016,7 +2096,7 @@ export async function setEmploymentType(input: {
     .eq("user_id", input.userId)
     .is("effective_to", null);
   if (openRes.error) return { ok: false, reason: "error" };
-  const openRows = (openRes.data ?? []) as { id: string; effective_from: string }[];
+  const openRows = gapFill ? [] : ((openRes.data ?? []) as { id: string; effective_from: string }[]);
   const pendingIds = openRows.filter((r) => r.effective_from >= input.effectiveFrom).map((r) => r.id);
   const activeIds = openRows.filter((r) => r.effective_from < input.effectiveFrom).map((r) => r.id);
 
@@ -2039,7 +2119,7 @@ export async function setEmploymentType(input: {
       user_id: input.userId,
       employment_type: input.employmentType,
       effective_from: input.effectiveFrom,
-      effective_to: null,
+      effective_to: gapFill?.effectiveTo ?? null,
       created_by_user_id: actorId,
     })
     .select("id")

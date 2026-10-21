@@ -27,6 +27,8 @@ export type FinalizationBlockers = {
   reviewRequired: number;
   pendingCorrections: number;
   openSessions: number;
+  /** 고용형태 · 시급이 없어 0원이 된 근무 수(`PayCalcMonth.unpricedCount`, 2026-10-21). 0원이 마감 금액으로 굳지 않게 막는다. */
+  missingPayInfo: number;
   alreadyFinalized: boolean;
 };
 
@@ -82,11 +84,13 @@ export async function getCurrentFinalizedSnapshot(
  * Can this user-month be finalized? Blocked while any unresolved item remains: review-required
  * sessions, pending correction requests (on month sessions), open/incomplete sessions, or an
  * already-finalized snapshot (must reopen first). Server-side; never rely on UI disabling.
+ * `unpricedCount` 는 호출자가 계산한 급여(`getMonthlyPayView`)에서 넘긴다 — 고용형태 · 시급이 없는 근무.
  */
 export async function getFinalizationEligibility(
   organizationId: string,
   userId: string,
   ym: string,
+  unpricedCount: number,
 ): Promise<FinalizationEligibility> {
   const service = getSupabaseServiceClient();
   const firstDay = monthFirstDay(ym);
@@ -139,10 +143,15 @@ export async function getFinalizationEligibility(
     reviewRequired,
     pendingCorrections,
     openSessions,
+    missingPayInfo: unpricedCount,
     alreadyFinalized,
   };
   const eligible =
-    reviewRequired === 0 && pendingCorrections === 0 && openSessions === 0 && !alreadyFinalized;
+    reviewRequired === 0 &&
+    pendingCorrections === 0 &&
+    openSessions === 0 &&
+    unpricedCount === 0 &&
+    !alreadyFinalized;
 
   return { eligible, blockers };
 }

@@ -2496,6 +2496,9 @@ const FALLBACK_DICTIONARY = {
       payPanelBlockerReview: (n: number) => `${n} sessions still need review`,
       payPanelBlockerCorr: (n: number) => `${n} correction requests are pending`,
       payPanelBlockerOpen: (n: number) => `${n} sessions are still open`,
+      // 2026-10-21: 그날 고용형태 · 시급이 없어 0원이 된 근무 — 마감을 막는다.
+      payPanelBlockerMissingPay: (n: number) => `${n} sessions have no employment type or hourly rate for that day (paid ¥0)`,
+      payPanelBlockerMissingPayGo: "Open wage settings",
       payPanelBlockerGo: "Open in review queue",
       payPanelKvBase: "Base wage",
       payPanelKvAllowance: "Extra allowance",
@@ -2869,7 +2872,10 @@ const FALLBACK_DICTIONARY = {
       wageActionForbidden: "You do not have permission for this change.",
       wageActionInvalid: "Invalid input.",
       wageActionRateRequired: "Enter a positive rate.",
-      wageActionFutureRequired: "Effective date must be today or later.",
+      // 2026-10-21: 지난 날짜는 아직 값이 없는 앞쪽 빈 날(지난달 1일부터)만.
+      wageActionFutureRequired:
+        "Use today or later. Past dates only work for days that have no rate yet (from the 1st of last month).",
+      wageActionMonthFinalized: "That period includes a finalized month. Reopen the month first.",
       wageActionSalaried: "Cannot set an hourly rate on a salaried account.",
     },
     leaveConsole: {
@@ -10543,6 +10549,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         payPanelBlockerReview: (n: number) => `검토 필요 세션 ${n}건`,
         payPanelBlockerCorr: (n: number) => `정정 요청 대기 ${n}건`,
         payPanelBlockerOpen: (n: number) => `진행 중 세션 ${n}건`,
+        payPanelBlockerMissingPay: (n: number) => `그날 고용형태 · 시급이 없어 0원인 근무 ${n}건`,
+        payPanelBlockerMissingPayGo: "시급 설정 열기",
         payPanelBlockerGo: "검토 큐에서 열기",
         payPanelKvBase: "기본급",
         payPanelKvAllowance: "추가수당",
@@ -10910,7 +10918,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         wageActionForbidden: "이 변경 권한이 없습니다.",
         wageActionInvalid: "입력값이 올바르지 않습니다.",
         wageActionRateRequired: "0보다 큰 시급을 입력하세요.",
-        wageActionFutureRequired: "적용 시작일은 오늘 또는 이후 날짜여야 합니다.",
+        wageActionFutureRequired:
+          "오늘 이후 날짜를 고르세요. 지난 날짜는 아직 값이 없는 날(지난달 1일부터)만 채울 수 있어요.",
+        wageActionMonthFinalized: "그 기간에 마감된 달이 있어요. 마감을 먼저 풀어 주세요.",
         wageActionSalaried: "정규직 계정에는 시급을 설정할 수 없습니다.",
       },
       leaveConsole: {
@@ -18439,6 +18449,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         payPanelBlockerReview: (n: number) => `要レビューのセッション ${n} 件`,
         payPanelBlockerCorr: (n: number) => `修正申請の待機 ${n} 件`,
         payPanelBlockerOpen: (n: number) => `進行中のセッション ${n} 件`,
+        payPanelBlockerMissingPay: (n: number) => `その日の雇用形態・時給が未設定で0円の勤務 ${n} 件`,
+        payPanelBlockerMissingPayGo: "時給設定を開く",
         payPanelBlockerGo: "レビューキューで開く",
         payPanelKvBase: "基本給",
         payPanelKvAllowance: "追加手当",
@@ -18807,7 +18819,9 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         wageActionForbidden: "この変更の権限がありません。",
         wageActionInvalid: "入力値が正しくありません。",
         wageActionRateRequired: "0 より大きい時給を入力してください。",
-        wageActionFutureRequired: "適用開始日は今日以降でなければなりません。",
+        wageActionFutureRequired:
+          "今日以降の日付を選んでください。過去の日付は、まだ設定のない日（先月1日から）だけ埋められます。",
+        wageActionMonthFinalized: "その期間に締め済みの月があります。先に締めを解除してください。",
         wageActionSalaried: "正社員アカウントには時給を設定できません。",
       },
       leaveConsole: {

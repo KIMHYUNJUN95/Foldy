@@ -278,11 +278,12 @@ async function legacyPayrollRows(userIds: string[], localeTag: string) {
   }
   const rows = [];
   for (const userId of userIds) {
-    const [pay, elig, snapshot] = await Promise.all([
+    const [pay, snapshot] = await Promise.all([
       getMonthlyPayView(ORG, userId, YM, localeTag),
-      getFinalizationEligibility(ORG, userId, YM),
       getCurrentFinalizedSnapshot(fakeClient as never, ORG, userId, YM),
     ]);
+    // 마감 판정은 급여의 「0원 근무」 수를 받는다 — 마감 액션과 같은 순서(2026-10-21).
+    const elig = await getFinalizationEligibility(ORG, userId, YM, pay.unpricedCount);
     // 예전 `getAdminAttendancePayroll` 의 행 매핑 그대로.
     const employment = pay.salariedOnly
       ? "salaried"

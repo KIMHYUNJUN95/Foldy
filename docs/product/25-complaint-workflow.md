@@ -141,6 +141,8 @@ Beds24가 제공하는 Airbnb 또는 Booking.com 리뷰의 로컬 사본이다. 
 조직 내 모든 활성 구성원은 읽을 수 있다. 댓글은 Part-time Staff를 제외한 전 구성원이 작성할 수 있다.
 상태 변경은 기존 계약을 유지한다: 작성자는 본인 건, Owner / Office Admin은 전체, CS Staff는 본인 작성
 건만 `open ↔ resolved` 전환한다.
+모바일 상세의 「해결」 · 「다시 열기」는 **누르자마자 반영**된다(2026-10-21 — `useOptimistic`, 성공 햅틱도 바로). 서버가 거절하면
+원래 상태로 돌아가고 오류 문구 + 오류 햅틱(권한 검사는 서버 그대로).
 
 ### External review
 

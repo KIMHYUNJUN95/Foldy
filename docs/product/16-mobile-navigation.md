@@ -606,6 +606,11 @@ Current rules:
     경로면 주소로 메뉴를 찾고, `/new` · `/compose` · `/edit` 은 탭바를 숨긴다.
   - 자리 셸은 스와이프 뒤로가기 · 밑그림 · 스크롤 위치 저장을 하지 않는다(진짜 화면이 한다).
 - **Scroll restoration (2026-06-22)**: the shell scrolls an inner div (not the window), so Next's built-in restoration can't help. `MobileShell` saves the scroll container's `scrollTop` per pathname (module-scoped `SCROLL_POSITIONS`, survives the per-route remount) and restores it on mount — back-nav lands where you left off in long lists. **2026-10-21:** 복원은 뒤로 · 스와이프 · 탭 전환 · 같은 화면일 때만 — **앞으로 새로 연 화면은 맨 위에서** 시작한다(네이티브). 예전에는 링크로 다시 들어와도 지난번 위치로 내려가 있었다.
+- **메뉴 끌어 닫기 (2026-10-21 네이티브 점검)**: 열린 왼쪽 메뉴(서랍)를 왼쪽으로 밀면 손가락을 따라 밀리고(폴드 · 태블릿은 뒤 어둠도 같이
+  걷힘), 메뉴 폭의 30% 넘게 밀었거나 왼쪽으로 빠르게 튕기면 닫힌다(가벼운 햅틱) — 아니면 제자리로. `useDrawerDragClose`
+  (`src/components/shell/use-drawer-drag-close.ts`). 세로 · 오른쪽 손짓은 메뉴 목록 스크롤 몫, 메뉴 검색칸에서 시작한 손짓은 받지 않는다.
+  끄는 동안 `html[data-gesture]`(누름 반응 끔). 서랍의 `transform` · `transition` 은 React 가 쥔 값이라 끄는 동안만 덮고, 닫을 땐 전환을
+  되돌린 뒤 `closeSidebar` 로 React 가 -100% 를 쓴다(남은 거리를 원래 360ms 곡선으로). 로컬 빌드로 폰(390) · 폴드(700) 폭 확인.
 - **Sidebar transition lock (2026-06-23)**: opening/closing the side menu locks the shared top and bottom chrome hidden until the sidebar transition completes. This prevents a closing-frame flash where the header/tab bar reappears while the menu panel is still sliding away.
 - **Keyboard inset (2026-06-22)**: `KeyboardInsetSync` (mounted in `layout.tsx`) publishes the on-screen keyboard height as `--keyboard-inset` (VisualViewport). Genuinely `position:fixed` bottom submit bars use `bottom: var(--keyboard-inset, 0px)` so the keyboard never covers them (linen-return create; attendance `.att .submitbar`). New fixed bottom bars with inputs should do the same; flex-flow composers don't need it (the browser auto-scrolls them).
 - **Known deferred**: the shell still renders per-page (no shared `mobile/layout.tsx`), so it remounts on navigation (header scroll state resets; bottom-tab active highlight updates on arrival, not instantly on tap). A true persistent shell needs a route-group restructure to exempt the no-shell screens (`/mobile/notifications`, attendance capture) — deferred.
@@ -620,6 +625,11 @@ Current rules:
     - `opacity` 가 아니라 `filter: opacity()` · `!important` 인 이유: 목록 줄 대부분의 등장 애니메이션(`ntw-in` 등)이 끝난 뒤에도 opacity 를
       쥐고 있어 지연이 안 걸렸고(바로 옅어짐), `transition-colors` 같은 유틸리티에 지연 transition 이 졌다. 누르는 동안만 걸린다.
     - 새 화면은 따로 넣을 필요 없다. 다른 반응(작아짐 · 배경색)을 원하면 그 요소에 `active:` 를 쓰면 공용 규칙이 빠진다.
+- **줄 접힘 · 즉시 반영 — 공용 (2026-10-21 네이티브 점검)**: 목록에서 줄을 지우면 서버를 기다리지 않고 바로 높이가 접히며 흐려지고 아래 줄이
+  부드럽게 올라온다 — 감싸는 요소에 `.row-collapse`(globals.css), 빠지는 동안 `data-leaving`, 실패하면 속성을 떼서 다시 편다. 알림 목록
+  (`.nfw-item[data-gone]`) · 할 일(`is-leaving`)은 이미 같은 방식이었고, 이번에 연차 임시저장 밀어서 지우기에 붙였다. 상태 바꾸기는
+  `useOptimistic` 으로 누르자마자 반영 — 이번에 불만 「해결 · 다시 열기」(할 일 · 게시판 반응 · 근무 신청 · 알림 읽음은 이미). 새로 쓰기 ·
+  고치기 폼은 저장 뒤 화면을 옮기므로 대상이 아니다. 새 목록에서 줄을 지우는 동작은 `.row-collapse` 를 쓴다.
 - **토스트 — 공용 움직임 (2026-10-21 네이티브 점검)**: 토스트 **모양은 화면마다**(시안으로 확정된 할 일 · 판매 캘린더 · 자동화 · 사용자 관리 ·
   게시판 알약) 두고, **움직임만** `useToastMotion`(`src/components/shell/use-toast-motion.ts`) 하나로 맞춘다. 화면에 고정된 토스트 바깥 요소에 `ref`.
   (점검 정정: 「등장 움직임 없음」은 틀렸다 — 셋 다 CSS 등장은 있었다. 빠진 건 아래 둘.)

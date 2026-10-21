@@ -33,6 +33,7 @@ import { consumeScreenEntrance, setNavDirection, type ScreenEntrance } from "@/l
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import "@/components/shell/pull-refresh.css";
+import { useDrawerDragClose } from "@/components/shell/use-drawer-drag-close";
 
 type MobileShellProps = {
   // Bug Report is not in the sidebar nav list (it lives in the footer next to Logout), but its
@@ -194,6 +195,8 @@ export function MobileShell({
   const [largeTitleGone, setLargeTitleGone] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const drawerBackdropRef = useRef<HTMLDivElement | null>(null);
   const touchStartYRef = useRef(0);
   const touchStartXRef = useRef(0);
   const isPullingRef = useRef(false);
@@ -517,6 +520,9 @@ export function MobileShell({
     };
   }, [requestVisibilityUpdate]);
 
+  // 열린 메뉴를 왼쪽으로 밀어 닫기(2026-10-21 네이티브 점검) — docs/product/16-mobile-navigation.md 「메뉴 끌어 닫기」.
+  useDrawerDragClose({ backdropRef: drawerBackdropRef, drawerRef, onClose: closeSidebar, open: sidebarOpen });
+
   useEffect(() => {
     if (!sidebarOpen) return;
 
@@ -731,6 +737,7 @@ export function MobileShell({
         {/* 넓은 화면에서 서랍(전체 메뉴)이 열리면 뒤를 어둡게 — 서랍이 화면 일부만 덮으므로. */}
         <div
           aria-hidden="true"
+          ref={drawerBackdropRef}
           className={cn(
             "absolute inset-0 z-[59] hidden bg-slate-950/30 transition-opacity duration-300 fold:block",
             sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
@@ -741,6 +748,7 @@ export function MobileShell({
           aria-label={dictionary.common.menu}
           // 열려 있을 때만 — 앱(Android) 뒤로가기 버튼이 먼저 메뉴를 닫게 한다(NativeShellBridge, 2026-10-06).
           data-native-back-overlay={sidebarOpen ? "" : undefined}
+          ref={drawerRef}
           className={cn(
             "absolute inset-y-0 left-0 z-[60] flex w-full flex-col overflow-hidden px-4 pb-[18px] pt-[max(24px,env(safe-area-inset-top))] text-foreground",
             // 넓은 화면에서는 왼쪽 360px 서랍(화면 전체를 덮지 않는다).

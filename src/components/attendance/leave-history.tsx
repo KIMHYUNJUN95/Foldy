@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import "./leave.css";
 import { AIc, AttIcon } from "./att-icons";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { haptic } from "@/lib/haptics";
 import { cancelLeaveRequestAction, deleteLeaveRequestDraftAction } from "@/app/mobile/attendance/leave/actions";
 import type { LeaveRequestView } from "@/lib/annual-leave-requests-server";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
@@ -257,7 +258,8 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
       ) : (
         rows.map((r) =>
           r.status === "draft" ? (
-            <div className="lrow-outer" key={r.id}>
+            // 지우면 서버를 기다리지 않고 바로 접힌다(줄 접힘 공용 `.row-collapse`, 2026-10-21). 실패하면 다시 펴진다.
+            <div className="lrow-outer row-collapse" data-leaving={deletingId === r.id ? "" : undefined} key={r.id}>
               <SwipeableDraftRow
                 r={r}
                 c={c}
@@ -267,9 +269,13 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
                 onOpenEdit={() => router.push(`/mobile/attendance/leave/new?id=${r.id}`)}
                 onDelete={async () => {
                   setDeletingId(r.id);
-                  // 액션이 revalidatePath 한다 — router.refresh() 중복 금지
-                  await deleteLeaveRequestDraftAction(r.id);
-                  setDeletingId(null);
+                  haptic("light");
+                  // 액션이 revalidatePath 한다 — router.refresh() 중복 금지. 성공하면 새 목록에서 빠지므로 접힌 채로 둔다.
+                  const result = await deleteLeaveRequestDraftAction(r.id).catch(() => ({ ok: false as const }));
+                  if (!result.ok) {
+                    haptic("error");
+                    setDeletingId(null);
+                  }
                 }}
               />
             </div>

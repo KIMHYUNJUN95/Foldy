@@ -337,6 +337,7 @@ No new migration was needed for these three — this reuses `annual_leave_reques
 - annual leave home / shortcut card — **built**
 - annual leave request form — **built**
 - annual leave history — **built** (list + filter + self-cancel + resume/continue/swipe-delete drafts)
+  — 임시저장 밀어서 지우기는 서버를 기다리지 않고 줄이 바로 접힌다(2026-10-21 공용 `.row-collapse`). 실패하면 다시 펴지고 오류 햅틱.
 - annual leave history calendar — **built** (mobile L5, real month navigation + real approved-only,
   org-wide data)
 - request detail / approval status — **built** (read-only detail sheet in history)

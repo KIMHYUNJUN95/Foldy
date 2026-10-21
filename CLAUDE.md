@@ -130,6 +130,9 @@ For `/mobile/*`, treat `src/components/shell/mobile-shell.tsx` as a global contr
 - **Toast motion is shared (2026-10-21).** Mobile toasts keep their own look but get exit + swipe-to-dismiss from
   `useToastMotion` (`src/components/shell/use-toast-motion.ts`) — put its `ref` on the fixed toast element. Do not
   hand-roll another exit/swipe for a new mobile toast. See 16 → 「토스트 — 공용 움직임」.
+- **Row removal collapses (2026-10-21).** Removing a row from a mobile list collapses it immediately (wrap in
+  `.row-collapse`, set `data-leaving` before awaiting the server, remove it on failure) — no row vanishing after a
+  round-trip. Quick status toggles use `useOptimistic`. See 16 → 「줄 접힘 · 즉시 반영 — 공용」.
 - **Swipe back is a shared contract (2026-10-08).** Back = swiping right anywhere on a screen (`src/lib/swipe-back/*`, wired in
   `MobileShell`). Do not add back buttons or a second swipe handler. Any element with its own horizontal gesture (swipe-to-reveal
   row — only while open, carousel, drag grid, reorder handle) must carry `data-swipe-back="off"`; new full-screen overlays need

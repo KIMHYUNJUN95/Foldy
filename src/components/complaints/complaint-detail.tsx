@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -89,7 +89,9 @@ export function ComplaintDetail({
   const [error, setError] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const open = c.status === "open";
+  // 해결 · 다시 열기는 누르자마자 반영(2026-10-21 네이티브 점검 — 즉시 반영). 실패하면 전환이 끝날 때 원래 상태로 돌아간다.
+  const [status, setOptimisticStatus] = useOptimistic(c.status);
+  const open = status === "open";
   const max = ratingMax(c.platform);
   const canDelete = canModerate || c.createdByUserId === currentUserId;
   const building = c.propertyName ? localizePropertyName(getCanonicalPropertyName(c.propertyName), buildingLabels) : null;
@@ -97,16 +99,19 @@ export function ComplaintDetail({
 
   function handleStatus() {
     setError(false);
+    const resolving = open;
     startTransition(async () => {
-      const res = open ? await resolveComplaintAction(c.id) : await reopenComplaintAction(c.id);
-      if ("error" in res) {
-        setError(true);
-        haptic("error");
-        return;
-      }
-      if (open) {
+      setOptimisticStatus(resolving ? "resolved" : "open");
+      if (resolving) {
         setJustResolved(true);
         haptic("success");
+      }
+      const res = resolving ? await resolveComplaintAction(c.id) : await reopenComplaintAction(c.id);
+      if ("error" in res) {
+        setError(true);
+        setJustResolved(false);
+        haptic("error");
+        return;
       }
       router.refresh();
     });

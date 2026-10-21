@@ -426,6 +426,32 @@ body:lang(ja) {
     animation: none;
   }
 }
+/* 줄 접힘 — 공용 (2026-10-21 네이티브급 움직임 점검). 목록에서 줄을 지우면 서버를 기다리지 않고 바로 높이가 접히며 흐려지고,
+   아래 줄이 부드럽게 올라온다(점프 없음). 감싸는 요소에 `.row-collapse`, 빠지는 동안 `data-leaving`. 실패하면 속성을 떼면 다시 펴진다.
+   알림 목록(`.nfw-item[data-gone]`)과 같은 방식. 상세 docs/product/16-mobile-navigation.md 「줄 접힘 — 공용」. */
+.row-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 260ms var(--ease-out),
+    opacity 200ms ease;
+}
+.row-collapse > * {
+  min-height: 0;
+}
+.row-collapse[data-leaving] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.row-collapse[data-leaving] > * {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-collapse {
+    transition: none;
+  }
+}
 /* 토스트가 사라질 때(`useToastMotion` 의 복제본) — 지금 자리에서 나갈 쪽으로 살짝 밀리며 흐려진다. 안쪽 등장 · 체크 · 남은 시간
    줄 애니메이션은 끝난 모습으로 멈춘다(복제본이 등장을 다시 틀지 않게). */
 @keyframes toast-leave {

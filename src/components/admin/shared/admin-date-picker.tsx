@@ -417,7 +417,8 @@ function RosterNavDatePicker({
                   onClick={() => go(cell.key!)}
                 >
                   {cell.day}
-                  {loadMarks && monthMarks[cell.key] ? <span className="adp__mark">{monthMarks[cell.key]}</span> : null}
+                  {/* 숫자가 없는 날도 자리를 둔다 — 날짜 숫자 높이가 칸마다 같게. */}
+                  {loadMarks ? <span className="adp__mark" aria-hidden="true">{monthMarks[cell.key] || ""}</span> : null}
                 </button>
               ) : (
                 <span key={`blank-${i}`} aria-hidden="true" className="adp__cell is-blank" />

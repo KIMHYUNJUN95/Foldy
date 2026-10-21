@@ -63,6 +63,8 @@ export type AdminCleaningTask = {
   note: string;
   reports: { lost?: number; issue?: number; lostIds?: string[]; issueIds?: string[] } | null;
   proxy: boolean;
+  /** 청소 배정 「처리 끝」으로 남긴 기록(청소 안 함) — 대리 완료 대신 「처리 끝 · 청소 안 함」으로 보인다. */
+  closed: boolean;
   /**
    * 오늘 이 객실에서 취소된 세션 수. 취소는 모바일에서 "다시 청소 대상으로 되돌리는" 동작이라
    * (docs: cancelCleaningMessage) 카드 상태 자체는 `pending` 을 유지하고, 취소가 있었다는 사실만
@@ -272,10 +274,11 @@ export async function getAdminCleaningToday(
         staffId: matched?.staff_user_id ?? null,
         staffName: matched ? (staffNameById.get(matched.staff_user_id) ?? null) : null,
         start: formatTokyoTime(matched?.started_at ?? null),
-        end: formatTokyoTime(matched?.completed_at ?? null),
+        end: matched?.closed_without_cleaning ? null : formatTokyoTime(matched?.completed_at ?? null),
         note: matched?.notes ?? "",
         reports: null, // filled below once session ids are known
         proxy: Boolean(matched?.completed_by_admin),
+        closed: Boolean(matched?.closed_without_cleaning),
         cancelledCount: countCancelled(roomSessions),
         guest: target.hasTurnover ? target.arrivingGuestName : null,
         pax: target.hasTurnover ? target.arrivingPax : null,
@@ -319,10 +322,11 @@ export async function getAdminCleaningToday(
       staffId: relevant.staff_user_id,
       staffName: staffNameById.get(relevant.staff_user_id) ?? null,
       start: formatTokyoTime(relevant.started_at),
-      end: formatTokyoTime(relevant.completed_at),
+      end: relevant.closed_without_cleaning ? null : formatTokyoTime(relevant.completed_at),
       note: relevant.notes ?? "",
       reports: null,
       proxy: Boolean(relevant.completed_by_admin),
+      closed: Boolean(relevant.closed_without_cleaning),
       cancelledCount: countCancelled(sessions),
       guest: null,
       pax: null,
@@ -389,6 +393,8 @@ export type AdminCleaningHistoryItem = {
   status: AdminCleaningStatus;
   /** 관리자 대리 완료 여부. 세션 상태와는 별개인 "완료 유형" 축. */
   proxy: boolean;
+  /** 청소 배정 「처리 끝」으로 남긴 기록(청소 안 함). */
+  closed: boolean;
   note: string;
   /** 이 세션에서 올라온 분실물 · 수리 신고(화이트 리디자인 2026-10-13 — 기록 표 · 상세의 「연결된 기록」). */
   reports: { lost?: number; issue?: number; lostIds?: string[]; issueIds?: string[] } | null;
@@ -420,9 +426,11 @@ function mapSessionToHistoryItem(
     staffId: s.staff_user_id,
     staffName: s.staff_name,
     start: formatTokyoTime(s.started_at) ?? "",
-    dur: s.duration_seconds == null ? null : Math.round(s.duration_seconds / 60),
+    // 「처리 끝」 기록은 청소한 시간이 없다 — 총 · 평균 소요에 0분으로 섞이지 않게 비운다.
+    dur: s.duration_seconds == null || s.closed_without_cleaning ? null : Math.round(s.duration_seconds / 60),
     status: sessionStatusToAdminStatus(s.status),
     proxy: Boolean(s.completed_by_admin),
+    closed: Boolean(s.closed_without_cleaning),
     note: s.notes ?? "",
     reports: null,
   };

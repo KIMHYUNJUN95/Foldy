@@ -131,6 +131,7 @@ export function HistoryBoard({
     dur: h.dur,
     status: h.status,
     proxy: h.proxy,
+    closed: h.closed,
     note: h.note,
   }));
 
@@ -344,7 +345,8 @@ export function HistoryBoard({
             const long = h.status === "done" && (h.dur ?? 0) > LONG_CLEANING_MIN;
             const memo: string[] = [];
             if (h.status === "cancelled") memo.push(t.stCancelled);
-            if (h.proxy) memo.push(t.stProxy);
+            if (h.closed) memo.push(t.stClosed);
+            else if (h.proxy) memo.push(t.stProxy);
             if (h.reports?.issue) memo.push(`${t.pIssue} ${h.reports.issue}`);
             if (h.reports?.lost) memo.push(`${t.pLostItem} ${h.reports.lost}`);
             if (long) memo.push(t.longTag);

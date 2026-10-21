@@ -55,6 +55,7 @@ export type CleaningHistoryExportRow = {
   dur: number | null; // minutes; 진행중/취소 세션은 null
   status: AdminCleaningStatus;
   proxy: boolean;
+  closed?: boolean;
   note: string;
 };
 
@@ -141,7 +142,7 @@ function cleaningTableRows(
       building: (r.building ? buildingLabels[r.building] : null) ?? r.buildingRaw,
       room: r.room,
       type: typeLabelOf(r.type, t),
-      staff: r.proxy ? `${staffLabel} · ${t.stProxy}` : staffLabel,
+      staff: r.closed ? `${staffLabel} · ${t.stClosed}` : r.proxy ? `${staffLabel} · ${t.stProxy}` : staffLabel,
       start: r.start,
       end: r.dur == null ? "—" : minToHHMM(startMin + r.dur),
       dur: fmtDur(r.dur),

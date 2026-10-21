@@ -138,6 +138,7 @@ export async function getMyTodayCleaningSessions(session: AppSession) {
     .eq("organization_id", session.organization.id)
     .eq("staff_user_id", session.user.id)
     .eq("cleaning_date", getCleaningOperatingDateKey())
+    .eq("closed_without_cleaning", false)
     .order("started_at", { ascending: false });
 
   if (error) {

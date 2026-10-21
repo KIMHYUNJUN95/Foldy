@@ -1078,6 +1078,8 @@ export async function loadCompareRows(
         .select("room_label, cleaning_date")
         .eq("organization_id", organizationId)
         .eq("status", "completed")
+        // 「처리 끝」 기록은 청소한 방이 아니다.
+        .eq("closed_without_cleaning", false)
         .gte("cleaning_date", from)
         .lte("cleaning_date", to)
         .order("id")

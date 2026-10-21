@@ -362,6 +362,8 @@ export async function getLinkedTransportCandidates(
     .select("id, cleaning_date, room_label, task_label")
     .eq("organization_id", organizationId)
     .eq("staff_user_id", userId)
+    // 청소 배정 「처리 끝」 기록은 실제로 그 건물에 간 것이 아니다.
+    .eq("closed_without_cleaning", false)
     .gte("cleaning_date", first)
     .lte("cleaning_date", last)
     .order("cleaning_date", { ascending: true });

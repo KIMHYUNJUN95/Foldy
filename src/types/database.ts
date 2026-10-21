@@ -2442,6 +2442,7 @@ export type Database = {
       }
       cleaning_room_holds: {
         Row: {
+          closed_session_id: string | null
           created_at: string
           created_by: string | null
           kind: string
@@ -2455,6 +2456,7 @@ export type Database = {
           until_date: string | null
         }
         Insert: {
+          closed_session_id?: string | null
           created_at?: string
           created_by?: string | null
           kind: string
@@ -2468,6 +2470,7 @@ export type Database = {
           until_date?: string | null
         }
         Update: {
+          closed_session_id?: string | null
           created_at?: string
           created_by?: string | null
           kind?: string
@@ -2596,6 +2599,7 @@ export type Database = {
       cleaning_sessions: {
         Row: {
           cleaning_date: string
+          closed_without_cleaning: boolean
           completed_at: string | null
           completed_by_admin: string | null
           created_at: string
@@ -2612,6 +2616,7 @@ export type Database = {
         }
         Insert: {
           cleaning_date?: string
+          closed_without_cleaning?: boolean
           completed_at?: string | null
           completed_by_admin?: string | null
           created_at?: string
@@ -2628,6 +2633,7 @@ export type Database = {
         }
         Update: {
           cleaning_date?: string
+          closed_without_cleaning?: boolean
           completed_at?: string | null
           completed_by_admin?: string | null
           created_at?: string

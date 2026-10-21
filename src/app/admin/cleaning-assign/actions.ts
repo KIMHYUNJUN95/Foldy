@@ -28,7 +28,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 export type AssignFail = { ok: false; reason: "forbidden" | "invalid" | "conflict" | "error" };
 export type AssignOk<T = object> = { ok: true } & T;
 
-const PATHS = ["/admin/cleaning-assign", "/admin/cleaning-assign/settings", "/mobile/shift", "/mobile/shift/today"];
+const PATHS = ["/admin/cleaning-assign", "/admin/cleaning-assign/settings", "/mobile/shift", "/mobile/shift/today", "/admin/cleaning", "/mobile/cleaning"];
 
 function revalidate() {
   for (const path of PATHS) revalidatePath(path);
@@ -310,6 +310,36 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
   ]);
   if (current.error || previous.error) return { ok: false, reason: "error" };
   const removedUserIds = [...new Set([...(previous.data?.removed_user_ids ?? []), ...(current.data ?? []).map((row) => row.user_id)])];
+  // 처리 끝은 청소 대시보드 강제완료처럼 그날 청소 기록(완료)을 남긴다 — 「처리 끝 · 청소 안 함」 표시(`closed_without_cleaning`),
+  // 담당자는 누른 관리자 · 소요 시간 없음, 사람별 숫자에서는 빠진다. 되돌리기가 지우도록 미룸 줄에 기록 id 를 둔다.
+  let closedSessionId: string | null = null;
+  if (input.kind === "resolved") {
+    const now = new Date().toISOString();
+    const closed = await supabase
+      .from("cleaning_sessions")
+      .insert({
+        cleaning_date: input.date,
+        closed_without_cleaning: true,
+        completed_at: now,
+        completed_by_admin: session.user.id,
+        // 완료 기록은 소요 시간이 있어야 한다(DB 제약) — 0 으로 두고 화면은 「처리 끝」 기록의 소요를 비운다.
+        duration_seconds: 0,
+        notes: reason || null,
+        organization_id: organizationId,
+        room_label: room.sessionRoomLabel,
+        staff_user_id: session.user.id,
+        started_at: now,
+        status: "completed",
+        task_label: "checkout",
+      })
+      .select("id")
+      .single();
+    if (closed.error) {
+      console.error("[cleaning-assign] closed session failed", { code: closed.error.code });
+      return { ok: false, reason: "error" };
+    }
+    closedSessionId = closed.data.id;
+  }
   const result = await supabase.from("cleaning_room_holds").upsert(
     {
       created_by: session.user.id,
@@ -318,6 +348,7 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
       origin_date: input.originDate,
       property_name: room.propertyName,
       reason: reason || null,
+      closed_session_id: closedSessionId,
       removed_user_ids: removedUserIds,
       room_key: room.roomKey,
       room_label: room.roomLabel,
@@ -327,6 +358,7 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
   );
   if (result.error) {
     console.error("[cleaning-assign] hold failed", { code: result.error.code });
+    if (closedSessionId) await supabase.from("cleaning_sessions").delete().eq("id", closedSessionId);
     return { ok: false, reason: "error" };
   }
   await supabase.from("cleaning_assignments").delete().eq("organization_id", organizationId).eq("work_date", input.date).eq("room_key", room.roomKey);
@@ -350,8 +382,13 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
     .eq("organization_id", organizationId)
     .eq("room_key", input.roomKey)
     .eq("origin_date", input.originDate)
-    .select("removed_user_ids");
+    .select("removed_user_ids, closed_session_id");
   if (result.error) return { ok: false, reason: "error" };
+  // 처리 끝이 남긴 청소 기록도 지운다(표시가 붙은 것만 — 실제 청소 기록은 건드리지 않는다).
+  const closedIds = (result.data ?? []).map((row) => row.closed_session_id).filter((id): id is string => Boolean(id));
+  if (closedIds.length > 0) {
+    await supabase.from("cleaning_sessions").delete().eq("organization_id", organizationId).eq("closed_without_cleaning", true).in("id", closedIds);
+  }
   const restore = [...new Set((result.data ?? []).flatMap((row) => row.removed_user_ids ?? []))].slice(0, 10);
   if (restore.length > 0 && isEditableDate(input.date)) {
     const room = (await loadAssignDayRooms(supabase, organizationId, input.date)).find((item) => item.roomKey === input.roomKey);

@@ -92,7 +92,7 @@ function RoomCard({
       <div className="cl-tile__foot">
         {staffName ? <Initial name={staffName} /> : <span className="cl-av cl-av--none">–</span>}
         <span className={`cl-tile__who${staffName ? "" : " is-none"}`}>{staffName || t.unassigned}</span>
-        {task.proxy ? <span className="cl-proxy">{t.stProxy}</span> : null}
+        {task.closed ? <span className="cl-proxy">{t.stClosed}</span> : task.proxy ? <span className="cl-proxy">{t.stProxy}</span> : null}
         {minutes != null ? (
           <span className={`cl-tile__min mono${task.status === "progress" ? " is-live" : ""}`}>{durLabel(minutes, t)}</span>
         ) : null}
@@ -320,7 +320,8 @@ function StaffSummarySection({
   staffDirectory: StaffDirectory;
 }) {
   // 완료했거나 지금 청소 중인 사람 — 시안 「완료 1 · 진행 1」(2026-10-13, 진행만 있는 사람도 보인다).
-  const worked = tasks.filter((task) => task.staffId && (task.status === "done" || task.status === "progress"));
+  // 청소 배정 「처리 끝」 기록은 누른 관리자의 청소가 아니다 — 직원별 요약에서 뺀다.
+  const worked = tasks.filter((task) => task.staffId && !task.closed && (task.status === "done" || task.status === "progress"));
   const ids = new Set(worked.map((task) => task.staffId));
   const staffList = [...staffDirectory.values()].filter((s) => ids.has(s.id));
   if (!staffList.length) return null;

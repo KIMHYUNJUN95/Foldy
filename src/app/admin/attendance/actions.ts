@@ -1417,6 +1417,7 @@ async function buildUserPayrollExportData(
     .select("cleaning_date, room_label, notes, completed_at")
     .eq("organization_id", organizationId)
     .eq("staff_user_id", userId)
+    .eq("closed_without_cleaning", false)
     .gte("cleaning_date", firstDay)
     .lte("cleaning_date", lastDay)
     .not("completed_at", "is", null)

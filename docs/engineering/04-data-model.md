@@ -511,6 +511,8 @@ notes text
 completed_by_admin uuid references profiles(id) on delete set null  -- admin id when force-completed on
                                                                      -- behalf of staff (202607150001); null
                                                                      -- for normal self-completion
+closed_without_cleaning boolean not null default false  -- 청소 배정 「처리 끝」이 남긴 기록(청소 안 함,
+                                                         -- 202610210005). 담당자 = 누른 관리자, 소요 0
 created_at timestamptz not null
 updated_at timestamptz not null
 ```
@@ -531,8 +533,12 @@ offset with no DST — but the label is inconsistent with the rest of the codeba
 convention (`cleaningOperatingTimeZone` in `src/lib/cleaning.ts`, etc). Left as-is (an already-applied
 migration; behavior is correct) — noted here so it isn't mistaken for a timezone bug during review.
 
-Admin force-complete (`forceCompleteCleaningSession` in `src/app/admin/cleaning/actions.ts`) is the
-only write path that sets `completed_by_admin`. See `docs/product/07-cleaning-workflow.md` →
+Admin force-complete (`forceCompleteCleaningSession` in `src/app/admin/cleaning/actions.ts`) and the
+cleaning-assignment 「처리 끝」 (`holdRoom` kind `resolved` in `src/app/admin/cleaning-assign/actions.ts`,
+which also sets `closed_without_cleaning = true`) are the only write paths that set `completed_by_admin`.
+`closed_without_cleaning` rows are excluded from per-person numbers (transport reimbursement buildings,
+field activity, payroll cleaning detail, monthly comparison, 「내 오늘 청소」, 청소 현황 직원별 요약) and
+their duration is hidden (not averaged); `releaseHold` deletes them on undo. See `docs/product/07-cleaning-workflow.md` →
 "2026-07-14 어드민 청소 대시보드 — 백엔드 연동".
 
 ## maintenance_reports
@@ -2125,7 +2131,7 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 | --- | --- | --- |
 | `cleaning_shift_applications` | 사람 × 날짜(PK) | `source`(self/admin — 대신 넣음) · `start_time`(그날만 다른 출근) · `cancelled_at/by`(관리자가 그날 일정 취소 → 「배정 없음」) · `cancel_requested_at` · `cancel_request_note`(배정된 날 본인 취소 요청) |
 | `cleaning_assignments` | 날짜 × 방 × 사람 한 줄 | 유일 `(organization_id, work_date, room_key, user_id)` — 같은 사람을 같은 방에 두 번 못 넣음(동시 수정 보호). `property_name` · `room_label` · `created_by/at`. 배정 = 확정 |
-| `cleaning_room_holds` | 방 × 원래 날짜(PK) | `kind` defer(`until_date` 까지 숨김) / resolved(처리 끝) · `reason`(1~120) · `removed_user_ids uuid[]`(미룰 때 그날 배정에서 뺀 사람 — 되돌리기가 다시 넣음, 202610210003) — 못 한 방은 다음 날 미배정 맨 위로 계속 뜨고, 이 줄이 있으면 숨김 |
+| `cleaning_room_holds` | 방 × 원래 날짜(PK) | `kind` defer(`until_date` 까지 숨김) / resolved(처리 끝) · `reason`(1~120) · `removed_user_ids uuid[]`(미룰 때 그날 배정에서 뺀 사람 — 되돌리기가 다시 넣음, 202610210003) · `closed_session_id`(처리 끝이 남긴 청소 기록 — 되돌리기가 지움, 202610210005) — 못 한 방은 다음 날 미배정 맨 위로 계속 뜨고, 이 줄이 있으면 숨김 |
 | `cleaning_assign_settings` | 조직 × 1 | `rules jsonb`(제안 규칙 켜기 · 순서, 키는 `src/lib/cleaning-assign/rules.ts`) · `flag_threshold`(월 비교표 기준 %, 기본 25) |
 | `cleaning_assign_setting_logs` | 설정 변경 한 번 | `changes jsonb`(area rules/fixed/staff/room) · `actor_id` |
 | `cleaning_fixed_staff` | 건물 × 사람(PK) | `tier`(1~9순위) · `position` |

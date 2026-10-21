@@ -130,6 +130,7 @@ export function CleaningDetailPanel({
   const status = task ? task.status : history!.status;
   const staffId = task ? task.staffId : history!.staffId;
   const proxy = task ? task.proxy : history!.proxy;
+  const closed = task ? task.closed : history!.closed;
   const note = task ? task.note : history!.note;
   const reports = task ? task.reports : history!.reports;
   const start = task ? task.start : history!.start;
@@ -218,7 +219,7 @@ export function CleaningDetailPanel({
                 <span className="durbig__lbl">{t.duration}</span>
               </div>
             </div>
-          ) : start ? (
+          ) : start && !closed ? (
             <div className="pblock">
               <div className="pblock__t">{t.pTime}</div>
               <div className="durbig">
@@ -248,8 +249,8 @@ export function CleaningDetailPanel({
                     <ShieldCheck aria-hidden="true" />
                   </span>
                   <div>
-                    <div className="proxynote__t">{t.proxy}</div>
-                    <div className="proxynote__s">{t.proxyNoteDesc}</div>
+                    <div className="proxynote__t">{closed ? t.closedNote : t.proxy}</div>
+                    <div className="proxynote__s">{closed ? t.closedNoteDesc : t.proxyNoteDesc}</div>
                   </div>
                 </div>
               ) : null}

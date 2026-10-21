@@ -114,6 +114,7 @@ export async function getFieldActivities(opts: {
       .eq("organization_id", organizationId)
       .eq("staff_user_id", userId)
       .eq("status", "completed")
+      .eq("closed_without_cleaning", false)
       .gte("cleaning_date", since),
     supabase
       .from("maintenance_reports")

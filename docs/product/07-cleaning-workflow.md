@@ -614,6 +614,11 @@ A date-grouped **cleaning record sheet** so staff can review their cleaning hist
 - **감사 기록**: `cleaning_sessions`에 `completed_by_admin`(관리자 user id) 저장. 상세·기록 뷰에
   **"관리자 대리 완료"** 배지 표시. → 마이그레이션으로 컬럼 추가 필요.
 - **권한**: 상위 관리자/매니저(owner·전무·office_admin·field_manager 등)만. 서버 액션에서 게이트.
+- **청소 배정 「처리 끝」도 같은 청소 기록(2026-10-21 사용자 지시)**: 청소가 필요 없어진 방을 청소 배정에서 「처리 끝」으로 두면
+  그날 완료 기록이 하나 생긴다(담당자 = 누른 관리자 · 소요 0 · `closed_without_cleaning`). 화면은 대리 완료 대신
+  **「처리 끝 · 청소 안 함」**(카드 · 기록 표 · Excel/PDF 담당자 칸), 상세는 「청소 배정에서 처리 끝」 안내 + 시간 기록 없음.
+  청소한 방이 아니라서 사람별 숫자(직원별 오늘 요약 · 교통비 건물 · 현장 활동 · 급여 상세 · 월 비교표)와 평균 소요에서 빠진다.
+  청소 배정에서 되돌리면 이 기록도 지워진다. docs/product/37-cleaning-shift-assignment.md
 
 ### 상호작용 목록 (디자인이 그려야 할 것)
 

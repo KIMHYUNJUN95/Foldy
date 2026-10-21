@@ -9,6 +9,17 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-21 — 실제 테스트 전 운영 DB 정리 (테스트 데이터 삭제)
+
+- 사용자 지시: Beds24 데이터를 뺀 업무 기록은 모두 테스트 데이터 → 깨끗한 상태에서 실제 테스트 시작.
+- **Haru 조직의 업무 기록만** 삭제(한 트랜잭션): 근태(근무 · 휴게 · 정정 · 마감 · 추가수당 · 시도/변경 기록), 할 일 · 진행 기록,
+  게시판, 공지, 연차 신청, 청소 기록 · 배정표, 린넨 반납, 분실물, 수리 보고, 발주, 교통비, 알림, 감사 로그, 버그 신고, 예약 내부 메모.
+  첨부 사진 64개(`request-images` · `announcement-images` · `board-attachments` 의 Haru 경로)도 삭제.
+- **남김:** 계정 · 역할 · 권한 · 초대 코드, 설정(QR 장소 · QR 코드 · 등록 기기 · 린넨 품목 · 청소 방 설정 · 자동화 규칙 · 팀 ·
+  업무일지 보낼 시각 · 시급/고용형태 이력 · 연차 기준일수), Beds24 데이터, 리뷰, 채용 지원서 · 이력서, 요금 변경 · 자동화 실행 기록,
+  방 막기 기록, 수기 예약 장부(`ops_manual_booking_requests` — Beds24 실제 예약과 연결, 중복 생성 방지). 심사용 「Foldy Demo」 조직은 손대지 않음.
+- 실제 테스트 전 할 일: Haru 13명 중 11명이 시급 · 고용형태 미등록 → 출근할 사람은 첫 출근일 이전 날짜로 등록해야 급여 마감이 된다.
+
 ## 2026-10-21 — 요금 안전망: 건물을 나눠 돌고, 웹훅이 놓친 변경을 알린다
 
 - 15분 요금 안전망(`/api/beds24/rates-sync`)이 10-19 · 10-21 에 504 로 실패(GitHub 메일) — 9건물 × 12개월을 한 번에 읽다

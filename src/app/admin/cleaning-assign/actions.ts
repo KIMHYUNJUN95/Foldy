@@ -11,7 +11,7 @@ import {
   loadMonthBoard,
   type MonthBoard,
 } from "@/lib/cleaning-assign/data";
-import { loadAssignDayRooms } from "@/lib/cleaning-assign/rooms";
+import { loadAssignDayRooms, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
 import { FLAG_THRESHOLD_OPTIONS, isAssignRuleKey, normalizeAssignRules, TRAINEE_CHECK_STEP, type AssignRule } from "@/lib/cleaning-assign/rules";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -295,7 +295,7 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
   if (!isEditableDate(input.date) || !isDateKey(input.originDate) || input.originDate > input.date) return { ok: false, reason: "invalid" };
   if (input.kind !== "defer" && input.kind !== "resolved") return { ok: false, reason: "invalid" };
   const until = input.kind === "defer" ? (input.untilDate ?? addDays(input.date, 1)) : null;
-  if (until !== null && (!isDateKey(until) || until <= input.date || until > addDays(input.date, 60))) return { ok: false, reason: "invalid" };
+  if (until !== null && (!isDateKey(until) || until <= input.date || until > addDays(input.date, MAX_DEFER_DAYS))) return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
   const room = (await loadAssignDayRooms(supabase, organizationId, input.date)).find((item) => item.roomKey === input.roomKey);

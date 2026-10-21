@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { startCleaningSession } from "@/app/mobile/cleaning/actions";
 import { useIsTablet } from "@/components/shell/split-list";
-import { dayLabel, shortDate, timeLabel } from "@/components/admin/cleaning-assign/format";
+import { dayLabel, shortDate, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { TodayRoom } from "@/lib/cleaning-assign/data";
 import type { ShiftDayState } from "@/lib/cleaning-assign/day-state";
@@ -91,7 +91,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
                 <span>
                   {fill(copy.changedBody, {
                     rooms: change.rooms.join(" · "),
-                    time: new Date(change.at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" }),
+                    time: tokyoTime(change.at),
                   })}
                 </span>
               </div>

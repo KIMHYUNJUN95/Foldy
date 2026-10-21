@@ -12,7 +12,7 @@ import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { SettingsView } from "@/lib/cleaning-assign/data";
 import { DEFAULT_ASSIGN_RULES, type AssignRule, type AssignRuleKey } from "@/lib/cleaning-assign/rules";
 import { haptic } from "@/lib/haptics";
-import { roleLabel, shortDate, timeValue } from "./format";
+import { roleLabel, shortDate, timeValue, tokyoTime } from "./format";
 import "./cleaning-assign.css";
 
 /**
@@ -25,13 +25,11 @@ type Tab = "rules" | "fixed" | "people" | "rooms";
 export function AssignSettingsView({
   view,
   copy,
-  locale,
   propertyLabels,
   initialTab,
 }: {
   view: SettingsView;
   copy: CleaningAssignCopy;
-  locale: string;
   propertyLabels: Record<string, string>;
   initialTab: Tab;
 }) {
@@ -56,7 +54,7 @@ export function AssignSettingsView({
   }
 
   const changed = view.settings.updatedAt
-    ? fill(copy.lastChanged, { date: new Date(view.settings.updatedAt).toLocaleString(locale, { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo" }), name: view.settings.updatedByName ?? "—" })
+    ? fill(copy.lastChanged, { date: tokyoTime(view.settings.updatedAt, true), name: view.settings.updatedByName ?? "—" })
     : "";
 
   return (

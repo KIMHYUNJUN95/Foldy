@@ -27,7 +27,7 @@ import type { Dictionary } from "@/lib/i18n";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { BoardPerson, BoardRoom, DayBoard } from "@/lib/cleaning-assign/data";
 import { haptic } from "@/lib/haptics";
-import { agoText, dayLabel, roleLabel, shortDate, timeLabel, timeValue } from "./format";
+import { agoText, dayLabel, roleLabel, shortDate, timeLabel, timeValue, tokyoTime } from "./format";
 import "./cleaning-assign.css";
 
 /**
@@ -162,7 +162,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           {room.status === "done" ? <span className="cas-tag">{copy.statusDone}</span> : null}
           {opts.open ? <span className="cas-room__note">{[roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · ")}</span> : null}
           {room.people.map((p) => (
-            <span key={p.userId} className={`cas-chip${picked?.userId === p.userId ? " is-picked" : ""}`} title={p.by ? `${p.by} · ${new Date(p.at).toLocaleString(locale)}` : undefined}>
+            <span key={p.userId} className={`cas-chip${picked?.userId === p.userId ? " is-picked" : ""}`} title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
               {p.name}
               {p.trainee ? <small>{fill(copy.traineeShort, { n: personById.get(p.userId)?.traineeCount ?? "" })}</small> : null}
             </span>
@@ -486,21 +486,23 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                 </button>
               </div>
             ) : (
+              // 줄 어디를 눌러도 고르지만 버튼 역할은 이름 칸 하나 — 줄 전체를 버튼으로 두면 안의 「취소 받아 주기」 등이 버튼 속 버튼이 된다.
               <div
                 key={p.userId}
                 className={`cas-person is-pickable${pickId === p.userId ? " is-picked" : ""}${p.cancelled ? " is-quiet" : ""}`}
-                role="button"
-                tabIndex={0}
-                aria-pressed={pickId === p.userId}
                 onClick={() => !p.cancelled && setPickId(pickId === p.userId ? null : p.userId)}
-                onKeyDown={(event) => {
-                  if ((event.key === "Enter" || event.key === " ") && !p.cancelled) {
-                    event.preventDefault();
-                    setPickId(pickId === p.userId ? null : p.userId);
-                  }
-                }}
               >
                 <div className="cas-person__main">
+                  <button
+                    type="button"
+                    className="cas-person__pick"
+                    aria-pressed={pickId === p.userId}
+                    disabled={p.cancelled}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPickId(pickId === p.userId ? null : p.userId);
+                    }}
+                  >
                   <span className="cas-person__name">
                     {p.name}
                     {p.priority ? <small>{copy.prio}</small> : null}
@@ -511,6 +513,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                     {p.source === "admin" ? <small className="is-muted">{copy.byAdmin}</small> : null}
                   </span>
                   <span className={`cas-person__sub${p.rooms.length === 0 && !p.cancelled ? " is-warn" : ""}`}>{personSub(p)}</span>
+                  </button>
                   {p.cancelRequested ? (
                     <span className="cas-person__req" onClick={(event) => event.stopPropagation()}>
                       <b>{copy.cancelRequest}</b>
@@ -558,6 +561,12 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                   {!p.cancelled && p.applied ? (
                     <button type="button" className="cas-btn is-danger-text is-tiny" disabled={pending} onClick={() => run(() => cancelPersonDay({ date: board.date, userId: p.userId }))}>
                       {copy.cancelDay}
+                    </button>
+                  ) : null}
+                  {p.cancelled ? (
+                    // 취소한 일정 되돌리기 — 「대신 넣기」와 같은 서버 액션(취소된 신청을 살린다).
+                    <button type="button" className="cas-btn is-soft is-tiny" disabled={pending} onClick={() => run(() => addApplicantForDay({ date: board.date, userId: p.userId }), copy.done)}>
+                      {copy.restoreDay}
                     </button>
                   ) : null}
                 </div>

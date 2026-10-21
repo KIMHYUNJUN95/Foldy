@@ -12,7 +12,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
  * docs/product/37-cleaning-shift-assignment.md 「4-1」
  */
 
-export type ShiftFail = { ok: false; reason: "forbidden" | "invalid" | "assigned" | "cancelled" | "past" | "error" };
+export type ShiftFail = { ok: false; reason: "forbidden" | "invalid" | "assigned" | "cancelled" | "past" | "tooFar" | "error" };
 
 const PATHS = ["/mobile/shift", "/mobile/shift/today", "/admin/cleaning-assign"];
 
@@ -33,7 +33,7 @@ export async function toggleMyShift(input: { date: string }): Promise<{ ok: true
   const session = await worker();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isDateKey(input.date)) return { ok: false, reason: "invalid" };
-  if (!isOpenDate(input.date)) return { ok: false, reason: "past" };
+  if (!isOpenDate(input.date)) return { ok: false, reason: input.date < getCleaningOperatingDateKey() ? "past" : "tooFar" };
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const userId = session.user.id;

@@ -33,7 +33,7 @@ export default async function AdminCleaningAssignSettingsPage({ searchParams }: 
   const copy = getCleaningAssignCopy(locale);
   return (
     <AdminShell activeItem="cleaning-assign" title={copy.settingsTitle}>
-      <AssignSettingsView view={view} copy={copy} locale={locale} propertyLabels={propertyLabels} initialTab={tab} />
+      <AssignSettingsView view={view} copy={copy} propertyLabels={propertyLabels} initialTab={tab} />
     </AdminShell>
   );
 }

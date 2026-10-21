@@ -57,6 +57,18 @@ export function timeValue(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
+const TOKYO_PARTS = new Intl.DateTimeFormat("en-US", { day: "numeric", hour: "numeric", hourCycle: "h23", minute: "2-digit", month: "numeric", timeZone: "Asia/Tokyo" });
+
+/**
+ * 시각(ISO) → 도쿄 「9:01」 · 「10/21 9:01」. 숫자로만 만든다 — `toLocaleString(locale)` 은 서버(Node)와 브라우저의 언어 데이터가 달라
+ * 「오전 9:01」 / 「AM 9:01」로 갈려 하이드레이션이 어긋난다(2026-10-21 발견).
+ */
+export function tokyoTime(iso: string, withDate = false): string {
+  const parts = Object.fromEntries(TOKYO_PARTS.formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
+  const time = `${Number(parts.hour)}:${parts.minute}`;
+  return withDate ? `${parts.month}/${parts.day} ${time}` : time;
+}
+
 export function yen(value: number): string {
   return `¥${Math.round(value).toLocaleString("en-US")}`;
 }

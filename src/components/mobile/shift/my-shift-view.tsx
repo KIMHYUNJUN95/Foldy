@@ -63,7 +63,7 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
         haptic("light");
       } else {
         haptic("error");
-        setMessage(result.reason === "assigned" ? copy.errAssigned : result.reason === "cancelled" ? copy.errCancelledDay : result.reason === "past" ? copy.errPast : copy.failed);
+        setMessage(result.reason === "assigned" ? copy.errAssigned : result.reason === "cancelled" ? copy.errCancelledDay : result.reason === "past" ? copy.errPast : result.reason === "tooFar" ? copy.errTooFar : copy.failed);
       }
       setOptimistic({});
       router.refresh();

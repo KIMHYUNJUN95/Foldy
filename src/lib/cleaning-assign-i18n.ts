@@ -88,6 +88,7 @@ export type CleaningAssignCopy = {
   stateAssigned: string; // "배정 {n} · {rooms}"
   withOthers: string; // "({n}명)"
   statePersonCancelled: string; // "그날 일정 취소됨"
+  restoreDay: string;
   cancelRequest: string; // "취소 요청"
   cancelRequestAccept: string;
   cancelRequestReject: string;
@@ -258,6 +259,7 @@ export type CleaningAssignCopy = {
   errAssigned: string;
   errCancelledDay: string;
   errPast: string;
+  errTooFar: string;
   // ── 모바일 — 오늘 내 방 ──
   todayTitle: string;
   todayHeadline: string; // "출근 · 방 {n}개 · {d}개 끝남"
@@ -360,6 +362,7 @@ const ko: CleaningAssignCopy = {
   stateAssigned: "배정 {n} · {rooms}",
   withOthers: "({n}명)",
   statePersonCancelled: "그날 일정 취소됨",
+  restoreDay: "다시 넣기",
   cancelRequest: "취소 요청",
   cancelRequestAccept: "취소 받아 주기",
   cancelRequestReject: "돌려보내기",
@@ -525,6 +528,7 @@ const ko: CleaningAssignCopy = {
   errAssigned: "배정된 날이에요 — 날짜를 눌러 취소 요청을 보내 주세요",
   errCancelledDay: "관리자가 취소한 날이에요 — 다시 나오려면 관리자에게 연락해 주세요",
   errPast: "지난날은 바꿀 수 없어요",
+  errTooFar: "신청은 오늘부터 약 3달 뒤까지만 할 수 있어요",
   todayTitle: "오늘 내 방",
   todayHeadline: "출근 · 방 {n}개 · {d}개 끝남",
   changedLastNight: "어젯밤 바뀜",
@@ -626,6 +630,7 @@ const ja: CleaningAssignCopy = {
   stateAssigned: "割り当て {n} · {rooms}",
   withOthers: "（{n}人）",
   statePersonCancelled: "その日の予定は取り消し",
+  restoreDay: "戻す",
   cancelRequest: "取り消し依頼",
   cancelRequestAccept: "取り消しを承認",
   cancelRequestReject: "差し戻す",
@@ -791,6 +796,7 @@ const ja: CleaningAssignCopy = {
   errAssigned: "割り当て済みの日です — 日付を押して取り消し依頼を送ってください",
   errCancelledDay: "管理者が取り消した日です — 出勤する場合は管理者に連絡してください",
   errPast: "過去の日は変更できません",
+  errTooFar: "申請できるのは今日から約3か月先までです",
   todayTitle: "今日の部屋",
   todayHeadline: "出勤 · {n}室 · {d}室完了",
   changedLastNight: "昨夜の変更",
@@ -892,6 +898,7 @@ const en: CleaningAssignCopy = {
   stateAssigned: "{n} assigned · {rooms}",
   withOthers: "({n} people)",
   statePersonCancelled: "Day cancelled",
+  restoreDay: "Restore",
   cancelRequest: "Cancel request",
   cancelRequestAccept: "Accept",
   cancelRequestReject: "Decline",
@@ -1057,6 +1064,7 @@ const en: CleaningAssignCopy = {
   errAssigned: "You're assigned that day — tap the date to send a cancel request",
   errCancelledDay: "A manager cancelled this day — contact them if you can still work",
   errPast: "Past days can't be changed",
+  errTooFar: "You can apply up to about 3 months ahead",
   todayTitle: "My rooms today",
   todayHeadline: "start · {n} rooms · {d} done",
   changedLastNight: "Changed last night",

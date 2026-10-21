@@ -11,10 +11,11 @@ import {
   timeToMinutes,
   type ShiftDayState,
 } from "@/lib/cleaning-assign/day-state";
-import { compareAssignRooms, loadAssignDayRooms, loadRangeRooms, type AssignRoom } from "@/lib/cleaning-assign/rooms";
+import { compareAssignRooms, loadAssignDayRooms, loadHeldRoomKeys, loadRangeRooms, type AssignRoom } from "@/lib/cleaning-assign/rooms";
 import { DEFAULT_FLAG_THRESHOLD, normalizeAssignRules, TRAINEE_FIRST_CHECK, type AssignRule } from "@/lib/cleaning-assign/rules";
 import { suggestAssignments, type SuggestPerson, type SuggestRoom, type Suggestion } from "@/lib/cleaning-assign/suggest";
 import { physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
+import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
 /**
@@ -171,14 +172,17 @@ export type AssignmentRow = {
 };
 
 export async function loadAssignments(supabase: Client, organizationId: string, from: string, to: string, userId?: string): Promise<AssignmentRow[]> {
-  let query = supabase
-    .from("cleaning_assignments")
-    .select("id, work_date, room_key, property_name, room_label, user_id, created_by, created_at")
-    .eq("organization_id", organizationId)
-    .gte("work_date", from)
-    .lte("work_date", to);
-  if (userId) query = query.eq("user_id", userId);
-  const result = await query.order("created_at").limit(10000);
+  // 한 달이면 방 수십 개 × 2~3명이라 1,000줄(Supabase 한 번 상한)을 넘는다 — 페이지로 끝까지 읽는다.
+  const result = await readAllPages<{ id: string; work_date: string; room_key: string; property_name: string; room_label: string; user_id: string; created_by: string | null; created_at: string }>((start, end) => {
+    let query = supabase
+      .from("cleaning_assignments")
+      .select("id, work_date, room_key, property_name, room_label, user_id, created_by, created_at")
+      .eq("organization_id", organizationId)
+      .gte("work_date", from)
+      .lte("work_date", to);
+    if (userId) query = query.eq("user_id", userId);
+    return query.order("created_at").order("id").range(start, end);
+  });
   if (result.error) throw new Error(result.error.message);
   return (result.data ?? []).map((row) => ({
     createdAt: row.created_at,
@@ -203,14 +207,16 @@ export type ApplicationRow = {
 };
 
 export async function loadApplications(supabase: Client, organizationId: string, from: string, to: string, userId?: string): Promise<ApplicationRow[]> {
-  let query = supabase
-    .from("cleaning_shift_applications")
-    .select("user_id, work_date, source, start_time, cancelled_at, cancel_requested_at, cancel_request_note")
-    .eq("organization_id", organizationId)
-    .gte("work_date", from)
-    .lte("work_date", to);
-  if (userId) query = query.eq("user_id", userId);
-  const result = await query.limit(10000);
+  const result = await readAllPages<{ user_id: string; work_date: string; source: string; start_time: string | null; cancelled_at: string | null; cancel_requested_at: string | null; cancel_request_note: string | null }>((start, end) => {
+    let query = supabase
+      .from("cleaning_shift_applications")
+      .select("user_id, work_date, source, start_time, cancelled_at, cancel_requested_at, cancel_request_note")
+      .eq("organization_id", organizationId)
+      .gte("work_date", from)
+      .lte("work_date", to);
+    if (userId) query = query.eq("user_id", userId);
+    return query.order("work_date").order("user_id").range(start, end);
+  });
   if (result.error) throw new Error(result.error.message);
   return (result.data ?? []).map((row) => ({
     cancelRequestNote: row.cancel_request_note,
@@ -232,13 +238,17 @@ async function loadTraineeCounts(
 ): Promise<Map<string, { total: number; byProperty: Record<string, number> }>> {
   const out = new Map<string, { total: number; byProperty: Record<string, number> }>();
   if (userIds.length === 0) return out;
-  const result = await supabase
-    .from("cleaning_assignments")
-    .select("user_id, work_date, property_name")
-    .eq("organization_id", organizationId)
-    .in("user_id", userIds)
-    .lte("work_date", until)
-    .limit(10000);
+  // 전 기간 누적이라 금방 1,000줄을 넘는다 — 페이지로 끝까지.
+  const result = await readAllPages<{ user_id: string; work_date: string; property_name: string }>((start, end) =>
+    supabase
+      .from("cleaning_assignments")
+      .select("user_id, work_date, property_name")
+      .eq("organization_id", organizationId)
+      .in("user_id", userIds)
+      .lte("work_date", until)
+      .order("id")
+      .range(start, end),
+  );
   if (result.error) throw new Error(result.error.message);
   const days = new Map<string, Set<string>>();
   const props = new Map<string, Map<string, Set<string>>>();
@@ -269,14 +279,18 @@ async function loadAttendanceActivity(
 ): Promise<Map<string, { last: string | null; monthDays: number }>> {
   const out = new Map<string, { last: string | null; monthDays: number }>();
   if (userIds.length === 0) return out;
-  const result = await supabase
-    .from("attendance_sessions")
-    .select("user_id, operating_date")
-    .eq("organization_id", organizationId)
-    .in("user_id", userIds)
-    .gte("operating_date", addDays(date, -90))
-    .lte("operating_date", date)
-    .limit(10000);
+  // 90일 × 현장 수십 명 — 1,000줄을 넘는다.
+  const result = await readAllPages<{ user_id: string; operating_date: string }>((start, end) =>
+    supabase
+      .from("attendance_sessions")
+      .select("user_id, operating_date")
+      .eq("organization_id", organizationId)
+      .in("user_id", userIds)
+      .gte("operating_date", addDays(date, -90))
+      .lte("operating_date", date)
+      .order("id")
+      .range(start, end),
+  );
   if (result.error) throw new Error(result.error.message);
   const ym = monthOf(date);
   const month = new Map<string, Set<string>>();
@@ -561,16 +575,15 @@ export async function loadMonthBoard(supabase: Client, organizationId: string, y
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
-  const [range, members, profiles, fixedTiers, assignments, applications, roomSettings] = await Promise.all([
+  const [range, members, profiles, fixedTiers, assignments, applications, held] = await Promise.all([
     loadRangeRooms(supabase, organizationId, from, to),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId),
     loadFixedTiers(supabase, organizationId),
     loadAssignments(supabase, organizationId, from, to),
     loadApplications(supabase, organizationId, from, to),
-    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId),
+    loadHeldRoomKeys(supabase, organizationId, from, to),
   ]);
-  void roomSettings;
   const assignedRooms = new Map<string, Set<string>>();
   const cellRooms = new Map<string, number>();
   for (const row of assignments) {
@@ -583,7 +596,7 @@ export async function loadMonthBoard(supabase: Client, organizationId: string, y
   const totals = days.map((date) => {
     const rooms = range.get(date)?.size ?? 0;
     const assigned = assignedRooms.get(date) ?? new Set<string>();
-    const open = [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(key)).length;
+    const open = [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(key) && !held.has(`${date}|${key}`)).length;
     return { applied: applications.filter((a) => a.workDate === date && !a.cancelledAt).length, date, open, rooms };
   });
   const ids = [...new Set([...members.map((m) => m.userId), ...applications.map((a) => a.userId), ...assignments.map((a) => a.userId)])];
@@ -633,7 +646,7 @@ export async function computeMonthSuggestions(
 ): Promise<{ suggestions: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }>; openTotal: number; shortDays: string[] }> {
   const days = monthDays(ym).filter((date) => date >= fromDate);
   if (days.length === 0) return { openTotal: 0, shortDays: [], suggestions: [] };
-  const [range, members, profiles, fixedTiers, settings, assignments, applications, roomSettings] = await Promise.all([
+  const [range, members, profiles, fixedTiers, settings, assignments, applications, roomSettings, held] = await Promise.all([
     loadRangeRooms(supabase, organizationId, days[0], days.at(-1)!),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId),
@@ -642,11 +655,18 @@ export async function computeMonthSuggestions(
     loadAssignments(supabase, organizationId, days[0], days.at(-1)!),
     loadApplications(supabase, organizationId, days[0], days.at(-1)!),
     supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId),
+    loadHeldRoomKeys(supabase, organizationId, days[0], days.at(-1)!),
   ]);
   const usual = new Map((roomSettings.data ?? []).map((row) => [row.room_key, row.usual_headcount]));
   const memberById = new Map(members.map((m) => [m.userId, m]));
-  const monthCount = new Map<string, number>();
-  for (const row of assignments) monthCount.set(row.userId, (monthCount.get(row.userId) ?? 0) + 1);
+  // 이번 달 근무 일수(방 수가 아니라 날 수) — 앞날에 제안한 날도 더해 가며 센다(「근무 일수 적은 사람 먼저」).
+  const monthDaysOf = new Map<string, Set<string>>();
+  const addWorkDay = (userId: string, date: string) => {
+    let set = monthDaysOf.get(userId);
+    if (!set) monthDaysOf.set(userId, (set = new Set()));
+    set.add(date);
+  };
+  for (const row of assignments) addWorkDay(row.userId, row.workDate);
   const out: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }> = [];
   let openTotal = 0;
   const shortDays: string[] = [];
@@ -661,6 +681,8 @@ export async function computeMonthSuggestions(
       byUser.set(row.userId, [...(byUser.get(row.userId) ?? []), row]);
     }
     const rooms: SuggestRoom[] = [...dayRooms.values()]
+      // 미루거나 처리 끝낸 방은 하루 보기처럼 제안에서 뺀다.
+      .filter((room) => !held.has(`${date}|${room.roomKey}`))
       .sort(compareAssignRooms)
       .map((room) => ({ assigned: byRoom.get(room.roomKey) ?? [], need: Math.max(0, (usual.get(room.roomKey) ?? 1) - (byRoom.get(room.roomKey)?.length ?? 0)), propertyName: room.propertyName, roomKey: room.roomKey }))
       .filter((room) => room.need > 0);
@@ -672,7 +694,7 @@ export async function computeMonthSuggestions(
         const profile = profileOf(profiles, a.userId);
         const mine = byUser.get(a.userId) ?? [];
         return {
-          monthDays: monthCount.get(a.userId) ?? 0,
+          monthDays: monthDaysOf.get(a.userId)?.size ?? 0,
           priority: profile.priority,
           propertiesToday: [...new Set(mine.map((row) => row.propertyName))],
           roomsToday: mine.length,
@@ -688,6 +710,7 @@ export async function computeMonthSuggestions(
     for (const s of day) {
       const room = dayRooms.get(s.roomKey)!;
       out.push({ ...s, propertyName: room.propertyName, roomLabel: room.roomLabel, workDate: date });
+      addWorkDay(s.userId, date);
     }
   }
   return { openTotal, shortDays, suggestions: out };
@@ -1020,14 +1043,17 @@ export async function loadCompareRows(
     loadStaffProfiles(supabase, organizationId),
     loadFixedTiers(supabase, organizationId),
     loadAssignments(supabase, organizationId, from, to),
-    supabase
-      .from("cleaning_sessions")
-      .select("room_label, cleaning_date")
-      .eq("organization_id", organizationId)
-      .eq("status", "completed")
-      .gte("cleaning_date", from)
-      .lte("cleaning_date", to)
-      .limit(10000),
+    readAllPages<{ room_label: string; cleaning_date: string }>((start, end) =>
+      supabase
+        .from("cleaning_sessions")
+        .select("room_label, cleaning_date")
+        .eq("organization_id", organizationId)
+        .eq("status", "completed")
+        .gte("cleaning_date", from)
+        .lte("cleaning_date", to)
+        .order("id")
+        .range(start, end),
+    ),
   ]);
   if (sessions.error) throw new Error(sessions.error.message);
   const done = new Set<string>();

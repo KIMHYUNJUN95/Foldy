@@ -32,7 +32,7 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 표시 이름만 변경(내부 이름 · 권한 그대로, ko/ja/en): `cs_staff` CS 관리자 · `field_manager` 현장 관리자(월급제) ·
   `staff` 아르바이트 리더(시급제) · `part_time_staff` 아르바이트(시급제). 초대 코드 분류 · 공지 대상 · 관련 안내 문구(「파트타임」 → 「아르바이트」)도 맞춤.
 - 직원 목록 묶음: 현장 = `field_manager`, 아르바이트 = `staff` · `part_time_staff`.
-- 연차 제외를 `part_time_staff` → **`part_time_staff` · `staff`**(`isLeaveHourlyRole`).
+- 시급제 판정 하나로(`isHourlyRole`, `part_time_staff` · `staff`): 연차 제외 · 청소 배정(기본 출근 9:45 · 월 비교표 포함 · 「알바 리더」 글자). 리더는 정직원이 아니라 시급제 알바(사용자).
 - 운영 데이터(Haru): 박선철 · 지유진 `staff` → `field_manager`, 김은성 · 윤승해 · 정지훈 `office_admin` → `staff`.
   고용형태 이력 10/1 부터 — 위 3명 시급제, 나머지 월급제(김현준 테스트 시급 · 시급제 이력 삭제). **3명의 시급 금액은 아직 미등록.**
 - 상세 `docs/product/01-user-roles.md` 「화면 표시 이름 · 급여 구분」.

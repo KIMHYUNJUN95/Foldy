@@ -21,6 +21,13 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
   상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
 
+## 2026-10-21 — 개발자는 역할 기본 기능도 사람마다 켜고 끈다
+
+- 사용자 패널에서 개발자에게는 「역할로 받음 · 끌 수 없음」 줄과 개인 부여가 막힌 키도 토글이 열린다. 대표 · 전무는 키 정책대로.
+- 판정(앱 `evaluateCapability` · DB `has_capability`)이 활성 부여 · 차단 행을 키 정책과 무관하게 따른다 — 마이그레이션 `202610210004` 운영 적용.
+- 유지: 대표 · 전무 · 개발자는 차단 불가, 권한 관리 키(`systemOnly`)는 개발자도 못 건다, 자기 자신 지정 금지.
+- 상세 `docs/product/27-permission-override-workflow.md` · `docs/engineering/05-rls-permissions.md` 맨 아래.
+
 ## 2026-10-21 — 역할을 바꾸면 역할 기본 권한만 남는다
 
 - 아르바이트 리더로 바꾼 사람에게 연차 결재자 · 급여 담당이 남아 있었고, 시급제라 결재자 끄기도 막혀 있었다.

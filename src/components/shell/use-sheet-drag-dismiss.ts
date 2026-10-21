@@ -81,6 +81,7 @@ export function useSheetDragDismiss({ shown, onDismiss, sheetRef }: Options) {
   useEffect(() => {
     if (shown) return;
     if (dragYRef.current === 0 && !draggingRef.current) return;
+    if (draggingRef.current) document.documentElement.removeAttribute("data-gesture");
     draggingRef.current = false;
     dragYRef.current = 0;
     pendingDragYRef.current = 0;
@@ -123,12 +124,15 @@ export function useSheetDragDismiss({ shown, onDismiss, sheetRef }: Options) {
     pendingDragYRef.current = 0;
     sourceRef.current = source;
     draggingRef.current = true;
+    // 끄는 동안은 누름 반응(globals.css 「누름 반응」)을 끈다 — 손가락 아래 줄이 옅어진 채 내려가지 않게.
+    document.documentElement.setAttribute("data-gesture", "");
     setDragging(true);
     setDragY(0);
   }
 
   function release() {
     draggingRef.current = false;
+    document.documentElement.removeAttribute("data-gesture");
     sourceRef.current = null;
     setDragging(false);
     const dy = dragYRef.current;

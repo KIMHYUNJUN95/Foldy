@@ -610,6 +610,16 @@ Current rules:
 - **Keyboard inset (2026-06-22)**: `KeyboardInsetSync` (mounted in `layout.tsx`) publishes the on-screen keyboard height as `--keyboard-inset` (VisualViewport). Genuinely `position:fixed` bottom submit bars use `bottom: var(--keyboard-inset, 0px)` so the keyboard never covers them (linen-return create; attendance `.att .submitbar`). New fixed bottom bars with inputs should do the same; flex-flow composers don't need it (the browser auto-scrolls them).
 - **Known deferred**: the shell still renders per-page (no shared `mobile/layout.tsx`), so it remounts on navigation (header scroll state resets; bottom-tab active highlight updates on arrival, not instantly on tap). A true persistent shell needs a route-group restructure to exempt the no-shell screens (`/mobile/notifications`, attendance capture) — deferred.
 - **Press feedback (2026-06-22)**: tappable controls give a native press response — the shared `Button` (`ui/button.tsx`) has `active:` states + `active:scale-[0.98]`, bottom tab items and notification rows depress on `:active`. Because Tailwind v4 only applies `hover:` on hover-capable devices, new touch controls must use `active:` (not hover) for tap feedback.
+  - **누름 반응 — 공용 규칙 (2026-10-21 네이티브 점검)**: 점검 때 링크가 있는 모바일 화면 28곳 중 21곳에 누름 표시가 없었다. 이제
+    `globals.css` 한 곳에서 **모바일 셸(`[data-shell-frame]`) · 시트(`[data-sheet]`) 안의 링크 · 버튼 · `role="button"` · `summary`** 가 누르는
+    동안 `filter: opacity(0.6)` 로 옅어진다(터치 기기만 — `pointer: coarse`).
+    - **50ms 늦게** 옅어진다 — 스크롤하려고 댄 손가락에 줄이 깜빡이지 않게(iOS 스크롤 뷰와 같은 원리). 떼면 바로 돌아온다.
+    - **가장 안쪽 것만** — 카드 링크 안의 버튼을 누르면 버튼만(`:has`).
+    - **빼는 것**: 자기 `active:` 유틸리티가 있는 요소(두 번 반응 안 함) · 탭바 · `.add-tile` · 자기 가로 손짓이 있는 줄(`[data-swipe-back="off"]`
+      안) · 화면을 밀거나 시트를 끄는 동안(`html[data-gesture]` — 스와이프 엔진 · `useSheetDragDismiss` 가 건다) · 개별로 `data-press="off"`.
+    - `opacity` 가 아니라 `filter: opacity()` · `!important` 인 이유: 목록 줄 대부분의 등장 애니메이션(`ntw-in` 등)이 끝난 뒤에도 opacity 를
+      쥐고 있어 지연이 안 걸렸고(바로 옅어짐), `transition-colors` 같은 유틸리티에 지연 transition 이 졌다. 누르는 동안만 걸린다.
+    - 새 화면은 따로 넣을 필요 없다. 다른 반응(작아짐 · 배경색)을 원하면 그 요소에 `active:` 를 쓰면 공용 규칙이 빠진다.
 - **Double-submit guard (2026-06-22)**: `<form action={serverAction}>` submit buttons use the shared `SubmitButton` (`ui/submit-button.tsx`, `useFormStatus`) which disables + shows a spinner while the action is in flight — prevents double-submit and the dead-button feel. New server-action forms should use it (or `disabled={isPending}` with `useTransition`).
 - **Calendar gesture isolation (2026-06-22, 2026-10-08 갱신)**: the horizontal calendar grid `stopPropagation`s its touch events (pull-to-refresh) and carries `data-swipe-back="off"` so a horizontal scroll never triggers the screen swipe-back (React `stopPropagation` does not stop the swipe engine's native listener — the marker does). Any full-width horizontal scroller or drag grid inside the shell should carry the same marker; see 「뒤로가기 — 화면 스와이프」.
 - **Tab re-tap scrolls to top (2026-06-22)**: tapping the already-active bottom tab `preventDefault`s the navigation and smooth-scrolls the content container to top (native behavior) instead of a no-op.

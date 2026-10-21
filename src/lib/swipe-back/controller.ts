@@ -272,6 +272,8 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     };
     surface.style.transition = "none";
     surface.style.willChange = "transform";
+    // 미는 동안은 누름 반응(globals.css 「누름 반응」)을 끈다 — 손가락 아래 줄이 옅어진 채 밀리지 않게.
+    document.documentElement.setAttribute("data-gesture", "");
     surface.style.boxShadow = `${-12 * direction}px 0 32px -8px rgba(15, 23, 42, 0.22)`;
     // 미는 동안만 둥근 판(인스타그램처럼) — 판은 이미 overflow: hidden 이라 내용도 같이 잘린다.
     surface.style.borderRadius = `${corner}px`;
@@ -303,6 +305,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     }
     main.style.background = "";
     document.body.style.background = "";
+    document.documentElement.removeAttribute("data-gesture");
     for (const element of hidden.splice(0)) element.style.visibility = "";
     if (surfaceBase) {
       // 전환을 끈 채 원래 값으로 돌려놓고 스타일을 한 번 확정한 뒤 전환을 되살린다 — 안 그러면 원래 전환(420ms)이 헛돈다.

@@ -102,6 +102,33 @@ summary,
     font-size: 16px;
   }
 }
+/* 누름 반응 — 공용 규칙 (2026-10-21 네이티브급 움직임 점검). 모바일 셸 · 시트 안의 링크 · 버튼은 누르는 동안 살짝 옅어진다
+   (iOS 의 눌림 표시). 점검 때 링크가 있는 모바일 화면 28곳 중 21곳에 누름 표시가 없었다 — 화면마다 넣는 대신 여기 하나로.
+   - 자기 `active:` 유틸리티를 쓰는 요소 · 탭바 · 더하기 타일(자기 `:active` 가 있다)은 빼서 두 번 반응하지 않게.
+   - 가장 안쪽에서 누른 것만: 카드 링크 안의 버튼을 누르면 버튼만 옅어진다(`:has`).
+   - 누른 뒤 50ms 늦게 옅어진다 — 스크롤하려고 댄 손가락에 줄이 깜빡이지 않게(iOS 도 스크롤 뷰 안의 눌림을 늦게 보인다).
+     `opacity` 가 아니라 `filter: opacity()` 인 이유: 목록 줄 대부분이 등장 애니메이션(`ntw-in` 등, 끝난 뒤에도 opacity 를 쥐고 있다)을
+     써서 opacity 는 애니메이션에 묶여 지연(transition)이 안 걸린다 — 바로 옅어져 스크롤 때 깜빡였다. `!important` 는 화면의
+     `transition-colors` 같은 유틸리티를 누르는 동안만 이기려고. 떼면 바로 돌아온다.
+   - 화면을 밀거나 시트를 끄는 동안(`html[data-gesture]`)과 자기 가로 손짓이 있는 줄(`data-swipe-back="off"`) 안은 빼고,
+     개별로 끌 때는 `data-press="off"`. 상세 docs/product/16-mobile-navigation.md 「누름 반응」. */
+@layer base {
+  @media (pointer: coarse) {
+    html:not([data-gesture])
+      :where([data-shell-frame], [data-sheet])
+      :where(a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary):not(
+        [class*="active:"],
+        [data-press="off"],
+        [data-press="off"] *,
+        [data-swipe-back="off"] *,
+        .tabbar *,
+        .add-tile
+      ):active:not(:has(a[href]:active, button:active, [role="button"]:active)) {
+      filter: opacity(0.6) !important;
+      transition: filter 0s 50ms !important;
+    }
+  }
+}
 /* Don't let iOS auto-inflate text (e.g. in landscape) — keep the designed sizes. */
 html {
   -webkit-text-size-adjust: 100%;

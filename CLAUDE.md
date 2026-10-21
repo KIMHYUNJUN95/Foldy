@@ -123,6 +123,10 @@ For `/mobile/*`, treat `src/components/shell/mobile-shell.tsx` as a global contr
   placeholder shell (`src/app/mobile/loading.tsx` → `MobileShellPlaceholder`) — never a full-screen loader that hides
   the tab bar. A new `/mobile` folder with child routes gets the one-line `loading.tsx` re-export. See
   `docs/product/16-mobile-navigation.md` → 「Route transitions — 화면 전환」 · 「로딩 자리 셸」.
+- **Press feedback is shared (2026-10-21).** Links and buttons inside the mobile shell and sheets dim while pressed via one
+  rule in `globals.css` (50ms delay, innermost only). Do not hand-add press dimming per screen; an element that wants a
+  different response uses its own `active:` utility (the shared rule then skips it), and `data-press="off"` opts out.
+  Custom gestures that drag content should set `html[data-gesture]` while dragging. See 16 → 「누름 반응 — 공용 규칙」.
 - **Swipe back is a shared contract (2026-10-08).** Back = swiping right anywhere on a screen (`src/lib/swipe-back/*`, wired in
   `MobileShell`). Do not add back buttons or a second swipe handler. Any element with its own horizontal gesture (swipe-to-reveal
   row — only while open, carousel, drag grid, reorder handle) must carry `data-swipe-back="off"`; new full-screen overlays need

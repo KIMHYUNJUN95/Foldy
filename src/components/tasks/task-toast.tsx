@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { RotateCcw } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,23 +17,28 @@ import { cn } from "@/lib/utils";
  * 마크업도 네 곳에 복붙돼 있었다 — 이 도메인의 반복된 실패 모드가 쌍둥이 어긋남이라 하나로 모은다.
  *
  * 닫기(X) 버튼은 없다. 토스트는 모두 스스로 사라지고(4~6초), 실행 취소라는 진짜 행동이 이미
- * 있으므로 X 는 좁은 알약 안에서 시선만 나눠 가졌다.
+ * 있으므로 X 는 좁은 알약 안에서 시선만 나눠 가졌다. 대신 옆 · 아래로 밀면 치워지고, 사라질 때는 살짝 내려가며 흐려진다
+ * (`useToastMotion`, 2026-10-21).
  */
 export function TaskToast({
   action,
   icon: Icon,
   message,
+  onDismiss,
   tone = "neutral",
 }: {
   /** 실행 취소 같은 단일 행동. 없으면 안내 전용 토스트. */
   action?: { label: string; onAction: () => void };
   icon?: LucideIcon;
   message: string;
+  /** 밀어서 치웠을 때 — 부모가 이 토스트 상태를 비운다. */
+  onDismiss?: () => void;
   /** `danger` 는 되돌릴 수 없는 쪽(건너뛰기/삭제)의 아이콘 칩만 물들인다. */
   tone?: "neutral" | "danger";
 }) {
+  const ref = useToastMotion<HTMLDivElement>(onDismiss);
   return createPortal(
-    <div className="toast-dock pointer-events-none fixed inset-x-0 z-[80] flex justify-center px-4">
+    <div className="toast-dock pointer-events-none fixed inset-x-0 z-[80] flex justify-center px-4" ref={ref}>
       <div
         className={cn(
           "toast-pop pointer-events-auto flex max-w-[440px] items-center gap-2.5 rounded-[20px]",

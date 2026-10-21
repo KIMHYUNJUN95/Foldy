@@ -47,6 +47,7 @@ import { isScheduledSendDue } from "@/lib/automation/schedule";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { haptic } from "@/lib/haptics";
 import "./mobile-automation.css";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
 
 /**
  * 모바일 자동화 — 시안 AutoM-Phone · AutoMDetail-Phone · AutoMRuns-Phone · AutoMSettings-Phone · AutoMAssign-Phone ·
@@ -169,7 +170,7 @@ export function MobileAutomation({
       </div>
 
       {confirm ? <ConfirmModal confirm={confirm} keep={m.keep} onClose={() => setConfirm(null)} /> : null}
-      {toast ? <Toast key={toast.id} settings={!!job && tab === "settings"} text={toast.text} /> : null}
+      {toast ? <Toast key={toast.id} onDismiss={() => setToast(null)} settings={!!job && tab === "settings"} text={toast.text} /> : null}
     </div>
   );
 }
@@ -817,10 +818,12 @@ function ConfirmModal({ confirm, keep, onClose }: { confirm: Confirm; keep: stri
   );
 }
 
-function Toast({ text, settings }: { text: string; settings: boolean }) {
+function Toast({ text, settings, onDismiss }: { text: string; settings: boolean; onDismiss: () => void }) {
+  // 밀어서 치우기 · 사라질 때 움직임은 모바일 토스트 공용(`useToastMotion`, 2026-10-21).
+  const ref = useToastMotion<HTMLDivElement>(onDismiss);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div aria-live="polite" className={`mat-toast${settings ? " is-raised" : ""}`} role="status">
+    <div aria-live="polite" className={`mat-toast${settings ? " is-raised" : ""}`} ref={ref} role="status">
       {text}
     </div>,
     document.body,

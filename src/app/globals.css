@@ -426,6 +426,19 @@ body:lang(ja) {
     animation: none;
   }
 }
+/* 토스트가 사라질 때(`useToastMotion` 의 복제본) — 지금 자리에서 나갈 쪽으로 살짝 밀리며 흐려진다. 안쪽 등장 · 체크 · 남은 시간
+   줄 애니메이션은 끝난 모습으로 멈춘다(복제본이 등장을 다시 틀지 않게). */
+@keyframes toast-leave {
+  to {
+    opacity: 0;
+    translate: var(--toast-leave-x, 0px) var(--toast-leave-y, 10px);
+    scale: 0.97;
+  }
+}
+[data-toast-leaving] * {
+  animation-delay: -60s !important;
+  animation-play-state: paused !important;
+}
 
 /* 넓은 화면(태블릿 · 펼친 폴드 · 가로 폰)은 하단 탭 바 대신 왼쪽 레일 · 사이드바(2026-10-05, `MobileSideNav`).
    `.tabbar` 가 레이어 밖 규칙이라 유틸리티(`fold:hidden`)보다 이겨서 여기서 숨긴다. */

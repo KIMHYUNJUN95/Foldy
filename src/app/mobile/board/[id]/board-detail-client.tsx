@@ -32,6 +32,7 @@ import {
   searchMentions,
   getBoardAttachmentDownloadUrl,
 } from "./actions";
+import { BoardToast } from "@/components/board/board-toast";
 
 export function BoardDetailClient({
   post,
@@ -493,11 +494,7 @@ export function BoardDetailClient({
         />
       ) : null}
 
-      {toast ? (
-        <div aria-live="polite" className="bdw-toast" role="status">
-          <span>{toast}</span>
-        </div>
-      ) : null}
+      {toast ? <BoardToast text={toast} /> : null}
     </div>
   );
 }

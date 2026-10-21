@@ -2204,6 +2204,7 @@ export function TasksWorkspace({
                 ? copy.moveRejectedRecurringSeries
                 : copy.moveDuplicateOccurrence
           }
+          onDismiss={() => setMoveNotice(null)}
           tone={moveNotice === "save_failed" ? "danger" : "neutral"}
         />
       ) : null}
@@ -2249,6 +2250,7 @@ export function TasksWorkspace({
           action={{ label: copy.undo, onAction: undoSkipOccurrence }}
           icon={SkipForward}
           message={copy.recurSkippedToastMobile}
+          onDismiss={() => setSkipUndo(null)}
           tone="danger"
         />
       ) : null}
@@ -2259,6 +2261,10 @@ export function TasksWorkspace({
           action={{ label: copy.undo, onAction: undoTask ? handleUndo : handleRestore }}
           icon={undoTask ? CheckCircle2 : Trash2}
           message={undoTask ? copy.completedToast : copy.deletedToast}
+          onDismiss={() => {
+            setUndoTask(null);
+            setDeletedUndoIds(null);
+          }}
           tone={undoTask ? "neutral" : "danger"}
         />
       ) : null}

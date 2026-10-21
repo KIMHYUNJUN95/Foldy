@@ -620,6 +620,17 @@ Current rules:
     - `opacity` 가 아니라 `filter: opacity()` · `!important` 인 이유: 목록 줄 대부분의 등장 애니메이션(`ntw-in` 등)이 끝난 뒤에도 opacity 를
       쥐고 있어 지연이 안 걸렸고(바로 옅어짐), `transition-colors` 같은 유틸리티에 지연 transition 이 졌다. 누르는 동안만 걸린다.
     - 새 화면은 따로 넣을 필요 없다. 다른 반응(작아짐 · 배경색)을 원하면 그 요소에 `active:` 를 쓰면 공용 규칙이 빠진다.
+- **토스트 — 공용 움직임 (2026-10-21 네이티브 점검)**: 토스트 **모양은 화면마다**(시안으로 확정된 할 일 · 판매 캘린더 · 자동화 · 사용자 관리 ·
+  게시판 알약) 두고, **움직임만** `useToastMotion`(`src/components/shell/use-toast-motion.ts`) 하나로 맞춘다. 화면에 고정된 토스트 바깥 요소에 `ref`.
+  (점검 정정: 「등장 움직임 없음」은 틀렸다 — 셋 다 CSS 등장은 있었다. 빠진 건 아래 둘.)
+  - **사라질 때** — 전엔 부모가 상태를 비우는 순간 한 프레임에 사라졌다. 이제 언마운트 직전 그 자리에 복제본을 두고 180ms 동안 살짝 내려가며
+    흐려진다(`@keyframes toast-leave`). 복제본 안 등장 · 체크 · 남은 시간 줄 애니메이션은 끝난 모습으로 멈춘다(`[data-toast-leaving]`). 다음
+    토스트가 바로 이어 뜨면(`key` 가 바뀜) 옛것은 빠지고 새것은 올라와 겹쳐 바뀐다.
+  - **밀어서 치우기** — 옆이나 아래로 밀면 손가락을 따라오며 흐려지고, 가로 56px · 아래 28px 넘게 밀거나 빠르게 튕기면 치워진다(가벼운 햅틱,
+    민 방향으로 이어서 나감). 아니면 제자리로. 6px 넘게 움직인 손짓 뒤의 클릭은 먹는다(몸통 탭 닫기 · 되돌리기가 잘못 눌리지 않게). 위로는
+    안 끌린다. `onDismiss` 를 안 주면(게시판 1.8초 알림 · 판매 캘린더 진행 중) 사라짐만.
+  - 쓰는 곳: `TaskToast`(되돌리기 · 건너뛰기 · 이동 거절) · `MobileOpsToast` · 자동화 `Toast` · `MobileUsersToast` · `BoardToast`(게시판 상세 · 신고).
+    근태 교통비 명세의 `trn-toast` 는 자체 나가는 움직임이 있어 그대로. 새 모바일 토스트는 이 훅을 쓴다.
 - **Double-submit guard (2026-06-22)**: `<form action={serverAction}>` submit buttons use the shared `SubmitButton` (`ui/submit-button.tsx`, `useFormStatus`) which disables + shows a spinner while the action is in flight — prevents double-submit and the dead-button feel. New server-action forms should use it (or `disabled={isPending}` with `useTransition`).
 - **Calendar gesture isolation (2026-06-22, 2026-10-08 갱신)**: the horizontal calendar grid `stopPropagation`s its touch events (pull-to-refresh) and carries `data-swipe-back="off"` so a horizontal scroll never triggers the screen swipe-back (React `stopPropagation` does not stop the swipe engine's native listener — the marker does). Any full-width horizontal scroller or drag grid inside the shell should carry the same marker; see 「뒤로가기 — 화면 스와이프」.
 - **Tab re-tap scrolls to top (2026-06-22)**: tapping the already-active bottom tab `preventDefault`s the navigation and smooth-scrolls the content container to top (native behavior) instead of a no-op.

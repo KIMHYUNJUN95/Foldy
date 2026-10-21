@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CircleAlert } from "lucide-react";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
 
 /**
  * 모바일 사용자 관리 알림 — 판매 캘린더와 같은 **한 줄 알약**(먹색, 탭 바 위). 2026-10-20 시안 ⑦.
@@ -24,10 +25,12 @@ export function MobileUsersToast({ toast, undoLabel, onDismiss }: { toast: Users
     const timer = setTimeout(() => onDismissRef.current(), wait);
     return () => clearTimeout(timer);
   }, [wait]);
+  // 옆 · 아래로 밀면 치워진다 · 사라질 때 살짝 내려가며 흐려진다 — 모바일 토스트 공용(`useToastMotion`, 2026-10-21).
+  const ref = useToastMotion<HTMLDivElement>(onDismiss);
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className={`muw-toast${toast.kind === "bad" ? " is-bad" : ""}`} role={toast.kind === "bad" ? "alert" : "status"}>
+    <div className={`muw-toast${toast.kind === "bad" ? " is-bad" : ""}`} ref={ref} role={toast.kind === "bad" ? "alert" : "status"}>
       {toast.kind === "bad" ? <CircleAlert aria-hidden="true" /> : null}
       <span>{toast.text}</span>
       {toast.kind === "undo" && toast.onUndo ? (

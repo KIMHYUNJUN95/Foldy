@@ -127,6 +127,9 @@ For `/mobile/*`, treat `src/components/shell/mobile-shell.tsx` as a global contr
   rule in `globals.css` (50ms delay, innermost only). Do not hand-add press dimming per screen; an element that wants a
   different response uses its own `active:` utility (the shared rule then skips it), and `data-press="off"` opts out.
   Custom gestures that drag content should set `html[data-gesture]` while dragging. See 16 → 「누름 반응 — 공용 규칙」.
+- **Toast motion is shared (2026-10-21).** Mobile toasts keep their own look but get exit + swipe-to-dismiss from
+  `useToastMotion` (`src/components/shell/use-toast-motion.ts`) — put its `ref` on the fixed toast element. Do not
+  hand-roll another exit/swipe for a new mobile toast. See 16 → 「토스트 — 공용 움직임」.
 - **Swipe back is a shared contract (2026-10-08).** Back = swiping right anywhere on a screen (`src/lib/swipe-back/*`, wired in
   `MobileShell`). Do not add back buttons or a second swipe handler. Any element with its own horizontal gesture (swipe-to-reveal
   row — only while open, carousel, drag grid, reorder handle) must carry `data-swipe-back="off"`; new full-screen overlays need

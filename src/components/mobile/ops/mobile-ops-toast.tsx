@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
 import { haptic } from "@/lib/haptics";
 import type { MovedReservation } from "@/components/admin/ops/ops-reservation-move";
 
@@ -81,9 +82,12 @@ export function MobileOpsToast({
     else if (toast.kind === "failed" || toast.kind === "partial") haptic("warning");
   }, [toast.kind]);
 
+  const busy = toast.kind === "pending" || toast.kind === "undoing";
+  // 옆 · 아래로 밀면 치워진다(진행 중 제외) · 사라질 때 살짝 내려가며 흐려진다 — 모바일 토스트 공용(`useToastMotion`, 2026-10-21).
+  const ref = useToastMotion<HTMLDivElement>(busy ? undefined : onDismiss);
+
   if (typeof document === "undefined") return null;
   const n = String(toast.count);
-  const busy = toast.kind === "pending" || toast.kind === "undoing";
   const bad = toast.kind === "partial" || toast.kind === "failed";
   const title =
     toast.text ??
@@ -111,6 +115,7 @@ export function MobileOpsToast({
       aria-live="polite"
       className={`mops-toast mops-vars${bad ? " bad" : ""}`}
       onClick={busy ? undefined : onDismiss}
+      ref={ref}
       role="status"
     >
       {busy ? (

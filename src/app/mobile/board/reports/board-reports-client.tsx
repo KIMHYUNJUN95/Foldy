@@ -11,6 +11,7 @@ import "@/components/board/board-white.css";
 import { resolveBoardReport } from "../moderation-actions";
 import type { PendingBoardReport } from "@/lib/board-moderation";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { BoardToast } from "@/components/board/board-toast";
 
 /**
  * 게시판 신고 처리(모바일, owner · office_admin) — 화이트 리디자인(2026-10-15, 시안 BoardReports-Phone).
@@ -146,11 +147,7 @@ export function BoardReportsClient({
         />
       ) : null}
 
-      {toast ? (
-        <div aria-live="polite" className="bdw-toast" role="status">
-          <span>{toast}</span>
-        </div>
-      ) : null}
+      {toast ? <BoardToast text={toast} /> : null}
     </div>
   );
 }

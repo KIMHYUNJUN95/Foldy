@@ -2280,7 +2280,7 @@
 .adm .adp__cell.sel.today::after { background:#fff; }
 .adm .adp__cell:disabled { color:var(--faint); cursor:not-allowed; opacity:.5; }
 /* 날짜별 숫자 표시(`loadMarks`, 청소 배정 하루 보기의 미배정 수) — 숫자가 들어갈 만큼 달력 · 칸을 키운다. 숫자는 날짜 아래 작은 빨강. */
-.adm .amp__pop--marks { width:372px; padding:16px; }
+.adm .amp__pop--marks { width:372px; padding:16px; left:0; right:auto; }
 .adm .amp__pop--marks .adp__cell { flex-direction:column; gap:3px; height:50px; font-size:14.5px; line-height:1; }
 .adm .adp__mark { display:block; height:11px; font-size:11px; font-weight:800; line-height:11px; color:#d93a3a; }
 .adm .adp__cell.sel .adp__mark { color:#fff; }

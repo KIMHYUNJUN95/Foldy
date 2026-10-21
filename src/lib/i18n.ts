@@ -4243,6 +4243,7 @@ const FALLBACK_DICTIONARY = {
     // 전체 메뉴 · 하단 탭 편집 화이트 리디자인(2026-10-15)
     menuSearch: "Search features",
     menuSearchEmpty: "No matching features",
+    offlineBanner: "Offline — showing what was already loaded",
     menuFrequent: "Frequently used",
     menuGroupWork: "Work",
     menuGroupComms: "Communication",
@@ -12319,6 +12320,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       // 전체 메뉴 · 하단 탭 편집 화이트 리디자인(2026-10-15)
       menuSearch: "기능 검색",
       menuSearchEmpty: "찾는 기능이 없어요",
+      offlineBanner: "오프라인 — 불러온 내용만 보여요",
       menuFrequent: "자주 쓰는 기능",
       menuGroupWork: "업무",
       menuGroupComms: "소통",
@@ -20271,6 +20273,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       // 전체 메뉴 · 하단 탭 편집 화이트 리디자인(2026-10-15)
       menuSearch: "機能を検索",
       menuSearchEmpty: "該当する機能がありません",
+      offlineBanner: "オフライン — 読み込み済みの内容のみ表示中",
       menuFrequent: "よく使う機能",
       menuGroupWork: "業務",
       menuGroupComms: "コミュニケーション",

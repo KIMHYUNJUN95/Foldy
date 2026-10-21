@@ -89,6 +89,15 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 새 표 `beds24_property_rates_state`(마이그레이션 `202610210001`). 상세 `docs/product/33-calendar-write-features.md` →
   「안전망은 건물을 나눠 돈다 · 웹훅이 놓친 변경 감지」.
 
+## 2026-10-22 — 출시 점검: 오프라인 · 화면 모서리
+
+- [x] **N6 오프라인 화면에 갇힘 — 진짜 원인** — 서비스 워커가 오프라인 화면을 원래 주소에 내보내 React 가 살아나지 못했고 자동 다시 불러오기가
+  한 번도 안 돌았다(로컬 재현: 복귀 6초 뒤에도 그대로, 누를 것 없음). React 없는 맨 스크립트로 교체 — 기기 언어 하나 · 「다시 시도」 · 연결되면 복귀.
+  SW 정적 캐시 v5(저장본 새로 받기). 로컬 확인: 복귀 뒤 원래 가려던 화면으로. 아이폰 재확인 남음.
+- [x] **D2 앱 안 오프라인 표시** — 끊기면 셸 위 알약(ko/ja/en), 지금 화면은 그대로. 로컬 확인.
+- [x] **스와이프 판 모서리 아이폰 기종별** — 화면 크기 · 배율 표(`iphoneScreenCorner`, 테스트 4개).
+- H10 Android 서명은 설정이 이미 끝나 있다 — 남은 건 사용자의 키 만들기 · 백업(03 「Android 릴리스 서명」).
+
 ## 2026-10-21 — 네이티브급 움직임 점검 (앱 출시 전)
 
 점검으로 찾은 5개(순서: 5 → 1~3 → 4). PWA 노치 띠는 그대로 둔다(일체형은 앱이 맡음).
@@ -4797,6 +4806,7 @@ real bugs and filled the highest-value native gaps; verified false positives wer
 - Service-worker **update flow**: `ServiceWorkerRegister` reloads once on `controllerchange` (only if an old SW was controlling) so a deploy doesn't strand users on the old shell / cause chunk-load errors.
 - **Scroll-to-top on active bottom-tab re-tap** (native behavior) via the shell's `scrollElRef`.
 - `/offline` page now **actually auto-reloads** when back online (`OfflineAutoReload`) — it previously only promised to.
+  (2026-10-22 정정: 이 컴포넌트는 실제로는 돌지 않았다 — 맨 스크립트로 교체, 아래 2026-10-22.)
 
 **A11y / i18n / overflow:**
 - Global `:focus-visible` outline (keyboard focus was invisible after the tap-highlight removal) + `prefers-reduced-motion` disables `animate-spin`.

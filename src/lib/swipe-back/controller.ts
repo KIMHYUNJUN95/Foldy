@@ -33,6 +33,7 @@ import {
   decideCommit,
   decideLock,
   followOffset,
+  iphoneScreenCorner,
   isSwipeBackScreen,
   parentScreen,
   settleMotion,
@@ -52,13 +53,16 @@ const SAFARI_EDGE = 24;
 const NAVIGATION_TIMEOUT_MS = 4000;
 /**
  * 미는 동안 판의 모서리 반경(px) — 기기 화면 모서리에 맞춘다. 웹에서는 기기 곡률을 읽을 수 없어 `--screen-corner`(앱 셸이 정해 줄
- * 수 있다)가 없으면 iPhone(홈 버튼 없는 기종 39~62pt)은 44, 그 밖은 28. 쉬는 동안엔 각진 판이라 화면 모서리와 맞물려 안 보인다.
+ * 수 있다)가 없으면 iPhone 은 화면 크기로 기종별 값(`iphoneScreenCorner` — 홈 버튼 기종 0 · 39~62pt, 모르는 기종 44), 그 밖은 28.
+ * 쉬는 동안엔 각진 판이라 화면 모서리와 맞물려 안 보인다.
  */
 function screenCorner(): number {
   const custom = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--screen-corner"));
   if (Number.isFinite(custom)) return custom;
   const ua = navigator.userAgent;
-  return /iP(hone|od)/.test(ua) ? 44 : 28;
+  if (!/iP(hone|od)/.test(ua)) return 28;
+  // 기종별 값(2026-10-22) — 모르는 새 기종은 예전 기본 44.
+  return iphoneScreenCorner(window.screen.width, window.screen.height, window.devicePixelRatio) ?? 44;
 }
 /** 「쓰던 내용」이 아닌 입력 — 화면 스와이프를 끄지 않는다. */
 const NON_DRAFT_INPUT_TYPES = new Set(["search", "checkbox", "radio", "range", "color", "hidden"]);

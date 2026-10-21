@@ -34,6 +34,7 @@ import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import "@/components/shell/pull-refresh.css";
 import { useDrawerDragClose } from "@/components/shell/use-drawer-drag-close";
+import { OfflinePill } from "@/components/shell/offline-pill";
 
 type MobileShellProps = {
   // Bug Report is not in the sidebar nav list (it lives in the footer next to Logout), but its
@@ -921,6 +922,7 @@ export function MobileShell({
               together (Option-B full-screen pull). The fixed indicator at the top is revealed as
               the shell moves down. No translateY here; no gradient curtain needed. */}
           <div className="relative flex-1 overflow-hidden">
+            <OfflinePill label={dictionary.common.offlineBanner} />
             <div
               data-shell-scroll=""
               className={cn(

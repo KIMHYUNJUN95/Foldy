@@ -17,7 +17,7 @@
  *   - A cached copy from an OLDER deployment is never painted (2026-10-19): the SW compares the copy's
  *     `x-foldy-build` header with `/api/build` and waits for the network document when they differ.
  * Bump the cache names to invalidate old caches on deploy. */
-const STATIC_CACHE = "stayops-static-v4"; // v3·v4 (2026-10-09): 로고 교체 · 흰 줄 복원 — /icons 는 cache-first 라 올려야 새 아이콘이 보인다
+const STATIC_CACHE = "stayops-static-v5"; // v3·v4 (2026-10-09): 로고 교체 · 흰 줄 복원 — /icons 는 cache-first 라 올려야 새 아이콘이 보인다. v5 (2026-10-22): 오프라인 화면 교체(React 없이 다시 불러오기 · 다시 시도) — 저장본을 새로 받게
 const NAV_CACHE = "stayops-nav-v3"; // v3 (2026-10-09): 이름 교체(Foldy) — 이름 바꾸기 전 화면 저장본(「Stay Ops」)을 버린다
 const OFFLINE_URL = "/offline";
 // 오프라인 화면이 쓰는 앱 아이콘. 네트워크 없이 뜨는 화면이라 **함께 프리캐시해야** 한다 —

@@ -120,7 +120,8 @@ Implementation note:
   튕겼으면 이전 화면으로, 아니면 제자리로. 이동한 새 화면은 전환 애니메이션 없이 그 자리에 나타난다(두 번 미끄러지지 않게).
   **다듬기 (2026-10-20, 사용자 지시 「인스타처럼 자연스럽게」 · 점검 측정 후):**
   - **둥근 판** — 미는 동안 판 모서리를 화면 모서리처럼 둥글게(인스타그램). 반경은 `--screen-corner` 가 있으면 그 값, 없으면
-    아이폰 44px · 그 밖 28px(웹은 기기 곡률을 못 읽는다). 아래 이전 화면도 같은 반경으로 잘린다. 쉬는 동안엔 각진 판.
+    아이폰은 화면 크기 · 배율로 기종별 값(2026-10-22 `iphoneScreenCorner` — 홈 버튼 기종 0, X~17 39~62px, 모르는 기종 44) · 그 밖 28px
+    (웹은 기기 곡률을 못 읽어 표로 둔다). 아래 이전 화면도 같은 반경으로 잘린다. 쉬는 동안엔 각진 판.
   - **놓은 뒤 손가락 속도 이어받기** — 전에는 140~320ms 에 시작이 가파른 곡선이라 놓는 첫 프레임에 화면이 손가락보다 약 25배
     빨리 튀었다(측정: 0.18px/ms → 77px). 이제 곡선 시작 기울기를 손가락 속도에 맞추고(멈춘 채 놓으면 0.3px/ms 로 출발) 220~380ms
     에 부드럽게 멈춘다(`settleMotion`). iOS · Ionic(`swipe-back.ts`)과 같은 원리.
@@ -611,6 +612,11 @@ Current rules:
   (`src/components/shell/use-drawer-drag-close.ts`). 세로 · 오른쪽 손짓은 메뉴 목록 스크롤 몫, 메뉴 검색칸에서 시작한 손짓은 받지 않는다.
   끄는 동안 `html[data-gesture]`(누름 반응 끔). 서랍의 `transform` · `transition` 은 React 가 쥔 값이라 끄는 동안만 덮고, 닫을 땐 전환을
   되돌린 뒤 `closeSidebar` 로 React 가 -100% 를 쓴다(남은 거리를 원래 360ms 곡선으로). 로컬 빌드로 폰(390) · 폴드(700) 폭 확인.
+- **오프라인 표시 (2026-10-22 출시 점검 D2)**: 연결이 끊기면 셸 위쪽(폰: 위 줄 바로 아래 72px · 폴드/태블릿: 본문 위)에 작은 알약
+  「오프라인 — 불러온 내용만 보여요」(`OfflinePill`, `common.offlineBanner` ko/ja/en)이 내려오고 돌아오면 걷힌다. 지금 화면은 그대로 둔다.
+  다른 화면으로 가면 서비스 워커가 그 화면의 저장본(전에 연 화면) 또는 `/offline` 을 내보낸다. `/offline` 은 React 없이 도는 맨 스크립트로
+  기기 언어 하나만 보이고 「다시 시도」 · `online` + 3초마다 `/api/build` 확인으로 돌아온다(전 `OfflineAutoReload` 는 React 가 안 살아나
+  한 번도 안 돌았다 — N6).
 - **Sidebar transition lock (2026-06-23)**: opening/closing the side menu locks the shared top and bottom chrome hidden until the sidebar transition completes. This prevents a closing-frame flash where the header/tab bar reappears while the menu panel is still sliding away.
 - **Keyboard inset (2026-06-22)**: `KeyboardInsetSync` (mounted in `layout.tsx`) publishes the on-screen keyboard height as `--keyboard-inset` (VisualViewport). Genuinely `position:fixed` bottom submit bars use `bottom: var(--keyboard-inset, 0px)` so the keyboard never covers them (linen-return create; attendance `.att .submitbar`). New fixed bottom bars with inputs should do the same; flex-flow composers don't need it (the browser auto-scrolls them).
 - **Known deferred**: the shell still renders per-page (no shared `mobile/layout.tsx`), so it remounts on navigation (header scroll state resets; bottom-tab active highlight updates on arrival, not instantly on tap). A true persistent shell needs a route-group restructure to exempt the no-shell screens (`/mobile/notifications`, attendance capture) — deferred.

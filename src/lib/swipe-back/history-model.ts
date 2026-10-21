@@ -154,3 +154,33 @@ export function timeForProgress(curve: Curve, progress: number): number {
  * 그림만 있는 화면이 눌리지 않았다. 남은 4% 는 새 화면이 그려지는 순간 사라져도 눈에 안 띈다.
  */
 export const NAVIGATE_AT_PROGRESS = 0.96;
+
+/**
+ * 아이폰 화면 모서리 반경(pt = CSS px) — 화면 크기(세로 기준 폭 × 높이) · 배율로 기종을 가린다(2026-10-22). 미는 동안 판 모서리를
+ * 기기 모서리에 맞추려고 쓴다(전엔 아이폰 전부 44). 웹은 기기 곡률을 못 읽어 공개된 기종별 값을 표로 둔다.
+ * - 홈 버튼 기종(SE · 8 이하)은 모서리가 각져 0.
+ * - 375×812@3x 는 X · XS · 11 Pro(39)와 12 · 13 mini(44)가 같은 크기라 사이 값 41.
+ * - 모르는 크기(새 기종)는 null — 부르는 쪽이 기본값을 쓴다.
+ */
+const IPHONE_CORNERS: Record<string, number> = {
+  "320x568": 0,
+  "375x667": 0,
+  "414x736": 0,
+  "375x812@3": 41,
+  "414x896@3": 39,
+  "414x896@2": 41.5,
+  "390x844": 47.33,
+  "428x926": 53.33,
+  "393x852": 55,
+  "430x932": 55,
+  "402x874": 62,
+  "420x912": 62,
+  "440x956": 62,
+};
+
+export function iphoneScreenCorner(width: number, height: number, dpr: number): number | null {
+  const w = Math.round(Math.min(width, height));
+  const h = Math.round(Math.max(width, height));
+  const key = `${w}x${h}`;
+  return IPHONE_CORNERS[`${key}@${Math.round(dpr)}`] ?? IPHONE_CORNERS[key] ?? null;
+}

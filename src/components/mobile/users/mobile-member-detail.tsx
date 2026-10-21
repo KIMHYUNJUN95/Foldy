@@ -8,9 +8,6 @@ import {
   deleteMember,
   grantPermissionOverrideAction,
   revokePermissionOverrideAction,
-  setMemberLeaveApprover,
-  setMemberPayrollAdmin,
-  setMemberReportAccess,
   setMemberRole,
   setMemberStatus,
   setMemberTeam,
@@ -94,7 +91,7 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
   const today = tokyoToday();
   const readOnly = m.isSelf || panel.lock !== null;
 
-  const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.payrollAdmin, m.leaveApprover, m.reportAccess, m.isDeveloper, panel.perms]);
+  const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.isDeveloper, panel.perms]);
   const lastKey = useRef(dataKey);
   useEffect(() => {
     if (lastKey.current === dataKey) return;
@@ -219,43 +216,6 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
             () => grantPermissionOverrideAction({ membershipId: m.membershipId, permissionKey: p.key, effect, expiresAt: null, reason: "" }),
             toastText,
             () => setOptimistic((prev) => ({ ...prev, [p.key]: p.on })),
-          );
-        },
-      });
-    }
-    if (panel.canManagePermissions) {
-      const flag = (id: string, label: string, value: boolean, action: (next: boolean) => Promise<{ ok: boolean; error?: string }>) => {
-        const on = optimistic[id] ?? value;
-        rows.push({
-          id,
-          label,
-          on,
-          src: on ? c.wSrcOn : c.wSrcOff,
-          disabled: pending,
-          onToggle: () => {
-            haptic("light");
-            setOptimistic((prev) => ({ ...prev, [id]: !on }));
-            run(() => action(!on), (on ? c.wToastOff : c.wToastOn).replace("{name}", label), () => setOptimistic((prev) => ({ ...prev, [id]: on })));
-          },
-        });
-      };
-      flag("payroll", c.payrollAdmin, m.payrollAdmin, (next) => setMemberPayrollAdmin(m.membershipId, next));
-      flag("approver", c.leaveApprover, m.leaveApprover, (next) => setMemberLeaveApprover(m.membershipId, next));
-    }
-    if (m.role === "part_time_staff") {
-      const id = "report";
-      const on = optimistic[id] ?? m.reportAccess;
-      rows.push({
-        id,
-        label: c.wReportFlag,
-        on,
-        src: on ? c.wSrcOn : c.wSrcOff,
-        disabled: pending,
-        onToggle: () => {
-          haptic("light");
-          setOptimistic((prev) => ({ ...prev, [id]: !on }));
-          run(() => setMemberReportAccess(m.membershipId, !on), (on ? c.wToastOff : c.wToastOn).replace("{name}", c.wReportFlag), () =>
-            setOptimistic((prev) => ({ ...prev, [id]: on })),
           );
         },
       });

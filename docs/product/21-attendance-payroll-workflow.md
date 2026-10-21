@@ -1016,3 +1016,11 @@ should be defined separately when the reimbursement module is implemented.
 | 표시 | 급여 패널에 「그날 고용형태 · 시급이 없어 0원인 근무 N건」 → 시급 설정으로 가는 링크(`payPanelBlockerMissingPay*`, ko/ja/en) |
 | 빈 날 채우기(사용자 결정) | 지난 날짜로 넣는 것은 **그 사람의 가장 이른 이력보다 앞쪽 빈 구간만**, **지난달 1일부터**(`gapFillMinFrom`), **마감된 달에 걸리지 않을 때만**(`planPastGapFill`). 새 행은 [시작일, 가장 이른 이력 전날]로 닫혀 들어가고(이력이 없으면 열린 행) 기존 행은 건드리지 않는다 → 이미 계산되던 날의 금액은 바뀌지 않는다. 이미 값이 있는 날을 바꾸는 소급은 계속 금지(`future_required`), 마감된 달이면 `month_finalized`. |
 | 화면 | 시급 관리 패널의 날짜 선택이 그 사람 이력이 지난달 1일보다 늦게 시작할 때만 지난달 1일까지 열린다. |
+
+## 근태 · 급여 권한 = 권한 키 (2026-10-21)
+
+위 본문의 「owner / `attendance_payroll_admin` only」는 이제 권한 키다(`attendanceCan`, `src/lib/attendance-review.ts`):
+근태 처리 · 정정 · 수기 입력 · 근무 수정/무효 · 변경 기록 = `attendance.manage`, 월 급여표 · 내보내기 · 추가수당 목록 · 청소 월 비교표 = `payroll.view`,
+마감 · 마감 취소 · 추가수당 만들기/취소 = `payroll.manage`, 시급 · 고용형태 = `wages.manage`, 교통비 = `transport.manage`. 역할 기본은 모두 대표 · 전무,
+사람마다 켜고 끈다. 직원 상세는 근태 관리 또는 급여 보기로 열리고 금액 칸은 `payroll.view` 일 때만. 관리자 알림 받는 사람 = `attendance.manage` 보유자.
+상세 `docs/product/27-permission-override-workflow.md` 「역할 = 기본 틀」.

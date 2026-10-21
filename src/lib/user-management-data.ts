@@ -62,9 +62,6 @@ export type MemberPanelVM = {
     isSelf: boolean;
     isDeveloper: boolean;
     teamId: string | null;
-    reportAccess: boolean;
-    payrollAdmin: boolean;
-    leaveApprover: boolean;
   };
   teams: { id: string; name: string; kind: string }[];
   perms: PermRowVM[];
@@ -191,8 +188,7 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
   };
   const lock = canChangeTarget(actorStanding, targetLevel) ? null : targetLevel;
 
-  const [{ data: flagData }, teams, overrides, effective, ownerCount, otherOrgCounts, history] = await Promise.all([
-    service.from("memberships").select("attendance_payroll_admin, leave_approver_role").eq("id", selected.id).maybeSingle(),
+  const [teams, overrides, effective, ownerCount, otherOrgCounts, history] = await Promise.all([
     getOrgTeams(selected.organization_id),
     canManagePermissions && !isSelf ? listMemberOverrides(selected.organization_id, selected.user_id) : Promise.resolve([]),
     canManagePermissions && !isSelf
@@ -219,11 +215,11 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
     loadMemberHistory(selected.organization_id, selected.id),
   ]);
   const lastOwner = removesLastOwner({ target: selected, change: { delete: true }, activeOwnerCount: ownerCount });
-  const flags = flagData as Pick<MembershipRow, "attendance_payroll_admin" | "leave_approver_role"> | null;
 
   // 한 목록 안에서 「역할로 받음 · 개인 부여 · 개인 차단 · 꺼짐」을 줄마다 한 줄 글로 보여 준다. 판정식(역할 + 부여 − 차단)은
   // 서버가 계산한 최종값(`resolveCapabilities`)을 그대로 쓴다 — 화면이 따로 계산하면 언젠가 어긋난다.
   const perms: PermRowVM[] = [];
+  const canBypassKeyPolicy = isSuperAdmin || actorStanding.topAdminInOrg;
   if (canManagePermissions && !isSelf && !lock) {
     for (const key of CAPABILITY_KEYS) {
       const policy = capabilityPolicy(key);
@@ -234,13 +230,13 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
       const deny = overrides.find((override) => override.key === key && override.effect === "deny");
       const on = effective.includes(key);
       const source: PermRowVM["source"] = deny ? "deny" : grant ? "grant" : fromRole ? "role" : "off";
-      // 개발자는 키의 개인 지정 허용 여부와 무관하게 전부 켜고 끈다(2026-10-21) — 대표 · 전무는 키 정책대로.
+      // 대표 · 전무 · 개발자는 키의 개인 지정 허용 여부와 무관하게 전부 켜고 끈다(2026-10-21 「역할 = 기본 틀, 나머지는 사람마다」).
       const canToggle =
         source === "grant" || source === "deny"
           ? true
           : source === "role"
-            ? (isSuperAdmin || policy.individualDeny) && canBeDenied(selected.role as Role)
-            : isSuperAdmin || policy.individualGrant;
+            ? (canBypassKeyPolicy || policy.individualDeny) && canBeDenied(selected.role as Role)
+            : canBypassKeyPolicy || policy.individualGrant;
       if (source === "off" && !canToggle) continue;
       perms.push({
         kind: "cap",
@@ -268,9 +264,6 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
       isSelf,
       isDeveloper: devIds.has(selected.user_id),
       teamId: selected.team_id ?? null,
-      reportAccess: profile?.can_generate_report ?? false,
-      payrollAdmin: flags?.attendance_payroll_admin ?? false,
-      leaveApprover: flags?.leave_approver_role != null,
     },
     teams,
     perms,

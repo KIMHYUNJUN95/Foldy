@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import type { Role } from "@/config/roles";
 import { getOnboardingState } from "@/lib/onboarding";
 import type { AppSession } from "@/lib/session";
@@ -23,7 +23,7 @@ export async function getAdminSessionForApi(): Promise<AdminApiAuthResult> {
     return { ok: false, status: 403 };
   }
 
-  if (!canAccessAdminWeb(session.user.role)) {
+  if (!hasAdminWebAccess(session)) {
     return { ok: false, status: 403 };
   }
 
@@ -44,7 +44,7 @@ export async function requireAdminSession() {
     redirect("/onboarding");
   }
 
-  if (!canAccessAdminWeb(session.user.role)) {
+  if (!hasAdminWebAccess(session)) {
     redirect("/mobile");
   }
 

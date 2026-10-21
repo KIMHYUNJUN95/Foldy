@@ -27,7 +27,7 @@ import {
   mobileSidebarNavigation,
   resolveBottomNavItems,
 } from "@/config/navigation";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { haptic } from "@/lib/haptics";
 import { consumeScreenEntrance, setNavDirection, type ScreenEntrance } from "@/lib/nav-direction";
 import { getDictionary } from "@/lib/i18n";
@@ -611,7 +611,7 @@ export function MobileShell({
   // 메뉴도 같은 두 조건으로 거른다 — 키만 받은 현장 역할에게 메뉴를 보여 주면 눌러도 홈으로 튕긴다(2026-10-01).
   const canSeeMobileNavItem = (item: { id: string }) =>
     canSeeNavItem(item, session.capabilities) &&
-    (!isMobileOpsAdminNavItem(item.id) || canAccessAdminWeb(session.user.role));
+    (!isMobileOpsAdminNavItem(item.id) || hasAdminWebAccess(session));
   const opsNavItems = mobileOpsAdminNavigation.filter(canSeeMobileNavItem);
   const bottomItems = resolveBottomNavItems(navTabIds).filter(canSeeMobileNavItem);
   const splitAt = Math.ceil(bottomItems.length / 2);

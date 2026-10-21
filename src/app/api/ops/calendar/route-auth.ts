@@ -1,4 +1,4 @@
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getCurrentAppSession, type AppSession } from "@/lib/session";
 
@@ -14,6 +14,6 @@ import { getCurrentAppSession, type AppSession } from "@/lib/session";
 export async function getOpsReadSession(): Promise<AppSession | null> {
   const session = await getCurrentAppSession();
   if (!session) return null;
-  if (!canAccessAdminWeb(session.user.role) || !canAccessOpsAdmin(session)) return null;
+  if (!hasAdminWebAccess(session) || !canAccessOpsAdmin(session)) return null;
   return session;
 }

@@ -5,10 +5,8 @@
 // 내보내기(Excel/PDF)는 없다 — 사용자 결정(2026-07-14): 수리·점검은 내보낼 일이 없다. 이는
 // `docs/product/05-admin-web-ia.md` §"Excel + PDF 내보내기 — 절대 규칙"의 명시적 예외다.
 // See docs/product/08-maintenance-workflow.md → "2026-07-14 어드민 수리·점검 대시보드".
-import { roleCan } from "@/config/capabilities";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import type { Role } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { canForceCompleteCleaning } from "@/lib/cleaning";
 import { maintenanceStatuses, type MaintenanceStatus } from "@/lib/maintenance-reports";
@@ -80,7 +78,7 @@ export async function applyMaintenanceException(input: {
   reportId: string;
 }): Promise<MaintenanceExceptionResult> {
   const session = await requireAdminSession();
-  if (!canForceCompleteCleaning(session.user.role)) {
+  if (!canForceCompleteCleaning(session)) {
     return { ok: false, reason: "forbidden" };
   }
   if (!isValidUUID(input.reportId)) {
@@ -122,8 +120,8 @@ export async function applyMaintenanceException(input: {
   return { ok: true };
 }
 
-function canDeleteAnyMaintenanceReport(role: Role): boolean {
-  return roleCan(role, "request.delete_any");
+function canDeleteAnyMaintenanceReport(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("request.delete_any");
 }
 
 export async function deleteMaintenanceReportById(
@@ -146,7 +144,7 @@ export async function deleteMaintenanceReportById(
     return { ok: false, error: "not_found" };
   }
   const owner = (existing as { reported_by_user_id: string }).reported_by_user_id;
-  if (owner !== session.user.id && !canDeleteAnyMaintenanceReport(session.user.role)) {
+  if (owner !== session.user.id && !canDeleteAnyMaintenanceReport(session)) {
     return { ok: false, error: "unauthorized" };
   }
 

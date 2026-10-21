@@ -1,11 +1,9 @@
 "use server";
 
-import { canGenerateDailyReport } from "@/config/roles";
 import { logDailyReportSent, postDailyReportToSlack } from "@/lib/daily-report-slack";
 import { buildDailyReportText, type DailyReportDraft, type DailyReportItem } from "@/lib/daily-report";
 import { getFieldActivities } from "@/lib/field-activity";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
-import { hasPermissionOverride } from "@/lib/permission-overrides-server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export type DailyReportResult =
@@ -101,7 +99,7 @@ function tidy(raw: string): string {
 
 /**
  * Build the daily work report ("업무일지") for the given Tokyo date from the current user's completed
- * tasks. Free / template-based — no LLM call, no per-use cost. Staff-only (see `canGenerateDailyReport`).
+ * tasks. Free / template-based — no LLM call, no per-use cost. Gated by the `can_generate_report` capability.
  * Outputs a formal business report: title, date, staff name, numbered task list, total count.
  * Tags and descriptions are intentionally excluded — titles only.
  */
@@ -111,10 +109,8 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
 
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "forbidden" };
-  if (
-    !canGenerateDailyReport(session.user.role, session.user.canGenerateReport) &&
-    !(await hasPermissionOverride(session.organization.id, session.user.id, "can_generate_report"))
-  ) {
+  // 권한 키 `can_generate_report` 하나로 판정(역할 기본 + 개인 부여 · 차단, 2026-10-21). 예전 프로필 표시는 마이그레이션에서 부여로 옮겼다.
+  if (!session.capabilities.includes("can_generate_report")) {
     return { ok: false, reason: "forbidden" };
   }
 

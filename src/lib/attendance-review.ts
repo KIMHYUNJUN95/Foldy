@@ -1,15 +1,16 @@
 // Attendance — admin REVIEW query layer + privilege guard (Step 7).
 //
-// Org-wide read layer for the attendance review queue + the server-side privilege gate. Only `owner`
-// and explicit `attendance_payroll_admin` members (or platform admins) may review org-wide attendance
-// and act on correction requests. Site-master management stays owner-only elsewhere (unchanged here).
+// Org-wide read layer for the attendance review queue + the server-side privilege gate. Gated by
+// capability keys since 2026-10-21 (`attendanceCan` — attendance.manage / payroll.view / payroll.manage /
+// wages.manage / transport.manage). Site-master management stays owner-only elsewhere (unchanged here).
 //
 // The review-queue UI is built later in the WEB DASHBOARD (user-confirmed 2026-06-17); this layer is
 // caller-agnostic so that dashboard can consume it. The privilege guard MUST be checked by any caller
 // before exposing org-wide data; the write actions (admin-actions) enforce it themselves.
 
 import "server-only";
-import { cache } from "react";
+import type { Capability } from "@/config/capabilities";
+import { memberCapabilities, memberIdsWithCapability } from "@/lib/capabilities-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { SUPABASE_PAGE_SIZE } from "@/lib/supabase/read-all-pages";
 import { chunk } from "@/lib/utils";
@@ -34,67 +35,47 @@ const SESSION_ID_QUERY_CHUNK = 200;
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
 /**
- * Server-side privilege gate for org-wide attendance/payroll review. True for platform admins and for
- * active members who are the org `owner` or carry the `attendance_payroll_admin` flag.
+ * 근태 · 급여 화면의 서버 권한 게이트 — **권한 키로 판정한다**(2026-10-21). 예전엔 `owner` · 전무 · `attendance_payroll_admin`
+ * 표시 하나가 근태와 급여를 한꺼번에 열었다. 이제 키를 나눈다:
+ * `attendance.manage`(출퇴근 · 정정 · 수기 입력) · `payroll.view`(금액 보기) · `payroll.manage`(마감 · 추가수당) ·
+ * `wages.manage`(시급 · 고용형태) · `transport.manage`(교통비). 역할이 기본 틀이고 대표 · 전무 · 개발자가 사람마다 켜고 끈다.
  *
- * `cache()` — 한 화면이 배지 · 본문 · 하위 조회에서 여러 번 부른다(최대 4번). 요청 안에서는 한 번만 읽는다.
+ * 플랫폼 개발자는 `developer_super_admin` 역할로 판정한다(`platformBypass`). `cache()` — 한 화면이 여러 번 부른다.
  */
-export const isAttendancePayrollAdmin = cache(async function isAttendancePayrollAdmin(
+export async function attendanceCapabilities(
+  _service: Service,
+  organizationId: string,
+  userId: string,
+): Promise<readonly Capability[]> {
+  return memberCapabilities(organizationId, userId);
+}
+
+export async function attendanceCan(
   service: Service,
   organizationId: string,
   userId: string,
+  capability: AttendanceCapability,
 ): Promise<boolean> {
-  const [pa, m] = await Promise.all([
-    service
-      .from("platform_admins")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .maybeSingle(),
-    service
-      .from("memberships")
-      .select("role, attendance_payroll_admin, status")
-      .eq("organization_id", organizationId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-  ]);
-  if (pa.data) return true;
+  return (await attendanceCapabilities(service, organizationId, userId)).includes(capability);
+}
 
-  const row = m.data as { role: string; attendance_payroll_admin: boolean; status: string } | null;
-  return (
-    !!row &&
-    row.status === "active" &&
-    // 전무(senior_managing_director) is owner-equivalent.
-    (row.role === "owner" || row.role === "senior_managing_director" || row.attendance_payroll_admin === true)
-  );
-});
+export type AttendanceCapability =
+  | "attendance.manage"
+  | "payroll.view"
+  | "payroll.manage"
+  | "wages.manage"
+  | "transport.manage";
 
 /**
- * The user ids of org members who should receive privileged attendance admin alerts: active `owner` or
- * `attendance_payroll_admin` members. Used to TARGET notifications (never broadens visibility).
+ * 이 키를 가진 활성 멤버의 id — 관리자 알림 받는 사람을 고른다(보이는 범위는 넓히지 않는다).
+ * 예전엔 owner · 전무 · 급여 담당 표시였다. 플랫폼 개발자는 멤버십 역할로만 센다(예전과 같음).
  */
-export async function getAttendancePayrollAdminUserIds(
-  service: Service,
+export async function getMemberIdsWithCapability(
+  _service: Service,
   organizationId: string,
+  capability: AttendanceCapability,
 ): Promise<string[]> {
-  const res = await service
-    .from("memberships")
-    .select("user_id, role, attendance_payroll_admin, status")
-    .eq("organization_id", organizationId)
-    .eq("status", "active");
-  const rows = (res.data ?? []) as {
-    user_id: string;
-    role: string;
-    attendance_payroll_admin: boolean;
-  }[];
-  return rows
-    .filter(
-      (m) =>
-        m.role === "owner" ||
-        m.role === "senior_managing_director" ||
-        m.attendance_payroll_admin === true,
-    )
-    .map((m) => m.user_id);
+  return memberIdsWithCapability(organizationId, capability);
 }
 
 export type ReviewQueueFilter =

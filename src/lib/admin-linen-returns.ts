@@ -1,5 +1,4 @@
 import "server-only";
-import { roleCan } from "@/config/capabilities";
 
 // Real-data layer for the admin 린넨 반품(Linen Return) console (/admin/linen-return).
 // Mirrors `admin-lost-found.ts` / `admin-maintenance.ts`: presentation-ready flat view models,
@@ -145,11 +144,11 @@ function shortIdOf(id: string): string {
 /** 작성자 본인 또는 관리자 역할이면 관리 가능. `canManageLinenRecord`(모바일)와 같은 규칙. */
 function canManage(session: AppSession, registeredById: string): boolean {
   if (session.user.id === registeredById) return true;
-  return roleCan(session.user.role, "linen.manage");
+  return session.capabilities.includes("linen.manage");
 }
 
-export function isAdminCapableRole(role: Role): boolean {
-  return roleCan(role, "linen.manage");
+export function isAdminCapableRole(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("linen.manage");
 }
 
 export function isOrganizationRole(role: Role): boolean {

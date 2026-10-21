@@ -7,6 +7,7 @@
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { memberCapabilities } from "@/lib/capabilities-server";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { AppSession } from "@/lib/session";
 import { tokyoToday } from "@/lib/annual-leave";
@@ -110,20 +111,18 @@ async function getLeaveApproverRole(
     .maybeSingle();
   if (pa.data) return { isApprover: true, approverRole: null };
 
-  const m = await service
-    .from("memberships")
-    .select("leave_approver_role, status")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  const row = m.data as { leave_approver_role: string | null; status: string } | null;
-  if (row && row.status === "active" && row.leave_approver_role) {
-    return { isApprover: true, approverRole: row.leave_approver_role };
+  // 결재 권한은 권한 키 `leave.approve` 로 판정한다(2026-10-21 — 역할 기본 대표 · 전무, 사람마다 켜고 끔). 예전 표시
+  // `memberships.leave_approver_role` 은 더 이상 권한을 주지 않는다. 휴가계 도장 칸은 예전 기본값(전무)을 그대로 쓴다.
+  if (!(await memberCapabilities(organizationId, userId)).includes("leave.approve")) {
+    return { isApprover: false, approverRole: null };
   }
-  return { isApprover: false, approverRole: null };
+  return { isApprover: true, approverRole: LEAVE_STAMP_ROLE };
 }
 
-/** Public approver check (platform admin, or an active membership with a non-null leave_approver_role).
+/** 휴가계 문서의 결재 도장 칸 — 2026-07-13 「연차 결재는 전무가 담당」 결정 때부터의 기본값. */
+const LEAVE_STAMP_ROLE = "senior_managing_director";
+
+/** Public approver check (platform admin, or `leave.approve`).
  *  Used to gate management writes (balance edit, approver toggle) that live behind the approver-only
  *  console but must still be re-verified server-side. */
 export async function isSessionLeaveApprover(session: AppSession): Promise<boolean> {

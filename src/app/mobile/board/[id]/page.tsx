@@ -1,4 +1,3 @@
-import { roleCan } from "@/config/capabilities";
 import { after } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -60,7 +59,7 @@ export default async function BoardPostPage({ params }: PageProps) {
       <BoardDetailClient
         post={post}
         viewerId={session.user.id}
-        canManage={roleCan(session.user.role, "board.manage")}
+        canManage={session.capabilities.includes("board.manage")}
         organizationId={session.organization.id}
         locale={session.user.preferredLanguage}
         copy={copy}

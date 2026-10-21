@@ -13,7 +13,7 @@
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { isAttendancePayrollAdmin } from "@/lib/attendance-review";
+import { attendanceCan } from "@/lib/attendance-review";
 import { monthFirstDay } from "@/lib/attendance-finalization";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
@@ -162,7 +162,7 @@ export async function runPayrollExport(
   actorId: string,
   params: { scope: ExportScope; ym: string; userId?: string },
 ): Promise<PayrollExportResult> {
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "payroll.view"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!/^\d{4}-\d{2}$/.test(params.ym)) return { ok: false, reason: "invalid" };

@@ -36,7 +36,7 @@ export default async function MobileComplaintCreatePage({ searchParams }: PagePr
     redirect("/mobile/unavailable");
   }
 
-  if (!canWriteComplaint(session.user.role)) {
+  if (!canWriteComplaint(session)) {
     redirect("/mobile/complaints");
   }
 

@@ -52,6 +52,8 @@ Important:
 | `staff` | **아르바이트 리더** | アルバイトリーダー | Part-time Leader | **시급제** | 오래 일해 관리 업무를 일부 맡는 알바. 관리자 웹 일부(민감 화면 제외) · 일일 보고서 항상 가능 |
 | `part_time_staff` | **아르바이트** | アルバイト | Part-timer | **시급제** | 모바일만 |
 
+- **역할 = 기본 틀(2026-10-21):** 역할은 처음 켜진 권한만 정한다. 그 밖은 대표 · 전무 · 개발자가 사람마다 주고 뺀다(관리자 웹 진입 ·
+  근태 관리 · 급여 · 연차 결재까지 전부 권한 키). 역할별 기본값 표: `docs/product/27-permission-override-workflow.md` 「역할 = 기본 틀」.
 - **시급제 역할 = `isHourlyRole`** (`src/config/roles.ts`, `part_time_staff` · `staff`) — 연차 제외 · 청소 배정의 알바 판정이 이것 하나를 쓴다. 권한 판단에는 쓰지 않는다. 전에는 `part_time_staff` 만 제외였다.
 - 급여 계산은 역할이 아니라 **고용형태 이력**(`employment_type_history`)으로 한다(기존 결정 그대로). 역할을 바꾸면 고용형태도 같이 맞춘다.
 - 리더에게 더 맡길 일은 사람별 권한 추가(`docs/product/27-permission-override-workflow.md`)로 준다.

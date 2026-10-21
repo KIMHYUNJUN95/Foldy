@@ -91,7 +91,7 @@ async function guard(recordId: string): Promise<GuardOk | GuardFail> {
 
   const record = data as RecordRow;
   const canManage =
-    session.user.id === record.registered_by_user_id || isAdminCapableRole(session.user.role);
+    session.user.id === record.registered_by_user_id || isAdminCapableRole(session);
   if (!canManage) return { ok: false, reason: "forbidden" };
 
   return { ok: true, session, record };

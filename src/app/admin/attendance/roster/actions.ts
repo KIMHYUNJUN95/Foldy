@@ -1,6 +1,6 @@
 "use server";
 
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { getAttendanceRoster } from "@/lib/attendance-roster";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
@@ -37,7 +37,7 @@ export async function loadAdminAttendanceRoster(
 ): Promise<AdminRosterActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  if (!canAccessAdminWeb(session.user.role)) return { ok: false, reason: "forbidden" };
+  if (!hasAdminWebAccess(session)) return { ok: false, reason: "forbidden" };
 
   const todayDate = tokyoDateKey();
   const date = clampRosterDate(operatingDate, todayDate);

@@ -688,7 +688,7 @@ export async function convertReviewToComplaint(input: {
   const { session, reviewId } = input;
   const organizationId = requireOrg(session);
 
-  if (!canWriteComplaint(session.user.role)) throw new Error("forbidden");
+  if (!canWriteComplaint(session)) throw new Error("forbidden");
 
   const title = input.title.trim();
   if (!title) throw new Error("title_required");

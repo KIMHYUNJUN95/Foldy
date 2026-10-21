@@ -11,7 +11,7 @@ import { loadDayBoard, loadMonthBoard } from "@/lib/cleaning-assign/data";
 import { getDictionary } from "@/lib/i18n";
 import { CALENDAR_BUILDING_ORDER, localizePropertyName } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { isAttendancePayrollAdmin } from "@/lib/attendance-review";
+import { attendanceCan } from "@/lib/attendance-review";
 
 /**
  * 청소 배정 — PC(하루 보기 · 월 보기). 배정 담당(`cleaning.assign`)만.
@@ -36,7 +36,7 @@ export default async function AdminCleaningAssignPage({
   const buildingLabels = dictionary.cleaning.buildingLabels;
   const propertyLabels = Object.fromEntries(CALENDAR_BUILDING_ORDER.map((name) => [name, localizePropertyName(name, buildingLabels)]));
   // 월 비교표는 급여가 보이므로 급여를 볼 수 있는 사람만(근태 · 급여 화면과 같은 기준).
-  const canCompare = await isAttendancePayrollAdmin(supabase, organizationId, session.user.id);
+  const canCompare = await attendanceCan(supabase, organizationId, session.user.id, "payroll.view");
 
   if (params.view === "month") {
     const ym = isMonthKey(params.ym) ? params.ym! : monthOf(today);

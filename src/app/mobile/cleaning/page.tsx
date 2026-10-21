@@ -368,7 +368,7 @@ export default async function MobileCleaningPage({
   const isToday = viewDate === operatingToday;
   // RLS 상 staff / part_time_staff 는 **본인 세션만** 읽는다. 그 사람들에게 "기록 없음"을 그리면
   // 남이 끝낸 청소가 빠뜨린 것처럼 보인다 — 단정할 수 있는 사람에게만 그린다(2026-08-04).
-  const canSeeAllSessions = canReadAllCleaningSessions(session.user.role);
+  const canSeeAllSessions = canReadAllCleaningSessions(session);
   const isFuture = viewDate > operatingToday;
 
   // 서로 기다릴 필요 없는 읽기는 한 번에 시작한다(2026-10-19 속도 — 전에는 9단계 직렬). 배지(`getMobileNavBadges`)도 함께.

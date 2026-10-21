@@ -1,5 +1,3 @@
-import { roleCan } from "@/config/capabilities";
-import type { Role } from "@/config/roles";
 import { toOriginalReservationId } from "@/lib/beds24/reservation-id";
 import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
 import { readBeds24BookingId } from "@/lib/beds24/reservation-status";
@@ -28,8 +26,8 @@ import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 import { getReservationGuests, type ReservationGuests } from "@/lib/reservation-guests";
 
-export function canEditPropertyOperationInfo(role: Role): boolean {
-  return roleCan(role, "property_info.edit");
+export function canEditPropertyOperationInfo(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("property_info.edit");
 }
 
 /** 예약 캘린더 인원 — 합계 + 성인 · 어린이(2026-10-05, `reservation-guests.ts`). */

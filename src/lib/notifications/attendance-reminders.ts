@@ -17,7 +17,7 @@ import {
   createAttendanceOpenSessionReminder,
   notifyAttendanceAdmins,
 } from "@/lib/notifications/create";
-import { getAttendancePayrollAdminUserIds } from "@/lib/attendance-review";
+import { getMemberIdsWithCapability } from "@/lib/attendance-review";
 import { isPastReminderTimeTokyo } from "@/lib/attendance-sessions";
 import { tokyoToday } from "@/lib/tokyo-date";
 
@@ -74,7 +74,7 @@ export async function runAttendanceReminders(
     if (s.operating_date < today) {
       let admins = adminCache.get(s.organization_id);
       if (!admins) {
-        admins = await getAttendancePayrollAdminUserIds(service, s.organization_id);
+        admins = await getMemberIdsWithCapability(service, s.organization_id, "attendance.manage");
         adminCache.set(s.organization_id, admins);
       }
       await notifyAttendanceAdmins(service, {

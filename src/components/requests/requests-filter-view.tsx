@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import { roleCan } from "@/config/capabilities";
 import { LiveWash } from "@/components/shared/live-wash";
 import "./requests-list.css";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -48,7 +47,6 @@ import {
 import { localizePropertyName } from "@/lib/room-label-normalization";
 import { resolveRequestLocation, type RequestLocationDisplay } from "@/lib/request-location";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
-import type { Role } from "@/config/roles";
 import type { Database } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { FoldyEmpty } from "@/components/shared/foldy-empty";
@@ -251,7 +249,8 @@ type DeleteCopy = {
 type RequestsFilterViewProps = {
   buildingLabels: Record<string, string>;
   currentUserId: string;
-  currentUserRole: Role;
+  /** 남이 쓴 요청 삭제 권한(`request.delete_any`, 역할 기본 + 개인 부여 · 차단) — 서버가 계산해 넘긴다. */
+  canDeleteAny: boolean;
   datePreset: RequestDatePreset;
   deleteCopy: DeleteCopy;
   endDate?: string;
@@ -398,7 +397,7 @@ type DeleteTarget = {
 export function RequestsFilterView({
   buildingLabels,
   currentUserId,
-  currentUserRole,
+  canDeleteAny,
   datePreset,
   deleteCopy,
   endDate,
@@ -427,7 +426,6 @@ export function RequestsFilterView({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
 
-  const canDeleteAny = roleCan(currentUserRole, "request.delete_any");
 
   const openDelete = useCallback((target: DeleteTarget) => {
     setDeleteTarget(target);

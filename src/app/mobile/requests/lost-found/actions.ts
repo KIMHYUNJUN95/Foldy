@@ -95,8 +95,8 @@ export async function updateLostItemHandling(
 ): Promise<LostItemHandlingResult> {
   const session = await getCurrentAppSession();
   if (!session) return { ok: false, error: "forbidden" };
-  // 파트타임은 상태를 바꿀 수 없다 (기존 규칙). RLS도 같은 결론을 내지만 여기서 먼저 끊는다.
-  if (session.user.role === "part_time_staff") return { ok: false, error: "forbidden" };
+  // 분실물 처리 = 권한 키 `lost_found.handle`(역할 기본: 아르바이트 빼고 전원, 사람마다 켜고 끔 — 2026-10-21). RLS 도 같은 키로 본다.
+  if (!session.capabilities.includes("lost_found.handle")) return { ok: false, error: "forbidden" };
 
   const { itemId, memo, handlingImageUrls } = input;
   if (!isValidUuid(itemId)) return { ok: false, error: "invalid" };

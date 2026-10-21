@@ -11,7 +11,6 @@
 // NOTE: `customer_complaints` / `complaint_comments` are not yet in the generated Database types, so
 // table access goes through an untyped client view and row shapes are cast explicitly.
 
-import { roleCan } from "@/config/capabilities";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -140,12 +139,12 @@ function requireOrg(session: AppSession): string {
   return session.organization.id;
 }
 
-export function canWriteComplaint(role: string): boolean {
-  return roleCan(role, "complaint.write");
+export function canWriteComplaint(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("complaint.write");
 }
 
-export function canWriteComment(role: string): boolean {
-  return roleCan(role, "complaint.comment");
+export function canWriteComment(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("complaint.comment");
 }
 
 /** 상태 변경(resolve/reopen): 작성자 본인 또는 owner/office_admin/super-admin. */
@@ -155,7 +154,7 @@ export function canChangeStatus(
 ): boolean {
   return (
     complaint.createdByUserId === session.user.id ||
-    roleCan(session.user.role, "complaint.manage")
+    session.capabilities.includes("complaint.manage")
   );
 }
 
@@ -163,12 +162,12 @@ export function canChangeStatus(
  * 컴플레인 조정 권한(owner/office_admin/super-admin) 여부. UI에서 "작성자 본인 외에도 삭제/상태
  * 변경 버튼을 보여줄지" 판단하는 용도다. 실제 삭제 권한은 `deleteComplaint`가 서버에서 다시 검증한다.
  */
-export function canModerateComplaints(role: string): boolean {
-  return roleCan(role, "complaint.manage");
+export function canModerateComplaints(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("complaint.manage");
 }
 
 function isComplaintAdmin(session: AppSession): boolean {
-  return roleCan(session.user.role, "complaint.manage");
+  return session.capabilities.includes("complaint.manage");
 }
 
 function validateTitle(value: string): string {
@@ -400,7 +399,7 @@ export async function createComplaint(input: {
 }): Promise<{ id: string }> {
   const { session } = input;
   const organizationId = requireOrg(session);
-  if (!canWriteComplaint(session.user.role)) throw new Error("forbidden");
+  if (!canWriteComplaint(session)) throw new Error("forbidden");
 
   const platform = validatePlatform(input.input.platform);
   const title = validateTitle(input.input.title);
@@ -622,7 +621,7 @@ export async function createComplaintComment(input: {
 }): Promise<{ id: string }> {
   const { session, complaintId } = input;
   const organizationId = requireOrg(session);
-  if (!canWriteComment(session.user.role)) throw new Error("forbidden");
+  if (!canWriteComment(session)) throw new Error("forbidden");
 
   const content = input.content.trim();
   if (!content) throw new Error("content_required");

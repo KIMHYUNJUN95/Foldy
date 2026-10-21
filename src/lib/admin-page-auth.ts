@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 
@@ -21,7 +21,7 @@ export async function requireAdminPageSession({
   if (state.status !== "ready" || !session || !hasOrganizationContext(session)) {
     redirect("/onboarding");
   }
-  if (!canAccessAdminWeb(session.user.role)) {
+  if (!hasAdminWebAccess(session)) {
     redirect("/mobile");
   }
 

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AppMode } from "@/config/routes";
-import { canAccessAdminWeb, canSwitchToFieldMode } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import type { AppSession } from "@/lib/session";
 
 type SessionContextValue = {
@@ -35,12 +35,9 @@ export function SessionProvider({
   );
 
   const value = useMemo<SessionContextValue>(() => {
-    const canAccessAdmin = initialSession
-      ? canAccessAdminWeb(initialSession.user.role)
-      : false;
-    const canSwitchMode = initialSession
-      ? canSwitchToFieldMode(initialSession.user.role)
-      : false;
+    // 관리자 웹 · 모드 전환 = 권한 키 `admin_web.access`(2026-10-21) — 관리자 웹에 못 들어가면 전환할 곳도 없다.
+    const canAccessAdmin = hasAdminWebAccess(initialSession);
+    const canSwitchMode = canAccessAdmin;
 
     return {
       canAccessAdmin,

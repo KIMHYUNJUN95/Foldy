@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { getDictionary } from "@/lib/i18n";
 import { getDeviceSurfaceFromHeaders } from "@/lib/mobile-device";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -32,7 +32,7 @@ export default async function ReservationShortcutPage({ params }: { params: Prom
   const ready = state.status === "ready" && session && hasOrganizationContext(session);
 
   const result = resolveReservationShortcut({
-    canOpenCalendar: Boolean(ready && session && canAccessOpsAdmin(session) && canAccessAdminWeb(session.user.role)),
+    canOpenCalendar: Boolean(ready && session && canAccessOpsAdmin(session) && hasAdminWebAccess(session)),
     reservationId: id,
     state: state.status === "unauthenticated" ? "unauthenticated" : ready ? "ready" : "onboarding",
     surface,
@@ -41,7 +41,7 @@ export default async function ReservationShortcutPage({ params }: { params: Prom
 
   // 여기까지 오면 로그인 · 가입이 끝난 사람이다(아니면 위에서 로그인 · 가입으로 보냈다).
   const copy = getDictionary(session?.user.preferredLanguage ?? "ko").reservationShortcut;
-  const homeHref = surface !== "mobile" && session && canAccessAdminWeb(session.user.role) ? "/admin" : "/mobile";
+  const homeHref = surface !== "mobile" && session && hasAdminWebAccess(session) ? "/admin" : "/mobile";
   const denied = result.kind === "denied";
 
   return (

@@ -191,3 +191,39 @@ that already handles role/status changes.
 - 서버: `grantMemberOverride({ actorIsDeveloper })` 가 개발자면 키 정책 검사를 건너뛴다. 그대로인 것 — 차단 면역(대표 · 전무 · 개발자), `systemOnly` 키,
   자기 자신에게 걸기 금지.
 - 판정: 앱 `evaluateCapability` · DB `has_capability` 둘 다 활성 부여 · 차단 행을 키 정책과 무관하게 따른다(`docs/engineering/05-rls-permissions.md` 맨 아래).
+
+## 역할 = 기본 틀 · 사람마다 켜고 끈다 (2026-10-21)
+
+- **결정(사용자):** 역할마다 기본 틀(처음부터 켜진 권한)은 정하되, 그 밖은 **대표 · 전무 · 개발자가 사람마다** 주고 뺀다.
+  아르바이트 리더가 사무실에서 근태 · 청소 배정을 넘겨받아 관리자를 돕는 경우가 있어서, 역할 이름만으로는 못 정한다.
+- **누가:** 대표 · 전무 · 개발자 — 키 정책(`individualGrant` · `individualDeny`)과 무관하게 모든 키를 켜고 끈다(`actorBypassesKeyPolicy`).
+  그대로: 대표 · 전무 · 개발자는 차단 불가, `systemOnly`(권한 관리 자체) 불가, 자기 자신 불가, `developerOnly`(사용자 관리 위임)는 개발자만.
+- **새 키 8개**(역할 기본값):
+
+  | 키 | 기능 | 역할 기본 |
+  | --- | --- | --- |
+  | `admin_web.access` | 관리자 웹 들어가기 + 관리 ↔ 현장 모드 전환(예전 `adminWebRoles`) | 아르바이트 빼고 전원 |
+  | `attendance.manage` | 근태 관리 — 전체 출퇴근 · 정정 승인 · 수기 입력 · 근무 수정/무효 · 변경 기록 (**금액은 안 보임**) | 대표 · 전무 |
+  | `payroll.view` | 급여 보기 — 월 급여표 · 내보내기 · 추가수당 목록 · 청소 월 비교표 | 대표 · 전무 |
+  | `payroll.manage` | 급여 마감 · 마감 취소 · 추가수당 만들기/취소 | 대표 · 전무 |
+  | `wages.manage` | 시급 · 고용형태 보기와 설정 | 대표 · 전무 |
+  | `transport.manage` | 교통비 신청 보기 · 승인/반려 · 영수증 | 대표 · 전무 |
+  | `leave.approve` | 연차 결재(승인 · 반려 · 휴가계) | 대표 · 전무 |
+  | `lost_found.handle` | 분실물 상태 바꾸기 · 보관 · 반환 | 아르바이트 빼고 전원 |
+
+- **없앤 것:** 급여 담당(`memberships.attendance_payroll_admin`) · 연차 결재자(`leave_approver_role`) · 일일 보고서 허용(`profiles.can_generate_report`)
+  토글 — 위 키(`can_generate_report` 포함)의 줄로 대신한다. 컬럼은 남기되 판정에서 보지 않는다. 남아 있던 표시는 마이그레이션이 같은 키의 개인 부여로
+  옮겼다(운영은 0건 — 그날 이미 역할 기본으로 정리).
+- **근태와 급여 분리:** 직원 상세(`/admin/attendance/staff/[id]`)는 근태 관리 또는 급여 보기면 열리고, 금액 칸은 `payroll.view`, 교통비 칸은
+  `transport.manage` 일 때만 보인다. 근태 탭 메뉴도 키가 없는 탭은 숨긴다(현황 · 출근부는 누구나).
+- **역할만 보던 곳 27곳을 사람별로:** `roleCan(역할, 키)` 는 개인 부여 · 차단을 무시해서 토글이 실제로 먹지 않았다 — 게시판 관리, 청소 기록 전체 보기 ·
+  강제 완료, 린넨, 컴플레인, 운영 정보 수정, 남의 요청 삭제, 버그 검토, 공지 작성/관리, 주문 처리(차단 무시), 수리 상태(차단 무시)를
+  `session.capabilities` · `memberCapabilities` 로 바꿨다. 공지 · 주문 · 수리는 아르바이트 하드코딩도 뺐다(역할 기본으로 같은 결과).
+- **DB:** 마이그레이션 `202610210005_capability_per_person.sql`(운영 적용) — 키 시드, 표시 → 부여 이전, RLS 헬퍼를 키로
+  (`can_manage_attendance_payroll` = 근태 관리 ∨ 급여 보기, 새 `can_view_payroll` · `can_manage_transport`, `is_leave_approver` = `leave.approve`),
+  금액 · 교통비 표 정책을 각자의 키로, 분실물 UPDATE 정책을 `lost_found.handle` 로.
+- **검증:** 운영 DB 에서 리더에게 근태 관리 부여 + 분실물 차단을 걸고 그 사람으로 로그인한 상태를 흉내 내 확인(근태 표 열림 · 급여 · 교통비 막힘 ·
+  분실물 막힘) 뒤 되돌림. 로컬 빌드 + 데모 조직 계정으로 화면 확인(리더 기본: 근태 탭 현황 · 출근부만 / 근태 관리 부여 → 근태 처리 탭 생김 ·
+  시급 · 교통비 없음 / 관리자 웹 차단 → `/mobile` 로 돌려보냄 / 대표가 보는 리더 패널: 34개 키 모두 토글 가능).
+- **남은 것:** 컴플레인 · 청소 · 게시판 등의 DB 보안 규칙 일부는 아직 역할 기준(`has_org_role`) — 그런 곳의 개인 차단은 앱(화면 · 서버 액션)에서만 걸린다.
+  근태 QR · 사이트 설정은 아직 대표 전용 역할 비교.

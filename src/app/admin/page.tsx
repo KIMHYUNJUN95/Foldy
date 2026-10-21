@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { DashboardHome } from "@/components/admin/dashboard-home";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { getDictionary } from "@/lib/i18n";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession } from "@/lib/session";
@@ -26,7 +26,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   if (state.status !== "ready" || !session) {
     redirect("/onboarding");
   }
-  if (!canAccessAdminWeb(session.user.role)) {
+  if (!hasAdminWebAccess(session)) {
     redirect("/mobile");
   }
 

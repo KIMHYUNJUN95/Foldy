@@ -3,7 +3,8 @@ import "server-only";
 import type { AppSession } from "@/lib/session";
 import {
   getAttendanceReviewQueue,
-  isAttendancePayrollAdmin,
+  attendanceCan,
+  attendanceCapabilities,
   type ReviewQueueItem,
 } from "@/lib/attendance-review";
 import {
@@ -155,11 +156,7 @@ export async function getAdminAttendanceBadgeStats(
   }
 
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "attendance.manage");
   if (!privileged) {
     return { isPrivileged: false, ym, ...EMPTY_BADGE_STATS };
   }
@@ -283,11 +280,7 @@ export async function getAdminAttendanceOverview(
   }
 
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "attendance.manage");
   if (!privileged) {
     return {
       isPrivileged: false,
@@ -476,11 +469,7 @@ export async function getAdminAttendanceCorrections(
     return { isPrivileged: false, monthLabel, items: [] };
   }
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "attendance.manage");
   if (!privileged) {
     return { isPrivileged: false, monthLabel, items: [] };
   }
@@ -1106,7 +1095,7 @@ export async function getAdminAttendancePayroll(
   if (session.organization.id === "platform") return empty;
   const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(service, organizationId, session.user.id);
+  const privileged = await attendanceCan(service, organizationId, session.user.id, "payroll.view");
   if (!privileged) return empty;
 
   const firstDay = `${ym}-01`;
@@ -1211,7 +1200,7 @@ export async function listActiveAttendanceStaff(
 ): Promise<{ userId: string; userName: string }[]> {
   if (session.organization.id === "platform") return [];
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, session.organization.id, session.user.id))) {
+  if (!(await attendanceCan(service, session.organization.id, session.user.id, "attendance.manage"))) {
     return [];
   }
   const membersRes = await service
@@ -1265,11 +1254,7 @@ export async function listAttendanceAllowances(
 ): Promise<AdminAllowanceListData> {
   if (session.organization.id === "platform") return { isPrivileged: false, rows: [] };
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "payroll.view");
   if (!privileged) return { isPrivileged: false, rows: [] };
 
   const res = await service
@@ -1419,11 +1404,7 @@ export async function getAdminAttendanceTransport(
     };
   }
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "transport.manage");
   if (!privileged) {
     return {
       isPrivileged: false,
@@ -1552,11 +1533,7 @@ export async function getAdminTransportReceiptsForUser(
   if (session.organization.id === "platform") return null;
   if (!/^\d{4}-\d{2}$/.test(ym)) return null;
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "transport.manage");
   if (!privileged) return null;
 
   const monthLabel = monthLabelForYm(ym, localeTag);
@@ -1684,6 +1661,10 @@ export type AdminStaffDetailData = {
     missingCount: number;
     totalAmount: number;
   };
+  /** 급여 칸(금액 · 시급)을 보여도 되는가 — `payroll.view`. 없으면 pay 는 근무 시간만 채운다. */
+  canSeePay: boolean;
+  /** 교통비 칸을 보여도 되는가 — `transport.manage`. */
+  canSeeTransport: boolean;
   days: AdminStaffDay[];
   stats: {
     totalDays: number;
@@ -1776,6 +1757,8 @@ export async function getAdminStaffDetail(
       missingCount: 0,
       totalAmount: 0,
     },
+    canSeePay: false,
+    canSeeTransport: false,
     days: [],
     stats: { totalDays: 0, doneSessions: 0, issueSessions: 0 },
   };
@@ -1785,8 +1768,8 @@ export async function getAdminStaffDetail(
   const targetMonthDate = `${ym}-01`;
 
   // 권한 · 멤버 · 이름 · 그 달 급여 입력 · 교통비 신청서를 한 번에 시작한다. 결과는 권한 확인 뒤에만 쓴다.
-  const [privileged, memberRes, profileRes, base, trReport] = await Promise.all([
-    isAttendancePayrollAdmin(service, organizationId, session.user.id),
+  const [caps, memberRes, profileRes, base, trReport] = await Promise.all([
+    attendanceCapabilities(service, organizationId, session.user.id),
     service
       .from("memberships")
       .select("role")
@@ -1797,7 +1780,10 @@ export async function getAdminStaffDetail(
     loadPayrollMonthBase(service, organizationId, ym, userId),
     getTransportReport(service, organizationId, userId, targetMonthDate).catch(() => null),
   ]);
-  if (!privileged) return baseEmpty;
+  // 근태 관리 또는 급여 보기 중 하나면 연다. 금액(급여 칸)은 급여 보기, 교통비 칸은 교통비 처리 권한이 있을 때만 채운다(2026-10-21).
+  const canSeePay = caps.includes("payroll.view");
+  const canSeeTransport = caps.includes("transport.manage");
+  if (!caps.includes("attendance.manage") && !canSeePay) return baseEmpty;
   const member = (memberRes.data as { role: string } | null) ?? null;
   if (!member) return { ...baseEmpty, isPrivileged: true };
   const userName = (profileRes.data as { name: string } | null)?.name ?? "—";
@@ -1919,21 +1905,27 @@ export async function getAdminStaffDetail(
     prevYm,
     nextYm,
     user: { id: userId, name: userName, role: member.role },
-    pay: {
-      employment: payrollEmploymentOf(payView),
-      recognizedLabel: fmtPaidMinutes(payView.finalization?.paidMinutes ?? payView.totalPaidMinutes),
-      expectedGross: payView.finalization?.gross ?? payView.expectedGross,
-      excludedCount: payView.excludedCount,
-      primaryRate: payView.primaryRate ?? 0,
-      finalized,
-    },
-    transport: {
-      status: trStatus,
-      itemCount: trItemCount,
-      linkedCount: trLinkedCount,
-      missingCount: trMissingCount,
-      totalAmount: trTotal,
-    },
+    pay: canSeePay
+      ? {
+          employment: payrollEmploymentOf(payView),
+          recognizedLabel: fmtPaidMinutes(payView.finalization?.paidMinutes ?? payView.totalPaidMinutes),
+          expectedGross: payView.finalization?.gross ?? payView.expectedGross,
+          excludedCount: payView.excludedCount,
+          primaryRate: payView.primaryRate ?? 0,
+          finalized,
+        }
+      : { ...baseEmpty.pay, recognizedLabel: fmtPaidMinutes(payView.totalPaidMinutes) },
+    canSeePay,
+    transport: canSeeTransport
+      ? {
+          status: trStatus,
+          itemCount: trItemCount,
+          linkedCount: trLinkedCount,
+          missingCount: trMissingCount,
+          totalAmount: trTotal,
+        }
+      : baseEmpty.transport,
+    canSeeTransport,
     days,
     stats: {
       totalDays: days.length,
@@ -2028,11 +2020,7 @@ export async function getAdminAttendanceWages(
     return { isPrivileged: false, defaultEffectiveFrom, minEffectiveFrom, gapFillMinFrom: gapMin, rows: [] };
   }
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "wages.manage");
   if (!privileged) {
     return { isPrivileged: false, defaultEffectiveFrom, minEffectiveFrom, gapFillMinFrom: gapMin, rows: [] };
   }
@@ -2177,11 +2165,7 @@ export async function getAdminAttendanceQueue(
     return { isPrivileged: false, monthLabel, items: [] };
   }
   const service = getSupabaseServiceClient();
-  const privileged = await isAttendancePayrollAdmin(
-    service,
-    session.organization.id,
-    session.user.id,
-  );
+  const privileged = await attendanceCan(service, session.organization.id, session.user.id, "attendance.manage");
   if (!privileged) {
     return { isPrivileged: false, monthLabel, items: [] };
   }

@@ -457,3 +457,10 @@ hourly-staff exclusion by real
   승인 · 반려하면 열어 둔 화면의 목록 · 탭 숫자 · 근태 탭 배지가 바로 갱신된다(새 줄은 LiveWash 로 위에서 끼어든다).
 - 방식: 테이블 변경 신호만 받고 서버 렌더를 다시 받는다(공용 `AdminLiveRefresh`). 클라이언트 목록은 서버 목록이 새로 오면
   그대로 받는다(서버가 기준). DB: `docs/engineering/04-data-model.md` → 「2026-10-15 `annual_leave_requests` — Realtime 활성화」.
+
+## 결재 권한 = 권한 키 `leave.approve` (2026-10-21)
+
+결재자는 더 이상 `memberships.leave_approver_role` 표시가 아니라 권한 키 `leave.approve`(역할 기본 대표 · 전무, 사람마다 켜고 끔)로 정한다.
+`getLeaveApproverRole` · DB `is_leave_approver()` 둘 다. 휴가계 도장 칸은 예전 기본값(전무)을 그대로 쓴다. 승인자 목록 · 토글 헬퍼
+(`listAdminApprovers` · `setLeaveApprover`)와 사용자 화면의 「연차 결재자」 토글은 지웠다 — 사용자 화면의 「연차 — 결재」 줄로 켜고 끈다.
+상세 `docs/product/27-permission-override-workflow.md` 「역할 = 기본 틀」.

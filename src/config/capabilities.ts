@@ -487,11 +487,104 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+
+  // ── 2026-10-21 역할 = 기본 틀, 대표 · 전무 · 개발자가 사람마다 켜고 끈다 ──────────────────────────────
+  // 역할 이름 · 따로 붙은 표시(급여 담당 · 연차 결재자)로 고정돼 있던 것을 키로 옮겼다. 근태와 급여는 나눴다 —
+  // 근태를 넘겨받은 아르바이트 리더에게 동료 급여까지 보이면 안 된다. docs/product/27-permission-override-workflow.md
+
+  /** 관리자 웹 들어가기(+ 관리 ↔ 현장 모드 전환). 예전 `adminWebRoles`. 아르바이트만 역할로 못 받는다. */
+  "admin_web.access": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 근태 관리 — 전체 출퇴근 보기 · 정정 승인/거절 · 수기 입력 · 근무 수정/무효 · 변경 기록. 금액은 안 보인다. 예전 급여 담당 표시의 절반. */
+  "attendance.manage": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 급여 보기 — 월 급여표 · 내보내기 · 추가수당 목록 · 청소 월 비교표의 금액. */
+  "payroll.view": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 급여 마감 · 마감 취소 · 추가수당 만들기/취소. */
+  "payroll.manage": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 시급 · 고용형태 보기와 설정. */
+  "wages.manage": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 교통비 신청 보기 · 승인/반려 · 영수증. */
+  "transport.manage": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 연차 결재(승인 · 반려 · 문서). 예전 `memberships.leave_approver_role` 표시. 시급제 역할은 연차 대상이 아니지만 결재는 맡을 수 있다. */
+  "leave.approve": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 분실물 처리(상태 바꾸기 · 보관/반환). 예전 「파트타임 제외 전원」 역할 비교. */
+  "lost_found.handle": {
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
 } as const satisfies Record<string, CapabilityPolicy>;
 
 export type Capability = keyof typeof CAPABILITIES;
 
 export const CAPABILITY_KEYS = Object.keys(CAPABILITIES) as Capability[];
+
+/**
+ * 관리자 웹에 들어갈 수 있나(+ 관리 ↔ 현장 모드 전환) — 권한 키 `admin_web.access`(2026-10-21). 예전 `canAccessAdminWeb(role)`.
+ * 세션이 서버에서 계산해 실어 보낸 권한 목록만 본다(클라이언트도 같은 함수).
+ */
+export function hasAdminWebAccess(session: { capabilities: readonly string[] } | null | undefined): boolean {
+  return Boolean(session?.capabilities.includes("admin_web.access"));
+}
 
 export function isCapability(value: string): value is Capability {
   return Object.prototype.hasOwnProperty.call(CAPABILITIES, value);

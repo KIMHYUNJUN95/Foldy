@@ -1,5 +1,5 @@
 import "server-only";
-import { roleCan } from "@/config/capabilities";
+import { memberCapabilities } from "@/lib/capabilities-server";
 
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -133,8 +133,7 @@ export async function getAdminAnnouncements(
         .from("memberships")
         .select("organization_id, role, user_id")
         .eq("user_id", me.id)
-        .eq("status", "active")
-        .neq("role", "part_time_staff");
+        .eq("status", "active");
       const memberships = (membershipData ?? []) as MembershipRow[];
       for (const membership of memberships) {
         membershipRoleByOrgId.set(
@@ -162,15 +161,15 @@ export async function getAdminAnnouncements(
 
     // Mirror of the server action's `canCreateInOrganization` gate, so the console can
     // hide the composer instead of letting the user hit a forbidden on submit.
+    // 조직마다 이 사람의 권한(역할 기본 + 개인 부여 · 차단, 2026-10-21). 예전엔 역할만 봤다.
+    const capsByOrg = new Map<string, readonly string[]>(
+      isPlatformAdmin
+        ? []
+        : await Promise.all(orgIds.map(async (org) => [org, await memberCapabilities(org, me.id)] as const)),
+    );
     const creatableOrganizationIds = isPlatformAdmin
       ? orgIds
-      : orgIds.filter((org) => {
-          const role = membershipRoleByOrgId.get(org);
-          return (
-            role !== undefined &&
-            roleCan(role, "announcement.create")
-          );
-        });
+      : orgIds.filter((org) => capsByOrg.get(org)?.includes("announcement.create") ?? false);
 
     // 2. Announcements across those orgs.
     const { data: announcementData } = await service
@@ -265,12 +264,9 @@ export async function getAdminAnnouncements(
           : (orgMemberTotal[org] ?? 0);
       const readCount = Math.min(readCountById.get(row.id) ?? 0, targetTotal);
       const isAuthor = row.created_by_user_id === me.id;
-      const role = membershipRoleByOrgId.get(org);
+      const caps = capsByOrg.get(org) ?? [];
       const canManage =
-        isPlatformAdmin ||
-        (role !== undefined &&
-          role !== "part_time_staff" &&
-          (roleCan(role, "announcement.manage") || isAuthor));
+        isPlatformAdmin || caps.includes("announcement.manage") || (isAuthor && caps.includes("announcement.create"));
 
       return {
         id: row.id,

@@ -19,7 +19,7 @@ import {
 } from "@/lib/notifications/create";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { isAttendancePayrollAdmin } from "@/lib/attendance-review";
+import { attendanceCan } from "@/lib/attendance-review";
 import { runPayrollExport, type PayrollExportResult } from "@/lib/attendance-export";
 import {
   getFinalizationEligibility,
@@ -148,7 +148,7 @@ export async function setCorrectionInReview(requestId: string): Promise<ReviewAc
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
   const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, session.user.id))) {
+  if (!(await attendanceCan(service, organizationId, session.user.id, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -180,7 +180,7 @@ export async function approveCorrectionRequest(
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -457,7 +457,7 @@ export async function rejectCorrectionRequest(
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
   const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, session.user.id))) {
+  if (!(await attendanceCan(service, organizationId, session.user.id, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!comment.trim()) return { ok: false, reason: "comment_required" };
@@ -640,7 +640,7 @@ export async function createManualAttendanceSession(
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -753,7 +753,7 @@ export async function updateAttendanceSessionAdmin(
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!input.reason.trim()) return { ok: false, reason: "reason_required" };
@@ -887,7 +887,7 @@ export async function invalidateAttendanceSession(
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!reason.trim()) return { ok: false, reason: "reason_required" };
@@ -955,7 +955,7 @@ export async function restoreAttendanceSession(
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!reason.trim()) return { ok: false, reason: "reason_required" };
@@ -1059,7 +1059,7 @@ export async function finalizeAttendanceMonth(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "payroll.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!/^\d{4}-\d{2}$/.test(input.ym)) return { ok: false, reason: "invalid" };
@@ -1176,7 +1176,7 @@ export async function reopenAttendanceMonth(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "payroll.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
   if (!/^\d{4}-\d{2}$/.test(input.ym)) return { ok: false, reason: "invalid" };
@@ -1376,7 +1376,7 @@ async function buildUserPayrollExportData(
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const actorId = session.user.id;
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "payroll.view"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -1706,7 +1706,7 @@ export async function setTransportReportReview(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "transport.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -1862,7 +1862,7 @@ export async function setHourlyRate(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "wages.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -2032,7 +2032,7 @@ export async function setEmploymentType(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "wages.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -2213,7 +2213,7 @@ export async function createAttendanceAllowance(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "payroll.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -2297,7 +2297,7 @@ export async function cancelAttendanceAllowance(input: {
   const organizationId = session.organization.id;
   const actorId = session.user.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, actorId))) {
+  if (!(await attendanceCan(service, organizationId, actorId, "payroll.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -2366,7 +2366,7 @@ export async function loadAdminTransportDetail(
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
   const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, session.user.id))) {
+  if (!(await attendanceCan(service, organizationId, session.user.id, "transport.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -2631,7 +2631,7 @@ export async function loadSessionAuditTrail(sessionId: string): Promise<SessionA
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
   const organizationId = session.organization.id;
   const service = getSupabaseServiceClient();
-  if (!(await isAttendancePayrollAdmin(service, organizationId, session.user.id))) {
+  if (!(await attendanceCan(service, organizationId, session.user.id, "attendance.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
 

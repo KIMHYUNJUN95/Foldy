@@ -103,3 +103,54 @@ export async function can(input: CapabilityInput, capability: Capability): Promi
   const capabilities = await resolveCapabilities(input);
   return capabilities.includes(capability);
 }
+
+/**
+ * 조직 · 사용자만으로 그 사람의 권한을 계산한다(역할 · 플랫폼 개발자 · 부여/차단을 직접 읽음) — 세션 역할이 다른 조직 것일 수 있는
+ * 서버 액션이나 **다른 사람**을 판정할 때 쓴다(근태 · 급여 · 연차 게이트, 2026-10-21). 플랫폼 개발자는 `developer_super_admin` 으로 판정.
+ * 비활성 · 멤버 아님이면 빈 목록.
+ */
+export const memberCapabilities = cache(
+  async (organizationId: string, userId: string): Promise<readonly Capability[]> => {
+    const service = getSupabaseServiceClient();
+    const [pa, m, overrides] = await Promise.all([
+      service.from("platform_admins").select("id").eq("user_id", userId).eq("is_active", true).maybeSingle(),
+      service
+        .from("memberships")
+        .select("role, status")
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+      loadActiveOverrides(organizationId, userId),
+    ]);
+    const row = m.data as { role: string; status: string } | null;
+    const role: Role | null = pa.data ? "developer_super_admin" : row?.status === "active" ? (row.role as Role) : null;
+    return role ? computeCapabilities(role, overrides) : [];
+  },
+);
+
+/** 이 키를 가진 활성 멤버의 id — 알림 받는 사람 고르기(보이는 범위는 넓히지 않는다). 멤버십 역할 + 부여/차단으로 센다. */
+export async function memberIdsWithCapability(organizationId: string, capability: Capability): Promise<string[]> {
+  const service = getSupabaseServiceClient();
+  const [mRes, oRes] = await Promise.all([
+    service.from("memberships").select("user_id, role").eq("organization_id", organizationId).eq("status", "active"),
+    service
+      .from("membership_permission_overrides")
+      .select("user_id, effect, expires_at")
+      .eq("organization_id", organizationId)
+      .eq("permission_key", capability)
+      .is("revoked_at", null),
+  ]);
+  const overrides = ((oRes.data ?? []) as { user_id: string; effect: string; expires_at: string | null }[]).filter(
+    (r) => isActiveOverrideRow(r),
+  );
+  return ((mRes.data ?? []) as { user_id: string; role: string }[])
+    .filter((m) =>
+      evaluateCapability({
+        capability,
+        role: m.role as Role,
+        granted: overrides.some((r) => r.user_id === m.user_id && r.effect === "grant"),
+        denied: overrides.some((r) => r.user_id === m.user_id && r.effect === "deny"),
+      }),
+    )
+    .map((m) => m.user_id);
+}

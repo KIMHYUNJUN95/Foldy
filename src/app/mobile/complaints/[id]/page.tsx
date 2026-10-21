@@ -51,9 +51,9 @@ export default async function MobileComplaintDetailPage({ params }: PageProps) {
         comments={comments}
         locale={locale}
         currentUserId={session.user.id}
-        canModerate={canModerateComplaints(session.user.role)}
+        canModerate={canModerateComplaints(session)}
         canChangeStatus={canChangeStatus(session, complaint)}
-        canComment={canWriteComment(session.user.role)}
+        canComment={canWriteComment(session)}
       />
     </MobileShell>
   );

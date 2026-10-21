@@ -1,7 +1,6 @@
 import "server-only";
 
-import { canGenerateDailyReport, type Role } from "@/config/roles";
-import { hasPermissionOverride } from "@/lib/permission-overrides-server";
+import { memberCapabilities } from "@/lib/capabilities-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Json } from "@/types/database";
 
@@ -58,15 +57,8 @@ export async function postDailyReportToSlack(text: string): Promise<{ ok: true }
 
 /** 세션 없이 — 그 조직에서 활성 멤버이고, 역할이나 개인 지정으로 업무일지를 만들 수 있나. */
 export async function canSendDailyReport(organizationId: string, userId: string): Promise<boolean> {
-  const service = getSupabaseServiceClient();
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    service.from("memberships").select("role").eq("organization_id", organizationId).eq("user_id", userId).eq("status", "active").maybeSingle(),
-    service.from("profiles").select("can_generate_report").eq("id", userId).maybeSingle(),
-  ]);
-  const role = (membership as { role: Role } | null)?.role;
-  if (!role) return false;
-  if (canGenerateDailyReport(role, Boolean((profile as { can_generate_report: boolean } | null)?.can_generate_report))) return true;
-  return hasPermissionOverride(organizationId, userId, "can_generate_report");
+  // 권한 키 하나로(역할 기본 + 개인 부여 · 차단, 2026-10-21). 비활성 · 멤버 아님이면 빈 목록이라 false.
+  return (await memberCapabilities(organizationId, userId)).includes("can_generate_report");
 }
 
 /**

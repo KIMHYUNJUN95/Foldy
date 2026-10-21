@@ -41,7 +41,7 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
         beds24SyncPaused={data.beds24SyncPaused}
         blockedProperties={[]}
         buildingInfos={data.buildingInfos}
-        canEditBuildingInfo={canEditPropertyOperationInfo(session.user.role)}
+        canEditBuildingInfo={canEditPropertyOperationInfo(session)}
         currentMonth={data.currentMonth}
         dates={data.dates}
         initialLocale={data.locale}

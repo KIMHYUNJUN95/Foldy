@@ -37,7 +37,7 @@ export async function convertReviewAction(formData: FormData): Promise<void> {
   const session = await getCurrentAppSession();
   const target = redirectTarget(formData);
   if (!session) redirect("/admin/complaints");
-  if (!canWriteComplaint(session.user.role)) redirect(target);
+  if (!canWriteComplaint(session)) redirect(target);
 
   const reviewId = String(formData.get("reviewId") ?? "").trim();
   if (!reviewId) redirect(target);
@@ -89,7 +89,7 @@ export async function createManualComplaintAction(
 ): Promise<CreateComplaintResult> {
   const session = await getCurrentAppSession();
   if (!session) return { error: "forbidden" };
-  if (!canWriteComplaint(session.user.role)) return { error: "forbidden" };
+  if (!canWriteComplaint(session)) return { error: "forbidden" };
 
   const imageUrls: string[] = [];
   for (let index = 0; index < MAX_IMAGES; index += 1) {
@@ -136,7 +136,7 @@ export async function uploadManualComplaintImageAction(
 ): Promise<UploadImageResult> {
   const session = await getCurrentAppSession();
   if (!session) return { error: "forbidden" };
-  if (!canWriteComplaint(session.user.role)) return { error: "forbidden" };
+  if (!canWriteComplaint(session)) return { error: "forbidden" };
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { error: "invalid_file" };

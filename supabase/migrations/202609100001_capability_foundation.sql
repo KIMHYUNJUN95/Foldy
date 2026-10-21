@@ -152,7 +152,31 @@ insert into public.capability_roles (capability, role) values
   ('bug.review', 'office_admin'::organization_role),
   ('board.manage', 'owner'::organization_role),
   ('board.manage', 'senior_managing_director'::organization_role),
-  ('board.manage', 'office_admin'::organization_role);
+  ('board.manage', 'office_admin'::organization_role),
+  ('admin_web.access', 'owner'::organization_role),
+  ('admin_web.access', 'senior_managing_director'::organization_role),
+  ('admin_web.access', 'office_admin'::organization_role),
+  ('admin_web.access', 'cs_staff'::organization_role),
+  ('admin_web.access', 'field_manager'::organization_role),
+  ('admin_web.access', 'staff'::organization_role),
+  ('attendance.manage', 'owner'::organization_role),
+  ('attendance.manage', 'senior_managing_director'::organization_role),
+  ('payroll.view', 'owner'::organization_role),
+  ('payroll.view', 'senior_managing_director'::organization_role),
+  ('payroll.manage', 'owner'::organization_role),
+  ('payroll.manage', 'senior_managing_director'::organization_role),
+  ('wages.manage', 'owner'::organization_role),
+  ('wages.manage', 'senior_managing_director'::organization_role),
+  ('transport.manage', 'owner'::organization_role),
+  ('transport.manage', 'senior_managing_director'::organization_role),
+  ('leave.approve', 'owner'::organization_role),
+  ('leave.approve', 'senior_managing_director'::organization_role),
+  ('lost_found.handle', 'owner'::organization_role),
+  ('lost_found.handle', 'senior_managing_director'::organization_role),
+  ('lost_found.handle', 'office_admin'::organization_role),
+  ('lost_found.handle', 'cs_staff'::organization_role),
+  ('lost_found.handle', 'field_manager'::organization_role),
+  ('lost_found.handle', 'staff'::organization_role);
 
 delete from public.capability_policies;
 insert into public.capability_policies (capability, individual_grant, individual_deny, platform_bypass) values
@@ -183,7 +207,15 @@ insert into public.capability_policies (capability, individual_grant, individual
   ('complaint.comment', false, false, true),
   ('request.delete_any', false, false, true),
   ('bug.review', false, false, true),
-  ('board.manage', false, false, true);
+  ('board.manage', false, false, true),
+  ('admin_web.access', true, true, true),
+  ('attendance.manage', true, true, true),
+  ('payroll.view', true, true, true),
+  ('payroll.manage', true, true, true),
+  ('wages.manage', true, true, true),
+  ('transport.manage', true, true, true),
+  ('leave.approve', true, true, true),
+  ('lost_found.handle', true, true, true);
 -- <<< generated
 
 -- ---------------------------------------------------------------------------

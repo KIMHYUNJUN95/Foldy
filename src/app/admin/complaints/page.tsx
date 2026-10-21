@@ -107,7 +107,7 @@ export default async function AdminComplaintsPage({
   // 세 뷰가 같은 KPI 줄을 공유하므로 집계는 항상 계산한다. 리뷰 목록은 뷰와 무관하게
   // 미전환 건수 계산에 쓰이므로 함께 가져온다.
   // 등록 패널의 선택지는 작성 권한자에게만 필요하다 — 권한이 없으면 두 쿼리를 아예 돌리지 않는다.
-  const canWrite = canWriteComplaint(session.user.role);
+  const canWrite = canWriteComplaint(session);
 
   // 상세 패널은 ?review=<id> 쿼리로만 연다 — 콘솔의 나머지 상태와 같은 서버 렌더 한 번으로 끝난다.
   const reviewId = params.review?.trim() || null;
@@ -186,7 +186,7 @@ export default async function AdminComplaintsPage({
         filter={filter}
         complaints={complaints}
         comments={comments}
-        canComment={canWriteComment(session.user.role)}
+        canComment={canWriteComment(session)}
         canChangeSelectedStatus={selectedComplaint ? canChangeStatus(session, selectedComplaint) : false}
         buildingOptions={buildingOptions.map(({ value, label }) => ({ value, label }))}
         building={building?.value ?? null}
@@ -197,7 +197,7 @@ export default async function AdminComplaintsPage({
         manualPlatform={params.mp?.trim() || "all"}
         manualAuthor={params.author?.trim() || "all"}
         currentUserId={session.user.id}
-        canModerate={canModerateComplaints(session.user.role)}
+        canModerate={canModerateComplaints(session)}
         canWrite={canWrite}
         createReservations={createReservations}
         createPlaces={createPlaces}

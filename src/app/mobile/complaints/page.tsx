@@ -120,7 +120,7 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
   const from = isDate(params.from) ? params.from! : fallback.from;
   const to = isDate(params.to) ? params.to! : fallback.to;
   const rangeDays = matchPresetDays(from, to);
-  const canCreate = canWriteComplaint(session.user.role);
+  const canCreate = canWriteComplaint(session);
 
   // 보기마다 필요한 쿼리를 배지 · 미처리 건수와 같은 단계에서 시작한다(직렬로 기다리지 않는다).
   const navBadgesPromise = getMobileNavBadges();
@@ -159,7 +159,7 @@ export default async function MobileComplaintsPage({ searchParams }: PageProps) 
       params.provider === "airbnb" || params.provider === "booking" ? params.provider : undefined;
     const riskOnly = params.risk === "1";
     const page = Math.max(Number(params.page ?? "1") || 1, 1);
-    const canSync = canWriteComplaint(session.user.role);
+    const canSync = canWriteComplaint(session);
 
     // 목록은 건물 마스터만 기다린다. 객실(rl)을 고른 경우에만 그 건물의 객실 목록(집계)도 기다린다.
     const buildingOptionsPromise = listReviewBuildingOptions({ session, locale });

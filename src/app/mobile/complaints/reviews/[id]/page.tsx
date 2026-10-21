@@ -44,7 +44,7 @@ export default async function MobileReviewDetailPage({ params }: PageProps) {
       <ReviewDetail
         review={review}
         locale={locale}
-        canConvert={canWriteComplaint(session.user.role)}
+        canConvert={canWriteComplaint(session)}
         initialTranslations={translations}
       />
     </MobileShell>

@@ -1,8 +1,6 @@
 "use server";
 
-import { roleCan } from "@/config/capabilities";
 import { revalidatePath } from "next/cache";
-import type { Role } from "@/config/roles";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -20,8 +18,8 @@ function revalidateAfterDelete(kind: "lost-found" | "maintenance" | "orders") {
 
 type DeleteResult = { ok: true } | { ok: false; error: "unauthorized" | "not_found" | "delete_failed" };
 
-function canDeleteAnyRequestRecord(role: Role): boolean {
-  return roleCan(role, "request.delete_any");
+function canDeleteAnyRequestRecord(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("request.delete_any");
 }
 
 function isValidUuid(value: string) {
@@ -29,8 +27,8 @@ function isValidUuid(value: string) {
 }
 
 /** 작성자 본인이거나 관리 역할이어야 삭제할 수 있다. */
-function canDelete(role: Role, reportedByUserId: string, currentUserId: string): boolean {
-  return reportedByUserId === currentUserId || canDeleteAnyRequestRecord(role);
+function canDelete(who: { capabilities: readonly string[] }, reportedByUserId: string, currentUserId: string): boolean {
+  return reportedByUserId === currentUserId || canDeleteAnyRequestRecord(who);
 }
 
 export async function deleteLostItem(id: string): Promise<DeleteResult> {
@@ -52,7 +50,7 @@ export async function deleteLostItem(id: string): Promise<DeleteResult> {
     return { ok: false, error: "not_found" };
   }
   const owner = (existing as { reported_by_user_id: string }).reported_by_user_id;
-  if (!canDelete(session.user.role, owner, session.user.id)) {
+  if (!canDelete(session, owner, session.user.id)) {
     return { ok: false, error: "unauthorized" };
   }
 
@@ -91,7 +89,7 @@ export async function deleteMaintenanceReport(id: string): Promise<DeleteResult>
     return { ok: false, error: "not_found" };
   }
   const owner = (existing as { reported_by_user_id: string }).reported_by_user_id;
-  if (!canDelete(session.user.role, owner, session.user.id)) {
+  if (!canDelete(session, owner, session.user.id)) {
     return { ok: false, error: "unauthorized" };
   }
 
@@ -130,14 +128,14 @@ export async function deleteOrderRequest(id: string): Promise<DeleteResult> {
     return { ok: false, error: "not_found" };
   }
   const row = existing as { reported_by_user_id: string; status: string };
-  if (!canDelete(session.user.role, row.reported_by_user_id, session.user.id)) {
+  if (!canDelete(session, row.reported_by_user_id, session.user.id)) {
     return { ok: false, error: "unauthorized" };
   }
   // 상태 제약(docs/product/10-order-request-workflow.md → Status constraint):
   // 이미 외부에 발주가 나간 `ordered`/`received` 건은 관리 역할만 삭제할 수 있다 — 작성자 본인이라도 불가.
   if (
     (row.status === "ordered" || row.status === "received") &&
-    !canDeleteAnyRequestRecord(session.user.role)
+    !canDeleteAnyRequestRecord(session)
   ) {
     return { ok: false, error: "unauthorized" };
   }

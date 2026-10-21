@@ -1,4 +1,3 @@
-import { roleCan } from "@/config/capabilities";
 import { revalidatePath } from "next/cache";
 import { organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -52,7 +51,7 @@ export function canManageLinenRecord(
   record: { registeredByUserId: string },
 ): boolean {
   if (session.user.id === record.registeredByUserId) return true;
-  return roleCan(session.user.role, "linen.manage");
+  return session.capabilities.includes("linen.manage");
 }
 
 function isOrganizationRole(role: Role): boolean {

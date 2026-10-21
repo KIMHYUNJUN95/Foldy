@@ -42,7 +42,7 @@ export async function savePropertyOperationInfoAction(input: {
   data: Pick<PropertyMapMeta, "address" | "note" | "roomAccess" | "sharedAccess">;
 }): Promise<{ ok: true } | { error: string; ok: false }> {
   const session = await requireAdminSession();
-  if (!canEditPropertyOperationInfo(session.user.role)) {
+  if (!canEditPropertyOperationInfo(session)) {
     return { error: "forbidden", ok: false };
   }
 

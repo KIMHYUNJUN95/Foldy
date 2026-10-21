@@ -134,17 +134,22 @@ export function AttendanceStaffDetail({
             <div className="uhead__sv">{data.pay.recognizedLabel}</div>
             <div className="uhead__sk">{c.staffStatRecognized}</div>
           </div>
-          <div className="uhead__stat">
-            <div className="uhead__sv">{expectedDisplay}</div>
-            <div className="uhead__sk">{c.staffStatExpected}</div>
-          </div>
-          <div className="uhead__stat">
-            <div className="uhead__sv">
-              {c.yenSym}
-              {formatAdminYen(data.transport.totalAmount, localeTag)}
+          {/* 금액은 급여 보기 · 교통비 처리 권한이 있을 때만(2026-10-21 — 근태만 넘겨받은 사람에게 급여가 보이지 않게). */}
+          {data.canSeePay ? (
+            <div className="uhead__stat">
+              <div className="uhead__sv">{expectedDisplay}</div>
+              <div className="uhead__sk">{c.staffStatExpected}</div>
             </div>
-            <div className="uhead__sk">{c.staffStatTransport}</div>
-          </div>
+          ) : null}
+          {data.canSeeTransport ? (
+            <div className="uhead__stat">
+              <div className="uhead__sv">
+                {c.yenSym}
+                {formatAdminYen(data.transport.totalAmount, localeTag)}
+              </div>
+              <div className="uhead__sk">{c.staffStatTransport}</div>
+            </div>
+          ) : null}
           <div className="uhead__stat">
             <div
               className="uhead__sv"
@@ -223,13 +228,15 @@ export function AttendanceStaffDetail({
       )}
 
       {/* Payroll + Transport summary */}
+      {data.canSeePay || data.canSeeTransport ? (
+        <>
       <div className="secthead">
         <span className="secthead__t">{c.staffSecSummary}</span>
         <span className="secthead__line" />
       </div>
       <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
         {/* Payroll card */}
-        {isSalaried ? (
+        {!data.canSeePay ? null : isSalaried ? (
           <div className="card" style={{ gridColumn: "span 6" }}>
             <div className="card__h">
               <span className="card__ic bg-surf">
@@ -315,6 +322,7 @@ export function AttendanceStaffDetail({
         )}
 
         {/* Transport card */}
+        {data.canSeeTransport ? (
         <div className="card" style={{ gridColumn: "span 6" }}>
           <div className="card__h">
             <span className="card__ic bg-info">
@@ -376,7 +384,10 @@ export function AttendanceStaffDetail({
             </div>
           </div>
         </div>
+        ) : null}
       </div>
+        </>
+      ) : null}
 
       {/* Side panel — day session detail */}
       {selSession ? (

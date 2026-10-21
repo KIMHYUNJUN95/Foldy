@@ -5,7 +5,7 @@ import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import "@/components/admin/admin-console.css";
 import "@/components/admin/ops/ops-console.css";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { countOpsHistoryAlerts } from "@/lib/beds24/ops-history-alerts";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -56,7 +56,7 @@ export default async function MobileOpsCalendarPage({ searchParams }: { searchPa
   if (!hasOrganizationContext(session)) redirect("/mobile/unavailable");
   // 쓰기 액션이 `requireAdminSession`(관리자 웹 역할)을 거친다 — 개별 부여로 키만 받은 현장 역할이 들어와
   // 보기만 되고 저장에서 튕기지 않게 같은 두 조건으로 막는다.
-  if (!canAccessOpsAdmin(session) || !canAccessAdminWeb(session.user.role)) redirect("/mobile");
+  if (!canAccessOpsAdmin(session) || !hasAdminWebAccess(session)) redirect("/mobile");
 
   const dictionary = getDictionary(session.user.preferredLanguage);
   const copy = dictionary.opsAdmin.calendar;

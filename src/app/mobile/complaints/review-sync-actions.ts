@@ -49,7 +49,7 @@ export type ReviewSyncStepResult =
 
 export async function syncReviewsNowStep(input: { runId: string | null; offset: number }): Promise<ReviewSyncStepResult> {
   const session = await getCurrentAppSession();
-  if (!session || !hasOrganizationContext(session) || !canWriteComplaint(session.user.role)) {
+  if (!session || !hasOrganizationContext(session) || !canWriteComplaint(session)) {
     return { error: "forbidden", ok: false };
   }
   if (isBeds24SyncPaused()) return { error: "paused", ok: false };

@@ -126,7 +126,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
           }}
           buildingLabels={dictionary.cleaning.buildingLabels}
           currentUserId={session.user.id}
-          currentUserRole={session.user.role}
+          canDeleteAny={session.capabilities.includes("request.delete_any")}
           datePreset={datePreset}
           deleteCopy={{
             confirmTitle: dictionary.mobile.deleteConfirmTitle,

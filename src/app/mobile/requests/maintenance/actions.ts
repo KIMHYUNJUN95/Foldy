@@ -17,7 +17,7 @@ import {
   MAINTENANCE_RESOLUTION_IMAGE_LIMIT,
   type MaintenanceStatus,
 } from "@/lib/maintenance-constants";
-import { hasPermissionOverride } from "@/lib/permission-overrides-server";
+import { memberCapabilities } from "@/lib/capabilities-server";
 import { getCurrentAppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -51,8 +51,9 @@ export async function canHandleMaintenance(
   userId: string,
   role: string,
 ): Promise<boolean> {
-  if (role !== "part_time_staff") return true;
-  return hasPermissionOverride(organizationId, userId, "maintenance_status_change");
+  // 권한 키 하나로(역할 기본: 아르바이트 빼고 + 개인 부여 · 차단, 2026-10-21 — 예전엔 차단을 무시했다).
+  void role;
+  return (await memberCapabilities(organizationId, userId)).includes("maintenance_status_change");
 }
 
 /** 완료 사진 URL이 반드시 {orgId}/maintenance-resolutions/{reportId}/{file} 아래인지 검증한다. */

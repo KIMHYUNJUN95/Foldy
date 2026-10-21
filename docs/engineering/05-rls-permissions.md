@@ -1472,3 +1472,15 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 플래그에 어긋나는 행은 이전엔 만들 수 없었으므로 적용 시점의 판정 결과는 바뀌지 않는다.
 - 주의: 일부 기능은 아직 `has_capability` 가 아니라 역할 직접 비교(`has_org_role` · 앱의 `role === …`)로 막는다. 그런 곳은 개인 차단이 앱 판정
   (`evaluateCapability` 를 쓰는 화면 · 서버 액션)에만 걸린다.
+
+## 2026-10-21 근태 · 급여 · 연차 · 분실물 RLS 를 권한 키로 (마이그레이션 `202610210005_capability_per_person.sql`, 운영 적용)
+
+- `can_manage_attendance_payroll(org)` = 플랫폼 ∨ `attendance.manage` ∨ `payroll.view` — 근태 표(출퇴근 · 휴게 · 정정 · 변경 기록 · QR · 시도 기록).
+- 새 `can_view_payroll(org)` = 플랫폼 ∨ `payroll.view` ∨ `payroll.manage` ∨ `wages.manage` — `hourly_rate_history` · `employment_type_history` ·
+  `attendance_month_snapshots` · `attendance_pay_allowances` 읽기. 근태 관리만으로는 금액 표가 안 열린다.
+- 새 `can_manage_transport(org)` = 플랫폼 ∨ `transport.manage` — 교통비 3표.
+- `is_leave_approver(org)` = 플랫폼 ∨ `leave.approve`(예전 `leave_approver_role is not null`). `annual_leave_baselines` 는 결재자 ∨ 근태 표 권한.
+- `lost_items` UPDATE = 작성자 ∨ 플랫폼 ∨ `lost_found.handle`(예전 역할 목록).
+- 예전 표시 컬럼(`attendance_payroll_admin` · `leave_approver_role`)은 남지만 어떤 판정도 보지 않는다.
+- 검증: 운영에서 트랜잭션 안에 리더에게 `attendance.manage` 부여 + `lost_found.handle` 차단 → `request.jwt.claims` 로 그 사람을 흉내 →
+  근태 true · 급여 false · 교통비 false · 분실물 false 확인 후 rollback.

@@ -90,8 +90,8 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
     item.property_name,
   );
   const isTerminal = isLostItemTerminal(item.status);
-  // 상태 변경 = part_time_staff 제외 전원. 서버 액션과 RLS가 최종 게이트, 여기서는 UI만 감춘다.
-  const canHandle = session.user.role !== "part_time_staff";
+  // 상태 변경 = 권한 키 `lost_found.handle`. 서버 액션과 RLS가 최종 게이트, 여기서는 UI만 감춘다.
+  const canHandle = session.capabilities.includes("lost_found.handle");
   const clock = lostItemClock(item);
   const c = copy.console;
   const flag = clock?.isExpired ? c.expiredFlag : clock?.isDueSoon ? c.soonFlag : null;

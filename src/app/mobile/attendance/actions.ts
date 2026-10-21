@@ -18,7 +18,7 @@ import {
   resolveTrustedDevice,
 } from "@/lib/attendance-trusted-device";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { getAttendancePayrollAdminUserIds } from "@/lib/attendance-review";
+import { getMemberIdsWithCapability } from "@/lib/attendance-review";
 import { notifyAttendanceAdmins } from "@/lib/notifications/create";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
@@ -725,7 +725,7 @@ export async function createAttendanceCorrectionRequest(
   }
 
   // Admin alert: notify owner + attendance_payroll_admin (privileged only; never the requester).
-  const adminIds = await getAttendancePayrollAdminUserIds(service, organizationId);
+  const adminIds = await getMemberIdsWithCapability(service, organizationId, "attendance.manage");
   await notifyAttendanceAdmins(service, {
     organizationId,
     recipientUserIds: adminIds,

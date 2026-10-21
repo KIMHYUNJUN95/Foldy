@@ -5,7 +5,6 @@ import type { OrganizationRole, Role } from "@/config/roles";
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles } from "@/config/roles";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { setLeaveApprover } from "@/lib/annual-leave-admin-server";
 import {
   grantMemberOverride,
   revokeAllMemberOverrides,
@@ -311,79 +310,8 @@ export async function setMemberTeam(membershipId: string, teamId: string | null)
   return { ok: true };
 }
 
-export async function setMemberReportAccess(membershipId: string, grant: boolean): Promise<ActionResult> {
-  const ctx = await resolveActor(membershipId);
-  if ("error" in ctx) return { ok: false, error: ctx.error };
-  if (!(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id))) {
-    return { ok: false, error: "forbidden" };
-  }
-  const blocked = await guardProtectedTarget(ctx);
-  if (blocked) return { ok: false, error: blocked };
-  const { error } = await getSupabaseServiceClient()
-    .from("profiles")
-    .update({ can_generate_report: grant })
-    .eq("id", ctx.membership.user_id);
-  if (error) return { ok: false, error: "save_failed" };
-  await logUserAudit({
-    organizationId: ctx.membership.organization_id,
-    actorUserId: ctx.actorUserId,
-    action: "member.report_access",
-    targetId: membershipId,
-    metadata: { to: grant },
-  });
-  revalidateMember(membershipId);
-  return { ok: true };
-}
-
-export async function setMemberPayrollAdmin(membershipId: string, grant: boolean): Promise<ActionResult> {
-  const ctx = await resolveActor(membershipId);
-  if ("error" in ctx) return { ok: false, error: ctx.error };
-  if (!(await canManagePermissions(ctx.actorUserId, ctx.actorRole, ctx.membership))) {
-    return { ok: false, error: "forbidden" };
-  }
-  const blocked = await guardProtectedTarget(ctx);
-  if (blocked) return { ok: false, error: blocked };
-  const { error } = await getSupabaseServiceClient()
-    .from("memberships")
-    .update({ attendance_payroll_admin: grant })
-    .eq("id", membershipId);
-  if (error) return { ok: false, error: "save_failed" };
-  await logUserAudit({
-    organizationId: ctx.membership.organization_id,
-    actorUserId: ctx.actorUserId,
-    action: "member.payroll_admin",
-    targetId: membershipId,
-    metadata: { to: grant },
-  });
-  revalidateMember(membershipId);
-  return { ok: true };
-}
-
-export async function setMemberLeaveApprover(membershipId: string, grant: boolean): Promise<ActionResult> {
-  const ctx = await resolveActor(membershipId);
-  if ("error" in ctx) return { ok: false, error: ctx.error };
-  if (!(await canManagePermissions(ctx.actorUserId, ctx.actorRole, ctx.membership))) {
-    return { ok: false, error: "forbidden" };
-  }
-  const blocked = await guardProtectedTarget(ctx);
-  if (blocked) return { ok: false, error: blocked };
-  const result = await setLeaveApprover({
-    organizationId: ctx.membership.organization_id,
-    actorUserId: ctx.actorUserId,
-    userId: ctx.membership.user_id,
-    isApprover: grant,
-  });
-  if (!result.ok) return { ok: false, error: result.error };
-  await logUserAudit({
-    organizationId: ctx.membership.organization_id,
-    actorUserId: ctx.actorUserId,
-    action: "member.leave_approver",
-    targetId: membershipId,
-    metadata: { to: grant },
-  });
-  revalidateMember(membershipId);
-  return { ok: true };
-}
+// 급여 담당 · 연차 결재자 · 일일 보고서 표시 토글은 권한 키(`payroll.*` · `attendance.manage` · `leave.approve` ·
+// `can_generate_report`)로 옮겨 지웠다(2026-10-21) — 개인 부여 · 차단(grantPermissionOverrideAction)으로 켜고 끈다.
 
 export async function grantPermissionOverrideAction(input: {
   membershipId: string;
@@ -421,7 +349,8 @@ export async function grantPermissionOverrideAction(input: {
     expiresAt: input.expiresAt ?? null,
     // 차단 면역 판정에 대상자의 역할이 필요하다(owner·전무는 잠글 수 없다).
     targetRole: ctx.membership.role as Role,
-    actorIsDeveloper: isDeveloper(ctx.actorRole),
+    // 대표 · 전무 · 개발자는 키 정책과 무관하게 켜고 끈다(2026-10-21). 이 액션은 이미 canManagePermissions(같은 셋)로 막혀 있다.
+    actorBypassesKeyPolicy: true,
   });
   if (!result.ok) return { ok: false, error: result.error };
   await logUserAudit({

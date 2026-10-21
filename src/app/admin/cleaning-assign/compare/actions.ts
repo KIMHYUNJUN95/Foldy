@@ -6,7 +6,7 @@ import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/a
 import { buildAdminTableReportHtml } from "@/lib/admin-table-report";
 import { buildAdminTableWorkbookBase64, type AdminTableColumn, type AdminTableSheet } from "@/lib/admin-table-workbook";
 import { getMonthlyPayView } from "@/lib/attendance-pay";
-import { isAttendancePayrollAdmin } from "@/lib/attendance-review";
+import { attendanceCan } from "@/lib/attendance-review";
 import { fill, getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import { computeCompare, devText } from "@/lib/cleaning-assign/compare";
 import { loadCompareRows } from "@/lib/cleaning-assign/data";
@@ -30,7 +30,7 @@ async function buildSheet(input: ExportInput): Promise<{ meta: AdminExportMeta; 
   if (!session.capabilities.includes("cleaning.assign")) return "forbidden";
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
-  if (!(await isAttendancePayrollAdmin(supabase, organizationId, session.user.id))) return "forbidden";
+  if (!(await attendanceCan(supabase, organizationId, session.user.id, "payroll.view"))) return "forbidden";
   if (!isMonthKey(input.ym) || !(FLAG_THRESHOLD_OPTIONS as readonly number[]).includes(input.threshold)) return "invalid";
 
   const meta = buildAdminExportMeta(session);

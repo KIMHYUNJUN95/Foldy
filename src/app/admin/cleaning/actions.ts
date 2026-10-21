@@ -286,7 +286,7 @@ export async function forceCompleteCleaningSession(
   input: ForceCompleteCleaningInput,
 ): Promise<ForceCompleteCleaningResult> {
   const session = await requireAdminSession();
-  if (!canForceCompleteCleaning(session.user.role)) {
+  if (!canForceCompleteCleaning(session)) {
     return { ok: false, reason: "forbidden" };
   }
 

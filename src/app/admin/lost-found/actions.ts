@@ -7,9 +7,7 @@
 //
 // 일반 처리는 콘솔의 능동 처리 존(반환/폐기/보관연장)에서 하고, 상태 정정은 잘못된 자동/수동 상태를
 // 관리자가 되돌리는 예외 경로다. 청소 강제완료와 같은 역할 게이트(canForceCompleteCleaning)를 쓴다.
-import { roleCan } from "@/config/capabilities";
 import { revalidatePath } from "next/cache";
-import type { Role } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { canForceCompleteCleaning } from "@/lib/cleaning";
 import {
@@ -54,7 +52,7 @@ function revalidateItem(itemId: string) {
 // 관리자 예외 개입(반환/폐기/연장/정정)의 공통 진입 가드: 세션 · 역할 게이트 · UUID.
 async function requireLostFoundAction(itemId: string) {
   const session = await requireAdminSession();
-  if (!canForceCompleteCleaning(session.user.role)) {
+  if (!canForceCompleteCleaning(session)) {
     return { ok: false as const, result: { ok: false, reason: "forbidden" } as LostActionResult };
   }
   if (!isValidUUID(itemId)) {
@@ -280,8 +278,8 @@ export async function restoreLostItem(input: {
   return { ok: true };
 }
 
-function canDeleteAnyLostItem(role: Role): boolean {
-  return roleCan(role, "request.delete_any");
+function canDeleteAnyLostItem(who: { capabilities: readonly string[] }): boolean {
+  return who.capabilities.includes("request.delete_any");
 }
 
 export async function deleteLostItemById(
@@ -304,7 +302,7 @@ export async function deleteLostItemById(
     return { ok: false, error: "not_found" };
   }
   const owner = (existing as { reported_by_user_id: string }).reported_by_user_id;
-  if (owner !== session.user.id && !canDeleteAnyLostItem(session.user.role)) {
+  if (owner !== session.user.id && !canDeleteAnyLostItem(session)) {
     return { ok: false, error: "unauthorized" };
   }
 

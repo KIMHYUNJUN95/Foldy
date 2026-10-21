@@ -8,6 +8,7 @@ import {
   canBeDenied,
   capabilityPolicy,
   evaluateCapability,
+  type Capability,
 } from "@/config/capabilities";
 import { organizationRoles } from "@/config/roles";
 import {
@@ -226,5 +227,39 @@ describe("판정식", () => {
         `${capability}`,
       ).toBe(policy.individualGrant);
     }
+  });
+});
+
+// 2026-10-21 — 역할 = 기본 틀, 대표 · 전무 · 개발자가 사람마다 켜고 끈다. 역할 이름 · 표시로 고정돼 있던 권한을 키로 옮겼다.
+describe("역할 기본 틀 — 옮겨 온 키", () => {
+  type OrgRole = (typeof organizationRoles)[number];
+  const can = (role: OrgRole, capability: Capability, over: { granted?: boolean; denied?: boolean } = {}) =>
+    evaluateCapability({ capability, role, granted: over.granted ?? false, denied: over.denied ?? false });
+
+  it("관리자 웹 · 분실물 처리는 아르바이트만 역할로 못 받는다(예전과 같음)", () => {
+    for (const role of organizationRoles) {
+      expect(can(role, "admin_web.access"), role).toBe(role !== "part_time_staff");
+      expect(can(role, "lost_found.handle"), role).toBe(role !== "part_time_staff");
+    }
+  });
+
+  it("근태 · 급여 · 시급 · 교통비 · 연차 결재는 역할로는 대표 · 전무만", () => {
+    const keys: Capability[] = ["attendance.manage", "payroll.view", "payroll.manage", "wages.manage", "transport.manage", "leave.approve"];
+    for (const capability of keys) {
+      for (const role of organizationRoles) {
+        expect(can(role, capability), `${capability} ${role}`).toBe(role === "owner" || role === "senior_managing_director");
+      }
+    }
+  });
+
+  it("근태 관리를 받은 아르바이트 리더에게 급여 보기는 따라오지 않는다", () => {
+    expect(can("staff", "attendance.manage", { granted: true })).toBe(true);
+    expect(can("staff", "payroll.view")).toBe(false);
+  });
+
+  it("역할로 받은 기본 기능도 사람마다 끌 수 있고, 대표 · 전무는 못 끈다", () => {
+    expect(can("staff", "admin_web.access", { denied: true })).toBe(false);
+    expect(can("owner", "attendance.manage", { denied: true })).toBe(true);
+    expect(can("senior_managing_director", "payroll.view", { denied: true })).toBe(true);
   });
 });

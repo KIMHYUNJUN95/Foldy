@@ -75,15 +75,8 @@ export const fieldOperationRoles = [
   ...fieldModeRoles,
 ] as const satisfies readonly Role[];
 
-export function canAccessAdminWeb(role: Role) {
-  return (adminWebRoles as readonly Role[]).includes(role);
-}
-
-// Every role except part_time_staff can switch between admin and field modes. (field_manager/staff can
-// now reach the admin web, so they must also be able to switch back to field mode.)
-export function canSwitchToFieldMode(role: Role) {
-  return role !== "part_time_staff";
-}
+// 관리자 웹 진입 · 모드 전환은 권한 키 `admin_web.access` 로 옮겼다(2026-10-21, `hasAdminWebAccess`). `adminWebRoles` 는
+// 그 키의 역할 기본값과 같은 목록이고, 공지 대상 필터처럼 「역할 묶음」이 필요한 곳만 쓴다.
 
 /**
  * The surface a role LANDS on by default — separate from what it can *access*. Field roles
@@ -111,17 +104,8 @@ export function canViewRoster(): boolean {
   return true;
 }
 
-/**
- * Whether a user may generate the daily work-report (Todo 완료/기록 tab).
- *
- * Staff-only feature: every regular staff member qualifies (any role except `part_time_staff`),
- * and individual part-timers can be granted access via the per-user `can_generate_report` flag
- * (toggled by owner/office_admin in admin user management). This keeps the few part-timers who work
- * in a management capacity covered without promoting their role.
- */
-export function canGenerateDailyReport(role: Role, reportFlag: boolean): boolean {
-  return role !== "part_time_staff" || reportFlag;
-}
+// 일일 업무일지 생성은 권한 키 `can_generate_report` 로만 판정한다(2026-10-21) — 예전 `profiles.can_generate_report` 표시는
+// 마이그레이션에서 개인 부여로 옮겼다.
 
 /**
  * The 5 user-facing invite categories shown during onboarding.

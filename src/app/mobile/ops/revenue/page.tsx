@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { MobileRevenue } from "@/components/mobile/ops/mobile-revenue";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { MobileShell } from "@/components/shell/mobile-shell";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { toJstDateString } from "@/lib/admin-calendar-dashboard";
 import { adminLocaleTag } from "@/lib/admin-export-meta";
 import { getDictionary } from "@/lib/i18n";
@@ -38,7 +38,7 @@ export default async function MobileRevenuePage({ searchParams }: { searchParams
   if (state.status === "unauthenticated") redirect(`/auth/login?next=${encodeURIComponent(BASE_PATH)}`);
   if (state.status !== "ready" || !session) redirect("/onboarding");
   if (!hasOrganizationContext(session)) redirect("/mobile/unavailable");
-  if (!canAccessOpsAdmin(session) || !canAccessAdminWeb(session.user.role)) redirect("/mobile");
+  if (!canAccessOpsAdmin(session) || !hasAdminWebAccess(session)) redirect("/mobile");
 
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);

@@ -21,7 +21,7 @@ import { getCurrentAppSession } from "@/lib/session";
 import { getDictionary, localizedNavigationLabels } from "@/lib/i18n";
 import { resolveBottomNavItems } from "@/config/navigation";
 import { adminLocaleTag } from "@/lib/admin-export-meta";
-import { canAccessAdminWeb } from "@/config/roles";
+import { hasAdminWebAccess } from "@/config/capabilities";
 import { updateAccountProfile } from "@/app/account/actions";
 import { signOut } from "@/app/auth/actions";
 
@@ -56,7 +56,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const requestedMode = firstParam(params?.mode);
   const shellMode =
     requestedMode === "mobile" ||
-    (requestedMode === "admin" && canAccessAdminWeb(session.user.role))
+    (requestedMode === "admin" && hasAdminWebAccess(session))
       ? requestedMode
       : session.user.preferredMode;
   const errorKey = firstParam(params?.error);

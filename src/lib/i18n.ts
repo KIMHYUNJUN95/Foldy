@@ -3963,6 +3963,38 @@ const FALLBACK_DICTIONARY = {
             label: "Board — manage posts",
             desc: "Delete or pin posts and comments by others",
           },
+          "admin_web.access": {
+            label: "Admin web — enter",
+            desc: "Open the admin web and switch between admin and field mode",
+          },
+          "attendance.manage": {
+            label: "Attendance — manage",
+            desc: "See everyone’s attendance, approve corrections, manual entries, edit or void shifts (no pay amounts)",
+          },
+          "payroll.view": {
+            label: "Payroll — view",
+            desc: "Monthly payroll table, exports, extra-pay list, pay in the cleaning comparison",
+          },
+          "payroll.manage": {
+            label: "Payroll — close",
+            desc: "Close and reopen months, create or cancel extra pay",
+          },
+          "wages.manage": {
+            label: "Hourly rate · employment type",
+            desc: "View and set hourly rates and employment types",
+          },
+          "transport.manage": {
+            label: "Transport costs — handle",
+            desc: "View, approve or return transport-cost claims and receipts",
+          },
+          "leave.approve": {
+            label: "Annual leave — approve",
+            desc: "Approve or reject leave requests and issue the leave form",
+          },
+          "lost_found.handle": {
+            label: "Lost & found — handle",
+            desc: "Change status, store and return lost items",
+          },
         } as Record<string, { label: string; desc: string }>,
       },
     },
@@ -12003,6 +12035,38 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
               label: "게시판 — 글 관리",
               desc: "남이 쓴 게시글 · 댓글 삭제 · 고정",
             },
+            "admin_web.access": {
+              label: "관리자 웹 — 들어가기",
+              desc: "관리자 웹 열기 · 관리 ↔ 현장 모드 전환",
+            },
+            "attendance.manage": {
+              label: "근태 — 관리",
+              desc: "전체 출퇴근 보기 · 정정 승인 · 수기 입력 · 근무 수정/무효 (금액은 안 보임)",
+            },
+            "payroll.view": {
+              label: "급여 — 보기",
+              desc: "월 급여표 · 내보내기 · 추가수당 목록 · 청소 비교표 금액",
+            },
+            "payroll.manage": {
+              label: "급여 — 마감",
+              desc: "월 마감 · 마감 취소 · 추가수당 만들기/취소",
+            },
+            "wages.manage": {
+              label: "시급 · 고용형태",
+              desc: "시급 · 고용형태 보기와 설정",
+            },
+            "transport.manage": {
+              label: "교통비 — 처리",
+              desc: "교통비 신청 보기 · 승인/반려 · 영수증",
+            },
+            "leave.approve": {
+              label: "연차 — 결재",
+              desc: "연차 신청 승인 · 반려 · 휴가계 문서",
+            },
+            "lost_found.handle": {
+              label: "분실물 — 처리",
+              desc: "분실물 상태 바꾸기 · 보관 · 반환",
+            },
           },
         },
       },
@@ -19912,6 +19976,38 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "board.manage": {
               label: "掲示板 — 投稿の管理",
               desc: "他の人の投稿・コメントを削除・固定",
+            },
+            "admin_web.access": {
+              label: "管理Web — 入る",
+              desc: "管理Webを開く・管理/現場モードの切り替え",
+            },
+            "attendance.manage": {
+              label: "勤怠 — 管理",
+              desc: "全員の出退勤・修正の承認・手入力・勤務の修正/無効（金額は見えない）",
+            },
+            "payroll.view": {
+              label: "給与 — 閲覧",
+              desc: "月の給与表・書き出し・追加手当一覧・清掃比較の金額",
+            },
+            "payroll.manage": {
+              label: "給与 — 締め",
+              desc: "月の締め・締め解除・追加手当の作成/取消",
+            },
+            "wages.manage": {
+              label: "時給・雇用形態",
+              desc: "時給・雇用形態の閲覧と設定",
+            },
+            "transport.manage": {
+              label: "交通費 — 処理",
+              desc: "交通費申請の閲覧・承認/差し戻し・領収書",
+            },
+            "leave.approve": {
+              label: "年休 — 決裁",
+              desc: "年休申請の承認・却下・休暇届",
+            },
+            "lost_found.handle": {
+              label: "落とし物 — 処理",
+              desc: "落とし物の状態変更・保管・返却",
             },
           },
         },

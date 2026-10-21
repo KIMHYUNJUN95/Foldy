@@ -1,4 +1,4 @@
-import { roleCan, rolesWithCapability } from "@/config/capabilities";
+import { rolesWithCapability } from "@/config/capabilities";
 import {
   canAccessFieldOperations,
   type Role,
@@ -36,13 +36,13 @@ export const cleaningOperatingTimeZone = "Asia/Tokyo";
  * 모르고 그리면 **남이 끝낸 청소가 "기록 없음"으로 보여** 빠뜨린 청소처럼 읽힌다. 그래서 권한이
  * 없는 사람에게는 "없음"을 단정하지 않는다(2026-08-04).
  */
-export function canReadAllCleaningSessions(role: string) {
-  return roleCan(role, "cleaning.read_all");
+export function canReadAllCleaningSessions(who: { capabilities: readonly string[] }) {
+  return who.capabilities.includes("cleaning.read_all");
 }
 
 /** 관리자 대리 완료(강제 완료) — 권한 키 `cleaning.force_complete`. docs/product/07-cleaning-workflow.md → 강제완료 스펙. */
-export function canForceCompleteCleaning(role: string) {
-  return roleCan(role, "cleaning.force_complete");
+export function canForceCompleteCleaning(who: { capabilities: readonly string[] }) {
+  return who.capabilities.includes("cleaning.force_complete");
 }
 
 export function isCleaningTaskKey(

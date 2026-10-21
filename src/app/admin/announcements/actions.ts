@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import type { OrganizationRole, Role } from "@/config/roles";
+import type { OrganizationRole } from "@/config/roles";
 import { organizationRoles } from "@/config/roles";
-import { roleCan } from "@/config/capabilities";
+import { memberCapabilities } from "@/lib/capabilities-server";
 import { getPublicSupabaseEnv } from "@/lib/env";
 import { getAnnouncementReadSummary } from "@/lib/announcements";
 import { createImportantAnnouncementNotifications } from "@/lib/notifications/create";
@@ -80,21 +80,8 @@ async function canCreateInOrganization(
     return true;
   }
 
-  const { data } = await getSupabaseServiceClient()
-    .from("memberships")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .neq("role", "part_time_staff")
-    .maybeSingle();
-
-  const membership = data as { role: Role } | null;
-
-  return Boolean(
-    membership &&
-      roleCan(membership.role, "announcement.create"),
-  );
+  // 권한 키 `announcement.create` — 역할 기본(아르바이트 빼고) + 개인 부여 · 차단(2026-10-21).
+  return (await memberCapabilities(organizationId, userId)).includes("announcement.create");
 }
 
 async function getAnnouncement(announcementId: string) {
@@ -128,41 +115,11 @@ async function canManageAnnouncement(
     return true;
   }
 
-  // All other users must have an active membership in the announcement's organization.
-  // We fetch the role so we can apply per-role rules in one query.
-  const { data } = await getSupabaseServiceClient()
-    .from("memberships")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("organization_id", announcement.organization_id)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!data) {
-    return false;
-  }
-
-  const membershipRole = (data as { role: Role }).role;
-
-  // owner / office_admin can manage any announcement in their organization.
-  if (
-    membershipRole === "owner" ||
-    membershipRole === "senior_managing_director" ||
-    membershipRole === "office_admin"
-  ) {
-    return true;
-  }
-
-  // Announcement authors can manage their own announcements only if they still
-  // hold an active, non-part_time_staff membership in the organization.
-  if (
-    membershipRole !== "part_time_staff" &&
-    announcement.created_by_user_id === userId
-  ) {
-    return true;
-  }
-
-  return false;
+  // 권한 키로 판정(2026-10-21) — 남의 공지까지 = `announcement.manage`(역할 기본 대표 · 전무 · 오피스),
+  // 내 공지 = 작성 권한 `announcement.create` 이 아직 있을 때. 비활성 · 멤버 아님이면 빈 목록이라 false.
+  const caps = await memberCapabilities(announcement.organization_id, userId);
+  if (caps.includes("announcement.manage")) return true;
+  return announcement.created_by_user_id === userId && caps.includes("announcement.create");
 }
 
 function normalizeTargetRoles(formData: FormData) {

@@ -57,7 +57,7 @@ export default async function AdminCleaningPage({
         initialHistory={history}
         initialHistoryFrom={range.from}
         initialHistoryTo={range.to}
-        canForceComplete={canForceCompleteCleaning(session.user.role)}
+        canForceComplete={canForceCompleteCleaning(session)}
       />
     </AdminShell>
   );

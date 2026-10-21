@@ -3,22 +3,25 @@ import type { ReactNode } from "react";
 import { ChartColumn, Clock, Bus, Tags, Users, Wallet, Plane } from "lucide-react";
 import { AdminDatePicker } from "../shared/admin-date-picker";
 import { AdminMonthPicker } from "../shared/admin-month-picker";
+import type { Capability } from "@/config/capabilities";
 import type { Dictionary } from "@/lib/i18n";
+import { getCurrentAppSession } from "@/lib/session";
 
 type Tab = "overview" | "roster" | "queue" | "payroll" | "transport" | "wages" | "leave";
 type Att = Dictionary["admin"]["attendanceConsole"];
 
-const TABS: { id: Tab; href: string; icon: ReactNode; labelKey: keyof Att }[] = [
+/** `needs` — 이 탭을 보이게 하는 권한 키(하나라도 있으면). 없으면 누구나(현황 · 출근부). 2026-10-21 근태 · 급여 키 분리. */
+const TABS: { id: Tab; href: string; icon: ReactNode; labelKey: keyof Att; needs?: Capability[] }[] = [
   { id: "overview", href: "/admin/attendance", icon: <ChartColumn />, labelKey: "tabOverview" },
-  { id: "queue", href: "/admin/attendance/queue", icon: <Clock />, labelKey: "tabQueue" },
-  { id: "payroll", href: "/admin/attendance/payroll", icon: <Wallet />, labelKey: "tabPayroll" },
-  { id: "wages", href: "/admin/attendance/wages", icon: <Tags />, labelKey: "tabWages" },
-  { id: "transport", href: "/admin/attendance/transport", icon: <Bus />, labelKey: "tabTransport" },
+  { id: "queue", href: "/admin/attendance/queue", icon: <Clock />, labelKey: "tabQueue", needs: ["attendance.manage"] },
+  { id: "payroll", href: "/admin/attendance/payroll", icon: <Wallet />, labelKey: "tabPayroll", needs: ["payroll.view"] },
+  { id: "wages", href: "/admin/attendance/wages", icon: <Tags />, labelKey: "tabWages", needs: ["wages.manage"] },
+  { id: "transport", href: "/admin/attendance/transport", icon: <Bus />, labelKey: "tabTransport", needs: ["transport.manage"] },
   { id: "roster", href: "/admin/attendance/roster", icon: <Users />, labelKey: "tabRoster" },
-  { id: "leave", href: "/admin/attendance/leave", icon: <Plane />, labelKey: "tabLeave" },
+  { id: "leave", href: "/admin/attendance/leave", icon: <Plane />, labelKey: "tabLeave", needs: ["leave.approve"] },
 ];
 
-export function AttendanceSubnav({
+export async function AttendanceSubnav({
   active,
   monthLabel,
   c,
@@ -46,6 +49,10 @@ export function AttendanceSubnav({
   };
 }) {
   const suffix = ym ? `?ym=${ym}` : "";
+  const session = await getCurrentAppSession();
+  const caps = session?.capabilities ?? [];
+  // 지금 보고 있는 탭은 권한이 없어도 남긴다(그 화면이 「권한 없음」을 그린다).
+  const tabs = TABS.filter((t) => t.id === active || !t.needs || t.needs.some((k) => caps.includes(k)));
   const activeTab = TABS.find((tab) => tab.id === active);
   const pickerBasePath = monthPickerBasePath ?? activeTab?.href ?? "/admin/attendance";
 
@@ -89,7 +96,7 @@ export function AttendanceSubnav({
 
   return (
     <div className="subnav" role="tablist" aria-label={c.crumb}>
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const badge = badges?.[t.id];
         const label = c[t.labelKey] as string;
         return (

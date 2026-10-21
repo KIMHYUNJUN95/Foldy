@@ -3,7 +3,7 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { AssignCompare } from "@/components/admin/cleaning-assign/assign-compare";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getMonthlyPayView } from "@/lib/attendance-pay";
-import { isAttendancePayrollAdmin } from "@/lib/attendance-review";
+import { attendanceCan } from "@/lib/attendance-review";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import { isMonthKey, monthOf } from "@/lib/cleaning-assign/day-state";
@@ -20,7 +20,7 @@ export default async function AdminCleaningAssignComparePage({ searchParams }: {
   if (!session.capabilities.includes("cleaning.assign")) redirect("/admin");
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
-  if (!(await isAttendancePayrollAdmin(supabase, organizationId, session.user.id))) redirect("/admin/cleaning-assign");
+  if (!(await attendanceCan(supabase, organizationId, session.user.id, "payroll.view"))) redirect("/admin/cleaning-assign");
   const locale = session.user.preferredLanguage;
   const copy = getCleaningAssignCopy(locale);
   const ym = isMonthKey(params.ym) ? params.ym! : monthOf(getCleaningOperatingDateKey());

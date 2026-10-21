@@ -2449,6 +2449,7 @@ export type Database = {
           origin_date: string
           property_name: string
           reason: string | null
+          removed_user_ids: string[]
           room_key: string
           room_label: string
           until_date: string | null
@@ -2461,6 +2462,7 @@ export type Database = {
           origin_date: string
           property_name: string
           reason?: string | null
+          removed_user_ids?: string[]
           room_key: string
           room_label: string
           until_date?: string | null
@@ -2473,6 +2475,7 @@ export type Database = {
           origin_date?: string
           property_name?: string
           reason?: string | null
+          removed_user_ids?: string[]
           room_key?: string
           room_label?: string
           until_date?: string | null

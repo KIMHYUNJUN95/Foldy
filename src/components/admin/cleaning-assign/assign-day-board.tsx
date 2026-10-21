@@ -115,8 +115,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     });
   }
 
-  // 미루기 · 처리 끝 — 5초 「실행 취소」(뺀 배정까지 되돌린다). 지난 뒤에는 방 줄의 「되돌리기」.
-  const [undo, setUndo] = useState<{ stamp: number; message: string; roomKey: string; originDate: string; restore: string[] } | null>(null);
+  // 미루기 · 처리 끝 — 5초 「실행 취소」. 지난 뒤에는 방 줄의 「되돌리기」(둘 다 뺀 배정까지 다시 넣는다).
+  const [undo, setUndo] = useState<{ stamp: number; message: string; roomKey: string; originDate: string } | null>(null);
   function hold(room: { roomKey: string; propertyName: string; roomLabel: string }, input: { originDate: string; kind: "defer" | "resolved"; untilDate?: string; reason?: string }) {
     const name = room.roomLabel === room.propertyName ? label(room.propertyName) : `${label(room.propertyName)} ${room.roomLabel}`;
     startTransition(async () => {
@@ -126,7 +126,6 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         setUndo({
           message: input.kind === "resolved" ? fill(copy.heldResolved, { room: name }) : fill(copy.heldDeferred, { date: shortDate(input.untilDate ?? nextDay(board.date)), room: name }),
           originDate: input.originDate,
-          restore: result.removed,
           roomKey: room.roomKey,
           stamp: Date.now(),
         });
@@ -688,7 +687,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           onUndo={() => {
             const target = undo;
             setUndo(null);
-            run(() => releaseHold({ date: board.date, originDate: target.originDate, restore: target.restore, roomKey: target.roomKey }), copy.heldUndone);
+            run(() => releaseHold({ date: board.date, originDate: target.originDate, roomKey: target.roomKey }), copy.heldUndone);
           }}
         />
       ) : null}

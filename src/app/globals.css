@@ -142,9 +142,19 @@ summary,
   }
 }
 
-/* iOS-style route transitions for /mobile/* (driven by src/app/mobile/template.tsx).
-   Forward = push in from the right; back = pop in from the left. A subtle slide + fade (not a full
-   100% slide) so nothing reveals blank canvas behind the incoming screen. Honors reduced-motion. */
+/* Screen entrances for /mobile/* (2026-10-21 — driven by MobileShell, was src/app/mobile/template.tsx).
+   Only the CONTENT column ([data-shell-column]) moves; the tab bar and top bar are redrawn in the same place, so they
+   read as fixed chrome like a native tab bar. Forward = push in from the right; back = pop in from the left (a subtle
+   slide + fade, not a full 100% slide, so nothing reveals blank canvas). Tab switch = a short fade in place (native tab
+   bars never slide). Reveal = the real screen replacing a placeholder shell that already played the push. */
+@keyframes screen-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 @keyframes screen-push-in {
   from {
     opacity: 0.5;
@@ -173,9 +183,17 @@ summary,
   animation: screen-pop-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both;
   will-change: transform, opacity;
 }
+.screen-tab {
+  animation: screen-fade-in 160ms ease-out both;
+}
+.screen-reveal {
+  animation: screen-fade-in 200ms ease-out both;
+}
 @media (prefers-reduced-motion: reduce) {
   .screen-push,
-  .screen-pop {
+  .screen-pop,
+  .screen-tab,
+  .screen-reveal {
     animation: none;
   }
 }

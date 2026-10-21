@@ -11,9 +11,12 @@ import { consumeRecentTraverse } from "@/lib/swipe-back/history-tracker";
  *   browser already animated the traversal itself (Safari edge swipe — `PopStateEvent.hasUAVisualTransition`), we play
  *   nothing, for the same double-animation reason.
  *
- * The template consumes the value once on mount, then it resets to "forward".
+ * - **"tab"** — set by the bottom tab bar, side menu and rail (2026-10-21): switching sections is a tab switch, not a
+ *   push — native tab bars swap the content in place (a short fade), they never slide the screen in.
+ *
+ * The mobile shell consumes the value once on mount (`consumeScreenEntrance`), then it resets to "forward".
  */
-export type NavDirection = "forward" | "back" | "none";
+export type NavDirection = "forward" | "back" | "none" | "tab";
 
 let pending: NavDirection | null = null;
 let stampedAt = 0;
@@ -43,4 +46,39 @@ export function consumeNavDirection(): NavDirection {
   if (traverse?.direction === "back") return traverse.uaVisual ? "none" : "back";
   if (traverse?.direction === "forward") return traverse.uaVisual ? "none" : "forward";
   return "forward";
+}
+
+/**
+ * How a mobile screen enters — the nav direction, or **"reveal"** when a placeholder shell (`loading.tsx` →
+ * `MobileShellPlaceholder`) already played the entrance for this path and the real screen only needs to fade its content in.
+ * `"same"` = the shell remounted on the same path (search-param change etc.) — no animation, no scroll restore change.
+ *
+ * Placeholder → real: the direction is consumed by the placeholder (it shows right after the tap — the push starts
+ * immediately, like a native app), remembered with its path, and the real screen of that path takes "reveal" plus the
+ * remembered direction (so the scroll restore still knows it was a back navigation). A second placeholder for the same
+ * path (outer `/mobile` boundary, then the section's own) takes "none".
+ */
+export type ScreenEntrance = { kind: NavDirection | "reveal" | "same"; direction: NavDirection };
+
+let placeholderFor: { path: string; direction: NavDirection } | null = null;
+let lastScreenPath: string | null = null;
+
+export function consumeScreenEntrance(path: string, placeholder: boolean): ScreenEntrance {
+  if (placeholder) {
+    if (placeholderFor?.path === path) return { kind: "none", direction: placeholderFor.direction };
+    const direction = path === lastScreenPath ? "none" : consumeNavDirection();
+    placeholderFor = { path, direction };
+    return { kind: direction, direction };
+  }
+  const pending = placeholderFor;
+  placeholderFor = null;
+  const previous = lastScreenPath;
+  lastScreenPath = path;
+  if (pending?.path === path) return { kind: "reveal", direction: pending.direction };
+  if (previous === path) {
+    clearNavDirection();
+    return { kind: "same", direction: "none" };
+  }
+  const direction = consumeNavDirection();
+  return { kind: direction, direction };
 }

@@ -29,6 +29,7 @@ import {
 } from "@/config/navigation";
 import { canAccessAdminWeb } from "@/config/roles";
 import { haptic } from "@/lib/haptics";
+import { consumeScreenEntrance, setNavDirection, type ScreenEntrance } from "@/lib/nav-direction";
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import "@/components/shell/pull-refresh.css";
@@ -61,7 +62,32 @@ type MobileShellProps = {
    * 목록 화면 — 태블릿 가로에서 목록 · 상세 2분할(`SplitList`)을 쓰므로 그 폭에서는 본문 폭 제한을 푼다(폴드는 760px 그대로).
    */
   split?: boolean;
+  /**
+   * 로딩 자리 셸(`MobileShellPlaceholder` ← `loading.tsx`, 2026-10-21). 화면 데이터가 오기 전에 탭바 · 위 줄을 그대로 둔 채
+   * 들어오는 전환을 먼저 시작한다. 스와이프 뒤로가기 · 밑그림 · 스크롤 위치 저장은 하지 않는다(진짜 화면이 한다).
+   */
+  placeholder?: boolean;
 };
+
+/**
+ * 화면 들어오는 움직임(2026-10-21 네이티브 점검) — **본문 칸만** 움직인다. 탭바 · 위 줄은 화면마다 같은 자리에 같은 모양으로
+ * 다시 그려지므로 움직이지 않으면 고정돼 보인다(네이티브 탭바처럼). 키프레임은 globals.css.
+ */
+const ENTRANCE_CLASS: Partial<Record<ScreenEntrance["kind"], string>> = {
+  back: "screen-pop",
+  forward: "screen-push",
+  reveal: "screen-reveal",
+  tab: "screen-tab",
+};
+
+/** 로딩 자리 셸이 진짜 화면의 모양을 흉내 내도록 — 경로별로 마지막에 그린 셸 설정 · 마지막 배지. */
+type ShellHint = Pick<MobileShellProps, "activeItem" | "hideBottomNav" | "title" | "wide" | "split">;
+const SHELL_HINTS = new Map<string, ShellHint>();
+let lastBadges: Partial<Record<string, number>> = {};
+
+export function getShellHint(pathname: string): { hint: ShellHint | undefined; badges: Partial<Record<string, number>> } {
+  return { badges: lastBadges, hint: SHELL_HINTS.get(pathname) };
+}
 
 const PULL_THRESHOLD = 72;
 const MAX_PULL = 120;
@@ -129,6 +155,7 @@ export function MobileShell({
   hideBottomNav = false,
   wide = false,
   split = false,
+  placeholder = false,
 }: MobileShellProps) {
   const lastScrollYRef = useRef(0);
   const hideAccumRef = useRef(0);
@@ -154,6 +181,9 @@ export function MobileShell({
    */
   const [contentKey, setContentKey] = useState(0);
   const pathname = usePathname();
+  const [entrance] = useState(() => consumeScreenEntrance(pathname, placeholder));
+  const [entranceDone, setEntranceDone] = useState(false);
+  const entranceClass = entranceDone ? undefined : ENTRANCE_CLASS[entrance.kind];
   const scrollElRef = useRef<HTMLDivElement | null>(null);
   /**
    * 위 줄 작은 제목(HIG 다듬기 2차, 2026-10-19 — iOS Large Title). 화면의 큰 제목(`[data-large-title]` 또는 첫 `h1`)이
@@ -304,6 +334,7 @@ export function MobileShell({
 
   const handleContentScroll = (event: UIEvent<HTMLDivElement>) => {
     const top = event.currentTarget.scrollTop;
+    if (placeholder) return requestVisibilityUpdate(top);
     const key = routeKey();
     // Remember where we are for back-nav restore. Re-set after delete to keep this key the most
     // recent (Map preserves insertion order) and cap the Map so it can't grow unbounded.
@@ -318,15 +349,26 @@ export function MobileShell({
   // Restore the saved scroll position for this route on mount (native back-nav behavior). Runs once
   // per shell mount (the shell remounts per route navigation). A layout effect, so the first painted frame is already at
   // the saved position — after a swipe back the screen must match the snapshot that was just under the finger.
+  //
+  // 2026-10-21: **앞으로 들어온 화면(push)은 맨 위에서** 시작한다 — 네이티브 앱에서 새로 연 화면은 늘 맨 위다. 예전에는 링크로 다시
+  // 들어와도 지난번 위치로 내려가 있었다. 되돌아온 화면(뒤로 · 스와이프) · 탭 전환 · 같은 화면은 그대로 복원.
+  const restoreScroll = !placeholder && entrance.direction !== "forward";
   useLayoutEffect(() => {
     const el = scrollElRef.current;
-    if (!el) return;
+    if (!el || !restoreScroll) return;
     const saved = SCROLL_POSITIONS.get(routeKey());
     if (saved && saved > 0) {
       el.scrollTop = saved;
       lastScrollYRef.current = saved; // avoid a spurious large delta on the first scroll event
     }
-  }, [pathname, routeKey]);
+  }, [pathname, restoreScroll, routeKey]);
+
+  // 로딩 자리 셸이 다음에 이 경로를 흉내 낼 수 있게.
+  useEffect(() => {
+    if (placeholder) return;
+    SHELL_HINTS.set(pathname, { activeItem, hideBottomNav, split, title, wide });
+    lastBadges = badges;
+  }, [activeItem, badges, hideBottomNav, pathname, placeholder, split, title, wide]);
 
   function syncPullDistance(v: number) {
     pullDistanceRef.current = v;
@@ -502,7 +544,7 @@ export function MobileShell({
   useLayoutEffect(() => {
     const main = mainRef.current;
     const surface = surfaceRef.current;
-    if (!main || !surface || document.documentElement.hasAttribute("data-pane")) return;
+    if (placeholder || !main || !surface || document.documentElement.hasAttribute("data-pane")) return;
     const ownIndex = getHistoryIndex();
     const ownUrl = getHistoryUrl(ownIndex);
     const capture = trackScreen(main, swipeDepsRef.current.userId);
@@ -517,7 +559,7 @@ export function MobileShell({
       if (ownUrl && getHistoryIndex() >= ownIndex) capture.commit(ownIndex, ownUrl);
       capture.dispose();
     };
-  }, []);
+  }, [placeholder]);
 
   // 2분할 오른쪽 칸(`html[data-pane]`) 안이면 주소가 바뀔 때마다 부모 목록에 알린다 — 상세 밖으로 가면 부모가 칸을 닫는다.
   useEffect(() => {
@@ -676,6 +718,11 @@ export function MobileShell({
       {/* 폰 = 430px 한 줄. 넓은 화면(`fold:`)은 폭 전부 — 왼쪽 레일/사이드바 + 본문(2026-10-05 태블릿 · 폴드 적응형). */}
       <div
         data-shell-frame=""
+        // 탭바 · 사이드 메뉴 · 레일에서 고른 이동은 탭 전환 — 화면을 밀어 넣지 않고 내용만 바꾼다(네이티브 탭바).
+        onClickCapture={(event) => {
+          const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+          if (link?.closest(".tabbar, aside, [data-shell-sidenav]")) setNavDirection("tab");
+        }}
         className={cn(
           "relative mx-auto flex h-full w-full flex-col overflow-hidden fold:max-w-none fold:flex-row",
           wide ? "max-w-none" : "max-w-[430px]",
@@ -902,9 +949,14 @@ export function MobileShell({
             >
               {/* 아직 넓은 화면용으로 다듬지 않은 화면은 가운데 760px 한 줄로(폰 화면이 끝없이 늘어나지 않게). `wide` 화면은 폭 전부. */}
               <div
-                className={wide ? undefined : cn("fold:mx-auto fold:max-w-[760px]", split && "tablet:max-w-none")}
+                className={cn(wide ? undefined : cn("fold:mx-auto fold:max-w-[760px]", split && "tablet:max-w-none"), entranceClass)}
                 data-shell-column=""
                 key={contentKey}
+                // 끝나면 클래스를 뗀다 — `animation-fill-mode: both` 가 남기는 transform 이 이 칸을 `position: fixed` 자손의
+                // 기준 상자로 만든다(스와이프 뒤로가기 · 시트 · 고정 막대).
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget) setEntranceDone(true);
+                }}
               >
                 {children}
               </div>

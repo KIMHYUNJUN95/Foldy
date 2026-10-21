@@ -118,6 +118,11 @@ For `/mobile/*`, treat `src/components/shell/mobile-shell.tsx` as a global contr
   `useIsTablet()` (room links); a screen that should use the full width uses `wide` and lays itself out. Design drafts include fold and
   tablet frames too. Adaptation status per screen: `docs/product/16-mobile-navigation.md` → 「화면별 넓은 화면 대응 현황」.
 - Keep the warm **ivory** chrome base: page/shell background (`bg-background`), sidebar, and bottom tab bar are ivory; **cards/sheets stay white** (`bg-surface`) so they lift off the canvas. The brand accent is **deep ink navy/indigo** (`--primary`), not teal/green — do not reintroduce teal/green as the brand color. Liquid Glass accents stay selective (floating sheets, cards, chips, overlays); the global background and tab bar remain solid.
+- **Screen transitions + loading are a shared contract (2026-10-21).** `MobileShell` animates only the content column
+  (push / pop / tab fade / reveal via `consumeScreenEntrance`); the tab bar and top bar never slide. Loading is the
+  placeholder shell (`src/app/mobile/loading.tsx` → `MobileShellPlaceholder`) — never a full-screen loader that hides
+  the tab bar. A new `/mobile` folder with child routes gets the one-line `loading.tsx` re-export. See
+  `docs/product/16-mobile-navigation.md` → 「Route transitions — 화면 전환」 · 「로딩 자리 셸」.
 - **Swipe back is a shared contract (2026-10-08).** Back = swiping right anywhere on a screen (`src/lib/swipe-back/*`, wired in
   `MobileShell`). Do not add back buttons or a second swipe handler. Any element with its own horizontal gesture (swipe-to-reveal
   row — only while open, carousel, drag grid, reorder handle) must carry `data-swipe-back="off"`; new full-screen overlays need

@@ -440,7 +440,8 @@ export async function setLeaveApprover(input: {
     .maybeSingle();
   const membership = memData as { status: string; role: string; leave_approver_role: string | null } | null;
   if (!membership || membership.status !== "active") return { ok: false, error: "target_not_found" };
-  if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
+  // 시급제는 결재자로 켤 수만 없다 — 끄기는 허용(역할이 시급제로 바뀐 사람의 남은 표시를 지울 수 있어야 한다, 2026-10-21).
+  if (input.isApprover && isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
 
   if (!input.isApprover) {
     if (input.userId === actorUserId) return { ok: false, error: "cannot_remove_self" };

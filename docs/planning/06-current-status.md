@@ -21,6 +21,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
   상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
 
+## 2026-10-21 — 역할을 바꾸면 역할 기본 권한만 남는다
+
+- 아르바이트 리더로 바꾼 사람에게 연차 결재자 · 급여 담당이 남아 있었고, 시급제라 결재자 끄기도 막혀 있었다.
+- 역할 변경 = 개인 부여 · 차단 회수 + 급여 담당 · 연차 결재자 끔(`setMemberRole`). 시급제는 결재자 켜기만 막음. 토스트 ko/ja/en.
+- 운영 데이터: 대표 · 전무 · 활성 개발자 외 전원을 역할 기본으로 되돌림. 상세 `docs/product/27-permission-override-workflow.md` 맨 아래.
+
 ## 2026-10-21 — 역할 표시 이름 정리 · 시급제 = 아르바이트 · 아르바이트 리더
 
 - 표시 이름만 변경(내부 이름 · 권한 그대로, ko/ja/en): `cs_staff` CS 관리자 · `field_manager` 현장 관리자(월급제) ·

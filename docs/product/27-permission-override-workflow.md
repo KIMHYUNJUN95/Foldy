@@ -172,3 +172,13 @@ that already handles role/status changes.
 - Should expired-but-unrevoked grants show up anywhere (e.g. a "recently expired" list) or just
   silently stop applying? Leaning toward: RLS/helper just checks `expires_at > now()`, expired rows
   are inert but not deleted (audit trail), no special UI needed for MVP.
+
+## 역할을 바꾸면 역할 기본 권한만 남는다 (2026-10-21)
+
+- **결정(사용자):** 각자 역할에 맞는 기본 기능만 켜져 있고, 그 밖의 권한(개인 부여 · 차단, 급여 담당, 연차 결재자)은 대표 · 전무 · 개발자만 바꾼다.
+  개인 권한 · 급여 담당 · 연차 결재자 토글은 원래부터 `canManagePermissions`(대표 · 전무 · 개발자) 게이트였다 — 그대로.
+- **바뀐 것:** `setMemberRole` 이 역할이 실제로 바뀌면 개인 부여 · 차단을 전부 회수(`revokeAllMemberOverrides`, 감사 `member.permissions_auto_revoke`)하고
+  `attendance_payroll_admin = false` · `leave_approver_role = null` 로 되돌린다. 계기: 오피스 관리자 → 아르바이트 리더로 바꾼 사람에게 연차 결재자 ·
+  급여 담당이 그대로 남아 있었다. 토스트가 「개인 권한 초기화」를 알린다(ko/ja/en). 실행 취소는 역할만 되돌린다(회수된 권한은 다시 줘야 함).
+- **연차 결재자 끄기:** 시급제 역할(`part_time_staff` · `staff`)은 결재자로 **켤 수만** 없다. 전에는 끄기도 막혀 남은 표시를 지울 수 없었다.
+- **운영 데이터(Haru):** 대표 · 전무 · 활성 개발자를 뺀 전원을 같은 날 역할 기본으로 되돌렸다(개인 부여 · 차단 회수, 급여 담당 · 결재자 끔).

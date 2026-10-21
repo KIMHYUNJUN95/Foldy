@@ -193,18 +193,30 @@ export async function setMemberRole(membershipId: string, role: string): Promise
   if (!canAssignRole(actorIsTopOrDeveloper, role as OrganizationRole)) return { ok: false, error: "forbidden" };
   const blocked = (await guardProtectedTarget(ctx)) ?? (await guardLastOwner(ctx.membership, { role }));
   if (blocked) return { ok: false, error: blocked };
+  const roleChanged = ctx.membership.role !== role;
+  // 역할이 바뀌면 그 역할의 기본 권한만 남긴다(2026-10-21 사용자 「역할에 맞는 기본기능만, 그 이외는 대표 · 전무 · 개발자만」) —
+  // 급여 담당 · 연차 결재자 · 개인 부여/차단은 예전 역할 때 받은 것이라 새 역할에 조용히 따라가면 안 된다.
   const { error } = await getSupabaseServiceClient()
     .from("memberships")
-    .update({ role: role as OrganizationRole })
+    .update(
+      roleChanged
+        ? { role: role as OrganizationRole, attendance_payroll_admin: false, leave_approver_role: null }
+        : { role: role as OrganizationRole },
+    )
     .eq("id", membershipId);
   if (error) return { ok: false, error: "save_failed" };
-  await logUserAudit({
-    organizationId: ctx.membership.organization_id,
-    actorUserId: ctx.actorUserId,
-    action: "member.role",
-    targetId: membershipId,
-    metadata: { from: ctx.membership.role, to: role },
-  });
+  const audit = { organizationId: ctx.membership.organization_id, actorUserId: ctx.actorUserId, targetId: membershipId };
+  await logUserAudit({ ...audit, action: "member.role", metadata: { from: ctx.membership.role, to: role } });
+  if (roleChanged) {
+    const revoked = await revokeAllMemberOverrides({
+      organizationId: ctx.membership.organization_id,
+      userId: ctx.membership.user_id,
+      revokedByUserId: ctx.actorUserId,
+    });
+    if (revoked.ok && revoked.revoked.length > 0) {
+      await logUserAudit({ ...audit, action: "member.permissions_auto_revoke", metadata: { keys: revoked.revoked.map((row) => row.key) } });
+    }
+  }
   revalidateMember(membershipId);
   return { ok: true };
 }

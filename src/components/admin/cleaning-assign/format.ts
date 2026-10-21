@@ -34,6 +34,25 @@ export function weekdayShort(date: string, locale: string): string {
   return new Intl.DateTimeFormat(tag(locale), { timeZone: "UTC", weekday: "short" }).format(utc(date));
 }
 
+/**
+ * 방의 체크인 한 줄 — 「오늘 체크인 2명 · 손님 이름」 · 「다음 체크인 10/24 · 3명 · 손님 이름」 · 「체크인 없음」(30일 안에 없음).
+ * 하루 보기 · 오늘 내 방이 같이 쓴다.
+ */
+export function checkInText(
+  room: { hasTurnover: boolean; arrivingGuests: number | null; arrivingGuestName: string | null; nextCheckInDate: string | null; nextGuests: number | null; nextGuestName: string | null },
+  copy: CleaningAssignCopy,
+): string {
+  if (room.hasTurnover) {
+    return [room.arrivingGuests ? fill(copy.turnover, { n: room.arrivingGuests }) : copy.turnoverUnknown, room.arrivingGuestName].filter(Boolean).join(" · ");
+  }
+  if (room.nextCheckInDate) {
+    return [fill(copy.nextCheckin, { date: shortDate(room.nextCheckInDate) }), room.nextGuests ? fill(copy.guestsN, { n: room.nextGuests }) : null, room.nextGuestName]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return copy.noCheckin;
+}
+
 export function agoText(iso: string, now: number, copy: CleaningAssignCopy): string {
   const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
   if (minutes < 1) return copy.agoJustNow;

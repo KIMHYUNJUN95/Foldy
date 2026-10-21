@@ -420,6 +420,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
     const first = rows[0];
     const ghost: AssignRoom = {
       arrivingGuests: null,
+      arrivingGuestName: null,
       carriedFrom: null,
       carryDays: 0,
       deferredUntil: null,
@@ -427,6 +428,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
       holdReason: null,
       nextCheckInDate: null,
       nextGuests: null,
+      nextGuestName: null,
       note: null,
       propertyName: first.propertyName,
       roomKey,
@@ -869,6 +871,7 @@ export async function loadTodayRooms(
       // 그 사이 예약이 취소된 방 — 그래도 보여 준다(관리자가 정리할 때까지).
       return {
         arrivingGuests: null,
+        arrivingGuestName: null,
         carriedFrom: null,
         carryDays: 0,
         deferredUntil: null,
@@ -877,6 +880,7 @@ export async function loadTodayRooms(
         mates,
         nextCheckInDate: null,
         nextGuests: null,
+        nextGuestName: null,
         note: null,
         propertyName: row.propertyName,
         roomKey: row.roomKey,

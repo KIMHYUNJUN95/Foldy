@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCleaningTargets } from "@/lib/cleaning-targets";
+import { getReservationGuests } from "@/lib/reservation-guests";
+import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { addDays } from "@/lib/cleaning-assign/day-state";
 import {
@@ -38,8 +40,12 @@ export type AssignRoom = {
   source: AssignRoomSource;
   hasTurnover: boolean;
   arrivingGuests: number | null;
+  /** 오늘 들어오는 손님 이름(체크인 있는 방). */
+  arrivingGuestName: string | null;
   nextCheckInDate: string | null;
   nextGuests: number | null;
+  /** 다음 체크인 손님 이름(오늘 체크인 없는 방 · 30일 안). */
+  nextGuestName: string | null;
   /** 수기 추가 메모. */
   note: string | null;
   /** 못 한 방 — 원래 청소해야 했던 날 · 며칠째. */
@@ -230,8 +236,10 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     source: "checkout",
     hasTurnover: false,
     arrivingGuests: null,
+    arrivingGuestName: null,
     nextCheckInDate: null,
     nextGuests: null,
+    nextGuestName: null,
     note: null,
     carriedFrom: null,
     carryDays: 0,
@@ -249,8 +257,10 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
       sessionRoomLabel: target.sessionRoomLabel,
       hasTurnover: target.hasTurnover,
       arrivingGuests: target.hasTurnover ? target.arrivingGuestsTotal : null,
+      arrivingGuestName: target.hasTurnover ? target.arrivingGuestName : null,
       nextCheckInDate: target.hasTurnover ? null : target.nextCheckInDate,
       nextGuests: target.hasTurnover ? null : target.nextCheckInGuestsTotal,
+      nextGuestName: target.hasTurnover ? null : target.nextCheckInGuestName,
     });
   }
   for (const extra of extras.data ?? []) {
@@ -337,7 +347,54 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     });
   }
 
+  await fillCheckIns(supabase, organizationId, date, [...rooms.values()]);
   return [...rooms.values()].sort(compareAssignRooms);
+}
+
+/** 체크인 정보를 찾는 범위 — 청소 화면(`getCleaningTargets`)의 「다음 체크인」과 같은 30일. */
+const CHECKIN_LOOKAHEAD_DAYS = 30;
+// 인원은 원본에서 키만 받는다(`getCleaningTargets` 와 같은 방식).
+const CHECKIN_SELECT: string = `id, check_in_date, guest_name, property_name, room_label, ${slimPayloadSelect(GUEST_PAYLOAD_KEYS)}`;
+
+/**
+ * 오늘 퇴실이 없는 방(수기 추가 · 못 한 방)과 30일 안에 체크인이 안 잡힌 방은 체크인 정보가 비어 있다 — 그 방들만 도착 예약을 찾아
+ * 오늘 체크인(인원 · 이름) 또는 다음 체크인(날짜 · 인원 · 이름)을 채운다. 하루 보기 「오늘 체크인 2명 · 이름」 · 「다음 체크인 날짜 · 인원 · 이름」.
+ */
+async function fillCheckIns(supabase: Client, organizationId: string, date: string, rooms: AssignRoom[]): Promise<void> {
+  const blank = new Map(rooms.filter((room) => !room.hasTurnover && !room.nextCheckInDate).map((room) => [room.roomKey, room]));
+  if (blank.size === 0) return;
+  const result = await readAllPages<Record<string, unknown>>((start, end) =>
+    supabase
+      .from("reservations")
+      .select(CHECKIN_SELECT)
+      .eq("organization_id", organizationId)
+      .eq("status", "confirmed")
+      .gte("check_in_date", date)
+      .lt("check_in_date", addDays(date, CHECKIN_LOOKAHEAD_DAYS))
+      .order("check_in_date")
+      .order("id")
+      .range(start, end) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>,
+  );
+  if (result.error) throw new Error(result.error.message);
+  for (const row of result.data) {
+    const propertyName = row.property_name as string | null;
+    const roomLabel = row.room_label as string | null;
+    if (!propertyName || !roomLabel) continue;
+    const room = blank.get(physicalKeyOf(propertyName, roomLabel).roomKey);
+    if (!room) continue;
+    blank.delete(room.roomKey);
+    const guests = getReservationGuests(slimPayloadOf(row, GUEST_PAYLOAD_KEYS)).total;
+    const name = (row.guest_name as string | null) || null;
+    if (row.check_in_date === date) {
+      room.hasTurnover = true;
+      room.arrivingGuests = guests;
+      room.arrivingGuestName = name;
+    } else {
+      room.nextCheckInDate = row.check_in_date as string;
+      room.nextGuests = guests;
+      room.nextGuestName = name;
+    }
+  }
 }
 
 /** 운영 건물 순서(가부키초 다음 스테이아리 · 사노 맨 뒤) → 객실 번호 순. */

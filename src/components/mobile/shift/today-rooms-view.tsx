@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { startCleaningSession } from "@/app/mobile/cleaning/actions";
 import { useIsTablet } from "@/components/shell/split-list";
-import { dayLabel, shortDate, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
+import { checkInText, dayLabel, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { TodayRoom } from "@/lib/cleaning-assign/data";
 import type { ShiftDayState } from "@/lib/cleaning-assign/day-state";
@@ -34,11 +34,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
   const done = data.rooms.filter((r) => r.status === "done").length;
   const sel = data.rooms.find((r) => r.roomKey === selected) ?? null;
   const roomName = (r: Room) => (r.roomLabel === r.propertyName ? r.buildingLabel : r.roomLabel);
-  const info = (r: Room) => {
-    if (r.hasTurnover) return r.arrivingGuests ? fill(copy.turnover, { n: r.arrivingGuests }) : copy.turnoverUnknown;
-    if (r.nextCheckInDate) return fill(copy.nextCheckin, { date: shortDate(r.nextCheckInDate) });
-    return copy.noCheckin;
-  };
+  const info = (r: Room) => checkInText(r, copy);
   const stateText = (r: Room) => (r.status === "done" ? copy.stateDoneRoom : r.status === "progress" ? copy.stateProgressRoom : copy.stateWaitingRoom);
 
   const startButton = (r: Room) =>

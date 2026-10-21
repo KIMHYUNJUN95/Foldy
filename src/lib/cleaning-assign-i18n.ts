@@ -55,6 +55,7 @@ export type CleaningAssignCopy = {
   turnoverUnknown: string;
   noCheckin: string; // "체크인 없음"
   nextCheckin: string; // "다음 체크인 {date}"
+  guestsN: string; // "{n}명"
   bigRoom: string; // "큰 방"
   statusProgress: string;
   statusDone: string;
@@ -330,6 +331,7 @@ const ko: CleaningAssignCopy = {
   turnoverUnknown: "오늘 체크인",
   noCheckin: "체크인 없음",
   nextCheckin: "다음 체크인 {date}",
+  guestsN: "{n}명",
   bigRoom: "큰 방",
   statusProgress: "청소 중",
   statusDone: "끝남",
@@ -598,6 +600,7 @@ const ja: CleaningAssignCopy = {
   turnoverUnknown: "本日チェックイン",
   noCheckin: "チェックインなし",
   nextCheckin: "次のチェックイン {date}",
+  guestsN: "{n}人",
   bigRoom: "大部屋",
   statusProgress: "清掃中",
   statusDone: "完了",
@@ -866,6 +869,7 @@ const en: CleaningAssignCopy = {
   turnoverUnknown: "Check-in today",
   noCheckin: "No check-in",
   nextCheckin: "Next check-in {date}",
+  guestsN: "{n} guests",
   bigRoom: "Large room",
   statusProgress: "Cleaning",
   statusDone: "Done",

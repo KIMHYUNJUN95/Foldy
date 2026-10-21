@@ -27,7 +27,7 @@ import type { Dictionary } from "@/lib/i18n";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { BoardPerson, BoardRoom, DayBoard } from "@/lib/cleaning-assign/data";
 import { haptic } from "@/lib/haptics";
-import { agoText, dayLabel, roleLabel, shortDate, timeLabel, timeValue, tokyoTime } from "./format";
+import { agoText, checkInText, dayLabel, roleLabel, shortDate, timeLabel, timeValue, tokyoTime } from "./format";
 import "./cleaning-assign.css";
 
 /**
@@ -135,11 +135,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     run(() => (inRoom ? unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId: picked.userId }) : assignToRoom({ date: board.date, roomKey: room.roomKey, userId: picked.userId })));
   };
 
-  const roomInfo = (room: BoardRoom) => {
-    if (room.hasTurnover) return room.arrivingGuests ? fill(copy.turnover, { n: room.arrivingGuests }) : copy.turnoverUnknown;
-    if (room.nextCheckInDate) return fill(copy.nextCheckin, { date: shortDate(room.nextCheckInDate) });
-    return copy.noCheckin;
-  };
+  const roomInfo = (room: BoardRoom) => checkInText(room, copy);
 
   const roomRow = (room: BoardRoom, opts: { open?: boolean; grouped?: boolean } = {}) => {
     const mine = picked ? room.people.some((p) => p.userId === picked.userId) : false;

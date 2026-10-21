@@ -288,7 +288,7 @@ No new migration was needed for these three — this reuses `annual_leave_reques
     or Esc.
 - **직원 잔여·부여** (`leave-balance-view.tsx`): server `listAdminLeaveBalances`
   (`src/lib/annual-leave-admin-server.ts`) returns one row per active salary-based employee
-  (`memberships.role !== 'part_time_staff'`), with balances from `computeAnnualLeaveSummary`.
+  (시급제 역할 제외 — `isLeaveHourlyRole`: `part_time_staff` · `staff`, 2026-10-21), with balances from `computeAnnualLeaveSummary`.
   **Approved** 유급 leave is deducted from the base pool and **approved** 특별 leave from the bonus
   pool (경조/기타 draw from neither) — this is the point where approved usage finally feeds the balance
   calc for the admin view. `grant` is reported as `remaining + used` so "remaining / grant" always
@@ -312,7 +312,7 @@ No new migration was needed for these three — this reuses `annual_leave_reques
   is a leave approver server-side via `isSessionLeaveApprover` (exported from
   `annual-leave-approvals-server.ts`), on top of the page-level `requireAdminPageSession` gate.
 - **Still not built:** applicant notification on approve/reject; and hourly-staff exclusion is currently
-  by membership role only (`part_time_staff`), not by `employment_type_history`. (문서 real generation is
+  by membership role only (`part_time_staff` · `staff` — 2026-10-21 역할 정리로 아르바이트 리더도 시급제), not by `employment_type_history`. (문서 real generation is
   now built — see "문서 (休暇届) — backend wiring".)
 
 ## Recommended user entry flow

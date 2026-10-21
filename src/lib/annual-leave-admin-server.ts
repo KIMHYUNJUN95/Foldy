@@ -11,7 +11,7 @@ import type { LeaveType, LeaveDurationUnit, LeaveStatus } from "@/lib/annual-lea
 import { createLeaveRequest } from "@/lib/annual-leave-requests-server";
 import {
   getAnnualLeaveBaseline,
-  LEAVE_HOURLY_ROLE,
+  isLeaveHourlyRole,
   MAX_LEAVE_BONUS,
   MAX_LEAVE_GRANT,
   setAnnualLeaveBaselineForUser,
@@ -19,11 +19,8 @@ import {
 } from "@/lib/annual-leave-server";
 import { computeAnnualLeaveSummary, getScheduledGrants, normalizeLeaveDays, tokyoToday } from "@/lib/annual-leave";
 
-// Hourly / part-time staff are excluded from annual leave (confirmed policy). Every other org role is a
-// salary-based regular employee for leave purposes.
-// 값 정의는 `annual-leave-server.ts` 에 있다(유일한 baseline 쓰기 지점이 거기라 검증도 거기 있다).
-// 여기서는 목록 필터링에만 쓰므로 재수출본을 그대로 참조한다 — 복사하면 두 정의가 갈라진다.
-const HOURLY_ROLE = LEAVE_HOURLY_ROLE;
+// 시급제 역할(아르바이트 · 아르바이트 리더)은 연차 대상이 아니다(확정 정책). 판정은 `annual-leave-server.ts` 의
+// `isLeaveHourlyRole` 하나만 쓴다(유일한 baseline 쓰기 지점이 거기라 검증도 거기 있다) — 복사하면 두 정의가 갈라진다.
 
 // Days-out window used to surface a bucket that lapses "soon" in the balance table's 소멸 예정 column.
 const EXPIRING_SOON_DAYS = 180;
@@ -188,7 +185,7 @@ export type AdminLeaveBalanceRow = {
 
 /**
  * Balances for every active salary-based employee. Approved 유급/특별 leave is deducted from the
- * respective pool via computeAnnualLeaveSummary; hourly (part_time_staff) members are excluded.
+ * respective pool via computeAnnualLeaveSummary; hourly roles (part_time_staff · staff) are excluded.
  * Org-isolated (service-role, filtered by session org).
  */
 export async function listAdminLeaveBalances(session: AppSession): Promise<AdminLeaveBalanceRow[]> {
@@ -202,7 +199,7 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
     .eq("organization_id", organizationId)
     .eq("status", "active");
   const members = ((memData ?? []) as { user_id: string; role: string }[]).filter(
-    (m) => m.role !== HOURLY_ROLE,
+    (m) => !isLeaveHourlyRole(m.role),
   );
   const userIds = [...new Set(members.map((m) => m.user_id))];
   if (userIds.length === 0) return [];
@@ -345,7 +342,7 @@ export async function saveEmployeeLeaveBaseline(
     .maybeSingle();
   const membership = memData as { status: string; role: string } | null;
   if (!membership || membership.status !== "active") return { ok: false, error: "target_not_found" };
-  if (membership.role === HOURLY_ROLE) return { ok: false, error: "hourly_excluded" };
+  if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
 
   return setAnnualLeaveBaselineForUser(service, organizationId, input.userId, {
     hireDate: input.hireDate,
@@ -388,7 +385,7 @@ export async function listAdminApprovers(session: AppSession): Promise<AdminAppr
     .eq("status", "active");
   const members = (
     (memData ?? []) as { user_id: string; role: string; leave_approver_role: string | null }[]
-  ).filter((m) => m.role !== HOURLY_ROLE);
+  ).filter((m) => !isLeaveHourlyRole(m.role));
   const userIds = [...new Set(members.map((m) => m.user_id))];
   if (userIds.length === 0) return [];
 
@@ -443,7 +440,7 @@ export async function setLeaveApprover(input: {
     .maybeSingle();
   const membership = memData as { status: string; role: string; leave_approver_role: string | null } | null;
   if (!membership || membership.status !== "active") return { ok: false, error: "target_not_found" };
-  if (membership.role === HOURLY_ROLE) return { ok: false, error: "hourly_excluded" };
+  if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
 
   if (!input.isApprover) {
     if (input.userId === actorUserId) return { ok: false, error: "cannot_remove_self" };

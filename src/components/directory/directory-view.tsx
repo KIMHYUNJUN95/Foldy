@@ -8,7 +8,7 @@ import { haptic } from "@/lib/haptics";
 
 /**
  * 직원 목록 — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet).
- * 역할 묶음(관리 · 사무실 / 현장 / 파트타임) + 묶음마다 인원수. 전화번호가 없는 사람과 나에게는 전화 버튼을 그리지 않는다
+ * 역할 묶음(관리 · 사무실 / 현장 / 아르바이트 · 아르바이트 리더) + 묶음마다 인원수. 전화번호가 없는 사람과 나에게는 전화 버튼을 그리지 않는다
  * (회색으로 막힌 버튼은 고장으로 읽힌다). 폴드는 한 줄에 번호까지, 태블릿 가로는 목록 + 오른쪽 프로필 칸
  * (상세 주소가 없는 화면이라 `useIsTablet()` 으로 칸을 직접 그린다 — CLAUDE.md §3). docs/product/16-mobile-navigation.md
  */
@@ -51,8 +51,8 @@ export type DirectoryCopy = {
 
 const GROUPS: { id: "lead" | "field" | "part" | "other"; roles: string[] }[] = [
   { id: "lead", roles: ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"] },
-  { id: "field", roles: ["field_manager", "staff"] },
-  { id: "part", roles: ["part_time_staff"] },
+  { id: "field", roles: ["field_manager"] },
+  { id: "part", roles: ["staff", "part_time_staff"] },
 ];
 
 export function DirectoryView({ people, orgName, locale, copy }: { people: DirectoryPerson[]; orgName: string; locale: string; copy: DirectoryCopy }) {

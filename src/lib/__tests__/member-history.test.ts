@@ -26,7 +26,7 @@ describe("formatMemberHistory", () => {
 
   it("코드값을 한국어 한 줄로", () => {
     expect(lines.map((line) => line.text)).toEqual([
-      "역할 직원 → CS 직원",
+      "역할 아르바이트 리더 → CS 관리자",
       "상태 활성 → 비활성",
       "소속 현장 → 사무실",
       "급여 담당 켬",

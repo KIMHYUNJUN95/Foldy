@@ -56,8 +56,15 @@ export async function getAnnualLeaveBaseline(
  */
 export const MAX_LEAVE_GRANT = 40;
 export const MAX_LEAVE_BONUS = 8;
-/** 시급·파트타임은 연차 대상이 아니다(확정 정책). 그 외 조직 역할은 전부 월급제 정규직으로 본다. */
-export const LEAVE_HOURLY_ROLE = "part_time_staff";
+/**
+ * 시급제 역할은 연차 대상이 아니다(확정 정책). 2026-10-21 역할 정리로 시급제는 아르바이트(`part_time_staff`)와
+ * 아르바이트 리더(`staff`) 둘이다. 그 외 조직 역할은 전부 월급제 정규직으로 본다.
+ */
+export const LEAVE_HOURLY_ROLES: readonly string[] = ["part_time_staff", "staff"];
+
+export function isLeaveHourlyRole(role: string): boolean {
+  return LEAVE_HOURLY_ROLES.includes(role);
+}
 
 export async function setAnnualLeaveBaselineForUser(
   service: Service,
@@ -83,7 +90,7 @@ export async function setAnnualLeaveBaselineForUser(
     .maybeSingle();
   const membership = memData as { status: string; role: string } | null;
   if (!membership || membership.status !== "active") return { ok: false, error: "target_not_found" };
-  if (membership.role === LEAVE_HOURLY_ROLE) return { ok: false, error: "hourly_excluded" };
+  if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
 
   const baselineDate = tokyoToday();
 

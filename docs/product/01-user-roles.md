@@ -38,6 +38,27 @@ Important:
 
 ## Organization-Level Roles
 
+### 화면 표시 이름 · 급여 구분 (2026-10-21 역할 정리 — 현재 기준)
+
+내부 이름(slug) · 권한은 그대로 두고 **화면 표시 이름만** 바꿨다. 아래 섹션 제목(CS Staff · Staff · Part-Time Staff …)은 옛 이름이다.
+
+| 내부 이름 | ko | ja | en | 급여 | 비고 |
+| --- | --- | --- | --- | --- | --- |
+| `owner` | 대표 | 代表 | Owner | 월급제 | 플랫폼 개발자는 멤버십이 owner 여도 「개발자」로 표시(2026-10-16, `displayRoleKey`) |
+| `senior_managing_director` | 전무 | 専務 | Managing Director | 월급제 | |
+| `office_admin` | 오피스 관리자 | オフィス管理者 | Office Admin | 월급제 | |
+| `cs_staff` | **CS 관리자** | CS管理者 | CS Manager | 월급제 | 옛 「CS 직원」 |
+| `field_manager` | 현장 관리자 | 現場管理者 | Field Manager | 월급제 | 현장 책임자. 청소 전체 보기 · 강제 완료 · 린넨 관리 · 남의 요청 삭제 |
+| `staff` | **아르바이트 리더** | アルバイトリーダー | Part-time Leader | **시급제** | 오래 일해 관리 업무를 일부 맡는 알바. 관리자 웹 일부(민감 화면 제외) · 일일 보고서 항상 가능 |
+| `part_time_staff` | **아르바이트** | アルバイト | Part-timer | **시급제** | 모바일만 |
+
+- **연차 제외 = 시급제 역할**(`part_time_staff` · `staff`) — `isLeaveHourlyRole` (`src/lib/annual-leave-server.ts`). 전에는 `part_time_staff` 만 제외였다.
+- 급여 계산은 역할이 아니라 **고용형태 이력**(`employment_type_history`)으로 한다(기존 결정 그대로). 역할을 바꾸면 고용형태도 같이 맞춘다.
+- 리더에게 더 맡길 일은 사람별 권한 추가(`docs/product/27-permission-override-workflow.md`)로 준다.
+- 초대 코드 분류 표시도 맞췄다: `part_time_staff` 아르바이트 · `office_staff` 오피스 관리자 · `field_staff`(→`staff`) 아르바이트 리더 ·
+  `part_time_manager`(→`field_manager`) 현장 관리자.
+- 직원 목록 묶음: 관리 · 사무실 / 현장(`field_manager`) / 아르바이트(`staff` · `part_time_staff`).
+
 ### Admin Dashboard Access Direction (confirmed 2026-06-29)
 
 The dashboard rebuild target is:

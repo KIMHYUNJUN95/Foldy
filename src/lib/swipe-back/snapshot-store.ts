@@ -275,14 +275,17 @@ export function trackScreen(root: HTMLElement, ownerId: string): ScreenCapture {
     schedule();
   }
 
-  // 스와이프 엔진이 판 · 루트에 거는 인라인 스타일은 화면 내용이 바뀐 게 아니다.
+  // 스와이프 엔진이 판 · 루트 · 당겨서 새로고침 띠에 거는 인라인 스타일은 화면 내용이 바뀐 게 아니다. 띠를 세면 미는 동안
+  // 다시 복제가 잡혀 놓은 뒤 움직임 한가운데서 메인 스레드를 수십 ms 잡았다(2026-10-21 120Hz 점검).
   const isContentChange = (records: MutationRecord[]) =>
     records.some(
       (record) =>
         !(
           record.type === "attributes" &&
           record.attributeName === "style" &&
-          (record.target === root || (record.target as Element).hasAttribute?.("data-swipe-surface"))
+          (record.target === root ||
+            (record.target as Element).hasAttribute?.("data-swipe-surface") ||
+            (record.target as Element).hasAttribute?.("data-ptr-indicator"))
         ),
     );
   const observer = new MutationObserver((records) => {

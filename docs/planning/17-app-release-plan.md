@@ -229,3 +229,4 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | 2026-10-20 | (이 커밋) | TestFlight 전 iOS 점검 — 위치 권한 키 `NSLocationAlwaysAndWhenInUseUsageDescription` 추가(Info.plist · ko/ja/en), WebView 바탕색 주석 정정 |
 | 2026-10-20 | `6c71878` | N12 화면 스와이프 다듬기 — 놓은 뒤 손가락 속도 이어받기 · 둥근 판 · 검색칸 예외 · 밑그림 저장 · 기록 없으면 위 화면 |
 | 2026-10-20 | (이 커밋) | N12 Android 예측 뒤로가기 → 같은 스와이프 엔진(`PredictiveBackPlugin`, App 뒤로 처리 끔) · 디버그 APK 컴파일 확인 — **새 앱 빌드 필요**, 실기기 미확인 |
+| 2026-10-21 | (이 커밋) | iOS `Info.plist` `CADisableMinimumFrameDurationOnPhone` — ProMotion 아이폰에서 앱 애니메이션 120Hz(새 앱 빌드부터) · 스와이프 판 `transform` |

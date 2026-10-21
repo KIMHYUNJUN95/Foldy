@@ -20,6 +20,10 @@
  * 앱 안 이전 기록이 없으면(알림 · 링크로 바로 들어옴) **위 화면**(`parentScreen` — 상세 → 목록 → 메뉴 첫 화면 → 홈)으로 간다.
  * 2026-10-20 다듬기: 미는 동안 판 모서리를 화면 모서리처럼 둥글게(인스타그램), 놓은 뒤엔 손가락 속도를 이어받아(`settleMotion`)
  * 튀지 않게, 넘어가는 움직임이 거의 끝날 때 이동을 시작해 새 화면이 빨리 살아나게.
+ * 2026-10-21 120Hz 점검: 판은 `transform` 으로 민다(전엔 `translate` 속성). iOS Safari · 홈 화면 PWA 는 JS 가 그리는 움직임을
+ * 60Hz 로 돌리므로, 놓은 뒤의 움직임만이라도 시스템 합성기(Core Animation)가 돌게 — 합성기 가속이 확실한 `transform` 전환이고,
+ * 그동안 메인 스레드가 새 화면을 그리느라 바빠도(도착 직전 이동) 끊기지 않는다. 판의 원래 `transform`(당겨서 새로고침이 쓰는
+ * `translateY`)은 뒤에 이어 붙이고 끝나면 그대로 돌려놓는다.
  */
 
 import { clearNavDirection, setNavDirection } from "@/lib/nav-direction";
@@ -171,6 +175,8 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
   /** 1 = 판이 오른쪽으로(보통), -1 = 왼쪽으로(Android 오른쪽 가장자리 제스처). */
   let direction: 1 | -1 = 1;
   const hidden: HTMLElement[] = [];
+  /** 미는 동안 덮어쓴 판의 원래 인라인 `transform` · `transition` · `will-change`(React 가 당겨서 새로고침용으로 건 값). */
+  let surfaceBase: { transform: string; transition: string; willChange: string } | null = null;
 
   function reset() {
     phase = "idle";
@@ -183,7 +189,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     frame = 0;
     if (!layer) return;
     const progress = width > 0 ? Math.min(1, offset / width) : 0;
-    surface.style.translate = `${direction * offset}px 0`;
+    surface.style.transform = `translate3d(${direction * offset}px, 0, 0) ${surfaceBase?.transform ?? ""}`;
     if (layer.content) layer.content.style.transform = `translate3d(${-direction * PARALLAX * width * (1 - progress)}px, 0, 0)`;
     layer.dim.style.opacity = String(DIM_MAX * (1 - progress));
   }
@@ -259,8 +265,13 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
       element.style.visibility = "hidden";
       hidden.push(element);
     }
+    surfaceBase ??= {
+      transform: surface.style.transform,
+      transition: surface.style.transition,
+      willChange: surface.style.willChange,
+    };
     surface.style.transition = "none";
-    surface.style.willChange = "translate";
+    surface.style.willChange = "transform";
     surface.style.boxShadow = `${-12 * direction}px 0 32px -8px rgba(15, 23, 42, 0.22)`;
     // 미는 동안만 둥근 판(인스타그램처럼) — 판은 이미 overflow: hidden 이라 내용도 같이 잘린다.
     surface.style.borderRadius = `${corner}px`;
@@ -293,9 +304,15 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
     main.style.background = "";
     document.body.style.background = "";
     for (const element of hidden.splice(0)) element.style.visibility = "";
-    surface.style.translate = "";
-    surface.style.transition = "";
-    surface.style.willChange = "";
+    if (surfaceBase) {
+      // 전환을 끈 채 원래 값으로 돌려놓고 스타일을 한 번 확정한 뒤 전환을 되살린다 — 안 그러면 원래 전환(420ms)이 헛돈다.
+      surface.style.transition = "none";
+      surface.style.transform = surfaceBase.transform;
+      void getComputedStyle(surface).transform;
+      surface.style.willChange = surfaceBase.willChange;
+      surface.style.transition = surfaceBase.transition;
+      surfaceBase = null;
+    }
     surface.style.boxShadow = "";
     surface.style.borderRadius = "";
     reset();
@@ -308,7 +325,7 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
   function settle(to: number, velocity: number, done: () => void, doneAt = 1) {
     phase = "settling";
     const { curve, duration, easing } = settleMotion(to - offset, velocity);
-    surface.style.transition = `translate ${duration}ms ${easing}`;
+    surface.style.transition = `transform ${duration}ms ${easing}`;
     if (layer?.content) layer.content.style.transition = `transform ${duration}ms ${easing}`;
     if (layer) layer.dim.style.transition = `opacity ${duration}ms ${easing}`;
     offset = to;

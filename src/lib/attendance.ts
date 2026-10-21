@@ -214,3 +214,15 @@ export const ATTENDANCE_GROSS_ROUNDING_YEN = 10;
 /** Tokyo-time hour for the once-per-day open-session reminder (18:30). */
 export const ATTENDANCE_OPEN_SESSION_REMINDER_HOUR = 18;
 export const ATTENDANCE_OPEN_SESSION_REMINDER_MINUTE = 30;
+
+/**
+ * 퇴근을 잊은 열린 근무인가(2026-10-21) — 운영일이 오늘(도쿄)보다 앞이면 그렇다.
+ *
+ * 현장 근무는 자정을 넘기지 않는다(가장 늦은 퇴근이 23:30 정도). 그래서 날짜가 바뀐 뒤에도 `open` 인
+ * 근무는 일하는 중이 아니라 퇴근을 안 찍은 것이다. 예전에는 홈이 이런 근무를 며칠이고 「근무 중」으로
+ * 띄우고 퇴근 버튼만 보여 줘서, 그 버튼을 누르면 866시간짜리 근무가 저장됐다. 출근 · 퇴근 · 휴게 · 홈이
+ * 모두 이 하나로 판정한다.
+ */
+export function isStaleOpenSession(operatingDate: string, today: string): boolean {
+  return operatingDate < today;
+}

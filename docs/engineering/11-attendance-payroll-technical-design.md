@@ -154,8 +154,10 @@ design (no redesign). Breaks, corrections, payroll, and notifications remain out
     QR token ref, lat/long/accuracy, and `clock_in_device_info` (user agent).
   - **Clock-out** requires an existing open session (else fails -> recorded as `success=false`, no enum
     failure reason exists for "no open session"); completes it with the clock-out fields. **Midnight
-    baseline:** if the clock-out Tokyo date differs from the session's `operating_date`, the session is flagged
-    `review_state='review_required'` (no silent normalization; full midnight sweep is a later step).
+    rule (2026-10-21, replaces the old `review_required` baseline):** work never crosses midnight, so an open
+    session whose `operating_date` is before today (`isStaleOpenSession`) is moved to `abandoned` and the
+    clock-out is refused with `stale_session` — the clock-out time comes in through a correction request.
+    See `docs/product/21-attendance-payroll-workflow.md` → 「퇴근 쪽 구멍 — 866시간 근무」.
   - **Every attempt** (success and each failure branch) is logged to `attendance_attempt_logs` with
     `action_type`, `method:"gps_qr"`, `success`, `failure_reason`, `resolved_site_id`, and the GPS/device
     fields. Attempt logs are the Step-3 auditability surface; session-level `attendance_session_audits`

@@ -32,6 +32,7 @@ import {
   type AttendanceQrTokenRow,
   type AttendanceSiteRow,
   type AttendanceSessionRow,
+  isStaleOpenSession,
 } from "@/lib/attendance";
 
 type AttendanceSiteWithProperty = AttendanceSiteRow & {
@@ -79,10 +80,13 @@ export type AttendanceScanSuccess = {
 
 export type AttendanceScanFailure = {
   ok: false;
-  reason: "gps" | "radius" | "qr" | "open_session" | "no_session" | "open_break" | "error";
+  reason: "gps" | "radius" | "qr" | "open_session" | "no_session" | "open_break" | "stale_session" | "error";
   siteName?: string;
   distanceMeters?: number;
   radiusMeters?: number;
+  /** `stale_session` — 퇴근을 안 찍고 날짜가 넘어간 근무(이번 퇴근 시도에서 `abandoned` 로 넘어감). 정정 요청 링크용. */
+  staleSessionId?: string;
+  staleDate?: string;
 };
 
 export type AttendanceScanResult = AttendanceScanSuccess | AttendanceScanFailure;
@@ -222,7 +226,12 @@ export async function submitAttendanceScan(
   //
   // `clock_out_at` 은 채우지 않는다 — 시각을 추측하면 그 값이 그대로 급여가 된다. 대신 월 마감
   // 판정이 `abandoned` 를 미해소로 세므로, 관리자가 정리하기 전에는 그 달을 닫을 수 없다.
-  if (input.mode === "in" && openSession && openSession.operating_date !== tokyoDate(new Date().toISOString())) {
+  //
+  // 퇴근도 같다(2026-10-21) — 근무는 자정을 넘기지 않으므로, 지난 운영일의 근무를 지금 시각으로 닫으면
+  // 며칠짜리 근무가 된다(실제 866시간). 퇴근 시각은 정정 요청으로 받는다.
+  let staleSession: AttendanceSessionRow | null = null;
+  if (openSession && isStaleOpenSession(openSession.operating_date, tokyoDate(new Date().toISOString()))) {
+    staleSession = openSession;
     const abandoned = await service
       .from("attendance_sessions")
       .update({ status: "abandoned", abandoned_at: new Date().toISOString() })
@@ -230,6 +239,17 @@ export async function submitAttendanceScan(
       .eq("status", "open"); // 동시 요청이 먼저 닫았으면 아무것도 하지 않는다.
     // 전환에 실패해도 출근을 막지 않는다 — 아래 insert 가 유니크 위반으로 걸러 준다.
     if (!abandoned.error) openSession = null;
+  }
+
+  if (input.mode === "out" && staleSession) {
+    await logAttempt({ success: false, failureReason: null, resolvedSiteId: site.id });
+    return {
+      ok: false,
+      reason: "stale_session",
+      siteName: localizedSiteName(site, locale),
+      staleSessionId: staleSession.id,
+      staleDate: staleSession.operating_date,
+    };
   }
 
   if (input.mode === "in") {
@@ -304,6 +324,11 @@ export async function submitAttendanceScan(
       .select("id")
       .single();
     if (insertRes.error) {
+      // 두 번 누른 출근이 거의 동시에 들어오면 열린 근무 유니크 인덱스가 두 번째를 막는다 — 오류가 아니라 「이미 출근 중」.
+      if ((insertRes.error as { code?: string }).code === "23505") {
+        await logAttempt({ success: false, failureReason: "open_session_exists", resolvedSiteId: site.id });
+        return { ok: false, reason: "open_session", siteName: localizedSiteName(site, locale) };
+      }
       await logAttempt({ success: false, failureReason: null, resolvedSiteId: site.id });
       return { ok: false, reason: "error", siteName: localizedSiteName(site, locale) };
     }
@@ -335,16 +360,11 @@ export async function submitAttendanceScan(
   }
   const open = openSession;
 
-  // Midnight-crossing is abnormal — do not silently normalize. Flag for later review (full midnight
-  // sweep is a later step); never downgrade an already-flagged session.
-  const crossedMidnight = open.operating_date !== tokyoDate(nowIso);
-  const reviewState = crossedMidnight ? "review_required" : open.review_state;
-
+  // 자정을 넘긴 근무는 위에서 `stale_session` 으로 걸러졌다 — 여기 오는 근무는 모두 오늘 운영일이다.
   const updateRes = await service
     .from("attendance_sessions")
     .update({
       status: "completed",
-      review_state: reviewState,
       clock_out_at: nowIso,
       clock_out_site_id: site.id,
       clock_out_method: "gps_qr",
@@ -355,32 +375,19 @@ export async function submitAttendanceScan(
       clock_out_device_info: deviceInfo,
     })
     .eq("id", open.id)
-    .eq("status", "open");
+    .eq("status", "open")
+    .select("id");
   if (updateRes.error) {
     await logAttempt({ success: false, failureReason: null, resolvedSiteId: site.id });
     return { ok: false, reason: "error", siteName: localizedSiteName(site, locale) };
   }
+  // 0행 = 같은 퇴근이 먼저 처리됐다(두 번 누름). 성공으로 기록하지 않는다.
+  if (!updateRes.data || updateRes.data.length === 0) {
+    await logAttempt({ success: false, failureReason: null, resolvedSiteId: site.id });
+    return { ok: false, reason: "no_session", siteName: localizedSiteName(site, locale) };
+  }
 
   await logAttempt({ success: true, failureReason: null, resolvedSiteId: site.id });
-
-  // Admin alert for an abnormal (midnight-crossing) session that needs review.
-  if (crossedMidnight) {
-    const adminIds = await getAttendancePayrollAdminUserIds(service, organizationId);
-    await notifyAttendanceAdmins(service, {
-      organizationId,
-      recipientUserIds: adminIds,
-      actorUserId: userId,
-      dedupeBase: `attendance_abnormal:${open.id}`,
-      href: "/mobile/attendance",
-      sourceId: open.id,
-      payload: {
-        event: "abnormal_session",
-        subjectUserId: userId,
-        subjectName: session?.user.name ?? null,
-        sessionId: open.id,
-      },
-    });
-  }
 
   await rememberTrustedDevice({ userId, organizationId, userAgent: input.userAgent ?? null });
   return {
@@ -402,7 +409,10 @@ export type BreakActionResult =
   | { ok: true }
   | { ok: false; reason: "no_session" | "already_on_break" | "no_open_break" | "error" };
 
-/** Resolve the caller's single open session id (status = 'open') within an org, or null. */
+/**
+ * Resolve the caller's single open session id (status = 'open') within an org, or null.
+ * 지난 운영일의 열린 근무(퇴근 미기록)는 없는 것으로 본다 — 거기에 휴게를 붙이면 안 된다(`isStaleOpenSession`).
+ */
 async function getOpenSessionId(
   service: ReturnType<typeof getSupabaseServiceClient>,
   userId: string,
@@ -414,6 +424,7 @@ async function getOpenSessionId(
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
     .eq("status", "open")
+    .eq("operating_date", tokyoDate(new Date().toISOString()))
     .maybeSingle();
   const row = res.data as { id: string } | null;
   return res.error ? null : (row?.id ?? null);
@@ -760,17 +771,19 @@ export async function respondOpenSessionReminder(
   const userId = session.user.id;
   const service = getSupabaseServiceClient();
 
+  const today = tokyoDate(new Date().toISOString());
+  // 오늘 운영일의 열린 근무에만 답한다 — 지난 날 퇴근 미기록은 정정 요청 대상이다.
   const openRes = await service
     .from("attendance_sessions")
     .select("id")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
     .eq("status", "open")
+    .eq("operating_date", today)
     .maybeSingle();
   const open = openRes.data as { id: string } | null;
   if (!open) return { ok: false, reason: "no_session" };
 
-  const today = tokyoDate(new Date().toISOString());
   const up = await service
     .from("attendance_open_session_reminders")
     .upsert(

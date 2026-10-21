@@ -1481,7 +1481,8 @@ temp site + scannable QR for app testing.
 
 **Step 3 (2026-06-17):** worker **GPS + QR clock-in/out** writes `attendance_sessions` (one `open` per
 user; Tokyo `operating_date`; clock-in/out site, method `gps_qr`, QR token ref, lat/long/accuracy,
-device info; clock-out flags `review_required` when it crosses midnight) and logs every attempt to
+device info; since 2026-10-21 a prior-day open session is moved to `abandoned` and the clock-out is
+refused — it no longer flags `review_required`) and logs every attempt to
 `attendance_attempt_logs`. Via `submitAttendanceScan` (`src/app/mobile/attendance/actions.ts`,
 service-role); the open session is read by `getCurrentOpenSession` (`src/lib/attendance-sessions.ts`).
 In-app QR decode uses the `jsqr` dependency. `attendance_session_audits` are still untouched (manager

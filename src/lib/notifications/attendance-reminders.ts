@@ -58,8 +58,9 @@ export async function runAttendanceReminders(
   }
 
   for (const s of openSessions) {
-    // 1) Worker 18:30 reminder (once/day via dedupe).
-    if (past1830) {
+    // 1) Worker 18:30 reminder (once/day via dedupe). 오늘 운영일 근무에만 — 지난 날 퇴근 미기록에
+    //    「아직 근무 중인가요?」를 묻지 않는다(그건 정정 요청 대상, `isStaleOpenSession`).
+    if (past1830 && s.operating_date === today) {
       const { created } = await createAttendanceOpenSessionReminder(service, {
         organizationId: s.organization_id,
         userId: s.user_id,

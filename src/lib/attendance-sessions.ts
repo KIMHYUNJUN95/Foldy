@@ -6,11 +6,11 @@
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import type { AttendanceSessionRow } from "@/lib/attendance";
+import { isStaleOpenSession, type AttendanceSessionRow } from "@/lib/attendance";
 import { tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
 
 // 문자열 리터럴이어야 타입 수준 파싱이 된다(배열 join 은 GenericStringError 로 떨어진다).
-const OPEN_SESSION_SELECT = "id, clock_in_at, clock_in_site_id" as const;
+const OPEN_SESSION_SELECT = "id, operating_date, clock_in_at, clock_in_site_id" as const;
 
 export type OpenAttendanceSession = {
   id: string;
@@ -81,12 +81,14 @@ export async function getAbandonedSessions(
   organizationId: string,
   userId: string,
 ): Promise<{ id: string; operatingDate: string }[]> {
+  // 지난 운영일인데 아직 `open` 인 근무도 같은 처지다(2026-10-21) — 다음 출근 · 퇴근 시도 때 `abandoned` 로
+  // 넘어가지만, 그 전에도 홈은 「근무 중」이 아니라 이 배너로 보여 준다(`isStaleOpenSession`).
   const { data, error } = await getSupabaseServiceClient()
     .from("attendance_sessions")
     .select("id, operating_date")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
-    .eq("status", "abandoned")
+    .or(`status.eq.abandoned,and(status.eq.open,operating_date.lt.${tokyoToday()})`)
     .order("operating_date", { ascending: false })
     .limit(10);
   if (error || !data) return [];
@@ -99,6 +101,8 @@ export async function getAbandonedSessions(
 /**
  * The user's current open work session (status = 'open'), or null. Org-scoped; the partial unique
  * index guarantees at most one. Resolves the clock-in site name for the home's info strip.
+ * 지난 운영일의 열린 근무는 null — 퇴근을 잊은 것이지 근무 중이 아니다(`isStaleOpenSession`, 2026-10-21).
+ * 홈은 출근 버튼과 퇴근 미기록 배너(`getAbandonedSessions`)를 보여 준다.
  */
 export async function getCurrentOpenSession(
   organizationId: string,
@@ -115,6 +119,7 @@ export async function getCurrentOpenSession(
   if (error || !data) return null;
 
   const session = data as AttendanceSessionRow;
+  if (isStaleOpenSession(session.operating_date, tokyoToday())) return null;
 
   // 쿼리 2(site name)와 쿼리 3(break rows)는 sessionId/siteId만 있으면 독립적으로 실행 가능하므로
   // Promise.all로 병렬 실행하여 직렬 대기 시간을 제거한다.
@@ -165,8 +170,10 @@ export async function getCurrentOpenSession(
 }
 
 /**
- * 홈 인사말용 오늘 근무 상태(2026-10-15) — 열린 세션이 있으면 근무 중, 오늘(도쿄) 출근해서 닫혔으면 퇴근,
- * 아니면 none. 실패하면 none(인사말만 덜 맞을 뿐 홈은 그대로).
+ * 홈 인사말용 오늘 근무 상태(2026-10-15) — 오늘(도쿄) 운영일의 열린 세션이 있으면 근무 중, 오늘 출근해서
+ * 닫혔으면 퇴근, 아니면 none. 실패하면 none(인사말만 덜 맞을 뿐 홈은 그대로).
+ * 지난 날 퇴근 미기록 · 무효 · 방치 근무는 세지 않는다(2026-10-21) — 전엔 어제 연 근무가 「근무 중」,
+ * 무효 처리된 오늘 근무가 「퇴근」으로 잡혔다.
  */
 export async function getTodayWorkState(
   organizationId: string,
@@ -178,7 +185,8 @@ export async function getTodayWorkState(
     .select("status")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
-    .or(`status.eq.open,clock_in_at.gte.${tokyoDayStart(tokyoToday())}`)
+    .gte("clock_in_at", tokyoDayStart(tokyoToday()))
+    .in("status", ["open", "completed", "reopened"])
     .limit(5);
   if (error || !data?.length) return "none";
   return data.some((r) => r.status === "open") ? "working" : "done";

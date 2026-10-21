@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ATTENDANCE_SESSION_STATUSES } from "@/lib/attendance";
+import { ATTENDANCE_SESSION_STATUSES, isStaleOpenSession } from "@/lib/attendance";
 
 /**
  * `abandoned` 계약 가드 (2026-08-04).
@@ -43,6 +43,37 @@ describe("abandoned attendance session contract", () => {
       fs.readFileSync("src/app/mobile/attendance/actions.ts", "utf8"),
     );
     expect(src).toContain('status: "abandoned"');
-    expect(src).toContain("openSession.operating_date !== tokyoDate(");
+    expect(src).toContain("isStaleOpenSession(openSession.operating_date, tokyoDate(");
+  });
+
+  // 2026-10-21 — 근무는 자정을 넘기지 않는다. 지난 운영일 근무를 지금 시각으로 닫으면 866시간짜리 근무가 됐다.
+  it("지난 운영일 근무는 퇴근으로 닫지 않는다", async () => {
+    const src = await import("fs").then((fs) =>
+      fs.readFileSync("src/app/mobile/attendance/actions.ts", "utf8"),
+    );
+    expect(src).toContain('if (input.mode === "out" && staleSession)');
+    expect(src).toContain('reason: "stale_session"');
+  });
+
+  it("홈은 지난 운영일 근무를 근무 중으로 보여 주지 않는다", async () => {
+    const src = await import("fs").then((fs) =>
+      fs.readFileSync("src/lib/attendance-sessions.ts", "utf8"),
+    );
+    expect(src).toContain("if (isStaleOpenSession(session.operating_date, tokyoToday())) return null;");
+    // 배너는 아직 `open` 인 지난 근무도 같이 보여 준다.
+    expect(src).toContain("and(status.eq.open,operating_date.lt.");
+  });
+});
+
+describe("isStaleOpenSession", () => {
+  it("오늘 운영일은 근무 중", () => {
+    expect(isStaleOpenSession("2026-10-21", "2026-10-21")).toBe(false);
+  });
+  it("어제 운영일은 퇴근 미기록 — 자정이 기준", () => {
+    expect(isStaleOpenSession("2026-10-20", "2026-10-21")).toBe(true);
+  });
+  it("달 · 해가 바뀌어도 같다", () => {
+    expect(isStaleOpenSession("2026-09-30", "2026-10-01")).toBe(true);
+    expect(isStaleOpenSession("2026-12-31", "2027-01-01")).toBe(true);
   });
 });

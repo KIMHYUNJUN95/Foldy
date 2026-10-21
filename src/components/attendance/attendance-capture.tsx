@@ -307,7 +307,7 @@ export function AttendanceCapture({
       <ClockDone result={result} isOut={isOut} userName={userName} locale={locale} onHome={goHome} copy={copy} />
     ) : phase === "result" && result ? (
       <BottomSheet ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle} className="att att__result-sheet capw-sheet" onClose={onDismiss}>
-        <ResultSheet result={result} isOut={isOut} onHome={goHome} onRetry={retry} copy={copy} />
+        <ResultSheet result={result} isOut={isOut} locale={locale} onHome={goHome} onRetry={retry} copy={copy} />
       </BottomSheet>
     ) : null;
 
@@ -416,12 +416,14 @@ export function AttendanceCapture({
 function ResultSheet({
   result,
   isOut,
+  locale,
   onHome,
   onRetry,
   copy,
 }: {
   result: AttendanceScanResult;
   isOut: boolean;
+  locale: string;
   onHome: () => void;
   onRetry: () => void;
   copy: AttendanceCopy;
@@ -487,6 +489,33 @@ function ResultSheet({
       return fail(copy.resultNoSessionTitle, [copy.resultNoSessionSub, copy.resultNoSessionHint], "home", true, "warn");
     case "open_break":
       return fail(copy.resultOpenBreakTitle, [copy.resultOpenBreakSub, copy.resultOpenBreakHint], "home", false, "warn");
+    case "stale_session": {
+      // 지난 근무(퇴근 미기록) — 그 근무에 묶인 정정 요청으로 바로 보낸다.
+      const date = result.staleDate
+        ? new Intl.DateTimeFormat(locale, { timeZone: "UTC", month: "long", day: "numeric" }).format(new Date(`${result.staleDate}T00:00:00Z`))
+        : "—";
+      return (
+        <div className="capr">
+          <span className="capr__ic is-warn" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M12 7v6M12 17h.01" />
+            </svg>
+          </span>
+          <h3 className="capr__t">{copy.resultStaleTitle.replace("{date}", date)}</h3>
+          <p className="capr__s">{copy.resultStaleSub}</p>
+          <p className="capr__s">{copy.resultStaleHint}</p>
+          <button type="button" className="capw-btn" onClick={onHome}>
+            {copy.resultHomeButton}
+          </button>
+          <Link
+            href={result.staleSessionId ? `/mobile/attendance/correction?sessionId=${result.staleSessionId}` : "/mobile/attendance/correction"}
+            className="capw__link"
+          >
+            {copy.resultStaleCorrection.replace("{date}", date)} ›
+          </Link>
+        </div>
+      );
+    }
     default:
       return fail(copy.resultGenericTitle, [copy.resultGenericSub], "retry", false);
   }

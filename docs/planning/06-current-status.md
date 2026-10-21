@@ -9,6 +9,14 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-21 — 근태 디버깅: 퇴근 미기록이 며칠짜리 근무로 저장되던 것
+
+- 실데이터에서 9/10 → 10/16 **866시간** 등 6건 발견 — 퇴근을 잊은 다음 날 홈이 어제 근무를 「근무 중」으로 띄우고 퇴근 버튼만 보여 줬다.
+  기준을 **자정**으로 확정(근무는 자정을 넘기지 않음): 지난 운영일 `open` 근무는 홈에서 근무 중이 아니고, 퇴근은 거절 → `abandoned` →
+  정정 요청으로 안내. 휴게 · 18:30 리마인더는 오늘 근무에만. 퇴근 · 출근 두 번 누름 처리, 앱 홈 인사말 상태도 고침.
+- 이미 생긴 6건과 지금 열린 1건(10/15)은 관리자 근태 화면에서 정리할 대상(데이터는 건드리지 않음).
+  상세 `docs/product/21-attendance-payroll-workflow.md` → 「퇴근 쪽 구멍 — 866시간 근무」.
+
 ## 2026-10-20 — 화면 스와이프 뒤로가기 다듬기 (앱 출시 전 점검)
 
 - 점검 측정 후 전부 고침: 놓은 뒤 손가락 속도 이어받기(전엔 첫 프레임 77px 튐) · 미는 동안 둥근 판(인스타그램) · 검색칸 입력이 스와이프를

@@ -213,7 +213,9 @@ Only the `owner` (or `senior_managing_director` / 전무, owner-equivalent since
 
 - all attendance dates use `Asia/Tokyo`
 - overnight work is not considered a normal operating case
-- if a session crosses midnight, it becomes a review-required abnormal session
+- **근무는 자정을 넘기지 않는다(2026-10-21 확정).** 운영일이 오늘보다 앞인 `open` 근무는 퇴근을 잊은 것이다
+  (`isStaleOpenSession`) — 퇴근으로 닫지 않고 `abandoned` 로 넘긴 뒤 정정 요청으로 받는다. 아래 「퇴근 미기록」 참고.
+  (예전 규칙 「자정을 넘긴 퇴근 = review_required 로 저장」은 폐기 — 그 경로로 866시간짜리 근무가 저장됐다.)
 - the next day can still start a new session
 
 ## Authentication Rules
@@ -932,6 +934,9 @@ should be defined separately when the reimbursement module is implemented.
 | | |
 | --- | --- |
 | 출근 시 지난 운영일의 `open` 이 있으면 | `abandoned` 로 옮기고 **새 출근을 통과**시킨다 |
+| **퇴근** 시 지난 운영일의 `open` 이 있으면(2026-10-21) | `abandoned` 로 옮기고 퇴근은 **거절**(`stale_session`) — 결과 시트가 그 근무의 정정 요청(`?sessionId=`)으로 안내 |
+| 근태 홈 · 앱 홈(2026-10-21) | 지난 운영일 `open` 은 「근무 중」이 아니다 — 출근 버튼 + 퇴근 미기록 배너(`abandoned` 와 함께 나열) |
+| 휴게 시작 · 종료 · 18:30 리마인더 응답 · 리마인더 발송 | 오늘 운영일 근무에만 |
 | 같은 운영일에 이미 열려 있으면 | 기존대로 거절(`open_session`) |
 | `clock_out_at` | **비운 채로 둔다** |
 | 급여 | 제외(`PayExcludeReason = "abandoned"`) — 0원 |
@@ -968,6 +973,22 @@ should be defined separately when the reimbursement module is implemented.
 
 가드: `src/lib/__tests__/attendance-abandoned.test.ts` — 위 조건들이 여러 파일에 흩어져 있어
 한 곳만 되돌려도 조용히 옛 동작으로 돌아가므로 소스를 직접 검사한다.
+
+### 퇴근 쪽 구멍 — 866시간 근무 (2026-10-21)
+
+**문제.** 위 처리는 **출근**에만 있었다. 퇴근을 잊은 다음 날 근태 홈을 열면 어제 근무가 「근무 중 150:xx」
+링과 **퇴근 버튼만**으로 떴고, 그 버튼을 누르면 며칠 전 출근부터 지금까지가 한 근무로 저장됐다 — 실데이터
+9/10 → 10/16 **866시간**, 528 · 471 · 51 · 49 · 47시간(모두 `review_required` 라 급여로 나가지는 않음, 관리자 정리 대상).
+그날 실제 출근은 기록되지 않았다.
+
+**기준 — 자정.** 현장 근무는 보통 8~9시 → 18시, 야근 1~2시간, 가장 늦은 퇴근이 23:30 정도로 **자정을 넘기지
+않는다**(사용자 확인). 그래서 새벽 몇 시까지 봐주는 유예 없이 출근과 같은 「운영일이 오늘보다 앞이면 지난 근무」
+하나로 판정한다(`isStaleOpenSession`, `src/lib/attendance.ts`). 드물게 자정을 넘겨 일한 날은 정정 요청 한 번이면 된다.
+
+**같이 고친 것.**
+- 퇴근 두 번 누름 — 두 번째가 0행 갱신인데 성공으로 기록 · 표시되던 것 → `no_session`.
+- 출근 두 번 누름이 거의 동시에 들어와 유니크 위반(23505) → 일반 오류 대신 `open_session`.
+- 앱 홈 인사말 상태(`getTodayWorkState`) — 지난 날 열린 근무를 「근무 중」, 오늘 무효 · 방치 근무를 「퇴근」으로 세던 것.
 
 ## 월 마감 동시 실행 · 고용형태 미설정 (2026-10-05)
 

@@ -529,8 +529,10 @@ export function canBeDenied(role: Role): boolean {
  * 판정식 — 앱과 SQL(`has_capability`)이 **같은 규칙**을 쓴다.
  *
  * ```txt
- * can = NOT denied
+ * can = NOT (denied AND deniable_role)
  *   AND ( granted OR role ∈ roles OR (platform_admin AND platformBypass) )
+ *
+ * 2026-10-21 부터 부여 · 차단 행은 키의 `individualGrant` · `individualDeny` 와 무관하게 판정에 든다(개발자 예외).
  * ```
  *
  * **차단이 최우선이다.** 개인 부여보다도 앞선다 — 「빼라」가 「줘라」보다 강해야 판단이 갈릴 때
@@ -548,14 +550,17 @@ export function evaluateCapability(args: {
 }): boolean {
   const policy = capabilityPolicy(args.capability);
 
-  if (args.denied && policy.individualDeny && canBeDenied(args.role)) return false;
+  // 개인 부여 · 차단은 **있으면 그대로 따른다.** `individualGrant` · `individualDeny` 는 「대표 · 전무가 걸 수 있는가」의 규칙이고,
+  // 개발자는 그와 무관하게 어떤 키든 켜고 끌 수 있다(2026-10-21 사용자 결정) — 그래서 판정에서는 정책 플래그를 보지 않는다.
+  // 플래그에 어긋나는 행은 개발자만 만들 수 있다(`grantMemberOverride`).
+  if (args.denied && canBeDenied(args.role)) return false;
 
   // 통과가 켜져 있으면 즉시 허용하고, **꺼져 있으면 일반 규칙으로 흘려보낸다.** 예전에는
   // `return policy.platformBypass` 라 통과가 꺼진 키에서 개발자가 개인 부여를 갖고도 거부됐다 —
   // SQL 은 흘려보내고 있어 둘의 답이 갈렸다(2026-09-10 감사).
   if (args.role === "developer_super_admin" && policy.platformBypass) return true;
 
-  if (args.granted && policy.individualGrant) return true;
+  if (args.granted) return true;
 
   return roleHasCapability(args.role, policy.roles);
 }

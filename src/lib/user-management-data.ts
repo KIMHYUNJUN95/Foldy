@@ -234,13 +234,14 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
       const deny = overrides.find((override) => override.key === key && override.effect === "deny");
       const on = effective.includes(key);
       const source: PermRowVM["source"] = deny ? "deny" : grant ? "grant" : fromRole ? "role" : "off";
+      // 개발자는 키의 개인 지정 허용 여부와 무관하게 전부 켜고 끈다(2026-10-21) — 대표 · 전무는 키 정책대로.
       const canToggle =
         source === "grant" || source === "deny"
           ? true
           : source === "role"
-            ? policy.individualDeny && canBeDenied(selected.role as Role)
-            : policy.individualGrant;
-      if (source === "off" && !policy.individualGrant) continue;
+            ? (isSuperAdmin || policy.individualDeny) && canBeDenied(selected.role as Role)
+            : isSuperAdmin || policy.individualGrant;
+      if (source === "off" && !canToggle) continue;
       perms.push({
         kind: "cap",
         key,

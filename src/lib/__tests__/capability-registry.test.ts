@@ -113,7 +113,9 @@ describe("판정식", () => {
     }
   });
 
-  it("차단을 허용하지 않는 키에서는 차단 행이 무시된다", () => {
+  // 2026-10-21 — 개발자 예외: 부여 · 차단 행은 키 정책(individualGrant · individualDeny)과 무관하게 판정에 든다.
+  // 정책 플래그는 「대표 · 전무가 걸 수 있는가」만 정한다(grantMemberOverride).
+  it("차단을 허용하지 않는 키라도 차단 행이 있으면 막힌다(개발자가 건 차단)", () => {
     expect(
       evaluateCapability({
         capability: "job_application.read",
@@ -121,7 +123,7 @@ describe("판정식", () => {
         granted: true,
         denied: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("역할이 비어 있는 키는 개인 지정으로만 열린다", () => {
@@ -162,7 +164,7 @@ describe("판정식", () => {
     }
   });
 
-  it("개인 부여를 허용하지 않는 키는 부여 행이 있어도 열리지 않는다", () => {
+  it("개인 부여를 허용하지 않는 키라도 부여 행이 있으면 열린다(개발자가 건 부여)", () => {
     expect(
       evaluateCapability({
         capability: "permission.manage",
@@ -170,7 +172,7 @@ describe("판정식", () => {
         granted: true,
         denied: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("전무는 owner 가 가진 것을 모두 가진다", () => {

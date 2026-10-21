@@ -421,6 +421,7 @@ export async function grantPermissionOverrideAction(input: {
     expiresAt: input.expiresAt ?? null,
     // 차단 면역 판정에 대상자의 역할이 필요하다(owner·전무는 잠글 수 없다).
     targetRole: ctx.membership.role as Role,
+    actorIsDeveloper: isDeveloper(ctx.actorRole),
   });
   if (!result.ok) return { ok: false, error: result.error };
   await logUserAudit({

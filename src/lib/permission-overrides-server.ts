@@ -129,6 +129,11 @@ export async function grantMemberOverride(input: {
   expiresAt: string | null;
   /** 대상자의 역할 — 차단 면역 판정에 쓴다. */
   targetRole: Role;
+  /**
+   * 거는 사람이 플랫폼 개발자인가. 개발자는 키의 개인 부여 · 차단 허용 여부와 무관하게 무엇이든 켜고 끈다
+   * (역할로 받은 기본 기능도 끌 수 있다, 2026-10-21 사용자 결정). 차단 면역 역할 · 시스템 키 · 자기부여 막기는 그대로.
+   */
+  actorIsDeveloper?: boolean;
 }): Promise<{ ok: true; override: MemberOverride } | { ok: false; error: string }> {
   if (!isCapability(input.permissionKey)) return { ok: false, error: "invalid_key" };
   const capability = input.permissionKey as Capability;
@@ -137,10 +142,10 @@ export async function grantMemberOverride(input: {
   // 관리 화면에 뜨지 않는 키(권한 관리 자체)는 개인 지정 대상이 아니다 — 뺏고 줄 수 있으면
   // 「아무도 권한을 관리할 수 없는」 잠금 상태가 만들어진다.
   if (policy.systemOnly) return { ok: false, error: "not_assignable" };
-  if (input.effect === "grant" && !policy.individualGrant) {
+  if (input.effect === "grant" && !policy.individualGrant && !input.actorIsDeveloper) {
     return { ok: false, error: "grant_not_allowed" };
   }
-  if (input.effect === "deny" && !policy.individualDeny) {
+  if (input.effect === "deny" && !policy.individualDeny && !input.actorIsDeveloper) {
     return { ok: false, error: "deny_not_allowed" };
   }
   // 소유자를 잠그면 되돌릴 사람이 없다.

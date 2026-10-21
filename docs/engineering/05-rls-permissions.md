@@ -1463,3 +1463,12 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   **관리자가 취소한 날도 스스로 다시 신청 못 함**(지우면 관리자 취소가 풀리므로 — 다시 넣기는 관리자).
 - 동료 배정은 **내가 배정된 날 중 오늘 · 내일만** 서버가 내려 준다(`loadMyShift` · `loadTodayRooms`) — 화면에서 숨기는 게 아니라 데이터를 안 준다.
 - 월 비교표 · 그 Excel/PDF 는 `cleaning.assign` **그리고** 급여 열람(`isAttendancePayrollAdmin`)이 둘 다 있어야 한다.
+
+## 2026-10-21 `has_capability` — 개인 부여 · 차단은 키 정책과 무관하게 든다 (마이그레이션 `202610210004_has_capability_overrides_always.sql`, 운영 적용)
+
+- 판정에서 `capability_policies.individual_grant` · `individual_deny` 조건을 뺐다. 활성 부여 행 → 열림, 활성 차단 행 → 막힘(차단 면역 owner · 전무 ·
+  플랫폼 개발자는 그대로). 앱 `evaluateCapability` 도 같은 규칙.
+- 두 플래그는 이제 「대표 · 전무가 걸 수 있는가」만 정한다(`grantMemberOverride` — 개발자는 플래그와 무관). `systemOnly` 키(권한 관리 자체)는 개발자도 못 건다.
+- 플래그에 어긋나는 행은 이전엔 만들 수 없었으므로 적용 시점의 판정 결과는 바뀌지 않는다.
+- 주의: 일부 기능은 아직 `has_capability` 가 아니라 역할 직접 비교(`has_org_role` · 앱의 `role === …`)로 막는다. 그런 곳은 개인 차단이 앱 판정
+  (`evaluateCapability` 를 쓰는 화면 · 서버 액션)에만 걸린다.

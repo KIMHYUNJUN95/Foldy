@@ -3,7 +3,7 @@
 // Admin · Attendance · manual work-session entry.
 // Field staff sometimes work off-site or forget to clock in/out, so a payroll admin enters the session by
 // hand: staff · date · clock-in · optional clock-out · free-text work location · reason. Wired to the
-// service-role `createManualAttendanceSession` (isAttendancePayrollAdmin, blocks a finalized month).
+// service-role `createManualAttendanceSession` (attendanceCan, blocks a finalized month).
 // Location is free text (no registered site required) and flows into per-user payroll exports.
 
 import { useEffect, useRef, useState, useTransition } from "react";

@@ -4,7 +4,7 @@
 //
 // Privileged review of correction requests: claim (in_review), approve (with AUTHORITATIVE application
 // to the session + audit), reject (required comment). Only `owner` / `attendance_payroll_admin` (or
-// platform admins) may call these — enforced server-side via `isAttendancePayrollAdmin`. User-submitted
+// platform admins) may call these — enforced server-side via `attendanceCan`. User-submitted
 // desired values are only proposals; on approval the admin confirms the FINAL values (defaulting to the
 // proposals) and those are written to the session. The review-queue UI lives in the web dashboard
 // (deferred); these actions are the backend it will call. Self-view (worker history / request status)

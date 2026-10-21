@@ -14,7 +14,7 @@ import { getDictionary } from "@/lib/i18n";
 
 // Admin · Attendance · Hourly Wage Management (Slice 7).
 // Per-member hourly rate management with inline live editor wired to
-// `setHourlyRate` server action (audit-logged, gated by isAttendancePayrollAdmin).
+// `setHourlyRate` server action (audit-logged, gated by attendanceCan).
 // Past closed rate tiers are non-editable (no retroactive change).
 export default async function AdminAttendanceWagesPage({
   searchParams,

@@ -165,7 +165,7 @@ function priorityRank(item: ReviewQueueItem): number {
 }
 
 /**
- * The org-wide attendance review queue. Caller MUST have verified `isAttendancePayrollAdmin` first.
+ * The org-wide attendance review queue. Caller MUST have verified `attendanceCan` first.
  * Resolves worker names, site names, break totals, and correction status; applies the documented
  * filters + name/date/site; orders by review priority then most-recent operating date.
  */

@@ -220,7 +220,7 @@ export async function exportCleaningHistoryReport(
 // ── 강제완료 (관리자 대리 완료) ─────────────────────────────────────────────
 // The console's only mutating action. Writes via the service-role client (RLS bypass) after an
 // app-level role check, matching the attendance admin-write pattern
-// (isAttendancePayrollAdmin + getSupabaseServiceClient in src/app/admin/attendance/actions.ts) —
+// (attendanceCan + getSupabaseServiceClient in src/app/admin/attendance/actions.ts) —
 // the cleaning_sessions UPDATE/INSERT RLS policies have no admin-on-behalf-of-another-staff branch,
 // so this intentionally does not rely on RLS for authorization.
 

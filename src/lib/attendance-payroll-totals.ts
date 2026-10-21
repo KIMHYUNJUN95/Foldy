@@ -6,7 +6,7 @@
 // data layer it (and export) will call.
 //
 // PRIVILEGE: org-wide compensation is owner / attendance_payroll_admin only. This function is
-// caller-agnostic (org + ym); the CALLER MUST gate it with `isAttendancePayrollAdmin` (the same pattern
+// caller-agnostic (org + ym); the CALLER MUST gate it with `attendanceCan` (the same pattern
 // as the review queue), and the `attendance_month_snapshots` admin-only SELECT RLS is the backstop.
 // Regular users / hourly workers never reach this — they only see their own pay via getMonthlyPayView.
 //

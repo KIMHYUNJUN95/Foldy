@@ -27,7 +27,7 @@ export type SessionUser = {
   preferredMode: AppMode;
   bottomNavTabs: string[];
   // Per-user override for the daily-report generator. Combined with the role check in
-  // `canGenerateDailyReport`; see profiles.can_generate_report.
+  // Legacy flag — the daily report is gated by the `can_generate_report` capability since 2026-10-21.
   canGenerateReport: boolean;
 };
 

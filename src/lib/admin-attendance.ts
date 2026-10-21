@@ -394,7 +394,7 @@ export async function getAdminAttendanceOverview(
 /**
  * Slice 2 — full review queue for the dashboard queue page.
  *
- * Returns the same `ReviewQueueItem[]` (gated by `isAttendancePayrollAdmin`) with no row limit,
+ * Returns the same `ReviewQueueItem[]` (gated by `attendanceCan`) with no row limit,
  * so the queue page can render the full review/pending/all tables client-side.
  */
 export type AdminAttendanceQueueData = {
@@ -407,7 +407,7 @@ export type AdminAttendanceQueueData = {
  * Slice 3 — admin-scoped correction requests for the queue page's `corr` tab.
  *
  * Wraps the existing `attendance_correction_requests` table (gated by
- * `isAttendancePayrollAdmin`). Derives a single primary "field" per request
+ * `attendanceCan`). Derives a single primary "field" per request
  * (clock-in / clock-out / site) from the desired_* columns, and pairs it with
  * the current session value as the "before" side of the diff. Session-less
  * (exception) requests render with `sessionId: null` and `beforeLabel: "—"`.
@@ -1325,7 +1325,7 @@ export async function listAttendanceAllowances(
 /**
  * Slice 5 — admin transport reimbursement review for `/admin/attendance/transport`.
  *
- * Wraps `getTransportReportSummaryForAdmin` (gated by `isAttendancePayrollAdmin`)
+ * Wraps `getTransportReportSummaryForAdmin` (gated by `attendanceCan`)
  * and derives KPI totals + month pager. Per-user item details + receipt thumbnails
  * load on demand via the `loadAdminTransportDetail` server action when a panel opens.
  */

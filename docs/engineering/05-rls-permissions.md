@@ -1507,3 +1507,12 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - **그대로 둔 것:** `memberships` · `organizations` · `invite_codes` · `membership_permission_overrides`(보안 뼈대 — 역할로만), `reservation_internal_notes`
   (권한 키 없음), 저장소(`storage.objects`) 업로드 규칙.
 - 검증: 운영에서 리더에게 `board.manage` · `attendance.settings` 부여 + `cleaning.work` 차단 → 그 사람 흉내로 true · true · false 확인 후 rollback.
+
+## 2026-10-22 저장소 사진 규칙 — 아르바이트 제외 없앰 (마이그레이션 `202610220001_storage_images_per_person.sql`, 운영 적용)
+
+- **버그:** 수리 · 분실물 · 주문 요청 사진(`request-images` 의 `lost-items` · `lost-found-handling` · `maintenance-reports` · `maintenance-resolutions` ·
+  `order-images`) 업로드가 `m.role <> 'part_time_staff'` 로 막혀 **아르바이트는 요청에 사진을 못 올렸다**(리더는 됨).
+- 업로드 = 그 조직 활성 멤버 누구나. 지우기 = 내가 올린 사진(`owner_id`) 또는 `request.delete_any`(남의 사진까지 지우는 건 아르바이트에게 열지 않음).
+- 공지 사진(`announcement-images`) 업로드 = 역할 비교 대신 `announcement.create`(사람마다 켠 작성 권한으로 사진도).
+- 경로 첫 칸(조직 id)은 정규식이 맞을 때만 uuid 로 바꿔 `has_capability` 에 넘긴다(틀리면 null → 권한 없음).
+- 검증: 운영에서 트랜잭션 안에 데모 계정을 아르바이트로 바꿔 흉내 → 요청 사진 업로드 성공, 공지 사진 업로드 거절 → rollback.

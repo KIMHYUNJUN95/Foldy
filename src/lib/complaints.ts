@@ -612,7 +612,7 @@ async function loadCommentForWrite(
   return data as unknown as ComplaintCommentRow;
 }
 
-/** 댓글 생성. part_time_staff 제외 전원. 대상 컴플레인이 같은 조직에 존재해야 함. */
+/** 댓글 생성. 권한 키 `complaint.comment`(역할 기본: 알바 빼고 전원, 사람마다 켜고 끔). 대상 컴플레인이 같은 조직에 존재해야 함. */
 export async function createComplaintComment(input: {
   session: AppSession;
   complaintId: string;

@@ -22,7 +22,7 @@ export async function requireAdminPageSession({
     redirect("/onboarding");
   }
   if (!hasAdminWebAccess(session)) {
-    redirect("/mobile");
+    redirect("/admin/no-access");
   }
 
   return session;

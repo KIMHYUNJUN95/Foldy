@@ -1,4 +1,3 @@
-import { CircleAlert } from "lucide-react";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { AttendanceSubnav } from "@/components/admin/attendance/attendance-subnav";
 import { AttendanceWagesClient } from "@/components/admin/attendance/attendance-wages-client";
@@ -11,6 +10,7 @@ import {
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 
 // Admin · Attendance · Hourly Wage Management (Slice 7).
 // Per-member hourly rate management with inline live editor wired to
@@ -91,17 +91,7 @@ export default async function AdminAttendanceWagesPage({
           />
         </>
       ) : (
-        <div className="card">
-          <div className="state">
-            <span className="state__ic empty">
-              <span className="ic">
-                <CircleAlert />
-              </span>
-            </span>
-            <div className="state__t">{c.wageNoDataTitle}</div>
-            <div className="state__s">{c.wageNoDataBody}</div>
-          </div>
-        </div>
+        <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}
     </AdminShell>
   );

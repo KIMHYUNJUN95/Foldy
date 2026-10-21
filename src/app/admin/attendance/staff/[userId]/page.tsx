@@ -1,4 +1,3 @@
-import { CircleAlert } from "lucide-react";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { AttendanceSubnav } from "@/components/admin/attendance/attendance-subnav";
 import { AttendanceStaffDetail } from "@/components/admin/attendance/attendance-staff-detail";
@@ -9,6 +8,7 @@ import {
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 
 // Admin · Attendance · Staff Detail (Slice 6).
 // Per-user monthly detail page wired to `getAdminStaffDetail` — header KPIs,
@@ -62,17 +62,7 @@ export default async function AdminAttendanceStaffPage({
       {detail.isPrivileged ? (
         <AttendanceStaffDetail data={detail} locale={locale} localeTag={localeTag} />
       ) : (
-        <div className="card">
-          <div className="state">
-            <span className="state__ic empty">
-              <span className="ic">
-                <CircleAlert />
-              </span>
-            </span>
-            <div className="state__t">{c.payNoDataTitle}</div>
-            <div className="state__s">{c.payNoDataBody}</div>
-          </div>
-        </div>
+        <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}
     </AdminShell>
   );

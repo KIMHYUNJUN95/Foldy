@@ -21,6 +21,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
   상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
 
+## 2026-10-21 — PC 권한 없음 화면
+
+- 관리자 웹 권한이 없으면 PC 에서 모바일 화면 대신 `/admin/no-access`(안내 + 로그아웃). 대시보드 안 메뉴 권한 없음은 공용 `AdminNoAccess` 카드
+  (근태 처리 · 급여 · 시급 · 교통비 · 직원 상세 · 연차). ko/ja/en. 로컬 빌드 + 데모 계정으로 확인(리더 PC → 안내, 폰 → /mobile, 대표 → /admin).
+  상세 `docs/product/05-admin-web-ia.md` 「권한 없음 화면」.
+
 ## 2026-10-21 — 권한: 리더 = 알바 기본 · 청소 배정은 사무실도
 
 - 리더(`staff`) 역할 기본 = 아르바이트와 같음(청소 작업만) — 관리자 웹 · 공지 작성 · 업무일지 · 수리 상태 · 분실물 · 컴플레인 댓글은 사람마다.

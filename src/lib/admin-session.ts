@@ -45,7 +45,7 @@ export async function requireAdminSession() {
   }
 
   if (!hasAdminWebAccess(session)) {
-    redirect("/mobile");
+    redirect("/admin/no-access");
   }
 
   return session;

@@ -27,7 +27,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     redirect("/onboarding");
   }
   if (!hasAdminWebAccess(session)) {
-    redirect("/mobile");
+    redirect("/admin/no-access");
   }
 
   const locale = session.user.preferredLanguage;

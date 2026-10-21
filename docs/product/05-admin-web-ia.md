@@ -1454,3 +1454,13 @@ Management Console" → Current Implementation Note.
   Booking.com 링크 열기 · 복사 · 편집). 1180px 아래에서는 패널이 아래로 내려간다.
 - 스타일은 `src/components/admin/ops/room-links.css`(`.adm .rl__*`, 콘솔 토큰만). 문구는 `dictionary.roomLinks`(ko/ja/en).
 - 도메인 계약: `docs/product/35-room-links.md`.
+
+## 권한 없음 화면 (2026-10-21)
+
+- **PC 에서 관리자 웹 권한(`admin_web.access`)이 없으면 `/admin/no-access`** 로 보낸다(`requireAdminSession` · `requireAdminPageSession` · `/admin`).
+  예전엔 `/mobile` 로 보냈는데 PC 에선 폰 너비로만 떠서 어색했다(사용자). 화면: 관리자 셸 없이 가운데 카드 — 「관리자 화면을 쓸 권한이 없어요」 ·
+  「필요하면 대표나 전무에게 요청해 주세요」 · 「출퇴근 · 청소 · 요청은 휴대폰 앱에서」 · 로그아웃. 「모바일로 열기」 버튼은 두지 않는다(PC 에서 모바일 화면은 쓰지 않음).
+  권한이 생기면 같은 주소가 `/admin` 으로 보낸다. 폰 · 태블릿은 미들웨어가 `/admin` 을 먼저 `/mobile` 로 보내므로 여기 오지 않는다.
+- **대시보드 안 한 메뉴의 권한이 없으면** 공용 `AdminNoAccess`(`src/components/admin/shared/admin-no-access.tsx`) — 「이 화면을 볼 권한이 없어요」 ·
+  「필요하면 대표나 전무에게 요청해 주세요」. 콘솔 빈 상태(`.card .state`)와 같은 모양, 자물쇠 아이콘. 근태 처리 · 급여 · 시급 · 교통비 · 직원 상세 · 연차에 적용
+  (예전엔 「데이터 없음」 문구를 빌려 써서 권한 문제인지 헷갈렸다). 새 메뉴도 권한 없음은 이 카드를 쓴다. 문구 `dictionary.admin.shared.noAccess*` (ko/ja/en).

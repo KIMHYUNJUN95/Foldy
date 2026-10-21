@@ -16,7 +16,7 @@ import {
 import { getAdminAttendanceBadgeStats } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
-import { CircleAlert } from "lucide-react";
+import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 
 const STATUS_GROUPS: LeaveStatusGroup[] = ["pending", "approved", "rejectedCancelled", "all"];
 const LEAVE_TYPES: LeaveType[] = ["annual", "paid", "special", "other"];
@@ -96,17 +96,7 @@ export default async function AdminAttendanceLeavePage({
         />
         </>
       ) : (
-        <div className="card">
-          <div className="state">
-            <span className="state__ic empty">
-              <span className="ic">
-                <CircleAlert />
-              </span>
-            </span>
-            <div className="state__t">{lc.noDataTitle}</div>
-            <div className="state__s">{lc.noDataBody}</div>
-          </div>
-        </div>
+        <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}
     </AdminShell>
   );

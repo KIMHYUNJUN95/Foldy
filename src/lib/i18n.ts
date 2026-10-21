@@ -1959,6 +1959,12 @@ const FALLBACK_DICTIONARY = {
     // labels and the Excel/PDF export buttons. Feature namespaces must NOT redefine these — see
     // CLAUDE.md → "Admin dashboard shared design contract".
     shared: {
+      noAccessTitle: "You don’t have access to this screen",
+      noAccessBody: "Ask the owner or managing director if you need it.",
+      noAccessConsoleEyebrow: "Admin console",
+      noAccessConsoleTitle: "You don’t have access to the admin console",
+      noAccessConsoleBody: "Only people who were given access can use the admin console. Ask the owner or managing director if you need it.",
+      noAccessConsoleHelp: "Clock-in, cleaning and requests are in the phone app.",
       exportXls: "Excel",
       exportPdf: "PDF",
       exportDone: "Export complete",
@@ -10056,6 +10062,12 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       navigationContract: "관리자 메뉴 구조",
       searchPlaceholder: "검색",
       shared: {
+        noAccessTitle: "이 화면을 볼 권한이 없어요",
+        noAccessBody: "필요하면 대표나 전무에게 요청해 주세요.",
+        noAccessConsoleEyebrow: "관리자 화면",
+        noAccessConsoleTitle: "관리자 화면을 쓸 권한이 없어요",
+        noAccessConsoleBody: "관리자 화면은 권한을 받은 사람만 쓸 수 있어요. 필요하면 대표나 전무에게 요청해 주세요.",
+        noAccessConsoleHelp: "출퇴근 · 청소 · 요청은 휴대폰 앱에서 할 수 있어요.",
         exportXls: "Excel",
         exportPdf: "PDF",
         exportDone: "내보내기가 완료되었습니다",
@@ -17995,6 +18007,12 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       navigationContract: "管理者メニュー構成",
       searchPlaceholder: "検索",
       shared: {
+        noAccessTitle: "この画面を見る権限がありません",
+        noAccessBody: "必要な場合は代表または専務に依頼してください。",
+        noAccessConsoleEyebrow: "管理画面",
+        noAccessConsoleTitle: "管理画面を使う権限がありません",
+        noAccessConsoleBody: "管理画面は権限を受けた人だけが使えます。必要な場合は代表または専務に依頼してください。",
+        noAccessConsoleHelp: "出退勤・清掃・依頼はスマホのアプリでできます。",
         exportXls: "Excel",
         exportPdf: "PDF",
         exportDone: "エクスポートが完了しました",

@@ -10,7 +10,7 @@ import {
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
-import { CircleAlert } from "lucide-react";
+import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 
 // Admin · Attendance · Review Queue (Slice 2).
 // Sessions table + multi-select bulk bar + right-detail session panel.
@@ -90,17 +90,7 @@ export default async function AdminAttendanceQueuePage({
           locale={locale}
         />
       ) : (
-        <div className="card">
-          <div className="state">
-            <span className="state__ic empty">
-              <span className="ic">
-                <CircleAlert />
-              </span>
-            </span>
-            <div className="state__t">{c.noDataTitle}</div>
-            <div className="state__s">{c.noDataBody}</div>
-          </div>
-        </div>
+        <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}
     </AdminShell>
   );

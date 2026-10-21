@@ -561,6 +561,16 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /** 근태 설정 — 출근 장소(QR) 만들기 · 고치기 · QR 발급/인쇄 · 등록 기기 해제. 예전 「대표 · 전무 · 개발자」 역할 비교(2026-10-21 키로). */
+  "attendance.settings": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
   /** 분실물 처리(상태 바꾸기 · 보관/반환). 알바(아르바이트 · 리더)는 역할로 못 받는다 — 필요한 사람에게 켠다(2026-10-21). */
   "lost_found.handle": {
     roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],

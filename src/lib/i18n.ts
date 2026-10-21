@@ -4001,6 +4001,10 @@ const FALLBACK_DICTIONARY = {
             label: "Lost & found — handle",
             desc: "Change status, store and return lost items",
           },
+          "attendance.settings": {
+            label: "Attendance — settings",
+            desc: "Clock-in places and QR codes, print QR, remove registered devices",
+          },
         } as Record<string, { label: string; desc: string }>,
       },
     },
@@ -12079,6 +12083,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
               label: "분실물 — 처리",
               desc: "분실물 상태 바꾸기 · 보관 · 반환",
             },
+            "attendance.settings": {
+              label: "근태 — 설정",
+              desc: "출근 장소 · QR 만들기와 인쇄 · 등록 기기 해제",
+            },
           },
         },
       },
@@ -20026,6 +20034,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "lost_found.handle": {
               label: "落とし物 — 処理",
               desc: "落とし物の状態変更・保管・返却",
+            },
+            "attendance.settings": {
+              label: "勤怠 — 設定",
+              desc: "出勤場所・QRの作成と印刷・登録端末の解除",
             },
           },
         },

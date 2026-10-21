@@ -14,7 +14,6 @@ import { SettingsConfirm } from "@/components/admin/settings/settings-confirm";
 import { SiteDangerActions } from "@/components/admin/settings/site-danger-actions";
 import { SiteGeoFields } from "@/components/admin/settings/site-geo-fields";
 import "@/components/admin/settings/settings-white.css";
-import { isOrgTopAdminOrPlatform } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { attendanceQrLinkState, buildAttendanceQrValue } from "@/lib/attendance-qr";
 import {
@@ -64,7 +63,7 @@ function tokyoDate(iso: string) {
 // See docs/product/24-attendance-workflow.md → "QR Deep Link" / "인쇄 전 안전장치".
 export default async function AdminAttendanceSettingsPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  if (!isOrgTopAdminOrPlatform(session.user.role) || !hasOrganizationContext(session)) {
+  if (!session.capabilities.includes("attendance.settings") || !hasOrganizationContext(session)) {
     redirect("/admin/settings?error=forbidden");
   }
 

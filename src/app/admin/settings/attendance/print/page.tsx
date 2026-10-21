@@ -1,6 +1,5 @@
 import QRCode from "qrcode";
 import { redirect } from "next/navigation";
-import { isOrgTopAdminOrPlatform } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { attendanceQrLinkState, buildAttendanceQrValue } from "@/lib/attendance-qr";
 import { getAttendanceSiteQrOverview } from "@/lib/attendance-sites";
@@ -30,7 +29,7 @@ function firstParam(value: string | string[] | undefined) {
 // See docs/product/24-attendance-workflow.md → "QR 인쇄".
 export default async function AttendanceQrPrintPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  if (!isOrgTopAdminOrPlatform(session.user.role) || !hasOrganizationContext(session)) {
+  if (!session.capabilities.includes("attendance.settings") || !hasOrganizationContext(session)) {
     redirect("/admin/settings?error=forbidden");
   }
 

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { isOrgTopAdminOrPlatform } from "@/config/roles";
 import { requireAdminSession } from "@/lib/admin-session";
 import { getDictionary } from "@/lib/i18n";
 import { hasOrganizationContext } from "@/lib/session";
@@ -20,7 +19,7 @@ export default async function AdminSettingsPage({
   const errorKey = Array.isArray(errorRaw) ? errorRaw[0] : errorRaw;
   const suffix = errorKey ? `?error=${encodeURIComponent(errorKey)}` : "";
 
-  if (isOrgTopAdminOrPlatform(session.user.role) && hasOrganizationContext(session)) {
+  if (session.capabilities.includes("attendance.settings") && hasOrganizationContext(session)) {
     redirect(`/admin/settings/attendance${suffix}`);
   }
   if (session.user.role === "developer_super_admin") {

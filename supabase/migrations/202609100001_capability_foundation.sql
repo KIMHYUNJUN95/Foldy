@@ -167,6 +167,8 @@ insert into public.capability_roles (capability, role) values
   ('transport.manage', 'senior_managing_director'::organization_role),
   ('leave.approve', 'owner'::organization_role),
   ('leave.approve', 'senior_managing_director'::organization_role),
+  ('attendance.settings', 'owner'::organization_role),
+  ('attendance.settings', 'senior_managing_director'::organization_role),
   ('lost_found.handle', 'owner'::organization_role),
   ('lost_found.handle', 'senior_managing_director'::organization_role),
   ('lost_found.handle', 'office_admin'::organization_role),
@@ -210,6 +212,7 @@ insert into public.capability_policies (capability, individual_grant, individual
   ('wages.manage', true, true, true),
   ('transport.manage', true, true, true),
   ('leave.approve', true, true, true),
+  ('attendance.settings', true, true, true),
   ('lost_found.handle', true, true, true);
 -- <<< generated
 

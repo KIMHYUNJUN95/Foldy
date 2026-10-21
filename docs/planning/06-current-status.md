@@ -21,6 +21,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
   상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
 
+## 2026-10-21 — DB 규칙도 권한 키로 · 근태 설정 키
+
+- 공지 · 게시판 · 버그 · 청소 · 린넨 · 요청 · 건물 운영 정보의 DB 보안 규칙을 역할 목록에서 권한 키로(`202610210007` 운영 적용) — 사람별 설정이 DB 에서도 적용.
+  계정 · 조직 · 초대 코드 · 권한 표 · 예약 내부 메모는 그대로. 연차 기준일수 DB 함수도 리더 제외.
+- 새 키 `attendance.settings`(출근 장소 · QR · 등록 기기, 기본 대표 · 전무). ko/ja/en.
+
 ## 2026-10-21 — PC 권한 없음 화면
 
 - 관리자 웹 권한이 없으면 PC 에서 모바일 화면 대신 `/admin/no-access`(안내 + 로그아웃). 대시보드 안 메뉴 권한 없음은 공용 `AdminNoAccess` 카드

@@ -1484,3 +1484,26 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 예전 표시 컬럼(`attendance_payroll_admin` · `leave_approver_role`)은 남지만 어떤 판정도 보지 않는다.
 - 검증: 운영에서 트랜잭션 안에 리더에게 `attendance.manage` 부여 + `lost_found.handle` 차단 → `request.jwt.claims` 로 그 사람을 흉내 →
   근태 true · 급여 false · 교통비 false · 분실물 false 확인 후 rollback.
+
+## 2026-10-21 역할 목록 → 권한 키 (마이그레이션 `202610210007_rls_role_lists_to_capabilities.sql`, 운영 적용)
+
+- `has_org_role(org, ARRAY[역할…])` 로 판단하던 정책을 같은 기능의 권한 키 `has_capability(org, auth.uid(), 키)` 로 바꿨다 — 사람마다 켠 권한이
+  DB 에서도 열리고, 끈 권한이 DB 에서도 닫힌다. 키의 역할 기본값이 예전 역할 목록과 같도록 골랐다.
+
+  | 표 | 키 |
+  | --- | --- |
+  | `announcements` 작성 / 수정 · 삭제, `announcement_reads` 관리자 읽기 | `announcement.create` / `announcement.manage`(작성자는 작성 권한이 남아 있을 때) |
+  | `attendance_trusted_devices` 관리자 읽기 · 해제 | 새 키 `attendance.settings`(대표 · 전무) |
+  | `board_posts` · `board_comments` 남의 글 | `board.manage` |
+  | `bug_reports` 읽기 · 상태 | `bug.review` |
+  | `cleaning_sessions` 시작 · 완료 / 남의 기록 읽기 | `cleaning.work` / `cleaning.read_all` |
+  | `linen_items` · `linen_return_records` · `linen_return_record_items` | `linen.manage` |
+  | `lost_items` · `maintenance_reports` · `order_requests` 남의 것 삭제 | `request.delete_any` |
+  | `maintenance_reports` 수정 | `maintenance_status_change`(예전 역할 + 부여 표시) |
+  | `order_requests` 수정 / 처리 칸 트리거 `enforce_order_request_processing` | `order_processor` ∨ `request.delete_any` / `order_processor` |
+  | `property_operation_infos` | `property_info.edit` |
+
+- `set_annual_leave_baseline_atomic` 은 시급제 역할(`part_time_staff` · `staff`)을 연차 대상에서 뺀다(앱 `isLeaveHourlyRole` 과 같게).
+- **그대로 둔 것:** `memberships` · `organizations` · `invite_codes` · `membership_permission_overrides`(보안 뼈대 — 역할로만), `reservation_internal_notes`
+  (권한 키 없음), 저장소(`storage.objects`) 업로드 규칙.
+- 검증: 운영에서 리더에게 `board.manage` · `attendance.settings` 부여 + `cleaning.work` 차단 → 그 사람 흉내로 true · true · false 확인 후 rollback.

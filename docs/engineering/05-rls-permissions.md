@@ -1300,6 +1300,15 @@ authenticated` + `grant execute … to service_role` 을 함께 넣었다 — �
 판매 캘린더 「이력」 패널의 서버 액션(`loadOpsChangeHistory` · `loadOpsSendLog` · `sendPendingPriceJobs`)은
 service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organization_id = session.organization.id`).
 
+## 2026-10-21 `beds24_property_rates_state` — service_role 전용
+
+마이그레이션 `202610210001_beds24_property_rates_state.sql`.
+
+- RLS 켜고 **정책 없음** + `revoke all … from anon, authenticated` + `grant all … to service_role` —
+  `beds24_deferred_refreshes` 와 같은 방식. 건물별 요금 읽기 시각 · 웹훅 도착 시각 · 놓친 변경 기록만 담는 시스템 표다.
+- 쓰는 곳: 재고 웹훅(`price-webhook.ts`) · 틱 · `/api/beds24/rates-sync`(전부 서비스 롤). 안전망이 건물을 읽을 때는
+  행에 적힌 `organization_id` 로 `syncBeds24RoomRates` 를 부르고, 그 함수가 모든 쿼리에 그 조직을 직접 건다.
+
 ## 2026-09-30 `beds24_deferred_refreshes` · Beds24 틱 함수 — service_role 전용
 
 마이그레이션 `202609300003_beds24_deferred_refreshes.sql` · `202609300004_beds24_tick_cron.sql` (운영 미적용).

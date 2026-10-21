@@ -293,7 +293,7 @@ curl -sX POST localhost:3000/api/beds24/rates-sync -H "authorization: Bearer $BE
 #### 되돌리기
 
 Beds24 URL 을 저쪽 주소로 되돌리면 즉시 원상복구된다. 그 사이 놓친 요금은 주기 동기화
-(`/api/beds24/rates-sync`, 15분 예정 · 실측 약 6시간)가 메운다 — 웹훅은 「즉시」를 위한 것이지 유일한 경로가 아니다.
+(`/api/beds24/rates-sync`, 15분 예정 · 한 번에 가장 오래된 건물 3곳 — 2026-10-21)가 메운다 — 웹훅은 「즉시」를 위한 것이지 유일한 경로가 아니다.
 
 ### 객실 × 월 집계 틱 (pg_cron + pg_net, 2026-10-08)
 

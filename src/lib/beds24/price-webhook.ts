@@ -27,6 +27,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { syncBeds24RoomRates } from "@/lib/beds24/room-rates-sync";
 import { syncBeds24RoomBlocks } from "@/lib/beds24/room-blocks-sync";
+import { markPropertyFullRead, markPropertyWebhook } from "@/lib/beds24/property-rates-state";
 import { hasPendingPriceJobs } from "@/lib/beds24/price-job-queue";
 import { acquireBeds24Lock, getBeds24Cooldown, releaseBeds24Lock } from "@/lib/beds24/sync-locks";
 import type { Database } from "@/types/database";
@@ -100,6 +101,7 @@ export async function refreshBeds24Property(
     return { yielded };
   }
 
+  const readStartedAt = Date.now();
   const rates = await syncBeds24RoomRates(organizationId, supabase, undefined, {
     externalPropertyIds: [externalPropertyId],
   });
@@ -113,6 +115,8 @@ export async function refreshBeds24Property(
 
   if (rates.skipped.length === 0) {
     await clearDeferredRefresh(supabase, externalPropertyId, startedAt);
+    // 안전망은 가장 오래 안 읽힌 건물부터 돈다 — 방금 읽은 이 건물은 뒤로 밀린다.
+    await markPropertyFullRead(supabase, organizationId, externalPropertyId, source, readStartedAt);
   } else if (source === "webhook") {
     // 읽다 실패했다(429 등). 버리지 않고 틱에게 넘긴다.
     await recordDeferredRefresh(supabase, {
@@ -329,6 +333,9 @@ export async function processBeds24PriceWebhook(args: {
   const lastSyncedAt = (freshResult.data as { synced_at: string } | null)?.synced_at ?? null;
   const organizationId = row.organization_id;
   const supabase = args.supabase;
+
+  // 배달이 왔다는 사실은 디바운스와 상관없이 남긴다 — 안전망이 「웹훅이 놓쳤나」를 가릴 때 쓴다.
+  await markPropertyWebhook(supabase, organizationId, externalPropertyId);
 
   /**
    * 창이 끝나면 한 번 더 읽도록 예약한다(건물별로 하나만). 이미 누가 예약했으면 그걸로 충분하다.

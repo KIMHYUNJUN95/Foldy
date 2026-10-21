@@ -1562,6 +1562,47 @@ export type Database = {
           },
         ]
       }
+      beds24_property_rates_state: {
+        Row: {
+          external_property_id: string
+          last_full_read_at: string | null
+          last_full_read_source: string | null
+          last_missed_at: string | null
+          last_missed_changes: number | null
+          last_webhook_at: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          external_property_id: string
+          last_full_read_at?: string | null
+          last_full_read_source?: string | null
+          last_missed_at?: string | null
+          last_missed_changes?: number | null
+          last_webhook_at?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          external_property_id?: string
+          last_full_read_at?: string | null
+          last_full_read_source?: string | null
+          last_missed_at?: string | null
+          last_missed_changes?: number | null
+          last_webhook_at?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beds24_property_rates_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beds24_sync_locks: {
         Row: {
           expires_at: string

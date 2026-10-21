@@ -9,6 +9,14 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-21 — 요금 안전망: 건물을 나눠 돌고, 웹훅이 놓친 변경을 알린다
+
+- 15분 요금 안전망(`/api/beds24/rates-sync`)이 10-19 · 10-21 에 504 로 실패(GitHub 메일) — 9건물 × 12개월을 한 번에 읽다
+  Beds24 연결 지연(10초)이 겹쳐 60초 상한 초과. 이제 **가장 오래 안 읽힌 건물부터 3곳만** 읽는다(웹훅이 방금 읽은 건물은 뒤로).
+- 안전망이 읽었는데 Beds24 가격이 우리 표와 달랐으면 = **웹훅이 놓친 것** → 워크플로 실패로 GitHub 메일. 실시간(웹훅)이 끊긴 순간을 잡는다.
+- 새 표 `beds24_property_rates_state`(마이그레이션 `202610210001`). 상세 `docs/product/33-calendar-write-features.md` →
+  「안전망은 건물을 나눠 돈다 · 웹훅이 놓친 변경 감지」.
+
 ## 2026-10-21 — 네이티브급 움직임 점검 (앱 출시 전)
 
 점검으로 찾은 5개(순서: 5 → 1~3 → 4). PWA 노치 띠는 그대로 둔다(일체형은 앱이 맡음).

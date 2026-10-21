@@ -5,23 +5,22 @@ name: Beds24 rates sync
 # 판매 캘린더의 가격·최소숙박·재고는 `room_daily_rates` 에서 온다. 그 표가 낡으면 화면은
 # **없는 가격을 보여주는 화면**이 된다 — 그대로 가격을 고치면 엉뚱한 값에서 출발한다.
 #
-# Beds24 는 가격 변경을 웹훅으로도 보낼 수 있고 우리 엔드포인트도 그걸 받을 준비가 돼 있다
-# (`src/lib/beds24/price-webhook.ts`). 그런데 2026-09-17 실측 결과, 두 달간 들어온 웹훅
-# **20,157건이 전부 예약**이고 가격은 0건이었다 — Beds24 의 「予約Webhook」 칸에만 우리 URL 이
-# 등록돼 있기 때문이다.
+# 2026-09-29 재고 웹훅을 이쪽으로 전환한 뒤로 **웹훅이 메인**이다 — Beds24 에서 가격·재고·최소숙박이
+# 바뀌면 그 건물을 몇 초 안에 다시 읽는다(`src/lib/beds24/price-webhook.ts`). 이 워크플로는 놓친 배달을
+# 메우는 안전망이다. 저쪽 프로젝트도 `priceWebhook`(즉시) + `scheduledBeds24PriceSync`(주기)를 함께 돌린다.
 #
-# 저쪽 프로젝트도 웹훅 하나에 기대지 않는다: `priceWebhook`(즉시)과
-# `scheduledBeds24PriceSync`(**15분마다 전체 동기화**)를 함께 돌린다.
-# 이 워크플로가 그 두 번째 축이다.
+# 한 번에 **가장 오래 안 읽힌 건물부터 3곳만** 읽는다(2026-10-21). 9건물을 한 번에 읽던 때는 Beds24
+# 연결이 한 번 늦으면 60초 상한을 넘겨 504 로 실패했다(10-19 · 10-21).
+#
+# 안전망이 읽었는데 Beds24 가격이 우리 표와 다르면 = **웹훅이 그 변경을 놓쳤다.** 응답의
+# `webhookMissed` 가 비어 있지 않으면 이 작업을 실패로 끝내 GitHub 메일로 알린다 — 판매 캘린더가
+# 실시간이 아니게 됐다는 뜻이다(Beds24 웹훅 설정 · 배달 상태를 확인할 것).
 #
 # CADENCE
 # -------
 # GitHub Actions 의 schedule 은 **정시에 안 온다.** 이 저장소에서 `*/5` 로 걸어 둔 작업이 실제로
 # 40분~3시간 40분 뒤에 돈 적이 있다(recruit-sync 실측). 그래서 15분으로 적어 두되 실제로는
 # 그보다 늦게 도는 것을 전제한다 — 동기화가 멱등하므로 늦거나 겹쳐도 해가 없다.
-#
-# 가격이 방금 바뀐 것을 즉시 반영해야 하면 웹훅 경로가 필요하다. Beds24 설정에서 가격/재고
-# 트리거에 우리 URL 을 등록하면 켜진다.
 #
 # SETUP (one-time): repository secret `BEDS24_WEBHOOK_SECRET`
 #   (GitHub → repo Settings → Secrets and variables → Actions)
@@ -65,4 +64,11 @@ jobs:
           if [ "${code}" != "200" ] && [ "${code}" != "202" ]; then
             echo "::error::rates sync failed with HTTP ${code}"
             exit 1
+          fi
+          if [ "${code}" = "200" ]; then
+            missed=$(jq -r '[.webhookMissed[]? | "\(.externalPropertyId):\(.changes)"] | join(", ")' /tmp/rates-sync.json)
+            if [ -n "${missed}" ]; then
+              echo "::error::Beds24 webhook missed price changes (property:cells) — ${missed}. Check the Beds24 inventory webhook."
+              exit 1
+            fi
           fi

@@ -1957,6 +1957,23 @@ r.synced_at < excluded.synced_at and r.organization_id = excluded.organization_i
 통과 값을 즉시 로컬에 반영할 때)는 일반 `upsert()` 를 쓰되 자기 쓰기 시각을 `synced_at` 으로 찍어 같은
 규약을 지킨다.
 
+## 2026-10-21 `beds24_property_rates_state` — 건물별 요금 읽기 상태
+
+마이그레이션: `supabase/migrations/202610210001_beds24_property_rates_state.sql`. 계약:
+`docs/product/33-calendar-write-features.md` → 「안전망은 건물을 나눠 돈다 · 웹훅이 놓친 변경 감지」.
+
+| 열 | 형 | 뜻 |
+| --- | --- | --- |
+| `external_property_id` | text PK | Beds24 건물 번호. 건물당 한 줄 |
+| `organization_id` | uuid FK → organizations | 그 건물의 조직 |
+| `last_full_read_at` | timestamptz null | 12개월을 오류 없이 다시 읽기 **시작한** 마지막 시각 — 안전망은 이 값이 오래된(null 먼저) 건물부터 돈다 |
+| `last_full_read_source` | text null | `webhook` · `tick` · `net` |
+| `last_webhook_at` | timestamptz null | 이 건물 재고(가격) 웹훅이 마지막으로 도착한 시각(디바운스로 미룬 배달 포함) |
+| `last_missed_at` · `last_missed_changes` | timestamptz · int null | 안전망이 웹훅이 놓친 가격 변경을 찾은 마지막 시각과 칸 수 |
+| `updated_at` | timestamptz | |
+
+인덱스 `(last_full_read_at nulls first)`. 쓰기: `src/lib/beds24/property-rates-state.ts`. 서비스 롤 전용(05 문서).
+
 ## 2026-09-30 `beds24_deferred_refreshes` · Beds24 틱 함수 — 쿨다운이 풀리면 이어받기
 
 마이그레이션: `supabase/migrations/202609300003_beds24_deferred_refreshes.sql`,

@@ -391,7 +391,7 @@ function TransportPanel({
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else {
-        setErr(c.actionFailed);
+        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
       }
     });
   }
@@ -407,7 +407,7 @@ function TransportPanel({
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else {
-        setErr(c.actionFailed);
+        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
       }
     });
   }
@@ -433,7 +433,7 @@ function TransportPanel({
       } else if (res.reason === "comment_required") {
         setErr(c.actionReasonRequired);
       } else {
-        setErr(c.actionFailed);
+        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
       }
     });
   }
@@ -459,7 +459,7 @@ function TransportPanel({
       } else if (res.reason === "comment_required") {
         setErr(c.actionReasonRequired);
       } else {
-        setErr(c.actionFailed);
+        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
       }
     });
   }
@@ -480,7 +480,7 @@ function TransportPanel({
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else {
-        setErr(c.actionFailed);
+        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
       }
     });
   }

@@ -21,6 +21,11 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
   상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
 
+## 2026-10-22 — 관리자 근태 액션 검토 · 수정 7건
+
+- 급여 내보내기 교통비 0 원(권한 분리 회귀) · 퇴사자 마지막 달 마감 · 추가수당 불가 · 마감된 달 교통비 승인/다시 열기 · 정정 승인으로 운영일 밖 출근 시각 ·
+  수동 정정으로 출근 시각 삭제 · 무효 복구의 자정 넘김 · 변경 기록 「퇴근 미기록」 글자. 상세 `docs/product/21-attendance-payroll-workflow.md` 맨 아래.
+
 ## 2026-10-21 — DB 규칙도 권한 키로 · 근태 설정 키
 
 - 공지 · 게시판 · 버그 · 청소 · 린넨 · 요청 · 건물 운영 정보의 DB 보안 규칙을 역할 목록에서 권한 키로(`202610210007` 운영 적용) — 사람별 설정이 DB 에서도 적용.

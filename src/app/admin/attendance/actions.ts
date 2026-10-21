@@ -254,6 +254,10 @@ export async function approveCorrectionRequest(
     if (!validClockOrder(resultingIn, resultingOut)) {
       return { ok: false, reason: "invalid" };
     }
+    // 출근 시각은 그 근무의 운영일 안이어야 한다 — 다른 날로 옮기면 급여 달 · 마감 확인이 옛 날짜 기준으로 남는다(2026-10-22 검토).
+    if (resultingIn && tokyoDateKey(resultingIn) !== s.operating_date) {
+      return { ok: false, reason: "invalid" };
+    }
     if (await isFinalizedUserMonth(service, organizationId, s.user_id, ymdToYm(s.operating_date))) {
       return { ok: false, reason: "invalid" };
     }
@@ -774,7 +778,8 @@ export async function updateAttendanceSessionAdmin(
 
   if (input.clockInTime !== undefined) {
     if (input.clockInTime === null) {
-      update.clock_in_at = null;
+      // 출근 시각을 지우면 출근 없는 근무가 남는다 — 지울 거면 무효 처리(2026-10-22 검토).
+      return { ok: false, reason: "invalid" };
     } else {
       if (!isHhmm(input.clockInTime)) return { ok: false, reason: "invalid" };
       const at = tokyoInstant(s.operating_date, input.clockInTime);
@@ -995,7 +1000,7 @@ export async function restoreAttendanceSession(
   };
   const after = {
     status: "completed",
-    review_state: "normal",
+    review_state: crossesTokyoMidnight(s.clock_in_at, s.clock_out_at) ? "review_required" : "normal",
     invalidated_at: null,
     invalidated_by_user_id: null,
     invalidated_reason: null,
@@ -1064,12 +1069,12 @@ export async function finalizeAttendanceMonth(input: {
   }
   if (!/^\d{4}-\d{2}$/.test(input.ym)) return { ok: false, reason: "invalid" };
 
+  // 비활성(퇴사)이어도 이 조직 멤버면 된다 — 마지막 달 급여를 닫아야 한다(2026-10-22 검토).
   const member = await service
     .from("memberships")
     .select("id")
     .eq("organization_id", organizationId)
     .eq("user_id", input.userId)
-    .eq("status", "active")
     .maybeSingle();
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
@@ -1276,20 +1281,15 @@ export async function exportMonthlyPayrollWorkbook(
 
   const locale = session.user.preferredLanguage;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-  const [data, transport] = await Promise.all([
-    getAdminAttendancePayroll(session, ym, localeTag),
-    getAdminAttendanceTransport(session, ym, localeTag),
-  ]);
+  const data = await getAdminAttendancePayroll(session, ym, localeTag);
   if (!data.isPrivileged) return { ok: false, reason: "forbidden" };
   const exportRows = options.hourlyOnly ? data.rows.filter(isHourlyPayrollExportRow) : data.rows;
   if (exportRows.length === 0) return { ok: false, reason: "empty" };
 
+  // 승인된 교통비는 급여 행에 이미 있다(`transportApproved`) — 교통비 화면 권한(`transport.manage`)이 없는 급여 담당도
+  // 총액이 맞게 나가야 한다(2026-10-22: 키를 나눈 뒤 교통비 칸이 0 으로 나가던 것).
   const transportByUser: Record<string, number> = {};
-  if (transport.isPrivileged) {
-    for (const r of transport.rows) {
-      if (r.status === "approved") transportByUser[r.userId] = r.totalAmount;
-    }
-  }
+  for (const r of exportRows) transportByUser[r.userId] = r.transportApproved;
   const wbRows: PayrollWorkbookRow[] = exportRows.map((r) => {
     const transportTotal = transportByUser[r.userId] ?? 0;
     return { ...r, transportTotal, totalWithTransport: r.expectedGross + transportTotal };
@@ -1584,19 +1584,14 @@ export async function exportMonthlyPayrollReport(
 
   const locale = session.user.preferredLanguage;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
-  const [data, transport] = await Promise.all([
-    getAdminAttendancePayroll(session, ym, localeTag),
-    getAdminAttendanceTransport(session, ym, localeTag),
-  ]);
+  const data = await getAdminAttendancePayroll(session, ym, localeTag);
   if (!data.isPrivileged) return { ok: false, reason: "forbidden" };
   const exportRows = options.hourlyOnly ? data.rows.filter(isHourlyPayrollExportRow) : data.rows;
   if (exportRows.length === 0) return { ok: false, reason: "empty" };
 
-  // Per-user approved transport reimbursement total for the month (auto-pulled from the transport module).
+  // 승인된 교통비 = 급여 행의 `transportApproved`(교통비 화면 권한과 무관 — 위 Excel 과 같은 근거).
   const transportByUser: Record<string, number> = {};
-  for (const r of transport.rows) {
-    if (r.status === "approved") transportByUser[r.userId] = r.totalAmount;
-  }
+  for (const r of exportRows) transportByUser[r.userId] = r.transportApproved;
 
   const c = getDictionary(locale).admin.attendanceConsole;
   const generatedAt = new Intl.DateTimeFormat(localeTag, {
@@ -1664,6 +1659,7 @@ export type TransportReviewResult =
         | "not_found"
         | "invalid"
         | "comment_required"
+        | "finalized"
         | "error";
     };
 
@@ -1721,14 +1717,21 @@ export async function setTransportReportReview(input: {
 
   const rRes = await service
     .from("transport_reimbursement_reports")
-    .select("status, organization_id")
+    .select("status, organization_id, user_id, target_month")
     .eq("id", input.reportId)
     .maybeSingle();
-  const row = rRes.data as { status: string; organization_id: string } | null;
+  const row = rRes.data as { status: string; organization_id: string; user_id: string; target_month: string } | null;
   if (!row || row.organization_id !== organizationId) return { ok: false, reason: "not_found" };
 
   if (!TRANSPORT_ACTION_VALID_FROM[input.action].includes(row.status)) {
     return { ok: false, reason: "invalid" };
+  }
+  // 승인(총액에 더함) · 다시 열기(승인을 빼냄)는 급여 총액을 바꾼다 — 그 달이 마감됐으면 마감 취소가 먼저(2026-10-22 검토).
+  if (
+    (input.action === "approved" || input.action === "reopen") &&
+    (await isUserMonthFinalized(service, organizationId, row.user_id, row.target_month.slice(0, 10)))
+  ) {
+    return { ok: false, reason: "finalized" };
   }
 
   const targetStatus = TRANSPORT_ACTION_TARGET[input.action];
@@ -2227,14 +2230,13 @@ export async function createAttendanceAllowance(input: {
   }
   const amountYen = Math.round(input.amountYen);
 
-  // A specific target must be an active member of this org.
+  // A specific target must be a member of this org — 비활성(퇴사)도 마지막 달 수당은 줄 수 있다(2026-10-22).
   if (input.targetUserId) {
     const member = await service
       .from("memberships")
       .select("id")
       .eq("organization_id", organizationId)
       .eq("user_id", input.targetUserId)
-      .eq("status", "active")
       .maybeSingle();
     if (!member.data) return { ok: false, reason: "target_invalid" };
   }
@@ -2733,6 +2735,8 @@ export async function loadSessionAuditTrail(sessionId: string): Promise<SessionA
         return c.statusCompleted;
       case "invalid":
         return c.statusInvalid;
+      case "abandoned":
+        return c.statusAbandoned;
       case null:
       case undefined:
         return "—";

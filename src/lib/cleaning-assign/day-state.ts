@@ -1,3 +1,5 @@
+import { isHourlyRole } from "@/config/roles";
+
 /**
  * 청소 배정 — 알바 「내 시프트」 달력 칸의 상태와 날짜 계산. 순수 모듈.
  *
@@ -90,7 +92,7 @@ export function minutesToLabel(minutes: number | null): string {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-/** 역할로 정한 처음 출근 시각 — 알바 9:45 · 직원 9:00(사용자 확인 2026-10-20). 사람별로 바꿀 수 있다. */
+/** 역할로 정한 처음 출근 시각 — 알바(아르바이트 · 리더) 9:45 · 직원 9:00(사용자 확인 2026-10-20). 사람별로 바꿀 수 있다. */
 export function defaultStartMinutes(role: string): number {
-  return role === "part_time_staff" ? 9 * 60 + 45 : 9 * 60;
+  return isHourlyRole(role) ? 9 * 60 + 45 : 9 * 60;
 }

@@ -63,6 +63,7 @@ export function agoText(iso: string, now: number, copy: CleaningAssignCopy): str
 
 export function roleLabel(role: string, copy: CleaningAssignCopy): string {
   if (role === "part_time_staff") return copy.rolePart;
+  if (role === "staff") return copy.roleLeader;
   if (role === "field_manager") return copy.roleManager;
   return copy.roleStaff;
 }

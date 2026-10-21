@@ -4,6 +4,7 @@
 // from the authenticated session) AND the organization id.
 
 import "server-only";
+import { isHourlyRole } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { computeAnnualLeaveSummary, tokyoToday, type AnnualLeaveSummary } from "@/lib/annual-leave";
 
@@ -60,10 +61,8 @@ export const MAX_LEAVE_BONUS = 8;
  * 시급제 역할은 연차 대상이 아니다(확정 정책). 2026-10-21 역할 정리로 시급제는 아르바이트(`part_time_staff`)와
  * 아르바이트 리더(`staff`) 둘이다. 그 외 조직 역할은 전부 월급제 정규직으로 본다.
  */
-export const LEAVE_HOURLY_ROLES: readonly string[] = ["part_time_staff", "staff"];
-
 export function isLeaveHourlyRole(role: string): boolean {
-  return LEAVE_HOURLY_ROLES.includes(role);
+  return isHourlyRole(role);
 }
 
 export async function setAnnualLeaveBaselineForUser(

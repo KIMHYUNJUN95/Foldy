@@ -53,6 +53,16 @@ export function isOrgTopAdminOrPlatform(role: Role): boolean {
   return role === "developer_super_admin" || isOrgTopAdmin(role);
 }
 
+/**
+ * 시급제(알바) 역할 — 아르바이트 · 아르바이트 리더(2026-10-21 사용자 「리더는 정직원이 아니라 시급제 알바생」).
+ * 급여 · 연차 · 청소 배정처럼 「알바냐 직원이냐」를 가르는 곳은 이것 하나만 쓴다. 권한(무엇을 할 수 있나) 판단에는 쓰지 않는다.
+ */
+export const hourlyRoles = ["part_time_staff", "staff"] as const satisfies readonly Role[];
+
+export function isHourlyRole(role: string): boolean {
+  return (hourlyRoles as readonly string[]).includes(role);
+}
+
 export const fieldModeRoles = [
   "field_manager",
   "staff",

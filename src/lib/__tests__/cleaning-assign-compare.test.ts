@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { computeCompare, flaggedRows } from "@/lib/cleaning-assign/compare";
+import { defaultStartMinutes } from "@/lib/cleaning-assign/day-state";
 import type { CompareRow } from "@/lib/cleaning-assign/data";
 
 /**
@@ -29,7 +30,7 @@ describe("computeCompare", () => {
     row({ userId: "b", name: "B", pay: 50000, cleaned: 10 }),
     row({ userId: "c", name: "C", pay: 80000, cleaned: 10 }),
     row({ userId: "t", name: "T", pay: 30000, cleaned: 2, trainee: true }),
-    row({ userId: "s", name: "S", pay: 200000, cleaned: 5, role: "staff" }),
+    row({ userId: "s", name: "S", pay: 200000, cleaned: 5, role: "field_manager" }),
   ];
 
   it("견습 · 직원을 빼면 평균에 들어가지 않고 벗어남도 없다", () => {
@@ -57,5 +58,18 @@ describe("computeCompare", () => {
     const { rows: out } = computeCompare(rows, true);
     expect(flaggedRows(out, 25).map((r) => r.userId)).toEqual(["c"]);
     expect(flaggedRows(out, 10).map((r) => r.userId)).toEqual(["c", "a", "b"]);
+  });
+});
+
+// 2026-10-21 — 아르바이트 리더(`staff`)는 정직원이 아니라 시급제 알바다.
+describe("아르바이트 리더는 알바로 센다", () => {
+  it("비교에서 빠지지 않는다", () => {
+    const { rows: out } = computeCompare([row({ userId: "l", role: "staff" })], true);
+    expect(out[0].excluded).toBeNull();
+  });
+  it("처음 출근 시각은 알바와 같은 9:45", () => {
+    expect(defaultStartMinutes("staff")).toBe(9 * 60 + 45);
+    expect(defaultStartMinutes("part_time_staff")).toBe(9 * 60 + 45);
+    expect(defaultStartMinutes("field_manager")).toBe(9 * 60);
   });
 });

@@ -1,3 +1,4 @@
+import { isHourlyRole } from "@/config/roles";
 import type { CompareRow } from "@/lib/cleaning-assign/data";
 
 /**
@@ -19,7 +20,7 @@ export function computeCompare(rows: CompareRow[], exclude: boolean): { avg: num
   const base: CompareComputedRow[] = rows.map((row) => ({
     ...row,
     dev: null,
-    excluded: exclude ? (row.trainee ? "trainee" : row.role !== "part_time_staff" ? "staff" : null) : null,
+    excluded: exclude ? (row.trainee ? "trainee" : !isHourlyRole(row.role) ? "staff" : null) : null,
     perMinutes: row.cleaned > 0 ? Math.round(row.paidMinutes / row.cleaned) : null,
     perRoom: row.cleaned > 0 ? Math.round(row.pay / row.cleaned) : null,
   }));

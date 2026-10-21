@@ -115,6 +115,7 @@ export type CleaningAssignCopy = {
   roleStaff: string;
   rolePart: string;
   roleManager: string;
+  roleLeader: string;
   more: string; // "{n}명 더 보기"
   conflict: string;
   failed: string;
@@ -394,7 +395,8 @@ const ko: CleaningAssignCopy = {
   putInstead: "대신 넣기",
   roleStaff: "직원",
   rolePart: "알바",
-  roleManager: "현장 매니저",
+  roleManager: "현장 관리자",
+  roleLeader: "알바 리더",
   more: "{n}명 더 보기",
   conflict: "방금 다른 담당자가 바꿔서 새로 불러왔어요",
   failed: "저장하지 못했어요. 다시 시도해 주세요",
@@ -668,7 +670,8 @@ const ja: CleaningAssignCopy = {
   putInstead: "代わりに入れる",
   roleStaff: "社員",
   rolePart: "アルバイト",
-  roleManager: "現場マネージャー",
+  roleManager: "現場管理者",
+  roleLeader: "バイトリーダー",
   more: "あと{n}人を表示",
   conflict: "ほかの担当者が変更したため再読み込みしました",
   failed: "保存できませんでした。もう一度お試しください",
@@ -943,6 +946,7 @@ const en: CleaningAssignCopy = {
   roleStaff: "Staff",
   rolePart: "Part-time",
   roleManager: "Field manager",
+  roleLeader: "Part-time leader",
   more: "Show {n} more",
   conflict: "Another manager just changed this — reloaded",
   failed: "Couldn't save. Please try again",

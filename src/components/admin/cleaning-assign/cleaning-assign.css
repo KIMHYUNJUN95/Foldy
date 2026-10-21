@@ -47,6 +47,12 @@
 .adm .cas-h > span { font-size: 14px; color: #6b6878; }
 .adm .cas-h > span.is-warn { color: #c5282e; font-weight: 600; }
 .adm .cas-bld { display: flex; flex-direction: column; margin-top: 16px; }
+/* 미배정 안의 건물 묶음 — 큰 제목(「미배정」) 아래 작은 제목. */
+.adm .cas-bld.is-open { margin-top: 10px; }
+.adm .cas-bld.is-open:first-of-type { margin-top: 0; }
+.adm .cas-h.is-sub { padding: 8px 0 4px; }
+.adm .cas-h.is-sub h3 { margin: 0; font-size: 14px; font-weight: 600; color: #3a3746; }
+.adm .cas-h.is-sub > span { font-size: 13px; }
 .adm .cas-empty, .adm .cas-hint { margin: 6px 0 4px; font-size: 13px; color: #6b6878; }
 
 .adm .cas-pickbar { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 6px 0 14px; margin-bottom: 8px; border-radius: 12px; background: #f4f1fd; color: #3b2a7a; }

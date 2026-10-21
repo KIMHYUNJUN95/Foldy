@@ -125,6 +125,9 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const byBuilding = new Map<string, BoardRoom[]>();
   for (const room of restRooms) byBuilding.set(room.propertyName, [...(byBuilding.get(room.propertyName) ?? []), room]);
   const suggestCount = openRooms.reduce((sum, room) => sum + room.suggested.length, 0);
+  // 미배정도 건물별로 나눠 객실 순서대로(board.rooms 가 이미 건물 순서 → 객실 번호 순) — 건물 이름은 묶음 제목에 한 번만.
+  const openByBuilding = new Map<string, BoardRoom[]>();
+  for (const room of openRooms) openByBuilding.set(room.propertyName, [...(openByBuilding.get(room.propertyName) ?? []), room]);
 
   const toggleRoom = (room: BoardRoom) => {
     if (!picked) return;
@@ -138,14 +141,14 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     return copy.noCheckin;
   };
 
-  const roomRow = (room: BoardRoom, opts: { open?: boolean } = {}) => {
+  const roomRow = (room: BoardRoom, opts: { open?: boolean; grouped?: boolean } = {}) => {
     const mine = picked ? room.people.some((p) => p.userId === picked.userId) : false;
     const need = Math.max(0, room.usualHeadcount - room.people.length);
     const origin = room.carriedFrom ?? board.date;
     return (
       <div key={room.roomKey} className={`cas-room${mine ? " is-mine" : ""}${room.status !== "pending" ? " is-quiet" : ""}`}>
         <div className="cas-room__id">
-          {opts.open ? <span className="cas-room__bld">{label(room.propertyName)}</span> : null}
+          {opts.open && !opts.grouped ? <span className="cas-room__bld">{label(room.propertyName)}</span> : null}
           <span className="cas-room__no">{room.roomLabel === room.propertyName ? label(room.propertyName) : room.roomLabel}</span>
           {!opts.open ? <span className="cas-room__sub">{roomInfo(room)}</span> : null}
         </div>
@@ -385,7 +388,15 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             ) : null}
           </div>
           {openRooms.length === 0 && cancelledRooms.length === 0 ? <p className="cas-empty">{board.rooms.length === 0 ? copy.noRooms : copy.noOpen}</p> : null}
-          {openRooms.map((room) => roomRow(room, { open: true }))}
+          {[...openByBuilding.entries()].map(([name, list]) => (
+            <div key={name} className="cas-bld is-open">
+              <div className="cas-h is-sub">
+                <h3>{label(name)}</h3>
+                <span>{list.length}</span>
+              </div>
+              {list.map((room) => roomRow(room, { grouped: true, open: true }))}
+            </div>
+          ))}
 
           {cancelledRooms.map((room) => (
             <div key={room.roomKey} className="cas-room is-cancelled">

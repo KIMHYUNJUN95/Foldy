@@ -9,6 +9,7 @@ import {
   computeMonthSuggestions,
   loadFieldMembers,
   loadMonthBoard,
+  loadMonthOpenCounts,
   type MonthBoard,
 } from "@/lib/cleaning-assign/data";
 import { loadAssignDayRooms, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
@@ -342,6 +343,15 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
 }
 
 // ── 월 보기 ──────────────────────────────────────────────────────────────────────────────────────
+
+/** 하루 보기 달력의 날짜별 미배정 수(오늘부터) — 달을 넘길 때마다 부른다. */
+export async function loadOpenCountsForMonth(input: { ym: string }): Promise<AssignOk<{ counts: Record<string, number> }> | AssignFail> {
+  const session = await assigner();
+  if (!session) return { ok: false, reason: "forbidden" };
+  if (!isMonthKey(input.ym)) return { ok: false, reason: "invalid" };
+  const counts = await loadMonthOpenCounts(getSupabaseServiceClient(), session.organization.id, input.ym, getCleaningOperatingDateKey());
+  return { counts, ok: true };
+}
 
 export async function previewMonthSuggestions(input: { ym: string }): Promise<AssignOk<{ board: MonthBoard; proposals: Array<{ workDate: string; userId: string; roomKey: string }>; openTotal: number; shortDays: string[] }> | AssignFail> {
   const session = await assigner();

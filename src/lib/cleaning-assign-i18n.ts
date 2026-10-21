@@ -56,6 +56,7 @@ export type CleaningAssignCopy = {
   noCheckin: string; // "체크인 없음"
   nextCheckin: string; // "다음 체크인 {date}"
   guestsN: string; // "{n}명"
+  calendarOpenMark: string; // 달력 칸 숫자의 뜻 "미배정 {n}실"
   bigRoom: string; // "큰 방"
   statusProgress: string;
   statusDone: string;
@@ -332,6 +333,7 @@ const ko: CleaningAssignCopy = {
   noCheckin: "체크인 없음",
   nextCheckin: "다음 체크인 {date}",
   guestsN: "{n}명",
+  calendarOpenMark: "미배정 {n}실",
   bigRoom: "큰 방",
   statusProgress: "청소 중",
   statusDone: "끝남",
@@ -601,6 +603,7 @@ const ja: CleaningAssignCopy = {
   noCheckin: "チェックインなし",
   nextCheckin: "次のチェックイン {date}",
   guestsN: "{n}人",
+  calendarOpenMark: "未割り当て {n}室",
   bigRoom: "大部屋",
   statusProgress: "清掃中",
   statusDone: "完了",
@@ -870,6 +873,7 @@ const en: CleaningAssignCopy = {
   noCheckin: "No check-in",
   nextCheckin: "Next check-in {date}",
   guestsN: "{n} guests",
+  calendarOpenMark: "{n} unassigned",
   bigRoom: "Large room",
   statusProgress: "Cleaning",
   statusDone: "Done",

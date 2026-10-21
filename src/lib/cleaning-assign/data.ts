@@ -573,6 +573,29 @@ export type MonthBoard = {
   people: { userId: string; name: string; tag: "fixed" | "priority" | "trainee" | null; fixedTier: number | null; trainee: number; total: number; cells: MonthCell[] }[];
 };
 
+/**
+ * 날짜별 미배정 방 수(오늘부터 그달 끝까지) — 하루 보기 날짜 고르기 달력에 숫자로 표시. 월 보기 미배정 수와 같은 기준(퇴실 + 수기 추가 − 배정 − 미룸 · 처리 끝).
+ * 지난날은 세지 않는다(월 보기도 지난날 경고를 빨갛게 그리지 않는다).
+ */
+export async function loadMonthOpenCounts(supabase: Client, organizationId: string, ym: string, today: string): Promise<Record<string, number>> {
+  const days = monthDays(ym).filter((date) => date >= today);
+  if (days.length === 0) return {};
+  const from = days[0];
+  const to = days.at(-1)!;
+  const [range, assignments, held] = await Promise.all([
+    loadRangeRooms(supabase, organizationId, from, to),
+    loadAssignments(supabase, organizationId, from, to),
+    loadHeldRoomKeys(supabase, organizationId, from, to),
+  ]);
+  const assigned = new Set(assignments.map((row) => `${row.workDate}|${row.roomKey}`));
+  const out: Record<string, number> = {};
+  for (const date of days) {
+    const open = [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(`${date}|${key}`) && !held.has(`${date}|${key}`)).length;
+    if (open > 0) out[date] = open;
+  }
+  return out;
+}
+
 export async function loadMonthBoard(supabase: Client, organizationId: string, ym: string): Promise<MonthBoard> {
   const days = monthDays(ym);
   const from = days[0];

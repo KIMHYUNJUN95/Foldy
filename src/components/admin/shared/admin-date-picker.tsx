@@ -49,6 +49,13 @@ type RosterNavDatePickerProps = {
    * 그래서 화면이 스스로 정하도록 열어 둔다 — 기본값은 기존 동작 그대로다.
    */
   allowFuture?: boolean;
+  /**
+   * 날짜별 숫자 표시(예: 청소 배정 하루 보기의 「미배정 방 수」). 달력을 열거나 달을 넘길 때 그달 값을 불러온다 —
+   * 주면 칸이 숫자가 들어갈 만큼 커진다(`.amp__pop--marks`). 0 · 없는 날은 표시하지 않는다.
+   */
+  loadMarks?: (monthKey: string) => Promise<Record<string, number>>;
+  /** 숫자 표시의 뜻(칸 aria-label 뒤에 붙음) — 「미배정 {n}」. */
+  markLabel?: string;
 };
 
 type AdminDatePickerProps = InlineDatePickerProps | RosterNavDatePickerProps;
@@ -250,11 +257,27 @@ function RosterNavDatePicker({
   basePath,
   labels,
   allowFuture = false,
+  loadMarks,
+  markLabel,
 }: RosterNavDatePickerProps) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(date.slice(0, 7));
+  const [marks, setMarks] = useState<Record<string, Record<string, number>>>({});
+  useEffect(() => {
+    if (!open || !loadMarks || marks[calendarMonth]) return;
+    let alive = true;
+    loadMarks(calendarMonth)
+      .then((values) => {
+        if (alive) setMarks((current) => ({ ...current, [calendarMonth]: values }));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [open, loadMarks, marks, calendarMonth]);
+  const monthMarks = marks[calendarMonth] ?? {};
   const cells = useMemo(
     () => buildCalendarCells(calendarMonth, todayDate, date, allowFuture),
     [allowFuture, calendarMonth, date, todayDate],
@@ -305,7 +328,11 @@ function RosterNavDatePicker({
     router.push(`${basePath}?date=${nextDate}`);
   }
   function toggle() {
-    if (!open) setCalendarMonth(date.slice(0, 7));
+    if (!open) {
+      setCalendarMonth(date.slice(0, 7));
+      // 열 때마다 새로 — 그 사이 배정이 바뀌었을 수 있다.
+      setMarks({});
+    }
     setOpen((value) => !value);
   }
 
@@ -336,7 +363,7 @@ function RosterNavDatePicker({
         className="chipbtn amp__arw"
         aria-label={labels.nextDay ?? labels.nextMonth}
         onClick={() => go(shiftDateKey(date, 1))}
-        disabled={date >= todayDate}
+        disabled={!allowFuture && date >= todayDate}
       >
         <span className="ic">
           <ChevronRight />
@@ -344,7 +371,7 @@ function RosterNavDatePicker({
       </button>
 
       {open ? (
-        <div className="amp__pop amp__pop--day" role="dialog" aria-label={labels.open ?? labels.today}>
+        <div className={`amp__pop amp__pop--day${loadMarks ? " amp__pop--marks" : ""}`} role="dialog" aria-label={labels.open ?? labels.today}>
           <div className="amp__hd">
             <button
               type="button"
@@ -361,7 +388,7 @@ function RosterNavDatePicker({
               type="button"
               className="adp__nav"
               aria-label={labels.nextMonth}
-              disabled={calendarMonth >= todayDate.slice(0, 7)}
+              disabled={!allowFuture && calendarMonth >= todayDate.slice(0, 7)}
               onClick={() =>
                 setCalendarMonth((month) => shiftDateKey(`${month}-01`, 32).slice(0, 7))
               }
@@ -386,9 +413,11 @@ function RosterNavDatePicker({
                     cell.key === todayDate && !cell.selected ? " today" : ""
                   }`}
                   disabled={cell.future}
+                  aria-label={monthMarks[cell.key] && markLabel ? `${cell.day} · ${markLabel.replace("{n}", String(monthMarks[cell.key]))}` : undefined}
                   onClick={() => go(cell.key!)}
                 >
                   {cell.day}
+                  {loadMarks && monthMarks[cell.key] ? <span className="adp__mark">{monthMarks[cell.key]}</span> : null}
                 </button>
               ) : (
                 <span key={`blank-${i}`} aria-hidden="true" className="adp__cell is-blank" />

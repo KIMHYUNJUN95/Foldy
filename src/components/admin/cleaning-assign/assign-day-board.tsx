@@ -12,6 +12,7 @@ import {
   assignToRoom,
   cancelPersonDay,
   holdRoom,
+  loadOpenCountsForMonth,
   releaseHold,
   resolveCancelRequest,
   saveMyMainProperties,
@@ -272,6 +273,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           localeTag={locale}
           basePath="/admin/cleaning-assign"
           allowFuture
+          loadMarks={loadOpenMarks}
+          markLabel={copy.calendarOpenMark}
           labels={{
             nextDay: shared.dateNextDay,
             nextMonth: shared.dateNextMonth,
@@ -652,6 +655,12 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
     </div>
   );
+}
+
+/** 날짜 고르기 달력의 날짜별 미배정 수 — 실패하면 숫자 없이 둔다. */
+async function loadOpenMarks(monthKey: string): Promise<Record<string, number>> {
+  const result = await loadOpenCountsForMonth({ ym: monthKey });
+  return result.ok ? result.counts : {};
 }
 
 function nextDay(date: string): string {

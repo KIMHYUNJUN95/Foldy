@@ -66,6 +66,10 @@ export type CleaningAssignCopy = {
   deferPick: string;
   resolve: string; // "처리 끝(청소 필요 없음)"
   undoHold: string;
+  tagResolved: string; // "처리 끝"
+  heldDeferred: string; // "{room} — {date}로 미뤘어요"
+  heldResolved: string; // "{room} — 처리 끝으로 뒀어요"
+  heldUndone: string; // "되돌렸어요"
   reasonPlaceholder: string;
   deferUntilLabel: string;
   confirm: string;
@@ -343,6 +347,10 @@ const ko: CleaningAssignCopy = {
   deferPick: "날짜 정해 미루기",
   resolve: "처리 끝 (청소 필요 없음)",
   undoHold: "되돌리기",
+  tagResolved: "처리 끝",
+  heldDeferred: "{room} — {date}로 미뤘어요",
+  heldResolved: "{room} — 처리 끝으로 뒀어요",
+  heldUndone: "되돌렸어요",
   reasonPlaceholder: "사유 한 줄 (예: 인원 부족)",
   deferUntilLabel: "이날 다시 보여요",
   confirm: "확인",
@@ -613,6 +621,10 @@ const ja: CleaningAssignCopy = {
   deferPick: "日付を決めて延期",
   resolve: "処理済み（清掃不要）",
   undoHold: "元に戻す",
+  tagResolved: "処理済み",
+  heldDeferred: "{room} — {date}に延期しました",
+  heldResolved: "{room} — 処理済みにしました",
+  heldUndone: "元に戻しました",
   reasonPlaceholder: "理由を一言（例：人手不足）",
   deferUntilLabel: "この日に再表示",
   confirm: "確認",
@@ -883,6 +895,10 @@ const en: CleaningAssignCopy = {
   deferPick: "Postpone to a date",
   resolve: "Close (no cleaning needed)",
   undoHold: "Undo",
+  tagResolved: "Closed",
+  heldDeferred: "{room} — postponed to {date}",
+  heldResolved: "{room} — marked as closed",
+  heldUndone: "Restored",
   reasonPlaceholder: "Reason (e.g. short-staffed)",
   deferUntilLabel: "Shows again on",
   confirm: "Confirm",

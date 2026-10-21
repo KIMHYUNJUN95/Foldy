@@ -6,6 +6,7 @@ import { getReservationGuests } from "@/lib/reservation-guests";
 import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { addDays } from "@/lib/cleaning-assign/day-state";
+import { tokyoDateOf } from "@/lib/tokyo-date";
 import {
   CALENDAR_BUILDING_ORDER,
   buildRoomKey,
@@ -55,6 +56,8 @@ export type AssignRoom = {
   holdReason: string | null;
   /** 오늘 미룬 방(다음 날 · 날짜 지정) — 미배정에서 빠진다. */
   deferredUntil: string | null;
+  /** 「처리 끝」으로 둔 방(청소 필요 없음) — 상태는 끝남, 「되돌리기」로 다시 미배정에. */
+  resolvedHold: boolean;
   status: AssignRoomStatus;
   usualHeadcount: number;
 };
@@ -200,7 +203,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId),
     supabase
       .from("cleaning_room_holds")
-      .select("room_key, origin_date, kind, until_date, reason, property_name, room_label")
+      .select("room_key, origin_date, kind, until_date, reason, property_name, room_label, created_at")
       .eq("organization_id", organizationId)
       .gte("origin_date", holdFrom)
       .lte("origin_date", date),
@@ -245,6 +248,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     carryDays: 0,
     holdReason: null,
     deferredUntil: null,
+    resolvedHold: false,
     status: todayStatus.get(key.roomKey) ?? "pending",
     usualHeadcount: usual.get(key.roomKey) ?? 1,
   });
@@ -279,8 +283,26 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
       room.deferredUntil = hold.until_date;
       room.holdReason = hold.reason;
     }
-    if (hold?.kind === "resolved") room.status = "done";
+    if (hold?.kind === "resolved") {
+      room.status = "done";
+      room.resolvedHold = true;
+    }
   }
+
+  // 못 한 방을 **오늘** 미뤘거나 처리 끝으로 뒀으면 오늘 목록에 남긴다(「N일로 미룸」 · 「처리 끝」 + 되돌리기) — 실수로 눌러도 되돌릴 수 있게.
+  // 다음 날부터는 지금처럼 안 보인다(미룬 방은 정한 날 다시 뜬다).
+  const heldToday = (hold: { kind: string; until_date: string | null; created_at: string } | undefined) =>
+    Boolean(hold && tokyoDateOf(hold.created_at) === date && (hold.kind === "resolved" || (hold.until_date !== null && hold.until_date > date)));
+  const markHeld = (room: AssignRoom, hold: { kind: string; until_date: string | null; reason: string | null }) => {
+    if (hold.kind === "resolved") {
+      room.status = "done";
+      room.resolvedHold = true;
+    } else {
+      room.deferredUntil = hold.until_date;
+    }
+    room.holdReason = hold.reason;
+    return room;
+  };
 
   // 못 한 방 — 배정을 쓴 날(그날 배정이 한 줄이라도 있는 날)만 본다. 기능을 쓰기 전 날의 방까지 몰려오지 않게.
   // 미룬 방이 있는 날도 넣는다 — 그날 배정이 하나도 없었어도 미룬 방은 정한 날 다시 떠야 한다.
@@ -293,10 +315,15 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
         const cleaned = (completedDates.get(candidate.roomKey) ?? []).some((d) => d >= origin && d < date);
         if (cleaned) continue;
         const hold = holds.get(`${candidate.roomKey}|${origin}`);
-        if (hold?.kind === "resolved") continue;
-        if (hold?.kind === "defer" && hold.until_date && hold.until_date > date) continue;
-        const existing = rooms.get(candidate.roomKey);
         const carryDays = Math.round((Date.parse(date) - Date.parse(origin)) / 86_400_000);
+        const isHeld = hold?.kind === "resolved" || (hold?.kind === "defer" && hold.until_date !== null && hold.until_date > date);
+        if (isHeld) {
+          if (hold && heldToday(hold) && !rooms.has(candidate.roomKey)) {
+            rooms.set(candidate.roomKey, markHeld({ ...base(candidate), source: "carry", note: candidate.note, carriedFrom: origin, carryDays }, hold));
+          }
+          continue;
+        }
+        const existing = rooms.get(candidate.roomKey);
         if (existing) {
           // 오늘도 퇴실이 있는 방 — 오늘 방으로 두되 밀려 온 표시는 남긴다(가장 이른 날 기준).
           if (!existing.carriedFrom || origin < existing.carriedFrom) {
@@ -320,10 +347,22 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
 
   // 7일보다 앞서 미룬 방 — 정한 날이 됐고 그 사이 청소 기록이 없으면 다시 띄운다(위 반복은 최근 7일만 본다).
   for (const hold of holdsResult.data ?? []) {
-    if (hold.kind !== "defer" || hold.origin_date >= lookFrom || !hold.until_date || hold.until_date > date) continue;
+    if (hold.origin_date >= lookFrom) continue;
     const cleaned = (completedDates.get(hold.room_key) ?? []).some((d) => d >= hold.origin_date && d < date);
     if (cleaned) continue;
     const carryDays = Math.round((Date.parse(date) - Date.parse(hold.origin_date)) / 86_400_000);
+    const key = {
+      roomKey: hold.room_key,
+      propertyName: hold.property_name,
+      roomLabel: hold.room_label,
+      sessionRoomLabel: buildSessionRoomLabel(hold.property_name, hold.room_label),
+    };
+    // 오늘 다시 미뤘거나 처리 끝으로 둔 오래된 방 — 오늘만 표시(되돌리기).
+    if (heldToday(hold)) {
+      if (!rooms.has(hold.room_key)) rooms.set(hold.room_key, markHeld({ ...base(key), source: "carry", carriedFrom: hold.origin_date, carryDays }, hold));
+      continue;
+    }
+    if (hold.kind !== "defer" || !hold.until_date || hold.until_date > date) continue;
     const existing = rooms.get(hold.room_key);
     if (existing) {
       if (!existing.carriedFrom || hold.origin_date < existing.carriedFrom) {
@@ -334,12 +373,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
       continue;
     }
     rooms.set(hold.room_key, {
-      ...base({
-        roomKey: hold.room_key,
-        propertyName: hold.property_name,
-        roomLabel: hold.room_label,
-        sessionRoomLabel: buildSessionRoomLabel(hold.property_name, hold.room_label),
-      }),
+      ...base(key),
       source: "carry",
       carriedFrom: hold.origin_date,
       carryDays,

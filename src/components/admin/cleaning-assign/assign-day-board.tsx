@@ -24,6 +24,7 @@ import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
+import { AdminUndoToast } from "@/components/admin/shared/admin-undo-toast";
 import type { Dictionary } from "@/lib/i18n";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { BoardPerson, BoardRoom, DayBoard } from "@/lib/cleaning-assign/data";
@@ -114,6 +115,29 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     });
   }
 
+  // 미루기 · 처리 끝 — 5초 「실행 취소」(뺀 배정까지 되돌린다). 지난 뒤에는 방 줄의 「되돌리기」.
+  const [undo, setUndo] = useState<{ stamp: number; message: string; roomKey: string; originDate: string; restore: string[] } | null>(null);
+  function hold(room: { roomKey: string; propertyName: string; roomLabel: string }, input: { originDate: string; kind: "defer" | "resolved"; untilDate?: string; reason?: string }) {
+    const name = room.roomLabel === room.propertyName ? label(room.propertyName) : `${label(room.propertyName)} ${room.roomLabel}`;
+    startTransition(async () => {
+      const result = await holdRoom({ date: board.date, roomKey: room.roomKey, ...input });
+      if (result.ok) {
+        haptic("success");
+        setUndo({
+          message: input.kind === "resolved" ? fill(copy.heldResolved, { room: name }) : fill(copy.heldDeferred, { date: shortDate(input.untilDate ?? nextDay(board.date)), room: name }),
+          originDate: input.originDate,
+          restore: result.removed,
+          roomKey: room.roomKey,
+          stamp: Date.now(),
+        });
+      } else {
+        haptic("error");
+        showToast(copy.failed);
+      }
+      router.refresh();
+    });
+  }
+
   const visibleProperty = (name: string) => !onlyMine || board.mainProperties.length === 0 || board.mainProperties.includes(name);
 
   const rooms = board.rooms.filter((room) => visibleProperty(room.propertyName));
@@ -159,7 +183,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           ) : null}
           {room.deferredUntil ? <span className="cas-tag is-warn">{fill(copy.deferredTo, { date: shortDate(room.deferredUntil) })}</span> : null}
           {room.status === "progress" ? <span className="cas-tag is-pri">{copy.statusProgress}</span> : null}
-          {room.status === "done" ? <span className="cas-tag">{copy.statusDone}</span> : null}
+          {room.status === "done" ? <span className="cas-tag">{room.resolvedHold ? copy.tagResolved : copy.statusDone}</span> : null}
           {opts.open ? <span className="cas-room__note">{[roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · ")}</span> : null}
           {room.people.map((p) => (
             <span key={p.userId} className={`cas-chip${picked?.userId === p.userId ? " is-picked" : ""}`} title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
@@ -188,7 +212,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
               </button>
             </>
           ) : null}
-          {room.deferredUntil ? (
+          {room.deferredUntil || room.resolvedHold ? (
             <button type="button" className="cas-btn is-ghost" disabled={pending} onClick={() => run(() => releaseHold({ date: board.date, originDate: origin, roomKey: room.roomKey }))}>
               {copy.undoHold}
             </button>
@@ -210,7 +234,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                     role="menuitem"
                     onClick={() => {
                       setMenuRoom(null);
-                      run(() => holdRoom({ date: board.date, kind: "resolved", originDate: origin, roomKey: room.roomKey }));
+                      hold(room, { kind: "resolved", originDate: origin });
                     }}
                   >
                     {copy.resolve}
@@ -623,9 +647,10 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                 disabled={pending || !deferRoom.until}
                 onClick={() => {
                   const target = deferRoom;
+                  const room = board.rooms.find((item) => item.roomKey === target.roomKey);
                   setDeferRoom(null);
                   setMenuRoom(null);
-                  run(() => holdRoom({ date: board.date, kind: "defer", originDate: target.origin, reason: target.reason, roomKey: target.roomKey, untilDate: target.until }));
+                  if (room) hold(room, { kind: "defer", originDate: target.origin, reason: target.reason, untilDate: target.until });
                 }}
               >
                 {copy.confirm}
@@ -653,6 +678,20 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       ) : null}
 
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
+      {undo && !toast ? (
+        <AdminUndoToast
+          stamp={undo.stamp}
+          message={undo.message}
+          undoLabel={copy.undoHold}
+          pending={pending}
+          onExpire={() => setUndo(null)}
+          onUndo={() => {
+            const target = undo;
+            setUndo(null);
+            run(() => releaseHold({ date: board.date, originDate: target.originDate, restore: target.restore, roomKey: target.roomKey }), copy.heldUndone);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

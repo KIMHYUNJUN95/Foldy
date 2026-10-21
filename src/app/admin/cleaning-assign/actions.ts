@@ -87,7 +87,8 @@ export async function assignToRoom(input: { date: string; roomKey: string; userI
   const supabase = getSupabaseServiceClient();
   const [rooms, member] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date), isFieldMember(organizationId, input.userId)]);
   const room = rooms.find((item) => item.roomKey === input.roomKey);
-  if (!room || !member) return { ok: false, reason: "invalid" };
+  // 미뤘거나 처리 끝으로 둔 방에는 넣지 않는다(되돌린 뒤에).
+  if (!room || !member || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
   const result = await supabase.from("cleaning_assignments").insert({
     created_by: session.user.id,
     organization_id: organizationId,
@@ -290,7 +291,7 @@ export async function addRoomForDay(input: { date: string; roomKey: string; note
  * 못 한 방 · 오늘 방 처리 — `defer`(untilDate 까지 숨겼다가 그날 미배정 맨 위로) · `resolved`(청소가 필요 없게 됨, 처리 끝).
  * `originDate` = 원래 청소해야 했던 날(밀려 온 방이면 그날, 오늘 방이면 오늘).
  */
-export async function holdRoom(input: { date: string; roomKey: string; originDate: string; kind: "defer" | "resolved"; untilDate?: string; reason?: string }): Promise<AssignOk | AssignFail> {
+export async function holdRoom(input: { date: string; roomKey: string; originDate: string; kind: "defer" | "resolved"; untilDate?: string; reason?: string }): Promise<AssignOk<{ removed: string[] }> | AssignFail> {
   const session = await assigner();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isEditableDate(input.date) || !isDateKey(input.originDate) || input.originDate > input.date) return { ok: false, reason: "invalid" };
@@ -320,24 +321,50 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
     console.error("[cleaning-assign] hold failed", { code: result.error.code });
     return { ok: false, reason: "error" };
   }
-  // 미루거나 끝낸 방의 오늘 배정은 뺀다(다른 날 다시 뜰 때 새로 배정).
-  await supabase.from("cleaning_assignments").delete().eq("organization_id", organizationId).eq("work_date", input.date).eq("room_key", room.roomKey);
+  // 미루거나 끝낸 방의 오늘 배정은 뺀다(다른 날 다시 뜰 때 새로 배정). 뺀 사람은 돌려준다 — 「되돌리기」가 다시 넣는다.
+  const removed = await supabase
+    .from("cleaning_assignments")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("work_date", input.date)
+    .eq("room_key", room.roomKey)
+    .select("user_id");
   revalidate();
-  return { ok: true };
+  return { ok: true, removed: (removed.data ?? []).map((row) => row.user_id) };
 }
 
-/** 미루기 · 처리 끝 되돌리기. */
-export async function releaseHold(input: { date: string; roomKey: string; originDate: string }): Promise<AssignOk | AssignFail> {
+/**
+ * 미루기 · 처리 끝 되돌리기 — 방이 다시 미배정으로. `restore`(방금 미루며 뺀 사람, 「실행 취소」 토스트)를 주면 그날 배정도 다시 넣는다.
+ */
+export async function releaseHold(input: { date: string; roomKey: string; originDate: string; restore?: string[] }): Promise<AssignOk | AssignFail> {
   const session = await assigner();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isDateKey(input.originDate) || typeof input.roomKey !== "string") return { ok: false, reason: "invalid" };
-  const result = await getSupabaseServiceClient()
-    .from("cleaning_room_holds")
-    .delete()
-    .eq("organization_id", session.organization.id)
-    .eq("room_key", input.roomKey)
-    .eq("origin_date", input.originDate);
+  const restore = Array.isArray(input.restore) ? input.restore.filter(isUuid).slice(0, 10) : [];
+  const organizationId = session.organization.id;
+  const supabase = getSupabaseServiceClient();
+  const result = await supabase.from("cleaning_room_holds").delete().eq("organization_id", organizationId).eq("room_key", input.roomKey).eq("origin_date", input.originDate);
   if (result.error) return { ok: false, reason: "error" };
+  if (restore.length > 0 && isEditableDate(input.date)) {
+    const room = (await loadAssignDayRooms(supabase, organizationId, input.date)).find((item) => item.roomKey === input.roomKey);
+    if (room) {
+      const members = await Promise.all(restore.map((userId) => isFieldMember(organizationId, userId)));
+      const rows = restore
+        .filter((_, index) => members[index])
+        .map((userId) => ({
+          created_by: session.user.id,
+          organization_id: organizationId,
+          property_name: room.propertyName,
+          room_key: room.roomKey,
+          room_label: room.roomLabel,
+          user_id: userId,
+          work_date: input.date,
+        }));
+      if (rows.length > 0) {
+        await supabase.from("cleaning_assignments").upsert(rows, { ignoreDuplicates: true, onConflict: "organization_id,work_date,room_key,user_id" });
+      }
+    }
+  }
   revalidate();
   return { ok: true };
 }

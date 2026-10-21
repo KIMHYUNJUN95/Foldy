@@ -79,13 +79,11 @@ insert into public.capability_roles (capability, role) values
   ('maintenance_status_change', 'office_admin'::organization_role),
   ('maintenance_status_change', 'cs_staff'::organization_role),
   ('maintenance_status_change', 'field_manager'::organization_role),
-  ('maintenance_status_change', 'staff'::organization_role),
   ('can_generate_report', 'owner'::organization_role),
   ('can_generate_report', 'senior_managing_director'::organization_role),
   ('can_generate_report', 'office_admin'::organization_role),
   ('can_generate_report', 'cs_staff'::organization_role),
   ('can_generate_report', 'field_manager'::organization_role),
-  ('can_generate_report', 'staff'::organization_role),
   ('ops_admin.access', 'owner'::organization_role),
   ('ops_admin.access', 'senior_managing_director'::organization_role),
   ('ops_calendar.write', 'owner'::organization_role),
@@ -99,7 +97,6 @@ insert into public.capability_roles (capability, role) values
   ('announcement.create', 'office_admin'::organization_role),
   ('announcement.create', 'cs_staff'::organization_role),
   ('announcement.create', 'field_manager'::organization_role),
-  ('announcement.create', 'staff'::organization_role),
   ('announcement.manage', 'owner'::organization_role),
   ('announcement.manage', 'senior_managing_director'::organization_role),
   ('announcement.manage', 'office_admin'::organization_role),
@@ -115,6 +112,7 @@ insert into public.capability_roles (capability, role) values
   ('cleaning.read_all', 'field_manager'::organization_role),
   ('cleaning.assign', 'owner'::organization_role),
   ('cleaning.assign', 'senior_managing_director'::organization_role),
+  ('cleaning.assign', 'office_admin'::organization_role),
   ('cleaning.assign', 'field_manager'::organization_role),
   ('cleaning.force_complete', 'owner'::organization_role),
   ('cleaning.force_complete', 'senior_managing_director'::organization_role),
@@ -141,7 +139,6 @@ insert into public.capability_roles (capability, role) values
   ('complaint.comment', 'office_admin'::organization_role),
   ('complaint.comment', 'cs_staff'::organization_role),
   ('complaint.comment', 'field_manager'::organization_role),
-  ('complaint.comment', 'staff'::organization_role),
   ('request.delete_any', 'owner'::organization_role),
   ('request.delete_any', 'senior_managing_director'::organization_role),
   ('request.delete_any', 'office_admin'::organization_role),
@@ -158,7 +155,6 @@ insert into public.capability_roles (capability, role) values
   ('admin_web.access', 'office_admin'::organization_role),
   ('admin_web.access', 'cs_staff'::organization_role),
   ('admin_web.access', 'field_manager'::organization_role),
-  ('admin_web.access', 'staff'::organization_role),
   ('attendance.manage', 'owner'::organization_role),
   ('attendance.manage', 'senior_managing_director'::organization_role),
   ('payroll.view', 'owner'::organization_role),
@@ -175,8 +171,7 @@ insert into public.capability_roles (capability, role) values
   ('lost_found.handle', 'senior_managing_director'::organization_role),
   ('lost_found.handle', 'office_admin'::organization_role),
   ('lost_found.handle', 'cs_staff'::organization_role),
-  ('lost_found.handle', 'field_manager'::organization_role),
-  ('lost_found.handle', 'staff'::organization_role);
+  ('lost_found.handle', 'field_manager'::organization_role);
 
 delete from public.capability_policies;
 insert into public.capability_policies (capability, individual_grant, individual_deny, platform_bypass) values

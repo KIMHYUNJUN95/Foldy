@@ -7,18 +7,19 @@ import { roles } from "@/config/roles";
  * 그대로** 여기 적어 못박았다(예외: 개발자는 「모든 권한」 결정에 따라 넷에 새로 들어감 — 공지 전체 관리 · 린넨 · 버그 검토 · 게시판 관리). 레지스트리를 바꾸면 이 표가 깨진다 — 의도한 변경이면 이 표와 문서(01-user-roles)를 같이 고친다.
  */
 const EXPECTED: Partial<Record<Capability, readonly string[]>> = {
-  "announcement.create": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+  // 2026-10-21 — 아르바이트 리더(staff)는 알바 기본(정직원 아님)이라 빠짐.
+  "announcement.create": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "announcement.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   "cleaning.work": ["developer_super_admin", "owner", "senior_managing_director", "field_manager", "staff", "part_time_staff"],
   "cleaning.read_all": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
-  // 청소 배정(2026-10-20) — 대표 · 전무 · 현장 매니저 + 개인 부여.
-  "cleaning.assign": ["developer_super_admin", "owner", "senior_managing_director", "field_manager"],
+  // 청소 배정(2026-10-20) — 대표 · 전무 · 현장 관리자 + 개인 부여. 2026-10-21 오피스 관리자 추가(사무실도 배정).
+  "cleaning.assign": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "field_manager"],
   "cleaning.force_complete": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "field_manager"],
   "linen.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "property_info.edit": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
   "complaint.write": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
   "complaint.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
-  "complaint.comment": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+  "complaint.comment": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "request.delete_any": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "bug.review": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   "board.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],

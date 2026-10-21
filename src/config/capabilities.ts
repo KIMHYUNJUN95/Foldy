@@ -185,7 +185,7 @@ export const CAPABILITIES = {
     developerOnly: false,
   },
 
-  /** `maintenance_reports` UPDATE 정책. */
+  /** `maintenance_reports` UPDATE 정책 — 수리 상태 바꾸기. 알바(아르바이트 · 리더)는 역할로 못 받는다(2026-10-21). */
   maintenance_status_change: {
     roles: [
       "owner",
@@ -193,7 +193,6 @@ export const CAPABILITIES = {
       "office_admin",
       "cs_staff",
       "field_manager",
-      "staff",
     ],
     individualGrant: true,
     individualDeny: true,
@@ -222,7 +221,7 @@ export const CAPABILITIES = {
   /**
    * 일일 업무일지 생성. RLS 가 아니라 앱 게이트다(`canGenerateDailyReport`).
    *
-   * 파트타임을 제외한 전 역할이 기본으로 갖고, 관리 업무를 겸하는 파트타이머에게 개인 부여한다.
+   * 알바(아르바이트 · 아르바이트 리더)를 뺀 전 역할이 기본으로 갖고, 필요한 알바에게 개인 부여한다(2026-10-21 리더도 알바 기본).
    */
   can_generate_report: {
     roles: [
@@ -231,7 +230,6 @@ export const CAPABILITIES = {
       "office_admin",
       "cs_staff",
       "field_manager",
-      "staff",
     ],
     individualGrant: true,
     individualDeny: true,
@@ -343,9 +341,9 @@ export const CAPABILITIES = {
   // 옮기기 전 목록을 못박는다). 개인 부여 · 차단은 닫아 둔다: 열면 RLS(역할 배열)도 같이 고쳐야 「앱은 허용, DB 는 거부」가 안 생긴다.
   // 열 때는 키 하나씩(3b). `platformBypass` 는 전부 켠다 — 「개발자는 모든 권한」(2026-09-10 사용자 결정). 예전 목록 중 공지 전체 관리 ·
   // 린넨 · 버그 검토 · 게시판 관리 넷은 개발자가 빠져 있었는데(앞의 하나는 따로 통과시켰다) 이번에 그 결정에 맞췄다 — 바뀐 건 개발자뿐.
-  /** 공지 작성 — 파트타임 빼고 전부(예전 `announcementCreatorRoles`). docs/product/11-announcement-workflow.md */
+  /** 공지 작성 — 알바(아르바이트 · 리더) 빼고 전부(예전 `announcementCreatorRoles`). docs/product/11-announcement-workflow.md */
   "announcement.create": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
     individualGrant: false,
     individualDeny: false,
     asksExpiry: false,
@@ -386,10 +384,11 @@ export const CAPABILITIES = {
   /**
    * 청소 배정(2026-10-20) — 시프트 신청자를 그날 방에 넣기 · 배정 설정(제안 규칙 · 건물별 고정 인력 · 사람별) · 대신 넣기 ·
    * 취소 요청 처리 · 못 한 방 미루기. 배정 담당이 건물마다 2명 정도라 역할 기본값에 개인 부여 · 차단을 연다.
+   * 2026-10-21 — 사무실도 배정한다(오피스 관리자 기본 추가, CS 는 안 함). 사무실 알바 리더는 사람마다 켠다.
    * docs/product/37-cleaning-shift-assignment.md
    */
   "cleaning.assign": {
-    roles: ["owner", "senior_managing_director", "field_manager"],
+    roles: ["owner", "senior_managing_director", "office_admin", "field_manager"],
     individualGrant: true,
     individualDeny: true,
     asksExpiry: false,
@@ -447,9 +446,9 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
-  /** 게스트 피드백 댓글 — 파트타임만 빠진다(예전 `NO_COMMENT_ROLES` 의 반대). */
+  /** 게스트 피드백 댓글 — 알바(아르바이트 · 리더)가 빠진다(예전 `NO_COMMENT_ROLES` 의 반대). */
   "complaint.comment": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
     individualGrant: false,
     individualDeny: false,
     asksExpiry: false,
@@ -492,9 +491,9 @@ export const CAPABILITIES = {
   // 역할 이름 · 따로 붙은 표시(급여 담당 · 연차 결재자)로 고정돼 있던 것을 키로 옮겼다. 근태와 급여는 나눴다 —
   // 근태를 넘겨받은 아르바이트 리더에게 동료 급여까지 보이면 안 된다. docs/product/27-permission-override-workflow.md
 
-  /** 관리자 웹 들어가기(+ 관리 ↔ 현장 모드 전환). 예전 `adminWebRoles`. 아르바이트만 역할로 못 받는다. */
+  /** 관리자 웹 들어가기(+ 관리 ↔ 현장 모드 전환). 예전 `adminWebRoles`. 알바(아르바이트 · 리더)는 역할로 못 받는다 — 사무실을 돕는 리더는 사람마다 켠다(2026-10-21). */
   "admin_web.access": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
     individualGrant: true,
     individualDeny: true,
     asksExpiry: false,
@@ -562,9 +561,9 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
-  /** 분실물 처리(상태 바꾸기 · 보관/반환). 예전 「파트타임 제외 전원」 역할 비교. */
+  /** 분실물 처리(상태 바꾸기 · 보관/반환). 알바(아르바이트 · 리더)는 역할로 못 받는다 — 필요한 사람에게 켠다(2026-10-21). */
   "lost_found.handle": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager", "staff"],
+    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
     individualGrant: true,
     individualDeny: true,
     asksExpiry: false,

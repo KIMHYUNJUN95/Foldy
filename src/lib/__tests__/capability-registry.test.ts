@@ -236,10 +236,10 @@ describe("역할 기본 틀 — 옮겨 온 키", () => {
   const can = (role: OrgRole, capability: Capability, over: { granted?: boolean; denied?: boolean } = {}) =>
     evaluateCapability({ capability, role, granted: over.granted ?? false, denied: over.denied ?? false });
 
-  it("관리자 웹 · 분실물 처리는 아르바이트만 역할로 못 받는다(예전과 같음)", () => {
+  it("관리자 웹 · 분실물 처리는 알바(아르바이트 · 리더)가 역할로 못 받는다", () => {
     for (const role of organizationRoles) {
-      expect(can(role, "admin_web.access"), role).toBe(role !== "part_time_staff");
-      expect(can(role, "lost_found.handle"), role).toBe(role !== "part_time_staff");
+      expect(can(role, "admin_web.access"), role).toBe(role !== "part_time_staff" && role !== "staff");
+      expect(can(role, "lost_found.handle"), role).toBe(role !== "part_time_staff" && role !== "staff");
     }
   });
 
@@ -258,7 +258,9 @@ describe("역할 기본 틀 — 옮겨 온 키", () => {
   });
 
   it("역할로 받은 기본 기능도 사람마다 끌 수 있고, 대표 · 전무는 못 끈다", () => {
-    expect(can("staff", "admin_web.access", { denied: true })).toBe(false);
+    expect(can("field_manager", "admin_web.access", { denied: true })).toBe(false);
+    expect(can("staff", "admin_web.access")).toBe(false);
+    expect(can("staff", "admin_web.access", { granted: true })).toBe(true);
     expect(can("owner", "attendance.manage", { denied: true })).toBe(true);
     expect(can("senior_managing_director", "payroll.view", { denied: true })).toBe(true);
   });

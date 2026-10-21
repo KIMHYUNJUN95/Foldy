@@ -179,7 +179,8 @@ export function BottomSheet({
     return () => clearTimeout(timer);
   }, [closing]);
 
-  const drag = useSheetDragDismiss({ shown, onDismiss: close });
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const drag = useSheetDragDismiss({ shown, onDismiss: close, sheetRef });
 
   // 스크림 탭으로 닫으려면 **포인터가 스크림 위에서 눌렸어야** 한다.
   //
@@ -195,7 +196,6 @@ export function BottomSheet({
    * 미끄러뜨린다(FLIP — `translate` 속성만 움직여 합성기에서 돈다. 끌기 · 열고 닫기의 `transform` 과 따로 논다).
    * 작아질 때는 그대로 둔다 — 같은 방법이면 시트가 바닥에서 떠서 아래로 스크림이 비친다.
    */
-  const sheetRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const sheet = sheetRef.current;
     if (!sheet || typeof ResizeObserver === "undefined" || typeof sheet.animate !== "function") return;

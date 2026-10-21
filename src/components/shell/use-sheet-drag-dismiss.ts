@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 /**
  * iOS-style drag-to-dismiss for the app's bottom sheets — a drag-only primitive.
@@ -9,6 +9,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * open/close lifecycle (the `shown ? translate-y-0 : translate-y-full` + `opacity` slide it already
  * has). The hook never owns mounting/visibility — it only:
  *   - follows the finger downward while dragging the grab handle / header (clamped at 0)
+ *   - with `sheetRef`: also from the sheet's CONTENT, iOS-style (2026-10-21) — a downward pull that starts
+ *     while the content under the finger is scrolled to the top drags the sheet instead of rubber-banding
+ *     the list. Not while a text field in the sheet is focused, not on horizontal gestures, not on
+ *     `[data-sheet-drag="off"]` / sliders / `touch-action: none` elements (their own gestures).
  *   - on release: calls the sheet's own close (`onDismiss`) if pulled far/fast enough, else snaps back
  *   - dims the scrim in proportion to the drag distance
  *
@@ -38,9 +42,15 @@ type Options = {
   shown: boolean;
   /** Run the sheet's existing close() — fired when a drag crosses the dismiss threshold. */
   onDismiss: () => void;
+  /** The sheet element — enables dragging from the content (see above). */
+  sheetRef?: RefObject<HTMLElement | null>;
 };
 
-export function useSheetDragDismiss({ shown, onDismiss }: Options) {
+/** Movement before a content touch is read as a scroll or a sheet drag. */
+const CONTENT_SLOP = 6;
+const CONTENT_BLOCKED = '[data-sheet-drag="off"], [role="slider"], input[type="range"], [data-swipe-back="off"]';
+
+export function useSheetDragDismiss({ shown, onDismiss, sheetRef }: Options) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [height, setHeight] = useState(0); // sheet height captured at drag start (for scrim dim)
@@ -57,6 +67,8 @@ export function useSheetDragDismiss({ shown, onDismiss }: Options) {
   const onDismissRef = useRef(onDismiss);
   const dragRafRef = useRef(0);
   const pendingDragYRef = useRef(0);
+  /** Which input drives the live drag — the handle (pointer events) or the content (touch events). */
+  const sourceRef = useRef<"handle" | "content" | null>(null);
 
   useEffect(() => {
     shownRef.current = shown;
@@ -80,41 +92,68 @@ export function useSheetDragDismiss({ shown, onDismiss }: Options) {
     setDragY(0);
   }, [shown]);
 
+  /** Live drag step — shared by the handle (pointer) and content (touch) paths. */
+  function follow(y: number, t: number) {
+    const dy = y - startYRef.current;
+    const clamped = dy > 0 ? dy : 0; // downward only
+    const dt = t - lastTRef.current;
+    if (dt > 0) velRef.current = (y - lastYRef.current) / dt;
+    lastYRef.current = y;
+    lastTRef.current = t;
+    dragYRef.current = clamped;
+    pendingDragYRef.current = clamped;
+    if (!dragRafRef.current) {
+      dragRafRef.current = requestAnimationFrame(() => {
+        dragRafRef.current = 0;
+        setDragY(pendingDragYRef.current);
+      });
+    }
+  }
+
+  /** Begin a live drag at `y` — the sheet height is captured for the scrim dim and the distance threshold. */
+  function begin(sheet: HTMLElement | null, y: number, t: number, source: "handle" | "content") {
+    const h = sheet?.getBoundingClientRect().height ?? 0;
+    heightRef.current = h;
+    setHeight(h);
+    startYRef.current = y;
+    lastYRef.current = y;
+    lastTRef.current = t;
+    velRef.current = 0;
+    dragYRef.current = 0;
+    pendingDragYRef.current = 0;
+    sourceRef.current = source;
+    draggingRef.current = true;
+    setDragging(true);
+    setDragY(0);
+  }
+
+  function release() {
+    draggingRef.current = false;
+    sourceRef.current = null;
+    setDragging(false);
+    const dy = dragYRef.current;
+    const threshold = Math.max(DISTANCE_FLOOR, heightRef.current * DISTANCE_RATIO);
+    dragYRef.current = 0;
+    pendingDragYRef.current = 0;
+    if (dragRafRef.current) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = 0;
+    }
+    setDragY(0);
+    if (dy >= threshold || velRef.current >= VELOCITY_CLOSE) {
+      onDismissRef.current();
+    }
+  }
+
   useEffect(() => {
     function onMove(e: PointerEvent) {
-      if (!draggingRef.current) return;
+      if (!draggingRef.current || sourceRef.current !== "handle") return;
       e.preventDefault();
-      const dy = e.clientY - startYRef.current;
-      const clamped = dy > 0 ? dy : 0; // downward only
-      const dt = e.timeStamp - lastTRef.current;
-      if (dt > 0) velRef.current = (e.clientY - lastYRef.current) / dt;
-      lastYRef.current = e.clientY;
-      lastTRef.current = e.timeStamp;
-      dragYRef.current = clamped;
-      pendingDragYRef.current = clamped;
-      if (!dragRafRef.current) {
-        dragRafRef.current = requestAnimationFrame(() => {
-          dragRafRef.current = 0;
-          setDragY(pendingDragYRef.current);
-        });
-      }
+      follow(e.clientY, e.timeStamp);
     }
     function onUp() {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      setDragging(false);
-      const dy = dragYRef.current;
-      const threshold = Math.max(DISTANCE_FLOOR, heightRef.current * DISTANCE_RATIO);
-      dragYRef.current = 0;
-      pendingDragYRef.current = 0;
-      if (dragRafRef.current) {
-        cancelAnimationFrame(dragRafRef.current);
-        dragRafRef.current = 0;
-      }
-      setDragY(0);
-      if (dy >= threshold || velRef.current >= VELOCITY_CLOSE) {
-        onDismissRef.current();
-      }
+      if (!draggingRef.current || sourceRef.current !== "handle") return;
+      release();
     }
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
@@ -128,24 +167,87 @@ export function useSheetDragDismiss({ shown, onDismiss }: Options) {
         dragRafRef.current = 0;
       }
     };
+     
   }, []);
+
+  // Content drag (iOS sheets): touch listeners on the sheet itself — `touchmove` must be non-passive so a claimed
+  // pull can stop the list's own scroll / rubber band. Undecided touches stay native scrolls.
+  useEffect(() => {
+    const sheet = sheetRef?.current;
+    if (!sheet) return;
+    let candidate = false;
+    let startX = 0;
+    let startY = 0;
+    let scroller: HTMLElement | null = null;
+
+    function scrollerFor(target: Element | null): HTMLElement | null {
+      for (let el = target; el && el !== sheet; el = el.parentElement) {
+        if (!(el instanceof HTMLElement)) continue;
+        const overflowY = getComputedStyle(el).overflowY;
+        if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) return el;
+      }
+      return null;
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      candidate = false;
+      if (!shownRef.current || draggingRef.current || e.touches.length !== 1) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target || target.closest("[data-sheet-handle]") || target.closest(CONTENT_BLOCKED)) return;
+      for (let el: Element | null = target; el && el !== sheet; el = el.parentElement) {
+        if (getComputedStyle(el).touchAction === "none") return;
+      }
+      const active = document.activeElement;
+      if (active && sheet!.contains(active) && active.matches("input, textarea, select, [contenteditable='true']")) return;
+      candidate = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      scroller = scrollerFor(target);
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      const touch = e.touches[0];
+      if (!touch) return;
+      if (draggingRef.current && sourceRef.current === "content") {
+        if (e.cancelable) e.preventDefault();
+        follow(touch.clientY, e.timeStamp);
+        return;
+      }
+      if (!candidate) return;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      if (Math.abs(dx) < CONTENT_SLOP && Math.abs(dy) < CONTENT_SLOP) return;
+      candidate = false;
+      if (dy <= 0 || Math.abs(dy) <= Math.abs(dx)) return;
+      if (scroller && scroller.scrollTop > 0) return;
+      if (e.cancelable) e.preventDefault();
+      // Start from here, not from the touch-down point — no jump by the slop distance.
+      begin(sheet!, touch.clientY, e.timeStamp, "content");
+    }
+
+    function onTouchEnd() {
+      candidate = false;
+      if (draggingRef.current && sourceRef.current === "content") release();
+    }
+
+    sheet.addEventListener("touchstart", onTouchStart, { passive: true });
+    sheet.addEventListener("touchmove", onTouchMove, { passive: false });
+    sheet.addEventListener("touchend", onTouchEnd);
+    sheet.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      sheet.removeEventListener("touchstart", onTouchStart);
+      sheet.removeEventListener("touchmove", onTouchMove);
+      sheet.removeEventListener("touchend", onTouchEnd);
+      sheet.removeEventListener("touchcancel", onTouchEnd);
+    };
+     
+  }, [sheetRef]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!shownRef.current) return;
     const handle = e.currentTarget as HTMLElement;
-    const sheet = handle.closest("[data-sheet]") as HTMLElement | null;
-    const h = sheet?.getBoundingClientRect().height ?? 0;
-    heightRef.current = h;
-    setHeight(h);
-    startYRef.current = e.clientY;
-    lastYRef.current = e.clientY;
-    lastTRef.current = e.timeStamp;
-    velRef.current = 0;
-    dragYRef.current = 0;
-    pendingDragYRef.current = 0;
-    draggingRef.current = true;
-    setDragging(true);
-    setDragY(0);
+    begin(handle.closest("[data-sheet]") as HTMLElement | null, e.clientY, e.timeStamp, "handle");
+     
   }, []);
 
   const dim = height > 0 ? Math.min(1, dragY / height) : 0;
@@ -168,6 +270,7 @@ export function useSheetDragDismiss({ shown, onDismiss }: Options) {
     } as React.CSSProperties,
     /** Spread onto the grab handle (and optionally the header block). */
     handleProps: {
+      "data-sheet-handle": "",
       onPointerDown,
       // Sheets portal to <body>, but React synthetic touch events still bubble through the React
       // tree — i.e. up into the mobile shell's content div, whose pull-to-refresh / swipe-nav

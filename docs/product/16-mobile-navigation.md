@@ -809,8 +809,14 @@ contract so they behave like native iOS sheets.
 
 - **Unified dismissal rule**: every bottom sheet closes either by dragging down from the sheet's upper touch area / grab-handle zone, or by tapping the empty scrim outside the sheet. Do not invent feature-specific close gestures for bottom sheets.
 - **Drag zone**: the center grab handle (`mx-auto h-1 w-[38px] rounded-full`) and the sheet's top
-  header area start the drag. A gesture that begins inside the sheet's scrollable body does **not**
-  trigger drag-dismiss (so inner scrolling is never hijacked).
+  header area start the drag. ~~A gesture that begins inside the sheet's scrollable body does **not**
+  trigger drag-dismiss~~ — **바뀜(2026-10-21, 네이티브 점검 5번):** iOS 시트처럼 **내용에서도** 끌어 닫는다.
+  내용을 누른 손가락이 6px 넘게 **아래로**(가로보다 세로가 크게) 움직였고, 그 자리의 스크롤 칸이 **맨 위**(또는 스크롤 칸이 없음)이면
+  시트가 손가락을 따라 내려간다(같은 문턱 · 같은 속도 판정 · 6px 만큼 튀지 않게 그 자리에서 시작). 스크롤이 내려가 있거나 위로 미는
+  손짓은 그대로 내용 스크롤. 받지 않는 경우: 시트 안 입력칸에 포커스(키보드 열림 — 쓰던 내용 보호), 가로 손짓,
+  `[data-sheet-drag="off"]` · `[data-swipe-back="off"]` · 슬라이더 · `touch-action: none` 요소(자기 제스처가 있는 것). 구현은
+  `useSheetDragDismiss` 의 `sheetRef` 옵션(시트에 직접 붙인 touch 리스너 — 받은 뒤 `touchmove` 를 막아 목록 고무줄 · 스크롤이 같이
+  움직이지 않게). `BottomSheet` 는 늘 켠다. **새 시트 규칙:** 시트 안에 세로로 끄는 자기 제스처를 만들면 `data-sheet-drag="off"`.
 - **Touch target size**: the upper drag area must stay broad and easy to catch. Do not shrink it into a tiny, hard-to-grab strip.
 - **Follow + dim**: while dragging, the sheet follows the finger downward (`translateY`, clamped at 0
   — no upward drag), and the scrim dims in proportion to the drag distance.

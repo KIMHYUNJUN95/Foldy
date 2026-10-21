@@ -9,6 +9,15 @@ step was deferred, design-only, pending, or not implemented, the newest dated en
 win. The concise current baseline is: Phase 13 rollout QA remains active, while the Phase 14 feature batch
 and the major mobile/admin operations modules are implemented and being hardened.
 
+## 2026-10-21 — 네이티브급 움직임 점검 (앱 출시 전)
+
+점검으로 찾은 5개(순서: 5 → 1~3 → 4). PWA 노치 띠는 그대로 둔다(일체형은 앱이 맡음).
+- [x] **5. 시트를 내용에서 끌어 닫기** — iOS 처럼 내용이 맨 위일 때 아래로 끌면 시트가 따라 내려가 닫힌다(입력 중 · 가로 손짓 · 자기 제스처 요소 제외).
+  `useSheetDragDismiss` `sheetRef`. 상세 `docs/product/16-mobile-navigation.md` 「Bottom Sheets — iOS-style Drag-to-Dismiss」.
+- [ ] 1. 뒤로 가면 목록 스크롤이 맨 위로 튐 · 2. 탭바 · 상단바가 화면과 같이 미끄러짐 · 3. 0.3초 넘는 로딩에 탭바까지 사라짐 — 원인 하나(셸이 화면마다
+  새로 그려짐). 셸을 레이아웃으로 올린다.
+- [ ] 4. 목록 → 상세 · 새로 쓰기가 눌러도 서버 응답까지 멈춤.
+
 ## 2026-10-21 — 근태 디버깅: 퇴근 미기록이 며칠짜리 근무로 저장되던 것
 
 - 실데이터에서 9/10 → 10/16 **866시간** 등 6건 발견 — 퇴근을 잊은 다음 날 홈이 어제 근무를 「근무 중」으로 띄우고 퇴근 버튼만 보여 줬다.

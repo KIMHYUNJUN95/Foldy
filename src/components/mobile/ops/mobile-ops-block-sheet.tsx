@@ -11,6 +11,7 @@ import { BLOCK_PURPOSE_ORDER, blockErrorText, type BlockPanelCopy } from "@/comp
 import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
 import { MswField, MswSuccess, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
+import { haptic } from "@/lib/haptics";
 
 /**
  * 모바일 차단 시트 — Claude Design 시안 `4a 최소숙박 · 차단 시트 v3`(4c · 4d · 4e, 2026-10-02 사용자 확정).
@@ -98,6 +99,7 @@ export function MobileOpsBlockSheet({
         return;
       }
       setConfirming(false);
+      haptic(result.appliedRanges ? "warning" : "error");
       setError(
         result.appliedRanges
           ? copy.bkPartialFailed

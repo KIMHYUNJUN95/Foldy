@@ -19,6 +19,7 @@ import {
   useSuccessThen,
 } from "@/components/mobile/ops/mobile-ops-form";
 import { stayNights, validateManualBooking } from "@/lib/ops-manual-booking";
+import { haptic } from "@/lib/haptics";
 
 /**
  * 모바일 수기 예약 시트 — Claude Design 시안 `5a 예약 상세 · 수기 예약 시트 v3`(5e, 2026-10-02 사용자 확정).
@@ -122,6 +123,7 @@ export function MobileOpsBookingSheet({
         succeed(() => onCreated({ guestName: guestName.trim(), nights: nights.length, reservationId: result.reservationId }));
         return;
       }
+      haptic("error");
       setError(bookingErrorText(copy, result));
     });
   };

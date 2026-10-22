@@ -17,6 +17,7 @@ import {
 import { uploadRequestImages } from "@/components/requests/request-image-upload";
 import type { Dictionary } from "@/lib/i18n";
 import { Ic, SgIcon } from "./sg-icons";
+import { haptic } from "@/lib/haptics";
 
 const MAX_PHOTOS = 5;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -94,9 +95,11 @@ export function SuggestionCommentComposer({
       }
       const result = await createStaffSuggestionComment(fd);
       if (!result.ok) {
+        haptic("error");
         setError(copy.errors.save_failed);
         return;
       }
+      haptic("light");
       for (const p of photos) URL.revokeObjectURL(p.previewUrl);
       setText("");
       setPhotos([]);

@@ -41,6 +41,7 @@ import type { OpsCalendarBar } from "@/lib/ops-calendar";
 import { stayNights } from "@/lib/ops-manual-booking";
 import { MobileMoveCalendar, addDaysKey } from "@/components/mobile/ops/mobile-move-calendar";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
+import { haptic } from "@/lib/haptics";
 
 /**
  * 모바일 예약 시트 — 상세 · 수정 · 취소. Claude Design 시안 `5a 예약 상세 · 수기 예약 시트 v3`(5a~5d, 2026-10-02 사용자 확정).
@@ -197,6 +198,7 @@ export function MobileOpsReservationSheet({
         succeed(onCancelled);
         return;
       }
+      haptic("error");
       setError(reservationCancelErrorText(copy, result));
       setMode("view");
     });
@@ -532,6 +534,7 @@ function MobileReservationEdit({
         succeed(onSaved);
         return;
       }
+      haptic("error");
       setError(reservationEditErrorText(copy, result.error, result.conflictDates));
     });
   };
@@ -764,6 +767,7 @@ function MobileMoveForm({
         });
         return;
       }
+      haptic("error");
       setError(reservationMoveErrorText(copy, result));
       // 그사이 찬 객실이 목록에 그대로 보이게 다시 읽고, 고른 것은 푼다.
       setPicked(null);

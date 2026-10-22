@@ -15,6 +15,7 @@ import {
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { SuggestionComment, SuggestionViewerRole } from "@/lib/suggestions-queries";
 import { Ic, SgIcon } from "./sg-icons";
+import { haptic } from "@/lib/haptics";
 
 const ROLE_CLS: Record<SuggestionViewerRole, string> = {
   author: "role-author",
@@ -86,9 +87,11 @@ export function SuggestionCommentItem({
       for (const url of comment.imageUrls) fd.append("imageUrls", url);
       const result = await updateStaffSuggestionComment(fd);
       if (!result.ok) {
+        haptic("error");
         setError(copy.errors.save_failed);
         return;
       }
+      haptic("success");
       setEditing(false);
     });
   }
@@ -100,6 +103,7 @@ export function SuggestionCommentItem({
       fd.set("commentId", comment.id);
       const result = await deleteStaffSuggestionComment(fd);
       if (!result.ok) {
+        haptic("error");
         setError(copy.errors.save_failed);
         return;
       }

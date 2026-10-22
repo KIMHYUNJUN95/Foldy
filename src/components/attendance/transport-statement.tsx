@@ -26,6 +26,7 @@ import type {
   TransportReportRow,
   LinkedTransportCandidate,
 } from "@/lib/transport-reimbursement";
+import { haptic } from "@/lib/haptics";
 
 type TransportItem = {
   id: string;
@@ -337,6 +338,7 @@ function AddItemSheet({
         memo: memo.trim() || null,
       });
       if (!result.ok) {
+        haptic("error");
         setPending(false);
         return;
       }
@@ -352,6 +354,7 @@ function AddItemSheet({
           // 이미지 업로드 실패는 비치명적; 항목 자체는 생성 완료
         }
       }
+      haptic("success");
       onCreated({
         id: itemId,
         date: usageDate,
@@ -767,6 +770,7 @@ function EditItemSheet({
         contextSummary: context.trim() || undefined,
       });
       if (!result.ok) {
+        haptic("error");
         setPending(false);
         return;
       }
@@ -779,6 +783,7 @@ function EditItemSheet({
           // 이미지 업로드 실패는 비치명적
         }
       }
+      haptic("success");
       onSaved({ amount: amountNum, context: context.trim(), memo: memo.trim(), mode });
       close();
     } catch {
@@ -1106,6 +1111,7 @@ export function TransportStatement({
       const result = await deleteTransportItemAction(id);
       setShowDelete(false);
       setSelectedId(null);
+      haptic(result.ok ? "light" : "error");
       if (result.ok) {
         setItems((prev) => prev.filter((it) => it.id !== id));
         setToast({ message: t.toastDeleted, tone: "del" });
@@ -1118,6 +1124,7 @@ export function TransportStatement({
     const result = await submitTransportReportAction(monthKey);
     setSubmitting(false);
     if (!result.ok) {
+      haptic("error");
       if (result.error === "missing_evidence") {
         setToast({ message: t.submitErrorMissingEvidence, tone: "del" });
       } else if (result.error === "no_items") {
@@ -1125,6 +1132,7 @@ export function TransportStatement({
       }
       return;
     }
+    haptic("success");
     setToast({ message: t.submitSuccess, tone: "ok" });
   }
 

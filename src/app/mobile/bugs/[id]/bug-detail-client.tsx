@@ -19,6 +19,7 @@ import {
 import { deleteBugReportAction, setBugReportStatus } from "../actions";
 import { formatBugCode } from "../bugs-list-client";
 import "@/components/bugs/bugs-white.css";
+import { haptic } from "@/lib/haptics";
 
 const STATUSES: BugStatus[] = ["submitted", "reviewing", "fixed", "closed"];
 
@@ -59,9 +60,11 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer }: Props
     startTransition(async () => {
       const result = await deleteBugReportAction(bug.id);
       if ("error" in result) {
+        haptic("error");
         window.alert(copy.detailDeleteError);
         return;
       }
+      haptic("success");
       router.replace("/mobile/bugs");
     });
   }
@@ -69,6 +72,7 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer }: Props
   function onStatusSelect(status: BugStatus) {
     if (status === bug.status || isPending) return;
     setPendingStatus(status);
+    haptic("light");
     startTransition(async () => {
       await setBugReportStatus(bug.id, status);
       router.refresh();

@@ -9,6 +9,7 @@ import { tokyoToday } from "@/lib/annual-leave";
 import { submitLeaveRequestAction } from "@/app/mobile/attendance/leave/actions";
 import type { LeaveRequestView } from "@/lib/annual-leave-requests-server";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
+import { haptic } from "@/lib/haptics";
 
 // L2 · 신청서 작성 — 종이 신청서를 그대로 옮긴 폼. 종류 선택 · 휴가 단위(종일/오전·오후 반차)는
 // 폼 안에서 바로 전환된다(섹션 T · H). 휴가 기간 필드를 탭하면 날짜 범위 캘린더 바텀시트(섹션 D)가
@@ -94,9 +95,11 @@ export function LeaveForm({
     setBusy(null);
 
     if (!result.ok) {
+      haptic("error");
       setSubmitErr(true);
       return;
     }
+    haptic("success");
     router.push(asDraft ? "/mobile/attendance/leave" : `/mobile/attendance/leave/done?id=${result.id}`);
   }
 

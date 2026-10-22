@@ -8,6 +8,7 @@ import { AIc, AttIcon } from "./att-icons";
 import { HireDatePicker } from "./hire-date-picker";
 import { setAnnualLeaveBaselineAction } from "@/app/mobile/attendance/leave/actions";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
+import { haptic } from "@/lib/haptics";
 
 // 섹션 S · 예외 상태 — 신청을 막고 이유·시점을 분명히 보여주는 전체 화면.
 //   missing: 입사일 미등록 — 본인이 입사일 + 현재 남은 연차를 직접 입력해 등록.
@@ -44,9 +45,11 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
     const result = await setAnnualLeaveBaselineAction({ hireDate, baseAmount: amount });
     setSaving(false);
     if (!result.ok) {
+      haptic("error");
       setSaveErr(result.error === "hourly_excluded" ? "hourly" : "generic");
       return;
     }
+    haptic("success");
     router.push("/mobile/attendance/leave");
   }
 

@@ -16,6 +16,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import "./attendance.css";
 import type { AttendanceCorrectionStatus } from "@/lib/attendance";
 import { getDictionary } from "@/lib/i18n";
+import { haptic } from "@/lib/haptics";
 
 export type CorrectionRequestView = {
   id: string;
@@ -56,7 +57,10 @@ export function AttendanceCorrectionStatus({
       const r = await cancelAttendanceCorrectionRequest(request.id);
       setConfirmCancel(false);
       // 성공은 액션의 revalidatePath 가 갱신한다 — router.refresh() 중복 금지
-      if (!r.ok) setCancelErr(true);
+      if (!r.ok) {
+        haptic("error");
+        setCancelErr(true);
+      } else haptic("success");
     });
 
   const editHref = request.sessionId

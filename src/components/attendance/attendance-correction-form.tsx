@@ -34,6 +34,7 @@ import type { AttendanceCorrectionReason, AttendanceCorrectionStatus } from "@/l
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { tokyoToday } from "@/lib/annual-leave";
 import { HireDatePicker } from "./hire-date-picker";
+import { haptic } from "@/lib/haptics";
 
 type AttendanceCopy = Dictionary["attendance"];
 
@@ -201,9 +202,11 @@ export function AttendanceCorrectionForm({
       };
       const res = await createAttendanceCorrectionRequest(input);
       if (res.ok) {
+        haptic("success");
         router.push(`/mobile/attendance/correction/status?id=${res.id}`);
         return;
       }
+      haptic("error");
       setError(
         res.reason === "out_of_range"
           ? copy.corrErrOutOfRange

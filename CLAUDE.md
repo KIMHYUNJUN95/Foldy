@@ -130,6 +130,9 @@ For `/mobile/*`, treat `src/components/shell/mobile-shell.tsx` as a global contr
 - **Toast motion is shared (2026-10-21).** Mobile toasts keep their own look but get exit + swipe-to-dismiss from
   `useToastMotion` (`src/components/shell/use-toast-motion.ts`) — put its `ref` on the fixed toast element. Do not
   hand-roll another exit/swipe for a new mobile toast. See 16 → 「토스트 — 공용 움직임」.
+- **Haptics follow one rule (2026-10-22).** `success` only after the server confirms a saved record, `error` with
+  a failure message, `light` for selections / toggles / dismissals / deletes, `medium` for long-press pick-up,
+  `warning` for partial results. See the header of `src/lib/haptics.ts` and 16 → 「햅틱 — 공용 규칙」.
 - **Row removal collapses (2026-10-21).** Removing a row from a mobile list collapses it immediately (wrap in
   `.row-collapse`, set `data-leaving` before awaiting the server, remove it on failure) — no row vanishing after a
   round-trip. Quick status toggles use `useOptimistic`. See 16 → 「줄 접힘 · 즉시 반영 — 공용」.

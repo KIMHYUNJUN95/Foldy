@@ -110,6 +110,8 @@ and the major mobile/admin operations modules are implemented and being hardened
   고침(그리다 버려진 셸이 판정을 써 버림 → `commitScreenEntrance`, 테스트 1개 추가). 700 · 1200 폭에서 매번 확인.
 - [x] **사진 부드럽게 나타나기 공용** — 모바일 셸 · 시트 안 사진은 받아질 때까지 숨겼다 0.22초에 나타남(`ImageFadeIn`). 스크립트가 안 돌면
   평소대로 보이는 안전장치. 데모 데이터에 사진이 없어 넣은 사진으로 확인(느린 · 깨진 · 이미 받은 사진).
+- [x] **햅틱 공용 규칙** — success · error · warning · light · medium 쓰임을 `haptics.ts` 머리 주석에 정하고, 저장하면서 진동이 없던 모바일 화면에
+  맞춰 넣음(결과를 받는 곳 전부, redirect 폼은 화면 이동이 피드백). 실기기(앱 · Android)에서 느낌 확인 남음 — iOS PWA 는 진동 API 가 없다.
 - H10 Android 서명은 설정이 이미 끝나 있다 — 남은 건 사용자의 키 만들기 · 백업(03 「Android 릴리스 서명」).
 
 ## 2026-10-21 — 네이티브급 움직임 점검 (앱 출시 전)

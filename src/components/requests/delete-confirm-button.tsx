@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { haptic } from "@/lib/haptics";
 
 type DeleteConfirmLabels = {
   confirmTitle: string;
@@ -44,6 +45,7 @@ export function DeleteConfirmButton({
     setIsDeleting(false);
 
     if (!result.ok) {
+      haptic("error");
       if (result.error === "unauthorized") {
         close();
         showToast(labels.permissionDeniedMessage, true);
@@ -53,6 +55,7 @@ export function DeleteConfirmButton({
       return;
     }
 
+    haptic("light");
     router.push(redirectTo);
   }
 

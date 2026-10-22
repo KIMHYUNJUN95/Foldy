@@ -14,6 +14,7 @@ import { compressImageFile } from "@/components/announcements/announcement-image
 import type { BugCopy } from "@/components/bugs/bug-types";
 import { uploadBugReportImageAction, createBugReportAction } from "../actions";
 import "@/components/bugs/bugs-white.css";
+import { haptic } from "@/lib/haptics";
 
 const ALLOWED_TYPES = ["image/gif", "image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGES = 5;
@@ -97,6 +98,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
 
       const createResult = await createBugReportAction(baseFormData);
       if ("error" in createResult) {
+        haptic("error");
         setError(copy.submitError);
         return;
       }
@@ -117,6 +119,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
 
       // 체크가 그려지는 걸 잠깐 보여 주고 목록으로.
       setDone(true);
+      haptic("success");
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.setTimeout(() => router.replace("/mobile/bugs"), reduce ? 0 : 650);
     });

@@ -29,6 +29,7 @@ import "./suggestions.css";
 import "./suggestions-white.css";
 import { SuggestionCommentComposer } from "./suggestion-comment-composer";
 import { SuggestionCommentItem } from "./suggestion-comment-item";
+import { haptic } from "@/lib/haptics";
 
 type SgCopy = Dictionary["mobile"]["suggestions"];
 
@@ -102,9 +103,11 @@ export function SuggestionsDetail({
       const result = await updateStaffSuggestionStatus(fd);
       setPendingTarget(null);
       if (!result.ok) {
+        haptic("error");
         setStatusError(copy.errors.save_failed);
         return;
       }
+      haptic("success");
       onDone?.();
     });
   }

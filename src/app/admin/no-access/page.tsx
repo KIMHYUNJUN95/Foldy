@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { LockKeyhole } from "lucide-react";
+import { LockKeyhole, Smartphone } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import { FoldyMark } from "@/components/brand/foldy-mark";
 import { hasAdminWebAccess } from "@/config/capabilities";
@@ -11,6 +11,9 @@ import { getCurrentAppSession } from "@/lib/session";
  * 관리자 화면 권한 없음(2026-10-21) — PC 에서 `admin_web.access` 가 없으면 여기로 온다. 예전엔 `/mobile` 로 보냈는데 PC 에선 가운데
  * 폰 너비로만 떠서 어색했다(사용자). 폰 · 태블릿은 미들웨어가 `/admin` 을 먼저 `/mobile` 로 보내므로 여기 오지 않는다.
  * 관리자 셸(메뉴)은 그리지 않는다 — 들어갈 수 없는 곳의 메뉴를 보여 주지 않는다. docs/product/05-admin-web-ia.md
+ *
+ * 모양(2026-10-22 Apple 스타일 시안 승인): 카드 없이 연회색 바탕 가운데 — 아이콘 · 제목 · 설명 · 회색 캡슐 로그아웃(보조 동작) ·
+ * 맨 아래 휴대폰 앱 한 줄. 로고는 왼쪽 위에 작게.
  */
 export default async function AdminNoAccessPage() {
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
@@ -23,33 +26,30 @@ export default async function AdminNoAccessPage() {
   const copy = dictionary.admin.shared;
 
   return (
-    <main className="flex min-h-[100svh] items-center justify-center bg-background px-6 py-12 text-foreground">
-      <section className="w-full max-w-[440px]">
-        {/* 로고 = 앱 아이콘과 같은 세 줄 마크 + 굵은 sans 「Foldy」(사이드 메뉴와 같음). */}
-        <div className="flex items-center gap-2.5">
-          <FoldyMark size={30} />
-          <span className="wordmark text-[19px] text-foreground">Foldy</span>
-        </div>
-        <div className="mt-8 rounded-[24px] bg-surface px-8 py-9 shadow-[0_24px_70px_-42px_rgba(16,24,40,0.45)]">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <LockKeyhole aria-hidden="true" size={20} strokeWidth={2} />
-          </span>
-          <p className="mt-5 text-[12px] font-bold uppercase tracking-[0.14em] text-primary">{copy.noAccessConsoleEyebrow}</p>
-          <h1 className="mt-2 text-[22px] font-black leading-tight tracking-[-0.03em]">{copy.noAccessConsoleTitle}</h1>
-          <p className="mt-3 text-[14px] font-medium leading-6 text-muted-foreground">{copy.noAccessConsoleBody}</p>
-          <p className="mt-4 rounded-2xl bg-muted px-4 py-3 text-[13px] font-semibold leading-5 text-muted-foreground">
-            {copy.noAccessConsoleHelp}
-          </p>
-          <form action={signOut} className="mt-7">
-            <input name="next" type="hidden" value="/auth/login?next=/admin" />
-            <button
-              className="h-12 w-full rounded-2xl bg-primary text-[15px] font-bold text-primary-foreground transition-transform active:scale-[0.99]"
-              type="submit"
-            >
-              {dictionary.common.logout}
-            </button>
-          </form>
-        </div>
+    <main className="relative flex min-h-[100svh] items-center justify-center bg-[#f5f5f7] px-6 py-16 text-[#1d1d1f]">
+      <div className="absolute left-8 top-7 flex items-center gap-2">
+        <FoldyMark size={24} />
+        <span className="wordmark text-[16px]">Foldy</span>
+      </div>
+      <section className="flex w-full max-w-[400px] flex-col items-center text-center">
+        <span className="flex size-16 items-center justify-center rounded-full bg-[#e8e8ed] text-[#6e6e73]">
+          <LockKeyhole aria-hidden="true" size={28} strokeWidth={1.8} />
+        </span>
+        <h1 className="mt-6 text-[28px] font-semibold leading-[34px] tracking-[-0.02em]">{copy.noAccessConsoleTitle}</h1>
+        <p className="mt-2.5 whitespace-pre-line text-[15px] leading-[22px] text-[#6e6e73]">{copy.noAccessConsoleBody}</p>
+        <form action={signOut} className="mt-8">
+          <input name="next" type="hidden" value="/auth/login?next=/admin" />
+          <button
+            className="h-11 rounded-full bg-[#e8e8ed] px-7 text-[15px] font-medium text-[#1d1d1f] transition-[background-color,transform] duration-150 hover:bg-[#dedee3] active:scale-[0.97]"
+            type="submit"
+          >
+            {dictionary.common.logout}
+          </button>
+        </form>
+        <p className="mt-10 flex items-center gap-1.5 text-[13px] leading-[18px] text-[#86868b]">
+          <Smartphone aria-hidden="true" size={14} strokeWidth={2} />
+          {copy.noAccessConsoleHelp}
+        </p>
       </section>
     </main>
   );

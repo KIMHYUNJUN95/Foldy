@@ -25,6 +25,11 @@ and the major mobile/admin operations modules are implemented and being hardened
 
 - `/admin/recruit` 보기바 Excel/PDF 앞에 「채용 사이트」 링크(새 탭 `stayari.web.app`). ko/ja/en. 상세 `docs/product/30-recruit-workflow.md` 맨 아래.
 
+## 2026-10-22 — 권한 없음 화면 Apple 스타일로
+
+- PC 관리자 화면 권한 없음 · 메뉴 권한 없음을 카드 없는 가운데 정렬(아이콘 · 제목 · 설명), 로그아웃은 회색 캡슐, 로고는 왼쪽 위 작게. ko/ja/en.
+  상세 `docs/product/05-admin-web-ia.md` 「권한 없음 화면」.
+
 ## 2026-10-22 — 운영 데이터 정리(계정 · 초대 코드)
 
 - 조직 없는 계정 정리: 직원 1명을 Haru 오피스 관리자(월급제)로 넣고, 테스트 계정 1개 삭제. Haru 활성 13명, 심사용 「Foldy Demo」는 그대로.

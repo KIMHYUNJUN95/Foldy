@@ -656,6 +656,8 @@ export function MobileCalendarView({
 
   const w = wcopy;
   const propertyName = (name: string) => propertyLabelMap[name] ?? name;
+  // 독채(오쿠보 · 사노)는 객실 이름이 건물 이름(한국어 정규 명칭)이다 — 그때만 건물 이름처럼 바꾼다(2026-10-22).
+  const roomName = (label: string) => propertyLabelMap[label] ?? label;
   const channelName = (source: string) => {
     const normalized = normalizeSource(source);
     return normalized === "booking" ? "Booking.com" : normalized === "airbnb" ? "Airbnb" : w.channelDirect;
@@ -771,7 +773,7 @@ export function MobileCalendarView({
         <div className="mcw-dwho">
           <h2>{item.guestName}</h2>
           <span>
-            {propertyName(item.propertyName)} · <b className="mcw-mono">{item.roomLabel}</b> · {guestsShort(item)}
+            {propertyName(item.propertyName)} · <b className="mcw-mono">{roomName(item.roomLabel)}</b> · {guestsShort(item)}
           </span>
         </div>
         <div className="mcw-dstay">
@@ -876,7 +878,7 @@ export function MobileCalendarView({
               const key = `r${item.roomLabel}`;
               return (
                 <button
-                  aria-label={`${item.roomLabel} · ${copy.copyNumber}`}
+                  aria-label={`${roomName(item.roomLabel)} · ${copy.copyNumber}`}
                   className="mcw-rcode"
                   key={item.roomLabel}
                   onClick={async () => {
@@ -885,7 +887,7 @@ export function MobileCalendarView({
                   }}
                   type="button"
                 >
-                  <span className="mcw-mono">{item.roomLabel}</span>
+                  <span className="mcw-mono">{roomName(item.roomLabel)}</span>
                   {copiedKey === key ? (
                     <span className="mcw-done">
                       <Check aria-hidden="true" />
@@ -1040,7 +1042,7 @@ export function MobileCalendarView({
                   return (
                     <div className="mcw-row" key={room} style={{ height: `${rowHeight}px` }}>
                       <div className="mcw-room" style={{ width: `${ROOM_LABEL_WIDTH}px` }}>
-                        {room}
+                        {roomName(room)}
                       </div>
                       <div className="mcw-track" style={{ width: `${dates.length * DAY_WIDTH}px` }}>
                         {(blockBarsByRoom.get(room) ?? []).map((entry) => (
@@ -1069,7 +1071,7 @@ export function MobileCalendarView({
                             const withGuests = bar.widthPx >= 150;
                             return (
                               <button
-                                aria-label={`${bar.item.guestName}, ${bar.item.roomLabel}, ${channelName(bar.item.source)}`}
+                                aria-label={`${bar.item.guestName}, ${roomName(bar.item.roomLabel)}, ${channelName(bar.item.source)}`}
                                 className={cn(
                                   "mcw-bar",
                                   `is-${normalizeSource(bar.item.source)}`,
@@ -1155,7 +1157,7 @@ export function MobileCalendarView({
                   ) : (
                     emptyRoomLabels.map((roomLabel) => (
                       <div className="mcw-li" key={roomLabel}>
-                        <span className="mcw-li__room">{roomLabel}</span>
+                        <span className="mcw-li__room">{roomName(roomLabel)}</span>
                         <span className="mcw-li__t">
                           <b>{propertyName(selectedProperty)}</b>
                           {blockedRoomsAtReference.has(roomLabel) ? <span>{w.blocked}</span> : null}
@@ -1176,7 +1178,7 @@ export function MobileCalendarView({
                           onClick={() => (isTablet ? setPaneReservationId(item.id) : openReservationSheet(item.id))}
                           type="button"
                         >
-                          <span className="mcw-li__room">{item.roomLabel}</span>
+                          <span className="mcw-li__room">{roomName(item.roomLabel)}</span>
                           <span className="mcw-li__t">
                             <b>{item.guestName}</b>
                             <span>{listSub(item)}</span>

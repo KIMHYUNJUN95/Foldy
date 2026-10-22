@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, ExternalLink, Search } from "lucide-react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
+import { useBuildingName } from "@/components/shared/building-names";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
 import type { RoomLinkBuildingView, RoomLinkRowView, RoomLinksPageData, RoomLinkUnitView } from "@/lib/room-links";
@@ -43,8 +44,25 @@ function copyTarget(row: RoomLinkRowView): RoomLinkUnitView | null {
 
 const unitKey = (unit: RoomLinkUnitView) => `unit:${unit.roomId}`;
 
-export function MobileRoomLinks({ data, copy }: { data: RoomLinksPageData; copy: Copy }) {
+export function MobileRoomLinks({ data: rawData, copy }: { data: RoomLinksPageData; copy: Copy }) {
   const m = copy.mWhite;
+  // Beds24 건물 이름(과 독채 객실 이름)은 한국어 정규 명칭 — 보는 사람 언어로(2026-10-22). 직접 추가한 건물은 사람이 적은 이름이라 그대로.
+  const bName = useBuildingName();
+  const data = useMemo(
+    () => ({
+      ...rawData,
+      buildings: rawData.buildings.map((building) =>
+        building.manualId
+          ? building
+          : {
+              ...building,
+              name: bName(building.name),
+              rows: building.rows.map((row) => (row.label === building.name ? { ...row, label: bName(row.label) } : row)),
+            },
+      ),
+    }),
+    [rawData, bName],
+  );
   const isTablet = useIsTablet();
   const [buildingIndex, setBuildingIndex] = useState(0);
   const [query, setQuery] = useState("");

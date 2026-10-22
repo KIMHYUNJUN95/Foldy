@@ -77,6 +77,7 @@ import type { CellHistory } from "@/lib/ops-price-history";
 import { buildOpsScopeSummary } from "@/lib/ops-scope-summary";
 import { opsUrgentVacantCells } from "@/lib/ops-urgent-vacant";
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
+import { useBuildingName } from "@/components/shared/building-names";
 import "./mobile-ops-calendar.css";
 import "./mobile-ops-calendar-white.css";
 
@@ -218,6 +219,10 @@ export function MobileOpsCalendar({
 }) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
+  // 건물 이름은 데이터에선 한국어 정규 명칭 — 화면에 그릴 때만 보는 사람 언어로(2026-10-22). 독채는 객실 이름 = 건물 이름이다.
+  const bName = useBuildingName();
+  const roomName = (room: { propertyName: string; displayRoomLabel: string }) =>
+    room.displayRoomLabel === room.propertyName ? bName(room.propertyName) : room.displayRoomLabel;
   /*
    * ── 새로고침이 와도 **안 바뀐 것은 참조를 유지한다**(데스크톱 격자와 같은 방식) ──────────
    * 실시간 신호 · 쓰기 반영으로 서버 데이터를 다시 받으면 모든 prop 이 새 객체로 온다. 그대로 넘기면 메모된
@@ -658,7 +663,12 @@ export function MobileOpsCalendar({
     .filter((cell): cell is PanelCell => cell !== null);
   /** 가격 · 최소숙박 시트에 넘기는 칸 — 팔린 밤은 뺀다(차단 시트는 `panelCells` 전부). */
   const editableCells = panelCells.filter((cell) => !soldCells.has(selectionCellKey(cell.roomKey, cell.date)));
-  const scopeSummary = buildOpsScopeSummary({ andMore: copy.andMore, rooms, selection });
+  // 선택 요약 글자(「가부키초 301 · 302」)는 화면에 그대로 나간다 — 건물 · 독채 이름을 보는 사람 언어로 넘긴다.
+  const scopeSummary = buildOpsScopeSummary({
+    andMore: copy.andMore,
+    rooms: rooms.map((room) => ({ ...room, displayRoomLabel: roomName(room), propertyName: bName(room.propertyName) })),
+    selection,
+  });
   const gapContext = useMemo(
     () =>
       buildGapContext({
@@ -1072,7 +1082,7 @@ export function MobileOpsCalendar({
       const row = rowByKey.get(rowKey);
       const block = row?.blocks.find((candidate) => candidate.id === blockElement.dataset.block);
       if (row && block) {
-        setOverlay({ block, kind: "blockInfo", roomTitle: `${row.room.propertyName} · ${row.room.displayRoomLabel}` });
+        setOverlay({ block, kind: "blockInfo", roomTitle: `${bName(row.room.propertyName)} · ${roomName(row.room)}` });
       }
       return;
     }
@@ -1402,7 +1412,7 @@ export function MobileOpsCalendar({
             onNavigate={markNav(property.href)}
             scroll={false}
           >
-            {property.name}
+            {bName(property.name)}
           </Link>
         ))}
       </div>
@@ -1677,7 +1687,7 @@ export function MobileOpsCalendar({
                 중복으로 보였고 이름도 56px 열에서 잘렸다(2026-10-01 사용자 지적). 이름은 객실 열에 줄바꿈해 적는다. */}
             {group.rooms.length > 1 && (
               <div className="mops-group">
-                <span className="mops-group__name">{group.property}</span>
+                <span className="mops-group__name">{bName(group.property)}</span>
                 <span>{copy.roomCount.replace("{count}", String(group.rooms.length))}</span>
               </div>
             )}
@@ -2090,9 +2100,9 @@ export function MobileOpsCalendar({
               }
               propertyName={
                 selectedProperties.length > 1
-                  ? selectedProperties.join(" · ")
+                  ? selectedProperties.map(bName).join(" · ")
                   : new Set(rooms.map((room) => room.propertyName)).size === 1
-                    ? (rooms[0]?.propertyName ?? null)
+                    ? (rooms[0]?.propertyName ? bName(rooms[0].propertyName) : null)
                     : null
               }
               windowLabel={opsWindowLabel(days)}
@@ -2134,9 +2144,9 @@ export function MobileOpsCalendar({
               onResetRange={recent.resetRange}
               propertyName={
                 selectedProperties.length > 1
-                  ? selectedProperties.join(" · ")
+                  ? selectedProperties.map(bName).join(" · ")
                   : new Set(rooms.map((room) => room.propertyName)).size === 1
-                    ? (rooms[0]?.propertyName ?? null)
+                    ? (rooms[0]?.propertyName ? bName(rooms[0].propertyName) : null)
                     : null
               }
               range={recent.range}
@@ -2245,7 +2255,7 @@ export function MobileOpsCalendar({
                     date={overlay.date}
                     history={loaded ? loaded.history : null}
                     localeTag={copy.localeTag}
-                    roomTitle={`${row.room.propertyName} ${row.room.displayRoomLabel}`}
+                    roomTitle={`${bName(row.room.propertyName)} ${roomName(row.room)}`}
                   />
                 )}
               </div>
@@ -2476,6 +2486,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
   /** 가격 개입 성공 막대 id(`|` 로 이음). 토글이 꺼져 있으면 빈 문자열. */
   winIds: string;
 }) {
+  const bName = useBuildingName();
   const first = days[0]?.date ?? "";
   const last = days.at(-1)?.date ?? "";
   const indexOf = (date: string) => days.findIndex((day) => day.date === date);
@@ -2501,7 +2512,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
       <button className={`mops-room${solo ? " solo" : ""}${scopeOn ? " on" : ""}`} data-room={row.room.key} type="button">
         {solo ? (
           <>
-            <span className="mops-room__p">{row.room.propertyName}</span>
+            <span className="mops-room__p">{bName(row.room.propertyName)}</span>
             {row.room.displayRoomLabel !== row.room.propertyName && (
               <span className="mops-room__l">{row.room.displayRoomLabel}</span>
             )}

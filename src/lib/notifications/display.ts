@@ -1,5 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 import { getDictionary } from "@/lib/i18n";
+import { bugStatusLabel, type BugStatus } from "@/components/bugs/bug-types";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import {
   isAnnouncementNotificationPayload,
   isAttendanceNotificationPayload,
@@ -12,6 +14,9 @@ import {
   type NotificationRow,
   type NotificationType,
 } from "@/lib/notifications/types";
+
+const BUG_STATUSES: readonly string[] = ["submitted", "reviewing", "fixed", "closed"];
+const isBugStatus = (value: string): value is BugStatus => BUG_STATUSES.includes(value);
 
 export type NotificationDisplay = {
   title: string;
@@ -78,10 +83,9 @@ export function getNotificationDisplay(
 
   if (notification.type === "order_processed" && isOrderProcessedPayload(notification.payload)) {
     const payload = notification.payload;
-    const location =
-      payload.roomLabel && payload.roomLabel !== "-"
-        ? `${payload.buildingName} · ${payload.roomLabel}`
-        : payload.buildingName;
+    // 건물은 한국어 정규 명칭으로 실려 온다 — 보는 사람 언어로(2026-10-22).
+    const building = localizeBuildingName(payload.buildingName, dictionary.cleaning.buildingLabels);
+    const location = payload.roomLabel && payload.roomLabel !== "-" ? `${building} · ${payload.roomLabel}` : building;
     const delivery = formatDeliverySummary(payload, locale, copy);
     const isDeliveryUpdate = payload.kind === "delivery_updated";
     const body = isDeliveryUpdate
@@ -241,24 +245,17 @@ export function getNotificationDisplay(
     isBugReportNotificationPayload(notification.payload)
   ) {
     const payload = notification.payload;
-    // The i18n keys below are intentionally read off the `notifications` copy bag with a typed-cast
-    // optional lookup so an in-flight i18n.ts update (Docs Agent) does not break the build. The
-    // fallback uses the report title verbatim until the localized strings land.
-    // TODO(i18n): notificationBugReportCreatedTitle / notificationBugReportCreatedBody /
-    // notificationBugReportStatusChangedTitle / notificationBugReportStatusChangedBody — needs ko/ja/en.
-    const bag = copy as unknown as Record<string, string | undefined>;
     const isCreated = payload.event === "created";
-    const titleTemplate = isCreated
-      ? bag.notificationBugReportCreatedTitle ?? "새 버그 신고"
-      : bag.notificationBugReportStatusChangedTitle ?? "버그 신고 상태 변경";
-    const bodyTemplate = isCreated
-      ? bag.notificationBugReportCreatedBody ?? "{title}"
-      : bag.notificationBugReportStatusChangedBody ?? "{title} · {status}";
+    const titleTemplate = isCreated ? copy.notificationBugReportCreatedTitle : copy.notificationBugReportStatusChangedTitle;
+    const bodyTemplate = isCreated ? copy.notificationBugReportCreatedBody : copy.notificationBugReportStatusChangedBody;
+    // 상태는 코드(`fixed`)로 실려 온다 — 버그 신고 화면과 같은 이름으로(2026-10-22, 전엔 영어 코드가 그대로 보였다).
+    const status = (payload.status ?? "") as string;
+    const statusText = isBugStatus(status) ? bugStatusLabel(dictionary.bugs, status) : status;
     const body = bodyTemplate
       .replace("{title}", payload.reportTitle)
       .replace("{actor}", payload.actorName ?? "")
-      .replace("{status}", payload.status ?? "");
-    const kindLabel = bag.bugReportKind ?? "버그 신고";
+      .replace("{status}", statusText);
+    const kindLabel = copy.bugReportKind;
     return {
       title: titleTemplate,
       body,
@@ -334,8 +331,7 @@ export function notificationTypeLabel(type: NotificationType, locale: Locale) {
     case "board_activity":
       return copy.boardKind;
     case "bug_report_activity":
-      // TODO(i18n): add `bugReportKind` to ko/ja/en notifications copy.
-      return (copy as unknown as Record<string, string | undefined>).bugReportKind ?? "버그 신고";
+      return copy.bugReportKind;
     default:
       return copy.fallbackKind;
   }

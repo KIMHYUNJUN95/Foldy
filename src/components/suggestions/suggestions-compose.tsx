@@ -30,6 +30,7 @@ import type { ShareableUser } from "@/lib/tasks";
 import "./suggestions.css";
 import { Ic, SgIcon } from "./sg-icons";
 import { SuggestionsUserPicker } from "./suggestions-user-picker";
+import { useBuildingName } from "@/components/shared/building-names";
 
 const MAX_PHOTOS = 5;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -73,6 +74,7 @@ export function SuggestionsCompose({
   editId?: string;
   initial?: SuggestionComposeInitial;
 }) {
+  const bName = useBuildingName();
   const isEdit = Boolean(editId);
   const [pickerMode, setPickerMode] = useState<"recipient" | "references" | null>(null);
   const [ctxOpen, setCtxOpen] = useState(false);
@@ -332,11 +334,11 @@ export function SuggestionsCompose({
           <div className="tags-row">
             <button type="button" className="tagbtn" onClick={() => { setCtxInitialProperty(undefined); setCtxOpen(true); }}>
               <Ic>{SgIcon.building}</Ic>{copy.tagBuilding}
-              <span className="v">{ctx?.propertyName ?? copy.tagSelect}</span>
+              <span className="v">{ctx?.propertyName ? bName(ctx.propertyName) : copy.tagSelect}</span>
             </button>
             <button type="button" className="tagbtn" onClick={() => { setCtxInitialProperty(ctx?.propertyName ?? undefined); setCtxOpen(true); }}>
               <Ic>{SgIcon.door}</Ic>{copy.tagRoom}
-              <span className="v">{ctx?.roomLabel ?? copy.tagSelect}</span>
+              <span className="v">{ctx?.roomLabel ? (ctx.roomLabel === ctx.propertyName ? bName(ctx.roomLabel) : ctx.roomLabel) : copy.tagSelect}</span>
             </button>
             {ctx ? (
               <button

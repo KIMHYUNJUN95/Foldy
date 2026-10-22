@@ -13,6 +13,7 @@ import {
   type AdjustmentInput,
 } from "@/lib/ops-price-adjustment";
 import { MswField, MswSuccess, mdWeekday, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 모바일 가격 시트 — Claude Design 시안 `3a 가격 시트 v3`(2026-10-02 사용자 확정).
@@ -152,6 +153,7 @@ export function MobileOpsPriceSheet({
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
 }) {
+  const bName = useBuildingName();
   const [input, setInput] = useState<AdjustmentInput | null>(null);
   const [amountText, setAmountText] = useState("");
   const [percentText, setPercentText] = useState("");
@@ -442,13 +444,13 @@ export function MobileOpsPriceSheet({
               </div>
               {listBuildings.map((building) => (
                 <div className="msw-list" key={building.name}>
-                  {listBuildings.length > 1 && <div className="msw-list__b">{building.name}</div>}
+                  {listBuildings.length > 1 && <div className="msw-list__b">{bName(building.name)}</div>}
                   {building.rooms.flatMap((room) =>
                     room.rows.map((row) => {
                       const changed = row.current !== null && row.next !== null && row.next !== row.current;
                       return (
                         <div className="msw-row" key={`${room.key}|${row.date}`}>
-                          <span className="rm">{room.label}</span>
+                          <span className="rm">{bName(room.label)}</span>
                           <span className="d">{mdWeekday(row.date, copy.localeTag)}</span>
                           {row.current === null ? (
                             <span className="none">{copy.panelListNoPrice}</span>

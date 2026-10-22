@@ -61,6 +61,7 @@ export default async function MobileOccupancyPage({ searchParams }: { searchPara
       <MobileOccupancy
         copy={dictionary.opsOccupancy.mobile}
         empty={dictionary.opsOccupancy.empty}
+        buildingLabels={dictionary.cleaning.buildingLabels}
         localeTag={adminLocaleTag(locale)}
         summary={summary}
         title={dictionary.opsOccupancy.title}

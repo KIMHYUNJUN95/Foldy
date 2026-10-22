@@ -8,6 +8,7 @@ import type { RunOpsWrite } from "@/components/admin/ops/ops-write-tracker";
 import type { MobilePriceSubmitted } from "@/components/mobile/ops/mobile-ops-price-sheet";
 import type { GapContextEntry } from "@/lib/ops-gap-context";
 import { MswSuccess, mdWeekday, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 모바일 최소숙박 시트 — Claude Design 시안 `4a 최소숙박 · 차단 시트 v3`(4a · 4b, 2026-10-02 사용자 확정).
@@ -81,6 +82,7 @@ export function MobileOpsMinStaySheet({
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
 }) {
+  const bName = useBuildingName();
   const [nights, setNights] = useState(1);
   const [custom, setCustom] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +166,7 @@ export function MobileOpsMinStaySheet({
   const minStayByKey = new Map(cells.map((cell) => [`${cell.roomKey}|${cell.date}`, cell.minStay]));
   const changedCount = cells.filter((cell) => cell.minStay !== nights).length;
   const buildingNames = [...new Set(cells.map((cell) => cell.roomKey.split("::")[0]).filter(Boolean))];
-  const sub = [buildingNames.join(" · "), copy.mSelCount.replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
+  const sub = [buildingNames.map(bName).join(" · "), copy.mSelCount.replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
   const valueRow = (current: number | null) => (
     <>
       <span className="c">{current === null ? "—" : current}</span>
@@ -299,9 +301,9 @@ export function MobileOpsMinStaySheet({
               {gapMode
                 ? gapRows.map((entry) => (
                     <div className="msw-row" key={`${entry.roomKey}|${entry.date}`}>
-                      <span className="rm">{entry.roomLabel}</span>
+                      <span className="rm">{bName(entry.roomLabel)}</span>
                       <span className="d">
-                        {buildingNames.length > 1 ? `${entry.propertyName} · ` : ""}
+                        {buildingNames.length > 1 ? `${bName(entry.propertyName)} · ` : ""}
                         {mdWeekday(entry.date, copy.localeTag)}
                       </span>
                       {valueRow(minStayByKey.get(`${entry.roomKey}|${entry.date}`) ?? null)}
@@ -310,7 +312,7 @@ export function MobileOpsMinStaySheet({
                 : rooms.flatMap(([key, room]) =>
                     room.rows.map((cell) => (
                       <div className="msw-row" key={`${key}|${cell.date}`}>
-                        <span className="rm">{room.label}</span>
+                        <span className="rm">{bName(room.label)}</span>
                         <span className="d">{mdWeekday(cell.date, copy.localeTag)}</span>
                         {cell.minStay !== nights ? (
                           valueRow(cell.minStay)

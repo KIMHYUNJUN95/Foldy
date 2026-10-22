@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Locale } from "@/lib/i18n";
 import { getDictionary } from "@/lib/i18n";
 import { getNotificationDisplay } from "@/lib/notifications/display";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import { categoryForType, type NotificationIconKey, type NotificationView } from "@/lib/notifications/grouping";
 import {
   isAnnouncementNotificationPayload,
@@ -139,8 +140,8 @@ function briefOf(row: NotificationRow, locale: Locale, actorNames: Map<string, s
   }
 
   if (row.type === "order_processed" && isOrderProcessedPayload(payload)) {
-    const location =
-      payload.roomLabel && payload.roomLabel !== "-" ? `${payload.buildingName} ${payload.roomLabel}` : payload.buildingName;
+    const building = localizeBuildingName(payload.buildingName, dictionary.cleaning.buildingLabels);
+    const location = payload.roomLabel && payload.roomLabel !== "-" ? `${building} ${payload.roomLabel}` : building;
     const object = location ? `${quote(payload.orderTitle)} · ${location}` : quote(payload.orderTitle);
     const delivery = payload.kind === "delivery_updated";
     return {

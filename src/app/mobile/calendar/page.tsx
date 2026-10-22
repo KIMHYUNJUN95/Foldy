@@ -16,6 +16,7 @@ import {
   getDisplayRoomLabel,
   isExcludedOperationalProperty,
   isExcludedOperationalRoom,
+  localizeBuildingName,
 } from "@/lib/room-label-normalization";
 import {
   type ActiveRoomCatalogItem,
@@ -166,24 +167,6 @@ function normalizePropertyParam(value: string | undefined): string | null {
   if (!value) return null;
   const trimmed = getCanonicalPropertyName(value.trim());
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function localizePropertyName(
-  canonicalPropertyName: string,
-  locale: "en" | "ja" | "ko",
-) {
-  const labels: Record<string, { en: string; ja: string; ko: string }> = {
-    "아라키초A": { en: "ArakichoA", ja: "荒木町A", ko: "아라키초A" },
-    "아라키초B": { en: "ArakichoB", ja: "荒木町B", ko: "아라키초B" },
-    "가부키초": { en: "Kabukicho", ja: "歌舞伎町", ko: "가부키초" },
-    "다카다노바바": { en: "Takadanobaba", ja: "高田馬場", ko: "다카다노바바" },
-    "오쿠보A": { en: "OkuboA", ja: "大久保A", ko: "오쿠보A" },
-    "오쿠보B": { en: "OkuboB", ja: "大久保B", ko: "오쿠보B" },
-    "오쿠보C": { en: "OkuboC", ja: "大久保C", ko: "오쿠보C" },
-  };
-  const entry = labels[canonicalPropertyName];
-  if (!entry) return canonicalPropertyName;
-  return entry[locale] ?? canonicalPropertyName;
 }
 
 function sortBuildings(values: string[]) {
@@ -470,7 +453,8 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
   const propertyLabelMap = Object.fromEntries(
     propertyOptions.map((property) => [
       property,
-      localizePropertyName(property, session.user.preferredLanguage),
+      // 건물 이름은 앱 공용 표(`cleaning.buildingLabels`) — 전엔 이 파일만의 표라 스테이아리 · 사노가 빠져 한국어로 남았다(2026-10-22).
+      localizeBuildingName(property, dictionary.cleaning.buildingLabels),
     ]),
   );
   const effectiveSelectedProperty =

@@ -2,6 +2,7 @@ import { AppSplash } from "@/components/mobile/app-splash";
 import { IdentityFillPrompt } from "@/components/identity/identity-fill-prompt";
 import { ImageFadeIn } from "@/components/shell/image-fade-in";
 import { ResumeRefresh } from "@/components/shell/resume-refresh";
+import { BuildingNamesProvider } from "@/components/shared/building-names";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentAppSession } from "@/lib/session";
 
@@ -30,7 +31,8 @@ export default async function MobileLayout({ children }: { children: React.React
       <ImageFadeIn />
       {/* 오래 나가 있다 돌아오면 새로 고치기(2026-10-22). */}
       <ResumeRefresh />
-      {children}
+      {/* 건물 이름을 보는 사람 언어로(2026-10-22) — 데이터는 한국어 정규 명칭이라 그릴 때 `useBuildingName()` 으로 바꾼다. */}
+      <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>{children}</BuildingNamesProvider>
     </>
   );
 }

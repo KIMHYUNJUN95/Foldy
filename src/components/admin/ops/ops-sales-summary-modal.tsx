@@ -16,6 +16,7 @@ import {
 } from "@/lib/ops-sales-summary";
 import { buildSalesYoy, type SalesYoy } from "@/lib/ops-sales-yoy";
 import "./ops-calendar-tools-white.css";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 판매 캘린더 「매출 요약」 모달 — **보고 있는 창 × 고른 건물**(2026-09-30).
@@ -277,11 +278,12 @@ function SalesSummaryContent({
   summary: ReturnType<typeof useSalesSummary>;
   titleId: string;
 }) {
+  const bName = useBuildingName();
   const scopeText =
     properties.length === 0
       ? copy.ssAllProperties
       : properties.length === 1
-        ? properties[0]
+        ? bName(properties[0])
         : copy.ssPropCount.replace("{n}", String(properties.length));
   return (
     <>
@@ -290,7 +292,7 @@ function SalesSummaryContent({
           <h2 className="stw-ss__title" id={titleId}>
             {copy.ssTitle}
           </h2>
-          <span className="stw-ss__sub" title={properties.length > 1 ? properties.join(" · ") : undefined}>
+          <span className="stw-ss__sub" title={properties.length > 1 ? properties.map(bName).join(" · ") : undefined}>
             {[period, copy.ssDays.replace("{n}", String(days)), scopeText, copy.ssConfirmedOnly].join(" · ")}
           </span>
         </div>
@@ -453,6 +455,7 @@ function YoyPct({ copy, current, previous }: { copy: SalesSummaryCopy; current: 
 
 /** 전년 매출 없던 객실 — 건물마다 「운영 전 · 첫 손님」/「운영 중 · 그 기간 매출 없음」, 객실과 지금 매출(= 차이). */
 function YoyPanel({ copy, fmt, panelId, yoy }: { copy: SalesSummaryCopy; fmt: Fmt; panelId: string; yoy: SalesYoy }) {
+  const bName = useBuildingName();
   const signed = (value: number) => `${value >= 0 ? "+" : ""}${fmt.yen(value)}`;
   return (
     <section aria-label={copy.ssYoyLabel} className="stw-ss__yoypanel" id={panelId}>
@@ -460,7 +463,7 @@ function YoyPanel({ copy, fmt, panelId, yoy }: { copy: SalesSummaryCopy; fmt: Fm
         {yoy.newRooms.groups.map((group) => (
           <li key={group.propertyName}>
             <div className="stw-ss__yoyg">
-              <b>{group.propertyName}</b>
+              <b>{bName(group.propertyName)}</b>
               <span className="stw-ss__dim">
                 {group.reason === "not_open" ? copy.ssYoyNotOpen.replace("{date}", group.firstStay ?? "—") : copy.ssYoyNoSales}
               </span>
@@ -472,7 +475,7 @@ function YoyPanel({ copy, fmt, panelId, yoy }: { copy: SalesSummaryCopy; fmt: Fm
               ) : (
                 group.rooms.map((room) => (
                   <span key={room.key}>
-                    {room.label} <em>{signed(room.revenue)}</em>
+                    {bName(room.label)} <em>{signed(room.revenue)}</em>
                   </span>
                 ))
               )}
@@ -496,6 +499,7 @@ export function SummaryContent({
   initialOpen?: readonly string[];
   summary: Loaded;
 }) {
+  const bName = useBuildingName();
   /*
    * **합계에 넣을 건물**(2026-10-05 사용자 지시) — 오쿠보A · 사노는 기본으로 합계(총매출 · 가동률 · 채널)에서 빼고 아래에
    * 따로 보인다. 건물 표의 체크로 넣고 뺄 수 있다(2026-10-16 화이트 — 칩 줄 대신 표 안 체크). 숫자는 건물별 몫을 다시
@@ -641,7 +645,7 @@ export function SummaryContent({
                   </svg>
                 )}
               </span>
-              <span className="stw-ss__pname">{row.propertyName}</span>
+              <span className="stw-ss__pname">{bName(row.propertyName)}</span>
             </button>
           </th>
           <td className="r" data-label={copy.ssRoomsCol}>
@@ -676,9 +680,9 @@ export function SummaryContent({
                 <th className="stw-ss__name" scope="row">
                   <span
                     className="stw-ss__rname"
-                    title={room.inCatalog ? room.label : `${room.label} — ${copy.ssOffCatalogHint}`}
+                    title={room.inCatalog ? bName(room.label) : `${bName(room.label)} — ${copy.ssOffCatalogHint}`}
                   >
-                    {room.label}
+                    {bName(room.label)}
                     {!room.inCatalog && <span className="stw-ss__offcat">*</span>}
                   </span>
                   <ChannelMix label={channelLabel} mix={room.channelRevenue} />
@@ -905,7 +909,7 @@ export function SummaryContent({
         <div className="stw-ss__footnotes">
           {excludedNames.length > 0 && (
             <span>
-              {copy.ssExcludedTitle}: {excludedNames.join(" · ")} — {copy.ssExcludedNote}
+              {copy.ssExcludedTitle}: {excludedNames.map(bName).join(" · ")} — {copy.ssExcludedNote}
             </span>
           )}
           {combined.zeroPriceCount > 0 && <span>{copy.ssZeroNote.replace("{n}", fmt.count(combined.zeroPriceCount))}</span>}

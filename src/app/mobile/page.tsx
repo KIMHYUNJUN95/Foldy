@@ -171,7 +171,7 @@ async function HomeBody({
       getHomeTodayActivity(session, 10),
       getHomeActiveCleaningSession(session),
       getHomeImportantAnnouncement(session),
-      getCurrentOpenSession(session.organization.id, session.user.id),
+      getCurrentOpenSession(session.organization.id, session.user.id, session.user.preferredLanguage),
     ]);
 
   const buildingLabels = dictionary.cleaning.buildingLabels;

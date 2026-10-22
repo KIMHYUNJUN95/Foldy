@@ -8,6 +8,7 @@ import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isStaleOpenSession, type AttendanceSessionRow } from "@/lib/attendance";
 import { tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
+import { localizeAttendanceSiteName, type AttendanceSiteDisplayRow } from "@/lib/attendance-site-display";
 
 // 문자열 리터럴이어야 타입 수준 파싱이 된다(배열 join 은 GenericStringError 로 떨어진다).
 const OPEN_SESSION_SELECT = "id, operating_date, clock_in_at, clock_in_site_id" as const;
@@ -107,6 +108,8 @@ export async function getAbandonedSessions(
 export async function getCurrentOpenSession(
   organizationId: string,
   userId: string,
+  /** 근무지 이름을 이 언어로(2026-10-22) — 빠지면 한국어. 사무실 · 건물 근무지가 일본어 · 영어 화면에 한국어로 남았다. */
+  locale = "ko",
 ): Promise<OpenAttendanceSession | null> {
   const service = getSupabaseServiceClient();
   const { data, error } = await service
@@ -126,7 +129,7 @@ export async function getCurrentOpenSession(
   const sitePromise = session.clock_in_site_id
     ? service
         .from("attendance_sites")
-        .select("name")
+        .select("name, properties(display_name_ko, display_name_ja, display_name_en)")
         .eq("organization_id", organizationId)
         .eq("id", session.clock_in_site_id)
         .maybeSingle()
@@ -142,8 +145,8 @@ export async function getCurrentOpenSession(
 
   const [siteRes, breaksRes] = await Promise.all([sitePromise, breaksPromise]);
 
-  const site = siteRes.data as { name: string } | null;
-  const siteName = site?.name ?? "—";
+  const site = siteRes.data as AttendanceSiteDisplayRow | null;
+  const siteName = site ? localizeAttendanceSiteName(site, locale) : "—";
   const breaks = (breaksRes.data ?? []) as { started_at: string; ended_at: string | null }[];
 
   let closedBreakSeconds = 0;

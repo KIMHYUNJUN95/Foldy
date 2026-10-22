@@ -6,6 +6,7 @@ import { getDictionary, isLocale, type Locale } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { AttendanceReviewState, AttendanceSessionRow } from "@/lib/attendance";
+import { localizeAttendanceSiteName, type AttendanceSiteDisplayRow } from "@/lib/attendance-site-display";
 
 // 문자열 리터럴이어야 타입 수준 파싱이 된다(배열 join 은 GenericStringError 로 떨어진다).
 const ROSTER_SESSION_SELECT = "id, user_id, clock_in_at, clock_out_at, clock_in_site_id, clock_out_site_id, review_state, invalidated_at" as const;
@@ -126,14 +127,14 @@ export async function getAttendanceRoster(
   // 2. 프로필, 멤버십, 사이트 이름, 브레이크 병렬 조회
   type ProfileSnap = { id: string; name: string | null; phone_number: string | null };
   type MembershipSnap = { user_id: string; role: string };
-  type SiteSnap = { id: string; name: string };
+  type SiteSnap = AttendanceSiteDisplayRow & { id: string };
   type BreakSnap = { session_id: string; started_at: string; ended_at: string | null };
 
   const [profilesRes, membershipsRes, sitesRes, breaksRes] = await Promise.all([
     supabase.from("profiles").select("id, name, phone_number").in("id", userIds),
     supabase.from("memberships").select("user_id, role").in("user_id", userIds).eq("organization_id", organizationId).eq("status", "active"),
     siteIds.length > 0
-      ? supabase.from("attendance_sites").select("id, name").in("id", siteIds)
+      ? supabase.from("attendance_sites").select("id, name, properties(display_name_ko, display_name_ja, display_name_en)").in("id", siteIds)
       : Promise.resolve({ data: [] as SiteSnap[], error: null }),
     supabase.from("attendance_breaks").select("session_id, started_at, ended_at").in("session_id", sessionIds),
   ]);
@@ -144,7 +145,8 @@ export async function getAttendanceRoster(
 
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const membershipMap = new Map(memberships.map((m) => [m.user_id, m.role]));
-  const siteMap = new Map(sites.map((s) => [s.id, s.name]));
+  // 근무지 이름은 보는 사람 언어로(2026-10-22) — 전엔 저장된 이름(사무실 · 아라키초A)을 그대로 보였다.
+  const siteMap = new Map(sites.map((s) => [s.id, localizeAttendanceSiteName(s, locale)]));
 
   // session별 break 그룹핑
   const breaksData = (breaksRes.data ?? []) as unknown as BreakSnap[];

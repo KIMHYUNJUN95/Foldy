@@ -57,6 +57,7 @@ export default async function MobileRevenuePage({ searchParams }: { searchParams
       <MobileRevenue
         copy={dictionary.opsRevenue.mobile}
         empty={dictionary.opsRevenue.empty}
+        buildingLabels={dictionary.cleaning.buildingLabels}
         localeTag={adminLocaleTag(locale)}
         summary={summary}
         title={dictionary.opsRevenue.title}

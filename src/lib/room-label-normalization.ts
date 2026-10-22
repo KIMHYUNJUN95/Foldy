@@ -78,6 +78,29 @@ export function localizePropertyName(
 }
 
 /**
+ * 아무 표기(`가부키초` · `歌舞伎町` · `Kabukicho` · 대소문자 섞임)로 들어온 건물 이름을 보는 사람 언어로(2026-10-22).
+ * DB · 집계는 한국어 정규 명칭(`아라키초A`)을 들고 다니므로 **화면에 그릴 때마다** 이걸 거친다 — 그대로 그리면
+ * 일본어 · 영어 화면에 한국어가 남는다. 모르는 건물은 들어온 이름 그대로.
+ */
+export function localizeBuildingName(rawPropertyName: string, buildingLabels: Record<string, string>): string {
+  return localizePropertyName(getCanonicalPropertyName(rawPropertyName), buildingLabels);
+}
+
+/**
+ * 「건물 객실」 한 덩어리 라벨(`아라키초A 201` · 독채는 `오쿠보A` 하나)의 건물 부분만 보는 사람 언어로(2026-10-22).
+ * 청소 세션 라벨 · 현장 활동 · 일지처럼 건물과 방이 한 글자열로 저장된 자리에 쓴다. 모르는 건물이면 그대로.
+ */
+export function localizeRoomPlaceLabel(label: string, buildingLabels: Record<string, string>): string {
+  const trimmed = label.trim();
+  const space = trimmed.indexOf(" ");
+  const head = space === -1 ? trimmed : trimmed.slice(0, space);
+  const key = CANONICAL_TO_BUILDING_KEY[getCanonicalPropertyName(head)];
+  const localized = key ? buildingLabels[key] : undefined;
+  if (!localized) return trimmed;
+  return space === -1 ? localized : `${localized} ${trimmed.slice(space + 1)}`;
+}
+
+/**
  * 캘린더 세로축의 **건물 순서**. 가나다순이 아니라 **운영 순서**다.
  *
  * 전에는 두 캘린더가 각자 목록을 들고 있었고(어드민은 `PROPERTY_MAP_META` 에서 파생,

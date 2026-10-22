@@ -59,7 +59,7 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
   const [openSession, monthlyPayView, abandonedSessions] = previewState
     ? [null, null, []]
     : await Promise.all([
-        getCurrentOpenSession(session.organization.id, session.user.id),
+        getCurrentOpenSession(session.organization.id, session.user.id, session.user.preferredLanguage),
         getMonthlyPayView(
           session.organization.id,
           session.user.id,

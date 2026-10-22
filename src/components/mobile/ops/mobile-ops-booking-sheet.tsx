@@ -20,6 +20,7 @@ import {
 } from "@/components/mobile/ops/mobile-ops-form";
 import { stayNights, validateManualBooking } from "@/lib/ops-manual-booking";
 import { haptic } from "@/lib/haptics";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 모바일 수기 예약 시트 — Claude Design 시안 `5a 예약 상세 · 수기 예약 시트 v3`(5e, 2026-10-02 사용자 확정).
@@ -68,6 +69,7 @@ export function MobileOpsBookingSheet({
   room: BookingPanelRoom;
   today: string;
 }) {
+  const bName = useBuildingName();
   // 요청 키 — 패널을 연 동안 하나. 같은 키로는 서버가 예약을 한 번만 만든다(실패 뒤 다시 눌러도 중복 없음).
   const [requestKey] = useState(() => crypto.randomUUID());
   const [arrival, setArrival] = useState(checkIn);
@@ -149,7 +151,7 @@ export function MobileOpsBookingSheet({
           <div className="msw-head__t">
             <h3>{copy.mwBookTitle}</h3>
             <p>
-              {[room.propertyName, room.label, `${arrival.slice(5).replace("-", "/")} → ${departure.slice(5).replace("-", "/")}`, copy.mbNights.replace("{n}", String(nights.length))]
+              {[bName(room.propertyName), room.label === room.propertyName ? null : room.label, `${arrival.slice(5).replace("-", "/")} → ${departure.slice(5).replace("-", "/")}`, copy.mbNights.replace("{n}", String(nights.length))]
                 .filter(Boolean)
                 .join(" · ")}
             </p>

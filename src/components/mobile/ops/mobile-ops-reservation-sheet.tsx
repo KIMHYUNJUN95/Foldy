@@ -42,6 +42,7 @@ import { stayNights } from "@/lib/ops-manual-booking";
 import { MobileMoveCalendar, addDaysKey } from "@/components/mobile/ops/mobile-move-calendar";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
 import { haptic } from "@/lib/haptics";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 모바일 예약 시트 — 상세 · 수정 · 취소. Claude Design 시안 `5a 예약 상세 · 수기 예약 시트 v3`(5a~5d, 2026-10-02 사용자 확정).
@@ -126,10 +127,10 @@ export function MobileOpsReservationSheet({
   onCancelled,
   onMoved,
   onSaved,
-  propertyName,
+  propertyName: rawPropertyName,
   roomIds,
   roomKey,
-  roomLabel,
+  roomLabel: rawRoomLabel,
   today,
 }: {
   bar: OpsCalendarBar;
@@ -152,6 +153,10 @@ export function MobileOpsReservationSheet({
   roomLabel: string;
   today: string;
 }) {
+  // 건물 · 독채 이름은 데이터에선 한국어 정규 명칭 — 이 시트는 그리기만 하므로 처음에 보는 사람 언어로 바꿔 둔다(2026-10-22).
+  const bName = useBuildingName();
+  const propertyName = bName(rawPropertyName);
+  const roomLabel = rawRoomLabel === rawPropertyName ? propertyName : rawRoomLabel;
   const [mode, setMode] = useState<"view" | "edit" | "cancel" | "move">("view");
   const [detail, setDetail] = useState<OpsReservationDetail | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -670,6 +675,7 @@ function MobileMoveForm({
   rooms: MoveRoom[];
   today: string;
 }) {
+  const bName = useBuildingName();
   const manual = bar.channel === "manual";
   const [arrival, setArrival] = useState(bar.checkIn);
   const departure = addDaysKey(arrival, nights);
@@ -788,7 +794,7 @@ function MobileMoveForm({
           <div className="msw-mv-head">
             <b>{copy.mvTitleManual.replace("{guest}", bar.guestName)}</b>
             <span>
-              {[CHANNEL_NAME[bar.channel] || null, `${propertyName} ${currentRoom.label}`, range(bar.checkIn, bar.checkOut), copy.rcNights.replace("{n}", String(nights))]
+              {[CHANNEL_NAME[bar.channel] || null, `${propertyName} ${bName(currentRoom.label)}`, range(bar.checkIn, bar.checkOut), copy.rcNights.replace("{n}", String(nights))]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -864,7 +870,7 @@ function MobileMoveForm({
                   if (checking) {
                     return (
                       <div aria-hidden className="msw-mv-row is-skel" key={room.roomKey}>
-                        <b>{room.label}</b>
+                        <b>{bName(room.label)}</b>
                         <i style={{ width: 70 + (index % 3) * 24 }} />
                       </div>
                     );
@@ -885,13 +891,13 @@ function MobileMoveForm({
                       role="radio"
                       type="button"
                     >
-                      <b>{room.label}</b>
+                      <b>{bName(room.label)}</b>
                       <span>{stateText(room, target)}</span>
                       {on && <Check aria-hidden className="msw-mv-ck" />}
                     </button>
                   ) : (
                     <div aria-disabled="true" className="msw-mv-row" key={room.roomKey}>
-                      <b>{room.label}</b>
+                      <b>{bName(room.label)}</b>
                       <span>{stateText(room, target)}</span>
                     </div>
                   );
@@ -943,9 +949,9 @@ function MobileMoveForm({
               </>
             ) : pickedRoom && pickedOk ? (
               datesChanged ? (
-                copy.mvSubmitDate.replace("{room}", pickedRoom.label).replace("{in}", short(arrival))
+                copy.mvSubmitDate.replace("{room}", bName(pickedRoom.label)).replace("{in}", short(arrival))
               ) : (
-                copy.mvSubmit.replace("{room}", pickedRoom.label)
+                copy.mvSubmit.replace("{room}", bName(pickedRoom.label))
               )
             ) : (
               copy.mvPick

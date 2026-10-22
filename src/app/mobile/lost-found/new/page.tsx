@@ -12,6 +12,7 @@ import { getOnboardingState } from "@/lib/onboarding";
 import {
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
+  localizeBuildingName,
 } from "@/lib/room-label-normalization";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -147,13 +148,16 @@ export default async function LostFoundNewPage({ searchParams }: PageProps) {
                   {dict.cleaning.manualBuildingLabel}
                 </dt>
                 <dd className="font-black">
-                  {dict.cleaning.buildingLabels[reservationPrefill.propertyName] ??
-                    reservationPrefill.propertyName}
+                  {localizeBuildingName(reservationPrefill.propertyName, dict.cleaning.buildingLabels)}
                 </dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="font-semibold text-muted-foreground">{copy.room}</dt>
-                <dd className="font-black">{reservationPrefill.roomLabel}</dd>
+                <dd className="font-black">
+                  {reservationPrefill.roomLabel === reservationPrefill.propertyName
+                    ? localizeBuildingName(reservationPrefill.roomLabel, dict.cleaning.buildingLabels)
+                    : reservationPrefill.roomLabel}
+                </dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="font-semibold text-muted-foreground">

@@ -97,6 +97,11 @@ Completion rule:
 - Check `src/lib/i18n.ts` first.
 - If new copy is needed, add `ko`, `ja`, and `en` together.
 - Fallback behavior exists, but new UI should not depend on missing translations.
+- **Building names are data, not copy (2026-10-22).** Reservations, rates, occupancy, revenue and notifications carry
+  the Korean canonical name (`아라키초A`). Never render it raw — server: `localizeBuildingName()` /
+  `localizeRoomPlaceLabel()` (`src/lib/room-label-normalization.ts`), mobile client: `useBuildingName()`
+  (`src/components/shared/building-names.tsx`). Single-unit buildings use the building name as the room label — localize
+  that too. Look `buildingLabels` up by building key, never by the stored name.
 - This is a **hard rule for every feature addition and every feature modification**.
 - Do **not** hardcode Korean UI text temporarily "just for now" during implementation.
 - New UI/UX, status labels, validation copy, action labels, empty states, and modal text must be

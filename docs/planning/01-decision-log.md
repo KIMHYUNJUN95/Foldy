@@ -2,6 +2,14 @@
 
 This file records important project decisions.
 
+## 2026-10-22 건물 이름은 그릴 때 보는 사람 언어로 — 데이터는 한국어 정규 명칭 그대로 (모바일 다국어 점검, 사용자 지시)
+
+- 예약 · 요금 · 가동률 · 매출 · 알림 데이터는 건물을 한국어 정규 명칭(`아라키초A`)으로 들고 다닌다. 키 · 필터 · 주소 · 저장에는 그대로 쓰고,
+  **화면 · 문구에 넣을 때만** 바꾼다 — 서버는 `localizeBuildingName(name, dictionary.cleaning.buildingLabels)`(「건물 객실」 한 덩어리는
+  `localizeRoomPlaceLabel`), 모바일 클라이언트는 `useBuildingName()`(`src/components/shared/building-names.tsx`, 모바일 레이아웃이 사전을 내려 준다).
+- 독채(오쿠보 · 사노)는 객실 이름 = 건물 이름이므로 객실 자리도 같은 함수로 바꾼다. 직접 추가한 건물(객실 링크)은 사람이 적은 이름이라 그대로.
+- `buildingLabels[저장된 이름]` 처럼 사전을 이름으로 바로 찾지 않는다 — 사전은 건물 키(`kabukicho`)로 찾는다(주문 배송 달력이 그래서 늘 한국어였다).
+
 ## 2026-10-21 청소 배정을 Foldy 로 — 배정 = 확정, 권한 키 `cleaning.assign` (사용자 결정 2026-10-20 · 구현 2026-10-21)
 
 - Hotelsmart 청소 배정을 Foldy 로 옮긴다(체크인은 Hotelsmart 유지). 확정 단계 없음 — 방에 넣는 순간 확정. 저장은 방 한 건씩, 같은 사람 · 같은 방 중복은 DB 유일 제약.

@@ -2,10 +2,11 @@ import {
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
   getDisplaySessionRoomLabel,
+  localizeRoomPlaceLabel,
 } from "@/lib/room-label-normalization";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { tokyoDateOf, tokyoToday, ymdShift } from "@/lib/tasks";
-import type { Locale } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
 
 /**
  * 현장 활동 — 투두 밖에서 **사용자가 확실하게 완료 처리한** 일을 완료·기록 탭과 업무일지에 얹기 위한
@@ -47,7 +48,7 @@ export type FieldActivityRecord = {
 
 // ── 문구 템플릿 ──────────────────────────────────────────────────────────────
 // i18n-ignore-start: 현장 활동 줄 문구를 로케일별로 한곳에 모아 둔다(report-actions 의 보고서
-// 템플릿과 같은 방식). 건물명 자체는 `아라키초A` 처럼 한국어 정규 명칭으로 저장돼 있어 그대로 쓴다.
+// 템플릿과 같은 방식). 건물명은 `아라키초A` 처럼 한국어 정규 명칭으로 저장돼 있어 넣을 때 보는 사람 언어로 바꾼다.
 const FIELD_TEMPLATE: Record<
   string,
   { cleaning: string; maintenance: string; linen: string; order: string }
@@ -103,6 +104,9 @@ export async function getFieldActivities(opts: {
 }): Promise<FieldActivityRecord[]> {
   const { organizationId, userId, locale } = opts;
   const tmpl = FIELD_TEMPLATE[locale] ?? FIELD_TEMPLATE.ko;
+  // 방 라벨의 건물 부분은 한국어 정규 명칭으로 저장돼 있다 — 일지 · 기록에 찍을 때 보는 사람 언어로(2026-10-22).
+  const buildingLabels = getDictionary(locale).cleaning.buildingLabels;
+  const place = (room: string) => localizeRoomPlaceLabel(room, buildingLabels);
   const since = ymdShift(tokyoToday(), -WINDOW_DAYS);
   const sinceIso = new Date(`${since}T00:00:00+09:00`).toISOString();
 
@@ -155,7 +159,7 @@ export async function getFieldActivities(opts: {
       day,
       at: row.completed_at ?? `${day}T00:00:00+09:00`,
       kind: "cleaning",
-      label: tmpl.cleaning.replace("{room}", room),
+      label: tmpl.cleaning.replace("{room}", place(room)),
     });
   }
 
@@ -176,7 +180,7 @@ export async function getFieldActivities(opts: {
       day,
       at: row.completed_at ?? "",
       kind: "maintenance",
-      label: tmpl.maintenance.replace("{room}", room),
+      label: tmpl.maintenance.replace("{room}", place(room)),
     });
   }
 

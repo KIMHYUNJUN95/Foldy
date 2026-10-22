@@ -9,6 +9,7 @@ import { RollNumber } from "@/components/shared/roll-number";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary } from "@/lib/i18n";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 import type { RevenueChannelKey, RevenueSummary } from "@/lib/ops-revenue-summary";
 import "./mobile-revenue.css";
 
@@ -54,13 +55,17 @@ export function MobileRevenue({
   title,
   empty,
   localeTag,
+  buildingLabels,
 }: {
   summary: RevenueSummary;
   copy: Copy;
   title: string;
   empty: string;
   localeTag: string;
+  /** 건물 이름을 보는 사람 언어로(`dictionary.cleaning.buildingLabels`) — 요약은 한국어 정규 명칭을 들고 온다. */
+  buildingLabels: Record<string, string>;
 }) {
+  const bName = (name: string) => localizeBuildingName(name, buildingLabels);
   const router = useRouter();
   const [pending, startNav] = useTransition();
   const [picking, setPicking] = useState(false);
@@ -88,7 +93,7 @@ export function MobileRevenue({
 
   const subtitle =
     summary.excluded.length > 0
-      ? fill(copy.totalExcluding, { names: summary.excluded.join(" · ") })
+      ? fill(copy.totalExcluding, { names: summary.excluded.map(bName).join(" · ") })
       : fill(copy.totalAll, { n: summary.includedCount });
 
   const header = (
@@ -307,13 +312,13 @@ export function MobileRevenue({
               {summary.buildings.map((building, index) => (
                 <li key={building.name}>
                   <Link
-                    aria-label={fill(copy.openCalendar, { name: building.name })}
+                    aria-label={fill(copy.openCalendar, { name: bName(building.name) })}
                     className="mrv-row"
                     href={calendarHref(building.name, summary.month)}
                     style={{ "--i": index } as CSSProperties}
                   >
                     <span className="mrv-row__top">
-                      <span className="mrv-row__n">{building.name}</span>
+                      <span className="mrv-row__n">{bName(building.name)}</span>
                       <b className="mrv-row__v num">{yen(building.revenue)}</b>
                       <span
                         className={`mrv-row__d num${building.change === null ? " is-new" : isDown(building.change) ? " is-down" : " is-up"}`}

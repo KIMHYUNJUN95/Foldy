@@ -13,6 +13,7 @@ import {
   tokyoParts,
 } from "@/lib/ops-recent-bookings-range";
 import { ListLoading } from "./ops-price-wins-panel";
+import { useBuildingName } from "@/components/shared/building-names";
 import "./ops-calendar-tools-white.css";
 
 /**
@@ -125,6 +126,8 @@ export function OpsRecentBookingsPanel({
   propertyName: string | null;
   range: RecentRange | null;
 }) {
+  // 건물 이름은 보는 사람 언어로 — 모바일 판매 캘린더에서 열릴 때(공급자 밖인 어드민에선 그대로).
+  const bName = useBuildingName();
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { quietRestore: true });
   const list = bookings ?? [];
   const [invalid, setInvalid] = useState(false);
@@ -250,7 +253,7 @@ export function OpsRecentBookingsPanel({
                     <span className="stw-row__l">
                       <b className="stw-row__name">{row.guestName}</b>
                       <span className="stw-row__sub">
-                        {row.propertyName} {row.roomLabel} · {shortDate(row.checkIn)} → {shortDate(row.checkOut)}
+                        {bName(row.propertyName)} {row.roomLabel === row.propertyName ? "" : row.roomLabel} · {shortDate(row.checkIn)} → {shortDate(row.checkOut)}
                       </span>
                       <span className="stw-row__meta">
                         {CHANNEL_LABEL[row.channel] ?? row.channel} ·{" "}

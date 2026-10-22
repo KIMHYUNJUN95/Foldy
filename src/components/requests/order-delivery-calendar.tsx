@@ -9,6 +9,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { haptic } from "@/lib/haptics";
 import "@/components/requests/order-detail.css";
+import { localizeBuildingName } from "@/lib/room-label-normalization";
 
 /**
  * Order delivery calendar — a bottom sheet with a large month grid of supply-order deliveries.
@@ -214,7 +215,8 @@ export function OrderDeliveryCalendar({
                 <p className="odc-empty">{copy.dayEmpty}</p>
               ) : (
                 selectedList.map((o) => {
-                  const building = buildingLabels[o.buildingName] ?? o.buildingName;
+                  // 사전은 건물 키(`kabukicho`)로 찾는다 — 저장된 한국어 이름으로 바로 찾으면 늘 비어 한국어가 남았다(2026-10-22).
+                  const building = localizeBuildingName(o.buildingName, buildingLabels);
                   const place = o.roomLabel && o.roomLabel !== "-" ? `${building} · ${o.roomLabel}` : building;
                   const isRange = Boolean(o.deliveryStartDate && o.deliveryEndDate && o.deliveryStartDate !== o.deliveryEndDate);
                   return (

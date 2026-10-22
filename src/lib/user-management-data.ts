@@ -2,6 +2,7 @@ import "server-only";
 
 import { isOrgTopAdmin, type Role } from "@/config/roles";
 import { CAPABILITY_KEYS, canBeDenied, capabilityPolicy, evaluateCapability } from "@/config/capabilities";
+import { HIDDEN_CAPABILITIES } from "@/config/capability-groups";
 import { resolveCapabilities } from "@/lib/capabilities-server";
 import { getDictionary } from "@/lib/i18n";
 import { listMemberOverrides } from "@/lib/permission-overrides-server";
@@ -224,12 +225,15 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
     for (const key of CAPABILITY_KEYS) {
       const policy = capabilityPolicy(key);
       if (policy.systemOnly) continue;
+      // 쓰는 화면이 없는 키는 그리지 않는다(`HIDDEN_CAPABILITIES`, 2026-10-22).
+      if (HIDDEN_CAPABILITIES.includes(key)) continue;
       if (policy.developerOnly && !isSuperAdmin) continue;
       const fromRole = evaluateCapability({ capability: key, role: selected.role, granted: false, denied: false });
       const grant = overrides.find((override) => override.key === key && override.effect === "grant");
       const deny = overrides.find((override) => override.key === key && override.effect === "deny");
       const on = effective.includes(key);
-      const source: PermRowVM["source"] = deny ? "deny" : grant ? "grant" : fromRole ? "role" : "off";
+      // 역할이 더는 받지 않는 키의 차단은 「꺼짐」으로 보인다(쓸모없는 차단 — 켜면 부여가 차단을 회수한다, 2026-10-22).
+      const source: PermRowVM["source"] = deny && fromRole ? "deny" : grant ? "grant" : fromRole ? "role" : "off";
       // 대표 · 전무 · 개발자는 키의 개인 지정 허용 여부와 무관하게 전부 켜고 끈다(2026-10-21 「역할 = 기본 틀, 나머지는 사람마다」).
       const canToggle =
         source === "grant" || source === "deny"

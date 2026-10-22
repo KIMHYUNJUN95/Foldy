@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
+import { FoldyMark } from "@/components/brand/foldy-mark";
 import { hasAdminWebAccess } from "@/config/capabilities";
 import { getDictionary } from "@/lib/i18n";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -24,7 +25,11 @@ export default async function AdminNoAccessPage() {
   return (
     <main className="flex min-h-[100svh] items-center justify-center bg-background px-6 py-12 text-foreground">
       <section className="w-full max-w-[440px]">
-        <p className="font-serif text-[26px] font-bold italic tracking-[-0.04em] text-foreground">Foldy</p>
+        {/* 로고 = 앱 아이콘과 같은 세 줄 마크 + 굵은 sans 「Foldy」(사이드 메뉴와 같음). */}
+        <div className="flex items-center gap-2.5">
+          <FoldyMark size={30} />
+          <span className="wordmark text-[19px] text-foreground">Foldy</span>
+        </div>
         <div className="mt-8 rounded-[24px] bg-surface px-8 py-9 shadow-[0_24px_70px_-42px_rgba(16,24,40,0.45)]">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <LockKeyhole aria-hidden="true" size={20} strokeWidth={2} />

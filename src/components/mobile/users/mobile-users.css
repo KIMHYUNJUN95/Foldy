@@ -188,3 +188,27 @@ html[data-pane] .muw-d { max-width: 600px; }
   .muw-row:active, .muw-btn:active, .muw-ic:active, .muw-qk button:active { transform: none; }
   .muw-toast__life { display: none; }
 }
+
+/* 권한 묶음(2026-10-22) — 기능별로 접고 펴기 · 「켜진 것만 보기」. 줄 모양(.muw-pr)은 그대로. */
+.muw-only { margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 16px; background: #f2f2f5; font: inherit; font-size: 13px; font-weight: 500; letter-spacing: 0; color: #3a3746; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.muw-only:active { transform: scale(.97); }
+.muw-only.on { background: #7a52e6; color: #fff; font-weight: 600; }
+.muw-pg + .muw-pg { border-top: 0.5px solid var(--separator); }
+.muw-pg__h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 0 4px; border: 0; background: none; font: inherit; text-align: left; color: inherit; cursor: pointer; transition: opacity 120ms ease; }
+.muw-pg__h:disabled { cursor: default; }
+.muw-pg__h:active:not(:disabled) { opacity: .6; }
+.muw-pg__h svg { width: 18px; height: 18px; flex: none; color: #6f6c7c; transition: transform 220ms cubic-bezier(.23, 1, .32, 1); }
+.muw-pg.is-open .muw-pg__h svg { transform: rotate(90deg); }
+.muw-pg__h b { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+.muw-pg__h span { font-size: 13px; color: #6f6c7c; }
+.muw-pg > .muw-pr + .muw-pr, .muw-pg > .muw-pr + .muw-pw, .muw-pg > .muw-pw + .muw-pr,
+.muw-pg__h + .muw-pr, .muw-pg__h + .muw-pw { border-top: 0.5px solid var(--separator); }
+
+/* 권한 설명 물음표(2026-10-22) — 이름 옆 작은 ? · 누르면 줄 아래에 설명. 누르는 자리는 32px. */
+.muw-help { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -8px -6px -8px -2px; padding: 0; border: 0; background: none; color: #a3a0ae; vertical-align: middle; cursor: pointer; transition: color 150ms ease, transform 120ms ease; }
+.muw-help svg { width: 16px; height: 16px; }
+.muw-help.on { color: #7a52e6; }
+.muw-help:active { transform: scale(.9); }
+.muw-help-t { margin: 0 4px 12px; padding: 10px 12px; border-radius: 12px; background: #f6f5f9; font-size: 14px; line-height: 20px; color: #3a3746; animation: muw-help-in 180ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes muw-help-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.muw-help-t + .muw-pr, .muw-help-t + .muw-pw { border-top: 0.5px solid var(--separator); }

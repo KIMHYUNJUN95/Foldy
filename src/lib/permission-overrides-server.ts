@@ -171,6 +171,19 @@ export async function grantMemberOverride(input: {
   if (input.grantedByUserId === input.userId) return { ok: false, error: "self_grant_blocked" };
 
   const service = getSupabaseServiceClient();
+  // 반대 방향의 활성 지정은 먼저 회수한다 — 차단이 남은 채 부여하면 차단이 이겨 켜지지 않는다(2026-10-22: 역할 기본값이 바뀌어
+  // 쓸모없어진 차단이 있던 사람에게 켜 주려던 경우). 회수 기록은 남는다.
+  const opposite = input.effect === "grant" ? "deny" : "grant";
+  const { error: revokeError } = await service
+    .from("membership_permission_overrides")
+    .update({ revoked_at: new Date().toISOString(), revoked_by_user_id: input.grantedByUserId })
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", input.userId)
+    .eq("permission_key", capability)
+    .eq("effect", opposite)
+    .is("revoked_at", null);
+  if (revokeError) return { ok: false, error: "insert_failed" };
+
   const { data, error } = await service
     .from("membership_permission_overrides")
     .insert({

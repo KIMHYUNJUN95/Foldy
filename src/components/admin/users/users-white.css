@@ -196,3 +196,26 @@
 .adm .usw-hist li span:first-child { font-size: 13px; color: #16141f; }
 .adm .usw-hist li span + span { font-size: 12px; color: #6b6878; }
 
+
+/* 권한 묶음(2026-10-22) — 기능별로 접고 펴기 · 「켜진 것만 보기」. 줄 모양(.usw-pr)은 그대로. */
+.adm .usw-perm__h { justify-content: flex-start; align-items: center; gap: 8px; }
+.adm .usw-only { margin-left: auto; height: 28px; padding: 0 12px; border: 0; border-radius: 14px; background: #f2f2f5; font: inherit; font-size: 12px; font-weight: 500; color: #3a3746; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.adm .usw-only:active { transform: scale(.97); }
+.adm .usw-only.on { background: #7a52e6; color: #fff; font-weight: 600; }
+.adm .usw-pg + .usw-pg { border-top: 0.5px solid var(--separator); }
+.adm .usw-pg.is-open { padding-bottom: 6px; }
+.adm .usw-pg__h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+.adm .usw-pg__h:disabled { cursor: default; }
+.adm .usw-pg__h svg { width: 16px; height: 16px; flex: none; color: #6b6878; transition: transform 220ms cubic-bezier(.23, 1, .32, 1); }
+.adm .usw-pg.is-open .usw-pg__h svg { transform: rotate(90deg); }
+.adm .usw-pg__h b { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: #16141f; }
+.adm .usw-pg__h span { font-size: 12px; color: #6b6878; }
+.adm .usw-pg__h:hover:not(:disabled) b { color: #5a30cf; }
+
+/* 권한 설명 물음표(2026-10-22) — 이름 옆 작은 ? · 누르면 줄 아래에 설명. */
+.adm .usw-help { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 4px; padding: 0; border: 0; border-radius: 50%; background: none; color: #a3a0ae; vertical-align: -3px; cursor: pointer; transition: color 150ms ease, transform 120ms ease; }
+.adm .usw-help svg { width: 14px; height: 14px; }
+.adm .usw-help:hover, .adm .usw-help.on { color: #7a52e6; }
+.adm .usw-help:active { transform: scale(.9); }
+.adm .usw-help-t { margin: 0 0 12px; padding: 9px 11px; border-radius: 10px; background: #f6f5f9; font-size: 12px; line-height: 18px; color: #3a3746; animation: usw-help-in 180ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes usw-help-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }

@@ -17,9 +17,10 @@ const EXPECTED: Partial<Record<Capability, readonly string[]>> = {
   "cleaning.force_complete": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "field_manager"],
   "linen.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "property_info.edit": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
-  "complaint.write": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff"],
-  "complaint.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
-  "complaint.comment": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+  // 2026-10-22 — 게스트 피드백 작성 · 관리 · 댓글은 CS 관리자(보기는 누구나).
+  "complaint.write": ["developer_super_admin", "owner", "senior_managing_director", "cs_staff"],
+  "complaint.manage": ["developer_super_admin", "owner", "senior_managing_director", "cs_staff"],
+  "complaint.comment": ["developer_super_admin", "owner", "senior_managing_director", "cs_staff"],
   "request.delete_any": ["developer_super_admin", "owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
   "bug.review": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],
   "board.manage": ["developer_super_admin", "owner", "senior_managing_director", "office_admin"],

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Trash2, X } from "lucide-react";
+import { ChevronRight, CircleHelp, Search, Trash2, X } from "lucide-react";
 import "./users-white.css";
 import { AdmDropdown, type AdmOption } from "../shared/adm-dropdown";
 import { AdminDatePicker } from "../shared/admin-date-picker";
@@ -19,6 +19,7 @@ import {
   setMemberStatus,
   setMemberTeam,
 } from "@/app/admin/users/actions";
+import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-groups";
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
@@ -278,6 +279,11 @@ function MemberPanel({
   const [picker, setPicker] = useState<Picker | null>(null);
   // 누른 즉시 바뀐 모습을 보여 주고, 서버가 새로 그리면 서버 값으로 돌아간다(패널 데이터가 바뀌면 비운다).
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  // 권한 묶음 펼침(처음엔 전부 접힘 — 2026-10-22 사용자) · 「켜진 것만 보기」.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [onlyOn, setOnlyOn] = useState(false);
+  // 물음표로 펼친 권한 설명(한 번에 하나).
+  const [helpOpen, setHelpOpen] = useState<string | null>(null);
   const [optRole, setOptRole] = useState<string | null>(null);
   const [optTeam, setOptTeam] = useState<string | null>(null);
   const [optStatus, setOptStatus] = useState<string | null>(null);
@@ -425,6 +431,94 @@ function MemberPanel({
     { id: "month3", label: c.wMonth3, days: 90 },
   ];
 
+  // 권한 줄 하나(2026-10-22 묶음으로 나눔 — 줄 모양은 그대로).
+  const permRows = rows;
+  const visiblePermRows = onlyOn ? rows.filter((row) => row.on || picker?.key === row.id) : rows;
+  const renderPermRow = (row: (typeof rows)[number]) => {
+                  const isOpen = picker?.key === row.id;
+                  return (
+                    <div key={row.id} className={`usw-pr${row.on ? "" : " off"}${isOpen ? " open" : ""}`}>
+                      <div className="usw-pr__line">
+                        <span className="usw-pr__t">
+                          <b>
+                            {row.label}
+                            {c.permHelp[row.id] ? (
+                              <button
+                                type="button"
+                                className={`usw-help${helpOpen === row.id ? " on" : ""}`}
+                                aria-label={c.wPermHelpAria.replace("{name}", row.label)}
+                                aria-expanded={helpOpen === row.id}
+                                onClick={() => setHelpOpen((cur) => (cur === row.id ? null : row.id))}
+                              >
+                                <CircleHelp aria-hidden="true" />
+                              </button>
+                            ) : null}
+                          </b>
+                          <span className={row.bad ? "is-bad" : ""}>{isOpen ? (picker.effect === "grant" ? c.wAskGrant : c.wAskDeny) : row.src}</span>
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isOpen ? picker.effect === "grant" : row.on}
+                          aria-label={row.label}
+                          className={`usw-sw${(isOpen ? picker.effect === "grant" : row.on) ? " on" : ""}`}
+                          disabled={row.disabled}
+                          onClick={row.onToggle}
+                        >
+                          <i />
+                        </button>
+                      </div>
+                      {helpOpen === row.id && c.permHelp[row.id] ? <p className="usw-help-t">{c.permHelp[row.id]}</p> : null}
+                      {isOpen ? (
+                        <div className="usw-xp">
+                          <div className="usw-xp__q">
+                            <button
+                              type="button"
+                              className={picker.preset === "forever" ? "on" : ""}
+                              aria-pressed={picker.preset === "forever"}
+                              onClick={() => setPicker({ ...picker, preset: "forever" })}
+                            >
+                              {c.wForever}
+                            </button>
+                            {presets.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                className={picker.preset === preset.id ? "on" : ""}
+                                aria-pressed={picker.preset === preset.id}
+                                onClick={() => setPicker({ ...picker, preset: preset.id, date: addDays(today, preset.days) })}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                            <AdminDatePicker
+                              value={picker.date}
+                              onChange={(value) => setPicker({ ...picker, preset: "date", date: value })}
+                              min={addDays(today, 1)}
+                              localeTag={locale}
+                              ariaLabel={c.wPickDate}
+                              display={picker.preset === "date" ? shortDate(picker.date) : c.wPickDate}
+                              labels={{ prevMonth: c.datePrev, nextMonth: c.dateNext, today: c.dateToday }}
+                            />
+                          </div>
+                          <div className="usw-xp__go">
+                            <button type="button" className="usw-btn is-ghost" onClick={() => setPicker(null)}>
+                              {c.cancel}
+                            </button>
+                            <button type="button" className="usw-btn is-pri" onClick={submitPicker} disabled={pending}>
+                              {picker.preset === "forever"
+                                ? picker.effect === "grant"
+                                  ? c.wGrantForever
+                                  : c.wDenyForever
+                                : (picker.effect === "grant" ? c.wGrantUntil : c.wDenyUntil).replace("{date}", shortDate(picker.date))}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+};
+
   return (
     <>
       <div className="panel-scrim on" onClick={pending ? undefined : onClose} />
@@ -541,80 +635,36 @@ function MemberPanel({
               <div className="usw-perm__h">
                 <b>{c.permTitle}</b>
                 {rows.length > 0 ? <span>{c.wPermCount.replace("{n}", String(onCount))}</span> : null}
+                {rows.length > 0 ? (
+                  <button type="button" className={`usw-only${onlyOn ? " on" : ""}`} aria-pressed={onlyOn} onClick={() => setOnlyOn((v) => !v)}>
+                    {c.wPermOnlyOn}
+                  </button>
+                ) : null}
               </div>
               <p className="usw-note">{panel.canManagePermissions ? c.wPermHint : c.wPermOwnerOnly}</p>
-              <div className="usw-pl">
-                {rows.map((row) => {
-                  const isOpen = picker?.key === row.id;
+                              {groupPermissionRows(visiblePermRows).map((group) => {
+                  const groupRows = permRows.filter((row) => capabilityGroupOf(row.id) === group.id);
+                  const groupOn = groupRows.filter((row) => row.on).length;
+                  const pickerHere = Boolean(picker && group.rows.some((row) => row.id === picker.key));
+                  const expanded = onlyOn || pickerHere || (openGroups[group.id] ?? false);
                   return (
-                    <div key={row.id} className={`usw-pr${row.on ? "" : " off"}${isOpen ? " open" : ""}`}>
-                      <div className="usw-pr__line">
-                        <span className="usw-pr__t">
-                          <b>{row.label}</b>
-                          <span className={row.bad ? "is-bad" : ""}>{isOpen ? (picker.effect === "grant" ? c.wAskGrant : c.wAskDeny) : row.src}</span>
-                        </span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isOpen ? picker.effect === "grant" : row.on}
-                          aria-label={row.label}
-                          className={`usw-sw${(isOpen ? picker.effect === "grant" : row.on) ? " on" : ""}`}
-                          disabled={row.disabled}
-                          onClick={row.onToggle}
-                        >
-                          <i />
-                        </button>
-                      </div>
-                      {isOpen ? (
-                        <div className="usw-xp">
-                          <div className="usw-xp__q">
-                            <button
-                              type="button"
-                              className={picker.preset === "forever" ? "on" : ""}
-                              aria-pressed={picker.preset === "forever"}
-                              onClick={() => setPicker({ ...picker, preset: "forever" })}
-                            >
-                              {c.wForever}
-                            </button>
-                            {presets.map((preset) => (
-                              <button
-                                key={preset.id}
-                                type="button"
-                                className={picker.preset === preset.id ? "on" : ""}
-                                aria-pressed={picker.preset === preset.id}
-                                onClick={() => setPicker({ ...picker, preset: preset.id, date: addDays(today, preset.days) })}
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
-                            <AdminDatePicker
-                              value={picker.date}
-                              onChange={(value) => setPicker({ ...picker, preset: "date", date: value })}
-                              min={addDays(today, 1)}
-                              localeTag={locale}
-                              ariaLabel={c.wPickDate}
-                              display={picker.preset === "date" ? shortDate(picker.date) : c.wPickDate}
-                              labels={{ prevMonth: c.datePrev, nextMonth: c.dateNext, today: c.dateToday }}
-                            />
-                          </div>
-                          <div className="usw-xp__go">
-                            <button type="button" className="usw-btn is-ghost" onClick={() => setPicker(null)}>
-                              {c.cancel}
-                            </button>
-                            <button type="button" className="usw-btn is-pri" onClick={submitPicker} disabled={pending}>
-                              {picker.preset === "forever"
-                                ? picker.effect === "grant"
-                                  ? c.wGrantForever
-                                  : c.wDenyForever
-                                : (picker.effect === "grant" ? c.wGrantUntil : c.wDenyUntil).replace("{date}", shortDate(picker.date))}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
+                    <div key={group.id} className={`usw-pg${expanded ? " is-open" : ""}`}>
+                      <button
+                        type="button"
+                        className="usw-pg__h"
+                        aria-expanded={expanded}
+                        disabled={onlyOn || pickerHere}
+                        onClick={() => setOpenGroups((prev) => ({ ...prev, [group.id]: !expanded }))}
+                      >
+                        <ChevronRight aria-hidden="true" />
+                        <b>{c.permGroups[group.id]}</b>
+                        <span className="num">{c.wPermGroupCount.replace("{on}", String(groupOn)).replace("{total}", String(groupRows.length))}</span>
+                      </button>
+                      {expanded ? group.rows.map(renderPermRow) : null}
                     </div>
                   );
                 })}
-              </div>
+
             </section>
           ) : null}
 

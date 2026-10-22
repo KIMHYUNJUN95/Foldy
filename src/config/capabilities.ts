@@ -426,9 +426,9 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
-  /** 게스트 피드백 작성(예전 `WRITE_COMPLAINT_ROLES`). docs/product/25-complaint-workflow.md */
+  /** 게스트 피드백 작성 — 보기는 누구나, 쓰기 · 관리 · 댓글은 CS 관리자 일(2026-10-22 사용자, 대표 · 전무 · 개발자는 늘 가짐). docs/product/25-complaint-workflow.md */
   "complaint.write": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff"],
+    roles: ["owner", "senior_managing_director", "cs_staff"],
     individualGrant: false,
     individualDeny: false,
     asksExpiry: false,
@@ -436,9 +436,9 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
-  /** 게스트 피드백 상태 변경 · 삭제(남의 것까지, 예전 `COMPLAINT_ADMIN_ROLES`). */
+  /** 게스트 피드백 상태 변경 · 삭제(남의 것까지) — CS 관리자(2026-10-22, 예전엔 오피스 관리자). */
   "complaint.manage": {
-    roles: ["owner", "senior_managing_director", "office_admin"],
+    roles: ["owner", "senior_managing_director", "cs_staff"],
     individualGrant: false,
     individualDeny: false,
     asksExpiry: false,
@@ -446,9 +446,9 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
-  /** 게스트 피드백 댓글 — 알바(아르바이트 · 리더)가 빠진다(예전 `NO_COMMENT_ROLES` 의 반대). */
+  /** 게스트 피드백 댓글 — CS 관리자(2026-10-22, 예전엔 알바 빼고 전원). */
   "complaint.comment": {
-    roles: ["owner", "senior_managing_director", "office_admin", "cs_staff", "field_manager"],
+    roles: ["owner", "senior_managing_director", "cs_staff"],
     individualGrant: false,
     individualDeny: false,
     asksExpiry: false,

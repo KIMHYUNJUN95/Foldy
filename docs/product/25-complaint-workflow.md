@@ -949,3 +949,9 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 - 수동 컴플레인: 「미처리 · 처리 완료」 14/700 → 17/600 · 높이 44 · 「n · 오래된 순」 15, 줄 제목 15 → 16 · 아래 줄 · 날짜 12 → 13.
 - 건물 · 객실별: 객실 이름 14 → 16 · 작은 글자 12 → 13 · 나눔 버튼 13 → 15. 빈 화면 17/15.
 
+
+## 권한 — CS 관리자 일 (2026-10-22)
+
+보기는 누구나. 컴플레인 등록 · 리뷰를 컴플레인으로 가져오기(`complaint.write`), 해결 · 다시 열기 · 남의 것 관리(`complaint.manage`), 댓글(`complaint.comment`)은
+역할 기본으로 대표 · 전무 · CS 관리자만(개발자는 늘 가능). 다른 사람은 대표 · 전무 · 개발자가 사용자 화면에서 사람마다 켠다.
+상세 `docs/product/27-permission-override-workflow.md` 「게스트 피드백 = CS 관리자」.

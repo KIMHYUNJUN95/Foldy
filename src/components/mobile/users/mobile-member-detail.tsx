@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Check, ChevronRight, CircleAlert, Lock, Phone, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, CircleAlert, CircleHelp, Lock, Phone, Trash2 } from "lucide-react";
 import {
   assignDeveloper,
   deleteMember,
@@ -14,6 +14,7 @@ import {
 } from "@/app/admin/users/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
+import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-groups";
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role } from "@/config/roles";
 import { haptic } from "@/lib/haptics";
 import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
@@ -85,6 +86,11 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
   const [toast, setToast] = useState<UsersToast | null>(null);
   // 누른 즉시 바뀐 모습을 보여 주고, 서버가 새로 그리면 서버 값으로 돌아간다(데이터가 바뀌면 비운다).
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  // 권한 묶음 펼침(처음엔 전부 접힘 — 2026-10-22 사용자) · 「켜진 것만 보기」.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [onlyOn, setOnlyOn] = useState(false);
+  // 물음표로 펼친 권한 설명(한 번에 하나).
+  const [helpOpen, setHelpOpen] = useState<string | null>(null);
   const [optRole, setOptRole] = useState<string | null>(null);
   const [optTeam, setOptTeam] = useState<string | null>(null);
   const [optStatus, setOptStatus] = useState<string | null>(null);
@@ -264,6 +270,97 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
   ];
   const summary = [m.name, m.isDeveloper ? c.devRole : roleLabel(role), m.email].filter(Boolean);
 
+  // 권한 줄 하나(2026-10-22 묶음으로 나눔 — 줄 모양은 그대로).
+  const permRows = rows;
+  const visiblePermRows = onlyOn ? rows.filter((row) => row.on || picker?.key === row.id) : rows;
+  const renderPermRow = (row: (typeof rows)[number]) => {
+                const isOpen = picker?.key === row.id;
+                const checked = isOpen ? picker.effect === "grant" : row.on;
+                const line = (
+                  <div className={`muw-pr${row.on ? "" : " is-off"}`}>
+                    <span className="muw-rb">
+                      <span className="muw-rt">
+                        {row.label}
+                        {c.permHelp[row.id] ? (
+                          <button
+                            type="button"
+                            className={`muw-help${helpOpen === row.id ? " on" : ""}`}
+                            aria-label={c.wPermHelpAria.replace("{name}", row.label)}
+                            aria-expanded={helpOpen === row.id}
+                            onClick={() => setHelpOpen((cur) => (cur === row.id ? null : row.id))}
+                          >
+                            <CircleHelp aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </span>
+                      <span className={`muw-rm${row.bad && !isOpen ? " is-bad" : ""}`}>
+                        {isOpen ? (picker.effect === "grant" ? c.wAskGrant : c.wAskDeny) : row.src}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={checked}
+                      aria-label={row.label}
+                      className="muw-sw"
+                      disabled={row.disabled}
+                      onClick={row.onToggle}
+                    >
+                      <i />
+                    </button>
+                  </div>
+                );
+                const help = helpOpen === row.id && c.permHelp[row.id] ? <p className="muw-help-t">{c.permHelp[row.id]}</p> : null;
+                if (!isOpen)
+                  return (
+                    <Fragment key={row.id}>
+                      {line}
+                      {help}
+                    </Fragment>
+                  );
+                return (
+                  <div key={row.id} className="muw-pw">
+                    {line}
+                    {help}
+                    <div className="muw-qk" role="group" aria-label={c.wPickDate}>
+                      <button
+                        type="button"
+                        aria-pressed={picker.preset === "forever"}
+                        onClick={() => setPicker({ ...picker, preset: "forever" })}
+                      >
+                        {c.wForever}
+                      </button>
+                      {presets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          aria-pressed={picker.preset === preset.id}
+                          onClick={() => setPicker({ ...picker, preset: preset.id, date: addDays(today, preset.days) })}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <button type="button" aria-pressed={picker.preset === "date"} aria-haspopup="dialog" onClick={() => setDateOpen(true)}>
+                        <CalendarDays aria-hidden="true" />
+                        {picker.preset === "date" ? shortDate(picker.date) : c.wPickDate}
+                      </button>
+                    </div>
+                    <div className="muw-go">
+                      <button type="button" className="muw-btn is-white" onClick={() => setPicker(null)}>
+                        {c.cancel}
+                      </button>
+                      <button type="button" className="muw-btn is-pri" onClick={submitPicker} disabled={pending}>
+                        {picker.preset === "forever"
+                          ? picker.effect === "grant"
+                            ? c.wGrantForever
+                            : c.wDenyForever
+                          : (picker.effect === "grant" ? c.wGrantUntil : c.wDenyUntil).replace("{date}", shortDate(picker.date))}
+                      </button>
+                    </div>
+                  </div>
+                );
+};
+
   return (
     <div className="muw muw-d">
       <div className="muw-dh">
@@ -399,76 +496,36 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
             <h2 className="muw-sec">
               {c.permTitle}
               {rows.length > 0 ? <span className="num">{c.wPermCount.replace("{n}", String(onCount))}</span> : null}
+              {rows.length > 0 ? (
+                <button type="button" className={`muw-only${onlyOn ? " on" : ""}`} aria-pressed={onlyOn} onClick={() => setOnlyOn((v) => !v)}>
+                  {c.wPermOnlyOn}
+                </button>
+              ) : null}
             </h2>
             <p className="muw-note">{panel.canManagePermissions ? c.wPermHint : c.wPermOwnerOnly}</p>
-            <div className="muw-pl">
-              {rows.map((row) => {
-                const isOpen = picker?.key === row.id;
-                const checked = isOpen ? picker.effect === "grant" : row.on;
-                const line = (
-                  <div className={`muw-pr${row.on ? "" : " is-off"}`}>
-                    <span className="muw-rb">
-                      <span className="muw-rt">{row.label}</span>
-                      <span className={`muw-rm${row.bad && !isOpen ? " is-bad" : ""}`}>
-                        {isOpen ? (picker.effect === "grant" ? c.wAskGrant : c.wAskDeny) : row.src}
-                      </span>
-                    </span>
+                          {groupPermissionRows(visiblePermRows).map((group) => {
+                const groupRows = permRows.filter((row) => capabilityGroupOf(row.id) === group.id);
+                const groupOn = groupRows.filter((row) => row.on).length;
+                const pickerHere = Boolean(picker && group.rows.some((row) => row.id === picker.key));
+                const expanded = onlyOn || pickerHere || (openGroups[group.id] ?? false);
+                return (
+                  <div key={group.id} className={`muw-pg${expanded ? " is-open" : ""}`}>
                     <button
                       type="button"
-                      role="switch"
-                      aria-checked={checked}
-                      aria-label={row.label}
-                      className="muw-sw"
-                      disabled={row.disabled}
-                      onClick={row.onToggle}
+                      className="muw-pg__h"
+                      aria-expanded={expanded}
+                      disabled={onlyOn || pickerHere}
+                      onClick={() => setOpenGroups((prev) => ({ ...prev, [group.id]: !expanded }))}
                     >
-                      <i />
+                      <ChevronRight aria-hidden="true" />
+                      <b>{c.permGroups[group.id]}</b>
+                      <span className="num">{c.wPermGroupCount.replace("{on}", String(groupOn)).replace("{total}", String(groupRows.length))}</span>
                     </button>
-                  </div>
-                );
-                if (!isOpen) return <Fragment key={row.id}>{line}</Fragment>;
-                return (
-                  <div key={row.id} className="muw-pw">
-                    {line}
-                    <div className="muw-qk" role="group" aria-label={c.wPickDate}>
-                      <button
-                        type="button"
-                        aria-pressed={picker.preset === "forever"}
-                        onClick={() => setPicker({ ...picker, preset: "forever" })}
-                      >
-                        {c.wForever}
-                      </button>
-                      {presets.map((preset) => (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          aria-pressed={picker.preset === preset.id}
-                          onClick={() => setPicker({ ...picker, preset: preset.id, date: addDays(today, preset.days) })}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                      <button type="button" aria-pressed={picker.preset === "date"} aria-haspopup="dialog" onClick={() => setDateOpen(true)}>
-                        <CalendarDays aria-hidden="true" />
-                        {picker.preset === "date" ? shortDate(picker.date) : c.wPickDate}
-                      </button>
-                    </div>
-                    <div className="muw-go">
-                      <button type="button" className="muw-btn is-white" onClick={() => setPicker(null)}>
-                        {c.cancel}
-                      </button>
-                      <button type="button" className="muw-btn is-pri" onClick={submitPicker} disabled={pending}>
-                        {picker.preset === "forever"
-                          ? picker.effect === "grant"
-                            ? c.wGrantForever
-                            : c.wDenyForever
-                          : (picker.effect === "grant" ? c.wGrantUntil : c.wDenyUntil).replace("{date}", shortDate(picker.date))}
-                      </button>
-                    </div>
+                    {expanded ? group.rows.map(renderPermRow) : null}
                   </div>
                 );
               })}
-            </div>
+
           </section>
         </>
       )}

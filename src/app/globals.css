@@ -870,3 +870,12 @@ select option:focus {
 [data-sheet]::-webkit-scrollbar, [data-sheet] *::-webkit-scrollbar { display: none; }
 html:has([data-shell-frame]) { scrollbar-width: none; }
 html:has([data-shell-frame])::-webkit-scrollbar { display: none; }
+
+/* 기기 글자 크기를 따라가지 않는 곳 (2026-10-22 큰 글씨 대응) — 앱은 기기 글자 크기를 0.85~1.35 배로 따라간다(NativeShellBridge,
+   body 의 text-size-adjust). 탭바(iOS 기본 탭바도 글자 크기를 따르지 않는다) · 촘촘한 데이터 표(판매 캘린더 격자 · 범례)는
+   키우면 겹치거나 잘리므로 원래 크기로 둔다. 새로 고정할 곳은 `data-text-fixed` — 본문 · 목록 · 버튼에는 쓰지 않는다. */
+.tabbar,
+[data-text-fixed] {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}

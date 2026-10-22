@@ -1555,7 +1555,7 @@ export function MobileOpsCalendar({
 
       {/* 상태 · 범례 한 줄 — 가격 신선도 · 실시간 점 · 반영 중 · 범례(데스크톱 위 줄 오른쪽 + 범례 줄). 넓은 화면에서도
           이 한 줄뿐이다(예전 범례를 따로 두지 않는다). */}
-      <div aria-label={copy.mLegend} className="mops-meta">
+      <div aria-label={copy.mLegend} className="mops-meta" data-text-fixed="">
         <span className={`mops-sync${staleRates ? " stale" : ""}`} title={copy.syncedHint}>
           <Beds24LiveDot offLabel={copy.liveOff} onLabel={copy.liveOn} />
           {syncedLabel}
@@ -1608,6 +1608,8 @@ export function MobileOpsCalendar({
         className="mops-grid"
         // 격자는 가로로 넘기고 칸을 끌어 고른다 — 화면 스와이프 뒤로가기가 가져가지 않게(16-mobile-navigation).
         data-swipe-back="off"
+        // 촘촘한 표라 기기 글자 크기를 따라 키우지 않는다(달력 앱과 같게, 2026-10-22).
+        data-text-fixed=""
         onClick={onGridClick}
         onScroll={onGridScroll}
         ref={scrollerRef}

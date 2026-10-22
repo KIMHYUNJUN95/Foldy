@@ -21,23 +21,35 @@ import { attachPredictiveBack } from "@/lib/swipe-back/native-predictive-back";
  * 3. **상태바 아이콘** — 어두운 아이콘 고정(앱 화면은 늘 밝다). 2026-10-08 네이티브 품질 N1.
  * 4. **길게 누르기 브라우저 메뉴 차단** — 링크 · 사진의 「링크 주소 복사 · Chrome 에서 열기」 메뉴(입력칸 제외). N8.
  * 5. **iOS 키보드 위 「‹ › 완료」 막대 숨김** — 웹 입력칸 티가 가장 많이 나는 곳(2026-10-09, N13).
- * 6. **기기 글자 크기** — OS 글자 크기 설정을 따르되 0.85~1.15 배로 묶는다(N14). Android WebView 는 원래 기기 글자 크기를 제한 없이
+ * 6. **기기 글자 크기** — OS 글자 크기 설정을 따르되 0.85~1.35 배로 묶는다(N14, 2026-10-22 1.15 → 1.35). Android WebView 는 원래 기기 글자 크기를 제한 없이
  *    따라가 큰 글씨에서 화면이 깨질 수 있었고, iOS WebView 는 아예 무시했다. 앱으로 돌아올 때마다 다시 맞춘다(설정을 바꿨을 수 있다).
  *
  * 네이티브 플러그인은 모두 `hasNativePlugin` 으로 거른다 — 옛 설치본에 없는 플러그인을 불러 멈추지 않게(웹 · 앱 버전 어긋남).
  */
 
-/** 기기 글자 크기 배율의 허용 범위 — 화면이 깨지지 않는 선에서 따른다. */
+/**
+ * 기기 글자 크기 배율의 허용 범위 — 화면이 깨지지 않는 선에서 따른다. 위 1.35 = iOS 일반 글자 크기의 가장 큰 단계(본문 17 → 23pt).
+ * 그보다 큰 「손쉬운 사용」 큰 글씨는 1.35 에서 멈춘다. 2026-10-22 에 1.15 → 1.35 로 넓혔다(모바일 화면 1.35 배 점검,
+ * 16 「접근성 — 공용 규칙」). 더 넓히려면 그 배율로 화면을 다시 점검한다.
+ */
 const TEXT_ZOOM_MIN = 0.85;
-const TEXT_ZOOM_MAX = 1.15;
+const TEXT_ZOOM_MAX = 1.35;
 
+/**
+ * 두 플랫폼 모두 **CSS(`body` 의 text-size-adjust)** 로 키운다 — 탭바 · 촘촘한 표는 `data-text-fixed` 로 원래 크기를 지키게
+ * (globals.css). Android WebView 는 기본으로 기기 글자 크기를 통째로 따라가(textZoom) CSS 로 막을 수 없으므로 그쪽은 100% 로 되돌린다.
+ * iOS 플러그인의 set 도 body 의 text-size-adjust 를 쓰는 같은 방식이다.
+ */
 async function syncTextZoom() {
   if (!hasNativePlugin("TextZoom")) return;
   try {
     const { TextZoom } = await import("@capacitor/text-zoom");
     const { value } = await TextZoom.getPreferred();
     const clamped = Math.min(TEXT_ZOOM_MAX, Math.max(TEXT_ZOOM_MIN, Number.isFinite(value) ? value : 1));
-    await TextZoom.set({ value: clamped });
+    if (nativePlatform() === "android") await TextZoom.set({ value: 1 });
+    const pct = `${Math.round(clamped * 100)}%`;
+    document.body.style.setProperty("-webkit-text-size-adjust", pct);
+    document.body.style.setProperty("text-size-adjust", pct);
   } catch {
     // 실패하면 WebView 기본값 그대로 — 기능에는 영향 없음
   }

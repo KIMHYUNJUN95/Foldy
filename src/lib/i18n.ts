@@ -24326,10 +24326,26 @@ function withNavigation(locale: Locale) {
 
 export type Dictionary = ReturnType<typeof withNavigation>;
 
+/**
+ * 언어별 사전은 **처음 쓸 때 한 번만** 만든다(2026-10-22 첫 실행 속도 점검). 전엔 모듈을 불러오는 순간 3개 언어를 모두 깊게
+ * 합쳐(`mergeDictionary`) 앱을 켤 때마다 중급 폰 기준 약 60ms 를 썼는데, 한 사람은 한 언어만 쓴다. 같은 언어는 늘 같은 객체를 돌려준다.
+ */
+const builtDictionaries: Partial<Record<Locale, Dictionary>> = {};
+
+function buildDictionary(locale: Locale): Dictionary {
+  return (builtDictionaries[locale] ??= withNavigation(locale));
+}
+
 export const dictionaries: Record<Locale, Dictionary> = {
-  ko: withNavigation("ko"),
-  ja: withNavigation("ja"),
-  en: withNavigation("en"),
+  get ko() {
+    return buildDictionary("ko");
+  },
+  get ja() {
+    return buildDictionary("ja");
+  },
+  get en() {
+    return buildDictionary("en");
+  },
 };
 
 export function isLocale(value: string | null | undefined): value is Locale {
@@ -24374,7 +24390,7 @@ export function inferLocaleFromAcceptLanguage(header: string): Locale {
 }
 
 export function getDictionary(locale: Locale | string | null | undefined): Dictionary {
-  return dictionaries[resolveLocale(locale)];
+  return buildDictionary(resolveLocale(locale));
 }
 
 export function getLocalizedText(

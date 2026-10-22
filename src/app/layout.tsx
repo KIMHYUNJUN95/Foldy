@@ -30,9 +30,11 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+// 고정폭 숫자는 몇 화면(사용자 · 룸 링크 · 청소 · 날짜 범위)만 쓴다 — 모든 화면 첫 로드에 미리 받지 않는다(2026-10-22 첫 실행 속도).
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 // CJK 본문 폰트 — 가변 폰트(wght 100~900) 한 벌. weight 배열을 주면 굵기마다 @font-face 를
@@ -49,12 +51,14 @@ const notoSansJp = Noto_Sans_JP({
   preload: false,
 });
 
-// Wordmark font — serif italic used for the "Foldy" brand mark across all shells.
+// 세리프 — 관리자 콘솔 워드마크 · 채용 KPI 숫자만 쓴다(admin-console.css `--serif`). 모바일은 안 쓰므로 미리 받지 않는다 —
+// 전엔 모든 화면 첫 로드에 4벌을 미리 받았다(2026-10-22 첫 실행 속도: 글꼴 154KB → 48KB).
 const notoSerif = Noto_Serif({
   variable: "--font-wordmark",
   subsets: ["latin"],
   weight: ["600", "700"],
   style: ["italic", "normal"],
+  preload: false,
 });
 
 export const metadata: Metadata = {

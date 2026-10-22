@@ -1353,6 +1353,7 @@
 /* 신청서: 입력 글자 16(16 미만이면 iOS 가 누르는 순간 확대) · 칸 50 · 칸 이름 13 · 묻는 줄 15 · 작은 글자 바닥 13 */
 .lvw .lnf__l { font-size: 13px; }
 .lvw .lnf__in { min-height: 50px; font-size: 16px; }
+.lvw button.lnf__in { padding-block: 12px 8px; line-height: 1.25; } /* 큰 글씨에서 날짜가 여러 줄이 돼도 테두리 · 이름표에 붙지 않게(날짜 · 고르기 칸만) */
 .lvw .lnf__count { font-size: 12px; }
 .lvw .lvw-q { font-size: 15px; }
 .lvw .lvw-days span { font-size: 15px; }
@@ -1361,7 +1362,8 @@
 .lvw .lvw-after span { font-size: 15px; }
 /* 종류 · 단위: 보라 알약 칩 → 나눔 버튼(회색 판 위 흰 칸 하나 — 요청 「전체 | 내 요청」과 같은 모양). 보이는 36 · 누르는 자리 44 · 15.
    칸 폭은 글자에 맞추고 남는 폭을 나눈다(en 「Bereavement」도 한 줄). */
-.lvw .lvw-chips { display: flex; flex-wrap: nowrap; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; }
+/* 나눔 버튼(세그먼트)은 기기 글자 크기를 따라 키우지 않는다 — iOS 세그먼트와 같게. 키우면 「Bereavement」가 옆 칸과 겹쳤다(2026-10-22). */
+.lvw .lvw-chips { display: flex; flex-wrap: nowrap; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .lvw .lvw-chip { position: relative; flex: 1 1 auto; min-width: 0; height: 36px; padding: 0 8px; border-radius: 9px; background: transparent; font-size: 15px; color: #6b6878; white-space: nowrap; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
 .lvw .lvw-chip::before { content: ""; position: absolute; inset: -4px 0; }
 .lvw .lvw-chip.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }

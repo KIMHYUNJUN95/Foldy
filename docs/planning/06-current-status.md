@@ -184,6 +184,9 @@ and the major mobile/admin operations modules are implemented and being hardened
   정해 둔 3개만 연다(`nativeShortcutToWebPath`, 테스트 2개). Android 디버그 빌드 통과. 새 앱 빌드부터 보임.
 - [x] **앱 오프라인 판정** — 앱에서는 OS 연결 상태(`@capacitor/network`)로 알약을 띄운다(iOS WebView 의 `navigator.onLine` 은 늦거나 틀림).
   옛 앱 빌드 · 브라우저는 그대로. 새 앱 빌드부터.
+- [x] **에뮬레이터 확인(Android 디버그 빌드)** — 아이콘 메뉴 3개 등록 · 실행 중/꺼진 앱 모두 바로가기 화면으로 이동 · 모르는 id 는 무시.
+- [x] **새 작업 폼 「더보기」 줄 글자가 세로로 깨짐** — 에뮬레이터 확인 중 발견. 머리 줄 44px 아이콘 버튼과 클래스 이름(`tkw-more`)이 겹쳐 폭이
+  44px 로 줄었다 → 폼 줄은 `tkw-moretog` 로 분리.
 
 ## 2026-10-21 — 네이티브급 움직임 점검 (앱 출시 전)
 

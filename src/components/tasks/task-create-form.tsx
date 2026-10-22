@@ -540,7 +540,7 @@ export function TaskCreateForm({
       />
 
       {/* More — collapsible advanced section (priority / tags / photos). */}
-      <button aria-expanded={more} className="tkw-more" onClick={() => setMore((v) => !v)} type="button">
+      <button aria-expanded={more} className="tkw-moretog" onClick={() => setMore((v) => !v)} type="button">
         <ChevronDown aria-hidden="true" />
         {moreLead}
         {moreHint ? <span>— {moreHint}</span> : null}

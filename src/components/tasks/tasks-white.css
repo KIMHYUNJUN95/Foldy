@@ -409,10 +409,11 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-tagin input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; box-sizing: border-box; border: 1px solid #e0e0e6; border-radius: 10px; background: #fff; font: inherit; font-size: 14px; color: #16141f; outline: none; }
 .tkw-tagin input:focus { border-color: #7a52e6; box-shadow: 0 0 0 4px #eee8fc; }
 .tkw-tagin button { height: 40px; padding: 0 14px; border: 0; border-radius: 10px; background: #f1ecfd; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; }
-.tkw-more { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #16141f; text-align: left; cursor: pointer; }
-.tkw-more svg { width: 17px; height: 17px; color: var(--text-3); transition: transform 200ms ease; }
-.tkw-more[aria-expanded="false"] svg { transform: rotate(-90deg); }
-.tkw-more span { font-weight: 400; color: var(--text-3); }
+/* 폼 「더보기 · 위치 · 태그 · 사진」 펼침 줄 — 머리 줄의 44px 아이콘 버튼(.tkw-more)과 이름이 겹쳐 폭이 44px 로 줄고 글자가 세로로 깨졌다(2026-10-22). */
+.tkw-moretog { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; border: 0; border-top: 0.5px solid var(--separator); background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #16141f; text-align: left; cursor: pointer; }
+.tkw-moretog svg { width: 17px; height: 17px; color: var(--text-3); transition: transform 200ms ease; }
+.tkw-moretog[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.tkw-moretog span { font-weight: 400; color: var(--text-3); }
 .tkw-swrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 0; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .tkw-swrow__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tkw-swrow__b b { font-size: 15px; font-weight: 600; color: #16141f; }

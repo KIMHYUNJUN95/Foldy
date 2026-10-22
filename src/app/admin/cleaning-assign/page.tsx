@@ -64,6 +64,7 @@ export default async function AdminCleaningAssignPage({
         propertyLabels={{ ...propertyLabels, ...Object.fromEntries(board.properties.map((name) => [name, propertyLabels[name] ?? localizePropertyName(name, buildingLabels)])) }}
         roomOptions={roomOptions.map((option) => ({ label: option.roomLabel, propertyName: option.propertyName, roomKey: option.roomKey }))}
         canCompare={canCompare}
+        canSwap={session.capabilities.includes("cleaning.assign_swap")}
       />
     </AdminShell>
   );

@@ -2139,3 +2139,10 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 | `cleaning_room_settings` | 방 × 1 | `usual_headcount`(1~5, 큰 방 2). 1이면 줄을 지운다 |
 
 - 삭제는 하드 삭제(신청 취소 · 배정 빼기). 권한 키 `cleaning.assign` 의 DB 사본도 같은 마이그레이션.
+
+## 2026-10-22 `cleaning_reassign_rooms` — 배정 담당 한 번에 옮기기
+
+- 함수 `public.cleaning_reassign_rooms(p_organization_id uuid, p_work_date date, p_moves jsonb, p_actor uuid) returns integer` — 이동 묶음
+  `[{room_key, from_user_id, to_user_id}]`(1~80개)을 한 트랜잭션으로 `cleaning_assignments.user_id` 를 바꾼다. 옮길 줄이 없거나 받는 사람이 이미
+  그 방에 있으면 `conflict` 예외로 전부 되돌린다. 옮긴 줄의 `created_by` · `created_at` 은 바꾼 사람 · 지금. 서로 바꾸기 = 양방향 이동, 실행 취소 = 거꾸로 이동.
+- 표는 그대로(새 컬럼 없음). 권한 정책 `capability_policies` 에 `cleaning.assign_swap` 한 줄. 마이그레이션 `202610220004`.

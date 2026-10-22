@@ -3781,6 +3781,7 @@ const FALLBACK_DICTIONARY = {
           "cleaning.work": "In the phone app: start and finish room cleaning, apply for cleaning shifts, and see “My rooms today”. They also appear in the cleaner list.",
           "cleaning.read_all": "See other staff members’ cleaning records (time, photos, notes). When off, they see only their own.",
           "cleaning.assign": "On the cleaning assignment screen: put shift applicants into rooms or take them out, set assignment rules and fixed staff, add on someone’s behalf, handle cancel requests and push rooms that weren’t done.",
+          "cleaning.assign_swap": "On the cleaning assignment screen: swap rooms or whole buildings between two assigned people, or hand rooms to an applicant with none. Needs “Cleaning — assign rooms” too.",
           "cleaning.force_complete": "Mark a room as done when the cleaner couldn’t, or close it as “not cleaned”.",
           "linen.manage": "Edit and delete linen defect and return records others entered, and manage linen items. When off, they can edit only their own records.",
           "maintenance_status_change": "Move repair requests to in progress or done and upload completion photos. When off, they can only write and view repair requests.",
@@ -3978,6 +3979,10 @@ const FALLBACK_DICTIONARY = {
           "cleaning.read_all": {
             label: "Cleaning — see everyone's records",
             desc: "See cleaning records of other staff",
+          },
+          "cleaning.assign_swap": {
+            label: "Cleaning — swap assignments",
+            desc: "Swap rooms or buildings between assigned people, hand rooms over",
           },
           "cleaning.force_complete": {
             label: "Cleaning — force complete",
@@ -11918,6 +11923,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "cleaning.work": "휴대폰 앱에서 방 청소를 시작 · 완료하고, 청소 시프트를 신청하고, 「오늘 내 방」을 봐요. 청소 담당자 목록에도 나와요.",
             "cleaning.read_all": "다른 직원의 청소 기록(시간 · 사진 · 메모)까지 봐요. 끄면 내 청소 기록만 보여요.",
             "cleaning.assign": "청소 배정 화면에서 시프트 신청자를 방에 넣고 빼요. 배정 규칙 · 고정 인력 설정, 대신 넣기, 취소 요청 처리, 못 한 방 미루기도 해요.",
+            "cleaning.assign_swap": "청소 배정 화면에서 배정된 두 사람의 방 · 건물을 서로 바꾸거나, 방이 없는 신청자에게 넘겨요. 「청소 — 방 배정」도 있어야 해요.",
             "cleaning.force_complete": "직원이 완료를 누르지 못한 방을 관리자가 대신 완료 처리하거나 「청소 안 함」으로 닫아요.",
             "linen.manage": "다른 사람이 등록한 린넨 불량 · 반품 기록까지 고치고 지우며, 린넨 품목을 관리해요. 끄면 내가 등록한 기록만 고칠 수 있어요.",
             "maintenance_status_change": "수리 요청을 처리 중 · 완료로 바꾸고 완료 사진을 올려요. 끄면 수리 요청을 쓰고 보기만 해요.",
@@ -12115,6 +12121,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "cleaning.read_all": {
               label: "청소 — 모든 기록 보기",
               desc: "다른 직원의 청소 기록 보기",
+            },
+            "cleaning.assign_swap": {
+              label: "청소 — 담당 바꾸기",
+              desc: "배정된 사람끼리 방 · 건물 바꾸기, 방 넘기기",
             },
             "cleaning.force_complete": {
               label: "청소 — 강제 완료",
@@ -19925,6 +19935,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "cleaning.work": "スマホのアプリで部屋の清掃を開始・完了し、清掃シフトを申請し、「今日の私の部屋」を見ます。清掃担当者の一覧にも表示されます。",
             "cleaning.read_all": "他のスタッフの清掃記録（時間・写真・メモ）まで見ます。オフにすると自分の清掃記録だけが見えます。",
             "cleaning.assign": "清掃割り当て画面でシフト申請者を部屋に入れたり外したりします。割り当てルール・固定人員の設定、代わりに入れる、取消依頼の処理、できなかった部屋の繰り延べもします。",
+            "cleaning.assign_swap": "清掃割り当て画面で、割り当て済みの2人の部屋・建物を入れ替えたり、部屋のない申請者に引き継いだりします。「清掃 — 部屋の割り当て」も必要です。",
             "cleaning.force_complete": "スタッフが完了を押せなかった部屋を管理者が代わりに完了にするか、「清掃なし」で閉じます。",
             "linen.manage": "他の人が登録したリネン不良・返品記録まで編集・削除し、リネン品目を管理します。オフにすると自分が登録した記録だけ編集できます。",
             "maintenance_status_change": "修理依頼を対応中・完了に変え、完了写真を上げます。オフにすると修理依頼を書いて見るだけです。",
@@ -20122,6 +20133,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "cleaning.read_all": {
               label: "清掃 — 全員の記録を見る",
               desc: "他のスタッフの清掃記録を見る",
+            },
+            "cleaning.assign_swap": {
+              label: "清掃 — 担当の入れ替え",
+              desc: "割り当て済みの人同士で部屋・建物を入れ替え、部屋を引き継ぐ",
             },
             "cleaning.force_complete": {
               label: "清掃 — 強制完了",

@@ -65,6 +65,35 @@ export type CleaningAssignCopy = {
   deferNextDay: string;
   deferPick: string;
   resolve: string; // "처리 끝(청소 필요 없음)"
+  /** 담당 바꾸기 · 넘기기(2026-10-22, `cleaning.assign_swap`) */
+  swapWith: string;
+  swapPickTarget: string;
+  swapTargetHint: string;
+  swapBtn: string;
+  giveBtn: string;
+  swapMenu: string;
+  swapWho: string;
+  swapFrom: string;
+  swapVerb: string;
+  giveVerb: string;
+  swapTitle: string;
+  giveTitle: string;
+  swapSub: string;
+  giveSub: string;
+  swapNoRooms: string;
+  swapResult: string;
+  swapKeepNote: string;
+  swapUndoHint: string;
+  swapKeep: string;
+  swapDo: string;
+  giveDo: string;
+  swapNoneLeft: string;
+  swapBoth: string;
+  swapLocked: string;
+  swapDone: string;
+  giveDone: string;
+  swapFromWho: string;
+  swapCancel: string;
   undoHold: string;
   tagResolved: string; // "처리 끝"
   heldDeferred: string; // "{room} — {date}로 미뤘어요"
@@ -367,6 +396,34 @@ const ko: CleaningAssignCopy = {
   deferNextDay: "다음 날로 미루기",
   deferPick: "날짜 정해 미루기",
   resolve: "처리 끝 (청소 필요 없음)",
+  swapWith: "다른 사람과 바꾸기",
+  swapPickTarget: "{name}과(와) 바꿀 사람을 골라요",
+  swapTargetHint: "오른쪽 신청자에서 눌러요",
+  swapBtn: "바꾸기",
+  giveBtn: "넘기기",
+  swapMenu: "담당 바꾸기…",
+  swapWho: "{room} · 지금 {names} — 누구에게?",
+  swapFrom: "누구 자리를 바꿀까요?",
+  swapVerb: "서로 바꾸기",
+  giveVerb: "넘기기",
+  swapTitle: "{a} ↔ {b} 담당 바꾸기",
+  giveTitle: "{a} → {b} 넘기기",
+  swapSub: "{date} · 고른 방만 두 사람이 서로 바꿔 맡아요",
+  giveSub: "{date} · 고른 방을 {b}에게 넘겨요",
+  swapNoRooms: "아직 방이 없어요. 왼쪽에서 고른 방을 넘겨받아요.",
+  swapResult: "바꾸면",
+  swapKeepNote: "출근 시각은 사람마다 그대로예요 · 같이 들어가는 방은 그 사람 자리만 바뀌어요",
+  swapUndoHint: "바꾼 뒤 5초 안에 되돌릴 수 있어요",
+  swapKeep: "그대로 두기",
+  swapDo: "{n}개 바꾸기",
+  giveDo: "{n}개 넘기기",
+  swapNoneLeft: "방 없음",
+  swapBoth: "두 사람 다 들어가 있어요",
+  swapLocked: "바꿀 수 없어요",
+  swapDone: "{a} ↔ {b} · 방 {n}개를 바꿨어요",
+  giveDone: "{a} → {b} · 방 {n}개를 넘겼어요",
+  swapFromWho: "{name}에게서",
+  swapCancel: "취소",
   undoHold: "되돌리기",
   tagResolved: "처리 끝",
   heldDeferred: "{room} — {date}로 미뤘어요",
@@ -661,6 +718,34 @@ const ja: CleaningAssignCopy = {
   deferNextDay: "翌日に延期",
   deferPick: "日付を決めて延期",
   resolve: "処理済み（清掃不要）",
+  swapWith: "ほかの人と入れ替える",
+  swapPickTarget: "{name}と入れ替える人を選んでください",
+  swapTargetHint: "右の申請者から押してください",
+  swapBtn: "入れ替え",
+  giveBtn: "引き継ぎ",
+  swapMenu: "担当を入れ替える…",
+  swapWho: "{room} · 現在 {names} — 誰に？",
+  swapFrom: "誰の担当を入れ替えますか？",
+  swapVerb: "入れ替え",
+  giveVerb: "引き継ぎ",
+  swapTitle: "{a} ↔ {b} 担当の入れ替え",
+  giveTitle: "{a} → {b} 引き継ぎ",
+  swapSub: "{date} · 選んだ部屋だけ2人で入れ替えます",
+  giveSub: "{date} · 選んだ部屋を{b}に引き継ぎます",
+  swapNoRooms: "まだ部屋がありません。左で選んだ部屋を引き継ぎます。",
+  swapResult: "入れ替えると",
+  swapKeepNote: "出勤時刻は人ごとにそのままです · 一緒に入る部屋はその人の枠だけ変わります",
+  swapUndoHint: "入れ替え後5秒以内なら元に戻せます",
+  swapKeep: "そのままにする",
+  swapDo: "{n}部屋を入れ替え",
+  giveDo: "{n}部屋を引き継ぐ",
+  swapNoneLeft: "部屋なし",
+  swapBoth: "2人とも入っています",
+  swapLocked: "入れ替えできません",
+  swapDone: "{a} ↔ {b} · {n}部屋を入れ替えました",
+  giveDone: "{a} → {b} · {n}部屋を引き継ぎました",
+  swapFromWho: "{name}から",
+  swapCancel: "キャンセル",
   undoHold: "元に戻す",
   tagResolved: "処理済み",
   heldDeferred: "{room} — {date}に延期しました",
@@ -955,6 +1040,34 @@ const en: CleaningAssignCopy = {
   deferNextDay: "Postpone to next day",
   deferPick: "Postpone to a date",
   resolve: "Close (no cleaning needed)",
+  swapWith: "Swap with someone",
+  swapPickTarget: "Choose who to swap with {name}",
+  swapTargetHint: "Tap a person on the right",
+  swapBtn: "Swap",
+  giveBtn: "Hand over",
+  swapMenu: "Change assignee…",
+  swapWho: "{room} · now {names} — to whom?",
+  swapFrom: "Whose place should change?",
+  swapVerb: "Swap",
+  giveVerb: "Hand over",
+  swapTitle: "Swap {a} ↔ {b}",
+  giveTitle: "Hand over {a} → {b}",
+  swapSub: "{date} · Only the chosen rooms change hands",
+  giveSub: "{date} · {b} takes the chosen rooms",
+  swapNoRooms: "No rooms yet. They take the rooms you choose on the left.",
+  swapResult: "After the swap",
+  swapKeepNote: "Start times stay as they are · In shared rooms only that person’s place changes",
+  swapUndoHint: "You can undo for 5 seconds after",
+  swapKeep: "Keep as is",
+  swapDo: "Swap {n} rooms",
+  giveDo: "Hand over {n} rooms",
+  swapNoneLeft: "No rooms",
+  swapBoth: "Both are already in it",
+  swapLocked: "Can’t be swapped",
+  swapDone: "Swapped {n} rooms · {a} ↔ {b}",
+  giveDone: "Handed over {n} rooms · {a} → {b}",
+  swapFromWho: "from {name}",
+  swapCancel: "Cancel",
   undoHold: "Undo",
   tagResolved: "Closed",
   heldDeferred: "{room} — postponed to {date}",

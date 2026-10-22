@@ -129,6 +129,55 @@ export async function unassignFromRoom(input: { date: string; roomKey: string; u
   return { ok: true };
 }
 
+// ── 담당 바꾸기 · 넘기기(`cleaning.assign` + `cleaning.assign_swap`) ───────────────────────────────
+
+export type RoomMove = { roomKey: string; fromUserId: string; toUserId: string };
+
+/**
+ * 여러 방의 담당을 한 번에 옮긴다 — 서로 바꾸기 = 양쪽 방향 이동 묶음, 넘기기 = 한 방향, 실행 취소 = 거꾸로 이동.
+ * DB 함수(`cleaning_reassign_rooms`)가 한 트랜잭션으로 옮기고, 하나라도 이미 바뀌었으면 전부 되돌려 `conflict`.
+ * 청소 중 · 끝난 방, 미룸 · 처리 끝 방은 옮기지 않는다. 받는 사람은 현장 멤버여야 하고 신청이 없으면 「관리자가 넣음」 신청을 만든다.
+ * 출근 시각은 사람마다 그대로(신청 줄에 있다). docs/product/37-cleaning-shift-assignment.md 「담당 교체」
+ */
+export async function reassignRooms(input: { date: string; moves: RoomMove[] }): Promise<AssignOk<{ moved: number }> | AssignFail> {
+  const session = await assigner();
+  if (!session || !session.capabilities.includes("cleaning.assign_swap")) return { ok: false, reason: "forbidden" };
+  const moves = Array.isArray(input.moves) ? input.moves : [];
+  if (
+    !isEditableDate(input.date) ||
+    moves.length === 0 ||
+    moves.length > 80 ||
+    moves.some((m) => !m || typeof m.roomKey !== "string" || !isUuid(m.fromUserId) || !isUuid(m.toUserId) || m.fromUserId === m.toUserId)
+  ) {
+    return { ok: false, reason: "invalid" };
+  }
+  // 같은 사람 · 같은 방이 두 번 나오면 안 된다(한 줄을 두 번 옮길 수 없음).
+  if (new Set(moves.map((m) => `${m.roomKey}|${m.fromUserId}`)).size !== moves.length) return { ok: false, reason: "invalid" };
+  const organizationId = session.organization.id;
+  const supabase = getSupabaseServiceClient();
+  const [rooms, members] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date), loadFieldMembers(supabase, organizationId)]);
+  const memberIds = new Set(members.map((m) => m.userId));
+  const roomBy = new Map(rooms.map((r) => [r.roomKey, r]));
+  for (const m of moves) {
+    const room = roomBy.get(m.roomKey);
+    if (!room || room.status !== "pending" || room.deferredUntil || room.resolvedHold || !memberIds.has(m.toUserId)) return { ok: false, reason: "invalid" };
+  }
+  const result = await supabase.rpc("cleaning_reassign_rooms", {
+    p_actor: session.user.id,
+    p_moves: moves.map((m) => ({ from_user_id: m.fromUserId, room_key: m.roomKey, to_user_id: m.toUserId })),
+    p_organization_id: organizationId,
+    p_work_date: input.date,
+  });
+  if (result.error) {
+    if (result.error.message?.includes("conflict")) return { ok: false, reason: "conflict" };
+    console.error("[cleaning-assign] reassign failed", { code: result.error.code });
+    return { ok: false, reason: "error" };
+  }
+  for (const userId of new Set(moves.map((m) => m.toUserId))) await ensureApplication(organizationId, userId, input.date, session.user.id);
+  revalidate();
+  return { moved: Number(result.data ?? moves.length), ok: true };
+}
+
 /** 제안대로 넣기 · 고정 인력 먼저 넣기 — 제안은 서버가 다시 계산한다. 이미 들어간 줄은 건너뛴다(동시에 눌러도 겹치지 않음). */
 export async function applyDaySuggestions(input: { date: string; onlyFixed?: boolean }): Promise<AssignOk<{ added: number }> | AssignFail> {
   const session = await assigner();

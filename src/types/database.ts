@@ -6247,6 +6247,15 @@ export type Database = {
         Args: { target_organization_id: string }
         Returns: boolean
       }
+      cleaning_reassign_rooms: {
+        Args: {
+          p_actor: string
+          p_moves: Json
+          p_organization_id: string
+          p_work_date: string
+        }
+        Returns: number
+      }
       has_capability: {
         Args: {
           target_capability: string

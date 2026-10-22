@@ -396,6 +396,20 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /**
+   * 청소 배정 — 담당 바꾸기(2026-10-22 사용자 지시): 배정된 사람끼리 방 · 건물을 서로 바꾸고, 방 없는 신청자에게 넘긴다.
+   * 「따로 권한이 있는 사람만」 — 역할 기본값 없이 사용자 관리에서 사람마다 켠다. 배정 화면은 `cleaning.assign` 이 있어야 열린다.
+   * docs/product/37-cleaning-shift-assignment.md 「담당 교체」
+   */
+  "cleaning.assign_swap": {
+    roles: [],
+    individualGrant: true,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
   /** 청소 강제 완료(예전 `cleaningForceCompleteRoles`). */
   "cleaning.force_complete": {
     roles: ["owner", "senior_managing_director", "office_admin", "field_manager"],

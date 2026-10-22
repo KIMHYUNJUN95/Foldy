@@ -20,7 +20,7 @@ export const CAPABILITY_GROUPS = [
       "can_generate_report",
     ],
   },
-  { id: "cleaning", keys: ["cleaning.work", "cleaning.read_all", "cleaning.assign", "cleaning.force_complete", "linen.manage"] },
+  { id: "cleaning", keys: ["cleaning.work", "cleaning.read_all", "cleaning.assign", "cleaning.assign_swap", "cleaning.force_complete", "linen.manage"] },
   { id: "requests", keys: ["maintenance_status_change", "lost_found.handle", "order_processor", "request.delete_any"] },
   { id: "comms", keys: ["announcement.create", "announcement.manage", "board.manage", "board.moderate", "bug.review"] },
   { id: "guest", keys: ["complaint.write", "complaint.manage", "complaint.comment", "property_info.edit"] },

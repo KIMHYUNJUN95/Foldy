@@ -244,8 +244,54 @@
   .adm .cas-people { position: static; }
   .adm .cas-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
 }
+/* 담당 바꾸기 · 넘기기(2026-10-22, 시안 「청소 배정 — 담당 교체」) — docs/product/37-cleaning-shift-assignment.md 「담당 교체」 */
+.adm .cas-swapbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; }
+.adm .cas-swapbtn svg { width: 14px; height: 14px; }
+.adm .cas-pop > button.is-swap { display: flex; align-items: center; gap: 8px; background: #f4f1fd; color: #3b2a7a; font-weight: 600; }
+.adm .cas-pop > button.is-swap svg { width: 14px; height: 14px; }
+.adm .cas-pop__sep { height: .5px; margin: 4px 8px; background: #e4e3e9; }
+.adm .cas-pop.cas-swappick { right: 228px; width: 270px; }
+.adm .cas-swappick__from { display: flex; gap: 4px; flex-wrap: wrap; padding: 0 4px 6px; }
+.adm .cas-swappick__from button { height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: #f4f4f7; font: inherit; font-size: 13px; color: #3a3746; cursor: pointer; }
+.adm .cas-swappick__from button.on { background: #7a52e6; color: #fff; font-weight: 600; }
+.adm .cas-pop > button.cas-swappick__row { display: flex; align-items: center; gap: 10px; height: auto; min-height: 44px; }
+.adm .cas-swappick__row span { flex: 1; display: flex; flex-direction: column; }
+.adm .cas-swappick__row b { font-size: 14px; font-weight: 600; }
+.adm .cas-swappick__row small { font-size: 12px; color: #6b6878; }
+.adm .cas-swappick__row em { font-style: normal; font-size: 12px; font-weight: 600; color: #5a30cf; }
+.adm .cas-room.is-changed { background: #efe9fd; border-radius: 10px; animation: cas-changed 4s ease forwards; }
+@keyframes cas-changed { 0%, 70% { background: #efe9fd; } 100% { background: transparent; } }
+.adm .modal.cas-modal.cas-swap { width: 780px; max-width: calc(100vw - 48px); padding: 28px; gap: 20px; }
+.adm .cas-swap h3 { font-size: 22px; }
+.adm .cas-swap__cols { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); align-items: start; max-height: 52vh; overflow: auto; }
+.adm .cas-swap__mid { display: grid; place-items: center; width: 32px; height: 32px; margin: 4px auto 0; border-radius: 50%; background: #f4f1fd; color: #7a52e6; }
+.adm .cas-swap__mid svg { width: 16px; height: 16px; }
+.adm .cas-swap__col { display: flex; flex-direction: column; min-width: 0; }
+.adm .cas-swap__who { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: .5px solid #e4e3e9; }
+.adm .cas-swap__who > span:last-child { display: flex; flex-direction: column; }
+.adm .cas-swap__who b { font-size: 16px; font-weight: 700; }
+.adm .cas-swap__who small { font-size: 12px; color: #6b6878; }
+.adm .cas-swap__av { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #efeafb; color: #3b2a7a; font-size: 14px; font-weight: 600; }
+.adm .cas-swap__empty { margin: 0; padding: 18px 2px; font-size: 14px; line-height: 20px; color: #6b6878; }
+.adm .cas-swap__grp { display: flex; flex-direction: column; }
+.adm .cas-swap__grp-h { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 13px; cursor: pointer; }
+.adm .cas-swap__grp-h small { font-size: 13px; color: #6b6878; }
+.adm .cas-swap__room { display: flex; align-items: center; gap: 10px; min-height: 40px; padding-left: 28px; border-bottom: .5px solid #e4e3e9; cursor: pointer; }
+.adm .cas-swap__room b { width: 52px; flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.adm .cas-swap__room span { flex: 1; min-width: 0; font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .cas-swap__room.is-lock { opacity: .55; cursor: default; }
+.adm .cas-swap input[type="checkbox"] { width: 18px; height: 18px; flex: none; margin: 0; accent-color: #7a52e6; }
+.adm .cas-swap__sum { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 14px; background: #f7f7fa; }
+.adm .cas-swap__sum > small { font-size: 12px; color: #6b6878; }
+.adm .cas-swap__sum > small:first-child { font-weight: 600; }
+.adm .cas-swap__sum > span { font-size: 14px; line-height: 20px; }
+.adm .cas-swap__sum b { font-weight: 700; }
+.adm .cas-swap__sum i { font-style: normal; color: #6b6878; margin: 0 6px; }
+.adm .cas-swap .cas-modal__f { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+.adm .cas-swap .cas-modal__f .cas-btn { padding: 0 20px; border-radius: 999px; }
+.adm .cas-swap__hint { font-size: 12px; color: #6b6878; }
 @media (prefers-reduced-motion: reduce) {
-  .adm .cas-live i, .adm .cas-pop { animation: none; }
+  .adm .cas-live i, .adm .cas-pop, .adm .cas-room.is-changed { animation: none; }
   .adm .cas-btn, .adm .cas-switch::after, .adm .cas-room { transition: none; }
 }
 /* 신청자 줄의 이름 칸 = 고르기 버튼(줄 전체는 버튼이 아니다 — 안에 다른 버튼이 있다). */

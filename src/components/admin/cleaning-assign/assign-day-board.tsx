@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { MoreHorizontal, Phone, Search } from "lucide-react";
+import { ArrowLeftRight, MoreHorizontal, Phone, Search } from "lucide-react";
 import {
   addApplicantForDay,
   addRoomForDay,
@@ -13,12 +13,14 @@ import {
   cancelPersonDay,
   holdRoom,
   loadOpenCountsForMonth,
+  reassignRooms,
   releaseHold,
   resolveCancelRequest,
   saveMyMainProperties,
   setDayStartTime,
   unassignFromRoom,
   type AssignFail,
+  type RoomMove,
 } from "@/app/admin/cleaning-assign/actions";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
@@ -30,6 +32,7 @@ import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { BoardPerson, BoardRoom, DayBoard } from "@/lib/cleaning-assign/data";
 import { haptic } from "@/lib/haptics";
 import { agoText, checkInText, dayLabel, roleLabel, shortDate, timeLabel, timeValue, tokyoTime } from "./format";
+import { SwapDialog } from "./swap-dialog";
 import "./cleaning-assign.css";
 
 /**
@@ -53,11 +56,13 @@ type Props = {
   propertyLabels: Record<string, string>;
   roomOptions: { roomKey: string; propertyName: string; label: string }[];
   canCompare: boolean;
+  /** 담당 바꾸기 · 넘기기(`cleaning.assign_swap`) — 사람마다 켜 준 사람만. */
+  canSwap: boolean;
 };
 
 const REFRESH_MS = 20_000;
 
-export function AssignDayBoard({ board, copy, locale, today, shared, propertyLabels, roomOptions, canCompare }: Props) {
+export function AssignDayBoard({ board, copy, locale, today, shared, propertyLabels, roomOptions, canCompare, canSwap }: Props) {
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [pending, startTransition] = useTransition();
@@ -73,6 +78,12 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const [timeEdit, setTimeEdit] = useState<string | null>(null);
   const [showAllRooms, setShowAllRooms] = useState<Record<string, boolean>>({});
   const [peopleLimit, setPeopleLimit] = useState(40);
+  // 담당 바꾸기 — 막대의 「다른 사람과 바꾸기」 → 바꿀 사람 고르기(swapMode) → 교체 창(swapPair). 방 ⋯ 메뉴는 roomSwap 으로 누구에게를 고른다.
+  const [swapMode, setSwapMode] = useState(false);
+  const [swapPair, setSwapPair] = useState<{ aId: string; bId: string; only?: string[] } | null>(null);
+  const [roomSwap, setRoomSwap] = useState<{ roomKey: string; fromId: string } | null>(null);
+  const [swapUndo, setSwapUndo] = useState<{ stamp: number; message: string; moves: RoomMove[] } | null>(null);
+  const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
 
   const label = (name: string) => propertyLabels[name] ?? name;
   const people = board.people;
@@ -94,6 +105,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       setPickId(null);
       setMenuRoom(null);
       setDeferRoom(null);
+      setSwapMode(false);
+      setRoomSwap(null);
       setAddOpen(false);
       setBuildingPicker(false);
     };
@@ -137,6 +150,44 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     });
   }
 
+  // 담당 바꾸기 실행 — 바뀐 줄을 잠깐 옅은 보라로 표시 + 5초 「되돌리기」(거꾸로 옮기기).
+  function reassign(moves: RoomMove[], message: string) {
+    startTransition(async () => {
+      const result = await reassignRooms({ date: board.date, moves });
+      if (result.ok) {
+        haptic("success");
+        setSwapUndo({ message, moves, stamp: Date.now() });
+        setChangedKeys(new Set(moves.map((m) => m.roomKey)));
+        window.setTimeout(() => setChangedKeys(new Set()), 4000);
+      } else {
+        haptic("error");
+        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+      }
+      router.refresh();
+    });
+  }
+  function undoReassign(moves: RoomMove[]) {
+    const back = moves.map((m) => ({ fromUserId: m.toUserId, roomKey: m.roomKey, toUserId: m.fromUserId }));
+    startTransition(async () => {
+      const result = await reassignRooms({ date: board.date, moves: back });
+      if (result.ok) {
+        haptic("success");
+        showToast(copy.heldUndone);
+      } else {
+        haptic("error");
+        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+      }
+      setChangedKeys(new Set());
+      router.refresh();
+    });
+  }
+  const openSwap = (aId: string, bId: string, only?: string[]) => {
+    setSwapMode(false);
+    setRoomSwap(null);
+    setMenuRoom(null);
+    setSwapPair({ aId, bId, only });
+  };
+
   const visibleProperty = (name: string) => !onlyMine || board.mainProperties.length === 0 || board.mainProperties.includes(name);
 
   const rooms = board.rooms.filter((room) => visibleProperty(room.propertyName));
@@ -161,12 +212,43 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
 
   const roomInfo = (room: BoardRoom) => checkInText(room, copy);
 
+  // 방 ⋯ 메뉴 「담당 바꾸기…」 → 누구에게(서로 바꾸기 · 방 없는 신청자에게 넘기기). 여러 명이 든 방은 먼저 누구 자리인지 고른다.
+  const roomSwapPicker = (room: BoardRoom) => {
+    if (!roomSwap) return null;
+    const inRoom = new Set(room.people.map((p) => p.userId));
+    const targets = people.filter((p) => p.applied && !p.cancelled && !inRoom.has(p.userId));
+    const roomName = room.roomLabel === room.propertyName ? label(room.propertyName) : `${label(room.propertyName)} ${room.roomLabel}`;
+    return (
+      <div className="cas-pop is-wide cas-swappick" role="dialog" aria-label={copy.swapMenu} onClick={(event) => event.stopPropagation()}>
+        <b className="cas-pop__t">{fill(copy.swapWho, { names: room.people.map((p) => p.name).join(" · "), room: roomName })}</b>
+        {room.people.length > 1 ? (
+          <div className="cas-swappick__from" role="radiogroup" aria-label={copy.swapFrom}>
+            {room.people.map((p) => (
+              <button key={p.userId} type="button" role="radio" aria-checked={roomSwap.fromId === p.userId} className={roomSwap.fromId === p.userId ? "on" : ""} onClick={() => setRoomSwap({ ...roomSwap, fromId: p.userId })}>
+                {p.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {targets.map((p) => (
+          <button key={p.userId} type="button" className="cas-swappick__row" onClick={() => openSwap(roomSwap.fromId, p.userId, [room.roomKey])}>
+            <span>
+              <b>{p.name}</b>
+              <small>{p.rooms.length > 0 ? fill(copy.roomsN, { n: p.rooms.length }) : copy.swapNoneLeft}</small>
+            </span>
+            <em>{p.rooms.length > 0 ? copy.swapVerb : copy.giveVerb}</em>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const roomRow = (room: BoardRoom, opts: { open?: boolean; grouped?: boolean } = {}) => {
     const mine = picked ? room.people.some((p) => p.userId === picked.userId) : false;
     const need = Math.max(0, room.usualHeadcount - room.people.length);
     const origin = room.carriedFrom ?? board.date;
     return (
-      <div key={room.roomKey} className={`cas-room${mine ? " is-mine" : ""}${room.status !== "pending" ? " is-quiet" : ""}`}>
+      <div key={room.roomKey} className={`cas-room${mine ? " is-mine" : ""}${changedKeys.has(room.roomKey) ? " is-changed" : ""}${room.status !== "pending" ? " is-quiet" : ""}`}>
         <div className="cas-room__id">
           {opts.open && !opts.grouped ? <span className="cas-room__bld">{label(room.propertyName)}</span> : null}
           <span className="cas-room__no">{room.roomLabel === room.propertyName ? label(room.propertyName) : room.roomLabel}</span>
@@ -222,6 +304,23 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
               </button>
               {menuRoom === room.roomKey ? (
                 <div className="cas-pop" role="menu">
+                  {canSwap && room.people.length > 0 ? (
+                    <>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="is-swap"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setRoomSwap({ fromId: room.people[0].userId, roomKey: room.roomKey });
+                        }}
+                      >
+                        <ArrowLeftRight aria-hidden="true" />
+                        {copy.swapMenu}
+                      </button>
+                      <span className="cas-pop__sep" />
+                    </>
+                  ) : null}
                   <button type="button" role="menuitem" onClick={() => setDeferRoom({ origin, reason: "", roomKey: room.roomKey, until: nextDay(board.date) })}>
                     {copy.deferNextDay}
                   </button>
@@ -240,6 +339,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                   </button>
                 </div>
               ) : null}
+              {menuRoom === room.roomKey && roomSwap?.roomKey === room.roomKey ? roomSwapPicker(room) : null}
             </div>
           ) : null}
         </div>
@@ -280,7 +380,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const mineList = board.mainProperties.map(label).join(" · ");
 
   return (
-    <div className="cas" onClick={() => menuRoom && setMenuRoom(null)}>
+    <div className="cas" onClick={() => { if (menuRoom) setMenuRoom(null); if (roomSwap) setRoomSwap(null); }}>
       <div className="cas-bar">
         <div className="cas-seg" role="tablist" aria-label={copy.title}>
           <span role="tab" aria-selected="true" className="on">
@@ -380,10 +480,29 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         <section className="cas-rooms" aria-label={copy.statRooms}>
           {picked ? (
             <div className="cas-pickbar" role="status">
-              <span>{fill(copy.pickBanner, { n: picked.rooms.length, name: picked.name })}</span>
+              {swapMode ? (
+                <span>
+                  <b>{fill(copy.swapPickTarget, { name: picked.name })}</b> {copy.swapTargetHint}
+                </span>
+              ) : (
+                <span>{fill(copy.pickBanner, { n: picked.rooms.length, name: picked.name })}</span>
+              )}
               <span className="cas-sp" />
-              <button type="button" className="cas-btn is-ghost" onClick={() => setPickId(null)}>
-                {copy.pickClear}
+              {canSwap && !swapMode && picked.rooms.length > 0 ? (
+                <button type="button" className="cas-btn is-pri cas-swapbtn" onClick={() => setSwapMode(true)}>
+                  <ArrowLeftRight aria-hidden="true" />
+                  {copy.swapWith}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="cas-btn is-ghost"
+                onClick={() => {
+                  if (swapMode) setSwapMode(false);
+                  else setPickId(null);
+                }}
+              >
+                {swapMode ? copy.swapCancel : copy.pickClear}
               </button>
             </div>
           ) : null}
@@ -523,7 +642,11 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
               <div
                 key={p.userId}
                 className={`cas-person is-pickable${pickId === p.userId ? " is-picked" : ""}${p.cancelled ? " is-quiet" : ""}`}
-                onClick={() => !p.cancelled && setPickId(pickId === p.userId ? null : p.userId)}
+                onClick={() => {
+                  if (p.cancelled) return;
+                  if (swapMode && picked && p.userId !== picked.userId) openSwap(picked.userId, p.userId);
+                  else setPickId(pickId === p.userId ? null : p.userId);
+                }}
               >
                 <div className="cas-person__main">
                   <button
@@ -533,7 +656,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                     disabled={p.cancelled}
                     onClick={(event) => {
                       event.stopPropagation();
-                      setPickId(pickId === p.userId ? null : p.userId);
+                      if (swapMode && picked && p.userId !== picked.userId) openSwap(picked.userId, p.userId);
+                      else setPickId(pickId === p.userId ? null : p.userId);
                     }}
                   >
                   <span className="cas-person__name">
@@ -571,6 +695,11 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                     </span>
                   ) : null}
                 </div>
+                {swapMode && picked && p.userId !== picked.userId && !p.cancelled ? (
+                  <button type="button" className={`cas-btn is-tiny ${p.rooms.length > 0 ? "is-line" : "is-soft"}`} onClick={(event) => { event.stopPropagation(); openSwap(picked.userId, p.userId); }}>
+                    {p.rooms.length > 0 ? copy.swapBtn : copy.giveBtn}
+                  </button>
+                ) : null}
                 <div className="cas-person__time" onClick={(event) => event.stopPropagation()}>
                   {timeEdit === p.userId ? (
                     <div className="cas-timeedit">
@@ -676,7 +805,44 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         />
       ) : null}
 
+      {swapPair && personById.get(swapPair.aId) && personById.get(swapPair.bId) ? (
+        <SwapDialog
+          copy={copy}
+          date={board.date}
+          locale={locale}
+          a={personById.get(swapPair.aId)!}
+          b={personById.get(swapPair.bId)!}
+          rooms={board.rooms}
+          initial={swapPair.only}
+          label={label}
+          busy={pending}
+          onClose={() => setSwapPair(null)}
+          onSubmit={(moves) => {
+            const a = personById.get(swapPair.aId)!;
+            const b = personById.get(swapPair.bId)!;
+            setSwapPair(null);
+            setPickId(null);
+            const oneWay = moves.every((m) => m.fromUserId === a.userId);
+            reassign(moves, fill(oneWay && b.rooms.length === 0 ? copy.giveDone : copy.swapDone, { a: a.name, b: b.name, n: moves.length }));
+          }}
+        />
+      ) : null}
+
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
+      {swapUndo && !toast && !undo ? (
+        <AdminUndoToast
+          stamp={swapUndo.stamp}
+          message={swapUndo.message}
+          undoLabel={copy.undoHold}
+          pending={pending}
+          onExpire={() => setSwapUndo(null)}
+          onUndo={() => {
+            const target = swapUndo;
+            setSwapUndo(null);
+            undoReassign(target.moves);
+          }}
+        />
+      ) : null}
       {undo && !toast ? (
         <AdminUndoToast
           stamp={undo.stamp}

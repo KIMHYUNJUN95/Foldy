@@ -193,6 +193,7 @@ insert into public.capability_policies (capability, individual_grant, individual
   ('cleaning.work', false, false, true),
   ('cleaning.read_all', false, false, true),
   ('cleaning.assign', true, true, true),
+  ('cleaning.assign_swap', true, false, true),
   ('cleaning.force_complete', false, false, true),
   ('linen.manage', false, false, true),
   ('property_info.edit', false, false, true),

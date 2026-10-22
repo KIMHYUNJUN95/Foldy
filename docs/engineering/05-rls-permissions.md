@@ -1516,3 +1516,12 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 공지 사진(`announcement-images`) 업로드 = 역할 비교 대신 `announcement.create`(사람마다 켠 작성 권한으로 사진도).
 - 경로 첫 칸(조직 id)은 정규식이 맞을 때만 uuid 로 바꿔 `has_capability` 에 넘긴다(틀리면 null → 권한 없음).
 - 검증: 운영에서 트랜잭션 안에 데모 계정을 아르바이트로 바꿔 흉내 → 요청 사진 업로드 성공, 공지 사진 업로드 거절 → rollback.
+
+## 2026-10-22 청소 배정 담당 바꾸기 — `cleaning.assign_swap`
+
+- 새 권한 키 **`cleaning.assign_swap`** — 배정된 사람끼리 방 · 건물을 서로 바꾸기, 방 없는 신청자에게 넘기기. **역할 기본값 없음**(`roles: []`,
+  사용자 지시 「따로 권한이 있는 사람만」) — 사용자 관리에서 사람마다 부여(개인 차단은 닫음 — 기본이 없으니 의미 없음), 개발자 통과.
+- 서버 액션 `reassignRooms`(`src/app/admin/cleaning-assign/actions.ts`)는 `cleaning.assign` **그리고** `cleaning.assign_swap` 을 둘 다 본다.
+  화면의 「다른 사람과 바꾸기」 · 방 ⋯ 「담당 바꾸기…」 · 「바꾸기/넘기기」 버튼도 이 키가 있을 때만 그린다(`canSwap`).
+- DB 함수 `cleaning_reassign_rooms(org, date, moves jsonb, actor)` — `security definer`, **service_role 만 실행**(public · anon · authenticated 회수).
+  권한 판정은 앱이 하고, 함수는 한 트랜잭션으로 옮기기만 한다. 마이그레이션 `202610220004_cleaning_assign_swap.sql`(운영 적용).

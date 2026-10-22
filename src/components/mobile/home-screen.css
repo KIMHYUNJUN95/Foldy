@@ -284,6 +284,32 @@
 .hm__cio-row + .hm__cio-row {
   border-top: 0.5px solid var(--separator);
 }
+/* 건물 묶음(2026-10-22) — 머리줄은 글자만(구분선 · 왼쪽 막대 없음), 객실 번호가 줄 앞에 선다. */
+.hm__cio-grp + .hm__cio-grp {
+  margin-top: 14px;
+}
+.hm__cio-gh {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 2px 2px;
+}
+.hm__cio-gt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hm-muted);
+}
+.hm__cio-gc {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.hm__cio-room {
+  flex: 0 0 auto;
+  min-width: 40px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .hm__cio-b {
   flex: 1;
   min-width: 0;
@@ -294,11 +320,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.hm__cio-p {
-  font-size: 13px;
-  color: var(--hm-muted);
-  margin-top: 2px;
 }
 .hm__cio-src {
   flex: 0 0 auto;

@@ -5,6 +5,7 @@ import { CleaningLiveCard } from "./cleaning-live-card";
 import { DashboardBuildingMap, type MapCardCopy } from "./dashboard-building-map";
 import type { BuildingMapCopy } from "@/components/calendar/building-map/building-map";
 import { getPropertyLocation } from "@/lib/property-locations";
+import { groupByBuilding } from "@/lib/home-reservation-groups";
 import { LiveWash } from "@/components/shared/live-wash";
 import { RollNumber } from "@/components/shared/roll-number";
 import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
@@ -81,12 +82,15 @@ export function DashboardHome({
   locale,
   ops,
   mapCopy,
+  buildingLabels,
 }: {
   data: AdminDashboardData;
   c: Console;
   locale: string;
   ops?: DashboardOpsBlock | null;
   mapCopy?: BuildingMapCopy;
+  /** 예약 현황을 건물별로 묶을 때 보는 사람 언어의 건물 이름(`dictionary.cleaning.buildingLabels`). */
+  buildingLabels: Record<string, string>;
 }) {
   const mCount = data.queue.filter((q) => q.kind === "maintenance").length;
   const lCount = data.queue.filter((q) => q.kind === "lost").length;
@@ -138,7 +142,7 @@ export function DashboardHome({
           </div>
         </>
       ) : null}
-      <QueueBlock c={c} data={data} divided={Boolean(ops) || showMap} locale={locale} />
+      <QueueBlock buildingLabels={buildingLabels} c={c} data={data} divided={Boolean(ops) || showMap} locale={locale} />
     </div>
   );
 }
@@ -338,7 +342,29 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
   );
 }
 
-function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c: Console; locale: string; divided: boolean }) {
+function QueueBlock({
+  data,
+  c,
+  locale,
+  divided,
+  buildingLabels,
+}: {
+  data: AdminDashboardData;
+  c: Console;
+  locale: string;
+  divided: boolean;
+  buildingLabels: Record<string, string>;
+}) {
+  const resvGroups = groupByBuilding(
+    [
+      ...data.reservations.checkIns.map((r) => ({ r, key: `in-${r.id}`, isIn: true })),
+      ...data.reservations.checkOuts.map((r) => ({ r, key: `out-${r.id}`, isIn: false })),
+    ],
+    (x) => x.r.propertyName,
+    (x) => x.r.roomLabel,
+    buildingLabels,
+  );
+
   return (
     <>
       <div className={divided ? "dh-sec dh-sec--line" : "dh-sec"}>
@@ -403,26 +429,37 @@ function QueueBlock({ data, c, locale, divided }: { data: AdminDashboardData; c:
             <span className="dh-ct">{c.resvTitle}</span>
             <Link className="dh-link" href="/admin/calendar" style={{ marginLeft: "auto" }}>{c.dhAllLink} →</Link>
           </div>
-          {data.reservations.checkIns.length === 0 && data.reservations.checkOuts.length === 0 ? (
+          {resvGroups.length === 0 ? (
             <div className="dh-empty">{c.resvEmpty}</div>
           ) : (
             <LiveWash
               move
               sig={[...data.reservations.checkIns.map((r) => `in-${r.id}`), ...data.reservations.checkOuts.map((r) => `out-${r.id}`)].join(",")}
             >
-            {[
-              ...data.reservations.checkIns.map((r) => ({ r, kind: c.resvCheckIn, key: `in-${r.id}`, isIn: true })),
-              ...data.reservations.checkOuts.map((r) => ({ r, kind: c.resvCheckOut, key: `out-${r.id}`, isIn: false })),
-            ].map(({ r, kind, key, isIn }) => (
-              <div className="dh-row" data-live={key} key={key} style={{ cursor: "default" }}>
-                <span className="dh-room">{r.roomLabel}</span>
-                <div className="dh-rb">
-                  <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
-                  <div className="dh-rs">{r.propertyName}{r.source ? ` · ${r.source}` : ""}</div>
+            {/* 건물별로 묶는다(2026-10-22) — 머리줄에 건물 이름과 체크인 · 체크아웃 수, 줄에는 객실 · 손님 · 채널. */}
+            {resvGroups.map((g) => {
+              const ins = g.items.filter((x) => x.isIn).length;
+              return (
+                <div className="dh-bgrp" key={g.key}>
+                  <div className="dh-bgrp__h">
+                    <span className="dh-bgrp__t">{g.label}</span>
+                    <span className="dh-cc">
+                      {c.resvCheckIn} {ins} · {c.resvCheckOut} {g.items.length - ins}
+                    </span>
+                  </div>
+                  {g.items.map(({ r, key, isIn }) => (
+                    <div className="dh-row" data-live={key} key={key} style={{ cursor: "default" }}>
+                      <span className="dh-room">{r.roomLabel}</span>
+                      <div className="dh-rb">
+                        <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
+                        {r.source ? <div className="dh-rs">{r.source}</div> : null}
+                      </div>
+                      <span className={`dh-kind${isIn ? " dh-kind--in" : ""}`}>{isIn ? c.resvCheckIn : c.resvCheckOut}</span>
+                    </div>
+                  ))}
                 </div>
-                <span className={`dh-kind${isIn ? " dh-kind--in" : ""}`}>{kind}</span>
-              </div>
-            ))}
+              );
+            })}
             </LiveWash>
           )}
         </div>

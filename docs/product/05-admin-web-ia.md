@@ -551,6 +551,11 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
 - 오늘 할 일
 - 예약 / 체크인 / 체크아웃 현황
 
+예약 현황(대시보드 홈 「예약 · 체크인 / 체크아웃」)은 **건물별로 묶는다**(2026-10-22). 건물 머리줄에 건물 이름과
+「체크인 N · 체크아웃 N」, 그 아래 줄은 객실 · 손님 · 채널 · 체크인/체크아웃. 건물 순서는 판매 캘린더 운영 순서
+(`CALENDAR_BUILDING_ORDER`), 건물 안은 객실 번호순. 모바일 홈 체크인 · 체크아웃 시트와 같은 규칙
+(`groupByBuilding`, `src/lib/home-reservation-groups.ts`).
+
 나머지는 수동 새로고침 또는 재진입 기준으로 처리해도 된다.
 
 ## Foundational First Screens

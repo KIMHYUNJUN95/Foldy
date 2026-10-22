@@ -55,6 +55,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       {/* 하루 첫 진입 모션(약 1.8초) — 시안 Motion-PC-Entry-PC */}
       {session.organization ? <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} /> : null}
       <DashboardHome
+        buildingLabels={dictionary.cleaning.buildingLabels}
         c={dictionary.admin.console}
         data={data}
         locale={localeTag}

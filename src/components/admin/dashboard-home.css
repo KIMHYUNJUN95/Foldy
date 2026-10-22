@@ -111,6 +111,10 @@
 .adm .dh-qic { width: 32px; height: 32px; flex: none; border-radius: 9px; background: #f4f4f7; color: #6b6878; display: flex; align-items: center; justify-content: center; }
 .adm .dh-qic .ic { font-size: 16px; }
 .adm .dh-urgent { font-size: 12px; font-weight: 600; color: #c5282e; }
+/* 예약 현황 건물 묶음(2026-10-22) — 머리줄은 구분선 없이 글자로만, 줄 구분선은 dh-row 가 그린다. */
+.adm .dh-bgrp + .dh-bgrp { margin-top: 14px; }
+.adm .dh-bgrp__h { display: flex; align-items: baseline; gap: 10px; padding: 8px 0 8px; }
+.adm .dh-bgrp__t { font-size: 13px; font-weight: 600; color: #16141f; }
 .adm .dh-kind { font-size: 12px; color: #6b6878; white-space: nowrap; }
 .adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-3); border-top: 0.5px solid var(--separator); }
 .adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 0.5px solid var(--separator); font-size: 14px; color: #16141f; }

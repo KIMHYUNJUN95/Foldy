@@ -371,6 +371,10 @@ Home includes (top → bottom):
    (e.g. `501`/`501_2`, `803#`/`K803`) collapse to one display label and unmapped/inactive
    rooms drop (authoritative). The count = the resolved list length, so it tracks the
    calendar's active-room axis. See `docs/product/15-reservation-calendar.md` → 2026-06-18.
+   **건물별 묶음 (2026-10-22):** 시트 목록은 건물 머리줄(건물 이름 · 건수) 아래에 그 건물의 줄이
+   이어진다 — 줄은 객실 번호 · 손님 · 채널. 건물 순서는 판매 캘린더와 같은 운영 순서
+   (`CALENDAR_BUILDING_ORDER`), 건물 안은 객실 번호순. 묶는 규칙은 어드민 대시보드 홈과 공용
+   (`groupByBuilding`, `src/lib/home-reservation-groups.ts`). 머리줄은 글자만 — 구분선 · 왼쪽 막대 없음.
 6. **진행 중 작업** — active cleaning task card (room/label + live elapsed timer), or a plain
    "진행 중인 작업 없음" empty card. (The empty-state "청소 시작하기" CTA was removed 2026-06-17 —
    the cleaning shortcut already lives in 빠른 실행, so the CTA was redundant.)

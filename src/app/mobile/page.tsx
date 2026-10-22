@@ -14,8 +14,9 @@ import {
 } from "lucide-react";
 import {
   HomeCheckInOut,
-  type HomeReservationItem,
+  type HomeReservationGroup,
 } from "@/components/mobile/home-checkinout";
+import { groupByBuilding } from "@/lib/home-reservation-groups";
 import { HomeElapsedTimer } from "@/components/mobile/home-elapsed-timer";
 import { HomeRefreshButton } from "@/components/mobile/home-refresh-button";
 import { MobileShell } from "@/components/shell/mobile-shell";
@@ -51,27 +52,20 @@ type QuickActionItem = {
   label: string;
 };
 
-// Build a localized "building room" label from a reservation's raw property + room.
-function buildPlaceLabel(
-  propertyName: string,
-  roomLabel: string,
-  buildingLabels: Record<string, string>,
-): string {
-  const canonicalProperty = getCanonicalPropertyName(propertyName);
-  const buildingKey = CANONICAL_TO_BUILDING_KEY[canonicalProperty];
-  const building = (buildingKey && buildingLabels[buildingKey]) || propertyName;
-  return roomLabel ? `${building} ${roomLabel}`.trim() : building;
-}
-
-function toReservationItems(
+// 건물별로 묶는다(2026-10-22) — 시트에서 건물 머리줄 아래 객실 · 손님이 이어진다.
+function toReservationGroups(
   rows: HomeReservationRow[],
   buildingLabels: Record<string, string>,
-): HomeReservationItem[] {
-  return rows.map((row) => ({
-    id: row.id,
-    guestName: row.guestName,
-    place: buildPlaceLabel(row.propertyName, row.roomLabel, buildingLabels),
-    source: row.source,
+): HomeReservationGroup[] {
+  return groupByBuilding(rows, (row) => row.propertyName, (row) => row.roomLabel, buildingLabels).map((group) => ({
+    items: group.items.map((row) => ({
+      guestName: row.guestName,
+      id: row.id,
+      place: row.roomLabel,
+      source: row.source,
+    })),
+    key: group.key,
+    label: group.label,
   }));
 }
 
@@ -298,8 +292,8 @@ async function HomeBody({
             <HomeCheckInOut
               checkInLabel={dictionary.admin.stats.checkIns}
               checkOutLabel={dictionary.admin.stats.checkOuts}
-              checkIns={toReservationItems(checkInOut.data.checkIns, buildingLabels)}
-              checkOuts={toReservationItems(checkInOut.data.checkOuts, buildingLabels)}
+              checkIns={toReservationGroups(checkInOut.data.checkIns, buildingLabels)}
+              checkOuts={toReservationGroups(checkInOut.data.checkOuts, buildingLabels)}
               emptyCheckIn={m.homeCheckInEmpty}
               emptyCheckOut={m.homeCheckOutEmpty}
               guestFallback={m.homeGuestUnknown}

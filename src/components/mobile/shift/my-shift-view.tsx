@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requestShiftCancel, toggleMyShift } from "@/app/mobile/shift/actions";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
@@ -43,6 +43,9 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
   const [paneDate, setPaneDate] = useState<string | null>(() => upcoming.find((d) => d.rooms.length > 0)?.date ?? null);
   const [message, setMessage] = useState<string | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const inflight = useRef(0);
+  const failed = useRef<Set<string>>(new Set());
   const detailBy = new Map(details.map((d) => [d.date, d]));
   const label = (name: string) => propertyLabels[name] ?? name;
   const roomText = (r: { propertyName: string; roomLabel: string }) => (r.roomLabel === r.propertyName ? label(r.propertyName) : `${label(r.propertyName)} ${r.roomLabel}`);
@@ -57,20 +60,48 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
       else setSheetDate(day.date);
       return;
     }
-    const before = day.state === "waiting" || day.state === "none";
-    setOptimistic({ ...optimistic, [day.date]: !before });
-    startTransition(async () => {
-      const result = await toggleMyShift({ date: day.date });
-      if (result.ok) {
-        haptic("light");
-      } else {
-        haptic("error");
-        setMessage(result.reason === "assigned" ? copy.errAssigned : result.reason === "cancelled" ? copy.errCancelledDay : result.reason === "past" ? copy.errPast : result.reason === "tooFar" ? copy.errTooFar : copy.failed);
-      }
-      setOptimistic({});
-      router.refresh();
-    });
+    // 빠르게 연달아 누를 수 있게 — 화면은 바로 바뀌고(잠그지 않음), 저장은 누른 순서대로 줄 세워 보낸다.
+    // 바라는 상태를 보내므로 같은 날을 여러 번 눌러도 마지막 상태로 맞는다. 새로고침은 줄이 다 비었을 때 한 번.
+    const cur = cellState(day);
+    const apply = !(cur === "waiting" || cur === "none");
+    const date = day.date;
+    setOptimistic((prev) => ({ ...prev, [date]: apply }));
+    haptic("light");
+    inflight.current += 1;
+    queue.current = queue.current
+      .then(async () => {
+        const result = await toggleMyShift({ apply, date }).catch(() => ({ ok: false as const, reason: "error" as const }));
+        if (!result.ok) {
+          haptic("error");
+          failed.current.add(date);
+          setMessage(result.reason === "assigned" ? copy.errAssigned : result.reason === "cancelled" ? copy.errCancelledDay : result.reason === "past" ? copy.errPast : result.reason === "tooFar" ? copy.errTooFar : copy.failed);
+        }
+      })
+      .finally(() => {
+        inflight.current -= 1;
+        if (inflight.current > 0) return;
+        // 실패한 날만 바로 원래대로, 나머지는 새 데이터가 올 때까지 그대로 둔다(깜빡임 없음).
+        const undo = failed.current;
+        failed.current = new Set();
+        if (undo.size > 0) setOptimistic((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !undo.has(key))));
+        router.refresh();
+      });
   }
+
+  // 서버 데이터가 화면 상태를 따라잡으면 그날의 임시 표시를 지운다.
+  useEffect(() => {
+    if (inflight.current > 0) return;
+    setOptimistic((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([date, applied]) => {
+          const day = days.find((d) => d.date === date);
+          if (!day) return false;
+          return (day.state === "waiting" || day.state === "none") !== applied;
+        }),
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [days]);
 
   function cancelRequest(date: string, withdraw: boolean) {
     startTransition(async () => {
@@ -237,7 +268,7 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
                   type="button"
                   role="gridcell"
                   className={`shf-day is-${st}${day.date === today ? " is-today" : ""}${paneDate === day.date && isTablet ? " is-sel" : ""}`}
-                  disabled={day.date < today || pending}
+                  disabled={day.date < today}
                   aria-label={`${dayLabel(day.date, locale)}${day.date === today ? ` ${copy.today}` : ""} ${spoken}`}
                   onClick={() => tap(day)}
                 >

@@ -29,7 +29,8 @@ function isOpenDate(date: string): boolean {
   return isDateKey(date) && date >= today && date <= addDays(today, 92);
 }
 
-export async function toggleMyShift(input: { date: string }): Promise<{ ok: true; applied: boolean } | ShiftFail> {
+/** `apply` — 바라는 상태(빠르게 여러 번 눌러도 마지막 상태로 맞춘다). 없으면 뒤집기. */
+export async function toggleMyShift(input: { date: string; apply?: boolean }): Promise<{ ok: true; applied: boolean } | ShiftFail> {
   const session = await worker();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isDateKey(input.date)) return { ok: false, reason: "invalid" };
@@ -44,6 +45,8 @@ export async function toggleMyShift(input: { date: string }): Promise<{ ok: true
   if ((rooms.data ?? []).length > 0) return { ok: false, reason: "assigned" };
   // 관리자가 취소한 날 — 지우면 다시 눌러 신청할 수 있게 되므로 막는다(다시 넣는 것은 관리자가).
   if (existing.data?.cancelled_at) return { ok: false, reason: "cancelled" };
+  // 이미 바라는 상태면 그대로.
+  if (input.apply !== undefined && Boolean(existing.data) === input.apply) return { applied: input.apply, ok: true };
   if (existing.data) {
     const del = await supabase.from("cleaning_shift_applications").delete().eq("organization_id", organizationId).eq("user_id", userId).eq("work_date", input.date);
     if (del.error) return { ok: false, reason: "error" };

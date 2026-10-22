@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AccountSettings } from "@/components/account/account-settings";
 import { AccountMobile } from "@/components/account/account-mobile";
+import { AccountIdentityFields } from "@/components/account/account-identity-fields";
 import { DeleteAccountSheet } from "@/components/account/delete-account-sheet";
 import { BlockedUsersList } from "@/components/account/blocked-users-list";
 import { MyReportsList } from "@/components/account/my-reports-list";
@@ -128,17 +129,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </p>
           </div>
         </div>
-        <label className="grid gap-1.5 text-sm font-semibold">
-          <span>{dictionary.onboarding.fullNamePlaceholder}</span>
-          <Input
-            defaultValue={session.user.name}
-            className={inputCls}
-            name="name"
-            placeholder={dictionary.onboarding.fullNamePlaceholder}
-            required
-            type="text"
+        {/* 국적 + 한국어 · 영문 · 가타카나 이름(docs/product/41 §2) — 앱에 보이는 이름은 여기서 만든다. */}
+        <div id="identity">
+          <AccountIdentityFields
+            copy={dictionary.onboarding.identity}
+            initial={session.user.identity}
+            locale={session.user.preferredLanguage}
+            showErrors={errorKey === "identity_invalid" || session.user.identityIncomplete}
           />
-        </label>
+        </div>
         <div className="grid gap-3.5 @2xl:grid-cols-2">
         <div className="grid gap-1.5 text-sm font-semibold">
           <span>{dictionary.onboarding.birthDateLabel}</span>
@@ -407,6 +406,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             errorText: errorKey
               ? (dictionary.onboarding.errors[errorKey] ?? dictionary.onboarding.errors.profile_failed)
               : null,
+            identity: dictionary.onboarding.identity,
             incomplete: profileIncomplete
               ? {
                   title: ap.completionTitle,
@@ -454,12 +454,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             role: dictionary.roles[session.user.role] ?? session.user.role,
           }}
           saved={Boolean(savedKey)}
+          openIdentity={firstParam(params?.fill) === "identity" || errorKey === "identity_invalid"}
           user={{
             name: session.user.name,
             birthDate: session.user.birthDate ?? null,
             phoneNumber: session.user.phoneNumber ?? "",
             gender,
             language: locale,
+            identity: session.user.identity,
+            identityIncomplete: session.user.identityIncomplete,
           }}
         />
       </MobileShell>

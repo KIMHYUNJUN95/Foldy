@@ -22,6 +22,15 @@ import { BlockedUsersList } from "@/components/account/blocked-users-list";
 import { DeleteAccountSheet } from "@/components/account/delete-account-sheet";
 import { MyReportsList, type MyReportRow } from "@/components/account/my-reports-list";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import {
+  IdentityNamesFields,
+  type IdentityCopy,
+} from "@/components/identity/identity-names-fields";
+import {
+  normalizeIdentityNames,
+  validateIdentityNames,
+  type IdentityNames,
+} from "@/lib/identity-names";
 import type { Locale } from "@/lib/i18n";
 import { getNativeAppInfo } from "@/lib/native-app";
 import "./account-white.css";
@@ -39,6 +48,8 @@ export type AccountMobileCopy = {
   genderOptions: Record<Gender, string>; language: string; languages: Record<Locale, string>;
   organizationName: string; role: string; logout: string; saved: string; errorText: string | null;
   incomplete: { title: string; body: string } | null;
+  /** 국적 + 이름 세 가지(docs/product/41 §2) — 「이름」 줄을 누르면 이 칸들을 고친다. */
+  identity: IdentityCopy;
   blockedList: { title: string; body: string; empty: string; unblock: string; unknown: string };
   reportsList: { title: string; body: string; empty: string; withdraw: string; unknown: string };
   deleteSheet: {
@@ -48,7 +59,16 @@ export type AccountMobileCopy = {
 };
 
 type Props = {
-  user: { name: string; birthDate: string | null; phoneNumber: string; gender: Gender | null; language: Locale };
+  user: {
+    name: string;
+    birthDate: string | null;
+    phoneNumber: string;
+    gender: Gender | null;
+    language: Locale;
+    identity: IdentityNames;
+    /** 국적 · 이름이 비었거나 규칙에 안 맞음 — 맨 위에 채워 달라는 줄을 띄운다. */
+    identityIncomplete: boolean;
+  };
   organization: { name: string; role: string };
   bottomTabsLabel: string;
   blockedUsers: { id: string; name: string }[];
@@ -56,6 +76,8 @@ type Props = {
   help: { href: string; label: string }[];
   saved: boolean;
   copy: AccountMobileCopy;
+  /** `?fill=identity` 로 왔으면 이름(국적 · 이름 세 가지) 시트를 바로 연다. */
+  openIdentity?: boolean;
 };
 
 const LANGS: Locale[] = ["ko", "ja", "en"];
@@ -82,6 +104,31 @@ function HiddenProfile({ user, except, language }: { user: Props["user"]; except
       {except !== "phoneNumber" ? <input name="phoneNumber" type="hidden" value={user.phoneNumber} /> : null}
       {except !== "gender" ? <input name="gender" type="hidden" value={user.gender ?? ""} /> : null}
       <input name="preferredLanguage" type="hidden" value={language ?? user.language} />
+    </>
+  );
+}
+
+/** 「이름」 시트 — 국적 + 한국어 · 영문 · 가타카나. 나라 목록은 시트 안에 펼친다(시트 위에 시트 금지). */
+function IdentitySheetFields({ copy, locale, initial, saveLabel }: { copy: IdentityCopy; locale: Locale; initial: IdentityNames; saveLabel: string }) {
+  const [value, setValue] = useState<IdentityNames>(initial);
+  const errors = validateIdentityNames(normalizeIdentityNames(value));
+  const [tried, setTried] = useState(false);
+  const bad = Object.keys(errors).length > 0;
+  return (
+    <>
+      <IdentityNamesFields
+        copy={copy}
+        errors={errors}
+        formNames
+        inlineNationality
+        locale={locale}
+        onChange={setValue}
+        showErrors={tried}
+        value={value}
+      />
+      <span onClickCapture={() => setTried(true)}>
+        <SaveButton disabled={bad && tried} label={saveLabel} />
+      </span>
     </>
   );
 }
@@ -125,10 +172,10 @@ function Row({ label, value, empty, onClick, href }: { label: string; value?: Re
   return <div className="acw-row">{inner}</div>;
 }
 
-export function AccountMobile({ user, organization, bottomTabsLabel, blockedUsers, myReports, help, saved, copy }: Props) {
+export function AccountMobile({ user, organization, bottomTabsLabel, blockedUsers, myReports, help, saved, copy, openIdentity = false }: Props) {
   const w = copy.white;
   const locale = user.language;
-  const [editing, setEditing] = useState<Field | null>(null);
+  const [editing, setEditing] = useState<Field | null>(openIdentity && !saved ? "name" : null);
   const [board, setBoard] = useState<"blocked" | "reports" | null>(null);
   const [gender, setGender] = useState<Gender | null>(user.gender);
   const [lang, setLang] = useState<Locale>(user.language);
@@ -198,6 +245,12 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
         <p className="acw-msg" data-tone="err" role="alert">
           {copy.errorText}
         </p>
+      ) : null}
+      {user.identityIncomplete ? (
+        <button className="acw-msg acw-msg--btn" onClick={() => setEditing("name")} type="button">
+          <b>{copy.identity.fillTitle}</b>
+          {copy.identity.fillBody}
+        </button>
       ) : null}
       {copy.incomplete ? (
         <p className="acw-msg">
@@ -306,7 +359,7 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
                 <span>{w.editHint}</span>
               </div>
               {editing === "name" ? (
-                <input aria-label={copy.name} autoComplete="name" defaultValue={user.name} name="name" required type="text" />
+                <IdentitySheetFields copy={copy.identity} initial={user.identity} locale={locale} saveLabel={w.save} />
               ) : null}
               {editing === "birthDate" ? (
                 <input aria-label={copy.birthDate} defaultValue={user.birthDate ?? ""} name="birthDate" type="date" />
@@ -327,7 +380,7 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
                 </>
               ) : null}
               {hints[editing] ? <span className="acw-sh__hint">{hints[editing]}</span> : null}
-              <SaveButton disabled={editing === "gender" && !gender} label={w.save} />
+              {editing !== "name" ? <SaveButton disabled={editing === "gender" && !gender} label={w.save} /> : null}
               <button className="acw-sh__no" onClick={close} type="button">
                 {w.cancel}
               </button>

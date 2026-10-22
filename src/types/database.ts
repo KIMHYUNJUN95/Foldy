@@ -4282,6 +4282,11 @@ export type Database = {
           id: string
           last_used_organization_id: string | null
           name: string
+          name_en: string | null
+          name_ja: string | null
+          name_katakana: string | null
+          name_ko: string | null
+          nationality: string | null
           ops_calendar_mode: string | null
           phone_number: string
           preferred_language: Database["public"]["Enums"]["app_language"]
@@ -4301,6 +4306,11 @@ export type Database = {
           id: string
           last_used_organization_id?: string | null
           name: string
+          name_en?: string | null
+          name_ja?: string | null
+          name_katakana?: string | null
+          name_ko?: string | null
+          nationality?: string | null
           ops_calendar_mode?: string | null
           phone_number: string
           preferred_language?: Database["public"]["Enums"]["app_language"]
@@ -4320,6 +4330,11 @@ export type Database = {
           id?: string
           last_used_organization_id?: string | null
           name?: string
+          name_en?: string | null
+          name_ja?: string | null
+          name_katakana?: string | null
+          name_ko?: string | null
+          nationality?: string | null
           ops_calendar_mode?: string | null
           phone_number?: string
           preferred_language?: Database["public"]["Enums"]["app_language"]

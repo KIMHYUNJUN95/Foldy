@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, CircleHelp, Search, Trash2, X } from "lucide-react";
 import "./users-white.css";
@@ -552,6 +552,12 @@ function MemberPanel({
             <dd className="num">{m.phone ? <a href={`tel:${m.phone}`}>{m.phone}</a> : "—"}</dd>
             <dt>{c.wJoinedShort}</dt>
             <dd className="num">{longDate(m.joinedAt)}</dd>
+            {m.identityRows.map((row) => (
+              <Fragment key={row.label}>
+                <dt>{row.label}</dt>
+                <dd>{row.value || "—"}</dd>
+              </Fragment>
+            ))}
           </dl>
 
           {readOnly ? (

@@ -116,6 +116,7 @@ export default async function OnboardingPage({
     return (
       <DesktopOnboarding
         allowInviteSkip={!membership}
+        identityCopy={o.identity}
         copy={{
           brandRole: c.role,
           brandHead: d.brandHead,
@@ -236,6 +237,7 @@ export default async function OnboardingPage({
           backCta: o.steps.backCta,
         }}
         countries={o.countries}
+        identity={o.identity}
         join={{
           inviteEyebrow: o.joinFlow.inviteEyebrow,
           inviteTitle: o.joinFlow.inviteTitle,
@@ -362,6 +364,7 @@ export default async function OnboardingPage({
           backCta: o.steps.backCta,
         }}
         countries={o.countries}
+        identity={o.identity}
         join={{
           inviteEyebrow: o.joinFlow.inviteEyebrow,
           inviteTitle: o.joinFlow.inviteTitle,

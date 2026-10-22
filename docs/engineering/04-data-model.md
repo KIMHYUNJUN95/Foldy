@@ -122,6 +122,11 @@ theme_preference text not null default 'system'  -- schema only; NOT used by the
 bottom_nav_tabs text[] not null default '{home,calendar,requests,announcements}'
 can_generate_report boolean not null default false
 ops_calendar_mode text  -- 2026-10-05 (202610050001): 판매 캘린더 마지막 보기 rolling·monthly, null = 30일
+nationality text      -- 2026-10-22 (202610220006): ISO 3166-1 alpha-2 (KR · JP …), check ^[A-Z]{2}$
+name_ko text          -- 한국어 이름 — 국적 KR 필수 (규칙은 src/lib/identity-names.ts)
+name_ja text          -- 일본어 이름(한자) — 국적 JP 필수
+name_en text          -- 영문 이름(로마자 대문자, 재류카드 · 여권과 같게) — 필수
+name_katakana text    -- 가타카나 이름(급여명세서 · 세무 서류 氏名) — 필수
 created_at timestamptz
 updated_at timestamptz
 ```
@@ -134,6 +139,12 @@ Auth/onboarding notes (updated 2026-06-18):
 - `last_used_organization_id` tracks the last organization the user actively signed into — used for multi-org routing so login returns to the right org. Nullable (NULL = first login or single-org user).
 - Users may edit `name`, `birth_date`, `phone_number`, and `gender` later. The current `/account` UI surfaces `birth_date` and `gender` specifically so legacy accounts can fill missing profile fields without being forced back through onboarding.
 - `preferred_language` is chosen during onboarding and becomes the user's top-priority locale after join.
+- **Nationality + names (2026-10-22, `202610220006`, docs/product/41 §2):** onboarding's first screen collects
+  `nationality` · `name_ko`(KR 필수) / `name_ja`(JP 필수) · `name_en` · `name_katakana`. `name` (shown in the app) is
+  derived server-side: Korean → Japanese → English name. The DB only enforces format/length — the per-nationality
+  rule lives in `validateIdentityNames()` and is re-checked in `submitOnboardingProfile` and `updateAccountProfile`.
+  Existing rows stay null; the session flags `identityIncomplete` and `/mobile` shows a once-a-day fill sheet.
+  Readable by the same-org members like the rest of `profiles` (existing RLS, unchanged).
 
 `can_generate_report` (migration `supabase/migrations/202606130001_profile_report_access.sql`) is a
 per-user override for the Todo **daily-report generator** (업무일지; free, template-based — no LLM).

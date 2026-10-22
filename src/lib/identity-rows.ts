@@ -26,6 +26,12 @@ export type IdentityProfileRow = {
   /** 마이그레이션 전 프로젝트에서는 없을 수 있다 — 없으면 기본값. */
   bottom_nav_tabs?: string[] | null;
   can_generate_report?: boolean | null;
+  /** 국적 + 이름 세 가지(2026-10-22, 마이그레이션 202610220006) — 없으면 null. */
+  nationality?: string | null;
+  name_ko?: string | null;
+  name_ja?: string | null;
+  name_en?: string | null;
+  name_katakana?: string | null;
 };
 
 export type IdentityMembershipRow = {
@@ -52,7 +58,7 @@ export type IdentityRows = {
 };
 
 const PROFILE_FULL =
-  "id, name, birth_date, gender, phone_number, preferred_language, last_used_organization_id, bottom_nav_tabs, can_generate_report";
+  "id, name, birth_date, gender, phone_number, preferred_language, last_used_organization_id, bottom_nav_tabs, can_generate_report, nationality, name_ko, name_ja, name_en, name_katakana";
 // 예전 두 읽기의 방어용 대체 — 컬럼이 아직 없는 프로젝트(마이그레이션 전)에서도 세션이 열리게 한다.
 const PROFILE_FALLBACK = "id, name, birth_date, phone_number, preferred_language, last_used_organization_id";
 

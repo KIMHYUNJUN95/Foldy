@@ -10,7 +10,20 @@ import {
   previewInviteCode,
   submitOnboardingProfile,
 } from "@/app/onboarding/actions";
+import {
+  EMPTY_IDENTITY,
+  IdentityNamesFields,
+  type IdentityCopy,
+} from "@/components/identity/identity-names-fields";
 import type { Locale } from "@/lib/i18n";
+import {
+  displayNameFrom,
+  normalizeIdentityNames,
+  validateIdentityNames,
+  type IdentityErrorKey,
+  type IdentityField,
+  type IdentityNames,
+} from "@/lib/identity-names";
 import type { ProfileGender } from "@/lib/onboarding";
 
 /**
@@ -109,6 +122,8 @@ type Props = {
   /** `profile` = 기본 정보 + 초대코드, `membership` = 프로필은 있고 초대코드만(재가입 포함). */
   mode: "profile" | "membership";
   copy: DesktopOnboardingCopy;
+  /** 국적 + 이름 세 가지 문구(`dictionary.onboarding.identity`). */
+  identityCopy: IdentityCopy;
   locale: Locale;
   safeNext: string;
   /** `?error=` 로 넘어온 문구(이미 번역됨). */
@@ -152,6 +167,7 @@ function birthDateOf(year: string, month: string, day: string): string | null {
 export function DesktopOnboarding({
   mode,
   copy,
+  identityCopy,
   locale,
   safeNext,
   initialError,
@@ -166,7 +182,11 @@ export function DesktopOnboarding({
     ? initialBirthDate.split("-")
     : ["", "", ""];
 
-  const [name, setName] = useState(initialName);
+  const [identity, setIdentity] = useState<IdentityNames>(EMPTY_IDENTITY);
+  /** 서버가 돌려준 칸별 오류 — 그 칸을 고치면 지운다. */
+  const [serverIdentityErrors, setServerIdentityErrors] = useState<
+    Partial<Record<IdentityField, IdentityErrorKey>>
+  >({});
   const [year, setYear] = useState(initY);
   const [month, setMonth] = useState(initM);
   const [day, setDay] = useState(initD);
@@ -197,7 +217,9 @@ export function DesktopOnboarding({
   const birthDate = birthDateOf(year, month, day);
   const dobFilled = year.length === 4 && Boolean(month) && Boolean(day);
 
-  const nameMissing = mode === "profile" && !name.trim();
+  const identityNormalized = normalizeIdentityNames(identity);
+  const identityErrors = { ...serverIdentityErrors, ...validateIdentityNames(identityNormalized) };
+  const nameMissing = mode === "profile" && Object.keys(identityErrors).length > 0;
   const dobBad = mode === "profile" && !birthDate;
   const genderMissing = mode === "profile" && !gender;
   const phoneMissing = mode === "profile" && nationalDigits.length < 6;
@@ -241,7 +263,7 @@ export function DesktopOnboarding({
       const result =
         mode === "profile"
           ? await submitOnboardingProfile({
-              name: name.trim(),
+              identity: identityNormalized,
               birthDate: birthDate ?? "",
               gender,
               phoneNumber: phoneE164,
@@ -257,6 +279,8 @@ export function DesktopOnboarding({
           return;
         }
         setDone({ dest: result.redirectTo });
+      } else if (result.errorKey === "identity_invalid" && result.fieldErrors) {
+        setServerIdentityErrors(result.fieldErrors);
       } else if (result.errorKey === "phone_duplicate" || result.errorKey === "phone_invalid") {
         setPhoneError(result.errorKey === "phone_duplicate" ? copy.phoneDuplicateHelp : copy.errors.phone_invalid ?? result.errorKey);
         phoneRef.current?.focus();
@@ -270,7 +294,7 @@ export function DesktopOnboarding({
   }
 
   if (done) {
-    const displayName = name.trim() || initialName;
+    const displayName = displayNameFrom(identityNormalized) || initialName;
     const body = preview
       ? copy.bodyJoined
           .replace("{org}", preview.organizationName)
@@ -318,15 +342,19 @@ export function DesktopOnboarding({
               <b>{copy.basicsTitle}</b>
             </div>
             <div className="obd__grid">
-              <Field error={tried && nameMissing ? copy.nameRequired : null} hint={copy.nameHint} label={copy.nameLabel}>
-                <input
-                  autoComplete="name"
-                  autoFocus
-                  className="obd__in"
-                  onChange={(event) => setName(event.target.value)}
-                  value={name}
-                />
-              </Field>
+<IdentityNamesFields
+                autoFocus
+                copy={identityCopy}
+                errors={identityErrors}
+                locale={locale}
+                onChange={(next) => {
+                  setIdentity(next);
+                  setServerIdentityErrors({});
+                }}
+                showErrors={tried}
+                value={identity}
+                variant="desktop"
+              />
 
               <Field
                 // 세 칸을 다 채웠는데 틀렸거나, 제출을 눌렀는데 비었거나 틀렸을 때만 빨갛게.

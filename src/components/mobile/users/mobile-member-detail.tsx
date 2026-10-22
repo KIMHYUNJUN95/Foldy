@@ -401,6 +401,13 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
           <span>{c.wJoinedShort}</span>
           <b className="num">{longDate(m.joinedAt)}</b>
         </div>
+        {/* 국적 + 이름 세 가지(docs/product/41 §2) — 서버가 화면 언어로 만든 줄. */}
+        {m.identityRows.map((row) => (
+          <div className="muw-kv" key={row.label}>
+            <span>{row.label}</span>
+            <b>{row.value || "—"}</b>
+          </div>
+        ))}
       </div>
 
       {readOnly ? (

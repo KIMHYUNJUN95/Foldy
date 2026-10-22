@@ -122,7 +122,8 @@ After any Google login:
 
 Required onboarding fields before app access (applies equally to email and Google login):
 
-- Name (entered manually)
+- Nationality + names — one screen (2026-10-22, docs/product/41 §2): nationality, Korean name (KR required) or
+  Japanese name (JP required), English name, katakana name. The app's display name is derived from them.
 - Date of birth (entered manually)
 - Phone number (entered manually; stored in international format)
 - Preferred language (selected manually)

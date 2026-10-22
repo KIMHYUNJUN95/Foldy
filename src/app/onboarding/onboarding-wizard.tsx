@@ -13,6 +13,19 @@ import {
   type ProfileFormCopy,
 } from "@/app/onboarding/onboarding-forms";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import {
+  EMPTY_IDENTITY,
+  IdentityNamesFields,
+  type IdentityCopy,
+} from "@/components/identity/identity-names-fields";
+import {
+  displayNameFrom,
+  normalizeIdentityNames,
+  validateIdentityNames,
+  type IdentityErrorKey,
+  type IdentityField,
+  type IdentityNames,
+} from "@/lib/identity-names";
 import type { Locale } from "@/lib/i18n";
 import type { ProfileGender } from "@/lib/onboarding";
 import { haptic } from "@/lib/haptics";
@@ -926,6 +939,7 @@ function CountrySheet({
 export function OnboardingWizard({
   intro,
   steps,
+  identity: identityCopy,
   countries,
   join,
   review,
@@ -939,6 +953,8 @@ export function OnboardingWizard({
 }: {
   intro: OnboardingIntroCopy;
   steps: OnboardingStepsCopy;
+  /** 국적 + 이름 세 가지(`dictionary.onboarding.identity`) — 1단계 화면. */
+  identity: IdentityCopy;
   countries: Record<string, string>;
   join: OnboardingJoinCopy;
   review: OnboardingReviewCopy;
@@ -980,7 +996,14 @@ export function OnboardingWizard({
     return () => window.clearTimeout(id);
   }, [step]);
   const [depth, setDepth] = useState(0);
-  const [name, setName] = useState(profile.initialName ?? "");
+  const [identity, setIdentity] = useState<IdentityNames>(EMPTY_IDENTITY);
+  const [identityTried, setIdentityTried] = useState(false);
+  const [serverIdentityErrors, setServerIdentityErrors] = useState<
+    Partial<Record<IdentityField, IdentityErrorKey>>
+  >({});
+  const identityNormalized = normalizeIdentityNames(identity);
+  const identityErrors = { ...serverIdentityErrors, ...validateIdentityNames(identityNormalized) };
+  const name = displayNameFrom(identityNormalized) || (profile.initialName ?? "");
   const [dob, setDob] = useState<DateParts | null>(() => {
     const birth = profile.initialBirthDate?.trim();
     if (!birth || !/^\d{4}-\d{2}-\d{2}$/.test(birth)) return null;
@@ -1015,7 +1038,7 @@ export function OnboardingWizard({
     let result: Awaited<ReturnType<typeof submitOnboardingProfile>>;
     try {
       result = await submitOnboardingProfile({
-        name: name.trim(),
+        identity: identityNormalized,
         birthDate,
         gender,
         phoneNumber: phoneE164,
@@ -1032,6 +1055,13 @@ export function OnboardingWizard({
       setDest(result.redirectTo);
       setSubmitting(false);
       goTo(8);
+      return;
+    }
+    if (result.errorKey === "identity_invalid" && result.fieldErrors) {
+      setServerIdentityErrors(result.fieldErrors);
+      setIdentityTried(true);
+      setSubmitting(false);
+      goTo(1);
       return;
     }
     if (result.errorKey === "phone_duplicate" || result.errorKey === "phone_invalid") {
@@ -1792,7 +1822,13 @@ export function OnboardingWizard({
   }
 
   if (step === 1) {
-    const isGood = name.trim().length > 0;
+    const identityGood = Object.keys(identityErrors).length === 0;
+    const next = () => {
+      setIdentityTried(true);
+      if (!identityGood) return;
+      setIdentity(identityNormalized);
+      goTo(2);
+    };
     return (
       <main
         lang={profile.locale}
@@ -1804,56 +1840,43 @@ export function OnboardingWizard({
           <div className="flex justify-end px-[26px] pb-1">{exitAction}</div>
         ) : null}
         <section className="mx-auto flex w-full max-w-[460px] flex-1 flex-col px-[26px]">
-          <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1">
-            <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
-              {steps.basicsEyebrow}
-            </p>
-            <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
-              {steps.nameTitle}
-            </h1>
-            <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
-              {steps.nameSubtitle}
-            </p>
-
-            <div className="mt-[22px]">
-              <div className="mb-2 text-[12.5px] font-extrabold text-[#3a3746]">
-                {steps.nameLabel}
-              </div>
-              <div className="relative">
-                <input
-                  autoFocus
-                  autoComplete="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  // 단독 <input> 이라 폼 제출이 없다 — PC 에서 Enter 로 넘어가지 못하고 매번
-                  // 하단 버튼을 마우스로 눌러야 했다(2026-09-09).
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter" || !isGood) return;
-                    e.preventDefault();
-                    goTo(2);
-                  }}
-                  className={`h-[54px] w-full rounded-[14px] border bg-surface px-[15px] pr-[46px] text-[16px] font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-text-done focus:ring-[3.5px] focus:ring-primary/15 ${
-                    isGood ? "border-[hsl(146_50%_32%)]" : "border-border focus:border-primary"
-                  }`}
-                />
-                {isGood && (
-                  <span className="pointer-events-none absolute right-[15px] top-[18px] text-[hsl(146_50%_32%)]">
-                    <CheckIcon />
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-[11.5px] font-semibold leading-[1.45] text-text-done">
-                {steps.nameHint}
+          <form
+            className="flex flex-1 flex-col"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              next();
+            }}
+          >
+            <div className="flex-1 overflow-y-auto pt-2 px-1 -mx-1 pb-4">
+              <p className="mb-[10px] mt-[14px] text-[13px] font-semibold t-eyebrow text-primary">
+                {steps.basicsEyebrow}
               </p>
+              <h1 className="whitespace-pre-line text-[26px] font-bold leading-[1.3] tracking-[-0.03em] t-display">
+                {identityCopy.title}
+              </h1>
+              <p className="mt-[10px] text-[15px] leading-[1.6] text-muted-foreground">
+                {identityCopy.subtitle}
+              </p>
+              <div className="mt-[22px]">
+                <IdentityNamesFields
+                  copy={identityCopy}
+                  errors={identityErrors}
+                  locale={profile.locale}
+                  onChange={(value) => {
+                    setIdentity(value);
+                    setServerIdentityErrors({});
+                  }}
+                  showErrors={identityTried}
+                  value={identity}
+                />
+              </div>
+              {/* Enter 로도 넘어가게 — 칸이 여러 개라 폼 제출로 받는다. */}
+              <button aria-hidden="true" className="hidden" tabIndex={-1} type="submit" />
             </div>
-          </div>
+          </form>
 
-          <StickyCta
-            label={steps.continueCta}
-            onClick={() => goTo(2)}
-            disabled={!isGood}
-            withArrow
-          />
+          <StickyCta label={steps.continueCta} onClick={next} withArrow />
         </section>
       </main>
     );

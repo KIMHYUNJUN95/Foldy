@@ -16,6 +16,14 @@ import {
   setLastUsedOrganization,
 } from "@/lib/onboarding";
 import { isLocale } from "@/lib/i18n";
+import {
+  displayNameFrom,
+  normalizeIdentityNames,
+  validateIdentityNames,
+  type IdentityErrorKey,
+  type IdentityField,
+  type IdentityNames,
+} from "@/lib/identity-names";
 import { resolveInviteRpcError } from "@/lib/invite-errors";
 import { normalizeNextPathForSurface, normalizePathForSurface } from "@/lib/surface-routing";
 import type { Database } from "@/types/database";
@@ -274,7 +282,12 @@ export async function claimFirstPlatformAdmin() {
 
 export type SubmitOnboardingResult =
   | { ok: true; redirectTo: string }
-  | { ok: false; errorKey: string };
+  | {
+      ok: false;
+      errorKey: string;
+      /** errorKey === "identity_invalid" 일 때 칸별 오류 — 국적 · 이름 세 가지. */
+      fieldErrors?: Partial<Record<IdentityField, IdentityErrorKey>>;
+    };
 
 /**
  * needs_membership wizard submit — joins via invite code only (profile already exists).
@@ -312,7 +325,8 @@ export async function joinWithInviteCode(input: {
  * wizard show its own "welcome / success" screen before entering the app.
  */
 export async function submitOnboardingProfile(input: {
-  name: string;
+  /** 국적 + 한국어 · 일본어 · 영문 · 가타카나 이름 — 앱에 보이는 이름은 여기서 만든다. */
+  identity: IdentityNames;
   birthDate: string;
   gender: string;
   phoneNumber: string;
@@ -322,7 +336,9 @@ export async function submitOnboardingProfile(input: {
 }): Promise<SubmitOnboardingResult> {
   const user = await requireUser();
   const surface = await getCurrentSurface();
-  const name = input.name.trim();
+  const identity = normalizeIdentityNames(input.identity);
+  const fieldErrors = validateIdentityNames(identity);
+  const name = displayNameFrom(identity);
   const birthDate = input.birthDate.trim();
   const gender = input.gender.trim();
   const phoneNumber = input.phoneNumber.trim();
@@ -330,6 +346,9 @@ export async function submitOnboardingProfile(input: {
   const code = input.inviteCode.trim().toUpperCase();
   const next = normalizeNextPathForSurface(input.next, surface);
 
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, errorKey: "identity_invalid", fieldErrors };
+  }
   if (!name || !phoneNumber) return { ok: false, errorKey: "missing_profile_fields" };
   if (!birthDate || !isValidBirthDate(birthDate)) {
     return { ok: false, errorKey: "missing_birth_date" };
@@ -342,6 +361,11 @@ export async function submitOnboardingProfile(input: {
   const profile: ProfileInsert = {
     id: user.id,
     name,
+    nationality: identity.nationality,
+    name_ko: identity.nameKo || null,
+    name_ja: identity.nameJa || null,
+    name_en: identity.nameEn,
+    name_katakana: identity.nameKatakana,
     birth_date: birthDate,
     gender,
     phone_number: phoneNumber,

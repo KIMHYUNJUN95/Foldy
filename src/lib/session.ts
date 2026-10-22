@@ -8,6 +8,11 @@ import { computeCapabilities, isActiveOverrideRow } from "@/lib/capabilities-ser
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getIdentityRows, sortMembershipsByJoinedAt } from "@/lib/identity-rows";
 import type { ProfileGender } from "@/lib/onboarding";
+import {
+  identityIncomplete,
+  normalizeIdentityNames,
+  type IdentityNames,
+} from "@/lib/identity-names";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export type OrganizationSummary = {
@@ -29,6 +34,10 @@ export type SessionUser = {
   // Per-user override for the daily-report generator. Combined with the role check in
   // Legacy flag — the daily report is gated by the `can_generate_report` capability since 2026-10-21.
   canGenerateReport: boolean;
+  /** 국적 + 한국어 · 일본어 · 영문 · 가타카나 이름(docs/product/41 §2). */
+  identity: IdentityNames;
+  /** 위 값이 규칙을 못 채움 — 「이름 정보를 채워 주세요」 를 띄운다. */
+  identityIncomplete: boolean;
 };
 
 export type AppSession = {
@@ -82,6 +91,8 @@ export const mockSession: AppSession = {
     preferredMode: "admin",
     bottomNavTabs: [...defaultBottomNavTabIds],
     canGenerateReport: true,
+    identity: { nationality: "US", nameKo: "", nameJa: "", nameEn: "SARAH JENKINS", nameKatakana: "サラ ジェンキンス" },
+    identityIncomplete: false,
   },
   capabilities: [],
 };
@@ -200,6 +211,20 @@ export const getCurrentAppSession = cache(
         preferredMode: defaultsToAdminSurface(role) ? "admin" : "mobile",
         bottomNavTabs,
         canGenerateReport,
+        identity: normalizeIdentityNames({
+          nationality: profile.nationality ?? "",
+          nameKo: profile.name_ko ?? "",
+          nameJa: profile.name_ja ?? "",
+          nameEn: profile.name_en ?? "",
+          nameKatakana: profile.name_katakana ?? "",
+        }),
+        identityIncomplete: identityIncomplete({
+          nationality: profile.nationality ?? null,
+          name_ko: profile.name_ko ?? null,
+          name_ja: profile.name_ja ?? null,
+          name_en: profile.name_en ?? null,
+          name_katakana: profile.name_katakana ?? null,
+        }),
       },
       capabilities,
     };

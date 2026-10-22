@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sanitizeBottomNavTabIds } from "@/config/navigation";
 import { isLocale } from "@/lib/i18n";
+import {
+  displayNameFrom,
+  normalizeIdentityNames,
+  validateIdentityNames,
+} from "@/lib/identity-names";
 import { isProfileGender, isValidBirthDate, isValidPhone } from "@/lib/onboarding";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -79,7 +84,29 @@ export async function updateAccountProfile(formData: FormData) {
   }
 
   const mode = String(formData.get("mode") ?? "admin");
-  const name = String(formData.get("name") ?? "").trim();
+  // 국적 + 이름 세 가지(docs/product/41 §2) — 이 칸들을 보낸 폼일 때만 검사 · 저장하고, 앱에 보이는 이름도 여기서 만든다.
+  // 모바일 계정 화면은 한 칸씩 고치므로(언어 · 전화 …) 이름 칸이 없는 저장은 지금 이름을 그대로 둔다.
+  const hasIdentity = formData.has("nationality");
+  const identity = normalizeIdentityNames({
+    nationality: String(formData.get("nationality") ?? ""),
+    nameKo: String(formData.get("nameKo") ?? ""),
+    nameJa: String(formData.get("nameJa") ?? ""),
+    nameEn: String(formData.get("nameEn") ?? ""),
+    nameKatakana: String(formData.get("nameKatakana") ?? ""),
+  });
+  if (hasIdentity && Object.keys(validateIdentityNames(identity)).length > 0) {
+    toAccountRedirect(mode, "error=identity_invalid");
+  }
+  const name = hasIdentity ? displayNameFrom(identity) : String(formData.get("name") ?? "").trim();
+  const identityUpdate = hasIdentity
+    ? {
+        nationality: identity.nationality,
+        name_ko: identity.nameKo || null,
+        name_ja: identity.nameJa || null,
+        name_en: identity.nameEn,
+        name_katakana: identity.nameKatakana,
+      }
+    : {};
   const birthDate = String(formData.get("birthDate") ?? "").trim();
   const gender = String(formData.get("gender") ?? "").trim();
   const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
@@ -109,6 +136,7 @@ export async function updateAccountProfile(formData: FormData) {
     .from("profiles")
     .update({
       name,
+      ...identityUpdate,
       gender,
       ...(birthDate ? { birth_date: birthDate } : {}),
       phone_number: phoneNumber,

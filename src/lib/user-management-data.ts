@@ -1,5 +1,6 @@
 import "server-only";
 
+import { nationalityName } from "@/lib/identity-names";
 import { isOrgTopAdmin, type Role } from "@/config/roles";
 import { CAPABILITY_KEYS, canBeDenied, capabilityPolicy, evaluateCapability } from "@/config/capabilities";
 import { HIDDEN_CAPABILITIES } from "@/config/capability-groups";
@@ -57,6 +58,8 @@ export type MemberPanelVM = {
     name: string;
     email: string;
     phone: string;
+    /** 국적 + 이름 세 가지(docs/product/41 §2) — 화면 언어로 만든 표시용 줄. 빈 값은 「—」. */
+    identityRows: { label: string; value: string }[];
     role: string;
     status: string;
     joinedAt: string | null;
@@ -109,7 +112,7 @@ async function fetchAllEmails(ids: string[]): Promise<Map<string, string>> {
 export type UserDirectory = {
   members: DirectoryMemberVM[];
   memberships: MembershipRow[];
-  profileMap: Map<string, Pick<ProfileRow, "id" | "name" | "phone_number" | "can_generate_report">>;
+  profileMap: Map<string, Pick<ProfileRow, "id" | "name" | "phone_number" | "can_generate_report" | "nationality" | "name_ko" | "name_ja" | "name_en" | "name_katakana">>;
   emailMap: Map<string, string>;
   devIds: Set<string>;
 };
@@ -128,12 +131,12 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
 
   const [{ data: profileData }, emailMap] = await Promise.all([
     userIds.length > 0
-      ? service.from("profiles").select("id, name, phone_number, can_generate_report").in("id", userIds)
+      ? service.from("profiles").select("id, name, phone_number, can_generate_report, nationality, name_ko, name_ja, name_en, name_katakana").in("id", userIds)
       : Promise.resolve({ data: [] }),
     fetchAllEmails(userIds),
   ]);
   const profileMap = new Map(
-    ((profileData ?? []) as Pick<ProfileRow, "id" | "name" | "phone_number" | "can_generate_report">[]).map((profile) => [profile.id, profile]),
+    ((profileData ?? []) as Pick<ProfileRow, "id" | "name" | "phone_number" | "can_generate_report" | "nationality" | "name_ko" | "name_ja" | "name_en" | "name_katakana">[]).map((profile) => [profile.id, profile]),
   );
 
   // Platform developers are shown as "개발자" regardless of their org role.
@@ -262,6 +265,17 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
       name: profile?.name ?? "",
       email: emailMap.get(selected.user_id) ?? "",
       phone: profile?.phone_number ?? "",
+      identityRows: [
+        {
+          label: dictionary.onboarding.identity.nationalityLabel,
+          value: profile?.nationality ? nationalityName(profile.nationality, session.user.preferredLanguage) : "",
+        },
+        profile?.nationality === "JP"
+          ? { label: dictionary.onboarding.identity.nameJaLabel, value: profile?.name_ja ?? "" }
+          : { label: dictionary.onboarding.identity.nameKoLabel, value: profile?.name_ko ?? "" },
+        { label: dictionary.onboarding.identity.nameEnLabel, value: profile?.name_en ?? "" },
+        { label: dictionary.onboarding.identity.nameKatakanaLabel, value: profile?.name_katakana ?? "" },
+      ],
       role: selected.role,
       status: selected.status,
       joinedAt: selected.joined_at,

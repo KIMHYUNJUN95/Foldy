@@ -25,6 +25,8 @@
 .acw-msg[data-tone="ok"] { color: var(--w-green); }
 .acw-msg[data-tone="err"] { color: var(--w-red); }
 .acw-msg b { display: block; font-weight: 700; color: var(--w-ink); margin-bottom: 2px; }
+/* 「이름 정보를 채워 주세요」 — 누르면 이름 시트가 열린다(2026-10-22). */
+.acw-msg--btn { display: block; width: 100%; border: 0; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
 
 .acw-grp { display: flex; flex-direction: column; animation: acw-up 360ms var(--w-ease) both; animation-delay: calc(min(var(--i, 0), 8) * 40ms); }
 .acw-sec { padding: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--w-sec); }

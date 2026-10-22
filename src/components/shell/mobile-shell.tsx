@@ -29,7 +29,7 @@ import {
 } from "@/config/navigation";
 import { hasAdminWebAccess } from "@/config/capabilities";
 import { haptic } from "@/lib/haptics";
-import { consumeScreenEntrance, setNavDirection, type ScreenEntrance } from "@/lib/nav-direction";
+import { commitScreenEntrance, consumeScreenEntrance, setNavDirection, type ScreenEntrance } from "@/lib/nav-direction";
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import "@/components/shell/pull-refresh.css";
@@ -184,6 +184,12 @@ export function MobileShell({
   const [contentKey, setContentKey] = useState(0);
   const pathname = usePathname();
   const [entrance] = useState(() => consumeScreenEntrance(pathname, placeholder));
+  // 화면에 붙었다 — 그리다 버려진 셸이 다시 불러도 같은 등장을 받게 해 두던 것을 비운다(`commitScreenEntrance`).
+  useEffect(() => {
+    commitScreenEntrance(pathname, placeholder);
+    // 마운트 때 한 번만(등장은 마운트 때 정해진다).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [entranceDone, setEntranceDone] = useState(false);
   const entranceClass = entranceDone ? undefined : ENTRANCE_CLASS[entrance.kind];
   const scrollElRef = useRef<HTMLDivElement | null>(null);

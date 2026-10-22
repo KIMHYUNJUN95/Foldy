@@ -62,8 +62,26 @@ export type ScreenEntrance = { kind: NavDirection | "reveal" | "same"; direction
 
 let placeholderFor: { path: string; direction: NavDirection } | null = null;
 let lastScreenPath: string | null = null;
+/**
+ * 아직 화면에 붙지 않은(커밋 전) 셸이 받은 등장 — React 가 그리던 것을 버리고 다시 그리면(로딩 중 재시도) `useState` 초기값이 한 번
+ * 더 불린다. 그때 같은 답을 돌려줘야 한다 — 전엔 버려진 쪽이 「reveal」을 써 버려 진짜 화면은 「same」(효과 없음)을 받았다
+ * (2026-10-22 태블릿 측정: 요청 탭으로 갈 때 셸이 두 번 그려져 나타남 효과가 빠짐). 셸이 붙으면 `commitScreenEntrance` 로 비운다.
+ */
+let uncommitted: { path: string; placeholder: boolean; entrance: ScreenEntrance } | null = null;
 
 export function consumeScreenEntrance(path: string, placeholder: boolean): ScreenEntrance {
+  if (uncommitted && uncommitted.path === path && uncommitted.placeholder === placeholder) return uncommitted.entrance;
+  const entrance = computeScreenEntrance(path, placeholder);
+  uncommitted = { entrance, path, placeholder };
+  return entrance;
+}
+
+/** 셸이 화면에 붙었다(마운트 effect) — 다음 셸은 새로 판정한다. */
+export function commitScreenEntrance(path: string, placeholder: boolean): void {
+  if (uncommitted && uncommitted.path === path && uncommitted.placeholder === placeholder) uncommitted = null;
+}
+
+function computeScreenEntrance(path: string, placeholder: boolean): ScreenEntrance {
   if (placeholder) {
     if (placeholderFor?.path === path) return { kind: "none", direction: placeholderFor.direction };
     const direction = path === lastScreenPath ? "none" : consumeNavDirection();

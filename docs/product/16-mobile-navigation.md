@@ -593,6 +593,10 @@ Current rules:
   - **탭 전환**(아래 탭바 · 사이드 메뉴 · 레일의 링크 — 셸 틀이 `onClickCapture` 로 `"tab"`) `.screen-tab` — 밀지 않고 160ms 짧게 나타남.
   - **스와이프 뒤로가기** · Safari 가 이미 그린 뒤로 = 움직임 없음. **같은 경로 다시 그림** = 없음.
   - **로딩 자리 셸**(아래)이 먼저 민 경로의 진짜 화면은 `.screen-reveal`(200ms 나타남)만 — 방향은 이어받는다.
+  - **그리다 버려진 셸 (2026-10-22 고침)**: React 가 그리던 화면을 버리고 다시 그리면(로딩 중 재시도) 셸의 `useState` 초기값이 한 번 더
+    불린다. 판정은 화면에 붙을 때까지 같은 답을 돌려주고(`consumeScreenEntrance`), 셸이 붙으면 마운트 effect 가 `commitScreenEntrance` 로
+    비운다. 전엔 버려진 쪽이 「reveal」을 써 버려 진짜 화면은 「same」(효과 없음) — 태블릿에서 요청 탭으로 갈 때 실측. 폴드(700) · 태블릿
+    (1200) 레일 · 사이드바 전환 측정: 레일 · 사이드바 제자리, 본문만 나타남(탭) → 로더 → 나타남(reveal), 매번.
   - 끝나면 클래스를 뗀다(`animation-fill-mode: both` 의 transform 이 `position: fixed` 자손의 기준 상자가 되지 않게). 줄이기 모드는 전부 없음.
 - **로딩 자리 셸 (2026-10-21)**: `src/app/mobile/loading.tsx` = `MobileShellPlaceholder`(`src/components/shell/mobile-shell-placeholder.tsx`)
   — 같은 셸(탭바 · 위 줄 · 배지)을 `placeholder` 로 그리고 본문 칸에 공용 로더(`FoldyLoader`, 0.3초 뒤에만 보임). 예전 로딩은 화면 전체를

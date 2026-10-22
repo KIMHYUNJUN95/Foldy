@@ -95,7 +95,7 @@
 - 저장소 규칙: 본인 경로 올리기 · 읽기 + `staff_documents.view` 가진 같은 조직 사람 읽기. 다른 기능 사진과 섞지 않는다.
 - 이미지: 클라이언트 압축(기존 정책)하되 **글자가 읽히게** 긴 변 2000px · 품질 높게. 장수 = 앞 · 뒤 2장(5장 제한 안).
 - 데이터(설계 개요):
-  - `profiles` 에 `name_ko` · `name_ja` · `name_en` · `name_katakana` · `nationality` (기존 `full_name` = 앱에 보이는 이름)
+  - `profiles` 에 `name_ko` · `name_ja` · `name_en` · `name_katakana` · `nationality` (기존 `name` = 앱에 보이는 이름)
   - `staff_residence_cards`(조직 · 사람 · 카드 번호 · 재류자격 · 만료일 · 就労制限 · 資格外活動 · 앞/뒤 경로 · 상태 · 확인자 · 확인 시각 · 요청 사유 · 지금 카드 여부)
   - `staff_document_print_logs`(조직 · 인쇄한 사람 · 대상 · 시각)
 - RLS: 조직 범위 + 본인 / `staff_documents.view`.

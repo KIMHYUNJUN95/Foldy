@@ -37,6 +37,12 @@ and the major mobile/admin operations modules are implemented and being hardened
 
 - `/admin/recruit` 보기바 Excel/PDF 앞에 「채용 사이트」 링크(새 탭 `stayari.web.app`). ko/ja/en. 상세 `docs/product/30-recruit-workflow.md` 맨 아래.
 
+## 2026-10-22 — 알바 급여 자동화 기획(39)
+
+- 엑셀 양식 전부를 Foldy 로 옮기는 기획 `docs/product/39-part-time-payroll-automation-plan.md` — 한 달 흐름 · 엑셀 열 A~AO 와 시트 10개의 Foldy 출처 ·
+  새 데이터(사람별 지급 방식 · 甲乙丙 · 부양 · 일본 이름 · 달별 손 입력 · 회사 설정 · 세금표) · 계산 규칙(엑셀과 1엔 일치) · 화면 · 출력 · 권한 · 단계 P1~P6 ·
+  결정 필요 11개. 구현 전 결정 대기.
+
 ## 2026-10-22 — 알바 급여 엑셀 전체 점검 · 설계서
 
 - 지금 쓰는 급여 엑셀(시트 10개 · 수식 약 1.2만 칸)을 전부 점검해 `docs/product/38-part-time-payslip-excel-spec.md` 로 정리 — 현금 / 이체 입력 · 명세서,

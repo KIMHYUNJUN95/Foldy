@@ -37,6 +37,11 @@ and the major mobile/admin operations modules are implemented and being hardened
 
 - `/admin/recruit` 보기바 Excel/PDF 앞에 「채용 사이트」 링크(새 탭 `stayari.web.app`). ko/ja/en. 상세 `docs/product/30-recruit-workflow.md` 맨 아래.
 
+## 2026-10-22 — 알바 급여 엑셀 전체 점검 · 설계서
+
+- 지금 쓰는 급여 엑셀(시트 10개 · 수식 약 1.2만 칸)을 전부 점검해 `docs/product/38-part-time-payslip-excel-spec.md` 로 정리 — 현금 / 이체 입력 · 명세서,
+  추가 지급 칸, 원천세, 명세서 28행 칸 배치, 사장 확인표 · 支給確認一覧. 엑셀 자체 문제 9개(현금 5번째 명세서 `#REF!` 등) 사용자에게 알림. 구현은 보류.
+
 ## 2026-10-22 — 권한 없음 화면 Apple 스타일로
 
 - PC 관리자 화면 권한 없음 · 메뉴 권한 없음을 카드 없는 가운데 정렬(아이콘 · 제목 · 설명), 로그아웃은 회색 캡슐, 로고는 왼쪽 위 작게. ko/ja/en.

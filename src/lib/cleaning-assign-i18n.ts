@@ -233,6 +233,26 @@ export type CleaningAssignCopy = {
   daysUnit: string; // "{n}일"
   compareEmpty: string;
   // ── 모바일 — 내 시프트 ──
+  /** 2026-10-22 다듬기(HIG) — 내 시프트 · 오늘 내 방 */
+  applyNextMonth: string; // "{m}월 신청"
+  nextMonthDue: string; // "{m}월 신청은 월말까지 · {n}일 남음"
+  nextShift: string; // "다음 근무"
+  nextShiftTitle: string; // "{rel} {time} · 방 {n}개"
+  markNoneShort: string; // "없음"
+  ringHint: string; // "빈 원은 신청한 날, 채운 원은 배정된 날이에요."
+  startAt: string; // "{time} 출근"
+  roomsN: string; // "방 {n}개"
+  matesHead: string; // "같이 일해요"
+  progressDone: string; // "{n}개 중 {d}개 끝남"
+  nowRoom: string; // "지금 할 방"
+  restRooms: string; // "남은 방"
+  doneRooms: string; // "끝난 방"
+  factCheckin: string;
+  factWith: string;
+  factNote: string;
+  factDoor: string;
+  startRoom: string; // "{room} 청소 시작"
+  continueCleaning: string;
   myShiftTitle: string;
   nextMonthBanner: string; // "{m}월 시프트를 월말까지 신청해 주세요"
   goNextMonth: string; // "{m}월로"
@@ -509,6 +529,25 @@ const ko: CleaningAssignCopy = {
   hoursUnit: "{n}시간",
   daysUnit: "{n}일",
   compareEmpty: "이 달에는 배정 기록이 없어요",
+  applyNextMonth: "{m}월 신청",
+  nextMonthDue: "{m}월 신청은 월말까지 · {n}일 남음",
+  nextShift: "다음 근무",
+  nextShiftTitle: "{rel} {time} · 방 {n}개",
+  markNoneShort: "없음",
+  ringHint: "빈 원은 신청한 날, 채운 원은 배정된 날이에요.",
+  startAt: "{time} 출근",
+  roomsN: "방 {n}개",
+  matesHead: "같이 일해요",
+  progressDone: "{n}개 중 {d}개 끝남",
+  nowRoom: "지금 할 방",
+  restRooms: "남은 방",
+  doneRooms: "끝난 방",
+  factCheckin: "체크인",
+  factWith: "같이",
+  factNote: "메모",
+  factDoor: "문 번호",
+  startRoom: "{room} 청소 시작",
+  continueCleaning: "청소 이어서 하기",
   myShiftTitle: "내 시프트",
   nextMonthBanner: "{m}월 시프트를 월말까지 신청해 주세요",
   goNextMonth: "{m}월로",
@@ -784,6 +823,25 @@ const ja: CleaningAssignCopy = {
   hoursUnit: "{n}時間",
   daysUnit: "{n}日",
   compareEmpty: "この月は割り当ての記録がありません",
+  applyNextMonth: "{m}月を申請",
+  nextMonthDue: "{m}月の申請は月末まで · あと{n}日",
+  nextShift: "次の勤務",
+  nextShiftTitle: "{rel} {time} · {n}部屋",
+  markNoneShort: "なし",
+  ringHint: "白い丸は申請した日、塗りつぶしの丸は割り当て済みの日です。",
+  startAt: "{time} 出勤",
+  roomsN: "{n}部屋",
+  matesHead: "一緒に働く人",
+  progressDone: "{n}部屋中 {d}部屋完了",
+  nowRoom: "今の部屋",
+  restRooms: "残りの部屋",
+  doneRooms: "完了した部屋",
+  factCheckin: "チェックイン",
+  factWith: "一緒に",
+  factNote: "メモ",
+  factDoor: "ドア番号",
+  startRoom: "{room} の清掃を開始",
+  continueCleaning: "清掃を続ける",
   myShiftTitle: "マイシフト",
   nextMonthBanner: "{m}月のシフトを月末までに申請してください",
   goNextMonth: "{m}月へ",
@@ -1059,6 +1117,25 @@ const en: CleaningAssignCopy = {
   hoursUnit: "{n} h",
   daysUnit: "{n}",
   compareEmpty: "No assignments this month",
+  applyNextMonth: "Apply for {mon}",
+  nextMonthDue: "{mon} applications close at month end · {n} days left",
+  nextShift: "Next shift",
+  nextShiftTitle: "{rel} {time} · {n} rooms",
+  markNoneShort: "None",
+  ringHint: "An outlined circle is a day you applied for; a filled circle is an assigned day.",
+  startAt: "Start {time}",
+  roomsN: "{n} rooms",
+  matesHead: "Working with you",
+  progressDone: "{d} of {n} done",
+  nowRoom: "Up next",
+  restRooms: "Still to do",
+  doneRooms: "Done",
+  factCheckin: "Check-in",
+  factWith: "With",
+  factNote: "Note",
+  factDoor: "Door code",
+  startRoom: "Start {room}",
+  continueCleaning: "Continue cleaning",
   myShiftTitle: "My shifts",
   nextMonthBanner: "Please apply for {mon} shifts by the end of the month",
   goNextMonth: "Go to {mon}",

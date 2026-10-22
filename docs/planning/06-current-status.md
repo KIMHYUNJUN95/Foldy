@@ -1,5 +1,11 @@
 ﻿# Current Status
 
+
+## 2026-10-22 — 내 시프트 · 오늘 내 방 HIG 다듬기
+
+- 시안(캔버스 3dCCKr2…) 컨펌 후 구현. 달력 = 배정 채운 원 + 「N방」 · 신청 빈 원 · 배정 없음 「없음」(범례 없음), 위에 「다음 근무」 한 줄.
+  오늘 내 방 = 「어젯밤 바뀜」 맨 위 · 진행 막대 · 지금 할 방 크게 · 남은/끝난 방 줄 · 폰은 「청소 시작」 탭 바 위 sticky. 앱 글꼴 · 셸 · 공용 시트 그대로. ko/ja/en.
+  상세 `docs/product/37-cleaning-shift-assignment.md` 맨 아래.
 ## Purpose
 
 This document tracks what has been completed, what is in progress, and what remains for the Foldy MVP.

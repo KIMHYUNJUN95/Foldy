@@ -21,6 +21,10 @@ and the major mobile/admin operations modules are implemented and being hardened
 - 남은 것: 실제 알바 데이터로 끌기 · 제안 반영 동작 확인(운영 DB 쓰기라 이번엔 안 눌러 봄), 알림(막바지 일괄), 처음 2주 한 건물 병행 운영.
   상세 `docs/product/37-cleaning-shift-assignment.md` 「10. 구현」.
 
+## 2026-10-22 — 채용 지원서에 채용 사이트 바로가기
+
+- `/admin/recruit` 보기바 Excel/PDF 앞에 「채용 사이트」 링크(새 탭 `stayari.web.app`). ko/ja/en. 상세 `docs/product/30-recruit-workflow.md` 맨 아래.
+
 ## 2026-10-22 — 아르바이트 요청 사진 업로드 버그
 
 - 수리 · 분실물 · 주문 요청 사진 업로드가 DB 저장소 규칙에서 아르바이트만 막혀 있던 것 — 활성 멤버 누구나 올리고, 지우기는 내가 올린 것 또는 남의 요청 삭제 권한.

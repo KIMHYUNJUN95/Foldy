@@ -3,7 +3,7 @@
 import { LiveWash } from "@/components/shared/live-wash";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, MoveRight, Search, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, MoveRight, Search, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { AdminExportButtons } from "@/components/admin/shared/admin-export-buttons";
@@ -23,6 +23,9 @@ import type {
 import { filterApplicationsBySearch } from "@/lib/recruit/search";
 import { nextStatusOf, type JobApplicationStatus } from "@/lib/recruit/status";
 import { tokyoDateOf } from "@/lib/tokyo-date";
+
+/** 지원자가 공고를 보고 지원하는 채용 사이트(haru-job-web, Firebase Hosting). 같은 번들이 haru-recruit.web.app 에도 있다. */
+const RECRUIT_SITE_URL = "https://stayari.web.app";
 
 /**
  * 채용 지원서 목록 — 디자인 「Foldy Recruiting Console」 1a·1d·1f 구현, 화이트 리디자인(2026-10-14, 시안 Recruit-PC).
@@ -257,6 +260,10 @@ export function RecruitConsole({
           {copy.wLive.replace("{n}", String(summary.today))}
         </span>
         <span className="rcw-sp" />
+        <a className="chipbtn rcw-site" href={RECRUIT_SITE_URL} rel="noopener noreferrer" target="_blank">
+          <ExternalLink aria-hidden="true" className="ic" />
+          {copy.wSite}
+        </a>
         <AdminExportButtons
           onExportXls={() => exportRecruitWorkbook(exportPayload)}
           onExportPdf={() => exportRecruitReport(exportPayload)}

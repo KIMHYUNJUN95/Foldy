@@ -1916,6 +1916,7 @@ const FALLBACK_DICTIONARY = {
     labelAppliedPosition: "Position applied for",
     // 화이트 리디자인(2026-10-14)
     wLive: "Live · {n} today",
+    wSite: "Careers site",
     wNew: "New",
     wAllJobs: "All positions",
     wAllEmployment: "All employment types",
@@ -10029,6 +10030,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     labelAppliedPosition: "지원 직무",
     // 화이트 리디자인(2026-10-14)
     wLive: "실시간 · 오늘 {n}건",
+    wSite: "채용 사이트",
     wNew: "새 지원",
     wAllJobs: "전체 직무",
     wAllEmployment: "전체 고용형태",
@@ -17981,6 +17983,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
     labelAppliedPosition: "応募職種",
     // 화이트 리디자인(2026-10-14)
     wLive: "リアルタイム · 今日{n}件",
+    wSite: "採用サイト",
     wNew: "新着",
     wAllJobs: "すべての職種",
     wAllEmployment: "すべての雇用形態",

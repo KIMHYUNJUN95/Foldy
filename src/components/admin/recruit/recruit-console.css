@@ -731,6 +731,8 @@
 .adm .rcw-bar .lviews button { font-weight: 600; }
 .adm .rcw-tabn { margin-left: 4px; font-weight: 600; color: #7a52e6; }
 .adm .rcw-sp { flex: 1; }
+.adm .rcw-site { text-decoration: none; }
+.adm .rcw-site svg { width: 16px; height: 16px; flex: none; color: var(--adm-muted); }
 .adm .rcw-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6878; }
 .adm .rcw-live i { width: 6px; height: 6px; border-radius: 50%; background: #7a52e6; box-shadow: 0 0 0 0 rgba(122, 82, 230, .5); animation: rcw-ping 2.4s ease-out infinite; }
 @keyframes rcw-ping { 0% { box-shadow: 0 0 0 0 rgba(122, 82, 230, .45); } 70%, 100% { box-shadow: 0 0 0 7px rgba(122, 82, 230, 0); } }

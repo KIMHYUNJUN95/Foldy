@@ -1,4 +1,5 @@
 import { AppSplash } from "@/components/mobile/app-splash";
+import { ImageFadeIn } from "@/components/shell/image-fade-in";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentAppSession } from "@/lib/session";
 
@@ -11,6 +12,8 @@ export default async function MobileLayout({ children }: { children: React.React
   return (
     <>
       <AppSplash tagline={tagline} />
+      {/* 사진 부드럽게 나타나기(2026-10-22) — 레이아웃에 한 번만 붙인다. */}
+      <ImageFadeIn />
       {children}
     </>
   );

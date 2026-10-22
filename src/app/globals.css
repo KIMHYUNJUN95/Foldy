@@ -452,6 +452,28 @@ body:lang(ja) {
     transition: none;
   }
 }
+/* 사진 부드럽게 나타나기 — 공용 (2026-10-22). `ImageFadeIn`(모바일 레이아웃)이 이미 받아진 사진을 표시한 뒤 `html[data-img-fade]` 를
+   켜야만 숨김이 걸린다(스크립트가 안 돌면 평소대로 보인다). 받아지면 `data-loaded` 가 붙어 0.22초에 나타난다(이미 받아져 있던 사진은 처음 그릴 때 0.22초 나타남). */
+html[data-img-fade] :where([data-shell-frame], [data-sheet]) img:not([data-loaded]) {
+  opacity: 0;
+}
+/* transition 이 아니라 animation — 사진에 붙은 `transition-transform` 같은 유틸리티를 덮지 않게. */
+@keyframes img-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+html[data-img-fade] :where([data-shell-frame], [data-sheet]) img[data-loaded] {
+  animation: img-fade-in 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-img-fade] :where([data-shell-frame], [data-sheet]) img:not([data-loaded]) {
+    opacity: 1;
+  }
+  html[data-img-fade] :where([data-shell-frame], [data-sheet]) img[data-loaded] {
+    animation: none;
+  }
+}
 /* 토스트가 사라질 때(`useToastMotion` 의 복제본) — 지금 자리에서 나갈 쪽으로 살짝 밀리며 흐려진다. 안쪽 등장 · 체크 · 남은 시간
    줄 애니메이션은 끝난 모습으로 멈춘다(복제본이 등장을 다시 틀지 않게). */
 @keyframes toast-leave {

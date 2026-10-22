@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowLeftRight, MoreHorizontal, Phone, Search } from "lucide-react";
 import {
   addApplicantForDay,
@@ -74,6 +74,21 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const [deferRoom, setDeferRoom] = useState<{ roomKey: string; origin: string; until: string; reason: string } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [buildingPicker, setBuildingPicker] = useState(false);
+  const buildingMenu = useRef<HTMLDivElement>(null);
+  // 건물 고르기 — 바깥을 누르거나 Esc 면 닫는다.
+  useEffect(() => {
+    if (!buildingPicker) return;
+    const onDown = (event: PointerEvent) => {
+      if (!buildingMenu.current?.contains(event.target as Node)) setBuildingPicker(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setBuildingPicker(false);
+    document.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [buildingPicker]);
   const [now, setNow] = useState(() => Date.now());
   const [timeEdit, setTimeEdit] = useState<string | null>(null);
   const [showAllRooms, setShowAllRooms] = useState<Record<string, boolean>>({});
@@ -414,7 +429,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           {board.lastChange ? fill(copy.live, { ago: agoText(board.lastChange.at, now, copy), name: board.lastChange.name }) : copy.liveNone}
         </span>
         <span className="cas-sp" />
-        <div className="cas-menu">
+        <div className="cas-menu" ref={buildingMenu}>
           <button type="button" className="cas-btn is-ghost" aria-expanded={buildingPicker} onClick={() => setBuildingPicker(!buildingPicker)}>
             {onlyMine && board.mainProperties.length > 0 ? fill(copy.myBuildings, { list: mineList }) : copy.allBuildings} ⌄
           </button>

@@ -58,6 +58,8 @@ and the major mobile/admin operations modules are implemented and being hardened
   前月調整額(몇 월분 필수)으로 나눔 · 사회보험은 雇用保険만(내년부터) · 住民税 안 뗌.
 - 워크플로우 `docs/product/40-part-time-payroll-workflow.md` — 급여 회차 상태(근태 마감 → 급여 준비 → 専務 · 社長 결재 → 지급 중 → 지급 완료 → 세무사 송부) ·
   사람별 할 일 · 한 달 일정(10일 지급) · 확인 필요 조건 · 결재 뒤 변경 시 결재 풀림 · 지급 뒤 오류는 다음 달 前月調整 · 예외 표.
+- 재류카드 · 가타카나 이름 기획 `docs/product/41-residence-card-workflow.md` — 가입(온보딩) 때 가타카나 이름 · 국적 · 재류카드 앞뒤 사진 · 카드 정보 받기,
+  관리자 확인, **A4 한 장 인쇄(실제 카드 크기, 여러 명 한 번에)**, 만료 표시, 새 권한 키 `staff_documents.view`, 비공개 버킷, 퇴사 3년 뒤 삭제. 급여(39 · 40)보다 먼저. 구현 전.
 
 ## 2026-10-22 — 알바 급여 엑셀 전체 점검 · 설계서
 

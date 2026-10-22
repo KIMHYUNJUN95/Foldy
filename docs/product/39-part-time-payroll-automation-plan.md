@@ -3,6 +3,7 @@
 > 상태: **기획 확정 전(결정 대기 §11)** · 구현 안 함. 2026-10-22 사용자 「기획부터 처음부터 끝까지 마무리부터 · 지금 보이는 엑셀 양식은 전부 빠짐없이 구현」.
 > 목적: 지금 사람이 손으로 하는 알바 급여 일(엑셀 `新アルバイト給与管理`)을 Foldy 가 **자동으로** 하게 한다. 엑셀은 **설계 참고 양식**이다 —
 > 엑셀 자체의 오류(칸 수 제한 · 줄 밀림 · `#REF!`)는 따라 하지 않는다.
+> 한 달 운영 흐름(누가 · 언제 · 상태 · 예외): `docs/product/40-part-time-payroll-workflow.md`.
 > 양식 분석: `docs/product/38-part-time-payslip-excel-spec.md`. 지금 급여 계산: `docs/product/21-attendance-payroll-workflow.md`.
 
 ## 0. 원칙

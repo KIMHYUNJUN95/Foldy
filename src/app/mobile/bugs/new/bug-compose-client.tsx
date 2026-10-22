@@ -179,7 +179,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
               </button>
             ) : null}
           </div>
-          <input accept="image/*" className="sr-only" multiple onChange={onPickFiles} ref={fileRef} tabIndex={-1} type="file" />
+          <input accept="image/*" aria-hidden="true" className="sr-only" multiple onChange={onPickFiles} ref={fileRef} tabIndex={-1} type="file" />
         </div>
 
         {error ? (

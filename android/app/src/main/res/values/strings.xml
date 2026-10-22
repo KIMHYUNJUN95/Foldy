@@ -4,4 +4,8 @@
     <string name="title_activity_main">Foldy</string>
     <string name="package_name">com.harutokyo.foldy</string>
     <string name="custom_url_scheme">com.harutokyo.foldy</string>
+    <!-- 앱 아이콘 꾹 누르기 메뉴(2026-10-22) — values-ko · values-ja 와 함께 고친다. -->
+    <string name="shortcut_attendance">Clock in/out</string>
+    <string name="shortcut_new_task">New task</string>
+    <string name="shortcut_my_rooms">My Rooms Today</string>
 </resources>

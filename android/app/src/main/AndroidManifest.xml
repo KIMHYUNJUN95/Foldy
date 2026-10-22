@@ -40,6 +40,11 @@
                 <data android:scheme="com.harutokyo.foldy" />
             </intent-filter>
 
+            <!-- 앱 아이콘 꾹 누르기 메뉴(2026-10-22) — res/xml/shortcuts.xml. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <provider

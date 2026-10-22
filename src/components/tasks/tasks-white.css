@@ -232,7 +232,7 @@ button.tkw-ck:active { transform: scale(.88); }
 .tkw-cal__wk, .tkw-cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .tkw-cal__wk span { height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-3); }
 .tkw-cal__wk span.is-sat { color: #2f6fde; }
-.tkw-cal__wk span.is-sun { color: #d8455a; }
+.tkw-cal__wk span.is-sun { color: #c4364b; }
 .tkw-cal__grid { row-gap: 4px; margin-bottom: 18px; }
 .tkw-cal__d { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; width: 44px; height: 46px; margin: 0 auto; padding: 8px 0 0; box-sizing: border-box; border: 0; border-radius: 12px; background: transparent; font: inherit; font-size: 15px; color: #16141f; font-variant-numeric: tabular-nums; cursor: pointer; transition: background 180ms ease, color 180ms ease, transform 140ms ease; }
 .tkw-cal__d:active { transform: scale(.94); }

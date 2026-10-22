@@ -3,3 +3,8 @@
 "NSLocationWhenInUseUsageDescription" = "출근 · 퇴근을 기록하는 그 순간에만 근무지에 있는지 확인하기 위해 위치를 사용합니다. 백그라운드에서 위치를 추적하지 않습니다.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "출근 · 퇴근을 기록하는 그 순간에만 근무지에 있는지 확인하기 위해 위치를 사용합니다. 백그라운드에서 위치를 추적하지 않습니다.";
 "NSPhotoLibraryUsageDescription" = "업무 기록에 첨부할 사진을 사진 보관함에서 고를 때 사용합니다.";
+
+/* 앱 아이콘 꾹 누르기 메뉴 (2026-10-22). 키는 Info.plist UIApplicationShortcutItemTitle 과 같아야 한다. */
+"Clock in/out" = "출퇴근";
+"New task" = "할 일 추가";
+"My Rooms Today" = "오늘 내 방";

@@ -175,6 +175,15 @@ and the major mobile/admin operations modules are implemented and being hardened
 - [x] **햅틱 공용 규칙** — success · error · warning · light · medium 쓰임을 `haptics.ts` 머리 주석에 정하고, 저장하면서 진동이 없던 모바일 화면에
   맞춰 넣음(결과를 받는 곳 전부, redirect 폼은 화면 이동이 피드백). 실기기(앱 · Android)에서 느낌 확인 남음 — iOS PWA 는 진동 API 가 없다.
 - H10 Android 서명은 설정이 이미 끝나 있다 — 남은 건 사용자의 키 만들기 · 백업(03 「Android 릴리스 서명」).
+- [x] **앱으로 돌아오면 새로 고침** — 5분 넘게 나가 있다 돌아오면 서버 내용을 새로(`ResumeRefresh`), 그사이 새 배포면 통째로 다시 불러옴(입력 ·
+  시트 중이면 안 함). 앱 · PWA · 브라우저 공통. 로컬 확인(1분 그대로 · 6분 새로 고침).
+- [x] **접근성 점검** — axe 를 모바일 화면 54곳 × 3너비 + 화면 밖 요소 · 작은 글자 · 작은 누르는 자리 측정. 이름 없는 버튼 0곳. 고친 것: 닫힌 메뉴가
+  화면 읽기에 그대로 읽힘(`inert`) · 숨긴 파일 입력칸 8곳 · 탭바 이름(「주요 탭」, ko/ja/en) · 일요일 빨강 등 글자 대비 4.5:1 · 시프트 달 이동
+  화살표 44px. 남은 판단: 앱 글자 크기 0.85~1.15 배 제한(N14) — Apple 권장은 200%. 규칙은 16 「접근성 — 공용 규칙」.
+- [x] **앱 아이콘 꾹 누르기 메뉴** — 출퇴근 · 할 일 추가 · 오늘 내 방(iOS `UIApplicationShortcutItems` · Android `shortcuts.xml`, ko/ja/en). 웹은
+  정해 둔 3개만 연다(`nativeShortcutToWebPath`, 테스트 2개). Android 디버그 빌드 통과. 새 앱 빌드부터 보임.
+- [x] **앱 오프라인 판정** — 앱에서는 OS 연결 상태(`@capacitor/network`)로 알약을 띄운다(iOS WebView 의 `navigator.onLine` 은 늦거나 틀림).
+  옛 앱 빌드 · 브라우저는 그대로. 새 앱 빌드부터.
 
 ## 2026-10-21 — 네이티브급 움직임 점검 (앱 출시 전)
 

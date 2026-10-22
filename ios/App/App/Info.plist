@@ -72,6 +72,35 @@
       </array>
     </dict>
 	</dict>
+	<!-- 앱 아이콘 꾹 누르기 메뉴(2026-10-22). 제목은 InfoPlist.strings(ko/ja/en)의 키 — SceneDelegate 가 type 을
+	     com.harutokyo.foldy://open/<type> 으로 바꿔 웹(NativeAuthBridge · nativeShortcutToWebPath)에 넘긴다. -->
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>attendance</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Clock in/out</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>clock</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>new-task</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>New task</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>plus.circle</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>my-rooms</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>My Rooms Today</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>bed.double</string>
+		</dict>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

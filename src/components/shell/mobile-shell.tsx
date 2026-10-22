@@ -755,6 +755,11 @@ export function MobileShell({
           aria-label={dictionary.common.menu}
           // 열려 있을 때만 — 앱(Android) 뒤로가기 버튼이 먼저 메뉴를 닫게 한다(NativeShellBridge, 2026-10-06).
           data-native-back-overlay={sidebarOpen ? "" : undefined}
+          // 닫혀 있으면 화면 밖에 있어도 화면 읽기(VoiceOver · TalkBack)와 키보드가 메뉴 20여 개를 본문보다 먼저 읽었다 — 닫힌 동안은 없는
+          // 것으로(inert). 열려 있으면 뒤 화면을 읽지 않게 모달로 알린다(2026-10-22 접근성 점검).
+          inert={!sidebarOpen}
+          role={sidebarOpen ? "dialog" : undefined}
+          aria-modal={sidebarOpen ? true : undefined}
           ref={drawerRef}
           className={cn(
             "absolute inset-y-0 left-0 z-[60] flex w-full flex-col overflow-hidden px-4 pb-[18px] pt-[max(24px,env(safe-area-inset-top))] text-foreground",
@@ -981,7 +986,7 @@ export function MobileShell({
 
           {hideBottomNav ? null : (
             <nav
-              aria-label={title}
+              aria-label={dictionary.common.tabBarLabel}
               className={cn(
                 "tabbar absolute inset-x-0 bottom-0 z-20 motion-reduce:transition-none fold:hidden",
                 wide && "mx-auto max-w-[560px]",

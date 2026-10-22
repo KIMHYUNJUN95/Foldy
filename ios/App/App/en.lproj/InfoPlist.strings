@@ -3,3 +3,8 @@
 "NSLocationWhenInUseUsageDescription" = "Foldy checks your location only at the moment you clock in or out, to confirm you are at the work site. Location is never tracked in the background.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Foldy checks your location only at the moment you clock in or out, to confirm you are at the work site. Location is never tracked in the background.";
 "NSPhotoLibraryUsageDescription" = "Foldy lets you choose photos from your library to attach to work records.";
+
+/* 앱 아이콘 꾹 누르기 메뉴 (2026-10-22). 키는 Info.plist UIApplicationShortcutItemTitle 과 같아야 한다. */
+"Clock in/out" = "Clock in/out";
+"New task" = "New task";
+"My Rooms Today" = "My Rooms Today";

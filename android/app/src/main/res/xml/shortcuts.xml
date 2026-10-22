@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘 꾹 누르기 메뉴(2026-10-22). 누르면 com.harutokyo.foldy://open/<id> 로 앱을 연다 → 웹이 정해 둔 화면으로 이동
+     (src/lib/native-app.ts NATIVE_SHORTCUT_PATHS · NativeAuthBridge). id 는 iOS Info.plist UIApplicationShortcutItems 의 type 과 같다. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_attendance"
+        android:shortcutId="attendance"
+        android:shortcutShortLabel="@string/shortcut_attendance">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="com.harutokyo.foldy://open/attendance"
+            android:targetClass="com.harutokyo.foldy.MainActivity"
+            android:targetPackage="com.harutokyo.foldy" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_task"
+        android:shortcutId="new-task"
+        android:shortcutShortLabel="@string/shortcut_new_task">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="com.harutokyo.foldy://open/new-task"
+            android:targetClass="com.harutokyo.foldy.MainActivity"
+            android:targetPackage="com.harutokyo.foldy" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_my_rooms"
+        android:shortcutId="my-rooms"
+        android:shortcutShortLabel="@string/shortcut_my_rooms">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="com.harutokyo.foldy://open/my-rooms"
+            android:targetClass="com.harutokyo.foldy.MainActivity"
+            android:targetPackage="com.harutokyo.foldy" />
+    </shortcut>
+</shortcuts>

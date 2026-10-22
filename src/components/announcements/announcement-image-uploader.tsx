@@ -277,10 +277,12 @@ export const AnnouncementImageUploader = forwardRef<
 
       <input
         accept="image/gif,image/jpeg,image/png,image/webp"
+        aria-hidden="true"
         className="sr-only"
         multiple
         onChange={handlePickChange}
         ref={pickInputRef}
+        tabIndex={-1}
         type="file"
       />
 

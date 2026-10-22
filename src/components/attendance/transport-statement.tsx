@@ -496,6 +496,8 @@ function AddItemSheet({
               type="file"
               accept="image/*"
               multiple
+              aria-hidden="true"
+              tabIndex={-1}
               className="sr-only"
               onChange={(e) => {
                 if (e.target.files) {
@@ -862,6 +864,8 @@ function EditItemSheet({
               type="file"
               accept="image/*"
               multiple
+              aria-hidden="true"
+              tabIndex={-1}
               className="sr-only"
               onChange={(e) => {
                 if (e.target.files) {

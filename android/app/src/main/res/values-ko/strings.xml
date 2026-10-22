@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 앱 아이콘 꾹 누르기 메뉴(2026-10-22) -->
+    <string name="shortcut_attendance">출퇴근</string>
+    <string name="shortcut_new_task">할 일 추가</string>
+    <string name="shortcut_my_rooms">오늘 내 방</string>
+</resources>

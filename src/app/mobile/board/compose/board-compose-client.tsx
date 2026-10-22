@@ -222,13 +222,15 @@ export function BoardComposeClient({
           />
         ))}
       </BoardAttachSection>
-      <input accept="image/*" className="sr-only" multiple onChange={handleImageSelect} ref={imageInputRef} type="file" />
+      <input accept="image/*" aria-hidden="true" className="sr-only" multiple onChange={handleImageSelect} ref={imageInputRef} tabIndex={-1} type="file" />
       <input
         accept=".pdf,.xlsx,.xls,.csv,.docx,.doc,.pptx,.ppt"
+        aria-hidden="true"
         className="sr-only"
         multiple
         onChange={handleFileSelect}
         ref={fileInputRef}
+        tabIndex={-1}
         type="file"
       />
 

@@ -1282,7 +1282,7 @@
 .lvw .lnf__in svg { width: 16px; height: 16px; color: var(--text-3); flex: none; }
 .lvw .lnf__in::placeholder { color: #b4b1bf; font-weight: 400; }
 .lvw .lnf__ta { display: block; min-height: 96px; padding: 12px 14px 24px; line-height: 1.55; resize: none; cursor: text; }
-.lvw .lnf__count { position: absolute; right: 12px; bottom: 8px; font-size: 11px; color: #b4b1bf; }
+.lvw .lnf__count { position: absolute; right: 12px; bottom: 8px; font-size: 11px; color: #77738a; }
 .lvw .lvw-q { margin: 18px 0 8px; font-size: 13px; font-weight: 600; color: #3a3746; }
 .lvw .lvw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .lvw .lvw-chip { height: 38px; padding: 0 14px; border: 0; border-radius: 19px; background: #f4f4f7; font: inherit; font-size: 14px; color: #3a3746; cursor: pointer; transition: transform 120ms ease; }
@@ -1334,7 +1334,7 @@
 .lvw .lvw-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; margin-top: 8px; }
 .lvw .lvw-cal__wd { text-align: center; font-size: 12px; color: var(--text-3); padding: 6px 0; }
 .lvw .lvw-cal__wd.is-sat { color: #2f6fde; }
-.lvw .lvw-cal__wd.is-sun { color: #d8455a; }
+.lvw .lvw-cal__wd.is-sun { color: #c4364b; }
 .lvw .lvw-cal__cell { height: 46px; display: flex; align-items: center; justify-content: center; }
 .lvw .lvw-cal__d { width: 38px; height: 40px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .lvw .lvw-cal__d.is-today { background: #7a52e6; color: #fff; font-weight: 700; }

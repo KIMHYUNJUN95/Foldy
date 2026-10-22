@@ -27,7 +27,7 @@
 .shf-calbox { display: flex; flex-direction: column; gap: 4px; }
 .shf-nav { display: flex; align-items: center; }
 .shf-month { font-size: 22px; font-weight: 700; line-height: 28px; white-space: nowrap; }
-.shf-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; color: #7a52e6; }
+.shf-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 999px; color: #7a52e6; }
 .shf-icon.is-last { margin-right: -12px; }
 .shf-icon svg { width: 22px; height: 22px; }
 .shf-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }

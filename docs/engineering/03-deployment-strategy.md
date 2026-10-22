@@ -175,6 +175,8 @@ Google 은 앱 내 WebView 의 OAuth 를 막는다(`403 disallowed_useragent`). 
 | Android 뒤로가기 버튼 | — | 오버레이 닫기 → 이전 화면 → 앱 최소화(`16-mobile-navigation.md`) |
 | 앱 안 브라우저 모양 | — | 툴바 = 앱 바탕색 아이보리(`IN_APP_BROWSER_OPTIONS` — 외부 링크 · Google 로그인 공통, N5) |
 | 링크 · 사진 길게 누르기 | 브라우저 메뉴 | 메뉴 없음(`contextmenu` 차단, 입력칸 · 편집 영역 제외). iOS 링크 미리보기 off(`ios.allowsLinkPreview: false`) — N8 |
+| 앱 아이콘 꾹 누르기(2026-10-22) | — | 출퇴근 · 할 일 추가 · 오늘 내 방. iOS `Info.plist` `UIApplicationShortcutItems` → `SceneDelegate` 가 `com.harutokyo.foldy://open/<id>` 로 넘김 · Android `res/xml/shortcuts.xml`(같은 주소 VIEW 인텐트). 웹 `NativeAuthBridge` + `nativeShortcutToWebPath`(허용 목록). id 를 바꾸면 세 곳을 같이 |
+| 연결 상태(2026-10-22) | `navigator.onLine` | `@capacitor/network` 로 오프라인 알약 판정(`OfflinePill`). 플러그인 없는 옛 빌드는 브라우저 값 |
 
 - 상태바 · 내비게이션 바: `capacitor.config.ts` `plugins.SystemBars` = `insetsHandling: "native"` + `initialViewportFitValueHint: "cover"`
   + `style: "LIGHT"`(어두운 아이콘). 웹의 `viewport-fit=cover` · `env(safe-area-inset-*)` 가 그대로 쓰인다(Android 15+ edge-to-edge 대응).

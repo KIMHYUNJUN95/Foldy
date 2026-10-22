@@ -3,3 +3,8 @@
 "NSLocationWhenInUseUsageDescription" = "出勤・退勤を記録する時点でのみ、勤務地にいることを確認するために位置情報を使用します。バックグラウンドで位置情報を追跡することはありません。";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "出勤・退勤を記録する時点でのみ、勤務地にいることを確認するために位置情報を使用します。バックグラウンドで位置情報を追跡することはありません。";
 "NSPhotoLibraryUsageDescription" = "業務記録に添付する写真を写真ライブラリから選ぶときに使用します。";
+
+/* 앱 아이콘 꾹 누르기 메뉴 (2026-10-22). 키는 Info.plist UIApplicationShortcutItemTitle 과 같아야 한다. */
+"Clock in/out" = "出退勤";
+"New task" = "タスクを追加";
+"My Rooms Today" = "今日の部屋";

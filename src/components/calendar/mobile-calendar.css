@@ -44,7 +44,7 @@
 .mcw-day { display: flex; flex-direction: column; align-items: center; gap: 1px; flex: none; padding: 6px 0; font-size: 11px; color: var(--mcw-soft); background: rgba(255, 255, 255, .92); }
 .mcw-day b { font-size: 14px; font-weight: 700; color: var(--mcw-ink); }
 .mcw-day.is-sat span { color: #2f6fde; }
-.mcw-day.is-sun span { color: #d8455a; }
+.mcw-day.is-sun span { color: #c4364b; }
 .mcw-day.is-today { background: #f4f1fd; }
 .mcw-day.is-today span, .mcw-day.is-today b { color: var(--mcw-pri-ink); }
 .mcw-head__empty { height: 26px; align-items: center; background: rgba(255, 255, 255, .92); }

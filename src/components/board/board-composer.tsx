@@ -225,7 +225,7 @@ export function BoardComposer({
           <ArrowRight aria-hidden="true" strokeWidth={2} />
         </button>
       </div>
-      <input accept="image/*" className="sr-only" multiple onChange={onPickFiles} ref={fileRef} type="file" />
+      <input accept="image/*" aria-hidden="true" className="sr-only" multiple onChange={onPickFiles} ref={fileRef} tabIndex={-1} type="file" />
     </div>
   );
 }

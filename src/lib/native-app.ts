@@ -129,3 +129,22 @@ export function nativeCallbackToWebPath(url: string): string | null {
   const query = rest.split("#")[0];
   return `/auth/callback${query}`;
 }
+
+/**
+ * 앱 아이콘 꾹 누르기 메뉴(2026-10-22) — `com.harutokyo.foldy://open/<id>` → 웹 경로. 정해 둔 것만 연다(아무 주소나 열지 않게).
+ * iOS `Info.plist` `UIApplicationShortcutItems`(SceneDelegate 가 이 주소로 바꿔 넘긴다) · Android `res/xml/shortcuts.xml` 의
+ * id 와 같아야 한다. 권한 없는 화면이면 그 화면이 평소처럼 막는다.
+ */
+export const NATIVE_SHORTCUT_PATHS: Record<string, string> = {
+  attendance: "/mobile/attendance",
+  "new-task": "/mobile/tasks/new",
+  "my-rooms": "/mobile/shift/today",
+};
+
+/** `com.harutokyo.foldy://open/<id>` 이면 그 바로가기의 웹 경로를, 아니면 null. 문자열로 판정한다(`nativeCallbackToWebPath` 와 같은 이유). */
+export function nativeShortcutToWebPath(url: string): string | null {
+  const prefix = `${NATIVE_APP_SCHEME}://open/`;
+  if (typeof url !== "string" || !url.startsWith(prefix)) return null;
+  const id = url.slice(prefix.length).split(/[?#/]/)[0];
+  return Object.hasOwn(NATIVE_SHORTCUT_PATHS, id) ? NATIVE_SHORTCUT_PATHS[id] : null;
+}

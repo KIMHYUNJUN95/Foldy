@@ -136,6 +136,9 @@ For `/mobile/*`, treat `src/components/shell/mobile-shell.tsx` as a global contr
 - **Row removal collapses (2026-10-21).** Removing a row from a mobile list collapses it immediately (wrap in
   `.row-collapse`, set `data-leaving` before awaiting the server, remove it on failure) — no row vanishing after a
   round-trip. Quick status toggles use `useOptimistic`. See 16 → 「줄 접힘 · 즉시 반영 — 공용」.
+- **Accessibility basics are shared (2026-10-22).** Off-screen panels that stay mounted (the drawer) are `inert` while
+  closed; hidden file inputs opened by a labelled button get `aria-hidden` + `tabIndex={-1}`; icon-only buttons need an
+  `aria-label` from i18n; text contrast ≥ 4.5:1 (Sunday red is `#c4364b`, not `#d8455a`). See 16 → 「접근성 — 공용 규칙」.
 - **Swipe back is a shared contract (2026-10-08).** Back = swiping right anywhere on a screen (`src/lib/swipe-back/*`, wired in
   `MobileShell`). Do not add back buttons or a second swipe handler. Any element with its own horizontal gesture (swipe-to-reveal
   row — only while open, carousel, drag grid, reorder handle) must carry `data-swipe-back="off"`; new full-screen overlays need

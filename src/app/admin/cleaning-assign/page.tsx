@@ -40,7 +40,7 @@ export default async function AdminCleaningAssignPage({
 
   if (params.view === "month") {
     const ym = isMonthKey(params.ym) ? params.ym! : monthOf(today);
-    const board = await loadMonthBoard(supabase, organizationId, ym);
+    const board = await loadMonthBoard(supabase, organizationId, ym, session.user.id);
     return (
       <AdminShell activeItem="cleaning-assign" title={copy.title}>
         <AssignMonthBoard board={board} copy={copy} locale={locale} today={today} shared={shared} canCompare={canCompare} />

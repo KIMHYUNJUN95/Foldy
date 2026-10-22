@@ -85,7 +85,7 @@ export async function assignToRoom(input: { date: string; roomKey: string; userI
   if (!isEditableDate(input.date) || !isUuid(input.userId) || typeof input.roomKey !== "string") return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const [rooms, member] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date), isFieldMember(organizationId, input.userId)]);
+  const [rooms, member] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date, session.user.id), isFieldMember(organizationId, input.userId)]);
   const room = rooms.find((item) => item.roomKey === input.roomKey);
   // 미뤘거나 처리 끝으로 둔 방에는 넣지 않는다(되돌린 뒤에).
   if (!room || !member || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
@@ -155,7 +155,7 @@ export async function reassignRooms(input: { date: string; moves: RoomMove[] }):
   if (new Set(moves.map((m) => `${m.roomKey}|${m.fromUserId}`)).size !== moves.length) return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const [rooms, members] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date), loadFieldMembers(supabase, organizationId)]);
+  const [rooms, members] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date, session.user.id), loadFieldMembers(supabase, organizationId)]);
   const memberIds = new Set(members.map((m) => m.userId));
   const roomBy = new Map(rooms.map((r) => [r.roomKey, r]));
   for (const m of moves) {
@@ -185,7 +185,7 @@ export async function applyDaySuggestions(input: { date: string; onlyFixed?: boo
   if (!isEditableDate(input.date)) return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const suggestions = await computeDaySuggestions(supabase, organizationId, input.date, Boolean(input.onlyFixed));
+  const suggestions = await computeDaySuggestions(supabase, organizationId, input.date, Boolean(input.onlyFixed), session.user.id);
   if (suggestions.length === 0) return { added: 0, ok: true };
   const result = await supabase
     .from("cleaning_assignments")
@@ -349,7 +349,7 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
   if (until !== null && (!isDateKey(until) || until <= input.date || until > addDays(input.date, MAX_DEFER_DAYS))) return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const room = (await loadAssignDayRooms(supabase, organizationId, input.date)).find((item) => item.roomKey === input.roomKey);
+  const room = (await loadAssignDayRooms(supabase, organizationId, input.date, session.user.id)).find((item) => item.roomKey === input.roomKey);
   if (!room) return { ok: false, reason: "invalid" };
   const reason = String(input.reason ?? "").trim().slice(0, 120);
   // 그날 이 방 배정은 뺀다 — 뺀 사람을 미룸 줄에 남겨 「되돌리기」가 다시 넣게(이미 미룬 방을 다시 미루면 전에 뺀 사람과 합친다).
@@ -440,7 +440,7 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
   }
   const restore = [...new Set((result.data ?? []).flatMap((row) => row.removed_user_ids ?? []))].slice(0, 10);
   if (restore.length > 0 && isEditableDate(input.date)) {
-    const room = (await loadAssignDayRooms(supabase, organizationId, input.date)).find((item) => item.roomKey === input.roomKey);
+    const room = (await loadAssignDayRooms(supabase, organizationId, input.date, session.user.id)).find((item) => item.roomKey === input.roomKey);
     if (room) {
       const members = await Promise.all(restore.map((userId) => isFieldMember(organizationId, userId)));
       const rows = restore
@@ -481,8 +481,8 @@ export async function previewMonthSuggestions(input: { ym: string }): Promise<As
   const supabase = getSupabaseServiceClient();
   const today = getCleaningOperatingDateKey();
   const [board, result] = await Promise.all([
-    loadMonthBoard(supabase, session.organization.id, input.ym),
-    computeMonthSuggestions(supabase, session.organization.id, input.ym, today),
+    loadMonthBoard(supabase, session.organization.id, input.ym, session.user.id),
+    computeMonthSuggestions(supabase, session.organization.id, input.ym, today, session.user.id),
   ]);
   return {
     board,
@@ -499,7 +499,7 @@ export async function applyMonthSuggestions(input: { ym: string }): Promise<Assi
   if (!isMonthKey(input.ym)) return { ok: false, reason: "invalid" };
   const supabase = getSupabaseServiceClient();
   const organizationId = session.organization.id;
-  const { suggestions } = await computeMonthSuggestions(supabase, organizationId, input.ym, getCleaningOperatingDateKey());
+  const { suggestions } = await computeMonthSuggestions(supabase, organizationId, input.ym, getCleaningOperatingDateKey(), session.user.id);
   if (suggestions.length === 0) return { added: 0, ok: true };
   const result = await supabase
     .from("cleaning_assignments")
@@ -563,10 +563,10 @@ export async function saveAssignRules(input: { rules: AssignRule[] }): Promise<A
   if (!Array.isArray(input.rules) || input.rules.some((rule) => !isAssignRuleKey(rule?.key))) return { ok: false, reason: "invalid" };
   const rules = normalizeAssignRules(input.rules);
   const supabase = getSupabaseServiceClient();
-  const before = await supabase.from("cleaning_assign_settings").select("rules").eq("organization_id", session.organization.id).maybeSingle();
+  const before = await supabase.from("cleaning_assign_settings").select("rules").eq("organization_id", session.organization.id).eq("owner_id", session.user.id).maybeSingle();
   const result = await supabase
     .from("cleaning_assign_settings")
-    .upsert({ organization_id: session.organization.id, rules: rules as never, updated_at: new Date().toISOString(), updated_by: session.user.id }, { onConflict: "organization_id" });
+    .upsert({ organization_id: session.organization.id, owner_id: session.user.id, rules: rules as never, updated_at: new Date().toISOString(), updated_by: session.user.id }, { onConflict: "organization_id,owner_id" });
   if (result.error) return { ok: false, reason: "error" };
   await writeSettingLog(session.organization.id, session.user.id, { after: rules, area: "rules", before: before.data?.rules ?? null });
   revalidate();
@@ -579,7 +579,7 @@ export async function saveFlagThreshold(input: { threshold: number }): Promise<A
   if (!(FLAG_THRESHOLD_OPTIONS as readonly number[]).includes(input.threshold)) return { ok: false, reason: "invalid" };
   const result = await getSupabaseServiceClient()
     .from("cleaning_assign_settings")
-    .upsert({ flag_threshold: input.threshold, organization_id: session.organization.id, updated_at: new Date().toISOString(), updated_by: session.user.id }, { onConflict: "organization_id" });
+    .upsert({ flag_threshold: input.threshold, organization_id: session.organization.id, owner_id: session.user.id, updated_at: new Date().toISOString(), updated_by: session.user.id }, { onConflict: "organization_id,owner_id" });
   if (result.error) return { ok: false, reason: "error" };
   revalidatePath("/admin/cleaning-assign/compare");
   return { ok: true };
@@ -595,15 +595,15 @@ export async function saveFixedStaff(input: { propertyName: string; entries: Arr
   const supabase = getSupabaseServiceClient();
   const members = new Set((await loadFieldMembers(supabase, organizationId)).map((member) => member.userId));
   const seen = new Set<string>();
-  const rows: Array<{ organization_id: string; property_name: string; user_id: string; tier: number; position: number }> = [];
+  const rows: Array<{ organization_id: string; owner_id: string; property_name: string; user_id: string; tier: number; position: number }> = [];
   for (const entry of input.entries) {
     if (!isUuid(entry.userId) || !members.has(entry.userId) || seen.has(entry.userId)) return { ok: false, reason: "invalid" };
     if (!Number.isInteger(entry.tier) || entry.tier < 1 || entry.tier > 9) return { ok: false, reason: "invalid" };
     seen.add(entry.userId);
-    rows.push({ organization_id: organizationId, position: rows.filter((row) => row.tier === entry.tier).length, property_name: propertyName, tier: entry.tier, user_id: entry.userId });
+    rows.push({ organization_id: organizationId, owner_id: session.user.id, position: rows.filter((row) => row.tier === entry.tier).length, property_name: propertyName, tier: entry.tier, user_id: entry.userId });
   }
-  const before = await supabase.from("cleaning_fixed_staff").select("user_id, tier").eq("organization_id", organizationId).eq("property_name", propertyName);
-  const del = await supabase.from("cleaning_fixed_staff").delete().eq("organization_id", organizationId).eq("property_name", propertyName);
+  const before = await supabase.from("cleaning_fixed_staff").select("user_id, tier").eq("organization_id", organizationId).eq("owner_id", session.user.id).eq("property_name", propertyName);
+  const del = await supabase.from("cleaning_fixed_staff").delete().eq("organization_id", organizationId).eq("owner_id", session.user.id).eq("property_name", propertyName);
   if (del.error) return { ok: false, reason: "error" };
   if (rows.length > 0) {
     const insert = await supabase.from("cleaning_fixed_staff").insert(rows);
@@ -648,7 +648,7 @@ export async function saveStaffProfile(input: { userId: string; patch: StaffProf
   if (Object.keys(patch).length === 0) return { ok: false, reason: "invalid" };
   const result = await getSupabaseServiceClient()
     .from("cleaning_staff_profiles")
-    .upsert({ organization_id: organizationId, updated_at: new Date().toISOString(), updated_by: session.user.id, user_id: input.userId, ...patch }, { onConflict: "organization_id,user_id" });
+    .upsert({ organization_id: organizationId, owner_id: session.user.id, updated_at: new Date().toISOString(), updated_by: session.user.id, user_id: input.userId, ...patch }, { onConflict: "organization_id,owner_id,user_id" });
   if (result.error) {
     console.error("[cleaning-assign] profile save failed", { code: result.error.code });
     return { ok: false, reason: "error" };
@@ -666,7 +666,7 @@ export async function answerTraineeCheck(input: { userId: string; done: boolean;
   const patch = input.done ? { trainee: false } : { trainee_check_at: Math.min(99, input.currentCount + TRAINEE_CHECK_STEP) };
   const result = await getSupabaseServiceClient()
     .from("cleaning_staff_profiles")
-    .upsert({ organization_id: session.organization.id, updated_at: new Date().toISOString(), updated_by: session.user.id, user_id: input.userId, ...patch }, { onConflict: "organization_id,user_id" });
+    .upsert({ organization_id: session.organization.id, owner_id: session.user.id, updated_at: new Date().toISOString(), updated_by: session.user.id, user_id: input.userId, ...patch }, { onConflict: "organization_id,owner_id,user_id" });
   if (result.error) return { ok: false, reason: "error" };
   revalidate();
   return { ok: true };
@@ -684,10 +684,10 @@ export async function saveRoomHeadcount(input: { roomKey: string; headcount: num
   if (!options.some((option) => option.roomKey === input.roomKey)) return { ok: false, reason: "invalid" };
   const result =
     input.headcount === 1
-      ? await supabase.from("cleaning_room_settings").delete().eq("organization_id", organizationId).eq("room_key", input.roomKey)
+      ? await supabase.from("cleaning_room_settings").delete().eq("organization_id", organizationId).eq("owner_id", session.user.id).eq("room_key", input.roomKey)
       : await supabase
           .from("cleaning_room_settings")
-          .upsert({ organization_id: organizationId, room_key: input.roomKey, updated_at: new Date().toISOString(), updated_by: session.user.id, usual_headcount: input.headcount }, { onConflict: "organization_id,room_key" });
+          .upsert({ organization_id: organizationId, owner_id: session.user.id, room_key: input.roomKey, updated_at: new Date().toISOString(), updated_by: session.user.id, usual_headcount: input.headcount }, { onConflict: "organization_id,owner_id,room_key" });
   if (result.error) return { ok: false, reason: "error" };
   await writeSettingLog(organizationId, session.user.id, { area: "room", headcount: input.headcount, roomKey: input.roomKey });
   revalidate();
@@ -701,7 +701,7 @@ export async function saveMyMainProperties(input: { properties: string[] }): Pro
   if (!Array.isArray(input.properties) || input.properties.length > 20 || input.properties.some((p) => typeof p !== "string" || p.length > 80)) return { ok: false, reason: "invalid" };
   const result = await getSupabaseServiceClient()
     .from("cleaning_staff_profiles")
-    .upsert({ main_properties: [...new Set(input.properties)], organization_id: session.organization.id, updated_at: new Date().toISOString(), user_id: session.user.id }, { onConflict: "organization_id,user_id" });
+    .upsert({ main_properties: [...new Set(input.properties)], organization_id: session.organization.id, owner_id: session.user.id, updated_at: new Date().toISOString(), user_id: session.user.id }, { onConflict: "organization_id,owner_id,user_id" });
   if (result.error) return { ok: false, reason: "error" };
   revalidatePath("/admin/cleaning-assign");
   return { ok: true };

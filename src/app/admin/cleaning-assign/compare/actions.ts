@@ -35,7 +35,7 @@ async function buildSheet(input: ExportInput): Promise<{ meta: AdminExportMeta; 
 
   const meta = buildAdminExportMeta(session);
   const copy = getCleaningAssignCopy(meta.locale);
-  const raw = await loadCompareRows(supabase, organizationId, input.ym, async (userId) => {
+  const raw = await loadCompareRows(supabase, organizationId, input.ym, session.user.id, async (userId) => {
     const view = await getMonthlyPayView(organizationId, userId, input.ym, meta.locale);
     return { expectedGross: view.expectedGross, finalizedGross: view.finalization?.gross ?? null, totalPaidMinutes: view.finalization?.paidMinutes ?? view.totalPaidMinutes };
   });

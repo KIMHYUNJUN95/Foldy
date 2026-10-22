@@ -74,23 +74,32 @@ const EMPTY_PROFILE: StaffProfile = {
   mainProperties: [],
 };
 
-export async function loadStaffProfiles(supabase: Client, organizationId: string): Promise<Map<string, StaffProfile>> {
-  const result = await supabase.from("cleaning_staff_profiles").select("*").eq("organization_id", organizationId);
+/** 사람별 설정은 배정 담당(owner)마다 따로다 — 주인이 없으면(알바 화면에서 배정한 사람을 모를 때) 빈 값. */
+export async function loadStaffProfiles(supabase: Client, organizationId: string, ownerId: string | null): Promise<Map<string, StaffProfile>> {
+  if (!ownerId) return new Map();
+  const result = await supabase.from("cleaning_staff_profiles").select("*").eq("organization_id", organizationId).eq("owner_id", ownerId);
   if (result.error) throw new Error(result.error.message);
-  return new Map(
-    (result.data ?? []).map((row) => [
-      row.user_id,
-      {
-        priority: row.priority,
-        trainee: row.trainee,
-        traineeCheckAt: row.trainee_check_at,
-        trainer: row.trainer,
-        defaultStartMinutes: timeToMinutes(row.default_start_time),
-        memo: row.memo,
-        mainProperties: row.main_properties ?? [],
-      },
-    ]),
-  );
+  return new Map((result.data ?? []).map((row) => [row.user_id, toStaffProfile(row)]));
+}
+
+/** 알바 화면용 — 그 방을 배정한 사람(owner)이 정한 사람별 설정. 열쇠는 `${ownerId}|${userId}`. */
+export async function loadProfilesByOwners(supabase: Client, organizationId: string, ownerIds: string[], userIds: string[]): Promise<Map<string, StaffProfile>> {
+  if (ownerIds.length === 0 || userIds.length === 0) return new Map();
+  const result = await supabase.from("cleaning_staff_profiles").select("*").eq("organization_id", organizationId).in("owner_id", ownerIds).in("user_id", userIds);
+  if (result.error) throw new Error(result.error.message);
+  return new Map((result.data ?? []).map((row) => [`${row.owner_id}|${row.user_id}`, toStaffProfile(row)]));
+}
+
+function toStaffProfile(row: Database["public"]["Tables"]["cleaning_staff_profiles"]["Row"]): StaffProfile {
+  return {
+    priority: row.priority,
+    trainee: row.trainee,
+    traineeCheckAt: row.trainee_check_at,
+    trainer: row.trainer,
+    defaultStartMinutes: timeToMinutes(row.default_start_time),
+    memo: row.memo,
+    mainProperties: row.main_properties ?? [],
+  };
 }
 
 export function profileOf(profiles: Map<string, StaffProfile>, userId: string): StaffProfile {
@@ -111,8 +120,9 @@ export type AssignSettings = {
   updatedByName: string | null;
 };
 
-export async function loadAssignSettings(supabase: Client, organizationId: string): Promise<AssignSettings> {
-  const result = await supabase.from("cleaning_assign_settings").select("*").eq("organization_id", organizationId).maybeSingle();
+/** 제안 규칙 · 비교표 기준 — 배정 담당(owner)마다 한 벌. */
+export async function loadAssignSettings(supabase: Client, organizationId: string, ownerId: string): Promise<AssignSettings> {
+  const result = await supabase.from("cleaning_assign_settings").select("*").eq("organization_id", organizationId).eq("owner_id", ownerId).maybeSingle();
   if (result.error) throw new Error(result.error.message);
   const row = result.data;
   let updatedByName: string | null = null;
@@ -129,11 +139,12 @@ export async function loadAssignSettings(supabase: Client, organizationId: strin
 }
 
 /** 건물 → (사람 → 순위). */
-export async function loadFixedTiers(supabase: Client, organizationId: string): Promise<Record<string, Record<string, number>>> {
+export async function loadFixedTiers(supabase: Client, organizationId: string, ownerId: string): Promise<Record<string, Record<string, number>>> {
   const result = await supabase
     .from("cleaning_fixed_staff")
     .select("property_name, user_id, tier, position")
     .eq("organization_id", organizationId)
+    .eq("owner_id", ownerId)
     .order("tier")
     .order("position");
   if (result.error) throw new Error(result.error.message);
@@ -147,11 +158,12 @@ export async function loadFixedTiers(supabase: Client, organizationId: string): 
 
 export type FixedStaffRow = { propertyName: string; userId: string; tier: number; position: number };
 
-export async function loadFixedStaffRows(supabase: Client, organizationId: string): Promise<FixedStaffRow[]> {
+export async function loadFixedStaffRows(supabase: Client, organizationId: string, ownerId: string): Promise<FixedStaffRow[]> {
   const result = await supabase
     .from("cleaning_fixed_staff")
     .select("property_name, user_id, tier, position")
     .eq("organization_id", organizationId)
+    .eq("owner_id", ownerId)
     .order("tier")
     .order("position");
   if (result.error) throw new Error(result.error.message);
@@ -372,11 +384,11 @@ export async function loadDayBoard(supabase: Client, organizationId: string, dat
 
 async function buildDay(supabase: Client, organizationId: string, date: string, viewerId: string): Promise<DayBuild> {
   const [rooms, members, profiles, settings, fixedTiers, assignments, applications] = await Promise.all([
-    loadAssignDayRooms(supabase, organizationId, date),
+    loadAssignDayRooms(supabase, organizationId, date, viewerId),
     loadFieldMembers(supabase, organizationId),
-    loadStaffProfiles(supabase, organizationId),
-    loadAssignSettings(supabase, organizationId),
-    loadFixedTiers(supabase, organizationId),
+    loadStaffProfiles(supabase, organizationId, viewerId),
+    loadAssignSettings(supabase, organizationId, viewerId),
+    loadFixedTiers(supabase, organizationId, viewerId),
     loadAssignments(supabase, organizationId, date, date),
     loadApplications(supabase, organizationId, date, date),
   ]);
@@ -553,8 +565,9 @@ export async function computeDaySuggestions(
   organizationId: string,
   date: string,
   onlyFixed: boolean,
+  ownerId: string,
 ): Promise<Array<Suggestion & { propertyName: string; roomLabel: string }>> {
-  const day = await buildDay(supabase, organizationId, date, "");
+  const day = await buildDay(supabase, organizationId, date, ownerId);
   const byKey = new Map(day.board.rooms.map((room) => [room.roomKey, room]));
   return suggestAssignments({ fixedTiers: day.fixedTiers, onlyFixed, people: day.suggestPeople, rooms: day.suggestRooms, rules: day.board.rules }).map((s) => ({
     ...s,
@@ -597,15 +610,15 @@ export async function loadMonthOpenCounts(supabase: Client, organizationId: stri
   return out;
 }
 
-export async function loadMonthBoard(supabase: Client, organizationId: string, ym: string): Promise<MonthBoard> {
+export async function loadMonthBoard(supabase: Client, organizationId: string, ym: string, ownerId: string): Promise<MonthBoard> {
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
   const [range, members, profiles, fixedTiers, assignments, applications, held] = await Promise.all([
     loadRangeRooms(supabase, organizationId, from, to),
     loadFieldMembers(supabase, organizationId),
-    loadStaffProfiles(supabase, organizationId),
-    loadFixedTiers(supabase, organizationId),
+    loadStaffProfiles(supabase, organizationId, ownerId),
+    loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, from, to),
     loadApplications(supabase, organizationId, from, to),
     loadHeldRoomKeys(supabase, organizationId, from, to),
@@ -669,18 +682,19 @@ export async function computeMonthSuggestions(
   organizationId: string,
   ym: string,
   fromDate: string,
+  ownerId: string,
 ): Promise<{ suggestions: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }>; openTotal: number; shortDays: string[] }> {
   const days = monthDays(ym).filter((date) => date >= fromDate);
   if (days.length === 0) return { openTotal: 0, shortDays: [], suggestions: [] };
   const [range, members, profiles, fixedTiers, settings, assignments, applications, roomSettings, held] = await Promise.all([
     loadRangeRooms(supabase, organizationId, days[0], days.at(-1)!),
     loadFieldMembers(supabase, organizationId),
-    loadStaffProfiles(supabase, organizationId),
-    loadFixedTiers(supabase, organizationId),
-    loadAssignSettings(supabase, organizationId),
+    loadStaffProfiles(supabase, organizationId, ownerId),
+    loadFixedTiers(supabase, organizationId, ownerId),
+    loadAssignSettings(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, days[0], days.at(-1)!),
     loadApplications(supabase, organizationId, days[0], days.at(-1)!),
-    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId),
+    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId).eq("owner_id", ownerId),
     loadHeldRoomKeys(supabase, organizationId, days[0], days.at(-1)!),
   ]);
   const usual = new Map((roomSettings.data ?? []).map((row) => [row.room_key, row.usual_headcount]));
@@ -767,14 +781,11 @@ export async function loadMyShift(
   const days = monthDays(ym);
   const from = days[0] < today ? days[0] : today;
   const to = addDays(today, 7) > days.at(-1)! ? addDays(today, 7) : days.at(-1)!;
-  const [range, myApps, allAssign, profiles] = await Promise.all([
+  const [range, myApps, allAssign] = await Promise.all([
     loadRangeRooms(supabase, organizationId, from, to),
     loadApplications(supabase, organizationId, from, to, userId),
     loadAssignments(supabase, organizationId, from, to),
-    loadStaffProfiles(supabase, organizationId),
   ]);
-  const profile = profileOf(profiles, userId);
-  const base = profile.defaultStartMinutes ?? defaultStartMinutes(role);
   const appBy = new Map(myApps.map((a) => [a.workDate, a]));
   const assignedKeys = new Map<string, Set<string>>();
   const mineBy = new Map<string, AssignmentRow[]>();
@@ -784,6 +795,13 @@ export async function loadMyShift(
     set.add(row.roomKey);
     if (row.userId === userId) mineBy.set(row.workDate, [...(mineBy.get(row.workDate) ?? []), row]);
   }
+  // 기본 출근 시각은 배정 담당마다 따로 — 그날 내 방을 넣은 사람이 정한 값, 없으면 역할 기본값.
+  const myOwners = [...new Set([...mineBy.values()].flat().map((row) => row.createdBy).filter((id): id is string => Boolean(id)))];
+  const ownerProfiles = await loadProfilesByOwners(supabase, organizationId, myOwners, [userId]);
+  const baseOf = (date: string) => {
+    const owner = mineBy.get(date)?.[0]?.createdBy;
+    return (owner ? ownerProfiles.get(`${owner}|${userId}`)?.defaultStartMinutes : null) ?? defaultStartMinutes(role);
+  };
   const stateOf = (date: string): ShiftDayState => {
     const app = appBy.get(date);
     const total = range.get(date)?.size ?? 0;
@@ -831,7 +849,7 @@ export async function loadMyShift(
           roomLabel: row.roomLabel,
         }))
         .sort(compareAssignRooms),
-      startMinutes: app?.startMinutes ?? base,
+      startMinutes: app?.startMinutes ?? baseOf(date),
       state: stateOf(date),
     };
   };
@@ -869,29 +887,37 @@ export async function loadTodayRooms(
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 }> {
   const tomorrow = addDays(date, 1);
-  const [dayRooms, assign, apps, profiles, range] = await Promise.all([
-    loadAssignDayRooms(supabase, organizationId, date),
+  const [dayRooms, assign, apps, range] = await Promise.all([
+    loadAssignDayRooms(supabase, organizationId, date, null),
     loadAssignments(supabase, organizationId, date, tomorrow),
     loadApplications(supabase, organizationId, date, tomorrow, userId),
-    loadStaffProfiles(supabase, organizationId),
     loadRangeRooms(supabase, organizationId, tomorrow, tomorrow),
   ]);
   const todayRows = assign.filter((row) => row.workDate === date);
   const mine = todayRows.filter((row) => row.userId === userId);
   const ids = [...new Set(todayRows.map((row) => row.userId))];
+  // 견습 · 큰 방 · 기본 출근 시각은 배정 담당마다 따로 — 그 방을 넣은 사람이 정한 값으로 보여 준다.
+  const owners = [...new Set(todayRows.map((row) => row.createdBy).filter((id): id is string => Boolean(id)))];
   const names = new Map<string, string>();
-  if (ids.length > 0) {
-    const result = await supabase.from("profiles").select("id, name").in("id", ids);
-    for (const row of result.data ?? []) names.set(row.id, row.name);
-  }
+  const [nameResult, ownerProfiles, ownerRooms] = await Promise.all([
+    ids.length > 0 ? supabase.from("profiles").select("id, name").in("id", ids) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    loadProfilesByOwners(supabase, organizationId, owners, ids),
+    owners.length > 0
+      ? supabase.from("cleaning_room_settings").select("owner_id, room_key, usual_headcount").eq("organization_id", organizationId).in("owner_id", owners)
+      : Promise.resolve({ data: [] as { owner_id: string; room_key: string; usual_headcount: number }[] }),
+  ]);
+  for (const row of nameResult.data ?? []) names.set(row.id, row.name);
+  const usualBy = new Map((ownerRooms.data ?? []).map((row) => [`${row.owner_id}|${row.room_key}`, row.usual_headcount]));
+  const profileBy = (owner: string | null, id: string) => (owner ? ownerProfiles.get(`${owner}|${id}`) : undefined);
   const roomBy = new Map(dayRooms.map((room) => [room.roomKey, room]));
   const rooms: TodayRoom[] = mine
     .map((row) => {
       const room = roomBy.get(row.roomKey);
       const mates = todayRows
         .filter((r) => r.roomKey === row.roomKey && r.userId !== userId)
-        .map((r) => ({ name: names.get(r.userId) ?? "—", trainee: profileOf(profiles, r.userId).trainee }));
-      if (room) return { ...room, mates };
+        .map((r) => ({ name: names.get(r.userId) ?? "—", trainee: profileBy(r.createdBy, r.userId)?.trainee ?? false }));
+      const usualHeadcount = (row.createdBy ? usualBy.get(`${row.createdBy}|${row.roomKey}`) : undefined) ?? 1;
+      if (room) return { ...room, mates, usualHeadcount };
       // 그 사이 예약이 취소된 방 — 그래도 보여 준다(관리자가 정리할 때까지).
       return {
         arrivingGuests: null,
@@ -913,7 +939,7 @@ export async function loadTodayRooms(
         sessionRoomLabel: `${row.propertyName} ${row.roomLabel}`,
         source: "checkout" as const,
         status: "pending" as const,
-        usualHeadcount: 1,
+        usualHeadcount,
       };
     })
     .sort(compareAssignRooms);
@@ -928,8 +954,7 @@ export async function loadTodayRooms(
   const cutoff = Date.parse(`${addDays(date, -1)}T18:00:00+09:00`);
   const changed = mine.filter((row) => Date.parse(row.createdAt) >= cutoff && Date.parse(row.createdAt) < Date.parse(`${date}T06:00:00+09:00`));
   const app = apps.find((a) => a.workDate === date);
-  const profile = profileOf(profiles, userId);
-  const base = profile.defaultStartMinutes ?? defaultStartMinutes(role);
+  const base = profileBy(mine[0]?.createdBy ?? null, userId)?.defaultStartMinutes ?? defaultStartMinutes(role);
   const todayTotal = dayRooms.length;
   const todayOpen = dayRooms.filter((room) => !todayRows.some((r) => r.roomKey === room.roomKey)).length;
   const tApp = apps.find((a) => a.workDate === tomorrow);
@@ -999,13 +1024,14 @@ export async function loadSettingsView(
   organizationId: string,
   today: string,
   roomOptions: Array<{ roomKey: string; propertyName: string; roomLabel: string }>,
+  ownerId: string,
 ): Promise<SettingsView> {
   const [settings, members, profiles, fixed, roomSettings] = await Promise.all([
-    loadAssignSettings(supabase, organizationId),
+    loadAssignSettings(supabase, organizationId, ownerId),
     loadFieldMembers(supabase, organizationId),
-    loadStaffProfiles(supabase, organizationId),
-    loadFixedStaffRows(supabase, organizationId),
-    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId),
+    loadStaffProfiles(supabase, organizationId, ownerId),
+    loadFixedStaffRows(supabase, organizationId, ownerId),
+    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId).eq("owner_id", ownerId),
   ]);
   const ids = members.map((m) => m.userId);
   const [trainee, activity] = await Promise.all([
@@ -1062,6 +1088,7 @@ export async function loadCompareRows(
   supabase: Client,
   organizationId: string,
   ym: string,
+  ownerId: string,
   payView: (userId: string) => Promise<{ totalPaidMinutes: number; expectedGross: number; finalizedGross: number | null }>,
 ): Promise<CompareRow[]> {
   const days = monthDays(ym);
@@ -1069,8 +1096,8 @@ export async function loadCompareRows(
   const to = days.at(-1)!;
   const [members, profiles, fixedTiers, assignments, sessions] = await Promise.all([
     loadFieldMembers(supabase, organizationId),
-    loadStaffProfiles(supabase, organizationId),
-    loadFixedTiers(supabase, organizationId),
+    loadStaffProfiles(supabase, organizationId, ownerId),
+    loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, from, to),
     readAllPages<{ room_label: string; cleaning_date: string }>((start, end) =>
       supabase

@@ -2360,6 +2360,7 @@ export type Database = {
         Row: {
           flag_threshold: number
           organization_id: string
+          owner_id: string
           rules: Json
           updated_at: string
           updated_by: string | null
@@ -2367,6 +2368,7 @@ export type Database = {
         Insert: {
           flag_threshold?: number
           organization_id: string
+          owner_id: string
           rules?: Json
           updated_at?: string
           updated_by?: string | null
@@ -2374,6 +2376,7 @@ export type Database = {
         Update: {
           flag_threshold?: number
           organization_id?: string
+          owner_id?: string
           rules?: Json
           updated_at?: string
           updated_by?: string | null
@@ -2419,6 +2422,7 @@ export type Database = {
       cleaning_fixed_staff: {
         Row: {
           organization_id: string
+          owner_id: string
           position: number
           property_name: string
           tier: number
@@ -2426,6 +2430,7 @@ export type Database = {
         }
         Insert: {
           organization_id: string
+          owner_id: string
           position?: number
           property_name: string
           tier: number
@@ -2433,6 +2438,7 @@ export type Database = {
         }
         Update: {
           organization_id?: string
+          owner_id?: string
           position?: number
           property_name?: string
           tier?: number
@@ -2488,6 +2494,7 @@ export type Database = {
       cleaning_room_settings: {
         Row: {
           organization_id: string
+          owner_id: string
           room_key: string
           updated_at: string
           updated_by: string | null
@@ -2495,6 +2502,7 @@ export type Database = {
         }
         Insert: {
           organization_id: string
+          owner_id: string
           room_key: string
           updated_at?: string
           updated_by?: string | null
@@ -2502,6 +2510,7 @@ export type Database = {
         }
         Update: {
           organization_id?: string
+          owner_id?: string
           room_key?: string
           updated_at?: string
           updated_by?: string | null
@@ -2560,6 +2569,7 @@ export type Database = {
           main_properties: string[]
           memo: string | null
           organization_id: string
+          owner_id: string
           priority: boolean
           trainee: boolean
           trainee_check_at: number
@@ -2573,6 +2583,7 @@ export type Database = {
           main_properties?: string[]
           memo?: string | null
           organization_id: string
+          owner_id: string
           priority?: boolean
           trainee?: boolean
           trainee_check_at?: number
@@ -2586,6 +2597,7 @@ export type Database = {
           main_properties?: string[]
           memo?: string | null
           organization_id?: string
+          owner_id?: string
           priority?: boolean
           trainee?: boolean
           trainee_check_at?: number

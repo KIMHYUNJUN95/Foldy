@@ -27,6 +27,7 @@ export default async function AdminCleaningAssignSettingsPage({ searchParams }: 
     session.organization.id,
     today,
     roomOptions.map((option) => ({ propertyName: option.propertyName, roomKey: option.roomKey, roomLabel: option.roomLabel })),
+    session.user.id,
   );
   const propertyLabels = Object.fromEntries(view.properties.map((name) => [name, localizePropertyName(name, dictionary.cleaning.buildingLabels)]));
   const tab = params.tab === "fixed" || params.tab === "people" || params.tab === "rooms" ? params.tab : "rules";

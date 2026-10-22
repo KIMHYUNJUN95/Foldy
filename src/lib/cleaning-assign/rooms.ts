@@ -168,7 +168,8 @@ type SessionRow = { room_label: string; status: string; cleaning_date: string };
 /**
  * 하루 배정 대상 방. `date` 는 도쿄 운영일.
  */
-export async function loadAssignDayRooms(supabase: Client, organizationId: string, date: string): Promise<AssignRoom[]> {
+/** `ownerId` — 큰 방(보통 인원)은 배정 담당마다 따로라 누구 기준인지. 없으면 모든 방 1명. */
+export async function loadAssignDayRooms(supabase: Client, organizationId: string, date: string, ownerId: string | null): Promise<AssignRoom[]> {
   const lookFrom = addDays(date, -CARRY_LOOKBACK_DAYS);
   // 밀려 온 방(최대 7일 전 것)을 오늘에서 60일 미룰 수 있으므로 둘을 더한 만큼 앞까지.
   const holdFrom = addDays(date, -(MAX_DEFER_DAYS + CARRY_LOOKBACK_DAYS + 1));
@@ -200,7 +201,9 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
         .order("id")
         .range(start, end),
     ),
-    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId),
+    ownerId
+      ? supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId).eq("owner_id", ownerId)
+      : Promise.resolve({ data: [] as { room_key: string; usual_headcount: number }[], error: null }),
     supabase
       .from("cleaning_room_holds")
       .select("room_key, origin_date, kind, until_date, reason, property_name, room_label, created_at")

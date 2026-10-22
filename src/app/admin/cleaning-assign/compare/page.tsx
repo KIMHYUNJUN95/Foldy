@@ -25,11 +25,11 @@ export default async function AdminCleaningAssignComparePage({ searchParams }: {
   const copy = getCleaningAssignCopy(locale);
   const ym = isMonthKey(params.ym) ? params.ym! : monthOf(getCleaningOperatingDateKey());
   const [rows, settings] = await Promise.all([
-    loadCompareRows(supabase, organizationId, ym, async (userId) => {
+    loadCompareRows(supabase, organizationId, ym, session.user.id, async (userId) => {
       const view = await getMonthlyPayView(organizationId, userId, ym, locale);
       return { expectedGross: view.expectedGross, finalizedGross: view.finalization?.gross ?? null, totalPaidMinutes: view.finalization?.paidMinutes ?? view.totalPaidMinutes };
     }),
-    loadAssignSettings(supabase, organizationId),
+    loadAssignSettings(supabase, organizationId, session.user.id),
   ]);
   return (
     <AdminShell activeItem="cleaning-assign" title={copy.compareTitle}>

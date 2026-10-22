@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import {
+  BEDS24_DATA_KINDS,
   BEDS24_LIVE_CHANNEL_OPTIONS,
   BEDS24_LIVE_EVENT,
   beds24LiveScopesOverlap,
@@ -101,7 +102,7 @@ export function useBeds24LiveRefresh(
 
     const onSignal = (message: { payload?: Partial<Beds24LivePayload> }) => {
       const kind = message.payload?.kind;
-      if (kindsRef.current && kind && !kindsRef.current.includes(kind)) return;
+      if (kind && !(kindsRef.current ?? BEDS24_DATA_KINDS).includes(kind)) return;
       if (!beds24LiveScopesOverlap(message.payload?.scope, scopeRef.current)) return;
       schedule();
     };
@@ -150,7 +151,7 @@ export function Beds24LiveRefresh({
   organizationId: string;
   /** 이 화면이 보여주는 건물·날짜. 없으면 모든 신호에 다시 읽는다. */
   scope?: Beds24LiveScope | null;
-  /** 받을 신호 종류. 없으면 전부(예약 · 요금 · 차단). */
+  /** 받을 신호 종류. 없으면 Beds24 데이터 전부(예약 · 요금 · 차단 — 청소 배정 신호는 빼고). */
   kinds?: readonly Beds24LiveKind[] | null;
 }) {
   useBeds24LiveRefresh(organizationId, undefined, scope, kinds);

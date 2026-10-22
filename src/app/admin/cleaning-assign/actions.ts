@@ -13,6 +13,7 @@ import {
   type MonthBoard,
 } from "@/lib/cleaning-assign/data";
 import { loadAssignDayRooms, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
+import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { FLAG_THRESHOLD_OPTIONS, isAssignRuleKey, normalizeAssignRules, TRAINEE_CHECK_STEP, type AssignRule } from "@/lib/cleaning-assign/rules";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -32,6 +33,12 @@ const PATHS = ["/admin/cleaning-assign", "/admin/cleaning-assign/settings", "/mo
 
 function revalidate() {
   for (const path of PATHS) revalidatePath(path);
+}
+
+/** 배정 · 신청이 바뀜 — 화면 캐시를 비우고 열려 있는 PC · 모바일 화면에 실시간 신호. */
+async function changed(organizationId: string) {
+  revalidate();
+  await signalCleaningAssignChange(organizationId);
 }
 
 async function assigner(): Promise<AppSession | null> {
@@ -104,7 +111,7 @@ export async function assignToRoom(input: { date: string; roomKey: string; userI
     return { ok: false, reason: "error" };
   }
   await ensureApplication(organizationId, input.userId, input.date, session.user.id);
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -125,7 +132,7 @@ export async function unassignFromRoom(input: { date: string; roomKey: string; u
     return { ok: false, reason: "error" };
   }
   if ((result.data ?? []).length === 0) return { ok: false, reason: "conflict" };
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -174,7 +181,7 @@ export async function reassignRooms(input: { date: string; moves: RoomMove[] }):
     return { ok: false, reason: "error" };
   }
   for (const userId of new Set(moves.map((m) => m.toUserId))) await ensureApplication(organizationId, userId, input.date, session.user.id);
-  revalidate();
+  await changed(session.organization.id);
   return { moved: Number(result.data ?? moves.length), ok: true };
 }
 
@@ -206,7 +213,7 @@ export async function applyDaySuggestions(input: { date: string; onlyFixed?: boo
     console.error("[cleaning-assign] apply suggestions failed", { code: result.error.code });
     return { ok: false, reason: "error" };
   }
-  revalidate();
+  await changed(session.organization.id);
   return { added: (result.data ?? []).length, ok: true };
 }
 
@@ -218,7 +225,7 @@ export async function addApplicantForDay(input: { date: string; userId: string }
   if (!isEditableDate(input.date) || !isUuid(input.userId)) return { ok: false, reason: "invalid" };
   if (!(await isFieldMember(session.organization.id, input.userId))) return { ok: false, reason: "invalid" };
   await ensureApplication(session.organization.id, input.userId, input.date, session.user.id);
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -250,7 +257,7 @@ export async function cancelPersonDay(input: { date: string; userId: string }): 
     });
   }
   await supabase.from("cleaning_assignments").delete().eq("organization_id", organizationId).eq("work_date", input.date).eq("user_id", input.userId);
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -266,7 +273,7 @@ export async function resolveCancelRequest(input: { date: string; userId: string
     .eq("user_id", input.userId)
     .eq("work_date", input.date);
   if (result.error) return { ok: false, reason: "error" };
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -283,7 +290,7 @@ export async function setDayStartTime(input: { date: string; userId: string; tim
     .eq("user_id", input.userId)
     .eq("work_date", input.date);
   if (result.error) return { ok: false, reason: "error" };
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -332,7 +339,7 @@ export async function addRoomForDay(input: { date: string; roomKey: string; note
     if (insert.error) return { ok: false, reason: "error" };
     for (const userId of userIds) await ensureApplication(organizationId, userId, input.date, session.user.id);
   }
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -411,7 +418,7 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
     return { ok: false, reason: "error" };
   }
   await supabase.from("cleaning_assignments").delete().eq("organization_id", organizationId).eq("work_date", input.date).eq("room_key", room.roomKey);
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -459,7 +466,7 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
       }
     }
   }
-  revalidate();
+  await changed(session.organization.id);
   return { ok: true };
 }
 
@@ -520,7 +527,7 @@ export async function applyMonthSuggestions(input: { ym: string }): Promise<Assi
     console.error("[cleaning-assign] apply month failed", { code: result.error.code });
     return { ok: false, reason: "error" };
   }
-  revalidate();
+  await changed(session.organization.id);
   return { added: (result.data ?? []).length, ok: true };
 }
 
@@ -542,12 +549,12 @@ export async function toggleApplicationForUser(input: { date: string; userId: st
     const rooms = await supabase.from("cleaning_assignments").select("id").eq("organization_id", organizationId).eq("user_id", input.userId).eq("work_date", input.date).limit(1);
     if ((rooms.data ?? []).length > 0) return { ok: false, reason: "conflict" };
     await supabase.from("cleaning_shift_applications").delete().eq("organization_id", organizationId).eq("user_id", input.userId).eq("work_date", input.date);
-    revalidate();
+    await changed(session.organization.id);
     return { applied: false, ok: true };
   }
   if (!(await isFieldMember(organizationId, input.userId))) return { ok: false, reason: "invalid" };
   await ensureApplication(organizationId, input.userId, input.date, session.user.id);
-  revalidate();
+  await changed(session.organization.id);
   return { applied: true, ok: true };
 }
 

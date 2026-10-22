@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { MyShiftView } from "@/components/mobile/shift/my-shift-view";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
@@ -11,6 +12,9 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { localizePropertyName } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+
+/** 배정 · 신청이 바뀌면 새로고침 없이 다시 읽는다(PC ↔ 모바일 실시간, `src/lib/cleaning-assign/live.ts`). */
+const LIVE_KINDS = ["cleaning_assign"] as const;
 
 /**
  * 내 시프트(모바일 · 알바) — 일할 날을 눌러 신청, 다시 누르면 취소. 배정된 날은 「취소 요청」. 개인 URL 없이 로그인한 그대로.
@@ -40,6 +44,7 @@ export default async function MobileShiftPage({ searchParams }: { searchParams: 
 
   return (
     <MobileShell activeItem="shift" badges={navBadges} title={copy.myShiftTitle} wide>
+      <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <MyShiftView
         copy={copy}
         locale={locale}

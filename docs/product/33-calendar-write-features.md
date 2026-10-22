@@ -545,6 +545,7 @@ V2(POST) {"roomId":440617,"action":"PRICE_CHANGE","propId":176430}
 | `/admin` 대시보드 · `/admin/cleaning` · `/mobile/cleaning` (2026-10-19) | `<Beds24LiveRefresh kinds={["reservations"]}>` — 예약에서 나온 숫자 · 목록만 보인다 |
 | `/admin/calendar` (2026-10-19) | `<Beds24LiveRefresh kinds={["reservations", "blocks"]}>` — 예약 막대 · 차단 구간만 그린다(요금은 안 보인다) |
 | `/mobile/calendar` | 기존 예약 구독과 **같은** 디바운스에 신호 채널을 붙였다 — 예약 변경에 두 번 읽지 않는다 |
+| `/admin/cleaning-assign` · `/mobile/shift` · `/mobile/shift/today` (2026-10-22) | `<Beds24LiveRefresh kinds={["cleaning_assign"]}>` — Beds24 가 아니라 **청소 배정 · 시프트 신청** 신호(같은 조직 private 채널, 종류 `cleaning_assign`, 보내는 곳 `src/lib/cleaning-assign/live.ts`). `kinds` 를 안 준 화면은 이 종류를 받지 않는다(`BEDS24_DATA_KINDS`) |
 | `/admin/ops/revenue` · `/admin/ops/occupancy` (2026-10-08) | `<Beds24LiveRefresh kinds={["reservations"]}>` — **예약 신호만** 받는다(`kinds`). 숫자는 예약으로만 만들고 한 번 읽는 데 2년 넘는 예약을 읽으므로, 요금 · 차단 동기화마다 다시 읽지 않는다. 끊김 따라잡기는 그대로 |
 
 - **표마다 postgres 변경 알림을 켜지 않는다.** 재고 웹훅 한 번에 요금 12개월(건물당 ~9,500행)을 다시

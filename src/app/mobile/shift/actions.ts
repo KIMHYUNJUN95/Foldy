@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { addDays, isDateKey } from "@/lib/cleaning-assign/day-state";
 import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
@@ -15,6 +16,12 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 export type ShiftFail = { ok: false; reason: "forbidden" | "invalid" | "assigned" | "cancelled" | "past" | "tooFar" | "error" };
 
 const PATHS = ["/mobile/shift", "/mobile/shift/today", "/admin/cleaning-assign"];
+
+/** 신청이 바뀜 — 화면 캐시를 비우고 열려 있는 배정 화면(PC)에 실시간 신호. */
+async function changed(organizationId: string) {
+  for (const path of PATHS) revalidatePath(path);
+  await signalCleaningAssignChange(organizationId);
+}
 
 async function worker(): Promise<AppSession | null> {
   const session = await getCurrentAppSession();
@@ -50,7 +57,7 @@ export async function toggleMyShift(input: { date: string; apply?: boolean }): P
   if (existing.data) {
     const del = await supabase.from("cleaning_shift_applications").delete().eq("organization_id", organizationId).eq("user_id", userId).eq("work_date", input.date);
     if (del.error) return { ok: false, reason: "error" };
-    for (const path of PATHS) revalidatePath(path);
+    await changed(organizationId);
     return { applied: false, ok: true };
   }
   const insert = await supabase.from("cleaning_shift_applications").insert({ created_by: userId, organization_id: organizationId, source: "self", user_id: userId, work_date: input.date });
@@ -59,7 +66,7 @@ export async function toggleMyShift(input: { date: string; apply?: boolean }): P
     if (insert.error.code === "23505") return { applied: true, ok: true };
     return { ok: false, reason: "error" };
   }
-  for (const path of PATHS) revalidatePath(path);
+  await changed(organizationId);
   return { applied: true, ok: true };
 }
 
@@ -83,6 +90,6 @@ export async function requestShiftCancel(input: { date: string; note?: string; w
     .select("user_id");
   if (result.error) return { ok: false, reason: "error" };
   if ((result.data ?? []).length === 0) return { ok: false, reason: "invalid" };
-  for (const path of PATHS) revalidatePath(path);
+  await changed(session.organization.id);
   return { ok: true };
 }

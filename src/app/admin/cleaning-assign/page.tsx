@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { AssignDayBoard } from "@/components/admin/cleaning-assign/assign-day-board";
 import { AssignMonthBoard } from "@/components/admin/cleaning-assign/assign-month-board";
@@ -12,6 +13,9 @@ import { getDictionary } from "@/lib/i18n";
 import { CALENDAR_BUILDING_ORDER, localizePropertyName } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { attendanceCan } from "@/lib/attendance-review";
+
+/** 배정 · 신청이 바뀌면 새로고침 없이 다시 읽는다(PC ↔ 모바일 실시간, `src/lib/cleaning-assign/live.ts`). */
+const LIVE_KINDS = ["cleaning_assign"] as const;
 
 /**
  * 청소 배정 — PC(하루 보기 · 월 보기). 배정 담당(`cleaning.assign`)만.
@@ -43,6 +47,7 @@ export default async function AdminCleaningAssignPage({
     const board = await loadMonthBoard(supabase, organizationId, ym, session.user.id);
     return (
       <AdminShell activeItem="cleaning-assign" title={copy.title}>
+        <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={organizationId} />
         <AssignMonthBoard board={board} copy={copy} locale={locale} today={today} shared={shared} canCompare={canCompare} />
       </AdminShell>
     );
@@ -55,6 +60,7 @@ export default async function AdminCleaningAssignPage({
   ]);
   return (
     <AdminShell activeItem="cleaning-assign" title={copy.title}>
+      <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={organizationId} />
       <AssignDayBoard
         board={board}
         copy={copy}

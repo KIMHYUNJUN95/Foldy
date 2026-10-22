@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { TodayRoomsView } from "@/components/mobile/shift/today-rooms-view";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
@@ -11,6 +12,9 @@ import { getPropertyMapMeta } from "@/lib/property-map-links";
 import { localizePropertyName } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+
+/** 배정 · 신청이 바뀌면 새로고침 없이 다시 읽는다(PC ↔ 모바일 실시간, `src/lib/cleaning-assign/live.ts`). */
+const LIVE_KINDS = ["cleaning_assign"] as const;
 
 /**
  * 오늘 내 방(모바일 · 알바) — 배정된 방만 순서대로, 누르면 지금 청소 시작(타이머)으로. 「어젯밤 바뀜」 · 오늘 같이 일하는 사람 · 내일 상태.
@@ -42,6 +46,7 @@ export default async function MobileShiftTodayPage() {
 
   return (
     <MobileShell activeItem="my-rooms" badges={navBadges} title={copy.todayTitle} wide>
+      <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
       <TodayRoomsView copy={copy} locale={locale} data={{ ...data, rooms }} />
     </MobileShell>
   );

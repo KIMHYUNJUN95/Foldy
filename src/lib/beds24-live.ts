@@ -15,7 +15,11 @@ import { getCanonicalPropertyName } from "@/lib/room-label-normalization";
 
 export const BEDS24_LIVE_EVENT = "changed";
 
-export type Beds24LiveKind = "reservations" | "rates" | "blocks";
+/** `cleaning_assign` — Beds24 가 아니라 청소 배정 · 시프트 신청(같은 조직 채널을 같이 쓴다, `src/lib/cleaning-assign/live.ts`). */
+export type Beds24LiveKind = "reservations" | "rates" | "blocks" | "cleaning_assign";
+
+/** `kinds` 를 안 준 화면이 받는 종류 — Beds24 데이터만(배정 신호로 다시 읽지 않게). */
+export const BEDS24_DATA_KINDS: readonly Beds24LiveKind[] = ["reservations", "rates", "blocks"];
 
 /**
  * 신호가 **어디를** 바꿨는지 / 화면이 **어디를** 보여주는지. 둘 다 선택이다 — 없는 쪽은 「전부」다.

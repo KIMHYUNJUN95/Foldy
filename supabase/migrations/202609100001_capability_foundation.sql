@@ -170,7 +170,9 @@ insert into public.capability_roles (capability, role) values
   ('lost_found.handle', 'senior_managing_director'::organization_role),
   ('lost_found.handle', 'office_admin'::organization_role),
   ('lost_found.handle', 'cs_staff'::organization_role),
-  ('lost_found.handle', 'field_manager'::organization_role);
+  ('lost_found.handle', 'field_manager'::organization_role),
+  ('staff_documents.view', 'owner'::organization_role),
+  ('staff_documents.view', 'senior_managing_director'::organization_role);
 
 delete from public.capability_policies;
 insert into public.capability_policies (capability, individual_grant, individual_deny, platform_bypass) values
@@ -211,7 +213,8 @@ insert into public.capability_policies (capability, individual_grant, individual
   ('transport.manage', true, true, true),
   ('leave.approve', true, true, true),
   ('attendance.settings', true, true, true),
-  ('lost_found.handle', true, true, true);
+  ('lost_found.handle', true, true, true),
+  ('staff_documents.view', true, true, true);
 -- <<< generated
 
 -- ---------------------------------------------------------------------------

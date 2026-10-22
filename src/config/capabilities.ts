@@ -595,6 +595,16 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /** 직원 서류(재류카드 · 마이넘버 카드 앞면) 보기 · 확인 · 다시 요청. 본인 것은 키 없이 본다(docs/product/41 §4, 2026-10-23). */
+  "staff_documents.view": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
 } as const satisfies Record<string, CapabilityPolicy>;
 
 export type Capability = keyof typeof CAPABILITIES;

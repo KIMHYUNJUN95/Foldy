@@ -1,6 +1,7 @@
 import "server-only";
 
 import { nationalityName } from "@/lib/identity-names";
+import { loadCurrentIdDocument, type IdDocumentView } from "@/lib/staff-documents/server";
 import { isOrgTopAdmin, type Role } from "@/config/roles";
 import { CAPABILITY_KEYS, canBeDenied, capabilityPolicy, evaluateCapability } from "@/config/capabilities";
 import { HIDDEN_CAPABILITIES } from "@/config/capability-groups";
@@ -81,6 +82,8 @@ export type MemberPanelVM = {
   otherOrgsActive: boolean;
   /** 최근 변경(audit_logs, 최신 10개) — 2026-10-20 권한 정리 ④. */
   history: MemberHistoryItem[];
+  /** 신분 서류(재류카드 · 마이넘버 카드 앞면, docs/product/41 R2) — `staff_documents.view` 가 없으면 canView=false 로 아예 읽지 않는다. */
+  idDocument: { canView: boolean; doc: IdDocumentView | null };
 };
 
 /** 지금 쓸 수 있는 초대코드 수(켜져 있고 · 기한 전 · 남은 횟수 있음) — 탭 숫자. */
@@ -218,6 +221,11 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
       }),
     loadMemberHistory(selected.organization_id, selected.id),
   ]);
+  const canViewDocuments =
+    session.capabilities.includes("staff_documents.view") && selected.organization_id === session.organization.id;
+  const idDocument = canViewDocuments
+    ? await loadCurrentIdDocument(selected.organization_id, selected.user_id, { withPhotos: true })
+    : null;
   const lastOwner = removesLastOwner({ target: selected, change: { delete: true }, activeOwnerCount: ownerCount });
 
   // 한 목록 안에서 「역할로 받음 · 개인 부여 · 개인 차단 · 꺼짐」을 줄마다 한 줄 글로 보여 준다. 판정식(역할 + 부여 − 차단)은
@@ -292,6 +300,7 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
     otherOrgs: otherOrgCounts.any > 0,
     otherOrgsActive: otherOrgCounts.active > 0,
     history,
+    idDocument: { canView: canViewDocuments, doc: idDocument },
   };
 }
 

@@ -25,7 +25,7 @@ export const CAPABILITY_GROUPS = [
   { id: "comms", keys: ["announcement.create", "announcement.manage", "board.manage", "board.moderate", "bug.review"] },
   { id: "guest", keys: ["complaint.write", "complaint.manage", "complaint.comment", "property_info.edit"] },
   { id: "ops", keys: ["ops_admin.access", "ops_calendar.write", "room_links.access", "automation.manage"] },
-  { id: "recruit", keys: ["job_application.read", "job_application.triage", "job_application.delete"] },
+  { id: "recruit", keys: ["job_application.read", "job_application.triage", "job_application.delete", "staff_documents.view"] },
 ] as const satisfies readonly { id: string; keys: readonly Capability[] }[];
 
 export type CapabilityGroupId = (typeof CAPABILITY_GROUPS)[number]["id"];

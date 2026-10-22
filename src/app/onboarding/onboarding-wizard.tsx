@@ -1257,7 +1257,12 @@ export function OnboardingWizard({
           <div className="obd__cta">
             <StickyCta
               label={success.startCta}
-              onClick={() => { window.location.replace(dest); }}
+              onClick={() => {
+                // 조직에 들어왔으면 신분 서류(재류카드 · 마이넘버 카드 앞면) 등록으로 이어 간다 — 그 화면에 「나중에」가 있다(docs/product/41 §3-1).
+                window.location.replace(
+                  dest && dest !== "/onboarding" ? `/account/id-card?from=onboarding&next=${encodeURIComponent(dest)}` : dest,
+                );
+              }}
               withArrow
             />
           </div>

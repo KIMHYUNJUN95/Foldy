@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { IdDocumentPanel } from "@/components/identity/id-document-panel";
 import { useRouter } from "next/navigation";
 import { ChevronRight, CircleHelp, Search, Trash2, X } from "lucide-react";
 import "./users-white.css";
@@ -559,6 +560,8 @@ function MemberPanel({
               </Fragment>
             ))}
           </dl>
+          {/* 신분 서류(docs/product/41 R2) — 서버가 staff_documents.view 를 본 뒤에만 실어 보낸다. */}
+          {panel.idDocument.canView ? <IdDocumentPanel doc={panel.idDocument.doc} locale={locale} /> : null}
 
           {readOnly ? (
             <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>

@@ -18,7 +18,8 @@ import { DateFormField } from "@/components/admin/shared/date-form-field";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getOnboardingState } from "@/lib/onboarding";
-import { getCurrentAppSession } from "@/lib/session";
+import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { loadCurrentIdDocument } from "@/lib/staff-documents/server";
 import { getDictionary, localizedNavigationLabels } from "@/lib/i18n";
 import { resolveBottomNavItems } from "@/config/navigation";
 import { adminLocaleTag } from "@/lib/admin-export-meta";
@@ -380,6 +381,26 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           : dictionary.accountProfile.myReportPending,
     }));
     const gender = session.user.gender === "female" || session.user.gender === "male" ? session.user.gender : null;
+    // 신분 서류 줄(docs/product/41 R2) — 조직 멤버이고 국적이 있을 때만.
+    const idDoc =
+      hasOrganizationContext(session) && session.user.identity.nationality
+        ? await loadCurrentIdDocument(session.organization.id, session.user.id, { withPhotos: false })
+        : null;
+    const idCopy = dictionary.idCard;
+    const idCardRow =
+      hasOrganizationContext(session) && session.user.identity.nationality
+        ? {
+            label: session.user.identity.nationality === "JP" ? idCopy.titleMyNumber : idCopy.titleResidence,
+            value: idDoc
+              ? idDoc.status === "confirmed"
+                ? idCopy.statusConfirmed
+                : idDoc.status === "returned"
+                  ? idCopy.statusReturned
+                  : idCopy.statusPending
+              : idCopy.statusMissing,
+            missing: !idDoc,
+          }
+        : null;
     return (
       <MobileShell title={dictionary.common.account}>
         <AccountMobile
@@ -455,6 +476,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           }}
           saved={Boolean(savedKey)}
           openIdentity={firstParam(params?.fill) === "identity" || errorKey === "identity_invalid"}
+          idCard={idCardRow}
           user={{
             name: session.user.name,
             birthDate: session.user.birthDate ?? null,

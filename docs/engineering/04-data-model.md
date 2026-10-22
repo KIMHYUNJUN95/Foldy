@@ -2160,3 +2160,21 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
   `[{room_key, from_user_id, to_user_id}]`(1~80개)을 한 트랜잭션으로 `cleaning_assignments.user_id` 를 바꾼다. 옮길 줄이 없거나 받는 사람이 이미
   그 방에 있으면 `conflict` 예외로 전부 되돌린다. 옮긴 줄의 `created_by` · `created_at` 은 바꾼 사람 · 지금. 서로 바꾸기 = 양방향 이동, 실행 취소 = 거꾸로 이동.
 - 표는 그대로(새 컬럼 없음). 권한 정책 `capability_policies` 에 `cleaning.assign_swap` 한 줄. 마이그레이션 `202610220004`.
+
+## 2026-10-23 `staff_id_documents` — 재류카드 · 마이넘버 카드 앞면 (`202610230001`)
+
+직원 신분 서류. 도메인 계약 `docs/product/41-residence-card-workflow.md` §10.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `organization_id` · `user_id` | 조직 · 본인 |
+| `kind` | `residence_card`(앞 · 뒤) / `my_number_card`(앞면만, 개인번호 칸 없음) — 국적 JP 면 마이넘버 |
+| `status` | `pending` 확인 대기 → `confirmed` 확인함 / `returned` 다시 요청 |
+| `is_current` | 지금 카드(사람 · 조직마다 하나, 부분 유일 인덱스). 다시 등록하면 이전 행은 false 로 이력 |
+| `front_path` · `back_path` | 비공개 버킷 `staff-documents` 경로. 마이넘버는 `back_path` null(제약) |
+| `name_roman` · `birth_date` · `gender` · `nationality_text` · `address` · `expires_on` | 공통 칸(마이넘버의 `name_roman` 은 카드에 적힌 한자 이름) |
+| `card_number`(`^[A-Z]{2}[0-9]{8}[A-Z]{2}$`) · `residence_status` · `work_restriction` · `extra_activity` | 재류카드 칸. 취로 제한 `none · status_based · designated_org · designated · not_allowed`, 자격외활동 `none · weekly_28h · per_certificate` |
+| `ocr_used` · `ocr_values` · `edited_fields` | AI 로 읽었는지 · 읽은 값 그대로 · 본인이 고친 칸 |
+| `confirmed_by` · `confirmed_at` · `return_reason` | 마지막으로 확인 / 다시 요청한 사람 · 시각 · 사유 |
+
+쓰기는 서버 액션(service role)만 — `src/app/account/id-card/actions.ts`. 권한 키 `staff_documents.view` 시드도 같은 마이그레이션.

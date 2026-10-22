@@ -78,6 +78,8 @@ type Props = {
   copy: AccountMobileCopy;
   /** `?fill=identity` 로 왔으면 이름(국적 · 이름 세 가지) 시트를 바로 연다. */
   openIdentity?: boolean;
+  /** 신분 서류 줄(재류카드 · 마이넘버 카드) — 조직 멤버만. 누르면 등록 · 보기 화면(docs/product/41 R2). */
+  idCard?: { label: string; value: string; missing: boolean } | null;
 };
 
 const LANGS: Locale[] = ["ko", "ja", "en"];
@@ -172,7 +174,7 @@ function Row({ label, value, empty, onClick, href }: { label: string; value?: Re
   return <div className="acw-row">{inner}</div>;
 }
 
-export function AccountMobile({ user, organization, bottomTabsLabel, blockedUsers, myReports, help, saved, copy, openIdentity = false }: Props) {
+export function AccountMobile({ user, organization, bottomTabsLabel, blockedUsers, myReports, help, saved, copy, openIdentity = false, idCard = null }: Props) {
   const w = copy.white;
   const locale = user.language;
   const [editing, setEditing] = useState<Field | null>(openIdentity && !saved ? "name" : null);
@@ -309,6 +311,7 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
       <section className="acw-grp" style={grp()}>
         <span className="acw-sec">{w.secOrg}</span>
         <Row label={organization.name} value={organization.role} />
+        {idCard ? <Row empty={idCard.missing} href="/account/id-card" label={idCard.label} value={idCard.value} /> : null}
       </section>
 
       <section className="acw-grp" style={grp()}>

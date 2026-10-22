@@ -5236,6 +5236,93 @@ export type Database = {
           },
         ]
       }
+      staff_id_documents: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          kind: string
+          status: string
+          is_current: boolean
+          front_path: string
+          back_path: string | null
+          name_roman: string | null
+          birth_date: string | null
+          gender: string | null
+          nationality_text: string | null
+          address: string | null
+          expires_on: string | null
+          card_number: string | null
+          residence_status: string | null
+          work_restriction: string | null
+          extra_activity: string | null
+          ocr_used: boolean
+          ocr_values: Json | null
+          edited_fields: string[]
+          confirmed_by: string | null
+          confirmed_at: string | null
+          return_reason: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          kind: string
+          status?: string
+          is_current?: boolean
+          front_path: string
+          back_path?: string | null
+          name_roman?: string | null
+          birth_date?: string | null
+          gender?: string | null
+          nationality_text?: string | null
+          address?: string | null
+          expires_on?: string | null
+          card_number?: string | null
+          residence_status?: string | null
+          work_restriction?: string | null
+          extra_activity?: string | null
+          ocr_used?: boolean
+          ocr_values?: Json | null
+          edited_fields?: string[]
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          return_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          kind?: string
+          status?: string
+          is_current?: boolean
+          front_path?: string
+          back_path?: string | null
+          name_roman?: string | null
+          birth_date?: string | null
+          gender?: string | null
+          nationality_text?: string | null
+          address?: string | null
+          expires_on?: string | null
+          card_number?: string | null
+          residence_status?: string | null
+          work_restriction?: string | null
+          extra_activity?: string | null
+          ocr_used?: boolean
+          ocr_values?: Json | null
+          edited_fields?: string[]
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          return_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff_suggestion_comments: {
         Row: {
           body: string | null

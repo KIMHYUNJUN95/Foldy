@@ -7155,3 +7155,10 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
   이름은 한국어 · 영문 · 가타카나 모두 필요(쓸 데가 많음), 국적은 이름 화면에 합침. 일본 국적은 마이넘버 카드 **앞면만**(직원 정보 보관 용도라
   개인번호는 받지 않음). 카드 글자 읽기는 Claude API, 읽은 값은 본인이 고칠 수 있고 관리자가 확인. A4 인쇄는 일본어 고정.
 - R1(국적 · 이름 세 가지) 구현 — 마이그레이션 `202610220006`. 상세 `docs/product/41-residence-card-workflow.md`.
+
+## 2026-10-23 — 재류카드 R2: Claude API 로 카드 읽기 · 새 권한 키 `staff_documents.view`
+
+- **결정(사용자):** 카드 글자 읽기는 Claude API — 사용자가 키를 발급해 Vercel 에 직접 넣음(Max 플랜 포함 크레딧). 읽은 값은 본인이 고칠 수 있고 관리자가 확인.
+- 모델은 `claude-opus-5-5`(effort low). 동의는 기본 꺼짐, 동의하지 않으면 손 입력. 동의 문구는 사실대로(학습 안 씀 · 최대 30일 보관).
+- 표 이름은 `staff_id_documents`(재류카드 · 마이넘버 카드 앞면 한 표). 보기 · 확인은 새 키 `staff_documents.view`(기본 대표 · 전무).
+- 상세 `docs/product/41-residence-card-workflow.md` §10.

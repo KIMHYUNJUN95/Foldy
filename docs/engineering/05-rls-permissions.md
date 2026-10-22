@@ -1525,3 +1525,12 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   화면의 「다른 사람과 바꾸기」 · 방 ⋯ 「담당 바꾸기…」 · 「바꾸기/넘기기」 버튼도 이 키가 있을 때만 그린다(`canSwap`).
 - DB 함수 `cleaning_reassign_rooms(org, date, moves jsonb, actor)` — `security definer`, **service_role 만 실행**(public · anon · authenticated 회수).
   권한 판정은 앱이 하고, 함수는 한 트랜잭션으로 옮기기만 한다. 마이그레이션 `202610220004_cleaning_assign_swap.sql`(운영 적용).
+
+## 2026-10-23 직원 신분 서류 — `staff_id_documents` · 버킷 `staff-documents` (`202610230001`)
+
+- 새 권한 키 **`staff_documents.view`**(직원 서류 — 보기): 역할 기본 대표 · 전무, 개인 부여 · 차단 가능, 개발자 통과. 사용자 화면 묶음 「채용 · 직원 서류」.
+- `staff_id_documents` RLS: **읽기만** — 본인 행 · 플랫폼 관리자 · 같은 조직 `has_capability(…, 'staff_documents.view')`. 쓰기 정책 없음(서버 액션 service role).
+  서버 액션은 본인 경로 · 같은 조직 · 지금 카드인지 다시 확인한다(`reviewIdDocument` 는 세션의 `staff_documents.view` 필수).
+- 버킷 `staff-documents`(비공개, 8MB, jpeg/png/webp): **올리기만** 본인 — 경로 `{조직}/{auth.uid()}/{uuid}/{front|back}-{임의}.jpg` · 그 조직 활성 멤버.
+  읽기 · 지우기 정책 없음 — 보기는 서버의 10분 서명 URL, 지우기는 서버(쓰지 않은 사진 · 개인번호가 보인 사진).
+- 관리자 사용자 패널은 `staff_documents.view` 가 없으면 서류 데이터를 싣지 않는다(UI 숨김만이 아님).

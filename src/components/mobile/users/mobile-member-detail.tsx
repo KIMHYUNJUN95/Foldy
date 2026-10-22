@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import { IdDocumentPanel } from "@/components/identity/id-document-panel";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Check, ChevronRight, CircleAlert, CircleHelp, Lock, Phone, Trash2 } from "lucide-react";
 import {
@@ -408,6 +409,8 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
             <b>{row.value || "—"}</b>
           </div>
         ))}
+        {/* 신분 서류(docs/product/41 R2) — 서버가 staff_documents.view 를 본 뒤에만 실어 보낸다. */}
+        {panel.idDocument.canView ? <IdDocumentPanel doc={panel.idDocument.doc} locale={locale} /> : null}
       </div>
 
       {readOnly ? (

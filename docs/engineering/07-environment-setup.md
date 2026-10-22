@@ -558,6 +558,14 @@ it builds the report deterministically from the day's completed tasks with a loc
 > ever wanted, re-introducing the SDK + key behind the same `generateDailyReport` contract is the
 > upgrade path.
 
+### `ANTHROPIC_API_KEY` — 재류카드 · 마이넘버 카드 글자 읽기 (2026-10-23)
+
+- `@anthropic-ai/sdk` 를 다시 들였다 — 업무일지가 아니라 **신분 서류 사진 읽기** 전용(`src/lib/staff-documents/ocr.ts`, `docs/product/41` §10).
+- 키는 **서버 전용** 환경변수 `ANTHROPIC_API_KEY`(Vercel Production). 사용자가 Claude Console 에서 발급해 직접 넣는다 — 채팅 · 문서에 값을 적지 않는다.
+  `NEXT_PUBLIC_` 접두어 금지. 키가 없거나 거절되면 읽기만 건너뛰고(손 입력) 가입 · 등록은 그대로 된다.
+- 키 만료일을 정했다면 그 전에 새 키로 바꿔야 한다(만료되면 읽기만 멈춤).
+- 크레딧: 사용자 계정은 Max 플랜 포함 API 크레딧(월 US$100)을 연결해 쓴다(2026-10-23). 한 장 몇 엔 수준.
+
 ### Slack single-channel delivery
 
 Set this server-only variable in local development and the deployed environment:

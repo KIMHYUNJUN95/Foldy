@@ -240,6 +240,7 @@ that already handles role/status changes.
 ### 근태 설정 키 · DB 규칙도 키로 (2026-10-21, 마이그레이션 `202610210007`)
 
 - 새 키 `attendance.settings`(근태 — 설정): 출근 장소 · QR 만들기/인쇄 · 등록 기기 해제. 역할 기본 대표 · 전무(예전 「대표 · 전무 · 개발자」 비교와 같음).
+- 새 키 `staff_documents.view`(직원 서류 — 보기, 2026-10-23): 재류카드 · 마이넘버 카드 앞면 보기 · 확인 · 다시 요청. 역할 기본 대표 · 전무, 사람마다 켜고 끔. 묶음 「채용 · 직원 서류」(`docs/product/41` §10).
   `/admin/settings` · `/admin/settings/attendance`(+ 인쇄) · 설정 액션이 이 키로 판정.
 - 공지 · 게시판 · 버그 · 청소 · 린넨 · 요청 · 건물 운영 정보의 DB 규칙을 역할 목록에서 권한 키로 — 사람별 설정이 DB 에서도 그대로. 표는
   `docs/engineering/05-rls-permissions.md` 「역할 목록 → 권한 키」.

@@ -290,6 +290,14 @@ export type CleaningAssignCopy = {
   legendMyWaiting: string;
   legendMyNone: string;
   tapHint: string;
+  /** 「신청하기」 토글(2026-10-22 시안 V9NDwf…) — 켰을 때만 날짜를 눌러 신청 · 취소. */
+  applyMode: string; // "신청하기"
+  applyModeOff: string; // "켜면 날짜를 눌러 바로 신청 · 취소해요"
+  applyModeNudge: string; // "신청하려면 먼저 켜 주세요"
+  applyModeCount: string; // "{mon} 신청 {n}일 · 누르면 바로 저장돼요" — {n} 은 숫자 넘김으로 따로 그린다
+  applyModeSaved: string; // "{mon} 신청 {n}일 · 저장돼 있어요"
+  tapHintOn: string;
+  tapHintOff: string;
   markRooms: string; // "{n}방"
   markApplied: string; // "신청"
   markNone: string; // "배정 없음"
@@ -613,12 +621,19 @@ const ko: CleaningAssignCopy = {
   legendMyWaiting: "신청 · 배정 전",
   legendMyNone: "배정 없음",
   tapHint: "날짜를 누르면 신청, 다시 누르면 취소예요. 배정된 날은 관리자에게 취소 요청이 가요.",
+  applyMode: "신청하기",
+  applyModeOff: "켜면 날짜를 눌러 바로 신청 · 취소해요",
+  applyModeNudge: "신청하려면 먼저 켜 주세요",
+  applyModeCount: "{mon} 신청 {n}일 · 누르면 바로 저장돼요",
+  applyModeSaved: "{mon} 신청 {n}일 · 저장돼 있어요",
+  tapHintOn: "날짜를 누를 때마다 바로 저장돼요. 다 고르면 토글을 끄거나 화면을 나가면 돼요. 배정된 날은 눌러도 취소되지 않아요.",
+  tapHintOff: "배정된 날을 누르면 방 · 출근 시각을 봐요.",
   markRooms: "{n}방",
   markApplied: "신청",
   markNone: "배정 없음",
   markWorked: "완료",
   upcoming: "다가오는 일정",
-  upcomingEmpty: "앞으로 7일 동안 신청한 날이 없어요. 일할 수 있는 날을 달력에서 눌러 주세요.",
+  upcomingEmpty: "앞으로 7일 동안 신청한 날이 없어요. 「신청하기」를 켜고 일할 수 있는 날을 눌러 주세요.",
   upAssigned: "{time} · 방 {n}개 — {rooms}",
   upWaiting: "신청함 · 배정 전",
   upWaitingSub: "아직 방이 남아 있어요 · 전날 밤까지 정해져요",
@@ -935,12 +950,19 @@ const ja: CleaningAssignCopy = {
   legendMyWaiting: "申請 · 割り当て前",
   legendMyNone: "割り当てなし",
   tapHint: "日付を押すと申請、もう一度押すと取り消しです。割り当て済みの日は管理者に取り消し依頼が送られます。",
+  applyMode: "申請する",
+  applyModeOff: "オンにすると日付を押してすぐ申請・取り消しできます",
+  applyModeNudge: "申請するには先にオンにしてください",
+  applyModeCount: "{mon}の申請 {n}日 · 押すとすぐ保存されます",
+  applyModeSaved: "{mon}の申請 {n}日 · 保存済みです",
+  tapHintOn: "日付を押すたびにすぐ保存されます。選び終えたらトグルをオフにするか、画面を離れてください。割り当て済みの日は押しても取り消されません。",
+  tapHintOff: "割り当て済みの日を押すと部屋・出勤時刻を確認できます。",
   markRooms: "{n}室",
   markApplied: "申請",
   markNone: "割り当てなし",
   markWorked: "完了",
   upcoming: "これからの予定",
-  upcomingEmpty: "これから7日間に申請した日はありません。働ける日をカレンダーで押してください。",
+  upcomingEmpty: "これから7日間に申請した日はありません。「申請する」をオンにして、働ける日を押してください。",
   upAssigned: "{time} · {n}室 — {rooms}",
   upWaiting: "申請済み · 割り当て前",
   upWaitingSub: "まだ部屋が残っています · 前日の夜までに決まります",
@@ -1257,12 +1279,19 @@ const en: CleaningAssignCopy = {
   legendMyWaiting: "Applied · waiting",
   legendMyNone: "No assignment",
   tapHint: "Tap a date to apply, tap again to cancel. For assigned days a cancel request goes to the manager.",
+  applyMode: "Apply",
+  applyModeOff: "Turn on to apply or cancel by tapping dates",
+  applyModeNudge: "Turn this on first to apply",
+  applyModeCount: "{mon}: {n} days applied · saved as you tap",
+  applyModeSaved: "{mon}: {n} days applied · saved",
+  tapHintOn: "Each tap is saved right away. When you are done, turn this off or leave the screen. Tapping an assigned day does not cancel it.",
+  tapHintOff: "Tap an assigned day to see its rooms and start time.",
   markRooms: "{n} rm",
   markApplied: "Applied",
   markNone: "None",
   markWorked: "Done",
   upcoming: "Coming up",
-  upcomingEmpty: "No shifts in the next 7 days. Tap the days you can work on the calendar.",
+  upcomingEmpty: "No shifts in the next 7 days. Turn on Apply and tap the days you can work.",
   upAssigned: "{time} · {n} rooms — {rooms}",
   upWaiting: "Applied · waiting",
   upWaitingSub: "Rooms are still open · decided by the night before",

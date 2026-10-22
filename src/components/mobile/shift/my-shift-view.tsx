@@ -8,6 +8,7 @@ import { requestShiftCancel, toggleMyShift } from "@/app/mobile/shift/actions";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
 import { dayLabel, monthName, monthTitle, timeLabel, weekdayShort } from "@/components/admin/cleaning-assign/format";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { MyShiftDay, MyShiftDetail } from "@/lib/cleaning-assign/data";
@@ -18,6 +19,8 @@ import "./shift.css";
  * 내 시프트 — 시안 「R · 내 시프트」(2026-10-22 HIG 다듬기, 캔버스 3dCCKr2…). 달력: 배정 = 채운 보라 원 + 「N방」, 신청(배정 전) = 옅은 보라
  * 빈 원, 배정 없음 = 흐린 숫자 + 「없음」, 지난날 · 일한 날 = 흐린 숫자. 범례 없이 모양 + 글자로 구분(색만으로 구분하지 않기).
  * 위에 「다음 근무」 한 줄 → 누르면 바텀 시트(태블릿 가로는 오른쪽 칸) — 출근 시각 · 방 · 같이 일하는 사람 · 「취소 요청」.
+ * 신청은 「신청하기」 토글을 켰을 때만(시안 V9NDwf…, 2026-10-22) — 켜면 누르는 즉시 저장 · 원이 그려지고 숫자가 넘어간다,
+ * 꺼진 채 누르면 토글이 흔들리며 「먼저 켜 주세요」, 끄면 「N월 신청 N일 · 저장돼 있어요」 토스트. 들어올 때마다 꺼진 채 시작.
  * docs/product/37-cleaning-shift-assignment.md 「4-1」
  */
 
@@ -43,6 +46,15 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
   const [paneDate, setPaneDate] = useState<string | null>(() => upcoming.find((d) => d.rooms.length > 0)?.date ?? null);
   const [message, setMessage] = useState<string | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  const [applying, setApplying] = useState(false);
+  const [nudge, setNudge] = useState(0);
+  const [savedToast, setSavedToast] = useState<string | null>(null);
+  /** 방금 넣은 날 · 뺀 날 — 원 그리기 · 줄며 사라지기 움직임. */
+  const [just, setJust] = useState<Record<string, "on" | "off">>({});
+  const [tick, setTick] = useState(0);
+  const nudgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastRef = useToastMotion<HTMLDivElement>(() => setSavedToast(null));
   const queue = useRef<Promise<void>>(Promise.resolve());
   const inflight = useRef(0);
   const failed = useRef<Set<string>>(new Set());
@@ -60,13 +72,24 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
       else setSheetDate(day.date);
       return;
     }
+    if (!applying) {
+      // 꺼져 있으면 신청하지 않고 토글을 살짝 흔들어 알려 준다.
+      haptic("warning");
+      setNudge((n) => n + 1);
+      if (nudgeTimer.current) clearTimeout(nudgeTimer.current);
+      nudgeTimer.current = setTimeout(() => setNudge(0), 2200);
+      return;
+    }
     // 빠르게 연달아 누를 수 있게 — 화면은 바로 바뀌고(잠그지 않음), 저장은 누른 순서대로 줄 세워 보낸다.
     // 바라는 상태를 보내므로 같은 날을 여러 번 눌러도 마지막 상태로 맞는다. 새로고침은 줄이 다 비었을 때 한 번.
     const cur = cellState(day);
     const apply = !(cur === "waiting" || cur === "none");
     const date = day.date;
     setOptimistic((prev) => ({ ...prev, [date]: apply }));
-    haptic("light");
+    setJust((prev) => ({ ...prev, [date]: apply ? "on" : "off" }));
+    setTick((n) => n + 1);
+    // 넣을 때는 또렷하게, 뺄 때는 가볍게.
+    haptic(apply ? "medium" : "light");
     inflight.current += 1;
     queue.current = queue.current
       .then(async () => {
@@ -103,6 +126,32 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
     });
   }, [days]);
 
+  function toggleApplying() {
+    if (applying) {
+      setApplying(false);
+      setJust({});
+      if (tick > 0) {
+        setSavedToast(fill(copy.applyModeSaved, { m: Number(ym.slice(5)), mon: monthName(ym, locale), n: appliedCount }));
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setSavedToast(null), 2600);
+      }
+      setTick(0);
+    } else {
+      setApplying(true);
+      setNudge(0);
+      setSavedToast(null);
+    }
+    haptic("light");
+  }
+
+  useEffect(
+    () => () => {
+      if (nudgeTimer.current) clearTimeout(nudgeTimer.current);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+
   function cancelRequest(date: string, withdraw: boolean) {
     startTransition(async () => {
       const result = await requestShiftCancel({ date, withdraw });
@@ -120,6 +169,13 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
     if (opt === undefined) return day.state;
     return opt ? "waiting" : "free";
   };
+
+  // 이달 신청 일수 — 일한 날 · 배정 · 배정 전 · 배정 없음(화면에 보이는 상태 그대로).
+  const appliedCount = days.filter((day) => {
+    const st = cellState(day);
+    return st === "waiting" || st === "none" || st === "assigned" || st === "worked";
+  }).length;
+  const [countBefore, countAfter] = copy.applyModeCount.split("{n}").map((part) => fill(part, { m: Number(ym.slice(5)), mon: monthName(ym, locale) }));
 
   const relOf = (date: string) => (date === today ? copy.today : date === nextDayOf(today) ? copy.tomorrow : "");
 
@@ -219,6 +275,28 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
           {nextYm ? <span className="shf-sub">{fill(copy.nextMonthDue, { m, mon: monthName(nextYm, locale), n: daysLeft })}</span> : null}
         </div>
 
+        <section className={`shf-mode${nudge > 0 && !applying ? " is-nudge" : ""}`} key={nudge > 0 ? `n${nudge}` : "mode"} aria-label={copy.applyMode}>
+          <span className="shf-mode__text">
+            <b>{copy.applyMode}</b>
+            {applying ? (
+              <span className="shf-mode__count">
+                {countBefore}
+                <span className="shf-mode__n">
+                  <b key={tick} className={tick > 0 ? "is-tick" : undefined}>
+                    {appliedCount}
+                  </b>
+                </span>
+                {countAfter}
+              </span>
+            ) : (
+              <span className={nudge > 0 ? "shf-mode__hint is-nudge" : "shf-mode__hint"}>{nudge > 0 ? copy.applyModeNudge : copy.applyModeOff}</span>
+            )}
+          </span>
+          <button type="button" role="switch" aria-checked={applying} aria-label={copy.applyMode} className="shf-sw" onClick={toggleApplying}>
+            <i />
+          </button>
+        </section>
+
         {next && !isTablet ? (
           <section className="shf-group" aria-label={copy.nextShift}>
             <span className="shf-cap">{copy.nextShift}</span>
@@ -235,7 +313,7 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
           </section>
         ) : null}
 
-        <section className="shf-calbox" aria-label={monthTitle(ym, locale)}>
+        <section className={`shf-calbox${applying ? " is-applying" : ""}`} aria-label={monthTitle(ym, locale)}>
           <div className="shf-nav">
             <span className="shf-month">{monthTitle(ym, locale)}</span>
             <span className="shf-sp" />
@@ -267,12 +345,19 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
                   key={day.date}
                   type="button"
                   role="gridcell"
-                  className={`shf-day is-${st}${day.date === today ? " is-today" : ""}${paneDate === day.date && isTablet ? " is-sel" : ""}`}
+                  className={`shf-day is-${st}${day.date === today ? " is-today" : ""}${paneDate === day.date && isTablet ? " is-sel" : ""}${just[day.date] ? ` is-just-${just[day.date]}` : ""}`}
                   disabled={day.date < today}
                   aria-label={`${dayLabel(day.date, locale)}${day.date === today ? ` ${copy.today}` : ""} ${spoken}`}
                   onClick={() => tap(day)}
                 >
-                  <span className="shf-day__n">{n}</span>
+                  <span className="shf-day__n">
+                    {st === "waiting" || (st === "free" && just[day.date] === "off") ? (
+                      <svg className="shf-day__ring" viewBox="0 0 40 40" aria-hidden="true">
+                        <circle cx="20" cy="20" r="19.2" pathLength={100} />
+                      </svg>
+                    ) : null}
+                    <span className="shf-day__t">{n}</span>
+                  </span>
                   <span className="shf-day__m">{mark}</span>
                 </button>
               );
@@ -292,7 +377,7 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
           </section>
         ) : null}
         <p className="shf-hint">
-          {copy.ringHint} {copy.tapHint}
+          {copy.ringHint} {applying ? copy.tapHintOn : copy.tapHintOff}
         </p>
       </div>
 
@@ -308,6 +393,16 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
             </section>
           )}
         </aside>
+      ) : null}
+
+      {savedToast ? (
+        <div ref={toastRef} className="shf-toast" role="status">
+          <svg viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="8" />
+            <path d="M5.4 9.2l2.4 2.4 4.8-5" pathLength={100} />
+          </svg>
+          <span>{savedToast}</span>
+        </div>
       ) : null}
 
       {sheetDate ? (

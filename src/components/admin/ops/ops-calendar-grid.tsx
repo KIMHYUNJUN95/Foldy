@@ -2276,6 +2276,23 @@ export function OpsCalendarGrid({
 
   // 「1박 갭 N」 — 최소 숙박일 모드로 들어가 갭 칸을 전부 고른다(예전 `ops-gap-button` 과 같은 동작).
   const gapCount = selectableGapCells.length;
+  /*
+   * 「수정 끝내기」 — 반영 안 한 칸(선택)이 남아 있으면 첫 번째 누름은 「버리고 끝내기」로 바뀌기만 한다.
+   * 반영이 끝난 칸은 선택에서 빠지므로(`removeSentCells`) 남은 선택 = 아직 안 보낸 작업이다.
+   * 모드나 고른 칸 수가 바뀌면 다시 처음 상태 — 효과 없이 「누를 때의 상태」를 키로 기억한다.
+   */
+  const exitKey = `${mode}:${selection.length}`;
+  const [exitArmedKey, setExitArmedKey] = useState<string | null>(null);
+  const exitArmed = exitArmedKey === exitKey;
+  const exitEdit = () => {
+    if (selection.length > 0 && !exitArmed) {
+      setExitArmedKey(exitKey);
+      return;
+    }
+    setExitArmedKey(null);
+    clearSelection();
+    setMode("off");
+  };
   const firstSelectedRoom = rooms.find((room) => scope.roomKeys.includes(room.key));
   const roomsScopeLabel =
     scope.roomKeys.length === 0 || allRoomsInScope
@@ -2350,18 +2367,9 @@ export function OpsCalendarGrid({
                   </button>
                 )}
               </>
-            ) : (
-              <button
-                className="scw-btn is-dark"
-                onClick={() => {
-                  clearSelection();
-                  setMode("off");
-                }}
-                type="button"
-              >
-                {copy.editModeExit}
-              </button>
-            )}
+            ) : null}
+            {/* 편집 중 「수정 끝내기」는 오른쪽 열 탭 줄 끝에 있다 — 이 줄은 스크롤에 밀려 올라가 아래쪽 방을 고친 뒤
+                끝내려면 맨 위로 돌아와야 했다(2026-10-23 사용자 지적). */}
           </div>
 
           {mode === "off" ? (
@@ -2848,35 +2856,66 @@ export function OpsCalendarGrid({
         {/* 편집 중 오른쪽 열 — 맨 위 「가격 · 최소숙박 · 차단」 탭 + 그 패널(시안 SalesEdit-PC). */}
         {editMode && (
           <div className="scw-side">
-            <div aria-label={copy.editMode} className="scw-modetabs" role="tablist">
+            <div className="scw-sidehead">
+              <div aria-label={copy.editMode} className="scw-modetabs" role="tablist">
+                <button
+                  aria-selected={mode === "price"}
+                  className={mode === "price" ? "on" : ""}
+                  onClick={() => switchEditMode("price")}
+                  role="tab"
+                  type="button"
+                >
+                  {copy.scwTabPrice}
+                </button>
+                <button
+                  aria-selected={mode === "minstay"}
+                  className={mode === "minstay" ? "on" : ""}
+                  onClick={() => switchEditMode("minstay")}
+                  role="tab"
+                  type="button"
+                >
+                  {copy.scwTabMinStay}
+                </button>
+                <button
+                  aria-selected={mode === "block"}
+                  className={mode === "block" ? "on" : ""}
+                  onClick={() => setMode("block")}
+                  role="tab"
+                  type="button"
+                >
+                  {copy.scwTabBlock}
+                </button>
+              </div>
               <button
-                aria-selected={mode === "price"}
-                className={mode === "price" ? "on" : ""}
-                onClick={() => switchEditMode("price")}
-                role="tab"
+                className={`scw-sideexit${exitArmed ? " is-armed" : ""}`}
+                onClick={exitEdit}
                 type="button"
               >
-                {copy.scwTabPrice}
-              </button>
-              <button
-                aria-selected={mode === "minstay"}
-                className={mode === "minstay" ? "on" : ""}
-                onClick={() => switchEditMode("minstay")}
-                role="tab"
-                type="button"
-              >
-                {copy.scwTabMinStay}
-              </button>
-              <button
-                aria-selected={mode === "block"}
-                className={mode === "block" ? "on" : ""}
-                onClick={() => setMode("block")}
-                role="tab"
-                type="button"
-              >
-                {copy.scwTabBlock}
+                {exitArmed ? copy.spwExitDiscard : copy.spwExit}
               </button>
             </div>
+            {exitArmed && (
+              <p className="scw-sidewarn" role="status">
+                {copy.spwExitUnsaved.replace("{count}", String(selection.length))}
+              </p>
+            )}
+            {/* 이 화면의 1박 갭 — 왼쪽 도구 줄 「1박 갭 N」은 편집 중엔 숨는다. 패널을 켠 채 건물을 넘겨도 고칠 칸이
+                있는지 보이게 여기에도 둔다(2026-10-23). 최소숙박 패널은 자기 머리에 같은 숫자를 크게 쓴다. */}
+            {mode !== "minstay" && (
+              <div className={`scw-gapline${gapCount === 0 ? " is-zero" : ""}`}>
+                {gapCount > 0 ? (
+                  <>
+                    <span>{copy.spwGapScreen}</span>
+                    <b>{gapCount}</b>
+                    <button onClick={() => openGapsRef.current()} type="button">
+                      {copy.spwGapPick}
+                    </button>
+                  </>
+                ) : (
+                  <span>{copy.spwGapNone}</span>
+                )}
+              </div>
+            )}
             {mode === "block" && (
               <OpsBlockPanel
                 blockedKeys={blockedCellKeys}
@@ -2897,6 +2936,8 @@ export function OpsCalendarGrid({
                 copy={copy}
                 gapContext={gapContext}
                 onApplied={(sent) => removeSentCells(sent, "minstay")}
+                onPickGaps={() => openGapsRef.current()}
+                screenGapCount={gapCount}
                 onClear={clearSelection}
                 runWrite={runWrite}
                 scopeSummary={scopeSummary}

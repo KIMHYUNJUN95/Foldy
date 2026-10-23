@@ -401,6 +401,31 @@
   position: static; top: auto; width: auto; flex: 1 1 auto; max-height: none; min-height: 0; align-self: stretch;
 }
 .adm .scw .scw-side > .opsp.has-list { height: auto; }
+/* 탭 줄 + 「수정 끝내기」 — 열이 화면에 붙어 다니므로 어디까지 스크롤했든 바로 끝낼 수 있다(2026-10-23). */
+.adm .scw-sidehead { display: flex; align-items: center; gap: 8px; flex: none; }
+.adm .scw-sidehead > .scw-modetabs { flex: 1 1 auto; min-width: 0; }
+.adm .scw-sideexit {
+  flex: none; height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--scw-ink); color: #fff;
+  font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-sideexit:hover { background: #2a2735; }
+.adm .scw-sideexit:active { transform: scale(0.97); }
+.adm .scw-sideexit.is-armed { background: #c4364b; }
+.adm .scw-sideexit.is-armed:hover { background: #a92c3f; }
+.adm .scw-sidewarn { margin: -8px 0 0; font-size: 13px; line-height: 1.4; color: #c4364b; animation: scwRise 200ms var(--scw-ease); }
+/* 이 화면의 1박 갭(가격 · 차단 모드) — 최소숙박 패널 머리 숫자의 작은 판. 0 이면 회색 한 줄. */
+.adm .scw-gapline {
+  display: flex; align-items: center; gap: 8px; flex: none; min-height: 40px; padding: 4px 6px 4px 14px; border-radius: 12px;
+  background: #fdecec; font-size: 13px; color: #3a3746;
+}
+.adm .scw-gapline b { font-size: 16px; font-weight: 700; color: #c5282e; font-variant-numeric: tabular-nums; }
+.adm .scw-gapline button {
+  margin-left: auto; height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: #fff; color: #c5282e;
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: transform 140ms var(--scw-ease);
+}
+.adm .scw-gapline button:active { transform: scale(0.97); }
+.adm .scw-gapline.is-zero { background: #f7f7f9; color: var(--scw-mute); }
 .adm .scw-modetabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 4px; border-radius: 12px; background: #f2f2f5; flex: none; }
 .adm .scw-modetabs button {
   height: 36px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; color: var(--scw-mute);

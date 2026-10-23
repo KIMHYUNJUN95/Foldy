@@ -7196,3 +7196,10 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 - **결정:** 외부 폼 · DB 함수가 한국어로 저장한 고정 선택지 · 자동 메모는 저장값을 바꾸지 않고 그릴 때만 번역
   (`src/lib/recruit/choice-labels.ts`, `localizeLostFoundMemo`). 자유 입력 글은 그대로.
 - 루트 404(`src/app/not-found.tsx`)를 둬 Next 기본 영어 화면이 나오지 않게.
+
+## 2026-10-23 — 근태 무결성 브랜치는 합치지 않고 마이그레이션 파일만 `main` 으로
+
+- **배경:** 원격 브랜치 `codex/attendance-integrity-hardening`(2026-08-11, 커밋 2개)이 `main` 에 없었다. 그 마이그레이션 `20260811012820_attendance_integrity_hardening.sql` 는 운영에 이미 적용됨.
+- **결정:** 운영과 저장소 이력을 맞추려고 마이그레이션 파일만 `main` 에 넣는다. 앱 코드 · 문서 변경(약 1,100줄, 25개 파일 충돌)은 합치지 않고 브랜치에 기록으로 남긴다.
+- 근태 저장을 DB 트랜잭션 RPC 로 옮기는 보강은 필요해지면 현재 코드 기준으로 새로 한다.
+

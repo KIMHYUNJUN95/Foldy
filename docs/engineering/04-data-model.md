@@ -2227,3 +2227,17 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, au
 
 인덱스 `(organization_id, user_id, printed_at)`. RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, authenticated 권한 없음).
 보관: 퇴사 3년 뒤 정리(`src/lib/staff-documents/retention.ts`)가 대상 기준으로 서류 · 사진 · 읽기 기록과 함께 하드 삭제.
+
+## 2026-08-11 근태 · 연차 무결성 보강 (`20260811012820_attendance_integrity_hardening`) — 저장소 복원 2026-10-23
+
+운영에는 2026-08-11 에 적용됐지만 파일이 브랜치 `codex/attendance-integrity-hardening` 에만 있어 `main` 이력에서 빠져 있었다.
+2026-10-23 에 파일만 `main` 으로 가져와 운영 DB와 맞췄다(DB 변경 없음). 브랜치의 앱 코드는 합치지 않았다 — `main` 앱은 아래 RPC 를 아직 호출하지 않는다.
+
+- `attendance_attempt_logs.failure_reason` check 에 `open_break_blocks_clock_out` · `midnight_crossing` · `open_session_exists` 포함.
+- `annual_leave_requests.balance_override_reason text` (nullable).
+- 트리거 `transport_reimbursement_items_validate` → `validate_transport_reimbursement_item()` (교통비 항목 불변식 검사).
+- RPC 7개(`security invoker`, service_role 만 실행): `set_annual_leave_baseline_atomic`(뒤에 `202610210007` 이 다시 정의) ·
+  `finalize_attendance_month_atomic` · `reopen_attendance_month_atomic` · `mutate_attendance_session_with_audit` ·
+  `create_attendance_session_with_audit` · `approve_attendance_correction_atomic` · `set_attendance_history_atomic`.
+- 운영 확인(2026-10-23): 이력 등록 · 컬럼 · 트리거 · 제약 · 함수 7개 존재, `authenticated` 실행 권한 없음.
+

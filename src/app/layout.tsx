@@ -18,7 +18,7 @@ import { HistoryTrackerBoot } from "@/components/shell/history-tracker-boot";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { SplashScreen } from "@/components/pwa/splash-screen";
 import { TouchTabletDetect } from "@/components/pwa/touch-tablet-detect";
-import { getDictionary, inferLocaleFromAcceptLanguage, isLocale } from "@/lib/i18n";
+import { getDictionary, resolvePreSessionLocale } from "@/lib/i18n";
 import { buildOutdatedEngineScript } from "@/lib/outdated-engine-guard";
 import { getCurrentAppSession } from "@/lib/session";
 import { SPLIT_PANE_BOOT_SCRIPT } from "@/lib/split-pane";
@@ -119,7 +119,7 @@ export const viewport: Viewport = {
 const LOCALE_COOKIE = "stayops_locale";
 
 /**
- * `<html lang>` — 세션 → `stayops_locale` 쿠키 → Accept-Language → "ko".
+ * `<html lang>` — 세션 → `stayops_locale` 쿠키 → Accept-Language(지원하지 않는 언어는 "en", 헤더 없음은 "ko").
  *
  * 예전에는 세션이 없으면 무조건 "ko" 였다. 로그인·회원가입은 로그아웃 상태에서 보는 화면이라,
  * 일본어/영어로 보고 있어도 문서 언어는 한국어라고 선언돼 있었다 — 스크린리더가 영어 문장을
@@ -130,10 +130,10 @@ const LOCALE_COOKIE = "stayops_locale";
  */
 async function resolveDocumentLocale(session: Awaited<ReturnType<typeof getCurrentAppSession>>) {
   if (session?.user.preferredLanguage) return session.user.preferredLanguage;
-  const cookieLocale = (await cookies()).get(LOCALE_COOKIE)?.value ?? "";
-  if (isLocale(cookieLocale)) return cookieLocale;
-  const acceptLanguage = (await headers()).get("accept-language") ?? "";
-  return inferLocaleFromAcceptLanguage(acceptLanguage);
+  return resolvePreSessionLocale({
+    cookie: (await cookies()).get(LOCALE_COOKIE)?.value,
+    acceptLanguage: (await headers()).get("accept-language"),
+  });
 }
 
 export default async function RootLayout({

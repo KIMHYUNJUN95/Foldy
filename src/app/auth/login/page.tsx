@@ -16,7 +16,7 @@ import { legalOverlayProps } from "@/components/legal/legal-overlay-props";
 import { resolveAuthErrorMessage } from "@/lib/auth-errors";
 import { ATTENDANCE_QR_PATH } from "@/lib/attendance-qr";
 import { isMobileSurfacePath, isSurfaceNeutralPath } from "@/lib/surface-routing";
-import { getDictionary, inferLocaleFromAcceptLanguage, isLocale, type Locale } from "@/lib/i18n";
+import { getDictionary, resolvePreSessionLocale, type Locale } from "@/lib/i18n";
 import { getDeviceSurfaceFromHeaders, isMobileUserAgent } from "@/lib/mobile-device";
 import { getOnboardingState } from "@/lib/onboarding";
 import { sanitizeNextPath } from "@/lib/safe-redirect";
@@ -84,15 +84,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const state = await getOnboardingState();
 
-  // Priority: ?lang= param → stayops_locale cookie → Accept-Language header → "ko"
+  // ?lang= → stayops_locale 쿠키 → Accept-Language(지원하지 않는 언어는 en) — 틀린 값은 다음 단계로.
   const cookieStore = await cookies();
-  const cookieLocale = cookieStore.get(LOCALE_COOKIE)?.value ?? "";
-  const requestedLocale = params.lang ?? cookieLocale;
   const headerStore = await headers();
-  const acceptLanguage = headerStore.get("accept-language") ?? "";
-  const locale: Locale = isLocale(requestedLocale)
-    ? requestedLocale
-    : inferLocaleFromAcceptLanguage(acceptLanguage);
+  const locale: Locale = resolvePreSessionLocale({
+    query: params.lang,
+    cookie: cookieStore.get(LOCALE_COOKIE)?.value,
+    acceptLanguage: headerStore.get("accept-language"),
+  });
   const dictionary = getDictionary(locale);
   const t = dictionary.auth;
   const c = t.console;

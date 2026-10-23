@@ -2,7 +2,7 @@
   "name": "Foldy Admin",
   "short_name": "Foldy Admin",
   "description": "Foldy operations console for office and management teams.",
-  "lang": "ko",
+  "lang": "en",
   "dir": "ltr",
   "categories": ["business", "productivity"],
   "id": "/admin",

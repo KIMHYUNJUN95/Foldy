@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { FALLBACK_COPY, resolveFallbackLocale } from "@/lib/fallback-copy";
+import { cookies, headers } from "next/headers";
+import { FALLBACK_COPY } from "@/lib/fallback-copy";
+import { resolvePreSessionLocale } from "@/lib/i18n";
 import { getCurrentAppSession } from "@/lib/session";
 
 /**
@@ -11,11 +13,18 @@ import { getCurrentAppSession } from "@/lib/session";
  *
  * **Localized since 2026-08-04.** This is a server component, so the session's `preferredLanguage`
  * is available — the old "renders without session locale context" justification for stacking all
- * three languages did not hold. A signed-out viewer falls back to `ko`.
+ * three languages did not hold. A signed-out viewer gets the root 404's order (2026-10-23):
+ * `stayops_locale` cookie → Accept-Language (unsupported → en) — it used to be `ko` unconditionally.
  */
 export default async function MobileNotFound() {
   const session = await getCurrentAppSession().catch(() => null);
-  const copy = FALLBACK_COPY[resolveFallbackLocale(session?.user.preferredLanguage)];
+  const locale =
+    session?.user.preferredLanguage ??
+    resolvePreSessionLocale({
+      cookie: (await cookies()).get("stayops_locale")?.value,
+      acceptLanguage: (await headers()).get("accept-language"),
+    });
+  const copy = FALLBACK_COPY[locale];
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center bg-background px-8 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-center text-foreground">

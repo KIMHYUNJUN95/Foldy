@@ -2,6 +2,12 @@
 
 This file records important project decisions.
 
+## 2026-10-23 로그인 전 모르는 언어는 영어 · 인증 메일은 영어 한 벌 (사용자 결정)
+
+- 세션이 없을 때 기기 언어가 ko · ja · en 이 아니면(중국어 · 베트남어 등) **영어**로 보인다. 예전엔 한국어. 판정은 `resolvePreSessionLocale()` 한 곳.
+- Supabase 인증 메일(가입 확인 · 비밀번호 재설정)은 **영어로 통일**한다 — 보내는 시점엔 그 사람의 언어를 모른다. 원본은 `supabase/templates/*.html`,
+  대시보드(Authentication → Emails → Templates)에 사람이 붙여 넣는다. 2026-10-09 의 3개 언어 문구를 대신한다.
+
 ## 2026-10-23 재류카드 만료 알림은 지금 구현 · 만료는 막지 않고 경고만 (사용자 요청)
 
 - 「알림은 막바지에 전 기능 일괄」 정책의 **예외** — 재류카드 만료 알림(`id_document_expiring`, 90 · 30일 전 · 만료)만 지금 구현한다(사용자 요청 2026-10-23).

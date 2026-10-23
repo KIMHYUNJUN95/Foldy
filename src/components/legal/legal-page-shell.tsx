@@ -3,8 +3,7 @@ import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
 import {
   getDictionary,
-  inferLocaleFromAcceptLanguage,
-  isLocale,
+  resolvePreSessionLocale,
   locales,
   type Locale,
 } from "@/lib/i18n";
@@ -24,10 +23,11 @@ const PAGE_PATHS: Record<LegalPageKey, string> = {
 /** 로그인 없이 여는 공개 페이지라 세션 대신 로그인 화면과 같은 순서로 언어를 고른다:
  *  `?lang=` → `stayops_locale` 쿠키 → Accept-Language → ko. */
 export async function resolvePublicLocale(lang: string | undefined): Promise<Locale> {
-  if (isLocale(lang)) return lang;
-  const cookieLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
-  if (isLocale(cookieLocale)) return cookieLocale;
-  return inferLocaleFromAcceptLanguage((await headers()).get("accept-language") ?? "");
+  return resolvePreSessionLocale({
+    query: lang,
+    cookie: (await cookies()).get(LOCALE_COOKIE)?.value,
+    acceptLanguage: (await headers()).get("accept-language"),
+  });
 }
 
 export function legalHref(page: LegalPageKey, locale: Locale, hash?: string) {

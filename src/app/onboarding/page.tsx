@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { InviteCodeFieldCopy } from "@/app/onboarding/invite-code-field";
 import { DesktopOnboarding } from "@/app/onboarding/desktop-onboarding";
 import { OnboardingWizard } from "@/app/onboarding/onboarding-wizard";
-import { getDictionary, inferLocaleFromAcceptLanguage, isLocale, type Locale } from "@/lib/i18n";
+import { getDictionary, resolvePreSessionLocale, type Locale } from "@/lib/i18n";
 import { getDeviceSurfaceFromHeaders } from "@/lib/mobile-device";
 import { getOnboardingState } from "@/lib/onboarding";
 import { normalizeNextPathForSurface, normalizePathForSurface } from "@/lib/surface-routing";
@@ -31,13 +31,12 @@ export default async function OnboardingPage({
   ]);
   const surface = getDeviceSurfaceFromHeaders(headerStore);
 
-  // Priority: ?lang= param → stayops_locale cookie → Accept-Language header → "ko"
-  const cookieLocale = cookieStore.get(LOCALE_COOKIE)?.value ?? "";
-  const requestedLocale = params.lang ?? cookieLocale;
-  const acceptLanguage = headerStore.get("accept-language") ?? "";
-  const queryLocale: Locale = isLocale(requestedLocale)
-    ? requestedLocale
-    : inferLocaleFromAcceptLanguage(acceptLanguage);
+  // ?lang= → stayops_locale 쿠키 → Accept-Language(지원하지 않는 언어는 en) — 틀린 값은 다음 단계로.
+  const queryLocale: Locale = resolvePreSessionLocale({
+    query: params.lang,
+    cookie: cookieStore.get(LOCALE_COOKIE)?.value,
+    acceptLanguage: headerStore.get("accept-language"),
+  });
   const safeNext = normalizeNextPathForSurface(params.next, surface);
   const allowRejoin = state.status === "removed" && params.rejoin === "1";
   const joinProfile =

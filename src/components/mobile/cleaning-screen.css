@@ -138,13 +138,21 @@
   .cln-kpi { align-items: center; }
   .cln-active__grid { padding: 20px; border-radius: 20px; background: #f7f7f9; }
   .cln-btn--soft { background: #fff; }
-  .cln-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  /* 청소 목록이 주인공 — 3:2(2026-10-23). 반반이면 칸이 약 250px 라 손님 이름 · ja 「チェックアウト清掃」가 잘렸다. */
+  .cln-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 28px; align-items: start; }
+  /* 둘째 줄(턴오버 · 손님 · 인원)은 두 줄까지 — 넓은 화면에서 이름을 말줄임으로 지우지 않는다. 폰은 한 줄 그대로. */
+  .cln-row__s { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .cln-row__split { display: inline; }
+  .cln-row__lead { white-space: normal; overflow: visible; }
+  .cln-row__tail { white-space: nowrap; }
 }
 
 /* 태블릿 가로 — 링 왼쪽 · 버튼 오른쪽, 목록 3열 */
 @media (min-width: 1000px) and (min-height: 600px) {
   .cln-active__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 32px; }
-  .cln-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* 청소 목록 2 : 셋팅 1 : 기록 1. 셋팅 목록이 없는 날은 빈 셋째 칸 대신 2 : 1(2026-10-23). */
+  .cln-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .cln-cols:not(:has(.cln-side > :nth-child(2))) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .cln-side { display: contents; }
 }
 

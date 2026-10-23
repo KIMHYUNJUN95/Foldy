@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cookies, headers } from "next/headers";
-import { FALLBACK_COPY, resolveFallbackLocale } from "@/lib/fallback-copy";
-import { inferLocaleFromAcceptLanguage } from "@/lib/i18n";
+import { FALLBACK_COPY } from "@/lib/fallback-copy";
+import { resolvePreSessionLocale } from "@/lib/i18n";
 import { getCurrentAppSession } from "@/lib/session";
 
 /**
@@ -15,12 +15,12 @@ import { getCurrentAppSession } from "@/lib/session";
  */
 export default async function RootNotFound() {
   const session = await getCurrentAppSession().catch(() => null);
-  const cookieLocale = (await cookies()).get("stayops_locale")?.value;
-  const locale = session?.user.preferredLanguage
-    ? resolveFallbackLocale(session.user.preferredLanguage)
-    : cookieLocale
-      ? resolveFallbackLocale(cookieLocale)
-      : inferLocaleFromAcceptLanguage((await headers()).get("accept-language") ?? "");
+  const locale =
+    session?.user.preferredLanguage ??
+    resolvePreSessionLocale({
+      cookie: (await cookies()).get("stayops_locale")?.value,
+      acceptLanguage: (await headers()).get("accept-language"),
+    });
   const copy = FALLBACK_COPY[locale];
 
   return (

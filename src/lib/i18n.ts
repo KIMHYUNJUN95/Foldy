@@ -25187,13 +25187,15 @@ export function resolveLocale(value: Locale | string | null | undefined): Locale
 /**
  * Infers the best supported locale from an HTTP Accept-Language header.
  * Parses quality values (q=), sorts by preference, and maps to ko/ja/en.
- * Falls back to "ko" when no supported language is found.
+ * A header that names only unsupported languages (zh, vi, …) falls back to "en" — such a visitor reads
+ * English far more often than Korean (2026-10-23). No header at all stays "ko".
  *
  * Examples:
  *   "ja-JP,ja;q=0.9,en-US;q=0.8"  → "ja"
  *   "ko-KR,ko;q=0.9"               → "ko"
  *   "en-US,en;q=0.9"               → "en"
- *   "zh-CN,zh;q=0.9"               → "ko"  (unsupported → default)
+ *   "zh-CN,zh;q=0.9"               → "en"  (unsupported → English)
+ *   ""                             → "ko"  (no header)
  */
 export function inferLocaleFromAcceptLanguage(header: string): Locale {
   if (!header) return "ko";
@@ -25210,7 +25212,22 @@ export function inferLocaleFromAcceptLanguage(header: string): Locale {
     if (tag.startsWith("ja")) return "ja";
     if (tag.startsWith("en")) return "en";
   }
-  return "ko";
+  return "en";
+}
+
+/**
+ * 세션이 없을 때의 화면 언어(로그인 · 온보딩 · 공개 페이지 · 404 · `<html lang>`, 2026-10-23 한 곳으로).
+ * `?lang=` → `stayops_locale` 쿠키 → Accept-Language. 각 단계는 **올바른 값일 때만** 쓰고, 틀린 값이면 다음 단계로
+ * 넘어간다 — 예전 로그인 · 온보딩은 `?lang=xx` 처럼 틀린 쿼리가 오면 쿠키를 건너뛰고 바로 Accept-Language 로 갔다.
+ */
+export function resolvePreSessionLocale(input: {
+  query?: string | null;
+  cookie?: string | null;
+  acceptLanguage?: string | null;
+}): Locale {
+  if (isLocale(input.query)) return input.query;
+  if (isLocale(input.cookie)) return input.cookie;
+  return inferLocaleFromAcceptLanguage(input.acceptLanguage ?? "");
 }
 
 export function getDictionary(locale: Locale | string | null | undefined): Dictionary {

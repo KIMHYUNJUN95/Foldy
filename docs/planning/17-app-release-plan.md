@@ -46,7 +46,7 @@
 | ~~화면 문구~~ ✅ 2026-10-09 | `src/lib/i18n.ts`(ko/ja/en 36곳) · 웹 시작 화면 · 헤더 워드마크(「Foldy」) · `src/` 기타 파일 | 3개 언어 함께 교체 완료 |
 | ~~법적 문서 · 스토어 문구~~ ✅ 2026-10-09 | `src/lib/legal-content.ts`(24곳) · `18-store-review-kit.md` · 지원 페이지 · iOS 권한 문구(`*.lproj/InfoPlist.strings`) | 방침 · 약관의 서비스 이름 |
 | ~~앱 ID / 번들 ID~~ ✅ 2026-10-09 → `com.harutokyo.foldy` | `capacitor.config.ts` `appId` · Android 패키지 · iOS 번들 · 앱 스킴 `com.harutokyo.foldy://` · **Supabase Redirect URLs** | **스토어 등록(C4) 후에는 못 바꾼다.** 새 이름에 맞출지 C4 전에 결정 (👤). 회사 도메인 기준이라 그대로 둬도 무방. **2026-10-09 이름 교체 때는 그대로 둠(미결)** |
-| 바깥 서비스의 이름 (👤) | ✅ Google OAuth 동의 화면(이름 Foldy · 로고 · 홈페이지/방침/약관 링크 · 승인 도메인 `stay-ops-two.vercel.app`, 2026-10-09) · ✅ Supabase 인증 메일(Confirm sign up · Reset password 를 Foldy 3개 언어 문구로, 2026-10-09) · ✅ Slack 앱 「Foldy Automation」(이름 · 새 아이콘 · 배경색 `#5B2BD6`, 2026-10-09) · [ ] Vercel 프로젝트/주소 `stay-ops-two` · GitHub 저장소 | 코드 밖이라 각 콘솔에서 바꾼다. **자체 도메인(C1) 때 Google 동의 화면의 홈페이지 · 방침 · 약관 링크와 승인 도메인도 새 도메인으로** |
+| 바깥 서비스의 이름 (👤) | ✅ Google OAuth 동의 화면(이름 Foldy · 로고 · 홈페이지/방침/약관 링크 · 승인 도메인 `stay-ops-two.vercel.app`, 2026-10-09) · [ ] Supabase 인증 메일(Confirm sign up · Reset password — 2026-10-09 3개 언어 문구 → **2026-10-23 영어 한 벌로 통일 결정**, 원본 `supabase/templates/*.html` 을 대시보드에 붙여 넣기) · ✅ Slack 앱 「Foldy Automation」(이름 · 새 아이콘 · 배경색 `#5B2BD6`, 2026-10-09) · [ ] Vercel 프로젝트/주소 `stay-ops-two` · GitHub 저장소 | 코드 밖이라 각 콘솔에서 바꾼다. **자체 도메인(C1) 때 Google 동의 화면의 홈페이지 · 방침 · 약관 링크와 승인 도메인도 새 도메인으로** |
 
 ## 0단계 — 계정 · 도메인 (오래 걸리므로 지금 시작)
 

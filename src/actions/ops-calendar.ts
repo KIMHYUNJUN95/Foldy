@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { requireAdminSession } from "@/lib/admin-session";
+import { getAdminSessionForApi } from "@/lib/admin-session";
 import { enqueueBeds24PriceJob, type PriceJobCellRequest } from "@/lib/beds24/price-job-queue";
 import {
   Beds24HttpError,
@@ -140,7 +140,10 @@ export type PriceChangeCell = {
 
 /** 보기(읽기) — 운영 관리자 영역에 들어올 수 있으면 된다(`ops_admin.access`). */
 async function requireOpsReader() {
-  const session = await requireAdminSession();
+  // 화면을 옮기지 않고 「권한 없음」만 돌려준다 — 모바일 판매 캘린더 · 자동화도 같은 액션을 부른다.
+  const auth = await getAdminSessionForApi();
+  if (!auth.ok) return null;
+  const { session } = auth;
   if (!canAccessOpsAdmin(session)) return null;
   return session;
 }

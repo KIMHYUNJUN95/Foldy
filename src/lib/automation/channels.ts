@@ -10,7 +10,7 @@ import { CHANNEL_KEY_PATTERN } from "@/lib/automation/jobs";
  * 이름 규칙 `SLACK_AUTOMATION_<KEY>_WEBHOOK_URL`. 서버가 이 접두어의 변수를 모아 채널 목록을 만든다 — 채널을
  * 늘리려면 Vercel 에 변수를 넣고 재배포하면 되고 코드는 안 바뀐다. 표(`automation_destinations`)에는 KEY 만 둔다.
  *
- * 업무일지용 `SLACK_DAILY_REPORT_WEBHOOK_URL`(mobile/tasks/report-actions.ts)과 **이름이 겹치지 않는다** —
+ * 업무일지용 `SLACK_DAILY_REPORT_WEBHOOK_URL`(src/actions/task-report.ts)과 **이름이 겹치지 않는다** —
  * 저쪽 프로젝트가 같은 이름을 일일 리포트에 썼지만 우리는 다른 채널이다.
  *
  * 주소 전체는 절대 로그 · 화면에 내지 않는다(경로에 토큰이 있다 — `slack-notify.ts` 와 같은 규칙). 화면에는 끝 4자리만.

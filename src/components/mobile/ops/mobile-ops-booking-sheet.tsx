@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { submitManualBooking } from "@/app/admin/ops/calendar/actions";
+import { submitManualBooking } from "@/actions/ops-calendar";
 import {
   bookingErrorText,
   type BookingPanelCopy,

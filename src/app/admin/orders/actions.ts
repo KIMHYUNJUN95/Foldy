@@ -176,8 +176,8 @@ export async function exportOrdersReport(
 // 어드민 주문·비품 콘솔 — 예외 개입 액션(거절/재오픈/상태 정정/내용 수정).
 //
 // 일반 처리(승인/주문처리/배송일수정/삭제)는 기존 액션을 콘솔 클라이언트가 직접 재사용한다:
-// updateOrderRequestStatus·updateOrderDeliveryDate(src/app/mobile/requests/orders/actions.ts),
-// deleteOrderRequest(src/app/mobile/requests/delete-actions.ts). 아래는 관리자 예외 경로다.
+// updateOrderRequestStatus·updateOrderDeliveryDate(src/actions/orders.ts),
+// deleteOrderRequest(src/actions/request-delete.ts). 아래는 관리자 예외 경로다.
 // 권한은 모바일 주문 처리와 같은 `canProcessOrders`(사무실 쪽 역할 + `order_processor` 예외)다.
 // 2026-10-19 까지는 청소 강제완료 게이트(canForceCompleteCleaning)를 잘못 써서 현장 관리자는 거절·정정이
 // 되고 CS 직원은 막혀 있었다(문서 10 과 반대).

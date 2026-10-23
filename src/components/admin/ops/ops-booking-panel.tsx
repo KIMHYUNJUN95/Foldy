@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { X } from "lucide-react";
-import { submitManualBooking, type ManualBookingResult } from "@/app/admin/ops/calendar/actions";
+import { submitManualBooking, type ManualBookingResult } from "@/actions/ops-calendar";
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";

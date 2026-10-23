@@ -7,7 +7,7 @@ import {
   loadReservationMoveTargets,
   submitReservationMove,
   type ReservationMoveTarget,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import {
   reservationMoveErrorText,
   type MovedReservation,
@@ -17,7 +17,7 @@ import {
   loadReservationDetail,
   submitReservationCancel,
   submitReservationEdit,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
 import { reservationCancelErrorText, type ReservationCardCopy } from "@/components/admin/ops/ops-reservation-panel";
 import { CHANNEL_NAME, reservationEditErrorText } from "@/components/admin/ops/ops-reservation-edit";

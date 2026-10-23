@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { submitMinStayChange } from "@/app/admin/ops/calendar/actions";
+import { submitMinStayChange } from "@/actions/ops-calendar";
 import { minStayErrorText, type MinStayPanelCopy } from "@/components/admin/ops/ops-minstay-panel";
 import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import type { RunOpsWrite } from "@/components/admin/ops/ops-write-tracker";

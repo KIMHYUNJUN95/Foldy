@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState, useTransition } f
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, ChevronRight } from "lucide-react";
-import { saveAutomationJob } from "@/app/admin/ops/automation/actions";
+import { saveAutomationJob } from "@/actions/ops-automation";
 import type { AutomationJobView, AutomationPageData } from "@/lib/automation/console-data";
 import {
   AUTOMATION_LOCALES,

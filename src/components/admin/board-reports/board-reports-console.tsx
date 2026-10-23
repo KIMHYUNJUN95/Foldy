@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { Trash2, X } from "lucide-react";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
-import { resolveBoardReport } from "@/app/mobile/board/moderation-actions";
+import { resolveBoardReport } from "@/actions/board-moderation";
 import { boardReasonLabel } from "@/lib/board-report-reasons";
 import { haptic } from "@/lib/haptics";
 import type { PendingBoardReport } from "@/lib/board-moderation";

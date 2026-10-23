@@ -15,7 +15,7 @@ import { BoardConfirm } from "@/components/board/board-confirm";
 import { boardMetaLine, boardRelativeTime } from "@/components/board/board-time";
 import { haptic } from "@/lib/haptics";
 import "@/components/board/board-white.css";
-import { blockBoardUser, reportBoardContent } from "../moderation-actions";
+import { blockBoardUser, reportBoardContent } from "@/actions/board-moderation";
 import type { ComposerSubmitPayload } from "@/components/board/board-composer";
 import type { MentionableMember } from "@/app/mobile/board/[id]/actions";
 import { ALL_TOKEN } from "@/lib/board-mention-utils";

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { generateDailyReport } from "./report-actions";
+import { generateDailyReport } from "@/actions/task-report";
 
 /**
  * 업무일지 예약 보내기(2026-10-20, 시안 「업무일지 예약 보내기 · 시안」 A안).

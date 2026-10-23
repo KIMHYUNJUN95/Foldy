@@ -12,7 +12,7 @@ import {
   setMemberRole,
   setMemberStatus,
   setMemberTeam,
-} from "@/app/admin/users/actions";
+} from "@/actions/users";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-groups";

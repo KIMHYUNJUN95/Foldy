@@ -11,7 +11,7 @@ import {
   createComplaintCommentAction,
   reopenComplaintAction,
   resolveComplaintAction,
-} from "@/app/mobile/complaints/actions";
+} from "@/actions/complaints";
 import { haptic } from "@/lib/haptics";
 
 export type ComplaintActionLabels = {

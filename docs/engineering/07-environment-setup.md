@@ -549,7 +549,7 @@ mailto:admin@example.com
 ## Daily Report (Todo 완료/기록 tab)
 
 No environment variable required. The daily work-report generator
-(`generateDailyReport` in `src/app/mobile/tasks/report-actions.ts`) is **template-based and free** —
+(`generateDailyReport` in `src/actions/task-report.ts`) is **template-based and free** —
 it builds the report deterministically from the day's completed tasks with a local text tidy-up
 (whitespace, bullet glyphs, punctuation spacing). No external API or key, no per-use cost.
 

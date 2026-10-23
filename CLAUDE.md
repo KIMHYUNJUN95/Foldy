@@ -65,6 +65,7 @@ npm run cleaning:normalize-room-labels
 ## Important Directories
 
 - `src/app`: routes, server actions, API routes
+- `src/actions`: server actions that **both** `/mobile` and `/admin` call (2026-10-23). A server action used by only one side stays next to its route; once the other side needs it, move it here — `/mobile` code must not import `src/app/admin/**` actions and vice versa. Guards in shared actions return a `forbidden` result instead of `redirect()` (a redirect would throw a phone user onto an admin page) — use `getAdminSessionForApi()`, not `requireAdminSession()`.
 - `src/components`: shared UI and domain components
 - `src/lib`: i18n, session, Supabase, Beds24, domain helpers
 - `src/config`: roles, navigation, routes

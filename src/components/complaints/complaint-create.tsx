@@ -7,7 +7,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {
   createComplaintAction,
   uploadComplaintImageAction,
-} from "@/app/mobile/complaints/actions";
+} from "@/actions/complaints";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import type { PlacePickRow, ReservationPickRow } from "@/lib/complaint-reservations";
 import { Camera, ChevronDown, Star, X } from "lucide-react";

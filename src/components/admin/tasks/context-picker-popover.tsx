@@ -1,7 +1,7 @@
 "use client";
 
 // Admin-console counterpart of the mobile `ContextPickerSheet` — same building → room →
-// reservation data flow (see src/app/mobile/tasks/context-actions.ts), but rendered as a desktop
+// reservation data flow (see src/actions/task-context.ts), but rendered as a desktop
 // popover (`.pop`) instead of a bottom sheet, and driven by a local draft + single Apply button
 // to match this console's other popovers (see `SchedulePopover` in admin-tasks-console.tsx).
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -27,7 +27,7 @@ import {
   type PickerRoom,
   type ReservationSearchResult,
   type RoomReservation,
-} from "@/app/mobile/tasks/context-actions";
+} from "@/actions/task-context";
 
 // The operational context a task can be linked to. Mirrors the mobile `LinkedContext` shape,
 // minus channel/date fields the admin console doesn't render.

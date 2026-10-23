@@ -6,7 +6,7 @@ import {
   sendDailyReportToSlack,
   type DailyReportResult,
   type SendDailyReportToSlackResult,
-} from "@/app/mobile/tasks/report-actions";
+} from "@/actions/task-report";
 import { notifyProjectMembers, notifyTaskParticipants } from "@/lib/notifications/create";
 import type { TaskNotificationPayload } from "@/lib/notifications/types";
 import { getProjectDetail, type ProjectDetailData } from "@/lib/projects";

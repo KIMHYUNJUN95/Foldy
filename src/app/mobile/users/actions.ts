@@ -6,7 +6,7 @@ import { getCurrentAppSession } from "@/lib/session";
 
 /**
  * 모바일 사용자 관리 — 초대코드 액션(2026-10-20). 본체는 대시보드와 같은 `src/lib/invite-codes-server.ts` 이고, 여기는 결과를
- * 화면에 그대로 돌려준다(대시보드 폼 액션은 주소로 넘긴다). 멤버 역할 · 상태 · 권한 액션은 `src/app/admin/users/actions.ts` 를 그대로 쓴다.
+ * 화면에 그대로 돌려준다(대시보드 폼 액션은 주소로 넘긴다). 멤버 역할 · 상태 · 권한 액션은 `src/actions/users.ts` 를 그대로 쓴다.
  */
 
 async function actor() {

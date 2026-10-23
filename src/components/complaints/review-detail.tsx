@@ -20,7 +20,7 @@ import type { TranslationPart } from "@/lib/review-translate";
 import {
   convertReviewToComplaintAction,
   translateReviewPartAction,
-} from "@/app/mobile/complaints/actions";
+} from "@/actions/complaints";
 
 /** «10/8» — 도쿄 기준. */
 function md(iso: string | null): string {

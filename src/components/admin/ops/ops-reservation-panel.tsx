@@ -12,7 +12,7 @@ import {
   loadReservationDetail,
   submitReservationCancel,
   type CancelReservationResult,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { useRouter } from "next/navigation";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import {

@@ -8,7 +8,7 @@ import {
   revertBlockChange,
   revertPriceJob,
   sendPendingPriceJobs,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import { fetchOpsSendLog } from "@/components/admin/ops/ops-reads";
 import {

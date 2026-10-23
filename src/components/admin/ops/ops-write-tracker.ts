@@ -1,6 +1,6 @@
 "use client";
 
-import type { PriceChangeResult } from "@/app/admin/ops/calendar/actions";
+import type { PriceChangeResult } from "@/actions/ops-calendar";
 import { fetchPriceJobStatus } from "./ops-reads";
 
 /**

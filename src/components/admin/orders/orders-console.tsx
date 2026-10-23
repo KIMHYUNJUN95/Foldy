@@ -19,8 +19,8 @@ import {
   correctOrderStatus,
   editOrder,
 } from "@/app/admin/orders/actions";
-import { updateOrderRequestStatus, updateOrderDeliveryDate } from "@/app/mobile/requests/orders/actions";
-import { deleteOrderRequest } from "@/app/mobile/requests/delete-actions";
+import { updateOrderRequestStatus, updateOrderDeliveryDate } from "@/actions/orders";
+import { deleteOrderRequest } from "@/actions/request-delete";
 import "@/components/admin/maintenance/maintenance-console.css";
 import "@/components/admin/lost-found/lost-found-console.css";
 import "./orders-console.css";

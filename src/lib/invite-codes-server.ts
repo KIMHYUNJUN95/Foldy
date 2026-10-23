@@ -80,7 +80,7 @@ export async function createInviteCodeAs(
     return { ok: false, error: "forbidden" };
   }
   // office_admin may not hand out office_admin-or-above access via invite code — mirrors the same
-  // tiering already enforced for manual role changes (canAssignRole, src/app/admin/users/actions.ts).
+  // tiering already enforced for manual role changes (canAssignRole, src/actions/users.ts).
   if (!selectableInviteRoles(actor.role).includes(defaultRole)) {
     return { ok: false, error: "invalid_invite" };
   }

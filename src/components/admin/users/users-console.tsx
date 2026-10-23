@@ -19,7 +19,7 @@ import {
   setMemberRole,
   setMemberStatus,
   setMemberTeam,
-} from "@/app/admin/users/actions";
+} from "@/actions/users";
 import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-groups";
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -30,7 +30,7 @@ import { tokyoToday } from "@/lib/tokyo-date";
  * 사용자 콘솔 — 화이트 리디자인(2026-10-14, 시안 Users-PC · UsersGrant-PC · UsersDeact-PC).
  * 목록(이름+이메일 · 역할 · 소속 · 전화 · 상태 · 가입일) + 오른쪽 패널(연락처 · 역할/소속/상태 · 권한 한 목록).
  * 역할 · 소속은 고르는 즉시 저장, 비활성은 확인 창, 기한이 필요한 권한은 그 줄이 펼쳐져 기한을 고른다.
- * 서버 계약은 그대로(`/admin/users/actions.ts`). docs/product/23-user-management.md
+ * 서버 계약은 그대로(`src/actions/users.ts`). docs/product/23-user-management.md
  */
 
 // 화면 데이터 모양은 서버 공용 로더와 같다(모바일 `/mobile/users` 도 같이 쓴다).

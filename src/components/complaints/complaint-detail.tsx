@@ -17,7 +17,7 @@ import {
   resolveComplaintAction,
   reopenComplaintAction,
   createComplaintCommentAction,
-} from "@/app/mobile/complaints/actions";
+} from "@/actions/complaints";
 
 /** «10/8 14:20» — 도쿄 기준. */
 function stamp(iso: string): string {

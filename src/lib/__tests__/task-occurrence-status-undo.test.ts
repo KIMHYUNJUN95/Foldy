@@ -100,7 +100,7 @@ vi.mock("@/lib/notifications/create", () => ({
   notifyProjectMembers: async () => {},
   notifyTaskParticipants: async () => {},
 }));
-vi.mock("@/app/mobile/tasks/report-actions", () => ({
+vi.mock("@/actions/task-report", () => ({
   generateDailyReport: async () => ({}),
   sendDailyReportToSlack: async () => ({}),
 }));

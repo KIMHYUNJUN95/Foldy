@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { submitPriceChange, type PriceChangeCell, type PriceChangeError } from "@/app/admin/ops/calendar/actions";
+import { submitPriceChange, type PriceChangeCell, type PriceChangeError } from "@/actions/ops-calendar";
 import type { PanelCell, PanelCopy, PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import type { OpsWriteOutcome, RunOpsWrite } from "@/components/admin/ops/ops-write-tracker";
 import {

@@ -2,6 +2,14 @@
 
 
 
+## 2026-10-23 — 모바일 · 대시보드 코드 경계
+
+- [x] 양쪽이 함께 부르는 서버 액션 11개 → `src/actions/`(01 2026-10-23 · CLAUDE.md Important Directories). 동작 그대로.
+- [x] 판매 캘린더 · 예약 검색 · 자동화 액션의 권한 검사 `requireAdminSession` → `getAdminSessionForApi` — 모바일에서 권한이 빠지면
+  대시보드 화면으로 튀던 것을 「권한 없음」 응답으로.
+- [ ] **남은 것(보류):** 모바일 판매 캘린더 · 가동률 · 매출 · 자동화가 `src/components/admin/ops/*` 패널 약 15개(대시보드 CSS 포함)와
+  `admin-month-key` · `cleaning-assign/format` · `users/member-history` 를 가져다 씀 — 공용 폴더로 옮기는 건 판매 캘린더 작업이 잠잠할 때.
+
 ## 2026-10-23 — 재류카드 자동 촬영 · 등록 실패 고침
 
 - 「이대로 등록」이 「등록하지 못했어요」로 실패하던 것: 새 표 `staff_id_documents` 에 서버 권한(GRANT)이 빠져 DB 42501 — `202610230002` 운영 적용.
@@ -2003,7 +2011,7 @@ Phase 13: QA and Internal Rollout — in progress; Phase 14 feature batch implem
   가능했음 → 형제와 동일하게 org 필터 추가. ② `lib/supabase/service.ts`·`server.ts`에 `import "server-only"`
   가드 추가(클라이언트 import 컴파일 타임 차단; 빌드로 현재 위반 0 확인). ③ `signInWithGoogle`의 URL
   `console.log` 2줄 제거. **오너 결정 후 반영(2026-07-22):** (a) 주문 상태 처리 권한 → **사무실·관리자(adminWebRoles)만**으로 확정
-  (문서 기준). `mobile/requests/orders/actions.ts`의 `ORDER_PROCESSOR_ROLES`에서 `field_manager` 제거 +
+  (문서 기준). `src/actions/orders.ts`의 `ORDER_PROCESSOR_ROLES`에서 `field_manager` 제거 +
   주문 상세 UI(`orders/[id]/page.tsx`)도 `canProcessOrder`(adminWebRoles)로 처리 바를 게이트해 비처리
   역할엔 처리 버튼 미노출(안 되는 버튼 방지). (b) 웹훅/크론 `?secret=` 쿼리 수용 → **현행 유지**(오너 결정,
   변경 없음). `npm run lint`/`npm run build` 통과.
@@ -2241,7 +2249,7 @@ Phase 13: QA and Internal Rollout — in progress; Phase 14 feature batch implem
   migration `supabase/migrations/202607140001_teams.sql` (seeds 현장/사무실 defaults per org + backfills
   existing members by role; RLS = org-member SELECT, service-role writes) — **written but not yet
   applied** to the linked Supabase project. `src/types/database.ts` hand-updated. New server action
-  `setMemberTeam` (`src/app/admin/users/actions.ts`) and helper `getOrgTeams`
+  `setMemberTeam` (`src/actions/users.ts`) and helper `getOrgTeams`
   (`src/lib/teams.ts`). `/admin/users/[id]` gained a 소속 (현장/사무실/미지정) dropdown + save; `/admin/users`
   directory gained a 소속 column + filter. i18n added ko/ja/en (`admin.users.console.team*`,
   `filterAllTeams`). tsc 0 / lint 0 errors. **Later phases (not built):** team CRUD (creating sub-teams
@@ -2662,7 +2670,7 @@ Build order and readiness:
 1. **Linen Defect Registration** — **First slice implemented (2026-06-10).** Mobile linen return ledger is live under `/mobile/linen-return/*` (side-menu entry `linen-return`). All five screens shipped: building picker, building-scoped list, create, detail (permission-gated edit/delete), and ledger (record + item-summary, registrant/item filters, month navigation). Tables `linen_items`, `linen_return_records`, `linen_return_record_items` (migration `202606100002_linen_returns.sql`); photos reuse the `request-images` bucket (`linen-returns/` subfolder). Building = canonical property name (text). **2026-06-15 hardening:** repeated saves by the same user for the same building on the same Tokyo operating day now auto-merge into one header record (same item = quantity sum, new item = appended line). Deferred: building-specific item master UI, admin web. The migration must be applied to the linked Supabase project (Dashboard SQL editor or `supabase db push`). See Product `19` + Tech-design `08` "As-Built".
 2. **Personal Todo / Shared Task Inbox** — **First slice implemented (2026-06-10), hardened through 2026-06-15.** Mobile Todo/Shared Task is live under `/mobile/tasks/*` (side-menu entry `tasks`): six views (Today / Tomorrow / Inbox(관리함) / Sent(공유함) / Completed(완료/기록) / Calendar), quick add + detailed create/edit, task detail with unified update log (text + photos), participant management, and context linking to **building-only / building · room / reservation / guest**. Tables `tasks`, `task_participants`, `task_updates` (migration `202606100003_todo_tasks.sql`); photos reuse the `request-images` bucket (`task-images` / `task-update-images`). Hardening shipped fail-safe create/share behavior, author-editable task photos, update-log photo upload, client-side title+author/date filtering, month-based task calendar navigation, custom date/time pickers, and body-portaled sheets over the mobile shell. **2026-06-12 IA adjustment:** the extra intermediate tab was removed from the mobile UI; manual complete / reopen controls were temporarily removed in the same pass but **re-introduced on 2026-06-13** — see the Completion bullet below. **2026-06-15 recurrence hardening:** repeat rules now generate real task-instance rows (`recurrence_series_id`, `recurrence_instance_date`) instead of a label-only reminder. Current workspace: `Today / Tomorrow / Inbox(관리함) / Sent(공유함) / Completed(완료/기록) / Calendar` (six views). `status` / `completed_*` columns are now active (used by completeTask / reopenTask). Notification expansion added `task_due_soon` + `task_overdue` via the daily CRON-secret task reminders endpoint; shared + update-log notifications remain active. **Activation status:** `202606110001_task_reminder_notifications.sql` is applied on the linked Supabase project; the remaining manual step is still setting `CRON_SECRET` in the Vercel project env so `/api/tasks/reminders` is authorized.
 
-Task Context Link — design + partial data layer (2026-06-12): four-screen context-linking UI allowing a task to be optionally attached to **building-only / building · room / reservation / guest**. **Full data layer (2026-06-12):** `fetchRoomReservations` server action (`src/app/mobile/tasks/context-actions.ts`) queries the `reservations` table for the selected `room_label` across the current month + next month (Tokyo timezone, 2-month window) — `check_in_date < first day of month after next`, `check_out_date >= first day of current month`, status excludes `cancelled`/`no_show`. Results are sorted by `check_in_date` ascending, `isLive` is computed server-side (Tokyo today). The section label "이 객실의 예약" shows the period (e.g. "6/1 – 7/31") inline. Spinner shown while loading; empty state if no reservations found. Typing work-around: a `ReservationSelectRow` type alias + `as` cast bypasses a supabase-js v2 enum-narrowing bug where chained filter methods collapse the inferred row type to `never`. **Screen 4 — task detail context block + list chip (2026-06-12)**: `LinkedTaskContext` type added to `src/lib/tasks.ts`; `TaskRecord` now carries `resolvedContext: LinkedTaskContext | null`. The `hydrate()` function does batch parallel joins (reservations → property_name + room_label + source + dates; properties and rooms for building-only and room-only links) so list queries incur at most 3 extra DB round-trips only when context-linked tasks exist. New `LinkedContextBlock` component (`src/components/tasks/linked-context-block.tsx`) implements the spec `lctx` card: Building icon with primary-tinted border, property · room name (15px/800), channel badge + guest + date range, and "예약 상세로 이동" ArrowUpRight link when a building-backed calendar jump exists. Building-only links now show a dedicated summary state in the detail block, and room-only links keep their no-reservation summary. Shown in `task-detail-view.tsx` between the header card and participants section when `task.resolvedContext !== null`. `task-card.tsx` meta row shows a `bg-primary/[0.09] text-primary` MapPin chip (building, building · room, or guestName) when the task has linked context. New i18n: `contextLinkedSection / contextGoToReservation` (ko/ja/en). **Context link real data — buildings + rooms (2026-06-12)**: `fetchPickerBuildings()`, `fetchPickerRooms(propertyId)`, and `fetchRoomReservations(propertyId, displayRoomLabel)` server actions in `context-actions.ts` now mirror the **reservation calendar's active-room catalog** instead of querying `rooms`/`properties` raw. The picker shows only genuinely active rooms and merges sub-units (201 / 201_2 → one "201" cell), exactly like the calendar room axis. `context-picker-sheet.tsx` stub data removed — buildings load on mount, rooms load when a building is tapped (loading spinners + empty states). `PickerBuilding.id` is the canonical property name; `PickerRoom.label` is the display label. **2026-06-24 follow-up:** the room step now exposes a **building-only** alt action in the shared picker, so tasks and suggestions can save building-level context without forcing a room selection. **Shared resolver extracted (2026-06-12)**: `getRawPayloadString`, `buildGlobalExternalRoomToCanonical`, and `resolveReservationCanonicalRoomLabel` moved into `src/lib/rooms.ts` as the single source of truth for reservation→active-room resolution (priority: raw_payload room/unit id → unit name → reservation room_label, exact then normalized; authoritative vs provisional mode). The picker consumes it; the calendar page still holds an inline equivalent (behaviorally identical) that can be unified onto the lib helper in a later pass. Active-room rules honored: `status='active'`, Beds24 `external_minimum_stay >= 50` excluded, Sano property + Takadanobaba 401_2 excluded. **Deactivation safety**: the picker offers only active rooms, but `hydrate()`'s context joins are NOT status-filtered, so a task linked to a room/reservation that later goes inactive keeps showing its context. `buildLinkedContext()` (tasks.ts) normalizes the saved reservation's raw `property_name`/`room_label` to canonical property + merged display label so chips/detail read consistently (e.g. "荒木町A" / "201_2" → "아라키초A" / "201"). Provisional fallback (`getActiveRoomCatalog` undefined): legacy `properties`/`rooms` listing + exact room_label reservation match. **Context link write path (2026-06-12)**: Full save pipeline wired. `ContextPickerSheet.onSelect` → `setLinkedCtx(ctx)` in `TaskCreateForm`. `handleSubmit` appends the context fields to formData; `createTask`/`updateTaskCore` parse and persist them (empty string → null = clear). Edit page (`[id]/edit/page.tsx`) passes `initialCtx` from `task.resolvedContext` so an existing link round-trips. **Context link UUIDs + deep-link complete (2026-06-12)** — closes the two remaining gaps:
+Task Context Link — design + partial data layer (2026-06-12): four-screen context-linking UI allowing a task to be optionally attached to **building-only / building · room / reservation / guest**. **Full data layer (2026-06-12):** `fetchRoomReservations` server action (`src/actions/task-context.ts`) queries the `reservations` table for the selected `room_label` across the current month + next month (Tokyo timezone, 2-month window) — `check_in_date < first day of month after next`, `check_out_date >= first day of current month`, status excludes `cancelled`/`no_show`. Results are sorted by `check_in_date` ascending, `isLive` is computed server-side (Tokyo today). The section label "이 객실의 예약" shows the period (e.g. "6/1 – 7/31") inline. Spinner shown while loading; empty state if no reservations found. Typing work-around: a `ReservationSelectRow` type alias + `as` cast bypasses a supabase-js v2 enum-narrowing bug where chained filter methods collapse the inferred row type to `never`. **Screen 4 — task detail context block + list chip (2026-06-12)**: `LinkedTaskContext` type added to `src/lib/tasks.ts`; `TaskRecord` now carries `resolvedContext: LinkedTaskContext | null`. The `hydrate()` function does batch parallel joins (reservations → property_name + room_label + source + dates; properties and rooms for building-only and room-only links) so list queries incur at most 3 extra DB round-trips only when context-linked tasks exist. New `LinkedContextBlock` component (`src/components/tasks/linked-context-block.tsx`) implements the spec `lctx` card: Building icon with primary-tinted border, property · room name (15px/800), channel badge + guest + date range, and "예약 상세로 이동" ArrowUpRight link when a building-backed calendar jump exists. Building-only links now show a dedicated summary state in the detail block, and room-only links keep their no-reservation summary. Shown in `task-detail-view.tsx` between the header card and participants section when `task.resolvedContext !== null`. `task-card.tsx` meta row shows a `bg-primary/[0.09] text-primary` MapPin chip (building, building · room, or guestName) when the task has linked context. New i18n: `contextLinkedSection / contextGoToReservation` (ko/ja/en). **Context link real data — buildings + rooms (2026-06-12)**: `fetchPickerBuildings()`, `fetchPickerRooms(propertyId)`, and `fetchRoomReservations(propertyId, displayRoomLabel)` server actions in `context-actions.ts` now mirror the **reservation calendar's active-room catalog** instead of querying `rooms`/`properties` raw. The picker shows only genuinely active rooms and merges sub-units (201 / 201_2 → one "201" cell), exactly like the calendar room axis. `context-picker-sheet.tsx` stub data removed — buildings load on mount, rooms load when a building is tapped (loading spinners + empty states). `PickerBuilding.id` is the canonical property name; `PickerRoom.label` is the display label. **2026-06-24 follow-up:** the room step now exposes a **building-only** alt action in the shared picker, so tasks and suggestions can save building-level context without forcing a room selection. **Shared resolver extracted (2026-06-12)**: `getRawPayloadString`, `buildGlobalExternalRoomToCanonical`, and `resolveReservationCanonicalRoomLabel` moved into `src/lib/rooms.ts` as the single source of truth for reservation→active-room resolution (priority: raw_payload room/unit id → unit name → reservation room_label, exact then normalized; authoritative vs provisional mode). The picker consumes it; the calendar page still holds an inline equivalent (behaviorally identical) that can be unified onto the lib helper in a later pass. Active-room rules honored: `status='active'`, Beds24 `external_minimum_stay >= 50` excluded, Sano property + Takadanobaba 401_2 excluded. **Deactivation safety**: the picker offers only active rooms, but `hydrate()`'s context joins are NOT status-filtered, so a task linked to a room/reservation that later goes inactive keeps showing its context. `buildLinkedContext()` (tasks.ts) normalizes the saved reservation's raw `property_name`/`room_label` to canonical property + merged display label so chips/detail read consistently (e.g. "荒木町A" / "201_2" → "아라키초A" / "201"). Provisional fallback (`getActiveRoomCatalog` undefined): legacy `properties`/`rooms` listing + exact room_label reservation match. **Context link write path (2026-06-12)**: Full save pipeline wired. `ContextPickerSheet.onSelect` → `setLinkedCtx(ctx)` in `TaskCreateForm`. `handleSubmit` appends the context fields to formData; `createTask`/`updateTaskCore` parse and persist them (empty string → null = clear). Edit page (`[id]/edit/page.tsx`) passes `initialCtx` from `task.resolvedContext` so an existing link round-trips. **Context link UUIDs + deep-link complete (2026-06-12)** — closes the two remaining gaps:
 - **`property_id` / `room_id` now persisted.** `getActiveRoomCatalog` (and `ActiveRoomCatalogItem`) gained `roomId` + `propertyId` (the `rooms.id` / `rooms.property_id` UUIDs; the SELECT now includes them). The picker carries them: `PickerBuilding.propertyId` and `PickerRoom.{roomId,propertyId}` (for a merged display label like 201 = {201, 201_2}, the **base sub-unit** — canonical key === display label — is the representative row). `LinkedContext` / `LinkedTaskContext` / `TaskInitialCtx` gained `propertyId` + `roomId`; the form sends `ctxPropertyId` / `ctxRoomId`; both server actions write `property_id` / `room_id`. So a **building-only link** persists `property_id` with `room_id = null`, and a **room-only link (no reservation)** persists both ids; both resolve their building name in the chip/detail, with the room number appearing when a room exists. `buildLinkedContext()` normalizes the joined raw property/room labels to canonical property + merged display label when a room is present. UUIDs also round-trip through edit via `resolvedContext` → `initialCtx`. The calendar page's inline `roomCatalog` type was replaced with the imported `ActiveRoomCatalogItem` (no behavior change).
 - **"예약 상세로 이동" routing wired.** `LinkedContextBlock` now deep-links to `/mobile/calendar?property={canonicalName}&month={check-in YYYY-MM}` (building-only and room-only links omit the month → current month). Guest-only links (no property) render the card non-interactive (go-link + chevron hidden), since there is nothing to navigate to.
 - **Deep-link now auto-opens the reservation sheet (2026-06-12).** The deep-link also carries `&reservationId={id}`, and `MobileCalendarView` auto-opens that reservation's detail sheet on arrival so the guest info shows immediately (no extra tap, no manual refresh). Both `reservationId` and `property` are read client-side from the **live URL via `useSearchParams()`** (server prop as fallback) because a soft `router.push` to `/mobile/calendar` can serve a prefetched/cached RSC payload with stale params — that stale-prop path was why the modal previously needed a refresh. The auto-open is scheduled in `requestAnimationFrame` with the "already-opened" guard set inside the callback, so React StrictMode's double-invoke can't cancel it. (Reservation list/maps are param-independent, so URL-derived params render correctly without a refetch.)
@@ -4588,7 +4596,7 @@ Delivery date (`delivery_date`) is now captured when marking an order as "주문
 - `supabase/migrations/202606010002_order_requests_delivery_date.sql`: `ALTER TABLE order_requests ADD COLUMN delivery_date date;` (nullable).
 - `src/types/database.ts`: `delivery_date: string | null` added to `order_requests` Row/Insert/Update.
 
-### Server action (`src/app/mobile/requests/orders/actions.ts`)
+### Server action (`src/actions/orders.ts`)
 
 - `deliveryDate?: string` added to input.
 - Validation: when `targetStatus === "ordered"`, `deliveryDate` is required and must be `YYYY-MM-DD` format. Returns `missing_delivery_date` or `invalid_delivery_date` on failure.
@@ -5077,7 +5085,7 @@ Verification: `npm run lint` + `npm run build` pass.
 ### 2026-06-29 — 컴플레인(customer_complaints) 백엔드 구현
 
 OTA 고객 컴플레인 기록 기능의 서버 사이드를 구현. 도메인 헬퍼 `src/lib/complaints.ts`
-(server-only) 와 모바일 server action 래퍼 `src/app/mobile/complaints/actions.ts` 추가.
+(server-only) 와 모바일 server action 래퍼 `src/actions/complaints.ts` 추가.
 프론트엔드(목록/상세/작성 화면)는 아직 design-only 목 데이터 — 이번 작업은 백엔드 한정.
 
 핵심:
@@ -5092,7 +5100,7 @@ OTA 고객 컴플레인 기록 기능의 서버 사이드를 구현. 도메인 �
 - `customer_complaints`/`complaint_comments` 가 아직 생성 DB 타입에 없어 untyped 클라이언트 뷰로
   접근 (타입 재생성 시 정리 예정).
 
-Files: `src/lib/complaints.ts`, `src/app/mobile/complaints/actions.ts`,
+Files: `src/lib/complaints.ts`, `src/actions/complaints.ts`,
 `docs/product/25-complaint-workflow.md`.
 
 Verification: `npm run lint` + `npm run build` pass.
@@ -5289,7 +5297,7 @@ Files(변경): `src/app/admin/users/page.tsx`, `src/app/admin/users/[id]/page.ts
 디자인 컨펌 후, 재디자인 사용자 화면을 **실제 DB에 연결**. 프로토타입(로컬 상태)이던 저장/부여/회수가
 이제 서버 액션 → Supabase로 반영된다. **마이그레이션 없음**(모든 컬럼/테이블 기존재).
 
-- **결과-반환형 서버 액션** (`src/app/admin/users/actions.ts` 전면 정비, FormData·redirect → `{ok,error}`):
+- **결과-반환형 서버 액션** (`src/actions/users.ts` 전면 정비, FormData·redirect → `{ok,error}`):
   `setMemberRole`/`setMemberStatus`(owner·office_admin·dev, 본인 차단, office_admin은 상위 역할 부여 불가),
   `setMemberReportAccess`(`profiles.can_generate_report`), `setMemberPayrollAdmin`
   (`memberships.attendance_payroll_admin`, **owner·dev만**), `setMemberLeaveApprover`
@@ -5310,7 +5318,7 @@ Files(변경): `src/app/admin/users/page.tsx`, `src/app/admin/users/[id]/page.ts
 `OR has_permission_override(...)`로 채택하는 **새 마이그레이션** 필요(사용자가 적용). 도메인별 인증 모델
 조사 후 단계 적용 예정. 문서: `27-permission-override-workflow.md`.
 
-Files: `src/app/admin/users/actions.ts`, `src/config/permission-overrides.ts`(신규),
+Files: `src/actions/users.ts`, `src/config/permission-overrides.ts`(신규),
 `src/lib/permission-overrides-server.ts`(신규), `src/lib/annual-leave-admin-server.ts`,
 `src/components/admin/users/users-directory-client.tsx`,
 `src/components/admin/users/user-detail-client.tsx`, `src/app/admin/users/[id]/page.tsx`,
@@ -5345,7 +5353,7 @@ Files(추가): `src/lib/i18n.ts`, `src/app/admin/users/page.tsx`, `src/app/admin
 `src/components/admin/users/users-directory-client.tsx`,
 `src/components/admin/users/user-detail-client.tsx`, `src/app/users-preview/page.tsx`.
 Files(P1 백엔드): `supabase/migrations/202607130001_membership_manage_users.sql`,
-`src/lib/user-management-access.ts`, `src/app/admin/users/actions.ts`, `src/types/database.ts`, docs(01/06).
+`src/lib/user-management-access.ts`, `src/actions/users.ts`, `src/types/database.ts`, docs(01/06).
 
 ## 2026-07-13 사용자/권한 모델 개편 — P2 (전무 역할, owner 동급)
 
@@ -5368,7 +5376,7 @@ Files(P1 백엔드): `supabase/migrations/202607130001_membership_manage_users.s
 
 Files: `supabase/migrations/202607130002_*.sql`·`202607130003_*.sql`(신규), `src/config/roles.ts`,
 `src/types/database.ts`, `src/lib/annual-leave-admin-server.ts`, `src/lib/attendance-review.ts`,
-`src/app/admin/users/actions.ts`, `src/app/admin/users/[id]/page.tsx`, `src/lib/i18n.ts`,
+`src/actions/users.ts`, `src/app/admin/users/[id]/page.tsx`, `src/lib/i18n.ts`,
 `src/lib/announcement-i18n.ts` + settings/announcements/complaints(에이전트 스윕), docs(06).
 
 ## 2026-07-13 사용자/권한 모델 개편 — P3 (상태 활성/비활성 + 완전 차단)
@@ -5386,7 +5394,7 @@ Files: `supabase/migrations/202607130002_*.sql`·`202607130003_*.sql`(신규), `
 - 참고: 이 변경 전부터 있던 suspended/invited 계정은 auth 밴이 안 걸려 있음 — 필요시 1회 백필(선택).
 - **다음:** P4 가드형 하드 삭제(활동 기록 있으면 차단, 허용 시 auth 계정까지 삭제, 2단계 확인).
 
-Files: `src/app/admin/users/actions.ts`, `src/components/admin/users/users-directory-client.tsx`,
+Files: `src/actions/users.ts`, `src/components/admin/users/users-directory-client.tsx`,
 `src/components/admin/users/user-detail-client.tsx`, `src/lib/i18n.ts`, docs(06). 마이그레이션 없음.
 
 ## 2026-07-13 사용자/권한 모델 개편 — P4 (가드형 하드 삭제) + 본인 행 정리
@@ -5406,7 +5414,7 @@ Files: `src/app/admin/users/actions.ts`, `src/components/admin/users/users-direc
 
 **→ P1~P4 전부 코드 완료.** 적용 대기 마이그레이션: `202607130002`·`003`(전무, ①→② 순서). P3/P4는 마이그 없음.
 
-Files: `src/app/admin/users/actions.ts`, `src/components/admin/users/user-detail-client.tsx`,
+Files: `src/actions/users.ts`, `src/components/admin/users/user-detail-client.tsx`,
 `src/components/admin/users/users-directory-client.tsx`, `src/lib/i18n.ts`, docs(06). 마이그레이션 없음.
 
 ## 2026-07-13 권한 예외 실효성 연결(enforcement) + 임시 프리뷰 삭제 — 마무리
@@ -5426,7 +5434,7 @@ Files: `src/app/admin/users/actions.ts`, `src/components/admin/users/user-detail
 **→ 사용자/권한 개편 전체 완료.** 남은 적용 마이그레이션: `202607130002`·`003`(전무) + `202607130004`(권한예외 enforcement).
 
 Files: `supabase/migrations/202607130004_permission_override_enforcement.sql`(신규),
-`src/lib/permission-overrides-server.ts`, `src/app/mobile/tasks/report-actions.ts`,
+`src/lib/permission-overrides-server.ts`, `src/actions/task-report.ts`,
 `src/app/users-preview/`(삭제), docs(27/06).
 
 ## 2026-07-13 권한 예외 부여 폼 UI 정리
@@ -6373,7 +6381,7 @@ i18n `ko`/`ja`/`en` 동시 추가. 테스트 513개 통과.
 | --- | --- | --- |
 | 블록 쓰기 로직 | ✅ 있음 — **아직 아무 데서도 부르지 않는다** | `src/lib/beds24/block-write.ts` · `block-write-payload.ts` |
 | 스냅샷 테이블 | ✅ 적용 완료 | `supabase/migrations/202609250001_room_block_snapshots.sql` |
-| 블록 서버 액션 | ❌ | `src/app/admin/ops/calendar/actions.ts` 에 추가 |
+| 블록 서버 액션 | ❌ | `src/actions/ops-calendar.ts` 에 추가 |
 | 블록 UI | ❌ | 모드에 `block` 을 하나 더 (`ops-calendar-grid.tsx` 의 `mode: "off" \| "price" \| "minstay"`) |
 | 수동 예약 생성 | ❌ | `POST /bookings`. **저쪽 모달 800줄을 아직 안 읽었다** |
 | 예약 취소 | ❌ | Beds24 에도 반영되고 되돌릴 수 없다 — 확인 단계 필요 |

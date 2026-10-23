@@ -311,7 +311,7 @@ Editing (as built):
 - The delivery date is editable after `ordered` from the **order detail page by office-level roles**
   (same permission as 주문 처리). The order action bar shows a **"배송일 수정"** action when
   `status === "ordered"`, reusing the existing delivery-date picker (exact / range) and persisting via
-  a dedicated `updateOrderDeliveryDate` server action (`src/app/mobile/requests/orders/actions.ts`) —
+  a dedicated `updateOrderDeliveryDate` server action (`src/actions/orders.ts`) —
   status stays `ordered`, only the delivery columns change. The calendar reflects edits automatically
   (it reads the order rows). Editing **notifies the requester** (delivery-date-changed notification —
   see Notifications below); self-suppressed when the editor is the requester.

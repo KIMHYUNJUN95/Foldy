@@ -11,7 +11,7 @@ import {
   type OrderRequestItem,
   type OrderRequestStatus,
 } from "@/lib/order-requests";
-import { canCurrentUserProcessOrders } from "@/app/mobile/requests/orders/actions";
+import { canCurrentUserProcessOrders } from "@/actions/orders";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { tokyoToday } from "@/lib/tokyo-date";

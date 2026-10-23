@@ -1,6 +1,6 @@
 "use server";
 
-import { requireAdminSession } from "@/lib/admin-session";
+import { getAdminSessionForApi } from "@/lib/admin-session";
 import { toJstDateString } from "@/lib/admin-calendar-dashboard";
 import {
   buildGuestSearchPlan,
@@ -38,7 +38,10 @@ export type ReservationSearchResult =
   | { ok: false; error: "forbidden" };
 
 async function requireOpsReader() {
-  const session = await requireAdminSession();
+  // 화면을 옮기지 않고 「권한 없음」만 돌려준다 — 모바일 판매 캘린더 · 자동화도 같은 액션을 부른다.
+  const auth = await getAdminSessionForApi();
+  if (!auth.ok) return null;
+  const { session } = auth;
   if (!canAccessOpsAdmin(session)) return null;
   return session;
 }

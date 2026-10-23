@@ -10,7 +10,7 @@ import {
   sendAutomationNow,
   type AssigneeRoomView,
   type CleaningRoomOptionGroup,
-} from "@/app/admin/ops/automation/actions";
+} from "@/actions/ops-automation";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import type { AutomationPageData } from "@/lib/automation/console-data";

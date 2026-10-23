@@ -587,7 +587,7 @@ Beds24 예약 웹훅 우선 원칙은 유지한다. 리뷰는 웹훅이 아닌 �
 ## Existing Implementation and Migration Boundary
 
 현재 모바일 수동 컴플레인 백엔드는 `src/lib/complaints.ts`,
-`src/app/mobile/complaints/actions.ts`, migration `202606290001_customer_complaints.sql`에 존재한다.
+`src/actions/complaints.ts`, migration `202606290001_customer_complaints.sql`에 존재한다.
 이번 기획은 그 동작을 즉시 바꾸지 않는다.
 
 구현 작업에서는 새 migration으로 `external_reviews` 및 필요한 연결 필드를 추가하고, DB 타입과 RLS를 함께

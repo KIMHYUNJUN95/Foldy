@@ -6,7 +6,7 @@ import { memberCapabilities } from "@/lib/capabilities-server";
 /**
  * 역할 게이트 + 권한 예외(override). `order_processor` 오버라이드는 RLS에는 이미 반영돼 있는데
  * (마이그레이션 202607130004) 앱 게이트가 먼저 거절해서 부여해도 아무 변화가 없었다.
- * 조회 패턴은 `can_generate_report`(src/app/mobile/tasks/report-actions.ts)와 같다.
+ * 조회 패턴은 `can_generate_report`(src/actions/task-report.ts)와 같다.
  */
 export async function canProcessOrders(
   organizationId: string,

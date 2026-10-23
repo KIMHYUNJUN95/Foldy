@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { submitMinStayChange } from "@/app/admin/ops/calendar/actions";
-import type { PriceChangeError } from "@/app/admin/ops/calendar/actions";
+import { submitMinStayChange } from "@/actions/ops-calendar";
+import type { PriceChangeError } from "@/actions/ops-calendar";
 import type { GapContextEntry } from "@/lib/ops-gap-context";
 import {
   outcomeText,

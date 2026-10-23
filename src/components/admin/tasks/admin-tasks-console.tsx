@@ -116,7 +116,7 @@ import {
   listReportSchedules,
   scheduleDailyReport,
   type ReportScheduleView,
-} from "@/app/mobile/tasks/report-schedule-actions";
+} from "@/actions/task-report-schedule";
 import {
   durationLabel,
   earliestMinute,

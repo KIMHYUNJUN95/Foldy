@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, ChevronRight, Clock, Copy, FileText, Lock, RefreshCw, Send, TriangleAlert } from "lucide-react";
-import { generateDailyReport, sendDailyReportToSlack } from "@/app/mobile/tasks/report-actions";
+import { generateDailyReport, sendDailyReportToSlack } from "@/actions/task-report";
 import {
   cancelDailyReportSchedule,
   getReportSchedule,
   scheduleDailyReport,
   type ReportScheduleView,
-} from "@/app/mobile/tasks/report-schedule-actions";
+} from "@/actions/task-report-schedule";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {
   buildDailyReportText,

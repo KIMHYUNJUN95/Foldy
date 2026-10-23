@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import {
   submitReservationEdit,
   type ReservationEditResult,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { useRoomAvailability } from "@/components/admin/ops/use-room-availability";
 import {

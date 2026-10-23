@@ -272,7 +272,7 @@ for schema.
 - Assignment/edit lives on `/admin/users/[id]` (a 소속 dropdown: 현장/사무실/미지정, save button) and the
   `/admin/users` directory shows a 소속 column + a 소속 filter (전체 소속/현장/사무실). Only shown when
   the org has teams.
-- Server action `setMemberTeam` (`src/app/admin/users/actions.ts`) uses the same
+- Server action `setMemberTeam` (`src/actions/users.ts`) uses the same
   `actorCanManageUsersInOrg` gate as role/status changes. `null` clears the assignment (미지정).
 - **Phase 1 scope only.** Team CRUD (creating additional/sub-teams beyond the two defaults) and using
   team as a filter on 근태/청소/대시보드 screens are later phases, not built yet.

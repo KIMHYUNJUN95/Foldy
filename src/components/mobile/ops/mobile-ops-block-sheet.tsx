@@ -6,7 +6,7 @@ import {
   submitRoomUnblock,
   type BlockChangeCell,
   type BlockPurpose,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { BLOCK_PURPOSE_ORDER, blockErrorText, type BlockPanelCopy } from "@/components/admin/ops/ops-block-panel";
 import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";

@@ -98,8 +98,8 @@ import { hasOpsLargeRooms, isOpsLargeRoom, orderOpsLargeRoomsFirst } from "@/lib
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
 import { OPS_GAP_OPEN_EVENT } from "@/components/admin/ops/ops-gap-button";
 import { OPS_OPEN_RESERVATION_EVENT } from "@/components/shell/admin-guest-search";
-import { loadOpsReservationPlacement } from "@/app/admin/ops/calendar/search-actions";
-import { submitReservationMove } from "@/app/admin/ops/calendar/actions";
+import { loadOpsReservationPlacement } from "@/actions/ops-calendar-search";
+import { submitReservationMove } from "@/actions/ops-calendar";
 import {
   channelDisplayName,
   reservationMoveErrorText,

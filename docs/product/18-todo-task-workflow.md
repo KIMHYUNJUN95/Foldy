@@ -1222,7 +1222,7 @@ Task completion was re-introduced (it had been removed in the 2026-06-12 IA clea
 서버:
 - 표 `task_report_schedules`(마이그레이션 `202610200005`) — 본인만 읽기(RLS), 쓰기는 서버(service role). **표 권한(GRANT)은 `202610200006`** — 0005 가 빠뜨려 첫날 예약이 `permission denied` 로 저장되지 않고 「Slack으로 보내지 못했습니다」가 떴다(2026-10-20 수정).
   새 표를 만들 땐 `grant all … to service_role` · 필요하면 `grant select … to authenticated` 를 같이 적는다 — 이 프로젝트는 기본 권한으로 DML 이 붙지 않는다. 한 사람 · 한 날짜에 살아 있는 예약 하나(부분 유니크) —
-  다시 예약하면 이전 것을 취소하고 새로 넣는다. 액션 `src/app/mobile/tasks/report-schedule-actions.ts`(`scheduleDailyReport` · `cancelDailyReportSchedule` ·
+  다시 예약하면 이전 것을 취소하고 새로 넣는다. 액션 `src/actions/task-report-schedule.ts`(`scheduleDailyReport` · `cancelDailyReportSchedule` ·
   `getReportSchedule` · `listReportSchedules`). 예약할 때 권한 · 빈 일지는 지금 보내기와 같은 판정(`generateDailyReport`).
 - 보내기: pg_cron 이 **매 분** `task_report_tick_if_needed()` — 보낼 때가 된 예약이 있을 때만 pg_net 으로 `/api/tasks/report-tick`(토큰은 Vault
   `task_report_tick_token`, 주소 `task_report_tick_url`). 라우트는 `claim_due_task_report_schedules`(원자적으로 'sending', `for update skip locked`)로 가져가

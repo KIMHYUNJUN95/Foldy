@@ -717,7 +717,7 @@ Per-occurrence state for recurring tasks (migration `202607300001_task_occurrenc
 - Update / delete: author own posts; admin-capable roles moderate all (pin, archive, delete).
 - **Reports · blocks (2026-10-06):** `board_reports` · `user_blocks` are service-role only (RLS on, no policies). Any active member may
   report others' posts/comments and block other same-org members; only holders of capability **`board.moderate`** (default owner · office_admin, individually grantable/deniable) see the queue and
-  resolve (`canModerateBoard`); reporters may withdraw their own pending/dismissed reports. All checks live in `src/app/mobile/board/moderation-actions.ts`. See `docs/product/23-board-workflow.md` §12-C.
+  resolve (`canModerateBoard`); reporters may withdraw their own pending/dismissed reports. All checks live in `src/actions/board-moderation.ts`. See `docs/product/23-board-workflow.md` §12-C.
 
 ## staff_suggestions
 
@@ -1124,7 +1124,7 @@ not yet applied.** See `docs/planning/01-decision-log.md` → 2026-07-14 and
   - SELECT: `organization_id in (select organization_id from active memberships for auth.uid())` —
     any active org member (assignment dropdowns / filters need to read team names).
   - No INSERT/UPDATE/DELETE policies — writes go only through service-role server actions
-    (`setMemberTeam`, `src/app/admin/users/actions.ts`), gated by the same
+    (`setMemberTeam`, `src/actions/users.ts`), gated by the same
     `actorCanManageUsersInOrg` check as `memberships.manage_users` (developer default or an explicit
     `manage_users` delegation).
 - `memberships.team_id`: no separate RLS — covered by the existing `memberships` SELECT/write policies
@@ -1372,7 +1372,7 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 ## 2026-09-30 판매 캘린더 · Beds24 웹훅 — 조직 격리 보강 (감사 저위험 3건)
 
 - **행 키는 서버가 다시 계산한다.** `submitManualBooking` · `submitReservationEdit`
-  (`src/app/admin/ops/calendar/actions.ts`)는 화면이 보낸 `roomKey` 를 믿지 않는다. 넘어온 `rooms.id` 를
+  (`src/actions/ops-calendar.ts`)는 화면이 보낸 `roomKey` 를 믿지 않는다. 넘어온 `rooms.id` 를
   세션 조직으로 읽고 `resolveOpsRowRoomKey`(`src/lib/ops-room-key.ts`, 격자 `mapRoomUnits` 와 같은
   `opsUnitRoomKey`)로 키를 다시 만든다. 조직 밖 id 가 하나라도 있거나, 유닛이 한 행으로 모이지 않거나,
   화면 키와 다르면 거절(수동 예약 `unknown_room`, 예약 수정 `not_found`). 겹침 검사는 서버 키만 쓴다.
@@ -1429,7 +1429,7 @@ service-role 로 읽으므로 **조직을 쿼리에 직접 건다**(`organizatio
 - `automation_jobs` · `automation_destinations` · `automation_runs` · `automation_setting_logs` · `cleaning_list_assignees` · `cleaning_list_extra_rooms`(2026-10-07):
   SELECT 정책 `ops admins can read` — `organization_id = any ((select public.capability_organization_ids('ops_admin.access'))::uuid[])`.
   INSERT/UPDATE/DELETE 정책 없음 — 쓰기는 서버 액션(service-role)이 **`automation.manage` 와 조직을 다시 확인한 뒤**만 한다
-  (`src/app/admin/ops/automation/actions.ts`). 틱 라우트도 service-role.
+  (`src/actions/ops-automation.ts`). 틱 라우트도 service-role.
 - 새 권한 키 **`automation.manage`** — 역할 기본 부여 **없음**(`roles: []`), 개인 부여만, 차단 없음, 기한 없음, 개발자 통과.
   설정 저장 · 발송 토글 · 지금 보내기 · 정정본 · 담당자 이름 입력. 정책 행만 넣는다(역할 행 없음).
 - 틱 함수 · 토큰 대조 함수는 `service_role` 만 실행.

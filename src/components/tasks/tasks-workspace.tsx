@@ -90,7 +90,7 @@ import {
   type OccurrenceState,
   recurringOccurrencesInRange,
 } from "@/lib/tasks-recurrence";
-import { listReportSchedules, type ReportScheduleView } from "@/app/mobile/tasks/report-schedule-actions";
+import { listReportSchedules, type ReportScheduleView } from "@/actions/task-report-schedule";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import "./tasks-white.css";

@@ -1398,7 +1398,7 @@ Beds24 내부 메모에 쓴다 — 손님에게 안 보이고 원문이 남는�
 | 시간 초과 | 쓰기 20초 · 읽기 10초. 쓰기가 시간 초과면 **다시 읽어** 이미 옮겨졌는지 본다(같은 예약을 고치는 것이라 다시 눌러도 중복은 생기지 않는다). |
 
 코드: 규칙 `src/lib/ops-booking-move.ts`(테스트 `ops-booking-move.test.ts`) · 서버 `submitReservationMove` · 후보 `loadReservationMoveTargets`
-(`readOpsMoveTargets` — 여러 줄을 한 번 읽어 줄마다 겹침 · 겹친 손님 이름 · 판매 안 함) · `src/app/admin/ops/calendar/actions.ts`.
+(`readOpsMoveTargets` — 여러 줄을 한 번 읽어 줄마다 겹침 · 겹친 손님 이름 · 판매 안 함) · `src/actions/ops-calendar.ts`.
 
 화면:
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { withdrawBoardReport } from "@/app/mobile/board/moderation-actions";
+import { withdrawBoardReport } from "@/actions/board-moderation";
 
 export type MyReportRow = {
   id: string;

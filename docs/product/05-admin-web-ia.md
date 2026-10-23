@@ -1412,7 +1412,7 @@ Management Console" → Current Implementation Note.
   `/admin/ops/calendar?resv=<id>` 로 넘어가 열고, 주소에서 `resv` 는 바로 뗀다. 창 밖 숙박도 열린다.
 - 오른쪽 끝은 ⌘K 장식 대신 **검색 버튼**(Enter 모양, 입력 전에는 비활성) + 입력 중 지우기(X).
   ⌘K / Ctrl+K 로 검색창에 포커스하는 단축키는 실제로 동작한다. ↑↓ 로 고르고 Esc 로 닫는다.
-- 서버 액션 `src/app/admin/ops/calendar/search-actions.ts`(service-role, 조직 필터 직접), 막대·객실 행
+- 서버 액션 `src/actions/ops-calendar-search.ts`(service-role, 조직 필터 직접), 막대·객실 행
   매핑은 격자와 같은 `resolveOpsReservationPlacements`(`ops-calendar.ts`). 문구는 `admin.console.search*`(ko/ja/en).
 - 컴포넌트 `src/components/shell/admin-guest-search.tsx`, 스타일 `admin-console.css` 의 `.gsearch*`.
 - 상단바(`.adm .top`)는 z-index 20 — 목록이 판매 캘린더의 붙는 날짜 머리(z 6) 아래로 깔리던 것을 고쳤다.

@@ -7162,3 +7162,16 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
 - 모델은 `claude-opus-5-5`(effort low). 동의는 기본 꺼짐, 동의하지 않으면 손 입력. 동의 문구는 사실대로(학습 안 씀 · 최대 30일 보관).
 - 표 이름은 `staff_id_documents`(재류카드 · 마이넘버 카드 앞면 한 표). 보기 · 확인은 새 키 `staff_documents.view`(기본 대표 · 전무).
 - 상세 `docs/product/41-residence-card-workflow.md` §10.
+
+## 2026-10-23 — 모바일 · 대시보드 코드 경계: 함께 쓰는 서버 액션은 `src/actions/`
+
+- **배경:** 구조 점검 결과 화면 · 주소(`/mobile/*` · `/admin/*`) · 셸은 나뉘어 있지만, 모바일이 `src/app/admin/**` 의 액션 4개를, 대시보드가
+  `src/app/mobile/**` 의 액션 7개를 가져다 쓰고 있었다 — 한쪽 폴더를 정리하면 다른 쪽이 깨지는 구조. 또 판매 캘린더 · 자동화 액션이
+  `requireAdminSession()`(권한 없으면 `redirect`)을 써서 모바일에서 권한이 빠지면 대시보드 「권한 없음」 화면으로 튀었다.
+- **결정(사용자 「진행해줘」):** 양쪽이 부르는 서버 액션 11개를 `src/actions/` 로 옮김 — `ops-calendar` · `ops-calendar-search` ·
+  `ops-automation` · `users` · `task-report` · `task-report-schedule` · `task-context` · `orders` · `request-delete` · `complaints` ·
+  `board-moderation`. 동작 · 권한 검사는 그대로, 위치와 불러오는 경로만 바뀜. 공용 액션의 권한 검사는 `getAdminSessionForApi()` 로 —
+  화면을 옮기지 않고 `forbidden` 을 돌려준다.
+- **미룸:** 모바일 판매 캘린더가 쓰는 `src/components/admin/ops/*` 패널 약 15개 · 작은 도구(`admin-month-key` · `cleaning-assign/format` ·
+  `member-history`)를 공용 폴더로 옮기는 건 판매 캘린더 작업이 잠잠할 때(다른 세션과 충돌이 커서). 06 「모바일 · 대시보드 코드 경계」.
+

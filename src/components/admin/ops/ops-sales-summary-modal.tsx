@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, X } from "lucide-react";
-import { loadOpsSalesSummary, type OpsSalesSummaryResult } from "@/app/admin/ops/calendar/actions";
+import { loadOpsSalesSummary, type OpsSalesSummaryResult } from "@/actions/ops-calendar";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { previewAutomationMessage } from "@/app/admin/ops/automation/actions";
+import { previewAutomationMessage } from "@/actions/ops-automation";
 import type { AutomationJobView, AutomationPageData, AutomationRunView } from "@/lib/automation/console-data";
 import type { AutomationJobKey, AutomationLocale } from "@/lib/automation/jobs";
 import type { AlertCard } from "@/lib/automation/messages";

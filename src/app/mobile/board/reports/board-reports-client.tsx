@@ -8,7 +8,7 @@ import { BoardConfirm } from "@/components/board/board-confirm";
 import { boardReasonLabel } from "@/lib/board-report-reasons";
 import { haptic } from "@/lib/haptics";
 import "@/components/board/board-white.css";
-import { resolveBoardReport } from "../moderation-actions";
+import { resolveBoardReport } from "@/actions/board-moderation";
 import type { PendingBoardReport } from "@/lib/board-moderation";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { BoardToast } from "@/components/board/board-toast";

@@ -44,7 +44,7 @@ function isValidUuid(value: string) {
  * 상태 변경 권한 = part_time_staff 제외 전원, 또는 `maintenance_status_change` 권한 예외(override).
  * 오버라이드는 RLS에는 이미 반영돼 있었는데(마이그레이션 202607130004 → 202607160001에서 유지)
  * 앱 게이트가 파트타임을 먼저 거절해서 부여해도 UI상 아무 변화가 없었다. 조회 패턴은
- * `can_generate_report`(src/app/mobile/tasks/report-actions.ts)와 같다.
+ * `can_generate_report`(src/actions/task-report.ts)와 같다.
  */
 export async function canHandleMaintenance(
   organizationId: string,

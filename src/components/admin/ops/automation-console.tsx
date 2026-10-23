@@ -13,7 +13,7 @@ import {
   setAutomationEnabled,
   type AssigneeRoomView,
   type CleaningRoomOptionGroup,
-} from "@/app/admin/ops/automation/actions";
+} from "@/actions/ops-automation";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminDatePicker } from "@/components/admin/shared/admin-date-picker";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";

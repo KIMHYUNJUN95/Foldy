@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { loadRoomAvailability } from "@/app/admin/ops/calendar/actions";
+import { loadRoomAvailability } from "@/actions/ops-calendar";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { MAX_STAY_NIGHTS, stayNights } from "@/lib/ops-manual-booking";
 

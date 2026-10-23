@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminSession } from "@/lib/admin-session";
+import { getAdminSessionForApi } from "@/lib/admin-session";
 import { getDictionary } from "@/lib/i18n";
 import { listAutomationChannels } from "@/lib/automation/channels";
 import {
@@ -51,13 +51,19 @@ import type { Json } from "@/types/database";
 type Fail = { ok: false; error: "forbidden" | "invalid" | "not_found" | "save_failed" | "no_destination" | "no_sample" };
 
 async function viewer() {
-  const session = await requireAdminSession();
+  // 화면을 옮기지 않고 「권한 없음」만 돌려준다 — 모바일 판매 캘린더 · 자동화도 같은 액션을 부른다.
+  const auth = await getAdminSessionForApi();
+  if (!auth.ok) return null;
+  const { session } = auth;
   if (!canAccessOpsAdmin(session)) return null;
   return session;
 }
 
 async function manager() {
-  const session = await requireAdminSession();
+  // 화면을 옮기지 않고 「권한 없음」만 돌려준다 — 모바일 판매 캘린더 · 자동화도 같은 액션을 부른다.
+  const auth = await getAdminSessionForApi();
+  if (!auth.ok) return null;
+  const { session } = auth;
   if (!canAccessOpsAdmin(session) || !session.capabilities.includes("automation.manage")) return null;
   return session;
 }

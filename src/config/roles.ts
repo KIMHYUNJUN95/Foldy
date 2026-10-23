@@ -140,7 +140,7 @@ export const roleToInviteCategory: Partial<Record<OrganizationRole, InviteCatego
 
 /**
  * Roles an `office_admin` (non-owner) may hand to someone else — via manual role change
- * (`src/app/admin/users/actions.ts`) or invite-code creation (`src/app/admin/settings/actions.ts`).
+ * (`src/actions/users.ts`) or invite-code creation (`src/app/admin/settings/actions.ts`).
  * Deliberately excludes `owner` and `office_admin` itself: only `owner`/`developer_super_admin` may
  * grant office_admin-or-above access, in either flow. Single source of truth so the two enforcement
  * points can't drift apart.

@@ -7,7 +7,7 @@ import {
   type BlockChangeCell,
   type BlockChangeError,
   type BlockPurpose,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
 import {
   SpwHead,

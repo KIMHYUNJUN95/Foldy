@@ -4,7 +4,7 @@ import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, u
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { loadAutomationRunMessage, sendAutomationNow, setAutomationEnabled } from "@/app/admin/ops/automation/actions";
+import { loadAutomationRunMessage, sendAutomationNow, setAutomationEnabled } from "@/actions/ops-automation";
 import {
   aheadWhen,
   dayLabel,

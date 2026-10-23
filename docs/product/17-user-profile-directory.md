@@ -157,7 +157,7 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
   - Also in the list: 급여 담당 · 연차 결재자 (membership flags), 일일 보고서 — 파트타임 허용 (only for part-time, `profiles.can_generate_report`), 개발자 지정 (developer viewer only). Developer-only keys (`user.manage`) are hidden from non-developers.
 - Your own row: no role/status/permission controls (「내 역할 · 권한은 여기서 바꿀 수 없어요.」), no delete.
 - Delete member: confirm modal (그대로 두기 / 삭제). Blocked with a message when the member has attendance / cleaning / leave history (deactivate instead).
-- **보호 대상 · 마지막 대표 · 삭제/비활성 범위 (2026-10-19)** — 판정은 순수 함수 `src/lib/user-management-guard.ts`, 서버 액션(`src/app/admin/users/actions.ts`)이 최종 판단. 회귀 테스트 `src/lib/__tests__/user-management-guard.test.ts`.
+- **보호 대상 · 마지막 대표 · 삭제/비활성 범위 (2026-10-19)** — 판정은 순수 함수 `src/lib/user-management-guard.ts`, 서버 액션(`src/actions/users.ts`)이 최종 판단. 회귀 테스트 `src/lib/__tests__/user-management-guard.test.ts`.
   - 대상이 **owner · 전무**면 역할 · 소속 · 상태 · 권한 · 플래그 · 삭제 등 패널의 모든 변경은 **그 조직의 owner · 전무 또는 개발자만**. 대상이 **개발자**(`platform_admins` 활성)면 **개발자만**. `user.manage` 위임만 받은 사람은 불가(`protected_member`). 패널은 그런 대상에 컨트롤 · 휴지통을 숨기고 한 줄 안내(「대표 · 전무 계정은 …」 / 「개발자 계정은 개발자만 …」)를 보여 준다.
   - 역할 변경의 「줄 수 있는 역할」(`officeAdminAssignableRoles` 밖)도 **대상 조직의** owner · 전무인지로 판정한다(세션 역할이 다른 조직 것일 수 있다).
   - **마지막 활성 owner** 는 owner 가 아닌 역할로 바꾸기 · 비활성 · 삭제가 막힌다(`last_owner`). 패널은 역할 드롭다운 · 「비활성」 · 휴지통을 막고 안내 문구를 띄운다. 전무는 owner 수에 세지 않는다.
@@ -216,7 +216,7 @@ emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패�
 | --- | --- |
 | 입장 | 대시보드와 같은 문 — 개발자 · 대표 · 전무(역할, 2026-10-20)이거나 `user.manage` 개인 부여(`actorCanOpenUserManagement`, `src/app/mobile/users/gate.ts`). 아니면 `/mobile` 로. 메뉴 「사용자」(사이드 메뉴 · 레일 · 사이드바 · 하단 탭 후보)도 같은 키로만 보인다(`src/config/navigation.ts`) |
 | 데이터 | `src/lib/user-management-data.ts`(`loadUserDirectory` · `loadMemberPanel` · `loadUsableInviteCount`) — 대시보드 페이지에서 빼서 둘이 같이 쓴다 |
-| 멤버 액션 | `src/app/admin/users/actions.ts` 그대로(역할 · 소속 · 상태 · 권한 · 플래그 · 개발자 지정 · 삭제). 바꾸면 `/admin/users` · `/mobile/users` 둘 다 다시 그린다 |
+| 멤버 액션 | `src/actions/users.ts` 그대로(역할 · 소속 · 상태 · 권한 · 플래그 · 개발자 지정 · 삭제). 바꾸면 `/admin/users` · `/mobile/users` 둘 다 다시 그린다 |
 | 초대코드 액션 | 본체 `src/lib/invite-codes-server.ts`(만들기 · 끄기/켜기 · 삭제 · 줄 수 있는 역할 · 고를 수 있는 조직). 대시보드 폼 액션(`/admin/settings/actions.ts`)은 결과를 주소 쿼리로, 모바일 액션(`src/app/mobile/users/actions.ts`)은 결과를 그대로 돌려준다 |
 
 화면(`src/components/mobile/users/*`, `mobile-users.css`):

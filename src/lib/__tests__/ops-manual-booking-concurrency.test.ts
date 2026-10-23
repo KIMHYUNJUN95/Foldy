@@ -11,9 +11,9 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/admin-session", () => ({
-  requireAdminSession: vi.fn(async () => ({
-    organization: { id: "org-1" },
-    user: { id: "user-1", name: "Tester" },
+  getAdminSessionForApi: vi.fn(async () => ({
+    ok: true,
+    session: { organization: { id: "org-1" }, user: { id: "user-1", name: "Tester" } },
   })),
 }));
 vi.mock("@/lib/ops-admin", () => ({ canAccessOpsAdmin: () => true, canWriteOpsCalendar: () => true }));
@@ -46,7 +46,7 @@ vi.mock("@/lib/beds24/calendar-client", async (importOriginal) => {
 let fake = createFakeSupabase({});
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => fake.client }));
 
-const { submitManualBooking } = await import("@/app/admin/ops/calendar/actions");
+const { submitManualBooking } = await import("@/actions/ops-calendar");
 const calendarClient = await import("@/lib/beds24/calendar-client");
 const fetchCalendar = vi.mocked(calendarClient.fetchBeds24Calendar);
 const postBooking = vi.mocked(calendarClient.postBeds24Booking);

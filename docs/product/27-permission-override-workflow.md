@@ -42,7 +42,7 @@ below. The schema was migrated 2026-07-09
   Labels/descriptions in i18n `admin.users.console.keys` (ko/ja/en).
 - Service-role data layer `src/lib/permission-overrides-server.ts`
   (`listMemberOverrides`/`grantMemberOverride`/`revokeMemberOverride`) + server actions
-  `grantPermissionOverrideAction`/`revokePermissionOverrideAction` in `src/app/admin/users/actions.ts`,
+  `grantPermissionOverrideAction`/`revokePermissionOverrideAction` in `src/actions/users.ts`,
   gated to owner/senior_managing_director(전무)/developer, org-scoped, self-grant blocked (DB constraint
   + action), expiry-required.
 - **No new migration** — reuses `202607090002`.
@@ -75,7 +75,7 @@ promoting their role or adding a brand-new dedicated column for a one-off need.
 **Permanent role/employment changes are a different problem and already have a solution.** A
 part-time worker becoming a regular employee, or any role promotion/demotion, is a normal
 `memberships.role` change — already implemented at `/admin/users/[id]` (`updateMemberRole` server
-action, `src/app/admin/users/actions.ts`). That flow already has its own permission tiering
+action, `src/actions/users.ts`). That flow already has its own permission tiering
 (`owner`/`senior_managing_director`/`developer_super_admin` can assign any organization role;
 `office_admin` can assign anything
 except `owner`/`office_admin`; nobody can promote themselves) and needs no changes. This document is
@@ -118,9 +118,9 @@ every time a new exception need comes up.
   the user console; `docs/product/17-user-profile-directory.md`).
 - **Adoption is a two-layer change, not just RLS (corrected 2026-07-09).** A lot of Foldy'
   real authorization logic lives in **TypeScript, not pure RLS** — e.g. `ORDER_PROCESSOR_ROLES`
-  (`src/app/mobile/requests/orders/actions.ts`), `canGenerateDailyReport()` /
+  (`src/actions/orders.ts`), `canGenerateDailyReport()` /
   `canAssignRole()` / `canAccessAdminWeb()` (`src/config/roles.ts`,
-  `src/app/admin/users/actions.ts`), `isAttendancePayrollAdmin()`
+  `src/actions/users.ts`), `isAttendancePayrollAdmin()`
   (`src/lib/attendance-review.ts`). Several of these are *stricter* than the matching RLS policy on
   purpose (e.g. `field_manager` can edit order-request content via RLS but is blocked from changing
   status by the server action alone). So adopting this system for a given feature means **both**:

@@ -4,8 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import {
   submitPriceChange,
   type PriceChangeCell,
-} from "@/app/admin/ops/calendar/actions";
-import type { PriceChangeError } from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
+import type { PriceChangeError } from "@/actions/ops-calendar";
 import {
   outcomeText as writeOutcomeText,
   type OpsWriteOutcome,

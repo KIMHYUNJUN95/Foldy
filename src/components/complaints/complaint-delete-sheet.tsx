@@ -7,7 +7,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
-import { deleteComplaintAction } from "@/app/mobile/complaints/actions";
+import { deleteComplaintAction } from "@/actions/complaints";
 import { haptic } from "@/lib/haptics";
 
 export type DeleteSheetLabels = {

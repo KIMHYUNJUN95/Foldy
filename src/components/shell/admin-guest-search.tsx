@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CornerDownLeft, Search, X } from "lucide-react";
-import { searchOpsReservations } from "@/app/admin/ops/calendar/search-actions";
+import { searchOpsReservations } from "@/actions/ops-calendar-search";
 import type { OpsReservationPlacement } from "@/lib/ops-calendar";
 
 /**

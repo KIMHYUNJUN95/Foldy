@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { unblockBoardUser } from "@/app/mobile/board/moderation-actions";
+import { unblockBoardUser } from "@/actions/board-moderation";
 
 /** 계정 → 보안 「차단한 사용자」 — 게시판 차단 해제(2026-10-06). */
 export function BlockedUsersList({

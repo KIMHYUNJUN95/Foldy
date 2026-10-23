@@ -745,7 +745,7 @@ App Store(1.2) · Google Play(UGC 정책)는 사용자 작성 콘텐츠가 있�
 - 표: `board_reports` · `user_blocks`(마이그레이션 `202610060001_board_reports_user_blocks.sql`, service-role 전용) — `docs/engineering/04-data-model.md`.
 - 조회: `src/lib/board-moderation.ts` — `getBoardHiddenFor()`(피드 · 상세 · 안읽음이 이걸로 거름), `countPendingBoardReports()`,
   `listPendingBoardReports()`, `listMyBlockedUsers()`.
-- 서버 액션: `src/app/mobile/board/moderation-actions.ts` — `reportBoardContent` · `blockBoardUser` · `unblockBoardUser` · `resolveBoardReport` · `withdrawBoardReport`.
+- 서버 액션: `src/actions/board-moderation.ts` — `reportBoardContent` · `blockBoardUser` · `unblockBoardUser` · `resolveBoardReport` · `withdrawBoardReport`.
   조직 · 대상 존재 · 작성자 · 처리 권한을 모두 서버에서 검사한다.
 - 문구: `dictionary.board.*`(report* · reason* · block* · reports*), `dictionary.accountProfile.blockedUsers*` · `unblock` — ko/ja/en.
 

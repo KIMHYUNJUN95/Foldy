@@ -11,7 +11,7 @@ import {
   submitReservationMove,
   type ReservationMoveResult,
   type ReservationMoveTarget,
-} from "@/app/admin/ops/calendar/actions";
+} from "@/actions/ops-calendar";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { MAX_STAY_NIGHTS, stayNights } from "@/lib/ops-manual-booking";
 import type { OpsCalendarBar } from "@/lib/ops-calendar";

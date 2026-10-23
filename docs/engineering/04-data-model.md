@@ -2178,3 +2178,4 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 | `confirmed_by` · `confirmed_at` · `return_reason` | 마지막으로 확인 / 다시 요청한 사람 · 시각 · 사유 |
 
 쓰기는 서버 액션(service role)만 — `src/app/account/id-card/actions.ts`. 권한 키 `staff_documents.view` 시드도 같은 마이그레이션.
+표 권한(GRANT): service_role 전부 · authenticated 읽기 — `202610230002`(첫 마이그레이션에서 빠져 등록이 42501 로 실패했었다. 새 표를 만들면 GRANT 를 같이 쓴다).

@@ -135,7 +135,10 @@
 .idc-cam__stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 0 16px; }
 .idc-cam__title { margin: 0; max-width: 300px; font-size: 17px; font-weight: 700; text-align: center; line-height: 1.45; text-shadow: 0 1px 6px rgba(0, 0, 0, .5); }
 .idc-cam__frame { position: relative; width: min(86vw, 520px); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .5); }
-.idc-cam__corner { position: absolute; width: 34px; height: 34px; border: 0 solid #8f6cff; }
+.idc-cam__corner { position: absolute; width: 34px; height: 34px; border: 0 solid rgba(255, 255, 255, .9); transition: border-color 150ms ease; }
+.idc-cam__frame[data-found] .idc-cam__corner { border-color: #8f6cff; }
+.idc-cam__found { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; margin: 0; padding: 6px 14px; border-radius: 999px; background: rgba(143, 108, 255, .28); font-size: 13.5px; font-weight: 700; color: #fff; text-align: center; }
+.idc-cam__found svg { flex: none; color: #c9b8ff; }
 .idc-cam__corner--tl { left: -2px; top: -2px; border-left-width: 4px; border-top-width: 4px; border-top-left-radius: 16px; }
 .idc-cam__corner--tr { right: -2px; top: -2px; border-right-width: 4px; border-top-width: 4px; border-top-right-radius: 16px; }
 .idc-cam__corner--bl { left: -2px; bottom: -2px; border-left-width: 4px; border-bottom-width: 4px; border-bottom-left-radius: 16px; }
@@ -148,6 +151,8 @@
 .idc-cam__album--ghost { background: transparent; }
 .idc-cam__shutter { position: relative; width: 80px; height: 80px; border-radius: 999px; border: 4px solid rgba(255, 255, 255, .9); padding: 0; transition: transform 160ms cubic-bezier(.23, 1, .32, 1); }
 .idc-cam__shutter span { position: absolute; inset: 6px; border-radius: 999px; background: #fff; }
+.idc-cam__ring { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); transform: rotate(-90deg); pointer-events: none; }
+.idc-cam__ring circle { fill: none; stroke: #8f6cff; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 232.5; transition: stroke-dashoffset 120ms linear; }
 .idc-cam__shutter:active:not(:disabled) { transform: scale(0.94); }
 .idc-cam__shutter:disabled { opacity: .45; }
 .idc-cam__side { display: none; }

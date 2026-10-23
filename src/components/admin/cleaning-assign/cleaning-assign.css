@@ -116,8 +116,29 @@
 .adm .cas-person__name small.is-muted { color: #6b6878; font-weight: 500; }
 .adm .cas-person__sub { font-size: 13px; color: #6b6878; }
 .adm .cas-person__sub.is-warn { color: #c5282e; font-weight: 600; }
-.adm .cas-person__req { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 4px; padding: 4px 4px 4px 10px; border-radius: 8px; background: #fdecec; color: #8a1d22; font-size: 13px; }
-.adm .cas-person__req.is-amber { background: #fff1dc; color: #6b3a00; }
+/* 요청 줄(취소 요청 · 견습 확인) — 시안 8siDG3… A안(2026-10-23): 상자 없이 색 점 + 한 줄, 아래 알약 칩 둘. 빨강은 취소 요청 줄에만. */
+.adm .cas-person__req { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.adm .cas-person__reqline { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; line-height: 18px; color: #6b6878; }
+.adm .cas-person__reqline i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+.adm .cas-person__reqline b { flex: none; font-weight: 600; }
+.adm .cas-person__reqline span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .cas-person__req.is-red i { background: #e5484d; }
+.adm .cas-person__req.is-red b { color: #b4232a; }
+.adm .cas-person__req.is-amber i { background: #f07b1a; }
+.adm .cas-person__req.is-amber b { color: #8a4b00; }
+.adm .cas-person__reqacts { display: flex; gap: 6px; flex-wrap: wrap; }
+.adm .cas-chip { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #f4f4f7; color: #3a3746; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .cas-chip:hover:not(:disabled) { background: #ececf0; }
+.adm .cas-chip:active:not(:disabled) { transform: scale(.97); }
+.adm .cas-chip:disabled { opacity: .5; cursor: default; }
+.adm .cas-chip.is-red { background: #fdecec; color: #b4232a; }
+.adm .cas-chip.is-red:hover:not(:disabled) { background: #fadcdc; }
+.adm .cas-chip.is-pri { background: #7a52e6; color: #fff; }
+.adm .cas-chip.is-pri:hover:not(:disabled) { background: #6b43dc; }
+/* 「일정 취소」 — 평소엔 회색 글자, 올렸을 때만 빨강(빨강은 요청 줄 하나만 눈에 띄게). */
+.adm .cas-quietdanger { height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #8e8a99; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: color 150ms ease, background 150ms ease; }
+.adm .cas-quietdanger:hover:not(:disabled) { color: #b4232a; background: #fdecec; }
+.adm .cas-quietdanger:disabled { opacity: .5; cursor: default; }
 .adm .cas-person__time { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .adm .cas-time { height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #6b6878; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .adm .cas-time:hover { background: #f4f4f7; }

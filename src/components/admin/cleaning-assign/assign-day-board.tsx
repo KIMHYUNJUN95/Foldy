@@ -687,26 +687,37 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                   <span className={`cas-person__sub${p.rooms.length === 0 && !p.cancelled ? " is-warn" : ""}`}>{personSub(p)}</span>
                   </button>
                   {p.cancelRequested ? (
-                    <span className="cas-person__req" onClick={(event) => event.stopPropagation()}>
-                      <b>{copy.cancelRequest}</b>
-                      {p.cancelRequestNote ? ` · ${p.cancelRequestNote}` : ""}
-                      <button type="button" className="cas-btn is-danger-text" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: true, date: board.date, userId: p.userId }))}>
-                        {copy.cancelRequestAccept}
-                      </button>
-                      <button type="button" className="cas-btn is-ghost" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: false, date: board.date, userId: p.userId }))}>
-                        {copy.cancelRequestReject}
-                      </button>
+                    // 요청 줄(시안 8siDG3… A안, 2026-10-23) — 상자 없이 점 + 한 줄, 아래 알약 칩 둘. 빨강은 이 줄에만.
+                    <span className="cas-person__req is-red" onClick={(event) => event.stopPropagation()}>
+                      <span className="cas-person__reqline">
+                        <i aria-hidden="true" />
+                        <b>{copy.cancelRequest}</b>
+                        {p.cancelRequestNote ? <span>{p.cancelRequestNote}</span> : null}
+                      </span>
+                      <span className="cas-person__reqacts">
+                        <button type="button" className="cas-chip is-red" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: true, date: board.date, userId: p.userId }))}>
+                          {copy.cancelRequestAccept}
+                        </button>
+                        <button type="button" className="cas-chip" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: false, date: board.date, userId: p.userId }))}>
+                          {copy.cancelRequestReject}
+                        </button>
+                      </span>
                     </span>
                   ) : null}
                   {p.traineeAsk ? (
                     <span className="cas-person__req is-amber" onClick={(event) => event.stopPropagation()}>
-                      <b>{copy.traineeAsk}</b>
-                      <button type="button" className="cas-btn is-ghost" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: true, userId: p.userId }))}>
-                        {copy.traineeDone}
-                      </button>
-                      <button type="button" className="cas-btn is-ghost" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: false, userId: p.userId }))}>
-                        {copy.traineeKeep}
-                      </button>
+                      <span className="cas-person__reqline">
+                        <i aria-hidden="true" />
+                        <b>{copy.traineeAsk}</b>
+                      </span>
+                      <span className="cas-person__reqacts">
+                        <button type="button" className="cas-chip is-pri" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: true, userId: p.userId }))}>
+                          {copy.traineeDone}
+                        </button>
+                        <button type="button" className="cas-chip" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: false, userId: p.userId }))}>
+                          {copy.traineeKeep}
+                        </button>
+                      </span>
                     </span>
                   ) : null}
                 </div>
@@ -736,7 +747,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                     </button>
                   )}
                   {!p.cancelled && p.applied ? (
-                    <button type="button" className="cas-btn is-danger-text is-tiny" disabled={pending} onClick={() => run(() => cancelPersonDay({ date: board.date, userId: p.userId }))}>
+                    <button type="button" className="cas-quietdanger" disabled={pending} onClick={() => run(() => cancelPersonDay({ date: board.date, userId: p.userId }))}>
                       {copy.cancelDay}
                     </button>
                   ) : null}

@@ -39,6 +39,9 @@
 - 관리자 사용자 패널(PC · 모바일)에 「신분 서류」 칸: 사진 · 칸 · 만료 남은 날 · 확인함 / 다시 요청(사유) · 카드 번호 유효 확인 바로가기. 새 권한 키 `staff_documents.view`(대표 · 전무).
 - DB `staff_id_documents` · 비공개 버킷 `staff-documents`(마이그레이션 `202610230001`, 운영 적용). SDK `@anthropic-ai/sdk`, 키 `ANTHROPIC_API_KEY`(사용자가 Vercel 에 넣음).
 - 문구 ko/ja/en(`dictionary.idCard`). 테스트 `staff-document-fields.test.ts`. 문서 41 §10 · 04 · 05 · 07 · 16 · 27 · 01. 실제 폰 촬영 확인은 아직.
+- 동의 기록 · 읽기 횟수 제한 · 보관 기한 정리(2026-10-23): 새 표 `staff_id_ocr_reads`(보내기 직전 누가 · 언제 · 문구 판 · 언어, 사람 10 · 조직 200/일 제한) ·
+  `memberships.left_at`(트리거) · 매일 크론에 퇴사 3년 뒤 서류 · 사진 하드 삭제. 마이그레이션 `202610230003` · `202610230004`(**운영 적용 대기**).
+  문구 `idCard.readRateLimited`(ko/ja/en). 테스트 `staff-document-policy.test.ts`. 문서 41 §10 · 04 · 05.
 
 ## 2026-10-22 — 모바일 다국어 점검 (전 화면)
 

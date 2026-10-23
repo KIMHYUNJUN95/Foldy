@@ -195,6 +195,7 @@ role text not null
 status text not null
 team_id uuid references teams(id) on delete set null  -- added migration 202607140001; nullable = 미지정
 joined_at timestamptz
+left_at timestamptz  -- added 202610230004; 떠난(suspended · removed) 시각, active · invited 면 null (트리거)
 created_at timestamptz
 updated_at timestamptz
 ```
@@ -2179,3 +2180,21 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 
 쓰기는 서버 액션(service role)만 — `src/app/account/id-card/actions.ts`. 권한 키 `staff_documents.view` 시드도 같은 마이그레이션.
 표 권한(GRANT): service_role 전부 · authenticated 읽기 — `202610230002`(첫 마이그레이션에서 빠져 등록이 42501 로 실패했었다. 새 표를 만들면 GRANT 를 같이 쓴다).
+
+## 2026-10-23 `staff_id_ocr_reads` · `memberships.left_at` — 동의 기록 · 읽기 횟수 · 보관 기한 (`202610230003` · `202610230004`)
+
+`staff_id_ocr_reads` — 자동 읽기로 사진을 해외(미국) 서버에 보내기 **직전**에 서버 액션 `readIdCard` 가 한 줄 남긴다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `organization_id` · `user_id` | 조직 · 동의한 사람 |
+| `document_id` | 서류 id(제출 전이라 FK 없음 — 제출되면 `staff_id_documents.id` 와 같다) |
+| `consent_version` | 동의 문구 판 `ID_CARD_CONSENT_VERSION`(`src/lib/staff-documents/policy.ts`) — `idCard.consent` · `consentDetail` 을 고치면 바꾼다 |
+| `locale` | 그때 화면 언어 `ko · ja · en` |
+| `created_at` | 동의 · 보낸 시각. 하루 횟수 제한(사람 10 · 조직 200, 도쿄 날짜)도 이 칸으로 센다 |
+
+RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, authenticated 권한 없음).
+
+`memberships.left_at` — 떠난 시각(트리거 `memberships_track_left_at`: active · invited 로 바뀌면 null, 그 밖 → suspended · removed 면 now(),
+떠난 상태끼리 바뀌면 처음 값 유지). 기존 suspended · removed 행은 `updated_at` 으로 채웠다(근사 — 실제보다 늦을 수는 있어도 이르지 않다).
+신분 서류 보관 기한(퇴사 3년 뒤 삭제)의 기준 — `docs/product/41` §6.

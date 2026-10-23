@@ -1534,3 +1534,9 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 버킷 `staff-documents`(비공개, 8MB, jpeg/png/webp): **올리기만** 본인 — 경로 `{조직}/{auth.uid()}/{uuid}/{front|back}-{임의}.jpg` · 그 조직 활성 멤버.
   읽기 · 지우기 정책 없음 — 보기는 서버의 10분 서명 URL, 지우기는 서버(쓰지 않은 사진 · 개인번호가 보인 사진).
 - 관리자 사용자 패널은 `staff_documents.view` 가 없으면 서류 데이터를 싣지 않는다(UI 숨김만이 아님).
+
+## 2026-10-23 신분 서류 동의 기록 `staff_id_ocr_reads` (`202610230003`)
+
+- RLS 켜짐 · **정책 없음** — authenticated 는 읽기 · 쓰기 모두 막힘. GRANT 는 `service_role` 만(`all`).
+- 쓰기는 `readIdCard`(세션 · 조직 · 본인 경로 확인 뒤) · 지우기는 보관 기한 정리 작업(`cleanupExpiredIdDocuments`, 크론) — 둘 다 service role, 조직 · 사람으로 직접 거른다.
+- 보관 기한 정리는 저장소 사진을 Storage API(service role)로 지운다(`storage.objects` 에 SQL 로 손대지 않는다).

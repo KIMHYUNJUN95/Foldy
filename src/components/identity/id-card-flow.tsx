@@ -206,7 +206,15 @@ export function IdCardFlow({
       setStep("camera");
       return;
     }
-    setNotice(result.reason === "not_card" ? copy.readNotCard : result.reason === "unreadable" ? copy.readUnreadable : copy.readFailed);
+    setNotice(
+      result.reason === "not_card"
+        ? copy.readNotCard
+        : result.reason === "unreadable"
+          ? copy.readUnreadable
+          : result.reason === "rate_limited"
+            ? copy.readRateLimited
+            : copy.readFailed,
+    );
     setReadFields(null);
     setStep("review");
   }

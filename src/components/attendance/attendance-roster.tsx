@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import "./attendance.css";
 import { AIc, AttIcon } from "./att-icons";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { WeeklyLimitBadge } from "@/components/shared/weekly-limit-badge";
+import type { WeeklyLimitChip } from "@/lib/staff-documents/weekly-limit";
 import { getDictionary } from "@/lib/i18n";
 import type { RosterDay, RosterEntry } from "@/lib/attendance-roster";
 
@@ -22,6 +24,8 @@ type Props = {
   operatingDate: string;  // currently selected date "YYYY-MM-DD"
   todayDate: string;      // today in Tokyo "YYYY-MM-DD"
   locale: string;
+  /** 「주 28시간」 칩(docs/product/41 R4) — 서버가 `staff_documents.view` 를 본 뒤에만 채운다. */
+  weeklyLimit?: Record<string, WeeklyLimitChip>;
 };
 
 // ─── 날짜 유틸 ────────────────────────────────────────────────────────────────
@@ -64,7 +68,15 @@ function fmtDateMeta(d: Date, locale: string): string {
 
 const ORDER: RosterEntry["statusKey"][] = ["working", "on_break", "needs_review", "done", "void"];
 
-function RosterLine({ entry, copy }: { entry: RosterEntry; copy: ReturnType<typeof getDictionary>["attendance"] }) {
+function RosterLine({
+  entry,
+  copy,
+  weekly,
+}: {
+  entry: RosterEntry;
+  copy: ReturnType<typeof getDictionary>["attendance"];
+  weekly: WeeklyLimitChip | null;
+}) {
   const isActive = entry.statusKey === "working" || entry.statusKey === "on_break";
   const canCall = isActive && !!entry.phoneNumber;
   const site = entry.statusKey === "done" && entry.clockOutSiteName ? entry.clockOutSiteName : entry.siteName;
@@ -84,6 +96,7 @@ function RosterLine({ entry, copy }: { entry: RosterEntry; copy: ReturnType<type
       <span className="ro-line__b">
         <span className="ro-line__t">
           {entry.name} <small>{entry.role}</small>
+          <WeeklyLimitBadge chip={weekly} copy={copy} />
         </span>
         <span className="ro-line__m">
           {site ? `${site} · ` : ""}
@@ -284,7 +297,7 @@ function CalendarSheet({ selectedDate, todayDate, hasDataDates, onSelect, onClos
 
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 
-export function AttendanceRoster({ rosterDay, operatingDate, todayDate, locale }: Props) {
+export function AttendanceRoster({ rosterDay, operatingDate, todayDate, locale, weeklyLimit = {} }: Props) {
   const copy = getDictionary(locale).attendance;
   const router = useRouter();
   const [calOpen, setCalOpen] = useState(false);
@@ -407,7 +420,9 @@ export function AttendanceRoster({ rosterDay, operatingDate, todayDate, locale }
             <div className="roster-empty__s">{copy.rosterNoEntriesSub}</div>
           </div>
         ) : (
-          entries.map((entry) => <RosterLine key={entry.sessionId} entry={entry} copy={copy} />)
+          entries.map((entry) => (
+            <RosterLine key={entry.sessionId} entry={entry} copy={copy} weekly={weeklyLimit[entry.userId] ?? null} />
+          ))
         )}
       </div>
 

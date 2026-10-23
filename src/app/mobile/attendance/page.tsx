@@ -11,6 +11,7 @@ import {
   isPastReminderTimeTokyo,
 } from "@/lib/attendance-sessions";
 import { getMonthlyPayView } from "@/lib/attendance-pay";
+import { loadOwnWeeklyLimit } from "@/lib/staff-documents/weekly-limit-server";
 import { getDictionary } from "@/lib/i18n";
 import { canViewRoster } from "@/config/roles";
 
@@ -56,8 +57,8 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
 
   // Real state: open session with an open break → 휴게 중; open session → 근무 중; otherwise → 출근 전.
   // Fetch monthly pay view in parallel (skip in preview mode; catch errors gracefully).
-  const [openSession, monthlyPayView, abandonedSessions] = previewState
-    ? [null, null, []]
+  const [openSession, monthlyPayView, abandonedSessions, weeklyLimit] = previewState
+    ? [null, null, [], null]
     : await Promise.all([
         getCurrentOpenSession(session.organization.id, session.user.id, session.user.preferredLanguage),
         getMonthlyPayView(
@@ -68,6 +69,8 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
         ).catch(() => null),
         // 퇴근을 안 찍고 넘어간 날들. 본인이 알아야 정정 요청을 낼 수 있다(2026-08-04).
         getAbandonedSessions(session.organization.id, session.user.id).catch(() => []),
+        // 「주 28시간」(docs/product/41 R4) — 자격외활동 대상자 본인에게 최근 7일이 24시간 이상이면 안내. 대상이 아니면 null.
+        loadOwnWeeklyLimit(session.organization.id, session.user.id),
       ]);
   const homeState =
     previewState ??
@@ -136,6 +139,7 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
         monthHours={monthHours}
         monthPay={monthPay}
         canSeeRoster={canSeeRoster}
+        weeklyLimit={weeklyLimit}
       />
     </MobileShell>
   );

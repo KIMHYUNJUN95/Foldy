@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { loadWeeklyLimitChips, monthWeeklyRange } from "@/lib/staff-documents/weekly-limit-server";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 
 // Admin · Attendance · Payroll (Slice 4).
@@ -33,9 +34,11 @@ export default async function AdminAttendancePayrollPage({
       ? params.ym
       : currentTokyoYm();
 
-  const [badgeStats, payroll] = await Promise.all([
+  // 「주 28시간」 칩(docs/product/41 R4) — `staff_documents.view` 가 있을 때만. 이달 안에 끝나는 7일 창 기준.
+  const [badgeStats, payroll, weeklyLimit] = await Promise.all([
     getAdminAttendanceBadgeStats(session, requestedYm),
     getAdminAttendancePayroll(session, requestedYm, localeTag),
+    loadWeeklyLimitChips(session, monthWeeklyRange(requestedYm)),
   ]);
 
   return (
@@ -65,6 +68,7 @@ export default async function AdminAttendancePayrollPage({
           initialKpi={payroll.kpi}
           locale={locale}
           localeTag={localeTag}
+          weeklyLimit={weeklyLimit}
         />
       ) : (
         <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />

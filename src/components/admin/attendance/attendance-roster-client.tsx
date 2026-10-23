@@ -7,6 +7,8 @@ import { AdmDropdown } from "../shared/adm-dropdown";
 import { loadAdminAttendanceRoster } from "@/app/admin/attendance/roster/actions";
 import type { RosterDay, RosterEntry, RosterStatusKey } from "@/lib/attendance-roster";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
+import type { WeeklyLimitChip } from "@/lib/staff-documents/weekly-limit";
+import { WeeklyLimitBadge } from "@/components/shared/weekly-limit-badge";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 
@@ -15,6 +17,8 @@ type Props = {
   initialTodayDate: string;
   locale: Locale;
   localeTag: string;
+  /** 「주 28시간」 칩 — 사람 id → 근접 · 초과(docs/product/41 R4). 권한이 없으면 빈 객체. */
+  weeklyLimit?: Record<string, WeeklyLimitChip>;
 };
 
 type StatusMeta = {
@@ -76,6 +80,7 @@ export function AttendanceRosterClient({
   initialTodayDate,
   locale,
   localeTag,
+  weeklyLimit = {},
 }: Props) {
   const c = getDictionary(locale).admin.attendanceConsole;
   const [rosterDay, setRosterDay] = useState(initialRosterDay);
@@ -262,7 +267,10 @@ export function AttendanceRosterClient({
                             {e.avatarInitial}
                           </span>
                           <div>
-                            <div className="who__nm">{e.name}</div>
+                            <div className="who__nm">
+                              {e.name}
+                              <WeeklyLimitBadge chip={weeklyLimit[e.userId]} copy={c} />
+                            </div>
                             <div className="who__sub">{e.role}</div>
                           </div>
                         </div>

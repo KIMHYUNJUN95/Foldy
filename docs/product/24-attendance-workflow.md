@@ -211,6 +211,19 @@ Screens:
 - **권한**: 전화 버튼은 출근자 명단 접근 권한(`cleaningRecordViewerRoles`)을 가진 관리자만 볼 수 있음
   (화면 자체가 권한 게이트됨).
 
+### 「주 28시간」 칩 (자격외활동, 2026-10-23)
+
+재류카드의 자격외활동이 「주 28시간」인 사람(유학 · 가족체재 등)은 **어느 날부터 세어도 7일 동안 28시간**을 넘으면 안 된다.
+규칙 · 대상 · 계산은 `docs/product/41-residence-card-workflow.md` → 「주 28시간 경고 구현」.
+
+- **관리자 웹** — 「출근자」 표 · 「급여」 표 이름 옆, 급여 오른쪽 패널(설명 한 줄), 직원 상세(이름 옆 + 설명 한 줄).
+  「28시간 초과」(빨강) · 「28시간 근접」(24시간 이상, 노랑). 마우스를 올리면 가장 많았던 7일과 시간(「10/14~10/20 · 29시간 30분」).
+  출근자는 그날까지 최근 일주일 안에 끝나는 7일 창, 급여 · 직원 상세는 그달 안에 끝나는 7일 창으로 판정한다.
+- **모바일 출근자 명단** — 이름 옆 같은 칩.
+- **본인 근태 홈** — 최근 7일이 24시간 이상이면 안내 한 장(퇴근 미기록 배너와 같은 모양, 초과면 옅은 빨강).
+- 칩은 **`staff_documents.view`** 가 있을 때만 보인다(체류 자격을 드러내므로). 근태 화면 권한만으로는 안 보인다.
+- 알림은 없다(막바지 일괄). 학교 장기 방학(1일 8시간)은 판정하지 않는다 — 관리자가 판단.
+
 **Back buttons were removed from all attendance screens** (the global shell owns navigation). A
 design-phase preview index existed during review and was **removed on completion**. Any remaining
 `?state=` / `?result=` affordances are development-preview compatibility only and must not be treated as

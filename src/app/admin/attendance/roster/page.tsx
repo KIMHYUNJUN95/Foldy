@@ -5,6 +5,7 @@ import { getAttendanceRoster } from "@/lib/attendance-roster";
 import { currentTokyoYm, getAdminAttendanceBadgeStats } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { dayWeeklyRange, loadWeeklyLimitChips } from "@/lib/staff-documents/weekly-limit-server";
 
 function tokyoDateKey(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -57,9 +58,11 @@ export default async function AdminAttendanceRosterPage({
   const operatingDate = clampRosterDate(params.date, todayDate);
   const carriedYm = currentTokyoYm();
 
-  const [badgeStats, rosterDay] = await Promise.all([
+  // 「주 28시간」 칩(docs/product/41 R4) — `staff_documents.view` 가 있을 때만 읽는다. 그날까지 최근 일주일 안에 끝나는 7일 창.
+  const [badgeStats, rosterDay, weeklyLimit] = await Promise.all([
     getAdminAttendanceBadgeStats(session, carriedYm),
     getAttendanceRoster(session.organization.id, operatingDate, localeTag),
+    loadWeeklyLimitChips(session, dayWeeklyRange(operatingDate)),
   ]);
 
   return (
@@ -90,6 +93,7 @@ export default async function AdminAttendanceRosterPage({
         initialTodayDate={todayDate}
         locale={locale}
         localeTag={localeTag}
+        weeklyLimit={weeklyLimit}
       />
     </AdminShell>
   );

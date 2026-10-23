@@ -15,6 +15,7 @@ import { startBreak, endBreak, respondOpenSessionReminder } from "@/app/mobile/a
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { usePersistentToggle } from "@/lib/use-persistent-toggle";
+import { formatWeeklyMinutes } from "@/lib/staff-documents/weekly-limit";
 
 type AttendanceCopy = Dictionary["attendance"];
 
@@ -321,6 +322,7 @@ export function AttendanceHome({
   monthHours = null,
   monthPay = null,
   canSeeRoster = false,
+  weeklyLimit = null,
   locale,
 }: {
   userName: string;
@@ -337,6 +339,8 @@ export function AttendanceHome({
   monthPay?: string | null;
   /** Whether the current user may view the attendance roster (manager roles only). */
   canSeeRoster?: boolean;
+  /** 「주 28시간」(docs/product/41 R4) — 자격외활동 대상자의 최근 7일이 근접 · 초과일 때만. */
+  weeklyLimit?: { status: "over" | "near"; minutes: number } | null;
   locale: string;
 }) {
   const fullDict = getDictionary(locale);
@@ -397,6 +401,21 @@ export function AttendanceHome({
         <b>{copy.abandonedTitle}</b>
         <span>{copy.abandonedBody.replace("{dates}", abandonedDates.join(", "))}</span>
       </div>
+    ) : null;
+
+  // 「주 28시간」 안내 — 최근 7일(오늘에서 끝나는 창) 24시간 이상이면 조용히 한 장. 퇴근 미기록 배너와 같은 자리.
+  const weeklyBanner = weeklyLimit ? (
+    <div className={`att-warn${weeklyLimit.status === "over" ? " is-over" : ""}`} role="status">
+      <b>{copy.weeklyNoticeTitle.replace("{hours}", formatWeeklyMinutes(weeklyLimit.minutes, copy))}</b>
+      <span>{weeklyLimit.status === "over" ? copy.weeklyNoticeOver : copy.weeklyNoticeNear}</span>
+    </div>
+  ) : null;
+  const notices =
+    abandonedBanner || weeklyBanner ? (
+      <>
+        {abandonedBanner}
+        {weeklyBanner}
+      </>
     ) : null;
 
   // 바로가기 + (근무 중일 때) 오늘 기록 — 태블릿 가로에서는 오른쪽 칸(HIG 2차 시안 A2Att-Tablet).
@@ -531,7 +550,7 @@ export function AttendanceHome({
             <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
           ) : null}
           {/* 근무 중 상태에서도 이력·급여로 바로 이동할 수 있도록 주요 액션 아래에 배치 */}
-          {abandonedBanner}
+          {notices}
         </div>
         {sideColumn(openSession ? <TodayLog session={openSession} copy={copy} /> : null)}
         {reminderOpenSessionId ? <ReminderPrompt sessionId={reminderOpenSessionId} copy={copy} /> : null}
@@ -589,7 +608,7 @@ export function AttendanceHome({
             <p role="alert" style={{ color: "var(--color-error, #c0392b)", fontSize: "0.875rem", textAlign: "center", margin: "8px 0 0" }}>{errorMsg}</p>
           ) : null}
           {/* 휴게 중 상태에서도 이력·급여 바로가기 유지 */}
-          {abandonedBanner}
+          {notices}
         </div>
         {sideColumn()}
         {reminderOpenSessionId ? <ReminderPrompt sessionId={reminderOpenSessionId} copy={copy} /> : null}
@@ -609,6 +628,8 @@ export function AttendanceHome({
         <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in">
           <AIc>{AttIcon.qr}</AIc>{copy.clockIn}
         </Link>
+        {/* 출근 전이 가장 쓸모 있는 때 — 출근하기 전에 최근 7일 시간을 본다 */}
+        {weeklyBanner}
       </div>
       {sideColumn()}
     </div>

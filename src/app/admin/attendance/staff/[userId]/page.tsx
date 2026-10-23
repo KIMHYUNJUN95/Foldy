@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { loadWeeklyLimitChips, monthWeeklyRange } from "@/lib/staff-documents/weekly-limit-server";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 
 // Admin · Attendance · Staff Detail (Slice 6).
@@ -33,9 +34,11 @@ export default async function AdminAttendanceStaffPage({
   const requestedYm =
     typeof q.ym === "string" && /^\d{4}-\d{2}$/.test(q.ym) ? q.ym : currentTokyoYm();
 
-  const [badgeStats, detail] = await Promise.all([
+  // 「주 28시간」(docs/product/41 R4) — `staff_documents.view` 가 있을 때만, 이 조직 서류로만 읽는다.
+  const [badgeStats, detail, weeklyLimit] = await Promise.all([
     getAdminAttendanceBadgeStats(session, requestedYm),
     getAdminStaffDetail(session, p.userId, requestedYm, localeTag),
+    loadWeeklyLimitChips(session, monthWeeklyRange(requestedYm), [p.userId]),
   ]);
 
   const title = c.staffPageTitle(detail.user.name, detail.monthLabel);
@@ -60,7 +63,12 @@ export default async function AdminAttendanceStaffPage({
       />
 
       {detail.isPrivileged ? (
-        <AttendanceStaffDetail data={detail} locale={locale} localeTag={localeTag} />
+        <AttendanceStaffDetail
+          data={detail}
+          locale={locale}
+          localeTag={localeTag}
+          weekly={weeklyLimit[p.userId] ?? null}
+        />
       ) : (
         <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}

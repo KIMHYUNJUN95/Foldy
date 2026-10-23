@@ -3992,3 +3992,10 @@
 @keyframes payw-grow { from { transform: scaleY(.04); } }
 @keyframes payw-glow { 50% { box-shadow: 0 0 14px 2px rgba(122, 82, 230, .5); } }
 @media (prefers-reduced-motion: reduce) { .payo__strip, .att.att--payw .payw-bar i { animation-duration: 1ms !important; animation-delay: 0ms !important; } }
+
+/* 「주 28시간」(docs/product/41 R4) — 명단 칩: 사용자 목록 서류 칩(.muw-doc)과 같은 색. 본인 안내는 .att-warn 그대로(초과면 옅은 빨강). */
+.att .wk28 { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 7px; font-size: 11.5px; font-weight: 600; line-height: 1.4; vertical-align: 1px; background: #fdf3dc; color: #8a5a00; }
+.att .wk28.is-over { background: #fdecee; color: #c4364b; }
+.att.att--home .att-warn.is-over { background: #fdecee; }
+.att.att--home .att-warn.is-over b { color: #9c2638; }
+.att.att--home .clockbtn + .att-warn { margin-top: 14px; }

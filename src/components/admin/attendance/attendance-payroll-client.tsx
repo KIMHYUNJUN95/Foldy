@@ -28,6 +28,8 @@ import { AdminReasonModal } from "../shared/admin-reason-modal";
 import { AdminUndoToast } from "../shared/admin-undo-toast";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 import { formatAdminYen } from "../shared/admin-format";
+import type { WeeklyLimitChip } from "@/lib/staff-documents/weekly-limit";
+import { WeeklyLimitBadge, WeeklyLimitNote } from "@/components/shared/weekly-limit-badge";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 
@@ -62,6 +64,7 @@ export function AttendancePayrollClient({
   initialKpi,
   locale,
   localeTag,
+  weeklyLimit = {},
 }: {
   ym: string;
   monthLabel: string;
@@ -74,6 +77,8 @@ export function AttendancePayrollClient({
   };
   locale: Locale;
   localeTag: string;
+  /** 「주 28시간」 칩 — 이달 안에 끝나는 7일 창 기준(docs/product/41 R4). 권한이 없으면 빈 객체. */
+  weeklyLimit?: Record<string, WeeklyLimitChip>;
 }) {
   const dictionary = getDictionary(locale);
   const c = dictionary.admin.attendanceConsole;
@@ -262,7 +267,10 @@ export function AttendancePayrollClient({
                         {initial(r.userName)}
                       </span>
                       <div>
-                        <div className="who__nm">{r.userName}</div>
+                        <div className="who__nm">
+                          {r.userName}
+                          <WeeklyLimitBadge chip={weeklyLimit[r.userId]} copy={c} />
+                        </div>
                         <div className="who__sub">
                           {r.employmentMissing ? (
                             <span style={{ color: "#a8641c", fontWeight: 600 }}>{c.payEmploymentMissing}</span>
@@ -316,6 +324,7 @@ export function AttendancePayrollClient({
         <PayrollPanel
           ym={ym}
           row={panelRow}
+          weekly={weeklyLimit[panelRow.userId] ?? null}
           c={c}
           shared={shared}
           localeTag={localeTag}
@@ -380,6 +389,7 @@ function LockIcon() {
 function PayrollPanel({
   ym,
   row,
+  weekly,
   c,
   shared,
   localeTag,
@@ -390,6 +400,7 @@ function PayrollPanel({
 }: {
   ym: string;
   row: AdminPayrollRow;
+  weekly: WeeklyLimitChip | null;
   c: Att;
   shared: AdminExportLabels;
   localeTag: string;
@@ -513,6 +524,7 @@ function PayrollPanel({
         </div>
 
         <div className="panel__body" key={`b-${row.userId}`}>
+          <WeeklyLimitNote chip={weekly} copy={c} />
           {/* summary */}
           <div className="pblock">
             <div className="pblock__t">{c.payPanelSecSummary}</div>

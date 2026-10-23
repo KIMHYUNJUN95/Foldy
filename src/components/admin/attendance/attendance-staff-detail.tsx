@@ -24,6 +24,8 @@ import type {
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import { adminTransportStatusPill, formatAdminYen } from "../shared/admin-format";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
+import type { WeeklyLimitChip } from "@/lib/staff-documents/weekly-limit";
+import { WeeklyLimitBadge, WeeklyLimitNote } from "@/components/shared/weekly-limit-badge";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
 
@@ -64,10 +66,13 @@ export function AttendanceStaffDetail({
   data,
   locale,
   localeTag,
+  weekly = null,
 }: {
   data: AdminStaffDetailData;
   locale: Locale;
   localeTag: string;
+  /** 「주 28시간」 — 이달 가장 많았던 7일이 근접 · 초과일 때만(docs/product/41 R4). */
+  weekly?: WeeklyLimitChip | null;
 }) {
   const c = getDictionary(locale).admin.attendanceConsole;
   const [panelSel, setPanelSel] = useState<string | null>(null);
@@ -122,7 +127,10 @@ export function AttendanceStaffDetail({
           {initial(data.user.name)}
         </span>
         <div className="uhead__b">
-          <div className="uhead__nm">{data.user.name}</div>
+          <div className="uhead__nm">
+            {data.user.name}
+            <WeeklyLimitBadge chip={weekly} copy={c} />
+          </div>
           <div className="uhead__sub">
             {data.user.role ?? "—"}
             <span className="sep" />
@@ -164,6 +172,8 @@ export function AttendanceStaffDetail({
           </div>
         </div>
       </div>
+
+      <WeeklyLimitNote chip={weekly} copy={c} />
 
       {/* Daily ledger */}
       <div className="secthead">

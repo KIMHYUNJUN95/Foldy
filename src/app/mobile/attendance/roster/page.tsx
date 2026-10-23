@@ -18,6 +18,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getAttendanceRoster } from "@/lib/attendance-roster";
 import { canViewRoster } from "@/config/roles";
 import { getDictionary } from "@/lib/i18n";
+import { dayWeeklyRange, loadWeeklyLimitChips } from "@/lib/staff-documents/weekly-limit-server";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -63,9 +64,12 @@ export default async function AttendanceRosterPage({ searchParams }: PageProps) 
   const localeMap: Record<string, string> = { ko: "ko-KR", ja: "ja-JP", en: "en-US" };
   const bcp47Locale = localeMap[locale] ?? "ko-KR";
 
-  const [navBadges, rosterDay] = await Promise.all([
+  // 「주 28시간」 칩(docs/product/41 R4) — 명단은 누구나 보지만 칩은 체류 자격을 드러내므로 `staff_documents.view` 가 있는
+  // 사람에게만 실어 보낸다(없으면 읽지도 않는다).
+  const [navBadges, rosterDay, weeklyLimit] = await Promise.all([
     navBadgesPromise,
     getAttendanceRoster(session.organization.id, operatingDate, bcp47Locale),
+    loadWeeklyLimitChips(session, dayWeeklyRange(operatingDate)),
   ]);
 
   const dict = getDictionary(locale);
@@ -78,6 +82,7 @@ export default async function AttendanceRosterPage({ searchParams }: PageProps) 
         operatingDate={operatingDate}
         todayDate={todayDate}
         locale={locale}
+        weeklyLimit={weeklyLimit}
       />
     </MobileShell>
   );

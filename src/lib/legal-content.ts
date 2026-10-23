@@ -12,7 +12,7 @@ import type { Locale } from "@/lib/i18n";
  * 「App Store 준비」를 같이 고친다. 공개 출시 전에는 운영 법인명 · 주소를 채우고 법무 검토를 받는다.
  */
 
-export const LEGAL_EFFECTIVE_DATE = "2026-10-06";
+export const LEGAL_EFFECTIVE_DATE = "2026-10-23";
 
 export type LegalSection = {
   /** 페이지 안 앵커 (예: 로그인 화면 「보안」 링크 → `#security`). */
@@ -59,6 +59,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "투숙객 정보: 소속 조직이 예약 관리 시스템(Beds24)과 연동한 경우, 업무 처리에 필요한 예약 정보(투숙객 이름, 숙박 일정, 객실 등)와 투숙객 리뷰.",
           "기술 정보: 로그인 상태 유지와 언어 설정을 위한 쿠키 · 로컬 저장소. 광고 식별자나 추적용 쿠키는 쓰지 않습니다.",
           "오류 진단 정보: 화면에서 오류가 나면 문제를 고치기 위해 오류 내용, 화면 경로, 앱 버전, 기기 · 브라우저 종류를 서버 로그에 기록합니다. 계정과 연결하지 않으며 서버 로그 보관 기간이 지나면 지워집니다.",
+          "신분 확인 서류: 외국 국적 구성원은 재류카드 앞면 · 뒷면 사진과 카드에 적힌 정보(로마자 이름, 생년월일, 성별, 국적 · 지역, 주소, 재류카드 번호, 재류자격, 재류기간 만료일, 취로 제한 여부, 자격외활동 허가)를, 일본 국적 구성원은 마이넘버 카드 앞면 사진과 앞면 정보(이름, 생년월일, 성별, 주소)를 받습니다. 마이넘버(개인번호)는 받지 않으며, 사진에 개인번호가 보이면 저장하지 않고 다시 찍도록 안내합니다.",
         ],
       },
       {
@@ -68,6 +69,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "청소 · 근태 · 연차 · 급여 등 숙박 운영 업무의 기록과 처리",
           "조직 내 공지 · 게시판 · 알림 등 업무 소통",
           "서비스 오류 대응과 보안 유지",
+          "고용 시 취로 자격 확인, 외국인 고용 상황 신고 등 소속 조직의 법령상 확인 업무와 직원 정보 관리",
         ],
       },
       {
@@ -75,6 +77,21 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
         paragraphs: [
           "위치 정보는 출퇴근 인증 버튼을 누르거나 출퇴근 QR을 스캔한 그 순간에만 한 번 확인하며, 백그라운드에서 위치를 추적하지 않습니다. 출퇴근 인증은 근무지 반경 안에 있는지 확인해야 하므로 위치 권한이 필요하며, 거부하면 출퇴근 인증을 할 수 없습니다. 인증에 실패한 시도도 그 시점의 위치와 함께 기록됩니다. 다른 기능은 위치 권한 없이 사용할 수 있습니다.",
           "카메라는 출퇴근 QR 코드를 읽을 때 사용하며 영상은 저장하지 않습니다. 사진은 이용자가 직접 촬영하거나 선택해 첨부한 경우에만 업로드됩니다.",
+        ],
+      },
+      {
+        heading: "4-1. 신분 확인 서류와 글자 자동 읽기",
+        paragraphs: [
+          "신분 확인 서류 사진은 Foldy의 비공개 저장소(일본 도쿄 리전)에 저장되며, 본인과 소속 조직에서 서류 열람 권한을 받은 관리자만 볼 수 있습니다.",
+          "등록할 때 이용자가 동의한 경우에만, 카드의 글자를 자동으로 읽기 위해 사진을 미국의 Anthropic, PBC가 제공하는 글자 인식 AI 서비스(Claude API)로 보냅니다. 동의하지 않아도 사진만 올리고 정보를 직접 입력해 등록할 수 있습니다. 동의는 등록할 때마다 따로 묻고, 다음 등록에서 동의하지 않는 것으로 언제든 철회할 수 있습니다.",
+        ],
+        items: [
+          "받는 곳: Anthropic, PBC(미국). 우리 지시에 따라 글자 읽기만 처리하는 처리자이며, 계약상 받은 데이터를 AI 학습에 쓰지 않습니다.",
+          "받는 곳의 보관: 보통 30일 안에 자동 삭제됩니다. 다만 Anthropic의 안전 점검 시스템이 이용 정책 위반 가능성으로 표시한 경우 최대 2년, 법령상 보관 의무가 있는 경우 그 기간 동안 보관될 수 있습니다.",
+          "이전되는 나라: 미국.",
+          "미국의 개인정보 보호 제도: 미국에는 연방 차원의 포괄적인 개인정보 보호법이 없고 분야별 법률(예: 의료 HIPAA, 금융 GLBA, 통신 ECPA)이 있으며, Anthropic의 소재지인 캘리포니아주에는 포괄적인 법률로 캘리포니아 소비자 프라이버시법(CCPA)이 있습니다. 미국은 EU 적정성 결정을 받지 않았고 APEC CBPR에 참여하고 있습니다. 자세한 내용은 일본 개인정보보호위원회의 「외국의 개인정보 보호 제도 조사(미국)」를 참고하세요: https://www.ppc.go.jp/enforcement/infoprovision/laws/offshore_report_america/",
+          "받는 곳의 보호 조치: 데이터 처리 계약에 따른 처리, 전송 · 저장 암호화, 접근 통제 등.",
+          "보관 기간: 재직 중에는 현재 서류와 이전 서류(갱신 이력)를 보관하고, 퇴사 후 3년이 지나면 사진과 정보를 삭제합니다. 계정을 삭제해도 소속 조직의 고용 확인 기록으로 퇴사 후 3년까지 보관한 뒤 삭제합니다.",
         ],
       },
       {
@@ -89,6 +106,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "Beds24 — 예약 정보 연동(소속 조직이 연동한 경우)",
           "DeepL — 투숙객 리뷰 번역",
           "Slack — 소속 조직의 내부 운영 알림",
+          "Anthropic — 신분 확인 서류 사진의 글자 읽기(이용자가 동의한 경우에만, 미국)",
         ],
       },
       {
@@ -96,6 +114,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
         paragraphs: [
           "계정 화면 → 보안 → 「계정 삭제」에서 언제든 계정을 삭제할 수 있습니다. 삭제하면 로그인 계정이 즉시 지워지고, 프로필의 이름 · 연락처 등 개인 식별 정보가 삭제되며, 조직 소속도 해제됩니다.",
           "이미 처리된 업무 기록(청소 · 근태 기록 등)은 소속 조직의 운영 · 법정 보존 기록으로 남을 수 있습니다. 이 경우에도 개인 식별 정보는 지워진 상태로 남습니다.",
+          "신분 확인 서류는 위 4-1의 기간에 따라 별도로 보관 · 삭제됩니다.",
         ],
       },
       {
@@ -151,6 +170,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "宿泊者情報：所属組織が予約管理システム（Beds24）と連携している場合、業務に必要な予約情報（宿泊者氏名、宿泊日程、客室など）と宿泊者のレビュー。",
           "技術情報：ログイン状態の維持と言語設定のためのCookie・ローカルストレージ。広告識別子やトラッキング用Cookieは使用しません。",
           "エラー診断情報：画面でエラーが発生した場合、問題を修正するためにエラー内容、画面のパス、アプリのバージョン、端末・ブラウザの種類をサーバーログに記録します。アカウントとは紐付けず、サーバーログの保存期間が過ぎると削除されます。",
+          "本人確認書類：外国籍のメンバーからは在留カードの表面・裏面の写真とカードに記載された情報（ローマ字氏名、生年月日、性別、国籍・地域、住居地、在留カード番号、在留資格、在留期間満了日、就労制限の有無、資格外活動許可）を、日本国籍のメンバーからはマイナンバーカード表面の写真と表面の情報（氏名、生年月日、性別、住所）を取得します。マイナンバー（個人番号）は取得せず、写真に個人番号が写っている場合は保存せずに撮り直しを案内します。",
         ],
       },
       {
@@ -160,6 +180,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "清掃・勤怠・休暇・給与など宿泊施設運営業務の記録と処理",
           "組織内のお知らせ・掲示板・通知などの業務連絡",
           "障害対応とセキュリティの維持",
+          "雇用時の就労資格の確認、外国人雇用状況の届出など所属組織の法令上の確認業務と従業員情報の管理",
         ],
       },
       {
@@ -167,6 +188,21 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
         paragraphs: [
           "位置情報は、出退勤の認証ボタンを押したとき、または出退勤QRを読み取ったその瞬間に一度だけ確認します。バックグラウンドで位置を追跡することはありません。出退勤の認証では勤務地の範囲内にいることを確認するため位置情報の許可が必要で、拒否すると出退勤の認証はできません。認証に失敗した試行も、その時点の位置情報とともに記録されます。その他の機能は位置情報の許可なしで利用できます。",
           "カメラは出退勤用QRコードの読み取りに使用し、映像は保存しません。写真は、ご本人が撮影または選択して添付した場合にのみアップロードされます。",
+        ],
+      },
+      {
+        heading: "4-1. 本人確認書類と文字の自動読み取り",
+        paragraphs: [
+          "本人確認書類の写真は Foldy の非公開ストレージ（日本・東京リージョン）に保存され、本人と、所属組織で書類閲覧権限を付与された管理者だけが閲覧できます。",
+          "登録時に利用者が同意した場合に限り、カードの文字を自動で読み取るため、写真を米国の Anthropic, PBC が提供する文字認識 AI サービス（Claude API）へ送信します。同意しなくても、写真だけをアップロードして情報を手入力すれば登録できます。同意は登録のたびに個別に確認し、次回の登録で同意しないことでいつでも撤回できます。",
+        ],
+        items: [
+          "提供先：Anthropic, PBC（米国）。当社の指示に従って文字の読み取りのみを行う委託先であり、契約上、受け取ったデータを AI の学習に使用しません。",
+          "提供先での保管：通常30日以内に自動で削除されます。ただし、Anthropic の安全確認システムが利用ポリシー違反の可能性を検知した場合は最長2年間、法令上の保存義務がある場合はその期間保管されることがあります。",
+          "移転先の国：米国。",
+          "米国の個人情報保護制度：米国には連邦レベルの包括的な個人情報保護法はなく、分野別の法律（例：医療 HIPAA、金融 GLBA、通信 ECPA）があります。Anthropic の所在地であるカリフォルニア州には包括的な法律としてカリフォルニア州消費者プライバシー法（CCPA）があります。米国は EU の十分性認定を受けておらず、APEC の CBPR システムに参加しています。詳しくは個人情報保護委員会「外国における個人情報の保護に関する制度等の調査（アメリカ）」をご覧ください：https://www.ppc.go.jp/enforcement/infoprovision/laws/offshore_report_america/",
+          "提供先の保護措置：データ処理契約に基づく取り扱い、通信・保存時の暗号化、アクセス制御など。",
+          "保管期間：在職中は現在の書類と以前の書類（更新履歴）を保管し、退職後3年が経過した時点で写真と情報を削除します。アカウントを削除しても、所属組織の雇用確認記録として退職後3年間保管したうえで削除します。",
         ],
       },
       {
@@ -181,6 +217,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "Beds24 — 予約情報の連携（所属組織が連携している場合）",
           "DeepL — 宿泊者レビューの翻訳",
           "Slack — 所属組織の社内運営通知",
+          "Anthropic — 本人確認書類の写真の文字読み取り（利用者が同意した場合のみ、米国）",
         ],
       },
       {
@@ -188,6 +225,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
         paragraphs: [
           "アカウント画面 → セキュリティ → 「アカウント削除」から、いつでもアカウントを削除できます。削除すると、ログインアカウントは直ちに削除され、プロフィールの氏名・連絡先などの個人を特定できる情報が消去され、組織への所属も解除されます。",
           "すでに処理された業務記録（清掃・勤怠記録など）は、所属組織の運営記録・法定保存記録として残る場合があります。その場合も、個人を特定できる情報は消去された状態で残ります。",
+          "本人確認書類は、上記 4-1 の期間に従って別途保管・削除します。",
         ],
       },
       {
@@ -243,6 +281,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "Guest data: if your organization connects its booking system (Beds24), the reservation details needed for operations (guest name, stay dates, room, etc.) and guest reviews.",
           "Technical: cookies and local storage to keep you signed in and remember your language. We do not use advertising identifiers or tracking cookies.",
           "Error diagnostics: when a screen hits an error, we record the error details, the screen path, the app version and the device / browser type in our server logs so we can fix it. This is not linked to your account and is deleted when the server log retention period ends.",
+          "Identity documents: from members who are not Japanese nationals, photos of the front and back of the residence card and the information printed on it (name in Latin letters, date of birth, sex, nationality/region, address, residence card number, status of residence, expiry date, work restriction, permission for extra activities); from Japanese nationals, a photo of the front of the My Number card and the information on the front (name, date of birth, sex, address). We never collect the individual number (My Number); if it appears in a photo, the photo is not saved and you are asked to retake it.",
         ],
       },
       {
@@ -252,6 +291,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "Recording and processing operations work such as cleaning, attendance, leave and payroll",
           "Work communication inside the organization: announcements, board, notifications",
           "Troubleshooting and keeping the Service secure",
+          "Checking eligibility to work at hiring, the foreign-worker employment report and other legal checks by your organization, and managing staff records",
         ],
       },
       {
@@ -259,6 +299,21 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
         paragraphs: [
           "Location is checked once, only at the moment you tap clock-in/out or scan the attendance QR code. We never track location in the background. Clock-in/out verification needs location permission to confirm you are within the work site's range; if you deny it, you cannot verify a clock-in or clock-out. Failed attempts are also recorded with the location at that moment. All other features work without location permission.",
           "The camera is used to read the attendance QR code; video is never stored. Photos are uploaded only when you take or choose them yourself.",
+        ],
+      },
+      {
+        heading: "4-1. Identity documents and automatic text reading",
+        paragraphs: [
+          "Photos of identity documents are stored in Foldy’s private storage (Tokyo region, Japan) and can be viewed only by you and by admins your organization has given permission to view documents.",
+          "Only if you agree when registering, the photos are sent to a text-recognition AI service (Claude API) provided by Anthropic, PBC in the United States to read the text on the card automatically. You can still register without agreeing by uploading the photos and typing the details yourself. Consent is asked separately each time you register, and you can withdraw it at any time by not agreeing at your next registration.",
+        ],
+        items: [
+          "Recipient: Anthropic, PBC (United States). It processes the photos only to read the text, on our instructions, and is contractually prohibited from using the data to train AI.",
+          "Retention by the recipient: usually deleted automatically within 30 days. If Anthropic’s safety systems flag a request as a possible usage-policy violation, it may be kept for up to 2 years, or longer where the law requires.",
+          "Country of transfer: United States.",
+          "Personal-information protection in the United States: there is no comprehensive federal privacy law; sector-specific laws apply (e.g. HIPAA for health, GLBA for finance, ECPA for communications). California, where Anthropic is based, has a comprehensive law, the California Consumer Privacy Act (CCPA). The United States has no EU adequacy decision and participates in the APEC CBPR system. For details, see the Personal Information Protection Commission of Japan’s survey of foreign systems (United States): https://www.ppc.go.jp/enforcement/infoprovision/laws/offshore_report_america/",
+          "Recipient’s safeguards: processing under a data processing agreement, encryption in transit and at rest, access controls and similar measures.",
+          "Retention period: while you work for the organization we keep the current and previous documents (renewal history); photos and information are deleted 3 years after you leave. Even if you delete your account, they are kept as your organization’s employment-check record until 3 years after you leave, then deleted.",
         ],
       },
       {
@@ -273,6 +328,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
           "Beds24 — reservation sync (if your organization connects it)",
           "DeepL — translation of guest reviews",
           "Slack — internal operations alerts for your organization",
+          "Anthropic — reading text on identity-document photos (only if you agree; United States)",
         ],
       },
       {
@@ -280,6 +336,7 @@ export const privacyPolicy: Record<Locale, LegalDocument> = {
         paragraphs: [
           "You can delete your account at any time from Account → Security → \"Delete account\". Deleting removes your sign-in account immediately, erases identifying profile information such as your name and contact details, and removes you from your organization.",
           "Work records that were already processed (such as cleaning or attendance records) may remain as your organization's operational or legally required records. Even then, they remain with your identifying information erased.",
+          "Identity documents are kept and deleted separately according to section 4-1 above.",
         ],
       },
       {

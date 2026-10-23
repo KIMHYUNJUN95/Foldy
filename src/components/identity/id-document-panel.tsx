@@ -19,7 +19,7 @@ import { ImageLightbox } from "@/components/shell/image-lightbox";
 import { formatDateKey, idFieldDisplay, idFieldLabel, statusLabel } from "@/components/identity/id-card-flow";
 
 /** 출입국재류관리청 「在留カード等番号失効情報照会」. */
-const VERIFY_URL = "https://lapse-immi.moj.go.jp/";
+const VERIFY_URL = "https://lapse-immi.moj.go.jp/html/top.html"; // 2026-01-05 주소 변경(옛 주소는 「不正なリクエスト」)
 
 export function IdDocumentPanel({
   doc,

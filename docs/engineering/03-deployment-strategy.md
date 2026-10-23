@@ -372,6 +372,8 @@ Reason:
 
 ## App Store 준비 (2026-10-06)
 
+> 2026-10-23: 개인정보처리방침에 신분 확인 서류(재류카드 · 마이넘버 카드 앞면)와 글자 자동 읽기(Anthropic · 미국, 동의한 경우만) 조항 4-1 추가, 시행일 2026-10-23. 스토어 신고 답안은 `docs/planning/17-app-release-plan.md` 「스토어 개인정보 신고 — 재류카드」.
+
 ### 방향
 
 1. **비공개 배포 먼저** — Apple Business Manager **Custom App**(조직 단위 배포) 또는 **Unlisted App**(링크로만 설치).

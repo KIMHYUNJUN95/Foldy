@@ -399,3 +399,21 @@
   .adm .cas-token, .adm .cas-seatpop { animation: none; }
   .adm .cas-token__x, .adm .cas-seatcheck, .adm .cas-seatcheck svg { transition: none; }
 }
+
+/* 보통 인원보다 많이 넣을 때 확인 창(시안 https://claude.ai/artifact/P297A6EKX5ofrx8dEFn8t1 · 2026-10-23) — 가운데 창, 확인 버튼에 처음 포커스(Enter 넣기 · Esc 그대로). */
+.adm .cas-tag.is-over { background: #fff1e5; color: #b4500a; font-weight: 700; }
+.adm .modal.cas-modal.cas-over { width: 420px; padding: 24px; gap: 14px; border-radius: 20px; }
+.adm .cas-over__h { display: flex; align-items: center; gap: 10px; }
+.adm .cas-over__ic { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #fff1e5; color: #b4500a; }
+.adm .cas-over__ic svg { width: 16px; height: 16px; }
+.adm .cas-over h3 { font-size: 17px; line-height: 23px; }
+.adm .cas-over__body { margin: 0; font-size: 14px; line-height: 21px; color: #3a3746; }
+.adm .cas-over__faces { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: #f7f6fa; }
+.adm .cas-over__faces b { font-size: 13px; font-weight: 600; color: #b4500a; font-variant-numeric: tabular-nums; }
+.adm .cas-over__face { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #fff; box-shadow: 0 0 0 1px #e4e3e9; color: #3a3746; font-size: 13px; font-weight: 700; }
+.adm .cas-over__face.is-new { background: #7a52e6; color: #fff; box-shadow: 0 0 0 3px #efeafb; animation: cas-over-new 320ms cubic-bezier(.23, 1, .32, 1) 120ms both; }
+.adm .cas-over__hint { margin: -4px 0 0; font-size: 12.5px; line-height: 18px; color: #6b6878; }
+.adm .cas-modal__f.is-even { grid-template-columns: 1fr 1fr; }
+.adm .cas-over__keys { align-self: center; font-size: 11.5px; color: #8e8a99; }
+@keyframes cas-over-new { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .adm .cas-over__face.is-new { animation: none; } }

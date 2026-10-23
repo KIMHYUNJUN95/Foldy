@@ -355,6 +355,15 @@ export type CleaningAssignCopy = {
   seatRoomsN: string;
   seatVerbAdd: string;
   searchNone: string;
+  // ── 보통 인원보다 많이 넣을 때 확인(2026-10-23) ──
+  overTitle: string;
+  overBody: string;
+  overCount: string;
+  overTrainee: string;
+  overConfirm: string;
+  overKeep: string;
+  overKeys: string;
+  overTag: string;
   // ── 사람별 시프트 달력(관리자, 2026-10-23) ──
   psOpen: string;
   psClose: string;
@@ -798,7 +807,14 @@ const ko: CleaningAssignCopy = {
   seatNoneLeft: "넣을 신청자가 없어요",
   seatWaiting: "배정 전",
   seatRoomsN: "방 {n}",
-  seatVerbAdd: "넣기",  searchNone: "맞는 항목이 없어요",
+  seatVerbAdd: "넣기",  searchNone: "맞는 항목이 없어요",  overTitle: "{room} 방은 보통 {n}명이에요",
+  overBody: "이미 {names} {n}명이 들어가 있어요. {name} 님까지 넣으면 {total}명이 돼요.",
+  overCount: "{total}명 / 보통 {n}명",
+  overTrainee: "견습을 같이 붙이는 거라면 그대로 넣으세요. 견습은 혼자 두지 않아요.",
+  overConfirm: "{total}명으로 넣기",
+  overKeep: "그대로 두기",
+  overKeys: "Enter 넣기 · Esc 그대로 두기",
+  overTag: "{have}/{need} · {more}명 많음",
 };
 
 const ja: CleaningAssignCopy = {
@@ -1188,7 +1204,14 @@ const ja: CleaningAssignCopy = {
   seatNoneLeft: "入れられる申請者がいません",
   seatWaiting: "割り当て前",
   seatRoomsN: "{n}室",
-  seatVerbAdd: "入れる",  searchNone: "該当する項目がありません",
+  seatVerbAdd: "入れる",  searchNone: "該当する項目がありません",  overTitle: "{room}は通常{n}人の部屋です",
+  overBody: "すでに{names}の{n}人が入っています。{name}さんを入れると{total}人になります。",
+  overCount: "{total}人 / 通常{n}人",
+  overTrainee: "見習いを一緒に付けるならそのまま入れてください。見習いは一人にしません。",
+  overConfirm: "{total}人で入れる",
+  overKeep: "そのままにする",
+  overKeys: "Enter 入れる · Esc そのまま",
+  overTag: "{have}/{need} · {more}人多い",
 };
 
 const en: CleaningAssignCopy = {
@@ -1578,7 +1601,14 @@ const en: CleaningAssignCopy = {
   seatNoneLeft: "No applicants left to add",
   seatWaiting: "Unassigned",
   seatRoomsN: "{n} rooms",
-  seatVerbAdd: "Add",  searchNone: "No matches",
+  seatVerbAdd: "Add",  searchNone: "No matches",  overTitle: "{room} usually takes {n}",
+  overBody: "{names} ({n}) are already in. Adding {name} makes {total}.",
+  overCount: "{total} / usually {n}",
+  overTrainee: "If you're pairing a trainee, go ahead — trainees never work alone.",
+  overConfirm: "Add as {total}",
+  overKeep: "Keep as is",
+  overKeys: "Enter to add · Esc to keep",
+  overTag: "{have}/{need} · {more} over",
 };
 
 const COPY: Record<Locale, CleaningAssignCopy> = { en, ja, ko };

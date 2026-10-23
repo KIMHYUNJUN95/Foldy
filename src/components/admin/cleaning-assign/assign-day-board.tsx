@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowLeftRight, Check, MoreHorizontal, Phone, Plus, Search, X } from "lucide-react";
+import { ArrowLeftRight, Check, MoreHorizontal, Phone, Plus, Search, UserPlus, X } from "lucide-react";
 import {
   addApplicantForDay,
   addRoomForDay,
@@ -40,6 +40,7 @@ import "./cleaning-assign.css";
  *
  * 왼쪽 = 그날 청소할 방(미배정 · 밀려 온 방 · 취소된 방이 위, 건물별 목록), 오른쪽 = 신청자 목록(신청 / 배정 전 / 신청 안 함).
  * **넣기 · 빼기(시안 Evr8xV…, 2026-10-23)** — 평소엔 방 안 이름표의 × 로 바로 빼고(5초 「되돌리기」), 빈 방의 「+ 사람」 작은 창에서 넣는다(배정 전이 위).
+ * **보통 인원보다 많이 넣으려 하면 확인 창(시안 P297A6…, 2026-10-23)** — 관리자 실수 방지. 넣은 뒤엔 방 줄에 주황 「3/2 · 1명 많음」.
  * **사람을 누르면 고른 상태** — 방 줄 왼쪽에 체크 원, 줄 아무 데나 누르면 그 사람을 넣기 ↔ 빼기(끌기 없이 누르기로 — 키보드 · 한 손 조작).
  * 저장은 방 한 건씩 서버 액션으로. 다른 담당자와 겹치면 「방금 다른 담당자가 바꿨어요」 + 새로 불러오기. 20초마다 새로 불러온다(실시간).
  * docs/product/37-cleaning-shift-assignment.md 「4-2」
@@ -103,6 +104,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   // 빈 방 「+ 사람」 작은 창 · 뺀 뒤 5초 「되돌리기」.
   const [seatFor, setSeatFor] = useState<string | null>(null);
   const seatMenu = useRef<HTMLDivElement>(null);
+  // 보통 인원(객실 설정, 기본 1명)이 이미 찬 방에 더 넣을 때 — 확인 창.
+  const [overfill, setOverfill] = useState<{ room: BoardRoom; userId: string } | null>(null);
   const [seatUndo, setSeatUndo] = useState<{ stamp: number; message: string; roomKey: string; userId: string } | null>(null);
   useEffect(() => {
     if (!seatFor) return;
@@ -138,6 +141,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       setAddOpen(false);
       setBuildingPicker(false);
       setSeatFor(null);
+      setOverfill(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -251,8 +255,13 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     });
   }
 
-  function addSeat(room: BoardRoom, userId: string) {
+  function addSeat(room: BoardRoom, userId: string, confirmed = false) {
     setSeatFor(null);
+    if (!confirmed && room.people.length >= Math.max(1, room.usualHeadcount)) {
+      setOverfill({ room, userId });
+      return;
+    }
+    setOverfill(null);
     startTransition(async () => {
       const result = await assignToRoom({ date: board.date, roomKey: room.roomKey, userId });
       if (result.ok) haptic("medium");
@@ -263,6 +272,50 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       router.refresh();
     });
   }
+
+  const overfillDialog = (room: BoardRoom, userId: string) => {
+    const usual = Math.max(1, room.usualHeadcount);
+    const person = personById.get(userId);
+    const total = room.people.length + 1;
+    const trainee = Boolean(person?.trainee) || room.people.some((p) => p.trainee);
+    return (
+      <>
+        <div className="modal-scrim on" onClick={() => setOverfill(null)} />
+        <div className="modal on cas-modal cas-over" role="alertdialog" aria-modal="true" aria-labelledby="cas-over-t" aria-describedby="cas-over-d">
+          <div className="cas-over__h">
+            <span className="cas-over__ic" aria-hidden="true">
+              <UserPlus />
+            </span>
+            <h3 id="cas-over-t">{fill(copy.overTitle, { n: usual, room: roomTitle(room) })}</h3>
+          </div>
+          <p id="cas-over-d" className="cas-over__body">
+            {fill(copy.overBody, { n: room.people.length, name: person?.name ?? "", names: room.people.map((p) => p.name).join(" · "), total })}
+          </p>
+          <div className="cas-over__faces">
+            {room.people.map((p) => (
+              <span key={p.userId} className="cas-over__face">
+                {p.name.slice(0, 1)}
+              </span>
+            ))}
+            <span className="cas-over__face is-new">{person?.name.slice(0, 1)}</span>
+            <span className="cas-sp" />
+            <b>{fill(copy.overCount, { n: usual, total })}</b>
+          </div>
+          {trainee ? <p className="cas-over__hint">{copy.overTrainee}</p> : null}
+          <div className="cas-modal__f is-even">
+            <button type="button" className="cas-btn is-gray" onClick={() => setOverfill(null)}>
+              {copy.overKeep}
+            </button>
+            {/* Enter 로 바로 넣을 수 있게 확인 버튼에 처음 포커스. */}
+            <button type="button" className="cas-btn is-pri" autoFocus disabled={pending} onClick={() => addSeat(room, userId, true)}>
+              {fill(copy.overConfirm, { total })}
+            </button>
+          </div>
+          <span className="cas-over__keys">{copy.overKeys}</span>
+        </div>
+      </>
+    );
+  };
 
   const toggleRoom = (room: BoardRoom) => {
     if (!picked) return;
@@ -369,7 +422,11 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         <div className="cas-room__body">
           {room.source === "carry" && room.carryDays > 0 ? <span className="cas-tag is-warn">{fill(copy.tagCarry, { n: room.carryDays + 1 })}</span> : null}
           {room.source === "extra" ? <span className="cas-tag is-blue">{copy.tagExtra}</span> : null}
-          {room.usualHeadcount > 1 ? (
+          {room.people.length > Math.max(1, room.usualHeadcount) ? (
+            <span className="cas-tag is-over">
+              {fill(copy.overTag, { have: room.people.length, more: room.people.length - Math.max(1, room.usualHeadcount), need: Math.max(1, room.usualHeadcount) })}
+            </span>
+          ) : room.usualHeadcount > 1 ? (
             <span className="cas-tag">
               {need > 0 ? fill(copy.tagBig, { have: room.people.length, more: need, need: room.usualHeadcount }) : copy.bigRoom}
             </span>
@@ -891,6 +948,8 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           ) : null}
         </aside>
       </div>
+
+      {overfill ? overfillDialog(overfill.room, overfill.userId) : null}
 
       {deferRoom ? (
         <>

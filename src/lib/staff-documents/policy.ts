@@ -9,7 +9,7 @@ import { tokyoDayStart } from "@/lib/tokyo-date";
  * `src/lib/i18n.ts` 의 `idCard.consent` · `idCard.consentDetail`(ko · ja · en 어느 하나라도)을 고치면 **반드시 오늘 날짜로 바꾼다** —
  * 그래야 누가 어느 문구에 동의했는지 나중에 가릴 수 있다.
  */
-export const ID_CARD_CONSENT_VERSION = "2026-10-23";
+export const ID_CARD_CONSENT_VERSION = "2026-10-23.2"; // .2 = 「자세히 보기」 보관 문구(보통 30일 · 안전 점검 시 더 길게)
 
 /** 자동 읽기 하루 상한(도쿄 날짜). 다시 찍기까지 넉넉히 — 넘으면 직접 입력으로. */
 export const OCR_DAILY_LIMIT_PER_USER = 10;

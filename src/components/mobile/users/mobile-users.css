@@ -24,10 +24,15 @@
 .muw-search input { flex: 1; min-width: 0; height: 44px; border: 0; background: transparent; font: inherit; font-size: 16px; color: #16141f; outline: none; }
 .muw-search input::placeholder { color: #6f6c7c; }
 .muw-search__x { width: 44px; height: 44px; flex: none; border: 0; background: transparent; display: grid; place-items: center; color: #6f6c7c; cursor: pointer; }
-.muw-bar { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.muw-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin-top: 4px; }
 .muw-flt { display: inline-flex; align-items: center; gap: 4px; height: 44px; padding: 0 4px; border: 0; background: transparent; font-size: 15px; color: #6b6878; cursor: pointer; }
 .muw-flt.is-on { color: #5a30cf; font-weight: 600; }
 .muw-flt svg { width: 14px; height: 14px; }
+.muw-flag { height: 44px; padding: 0 8px; border: 0; background: transparent; font-size: 15px; font-weight: 600; color: #8a5a00; cursor: pointer; font-variant-numeric: tabular-nums; border-radius: 10px; white-space: nowrap; }
+.muw-flag[aria-pressed="true"] { background: #fdf3dc; }
+.muw-doc { flex: none; max-width: 40%; padding: 2px 8px; border-radius: 7px; font-size: 12px; font-weight: 600; line-height: 1.3; background: #fdf3dc; color: #8a5a00; text-align: center; }
+.muw-doc.is-expired { background: #fdecee; color: #c4364b; }
+.muw-doc.is-returned { background: #f1f1f4; color: #6b6878; }
 .muw-cnt { margin-left: auto; font-size: 13px; color: #6f6c7c; }
 
 /* 묶음 · 줄 */

@@ -33,6 +33,15 @@
 .adm .usw-who__t b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .usw-who__t > span { font-size: 12px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .usw-me { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #f1ecfd; font-size: 11px; font-weight: 600; color: #5a30cf; vertical-align: 1px; }
+.adm .usw-nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.adm .usw-nm b { min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .usw-doc { flex: none; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; background: #fdf3dc; color: #8a5a00; }
+.adm .usw-doc.is-expired { background: #fdecee; color: #c4364b; }
+.adm .usw-doc.is-returned { background: #f1f1f4; color: #6b6878; }
+.adm .usw-flag { height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #8a5a00; cursor: pointer; font-variant-numeric: tabular-nums; transition: background 150ms ease; }
+.adm .usw-flag:hover { background: #faf9fc; }
+.adm .usw-flag[aria-pressed="true"] { background: #fdf3dc; }
+.adm .usw-flag:focus-visible { outline: 2px solid #7a52e6; outline-offset: 1px; }
 .adm .usw-c { min-width: 0; font-size: 13px; color: #3a3746; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .usw-c.is-dim { color: var(--text-done); }
 .adm .usw-c.is-soft { font-size: 12px; color: #6b6878; }

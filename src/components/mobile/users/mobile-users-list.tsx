@@ -7,6 +7,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { organizationRoles } from "@/config/roles";
 import { haptic } from "@/lib/haptics";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { idDocChip } from "@/lib/staff-documents/chip";
 import type { DirectoryMemberVM } from "@/lib/user-management-data";
 import { MobileUsersHead } from "./mobile-users-head";
 import "./mobile-users.css";
@@ -49,8 +50,14 @@ export function MobileUsersList({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>(NO_FILTER);
   const [sheet, setSheet] = useState(false);
+  const [docOnly, setDocOnly] = useState(false);
+  // idDoc 은 서버가 `staff_documents.view` 가 있을 때만 채운다 — 권한 없는 화면엔 칩도 거르기 칸도 없다.
+  const pendingDocs = useMemo(() => members.filter((m) => m.idDoc?.status === "pending").length, [members]);
 
-  const shown = useMemo(() => members.filter((m) => matches(m, query, filter)), [members, query, filter]);
+  const shown = useMemo(
+    () => members.filter((m) => matches(m, query, filter) && (!docOnly || m.idDoc?.status === "pending")),
+    [members, query, filter, docOnly],
+  );
   const active = shown.filter((m) => m.status === "active");
   const inactive = shown.filter((m) => m.status !== "active");
   const filterOn = Boolean(filter.status || filter.team || filter.role);
@@ -80,6 +87,10 @@ export function MobileUsersList({
             .join(" · ")}
         </span>
       </span>
+      {(() => {
+        const chip = idDocChip(m.idDoc, c);
+        return chip ? <span className={`muw-doc is-${chip.kind}`}>{chip.label}</span> : null;
+      })()}
       <ChevronRight className="muw-chev" aria-hidden="true" />
     </Link>
   );
@@ -110,6 +121,20 @@ export function MobileUsersList({
           {filterText}
           <ChevronDown aria-hidden="true" />
         </button>
+        {pendingDocs > 0 || docOnly ? (
+          <button
+            type="button"
+            className="muw-flag"
+            aria-pressed={docOnly}
+            aria-label={c.idDocFilterAria}
+            onClick={() => {
+              haptic("light");
+              setDocOnly((on) => !on);
+            }}
+          >
+            {c.idDocFilter.replace("{n}", String(pendingDocs))}
+          </button>
+        ) : null}
         <span className="muw-cnt num" aria-live="polite">
           {c.mCount.replace("{n}", String(shown.length))}
         </span>
@@ -117,8 +142,8 @@ export function MobileUsersList({
 
       {shown.length === 0 ? (
         <div className="muw-empty">
-          <b>{query || filterOn ? c.wEmpty : u.empty}</b>
-          {query || filterOn ? (
+          <b>{query || filterOn || docOnly ? c.wEmpty : u.empty}</b>
+          {query || filterOn || docOnly ? (
             <>
               <span>{c.mEmptyHint}</span>
               <button
@@ -126,6 +151,7 @@ export function MobileUsersList({
                 onClick={() => {
                   setQuery("");
                   setFilter(NO_FILTER);
+                  setDocOnly(false);
                 }}
               >
                 {c.wClear}

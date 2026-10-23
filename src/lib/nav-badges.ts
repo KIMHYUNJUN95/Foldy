@@ -6,6 +6,7 @@ import { getBoardUnreadCount } from "@/lib/board-queries";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { countUnreadNotifications } from "@/lib/notifications/queries";
 import { getCurrentAppSession } from "@/lib/session";
+import { countPendingIdDocumentPeople } from "@/lib/staff-documents/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -22,6 +23,8 @@ import type { Database } from "@/types/database";
  *                  (organization-wide shared count).
  * - announcements: published announcements the user has not read yet (clears on read).
  * - board:         org board posts (not authored by the user) without a read row (clears on open).
+ * - users:         people whose residence / My Number card is waiting for confirmation — only for viewers
+ *                  with `staff_documents.view` (other viewers get no key at all).
  * - notifications: unread notifications (read_at is null). [placeholder — to be revisited]
  *
  * Home, Calendar and Directory intentionally have no badge.
@@ -114,7 +117,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
   const dayStartIso = dayStart.toISOString();
   const dayEndIso = dayEnd.toISOString();
 
-  const [cleaning, orders, maintenance, lostToday, linenReturn, announcements, board, notifications] =
+  const [cleaning, orders, maintenance, lostToday, linenReturn, announcements, board, notifications, users] =
     await Promise.all([
       // Remaining cleanings for today (Tokyo): started but not yet completed.
       safeCount(() =>
@@ -166,6 +169,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
         userId,
         organizationId: orgId,
       }).catch(() => 0),
+      session.capabilities.includes("staff_documents.view") ? countPendingIdDocumentPeople(orgId) : Promise.resolve(0),
     ]);
 
   return {
@@ -175,6 +179,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
     announcements,
     board,
     notifications,
+    users,
   };
 });
 

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { nationalityName } from "@/lib/identity-names";
-import { loadCurrentIdDocument, type IdDocumentView } from "@/lib/staff-documents/server";
+import { loadCurrentIdDocument, loadIdDocumentBadges, type IdDocumentBadge, type IdDocumentView } from "@/lib/staff-documents/server";
 import { isOrgTopAdmin, type Role } from "@/config/roles";
 import { CAPABILITY_KEYS, canBeDenied, capabilityPolicy, evaluateCapability } from "@/config/capabilities";
 import { HIDDEN_CAPABILITIES } from "@/config/capability-groups";
@@ -37,6 +37,8 @@ export type DirectoryMemberVM = {
   isSelf: boolean;
   isDeveloper: boolean;
   teamKind: string | null;
+  /** 신분 서류 상태(칩용) — `staff_documents.view` 가 없으면 항상 null, 서류가 없어도 null. */
+  idDoc: IdDocumentBadge | null;
 };
 
 export type PermRowVM = {
@@ -118,6 +120,8 @@ export type UserDirectory = {
   profileMap: Map<string, Pick<ProfileRow, "id" | "name" | "phone_number" | "can_generate_report" | "nationality" | "name_ko" | "name_ja" | "name_en" | "name_katakana">>;
   emailMap: Map<string, string>;
   devIds: Set<string>;
+  /** 이 보는 사람이 서류 상태를 읽을 수 있는가 — 「확인 대기」 거르기 칸을 그릴지 정한다. */
+  canViewIdDocs: boolean;
 };
 
 /** 멤버 목록(이 조직, 플랫폼 세션이면 전체). */
@@ -155,6 +159,10 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
     orgIds.length > 0 ? await service.from("teams").select("id, kind").in("organization_id", orgIds) : { data: [] as { id: string; kind: string }[] };
   const teamKindById = new Map(((teamData ?? []) as { id: string; kind: string }[]).map((team) => [team.id, team.kind]));
 
+  // 서류 상태는 권한이 있을 때만 읽는다(없으면 데이터 자체가 화면으로 안 간다). 플랫폼 세션은 한 조직이 아니라 제외.
+  const canViewIdDocs = session.capabilities.includes("staff_documents.view") && session.organization.id !== "platform";
+  const idDocByUser = canViewIdDocs ? await loadIdDocumentBadges(session.organization.id) : new Map<string, IdDocumentBadge>();
+
   const members: DirectoryMemberVM[] = memberships.map((membership) => {
     const profile = profileMap.get(membership.user_id);
     return {
@@ -169,9 +177,10 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
       isSelf: membership.user_id === session.user.id,
       isDeveloper: devIds.has(membership.user_id),
       teamKind: membership.team_id ? teamKindById.get(membership.team_id) ?? null : null,
+      idDoc: membership.organization_id === session.organization.id ? idDocByUser.get(membership.user_id) ?? null : null,
     };
   });
-  return { members, memberships, profileMap, emailMap, devIds };
+  return { members, memberships, profileMap, emailMap, devIds, canViewIdDocs };
 }
 
 /** 고른 사람의 상세(패널) — 목록에 없는 멤버십이면 null. */

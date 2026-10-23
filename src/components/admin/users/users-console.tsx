@@ -24,6 +24,7 @@ import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-grou
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
+import { idDocChip } from "@/lib/staff-documents/chip";
 import { tokyoToday } from "@/lib/tokyo-date";
 
 /**
@@ -102,6 +103,9 @@ export function UsersConsole({
   const [fRole, setFRole] = useState("");
   const [fTeam, setFTeam] = useState("");
   const [fStatus, setFStatus] = useState("");
+  const [fDoc, setFDoc] = useState(false);
+  // idDoc 은 서버가 `staff_documents.view` 가 있을 때만 채운다 — 권한 없는 화면엔 칩도 거르기 칸도 없다.
+  const pendingDocs = useMemo(() => members.filter((m) => m.idDoc?.status === "pending").length, [members]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -112,14 +116,15 @@ export function UsersConsole({
       const matchesRole = !fRole || m.role === fRole;
       const matchesTeam = !fTeam || m.teamKind === fTeam;
       const matchesStatus = !fStatus || (fStatus === "active" ? m.status === "active" : m.status !== "active");
-      return matchesQuery && matchesRole && matchesTeam && matchesStatus;
+      const matchesDoc = !fDoc || m.idDoc?.status === "pending";
+      return matchesQuery && matchesRole && matchesTeam && matchesStatus && matchesDoc;
     });
-  }, [members, query, fRole, fTeam, fStatus]);
+  }, [members, query, fRole, fTeam, fStatus, fDoc]);
 
   const joined = (value: string | null) => (value ? value.slice(0, 10).replaceAll("-", ".") : "—");
   const open = (id: string) => router.push(`/admin/users?member=${id}`, { scroll: false });
   const close = () => router.push("/admin/users", { scroll: false });
-  const filtersOn = Boolean(query || fRole || fTeam || fStatus);
+  const filtersOn = Boolean(query || fRole || fTeam || fStatus || fDoc);
 
   return (
     <div className="usw">
@@ -176,6 +181,11 @@ export function UsersConsole({
             { value: "inactive", label: c.statusInactive },
           ]}
         />
+        {pendingDocs > 0 || fDoc ? (
+          <button type="button" className="usw-flag" aria-pressed={fDoc} aria-label={c.idDocFilterAria} onClick={() => setFDoc((on) => !on)}>
+            {c.idDocFilter.replace("{n}", String(pendingDocs))}
+          </button>
+        ) : null}
       </div>
 
       <div className="usw-th" aria-hidden="true">
@@ -198,6 +208,7 @@ export function UsersConsole({
                 setFRole("");
                 setFTeam("");
                 setFStatus("");
+                setFDoc(false);
               }}
             >
               {c.wClear}
@@ -219,10 +230,16 @@ export function UsersConsole({
                   {initialOf(m.name)}
                 </span>
                 <span className="usw-who__t">
-                  <b>
-                    {m.name || "—"}
-                    {m.isSelf ? <span className="usw-me">{c.selfChip}</span> : null}
-                  </b>
+                  <span className="usw-nm">
+                    <b>
+                      {m.name || "—"}
+                      {m.isSelf ? <span className="usw-me">{c.selfChip}</span> : null}
+                    </b>
+                    {(() => {
+                      const chip = idDocChip(m.idDoc, c);
+                      return chip ? <span className={`usw-doc is-${chip.kind}`}>{chip.label}</span> : null;
+                    })()}
+                  </span>
                   <span>{m.email || "—"}</span>
                 </span>
               </span>

@@ -85,7 +85,8 @@ export type MemberPanelVM = {
   /** 최근 변경(audit_logs, 최신 10개) — 2026-10-20 권한 정리 ④. */
   history: MemberHistoryItem[];
   /** 신분 서류(재류카드 · 마이넘버 카드 앞면, docs/product/41 R2) — `staff_documents.view` 가 없으면 canView=false 로 아예 읽지 않는다. */
-  idDocument: { canView: boolean; doc: IdDocumentView | null };
+  /** `printHref` = A4 인쇄 화면(R3, 서류가 있을 때만). */
+  idDocument: { canView: boolean; doc: IdDocumentView | null; printHref: string | null };
 };
 
 /** 지금 쓸 수 있는 초대코드 수(켜져 있고 · 기한 전 · 남은 횟수 있음) — 탭 숫자. */
@@ -309,7 +310,11 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
     otherOrgs: otherOrgCounts.any > 0,
     otherOrgsActive: otherOrgCounts.active > 0,
     history,
-    idDocument: { canView: canViewDocuments, doc: idDocument },
+    idDocument: {
+      canView: canViewDocuments,
+      doc: idDocument,
+      printHref: idDocument ? `/account/id-card/print?u=${selected.user_id}` : null,
+    },
   };
 }
 

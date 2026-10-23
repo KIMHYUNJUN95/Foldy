@@ -228,3 +228,15 @@
 .adm .usw-help:active { transform: scale(.9); }
 .adm .usw-help-t { margin: 0 0 12px; padding: 9px 11px; border-radius: 10px; background: #f6f5f9; font-size: 12px; line-height: 18px; color: #3a3746; animation: usw-help-in 180ms cubic-bezier(.23, 1, .32, 1); }
 @keyframes usw-help-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
+/* 재류카드 A4 인쇄 고르기(R3, docs/product/17 · 41 §3-4) — 거르기 줄 오른쪽 끝. 고르는 동안 줄을 누르면 고름(서류 없는 줄은 흐리게 · 못 누름). */
+.adm .usw-printsel { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: #16141f; }
+.adm .usw-printbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.adm .usw-printbar__hint { font-size: 12.5px; color: #6b6878; }
+.adm .usw-printbar .usw-btn { height: 32px; padding: 0 12px; background: #f4f4f7; color: #16141f; text-decoration: none; }
+.adm .usw-printbar .usw-btn.is-pri { background: #7a52e6; color: #fff; }
+.adm .usw-pick { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 50%; border: 1.5px solid #c9c7d0; background: #fff; color: #fff; transition: background 150ms ease, border-color 150ms ease; }
+.adm .usw-tr.is-picked { background: #f4f1fd; border-radius: 12px; border-top-color: transparent; }
+.adm .usw-tr.is-picked .usw-pick { background: #7a52e6; border-color: #7a52e6; }
+.adm .usw-tr:disabled { cursor: default; opacity: .45; }
+.adm .usw-tr:disabled:hover { background: transparent; }

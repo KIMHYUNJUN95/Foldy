@@ -1,0 +1,128 @@
+/* 신분 서류 A4 인쇄(재류카드 R3, docs/product/41 §3-4 · 시안 A4-Print).
+   종이 = A4 세로 210 × 297mm, 여백은 종이(.icp-sheet) 안 padding 으로 — @page 여백 0 이라 브라우저 머리글 · 바닥글(주소)이 안 찍힌다.
+   카드 사진은 mm 로 실제 크기(85.6 × 54mm), 「크게」 = 2배(171.2 × 108mm). 2배일 때는 위 · 아래 칸을 3열로 줄여 한 장에 들어가게. */
+
+.icp {
+  min-height: 100dvh;
+  padding: 16px 12px 40px;
+  background: #ecebf0;
+  color: #16141f;
+  font-family: var(--font-sans);
+}
+
+.icp-msg {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--background);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+/* ── 위 막대(화면 전용) ── */
+.icp-bar {
+  max-width: 794px;
+  margin: 0 auto 16px;
+}
+.icp-bar__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.icp-bar__count { margin: 0 auto 0 0; font-size: 14px; font-weight: 800; }
+.icp-bar__toggle { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 10px; background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+.icp-bar__toggle input { width: 16px; height: 16px; accent-color: var(--primary); }
+.icp-bar__btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 10px;
+  background: var(--primary); color: #fff; font-size: 13px; font-weight: 800; cursor: pointer;
+}
+.icp-bar__btn svg { width: 16px; height: 16px; }
+.icp-bar__btn:disabled { opacity: .5; cursor: default; }
+.icp-bar__close { height: 36px; padding: 0 12px; border-radius: 10px; background: #fff; font-size: 13px; font-weight: 700; color: #16141f; }
+.icp-bar__hint { margin: 10px 0 0; font-size: 12.5px; line-height: 1.6; color: #5f5d6b; }
+.icp-bar__warn { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: #fff6e0; color: #7a5300; font-size: 12.5px; font-weight: 700; }
+.icp-bar__error { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: #c4364b; }
+
+/* ── 종이 ── */
+.icp-sheets { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+.icp-sheet {
+  width: 210mm;
+  height: 296mm; /* 297 이면 반올림으로 빈 장이 끼는 브라우저가 있다 */
+  box-sizing: border-box;
+  padding: 16mm 18mm 14mm;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #16141f;
+  font-family: var(--font-noto-jp), "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  font-size: 9.75pt;
+  line-height: 1.45;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.06);
+}
+.icp-sheet [lang="ko"] { font-family: var(--font-noto-kr), "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+
+.icp-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 6mm; padding-bottom: 3.5mm; border-bottom: 0.4mm solid #16141f; }
+.icp-head__org { font-size: 9pt; color: #6b6878; }
+.icp-head__title { margin: 1mm 0 0; font-size: 18pt; font-weight: 700; letter-spacing: 0.04em; }
+.icp-stamp { flex: none; width: 17mm; border: 0.25mm solid #16141f; text-align: center; }
+.icp-stamp div:first-child { font-size: 7.5pt; padding: 0.5mm 0; border-bottom: 0.25mm solid #16141f; }
+.icp-stamp div:last-child { height: 12mm; }
+
+.icp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 7mm; margin: 4mm 0 0; }
+.icp-grid__row { display: flex; gap: 2mm; padding: 2mm 0; border-bottom: 0.15mm solid #c9c7d0; min-width: 0; }
+.icp-grid__row dt { flex: none; width: 27mm; color: #6b6878; }
+.icp-grid__row dd { margin: 0; flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+
+.icp-cards { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7mm; }
+.icp-card { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2mm; }
+.icp-card figcaption { font-size: 9pt; font-weight: 700; color: #6b6878; }
+.icp-card__frame {
+  width: 85.6mm;
+  height: 54mm;
+  box-sizing: border-box;
+  border: 0.25mm solid #c9c7d0;
+  border-radius: 3mm;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #fff;
+}
+.icp-card__frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.icp-card__missing { font-size: 9pt; color: #6b6878; }
+.icp-cards__note { margin: 0; font-size: 8pt; color: #6b6878; }
+
+.icp-foot__attest { margin: 4mm 0 0; font-size: 9.5pt; }
+.icp-foot__meta { display: flex; justify-content: space-between; gap: 4mm; margin-top: 3.5mm; font-size: 8pt; color: #6b6878; }
+
+/* 「크게(2배)」 — 사진 171.2 × 108mm 두 장(216mm)이 들어가게 여백 · 칸을 줄이고 위 · 아래를 3열로.
+   예산이 빠듯하다(296mm 중 약 280mm 사용) — 칸 · 글 크기를 키우면 바닥글이 잘린다. 바꿀 땐 PDF 로 한 장에 들어가는지 확인. */
+.icp[data-size="large"] .icp-sheet { padding: 6mm 12mm 6mm; font-size: 8pt; line-height: 1.35; }
+.icp[data-size="large"] .icp-head { padding-bottom: 2mm; }
+.icp[data-size="large"] .icp-head__org { font-size: 8pt; }
+.icp[data-size="large"] .icp-head__title { font-size: 12pt; margin-top: 0.5mm; }
+.icp[data-size="large"] .icp-stamp div:last-child { height: 9mm; }
+.icp[data-size="large"] .icp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 4mm; margin-top: 2mm; }
+.icp[data-size="large"] .icp-grid__row { padding: 1.2mm 0; }
+.icp[data-size="large"] .icp-grid__row dt { width: 20mm; }
+.icp[data-size="large"] .icp-cards { gap: 2mm; }
+/* 2배일 때 「表面（2倍）」은 카드 왼쪽 세로 글 — 위아래 자리를 아낀다(사진 두 장만 216mm). */
+.icp[data-size="large"] .icp-card { flex-direction: row; align-items: center; gap: 1.5mm; }
+.icp[data-size="large"] .icp-card figcaption { writing-mode: vertical-rl; font-size: 7.5pt; line-height: 1; }
+.icp[data-size="large"] .icp-card__frame { width: 171.2mm; height: 108mm; border-radius: 6mm; }
+.icp[data-size="large"] .icp-cards__note { display: none; }
+.icp[data-size="large"] .icp-foot__attest { margin-top: 2mm; font-size: 8pt; }
+.icp[data-size="large"] .icp-foot__meta { margin-top: 1.5mm; font-size: 7pt; }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html, body { background: #fff !important; }
+  [data-splash] { display: none !important; }
+  .icp { min-height: 0; padding: 0; background: #fff; }
+  .icp-bar { display: none !important; }
+  .icp-sheets { display: block; zoom: 1 !important; }
+  .icp-sheet { box-shadow: none; break-after: page; page-break-after: always; break-inside: avoid; }
+  .icp-sheet:last-child { break-after: auto; page-break-after: auto; }
+}

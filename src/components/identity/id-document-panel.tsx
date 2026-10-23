@@ -7,6 +7,7 @@
  */
 
 import "./id-document-panel.css";
+import { Printer } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { reviewIdDocument } from "@/app/account/id-card/actions";
@@ -25,11 +26,14 @@ export function IdDocumentPanel({
   doc,
   locale,
   canReview = true,
+  printHref = null,
 }: {
   doc: IdDocumentView | null;
   locale: Locale;
   /** 본인 서류는 서버가 검토를 막는다 — false 면 「확인함」 · 「다시 요청」 칸을 숨긴다. */
   canReview?: boolean;
+  /** A4 인쇄 화면 주소(R3) — 새 탭으로 연다. 앱(Capacitor)에서는 WebView 가 인쇄를 못 해 CSS 로 숨긴다(docs/planning/17 H8). */
+  printHref?: string | null;
 }) {
   const copy = getDictionary(locale).idCard;
   const router = useRouter();
@@ -102,6 +106,12 @@ export function IdDocumentPanel({
             {tone === "expired" ? copy.adminExpired : copy.adminDaysLeft.replace("{n}", String(doc.expiryDays))}
           </span>
         )}
+        {printHref ? (
+          <a className="idp__print" href={printHref} rel="noopener" target="_blank">
+            <Printer aria-hidden="true" size={14} />
+            {copy.printOpen}
+          </a>
+        ) : null}
       </div>
 
       <div className="idp__photos">

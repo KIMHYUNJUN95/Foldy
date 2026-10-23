@@ -13,8 +13,8 @@ import {
  * 카드 사진 → 칸 값 (재류카드 R2, docs/product/41 §3-1a).
  *
  * Claude API 이미지 읽기 + 정해진 JSON(structured outputs). 키는 서버 전용 `ANTHROPIC_API_KEY`.
- * 사진은 이 요청에만 쓰인다(Anthropic API 는 학습에 쓰지 않고, 안전 점검용으로 최대 30일 보관 후 지운다 —
- * 촬영 전 동의 문구가 이 사실을 그대로 말한다).
+ * 사진은 이 요청에만 쓰인다(Anthropic API 는 학습에 쓰지 않고 보통 30일 안에 지운다 — 안전 점검에 걸린 요청은 최대 2년.
+ * 촬영 전 동의 「자세히 보기」가 이 사실을 말한다).
  *
  * 읽기는 「미리 채우기」일 뿐이다 — 실패해도 손으로 입력해 가입을 마칠 수 있어야 한다. 그래서 오류를 던지지 않고
  * `{ ok: false, reason }` 으로 돌려준다.
@@ -136,6 +136,8 @@ export async function readIdCardPhotos(kind: IdDocumentKind, images: OcrImage[])
         // 드물게 안전 분류기가 거절하면 서버가 알맞은 모델로 다시 돌린다.
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
+        // 동의 문구가 「미국에 있는 서버」라 처리 지역을 미국으로 묶는다(지정 안 하면 global — 미국 밖일 수 있다). 요금 1.1배.
+        inference_geo: "us",
         messages: [{ role: "user", content }],
       },
       { timeout: 60_000, maxRetries: 1 },

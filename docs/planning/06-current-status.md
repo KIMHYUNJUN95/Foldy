@@ -24,6 +24,11 @@
 - 새 공용: `useRoomPlaceLabel` · 어드민 레이아웃 `BuildingNamesProvider` · `localizeStoredPlaceText`. 테스트 `admin-building-name-localize.test.ts`. 새 문구 없음. 스키마 변경 없음.
 - 그대로 둔 것: 근무지 설정 화면의 근무지 이름(사람이 고치는 값), 자동화 Slack 메시지(언어별 표가 따로 있음).
 
+## 2026-10-23 — 계정 화면 밀어서 뒤로가기
+
+- [x] 계정 화면(`/account?mode=mobile`)에서 가운데부터 밀어도 뒤로 가게(`canStartSwipeBack`) — 전엔 주소가 `/mobile` 밖이라 가장자리
+  OS 제스처만 됐다. 브라우저에서 가운데 밀기 → `/mobile` 복귀 확인. 16 「뒤로가기 — 화면 스와이프」.
+
 ## 2026-10-23 — 모바일 · 대시보드 코드 경계
 
 - [x] 양쪽이 함께 부르는 서버 액션 11개 → `src/actions/`(01 2026-10-23 · CLAUDE.md Important Directories). 동작 그대로.

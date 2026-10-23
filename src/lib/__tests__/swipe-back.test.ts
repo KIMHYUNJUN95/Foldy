@@ -7,6 +7,7 @@ import {
   decideLock,
   findBackTarget,
   followOffset,
+  canStartSwipeBack,
   isSwipeBackScreen,
   parentScreen,
   settleMotion,
@@ -54,6 +55,19 @@ describe("isSwipeBackScreen", () => {
     expect(isSwipeBackScreen("/account")).toBe(false);
     expect(isSwipeBackScreen("/login?next=/mobile")).toBe(false);
     expect(isSwipeBackScreen("/mobilex")).toBe(false);
+  });
+});
+
+describe("canStartSwipeBack", () => {
+  it("the account screen in the mobile shell starts a swipe too (2026-10-23)", () => {
+    expect(canStartSwipeBack("/account")).toBe(true);
+    expect(canStartSwipeBack("/account?mode=mobile")).toBe(true);
+    expect(canStartSwipeBack("/mobile/users/1")).toBe(true);
+  });
+  it("but not the full-screen id-card flow, login, or look-alike paths", () => {
+    expect(canStartSwipeBack("/account/id-card")).toBe(false);
+    expect(canStartSwipeBack("/accounts")).toBe(false);
+    expect(canStartSwipeBack("/auth/login")).toBe(false);
   });
 });
 

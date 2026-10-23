@@ -38,6 +38,7 @@ export function BoardDetailClient({
   post,
   viewerId,
   canManage,
+  canEditAny = false,
   organizationId,
   locale,
   copy,
@@ -45,6 +46,8 @@ export function BoardDetailClient({
   post: BoardPostDetail;
   viewerId: string;
   canManage: boolean;
+  /** 플랫폼 개발자 — 남의 글도 「글 수정」을 보여 준다(2026-10-23). */
+  canEditAny?: boolean;
   organizationId: string;
   locale: Locale;
   copy: Dictionary["board"];
@@ -419,6 +422,7 @@ export function BoardDetailClient({
           onClose={() => setShowActionSheet(false)}
           isOwn={isOwn}
           canManage={canManage}
+          canEdit={isOwn || canEditAny}
           isPinned={post.isPinned}
           copy={copy}
           onEdit={() => {

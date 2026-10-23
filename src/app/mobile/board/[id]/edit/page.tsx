@@ -5,7 +5,7 @@ import { getBoardPost, getBoardTags } from "@/lib/board-queries";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { getDictionary } from "@/lib/i18n";
-import { isOrgTopAdmin } from "@/config/roles";
+import { isOrgTopAdminOrPlatform, isPlatformDeveloper } from "@/config/roles";
 import { BoardEditClient } from "./board-edit-client";
 
 type PageProps = {
@@ -44,12 +44,15 @@ export default async function BoardEditPage({ params }: PageProps) {
   // 없는 글이든 남의 글이든 **상세로 돌려보낸다.** 「권한 없음」 화면을 따로 띄우면 남의 글이
   // 존재한다는 사실만 알려 주는 셈이고, 목록으로 보내면 보고 있던 맥락을 잃는다.
   if (!post) redirect("/mobile/board");
-  if (post.authorId !== session.user.id) redirect(`/mobile/board/${id}`);
+  // 개발자(설계자)는 남의 글도 고친다(2026-10-23).
+  if (post.authorId !== session.user.id && !isPlatformDeveloper(session.user.role)) {
+    redirect(`/mobile/board/${id}`);
+  }
 
   const dictionary = getDictionary(session.user.preferredLanguage);
   // 작성 경로(`createBoardPost`)와 같은 고정 권한. 두 경로가 갈리면 수정으로 우회할 수 있다.
   const canPin =
-    isOrgTopAdmin(session.user.role) || session.user.role === "office_admin";
+    isOrgTopAdminOrPlatform(session.user.role) || session.user.role === "office_admin";
 
   const [tags, navBadges] = await Promise.all([
     getBoardTags(session),

@@ -93,6 +93,7 @@ import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
 import { hasOverlappingSession } from "@/lib/attendance-overlap";
+import { isPlatformDeveloper } from "@/config/roles";
 
 export type ReviewActionResult =
   | { ok: true }
@@ -127,6 +128,29 @@ async function getProfileName(
 ): Promise<string | null> {
   const res = await service.from("profiles").select("name").eq("id", userId).maybeSingle();
   return ((res.data as { name: string } | null)?.name ?? null);
+}
+
+/**
+ * 다른 검토자가 잡은 in_review 요청을 플랫폼 개발자가 넘겨받는다(2026-10-23). 잡은 사람이 그대로일 때만
+ * 바꾸는 비교-교체라, 그 사이 상대가 먼저 승인 · 반려했으면 0행 → false.
+ */
+async function takeOverCorrectionReview(
+  service: ReturnType<typeof getSupabaseServiceClient>,
+  organizationId: string,
+  requestId: string,
+  heldBy: string,
+  actorId: string,
+): Promise<boolean> {
+  const res = await service
+    .from("attendance_correction_requests")
+    .update({ reviewed_by_user_id: actorId })
+    .eq("id", requestId)
+    .eq("organization_id", organizationId)
+    .eq("status", "in_review")
+    .eq("reviewed_by_user_id", heldBy)
+    .select("id")
+    .maybeSingle();
+  return !res.error && !!res.data;
 }
 
 async function loadRequest(
@@ -195,7 +219,11 @@ export async function approveCorrectionRequest(
     request.reviewed_by_user_id &&
     request.reviewed_by_user_id !== actorId
   ) {
-    return { ok: false, reason: "invalid" };
+    // 다른 검토자가 잡은 요청 — 플랫폼 개발자는 넘겨받아 처리한다(2026-10-23 「개발자는 전부 가능」).
+    if (!isPlatformDeveloper(session.user.role)) return { ok: false, reason: "invalid" };
+    if (!(await takeOverCorrectionReview(service, organizationId, request.id, request.reviewed_by_user_id, actorId))) {
+      return { ok: false, reason: "invalid" };
+    }
   }
 
   if (request.status === "requested") {
@@ -477,7 +505,19 @@ export async function rejectCorrectionRequest(
     request.reviewed_by_user_id &&
     request.reviewed_by_user_id !== session.user.id
   ) {
-    return { ok: false, reason: "invalid" };
+    // 다른 검토자가 잡은 요청 — 플랫폼 개발자는 넘겨받아 반려한다(2026-10-23).
+    if (!isPlatformDeveloper(session.user.role)) return { ok: false, reason: "invalid" };
+    if (
+      !(await takeOverCorrectionReview(
+        service,
+        organizationId,
+        request.id,
+        request.reviewed_by_user_id,
+        session.user.id,
+      ))
+    ) {
+      return { ok: false, reason: "invalid" };
+    }
   }
 
   const updateQuery = service

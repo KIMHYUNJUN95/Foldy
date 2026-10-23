@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
+import { isPlatformDeveloper } from "@/config/roles";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { getFieldActivities } from "@/lib/field-activity";
@@ -103,6 +104,7 @@ export default async function MobileTasksPage({ searchParams }: PageProps) {
           fieldActivities={fieldActivities}
           copy={dict.tasks}
           currentUserId={session.user.id}
+          canEditAny={isPlatformDeveloper(session.user.role)}
           initialView={initialView}
           locale={locale}
           moveError={params.moveError}

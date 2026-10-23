@@ -338,6 +338,9 @@ export function AdminTasksConsole({
   const { toast, showToast, dismiss } = useAdminToast();
 
   const meId = data.me.id;
+  // 플랫폼 개발자는 남의 작업 · 프로젝트도 작성자처럼 고친다(2026-10-23, 서버 canEditTaskCore · project.viewerCanManage 와 같은 규칙).
+  // isPlatformDeveloper() 와 같은 판정. 여기서 함수를 부르면 React Compiler 가 이 컴포넌트의 수동 메모를 못 지켜 최적화를 건너뛴다(린트 오류) — 그래서 비교를 그대로 쓴다.
+  const meIsDeveloper = data.me.role === "developer_super_admin";
   // Tokyo operating date. Kept live so a console left open across Tokyo midnight rolls today/내일/
   // overdue over without a manual refresh (checked each minute + on focus/visibility change).
   const [today, setToday] = useState(() => tokyoToday());
@@ -2696,7 +2699,7 @@ export function AdminTasksConsole({
     if (!summary) return null;
     // summary.members 는 owner(=createdByUserId) 행을 이미 포함한다 — Set 으로 합쳐 dedup(멤버 4명 버그).
     const memberIds = Array.from(new Set([summary.createdByUserId, ...summary.members.map((mem) => mem.userId)]));
-    const canManage = summary.viewerRole === "owner" || summary.createdByUserId === meId;
+    const canManage = summary.viewerRole === "owner" || summary.createdByUserId === meId || meIsDeveloper;
     const pd = projectDetail && projectDetail.id === projectId ? projectDetail : null;
     const sections =
       pd?.sections && pd.sections.length > 0 ? pd.sections : [{ id: "__default", title: dict.dpTask, sortOrder: 0 }];
@@ -3466,7 +3469,9 @@ export function AdminTasksConsole({
       statusDraft && statusDraft.id === t.id && realStatus === statusDraft.from
         ? statusDraft.status
         : realStatus;
-    const mine = isMine(t, meId);
+    const ownTask = isMine(t, meId);
+    // 편집 · 삭제 단추를 보일지. 「누가 지시했나」 같은 표시는 실제 작성자(ownTask)로 가른다.
+    const mine = ownTask || meIsDeveloper;
     const proj = t.projectId ? projById.get(t.projectId) : null;
     const d = dueDateOf(t) ?? t.scheduledDate ?? null;
     const trng = timeRange(t.timeLabel, t.durationMinutes);
@@ -3779,7 +3784,7 @@ export function AdminTasksConsole({
                 <dd className="is-soft">{t.tags.map((g) => `#${g}`).join(" ")}</dd>
               </>
             )}
-            {t.isDirective && !mine && (
+            {t.isDirective && !ownTask && (
               <>
                 <dt>{dict.vInstr}</dt>
                 <dd>{fill(dict.instructedBy, { name: t.authorName || nameOf(t.createdByUserId) })}</dd>
@@ -4317,7 +4322,7 @@ export function AdminTasksConsole({
   function RowMenu({ p }: { p: RowMenuPop }) {
     const t = tasks.find((x) => x.id === p.taskId);
     if (!t) return null;
-    const mine = isMine(t, meId);
+    const mine = isMine(t, meId) || meIsDeveloper;
     const close = () => setPop(null);
     return (
       <div className="pop menu">

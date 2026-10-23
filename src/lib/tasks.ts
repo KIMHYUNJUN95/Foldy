@@ -7,6 +7,7 @@ import {
   getDisplayRoomLabel,
 } from "@/lib/room-label-normalization";
 import type { AppSession } from "@/lib/session";
+import { isOwnerOrPlatformDeveloper } from "@/config/roles";
 // The custom-weekday rule format has exactly one parser, and it lives in the client-safe twin so
 // the two recurrence tables can't drift apart on it (see that file's header warning).
 import {
@@ -393,8 +394,15 @@ export function isTaskToday(task: TaskRecord): boolean {
   return task.scheduledDate === today || tokyoDateOf(task.dueAt) === today;
 }
 
-export function canEditTaskCore(session: AppSession, task: TaskRecord): boolean {
-  return task.createdByUserId === session.user.id;
+/**
+ * 작업 본문 · 일정 · 삭제 · 참여자 빼기 같은 「작성자만」 동작의 게이트. 플랫폼 개발자는 예외로 통과한다
+ * (2026-10-23 「개발자는 전부 가능」). 개발자가 열 수 있는 작업(getTaskScope 범위) 안에서만 쓰인다.
+ */
+export function canEditTaskCore(
+  session: Pick<AppSession, "user">,
+  task: Pick<TaskRecord, "createdByUserId">,
+): boolean {
+  return isOwnerOrPlatformDeveloper(session.user, task.createdByUserId);
 }
 
 type ResContextRow = {

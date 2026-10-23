@@ -47,6 +47,8 @@ function ActionRow({
 type ActionSheetProps = {
   isOwn: boolean;
   canManage: boolean;
+  /** 「글 수정」을 보일지 — 기본은 내 글(isOwn). 개발자는 남의 글도(2026-10-23). */
+  canEdit?: boolean;
   isPinned: boolean;
   copy: BoardActionSheetCopy;
   /** false 면 글 전용 동작(수정 · 고정 · 공유 · 삭제)을 숨긴다 — 댓글 「⋯」 메뉴는 신고 · 차단만. */
@@ -63,6 +65,7 @@ type ActionSheetProps = {
 function ActionSheetContent({
   isOwn,
   canManage,
+  canEdit = isOwn,
   isPinned,
   copy,
   showPostActions = true,
@@ -80,7 +83,7 @@ function ActionSheetContent({
   return (
     <div className="bdw-sheet">
       <div className="bdw-act">
-        {showPostActions && isOwn && (
+        {showPostActions && canEdit && (
           <ActionRow
             icon={<Pencil strokeWidth={1.8} />}
             label={copy.actionEdit}

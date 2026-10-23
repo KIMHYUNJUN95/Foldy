@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { notifyTaskParticipants } from "@/lib/notifications/create";
 import type { TaskNotificationPayload } from "@/lib/notifications/types";
 import {
+  canEditTaskCore,
   getShareableUsers,
+  getTaskScope,
   getTaskDetail,
   getVisibleTasks,
   normalizeTaskDateTime,
@@ -38,6 +40,7 @@ import {
 } from "@/lib/task-occurrences";
 import { cleanupRemovedTaskImages, mergeTaskImageUrls } from "@/lib/task-images";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { isOwnerOrPlatformDeveloper, isPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
 import type { Database } from "@/types/database";
@@ -248,7 +251,7 @@ async function notify(
 export async function updateTaskCore(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
   const { session, task } = await requireSessionAndTask(id);
-  if (task.createdByUserId !== session.user.id) {
+  if (!canEditTaskCore(session, task)) {
     redirect(detailPath(id, "forbidden"));
   }
 
@@ -720,8 +723,8 @@ export async function removeTaskParticipant(formData: FormData) {
     redirect(deleted ? `/mobile/tasks?deleted=${id}` : detailPath(id, "save_failed"));
   }
 
-  // Only the author may remove others; anyone may remove themselves.
-  if (!removingSelf && !isAuthor) {
+  // Only the author (or the platform developer, 2026-10-23) may remove others; anyone may remove themselves.
+  if (!removingSelf && !canEditTaskCore(session, task)) {
     redirect(detailPath(id, "forbidden"));
   }
   // Never remove the author via this path (author leaves only via self-delete above).
@@ -756,7 +759,7 @@ export async function removeTaskParticipant(formData: FormData) {
 export async function deleteTask(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
   const { session, task } = await requireSessionAndTask(id);
-  if (task.createdByUserId !== session.user.id) {
+  if (!canEditTaskCore(session, task)) {
     redirect(detailPath(id, "forbidden"));
   }
   const supabase = getSupabaseServiceClient();
@@ -787,7 +790,7 @@ export async function restoreTask(taskId: string): Promise<{ ok: boolean }> {
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   const row = data as { created_by_user_id: string } | null;
-  if (!row || row.created_by_user_id !== session.user.id) return { ok: false };
+  if (!row || !isOwnerOrPlatformDeveloper(session.user, row.created_by_user_id)) return { ok: false };
   const { error } = await supabase
     .from("tasks")
     .update({ deleted_at: null })
@@ -814,17 +817,24 @@ export async function deleteTasksInList(taskIds: string[]): Promise<{ deletedIds
     redirect("/mobile/unavailable");
   }
   const supabase = getSupabaseServiceClient();
+  // 플랫폼 개발자는 남의 작업도 지운다(2026-10-23) — 다만 **자기가 열 수 있는 작업(getTaskScope)** 만.
+  // 작성자 조건을 빼는 대신 범위 조건을 건다(서비스 키 쓰기라 id 를 그대로 믿으면 안 된다).
+  const developer = isPlatformDeveloper(session.user.role);
+  const targetIds = developer
+    ? await getTaskScope(session).then((scope) => ids.filter((id) => scope.taskIds.has(id)))
+    : ids;
+  if (targetIds.length === 0) return { deletedIds: [] };
   // 실제로 지워진 id 만 돌려준다 — 목록에서 남의 작업을 같이 골랐어도 그건 안 지워지므로,
   // "실행 취소" 가 지우지도 않은 작업을 되살리려 하면 안 된다(콘솔 `bulkDeleteConsoleTasks` 와 동일).
-  const { data } = await supabase
+  let query = supabase
     .from("tasks")
     .update({ deleted_at: new Date().toISOString() })
-    .in("id", ids)
-    .eq("created_by_user_id", session.user.id)
+    .in("id", targetIds)
     // 조직 스코프도 함께 건다 — 작성자 조건만으로도 실무상 안전하지만, 쌍둥이인
     // `restoreTasksInList` 는 걸고 있어서 두 함수의 방어 수준이 달랐다(2026-08-28).
-    .eq("organization_id", session.organization.id)
-    .select("id");
+    .eq("organization_id", session.organization.id);
+  if (!developer) query = query.eq("created_by_user_id", session.user.id);
+  const { data } = await query.select("id");
   revalidatePath("/mobile/tasks");
   return { deletedIds: ((data ?? []) as Array<{ id: string }>).map((r) => r.id) };
 }
@@ -838,12 +848,14 @@ export async function restoreTasksInList(taskIds: string[]): Promise<void> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return;
   const supabase = getSupabaseServiceClient();
-  await supabase
+  let query = supabase
     .from("tasks")
     .update({ deleted_at: null })
     .in("id", ids)
-    .eq("created_by_user_id", session.user.id)
     .eq("organization_id", session.organization.id);
+  // 플랫폼 개발자는 자기가 지운 남의 작업도 되살린다(단건 restoreTask 와 같은 규칙, 2026-10-23).
+  if (!isPlatformDeveloper(session.user.role)) query = query.eq("created_by_user_id", session.user.id);
+  await query;
   revalidatePath("/mobile/tasks");
 }
 

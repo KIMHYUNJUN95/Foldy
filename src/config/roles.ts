@@ -50,7 +50,29 @@ export function isOrgTopAdmin(role: Role): boolean {
  * 사용자 관리 화면들이 이미 같은 조합을 인라인으로 쓰고 있었다.
  */
 export function isOrgTopAdminOrPlatform(role: Role): boolean {
-  return role === "developer_super_admin" || isOrgTopAdmin(role);
+  return isPlatformDeveloper(role) || isOrgTopAdmin(role);
+}
+
+/**
+ * 플랫폼 개발자(설계자) 계정인가. 2026-10-23 사용자 「난 개발자이고 … 전부 가능해야해. 난 이거 설계자야」.
+ * 작성자 본인만 · 담당자만 · 다른 검토자가 잡은 건 손대지 않기 같은 「주인만」 게이트에서 개발자는 예외로 통과한다.
+ * 조직 격리(session.organization)와 자기 계정 잠금 방지 가드(자기 역할 · 상태 · 권한 · 개발자 플래그 · 계정 삭제,
+ * 마지막 대표 보호)는 그대로 둔다. 목록: docs/engineering/05-rls-permissions.md 「개발자 예외(2026-10-23)」.
+ */
+export function isPlatformDeveloper(role: Role | string | null | undefined): boolean {
+  return role === "developer_super_admin";
+}
+
+/**
+ * 「주인(작성자 · 제보자 · 담당자)만」 게이트 — 주인 본인이거나 플랫폼 개발자면 통과.
+ * ownerUserId 가 비어 있으면(주인 없음) 개발자만 통과한다.
+ */
+export function isOwnerOrPlatformDeveloper(
+  viewer: { id: string; role: Role | string | null | undefined },
+  ownerUserId: string | null | undefined,
+): boolean {
+  if (isPlatformDeveloper(viewer.role)) return true;
+  return !!ownerUserId && ownerUserId === viewer.id;
 }
 
 /**

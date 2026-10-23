@@ -42,7 +42,7 @@ async function requireSession(): Promise<Session> {
 }
 
 // getProjectDetail uses the RLS-scoped client, so a non-null result proves the acting user is a
-// project participant. Owner-only actions additionally check `project.viewerIsOwner`.
+// project participant. Owner-only actions additionally check `project.viewerCanManage` (owner or platform developer).
 async function requireProject(
   projectId: string,
 ): Promise<{ session: Session; project: ProjectDetailData }> {
@@ -134,7 +134,7 @@ export async function createProject(formData: FormData) {
 export async function deleteProject(formData: FormData) {
   const id = cleanText(formData.get("projectId"));
   const { session, project } = await requireProject(id);
-  if (!project.viewerIsOwner) {
+  if (!project.viewerCanManage) {
     redirect(detailPath(id, "forbidden"));
   }
   const supabase = getSupabaseServiceClient();
@@ -151,7 +151,7 @@ export async function addProjectSection(formData: FormData) {
   const id = cleanText(formData.get("projectId"));
   const title = cleanText(formData.get("title"));
   const { project } = await requireProject(id);
-  if (!project.viewerIsOwner) {
+  if (!project.viewerCanManage) {
     redirect(detailPath(id, "forbidden"));
   }
   if (!title) {
@@ -179,7 +179,7 @@ export async function renameProjectSection(formData: FormData) {
   const sectionId = cleanText(formData.get("sectionId"));
   const title = cleanText(formData.get("title"));
   const { project } = await requireProject(id);
-  if (!project.viewerIsOwner) {
+  if (!project.viewerCanManage) {
     redirect(detailPath(id, "forbidden"));
   }
   if (!title || !project.sections.some((s) => s.id === sectionId)) {
@@ -198,7 +198,7 @@ export async function deleteProjectSection(formData: FormData) {
   const id = cleanText(formData.get("projectId"));
   const sectionId = cleanText(formData.get("sectionId"));
   const { project } = await requireProject(id);
-  if (!project.viewerIsOwner || !project.sections.some((s) => s.id === sectionId)) {
+  if (!project.viewerCanManage || !project.sections.some((s) => s.id === sectionId)) {
     redirect(detailPath(id, "forbidden"));
   }
   const supabase = getSupabaseServiceClient();
@@ -225,7 +225,7 @@ export async function reorderProjectSections(projectId: string, orderedIds: stri
   const id = String(projectId ?? "").trim();
   if (!id) return;
   const { project } = await requireProject(id);
-  if (!project.viewerIsOwner) return;
+  if (!project.viewerCanManage) return;
   const valid = new Set(project.sections.map((s) => s.id));
   const ids = Array.from(
     new Set((orderedIds ?? []).map((s) => String(s).trim()).filter((s) => valid.has(s))),
@@ -247,7 +247,7 @@ export async function reorderProjectSections(projectId: string, orderedIds: stri
 export async function inviteProjectMembers(formData: FormData) {
   const id = cleanText(formData.get("projectId"));
   const { session, project } = await requireProject(id);
-  if (!project.viewerIsOwner) {
+  if (!project.viewerCanManage) {
     redirect(detailPath(id, "forbidden"));
   }
   const existing = new Set(project.members.map((m) => m.userId));
@@ -290,7 +290,7 @@ export async function removeProjectMember(formData: FormData) {
   const id = cleanText(formData.get("projectId"));
   const targetUserId = cleanText(formData.get("userId"));
   const { project } = await requireProject(id);
-  if (!project.viewerIsOwner) {
+  if (!project.viewerCanManage) {
     redirect(detailPath(id, "forbidden"));
   }
   // The owner / creator is never removable via this path.

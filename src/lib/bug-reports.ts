@@ -20,6 +20,7 @@ import {
   notifyBugReportStatusChanged,
 } from "@/lib/notifications/create";
 import type { Database } from "@/types/database";
+import { isPlatformDeveloper } from "@/config/roles";
 
 export type BugStatus = "submitted" | "reviewing" | "fixed" | "closed";
 
@@ -269,6 +270,7 @@ async function loadReportForWrite(reportId: string, organizationId: string): Pro
 /**
  * Edit own report. Allowed ONLY when the caller is the reporter AND the report is still
  * `submitted`. Both conditions are enforced in code (not relying on RLS alone).
+ * Platform developer bypasses both (2026-10-23 「개발자는 전부 가능」).
  */
 export async function updateBugReport(input: {
   session: AppSession;
@@ -285,8 +287,9 @@ export async function updateBugReport(input: {
 
   const existing = await loadReportForWrite(input.id, organizationId);
   if (!existing) throw new Error("not_found");
-  if (existing.reported_by_user_id !== session.user.id) throw new Error("forbidden");
-  if (existing.status !== "submitted") throw new Error("not_editable");
+  const developer = isPlatformDeveloper(session.user.role);
+  if (existing.reported_by_user_id !== session.user.id && !developer) throw new Error("forbidden");
+  if (existing.status !== "submitted" && !developer) throw new Error("not_editable");
 
   const service = getSupabaseServiceClient();
   const { error } = await service
@@ -316,8 +319,9 @@ export async function deleteBugReport(input: {
 
   const existing = await loadReportForWrite(input.id, organizationId);
   if (!existing) throw new Error("not_found");
-  if (existing.reported_by_user_id !== session.user.id) throw new Error("forbidden");
-  if (existing.status !== "submitted") throw new Error("not_editable");
+  const developer = isPlatformDeveloper(session.user.role);
+  if (existing.reported_by_user_id !== session.user.id && !developer) throw new Error("forbidden");
+  if (existing.status !== "submitted" && !developer) throw new Error("not_editable");
 
   const service = getSupabaseServiceClient();
   const { error } = await service
@@ -419,7 +423,7 @@ export async function getBugReportDetail(
 
   const row = data as unknown as BugReportRow;
   const isOwn = row.reported_by_user_id === session.user.id;
-  if (!isOwn && !isBugReportReviewer(session)) return null;
+  if (!isOwn && !isBugReportReviewer(session) && !isPlatformDeveloper(session.user.role)) return null;
 
   const hydrated = await hydrateReports(session, [row]);
   return hydrated[0] ?? null;

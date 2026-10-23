@@ -90,7 +90,7 @@ export type PsAction = "fixDay" | "openDay" | "addDay" | "accept" | "reject" | "
 export function psActions(kind: PsKind, date: string, today: string, pc: boolean): PsAction[] {
   const future = date >= today;
   const out: PsAction[] = [];
-  if (kind === "request") out.push("accept", "reject");
+  if (kind === "request" && future) out.push("accept", "reject");
   if (kind === "waiting" && future) out.push(...(pc ? (["addDay"] as const) : []), "removeApply");
   if (kind === "free" && future) out.push("applyFor");
   if (pc && kind === "assigned") out.push("fixDay");

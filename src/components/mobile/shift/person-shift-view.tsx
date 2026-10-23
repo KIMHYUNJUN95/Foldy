@@ -6,7 +6,7 @@ import { useState, useSyncExternalStore, useTransition } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { resolveCancelRequest, toggleApplicationForUser } from "@/app/admin/cleaning-assign/actions";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
-import { monthTitle } from "@/components/admin/cleaning-assign/format";
+import { dayLabel, monthTitle } from "@/components/admin/cleaning-assign/format";
 import { PersonShiftCalendar, PersonShiftDay, PersonShiftStats, PersonShiftUpcoming, psPersonLine } from "@/components/admin/cleaning-assign/person-shift-parts";
 import type { PsAction } from "@/components/admin/cleaning-assign/person-shift-text";
 import { useBuildingName } from "@/components/shared/building-names";
@@ -130,7 +130,7 @@ export function PersonShiftView({ data, copy, locale, today, basePath }: { data:
       ) : null}
 
       {sheet && selected && !isTablet && !isFold ? (
-        <BottomSheet onClose={() => setSheet(false)} ariaLabel={selected}>
+        <BottomSheet onClose={() => setSheet(false)} ariaLabel={dayLabel(selected, locale)}>
           <div className="shf-sheet psv-sheet">{day(selected)}</div>
         </BottomSheet>
       ) : null}

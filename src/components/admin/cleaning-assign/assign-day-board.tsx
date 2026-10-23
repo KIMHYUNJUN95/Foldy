@@ -130,10 +130,12 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     return () => window.clearInterval(id);
   }, [router, pending]);
 
+  // Esc 는 맨 위 것만 닫는다 — 창 · 작은 창 · 메뉴가 열려 있으면 그것만 닫고, 고른 사람(넣기 모드)은 그대로 둔다(2026-10-23).
+  const overlayOpen = Boolean(overfill || seatFor || menuRoom || deferRoom || addOpen || buildingPicker || roomSwap || swapPair);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setPickId(null);
+      if (!overlayOpen) setPickId(null);
       setMenuRoom(null);
       setDeferRoom(null);
       setSwapMode(false);
@@ -145,7 +147,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [overlayOpen]);
 
   function run(task: () => Promise<{ ok: true } | AssignFail>, success?: string) {
     startTransition(async () => {

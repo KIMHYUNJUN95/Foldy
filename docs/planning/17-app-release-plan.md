@@ -185,6 +185,144 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 
 ---
 
+## 스토어 개인정보 신고 — 재류카드(2026-10-23)
+
+> 재류카드 R2(`docs/product/41-residence-card-workflow.md` §10)로 **신분 서류 사진 · 카드 칸**을 새로 모으고, 동의한 사람만 사진을
+> **Anthropic(미국) Claude API** 로 보내 글자를 읽는다. 이 절은 C6(개인정보 신고) 답안의 **추가분**이다 — 확정되면 `18-store-review-kit.md` §2~4,
+> `ios/App/App/PrivacyInfo.xcprivacy`, `src/lib/legal-content.ts` 를 같이 고친다(이 절을 쓴 시점에는 **아무것도 고치지 않음** — 사용자 승인 대기).
+> 조사일 2026-10-23. 근거 URL 은 각 줄에 붙였다. 확인하지 못한 것은 「확인 필요」로 적었다.
+
+### 0. 사실관계 (우리 쪽 구현 기준)
+
+| 항목 | 값 | 근거 |
+| --- | --- | --- |
+| 모으는 것 | 재류카드 앞 · 뒤 사진(일본 국적은 마이넘버 카드 **앞면만** — 12자리 개인번호는 받지 않음, 보이면 사진 삭제 후 다시 찍게 함) + 칸: 로마자 이름 · 생년월일 · 성별 · 국적 · **주소(住居地)** · 카드 번호 · 재류자격 · 만료일 · 취로 제한 · 자격외활동 · 읽은 값(`ocr_values`) · 고친 칸 | `staff_id_documents`(마이그레이션 `202610230001`) · `src/lib/staff-documents/fields.ts` |
+| 원본 저장 | Supabase 비공개 버킷 `staff-documents` — **도쿄(`ap-northeast-1`)**. 앱 서버(Vercel 함수)도 도쿄 `hnd1` | `docs/engineering/06-implementation-plan.md`(Tokyo region) · `vercel.json` `regions: ["hnd1"]` · `docs/product/15-reservation-calendar.md` |
+| 해외로 가는 것 | **동의(기본 꺼짐)한 경우에만** 사진을 Anthropic API 로 보냄. 동의 안 하면 사진만 저장 · 직접 입력 | `src/lib/staff-documents/ocr.ts` · `id-card-flow.tsx` |
+| Anthropic 보관 | API 입력 · 출력은 **30일 안에 자동 삭제**. 단 안전 분류기에 걸리면 **최대 2년**(분류 점수 최대 7년), 법적 의무가 있으면 그 기간 | [Anthropic — How long do you store my organization's data](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data) · [API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) |
+| 학습 사용 | 상용 약관: 「Anthropic may not train models on Customer Content from Services」 · API 문서: 「Retained data is never used for model training without your express permission」 | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) · [API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) |
+| Anthropic 의 지위 | Claude API 에서 Anthropic 은 **데이터 처리자(data processor)** — DPA(데이터 처리 부속서)가 상용 약관에 편입 | 위 두 문서 |
+| 보는 사람 | 본인 + `staff_documents.view`(기본 대표 · 전무). 서버 · RLS 에서 막음 | 41 §4 · §10 |
+| 보관 | 퇴사 후 3년 뒤 하드 삭제(R4 에서 자동 정리 — 아직 미구현) | 41 §6 |
+
+#### 0-1. 신고 전에 고쳐야 할 것 (조사 중 발견 — 코드 안 고침, 사용자 결정 필요)
+
+1. **「미국」이라는 동의 문구와 실제 처리 위치가 다를 수 있다.** Claude API 의 `inference_geo` 기본값은 `"global"`(「Inference may run in any available
+   geography」)이고, 미국 안으로 고정하려면 `inference_geo: "us"`(요금 1.1배) 또는 워크스페이스 `default_inference_geo`/`allowed_inference_geos` 를 `us` 로 둬야 한다.
+   저장(at rest)은 지금 `us` 하나뿐이다. `ocr.ts` 는 `inference_geo` 를 넘기지 않는다 → **추천: `inference_geo: "us"` 를 넣거나 콘솔에서 워크스페이스를 US 로 고정**.
+   (서버 쪽 대체 모델 `fallbacks: "default"` 에도 같은 지역 제한이 걸리는지는 **확인 필요**.) 근거: [Data residency](https://platform.claude.com/docs/en/manage-claude/data-residency).
+2. **동의 「자세히 보기」의 「최대 30일」은 예외를 빠뜨렸다** — 안전 분류기에 걸린 요청은 최대 2년. 방침 본문(아래 §4)에는 예외까지 적고, 화면 문구는
+   「보통 30일 안에 지워요(예외는 개인정보처리방침)」 정도로 맞추기를 추천.
+3. **계정 삭제가 신분 서류를 지우지 않는다.** `deleteAccount`(`src/app/account/actions.ts`)는 프로필을 묘비 처리(이름 · 전화 · 사진 · 생년월일 비움)하고
+   행은 남기므로 `staff_id_documents` 의 `on delete cascade` 가 돌지 않는다 — **카드 사진(버킷) · 카드 칸 · `name_ko`/`name_ja`/`name_katakana`/`nationality` 가 남는다**.
+   Google Play 는 계정 삭제 때 「계정에 연결된 사용자 데이터」를 지우거나, 보안 · 규제 이유로 남기는 것은 방침에 밝히라고 요구한다
+   ([Play 사용자 데이터 정책](https://support.google.com/googleplay/android-developer/answer/10144311)). 결정할 것:
+   (가) 계정 삭제 = 서류도 즉시 삭제, 또는 (나) 「퇴사 후 3년」 보관을 유지하되 방침에 「고용 관련 법정 확인 기록으로 최대 3년 보관 후 삭제」라고 명시.
+   **추천: (나) + 보관 중엔 서류 담당자만 열람 · R4 자동 삭제 구현 전에는 출시 신고에 (나)라고 쓰지 않는다**(지키지 못하는 약속이 되므로).
+4. **APPI 28조 2항 정보 제공**: 동의를 받을 때 ①나라 이름 ②그 나라 개인정보 보호 제도 ③받는 쪽의 보호 조치를 본인에게 알려야 한다. 지금 동의 화면은 「미국」만 있다 →
+   「자세히 보기」에 방침 §4 링크(아래 문안)를 붙이면 된다(문구 ko/ja/en 추가 필요 — 코드 작업).
+
+### 1. App Store 「앱 개인정보」 (App Store Connect → 앱 개인정보) — 추가 · 변경분
+
+현재 Apple 의 분류(16 범주 · 35 유형, [App privacy details](https://developer.apple.com/app-store/app-privacy-details/)) 기준. **추적: 아니요(그대로)**.
+모든 새 항목: **사용자에게 연결됨(Linked)** · 목적 **앱 기능(App Functionality)** 하나(Apple 정의에 「authenticate the user … prevent fraud, implement security
+measures」 포함 — 고용 자격 확인이 여기 들어간다).
+
+| Apple 범주 → 유형 | 지금 신고 | 재류카드로 바뀌는 것 |
+| --- | --- | --- |
+| 연락처 정보 → 이름 | 있음 | 그대로(로마자 · 가타카나 이름도 「이름」) |
+| 연락처 정보 → **실제 주소(Physical Address)** | **없음** | **새로 추가** — 카드의 住居地를 칸으로 저장(`staff_id_documents.address`) |
+| 사용자 콘텐츠 → 사진 또는 비디오 | 있음 | 그대로 — 카드 사진도 이 유형. Apple: 「if you have a feature that enables users to upload … photos … you'll need to disclose」 |
+| 기타 데이터 → 기타 데이터 유형 | 있음(생년월일 · 성별 · 근태 …) | 근거 설명에 **국적 · 재류자격 · 카드 번호 · 만료일 · 취로 제한 · 자격외활동**을 더함 |
+| 민감한 정보(Sensitive Info) | 없음 | **추천: 신고 안 함.** Apple 정의는 「racial or ethnic data, sexual orientation, … religious …, biometric data」 — 국적은 인종 · 민족이 아니고, 카드 얼굴 사진은 **생체 인식 처리(얼굴 대조)를 하지 않는다**. 나중에 NFC 칩 얼굴 사진으로 **얼굴 대조**를 하면 다시 판단(42 문서 §6) |
+| 식별자 / 진단 / 위치 | 있음 | 변화 없음 |
+
+- **Anthropic 은 「제3자 파트너」 신고 대상이 아니라 우리 수집의 일부로 신고된다.** Apple 의 「third-party partners」 = 「analytics tools, advertising networks,
+  third-party SDKs, or other external vendors **whose code you've added to your app**」. Anthropic 호출은 우리 서버에서 하므로 앱 안 SDK 가 아니다 —
+  라벨은 「우리가 모으는 데이터」로 위 표에 이미 들어간다. 추적(데이터 브로커 · 광고)이 아니므로 「추적」도 아니요.
+- **선택 신고(optional disclosure) 예외는 해당 없음** — 신분 서류 등록은 앱의 업무 기능(고용 확인)의 일부이고 「infrequent … not part of primary functionality」 조건을 다 채우지 않는다. 신고한다.
+- `PrivacyInfo.xcprivacy`: `NSPrivacyCollectedDataTypePhysicalAddress`(Linked · 추적 아님 · AppFunctionality) 추가 필요 — **코드 작업, 승인 후**.
+
+### 2. Google Play 「데이터 보안」 — 추가 · 변경분
+
+현재 Play 분류([데이터 보안 양식 도움말](https://support.google.com/googleplay/android-developer/answer/10787469)) 기준. Play 에는 **「신분증(Government ID)」 유형이 따로 없다** —
+개인 정보 → 기타 정보 정의가 「Any other personal information such as date of birth, gender identity, veteran status, etc.」 라서 카드 번호 · 재류자격 · 국적은 여기에 넣는다.
+
+| Play 분류 → 유형 | 수집 / 공유 | 일시 처리? | 필수 / 선택 | 목적 |
+| --- | --- | --- | --- | --- |
+| 개인 정보 → 이름 | 수집 · 공유 안 함 | 아니요 | 필수(그대로) | 앱 기능 · 계정 관리 |
+| 개인 정보 → **주소** | **새로 추가** · 공유 안 함 | 아니요 | **선택**(카드 등록은 「나중에」 가능) | 앱 기능 · **사기 방지 · 보안 · 규정 준수** |
+| 개인 정보 → 기타 정보 | 수집 · 공유 안 함 | 아니요 | 기존 항목은 필수, 카드 칸은 선택 — Play 는 유형 하나에 한 값이므로 **필수**로 둠 | 앱 기능 · 계정 관리 · **사기 방지 · 보안 · 규정 준수**(추가) |
+| 사진 및 동영상 → 사진 | 수집 · 공유 안 함 | 아니요(버킷에 저장) | 선택 | 앱 기능 · **사기 방지 · 보안 · 규정 준수**(추가) |
+
+- **「공유」 아님**: Play 는 「a "service provider" that processes data on the developer's behalf … based on the developer's instructions」 로의 전송을 공유에서 뺀다.
+  Anthropic 은 상용 약관 · DPA 상 처리자이고 우리 지시(글자 읽기)로만 처리한다 → **공유 = 아니요**. 18 §4 의 서비스 제공자 목록에 Anthropic 을 더한다.
+- **전송 중 암호화: 예**(앱 ↔ 서버 HTTPS, 서버 ↔ Supabase · Anthropic HTTPS).
+- **삭제 요청 가능: 예** — 단 위 §0-1 의 3번(계정 삭제가 서류를 안 지움)을 정한 뒤 답한다. 남기는 경우 방침에 사유 · 기간을 적어야 한다(Play 정책).
+- 목적 「사기 방지 · 보안 · 규정 준수(Fraud prevention, security, and compliance)」 은 Play 목적 목록에 있는 값이다 — 외국인 고용 시 재류 자격 확인(입관법)이 「규정 준수」.
+
+### 3. 심사 지침 · 정책에서 특별히 걸리는 것
+
+| 출처 | 내용 | 우리 상태 |
+| --- | --- | --- |
+| Apple 5.1.2(i) | 「You must clearly disclose where personal data will be shared with third parties, **including with third-party AI**, and obtain explicit permission before doing so.」 | **충족** — 동의 체크(기본 꺼짐) 뒤에만 전송, 동의 안 해도 등록 가능. 단 화면에 AI 언급을 뺀 상태(2026-10-23 사용자 결정)라 **방침에는 「글자 인식 AI 서비스(Anthropic)」라고 분명히 적어야** 이 조항을 충족한다(아래 §4) |
+| Apple 5.1.1(i) | 방침에 수집 데이터 · 용도 · 제3자 보호 수준 · 보관/삭제 · 동의 철회 방법 | 방침 추가 필요(§4) |
+| Apple 5.1.1(ii)·(iv) | 동의 철회를 쉽게, 거부해도 대안 | 대안 있음(직접 입력). 철회 = 다음 등록부터 동의 끄기 · 이미 보낸 사진은 Anthropic 에서 30일 안 삭제 — 방침에 적음 |
+| Apple 5.1.1(iii) | 데이터 최소화 · 가능하면 시스템 사진 선택기 | 마이넘버 개인번호 미수집 · 앱 안 카메라 + 앨범 둘 다 |
+| Apple 5.1.1(ix) | 「require sensitive user information」 앱은 개인이 아니라 **법인 명의로 제출** | A2 가 「조직」 가입이라 충족(17 0단계) |
+| Apple 5.1 전체 | **신분증 수집 자체를 금지하거나 별도 서류를 요구하는 조항은 없다**(5.1 원문에 「government」 · 「ID」 단어 없음, 4.8 의 정부 전자 ID 로그인 예외만 있음) | — · 근거 [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
+| Google Play 사용자 데이터 정책 | 개인 · 민감 데이터는 **앱 안에서 눈에 띄는 고지 + 적극적 동의**(탭 · 체크; 뒤로 가기 · 화면 이탈은 동의 아님), 수집 전에. 고지는 방침에만 있으면 안 되고 다른 고지와 묶지 말 것. 「government identification numbers」를 공개적으로 노출하는 것 금지 | 동의 화면이 촬영 **전**에 따로 있음 · 기본 꺼짐 → 충족. Play 권장 형식(「[앱]은 [기능]을 위해 [데이터]를 [언제] 전송합니다」)에 맞춰 「자세히 보기」를 보강하면 더 안전 |
+| Google Play 계정 삭제 | 앱 안 + 웹 링크, 계정에 연결된 데이터 삭제, 남기는 건 방침에 공개 | §0-1 3번 결정 필요 |
+
+- 심사 메모(18 §5)에 한 줄 추가 추천: 「외국인 직원의 재류카드(일본 국적은 마이넘버 카드 앞면 — 개인번호 미수집)를 고용 자격 확인용으로 받습니다. 사진 글자 읽기는
+  사용자가 동의한 경우에만 외부 AI 서비스를 쓰며, 동의하지 않으면 직접 입력합니다. 데모 계정에서 계정 → 재류카드로 확인할 수 있습니다.」
+
+### 4. 개인정보처리방침 추가 문안(안) — **승인 대기, `legal-content.ts` 미반영**
+
+`/legal/privacy`(`src/lib/legal-content.ts` `privacyPolicy`)에 넣을 한국어 원안. 승인되면 ja · en 을 같은 조항 구조로 만들고 `LEGAL_EFFECTIVE_DATE` 를 올린다.
+**공개 출시 전 법무 검토(D1) 대상**이다.
+
+**「2. 수집하는 정보」에 한 줄 추가**
+
+> 신분 확인 서류: 외국 국적 구성원은 재류카드 앞면 · 뒷면 사진과 카드에 적힌 정보(로마자 이름, 생년월일, 성별, 국적 · 지역, 주소, 재류카드 번호, 재류자격,
+> 재류기간 만료일, 취로 제한 여부, 자격외활동 허가)를, 일본 국적 구성원은 마이넘버 카드 **앞면** 사진과 앞면 정보(이름, 생년월일, 성별, 주소)를 받습니다.
+> 마이넘버(개인번호)는 받지 않으며, 사진에 개인번호가 보이면 저장하지 않고 다시 찍도록 안내합니다.
+
+**「3. 이용 목적」에 한 줄 추가**
+
+> 고용 시 취로 자격 확인, 외국인 고용 상황 신고 등 소속 조직의 법령상 확인 업무와 직원 정보 관리
+
+**새 조항 「4-1. 신분 확인 서류와 글자 자동 읽기」**
+
+> 신분 확인 서류 사진은 Foldy 의 비공개 저장소(일본 도쿄 리전)에 저장되며, 본인과 소속 조직에서 서류 열람 권한을 받은 관리자만 볼 수 있습니다.
+> 등록할 때 이용자가 **동의한 경우에만**, 카드의 글자를 자동으로 읽기 위해 사진을 미국의 Anthropic, PBC 가 제공하는 글자 인식 AI 서비스(Claude API)로 보냅니다.
+> 동의하지 않아도 사진만 올리고 정보를 직접 입력해 등록할 수 있습니다. 동의는 등록할 때마다 따로 묻고, 다음 등록에서 동의하지 않는 것으로 언제든 철회할 수 있습니다.
+>
+> - 받는 곳: Anthropic, PBC(미국). 우리 지시에 따라 글자 읽기만 처리하는 처리자이며, 계약상 받은 데이터를 AI 학습에 쓰지 않습니다.
+> - 받는 곳의 보관: 보통 30일 안에 자동 삭제됩니다. 다만 Anthropic 의 안전 점검 시스템이 이용 정책 위반 가능성으로 표시한 경우 최대 2년, 법령상 보관 의무가 있는 경우 그 기간 동안 보관될 수 있습니다.
+> - 이전되는 나라: 미국.
+> - 미국의 개인정보 보호 제도: 미국에는 연방 차원의 포괄적인 개인정보 보호법이 없고 분야별 법률(예: 의료 HIPAA, 금융 GLBA, 통신 ECPA)이 있으며,
+>   Anthropic 의 소재지인 캘리포니아주에는 포괄적인 법률로 캘리포니아 소비자 프라이버시법(CCPA)이 있습니다. 미국은 EU 적정성 결정을 받지 않았고 APEC CBPR 에 참여하고 있습니다.
+>   자세한 내용은 일본 개인정보보호위원회의 「외국의 개인정보 보호 제도 조사(미국)」를 참고하세요: https://www.ppc.go.jp/enforcement/infoprovision/laws/offshore_report_america/
+> - 받는 곳의 보호 조치: 데이터 처리 계약(DPA)에 따른 처리, 전송 · 저장 암호화, 접근 통제 등. 〔확인 필요: Anthropic Trust Center(https://trust.anthropic.com)에서 보유 인증(SOC 2 Type II · ISO 27001 등)을 확인해 이름을 적을지 결정〕
+>
+> 보관 기간: 재직 중에는 현재 서류와 이전 서류(갱신 이력)를 보관하고, 퇴사 후 3년이 지나면 사진과 정보를 삭제합니다.
+> 〔§0-1 3번 결정에 따라 「계정을 삭제해도 소속 조직의 고용 확인 기록으로 퇴사 후 3년까지 보관한 뒤 삭제합니다」를 넣거나 「계정 삭제 시 함께 삭제합니다」로 바꿈〕
+
+**「5. 외부 처리자와 국외 이전」 목록에 한 줄 추가**
+
+> Anthropic — 신분 확인 서류 사진의 글자 읽기(이용자가 동의한 경우에만, 미국)
+
+**「6. 보관과 파기」에 문장 추가**(§0-1 3번 (나)를 고른 경우)
+
+> 신분 확인 서류는 위 4-1 의 기간에 따라 별도로 보관 · 삭제됩니다.
+
+- 근거: APPI 28조 2항 · 시행규칙 17조 2항(나라 이름 · 제도 정보 · 받는 쪽 조치) — 개인정보보호위원회는 위 미국 조사(2021년 10월 시점)를 참고 자료로 공개하면서
+  「外国における個人情報の保護に関する制度の確認は、外国にある第三者に対して個人データを提供する事業者の責任において行うべき」라고 적었다 → 출시 전 법무 검토 때 최신 여부 확인.
+- 출입국재류관리청 공개 페이지도 「IC 칩에서 읽은 정보를 저장하면 개인정보보호법에 따라 이용 목적을 통지 · 공표해야 한다」는 취지를 적고 있다 — NFC(42 문서)를 붙이면 이 조항에 칩 정보를 더한다.
+
+---
+
 ## 작업 기록
 
 | 날짜 | 커밋 | 무엇 |
@@ -235,3 +373,4 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | 2026-10-20 | (이 커밋) | N12 Android 예측 뒤로가기 → 같은 스와이프 엔진(`PredictiveBackPlugin`, App 뒤로 처리 끔) · 디버그 APK 컴파일 확인 — **새 앱 빌드 필요**, 실기기 미확인 |
 | 2026-10-21 | (이 커밋) | iOS `Info.plist` `CADisableMinimumFrameDurationOnPhone` — ProMotion 아이폰에서 앱 애니메이션 120Hz(새 앱 빌드부터) · 스와이프 판 `transform` |
 | 2026-10-22 | (이 커밋) | N6 오프라인 화면이 다시 안 살아나던 진짜 원인(React 미기동) → 맨 스크립트 · 기기 언어 · 다시 시도 · D2 앱 안 오프라인 표시 · 스와이프 판 모서리 아이폰 기종별 |
+| 2026-10-23 | (이 커밋) | C6 추가분 — 재류카드 스토어 개인정보 신고 답안 · 방침 추가 문안(승인 대기) · 신고 전 고칠 것 3개 · NFC 칩 확인 설계(42) |

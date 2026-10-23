@@ -343,6 +343,60 @@ export type CleaningAssignCopy = {
   emptyBodyWaiting: string;
   emptyBodyFree: string;
   goMyShift: string;
+  // ── 사람별 시프트 달력(관리자, 2026-10-23) ──
+  psOpen: string;
+  psClose: string;
+  psPrevPerson: string;
+  psNextPerson: string;
+  psStatApplied: string;
+  psStatAssigned: string;
+  psStatRooms: string;
+  psStatWorked: string;
+  psUnitDay: string;
+  psUnitRoom: string;
+  psBaseStart: string;
+  psSameMonth: string;
+  psUpcoming: string;
+  psUpcomingEmpty: string;
+  psStWorked: string;
+  psStNoRecord: string;
+  psStNone: string;
+  psStAssigned: string;
+  psStReq: string;
+  psStWaiting: string;
+  psStFree: string;
+  psHeadRooms: string;
+  psHeadNoRecord: string;
+  psSubNoRecord: string;
+  psHeadNonePast: string;
+  psHeadNone: string;
+  psHeadWaiting: string;
+  psSubWaiting: string;
+  psHeadFree: string;
+  psSubFree: string;
+  psHeadPast: string;
+  psAssignedBy: string;
+  psByAdmin: string;
+  psReqAt: string;
+  psRoomTime: string;
+  psRoomMinutes: string;
+  psRoomStarted: string;
+  psRoomNotStarted: string;
+  psNotStartedTag: string;
+  psOpenDay: string;
+  psFixDay: string;
+  psAddDay: string;
+  psAccept: string;
+  psReject: string;
+  psApplyFor: string;
+  psRemoveApply: string;
+  psCall: string;
+  psLegend: string;
+  psSection: string;
+  psRowTitle: string;
+  psRowNext: string;
+  psRowNoNext: string;
+  psDone: string;
 };
 
 const ko: CleaningAssignCopy = {
@@ -501,7 +555,7 @@ const ko: CleaningAssignCopy = {
   legendApplied: "신청만 함",
   legendAssigned: "배정 · 방 수",
   legendSuggested: "제안 (반영 전)",
-  legendHint: "날짜를 누르면 그날 하루 보기 · 칸을 누르면 신청 넣기/빼기",
+  legendHint: "날짜를 누르면 그날 하루 보기 · 칸을 누르면 신청 넣기/빼기 · 이름을 누르면 그 사람 달력",
   sumRooms: "청소 방 (예약 기준)",
   sumApplied: "신청",
   sumOpen: "미배정 방",
@@ -671,7 +725,59 @@ const ko: CleaningAssignCopy = {
   emptyBodyNone: "신청하신 날이지만 그날 방이 모두 배정됐어요. 나오지 않아도 돼요.",
   emptyBodyWaiting: "신청하셨어요. 아직 방을 나누는 중이에요.",
   emptyBodyFree: "오늘은 신청하지 않은 날이에요.",
-  goMyShift: "내 시프트 보기",
+  goMyShift: "내 시프트 보기",  psOpen: "{name} 시프트 달력 열기",
+  psClose: "닫기",
+  psPrevPerson: "위 사람",
+  psNextPerson: "아래 사람",
+  psStatApplied: "신청",
+  psStatAssigned: "배정",
+  psStatRooms: "배정 방",
+  psStatWorked: "일한 날",
+  psUnitDay: "일",
+  psUnitRoom: "개",
+  psBaseStart: "기본 출근 {time}",
+  psSameMonth: "보드와 같은 달",
+  psUpcoming: "다가오는 일정 · 날짜를 누르면 그날 방",
+  psUpcomingEmpty: "앞으로 신청한 날이 없어요",
+  psStWorked: "일함",
+  psStNoRecord: "기록 없음",
+  psStNone: "배정 없음",
+  psStAssigned: "배정됨",
+  psStReq: "취소 요청",
+  psStWaiting: "신청 · 배정 전",
+  psStFree: "신청 안 함",
+  psHeadRooms: "{time} 출근 · 방 {n}개",
+  psHeadNoRecord: "배정 {n}방 · 청소 기록 없음",
+  psSubNoRecord: "그날 이 사람 청소 기록이 없어요. 다른 사람이 했는지, 안 나왔는지 확인해 주세요.",
+  psHeadNonePast: "신청했지만 방이 없었어요",
+  psHeadNone: "그날은 더 넣을 방이 없어요",
+  psHeadWaiting: "아직 방이 없어요",
+  psSubWaiting: "그날 미배정 방 {n}개",
+  psHeadFree: "신청하지 않은 날",
+  psSubFree: "급하면 대신 신청해 넣을 수 있어요",
+  psHeadPast: "쉬는 날이었어요",
+  psAssignedBy: "{name} 님이 배정 · {at}",
+  psByAdmin: "관리자가 넣음",
+  psReqAt: "{at}에 이 날 취소를 요청했어요",
+  psRoomTime: "{start} ~ {end}",
+  psRoomMinutes: "{n}분",
+  psRoomStarted: "{start} 시작 · 아직 안 끝남",
+  psRoomNotStarted: "시작 안 함",
+  psNotStartedTag: "미시작",
+  psOpenDay: "하루 보기에서 열기",
+  psFixDay: "하루 보기에서 고치기",
+  psAddDay: "하루 보기에서 넣기",
+  psAccept: "받아 주기",
+  psReject: "돌려보내기",
+  psApplyFor: "대신 신청",
+  psRemoveApply: "신청 빼기",
+  psCall: "전화하기",
+  psLegend: "채운 원은 배정(방 수), 빈 원은 신청 · 배정 전, 회색 원은 일한 날, 주황은 확인할 날(기록 없음 · 취소 요청)이에요. 이 사람이 「내 시프트」에서 보는 달력과 같은 모양이에요.",
+  psSection: "시프트",
+  psRowTitle: "{mon} 신청 {a}일 · 배정 {b}일",
+  psRowNext: "다음 근무 {rel} {time} · 방 {n}개",
+  psRowNoNext: "앞으로 배정된 날이 없어요",
+  psDone: "처리했어요",
 };
 
 const ja: CleaningAssignCopy = {
@@ -830,7 +936,7 @@ const ja: CleaningAssignCopy = {
   legendApplied: "申請のみ",
   legendAssigned: "割り当て · 部屋数",
   legendSuggested: "提案（反映前）",
-  legendHint: "日付を押すとその日の画面 · マスを押すと申請の追加/削除",
+  legendHint: "日付を押すとその日の画面 · マスを押すと申請の追加/削除 · 名前を押すとその人のカレンダー",
   sumRooms: "清掃部屋（予約基準）",
   sumApplied: "申請",
   sumOpen: "未割り当て部屋",
@@ -1000,7 +1106,59 @@ const ja: CleaningAssignCopy = {
   emptyBodyNone: "申請した日ですが、その日の部屋はすべて割り当て済みです。出勤しなくて大丈夫です。",
   emptyBodyWaiting: "申請済みです。まだ部屋を割り振っています。",
   emptyBodyFree: "今日は申請していない日です。",
-  goMyShift: "マイシフトを見る",
+  goMyShift: "マイシフトを見る",  psOpen: "{name}のシフトカレンダーを開く",
+  psClose: "閉じる",
+  psPrevPerson: "前の人",
+  psNextPerson: "次の人",
+  psStatApplied: "申請",
+  psStatAssigned: "割り当て",
+  psStatRooms: "割り当て部屋",
+  psStatWorked: "勤務日",
+  psUnitDay: "日",
+  psUnitRoom: "室",
+  psBaseStart: "基本出勤 {time}",
+  psSameMonth: "ボードと同じ月",
+  psUpcoming: "今後の予定 · 日付を押すとその日の部屋",
+  psUpcomingEmpty: "今後の申請はありません",
+  psStWorked: "勤務",
+  psStNoRecord: "記録なし",
+  psStNone: "割り当てなし",
+  psStAssigned: "割り当て済み",
+  psStReq: "キャンセル依頼",
+  psStWaiting: "申請 · 割り当て前",
+  psStFree: "申請なし",
+  psHeadRooms: "{time} 出勤 · {n}室",
+  psHeadNoRecord: "割り当て {n}室 · 清掃記録なし",
+  psSubNoRecord: "この日、この人の清掃記録がありません。ほかの人が担当したか、出勤しなかったか確認してください。",
+  psHeadNonePast: "申請しましたが部屋がありませんでした",
+  psHeadNone: "この日は割り当てる部屋がありません",
+  psHeadWaiting: "まだ部屋がありません",
+  psSubWaiting: "この日の未割り当て {n}室",
+  psHeadFree: "申請していない日",
+  psSubFree: "急ぎの時は代わりに申請できます",
+  psHeadPast: "休みでした",
+  psAssignedBy: "{name}さんが割り当て · {at}",
+  psByAdmin: "管理者が追加",
+  psReqAt: "{at}にこの日のキャンセルを依頼しました",
+  psRoomTime: "{start} ~ {end}",
+  psRoomMinutes: "{n}分",
+  psRoomStarted: "{start} 開始 · 未完了",
+  psRoomNotStarted: "未開始",
+  psNotStartedTag: "未開始",
+  psOpenDay: "日の画面で開く",
+  psFixDay: "日の画面で直す",
+  psAddDay: "日の画面で割り当て",
+  psAccept: "承認",
+  psReject: "差し戻し",
+  psApplyFor: "代わりに申請",
+  psRemoveApply: "申請を外す",
+  psCall: "電話する",
+  psLegend: "塗りつぶしの円は割り当て(部屋数)、白い円は申請 · 割り当て前、グレーの円は勤務した日、オレンジは確認が必要な日(記録なし · キャンセル依頼)です。この人が「マイシフト」で見るカレンダーと同じ形です。",
+  psSection: "シフト",
+  psRowTitle: "{mon} 申請 {a}日 · 割り当て {b}日",
+  psRowNext: "次の勤務 {rel} {time} · {n}室",
+  psRowNoNext: "今後の割り当てはありません",
+  psDone: "処理しました",
 };
 
 const en: CleaningAssignCopy = {
@@ -1159,7 +1317,7 @@ const en: CleaningAssignCopy = {
   legendApplied: "Applied only",
   legendAssigned: "Assigned · rooms",
   legendSuggested: "Suggested (not saved)",
-  legendHint: "Click a date for that day · click a cell to add or remove an application",
+  legendHint: "Click a date for that day · click a cell to add or remove an application · click a name for their calendar",
   sumRooms: "Rooms (from bookings)",
   sumApplied: "Applied",
   sumOpen: "Unassigned rooms",
@@ -1329,7 +1487,59 @@ const en: CleaningAssignCopy = {
   emptyBodyNone: "You applied, but all rooms that day are assigned. You don't need to come in.",
   emptyBodyWaiting: "You applied. Rooms are still being assigned.",
   emptyBodyFree: "You didn't apply for today.",
-  goMyShift: "View my shifts",
+  goMyShift: "View my shifts",  psOpen: "Open {name}'s shift calendar",
+  psClose: "Close",
+  psPrevPerson: "Previous person",
+  psNextPerson: "Next person",
+  psStatApplied: "Applied",
+  psStatAssigned: "Assigned",
+  psStatRooms: "Rooms",
+  psStatWorked: "Worked",
+  psUnitDay: " days",
+  psUnitRoom: " rooms",
+  psBaseStart: "Usually starts {time}",
+  psSameMonth: "Same month as the board",
+  psUpcoming: "Coming up · tap a date for that day's rooms",
+  psUpcomingEmpty: "No upcoming applications",
+  psStWorked: "Worked",
+  psStNoRecord: "No record",
+  psStNone: "Not assigned",
+  psStAssigned: "Assigned",
+  psStReq: "Cancel request",
+  psStWaiting: "Applied · not assigned yet",
+  psStFree: "Didn't apply",
+  psHeadRooms: "Starts {time} · {n} rooms",
+  psHeadNoRecord: "{n} rooms assigned · no cleaning record",
+  psSubNoRecord: "There's no cleaning record from this person that day. Check whether someone else cleaned or they didn't come in.",
+  psHeadNonePast: "Applied, but there were no rooms",
+  psHeadNone: "No rooms left to assign that day",
+  psHeadWaiting: "No rooms yet",
+  psSubWaiting: "{n} rooms unassigned that day",
+  psHeadFree: "Didn't apply for this day",
+  psSubFree: "You can apply on their behalf if needed",
+  psHeadPast: "Day off",
+  psAssignedBy: "Assigned by {name} · {at}",
+  psByAdmin: "Added by an admin",
+  psReqAt: "Asked to cancel this day at {at}",
+  psRoomTime: "{start} – {end}",
+  psRoomMinutes: "{n} min",
+  psRoomStarted: "Started {start} · not finished",
+  psRoomNotStarted: "Not started",
+  psNotStartedTag: "Not started",
+  psOpenDay: "Open in day view",
+  psFixDay: "Edit in day view",
+  psAddDay: "Assign in day view",
+  psAccept: "Accept",
+  psReject: "Decline",
+  psApplyFor: "Apply for them",
+  psRemoveApply: "Remove application",
+  psCall: "Call",
+  psLegend: "Filled circles are assigned days (room count), outlined circles are applied but not assigned yet, grey circles are days worked, and orange marks days to check (no record · cancel request). It's the same calendar this person sees in My shifts.",
+  psSection: "Shifts",
+  psRowTitle: "{mon}: applied {a} · assigned {b}",
+  psRowNext: "Next shift {rel} {time} · {n} rooms",
+  psRowNoNext: "No upcoming assigned days",
+  psDone: "Done",
 };
 
 const COPY: Record<Locale, CleaningAssignCopy> = { en, ja, ko };

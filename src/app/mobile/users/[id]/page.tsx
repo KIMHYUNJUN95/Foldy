@@ -1,6 +1,13 @@
 import { notFound } from "next/navigation";
 import { MobileMemberDetail } from "@/components/mobile/users/mobile-member-detail";
+import { MemberShiftRow } from "@/components/mobile/shift/member-shift-row";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { getCleaningOperatingDateKey } from "@/lib/cleaning";
+import { getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { monthOf } from "@/lib/cleaning-assign/day-state";
+import { loadPersonShift } from "@/lib/cleaning-assign/person-shift";
+import { hasOrganizationContext } from "@/lib/session";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { loadMemberPanel, loadUserDirectory } from "@/lib/user-management-data";
@@ -18,9 +25,22 @@ export default async function MobileMemberPage({ params }: { params: Promise<{ i
   const [panel, navBadges] = await Promise.all([loadMemberPanel(session, directory, id), navBadgesPromise]);
   if (!panel) notFound();
   const locale = session.user.preferredLanguage;
+  // 「시프트」 줄 — 배정 권한이 있고 이 사람이 현장 인원이면(docs/product/37 「4-6」). 같은 조직 사람만.
+  const userId = directory.memberships.find((membership) => membership.id === id)?.user_id ?? null;
+  const today = getCleaningOperatingDateKey();
+  const shift =
+    userId && hasOrganizationContext(session) && session.capabilities.includes("cleaning.assign")
+      ? await loadPersonShift(getSupabaseServiceClient(), session.organization.id, userId, monthOf(today), today, session.user.id).catch(() => null)
+      : null;
   return (
     <MobileShell activeItem="users" badges={navBadges} title={getDictionary(locale).admin.users.console.mDetailTitle}>
-      <MobileMemberDetail key={panel.member.membershipId} panel={panel} locale={locale} actorRole={session.user.role} />
+      <MobileMemberDetail
+        key={panel.member.membershipId}
+        panel={panel}
+        locale={locale}
+        actorRole={session.user.role}
+        shiftSlot={shift ? <MemberShiftRow data={shift} copy={getCleaningAssignCopy(locale)} today={today} href={`/mobile/users/${id}/shift`} locale={locale} /> : null}
+      />
     </MobileShell>
   );
 }

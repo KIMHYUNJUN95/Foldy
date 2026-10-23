@@ -48,7 +48,7 @@ export default async function AdminCleaningAssignPage({
     return (
       <AdminShell activeItem="cleaning-assign" title={copy.title}>
         <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={organizationId} />
-        <AssignMonthBoard board={board} copy={copy} locale={locale} today={today} shared={shared} canCompare={canCompare} />
+        <AssignMonthBoard board={board} copy={copy} locale={locale} today={today} shared={shared} canCompare={canCompare} buildingLabels={buildingLabels} />
       </AdminShell>
     );
   }

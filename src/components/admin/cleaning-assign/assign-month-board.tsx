@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { applyMonthSuggestions, previewMonthSuggestions, toggleApplicationForUser } from "@/app/admin/cleaning-assign/actions";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
@@ -10,6 +10,7 @@ import type { Dictionary } from "@/lib/i18n";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { MonthBoard } from "@/lib/cleaning-assign/data";
 import { haptic } from "@/lib/haptics";
+import { AssignPersonPanel } from "./assign-person-panel";
 import { monthName, shortDate, weekdayShort } from "./format";
 import "./cleaning-assign.css";
 
@@ -17,6 +18,7 @@ import "./cleaning-assign.css";
  * 청소 배정 — 월 보기(PC). 시안 「④ 배정 월 보기」. 날짜 × 사람 표: 점 = 신청만 · 옅은 보라 숫자 = 배정(방 수) · 보라 테두리 = 제안(반영 전).
  * 위 세 줄 = 청소 방(예약 기준) · 신청 · 미배정 방. 「N월 자동 제안」 → 미리 보기 → 반영(미배정 방만 채움 — 이미 배정된 방은 그대로).
  * 칸을 누르면 신청 넣기/빼기(배정 있는 칸은 하루 보기에서), 날짜를 누르면 그날 하루 보기.
+ * 이름을 누르면 오른쪽에 그 사람 시프트 달력(`AssignPersonPanel`, 2026-10-23 · 「4-6」) — 그 줄 · 고른 날 열이 옅은 보라.
  * docs/product/37-cleaning-shift-assignment.md 「4-2」
  */
 
@@ -31,6 +33,7 @@ export function AssignMonthBoard({
   today,
   shared,
   canCompare,
+  buildingLabels,
 }: {
   board: MonthBoard;
   copy: CleaningAssignCopy;
@@ -38,14 +41,32 @@ export function AssignMonthBoard({
   today: string;
   shared: Shared;
   canCompare: boolean;
+  buildingLabels: Record<string, string>;
 }) {
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [pending, startTransition] = useTransition();
   const [preview, setPreview] = useState<Preview | null>(null);
   const [limit, setLimit] = useState(30);
+  const [personId, setPersonId] = useState<string | null>(null);
+  const [panelDate, setPanelDate] = useState<string | null>(null);
   const mon = monthName(board.ym, locale);
   const people = board.people;
+
+  const closePanel = useCallback(() => {
+    setPersonId(null);
+    setPanelDate(null);
+  }, []);
+  const stepPerson = useCallback(
+    (dir: -1 | 1) => {
+      const visible = people.slice(0, limit);
+      if (visible.length === 0) return;
+      const index = visible.findIndex((p) => p.userId === personId);
+      setPersonId(visible[(index + dir + visible.length) % visible.length].userId);
+      setPanelDate(null);
+    },
+    [people, limit, personId],
+  );
 
   const columns = useMemo(() => `168px repeat(${board.days.length}, minmax(0, 1fr))`, [board.days.length]);
 
@@ -86,7 +107,7 @@ export function AssignMonthBoard({
   }
 
   return (
-    <div className="cas">
+    <div className={`cas${personId ? " has-panel" : ""}`}>
       <div className="cas-bar">
         <div className="cas-seg" role="tablist" aria-label={copy.title}>
           <Link role="tab" aria-selected="false" href={`/admin/cleaning-assign?date=${board.ym === today.slice(0, 7) ? today : `${board.ym}-01`}`}>
@@ -164,7 +185,7 @@ export function AssignMonthBoard({
           {board.days.map((date) => {
             const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
             return (
-              <Link key={date} role="columnheader" href={`/admin/cleaning-assign?date=${date}`} className={`cas-mday${wd === 0 || wd === 6 ? " is-weekend" : ""}${date === today ? " is-today" : ""}`}>
+              <Link key={date} role="columnheader" href={`/admin/cleaning-assign?date=${date}`} className={`cas-mday${wd === 0 || wd === 6 ? " is-weekend" : ""}${date === today ? " is-today" : ""}${date === panelDate ? " is-picked" : ""}`}>
                 <small>{weekdayShort(date, locale)}</small>
                 <b>{Number(date.slice(8))}</b>
               </Link>
@@ -195,9 +216,20 @@ export function AssignMonthBoard({
           </div>
         ))}
         {people.slice(0, limit).map((person) => (
-          <div key={person.userId} className="cas-mrow" role="row" style={{ gridTemplateColumns: columns }}>
+          <div key={person.userId} className={`cas-mrow${person.userId === personId ? " is-picked" : ""}`} role="row" style={{ gridTemplateColumns: columns }}>
             <span className="cas-mname">
-              <b>{person.name}</b>
+              <button
+                type="button"
+                className="cas-mname__open"
+                aria-label={fill(copy.psOpen, { name: person.name })}
+                aria-pressed={person.userId === personId}
+                onClick={() => {
+                  setPersonId(person.userId === personId ? null : person.userId);
+                  setPanelDate(null);
+                }}
+              >
+                {person.name}
+              </button>
               {person.tag === "fixed" && person.fixedTier ? <small>{fill(copy.tierBadge, { n: person.fixedTier })}</small> : null}
               {person.tag === "priority" ? <small>{copy.prio}</small> : null}
               {person.tag === "trainee" ? <small>{copy.colTrainee}</small> : null}
@@ -221,7 +253,7 @@ export function AssignMonthBoard({
                   key={date}
                   type="button"
                   role="gridcell"
-                  className="cas-mcell"
+                  className={`cas-mcell${date === panelDate ? " is-picked" : ""}`}
                   disabled={pending || past || cell.rooms > 0}
                   aria-label={`${person.name} ${shortDate(date)}`}
                   onClick={() => toggleCell(person.userId, date)}
@@ -238,6 +270,22 @@ export function AssignMonthBoard({
           </button>
         ) : null}
       </div>
+      {personId ? (
+        <AssignPersonPanel
+          key={personId}
+          userId={personId}
+          ym={board.ym}
+          today={today}
+          copy={copy}
+          locale={locale}
+          buildingLabels={buildingLabels}
+          refreshKey={board}
+          onClose={closePanel}
+          onStep={stepPerson}
+          onDate={setPanelDate}
+          onMessage={showToast}
+        />
+      ) : null}
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
     </div>
   );

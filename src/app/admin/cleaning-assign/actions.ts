@@ -12,6 +12,7 @@ import {
   loadMonthOpenCounts,
   type MonthBoard,
 } from "@/lib/cleaning-assign/data";
+import { loadPersonShift, type PersonShift } from "@/lib/cleaning-assign/person-shift";
 import { loadAssignDayRooms, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
 import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { FLAG_THRESHOLD_OPTIONS, isAssignRuleKey, normalizeAssignRules, TRAINEE_CHECK_STEP, type AssignRule } from "@/lib/cleaning-assign/rules";
@@ -556,6 +557,16 @@ export async function toggleApplicationForUser(input: { date: string; userId: st
   await ensureApplication(organizationId, input.userId, input.date, session.user.id);
   await changed(session.organization.id);
   return { applied: true, ok: true };
+}
+
+/** 사람별 시프트 달력(월 보기 오른쪽 패널) — 읽기만. 현장 인원이 아니면 null. docs/product/37 「4-6」 */
+export async function loadPersonShiftForPanel(input: { userId: string; ym: string }): Promise<AssignOk<{ data: PersonShift }> | AssignFail> {
+  const session = await assigner();
+  if (!session) return { ok: false, reason: "forbidden" };
+  if (!isUuid(input.userId) || !isMonthKey(input.ym)) return { ok: false, reason: "invalid" };
+  const data = await loadPersonShift(getSupabaseServiceClient(), session.organization.id, input.userId, input.ym, getCleaningOperatingDateKey(), session.user.id).catch(() => null);
+  if (!data) return { ok: false, reason: "invalid" };
+  return { data, ok: true };
 }
 
 // ── 배정 설정 ────────────────────────────────────────────────────────────────────────────────────

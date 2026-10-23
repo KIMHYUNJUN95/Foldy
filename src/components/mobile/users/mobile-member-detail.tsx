@@ -73,7 +73,18 @@ function errorText(code: string | undefined, dict: Dict): string {
   }
 }
 
-export function MobileMemberDetail({ panel, locale, actorRole }: { panel: MemberPanelVM; locale: Locale; actorRole: string }) {
+export function MobileMemberDetail({
+  panel,
+  locale,
+  actorRole,
+  shiftSlot,
+}: {
+  panel: MemberPanelVM;
+  locale: Locale;
+  actorRole: string;
+  /** 「시프트」 줄(배정 권한이 있을 때만 서버가 그려 넘긴다 — docs/product/37 「4-6」). */
+  shiftSlot?: React.ReactNode;
+}) {
   const router = useRouter();
   const dict = getDictionary(locale);
   const u = dict.admin.users;
@@ -412,6 +423,7 @@ export function MobileMemberDetail({ panel, locale, actorRole }: { panel: Member
         {/* 신분 서류(docs/product/41 R2) — 서버가 staff_documents.view 를 본 뒤에만 실어 보낸다. */}
         {panel.idDocument.canView ? <IdDocumentPanel doc={panel.idDocument.doc} locale={locale} /> : null}
       </div>
+      {shiftSlot}
 
       {readOnly ? (
         <>

@@ -24,7 +24,7 @@ export default async function MobileLayout({ children }: { children: React.React
   return (
     <>
       <AppSplash tagline={tagline} />
-      {/* 국적 · 이름 세 가지가 빈 사람에게 하루 한 번(2026-10-22, docs/product/41 §3-2). */}
+      {/* 국적 · 이름 세 가지 · 신분 서류가 빈 사람에게 앱을 켤 때마다(2026-10-23, docs/product/41 §3-2). */}
       <IdentityFillPrompt
         copy={{
           fillTitle: identity.fillTitle,

@@ -348,3 +348,53 @@
 .adm .cas-pp__loading { height: 420px; border-radius: 16px; background: linear-gradient(90deg, #f6f5f9 0%, #fbfafd 50%, #f6f5f9 100%); background-size: 200% 100%; animation: cas-pp-shim 1.2s ease-in-out infinite; }
 @keyframes cas-pp-shim { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .adm .cas-pp__loading { animation: none; } }
+
+/* 넣기 · 빼기(하루 보기, 시안 https://claude.ai/artifact/Evr8xVkWpHhpNtg5NCgrU1 · 2026-10-23) — docs/product/37 「4-2」
+   ① 이름표: 이니셜 원 + 이름, 올리면 × (자리는 미리 잡아 둬 줄이 흔들리지 않음). ② 빈 방 「+ 사람」 → 작은 창(배정 전이 위).
+   ③ 사람을 고르면 방 줄 왼쪽 체크 원 — 줄 아무 데나 눌러 넣기 ↔ 빼기, 넣으면 원이 채워지며 체크가 그려진다. */
+.adm .cas-av { width: 22px; height: 22px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; background: #fff; color: #5a30cf; font-size: 11px; font-weight: 700; }
+.adm .cas-token { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 3px 0 4px; border-radius: 999px; background: #f4f1fd; color: #2a2140; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background 150ms ease; animation: cas-token-in 180ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .cas-token small { font-size: 11px; font-weight: 600; color: #b4500a; }
+.adm .cas-token__x { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #5a30cf; cursor: pointer; opacity: 0; transform: scale(.8); transition: opacity 140ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1), background 140ms ease; }
+.adm .cas-token__x svg { width: 12px; height: 12px; }
+.adm .cas-token:hover, .adm .cas-token:focus-within { background: #ede8fb; }
+.adm .cas-token:hover .cas-token__x, .adm .cas-token:focus-within .cas-token__x { opacity: 1; transform: none; }
+.adm .cas-token__x:hover { background: #e2d9fa; }
+.adm .cas-token__x:active:not(:disabled) { transform: scale(.88); }
+@media (hover: none) { .adm .cas-token__x { opacity: 1; transform: none; } }
+@keyframes cas-token-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+
+.adm .cas-seat { position: relative; }
+.adm .cas-seatbtn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #fff; color: #7a52e6; box-shadow: inset 0 0 0 1px #dcd2fa; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, color 150ms ease, transform 140ms ease; }
+.adm .cas-seatbtn svg { width: 13px; height: 13px; }
+.adm .cas-seatbtn.is-more { color: #6b6878; box-shadow: inset 0 0 0 1px #e4e3e9; }
+.adm .cas-seatbtn.is-icon { width: 30px; padding: 0; justify-content: center; color: #6b6878; box-shadow: inset 0 0 0 1px #e4e3e9; }
+.adm .cas-seatbtn:hover, .adm .cas-seatbtn[aria-expanded="true"] { background: #f4f1fd; color: #5a30cf; }
+.adm .cas-seatbtn:active { transform: scale(.97); }
+.adm .cas-seatpop { position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; width: 280px; max-height: 340px; overflow-y: auto; padding: 6px; border-radius: 14px; background: #fff; box-shadow: 0 2px 6px rgba(22, 20, 31, .06), 0 16px 40px rgba(22, 20, 31, .16); animation: cas-pop 160ms cubic-bezier(.23, 1, .32, 1); transform-origin: top right; }
+.adm .cas-seatpop__t { display: block; padding: 6px 10px 4px; font-size: 12px; color: #6b6878; }
+.adm .cas-seatpop__none { margin: 0; padding: 12px 10px; font-size: 13px; color: #6b6878; }
+.adm .cas-seatpop__row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; font: inherit; color: #16141f; text-align: left; cursor: pointer; }
+.adm .cas-seatpop__row:hover:not(:disabled) { background: #f4f4f7; }
+.adm .cas-seatpop__row .cas-av { background: #f4f1fd; width: 24px; height: 24px; }
+.adm .cas-seatpop__row b { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm .cas-seatpop__row small.is-sug { font-size: 11px; font-weight: 600; color: #5a30cf; }
+.adm .cas-seatpop__row > span:last-child { font-size: 12px; font-weight: 600; color: #8e8a99; white-space: nowrap; }
+.adm .cas-seatpop__row > span.is-warn { color: #c5282e; }
+
+.adm .cas-room.is-toggle { grid-template-columns: 22px 124px minmax(0, 1fr) auto; cursor: pointer; }
+.adm .cas-room.is-toggle:hover { background: #f7f6fa; }
+.adm .cas-room.is-toggle.is-mine { border-radius: 0; }
+.adm .cas-room.is-toggle.is-mine:hover { background: #efeafb; }
+.adm .cas-check { display: grid; place-items: center; align-self: center; width: 22px; height: 22px; min-width: 22px; min-height: 0; aspect-ratio: 1; box-sizing: border-box; padding: 0; border: 0; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1.6px #c9c4d6; color: #fff; cursor: pointer; transition: background 160ms ease, box-shadow 160ms ease, transform 140ms cubic-bezier(.23, 1, .32, 1); }
+.adm .cas-check svg { width: 14px; height: 14px; stroke-width: 3; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 220ms cubic-bezier(.23, 1, .32, 1) 40ms; }
+.adm .cas-check.is-on { background: #7a52e6; box-shadow: none; }
+.adm .cas-check.is-on svg { stroke-dashoffset: 0; }
+.adm .cas-room.is-toggle:active .cas-check { transform: scale(.9); }
+.adm .cas-room.is-toggle:hover .cas-check:not(.is-on) { box-shadow: inset 0 0 0 1.6px #a98ef0; }
+.adm .cas-room__verb { width: 40px; text-align: right; font-size: 13px; font-weight: 600; color: #5a30cf; }
+.adm .cas-room__verb.is-on { color: #8e8a99; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .cas-token, .adm .cas-seatpop { animation: none; }
+  .adm .cas-token__x, .adm .cas-check, .adm .cas-check svg { transition: none; }
+}

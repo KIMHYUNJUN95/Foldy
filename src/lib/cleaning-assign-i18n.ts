@@ -343,6 +343,17 @@ export type CleaningAssignCopy = {
   emptyBodyWaiting: string;
   emptyBodyFree: string;
   goMyShift: string;
+  // ── 넣기 · 빼기(하루 보기, 2026-10-23) ──
+  seatAdd: string;
+  seatAddMore: string;
+  seatAddAria: string;
+  seatRemoveAria: string;
+  seatRemoved: string;
+  seatPickerTitle: string;
+  seatNoneLeft: string;
+  seatWaiting: string;
+  seatRoomsN: string;
+  seatVerbAdd: string;
   // ── 사람별 시프트 달력(관리자, 2026-10-23) ──
   psOpen: string;
   psClose: string;
@@ -777,7 +788,16 @@ const ko: CleaningAssignCopy = {
   psRowTitle: "{mon} 신청 {a}일 · 배정 {b}일",
   psRowNext: "다음 근무 {rel} {time} · 방 {n}개",
   psRowNoNext: "앞으로 배정된 날이 없어요",
-  psDone: "처리했어요",
+  psDone: "처리했어요",  seatAdd: "사람",
+  seatAddMore: "1명 더",
+  seatAddAria: "{room}에 사람 넣기",
+  seatRemoveAria: "{room}에서 {name} 빼기",
+  seatRemoved: "{room}에서 {name} 뺐어요",
+  seatPickerTitle: "{room}에 넣을 사람 · 배정 전이 위",
+  seatNoneLeft: "넣을 신청자가 없어요",
+  seatWaiting: "배정 전",
+  seatRoomsN: "방 {n}",
+  seatVerbAdd: "넣기",
 };
 
 const ja: CleaningAssignCopy = {
@@ -1158,7 +1178,16 @@ const ja: CleaningAssignCopy = {
   psRowTitle: "{mon} 申請 {a}日 · 割り当て {b}日",
   psRowNext: "次の勤務 {rel} {time} · {n}室",
   psRowNoNext: "今後の割り当てはありません",
-  psDone: "処理しました",
+  psDone: "処理しました",  seatAdd: "人",
+  seatAddMore: "もう1人",
+  seatAddAria: "{room}に人を入れる",
+  seatRemoveAria: "{room}から{name}を外す",
+  seatRemoved: "{room}から{name}を外しました",
+  seatPickerTitle: "{room}に入れる人 · 割り当て前が上",
+  seatNoneLeft: "入れられる申請者がいません",
+  seatWaiting: "割り当て前",
+  seatRoomsN: "{n}室",
+  seatVerbAdd: "入れる",
 };
 
 const en: CleaningAssignCopy = {
@@ -1539,7 +1568,16 @@ const en: CleaningAssignCopy = {
   psRowTitle: "{mon}: applied {a} · assigned {b}",
   psRowNext: "Next shift {rel} {time} · {n} rooms",
   psRowNoNext: "No upcoming assigned days",
-  psDone: "Done",
+  psDone: "Done",  seatAdd: "Person",
+  seatAddMore: "1 more",
+  seatAddAria: "Add someone to {room}",
+  seatRemoveAria: "Remove {name} from {room}",
+  seatRemoved: "Removed {name} from {room}",
+  seatPickerTitle: "Who to add to {room} · unassigned first",
+  seatNoneLeft: "No applicants left to add",
+  seatWaiting: "Unassigned",
+  seatRoomsN: "{n} rooms",
+  seatVerbAdd: "Add",
 };
 
 const COPY: Record<Locale, CleaningAssignCopy> = { en, ja, ko };

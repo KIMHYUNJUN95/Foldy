@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowLeftRight, MoreHorizontal, Phone, Search } from "lucide-react";
+import { ArrowLeftRight, Check, MoreHorizontal, Phone, Plus, Search, X } from "lucide-react";
 import {
   addApplicantForDay,
   addRoomForDay,
@@ -39,7 +39,8 @@ import "./cleaning-assign.css";
  * 청소 배정 — 하루 보기(PC). 시안 「③ 배정 하루 보기」(https://claude.ai/artifact/Fz6ux5HZDwHtDQ5CmDBV64).
  *
  * 왼쪽 = 그날 청소할 방(미배정 · 밀려 온 방 · 취소된 방이 위, 건물별 목록), 오른쪽 = 신청자 목록(신청 / 배정 전 / 신청 안 함).
- * **사람을 누르면 고른 상태** — 그 사람 방이 강조되고, 다른 방은 「+ 넣기」, 들어간 방은 「빼기」(끌기 없이 누르기로 — 키보드 · 한 손 조작).
+ * **넣기 · 빼기(시안 Evr8xV…, 2026-10-23)** — 평소엔 방 안 이름표의 × 로 바로 빼고(5초 「되돌리기」), 빈 방의 「+ 사람」 작은 창에서 넣는다(배정 전이 위).
+ * **사람을 누르면 고른 상태** — 방 줄 왼쪽에 체크 원, 줄 아무 데나 누르면 그 사람을 넣기 ↔ 빼기(끌기 없이 누르기로 — 키보드 · 한 손 조작).
  * 저장은 방 한 건씩 서버 액션으로. 다른 담당자와 겹치면 「방금 다른 담당자가 바꿨어요」 + 새로 불러오기. 20초마다 새로 불러온다(실시간).
  * docs/product/37-cleaning-shift-assignment.md 「4-2」
  */
@@ -99,6 +100,18 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const [roomSwap, setRoomSwap] = useState<{ roomKey: string; fromId: string } | null>(null);
   const [swapUndo, setSwapUndo] = useState<{ stamp: number; message: string; moves: RoomMove[] } | null>(null);
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
+  // 빈 방 「+ 사람」 작은 창 · 뺀 뒤 5초 「되돌리기」.
+  const [seatFor, setSeatFor] = useState<string | null>(null);
+  const seatMenu = useRef<HTMLDivElement>(null);
+  const [seatUndo, setSeatUndo] = useState<{ stamp: number; message: string; roomKey: string; userId: string } | null>(null);
+  useEffect(() => {
+    if (!seatFor) return;
+    const onDown = (event: PointerEvent) => {
+      if (!seatMenu.current?.contains(event.target as Node)) setSeatFor(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [seatFor]);
 
   const label = (name: string) => propertyLabels[name] ?? name;
   const people = board.people;
@@ -124,6 +137,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       setRoomSwap(null);
       setAddOpen(false);
       setBuildingPicker(false);
+      setSeatFor(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -219,10 +233,67 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   const openByBuilding = new Map<string, BoardRoom[]>();
   for (const room of openRooms) openByBuilding.set(room.propertyName, [...(openByBuilding.get(room.propertyName) ?? []), room]);
 
+  const roomTitle = (room: { propertyName: string; roomLabel: string }) => (room.roomLabel === room.propertyName ? label(room.propertyName) : `${label(room.propertyName)} ${room.roomLabel}`);
+
+  // 빼기 — 바로 저장하고 5초 「되돌리기」(다시 넣기). 이름표 × · 고른 상태의 체크 해제가 같이 쓴다.
+  function removeSeat(room: BoardRoom, userId: string) {
+    const name = personById.get(userId)?.name ?? room.people.find((p) => p.userId === userId)?.name ?? "";
+    startTransition(async () => {
+      const result = await unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId });
+      if (result.ok) {
+        haptic("light");
+        setSeatUndo({ message: fill(copy.seatRemoved, { name, room: roomTitle(room) }), roomKey: room.roomKey, stamp: Date.now(), userId });
+      } else {
+        haptic("error");
+        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+      }
+      router.refresh();
+    });
+  }
+
+  function addSeat(room: BoardRoom, userId: string) {
+    setSeatFor(null);
+    startTransition(async () => {
+      const result = await assignToRoom({ date: board.date, roomKey: room.roomKey, userId });
+      if (result.ok) haptic("medium");
+      else {
+        haptic("error");
+        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+      }
+      router.refresh();
+    });
+  }
+
   const toggleRoom = (room: BoardRoom) => {
     if (!picked) return;
     const inRoom = room.people.some((p) => p.userId === picked.userId);
-    run(() => (inRoom ? unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId: picked.userId }) : assignToRoom({ date: board.date, roomKey: room.roomKey, userId: picked.userId })));
+    if (inRoom) removeSeat(room, picked.userId);
+    else addSeat(room, picked.userId);
+  };
+
+  // 「+ 사람」 작은 창 — 그날 신청한 사람(취소 제외) 중 그 방에 없는 사람, 방이 적은 사람(배정 전)이 위.
+  const seatPicker = (room: BoardRoom) => {
+    const inRoom = new Set(room.people.map((p) => p.userId));
+    const options = people
+      .filter((p) => p.applied && !p.cancelled && !inRoom.has(p.userId))
+      .sort((a, b) => a.rooms.length - b.rooms.length || a.name.localeCompare(b.name, "ko"));
+    const suggested = new Set(room.suggested.map((s) => s.userId));
+    return (
+      <div className="cas-seatpop" role="dialog" aria-label={fill(copy.seatAddAria, { room: roomTitle(room) })} ref={seatMenu}>
+        <span className="cas-seatpop__t">{fill(copy.seatPickerTitle, { room: roomTitle(room) })}</span>
+        {options.length === 0 ? <p className="cas-seatpop__none">{copy.seatNoneLeft}</p> : null}
+        {options.map((p) => (
+          <button key={p.userId} type="button" className="cas-seatpop__row" disabled={pending} onClick={() => addSeat(room, p.userId)}>
+            <span className="cas-av" aria-hidden="true">
+              {p.name.slice(0, 1)}
+            </span>
+            <b>{p.name}</b>
+            {suggested.has(p.userId) ? <small className="is-sug">{copy.suggest}</small> : null}
+            <span className={p.rooms.length === 0 ? "is-warn" : ""}>{p.rooms.length === 0 ? copy.seatWaiting : fill(copy.seatRoomsN, { n: p.rooms.length })}</span>
+          </button>
+        ))}
+      </div>
+    );
   };
 
   const roomInfo = (room: BoardRoom) => checkInText(room, copy);
@@ -262,8 +333,34 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     const mine = picked ? room.people.some((p) => p.userId === picked.userId) : false;
     const need = Math.max(0, room.usualHeadcount - room.people.length);
     const origin = room.carriedFrom ?? board.date;
+    // 넣고 뺄 수 있는 방 — 청소 전이고 미루지 않은 방만(청소 중 · 끝남 · 처리 끝 · 미룸은 그대로 둔다).
+    const editable = room.status === "pending" && !room.deferredUntil;
+    const toggleable = Boolean(picked) && editable;
+    const canSeat = !picked && editable && room.people.length < Math.max(1, room.usualHeadcount);
+    // 제안 버튼(「김현준 넣기」)이 있으면 「+」는 아이콘만 — 다른 사람을 고를 때만 연다.
+    const iconSeat = canSeat && Boolean(opts.open) && room.suggested.length > 0;
     return (
-      <div key={room.roomKey} className={`cas-room${mine ? " is-mine" : ""}${changedKeys.has(room.roomKey) ? " is-changed" : ""}${room.status !== "pending" ? " is-quiet" : ""}`}>
+      <div
+        key={room.roomKey}
+        className={`cas-room${mine ? " is-mine" : ""}${toggleable ? " is-toggle" : ""}${changedKeys.has(room.roomKey) ? " is-changed" : ""}${room.status !== "pending" ? " is-quiet" : ""}`}
+        onClick={toggleable && !pending ? () => toggleRoom(room) : undefined}
+      >
+        {toggleable ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={mine}
+            aria-label={`${roomTitle(room)} — ${mine ? copy.removeHere : copy.seatVerbAdd}`}
+            className={`cas-check${mine ? " is-on" : ""}`}
+            disabled={pending}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleRoom(room);
+            }}
+          >
+            <Check aria-hidden="true" />
+          </button>
+        ) : null}
         <div className="cas-room__id">
           {opts.open && !opts.grouped ? <span className="cas-room__bld">{label(room.propertyName)}</span> : null}
           <span className="cas-room__no">{room.roomLabel === room.propertyName ? label(room.propertyName) : room.roomLabel}</span>
@@ -281,20 +378,30 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           {room.status === "progress" ? <span className="cas-tag is-pri">{copy.statusProgress}</span> : null}
           {room.status === "done" ? <span className="cas-tag">{room.resolvedHold ? copy.tagResolved : copy.statusDone}</span> : null}
           {opts.open ? <span className="cas-room__note">{[roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · ")}</span> : null}
-          {room.people.map((p) => (
-            <span key={p.userId} className={`cas-chip${picked?.userId === p.userId ? " is-picked" : ""}`} title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
-              {p.name}
-              {p.trainee ? <small>{fill(copy.traineeShort, { n: personById.get(p.userId)?.traineeCount ?? "" })}</small> : null}
-            </span>
-          ))}
+          {room.people.map((p) =>
+            !picked && editable ? (
+              // 이름표 — 마우스를 올리면 ×, 누르면 바로 빠지고 5초 「되돌리기」.
+              <span key={p.userId} className="cas-token" title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
+                <span className="cas-av" aria-hidden="true">
+                  {p.name.slice(0, 1)}
+                </span>
+                {p.name}
+                {p.trainee ? <small>{fill(copy.traineeShort, { n: personById.get(p.userId)?.traineeCount ?? "" })}</small> : null}
+                <button type="button" className="cas-token__x" aria-label={fill(copy.seatRemoveAria, { name: p.name, room: roomTitle(room) })} disabled={pending} onClick={() => removeSeat(room, p.userId)}>
+                  <X aria-hidden="true" />
+                </button>
+              </span>
+            ) : (
+              <span key={p.userId} className={`cas-chip${picked?.userId === p.userId ? " is-picked" : ""}`} title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
+                {p.name}
+                {p.trainee ? <small>{fill(copy.traineeShort, { n: personById.get(p.userId)?.traineeCount ?? "" })}</small> : null}
+              </span>
+            ),
+          )}
         </div>
-        <div className="cas-room__act">
+        <div className="cas-room__act" onClick={(event) => event.stopPropagation()}>
           {room.usualHeadcount > 1 && room.people.length > 0 ? <span className="cas-room__count">{`${room.people.length}/${room.usualHeadcount}`}</span> : null}
-          {picked && room.status === "pending" && !room.deferredUntil ? (
-            <button type="button" className={mine ? "cas-btn is-ghost" : "cas-btn is-line"} disabled={pending} onClick={() => toggleRoom(room)}>
-              {mine ? copy.removeHere : copy.addHere}
-            </button>
-          ) : null}
+          {toggleable ? <span className={`cas-room__verb${mine ? " is-on" : ""}`}>{mine ? copy.removeHere : copy.seatVerbAdd}</span> : null}
           {!picked && opts.open && room.suggested.length > 0 ? (
             <>
               <span className="cas-room__hint">{copy.suggest}</span>
@@ -307,6 +414,22 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                 {fill(copy.put, { name: room.suggested[0].name })}
               </button>
             </>
+          ) : null}
+          {canSeat ? (
+            <span className="cas-seat">
+              <button
+                type="button"
+                className={`cas-seatbtn${iconSeat ? " is-icon" : room.people.length > 0 ? " is-more" : ""}`}
+                aria-expanded={seatFor === room.roomKey}
+                aria-haspopup="dialog"
+                aria-label={fill(copy.seatAddAria, { room: roomTitle(room) })}
+                onClick={() => setSeatFor(seatFor === room.roomKey ? null : room.roomKey)}
+              >
+                <Plus aria-hidden="true" />
+                {iconSeat ? null : room.people.length > 0 ? copy.seatAddMore : copy.seatAdd}
+              </button>
+              {seatFor === room.roomKey ? seatPicker(room) : null}
+            </span>
           ) : null}
           {room.deferredUntil || room.resolvedHold ? (
             <button type="button" className="cas-btn is-ghost" disabled={pending} onClick={() => run(() => releaseHold({ date: board.date, originDate: origin, roomKey: room.roomKey }))}>
@@ -855,6 +978,20 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       ) : null}
 
       {toast ? <AdminToast message={toast.message} onDismiss={dismiss} /> : null}
+      {seatUndo && !toast && !undo && !swapUndo ? (
+        <AdminUndoToast
+          stamp={seatUndo.stamp}
+          message={seatUndo.message}
+          undoLabel={copy.undoHold}
+          pending={pending}
+          onExpire={() => setSeatUndo(null)}
+          onUndo={() => {
+            const target = seatUndo;
+            setSeatUndo(null);
+            run(() => assignToRoom({ date: board.date, roomKey: target.roomKey, userId: target.userId }), copy.heldUndone);
+          }}
+        />
+      ) : null}
       {swapUndo && !toast && !undo ? (
         <AdminUndoToast
           stamp={swapUndo.stamp}

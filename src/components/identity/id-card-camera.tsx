@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { haptic } from "@/lib/haptics";
 import { canOpenAppSettings, openAppSettings } from "@/lib/native/app-settings";
-import { canUseDocumentScanner, scanCardSide } from "@/lib/native/document-scanner";
+import { abandonCardScan, canUseDocumentScanner, scanCardSide, scannerFailedBefore } from "@/lib/native/document-scanner";
 import { DETECT_PAD, STILL_DIFF, assessCardFit, frameDifference, toGray, type GrayFrame } from "@/lib/staff-documents/card-detect";
 
 const CARD_RATIO = 85.6 / 54;
@@ -58,6 +58,8 @@ export type CameraCopy = {
   scanStart: string;
   cameraDeniedApp: string;
   openSettings: string;
+  cameraUnavailable: string;
+  cameraRetry: string;
 };
 
 export function IdCardCamera({
@@ -89,10 +91,10 @@ export function IdCardCamera({
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   /** 앱에서 문서 스캐너를 쓸 수 있으면 스캐너부터, 아니면 웹 카메라. */
-  const [mode, setMode] = useState<"scan" | "camera">(() => (autoScan && canUseDocumentScanner() ? "scan" : "camera"));
+  const [mode, setMode] = useState<"scan" | "camera">(() => (autoScan && canUseDocumentScanner() && !scannerFailedBefore() ? "scan" : "camera"));
   const [scannerAvailable] = useState(canUseDocumentScanner);
   const [scanNote, setScanNote] = useState<string | null>(null);
-  const [state, setState] = useState<"starting" | "live" | "denied">("starting");
+  const [state, setState] = useState<"starting" | "live" | "denied" | "unavailable">("starting");
   /** 한 번 넘긴 뒤에는 다시 넘기지 않는다(자동 촬영 · 셔터 · 앨범 · 스캐너가 겹쳐도 한 장만). */
   const deliveredRef = useRef(false);
   /** 넘긴 뒤(올리는 중) — 안내 · 버튼을 거둔다. */
@@ -145,8 +147,24 @@ export function IdCardCamera({
       setState("starting");
       setMode("camera");
     });
+    // 결과가 끝내 안 오면(네이티브가 멈춤) 기다림을 버리고 웹 카메라로 — 안 그러면 이후 모든 열기가 같이 멈춘다.
+    let wasHidden = false;
+    let timer = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        window.clearTimeout(timer);
+      } else if (wasHidden) {
+        // 안드로이드는 스캐너가 닫힌 뒤 결과가 곧 따라온다 — 넉넉히 기다려도 없으면 포기.
+        timer = window.setTimeout(abandonCardScan, 3000);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      abandonCardScan();
     };
   }, [mode]);
 
@@ -164,27 +182,42 @@ export function IdCardCamera({
   useEffect(() => {
     if (mode !== "camera") return;
     let cancelled = false;
+    const open = (video: MediaStreamConstraints["video"]) => navigator.mediaDevices.getUserMedia({ video, audio: false });
     const id = window.setTimeout(async () => {
+      let stream: MediaStream;
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("no camera");
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 2560 }, height: { ideal: 1440 } },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
+        stream = await open({ facingMode: "environment", width: { ideal: 2560 }, height: { ideal: 1440 } });
+      } catch (error) {
+        const name = error instanceof DOMException ? error.name : "";
+        if (name === "NotAllowedError" || name === "SecurityError") {
+          if (!cancelled) setState("denied");
           return;
         }
-        streamRef.current = stream;
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          await video.play().catch(() => {});
+        // 스캐너가 막 닫혀 카메라가 아직 잡혀 있는 경우 등 — 잠깐 뒤 조건을 풀어 한 번 더.
+        await new Promise((resolve) => window.setTimeout(resolve, 400));
+        if (cancelled) return;
+        try {
+          stream = await open(true);
+        } catch (retryError) {
+          const retryName = retryError instanceof DOMException ? retryError.name : "";
+          if (!cancelled) setState(retryName === "NotAllowedError" || retryName === "SecurityError" ? "denied" : "unavailable");
+          return;
         }
-        setState("live");
-      } catch {
-        if (!cancelled) setState("denied");
       }
+      if (cancelled) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+      }
+      if (cancelled) return;
+      setScanNote(null);
+      setState("live");
     }, 0);
     return () => {
       cancelled = true;
@@ -206,6 +239,22 @@ export function IdCardCamera({
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [state, mode]);
+
+  // 안드로이드 뒤로가기는 먼저 Esc 를 보낸다(NativeShellBridge) — 여기서 받아 바로 닫는다(두 번 눌러야 하지 않게).
+  const cancelRef = useRef(() => {});
+  useEffect(() => {
+    cancelRef.current = () => {
+      stop();
+      onCancel();
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") cancelRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   /** 화면에 보이는 영상(object-fit: cover)에서 틀(+ 여유 `pad`)이 차지하는 부분 → 원본 영상 픽셀 사각형. */
   function cropRect(pad: number) {
@@ -351,6 +400,13 @@ export function IdCardCamera({
                 </button>
               )}
             </div>
+          ) : state === "unavailable" ? (
+            <div className="idc-cam__denied">
+              <p className="idc-cam__note idc-cam__note--warn" role="alert">{copy.cameraUnavailable}</p>
+              <button className="idc-cam__settings" onClick={() => { setState("starting"); setCameraTry((n) => n + 1); }} type="button">
+                {copy.cameraRetry}
+              </button>
+            </div>
           ) : scanNote ? (
             <p className="idc-cam__note idc-cam__note--warn" role="status">{scanNote}</p>
           ) : state === "starting" ? (
@@ -369,7 +425,7 @@ export function IdCardCamera({
           <button
             aria-label={copy.album}
             className="idc-cam__album"
-            disabled={busy || scanning || sent}
+            disabled={busy || sent}
             onClick={() => fileRef.current?.click()}
             type="button"
           >

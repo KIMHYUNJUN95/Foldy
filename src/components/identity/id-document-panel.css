@@ -8,7 +8,7 @@
 .idp__chip[data-status="returned"], .idp__chip[data-tone="within90"] { background: #fff6e0; color: #7a5300; }
 .idp__chip[data-tone="within30"], .idp__chip[data-tone="expired"] { background: #fdecef; color: #c4364b; }
 .idp__photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-.idp__photo { display: block; min-width: 0; color: var(--muted-foreground); font-size: 11.5px; }
+.idp__photo { display: block; padding: 0; background: none; border: 0; text-align: left; cursor: pointer; min-width: 0; color: var(--muted-foreground); font-size: 11.5px; }
 .idp__photo img { display: block; width: 100%; aspect-ratio: 85.6 / 54; object-fit: cover; border-radius: 8px; border: 1px solid #e4e3e9; background: #f4f2fa; transition: opacity 160ms ease; }
 .idp__photo:hover img { opacity: .88; }
 .idp__photo span { display: block; margin-top: 3px; }

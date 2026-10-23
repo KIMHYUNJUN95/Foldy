@@ -46,34 +46,25 @@ export type RetentionMembership = { organizationId: string; userId: string; stat
  * 지울 사람(조직 · 사람 짝)을 고른다.
  * - 멤버십이 active 면 둔다(재직 중엔 이전 카드까지 보관).
  * - 비활성이고 `left_at` 이 기준보다 앞이면 지운다. `left_at` 이 비어 있으면 둔다(기준을 모르면 지우지 않는다).
- * - 멤버십 행이 아예 없으면(관리자가 멤버십을 지움) 그 사람 서류 중 가장 늦은 `updated_at` 을 떠난 시각으로 본다 —
- *   실제 떠난 시각보다 늦거나 같아서 일찍 지우는 일은 없다. 목록이 잘렸으면(`includeOrphans: false`) 가장 늦은 값을 모르므로 건너뛴다.
+ * - 멤버십 행이 아예 없으면(관리자가 멤버십을 지움) **지우지 않는다** — 떠난 시각을 모른다. 서류 `updated_at` 은 재직 중 갱신
+ *   시각이라 떠난 시각보다 이르다(그걸로 재면 일찍 지운다, 2026-10-23 점검). 이런 사람은 사람이 직접 정리한다.
  */
 export function pickExpiredOwners(
   documents: RetentionDocument[],
   memberships: RetentionMembership[],
   cutoffIso: string,
-  { includeOrphans = true }: { includeOrphans?: boolean } = {},
 ): { organizationId: string; userId: string }[] {
   const cutoff = Date.parse(cutoffIso);
   const key = (o: string, u: string) => `${o}:${u}`;
   const membershipByKey = new Map(memberships.map((m) => [key(m.organizationId, m.userId), m]));
-  const latestDoc = new Map<string, number>();
-  for (const doc of documents) {
-    const k = key(doc.organizationId, doc.userId);
-    const at = Date.parse(doc.updatedAt);
-    latestDoc.set(k, Math.max(latestDoc.get(k) ?? -Infinity, at));
-  }
+  const owners = new Set(documents.map((doc) => key(doc.organizationId, doc.userId)));
   const expired: { organizationId: string; userId: string }[] = [];
-  for (const [k, latest] of latestDoc) {
+  for (const k of owners) {
     const [organizationId, userId] = k.split(":");
     const membership = membershipByKey.get(k);
-    const leftAt = membership
-      ? membership.status === "active" || !membership.leftAt
-        ? null
-        : Date.parse(membership.leftAt)
-      : includeOrphans
-        ? latest
+    const leftAt =
+      membership && membership.status !== "active" && membership.status !== "invited" && membership.leftAt
+        ? Date.parse(membership.leftAt)
         : null;
     if (leftAt !== null && Number.isFinite(leftAt) && leftAt < cutoff) expired.push({ organizationId, userId });
   }

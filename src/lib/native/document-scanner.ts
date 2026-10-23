@@ -3,8 +3,8 @@
  *
  * 앱(iOS · Android)에서만. 카드 네 모서리를 OS 가 찾아 저절로 찍고 기울기를 펴 준다.
  * - iOS: VisionKit `VNDocumentCameraViewController`(iOS 13+). 여러 장을 찍을 수 있는 화면이라 **첫 장만** 쓴다.
- *   쪽수 제한(`maxNumDocuments`) · 찍은 뒤 미리보기(`letUserAdjustCrop` · `reviewCapturedDocument`)는 이 플러그인이 VisionKit 비공개
- *   클래스를 바꿔치기(swizzle)해서 구현하므로 **넘기지 않는다** — 넘기지 않으면 공개 API 만 쓴다(App Store 2.5.2).
+ *   `maxNumDocuments` 는 넘기지 않는다. 반대로 `letUserAdjustCrop: false` · `reviewCapturedDocument: false` 는 **반드시 명시해서 넘긴다** —
+ *   플러그인 기본값이 true 이고, true 면 VisionKit 비공개 클래스를 바꿔치기(swizzle)해서 구현한다. false 로 넘겨야 공개 API 만 쓴다(App Store 2.5.2).
  * - Android: Google ML Kit Document Scanner(Google Play 서비스 안에서 돈다 — 앱 카메라 권한 불필요). `maxNumDocuments: 1` 은
  *   ML Kit 공식 `setPageLimit(1)`. Play 서비스가 없거나(일부 기기) 에뮬레이터면 실패로 답한다 → 웹 카메라로.
  * - 브라우저 · PWA · 플러그인이 없는 옛 앱 빌드: `canUseDocumentScanner()` 가 false — 웹 카메라(getUserMedia)를 쓴다.
@@ -21,7 +21,14 @@ export function canUseDocumentScanner(): boolean {
   return nativePlatform() !== null && hasNativePlugin("DocumentScanner");
 }
 
-let inflight: Promise<CardScanResult> | null = null;
+/** 한 번 실패(Play 서비스 없음 등)하면 같은 앱 실행 동안 다음 면에서 자동으로 다시 열지 않는다(「자동 스캔」 버튼은 여전히 시도). */
+let failedBefore = false;
+export function scannerFailedBefore(): boolean {
+  return failedBefore;
+}
+
+type Inflight = { promise: Promise<CardScanResult>; abandon: () => void };
+let inflight: Inflight | null = null;
 
 async function run(): Promise<CardScanResult> {
   try {
@@ -57,8 +64,28 @@ async function run(): Promise<CardScanResult> {
 
 /** 스캐너를 연다. 이미 열려 있으면 같은 결과를 기다린다(두 번 열지 않는다). */
 export function scanCardSide(): Promise<CardScanResult> {
-  inflight ??= run().finally(() => {
-    inflight = null;
-  });
-  return inflight;
+  if (!inflight) {
+    let abandon = () => {};
+    const abandoned = new Promise<CardScanResult>((resolve) => {
+      abandon = () => resolve({ kind: "cancel" });
+    });
+    const entry: Inflight = { abandon, promise: Promise.resolve({ kind: "cancel" }) };
+    entry.promise = Promise.race([run(), abandoned])
+      .then((result) => {
+        if (result.kind === "error") failedBefore = true;
+        return result;
+      })
+      .finally(() => {
+        if (inflight === entry) inflight = null;
+      });
+    inflight = entry;
+  }
+  return inflight.promise;
+}
+
+/** 결과가 끝내 오지 않을 때를 위해 기다림을 버린다 — 이후 열기는 새로 시작하고, 기다리던 쪽은 「취소」로 받아 웹 카메라로 간다. */
+export function abandonCardScan() {
+  const current = inflight;
+  inflight = null;
+  current?.abandon();
 }

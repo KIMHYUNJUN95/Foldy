@@ -58,6 +58,8 @@ export async function readIdCard(
   const session = await memberSession();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!input.consent) return { ok: false, reason: "no_consent" };
+  // 국적이 없으면 카드 종류를 모른다 — 등록(submit)과 같은 조건으로 막는다(2026-10-23 점검).
+  if (!session.user.identity.nationality) return { ok: false, reason: "forbidden" };
   const kind = documentKindFor(session.user.identity.nationality);
   const org = session.organization.id;
   const uid = session.user.id;
@@ -215,10 +217,12 @@ export async function reviewIdDocument(input: ReviewIdDocumentInput): Promise<{ 
   const service = getSupabaseServiceClient();
   const { data: row } = await service
     .from("staff_id_documents")
-    .select("id, organization_id, is_current")
+    .select("id, organization_id, user_id, is_current")
     .eq("id", input.documentId)
     .maybeSingle();
   if (!row || row.organization_id !== session.organization.id || !row.is_current) return { ok: false, errorKey: "forbidden" };
+  // 자기 서류는 스스로 확인 · 다시 요청하지 않는다 — 다른 관리자가 본다(2026-10-23 점검).
+  if (row.user_id === session.user.id) return { ok: false, errorKey: "forbidden" };
 
   const { error } = await service
     .from("staff_id_documents")

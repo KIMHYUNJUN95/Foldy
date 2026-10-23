@@ -7128,6 +7128,8 @@ const FALLBACK_DICTIONARY = {
     scanStart: "Auto scan",
     cameraDeniedApp: "Camera access for Foldy is off. Turn it on in Settings, or choose a photo.",
     openSettings: "Open Settings",
+    cameraUnavailable: "The camera isn’t available right now. Try again, or choose a photo.",
+    cameraRetry: "Try again",
   },
   accountProfile: {
     // 설정 허브 서브내비 (2026-07-31)
@@ -15367,8 +15369,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       scanOpening: "카드 스캐너를 여는 중…",
       scanUnavailable: "자동 스캔을 쓸 수 없어요. 카메라로 찍어 주세요.",
       scanStart: "자동 스캔",
-      cameraDeniedApp: "Foldy 의 카메라 권한이 꺼져 있어요. 설정에서 켜거나 앨범에서 골라 주세요.",
+      cameraDeniedApp: "Foldy의 카메라 권한이 꺼져 있어요. 설정에서 켜거나 앨범에서 골라 주세요.",
       openSettings: "설정 열기",
+      cameraUnavailable: "지금은 카메라를 쓸 수 없어요. 다시 시도하거나 앨범에서 골라 주세요.",
+      cameraRetry: "다시 시도",
     },
     accountProfile: {
       // 설정 허브 서브내비 (2026-07-31)
@@ -23554,6 +23558,8 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       scanStart: "自動スキャン",
       cameraDeniedApp: "Foldy のカメラへのアクセスがオフになっています。設定でオンにするか、アルバムから選んでください。",
       openSettings: "設定を開く",
+      cameraUnavailable: "今はカメラを使えません。もう一度試すか、アルバムから選んでください。",
+      cameraRetry: "もう一度試す",
     },
     accountProfile: {
       // 설정 허브 서브내비 (2026-07-31)

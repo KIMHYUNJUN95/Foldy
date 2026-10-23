@@ -52,16 +52,15 @@ describe("pickExpiredOwners", () => {
   });
 
   it("다른 조직의 멤버십은 보지 않는다", () => {
-    const memberships = [{ organizationId: "other", userId: "a", status: "active", leftAt: null }];
+    // 다른 조직에서는 재직 중이어도, 이 조직을 떠난 지 3년이 지났으면 이 조직의 서류는 지운다.
+    const memberships = [
+      { organizationId: "other", userId: "a", status: "active", leftAt: null },
+      { organizationId: "o", userId: "a", status: "removed", leftAt: "2020-01-01T00:00:00Z" },
+    ];
     expect(pickExpiredOwners([doc("a")], memberships, cutoff)).toEqual([{ organizationId: "o", userId: "a" }]);
   });
 
-  it("멤버십이 없으면 가장 늦은 서류 시각으로 잰다", () => {
-    expect(pickExpiredOwners([doc("a"), doc("a", "2027-01-01T00:00:00Z")], [], cutoff)).toEqual([]);
-    expect(pickExpiredOwners([doc("a"), doc("a", "2025-01-01T00:00:00Z")], [], cutoff)).toEqual([{ organizationId: "o", userId: "a" }]);
-  });
-
-  it("목록이 잘렸으면 멤버십 없는 사람은 건너뛴다", () => {
-    expect(pickExpiredOwners([doc("a")], [], cutoff, { includeOrphans: false })).toEqual([]);
+  it("멤버십이 없으면 지우지 않는다(떠난 시각을 모른다)", () => {
+    expect(pickExpiredOwners([doc("a"), doc("a", "2025-01-01T00:00:00Z")], [], cutoff)).toEqual([]);
   });
 });

@@ -559,7 +559,7 @@ export function IdCardFlow({
         )}
       </dl>
       <div className="idc__cta idc__cta--wide">
-        <a className="idc__btn idc__btn--pri" href={doneHref}>{doneLabel}</a>
+        <Link className="idc__btn idc__btn--pri" href={doneHref}>{doneLabel}</Link>
       </div>
     </main>
   );

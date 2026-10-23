@@ -15,12 +15,22 @@ import { haptic } from "@/lib/haptics";
 import { usePrivacyScreen } from "@/lib/native/privacy-screen";
 import { expiryTone, fieldsForKind, type IdDocumentField } from "@/lib/staff-documents/fields";
 import type { IdDocumentView } from "@/lib/staff-documents/server";
+import { ImageLightbox } from "@/components/shell/image-lightbox";
 import { formatDateKey, idFieldDisplay, idFieldLabel, statusLabel } from "@/components/identity/id-card-flow";
 
 /** 출입국재류관리청 「在留カード等番号失効情報照会」. */
 const VERIFY_URL = "https://lapse-immi.moj.go.jp/";
 
-export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; locale: Locale }) {
+export function IdDocumentPanel({
+  doc,
+  locale,
+  canReview = true,
+}: {
+  doc: IdDocumentView | null;
+  locale: Locale;
+  /** 본인 서류는 서버가 검토를 막는다 — false 면 「확인함」 · 「다시 요청」 칸을 숨긴다. */
+  canReview?: boolean;
+}) {
   const copy = getDictionary(locale).idCard;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -28,6 +38,8 @@ export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; l
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // 앱에서 target="_blank" 는 화면 가리기 밖 외부 브라우저로 나가므로 앱 안 사진 뷰어로 연다.
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   // 앱: 카드 사진 · 칸이 보이는 동안 스크린샷 · 앱 전환기 미리보기를 막는다(docs/product/41 §10). 브라우저에서는 아무것도 안 한다.
   usePrivacyScreen(doc !== null);
 
@@ -41,6 +53,10 @@ export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; l
   }
 
   const tone = expiryTone(doc.expiryDays);
+  const photos = [
+    { url: doc.frontUrl, label: copy.sideFront },
+    { url: doc.backUrl, label: copy.sideBack },
+  ].filter((p): p is { url: string; label: string } => Boolean(p.url));
   const editedLabels = doc.editedFields.map((key: IdDocumentField) => idFieldLabel(copy, doc.kind, key)).join(", ");
 
   function review(decision: "confirm" | "return") {
@@ -89,16 +105,15 @@ export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; l
       </div>
 
       <div className="idp__photos">
-        {[doc.frontUrl, doc.backUrl].map((url, i) =>
-          url ? (
-            <a className="idp__photo" href={url} key={i} rel="noreferrer" target="_blank" aria-label={`${i === 0 ? copy.sideFront : copy.sideBack} · ${copy.adminPhotoOpen}`}>
+        {photos.map(({ url, label }, i) => (
+            <button className="idp__photo" key={label} onClick={() => setViewerIndex(i)} type="button" aria-haspopup="dialog" aria-label={`${label} · ${copy.adminPhotoOpen}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- 10분 서명 URL */}
               <img alt="" src={url} />
-              <span>{i === 0 ? copy.sideFront : copy.sideBack}</span>
-            </a>
-          ) : null,
-        )}
+              <span>{label}</span>
+            </button>
+        ))}
       </div>
+      <ImageLightbox closeLabel={copy.cancel} onClose={() => setViewerIndex(null)} openIndex={viewerIndex} urls={photos.map((p) => p.url)} />
 
       <dl className="idp__kv">
         {fieldsForKind(doc.kind).map((key) => (
@@ -130,7 +145,7 @@ export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; l
         </div>
       )}
 
-      {returning ? (
+      {!canReview ? null : returning ? (
         <div className="idp__return">
           <textarea
             aria-label={copy.adminReturnPlaceholder}
@@ -164,7 +179,7 @@ export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; l
           </button>
         </div>
       )}
-      {error && <p className="idp__error" role="alert">{error}</p>}
+      {canReview && error && <p className="idp__error" role="alert">{error}</p>}
     </section>
   );
 }

@@ -13,30 +13,89 @@
 import { useEffect } from "react";
 import { hasNativePlugin } from "@/lib/native-app";
 
-let holders = 0;
+type TopCapacitor = {
+  isNativePlatform?: () => boolean;
+  isPluginAvailable?: (name: string) => boolean;
+  nativePromise?: (plugin: string, method: string, options?: unknown) => Promise<unknown>;
+};
+type CountBox = { __privacyHolders?: number };
+
+/** iframe(분할 화면 칸)이면 같은 출처인 top 창, 아니면 자기 창. 접근이 막히면 자기 창. */
+function ownerWindow(): Window {
+  try {
+    if (window.top && window.top !== window) {
+      void window.top.location.href; // 다른 출처면 여기서 던진다
+      return window.top;
+    }
+  } catch {
+    // 다른 출처 — 자기 창
+  }
+  return window;
+}
+
+function topCapacitor(): TopCapacitor | null {
+  const owner = ownerWindow();
+  if (owner === window) return null;
+  return (owner as unknown as { Capacitor?: TopCapacitor }).Capacitor ?? null;
+}
+
+/** 이 창(또는 iframe 이면 top 의 Capacitor)에서 화면 가리기 플러그인을 쓸 수 있는가. */
+function privacyAvailable(): boolean {
+  if (hasNativePlugin("PrivacyScreen")) return true;
+  const cap = topCapacitor();
+  try {
+    return Boolean(cap?.isNativePlatform?.() && cap.isPluginAvailable?.("PrivacyScreen"));
+  } catch {
+    return false;
+  }
+}
+
+function holders(): number {
+  return (ownerWindow() as unknown as CountBox).__privacyHolders ?? 0;
+}
+function setHolders(n: number) {
+  (ownerWindow() as unknown as CountBox).__privacyHolders = n;
+}
+
 /** 켜고 끄는 호출이 순서대로 가게 한 줄로 잇는다. */
 let queue: Promise<unknown> = Promise.resolve();
+
+async function callPlugin(method: "enable" | "disable") {
+  const cap = topCapacitor();
+  // iframe — top 의 네이티브 다리로 바로 부른다(이 프레임에는 다리가 없다).
+  if (cap?.nativePromise && !hasNativePlugin("PrivacyScreen")) {
+    await cap.nativePromise("PrivacyScreen", method, {});
+    return;
+  }
+  const { PrivacyScreen } = await import("@capgo/capacitor-privacy-screen");
+  await PrivacyScreen[method]();
+}
 
 function apply(enable: boolean) {
   queue = queue
     .then(async () => {
-      const { PrivacyScreen } = await import("@capgo/capacitor-privacy-screen");
       // 끝난 시점의 수를 다시 본다 — 빠르게 열고 닫으면 마지막 상태만 맞으면 된다.
-      if (enable && holders > 0) await PrivacyScreen.enable();
-      else if (!enable && holders === 0) await PrivacyScreen.disable();
+      if (enable && holders() > 0) await callPlugin("enable");
+      else if (!enable && holders() === 0) await callPlugin("disable");
     })
     .catch(() => undefined);
+}
+
+/** 앱 시작 때 한 번 — 새로고침 · 비정상 종료로 켜진 채 남은 가리기를 끈다(켠 곳이 없을 때만). */
+export function resetPrivacyScreenOnStart() {
+  if (window !== ownerWindow() || holders() > 0 || !privacyAvailable()) return;
+  apply(false);
 }
 
 /** 이 컴포넌트가 떠 있는 동안 화면 가리기를 켠다. `active` 가 false 면 아무것도 하지 않는다. */
 export function usePrivacyScreen(active = true) {
   useEffect(() => {
-    if (!active || !hasNativePlugin("PrivacyScreen")) return;
-    holders += 1;
-    if (holders === 1) apply(true);
+    if (!active || !privacyAvailable()) return;
+    setHolders(holders() + 1);
+    if (holders() === 1) apply(true);
     return () => {
-      holders = Math.max(0, holders - 1);
-      if (holders === 0) apply(false);
+      setHolders(Math.max(0, holders() - 1));
+      if (holders() === 0) apply(false);
     };
   }, [active]);
 }

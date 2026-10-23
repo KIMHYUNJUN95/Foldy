@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { hasNativePlugin, IN_APP_BROWSER_OPTIONS, isNativeApp, nativePlatform } from "@/lib/native-app";
+import { resetPrivacyScreenOnStart } from "@/lib/native/privacy-screen";
 import { hasOpenOverlay } from "@/lib/swipe-back/controller";
 import { isSwipeBackScreen, parentScreen } from "@/lib/swipe-back/history-model";
 import { getBackTarget } from "@/lib/swipe-back/history-tracker";
@@ -138,6 +139,9 @@ export function NativeShellBridge() {
 
     // 6. 기기 글자 크기
     void syncTextZoom();
+
+    // 7. 화면 가리기 — 새로고침 · 비정상 종료로 켜진 채 남지 않게 시작 때 한 번 끈다(켠 화면이 있으면 건드리지 않는다).
+    resetPrivacyScreenOnStart();
 
     // 2. Android 뒤로가기 (+ 6. 앱으로 돌아올 때 글자 크기 다시 맞추기)
     let removeBack: (() => void) | null = null;

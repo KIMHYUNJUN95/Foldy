@@ -6622,6 +6622,7 @@ export type Database = {
         | "board_activity"
         | "announcement_activity"
         | "bug_report_activity"
+        | "id_document_expiring"
       order_request_status:
         | "requested"
         | "approved"
@@ -6835,6 +6836,7 @@ export const Constants = {
         "board_activity",
         "announcement_activity",
         "bug_report_activity",
+        "id_document_expiring",
       ],
       order_request_status: [
         "requested",

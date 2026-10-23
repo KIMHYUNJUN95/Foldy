@@ -9,6 +9,7 @@ import {
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 
 // Admin · Attendance · Staff Detail (Slice 6).
 // Per-user monthly detail page wired to `getAdminStaffDetail` — header KPIs,
@@ -33,9 +34,11 @@ export default async function AdminAttendanceStaffPage({
   const requestedYm =
     typeof q.ym === "string" && /^\d{4}-\d{2}$/.test(q.ym) ? q.ym : currentTokyoYm();
 
-  const [badgeStats, detail] = await Promise.all([
+  const [badgeStats, detail, expiredCardUserIds] = await Promise.all([
     getAdminAttendanceBadgeStats(session, requestedYm),
     getAdminStaffDetail(session, p.userId, requestedYm, localeTag),
+    // 재류카드 만료 칩 — 사람 id 만, 칩은 이 화면을 볼 수 있는(isPrivileged) 사람에게만 그린다(docs/product/41 「만료 표시」).
+    loadExpiredResidenceCardUserIds(session.organization.id),
   ]);
 
   const title = c.staffPageTitle(detail.user.name, detail.monthLabel);
@@ -60,7 +63,12 @@ export default async function AdminAttendanceStaffPage({
       />
 
       {detail.isPrivileged ? (
-        <AttendanceStaffDetail data={detail} locale={locale} localeTag={localeTag} />
+        <AttendanceStaffDetail
+          data={detail}
+          locale={locale}
+          localeTag={localeTag}
+          cardExpired={expiredCardUserIds.includes(detail.user.id)}
+        />
       ) : (
         <AdminNoAccess title={dictionary.admin.shared.noAccessTitle} body={dictionary.admin.shared.noAccessBody} />
       )}

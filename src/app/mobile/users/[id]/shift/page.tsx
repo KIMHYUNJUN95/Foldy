@@ -9,6 +9,7 @@ import { loadPersonShift } from "@/lib/cleaning-assign/person-shift";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 
 /** 배정 · 신청이 바뀌면 새로고침 없이 다시 읽는다(`src/lib/cleaning-assign/live.ts`). */
 const LIVE_KINDS = ["cleaning_assign"] as const;
@@ -33,7 +34,10 @@ export default async function MobileMemberShiftPage({ params, searchParams }: { 
 
   const today = getCleaningOperatingDateKey();
   const ym = isMonthKey(query.ym) ? query.ym! : monthOf(today);
-  const data = await loadPersonShift(supabase, organizationId, membership.data.user_id, ym, today, session.user.id);
+  const [data, expiredCardUserIds] = await Promise.all([
+    loadPersonShift(supabase, organizationId, membership.data.user_id, ym, today, session.user.id),
+    loadExpiredResidenceCardUserIds(organizationId),
+  ]);
   if (!data) notFound();
   const locale = session.user.preferredLanguage;
   const copy = getCleaningAssignCopy(locale);
@@ -42,7 +46,7 @@ export default async function MobileMemberShiftPage({ params, searchParams }: { 
   return (
     <MobileShell activeItem="users" badges={navBadges} title={copy.psSection} wide>
       <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={organizationId} />
-      <PersonShiftView data={data} copy={copy} locale={locale} today={today} basePath={`/mobile/users/${id}/shift`} />
+      <PersonShiftView data={data} copy={copy} locale={locale} today={today} basePath={`/mobile/users/${id}/shift`} cardExpired={expiredCardUserIds.includes(membership.data.user_id)} />
     </MobileShell>
   );
 }

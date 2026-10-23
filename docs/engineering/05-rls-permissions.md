@@ -1535,6 +1535,13 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   읽기 · 지우기 정책 없음 — 보기는 서버의 10분 서명 URL, 지우기는 서버(쓰지 않은 사진 · 개인번호가 보인 사진).
 - 관리자 사용자 패널은 `staff_documents.view` 가 없으면 서류 데이터를 싣지 않는다(UI 숨김만이 아님).
 
+## 2026-10-23 재류카드 「만료됨」 한 비트는 운영 화면 권한으로 본다
+
+- 청소 배정(`cleaning.assign`) · 출근자 명단(`attendance.manage`) · 근태 개요 · 직원 상세(그 화면의 특권 판정)는 이름 옆 「재류카드 만료」 칩을 그린다.
+  서버는 **사람 id 목록만** 싣는다(`loadExpiredResidenceCardUserIds` — service role, `organization_id` 로 거름) — 카드 번호 · 만료일 · 재류자격 · 사진은 싣지 않는다.
+  그래서 `staff_documents.view` 가 없어도 보인다. 카드 자세한 내용 · 사진은 그대로 `staff_documents.view` 만.
+- 만료 알림 `id_document_expiring` 의 관리자 받는 사람은 `staff_documents.view` 활성 멤버(개인 부여 · 차단 반영), 글에는 이름 · 남은 날만. docs/product/41 「만료 표시 · 만료 알림」.
+
 ## 2026-10-23 신분 서류 동의 기록 `staff_id_ocr_reads` (`202610230003`)
 
 - RLS 켜짐 · **정책 없음** — authenticated 는 읽기 · 쓰기 모두 막힘. GRANT 는 `service_role` 만(`all`).

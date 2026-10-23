@@ -3273,3 +3273,6 @@
 .adm .alw-panel .alw-note { margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .adm .alw-panel .alw-err { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: #c5282e; }
 .adm .alw-panel .alw-save { flex: 1; height: 46px; justify-content: center; }
+
+/* 재류카드 만료 칩 — 근태 화면 이름 옆. 사용자 목록 「만료됨」(.usw-doc.is-expired)과 같은 빨강, 경고만(docs/product/41 「만료 표시」). */
+.adm .adm-idexp { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; vertical-align: 1px; font-size: 11px; font-weight: 600; line-height: 1.4; letter-spacing: 0; white-space: nowrap; background: #fdecee; color: #c4364b; cursor: help; }

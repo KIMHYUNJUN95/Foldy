@@ -24,7 +24,7 @@ function corrFieldLabel(field: AdminCorrectionField, c: Att): string {
   return c.corrFieldOther;
 }
 
-function ReviewRow({ item, c, ym }: { item: ReviewQueueItem; c: Att; ym: string }) {
+function ReviewRow({ item, c, ym, cardExpired }: { item: ReviewQueueItem; c: Att; ym: string; cardExpired: boolean }) {
   const isUrgent = item.reviewState === "review_required" && (item.isAbnormal || !item.clockOutLabel);
   // 사유는 데이터로 알 수 있는 것만 — 퇴근 누락 · 장시간(인정 12시간 초과) · 이상 감지(2026-10-13 시안 컨펌).
   const reason = !item.clockOutLabel
@@ -45,6 +45,11 @@ function ReviewRow({ item, c, ym }: { item: ReviewQueueItem; c: Att; ym: string 
       <div className="wrow__b">
         <div className="wrow__t">
           {item.userName}
+          {cardExpired ? (
+            <span className="adm-idexp" title={c.cardExpiredHint}>
+              {c.cardExpiredChip}
+            </span>
+          ) : null}
           <span className="wrow__dim"> · {item.dateLabel}</span>
         </div>
         {subParts.length ? <div className="wrow__s">{subParts.join(" · ")}</div> : null}
@@ -76,11 +81,15 @@ export function AttendanceOverview({
   data,
   c,
   localeTag,
+  expiredCardUserIds = [],
 }: {
   data: AdminAttendanceOverviewData;
   c: Att;
   localeTag: string;
+  /** 재류카드가 만료된 사람 — 이름 옆 빨간 칩(경고만, docs/product/41 「만료 표시」). */
+  expiredCardUserIds?: string[];
 }) {
+  const expiredCards = new Set(expiredCardUserIds);
   const k = data.kpi;
   const yen = (n: number) => `${c.yenSym}${formatAdminYen(n, localeTag)}`;
 
@@ -129,7 +138,7 @@ export function AttendanceOverview({
           {data.reviewSample.length === 0 ? (
             <div className="wempty">{c.cardReviewEmpty}</div>
           ) : (
-            data.reviewSample.map((item) => <ReviewRow key={item.sessionId} item={item} c={c} ym={data.ym} />)
+            data.reviewSample.map((item) => <ReviewRow key={item.sessionId} item={item} c={c} ym={data.ym} cardExpired={expiredCards.has(item.userId)} />)
           )}
         </section>
         <section>

@@ -60,11 +60,20 @@ type Props = {
   canCompare: boolean;
   /** 담당 바꾸기 · 넘기기(`cleaning.assign_swap`) — 사람마다 켜 준 사람만. */
   canSwap: boolean;
+  /** 재류카드가 만료된 사람(빨간 「재류카드 만료」 칩 — 배정은 막지 않는다, docs/product/41 「만료 표시」). */
+  expiredCardUserIds?: string[];
 };
 
 const REFRESH_MS = 20_000;
 
-export function AssignDayBoard({ board, copy, locale, today, shared, propertyLabels, roomOptions, canCompare, canSwap }: Props) {
+export function AssignDayBoard({ board, copy, locale, today, shared, propertyLabels, roomOptions, canCompare, canSwap, expiredCardUserIds = [] }: Props) {
+  const expiredCards = new Set(expiredCardUserIds);
+  const cardChip = (userId: string) =>
+    expiredCards.has(userId) ? (
+      <small className="cas-idexp" title={copy.cardExpiredHint}>
+        {copy.cardExpired}
+      </small>
+    ) : null;
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [pending, startTransition] = useTransition();
@@ -343,6 +352,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
               {p.name.slice(0, 1)}
             </span>
             <b>{p.name}</b>
+            {cardChip(p.userId)}
             {suggested.has(p.userId) ? <small className="is-sug">{copy.suggest}</small> : null}
             <span className={p.rooms.length === 0 ? "is-warn" : ""}>{p.rooms.length === 0 ? copy.seatWaiting : fill(copy.seatRoomsN, { n: p.rooms.length })}</span>
           </button>
@@ -446,6 +456,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                 </span>
                 {p.name}
                 {p.trainee ? <small>{fill(copy.traineeShort, { n: personById.get(p.userId)?.traineeCount ?? "" })}</small> : null}
+                {cardChip(p.userId)}
                 <button type="button" className="cas-token__x" aria-label={fill(copy.seatRemoveAria, { name: p.name, room: roomTitle(room) })} disabled={pending} onClick={() => removeSeat(room, p.userId)}>
                   <X aria-hidden="true" />
                 </button>
@@ -454,6 +465,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
               <span key={p.userId} className={`cas-chip${picked?.userId === p.userId ? " is-picked" : ""}`} title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
                 {p.name}
                 {p.trainee ? <small>{fill(copy.traineeShort, { n: personById.get(p.userId)?.traineeCount ?? "" })}</small> : null}
+                {cardChip(p.userId)}
               </span>
             ),
           )}
@@ -820,6 +832,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                   <span className="cas-person__name">
                     {p.name}
                     <small className="is-muted">{roleLabel(p.role, copy)}</small>
+                    {cardChip(p.userId)}
                     {p.priority ? <small>{copy.prio}</small> : null}
                   </span>
                   <span className="cas-person__sub">{p.lastWorked ? fill(copy.lastWorked, { date: shortDate(p.lastWorked), n: p.monthDays }) : copy.neverWorked}</span>
@@ -859,6 +872,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                   >
                   <span className="cas-person__name">
                     {p.name}
+                    {cardChip(p.userId)}
                     {p.priority ? <small>{copy.prio}</small> : null}
                     {p.trainee ? <small title={fill(copy.traineeBuildings, { list: Object.entries(p.traineeByProperty).map(([k, v]) => `${label(k)} ${v}`).join(" · ") })}>{fill(copy.traineeNth, { n: p.traineeCount + (p.rooms.length > 0 ? 0 : 1) })}</small> : null}
                     {p.fixed.slice(0, 1).map((f) => (

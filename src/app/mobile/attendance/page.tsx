@@ -13,6 +13,8 @@ import {
 import { getMonthlyPayView } from "@/lib/attendance-pay";
 import { getDictionary } from "@/lib/i18n";
 import { canViewRoster } from "@/config/roles";
+import { residenceCardNotice } from "@/lib/staff-documents/expiry";
+import { loadOwnResidenceCardDaysLeft } from "@/lib/staff-documents/server";
 
 type PageProps = {
   searchParams: Promise<{ state?: string }>;
@@ -56,8 +58,8 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
 
   // Real state: open session with an open break → 휴게 중; open session → 근무 중; otherwise → 출근 전.
   // Fetch monthly pay view in parallel (skip in preview mode; catch errors gracefully).
-  const [openSession, monthlyPayView, abandonedSessions] = previewState
-    ? [null, null, []]
+  const [openSession, monthlyPayView, abandonedSessions, idCardDaysLeft] = previewState
+    ? [null, null, [], null]
     : await Promise.all([
         getCurrentOpenSession(session.organization.id, session.user.id, session.user.preferredLanguage),
         getMonthlyPayView(
@@ -68,6 +70,8 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
         ).catch(() => null),
         // 퇴근을 안 찍고 넘어간 날들. 본인이 알아야 정정 요청을 낼 수 있다(2026-08-04).
         getAbandonedSessions(session.organization.id, session.user.id).catch(() => []),
+        // 본인 재류카드 만료 · 30일 안 안내(docs/product/41 「만료 표시」). 실패하면 null(안내 없음).
+        loadOwnResidenceCardDaysLeft(session.organization.id, session.user.id),
       ]);
   const homeState =
     previewState ??
@@ -136,6 +140,7 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
         monthHours={monthHours}
         monthPay={monthPay}
         canSeeRoster={canSeeRoster}
+        idCardNotice={residenceCardNotice(idCardDaysLeft)}
       />
     </MobileShell>
   );

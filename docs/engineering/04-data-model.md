@@ -901,6 +901,11 @@ task_due_soon
 task_overdue
 project_shared
 suggestion_activity
+attendance_activity
+board_activity
+announcement_activity
+bug_report_activity
+id_document_expiring
 ```
 
 Implementation notes:
@@ -917,6 +922,13 @@ Implementation notes:
   today (Tokyo), overdue = active task due before today. The `unique (recipient_user_id, dedupe_key)`
   constraint (key `task_due_soon|task_overdue:<taskId>`) limits each task to one reminder per recipient,
   so the cron never re-spams. See `docs/product/14-notification-design.md` for the full matrix.
+- `id_document_expiring` (migration `202610230008_id_document_expiry_notification.sql`, 2026-10-23) is a
+  time-based reminder from the same daily cron (`src/lib/notifications/id-document-reminders.ts`): current
+  residence cards (not My Number cards; status pending/confirmed) at 90 days / 30 days / expired, sent "on or
+  after crossing", only the most urgent stage. Dedupe key `id_doc_expiring:<documentId>:<stage>`. Recipients:
+  the holder (`/account/id-card`) + active members with `staff_documents.view` (`/mobile/users/<membershipId>`).
+  Payload `{ documentId, subjectUserId, subjectName, stage, daysLeft, audience: "holder" | "admin" }`.
+  See `docs/product/41-residence-card-workflow.md` 「만료 표시 · 만료 알림」.
 - Self-notifications are suppressed for event-driven types (the actor is excluded from recipients).
   Reminders have no actor, so a task's author is intentionally reminded about their own deadline.
 - A `schemaUnavailable` graceful fallback is used if the migration has not yet been applied; the

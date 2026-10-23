@@ -3992,3 +3992,24 @@
 @keyframes payw-grow { from { transform: scaleY(.04); } }
 @keyframes payw-glow { 50% { box-shadow: 0 0 14px 2px rgba(122, 82, 230, .5); } }
 @media (prefers-reduced-motion: reduce) { .payo__strip, .att.att--payw .payw-bar i { animation-duration: 1ms !important; animation-delay: 0ms !important; } }
+
+/* 재류카드 안내(본인) — 차분한 카드 한 장 · 누르면 /account/id-card. 30일 안 = 옅은 보라, 만료 = 옅은 빨강(docs/product/41 「만료 표시」). */
+.att .att-idcard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: #f4f1fd;
+  color: inherit;
+  text-decoration: none;
+  text-align: left;
+}
+.att .att-idcard.is-expired { background: #fdecee; }
+.att .att-idcard__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.att .att-idcard__b b { font-size: 14px; font-weight: 700; line-height: 1.35; color: #3b2a7a; }
+.att .att-idcard.is-expired .att-idcard__b b { color: #ad2a3f; }
+.att .att-idcard__b span { font-size: 12.5px; font-weight: 500; line-height: 1.5; color: #4a4658; }
+.att .att-idcard__a { flex: none; font-size: 13px; font-weight: 700; color: #5a30cf; white-space: nowrap; }
+.att .att-idcard.is-expired .att-idcard__a { color: #ad2a3f; }

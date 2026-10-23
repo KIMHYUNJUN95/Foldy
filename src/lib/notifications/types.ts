@@ -91,6 +91,20 @@ export type AttendanceNotificationPayload = {
   correctionId?: string | null;
 };
 
+export type IdDocumentExpiryNotificationPayload = {
+  documentId: string;
+  /** 카드 주인. 관리자 알림이면 「OOO님」의 그 사람. */
+  subjectUserId: string;
+  /** 보낸 때의 이름(관리자 알림 글에만 쓴다). */
+  subjectName: string | null;
+  /** 90일 전 · 30일 전 · 만료 — `src/lib/staff-documents/expiry.ts`. */
+  stage: "d90" | "d30" | "expired";
+  /** 보낸 날 기준 남은 날(크론이 하루 빠지면 89처럼 단계 값과 다를 수 있다). 만료면 음수. */
+  daysLeft: number;
+  /** 본인 알림인가, `staff_documents.view` 가진 사람 알림인가 — 글이 다르다. */
+  audience: "holder" | "admin";
+};
+
 export type NotificationPayloadByType = {
   order_processed: OrderProcessedNotificationPayload;
   task_shared: TaskNotificationPayload;
@@ -104,6 +118,7 @@ export type NotificationPayloadByType = {
   attendance_activity: AttendanceNotificationPayload;
   board_activity: BoardNotificationPayload;
   bug_report_activity: BugReportNotificationPayload;
+  id_document_expiring: IdDocumentExpiryNotificationPayload;
 };
 
 export function isTaskNotificationPayload(
@@ -183,5 +198,18 @@ export function isAttendanceNotificationPayload(
     record.event === "correction_rejected" ||
     record.event === "abnormal_session" ||
     record.event === "open_session_reminder"
+  );
+}
+
+export function isIdDocumentExpiryNotificationPayload(
+  payload: unknown,
+): payload is IdDocumentExpiryNotificationPayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  const record = payload as Record<string, unknown>;
+  return (
+    typeof record.documentId === "string" &&
+    (record.stage === "d90" || record.stage === "d30" || record.stage === "expired") &&
+    typeof record.daysLeft === "number" &&
+    (record.audience === "holder" || record.audience === "admin")
   );
 }

@@ -417,3 +417,10 @@
 .adm .cas-over__keys { align-self: center; font-size: 11.5px; color: #8e8a99; }
 @keyframes cas-over-new { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .adm .cas-over__face.is-new { animation: none; } }
+
+/* 재류카드 만료 칩 — 사용자 목록 「만료됨」(.usw-doc.is-expired)과 같은 빨강. 배정은 막지 않는 경고(docs/product/41 「만료 표시」). */
+.adm small.cas-idexp,
+.adm .cas-person__name small.cas-idexp,
+.adm .cas-mname small.cas-idexp,
+.adm .cas-chip small.cas-idexp,
+.adm .cas-token small.cas-idexp { flex: none; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; line-height: 1.4; white-space: nowrap; background: #fdecee; color: #c4364b; cursor: help; }

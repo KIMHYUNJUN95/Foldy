@@ -250,3 +250,6 @@
   .psv-pane .psc-btn { width: 100%; height: 50px; font-size: 17px; }
   .psv-pane .psc-btn:not(.is-pri) { background: #fff; }
 }
+
+/* 재류카드 만료 칩 — 사용자 목록 「만료됨」(.muw-doc.is-expired)과 같은 빨강(docs/product/41 「만료 표시」). */
+.psv-name span.psv-idexp { align-self: flex-start; margin-top: 4px; padding: 2px 8px; border-radius: 7px; font-size: 12px; font-weight: 600; line-height: 1.3; background: #fdecee; color: #c4364b; }

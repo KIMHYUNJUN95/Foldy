@@ -216,6 +216,13 @@ design-phase preview index existed during review and was **removed on completion
 `?state=` / `?result=` affordances are development-preview compatibility only and must not be treated as
 the source of operational state.
 
+## 재류카드 만료 — 칩 · 본인 안내 (2026-10-23)
+
+- 관리자: 근태 개요의 검토 목록 · 출근자 명단 · 직원 상세 이름 옆에 빨간 칩 「재류카드 만료」(올리면 특례기간 안내). 출근자 명단은 `attendance.manage` 일 때만,
+  개요 · 직원 상세는 그 화면 특권 판정일 때만 싣는다. 사람 id 만 — 카드 내용 없음.
+- 본인: `/mobile/attendance` 홈 오른쪽 칸 맨 위(폰 · 폴드는 버튼 아래)에 차분한 카드 — 만료 「재류카드 기간이 지났어요」, 30일 안 「재류카드 기간이 N일 남았어요」, 누르면 `/account/id-card`.
+- 출근 · 퇴근 · 급여는 막지 않는다(경고만). 규칙: docs/product/41 「만료 표시 · 만료 알림」.
+
 ## Current Product Scope
 
 Implemented scope: GPS + QR clock-in/out, break start/stop with clock-out blocked during an open break,

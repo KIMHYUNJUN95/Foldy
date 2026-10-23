@@ -9,6 +9,7 @@ import {
   isAttendanceNotificationPayload,
   isBoardNotificationPayload,
   isBugReportNotificationPayload,
+  isIdDocumentExpiryNotificationPayload,
   isOrderProcessedPayload,
   isProjectNotificationPayload,
   isSuggestionNotificationPayload,
@@ -222,6 +223,23 @@ function briefOf(row: NotificationRow, locale: Locale, actorNames: Map<string, s
       default:
         return { title: copy.tReminder, object: copy.oReminder, icon: "clock", source: src, event: payload.event };
     }
+  }
+
+  if (row.type === "id_document_expiring" && isIdDocumentExpiryNotificationPayload(payload)) {
+    const expired = payload.stage === "expired";
+    const admin = payload.audience === "admin";
+    const values = { n: Math.max(0, payload.daysLeft), name: payload.subjectName ?? "" };
+    const title = fill(
+      expired ? (admin ? copy.tIdDocExpiredAdmin : copy.tIdDocExpired) : admin ? copy.tIdDocExpiringAdmin : copy.tIdDocExpiring,
+      values,
+    );
+    return {
+      title,
+      object: admin ? copy.oIdDocCheck : copy.oIdDocRenew,
+      icon: expired ? "flag" : "clock",
+      source: copy.sIdDoc,
+      event: `${payload.audience}:${payload.stage}`,
+    };
   }
 
   // 모르는 종류 · 깨진 payload — 예전 긴 문장 그대로.

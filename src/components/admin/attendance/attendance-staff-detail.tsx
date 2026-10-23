@@ -64,10 +64,13 @@ export function AttendanceStaffDetail({
   data,
   locale,
   localeTag,
+  cardExpired = false,
 }: {
   data: AdminStaffDetailData;
   locale: Locale;
   localeTag: string;
+  /** 재류카드 만료 — 이름 옆 빨간 칩(경고만, docs/product/41 「만료 표시」). */
+  cardExpired?: boolean;
 }) {
   const c = getDictionary(locale).admin.attendanceConsole;
   const [panelSel, setPanelSel] = useState<string | null>(null);
@@ -122,7 +125,14 @@ export function AttendanceStaffDetail({
           {initial(data.user.name)}
         </span>
         <div className="uhead__b">
-          <div className="uhead__nm">{data.user.name}</div>
+          <div className="uhead__nm">
+            {data.user.name}
+            {cardExpired ? (
+              <span className="adm-idexp" title={c.cardExpiredHint}>
+                {c.cardExpiredChip}
+              </span>
+            ) : null}
+          </div>
           <div className="uhead__sub">
             {data.user.role ?? "—"}
             <span className="sep" />

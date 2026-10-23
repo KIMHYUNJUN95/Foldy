@@ -15,6 +15,8 @@ type Props = {
   initialTodayDate: string;
   locale: Locale;
   localeTag: string;
+  /** 재류카드가 만료된 사람 — 이름 옆 빨간 칩(경고만, docs/product/41 「만료 표시」). */
+  expiredCardUserIds?: string[];
 };
 
 type StatusMeta = {
@@ -76,7 +78,9 @@ export function AttendanceRosterClient({
   initialTodayDate,
   locale,
   localeTag,
+  expiredCardUserIds = [],
 }: Props) {
+  const expiredCards = new Set(expiredCardUserIds);
   const c = getDictionary(locale).admin.attendanceConsole;
   const [rosterDay, setRosterDay] = useState(initialRosterDay);
   const [todayDate, setTodayDate] = useState(initialTodayDate);
@@ -262,7 +266,14 @@ export function AttendanceRosterClient({
                             {e.avatarInitial}
                           </span>
                           <div>
-                            <div className="who__nm">{e.name}</div>
+                            <div className="who__nm">
+                              {e.name}
+                              {expiredCards.has(e.userId) ? (
+                                <span className="adm-idexp" title={c.cardExpiredHint}>
+                                  {c.cardExpiredChip}
+                                </span>
+                              ) : null}
+                            </div>
                             <div className="who__sub">{e.role}</div>
                           </div>
                         </div>

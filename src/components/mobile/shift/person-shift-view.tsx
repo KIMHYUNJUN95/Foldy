@@ -34,7 +34,22 @@ function useIsFold(): boolean {
   return useSyncExternalStore(subscribeFold, () => window.matchMedia(FOLD_QUERY).matches, () => false);
 }
 
-export function PersonShiftView({ data, copy, locale, today, basePath }: { data: PersonShift; copy: CleaningAssignCopy; locale: string; today: string; basePath: string }) {
+export function PersonShiftView({
+  data,
+  copy,
+  locale,
+  today,
+  basePath,
+  cardExpired = false,
+}: {
+  data: PersonShift;
+  copy: CleaningAssignCopy;
+  locale: string;
+  today: string;
+  basePath: string;
+  /** 재류카드 만료 — 이름 아래 빨간 칩(막지 않음, docs/product/41 「만료 표시」). */
+  cardExpired?: boolean;
+}) {
   const router = useRouter();
   const isTablet = useIsTablet();
   const isFold = useIsFold();
@@ -98,6 +113,11 @@ export function PersonShiftView({ data, copy, locale, today, basePath }: { data:
           <span className="psv-name">
             <h1>{person.name}</h1>
             <span>{psPersonLine(person, copy)}</span>
+            {cardExpired ? (
+              <span className="psv-idexp" title={copy.cardExpiredHint}>
+                {copy.cardExpired}
+              </span>
+            ) : null}
           </span>
         </div>
         <PersonShiftStats summary={data.summary} copy={copy} />

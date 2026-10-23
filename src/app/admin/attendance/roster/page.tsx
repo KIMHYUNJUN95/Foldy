@@ -5,6 +5,7 @@ import { getAttendanceRoster } from "@/lib/attendance-roster";
 import { currentTokyoYm, getAdminAttendanceBadgeStats } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 
 function tokyoDateKey(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -57,9 +58,13 @@ export default async function AdminAttendanceRosterPage({
   const operatingDate = clampRosterDate(params.date, todayDate);
   const carriedYm = currentTokyoYm();
 
-  const [badgeStats, rosterDay] = await Promise.all([
+  const [badgeStats, rosterDay, expiredCardUserIds] = await Promise.all([
     getAdminAttendanceBadgeStats(session, carriedYm),
     getAttendanceRoster(session.organization.id, operatingDate, localeTag),
+    // 재류카드 만료 칩 — 근태 관리(`attendance.manage`) 하는 사람에게만, 사람 id 만(docs/product/41 「만료 표시」).
+    session.capabilities.includes("attendance.manage")
+      ? loadExpiredResidenceCardUserIds(session.organization.id)
+      : Promise.resolve<string[]>([]),
   ]);
 
   return (
@@ -90,6 +95,7 @@ export default async function AdminAttendanceRosterPage({
         initialTodayDate={todayDate}
         locale={locale}
         localeTag={localeTag}
+        expiredCardUserIds={expiredCardUserIds}
       />
     </AdminShell>
   );

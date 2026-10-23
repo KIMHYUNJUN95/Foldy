@@ -351,7 +351,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             role="checkbox"
             aria-checked={mine}
             aria-label={`${roomTitle(room)} — ${mine ? copy.removeHere : copy.seatVerbAdd}`}
-            className={`cas-check${mine ? " is-on" : ""}`}
+            className={`cas-seatcheck${mine ? " is-on" : ""}`}
             disabled={pending}
             onClick={(event) => {
               event.stopPropagation();

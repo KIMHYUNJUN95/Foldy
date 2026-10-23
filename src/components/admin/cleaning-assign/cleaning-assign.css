@@ -386,15 +386,15 @@
 .adm .cas-room.is-toggle:hover { background: #f7f6fa; }
 .adm .cas-room.is-toggle.is-mine { border-radius: 0; }
 .adm .cas-room.is-toggle.is-mine:hover { background: #efeafb; }
-.adm .cas-check { display: grid; place-items: center; align-self: center; width: 22px; height: 22px; min-width: 22px; min-height: 0; aspect-ratio: 1; box-sizing: border-box; padding: 0; border: 0; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1.6px #c9c4d6; color: #fff; cursor: pointer; transition: background 160ms ease, box-shadow 160ms ease, transform 140ms cubic-bezier(.23, 1, .32, 1); }
-.adm .cas-check svg { width: 14px; height: 14px; stroke-width: 3; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 220ms cubic-bezier(.23, 1, .32, 1) 40ms; }
-.adm .cas-check.is-on { background: #7a52e6; box-shadow: none; }
-.adm .cas-check.is-on svg { stroke-dashoffset: 0; }
-.adm .cas-room.is-toggle:active .cas-check { transform: scale(.9); }
-.adm .cas-room.is-toggle:hover .cas-check:not(.is-on) { box-shadow: inset 0 0 0 1.6px #a98ef0; }
+.adm .cas-seatcheck { display: grid; place-items: center; align-self: center; width: 22px; height: 22px; min-width: 22px; min-height: 0; aspect-ratio: 1; box-sizing: border-box; padding: 0; border: 0; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1.6px #c9c4d6; color: #fff; cursor: pointer; transition: background 160ms ease, box-shadow 160ms ease, transform 140ms cubic-bezier(.23, 1, .32, 1); }
+.adm .cas-seatcheck svg { width: 14px; height: 14px; stroke-width: 3; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 220ms cubic-bezier(.23, 1, .32, 1) 40ms; }
+.adm .cas-seatcheck.is-on { background: #7a52e6; box-shadow: none; }
+.adm .cas-seatcheck.is-on svg { stroke-dashoffset: 0; }
+.adm .cas-room.is-toggle:active .cas-seatcheck { transform: scale(.9); }
+.adm .cas-room.is-toggle:hover .cas-seatcheck:not(.is-on) { box-shadow: inset 0 0 0 1.6px #a98ef0; }
 .adm .cas-room__verb { width: 40px; text-align: right; font-size: 13px; font-weight: 600; color: #5a30cf; }
 .adm .cas-room__verb.is-on { color: #8e8a99; }
 @media (prefers-reduced-motion: reduce) {
   .adm .cas-token, .adm .cas-seatpop { animation: none; }
-  .adm .cas-token__x, .adm .cas-check, .adm .cas-check svg { transition: none; }
+  .adm .cas-token__x, .adm .cas-seatcheck, .adm .cas-seatcheck svg { transition: none; }
 }

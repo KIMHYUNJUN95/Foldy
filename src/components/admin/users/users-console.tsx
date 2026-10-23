@@ -122,6 +122,7 @@ export function UsersConsole({
     setPicked([]);
   };
 
+  // 검색 · 거르기를 바꾸면 안 보이는 사람은 인쇄에서 뺀다(고른 줄이 화면에 다 보이게, 2026-10-23 점검) — 아래 filtered 다음에 계산.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const digits = q.replace(/\D/g, "");
@@ -135,6 +136,8 @@ export function UsersConsole({
       return matchesQuery && matchesRole && matchesTeam && matchesStatus && matchesDoc;
     });
   }, [members, query, fRole, fTeam, fStatus, fDoc]);
+  const visibleIds = useMemo(() => new Set(filtered.map((m) => m.userId)), [filtered]);
+  const pickedVisible = picked.filter((id) => visibleIds.has(id));
 
   const joined = (value: string | null) => (value ? value.slice(0, 10).replaceAll("-", ".") : "—");
   const open = (id: string) => router.push(`/admin/users?member=${id}`, { scroll: false });
@@ -209,14 +212,17 @@ export function UsersConsole({
         ) : null}
         {selecting ? (
           <div className="usw-printbar" role="group" aria-label={c.printSelect}>
-            <span className="usw-printbar__hint">{c.printSelectHint}</span>
+            <span className="usw-printbar__hint">
+              {picked.length >= MAX_PRINT_PEOPLE ? c.printMaxHint.replace("{n}", String(MAX_PRINT_PEOPLE)) : c.printSelectHint}
+            </span>
             <button
               type="button"
               className="usw-link"
               onClick={() => {
                 haptic("light");
-                setPicked(
-                  [...new Set(filtered.filter((m) => m.idDoc).map((m) => m.userId))].slice(0, MAX_PRINT_PEOPLE),
+                // 앞에서 고른 사람에 더한다(바꾸지 않음) — 상한은 아래 안내로 알린다.
+                setPicked((list) =>
+                  [...new Set([...list, ...filtered.filter((m) => m.idDoc).map((m) => m.userId)])].slice(0, MAX_PRINT_PEOPLE),
                 );
               }}
             >
@@ -225,15 +231,15 @@ export function UsersConsole({
             <button type="button" className="usw-btn" onClick={stopSelecting}>
               {c.printSelectCancel}
             </button>
-            {picked.length > 0 ? (
+            {pickedVisible.length > 0 ? (
               <a
                 className="usw-btn is-pri"
-                href={`/account/id-card/print?u=${picked.join(",")}`}
+                href={`/account/id-card/print?u=${pickedVisible.join(",")}`}
                 rel="noopener"
                 target="_blank"
               >
                 <Printer size={14} aria-hidden="true" />
-                {c.printSelected.replace("{n}", String(picked.length))}
+                {c.printSelected.replace("{n}", String(pickedVisible.length))}
               </a>
             ) : (
               <button type="button" className="usw-btn is-pri" disabled>

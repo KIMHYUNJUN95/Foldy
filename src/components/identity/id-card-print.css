@@ -120,6 +120,8 @@
   }
   html, body { background: #fff !important; }
   [data-splash] { display: none !important; }
+  /* 사진을 다 불러오기 전 Ctrl+P — 빈 카드 칸이 인쇄되지 않게 종이를 숨긴다(2026-10-23 점검). */
+  .icp:not([data-ready]) .icp-sheet { display: none !important; }
   .icp { min-height: 0; padding: 0; background: #fff; }
   .icp-bar { display: none !important; }
   .icp-sheets { display: block; zoom: 1 !important; }

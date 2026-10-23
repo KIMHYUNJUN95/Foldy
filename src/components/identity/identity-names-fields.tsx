@@ -18,7 +18,6 @@ import {
   NATIONALITY_CODES,
   localNameField,
   nationalityName,
-  normalizeEnglishName,
   normalizeKatakana,
   type IdentityErrorKey,
   type IdentityField,

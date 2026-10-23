@@ -261,3 +261,6 @@ A4 인쇄도 앞면만(マイナンバーカード（表面）写し). 개인번
   → 「N명 인쇄」가 새 탭으로 인쇄 화면. 모바일은 한 사람씩.
 - 코드: `src/app/account/id-card/print/{page,actions}.ts(x)` · `src/components/identity/id-card-print-view.tsx` · `id-card-print.css` ·
   `src/lib/staff-documents/{print,print-server}.ts` · 마이그레이션 `202610230006_staff_document_print_logs.sql`(**운영 적용 대기**) · 테스트 `staff-document-print.test.ts`.
+- **R3 인쇄 점검 반영(2026-10-23)**: 「인쇄」 버튼은 누른 자리에서 바로 인쇄 창을 연다(Safari 가 서버 기다린 뒤의 인쇄를 막을 수 있어). 기록은 인쇄 창이 열리는 순간(`beforeprint`) 한 곳에서 남기고, 실패하면 화면에 알림만 — 「기록 실패 시 인쇄 안 함」은 보장하지 않는다.
+  사진을 다 불러오기 전 Ctrl+P 면 종이를 숨김(빈 칸 인쇄 방지). 「돌아가기」는 탭을 못 닫으면 사용자 관리로. PC 목록 고르기: 검색 · 거르기로 안 보이게 된 사람은 인쇄에서 빠지고, 「서류 있는 사람 모두」는 더하기, 50명 상한은 안내 문구로.
+

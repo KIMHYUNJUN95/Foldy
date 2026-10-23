@@ -11,7 +11,7 @@
  */
 
 import { Printer } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { recordIdDocumentPrint } from "@/app/account/id-card/print/actions";
 import {
@@ -56,7 +56,8 @@ export function IdCardPrintView({
   const [large, setLarge] = useState(false);
   const [ready, setReady] = useState(people.length === 0);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // 닫기를 막는 탭에서 돌아갈 곳. 폰 화면이면 미들웨어가 /mobile 쪽으로 보낸다.
+  const backHref = "/admin/users";
   const [footerAt, setFooterAt] = useState(() => new Date(printedAt));
   const [zoom, setZoom] = useState(1);
   const sheetsRef = useRef<HTMLDivElement>(null);
@@ -91,15 +92,19 @@ export function IdCardPrintView({
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  // Ctrl+P · 브라우저 메뉴 인쇄도 기록한다. 바닥글의 출력 일시는 실제 인쇄 순간으로.
+  // 기록은 인쇄 창이 열리는 순간(beforeprint) 한 곳에서만 남긴다 — 버튼 · Ctrl+P · 브라우저 메뉴 모두.
+  // 예전엔 버튼이 서버 기록을 기다린 뒤 window.print() 를 불러, Safari 가 「사용자 동작이 아님」으로 막거나 다시 물을 수 있었다(2026-10-23 점검).
+  // 그래서 「기록이 실패하면 인쇄하지 않음」은 보장하지 않는다(실패하면 화면에 알림만). 바닥글의 출력 일시는 실제 인쇄 순간으로.
   useEffect(() => {
     const onBefore = () => {
       flushSync(() => setFooterAt(new Date()));
-      if (loggedByButton.current) {
-        loggedByButton.current = false;
-        return;
+      if (loggedByButton.current) return;
+      loggedByButton.current = true;
+      if (idsKey) {
+        void recordIdDocumentPrint(idsKey.split(",")).then((result) => {
+          if (!result.ok) setError(copy.printLogFailed);
+        });
       }
-      if (idsKey) void recordIdDocumentPrint(idsKey.split(","));
     };
     const onAfter = () => {
       loggedByButton.current = false;
@@ -110,25 +115,18 @@ export function IdCardPrintView({
       window.removeEventListener("beforeprint", onBefore);
       window.removeEventListener("afterprint", onAfter);
     };
-  }, [idsKey]);
+  }, [idsKey, copy.printLogFailed]);
 
   function print() {
     setError(null);
-    startTransition(async () => {
-      const result = await recordIdDocumentPrint(userIds);
-      if (!result.ok) {
-        setError(copy.printLogFailed);
-        return;
-      }
-      loggedByButton.current = true;
-      window.print();
-    });
+    // 누른 그 자리에서 바로 연다(사용자 동작 유지). 기록은 위 beforeprint 가 남긴다.
+    window.print();
   }
 
   const footer = printFooter(footerAt, printerName);
 
   return (
-    <main className="icp" data-size={large ? "large" : "actual"}>
+    <main className="icp" data-ready={ready ? "" : undefined} data-size={large ? "large" : "actual"}>
       <div className="icp-bar">
         <div className="icp-bar__row">
           <p className="icp-bar__count">
@@ -140,13 +138,23 @@ export function IdCardPrintView({
                 <input checked={large} onChange={(e) => setLarge(e.target.checked)} type="checkbox" />
                 <span>{copy.printLarge}</span>
               </label>
-              <button className="icp-bar__btn" disabled={!ready || pending} onClick={print} type="button">
+              <button className="icp-bar__btn" disabled={!ready} onClick={print} type="button">
                 <Printer aria-hidden="true" />
                 {ready ? copy.printCta : copy.printLoading}
               </button>
             </>
           ) : null}
-          <button className="icp-bar__close" onClick={() => window.close()} type="button">
+          <button
+            className="icp-bar__close"
+            onClick={() => {
+              window.close();
+              // 탭을 닫을 수 없는 경우(방문 기록이 여러 개) — 사용자 관리로.
+              window.setTimeout(() => {
+                if (!window.closed) window.location.assign(backHref);
+              }, 150);
+            }}
+            type="button"
+          >
             {copy.printBack}
           </button>
         </div>

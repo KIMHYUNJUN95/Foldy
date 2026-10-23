@@ -127,14 +127,14 @@
 .adm .cas-person__req.is-amber i { background: #f07b1a; }
 .adm .cas-person__req.is-amber b { color: #8a4b00; }
 .adm .cas-person__reqacts { display: flex; gap: 6px; flex-wrap: wrap; }
-.adm .cas-chip { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #f4f4f7; color: #3a3746; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
-.adm .cas-chip:hover:not(:disabled) { background: #ececf0; }
-.adm .cas-chip:active:not(:disabled) { transform: scale(.97); }
-.adm .cas-chip:disabled { opacity: .5; cursor: default; }
-.adm .cas-chip.is-red { background: #fdecec; color: #b4232a; }
-.adm .cas-chip.is-red:hover:not(:disabled) { background: #fadcdc; }
-.adm .cas-chip.is-pri { background: #7a52e6; color: #fff; }
-.adm .cas-chip.is-pri:hover:not(:disabled) { background: #6b43dc; }
+.adm .cas-reqbtn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #f4f4f7; color: #3a3746; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, transform 140ms ease, opacity 150ms ease; }
+.adm .cas-reqbtn:hover:not(:disabled) { background: #ececf0; }
+.adm .cas-reqbtn:active:not(:disabled) { transform: scale(.97); }
+.adm .cas-reqbtn:disabled { opacity: .5; cursor: default; }
+.adm .cas-reqbtn.is-red { background: #fdecec; color: #b4232a; }
+.adm .cas-reqbtn.is-red:hover:not(:disabled) { background: #fadcdc; }
+.adm .cas-reqbtn.is-pri { background: #7a52e6; color: #fff; }
+.adm .cas-reqbtn.is-pri:hover:not(:disabled) { background: #6b43dc; }
 /* 「일정 취소」 — 평소엔 회색 글자, 올렸을 때만 빨강(빨강은 요청 줄 하나만 눈에 띄게). */
 .adm .cas-quietdanger { height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #8e8a99; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: color 150ms ease, background 150ms ease; }
 .adm .cas-quietdanger:hover:not(:disabled) { color: #b4232a; background: #fdecec; }

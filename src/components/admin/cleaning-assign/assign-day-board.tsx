@@ -695,10 +695,10 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                         {p.cancelRequestNote ? <span>{p.cancelRequestNote}</span> : null}
                       </span>
                       <span className="cas-person__reqacts">
-                        <button type="button" className="cas-chip is-red" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: true, date: board.date, userId: p.userId }))}>
+                        <button type="button" className="cas-reqbtn is-red" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: true, date: board.date, userId: p.userId }))}>
                           {copy.cancelRequestAccept}
                         </button>
-                        <button type="button" className="cas-chip" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: false, date: board.date, userId: p.userId }))}>
+                        <button type="button" className="cas-reqbtn" disabled={pending} onClick={() => run(() => resolveCancelRequest({ accept: false, date: board.date, userId: p.userId }))}>
                           {copy.cancelRequestReject}
                         </button>
                       </span>
@@ -711,10 +711,10 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                         <b>{copy.traineeAsk}</b>
                       </span>
                       <span className="cas-person__reqacts">
-                        <button type="button" className="cas-chip is-pri" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: true, userId: p.userId }))}>
+                        <button type="button" className="cas-reqbtn is-pri" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: true, userId: p.userId }))}>
                           {copy.traineeDone}
                         </button>
-                        <button type="button" className="cas-chip" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: false, userId: p.userId }))}>
+                        <button type="button" className="cas-reqbtn" disabled={pending} onClick={() => run(() => answerTraineeCheck({ currentCount: p.traineeCount, done: false, userId: p.userId }))}>
                           {copy.traineeKeep}
                         </button>
                       </span>

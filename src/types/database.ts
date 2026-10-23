@@ -3810,6 +3810,7 @@ export type Database = {
           id: string
           joined_at: string | null
           leave_approver_role: string | null
+          left_at: string | null
           organization_id: string
           role: Database["public"]["Enums"]["organization_role"]
           status: Database["public"]["Enums"]["membership_status"]
@@ -3823,6 +3824,7 @@ export type Database = {
           id?: string
           joined_at?: string | null
           leave_approver_role?: string | null
+          left_at?: string | null
           organization_id: string
           role: Database["public"]["Enums"]["organization_role"]
           status?: Database["public"]["Enums"]["membership_status"]
@@ -3836,6 +3838,7 @@ export type Database = {
           id?: string
           joined_at?: string | null
           leave_approver_role?: string | null
+          left_at?: string | null
           organization_id?: string
           role?: Database["public"]["Enums"]["organization_role"]
           status?: Database["public"]["Enums"]["membership_status"]
@@ -5320,6 +5323,36 @@ export type Database = {
           return_reason?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      staff_id_ocr_reads: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          document_id: string
+          consent_version: string
+          locale: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          document_id: string
+          consent_version: string
+          locale: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          document_id?: string
+          consent_version?: string
+          locale?: string
+          created_at?: string
         }
         Relationships: []
       }

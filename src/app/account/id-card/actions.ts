@@ -5,6 +5,8 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { readIdCardPhotos, type OcrResult } from "@/lib/staff-documents/ocr";
 import { STAFF_DOCUMENT_BUCKET } from "@/lib/staff-documents/server";
+import { ID_CARD_CONSENT_VERSION, ocrLimitReached } from "@/lib/staff-documents/policy";
+import { tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
 import {
   documentKindFor,
   editedFieldsOf,
@@ -46,8 +48,13 @@ async function memberSession() {
 
 export type ReadIdCardInput = { documentId: string; frontPath: string; backPath: string | null; consent: boolean };
 
-/** 찍은 사진을 AI 로 읽어 칸을 미리 채운다. 동의하지 않았으면 부르지 않는다(손 입력). */
-export async function readIdCard(input: ReadIdCardInput): Promise<OcrResult | { ok: false; reason: "forbidden" | "no_consent" }> {
+/**
+ * 찍은 사진을 AI 로 읽어 칸을 미리 채운다. 동의하지 않았으면 부르지 않는다(손 입력).
+ * 보내기 직전에 동의 기록(`staff_id_ocr_reads`)을 남기고, 같은 표로 하루 횟수를 센다(사람 10 · 조직 200, 도쿄 날짜). 기록을 못 남기면 보내지 않는다.
+ */
+export async function readIdCard(
+  input: ReadIdCardInput,
+): Promise<OcrResult | { ok: false; reason: "forbidden" | "no_consent" | "rate_limited" }> {
   const session = await memberSession();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!input.consent) return { ok: false, reason: "no_consent" };
@@ -61,6 +68,25 @@ export async function readIdCard(input: ReadIdCardInput): Promise<OcrResult | { 
   }
 
   const service = getSupabaseServiceClient();
+  const since = tokyoDayStart(tokyoToday());
+  const [userReads, orgReads] = await Promise.all([
+    service.from("staff_id_ocr_reads").select("id", { count: "exact", head: true }).eq("organization_id", org).eq("user_id", uid).gte("created_at", since),
+    service.from("staff_id_ocr_reads").select("id", { count: "exact", head: true }).eq("organization_id", org).gte("created_at", since),
+  ]);
+  if (userReads.error || orgReads.error) return { ok: false, reason: "failed" };
+  if (ocrLimitReached({ user: userReads.count ?? 0, organization: orgReads.count ?? 0 })) return { ok: false, reason: "rate_limited" };
+  const { error: logError } = await service.from("staff_id_ocr_reads").insert({
+    organization_id: org,
+    user_id: uid,
+    document_id: input.documentId,
+    consent_version: ID_CARD_CONSENT_VERSION,
+    locale: session.user.preferredLanguage,
+  });
+  if (logError) {
+    console.error("[staff-documents] consent log failed", logError.code);
+    return { ok: false, reason: "failed" };
+  }
+
   const paths = kind === "residence_card" ? [input.frontPath, input.backPath as string] : [input.frontPath];
   const images = [];
   for (const path of paths) {

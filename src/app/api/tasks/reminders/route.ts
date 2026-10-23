@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cleanupUnconfirmedSignups } from "@/lib/auth/unconfirmed-signup-cleanup";
+import { cleanupExpiredIdDocuments } from "@/lib/staff-documents/retention";
 import { runTaskReminders } from "@/lib/notifications/task-reminders";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -16,6 +17,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 //
 // 같은 하루 한 번에 「확인 안 된 오래된 가입 정리」도 돈다(2026-10-09) — 크론 칸을 하나 더 쓰지 않으려고 여기 붙였다.
 // 알림과 서로 막지 않게 따로 감싼다(정리가 실패해도 알림 결과는 그대로 돌려준다).
+// 「신분 서류 보관 기한 정리」(퇴사 3년 뒤 삭제, docs/product/41 §6)도 같은 이유로 여기 붙였다(2026-10-23).
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -63,7 +65,16 @@ async function handle(request: NextRequest) {
       console.error("[tasks/reminders] unconfirmed signup cleanup failed", error);
       signupCleanup = { checked: false, error: "cleanup_failed" };
     }
-    return NextResponse.json({ ok: true, ...result, signupCleanup });
+    let idDocumentCleanup: Awaited<ReturnType<typeof cleanupExpiredIdDocuments>> | { checked: false; error: string };
+    try {
+      idDocumentCleanup = organizationIdParam
+        ? { checked: false, error: "skipped_for_org_run" }
+        : await cleanupExpiredIdDocuments(service);
+    } catch (error) {
+      console.error("[tasks/reminders] id document retention cleanup failed", error);
+      idDocumentCleanup = { checked: false, error: "cleanup_failed" };
+    }
+    return NextResponse.json({ ok: true, ...result, signupCleanup, idDocumentCleanup });
   } catch (error) {
     console.error("[tasks/reminders] failed", error);
     return NextResponse.json({ ok: false, error: "reminders_failed" }, { status: 500 });

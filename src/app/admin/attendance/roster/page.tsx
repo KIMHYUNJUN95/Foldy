@@ -6,6 +6,7 @@ import { currentTokyoYm, getAdminAttendanceBadgeStats } from "@/lib/admin-attend
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { dayWeeklyRange, loadWeeklyLimitChips } from "@/lib/staff-documents/weekly-limit-server";
+import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 
 function tokyoDateKey(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -59,10 +60,14 @@ export default async function AdminAttendanceRosterPage({
   const carriedYm = currentTokyoYm();
 
   // 「주 28시간」 칩(docs/product/41 R4) — `staff_documents.view` 가 있을 때만 읽는다. 그날까지 최근 일주일 안에 끝나는 7일 창.
-  const [badgeStats, rosterDay, weeklyLimit] = await Promise.all([
+  const [badgeStats, rosterDay, weeklyLimit, expiredCardUserIds] = await Promise.all([
     getAdminAttendanceBadgeStats(session, carriedYm),
     getAttendanceRoster(session.organization.id, operatingDate, localeTag),
     loadWeeklyLimitChips(session, dayWeeklyRange(operatingDate)),
+    // 재류카드 만료 칩 — 근태 관리(`attendance.manage`) 하는 사람에게만, 사람 id 만(docs/product/41 「만료 표시」).
+    session.capabilities.includes("attendance.manage")
+      ? loadExpiredResidenceCardUserIds(session.organization.id)
+      : Promise.resolve<string[]>([]),
   ]);
 
   return (
@@ -94,6 +99,7 @@ export default async function AdminAttendanceRosterPage({
         locale={locale}
         localeTag={localeTag}
         weeklyLimit={weeklyLimit}
+        expiredCardUserIds={expiredCardUserIds}
       />
     </AdminShell>
   );

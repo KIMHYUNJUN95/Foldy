@@ -155,3 +155,45 @@ export async function countPendingIdDocumentPeople(organizationId: string): Prom
     return 0;
   }
 }
+
+/**
+ * 재류카드가 만료된 사람(지금 카드 · 재류카드 · 확인 대기/확인함 · 만료일 < 오늘 도쿄) — 청소 배정 · 근태 관리 화면의 「재류카드 만료」 칩용
+ * (docs/product/41 「만료 표시」, 2026-10-23). **사람 id 만** 돌려준다 — 카드 번호 · 만료일 · 사진 같은 카드 내용은 싣지 않으므로
+ * `staff_documents.view` 가 없는 배정 · 근태 담당에게도 보여 줄 수 있다(조직 범위 · 그 화면의 권한은 부르는 쪽이 이미 확인).
+ * 마이넘버 카드는 취로 자격과 무관해 빼고, 「다시 요청」 상태는 날짜를 믿을 수 없어 뺀다. 실패하면 빈 목록(경고는 덤).
+ */
+export async function loadExpiredResidenceCardUserIds(organizationId: string): Promise<string[]> {
+  try {
+    const { data } = await getSupabaseServiceClient()
+      .from("staff_id_documents")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("is_current", true)
+      .eq("kind", "residence_card")
+      .in("status", ["pending", "confirmed"])
+      .lt("expires_on", tokyoToday())
+      .limit(5000);
+    return [...new Set(((data ?? []) as { user_id: string }[]).map((row) => row.user_id))];
+  } catch {
+    return [];
+  }
+}
+
+/** 본인 재류카드 만료까지 남은 날(도쿄) — 근태 홈 안내용. 재류카드가 없거나(마이넘버 · 미등록) 「다시 요청」이거나 만료일이 없으면 null. */
+export async function loadOwnResidenceCardDaysLeft(organizationId: string, userId: string): Promise<number | null> {
+  try {
+    const { data } = await getSupabaseServiceClient()
+      .from("staff_id_documents")
+      .select("expires_on, status")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("is_current", true)
+      .eq("kind", "residence_card")
+      .maybeSingle();
+    const row = data as { expires_on: string | null; status: string } | null;
+    if (!row?.expires_on || row.status === "returned") return null;
+    return daysUntil(row.expires_on, tokyoToday());
+  } catch {
+    return null;
+  }
+}

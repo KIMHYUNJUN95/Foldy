@@ -19,6 +19,8 @@ type Props = {
   localeTag: string;
   /** 「주 28시간」 칩 — 사람 id → 근접 · 초과(docs/product/41 R4). 권한이 없으면 빈 객체. */
   weeklyLimit?: Record<string, WeeklyLimitChip>;
+  /** 재류카드가 만료된 사람 — 이름 옆 빨간 칩(경고만, docs/product/41 「만료 표시」). */
+  expiredCardUserIds?: string[];
 };
 
 type StatusMeta = {
@@ -81,7 +83,9 @@ export function AttendanceRosterClient({
   locale,
   localeTag,
   weeklyLimit = {},
+  expiredCardUserIds = [],
 }: Props) {
+  const expiredCards = new Set(expiredCardUserIds);
   const c = getDictionary(locale).admin.attendanceConsole;
   const [rosterDay, setRosterDay] = useState(initialRosterDay);
   const [todayDate, setTodayDate] = useState(initialTodayDate);
@@ -270,6 +274,11 @@ export function AttendanceRosterClient({
                             <div className="who__nm">
                               {e.name}
                               <WeeklyLimitBadge chip={weeklyLimit[e.userId]} copy={c} />
+                              {expiredCards.has(e.userId) ? (
+                                <span className="adm-idexp" title={c.cardExpiredHint}>
+                                  {c.cardExpiredChip}
+                                </span>
+                              ) : null}
                             </div>
                             <div className="who__sub">{e.role}</div>
                           </div>

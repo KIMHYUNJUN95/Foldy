@@ -13,6 +13,7 @@ import { getDictionary } from "@/lib/i18n";
 import { CALENDAR_BUILDING_ORDER, localizePropertyName } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { attendanceCan } from "@/lib/attendance-review";
+import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 
 /** 배정 · 신청이 바뀌면 새로고침 없이 다시 읽는다(PC ↔ 모바일 실시간, `src/lib/cleaning-assign/live.ts`). */
 const LIVE_KINDS = ["cleaning_assign"] as const;
@@ -40,7 +41,11 @@ export default async function AdminCleaningAssignPage({
   const buildingLabels = dictionary.cleaning.buildingLabels;
   const propertyLabels = Object.fromEntries(CALENDAR_BUILDING_ORDER.map((name) => [name, localizePropertyName(name, buildingLabels)]));
   // 월 비교표는 급여가 보이므로 급여를 볼 수 있는 사람만(근태 · 급여 화면과 같은 기준).
-  const canCompare = await attendanceCan(supabase, organizationId, session.user.id, "payroll.view");
+  // 재류카드 만료 칩(docs/product/41 「만료 표시」) — 사람 id 만, 카드 내용은 싣지 않는다. 배정을 막지 않는다.
+  const [canCompare, expiredCardUserIds] = await Promise.all([
+    attendanceCan(supabase, organizationId, session.user.id, "payroll.view"),
+    loadExpiredResidenceCardUserIds(organizationId),
+  ]);
 
   if (params.view === "month") {
     const ym = isMonthKey(params.ym) ? params.ym! : monthOf(today);
@@ -48,7 +53,7 @@ export default async function AdminCleaningAssignPage({
     return (
       <AdminShell activeItem="cleaning-assign" title={copy.title}>
         <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={organizationId} />
-        <AssignMonthBoard board={board} copy={copy} locale={locale} today={today} shared={shared} canCompare={canCompare} buildingLabels={buildingLabels} />
+        <AssignMonthBoard board={board} expiredCardUserIds={expiredCardUserIds} copy={copy} locale={locale} today={today} shared={shared} canCompare={canCompare} buildingLabels={buildingLabels} />
       </AdminShell>
     );
   }
@@ -71,6 +76,7 @@ export default async function AdminCleaningAssignPage({
         roomOptions={roomOptions.map((option) => ({ label: option.roomLabel, propertyName: option.propertyName, roomKey: option.roomKey }))}
         canCompare={canCompare}
         canSwap={session.capabilities.includes("cleaning.assign_swap")}
+        expiredCardUserIds={expiredCardUserIds}
       />
     </AdminShell>
   );

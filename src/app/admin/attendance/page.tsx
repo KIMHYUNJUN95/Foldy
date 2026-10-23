@@ -4,6 +4,7 @@ import { AttendanceOverview } from "@/components/admin/attendance/attendance-ove
 import { currentTokyoYm, getAdminAttendanceOverview } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 
 // Admin · Attendance Overview (Slice 1).
 // Shell sub-tab bar + KPI bar + review/correction cards + payroll/transport summary.
@@ -28,6 +29,8 @@ export default async function AdminAttendanceOverviewPage({
       ? params.ym
       : currentTokyoYm();
   const data = await getAdminAttendanceOverview(session, localeTag, requestedYm);
+  // 재류카드 만료 칩 — 검토 목록을 볼 수 있는(isPrivileged) 사람에게만, 사람 id 만(docs/product/41 「만료 표시」).
+  const expiredCardUserIds = data.isPrivileged ? await loadExpiredResidenceCardUserIds(session.organization.id) : [];
 
   return (
     <AdminShell activeItem="attendance" title={c.headerOverview}>
@@ -43,7 +46,7 @@ export default async function AdminAttendanceOverviewPage({
           transport: { n: data.kpi.trPending },
         }}
       />
-      <AttendanceOverview data={data} c={c} localeTag={localeTag} />
+      <AttendanceOverview data={data} c={c} localeTag={localeTag} expiredCardUserIds={expiredCardUserIds} />
     </AdminShell>
   );
 }

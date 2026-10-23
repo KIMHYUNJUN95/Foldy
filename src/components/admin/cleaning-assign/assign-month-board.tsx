@@ -34,6 +34,7 @@ export function AssignMonthBoard({
   shared,
   canCompare,
   buildingLabels,
+  expiredCardUserIds = [],
 }: {
   board: MonthBoard;
   copy: CleaningAssignCopy;
@@ -42,7 +43,10 @@ export function AssignMonthBoard({
   shared: Shared;
   canCompare: boolean;
   buildingLabels: Record<string, string>;
+  /** 재류카드가 만료된 사람 — 이름 옆 빨간 칩(막지 않음, docs/product/41 「만료 표시」). */
+  expiredCardUserIds?: string[];
 }) {
+  const expiredCards = new Set(expiredCardUserIds);
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
   const [pending, startTransition] = useTransition();
@@ -230,6 +234,11 @@ export function AssignMonthBoard({
               >
                 {person.name}
               </button>
+              {expiredCards.has(person.userId) ? (
+                <small className="cas-idexp" title={`${copy.cardExpired} — ${copy.cardExpiredHint}`}>
+                  {copy.cardExpiredShort}
+                </small>
+              ) : null}
               {person.tag === "fixed" && person.fixedTier ? <small>{fill(copy.tierBadge, { n: person.fixedTier })}</small> : null}
               {person.tag === "priority" ? <small>{copy.prio}</small> : null}
               {person.tag === "trainee" ? <small>{copy.colTrainee}</small> : null}

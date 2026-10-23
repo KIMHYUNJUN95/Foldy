@@ -16,6 +16,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { usePersistentToggle } from "@/lib/use-persistent-toggle";
 import { formatWeeklyMinutes } from "@/lib/staff-documents/weekly-limit";
+import type { ResidenceCardNotice } from "@/lib/staff-documents/expiry";
 
 type AttendanceCopy = Dictionary["attendance"];
 
@@ -323,6 +324,7 @@ export function AttendanceHome({
   monthPay = null,
   canSeeRoster = false,
   weeklyLimit = null,
+  idCardNotice = null,
   locale,
 }: {
   userName: string;
@@ -341,6 +343,8 @@ export function AttendanceHome({
   canSeeRoster?: boolean;
   /** 「주 28시간」(docs/product/41 R4) — 자격외활동 대상자의 최근 7일이 근접 · 초과일 때만. */
   weeklyLimit?: { status: "over" | "near"; minutes: number } | null;
+  /** 본인 재류카드 만료 · 30일 안 안내(docs/product/41 「만료 표시」). null 이면 그리지 않는다. */
+  idCardNotice?: ResidenceCardNotice | null;
   locale: string;
 }) {
   const fullDict = getDictionary(locale);
@@ -420,8 +424,25 @@ export function AttendanceHome({
 
   // 바로가기 + (근무 중일 때) 오늘 기록 — 태블릿 가로에서는 오른쪽 칸(HIG 2차 시안 A2Att-Tablet).
   const chev = <span className="entryrow__chev" aria-hidden="true">{AttIcon.chevR}</span>;
+  // 재류카드 안내 — 차분한 카드 한 장, 누르면 카드 등록 화면. 막지 않고 알리기만(갱신 신청 중이면 계속 일할 수 있다).
+  const idCardCard = idCardNotice ? (
+    <Link href="/account/id-card" className={`att-idcard${idCardNotice.kind === "expired" ? " is-expired" : ""}`}>
+      <span className="att-idcard__b">
+        <b>
+          {idCardNotice.kind === "expired"
+            ? copy.idCardExpiredTitle
+            : idCardNotice.days === 0
+              ? copy.idCardExpiringTodayTitle
+              : copy.idCardExpiringTitle.replace("{n}", String(idCardNotice.days))}
+        </b>
+        <span>{idCardNotice.kind === "expired" ? copy.idCardExpiredBody : copy.idCardExpiringBody}</span>
+      </span>
+      <span className="att-idcard__a">{copy.idCardAction}</span>
+    </Link>
+  ) : null;
   const sideColumn = (log: ReactNode = null) => (
     <div className="att-side">
+      {idCardCard}
       <div className="seclbl">{copy.homeShortcutLabel}</div>
       <div className="entrylist">
         <Link href="/mobile/attendance/history" className="entryrow hist">

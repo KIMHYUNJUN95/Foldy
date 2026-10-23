@@ -67,12 +67,15 @@ export function AttendanceStaffDetail({
   locale,
   localeTag,
   weekly = null,
+  cardExpired = false,
 }: {
   data: AdminStaffDetailData;
   locale: Locale;
   localeTag: string;
   /** 「주 28시간」 — 이달 가장 많았던 7일이 근접 · 초과일 때만(docs/product/41 R4). */
   weekly?: WeeklyLimitChip | null;
+  /** 재류카드 만료 — 이름 옆 빨간 칩(경고만, docs/product/41 「만료 표시」). */
+  cardExpired?: boolean;
 }) {
   const c = getDictionary(locale).admin.attendanceConsole;
   const [panelSel, setPanelSel] = useState<string | null>(null);
@@ -130,6 +133,11 @@ export function AttendanceStaffDetail({
           <div className="uhead__nm">
             {data.user.name}
             <WeeklyLimitBadge chip={weekly} copy={c} />
+            {cardExpired ? (
+              <span className="adm-idexp" title={c.cardExpiredHint}>
+                {c.cardExpiredChip}
+              </span>
+            ) : null}
           </div>
           <div className="uhead__sub">
             {data.user.role ?? "—"}

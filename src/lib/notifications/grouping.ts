@@ -62,6 +62,8 @@ export function categoryForType(type: string): NotificationCategory {
   if (type === "announcement_activity") return "notice";
   if (type === "board_activity") return "board";
   if (type === "attendance_activity") return "attendance";
+  // 재류카드 만료 — 취로 자격(일할 수 있는가)이라 근태 탭(2026-10-23, docs/product/14).
+  if (type === "id_document_expiring") return "attendance";
   return "work";
 }
 

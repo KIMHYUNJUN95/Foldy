@@ -128,6 +128,9 @@ export type CleaningAssignCopy = {
   cancelRequestAccept: string;
   cancelRequestReject: string;
   prio: string; // "우선"
+  cardExpired: string; // "재류카드 만료" — 사람 이름 옆 빨간 칩(docs/product/41 「만료 표시」)
+  cardExpiredShort: string; // 월 보기 좁은 이름 칸용 "만료"
+  cardExpiredHint: string; // 칩에 올리면 보이는 설명(특례기간 — 막지 않고 확인만)
   traineeNth: string; // "견습 {n}번째"
   traineeAsk: string; // "아직 견습인가요?"
   traineeDone: string;
@@ -540,6 +543,9 @@ const ko: CleaningAssignCopy = {
   cancelRequestAccept: "받아 주기",
   cancelRequestReject: "돌려보내기",
   prio: "우선",
+  cardExpired: "재류카드 만료",
+  cardExpiredShort: "만료",
+  cardExpiredHint: "재류카드 기간이 지났어요. 기간 안에 갱신 신청을 했다면 계속 일할 수 있어요 — 확인해 주세요.",
   traineeNth: "견습 {n}번째",
   traineeAsk: "아직 견습인가요?",
   traineeDone: "견습 끝",
@@ -937,6 +943,9 @@ const ja: CleaningAssignCopy = {
   cancelRequestAccept: "承認",
   cancelRequestReject: "差し戻す",
   prio: "優先",
+  cardExpired: "在留カード期限切れ",
+  cardExpiredShort: "期限切れ",
+  cardExpiredHint: "在留カードの期間が過ぎています。期間内に更新申請していれば引き続き就労できます — ご確認ください。",
   traineeNth: "見習い{n}回目",
   traineeAsk: "まだ見習いですか？",
   traineeDone: "見習い終了",
@@ -1334,6 +1343,9 @@ const en: CleaningAssignCopy = {
   cancelRequestAccept: "Accept",
   cancelRequestReject: "Decline",
   prio: "Priority",
+  cardExpired: "Residence card expired",
+  cardExpiredShort: "Expired",
+  cardExpiredHint: "The residence card's period has passed. They may still work if a renewal was filed in time — please check.",
   traineeNth: "Trainee #{n}",
   traineeAsk: "Still a trainee?",
   traineeDone: "Training done",

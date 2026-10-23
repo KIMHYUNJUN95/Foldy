@@ -7,6 +7,7 @@ import {
   isAttendanceNotificationPayload,
   isBoardNotificationPayload,
   isBugReportNotificationPayload,
+  isIdDocumentExpiryNotificationPayload,
   isOrderProcessedPayload,
   isProjectNotificationPayload,
   isSuggestionNotificationPayload,
@@ -300,6 +301,35 @@ export function getNotificationDisplay(
     };
   }
 
+  if (
+    notification.type === "id_document_expiring" &&
+    isIdDocumentExpiryNotificationPayload(notification.payload)
+  ) {
+    const payload = notification.payload;
+    const expired = payload.stage === "expired";
+    const admin = payload.audience === "admin";
+    const days = String(Math.max(0, payload.daysLeft));
+    const name = payload.subjectName ?? "";
+    const body = (
+      expired
+        ? admin
+          ? copy.idDocExpiredAdminBody
+          : copy.idDocExpiredBody
+        : admin
+          ? copy.idDocExpiringAdminBody
+          : copy.idDocExpiringBody
+    )
+      .replace("{name}", name)
+      .replace("{n}", days);
+    return {
+      title: expired ? copy.idDocExpiredTitle : copy.idDocExpiringTitle.replace("{n}", days),
+      body,
+      statusLabel: copy.idDocKind,
+      kindLabel: copy.idDocKind,
+      locationLabel: "",
+    };
+  }
+
   return {
     title: copy.fallbackTitle,
     body: copy.fallbackBody,
@@ -332,6 +362,8 @@ export function notificationTypeLabel(type: NotificationType, locale: Locale) {
       return copy.boardKind;
     case "bug_report_activity":
       return copy.bugReportKind;
+    case "id_document_expiring":
+      return copy.idDocKind;
     default:
       return copy.fallbackKind;
   }

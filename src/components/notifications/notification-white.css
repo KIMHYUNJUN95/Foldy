@@ -85,6 +85,10 @@
 .nfw-tbtn[data-tone="pri"] { color: var(--nfw-pri-ink); }
 .nfw-tbtn:disabled { opacity: .45; cursor: default; }
 .nfw-h__acts { display: flex; margin-right: -8px; margin-top: -6px; }
+/* 긴 제목(en 「Notifications」)이 오른쪽 버튼과 겹치지 않게 — 제목이 한 단어 폭보다 줄지 않고, 모자라면 버튼 줄이 아래 오른쪽으로 내려간다. ko · ja 는 한 줄 그대로. */
+.nfw-h { flex-wrap: wrap; }
+.nfw-h__t { min-width: min-content; }
+.nfw-h__acts { margin-left: auto; }
 
 .nfw-tabs {
   display: flex; gap: 18px; overflow-x: auto; margin: -4px -20px 0; padding: 0 20px; scrollbar-width: none; -ms-overflow-style: none;

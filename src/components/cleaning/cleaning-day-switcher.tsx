@@ -54,6 +54,17 @@ export function CleaningDaySwitcher({
     day: "numeric",
     weekday: "short",
   }).format(new Date(`${date}T00:00:00+09:00`));
+  // 폰 폭에선 ja · en 의 긴 달 이름(「10月…」「Fri, O…」)이 「오늘」 표시 옆에서 잘려 날짜를 못 읽는다 — 숫자 달(「10/23(金)」
+  // 「Fri, 10/23」)로 짧게. 폴드 이상은 자리가 넉넉해 긴 이름 그대로. ko 는 그대로(2026-10-23).
+  const compactLabel =
+    locale.startsWith("ko")
+      ? null
+      : new Intl.DateTimeFormat(locale, {
+          timeZone: "Asia/Tokyo",
+          month: "numeric",
+          day: "numeric",
+          weekday: "short",
+        }).format(new Date(`${date}T00:00:00+09:00`));
 
   const isToday = date === today;
 
@@ -75,7 +86,14 @@ export function CleaningDaySwitcher({
           onClick={() => setPickerOpen(true)}
           type="button"
         >
-          <span className="truncate">{label}</span>
+          {compactLabel ? (
+            <>
+              <span className="truncate fold:hidden">{compactLabel}</span>
+              <span className="hidden truncate fold:inline">{label}</span>
+            </>
+          ) : (
+            <span className="truncate">{label}</span>
+          )}
           {isToday ? (
             <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[12px] font-semibold text-[#5a30cf]">
               {labels.today}

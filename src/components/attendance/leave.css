@@ -1208,6 +1208,11 @@
 .lvw .lvw-title span { display: block; margin-top: 4px; font-size: 13px; color: var(--text-3); }
 .lvw .lvw-title { display: flex; flex-direction: column; }
 .lvw .lvw-title--row { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 12px; }
+/* 제목 + 오른쪽 알약이 한 줄에 안 들어가면(en 「Leave calendar」 · ja 「休暇カレンダー」) 제목을 쪼개지 않고 알약을 아래 줄 오른쪽으로 내린다. ko 는 한 줄 그대로(2026-10-23). */
+.lvw .lvw-title--row { flex-wrap: wrap; row-gap: 10px; }
+.lvw .lvw-title--row > div:first-child { min-width: 0; }
+.lvw .lvw-title--row h1 { white-space: nowrap; }
+.lvw .lvw-title--row > :last-child:not(:first-child) { margin-left: auto; }
 .lvw .lvw-hero { display: flex; flex-direction: column; gap: 4px; margin-top: 18px; }
 .lvw .lvw-hero__k { font-size: 13px; color: #6b6878; }
 .lvw .lvw-hero__v { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -1289,8 +1294,8 @@
 .lvw .lvw-chip:active { transform: scale(0.97); }
 .lvw .lvw-chip.on { background: #7a52e6; color: #fff; font-weight: 600; }
 .lvw .lvw-days { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
-.lvw .lvw-days span { font-size: 13px; color: #6b6878; }
-.lvw .lvw-days b { font-size: 18px; font-weight: 700; color: var(--ink); }
+.lvw .lvw-days span { flex: none; white-space: nowrap; font-size: 13px; color: #6b6878; } /* en 「Days used」가 두 줄로 접히지 않게 — 긴 값(「Bereavement leave · 3 days fixed」)이 오른쪽에서 줄바꿈 */
+.lvw .lvw-days b { min-width: 0; text-align: right; font-size: 18px; font-weight: 700; color: var(--ink); }
 .lvw .lvw-err { margin: 6px 0 0; font-size: 12px; color: #c5282e; }
 .lvw .lvw-hint { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
 .lvw .lvw-acts { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 20px; }

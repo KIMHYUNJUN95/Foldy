@@ -7,12 +7,22 @@ import "./feedback-mobile.css";
 
 export type FeedbackView = "manual" | "reviews" | "rooms";
 
-/** 기간 줄 글자 — 프리셋과 맞으면 «최근 N일 · 9월 10일 – 10월 9일», 아니면 날짜만. */
+/**
+ * 한 덩어리(«7월 26일 – 10월 23일»)가 중간에서 끊기지 않게 — 띄어쓰기는 줄바꿈 없는 칸으로, 대시 «–» 뒤는 글자 붙임표
+ * (U+2060)로 막는다(브라우저는 대시 뒤에서 줄을 바꿀 수 있다).
+ */
+const keepTogether = (text: string) => text.replace(/ /g, "\u00a0").replace(/–/g, "–\u2060");
+
+/**
+ * 기간 줄 글자 — 프리셋과 맞으면 «최근 N일 · 9월 10일 – 10월 9일», 아니면 날짜만.
+ * 좁으면 « · » 에서만 두 줄로 나뉜다(덩어리 안은 줄바꿈 없는 칸 + CSS keep-all). 달은 short — ko · ja 는 long 과
+ * 같은 글자이고 영어만 «Jul 26 – Oct 23» 으로 짧아진다.
+ */
 export function rangeLine(locale: Locale, from: string, to: string, days: number | null): string {
   const t = getDictionary(locale).complaints;
-  const fmt = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", timeZone: "UTC" });
-  const span = `${fmt.format(new Date(`${from}T00:00:00Z`))} – ${fmt.format(new Date(`${to}T00:00:00Z`))}`;
-  return days ? `${t.wRecentDays.replace("{n}", String(days))} · ${span}` : span;
+  const fmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" });
+  const span = keepTogether(`${fmt.format(new Date(`${from}T00:00:00Z`))} – ${fmt.format(new Date(`${to}T00:00:00Z`))}`);
+  return days ? `${keepTogether(t.wRecentDays.replace("{n}", String(days)))} · ${span}` : span;
 }
 
 /**
@@ -39,14 +49,14 @@ export function FeedbackHead({
   const dict = getDictionary(locale);
   const t = dict.complaints;
   const tabs: { id: FeedbackView; label: string; count?: number }[] = [
-    { id: "reviews", label: t.viewReviews },
-    { id: "manual", label: t.viewManual, count: openCount },
-    { id: "rooms", label: t.viewRooms },
+    { id: "reviews", label: t.wTabReviews },
+    { id: "manual", label: t.wTabManual, count: openCount },
+    { id: "rooms", label: t.wTabRooms },
   ];
 
   return (
     <div className="fbw fbw-head">
-      <div className="fbw-head__top">
+      <div className={range ? "fbw-head__top has-range" : "fbw-head__top"}>
         <div className="fbw-head__tt">
           <h1>{t.pageTitle}</h1>
           {range ? (

@@ -3,6 +3,15 @@ import { FileText, X } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n";
 import type { ApplicationDetail, ApplicationHistoryRow } from "@/lib/recruit/applications";
 import { resumeKindOf } from "@/lib/recruit/status";
+import {
+  localizeRecruitCommute,
+  localizeRecruitDaysPerWeek,
+  localizeRecruitDuration,
+  localizeRecruitEmployment,
+  localizeRecruitGender,
+  localizeRecruitStartDate,
+  RECRUIT_WEEK_DAY_KEYS,
+} from "@/lib/recruit/choice-labels";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import { ApplicationPrintSheet } from "./application-print-sheet";
 import {
@@ -23,13 +32,6 @@ import {
  * 도메인 계약: docs/product/30-recruit-workflow.md
  */
 
-/**
- * 폼이 `work_days` 에 저장한 값 그대로 — **표시용이 아니라 대조용 키다.** 화면에 찍히는 글자는 `copy.weekDays` 가 만든다.
- */
-// i18n-ignore-start -- stored form values, matched not displayed
-const WEEK_DAY_KEYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
-// i18n-ignore-end
-
 type Props = {
   application: ApplicationDetail;
   history: ApplicationHistoryRow[];
@@ -47,8 +49,10 @@ function stamp(iso: string | null): string {
 
 export function ApplicationDetailPanel({ application: a, history, resumeUrl, copy, closeHref }: Props) {
   const resume = resumeKindOf(a.resumeFileName);
-  const days = WEEK_DAY_KEYS.map((key, index) => (a.workDays.includes(key) ? copy.weekDays[index] : null)).filter(Boolean);
+  const days = RECRUIT_WEEK_DAY_KEYS.map((key, index) => (a.workDays.includes(key) ? copy.weekDays[index] : null)).filter(Boolean);
   const join = (parts: (string | null | undefined | false)[]) => parts.filter(Boolean).join(" · ");
+  // 채용 폼의 한국어 선택지 그대로 저장돼 있다 — 보는 사람 언어로(2026-10-23, src/lib/recruit/choice-labels.ts).
+  const choice = copy.choice;
 
   const visa = (() => {
     if (!a.visaPeriodRaw) return null;
@@ -59,8 +63,12 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
   })();
 
   const rows: [string, React.ReactNode][] = [
-    [copy.wWorkable, join([a.daysPerWeek, days.join(""), a.duration ?? (a.isLegacyForm ? copy.notCollected : null)]) || "—"],
-    [copy.labelStart, a.startDate ?? "—"],
+    [copy.wWorkable, join([
+        localizeRecruitDaysPerWeek(a.daysPerWeek, choice),
+        days.join(""),
+        localizeRecruitDuration(a.duration, choice) ?? (a.isLegacyForm ? copy.notCollected : null),
+      ]) || "—"],
+    [copy.labelStart, localizeRecruitStartDate(a.startDate, choice) ?? "—"],
     [
       copy.wStay,
       <>
@@ -73,7 +81,7 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
         ) : null}
       </>,
     ],
-    [copy.wCommute, join([a.commuteTime, a.uniformSize ? copy.wUniform.replace("{size}", a.uniformSize) : null]) || "—"],
+    [copy.wCommute, join([localizeRecruitCommute(a.commuteTime, choice), a.uniformSize ? copy.wUniform.replace("{size}", a.uniformSize) : null]) || "—"],
     [copy.wExperience, join([a.hasIndustryExp ? copy.wExpYes : copy.wExpNo, ...a.industryTasks])],
   ];
   if (a.sourceChannel) rows.push([copy.labelSource, a.sourceChannel]);
@@ -91,9 +99,9 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
             </span>
             <h2 className="rcw-name">
               {a.name}
-              <small>{join([a.age, a.gender])}</small>
+              <small>{join([a.age, localizeRecruitGender(a.gender, choice)])}</small>
             </h2>
-            <span className="rcw-job">{join([a.jobTitle ?? copy.notCollected, a.employmentType])}</span>
+            <span className="rcw-job">{join([a.jobTitle ?? copy.notCollected, localizeRecruitEmployment(a.employmentType, choice)])}</span>
           </div>
           {/* 보기 · 인쇄는 상태를 바꾸지 않는 보조 동작 — 아래 진행 버튼 자리와 섞지 않는다. */}
           <RecruitViewSheet labels={{ view: copy.wView, print: copy.wPrintShort, close: copy.close }}>

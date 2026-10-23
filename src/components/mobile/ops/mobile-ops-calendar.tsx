@@ -1739,7 +1739,7 @@ export function MobileOpsCalendar({
         typeof document !== "undefined" &&
         createPortal(
           <MobileOpsDock
-            count={copy.mSelCount.replace("{n}", String(selCount))}
+            count={(selCount === 1 ? copy.mSelCountOne : copy.mSelCount).replace("{n}", String(selCount))}
             extras={[
               ...(bookingDraft && canWrite
                 ? [
@@ -2029,7 +2029,7 @@ export function MobileOpsCalendar({
             <div className="mops-scope__foot">
               <div className="mops-scope__sum">
                 <p>
-                  <b>{copy.mSelCount.replace("{n}", String(selCount))}</b>
+                  <b>{(selCount === 1 ? copy.mSelCountOne : copy.mSelCount).replace("{n}", String(selCount))}</b>
                   {selCount > 0 && (
                     <span>
                       {copy.mwScopeCount

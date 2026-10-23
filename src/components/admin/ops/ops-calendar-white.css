@@ -277,6 +277,8 @@
 .adm .scw .opsg__row + .opsg__row { border-top: 0; }
 .adm .scw .opsg__label { border-right: 0; background: #fff; padding: 0 8px 0 12px; }
 .adm .scw .opsg__rn { font-size: 14px; font-weight: 700; color: var(--scw-ink); }
+/* 독채는 객실 이름이 건물 이름 — 영어(「Okubo A」)는 칸보다 길어 끝이 잘렸다. 두 줄까지 허용(2026-10-23). */
+.adm .scw .opsg__rn { white-space: normal; overflow-wrap: anywhere; line-height: 1.15; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .adm .scw .opsg__label.pick:hover { background: #f7f7f9; }
 .adm .scw .opsg__label.on { background: var(--scw-v-bg); }
 .adm .scw .opsg__label.on .opsg__rn { color: var(--scw-v-ink); }

@@ -93,7 +93,7 @@ export function MobileInvites({
 
   const org = organizations.find((item) => item.id === orgId);
   const days = Math.max(0, Math.round((Date.parse(`${expiresAt}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86_400_000));
-  const expiresText = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "long", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`));
+  const expiresText = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", month: "short", day: "numeric" }).format(new Date(`${expiresAt}T12:00:00+09:00`));
   const live = rows.filter((row) => row.state === "live").length;
 
   async function copy(row: MobileInviteRow) {
@@ -294,7 +294,11 @@ export function MobileInvites({
                       .replace("{role}", roleLabel(row.role))
                       .replace("{used}", String(row.used))
                       .replace("{max}", String(row.max))
-                      .replace("{until}", row.until)}
+                      .replace("{until}", row.until)
+                      // 덩어리(역할 · 횟수 · 기한) 안은 줄바꿈 없는 칸 — 영어 · 일본어에서 넘치면 « · » 에서만 두 줄로.
+                      .split(" · ")
+                      .map((part) => part.replace(/ /g, "\u00a0"))
+                      .join(" · ")}
                   </span>
                 </span>
                 <button

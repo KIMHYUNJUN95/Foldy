@@ -104,6 +104,10 @@ Completion rule:
   `useBuildingName()` / `useRoomPlaceLabel()` (`src/components/shared/building-names.tsx`). Single-unit buildings use the
   building name as the room label — localize that too. Look `buildingLabels` up by building key, never by the stored name.
   Localize only where it is drawn — values sent to server actions, history and queues keep the canonical name.
+- **Layout must survive en / ja (2026-10-23).** English and Japanese labels run longer — check new controls in all three
+  languages (phone · fold · tablet for `/mobile`, 1280 and 1440 for `/admin`). Fix with layout first (min widths, allowed
+  wrapping, line clamps); where a slot is genuinely narrow (tab bar, phone sheet buttons, filter buttons) add a slot-specific
+  short-label key instead of truncating. English plurals need a singular key or label-first wording ("Adults 2").
 - This is a **hard rule for every feature addition and every feature modification**.
 - Do **not** hardcode Korean UI text temporarily "just for now" during implementation.
 - New UI/UX, status labels, validation copy, action labels, empty states, and modal text must be

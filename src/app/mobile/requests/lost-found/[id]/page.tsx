@@ -81,7 +81,7 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
   if (!item) {
     notFound();
   }
-  const localizedHandlingMemo = localizeLostFoundMemo(item.handling_memo, copy.adminRestoreMemoLabel);
+  const localizedHandlingMemo = localizeLostFoundMemo(item.handling_memo, copy.adminRestoreMemoLabel, copy.autoDisposeMemoLabel);
 
   const location = resolveRequestLocation(
     item.room_label,

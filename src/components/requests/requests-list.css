@@ -49,6 +49,8 @@
 .rqw-head p { margin: 0; font-size: 15px; color: #6b6878; }
 .rqw-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
 .rqw-quick a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; height: 76px; border-radius: 14px; background: #f7f7f9; color: #16141f; font-size: 15px; font-weight: 600; text-decoration: none; transition: background 150ms ease, transform 140ms ease; }
+/* 영어(「Report lost item」「Order supplies」)처럼 두 줄이 되면 가운데 맞춤 · 두 줄 길이 맞춤 — 한 줄인 한국어는 그대로. */
+.rqw-quick a { padding: 0 8px; line-height: 1.25; text-align: center; word-break: keep-all; overflow-wrap: anywhere; text-wrap: balance; }
 .rqw-quick a:active { transform: scale(.97); }
 @media (hover: hover) { .rqw-quick a:hover { background: #f1f0f5; } }
 .rqw-quick a svg { width: 22px; height: 22px; color: #7a52e6; }

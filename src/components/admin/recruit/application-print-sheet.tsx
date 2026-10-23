@@ -2,6 +2,15 @@
 
 import type { Dictionary } from "@/lib/i18n";
 import type { ApplicationDetail } from "@/lib/recruit/applications";
+import {
+  localizeRecruitCommute,
+  localizeRecruitDaysPerWeek,
+  localizeRecruitDuration,
+  localizeRecruitEmployment,
+  localizeRecruitGender,
+  localizeRecruitStartDate,
+  localizeRecruitWorkDays,
+} from "@/lib/recruit/choice-labels";
 
 /**
  * 지원서 인쇄 — A4 한 장.
@@ -61,7 +70,10 @@ export function ApplicationPrintSheet({ application, copy, variant = "print" }: 
   // 출력일은 인쇄 시점이 아니라 렌더 시점이다. 초 단위 정확도가 필요한 값이 아니고, 인쇄
   // 다이얼로그를 여는 순간 DOM 을 건드리면 브라우저마다 반영 시점이 갈린다.
   const printedOn = new Date().toISOString().slice(0, 10);
-  const workDays = application.workDays.length > 0 ? application.workDays.join(" · ") : "—";
+  // 채용 폼의 한국어 선택지 그대로 저장돼 있다 — 보는 사람 언어로(2026-10-23, src/lib/recruit/choice-labels.ts).
+  const choice = copy.choice;
+  const workDays =
+    application.workDays.length > 0 ? localizeRecruitWorkDays(application.workDays, copy.weekDays).join(" · ") : "—";
   const experience = application.hasIndustryExp ? copy.labelExperienceYes : copy.labelExperienceNo;
   const tasks = application.industryTasks.length > 0 ? application.industryTasks.join(" · ") : null;
 
@@ -93,7 +105,7 @@ export function ApplicationPrintSheet({ application, copy, variant = "print" }: 
       <Section title={copy.sectionBasic}>
         <Field label={copy.colName} value={val(application.name)} />
         <Field label={copy.colAge} value={val(application.age)} />
-        <Field label={copy.labelGender} value={val(application.gender)} />
+        <Field label={copy.labelGender} value={val(localizeRecruitGender(application.gender, choice))} />
         <Field label={copy.labelNationality} value={val(application.nationality)} />
         <Field label={copy.labelPhone} value={val(application.phone)} />
         <Field label={copy.labelKakao} value={val(application.kakaoId)} />
@@ -102,17 +114,17 @@ export function ApplicationPrintSheet({ application, copy, variant = "print" }: 
 
       <Section title={copy.printSectionJob}>
         <Field label={copy.colJob} value={val(application.jobTitle)} />
-        <Field label={copy.colEmployment} value={val(application.employmentType)} />
+        <Field label={copy.colEmployment} value={val(localizeRecruitEmployment(application.employmentType, choice))} />
         <Field label={copy.labelAppliedPosition} value={val(application.appliedPosition)} />
         <Field label={copy.labelSource} value={val(application.sourceChannel)} />
       </Section>
 
       <Section title={copy.sectionWork}>
         <Field label={copy.labelWorkDays} value={workDays} wide />
-        <Field label={copy.labelDaysPerWeek} value={val(application.daysPerWeek)} />
-        <Field label={copy.labelDuration} value={val(application.duration)} />
-        <Field label={copy.labelStart} value={val(application.startDate)} />
-        <Field label={copy.labelCommute} value={val(application.commuteTime)} />
+        <Field label={copy.labelDaysPerWeek} value={val(localizeRecruitDaysPerWeek(application.daysPerWeek, choice))} />
+        <Field label={copy.labelDuration} value={val(localizeRecruitDuration(application.duration, choice))} />
+        <Field label={copy.labelStart} value={val(localizeRecruitStartDate(application.startDate, choice))} />
+        <Field label={copy.labelCommute} value={val(localizeRecruitCommute(application.commuteTime, choice))} />
         <Field label={copy.labelUniform} value={val(application.uniformSize)} />
       </Section>
 

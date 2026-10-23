@@ -108,7 +108,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
             filterLast30Days: dictionary.mobile.filterLast30Days,
             filterLostFound: dictionary.mobile.filterLostFound,
             filterMaintenance: dictionary.mobile.filterMaintenance,
-            filterOrder: dictionary.mobile.quickActions.order,
+            filterOrder: dictionary.mobile.filterOrder,
             filterScopeMine: dictionary.mobile.filterScopeMine,
             filterScopeMineRequest: dictionary.mobile.filterScopeMineRequest,
             filterToday: dictionary.mobile.filterToday,

@@ -130,7 +130,7 @@ export function ReviewList({
       <div className="fbw-filters">
         <FeedbackFilterDd
           ariaLabel={t.wPlatform}
-          label={provider === "all" ? t.allPlatforms : PROVIDER_FULL[provider]}
+          label={provider === "all" ? t.wDdAllPlatforms : PROVIDER_FULL[provider]}
           options={(["all", "airbnb", "booking"] as const).map((value) => ({
             label: value === "all" ? t.allPlatforms : PROVIDER_FULL[value],
             href: hrefWith({ provider: value === "all" ? null : value, page: null }),
@@ -139,7 +139,7 @@ export function ReviewList({
         />
         <FeedbackFilterDd
           ariaLabel={t.metaBuilding}
-          label={buildingName ?? t.allBuildings}
+          label={buildingName ?? t.wDdAllBuildings}
           options={[
             { label: t.allBuildings, href: hrefWith({ building: null, rl: null, page: null }), on: !building },
             ...buildingOptions.map((option) => ({
@@ -153,7 +153,7 @@ export function ReviewList({
           ariaLabel={t.metaRoom}
           align="right"
           disabled={!building || roomOptions.length === 0}
-          label={roomLabel ?? t.wAllRooms}
+          label={roomLabel ?? t.wDdAllRooms}
           options={[
             { label: t.wAllRooms, href: hrefWith({ rl: null, page: null }), on: !roomLabel },
             ...roomOptions.map((room) => ({ label: room, href: hrefWith({ rl: room, page: null }), on: roomLabel === room })),

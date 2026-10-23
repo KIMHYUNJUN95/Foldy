@@ -284,6 +284,20 @@ function CleanRow({
 }
 
 /**
+ * 보조 줄 — 손님 이름이 길면 이름만 말줄임하고 끝의 인원(「· 3명」)은 늘 남긴다(2026-10-23). en 「3 guests」 ·
+ * ja 「3名」처럼 단위가 길어져도 청소 준비에 필요한 인원이 잘려 사라지지 않게.
+ */
+function SubKeepTail({ lead, tail }: { lead: string; tail: string | null }) {
+  if (!tail) return <>{lead}</>;
+  return (
+    <span className="cln-row__split">
+      <span className="cln-row__lead">{lead}</span>
+      <span className="cln-row__tail">{tail}</span>
+    </span>
+  );
+}
+
+/**
  * 줄 오른쪽. 오늘 = 시작 버튼, 지난 날 = 결과. `record` 가 `null` 이면 **확실히** 기록이 없는 것,
  * `undefined` 면 볼 권한이 없어 단정할 수 없는 것이라 아무것도 그리지 않는다 — 남의 청소를
  * 「기록 없음」으로 그리면 빠뜨린 것처럼 읽힌다(2026-08-04).
@@ -663,15 +677,21 @@ export default async function MobileCleaningPage({
                       room={getRowRoomLabel(target.canonicalPropertyName, target.canonicalRoomLabel, copy)}
                       title={copy.taskOptions.checkout}
                       sub={
-                        target.hasTurnover
-                          ? `${copy.turnoverBadge} · ${target.arrivingGuestName ?? "Guest"}${
-                              target.arrivingPax !== null ? ` · ${target.arrivingPax}${copy.paxUnit}` : ""
-                            }`
-                          : target.nextCheckInDate
-                            ? `${copy.nextCheckIn} ${formatDateShort(target.nextCheckInDate, locale)}${
-                                target.nextCheckInGuestName ? ` ${target.nextCheckInGuestName}` : ""
-                              }${target.nextCheckInPax !== null ? ` · ${target.nextCheckInPax}${copy.paxUnit}` : ""}`
-                            : copy.noCheckInToday
+                        target.hasTurnover ? (
+                          <SubKeepTail
+                            lead={`${copy.turnoverBadge} · ${target.arrivingGuestName ?? "Guest"}`}
+                            tail={target.arrivingPax !== null ? ` · ${target.arrivingPax}${copy.paxUnit}` : null}
+                          />
+                        ) : target.nextCheckInDate ? (
+                          <SubKeepTail
+                            lead={`${copy.nextCheckIn} ${formatDateShort(target.nextCheckInDate, locale)}${
+                              target.nextCheckInGuestName ? ` ${target.nextCheckInGuestName}` : ""
+                            }`}
+                            tail={target.nextCheckInPax !== null ? ` · ${target.nextCheckInPax}${copy.paxUnit}` : null}
+                          />
+                        ) : (
+                          copy.noCheckInToday
+                        )
                       }
                       right={
                         <RowRight

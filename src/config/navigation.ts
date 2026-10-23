@@ -167,6 +167,7 @@ const mobileNavShift = {
 const mobileNavMyRooms = {
   id: "my-rooms",
   label: localizedNavigationLabels.mobile.myRooms,
+  shortLabel: localizedNavigationLabels.mobile.myRoomsShort,
   href: "/mobile/shift/today",
   icon: DoorOpen,
   capability: "cleaning.work",
@@ -182,6 +183,7 @@ const mobileNavRequests = {
 const mobileNavAnnouncements = {
   id: "announcements",
   label: localizedNavigationLabels.mobile.announcements,
+  shortLabel: localizedNavigationLabels.mobile.announcementsShort,
   href: "/mobile/announcements",
   icon: BellRing,
 } as const satisfies NavigationItem;
@@ -278,6 +280,7 @@ export const mobileSidebarNavigation = [
   {
     id: "directory",
     label: localizedNavigationLabels.mobile.directory,
+    shortLabel: localizedNavigationLabels.mobile.directoryShort,
     href: "/mobile/directory",
     icon: Users,
   },

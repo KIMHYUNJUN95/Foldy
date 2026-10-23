@@ -103,6 +103,11 @@
 .mops .mops-range::after { content: ""; position: absolute; inset: -5px 0; }
 .mops .mops-range > svg { width: 15px; height: 15px; color: var(--mw-ink); }
 .mops .mops-range:active { transform: scale(0.98); border-color: transparent; background: #ececf1; }
+/* 영어 · 일본어(2026-10-23) — 토글(「30 days | Monthly」)이 길어 기간이 「10/2…」로 잘렸다. 기간 묶음이 글자 폭보다 줄지 않게 하고,
+   한 줄에 안 들어가면 묶음째 다음 줄로 내린다. 한국어는 한 줄에 들어가 모양 그대로. */
+.mops .mops-bar { flex-wrap: wrap; row-gap: 8px; column-gap: 10px; }
+.mops .mops-move { min-width: max-content; margin-left: 0; } /* 토글과 사이 10px 는 그대로(gap 4 + margin 6 → gap 10) — 내려간 줄도 왼쪽이 맞는다 */
+.mops .mops-range > span { overflow: visible; }
 
 /* ── 도구 — 글자 스크롤 줄 ───────────────────────────────────────────────── */
 .mops .mops-chips { gap: 2px; padding-left: 10px; padding-block: 6px; margin-block: -6px; }

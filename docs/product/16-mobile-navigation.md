@@ -759,6 +759,10 @@ Current rules:
   from `src/lib/i18n.ts`: these screens must render when the rest of the app is broken, so they must
   not pull in the 11k-line dictionary chunk. **`/offline` stays trilingual** — the service worker
   serves it from cache with no network, no session, and no server render.
+- **Root 404 (2026-10-23)**: `src/app/not-found.tsx` covers unknown URLs outside `/mobile` and `notFound()` from `/admin`
+  detail pages (before, Next's English default 404 showed). Same copy table (`src/lib/fallback-copy.ts`) and look as the
+  mobile 404; language = session → `stayops_locale` cookie → Accept-Language (same order as the root layout's `<html lang>`);
+  「home」 goes to `/`, which re-routes by device. `/offline` now also sets the tab title in the device language.
 - **Error / 404 / offline screens (2026-06-22)**: `/mobile` has branded trilingual `error.tsx` (retry/home) and `not-found.tsx` (deep-links to deleted records); `/offline` (SW fallback) auto-reloads when back online. The service worker reloads the client once on `controllerchange` after a deploy so users aren't stranded on the old shell. Keyboard focus uses a global `:focus-visible` outline (restored after the tap-highlight removal); `animate-spin` honors reduced-motion.
 - **Scroll restoration keying (2026-06-22)**: restoration is keyed by the full URL (path + query) via `window.location`, since list screens vary content by query (`?view=`/`?month=`) on one pathname.
 - **In-app photo viewing**: mobile photo attachments open in the shared `ImageLightbox` (`src/components/shell/image-lightbox.tsx`, via `LightboxThumbs`), **not** `target="_blank"` — a new tab ejects the installed standalone app into Safari. New image surfaces must reuse the lightbox. Genuine external destinations (maps, shopping links, mailto/tel) intentionally still leave the app.
@@ -894,6 +898,9 @@ Current rules:
   `/admin/ops/calendar` 의 모바일판이다 — 화면 · 입력 계약은 `33-calendar-write-features.md` → 「모바일 판매 캘린더」.
 - **룸 링크** `ops-room-links` → `/mobile/ops/room-links`(`room_links.access`, 2026-10-05). 탭 라벨 축약형 `roomLinksShort`
   (룸 링크 / リンク / Links). 화면 계약은 `35-room-links.md` → 「모바일」.
+- **영어 탭 축약형(2026-10-23)** — 탭 폭(~72px, 10.5px 글자)을 넘는 영어 이름만 탭 · 레일 · 서랍 자주 쓰는 칸 · 탭 편집에서 줄인다:
+  `myRoomsShort`(en 「My Rooms」) · `announcementsShort`(en 「Notices」) · `directoryShort`(en 「Staff」). ko · ja 는 정식 이름과 같다.
+  사이드 메뉴 · 화면 제목은 정식 이름 그대로(`getNavigationLabel`).
 - 이 화면의 격자는 **자체 스크롤 상자**다(날짜 머리 · 객실 열 sticky). 셸 크롬은 `mobile-shell-scroll` 로 **다른 화면처럼 숨었다 나타나고**, 그 빈자리는 화면이
   채운다(탭 바의 `pointer-events-none` 을 지켜봐서 숨으면 64px 올리고 격자를 바닥까지 늘림 — 셸과 같은 곡선), 격자가 맨 위가 아닐 때는 셸의 당겨서 새로고침을 무장시키지 않는다. 칸을 고르는 동안에는 **선택 도구줄이 하단 탭 바 자리를 대신한다**(`body` 포털 z-70, 탭 바와 같은 표면 ·
   모서리 · 위치 — 사진 앱 선택 모드. X 없이 아래로 밀기 · 빈 곳 탭으로 닫는다. 셸의 탭 바 계약은 그대로이고, 선택을

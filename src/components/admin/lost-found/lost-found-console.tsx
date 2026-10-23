@@ -455,6 +455,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
         item={selected}
         t={t}
         adminRestoreLabel={dictionary.lostFound.adminRestoreMemoLabel}
+        autoDisposeLabel={dictionary.lostFound.autoDisposeMemoLabel}
         locale={locale}
         onClose={() => setSelectedId(null)}
         onAction={(kind, id) => setConfirm({ kind, id })}

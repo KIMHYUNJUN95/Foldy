@@ -63,6 +63,8 @@ import { useBuildingName } from "@/components/shared/building-names";
 export type MobileReservationSheetCopy = ReservationCardCopy & {
   mrArrival: string;
   mrRefCopy: string;
+  mrEditShort: string;
+  mrCancelShort: string;
   mrGuestInfo: string;
   mrBookingInfo: string;
   mrBookedSummary: string;
@@ -259,6 +261,7 @@ export function MobileOpsReservationSheet({
   const sub = [channelName, `${propertyName} ${roomLabel}`.trim(), copy.rcNights.replace("{n}", String(nights)), guests]
     .filter(Boolean)
     .join(" · ");
+  const threeActs = Boolean(moveRooms && moveRooms.length > 1 && onMoved);
 
   if (mode === "move" && moveRooms && onMoved) {
     return (
@@ -450,9 +453,17 @@ export function MobileOpsReservationSheet({
       </div>
 
       {!bar.isCancelled && canWrite && (
-        <div className={`msw-foot even${moveRooms && moveRooms.length > 1 && onMoved ? " three" : ""}`}>
+        <div className={`msw-foot even${threeActs ? " three" : ""}`}>
+          {/* 버튼 셋이면 폰 폭(< 600)에서만 짧은 이름 — 영어 · 일본어 전체 이름은 두 줄로 접혔다(2026-10-23). 넓은 화면은 전체 이름. */}
           <button className="msw-btn soft" disabled={!detail} onClick={() => setMode("edit")} type="button">
-            {copy.reTitle}
+            {threeActs ? (
+              <>
+                <span className="msw-full">{copy.reTitle}</span>
+                <span className="msw-short">{copy.mrEditShort}</span>
+              </>
+            ) : (
+              copy.reTitle
+            )}
           </button>
           {moveRooms && moveRooms.length > 1 && onMoved && (
             <button className="msw-btn soft" onClick={() => setMode("move")} type="button">
@@ -460,7 +471,14 @@ export function MobileOpsReservationSheet({
             </button>
           )}
           <button className="msw-btn soft-red" onClick={() => setMode("cancel")} type="button">
-            {copy.rcCancel}
+            {threeActs ? (
+              <>
+                <span className="msw-full">{copy.rcCancel}</span>
+                <span className="msw-short">{copy.mrCancelShort}</span>
+              </>
+            ) : (
+              copy.rcCancel
+            )}
           </button>
         </div>
       )}

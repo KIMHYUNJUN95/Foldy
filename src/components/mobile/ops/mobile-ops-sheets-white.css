@@ -566,6 +566,12 @@ details.msw-nightly[open] > summary::before { transform: rotate(90deg); }
 /* 객실 옮기기(2026-10-19, 시안 SalesMove-Phone · SalesMovePick-Phone · Fold · Tablet). 고른 줄 = 옅은 보라 면만. */
 .msw-foot.even.three { grid-template-columns: 1fr 1fr 1fr; }
 .msw-foot.even.three .msw-btn { font-size: 14px; }
+/* 버튼 셋 — 폰 폭에선 짧은 이름(「Edit」·「Cancel」, 영어 · 일본어 전체 이름은 두 줄로 접혔다), 넓은 시트에선 전체 이름(2026-10-23). */
+.msw-foot.three .msw-short { display: none; }
+@media (max-width: 599px) {
+  .msw-foot.three .msw-full { display: none; }
+  .msw-foot.three .msw-short { display: inline; }
+}
 .msw-mv-head { display: flex; flex-direction: column; gap: 3px; }
 .msw-mv-head b { font-size: 18px; letter-spacing: -0.02em; }
 .msw-mv-head span { font-size: 13px; color: var(--msw-muted); }

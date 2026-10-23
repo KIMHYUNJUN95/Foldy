@@ -40,6 +40,7 @@ import { useBuildingName } from "@/components/shared/building-names";
 
 export type MobilePriceSheetCopy = PanelCopy & {
   mSelCount: string;
+  mSelCountOne: string;
   mpClearInput: string;
   mpConfirmHead: string;
   mpAvgDelta: string;
@@ -258,7 +259,7 @@ export function MobileOpsPriceSheet({
   const warningText = (warning: string) =>
     warning === "zero" ? copy.warnZero : warning === "huge_drop" ? copy.warnDrop : copy.warnRise;
   const pctOn = input?.kind === "percent" && !PERCENT_PRESETS.some((preset) => preset === input.percent);
-  const sub = [scopeSummary?.dates, copy.mSelCount.replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
+  const sub = [scopeSummary?.dates, (cells.length === 1 ? copy.mSelCountOne : copy.mSelCount).replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
 
   return (
     <div className="msw">
@@ -386,6 +387,8 @@ export function MobileOpsPriceSheet({
                     }}
                     onKeyDown={blurOnEnter}
                     placeholder={copy.mwPctCustom}
+                    // 칸 폭은 44px 이 기본 — 영어 「Custom」은 그보다 길어 「Custc」로 잘렸다. 자리표시 글자 수만큼만 넓힌다(2026-10-23).
+                    style={{ width: `max(44px, ${copy.mwPctCustom.length}ch + 6px)` }}
                     // 프리셋을 누른 동안엔 비운다(프리셋 버튼이 이미 보라) — 직접 값 · 금액에서 나온 % 만 보인다.
                     value={input?.kind === "percent" && !pctOn ? "" : percentText}
                   />

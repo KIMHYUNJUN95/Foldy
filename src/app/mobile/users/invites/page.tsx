@@ -52,7 +52,7 @@ export default async function MobileInvitesPage() {
     new Intl.DateTimeFormat(locale, {
       timeZone: "Asia/Tokyo",
       ...(new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" }).slice(0, 4) === thisYear ? {} : { year: "numeric" }),
-      month: "long",
+      month: "short", // ko · ja 는 long 과 같은 글자, 영어만 «Nov 22»(목록 보조 줄이 잘리지 않게)
       day: "numeric",
     }).format(new Date(iso));
   const rows: MobileInviteRow[] = invites.map((invite) => {

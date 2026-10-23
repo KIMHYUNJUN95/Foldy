@@ -20,6 +20,13 @@ import type {
   ApplicationListRow,
   ApplicationSummary,
 } from "@/lib/recruit/applications";
+import {
+  localizeRecruitDaysPerWeek,
+  localizeRecruitEmployment,
+  localizeRecruitGender,
+  localizeRecruitStartDate,
+  localizeRecruitWorkDays,
+} from "@/lib/recruit/choice-labels";
 import { filterApplicationsBySearch } from "@/lib/recruit/search";
 import { nextStatusOf, type JobApplicationStatus } from "@/lib/recruit/status";
 import { tokyoDateOf } from "@/lib/tokyo-date";
@@ -168,12 +175,12 @@ export function RecruitConsole({
         appliedAt: row.appliedAt ? row.appliedAt.slice(0, 10) : "—",
         name: row.name,
         age: row.age ?? "—",
-        gender: row.gender ?? "—",
+        gender: localizeRecruitGender(row.gender, copy.choice) ?? "—",
         jobTitle: row.jobTitle ?? "—",
-        employmentType: row.employmentType ?? "—",
-        daysPerWeek: row.daysPerWeek ?? "—",
-        workDays: row.workDays.join(" "),
-        startDate: row.startDate ?? "—",
+        employmentType: localizeRecruitEmployment(row.employmentType, copy.choice) ?? "—",
+        daysPerWeek: localizeRecruitDaysPerWeek(row.daysPerWeek, copy.choice) ?? "—",
+        workDays: localizeRecruitWorkDays(row.workDays, copy.weekDays).join(" "),
+        startDate: localizeRecruitStartDate(row.startDate, copy.choice) ?? "—",
         experience: row.hasIndustryExp ? copy.labelExperienceYes : copy.labelExperienceNo,
         visa:
           row.visaDaysLeft === null
@@ -217,7 +224,10 @@ export function RecruitConsole({
   if (query.trim()) activeFilters.push({ label: query.trim(), onClear: () => setQuery("") });
   if (filter.jobTitle) activeFilters.push({ label: filter.jobTitle, clear: { job: null } });
   if (filter.employmentType) {
-    activeFilters.push({ label: filter.employmentType, clear: { employment: null } });
+    activeFilters.push({
+      label: localizeRecruitEmployment(filter.employmentType, copy.choice) ?? filter.employmentType,
+      clear: { employment: null },
+    });
   }
   if (filter.from && filter.to) {
     activeFilters.push({ label: `${filter.from} ~ ${filter.to}`, clear: { from: null, to: null } });
@@ -305,7 +315,7 @@ export function RecruitConsole({
           ariaLabel={copy.filterEmployment}
           value={filter.employmentType ?? ""}
           onChange={(value) => pushFilter({ employment: value || null })}
-          options={[{ value: "", label: copy.wAllEmployment }, ...facets.employmentTypes.map((type) => ({ value: type, label: type }))]}
+          options={[{ value: "", label: copy.wAllEmployment }, ...facets.employmentTypes.map((type) => ({ value: type, label: localizeRecruitEmployment(type, copy.choice) ?? type }))]}
         />
         <button
           type="button"
@@ -459,7 +469,7 @@ export function RecruitConsole({
                   <span className="rcw-who">
                     <span className="rcw-who__h">
                       <b>{row.name}</b>
-                      <span>{[row.age, row.gender].filter(Boolean).join(" · ")}</span>
+                      <span>{[row.age, localizeRecruitGender(row.gender, copy.choice)].filter(Boolean).join(" · ")}</span>
                       {isNew ? <em>{copy.wNew}</em> : null}
                     </span>
                     <span className="rcw-who__s">
@@ -475,12 +485,12 @@ export function RecruitConsole({
 
                   <span className="rcw-two">
                     <span>{row.jobTitle ?? copy.notCollected}</span>
-                    {row.employmentType ? <small>{row.employmentType}</small> : null}
+                    {row.employmentType ? <small>{localizeRecruitEmployment(row.employmentType, copy.choice)}</small> : null}
                   </span>
 
                   <span className="rcw-two">
-                    <span>{row.daysPerWeek ?? "—"}</span>
-                    <small>{[row.workDays.join(" "), row.startDate].filter(Boolean).join(" · ") || "—"}</small>
+                    <span>{localizeRecruitDaysPerWeek(row.daysPerWeek, copy.choice) ?? "—"}</span>
+                    <small>{[localizeRecruitWorkDays(row.workDays, copy.weekDays).join(" "), localizeRecruitStartDate(row.startDate, copy.choice)].filter(Boolean).join(" · ") || "—"}</small>
                   </span>
 
                   <span className="rcw-at num">{fmtApplied(row.appliedAt)}</span>

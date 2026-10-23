@@ -19,6 +19,7 @@ type PanelProps = {
   item: AdminLostItemVM | null;
   t: LFCopy;
   adminRestoreLabel: string;
+  autoDisposeLabel: string;
   locale: Locale;
   onClose: () => void;
   onAction: (kind: LFActionKind, id: string) => void;
@@ -37,7 +38,7 @@ function Gallery({ urls }: { urls: readonly string[] }) {
   );
 }
 
-export function LostFoundDetailPanel({ item, t, adminRestoreLabel, locale, onClose, onAction, disabled }: PanelProps) {
+export function LostFoundDetailPanel({ item, t, adminRestoreLabel, autoDisposeLabel, locale, onClose, onAction, disabled }: PanelProps) {
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled });
   if (!item) return null;
 
@@ -51,7 +52,7 @@ export function LostFoundDetailPanel({ item, t, adminRestoreLabel, locale, onClo
         .replace("{in}", fmtDate(item.guest.checkIn, locale))
         .replace("{out}", fmtDate(item.guest.checkOut, locale))
     : null;
-  const memo = item.handlingMemo ? localizeLostFoundMemo(item.handlingMemo, adminRestoreLabel) : null;
+  const memo = item.handlingMemo ? localizeLostFoundMemo(item.handlingMemo, adminRestoreLabel, autoDisposeLabel) : null;
 
   return (
     <>

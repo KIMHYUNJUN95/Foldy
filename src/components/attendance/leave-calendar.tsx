@@ -65,7 +65,8 @@ export function LeaveCalendar({
   };
   const wd = new Intl.DateTimeFormat(localeTag(locale), { weekday: "short", timeZone: "UTC" });
   const heads = Array.from({ length: 7 }, (_, i) => wd.format(new Date(Date.UTC(2024, 0, 1 + i))));
-  const monthShort = new Intl.DateTimeFormat(localeTag(locale), { month: "long", timeZone: "UTC" }).format(
+  // 알약 안 달 이름 — en 은 「October」 대신 「Oct」(ko 「10월」 · ja 「10月」는 short 도 같다).
+  const monthShort = new Intl.DateTimeFormat(localeTag(locale), { month: "short", timeZone: "UTC" }).format(
     new Date(Date.UTC(year, month - 1, 1)),
   );
   const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;

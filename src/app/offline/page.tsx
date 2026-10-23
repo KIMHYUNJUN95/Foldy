@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 // i18n-ignore-file: offline fallback is static and trilingual because session locale may be unavailable.
 
 export const metadata: Metadata = {
-  title: "오프라인 · Foldy",
+  // 언어 중립 — 아래 스크립트가 기기 언어로 「오프라인 · Foldy」 / 「オフライン · Foldy」 / 「Offline · Foldy」 로 바꾼다.
+  title: "Foldy",
 };
 
 /**
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
  * 서비스 워커는 이 화면을 **원래 가려던 주소**(예: `/mobile/calendar`)에 내보낸다. 그래서 Next 가 이 화면을 React 로 살려내지
  * 못했고(주소와 화면이 다르다), 예전 `OfflineAutoReload`(useEffect)가 한 번도 실행되지 않았다 — 인터넷이 돌아와도 앱을 껐다 켜기
  * 전까지 이 화면에 갇혔다(사용자 보고 「아무것도 안 눌림」, 로컬 재현: 온라인 복귀 6초 뒤에도 그대로). 그래서:
- * - 기기 언어(ko · ja · 그 밖 en) 한 가지만 보인다(스크립트가 못 돌면 세 언어 다).
+ * - 기기 언어(ko · ja · 그 밖 en) 한 가지만 보인다(스크립트가 못 돌면 세 언어 다). 탭 제목도 그 언어로(2026-10-23 — 전엔 한국어 고정).
  * - `online` 이벤트 + 3초마다 `/api/build` 를 두드려 닿으면 다시 불러온다(iOS 는 `online` 이벤트가 믿을 만하지 않다).
  * - 「다시 시도」 버튼 — 누르면 바로 확인하고, 닿으면 다시 불러온다.
  */
@@ -20,6 +21,7 @@ const SCRIPT = `(function(){
   var l=(navigator.language||"").toLowerCase();
   var lang=l.indexOf("ko")===0?"ko":l.indexOf("ja")===0?"ja":"en";
   document.documentElement.lang=lang;
+  document.title=({ko:"오프라인 · Foldy",ja:"オフライン · Foldy",en:"Offline · Foldy"})[lang];
   var blocks=document.querySelectorAll("[data-offline-lang]");
   for(var i=0;i<blocks.length;i++){if(blocks[i].getAttribute("data-offline-lang")!==lang)blocks[i].hidden=true;}
   var busy=false;

@@ -198,3 +198,21 @@
 .moc-sheet__m { font-size: 16px; }
 .moc-sheet__m span { font-size: 13px; }
 @media (min-width: 1000px) and (min-height: 600px) { .moc-bld { padding-top: 0; } }
+
+/* 영어 · 일본어 폭 맞춤(2026-10-23). 한국어는 지금 모양 그대로 — 넘칠 때만 움직인다.
+   - 머리: 부제(「Total · excluding Okubo A · Sano」)가 달 고르기 옆에 안 들어가면 달 고르기를 다음 줄 오른쪽으로 내린다
+     (전엔 부제가 두 줄로 접혀 달 고르기와 부딪혔다).
+   - 고리 안 전년 비교: 고리 안쪽 폭(≈108px)보다 길면 두 줄(「vs last year」/「+1.7pp」) — 전엔 고리 밖으로 넘쳤다.
+   - 앞으로 3달: 달 이름(「October · In progress」)이 길면 두 줄로, 세 칸의 숫자 줄은 subgrid 로 같은 높이에 맞춘다.
+   - 건물 이름: 104px · 두 줄까지(「Takadanobaba」 「STAY ARI Apartment Hotel」 잘림). */
+.moc-h { flex-wrap: wrap; row-gap: 4px; }
+.moc-h__t { flex: 1 1 auto; }
+.moc-mnav { margin-left: auto; }
+.moc-ring__c > span { max-width: 108px; white-space: normal; text-align: center; line-height: 1.25; }
+.moc-fwd__cols { grid-template-rows: repeat(4, auto); row-gap: 6px; }
+.moc-fwd__c { display: grid; grid-row: span 4; grid-template-rows: subgrid; gap: 6px; align-items: end; }
+.moc-fwd__m { white-space: normal; overflow: visible; align-self: end; }
+.moc-row { grid-template-columns: 104px minmax(0, 1fr) 44px; }
+.moc-row__n { white-space: normal; line-height: 1.25; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+@media (min-width: 600px) { .moc-row { grid-template-columns: 124px minmax(0, 1fr) 44px; } }
+@media (min-width: 1000px) and (min-height: 600px) { .moc-row { grid-template-columns: 132px minmax(0, 1fr) 48px; } }

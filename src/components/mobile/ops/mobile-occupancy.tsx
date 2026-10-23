@@ -194,7 +194,7 @@ export function MobileOccupancy({
             <div>
               <dt>{copy.under}</dt>
               <dd className={`num${summary.underLine > 0 ? " is-low" : ""}`}>
-                {hasMonth ? fill(copy.underUnit, { n: n(summary.underLine) }) : "—"}
+                {hasMonth ? fill(summary.underLine === 1 ? copy.underUnitOne : copy.underUnit, { n: n(summary.underLine) }) : "—"}
               </dd>
             </div>
             {summary.thisMonth && (

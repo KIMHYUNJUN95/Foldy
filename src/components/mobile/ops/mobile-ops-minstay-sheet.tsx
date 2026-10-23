@@ -27,6 +27,7 @@ import { useBuildingName } from "@/components/shared/building-names";
 
 export type MobileMinStaySheetCopy = MinStayPanelCopy & {
   mSelCount: string;
+  mSelCountOne: string;
   mmCurrent: string;
   mmNoGap: string;
   mmGapList: string;
@@ -37,6 +38,7 @@ export type MobileMinStaySheetCopy = MinStayPanelCopy & {
   panelCurrent: string;
   panelNext: string;
   mwGapHero: string;
+  mwGapHeroOne: string;
   mwNightUnit: string;
   mwChangeHead: string;
   mwChangedCells: string;
@@ -166,7 +168,7 @@ export function MobileOpsMinStaySheet({
   const minStayByKey = new Map(cells.map((cell) => [`${cell.roomKey}|${cell.date}`, cell.minStay]));
   const changedCount = cells.filter((cell) => cell.minStay !== nights).length;
   const buildingNames = [...new Set(cells.map((cell) => cell.roomKey.split("::")[0]).filter(Boolean))];
-  const sub = [buildingNames.map(bName).join(" · "), copy.mSelCount.replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
+  const sub = [buildingNames.map(bName).join(" · "), (cells.length === 1 ? copy.mSelCountOne : copy.mSelCount).replace("{n}", String(cells.length))].filter(Boolean).join(" · ");
   const valueRow = (current: number | null) => (
     <>
       <span className="c">{current === null ? "—" : current}</span>
@@ -232,7 +234,7 @@ export function MobileOpsMinStaySheet({
               <>
                 <div className="msw-hero">
                   <b>{gapRows.length}</b>
-                  <span>{copy.mwGapHero}</span>
+                  <span>{gapRows.length === 1 ? copy.mwGapHeroOne : copy.mwGapHero}</span>
                 </div>
                 <p className="msw-hero__p">{copy.msGapBody}</p>
               </>
@@ -294,7 +296,7 @@ export function MobileOpsMinStaySheet({
                 <span>{gapMode ? copy.mmGapList : copy.panelListTitle}</span>
                 <small>
                   {gapMode
-                    ? copy.mSelCount.replace("{n}", String(gapRows.length))
+                    ? (gapRows.length === 1 ? copy.mSelCountOne : copy.mSelCount).replace("{n}", String(gapRows.length))
                     : copy.panelListRooms.replace("{rooms}", String(rooms.length)).replace("{cells}", String(cells.length))}
                 </small>
               </div>

@@ -67,6 +67,10 @@
 .cln-row__b { flex: 1; min-width: 0; }
 .cln-row__t { margin: 0; font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cln-row__s { margin: 2px 0 0; font-size: 13px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 이름만 말줄임, 끝의 인원은 남김(SubKeepTail, 2026-10-23). */
+.cln-row__split { display: flex; min-width: 0; }
+.cln-row__lead { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cln-row__tail { flex: none; white-space: pre; }
 .cln-row__r { flex: 0 0 auto; }
 .cln-row__time { font-family: var(--font-mono, ui-monospace), monospace; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .cln-row.is-muted .cln-row__rm { color: var(--text-done); }

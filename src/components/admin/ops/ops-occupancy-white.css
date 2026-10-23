@@ -62,9 +62,11 @@
 .adm .ocw-plabel { padding: 0 8px; font-size: 15px; font-weight: 700; white-space: nowrap; }
 .adm .ocw-period .datepick { height: 34px; border: 0; background: transparent; padding: 0 8px; font-size: 14px; font-weight: 600; color: var(--ocw-ink); }
 .adm .ocw-period .datepick:hover { background: #f4f4f7; }
-.adm .ocw-bar__rest { flex: 1 1 440px; min-width: 0; display: flex; align-items: center; gap: 8px; }
+/* 덩어리는 「진행 · 합계 · 내보내기 + 비교 96px」보다 줄지 않는다 — 그보다 좁으면 덩어리째 다음 줄로.
+   예전엔 min-width: 0 이라 영어(합계 글자가 길다)에서 비교 글자가 사라지고 PDF 버튼이 화면 밖으로 밀렸다(2026-10-23). */
+.adm .ocw-bar__rest { flex: 1 1 440px; display: flex; align-items: center; gap: 8px; }
 .adm .ocw-cmp { font-size: 12px; color: var(--ocw-faint); white-space: nowrap; }
-.adm .ocw-bar__rest .ocw-cmp { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.adm .ocw-bar__rest .ocw-cmp { flex: 1 1 auto; width: 96px; max-width: max-content; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .adm .ocw-phase { flex: none; font-size: 12px; font-weight: 600; color: var(--ocw-v-ink); white-space: nowrap; }
 
 .adm .ocw-tools { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
@@ -115,7 +117,7 @@
 .adm .ocw-kpi .l { font-size: 13px; color: var(--ocw-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .adm .ocw-kpi .v { display: flex; align-items: baseline; font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--ocw-ink); white-space: nowrap; }
 .adm .ocw-kpi .v small { margin-left: 4px; font-size: 14px; font-weight: 500; letter-spacing: 0; color: var(--ocw-faint); }
-.adm .ocw-kpi .s { font-size: 12px; color: var(--ocw-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .ocw-kpi .s { font-size: 12px; line-height: 1.4; color: var(--ocw-faint); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; } /* 두 줄까지 — 영어 · 일본어 보조 글이 한 줄에 안 들어간다(2026-10-23) */
 
 /* 탭 바꿈 — 내용만 짧게 */
 .adm .ocw-pane { animation: ocw-fade 160ms ease both; }
@@ -177,7 +179,7 @@
 .adm .ocw-table col.c-name { width: 230px; }
 .adm .ocw-table col.c-nights { width: 130px; }
 .adm .ocw-table col.c-s { width: 82px; }
-.adm .ocw-table col.c-g { width: 64px; }
+.adm .ocw-table col.c-g { width: 84px; } /* 영어 「Excellent」가 들어가는 폭(2026-10-23) */
 .adm .ocw-table th { height: 32px; padding: 0 12px 8px; text-align: left; font-size: 12px; font-weight: 400; color: var(--ocw-faint); border-bottom: 0.5px solid var(--separator); vertical-align: bottom; white-space: nowrap; }
 .adm .ocw-table .r { text-align: right; }
 .adm .ocw-table td { height: 60px; padding: 0 12px; border-top: 0.5px solid var(--separator); vertical-align: middle; }
@@ -352,9 +354,9 @@
   .adm .ocw-inc__btn:active, .adm .ocw-row:active td:first-child .ocw-bn { transform: none; }
 }
 
-/* 넓은 화면에선 위 줄을 한 줄로 — 비교 글자가 먼저 줄어든다(탭마다 줄 수가 달라지지 않게). */
+/* 넓은 화면에선 위 줄을 한 줄로 — 비교 글자가 먼저 줄어든다(탭마다 줄 수가 달라지지 않게).
+   그래도 모자라면(영어 · 일본어) 줄바꿈은 허용 — 막으면 버튼이 화면 밖으로 나간다(2026-10-23). */
 @media (min-width: 1300px) {
-  .adm .ocw-bar { flex-wrap: nowrap; }
   .adm .ocw-bar__rest { flex: 1 1 0; }
   .adm .ocw-phase { flex: none; }
 }

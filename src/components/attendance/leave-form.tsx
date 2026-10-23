@@ -106,7 +106,8 @@ export function LeaveForm({
   const useDays = isBereavement ? BEREAVEMENT_DAYS : half ? 0.5 : rangeDays;
   const fmtDay = (iso: string) =>
     new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : locale === "en" ? "en-US" : "ko-KR", {
-      month: "long",
+      // en 은 「Sun, October 25」가 반 칸에서 두 줄이 돼 짧은 달 이름(「Sun, Oct 25」). ko · ja 는 그대로.
+      month: locale === "en" ? "short" : "long",
       day: "numeric",
       weekday: "short",
       timeZone: "UTC",

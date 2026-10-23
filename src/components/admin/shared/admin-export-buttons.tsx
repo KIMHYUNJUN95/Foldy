@@ -149,6 +149,8 @@ export function AdminExportButtons({
 
   return (
     <>
+      {/* 둘은 한 덩어리 — 줄이 모자랄 때 PDF 만 다음 줄로 떨어지지 않게(영어 화면, 2026-10-23). */}
+      <span className="axb-pair">
       <ExportButton
         btnRef={(el) => { btns.current.xls = el; }}
         disabled={disabled}
@@ -171,6 +173,7 @@ export function AdminExportButtons({
         phase={phase("pdf", pdfPending)}
         doneLabel={doneLabel.pdf}
       />
+      </span>
       {card
         ? createPortal(
             <div

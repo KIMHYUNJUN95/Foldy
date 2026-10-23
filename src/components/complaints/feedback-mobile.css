@@ -12,6 +12,15 @@
 .fbw-head { display: flex; flex-direction: column; gap: 16px; margin: 2px 0 18px; }
 .fbw-head__top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .fbw-head__tt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* 기간 줄이 있을 때 — 제목은 줄 전체 폭(일본어 「ゲストフィードバック」이 등록 버튼 폭만큼 좁아져 두 줄로 쪼개지지 않게),
+   기간 줄과 「+ 등록」은 그 아래 한 줄. 한국어는 원래도 이 배치(버튼이 기간 줄 높이에 맞춰 아래 정렬)라 모양이 같다. */
+/* 기간 줄이 없는 보기(수동 컴플레인) — 제목과 버튼이 한 줄에 안 들어가면 버튼이 제목 아래 오른쪽으로 내려간다(제목을 쪼개지 않는다). */
+.fbw-head__top:not(.has-range) { flex-wrap: wrap; }
+.fbw-head__top:not(.has-range) > .fbw-head__new { margin-left: auto; }
+.fbw-head__top.has-range { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; align-items: end; }
+.fbw-head__top.has-range > .fbw-head__tt { display: contents; }
+.fbw-head__top.has-range h1 { grid-column: 1 / -1; }
+.fbw-head__top.has-range .fbw-rangeline { justify-self: start; text-align: left; word-break: keep-all; overflow-wrap: anywhere; }
 .fbw-head h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .fbw-rangeline { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: #4c4958; cursor: pointer; }
 .fbw-rangeline svg { width: 14px; height: 14px; color: var(--text-3); }

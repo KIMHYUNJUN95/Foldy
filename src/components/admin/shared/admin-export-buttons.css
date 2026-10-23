@@ -1,5 +1,7 @@
 /* 내보내기 버튼 모션(2026-10-15, 시안 Motion-PC-Export-PC) — 누름 반응 · 도는 고리 「만드는 중」 · 결과는 같은 버튼 자리에서
    (초록 체크 「다운로드됨 / 새 탭에 열림」 · 빨간 「다시 시도 / 팝업 차단됨」 + 흔들림) · 버튼 아래 카드 4초. 버튼 폭은 그대로. */
+/* Excel · PDF 한 덩어리(2026-10-23) — 부모의 간격을 그대로 이어받아 겉모양은 예전과 같다. */
+.adm .axb-pair { display: inline-flex; flex: none; align-items: center; gap: inherit; }
 .adm button.axb { transition: transform 160ms cubic-bezier(.23, 1, .32, 1), background-color 200ms ease, color 200ms ease, border-color 200ms ease; }
 .adm button.axb:active:not(:disabled) { transform: scale(.97); }
 .adm .axb__ic { display: inline-flex; width: 16px; height: 16px; flex: none; align-items: center; justify-content: center; color: var(--adm-muted); animation: axb-in 220ms cubic-bezier(.23, 1, .32, 1) both; }

@@ -218,3 +218,9 @@
 .mrv-sheet__m { font-size: 16px; }
 .mrv-sheet__m span { font-size: 13px; }
 @media (min-width: 1000px) and (min-height: 600px) { .mrv-bld { padding-top: 0; } }
+
+/* 영어 · 일본어 폭 맞춤(2026-10-23) — 가동률과 같은 규칙. 부제(「Total · excl. Okubo A · Sano」)가 달 고르기 옆에 안 들어가면
+   달 고르기를 다음 줄 오른쪽으로 내린다(전엔 부제가 두 줄로 접혀 달 고르기와 부딪혔다). 한국어는 그대로 한 줄. */
+.mrv-h { flex-wrap: wrap; row-gap: 4px; }
+.mrv-h__t { flex: 1 1 auto; }
+.mrv-mnav { margin-left: auto; }

@@ -123,6 +123,9 @@
 .ofw-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .ofw-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ofw-tiles button { min-height: 44px; padding: 0 6px; border: 0; border-radius: 12px; background: #f4f4f7; font: inherit; font-size: 14px; font-weight: 500; color: #3a3746; cursor: pointer; touch-action: manipulation; transition: background 160ms ease, color 160ms ease, transform 140ms ease; }
+/* 영어 · 일본어 긴 이름(「アクセサリー · 時計」「Docs · Passport」)은 두 줄이 되는데, 글자 중간(「パスポ / ート」)이 아니라
+   띄어쓰기에서만 끊는다(« · » 는 앞 줄 끝에 남는다 — balance 를 쓰면 「· 時計」처럼 다음 줄 머리로 간다). 한 줄에 들어가는 한국어는 그대로. */
+.ofw-tiles button { padding-block: 4px; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
 .ofw-tiles button:active { transform: scale(.97); }
 .ofw-tiles button.on { background: #f4f1fd; color: #5a30cf; font-weight: 600; }
 .ofw-tiles button.on.is-danger { background: #fdecec; color: #c5282e; }

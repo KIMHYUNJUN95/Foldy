@@ -94,15 +94,22 @@ export function GreetingLine({
       </span>
     );
   }
-  const words = text.split(" ");
+  // 띄어쓰기 단위로 나누고, 일본어처럼 띄어쓰기가 없는 문장은 「、」「。」 뒤에서도 나눈다 — 덩어리(inline-block)
+  // 사이에서만 줄이 바뀌어 「金曜日です / ね、…」처럼 한 글자가 다음 줄로 떨어지지 않는다.
+  const words = text
+    .split(" ")
+    .flatMap((w, i, all) => {
+      const parts = w.split(/(?<=[、。！？])/);
+      return parts.map((part, j) => ({ part, space: j === parts.length - 1 && i < all.length - 1 }));
+    });
   return (
     <span className="gl is-ready">
-      {words.map((w, i) => (
+      {words.map(({ part, space }, i) => (
         <span key={i}>
           <span className="gl__w" style={{ animationDelay: `${i * 45}ms` }}>
-            {w}
+            {part}
           </span>
-          {i < words.length - 1 ? " " : null}
+          {space ? " " : null}
         </span>
       ))}
     </span>

@@ -463,7 +463,8 @@
 /* quick actions — soft violet tiles, no outer cards */
 .hm__qa {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, …) — 긴 영어 이름이 한 칸만 넓혀 아이콘 간격이 흐트러지지 않게(2026-10-23). */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 .hm__qa-item {

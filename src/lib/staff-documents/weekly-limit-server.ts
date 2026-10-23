@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AppSession } from "@/lib/session";
 import type { BreakInterval } from "@/lib/attendance-pay-calculation";
+import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { tokyoToday, ymdShift } from "@/lib/tokyo-date";
 import {
@@ -71,35 +72,50 @@ export async function loadWeeklyLimitResults(
   const sessionFrom = ymdShift(from, -WEEKLY_WINDOW_DAYS);
   const sessions: (WeeklyLimitSession & { user_id: string })[] = [];
   for (let i = 0; i < targets.length; i += IN_CHUNK) {
-    const { data, error } = await service
-      .from("attendance_sessions")
-      .select(SESSION_SELECT)
-      .eq("organization_id", organizationId)
-      .in("user_id", targets.slice(i, i + IN_CHUNK))
-      .gte("operating_date", sessionFrom)
-      .lte("operating_date", to)
-      .limit(10000);
+    // PostgREST 는 한 번에 1,000행까지만 준다(`.limit` 이 더 커도 조용히 잘린다) — 200명 × 38일이면 넘으므로 쪽으로 끝까지 읽는다.
+    const chunk = targets.slice(i, i + IN_CHUNK);
+    const { data, error } = await readAllPages<WeeklyLimitSession & { user_id: string }>((rangeFrom, rangeTo) =>
+      service
+        .from("attendance_sessions")
+        .select(SESSION_SELECT)
+        .eq("organization_id", organizationId)
+        .in("user_id", chunk)
+        .gte("operating_date", sessionFrom)
+        .lte("operating_date", to)
+        .order("id", { ascending: true })
+        .range(rangeFrom, rangeTo) as unknown as PromiseLike<{
+        data: (WeeklyLimitSession & { user_id: string })[] | null;
+        error: { message: string } | null;
+      }>,
+    );
     if (error) {
       console.error("[weekly-limit] sessions", error.message);
       return results;
     }
-    sessions.push(...((data ?? []) as (WeeklyLimitSession & { user_id: string })[]));
+    sessions.push(...data);
   }
 
   const breaks: BreakInterval[] = [];
   const sessionIds = sessions.map((s) => s.id);
   for (let i = 0; i < sessionIds.length; i += IN_CHUNK) {
-    const { data, error } = await service
-      .from("attendance_breaks")
-      .select("session_id, started_at, ended_at")
-      .eq("organization_id", organizationId)
-      .in("session_id", sessionIds.slice(i, i + IN_CHUNK))
-      .limit(10000);
+    const chunk = sessionIds.slice(i, i + IN_CHUNK);
+    const { data, error } = await readAllPages<BreakInterval & { id: string }>((rangeFrom, rangeTo) =>
+      service
+        .from("attendance_breaks")
+        .select("id, session_id, started_at, ended_at")
+        .eq("organization_id", organizationId)
+        .in("session_id", chunk)
+        .order("id", { ascending: true })
+        .range(rangeFrom, rangeTo) as unknown as PromiseLike<{
+        data: (BreakInterval & { id: string })[] | null;
+        error: { message: string } | null;
+      }>,
+    );
     if (error) {
       console.error("[weekly-limit] breaks", error.message);
       return results;
     }
-    breaks.push(...((data ?? []) as BreakInterval[]));
+    breaks.push(...data);
   }
 
   const sessionsByUser = new Map<string, WeeklyLimitSession[]>();

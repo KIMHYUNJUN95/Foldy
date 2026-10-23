@@ -13,7 +13,7 @@ import { MobileSideNav } from "@/components/shell/mobile-side-nav";
 import { TabEditor } from "@/components/shell/tab-editor";
 import { SPLIT_PANE_MESSAGE } from "@/lib/split-pane";
 import { attachSwipeBack } from "@/lib/swipe-back/controller";
-import { isSwipeBackScreen } from "@/lib/swipe-back/history-model";
+import { canStartSwipeBack } from "@/lib/swipe-back/history-model";
 import { getHistoryIndex, getHistoryUrl } from "@/lib/swipe-back/history-tracker";
 import { trackScreen } from "@/lib/swipe-back/snapshot-store";
 import { updateBottomNavTabs } from "@/app/account/actions";
@@ -562,7 +562,7 @@ export function MobileShell({
     const ownUrl = getHistoryUrl(ownIndex);
     const capture = trackScreen(main, swipeDepsRef.current.userId);
     const detach = attachSwipeBack({
-      isSwipeScreen: () => isSwipeBackScreen(window.location.pathname),
+      isSwipeScreen: () => canStartSwipeBack(window.location.pathname),
       main,
       replace: (url) => swipeDepsRef.current.router.replace(url),
       surface,

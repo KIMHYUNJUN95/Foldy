@@ -44,6 +44,15 @@ export function isSwipeBackScreen(path: string): boolean {
 }
 
 /**
+ * 이 화면에서 **밀기를 시작**할 수 있는가 — `/mobile` 화면에 더해, 모바일 셸로 그려지는 계정 화면(`/account?mode=mobile`)도 받는다
+ * (2026-10-23 버그: 모양은 앱 화면인데 주소가 `/mobile` 밖이라 가운데에서 밀면 반응이 없었다). 돌아갈 곳 판정은 그대로
+ * `isSwipeBackScreen` 이다 — 다른 화면에서 밀어 계정으로 나가지는 않는다. `/account/id-card`(셸 없는 전체 화면)는 넣지 않는다.
+ */
+export function canStartSwipeBack(path: string): boolean {
+  return isSwipeBackScreen(path) || /^\/account(?:[?#]|$)/.test(path);
+}
+
+/**
  * 앱 안 이전 기록이 없을 때(알림 · 링크로 바로 들어옴, 앱을 새로 엶) 돌아갈 **위 화면** — 주소를 한 칸씩 올라가며 처음 만나는 실제
  * 화면(`screens`). 상세는 목록으로, 목록은 메뉴 첫 화면으로, 끝은 홈(`/mobile`). 홈이면 null(더 갈 곳이 없다 — 앱을 나간다).
  * 뒤로 버튼이 없는 앱이라 이게 없으면 그런 화면에서 갇혔다(2026-10-20 점검).

@@ -194,6 +194,8 @@ user_id uuid not null references profiles(id)
 role text not null
 status text not null
 team_id uuid references teams(id) on delete set null  -- added migration 202607140001; nullable = 미지정
+-- 2026-10-23 (202610230007): trigger memberships_default_team fills an empty team_id on insert from the role
+--   (field_manager · staff · part_time_staff → 현장, else 사무실); existing empty rows backfilled the same way.
 joined_at timestamptz
 left_at timestamptz  -- added 202610230004; 떠난(suspended · removed) 시각, active · invited 면 null (트리거)
 created_at timestamptz

@@ -277,6 +277,11 @@ for schema.
 - **Phase 1 scope only.** Team CRUD (creating additional/sub-teams beyond the two defaults) and using
   team as a filter on 근태/청소/대시보드 screens are later phases, not built yet.
 - Migration is written but **not yet applied** to the linked Supabase project as of 2026-07-14.
+- **Default on join (2026-10-23, migration `202610230007_membership_default_team.sql`):** the 07-14 backfill only covered members
+  who existed then — everyone who joined later had no team (12 of 13 members 미지정), so the 소속 filter (현장/사무실) showed
+  nobody. The migration fills every empty `team_id` with the same role rule (`field_manager` · `staff` · `part_time_staff` → 현장,
+  everyone else → 사무실; existing assignments untouched), seeds the two default teams for orgs created after 07-14, and adds a
+  `before insert` trigger on `memberships` that sets the default team when `team_id` is empty. Admins can still change it any time.
 
 ## Auth / Onboarding Rules (2026-06-18 planning baseline)
 

@@ -1540,3 +1540,10 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - RLS 켜짐 · **정책 없음** — authenticated 는 읽기 · 쓰기 모두 막힘. GRANT 는 `service_role` 만(`all`).
 - 쓰기는 `readIdCard`(세션 · 조직 · 본인 경로 확인 뒤) · 지우기는 보관 기한 정리 작업(`cleanupExpiredIdDocuments`, 크론) — 둘 다 service role, 조직 · 사람으로 직접 거른다.
 - 보관 기한 정리는 저장소 사진을 Storage API(service role)로 지운다(`storage.objects` 에 SQL 로 손대지 않는다).
+
+## 2026-10-23 신분 서류 인쇄 기록 `staff_document_print_logs` (`202610230006`)
+
+- RLS 켜짐 · **정책 없음** — authenticated 는 읽기 · 쓰기 모두 막힘. GRANT 는 `service_role` 만(`all`).
+- 인쇄 화면 `/account/id-card/print` · 서버 액션 `recordIdDocumentPrint`: 세션의 `staff_documents.view` + 조직 세션(플랫폼 제외)이 없으면 아무것도 읽지 · 쓰지 않는다.
+  주소 · 액션으로 받은 사람 id 는 **이 조직** `staff_id_documents`(지금 카드) · **이 조직** `memberships` 로만 걸러 읽고 기록한다 — 다른 조직 id 는 조회 대상이 아니다.
+- 사진은 서버의 10분 서명 URL(Storage 정책 그대로). 지우기는 보관 기한 정리 작업(service role).

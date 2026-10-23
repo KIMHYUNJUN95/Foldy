@@ -95,6 +95,8 @@ memo
 
 **서류 상태(2026-10-23)**: `DirectoryMemberVM.idDoc`(확인 대기 · 만료 · 재제출) — `staff_documents.view` 가 있을 때만 서버가 채운다. PC 목록은 이름 옆 칩 + 필터 줄 「확인 대기 N」, 모바일은 줄 오른쪽 칩 + 거르기 줄 「확인 대기 N」. 문서 41 §10.
 
+**재류카드 A4 인쇄(R3, 2026-10-23)**: PC 목록 필터 줄 오른쪽 「재류카드 인쇄」(서류 있는 사람이 한 명이라도 보일 때 = `staff_documents.view`) → 고르기 모드 — 줄을 누르면 고름(동그라미 체크 · 옅은 보라 배경, 서류 없는 줄은 흐리게 · 못 누름), 「서류 있는 사람 모두」(지금 거른 목록, 최대 50명) · 「취소」 · 「N명 인쇄」(새 탭 `/account/id-card/print?u=…`, 한 사람당 A4 한 장). 고르는 동안 줄을 눌러도 패널이 열리지 않는다. 상세 패널(PC · 모바일) 「신분 서류」 칸 머리에 「인쇄」(한 사람, 앱에서는 숨김). `MemberPanelVM.idDocument.printHref`. 문서 41 §10 「R3 구현」.
+
 All registered organization members should be visible in a user directory.
 
 Purpose:

@@ -2198,3 +2198,18 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, au
 `memberships.left_at` — 떠난 시각(트리거 `memberships_track_left_at`: active · invited 로 바뀌면 null, 그 밖 → suspended · removed 면 now(),
 떠난 상태끼리 바뀌면 처음 값 유지). 기존 suspended · removed 행은 `updated_at` 으로 채웠다(근사 — 실제보다 늦을 수는 있어도 이르지 않다).
 신분 서류 보관 기한(퇴사 3년 뒤 삭제)의 기준 — `docs/product/41` §6.
+
+## 2026-10-23 `staff_document_print_logs` — 신분 서류 A4 인쇄 기록 (`202610230006`)
+
+재류카드 R3(`docs/product/41` §3-4 · §10 「R3 구현」). 인쇄 화면에서 인쇄할 때마다(버튼 · Ctrl+P) 서버 액션 `recordIdDocumentPrint` 가 대상 한 사람당 한 줄.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `organization_id` | 조직(FK, 조직 지우면 같이) |
+| `printed_by` | 인쇄한 사람(FK profiles, 지워지면 null) |
+| `user_id` | 대상(서류 주인, FK profiles) |
+| `document_id` | 그때 뽑은 `staff_id_documents.id`(FK 없음 — 서류 행이 갱신 · 정리로 사라져도 남는다) |
+| `printed_at` | 시각 |
+
+인덱스 `(organization_id, user_id, printed_at)`. RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, authenticated 권한 없음).
+보관: 퇴사 3년 뒤 정리(`src/lib/staff-documents/retention.ts`)가 대상 기준으로 서류 · 사진 · 읽기 기록과 함께 하드 삭제.

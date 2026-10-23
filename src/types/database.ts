@@ -5239,6 +5239,33 @@ export type Database = {
           },
         ]
       }
+      staff_document_print_logs: {
+        Row: {
+          id: string
+          organization_id: string
+          printed_by: string | null
+          user_id: string
+          document_id: string
+          printed_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          printed_by?: string | null
+          user_id: string
+          document_id: string
+          printed_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          printed_by?: string | null
+          user_id?: string
+          document_id?: string
+          printed_at?: string
+        }
+        Relationships: []
+      }
       staff_id_documents: {
         Row: {
           id: string

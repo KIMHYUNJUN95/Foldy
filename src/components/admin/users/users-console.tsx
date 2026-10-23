@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { IdDocumentPanel } from "@/components/identity/id-document-panel";
 import { useRouter } from "next/navigation";
-import { ChevronRight, CircleHelp, Search, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, CircleHelp, Printer, Search, Trash2, X } from "lucide-react";
 import "./users-white.css";
 import { AdmDropdown, type AdmOption } from "../shared/adm-dropdown";
 import { AdminDatePicker } from "../shared/admin-date-picker";
@@ -25,6 +25,7 @@ import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
 import { idDocChip } from "@/lib/staff-documents/chip";
+import { MAX_PRINT_PEOPLE } from "@/lib/staff-documents/print";
 import { tokyoToday } from "@/lib/tokyo-date";
 
 /**
@@ -106,6 +107,20 @@ export function UsersConsole({
   const [fDoc, setFDoc] = useState(false);
   // idDoc 은 서버가 `staff_documents.view` 가 있을 때만 채운다 — 권한 없는 화면엔 칩도 거르기 칸도 없다.
   const pendingDocs = useMemo(() => members.filter((m) => m.idDoc?.status === "pending").length, [members]);
+  // 재류카드 A4 인쇄(R3) — 고르기 모드에서 줄을 누르면 고르고(서류 있는 사람만), 「N명 인쇄」가 새 탭으로 인쇄 화면을 연다.
+  const printable = useMemo(() => members.some((m) => m.idDoc), [members]);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePick = (userId: string) => {
+    haptic("light");
+    setPicked((list) =>
+      list.includes(userId) ? list.filter((id) => id !== userId) : list.length >= MAX_PRINT_PEOPLE ? list : [...list, userId],
+    );
+  };
+  const stopSelecting = () => {
+    setSelecting(false);
+    setPicked([]);
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -186,6 +201,48 @@ export function UsersConsole({
             {c.idDocFilter.replace("{n}", String(pendingDocs))}
           </button>
         ) : null}
+        {printable && !selecting ? (
+          <button type="button" className="usw-flag usw-printsel" onClick={() => setSelecting(true)}>
+            <Printer size={14} aria-hidden="true" />
+            {c.printSelect}
+          </button>
+        ) : null}
+        {selecting ? (
+          <div className="usw-printbar" role="group" aria-label={c.printSelect}>
+            <span className="usw-printbar__hint">{c.printSelectHint}</span>
+            <button
+              type="button"
+              className="usw-link"
+              onClick={() => {
+                haptic("light");
+                setPicked(
+                  [...new Set(filtered.filter((m) => m.idDoc).map((m) => m.userId))].slice(0, MAX_PRINT_PEOPLE),
+                );
+              }}
+            >
+              {c.printSelectAll}
+            </button>
+            <button type="button" className="usw-btn" onClick={stopSelecting}>
+              {c.printSelectCancel}
+            </button>
+            {picked.length > 0 ? (
+              <a
+                className="usw-btn is-pri"
+                href={`/account/id-card/print?u=${picked.join(",")}`}
+                rel="noopener"
+                target="_blank"
+              >
+                <Printer size={14} aria-hidden="true" />
+                {c.printSelected.replace("{n}", String(picked.length))}
+              </a>
+            ) : (
+              <button type="button" className="usw-btn is-pri" disabled>
+                <Printer size={14} aria-hidden="true" />
+                {c.printSelected.replace("{n}", "0")}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="usw-th" aria-hidden="true">
@@ -217,15 +274,24 @@ export function UsersConsole({
         </div>
       ) : (
         <div className="usw-rows">
-          {filtered.map((m) => (
+          {filtered.map((m) => {
+            const isPicked = selecting && picked.includes(m.userId);
+            return (
             <button
               key={m.membershipId}
               type="button"
-              className={`usw-tr${m.membershipId === selectedId ? " on" : ""}`}
-              aria-current={m.membershipId === selectedId ? "true" : undefined}
-              onClick={() => open(m.membershipId)}
+              className={`usw-tr${!selecting && m.membershipId === selectedId ? " on" : ""}${isPicked ? " is-picked" : ""}`}
+              aria-current={!selecting && m.membershipId === selectedId ? "true" : undefined}
+              aria-pressed={selecting ? isPicked : undefined}
+              disabled={selecting && !m.idDoc}
+              onClick={() => (selecting ? togglePick(m.userId) : open(m.membershipId))}
             >
               <span className="usw-who">
+                {selecting ? (
+                  <span className="usw-pick" aria-hidden="true" title={m.idDoc ? undefined : c.printNoDoc}>
+                    {isPicked ? <Check size={13} strokeWidth={3} /> : null}
+                  </span>
+                ) : null}
                 <span className="usw-av" aria-hidden="true">
                   {initialOf(m.name)}
                 </span>
@@ -251,7 +317,8 @@ export function UsersConsole({
               </span>
               <span className="usw-c r num is-soft">{joined(m.joinedAt)}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -580,7 +647,7 @@ function MemberPanel({
             ))}
           </dl>
           {/* 신분 서류(docs/product/41 R2) — 서버가 staff_documents.view 를 본 뒤에만 실어 보낸다. */}
-          {panel.idDocument.canView ? <IdDocumentPanel canReview={!m.isSelf} doc={panel.idDocument.doc} locale={locale} /> : null}
+          {panel.idDocument.canView ? <IdDocumentPanel canReview={!m.isSelf} doc={panel.idDocument.doc} locale={locale} printHref={panel.idDocument.printHref} /> : null}
 
           {readOnly ? (
             <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>

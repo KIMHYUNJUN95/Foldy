@@ -14,7 +14,7 @@ const PAGE = 1000;
  * 신분 서류 보관 기한 정리 — 퇴사 3년 뒤 하드 삭제(docs/product/41 §6). 매일 `/api/tasks/reminders` 크론에 붙어 돈다.
  *
  * 대상은 **멤버십에서** 고른다: 떠난 상태(suspended · removed)이고 `left_at` 이 기준보다 앞인 (조직, 사람). 그중 서류나
- * 읽기 기록이 남은 사람만. 서류 표를 앞에서부터 읽던 첫 판은 1000행에서 잘려 재직자가 앞자리를 차지하면 퇴사자를 영영 못 보고,
+ * 읽기 기록 · 인쇄 기록이 남은 사람만. 서류 표를 앞에서부터 읽던 첫 판은 1000행에서 잘려 재직자가 앞자리를 차지하면 퇴사자를 영영 못 보고,
  * 멤버십 없는 사람을 서류 갱신 시각으로 재 일찍 지울 수 있었다(2026-10-23 점검). 멤버십이 없는 사람은 지우지 않는다.
  *
  * 한 사람(조직 · 사람 짝)마다 **사진 먼저 → 표 행 나중**. 사진 지우기가 실패하면 표 행을 남겨 다음 날 다시 찾게 한다
@@ -49,14 +49,17 @@ export async function cleanupExpiredIdDocuments(service: SupabaseClient<Database
   for (const [organizationId, userIds] of byOrg) {
     for (let i = 0; i < userIds.length; i += 200) {
       const chunk = userIds.slice(i, i + 200);
-      const [docs, reads] = await Promise.all([
+      const [docs, reads, prints] = await Promise.all([
         service.from("staff_id_documents").select("user_id, updated_at").eq("organization_id", organizationId).in("user_id", chunk),
         service.from("staff_id_ocr_reads").select("user_id, created_at").eq("organization_id", organizationId).in("user_id", chunk),
+        service.from("staff_document_print_logs").select("user_id, printed_at").eq("organization_id", organizationId).in("user_id", chunk),
       ]);
       if (docs.error) throw docs.error;
       if (reads.error) throw reads.error;
+      if (prints.error) throw prints.error;
       for (const d of docs.data ?? []) owners.push({ organizationId, userId: d.user_id, updatedAt: d.updated_at });
       for (const r of reads.data ?? []) owners.push({ organizationId, userId: r.user_id, updatedAt: r.created_at });
+      for (const r of prints.data ?? []) owners.push({ organizationId, userId: r.user_id, updatedAt: r.printed_at });
     }
   }
 
@@ -118,5 +121,12 @@ async function purgeOwner(service: SupabaseClient<Database>, organizationId: str
     .delete()
     .eq("organization_id", organizationId)
     .eq("user_id", userId);
-  return !readError;
+  if (readError) return false;
+  // 인쇄 기록(R3) — 그 사람(대상) 것. 인쇄한 사람(printed_by)으로 남은 기록은 대상의 기록이라 대상 기준으로만 지운다.
+  const { error: printError } = await service
+    .from("staff_document_print_logs")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId);
+  return !printError;
 }

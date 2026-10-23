@@ -75,7 +75,8 @@ export function SuggestionsDetail({
 
   // Author may edit/delete the main suggestion only while it is still `submitted`.
   const canAuthorEdit = data.viewerRole === "author" && data.status === "submitted";
-  const isRecipient = data.viewerRole === "recipient";
+  // 상태 바꾸기 — 받는 사람 또는 플랫폼 개발자(서버 changeSuggestionStatus 와 같은 규칙).
+  const isRecipient = data.viewerCanChangeStatus;
 
   function removeSuggestion() {
     startDelete(async () => {

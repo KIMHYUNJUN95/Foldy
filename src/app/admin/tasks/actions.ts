@@ -11,6 +11,7 @@ import { notifyProjectMembers, notifyTaskParticipants } from "@/lib/notification
 import type { TaskNotificationPayload } from "@/lib/notifications/types";
 import { getProjectDetail, type ProjectDetailData } from "@/lib/projects";
 import {
+  canEditTaskCore,
   getShareableUsers,
   getTaskDetail,
   getTasksByIds,
@@ -44,6 +45,7 @@ import {
   skipOccurrences,
 } from "@/lib/task-occurrences";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { isOwnerOrPlatformDeveloper } from "@/config/roles";
 import { cleanupRemovedTaskImages, mergeTaskImageUrls, sanitizeTaskImageUrls } from "@/lib/task-images";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
@@ -552,7 +554,7 @@ export async function updateConsoleTaskCore(input: {
   const resolved = await resolveTask(input.taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
-  if (task.createdByUserId !== session.user.id) return { ok: false, error: "forbidden" };
+  if (!canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
 
   const title = input.title.trim();
   if (!title) return { ok: false, error: "missing_title" };
@@ -654,7 +656,7 @@ export async function rescheduleConsoleTask(
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
-  if (task.createdByUserId !== session.user.id) return { ok: false, error: "forbidden" };
+  if (!canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
 
   const date = input.date.trim();
   const time = input.time.trim();
@@ -805,7 +807,8 @@ export async function shareConsoleTask(
   const { session, task } = resolved;
   // Project tasks are governed by project membership, not per-task sharing.
   if (task.projectId) return { ok: false, error: "forbidden" };
-  const isAuthor = task.createdByUserId === session.user.id;
+  // 플랫폼 개발자는 작성자와 같은 힘(빼기 · 지시 바꾸기)을 갖는다(2026-10-23).
+  const isAuthor = canEditTaskCore(session, task);
   const isParticipant = task.participants.some((p) => p.userId === session.user.id);
   if (!isAuthor && !isParticipant) return { ok: false, error: "forbidden" };
 
@@ -940,7 +943,7 @@ export async function deleteConsoleTask(taskId: string): Promise<TaskActionResul
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
-  if (task.createdByUserId !== session.user.id) return { ok: false, error: "forbidden" };
+  if (!canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
   const supabase = getSupabaseServiceClient();
   const { error } = await supabase
     .from("tasks")
@@ -968,7 +971,7 @@ export async function restoreConsoleTask(taskId: string): Promise<TaskActionResu
     .maybeSingle();
   const row = data as { created_by_user_id: string } | null;
   if (!row) return { ok: false, error: "not_found" };
-  if (row.created_by_user_id !== session.user.id) return { ok: false, error: "forbidden" };
+  if (!isOwnerOrPlatformDeveloper(session.user, row.created_by_user_id)) return { ok: false, error: "forbidden" };
   const { error } = await supabase
     .from("tasks")
     .update({ deleted_at: null })
@@ -1125,7 +1128,7 @@ export async function bulkDeleteConsoleTasks(taskIds: string[]): Promise<BulkDel
       failedIds.push(id);
       continue;
     }
-    if (task.createdByUserId === session.user.id) mine.push(id);
+    if (canEditTaskCore(session, task)) mine.push(id);
     else theirs.push(id);
   }
 
@@ -1187,7 +1190,7 @@ export async function restoreConsoleTasks(taskIds: string[]): Promise<TaskAction
     .in("id", ids)
     .eq("organization_id", session.organization.id);
   const own = ((data ?? []) as { id: string; created_by_user_id: string }[])
-    .filter((r) => r.created_by_user_id === session.user.id)
+    .filter((r) => isOwnerOrPlatformDeveloper(session.user, r.created_by_user_id))
     .map((r) => r.id);
   if (!own.length) return { ok: false, error: "forbidden" };
   const { error } = await supabase
@@ -1421,7 +1424,7 @@ async function resolveOwnedProject(projectId: string): Promise<OwnedProject> {
   if (!id) return { ok: false, error: "not_found" };
   const project = await getProjectDetail(session, id);
   if (!project) return { ok: false, error: "not_found" };
-  if (!project.viewerIsOwner) return { ok: false, error: "forbidden" };
+  if (!project.viewerCanManage) return { ok: false, error: "forbidden" };
   return { ok: true, session, project, id };
 }
 
@@ -1570,7 +1573,7 @@ export async function deleteConsoleProject(projectId: string): Promise<TaskActio
   if (!id) return { ok: false, error: "not_found" };
   const project = await getProjectDetail(session, id);
   if (!project) return { ok: false, error: "not_found" };
-  if (!project.viewerIsOwner) return { ok: false, error: "forbidden" };
+  if (!project.viewerCanManage) return { ok: false, error: "forbidden" };
   const supabase = getSupabaseServiceClient();
   const { error } = await supabase
     .from("projects")

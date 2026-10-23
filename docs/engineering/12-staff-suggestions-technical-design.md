@@ -451,7 +451,8 @@ Recommended baseline:
 - suggestion select: only author / recipient / referenced users / platform admin
 - suggestion update:
   - author only for main-body edits while `submitted`
-  - recipient only for status fields
+  - recipient only for status fields (platform developer may too — 2026-10-23; developers also see every org suggestion
+    in the 「받은」 list and may comment. See 05 「개발자 예외」)
 - suggestion delete:
   - author only while `submitted`
 - reference-row management:

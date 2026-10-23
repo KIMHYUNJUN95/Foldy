@@ -12,7 +12,7 @@ import {
   searchMentionableMembers,
   validateMentionTargets,
 } from "@/lib/board-queries";
-import { isOrgTopAdmin } from "@/config/roles";
+import { isOrgTopAdminOrPlatform, isPlatformDeveloper } from "@/config/roles";
 import { BOARD_MAX_FILES, BOARD_MAX_IMAGES } from "@/lib/board";
 import type { AvatarColor, FileAttachment } from "@/components/board/board-types";
 import type { Database, Json } from "@/types/database";
@@ -379,7 +379,7 @@ type UpdateBoardPostInput = {
   isPinned?: boolean;
 };
 
-/** Edit a post. Author only. Pin flag updatable (kept consistent with pinned_at/by). */
+/** Edit a post. Author only (platform developer may edit any post, 2026-10-23). Pin flag updatable (kept consistent with pinned_at/by). */
 export async function updateBoardPost(
   postId: string,
   input: UpdateBoardPostInput,
@@ -389,7 +389,9 @@ export async function updateBoardPost(
 
   const post = await loadPostMeta(postId, session.organization.id);
   if (!post) return { error: "not_found" };
-  if (post.created_by_user_id !== session.user.id) return { error: "forbidden" };
+  if (post.created_by_user_id !== session.user.id && !isPlatformDeveloper(session.user.role)) {
+    return { error: "forbidden" };
+  }
 
   const patch: Database["public"]["Tables"]["board_posts"]["Update"] = {};
   if (input.title !== undefined) patch.title = input.title?.trim() || null;
@@ -412,7 +414,7 @@ export async function updateBoardPost(
     // **고정 권한은 작성 경로와 같아야 한다.** `createBoardPost` 는 owner/전무/office_admin 에게만
     // 고정을 허용하는데 여기엔 그 검사가 없어서, 일반 직원이 자기 글을 수정하며 상단 고정을 할 수
     // 있었다(2026-08-07 발견). 같은 상태를 바꾸는 두 경로가 다른 권한을 갖고 있으면 안 된다.
-    const canPin = isOrgTopAdmin(session.user.role) || session.user.role === "office_admin";
+    const canPin = isOrgTopAdminOrPlatform(session.user.role) || session.user.role === "office_admin";
     if (!canPin && input.isPinned !== post.is_pinned) return { error: "forbidden" };
   }
   if (input.isPinned !== undefined) {

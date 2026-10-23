@@ -6,6 +6,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getBugReportDetail, isBugReportReviewer } from "@/lib/bug-reports";
 import { getDictionary } from "@/lib/i18n";
 import { BugDetailClient } from "./bug-detail-client";
+import { isPlatformDeveloper } from "@/config/roles";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -45,6 +46,7 @@ export default async function MobileBugDetailPage({ params }: PageProps) {
         copy={copy}
         bug={bug}
         viewerIsAuthor={viewerIsAuthor}
+        isDeveloper={isPlatformDeveloper(session.user.role)}
         isReviewer={isReviewer}
       />
     </MobileShell>

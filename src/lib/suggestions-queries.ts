@@ -13,6 +13,7 @@ import type { Database } from "@/types/database";
 import type { AppSession } from "@/lib/session";
 import type { StaffSuggestionStatus } from "@/lib/suggestions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { isPlatformDeveloper } from "@/config/roles";
 
 // Resolve display names for a set of org members (active or not) via memberships→profiles.
 async function fetchMemberNames(
@@ -90,6 +91,13 @@ export async function getSuggestionListData(session: AppSession): Promise<Sugges
   const supabase = await getSupabaseServerClient();
   const orgId = session.organization.id;
   const uid = session.user.id;
+  // 플랫폼 개발자는 조직의 건의를 전부 본다(2026-10-23) — 내가 쓴 것 말고는 모두 「받은」 칸에 모인다
+  // (상태도 바꿀 수 있으니 받는 사람 자리). RLS 는 is_platform_admin() 으로 이미 통과한다.
+  const developer = isPlatformDeveloper(session.user.role);
+  const receivedQuery = supabase
+    .from("staff_suggestions")
+    .select(LIST_COLS)
+    .eq("organization_id", orgId);
 
   const [sentRes, receivedRes, refRes] = await Promise.all([
     supabase
@@ -98,12 +106,10 @@ export async function getSuggestionListData(session: AppSession): Promise<Sugges
       .eq("organization_id", orgId)
       .eq("created_by_user_id", uid)
       .order("created_at", { ascending: false }),
-    supabase
-      .from("staff_suggestions")
-      .select(LIST_COLS)
-      .eq("organization_id", orgId)
-      .eq("recipient_user_id", uid)
-      .order("created_at", { ascending: false }),
+    (developer ? receivedQuery.neq("created_by_user_id", uid) : receivedQuery.eq("recipient_user_id", uid)).order(
+      "created_at",
+      { ascending: false },
+    ),
     supabase
       .from("staff_suggestion_references")
       .select(`suggestion_id, created_at, staff_suggestions(${LIST_COLS})`)
@@ -121,7 +127,7 @@ export async function getSuggestionListData(session: AppSession): Promise<Sugges
       : ((refRes.data ?? []) as { staff_suggestions: SuggestionRow | SuggestionRow[] | null }[])
           .map((r) => (Array.isArray(r.staff_suggestions) ? r.staff_suggestions[0] : r.staff_suggestions))
           .filter((r): r is SuggestionRow => Boolean(r))
-  );
+  ).filter((r) => !developer || !receivedRows.some((x) => x.id === r.id));
 
   const allRows = [...sentRows, ...receivedRows, ...referencedRows];
   const ids = Array.from(new Set(allRows.map((r) => r.id)));
@@ -211,6 +217,8 @@ export type SuggestionDetail = {
   comments: SuggestionComment[];
   events: SuggestionStatusEvent[];
   viewerRole: SuggestionViewerRole;
+  /** 상태를 바꿀 수 있는가 — 받는 사람 또는 플랫폼 개발자(2026-10-23). */
+  viewerCanChangeStatus: boolean;
 };
 
 type DetailRow = {
@@ -268,7 +276,11 @@ export async function getSuggestionDetail(
   if (sug.created_by_user_id === uid) viewerRole = "author";
   else if (sug.recipient_user_id === uid) viewerRole = "recipient";
   else if (referenceIds.includes(uid)) viewerRole = "referenced";
+  // 플랫폼 개발자는 관계없는 건의도 연다(보기 전용 자리 = referenced, 상태 변경은 아래 플래그로).
+  const developer = isPlatformDeveloper(session.user.role);
+  if (!viewerRole && developer) viewerRole = "referenced";
   if (!viewerRole) return null; // defensive — RLS should already prevent this
+  const viewerCanChangeStatus = viewerRole === "recipient" || developer;
 
   const { data: commentRows } = await supabase
     .from("staff_suggestion_comments")
@@ -348,5 +360,6 @@ export async function getSuggestionDetail(
       createdAt: e.created_at,
     })),
     viewerRole,
+    viewerCanChangeStatus,
   };
 }

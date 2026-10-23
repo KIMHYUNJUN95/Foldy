@@ -19,6 +19,7 @@ import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
+import { isPlatformDeveloper } from "@/config/roles";
 
 export type ComplaintPlatform =
   | "airbnb"
@@ -451,7 +452,7 @@ async function loadComplaintForWrite(
 
 export type ComplaintPatch = Partial<ComplaintInput>;
 
-/** 수정. 작성자 본인 + open 상태일 때만. */
+/** 수정. 작성자 본인 + open 상태일 때만. 플랫폼 개발자는 둘 다 예외(2026-10-23). */
 export async function updateComplaint(input: {
   session: AppSession;
   id: string;
@@ -462,8 +463,9 @@ export async function updateComplaint(input: {
 
   const existing = await loadComplaintForWrite(id, organizationId);
   if (!existing) throw new Error("not_found");
-  if (existing.created_by_user_id !== session.user.id) throw new Error("forbidden");
-  if (existing.status !== "open") throw new Error("not_editable");
+  const developer = isPlatformDeveloper(session.user.role);
+  if (existing.created_by_user_id !== session.user.id && !developer) throw new Error("forbidden");
+  if (existing.status !== "open" && !developer) throw new Error("not_editable");
 
   const update: Database["public"]["Tables"]["customer_complaints"]["Update"] = { updated_at: new Date().toISOString() };
   if (patch.platform !== undefined) update.platform = validatePlatform(patch.platform);
@@ -649,7 +651,7 @@ export async function createComplaintComment(input: {
   return { id };
 }
 
-/** 댓글 수정. 작성자 본인만. */
+/** 댓글 수정. 작성자 본인만(플랫폼 개발자 예외, 2026-10-23). */
 export async function updateComplaintComment(input: {
   session: AppSession;
   commentId: string;
@@ -663,7 +665,9 @@ export async function updateComplaintComment(input: {
 
   const existing = await loadCommentForWrite(commentId, organizationId);
   if (!existing || existing.deleted_at) throw new Error("not_found");
-  if (existing.created_by_user_id !== session.user.id) throw new Error("forbidden");
+  if (existing.created_by_user_id !== session.user.id && !isPlatformDeveloper(session.user.role)) {
+    throw new Error("forbidden");
+  }
 
   const service = getSupabaseServiceClient();
   const { error } = await untyped(service)

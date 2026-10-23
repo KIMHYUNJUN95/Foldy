@@ -110,6 +110,8 @@ export function MobileMemberDetail({
   const [optStatus, setOptStatus] = useState<string | null>(null);
   const today = tokyoToday();
   const readOnly = m.isSelf || panel.lock !== null;
+  // 개발자 본인 — 역할 · 상태 · 권한 · 삭제는 잠금 방지로 막아 두고, 서버가 허용하는 소속 팀만 연다(2026-10-23).
+  const selfTeamEditable = m.isSelf && panel.isDeveloperViewer && panel.lock === null;
 
   const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.isDeveloper, panel.perms]);
   const lastKey = useRef(dataKey);
@@ -127,6 +129,32 @@ export function MobileMemberDetail({
   const status = optStatus ?? (m.status === "active" ? "active" : "suspended");
   const team = panel.teams.find((t) => t.id === teamId);
   const teamName = (t: { kind: string; name: string }) => (t.kind === "field" ? c.teamFieldOption : t.kind === "office" ? c.teamOfficeOption : t.name);
+  const teamSeg =
+    panel.teams.length > 0 ? (
+      <div className="muw-kv">
+        <span>{c.teamField}</span>
+        <div className="muw-seg" role="radiogroup" aria-label={c.teamField}>
+          {panel.teams.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={teamId === t.id}
+              disabled={pending}
+              onClick={() => {
+                if (teamId === t.id) return;
+                haptic("light");
+                const before = optTeam;
+                setOptTeam(t.id);
+                run(() => setMemberTeam(m.membershipId, t.id), c.wToastTeam, () => setOptTeam(before));
+              }}
+            >
+              {teamName(t)}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   const show = (next: Omit<UsersToast, "id">) => {
     setToast((prev) => ({ ...next, id: (prev?.id ?? 0) + 1 }));
@@ -438,10 +466,14 @@ export function MobileMemberDetail({
             <span>{u.role}</span>
             <b>{m.isDeveloper ? c.devRole : roleLabel(m.role)}</b>
           </div>
-          <div className="muw-kv">
-            <span>{c.teamField}</span>
-            <b>{team ? teamName(team) : c.teamUnassigned}</b>
-          </div>
+          {selfTeamEditable && teamSeg ? (
+            teamSeg
+          ) : (
+            <div className="muw-kv">
+              <span>{c.teamField}</span>
+              <b>{team ? teamName(team) : c.teamUnassigned}</b>
+            </div>
+          )}
           <div className="muw-kv">
             <span>{u.status}</span>
             <b>{m.status === "active" ? c.statusActive : c.statusInactive}</b>
@@ -458,31 +490,7 @@ export function MobileMemberDetail({
                 {panel.lastOwner ? null : <ChevronRight className="muw-chev" aria-hidden="true" />}
               </button>
             </div>
-            {panel.teams.length > 0 ? (
-              <div className="muw-kv">
-                <span>{c.teamField}</span>
-                <div className="muw-seg" role="radiogroup" aria-label={c.teamField}>
-                  {panel.teams.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={teamId === t.id}
-                      disabled={pending}
-                      onClick={() => {
-                        if (teamId === t.id) return;
-                        haptic("light");
-                        const before = optTeam;
-                        setOptTeam(t.id);
-                        run(() => setMemberTeam(m.membershipId, t.id), c.wToastTeam, () => setOptTeam(before));
-                      }}
-                    >
-                      {teamName(t)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            {teamSeg}
             <div className="muw-kv">
               <span>{u.status}</span>
               <div className="muw-seg" role="radiogroup" aria-label={u.status}>

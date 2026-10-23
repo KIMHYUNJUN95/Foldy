@@ -6,6 +6,7 @@ import { getBoardPost, ensureBoardPostRead, hasReadBoardPost } from "@/lib/board
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { isPlatformDeveloper } from "@/config/roles";
 import { BoardDetailClient } from "./board-detail-client";
 
 type PageProps = {
@@ -60,6 +61,7 @@ export default async function BoardPostPage({ params }: PageProps) {
         post={post}
         viewerId={session.user.id}
         canManage={session.capabilities.includes("board.manage")}
+        canEditAny={isPlatformDeveloper(session.user.role)}
         organizationId={session.organization.id}
         locale={session.user.preferredLanguage}
         copy={copy}

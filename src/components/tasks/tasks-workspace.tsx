@@ -172,6 +172,7 @@ export function TasksWorkspace({
   fieldActivities,
   copy,
   currentUserId,
+  canEditAny = false,
   initialView,
   locale,
   moveError,
@@ -189,6 +190,8 @@ export function TasksWorkspace({
   fieldActivities: FieldActivityRecord[];
   copy: Copy;
   currentUserId: string;
+  /** 플랫폼 개발자 — 길게 누름 메뉴에서 남의 작업도 편집 · 삭제(2026-10-23, 서버 canEditTaskCore 와 같은 규칙). */
+  canEditAny?: boolean;
   initialView: View;
   locale: Locale;
   /** 이동이 거절된 이유(반복 회차 중복). 서버 액션이 쿼리로 돌려보낸다. */
@@ -2096,7 +2099,7 @@ export function TasksWorkspace({
             <div className="tkw-sheet">
               <p className="tkw-sheet__t">{pressTask.title}</p>
               <div className="tkw-act">
-                {pressTask.createdByUserId === currentUserId ? (
+                {canEditAny || pressTask.createdByUserId === currentUserId ? (
                   <button
                     onClick={() => {
                       const id = pressTask.id;
@@ -2120,7 +2123,7 @@ export function TasksWorkspace({
                   <ListChecks aria-hidden="true" />
                   {copy.actionSelect}
                 </button>
-                {pressTask.createdByUserId === currentUserId ? (
+                {canEditAny || pressTask.createdByUserId === currentUserId ? (
                   <button
                     className="is-red"
                     onClick={() => {

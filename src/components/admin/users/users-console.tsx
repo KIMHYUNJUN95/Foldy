@@ -383,6 +383,9 @@ function MemberPanel({
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: confirm !== null || pending });
   const today = tokyoToday();
   const readOnly = m.isSelf || panel.lock !== null;
+  // 개발자 본인 줄 — 역할 · 상태 · 권한 · 삭제는 잠금 방지로 그대로 막지만(서버 self_update_blocked 등),
+  // 서버가 허용하는 소속 팀은 바꿀 수 있게 연다(2026-10-23 「개발자는 전부 가능」).
+  const selfTeamEditable = m.isSelf && panel.isDeveloperViewer && panel.lock === null;
 
   const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.isDeveloper, panel.perms]);
   const lastKey = useRef(dataKey);
@@ -499,6 +502,32 @@ function MemberPanel({
       });
     }
   }
+  const teamControl =
+    panel.teams.length > 0 ? (
+      <>
+        <span className="usw-set__k">{c.teamField}</span>
+        <div className="usw-seg" role="radiogroup" aria-label={c.teamField}>
+          {panel.teams.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={teamId === t.id}
+              className={teamId === t.id ? "on" : ""}
+              disabled={pending}
+              onClick={() => {
+                if (teamId === t.id) return;
+                const before = optTeam;
+                setOptTeam(t.id);
+                run(() => setMemberTeam(m.membershipId, t.id), c.wToastTeam, () => setOptTeam(before));
+              }}
+            >
+              {t.kind === "field" ? c.teamFieldOption : t.kind === "office" ? c.teamOfficeOption : t.name}
+            </button>
+          ))}
+        </div>
+      </>
+    ) : null;
   const onCount = rows.filter((row) => row.on).length;
   const history = formatMemberHistory(panel.history, { dict, locale, teams: panel.teams });
 
@@ -656,7 +685,10 @@ function MemberPanel({
           {panel.idDocument.canView ? <IdDocumentPanel canReview={panel.idDocument.canReview} doc={panel.idDocument.doc} locale={locale} printHref={panel.idDocument.printHref} /> : null}
 
           {readOnly ? (
-            <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>
+            <>
+              <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>
+              {selfTeamEditable && teamControl ? <div className="usw-set">{teamControl}</div> : null}
+            </>
           ) : (
             <div className="usw-set">
               <span className="usw-set__k">{u.role}</span>
@@ -672,31 +704,7 @@ function MemberPanel({
                   run(() => setMemberRole(m.membershipId, value), c.wToastRole, () => setOptRole(before));
                 }}
               />
-              {panel.teams.length > 0 ? (
-                <>
-                  <span className="usw-set__k">{c.teamField}</span>
-                  <div className="usw-seg" role="radiogroup" aria-label={c.teamField}>
-                    {panel.teams.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={teamId === t.id}
-                        className={teamId === t.id ? "on" : ""}
-                        disabled={pending}
-                        onClick={() => {
-                          if (teamId === t.id) return;
-                          const before = optTeam;
-                          setOptTeam(t.id);
-                          run(() => setMemberTeam(m.membershipId, t.id), c.wToastTeam, () => setOptTeam(before));
-                        }}
-                      >
-                        {t.kind === "field" ? c.teamFieldOption : t.kind === "office" ? c.teamOfficeOption : t.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : null}
+              {teamControl}
               <span className="usw-set__k">{u.status}</span>
               <div className="usw-seg" role="radiogroup" aria-label={u.status}>
                 <button

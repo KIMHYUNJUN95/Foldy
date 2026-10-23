@@ -1,4 +1,5 @@
 import type { AppSession } from "@/lib/session";
+import { isPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getProjectTasks, getTaskScope, type TaskRecord } from "@/lib/tasks";
 import type { Database } from "@/types/database";
@@ -43,7 +44,10 @@ export type ProjectDetailData = {
   isShared: boolean;
   createdByUserId: string;
   viewerRole: ProjectRole;
+  /** 진짜 소유자(owner 역할 또는 생성자). 「소유자는 나가지 못한다」 같은 소유자 자신의 규칙에 쓴다. */
   viewerIsOwner: boolean;
+  /** 소유자 전용 관리(섹션 · 멤버 · 프로젝트 삭제)를 할 수 있는가 — 소유자 또는 플랫폼 개발자(2026-10-23). */
+  viewerCanManage: boolean;
   members: ProjectMemberInfo[];
   sections: ProjectSectionInfo[];
   tasks: TaskRecord[];
@@ -216,6 +220,7 @@ export async function getProjectDetail(
   const viewerRole: ProjectRole = mine ? normalizeRole(mine.role) : "member";
   const viewerIsOwner =
     viewerRole === "owner" || project.created_by_user_id === session.user.id;
+  const viewerCanManage = viewerIsOwner || isPlatformDeveloper(session.user.role);
 
   const sections: ProjectSectionInfo[] = (
     (sectionData ?? []) as Pick<ProjectSectionRow, "id" | "title" | "sort_order">[]
@@ -229,6 +234,7 @@ export async function getProjectDetail(
     createdByUserId: project.created_by_user_id,
     viewerRole,
     viewerIsOwner,
+    viewerCanManage,
     members,
     sections,
     tasks,

@@ -11,6 +11,8 @@ import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room
 import { getActiveRoomCatalog } from "@/lib/rooms";
 import { getCurrentAppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { isPlatformDeveloper } from "@/config/roles";
 import type { Database } from "@/types/database";
 
 const cleaningPath = "/mobile/cleaning";
@@ -149,7 +151,9 @@ export async function cancelCleaningSession(formData: FormData) {
     redirectWithError("already_completed");
   }
 
-  if (sessionRow.staff_user_id !== session.user.id) {
+  // 남의 진행 중 청소는 플랫폼 개발자만 취소한다(2026-10-23 「개발자는 전부 가능」).
+  const cancellingOthers = sessionRow.staff_user_id !== session.user.id;
+  if (cancellingOthers && !isPlatformDeveloper(session.user.role)) {
     redirectWithError("not_allowed");
   }
 
@@ -161,7 +165,11 @@ export async function cancelCleaningSession(formData: FormData) {
     Math.round((cancelledAt.getTime() - new Date(sessionRow.started_at).getTime()) / 1000),
   );
 
-  const { error: updateError } = await supabase
+  // RLS 쓰기 정책은 `staff_user_id = auth.uid()` 라 남의 세션은 0행으로 조용히 막힌다. 그래서 개발자가
+  // 남의 세션을 취소할 때만 서비스 키로 쓴다 — 관리자 강제완료(202607150001)와 같은 방식: 위에서 앱 권한을
+  // 확인했고, 조직 · 상태 조건을 함께 건다.
+  const writer = cancellingOthers ? getSupabaseServiceClient() : supabase;
+  const { error: updateError } = await writer
     .from("cleaning_sessions")
     .update({
       completed_at: cancelledAt.toISOString(),
@@ -169,6 +177,7 @@ export async function cancelCleaningSession(formData: FormData) {
       status: "cancelled",
     })
     .eq("id", sessionId)
+    .eq("organization_id", session.organization.id)
     .eq("status", "in_progress");
 
   if (updateError) {

@@ -42,17 +42,19 @@ type Props = {
   bug: BugReport;
   viewerIsAuthor: boolean;
   isReviewer: boolean;
+  /** 플랫폼 개발자 — 남의 제보 · 접수 뒤 제보도 지울 수 있다(2026-10-23, 서버 deleteBugReport 와 같은 규칙). */
+  isDeveloper?: boolean;
 };
 
-export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer }: Props) {
+export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDeveloper = false }: Props) {
   const w = copy.white;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingStatus, setPendingStatus] = useState<BugStatus | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // 삭제 조건: 작성자 본인 + status === "submitted"
-  const canDelete = viewerIsAuthor && bug.status === "submitted";
+  // 삭제 조건: 작성자 본인 + status === "submitted" (플랫폼 개발자는 언제나)
+  const canDelete = isDeveloper || (viewerIsAuthor && bug.status === "submitted");
   const shownStatus = pendingStatus ?? bug.status;
 
   function onConfirmDelete() {

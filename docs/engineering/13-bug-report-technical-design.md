@@ -164,10 +164,12 @@ createBugReport(formData)
 
 updateBugReport(formData)
   -- author only, status = 'submitted' only
+  -- platform developer bypasses both (2026-10-23, 05 「개발자 예외」)
   -- 1차: not exposed via UI (edit page deferred)
 
 deleteBugReport(reportId)
   -- author only, status = 'submitted' only
+  -- platform developer bypasses both — detail page shows delete for them (2026-10-23)
   -- hard delete, requires confirmation modal
 
 updateBugReportStatus(formData)

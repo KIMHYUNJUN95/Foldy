@@ -1557,3 +1557,27 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 인쇄 화면 `/account/id-card/print` · 서버 액션 `recordIdDocumentPrint`: 세션의 `staff_documents.view` + 조직 세션(플랫폼 제외)이 없으면 아무것도 읽지 · 쓰지 않는다.
   주소 · 액션으로 받은 사람 id 는 **이 조직** `staff_id_documents`(지금 카드) · **이 조직** `memberships` 로만 걸러 읽고 기록한다 — 다른 조직 id 는 조회 대상이 아니다.
 - 사진은 서버의 10분 서명 URL(Storage 정책 그대로). 지우기는 보관 기한 정리 작업(service role).
+
+## 개발자 예외(2026-10-23)
+
+사용자(설계자) 지시: 「난 개발자이고 … 무엇이든지 할 수 있는 게 없으면 안 돼, 전부 가능해야 해」. 플랫폼 개발자
+(`session.user.role === "developer_super_admin"` — 세션 역할이 조직 역할을 덮으므로 `isOrgTopAdmin()` 은 false)는
+**「주인만」 게이트를 통과한다.** 헬퍼는 `src/config/roles.ts` 의 `isPlatformDeveloper(role)` ·
+`isOwnerOrPlatformDeveloper(viewer, ownerUserId)` · (기존) `isOrgTopAdminOrPlatform(role)`. 서버와 UI(단추 노출) 둘 다 같은 규칙.
+
+| 곳 | 원래 규칙 | 개발자 |
+| --- | --- | --- |
+| 게시판 상단 고정(글쓰기 · 글 수정) | owner/전무/office_admin | 가능 (`isOrgTopAdminOrPlatform`) |
+| 게시판 글 수정 | 작성자만 | 남의 글도(액션 시트 「글 수정」 노출) |
+| 컴플레인 본문 · 댓글 수정 | 작성자 + open | 작성자 · 상태 무관 (편집 UI 는 원래 없음, 서버만) |
+| 버그 제보 수정 · 삭제 · 상세 열기 | 제보자 + submitted | 제보자 · 상태 무관(상세에 삭제 노출) |
+| 투두 코어 편집 · 일정 · 삭제 · 되살리기 · 참여자 빼기 · 지시 전환 · 일괄 삭제 | 작성자만 | 가능 (`canEditTaskCore`) — **열 수 있는 작업(getTaskScope)만** |
+| 프로젝트 섹션(추가 · 이름 · 순서 · 삭제) · 멤버 · 프로젝트 삭제 | 소유자만 | 가능 (`viewerCanManage`). 「소유자는 못 나감」은 진짜 소유자(`viewerIsOwner`)만 |
+| 근태 정정 승인 · 반려 | 잡은 검토자만(in_review 잠금) | 넘겨받아 처리(비교-교체 `takeOverCorrectionReview`) |
+| 건의 보기 · 상태 변경 · 댓글 | 작성자 · 받는 사람 · 참조 / 상태는 받는 사람만 | 조직 전부 보기(「받은」 목록) · 상태 변경 · 댓글 (RLS 는 `is_platform_admin()` 으로 이미 통과) |
+| 청소 진행 취소 | 담당자 본인만 | 남의 것도 — RLS 쓰기 정책이 `staff_user_id = auth.uid()` 라 이 경우만 서비스 키(관리자 강제완료 202607150001 과 같은 방식, 조직 · 상태 조건) |
+| 사용자 관리 — 자기 줄 | 읽기 전용 | 소속 팀만 바꿀 수 있게 열림(PC 패널 · 모바일 상세) |
+
+**그대로 두는 것(잠금 방지 가드 — 개발자도 막힌다):** 자기 역할 · 상태 변경(`self_update_blocked`), 자기 권한 부여 · 차단,
+자기 개발자 플래그 끄기, 자기 계정 삭제, 마지막 대표 보호(`guardLastOwner`). 개발자는 플랫폼 역할로 이미 모든 권한을 갖고
+있어서 이 가드들은 «스스로를 잠그는 사고»만 막는다. **조직 격리도 그대로** — 모든 예외는 `session.organization` 안에서만.

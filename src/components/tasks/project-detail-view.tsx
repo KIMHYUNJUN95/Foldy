@@ -143,7 +143,8 @@ export function ProjectDetailView({
 }) {
   const p = copy.projects;
   const w = copy.mobileWhite;
-  const isOwner = project.viewerIsOwner;
+  // 소유자 전용 관리 단추 — 플랫폼 개발자에게도 보인다(viewerCanManage, 2026-10-23).
+  const isOwner = project.viewerCanManage;
 
   const [, startToggle] = useTransition();
   const onToggle = (task: TaskRecord) => {

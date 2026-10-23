@@ -10,6 +10,7 @@ import {
   type StaffSuggestionStatus,
 } from "@/lib/suggestions";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { isOwnerOrPlatformDeveloper, isPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
@@ -405,7 +406,9 @@ export async function createStaffSuggestionComment(
   const isParticipant =
     uid === participants.authorId ||
     uid === participants.recipientId ||
-    participants.referenceIds.includes(uid);
+    participants.referenceIds.includes(uid) ||
+    // 플랫폼 개발자는 모든 건의를 보고 상태도 바꾸므로 댓글도 단다(2026-10-23).
+    isPlatformDeveloper(session.user.role);
   if (!isParticipant) return { ok: false, error: "forbidden" };
 
   const insert: Database["public"]["Tables"]["staff_suggestion_comments"]["Insert"] = {
@@ -573,8 +576,8 @@ export async function updateStaffSuggestionStatus(
     title: string;
   } | null;
   if (!sug) return { ok: false, error: "not_found" };
-  // Recipient-only — author and referenced users cannot change status.
-  if (sug.recipient_user_id !== session.user.id) return { ok: false, error: "forbidden" };
+  // Recipient-only — author and referenced users cannot change status. 플랫폼 개발자는 예외(2026-10-23).
+  if (!isOwnerOrPlatformDeveloper(session.user, sug.recipient_user_id)) return { ok: false, error: "forbidden" };
 
   // Persist the note that the target status requires; leave the other note untouched (it is hidden
   // by the detail UI unless its status is active).

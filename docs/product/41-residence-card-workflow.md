@@ -173,4 +173,22 @@ A4 인쇄도 앞면만(マイナンバーカード（表面）写し). 개인번
   마이그레이션 `202610230001_staff_id_documents.sql`(운영 적용) · 테스트 `staff-document-fields.test.ts`.
 - **고친 것(2026-10-23)**: 첫 배포 때 새 표에 서버 쓰기 권한(GRANT)이 빠져 「이대로 등록」이 「등록하지 못했어요」(DB 42501)로 실패 → `202610230002_staff_id_documents_grants.sql`(운영 적용).
   같은 이유로 `/mobile` 의 「카드를 등록해 주세요」 판단도 늘 「없음」으로 보였다 — 같이 풀림.
+- **앱(iOS · Android) 촬영 — OS 문서 스캐너**(2026-10-23): 앱에서 촬영 단계에 들어가면 먼저 OS 스캐너를 연다 — iOS VisionKit
+  (`VNDocumentCameraViewController`) · Android Google ML Kit Document Scanner. 카드 모서리를 찾아 저절로 찍고 기울기를 편다. 한 면에 한 번
+  (재류카드는 앞 → 뒤 두 번). 결과는 앨범 사진과 같은 규칙(긴 변 2000px · JPEG 0.92)으로 다시 만들어 같은 업로드로 넘긴다.
+  - 스캐너를 닫으면(취소) 웹 카메라 화면(틀 · 셔터 · 자동 촬영 · 앨범)으로 이어지고, 오른쪽 아래 「자동 스캔」 버튼으로 다시 연다.
+    스캐너를 쓸 수 없으면(Play 서비스 없음 · 에뮬레이터 · 오류) 「자동 스캔을 쓸 수 없어요. 카메라로 찍어 주세요」와 함께 웹 카메라로.
+  - 안내가 먼저 보여야 할 때는 스캐너를 자동으로 열지 않는다 — 「자동 스캔」 버튼으로 연다: 업로드 실패 · 마이넘버 뒷면 감지 후 다시 찍기,
+    그리고 **마이넘버 카드**(「뒷면은 찍지 마세요」 경고를 스캐너 화면이 덮으면 안 된다).
+  - 카메라 권한 거부 → 「설정 열기」로 나갔다 돌아오면 카메라를 다시 시도한다. 올리기 실패로 촬영에 돌아오면 카메라를 새로 연다.
+  - 브라우저 · PWA, 그리고 **이 플러그인이 없는 옛 앱 설치본**(웹은 앱과 따로 배포된다)은 지금처럼 웹 카메라만 — `hasNativePlugin("DocumentScanner")` 로 가른다.
+  - iOS 는 VisionKit 공개 API 만 쓴다: 플러그인의 쪽수 제한 · 찍은 뒤 미리보기 옵션은 비공개 클래스를 바꿔치기하므로 넘기지 않고, 여러 장을 찍어도 첫 장만 쓴다.
+  - 코드 `src/lib/native/document-scanner.ts` · 플러그인 `@capgo/capacitor-document-scanner`(docs/planning/17 「신분 서류 촬영 · 화면 가리기」).
+- **카메라 권한이 꺼져 있을 때**(2026-10-23): 앱에서는 「Foldy 의 카메라 권한이 꺼져 있어요…」 + 「설정 열기」 버튼(iOS `app-settings:` · Android 앱 안
+  플러그인 `AppSettings` → 앱 정보 화면). 앨범은 그대로. 브라우저는 예전 안내만(`src/lib/native/app-settings.ts`).
+- **화면 가리기**(2026-10-23): 앱에서 `/account/id-card` 흐름(안내 · 촬영 · 확인 · 지금 카드 보기)과 관리자 「신분 서류」 칸이 떠 있는 동안만 켠다 —
+  Android FLAG_SECURE(스크린샷 · 화면 녹화 · 최근 앱 미리보기가 검게), iOS 앱 전환기 미리보기 가림 + 화면 캡처 검게. 화면을 벗어나면 끈다.
+  브라우저는 막을 수 없다(아무것도 하지 않음). `usePrivacyScreen()`(`src/lib/native/privacy-screen.ts`) · 플러그인 `@capgo/capacitor-privacy-screen`.
+- **iOS 권한 문구**: 카메라(`NSCameraUsageDescription`) · 사진 보관함(`NSPhotoLibraryUsageDescription`) 문구에 재류카드 · 마이넘버 카드 앞면 촬영 · 선택을 넣었다
+  (`Info.plist` + `ko/ja/en.lproj/InfoPlist.strings`) — 심사가 「카메라를 왜 쓰는지」와 실제 기능을 대조한다.
 - 남은 것: 관리자 대신 올리기(§3-2 스캔본) — R4 목록과 함께.

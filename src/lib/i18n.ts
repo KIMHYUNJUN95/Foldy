@@ -7122,6 +7122,11 @@ const FALLBACK_DICTIONARY = {
     adminExpired: "Expired",
     adminFailed: "Couldn’t save. Please try again.",
     adminPhotoOpen: "View larger",
+    scanOpening: "Opening the card scanner…",
+    scanUnavailable: "Auto scan isn’t available. Take the photo with the camera.",
+    scanStart: "Auto scan",
+    cameraDeniedApp: "Camera access for Foldy is off. Turn it on in Settings, or choose a photo.",
+    openSettings: "Open Settings",
   },
   accountProfile: {
     // 설정 허브 서브내비 (2026-07-31)
@@ -15357,6 +15362,11 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       adminExpired: "만료됨",
       adminFailed: "처리하지 못했어요. 다시 시도해 주세요.",
       adminPhotoOpen: "크게 보기",
+      scanOpening: "카드 스캐너를 여는 중…",
+      scanUnavailable: "자동 스캔을 쓸 수 없어요. 카메라로 찍어 주세요.",
+      scanStart: "자동 스캔",
+      cameraDeniedApp: "Foldy 의 카메라 권한이 꺼져 있어요. 설정에서 켜거나 앨범에서 골라 주세요.",
+      openSettings: "설정 열기",
     },
     accountProfile: {
       // 설정 허브 서브내비 (2026-07-31)
@@ -23536,6 +23546,11 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       adminExpired: "期限切れ",
       adminFailed: "処理できませんでした。もう一度お試しください。",
       adminPhotoOpen: "拡大表示",
+      scanOpening: "カードスキャナーを起動中…",
+      scanUnavailable: "自動スキャンを使えません。カメラで撮影してください。",
+      scanStart: "自動スキャン",
+      cameraDeniedApp: "Foldy のカメラへのアクセスがオフになっています。設定でオンにするか、アルバムから選んでください。",
+      openSettings: "設定を開く",
     },
     accountProfile: {
       // 설정 허브 서브내비 (2026-07-31)

@@ -17,6 +17,8 @@ dependencies {
     implementation project(':capacitor-network')
     implementation project(':capacitor-share')
     implementation project(':capacitor-text-zoom')
+    implementation project(':capgo-capacitor-document-scanner')
+    implementation project(':capgo-capacitor-privacy-screen')
 
 }
 

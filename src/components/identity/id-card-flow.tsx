@@ -16,6 +16,7 @@ import { IdCardCamera } from "@/components/identity/id-card-camera";
 import { readIdCard, submitIdCard } from "@/app/account/id-card/actions";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { haptic } from "@/lib/haptics";
+import { usePrivacyScreen } from "@/lib/native/privacy-screen";
 import {
   EMPTY_ID_FIELDS,
   EXTRA_ACTIVITIES,
@@ -123,12 +124,16 @@ export function IdCardFlow({
   todayKey: string;
 }) {
   const [step, setStep] = useState<Step>(current ? "view" : "intro");
+  // 앱: 이 화면(카드 사진 · 읽은 칸)이 떠 있는 동안 스크린샷 · 앱 전환기 미리보기를 막는다(docs/product/41 §10).
+  usePrivacyScreen();
   const [documentId, setDocumentId] = useState(() => crypto.randomUUID());
   const [consent, setConsent] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [side, setSide] = useState<Side>("front");
   /** 다시 찍기 한 장만이면 끝나고 바로 확인 화면으로. */
   const [retakeOnly, setRetakeOnly] = useState(false);
+  /** 올리기 실패로 촬영에 돌아올 때마다 카메라를 새로 연다(같은 안내가 두 번 나와도). */
+  const [cameraRound, setCameraRound] = useState(0);
   const [photos, setPhotos] = useState<Partial<Record<Side, Photo>>>({});
   const [fields, setFields] = useState<IdDocumentFields>(EMPTY_ID_FIELDS);
   const [readFields, setReadFields] = useState<IdDocumentFields | null>(null);
@@ -216,6 +221,7 @@ export function IdCardFlow({
     if (!photo) {
       haptic("error");
       setNotice(copy.uploadFailed);
+      setCameraRound((n) => n + 1);
       setStep("camera");
       return;
     }
@@ -398,7 +404,10 @@ export function IdCardFlow({
       <IdCardCamera
         copy={copy}
         counter={copy.stepCounter.replace("{side}", sideLabel).replace("{n}", String(n)).replace("{total}", String(total))}
-        key={`${side}-${retakeOnly}-${notice ?? ""}`}
+        key={`${side}-${retakeOnly}-${notice ?? ""}-${cameraRound}`}
+        // 안내가 먼저 보여야 할 때는 스캐너를 바로 띄우지 않는다 — 「자동 스캔」 버튼으로 연다. 업로드 실패 · 마이넘버 뒷면 감지 안내,
+        // 그리고 마이넘버 카드(「뒷면은 찍지 마세요」 경고를 스캐너가 덮으면 안 된다).
+        autoScan={!notice && kind !== "my_number_card"}
         onCancel={() => setStep(photos.front && (kind === "my_number_card" || photos.back) ? "review" : "intro")}
         onCapture={(blob) => void onCapture(blob)}
         steps={

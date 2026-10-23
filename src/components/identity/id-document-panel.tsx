@@ -12,6 +12,7 @@ import { useState, useTransition } from "react";
 import { reviewIdDocument } from "@/app/account/id-card/actions";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
+import { usePrivacyScreen } from "@/lib/native/privacy-screen";
 import { expiryTone, fieldsForKind, type IdDocumentField } from "@/lib/staff-documents/fields";
 import type { IdDocumentView } from "@/lib/staff-documents/server";
 import { formatDateKey, idFieldDisplay, idFieldLabel, statusLabel } from "@/components/identity/id-card-flow";
@@ -27,6 +28,8 @@ export function IdDocumentPanel({ doc, locale }: { doc: IdDocumentView | null; l
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // 앱: 카드 사진 · 칸이 보이는 동안 스크린샷 · 앱 전환기 미리보기를 막는다(docs/product/41 §10). 브라우저에서는 아무것도 안 한다.
+  usePrivacyScreen(doc !== null);
 
   if (!doc) {
     return (

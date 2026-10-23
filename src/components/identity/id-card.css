@@ -145,6 +145,10 @@
 .idc-cam__corner--br { right: -2px; bottom: -2px; border-right-width: 4px; border-bottom-width: 4px; border-bottom-right-radius: 16px; }
 .idc-cam__note { margin: 0; max-width: 320px; font-size: 13px; color: rgba(255, 255, 255, .75); text-align: center; line-height: 1.5; }
 .idc-cam__note--warn { color: #ffd98a; font-weight: 700; }
+/* 앱에서 카메라 권한이 꺼져 있을 때 — 안내 + 「설정 열기」(2026-10-23). */
+.idc-cam__denied { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.idc-cam__settings { min-height: 44px; padding: 0 20px; border-radius: 999px; background: #fff; color: #0f0e14; font-size: 15px; font-weight: 700; }
+.idc-cam__album:disabled { opacity: .45; }
 .idc-cam__warn { max-width: 330px; padding: 12px 14px; border-radius: 12px; background: rgba(15, 14, 20, .72); font-size: 13.5px; line-height: 1.55; color: rgba(255, 255, 255, .92); }
 .idc-cam__bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 34px max(34px, env(safe-area-inset-bottom)); }
 .idc-cam__album { width: 48px; height: 48px; border-radius: 12px; background: rgba(255, 255, 255, .14); color: #fff; display: flex; align-items: center; justify-content: center; }

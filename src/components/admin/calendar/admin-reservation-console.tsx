@@ -47,6 +47,7 @@ import { collectBlockedRooms } from "@/lib/room-blocks";
 import { localizePropertyName } from "@/lib/room-label-normalization";
 import type { Database } from "@/types/database";
 import "./admin-reservation-console.css";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 type ReservationStatus = Database["public"]["Enums"]["reservation_status"];
 
@@ -344,6 +345,7 @@ export function AdminReservationConsole({
   selectedProperty,
   today,
 }: AdminReservationConsoleProps) {
+  const bRoom = useRoomPlaceLabel();
   const router = useRouter();
   const { dismiss, showToast, toast } = useAdminToast();
 
@@ -740,7 +742,7 @@ export function AdminReservationConsole({
                             );
                             return (
                               <div className="admcal__room-row" key={room.key}>
-                                <div className="admcal__room-label">{room.displayRoomLabel}</div>
+                                <div className="admcal__room-label">{bRoom(room.displayRoomLabel)}</div>
                                 <div className="admcal__room-track">
                                   {dates.map((date) => {
                                     const dow = dayOfWeek(date);
@@ -961,7 +963,7 @@ export function AdminReservationConsole({
               ) : (
                 column.items.map((reservation) => (
                   <button className="acw-row" key={reservation.id} onClick={() => openReservationPanel(reservation.id)} type="button">
-                    <span className="acw-room">{roomLookup[reservation.roomKey]?.displayRoomLabel ?? reservation.roomLabel}</span>
+                    <span className="acw-room">{bRoom(roomLookup[reservation.roomKey]?.displayRoomLabel ?? reservation.roomLabel)}</span>
                     <span className="acw-row__t">
                       <b>{column.name(reservation)}</b>
                       <span>
@@ -1179,7 +1181,7 @@ export function AdminReservationConsole({
                     <div className="acw-rcs">
                     {card.info.roomAccess.map((room) => (
                       <div className="acw-rc" key={room.roomLabel}>
-                        <span className="acw-mono">{room.roomLabel}</span>
+                        <span className="acw-mono">{bRoom(room.roomLabel)}</span>
                         {isEditing ? (
                           <input
                             aria-label={room.roomLabel}
@@ -1321,7 +1323,7 @@ export function AdminReservationConsole({
 
       <aside
         aria-hidden={!isPanelVisible}
-        aria-label={panelReservation?.guestName ?? panelRoom?.displayRoomLabel ?? copy.closePanel}
+        aria-label={panelReservation?.guestName ?? (panelRoom ? bRoom(panelRoom.displayRoomLabel) : copy.closePanel)}
         aria-modal={isPanelVisible || undefined}
         className={`admcal__panel${isPanelVisible ? " is-visible" : ""}`}
         role="dialog"
@@ -1427,6 +1429,7 @@ function ReservationPanel({
   roomLabel: string;
   uiLocale: Locale;
 }) {
+  const bRoom = useRoomPlaceLabel();
   // 성인 · 어린이를 나눠 보인다 — 판매 캘린더와 같은 표기(2026-10-05). 성인 수를 모르는 예약만 합계.
   const guestCountLabel =
     reservation.adults !== null
@@ -1462,7 +1465,7 @@ function ReservationPanel({
         <div className="acw-who">
           <h2>{reservation.guestName}</h2>
           <span>
-            {propertyLabel} · <b className="acw-mono">{roomLabel}</b> · {guestCountLabel}
+            {propertyLabel} · <b className="acw-mono">{bRoom(roomLabel)}</b> · {guestCountLabel}
           </span>
         </div>
 
@@ -1550,6 +1553,7 @@ function RoomPanel({
   today: string;
   uiLocale: Locale;
 }) {
+  const bRoom = useRoomPlaceLabel();
   const currentGuest =
     reservations.find(
       (reservation) =>
@@ -1571,7 +1575,7 @@ function RoomPanel({
         <button className="admcal__panel-close" onClick={onClose} type="button">
           <X className="size-4" />
         </button>
-        <div className="admcal__panel-title">{room.displayRoomLabel}</div>
+        <div className="admcal__panel-title">{bRoom(room.displayRoomLabel)}</div>
         <div className="admcal__panel-subtitle">{propertyLabel}</div>
       </div>
 
@@ -1643,6 +1647,7 @@ function FragmentRows({
   today: string;
   uiLocale: Locale;
 }) {
+  const bRoom = useRoomPlaceLabel();
   return (
     <>
       <tr className="admcal__table-group">
@@ -1719,7 +1724,7 @@ function FragmentRows({
             <tr className="admcal__table-row" key={room.key}>
               <td>
                 <button className="admcal__table-link" onClick={() => onRoomClick(room.key)} type="button">
-                  {room.displayRoomLabel}
+                  {bRoom(room.displayRoomLabel)}
                 </button>
               </td>
               <td>

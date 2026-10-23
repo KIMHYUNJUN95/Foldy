@@ -10,6 +10,7 @@ import type { Locale } from "@/lib/i18n";
 import type { AdminMaintenanceReport } from "@/lib/admin-maintenance";
 import { fmtDate, fmtDateTime, fmtElapsed, isActive } from "./maintenance-console-data";
 import { categoryLabel, priorityLabel, statusLabel, type MaintCopy } from "./maintenance-console-shared";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 export type MaintExceptionKind = "force" | "void" | "del";
 
@@ -32,6 +33,7 @@ export function MaintenanceDetailPanel({
   onOpenLink,
   disabled,
 }: PanelProps) {
+  const bRoom = useRoomPlaceLabel();
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled });
   if (!report) return null;
 
@@ -117,7 +119,7 @@ export function MaintenanceDetailPanel({
             <dd>
               {clean ? (
                 <button type="button" className="mwp__link" onClick={() => onOpenLink("clean")}>
-                  {t.pCleaning} · {clean.room} {fmtDate(clean.date, locale)}
+                  {t.pCleaning} · {bRoom(clean.room)} {fmtDate(clean.date, locale)}
                 </button>
               ) : null}
               {clean && resv ? <br /> : null}

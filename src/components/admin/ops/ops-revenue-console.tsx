@@ -32,6 +32,7 @@ import { IncludePicker } from "./ops-include-picker";
 import { compareHref } from "./ops-revenue-compare";
 import "./ops-occupancy-white.css";
 import "./ops-revenue-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 매출 화면 — 추이 · 건물별 / 건물 × 월 (2026-10-06 시안 A v2 구현 · 2026-10-15 화이트 리디자인, 시안 Rev-PC · RevMatrix-PC).
@@ -91,6 +92,7 @@ export function OpsRevenueConsole({
   localeTag: string;
   initialTab: Tab;
 }) {
+  const bName = useBuildingName();
   const router = useRouter();
   const [navPending, startNav] = useTransition();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -177,7 +179,7 @@ export function OpsRevenueConsole({
       monthRangeLabel: `${monthLong(data.months[0])} – ${monthLong(data.months[data.months.length - 1])}`,
       monthlyTotal: data.months.map((month) => inNames.reduce((sum, name) => sum + (data.monthCells[month]?.[name]?.revenue ?? 0), 0)),
       monthly: data.properties.map((p) => ({
-        name: p.name,
+        name: bName(p.name),
         values: data.months.map((month) => {
           const cell = data.monthCells[month]?.[p.name];
           return cell && cell.revenue > 0 ? cell.revenue : null;
@@ -186,7 +188,7 @@ export function OpsRevenueConsole({
       rangeLabel: rangeLabel(data.mode, data.range),
       rows: data.properties
         .filter((p) => (data.rangeCells[p.name]?.revenue ?? 0) > 0 || (data.previousRangeCells[p.name]?.revenue ?? 0) > 0)
-        .map((p) => row(p.name, metricsOf(data.rangeCells[p.name] ?? sumMetrics([])), metricsOf(data.previousRangeCells[p.name] ?? sumMetrics([])))),
+        .map((p) => row(bName(p.name), metricsOf(data.rangeCells[p.name] ?? sumMetrics([])), metricsOf(data.previousRangeCells[p.name] ?? sumMetrics([])))),
       total: row(fill(copy.totalRow, { n: included.size }), current, previous),
     };
   };
@@ -281,7 +283,7 @@ export function OpsRevenueConsole({
 
   const prevRange = shiftRange(data.mode, data.range, -1);
   const nextRange = shiftRange(data.mode, data.range, 1);
-  const excludedNames = data.properties.filter((p) => !isIn(p.name)).map((p) => p.name);
+  const excludedNames = data.properties.filter((p) => !isIn(p.name)).map((p) => bName(p.name));
   const includeSummary =
     excludedNames.length === 0
       ? w.includeAll
@@ -502,6 +504,8 @@ function ReportTab({
   go: (href: string) => void;
   channelName: Record<ChannelKey, string>;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const w = copy.white;
   /*
    * 머리글 정렬(2026-10-06 사용자 요청) — 누를 때마다 높은순 → 낮은순 → 원래 순서(캘린더 탭 순서). 「건물」 머리글은 바로 원래
@@ -744,7 +748,7 @@ function ReportTab({
                     <td>
                       <span className="ocw-bn">
                         <ChevronRight aria-hidden="true" className="tw" />
-                        <b>{property.name}</b>
+                        <b>{bName(property.name)}</b>
                         {!isIn(property.name) && <span className="ex">{copy.excludedTag}</span>}
                       </span>
                     </td>
@@ -753,7 +757,7 @@ function ReportTab({
                   {rooms.map((room, index) => (
                     <tr className="ocw-room" key={room.label} style={{ "--i": index } as CSSProperties}>
                       <td>
-                        <span className="rn">{room.label}</span>
+                        <span className="rn">{bRoom(room.label)}</span>
                       </td>
                       {line(room.cur, room.prev, false)}
                     </tr>
@@ -819,6 +823,8 @@ function MatrixTab({
   pointText: (current: number, previous: number) => string;
   channelName: Record<ChannelKey, string>;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const w = copy.white;
   const months = data.months;
   const value = (m: RevenueMetrics) =>
@@ -965,11 +971,11 @@ function MatrixTab({
                 const off = !isIn(row.name);
                 return (
                   <Fragment key={row.name}>
-                    <span className={`rvw-rl${off ? " off" : ""}`} title={row.name}>
-                      <b>{row.name}</b>
+                    <span className={`rvw-rl${off ? " off" : ""}`} title={bName(row.name)}>
+                      <b>{bName(row.name)}</b>
                       <span>{off ? copy.excludedTag : fill(copy.roomCount, { n: row.rooms })}</span>
                     </span>
-                    {row.cells.map(({ cur, prev, month }, index) => cell(cur, prev, month, cuts, row.name, index, row.name))}
+                    {row.cells.map(({ cur, prev, month }, index) => cell(cur, prev, month, cuts, row.name, index, bName(row.name)))}
                     <span className={`rvw-sm${off ? " off" : ""}`} title={total.full}>
                       <b>{total.v}</b>
                       <span className={total.down ? "is-red" : undefined}>{total.d}</span>
@@ -1006,7 +1012,7 @@ function MatrixTab({
               {!isPast(pick.month) && <em> · {copy.detailBooked}</em>}
             </span>
             <h2>
-              {pick.property ?? copy.totalLabel} · {monthShort(pick.month)}
+              {pick.property ? bName(pick.property) : copy.totalLabel} · {monthShort(pick.month)}
             </h2>
             <span className="sub">
               {pickProperty
@@ -1067,7 +1073,7 @@ function MatrixTab({
                 <div className="rvw-rooms">
                   {pickRooms.map((room, index) => (
                     <div className="rvw-rr" key={room.label} style={{ "--i": index } as CSSProperties}>
-                      <span className="n">{room.label}</span>
+                      <span className="n">{bRoom(room.label)}</span>
                       <span className="a">{yen(room.m.revenue)}</span>
                       <b className={room.m.occupancyPct < 60 ? "is-red" : undefined}>{room.m.occupancyPct.toFixed(0)}%</b>
                     </div>

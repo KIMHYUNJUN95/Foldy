@@ -100,9 +100,10 @@ Completion rule:
 - Fallback behavior exists, but new UI should not depend on missing translations.
 - **Building names are data, not copy (2026-10-22).** Reservations, rates, occupancy, revenue and notifications carry
   the Korean canonical name (`아라키초A`). Never render it raw — server: `localizeBuildingName()` /
-  `localizeRoomPlaceLabel()` (`src/lib/room-label-normalization.ts`), mobile client: `useBuildingName()`
-  (`src/components/shared/building-names.tsx`). Single-unit buildings use the building name as the room label — localize
-  that too. Look `buildingLabels` up by building key, never by the stored name.
+  `localizeRoomPlaceLabel()` (`src/lib/room-label-normalization.ts`), client (mobile + admin layouts provide it):
+  `useBuildingName()` / `useRoomPlaceLabel()` (`src/components/shared/building-names.tsx`). Single-unit buildings use the
+  building name as the room label — localize that too. Look `buildingLabels` up by building key, never by the stored name.
+  Localize only where it is drawn — values sent to server actions, history and queues keep the canonical name.
 - This is a **hard rule for every feature addition and every feature modification**.
 - Do **not** hardcode Korean UI text temporarily "just for now" during implementation.
 - New UI/UX, status labels, validation copy, action labels, empty states, and modal text must be

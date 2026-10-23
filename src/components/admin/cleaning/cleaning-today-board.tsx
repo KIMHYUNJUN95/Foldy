@@ -20,6 +20,7 @@ import {
   staffLabelOf,
   typeLabel,
 } from "./cleaning-console-shared";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 type TodayBoardProps = {
   tasks: AdminCleaningTask[];
@@ -60,6 +61,7 @@ function RoomCard({
   selected: boolean;
   onSelect: (id: string) => void;
 }) {
+  const bRoom = useRoomPlaceLabel();
   const minutes =
     task.status === "progress" ? elapsedMin(task.start) : task.status === "done" ? durationMin(task.start, task.end) : null;
   const staffName = task.staffId ? staffLabelOf(task.staffId, staffDirectory) : "";
@@ -78,7 +80,7 @@ function RoomCard({
       }}
     >
       <div className="cl-tile__top">
-        <span className="cl-tile__rm">{task.room}</span>
+        <span className="cl-tile__rm">{bRoom(task.room)}</span>
         <span className="cl-tile__badges">
           <CancelledBadge count={task.cancelledCount} t={t} />
           <ReportBadges reports={task.reports} t={t} />
@@ -267,6 +269,7 @@ function SetupSection({
   selectedSetupKey: string | null;
   onSelectSetupTarget: (roomKey: string) => void;
 }) {
+  const bRoom = useRoomPlaceLabel();
   if (!targets.length) return null;
   return (
     <section className="cl-split__col">
@@ -290,7 +293,7 @@ function SetupSection({
               }
             }}
           >
-            <span className="cl-setrow__rm mono">{target.room}</span>
+            <span className="cl-setrow__rm mono">{bRoom(target.room)}</span>
             <div className="cl-setrow__b">
               <div className="cl-setrow__t">{target.guest}</div>
               <div className="cl-setrow__s">

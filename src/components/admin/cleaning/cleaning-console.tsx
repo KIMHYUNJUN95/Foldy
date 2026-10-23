@@ -24,6 +24,7 @@ import { TodayBoard } from "./cleaning-today-board";
 import { HistoryBoard } from "./cleaning-history-board";
 import { CleaningDetailPanel } from "./cleaning-detail-panel";
 import { CleaningForceCompleteModal, type ForceCompleteResult } from "./cleaning-force-complete-modal";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 type CleaningConsoleProps = {
   locale: Locale;
@@ -70,6 +71,7 @@ export function CleaningConsole({
   initialHistoryTo,
   canForceComplete,
 }: CleaningConsoleProps) {
+  const bRoom = useRoomPlaceLabel();
   const router = useRouter();
   const dictionary = getDictionary(locale);
   const t = useMemo(() => buildConsoleCopy(dictionary), [dictionary]);
@@ -192,7 +194,7 @@ export function CleaningConsole({
   }
 
   function handleForceCompleteConfirm(result: ForceCompleteResult) {
-    const roomLabel = modalTask?.room ?? "";
+    const roomLabel = bRoom(modalTask?.room ?? "");
     startForceComplete(async () => {
       const res = await forceCompleteCleaningSession({ ...result, cleaningDate: viewDate });
       if (res.ok) {

@@ -17,6 +17,7 @@ import {
   type SpwMode,
 } from "@/components/admin/ops/ops-price-panel";
 import "./ops-calendar-panels-white.css";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /** 사유 칩 순서. 코드는 DB 체크 제약과 같다(`202610010001_block_log_purpose.sql`). */
 export const BLOCK_PURPOSE_ORDER: readonly BlockPurpose[] = ["repair", "cleaning", "owner", "other"];
@@ -145,6 +146,7 @@ export function OpsBlockPanel({
   onSwitchMode?: (mode: SpwMode) => void;
   scopeSummary: { rooms: string; dates: string } | null;
 }) {
+  const bRoom = useRoomPlaceLabel();
   const [confirming, setConfirming] = useState(false);
   // 차단 사유(선택) — 걸 때만 보낸다. 같은 칩을 다시 누르면 뺀다.
   const [purpose, setPurpose] = useState<BlockPurpose | null>(null);
@@ -196,7 +198,7 @@ export function OpsBlockPanel({
               result.unappliedRanges
                 .map(
                   (range) =>
-                    `${range.roomLabel} ${spwDate(range.startDate, copy.localeTag)} → ${spwDate(nextDay(range.endDate), copy.localeTag)}`,
+                    `${bRoom(range.roomLabel)} ${spwDate(range.startDate, copy.localeTag)} → ${spwDate(nextDay(range.endDate), copy.localeTag)}`,
                 )
                 .join(", "),
             )
@@ -211,7 +213,7 @@ export function OpsBlockPanel({
     .replace("{nights}", String(cells.length));
   /** 행 키는 `건물::방` 이다 — 그대로 보이면 내부 키가 드러난다. 고른 칸의 방 이름을 쓴다. */
   const labelByRoom = new Map(cells.map((cell) => [cell.roomKey, cell.roomLabel]));
-  const roomName = (roomKey: string) => labelByRoom.get(roomKey) ?? roomKey.replace("::", " ");
+  const roomName = (roomKey: string) => bRoom(labelByRoom.get(roomKey) ?? roomKey.replace("::", " "));
   /** 구간은 **밤** 기준(끝 = 마지막 밤)이다. 화면은 예약처럼 「첫 밤 → 다음 날 아침」으로 적는다. */
   const rangeText = (range: { startDate: string; endDate: string }) =>
     `${spwDate(range.startDate, copy.localeTag)} → ${spwDate(nextDay(range.endDate), copy.localeTag)}`;

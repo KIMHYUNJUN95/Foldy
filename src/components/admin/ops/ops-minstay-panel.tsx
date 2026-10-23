@@ -17,6 +17,7 @@ import {
   type SpwMode,
 } from "@/components/admin/ops/ops-price-panel";
 import "./ops-calendar-panels-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 최소 숙박일 패널 — 격자 오른쪽 세로 카드.
@@ -125,6 +126,8 @@ export function OpsMinStayPanel({
   runWrite: RunOpsWrite;
   scopeSummary: { rooms: string; dates: string } | null;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const [nights, setNights] = useState<number>(1);
   const [custom, setCustom] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -240,9 +243,9 @@ export function OpsMinStayPanel({
               // **어느 건물 · 어느 방 · 어느 날**만 적는다. 앞뒤 예약의 채널 칩은 최소 숙박일을 정하는 데
               // 필요 없고 플랫폼이 두 번 찍힌 것처럼 읽혔다(2026-09-28 지적). 건물이 여럿이면 건물도 적는다.
               <div className="spw-row" key={`${entry.roomKey}|${entry.date}`} style={{ "--i": Math.min(order, 12) } as React.CSSProperties}>
-                <span className="spw-row__room is-wide">{entry.roomLabel}</span>
+                <span className="spw-row__room is-wide">{bRoom(entry.roomLabel)}</span>
                 <span className="spw-row__date">
-                  {multiBuilding && <span className="spw-row__bld">{entry.propertyName}</span>}
+                  {multiBuilding && <span className="spw-row__bld">{bName(entry.propertyName)}</span>}
                   {spwDate(entry.date, copy.localeTag)}
                 </span>
                 {/* 갭은 최소 숙박일이 정확히 2일 때만 잡힌다(감지 기준 ②). */}

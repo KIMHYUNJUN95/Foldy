@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import type { Complaint, ComplaintComment } from "@/lib/complaints";
 import type { Dictionary } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
-import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { getCanonicalPropertyName, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { PLATFORMS } from "@/components/complaints/cx-platform";
 import {
   ComplaintComposer,
@@ -67,7 +67,9 @@ export function ComplaintDetailPanel({
   const building = complaint.propertyName
     ? localizePropertyName(getCanonicalPropertyName(complaint.propertyName), buildingLabels)
     : null;
-  const place = building ? `${building}${complaint.roomLabel ? ` · ${complaint.roomLabel}` : ""}` : "—";
+  const place = building
+    ? `${building}${complaint.roomLabel ? ` · ${localizeRoomPlaceLabel(complaint.roomLabel, buildingLabels)}` : ""}`
+    : "—";
   const max = PLATFORMS[complaint.platform]?.maxRating ?? 5;
 
   const actionLabels: ComplaintActionLabels = {

@@ -21,6 +21,7 @@ import {
   type AdjustmentInput,
 } from "@/lib/ops-price-adjustment";
 import "./ops-calendar-panels-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 가격·최소숙박 조작 패널 — **격자 오른쪽 세로 카드**.
@@ -289,20 +290,22 @@ function SelectionList({
   copy: PanelCopy & SpwCopy;
   showNext: boolean;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   let index = 0;
   return (
     <section aria-label={copy.panelListTitle} className="spw-list">
       <span className="spw-sec">{copy.spwListCount.replace("{n}", String(cellCount))}</span>
       {buildings.map((building) => (
         <div key={building.name}>
-          {buildings.length > 1 && <div className="spw-list__bld">{building.name}</div>}
+          {buildings.length > 1 && <div className="spw-list__bld">{bName(building.name)}</div>}
           {building.rooms.map((room) =>
             room.rows.map((row) => {
               const delta = showNext && row.current !== null && row.next !== null ? row.next - row.current : null;
               const order = index++;
               return (
                 <div className="spw-row" key={`${room.key}|${row.date}`} style={{ "--i": Math.min(order, 12) } as React.CSSProperties}>
-                  <span className="spw-row__room">{room.label}</span>
+                  <span className="spw-row__room">{bRoom(room.label)}</span>
                   <span className="spw-row__date">{spwDate(row.date, copy.localeTag)}</span>
                   {row.current === null ? (
                     <span className="spw-row__none">{copy.panelListNoPrice}</span>
@@ -378,6 +381,7 @@ export function OpsPricePanel({
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
 }) {
+  const bRoom = useRoomPlaceLabel();
   const [input, setInput] = useState<AdjustmentInput | null>(null);
   const [amountText, setAmountText] = useState("");
   const [percentText, setPercentText] = useState("");
@@ -557,7 +561,7 @@ export function OpsPricePanel({
                 <b>{copy.spwCheckTitle.replace("{warning}", warningText(warning))}</b>
                 {row && (
                   <span>
-                    {row.roomLabel} {spwDate(row.date, copy.localeTag)} {yen(row.currentPrice)} → {yen(row.newPrice)}
+                    {bRoom(row.roomLabel)} {spwDate(row.date, copy.localeTag)} {yen(row.currentPrice)} → {yen(row.newPrice)}
                   </span>
                 )}
               </div>

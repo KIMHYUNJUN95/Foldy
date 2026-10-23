@@ -5,7 +5,7 @@ import {
   getCleaningOperatingDateKey,
   getCleaningSessionsForDate,
 } from "@/lib/cleaning";
-import { getDisplaySessionRoomLabel } from "@/lib/room-label-normalization";
+import { getDisplaySessionRoomLabel, localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { getOrgMaintenanceReports } from "@/lib/maintenance-reports";
 import { getOrgLostItems } from "@/lib/lost-found";
 import { getOrgOrderRequests } from "@/lib/order-requests";
@@ -137,6 +137,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
   if (session.organization.id === "platform") return EMPTY;
 
   const today = getCleaningOperatingDateKey();
+  const buildingLabels = getDictionary(session.user.preferredLanguage).cleaning.buildingLabels;
 
   const [
     cleaningSessions,
@@ -169,20 +170,25 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     .filter((s) => s.status === "in_progress")
     .map((s) => ({
       id: s.id,
-      room: getDisplaySessionRoomLabel(s.room_label),
+      room: localizeRoomPlaceLabel(getDisplaySessionRoomLabel(s.room_label), buildingLabels),
       taskLabel: s.task_label ?? "",
       staff: s.staff_name || "",
       startedAt: s.started_at ?? null,
     }));
 
   // 즉시 처리 큐 (정비 open/in_progress · 분실물 registered · 주문 requested/approved)
+  // 위치의 건물 · 독채 이름은 한국어 정규 명칭으로 저장돼 있어 보는 사람 언어로 바꾼다(2026-10-23).
+  const place = (building: string | null, room: string | null) =>
+    [building ? localizeBuildingName(building, buildingLabels) : null, room ? localizeRoomPlaceLabel(room, buildingLabels) : null]
+      .filter(Boolean)
+      .join(" · ");
   const maintenanceQueue: QueueEntry[] = maintenance
     .filter((m) => m.status === "open" || m.status === "in_progress")
     .map((m) => ({
       id: m.id,
       kind: "maintenance" as const,
       title: m.issue_title,
-      location: [m.property_name, m.room_label].filter(Boolean).join(" · "),
+      location: place(m.property_name, m.room_label),
       createdAt: m.created_at,
       // 2026-07-14: `priority`가 실제 컬럼이 되기 전에는 open 이면 전부 urgent로 표시했다(= 사실상
       // 전부 빨간색). 이제 신고자가 고른 우선순위를 그대로 쓴다.
@@ -194,7 +200,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       id: l.id,
       kind: "lost" as const,
       title: l.item_name,
-      location: l.room_label ?? "",
+      location: place(null, l.room_label),
       createdAt: l.created_at,
       urgent: false,
     }));
@@ -204,7 +210,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       id: o.id,
       kind: "order" as const,
       title: o.title,
-      location: [o.building_name, o.room_label].filter(Boolean).join(" · "),
+      location: place(o.building_name, o.room_label),
       createdAt: o.created_at,
       urgent: o.urgency === "high",
     }));
@@ -259,7 +265,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
           buildingSource,
           cleaningSessions,
           today,
-          getDictionary(session.user.preferredLanguage).cleaning.buildingLabels,
+          buildingLabels,
         )
       : null,
   };

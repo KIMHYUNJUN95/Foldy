@@ -6,6 +6,7 @@ import { DashboardBuildingMap, type MapCardCopy } from "./dashboard-building-map
 import type { BuildingMapCopy } from "@/components/calendar/building-map/building-map";
 import { getPropertyLocation } from "@/lib/property-locations";
 import { groupByBuilding } from "@/lib/home-reservation-groups";
+import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { LiveWash } from "@/components/shared/live-wash";
 import { RollNumber } from "@/components/shared/roll-number";
 import { AdminMonthPicker, type AdminMonthPickerLabels } from "@/components/admin/shared/admin-month-picker";
@@ -130,7 +131,7 @@ export function DashboardHome({
       </div>
 
       {/* 운영 관리자는 매출 · 가동률 아래에 큐 · 할 일 · 예약까지 전부, 그 밖의 관리자는 매출 · 가동률 없이 큐부터. */}
-      {ops ? <OpsBlock c={c} locale={locale} ops={ops} /> : null}
+      {ops ? <OpsBlock buildingLabels={buildingLabels} c={c} locale={locale} ops={ops} /> : null}
       {showMap && data.buildingMap && mapCopy ? (
         <>
           <div className={ops ? "dh-sec dh-sec--line" : "dh-sec"}>
@@ -147,7 +148,7 @@ export function DashboardHome({
   );
 }
 
-function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; locale: string }) {
+function OpsBlock({ ops, c, locale, buildingLabels }: { ops: DashboardOpsBlock; c: Console; locale: string; buildingLabels: Record<string, string> }) {
   const s = ops.summary;
   const max = niceMax(Math.max(...s.daily.map((d) => d.revenue), 1));
   const showLabel = (day: number) => [1, 5, 10, 15, 20, 25, s.daily.length].includes(day);
@@ -260,7 +261,7 @@ function OpsBlock({ ops, c, locale }: { ops: DashboardOpsBlock; c: Console; loca
           <div className="dh-bld">
             {s.buildings.map((b, i) => (
               <div className="dh-bld__row" key={b.name}>
-                <span className="dh-bld__n" title={b.name}>{b.name}</span>
+                <span className="dh-bld__n" title={localizeBuildingName(b.name, buildingLabels)}>{localizeBuildingName(b.name, buildingLabels)}</span>
                 <span className="dh-meter"><i style={{ width: `${Math.min(b.pct, 100)}%`, "--i": i } as React.CSSProperties} /></span>
                 <span className="dh-bld__v">{pct(b.pct)}</span>
               </div>
@@ -449,7 +450,7 @@ function QueueBlock({
                   </div>
                   {g.items.map(({ r, key, isIn }) => (
                     <div className="dh-row" data-live={key} key={key} style={{ cursor: "default" }}>
-                      <span className="dh-room">{r.roomLabel}</span>
+                      <span className="dh-room">{localizeRoomPlaceLabel(r.roomLabel, buildingLabels)}</span>
                       <div className="dh-rb">
                         <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
                         {r.source ? <div className="dh-rs">{r.source}</div> : null}

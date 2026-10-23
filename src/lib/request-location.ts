@@ -1,14 +1,5 @@
+import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
-
-const CANONICAL_TO_BUILDING_KEY: Record<string, string> = {
-  아라키초A: "arakicho_a",
-  아라키초B: "arakicho_b",
-  가부키초: "kabukicho",
-  다카다노바바: "takadanobaba",
-  오쿠보A: "okubo_a",
-  오쿠보B: "okubo_b",
-  오쿠보C: "okubo_c",
-};
 
 export type RequestLocationDisplay = {
   buildingLabel: string | null;
@@ -23,12 +14,15 @@ export type RequestCatalogLocation = {
   roomLabel: string;
 };
 
-function localizePropertyName(
-  propertyName: string,
-  buildingLabels: Record<string, string>,
-) {
-  const buildingKey = CANONICAL_TO_BUILDING_KEY[propertyName] ?? propertyName;
-  return buildingLabels[buildingKey] ?? propertyName;
+/**
+ * 건물 이름을 보는 사람 언어로 — 공용 `localizeBuildingName`(2026-10-23). 예전엔 이 파일만의 표가 있었는데 스테이아리 ·
+ * 사노가 빠져 있어 수리 · 분실물 · 주문 위치에 사노가 한국어로 남았다.
+ */
+const localizePropertyName = localizeBuildingName;
+
+/** 표시용 객실 라벨 — 독채(오쿠보 · 사노)는 객실 이름이 곧 한국어 건물 이름이라 같이 바꾼다. */
+function displayRoom(roomLabel: string, buildingLabels: Record<string, string>): string {
+  return localizeRoomPlaceLabel(roomLabel, buildingLabels);
 }
 
 /**
@@ -57,7 +51,7 @@ function fromCatalogItem(
   return {
     buildingLabel: localizePropertyName(item.propertyName, buildingLabels),
     // Display the collapsed room (Arakicho 201_2 → 201), never the raw sub-unit.
-    roomLabel: item.displayRoomLabel,
+    roomLabel: displayRoom(item.displayRoomLabel, buildingLabels),
   };
 }
 
@@ -139,7 +133,7 @@ export function resolveRequestLocation(
       buildingLabel: localizePropertyName(propertyName, buildingLabels),
       // 건물명이 객실 라벨 앞에 이미 붙어 있으면(분실물 결합 형식) 떼어낸다 — 안 그러면
       // "아라키초 A · 아라키초A 201"처럼 건물명이 중복 표시된다.
-      roomLabel: stripBuildingPrefix(trimmed, propertyName),
+      roomLabel: displayRoom(stripBuildingPrefix(trimmed, propertyName), buildingLabels),
     };
   }
 

@@ -21,6 +21,7 @@ import {
 } from "@/lib/transport-reimbursement";
 import {
   localizeAttendanceSiteName,
+  localizeStoredPlaceText,
   type AttendanceSiteDisplayRow,
 } from "@/lib/attendance-site-display";
 import {
@@ -1586,8 +1587,11 @@ export async function getAdminTransportReceiptsForUser(
       itemId: it.id,
       usageDate: it.usageDate,
       amountYen: it.amountYen,
-      buildingLabel: wc.buildingLabel ?? null,
-      contextLabel: wc.contextSummary ?? wc.taskLabel ?? wc.roomLabel ?? null,
+      buildingLabel: wc.buildingLabel ? localizeStoredPlaceText(wc.buildingLabel, localeTag) : null,
+      contextLabel: (() => {
+        const label = wc.contextSummary ?? wc.taskLabel ?? wc.roomLabel ?? null;
+        return label ? localizeStoredPlaceText(label, localeTag) : null;
+      })(),
       imageUrls: it.images
         .map((img) => urlByPath.get(img.storagePath))
         .filter((u): u is string => typeof u === "string"),

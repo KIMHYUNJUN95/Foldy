@@ -30,6 +30,7 @@ import {
   buildSessionRoomLabel,
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
+  localizeRoomPlaceLabel,
 } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 // 소요시간 포맷은 화면(오늘 현황 카드·기록 표·상세 패널)이 쓰는 fmtDur 를 그대로 재사용한다 —
@@ -140,7 +141,8 @@ function cleaningTableRows(
     return {
       date: fmtDate(r.date, localeTag),
       building: (r.building ? buildingLabels[r.building] : null) ?? r.buildingRaw,
-      room: r.room,
+      // 독채(오쿠보 · 사노)는 객실 이름이 한국어 건물 이름이다(2026-10-23).
+      room: localizeRoomPlaceLabel(r.room, buildingLabels),
       type: typeLabelOf(r.type, t),
       staff: r.closed ? `${staffLabel} · ${t.stClosed}` : r.proxy ? `${staffLabel} · ${t.stProxy}` : staffLabel,
       start: r.start,

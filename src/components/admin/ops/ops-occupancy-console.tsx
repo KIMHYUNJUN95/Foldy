@@ -37,6 +37,7 @@ import {
 } from "@/lib/ops-revenue";
 import type { OpsRevenueData } from "@/lib/ops-revenue-server";
 import "./ops-occupancy-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 가동률 화면 — 추이 · 건물별 / 객실 × 월 / 앞으로, 탭 셋 (2026-10-07 구현 · 2026-10-15 화이트 리디자인).
@@ -98,6 +99,8 @@ export function OpsOccupancyConsole({
   localeTag: string;
   initialTab: OccupancyTab;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const router = useRouter();
   const [navPending, startNav] = useTransition();
   const [tab, setTab] = useState<OccupancyTab>(initialTab);
@@ -201,7 +204,7 @@ export function OpsOccupancyConsole({
     return {
       forward: data.properties.map((p) => ({
         cells: data.forwardMonths.map((month) => fwdCell(data.forwardCells[month]?.[p.name])),
-        name: p.name,
+        name: bName(p.name),
       })),
       forwardLabel: fill(copy.forwardBadge, { today: data.today }),
       forwardMonthLabels: data.forwardMonths.map((month) => monthLong(month)),
@@ -213,12 +216,12 @@ export function OpsOccupancyConsole({
         to: monthLong(anchor),
       }),
       rooms: roomSeries.map((room) => ({
-        name: `${room.property} ${room.label}`,
+        name: `${bName(room.property)} ${bRoom(room.label)}`,
         values: room.values,
       })),
       rows: data.properties
         .filter((p) => (data.rangeCells[p.name]?.availableNights ?? 0) > 0)
-        .map((p) => row(p.name, metricsOf(data.rangeCells[p.name] ?? sumMetrics([])), metricsOf(data.previousRangeCells[p.name] ?? sumMetrics([])))),
+        .map((p) => row(bName(p.name), metricsOf(data.rangeCells[p.name] ?? sumMetrics([])), metricsOf(data.previousRangeCells[p.name] ?? sumMetrics([])))),
       total: row(fill(rcopy.totalRow, { n: inNames.length }), current, previous),
     };
   };
@@ -255,7 +258,7 @@ export function OpsOccupancyConsole({
     .filter((p) => isIn(p.name) && (data.rangeCells[p.name]?.availableNights ?? 0) > 0)
     .map((p) => ({
       cur: metricsOf(data.rangeCells[p.name]!),
-      name: p.name,
+      name: bName(p.name),
       prev: metricsOf(data.previousRangeCells[p.name] ?? sumMetrics([])),
     }))
     .sort((a, b) => a.cur.occupancyPct - b.cur.occupancyPct)[0];
@@ -342,7 +345,7 @@ export function OpsOccupancyConsole({
     ["forward", copy.tabForward],
   ];
 
-  const excludedNames = data.properties.filter((p) => !isIn(p.name)).map((p) => p.name);
+  const excludedNames = data.properties.filter((p) => !isIn(p.name)).map((p) => bName(p.name));
   const includeSummary =
     excludedNames.length === 0
       ? w.includeAll
@@ -551,6 +554,8 @@ function ReportTab({
   tab: OccupancyTab;
   gradeLabel: (value: number) => string;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const w = copy.white;
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [sort, setSort] = useState<{
@@ -775,7 +780,7 @@ function ReportTab({
                     <td>
                       <span className="ocw-bn">
                         <ChevronRight aria-hidden="true" className="tw" />
-                        <b>{property.name}</b>
+                        <b>{bName(property.name)}</b>
                         {!isIn(property.name) && <span className="ex">{rcopy.excludedTag}</span>}
                       </span>
                     </td>
@@ -784,7 +789,7 @@ function ReportTab({
                   {rooms.map((room, index) => (
                     <tr className="ocw-room" key={room.label} style={{ "--i": index } as CSSProperties}>
                       <td>
-                        <span className="rn">{room.label}</span>
+                        <span className="rn">{bRoom(room.label)}</span>
                       </td>
                       {line(room.cur, room.prev, true, false)}
                     </tr>
@@ -859,6 +864,8 @@ function RoomsTab({
   monthShort: (month: string) => string;
   monthLong: (month: string) => string;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const w = copy.white;
   const [roomSort, setRoomSort] = useState<RoomSort>("catalog");
   const sortRooms = (rooms: RoomSeries[]) => {
@@ -941,14 +948,14 @@ function RoomsTab({
                 return (
                   <Fragment key={room.key}>
                     <div className={`ocw-rl${off ? " off" : ""}`}>
-                      <b>{room.label}</b>
-                      <span>{off ? `${property.name} · ${rcopy.excludedTag}` : property.name}</span>
+                      <b>{bRoom(room.label)}</b>
+                      <span>{off ? `${bName(property.name)} · ${rcopy.excludedTag}` : bName(property.name)}</span>
                     </div>
                     {room.values.map((value, index) => {
                       const level = value === null ? -1 : heatLevel(value);
                       return (
                         <Link
-                          aria-label={`${property.name} ${room.label} ${monthLong(months12[index])}`}
+                          aria-label={`${bName(property.name)} ${bRoom(room.label)} ${monthLong(months12[index])}`}
                           className={`ocw-hc${value === null ? " na" : ""}${level === 0 ? " low" : ""}${off ? " off" : ""}`}
                           href={calendarHref(property.name, months12[index])}
                           key={months12[index]}
@@ -1004,7 +1011,7 @@ function RoomsTab({
             return (
               <Link className="ocw-sr" href={calendarHref(room.property, anchor)} key={room.key}>
                 <span className="n">
-                  <b>{room.label}</b> <span>{room.property}</span>
+                  <b>{bRoom(room.label)}</b> <span>{bName(room.property)}</span>
                 </span>
                 <b className={`p${value < 75 ? " is-red" : ""}`}>{Math.round(value)}%</b>
               </Link>
@@ -1018,9 +1025,9 @@ function RoomsTab({
             <span className="hint">{copy.dropNone}</span>
           ) : (
             below.map((room) => (
-              <Link className="ocw-sr" href={calendarHref(room.property, anchor)} key={room.key} title={room.property}>
+              <Link className="ocw-sr" href={calendarHref(room.property, anchor)} key={room.key} title={bName(room.property)}>
                 <span className="n">
-                  <b>{room.label}</b> <span>{fill(w.usual, { v: Math.round(room.usual) })}</span>
+                  <b>{bRoom(room.label)}</b> <span>{fill(w.usual, { v: Math.round(room.usual) })}</span>
                 </span>
                 <b className="p is-red">
                   {Math.round(room.now)}% · −{Math.round(room.usual - room.now)}
@@ -1055,6 +1062,7 @@ function ForwardTab({
   monthLong: (month: string) => string;
   monthShort: (month: string) => string;
 }) {
+  const bName = useBuildingName();
   const w = copy.white;
   const months = data.forwardMonths;
   const totals = months.map((month) => ({
@@ -1132,8 +1140,8 @@ function ForwardTab({
             const off = !isIn(property.name);
             return (
               <Fragment key={property.name}>
-                <span className={`ocw-frl${off ? " off" : ""}`} title={property.name}>
-                  <b>{property.name}</b>
+                <span className={`ocw-frl${off ? " off" : ""}`} title={bName(property.name)}>
+                  <b>{bName(property.name)}</b>
                   <span>{off ? rcopy.excludedTag : fill(rcopy.roomCount, { n: property.roomCount })}</span>
                 </span>
                 {months.map((month, index) => {
@@ -1141,7 +1149,7 @@ function ForwardTab({
                   const vacant = Math.max(0, cell.availableNights - cell.occupiedNights);
                   return (
                     <Link
-                      aria-label={`${property.name} ${monthLong(month)}`}
+                      aria-label={`${bName(property.name)} ${monthLong(month)}`}
                       className={`ocw-fc${off ? " off" : ""}`}
                       href={calendarHref(property.name, month)}
                       key={month}
@@ -1214,7 +1222,7 @@ function ForwardTab({
           </div>
           {watch.map((cell) => (
             <Link className="ocw-wr" href={calendarHref(cell.property, cell.month)} key={`${cell.property}|${cell.month}`}>
-              <b>{cell.property}</b>
+              <b>{bName(cell.property)}</b>
               <span className="m">{monthShort(cell.month)}</span>
               <b className="v">{fill(w.nights, { n: n(cell.vacant) })}</b>
               <span className="s">

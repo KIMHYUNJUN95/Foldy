@@ -100,6 +100,7 @@ import { OPS_GAP_OPEN_EVENT } from "@/components/admin/ops/ops-gap-button";
 import { OPS_OPEN_RESERVATION_EVENT } from "@/components/shell/admin-guest-search";
 import { loadOpsReservationPlacement } from "@/actions/ops-calendar-search";
 import { submitReservationMove } from "@/actions/ops-calendar";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 import {
   channelDisplayName,
   reservationMoveErrorText,
@@ -475,6 +476,7 @@ const OpsGridRow = memo(function OpsGridRow({
   moveFadeId,
   moveGhost,
 }: GridRowProps) {
+  const bRoom = useRoomPlaceLabel();
   const { room } = row;
   const allRoomBars = row.bars;
   const roomBlocks = row.blocks;
@@ -570,7 +572,7 @@ const OpsGridRow = memo(function OpsGridRow({
         {/* 선택 모드에서만 나오는 네모. 누를 수 있다는 것과 켜졌다는 것을
             한 번에 말한다 — 객실명만으로는 눌러도 되는지 알 수 없다. */}
         {editMode && <span className="opsg__rbox" />}
-        <span className="opsg__rn">{room.displayRoomLabel}</span>
+        <span className="opsg__rn">{bRoom(room.displayRoomLabel)}</span>
       </div>
       <div className="opsg__tracks">
         {/* 가격. 값이 없으면 대시 — **0원이 아니다.** */}
@@ -880,6 +882,9 @@ export function OpsCalendarGrid({
     copy = JSON.stringify(copyProp) === JSON.stringify(copyState.stable) ? copyState.stable : copyProp;
     setCopyState({ seen: copyProp, stable: copy });
   }
+  // 건물 · 독채 이름은 한국어 정규 명칭으로 온다 — 키 · 필터 · 서버로 보내는 값은 그대로, 그릴 때만 바꾼다(2026-10-23).
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const dates = useMemo(() => days.map((day) => day.date), [days]);
   const dayIndex = useMemo(() => new Map(dates.map((date, index) => [date, index])), [dates]);
   const serverRooms = useMemo(() => stableRows.map((row) => row.room), [stableRows]);
@@ -1557,7 +1562,7 @@ export function OpsCalendarGrid({
     const nights = stayNights(target.arrival, target.departure).length;
     const short = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
     const label = target.ok
-      ? `${room?.displayRoomLabel ?? ""} · ${short(target.arrival)} → ${short(target.departure)} · ${copy.rcNights.replace("{n}", String(nights))}`
+      ? `${bRoom(room?.displayRoomLabel ?? "")} · ${short(target.arrival)} → ${short(target.departure)} · ${copy.rcNights.replace("{n}", String(nights))}`
       : target.clashGuest
         ? copy.mvBooked.replace("{guest}", target.clashGuest)
         : copy.mvBookedNoName;
@@ -2276,9 +2281,9 @@ export function OpsCalendarGrid({
     scope.roomKeys.length === 0 || allRoomsInScope
       ? copy.scopeAll
       : scope.roomKeys.length === 1
-        ? (firstSelectedRoom?.displayRoomLabel ?? copy.scopeAll)
+        ? (firstSelectedRoom ? bRoom(firstSelectedRoom.displayRoomLabel) : copy.scopeAll)
         : copy.scwScopeRoomsSome
-            .replace("{first}", firstSelectedRoom?.displayRoomLabel ?? "")
+            .replace("{first}", bRoom(firstSelectedRoom?.displayRoomLabel ?? ""))
             .replace("{n}", String(scope.roomKeys.length - 1));
   const weekLabel = (week: { start: string; end: string }) =>
     `${Number(week.start.slice(5, 7))}/${Number(week.start.slice(8, 10))}–${Number(week.end.slice(5, 7))}/${Number(week.end.slice(8, 10))}`;
@@ -2539,8 +2544,8 @@ export function OpsCalendarGrid({
                       <span className="scw-menu__ck">
                         <Check aria-hidden="true" strokeWidth={3.2} />
                       </span>
-                      <span className="scw-menu__name">{room.displayRoomLabel}</span>
-                      {properties.length !== 1 && <span className="scw-menu__sub">{room.propertyName}</span>}
+                      <span className="scw-menu__name">{bRoom(room.displayRoomLabel)}</span>
+                      {properties.length !== 1 && <span className="scw-menu__sub">{bName(room.propertyName)}</span>}
                     </button>
                   );
                 })}
@@ -2793,7 +2798,7 @@ export function OpsCalendarGrid({
         {roomsByProperty.map((group) => (
           <div key={group.property}>
             <div className="opsg__group">
-              {group.property}
+              {bName(group.property)}
               <span className="opsg__gcount">
                 · {copy.roomCount.replace("{count}", String(group.rows.length))}
               </span>
@@ -2935,7 +2940,11 @@ export function OpsCalendarGrid({
               date={hoverCell.date}
               history={cached?.history ?? null}
               localeTag={copy.localeTag}
-              roomTitle={`${hoverRoom.propertyName} ${hoverRoom.displayRoomLabel}`}
+              roomTitle={
+                hoverRoom.displayRoomLabel === hoverRoom.propertyName
+                  ? bName(hoverRoom.propertyName)
+                  : `${bName(hoverRoom.propertyName)} ${hoverRoom.displayRoomLabel}`
+              }
             />
           );
         })()}
@@ -3088,7 +3097,7 @@ export function OpsCalendarGrid({
             <div className="spw-movepop__cmp">
               <div>
                 <span>{copy.mvNow}</span>
-                <b>{moveConfirm.from.displayRoomLabel}</b>
+                <b>{bRoom(moveConfirm.from.displayRoomLabel)}</b>
                 <small>
                   {moveConfirm.bar.checkIn.slice(5).replace("-", "/")} → {moveConfirm.bar.checkOut.slice(5).replace("-", "/")}
                 </small>
@@ -3096,7 +3105,7 @@ export function OpsCalendarGrid({
               <span aria-hidden="true" className="spw-movepop__arrow">→</span>
               <div className="is-to">
                 <span>{copy.mvTo}</span>
-                <b>{moveConfirm.to.displayRoomLabel}</b>
+                <b>{bRoom(moveConfirm.to.displayRoomLabel)}</b>
                 <small>
                   {moveConfirm.arrival.slice(5).replace("-", "/")} → {moveConfirm.departure.slice(5).replace("-", "/")}
                 </small>
@@ -3108,7 +3117,7 @@ export function OpsCalendarGrid({
                 : moveConfirm.arrival !== moveConfirm.bar.checkIn
                   ? // 채널 예약의 날짜를 옮김 — Beds24 · 캘린더만 바뀌고 채널 예약 내용은 그대로(2026-10-20).
                     copy.mvConfirmNoteChannelDates.replaceAll("{channel}", channelDisplayName(moveConfirm.bar.channel))
-                  : copy.mvConfirmNote.replace("{room}", moveConfirm.to.displayRoomLabel)}
+                  : copy.mvConfirmNote.replace("{room}", bRoom(moveConfirm.to.displayRoomLabel))}
             </p>
             {moveConfirm.error && (
               <p className="spw-msg is-err" role="status">
@@ -3126,7 +3135,7 @@ export function OpsCalendarGrid({
                 onClick={submitMoveConfirm}
                 type="button"
               >
-                {moveConfirm.pending ? copy.mvPending : copy.mvSubmit.replace("{room}", moveConfirm.to.displayRoomLabel)}
+                {moveConfirm.pending ? copy.mvPending : copy.mvSubmit.replace("{room}", bRoom(moveConfirm.to.displayRoomLabel))}
               </button>
             </div>
           </div>

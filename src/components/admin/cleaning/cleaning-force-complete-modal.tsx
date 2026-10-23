@@ -20,6 +20,7 @@ import {
   type ConsoleCopy,
   type StaffDirectory,
 } from "./cleaning-console-shared";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 export type ForceCompleteResult = {
   sessionId: string | null;
@@ -57,6 +58,7 @@ export function CleaningForceCompleteModal({
   onCancel,
   onConfirm,
 }: ForceCompleteModalProps) {
+  const bRoom = useRoomPlaceLabel();
   const [start, setStart] = useState(task.start ?? "11:00");
   const [end, setEnd] = useState(nowLabel);
   const [staffId, setStaffId] = useState(task.staffId ?? "");
@@ -82,7 +84,7 @@ export function CleaningForceCompleteModal({
         </div>
         <div className="modal__body">
           <div className="mrow">
-            <span className="mrow__rm">{task.room}</span>
+            <span className="mrow__rm">{bRoom(task.room)}</span>
             <div className="mrow__b">
               <div className="mrow__t">
                 {buildingLabelOf(task, buildingLabels)} · {typeLabel(task.type, t)}

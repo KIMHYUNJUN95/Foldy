@@ -6,7 +6,10 @@ This file records important project decisions.
 
 - 예약 · 요금 · 가동률 · 매출 · 알림 데이터는 건물을 한국어 정규 명칭(`아라키초A`)으로 들고 다닌다. 키 · 필터 · 주소 · 저장에는 그대로 쓰고,
   **화면 · 문구에 넣을 때만** 바꾼다 — 서버는 `localizeBuildingName(name, dictionary.cleaning.buildingLabels)`(「건물 객실」 한 덩어리는
-  `localizeRoomPlaceLabel`), 모바일 클라이언트는 `useBuildingName()`(`src/components/shared/building-names.tsx`, 모바일 레이아웃이 사전을 내려 준다).
+  `localizeRoomPlaceLabel`), 클라이언트는 `useBuildingName()` · `useRoomPlaceLabel()`(`src/components/shared/building-names.tsx`, 모바일 ·
+  어드민 레이아웃이 사전을 내려 준다 — 어드민은 2026-10-23 추가).
+- **서버로 보내는 값 · 이력 · 큐에 실리는 라벨은 바꾸지 않는다** — 판매 캘린더 칸 · 객실 옮기기 · 객실 링크 저장은 원래 이름을 보내고, 바꾸는 건 그리는 자리뿐.
+- 저장된 장소 글자(교통비 항목 `work_context` 등)는 읽을 때 `localizeStoredPlaceText()`(`attendance-site-display.ts`)로 바꾼다.
 - 독채(오쿠보 · 사노)는 객실 이름 = 건물 이름이므로 객실 자리도 같은 함수로 바꾼다. 직접 추가한 건물(객실 링크)은 사람이 적은 이름이라 그대로.
 - `buildingLabels[저장된 이름]` 처럼 사전을 이름으로 바로 찾지 않는다 — 사전은 건물 키(`kabukicho`)로 찾는다(주문 배송 달력이 그래서 늘 한국어였다).
 

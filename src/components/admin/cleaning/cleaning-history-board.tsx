@@ -28,6 +28,7 @@ import {
   type ConsoleCopy,
   type StaffDirectory,
 } from "./cleaning-console-shared";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /** 이보다 오래 걸린 청소는 「오래 걸림」(빨강) — 시안 KPI 「70분 넘김」(2026-10-13). */
 export const LONG_CLEANING_MIN = 70;
@@ -102,6 +103,7 @@ export function HistoryBoard({
   onToast,
   onClearFilters,
 }: HistoryBoardProps) {
+  const bRoom = useRoomPlaceLabel();
   const localeTag = localeTagOf(locale);
   const q = query.trim().toLowerCase();
   const rows = history.filter((h) => {
@@ -356,7 +358,7 @@ export function HistoryBoard({
               <tr key={h.id} data-live={h.id} className={selectedId === h.id ? "sel" : ""} onClick={() => onSelect(h.id)}>
                 <td className="mono b">{shortDate(h.date)}</td>
                 <td>
-                  <span className="mono b">{h.room}</span>
+                  <span className="mono b">{bRoom(h.room)}</span>
                   <div className="cl-tbl__sub">{typeLabel(h.type, t)}</div>
                 </td>
                 <td>{buildingLabelOf(h, buildingLabels)}</td>

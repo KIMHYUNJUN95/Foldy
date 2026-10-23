@@ -23,6 +23,7 @@ import type { OpsCalendarBar } from "@/lib/ops-calendar";
 import type { OpsReservationDetail } from "@/lib/ops-reservation-detail";
 import { formatPhoneDisplay } from "@/lib/phone-format";
 import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 import "./ops-calendar-panels-white.css";
 
 /**
@@ -222,6 +223,8 @@ export function OpsReservationPanel({
   today: string;
 }) {
   const router = useRouter();
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   /** 보기 / 고치기. 고치는 동안은 본문·하단을 편집 폼이 차지한다. */
   const [editing, setEditing] = useState(false);
   /** 객실 옮기기(2026-10-19). 옮기는 동안은 본문 · 하단을 옮기기 폼이 차지한다. */
@@ -332,7 +335,7 @@ export function OpsReservationPanel({
             <div className="spw-head">
               <span className="spw-head__k">
                 <i aria-hidden="true" className={`spw-dot is-${bar.channel}`} />
-                {channelName} · {propertyName} · {roomLabel}
+                {channelName} · {bName(propertyName)} · {bRoom(roomLabel)}
               </span>
               <b className="spw-head__t">
                 {copy.mvTitleManual.replace("{guest}", bar.guestName)}
@@ -348,7 +351,7 @@ export function OpsReservationPanel({
             <div className="spw-head">
               <span className="spw-head__k">
                 <i aria-hidden="true" className={`spw-dot is-${bar.channel}`} />
-                {channelName} · {propertyName} · {roomLabel}
+                {channelName} · {bName(propertyName)} · {bRoom(roomLabel)}
               </span>
               <b className="spw-head__t">{bar.guestName}</b>
               <span className="spw-head__s">
@@ -610,7 +613,7 @@ export function OpsReservationPanel({
                 <div>
                   <dt>{copy.rcTitle}</dt>
                   <dd>
-                    {propertyName} · {roomLabel}
+                    {bName(propertyName)} · {bRoom(roomLabel)}
                   </dd>
                 </div>
                 <div>

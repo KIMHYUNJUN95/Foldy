@@ -28,6 +28,7 @@ import type { OpsRevenueCompareData, OpsRevenueComparePeriod } from "@/lib/ops-r
 import { IncludePicker } from "./ops-include-picker";
 import "./ops-occupancy-white.css";
 import "./ops-revenue-compare-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 매출 비교(A vs B) — 화이트 리디자인(2026-10-15, 시안 RevCompare-PC). 가동률 화면(`.ocw-*`)의 형제 — 탭 · 고르기 · 합계
@@ -79,6 +80,8 @@ export function OpsRevenueCompareConsole({
   localeTag: string;
   initialExcluded: string[] | null;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const w = copy.white;
   const router = useRouter();
   const [navPending, startNav] = useTransition();
@@ -166,19 +169,19 @@ export function OpsRevenueCompareConsole({
     excluded.length === 0
       ? w.includeAll
       : excluded.length <= 3 && inNames.length > 0
-        ? fill(w.includeExcept, { list: excluded.join(" · ") })
+        ? fill(w.includeExcept, { list: excluded.map(bName).join(" · ") })
         : fill(w.includeCount, { n: inNames.length });
 
   const insights = [
     ...(groups.fresh.length > 0 ? [fill(copy.insNew, { d: signedYen(delta), n: yen(freshSum), names: groups.fresh.join(" · ") })] : []),
-    ...(roomShare && newRoomsDelta !== 0 ? [fill(copy.insNewRooms, { names: roomShare.labels.join(" · "), v: signedYen(newRoomsDelta) })] : []),
+    ...(roomShare && newRoomsDelta !== 0 ? [fill(copy.insNewRooms, { names: roomShare.labels.map(bRoom).join(" · "), v: signedYen(newRoomsDelta) })] : []),
     ...(groups.existing.length > 0 && (mixChanged || roomShare)
       ? [fill(copy.insExisting, { adr: signedPct(exAdr), n: groups.existing.length, occ: exOcc === null ? "—" : signedPoint(exOcc) })]
       : []),
     ...(() => {
       const mover = topMover(groups.existing, data.aCells, data.bCells);
       if (!mover) return [];
-      return [fill(mover.delta > 0 ? copy.insTopUp : copy.insTopDown, { d: signedPct(mover.pct), name: mover.name, v: signedYen(mover.delta) })];
+      return [fill(mover.delta > 0 ? copy.insTopUp : copy.insTopDown, { d: signedPct(mover.pct), name: bName(mover.name), v: signedYen(mover.delta) })];
     })(),
     ...(!mixChanged ? [copy.insSame] : []),
   ].slice(0, 3);
@@ -189,7 +192,7 @@ export function OpsRevenueCompareConsole({
       aLabel,
       bLabel,
       rows: inNames
-        .map((name) => ({ a: side(metricsOf(data.aCells[name] ?? sumMetrics([]))), b: side(metricsOf(data.bCells[name] ?? sumMetrics([]))), name }))
+        .map((name) => ({ a: side(metricsOf(data.aCells[name] ?? sumMetrics([]))), b: side(metricsOf(data.bCells[name] ?? sumMetrics([]))), name: bName(name) }))
         .filter((row) => row.a.revenue !== 0 || row.b.revenue !== 0),
       total: { a: side(aTot), b: side(bTot) },
     };
@@ -292,14 +295,14 @@ export function OpsRevenueCompareConsole({
               <GrowthColumn
                 aEx={same.a}
                 bEx={same.b}
-                closedNames={groups.closed}
+                closedNames={groups.closed.map(bName)}
                 copy={copy}
                 drivers={drivers}
-                freshNames={groups.fresh}
+                freshNames={groups.fresh.map(bName)}
                 growth={growth}
                 insights={insights}
                 n={n}
-                newRoomLabels={roomShare?.labels ?? []}
+                newRoomLabels={(roomShare?.labels ?? []).map(bRoom)}
                 signedPct={signedPct}
                 signedPoint={signedPoint}
                 signedYen={signedYen}
@@ -733,6 +736,7 @@ function Duel({
   signedPct: (v: number | null) => string;
   signedPoint: (v: number) => string;
 }) {
+  const bName = useBuildingName();
   const w = copy.white;
   const valueOf = (m: RevenueMetrics): number | null => {
     switch (metric) {
@@ -797,8 +801,8 @@ function Duel({
           const t = d === null ? "z" : d > 0.05 ? "up" : d < -0.05 ? "dn" : "z";
           return (
             <div className="rcw-drow" key={row.name} style={{ "--i": index } as CSSProperties}>
-              <b className="nm" title={row.name}>
-                {row.name}
+              <b className="nm" title={bName(row.name)}>
+                {bName(row.name)}
               </b>
               <span aria-hidden="true" className="bars">
                 <i className="a" style={{ width: width(row.a) }} />

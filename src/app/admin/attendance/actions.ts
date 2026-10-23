@@ -46,6 +46,7 @@ import {
 import { getDictionary } from "@/lib/i18n";
 import {
   localizeAttendanceSiteName,
+  localizeStoredPlaceText,
   type AttendanceSiteDisplayRow,
 } from "@/lib/attendance-site-display";
 import {
@@ -2397,8 +2398,8 @@ export async function loadAdminTransportDetail(
       amountYen: it.amountYen,
       entryMode: it.entryMode,
       attendanceSessionId: it.attendanceSessionId,
-      contextSummary: ctx,
-      buildingLabel: wc.buildingLabel ?? null,
+      contextSummary: ctx ? localizeStoredPlaceText(ctx, session.user.preferredLanguage) : ctx,
+      buildingLabel: wc.buildingLabel ? localizeStoredPlaceText(wc.buildingLabel, session.user.preferredLanguage) : null,
       imageCount: it.imageCount,
       imageUrls: it.images
         .map((img) => urlByPath.get(img.storagePath))
@@ -2482,7 +2483,7 @@ async function buildTransportExportItems(
         items.push({
           userName: row.userName,
           usageDate: item.usageDate,
-          buildingLabel: wc.buildingLabel ?? "",
+          buildingLabel: wc.buildingLabel ? localizeStoredPlaceText(wc.buildingLabel, localeTag) : "",
           memo: item.memo ?? "",
           statusLabel: transportStatusLabel(row.status, c),
           amountYen: item.amountYen,

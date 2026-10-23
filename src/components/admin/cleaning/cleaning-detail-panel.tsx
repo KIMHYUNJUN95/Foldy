@@ -21,6 +21,7 @@ import {
   type StaffDirectory,
 } from "./cleaning-console-shared";
 import type { Locale } from "@/lib/i18n";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 
 type DetailPanelProps = {
   task: AdminCleaningTask | null;
@@ -52,6 +53,7 @@ export function CleaningDetailPanel({
   canForceComplete,
   disabled,
 }: DetailPanelProps) {
+  const bRoom = useRoomPlaceLabel();
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled });
   if (!task && !history && !setupTarget) return null;
 
@@ -72,7 +74,7 @@ export function CleaningDetailPanel({
               </button>
             </div>
             <div className="panel__title" style={{ alignItems: "baseline", marginTop: 11 }}>
-              <span className="panel__room">{setupTarget.room}</span>
+              <span className="panel__room">{bRoom(setupTarget.room)}</span>
               <span className="cpanel__type">
                 <BedDouble aria-hidden="true" />
                 {t.tySetup}
@@ -86,7 +88,7 @@ export function CleaningDetailPanel({
               <div className="kv">
                 <span className="kv__k">{t.pRoom}</span>
                 <span className="kv__v">
-                  {buildingLabelOf(setupTarget, buildingLabels)} · {setupTarget.room}
+                  {buildingLabelOf(setupTarget, buildingLabels)} · {bRoom(setupTarget.room)}
                 </span>
               </div>
               <div className="kv">
@@ -166,7 +168,7 @@ export function CleaningDetailPanel({
             </button>
           </div>
           <div className="panel__title" style={{ alignItems: "baseline", marginTop: 11 }}>
-            <span className="panel__room">{room}</span>
+            <span className="panel__room">{bRoom(room)}</span>
             <span className="cpanel__type">
               <TypeIcon aria-hidden="true" />
               {typeLabel(type, t)}
@@ -184,7 +186,7 @@ export function CleaningDetailPanel({
             <div className="kv">
               <span className="kv__k">{t.pRoom}</span>
               <span className="kv__v">
-                {buildingLabelOf(location, buildingLabels)} · {room}
+                {buildingLabelOf(location, buildingLabels)} · {bRoom(room)}
               </span>
             </div>
             <div className="kv">

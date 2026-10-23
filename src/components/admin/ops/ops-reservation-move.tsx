@@ -13,6 +13,7 @@ import {
   type ReservationMoveTarget,
 } from "@/actions/ops-calendar";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
+import { useRoomPlaceLabel } from "@/components/shared/building-names";
 import { MAX_STAY_NIGHTS, stayNights } from "@/lib/ops-manual-booking";
 import type { OpsCalendarBar } from "@/lib/ops-calendar";
 
@@ -165,6 +166,7 @@ export function OpsReservationMoveForm({
   /** 같은 건물의 줄 전부(지금 줄 포함). */
   rooms: MoveRoom[];
 }) {
+  const bRoom = useRoomPlaceLabel();
   const channelName = CHANNEL_NAME[bar.channel] || bar.channel;
   const nights = stayNights(bar.checkIn, bar.checkOut).length;
   const [arrival, setArrival] = useState(bar.checkIn);
@@ -293,13 +295,13 @@ export function OpsReservationMoveForm({
                   role="radio"
                   type="button"
                 >
-                  <b>{room.label}</b>
+                  <b>{bRoom(room.label)}</b>
                   <span>{stateText(target)}</span>
                   {on && <Check aria-hidden className="spw-move__ck" />}
                 </button>
               ) : (
                 <div aria-disabled="true" className="spw-move__row" key={room.roomKey}>
-                  <b>{room.label}</b>
+                  <b>{bRoom(room.label)}</b>
                   <span>{stateText(target)}</span>
                 </div>
               );
@@ -319,7 +321,7 @@ export function OpsReservationMoveForm({
           {copy.mvKeep}
         </button>
         <button className="spw-btn is-primary" disabled={pending || !pickedOk} onClick={submit} type="button">
-          {pickedRoom ? copy.mvSubmit.replace("{room}", pickedRoom.label) : copy.mvPick}
+          {pickedRoom ? copy.mvSubmit.replace("{room}", bRoom(pickedRoom.label)) : copy.mvPick}
         </button>
       </div>
     </>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import "./ops-occupancy-white.css";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 합계에 넣을 건물 — 칩 9개 대신 드롭다운 하나(2026-10-15 가동률 화이트 리디자인에서 시작).
@@ -23,6 +24,7 @@ export function IncludePicker({
   title: string;
   allLabel: string;
 }) {
+  const bName = useBuildingName();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +75,7 @@ export function IncludePicker({
                 <span aria-hidden="true" className="ck">
                   {on && <Check />}
                 </span>
-                <span className="n">{name}</span>
+                <span className="n">{bName(name)}</span>
               </button>
             );
           })}

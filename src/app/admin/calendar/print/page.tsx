@@ -6,7 +6,7 @@ import {
 } from "@/lib/admin-calendar-dashboard";
 import { requireAdminSession } from "@/lib/admin-session";
 import { getDictionary } from "@/lib/i18n";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 
 type PageProps = {
   searchParams: Promise<{
@@ -431,7 +431,7 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
 
                 return (
                   <div className="admcal-print__row" key={row.key}>
-                    <div className="admcal-print__room">{row.displayRoomLabel}</div>
+                    <div className="admcal-print__room">{localizeRoomPlaceLabel(row.displayRoomLabel, buildingLabels)}</div>
                     <div className="admcal-print__track">
                       {data.dates.map((date) => {
                         const dow = dayOfWeek(date);

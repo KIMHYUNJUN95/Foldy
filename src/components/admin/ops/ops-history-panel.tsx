@@ -26,6 +26,7 @@ import {
 import { haptic } from "@/lib/haptics";
 import { formatHistoryWhen } from "@/lib/ops-price-history";
 import "./ops-calendar-tools-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 판매 캘린더 「이력」 — 오른쪽 사이드 패널, 탭 둘.
@@ -180,6 +181,8 @@ function isRevertibleGroup(group: ChangeGroup) {
 }
 
 function CellRunsTable({ copy, group }: { copy: HistoryPanelCopy; group: ChangeGroup }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   const runs = collapseCellRuns(group.cells);
   const singleProperty = new Set(runs.map((run) => run.property)).size <= 1;
   const show = (value: number | null, field: ChangeField) => (value === null ? "—" : formatValue(value, field, copy));
@@ -190,7 +193,7 @@ function CellRunsTable({ copy, group }: { copy: HistoryPanelCopy; group: ChangeG
         {runs.map((run) => (
           <tr key={`${run.property}-${run.room}-${run.field}-${run.dateFrom}`}>
             <th scope="row">
-              {singleProperty ? run.room : [run.property, run.room].filter(Boolean).join(" ")}
+              {singleProperty ? bRoom(run.room) : [run.property ? bName(run.property) : "", run.room].filter(Boolean).join(" ")}
               {multiField && <span className="stw-cells__kind">{kindOf(run.field, copy)}</span>}
             </th>
             <td className="stw-cells__date">
@@ -265,6 +268,7 @@ function applyChanges(
 
 /** `canWrite` — 판매 캘린더를 바꿀 수 있나(`ops_calendar.write`). 없으면 되돌리기 · 지금 보내기를 숨긴다(기록은 본다, 서버도 막는다). */
 export function OpsHistoryPanel({ canWrite = true, copy, onClose }: { canWrite?: boolean; copy: HistoryPanelCopy; onClose: () => void }) {
+  const bRoom = useRoomPlaceLabel();
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { quietRestore: true });
   const [tab, setTab] = useState<"changes" | "send">("changes");
 
@@ -469,8 +473,8 @@ export function OpsHistoryPanel({ canWrite = true, copy, onClose }: { canWrite?:
                   return (
                     <li className="stw-item" key={group.id} style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
                       <div className="stw-item__top">
-                        <b className="stw-item__t" title={roomsText(group.rooms, copy)}>
-                          {kinds} · {compactRooms(group.rooms, copy)}
+                        <b className="stw-item__t" title={roomsText(group.rooms.map(bRoom), copy)}>
+                          {kinds} · {compactRooms(group.rooms.map(bRoom), copy)}
                         </b>
                         <span className="stw-st is-mute">
                           {group.source === "beds24" ? copy.hsFromBeds24 : copy.hsSourceApp}
@@ -609,8 +613,8 @@ export function OpsHistoryPanel({ canWrite = true, copy, onClose }: { canWrite?:
                   return (
                     <li className="stw-item" key={entry.id} style={{ "--i": Math.min(index, 12) } as React.CSSProperties}>
                       <div className="stw-item__top">
-                        <b className="stw-item__t" title={roomsText(entry.rooms, copy)}>
-                          {kindLabel(entry)} · {compactRooms(entry.rooms, copy)}
+                        <b className="stw-item__t" title={roomsText(entry.rooms.map(bRoom), copy)}>
+                          {kindLabel(entry)} · {compactRooms(entry.rooms.map(bRoom), copy)}
                         </b>
                         <span className={`stw-st is-${tone}`}>
                           {active && <i aria-hidden="true" className="stw-dot is-v stw-breathe" />}

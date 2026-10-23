@@ -23,6 +23,7 @@ import type {
   RoomLinkView,
 } from "@/lib/room-links";
 import { ROOM_LINK_NAME_MAX, type RoomLinkChannel } from "@/lib/room-links-model";
+import { useBuildingName } from "@/components/shared/building-names";
 import "./room-links-white.css";
 
 /**
@@ -78,6 +79,12 @@ const buildingKey = (building: RoomLinkBuildingView) =>
 
 export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy: Copy }) {
   const w = copy.white;
+  // Beds24 건물 이름(과 독채 객실 이름)은 한국어 정규 명칭 — 그릴 때만 보는 사람 언어로(2026-10-23). 서버로는 원래 이름을 보낸다.
+  // 직접 추가한 건물은 사람이 적은 이름이라 그대로.
+  const bName = useBuildingName();
+  const shownBuilding = (building: RoomLinkBuildingView) => (building.manualId ? building.name : bName(building.name));
+  const shownRow = (building: RoomLinkBuildingView, row: RoomLinkRowView) =>
+    !building.manualId && row.label === building.name ? bName(row.label) : row.label;
   const [selection, setSelection] = useState<Selection>(() => ({
     building: data.buildings[0] ? buildingKey(data.buildings[0]) : "",
     row: null,
@@ -143,6 +150,7 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
     ? all.filter(({ building, row }) =>
         [
           building.name,
+          shownBuilding(building),
           building.booking?.listingId,
           building.booking?.guestUrl,
           row.label,
@@ -193,9 +201,9 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
         style={{ "--i": Math.min(index, 14) } as CSSProperties}
       >
         <span className="rlw-row__room">
-          {showBuilding && <small>{entry.building.name}</small>}
+          {showBuilding && <small>{shownBuilding(entry.building)}</small>}
           <button aria-pressed={on} className="rlw-row__sel" onClick={() => select(target)} type="button">
-            {entry.row.label}
+            {shownRow(entry.building, entry.row)}
           </button>
         </span>
         <span className="rlw-row__units">
@@ -373,7 +381,7 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
                       onClick={() => select({ building: key, row: null })}
                       type="button"
                     >
-                      <span>{item.name}</span>
+                      <span>{shownBuilding(item)}</span>
                       {item.manualId && <span className="rlw-tag">{w.manualTag}</span>}
                       <span className="rlw-bld__n">{unitTotal(item)}</span>
                     </button>
@@ -423,7 +431,7 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
                       />
                     ) : (
                       <div className="rlw-bh__t">
-                        <h2>{building.name}</h2>
+                        <h2>{shownBuilding(building)}</h2>
                         {building.manualId && <span className="rlw-tag">{w.manualTag}</span>}
                         <span>
                           {fill(copy.statRooms, { n: building.rows.length })}
@@ -508,7 +516,7 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
         {row && building ? (
           <aside className="rlw-pane" key={row.key}>
             <div className="rlw-pane__h">
-              <span>{building.name}</span>
+              <span>{shownBuilding(building)}</span>
               {row.manualRoomId ? (
                 <>
                   <div className="rlw-pane__name">
@@ -519,7 +527,7 @@ export function RoomLinksConsole({ data, copy }: { data: RoomLinksPageData; copy
                 </>
               ) : (
                 <>
-                  <b>{row.label}</b>
+                  <b>{shownRow(building, row)}</b>
                   <small>
                     {fill(w.unitCount, { n: row.units.length })}
                     {row.units.length > 1 ? ` · ${w.sellingFirst}` : ""}

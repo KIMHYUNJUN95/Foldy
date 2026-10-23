@@ -10,6 +10,7 @@ import { MAX_STAY_NIGHTS, stayNights, validateManualBooking } from "@/lib/ops-ma
 import { formatPhoneInput } from "@/lib/phone-format";
 import { spwDate, type SpwCopy } from "@/components/admin/ops/ops-price-panel";
 import "./ops-calendar-panels-white.css";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 수동 예약 생성 — **오른쪽 사이드 패널.**
@@ -185,6 +186,8 @@ export function OpsBookingPanel({
   room: BookingPanelRoom;
   today: string;
 }) {
+  const bName = useBuildingName();
+  const bRoom = useRoomPlaceLabel();
   // 요청 키 — 패널을 연 동안 하나. 같은 키로는 서버가 예약을 한 번만 만든다(실패 뒤 다시 눌러도 중복 없음).
   const [requestKey] = useState(() => crypto.randomUUID());
   const [arrival, setArrival] = useState(checkIn);
@@ -337,7 +340,7 @@ export function OpsBookingPanel({
           <div className="spw-head">
             <span className="spw-head__k">{copy.spwMbKicker}</span>
             <b className="spw-head__t">
-              {room.propertyName} · {room.label}
+              {bName(room.propertyName)} · {bRoom(room.label)}
             </b>
             <span className="spw-head__s">{nightsText}</span>
           </div>

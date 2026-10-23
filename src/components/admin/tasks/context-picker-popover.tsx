@@ -494,7 +494,7 @@ export function ContextPickerPopover({
           {draft.propertyName ? (
             <span className="achip set">
               <Building2 className="ic" size={13} aria-hidden="true" />
-              {draft.propertyName}
+              {buildings.find((b) => b.id === draft.propertyName)?.name ?? draft.propertyName}
             </span>
           ) : null}
           {draft.roomLabel ? (

@@ -3,6 +3,7 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { OpsNavLink, useOpsNavigate } from "@/components/admin/ops/ops-nav";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 판매 캘린더의 건물 고르기 — **여러 건물을 함께 볼 수 있다**(2026-09-30).
@@ -57,6 +58,7 @@ export function OpsPropertyTabs({
   const rootRef = useRef<HTMLDivElement | null>(null);
   /** 체크 · 수정키 클릭으로 이동 중인 건물 — 그 줄에 로딩 점을 띄운다. */
   const [pendingName, setPendingName] = useState<string | null>(null);
+  const bName = useBuildingName();
   const selected = tabs.filter((tab) => tab.selected);
   const selectedCount = selected.length;
 
@@ -99,8 +101,8 @@ export function OpsPropertyTabs({
     selectedCount === 0
       ? copy.propertySelectedCount.replace("{count}", String(tabs.length))
       : selectedCount === 1
-        ? selected[0].name
-        : copy.scwScopeRoomsSome.replace("{first}", selected[0].name).replace("{n}", String(selectedCount - 1));
+        ? bName(selected[0].name)
+        : copy.scwScopeRoomsSome.replace("{first}", bName(selected[0].name)).replace("{n}", String(selectedCount - 1));
 
   return (
     <div className="scw-pp" ref={rootRef}>
@@ -123,7 +125,7 @@ export function OpsPropertyTabs({
         <div aria-label={copy.propertyGroupLabel} className="scw-pp__pop" role="dialog">
           <div className="scw-pp__list" role="group">
             {tabs.map((tab) => {
-              const toggleLabel = (tab.selected ? copy.propertyRemove : copy.propertyAdd).replace("{name}", tab.name);
+              const toggleLabel = (tab.selected ? copy.propertyRemove : copy.propertyAdd).replace("{name}", bName(tab.name));
               return (
                 <div className={`scw-pp__row${tab.selected ? " on" : ""}`} key={tab.name}>
                   <button
@@ -143,7 +145,7 @@ export function OpsPropertyTabs({
                     onClick={onLabelClick(tab)}
                     title={copy.propertyTabHint}
                   >
-                    {tab.name}
+                    {bName(tab.name)}
                     {pending && pendingName === tab.name && <span aria-hidden="true" className="ops__navspin" />}
                   </OpsNavLink>
                 </div>

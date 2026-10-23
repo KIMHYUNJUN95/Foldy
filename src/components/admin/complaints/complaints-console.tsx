@@ -26,7 +26,7 @@ import { REVIEW_LIST_STEP } from "@/lib/external-review-pages";
 import type { TranslationPart } from "@/lib/review-translate";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { tokyoDateOf } from "@/lib/tokyo-date";
-import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { getCanonicalPropertyName, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import "./complaints-console.css";
 
 // 게스트 피드백 콘솔 — 화이트 리디자인(2026-10-14, 시안 FB-PC · FBManual-PC · FBNewCx-PC · FBDelete-PC ·
@@ -427,6 +427,7 @@ export function ComplaintsConsole(props: Props) {
 // ── 외부 리뷰 ─────────────────────────────────────────────
 
 function ReviewsView({
+  buildingLabels,
   copy,
   filter,
   reviews,
@@ -447,6 +448,8 @@ function ReviewsView({
   reviewHref: (id: string) => string;
   buildingLabelOf: (name: string | null) => string;
 }) {
+  // 독채(오쿠보 · 사노)는 객실 이름이 한국어 건물 이름이다(2026-10-23).
+  const bRoom = (label: string) => localizeRoomPlaceLabel(label, buildingLabels);
   return (
     <>
       <div className="wkpis cxw-kpis">
@@ -543,7 +546,7 @@ function ReviewsView({
                     {risk ? <em className="is-bad">{copy.riskChip}</em> : null}
                     {review.riskLevel === "unrated" ? <em>{copy.unratedChip}</em> : null}
                     <b>{PROVIDER_LABEL[review.provider]}</b>
-                    <span>{`${buildingLabelOf(review.propertyName)} · ${room}`}</span>
+                    <span>{`${buildingLabelOf(review.propertyName)} · ${bRoom(room)}`}</span>
                     {review.guestDisplayName ? <span>{review.guestDisplayName}</span> : null}
                     {review.linkedComplaintId ? <em className="is-linked">{copy.wLinked}</em> : null}
                     <time className="num">{md(review.reviewedAt)}</time>
@@ -591,6 +594,7 @@ function ReviewsView({
 // ── 수동 컴플레인 ─────────────────────────────────────────
 
 function ManualView({
+  buildingLabels,
   copy,
   complaints,
   building,
@@ -606,6 +610,8 @@ function ManualView({
   href: (patch: Record<string, string | null | undefined>) => string;
   buildingLabelOf: (name: string | null) => string;
 }) {
+  // 독채(오쿠보 · 사노)는 객실 이름이 한국어 건물 이름이다(2026-10-23).
+  const bRoom = (label: string) => localizeRoomPlaceLabel(label, buildingLabels);
   const open = complaints.filter((complaint) => complaint.status === "open").length;
   const rows = complaints
     .filter((complaint) => {
@@ -664,7 +670,7 @@ function ManualView({
             title: complaint.title,
             description: complaint.description,
             platform: platformName(complaint.platform, copy),
-            place: `${buildingLabelOf(complaint.propertyName)}${complaint.roomLabel ? ` · ${complaint.roomLabel}` : ""}`,
+            place: `${buildingLabelOf(complaint.propertyName)}${complaint.roomLabel ? ` · ${bRoom(complaint.roomLabel)}` : ""}`,
             byline: `${complaint.authorName || "—"} · ${md(complaint.createdAt)}`,
           }))}
           selectedId={selectedComplaint?.id ?? null}

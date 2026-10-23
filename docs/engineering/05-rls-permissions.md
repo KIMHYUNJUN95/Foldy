@@ -1503,6 +1503,9 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   | `order_requests` 수정 / 처리 칸 트리거 `enforce_order_request_processing` | `order_processor` ∨ `request.delete_any` / `order_processor` |
   | `property_operation_infos` | `property_info.edit` |
 
+- `set_annual_leave_baseline_atomic` 은 `20260811012820_attendance_integrity_hardening.sql`(2026-08-11 운영 적용, 2026-10-23 저장소 복원)에서 처음 만들어진
+  service_role 전용 RPC 다. 같은 파일의 나머지 근태 RPC 6개도 `security invoker` · service_role 전용(`PUBLIC` · `anon` · `authenticated`
+  실행 권한 없음)이라 클라이언트 쓰기 권한을 넓히지 않는다.
 - `set_annual_leave_baseline_atomic` 은 시급제 역할(`part_time_staff` · `staff`)을 연차 대상에서 뺀다(앱 `isLeaveHourlyRole` 과 같게).
 - **그대로 둔 것:** `memberships` · `organizations` · `invite_codes` · `membership_permission_overrides`(보안 뼈대 — 역할로만), `reservation_internal_notes`
   (권한 키 없음), 저장소(`storage.objects`) 업로드 규칙.

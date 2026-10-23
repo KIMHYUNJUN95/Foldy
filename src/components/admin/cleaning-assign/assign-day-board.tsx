@@ -1103,7 +1103,10 @@ function AddRoomDialog({
   const [roomKey, setRoomKey] = useState("");
   const [note, setNote] = useState("");
   const [userIds, setUserIds] = useState<string[]>([]);
-  const rooms = roomOptions.filter((option) => option.propertyName === building);
+  // 방 번호 순(7, 8, 3 … 처럼 섞여 오던 것 — 숫자는 숫자 크기대로).
+  const rooms = roomOptions
+    .filter((option) => option.propertyName === building)
+    .sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true }));
   return (
     <>
       <div className="modal-scrim on" onClick={onClose} />
@@ -1126,7 +1129,7 @@ function AddRoomDialog({
         </label>
         <label className="cas-field">
           <span>{copy.room}</span>
-          <AdmDropdown value={roomKey} ariaLabel={copy.room} onChange={setRoomKey} options={rooms.map((option) => ({ label: option.label, value: option.roomKey }))} searchable />
+          <AdmDropdown value={roomKey} ariaLabel={copy.room} onChange={setRoomKey} options={rooms.map((option) => ({ label: option.label, value: option.roomKey }))} searchable keepFirst={false} searchPlaceholder={copy.room} noResultLabel={copy.searchNone} />
         </label>
         <label className="cas-field">
           <span>{copy.memoOptional}</span>
@@ -1146,6 +1149,9 @@ function AddRoomDialog({
             ariaLabel={copy.peopleOptional}
             placeholder={copy.searchName}
             searchable
+            keepFirst={false}
+            searchPlaceholder={copy.searchName}
+            noResultLabel={copy.searchNone}
             onChange={(value) => value && !userIds.includes(value) && setUserIds([...userIds, value])}
             options={people.filter((p) => !userIds.includes(p.userId)).map((p) => ({ label: p.name, value: p.userId }))}
           />

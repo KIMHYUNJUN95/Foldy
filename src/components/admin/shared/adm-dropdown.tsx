@@ -38,6 +38,11 @@ type AdmDropdownProps = {
   searchPlaceholder?: string;
   /** 검색 결과가 없을 때 메뉴에 표시할 문구. */
   noResultLabel?: string;
+  /**
+   * 검색할 때 첫 옵션을 늘 남길지(기본 true — 「전체 …」 필터용). 방 · 사람처럼 첫 옵션이 그냥 한 항목인
+   * 목록은 false 로 — 안 그러면 검색어와 무관한 첫 항목이 맨 위에 붙어 남는다(2026-10-23).
+   */
+  keepFirst?: boolean;
 };
 
 /**
@@ -59,6 +64,7 @@ export function AdmDropdown({
   searchable = false,
   searchPlaceholder,
   noResultLabel,
+  keepFirst = true,
 }: AdmDropdownProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -103,7 +109,8 @@ export function AdmDropdown({
   const label = current ? current.label : (placeholder ?? fallbackPlaceholder);
 
   const q = query.trim().toLowerCase();
-  const [head, ...rest] = options;
+  const head = keepFirst ? options[0] : undefined;
+  const rest = keepFirst ? options.slice(1) : options;
   const filtered =
     searchable && q
       ? rest.filter((option) => option.label.toLowerCase().includes(q))
@@ -157,7 +164,7 @@ export function AdmDropdown({
             </div>
           ) : null}
           <div className={searchable ? "dd__scroll" : undefined}>
-          {searchable && visible.length <= 1 && q ? <div className="ddnone">{noResultLabel}</div> : null}
+          {searchable && visible.length <= (keepFirst ? 1 : 0) && q ? <div className="ddnone">{noResultLabel}</div> : null}
           {visible.map((option) => {
             const on = option.value === value;
             return (

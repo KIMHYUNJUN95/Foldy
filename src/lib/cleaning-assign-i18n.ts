@@ -354,6 +354,7 @@ export type CleaningAssignCopy = {
   seatWaiting: string;
   seatRoomsN: string;
   seatVerbAdd: string;
+  searchNone: string;
   // ── 사람별 시프트 달력(관리자, 2026-10-23) ──
   psOpen: string;
   psClose: string;
@@ -797,7 +798,7 @@ const ko: CleaningAssignCopy = {
   seatNoneLeft: "넣을 신청자가 없어요",
   seatWaiting: "배정 전",
   seatRoomsN: "방 {n}",
-  seatVerbAdd: "넣기",
+  seatVerbAdd: "넣기",  searchNone: "맞는 항목이 없어요",
 };
 
 const ja: CleaningAssignCopy = {
@@ -1187,7 +1188,7 @@ const ja: CleaningAssignCopy = {
   seatNoneLeft: "入れられる申請者がいません",
   seatWaiting: "割り当て前",
   seatRoomsN: "{n}室",
-  seatVerbAdd: "入れる",
+  seatVerbAdd: "入れる",  searchNone: "該当する項目がありません",
 };
 
 const en: CleaningAssignCopy = {
@@ -1577,7 +1578,7 @@ const en: CleaningAssignCopy = {
   seatNoneLeft: "No applicants left to add",
   seatWaiting: "Unassigned",
   seatRoomsN: "{n} rooms",
-  seatVerbAdd: "Add",
+  seatVerbAdd: "Add",  searchNone: "No matches",
 };
 
 const COPY: Record<Locale, CleaningAssignCopy> = { en, ja, ko };

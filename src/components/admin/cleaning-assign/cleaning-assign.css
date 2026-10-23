@@ -154,8 +154,9 @@
 .adm .cas-modal__f { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
 .adm .cas-modal__f .cas-btn { height: 44px; border-radius: 12px; }
 .adm .cas-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #6b6878; }
-.adm .cas-field input { height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: #f4f4f7; font: inherit; font-size: 15px; color: #16141f; }
-.adm .cas-field input:focus { outline: 2px solid #7a52e6; outline-offset: 0; }
+/* 칸 바로 아래 입력만 — 드롭다운 안 검색칸(.qsearch input)까지 칠하면 테두리가 두 겹이 된다(2026-10-23). */
+.adm .cas-field > input { height: 40px; padding: 0 12px; border: 0; border-radius: 10px; background: #f4f4f7; font: inherit; font-size: 15px; color: #16141f; }
+.adm .cas-field > input:focus { outline: 2px solid #7a52e6; outline-offset: 0; }
 
 /* 월 보기 */
 .adm .cas-preview { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 52px; padding: 6px 8px 6px 16px; border-radius: 12px; background: #f4f1fd; color: #3b2a7a; }

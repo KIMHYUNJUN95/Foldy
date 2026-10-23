@@ -161,7 +161,7 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
   - 대상이 **owner · 전무**면 역할 · 소속 · 상태 · 권한 · 플래그 · 삭제 등 패널의 모든 변경은 **그 조직의 owner · 전무 또는 개발자만**. 대상이 **개발자**(`platform_admins` 활성)면 **개발자만**. `user.manage` 위임만 받은 사람은 불가(`protected_member`). 패널은 그런 대상에 컨트롤 · 휴지통을 숨기고 한 줄 안내(「대표 · 전무 계정은 …」 / 「개발자 계정은 개발자만 …」)를 보여 준다.
   - 역할 변경의 「줄 수 있는 역할」(`officeAdminAssignableRoles` 밖)도 **대상 조직의** owner · 전무인지로 판정한다(세션 역할이 다른 조직 것일 수 있다).
   - **마지막 활성 owner** 는 owner 가 아닌 역할로 바꾸기 · 비활성 · 삭제가 막힌다(`last_owner`). 패널은 역할 드롭다운 · 「비활성」 · 휴지통을 막고 안내 문구를 띄운다. 전무는 owner 수에 세지 않는다.
-  - **삭제**는 이 조직 멤버십만 지운다. 그 사람에게 **다른 조직 멤버십(상태 무관)** 이 있으면 profile · 로그인 계정은 남긴다. 다른 조직 멤버십이 없을 때만 계정 전체(멤버십 → profile → auth) 삭제. 활동 기록 검사(근태 · 청소 · 연차)는 예전처럼 조직 무관.
+  - **삭제**는 이 조직 멤버십만 지운다. 그 사람에게 **다른 조직 멤버십(상태 무관)** 이 있으면 profile · 로그인 계정은 남긴다. 다른 조직 멤버십이 없을 때만 계정 전체(멤버십 → profile → auth) 삭제. 활동 기록 검사(근태 · 청소 · 연차)는 예전처럼 조직 무관. **이 조직에 신분 서류(재류카드 · 마이넘버 카드 앞면)가 있으면 삭제 대신 비활성**(`has_id_documents`, 2026-10-23 — 퇴사 후 3년 보관, `41-residence-card-workflow.md` §6).
   - **비활성(auth ban)** 기준은 「바뀐 뒤 어느 조직에도 활성 멤버십이 없으면 로그인 차단」 하나. 다른 조직에 활성 멤버십이 있으면 이 조직 멤버십 상태만 바뀌고 로그인은 막지 않는다. 활성으로 바꾸면 항상 차단 해제. 확인 창 문구도 그 경우 「이 조직에서만 …」으로 바뀐다.
 - Motion: rows rise in order, switch knob slide, expiry row unfolds, button press. Off under reduced motion.
 - Code: `src/components/admin/users/users-console.tsx` + `users-white.css` (`usw-*`). Scope guard: the list is org-scoped; the panel only opens for a membership in that list.

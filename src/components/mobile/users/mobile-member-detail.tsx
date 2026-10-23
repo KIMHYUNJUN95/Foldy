@@ -57,6 +57,8 @@ function errorText(code: string | undefined, dict: Dict): string {
       return dict.admin.users.errors.self_update_blocked;
     case "has_activity":
       return c.errHasActivity;
+    case "has_id_documents":
+      return c.errHasIdDocuments;
     case "protected_member":
       return c.errProtected;
     case "last_owner":

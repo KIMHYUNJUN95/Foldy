@@ -483,6 +483,14 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
   if ((att.count ?? 0) > 0 || (clean.count ?? 0) > 0 || (leave.count ?? 0) > 0) {
     return { ok: false, error: "has_activity" };
   }
+  // 신분 서류(재류카드 · 마이넘버 카드 앞면)가 있으면 완전 삭제 대신 정지 — 퇴사 후 3년 보관 규칙(docs/product/41 §6, 2026-10-23 사용자).
+  // 완전 삭제하면 프로필과 함께 서류 행이 바로 지워지고 사진만 저장소에 남았다. 정지하면 떠난 시각이 남아 3년 뒤 자동 정리된다.
+  const { count: idDocs } = await service
+    .from("staff_id_documents")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", ctx.membership.organization_id)
+    .eq("user_id", userId);
+  if ((idDocs ?? 0) > 0) return { ok: false, error: "has_id_documents" };
 
   // Profile + auth login are shared across orgs: if the user belongs to any other org (any status),
   // remove only THIS org's membership. Otherwise remove the whole account explicitly (membership →

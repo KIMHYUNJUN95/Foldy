@@ -14,7 +14,7 @@ describe("IdentityNamesFields", () => {
         <IdentityNamesFields copy={copy} errors={{}} locale={locale} onChange={() => {}} showErrors={false} value={value} />,
       );
       expect(html).toContain(copy.nameKoLabel);
-      expect(html).toContain(copy.nameEnLabel);
+      expect(html).not.toContain(copy.nameEnLabel);
       expect(html).toContain(copy.nameKatakanaLabel);
       expect(html).not.toContain(copy.nameJaLabel);
     });

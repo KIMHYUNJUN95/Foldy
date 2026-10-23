@@ -13,7 +13,7 @@
  */
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateAccountProfile } from "@/app/account/actions";
@@ -128,17 +128,23 @@ function IdentitySheetFields({ copy, locale, initial, saveLabel }: { copy: Ident
         showErrors={tried}
         value={value}
       />
-      <span onClickCapture={() => setTried(true)}>
-        <SaveButton disabled={bad && tried} label={saveLabel} />
-      </span>
+      {/* 버튼을 span 으로 감싸 폭이 글자만큼 줄고, 한 번 틀리면 회색으로 잠기던 것(2026-10-23 사용자 「저장 버튼이 이상」) —
+          다른 칸 시트와 같은 꽉 찬 버튼, 틀리면 잠그지 않고 막은 뒤 칸 아래 오류만 보인다. */}
+      <SaveButton
+        label={saveLabel}
+        onPress={(event) => {
+          setTried(true);
+          if (bad) event.preventDefault();
+        }}
+      />
     </>
   );
 }
 
-function SaveButton({ label, disabled }: { label: string; disabled?: boolean }) {
+function SaveButton({ label, disabled, onPress }: { label: string; disabled?: boolean; onPress?: (event: MouseEvent<HTMLButtonElement>) => void }) {
   const { pending } = useFormStatus();
   return (
-    <button className="acw-sh__go" disabled={pending || disabled} type="submit">
+    <button className="acw-sh__go" disabled={pending || disabled} onClick={onPress} type="submit">
       {pending ? <span aria-hidden="true" className="acw-spin" /> : null}
       {label}
     </button>

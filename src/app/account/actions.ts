@@ -103,7 +103,7 @@ export async function updateAccountProfile(formData: FormData) {
         nationality: identity.nationality,
         name_ko: identity.nameKo || null,
         name_ja: identity.nameJa || null,
-        name_en: identity.nameEn,
+        name_en: identity.nameEn || null,
         name_katakana: identity.nameKatakana,
       }
     : {};

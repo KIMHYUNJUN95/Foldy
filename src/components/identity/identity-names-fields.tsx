@@ -441,15 +441,6 @@ export function IdentityNamesFields({
           autoComplete: "name",
         },
     {
-      field: "nameEn",
-      label: copy.nameEnLabel,
-      placeholder: copy.nameEnPlaceholder,
-      hint: copy.nameEnHint,
-      autoComplete: "off",
-      normalize: normalizeEnglishName,
-      upper: true,
-    },
-    {
       field: "nameKatakana",
       label: copy.nameKatakanaLabel,
       placeholder: copy.nameKatakanaPlaceholder,

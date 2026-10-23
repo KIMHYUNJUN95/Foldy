@@ -56,10 +56,13 @@ describe("identity names", () => {
     expect(displayNameFrom({ nationality: "KR", nameKo: "김하루", nameJa: "", nameEn: "KIM HARU", nameKatakana: "キム ハル" })).toBe("김하루");
     expect(displayNameFrom({ nationality: "JP", nameKo: "", nameJa: "山田 太郎", nameEn: "YAMADA TARO", nameKatakana: "ヤマダ タロウ" })).toBe("山田 太郎");
     expect(displayNameFrom({ nationality: "VN", nameKo: "", nameJa: "", nameEn: "NGUYEN AN", nameKatakana: "グエン アン" })).toBe("NGUYEN AN");
+    // 영문 이름은 가입 때 받지 않는다(2026-10-23) — 없으면 가타카나가 보이는 이름.
+    expect(displayNameFrom({ nationality: "VN", nameKo: "", nameJa: "", nameEn: "", nameKatakana: "グエン アン" })).toBe("グエン アン");
   });
 
   it("detects incomplete rows", () => {
     expect(identityIncomplete({ nationality: null, name_en: null, name_katakana: null, name_ko: null, name_ja: null })).toBe(true);
     expect(identityIncomplete({ nationality: "KR", name_en: "KIM HARU", name_katakana: "キム ハル", name_ko: "김하루", name_ja: null })).toBe(false);
+    expect(identityIncomplete({ nationality: "KR", name_en: null, name_katakana: "キム ハル", name_ko: "김하루", name_ja: null })).toBe(false);
   });
 });

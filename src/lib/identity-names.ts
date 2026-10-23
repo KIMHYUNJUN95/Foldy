@@ -3,8 +3,9 @@
  * `docs/product/41-residence-card-workflow.md` §2 (2026-10-22).
  *
  * - 국적에 따라 필수 칸이 바뀐다: 대한민국 → 한국어 이름 · 일본 → 일본어 이름(한자) · 그 밖 → 둘 다 선택.
- *   영문 이름 · 가타카나 이름은 모두 필수(재류카드 대조 · 급여명세서 氏名).
- * - 앱에 보이는 이름(`profiles.name`)은 한국어 → 일본어 → 영문 순으로 있는 것.
+ *   가타카나 이름은 필수(급여명세서 氏名). 영문 이름은 **입력받지 않는다**(2026-10-23 사용자) — 재류카드를 등록하면 카드의 로마자
+ *   이름으로 채운다(비어 있을 때만). 예전에 적은 값은 그대로 두고, 적혀 있으면 형식만 본다.
+ * - 앱에 보이는 이름(`profiles.name`)은 한국어 → 일본어 → 영문 → 가타카나 순으로 있는 것.
  * - 이 파일은 클라이언트 · 서버 둘 다 쓴다 — 서버 액션이 같은 함수로 다시 검사한다.
  */
 
@@ -123,17 +124,16 @@ export function validateIdentityNames(
   if (!isNationalityCode(names.nationality)) errors.nationality = "nationality_required";
   if (names.nationality === "KR" && !names.nameKo) errors.nameKo = "name_ko_required";
   if (names.nationality === "JP" && !names.nameJa) errors.nameJa = "name_ja_required";
-  if (!names.nameEn) errors.nameEn = "name_en_required";
-  else if (!isEnglishName(names.nameEn)) errors.nameEn = "name_en_invalid";
+  if (names.nameEn && !isEnglishName(names.nameEn)) errors.nameEn = "name_en_invalid";
   if (!names.nameKatakana) errors.nameKatakana = "name_katakana_required";
   else if (!isKatakanaName(names.nameKatakana)) errors.nameKatakana = "name_katakana_invalid";
   return errors;
 }
 
-/** 앱에 보이는 이름 — 한국어 → 일본어 → 영문 순. */
+/** 앱에 보이는 이름 — 한국어 → 일본어 → 영문 → 가타카나 순(가타카나는 늘 있다). */
 export function displayNameFrom(names: IdentityNames): string {
-  if (names.nationality === "JP") return names.nameJa || names.nameKo || names.nameEn;
-  return names.nameKo || names.nameJa || names.nameEn;
+  if (names.nationality === "JP") return names.nameJa || names.nameKo || names.nameEn || names.nameKatakana;
+  return names.nameKo || names.nameJa || names.nameEn || names.nameKatakana;
 }
 
 /** 국적 · 이름 세 가지 중 빠진 게 있어 「정보를 채워 주세요」 를 띄워야 하는지. */

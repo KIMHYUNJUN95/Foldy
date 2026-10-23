@@ -164,6 +164,11 @@ export async function submitIdCard(input: SubmitIdCardInput): Promise<SubmitIdCa
     : await service.from("staff_id_documents").update({ is_current: true }).eq("id", input.documentId);
   if (promoteError) return { ok: false, errorKey: "failed" };
 
+  // 영문 이름은 가입 때 받지 않는다 — 재류카드의 로마자 이름으로 채운다(비어 있을 때만, 2026-10-23 사용자). 마이넘버 카드는 로마자가 없다.
+  if (kind === "residence_card" && fields.nameRoman && !session.user.identity.nameEn) {
+    await service.from("profiles").update({ name_en: fields.nameRoman }).eq("id", uid);
+  }
+
   const unused = [...names].filter((path) => path !== input.frontPath && path !== backPath);
   if (unused.length > 0) await service.storage.from(STAFF_DOCUMENT_BUCKET).remove(unused);
 

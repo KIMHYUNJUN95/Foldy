@@ -282,6 +282,7 @@ for schema.
   nobody. The migration fills every empty `team_id` with the same role rule (`field_manager` · `staff` · `part_time_staff` → 현장,
   everyone else → 사무실; existing assignments untouched), seeds the two default teams for orgs created after 07-14, and adds a
   `before insert` trigger on `memberships` that sets the default team when `team_id` is empty. Admins can still change it any time.
+  **Applied to production 2026-10-23** — Haru now 현장 5 · 사무실 8, no 미지정; trigger checked with a rolled-back insert.
 
 ## Auth / Onboarding Rules (2026-06-18 planning baseline)
 

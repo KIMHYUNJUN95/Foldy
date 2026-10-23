@@ -86,7 +86,8 @@ export type MemberPanelVM = {
   history: MemberHistoryItem[];
   /** 신분 서류(재류카드 · 마이넘버 카드 앞면, docs/product/41 R2) — `staff_documents.view` 가 없으면 canView=false 로 아예 읽지 않는다. */
   /** `printHref` = A4 인쇄 화면(R3, 서류가 있을 때만). */
-  idDocument: { canView: boolean; doc: IdDocumentView | null; printHref: string | null };
+  /** canReview: 확인 · 다시 요청 버튼. 자기 서류는 안 되지만 개발자는 예외(2026-10-23). */
+  idDocument: { canView: boolean; canReview: boolean; doc: IdDocumentView | null; printHref: string | null };
 };
 
 /** 지금 쓸 수 있는 초대코드 수(켜져 있고 · 기한 전 · 남은 횟수 있음) — 탭 숫자. */
@@ -312,6 +313,7 @@ export async function loadMemberPanel(session: AppSession, directory: UserDirect
     history,
     idDocument: {
       canView: canViewDocuments,
+      canReview: !isSelf || isSuperAdmin,
       doc: idDocument,
       printHref: idDocument ? `/account/id-card/print?u=${selected.user_id}` : null,
     },

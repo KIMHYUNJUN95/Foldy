@@ -222,7 +222,8 @@ export async function reviewIdDocument(input: ReviewIdDocumentInput): Promise<{ 
     .maybeSingle();
   if (!row || row.organization_id !== session.organization.id || !row.is_current) return { ok: false, errorKey: "forbidden" };
   // 자기 서류는 스스로 확인 · 다시 요청하지 않는다 — 다른 관리자가 본다(2026-10-23 점검).
-  if (row.user_id === session.user.id) return { ok: false, errorKey: "forbidden" };
+  // 단 개발자(developer_super_admin)는 막지 않는다 — 개발자는 모든 것을 할 수 있어야 한다(2026-10-23 사용자).
+  if (row.user_id === session.user.id && session.user.role !== "developer_super_admin") return { ok: false, errorKey: "forbidden" };
 
   const { error } = await service
     .from("staff_id_documents")

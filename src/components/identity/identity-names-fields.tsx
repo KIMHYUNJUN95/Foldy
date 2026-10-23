@@ -187,16 +187,21 @@ function NationalityInline({
 }) {
   const { frequent, all } = useNationalityList(locale);
   const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  // 펼칠 때 검색칸에 바로 포커스하지 않는다 — 폰에서 키보드가 올라오며 시트 · 화면이 위로 밀려 깨졌다(2026-10-23 사용자 제보).
+  // 대신 펼친 목록이 시트 안에서 보이게만 굴린다. 검색은 칸을 누르면 그때.
+  useEffect(() => {
+    boxRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, []);
   const q = query.trim().toLowerCase();
   const list = q
     ? all.filter((n) => n.name.toLowerCase().includes(q) || n.code.toLowerCase() === q)
     : [...frequent, ...all.filter((n) => !(FREQUENT_NATIONALITIES as readonly string[]).includes(n.code))];
   return (
-    <div className="mt-2 rounded-[14px] bg-[#f7f7f9] p-2">
+    <div className="mt-2 scroll-mb-4 rounded-[14px] bg-[#f7f7f9] p-2" ref={boxRef}>
       <input
         aria-label={copy.nationalitySearch}
         autoComplete="off"
-        autoFocus
         className="h-[42px] w-full rounded-[10px] border-0 bg-surface px-3 text-[15px] font-medium text-foreground outline-none placeholder:text-muted-foreground focus:ring-[3px] focus:ring-primary/15"
         onChange={(event) => setQuery(event.target.value)}
         placeholder={copy.nationalitySearch}

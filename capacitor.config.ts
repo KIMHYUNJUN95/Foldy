@@ -61,6 +61,12 @@ const config: CapacitorConfig = {
       autoBackdropColor: "auto",
       resizeOnFullScreen: true,
     },
+    // 신분 서류 화면 가리기(2026-10-23, `@capgo/capacitor-privacy-screen`, docs/product/41 §10). 앱 시작 때는 꺼 둔다 —
+    // 재류카드 촬영 · 관리자 카드 칸이 떠 있는 동안만 웹이 켠다(`src/lib/native/privacy-screen.ts`). Android: FLAG_SECURE(스크린샷 ·
+    // 녹화 · 최근 앱 미리보기 막기). iOS: 켜져 있는 동안 앱 전환기 미리보기를 가리고 화면 캡처를 검게 만든다.
+    PrivacyScreen: {
+      enabled: false,
+    },
   },
 };
 

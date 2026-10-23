@@ -848,3 +848,10 @@ curl -o /dev/null -w '%{http_code}\n' \
 
 - `CAP_SERVER_URL` (선택) — `npm run cap:sync` 할 때 앱이 띄울 웹 주소. 비우면 `https://stay-ops-two.vercel.app`. 웹 런타임 변수가 아니라
   네이티브 설정을 만들 때만 읽는다(Vercel 에 넣을 필요 없음). 빌드 환경 · 명령: `docs/engineering/03-deployment-strategy.md` 「앱 빌드」.
+
+### 네이티브 플러그인 추가 후 (2026-10-23)
+
+- 신분 서류 촬영 · 화면 가리기로 `@capgo/capacitor-document-scanner` · `@capgo/capacitor-privacy-screen` 이 들어왔다(docs/planning/17 H15).
+  새 환경 변수는 없다. `npm install` 뒤 `npx cap sync` 를 한 번 돌리고(이미 커밋된 `ios/App/CapApp-SPM/Package.swift` ·
+  `android/capacitor.settings.gradle` 과 같아야 한다), iOS 는 Xcode 에서 SPM 패키지를 다시 받고(File → Packages → Resolve Package Versions),
+  Android 는 Gradle 동기화 — ML Kit 문서 스캐너는 Google Play 서비스가 있는 **실기기**에서만 돈다(에뮬레이터는 실패 → 웹 카메라).

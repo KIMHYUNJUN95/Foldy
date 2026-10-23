@@ -29,6 +29,8 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/share": "^8.0.3",
     "@capacitor/text-zoom": "^8.0.1",
+    "@capgo/capacitor-document-scanner": "^8.4.14",
+    "@capgo/capacitor-privacy-screen": "^8.3.14",
     "@lottiefiles/dotlottie-react": "^0.19.4",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",

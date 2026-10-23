@@ -7,10 +7,17 @@
  * 자동 촬영(2026-10-23): 0.12초마다 틀 주변을 작게 떠서 카드 네 변이 틀에 맞고(셋 이상) 선명하고 멈춰 있으면 셔터 둘레 원이
  * 0.7초 동안 차오르고 저절로 찍힌다. 틀 모서리는 찾으면 흰색 → 보라. 못 찾는 환경(흰 카드 · 흰 책상)을 위해 셔터는 그대로.
  * 넓은 화면(`tablet:`)에서는 왼쪽 미리보기 · 오른쪽 단계 안내로 나눈다.
+ *
+ * 앱(iOS · Android, 2026-10-23): 먼저 OS 문서 스캐너(VisionKit · ML Kit)를 연다(`src/lib/native/document-scanner.ts`) — 모서리를
+ * 찾아 저절로 찍고 기울기를 편다. 결과는 앨범 사진과 같은 규칙(긴 변 2000px · 0.92)으로 다시 만든다. 스캐너를 닫거나(취소) 쓸 수
+ * 없으면(옛 앱 빌드 · Play 서비스 없음) 아래 웹 카메라로 이어지고, 오른쪽 아래 「자동 스캔」으로 다시 열 수 있다.
+ * 카메라 권한이 꺼져 있으면 앱에서는 「설정 열기」를 같이 보여 준다(`src/lib/native/app-settings.ts`).
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { haptic } from "@/lib/haptics";
+import { canOpenAppSettings, openAppSettings } from "@/lib/native/app-settings";
+import { canUseDocumentScanner, scanCardSide } from "@/lib/native/document-scanner";
 import { DETECT_PAD, STILL_DIFF, assessCardFit, frameDifference, toGray, type GrayFrame } from "@/lib/staff-documents/card-detect";
 
 const CARD_RATIO = 85.6 / 54;
@@ -24,8 +31,8 @@ function toJpeg(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", QUALITY));
 }
 
-/** 앨범 사진 — 자르지 않고 긴 변만 줄인다. */
-export async function fileToCardJpeg(file: File): Promise<Blob | null> {
+/** 앨범 사진 · 문서 스캐너 결과 — 자르지 않고 긴 변만 줄인다. */
+export async function fileToCardJpeg(file: Blob): Promise<Blob | null> {
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return null;
   const scale = Math.min(1, MAX_LONG / Math.max(bitmap.width, bitmap.height));
@@ -46,6 +53,11 @@ export type CameraCopy = {
   tipGlare: string;
   autoHint: string;
   autoFound: string;
+  scanOpening: string;
+  scanUnavailable: string;
+  scanStart: string;
+  cameraDeniedApp: string;
+  openSettings: string;
 };
 
 export function IdCardCamera({
@@ -54,6 +66,7 @@ export function IdCardCamera({
   counter,
   warning,
   steps,
+  autoScan = true,
   onCapture,
   onCancel,
 }: {
@@ -66,6 +79,8 @@ export function IdCardCamera({
   warning?: ReactNode;
   /** 태블릿 오른쪽 단계 목록(선택). */
   steps?: ReactNode;
+  /** 앱에서 열리자마자 문서 스캐너를 띄울지. 안내(경고 · 실패)를 먼저 읽어야 할 때는 false — 「자동 스캔」 버튼으로 연다. */
+  autoScan?: boolean;
   onCapture: (jpeg: Blob) => void;
   onCancel: () => void;
 }) {
@@ -73,7 +88,18 @@ export function IdCardCamera({
   const frameRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 앱에서 문서 스캐너를 쓸 수 있으면 스캐너부터, 아니면 웹 카메라. */
+  const [mode, setMode] = useState<"scan" | "camera">(() => (autoScan && canUseDocumentScanner() ? "scan" : "camera"));
+  const [scannerAvailable] = useState(canUseDocumentScanner);
+  const [scanNote, setScanNote] = useState<string | null>(null);
   const [state, setState] = useState<"starting" | "live" | "denied">("starting");
+  /** 한 번 넘긴 뒤에는 다시 넘기지 않는다(자동 촬영 · 셔터 · 앨범 · 스캐너가 겹쳐도 한 장만). */
+  const deliveredRef = useRef(false);
+  /** 넘긴 뒤(올리는 중) — 안내 · 버튼을 거둔다. */
+  const [sent, setSent] = useState(false);
+  /** 권한 거부 뒤 설정에서 켜고 돌아오면 카메라를 다시 켠다. */
+  const [cameraTry, setCameraTry] = useState(0);
+  const wentToSettingsRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -85,7 +111,58 @@ export function IdCardCamera({
     streamRef.current = null;
   }, []);
 
+  function deliver(jpeg: Blob) {
+    if (deliveredRef.current) return;
+    deliveredRef.current = true;
+    stop();
+    setSent(true);
+    onCapture(jpeg);
+  }
+  // 스캐너 결과가 늘 최신 deliver · 문구를 쓰게(렌더 중 ref 쓰기 금지 — 커밋 뒤에).
+  const deliverRef = useRef(deliver);
+  const scanFailCopyRef = useRef(copy.scanUnavailable);
   useEffect(() => {
+    deliverRef.current = deliver;
+    scanFailCopyRef.current = copy.scanUnavailable;
+  });
+
+  // 앱 — OS 문서 스캐너. 닫으면(취소) · 실패하면 웹 카메라로. mode 가 바뀔 때만 연다(다시 그려져도 두 번 열지 않는다).
+  useEffect(() => {
+    if (mode !== "scan" || deliveredRef.current) return;
+    let cancelled = false;
+    void scanCardSide().then(async (result) => {
+      if (cancelled || deliveredRef.current) return;
+      if (result.kind === "image") {
+        const jpeg = await fileToCardJpeg(result.blob);
+        if (cancelled) return;
+        if (jpeg) {
+          haptic("light");
+          deliverRef.current(jpeg);
+          return;
+        }
+      }
+      setScanNote(result.kind === "cancel" ? null : scanFailCopyRef.current);
+      setState("starting");
+      setMode("camera");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  function reopenScanner() {
+    haptic("light");
+    stop();
+    setScanNote(null);
+    setFound(false);
+    setProgress(0);
+    // 자동 촬영 타이머를 멈춘다 — 스캐너가 떠 있는 동안 멈춘 영상의 마지막 장면을 찍지 않게.
+    setState("starting");
+    setMode("scan");
+  }
+
+  useEffect(() => {
+    if (mode !== "camera") return;
     let cancelled = false;
     const id = window.setTimeout(async () => {
       try {
@@ -114,7 +191,21 @@ export function IdCardCamera({
       window.clearTimeout(id);
       stop();
     };
-  }, [stop]);
+  }, [mode, stop, cameraTry]);
+
+  // 「설정 열기」로 나갔다가 돌아오면(권한을 켰을 수 있다) 카메라를 다시 시도한다. 권한 팝업이 닫힐 때도 화면이 다시 보이므로
+  // 설정으로 나간 경우에만(다시 묻는 팝업이 이어지지 않게).
+  useEffect(() => {
+    if (state !== "denied" || mode !== "camera") return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || !wentToSettingsRef.current) return;
+      wentToSettingsRef.current = false;
+      setState("starting");
+      setCameraTry((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [state, mode]);
 
   /** 화면에 보이는 영상(object-fit: cover)에서 틀(+ 여유 `pad`)이 차지하는 부분 → 원본 영상 픽셀 사각형. */
   function cropRect(pad: number) {
@@ -154,10 +245,7 @@ export function IdCardCamera({
     const blob = await toJpeg(canvas);
     busyRef.current = false;
     setBusy(false);
-    if (blob) {
-      stop();
-      onCapture(blob);
-    }
+    if (blob) deliver(blob);
   }
   // 자동 촬영 타이머가 늘 최신 shoot 를 부르게(렌더 중 ref 쓰기 금지 — 커밋 뒤에).
   useEffect(() => {
@@ -216,11 +304,11 @@ export function IdCardCamera({
     setBusy(true);
     const blob = await fileToCardJpeg(file);
     setBusy(false);
-    if (blob) {
-      stop();
-      onCapture(blob);
-    }
+    if (blob) deliver(blob);
   }
+
+  const scanning = mode === "scan";
+  const settingsAvailable = state === "denied" && canOpenAppSettings();
 
   return (
     <div className="idc-cam" role="dialog" aria-label={title} data-swipe-back="off">
@@ -247,8 +335,24 @@ export function IdCardCamera({
             <i className="idc-cam__corner idc-cam__corner--bl" />
             <i className="idc-cam__corner idc-cam__corner--br" />
           </div>
-          {state === "denied" ? (
-            <p className="idc-cam__note idc-cam__note--warn" role="alert">{copy.cameraDenied}</p>
+          {sent ? null : scanning ? (
+            <p className="idc-cam__note" role="status">{copy.scanOpening}</p>
+          ) : state === "denied" ? (
+            <div className="idc-cam__denied">
+              <p className="idc-cam__note idc-cam__note--warn" role="alert">
+                {settingsAvailable ? copy.cameraDeniedApp : copy.cameraDenied}
+              </p>
+              {settingsAvailable && (
+                <button className="idc-cam__settings" onClick={() => {
+                    wentToSettingsRef.current = true;
+                    void openAppSettings();
+                  }} type="button">
+                  {copy.openSettings}
+                </button>
+              )}
+            </div>
+          ) : scanNote ? (
+            <p className="idc-cam__note idc-cam__note--warn" role="status">{scanNote}</p>
           ) : state === "starting" ? (
             <p className="idc-cam__note" role="status">{copy.cameraStarting}</p>
           ) : found ? (
@@ -265,7 +369,7 @@ export function IdCardCamera({
           <button
             aria-label={copy.album}
             className="idc-cam__album"
-            disabled={busy}
+            disabled={busy || scanning || sent}
             onClick={() => fileRef.current?.click()}
             type="button"
           >
@@ -274,7 +378,7 @@ export function IdCardCamera({
           <button
             aria-label={copy.shutter}
             className="idc-cam__shutter"
-            disabled={state !== "live" || busy}
+            disabled={scanning || sent || state !== "live" || busy}
             onClick={() => void shoot()}
             type="button"
           >
@@ -283,7 +387,19 @@ export function IdCardCamera({
             </svg>
             <span />
           </button>
-          <span className="idc-cam__album idc-cam__album--ghost" aria-hidden="true" />
+          {scannerAvailable ? (
+            <button
+              aria-label={copy.scanStart}
+              className="idc-cam__album"
+              disabled={busy || scanning || sent}
+              onClick={reopenScanner}
+              type="button"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 12h10" /></svg>
+            </button>
+          ) : (
+            <span className="idc-cam__album idc-cam__album--ghost" aria-hidden="true" />
+          )}
         </div>
       </div>
       {steps && <aside className="idc-cam__side">{steps}</aside>}

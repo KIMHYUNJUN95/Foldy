@@ -19,7 +19,9 @@ let package = Package(
         .package(name: "CapacitorKeyboard", path: "../../../node_modules/@capacitor/keyboard"),
         .package(name: "CapacitorNetwork", path: "../../../node_modules/@capacitor/network"),
         .package(name: "CapacitorShare", path: "../../../node_modules/@capacitor/share"),
-        .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom")
+        .package(name: "CapacitorTextZoom", path: "../../../node_modules/@capacitor/text-zoom"),
+        .package(name: "CapgoCapacitorDocumentScanner", path: "../../../node_modules/@capgo/capacitor-document-scanner"),
+        .package(name: "CapgoCapacitorPrivacyScreen", path: "../../../node_modules/@capgo/capacitor-privacy-screen")
     ],
     targets: [
         .target(
@@ -34,7 +36,9 @@ let package = Package(
                 .product(name: "CapacitorKeyboard", package: "CapacitorKeyboard"),
                 .product(name: "CapacitorNetwork", package: "CapacitorNetwork"),
                 .product(name: "CapacitorShare", package: "CapacitorShare"),
-                .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom")
+                .product(name: "CapacitorTextZoom", package: "CapacitorTextZoom"),
+                .product(name: "CapgoCapacitorDocumentScanner", package: "CapgoCapacitorDocumentScanner"),
+                .product(name: "CapgoCapacitorPrivacyScreen", package: "CapgoCapacitorPrivacyScreen")
             ]
         )
     ]

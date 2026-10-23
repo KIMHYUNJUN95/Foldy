@@ -1,8 +1,8 @@
 /* iOS 권한 안내 문구 (계획 C6). Info.plist 의 같은 키는 대체값 — 문구를 바꾸면 en/ko/ja 와 Info.plist 를 함께 고친다. */
-"NSCameraUsageDescription" = "出退勤のQRコードの読み取りと、メンテナンス・忘れ物などの業務記録に添付する写真の撮影にカメラを使用します。";
+"NSCameraUsageDescription" = "出退勤のQRコードの読み取り、メンテナンス・忘れ物などの業務記録に添付する写真の撮影、スタッフ記録のための在留カード（表・裏）またはマイナンバーカード表面の撮影にカメラを使用します。";
 "NSLocationWhenInUseUsageDescription" = "出勤・退勤を記録する時点でのみ、勤務地にいることを確認するために位置情報を使用します。バックグラウンドで位置情報を追跡することはありません。";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "出勤・退勤を記録する時点でのみ、勤務地にいることを確認するために位置情報を使用します。バックグラウンドで位置情報を追跡することはありません。";
-"NSPhotoLibraryUsageDescription" = "業務記録に添付する写真を写真ライブラリから選ぶときに使用します。";
+"NSPhotoLibraryUsageDescription" = "業務記録に添付する写真や、スタッフ記録のための在留カード・マイナンバーカード（表面）の写真を写真ライブラリから選ぶときに使用します。";
 
 /* 앱 아이콘 꾹 누르기 메뉴 (2026-10-22). 키는 Info.plist UIApplicationShortcutItemTitle 과 같아야 한다. */
 "Clock in/out" = "出退勤";

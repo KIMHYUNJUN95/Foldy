@@ -7,6 +7,7 @@ import { ChevronDown, Search, Smartphone } from "lucide-react";
 import { AdminGuestSearch } from "@/components/shell/admin-guest-search";
 import { MobilePreview } from "@/components/shell/mobile-preview";
 import "@/components/admin/admin-console.css";
+import { useAdminNavBadges } from "@/components/admin/admin-nav-badges";
 import { NotificationBell } from "@/components/admin/notification-bell";
 import { useSession } from "@/components/providers/session-provider";
 import {
@@ -31,6 +32,7 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
   const { session } = useSession();
   // 훅은 조기 반환보다 앞에 와야 한다(세션이 없으면 아래에서 null 을 돌려준다).
   const [previewOpen, setPreviewOpen] = useState(false);
+  const navBadges = useAdminNavBadges();
   if (!session) {
     return null;
   }
@@ -98,14 +100,19 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
                   <div className="navgrp__t">{groupLabel[groupKey]}</div>
                   {items.map((item) => {
                     const Icon = item.icon;
+                    const count = navBadges[item.id] ?? 0;
                     return (
                       <Link
                         className={`navi${item.id === activeItem ? " on" : ""}`}
                         href={item.href}
                         key={item.id}
                       >
-                        <span className="ic"><Icon /></span>
+                        <span className="ic">
+                          <Icon />
+                          {count > 0 ? <i className="navi__dot" aria-hidden="true" /> : null}
+                        </span>
                         <span className="navi__t">{getNavigationLabel(item, locale)}</span>
+                        {count > 0 ? <span className="navi__badge amber">{count > 99 ? "99+" : count}</span> : null}
                       </Link>
                     );
                   })}

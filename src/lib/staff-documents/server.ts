@@ -4,7 +4,9 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { tokyoToday } from "@/lib/tokyo-date";
 import {
   daysUntil,
+  expiryTone,
   normalizeIdFields,
+  type ExpiryTone,
   type IdDocumentField,
   type IdDocumentFields,
   type IdDocumentKind,
@@ -114,4 +116,42 @@ export async function hasCurrentIdDocument(organizationId: string, userId: strin
     .eq("user_id", userId)
     .eq("is_current", true);
   return (count ?? 0) > 0;
+}
+
+export type IdDocumentBadge = { status: IdDocumentStatus; tone: ExpiryTone | null };
+
+/** 조직의 지금 서류를 사람별로 한 번에(목록 칩용, 사진 없음). 호출 쪽이 `staff_documents.view` 를 먼저 확인한다. */
+export async function loadIdDocumentBadges(organizationId: string): Promise<Map<string, IdDocumentBadge>> {
+  const { data } = await getSupabaseServiceClient()
+    .from("staff_id_documents")
+    .select("user_id, status, expires_on")
+    .eq("organization_id", organizationId)
+    .eq("is_current", true)
+    .limit(5000);
+  const today = tokyoToday();
+  const map = new Map<string, IdDocumentBadge>();
+  for (const row of (data ?? []) as { user_id: string; status: IdDocumentStatus; expires_on: string | null }[]) {
+    map.set(row.user_id, { status: row.status, tone: expiryTone(row.expires_on ? daysUntil(row.expires_on, today) : null) });
+  }
+  return map;
+}
+
+/** 확인 대기 사람 수 — 목록 칩 · 「확인 대기 N」과 같은 기준(이 조직 멤버십이 있는 사람). 메뉴 숫자용이라 가볍게, 실패하면 0. */
+export async function countPendingIdDocumentPeople(organizationId: string): Promise<number> {
+  try {
+    const service = getSupabaseServiceClient();
+    const { data: pending } = await service
+      .from("staff_id_documents")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("is_current", true)
+      .eq("status", "pending")
+      .limit(1000);
+    const ids = [...new Set(((pending ?? []) as { user_id: string }[]).map((row) => row.user_id))];
+    if (ids.length === 0) return 0;
+    const { data: members } = await service.from("memberships").select("user_id").eq("organization_id", organizationId).in("user_id", ids);
+    return new Set(((members ?? []) as { user_id: string }[]).map((row) => row.user_id)).size;
+  } catch {
+    return 0;
+  }
 }

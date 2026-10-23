@@ -291,6 +291,21 @@
   justify-content: center;
   font-variant-numeric: tabular-nums;
 }
+.adm .navi .ic { position: relative; }
+/* 레일이 접혀 숫자가 안 보일 때 아이콘 모서리의 점 — 펼쳐지면 숫자가 대신한다. */
+.adm .navi__dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 2px #fff;
+  transition: opacity 120ms ease;
+}
+.adm .side:hover .navi__dot,
+.adm .side:focus-within .navi__dot { opacity: 0; }
 .adm .navi__badge.amber {
   background: var(--warn);
 }

@@ -7,6 +7,7 @@
  * - 국적을 고르면 한국어 이름 ↔ 일본어 이름 칸이 바뀐다(일본 국적 = 일본어 이름).
  * - 가타카나 · 영문 정리는 칸을 떠날 때 한다 — 입력 중에 바꾸면 일본어 IME 조합이 깨진다.
  * - `variant="app"` = 모바일 · 계정 화면(나라는 하단 시트), `variant="desktop"` = PC 가입(나라는 드롭다운).
+ * - `nationalityPopover` = `app` 모양 칸이지만 나라는 칸 아래 검색 드롭다운(PC 콘솔 계정 화면 — 모바일 하단 시트를 PC 에 띄우지 않는다, 2026-10-23).
  * - `formNames` 를 주면 숨은 input 으로 값을 같이 내보내 `<form action>` 에서도 쓸 수 있다.
  */
 
@@ -233,20 +234,54 @@ function NationalityInline({
   );
 }
 
-/** PC — 칸 아래로 펼치는 검색 드롭다운(가입 화면 국가번호 고르기와 같은 모양 · `obd__pop*`). */
+/** PC 드롭다운 모양 두 벌 — 가입 화면(`obd__pop*`) · 계정 화면(앱 칸과 같은 52px 칸 + 칸 폭 메뉴). */
+const POPOVER_SKIN = {
+  obd: {
+    root: "obd__cc",
+    button: (invalid: boolean) => `obd__in obd__ccbtn${invalid ? " bad" : ""}`,
+    placeholder: "obd__ph",
+    pop: "obd__pop",
+    search: "obd__popq",
+    list: "obd__poplist",
+    none: "obd__popnone",
+    option: (active: boolean, selected: boolean) => `obd__popopt${active ? " on" : ""}${selected ? " sel" : ""}`,
+    name: "obd__popname",
+  },
+  app: {
+    root: "relative",
+    button: (invalid: boolean) =>
+      `flex h-[52px] w-full items-center gap-2 rounded-[14px] border bg-surface px-[15px] text-left text-[16px] font-semibold text-foreground outline-none transition-colors focus:border-primary focus:ring-[3.5px] focus:ring-primary/15 ${invalid ? "border-destructive" : "border-border"}`,
+    placeholder: "font-medium text-muted-foreground",
+    pop: "absolute inset-x-0 top-[calc(100%+6px)] z-40 rounded-[14px] bg-surface p-1.5 shadow-[0_12px_32px_-8px_rgba(22,20,31,0.22),0_0_0_0.5px_rgba(22,20,31,0.08)]",
+    search:
+      "mb-1 h-[38px] w-full rounded-[10px] border-0 bg-[#f4f4f7] px-3 text-[14px] font-medium text-foreground outline-none placeholder:text-muted-foreground focus:ring-[3px] focus:ring-primary/15",
+    list: "max-h-[300px] overflow-y-auto",
+    none: "px-3 py-4 text-center text-[13.5px] font-semibold text-muted-foreground",
+    option: (active: boolean, selected: boolean) =>
+      `flex min-h-[40px] w-full items-center gap-2 rounded-[9px] px-3 text-left text-[14.5px] font-semibold ${selected ? "bg-primary/[0.08] text-primary" : active ? "bg-[#f4f4f7] text-foreground" : "text-foreground"}`,
+    name: "min-w-0 flex-1",
+  },
+} as const;
+
+/** PC — 칸 아래로 펼치는 검색 드롭다운(가입 화면 국가번호 고르기와 같은 모양 · `obd__pop*`, 계정 화면은 `skin="app"`). */
 function NationalityPopover({
   copy,
   locale,
   value,
   onPick,
   invalid,
+  skin = "obd",
+  labelledBy,
 }: {
   copy: IdentityCopy;
   locale: string;
   value: string;
   onPick: (code: string) => void;
   invalid: boolean;
+  skin?: keyof typeof POPOVER_SKIN;
+  labelledBy?: string;
 }) {
+  const k = POPOVER_SKIN[skin];
   const { frequent, all } = useNationalityList(locale);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -275,25 +310,26 @@ function NationalityPopover({
   }
 
   return (
-    <div className="obd__cc" ref={rootRef}>
+    <div className={k.root} ref={rootRef}>
       <button
         aria-expanded={open}
         aria-haspopup="listbox"
-        className={`obd__in obd__ccbtn${invalid ? " bad" : ""}`}
+        aria-labelledby={labelledBy}
+        className={k.button(invalid)}
         onClick={() => {
           setActive(0);
           setOpen((v) => !v);
         }}
         type="button"
       >
-        <span className={value ? "" : "obd__ph"}>{value ? nationalityName(value, locale) : copy.nationalityPick}</span>
-        <ChevronIcon />
+        <span className={`${skin === "app" ? "flex-1 " : ""}${value ? "" : k.placeholder}`}>{value ? nationalityName(value, locale) : copy.nationalityPick}</span>
+        <ChevronIcon className={skin === "app" ? "size-4 text-muted-foreground" : undefined} />
       </button>
       {open ? (
-        <div className="obd__pop">
+        <div className={k.pop}>
           <input
             aria-label={copy.nationalitySearch}
-            className="obd__popq"
+            className={k.search}
             onChange={(event) => {
               setQuery(event.target.value);
               setActive(0);
@@ -318,19 +354,19 @@ function NationalityPopover({
             ref={searchRef}
             value={query}
           />
-          <div className="obd__poplist" role="listbox">
-            {list.length === 0 ? <div className="obd__popnone">{copy.nationalityEmpty}</div> : null}
+          <div className={k.list} role="listbox">
+            {list.length === 0 ? <div className={k.none}>{copy.nationalityEmpty}</div> : null}
             {list.map((n, index) => (
               <button
                 aria-selected={n.code === value}
-                className={`obd__popopt${index === active ? " on" : ""}${n.code === value ? " sel" : ""}`}
+                className={k.option(index === active, n.code === value)}
                 key={`${n.code}-${index}`}
                 onClick={() => pick(n.code)}
                 onMouseEnter={() => setActive(index)}
                 role="option"
                 type="button"
               >
-                <span className="obd__popname">{n.name}</span>
+                <span className={k.name}>{n.name}</span>
               </button>
             ))}
           </div>
@@ -351,6 +387,7 @@ export function IdentityNamesFields({
   formNames = false,
   autoFocus = false,
   inlineNationality = false,
+  nationalityPopover = false,
 }: {
   copy: IdentityCopy;
   locale: string;
@@ -364,6 +401,8 @@ export function IdentityNamesFields({
   autoFocus?: boolean;
   /** 하단 시트 안에서 쓸 때 — 나라 목록을 시트 대신 칸 아래에 펼친다. */
   inlineNationality?: boolean;
+  /** PC 콘솔(계정 화면) — 나라를 하단 시트 대신 칸 아래 검색 드롭다운으로. */
+  nationalityPopover?: boolean;
 }) {
   const [sheet, setSheet] = useState(false);
   const [touched, setTouched] = useState<Partial<Record<IdentityField, boolean>>>({});
@@ -499,20 +538,35 @@ export function IdentityNamesFields({
         <span className="mb-2 block text-[12.5px] font-extrabold text-[#3a3746]" id="identity-nationality-label">
           {copy.nationalityLabel}
         </span>
-        <button
-          aria-describedby={natErr ? "identity-nationality-err" : undefined}
-          aria-haspopup="dialog"
-          aria-expanded={inlineNationality ? sheet : undefined}
-          aria-labelledby="identity-nationality-label"
-          className={`${inputCls(Boolean(natErr))} flex items-center text-left`}
-          onClick={() => setSheet((open) => (inlineNationality ? !open : true))}
-          type="button"
-        >
-          <span className={`flex-1 ${value.nationality ? "" : "font-medium text-muted-foreground"}`}>
-            {value.nationality ? nationalityName(value.nationality, locale) : copy.nationalityPick}
-          </span>
-          <ChevronIcon className="size-4 text-muted-foreground" />
-        </button>
+        {nationalityPopover ? (
+          <NationalityPopover
+            copy={copy}
+            invalid={Boolean(natErr)}
+            labelledBy="identity-nationality-label"
+            locale={locale}
+            onPick={(code) => {
+              set({ nationality: code });
+              touch("nationality");
+            }}
+            skin="app"
+            value={value.nationality}
+          />
+        ) : (
+          <button
+            aria-describedby={natErr ? "identity-nationality-err" : undefined}
+            aria-haspopup="dialog"
+            aria-expanded={inlineNationality ? sheet : undefined}
+            aria-labelledby="identity-nationality-label"
+            className={`${inputCls(Boolean(natErr))} flex items-center text-left`}
+            onClick={() => setSheet((open) => (inlineNationality ? !open : true))}
+            type="button"
+          >
+            <span className={`flex-1 ${value.nationality ? "" : "font-medium text-muted-foreground"}`}>
+              {value.nationality ? nationalityName(value.nationality, locale) : copy.nationalityPick}
+            </span>
+            <ChevronIcon className="size-4 text-muted-foreground" />
+          </button>
+        )}
         {inlineNationality && sheet ? (
           <NationalityInline
             copy={copy}
@@ -569,7 +623,7 @@ export function IdentityNamesFields({
           </label>
         );
       })}
-      {sheet && !inlineNationality ? (
+      {sheet && !inlineNationality && !nationalityPopover ? (
         <NationalitySheet
           copy={copy}
           locale={locale}

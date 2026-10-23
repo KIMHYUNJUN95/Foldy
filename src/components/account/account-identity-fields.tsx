@@ -13,7 +13,7 @@ import {
 
 /**
  * 내 정보 — 국적 + 이름 세 가지. 서버 폼(`updateAccountProfile`)에 숨은 input 으로 값을 실어 보낸다.
- * 서버가 같은 규칙(`validateIdentityNames`)으로 다시 검사한다.
+ * 서버가 같은 규칙(`validateIdentityNames`)으로 다시 검사한다. PC 콘솔 화면이라 나라는 칸 아래 검색 드롭다운(모바일 하단 시트 아님).
  */
 export function AccountIdentityFields({
   copy,
@@ -35,6 +35,7 @@ export function AccountIdentityFields({
       errors={errors}
       formNames
       locale={locale}
+      nationalityPopover
       onChange={setValue}
       showErrors={showErrors}
       value={value}

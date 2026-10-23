@@ -139,6 +139,15 @@ export type SpwCopy = {
   spwSameValue: string;
   spwMsTitle: string;
   spwMsGapLine: string;
+  /** 편집 중 오른쪽 열 탭 줄 끝 「수정 끝내기」 — 반영 안 한 칸이 있으면 한 번 더 누르게(2026-10-23). */
+  spwExit: string;
+  spwExitDiscard: string;
+  spwExitUnsaved: string;
+  /** 오른쪽 열의 「이 화면의 1박 갭」 줄 — 패널을 켠 채 건물을 넘겨도 고칠 칸이 있는지 보이게(2026-10-23). */
+  spwGapScreen: string;
+  spwGapNone: string;
+  spwGapPick: string;
+  spwGapPicked: string;
   spwMsCustomPh: string;
   spwNightUnit: string;
   spwMsListTitle: string;

@@ -256,6 +256,17 @@
 .adm .spw-gap span { font-size: 14px; line-height: 1.45; color: var(--spw-ink2); }
 .adm .spw-gap.is-zero { background: #f7f7f9; }
 .adm .spw-gap.is-zero b { color: var(--spw-faint); }
+/* 「이 화면」 기준 머리(데스크톱) — 숫자 · 설명 · 「모두 고르기」 한 줄, 0 이면 회색 한 줄(2026-10-23). */
+.adm .spw-gap.is-screen { align-items: center; }
+.adm .spw-gap__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adm .spw-gap__txt small { font-size: 12px; color: var(--spw-faint); }
+.adm .spw-gap__pick {
+  margin-left: auto; flex: none; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: #fff; color: var(--spw-red);
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: transform 140ms var(--spw-ease);
+}
+.adm .spw-gap__pick:active:not(:disabled) { transform: scale(0.97); }
+.adm .spw-gap__pick:disabled { opacity: 0.45; cursor: default; }
+.adm .spw-gap.is-screen.is-zero span { color: var(--spw-faint); }
 .adm .spw-nights { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 6px; }
 .adm .spw-choice {
   height: 44px;

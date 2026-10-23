@@ -107,8 +107,10 @@ export function OpsMinStayPanel({
   onApplied,
   onClear,
   onFinished,
+  onPickGaps,
   onSwitchMode,
   runWrite,
+  screenGapCount,
   scopeSummary,
 }: {
   cells: MinStayPanelCell[];
@@ -122,6 +124,13 @@ export function OpsMinStayPanel({
   onFinished?: () => void;
   /** 패널 위 「가격 · 최소숙박 · 차단」 탭(2026-10-16 화이트 리디자인). 넘겨야 탭이 그려진다. */
   onSwitchMode?: (mode: SpwMode) => void;
+  /**
+   * 이 화면(지금 보는 건물 · 기간)에서 고를 수 있는 1박 갭 수와 「모두 고르기」(2026-10-23).
+   * 넘기면 머리 숫자가 「고른 칸 중」이 아니라 「이 화면」 기준이 된다 — 패널을 켠 채 건물을 넘겼을 때
+   * 아무것도 안 골라 0 으로 보이던 것. 모바일 시트는 넘기지 않는다(예전처럼 고른 칸 기준).
+   */
+  screenGapCount?: number;
+  onPickGaps?: () => void;
   /** 격자가 흐린 값 → 접수 → 반영 대기 → 데이터 다시 받기를 맡는다(`ops-write-tracker.ts`). */
   runWrite: RunOpsWrite;
   scopeSummary: { rooms: string; dates: string } | null;
@@ -194,10 +203,29 @@ export function OpsMinStayPanel({
         <SpwModeTabs copy={copy} mode="minstay" onSwitchMode={onSwitchMode} />
 
         {/* 갭 개수를 크게 적는다 — 눈에 안 띄는 손실이라 숫자가 작으면 손이 안 간다. */}
-        <div className={`spw-gap${rows.length === 0 ? " is-zero" : ""}`}>
-          <b>{rows.length}</b>
-          <span>{copy.spwMsGapLine}</span>
-        </div>
+        {screenGapCount === undefined ? (
+          <div className={`spw-gap${rows.length === 0 ? " is-zero" : ""}`}>
+            <b>{rows.length}</b>
+            <span>{copy.spwMsGapLine}</span>
+          </div>
+        ) : screenGapCount > 0 ? (
+          <div className="spw-gap is-screen">
+            <b>{screenGapCount}</b>
+            <span className="spw-gap__txt">
+              {copy.spwGapScreen}
+              {rows.length > 0 && <small>{copy.spwGapPicked.replace("{count}", String(rows.length))}</small>}
+            </span>
+            {onPickGaps && (
+              <button className="spw-gap__pick" disabled={rows.length >= screenGapCount} onClick={onPickGaps} type="button">
+                {copy.spwGapPick}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="spw-gap is-screen is-zero">
+            <span>{copy.spwGapNone}</span>
+          </div>
+        )}
 
         {/* 1박이 기본이다. 2박·직접 입력은 되돌리거나 다른 값으로 바꿀 때 쓴다. */}
         <div className="spw-group">

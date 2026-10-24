@@ -47,7 +47,9 @@ const nextConfig: NextConfig = {
   // the WSL network IP instead of localhost. Dev-only; no effect on production.
   // `*.trycloudflare.com` covers Cloudflare quick tunnels (random subdomain each
   // run) so the app can be opened on a phone over any network, not just same-WiFi.
-  allowedDevOrigins: ["172.20.50.244", "10.255.255.254", "192.168.1.112", "*.trycloudflare.com"],
+  // `127.0.0.1` is the iOS Simulator app pointed at the local server
+  // (`CAP_SERVER_URL=http://127.0.0.1:3000` — Capacitor iOS reserves `localhost`).
+  allowedDevOrigins: ["127.0.0.1", "172.20.50.244", "10.255.255.254", "192.168.1.112", "*.trycloudflare.com"],
   /**
    * 개발 서버에서는 `/sw.js` 를 스스로 해제하는 kill-switch 로 바꿔 낸다(`public/sw-dev-reset.js`).
    * 같은 localhost 에서 전에 프로덕션으로 띄울 때 깔린 SW 가 dev 요청을 가로채 옛 캐시를 내주면

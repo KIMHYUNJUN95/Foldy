@@ -211,6 +211,18 @@ Google 은 앱 내 WebView 의 OAuth 를 막는다(`403 disallowed_useragent`). 
   서명 없이 시뮬레이터용으로 빌드해 Xcode 프로젝트가 깨지지 않았는지, 앱 묶음에 `*.lproj/InfoPlist.strings` · `PrivacyInfo.xcprivacy` 가
   들어갔는지 확인한다.
 
+### iOS 시뮬레이터에서 로컬 코드 실시간 확인 (Mac, 2026-10-25)
+
+앱이 배포 주소 대신 **로컬 개발 서버**를 띄우게 해서, 코드를 고치면 시뮬레이터 앱에 바로(HMR) 반영되게 한다.
+
+1. 개발 서버: `npm run dev`(포트 3000).
+2. 주소를 바꿔 넣기: `CAP_SERVER_URL=http://127.0.0.1:3000 npx cap sync ios` — **`localhost` 는 쓰지 않는다**(Capacitor iOS 가
+   자기 내부 주소로 `localhost` 를 써서 겹친다 → 연결 실패 화면). `127.0.0.1` 은 `next.config.ts` `allowedDevOrigins` 에 넣어 둬서 HMR 이 막히지 않는다.
+3. Xcode 에서 ▶ Run(시뮬레이터) — 또는 `xcodebuild` 로 빌드해 `xcrun simctl install/launch`.
+4. 주소가 `http://` 이면 `capacitor.config.ts` 가 연결 실패 화면(`errorPath`)을 끈다 — Capacitor iOS 는 취소된 이동(-999)에도 그 화면을 여는데,
+   개발 서버는 새로 고침 · 리디렉트가 잦아 매번 걸렸다.
+5. **끝나면 되돌리기**: `npx cap sync ios`(환경 변수 없이) → 배포 주소 · 연결 실패 화면이 돌아온다. `ios/App/App/capacitor.config.json` 은 커밋하지 않는 생성 파일이다.
+
 ### 연결 실패 화면 (계획 D2, 2026-10-07)
 
 - 앱은 배포된 웹(`server.url`)을 띄우므로, 그 주소를 못 불러오면 원래는 **WebView 기본 오류 화면**(「웹페이지를 사용할 수 없음」)이 떴다.

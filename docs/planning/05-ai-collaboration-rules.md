@@ -19,6 +19,13 @@ Important docs:
 - Relevant design documents in `docs/design`
 - Relevant engineering documents in `docs/engineering`
 
+## Commit · Push · Deploy Need User Confirmation (ABSOLUTE, 2026-10-26)
+
+어느 세션이든 수정 · 기능 구현이 끝나도 **스스로 커밋 · 푸시 · 배포하지 않는다.** 결과와 검증(lint · build · 테스트 · 화면 확인)을
+보고하고 사용자가 채팅에서 분명히 허락한 뒤에만 한다. 커밋 허락과 푸시 허락은 따로 받는다.
+배포에는 `main` 푸시(Vercel 자동 배포) · Vercel 배포 · 운영 Supabase 마이그레이션 적용 · 데이터 변경 · 앱 스토어 빌드 업로드가 모두 들어간다.
+허락은 그 작업 한 번에만 유효하다. 자세한 규칙은 `CLAUDE.md` Highest Priority Rules 10.
+
 ## Documentation Must Stay Updated
 
 Any AI that changes behavior, UI, data structure, permissions, or workflow must update the related Markdown docs.

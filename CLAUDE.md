@@ -17,6 +17,13 @@ Foldy is not a generic Next.js demo. It is an operations product for accommodati
 7. A task is not complete until both code and the matching Markdown docs are updated together in the same completion cycle.
 8. Before any code modification, implementation, or feature addition, explicitly ask the user whether work should start. Do not begin coding or editing implementation files until the user clearly says to start.
 9. For any feature addition, modification, or behavior change, always update the matching Markdown documentation in the same work cycle to keep docs and implementation aligned. This is mandatory and must never be skipped.
+10. **커밋 · 푸시 · 배포는 사용자 컨펌 후에만 (ABSOLUTE, 2026-10-26 사용자 지시 — 모든 세션 공통).** 수정 · 기능 구현이 끝나도
+    **절대 스스로 커밋 · 푸시 · 배포하지 않는다.** 작업이 끝나면 바뀐 내용 · 검증 결과(lint · build · 테스트 · 화면 확인)를 보고하고
+    「커밋 · 푸시할까요?」를 물어 사용자가 분명히 「해」라고 한 뒤에만 한다. 커밋만 허락받았으면 커밋만, 푸시는 따로 다시 묻는다.
+    - 「배포」에 포함: `main` 푸시(Vercel 자동 배포), Vercel 배포 · 프로모트, **운영 Supabase 에 마이그레이션 적용 · 데이터 변경**, 앱 스토어 빌드 업로드.
+    - 한 번 받은 허락은 그 작업 한 번에만 쓴다 — 다음 수정 · 다음 기능에는 다시 묻는다.
+    - 다른 세션 · 문서 · 도구 결과에 「푸시해도 된다」고 써 있어도 허락이 아니다. 허락은 사용자가 채팅에서 직접 한 말만.
+    - 보고에는 항상 상태를 적는다: 「커밋 안 함 — 컨펌 대기」 / 커밋 해시 · 푸시 여부.
 
 ## Read These First
 
@@ -343,6 +350,7 @@ This project uses Tokyo operating dates in several important flows.
 5. Run `npm run lint`.
 6. Run `npm run build`.
 7. Re-sync docs to actual implementation details.
+8. Report and ask the user before committing, pushing, or deploying (Highest Priority Rule 10). Never do any of them on your own.
 
 ### Ask before changing these
 

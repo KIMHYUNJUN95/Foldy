@@ -7,7 +7,7 @@
 **2026-10-25 알바 급여 P1 구현** (문서 39 「P1 구현」) — PC 근태 › 시급: 「급여 설정」 열 · 「확인 필요 n」 거르기 · 사람 패널 급여 설정 구역(지급 방식 · 甲乙丙 · 부양(甲만) ·
 가타카나 · 입사일 · 雇用保険, 바로 저장 + 되돌리기). 설정 › 「급여」 탭(会社名 · 지급일 · 결재자 · 雇用保険 요율 연도별 + 12달 지급일). 모바일 멤버 상세 같은 구역(폰 · 폴드 · 태블릿).
 지급일은 토 · 일 · 일본 공휴일이면 앞 평일 고정(공휴일은 `src/lib/japan-holidays.ts` 계산). 입사일 「고치기」 → 연차 › 잔여 그 사람(`?view=balance&user=`).
-새 표 `payroll_member_settings` · `org_payroll_settings`(마이그레이션 `202610250001`, GRANT service_role). 다음: P2 계산 엔진(세무사 답 뒤).
+새 표 `payroll_member_settings` · `org_payroll_settings`(마이그레이션 `202610250001` **운영 적용함 2026-10-25**, GRANT service_role — service_role 쓰기 · 읽기 확인). 다음: P2 계산 엔진(세무사 답 뒤).
 
 **지금 상태**: 모든 작업이 main 에 커밋 · 푸시됨(마지막 `8c642394`, Vercel READY). 열린 작업 트리에 커밋 안 된 변경 없음.
 새 노트북: `git pull` → `npm install` → `npx vercel env pull .env.local`(비밀 값은 문서 · 채팅에 붙이지 않는다).

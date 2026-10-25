@@ -27,13 +27,13 @@ import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import {
   fillCopy,
   getPayrollSettingsCopy,
+  withholdingLabel,
   type PayrollSettingsCopy,
 } from "@/lib/payroll-settings-i18n";
 import {
   MAX_DEPENDENTS,
   PAYMENT_METHODS,
   WITHHOLDING_CLASSES,
-  WITHHOLDING_LABEL,
   payrollIssues,
   type MemberPayrollSetting,
   type PayrollIssue,
@@ -1089,7 +1089,7 @@ function PayrollCell({ row, copy: pc }: { row: AdminWageRow; copy: PayrollSettin
   const pay = setting.paymentMethod === "cash" ? pc.cash : pc.transfer;
   return (
     <span>
-      {pay} · {setting.withholdingClass ? WITHHOLDING_LABEL[setting.withholdingClass] : ""}
+      {pay} · {setting.withholdingClass ? withholdingLabel(pc, setting.withholdingClass) : ""}
     </span>
   );
 }
@@ -1182,8 +1182,8 @@ function PayrollBlock({
         <PayrollSeg
           label={pc.withholding}
           value={cls}
-          options={WITHHOLDING_CLASSES.map((k) => ({ value: k, label: WITHHOLDING_LABEL[k], title: helpOf[k] }))}
-          onChange={(k) => save({ withholdingClass: k }, pc.withholding, WITHHOLDING_LABEL[k])}
+          options={WITHHOLDING_CLASSES.map((k) => ({ value: k, label: withholdingLabel(pc, k), title: helpOf[k] }))}
+          onChange={(k) => save({ withholdingClass: k }, pc.withholding, withholdingLabel(pc, k))}
         />
       </div>
       {heiError ? (

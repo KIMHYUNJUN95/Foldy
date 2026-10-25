@@ -33,6 +33,7 @@ import {
   UserCog,
   UserSearch,
   Users,
+  Wallet,
   Wrench,
   Zap,
 } from "lucide-react";
@@ -242,6 +243,17 @@ const mobileNavAttendance = {
   icon: Clock,
 } as const satisfies NavigationItem;
 
+// 급여 준비(2026-10-25) — 알바 한 달 급여를 이름별로 보고 손 입력을 채운다. 키 `payroll.view`(입력은 서버 액션이 `payroll.manage` 를 다시 본다).
+// See docs/product/39 §5-A.
+const mobileNavPayroll = {
+  id: "payroll",
+  label: localizedNavigationLabels.mobile.payroll,
+  shortLabel: localizedNavigationLabels.mobile.payrollShort,
+  href: "/mobile/payroll",
+  icon: Wallet,
+  capability: "payroll.view",
+} as const satisfies NavigationItem;
+
 // Complaints / 컴플레인 — implemented manual complaint + external-review workspace. Side-menu entry
 // + pinnable bottom-bar candidate. See docs/product/25-complaint-workflow.md.
 const mobileNavComplaints = {
@@ -272,6 +284,7 @@ export const mobileSidebarNavigation = [
   mobileNavTasks,
   mobileNavRequests,
   mobileNavAttendance,
+  mobileNavPayroll,
   mobileNavAnnouncements,
   mobileNavBoard,
   mobileNavSuggestions,

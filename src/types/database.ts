@@ -4194,6 +4194,66 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_month_inputs: {
+        Row: {
+          organization_id: string
+          user_id: string
+          target_month: string
+          overtime: number
+          weekend: number
+          special: number
+          prev_adjustment: number
+          prev_adjustment_kind: string
+          prev_adjustment_month: string | null
+          year_end_adjustment: number
+          withholding_override: number | null
+          withholding_override_reason: string | null
+          employment_insurance_override: number | null
+          memo: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          user_id: string
+          target_month: string
+          overtime?: number
+          weekend?: number
+          special?: number
+          prev_adjustment?: number
+          prev_adjustment_kind?: string
+          prev_adjustment_month?: string | null
+          year_end_adjustment?: number
+          withholding_override?: number | null
+          withholding_override_reason?: string | null
+          employment_insurance_override?: number | null
+          memo?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          organization_id?: string
+          user_id?: string
+          target_month?: string
+          overtime?: number
+          weekend?: number
+          special?: number
+          prev_adjustment?: number
+          prev_adjustment_kind?: string
+          prev_adjustment_month?: string | null
+          year_end_adjustment?: number
+          withholding_override?: number | null
+          withholding_override_reason?: string | null
+          employment_insurance_override?: number | null
+          memo?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payroll_member_settings: {
         Row: {
           organization_id: string

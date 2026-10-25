@@ -805,7 +805,7 @@ export type PayrollMonthInputs = PayrollMonthBase & PayrollMonthLinks;
 
 const PAYROLL_SESSION_ID_CHUNK = 200;
 
-async function loadPayrollMonthBase(
+export async function loadPayrollMonthBase(
   service: Service,
   organizationId: string,
   ym: string,
@@ -879,7 +879,7 @@ async function loadPayrollMonthBase(
   };
 }
 
-async function loadPayrollMonthLinks(
+export async function loadPayrollMonthLinks(
   service: Service,
   organizationId: string,
   sessions: readonly { id: string }[],
@@ -933,8 +933,17 @@ export type PayrollPaySummary = {
   finalization: { gross: number; paidMinutes: number; finalizedAtLabel: string | null } | null;
 };
 
+/** 급여 준비(P3)가 P2 엔진에 넣는 값 — 시급 구간별 분 합계와 날마다 과세 급여(丙 日額表용). */
+export type PayrollPrepDetail = {
+  /** `since` = 그 시급으로 처음 근무한 날(도쿄 YYYY-MM-DD) — 패널 「10월 16일부터」. */
+  rateSegments: { rate: number; paidMinutes: number; since: string | null }[];
+  /** 근무한 날마다 기본급 + 추가수당(엔, 반올림). 날짜 ↑. */
+  dailyTaxable: number[];
+};
+
 export type PayrollUserMonth = {
   pay: PayrollPaySummary;
+  prep: PayrollPrepDetail;
   eligibility: FinalizationEligibility;
   finalized: boolean;
 };
@@ -1057,6 +1066,16 @@ export function computePayrollMonth(
     const alreadyFinalized = snap != null;
     out.set(userId, {
       pay,
+      prep: {
+        rateSegments: calc.rateSegments.map((r) => ({
+          rate: r.rate,
+          paidMinutes: r.paidMinutes,
+          since: calc.days.find((d) => d.hourlyRate === r.rate && d.paidMinutes > 0)?.date ?? null,
+        })),
+        dailyTaxable: calc.days
+          .filter((d) => d.grossExact + d.allowanceExact > 0)
+          .map((d) => Math.round(d.grossExact + d.allowanceExact)),
+      },
       eligibility: {
         eligible:
           reviewRequired === 0 &&

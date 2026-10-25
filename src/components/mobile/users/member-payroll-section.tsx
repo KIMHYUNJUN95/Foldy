@@ -6,12 +6,11 @@ import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { haptic } from "@/lib/haptics";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { fillCopy, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
+import { fillCopy, withholdingLabel, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import type { MemberPayrollPanel } from "@/lib/payroll-settings-server";
 import {
   MAX_DEPENDENTS,
   WITHHOLDING_CLASSES,
-  WITHHOLDING_LABEL,
   payrollIssues,
   type MemberPayrollSetting,
   type PaymentMethod,
@@ -156,10 +155,10 @@ export function MemberPayrollSection({
                 role="radio"
                 aria-checked={setting.withholdingClass === k}
                 onClick={() => {
-                  if (setting.withholdingClass !== k) change({ withholdingClass: k }, copy.withholding, WITHHOLDING_LABEL[k]);
+                  if (setting.withholdingClass !== k) change({ withholdingClass: k }, copy.withholding, withholdingLabel(copy, k));
                 }}
               >
-                {WITHHOLDING_LABEL[k]}
+                {withholdingLabel(copy, k)}
               </button>
             ))}
           </div>

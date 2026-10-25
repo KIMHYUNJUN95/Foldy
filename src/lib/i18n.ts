@@ -54,6 +54,8 @@ export const localizedNavigationLabels = {
     suggestions: { ko: "제안함", ja: "提案箱", en: "Suggestions" },
     attendance: { ko: "근태", ja: "勤怠", en: "Attendance" },
     complaints: { ko: "게스트 피드백", ja: "ゲストフィードバック", en: "Guest Feedback" },
+    // 급여 준비(2026-10-25) — `payroll.view` 보유자만.
+    payroll: { ko: "급여 준비", ja: "給与準備", en: "Payroll prep" },
     /**
      * 하단 탭바 **전용** 축약형 (`NavigationItem.shortLabel`).
      *
@@ -66,6 +68,7 @@ export const localizedNavigationLabels = {
      */
     complaintsShort: { ko: "피드백", ja: "ゲストの声", en: "Feedback" },
     opsCalendarShort: { ko: "판매", ja: "販売", en: "Sales" },
+    payrollShort: { ko: "급여 준비", ja: "給与準備", en: "Payroll" },
     // 모바일 가동률(2026-10-15) — 탭 폭에도 들어가는 짧은 이름이라 축약형이 따로 없다.
     opsOccupancy: { ko: "가동률", ja: "稼働率", en: "Occupancy" },
     // 모바일 매출(2026-10-15) — 가동률처럼 짧아 축약형이 없다.

@@ -154,6 +154,9 @@ export async function saveMemberPayrollSetting(input: {
 
   revalidatePath("/admin/attendance/wages");
   revalidatePath("/mobile/users", "layout");
+  // 급여 준비(P3)의 줄 안 「원천세 구분 고르기」도 이 액션을 쓴다.
+  revalidatePath("/admin/attendance/payroll");
+  revalidatePath("/mobile/payroll");
   return { ok: true, setting: after };
 }
 

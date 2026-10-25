@@ -4,7 +4,7 @@ import type { JapanHolidayKey } from "@/lib/japan-holidays";
 /**
  * 알바 급여 P1 문구(ko · ja · en) — PC 근태 › 시급 패널 · 설정 › 급여 · 모바일 멤버 상세가 같이 쓴다.
  * 클라이언트로 통째로 넘기므로 **문자열만**(함수 금지) — `{n}` 자리표시자 + `fill()`.
- * 甲 · 乙 · 丙 · 雇用保険 · 会社名 · 専務 · 社長 은 명세서 양식 용어라 모든 언어에서 그대로 쓴다.
+ * 한국어는 한자 없이(갑 · 을 · 병 · 고용보험 · 전무 · 사장, 2026-10-25 사용자) — 일본어 · 영어는 명세서 양식 용어(甲乙丙 · 雇用保険 …) 그대로.
  * docs/product/39 §3-A · §3-C
  */
 export type PayrollSettingsCopy = {
@@ -17,6 +17,9 @@ export type PayrollSettingsCopy = {
   cash: string;
   transfer: string;
   withholding: string;
+  classKou: string;
+  classOtsu: string;
+  classHei: string;
   kouHelp: string;
   otsuHelp: string;
   heiHelp: string;
@@ -104,20 +107,23 @@ const ko: PayrollSettingsCopy = {
   cash: "현금",
   transfer: "계좌이체",
   withholding: "원천세 구분",
-  kouHelp: "甲 — 이곳이 주된 일자리 · 워킹홀리데이 포함",
-  otsuHelp: "乙 — 다른 곳이 주된 급여",
-  heiHelp: "丙 — 2개월 이내 고용",
+  classKou: "갑",
+  classOtsu: "을",
+  classHei: "병",
+  kouHelp: "갑 — 이곳이 주된 일자리 · 워킹홀리데이 포함",
+  otsuHelp: "을 — 다른 곳이 주된 급여",
+  heiHelp: "병 — 2개월 이내 고용",
   pickOne: "하나 골라 주세요",
-  allClassesHelp: "甲 이곳이 주된 일자리 · 乙 다른 곳이 주된 급여 · 丙 2개월 이내 고용",
+  allClassesHelp: "갑 이곳이 주된 일자리 · 을 다른 곳이 주된 급여 · 병 2개월 이내 고용",
   dependents: "부양 인원",
   dependentsMinus: "한 명 빼기",
   dependentsPlus: "한 명 더하기",
-  katakana: "일본 이름",
+  katakana: "가타카나 이름",
   katakanaMissing: "아직 없음 — 본인이 내 정보에서 넣어요",
   hireDate: "입사일",
   hireDateMissing: "없음",
   edit: "고치기",
-  employmentInsurance: "雇用保険",
+  employmentInsurance: "고용보험",
   insuranceOff: "가입 안 함",
   insuranceOn: "가입",
   insuranceSince: "가입일",
@@ -128,11 +134,11 @@ const ko: PayrollSettingsCopy = {
   rateFrom: "{date}부터",
   issuePaymentMethod: "지급 방식 없음",
   issueWithholding: "원천세 구분 없음",
-  issueKatakana: "일본 이름 없음",
-  issueHeiOver: "丙 · 2개월 지남",
-  issueHeiNoHireDate: "丙 · 입사일 없음",
-  heiOverError: "입사({date})부터 2개월이 지났어요. 계속 일하면 甲 또는 乙로 바꿔 주세요.",
-  heiNoHireDateError: "丙은 입사일이 있어야 2개월을 셀 수 있어요. 입사일을 넣어 주세요.",
+  issueKatakana: "가타카나 이름 없음",
+  issueHeiOver: "병 · 2개월 지남",
+  issueHeiNoHireDate: "병 · 입사일 없음",
+  heiOverError: "입사({date})부터 2개월이 지났어요. 계속 일하면 갑 또는 을로 바꿔 주세요.",
+  heiNoHireDateError: "병은 입사일이 있어야 2개월을 셀 수 있어요. 입사일을 넣어 주세요.",
   columnHeader: "급여 설정",
   toastSaved: "{name} · {field} → {value}",
   undo: "되돌리기",
@@ -143,7 +149,7 @@ const ko: PayrollSettingsCopy = {
   tab: "급여",
   pageTitle: "급여",
   secPayslip: "명세서",
-  companyName: "会社名 · 명세서에 찍히는 회사 이름",
+  companyName: "회사 이름 · 명세서에 찍혀요",
   companyNamePlaceholder: "株式会社〇〇",
   companyNameNote: "알바 급여명세서 · 사장 확인표 · 세무사용 명세 맨 위에 그대로 나와요.",
   secPayday: "지급일",
@@ -152,12 +158,12 @@ const ko: PayrollSettingsCopy = {
   payDayRange: "1~28 사이로 넣어 주세요.",
   holidayRule: "토 · 일 · 일본 공휴일(대체휴일 포함)이면 앞 평일로 옮겨요. 급여 기간은 1일~말일.",
   secApproval: "결재",
-  senmuApprover: "専務 결재",
-  presidentApprover: "社長 결재",
+  senmuApprover: "전무 결재",
+  presidentApprover: "사장 결재",
   approverNone: "정하지 않음",
   approvalNote: "급여를 넘기기 전에 이 순서로 확인을 받아요.",
-  sameApproverError: "専務와 社長은 다른 사람이어야 해요.",
-  secInsurance: "雇用保険 근로자 부담률",
+  sameApproverError: "전무와 사장은 다른 사람이어야 해요.",
+  secInsurance: "고용보험 근로자 부담률",
   insuranceRateValue: "1,000분의 {n}",
   insuranceRatePrefix: "1,000분의",
   insuranceRateMissing: "아직 없음 — 가입자가 생기기 전에 넣어 주세요",
@@ -178,7 +184,7 @@ const ko: PayrollSettingsCopy = {
   cancel: "취소",
   saved: "저장했어요",
   holidays: {
-    newYear: "새해 첫날(元日)",
+    newYear: "새해 첫날",
     comingOfAge: "성인의 날",
     foundation: "건국기념일",
     emperor: "천황 탄생일",
@@ -209,6 +215,9 @@ const ja: PayrollSettingsCopy = {
   cash: "現金",
   transfer: "振込",
   withholding: "源泉税区分",
+  classKou: "甲",
+  classOtsu: "乙",
+  classHei: "丙",
   kouHelp: "甲 — ここが主たる勤務先 · ワーキングホリデー含む",
   otsuHelp: "乙 — 主たる給与は他社",
   heiHelp: "丙 — 2か月以内の雇用",
@@ -314,6 +323,9 @@ const en: PayrollSettingsCopy = {
   cash: "Cash",
   transfer: "Transfer",
   withholding: "Tax column",
+  classKou: "甲",
+  classOtsu: "乙",
+  classHei: "丙",
   kouHelp: "甲 — main job here · includes working holiday",
   otsuHelp: "乙 — main pay comes from another job",
   heiHelp: "丙 — hired for 2 months or less",
@@ -418,4 +430,9 @@ export function getPayrollSettingsCopy(locale: Locale): PayrollSettingsCopy {
 /** `{name}` 자리표시자 채우기. */
 export function fillCopy(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, k: string) => (k in values ? String(values[k]) : match));
+}
+
+/** 원천세 구분 표시 — 한국어 갑 · 을 · 병, 일본어 · 영어 甲 · 乙 · 丙. */
+export function withholdingLabel(copy: Pick<PayrollSettingsCopy, "classKou" | "classOtsu" | "classHei">, cls: "kou" | "otsu" | "hei"): string {
+  return cls === "kou" ? copy.classKou : cls === "otsu" ? copy.classOtsu : copy.classHei;
 }

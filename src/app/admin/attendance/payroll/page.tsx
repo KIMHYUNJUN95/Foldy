@@ -10,6 +10,11 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { loadWeeklyLimitChips, monthWeeklyRange } from "@/lib/staff-documents/weekly-limit-server";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { PayrollPrepClient } from "@/components/admin/attendance/payroll-prep/payroll-prep-client";
+import { PrepSteps, type PrepStage } from "@/components/admin/attendance/payroll-prep/prep-steps";
+import { getPayrollPrepCopy } from "@/lib/payroll-prep-i18n";
+import { payrollPrepAvailable } from "@/lib/payroll-prep";
+import { getPayrollPrep } from "@/lib/payroll-prep-server";
 
 // Admin · Attendance · Payroll (Slice 4).
 // Monthly per-user payroll review wired to existing `getMonthlyPayView` +
@@ -18,7 +23,7 @@ import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 export default async function AdminAttendancePayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string }>;
+  searchParams: Promise<{ ym?: string; stage?: string }>;
 }) {
   const [session, params] = await Promise.all([
     requireAdminPageSession({ nextPath: "/admin/attendance/payroll" }),
@@ -35,11 +40,21 @@ export default async function AdminAttendancePayrollPage({
       : currentTokyoYm();
 
   // 「주 28시간」 칩(docs/product/41 R4) — `staff_documents.view` 가 있을 때만. 이달 안에 끝나는 7일 창 기준.
-  const [badgeStats, payroll, weeklyLimit] = await Promise.all([
+  const [badgeStats, payroll, weeklyLimit, prep] = await Promise.all([
     getAdminAttendanceBadgeStats(session, requestedYm),
     getAdminAttendancePayroll(session, requestedYm, localeTag),
     loadWeeklyLimitChips(session, monthWeeklyRange(requestedYm)),
+    // 10월분부터 새 계산(급여 준비) — 그 전 달은 지금 급여 검토 표 그대로.
+    payrollPrepAvailable(requestedYm) ? getPayrollPrep(session, requestedYm) : Promise.resolve(null),
   ]);
+  const showPrep = Boolean(prep?.canView);
+  const stage: PrepStage =
+    params.stage === "prep" || params.stage === "close"
+      ? params.stage
+      : prep && prep.allFinalized && prep.rows.length > 0
+        ? "prep"
+        : "close";
+  const prepCopy = getPayrollPrepCopy(locale);
 
   return (
     <AdminShell activeItem="attendance" title={c.headerPayroll}>
@@ -59,7 +74,11 @@ export default async function AdminAttendancePayrollPage({
         }}
       />
 
-      {payroll.isPrivileged ? (
+      {showPrep && prep ? <PrepSteps ym={payroll.ym} stage={stage} copy={prepCopy} /> : null}
+
+      {showPrep && prep && stage === "prep" ? (
+        <PayrollPrepClient key={payroll.ym} data={prep} locale={locale} localeTag={localeTag} />
+      ) : payroll.isPrivileged ? (
         <AttendancePayrollClient
           key={payroll.ym}
           ym={payroll.ym}

@@ -2213,6 +2213,27 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, au
 떠난 상태끼리 바뀌면 처음 값 유지). 기존 suspended · removed 행은 `updated_at` 으로 채웠다(근사 — 실제보다 늦을 수는 있어도 이르지 않다).
 신분 서류 보관 기한(퇴사 3년 뒤 삭제)의 기준 — `docs/product/41` §6.
 
+## 2026-10-25 `payroll_month_inputs` — 알바 급여 P3 급여 준비 손 입력 (`202610250002`)
+
+알바 급여 P3(`docs/product/39` §3-B · §5-A · §9). 사람 · 달마다 **손으로 넣는 값만** 둔다 — 총지급 · 원천세 · 실수령은 저장하지 않고 화면을 그릴 때마다
+P2 엔진(`calculatePayrollMonth`, `src/lib/payroll-prep.ts` `buildPrepRow`)으로 낸다. 결재 · 지급 때 굳히는 건 P5 스냅샷.
+
+PK `(organization_id, user_id, target_month)` — `target_month` 는 그 달 1일.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `overtime` · `weekend` · `special` | 잔업 · 주말 · 특별수당 칸에 **Foldy 추가수당(자동) 위에 더하는** 금액(±엔). 화면은 자동 + 손 = 합계를 보여 주고, 합계를 고치면 차이를 저장 |
+| `prev_adjustment` · `prev_adjustment_kind` · `prev_adjustment_month` | 지난달 조정(前月調整額, ±엔) · 종류 `taxable`(급여 조정 → 과세 합계) / `commute`(교통비 조정 → 비과세) · 몇 월분(그 달 1일). 금액이 있는데 몇 월분이 없으면 확인 필요 |
+| `year_end_adjustment` | 연말정산(±, 공제 쪽) |
+| `withholding_override` · `withholding_override_reason` | 원천세 손 덮어쓰기(null = 계산값) · 사유(없으면 확인 필요) |
+| `employment_insurance_override` | 고용보험 손 덮어쓰기(가입자만 쓰임, null = 계산값) |
+| `memo` | 메모(備考) |
+| `updated_by` · `created_at` · `updated_at` | 마지막으로 바꾼 사람 · 시각 |
+
+통근 과세 칸은 없다(교통비 전부 비과세, 39 §11-4). 변경 기록: `audit_logs.action = 'payroll_month_input_update'`, `target_id` = 사람 id, `metadata = { ym, before, after }`.
+쓰기 = 서버 액션 `savePayrollMonthInput`(`src/actions/payroll-month-inputs.ts`, `payroll.manage`), 읽기 = `getPayrollPrep`(`src/lib/payroll-prep-server.ts`, `payroll.view`).
+RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
+
 ## 2026-10-25 `payroll_member_settings` · `org_payroll_settings` — 알바 급여 P1 (`202610250001`)
 
 알바 급여 P1(`docs/product/39` §3-A · §3-C · §9). 둘 다 「지금 값」 한 줄 — 바꾼 기록은 `audit_logs`, 급여 회차에 굳히는 건 P5 마감 스냅샷.

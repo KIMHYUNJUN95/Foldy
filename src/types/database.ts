@@ -4134,6 +4134,39 @@ export type Database = {
           },
         ]
       }
+      org_payroll_settings: {
+        Row: {
+          organization_id: string
+          company_name: string | null
+          pay_day: number
+          senmu_approver_id: string | null
+          president_approver_id: string | null
+          employment_insurance_rates: Json
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          company_name?: string | null
+          pay_day?: number
+          senmu_approver_id?: string | null
+          president_approver_id?: string | null
+          employment_insurance_rates?: Json
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          organization_id?: string
+          company_name?: string | null
+          pay_day?: number
+          senmu_approver_id?: string | null
+          president_approver_id?: string | null
+          employment_insurance_rates?: Json
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           created_at: string
@@ -4157,6 +4190,45 @@ export type Database = {
           name?: string
           slug?: string | null
           status?: Database["public"]["Enums"]["organization_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payroll_member_settings: {
+        Row: {
+          organization_id: string
+          user_id: string
+          payment_method: string | null
+          withholding_class: string | null
+          dependents: number
+          employment_insurance: boolean
+          employment_insurance_since: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          user_id: string
+          payment_method?: string | null
+          withholding_class?: string | null
+          dependents?: number
+          employment_insurance?: boolean
+          employment_insurance_since?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          organization_id?: string
+          user_id?: string
+          payment_method?: string | null
+          withholding_class?: string | null
+          dependents?: number
+          employment_insurance?: boolean
+          employment_insurance_since?: string | null
+          updated_by?: string | null
+          created_at?: string
           updated_at?: string
         }
         Relationships: []

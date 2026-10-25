@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { AppSession } from "@/lib/session";
+import { loadMemberPayrollViews, type MemberPayrollView } from "@/lib/payroll-settings-server";
+import { EMPTY_MEMBER_PAYROLL_SETTING } from "@/lib/payroll-settings-rules";
 import {
   getAttendanceReviewQueue,
   attendanceCan,
@@ -1977,6 +1979,8 @@ export type AdminWageRow = {
   currentFrom: string | null;
   history: WageHistoryEntry[];
   employmentHistory: EmploymentHistoryEntry[];
+  /** 알바 급여 P1 — 급여 설정 · 가타카나 · 입사일 · 확인 필요(docs/product/39 §3-A). */
+  payroll: MemberPayrollView;
 };
 
 export type AdminAttendanceWagesData = {
@@ -2115,6 +2119,24 @@ export async function getAdminAttendanceWages(
     if (activeNow && !empLatestByUser.has(e.user_id)) empLatestByUser.set(e.user_id, e);
   }
 
+  const isHourlyNow = (userId: string) => {
+    const empRow = empLatestByUser.get(userId);
+    return empRow ? empRow.employment_type !== "salaried" : (ratesByUser.get(userId) ?? []).length > 0;
+  };
+  const payrollByUser = await loadMemberPayrollViews(
+    service,
+    session.organization.id,
+    members.map((m) => ({ userId: m.user_id, hourly: isHourlyNow(m.user_id) })),
+    today,
+  );
+  const emptyPayrollView: MemberPayrollView = {
+    setting: { ...EMPTY_MEMBER_PAYROLL_SETTING },
+    nameKatakana: null,
+    hireDate: null,
+    issues: [],
+    changeCount: 0,
+  };
+
   const rows: AdminWageRow[] = members.map((m) => {
     const userRates = ratesByUser.get(m.user_id) ?? [];
     const current =
@@ -2152,6 +2174,7 @@ export async function getAdminAttendanceWages(
       currentFrom: current?.effective_from ?? null,
       history,
       employmentHistory,
+      payroll: payrollByUser.get(m.user_id) ?? emptyPayrollView,
     };
   });
   rows.sort((a, b) => a.userName.localeCompare(b.userName));

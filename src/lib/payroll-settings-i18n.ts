@@ -78,7 +78,7 @@ export type PayrollSettingsCopy = {
   insuranceRateEnter: string;
   insuranceRateRemove: string;
   insuranceRateInvalid: string;
-  yearLabel: string; // "{y}년"
+  yearLabel: string; // "{y}년도" — 雇用保険 율은 年度(4월~3월) 단위
   upcomingTitle: string;
   upcomingNote: string;
   monthFor: string; // "{m}월분"
@@ -164,7 +164,7 @@ const ko: PayrollSettingsCopy = {
   insuranceRateEnter: "요율 입력",
   insuranceRateRemove: "지우기",
   insuranceRateInvalid: "0 이상 100 미만의 숫자로 넣어 주세요.",
-  yearLabel: "{y}년",
+  yearLabel: "{y}년도",
   upcomingTitle: "앞으로 12달 지급일",
   upcomingNote: "위 규칙으로 계산한 실제 날짜예요.",
   monthFor: "{m}월분",
@@ -269,7 +269,7 @@ const ja: PayrollSettingsCopy = {
   insuranceRateEnter: "料率を入力",
   insuranceRateRemove: "削除",
   insuranceRateInvalid: "0以上100未満の数字で入れてください。",
-  yearLabel: "{y}年",
+  yearLabel: "{y}年度",
   upcomingTitle: "今後12か月の支給日",
   upcomingNote: "上のルールで計算した実際の日付です。",
   monthFor: "{m}月分",
@@ -374,7 +374,7 @@ const en: PayrollSettingsCopy = {
   insuranceRateEnter: "Add rate",
   insuranceRateRemove: "Remove",
   insuranceRateInvalid: "Enter a number from 0 up to (not including) 100.",
-  yearLabel: "{y}",
+  yearLabel: "FY{y}",
   upcomingTitle: "Pay days for the next 12 months",
   upcomingNote: "Actual dates from the rule above.",
   monthFor: "{m} pay",

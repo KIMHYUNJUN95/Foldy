@@ -420,7 +420,8 @@
 .adm .orgsw__mt,
 .adm .orgsw__chev,
 .adm .navgrp__t,
-.adm .navi__t {
+.adm .navi__t,
+.adm .navi__badge {
   transition:
     width 170ms cubic-bezier(0.4, 0, 0.2, 1) 120ms,
     padding 170ms cubic-bezier(0.4, 0, 0.2, 1) 120ms,
@@ -551,7 +552,10 @@
 .adm .orgsw__mt,
 .adm .orgsw__chev,
 .adm .navgrp__t,
-.adm .navi__t { opacity: 0; }
+.adm .navi__t,
+/* 숫자 알약도 글자와 같이 숨긴다 — 접힌 레일에선 아이콘 바로 뒤 자리가 레일 끝이라 알약 왼쪽 몇 px 이
+ * `overflow: hidden` 경계에 걸려 주황 조각으로 삐져나왔다(2026-10-26). 접혔을 땐 아이콘 모서리 점이 대신한다. */
+.adm .navi__badge { opacity: 0; }
 
 .adm .side:hover .side__wm,
 .adm .side:hover .side__role,
@@ -560,6 +564,7 @@
 .adm .side:hover .orgsw__chev,
 .adm .side:hover .navgrp__t,
 .adm .side:hover .navi__t,
+.adm .side:hover .navi__badge,
 .adm .side:focus-within .side__wm,
 .adm .side:focus-within .side__role,
 .adm .side:focus-within .orgsw__nm,
@@ -567,7 +572,7 @@
 .adm .side:focus-within .orgsw__chev,
 .adm .side:focus-within .navgrp__t,
 .adm .side:focus-within .navi__t,
-.adm .side:focus-within .navi__t { opacity: 1; }
+.adm .side:focus-within .navi__badge { opacity: 1; }
 
 /* ── main column ── */
 .adm .main {

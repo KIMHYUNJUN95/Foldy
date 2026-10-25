@@ -117,7 +117,9 @@
 .mpp-fl__sign { position: absolute; left: 1px; top: 1px; width: 44px; height: 46px; border: 0; border-radius: 11px 0 0 11px; background: transparent; font-size: 20px; font-weight: 600; color: var(--mpp-link); }
 .mpp-fl small { display: block; margin-top: 4px; font-size: 12px; color: var(--mpp-soft); overflow-wrap: anywhere; }
 .mpp-kind { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: #f2f2f5; min-width: 0; }
-.mpp-kind button { padding: 0 4px; font-size: 14px; white-space: normal; line-height: 1.2; }
+/* 시트 폭(최대 460px)에선 반 칸에 「교통비 조정」이 두 줄로 꺾였다 — 종류 고르기는 한 줄을 다 쓰고, 몇 월분은 그 아래. */
+.mpp-g2--adj .mpp-kind { grid-column: 1 / -1; }
+.mpp-kind button { padding: 0 8px; font-size: 14px; white-space: nowrap; }
 .mpp-lnk { display: block; margin-top: 14px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--mpp-link); font-size: 14px; font-weight: 500; text-align: left; }
 .mpp-lnk--in { grid-column: 1 / -1; margin-top: 0; }
 .mpp-more { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }

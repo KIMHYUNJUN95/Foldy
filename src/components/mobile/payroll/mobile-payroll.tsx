@@ -137,7 +137,7 @@ export function MobilePayroll({
       else if (row.prevAdjustmentTaxable !== 0) parts.push(`${copy.prevAdjust} ${signedNum(row.prevAdjustmentTaxable)}`);
       else if (row.paymentMethod === "cash") parts.push(copy.cash);
     }
-    return <span className="mpp-sub">{parts.join(", ") || " "}</span>;
+    return <span className="mpp-sub">{parts.join(" · ") || " "}</span>;
   };
   const tableSub = (row: PrepRow) => {
     const first = row.issues[0];

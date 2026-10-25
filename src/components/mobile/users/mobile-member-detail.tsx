@@ -80,12 +80,15 @@ export function MobileMemberDetail({
   locale,
   actorRole,
   shiftSlot,
+  payrollSlot,
 }: {
   panel: MemberPanelVM;
   locale: Locale;
   actorRole: string;
   /** 「시프트」 줄(배정 권한이 있을 때만 서버가 그려 넘긴다 — docs/product/37 「4-6」). */
   shiftSlot?: React.ReactNode;
+  /** 「급여 설정」 구역(`wages.manage` 가 있을 때만 서버가 그려 넘긴다 — docs/product/39 §3-A). */
+  payrollSlot?: React.ReactNode;
 }) {
   const router = useRouter();
   const dict = getDictionary(locale);
@@ -478,6 +481,7 @@ export function MobileMemberDetail({
             <span>{u.status}</span>
             <b>{m.status === "active" ? c.statusActive : c.statusInactive}</b>
           </div>
+          {payrollSlot}
         </>
       ) : (
         <>
@@ -523,6 +527,8 @@ export function MobileMemberDetail({
             </div>
           </div>
           {panel.lastOwner ? <p className="muw-note">{c.wLastOwnerNote}</p> : null}
+
+          {payrollSlot}
 
           <section aria-label={c.permTitle}>
             <h2 className="muw-sec">

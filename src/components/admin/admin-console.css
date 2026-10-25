@@ -3281,3 +3281,53 @@
 .adm .wk28-note.is-over { background: #fdecee; color: #9c2638; }
 /* 재류카드 만료 칩 — 근태 화면 이름 옆. 사용자 목록 「만료됨」(.usw-doc.is-expired)과 같은 빨강, 경고만(docs/product/41 「만료 표시」). */
 .adm .adm-idexp { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; vertical-align: 1px; font-size: 11px; font-weight: 600; line-height: 1.4; letter-spacing: 0; white-space: nowrap; background: #fdecee; color: #c4364b; cursor: help; }
+
+/* 시급 · 급여 설정(알바 급여 P1, 2026-10-25 시안 Wages-PC · WagesCheck-PC) — 표 칸 · 확인 필요 점 · 오른쪽 패널 블록 */
+.adm .wage-tbl tbody tr.sel td:first-child { box-shadow: none; }
+.adm .wg-miss { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 500; font-style: normal; }
+.adm .wg-miss::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #c5282e; flex: none; }
+.adm .fseg button .cnt.wg-miss { font-size: 10.5px; font-weight: 800; color: var(--faint); }
+.adm .fseg button.on .cnt.wg-miss { color: var(--ink); }
+.adm .wg-hint { font-size: 12px; color: var(--adm-muted); margin: 8px 4px 0; }
+.adm .wg-leave td { animation: wg-leave 0.26s ease-out forwards; overflow: hidden; }
+.adm .wg-leave td > * { animation: wg-leave-in 0.26s ease-out forwards; overflow: hidden; }
+@keyframes wg-leave { from { opacity: 1; } 60% { opacity: 0; } to { opacity: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; } }
+@keyframes wg-leave-in { from { max-height: 48px; } to { max-height: 0; } }
+
+.adm .wgp__h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.adm .wgp__t { font-size: 15px; font-weight: 700; color: #16141f; }
+.adm .wgp__row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 46px; font-size: 14px; color: #3a3746; }
+.adm .wgp__row > .k { flex: 1 1 auto; min-width: 0; }
+.adm .wgp__row > .v { margin-left: auto; text-align: right; min-width: 0; }
+.adm .wgp__row .dim { color: #6f6c7c; }
+.adm .wgp__help { margin: -2px 0 6px; font-size: 12px; line-height: 17px; color: #6f6c7c; }
+.adm .wgp__err { display: flex; gap: 6px; align-items: flex-start; margin: 2px 0 8px; font-size: 12px; line-height: 17px; color: #c5282e; }
+.adm .wgp__err svg { width: 14px; height: 14px; flex: none; margin-top: 1.5px; }
+.adm .wgp__lnk { color: #5a30cf; font-weight: 500; font-size: 13px; text-decoration: none; }
+.adm .wgp__lnk:hover { text-decoration: underline; }
+.adm .wgp__since { padding: 2px 0 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: #3a3746; }
+.adm .wgp__since > span { flex: 1 1 auto; }
+
+.adm .wgseg { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; padding: 3px; border-radius: 10px; background: #f2f2f5; margin-left: auto; }
+.adm .wgseg__thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n)); border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.12); transform: translateX(calc(var(--i) * 100%)); transition: transform 0.18s ease-out; pointer-events: none; }
+.adm .wgseg button { position: relative; height: 32px; min-width: 52px; border: 0; background: transparent; padding: 0 12px; border-radius: 8px; font-size: 13px; color: #6b6878; cursor: pointer; white-space: nowrap; }
+.adm .wgseg button[aria-checked="true"] { color: #16141f; font-weight: 600; }
+.adm .wgseg:focus-within button:focus-visible { outline: 2px solid color-mix(in oklab, var(--adm-primary) 45%, transparent); outline-offset: 1px; }
+
+.adm .wgstep { display: flex; align-items: center; gap: 2px; margin-left: auto; padding: 3px; border-radius: 10px; background: #f2f2f5; }
+.adm .wgstep button { width: 32px; height: 32px; border: 0; border-radius: 8px; background: #fff; font-size: 16px; color: #3a3746; box-shadow: 0 1px 2px rgba(22, 20, 31, 0.08); cursor: pointer; }
+.adm .wgstep button:disabled { opacity: 0.4; cursor: default; }
+.adm .wgstep b { min-width: 28px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.adm .wgsw { width: 44px; height: 26px; flex: none; border-radius: 13px; background: #e4e3e9; position: relative; border: 0; cursor: pointer; transition: background 0.18s ease-out; padding: 0; }
+.adm .wgsw[aria-checked="true"] { background: #7a52e6; }
+.adm .wgsw i { position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(22, 20, 31, 0.18); transition: transform 0.18s ease-out; }
+.adm .wgsw[aria-checked="true"] i { transform: translateX(18px); }
+
+.adm .adm-toast--undo { display: inline-flex; align-items: center; gap: 14px; cursor: default; }
+.adm .adm-toast--undo button { border: 0; background: transparent; color: #c9b8ff; font-weight: 700; font-size: 13px; cursor: pointer; padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .adm .wgseg__thumb, .adm .wgsw, .adm .wgsw i { transition: none; }
+  .adm .wg-leave td, .adm .wg-leave td > * { animation: none; display: none; }
+}

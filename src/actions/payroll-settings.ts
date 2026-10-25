@@ -36,6 +36,14 @@ export type MemberPayrollSettingPatch = {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** `YYYY-MM-DD` 이면서 실제 있는 날짜(2026-13-45 같은 값은 DB 오류 대신 invalid). */
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}
+
 /** 한 사람의 급여 설정 한 칸(또는 여러 칸)을 바로 저장 — 고르면 저장 + 되돌리기(같은 액션에 전 값). 권한 `wages.manage`. */
 export async function saveMemberPayrollSetting(input: {
   userId: string;
@@ -83,7 +91,7 @@ export async function saveMemberPayrollSetting(input: {
     if (!p.employmentInsurance) update.employment_insurance_since = null;
   }
   if ("employmentInsuranceSince" in p) {
-    if (p.employmentInsuranceSince !== null && !(typeof p.employmentInsuranceSince === "string" && DATE_RE.test(p.employmentInsuranceSince))) {
+    if (p.employmentInsuranceSince !== null && !(typeof p.employmentInsuranceSince === "string" && isRealDate(p.employmentInsuranceSince))) {
       return { ok: false, reason: "invalid" };
     }
     update.employment_insurance_since = p.employmentInsuranceSince ?? null;
@@ -107,6 +115,9 @@ export async function saveMemberPayrollSetting(input: {
     .eq("user_id", input.userId)
     .maybeSingle();
   if (beforeRes.error) return { ok: false, reason: "error" };
+  // 가입하지 않은 사람에게 가입일만 남지 않게 — 최종 가입 여부가 꺼짐이면 가입일을 비운다.
+  const insuredAfter = update.employment_insurance ?? beforeRes.data?.employment_insurance ?? false;
+  if (!insuredAfter && update.employment_insurance_since) update.employment_insurance_since = null;
 
   const saved = await service
     .from("payroll_member_settings")

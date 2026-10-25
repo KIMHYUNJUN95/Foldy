@@ -22,6 +22,9 @@ export default async function AdminSettingsPage({
   if (session.capabilities.includes("attendance.settings") && hasOrganizationContext(session)) {
     redirect(`/admin/settings/attendance${suffix}`);
   }
+  if (session.capabilities.includes("payroll.manage") && hasOrganizationContext(session)) {
+    redirect(`/admin/settings/payroll${suffix}`);
+  }
   if (session.user.role === "developer_super_admin") {
     redirect(`/admin/settings/organization${suffix}`);
   }

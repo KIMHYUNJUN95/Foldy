@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   ArrowUpRight,
   CircleAlert,
@@ -23,6 +23,22 @@ import {
   setEmploymentType,
   setHourlyRate,
 } from "@/app/admin/attendance/actions";
+import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
+import {
+  fillCopy,
+  getPayrollSettingsCopy,
+  type PayrollSettingsCopy,
+} from "@/lib/payroll-settings-i18n";
+import {
+  MAX_DEPENDENTS,
+  PAYMENT_METHODS,
+  WITHHOLDING_CLASSES,
+  WITHHOLDING_LABEL,
+  payrollIssues,
+  type MemberPayrollSetting,
+  type PayrollIssue,
+  type WithholdingClass,
+} from "@/lib/payroll-settings-rules";
 import { AdminDatePicker } from "../shared/admin-date-picker";
 import { AdminExportButtons } from "../shared/admin-export-buttons";
 import { AdminReasonModal } from "../shared/admin-reason-modal";
@@ -30,7 +46,8 @@ import { formatOptionalAdminYen } from "../shared/admin-format";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
-type Filter = "all" | "hourly" | "salaried";
+type Filter = "all" | "hourly" | "salaried" | "check";
+type Toast = { id: number; msg: string; undo?: () => void };
 
 function Ic({ children }: { children: React.ReactNode }) {
   return <span className="ic">{children}</span>;
@@ -66,20 +83,97 @@ export function AttendanceWagesClient({
   const [rows, setRows] = useState(initialRows);
   const [filter, setFilter] = useState<Filter>("all");
   const [panelId, setPanelId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
-  const showToast = (msg: string) => setToast({ id: Date.now(), msg });
+  const [toast, setToast] = useState<Toast | null>(null);
+  const showToast = (msg: string, undo?: () => void) => setToast({ id: Date.now(), msg, undo });
+  const pc = getPayrollSettingsCopy(locale);
+  // 확인 필요 보기에서 고쳐진 줄은 접히는 동안만 더 보여 준다.
+  const [leaving, setLeaving] = useState<Set<string>>(new Set());
+  const rowsRef = useRef(rows);
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    rowsRef.current = rows;
+    filterRef.current = filter;
+  }, [rows, filter]);
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 1800);
+    const t = setTimeout(() => setToast(null), toast.undo ? 6000 : 1800);
     return () => clearTimeout(t);
   }, [toast]);
+
+  function applySetting(userId: string, setting: MemberPayrollSetting, bumpChange: boolean) {
+    const before = rowsRef.current.find((r) => r.userId === userId);
+    if (!before) return;
+    const issues = payrollIssues({
+      hourly: before.employment === "hourly",
+      setting,
+      nameKatakana: before.payroll.nameKatakana,
+      hireDate: before.payroll.hireDate,
+      today: todayTokyoKey(),
+    });
+    setRows((prev) =>
+      prev.map((r) =>
+        r.userId === userId
+          ? { ...r, payroll: { ...r.payroll, setting, issues, changeCount: r.payroll.changeCount + (bumpChange ? 1 : 0) } }
+          : r,
+      ),
+    );
+    if (filterRef.current === "check") {
+      if (before.payroll.issues.length > 0 && issues.length === 0) {
+        setLeaving((p) => new Set(p).add(userId));
+        window.setTimeout(
+          () =>
+            setLeaving((p) => {
+              const n = new Set(p);
+              n.delete(userId);
+              return n;
+            }),
+          300,
+        );
+      } else if (issues.length > 0) {
+        setLeaving((p) => {
+          const n = new Set(p);
+          n.delete(userId);
+          return n;
+        });
+      }
+    }
+  }
+
+  /** 고르면 바로 저장 — 화면 먼저 바꾸고, 못 저장하면 되돌린다. 성공하면 「되돌리기」 토스트. */
+  async function savePayroll(userId: string, patch: Partial<MemberPayrollSetting>, field: string, value: string) {
+    const row = rowsRef.current.find((r) => r.userId === userId);
+    if (!row) return;
+    const prev = row.payroll.setting;
+    const prevPatch: Partial<MemberPayrollSetting> = {};
+    for (const k of Object.keys(patch) as (keyof MemberPayrollSetting)[]) {
+      (prevPatch as Record<string, unknown>)[k] = prev[k];
+    }
+    applySetting(userId, { ...prev, ...patch }, false);
+    const res = await saveMemberPayrollSetting({ userId, patch });
+    if (!res.ok) {
+      applySetting(userId, prev, false);
+      showToast(res.reason === "forbidden" ? pc.errorForbidden : pc.errorSave);
+      return;
+    }
+    applySetting(userId, res.setting, true);
+    showToast(fillCopy(pc.toastSaved, { name: row.userName, field, value }), async () => {
+      const back = await saveMemberPayrollSetting({ userId, patch: prevPatch });
+      if (back.ok) {
+        applySetting(userId, back.setting, true);
+        showToast(pc.toastUndone);
+      } else {
+        showToast(pc.errorSave);
+      }
+    });
+  }
 
   const counts = useMemo(
     () => ({
       all: rows.length,
       hourly: rows.filter((r) => r.employment === "hourly").length,
       salaried: rows.filter((r) => r.employment === "salaried").length,
+      check: rows.filter((r) => r.payroll.issues.length > 0).length,
     }),
     [rows],
   );
@@ -87,10 +181,12 @@ export function AttendanceWagesClient({
     () =>
       filter === "all"
         ? rows
-        : rows.filter((r) =>
-            filter === "hourly" ? r.employment === "hourly" : r.employment === "salaried",
-          ),
-    [rows, filter],
+        : filter === "check"
+          ? rows.filter((r) => r.payroll.issues.length > 0 || leaving.has(r.userId))
+          : rows.filter((r) =>
+              filter === "hourly" ? r.employment === "hourly" : r.employment === "salaried",
+            ),
+    [rows, filter, leaving],
   );
 
   const panelRow = panelId ? rows.find((r) => r.userId === panelId) ?? null : null;
@@ -127,6 +223,14 @@ export function AttendanceWagesClient({
             {c.wageFilterSalaried}
             <span className="cnt">{counts.salaried}</span>
           </button>
+          <button
+            type="button"
+            className={filter === "check" ? "on" : ""}
+            onClick={() => setFilter("check")}
+          >
+            {pc.needsCheckFilter}
+            <span className={`cnt${counts.check > 0 ? " wg-miss" : ""}`}>{counts.check}</span>
+          </button>
         </div>
         <span className="toolbar__spacer" />
         <AdminExportButtons
@@ -160,6 +264,7 @@ export function AttendanceWagesClient({
                 <th className="r">{c.wageColCurrent}</th>
                 <th className="r">{c.wageColFrom}</th>
                 <th className="r">{c.wageColRecent}</th>
+                <th className="r">{pc.columnHeader}</th>
                 <th className="r">{c.wageColChanges}</th>
               </tr>
             </thead>
@@ -167,10 +272,14 @@ export function AttendanceWagesClient({
               {list.map((r) => {
                 const salaried = r.employment === "salaried";
                 const sel = panelId === r.userId;
+                const changeTotal = r.history.filter((h) => h.rate != null).length + r.payroll.changeCount;
                 const hist = [...r.history].filter((h) => h.rate != null).sort((x, y) => (x.from < y.from ? 1 : -1));
                 const yen = (n: number | null) => (n == null ? "—" : `${c.yenSym}${formatOptionalAdminYen(n, localeTag)}`);
                 return (
-                  <tr key={r.userId} className={sel ? "sel" : ""} onClick={() => setPanelId(r.userId)}>
+                  <tr
+                    key={r.userId}
+                    className={`${sel ? "sel" : ""}${leaving.has(r.userId) && r.payroll.issues.length === 0 ? " wg-leave" : ""}`}
+                    onClick={() => setPanelId(r.userId)}>
                     <td style={{ paddingLeft: 16 }}>
                       <div className="who">
                         <span className="uhead__av" style={{ width: 32, height: 32 }}>
@@ -198,13 +307,17 @@ export function AttendanceWagesClient({
                       )}
                     </td>
                     <td className="r">
-                      {salaried || hist.length === 0 ? <span className="dim-cell">—</span> : <span className="dim-cell">{c.wageTimes.replace("{n}", String(hist.length))}</span>}
+                      <PayrollCell row={r} copy={pc} />
+                    </td>
+                    <td className="r">
+                      {salaried || changeTotal === 0 ? <span className="dim-cell">—</span> : <span className="dim-cell">{c.wageTimes.replace("{n}", String(changeTotal))}</span>}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          {filter === "check" ? <p className="wg-hint">{pc.needsCheckHint}</p> : null}
         </div>
       )}
 
@@ -218,6 +331,8 @@ export function AttendanceWagesClient({
         }}
       >
         {c.wageHelpFootnote}
+        <br />
+        {pc.savesInstantly}
       </p>
 
       {panelRow ? (
@@ -225,6 +340,8 @@ export function AttendanceWagesClient({
           row={panelRow}
           ym={ym}
           c={c}
+          pc={pc}
+          onSavePayroll={savePayroll}
           localeTag={localeTag}
           defaultEffectiveFrom={defaultEffectiveFrom}
           minEffectiveFrom={minEffectiveFrom}
@@ -239,8 +356,25 @@ export function AttendanceWagesClient({
       ) : null}
 
       {toast ? (
-        <div key={toast.id} role="status" className="adm-toast" onClick={() => setToast(null)}>
-          {toast.msg}
+        <div
+          key={toast.id}
+          role="status"
+          className={`adm-toast${toast.undo ? " adm-toast--undo" : ""}`}
+          onClick={toast.undo ? undefined : () => setToast(null)}
+        >
+          <span>{toast.msg}</span>
+          {toast.undo ? (
+            <button
+              type="button"
+              onClick={() => {
+                const undo = toast.undo;
+                setToast(null);
+                undo?.();
+              }}
+            >
+              {pc.undo}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -251,6 +385,8 @@ function WagePanel({
   row,
   ym,
   c,
+  pc,
+  onSavePayroll,
   localeTag,
   defaultEffectiveFrom,
   minEffectiveFrom,
@@ -261,6 +397,8 @@ function WagePanel({
   row: AdminWageRow;
   ym: string;
   c: Att;
+  pc: PayrollSettingsCopy;
+  onSavePayroll: (userId: string, patch: Partial<MemberPayrollSetting>, field: string, value: string) => void;
   localeTag: string;
   defaultEffectiveFrom: string;
   minEffectiveFrom: string;
@@ -463,6 +601,19 @@ function WagePanel({
         </div>
 
         <div className="panel__body">
+          {salaried ? (
+            <div className="pblock">
+              <div className="wgp__h">
+                <span className="wgp__t">{pc.sectionTitle}</span>
+              </div>
+              <p className="wgp__help" style={{ margin: 0 }}>
+                {pc.salariedNote}
+              </p>
+            </div>
+          ) : (
+            <PayrollBlock row={row} pc={pc} c={c} localeTag={localeTag} onSave={onSavePayroll} />
+          )}
+
           {/* Employment-type change — available for both hourly and salaried members. */}
           <div className="pblock">
             <div className="wedit">
@@ -905,4 +1056,230 @@ function renderPreview(
     ),
     same: false,
   };
+}
+
+function todayTokyoKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function issueLabel(issue: PayrollIssue, pc: PayrollSettingsCopy): string {
+  switch (issue) {
+    case "payment_method":
+      return pc.issuePaymentMethod;
+    case "withholding":
+      return pc.issueWithholding;
+    case "katakana":
+      return pc.issueKatakana;
+    case "hei_over":
+      return pc.issueHeiOver;
+    case "hei_no_hire_date":
+      return pc.issueHeiNoHireDate;
+  }
+}
+
+function PayrollCell({ row, copy: pc }: { row: AdminWageRow; copy: PayrollSettingsCopy }) {
+  if (row.employment === "salaried") return <span className="dim-cell">{pc.salariedShort}</span>;
+  const { setting, issues } = row.payroll;
+  if (issues.length > 0) return <span className="wg-miss">{issueLabel(issues[0], pc)}</span>;
+  const pay = setting.paymentMethod === "cash" ? pc.cash : pc.transfer;
+  return (
+    <span>
+      {pay} · {setting.withholdingClass ? WITHHOLDING_LABEL[setting.withholdingClass] : ""}
+    </span>
+  );
+}
+
+function PayrollSeg<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: T; label: string; title?: string }[];
+  value: T | null;
+  onChange: (v: T) => void;
+}) {
+  const idx = value ? options.findIndex((o) => o.value === value) : -1;
+  return (
+    <div
+      className="wgseg"
+      role="radiogroup"
+      aria-label={label}
+      style={{ "--n": options.length, "--i": Math.max(idx, 0) } as React.CSSProperties}
+    >
+      {idx >= 0 ? <span className="wgseg__thumb" aria-hidden="true" /> : null}
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={o.value === value}
+          title={o.title}
+          onClick={() => {
+            if (o.value !== value) onChange(o.value);
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PayrollBlock({
+  row,
+  pc,
+  c,
+  localeTag,
+  onSave,
+}: {
+  row: AdminWageRow;
+  pc: PayrollSettingsCopy;
+  c: Att;
+  localeTag: string;
+  onSave: (userId: string, patch: Partial<MemberPayrollSetting>, field: string, value: string) => void;
+}) {
+  const { setting, nameKatakana, hireDate, issues } = row.payroll;
+  const cls = setting.withholdingClass;
+  const helpOf: Record<WithholdingClass, string> = { kou: pc.kouHelp, otsu: pc.otsuHelp, hei: pc.heiHelp };
+  const heiError = issues.includes("hei_over")
+    ? fillCopy(pc.heiOverError, { date: (hireDate ?? "").replace(/-/g, ".") })
+    : issues.includes("hei_no_hire_date")
+      ? pc.heiNoHireDateError
+      : null;
+  const save = (patch: Partial<MemberPayrollSetting>, field: string, value: string) =>
+    onSave(row.userId, patch, field, value);
+
+  return (
+    <div className="pblock">
+      <div className="wgp__h">
+        <span className="wgp__t">{pc.sectionTitle}</span>
+        {issues.length > 0 ? (
+          <span className="wg-miss" style={{ fontSize: 12 }}>
+            {fillCopy(pc.needsCheck, { n: issues.length })}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="wgp__row">
+        <span className="k">{pc.paymentMethod}</span>
+        <PayrollSeg
+          label={pc.paymentMethod}
+          value={setting.paymentMethod}
+          options={PAYMENT_METHODS.map((m) => ({ value: m, label: m === "cash" ? pc.cash : pc.transfer }))}
+          onChange={(m) => save({ paymentMethod: m }, pc.paymentMethod, m === "cash" ? pc.cash : pc.transfer)}
+        />
+      </div>
+
+      <div className="wgp__row">
+        <span className="k">{pc.withholding}</span>
+        <PayrollSeg
+          label={pc.withholding}
+          value={cls}
+          options={WITHHOLDING_CLASSES.map((k) => ({ value: k, label: WITHHOLDING_LABEL[k], title: helpOf[k] }))}
+          onChange={(k) => save({ withholdingClass: k }, pc.withholding, WITHHOLDING_LABEL[k])}
+        />
+      </div>
+      {heiError ? (
+        <div className="wgp__err" role="alert">
+          <Info aria-hidden="true" />
+          <span>{heiError}</span>
+        </div>
+      ) : null}
+      <p className="wgp__help">
+        {cls ? helpOf[cls] : <span className="wg-miss">{pc.pickOne}</span>}
+      </p>
+
+      {cls === "kou" ? (
+        <div className="wgp__row">
+          <span className="k">{pc.dependents}</span>
+          <div className="wgstep">
+            <button
+              type="button"
+              aria-label={pc.dependentsMinus}
+              disabled={setting.dependents <= 0}
+              onClick={() =>
+                save({ dependents: setting.dependents - 1 }, pc.dependents, String(setting.dependents - 1))
+              }
+            >
+              −
+            </button>
+            <b aria-live="polite">{setting.dependents}</b>
+            <button
+              type="button"
+              aria-label={pc.dependentsPlus}
+              disabled={setting.dependents >= MAX_DEPENDENTS}
+              onClick={() =>
+                save({ dependents: setting.dependents + 1 }, pc.dependents, String(setting.dependents + 1))
+              }
+            >
+              +
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="wgp__row">
+        <span className="k">{pc.katakana}</span>
+        <span className="v" style={{ fontFamily: "'Noto Sans JP', sans-serif" }}>
+          {nameKatakana?.trim() ? nameKatakana : <span className="wg-miss">{pc.katakanaMissing}</span>}
+        </span>
+      </div>
+
+      <div className="wgp__row">
+        <span className="k">{pc.hireDate}</span>
+        <span className="v" style={{ fontVariantNumeric: "tabular-nums" }}>
+          {hireDate ? hireDate.replace(/-/g, ".") : <span className="dim">{pc.hireDateMissing}</span>}
+        </span>
+        {/* 입사일은 근태 › 연차 › 잔여에서만 고친다 — 그 사람 잔여 패널로 바로 연다. */}
+        <Link className="wgp__lnk" href={`/admin/attendance/leave?view=balance&user=${encodeURIComponent(row.userId)}`}>
+          {pc.edit}
+        </Link>
+      </div>
+
+      <div className="wgp__row">
+        <span className="k">{pc.employmentInsurance}</span>
+        <span className="v dim">{setting.employmentInsurance ? pc.insuranceOn : pc.insuranceOff}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={setting.employmentInsurance}
+          aria-label={pc.employmentInsurance}
+          className="wgsw"
+          onClick={() =>
+            save(
+              { employmentInsurance: !setting.employmentInsurance },
+              pc.employmentInsurance,
+              setting.employmentInsurance ? pc.insuranceOff : pc.insuranceOn,
+            )
+          }
+        >
+          <i />
+        </button>
+      </div>
+      {setting.employmentInsurance ? (
+        <div className="wgp__since">
+          <span>{pc.insuranceSince}</span>
+          <AdminDatePicker
+            value={setting.employmentInsuranceSince ?? ""}
+            onChange={(d) => save({ employmentInsuranceSince: d }, pc.insuranceSince, d.replace(/-/g, "."))}
+            placeholder={pc.insuranceSincePick}
+            localeTag={localeTag}
+            ariaLabel={pc.insuranceSince}
+            labels={{
+              prevMonth: c.datePickerPrevMonth,
+              nextMonth: c.datePickerNextMonth,
+              today: c.datePickerToday,
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
 }

@@ -54,16 +54,18 @@ export function LeaveBalanceView({
   shared,
   locale,
   employees,
+  initialSelectedUserId,
   onToast,
 }: {
   lc: Lc;
   shared: Dictionary["admin"]["shared"];
   locale: Locale;
   employees: AdminLeaveBalanceRow[];
+  initialSelectedUserId?: string | null;
   onToast: (msg: string) => void;
 }) {
   const dictionary = getDictionary(locale);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialSelectedUserId ?? null);
   const selectedEmp = selected ? employees.find((e) => e.userId === selected) ?? null : null;
 
   return (

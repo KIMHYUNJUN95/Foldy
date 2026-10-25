@@ -1581,3 +1581,12 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 **그대로 두는 것(잠금 방지 가드 — 개발자도 막힌다):** 자기 역할 · 상태 변경(`self_update_blocked`), 자기 권한 부여 · 차단,
 자기 개발자 플래그 끄기, 자기 계정 삭제, 마지막 대표 보호(`guardLastOwner`). 개발자는 플랫폼 역할로 이미 모든 권한을 갖고
 있어서 이 가드들은 «스스로를 잠그는 사고»만 막는다. **조직 격리도 그대로** — 모든 예외는 `session.organization` 안에서만.
+
+## 2026-10-25 알바 급여 설정 `payroll_member_settings` · `org_payroll_settings` (`202610250001`)
+
+- RLS 켜짐 · **정책 없음** — authenticated 는 읽기 · 쓰기 모두 막힘. GRANT 는 `service_role` 만(`all`).
+- 사람별 설정: 읽기(근태 › 시급 · 모바일 멤버 상세) · 쓰기(`saveMemberPayrollSetting`, `src/actions/payroll-settings.ts`) 모두 **`wages.manage`**(시급과 같은 키).
+  대상은 **이 조직** `memberships` 에 있는 사람만(퇴사 · 정지 포함 — 그 달 근무가 남을 수 있다). 모바일 구역은 키가 없으면 그리지 않는다.
+- 회사 설정: 설정 › 급여 화면 · `saveOrgPayrollSettings` 모두 **`payroll.manage`**. 결재자는 이 조직 활성 멤버만, 専務 ≠ 社長(서버 + DB check).
+- 막히면 redirect 대신 `forbidden` 결과(모바일 · 대시보드 공용 액션 규칙). 모든 변경은 `audit_logs` 에 전 · 후 값.
+

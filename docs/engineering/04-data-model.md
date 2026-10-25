@@ -2213,6 +2213,36 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, au
 떠난 상태끼리 바뀌면 처음 값 유지). 기존 suspended · removed 행은 `updated_at` 으로 채웠다(근사 — 실제보다 늦을 수는 있어도 이르지 않다).
 신분 서류 보관 기한(퇴사 3년 뒤 삭제)의 기준 — `docs/product/41` §6.
 
+## 2026-10-25 `payroll_member_settings` · `org_payroll_settings` — 알바 급여 P1 (`202610250001`)
+
+알바 급여 P1(`docs/product/39` §3-A · §3-C · §9). 둘 다 「지금 값」 한 줄 — 바꾼 기록은 `audit_logs`, 급여 회차에 굳히는 건 P5 마감 스냅샷.
+
+**`payroll_member_settings`** — 사람별(PK `organization_id, user_id`)
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `payment_method` | `cash` · `transfer` · null(아직 안 고름 → 확인 필요). 본인 희망, 기본값 없음 |
+| `withholding_class` | `kou`(甲) · `otsu`(乙) · `hei`(丙) · null. 워홀 = 甲, 2개월 이내 고용 = 丙 |
+| `dependents` | 부양 인원 0~7(기본 0). 받아만 둔다 — 원천세 반영은 세무사 답 뒤 P2 |
+| `employment_insurance` · `employment_insurance_since` | 雇用保険 가입 · 가입일. 가입을 끄면 가입일도 비운다 |
+| `updated_by` · `created_at` · `updated_at` | 마지막으로 바꾼 사람 · 시각 |
+
+가타카나 이름 · 입사일은 여기 두지 않는다 — `profiles.name_katakana`(본인 입력) · `profiles.hire_date`(근태 › 연차 › 잔여에서 관리자가 고침).
+변경 기록: `audit_logs.action = 'payroll_member_setting_update'`, `target_id` = 사람 id, `metadata = { before, after }`. 시급 화면 「변경 기록」 횟수에 쓰인다.
+
+**`org_payroll_settings`** — 조직별(PK `organization_id`)
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `company_name` | 会社名 — 명세서 · 사장 확인표 · 세무사용 명세 맨 위 |
+| `pay_day` | 매월 지급일 1~28(기본 10). 토 · 일 · 일본 공휴일이면 **앞 평일 고정**(선택지 없음, 2026-10-25) |
+| `senmu_approver_id` · `president_approver_id` | 専務 · 社長 결재자(profiles, 같은 사람 금지 — check 제약) |
+| `employment_insurance_rates` | 雇用保険 근로자 부담률 `{"2025": 5.5}` — 연도 → 1,000분의 n. 없는 해는 키 없음 |
+
+변경 기록: `audit_logs.action = 'org_payroll_settings_update'`(`metadata = { before, changes }`).
+공휴일은 표로 넣지 않는다 — `src/lib/japan-holidays.ts` 가 법 규칙(춘분 · 추분 근사식 · 振替休日 · 国民の休日 · 2020/2021 올림픽 특례)으로 계산, 지급일은 `src/lib/payroll-settings-rules.ts` `paydayFor()`.
+RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
+
 ## 2026-10-23 `staff_document_print_logs` — 신분 서류 A4 인쇄 기록 (`202610230006`)
 
 재류카드 R3(`docs/product/41` §3-4 · §10 「R3 구현」). 인쇄 화면에서 인쇄할 때마다(버튼 · Ctrl+P) 서버 액션 `recordIdDocumentPrint` 가 대상 한 사람당 한 줄.

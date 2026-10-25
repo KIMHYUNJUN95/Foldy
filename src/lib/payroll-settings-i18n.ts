@@ -36,6 +36,7 @@ export type PayrollSettingsCopy = {
   insuranceSince: string;
   insuranceSincePick: string;
   salariedNote: string;
+  salariedShort: string;
   hourlyRate: string;
   rateFrom: string; // "{date}부터"
   issuePaymentMethod: string;
@@ -46,7 +47,6 @@ export type PayrollSettingsCopy = {
   heiOverError: string; // "{date}"
   heiNoHireDateError: string;
   columnHeader: string;
-  changeLogCount: string; // "{n}회"
   toastSaved: string; // "{name} · {field} → {value}"
   undo: string;
   toastUndone: string;
@@ -123,6 +123,7 @@ const ko: PayrollSettingsCopy = {
   insuranceSince: "가입일",
   insuranceSincePick: "날짜 고르기",
   salariedNote: "월급제 — 세무사 담당이라 설정이 없어요",
+  salariedShort: "세무사 담당",
   hourlyRate: "시급",
   rateFrom: "{date}부터",
   issuePaymentMethod: "지급 방식 없음",
@@ -133,7 +134,6 @@ const ko: PayrollSettingsCopy = {
   heiOverError: "입사({date})부터 2개월이 지났어요. 계속 일하면 甲 또는 乙로 바꿔 주세요.",
   heiNoHireDateError: "丙은 입사일이 있어야 2개월을 셀 수 있어요. 입사일을 넣어 주세요.",
   columnHeader: "급여 설정",
-  changeLogCount: "{n}회",
   toastSaved: "{name} · {field} → {value}",
   undo: "되돌리기",
   toastUndone: "되돌렸어요",
@@ -178,7 +178,7 @@ const ko: PayrollSettingsCopy = {
   cancel: "취소",
   saved: "저장했어요",
   holidays: {
-    newYear: "설날(元日)",
+    newYear: "새해 첫날(元日)",
     comingOfAge: "성인의 날",
     foundation: "건국기념일",
     emperor: "천황 탄생일",
@@ -228,6 +228,7 @@ const ja: PayrollSettingsCopy = {
   insuranceSince: "加入日",
   insuranceSincePick: "日付を選ぶ",
   salariedNote: "月給制 — 税理士の担当のため設定はありません",
+  salariedShort: "税理士担当",
   hourlyRate: "時給",
   rateFrom: "{date}から",
   issuePaymentMethod: "支払方法なし",
@@ -238,7 +239,6 @@ const ja: PayrollSettingsCopy = {
   heiOverError: "入社({date})から2か月が過ぎました。続けて働く場合は甲か乙に変えてください。",
   heiNoHireDateError: "丙は入社日がないと2か月を数えられません。入社日を入れてください。",
   columnHeader: "給与設定",
-  changeLogCount: "{n}回",
   toastSaved: "{name} · {field} → {value}",
   undo: "元に戻す",
   toastUndone: "元に戻しました",
@@ -333,6 +333,7 @@ const en: PayrollSettingsCopy = {
   insuranceSince: "Enrolled on",
   insuranceSincePick: "Pick a date",
   salariedNote: "Salaried — handled by the tax accountant, nothing to set",
+  salariedShort: "Accountant",
   hourlyRate: "Hourly rate",
   rateFrom: "from {date}",
   issuePaymentMethod: "No payment method",
@@ -343,7 +344,6 @@ const en: PayrollSettingsCopy = {
   heiOverError: "It’s been over 2 months since they were hired ({date}). If they keep working, switch to 甲 or 乙.",
   heiNoHireDateError: "丙 needs a hire date to count the 2 months. Add the hire date.",
   columnHeader: "Payroll",
-  changeLogCount: "{n}×",
   toastSaved: "{name} · {field} → {value}",
   undo: "Undo",
   toastUndone: "Undone",
@@ -357,7 +357,7 @@ const en: PayrollSettingsCopy = {
   companyNamePlaceholder: "株式会社〇〇",
   companyNameNote: "Printed at the top of part-time payslips, the president’s check sheet and the accountant’s list.",
   secPayday: "Pay day",
-  payDayLabel: "Pay day each month",
+  payDayLabel: "Pay day (day of month)",
   payDayUnit: "",
   payDayRange: "Enter a day from 1 to 28.",
   holidayRule: "If it falls on a Saturday, Sunday or Japanese holiday (incl. substitute holidays), pay moves to the weekday before. Pay period: 1st to month end.",
@@ -380,9 +380,9 @@ const en: PayrollSettingsCopy = {
   monthFor: "{m} pay",
   payDate: "{w}, {m} {d}",
   nextPay: "Next",
-  shiftedSun: "{d}th is a Sunday",
-  shiftedSat: "{d}th is a Saturday",
-  shiftedHoliday: "{d}th is {holiday}",
+  shiftedSun: "{d} is a Sunday",
+  shiftedSat: "{d} is a Saturday",
+  shiftedHoliday: "{d} is {holiday}",
   weekdaysShort: "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
   save: "Save",
   cancel: "Cancel",

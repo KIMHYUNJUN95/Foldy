@@ -244,6 +244,8 @@ export function LeaveQueueClient({
   initialType,
   initialSearch,
   initialRequestId = null,
+  initialView,
+  initialBalanceUserId,
   locale,
   applicants,
   balances,
@@ -258,6 +260,9 @@ export function LeaveQueueClient({
   initialType: LeaveType | null;
   initialSearch: string;
   initialRequestId?: string | null;
+  /** `?view=balance&user=` — 시급 화면 입사일 「고치기」가 그 사람 잔여 패널로 바로 연다(2026-10-25). */
+  initialView?: "review" | "balance";
+  initialBalanceUserId?: string | null;
   locale: Locale;
   applicants: LeaveApplicantOption[];
   balances: AdminLeaveBalanceRow[];
@@ -268,7 +273,7 @@ export function LeaveQueueClient({
 }) {
   const dictionary = getDictionary(locale);
   const lc = dictionary.admin.leaveConsole;
-  const [view, setView] = useState<LeaveView>("review");
+  const [view, setView] = useState<LeaveView>(initialView ?? "review");
   const [items, setItems] = useState(initialItems);
   // 실시간 갱신(AdminLiveRefresh → router.refresh)으로 서버 목록이 새로 오면 그대로 받는다 — 서버가 기준.
   const [seenInitial, setSeenInitial] = useState(initialItems);
@@ -405,6 +410,7 @@ export function LeaveQueueClient({
           shared={dictionary.admin.shared}
           locale={locale}
           employees={balances}
+          initialSelectedUserId={initialBalanceUserId ?? null}
           onToast={(msg) => showToast(msg)}
         />
         {toast ? (

@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import { MobileMemberDetail } from "@/components/mobile/users/mobile-member-detail";
 import { MemberShiftRow } from "@/components/mobile/shift/member-shift-row";
+import { MemberPayrollSection } from "@/components/mobile/users/member-payroll-section";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
+import { loadMemberPayrollPanel } from "@/lib/payroll-settings-server";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import { monthOf } from "@/lib/cleaning-assign/day-state";
@@ -32,6 +35,11 @@ export default async function MobileMemberPage({ params }: { params: Promise<{ i
     userId && hasOrganizationContext(session) && session.capabilities.includes("cleaning.assign")
       ? await loadPersonShift(getSupabaseServiceClient(), session.organization.id, userId, monthOf(today), today, session.user.id).catch(() => null)
       : null;
+  // 「급여 설정」 구역 — `wages.manage` 가 없으면 null(구역 없음, docs/product/39 §3-A).
+  const payroll =
+    userId && hasOrganizationContext(session)
+      ? await loadMemberPayrollPanel(getSupabaseServiceClient(), session.organization.id, session.user.id, userId, today).catch(() => null)
+      : null;
   return (
     <MobileShell activeItem="users" badges={navBadges} title={getDictionary(locale).admin.users.console.mDetailTitle}>
       <MobileMemberDetail
@@ -39,6 +47,18 @@ export default async function MobileMemberPage({ params }: { params: Promise<{ i
         panel={panel}
         locale={locale}
         actorRole={session.user.role}
+        payrollSlot={
+          payroll ? (
+            <MemberPayrollSection
+              key={panel.member.membershipId}
+              panel={payroll}
+              copy={getPayrollSettingsCopy(locale)}
+              locale={locale}
+              memberName={panel.member.name}
+              today={today}
+            />
+          ) : null
+        }
         shiftSlot={shift ? <MemberShiftRow data={shift} copy={getCleaningAssignCopy(locale)} today={today} href={`/mobile/users/${id}/shift`} locale={locale} /> : null}
       />
     </MobileShell>

@@ -181,6 +181,42 @@
 .adm .stw-modal p { margin: 0; font-size: 14px; line-height: 1.6; color: #3a3746; }
 .adm .stw-modal__f { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
 
+/* 급여 탭(2026-10-25, 시안 SettingsPay-PC) — 왼쪽 설정 열 + 오른쪽 400px 지급일 목록. 구분선 0.5px · 상자·세로선 없음 · 다음 지급 줄은 옅은 바탕만. */
+.adm .stwp { display: grid; grid-template-columns: minmax(0, 600px) 400px; gap: 64px; align-items: start; margin-top: 14px; }
+@media (max-width: 1180px) { .adm .stwp { grid-template-columns: minmax(0, 600px); gap: 40px; } }
+.adm .stwp-main { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.adm .stwp-sec { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.adm .stwp-sec h2, .adm .stwp-side h2 { margin: 0; font-size: 16px; font-weight: 600; color: #16141f; }
+.adm .stwp .jp, .adm .stwp-jp { font-family: 'Noto Sans JP', var(--font-sans, sans-serif); }
+.adm .stwp-note { margin: 0; font-size: 13px; line-height: 19px; color: #6b6878; }
+.adm .stwp-note.is-red { color: #c5282e; }
+.adm .stwp-rows { display: flex; flex-direction: column; }
+.adm .stwp-row, .adm .stwp-yr { display: flex; align-items: center; gap: 12px; min-height: 50px; font-size: 14px; color: #3a3746; }
+.adm .stwp-row + .stwp-row, .adm .stwp-yr + .stwp-yr { border-top: 0.5px solid var(--separator); }
+.adm .stwp-k { flex: none; width: 150px; }
+.adm .stwp-v { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.adm .stwp-dd { width: 220px; }
+.adm .stwp-day, .adm .stwp-rate { height: 40px; box-sizing: border-box; padding: 0 8px; border: 1px solid #e0e0e6; border-radius: 10px; background: #fff; font: inherit; font-size: 15px; color: #16141f; text-align: center; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.adm .stwp-day { width: 76px; }
+.adm .stwp-rate { width: 84px; }
+.adm .stwp-day:focus, .adm .stwp-rate:focus { border-color: #7a52e6; box-shadow: 0 0 0 3px rgba(122, 82, 230, .14); }
+.adm .stwp-day.is-bad, .adm .stwp-rate.is-bad { border-color: #c5282e; }
+.adm .stwp-yr { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; }
+.adm .stwp-dim { color: #6b6878; }
+.adm .stwp-act { justify-self: end; white-space: nowrap; }
+.adm .stwp-edit { grid-column: 2 / 4; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.adm .stw-link.is-soft { color: #6b6878; }
+.adm .stwp-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.adm .stwp-pd { margin: 4px 0 0; padding: 0; list-style: none; }
+.adm .stwp-pd li { display: grid; grid-template-columns: 86px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; min-height: 44px; font-size: 14px; color: #16141f; }
+.adm .stwp-pd li + li { border-top: 0.5px solid var(--separator); }
+.adm .stwp-pd li.is-next { margin: 0 -10px; padding: 0 10px; border-radius: 10px; background: #f4f1fd; border-top-color: transparent; }
+.adm .stwp-pd li.is-next + li { border-top-color: transparent; }
+.adm .stwp-pd li.is-moved b { color: #5a30cf; }
+.adm .stwp-pd__m { font-size: 13px; color: #6b6878; }
+.adm .stwp-pd b { font-weight: 600; min-width: 0; }
+.adm .stwp-pd__why { max-width: 190px; font-size: 12px; line-height: 16px; color: #6b6878; text-align: right; }
+
 @media (prefers-reduced-motion: reduce) {
   .adm .stw-tr, .adm .stw-panel, .adm .stw-flash, .adm .stw-err { animation: none; }
   .adm .stw-nf.is-dd .dd__menu { animation: none; }

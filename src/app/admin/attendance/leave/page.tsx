@@ -28,7 +28,7 @@ const LEAVE_TYPES: LeaveType[] = ["annual", "paid", "special", "other"];
 export default async function AdminAttendanceLeavePage({
   searchParams,
 }: {
-  searchParams: Promise<{ statusGroup?: string; type?: string; q?: string; requestId?: string }>;
+  searchParams: Promise<{ statusGroup?: string; type?: string; q?: string; requestId?: string; view?: string; user?: string }>;
 }) {
   const [session, params] = await Promise.all([
     requireAdminPageSession({ nextPath: "/admin/attendance/leave" }),
@@ -86,6 +86,8 @@ export default async function AdminAttendanceLeavePage({
           initialType={type ?? null}
           initialSearch={search ?? ""}
           initialRequestId={typeof params.requestId === "string" ? params.requestId : null}
+          initialView={params.view === "balance" ? "balance" : "review"}
+          initialBalanceUserId={params.view === "balance" && typeof params.user === "string" ? params.user : null}
           locale={locale}
           applicants={applicants}
           balances={balances}

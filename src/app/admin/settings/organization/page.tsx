@@ -7,6 +7,7 @@ import { OrgDeleteButton } from "@/components/admin/settings/org-delete-button";
 import { SettingsSubnav } from "@/components/admin/settings/settings-subnav";
 import "@/components/admin/settings/settings-white.css";
 import { getDictionary } from "@/lib/i18n";
+import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { requireAdminSession } from "@/lib/admin-session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
@@ -90,7 +91,13 @@ export default async function AdminOrganizationSettingsPage({ searchParams }: Pa
   return (
     <AdminShell activeItem="settings" title={settings.organizationTitle}>
       <div className="stw">
-        <SettingsSubnav active="organization" settings={settings} showOrganization />
+        <SettingsSubnav
+          active="organization"
+          settings={settings}
+          showOrganization
+          showPayroll={session.capabilities.includes("payroll.manage")}
+          payrollLabel={getPayrollSettingsCopy(session.user.preferredLanguage).tab}
+        />
 
         {flashMessage ? (
           <p className={`stw-flash ${errorKey ? "is-red" : "is-green"}`} role="status">

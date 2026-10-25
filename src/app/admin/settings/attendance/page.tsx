@@ -24,6 +24,7 @@ import {
 } from "@/lib/attendance-sites";
 import { listTrustedDevices } from "@/lib/attendance-trusted-device";
 import { getDictionary } from "@/lib/i18n";
+import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { hasOrganizationContext } from "@/lib/session";
 import type { AttendanceSiteRow } from "@/lib/attendance";
 
@@ -145,6 +146,8 @@ export default async function AdminAttendanceSettingsPage({ searchParams }: Page
           active="attendance"
           settings={settings}
           showOrganization={session.user.role === "developer_super_admin"}
+          showPayroll={session.capabilities.includes("payroll.manage")}
+          payrollLabel={getPayrollSettingsCopy(session.user.preferredLanguage).tab}
         />
 
         {flashMessage ? (

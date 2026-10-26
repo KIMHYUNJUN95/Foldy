@@ -15,7 +15,7 @@ import {
  * 서버(`payroll-prep-server.ts`)가 읽어 와서 여기에 넣고, PC · 모바일이 같은 줄을 그린다.
  */
 
-/** 새 계산(구간별 분 합계 · 실수령 10엔 올림)을 쓰는 첫 달 — 그 전 달은 지금 급여 검토 표 그대로(39 §11-10, 2026-10-25 결정 1). */
+/** 새 계산(구간별 분 합계 · 1엔 단위, 2026-10-27 전엔 실수령 10엔 올림)을 쓰는 첫 달 — 그 전 달은 지금 급여 검토 표 그대로(39 §11-10, 2026-10-25 결정 1). */
 export const PAYROLL_PREP_START_YM = "2026-10";
 
 export function payrollPrepAvailable(ym: string): boolean {
@@ -127,7 +127,8 @@ export type PrepRow = {
   yearEndAdjustment: number;
   /** 실수령 — 원천세를 낼 수 없으면 null. */
   net: number | null;
-  roundUpYen: number;
+  /** 옛 10엔 올림으로 더 준 끝돈 — 2026-10-27 이전에 굳힌 결재 스냅샷에만 있다(새 계산은 1엔 단위라 없음). */
+  roundUpYen?: number;
   issues: PrepIssue[];
   /** 출력 엑셀 근태 칸(欠勤 · 残業 · 週末 · 勤務表チェック用) — 2026-10-26 이전 결재 스냅샷엔 없다(빈칸으로 낸다). */
   kintai?: PayrollKintai;
@@ -256,7 +257,6 @@ export function buildPrepRow(input: PrepRowInput): PrepRow {
     withholdingOverridden: result.withholdingOverridden,
     yearEndAdjustment: result.yearEndAdjustment,
     net: withholdingKnown ? result.netPay : null,
-    roundUpYen: withholdingKnown ? result.roundUpYen : 0,
     issues: PREP_ISSUE_ORDER.filter((i) => issues.has(i)),
     ...(input.kintai ? { kintai: input.kintai } : {}),
   };

@@ -342,7 +342,7 @@ export function PayrollPerson({
         <div className="mpp-tot">
           <span>
             {copy.net}
-            {row.roundUpYen > 0 ? <small>{fillCopy(copy.roundUp, { n: num(row.roundUpYen) })}</small> : null}
+            {(row.roundUpYen ?? 0) > 0 ? <small>{fillCopy(copy.roundUp, { n: num(row.roundUpYen ?? 0) })}</small> : null}
           </span>
           <b>{row.net == null ? "—" : num(row.net)}</b>
         </div>

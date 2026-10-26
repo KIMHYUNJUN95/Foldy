@@ -13,6 +13,7 @@ import { AIc, AttIcon } from "./att-icons";
 import { MonthSwitcher } from "./month-switcher";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import type { MonthlyPayView, PayExcludeReason } from "@/lib/attendance-pay";
+import { ONE_YEN_PAY_START_YM } from "@/lib/attendance-pay-calculation";
 import { getDictionary } from "@/lib/i18n";
 import { usePersistentToggle } from "@/lib/use-persistent-toggle";
 
@@ -386,7 +387,8 @@ export function AttendancePay({
         </div>
 
         <p className="gross-note">
-          {copy.payDisclaimerBase} {isFinal ? copy.payDisclaimerFinal : copy.payDisclaimerPending} {copy.payRoundNote}
+          {copy.payDisclaimerBase} {isFinal ? copy.payDisclaimerFinal : copy.payDisclaimerPending}{" "}
+          {view.ym >= ONE_YEN_PAY_START_YM ? copy.payRoundNote : copy.payRoundNoteLegacy}
         </p>
       </div>
 

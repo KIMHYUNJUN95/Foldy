@@ -138,10 +138,10 @@ describe("payroll book", () => {
       expect(transfer.cells.get(`P${r}`)).toMatchObject({ v: row.taxable });
       expect(transfer.cells.get(`Q${r}`)).toMatchObject({ v: row.gross });
       expect(transfer.cells.get(`AB${r}`)?.v).toBe(row.net);
-      expect(transfer.cells.get(`AB${r}`)?.f).toBe(`IF(AND(B${r}="",C${r}=""),"",CEILING(Q${r}-Z${r},10))`);
-      // 엑셀 끝처리: CEILING(Q−Z, 10) == 엔진 실수령
+      expect(transfer.cells.get(`AB${r}`)?.f).toBe(`IF(AND(B${r}="",C${r}=""),"",Q${r}-Z${r})`);
+      // 엑셀 끝처리: Q−Z(1엔 단위) == 엔진 실수령
       const z = transfer.cells.get(`Z${r}`)!.v as number;
-      expect(Math.ceil((row.gross - z) / 10) * 10).toBe(row.net);
+      expect(row.gross - z).toBe(row.net);
     });
     // 시급 ③ — ② 칸에 나머지 합 + 備考 메모
     const three = rows.find((r) => r.segments.length === 3)!;
@@ -231,7 +231,7 @@ describe("payroll book", () => {
     await wb.xlsx.load(Buffer.from(b64, "base64") as unknown as ExcelJS.Buffer);
     const ws = wb.getWorksheet(SHEET.transferInput)!;
     const ab3 = ws.getCell("AB3").value as ExcelJS.CellFormulaValue;
-    expect(ab3.formula).toContain("CEILING");
+    expect(ab3.formula).toContain("Q3-Z3");
     expect(typeof ab3.result).toBe("number");
     expect(ws.getColumn("AE").hidden).toBe(false);
     expect(wb.getWorksheet(SHEET.guide)!.state).toBe("hidden");
@@ -318,7 +318,7 @@ function rich(): PrepRow[] {
 }
 
 describe("rich sample", () => {
-  it("입력 시트 값 — P · Q · V · Z 가 칸 합과 같고 AB == CEILING(Q−Z)", () => {
+  it("입력 시트 값 — P · Q · V · Z 가 칸 합과 같고 AB == Q−Z(1엔 단위)", () => {
     const rows = rich();
     const sheets = buildPayrollBook({ ym: "2026-10", paydayDate: "2026-11-10", companyName: "テスト", taxYear: 2026, rows });
     for (const name of [SHEET.cashInput, SHEET.transferInput]) {
@@ -335,7 +335,7 @@ describe("rich sample", () => {
         expect(n(`V${r}`)).toBe(["R", "S", "T", "U"].reduce((a, c) => a + n(`${c}${r}`), 0));
         expect(n(`Z${r}`)).toBe(["V", "W", "X", "Y"].reduce((a, c) => a + n(`${c}${r}`), 0));
         const ab = sh.cells.get(`AB${r}`)!;
-        if (ab.v !== "") expect(ab.v).toBe(Math.ceil((n(`Q${r}`) - n(`Z${r}`)) / 10) * 10);
+        if (ab.v !== "") expect(ab.v).toBe(n(`Q${r}`) - n(`Z${r}`));
       }
     }
     const out = process.env.PAYROLL_EXPORT_OUT;

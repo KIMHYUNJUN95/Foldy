@@ -441,7 +441,7 @@ export function PayrollPrepPanel({
         <div className="ppr-tot">
           <span>
             {copy.net}
-            {row.roundUpYen > 0 ? <small>{fillCopy(copy.roundUp, { n: money.format(row.roundUpYen) })}</small> : null}
+            {(row.roundUpYen ?? 0) > 0 ? <small>{fillCopy(copy.roundUp, { n: money.format(row.roundUpYen ?? 0) })}</small> : null}
           </span>
           <b>{row.net == null ? "—" : fillCopy(copy.yen, { n: money.format(row.net) })}</b>
         </div>

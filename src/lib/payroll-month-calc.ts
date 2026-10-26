@@ -7,13 +7,13 @@ import { dailyHeiWithholding, monthlyWithholding } from "@/lib/withholding-tax";
  *
  * 엑셀 `新アルバイト給与管理` 입력 시트의 열을 그대로 낸다(F · I · J~O · P · Q · U · V · W · Z · AB).
  * ```
- * 支給額_k  = ROUND(시급_k × 분_k ÷ 60)          ← 시급 구간별 그 달 분 합계에 한 번 곱함
+ * 支給額_k  = ROUNDUP(시급_k × 분_k ÷ 60)        ← 시급 구간별 그 달 분 합계에 한 번 곱함, 소수점이면 1엔 올림(2026-10-27)
  * 課税計 P   = Σ支給額_k + 前月調整(과세) + 残業 + 週末 + 特別 + 通勤課税
  * 支給額合計 Q = P + 通勤非課税(+ 前月調整 교통비분)
  * 社会保険計 V = 雇用保険(가입자만)
  * 源泉税 W   = 표 조회(甲乙丙)
  * 控除合計 Z = V + W + 年末調整
- * 差引 AB    = CEILING(Q − Z, 10)               ← 실수령 10엔 올림
+ * 差引 AB    = Q − Z                            ← 1엔 단위 그대로 지급(2026-10-27 — 10엔 올림 폐지)
  * ```
  * 원천세 규칙은 `PayrollTaxRules` 로 갈라 둔다 — 기본값은 국세청 표 기준(인사팀 답변 2026-10-26), 엑셀 방식은
  * `EXCEL_LEGACY_TAX_RULES` 로 남겨 9월분 대조에 쓴다(§11-5 · §11-12).
@@ -131,10 +131,8 @@ export type PayrollMonthResult = {
   yearEndAdjustment: number;
   /** Z 控除合計(住民税 0). */
   deductionTotal: number;
-  /** AB 差引支給額 — 10엔 올림. */
+  /** AB 差引支給額 — 1엔 단위(Q − Z). */
   netPay: number;
-  /** 10엔 올림으로 더 준 끝돈(0~9엔) = AB − (Q − Z). */
-  roundUpYen: number;
   issues: PayrollMonthIssue[];
 };
 
@@ -144,9 +142,9 @@ export function excelRound(yen: number): number {
   return Math.sign(v) * Math.round(Math.abs(v));
 }
 
-/** 엑셀 CEILING(x, 10) — 실수령 10엔 올림. */
-export function ceilTo10(yen: number): number {
-  return Math.ceil(settleYen(yen) / 10) * 10;
+/** 엑셀 ROUNDUP(x, 0) — 소수점이면 1엔 올림(2026-10-27 사용자 결정). 부동소수 끝은 먼저 맞춘다. */
+export function ceilYen(yen: number): number {
+  return Math.ceil(settleYen(yen));
 }
 
 /** 雇用保険 근로자 부담 — 賃金 × 율, 1엔 미만은 50전 이하 버림 · 넘으면 올림(급여에서 뗄 때의 법정 끝처리). */
@@ -184,7 +182,7 @@ export function calculatePayrollMonth(input: PayrollMonthInput): PayrollMonthRes
   const segmentPays = input.segments.map((s) => ({
     hourlyRate: s.hourlyRate,
     paidMinutes: s.paidMinutes,
-    pay: excelRound((s.hourlyRate * s.paidMinutes) / 60),
+    pay: ceilYen((s.hourlyRate * s.paidMinutes) / 60),
   }));
   const basePay = segmentPays.reduce((sum, s) => sum + s.pay, 0);
 
@@ -192,9 +190,9 @@ export function calculatePayrollMonth(input: PayrollMonthInput): PayrollMonthRes
   const adjustCommute = manual.prevMonthAdjustmentKind === "commute" ? manual.prevMonthAdjustment : 0;
   if (manual.prevMonthAdjustment !== 0 && !manual.prevMonthAdjustmentYm) issues.push("prev_adjustment_month_missing");
 
-  const overtime = excelRound(input.autoAllowances.overtime) + manual.overtime;
-  const weekend = excelRound(input.autoAllowances.weekend) + manual.weekend;
-  const special = excelRound(input.autoAllowances.special) + manual.special;
+  const overtime = ceilYen(input.autoAllowances.overtime) + manual.overtime;
+  const weekend = ceilYen(input.autoAllowances.weekend) + manual.weekend;
+  const special = ceilYen(input.autoAllowances.special) + manual.special;
   const commuteTaxable = manual.commuteTaxable;
   const commuteNonTaxable = excelRound(input.commuteNonTaxable) + adjustCommute;
 
@@ -242,8 +240,7 @@ export function calculatePayrollMonth(input: PayrollMonthInput): PayrollMonthRes
   const withholding = manual.withholdingOverride ?? computed;
 
   const deductionTotal = socialInsuranceTotal + withholding + manual.yearEndAdjustment;
-  const exactNet = grossTotal - deductionTotal;
-  const netPay = ceilTo10(exactNet);
+  const netPay = grossTotal - deductionTotal;
 
   return {
     segmentPays,
@@ -263,7 +260,6 @@ export function calculatePayrollMonth(input: PayrollMonthInput): PayrollMonthRes
     yearEndAdjustment: manual.yearEndAdjustment,
     deductionTotal,
     netPay,
-    roundUpYen: netPay - exactNet,
     issues,
   };
 }

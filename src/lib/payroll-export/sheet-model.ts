@@ -51,6 +51,11 @@ export type ModelSheet = {
   autoFilter?: string;
   /** 「未 / 済」 고르기 칸. */
   checkLists?: string[];
+  /**
+   * 엑셀 조건부 서식 — `formula` 가 참이면 칸을 칠한다(왼쪽 위 칸 기준 상대 참조). 엑셀만 쓴다: HTML 은 셀 스타일에
+   * 미리 칠한 값을 그리므로, 만들 때의 값으로 같은 칸을 칠해 둔다.
+   */
+  condFormats?: { range: string; formula: string; fill: string; color: string }[];
   tabColor?: string;
   /** 마지막 행 · 열(1 부터) — 그릴 범위. */
   maxRow: number;
@@ -156,5 +161,6 @@ export function formatCellText(cell: ModelCell): string {
     if (v < 0) return fmt.includes("[Red]") ? `(${s})` : `-${s}`;
     return s;
   }
+  if (fmt === "+0;-0;0") return v > 0 ? `+${v}` : String(v);
   return String(v);
 }

@@ -59,6 +59,15 @@ function sample(): PrepRow[] {
       allowanceSpecial: 3000,
       commuteApproved: 9000,
       manual: { ...EMPTY_PREP_MANUAL, prevAdjustment: -1200, prevAdjustmentYm: "2026-08", overtime: 2000 },
+      kintai: {
+        absentDays: 1,
+        overtimeMinutes: 210,
+        weekendDays: 6,
+        weekendMinutes: 48 * 60,
+        recordedMinutes: 158 * 60 + 30,
+        recordedDays: 19,
+        notes: "打刻修正 1件（10/14）",
+      },
     }),
   );
   const otsu = buildPrepRow(
@@ -70,6 +79,15 @@ function sample(): PrepRow[] {
       paidMinutes: 50 * 60,
       workDays: 8,
       rateSegments: [{ rate: 1300, paidMinutes: 50 * 60 }],
+      kintai: {
+        absentDays: 0,
+        overtimeMinutes: 0,
+        weekendDays: 2,
+        weekendMinutes: 12 * 60,
+        recordedMinutes: 50 * 60,
+        recordedDays: 8,
+        notes: "",
+      },
     }),
   );
   const three = buildPrepRow(
@@ -93,13 +111,14 @@ const book = () =>
   buildPayrollBook({ ym: "2026-10", paydayDate: "2026-11-10", companyName: "テスト株式会社", taxYear: 2026, rows: sample() });
 
 describe("payroll book", () => {
-  it("시트 9장 · 이름 · 파일 이름", () => {
+  it("시트 10장(원본과 같은 순서) · 이름 · 파일 이름", () => {
     const names = book().map((s) => s.name);
     expect(names).toEqual([
       SHEET.guide,
       SHEET.settings,
       SHEET.cashInput,
       SHEET.transferInput,
+      SHEET.workCheck,
       SHEET.owner,
       SHEET.cashSlip,
       SHEET.transferSlip,
@@ -214,11 +233,57 @@ describe("payroll book", () => {
     const ab3 = ws.getCell("AB3").value as ExcelJS.CellFormulaValue;
     expect(ab3.formula).toContain("CEILING");
     expect(typeof ab3.result).toBe("number");
-    expect(ws.getColumn("AD").hidden).toBe(true);
+    expect(ws.getColumn("AE").hidden).toBe(false);
     expect(wb.getWorksheet(SHEET.guide)!.state).toBe("hidden");
+    const wc = wb.getWorksheet(SHEET.workCheck)!;
+    expect(wc.state).toBe("hidden");
+    expect((wc.getCell("F3").value as ExcelJS.CellFormulaValue).formula).toBe("N(現金入力_50名!E3)+N(現金入力_50名!H3)");
+    expect(wc.getCell("K3").dataValidation?.formulae).toEqual(['"未,済"']);
     const slip = wb.getWorksheet(SHEET.transferSlip)!;
     expect(slip.getCell("A1").isMerged).toBe(true);
     expect(slip.getCell("D2").border?.bottom?.style).toBe("thin");
+  });
+
+  it("근태 칸 — 입력 시트 AE~AH 와 명세서 勤怠, 有給日数는 빈칸", () => {
+    const sheets = book();
+    const transfer = sheets.find((s) => s.name === SHEET.transferInput)!;
+    // 이체 쪽 이름순: 가나다(근태 있음) → 사아자(근태 없음 = 옛 스냅샷)
+    expect(transfer.cells.get("AD3")?.v ?? null).toBeNull();
+    expect(transfer.cells.get("AE3")?.v).toBe(1);
+    expect(transfer.cells.get("AF3")?.v).toBeCloseTo(210 / 1440);
+    expect(transfer.cells.get("AG3")?.v).toBe(6);
+    expect(transfer.cells.get("AH3")?.v).toBeCloseTo((48 * 60) / 1440);
+    expect(transfer.cells.get("AE4")?.v ?? null).toBeNull();
+    expect(transfer.hiddenCols ?? []).toEqual([]);
+    const slip = sheets.find((s) => s.name === SHEET.transferSlip)!;
+    const html = buildSheetsHtml({ title: "t", sheets: [slip], printLabel: "Print", lang: "ja" });
+    expect(html).toContain("3:30");
+    expect(html).toContain("48:00");
+  });
+
+  it("勤務表チェック用 — 본인 기록 ↔ 급여 입력, 차이는 빨강 · 「未」, 같으면 「済」", () => {
+    const wc = book().find((s) => s.name === SHEET.workCheck)!;
+    expect(wc.hidden).toBe(true);
+    // 현금(라마바, 차이 없음) → 이체(가나다 +1:30 · 사아자 근태 없음)
+    expect(wc.cells.get("A3")?.v).toBe("現金");
+    expect(wc.cells.get("G3")?.v).toBe("0:00");
+    expect(wc.cells.get("K3")?.v).toBe("済");
+    expect(wc.cells.get("G3")?.s?.fill).toBeUndefined();
+    expect(wc.cells.get("A4")?.v).toBe("振込");
+    expect(wc.cells.get("G4")?.v).toBe("+1:30");
+    expect(wc.cells.get("G4")?.s?.fill).toBe("FCE4D6");
+    expect(wc.cells.get("J4")?.v).toBe(1);
+    expect(wc.cells.get("K4")?.v).toBe("未");
+    expect(wc.cells.get("L4")?.v).toBe("打刻修正 1件（10/14）");
+    expect(wc.cells.get("E5")?.v ?? null).toBeNull();
+    expect(wc.cells.get("K5")?.v ?? null).toBeNull();
+    // 합계 — 확인 끝 1 / 3, 시간 차이 1
+    expect(wc.cells.get("E7")?.v).toBe("1 / 3");
+    expect(wc.cells.get("E8")?.v).toBe(1);
+    expect(wc.condFormats?.map((c) => c.range)).toEqual(["G3:G5", "J3:J5"]);
+    const html = buildSheetsHtml({ title: "t", sheets: [wc], printLabel: "Print", lang: "ja" });
+    expect(html).toContain("+1:30");
+    expect(html).toContain("+1");
   });
 
   it("인쇄 HTML — 명세서 2명마다 쪽 나눔", () => {

@@ -1,4 +1,5 @@
 import { calculatePayrollMonth, insuranceFiscalYear, type PayrollMonthIssue } from "@/lib/payroll-month-calc";
+import type { PayrollKintai } from "@/lib/payroll-kintai";
 import {
   payrollIssues,
   type MemberPayrollSetting,
@@ -120,6 +121,8 @@ export type PrepRow = {
   net: number | null;
   roundUpYen: number;
   issues: PrepIssue[];
+  /** 출력 엑셀 근태 칸(欠勤 · 残業 · 週末 · 勤務表チェック用) — 2026-10-26 이전 결재 스냅샷엔 없다(빈칸으로 낸다). */
+  kintai?: PayrollKintai;
 };
 
 export type PrepRowInput = {
@@ -144,6 +147,7 @@ export type PrepRowInput = {
   /** 근무 달 — 雇用保険 年度. */
   ym: string;
   insuranceRates: Record<string, number>;
+  kintai?: PayrollKintai;
 };
 
 function engineIssue(issue: PayrollMonthIssue): PrepIssue | null {
@@ -239,6 +243,7 @@ export function buildPrepRow(input: PrepRowInput): PrepRow {
     net: withholdingKnown ? result.netPay : null,
     roundUpYen: withholdingKnown ? result.roundUpYen : 0,
     issues: PREP_ISSUE_ORDER.filter((i) => issues.has(i)),
+    ...(input.kintai ? { kintai: input.kintai } : {}),
   };
 }
 

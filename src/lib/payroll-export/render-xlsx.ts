@@ -95,6 +95,22 @@ function addSheet(wb: ExcelJS.Workbook, m: ModelSheet) {
   for (const addr of m.checkLists ?? []) {
     ws.getCell(addr).dataValidation = { type: "list", allowBlank: true, formulae: ['"未,済"'] };
   }
+  m.condFormats?.forEach((cf, i) => {
+    ws.addConditionalFormatting({
+      ref: cf.range,
+      rules: [
+        {
+          type: "expression",
+          priority: i + 1,
+          formulae: [cf.formula],
+          style: {
+            fill: { type: "pattern", pattern: "solid", bgColor: { argb: argb(cf.fill) } },
+            font: { color: { argb: argb(cf.color) }, bold: true },
+          },
+        },
+      ],
+    });
+  });
 }
 
 export async function renderWorkbookBase64(sheets: readonly ModelSheet[], creator = "Foldy"): Promise<string> {

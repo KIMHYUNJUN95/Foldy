@@ -19,6 +19,9 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { loadPayrollRound } from "@/lib/payroll-approval-server";
 import type { PayrollRound } from "@/lib/payroll-approval";
 import { tokyoToday } from "@/lib/tokyo-date";
+import { readAllPages } from "@/lib/supabase/read-all-pages";
+import { breakSecondsBySession } from "@/lib/attendance-pay-calculation";
+import { computePayrollKintai, type KintaiAudit } from "@/lib/payroll-kintai";
 
 /**
  * 알바 급여 P3 — 급여 준비 읽기(서버 전용, service role). PC 근태 › 급여 · 모바일 급여 준비가 같이 쓴다.
@@ -206,7 +209,9 @@ export async function loadPrepRows(
     return { ym, available: true, payday, allFinalized: false, rows: [], totals: prepTotals([]) };
   }
 
-  const [profilesRes, views] = await Promise.all([
+  const hourlySet = new Set(hourlyIds);
+  const hourlySessions = base.sessions.filter((s) => hourlySet.has(s.user_id));
+  const [profilesRes, views, kintaiSources] = await Promise.all([
     service.from("profiles").select("id, name").in("id", hourlyIds),
     loadMemberPayrollViews(
       service,
@@ -214,7 +219,9 @@ export async function loadPrepRows(
       hourlyIds.map((userId) => ({ userId, hourly: true })),
       today,
     ),
+    loadKintaiSources(service, organizationId, ym, hourlySessions, hourlyIds),
   ]);
+  const breakSecs = breakSecondsBySession(links.breaks, base.sessions);
   const nameById = new Map<string, string>();
   for (const p of (profilesRes.data ?? []) as { id: string; name: string }[]) nameById.set(p.id, p.name);
   const transportByUser = new Map<string, number>();
@@ -245,6 +252,14 @@ export async function loadPrepRows(
       taxYear,
       ym,
       insuranceRates,
+      kintai: computePayrollKintai({
+        days: month.prep.dailyPaid,
+        sessions: hourlySessions.filter((s) => s.user_id === userId),
+        breakSecondsBySession: breakSecs,
+        auditsBySession: kintaiSources.auditsBySession,
+        assignedDates: kintaiSources.assignedByUser.get(userId) ?? [],
+        today,
+      }),
     });
   });
   sortPrepRows(rows);
@@ -256,4 +271,83 @@ export async function loadPrepRows(
     rows,
     totals: prepTotals(rows),
   };
+}
+
+const KINTAI_ID_CHUNK = 200;
+
+function chunked<T>(items: readonly T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += KINTAI_ID_CHUNK) out.push(items.slice(i, i + KINTAI_ID_CHUNK));
+  return out;
+}
+
+/**
+ * 출력 엑셀 근태 칸의 원천 — 세션 감사 기록(본인 원래 시각 · 정정 이유)과 그 달 청소 배정(= 확정 시프트, 欠勤日数).
+ * 배정은 방마다 한 행이라 한 달에 1,000행을 쉽게 넘는다 — 둘 다 `readAllPages` 로 끝까지 읽는다.
+ * 읽기 실패는 경고만 남기고 읽은 만큼 쓴다(근태 칸은 확인용이라 급여 계산을 막지 않는다).
+ */
+async function loadKintaiSources(
+  service: Service,
+  organizationId: string,
+  ym: string,
+  sessions: readonly { id: string }[],
+  userIds: readonly string[],
+): Promise<{ auditsBySession: Map<string, KintaiAudit[]>; assignedByUser: Map<string, string[]> }> {
+  const firstDay = `${ym}-01`;
+  const lastDay = tokyoMonthLastDay(ym);
+  const [auditPages, assignPages] = await Promise.all([
+    Promise.all(
+      chunked(sessions.map((s) => s.id)).map((ids) =>
+        readAllPages<KintaiAudit>((from, to) =>
+          service
+            .from("attendance_session_audits")
+            .select("session_id, action_type, before_json, created_at")
+            .eq("organization_id", organizationId)
+            .in("session_id", ids)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+      ),
+    ),
+    Promise.all(
+      chunked(userIds).map((ids) =>
+        readAllPages<{ user_id: string; work_date: string }>((from, to) =>
+          service
+            .from("cleaning_assignments")
+            .select("user_id, work_date")
+            .eq("organization_id", organizationId)
+            .gte("work_date", firstDay)
+            .lte("work_date", lastDay)
+            .in("user_id", ids)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+      ),
+    ),
+  ]);
+  const auditsBySession = new Map<string, KintaiAudit[]>();
+  for (const res of auditPages) {
+    if (res.error) console.warn("[payroll-prep] session audits read failed:", res.error.message);
+    for (const a of res.data) {
+      const list = auditsBySession.get(a.session_id);
+      if (list) list.push(a);
+      else auditsBySession.set(a.session_id, [a]);
+    }
+  }
+  const assignedByUser = new Map<string, string[]>();
+  for (const res of assignPages) {
+    if (res.error) console.warn("[payroll-prep] cleaning assignments read failed:", res.error.message);
+    for (const a of res.data) {
+      const list = assignedByUser.get(a.user_id);
+      if (list) list.push(a.work_date);
+      else assignedByUser.set(a.user_id, [a.work_date]);
+    }
+  }
+  return { auditsBySession, assignedByUser };
+}
+
+/** YYYY-MM 의 마지막 날 키. */
+function tokyoMonthLastDay(ym: string): string {
+  const days = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+  return `${ym}-${String(days).padStart(2, "0")}`;
 }

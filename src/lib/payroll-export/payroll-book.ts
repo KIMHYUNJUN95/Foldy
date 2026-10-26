@@ -14,8 +14,9 @@ import {
  *
  * 인사팀이 쓰던 엑셀과 같은 시트 · 같은 칸 · 같은 수식 흐름(입력 시트 → 명세서 · 사장 확인표 · 지급 확인 목록)을 만든다.
  * 다른 점(문서 38 §9 의 오류는 따라 하지 않음): 사람 수만큼 행 · 블록(50칸 제한 없음), 수당 칸 이름(前月調整額 · 週末手当 ·
- * 特別手当), 원천세는 국세청 표 그대로(사회보험 뺀 금액 · 甲 부양 인원 열 · 乙 하한 없음), 有給日数 칸 없음,
- * 勤務表チェック用 시트는 뺌(Foldy 근태가 같은 원천이라 대조할 것이 없음).
+ * 特別手当), 원천세는 국세청 표 그대로(사회보험 뺀 금액 · 甲 부양 인원 열 · 乙 하한 없음).
+ * 원본 10장 전부를 만든다(2026-10-26) — 근태 칸(欠勤 · 残業 · 週末)은 Foldy 근태로 채우고, 숨김 시트 勤務表チェック用은
+ * 본인이 찍은 원래 기록과 급여에 들어간 시간을 대조한다(`src/lib/payroll-kintai.ts`). 有給日数는 2027-03 기준이 정해질 때까지 빈칸.
  * 숫자는 모두 급여 준비 화면(P2 엔진)과 같은 값 — 수식 칸에도 그 값을 미리 넣어 둔다.
  */
 
@@ -52,6 +53,7 @@ export const SHEET = {
   settings: "設定",
   cashInput: "現金入力_50名",
   transferInput: "振込入力_50名",
+  workCheck: "勤務表チェック用",
   owner: "社長確認用・資金準備表",
   cashSlip: "現金_明細印刷",
   transferSlip: "振込_明細印刷",
@@ -287,8 +289,13 @@ function inputSheet(name: string, title: string, rows: readonly PrepRow[], taxYe
     if (row.net == null) b.set(`AB${r}`, "", st.cell(YEN));
     else b.set(`AB${r}`, row.net, st.cell(YEN), `IF(AND(B${r}="",C${r}=""),"",CEILING(Q${r}-Z${r},10))`);
     b.set(`AC${r}`, row.workDays, st.cell("0"));
-    for (const c of ["AD", "AE", "AG"]) b.set(`${c}${r}`, null, st.cell("0"));
-    for (const c of ["AF", "AH"]) b.set(`${c}${r}`, null, st.cell(HOURS));
+    // 근태 칸 — 有給日数(AD)는 빈칸. 2026-10-26 이전 결재 스냅샷엔 근태 값이 없어 빈칸으로 둔다.
+    const k = row.kintai;
+    b.set(`AD${r}`, null, st.cell("0"));
+    b.set(`AE${r}`, k ? k.absentDays : null, st.cell("0"));
+    b.set(`AF${r}`, k ? minutesToDays(k.overtimeMinutes) : null, st.cell(HOURS));
+    b.set(`AG${r}`, k ? k.weekendDays : null, st.cell("0"));
+    b.set(`AH${r}`, k ? minutesToDays(k.weekendMinutes) : null, st.cell(HOURS));
     b.set(`AI${r}`, methodLabel(row), st.cell());
     b.set(`AJ${r}`, null, st.cell());
     b.set(`AK${r}`, null, st.cell());
@@ -312,7 +319,6 @@ function inputSheet(name: string, title: string, rows: readonly PrepRow[], taxYe
   const s = b.sheet;
   s.freeze = { rows: 2, cols: 2 };
   s.autoFilter = `A2:AO${end}`;
-  s.hiddenCols = [29, 30, 31, 32, 33]; // AD~AH — 알바는 비어 있는 칸(명세서엔 그대로 나옴)
   s.checkLists = rows.map((_, i) => `AJ${i + 3}`).concat(rows.map((_, i) => `AK${i + 3}`));
   s.tabColor = "375623";
   return s;
@@ -420,12 +426,13 @@ function slipSheet(name: string, inputName: string, rows: readonly PrepRow[], se
       { range: "K:L", label: "控除合計", ref: "Z", value: deduction },
     ]);
 
-    // 勤怠 — 有給日数 칸은 비움(시급제 연차는 급여 밖, 문서 39 §11-7)
+    // 勤怠 — 有給日数 칸은 비움(시급제 연차는 급여 밖, 문서 39 §11-7). 나머지는 입력 시트 AE~AH(Foldy 근태).
+    const k = row.kintai;
     b.merge(`A${R(20)}:A${R(23)}`, "勤\n怠", SLIP_PLAIN);
     pairs(20, [
       { range: "B:C", label: "出勤日数", ref: "AC", value: row.workDays, numFmt: "0" },
-      { range: "D:E" },
-      { range: "F:G", label: "欠勤日数", ref: "AE", value: "", numFmt: "0" },
+      { range: "D:E", label: "有給日数", ref: "AD", value: "", numFmt: "0" },
+      { range: "F:G", label: "欠勤日数", ref: "AE", value: k ? k.absentDays : "", numFmt: "0" },
       { range: "H:I", label: "出勤時間①", ref: "E", value: row.segments[0] ? minutesToDays(row.segments[0].paidMinutes) : "", numFmt: HOURS },
       {
         range: "J:L",
@@ -436,9 +443,9 @@ function slipSheet(name: string, inputName: string, rows: readonly PrepRow[], se
       },
     ]);
     pairs(22, [
-      { range: "B:C", label: "残業時間", ref: "AF", value: "", numFmt: HOURS },
-      { range: "D:E", label: "週末出勤日数", ref: "AG", value: "", numFmt: "0" },
-      { range: "F:G", label: "週末出勤時間", ref: "AH", value: "", numFmt: HOURS },
+      { range: "B:C", label: "残業時間", ref: "AF", value: k ? minutesToDays(k.overtimeMinutes) : "", numFmt: HOURS },
+      { range: "D:E", label: "週末出勤日数", ref: "AG", value: k ? k.weekendDays : "", numFmt: "0" },
+      { range: "F:G", label: "週末出勤時間", ref: "AH", value: k ? minutesToDays(k.weekendMinutes) : "", numFmt: HOURS },
       { range: "H:I" },
       { range: "J:L" },
     ]);
@@ -635,6 +642,123 @@ function ownerSheet(
   return s;
 }
 
+// ── 근무 기록 대조(숨김) ──
+
+const DIFF_FILL = "FCE4D6";
+const DIFF_COLOR = "C00000";
+
+/** 「+1:30」 · 「-1:15」 · 「0:00」 — 엑셀 시각 서식은 음수를 못 그려(####) 글로 낸다. */
+function signedHm(minutes: number): string {
+  if (minutes === 0) return "0:00";
+  return `${minutes > 0 ? "+" : "-"}${hm(Math.abs(minutes))}`;
+}
+
+/**
+ * 勤務表チェック用 — 본인이 찍은 원래 기록(本人記入) ↔ 급여에 들어간 시간 · 일수(給与入力 = 입력 시트 E+H · AC).
+ * 차이 칸은 빨갛게(엑셀은 조건부 서식이라 입력 시트를 고치면 따라 바뀐다), 備考는 차이 이유(정정 · 손 추가 · 무효 · 퇴근 없음).
+ * 원본처럼 숨김 시트이고 PDF 인쇄에는 넣지 않는다.
+ */
+function workCheckSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[]): ModelSheet {
+  const b = new SheetBuilder(SHEET.workCheck, [6, 4.5, 10, 14, 10, 10, 8, 9.5, 9.5, 7, 6, 31, 10.75], {
+    orientation: "landscape",
+    fitToWidth: true,
+    margins: { left: 0.55, right: 0.55, top: 0.75, bottom: 0.75 },
+  });
+  b.merge("A1:M1", "勤務表チェック（打刻記録 と 給与入力 の差）", st.title(12));
+  b.height(1, 21).height(2, 14.45);
+  [
+    "区分",
+    "No",
+    "韓国名",
+    "氏名",
+    "本人記入時間",
+    "給与入力時間",
+    "時間差",
+    "本人記入日数",
+    "給与入力日数",
+    "日数差",
+    "確認",
+    "備考",
+    "金額",
+  ].forEach((h, i) => b.set(`${colLetter(i)}2`, h, st.head(9)));
+
+  const diffStyle = (base: CellStyle): CellStyle => ({
+    ...base,
+    fill: DIFF_FILL,
+    font: { ...base.font, color: DIFF_COLOR, bold: true },
+  });
+  let r = 3;
+  const checks: string[] = [];
+  const add = (rows: readonly PrepRow[], inputName: string) => {
+    const inp = sheetRef(inputName);
+    rows.forEach((row, i) => {
+      const ir = i + 3;
+      const k = row.kintai;
+      const payMinutes = row.segments.reduce((sum, x) => sum + x.paidMinutes, 0);
+      const minuteDiff = k ? payMinutes - k.recordedMinutes : 0;
+      const dayDiff = k ? row.workDays - k.recordedDays : 0;
+      b.height(r, 18.95);
+      b.set(`A${r}`, methodLabel(row), st.cell(undefined, 9), `${inp}!AI${ir}`);
+      b.set(`B${r}`, i + 1, st.cell(undefined, 9), `${inp}!A${ir}`);
+      b.set(`C${r}`, row.name, st.cell(undefined, 9), `${inp}!B${ir}`);
+      b.set(`D${r}`, row.nameKatakana ?? "", st.cell(undefined, 9), orBlank(`${inp}!C${ir}`));
+      b.set(`E${r}`, k ? minutesToDays(k.recordedMinutes) : null, st.cell(HOURS, 9));
+      b.set(`F${r}`, minutesToDays(payMinutes), st.cell(HOURS, 9), `N(${inp}!E${ir})+N(${inp}!H${ir})`);
+      const g = st.cell(undefined, 9);
+      b.set(
+        `G${r}`,
+        k ? signedHm(minuteDiff) : "",
+        minuteDiff !== 0 ? diffStyle(g) : g,
+        `IF(E${r}="","",IF(ROUND((F${r}-E${r})*1440,0)=0,"0:00",IF(F${r}<E${r},"-","+")&TEXT(ABS(F${r}-E${r}),"[h]:mm")))`,
+      );
+      b.set(`H${r}`, k ? k.recordedDays : null, st.cell("0", 9));
+      b.set(`I${r}`, row.workDays, st.cell("0", 9), `${inp}!AC${ir}`);
+      const j = st.cell("+0;-0;0", 9);
+      b.set(`J${r}`, k ? dayDiff : "", dayDiff !== 0 ? diffStyle(j) : j, `IF(H${r}="","",I${r}-H${r})`);
+      // 차이가 없으면 볼 것이 없어 「済」, 있으면 「未」 — 확인한 사람이 「済」로 바꾼다.
+      b.set(`K${r}`, k ? (minuteDiff === 0 && dayDiff === 0 ? "済" : "未") : null, st.cell(undefined, 9));
+      b.set(`L${r}`, k?.notes ?? "", st.cell(undefined, 9, left));
+      b.set(`M${r}`, row.net ?? "", st.cell(YEN, 9), orBlank(`${inp}!AB${ir}`));
+      checks.push(`K${r}`);
+      r += 1;
+    });
+  };
+  add(cash, SHEET.cashInput);
+  add(transfer, SHEET.transferInput);
+  const last = Math.max(3, r - 1);
+  const all = [...cash, ...transfer];
+  const people = all.length;
+  const doneCount = all.filter((row) => {
+    const k = row.kintai;
+    if (!k) return false;
+    const pay = row.segments.reduce((sum, x) => sum + x.paidMinutes, 0);
+    return pay === k.recordedMinutes && row.workDays === k.recordedDays;
+  }).length;
+  const diffCount = all.filter((row) => {
+    const k = row.kintai;
+    if (!k) return false;
+    return row.segments.reduce((sum, x) => sum + x.paidMinutes, 0) !== k.recordedMinutes;
+  }).length;
+  r += 1;
+  b.merge(`A${r}:D${r}`, "確認済件数", st.total());
+  b.set(`E${r}`, `${doneCount} / ${people}`, st.total(), `COUNTIF(K3:K${last},"済")&" / "&${people}`);
+  b.merge(`A${r + 1}:D${r + 1}`, "時間差あり", st.total());
+  b.set(`E${r + 1}`, diffCount, st.total("0"), `SUMPRODUCT((E3:E${last}<>"")*(ROUND((F3:F${last}-E3:E${last})*1440,0)<>0))`);
+  b.height(r, 14.45).height(r + 1, 14.45);
+
+  const s = b.sheet;
+  s.hidden = true;
+  s.freeze = { rows: 2, cols: 0 };
+  s.checkLists = checks;
+  if (people > 0) {
+    s.condFormats = [
+      { range: `G3:G${last}`, formula: `AND($E3<>"",ROUND(($F3-$E3)*1440,0)<>0)`, fill: DIFF_FILL, color: DIFF_COLOR },
+      { range: `J3:J${last}`, formula: `AND($H3<>"",$I3<>$H3)`, fill: DIFF_FILL, color: DIFF_COLOR },
+    ];
+  }
+  return s;
+}
+
 // ── 지급 확인 목록 ──
 
 function checkSheet(
@@ -789,6 +913,7 @@ export function buildPayrollBook(input: PayrollBookInput): ModelSheet[] {
     settings,
     inputSheet(SHEET.cashInput, "現金入力　※ここを直すと、明細・社長確認表・支給確認一覧へ自動反映", cash, input.taxYear),
     inputSheet(SHEET.transferInput, "振込入力　※ここを直すと、明細・社長確認表・支給確認一覧へ自動反映", transfer, input.taxYear),
+    workCheckSheet(cash, transfer),
     ownerSheet(cash, transfer, values.title, input.stamps),
     slipSheet(SHEET.cashSlip, SHEET.cashInput, cash, values),
     slipSheet(SHEET.transferSlip, SHEET.transferInput, transfer, values),

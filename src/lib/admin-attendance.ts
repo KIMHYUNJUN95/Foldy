@@ -729,7 +729,7 @@ export function currentTokyoYm(): string {
 // 1엔 단위까지 비교한다.
 
 const PAYROLL_SESSION_SELECT =
-  "id, user_id, operating_date, clock_in_at, clock_out_at, status, review_state, clock_in_site_id, clock_out_site_id" as const;
+  "id, user_id, operating_date, clock_in_at, clock_out_at, status, review_state, clock_in_site_id, clock_out_site_id, manual_created" as const;
 
 type PayrollSessionRow = {
   id: string;
@@ -741,6 +741,8 @@ type PayrollSessionRow = {
   review_state: string;
   clock_in_site_id: string | null;
   clock_out_site_id: string | null;
+  /** 관리자가 손으로 만든 세션 — 급여 엑셀 勤務表チェック用의 본인 기록에서 뺀다. */
+  manual_created: boolean;
 };
 
 type PayrollRateRow = {
@@ -940,6 +942,8 @@ export type PayrollPrepDetail = {
   rateSegments: { rate: number; paidMinutes: number; since: string | null }[];
   /** 근무한 날마다 기본급 + 추가수당(엔, 반올림). 날짜 ↑. */
   dailyTaxable: number[];
+  /** 날마다 급여 인정 분(세션 있는 날, 날짜 ↑) — 출력 엑셀의 残業 · 週末 칸. */
+  dailyPaid: { date: string; paidMinutes: number }[];
 };
 
 export type PayrollUserMonth = {
@@ -1076,6 +1080,7 @@ export function computePayrollMonth(
         dailyTaxable: calc.days
           .filter((d) => d.grossExact + d.allowanceExact > 0)
           .map((d) => Math.round(d.grossExact + d.allowanceExact)),
+        dailyPaid: calc.days.map((d) => ({ date: d.date, paidMinutes: d.paidMinutes })),
       },
       eligibility: {
         eligible:

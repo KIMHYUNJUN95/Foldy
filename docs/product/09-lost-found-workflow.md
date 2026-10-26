@@ -81,6 +81,10 @@ Photos help identify the item later when a guest contacts the team.
 Limit:
 
 - Maximum 5 photos per lost item.
+- Server check (2026-10-26): every URL must be our Storage `request-images` URL directly under
+  `{orgId}/lost-items/{requestId}/` (shared `isOwnStoragePublicUrl()`).
+- Upload owner = the client hook `usePhotoUpload` (2026-10-26): a failed insert no longer deletes the uploaded photos on
+  the server (the retry re-sends the same URLs); the photos are removed only when the user abandons the confirm sheet.
 
 Compression:
 
@@ -327,6 +331,24 @@ Default mobile behavior:
   블록**, **파트타임 → 읽기 전용 진행바 + 잠금 안내**.
 - 증빙 사진은 `request-images` 버킷의 `{org}/lost-found-handling/{itemId}/` 경로. 스토리지 정책
   화이트리스트에 `lost-found-handling` 추가(마이그레이션 `202607170001`).
+- **2026-10-26 디버깅 — 현장 처리 고침**
+  - **반환 방식**: 반환완료로 새로 넘길 때 상태 칸 아래에 어드민 반환 창과 같은 **[직접 수령 | 배송]** 토글(기본 직접 수령)이
+    나타나고, 배송이면 **송장번호(선택)** 칸이 열린다(사전은 `lostFound.console.mrMethod` · `mrPickup` · `mrDelivery` ·
+    `mrTracking` · `mrTrackingPh` 재사용). 확인 시트에도 「반환 방식 · 송장」 줄. 서버는 반환완료로 새로 넘어갈 때
+    `returnMethod` 가 없으면 `return_method_required` 로 거절한다(예전 모바일은 방식을 안 물어 `return_method` 가 비고
+    송장은 `""` 로 저장됐다). 송장번호는 어드민과 같이 선택 — 배송일 때만 저장(100자까지).
+  - **갈 수 있는 상태만**: 상태 5칸 중 지금 상태에서 갈 수 없는 칸은 흐리게 · 누를 수 없다. 규칙은 서버와 같은
+    `isValidLostItemTransition()`(`src/lib/lost-found-handling.ts` — 클라이언트 · 서버 공용으로 옮김): 한 단계 전진 ·
+    진행 중 어디서든 반환 · 종결에서 나가기 금지.
+  - **증빙 사진 이어 붙이기**: 새로 고른 사진만 보내고 서버가 저장된 사진 뒤에 붙인다(예전엔 통째로 바꿔 이전 사진이
+    사라졌다). 합쳐 5장 — 넘으면 `too_many_photos`. 업로더는 남은 장수만, 진행 중 상세에도 이미 남긴 증빙 사진을 보여 준다.
+    주소 검사는 공용 `isOwnStoragePublicUrl()`(`src/lib/storage-url-guard.ts`).
+  - **두 번 저장 막기**: 사진 올리기부터 저장까지 버튼이 잠기고, 성공하면 고른 사진을 비우며, 실패하면 방금 올린 사진을 지운다.
+  - **동시 변경**: 화면을 열 때 본 상태(`expectedStatus`)와 지금 상태가 다르면 `conflict`(「방금 다른 사람이 이 분실물을
+    바꿨어요」) — 업데이트에도 `.eq("status", 읽은 상태)` 가드.
+  - **처리 메모의 시스템 줄**: 고치는 칸에는 사람이 쓴 줄만 넣는다(`splitLostFoundHandlingMemo()`). 관리자 복원 표시
+    (`[stayops:admin_restore] …`)는 보는 사람 언어로 바꾼 글로 칸에 들어가 그 언어로 굳어 저장되던 문제 — 이제 서버가
+    저장할 때 시스템 줄을 원래대로 뒤에 다시 붙인다.
 
 ### 반환완료 전용 목록 (2026-07-15 신설)
 

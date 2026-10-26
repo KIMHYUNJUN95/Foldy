@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
-import { applyMonthSuggestions, previewMonthSuggestions, toggleApplicationForUser } from "@/app/admin/cleaning-assign/actions";
+import { applyMonthSuggestions, previewMonthSuggestions } from "@/app/admin/cleaning-assign/actions";
+import { toggleApplicationForUser } from "@/actions/cleaning-assign-shift";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import type { Dictionary } from "@/lib/i18n";

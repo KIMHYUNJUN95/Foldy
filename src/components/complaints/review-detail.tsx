@@ -105,7 +105,8 @@ export function ReviewDetail({
       const results = await Promise.all(
         missing.map(async (p) => ({
           part: p.part,
-          res: await translateReviewPartAction(review.id, p.part, p.text, review.sourceLanguageCode),
+          // 원문은 서버가 리뷰에서 직접 읽는다 — 여기서는 어느 조각인지만 보낸다.
+          res: await translateReviewPartAction(review.id, p.part),
         })),
       );
       setTranslations((prev) => {

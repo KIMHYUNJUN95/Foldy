@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { formatIncompletePhoneNumber, type MetadataJson } from "libphonenumber-js/core";
 import metadataModule from "libphonenumber-js/metadata.min";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
-import { haptic } from "@/lib/haptics";
 import "./mobile-ops-sheets-white.css";
 
 /**
@@ -215,7 +214,11 @@ export function MswSuccess({ label }: { label: string }) {
   );
 }
 
-/** 성공 표시 후 잠깐 뒤 콜백 — 체크가 그려지는 것을 보여 주고 시트를 닫게 한다. */
+/**
+ * 성공 표시 후 잠깐 뒤 콜백 — 체크가 그려지는 것을 보여 주고 시트를 닫게 한다.
+ * 햅틱은 여기서 울리지 않는다 — 뒤이어 뜨는 알림(`MobileOpsToast` 의 「완료」)이 서버 확정 때 한 번 울린다. 둘 다 울리면
+ * 성공 진동이 두 번 났다(2026-10-26 버그 수정). 가격 · 최소숙박은 접수가 아니라 Beds24 반영 완료 때 울린다.
+ */
 export function useSuccessThen(delayMs = 720) {
   const [done, setDone] = useState(false);
   const timer = useRef<number | null>(null);
@@ -228,7 +231,6 @@ export function useSuccessThen(delayMs = 720) {
   const succeed = useCallback(
     (then: () => void) => {
       setDone(true);
-      haptic("success");
       timer.current = window.setTimeout(then, delayMs);
     },
     [delayMs],

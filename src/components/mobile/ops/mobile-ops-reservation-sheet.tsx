@@ -93,9 +93,12 @@ export type MobileReservationSheetCopy = ReservationCardCopy & {
   mvListChecking: string;
   mvSending: string;
   mvSubmitDate: string;
+  mrChannelDirect: string;
+  mbErrRoomBusy: string;
 };
 
-const CHANNEL_LABEL: Record<string, string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Direct" };
+/** 채널 이름 — 브랜드 이름은 그대로, 수기(직접) 예약만 사전 문구(`mrChannelDirect`, 2026-10-26). */
+const CHANNEL_LABEL: Record<string, string> = { airbnb: "Airbnb", booking: "Booking.com" };
 const money = (value: number) => `¥${Math.round(value).toLocaleString("ja-JP")}`;
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
@@ -180,7 +183,8 @@ export function MobileOpsReservationSheet({
     };
   }, [bar.id]);
 
-  const channelName = detail?.channelName ?? CHANNEL_LABEL[bar.channel] ?? bar.channel;
+  const channelName =
+    detail?.channelName ?? (bar.channel === "manual" ? copy.mrChannelDirect : CHANNEL_LABEL[bar.channel]) ?? bar.channel;
   const guests =
     detail && detail.numAdult !== null
       ? copy.rpGuestsValue.replace("{adults}", String(detail.numAdult)).replace("{children}", String(detail.numChild ?? 0))
@@ -558,7 +562,12 @@ function MobileReservationEdit({
         return;
       }
       haptic("error");
-      setError(reservationEditErrorText(copy, result.error, result.conflictDates));
+      // 같은 방에 다른 쓰기가 진행 중(방 잠금 · 2026-10-26) — 수기 예약 · 옮기기와 같은 문구.
+      setError(
+        result.error === "room_busy"
+          ? copy.mbErrRoomBusy
+          : reservationEditErrorText(copy, result.error, result.conflictDates),
+      );
     });
   };
 

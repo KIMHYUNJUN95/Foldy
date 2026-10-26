@@ -15,6 +15,7 @@ import { startBreak, endBreak, respondOpenSessionReminder } from "@/app/mobile/a
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
 import { usePersistentToggle } from "@/lib/use-persistent-toggle";
+import { haptic } from "@/lib/haptics";
 import { formatWeeklyMinutes } from "@/lib/staff-documents/weekly-limit";
 import type { ResidenceCardNotice } from "@/lib/staff-documents/expiry";
 
@@ -362,20 +363,40 @@ export function AttendanceHome({
     if (busy) return;
     setBusy(true);
     setErrorMsg(null);
-    const res = await startBreak();
+    let res: Awaited<ReturnType<typeof startBreak>>;
+    try {
+      res = await startBreak();
+    } catch {
+      res = { ok: false, reason: "error" } as Awaited<ReturnType<typeof startBreak>>;
+    }
     setBusy(false);
     // 성공은 액션의 revalidatePath 가 화면을 갱신한다 — router.refresh() 중복 금지
-    if (!res.ok) setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
+    if (!res.ok) {
+      haptic("error");
+      setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
+      return;
+    }
+    haptic("success");
   }, [busy, copy]);
 
   const onEndBreak = useCallback(async () => {
     if (busy) return;
     setBusy(true);
     setErrorMsg(null);
-    const res = await endBreak();
+    let res: Awaited<ReturnType<typeof endBreak>>;
+    try {
+      res = await endBreak();
+    } catch {
+      res = { ok: false, reason: "error" } as Awaited<ReturnType<typeof endBreak>>;
+    }
     setBusy(false);
     // 성공은 액션의 revalidatePath 가 화면을 갱신한다 — router.refresh() 중복 금지
-    if (!res.ok) setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
+    if (!res.ok) {
+      haptic("error");
+      setErrorMsg(resolveBreakErrorMsg(res.reason ?? "error", copy));
+      return;
+    }
+    haptic("success");
   }, [busy, copy]);
 
   const [booting, setBooting] = useState(true);
@@ -649,8 +670,9 @@ export function AttendanceHome({
         <Link href="/mobile/attendance/capture" className="clockbtn clockbtn--in">
           <AIc>{AttIcon.qr}</AIc>{copy.clockIn}
         </Link>
-        {/* 출근 전이 가장 쓸모 있는 때 — 출근하기 전에 최근 7일 시간을 본다 */}
-        {weeklyBanner}
+        {/* 출근 전이 가장 쓸모 있는 때 — 출근하기 전에 최근 7일 시간을 본다. 퇴근 미기록 배너도 출근 전에
+            보여야 한다(지난 운영일의 열린 근무는 출근 전 상태로 온다 — attendance-sessions getCurrentOpenSession). */}
+        {notices}
       </div>
       {sideColumn()}
     </div>

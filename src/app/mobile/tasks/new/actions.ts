@@ -16,6 +16,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
+import { sanitizeTaskImageUrls } from "@/lib/task-images";
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -205,11 +206,12 @@ export async function createTask(formData: FormData) {
   // 지시로 보내기 — 대상자의 일정으로 잡히고 지시자의 "오늘" 목록에는 들어가지 않는다.
   const directive = cleanText(formData.get("directive")) === "1";
   // Upper safety bound (20); the real per-task cap (5 regular / 20 project) is applied at insert.
-  const imageUrls = formData
-    .getAll("imageUrls")
-    .map((v) => String(v))
-    .filter((u) => u.startsWith("https://") || u.startsWith("http://"))
-    .slice(0, 20);
+  // Only our own `{org}/task-images/` storage objects are accepted (2026-10-26, lib/task-images).
+  const imageUrls = sanitizeTaskImageUrls(
+    formData.getAll("imageUrls").map((v) => String(v)),
+    true,
+    session.organization.id,
+  );
   const ctxPropertyId = cleanText(formData.get("ctxPropertyId")) || null;
   const ctxRoomId = cleanText(formData.get("ctxRoomId")) || null;
   const ctxReservationId = cleanText(formData.get("ctxReservationId")) || null;

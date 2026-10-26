@@ -132,7 +132,7 @@ export function ProjectsBoard({
       {createOpen && hydrated ? (
         <BottomSheet ariaLabel={p.createTitle} onClose={() => setCreateOpen(false)}>
           {({ close }) => (
-            <form action={createProject} className="tkw-sheet tkw-form" onSubmit={() => haptic("success")} style={{ padding: 0, gap: 16 }}>
+            <form action={createProject} className="tkw-sheet tkw-form" onSubmit={() => haptic("light")} style={{ padding: 0, gap: 16 }}>
               <h2 style={{ margin: 0 }}>{p.createTitle}</h2>
               <input name="share" type="hidden" value={shareOn ? "on" : "off"} />
               <input name="shareJson" type="hidden" value={JSON.stringify(inviteIds)} />

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { CornerDownLeft, Search, X } from "lucide-react";
 import { searchOpsReservations } from "@/actions/ops-calendar-search";
 import type { OpsReservationPlacement } from "@/lib/ops-calendar";
+import { useBuildingName, useRoomPlaceLabel } from "@/components/shared/building-names";
 
 /**
  * 어드민 상단 검색 — 고객명 · 예약번호 · 전화번호 → 판매 캘린더의 예약 상세 패널(2026-09-30).
@@ -50,6 +51,9 @@ function isSearchable(query: string): boolean {
 export function AdminGuestSearch({ copy }: { copy: AdminGuestSearchCopy }) {
   const router = useRouter();
   const pathname = usePathname();
+  // 건물 이름은 데이터(한국어 기준 이름) — 그릴 때만 지금 언어로(CLAUDE.md 다국어 규칙). 독채는 객실 라벨이 건물 이름이다.
+  const buildingName = useBuildingName();
+  const roomPlaceLabel = useRoomPlaceLabel();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<OpsReservationPlacement[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -222,7 +226,7 @@ export function AdminGuestSearch({ copy }: { copy: AdminGuestSearchCopy }) {
                     <span className="gsearch__main">
                       <b>{item.bar.guestName || "—"}</b>
                       <small>
-                        {item.propertyName} · {item.roomLabel}
+                        {buildingName(item.propertyName)} · {roomPlaceLabel(item.roomLabel)}
                       </small>
                     </span>
                     <span className="gsearch__when">

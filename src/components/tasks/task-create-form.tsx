@@ -21,6 +21,17 @@ import "./tasks-white.css";
 
 type Copy = Dictionary["tasks"];
 
+/**
+ * 서버 액션이 `redirect()` 로 끝나면 클라이언트의 액션 프로미스는 NEXT_REDIRECT 에러로 거절된다
+ * (digest = `NEXT_REDIRECT;{type};{url};{status};`). 그 대상 URL — 리다이렉트가 아니면 null.
+ */
+function redirectTargetOf(e: unknown): string | null {
+  const digest =
+    typeof e === "object" && e !== null && "digest" in e ? String((e as { digest: unknown }).digest) : "";
+  if (!digest.startsWith("NEXT_REDIRECT")) return null;
+  return digest.split(";")[2] ?? "";
+}
+
 // 우선순위 1~4 (Todoist) 순서로 표시: urgent(1) · important(2) · medium(3) · normal(4).
 const PRIOS = ["urgent", "important", "medium", "normal"] as const;
 
@@ -128,6 +139,17 @@ export function TaskCreateForm({
   // 업로드 대기 중 표시용 — `isPending` 은 업로드 `await` 가 끝난 뒤 `startTransition` 이 불릴 때만
   // 켜져서, 그 사이(사진 있음 + 느린 회선)에 버튼이 살아 있어 두 번 눌릴 수 있었다.
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 서버가 `?error=` 로 돌려보낸 값이 바뀌면 화면 오류도 따라 바꾼다(2026-10-26). 같은 라우트로의
+  // 리다이렉트는 이 폼을 다시 마운트하지 않아, 예전엔 처음 값만 보이고 새 오류는 묻혔다.
+  // (렌더 중 상태 맞추기 — effect 안 setState 대신 React 권장 패턴.)
+  const [seenServerError, setSeenServerError] = useState(serverError);
+  if (serverError !== seenServerError) {
+    setSeenServerError(serverError);
+    if (serverError) {
+      setError(serverError);
+      setIsSubmitting(false);
+    }
+  }
 
   // ── In-progress draft persistence ──────────────────────────────────────────
   // Tapping "예약 보기" navigates to the calendar (router.push) and a back-navigation remounts this
@@ -142,6 +164,12 @@ export function TaskCreateForm({
   // 나눈다. ref 는 리렌더 없이 즉시(동기) 반영되므로, `isPending`/`isSubmitting` 같은 state 로는
   // 못 막는 "같은 이벤트 루프 안의 연속 두 번째 탭"까지 막는다.
   const submitLockRef = useRef(false);
+  // 서버 오류로 돌아왔으면 잠금도 푼다 — 위의 렌더 중 맞추기는 ref 를 건드릴 수 없어 여기서.
+  useEffect(() => {
+    if (!serverError) return;
+    submitLockRef.current = false;
+    submittedRef.current = false;
+  }, [serverError]);
 
   const clearDraft = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -151,6 +179,53 @@ export function TaskCreateForm({
       /* ignore storage errors (private mode / quota) */
     }
   }, [draftKey]);
+
+  /** 제출을 되돌릴 수 있는 상태로 — 다시 누를 수 있고 초안 저장도 다시 켜진다. */
+  const unlockSubmit = useCallback(() => {
+    submitLockRef.current = false;
+    submittedRef.current = false;
+    setIsSubmitting(false);
+  }, []);
+
+  /**
+   * 서버 액션 실행. 액션은 성공 · 검증 실패 모두 `redirect()` 로 끝난다(2026-10-26 정리):
+   * - `?error=` 가 붙은 리다이렉트 = 실패 → 잠금을 풀고 오류를 보여 준다. **초안은 지우지 않는다.**
+   * - 그 밖의 리다이렉트 = 성공 → 이제서야 초안을 지운다(예전엔 제출 전에 지워, 실패하면 입력이 날아갔다).
+   * - 리다이렉트가 아닌 throw(네트워크 등) = 실패.
+   * 리다이렉트 에러는 다시 던져 Next 가 이동을 마치게 한다.
+   */
+  const submitAction = useCallback(
+    (action: (fd: FormData) => Promise<void>, formData: FormData) => {
+      submittedRef.current = true;
+      startTransition(async () => {
+        try {
+          await action(formData);
+          unlockSubmit();
+        } catch (e) {
+          const target = redirectTargetOf(e);
+          if (target === null) {
+            unlockSubmit();
+            setError(copy.errors.save_failed);
+            return;
+          }
+          let code: string | null = null;
+          try {
+            code = new URL(target, window.location.origin).searchParams.get("error");
+          } catch {
+            code = null;
+          }
+          if (code) {
+            unlockSubmit();
+            setError(copy.errors[code] ?? copy.errors.save_failed);
+          } else {
+            clearDraft();
+          }
+          throw e;
+        }
+      });
+    },
+    [clearDraft, copy.errors, unlockSubmit],
+  );
 
   const persistDraft = useCallback(() => {
     if (typeof window === "undefined" || submittedRef.current) return;
@@ -323,11 +398,7 @@ export function TaskCreateForm({
           return;
         }
       }
-      submittedRef.current = true;
-      clearDraft();
-      startTransition(async () => {
-        await updateTaskCore(formData);
-      });
+      submitAction(updateTaskCore, formData);
       return;
     }
 
@@ -347,11 +418,7 @@ export function TaskCreateForm({
       setIsSubmitting(false);
       return;
     }
-    submittedRef.current = true;
-    clearDraft();
-    startTransition(async () => {
-      await createTask(formData);
-    });
+    submitAction(createTask, formData);
   }
 
   // "더 보기 — 시간 · 우선순위 …" → bold lead + muted hint (every locale uses an em-dash separator).

@@ -215,6 +215,7 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
   // Only ONE sheet at a time: detail ↔ confirm are the same stack, never stacked.
   const [mode, setMode] = useState<"detail" | "confirm" | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelErr, setCancelErr] = useState<null | "not_cancellable" | "generic">(null);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -359,7 +360,10 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
       {/* C2 · 취소 확인 시트 — [유지]·스크림 탭 → 자연스럽게 내려가고 상세 시트로 복귀 */}
       {mode === "confirm" && selected ? (
         <BottomSheet
-          onClose={() => setMode("detail")}
+          onClose={() => {
+            setCancelErr(null);
+            setMode("detail");
+          }}
           className="pb-[max(16px,env(safe-area-inset-bottom))]"
         >
           {({ close }) => (
@@ -371,6 +375,11 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
                 <span className="lsheet__t">{c.cancelQT}</span>
               </div>
               <p className="lsheet__lede">{c.cancelQPending}</p>
+              {cancelErr ? (
+                <p className="lsheet__lede" role="alert" style={{ color: "var(--danger)", marginTop: -8 }}>
+                  {cancelErr === "not_cancellable" ? c.cancelNotCancellable : c.cancelFailed}
+                </p>
+              ) : null}
               <div className="lsheet__btns">
                 <button type="button" className="lbtn lbtn--ghost" onClick={close}>
                   {c.cancelKeep}
@@ -381,9 +390,19 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
                   disabled={cancelling}
                   onClick={async () => {
                     setCancelling(true);
-                    const result = await cancelLeaveRequestAction(selected.id);
+                    setCancelErr(null);
+                    let result: Awaited<ReturnType<typeof cancelLeaveRequestAction>>;
+                    try {
+                      result = await cancelLeaveRequestAction(selected.id);
+                    } catch {
+                      result = { ok: false, error: "network" };
+                    }
                     setCancelling(false);
-                    if (!result.ok) return;
+                    if (!result.ok) {
+                      haptic("error");
+                      setCancelErr(result.error === "not_cancellable" ? "not_cancellable" : "generic");
+                      return;
+                    }
                     router.push(
                       `/mobile/attendance/leave/cancel-done?start=${result.startDate}&end=${result.endDate}&days=${result.daysCount}`,
                     );

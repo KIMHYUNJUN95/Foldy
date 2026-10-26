@@ -53,6 +53,7 @@ export type MobilePriceSheetCopy = PanelCopy & {
   mwPriceInputHint: string;
   mwPctTitle: string;
   mwPctHint: string;
+  mwPctInFlight: string;
   mwPctCustom: string;
   mwChangeHead: string;
   mwChangedCells: string;
@@ -140,6 +141,7 @@ export function MobileOpsPriceSheet({
   onApplied,
   onClear,
   onSubmitted,
+  pendingPriceKeys,
   runWrite,
   scopeSummary,
 }: {
@@ -151,6 +153,11 @@ export function MobileOpsPriceSheet({
   onClear: () => void;
   /** 접수 성공 — 부모가 시트를 닫고 알림을 띄운다. */
   onSubmitted: (submitted: MobilePriceSubmitted) => void;
+  /**
+   * 아직 반영 중인 가격 칸(`roomKey|date`). 화면의 「현재가」는 보낸 값이지만 서버는 % 를 **저장된 값**으로 다시
+   * 계산한다 — 미리보기와 결과가 어긋나므로, 이런 칸이 섞이면 % 조정을 막는다(2026-10-26). 금액 직접 입력은 그대로.
+   */
+  pendingPriceKeys: ReadonlySet<string>;
   runWrite: RunOpsWrite;
   scopeSummary: PanelScopeSummary | null;
 }) {
@@ -189,11 +196,17 @@ export function MobileOpsPriceSheet({
   }, [preview]);
 
   const hasPriced = preview.rows.length > 0;
+  const priceInFlight = useMemo(
+    () => cells.some((cell) => pendingPriceKeys.has(`${cell.roomKey}|${cell.date}`)),
+    [cells, pendingPriceKeys],
+  );
+  const percentDisabled = !hasPriced || priceInFlight;
   const deltaPercent = input && hasPriced ? percentFromAmount(preview.currentAverage, preview.newAverage) : null;
   const roomCount = listBuildings.reduce((sum, building) => sum + building.rooms.length, 0);
   // 버튼 숫자 — 입력 전에는 「바꿀 수 있는 칸」(요금 있는 칸), 입력 뒤에는 실제로 바뀌는 칸.
   const goCount = input ? preview.changedCount : preview.rows.length;
-  const canGo = input !== null && preview.changedCount > 0 && !pending;
+  const canGo =
+    input !== null && preview.changedCount > 0 && !pending && !(input.kind === "percent" && priceInFlight);
   const danger = warnings.length > 0;
 
   const onAmount = (text: string) => {
@@ -210,6 +223,7 @@ export function MobileOpsPriceSheet({
     setPercentText(percent === null ? "" : String(percent));
   };
   const onPercent = (value: number) => {
+    if (priceInFlight) return;
     setError(null);
     setPercentText(String(value));
     setInput({ kind: "percent", percent: value });
@@ -225,6 +239,7 @@ export function MobileOpsPriceSheet({
 
   const apply = () => {
     if (!input) return;
+    if (input.kind === "percent" && priceInFlight) return;
     const rows = preview.rows;
     const count = preview.changedCount;
     const sentInput = input;
@@ -374,7 +389,7 @@ export function MobileOpsPriceSheet({
                   <input
                     aria-label={copy.panelPercent}
                     autoComplete="off"
-                    disabled={!hasPriced}
+                    disabled={percentDisabled}
                     enterKeyHint="done"
                     inputMode="numeric"
                     onChange={(event) => {
@@ -402,7 +417,7 @@ export function MobileOpsPriceSheet({
                     <button
                       aria-pressed={on}
                       className={`msw-opt${on ? " on" : ""}`}
-                      disabled={!hasPriced}
+                      disabled={percentDisabled}
                       key={preset}
                       // 같은 프리셋을 다시 누르면 푼다(2026-10-01 사용자 요청).
                       onClick={() => (on ? clearInput() : onPercent(preset))}
@@ -418,6 +433,7 @@ export function MobileOpsPriceSheet({
               </div>
               <span className="msw-field__hint end">{copy.mwPctHint}</span>
             </div>
+            {priceInFlight && hasPriced && <div className="msw-alert warn">{copy.mwPctInFlight}</div>}
 
             {preview.skippedNoPrice > 0 && (
               <div className="msw-alert warn">{copy.panelExcluded.replace("{count}", String(preview.skippedNoPrice))}</div>

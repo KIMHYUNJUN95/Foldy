@@ -77,7 +77,21 @@ export async function requestShiftCancel(input: { date: string; note?: string; w
   if (!isDateKey(input.date)) return { ok: false, reason: "invalid" };
   if (input.date < getCleaningOperatingDateKey()) return { ok: false, reason: "past" };
   const note = String(input.note ?? "").trim().slice(0, 200);
-  const result = await getSupabaseServiceClient()
+  const supabase = getSupabaseServiceClient();
+  // 취소 요청은 **실제로 배정된 날**에만(2026-10-26). 예전에는 신청 행만 있으면(배정 전 · 관리자가 이미 취소한 날도)
+  // 요청이 들어가 관리자 큐에 배정 없는 「취소 요청」이 떴다. 거두기(withdraw)는 배정이 빠진 뒤에도 할 수 있게 둔다.
+  if (!input.withdraw) {
+    const rooms = await supabase
+      .from("cleaning_assignments")
+      .select("id")
+      .eq("organization_id", session.organization.id)
+      .eq("user_id", session.user.id)
+      .eq("work_date", input.date)
+      .limit(1);
+    if (rooms.error) return { ok: false, reason: "error" };
+    if ((rooms.data ?? []).length === 0) return { ok: false, reason: "invalid" };
+  }
+  let query = supabase
     .from("cleaning_shift_applications")
     .update(
       input.withdraw
@@ -86,8 +100,10 @@ export async function requestShiftCancel(input: { date: string; note?: string; w
     )
     .eq("organization_id", session.organization.id)
     .eq("user_id", session.user.id)
-    .eq("work_date", input.date)
-    .select("user_id");
+    .eq("work_date", input.date);
+  // 관리자가 취소한 신청에는 요청을 걸지 않는다 — 거두기는 그 뒤에도 된다(남은 요청을 치울 수 있게).
+  if (!input.withdraw) query = query.is("cancelled_at", null);
+  const result = await query.select("user_id");
   if (result.error) return { ok: false, reason: "error" };
   if ((result.data ?? []).length === 0) return { ok: false, reason: "invalid" };
   await changed(session.organization.id);

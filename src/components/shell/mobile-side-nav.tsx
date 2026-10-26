@@ -10,6 +10,7 @@ import type { Locale } from "@/lib/i18n";
 import { FoldyMark } from "@/components/brand/foldy-mark";
 import { NAV_GLYPHS } from "@/components/shell/nav-glyphs";
 import { cn } from "@/lib/utils";
+import { clearSwipeSnapshots } from "@/lib/swipe-back/snapshot-store";
 
 /**
  * 넓은 화면 메뉴 — 태블릿 · 펼친 폴드(2026-10-05, Claude Design 시안 `6a 태블릿 · 폴드 적응형 v1` 의 6b · 6c).
@@ -312,7 +313,8 @@ export function MobileSideNav({
           >
             <mobileNavBugs.icon aria-hidden="true" className="size-4" />
           </Link>
-          <form action={signOut} className="shrink-0">
+          {/* 로그아웃 — 스와이프 뒤로가기 밑그림(화면 복제본 · 개인정보 포함)을 먼저 비운다. */}
+          <form action={signOut} className="shrink-0" onSubmit={clearSwipeSnapshots}>
             <button
               aria-label={labels.logout}
               className="flex size-9 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-muted"

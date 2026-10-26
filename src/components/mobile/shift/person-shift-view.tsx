@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { resolveCancelRequest, toggleApplicationForUser } from "@/app/admin/cleaning-assign/actions";
+import { resolveCancelRequest, toggleApplicationForUser } from "@/actions/cleaning-assign-shift";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { dayLabel, monthTitle } from "@/components/admin/cleaning-assign/format";
 import { PersonShiftCalendar, PersonShiftDay, PersonShiftStats, PersonShiftUpcoming, psPersonLine } from "@/components/admin/cleaning-assign/person-shift-parts";

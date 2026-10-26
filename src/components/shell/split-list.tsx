@@ -131,7 +131,8 @@ export function SplitList({
     for (const anchor of list.querySelectorAll<HTMLAnchorElement>("a[href]")) {
       if (new URL(anchor.href).pathname === target) anchor.setAttribute("data-split-active", "");
     }
-  });
+    // 고른 주소 · 폭 · 목록 내용(children)이 바뀔 때만 다시 훑는다 — 전엔 의존성 없이 칸 로딩 표시 같은 모든 다시 그림마다 링크를 전부 훑었다.
+  }, [children, href, isTablet]);
 
   const onClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isTablet || event.defaultPrevented || event.button !== 0) return;

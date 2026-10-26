@@ -14,8 +14,8 @@ export const PAYMENT_METHODS: readonly PaymentMethod[] = ["cash", "transfer"];
 export const WITHHOLDING_CLASSES: readonly WithholdingClass[] = ["kou", "otsu", "hei"];
 export const MAX_DEPENDENTS = 7;
 
-/** 화면에 그대로 찍는 원천세 구분 글자(언어와 상관없이 같은 한자). */
-export const WITHHOLDING_LABEL: Record<WithholdingClass, string> = { kou: "甲", otsu: "乙", hei: "丙" };
+// 원천세 구분 표시 글자는 사전에서 — `withholdingLabel()` (`payroll-settings-i18n.ts` · 한국어 갑/을/병, 일본어 · 영어 甲/乙/丙).
+// 언어와 상관없이 한자를 찍던 상수(WITHHOLDING_LABEL)는 2026-10-26 지웠다(쓰는 곳 없음 · 한국어 화면 한자 금지).
 
 export type MemberPayrollSetting = {
   paymentMethod: PaymentMethod | null;

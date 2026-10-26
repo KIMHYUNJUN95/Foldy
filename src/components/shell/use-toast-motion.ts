@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { haptic } from "@/lib/haptics";
 
 /**
@@ -13,6 +13,9 @@ import { haptic } from "@/lib/haptics";
  *   아니면 제자리로. 민 방향으로 이어서 나간다. 6px 넘게 움직였으면 그 뒤 클릭(몸통 탭으로 닫기 · 행동 버튼)은 먹지 않는다.
  *
  * 쓰는 법: `const ref = useToastMotion<HTMLDivElement>(onDismiss);` → 화면에 고정된 토스트 바깥 요소에 `ref`.
+ * `ref` 는 콜백 ref 다(2026-10-26) — 토스트가 조건부로 나중에 그려져도(`{toast && <div ref={ref}>}`) 그때 붙고, 사라지면 떼면서
+ * 복제본을 남긴다. 전엔 훅이 처음 그려질 때의 `ref.current` 에만 붙어, 같은 컴포넌트 안에서 조건부로 그리는 토스트(내 시프트
+ * 저장 토스트)는 움직임이 하나도 없었다. `ref.current` 를 읽지 말 것.
  * `onDismiss` 가 없으면 밀어서 치우기는 없고 사라짐만. 상세 docs/product/16-mobile-navigation.md 「토스트 — 공용 움직임」.
  */
 
@@ -22,15 +25,21 @@ const DISMISS_Y = 28;
 const FLICK = 0.45; // px/ms
 
 export function useToastMotion<T extends HTMLElement>(onDismiss?: () => void) {
-  const ref = useRef<T | null>(null);
+  // 붙은 요소는 ref 에, 「붙었다 · 떨어졌다」는 state 로 — state 가 바뀌면 아래 효과가 새 요소에 다시 붙는다.
+  const elementRef = useRef<T | null>(null);
+  const [attached, setAttached] = useState<T | null>(null);
+  const ref = useCallback((node: T | null) => {
+    elementRef.current = node;
+    setAttached(node);
+  }, []);
   const onDismissRef = useRef(onDismiss);
   useLayoutEffect(() => {
     onDismissRef.current = onDismiss;
   });
 
   useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const el = elementRef.current;
+    if (!el || el !== attached) return;
     const parent = el.parentNode;
     const mountedAt = performance.now();
     /** 나갈 방향 — 민 쪽으로 이어서, 아니면 아래로 살짝. */
@@ -149,7 +158,7 @@ export function useToastMotion<T extends HTMLElement>(onDismiss?: () => void) {
       ghost.addEventListener("animationend", (event) => event.target === ghost && remove());
       window.setTimeout(remove, 400);
     };
-  }, []);
+  }, [attached]);
 
   return ref;
 }

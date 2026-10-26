@@ -464,3 +464,20 @@ hourly-staff exclusion by real
 `getLeaveApproverRole` · DB `is_leave_approver()` 둘 다. 휴가계 도장 칸은 예전 기본값(전무)을 그대로 쓴다. 승인자 목록 · 토글 헬퍼
 (`listAdminApprovers` · `setLeaveApprover`)와 사용자 화면의 「연차 결재자」 토글은 지웠다 — 사용자 화면의 「연차 — 결재」 줄로 켜고 끈다.
 상세 `docs/product/27-permission-override-workflow.md` 「역할 = 기본 틀」.
+
+## 버그 수정 — 자가 설정 1회 · 신청 자격 · 취소 경쟁 (2026-10-26)
+
+- **본인 잔여 설정은 처음 한 번만.** 모바일 「입사일 + 남은 연차」 저장(`setAnnualLeaveBaselineAction`)이 매번 덮어써서 직원이 잔여를
+  언제든 다시 채우고 입사일을 바꿀 수 있었고, 이 화면이 특별휴가 값을 안 보내 관리자가 넣은 특별휴가가 0 이 됐다.
+  이제 `setAnnualLeaveBaselineForUser(..., "self_once")` — 기준 행이 있으면 `already_set`(화면: `leave.exSetupAlreadySet` 「이미 등록돼 있어요.
+  바꾸려면 사무실에 요청해 주세요」), upsert 대신 insert(동시 두 번 = 유니크 충돌 → `already_set`), 입사일은 기준 행이 들어간 뒤에 쓴다(실패하면 기준 행을 되돌림).
+  특별휴가는 본인 경로에서 받지 않는다. 이후 수정은 관리자 「잔여」 화면(`saveEmployeeLeaveBaseline`, 덮어쓰기 그대로)에서만.
+- **차감 규칙은 그대로 (보류 · 사용자 결정 필요).** 리뷰에서 「기준 잔여 전에 쓴 휴가를 다시 뺀다」는 지적이 있었지만, 관리자 잔여 화면은
+  부여 칸에 «잔여 + 사용»을 채워 저장하므로 지금의 «승인된 휴가 전부 차감»과 맞물려 있다. 규칙만 바꾸면 관리자 저장 · 기존 행의 잔여가
+  부풀어 올라 되돌렸다. 본인 첫 설정 화면이 받는 숫자가 «지금 남은 일수»인지 «부여 일수»인지 정한 뒤 두 경로를 함께 맞춘다.
+- **신청 자격(서버).** 유급(`paid`) · 특별(`special`)은 시급직(`isLeaveHourlyRole`, 연차 대상 아님 — 확정 정책)이면 `hourly_excluded`,
+  기준 잔여가 없으면 `baseline_required` 로 거절한다. 경조 · 기타는 잔여와 무관해 그대로. 화면 문구 `leave.fHourlyPaidErr` · `fBaselineRequiredErr`
+  (· 이미 제출된 임시 저장 `fNotEditableErr`).
+- **취소 · 임시 저장 수정 · 삭제 경쟁.** 읽고 나서 쓰기 전에 관리자가 승인하면 승인된 휴가가 「취소」로 덮어써졌다. 쓰기에도 상태 조건을 건다 —
+  취소는 `.eq("status", 읽은 상태)` 후 0행이면 `not_cancellable`, 임시 저장 이어쓰기 · 삭제는 `.eq("status","draft")`(0행이면 `not_editable`).
+- **취소 실패 표시.** 신청 내역 「취소하기」가 실패하면 아무 반응이 없었다 → 확인 시트 안에 문구(`leave.cancelNotCancellable` · `cancelFailed`) + 햅틱 `error`.

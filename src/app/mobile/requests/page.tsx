@@ -149,6 +149,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
           }}
           lostItems={lostItems}
           maintenanceCopy={{
+            buildingOnly: dictionary.maintenance.form.roomBuildingOnly,
             fromCleaningTag: dictionary.maintenance.fromCleaningTag,
             mobileListTitle: dictionary.maintenance.mobileListTitle,
             noRecords: dictionary.maintenance.noRecords,

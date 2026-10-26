@@ -115,9 +115,23 @@ export function BoardDetailClient({
     });
   }
 
+  // 지우는 댓글은 서버를 기다리지 않고 바로 접는다(줄 접힘 공용 `.row-collapse`, 2026-10-26). 실패하면 다시 펴고 알린다.
+  const [leavingCommentIds, setLeavingCommentIds] = useState<ReadonlySet<string>>(() => new Set());
+
   function onDeleteComment(commentId: string) {
+    haptic("light");
+    setLeavingCommentIds((prev) => new Set(prev).add(commentId));
     startTransition(async () => {
-      await deleteBoardComment(commentId);
+      const result = await deleteBoardComment(commentId).catch(() => ({ error: "save_failed" }));
+      if ("error" in result) {
+        setLeavingCommentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(commentId);
+          return next;
+        });
+        haptic("error");
+        flashToast(copy.errSaveFailed);
+      }
     });
   }
 
@@ -151,38 +165,38 @@ export function BoardDetailClient({
     setShowMentionSheet(false);
   }
 
-  function onComposerSubmit(payload: ComposerSubmitPayload) {
-    startTransition(async () => {
-      // 본문에 멘션 토큰 삽입: @이름 형식으로 content 앞에 붙여 DB에 저장.
-      // 렌더 시 mentionedUsers와 매칭해 강조 표시함.
-      let content = payload.content;
+  // 저장됐으면 true — 컴포저가 그때만 입력을 비운다(실패 시 쓴 글 유지, 2026-10-26).
+  async function onComposerSubmit(payload: ComposerSubmitPayload): Promise<boolean> {
+    // 본문에 멘션 토큰 삽입: @이름 형식으로 content 앞에 붙여 DB에 저장.
+    // 렌더 시 mentionedUsers와 매칭해 강조 표시함.
+    let content = payload.content;
 
-      // @ALL은 고정 토큰(@ALL)으로 본문에 삽입 — 렌더에서 locale별 변환
-      if (payload.mentionAll) {
-        content = `${ALL_TOKEN} ${content}`;
-      } else if (payload.mentionedUsers.length > 0) {
-        const names = payload.mentionedUsers.map((u) => `@${u.name}`).join(" ");
-        content = `${names} ${content}`;
-      }
+    // @ALL은 고정 토큰(@ALL)으로 본문에 삽입 — 렌더에서 locale별 변환
+    if (payload.mentionAll) {
+      content = `${ALL_TOKEN} ${content}`;
+    } else if (payload.mentionedUsers.length > 0) {
+      const names = payload.mentionedUsers.map((u) => `@${u.name}`).join(" ");
+      content = `${names} ${content}`;
+    }
 
-      const mentionedUserIds = payload.mentionedUsers.map((u) => u.id);
+    const mentionedUserIds = payload.mentionedUsers.map((u) => u.id);
 
-      const result = await addBoardComment(post.id, content, payload.imageUrls, {
-        mentionedUserIds,
-        mentionAll: payload.mentionAll,
-      });
+    const result = await addBoardComment(post.id, content, payload.imageUrls, {
+      mentionedUserIds,
+      mentionAll: payload.mentionAll,
+    }).catch(() => ({ error: "save_failed" }));
 
-      if ("error" in result) {
-        haptic("error");
-        flashToast(copy.errSaveFailed);
-        return;
-      }
-      haptic("success");
+    if ("error" in result) {
+      haptic("error");
+      flashToast(copy.errSaveFailed);
+      return false;
+    }
+    haptic("success");
 
-      // 멘션 상태 초기화
-      setMentionedUsers([]);
-      setMentionAll(false);
-    });
+    // 멘션 상태 초기화
+    setMentionedUsers([]);
+    setMentionAll(false);
+    return true;
   }
 
   const postTarget: ModTarget = {
@@ -243,11 +257,22 @@ export function BoardDetailClient({
     }
   }
 
+  // 고정 토글은 바로 바뀐 것처럼 보이고(useOptimistic), 서버가 거절하면 되돌아가며 알린다(2026-10-26).
+  // 누가 고정할 수 있는지는 서버(`setPinned`)가 정한다 — 여기서 바꾸지 않는다.
+  const [isPinned, setOptimisticPinned] = useOptimistic(post.isPinned);
   function onPinToggle() {
     setShowActionSheet(false);
+    const next = !isPinned;
+    haptic("light");
     startTransition(async () => {
-      if (post.isPinned) await unpinBoardPost(post.id);
-      else await pinBoardPost(post.id);
+      setOptimisticPinned(next);
+      const result = await (next ? pinBoardPost(post.id) : unpinBoardPost(post.id)).catch(() => ({
+        error: "save_failed",
+      }));
+      if ("error" in result) {
+        haptic("error");
+        flashToast(copy.errSaveFailed);
+      }
     });
   }
 
@@ -353,28 +378,29 @@ export function BoardDetailClient({
             <p className="bdw-cm__empty">{copy.commentEmpty}</p>
           ) : (
             post.comments.map((c) => (
-              <BoardComment
-                allLabel={copy.mentionAll}
-                comment={{
-                  id: c.id,
-                  authorName: c.authorName,
-                  authorInitial: c.authorName.charAt(0) || "·",
-                  avatarColor: c.avatarColor,
-                  role: c.authorRole || undefined,
-                  timeLabel: hydrated ? boardRelativeTime(c.createdAt, locale) : "",
-                  content: c.content,
-                  imageUrls: c.imageUrls,
-                  isOwn: c.isOwn,
-                  canDelete: c.isOwn || canManage,
-                  // 멘션 메타 — BoardCommentDetail 타입 확장 전까지는 빈 배열로 fallback
-                  mentionedUsers: (c as { mentionedUsers?: { id: string; name: string }[] }).mentionedUsers ?? [],
-                  mentionAll: (c as { mentionAll?: boolean }).mentionAll ?? false,
-                }}
-                copy={copy}
-                key={c.id}
-                onDelete={onDeleteComment}
-                onMore={onOpenCommentMenu}
-              />
+              <div className="row-collapse" data-leaving={leavingCommentIds.has(c.id) ? "" : undefined} key={c.id}>
+                <BoardComment
+                  allLabel={copy.mentionAll}
+                  comment={{
+                    id: c.id,
+                    authorName: c.authorName,
+                    authorInitial: c.authorName.charAt(0) || "·",
+                    avatarColor: c.avatarColor,
+                    role: c.authorRole || undefined,
+                    timeLabel: hydrated ? boardRelativeTime(c.createdAt, locale) : "",
+                    content: c.content,
+                    imageUrls: c.imageUrls,
+                    isOwn: c.isOwn,
+                    canDelete: c.isOwn || canManage,
+                    // 멘션 메타 — BoardCommentDetail 타입 확장 전까지는 빈 배열로 fallback
+                    mentionedUsers: (c as { mentionedUsers?: { id: string; name: string }[] }).mentionedUsers ?? [],
+                    mentionAll: (c as { mentionAll?: boolean }).mentionAll ?? false,
+                  }}
+                  copy={copy}
+                  onDelete={onDeleteComment}
+                  onMore={onOpenCommentMenu}
+                />
+              </div>
             ))
           )}
         </section>
@@ -423,7 +449,7 @@ export function BoardDetailClient({
           isOwn={isOwn}
           canManage={canManage}
           canEdit={isOwn || canEditAny}
-          isPinned={post.isPinned}
+          isPinned={isPinned}
           copy={copy}
           onEdit={() => {
             setShowActionSheet(false);

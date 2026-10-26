@@ -52,6 +52,7 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
   const [isPending, startTransition] = useTransition();
   const [pendingStatus, setPendingStatus] = useState<BugStatus | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   // 삭제 조건: 작성자 본인 + status === "submitted" (플랫폼 개발자는 언제나)
   const canDelete = isDeveloper || (viewerIsAuthor && bug.status === "submitted");
@@ -74,9 +75,17 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
   function onStatusSelect(status: BugStatus) {
     if (status === bug.status || isPending) return;
     setPendingStatus(status);
+    setStatusError(null);
     haptic("light");
     startTransition(async () => {
-      await setBugReportStatus(bug.id, status);
+      // 결과를 본다(2026-10-26) — 예전엔 실패해도 아무 말 없이 원래 상태로 돌아갔다.
+      const result = await setBugReportStatus(bug.id, status);
+      if ("error" in result) {
+        haptic("error");
+        setStatusError(copy.statusChangeError);
+        setPendingStatus(null);
+        return;
+      }
       router.refresh();
       setPendingStatus(null);
     });
@@ -129,6 +138,11 @@ export function BugDetailClient({ copy, bug, viewerIsAuthor, isReviewer, isDevel
               </button>
             ))}
           </div>
+          {statusError ? (
+            <p className="bgw-err" role="alert">
+              {statusError}
+            </p>
+          ) : null}
         </section>
       ) : null}
 

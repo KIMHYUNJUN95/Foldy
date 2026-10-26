@@ -40,16 +40,18 @@ vi.mock("@/lib/beds24/calendar-client", async (importOriginal) => {
     fetchBeds24BookingById: vi.fn(async () => ({ error: "not_found", ok: false })),
     fetchBeds24Calendar: vi.fn(),
     postBeds24Booking: vi.fn(),
+    postBeds24BookingUpdate: vi.fn(),
   };
 });
 
 let fake = createFakeSupabase({});
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => fake.client }));
 
-const { submitManualBooking } = await import("@/actions/ops-calendar");
+const { submitManualBooking, submitReservationEdit } = await import("@/actions/ops-calendar");
 const calendarClient = await import("@/lib/beds24/calendar-client");
 const fetchCalendar = vi.mocked(calendarClient.fetchBeds24Calendar);
 const postBooking = vi.mocked(calendarClient.postBeds24Booking);
+const postBookingUpdate = vi.mocked(calendarClient.postBeds24BookingUpdate);
 
 const PROPERTY = { external_property_id: "176431", name: "Test House" };
 const ROOM_KEY = opsUnitRoomKey({ propertyName: PROPERTY.name, roomLabel: "101" })!;
@@ -104,6 +106,7 @@ beforeEach(() => {
   seed();
   fetchCalendar.mockReset();
   postBooking.mockReset();
+  postBookingUpdate.mockReset();
 });
 
 describe("submitManualBooking — 같은 방 동시 생성", () => {
@@ -187,6 +190,77 @@ describe("submitManualBooking — 같은 방 동시 생성", () => {
     const result = await submitManualBooking(request("key-ffffffff"));
 
     expect(result).toEqual({ bookingId: "777", ok: true, reservationId: "res-9" });
+    expect(fetchCalendar).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 예약 수정도 새로 묵는 밤이 있으면 수기 예약 · 옮기기와 **같은 방 잠금** 안에서 확인 → 보내기, 보내기 직전 Beds24 가용 재확인
+ * (2026-10-26). 인원 · 이름만 바꾸면 가용이 안 바뀌므로 잠그지 않는다.
+ */
+describe("submitReservationEdit — 방 잠금 · Beds24 재확인", () => {
+  const seedReservation = () => {
+    fake.tables.reservations = [
+      {
+        check_in_date: "2030-01-10",
+        check_out_date: "2030-01-11",
+        guest_name: "Kim Guest",
+        id: "res-1",
+        organization_id: "org-1",
+        raw_payload: { bookId: 900, numAdult: 1, numChild: 0, price: 10000, roomId: 5001 },
+        source: "beds24",
+        status: "confirmed",
+      },
+    ];
+  };
+  const extend = { changes: { departure: "2030-01-12" }, reservationId: "res-1", roomIds: ["u1"], roomKey: ROOM_KEY };
+
+  it("같은 방 잠금을 남이 들고 있으면 Beds24 를 부르지 않고 「방 사용 중」", async () => {
+    seedReservation();
+    fake.client.rpc = async (name: string) => ({ data: name === "beds24_try_lock" ? false : true, error: null });
+
+    const result = await submitReservationEdit(extend);
+
+    expect(result).toEqual({ error: "room_busy", ok: false });
+    expect(fetchCalendar).not.toHaveBeenCalled();
+    expect(postBookingUpdate).not.toHaveBeenCalled();
+  });
+
+  it("새 밤이 Beds24 에서 찼으면 보내지 않는다 · 잠금은 놓는다", async () => {
+    seedReservation();
+    fetchCalendar.mockResolvedValue(liveCalendar({ "2030-01-11": { numAvail: 0 } }) as never);
+
+    const result = await submitReservationEdit(extend);
+
+    expect(result).toEqual({ conflictDates: ["2030-01-11"], error: "occupied", ok: false });
+    expect(postBookingUpdate).not.toHaveBeenCalled();
+    expect(fake.rpcCalls.filter((call) => call.name === "beds24_release_lock")).toHaveLength(1);
+  });
+
+  it("비어 있으면 같은 방 잠금(manual_booking:조직:행 키) 안에서 보낸다", async () => {
+    seedReservation();
+    fetchCalendar.mockResolvedValue(liveCalendar({}) as never);
+    postBookingUpdate.mockResolvedValue({ ok: true } as never);
+
+    const result = await submitReservationEdit(extend);
+
+    expect(result).toEqual({ ok: true });
+    const lockCalls = fake.rpcCalls.filter((call) => call.name === "beds24_try_lock");
+    expect(lockCalls).toHaveLength(1);
+    expect((lockCalls[0].args as { p_name: string }).p_name).toBe(`manual_booking:org-1:${ROOM_KEY}`);
+    expect(fake.rpcCalls.filter((call) => call.name === "beds24_release_lock")).toHaveLength(1);
+    // 재확인은 그 유닛 · 새 밤만.
+    expect(fetchCalendar.mock.calls[0][0]).toMatchObject({ endDate: "2030-01-11", externalRoomIds: ["5001"], startDate: "2030-01-11" });
+  });
+
+  it("인원만 바꾸면 잠그지도 재확인하지도 않는다", async () => {
+    seedReservation();
+    postBookingUpdate.mockResolvedValue({ ok: true } as never);
+
+    const result = await submitReservationEdit({ ...extend, changes: { numAdult: 2 } });
+
+    expect(result).toEqual({ ok: true });
+    expect(fake.rpcCalls.filter((call) => call.name === "beds24_try_lock")).toHaveLength(0);
     expect(fetchCalendar).not.toHaveBeenCalled();
   });
 });

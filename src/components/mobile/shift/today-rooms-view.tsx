@@ -7,7 +7,8 @@ import { startCleaningSession } from "@/app/mobile/cleaning/actions";
 import { useIsTablet } from "@/components/shell/split-list";
 import { checkInText, dayLabel, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
-import type { TodayRoom } from "@/lib/cleaning-assign/data";
+import type { AssignPlace, TodayRoom } from "@/lib/cleaning-assign/data";
+import { useBuildingName } from "@/components/shared/building-names";
 import type { ShiftDayState } from "@/lib/cleaning-assign/day-state";
 import "./shift.css";
 
@@ -24,14 +25,18 @@ type Data = {
   date: string;
   startMinutes: number;
   rooms: Room[];
-  mates: { name: string; rooms: string[] }[];
-  changedLastNight: { at: string; rooms: string[] }[];
+  mates: { name: string; rooms: AssignPlace[] }[];
+  changedLastNight: { at: string; rooms: AssignPlace[] }[];
   state: ShiftDayState;
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 };
 
 export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCopy; locale: string; data: Data }) {
   const isTablet = useIsTablet();
+  // 「어젯밤 바뀜」 · 같이 일하는 사람의 방 — 건물은 보는 사람 언어로, 독채는 건물 이름 하나만(2026-10-26).
+  const bName = useBuildingName();
+  const placeText = (place: AssignPlace) =>
+    place.roomLabel === place.propertyName ? bName(place.propertyName) : `${bName(place.propertyName)} ${place.roomLabel}`;
   const [selected, setSelected] = useState<string | null>(() => data.rooms.find((r) => r.status !== "done")?.roomKey ?? data.rooms[0]?.roomKey ?? null);
   const done = data.rooms.filter((r) => r.status === "done").length;
   const sel = data.rooms.find((r) => r.roomKey === selected) ?? null;
@@ -122,7 +127,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
                 <span>
                   <b>{copy.changedLastNight}</b>
                   {" · "}
-                  {fill(copy.changedBody, { rooms: change.rooms.join(" · "), time: tokyoTime(change.at) })}
+                  {fill(copy.changedBody, { rooms: change.rooms.map(placeText).join(" · "), time: tokyoTime(change.at) })}
                 </span>
               </div>
             ))}
@@ -210,7 +215,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
                   {data.mates.map((mate) => (
                     <div key={mate.name} className="shf-mate">
                       <b>{mate.name}</b>
-                      <span>{mate.rooms.join(" · ")}</span>
+                      <span>{mate.rooms.map(placeText).join(" · ")}</span>
                     </div>
                   ))}
                 </div>

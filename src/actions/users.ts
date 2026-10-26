@@ -234,20 +234,33 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
   if (otherActive === null) return { ok: false, error: "save_failed" };
 
   const service = getSupabaseServiceClient();
-  const { error } = await service
-    .from("memberships")
-    .update({ status: status as MembershipStatus })
-    .eq("id", membershipId);
-  if (error) return { ok: false, error: "save_failed" };
-
   // The auth login is shared across orgs — ban it only when no org has an active membership left
   // (`authBanAction`). Self-status is already blocked above, so an actor can't ban themselves.
+  // **로그인 잠금 · 풀기를 먼저**(2026-10-26 버그 수정) — 전에는 상태를 먼저 바꾸고 잠금이 실패하면 「정지」로 보이는데
+  // 로그인은 되는 상태가 남았다. 잠금이 실패하면 아무것도 바꾸지 않고, 상태 저장이 실패하면 잠금을 되돌린다.
   const ban = authBanAction(status, otherActive);
   if (ban !== "keep") {
     const { error: banError } = await service.auth.admin.updateUserById(ctx.membership.user_id, {
       ban_duration: ban === "unban" ? "none" : "876000h",
     });
     if (banError) return { ok: false, error: "save_failed" };
+  }
+  const { error } = await service
+    .from("memberships")
+    .update({ status: status as MembershipStatus })
+    .eq("id", membershipId);
+  if (error) {
+    // 바꾸기 전 잠금 상태로만 되돌린다 — 이전 상태가 이번과 같은 쪽이면(이미 풀려 있었음 · 이미 잠겨 있었음) 건드리지 않는다.
+    const prevBan = authBanAction(ctx.membership.status, otherActive);
+    const prevLocked = prevBan === "ban";
+    const nowLocked = ban === "ban";
+    if (ban !== "keep" && prevLocked !== nowLocked) {
+      const { error: revertError } = await service.auth.admin.updateUserById(ctx.membership.user_id, {
+        ban_duration: prevLocked ? "876000h" : "none",
+      });
+      if (revertError) console.error("[users] ban revert failed after status save error", revertError);
+    }
+    return { ok: false, error: "save_failed" };
   }
 
   // 비활성 · 정지면 이 조직의 개인 부여 · 차단을 전부 회수한다(권한 정리 ④ B) — 다시 활성으로 돌려도 예전 권한이 조용히 살아나지 않게.
@@ -493,15 +506,33 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
   if ((idDocs ?? 0) > 0) return { ok: false, error: "has_id_documents" };
 
   // Profile + auth login are shared across orgs: if the user belongs to any other org (any status),
-  // remove only THIS org's membership. Otherwise remove the whole account explicitly (membership →
-  // profile → auth login) so cleanup doesn't depend on a particular FK cascade config.
-  // 삭제 전에 이 조직의 개인 부여 · 차단을 회수하고(멤버십만 지우면 행이 남는다) 기록을 남긴다 — 멤버십이 사라져 화면에선 안 보이지만
+  // remove only THIS org's membership. Otherwise remove the whole account (auth login first, then
+  // membership → profile explicitly so cleanup doesn't depend on a particular FK cascade config).
+  const otherOrgs = await countOtherOrgMemberships(ctx.membership, false);
+  if (otherOrgs === null) return { ok: false, error: "delete_failed" };
+  const wholeAccount = deleteScope(otherOrgs) !== "membership";
+
+  // **실패할 수 있는 auth 삭제를 먼저**(2026-10-26 버그 수정). 전에는 멤버십 → 프로필을 지운 뒤 auth 삭제가 실패하면
+  // 로그인만 남은 반쪽 계정이 됐다. auth 삭제가 실패하면 아무것도 지우지 않고 돌아간다. 성공하면 프로필 · 멤버십은
+  // FK cascade 로 같이 지워지고, 아래 명시 삭제는 남은 것이 있을 때의 정리다.
+  // 이 조직의 개인 부여 · 차단을 회수하고(멤버십만 지우면 행이 남는다) 기록을 남긴다(auth 삭제의 cascade 로 행이 먼저 사라지기 전에) — 멤버십이 사라져 화면에선 안 보이지만
   // audit_logs 에는 남는다(권한 정리 ④).
   await revokeAllMemberOverrides({
     organizationId: ctx.membership.organization_id,
     userId,
     revokedByUserId: ctx.actorUserId,
   });
+  if (wholeAccount) {
+    const { error: authError } = await service.auth.admin.deleteUser(userId);
+    if (authError) return { ok: false, error: "delete_failed" };
+  }
+
+  const { error: membershipError } = await service.from("memberships").delete().eq("id", membershipId);
+  if (membershipError) return { ok: false, error: "delete_failed" };
+  if (wholeAccount) {
+    const { error: profileError } = await service.from("profiles").delete().eq("id", userId);
+    if (profileError) return { ok: false, error: "delete_failed" };
+  }
   await logUserAudit({
     organizationId: ctx.membership.organization_id,
     actorUserId: ctx.actorUserId,
@@ -509,18 +540,6 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
     targetId: membershipId,
     metadata: { user_id: userId, role: ctx.membership.role },
   });
-  const otherOrgs = await countOtherOrgMemberships(ctx.membership, false);
-  if (otherOrgs === null) return { ok: false, error: "delete_failed" };
-  const { error: membershipError } = await service.from("memberships").delete().eq("id", membershipId);
-  if (membershipError) return { ok: false, error: "delete_failed" };
-  if (deleteScope(otherOrgs) === "membership") {
-    revalidatePath(LIST_PATH);
-    revalidatePath(MOBILE_LIST_PATH);
-    return { ok: true };
-  }
-  await service.from("profiles").delete().eq("id", userId);
-  const { error } = await service.auth.admin.deleteUser(userId);
-  if (error) return { ok: false, error: "delete_failed" };
 
   revalidatePath(LIST_PATH);
   revalidatePath(MOBILE_LIST_PATH);

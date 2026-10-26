@@ -76,8 +76,10 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
     notFound();
   }
 
+  // 「건물 전체」 신고는 room_label 이 아니라 is_building_only 로 그린다(2026-10-26) — 옛 건은 room_label 에 신고자 언어의
+  // 「건물 전체」가 들어 있어서 그대로 그리면 다른 언어가 섞였다.
   const location = resolveRequestLocation(
-    report.room_label,
+    report.is_building_only ? "" : report.room_label,
     roomCatalog,
     dictionary.cleaning.buildingLabels,
     report.property_name,
@@ -97,7 +99,11 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
 
   // 화이트 리디자인(2026-10-13, 시안 ReqDetail-Phone · Req-Tablet): 카드 · 아이콘 상자 · 배지 대신 위 한 줄(우선순위 · 상태 · 분류) →
   // 제목 → 「호실 · 건물 · 신고자 · 시각」 → (연결된 예약) → 사진 → 설명 → 정보 줄 → 처리 결과 → 현장 처리.
-  const roomText = location.roomLabel && location.roomLabel !== "-" ? location.roomLabel : null;
+  const roomText = report.is_building_only
+    ? copy.form.roomBuildingOnly
+    : location.roomLabel && location.roomLabel !== "-"
+      ? location.roomLabel
+      : null;
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.detailTitle}>
       <div className="mdw">
@@ -174,6 +180,7 @@ export default async function MobileMaintenanceDetailPage({ params, searchParams
         <MaintenanceHandlingForm
           canHandle={canHandle}
           copy={copy}
+          existingPhotoCount={report.resolution_image_urls.length}
           imgCopy={dictionary.requestImages}
           initialMemo={report.resolution_memo ?? ""}
           initialStatus={report.status}

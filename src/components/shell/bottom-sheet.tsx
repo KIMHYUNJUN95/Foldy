@@ -114,6 +114,22 @@ function unlockBodyScroll() {
  */
 const openSheets: symbol[] = [];
 
+/**
+ * 열린 오버레이 쌓임(시트 · 사진 뷰어 `ImageLightbox`) — Esc 는 **맨 위 하나만** 닫는다(2026-10-26). 전엔 시트 안에서 연 사진
+ * 뷰어에서 Esc 를 누르면 뷰어와 그 밑 시트가 함께 닫혔다. 돌려준 함수로 뺀다.
+ */
+export function pushOverlay(id: symbol): () => void {
+  openSheets.push(id);
+  return () => {
+    const index = openSheets.indexOf(id);
+    if (index >= 0) openSheets.splice(index, 1);
+  };
+}
+
+export function isTopOverlay(id: symbol): boolean {
+  return openSheets[openSheets.length - 1] === id;
+}
+
 const BottomSheetDragContext = createContext<HandleProps>({} as HandleProps);
 const BottomSheetCloseContext = createContext<() => void>(() => {});
 

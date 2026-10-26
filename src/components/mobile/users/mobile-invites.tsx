@@ -78,6 +78,8 @@ export function MobileInvites({
   const [sheet, setSheet] = useState<"role" | "org" | "date" | { more: MobileInviteRow } | { del: MobileInviteRow } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [freshId, setFreshId] = useState<string | null>(null);
+  /** 지우는 중인 코드 — 서버를 기다리지 않고 줄이 바로 접힌다(줄 접힘 공용 `.row-collapse`). 실패하면 다시 펴진다. */
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [toast, setToast] = useState<UsersToast | null>(null);
   const knownIds = useRef(new Set(rows.map((row) => row.id)));
   const show = (next: Omit<UsersToast, "id">) => {
@@ -154,13 +156,16 @@ export function MobileInvites({
   }
 
   function remove(row: MobileInviteRow) {
+    // 줄은 바로 접는다(2026-10-26 — 줄 접힘 공용 규칙). 서버가 실패하면 속성을 떼서 다시 편다.
+    setLeavingId(row.id);
+    haptic("light");
     startTransition(async () => {
       const result = await deleteMobileInviteCode({ inviteCodeId: row.id, organizationId: row.organizationId });
       if (result.ok) {
-        haptic("success");
         show({ kind: "done", text: c.mInvDeleted });
         router.refresh();
       } else {
+        setLeavingId((current) => (current === row.id ? null : current));
         haptic("error");
         show({ kind: "bad", text: inviteError(result.error, dict) });
       }
@@ -286,7 +291,8 @@ export function MobileInvites({
             const end = row.state !== "live";
             const isCopied = copied === row.id;
             return (
-              <div key={row.id} className={`muw-inv${end ? " is-end" : ""}${freshId === row.id ? " is-new" : ""}`}>
+              <div key={row.id} className="muw-inv-wrap row-collapse" data-leaving={leavingId === row.id ? "" : undefined}>
+              <div className={`muw-inv${end ? " is-end" : ""}${freshId === row.id ? " is-new" : ""}`}>
                 <span className="muw-rb">
                   <span className="muw-rt muw-mono">{row.code}</span>
                   <span className="muw-rm num">
@@ -320,6 +326,7 @@ export function MobileInvites({
                 <button type="button" className="muw-ic muw-more" aria-label={c.mInvMore} aria-haspopup="dialog" onClick={() => setSheet({ more: row })}>
                   <Ellipsis aria-hidden="true" />
                 </button>
+              </div>
               </div>
             );
           })}

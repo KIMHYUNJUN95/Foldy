@@ -173,6 +173,31 @@ export async function getOrgTodayCleaningRoomLabels(
   }[];
 }
 
+/**
+ * 그날 조직 전체에서 **이미 시작 · 완료된 방** — 방 라벨 · 상태만(2026-10-26 버그 수정).
+ *
+ * `getOrgTodayCleaningRoomLabels` 는 RLS 클라이언트라 `cleaning.read_all` 이 없는 직원은 본인 세션만 받는다.
+ * 그래서 남이 시작한 방이 목록에 그대로 남고, 서버의 「오늘 이미 처리된 객실」 검사도 통과해 **같은 방을 두 번
+ * 시작**할 수 있었다. 이 조회는 서비스 키로 읽되 조직 · 날짜 · 상태로 좁히고 담당자 · 시각은 돌려주지 않는다 —
+ * 「이 방은 이미 누가 맡았다」는 사실만 쓴다. 서버 전용(시작 액션 · 청소 화면 서버 컴포넌트)에서만 부른다.
+ * 서비스 클라이언트는 동적 import — 이 파일은 클라이언트 컴포넌트도 가져다 쓴다.
+ */
+export async function getOrgProcessedCleaningRoomLabels(
+  organizationId: string,
+  date?: string,
+): Promise<{ room_label: string; status: "in_progress" | "completed" }[]> {
+  const { getSupabaseServiceClient } = await import("@/lib/supabase/service");
+  const { data, error } = await getSupabaseServiceClient()
+    .from("cleaning_sessions")
+    .select("room_label, status")
+    .eq("organization_id", organizationId)
+    .eq("cleaning_date", date ?? getCleaningOperatingDateKey())
+    .in("status", ["in_progress", "completed"]);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as { room_label: string; status: "in_progress" | "completed" }[];
+}
+
 // Full session rows for the org on one operating date (org-wide, every staff member) — used by the
 // admin console to overlay real cleaning-session status onto the reservation-derived targets.
 // `date` 를 열어 과거·미래 날짜도 같은 화면으로 볼 수 있게 한다(2026-08-04). 과거 날짜에서는 이

@@ -46,8 +46,8 @@ export async function getAnnualLeaveBaseline(
 }
 
 /**
- * Self-service upsert: sets hire_date on the profile and writes the balance baseline as of today.
- * Overwrites any prior baseline (the employee is expected to do this once at setup).
+ * Sets hire_date on the profile and writes the balance baseline as of today. The admin path overwrites;
+ * the employee self path (`mode: "self_once"`) only works once — see below.
  *
  * **검증이 여기 있는 이유 (2026-08-03).** 이 함수는 service-role 클라이언트로 쓰므로 RLS 가
  * 아무것도 막지 않는다. 상한·자격 검사가 관리자 경로(`saveEmployeeLeaveBaseline`)에만 있어서,
@@ -65,11 +65,36 @@ export function isLeaveHourlyRole(role: string): boolean {
   return isHourlyRole(role);
 }
 
+/**
+ * 기준 잔여 행이 이미 있는가(입사일 유무와 상관없이). 본인 자가 설정은 **처음 한 번만** 허용한다 —
+ * 있으면 `already_set` 이고 이후 수정은 관리자 화면(`saveEmployeeLeaveBaseline`)에서만 한다(2026-10-26).
+ */
+export async function hasAnnualLeaveBaselineRow(
+  service: Service,
+  organizationId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await service
+    .from("annual_leave_baselines")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
+/**
+ * `mode: "self_once"` — 본인 자가 설정(모바일). 기준 행이 이미 있으면 `already_set` 으로 거절하고,
+ * upsert 대신 insert 로 써서 두 번 눌러도(경쟁) 두 번째는 유니크 충돌로 막힌다. 입사일은 기준 행이
+ * 들어간 **뒤에** 쓴다 — 거절된 요청이 입사일만 바꾸는 일이 없도록.
+ * 기본(`"admin_upsert"`)은 관리자 경로 — 예전처럼 덮어쓴다.
+ */
 export async function setAnnualLeaveBaselineForUser(
   service: Service,
   organizationId: string,
   userId: string,
   input: { hireDate: string; baseAmount: number; bonusAmount?: number },
+  mode: "admin_upsert" | "self_once" = "admin_upsert",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.hireDate)) return { ok: false, error: "invalid_dates" };
   if (!Number.isFinite(input.baseAmount) || input.baseAmount < 0 || input.baseAmount > MAX_LEAVE_GRANT) {
@@ -92,6 +117,38 @@ export async function setAnnualLeaveBaselineForUser(
   if (isLeaveHourlyRole(membership.role)) return { ok: false, error: "hourly_excluded" };
 
   const baselineDate = tokyoToday();
+  const row = {
+    organization_id: organizationId,
+    user_id: userId,
+    base_amount: input.baseAmount,
+    bonus_amount: input.bonusAmount ?? 0,
+    baseline_date: baselineDate,
+  };
+
+  if (mode === "self_once") {
+    if (await hasAnnualLeaveBaselineRow(service, organizationId, userId)) {
+      return { ok: false, error: "already_set" };
+    }
+    const { error: insertError } = await service.from("annual_leave_baselines").insert(row);
+    if (insertError) {
+      // 23505 = 유니크 충돌(동시에 두 번 저장) — 이미 설정된 것으로 본다.
+      return { ok: false, error: insertError.code === "23505" ? "already_set" : "baseline_upsert_failed" };
+    }
+    const { error: profileError } = await service
+      .from("profiles")
+      .update({ hire_date: input.hireDate })
+      .eq("id", userId);
+    if (profileError) {
+      // 입사일이 안 들어가면 기준 행만 남아 다시 설정도 못 하게 되므로 되돌린다.
+      await service
+        .from("annual_leave_baselines")
+        .delete()
+        .eq("organization_id", organizationId)
+        .eq("user_id", userId);
+      return { ok: false, error: "profile_update_failed" };
+    }
+    return { ok: true };
+  }
 
   const { error: profileError } = await service
     .from("profiles")
@@ -99,16 +156,9 @@ export async function setAnnualLeaveBaselineForUser(
     .eq("id", userId);
   if (profileError) return { ok: false, error: "profile_update_failed" };
 
-  const { error: baselineError } = await service.from("annual_leave_baselines").upsert(
-    {
-      organization_id: organizationId,
-      user_id: userId,
-      base_amount: input.baseAmount,
-      bonus_amount: input.bonusAmount ?? 0,
-      baseline_date: baselineDate,
-    },
-    { onConflict: "organization_id,user_id" },
-  );
+  const { error: baselineError } = await service
+    .from("annual_leave_baselines")
+    .upsert(row, { onConflict: "organization_id,user_id" });
   if (baselineError) return { ok: false, error: "baseline_upsert_failed" };
 
   return { ok: true };

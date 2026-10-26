@@ -80,7 +80,10 @@ async function uploadTransportImage(
   itemId: string,
 ): Promise<string> {
   const compressed = await compressImageFile(file);
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  // 확장자는 압축 결과의 MIME 에서 — 파일 이름에 점이 없거나(「사진」) 공백이 섞이면 서버 경로 검사(SAFE_FILE)에 걸린다.
+  const fromMime = compressed.type.startsWith("image/") ? compressed.type.slice(6).replace("jpeg", "jpg") : "";
+  const fromName = file.name.includes(".") ? (file.name.split(".").pop()?.toLowerCase() ?? "") : "";
+  const ext = [fromMime, fromName].find((value) => /^[a-z0-9]{1,8}$/.test(value)) ?? "jpg";
   const filename = `${crypto.randomUUID()}.${ext}`;
   const storagePath = `${organizationId}/transport-reimbursements/${reportId}/${itemId}/${filename}`;
 
@@ -250,11 +253,48 @@ function getTodayTokyo(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
 }
 
+/** 영수증 사진 상한 — 항목마다 5장(서버 `addTransportItemImageAction` 도 같은 수로 막는다). */
+const MAX_RECEIPTS = 5;
+
+/**
+ * 정산서 달 안의 기본 사용일(2026-10-26). 이번 달이면 오늘, 지난달이면 그 달 말일, 다음 달이면 1일.
+ * 예전에는 늘 오늘이라 지난달 정산서를 열면 이번 달 날짜가 기본으로 들어갔다(서버가 이제 달 밖 날짜를 거절한다).
+ */
+function defaultUsageDateForMonth(monthKey: string): string {
+  const today = getTodayTokyo();
+  if (today.slice(0, 7) === monthKey) return today;
+  if (monthKey > today.slice(0, 7)) return `${monthKey}-01`;
+  const [y, m] = monthKey.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${monthKey}-${String(lastDay).padStart(2, "0")}`;
+}
+
+/** 영수증 사진을 차례로 올리고 등록 — 실패한 장 수를 돌려준다(액션이 거절한 것도 실패로 센다). */
+async function uploadReceipts(
+  files: File[],
+  organizationId: string,
+  reportId: string,
+  itemId: string,
+): Promise<{ ok: number; failed: number }> {
+  let ok = 0;
+  let failed = 0;
+  for (const file of files) {
+    try {
+      const path = await uploadTransportImage(file, organizationId, reportId, itemId);
+      const res = await addTransportItemImageAction(itemId, path);
+      if (res.ok) ok++;
+      else failed++;
+    } catch {
+      failed++;
+    }
+  }
+  return { ok, failed };
+}
+
 function AddItemSheet({
   dict,
   localeTag,
   organizationId,
-  reportId,
   monthKey,
   destinations,
   recentAmounts,
@@ -266,7 +306,6 @@ function AddItemSheet({
   dict: Dictionary;
   localeTag: string;
   organizationId: string;
-  reportId: string;
   monthKey: string;
   destinations: TransportDestination[];
   recentAmounts: Record<string, { amountYen: number; usageDate: string }>;
@@ -274,11 +313,13 @@ function AddItemSheet({
   /** 이미 교통비를 넣은 날짜 — 같은 날 두 번 넣는 실수를 눈에 띄게 한다. */
   usedDates: Set<string>;
   onClose: () => void;
-  onCreated: (item: TransportItem) => void;
+  /** `reportId` — 첫 항목이면 방금 만들어진 보고서. `failedReceipts` — 올리지 못한 영수증 장 수. */
+  onCreated: (item: TransportItem, meta: { reportId: string; failedReceipts: number }) => void;
 }) {
   const t = dict.transport;
   const [inputMode, setInputMode] = useState<"linked" | "manual">("manual");
-  const [usageDate, setUsageDate] = useState(getTodayTokyo());
+  const [usageDate, setUsageDate] = useState(() => defaultUsageDateForMonth(monthKey));
+  const [saveErr, setSaveErr] = useState(false);
   const [showCal, setShowCal] = useState(false);
   const [amount, setAmount] = useState("");
   // 라벨이 아니라 **키**를 들고 있는다. 라벨은 로케일마다 달라서 저장·기억의 키가 될 수 없다.
@@ -324,6 +365,7 @@ function AddItemSheet({
     if (!amountNum || amountNum <= 0) return;
     if (memoMissing || linkMissing) return;
     setPending(true);
+    setSaveErr(false);
     try {
       const result = await createTransportItemAction({
         targetMonth: monthKey,
@@ -339,22 +381,17 @@ function AddItemSheet({
       });
       if (!result.ok) {
         haptic("error");
+        setSaveErr(true);
         setPending(false);
         return;
       }
       const itemId = result.itemId;
-      // 이미지가 있으면 compress → upload → DB 등록
-      let receiptCount = 0;
-      for (const file of files) {
-        try {
-          const path = await uploadTransportImage(file, organizationId, reportId, itemId);
-          await addTransportItemImageAction(itemId, path);
-          receiptCount++;
-        } catch {
-          // 이미지 업로드 실패는 비치명적; 항목 자체는 생성 완료
-        }
-      }
-      haptic("success");
+      // 이미지가 있으면 compress → upload → DB 등록. 경로의 보고서 id 는 서버가 돌려준 것 —
+      // 첫 항목이면 화면을 열 때는 보고서가 없었다(page.tsx 는 읽기만 한다).
+      const uploaded = await uploadReceipts(files.slice(0, MAX_RECEIPTS), organizationId, result.reportId, itemId);
+      const receiptCount = uploaded.ok;
+      // 항목은 저장됐지만 영수증 일부가 빠졌으면 성공이 아니라 경고(햅틱 규칙: 부분 결과 = warning).
+      haptic(uploaded.failed > 0 ? "warning" : "success");
       onCreated({
         id: itemId,
         date: usageDate,
@@ -365,9 +402,11 @@ function AddItemSheet({
         mode: inputMode,
         missingReceipt: receiptCount === 0,
         memo: memo.trim() || undefined,
-      });
+      }, { reportId: result.reportId, failedReceipts: uploaded.failed });
       onClose();
     } catch {
+      haptic("error");
+      setSaveErr(true);
       setPending(false);
     }
   }
@@ -381,6 +420,7 @@ function AddItemSheet({
         {({ close }) => (
           <CalendarPanel
             value={usageDate}
+            monthKey={monthKey}
             dict={dict}
             localeTag={localeTag}
             onConfirm={(d) => {
@@ -501,7 +541,7 @@ function AddItemSheet({
               className="sr-only"
               onChange={(e) => {
                 if (e.target.files) {
-                  setFiles((prev) => [...prev, ...Array.from(e.target.files!)].slice(0, 5));
+                  setFiles((prev) => [...prev, ...Array.from(e.target.files!)].slice(0, MAX_RECEIPTS));
                 }
               }}
             />
@@ -606,6 +646,11 @@ function AddItemSheet({
           </div>
         ) : null}
 
+        {saveErr ? (
+          <div className="trn-err" role="alert">
+            {t.saveFailed}
+          </div>
+        ) : null}
         <button
           type="button"
           className="trn-add-submit"
@@ -749,7 +794,7 @@ function EditItemSheet({
   organizationId: string;
   reportId: string;
   onClose: () => void;
-  onSaved: (patch: Pick<TransportItem, "amount" | "context" | "memo" | "mode">) => void;
+  onSaved: (patch: Pick<TransportItem, "amount" | "context" | "memo" | "mode" | "receiptCount">, failedReceipts: number) => void;
 }) {
   const t = dict.transport;
   const { full, weekday } = fmtDateParts(item.date, localeTag);
@@ -759,10 +804,21 @@ function EditItemSheet({
   const [mode, setMode] = useState<"linked" | "manual">(item.mode);
   const [files, setFiles] = useState<File[]>([]);
   const [pending, setPending] = useState(false);
+  /** amount = 금액 비었음/0, save = 서버 거절 · 네트워크. */
+  const [err, setErr] = useState<null | "amount" | "save">(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 이미 붙은 영수증과 합쳐 5장까지만 더 받는다.
+  const receiptRoom = Math.max(0, MAX_RECEIPTS - item.receiptCount);
 
   async function handleSave(close: () => void) {
-    const amountNum = Math.max(0, parseInt(amount.replace(/[^\d]/g, ""), 10) || 0);
+    const amountNum = parseInt(amount.replace(/[^\d]/g, ""), 10) || 0;
+    // 예전에는 빈 칸이 0 으로 바뀌어 그대로 보내졌고, 서버가 거절해도 아무 말이 없었다.
+    if (amountNum <= 0) {
+      haptic("error");
+      setErr("amount");
+      return;
+    }
+    setErr(null);
     setPending(true);
     try {
       const result = await updateTransportItemAction({
@@ -773,22 +829,21 @@ function EditItemSheet({
       });
       if (!result.ok) {
         haptic("error");
+        setErr("save");
         setPending(false);
         return;
       }
-      // 새 이미지 추가
-      for (const file of files) {
-        try {
-          const path = await uploadTransportImage(file, organizationId, reportId, item.id);
-          await addTransportItemImageAction(item.id, path);
-        } catch {
-          // 이미지 업로드 실패는 비치명적
-        }
-      }
-      haptic("success");
-      onSaved({ amount: amountNum, context: context.trim(), memo: memo.trim(), mode });
+      // 새 이미지 추가 — 일부가 빠지면 저장은 됐어도 경고.
+      const uploaded = await uploadReceipts(files.slice(0, receiptRoom), organizationId, reportId, item.id);
+      haptic(uploaded.failed > 0 ? "warning" : "success");
+      onSaved(
+        { amount: amountNum, context: context.trim(), memo: memo.trim(), mode, receiptCount: item.receiptCount + uploaded.ok },
+        uploaded.failed,
+      );
       close();
     } catch {
+      haptic("error");
+      setErr("save");
       setPending(false);
     }
   }
@@ -854,7 +909,7 @@ function EditItemSheet({
                 </button>
               ),
             )}
-            {item.receiptCount < 2 && (
+            {item.receiptCount > 0 && item.receiptCount + files.length < MAX_RECEIPTS && (
               <button type="button" className="trn-shot-add" aria-label={t.addPhoto} onClick={() => fileInputRef.current?.click()}>
                 <CameraIcon />
               </button>
@@ -869,7 +924,7 @@ function EditItemSheet({
               className="sr-only"
               onChange={(e) => {
                 if (e.target.files) {
-                  setFiles((prev) => [...prev, ...Array.from(e.target.files!)].slice(0, 5));
+                  setFiles((prev) => [...prev, ...Array.from(e.target.files!)].slice(0, receiptRoom));
                 }
               }}
             />
@@ -911,6 +966,11 @@ function EditItemSheet({
           </div>
         </div>
 
+        {err ? (
+          <div className="trn-err" role="alert">
+            {err === "amount" ? t.amountRequired : t.saveFailed}
+          </div>
+        ) : null}
         <button
           type="button"
           className="trn-add-submit"
@@ -1068,6 +1128,9 @@ export function TransportStatement({
   const intentRef = useRef<"edit" | "delete" | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "ok" | "del" } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // 첫 항목을 넣으면서 서버가 만든 보고서 id. 화면을 열 때 보고서가 없으면 report.id 는 빈 값이다(page.tsx).
+  const [createdReportId, setCreatedReportId] = useState<string | null>(null);
+  const reportId = report.id || createdReportId || "";
 
   const total = items.reduce((s, x) => s + x.amount, 0);
   const selectedItem = items.find((x) => x.id === selectedId) ?? null;
@@ -1090,21 +1153,26 @@ export function TransportStatement({
   }, []);
 
   const handleSaved = useCallback(
-    (patch: Pick<TransportItem, "amount" | "context" | "memo" | "mode">) => {
+    (patch: Pick<TransportItem, "amount" | "context" | "memo" | "mode" | "receiptCount">, failedReceipts: number) => {
       setItems((prev) =>
         prev.map((it) =>
           it.id === selectedId
             ? {
                 ...it,
                 ...patch,
-                missingReceipt: it.receiptCount > 0 ? undefined : it.missingReceipt,
+                missingReceipt: patch.receiptCount > 0 ? undefined : it.missingReceipt,
               }
             : it,
         ),
       );
-      setToast({ message: t.toastSaved, tone: "ok" }); // 액션이 revalidatePath — refresh 중복 금지
+      // 액션이 revalidatePath — refresh 중복 금지
+      setToast(
+        failedReceipts > 0
+          ? { message: t.receiptUploadPartial.replace("{n}", String(failedReceipts)), tone: "del" }
+          : { message: t.toastSaved, tone: "ok" },
+      );
     },
-    [selectedId, t.toastSaved],
+    [selectedId, t.toastSaved, t.receiptUploadPartial],
   );
 
   const handleDelete = useCallback(() => {
@@ -1125,15 +1193,25 @@ export function TransportStatement({
 
   async function handleSubmit() {
     setSubmitting(true);
-    const result = await submitTransportReportAction(monthKey);
+    let result: Awaited<ReturnType<typeof submitTransportReportAction>>;
+    try {
+      result = await submitTransportReportAction(monthKey);
+    } catch {
+      result = { ok: false, error: "submit_failed" };
+    }
     setSubmitting(false);
     if (!result.ok) {
       haptic("error");
-      if (result.error === "missing_evidence") {
-        setToast({ message: t.submitErrorMissingEvidence, tone: "del" });
-      } else if (result.error === "no_items") {
-        setToast({ message: t.submitErrorNoItems, tone: "del" });
-      }
+      // 예전에는 증빙 누락 · 항목 없음 말고는(이미 제출됨 · 저장 실패) 아무 말이 없었다.
+      const message =
+        result.error === "missing_evidence"
+          ? t.submitErrorMissingEvidence
+          : result.error === "no_items" || result.error === "no_report"
+            ? t.submitErrorNoItems
+            : result.error === "report_not_editable"
+              ? t.submitErrorLocked
+              : t.submitErrorFailed;
+      setToast({ message, tone: "del" });
       return;
     }
     haptic("success");
@@ -1249,15 +1327,18 @@ export function TransportStatement({
           dict={dict}
           localeTag={localeTag}
           organizationId={organizationId}
-          reportId={report.id}
           monthKey={monthKey}
           destinations={destinations}
           recentAmounts={recentAmounts}
           linkedCandidates={linkedCandidates}
           usedDates={new Set(items.map((i) => i.date))}
           onClose={() => setShowAddSheet(false)}
-          onCreated={(item) => {
+          onCreated={(item, meta) => {
             setItems((prev) => [...prev, item]);
+            if (!report.id) setCreatedReportId(meta.reportId);
+            if (meta.failedReceipts > 0) {
+              setToast({ message: t.receiptUploadPartial.replace("{n}", String(meta.failedReceipts)), tone: "del" });
+            }
           }}
         />
       )}
@@ -1285,7 +1366,7 @@ export function TransportStatement({
           dict={dict}
           localeTag={localeTag}
           organizationId={organizationId}
-          reportId={report.id}
+          reportId={reportId}
           onClose={() => {
             setShowEdit(false);
             setSelectedId(null);

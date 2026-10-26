@@ -121,6 +121,7 @@ Implementation notes:
 Mobile directory (`/mobile/directory`) — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet):
 
 - Available in the mobile shell as the directory tab (bottom tab or side menu). Client view: `src/components/directory/directory-view.tsx` (`drw-*` in `directory.css`).
+- Phone numbers are shown hyphenated (`formatPhoneDisplay` — `090-1234-5678` · `+82-10-…`); `tel:` and copy keep the raw value. Press feedback is the shared mobile rule (no per-screen scale / tint, 2026-10-26).
 - Shows all active/invited org members, **grouped by role**: 관리 · 사무실(개발자 · 대표 · 전무 · 오피스 관리자 · CS) / 현장(현장 관리자 · 직원) / 파트타임, each group with a head count. Inside a group: role priority, then name.
 - Head: 「직원 목록」 + `조직 · N명`, search box (name · role · phone digits, 2+ digits).
 - Row: avatar initial · name (+ 「나」) · `역할 · 번호`. The call button is a `tel:` link (press: scale + light haptic).
@@ -165,8 +166,8 @@ Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, �
   - 대상이 **owner · 전무**면 역할 · 소속 · 상태 · 권한 · 플래그 · 삭제 등 패널의 모든 변경은 **그 조직의 owner · 전무 또는 개발자만**. 대상이 **개발자**(`platform_admins` 활성)면 **개발자만**. `user.manage` 위임만 받은 사람은 불가(`protected_member`). 패널은 그런 대상에 컨트롤 · 휴지통을 숨기고 한 줄 안내(「대표 · 전무 계정은 …」 / 「개발자 계정은 개발자만 …」)를 보여 준다.
   - 역할 변경의 「줄 수 있는 역할」(`officeAdminAssignableRoles` 밖)도 **대상 조직의** owner · 전무인지로 판정한다(세션 역할이 다른 조직 것일 수 있다).
   - **마지막 활성 owner** 는 owner 가 아닌 역할로 바꾸기 · 비활성 · 삭제가 막힌다(`last_owner`). 패널은 역할 드롭다운 · 「비활성」 · 휴지통을 막고 안내 문구를 띄운다. 전무는 owner 수에 세지 않는다.
-  - **삭제**는 이 조직 멤버십만 지운다. 그 사람에게 **다른 조직 멤버십(상태 무관)** 이 있으면 profile · 로그인 계정은 남긴다. 다른 조직 멤버십이 없을 때만 계정 전체(멤버십 → profile → auth) 삭제. 활동 기록 검사(근태 · 청소 · 연차)는 예전처럼 조직 무관. **이 조직에 신분 서류(재류카드 · 마이넘버 카드 앞면)가 있으면 삭제 대신 비활성**(`has_id_documents`, 2026-10-23 — 퇴사 후 3년 보관, `41-residence-card-workflow.md` §6).
-  - **비활성(auth ban)** 기준은 「바뀐 뒤 어느 조직에도 활성 멤버십이 없으면 로그인 차단」 하나. 다른 조직에 활성 멤버십이 있으면 이 조직 멤버십 상태만 바뀌고 로그인은 막지 않는다. 활성으로 바꾸면 항상 차단 해제. 확인 창 문구도 그 경우 「이 조직에서만 …」으로 바뀐다.
+  - **삭제**는 이 조직 멤버십만 지운다. 그 사람에게 **다른 조직 멤버십(상태 무관)** 이 있으면 profile · 로그인 계정은 남긴다. 다른 조직 멤버십이 없을 때만 계정 전체 삭제 — **auth 로그인을 먼저** 지우고(실패하면 아무것도 안 지우고 `delete_failed`), 그 뒤 멤버십 → profile(오류 확인). 전에는 멤버십 · profile 을 지운 뒤 auth 삭제가 실패하면 로그인만 남았다(2026-10-26 버그 수정). 활동 기록 검사(근태 · 청소 · 연차)는 예전처럼 조직 무관. **이 조직에 신분 서류(재류카드 · 마이넘버 카드 앞면)가 있으면 삭제 대신 비활성**(`has_id_documents`, 2026-10-23 — 퇴사 후 3년 보관, `41-residence-card-workflow.md` §6).
+  - **비활성(auth ban)** 기준은 「바뀐 뒤 어느 조직에도 활성 멤버십이 없으면 로그인 차단」 하나. 다른 조직에 활성 멤버십이 있으면 이 조직 멤버십 상태만 바뀌고 로그인은 막지 않는다. 활성으로 바꾸면 항상 차단 해제. 확인 창 문구도 그 경우 「이 조직에서만 …」으로 바뀐다. **로그인 차단 · 해제를 먼저** 하고 상태를 저장한다 — 차단이 실패하면 상태도 안 바뀌고, 상태 저장이 실패하면 차단을 되돌린다(2026-10-26 — 전에는 「비활성」으로 보이는데 로그인되는 상태가 남을 수 있었다).
 - Motion: rows rise in order, switch knob slide, expiry row unfolds, button press. Off under reduced motion.
 - Code: `src/components/admin/users/users-console.tsx` + `users-white.css` (`usw-*`). Scope guard: the list is org-scoped; the panel only opens for a membership in that list.
 
@@ -236,7 +237,8 @@ emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패�
   나 · 대표/전무 · 개발자 계정은 자물쇠 안내 + 값만.
 - **초대코드** `/mobile/users/invites` — 새 초대코드(조직이 여럿일 때만 조직 줄 · 역할 › · 코드 ↻ · 기한 · 횟수, 「세부 설정 바꾸기」로 코드 · 이름 ·
   기한(날짜 시트) · 횟수를 덮어씀) → 코드 목록(고정폭 코드 · 「역할 · 사용 / 최대회 · 기한」 · 복사 → 「✓ 복사됨」 1.5초 · 「⋯」 = 끄기/다시 켜기 · 삭제 → 확인).
-  만든 직후에는 목록이 위로 오고 새 코드가 옅은 보라.
+  만든 직후에는 목록이 위로 오고 새 코드가 옅은 보라. 삭제는 확인 뒤 줄이 **바로 접힌다**(줄 접힘 공용 `.row-collapse`, 실패하면 다시 펴짐 · 햅틱 light — 2026-10-26).
+  초대코드 기본 역할의 「줄 수 있는 역할」은 서버가 **그 조직의 멤버십 역할**로 판정한다(`selectableInviteRolesInOrg` — 세션 역할은 다른 조직 것일 수 있다, 2026-10-26).
 - **넓은 화면** — 폴드: 레일 + 셸 가운데 칸. 태블릿 가로: 목록 \| 상세 칸(`SplitList`, `SPLIT_DETAIL_PATTERNS.users`, 고른 줄 옅은 보라 · 테두리 없음).
   초대코드는 상세 주소가 없어 한 단. 시트는 태블릿에서 가운데 카드(공용 BottomSheet).
 - **알림** — 한 줄 알약(판매 캘린더와 같은 모양): 역할 · 상태 = 「되돌리기」 + 6초 줄, 스위치 · 소속 = 글만 2초(스위치가 곧 되돌리기), 실패 = 빨간 기운 + 이유 5초

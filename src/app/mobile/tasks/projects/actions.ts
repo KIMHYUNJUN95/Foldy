@@ -139,11 +139,12 @@ export async function deleteProject(formData: FormData) {
   }
   const supabase = getSupabaseServiceClient();
   // Cascade removes participants, sections, and project tasks (FKs on delete cascade).
-  await supabase
-    .from("projects")
-    .delete()
-    .eq("id", id)
-    .eq("organization_id", session.organization.id);
+  // 실패하면 목록으로 보내지 않는다(2026-10-26) — 「지워졌다」고 믿게 한 뒤 다시 나타나는 것을 막는다.
+  const deleted = await mustWrite(
+    "project: delete",
+    supabase.from("projects").delete().eq("id", id).eq("organization_id", session.organization.id),
+  );
+  if (!deleted) redirect(detailPath(id, "delete_failed"));
   redirect(PROJECTS_PATH);
 }
 

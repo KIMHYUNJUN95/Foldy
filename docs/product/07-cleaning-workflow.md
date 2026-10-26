@@ -63,6 +63,24 @@ Both lists are **unprocessed work queues**, not raw reservation queries. Before 
 
 Exclusion is org-wide: if any staff member in the organization has an `in_progress` or `completed` session for a given room today, that room disappears from all staff members' lists. The "Today's records" section below the lists remains unfiltered and always shows the full history.
 
+**2026-10-26 — 조직 전체를 실제로 읽는다.** 위 규칙과 달리 화면과 시작 액션이 이 목록을 RLS 클라이언트로 읽고 있어서,
+`cleaning.read_all` 이 없는 직원(staff · part_time_staff)은 **본인 세션만** 받았다. 남이 시작한 방이 목록에 그대로 남고, 서버의
+「오늘 이미 처리된 객실」 검사도 통과해 **같은 방을 두 사람이 시작**할 수 있었다. 이제 둘 다
+`getOrgProcessedCleaningRoomLabels(orgId, date)`(`src/lib/cleaning.ts`) 를 쓴다 — 서비스 키로 읽되 조직 · 운영일 · 상태
+(`in_progress`/`completed`)로 좁히고 **방 라벨 · 상태만** 돌려준다(담당자 · 시각은 안 내려 줌). 지난 날 「누가 언제」 기록은
+여전히 RLS 조회(`getOrgTodayCleaningRoomLabels`)라 권한 없는 사람에게는 그리지 않는다(아래 「실패 사유 표시」 · 08-04 규칙 그대로).
+시작 액션은 이 조회가 실패하면 **막는다**(`start_failed`) — 확인 못 한 채 시작시키지 않는다. 객실 카탈로그가 없으면(객실
+마스터 없음 · 읽기 오류 — `getActiveRoomCatalog` 가 둘을 구분하지 않음) 예전처럼 객실 검사만 건너뛴다(막으면 객실 마스터 없는 조직이 청소를 못 시작함). KPI 「진행 중」 숫자도 같은 조직 전체 목록에서 센다.
+
+취소 액션은 업데이트가 **0행**이면(그 사이 완료 · 취소됐거나 RLS 가 조용히 막음) 「취소했습니다」 대신 `active_not_found` 로 돌아간다.
+완료 햅틱(`success`)은 버튼을 누를 때가 아니라 서버가 저장하고 돌아온 화면의 안내(`CleaningNotice haptic="success"`)에서, 거절 안내는
+`error` 로 울린다. 다음 체크인 손님 이름이 없을 때의 「Guest」 는 `cleaning.guestFallback`(ko 게스트 · ja ゲスト · en Guest).
+
+> **남은 것 — DB 유니크 인덱스.** 위 검사는 「읽고 → 넣기」 두 단계라, 두 사람이 **같은 순간** 같은 방을 누르면 둘 다 통과할 수 있다.
+> 완전히 막으려면 `cleaning_sessions` 에 (조직 · 운영일 · 실제 방) 기준 부분 유니크 인덱스(`status in ('in_progress','completed')`)가
+> 필요하다. 아라키초는 한 방에 계정 라벨이 둘(`401` · `401_2_2`)이라 `room_label` 그대로가 아니라 실제 방 키 컬럼(또는 식)이 있어야
+> 하고, 기존 중복 행 정리도 먼저 해야 한다 — 마이그레이션이라 사용자 확인 후 진행(2026-10-26 미적용).
+
 #### room_label -> roomKey Resolution Priority
 
 The filter compares `cleaning_sessions.room_label` values against `CleaningTarget.roomKey` / `SettingTarget.roomKey`. Reverse mapping uses a three-stage fallback:

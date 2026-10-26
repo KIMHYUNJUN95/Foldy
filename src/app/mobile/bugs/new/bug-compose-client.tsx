@@ -12,7 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import type { BugCopy } from "@/components/bugs/bug-types";
-import { uploadBugReportImageAction, createBugReportAction } from "../actions";
+import { createBugReportAction, updateBugReportAction, uploadBugReportImageAction } from "../actions";
 import "@/components/bugs/bugs-white.css";
 import { haptic } from "@/lib/haptics";
 
@@ -45,6 +45,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
   const [description, setDescription] = useState("");
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -105,22 +106,44 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
 
       const reportId = createResult.id;
 
-      // 2단계: 이미지가 있으면 각각 압축 후 업로드
+      // 2단계: 이미지가 있으면 각각 압축 후 업로드 → 돌려받은 주소를 모아 3단계에서 신고에 붙인다.
+      // (2026-10-26 — 예전엔 올린 주소를 버려서 신고의 image_urls 가 늘 비어 있었고, 실패도 조용히 삼켰다.)
+      const uploadedUrls: string[] = [];
+      let failed = 0;
       for (const preview of previews) {
         try {
           const compressed = await compressImageFile(preview.file);
           const imgForm = new FormData();
           imgForm.set("file", compressed);
-          await uploadBugReportImageAction(reportId, imgForm);
+          const res = await uploadBugReportImageAction(reportId, imgForm);
+          if ("url" in res) uploadedUrls.push(res.url);
+          else failed += 1;
         } catch {
-          // 이미지 업로드 실패는 non-fatal — report 자체는 이미 생성됨
+          failed += 1;
         }
       }
 
-      // 체크가 그려지는 걸 잠깐 보여 주고 목록으로.
+      // 3단계: 올라간 사진 주소를 신고에 붙인다. 붙이기에 실패하면 그 사진들도 못 올린 것으로 센다.
+      if (uploadedUrls.length > 0) {
+        const attachForm = new FormData();
+        attachForm.set("title", title.trim());
+        attachForm.set("description", description.trim());
+        for (const url of uploadedUrls) attachForm.append("imageUrls", url);
+        const attachResult = await updateBugReportAction(reportId, attachForm);
+        if ("error" in attachResult) failed += uploadedUrls.length;
+      }
+
+      // 신고 자체는 접수됐다 — 사진 일부가 빠졌으면 경고 진동 + 한 줄 안내를 잠깐 보여 주고 목록으로.
       setDone(true);
-      haptic("success");
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (failed > 0) {
+        haptic("warning");
+        setWarning(copy.photosPartialFailed.replace("{n}", String(failed)));
+        window.setTimeout(() => router.replace("/mobile/bugs"), 2400);
+        return;
+      }
+      // 체크가 그려지는 걸 잠깐 보여 주고 목록으로.
+      haptic("success");
       window.setTimeout(() => router.replace("/mobile/bugs"), reduce ? 0 : 650);
     });
   }
@@ -185,6 +208,11 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
         {error ? (
           <p className="bgw-err" role="alert">
             {error}
+          </p>
+        ) : null}
+        {warning ? (
+          <p className="bgw-err" role="status">
+            {warning}
           </p>
         ) : null}
 

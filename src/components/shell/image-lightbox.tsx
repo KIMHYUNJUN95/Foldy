@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useSession } from "@/components/providers/session-provider";
+import { isTopOverlay, pushOverlay } from "@/components/shell/bottom-sheet";
 import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
+import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -62,14 +65,23 @@ export function ImageLightbox({
 
   useBodyScrollLock(open);
 
-  // Esc closes.
+  // 이전 · 다음 · 점 버튼 읽기 이름(2026-10-26 — 전엔 「←」 「→」 「1」 그대로 읽혔다). 관리자 · 모바일 모두 루트 SessionProvider 안이다.
+  const { session } = useSession();
+  const copy = getDictionary(session?.user.preferredLanguage ?? "ko").common;
+
+  // Esc closes — 맨 위 오버레이일 때만(시트 안에서 연 뷰어면 뷰어만 닫히고 시트는 남는다). 오버레이 쌓임은 BottomSheet 와 공용.
   useEffect(() => {
     if (!open) return;
+    const id = Symbol("lightbox");
+    const release = pushOverlay(id);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && isTopOverlay(id)) onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      release();
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   // On open / requested index change, jump the rail to the slide and reset any zoom.
@@ -266,9 +278,12 @@ export function ImageLightbox({
 
   return createPortal(
     <div
+      aria-label={copy.lightboxDialog}
+      aria-modal="true"
       className="fixed inset-0 z-[95] flex flex-col bg-slate-950/95 backdrop-blur-sm"
       // 앱(Android) 뒤로가기 버튼이 먼저 이 뷰어를 닫게 하는 표식 — NativeShellBridge.
       data-native-back-overlay=""
+      role="dialog"
       style={{ animation: "modal-overlay-in 200ms ease-out both" }}
     >
       {/* Top glass bar — counter + close. */}
@@ -334,7 +349,7 @@ export function ImageLightbox({
         <>
           {activeIndex > 0 ? (
             <button
-              aria-label="←"
+              aria-label={copy.lightboxPrev}
               className="absolute left-3 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md ring-1 ring-inset ring-white/15 transition-colors active:bg-white/20 sm:flex"
               onClick={() => goTo(activeIndex - 1)}
               type="button"
@@ -344,7 +359,7 @@ export function ImageLightbox({
           ) : null}
           {activeIndex < urls.length - 1 ? (
             <button
-              aria-label="→"
+              aria-label={copy.lightboxNext}
               className="absolute right-3 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md ring-1 ring-inset ring-white/15 transition-colors active:bg-white/20 sm:flex"
               onClick={() => goTo(activeIndex + 1)}
               type="button"
@@ -356,7 +371,8 @@ export function ImageLightbox({
           <div className="flex items-center justify-center gap-1.5 pb-[max(18px,env(safe-area-inset-bottom))] pt-3">
             {urls.map((_, i) => (
               <button
-                aria-label={`${i + 1}`}
+                aria-current={i === activeIndex ? "true" : undefined}
+                aria-label={copy.lightboxGoTo.replace("{index}", String(i + 1)).replace("{total}", String(urls.length))}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
                   i === activeIndex ? "w-5 bg-white" : "w-1.5 bg-white/35",

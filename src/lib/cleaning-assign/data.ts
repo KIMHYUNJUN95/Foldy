@@ -760,6 +760,9 @@ export async function computeMonthSuggestions(
 
 export type MyShiftDay = { date: string; state: ShiftDayState; rooms: number; cancelRequested: boolean };
 
+/** 건물 + 방 — 화면이 건물 이름을 보는 사람 언어로 바꿔 그린다(미리 붙인 「건물 방」 문자열을 내리지 않는다 · 2026-10-26). */
+export type AssignPlace = { propertyName: string; roomLabel: string };
+
 export type MyShiftDetail = {
   date: string;
   state: ShiftDayState;
@@ -767,7 +770,7 @@ export type MyShiftDetail = {
   cancelRequested: boolean;
   rooms: { roomKey: string; propertyName: string; roomLabel: string; mates: string[] }[];
   /** 같이 일하는 사람 — 내가 배정된 날 중 오늘 · 내일만(서버가 거른다). */
-  mates: { name: string; rooms: string[] }[] | null;
+  mates: { name: string; rooms: AssignPlace[] }[] | null;
 };
 
 export async function loadMyShift(
@@ -830,11 +833,11 @@ export async function loadMyShift(
     const dayRows = allAssign.filter((row) => row.workDate === date);
     // 같이 일하는 사람은 내가 배정된 날 중 오늘 · 내일만 — 서버가 데이터를 주지 않는다(불만 · 논쟁 방지, 사용자 결정 2026-10-20).
     const showMates = mine.length > 0 && (date === today || date === addDays(today, 1));
-    const matesMap = new Map<string, string[]>();
+    const matesMap = new Map<string, AssignPlace[]>();
     if (showMates) {
       for (const row of dayRows) {
         if (row.userId === userId) continue;
-        matesMap.set(row.userId, [...(matesMap.get(row.userId) ?? []), `${row.propertyName} ${row.roomLabel}`]);
+        matesMap.set(row.userId, [...(matesMap.get(row.userId) ?? []), { propertyName: row.propertyName, roomLabel: row.roomLabel }]);
       }
     }
     return {
@@ -881,8 +884,8 @@ export async function loadTodayRooms(
   date: string;
   startMinutes: number;
   rooms: TodayRoom[];
-  mates: { name: string; rooms: string[] }[];
-  changedLastNight: { at: string; rooms: string[] }[];
+  mates: { name: string; rooms: AssignPlace[] }[];
+  changedLastNight: { at: string; rooms: AssignPlace[] }[];
   state: ShiftDayState;
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 }> {
@@ -943,11 +946,11 @@ export async function loadTodayRooms(
       };
     })
     .sort(compareAssignRooms);
-  const matesMap = new Map<string, string[]>();
+  const matesMap = new Map<string, AssignPlace[]>();
   if (mine.length > 0) {
     for (const row of todayRows) {
       if (row.userId === userId) continue;
-      matesMap.set(row.userId, [...(matesMap.get(row.userId) ?? []), `${row.propertyName} ${row.roomLabel}`]);
+      matesMap.set(row.userId, [...(matesMap.get(row.userId) ?? []), { propertyName: row.propertyName, roomLabel: row.roomLabel }]);
     }
   }
   // 「어젯밤 바뀜」 — 전날 18시(도쿄) 이후에 더해진 내 방.
@@ -963,7 +966,7 @@ export async function loadTodayRooms(
   const tRange = range.get(tomorrow);
   const tMine = tRows.filter((row) => row.userId === userId).length;
   return {
-    changedLastNight: changed.length ? [{ at: changed.at(-1)!.createdAt, rooms: changed.map((row) => `${row.propertyName} ${row.roomLabel}`) }] : [],
+    changedLastNight: changed.length ? [{ at: changed.at(-1)!.createdAt, rooms: changed.map((row) => ({ propertyName: row.propertyName, roomLabel: row.roomLabel })) }] : [],
     date,
     mates: [...matesMap.entries()].map(([id, list]) => ({ name: names.get(id) ?? "—", rooms: list })),
     rooms,

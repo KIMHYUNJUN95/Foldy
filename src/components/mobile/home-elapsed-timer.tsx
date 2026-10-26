@@ -27,5 +27,10 @@ export function HomeElapsedTimer({ startedAt }: HomeElapsedTimerProps) {
     return () => clearInterval(id);
   }, [startedAt]);
 
-  return <span className="tabular-nums">{elapsed}</span>;
+  // data-snapshot-ignore — 1초마다 바뀌어도 스와이프 뒤로가기 밑그림을 다시 찍지 않게(snapshot-store).
+  return (
+    <span className="tabular-nums" data-snapshot-ignore="">
+      {elapsed}
+    </span>
+  );
 }

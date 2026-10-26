@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // 모듈 상태(직전 화면 경로 · 로딩 자리 셸)를 테스트마다 새로.
 async function load() {
   vi.resetModules();
+  // 판정은 브라우저에서만 한다(서버 = 문서 없음 → 늘 「none」, 2026-10-26). 기록 추적기는 window 를 보므로 document 만 흉내.
+  vi.stubGlobal("document", {});
   const nav = await import("@/lib/nav-direction");
   // 셸 하나가 화면에 붙는 것 — 판정 + 마운트 effect 의 커밋.
   const mount = (path: string, placeholder: boolean) => {
@@ -15,6 +17,7 @@ async function load() {
 
 describe("consumeScreenEntrance — 화면 들어오는 움직임 (2026-10-21)", () => {
   beforeEach(() => vi.resetModules());
+  afterEach(() => vi.unstubAllGlobals());
 
   it("평범한 이동은 앞으로 밀어 넣는다", async () => {
     const nav = await load();
@@ -78,5 +81,22 @@ describe("consumeScreenEntrance — 화면 들어오는 움직임 (2026-10-21)",
     nav.commitScreenEntrance("/mobile/requests", false);
     // 붙은 뒤 같은 경로로 다시 그려지면 그때는 「same」.
     expect(nav.mount("/mobile/requests", false).kind).toBe("same");
+  });
+
+  it("서버(문서 없음)에서는 모듈 상태를 건드리지 않고 「none」 (2026-10-26)", async () => {
+    const nav = await load();
+    vi.unstubAllGlobals();
+    expect(nav.consumeScreenEntrance("/mobile", false)).toEqual({ kind: "none", direction: "none" });
+    vi.stubGlobal("document", {});
+    // 서버 호출이 직전 경로를 남기지 않았다 — 클라이언트 첫 판정은 「same」이 아니라 앞으로.
+    expect(nav.mount("/mobile", false).kind).toBe("forward");
+  });
+
+  it("하이드레이션 중에는 서버와 같은 「none」, 방향은 그대로 돌려준다 (2026-10-26)", async () => {
+    const nav = await load();
+    expect(nav.consumeScreenEntrance("/mobile", false, true)).toEqual({ kind: "none", direction: "forward" });
+    nav.commitScreenEntrance("/mobile", false);
+    // 판정은 했으므로 같은 경로 다시 그림은 「same」.
+    expect(nav.mount("/mobile", false).kind).toBe("same");
   });
 });

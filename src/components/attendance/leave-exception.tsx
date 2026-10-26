@@ -28,7 +28,7 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
   const [hireErr, setHireErr] = useState(false);
   const [baselineErr, setBaselineErr] = useState(false);
   /** null = 오류 없음. "hourly" 는 파트타임 제외(정책)라 재시도해도 안 되므로 문구를 구분한다. */
-  const [saveErr, setSaveErr] = useState<null | "generic" | "hourly">(null);
+  const [saveErr, setSaveErr] = useState<null | "generic" | "hourly" | "already">(null);
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -46,7 +46,9 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
     setSaving(false);
     if (!result.ok) {
       haptic("error");
-      setSaveErr(result.error === "hourly_excluded" ? "hourly" : "generic");
+      setSaveErr(
+        result.error === "hourly_excluded" ? "hourly" : result.error === "already_set" ? "already" : "generic",
+      );
       return;
     }
     haptic("success");
@@ -107,7 +109,11 @@ export function LeaveException({ locale, variant }: { locale: string; variant: "
             </div>
             {saveErr ? (
               <div className="ferr">
-                {saveErr === "hourly" ? c.exSetupHourlyErr : c.exSetupSaveErr}
+                {saveErr === "hourly"
+                  ? c.exSetupHourlyErr
+                  : saveErr === "already"
+                    ? c.exSetupAlreadySet
+                    : c.exSetupSaveErr}
               </div>
             ) : null}
           </div>

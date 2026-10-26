@@ -7,9 +7,10 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
-  getOrCreateTransportReport,
+  getTransportReport,
   getTransportItems,
   getLinkedTransportCandidates,
+  type TransportReportRow,
 } from "@/lib/transport-reimbursement";
 import {
   getRecentTransportAmounts,
@@ -21,6 +22,22 @@ function getCurrentTokyoMonth(): string {
   const now = new Date();
   const tokyoStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
   return tokyoStr.substring(0, 7);
+}
+
+/** 'YYYY-MM' 를 달 수(년×12+월)로 — 범위 비교용. */
+function monthIndex(ym: string): number {
+  const [y, m] = ym.split("-").map(Number);
+  return y * 12 + (m - 1);
+}
+
+/**
+ * `?ym` 검사(2026-10-26). 실제 달(01~12)이고 지금 달 기준 3년 전 ~ 다음 달 사이일 때만 받는다 — 아니면 지금 달.
+ * 예전에는 모양만 봐서 `?ym=2026-13` · `?ym=9999-01` 로 열면 그 달 보고서 행이 DB 에 생겼다.
+ */
+function resolveMonthKey(ym: string | undefined, current: string): string {
+  if (!ym || !/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)) return current;
+  const diff = monthIndex(ym) - monthIndex(current);
+  return diff >= -36 && diff <= 1 ? ym : current;
 }
 
 // Mobile — 교통비 정산서 (Transport Expense Statement).
@@ -44,7 +61,7 @@ export default async function MobileTransportPage({
   }
 
   const { ym } = await searchParams;
-  const monthKey = ym && /^\d{4}-\d{2}$/.test(ym) ? ym : getCurrentTokyoMonth();
+  const monthKey = resolveMonthKey(ym, getCurrentTokyoMonth());
   const targetMonthDate = `${monthKey}-01`;
 
   const locale = session.user.preferredLanguage;
@@ -54,14 +71,30 @@ export default async function MobileTransportPage({
 
   const service = getSupabaseServiceClient();
 
-  const [navBadges, dict, report] = await Promise.all([
+  // 열기만 해서는 보고서 행을 만들지 않는다 — 읽기만. 없으면 빈 「작성 중」으로 그리고, 첫 항목을 넣을 때
+  // createTransportItemAction 이 만든다(2026-10-26).
+  const [navBadges, dict, existingReport] = await Promise.all([
     navBadgesPromise,
     Promise.resolve(getDictionary(locale)),
-    getOrCreateTransportReport(service, organizationId, userId, targetMonthDate),
+    getTransportReport(service, organizationId, userId, targetMonthDate),
   ]);
+  const report: TransportReportRow = existingReport ?? {
+    id: "",
+    organizationId,
+    userId,
+    targetMonth: targetMonthDate,
+    status: "draft",
+    submittedAt: null,
+    reviewedAt: null,
+    reviewedByUserId: null,
+    reviewNote: null,
+    totalAmountCached: 0,
+    createdAt: "",
+    updatedAt: "",
+  };
 
   const [items, linkedCandidates, destinations, recentAmounts] = await Promise.all([
-    getTransportItems(service, report.id),
+    existingReport ? getTransportItems(service, existingReport.id) : Promise.resolve([]),
     getLinkedTransportCandidates(service, organizationId, userId, targetMonthDate),
     listTransportDestinations(service, organizationId, dict),
     getRecentTransportAmounts(service, organizationId, userId),

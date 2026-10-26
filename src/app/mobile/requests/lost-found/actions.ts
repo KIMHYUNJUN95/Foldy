@@ -12,15 +12,15 @@
 import { revalidatePath } from "next/cache";
 import {
   isLostItemStatus,
-  isLostItemTerminal,
   isLostReturnMethod,
   LOST_FOUND_HANDLING_IMAGE_LIMIT,
-  lostItemLinearStatuses,
   type LostItemStatus,
   type LostReturnMethod,
 } from "@/lib/lost-found-constants";
 import { getCurrentAppSession } from "@/lib/session";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { isValidLostItemTransition, splitLostFoundHandlingMemo } from "@/lib/lost-found-handling";
 import type { Database } from "@/types/database";
 
 const REQUEST_IMAGE_BUCKET = "request-images";
@@ -29,9 +29,12 @@ const HANDLING_FOLDER = "lost-found-handling";
 export type LostItemHandlingInput = {
   itemId: string;
   status: LostItemStatus;
+  /** 화면을 열 때 본 상태. 그 사이 다른 사람이 바꿨으면 덮어쓰지 않고 conflict(2026-10-26). */
+  expectedStatus?: LostItemStatus;
   memo: string;
+  /** 이번에 새로 올린 증빙 사진만. 서버가 이미 저장된 사진 뒤에 붙인다(덮어쓰지 않음, 2026-10-26). */
   handlingImageUrls: string[];
-  /** 반환완료(returned)로 넘어갈 때의 반환 방식. 어드민 `returnLostItem`과 같은 컬럼에 기록한다. */
+  /** 반환완료(returned)로 넘어갈 때의 반환 방식(필수). 어드민 `returnLostItem`과 같은 컬럼에 기록한다. */
   returnMethod?: LostReturnMethod;
   /** 배송 반환일 때의 송장번호. 손님 클레임 시 증빙이 된다. */
   returnTrackingNo?: string;
@@ -39,55 +42,27 @@ export type LostItemHandlingInput = {
 
 export type LostItemHandlingResult =
   | { ok: true }
-  | { ok: false; error: "forbidden" | "not_found" | "invalid" | "save_failed" };
+  | {
+      ok: false;
+      error:
+        | "forbidden"
+        | "not_found"
+        | "invalid"
+        | "save_failed"
+        | "too_many_photos"
+        | "conflict"
+        | "return_method_required";
+    };
 
 function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-/**
- * 상태 전이 검증 — 그동안 모바일은 "값이 상태 목록에 있는가"만 봤기 때문에 접수 → 폐기완료 직행이
- * 가능했고, 종결되면 모바일 상세는 읽기 전용이라 되돌릴 수도 없었다(복구는 어드민 `restoreLostItem`
- * 전용). 어드민 콘솔이 지키는 규칙과 같은 기준을 현장에도 적용한다:
- *
- * - 상태 변경 없이 메모·사진만 저장하는 것은 허용한다.
- * - 종결(폐기완료 / 반환완료)에서 다른 상태로 나가는 것은 금지 — 관리자 복원 경로만 되돌릴 수 있다.
- * - 손님 반환(returned)은 진행 중 어느 단계에서든 가능하다(보관 흐름 밖의 종결).
- * - 폐기 경로는 접수 → 보관 → 폐기예정 → 폐기완료를 한 단계씩만 전진한다. 되돌리기(보관 연장 등)는
- *   어드민 `extendLostItemStorage` / `correctLostItemStatus` 담당.
- */
-function isValidLostItemTransition(from: LostItemStatus, to: LostItemStatus): boolean {
-  if (from === to) return true;
-  if (isLostItemTerminal(from)) return false;
-  if (to === "returned") return true;
-  const fromIdx = lostItemLinearStatuses.indexOf(from);
-  const toIdx = lostItemLinearStatuses.indexOf(to);
-  return fromIdx >= 0 && toIdx === fromIdx + 1;
-}
+// 상태 전이 규칙(`isValidLostItemTransition`)은 모바일 처리 폼과 같이 쓰도록 `@/lib/lost-found-handling` 에 있다.
 
-/** 증빙 사진 URL이 반드시 {orgId}/lost-found-handling/{itemId}/{file} 아래인지 검증한다. */
+/** 증빙 사진 URL이 반드시 우리 Storage 의 {orgId}/lost-found-handling/{itemId}/{file} 아래인지 검증한다. */
 function isOwnHandlingImage(url: string, organizationId: string, itemId: string): boolean {
-  try {
-    const parsed = new URL(url);
-    const markers = [
-      `/storage/v1/object/public/${REQUEST_IMAGE_BUCKET}/`,
-      `/storage/v1/object/${REQUEST_IMAGE_BUCKET}/`,
-    ];
-    for (const marker of markers) {
-      const idx = parsed.pathname.indexOf(marker);
-      if (idx === -1) continue;
-      const segments = parsed.pathname.slice(idx + marker.length).split("/");
-      return (
-        segments.length === 4 &&
-        segments[0] === organizationId &&
-        segments[1] === HANDLING_FOLDER &&
-        segments[2] === itemId
-      );
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, `${organizationId}/${HANDLING_FOLDER}/${itemId}/`);
 }
 
 export async function updateLostItemHandling(
@@ -101,6 +76,7 @@ export async function updateLostItemHandling(
   const { itemId, memo, handlingImageUrls } = input;
   if (!isValidUuid(itemId)) return { ok: false, error: "invalid" };
   if (!isLostItemStatus(input.status)) return { ok: false, error: "invalid" };
+  if (!Array.isArray(handlingImageUrls) || typeof memo !== "string") return { ok: false, error: "invalid" };
   if (handlingImageUrls.length > LOST_FOUND_HANDLING_IMAGE_LIMIT) {
     return { ok: false, error: "invalid" };
   }
@@ -115,25 +91,49 @@ export async function updateLostItemHandling(
   if (input.returnMethod && !returnMethod) return { ok: false, error: "invalid" };
 
   const supabase = await getSupabaseServerClient();
-  const { data: existing } = await supabase
+  const { data: existingRow } = await supabase
     .from("lost_items")
-    .select("id, status")
+    .select("id, status, handling_memo, handling_image_urls")
     .eq("id", itemId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
-  if (!existing) return { ok: false, error: "not_found" };
+  if (!existingRow) return { ok: false, error: "not_found" };
+  const existing = existingRow as {
+    id: string;
+    status: LostItemStatus;
+    handling_memo: string | null;
+    handling_image_urls: string[] | null;
+  };
 
-  const currentStatus = (existing as { status: LostItemStatus }).status;
+  const currentStatus = existing.status;
+  if (input.expectedStatus !== undefined && input.expectedStatus !== existing.status) {
+    return { ok: false, error: "conflict" };
+  }
   if (!isValidLostItemTransition(currentStatus, input.status)) {
     return { ok: false, error: "invalid" };
   }
+
+  // 반환완료로 새로 넘어갈 때는 반환 방식(직접 수령 | 배송)이 반드시 있어야 한다(문서 09 「능동 처리 — 반환 처리」).
+  // 예전 모바일은 방식을 묻지 않아 return_method 가 비어 저장됐다. 송장번호는 어드민과 같이 선택.
+  const becomingReturned = input.status === "returned" && currentStatus !== "returned";
+  if (becomingReturned && !returnMethod) return { ok: false, error: "return_method_required" };
+
+  // 증빙 사진은 덮어쓰지 않고 이어 붙인다(2026-10-26). 합친 장수도 5장 상한.
+  const mergedImages = Array.from(new Set([...(existing.handling_image_urls ?? []), ...handlingImageUrls]));
+  if (mergedImages.length > LOST_FOUND_HANDLING_IMAGE_LIMIT) {
+    return { ok: false, error: "too_many_photos" };
+  }
+
+  // 화면에서 고치는 메모에는 시스템 줄(관리자 복원 표시)이 빠져 있다 — 저장할 때 원래 자리 끝에 다시 붙여 기록이 사라지지 않게.
+  const { systemLines } = splitLostFoundHandlingMemo(existing.handling_memo);
+  const nextMemo = [memo.trim(), ...systemLines].filter(Boolean).join("\n");
 
   // 어떤 상태 변경이든 "누가·언제 처리했는지"를 기록으로 남긴다(요구사항). 현장 처리이므로
   // handled_by_admin = false — 관리자 예외 개입(대시보드)이 아니다.
   const update: Database["public"]["Tables"]["lost_items"]["Update"] = {
     status: input.status,
-    handling_memo: memo.trim() || null,
-    handling_image_urls: handlingImageUrls,
+    handling_memo: nextMemo || null,
+    handling_image_urls: mergedImages,
     handled_at: new Date().toISOString(),
     handled_by: session.user.id,
     handled_by_admin: false,
@@ -141,22 +141,34 @@ export async function updateLostItemHandling(
 
   // 반환 처리는 반환 방식·송장번호까지 남겨야 손님 클레임 시 증빙이 된다 — 어드민 `returnLostItem`과
   // 같은 컬럼·같은 규칙(송장번호는 배송 반환일 때만).
-  if (input.status === "returned") {
+  if (becomingReturned) {
     update.return_method = returnMethod;
     update.return_tracking_no =
-      returnMethod === "delivery" ? (input.returnTrackingNo ?? "").trim() : "";
+      returnMethod === "delivery" ? (input.returnTrackingNo ?? "").trim().slice(0, 100) : "";
   }
 
+  // 읽은 뒤 다른 사람이 상태를 바꿨으면 덮어쓰지 않는다 — 읽은 상태 그대로일 때만 쓴다.
   const { data: updated, error } = await supabase
     .from("lost_items")
     .update(update)
     .eq("id", itemId)
     .eq("organization_id", session.organization.id)
+    .eq("status", currentStatus)
     .select("id");
 
   if (error) return { ok: false, error: "save_failed" };
-  // RLS가 걸러내면 error 없이 0행이 돌아온다 → 이것을 성공으로 착각하면 안 된다.
-  if (!updated || updated.length === 0) return { ok: false, error: "forbidden" };
+  if (!updated || updated.length === 0) {
+    // 0행 = RLS 가 걸렀거나(권한), 그 사이 상태가 바뀌었다(동시 변경). 다시 읽어 구분한다.
+    const { data: recheck } = await supabase
+      .from("lost_items")
+      .select("status")
+      .eq("id", itemId)
+      .eq("organization_id", session.organization.id)
+      .maybeSingle();
+    const nowStatus = (recheck as { status: LostItemStatus } | null)?.status;
+    if (nowStatus && nowStatus !== currentStatus) return { ok: false, error: "conflict" };
+    return { ok: false, error: "forbidden" };
+  }
 
   revalidatePath(`/mobile/requests/lost-found/${itemId}`);
   revalidatePath("/mobile/requests");

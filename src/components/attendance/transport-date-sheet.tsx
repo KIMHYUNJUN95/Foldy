@@ -49,16 +49,24 @@ type Props = {
   onConfirm: (iso: string) => void;
   /** 뒤로(날짜 변경 없이) → 폼으로 복귀. */
   onBack: () => void;
+  /**
+   * 'YYYY-MM' — 정산서의 달. 주면 그 달만 고를 수 있다(달 이동 · 다른 달 칸 · 그 달이 아닐 때의 「오늘」 잠금).
+   * 서버도 같은 판정을 한다(`createTransportItemAction` — 사용일은 정산서 달 안).
+   */
+  monthKey?: string;
 };
 
 /**
  * 캘린더 패널 — BottomSheet를 직접 들지 않는다.
  * 항목 추가 시트 내부에서 폼과 "교체"되어 단일 시트로 표시된다(겹침 방지).
  */
-export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack }: Props) {
+export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack, monthKey }: Props) {
   const t = dict.transport;
   const today = todayTokyo();
-  const initial = value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : today;
+  const locked = Boolean(monthKey && /^\d{4}-\d{2}$/.test(monthKey));
+  const inLockedMonth = (iso: string) => !locked || iso.slice(0, 7) === monthKey;
+  const fallback = locked && !inLockedMonth(today) ? `${monthKey}-01` : today;
+  const initial = value && /^\d{4}-\d{2}-\d{2}$/.test(value) && inLockedMonth(value) ? value : fallback;
   const init = parseISO(initial);
 
   const [selected, setSelected] = useState(initial);
@@ -137,6 +145,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack }: Pro
               type="button"
               className="trn-cal-nav"
               onClick={goPrev}
+              disabled={locked}
               aria-label={t.calPrevMonth}
             >
               <ChevLeft />
@@ -146,6 +155,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack }: Pro
               type="button"
               className="trn-cal-nav"
               onClick={goNext}
+              disabled={locked}
               aria-label={t.calNextMonth}
             >
               <ChevRight />
@@ -185,6 +195,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack }: Pro
                 key={c.iso}
                 type="button"
                 className={cls}
+                disabled={locked && !c.inMonth}
                 onClick={() => setSelected(c.iso)}
               >
                 {c.d}
@@ -195,7 +206,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack }: Pro
 
         {/* Footer */}
         <div className="trn-cal-foot">
-          <button type="button" className="trn-cal-today" onClick={goToday}>
+          <button type="button" className="trn-cal-today" onClick={goToday} disabled={!inLockedMonth(today)}>
             {t.calToday}
           </button>
           <button

@@ -609,6 +609,17 @@ UI 디자인 핸드오프 후 아래 순서로 진행:
   다운로드**된다. 클라이언트는 임시 `<a>`를 만들어 클릭 → 다운로드(설치형 PWA 이탈 없음). i18n
   `downloadFile`/`downloadFailed`(ko·ja·en) 추가. **첨부 URL 정책은 signed URL로 확정**(아래 §13 미결
   해소).
+- **경로 검사 (2026-10-26)**: 작성 · 수정 · 댓글 액션이 클라이언트가 보낸 사진 URL · 첨부 경로를 그대로 저장하고 있어서, 다른 조직
+  폴더의 파일 경로를 첨부로 끼워 넣으면 위 다운로드 액션이 서비스 키로 서명해 줄 수 있었다. 이제 업로드 함수(`src/lib/board.ts`)가
+  만드는 모양만 받는다(`src/app/mobile/board/board-storage-guard.ts`): 첨부 = `{orgId}/{postId}/{uuid}.{ext}`, 사진 = 우리 스토리지 공개 URL
+  `…/request-images/{orgId}/{board-posts|board-comments}/{postId}/{uuid}.{ext}`, 「..」 · 하위 폴더 금지. 첨부 객체는 알려진 필드
+  (`name`·`url`·`sizeBytes`·`mimeType`)만 남겨 다시 만든다. 수정 때는 **이미 그 글에 있던** URL · 경로는 그대로 허용한다. 다운로드 액션은
+  서명 **직전에** 경로를 한 번 더 본다(검사 전 저장된 행 대비). 글 id 도 UUID 여야 한다. 거절 사유(`invalid_image` · `invalid_attachment` ·
+  `invalid_id`)는 화면에서 「저장 실패」 문구로 보인다. 회귀 테스트: `src/lib/__tests__/board-storage-guard.test.ts`.
+- **댓글 · 고정 결과 처리 (2026-10-26)**: 댓글 보내기가 실패해도 입력이 비워지던 것을 고쳤다 — 컴포저의 `onSubmit` 은
+  `Promise<boolean>` 을 돌려주고, 저장됐을 때만 글 · 사진을 비운다. 댓글 지우기는 공용 줄 접힘(`.row-collapse` + `data-leaving`)으로 바로
+  접히고 실패하면 다시 펴지며 토스트 + `error` 햅틱. 고정 토글은 `useOptimistic` 으로 바로 바뀌고 실패하면 되돌아가며 알린다. **누가
+  고정할 수 있는지는 바꾸지 않았다**(작성자 · `board.manage` — 사용자 결정 대기).
 - **사진 뷰어 (2026-06-25 추가)**: 게시글 사진과 댓글 사진을 탭하면 공유 `ImageLightbox`
   (`src/components/shell/image-lightbox.tsx` — 풀스크린·스와이프·원본 표시·`<body>` 포털)가 열린다.
   `target="_blank"`는 쓰지 않는다(설치형 PWA 이탈 방지 — decision-log 2026-06-22 이미지 계약).

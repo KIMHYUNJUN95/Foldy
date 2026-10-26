@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   canAccessMobileCleaning,
   getCleaningOperatingDateKey,
+  getOrgProcessedCleaningRoomLabels,
   isCleaningTaskKey,
   type CleaningSessionRow,
 } from "@/lib/cleaning";
@@ -64,6 +65,8 @@ export async function startCleaningSession(formData: FormData) {
   // 쉬는 계정으로 들어온 예약의 카드가 판매 중 계정 라벨만 있는 카탈로그와 글자로 안 맞아 시작이 늘 거절됐다.
   // 라벨은 카드가 보낸 그대로 저장한다 — 화면 · 콘솔이 그 라벨로 예약 카드와 짝을 짓는다.
   const physicalRoom = physicalRoomKeyOfSessionLabel(roomLabel);
+  // 카탈로그가 없으면(객실 마스터 없음 · 읽기 오류 → undefined) 예전처럼 검사를 건너뛴다 — `getActiveRoomCatalog` 가
+  // 두 경우를 구분하지 않아, 막으면 객실 마스터가 없는 조직은 청소를 아예 시작하지 못한다.
   const catalog = await getActiveRoomCatalog(session.organization.id, supabase).catch(() => undefined);
   if (catalog !== undefined) {
     const labels = catalog.map((item) => buildSessionRoomLabel(item.propertyName, item.canonicalRoomLabel));
@@ -77,14 +80,15 @@ export async function startCleaningSession(formData: FormData) {
 
   // Block re-starting a room that already has an in_progress or completed session today — 같은 실제 방의 다른 계정
   // 라벨로 시작한 것도 막는다(「401」로 시작했는데 「401_2_2」로 또 시작하지 않게).
-  const { data: todayActive } = await supabase
-    .from("cleaning_sessions")
-    .select("room_label")
-    .eq("organization_id", session.organization.id)
-    .eq("cleaning_date", getCleaningOperatingDateKey())
-    .in("status", ["in_progress", "completed"]);
+  // 남이 시작한 방도 봐야 하므로 서비스 키로 읽는다(2026-10-26) — RLS 로는 `cleaning.read_all` 없는 직원이 본인 세션만
+  // 받아 같은 방을 두 번 시작할 수 있었다. 읽기에 실패하면 막는다(확인 못 한 채 시작시키지 않는다).
+  // 남는 틈: 두 사람이 같은 순간에 누르는 경쟁은 DB 유니크 인덱스(조직 · 날짜 · 실제 방)가 있어야 완전히 막힌다 — 문서 07 「남은 것」.
+  const todayActive = await getOrgProcessedCleaningRoomLabels(session.organization.id).catch(() => null);
+  if (todayActive === null) {
+    redirectWithError("start_failed");
+  }
 
-  const alreadyProcessed = (todayActive ?? []).some(
+  const alreadyProcessed = todayActive.some(
     (row) =>
       row.room_label === roomLabel ||
       (physicalRoom !== null && physicalRoomKeyOfSessionLabel(row.room_label) === physicalRoom),
@@ -169,7 +173,7 @@ export async function cancelCleaningSession(formData: FormData) {
   // 남의 세션을 취소할 때만 서비스 키로 쓴다 — 관리자 강제완료(202607150001)와 같은 방식: 위에서 앱 권한을
   // 확인했고, 조직 · 상태 조건을 함께 건다.
   const writer = cancellingOthers ? getSupabaseServiceClient() : supabase;
-  const { error: updateError } = await writer
+  const { data: cancelledRows, error: updateError } = await writer
     .from("cleaning_sessions")
     .update({
       completed_at: cancelledAt.toISOString(),
@@ -178,10 +182,16 @@ export async function cancelCleaningSession(formData: FormData) {
     })
     .eq("id", sessionId)
     .eq("organization_id", session.organization.id)
-    .eq("status", "in_progress");
+    .eq("status", "in_progress")
+    .select("id");
 
   if (updateError) {
     redirectWithError("cancel_failed");
+  }
+
+  // 0행 = 그 사이에 완료 · 취소됐거나 RLS 가 조용히 막은 것 — 「취소했습니다」라고 하지 않는다(2026-10-26).
+  if (!cancelledRows || cancelledRows.length === 0) {
+    redirectWithError("active_not_found");
   }
 
   redirect(`${cleaningPath}?cancelled=1&n=${noticeNonce()}`);

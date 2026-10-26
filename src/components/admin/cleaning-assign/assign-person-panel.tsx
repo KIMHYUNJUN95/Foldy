@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { loadPersonShiftForPanel, resolveCancelRequest, toggleApplicationForUser } from "@/app/admin/cleaning-assign/actions";
+import { loadPersonShiftForPanel } from "@/app/admin/cleaning-assign/actions";
+import { resolveCancelRequest, toggleApplicationForUser } from "@/actions/cleaning-assign-shift";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { PersonShift } from "@/lib/cleaning-assign/person-shift";
 import { haptic } from "@/lib/haptics";

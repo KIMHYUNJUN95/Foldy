@@ -17,6 +17,11 @@ import { BOARD_MAX_FILES, BOARD_MAX_IMAGES } from "@/lib/board";
 import type { AvatarColor, FileAttachment } from "@/components/board/board-types";
 import type { Database, Json } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
+import {
+  areOwnBoardImageUrls,
+  isOwnBoardAttachmentPath,
+  sanitizeBoardAttachments,
+} from "@/app/mobile/board/board-storage-guard";
 
 // The mention-sheet client component imports this type from the same module it calls
 // (`searchMentions`). A `export type { ... }` re-export is stripped by Turbopack's "use server"
@@ -112,6 +117,10 @@ export async function addBoardComment(
   const post = await loadPostMeta(postId, session.organization.id);
   if (!post) return { error: "not_found" };
   if (!post.allow_comments) return { error: "comments_disabled" };
+  // 댓글 사진도 이 조직 · 이 글의 `board-comments` 폴더에 올린 우리 공개 URL 만(2026-10-26).
+  if (!areOwnBoardImageUrls(imageUrls, session.organization.id, postId, "board-comments")) {
+    return { error: "invalid_image" };
+  }
 
   // Server-side mention validation: drop any id that is not an active same-org member or that is
   // the author themselves. We do NOT reject the comment when an id is bogus — we just don't persist
@@ -246,6 +255,9 @@ export async function getBoardAttachmentDownloadUrl(
     : [];
   const match = attachments.find((a) => a.url === path);
   if (!match) return { error: "not_found" };
+  // 서명 직전에 경로를 한 번 더 본다(2026-10-26) — 저장 검사가 생기기 전에 들어간 행이 남아 있어도 이 조직 · 이 글
+  // 폴더 밖의 파일에는 서비스 키로 서명하지 않는다.
+  if (!isOwnBoardAttachmentPath(path, session.organization.id, postId)) return { error: "not_found" };
 
   const { data: signed, error: signErr } = await service.storage
     .from("board-attachments")
@@ -402,13 +414,39 @@ export async function updateBoardPost(
   }
   if (input.tags !== undefined) patch.tags = input.tags;
   // 작성과 같은 상한을 **서버에서 다시** 건다. 폼이 막고 있더라도 액션은 폼을 신뢰하지 않는다.
-  if (input.imageUrls !== undefined) {
-    if (input.imageUrls.length > BOARD_MAX_IMAGES) return { error: "too_many_photos" };
-    patch.image_urls = input.imageUrls;
-  }
-  if (input.fileAttachments !== undefined) {
-    if (input.fileAttachments.length > BOARD_MAX_FILES) return { error: "too_many_files" };
-    patch.file_attachments = input.fileAttachments as unknown as Json;
+  // 경로도 다시 본다(2026-10-26): 이미 이 글에 있던 것은 그대로 두고, 새로 넣는 것은 이 조직 · 이 글 폴더의 업로드 모양만.
+  if (input.imageUrls !== undefined || input.fileAttachments !== undefined) {
+    const { data: currentRow, error: currentError } = await getSupabaseServiceClient()
+      .from("board_posts")
+      .select("image_urls, file_attachments")
+      .eq("id", postId)
+      .maybeSingle();
+    if (currentError || !currentRow) return { error: "not_found" };
+    const current = currentRow as unknown as { image_urls: string[] | null; file_attachments: unknown };
+    if (input.imageUrls !== undefined) {
+      if (input.imageUrls.length > BOARD_MAX_IMAGES) return { error: "too_many_photos" };
+      const existingImages = new Set(current.image_urls ?? []);
+      if (!areOwnBoardImageUrls(input.imageUrls, session.organization.id, postId, "board-posts", existingImages)) {
+        return { error: "invalid_image" };
+      }
+      patch.image_urls = input.imageUrls;
+    }
+    if (input.fileAttachments !== undefined) {
+      if (input.fileAttachments.length > BOARD_MAX_FILES) return { error: "too_many_files" };
+      const existingPaths = new Set(
+        (Array.isArray(current.file_attachments) ? (current.file_attachments as Array<{ url?: unknown }>) : [])
+          .map((item) => item?.url)
+          .filter((url): url is string => typeof url === "string"),
+      );
+      const safeAttachments = sanitizeBoardAttachments(
+        input.fileAttachments,
+        session.organization.id,
+        postId,
+        existingPaths,
+      );
+      if (!safeAttachments) return { error: "invalid_attachment" };
+      patch.file_attachments = safeAttachments as unknown as Json;
+    }
   }
   if (input.isPinned !== undefined) {
     // **고정 권한은 작성 경로와 같아야 한다.** `createBoardPost` 는 owner/전무/office_admin 에게만

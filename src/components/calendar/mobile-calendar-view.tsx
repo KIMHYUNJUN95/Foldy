@@ -163,15 +163,16 @@ type ReservationBarLayout = ReservationBarBounds & {
 export type CalendarRoomBlock = {
   endDate: string;
   id: string;
+  /** 정규 건물 이름 — 다른 건물의 같은 방 번호(「201」)에 블락이 그려지지 않게 고른 건물로 거른다(2026-10-26). */
+  propertyName: string;
   roomLabel: string;
   startDate: string;
 };
 
 /** 막힌 마지막 밤 다음 날 = 같은 구간을 예약으로 봤을 때의 체크아웃 날짜. */
+/** 날짜 키는 UTC 자정 기준이라 UTC 메서드로 더한다(`addDays`) — 로컬 `getDate` 는 UTC 보다 늦은 기기 시간대에서 하루 밀린다(2026-10-26). */
 function blockCheckOutDate(endDate: string) {
-  const next = parseDate(endDate);
-  next.setDate(next.getDate() + 1);
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+  return addDays(endDate, 1);
 }
 
 function computeReservationBarBounds(
@@ -272,6 +273,7 @@ function formatDateLabel(value: string, locale: Locale) {
   return new Intl.DateTimeFormat(locale, {
     month: "2-digit",
     day: "2-digit",
+    timeZone: "UTC",
   }).format(parseDate(value));
 }
 
@@ -390,7 +392,8 @@ export function MobileCalendarView({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   // 복사하면 그 자리가 1.6초 체크로 바뀐다(따로 알림 창 없음).
   const flashCopied = useCallback((key: string) => {
-    haptic("success");
+    // 복사는 서버 저장이 아니라 선택 동작 — success 가 아니라 light(햅틱 공용 규칙).
+    haptic("light");
     setCopiedKey(key);
   }, []);
   useEffect(() => {
@@ -462,8 +465,19 @@ export function MobileCalendarView({
     return `/mobile/calendar?${params.toString()}`;
   };
 
-  const activeInRange = effectiveReservations.filter(
-    (item) => item.checkInDate < rangeEndExclusive && item.checkOutDate > rangeStart,
+  const activeInRange = useMemo(
+    () =>
+      effectiveReservations.filter(
+        (item) => item.checkInDate < rangeEndExclusive && item.checkOutDate > rangeStart,
+      ),
+    [effectiveReservations, rangeEndExclusive, rangeStart],
+  );
+
+  // 고른 건물의 블락만 — 방 축이 표시 라벨(「201」)뿐이라 건물로 거르지 않으면 다른 건물의 같은 번호 방에도 그려진다
+  // (관리자 캘린더는 `건물::방` 키로 맞춘다, 2026-10-26). 건물을 안 고른 화면은 블락을 쓰지 않는다.
+  const scopedRoomBlocks = useMemo(
+    () => (selectedProperty ? roomBlocks.filter((block) => block.propertyName === selectedProperty) : []),
+    [roomBlocks, selectedProperty],
   );
 
   const byRoom = useMemo(() => {
@@ -496,7 +510,7 @@ export function MobileCalendarView({
   // 마지막 밤 다음 날을 체크아웃으로 넘긴다 — 블락은 양끝 포함, 예약은 체크아웃 제외이기 때문.
   const blockBarsByRoom = useMemo(() => {
     const map = new Map<string, Array<{ block: CalendarRoomBlock; leftPx: number; widthPx: number }>>();
-    for (const block of roomBlocks) {
+    for (const block of scopedRoomBlocks) {
       const checkOutDate = blockCheckOutDate(block.endDate);
       if (block.startDate >= rangeEndExclusive || checkOutDate <= rangeStart) continue;
       const bounds = computeReservationBarBounds(
@@ -511,7 +525,7 @@ export function MobileCalendarView({
       else map.set(block.roomLabel, [entry]);
     }
     return map;
-  }, [dates.length, rangeEndExclusive, rangeStart, roomBlocks]);
+  }, [dates.length, rangeEndExclusive, rangeStart, scopedRoomBlocks]);
 
 
   // today is passed from server (Asia/Tokyo) -> never recompute on client
@@ -526,10 +540,20 @@ export function MobileCalendarView({
     () => effectiveReservations.filter((item) => activeRoomSet.has(item.roomLabel)),
     [effectiveReservations, activeRoomSet],
   );
-  const checkInsToday = activeReservations.filter((item) => item.checkInDate === listReferenceDate);
-  const checkOutsToday = activeReservations.filter((item) => item.checkOutDate === listReferenceDate);
-  const stayingToday = activeReservations.filter(
-    (item) => item.checkInDate <= listReferenceDate && item.checkOutDate > listReferenceDate,
+  const checkInsToday = useMemo(
+    () => activeReservations.filter((item) => item.checkInDate === listReferenceDate),
+    [activeReservations, listReferenceDate],
+  );
+  const checkOutsToday = useMemo(
+    () => activeReservations.filter((item) => item.checkOutDate === listReferenceDate),
+    [activeReservations, listReferenceDate],
+  );
+  const stayingToday = useMemo(
+    () =>
+      activeReservations.filter(
+        (item) => item.checkInDate <= listReferenceDate && item.checkOutDate > listReferenceDate,
+      ),
+    [activeReservations, listReferenceDate],
   );
   const emptyRoomLabels = useMemo(() => {
     const occupiedRoomSet = new Set(stayingToday.map((item) => item.roomLabel));
@@ -544,9 +568,23 @@ export function MobileCalendarView({
    * 대신 목록에서 「차단」으로 표시해, 팔 수 있는 방으로 착각하지 않게 한다.
    */
   const blockedRoomsAtReference = useMemo(
-    () => collectBlockedRooms(roomBlocks, listReferenceDate, (block) => block.roomLabel),
-    [listReferenceDate, roomBlocks],
+    () => collectBlockedRooms(scopedRoomBlocks, listReferenceDate, (block) => block.roomLabel),
+    [listReferenceDate, scopedRoomBlocks],
   );
+
+  // 날짜별 「빈 방」 수(머리 줄) — 렌더마다 날짜 × 예약을 다시 돌지 않게 한 번만 센다(2026-10-26).
+  const emptyCountByDate = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const date of dates) {
+      const occupied = new Set<string>();
+      for (const item of activeInRange) {
+        if (item.checkInDate <= date && item.checkOutDate > date) occupied.add(item.roomLabel);
+      }
+      const blocked = collectBlockedRooms(scopedRoomBlocks, date, (block) => block.roomLabel);
+      counts.set(date, rooms.filter((room) => !occupied.has(room) && !blocked.has(room)).length);
+    }
+    return counts;
+  }, [activeInRange, dates, rooms, scopedRoomBlocks]);
 
   // Auto-scroll: bring today (and the day before) into view on first entry per month/property.
   // Uses a Set so each selectedMonth+selectedProperty combo scrolls at most once per session.
@@ -1021,13 +1059,7 @@ export function MobileCalendarView({
                       {w.emptyRow}
                     </div>
                     {dates.map((date) => {
-                      const occupied = new Set(
-                        effectiveReservations
-                          .filter((item) => item.checkInDate <= date && item.checkOutDate > date)
-                          .map((item) => item.roomLabel),
-                      );
-                      const blocked = collectBlockedRooms(roomBlocks, date, (block) => block.roomLabel);
-                      const count = rooms.filter((room) => !occupied.has(room) && !blocked.has(room)).length;
+                      const count = emptyCountByDate.get(date) ?? 0;
                       return (
                         <span className={`num${count ? "" : " is-zero"}`} key={`e-${date}`} style={{ width: `${DAY_WIDTH}px` }}>
                           {count || "–"}

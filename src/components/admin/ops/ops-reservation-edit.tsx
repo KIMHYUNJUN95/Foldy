@@ -60,6 +60,7 @@ export type ReservationEditCopy = {
   mbErrNightsTaken: string;
   mbErrOccupied: string;
   mbErrNoActiveUnit: string;
+  mbErrRoomBusy: string;
   mbErrNoGuestName: string;
   mbErrBadDates: string;
   mbErrPastArrival: string;
@@ -111,6 +112,8 @@ export function reservationEditErrorText(
       return copy.mbErrOccupied.replace("{dates}", list);
     case "no_active_unit":
       return copy.mbErrNoActiveUnit.replace("{dates}", list);
+    case "room_busy":
+      return copy.mbErrRoomBusy;
     case "cancelled":
       return copy.reErrCancelled;
     case "not_applied":

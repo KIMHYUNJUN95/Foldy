@@ -91,6 +91,7 @@
 - 날짜 상태: 신청 · **배정됨(= 확정, 방 수 표시)** · **배정 없음**(신청했지만 그날 방이 없음 — 확실히 보여 줘야 헷갈리지 않는다).
   배정은 전날 밤 11시까지도 바뀌므로 **다음 날 몫은 바뀌는 즉시 화면에 반영**한다(정할 것 Q13-b).
 - **배정된 날은 스스로 취소할 수 없다** — 누르면 「취소 요청」이 관리자에게 가고, 관리자가 받아 주면 그 방들은 「미배정」으로 돌아간다.
+  취소 요청은 **실제로 배정된 날**(그 사람 · 그날 `cleaning_assignments` 가 있음)이고 관리자가 취소하지 않은 신청(`cancelled_at is null`)에만 걸린다(2026-10-26 — 배정 전 · 취소된 날에 요청이 들어가던 것 수정). 요청 거두기는 배정이 빠진 뒤에도 된다.
 - **마감 없음**(Q1-b): 이번 달 · 다음 달 모두 언제든 신청 · 취소(배정 전). 다음 달 달력은 늘 열려 있고, 월말이 다가오면(20일부터)
   「다음 달 시프트를 월말까지 신청해 주세요」 한 줄만 보여 준다 — 막지 않는다.
 - 배정된 날에는 **그날 출근 시각**이 같이 보인다(4-2-b).
@@ -247,7 +248,9 @@
 - 위 숫자 넷: 신청(취소된 날 제외) · 배정(날) · 배정 방 · 일한 날(기록 없음 제외). 머리 줄: 이름 · 역할 · 기본 출근(보는 사람 설정 → 역할 기본값) · 우선 · 견습.
 - 날짜를 누르면 그날: 상태 · 「9:45 출근 · 방 N개」 · 누가 언제 배정 · 방마다 같이 들어간 사람(관리자는 모든 날) — 지난 날은 방마다 그 사람 청소 시각 · 분,
   기록이 없으면 「미시작」. 취소 요청은 요청 시각 · 메모 + [받아 주기] [돌려보내기], 신청 · 배정 전은 그날 미배정 방 수 + [신청 빼기],
-  신청 안 한 앞날은 [대신 신청]. (기존 서버 액션 `resolveCancelRequest` · `toggleApplicationForUser` 그대로 — 권한 · 날짜 검사도 그대로.)
+  신청 안 한 앞날은 [대신 신청]. (서버 액션 `resolveCancelRequest` · `toggleApplicationForUser` — 권한 · 날짜 검사 그대로. PC · 모바일이 같이 부르므로
+  2026-10-26 `src/actions/cleaning-assign-shift.ts` 로 옮겼다(`cancelPersonDay` 포함) — `/mobile` 이 `src/app/admin/**` 액션을 가져오지 않게. 권한 · 검증 도우미는
+  `src/actions/cleaning-assign-guards.ts`(서버 전용, 액션 아님) 하나를 관리자 액션과 같이 쓴다. 권한 없으면 `forbidden` 결과, redirect 없음.)
 - **PC**: 월 보기에서 **이름을 누르면** 오른쪽 공용 `.panel`(420px, 가림막 없음 — 보드를 그대로 쓸 수 있다). 다른 이름을 누르거나 ↑↓ · 패널의 ⌃⌄ 로
   바로 다음 사람, Esc 로 닫기. 고른 사람 줄 · 고른 날 열이 옅은 보라. 보드는 패널 폭만큼 비켜 앉는다. PC 에만 [하루 보기에서 고치기 / 넣기 / 열기].
   날짜를 고르지 않았으면 「다가오는 일정」(오늘부터 5개). 데이터는 `loadPersonShiftForPanel` 서버 액션 — 보드가 새로 읽힐 때(실시간 신호 · 동작 뒤) 다시 읽는다.
@@ -369,7 +372,7 @@
 | 권한 | `cleaning.assign`(`src/config/capabilities.ts`) · 알바는 `cleaning.work` — `docs/engineering/05-rls-permissions.md` 「2026-10-21」 |
 | 계산(순수) | `src/lib/cleaning-assign/rules.ts`(제안 규칙 키 · 처음 값) · `suggest.ts`(자동 제안) · `day-state.ts`(「배정 없음」 판정 · 날짜) · `compare.ts`(월 비교표 — 화면 · 내보내기 공용) |
 | 데이터 | `src/lib/cleaning-assign/rooms.ts`(그날 방 = 체크아웃 + 수기 추가 + 어제부터 밀린 방, 미루기 반영) · `data.ts`(하루 · 월 · 내 시프트 · 오늘 내 방 · 설정 · 비교표 · Slack 이름) |
-| 서버 액션 | 관리자 `src/app/admin/cleaning-assign/actions.ts` · 비교표 내보내기 `compare/actions.ts` · 알바 `src/app/mobile/shift/actions.ts` |
+| 서버 액션 | 관리자 `src/app/admin/cleaning-assign/actions.ts` · PC · 모바일 공용(취소 요청 처리 · 대신 신청 · 그날 취소) `src/actions/cleaning-assign-shift.ts` · 공용 권한 · 검증 `src/actions/cleaning-assign-guards.ts` · 비교표 내보내기 `compare/actions.ts` · 알바 `src/app/mobile/shift/actions.ts` |
 | PC | `/admin/cleaning-assign`(하루 · `?view=month` 월) · `/settings` · `/compare` — `src/components/admin/cleaning-assign/*` |
 | 모바일 | `/mobile/shift` · `/mobile/shift/today` — `src/components/mobile/shift/*`, 사이드 메뉴 「내 시프트」 · 「오늘 내 방」(`cleaning.work`) |
 | Slack | `loadAssigneesForModel`(`src/lib/automation/data.ts`) — 배정 이름이 수기 담당자보다 먼저 |
@@ -402,6 +405,11 @@
 
 ## 9. 기록
 
+- 2026-10-26 — **버그 수정.** ⓐ 「오늘 내 방」의 「어젯밤 바뀜」 · 같이 일하는 사람 방이 서버에서 미리 붙인 「건물 방」 한국어 문자열이었다 → `data.ts` 가
+  `{ propertyName, roomLabel }`(`AssignPlace`)로 내리고 화면이 건물을 보는 사람 언어로(독채는 건물 이름 하나만). 내 시프트의 `mates.rooms` 도 같은 모양.
+  ⓑ 내 시프트 — 신청 토글의 임시 표시가, 그 사이 관리자가 방을 배정한 날(assigned) · 지난 날 위에 계속 남았다 → 서버 상태가 신청 · 취소로 닿을 수 없는
+  상태면 임시 표시를 지우고, 방이 있는 날은 서버 상태가 이긴다. ⓒ 내 시프트 햅틱 — 꺼진 토글 흔들기 `warning` · 날 넣기 `medium` → 둘 다 `light`(선택 토글 ·
+  햅틱 공용 규칙). ⓓ 사람별 시프트 액션을 `src/actions/` 로 옮김(4-6).
 - 2026-10-23 — **전체 디버깅 → 기능 구현 완료**(로컬 · 운영 DB, 먼 날짜 12/15 임시 데이터로 확인 후 모두 삭제). 확인한 것: 하루 보기 「+ 사람」 넣기 ·
   이름표 × 빼기 · 5초 되돌리기 · 사람 고른 상태의 체크 원 넣기/빼기 · 보통 인원 초과 확인 창(Esc · 그대로 두기 · Enter 넣기 + 「2/1 · 1명 많음」) ·
   월 보기 사람 패널(취소 요청 · 메모 → 돌려보내기, 신청 빼기 → 대신 신청) · 모바일 사람 시프트 시트 · 화면 9곳(PC 4 · 모바일 폰/폴드/태블릿) 오류 없음 · 단위 테스트.

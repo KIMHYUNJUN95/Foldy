@@ -19,6 +19,7 @@ import {
 } from "@/lib/maintenance-constants";
 import { memberCapabilities } from "@/lib/capabilities-server";
 import { getCurrentAppSession } from "@/lib/session";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -28,13 +29,19 @@ const RESOLUTION_FOLDER = "maintenance-resolutions";
 export type MaintenanceHandlingInput = {
   reportId: string;
   status: MaintenanceStatus;
+  /** 화면을 열 때 본 상태. 그 사이 다른 사람이 바꿨으면 덮어쓰지 않고 conflict(2026-10-26). */
+  expectedStatus?: MaintenanceStatus;
   memo: string;
+  /** 이번에 새로 올린 완료 사진만. 서버가 이미 저장된 사진 뒤에 붙인다(덮어쓰지 않음, 2026-10-26). */
   resolutionImageUrls: string[];
 };
 
 export type MaintenanceHandlingResult =
   | { ok: true }
-  | { ok: false; error: "forbidden" | "not_found" | "invalid" | "save_failed" };
+  | {
+      ok: false;
+      error: "forbidden" | "not_found" | "invalid" | "save_failed" | "too_many_photos" | "conflict";
+    };
 
 function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -56,29 +63,9 @@ export async function canHandleMaintenance(
   return (await memberCapabilities(organizationId, userId)).includes("maintenance_status_change");
 }
 
-/** 완료 사진 URL이 반드시 {orgId}/maintenance-resolutions/{reportId}/{file} 아래인지 검증한다. */
+/** 완료 사진 URL이 반드시 우리 Storage 의 {orgId}/maintenance-resolutions/{reportId}/{file} 아래인지 검증한다. */
 function isOwnResolutionImage(url: string, organizationId: string, reportId: string): boolean {
-  try {
-    const parsed = new URL(url);
-    const markers = [
-      `/storage/v1/object/public/${REQUEST_IMAGE_BUCKET}/`,
-      `/storage/v1/object/${REQUEST_IMAGE_BUCKET}/`,
-    ];
-    for (const marker of markers) {
-      const idx = parsed.pathname.indexOf(marker);
-      if (idx === -1) continue;
-      const segments = parsed.pathname.slice(idx + marker.length).split("/");
-      return (
-        segments.length === 4 &&
-        segments[0] === organizationId &&
-        segments[1] === RESOLUTION_FOLDER &&
-        segments[2] === reportId
-      );
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, `${organizationId}/${RESOLUTION_FOLDER}/${reportId}/`);
 }
 
 export async function updateMaintenanceHandling(
@@ -97,6 +84,7 @@ export async function updateMaintenanceHandling(
   const { reportId, memo, resolutionImageUrls } = input;
   if (!isValidUuid(reportId)) return { ok: false, error: "invalid" };
   if (!isMaintenanceStatus(input.status)) return { ok: false, error: "invalid" };
+  if (!Array.isArray(resolutionImageUrls) || typeof memo !== "string") return { ok: false, error: "invalid" };
   if (resolutionImageUrls.length > MAINTENANCE_RESOLUTION_IMAGE_LIMIT) {
     return { ok: false, error: "invalid" };
   }
@@ -107,38 +95,74 @@ export async function updateMaintenanceHandling(
   }
 
   const supabase = await getSupabaseServerClient();
-  const { data: existing } = await supabase
+  const { data: existingRow } = await supabase
     .from("maintenance_reports")
-    .select("id, status")
+    .select("id, status, resolution_image_urls")
     .eq("id", reportId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
-  if (!existing) return { ok: false, error: "not_found" };
+  if (!existingRow) return { ok: false, error: "not_found" };
+  const existing = existingRow as {
+    id: string;
+    status: MaintenanceStatus;
+    resolution_image_urls: string[] | null;
+  };
 
+  // 완료 사진은 덮어쓰지 않고 이어 붙인다(2026-10-26) — 예전엔 새로 올린 사진 목록으로 통째로 바꿔서, 상태만 바꾸려고
+  // 다시 저장하면 이전 완료 사진이 사라졌다. 합친 장수도 5장 상한을 넘을 수 없다.
+  const previousImages = existing.resolution_image_urls ?? [];
+  const mergedImages = Array.from(new Set([...previousImages, ...resolutionImageUrls]));
+  if (mergedImages.length > MAINTENANCE_RESOLUTION_IMAGE_LIMIT) {
+    return { ok: false, error: "too_many_photos" };
+  }
+
+  if (input.expectedStatus !== undefined && input.expectedStatus !== existing.status) {
+    return { ok: false, error: "conflict" };
+  }
+  const wasTerminal = isMaintenanceTerminal(existing.status);
   const terminal = isMaintenanceTerminal(input.status);
   const nowIso = new Date().toISOString();
 
   const update: Database["public"]["Tables"]["maintenance_reports"]["Update"] = {
     status: input.status,
     resolution_memo: memo.trim() || null,
-    resolution_image_urls: resolutionImageUrls,
-    // 종료(완료/무효)로 가면 완료시각·처리자를 찍고, 다시 열면 되돌린다 (재오픈 허용).
-    completed_at: terminal ? nowIso : null,
-    completed_by: terminal ? session.user.id : null,
-    // 현장이 직접 처리한 건 — 관리자 예외 개입이 아니다.
-    completed_by_admin: false,
+    resolution_image_urls: mergedImages,
   };
+  // 완료시각 · 처리자는 "진행 → 종료"로 넘어가는 순간에만 찍는다(2026-10-26). 예전엔 종료 건의 메모 · 사진만 고쳐도
+  // 완료시각이 지금으로 바뀌고 처리자가 고친 사람으로 덮였다. 다시 열면(종료 → 진행) 지운다. 종료 → 종료(완료 ↔ 무효)는 그대로.
+  if (!wasTerminal && terminal) {
+    update.completed_at = nowIso;
+    update.completed_by = session.user.id;
+    // 현장이 직접 처리한 건 — 관리자 예외 개입이 아니다.
+    update.completed_by_admin = false;
+  } else if (wasTerminal && !terminal) {
+    update.completed_at = null;
+    update.completed_by = null;
+    update.completed_by_admin = false;
+  }
 
+  // 읽은 뒤 다른 사람이 상태를 바꿨으면 덮어쓰지 않는다 — 읽은 상태 그대로일 때만 쓴다.
   const { data: updated, error } = await supabase
     .from("maintenance_reports")
     .update(update)
     .eq("id", reportId)
     .eq("organization_id", session.organization.id)
+    .eq("status", existing.status)
     .select("id");
 
   if (error) return { ok: false, error: "save_failed" };
-  // RLS가 걸러내면 error 없이 0행이 돌아온다 → 이것을 성공으로 착각하면 안 된다.
-  if (!updated || updated.length === 0) return { ok: false, error: "forbidden" };
+  if (!updated || updated.length === 0) {
+    // 0행 = RLS 가 걸렀거나(권한), 그 사이 상태가 바뀌었다(동시 변경). 다시 읽어 구분한다.
+    const { data: recheck } = await supabase
+      .from("maintenance_reports")
+      .select("status")
+      .eq("id", reportId)
+      .eq("organization_id", session.organization.id)
+      .maybeSingle();
+    const nowStatus = (recheck as { status: MaintenanceStatus } | null)?.status;
+    if (nowStatus && nowStatus !== existing.status) return { ok: false, error: "conflict" };
+    return { ok: false, error: "forbidden" };
+  }
 
   revalidatePath(`/mobile/requests/maintenance/${reportId}`);
   revalidatePath("/mobile/requests");

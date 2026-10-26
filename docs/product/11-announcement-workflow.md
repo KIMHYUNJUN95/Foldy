@@ -479,6 +479,9 @@ Current implementation:
 - `/admin/announcements` 에서 **앱 오픈 팝업 미리보기(AnnouncementPopup)** 와 **고아 이미지 정리
   버튼(OrphanCleanupButton)** UI 를 제거했다 (콘솔은 관리 표면이라는 방향에 맞춤). 두 기능의 서버
   로직(`purgeOrphanAnnouncementImages` 등)은 그대로 유지되며, 추후 필요 시 별도 위치에서 재노출한다.
+  (2026-10-26) 어디서도 쓰이지 않던 옛 컴포넌트 `src/components/announcements/{announcement-create-card,orphan-cleanup-button,
+  delete-announcement-button}.tsx` 를 지웠다 — 공용 컴포넌트 폴더에서 `src/app/admin/**` 액션을 가져오고 있어 모바일 ↔ 어드민 경계
+  규칙(CLAUDE.md `src/actions`)에 어긋났다. 다시 노출할 때는 새로 짓는다.
 - 목록 행의 읽음 수는 성능을 위해 `announcement_reads` 원시 레코드 수(대상자 수로 상한)를 사용한다.
   정밀 명단(현재 활성 대상자 교차)은 읽음 현황 모달에서 `getAnnouncementReadStatusConsole` 로 조회한다.
 

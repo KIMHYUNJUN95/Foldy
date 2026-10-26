@@ -161,6 +161,16 @@ Per-item photo attachment implemented (2026-06-02).
 - Image URLs are stored in `items[].imageUrls` inside the `items` JSONB column.
 - The first photo of the first item with an image is shown as a thumbnail in the request list card.
 - All photos are shown per-item in the request detail page.
+- **Server check (2026-10-26):** `createOrderRequest` rejects (→ `?error=save_failed`) any item with more than 5 photos or
+  a URL that is not our Storage `request-images` URL directly under `{orgId}/order-images/{requestId}/` (shared
+  `isOwnStoragePublicUrl()`, `src/lib/storage-url-guard.ts`). Until then any `http(s)` string was stored and the per-item
+  cap was client-only. Uploaded photos are owned by the client hook `usePhotoUpload` (removed when the confirm sheet is
+  abandoned).
+- **Mobile request list building filter (2026-10-26):** the 「건물」 filter on `/mobile/requests` compares building **keys**
+  (canonical names via `getCanonicalPropertyName`) for orders, lost items and maintenance — it used to compare an order's
+  canonical `building_name` with the translated label, so in ja/en every order disappeared when a building was picked.
+  The same list's filter `BottomSheet` no longer adds its own `useBodyScrollLock` + Esc listener on top of the canonical
+  sheet (which already does both) — the double lock could leave the page locked after closing.
 
 ### Urgency
 

@@ -73,8 +73,8 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
       return;
     }
     if (!applying) {
-      // 꺼져 있으면 신청하지 않고 토글을 살짝 흔들어 알려 준다.
-      haptic("warning");
+      // 꺼져 있으면 신청하지 않고 토글을 살짝 흔들어 알려 준다(선택 반응 — light, 햅틱 공용 규칙).
+      haptic("light");
       setNudge((n) => n + 1);
       if (nudgeTimer.current) clearTimeout(nudgeTimer.current);
       nudgeTimer.current = setTimeout(() => setNudge(0), 2200);
@@ -88,8 +88,8 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
     setOptimistic((prev) => ({ ...prev, [date]: apply }));
     setJust((prev) => ({ ...prev, [date]: apply ? "on" : "off" }));
     setTick((n) => n + 1);
-    // 넣을 때는 또렷하게, 뺄 때는 가볍게.
-    haptic(apply ? "medium" : "light");
+    // 날 고르기 · 풀기는 선택 토글 — 둘 다 light(햅틱 공용 규칙 · medium 은 꾹 눌러 집기 전용).
+    haptic("light");
     inflight.current += 1;
     queue.current = queue.current
       .then(async () => {
@@ -112,6 +112,8 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
   }
 
   // 서버 데이터가 화면 상태를 따라잡으면 그날의 임시 표시를 지운다.
+  // 관리자가 그 사이 방을 배정했거나(assigned) 날이 지나 버린(worked · past) 날도 지운다 — 신청 · 취소로는 그 상태에
+  // 닿지 않아 전에는 임시 「신청」 표시가 배정된 날 위에 계속 남았다(2026-10-26 버그 수정).
   useEffect(() => {
     if (inflight.current > 0) return;
     setOptimistic((prev) => {
@@ -119,6 +121,7 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
         Object.entries(prev).filter(([date, applied]) => {
           const day = days.find((d) => d.date === date);
           if (!day) return false;
+          if (day.state !== "waiting" && day.state !== "none" && day.state !== "free") return false;
           return (day.state === "waiting" || day.state === "none") !== applied;
         }),
       );
@@ -166,7 +169,8 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
 
   const cellState = (day: MyShiftDay) => {
     const opt = optimistic[day.date];
-    if (opt === undefined) return day.state;
+    // 배정된 날은 서버 상태가 이긴다 — 임시 표시가 정리되기 전 한 번의 그림에서도.
+    if (opt === undefined || day.rooms > 0) return day.state;
     return opt ? "waiting" : "free";
   };
 

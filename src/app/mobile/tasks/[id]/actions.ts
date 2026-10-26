@@ -38,7 +38,11 @@ import {
   setTaskSortOrders,
   skipOccurrences,
 } from "@/lib/task-occurrences";
-import { cleanupRemovedTaskImages, mergeTaskImageUrls } from "@/lib/task-images";
+import {
+  cleanupRemovedTaskImages,
+  isOrgTaskImageUrl,
+  mergeTaskImageUrls,
+} from "@/lib/task-images";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper, isPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -60,6 +64,13 @@ function parseStringArray(value: string): string[] {
   }
 }
 const PRIORITIES = new Set(["normal", "important", "urgent", "medium"]);
+
+/** `YYYY-MM-DD` 이면서 실제로 있는 날짜인가(2월 30일 같은 값은 거절). */
+function isValidYmd(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
 
 
 const detailPath = (id: string, error?: string) =>
@@ -120,6 +131,10 @@ function isOverdueOwned(t: TaskRecord, today: string, userId: string): boolean {
  * `taskIds` are the IDs the user chose; server re-validates each is truly overdue + owned.
  */
 export async function rescheduleOverdueTo(targetDate: string, taskIds: string[]) {
+  // 날짜 모양을 먼저 본다(2026-10-26) — 이상한 값이 오면 `new Date(...).toISOString()` 이
+  // RangeError 를 던져 서버 액션이 500 으로 끝났다.
+  const date = String(targetDate ?? "").trim();
+  if (!isValidYmd(date)) return;
   const session = await requireSession();
   const today = tokyoToday();
   const allowed = new Set(taskIds);
@@ -131,7 +146,7 @@ export async function rescheduleOverdueTo(targetDate: string, taskIds: string[])
   const orgId = session.organization.id;
   for (const t of overdue) {
     // One-off only — recurring is excluded by isOverdueOwned (handled per-occurrence).
-    const dueAt = new Date(`${targetDate}T${t.timeLabel || "00:00"}:00+09:00`).toISOString();
+    const dueAt = new Date(`${date}T${t.timeLabel || "00:00"}:00+09:00`).toISOString();
     await supabase
       .from("tasks")
       .update({ due_at: dueAt })
@@ -248,16 +263,19 @@ async function notify(
   });
 }
 
+// 편집 실패는 편집 화면으로 돌려보낸다(2026-10-26) — 상세 화면은 `?error=` 를 그리지 않아 실패가
+// 조용히 묻혔다. 편집 폼은 이 값을 오류로 보여 주고 입력(초안)을 그대로 둔다. 키는 문자열 그대로
+// 적는다 — `action-error-keys.test.ts` 가 소스에서 `?error=키` 를 뽑아 사전에 있는지 확인한다.
 export async function updateTaskCore(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
   const { session, task } = await requireSessionAndTask(id);
   if (!canEditTaskCore(session, task)) {
-    redirect(detailPath(id, "forbidden"));
+    redirect(`/mobile/tasks/${id}/edit?error=forbidden`);
   }
 
   const title = cleanText(formData.get("title"));
   if (!title) {
-    redirect(detailPath(id, "missing_title"));
+    redirect(`/mobile/tasks/${id}/edit?error=missing_title`);
   }
   const description = cleanText(formData.get("description"));
   let scheduledDate = cleanText(formData.get("scheduledDate"));
@@ -271,11 +289,13 @@ export async function updateTaskCore(formData: FormData) {
     .filter(Boolean)
     .slice(0, 10);
   // Project tasks allow up to 20 photos; regular tasks keep the standard 5. Photos the task already
-  // has survive the cap (e.g. moved out of a project) — only new additions are capped.
+  // has survive the cap (e.g. moved out of a project) — only new additions are capped. New URLs must
+  // be our own `{org}/task-images/` storage objects (2026-10-26) — see lib/task-images.
   const imageUrls = mergeTaskImageUrls(
     task.imageUrls,
     formData.getAll("imageUrls").map(String),
     !!task.projectId,
+    session.organization.id,
   );
   const ctxPropertyId = cleanText(formData.get("ctxPropertyId")) || null;
   const ctxRoomId = cleanText(formData.get("ctxRoomId")) || null;
@@ -332,9 +352,13 @@ export async function updateTaskCore(formData: FormData) {
   };
   // Files the author detached in this edit (server-truth previous set minus the new set).
   const removedImageUrls = task.imageUrls.filter((u) => !imageUrls.includes(u));
-  const { error } = await supabase.from("tasks").update(update).eq("id", id);
+  const { error } = await supabase
+    .from("tasks")
+    .update(update)
+    .eq("id", id)
+    .eq("organization_id", session.organization.id);
   if (error) {
-    redirect(detailPath(id, "save_failed"));
+    redirect(`/mobile/tasks/${id}/edit?error=save_failed`);
   }
   // Only after the DB no longer references them, hard-delete the detached files.
   await cleanupRemovedTaskImages(supabase, removedImageUrls, session.organization.id);
@@ -464,9 +488,14 @@ function recurringAnchorDate(task: TaskRecord): string {
 // log a `completed` update + notify participants. Programmatic (list card / detail view / calendar).
 // Returns the occurrence date a recurring completion actually recorded (it differs from the passed
 // date on a non-occurrence day) — undo must reopen that date.
-export async function completeTask(taskId: string, occurrenceDate?: string): Promise<string | undefined> {
+export type TaskStatusResult = { ok: boolean; occurrenceDate?: string };
+
+export async function completeTask(
+  taskId: string,
+  occurrenceDate?: string,
+): Promise<TaskStatusResult> {
   const id = String(taskId ?? "").trim();
-  if (!id) return;
+  if (!id) return { ok: false };
   const { session, task } = await requireSessionAndTask(id);
   const supabase = getSupabaseServiceClient();
 
@@ -478,12 +507,14 @@ export async function completeTask(taskId: string, occurrenceDate?: string): Pro
       anchor: taskAnchorDate(task),
       requested: String(occurrenceDate ?? "").trim() || recurringAnchorDate(task),
     });
-    await completeOccurrence({
+    const saved = await completeOccurrence({
       taskId: id,
       organizationId: session.organization.id,
       occurrenceDate: occ,
       userId: session.user.id,
     });
+    // 저장이 실패하면 완료 기록 · 알림을 남기지 않는다(2026-10-26) — 호출부가 낙관적 체크를 되돌린다.
+    if (!saved) return { ok: false };
     // 밀린 회차는 이 완료가 흡수한다 — 콘솔 `completeInternal` 과 같은 규칙(2026-09-08).
     await absorbEarlierOccurrences({
       taskId: id,
@@ -513,17 +544,22 @@ export async function completeTask(taskId: string, occurrenceDate?: string): Pro
     revalidatePath("/mobile/tasks");
     revalidatePath(detailPath(id));
     revalidateProjectPath(task.projectId);
-    return occ;
+    return { ok: true, occurrenceDate: occ };
   }
 
-  await supabase
-    .from("tasks")
-    .update({
-      status: "completed",
-      completed_at: new Date().toISOString(),
-      completed_by_user_id: session.user.id,
-    })
-    .eq("id", id);
+  const completed = await mustWrite(
+    "task: complete",
+    supabase
+      .from("tasks")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        completed_by_user_id: session.user.id,
+      })
+      .eq("id", id)
+      .eq("organization_id", session.organization.id),
+  );
+  if (!completed) return { ok: false };
   await bestEffortWrite(
     "task_updates: insert",
     supabase.from("task_updates").insert({
@@ -545,14 +581,18 @@ export async function completeTask(taskId: string, occurrenceDate?: string): Pro
   revalidatePath("/mobile/tasks");
   revalidatePath(detailPath(id));
   revalidateProjectPath(task.projectId);
+  return { ok: true };
 }
 
 // Re-open a completed task: clear status + completion stamps and log a `reopened` update. No
 // notification (re-opening is a quiet correction, typically the same user undoing a tap). Used by
 // the undo toast and the detail view's "다시 열기" button.
-export async function reopenTask(taskId: string, occurrenceDate?: string) {
+export async function reopenTask(
+  taskId: string,
+  occurrenceDate?: string,
+): Promise<TaskStatusResult> {
   const id = String(taskId ?? "").trim();
-  if (!id) return;
+  if (!id) return { ok: false };
   const { session, task } = await requireSessionAndTask(id);
   const supabase = getSupabaseServiceClient();
 
@@ -560,7 +600,7 @@ export async function reopenTask(taskId: string, occurrenceDate?: string) {
   // again (the row was never touched by completion). ONE-OFF: clears the row's completion stamps.
   if (isStandardRecurrence(task.recurrenceRule)) {
     const occ = String(occurrenceDate ?? "").trim() || recurringAnchorDate(task);
-    await clearOccurrenceState(id, occ);
+    if (!(await clearOccurrenceState(id, occ))) return { ok: false };
     // 그 완료가 흡수했던 밀린 회차도 되살린다 — 콘솔 `reopenInternal` 과 같은 규칙.
     await releaseAbsorbedOccurrences(id, occ);
     await bestEffortWrite(
@@ -574,17 +614,22 @@ export async function reopenTask(taskId: string, occurrenceDate?: string) {
     revalidatePath("/mobile/tasks");
     revalidatePath(detailPath(id));
     revalidateProjectPath(task.projectId);
-    return;
+    return { ok: true, occurrenceDate: occ };
   }
 
-  await supabase
-    .from("tasks")
-    .update({
-      status: "open",
-      completed_at: null,
-      completed_by_user_id: null,
-    })
-    .eq("id", id);
+  const reopened = await mustWrite(
+    "task: reopen",
+    supabase
+      .from("tasks")
+      .update({
+        status: "open",
+        completed_at: null,
+        completed_by_user_id: null,
+      })
+      .eq("id", id)
+      .eq("organization_id", session.organization.id),
+  );
+  if (!reopened) return { ok: false };
   await bestEffortWrite(
     "task_updates: insert",
     supabase.from("task_updates").insert({
@@ -596,6 +641,7 @@ export async function reopenTask(taskId: string, occurrenceDate?: string) {
   revalidatePath("/mobile/tasks");
   revalidatePath(detailPath(id));
   revalidateProjectPath(task.projectId);
+  return { ok: true };
 }
 
 /**
@@ -606,19 +652,31 @@ export async function reopenTask(taskId: string, occurrenceDate?: string) {
  * 완료 전환은 반복 처리(occurrence)와 알림이 얽혀 있어 기존 `completeTask` 가 계속 맡고, 이 액션은
  * open ↔ in_progress 만 다룬다 — 완료 상태를 이 경로로 되돌리지 않도록 완료 스탬프도 함께 지운다.
  */
-export async function setTaskProgress(taskId: string, inProgress: boolean) {
+export async function setTaskProgress(
+  taskId: string,
+  inProgress: boolean,
+): Promise<{ ok: boolean; reason?: "recurring" }> {
   const id = String(taskId ?? "").trim();
-  if (!id) return;
+  if (!id) return { ok: false };
   const { session, task } = await requireSessionAndTask(id);
+  // 반복 업무의 행 상태는 언제나 열림이다 — 완료는 회차(task_occurrence_state)별로 따로 든다
+  // (2026-07-30). 행을 in_progress 로 바꾸면 모든 회차가 함께 «진행 중»이 되고, 완료된 회차
+  // 표시와도 어긋난다. 화면은 반복 업무에 진행 세그먼트를 그리지 않지만 서버도 거절한다(2026-10-26).
+  if (isStandardRecurrence(task.recurrenceRule)) return { ok: false, reason: "recurring" };
   const supabase = getSupabaseServiceClient();
-  await supabase
-    .from("tasks")
-    .update({
-      status: inProgress ? "in_progress" : "open",
-      completed_at: null,
-      completed_by_user_id: null,
-    })
-    .eq("id", id);
+  const saved = await mustWrite(
+    "task: set progress",
+    supabase
+      .from("tasks")
+      .update({
+        status: inProgress ? "in_progress" : "open",
+        completed_at: null,
+        completed_by_user_id: null,
+      })
+      .eq("id", id)
+      .eq("organization_id", session.organization.id),
+  );
+  if (!saved) return { ok: false };
   await bestEffortWrite(
     "task_updates: insert",
     supabase.from("task_updates").insert({
@@ -631,6 +689,7 @@ export async function setTaskProgress(taskId: string, inProgress: boolean) {
   revalidatePath("/mobile/tasks");
   revalidatePath(detailPath(id));
   revalidateProjectPath(task.projectId);
+  return { ok: true };
 }
 
 /**
@@ -732,11 +791,15 @@ export async function removeTaskParticipant(formData: FormData) {
     redirect(detailPath(id, "forbidden"));
   }
 
-  await supabase
-    .from("task_participants")
-    .delete()
-    .eq("task_id", id)
-    .eq("user_id", targetUserId);
+  // 실패하면 빠진 척하지 않는다(2026-10-26) — 예전엔 결과를 버려 「나가기」 후 목록으로 갔다가
+  // 새로고침하면 작업이 그대로 있었다.
+  const removed = await mustWrite(
+    "task_participants: remove",
+    supabase.from("task_participants").delete().eq("task_id", id).eq("user_id", targetUserId),
+  );
+  if (!removed) {
+    redirect(detailPath(id, "save_failed"));
+  }
 
   // If no non-author participants remain, the task returns to private.
   const remainingNonAuthor = task.participants.filter(
@@ -876,10 +939,14 @@ export async function reorderTasks(orderedIds: string[]) {
   if (!hasOrganizationContext(session)) {
     redirect("/mobile/unavailable");
   }
-  await setTaskSortOrders({
-    organizationId: session.organization.id,
-    positions: new Map(ids.map((id, index) => [id, index])),
+  // 조직 조건만으로는 같은 조직 남의 개인 작업 순서도 바꿀 수 있었다(서비스 키 쓰기) — 내가 볼 수
+  // 있는 작업(getTaskScope)만 남긴다(2026-10-26). 인덱스는 원래 목록 기준을 유지한다.
+  const scope = await getTaskScope(session);
+  const positions = new Map<string, number>();
+  ids.forEach((id, index) => {
+    if (scope.taskIds.has(id)) positions.set(id, index);
   });
+  await setTaskSortOrders({ organizationId: session.organization.id, positions });
   revalidatePath("/mobile/tasks");
 }
 
@@ -914,10 +981,14 @@ export async function reorderDateTasks(
     .filter((it) => it.taskId && !seen.has(it.taskId) && seen.add(it.taskId))
     .slice(0, 500);
   if (clean.length === 0) return;
+  // 내가 볼 수 있는 작업만(2026-10-26, `reorderTasks` 와 같은 이유). 인덱스는 병합 목록 기준을
+  // 그대로 쓰므로 걸러진 항목이 있어도 나머지 위치는 사용자가 놓은 순서를 유지한다.
+  const scope = await getTaskScope(session);
 
   const recurringPositions = new Map<string, number>();
   const oneOffUpdates: { taskId: string; index: number }[] = [];
   clean.forEach((it, index) => {
+    if (!scope.taskIds.has(it.taskId)) return;
     if (it.recurring) recurringPositions.set(it.taskId, index);
     else oneOffUpdates.push({ taskId: it.taskId, index });
   });
@@ -944,10 +1015,10 @@ export async function addTaskUpdate(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
   const { session, task } = await requireSessionAndTask(id);
   const body = cleanText(formData.get("body"));
-  const imageUrls = formData
-    .getAll("imageUrls")
-    .map((v) => String(v))
-    .filter((u) => u.startsWith("https://") || u.startsWith("http://"))
+  // 메모 사진은 우리 스토리지의 `{org}/task-update-images/` 객체만 받는다(2026-10-26) — 임의 URL 을
+  // 심어 참여자 화면에 외부 이미지를 띄우는 것을 막는다.
+  const imageUrls = Array.from(new Set(formData.getAll("imageUrls").map((v) => String(v))))
+    .filter((u) => isOrgTaskImageUrl(u, session.organization.id, "task-update-images"))
     .slice(0, 5);
   if (!body && imageUrls.length === 0) {
     redirect(detailPath(id));

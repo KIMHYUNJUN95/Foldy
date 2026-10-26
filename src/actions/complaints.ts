@@ -16,7 +16,7 @@ import {
   type ComplaintInput,
   type ComplaintPatch,
 } from "@/lib/complaints";
-import { convertReviewToComplaint } from "@/lib/external-reviews";
+import { convertReviewToComplaint, getExternalReview } from "@/lib/external-reviews";
 import { translateReviewPart, type TranslationPart } from "@/lib/review-translate";
 
 type ActionError = { error: string };
@@ -279,24 +279,54 @@ export async function convertReviewToComplaintAction(
 
 export type TranslateReviewResult = { status: "ok"; text: string } | { status: "unavailable" };
 
+const TRANSLATION_PARTS: ReadonlySet<TranslationPart> = new Set([
+  "review",
+  "positive",
+  "negative",
+  "headline",
+  "private",
+]);
+
+/**
+ * 리뷰 본문 한 조각 번역. 원문은 클라이언트가 보낸 글이 아니라 서버가 `external_reviews` 에서 직접 읽는다(2026-10-26) —
+ * 예전엔 클라이언트가 보낸 `sourceText` 를 그대로 DeepL 에 보내고 그 리뷰의 번역으로 캐시해, 아무 글이나 번역 한도를 쓰고
+ * 남의 화면에 엉뚱한 번역이 뜰 수 있었다.
+ *
+ * 권한: 리뷰 보기는 누구나(문서 25 — `complaint.*` 키는 쓰기 · 관리 · 댓글만 가르고 보기 키는 없다). 그래서 번역도
+ * "이 리뷰를 읽을 수 있는 사람"만 — 조직 RLS 로 읽히는 리뷰인지 `getExternalReview` 로 확인한다.
+ */
 export async function translateReviewPartAction(
   reviewId: string,
   part: TranslationPart,
-  sourceText: string,
-  sourceLanguageCode: string | null,
 ): Promise<TranslateReviewResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { status: "unavailable" };
+  if (typeof reviewId !== "string" || !TRANSLATION_PARTS.has(part)) return { status: "unavailable" };
+
+  const review = await getExternalReview({ session, id: reviewId }).catch(() => null);
+  if (!review) return { status: "unavailable" };
+
+  const sourceText =
+    part === "headline"
+      ? review.headline
+      : part === "review"
+        ? review.reviewText
+        : part === "positive"
+          ? review.positiveReviewText
+          : part === "negative"
+            ? review.negativeReviewText
+            : review.privateFeedback;
+  if (!sourceText?.trim()) return { status: "unavailable" };
 
   // Locale is read from the session, never taken from the caller — keeps the translation
   // cache keyed to the viewer's real app language.
   const result = await translateReviewPart({
     organizationId: session.organization.id,
-    externalReviewId: reviewId,
+    externalReviewId: review.id,
     part,
     targetLocale: session.user.preferredLanguage,
     sourceText,
-    sourceLanguageCode,
+    sourceLanguageCode: review.sourceLanguageCode,
   });
 
   if (result.status === "ok") return { status: "ok", text: result.text };

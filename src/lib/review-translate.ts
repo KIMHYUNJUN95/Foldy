@@ -71,6 +71,9 @@ async function monthlyCharsUsed(db: SupabaseClient, monthStartIso: string): Prom
  *
  * `sourceLanguageCode`가 있으면(Booking.com `content.language_code`) DeepL 자동 감지를
  * 건너뛰어 사용량을 아낀다. Airbnb는 언어 코드를 주지 않으므로 자동 감지로 돌아간다.
+ *
+ * `sourceText` 는 반드시 서버가 `external_reviews` 에서 읽은 원문이어야 한다(2026-10-26) — 클라이언트가 보낸 글을
+ * 넘기면 아무 글이나 번역 한도를 쓰고 이 리뷰의 번역으로 캐시된다. `translateReviewPartAction` 이 리뷰를 읽어 넘긴다.
  */
 export async function translateReviewPart(input: {
   organizationId: string;

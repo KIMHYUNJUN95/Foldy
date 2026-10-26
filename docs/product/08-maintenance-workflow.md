@@ -94,9 +94,13 @@ historical data.
 **Building-only reports (2026-07-14):** the mobile create form (`maintenance-create-form.tsx`) shows a
 **"건물 전체"(whole building)** option at the top of the room dropdown — for common-area / building-level
 issues with no specific room (also available for buildings that have no room catalog entries). Selecting
-it stores the localized `roomBuildingOnly` label (`maintenance.form.roomBuildingOnly`, ko/ja/en) as
-`room_label`; `property_name` still carries the building, so `resolveRequestLocation` renders it as
-"건물 · 건물 전체". The linked/from-cleaning form keeps its fixed room and has no building-only option.
+it sets `is_building_only = true` and stores the fixed value **`"-"`** as `room_label` (2026-10-26 — until then the
+form stored the reporter's *translated* label "건물 전체" / "建物全体" / "Whole building" in `room_label`, so other-language
+readers saw it untranslated). The dropdown value is a fixed token (`__building_only__`), never the label. Readers draw the
+room slot from the flag — mobile list (`requests-filter-view.tsx`) and mobile detail (`requests/maintenance/[id]/page.tsx`)
+show the viewer's `maintenance.form.roomBuildingOnly` (ko/ja/en), the admin console already shows no room. This also
+fixes old rows whose `room_label` still holds a translated label. `property_name` still carries the building. The
+linked/from-cleaning form keeps its fixed room and has no building-only option.
 
 ### Description
 
@@ -113,6 +117,11 @@ Implementation: photos are stored as `image_urls text[]` on the `maintenance_rep
 Limit:
 
 - Maximum 5 photos per maintenance report.
+- Server check (2026-10-26): every URL must be our Storage `request-images` URL directly under
+  `{orgId}/maintenance-reports/{requestId}/` (shared `isOwnStoragePublicUrl()`, `src/lib/storage-url-guard.ts`).
+- **Upload owner = the client hook `usePhotoUpload` (2026-10-26).** If the insert fails the server no longer deletes the
+  uploaded photos — the form re-sends the same request id and the same URLs, and the server used to delete them first, so
+  the retried report pointed at deleted files. Photos are removed only when the user abandons the confirm sheet.
 
 Compression:
 
@@ -158,6 +167,11 @@ Implemented DB enum values (maintenance_status) — **4-state as of 2026-07-14**
 **재오픈 허용**: `closed`/`cancelled`를 다시 `open`/`in_progress`로 되돌릴 수 있다(실제로 안 고쳐진
 경우). 재오픈하면 `completed_at` / `completed_by`가 초기화된다.
 
+**완료시각 · 처리자는 "진행 → 종료"로 넘어가는 순간에만 찍는다(2026-10-26).** 이미 종료된 건의 메모 · 사진만 고치거나
+완료 ↔ 무효로 바꿔도 `completed_at` / `completed_by` 는 그대로다(예전엔 다시 저장할 때마다 지금 시각 · 저장한 사람으로 덮였다).
+저장은 화면을 열 때 본 상태(`expectedStatus`) 그대로일 때만 된다 — 그 사이 다른 사람이 상태를 바꿨으면
+「방금 다른 사람이 이 신고를 바꿨어요」(`errors.status_conflict`)로 막고 덮어쓰지 않는다(`.eq("status", 읽은 상태)` 가드도 같이).
+
 ### Memo
 
 Optional.
@@ -176,6 +190,13 @@ Optional. 완료(수리 후) 사진을 최대 5장 첨부할 수 있다. **강�
 - 스토리지 경로도 분리: `{orgId}/maintenance-resolutions/{reportId}/{file}`
   (신고 사진은 `{orgId}/maintenance-reports/…`). 같은 `request-images` 버킷.
 - 압축·용량·타입 정책은 신고 사진과 동일하다.
+- **이어 붙이기(2026-10-26).** 현장 처리에서 저장할 때 새로 고른 사진만 보내고, 서버가 이미 저장된 사진 뒤에 붙인다
+  (예전엔 새 목록으로 통째로 바꿔서 상태만 바꿔 다시 저장하면 이전 사진이 사라졌다). 합친 장수도 5장 — 넘으면
+  `too_many_photos`. 업로더는 남은 장수(5 − 저장된 장수)만 고르게 하고, 다 찼으면 업로더 대신 안내 한 줄.
+- 주소 검사는 공용 `isOwnStoragePublicUrl()`(`src/lib/storage-url-guard.ts`) — 우리 Supabase 호스트 · `request-images`
+  버킷 · `{orgId}/maintenance-resolutions/{reportId}/{파일}` 바로 아래만 통과.
+- 저장 중(사진 올리기부터 서버 저장까지) 버튼은 한 덩어리로 잠기고, 저장에 성공하면 고른 사진을 비운다. 저장이
+  실패하면 방금 올린 사진을 저장소에서 지운다.
 
 ## Categories
 
@@ -428,6 +449,8 @@ When created from an active cleaning timer, the request should automatically lin
   종료 건을 다시 열면 "완료시각이 초기화된다"는 안내가 뜬다.
 - `part_time_staff`에게는 폼 대신 읽기 전용 안내만 보인다. 서버 액션과 RLS가 최종 게이트다.
 - 서버 액션: `updateMaintenanceHandling`(`src/app/mobile/requests/maintenance/actions.ts`).
+- **2026-10-26 디버깅**: 완료 사진 이어 붙이기 · 완료시각은 진행 → 종료 때만 · 동시 변경 가드(`conflict`) ·
+  올리는 동안 두 번 저장 막기 · 성공 후 고른 사진 비우기 · 실패 시 방금 올린 사진 삭제(위 Status · Resolution photos).
 
 ### 모바일 — 신청 폼의 "유령 필드" 수정
 
@@ -441,6 +464,7 @@ When created from an active cleaning timer, the request should automatically lin
 - **건물 전체 신고**: 그동안 신고자의 **언어로 번역된 문자열**("건물 전체" / "建物全体" /
   "Whole building")이 `room_label`에 저장돼, 조회하는 사람의 언어가 다르면 그대로 노출됐다. 이제
   `is_building_only` 불리언으로 정규화하고, 기존 행은 마이그레이션이 backfill한다.
+  (2026-10-26: 그런데도 폼은 번역된 라벨을 `room_label` 에 계속 넣고 있었다 — 이제 `"-"` 를 저장하고 화면은 플래그로 그린다.)
 
 ### 내보내기 — 없다 (확정)
 

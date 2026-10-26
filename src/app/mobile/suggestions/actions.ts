@@ -12,6 +12,7 @@ import {
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper, isPlatformDeveloper } from "@/config/roles";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import type { Database } from "@/types/database";
 
 // database.ts omits Relationships, so `service.rpc()` isn't typed; this gives just enough typing for
@@ -54,6 +55,18 @@ function parseStringArray(value: string): string[] {
 const NEW = "/mobile/suggestions/new";
 
 /**
+ * 제안 · 댓글 사진 주소 — 우리 Storage 의 `{조직}/suggestion-images/{무작위 id}/{파일}` 아래만 받는다(2026-10-26).
+ * 업로더(`suggestions-compose` · `suggestion-comment-composer`)는 올릴 때마다 무작위 폴더를 하나 만든다.
+ * 예전엔 아무 문자열이나 저장됐다. `keep` 은 이미 이 글에 저장된 주소(수정 때 그대로 다시 보내는 것)라 그대로 통과.
+ */
+function areSuggestionImageUrls(urls: string[], organizationId: string, keep: readonly string[] = []): boolean {
+  const prefix = `${organizationId}/suggestion-images/`;
+  return urls.every(
+    (url) => keep.includes(url) || isOwnStoragePublicUrl(url, "request-images", prefix, { subfolders: 1 }),
+  );
+}
+
+/**
  * Create a Staff Suggestion (Step 2 — create flow).
  *
  * Any active org member can create one. Exactly one recipient is required (active same-org member,
@@ -91,6 +104,7 @@ export async function createStaffSuggestion(formData: FormData) {
   if (!title) redirect(`${NEW}?error=missing_title`);
   if (!body) redirect(`${NEW}?error=missing_body`);
   if (!recipientId) redirect(`${NEW}?error=missing_recipient`);
+  if (!areSuggestionImageUrls(imageUrls, session.organization.id)) redirect(`${NEW}?error=save_failed`);
 
   // Same-org active members (excludes the author). Validates recipient + references in one place.
   const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
@@ -209,18 +223,27 @@ export async function updateStaffSuggestion(formData: FormData) {
   const supabase = getSupabaseServiceClient();
   const { data: rawCurrent } = await supabase
     .from("staff_suggestions")
-    .select("id, created_by_user_id, recipient_user_id, status")
+    .select("id, created_by_user_id, recipient_user_id, status, image_urls")
     .eq("id", suggestionId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   const current = rawCurrent as
-    | { id: string; created_by_user_id: string; recipient_user_id: string; status: string }
+    | {
+        id: string;
+        created_by_user_id: string;
+        recipient_user_id: string;
+        status: string;
+        image_urls: string[] | null;
+      }
     | null;
   // Author-only, and only while submitted — otherwise just bounce back to the detail (no leak).
   if (!current || current.created_by_user_id !== session.user.id || current.status !== "submitted") {
     redirect(`/mobile/suggestions/${suggestionId}`);
   }
   const previousRecipientId = current.recipient_user_id;
+  if (!areSuggestionImageUrls(imageUrls, session.organization.id, current.image_urls ?? [])) {
+    redirect(`${EDIT}?error=save_failed`);
+  }
 
   const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
   if (recipientId === session.user.id || !allowed.has(recipientId)) {
@@ -347,8 +370,7 @@ function commentImageUrls(formData: FormData): string[] {
   return formData
     .getAll("imageUrls")
     .map((v) => String(v))
-    .filter(Boolean)
-    .slice(0, STAFF_SUGGESTION_MAX_IMAGES);
+    .filter(Boolean);
 }
 
 type ServiceClient = ReturnType<typeof getSupabaseServiceClient>;
@@ -397,6 +419,9 @@ export async function createStaffSuggestionComment(
   const imageUrls = commentImageUrls(formData);
   if (!suggestionId) return { ok: false, error: "not_found" };
   if (!body && imageUrls.length === 0) return { ok: false, error: "empty" };
+  // 5장 상한은 잘라 버리지 않고 거절한다 · 우리 Storage 주소만(2026-10-26).
+  if (imageUrls.length > STAFF_SUGGESTION_MAX_IMAGES) return { ok: false, error: "too_many_photos" };
+  if (!areSuggestionImageUrls(imageUrls, session.organization.id)) return { ok: false, error: "save_failed" };
 
   const supabase = getSupabaseServiceClient();
   const participants = await loadParticipantIds(supabase, session.organization.id, suggestionId);
@@ -460,7 +485,7 @@ export async function updateStaffSuggestionComment(
   const supabase = getSupabaseServiceClient();
   const { data } = await supabase
     .from("staff_suggestion_comments")
-    .select("id, suggestion_id, created_by_user_id, organization_id")
+    .select("id, suggestion_id, created_by_user_id, organization_id, image_urls")
     .eq("id", commentId)
     .maybeSingle();
   const comment = data as {
@@ -468,12 +493,17 @@ export async function updateStaffSuggestionComment(
     suggestion_id: string;
     created_by_user_id: string;
     organization_id: string;
+    image_urls: string[] | null;
   } | null;
   if (!comment || comment.organization_id !== session.organization.id) {
     return { ok: false, error: "not_found" };
   }
   // Edit is comment-author-only, independent of suggestion status.
   if (comment.created_by_user_id !== session.user.id) return { ok: false, error: "forbidden" };
+  if (imageUrls.length > STAFF_SUGGESTION_MAX_IMAGES) return { ok: false, error: "too_many_photos" };
+  if (!areSuggestionImageUrls(imageUrls, session.organization.id, comment.image_urls ?? [])) {
+    return { ok: false, error: "save_failed" };
+  }
 
   const { error } = await supabase
     .from("staff_suggestion_comments")
@@ -498,7 +528,7 @@ export async function deleteStaffSuggestionComment(
   const supabase = getSupabaseServiceClient();
   const { data } = await supabase
     .from("staff_suggestion_comments")
-    .select("id, suggestion_id, created_by_user_id, organization_id")
+    .select("id, suggestion_id, created_by_user_id, organization_id, image_urls")
     .eq("id", commentId)
     .maybeSingle();
   const comment = data as {
@@ -506,6 +536,7 @@ export async function deleteStaffSuggestionComment(
     suggestion_id: string;
     created_by_user_id: string;
     organization_id: string;
+    image_urls: string[] | null;
   } | null;
   if (!comment || comment.organization_id !== session.organization.id) {
     return { ok: false, error: "not_found" };

@@ -14,10 +14,14 @@ const removedPaths: string[] = [];
 
 function makeQuery(table: string) {
   const filters: Array<[string, unknown]> = [];
+  // `.overlaps(col, values)` — 배열 칼럼이 values 와 하나라도 겹치는 행(cleanupRemovedTaskImages 의 참조 확인).
+  const overlapFilters: Array<[string, unknown[]]> = [];
   let op: "select" | "update" | "delete" | "insert" | "upsert" = "select";
   let payload: Row | Row[] | null = null;
   const rows = () => (db[table] ??= []);
-  const match = (r: Row) => filters.every(([k, v]) => r[k] === v);
+  const match = (r: Row) =>
+    filters.every(([k, v]) => r[k] === v) &&
+    overlapFilters.every(([k, vs]) => Array.isArray(r[k]) && (r[k] as unknown[]).some((x) => vs.includes(x)));
   const run = () => {
     if (op === "select") return { data: rows().filter(match), error: null };
     if (op === "update") {
@@ -45,6 +49,10 @@ function makeQuery(table: string) {
     select: () => q,
     eq: (k: string, v: unknown) => {
       filters.push([k, v]);
+      return q;
+    },
+    overlaps: (k: string, vs: unknown[]) => {
+      overlapFilters.push([k, vs]);
       return q;
     },
     update: (p: Row) => {

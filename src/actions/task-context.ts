@@ -417,7 +417,10 @@ function offsetYm(year: number, month: number, delta: number): string {
  * Searches a 4-month window (1 month back → 3 months ahead, Tokyo) and returns up to 20 results.
  */
 export async function searchReservations(query: string): Promise<ReservationSearchResult[]> {
-  const q = query.trim();
+  // PostgREST `or()` 필터 문법 글자(`,` `(` `)` `%` …)를 뺀다(2026-10-26) — 손님 이름에 쉼표나 괄호가
+  // 들어가면 필터 문자열이 깨져 검색이 통째로 실패하거나 다른 조건으로 읽혔다.
+  // `or()` 문법을 깨는 글자(쉼표 · 괄호 · 따옴표 · 역슬래시)와 와일드카드(% *)만 뺀다 — `.` `_` 는 이름(J. Smith) · 예약 번호에 쓰여 남긴다.
+  const q = String(query ?? "").replace(/[,()"\\%*]/g, "").trim();
   if (q.length < 2) return [];
 
   const session = await getCurrentAppSession();

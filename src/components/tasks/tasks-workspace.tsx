@@ -53,6 +53,7 @@ import {
   skipOccurrenceOn,
   unskipOccurrenceOn,
 } from "@/app/mobile/tasks/[id]/actions";
+import type { TaskStatusResult } from "@/app/mobile/tasks/[id]/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { TaskSchedulePicker } from "@/components/tasks/task-schedule-sheet";
 import { repeatLabel, TaskCard } from "@/components/tasks/task-card";
@@ -267,11 +268,18 @@ export function TasksWorkspace({
     allTasks,
     (
       tasks: TaskRecord[],
-      action: { type: "hide"; ids: readonly string[] } | { type: "complete"; id: string },
+      action:
+        | { type: "hide"; ids: readonly string[] }
+        | { type: "complete"; id: string }
+        | { type: "reopen"; id: string },
     ) => {
       if (action.type === "hide") {
         const gone = new Set(action.ids);
         return tasks.filter((t) => !gone.has(t.id));
+      }
+      // 되돌리기 — 서버 확인 전에 열린 줄로(일회성 완료 실행 취소, 2026-10-26).
+      if (action.type === "reopen") {
+        return tasks.map((t) => (t.id === action.id ? { ...t, status: "open" as const, completedAt: null } : t));
       }
       // 완료 — 목록에서 지우지 않고 **완료 상태로 바꾼다**(2026-10-15 화이트 리디자인). 그래야 같은 순간
       // 오늘 탭 아래 「완료」 묶음으로 내려앉는다(아래 `optimisticCompletions` 와 짝).
@@ -405,11 +413,23 @@ export function TasksWorkspace({
   // "Cannot access variable before it is declared" 로 막는다.
   const [deletedUndoIds, setDeletedUndoIds] = useState<string[] | null>(null);
   const deleteUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * 완료 실행 취소와 삭제 실행 취소는 같은 자리(토스트 하나)를 쓴다. 둘이 겹치면 **가장 최근 것**을
+   * 보여 주고, 다른 쪽 상태는 그대로 둔다 — 하나를 치워도 다른 쪽 실행 취소가 사라지지 않는다
+   * (2026-10-26, 예전엔 닫기 한 번에 둘 다 비워졌다).
+   */
+  const [lastUndoKind, setLastUndoKind] = useState<"complete" | "delete">("complete");
   const showDeleteUndo = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
     if (deleteUndoTimer.current) clearTimeout(deleteUndoTimer.current);
     setDeletedUndoIds(ids);
+    setLastUndoKind("delete");
     deleteUndoTimer.current = setTimeout(() => setDeletedUndoIds(null), 6000);
+  }, []);
+  /** 서버 액션 실패 안내(완료 · 되돌리기 · 삭제 · 건너뛰기) — 이동 거절 토스트 자리를 함께 쓴다. */
+  const notifyActionFailed = useCallback(() => {
+    haptic("error");
+    setMoveNotice("action_failed");
   }, []);
 
   // Commit a delete (single from the menu, or the multi-select batch). Optimistically hide the
@@ -421,7 +441,14 @@ export function TasksWorkspace({
         // 완료와 같은 낙관적 경로를 쓴다. 남의 작업을 같이 골랐다면 서버가 그것만 남겨서 돌려주고,
         // 새 props 가 도착하면서 낙관적 값이 버려져 그 행은 제자리로 돌아온다.
         hideTasksOptimistically(ids);
-        const { deletedIds } = await deleteTasksInList(ids);
+        let deletedIds: string[];
+        try {
+          ({ deletedIds } = await deleteTasksInList(ids));
+        } catch {
+          // 트랜지션이 끝나면 낙관적 숨김은 저절로 버려져 행이 돌아온다 — 이유만 알려 준다.
+          notifyActionFailed();
+          return;
+        }
         // 실제로 지워진 것만 되돌릴 수 있다 — 남의 작업을 같이 골랐어도 그건 안 지워진다.
         showDeleteUndo(deletedIds);
       });
@@ -429,7 +456,7 @@ export function TasksWorkspace({
       setSelectMode(false);
       setSelectedIds(new Set());
     },
-    [hideTasksOptimistically, showDeleteUndo],
+    [hideTasksOptimistically, notifyActionFailed, showDeleteUndo],
   );
 
   /**
@@ -462,23 +489,33 @@ export function TasksWorkspace({
     (taskId: string, date: string) => {
       setRecurDelete(null);
       startSkip(async () => {
-        await skipOccurrenceOn(taskId, date);
+        try {
+          await skipOccurrenceOn(taskId, date);
+        } catch {
+          setSkipUndo((cur) => (cur?.taskId === taskId && cur.date === date ? null : cur));
+          notifyActionFailed();
+        }
       });
       if (skipUndoTimer.current) clearTimeout(skipUndoTimer.current);
       setSkipUndo({ taskId, date });
       skipUndoTimer.current = setTimeout(() => setSkipUndo(null), 6000);
     },
-    [],
+    [notifyActionFailed],
   );
+  // 서버 액션은 상태 갱신 함수(updater) 밖에서 부른다 — updater 는 Strict Mode 에서 두 번 돌 수 있다.
   const undoSkipOccurrence = useCallback(() => {
-    setSkipUndo((cur) => {
-      if (cur)
-        startSkip(async () => {
-          await unskipOccurrenceOn(cur.taskId, cur.date);
-        });
-      return null;
+    const cur = skipUndo;
+    setSkipUndo(null);
+    if (skipUndoTimer.current) clearTimeout(skipUndoTimer.current);
+    if (!cur) return;
+    startSkip(async () => {
+      try {
+        await unskipOccurrenceOn(cur.taskId, cur.date);
+      } catch {
+        notifyActionFailed();
+      }
     });
-  }, []);
+  }, [notifyActionFailed, skipUndo]);
 
   // --- Overdue prompt (Today tab): reschedule / clear past unfinished.
   const [overduePending, startOverdue] = useTransition();
@@ -500,7 +537,7 @@ export function TasksWorkspace({
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 마지막 완료 요청 — 실행 취소는 서버가 **실제로 기록한** 회차로 되돌린다. 회차가 아닌 날 완료하면
   // 가장 오래된 밀린 회차로 정산되므로, 누른 날짜로 되돌리면 아무것도 풀리지 않는다.
-  const lastCompletion = useRef<Promise<string | undefined> | null>(null);
+  const lastCompletion = useRef<Promise<TaskStatusResult> | null>(null);
   /**
    * 완료/되돌리기 실행. 완료는 **누른 즉시** 목록에서 빠지고, 서버 왕복은 그 뒤에 따라온다.
    *
@@ -521,15 +558,35 @@ export function TasksWorkspace({
             byUserId: currentUserId,
             at: new Date().toISOString(),
           });
-          const pending = completeTask(task.id, occurrenceDate);
+          // 던지면(네트워크 · 서버 오류) 실패로 본다 — 트랜지션이 끝나며 낙관적 값은 저절로 버려진다.
+          const pending = completeTask(task.id, occurrenceDate).catch(
+            (): TaskStatusResult => ({ ok: false }),
+          );
           lastCompletion.current = pending;
-          await pending;
+          const res = await pending;
+          if (res.ok) {
+            // 「성공」 햅틱은 서버가 기록을 확인한 뒤에만(2026-10-26, haptics 규칙).
+            haptic("success");
+          } else {
+            // 실행 취소할 것이 없다 — 이 작업의 완료 토스트를 걷고 이유를 알린다.
+            setUndoTask((cur) => (cur?.id === task.id ? null : cur));
+            notifyActionFailed();
+          }
         } else {
-          await reopenTask(task.id, occurrenceDate);
+          const res = await reopenTask(task.id, occurrenceDate).catch(
+            (): TaskStatusResult => ({ ok: false }),
+          );
+          if (!res.ok) notifyActionFailed();
         }
       });
     },
-    [applyTaskOptimistic, addCompletionOptimistically, currentUserId, resolveOccurrenceOptimistically],
+    [
+      applyTaskOptimistic,
+      addCompletionOptimistically,
+      currentUserId,
+      notifyActionFailed,
+      resolveOccurrenceOptimistically,
+    ],
   );
   const handleCompleteToggle = useCallback(
     (task: TaskRecord, occurrence?: { date: string; done: boolean }) => {
@@ -539,6 +596,7 @@ export function TasksWorkspace({
       if (complete) {
         setUndoTask(task);
         setUndoOcc(occurrence?.date ?? null);
+        setLastUndoKind("complete");
         undoTimer.current = setTimeout(() => setUndoTask(null), 6000);
       } else {
         setUndoTask(null);
@@ -551,11 +609,20 @@ export function TasksWorkspace({
     haptic("light");
     if (undoTask) {
       const task = undoTask;
-      const pending = undoOcc ? lastCompletion.current : null;
+      // 일회성도 완료 요청이 끝난 뒤에 되돌린다 — 아직 날아가는 중인 완료보다 되돌리기가 먼저 닿으면
+      // 서버엔 결국 완료가 남았다(2026-10-26, 예전엔 반복만 기다렸다).
+      const pending = lastCompletion.current;
       if (pending) {
         startComplete(async () => {
-          const recorded = await pending.catch(() => undefined);
-          await reopenTask(task.id, recorded ?? undoOcc ?? undefined);
+          // 기다리는 동안에도 바로 열린 줄로 보이게(서버 확인 전 즉시 반영) — 실패하면 transition 이 끝나며 되돌아온다.
+          if (!task.recurrenceRule) applyTaskOptimistic({ type: "reopen", id: task.id });
+          const recorded = await pending;
+          // 완료 자체가 실패했다면 되돌릴 것이 없다(실패 안내는 runStatus 가 이미 냈다).
+          if (!recorded.ok) return;
+          const res = await reopenTask(task.id, recorded.occurrenceDate ?? undoOcc ?? undefined).catch(
+            (): TaskStatusResult => ({ ok: false }),
+          );
+          if (!res.ok) notifyActionFailed();
         });
       } else {
         runStatus(task, false, undoOcc ?? undefined);
@@ -564,7 +631,7 @@ export function TasksWorkspace({
     setUndoTask(null);
     setUndoOcc(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
-  }, [runStatus, undoTask, undoOcc]);
+  }, [applyTaskOptimistic, notifyActionFailed, runStatus, undoTask, undoOcc]);
 
   // Delete undo: deleteTask soft-deletes then redirects to ?deleted=<id>. Show a "삭제했습니다 · 실행
   // 취소" toast that calls restoreTask. Guarded by a ref so it fires once per id (no re-show on refresh).
@@ -611,6 +678,8 @@ export function TasksWorkspace({
     if (processedCreated.current === key) return;
     processedCreated.current = key;
     const raf = requestAnimationFrame(() => {
+      // 서버가 저장을 확인한 시점 — 「성공」 햅틱은 여기서(제출 순간이 아니라, 2026-10-26).
+      haptic("success");
       if (quickInputEl.current) quickInputEl.current.value = "";
       setQuickSeed("");
       setHasQuickTitle(false);
@@ -622,27 +691,38 @@ export function TasksWorkspace({
     });
     return () => cancelAnimationFrame(raf);
   }, [router, searchParams, quickOpen]);
+  // `?deleted=<id>` 는 토스트를 한 번 띄운 뒤 URL 에서 지운다(2026-10-26) — 남겨 두면 새로고침할 때마다
+  // 토스트가 다시 떴고, 거기서 실행 취소를 누르면 한참 전에 지운 작업이 실제로 되살아났다. 타이머는
+  // `showDeleteUndo` 의 ref 가 들고 있어 searchParams 가 바뀌어도(이 effect 정리) 사라지지 않는다.
+  // `processedDelete` 는 rAF 안에서 표시한다 — 그 전에 정리되면 다음 실행이 다시 처리한다.
   useEffect(() => {
     const id = searchParams.get("deleted");
     if (!id || processedDelete.current === id) return;
-    processedDelete.current = id;
-    const raf = requestAnimationFrame(() => setDeletedUndoIds([id]));
-    const t = setTimeout(() => setDeletedUndoIds((cur) => (cur?.[0] === id ? null : cur)), 6000);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(t);
-    };
-  }, [searchParams]);
+    const raf = requestAnimationFrame(() => {
+      processedDelete.current = id;
+      showDeleteUndo([id]);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("deleted");
+      const query = next.toString();
+      router.replace(`/mobile/tasks${query ? `?${query}` : ""}`, { scroll: false });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [router, searchParams, showDeleteUndo]);
+  // 서버 액션은 updater 밖에서 부른다(위 undoSkipOccurrence 와 같은 이유).
   const handleRestore = useCallback(() => {
     haptic("light");
-    setDeletedUndoIds((ids) => {
-      if (ids?.length)
-        startComplete(async () => {
-          await restoreTasksInList(ids); // 액션이 revalidatePath 한다 — refresh 중복 금지
-        });
-      return null;
+    const ids = deletedUndoIds;
+    setDeletedUndoIds(null);
+    if (deleteUndoTimer.current) clearTimeout(deleteUndoTimer.current);
+    if (!ids?.length) return;
+    startComplete(async () => {
+      try {
+        await restoreTasksInList(ids); // 액션이 revalidatePath 한다 — refresh 중복 금지
+      } catch {
+        notifyActionFailed();
+      }
     });
-  }, []);
+  }, [deletedUndoIds, notifyActionFailed]);
 
   // 완료/기록 tab: daily-report sheet target date (the day-group whose 보고서 button was tapped).
   const [reportDate, setReportDate] = useState<string | null>(null);
@@ -658,6 +738,11 @@ export function TasksWorkspace({
   const toastVisible = !!(
     moveNotice || skipUndo || undoTask || deletedUndoIds?.length
   );
+  // 완료 / 삭제 실행 취소 중 지금 보여 줄 쪽 — 둘 다 살아 있으면 최근 것(lastUndoKind).
+  const hasDeleteUndo = !!deletedUndoIds?.length;
+  const showCompleteUndo =
+    hydrated && !!undoTask && (lastUndoKind === "complete" || !hasDeleteUndo);
+  const showDeleteUndoToast = hydrated && hasDeleteUndo && !showCompleteUndo;
   // 반복 회차 상태(2026-07-30): taskId → (date → state). 완료/지연 판정에 사용.
   const occByTask = useMemo(() => {
     const m = new Map<string, Map<string, OccurrenceState>>();
@@ -896,10 +981,15 @@ export function TasksWorkspace({
   // return. 선택 모드가 아니면 내 지연 전체가 대상(오늘 뷰의 `overdueTargets` 와 같은 규칙).
   const rescheduleOverdue = (targetDate: string) =>
     startOverdue(async () => {
-      await rescheduleOverdueTo(
-        targetDate,
-        overdueSelectMode ? [...overdueSelection] : ownedOverdueIds,
-      );
+      try {
+        await rescheduleOverdueTo(
+          targetDate,
+          overdueSelectMode ? [...overdueSelection] : ownedOverdueIds,
+        );
+      } catch {
+        notifyActionFailed();
+        return;
+      }
       setOverdueRescheduleOpen(false);
       setOverdueSelectMode(false);
       setOverdueSelection(new Set());
@@ -1031,7 +1121,12 @@ export function TasksWorkspace({
   const overdueTargets = overdueSelectMode ? [...overdueSelection] : ownedOverdueIds;
   const clearOverdue = () =>
     startOverdue(async () => {
-      await dismissOverdueTasks(overdueTargets);
+      try {
+        await dismissOverdueTasks(overdueTargets);
+      } catch {
+        notifyActionFailed();
+        return;
+      }
       setOverdueConfirm(false);
       setOverdueSelectMode(false);
       setOverdueSelection(new Set());
@@ -2025,7 +2120,7 @@ export function TasksWorkspace({
                   className="tkw-btn is-red"
                   disabled={overduePending || overdueTargets.length === 0}
                   onClick={() => {
-                    haptic("warning");
+                    haptic("light");
                     clearOverdue();
                   }}
                   type="button"
@@ -2060,7 +2155,7 @@ export function TasksWorkspace({
         <BottomSheet ariaLabel={w.addTask} onClose={onQuickClosed}>
           <div className="tkw-sheet">
             <h2>{w.addTask}</h2>
-            <form action={quickCreateTask} onSubmit={() => haptic("success")}>
+            <form action={quickCreateTask} onSubmit={() => haptic("light")}>
               <input
                 aria-label={w.addTask}
                 autoFocus
@@ -2181,7 +2276,7 @@ export function TasksWorkspace({
                   className="tkw-btn is-red"
                   disabled={deleting}
                   onClick={() => {
-                    haptic("warning");
+                    haptic("light");
                     performDelete(confirmIds);
                   }}
                   type="button"
@@ -2199,16 +2294,18 @@ export function TasksWorkspace({
           `duplicate_occurrence` = 그 날짜에 이미 회차가 있는 레거시 케이스. 모르는 값은 duplicate 문구로 폴백. */}
       {moveNotice && hydrated ? (
         <TaskToast
-          icon={moveNotice === "save_failed" ? AlertTriangle : Repeat}
+          icon={moveNotice === "save_failed" || moveNotice === "action_failed" ? AlertTriangle : Repeat}
           message={
-            moveNotice === "save_failed"
-              ? copy.moveSaveFailed
-              : moveNotice === "recurring_series"
-                ? copy.moveRejectedRecurringSeries
-                : copy.moveDuplicateOccurrence
+            moveNotice === "action_failed"
+              ? copy.errors.save_failed
+              : moveNotice === "save_failed"
+                ? copy.moveSaveFailed
+                : moveNotice === "recurring_series"
+                  ? copy.moveRejectedRecurringSeries
+                  : copy.moveDuplicateOccurrence
           }
           onDismiss={() => setMoveNotice(null)}
-          tone={moveNotice === "save_failed" ? "danger" : "neutral"}
+          tone={moveNotice === "save_failed" || moveNotice === "action_failed" ? "danger" : "neutral"}
         />
       ) : null}
 
@@ -2258,17 +2355,19 @@ export function TasksWorkspace({
         />
       ) : null}
 
-      {/* 되돌리기 토스트 — 완료(고리) 또는 삭제 뒤 6초. */}
-      {(undoTask || deletedUndoIds?.length) && hydrated ? (
+      {/* 되돌리기 토스트 — 완료(고리) 또는 삭제 뒤 6초. 둘이 겹치면 최근 것을 보여 주고, 치우면 그것만
+          비운다(다른 쪽이 아직 살아 있으면 그 토스트가 이어서 보인다). */}
+      {showCompleteUndo || showDeleteUndoToast ? (
         <TaskToast
-          action={{ label: copy.undo, onAction: undoTask ? handleUndo : handleRestore }}
-          icon={undoTask ? CheckCircle2 : Trash2}
-          message={undoTask ? copy.completedToast : copy.deletedToast}
+          action={{ label: copy.undo, onAction: showCompleteUndo ? handleUndo : handleRestore }}
+          icon={showCompleteUndo ? CheckCircle2 : Trash2}
+          key={showCompleteUndo ? "undo-complete" : "undo-delete"}
+          message={showCompleteUndo ? copy.completedToast : copy.deletedToast}
           onDismiss={() => {
-            setUndoTask(null);
-            setDeletedUndoIds(null);
+            if (showCompleteUndo) setUndoTask(null);
+            else setDeletedUndoIds(null);
           }}
-          tone={undoTask ? "neutral" : "danger"}
+          tone={showCompleteUndo ? "neutral" : "danger"}
         />
       ) : null}
 

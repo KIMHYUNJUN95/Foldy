@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import type { Database } from "@/types/database";
 import { isPlatformDeveloper } from "@/config/roles";
 
@@ -184,8 +185,21 @@ function validatePlatform(value: string): ComplaintPlatform {
   return value as ComplaintPlatform;
 }
 
-function validateImages(urls: string[]): void {
-  if (urls.length > MAX_IMAGES) throw new Error("too_many_photos");
+/**
+ * 사진 주소 검사 — 5장 상한 + 우리 Storage 주소만(2026-10-26, 예전엔 장수만 봤다).
+ * `prefix` 아래 무작위 폴더 한 칸 + 파일이어야 한다:
+ *   컴플레인 = `{조직}/complaint-images/{작성 중 id}/{파일}` (작성 화면이 만든 draft id 폴더),
+ *   댓글    = `{조직}/complaint-comment-images/{컴플레인 id}/{댓글 id}/{파일}`.
+ * `keep` 은 이미 이 글에 저장된 주소(수정 때 그대로 다시 오는 것)라 그대로 통과.
+ */
+function validateImages(urls: string[], prefix: string, keep: readonly string[] = []): void {
+  if (!Array.isArray(urls) || urls.length > MAX_IMAGES) throw new Error("too_many_photos");
+  const ok = urls.every(
+    (url) =>
+      typeof url === "string" &&
+      (keep.includes(url) || isOwnStoragePublicUrl(url, REQUEST_IMAGES_BUCKET, prefix, { subfolders: 1 })),
+  );
+  if (!ok) throw new Error("invalid_image");
 }
 
 function normalizeOptional(value: string | null | undefined): string | null {
@@ -404,7 +418,7 @@ export async function createComplaint(input: {
 
   const platform = validatePlatform(input.input.platform);
   const title = validateTitle(input.input.title);
-  validateImages(input.input.imageUrls);
+  validateImages(input.input.imageUrls, `${organizationId}/complaint-images/`);
 
   const service = getSupabaseServiceClient();
   const id = randomUUID();
@@ -482,7 +496,7 @@ export async function updateComplaint(input: {
   }
   if (patch.guestName !== undefined) update.guest_name = normalizeOptional(patch.guestName);
   if (patch.imageUrls !== undefined) {
-    validateImages(patch.imageUrls);
+    validateImages(patch.imageUrls, `${organizationId}/complaint-images/`, existing.image_urls ?? []);
     update.image_urls = patch.imageUrls;
   }
 
@@ -627,7 +641,7 @@ export async function createComplaintComment(input: {
 
   const content = input.content.trim();
   if (!content) throw new Error("content_required");
-  validateImages(input.imageUrls);
+  validateImages(input.imageUrls, `${organizationId}/complaint-comment-images/${complaintId}/`);
 
   const complaint = await loadComplaintForWrite(complaintId, organizationId);
   if (!complaint) throw new Error("not_found");

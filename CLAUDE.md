@@ -341,6 +341,19 @@ This project uses Tokyo operating dates in several important flows.
 
 ## Working Style
 
+### Model choice · token saving (2026-10-26)
+
+Use the lightest model that fits each change, and keep only conclusions in the lead's context.
+Always set `model` when spawning an agent. Full rules: `docs/planning/05-ai-collaboration-rules.md` → 「모델 고르기 · 컨텍스트 토큰 아끼기」.
+
+- **Haiku**: lookups, i18n/doc-sync checks, mechanical one-line edits.
+- **Sonnet**: scoped single-area implementation, confirmed bug fixes, area reviews, tests, docs.
+- **Opus**: permissions/RLS, migrations, Beds24, payroll/leave math, unclear debugging, cross-area design, final regression review, lead.
+- Pick the lead's model at task start and don't switch mid-task (prompt cache is per model). Give lighter models only
+  self-contained work that a short brief fully describes; follow-ups on context you already built stay with you or the same agent.
+- Delegate broad reading; do small known lookups yourself. Narrow agent briefs with file ownership; short `path:line` reports;
+  don't re-read what an agent verified; read big files by grep + offset; tail command output; one `npm run build` at the end.
+
 ### Default execution order
 
 1. Read relevant docs and current implementation.

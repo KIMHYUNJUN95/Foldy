@@ -12,6 +12,7 @@ import type { PanelScopeSummary } from "@/components/admin/ops/ops-price-panel";
 import { groupSelectionIntoRanges } from "@/lib/ops-calendar-selection";
 import { MswField, MswSuccess, useSuccessThen } from "@/components/mobile/ops/mobile-ops-form";
 import { haptic } from "@/lib/haptics";
+import { useBuildingName } from "@/components/shared/building-names";
 
 /**
  * 모바일 차단 시트 — Claude Design 시안 `4a 최소숙박 · 차단 시트 v3`(4c · 4d · 4e, 2026-10-02 사용자 확정).
@@ -53,6 +54,7 @@ export function MobileOpsBlockSheet({
   blockedKeys,
   cells,
   copy,
+  onApplied,
   onClear,
   onDone,
   scopeSummary,
@@ -61,6 +63,11 @@ export function MobileOpsBlockSheet({
   blockedKeys: ReadonlySet<string>;
   cells: BlockChangeCell[];
   copy: MobileBlockSheetCopy;
+  /**
+   * 일부만 반영됐을 때 — 반영된 칸을 부모 선택에서 뺀다. 다시 누르면 반영 안 된 구간만 간다(2026-10-26 버그 수정 —
+   * 전에는 성공한 구간까지 다시 보내 이력이 두 번 남았다).
+   */
+  onApplied: (appliedCells: { roomKey: string; date: string }[]) => void;
   onClear: () => void;
   /** 성공 — 부모가 선택을 비우고 시트를 닫고 알림을 띄운다. */
   onDone: (done: MobileBlockDone) => void;
@@ -82,7 +89,26 @@ export function MobileOpsBlockSheet({
     [blockedKeys, cells],
   );
   const nightsLabel = (n: number) => copy.mpNights.replace("{n}", String(n));
-  const roomName = (roomKey: string) => roomKey.replace("::", " ");
+  // 행 키는 `건물::방` 정규 이름이다 — 내부 키를 그대로 그리지 않고, 건물은 보는 사람 언어로(2026-10-26).
+  // 독채는 방 이름 = 건물 이름이라 건물 이름 하나만.
+  const bName = useBuildingName();
+  const labelByKey = useMemo(() => new Map(cells.map((cell) => [cell.roomKey, cell.roomLabel])), [cells]);
+  const roomParts = (roomKey: string, label?: string) => {
+    const property = roomKey.split("::")[0] ?? roomKey;
+    const room = label ?? labelByKey.get(roomKey) ?? roomKey.split("::")[1] ?? "";
+    const single = !room || room === property;
+    return { property: bName(property), room: single ? null : room };
+  };
+  /** 확인 카드 · 실패 문구 — 「건물 방」(독채는 건물만). */
+  const roomName = (roomKey: string, label?: string) => {
+    const parts = roomParts(roomKey, label);
+    return parts.room ? `${parts.property} ${parts.room}` : parts.property;
+  };
+  /** 구간 목록 — 방 이름만(독채는 건물 이름). */
+  const roomShort = (roomKey: string) => {
+    const parts = roomParts(roomKey);
+    return parts.room ?? parts.property;
+  };
 
   const run = (mode: "block" | "release") => {
     const targets = mode === "release" ? blockedCells : cells;
@@ -100,13 +126,31 @@ export function MobileOpsBlockSheet({
       }
       setConfirming(false);
       haptic(result.appliedRanges ? "warning" : "error");
-      setError(
-        result.appliedRanges
-          ? copy.bkPartialFailed
-              .replace("{done}", String(result.appliedRanges))
-              .replace("{error}", blockErrorText(copy, result.error))
-          : copy.bkFailed.replace("{error}", blockErrorText(copy, result.error)),
-      );
+      const failed = result.appliedRanges
+        ? copy.bkPartialFailed
+            .replace("{done}", String(result.appliedRanges))
+            .replace("{error}", blockErrorText(copy, result.error))
+        : copy.bkFailed.replace("{error}", blockErrorText(copy, result.error));
+      const unapplied = result.unappliedRanges ?? [];
+      if (result.appliedRanges && unapplied.length > 0) {
+        // 반영 안 된 구간(실패 + 손대지 않은 뒤 구간)을 방 · 날짜로 적고, 반영된 칸은 선택에서 뺀다 — 다시 누르면
+        // 남은 구간만 간다(데스크톱 차단 패널과 같은 문구 · 2026-10-26).
+        const isUnapplied = (cell: BlockChangeCell) =>
+          unapplied.some(
+            (range) => range.roomKey === cell.roomKey && cell.date >= range.startDate && cell.date <= range.endDate,
+          );
+        const appliedCells = targets.filter((cell) => !isUnapplied(cell));
+        if (appliedCells.length > 0) onApplied(appliedCells.map((cell) => ({ date: cell.date, roomKey: cell.roomKey })));
+        const list = unapplied
+          .map(
+            (range) =>
+              `${roomName(range.roomKey, range.roomLabel)} ${pad(range.startDate)} → ${pad(range.endDate)}`,
+          )
+          .join(", ");
+        setError(`${failed} ${copy.bkUnapplied.replace("{ranges}", list)}`);
+        return;
+      }
+      setError(failed);
     });
   };
 
@@ -208,7 +252,7 @@ export function MobileOpsBlockSheet({
               </div>
               {ranges.map((range) => (
                 <div className="msw-row" key={`${range.roomKey}|${range.startDate}`}>
-                  <span className="rm">{range.roomKey.split("::")[1] ?? range.roomKey}</span>
+                  <span className="rm">{roomShort(range.roomKey)}</span>
                   <span className="d">
                     {pad(range.startDate)} → {pad(range.endDate)}
                   </span>

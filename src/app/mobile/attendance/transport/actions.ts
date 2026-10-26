@@ -46,8 +46,40 @@ const EDITABLE_STATUSES = new Set(["draft", "rejected", "changes_requested"]);
 
 /** Convert a 'YYYY-MM' month key to the 'YYYY-MM-01' first-day form used by target_month. */
 function monthKeyToFirstDay(targetMonth: string): string | null {
-  if (!/^\d{4}-\d{2}$/.test(targetMonth)) return null;
+  // 실제 달(01~12)만 — 「2026-13」 같은 키로 보고서 행이 생기지 않게(2026-10-26).
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)) return null;
   return `${targetMonth}-01`;
+}
+
+/** 실제로 있는 날짜인가(2026-02-30 같은 값 거름). */
+function isRealDate(ymd: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/** 항목 하나에 붙는 영수증 사진 상한 — 업로드 공통 규칙(기능당 5장). 화면도 같은 수로 자른다. */
+const MAX_ITEM_IMAGES = 5;
+const SAFE_FILE = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * 영수증 사진 경로는 **그 항목의 폴더 바로 아래 파일 한 장**이어야 한다(2026-10-26):
+ * `{조직}/transport-reimbursements/{보고서 id}/{항목 id}/{파일}` — 업로더(`uploadTransportImage`)가 쓰는 모양 그대로.
+ * 예전에는 `{조직}/transport-reimbursements/` 로 시작하기만 보면 돼서, 남의 항목 파일 경로를 등록한 뒤
+ * 그 사진(또는 항목)을 지우면 **남의 파일이 Storage 에서 지워질** 수 있었다. 삭제 때도 같은 검사를 다시 한다.
+ */
+function isOwnItemImagePath(
+  storagePath: string,
+  organizationId: string,
+  reportId: string,
+  itemId: string,
+): boolean {
+  if (typeof storagePath !== "string") return false;
+  const prefix = `${organizationId}/transport-reimbursements/${reportId}/${itemId}/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const file = storagePath.slice(prefix.length);
+  return file.length > 0 && file !== "." && file !== ".." && SAFE_FILE.test(file);
 }
 
 // ── Create ─────────────────────────────────────────────────────────────────
@@ -67,7 +99,8 @@ export type CreateTransportItemInput = {
 };
 
 export type CreateTransportItemResult =
-  | { ok: true; itemId: string }
+  /** `reportId` — 이 항목이 들어간 보고서. 첫 항목이면 방금 만들어진 것이라 화면이 아직 모른다(영수증 경로에 쓴다). */
+  | { ok: true; itemId: string; reportId: string }
   | { ok: false; error: string };
 
 export async function createTransportItemAction(
@@ -81,7 +114,9 @@ export async function createTransportItemAction(
 
   const targetMonthDate = monthKeyToFirstDay(input.targetMonth);
   if (!targetMonthDate) return { ok: false, error: "invalid_month" };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.usageDate)) return { ok: false, error: "invalid_date" };
+  if (!isRealDate(input.usageDate)) return { ok: false, error: "invalid_date" };
+  // 사용일은 정산서의 달 안이어야 한다 — 다른 달 날짜가 이 달 정산서에 섞이면 월별 합계 · 마감이 어긋난다.
+  if (input.usageDate.slice(0, 7) !== input.targetMonth) return { ok: false, error: "date_outside_month" };
   if (!Number.isInteger(input.amountYen) || input.amountYen <= 0) {
     return { ok: false, error: "invalid_amount" };
   }
@@ -105,6 +140,31 @@ export async function createTransportItemAction(
     return { ok: false, error: "memo_required" };
   }
 
+  // 연결 대상은 **내 것 · 우리 조직 것**만(2026-10-26). 화면이 보낸 id 를 그대로 저장하면 남의 근태 기록이나
+  // 다른 조직 건물에 이어진 행이 생긴다.
+  const attendanceSessionId = input.attendanceSessionId?.trim() || null;
+  const propertyId = input.propertyId?.trim() || null;
+  if (attendanceSessionId) {
+    const sessionRes = await service
+      .from("attendance_sessions")
+      .select("id")
+      .eq("id", attendanceSessionId)
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (sessionRes.error || !sessionRes.data) return { ok: false, error: "invalid_link" };
+  }
+  if (propertyId) {
+    const propertyRes = await service
+      .from("properties")
+      .select("id")
+      .eq("id", propertyId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (propertyRes.error || !propertyRes.data) return { ok: false, error: "invalid_link" };
+  }
+
+  // 보고서 행은 **첫 항목을 넣을 때** 만든다 — 화면을 여는 것만으로는 만들지 않는다(page.tsx 는 읽기만).
   const report = await getOrCreateTransportReport(service, organizationId, userId, targetMonthDate);
   if (!EDITABLE_STATUSES.has(report.status)) return { ok: false, error: "report_not_editable" };
 
@@ -123,8 +183,8 @@ export async function createTransportItemAction(
       usage_date: input.usageDate,
       amount_yen: input.amountYen,
       entry_mode: input.entryMode,
-      attendance_session_id: input.attendanceSessionId ?? null,
-      property_id: input.propertyId ?? null,
+      attendance_session_id: attendanceSessionId,
+      property_id: propertyId,
       work_context: workContext,
       memo: input.memo?.trim() ? input.memo.trim() : null,
     })
@@ -134,7 +194,7 @@ export async function createTransportItemAction(
 
   await syncReportTotalAmount(service, report.id);
   revalidatePath(TRANSPORT_PATH);
-  return { ok: true, itemId: (ins.data as { id: string }).id };
+  return { ok: true, itemId: (ins.data as { id: string }).id, reportId: report.id };
 }
 
 // ── Update ─────────────────────────────────────────────────────────────────
@@ -266,9 +326,10 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
     .select("storage_path")
     .eq("item_id", itemId)
     .eq("organization_id", organizationId);
+  // 이 항목 폴더의 파일만 지운다 — 예전 검사가 느슨할 때 들어간 남의 경로가 있어도 건드리지 않는다.
   const paths = ((imgRes.data ?? []) as { storage_path: string }[])
     .map((r) => r.storage_path)
-    .filter(Boolean);
+    .filter((path) => Boolean(path) && isOwnItemImagePath(path, organizationId, reportId, itemId));
   if (paths.length > 0) {
     const { error } = await service.storage.from(IMAGE_BUCKET).remove(paths);
     if (error) {
@@ -302,20 +363,22 @@ export async function addTransportItemImageAction(
   const userId = session.user.id;
   const service = getSupabaseServiceClient();
 
-  if (!storagePath || !storagePath.startsWith(`${organizationId}/transport-reimbursements/`)) {
-    return { ok: false, error: "invalid_path" };
-  }
-
   const loaded = await loadEditableOwnItem(service, organizationId, userId, itemId);
   if (!loaded.ok) return loaded;
 
-  // Next sort_order: append after existing images.
+  if (!isOwnItemImagePath(storagePath, organizationId, loaded.item.report_id, loaded.item.id)) {
+    return { ok: false, error: "invalid_path" };
+  }
+
+  // Next sort_order: append after existing images. 5장이 차 있으면 더 받지 않는다(서버가 상한을 다시 건다).
   const countRes = await untyped(service)
     .from("transport_reimbursement_item_images")
     .select("id")
     .eq("item_id", itemId)
     .eq("organization_id", organizationId);
+  if (countRes.error) return { ok: false, error: "insert_failed" };
   const nextOrder = ((countRes.data ?? []) as { id: string }[]).length;
+  if (nextOrder >= MAX_ITEM_IMAGES) return { ok: false, error: "too_many_images" };
 
   const ins = await untyped(service)
     .from("transport_reimbursement_item_images")
@@ -362,7 +425,11 @@ export async function deleteTransportItemImageAction(
   const loaded = await loadEditableOwnItem(service, organizationId, userId, image.item_id);
   if (!loaded.ok) return loaded;
 
-  if (image.storage_path) {
+  // 이 항목 폴더의 파일일 때만 Storage 에서 지운다(행은 아래에서 지운다).
+  if (
+    image.storage_path &&
+    isOwnItemImagePath(image.storage_path, organizationId, loaded.item.report_id, loaded.item.id)
+  ) {
     const { error } = await service.storage.from(IMAGE_BUCKET).remove([image.storage_path]);
     if (error) {
       console.error("[deleteTransportItemImageAction] storage remove failed:", error.message);

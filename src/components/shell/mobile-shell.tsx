@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import type { ReactNode, UIEvent } from "react";
 import { Bell } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import "@/components/shell/pull-refresh.css";
 import { useDrawerDragClose } from "@/components/shell/use-drawer-drag-close";
 import { OfflinePill } from "@/components/shell/offline-pill";
+import { useToastMotion } from "@/components/shell/use-toast-motion";
 
 type MobileShellProps = {
   // Bug Report is not in the sidebar nav list (it lives in the footer next to Logout), but its
@@ -134,6 +135,27 @@ const LAUNCHER_META: Record<string, { hue: number; icon: ReactNode }> = {
 const FALLBACK_ICON = FALLBACK_GLYPH;
 
 
+/**
+ * 셸 자체 오류 알림(하단 탭 저장 실패, 2026-10-26) — 탭바 위 짧은 알약. 움직임(사라짐 · 밀어서 치우기)은 모바일 토스트 공용
+ * `useToastMotion`.
+ */
+function ShellErrorToast({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  // 바깥 띠는 화면 폭 전체라 터치를 통과시키고(pointer-events-none), 움직임 · 밀어서 치우기는 알약에만 건다.
+  const ref = useToastMotion<HTMLSpanElement>(onDismiss);
+  return (
+    <div
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(96px+env(safe-area-inset-bottom,0px))] z-[90] flex justify-center px-6 fold:bottom-6"
+      role="alert"
+    >
+      <span
+        ref={ref}
+        className="pointer-events-auto rounded-full bg-slate-900/92 px-[18px] py-2.5 text-[13px] font-medium text-white shadow-[0_10px_30px_-12px_rgba(15,23,42,0.6)]">
+        {text}
+      </span>
+    </div>
+  );
+}
+
 /** Rubber-band resistance: fast start, asymptotic ceiling at MAX_DISPLAY_H. */
 function computeContentOffset(raw: number): number {
   if (raw <= 0) return 0;
@@ -145,6 +167,11 @@ function computeContentOffset(raw: number): number {
 // lists. Keyed by pathname, module-scoped so it survives the shell's per-route remount within a
 // session (the shell is rendered per page, so this Map is the only thing that persists).
 const SCROLL_POSITIONS = new Map<string, number>();
+
+// useSyncExternalStore 로 「지금 하이드레이션 중인가」를 읽는다 — 서버 · 하이드레이션 그림은 true, 그 뒤 클라이언트 그림은 false.
+const noopSubscribe = () => () => {};
+const hydratingOnClient = () => false;
+const hydratingOnServer = () => true;
 
 
 
@@ -183,7 +210,9 @@ export function MobileShell({
    */
   const [contentKey, setContentKey] = useState(0);
   const pathname = usePathname();
-  const [entrance] = useState(() => consumeScreenEntrance(pathname, placeholder));
+  // 하이드레이션 중이면 true — 서버와 같은 「움직임 없음」으로 첫 그림을 맞춘다(`consumeScreenEntrance` 머리말).
+  const hydrating = useSyncExternalStore(noopSubscribe, hydratingOnClient, hydratingOnServer);
+  const [entrance] = useState(() => consumeScreenEntrance(pathname, placeholder, hydrating));
   // 화면에 붙었다 — 그리다 버려진 셸이 다시 불러도 같은 등장을 받게 해 두던 것을 비운다(`commitScreenEntrance`).
   useEffect(() => {
     commitScreenEntrance(pathname, placeholder);
@@ -262,6 +291,13 @@ export function MobileShell({
   const savedNavRef = useRef<string[]>(initialNavIds);
   const sheetWasOpenRef = useRef(false);
   const [, startNavSave] = useTransition();
+  const [navSaveFailed, setNavSaveFailed] = useState(false);
+  const dismissNavSaveFailed = useCallback(() => setNavSaveFailed(false), []);
+  useEffect(() => {
+    if (!navSaveFailed) return;
+    const timer = setTimeout(() => setNavSaveFailed(false), 3200);
+    return () => clearTimeout(timer);
+  }, [navSaveFailed]);
 
   const clearSidebarChromeTimer = useCallback(() => {
     if (sidebarChromeTimerRef.current) {
@@ -317,9 +353,12 @@ export function MobileShell({
     tickingRef.current = false;
   }, []);
 
+  // 스크롤 이벤트마다 새로 만들지 않는다 — 한 번 만든 MediaQueryList 의 `matches` 는 화면 폭이 바뀌면 저절로 갱신된다.
+  const foldMqlRef = useRef<MediaQueryList | null>(null);
   const requestVisibilityUpdate = useCallback(
     (currentY: number) => {
-      if (window.matchMedia(FOLD_QUERY).matches) {
+      foldMqlRef.current ??= window.matchMedia(FOLD_QUERY);
+      if (foldMqlRef.current.matches) {
         lastScrollYRef.current = currentY;
         setHeaderVisible(true);
         return;
@@ -447,7 +486,7 @@ export function MobileShell({
     const wasBelowThreshold = pullDistanceRef.current < PULL_THRESHOLD;
     syncPullDistance(deltaY);
     if (wasBelowThreshold && deltaY >= PULL_THRESHOLD) {
-      if (typeof navigator !== "undefined") navigator.vibrate?.(10);
+      haptic("light");
     }
   }
 
@@ -500,7 +539,7 @@ export function MobileShell({
     }
     setPullDistanceState(0);
     if (dist >= PULL_THRESHOLD) {
-      haptic("medium");
+      haptic("light");
       startRefreshTransition(() => { router.refresh(); });
     }
   }
@@ -596,12 +635,24 @@ export function MobileShell({
       return;
     }
     const next = navTabIds;
+    const previous = savedNavRef.current;
     savedNavRef.current = next;
     startNavSave(async () => {
-      const result = await updateBottomNavTabs(next);
-      if (result.ok) {
-        router.refresh();
+      // 오프라인 · 서버 오류로 액션이 던지면 오류 화면으로 튕기지 않게 잡는다(2026-10-26). 실패하면 탭을 저장 전으로 되돌리고 알린다.
+      let ok = false;
+      try {
+        ok = (await updateBottomNavTabs(next)).ok;
+      } catch {
+        ok = false;
       }
+      if (ok) {
+        router.refresh();
+        return;
+      }
+      if (savedNavRef.current === next) savedNavRef.current = previous;
+      setNavTabIds((current) => (current === next ? previous : current));
+      haptic("error");
+      setNavSaveFailed(true);
     });
   }, [createOpen, navTabIds, router, startNavSave]);
 
@@ -678,6 +729,9 @@ export function MobileShell({
       ref={mainRef}
     >
 
+      {/* 하단 탭 저장 실패 알림 — 셸(당겨서 새로고침으로 transform 이 걸리는 판) 밖에 두어 화면 기준으로 고정한다. */}
+      {navSaveFailed ? <ShellErrorToast onDismiss={dismissNavSaveFailed} text={dictionary.common.bottomNavSaveFailed} /> : null}
+
       {/* ── Option-B PTR indicator — fixed at the top, revealed as the whole shell slides down ── */}
       {/* The shell (header + content + bottom nav) all translate together; this fixed layer fills
           the gap that opens above them. Background matches the canvas so the reveal looks seamless. */}
@@ -685,6 +739,8 @@ export function MobileShell({
         aria-atomic="true"
         aria-live="polite"
         data-ptr-indicator=""
+        // 당기는 동안 바뀌는 띠 — 스와이프 뒤로가기 밑그림 다시 찍기에서 뺀다(snapshot-store).
+        data-snapshot-ignore=""
         className="pointer-events-none fixed inset-x-0 top-0 z-[1] flex flex-col items-center justify-start bg-background"
         style={{
           height: `calc(env(safe-area-inset-top, 0px) + ${REFRESH_DISPLAY_H}px)`,
@@ -828,6 +884,8 @@ export function MobileShell({
           className="relative flex h-full w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] fold:min-w-0 fold:flex-1"
           // 화면 스와이프 뒤로가기에서 손가락을 따라 움직이는 판(`translate` — PTR 의 `transform` 과 따로 논다).
           data-swipe-surface=""
+          // 당겨서 새로고침이 판을 움직이는 동안 — 스와이프 뒤로가기가 시작하지 않는다(controller `canBegin`).
+          data-ptr-active={isPulling || isRefreshPending || pullDistanceState > 0 ? "" : undefined}
           ref={surfaceRef}
           style={{
             // z-index: 2 makes this stacking context sit ABOVE the fixed PTR indicator (z-1),

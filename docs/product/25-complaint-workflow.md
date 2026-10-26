@@ -178,6 +178,11 @@ id, organization_id, created_by_user_id, title, platform, status,
 image_urls, created_at, updated_at
 ```
 
+> 사진 주소 검사(2026-10-26): 컴플레인 등록 · 수정은 우리 Storage `request-images` 의 `{조직}/complaint-images/{작성 중 id}/{파일}`
+> 주소만, 댓글은 `{조직}/complaint-comment-images/{컴플레인 id}/{댓글 id}/{파일}` 만 받는다(공용 `isOwnStoragePublicUrl()`,
+> 수정 때 이미 저장된 주소는 그대로 통과). 어긋나면 `invalid_image`. 예전엔 5장 상한만 봤다.
+> 상태 바꾸기(해결 · 다시 열기)의 진동은 서버가 저장을 확인한 뒤에 울린다(해결 = success, 다시 열기 = light — 예전엔 보내기 전에 울렸다).
+
 선택 필드: `description`, `platform_ref`, `property_id`, `property_name`, `room_id`, `room_label`,
 `reservation_id`, `guest_name`, `resolved_at`, `resolved_by_user_id`.
 
@@ -311,6 +316,11 @@ Airbnb 리뷰는 **양방향**이다. 호스트가 게스트에게 쓴 리뷰까
 - 월 사용량과 한도를 서버에서 조회·기록한다. 450,000자에 도달하면 새 자동 번역 요청을 중단하여
   무료 한도 초과를 막고, 다음 월 갱신 뒤 재개한다. 이미 저장된 번역은 계속 표시한다.
 - 번역 API 키는 서버 환경변수에만 둔다. 브라우저·클라이언트 로그·문서에 키를 노출하지 않는다.
+- **원문은 서버가 읽는다(2026-10-26).** `translateReviewPartAction(reviewId, part)` 는 조각 이름만 받고, 원문 · 원문 언어는
+  서버가 `getExternalReview`(조직 RLS)로 `external_reviews` 에서 직접 꺼내 DeepL 에 보낸다. 예전엔 클라이언트가 보낸
+  `sourceText` 를 그대로 번역 · 캐시해서, 아무 글로 무료 한도를 쓰거나 그 리뷰의 번역 캐시를 엉뚱한 글로 채울 수 있었다.
+  권한은 "이 리뷰를 읽을 수 있는 사람" — 리뷰 보기는 누구나라(`complaint.*` 키는 쓰기 · 관리 · 댓글만 가른다) 번역도
+  보기와 같은 조건이다. `part` 는 `review` · `positive` · `negative` · `headline` · `private` 만.
 
 ### Implemented data shape
 

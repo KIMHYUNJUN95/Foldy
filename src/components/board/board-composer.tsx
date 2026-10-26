@@ -53,8 +53,9 @@ export function BoardComposer({
   mentionAll?: boolean;
   onOpenMentionSheet?: () => void;
   onClearMentions?: () => void;
-  // 사진 업로드가 끝난 최종 내용을 부모로(서버 액션 호출은 부모 담당)
-  onSubmit?: (payload: ComposerSubmitPayload) => void;
+  // 사진 업로드가 끝난 최종 내용을 부모로(서버 액션 호출은 부모 담당). 서버가 저장했으면 true —
+  // false 면 입력 · 사진을 그대로 둔다(실패했는데 쓴 글이 사라지지 않게, 2026-10-26).
+  onSubmit?: (payload: ComposerSubmitPayload) => Promise<boolean>;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
@@ -136,7 +137,8 @@ export function BoardComposer({
       }
 
       if (onSubmit) {
-        onSubmit({ content: value.trim(), imageUrls, mentionedUsers, mentionAll });
+        const saved = await onSubmit({ content: value.trim(), imageUrls, mentionedUsers, mentionAll }).catch(() => false);
+        if (!saved) return;
       } else {
         const { addBoardComment } = await import("@/app/mobile/board/[id]/actions");
         const result = await addBoardComment(postId, value.trim(), imageUrls);

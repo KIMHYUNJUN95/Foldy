@@ -59,6 +59,9 @@ function mergeNote(existing: string | null, incoming: string) {
   return `${existing}\n\n${incoming}`;
 }
 
+/** CLAUDE.md §8 — 기능당 5장. 수정 액션 · 어드민 콘솔과 같은 상한(2026-10-26 서버에서도 강제). */
+const MAX_PHOTOS = 5;
+
 function mergeImageUrls(existing: string[] | null, incoming: string[]) {
   return Array.from(new Set([...(existing ?? []), ...incoming]));
 }
@@ -113,6 +116,9 @@ export async function createLinenReturnRecord(formData: FormData) {
     .getAll("imageUrls")
     .map((v) => String(v))
     .filter((u) => u.startsWith("https://") || u.startsWith("http://"));
+  if (imageUrls.length > MAX_PHOTOS) {
+    redirect(newPath(building, "too_many_photos"));
+  }
 
   // Reuse the client-generated id (also used as the image folder) when valid so
   // photo storage paths and the record id stay aligned on brand-new records;
@@ -139,6 +145,11 @@ export async function createLinenReturnRecord(formData: FormData) {
 
   if (sameDayRecord) {
     const targetRecord = sameDayRecord as Pick<RecordRow, "id" | "note" | "image_urls">;
+    // 합친 뒤 사진이 5장을 넘으면 아무것도 쓰기 전에 거절한다 — 줄 수량만 더해지고 사진에서 막히는 반쪽 저장이 없게.
+    const mergedImageUrls = mergeImageUrls(targetRecord.image_urls, imageUrls);
+    if (mergedImageUrls.length > MAX_PHOTOS) {
+      redirect(newPath(building, "too_many_photos_merged"));
+    }
     const { data: existingLineData, error: existingLinesError } = await supabase
       .from("linen_return_record_items")
       .select("id, linen_item_id, quantity, sort_order")
@@ -194,7 +205,7 @@ export async function createLinenReturnRecord(formData: FormData) {
 
     const headerUpdate: Database["public"]["Tables"]["linen_return_records"]["Update"] = {
       note: mergeNote(targetRecord.note, note),
-      image_urls: mergeImageUrls(targetRecord.image_urls, imageUrls),
+      image_urls: mergedImageUrls,
     };
     const { error: updateRecordError } = await supabase
       .from("linen_return_records")

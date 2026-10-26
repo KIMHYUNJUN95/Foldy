@@ -65,7 +65,8 @@ export function LeaveForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [reasonErr, setReasonErr] = useState(false);
   const [emergencyErr, setEmergencyErr] = useState(false);
-  const [submitErr, setSubmitErr] = useState(false);
+  /** 서버가 거절한 이유 — 시급직 · 기준 잔여 없음 · 이미 제출됨은 다시 눌러도 안 되므로 문구를 나눈다. */
+  const [submitErr, setSubmitErr] = useState<null | "generic" | "hourly" | "baseline" | "not_editable">(null);
   const [busy, setBusy] = useState<"draft" | "submit" | null>(null);
 
   const isBereavement = selType === "annual";
@@ -78,7 +79,7 @@ export function LeaveForm({
     const hasEmergency = emergency.trim().length > 0;
     setReasonErr(!hasReason);
     setEmergencyErr(!hasEmergency);
-    setSubmitErr(false);
+    setSubmitErr(null);
     if (!asDraft && (!hasReason || !hasEmergency)) return;
 
     setBusy(asDraft ? "draft" : "submit");
@@ -96,7 +97,15 @@ export function LeaveForm({
 
     if (!result.ok) {
       haptic("error");
-      setSubmitErr(true);
+      setSubmitErr(
+        result.error === "hourly_excluded"
+          ? "hourly"
+          : result.error === "baseline_required"
+            ? "baseline"
+            : result.error === "not_editable"
+              ? "not_editable"
+              : "generic",
+      );
       return;
     }
     haptic("success");
@@ -223,7 +232,17 @@ export function LeaveForm({
 
         {isBereavement ? <p className="lvw-hint">{c.fBereaveHint}</p> : null}
         {isUnpaid ? <p className="lvw-hint">{c.fOtherUnpaidHint}</p> : null}
-        {submitErr ? <p className="lvw-err">{c.exSetupSaveErr}</p> : null}
+        {submitErr ? (
+          <p className="lvw-err">
+            {submitErr === "hourly"
+              ? c.fHourlyPaidErr
+              : submitErr === "baseline"
+                ? c.fBaselineRequiredErr
+                : submitErr === "not_editable"
+                  ? c.fNotEditableErr
+                  : c.exSetupSaveErr}
+          </p>
+        ) : null}
 
         <div className="lvw-acts">
           <button type="button" className="lvw-btn lvw-btn--ghost" disabled={busy !== null} onClick={() => submit(true)}>

@@ -21,6 +21,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getMemberIdsWithCapability } from "@/lib/attendance-review";
 import { notifyAttendanceAdmins } from "@/lib/notifications/create";
 import { bestEffortWrite } from "@/lib/db-write-guard";
+import { storagePathFromPublicUrl } from "@/lib/storage-url-guard";
 import { resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
 import {
   ATTENDANCE_CORRECTION_PENDING_STATUSES,
@@ -578,6 +579,32 @@ export async function cancelAttendanceCorrectionRequest(
   return { ok: true };
 }
 
+const CORRECTION_IMAGE_BUCKET = "request-images";
+const SAFE_STORAGE_SEGMENT = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * 정정 요청 사진 주소 검사(2026-10-26). 예전에는 화면이 보낸 주소를 그대로 저장해서 아무 외부 주소나
+ * 다른 조직의 사진이 관리자 화면에 뜰 수 있었다. 업로더(`uploadRequestImages`, requestType
+ * `attendance-corrections`)가 쓰는 모양 그대로 — 우리 Storage `request-images` 버킷의
+ * `{조직}/attendance-corrections/{요청 id}/{파일}` — 만 받는다. 요청 id 는 화면이 한 번 제출할 때 만든 것이라
+ * 서버가 모르므로 «한 칸짜리 안전한 이름»인지와, 한 요청의 사진이 모두 같은 요청 id 아래인지만 본다.
+ */
+function areOwnCorrectionImageUrls(urls: readonly string[], organizationId: string): boolean {
+  let folder: string | null = null;
+  for (const url of urls) {
+    const path = storagePathFromPublicUrl(url, CORRECTION_IMAGE_BUCKET);
+    if (!path) return false;
+    const segs = path.split("/");
+    if (segs.length !== 4) return false;
+    const [org, kind, requestFolder, file] = segs;
+    if (org !== organizationId || kind !== "attendance-corrections") return false;
+    if (!SAFE_STORAGE_SEGMENT.test(requestFolder) || !SAFE_STORAGE_SEGMENT.test(file)) return false;
+    if (folder !== null && folder !== requestFolder) return false;
+    folder = requestFolder;
+  }
+  return true;
+}
+
 export async function createAttendanceCorrectionRequest(
   input: CreateCorrectionInput,
 ): Promise<CreateCorrectionResult> {
@@ -591,6 +618,7 @@ export async function createAttendanceCorrectionRequest(
     return { ok: false, reason: "invalid" };
   }
   const imageUrls = (input.imageUrls ?? []).slice(0, ATTENDANCE_CORRECTION_MAX_IMAGES);
+  if (!areOwnCorrectionImageUrls(imageUrls, organizationId)) return { ok: false, reason: "invalid" };
 
   // Resolve the base date the correction concerns + verify self-ownership of any linked session.
   let baseDate: string;

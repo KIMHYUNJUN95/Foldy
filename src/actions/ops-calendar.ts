@@ -1035,6 +1035,8 @@ export type ReservationEditResult =
         | "no_booking_id"
         | "occupied"
         | "no_active_unit"
+        /** 같은 방에 수기 예약 · 옮기기 · 다른 수정이 진행 중(방 잠금 · 2026-10-26). 잠깐 뒤 다시. */
+        | "room_busy"
         | "beds24_failed"
         /** Beds24 가 받았지만 다시 읽으니 날짜 · 인원 · 금액이 안 바뀌었다(2026-10-08). `detail` = 항목 코드. */
         | "not_applied"
@@ -1059,6 +1061,8 @@ export type ReservationEditResult =
  * 1. 다른 예약·블록과 겹치는지 — 격자와 **같은 매칭**, 그 예약 자신은 뺀다.
  * 2. 그 예약의 **유닛이 그 밤에 팔리고 있는지** — 예약은 roomId 하나에 붙어 있고 수정해도
  *    유닛은 그대로다. 잠긴 유닛의 밤으로 늘리면 접어둔 listing 이 다시 열린다.
+ * 3. (2026-10-26) 새 밤이 있으면 수기 예약 · 옮기기와 **같은 방 잠금** 안에서 확인 → 보내기를 하고, 보내기 직전
+ *    **Beds24 가용을 한 번 더** 읽는다(그 유닛 · 새 밤만). 잠금을 못 잡으면 `room_busy`.
  *
  * 원래 값은 **화면이 아니라 DB 에서** 읽는다 — 화면이 보낸 「원래 값」을 믿으면 채널 예약의
  * 잠금을 우회할 수 있다.
@@ -1130,14 +1134,11 @@ export async function submitReservationEdit(args: {
   if (invalid) return { error: invalid, ok: false };
 
   const newNights = addedNights(original, changes).filter((night) => night >= today);
+  // 새로 묵게 되는 밤이 있으면 행 키를 서버가 다시 계산하고, 수기 예약 · 옮기기와 **같은 방 잠금**(`manualBookingLockName`)
+  // 안에서 확인 → 보내기를 한다(2026-10-26). 잠금 없이는 확인과 보내기 사이에 같은 방 수기 예약이 끼어 둘 다 「비어 있음」을
+  // 보고 겹칠 수 있었다. 새 밤이 없으면(인원 · 금액 · 메모 · 줄이기만) 가용이 바뀌지 않으므로 잠그지 않는다.
+  let lockedAxis: { roomKey: string; roomIds: string[] } | null = null;
   if (newNights.length > 0) {
-    const sorted = [...newNights].sort();
-    const toExclusive = (() => {
-      const at = new Date(`${sorted[sorted.length - 1]}T12:00:00Z`);
-      at.setUTCDate(at.getUTCDate() + 1);
-      return at.toISOString().slice(0, 10);
-    })();
-
     const ownedResult = await supabase
       .from("rooms")
       .select("id, room_label, properties(name)")
@@ -1156,94 +1157,146 @@ export async function submitReservationEdit(args: {
       requestedRoomIds: args.roomIds,
     });
     if (!axis.ok) return { error: "not_found", ok: false };
+    lockedAxis = { roomIds: axis.roomIds, roomKey: axis.roomKey };
+  }
 
-    let unavailable: Awaited<ReturnType<typeof readOpsRoomUnavailableNights>>;
+  const editLocked = async (): Promise<ReservationEditResult> => {
+    if (lockedAxis) {
+      const axis = lockedAxis;
+      const sorted = [...newNights].sort();
+      const toExclusive = (() => {
+        const at = new Date(`${sorted[sorted.length - 1]}T12:00:00Z`);
+        at.setUTCDate(at.getUTCDate() + 1);
+        return at.toISOString().slice(0, 10);
+      })();
+
+      let unavailable: Awaited<ReturnType<typeof readOpsRoomUnavailableNights>>;
+      try {
+        unavailable = await readOpsRoomUnavailableNights({
+          excludeReservationId: row.id,
+          from: sorted[0],
+          organizationId: session.organization.id,
+          roomIds: axis.roomIds,
+          roomKey: axis.roomKey,
+          supabase,
+          toExclusive,
+        });
+      } catch (error) {
+        // 확인을 못 했으면 보내지 않는다 — 「비어 있을 것이다」로 늘리면 그대로 초과예약이다.
+        return { detail: (error as Error).message, error: "beds24_failed", ok: false };
+      }
+      const newSet = new Set(newNights);
+      const clash = unavailable.booked.filter((night) => newSet.has(night));
+      if (clash.length > 0) return { conflictDates: clash, error: "occupied", ok: false };
+
+      // 예약이 붙은 **그 유닛**이 새 밤에 팔리고 있어야 한다.
+      // **이 행의 유닛 안에서** 찾는다(`axis.roomIds` — 서버가 확인한 값). 조직 전체에서 `maybeSingle` 로 찾으면 같은
+      // 방 번호의 유닛이 둘 이상일 때 오류가 나 「팔 수 있는 방 없음」으로 잘못 떨어졌다. 읽기 실패도 그 오류로
+      // 덮지 않는다.
+      const unitExternalId = String(raw.roomId ?? "");
+      const unit = await supabase
+        .from("rooms")
+        .select("id")
+        .eq("organization_id", session.organization.id)
+        .in("id", axis.roomIds)
+        .eq("external_room_id", unitExternalId)
+        .limit(1);
+      if (unit.error) return { detail: unit.error.message, error: "beds24_failed", ok: false };
+      const unitId = ((unit.data ?? []) as Array<{ id: string }>)[0]?.id;
+      if (!unitId) return { conflictDates: newNights, error: "no_active_unit", ok: false };
+      const rates = await supabase
+        .from("room_daily_rates")
+        .select("stay_date, min_stay")
+        .eq("organization_id", session.organization.id)
+        .eq("room_id", unitId)
+        .in("stay_date", newNights);
+      const active = new Set(
+        ((rates.data ?? []) as Array<{ stay_date: string; min_stay: number | null }>)
+          .filter((rate) => isActiveUnitMinStay(rate.min_stay))
+          .map((rate) => rate.stay_date),
+      );
+      const locked = newNights.filter((night) => !active.has(night));
+      if (locked.length > 0) return { conflictDates: locked, error: "no_active_unit", ok: false };
+
+      // **Beds24 에서 한 번 더 본다** — 수기 예약 · 옮기기와 같은 확인(그 유닛 · 새 밤만, 요청 한 번). 우리 표는 웹훅 · 동기화를
+      // 거친 값이라 방금 들어온 채널 예약이나 API 로 만든 수기 예약을 모를 수 있다. 확인을 못 하면 보내지 않는다.
+      const cooldown = await getBeds24Cooldown(supabase);
+      if (cooldown.active) return { error: "cooldown", ok: false };
+      let live: Awaited<ReturnType<typeof fetchBeds24Calendar>>;
+      try {
+        live = await fetchBeds24Calendar(
+          {
+            endDate: sorted[sorted.length - 1],
+            externalRoomIds: [unitExternalId],
+            includeNumAvail: true,
+            includeOverride: true,
+            startDate: sorted[0],
+          },
+          { timeoutMs: MOVE_READ_TIMEOUT_MS },
+        );
+      } catch (error) {
+        if (error instanceof Beds24HttpError && error.isRateLimit) {
+          await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+          return { error: "cooldown", ok: false };
+        }
+        return { detail: "availability_check_failed", error: "beds24_failed", ok: false };
+      }
+      if ("skipped" in live || live.truncated) return { detail: "availability_check_failed", error: "beds24_failed", ok: false };
+      const taken = beds24UnsellableNights(live.roomsById.get(unitExternalId)?.calendar ?? [], sorted);
+      if (taken.length > 0) return { conflictDates: taken, error: "occupied", ok: false };
+    }
+
+    const updatePayload = buildBeds24BookingUpdate(bookingId, changes);
+    let posted: Awaited<ReturnType<typeof postBeds24BookingUpdate>>;
     try {
-      unavailable = await readOpsRoomUnavailableNights({
-        excludeReservationId: row.id,
-        from: sorted[0],
-        organizationId: session.organization.id,
-        roomIds: axis.roomIds,
-        roomKey: axis.roomKey,
-        supabase,
-        toExclusive,
-      });
+      posted = await postBeds24BookingUpdate(updatePayload);
     } catch (error) {
-      // 확인을 못 했으면 보내지 않는다 — 「비어 있을 것이다」로 늘리면 그대로 초과예약이다.
-      return { detail: (error as Error).message, error: "beds24_failed", ok: false };
+      if (error instanceof Beds24HttpError && error.isRateLimit) {
+        await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
+        return { error: "cooldown", ok: false };
+      }
+      return { detail: error instanceof Error ? error.message : "unknown", error: "beds24_failed", ok: false };
     }
-    const newSet = new Set(newNights);
-    const clash = unavailable.booked.filter((night) => newSet.has(night));
-    if (clash.length > 0) return { conflictDates: clash, error: "occupied", ok: false };
+    if ("skipped" in posted) return { detail: posted.skipped, error: "beds24_failed", ok: false };
+    if (!posted.ok) return { detail: posted.error, error: "beds24_failed", ok: false };
 
-    // 예약이 붙은 **그 유닛**이 새 밤에 팔리고 있어야 한다.
-    // **이 행의 유닛 안에서** 찾는다(`axis.roomIds` — 서버가 확인한 값). 조직 전체에서 `maybeSingle` 로 찾으면 같은
-    // 방 번호의 유닛이 둘 이상일 때 오류가 나 「팔 수 있는 방 없음」으로 잘못 떨어졌다. 읽기 실패도 그 오류로
-    // 덮지 않는다.
-    const unitExternalId = String(raw.roomId ?? "");
-    const unit = await supabase
-      .from("rooms")
-      .select("id")
-      .eq("organization_id", session.organization.id)
-      .in("id", axis.roomIds)
-      .eq("external_room_id", unitExternalId)
-      .limit(1);
-    if (unit.error) return { detail: unit.error.message, error: "beds24_failed", ok: false };
-    const unitId = ((unit.data ?? []) as Array<{ id: string }>)[0]?.id;
-    if (!unitId) return { conflictDates: newNights, error: "no_active_unit", ok: false };
-    const rates = await supabase
-      .from("room_daily_rates")
-      .select("stay_date, min_stay")
-      .eq("organization_id", session.organization.id)
-      .eq("room_id", unitId)
-      .in("stay_date", newNights);
-    const active = new Set(
-      ((rates.data ?? []) as Array<{ stay_date: string; min_stay: number | null }>)
-        .filter((rate) => isActiveUnitMinStay(rate.min_stay))
-        .map((rate) => rate.stay_date),
-    );
-    const locked = newNights.filter((night) => !active.has(night));
-    if (locked.length > 0) return { conflictDates: locked, error: "no_active_unit", ok: false };
+    // **다시 읽어 확인하고 우리 표를 맞춘다** — 예약 웹훅과 같은 처리기라 형식이 갈리지 않는다.
+    // 다시 읽은 날짜 · 인원 · 금액이 보낸 값과 다르면 「반영 안 됨」으로 돌린다(2026-10-08 — Beds24 는 받기만 하고 안 바꾼 것도
+    // 성공으로 답할 수 있다). 다시 읽기 자체가 안 되면(네트워크) Beds24 가 받아들인 대로 성공 — 웹훅 · 정합성이 곧 맞춘다.
+    let notApplied: string[] = [];
+    try {
+      const fetched = await fetchBeds24BookingById(bookingId);
+      if (!("skipped" in fetched) && fetched.ok) {
+        notApplied = diffBookingReadback(updatePayload, fetched.booking);
+        await processBeds24WebhookBooking({
+          organizationIdDefault: session.organization.id,
+          payload: fetched.booking,
+          supabase,
+        });
+      }
+    } catch (error) {
+      console.error("[ops/reservation-edit] local refresh failed", error);
+    }
+
+    revalidateOpsCalendars();
+    if (notApplied.length > 0) {
+      console.error("[ops/reservation-edit] Beds24 readback mismatch", { bookingId, fields: notApplied });
+      return { detail: notApplied.join(","), error: "not_applied", ok: false };
+    }
+    return { ok: true };
+  };
+
+  if (!lockedAxis) return editLocked();
+  const lockName = manualBookingLockName(session.organization.id, lockedAxis.roomKey);
+  const lock = await acquireBeds24Lock(supabase, lockName, session.user.id, MOVE_LOCK_TTL_MS);
+  if (!lock.acquired) {
+    return lock.reason === "busy" ? { error: "room_busy", ok: false } : { detail: "lock_error", error: "beds24_failed", ok: false };
   }
-
-  const updatePayload = buildBeds24BookingUpdate(bookingId, changes);
-  let posted: Awaited<ReturnType<typeof postBeds24BookingUpdate>>;
   try {
-    posted = await postBeds24BookingUpdate(updatePayload);
-  } catch (error) {
-    if (error instanceof Beds24HttpError && error.isRateLimit) {
-      await activateBeds24Cooldown(supabase, { reason: "rate_limit", resetInSec: error.resetInSec });
-      return { error: "cooldown", ok: false };
-    }
-    return { detail: error instanceof Error ? error.message : "unknown", error: "beds24_failed", ok: false };
+    return await editLocked();
+  } finally {
+    await releaseBeds24Lock(supabase, lockName, lock.lockId);
   }
-  if ("skipped" in posted) return { detail: posted.skipped, error: "beds24_failed", ok: false };
-  if (!posted.ok) return { detail: posted.error, error: "beds24_failed", ok: false };
-
-  // **다시 읽어 확인하고 우리 표를 맞춘다** — 예약 웹훅과 같은 처리기라 형식이 갈리지 않는다.
-  // 다시 읽은 날짜 · 인원 · 금액이 보낸 값과 다르면 「반영 안 됨」으로 돌린다(2026-10-08 — Beds24 는 받기만 하고 안 바꾼 것도
-  // 성공으로 답할 수 있다). 다시 읽기 자체가 안 되면(네트워크) Beds24 가 받아들인 대로 성공 — 웹훅 · 정합성이 곧 맞춘다.
-  let notApplied: string[] = [];
-  try {
-    const fetched = await fetchBeds24BookingById(bookingId);
-    if (!("skipped" in fetched) && fetched.ok) {
-      notApplied = diffBookingReadback(updatePayload, fetched.booking);
-      await processBeds24WebhookBooking({
-        organizationIdDefault: session.organization.id,
-        payload: fetched.booking,
-        supabase,
-      });
-    }
-  } catch (error) {
-    console.error("[ops/reservation-edit] local refresh failed", error);
-  }
-
-  revalidateOpsCalendars();
-  if (notApplied.length > 0) {
-    console.error("[ops/reservation-edit] Beds24 readback mismatch", { bookingId, fields: notApplied });
-    return { detail: notApplied.join(","), error: "not_applied", ok: false };
-  }
-  return { ok: true };
 }
 
 export type ReservationMoveResult =

@@ -208,6 +208,18 @@ Implementation:
 
 - reuses the shared `request-images` bucket upload/compression policy
 - path: `{organization_id}/bug-reports/{report_id}/{filename}`
+- **Save order (fixed 2026-10-26):** ① `createBugReportAction` (title · description only, the server makes the id) →
+  ② each photo is compressed and uploaded with `uploadBugReportImageAction(reportId)` → ③ the returned URLs are attached
+  with `updateBugReportAction`. Until then step ③ was missing — the uploaded URLs were thrown away, `image_urls` stayed
+  empty and failures were silent. If some photos fail, the report is still sent: a `warning` haptic plus
+  `bugs.photosPartialFailed` 「신고는 보냈지만 사진 n장을 올리지 못했어요」 shows for a moment before returning to the list.
+- **Upload gate (2026-10-26):** `uploadBugReportImage` now loads the report and requires the caller to be its reporter
+  and the report to be `submitted` (platform developer bypass — same rule as edit/delete), and refuses once the report's
+  storage folder already holds 5 files (`too_many_photos`). Before, only the id *shape* was checked, so anyone in the
+  org could write into another report's folder.
+- **URL check (2026-10-26):** create/update accept only our Storage `request-images` URLs directly under
+  `{org}/bug-reports/{that report id}/` (shared `isOwnStoragePublicUrl()`, `src/lib/storage-url-guard.ts`) —
+  `invalid_image` otherwise.
 
 ## Reviewer Actions
 
@@ -290,6 +302,8 @@ Empty state:
 - **상세** `/mobile/bugs/[id]`: `BR-xxxx · 상태` → 제목 → 「신고자 · 역할 신고 · 날짜 시각」 → 설명 → 화면 사진 2열(누르면 새 탭) →
   검토자만 「상태 바꾸기」 4칸(예전 상태 칩 → 시트 대신, 제안함 상세와 같은 모양) → 작성자 · 접수 상태면 빨간 「삭제」(가운데 확인 창 — 의도된 예외) →
   (신고자) 안내 한 줄. `BugStatusSheet` · `BugStatusBadge` 는 이제 쓰는 곳이 없다.
+- 상태 바꾸기(2026-10-26): 서버 결과를 본다 — 실패하면 `error` 진동 + 4칸 아래 빨간 한 줄 `bugs.statusChangeError`
+  (예전엔 실패해도 조용히 원래 상태로 돌아갔다).
 - **폴드** 가운데 540px 한 줄 · **태블릿 가로** `SplitList` 목록 | 상세 칸(연 줄 옅은 보라). 새 신고 폼은 칸이 아니라 화면 이동.
 - 움직임: 줄 · 버튼 누름, 줄 차례로 떠오름, 사진 타일 톡, 보내기 → 체크 그리기. 동작 줄이기면 끔. 문구 `bugs.white.*`(ko/ja/en).
 

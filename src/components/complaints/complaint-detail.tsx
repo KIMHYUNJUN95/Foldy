@@ -102,10 +102,7 @@ export function ComplaintDetail({
     const resolving = open;
     startTransition(async () => {
       setOptimisticStatus(resolving ? "resolved" : "open");
-      if (resolving) {
-        setJustResolved(true);
-        haptic("success");
-      }
+      if (resolving) setJustResolved(true);
       const res = resolving ? await resolveComplaintAction(c.id) : await reopenComplaintAction(c.id);
       if ("error" in res) {
         setError(true);
@@ -113,6 +110,8 @@ export function ComplaintDetail({
         haptic("error");
         return;
       }
+      // 성공 진동은 서버가 저장을 확인한 뒤에만(햅틱 공용 규칙, 2026-10-26 — 예전엔 보내기 전에 울렸다).
+      haptic(resolving ? "success" : "light");
       router.refresh();
     });
   }

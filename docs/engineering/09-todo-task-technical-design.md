@@ -1,5 +1,67 @@
 # Todo / Task Technical Design
 
+## 2026-10-26 mobile bug-fix pass (as-built)
+
+Server actions (`src/app/mobile/tasks/[id]/actions.ts`):
+
+- **Status actions return a result.** `completeTask` / `reopenTask` → `TaskStatusResult = { ok, occurrenceDate? }`
+  (completeTask used to return the bare recorded date); `setTaskProgress` → `{ ok, reason?: "recurring" }`.
+  The row UPDATE (one-off) and the `task_occurrence_state` write (recurring — `completeOccurrence` /
+  `clearOccurrenceState` now return `boolean`) are checked; on failure the action returns `{ ok: false }`
+  **before** writing the `completed` log or notifying participants. Writes also carry `organization_id`.
+- **`setTaskProgress` rejects recurring tasks** (`reason: "recurring"`) — the row status of a recurring task
+  stays `open`; completion is per occurrence. The detail view no longer draws the 대기 | 진행 중 | 완료
+  segment for recurring tasks (the big ring handles complete / reopen).
+- **Reorder ids are scope-filtered.** `reorderTasks` / `reorderDateTasks` keep only ids in
+  `getTaskScope(session).taskIds` (indexes keep the original merged-list positions), and
+  `setOccurrenceOrders` (shared with the console) re-checks the ids belong to the org and are not deleted.
+- `rescheduleOverdueTo` validates `targetDate` as a real `YYYY-MM-DD` (bad input used to throw a RangeError → 500).
+- `removeTaskParticipant` checks the delete (`mustWrite`) and returns `?error=save_failed` on failure.
+- `updateTaskCore` failures (`forbidden` / `missing_title` / `save_failed` / `time_needs_date` /
+  `repeat_needs_date`) redirect to **`/mobile/tasks/{id}/edit?error=…`** — the detail page never rendered
+  `?error=`, so edit failures were silent. `deleteProject` checks its delete and returns
+  `?error=delete_failed`.
+
+Clients:
+
+- `TaskCreateForm` (create + edit) runs the action through `submitAction`: a redirect carrying `?error=`
+  unlocks the form and shows the mapped `copy.errors[...]` (draft kept); any other redirect = success →
+  **only then** the sessionStorage draft is cleared (it used to be cleared before submit); a non-redirect
+  throw shows `save_failed`. The redirect error is re-thrown so Next completes the navigation. A changed
+  `serverError` prop is synced into the visible error and unlocks the submit guard.
+- `tasks-workspace.tsx`: completion / reopen / delete / skip / restore / overdue bulk actions catch
+  thrown actions and `{ ok: false }` → the optimistic value is dropped when the transition ends, an
+  error toast (`copy.errors.save_failed`, reusing the move-notice slot as `action_failed`) and
+  `haptic("error")`. `haptic("success")` fires only after the server confirms (card ring → `light` on
+  tap; quick-add → on the `?created=1` return). Undo of a completion (one-off too) waits for the
+  completion request before reopening, and is skipped if the completion failed.
+- `?deleted=<id>` is removed from the URL after showing the undo toast (it used to re-appear on every
+  refresh and actually restore the task); the timer lives in the `showDeleteUndo` ref.
+- Completion undo and delete undo share one toast slot: the most recent is shown, dismissing it clears
+  only that one (`lastUndoKind`), the other's undo stays available.
+- State updaters no longer call server actions (`undoSkipOccurrence`, `handleRestore`).
+- `ProjectDetailView`: a recurring project task's ring opens the detail with `?occurrence=<today Tokyo>`
+  instead of completing (which completed the series start date); the detail page re-validates the date.
+  Complete / reopen failures show an error toast.
+- `ReorderableTaskList` resyncs its order only when the **id sequence** of `items` changes (same ids →
+  card objects refreshed in the current order), so a dropped order no longer snaps back on an
+  unrelated parent re-render.
+- `ReportSheet`: load failures fall to the error state (spinner no longer hangs); schedule / cancel /
+  Slack send failures release the busy state; clipboard `writeText` rejection falls back to
+  `execCommand`.
+- Haptics: delete confirmations use `light` (was `warning`); form-action submits that can't observe the
+  server result (create project, add section) use `light`.
+
+Other:
+
+- `scheduleDailyReport` (`src/actions/task-report-schedule.ts`) **updates the live scheduled row in place**
+  (body + send_at, guarded by `status = 'scheduled'`) instead of cancel → insert, so a failed write no
+  longer loses the existing schedule (insert-before-cancel is impossible — the one-active partial unique
+  index). All its queries and `cancelDailyReportSchedule` filter `organization_id`.
+- `searchReservations` (`src/actions/task-context.ts`) strips PostgREST `or()` syntax characters with
+  `escapeIlikeFragment` (`src/lib/guest-search.ts`) before building the `ilike` filter.
+- Image URL validation — see Images below.
+
 ## 2026-08-07 mobile occurrence-detail deletion
 
 A recurring mobile `TaskCard` appends a candidate `occurrence` date when navigating to detail. The
@@ -505,9 +567,11 @@ Mutate (`src/app/mobile/tasks/[id]/actions.ts`):
 - `shareTaskWithUsers`
 - `removeTaskParticipant`
 - `deleteTask` (detail) / `deleteTasksInList` (list multi-select batch; author-owned only)
-- `reorderTasks` — Today/Tomorrow drag-reorder persistence (`sort_order`)
+- `reorderTasks` — Today/Tomorrow drag-reorder persistence (`sort_order`); ids filtered by `getTaskScope`
 - `completeTask` / `reopenTask` — set/clear `status` + `completed_*`, log `completed`/`reopened`,
-  fan out `task_completed` (complete only); programmatic (card circle + undo toast, detail button)
+  fan out `task_completed` (complete only); programmatic (card circle + undo toast, detail button).
+  Return `{ ok, occurrenceDate? }`; nothing is logged / notified when the write fails (2026-10-26)
+- `setTaskProgress` — open ↔ in_progress for one-off tasks; rejects recurring (`reason: "recurring"`)
 - `addTaskUpdate`
 
 Report (`src/actions/task-report.ts`):
@@ -976,6 +1040,20 @@ Task-level images:
   over-cap task keeps its photos and simply can't take more. `sanitizeTaskImageUrls` (plain cap) is for
   creates only. The only storage delete path for task photos is `cleanupRemovedTaskImages`.
   Regression: `src/lib/__tests__/task-images-merge.test.ts`, `task-occurrence-status-undo.test.ts`.
+- **Only our own storage URLs are accepted (2026-10-26, mobile).** `isOrgTaskImageUrl(url, org, folder)`
+  accepts a URL only if it is a `request-images` public object on our Supabase host under
+  `{org}/task-images/` (`{org}/task-update-images/` for update-log/memo photos), with no `..` segments.
+  `createTask` uses `sanitizeTaskImageUrls(urls, true, org)`, `updateTaskCore` passes the org to
+  `mergeTaskImageUrls` (only *newly added* URLs are checked — existing ones stay), and `addTaskUpdate`
+  filters memo URLs by the `task-update-images` folder. The upload path is
+  `{org}/{folder}/{random requestId}/{uuid}.{ext}` for both create and edit (the task id does not exist
+  yet on create), so the rule is the org folder, not the task's own folder. The admin console callers
+  still pass no org (unchanged behaviour there).
+- **Deletion requires no other reference (2026-10-26).** `cleanupRemovedTaskImages` (mobile + console)
+  now deletes a removed URL only if it is under `{org}/task-images/` **and no other task row in the org
+  still lists it in `image_urls`** (soft-deleted rows count). This closes «attach a colleague's photo URL,
+  save, then remove it → their file is deleted». If the reference check errors, nothing is deleted
+  (fail closed). Regression: `src/lib/__tests__/task-images-org-guard.test.ts`.
 
 Update-log images:
 

@@ -157,6 +157,7 @@ export function TaskDetailView({
   const [isSkippingOccurrence, startSkipTransition] = useTransition();
   // 누른 상태를 서버 응답 전에 먼저 보여 준다(세그먼트가 미끄러지듯 옮겨 감). 응답이 오면 실제 값으로 맞춰진다.
   const [pendingStatus, setPendingStatus] = useState<"open" | "in_progress" | "done" | null>(null);
+  const [statusError, setStatusError] = useState(false);
   const updateBodyRef = useRef<HTMLInputElement>(null);
   const updateUploaderRef = useRef<AnnouncementImageUploaderHandle>(null);
   const shareFormRef = useRef<HTMLFormElement>(null);
@@ -207,19 +208,34 @@ export function TaskDetailView({
   function changeStatus(next: "open" | "in_progress" | "done") {
     if (next === shownStatus || isTogglingStatus) return;
     if (next === "done" && !hasOccurrenceContext) return;
-    haptic(next === "done" ? "success" : "light");
+    // 반복 업무에는 진행 중이 없다 — 행 상태는 언제나 열림이고 완료는 회차별(서버도 거절, 2026-10-26).
+    if (next === "in_progress" && isRecurring) return;
+    // 「성공」 햅틱은 서버가 저장을 확인한 뒤에만. 그 밖의 전환은 고르기 반응(light)을 바로 준다.
+    if (next !== "done") haptic("light");
+    setStatusError(false);
     setPendingStatus(next);
     startStatusTransition(async () => {
-      if (next === "done") {
-        await completeTask(task.id, actionOccurrenceDate);
+      let ok = false;
+      try {
+        if (next === "done") {
+          ok = (await completeTask(task.id, actionOccurrenceDate)).ok;
+        } else if (done) {
+          ok = (await reopenTask(task.id, actionOccurrenceDate)).ok;
+          if (ok && next === "in_progress") ok = (await setTaskProgress(task.id, true)).ok;
+        } else {
+          ok = (await setTaskProgress(task.id, next === "in_progress")).ok;
+        }
+      } catch {
+        ok = false;
+      }
+      if (ok) {
+        if (next === "done") haptic("success");
         return;
       }
-      if (done) {
-        await reopenTask(task.id, actionOccurrenceDate);
-        if (next === "in_progress") await setTaskProgress(task.id, true);
-        return;
-      }
-      await setTaskProgress(task.id, next === "in_progress");
+      // 실패 — 낙관적 표시를 내려놓고(서버 값으로 돌아감) 이유를 보여 준다.
+      haptic("error");
+      setPendingStatus(null);
+      setStatusError(true);
     });
   }
 
@@ -343,29 +359,37 @@ export function TaskDetailView({
       {task.description ? <p className="tkw-d__desc">{task.description}</p> : null}
       {!canEditCore ? <p className="tkw-d__note">{copy.coreEditHint.replace("{name}", task.authorName)}</p> : null}
 
-      {/* 상태 — 대기 | 진행 중 | 완료 */}
-      <div aria-label={w.status} className="tkw-seg is-full" role="radiogroup">
-        {(
-          [
-            ["open", copy.statusOpen],
-            ["in_progress", copy.statusInProgress],
-            ["done", copy.statusCompleted],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            aria-checked={shownStatus === key}
-            className={cn(shownStatus === key && "is-on")}
-            disabled={isTogglingStatus || (key === "done" && !hasOccurrenceContext)}
-            key={key}
-            onClick={() => changeStatus(key)}
-            role="radio"
-            type="button"
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* 상태 — 대기 | 진행 중 | 완료. 반복 업무는 그리지 않는다(2026-10-26): 행 상태는 언제나 열림이고
+          완료는 회차별이라 「진행 중」이 성립하지 않는다 — 완료 / 되돌리기는 위의 큰 고리가 맡는다. */}
+      {!isRecurring ? (
+        <div aria-label={w.status} className="tkw-seg is-full" role="radiogroup">
+          {(
+            [
+              ["open", copy.statusOpen],
+              ["in_progress", copy.statusInProgress],
+              ["done", copy.statusCompleted],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              aria-checked={shownStatus === key}
+              className={cn(shownStatus === key && "is-on")}
+              disabled={isTogglingStatus || (key === "done" && !hasOccurrenceContext)}
+              key={key}
+              onClick={() => changeStatus(key)}
+              role="radio"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {!hasOccurrenceContext ? <p className="tkw-d__note">{copy.completeNeedsOccurrence}</p> : null}
+      {statusError ? (
+        <p className="tkw-d__note" role="alert">
+          {copy.errors.save_failed}
+        </p>
+      ) : null}
 
       {/* 사진 — 작업 사진은 수정 화면에서 붙인다(+ 칸이 그리로 간다). */}
       {task.imageUrls.length > 0 || canEditCore ? (
@@ -634,7 +658,7 @@ export function TaskDetailView({
             </div>
             <form action={deleteTask} className="tkw-act">
               <input name="taskId" type="hidden" value={task.id} />
-              <button className="is-red" onClick={() => haptic("warning")} style={{ borderTop: "1px solid #f3f3f6" }} type="submit">
+              <button className="is-red" onClick={() => haptic("light")} style={{ borderTop: "1px solid #f3f3f6" }} type="submit">
                 <Trash2 aria-hidden="true" />
                 <span>
                   {copy.recurDeleteAll}
@@ -658,7 +682,7 @@ export function TaskDetailView({
                 </button>
                 <form action={deleteTask}>
                   <input name="taskId" type="hidden" value={task.id} />
-                  <button className="tkw-btn is-red" onClick={() => haptic("warning")} type="submit">
+                  <button className="tkw-btn is-red" onClick={() => haptic("light")} type="submit">
                     {copy.confirm}
                   </button>
                 </form>

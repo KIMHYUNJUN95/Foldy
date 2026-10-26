@@ -69,11 +69,24 @@ let lastScreenPath: string | null = null;
  */
 let uncommitted: { path: string; placeholder: boolean; entrance: ScreenEntrance } | null = null;
 
-export function consumeScreenEntrance(path: string, placeholder: boolean): ScreenEntrance {
-  if (uncommitted && uncommitted.path === path && uncommitted.placeholder === placeholder) return uncommitted.entrance;
-  const entrance = computeScreenEntrance(path, placeholder);
-  uncommitted = { entrance, path, placeholder };
-  return entrance;
+/**
+ * 서버 · 하이드레이션 (2026-10-26) — 이 판정은 **브라우저 한 곳의 탐색 기록**이라 모듈 변수에 둔다. 서버에서 부르면 그 변수가
+ * 요청 사이에 공유돼(다른 사람의 앞 요청 경로가 「same」 · 「reveal」 판정에 섞였다) 서버 HTML 과 클라이언트 첫 그림이 달라졌다.
+ * 그래서 서버에서는 아무것도 바꾸지 않고 `none` 을 돌려주고, 클라이언트도 **하이드레이션 중에는** 같은 `none` 을 그린다(앱을 처음
+ * 열 때 화면이 밀려 들어오지 않는다 — 네이티브 앱도 실행 첫 화면은 그냥 떠 있다). 하이드레이션 중에도 판정은 해서 모듈 상태
+ * (`lastScreenPath` 등)는 맞춰 두고 방향은 돌려준다 — 같은 화면 다시 그림 「same」 · 스크롤 복원이 그대로 동작한다.
+ */
+export function consumeScreenEntrance(path: string, placeholder: boolean, hydrating = false): ScreenEntrance {
+  // 서버(문서 없음) — 모듈 상태를 건드리지 않는다.
+  if (typeof document === "undefined") return { kind: "none", direction: "none" };
+  let entrance: ScreenEntrance;
+  if (uncommitted && uncommitted.path === path && uncommitted.placeholder === placeholder) {
+    entrance = uncommitted.entrance;
+  } else {
+    entrance = computeScreenEntrance(path, placeholder);
+    uncommitted = { entrance, path, placeholder };
+  }
+  return hydrating ? { kind: "none", direction: entrance.direction } : entrance;
 }
 
 /** 셸이 화면에 붙었다(마운트 effect) — 다음 셸은 새로 판정한다. */

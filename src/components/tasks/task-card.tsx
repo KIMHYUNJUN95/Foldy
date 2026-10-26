@@ -414,7 +414,8 @@ export function TaskCard({
       return;
     }
     // 채움 + 체크 그리기를 먼저 보여 주고(320ms), 그 뒤에 목록에서 빠지며 「완료」로 내려앉는다.
-    haptic("success");
+    // 「성공」 햅틱은 서버가 저장을 확인한 뒤 부모(runStatus)가 낸다 — 여기선 누름 반응만(2026-10-26).
+    haptic("light");
     setChecking(true);
     const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     checkTimer.current = setTimeout(

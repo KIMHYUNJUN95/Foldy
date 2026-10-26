@@ -13,6 +13,7 @@ import {
   type MaintenancePriority,
 } from "@/lib/maintenance-constants";
 import { getCurrentAppSession } from "@/lib/session";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -20,25 +21,6 @@ const REQUEST_IMAGE_BUCKET = "request-images";
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
-}
-
-function getRequestImagePathFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const markers = [
-      `/storage/v1/object/public/${REQUEST_IMAGE_BUCKET}/`,
-      `/storage/v1/object/${REQUEST_IMAGE_BUCKET}/`,
-    ];
-    for (const marker of markers) {
-      const idx = parsed.pathname.indexOf(marker);
-      if (idx !== -1) {
-        return parsed.pathname.slice(idx + marker.length);
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function isValidUuid(value: string) {
@@ -65,7 +47,7 @@ export async function createMaintenanceReport(formData: FormData) {
     redirect(`/auth/login?next=${encodeURIComponent(targetPath)}`);
   }
 
-  const roomLabel = cleanText(formData.get("roomLabel"));
+  const rawRoomLabel = cleanText(formData.get("roomLabel"));
   const propertyName = cleanText(formData.get("propertyName")) || null;
   const issueTitle = cleanText(formData.get("issueTitle"));
   const description = cleanText(formData.get("description"));
@@ -86,6 +68,9 @@ export async function createMaintenanceReport(formData: FormData) {
   // localized label, so a Japanese reporter's report looked room-specific to a Korean reader. The
   // form now sends an explicit flag and the DB stores a boolean.
   const isBuildingOnly = cleanText(formData.get("isBuildingOnly")) === "1";
+  // 「건물 전체」는 방 자리에 번역된 라벨이 아니라 고정값 "-" 를 둔다(2026-10-26). 화면은 is_building_only 를 보고
+  // 보는 사람 언어로 「건물 전체」를 그린다.
+  const roomLabel = isBuildingOnly ? "-" : rawRoomLabel;
 
   const sessionParams = new URLSearchParams();
   if (rawCleaningSessionId) sessionParams.set("sessionId", rawCleaningSessionId);
@@ -106,22 +91,9 @@ export async function createMaintenanceReport(formData: FormData) {
   }
 
   const requestId = requestedId || crypto.randomUUID();
-  const imagePaths: string[] = [];
-  for (const imageUrl of imageUrls) {
-    const path = getRequestImagePathFromUrl(imageUrl);
-    if (!path) {
-      redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);
-    }
-    const segments = path.split("/");
-    if (
-      segments.length !== 4 ||
-      segments[0] !== session.organization.id ||
-      segments[1] !== "maintenance-reports" ||
-      segments[2] !== requestId
-    ) {
-      redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);
-    }
-    imagePaths.push(path);
+  const imagePrefix = `${session.organization.id}/maintenance-reports/${requestId}/`;
+  if (!imageUrls.every((url) => isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, imagePrefix))) {
+    redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);
   }
 
   const supabase = await getSupabaseServerClient();
@@ -205,9 +177,8 @@ export async function createMaintenanceReport(formData: FormData) {
   const createdId = (created as { id: string } | null)?.id ?? null;
 
   if (error || !createdId) {
-    if (imagePaths.length > 0) {
-      await supabase.storage.from(REQUEST_IMAGE_BUCKET).remove(imagePaths);
-    }
+    // 올라간 사진은 지우지 않는다(2026-10-26) — 사진의 주인은 클라이언트(`usePhotoUpload`)다. 폼은 같은 요청 id 와
+    // 같은 주소로 다시 보내므로 여기서 지우면 다시 보낸 신고가 지워진 사진을 가리켰다. 그만두면 클라이언트가 지운다.
     redirect(`/mobile/maintenance/new?error=save_failed${sessionParam}`);
   }
   redirect(`/mobile/requests/maintenance/${createdId}?created=1`);

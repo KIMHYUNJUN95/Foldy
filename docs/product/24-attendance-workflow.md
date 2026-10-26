@@ -968,3 +968,22 @@ FK 를 채우는 것이 정답이지만 그건 운영 데이터 정리다. 그 �
   **마감된 달은 스냅샷 금액을 쓰므로 바뀌지 않는다.** 무작위 1,500개 달 비교에서 바뀐 것은 8개, 전부 정확히 −10엔(부동소수 잡음 경우)이었다.
 - **급여 계산 한 곳으로** — `calculateMonthlyPay`(`src/lib/attendance-pay-calculation.ts`)를 자기 급여 화면 · 마감 스냅샷 · 내보내기
   (`getMonthlyPayView`)와 관리자 급여 · 개요 · 직원 상세(`computePayrollMonth`)가 같이 쓴다.
+
+## 근태 · 교통비 버그 수정 (2026-10-26)
+
+- **출근 전 화면에도 퇴근 미기록 배너.** 지난 운영일의 열린 근무는 출근 전 상태로 오는데(`getCurrentOpenSession`), 출근 전 화면은 「주 28시간」 배너만
+  그려 퇴근 미기록 배너가 빠졌다 → 근무 중 · 휴게 중과 같은 `notices`(퇴근 미기록 + 주 28시간)를 그린다.
+- **휴게 시작 · 끝 햅틱.** 성공 `success`, 실패 `error` + 문구. 액션이 던져도(네트워크) 「처리 중」에 멈추지 않는다.
+- **출퇴근 QR 전송 실패.** 액션이 던지면 「보내는 중」에 영원히 멈추고 다시 시도도 막혔다 → 일반 실패 결과(다시 시도)로 보내고 잠금(`submittedRef`)을 푼다.
+- **정정 요청 사진 주소 검사.** 화면이 보낸 주소를 그대로 저장했다 → 우리 Storage `request-images` 의
+  `{조직}/attendance-corrections/{요청 id}/{파일}` 만(한 요청의 사진은 같은 요청 id), 아니면 `invalid`. 공용 `storagePathFromPublicUrl`(`src/lib/storage-url-guard.ts`).
+- **교통비**
+  - 사용일은 **정산서의 달 안**만(서버 `date_outside_month`, 실제 날짜 검사). 기본 사용일은 이번 달이면 오늘, 지난달이면 그 달 말일, 다음 달이면 1일.
+    날짜 시트(`CalendarPanel` `monthKey`)는 그 달만 — 달 이동 · 다른 달 칸 · (그 달이 아니면) 「오늘」 잠금.
+  - 연결 대상 검사 — `attendanceSessionId` 는 내 것 · 우리 조직, `propertyId` 는 우리 조직 건물만(`invalid_link`).
+  - 영수증 사진 — 항목마다 **5장 상한을 서버가 다시 건다**(`too_many_images`). 경로는 정확히 `{조직}/transport-reimbursements/{보고서 id}/{항목 id}/{파일}`
+    (그 항목의 폴더, 한 칸짜리 안전한 파일 이름)만. 사진 · 항목 삭제 때도 같은 검사를 통과한 경로만 Storage 에서 지운다(남의 파일 삭제 방지).
+  - `?ym` 은 실제 달(01~12)이고 지금 달 기준 3년 전 ~ 다음 달일 때만, 아니면 지금 달. **화면을 열기만 해서는 보고서 행을 만들지 않는다** —
+    읽기만 하고, 없으면 빈 「작성 중」으로 그린다. 첫 항목을 넣을 때 `createTransportItemAction` 이 만들고 `reportId` 를 돌려준다(영수증 경로에 씀).
+  - 실패 표시 — 제출 실패(이미 제출됨 `submitErrorLocked` · 그 외 `submitErrorFailed`)도 토스트, 항목 추가 · 수정 실패는 시트 안 `saveFailed`,
+    수정에서 금액이 비면 `amountRequired`(예전에는 0 으로 보내져 조용히 거절). 영수증 일부만 올라가면 햅틱 `warning` + `receiptUploadPartial` 토스트.

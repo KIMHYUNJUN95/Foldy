@@ -98,10 +98,25 @@ export function ReorderableTaskList({
     occurrenceDateRef.current = occurrenceDate;
   }, [onPersist, onPersistDate, occurrenceDate]);
 
-  // Resync from the server list whenever it changes — but never mid-drag (that would yank the row
-  // out from under the finger). After a persisted reorder the revalidated list arrives here.
+  // Resync from the server list — but never mid-drag (that would yank the row out from under the
+  // finger). After a persisted reorder the revalidated list arrives here.
+  //
+  // 부모는 렌더마다 새 배열을 만든다. 예전엔 그때마다 순서를 덮어써, 방금 끌어 놓은 순서가 저장
+  // 응답이 오기도 전에(다른 상태 변화로 부모가 다시 그려지면) 옛 순서로 튀었다(2026-10-26).
+  // 이제 **id 순서가 실제로 바뀐 때만** 순서를 다시 받고, 같으면 카드 내용(제목 · 상태)만 새 객체로 바꾼다.
+  const lastItemKeyRef = useRef(items.map((t) => t.id).join("\u0000"));
   useEffect(() => {
     if (draggingRef.current) return;
+    const key = items.map((t) => t.id).join("\u0000");
+    if (key === lastItemKeyRef.current) {
+      const byId = new Map(items.map((t) => [t.id, t] as const));
+      setOrder((cur) => {
+        const next = cur.map((t) => byId.get(t.id) ?? t);
+        return next.every((t, i) => t === cur[i]) ? cur : next;
+      });
+      return;
+    }
+    lastItemKeyRef.current = key;
     setOrder(items);
   }, [items]);
 

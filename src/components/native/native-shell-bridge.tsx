@@ -165,10 +165,14 @@ export function NativeShellBridge() {
         }
         lastEscapeAt = 0;
         // 앱 안 이전 기록이 없으면(알림 · 링크로 바로 들어옴) 화면 스와이프와 같이 위 화면으로(2026-10-20). 홈이면 앱을 내린다.
+        // 2026-10-26: **홈에서는** 이전 기록이 `/mobile` 화면일 때만 기록 뒤로 — WebView 기록에 남은 로그인 · 온보딩 · 외부 페이지로
+        // 돌아가던 것을 막는다(그때는 앱을 내린다). 홈 밖(계정 `/account/id-card` 등 `/mobile` 밖 앱 화면)은 예전처럼 기록 뒤로.
         const back = getBackTarget();
+        const backInApp = Boolean(back && isSwipeBackScreen(back.url));
+        const onHome = window.location.pathname === "/mobile";
         const parent = parentScreen(window.location.pathname, MOBILE_SCREENS);
-        if (!(back && isSwipeBackScreen(back.url)) && parent) routerRef.current.replace(parent);
-        else if (canGoBack) window.history.back();
+        if (!backInApp && parent) routerRef.current.replace(parent);
+        else if (canGoBack && (backInApp || !onHome)) window.history.back();
         else void App.minimizeApp();
       };
 

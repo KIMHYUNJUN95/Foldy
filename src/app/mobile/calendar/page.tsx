@@ -496,6 +496,8 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       return {
         endDate: row.end_date,
         id: row.id,
+        // 건물도 넘긴다 — 화면이 고른 건물의 블락만 그린다(다른 건물 같은 번호 방에 그려지던 버그, 2026-10-26).
+        propertyName,
         roomLabel: getDisplayRoomLabel(propertyName, canonicalRoomLabel) || canonicalRoomLabel,
         startDate: row.start_date,
       };

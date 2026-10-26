@@ -7,7 +7,11 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { setAnnualLeaveBaselineForUser } from "@/lib/annual-leave-server";
+import {
+  hasAnnualLeaveBaselineRow,
+  isLeaveHourlyRole,
+  setAnnualLeaveBaselineForUser,
+} from "@/lib/annual-leave-server";
 import { normalizeLeaveDays } from "@/lib/annual-leave";
 import { getDictionary } from "@/lib/i18n";
 import {
@@ -29,7 +33,6 @@ export type SetAnnualLeaveBaselineResult = { ok: true } | { ok: false; error: st
 export async function setAnnualLeaveBaselineAction(input: {
   hireDate: string;
   baseAmount: number;
-  bonusAmount?: number;
 }): Promise<SetAnnualLeaveBaselineResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, error: "auth" };
@@ -38,16 +41,17 @@ export async function setAnnualLeaveBaselineAction(input: {
   if (!Number.isFinite(input.baseAmount) || input.baseAmount < 0) {
     return { ok: false, error: "invalid_base_amount" };
   }
-  if (input.bonusAmount !== undefined && (!Number.isFinite(input.bonusAmount) || input.bonusAmount < 0)) {
-    return { ok: false, error: "invalid_bonus_amount" };
-  }
 
   const service = getSupabaseServiceClient();
+  // 본인 자가 설정은 처음 한 번뿐(2026-10-26). 예전에는 매번 덮어써서 직원이 잔여를 언제든 다시 채우고
+  // 입사일을 바꿀 수 있었고, 이 화면이 특별휴가 값을 안 보내 관리자가 넣은 특별휴가가 0 이 됐다.
+  // 이후 수정은 관리자 화면에서만. 특별휴가는 여기서 받지 않는다(관리자 값).
   const result = await setAnnualLeaveBaselineForUser(
     service,
     session.organization.id,
     session.user.id,
-    input,
+    { hireDate: input.hireDate, baseAmount: input.baseAmount },
+    "self_once",
   );
   if (!result.ok) return result;
 
@@ -97,6 +101,15 @@ export async function submitLeaveRequestAction(input: {
   if (!input.asDraft && !input.emergencyContact.trim()) return { ok: false, error: "missing_emergency_contact" };
 
   const service = getSupabaseServiceClient();
+  // 유급 · 특별휴가는 잔여에서 빠지는 종류 — 시급직(연차 대상 아님, 확정 정책)은 낼 수 없고,
+  // 기준 잔여가 없는 사람도 낼 수 없다(빠질 잔여가 없다). 경조 · 기타는 잔여와 무관해 그대로 둔다.
+  if (input.leaveType === "paid" || input.leaveType === "special") {
+    if (isLeaveHourlyRole(session.user.role)) return { ok: false, error: "hourly_excluded" };
+    if (!(await hasAnnualLeaveBaselineRow(service, session.organization.id, session.user.id))) {
+      return { ok: false, error: "baseline_required" };
+    }
+  }
+
   const requestInput = {
     applicantName: session.user.name?.trim() || getDictionary(session.user.preferredLanguage).attendance.userFallback,
     leaveType: input.leaveType as LeaveRequestType,

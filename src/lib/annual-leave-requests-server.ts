@@ -130,7 +130,7 @@ export async function updateDraftLeaveRequest(
   }
 
   const status: LeaveRequestStatus = input.asDraft ? "draft" : "requested";
-  const { error } = await service
+  const { data, error } = await service
     .from("annual_leave_requests")
     .update({
       applicant_name: input.applicantName,
@@ -147,9 +147,13 @@ export async function updateDraftLeaveRequest(
     })
     .eq("id", requestId)
     .eq("organization_id", organizationId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    // 읽은 뒤 쓰기 사이에 다른 탭이 제출했으면(이미 requested) 덮어쓰지 않는다 — 0행이면 not_editable.
+    .eq("status", "draft")
+    .select("id");
 
   if (error) return { ok: false, error: "update_failed" };
+  if (!data || data.length === 0) return { ok: false, error: "not_editable" };
   return { ok: true, id: requestId };
 }
 
@@ -176,7 +180,8 @@ export async function deleteLeaveRequestDraft(
     .delete()
     .eq("id", requestId)
     .eq("organization_id", organizationId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("status", "draft");
   if (error) return { ok: false, error: "delete_failed" };
   return { ok: true };
 }
@@ -203,7 +208,8 @@ export async function cancelLeaveRequest(
     return { ok: false, error: "not_cancellable" };
   }
 
-  const { error } = await service
+  // 상태 조건을 쓰기에도 건다 — 읽은 뒤 관리자가 승인하면 승인된 휴가를 취소로 덮어쓰던 경쟁 상태(2026-10-26).
+  const { data: updated, error } = await service
     .from("annual_leave_requests")
     .update({
       status: "cancelled",
@@ -212,8 +218,11 @@ export async function cancelLeaveRequest(
     })
     .eq("id", requestId)
     .eq("organization_id", organizationId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("status", row.status)
+    .select("id");
   if (error) return { ok: false, error: "cancel_failed" };
+  if (!updated || updated.length === 0) return { ok: false, error: "not_cancellable" };
 
   return { ok: true, startDate: row.start_date, endDate: row.end_date, daysCount: Number(row.days_count) };
 }

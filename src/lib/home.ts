@@ -247,7 +247,7 @@ export async function getHomeTodayActivity(
         .limit(limit),
       supabase
         .from("maintenance_reports")
-        .select("id, room_label, created_at")
+        .select("id, room_label, created_at, property_name, is_building_only")
         .eq("organization_id", session.organization.id)
         .gte("created_at", start)
         .lt("created_at", end)
@@ -301,10 +301,14 @@ export async function getHomeTodayActivity(
         type: "lost_item_reported",
       });
     }
-    for (const row of (maintRes.data ?? []) as SimpleActivityRow[]) {
+    for (const row of (maintRes.data ?? []) as (SimpleActivityRow & {
+      property_name: string | null;
+      is_building_only: boolean | null;
+    })[]) {
       events.push({
         id: `maint-${row.id}`,
-        room: row.room_label,
+        // 건물 전체 신고는 room_label 이 "-" 라(2026-10-26) 건물 이름을 자리 라벨로 쓴다 — 그리는 곳에서 번역된다.
+        room: row.is_building_only && row.property_name ? row.property_name : row.room_label,
         timestamp: row.created_at,
         type: "maintenance_reported",
       });

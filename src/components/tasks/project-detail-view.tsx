@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSplitPush } from "@/components/shell/split-list";
-import { ChevronLeft, LogOut, MoreHorizontal, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, LogOut, MoreHorizontal, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { completeTask, reopenTask } from "@/app/mobile/tasks/[id]/actions";
 import {
   addProjectSection,
@@ -19,12 +19,15 @@ import {
 import { ReorderableSectionList } from "@/components/tasks/reorderable-section-list";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { SharePicker } from "@/components/tasks/share-picker";
+import { TaskToast } from "@/components/tasks/task-toast";
 import { CheckMark, contextLabelOf, prioRingClass } from "@/components/tasks/task-card";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type { ProjectDetailData, ProjectSectionInfo } from "@/lib/projects";
 import type { ShareableUser } from "@/lib/tasks";
 import type { TaskRecord } from "@/lib/tasks";
+import { isStandardRecurrence } from "@/lib/tasks-recurrence";
+import { tokyoToday } from "@/lib/tokyo-date";
 import { cn } from "@/lib/utils";
 import "./tasks-white.css";
 
@@ -66,7 +69,11 @@ function TaskRow({
     },
     [],
   );
-  const done = task.status === "completed";
+  // 반복 업무는 행 status 가 언제나 열림이고 완료는 회차별이다(2026-07-30). 이 줄에서 바로 완료하면
+  // 회차를 모른 채 시리즈 시작일이 완료돼 버렸다(2026-10-26) — 반복은 고리를 눌러도 오늘 회차로 상세를
+  // 연다(상세가 그 날짜가 실제 회차인지 다시 확인하고, 아니면 완료 칸을 막는다 = task-detail-view 가드).
+  const recurring = isStandardRecurrence(task.recurrenceRule);
+  const done = !recurring && task.status === "completed";
   const due = anchorChip(task, locale);
   const others = task.participants.filter((p) => p.userId !== currentUserId).length;
   const meta = [
@@ -79,7 +86,9 @@ function TaskRow({
     task.imageUrls.length ? w.photos.replace("{n}", String(task.imageUrls.length)) : null,
     others > 0 && task.isShared ? w.shared.replace("{n}", String(others)) : null,
   ].filter(Boolean);
-  const href = `/mobile/tasks/${task.id}?view=projects`;
+  const href = recurring
+    ? `/mobile/tasks/${task.id}?view=projects&occurrence=${tokyoToday()}`
+    : `/mobile/tasks/${task.id}?view=projects`;
   return (
     <div className={cn("tkw-row", done && "is-done")}>
       <div className="tkw-row__in">
@@ -88,12 +97,18 @@ function TaskRow({
           className={cn("tkw-ck", prioRingClass(task.priority), done && "is-done", checking && "is-checking")}
           onClick={() => {
             if (checking) return;
+            if (recurring) {
+              haptic("light");
+              splitPush(href);
+              return;
+            }
             if (done) {
               haptic("light");
               onToggle(task);
               return;
             }
-            haptic("success");
+            // 「성공」 햅틱은 서버가 저장을 확인한 뒤(onToggle) — 여기선 누름 반응만.
+            haptic("light");
             setChecking(true);
             timer.current = setTimeout(() => {
               onToggle(task);
@@ -147,10 +162,31 @@ export function ProjectDetailView({
   const isOwner = project.viewerCanManage;
 
   const [, startToggle] = useTransition();
+  const [toggleError, setToggleError] = useState(false);
+  useEffect(() => {
+    if (!toggleError) return;
+    const t = setTimeout(() => setToggleError(false), 4000);
+    return () => clearTimeout(t);
+  }, [toggleError]);
   const onToggle = (task: TaskRecord) => {
+    // 반복 업무는 TaskRow 가 상세로 보낸다 — 회차 없이 완료하면 시리즈 시작일이 완료된다.
+    if (isStandardRecurrence(task.recurrenceRule)) return;
+    const completing = task.status !== "completed";
     startToggle(async () => {
-      if (task.status === "completed") await reopenTask(task.id);
-      else await completeTask(task.id);
+      let ok = false;
+      try {
+        const res = completing ? await completeTask(task.id) : await reopenTask(task.id);
+        ok = res.ok;
+      } catch {
+        ok = false;
+      }
+      if (ok) {
+        if (completing) haptic("success");
+        setToggleError(false);
+      } else {
+        haptic("error");
+        setToggleError(true);
+      }
     });
   };
 
@@ -296,7 +332,7 @@ export function ProjectDetailView({
       {/* Add section (Owner only) */}
       {isOwner ? (
         addingSection ? (
-          <form action={addProjectSection} className="tkw-secform" onSubmit={() => haptic("success")}>
+          <form action={addProjectSection} className="tkw-secform" onSubmit={() => haptic("light")}>
             <input name="projectId" type="hidden" value={project.id} />
             <input aria-label={p.sectionNamePlaceholder} autoFocus name="title" placeholder={p.sectionNamePlaceholder} required />
             <button className="tkw-btn is-pri" style={{ width: "auto", height: 44, padding: "0 16px", fontSize: 14 }} type="submit">
@@ -517,6 +553,16 @@ export function ProjectDetailView({
           }}
           onClose={() => setPickerOpen(false)}
           users={shareableUsers.filter((u) => !project.members.some((m) => m.userId === u.id))}
+        />
+      ) : null}
+
+      {/* 완료 / 되돌리기 저장 실패 — 낙관적 체크는 1.5초 뒤 빈 고리로 돌아가고, 이 안내가 이유를 말한다. */}
+      {toggleError ? (
+        <TaskToast
+          icon={AlertTriangle}
+          message={copy.errors.save_failed}
+          onDismiss={() => setToggleError(false)}
+          tone="danger"
         />
       ) : null}
     </div>

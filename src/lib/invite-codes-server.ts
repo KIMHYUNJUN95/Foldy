@@ -42,6 +42,25 @@ export function selectableInviteRoles(role: Role): OrganizationRole[] {
   );
 }
 
+/**
+ * 그 **조직에서** 줄 수 있는 기본 역할 — 서버 판정용(2026-10-26 버그 수정). 세션 역할은 다른 조직 것일 수 있어서
+ * (A 조직 대표 · B 조직 오피스 관리자), B 조직 초대에 대표용 역할 목록이 열렸다. 개발자가 아니면 그 조직의 활성 멤버십
+ * 역할로 본다(`isTopAdminInOrg` 와 같은 방식).
+ */
+export async function selectableInviteRolesInOrg(actor: InviteActor, organizationId: string): Promise<OrganizationRole[]> {
+  if (actor.role === "developer_super_admin") return selectableInviteRoles(actor.role);
+  const { data } = await getSupabaseServiceClient()
+    .from("memberships")
+    .select("role")
+    .eq("user_id", actor.userId)
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .maybeSingle();
+  const orgRole = (data as { role: OrganizationRole } | null)?.role;
+  if (!orgRole) return [];
+  return selectableInviteRoles(orgRole);
+}
+
 function normalizeInviteCode(value: string) {
   return value.trim().toUpperCase().replace(/\s+/g, "-");
 }
@@ -81,7 +100,8 @@ export async function createInviteCodeAs(
   }
   // office_admin may not hand out office_admin-or-above access via invite code — mirrors the same
   // tiering already enforced for manual role changes (canAssignRole, src/actions/users.ts).
-  if (!selectableInviteRoles(actor.role).includes(defaultRole)) {
+  // 판정은 **그 조직의 멤버십 역할**로(세션 역할 아님).
+  if (!(await selectableInviteRolesInOrg(actor, organizationId)).includes(defaultRole)) {
     return { ok: false, error: "invalid_invite" };
   }
 

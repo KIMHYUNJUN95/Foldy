@@ -7,6 +7,7 @@ import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getLostItemById, isLostItemTerminal } from "@/lib/lost-found";
 import { lostItemClock } from "@/lib/lost-found-constants";
+import { splitLostFoundHandlingMemo } from "@/lib/lost-found-handling";
 import { localizeLostFoundMemo } from "@/lib/lost-found-memo";
 import { getOnboardingState } from "@/lib/onboarding";
 import { resolveRequestLocation } from "@/lib/request-location";
@@ -192,17 +193,29 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
             <p className="mdw-hint">{copy.handling.adminNote}</p>
           </section>
         ) : (
-          <LostFoundHandlingForm
+          <>
+            {/* 진행 중에도 이미 남긴 증빙 사진을 보여 준다 — 새 사진은 이 뒤에 이어 붙는다(2026-10-26). */}
+            {item.handling_image_urls.length > 0 ? (
+              <div className="mdw-block">
+                <span className="mdw-k">{copy.handling.photosLabel}</span>
+                <AnnouncementImageGrid imageUrls={item.handling_image_urls} closeLabel={dictionary.common.close} imageAltLabel={copy.handling.photosLabel} />
+              </div>
+            ) : null}
+            <LostFoundHandlingForm
             canHandle={canHandle}
             copy={copy}
+            existingPhotoCount={item.handling_image_urls.length}
             handlerName={session.user.name}
             imgCopy={dictionary.requestImages}
-            initialMemo={localizedHandlingMemo ?? ""}
+            // 고칠 수 있는 건 사람이 쓴 줄만 — 시스템 줄(관리자 복원 표시)을 보는 사람 언어로 바꾼 채 저장하면 그 언어로 굳는다.
+            // 시스템 줄은 서버가 저장할 때 다시 붙인다.
+            initialMemo={splitLostFoundHandlingMemo(item.handling_memo).editable}
             initialStatus={item.status}
             itemId={item.id}
             itemName={item.item_name}
             organizationId={session.organization.id}
           />
+          </>
         )}
       </div>
     </MobileShell>

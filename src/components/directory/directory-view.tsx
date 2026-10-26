@@ -5,6 +5,7 @@ import { Check, Copy, Phone, Search, Users, X } from "lucide-react";
 import "./directory.css";
 import { useIsTablet } from "@/components/shell/split-list";
 import { haptic } from "@/lib/haptics";
+import { formatPhoneDisplay, phoneHref } from "@/lib/phone-format";
 
 /**
  * 직원 목록 — 화이트 리디자인(2026-10-14, 시안 Dir-Phone · Dir-Fold · Dir-Tablet).
@@ -59,7 +60,6 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
   const isTablet = useIsTablet();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pressed, setPressed] = useState<string | null>(null);
 
   const groupLabel = { lead: copy.groupLead, field: copy.groupField, part: copy.groupPart, other: copy.groupOther };
   const teamText = (kind: string | null) => (kind === "field" ? copy.teamField : kind === "office" ? copy.teamOffice : null);
@@ -127,10 +127,10 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
                       </b>
                       <span className="num">
                         <span className="drw-role">{p.roleLabel}</span>
-                        <span className="drw-subph">{` · ${p.phone || copy.noPhoneLong}`}</span>
+                        <span className="drw-subph">{` · ${formatPhoneDisplay(p.phone) || copy.noPhoneLong}`}</span>
                       </span>
                     </span>
-                    <span className={`drw-ph num${p.phone ? "" : " is-none"}`}>{p.phone || copy.noPhoneLong}</span>
+                    <span className={`drw-ph num${p.phone ? "" : " is-none"}`}>{formatPhoneDisplay(p.phone) || copy.noPhoneLong}</span>
                   </>
                 );
                 return (
@@ -144,12 +144,10 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
                     )}
                     {p.phone && !p.isSelf ? (
                       <a
-                        href={`tel:${p.phone.replace(/[^\d+]/g, "")}`}
-                        className={`drw-call${pressed === p.membershipId ? " is-press" : ""}`}
+                        href={phoneHref(p.phone)}
+                        // 누름 반응은 공용 규칙(globals.css 「누름 반응」) — 화면에서 따로 그리지 않는다(2026-10-26).
+                        className="drw-call"
                         aria-label={`${copy.call} ${p.name}`}
-                        onPointerDown={() => setPressed(p.membershipId)}
-                        onPointerUp={() => setPressed(null)}
-                        onPointerLeave={() => setPressed(null)}
                         onClick={() => haptic("light")}
                       >
                         <Phone aria-hidden="true" />
@@ -209,7 +207,7 @@ function Profile({ person, copy, locale, teamText }: { person: DirectoryPerson; 
       </div>
       {person.phone && !person.isSelf ? (
         <div className="drw-prof__btns">
-          <a href={`tel:${person.phone.replace(/[^\d+]/g, "")}`} className="drw-btn is-pri" onClick={() => haptic("light")}>
+          <a href={phoneHref(person.phone)} className="drw-btn is-pri" onClick={() => haptic("light")}>
             <Phone aria-hidden="true" />
             {copy.call}
           </a>
@@ -221,7 +219,7 @@ function Profile({ person, copy, locale, teamText }: { person: DirectoryPerson; 
       ) : null}
       <dl className="drw-dl">
         <dt>{copy.labelPhone}</dt>
-        <dd className="num">{person.phone || copy.noPhoneLong}</dd>
+        <dd className="num">{formatPhoneDisplay(person.phone) || copy.noPhoneLong}</dd>
         <dt>{copy.labelRole}</dt>
         <dd>{person.roleLabel}</dd>
         <dt>{copy.labelTeam}</dt>

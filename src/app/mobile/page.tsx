@@ -320,7 +320,7 @@ async function HomeBody({
               </span>
               <div className="hm__task-b">
                 <div className="hm__task-t">{localizeRoomLabel(activeSession.data.room_label, dictionary.cleaning.buildingLabels)}</div>
-                <div className="hm__task-s">{activeSession.data.task_label}</div>
+                <div className="hm__task-s">{resolveCleaningTaskLabel(activeSession.data.task_label ?? undefined, dictionary.cleaning?.taskOptions)}</div>
               </div>
               <div className="hm__task-right">
                 <div className="hm__task-rk">{m.homeActiveTaskElapsed}</div>

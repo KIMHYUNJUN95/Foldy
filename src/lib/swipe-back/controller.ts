@@ -402,7 +402,11 @@ export function attachSwipeBack({ main, surface, isSwipeScreen, replace }: Swipe
           ? "split pane"
           : hasOpenOverlay()
             ? "overlay open"
-            : null;
+            : // 당겨서 새로고침 중(당기는 중 · 새로고침 중 · 되돌아가는 중) — 판의 transform 을 PTR 이 쥐고 있다. 여기서 밀기를
+              // 시작하면 끝날 때 그때의 transform 을 되돌려 놓아 판이 내려간 채 멈췄다(2026-10-26).
+              surface.hasAttribute("data-ptr-active")
+              ? "pull-to-refresh active"
+              : null;
     if (why) swipeDebug(`start: skip — ${why}`);
     return why === null;
   }

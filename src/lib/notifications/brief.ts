@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Locale } from "@/lib/i18n";
 import { getDictionary } from "@/lib/i18n";
 import { getNotificationDisplay } from "@/lib/notifications/display";
-import { localizeBuildingName } from "@/lib/room-label-normalization";
+import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { categoryForType, type NotificationIconKey, type NotificationView } from "@/lib/notifications/grouping";
 import {
   isAnnouncementNotificationPayload,
@@ -142,7 +142,12 @@ function briefOf(row: NotificationRow, locale: Locale, actorNames: Map<string, s
 
   if (row.type === "order_processed" && isOrderProcessedPayload(payload)) {
     const building = localizeBuildingName(payload.buildingName, dictionary.cleaning.buildingLabels);
-    const location = payload.roomLabel && payload.roomLabel !== "-" ? `${building} ${payload.roomLabel}` : building;
+    // 독채는 방 라벨이 건물 이름(「오쿠보A」) — 방 자리도 보는 사람 언어로 바꾸고, 건물과 같으면 한 번만 쓴다(2026-10-26).
+    const room =
+      payload.roomLabel && payload.roomLabel !== "-"
+        ? localizeRoomPlaceLabel(payload.roomLabel, dictionary.cleaning.buildingLabels)
+        : "";
+    const location = room && room !== building ? `${building} ${room}` : building;
     const object = location ? `${quote(payload.orderTitle)} · ${location}` : quote(payload.orderTitle);
     const delivery = payload.kind === "delivery_updated";
     return {

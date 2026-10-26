@@ -14,6 +14,7 @@ import type { AppSession } from "@/lib/session";
 import { getDictionary } from "@/lib/i18n";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import {
   notifyBugReportCreated,
@@ -77,9 +78,17 @@ function requireOrg(session: AppSession): string {
   return session.organization.id;
 }
 
-function validateImages(urls: string[]): void {
-  if (urls.length > MAX_IMAGES) {
+/**
+ * 사진 주소 검사 — 5장 상한 + 우리 Storage 의 `{조직}/bug-reports/{신고 id}/{파일}` 아래 주소만(2026-10-26).
+ * 예전엔 장수만 봐서 아무 외부 주소나 저장될 수 있었다.
+ */
+function validateImages(urls: string[], organizationId: string, reportId: string): void {
+  if (!Array.isArray(urls) || urls.length > MAX_IMAGES) {
     throw new Error("too_many_photos");
+  }
+  const prefix = `${organizationId}/bug-reports/${reportId}/`;
+  if (!urls.every((url) => typeof url === "string" && isOwnStoragePublicUrl(url, REQUEST_IMAGES_BUCKET, prefix))) {
+    throw new Error("invalid_image");
   }
 }
 
@@ -120,9 +129,25 @@ export async function uploadBugReportImage(input: {
   if (file.size > 10 * 1024 * 1024) throw new Error("image_too_large");
   if (!/^[a-f0-9-]{8,}$/i.test(reportId)) throw new Error("invalid_report_id");
 
+  // 이 신고가 정말 부른 사람 것이고 아직 고칠 수 있는 상태인지(2026-10-26) — 예전엔 id 모양만 봐서 남의 신고 폴더에도
+  // 올릴 수 있었다. 수정 · 삭제와 같은 규칙(작성자 + 접수 상태, 플랫폼 개발자는 예외).
+  const existing = await loadReportForWrite(reportId, organizationId);
+  if (!existing) throw new Error("not_found");
+  const developer = isPlatformDeveloper(session.user.role);
+  if (existing.reported_by_user_id !== session.user.id && !developer) throw new Error("forbidden");
+  if (existing.status !== "submitted" && !developer) throw new Error("not_editable");
+
   const service = getSupabaseServiceClient();
+  const folder = `${organizationId}/bug-reports/${reportId}`;
+  // 5장 상한 — 이미 이 신고 폴더에 올라간 파일 수로 센다(주소를 붙이기 전 단계라 image_urls 로는 못 센다).
+  const { data: listed, error: listError } = await service.storage
+    .from(REQUEST_IMAGES_BUCKET)
+    .list(folder, { limit: MAX_IMAGES + 1 });
+  if (listError) throw new Error("upload_failed");
+  if ((listed ?? []).length >= MAX_IMAGES) throw new Error("too_many_photos");
+
   const ext = safeExt(file);
-  const path = `${organizationId}/bug-reports/${reportId}/${randomUUID()}.${ext}`;
+  const path = `${folder}/${randomUUID()}.${ext}`;
 
   const { error } = await service.storage
     .from(REQUEST_IMAGES_BUCKET)
@@ -226,10 +251,11 @@ export async function createBugReport(input: {
 
   const title = validateTitle(input.title);
   const description = validateDescription(input.description);
-  validateImages(input.imageUrls);
 
   const service = getSupabaseServiceClient();
   const id = randomUUID();
+  // 사진은 신고를 만든 뒤 그 id 폴더에 올리고 `updateBugReport` 로 붙인다 — 새 id 폴더의 주소만 통과한다.
+  validateImages(input.imageUrls, organizationId, id);
   const insert = {
     id,
     organization_id: organizationId,
@@ -283,7 +309,7 @@ export async function updateBugReport(input: {
   const organizationId = requireOrg(session);
   const title = validateTitle(input.title);
   const description = validateDescription(input.description);
-  validateImages(input.imageUrls);
+  validateImages(input.imageUrls, organizationId, input.id);
 
   const existing = await loadReportForWrite(input.id, organizationId);
   if (!existing) throw new Error("not_found");

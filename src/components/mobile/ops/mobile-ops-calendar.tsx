@@ -29,6 +29,7 @@ import { useRecentBookings } from "@/components/admin/ops/use-recent-bookings";
 import { OpsSalesSummarySheet } from "@/components/admin/ops/ops-sales-summary-modal";
 import { watchOpsWriteJob, type OpsWriteKind, type RunOpsWrite } from "@/components/admin/ops/ops-write-tracker";
 import { Beds24LiveDot } from "@/components/shared/beds24-live-dot";
+import { haptic } from "@/lib/haptics";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import type { Dictionary } from "@/lib/i18n";
@@ -486,6 +487,8 @@ export function MobileOpsCalendar({
   // ── 쓰기(흐린 값 → 접수 → 반영 대기 → 다시 읽기) ──────────────────────────
   const [pendingPrices, setPendingPrices] = useState<Map<string, Pending>>(new Map());
   const [pendingMinStay, setPendingMinStay] = useState<Map<string, Pending>>(new Map());
+  /** 반영 중인 가격 칸 — 가격 시트가 이 칸이 섞이면 % 조정을 막는다(미리보기 ≠ 서버 재계산 · 2026-10-26). */
+  const pendingPriceKeys = useMemo(() => new Set(pendingPrices.keys()), [pendingPrices]);
   const [settledTokens, setSettledTokens] = useState<Set<number>>(new Set());
   /** 아직 Beds24 에 반영 중인 쓰기 수 — 시트를 닫아도 「가는 중」임을 위에 띄운다(데스크톱 `msQueued`). */
   const [writesInFlight, setWritesInFlight] = useState(0);
@@ -917,7 +920,7 @@ export function MobileOpsCalendar({
       pressTimer = setTimeout(() => {
         pressTimer = null;
         if (!press) return;
-        if (startDrag(press.x, press.y)) navigator.vibrate?.(8);
+        if (startDrag(press.x, press.y)) haptic("medium");
       }, LONG_PRESS_MS);
     };
     const onTouchMove = (event: TouchEvent) => {
@@ -1803,6 +1806,7 @@ export function MobileOpsCalendar({
                   close();
                   trackJobWrite(submitted);
                 }}
+                pendingPriceKeys={pendingPriceKeys}
                 runWrite={runWrite}
                 scopeSummary={scopeSummary}
               />
@@ -1845,6 +1849,7 @@ export function MobileOpsCalendar({
                   roomLabel: cell.roomLabel,
                 }))}
                 copy={copy}
+                onApplied={removeSentCells}
                 onClear={() => {
                   clearSelection();
                   close();

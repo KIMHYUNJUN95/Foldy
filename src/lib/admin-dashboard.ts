@@ -188,7 +188,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       id: m.id,
       kind: "maintenance" as const,
       title: m.issue_title,
-      location: place(m.property_name, m.room_label),
+      location: place(m.property_name, m.is_building_only ? null : m.room_label),
       createdAt: m.created_at,
       // 2026-07-14: `priority`가 실제 컬럼이 되기 전에는 open 이면 전부 urgent로 표시했다(= 사실상
       // 전부 빨간색). 이제 신고자가 고른 우선순위를 그대로 쓴다.

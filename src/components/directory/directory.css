@@ -33,7 +33,6 @@
 .drw-ph { display: none; }
 .drw-call { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--drw-tint); color: var(--drw-pri-ink); transition: transform 140ms ease, background 150ms ease; -webkit-tap-highlight-color: transparent; }
 .drw-call svg { width: 18px; height: 18px; }
-.drw-call:active, .drw-call.is-press { transform: scale(.94); background: #e6ddfb; }
 .drw-call:focus-visible, .drw-r__main:focus-visible, .drw-btn:focus-visible { outline: 2px solid var(--drw-pri); outline-offset: 2px; }
 .drw-call-gap { width: 44px; flex: none; }
 .drw-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 16px; font-size: 14px; color: var(--drw-soft); }
@@ -64,7 +63,6 @@
 .drw-prof__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .drw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border: 0; border-radius: 14px; background: #f4f4f7; font: inherit; font-size: 15px; font-weight: 600; color: #3a3746; text-decoration: none; transition: transform 140ms ease, background 150ms ease; }
 .drw-btn svg { width: 18px; height: 18px; }
-.drw-btn:active { transform: scale(.98); }
 .drw-btn.is-pri { background: var(--drw-pri); color: #fff; }
 .drw-btn.is-done { color: #1f7a4d; }
 .drw-btn.is-done svg path, .drw-btn.is-done svg polyline { stroke-dasharray: 24; animation: drw-draw 260ms cubic-bezier(.23, 1, .32, 1) both; }

@@ -26,7 +26,7 @@ export async function completeOccurrence(args: {
   organizationId: string;
   occurrenceDate: string;
   userId: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
   const row: OccurrenceInsert = {
     task_id: args.taskId,
@@ -36,19 +36,31 @@ export async function completeOccurrence(args: {
     completed_by_user_id: args.userId,
     moved_to_date: null,
   };
-  await supabase
+  // 결과를 돌려준다(2026-10-26) — 실패를 버리면 호출부가 완료 기록 · 알림을 그대로 남겨,
+  // 화면은 «완료됐다»고 말하는데 새로고침하면 다시 열려 있었다.
+  const { error } = await supabase
     .from("task_occurrence_state")
     .upsert(row, { onConflict: "task_id,occurrence_date" });
+  if (error) {
+    console.error("[completeOccurrence] upsert failed:", error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Remove an occurrence's recorded state (used to reopen/undo a completed occurrence). */
-export async function clearOccurrenceState(taskId: string, occurrenceDate: string): Promise<void> {
+export async function clearOccurrenceState(taskId: string, occurrenceDate: string): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
-  await supabase
+  const { error } = await supabase
     .from("task_occurrence_state")
     .delete()
     .eq("task_id", taskId)
     .eq("occurrence_date", occurrenceDate);
+  if (error) {
+    console.error("[clearOccurrenceState] delete failed:", error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Resolve a set of overdue occurrence dates as skipped ("삭제") — kept forever, never re-appears. */
@@ -341,12 +353,28 @@ export async function setOccurrenceOrders(args: {
 }): Promise<boolean> {
   if (args.positions.size === 0) return true;
   const supabase = getSupabaseServiceClient();
-  const rows: OccurrenceOrderInsert[] = [...args.positions].map(([taskId, sortOrder]) => ({
+  // 이 조직의 살아 있는 작업만 남긴다(2026-10-26) — 서비스 키 upsert 라 클라이언트 id 를 그대로
+  // 믿으면 다른 조직 작업 id 로 순서 행을 심을 수 있었다(`setTaskSortOrders` 와 같은 방어).
+  const { data: owned, error: ownedError } = await supabase
+    .from("tasks")
+    .select("id")
+    .in("id", [...args.positions.keys()])
+    .eq("organization_id", args.organizationId)
+    .is("deleted_at", null);
+  if (ownedError) {
+    console.error("[setOccurrenceOrders] ownership check failed:", ownedError.message);
+    return false;
+  }
+  const ownedIds = new Set(((owned ?? []) as Array<{ id: string }>).map((r) => r.id));
+  const rows: OccurrenceOrderInsert[] = [...args.positions]
+    .filter(([taskId]) => ownedIds.has(taskId))
+    .map(([taskId, sortOrder]) => ({
     task_id: taskId,
     organization_id: args.organizationId,
     occurrence_date: args.occurrenceDate,
     sort_order: sortOrder,
   }));
+  if (rows.length === 0) return true;
   const { error } = await supabase
     .from("task_occurrence_order")
     .upsert(rows, { onConflict: "task_id,occurrence_date" });

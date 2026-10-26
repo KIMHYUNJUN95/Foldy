@@ -157,17 +157,25 @@ export function AttendanceCapture({
       stopCamera();
       haptic("light");
       setPhase("submitting");
-      let g = gpsRef.current;
-      if (!g) {
-        g = await getGpsOnce();
-        gpsRef.current = g;
+      let res: AttendanceScanResult;
+      try {
+        let g = gpsRef.current;
+        if (!g) {
+          g = await getGpsOnce();
+          gpsRef.current = g;
+        }
+        const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : null;
+        res = await submitAttendanceScan(
+          "lat" in g
+            ? { mode: submitMode, token, latitude: g.lat, longitude: g.lng, accuracy: g.acc, gpsError: null, userAgent }
+            : { mode: submitMode, token, latitude: null, longitude: null, accuracy: null, gpsError: g.error, userAgent },
+        );
+      } catch {
+        // 네트워크 끊김 · 서버 오류로 액션이 던지면 예전에는 「보내는 중」에 영원히 멈췄다(submittedRef 도 true 로 남아
+        // 다시 시도도 막혔다). 일반 실패 결과(다시 시도 버튼)로 보내고 잠금을 푼다(2026-10-26).
+        res = { ok: false, reason: "error" };
+        submittedRef.current = false;
       }
-      const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : null;
-      const res = await submitAttendanceScan(
-        "lat" in g
-          ? { mode: submitMode, token, latitude: g.lat, longitude: g.lng, accuracy: g.acc, gpsError: null, userAgent }
-          : { mode: submitMode, token, latitude: null, longitude: null, accuracy: null, gpsError: g.error, userAgent },
-      );
       haptic(res.ok ? "success" : "error");
       setResult(res);
       setPhase("result");

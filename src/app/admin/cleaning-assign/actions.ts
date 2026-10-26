@@ -14,10 +14,19 @@ import {
 } from "@/lib/cleaning-assign/data";
 import { loadPersonShift, type PersonShift } from "@/lib/cleaning-assign/person-shift";
 import { loadAssignDayRooms, MAX_DEFER_DAYS } from "@/lib/cleaning-assign/rooms";
-import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { FLAG_THRESHOLD_OPTIONS, isAssignRuleKey, normalizeAssignRules, TRAINEE_CHECK_STEP, type AssignRule } from "@/lib/cleaning-assign/rules";
-import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import {
+  assigner,
+  changed,
+  ensureApplication,
+  isEditableDate,
+  isFieldMember,
+  isUuid,
+  revalidate,
+  type AssignFail,
+  type AssignOk,
+} from "@/actions/cleaning-assign-guards";
 
 /**
  * 청소 배정 — 관리자 서버 액션(`cleaning.assign`). 모든 쓰기는 service-role, 권한은 여기서 다시 본다(CLAUDE.md §6).
@@ -27,63 +36,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
  * docs/product/37-cleaning-shift-assignment.md 「4-2-f」
  */
 
-export type AssignFail = { ok: false; reason: "forbidden" | "invalid" | "conflict" | "error" };
-export type AssignOk<T = object> = { ok: true } & T;
-
-const PATHS = ["/admin/cleaning-assign", "/admin/cleaning-assign/settings", "/mobile/shift", "/mobile/shift/today", "/admin/cleaning", "/mobile/cleaning"];
-
-function revalidate() {
-  for (const path of PATHS) revalidatePath(path);
-}
-
-/** 배정 · 신청이 바뀜 — 화면 캐시를 비우고 열려 있는 PC · 모바일 화면에 실시간 신호. */
-async function changed(organizationId: string) {
-  revalidate();
-  await signalCleaningAssignChange(organizationId);
-}
-
-async function assigner(): Promise<AppSession | null> {
-  const session = await getCurrentAppSession();
-  if (!session || !hasOrganizationContext(session)) return null;
-  if (!session.capabilities.includes("cleaning.assign")) return null;
-  return session;
-}
-
-const isUuid = (value: unknown): value is string =>
-  typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-
-/** 지난날 · 너무 먼 날은 배정하지 않는다(어제까지는 기록 정리용으로 허용). */
-function isEditableDate(date: string): boolean {
-  const today = getCleaningOperatingDateKey();
-  return isDateKey(date) && date >= addDays(today, -1) && date <= addDays(today, 120);
-}
-
-async function isFieldMember(organizationId: string, userId: string): Promise<boolean> {
-  const members = await loadFieldMembers(getSupabaseServiceClient(), organizationId);
-  return members.some((member) => member.userId === userId);
-}
-
-/** 신청이 없으면 「관리자가 넣음」 신청을 만든다 · 취소된 날이면 살린다. */
-async function ensureApplication(organizationId: string, userId: string, date: string, actorId: string) {
-  const supabase = getSupabaseServiceClient();
-  const existing = await supabase
-    .from("cleaning_shift_applications")
-    .select("cancelled_at")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .eq("work_date", date)
-    .maybeSingle();
-  if (!existing.data) {
-    await supabase.from("cleaning_shift_applications").insert({ created_by: actorId, organization_id: organizationId, source: "admin", user_id: userId, work_date: date });
-  } else if (existing.data.cancelled_at) {
-    await supabase
-      .from("cleaning_shift_applications")
-      .update({ cancel_request_note: null, cancel_requested_at: null, cancelled_at: null, cancelled_by: null, updated_at: new Date().toISOString() })
-      .eq("organization_id", organizationId)
-      .eq("user_id", userId)
-      .eq("work_date", date);
-  }
-}
+export type { AssignFail, AssignOk } from "@/actions/cleaning-assign-guards";
 
 // ── 방 하나씩 넣고 빼기 ─────────────────────────────────────────────────────────────────────────
 
@@ -230,53 +183,7 @@ export async function addApplicantForDay(input: { date: string; userId: string }
   return { ok: true };
 }
 
-/** 그날 일정 취소(출근 전 당일 취소 등) — 그 사람 방은 미배정으로 돌아가고 알바 화면엔 「배정 없음」. */
-export async function cancelPersonDay(input: { date: string; userId: string }): Promise<AssignOk | AssignFail> {
-  const session = await assigner();
-  if (!session) return { ok: false, reason: "forbidden" };
-  if (!isEditableDate(input.date) || !isUuid(input.userId)) return { ok: false, reason: "invalid" };
-  const supabase = getSupabaseServiceClient();
-  const organizationId = session.organization.id;
-  const now = new Date().toISOString();
-  const update = await supabase
-    .from("cleaning_shift_applications")
-    .update({ cancelled_at: now, cancelled_by: session.user.id, updated_at: now })
-    .eq("organization_id", organizationId)
-    .eq("user_id", input.userId)
-    .eq("work_date", input.date)
-    .select("user_id");
-  if (update.error) return { ok: false, reason: "error" };
-  if ((update.data ?? []).length === 0) {
-    await supabase.from("cleaning_shift_applications").insert({
-      cancelled_at: now,
-      cancelled_by: session.user.id,
-      created_by: session.user.id,
-      organization_id: organizationId,
-      source: "admin",
-      user_id: input.userId,
-      work_date: input.date,
-    });
-  }
-  await supabase.from("cleaning_assignments").delete().eq("organization_id", organizationId).eq("work_date", input.date).eq("user_id", input.userId);
-  await changed(session.organization.id);
-  return { ok: true };
-}
 
-export async function resolveCancelRequest(input: { date: string; userId: string; accept: boolean }): Promise<AssignOk | AssignFail> {
-  const session = await assigner();
-  if (!session) return { ok: false, reason: "forbidden" };
-  if (!isDateKey(input.date) || !isUuid(input.userId)) return { ok: false, reason: "invalid" };
-  if (input.accept) return cancelPersonDay({ date: input.date, userId: input.userId });
-  const result = await getSupabaseServiceClient()
-    .from("cleaning_shift_applications")
-    .update({ cancel_request_note: null, cancel_requested_at: null, updated_at: new Date().toISOString() })
-    .eq("organization_id", session.organization.id)
-    .eq("user_id", input.userId)
-    .eq("work_date", input.date);
-  if (result.error) return { ok: false, reason: "error" };
-  await changed(session.organization.id);
-  return { ok: true };
-}
 
 export async function setDayStartTime(input: { date: string; userId: string; time: string | null }): Promise<AssignOk | AssignFail> {
   const session = await assigner();
@@ -532,32 +439,6 @@ export async function applyMonthSuggestions(input: { ym: string }): Promise<Assi
   return { added: (result.data ?? []).length, ok: true };
 }
 
-/** 월 보기 칸 — 신청만 대신 넣기 / 빼기(배정 없는 날만). */
-export async function toggleApplicationForUser(input: { date: string; userId: string }): Promise<AssignOk<{ applied: boolean }> | AssignFail> {
-  const session = await assigner();
-  if (!session) return { ok: false, reason: "forbidden" };
-  if (!isEditableDate(input.date) || !isUuid(input.userId)) return { ok: false, reason: "invalid" };
-  const supabase = getSupabaseServiceClient();
-  const organizationId = session.organization.id;
-  const existing = await supabase
-    .from("cleaning_shift_applications")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("user_id", input.userId)
-    .eq("work_date", input.date)
-    .maybeSingle();
-  if (existing.data) {
-    const rooms = await supabase.from("cleaning_assignments").select("id").eq("organization_id", organizationId).eq("user_id", input.userId).eq("work_date", input.date).limit(1);
-    if ((rooms.data ?? []).length > 0) return { ok: false, reason: "conflict" };
-    await supabase.from("cleaning_shift_applications").delete().eq("organization_id", organizationId).eq("user_id", input.userId).eq("work_date", input.date);
-    await changed(session.organization.id);
-    return { applied: false, ok: true };
-  }
-  if (!(await isFieldMember(organizationId, input.userId))) return { ok: false, reason: "invalid" };
-  await ensureApplication(organizationId, input.userId, input.date, session.user.id);
-  await changed(session.organization.id);
-  return { applied: true, ok: true };
-}
 
 /** 사람별 시프트 달력(월 보기 오른쪽 패널) — 읽기만. 현장 인원이 아니면 null. docs/product/37 「4-6」 */
 export async function loadPersonShiftForPanel(input: { userId: string; ym: string }): Promise<AssignOk<{ data: PersonShift }> | AssignFail> {

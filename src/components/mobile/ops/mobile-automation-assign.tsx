@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import {
   addCleaningExtraRoom,
@@ -75,8 +75,13 @@ export function MobileAutomationAssign({
   const setRooms = (update: (current: AssigneeRoomView[]) => AssigneeRoomView[]) =>
     setBoard((current) => (current ? { ...current, rooms: update(current.rooms) } : current));
 
+  // 날짜를 빨리 넘기면 앞 날짜 응답이 늦게 와서 지금 날짜의 표 · 이름을 덮었다 — 마지막 요청의 응답만 받는다(2026-10-26).
+  const reloadSeqRef = useRef(0);
   const reload = useCallback(() => {
+    reloadSeqRef.current += 1;
+    const seq = reloadSeqRef.current;
     loadAssigneeBoard(date, userLocale).then((result) => {
+      if (seq !== reloadSeqRef.current) return;
       if (!result.ok) {
         flash(errorTextOf(copy, result.error));
         setBoard({ date, roomOptions: [], rooms: [], sent: false });

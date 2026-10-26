@@ -46,8 +46,12 @@ type SlackStatus =
 // non-secure contexts / older webviews.
 async function copyText(value: string) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // 권한 거부 · 포커스 없음(iOS PWA 등)에서 거절된다 — 아래 예전 방식으로 한 번 더 시도한다.
+    }
   }
   const textarea = document.createElement("textarea");
   textarea.value = value;
@@ -109,28 +113,31 @@ export function ReportSheet({
     setSlackStatus("idle");
     setScheduleMsg(null);
     setNowMin(tokyoNowMinutes());
-    Promise.all([generateDailyReport(date), getReportSchedule(date)]).then(([res, sched]) => {
-      if (res.ok) {
-        setItems(res.items);
-        setTemplate(res.template);
-        setPicked(res.items.map(() => true)); // 기본은 전체 포함 — 빼는 쪽이 예외다.
-        setText(res.text);
-        setBuiltText(res.text);
-        setStatus("done");
-      } else {
-        setStatus(res.reason);
-      }
-      setSchedule(sched);
-      // 예약해 둔 것이 있으면 그 본문 · 시각을 보여 준다 — 그게 그 시각에 나간다.
-      if (sched?.status === "scheduled") {
-        if (sched.body) setText(sched.body);
-        setScheduledText(sched.body ?? null);
-        setWhenTime(tokyoHHMM(sched.sendAt));
-      } else {
-        setScheduledText(null);
-        setWhenTime(null);
-      }
-    });
+    Promise.all([generateDailyReport(date), getReportSchedule(date)])
+      .then(([res, sched]) => {
+        if (res.ok) {
+          setItems(res.items);
+          setTemplate(res.template);
+          setPicked(res.items.map(() => true)); // 기본은 전체 포함 — 빼는 쪽이 예외다.
+          setText(res.text);
+          setBuiltText(res.text);
+          setStatus("done");
+        } else {
+          setStatus(res.reason);
+        }
+        setSchedule(sched);
+        // 예약해 둔 것이 있으면 그 본문 · 시각을 보여 준다 — 그게 그 시각에 나간다.
+        if (sched?.status === "scheduled") {
+          if (sched.body) setText(sched.body);
+          setScheduledText(sched.body ?? null);
+          setWhenTime(tokyoHHMM(sched.sendAt));
+        } else {
+          setScheduledText(null);
+          setWhenTime(null);
+        }
+      })
+      // 서버 액션이 던지면(네트워크 · 서버 오류) 로딩이 영원히 돌았다 — 오류 칸으로 내린다(2026-10-26).
+      .catch(() => setStatus("error"));
   }, [date]);
 
   /**
@@ -161,14 +168,25 @@ export function ReportSheet({
   }, [run]);
 
   const onCopy = async () => {
-    await copyText(text);
+    try {
+      await copyText(text);
+    } catch {
+      haptic("error");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const onSlackSend = async () => {
     setSlackStatus("sending");
-    const result = await sendDailyReportToSlack(date, text);
+    let result: Awaited<ReturnType<typeof sendDailyReportToSlack>>;
+    try {
+      result = await sendDailyReportToSlack(date, text);
+    } catch {
+      setSlackStatus("error");
+      return;
+    }
     if (result.ok) {
       setSlackStatus("sent");
       return;
@@ -211,7 +229,10 @@ export function ReportSheet({
     if (!slotOpen(whenTime, now)) return; // 칸 아래 이유 줄이 이미 보인다.
     setScheduleBusy(true);
     setScheduleMsg(null);
-    const result = await scheduleDailyReport(date, text, tokyoTodayIso(whenTime));
+    // 던지면 바쁨 표시가 풀리지 않았다 — 실패 결과로 접는다(2026-10-26).
+    const result = await scheduleDailyReport(date, text, tokyoTodayIso(whenTime)).catch(
+      () => ({ ok: false, reason: "error" }) as const,
+    );
     setScheduleBusy(false);
     if (result.ok) {
       haptic("success");
@@ -242,7 +263,7 @@ export function ReportSheet({
   const onCancelSchedule = async () => {
     const undo = activeTime && scheduledText ? { time: activeTime, body: scheduledText } : undefined;
     setScheduleBusy(true);
-    const result = await cancelDailyReportSchedule(date);
+    const result = await cancelDailyReportSchedule(date).catch(() => ({ ok: false }) as const);
     setScheduleBusy(false);
     if (result.ok) {
       haptic("light");
@@ -264,7 +285,9 @@ export function ReportSheet({
   const onUndoCancel = async (undo: { time: string; body: string }) => {
     setScheduleBusy(true);
     setScheduleMsg(null);
-    const result = await scheduleDailyReport(date, undo.body, tokyoTodayIso(undo.time));
+    const result = await scheduleDailyReport(date, undo.body, tokyoTodayIso(undo.time)).catch(
+      () => ({ ok: false, reason: "error" }) as const,
+    );
     setScheduleBusy(false);
     if (result.ok) {
       haptic("success");

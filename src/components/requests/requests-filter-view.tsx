@@ -19,7 +19,6 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import {
   deleteLostItem,
   deleteMaintenanceReport,
@@ -44,8 +43,8 @@ import {
   OrderDeliveryCalendar,
   type DeliveryCalendarOrder,
 } from "@/components/requests/order-delivery-calendar";
-import { localizePropertyName } from "@/lib/room-label-normalization";
-import { resolveRequestLocation, type RequestLocationDisplay } from "@/lib/request-location";
+import { getCanonicalPropertyName, localizePropertyName } from "@/lib/room-label-normalization";
+import { resolveRequestCatalogLocation, resolveRequestLocation, type RequestLocationDisplay } from "@/lib/request-location";
 import type { ActiveRoomCatalogItem } from "@/lib/rooms";
 import type { Database } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -197,6 +196,8 @@ type LostFoundCopy = {
 };
 
 type MaintenanceCopy = {
+  /** 「건물 전체」 신고(is_building_only)의 방 자리 표시. */
+  buildingOnly: string;
   fromCleaningTag: string;
   mobileListTitle: string;
   noRecords: string;
@@ -381,8 +382,14 @@ function sanitizeStatus(val: string | null): StatusFilter {
 }
 
 // Enriched item types: location pre-attached, avoids repeated catalog lookups.
-type EnrichedLostItem = LostItemWithReporter & { location: RequestLocationDisplay };
-type EnrichedMaintenance = MaintenanceReportWithReporter & { location: RequestLocationDisplay };
+type EnrichedLostItem = LostItemWithReporter & { location: RequestLocationDisplay; buildingKey: string | null };
+type EnrichedMaintenance = MaintenanceReportWithReporter & { location: RequestLocationDisplay; buildingKey: string | null };
+
+/** 건물 거르기용 키 — 저장된 이름(한국어 기준 · 옛 표기)을 기준 이름 하나로 모은다. */
+function buildingKeyOf(name: string | null | undefined): string | null {
+  const trimmed = name?.trim();
+  return trimmed ? getCanonicalPropertyName(trimmed) : null;
+}
 
 /** Roles that can delete ANY record (not just their own). Matches the DB RLS policy. */
 
@@ -475,17 +482,7 @@ export function RequestsFilterView({
     }
   }, [filterSheetOpen]);
 
-  // Close the sheet on Esc key.
-  useEffect(() => {
-    if (!filterSheetOpen) return;
-    function handleEsc(e: KeyboardEvent) {
-      if (e.key === "Escape") setFilterSheetOpen(false);
-    }
-    document.addEventListener("keydown", handleEsc);
-    return () => document.removeEventListener("keydown", handleEsc);
-  }, [filterSheetOpen]);
-
-  useBodyScrollLock(filterSheetOpen);
+  // Esc 닫기 · 배경 스크롤 잠금은 공용 BottomSheet 가 한다(2026-10-26 — 예전엔 여기서 한 번 더 걸어 두 번 잠겼다).
 
   // Constrain Tab focus inside the sheet panel.
   function handleSheetKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
@@ -596,6 +593,12 @@ export function RequestsFilterView({
     if (!selectedBuildingKey) return null;
     return buildingOptions.find((option) => option.key === selectedBuildingKey)?.label ?? null;
   }, [buildingOptions, selectedBuildingKey]);
+  // 건물 거르기는 번역된 이름이 아니라 건물 키(한국어 기준 이름)끼리 비교한다(2026-10-26) — 예전엔 주문의 기준 이름을
+  // 번역된 라벨과 비교해 ja · en 에서 주문이 전부 사라졌다.
+  const selectedBuildingCanonical = useMemo(
+    () => (selectedBuildingKey ? getCanonicalPropertyName(selectedBuildingKey) : null),
+    [selectedBuildingKey],
+  );
 
   function setBuildingFilter(nextBuildingKey: string | null) {
     updateQuery({ building: nextBuildingKey });
@@ -609,6 +612,9 @@ export function RequestsFilterView({
       lostItems.map((item) => ({
         ...item,
         location: resolveRequestLocation(item.room_label, roomCatalog, buildingLabels),
+        buildingKey: buildingKeyOf(
+          item.property_name ?? resolveRequestCatalogLocation(item.room_label, roomCatalog, buildingLabels).buildingName,
+        ),
       })),
     [lostItems, roomCatalog, buildingLabels],
   );
@@ -617,7 +623,15 @@ export function RequestsFilterView({
     () =>
       maintenanceReports.map((report) => ({
         ...report,
-        location: resolveRequestLocation(report.room_label, roomCatalog, buildingLabels, report.property_name),
+        location: resolveRequestLocation(
+          report.is_building_only ? "" : report.room_label,
+          roomCatalog,
+          buildingLabels,
+          report.property_name,
+        ),
+        buildingKey: buildingKeyOf(
+          report.property_name ?? resolveRequestCatalogLocation(report.room_label, roomCatalog, buildingLabels).buildingName,
+        ),
       })),
     [maintenanceReports, roomCatalog, buildingLabels],
   );
@@ -627,25 +641,23 @@ export function RequestsFilterView({
   const baseLostItems = useMemo<EnrichedLostItem[]>(() => {
     return enrichedLostItems.filter((item) => {
       if (scopeFilter === "mine" && item.reported_by_user_id !== currentUserId) return false;
-      if (selectedBuildingLabel && item.location.buildingLabel !== selectedBuildingLabel)
-        return false;
+      if (selectedBuildingCanonical && item.buildingKey !== selectedBuildingCanonical) return false;
       if (statusFilter === "active") return activeLostStatuses.has(item.status);
       if (statusFilter === "closed") return !activeLostStatuses.has(item.status);
       return true;
     });
-  }, [enrichedLostItems, scopeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  }, [enrichedLostItems, scopeFilter, statusFilter, selectedBuildingCanonical, currentUserId]);
   const visibleLostItems = useMemo(() => (typeFilter === "all" || typeFilter === "lost-found" ? baseLostItems : []), [typeFilter, baseLostItems]);
 
   const baseMaintenance = useMemo<EnrichedMaintenance[]>(() => {
     return enrichedMaintenance.filter((report) => {
       if (scopeFilter === "mine" && report.reported_by_user_id !== currentUserId) return false;
-      if (selectedBuildingLabel && report.location.buildingLabel !== selectedBuildingLabel)
-        return false;
+      if (selectedBuildingCanonical && report.buildingKey !== selectedBuildingCanonical) return false;
       if (statusFilter === "active") return activeMaintenanceStatuses.has(report.status);
       if (statusFilter === "closed") return !activeMaintenanceStatuses.has(report.status);
       return true;
     });
-  }, [enrichedMaintenance, scopeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  }, [enrichedMaintenance, scopeFilter, statusFilter, selectedBuildingCanonical, currentUserId]);
   const visibleMaintenance = useMemo(() => (typeFilter === "all" || typeFilter === "maintenance" ? baseMaintenance : []), [typeFilter, baseMaintenance]);
 
   const enrichedOrders = useMemo<EnrichedOrder[]>(
@@ -660,12 +672,12 @@ export function RequestsFilterView({
   const baseOrders = useMemo<EnrichedOrder[]>(() => {
     return enrichedOrders.filter((order) => {
       if (scopeFilter === "mine" && order.reported_by_user_id !== currentUserId) return false;
-      if (selectedBuildingLabel && order.building_name !== selectedBuildingLabel) return false;
+      if (selectedBuildingCanonical && buildingKeyOf(order.building_name) !== selectedBuildingCanonical) return false;
       if (statusFilter === "active") return activeOrderStatuses.has(order.status);
       if (statusFilter === "closed") return !activeOrderStatuses.has(order.status);
       return true;
     });
-  }, [enrichedOrders, scopeFilter, statusFilter, selectedBuildingLabel, currentUserId]);
+  }, [enrichedOrders, scopeFilter, statusFilter, selectedBuildingCanonical, currentUserId]);
   const visibleOrders = useMemo(() => (typeFilter === "all" || typeFilter === "order" ? baseOrders : []), [typeFilter, baseOrders]);
 
   const hasAnyResults =
@@ -819,7 +831,12 @@ export function RequestsFilterView({
           href={`/mobile/requests/maintenance/${report.id}${listQueryString ? `?${listQueryString}` : ""}`}
           title={report.issue_title}
           urgentLabel={report.priority === "urgent" ? maintenanceCopy.urgentLabel : null}
-          meta={[report.location.roomLabel, report.location.buildingLabel, report.reporter_name, formatTime(report.created_at, locale)]}
+          meta={[
+            report.is_building_only ? maintenanceCopy.buildingOnly : report.location.roomLabel,
+            report.location.buildingLabel,
+            report.reporter_name,
+            formatTime(report.created_at, locale),
+          ]}
           statusLabel={maintenanceCopy.statusLabels[report.status]}
           statusTone={report.status === "in_progress" ? "prog" : activeMaintenanceStatuses.has(report.status) ? "open" : "done"}
           onDelete={

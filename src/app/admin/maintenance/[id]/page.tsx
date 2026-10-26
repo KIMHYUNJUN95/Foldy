@@ -120,10 +120,12 @@ export default async function AdminMaintenanceDetailPage({
             <div className="flex items-start justify-between gap-3 text-sm">
               <dt className="font-semibold text-muted-foreground">{copy.room}</dt>
               <dd className="font-black">
-                {localizeRoomPlaceLabel(
-                  getDisplayRoomLabel(report.property_name ?? "", report.room_label),
-                  dictionary.cleaning.buildingLabels,
-                )}
+                {report.is_building_only
+                  ? dictionary.maintenance.form.roomBuildingOnly
+                  : localizeRoomPlaceLabel(
+                      getDisplayRoomLabel(report.property_name ?? "", report.room_label),
+                      dictionary.cleaning.buildingLabels,
+                    )}
               </dd>
             </div>
             <div className="flex items-start justify-between gap-3 text-sm">

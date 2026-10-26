@@ -9,6 +9,7 @@ import {
 import { isLostItemCategory, type LostItemCategory } from "@/lib/lost-found-constants";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession } from "@/lib/session";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -16,25 +17,6 @@ const REQUEST_IMAGE_BUCKET = "request-images";
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
-}
-
-function getRequestImagePathFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const markers = [
-      `/storage/v1/object/public/${REQUEST_IMAGE_BUCKET}/`,
-      `/storage/v1/object/${REQUEST_IMAGE_BUCKET}/`,
-    ];
-    for (const marker of markers) {
-      const idx = parsed.pathname.indexOf(marker);
-      if (idx !== -1) {
-        return parsed.pathname.slice(idx + marker.length);
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function isValidUuid(value: string) {
@@ -110,22 +92,9 @@ export async function createLostItem(formData: FormData) {
   }
 
   const requestId = requestedId || crypto.randomUUID();
-  const imagePaths: string[] = [];
-  for (const imageUrl of imageUrls) {
-    const path = getRequestImagePathFromUrl(imageUrl);
-    if (!path) {
-      redirect(`/mobile/lost-found/new?error=save_failed${sessionParam}`);
-    }
-    const segments = path.split("/");
-    if (
-      segments.length !== 4 ||
-      segments[0] !== session.organization.id ||
-      segments[1] !== "lost-items" ||
-      segments[2] !== requestId
-    ) {
-      redirect(`/mobile/lost-found/new?error=save_failed${sessionParam}`);
-    }
-    imagePaths.push(path);
+  const imagePrefix = `${session.organization.id}/lost-items/${requestId}/`;
+  if (!imageUrls.every((url) => isOwnStoragePublicUrl(url, REQUEST_IMAGE_BUCKET, imagePrefix))) {
+    redirect(`/mobile/lost-found/new?error=save_failed${sessionParam}`);
   }
 
   const supabase = await getSupabaseServerClient();
@@ -215,9 +184,8 @@ export async function createLostItem(formData: FormData) {
   const createdId = (created as { id: string } | null)?.id ?? null;
 
   if (error || !createdId) {
-    if (imagePaths.length > 0) {
-      await supabase.storage.from(REQUEST_IMAGE_BUCKET).remove(imagePaths);
-    }
+    // 올라간 사진은 지우지 않는다(2026-10-26) — 사진의 주인은 클라이언트(`usePhotoUpload`)다. 폼은 같은 요청 id 와
+    // 같은 주소로 다시 보내므로 여기서 지우면 다시 보낸 등록이 지워진 사진을 가리켰다. 그만두면 클라이언트가 지운다.
     redirect(`/mobile/lost-found/new?error=save_failed${sessionParam}`);
   }
   redirect(`/mobile/requests/lost-found/${createdId}?created=1`);

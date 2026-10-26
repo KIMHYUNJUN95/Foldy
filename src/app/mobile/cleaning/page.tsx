@@ -20,6 +20,7 @@ import {
   getCleaningStaffOptions,
   getMyActiveCleaningSession,
   getMyTodayCleaningSessions,
+  getOrgProcessedCleaningRoomLabels,
   getOrgTodayCleaningRoomLabels,
   isCleaningTaskKey,
 } from "@/lib/cleaning";
@@ -389,13 +390,17 @@ export default async function MobileCleaningPage({
   // 과거 날짜에서 담당자 이름을 그리려면 이름표가 필요하다. 오늘만 볼 때는 부르지 않는다.
   // roomCatalog is always fetched (not gated on activeSession) because it serves
   // both the catalog-based room label resolver and the manual form options.
-  const [sessions, activeSession, staffOptions, cleaningTargets, roomCatalog, orgTodaySessions, navBadges] = await Promise.all([
+  // 「이미 시작 · 완료한 방」은 서비스 키로 조직 전체를 읽는다(`getOrgProcessedCleaningRoomLabels`, 라벨 · 상태만, 2026-10-26) —
+  // RLS 로 읽으면 `cleaning.read_all` 없는 직원에게 남이 맡은 방이 시작 가능한 채로 남았다. 지난 날 「누가 언제」 기록은
+  // 담당자 · 시각이 필요해 RLS 조회(`getOrgTodayCleaningRoomLabels`)를 그대로 쓴다 — 지난 날짜일 때만.
+  const [sessions, activeSession, staffOptions, cleaningTargets, roomCatalog, orgProcessedSessions, orgDaySessions, navBadges] = await Promise.all([
     getMyTodayCleaningSessions(session),
     getMyActiveCleaningSession(session),
     isToday ? Promise.resolve([]) : getCleaningStaffOptions(session.organization.id).catch(() => []),
     getCleaningTargets(session.organization.id, viewDate).catch(() => null),
     getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
-    getOrgTodayCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
+    getOrgProcessedCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
+    isToday ? Promise.resolve([]) : getOrgTodayCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
     getMobileNavBadges(),
   ]);
   // 진행 중인 세션은 **오늘 목록이 아니라 날짜 무관 조회**로 잡는다. 유니크 인덱스가 날짜를 보지
@@ -437,8 +442,7 @@ export default async function MobileCleaningPage({
   const unknownRoomLabelSamples: string[] = [];
   let unknownRoomLabelCount = 0;
   let resolvedByAliasCount = 0;
-  for (const s of orgTodaySessions) {
-    if (s.status !== "in_progress" && s.status !== "completed") continue;
+  for (const s of orgProcessedSessions) {
     const resolved = resolveRoomKey(s.room_label, catalogLabelMap, legacyAliasMap);
     if (resolved.matchedBy === "legacy_alias") resolvedByAliasCount += 1;
     if (resolved.roomKey !== null) {
@@ -451,7 +455,7 @@ export default async function MobileCleaningPage({
   // 과거 날짜용 — 객실별 "누가 언제 했는지". 오늘은 시작 버튼을 그려야 하므로 만들지 않는다.
   const recordByRoomKey = new Map<string, DayCleaningRecord>();
   if (!isToday) {
-    for (const s of orgTodaySessions) {
+    for (const s of orgDaySessions) {
       if (s.status !== "completed") continue;
       const resolved = resolveRoomKey(s.room_label, catalogLabelMap, legacyAliasMap);
       if (resolved.roomKey === null) continue;
@@ -506,7 +510,7 @@ export default async function MobileCleaningPage({
   }));
   const sessionLabelToLocalizedRoomTitleMap = buildSessionLabelToLocalizedRoomTitleMap(roomCatalog, copy);
   // Org-wide in_progress count — same scope as the queue filter for KPI consistency
-  const inProgressCount = orgTodaySessions.filter((s) => s.status === "in_progress").length;
+  const inProgressCount = orgProcessedSessions.filter((s) => s.status === "in_progress").length;
 
   // 진행 중인 청소가 있으면 새로 시작할 수 없다(유니크 인덱스) — 목록은 보여 주되 시작 버튼은 감춘다(2026-10-13).
   const startable = isToday && !activeSession;
@@ -597,10 +601,10 @@ export default async function MobileCleaningPage({
 
         {/* 오늘이 아닌 날짜의 한계를 명시한다 — 숫자를 오해하지 않도록. */}
         {!isToday ? <div className="cln-note">{isFuture ? copy.console.dateFutureNotice : copy.console.datePastNotice}</div> : null}
-        {errorMessage ? <CleaningNotice className="cln-note is-danger" nonce={noticeNonce}>{errorMessage}</CleaningNotice> : null}
+        {errorMessage ? <CleaningNotice className="cln-note is-danger" haptic="error" nonce={noticeNonce}>{errorMessage}</CleaningNotice> : null}
         {params.cancelled ? <CleaningNotice className="cln-note is-danger" nonce={noticeNonce}>{copy.cancelSuccess}</CleaningNotice> : null}
         {params.started ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.startSuccess}</CleaningNotice> : null}
-        {params.completed ? <CleaningNotice className="cln-note cln-note--done" nonce={noticeNonce}>{copy.completeSuccess}</CleaningNotice> : null}
+        {params.completed ? <CleaningNotice className="cln-note cln-note--done" haptic="success" nonce={noticeNonce}>{copy.completeSuccess}</CleaningNotice> : null}
         {params.lostReported ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.lostReported}</CleaningNotice> : null}
         {params.maintenanceReported ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.maintenanceReported}</CleaningNotice> : null}
         {unknownRoomLabelCount >= ROOM_LABEL_MAPPING_WARNING_THRESHOLD ? (
@@ -679,7 +683,7 @@ export default async function MobileCleaningPage({
                       sub={
                         target.hasTurnover ? (
                           <SubKeepTail
-                            lead={`${copy.turnoverBadge} · ${target.arrivingGuestName ?? "Guest"}`}
+                            lead={`${copy.turnoverBadge} · ${target.arrivingGuestName ?? copy.guestFallback}`}
                             tail={target.arrivingPax !== null ? ` · ${target.arrivingPax}${copy.paxUnit}` : null}
                           />
                         ) : target.nextCheckInDate ? (
@@ -755,7 +759,7 @@ export default async function MobileCleaningPage({
                       <CleanRow
                         key={target.roomKey}
                         room={getRowRoomLabel(target.canonicalPropertyName, target.canonicalRoomLabel, copy)}
-                        title={target.arrivingGuestName ?? "Guest"}
+                        title={target.arrivingGuestName ?? copy.guestFallback}
                         sub={target.arrivingPax !== null ? `${target.arrivingPax}${copy.paxUnit}` : undefined}
                         right={
                           <RowRight

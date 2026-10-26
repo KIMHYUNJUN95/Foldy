@@ -33,6 +33,7 @@ import {
 } from "@/lib/identity-names";
 import type { Locale } from "@/lib/i18n";
 import { getNativeAppInfo } from "@/lib/native-app";
+import { clearSwipeSnapshots } from "@/lib/swipe-back/snapshot-store";
 import "./account-white.css";
 
 type Gender = "female" | "male";
@@ -347,7 +348,8 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
       </section>
 
       <div className="acw-grp" style={grp()}>
-        <form action={signOut}>
+        {/* 로그아웃 — 스와이프 뒤로가기 밑그림(화면 복제본 · 개인정보 포함)을 먼저 비운다. */}
+        <form action={signOut} onSubmit={clearSwipeSnapshots}>
           <button className="acw-out" type="submit">
             {copy.logout}
           </button>

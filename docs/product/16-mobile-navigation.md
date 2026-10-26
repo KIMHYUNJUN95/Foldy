@@ -185,10 +185,19 @@ Implementation note:
     같은 크기의 빈 칸으로(연달아 밖인 형제는 칸 하나로) 바꿔 노드 1만 2천 개 화면도 350개 남짓이 된다. 복제는 **한가할 때 미리**
     (화면이 뜬 뒤 · 스크롤 · 내용이 바뀐 뒤) 하고, 떠날 때는 맡기기만 한다 — 떠나는 커밋 안에서 복제하면 반쯤 바뀐 DOM 을 통째로
     다시 배치해 긴 목록에서 200ms 가 들었다(CPU 4배 감속 측정, 미리 복제로 5~35ms). id 는 지운다.
+    **개인정보 · 다시 찍기 (2026-10-26)**: 복제본엔 게스트 이름 · 연락처 같은 화면 내용이 그대로 들어 있다 — 로그아웃 버튼(사이드바 ·
+    계정 화면 `<form action={signOut} onSubmit={clearSwipeSnapshots}>`)이 메모리 · sessionStorage(`stayops:swipe-snapshots`)를 비우고
+    다음 화면을 잡을 때까지 새로 저장하지 않는다(떠나는 화면의 마지막 맡김 포함). 다른 사용자가 화면을 잡으면(`trackScreen` 의 사용자
+    바뀜) 앞 사용자 것을 모두 버린다. **`data-no-snapshot`** 이 붙은 요소는 속 · 속성을 복제하지 않고 같은 크기 빈 칸으로 둔다(민감한 칸
+    opt-out). **`data-snapshot-ignore`** 안의 변화는 「내용 바뀜」으로 세지 않는다 — 홈 경과 시계(1초마다)와 당겨서 새로고침 띠에
+    붙였다. 전엔 시계가 바뀔 때마다 1.5초 간격으로 화면 전체를 다시 복제했다.
   - `controller.ts` — 제스처 엔진. React 밖에서 판(`[data-swipe-surface]`)에 `transform` 을 직접 써서(2026-10-21 전엔 `translate`) 미는 동안 렌더 0회. 밑그림
     층은 `body` 맨 끝 `position: fixed; z-index: -1; contain: strict` 로 **한가할 때 미리 깔아 두고**(보이지 않게) 밀 때 보이게만 한다
     (드래그 시작 1ms). 미는 동안만 `<main>` · `<body>` 바탕을 투명하게 해 판 뒤로 이 층이 보인다. 이동은 `history.go(-n)`, 옛 판이
     DOM 에서 빠지는 순간(MutationObserver — 그리기 전) 층을 걷는다. 4초 안에 이동이 안 되면 제자리로.
+    **당겨서 새로고침 중엔 시작하지 않는다 (2026-10-26)**: 판의 `transform` 을 PTR 이 쥐고 있는 동안(당기는 중 · 새로고침 중 · 띠가
+    남은 동안) 셸이 판에 `data-ptr-active` 를 달고 `canBegin` 이 거절한다. 전엔 새로고침 중에 밀면 끝날 때 그때의 transform 을 되돌려
+    놓아 판이 내려간 채 멈출 수 있었다.
   - **iOS(WebKit) 팬 선점 (2026-10-08 `c5cdf12`)**: iOS 는 방향 판정(10px) 전에 스크롤 팬을 시작해, 그 뒤 touchmove 를 막을 수 없어
     아이폰에서 제스처가 통째로 무시됐다(Chromium 은 `touch-action` 이 막아 재현 안 됨). 판정 전이라도 오른쪽으로 뚜렷이 가로인 움직임
     (dx > 1.5|dy|)이면 첫 touchmove 부터 막고, 막을 수 없는 touchmove 여도 가로로 잠갔으면 계속 간다.
@@ -214,8 +223,14 @@ Implementation note:
 
   **앱(Capacitor) Android 하드웨어 뒤로가기 (2026-10-06):** `NativeShellBridge` 가 받는다. 열린 오버레이가 있으면(`hasOpenOverlay` —
   밑그림 복제본 속 표식은 세지 않는다) window 에 Esc 를 보내 닫고(BottomSheet · 사진 뷰어 · 사이드 메뉴가 이미 Esc 로 닫힌다), 없으면
-  `history.back()`, 앱 안 이전 기록이 없으면 위 화면(`parentScreen`, 2026-10-20), 홈이면 앱 최소화. Esc 를 안 받는 대화상자에서 막히지 않게 1.2초 안에 다시 누르면 화면 이동. 셸 쪽 표식 —
+  `history.back()`, 앱 안 이전 기록이 없으면 위 화면(`parentScreen`, 2026-10-20), 홈이면 앱 최소화. **2026-10-26**: **홈(`/mobile`)에서는** `history.back()` 을
+  이전 기록이 앱 안 화면(`isSwipeBackScreen`)일 때만 — WebView 기록에 남은 로그인 · 온보딩 · 외부 페이지로 돌아가던 것을 막고 앱을 내린다.
+  홈 밖의 `/mobile` 밖 앱 화면(계정 `/account/id-card` 등)은 예전처럼 기록 뒤로(막으면 재류카드 화면에서 뒤로 = 앱이 내려갔다). Esc 를 안 받는 대화상자에서 막히지 않게 1.2초 안에 다시 누르면 화면 이동. 셸 쪽 표식 —
   사이드 메뉴 `<aside>` 가 열려 있을 때 `data-native-back-overlay`, `ImageLightbox` 루트에 같은 표식.
+  **사진 뷰어 접근성 · Esc (2026-10-26)**: `ImageLightbox` 루트는 `role="dialog"` · `aria-modal` · `aria-label`(`common.lightboxDialog`), 이전 · 다음 ·
+  점 버튼은 `common.lightboxPrev` · `lightboxNext` · `lightboxGoTo`(「사진 {index} / {total}」, 지금 사진은 `aria-current`) — 전엔 「←」 「→」 「1」 그대로
+  읽혔다. Esc 는 **맨 위 오버레이일 때만** 닫는다 — `BottomSheet` 의 열린 시트 쌓임을 `pushOverlay` · `isTopOverlay` 로 내보내 뷰어도 같이 쓴다.
+  전엔 시트 안에서 연 뷰어에서 Esc(= Android 뒤로) 한 번에 뷰어와 시트가 함께 닫혔다.
 
   **Android 예측 뒤로가기 (2026-10-20, 17번 N12).** Android 는 화면 양쪽 가장자리 밀기를 OS 가 먼저 가져간다 — 구글 지침상 앱이
   가로채면 안 되고 가로챌 수 있는 길이도 한쪽 200dp 뿐이라, 가장자리를 우리 터치로 받지 않는다. 대신 OS 가 알려 주는 제스처의
@@ -295,8 +310,9 @@ Implementation note:
   52px`). The outer shell wrapper div (header + content + bottom nav combined) carries a
   `translateY(${contentOffset}px)` so the entire chrome slides down together as the user pulls,
   gradually revealing the fixed indicator behind. The inner scroll div no longer holds a `translateY`
-  or any inline PTR indicator/gradient curtain. Haptic feedback (`navigator.vibrate(10)`) fires once
-  at the pull threshold crossing. On release, the outer shell springs back with
+  or any inline PTR indicator/gradient curtain. Haptic feedback fires once at the pull threshold
+  crossing and once when the refresh starts — both `haptic("light")` (2026-10-26: was a raw
+  `navigator.vibrate(10)` + `medium`, which skipped the native haptics bridge and broke the shared haptics rule). On release, the outer shell springs back with
   `cubic-bezier(0.34,1.56,0.64,1)` while the indicator fades/scales out.
   **로고 막대 표시(2026-10-15, 시안 Motion-C-Pull-Phone — 모든 `/mobile/*` 공용):** 위 패널의 글자(「놓아서 새로고침」 ·
   「새로고침 중…」)를 로고 세 막대로 바꿨다. 당긴 거리 ÷ 72px 에 따라 위(연보라) → 가운데(보라) → 아래(진보라) 순서로
@@ -604,6 +620,11 @@ Current rules:
     비운다. 전엔 버려진 쪽이 「reveal」을 써 버려 진짜 화면은 「same」(효과 없음) — 태블릿에서 요청 탭으로 갈 때 실측. 폴드(700) · 태블릿
     (1200) 레일 · 사이드바 전환 측정: 레일 · 사이드바 제자리, 본문만 나타남(탭) → 로더 → 나타남(reveal), 매번.
   - 끝나면 클래스를 뗀다(`animation-fill-mode: both` 의 transform 이 `position: fixed` 자손의 기준 상자가 되지 않게). 줄이기 모드는 전부 없음.
+  - **서버 · 하이드레이션 (2026-10-26 고침)**: 판정은 브라우저 한 곳의 기록이라 모듈 변수에 두는데, 서버에서도 불려 요청 사이에 그 변수가
+    공유됐다(다른 요청의 경로가 「same」 · 「reveal」 판정에 섞여 서버 HTML ≠ 클라이언트 첫 그림). 이제 서버에서는 아무것도 바꾸지 않고
+    `none`, 클라이언트도 **하이드레이션 중에는**(`useSyncExternalStore` 서버 스냅샷) 같은 `none` 을 그린다 — 앱을 처음 열 때 첫 화면은
+    밀려 들어오지 않는다(네이티브 앱 실행 첫 화면처럼). 하이드레이션 중에도 판정은 해서 모듈 상태 · 스크롤 복원 방향은 맞춘다. 그 뒤 이동의
+    push · pop · tab · reveal 은 그대로.
 - **로딩 자리 셸 (2026-10-21)**: `src/app/mobile/loading.tsx` = `MobileShellPlaceholder`(`src/components/shell/mobile-shell-placeholder.tsx`)
   — 같은 셸(탭바 · 위 줄 · 배지)을 `placeholder` 로 그리고 본문 칸에 공용 로더(`FoldyLoader`, 0.3초 뒤에만 보임). 예전 로딩은 화면 전체를
   덮어(`fill`) **탭바까지 사라졌고**, 섹션 안 이동(목록 → 상세 · 새로 쓰기)은 로딩 경계가 없어 서버 응답까지 **눌러도 멈춰** 있었다. 이제:
@@ -702,7 +723,13 @@ Current rules:
   - **밀어서 치우기** — 옆이나 아래로 밀면 손가락을 따라오며 흐려지고, 가로 56px · 아래 28px 넘게 밀거나 빠르게 튕기면 치워진다(가벼운 햅틱,
     민 방향으로 이어서 나감). 아니면 제자리로. 6px 넘게 움직인 손짓 뒤의 클릭은 먹는다(몸통 탭 닫기 · 되돌리기가 잘못 눌리지 않게). 위로는
     안 끌린다. `onDismiss` 를 안 주면(게시판 1.8초 알림 · 판매 캘린더 진행 중) 사라짐만.
-  - 쓰는 곳: `TaskToast`(되돌리기 · 건너뛰기 · 이동 거절) · `MobileOpsToast` · 자동화 `Toast` · `MobileUsersToast` · `BoardToast`(게시판 상세 · 신고).
+  - **콜백 ref (2026-10-26)**: 훅이 돌려주는 `ref` 는 콜백 ref 다 — 같은 컴포넌트 안에서 조건부로 나중에 그려지는 토스트(`{toast && <div ref={ref}>}`)도
+    그려질 때 붙고 사라질 때 복제본을 남긴다. 전엔 처음 그릴 때의 `ref.current` 에만 붙어 내 시프트 저장 토스트는 움직임이 없었다. `ref.current` 는 읽지 않는다.
+  - 쓰는 곳: `TaskToast`(되돌리기 · 건너뛰기 · 이동 거절) · `MobileOpsToast` · 자동화 `Toast` · `MobileUsersToast` · `BoardToast`(게시판 상세 · 신고) ·
+    내 시프트 저장 토스트 · 급여 토스트 · 셸 오류 알약(하단 탭 저장 실패 — 아래).
+- **하단 탭 저장 실패 (2026-10-26)**: 편집 시트를 닫으면 저장하는데, 오프라인 · 서버 오류로 액션이 던지면 오류 화면으로 튕겼고 실패해도
+  탭은 바뀐 채였다. 이제 잡아서 탭을 저장 전으로 되돌리고 `haptic("error")` + 셸 알약(「탭을 저장하지 못했어요」, `common.bottomNavSaveFailed`,
+  3.2초 · 밀어서 치움). 알약은 PTR 로 transform 이 걸리는 판 밖(`<main>` 바로 아래)에 둔다.
     근태 교통비 명세의 `trn-toast` 는 자체 나가는 움직임이 있어 그대로. 새 모바일 토스트는 이 훅을 쓴다.
 - **Double-submit guard (2026-06-22)**: `<form action={serverAction}>` submit buttons use the shared `SubmitButton` (`ui/submit-button.tsx`, `useFormStatus`) which disables + shows a spinner while the action is in flight — prevents double-submit and the dead-button feel. New server-action forms should use it (or `disabled={isPending}` with `useTransition`).
 - **Calendar gesture isolation (2026-06-22, 2026-10-08 갱신)**: the horizontal calendar grid `stopPropagation`s its touch events (pull-to-refresh) and carries `data-swipe-back="off"` so a horizontal scroll never triggers the screen swipe-back (React `stopPropagation` does not stop the swipe engine's native listener — the marker does). Any full-width horizontal scroller or drag grid inside the shell should carry the same marker; see 「뒤로가기 — 화면 스와이프」.

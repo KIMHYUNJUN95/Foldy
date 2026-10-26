@@ -152,9 +152,11 @@ html:lang(en) .muw-kv > span:first-child, html:lang(ja) .muw-kv > span:first-chi
 /* 초대코드 */
 .muw-mono { font-family: var(--font-geist-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
 .muw-inv { display: flex; align-items: center; gap: 6px; min-height: 64px; padding: 8px 0 8px 8px; box-sizing: border-box; border-radius: 10px; }
-.muw-inv + .muw-inv { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 8px, var(--separator) 8px) 1; }
+/* 줄마다 `.muw-inv-wrap.row-collapse` 로 감싼다(지울 때 바로 접힘 · 2026-10-26) — 구분선은 감싼 요소끼리 이웃일 때. */
+.muw-inv-wrap + .muw-inv-wrap > .muw-inv { border-top: 0.5px solid var(--separator); border-image: linear-gradient(90deg, transparent 8px, var(--separator) 8px) 1; }
 .muw-inv.is-new { background: #f4f1fd; border-image: none; border-top-color: transparent; }
-.muw-inv.is-new + .muw-inv { border-image: none; border-top-color: transparent; }
+.muw-inv-wrap + .muw-inv-wrap > .muw-inv.is-new,
+.muw-inv-wrap:has(> .muw-inv.is-new) + .muw-inv-wrap > .muw-inv { border-image: none; border-top-color: transparent; }
 .muw-inv .muw-rt { font-size: 17px; font-weight: 600; }
 /* 보조 줄(역할 · 0 / 10회 · 11월 22일까지) — 한국어는 한 줄, 영어 · 일본어처럼 길면 « · » 에서 두 줄(잘라 숨기지 않는다). */
 .muw-inv .muw-rm { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }

@@ -102,21 +102,39 @@ export async function scheduleDailyReport(date: string, editedText: string, send
   const service = getSupabaseServiceClient();
 
   // 보내는 중이면 바꾸지 않는다(곧 끝난다).
-  const { data: active } = await service
+  const { data: active, error: activeError } = await service
     .from("task_report_schedules")
     .select("id, status")
     .eq("user_id", session.user.id)
+    .eq("organization_id", session.organization.id)
     .eq("report_date", day)
     .in("status", ["scheduled", "sending"]);
-  if (((active ?? []) as { status: string }[]).some((row) => row.status === "sending")) return { ok: false, reason: "busy" };
-  if ((active ?? []).length > 0) {
-    const { error: cancelError } = await service
+  if (activeError) return { ok: false, reason: "error" };
+  const activeRows = (active ?? []) as { id: string; status: string }[];
+  if (activeRows.some((row) => row.status === "sending")) return { ok: false, reason: "busy" };
+
+  // 살아 있는 예약이 있으면 **그 행을 고쳐 쓴다**(2026-10-26). 예전엔 «취소 → 새로 넣기» 두 단계라 넣기가
+  // 실패하면 원래 예약까지 사라졌다. 「살아 있는 예약은 하나」 부분 유니크 인덱스 때문에 «넣고 나서 취소»는
+  // 안 되므로, 한 번의 UPDATE 로 본문 · 시각만 바꾼다 — 실패해도 이전 예약은 그대로 남는다.
+  // `status = scheduled` 조건으로, 그 사이 틱이 집어 가(sending) 바뀐 행은 건드리지 않는다.
+  if (activeRows.length > 0) {
+    const { data: updated, error: updateError } = await service
       .from("task_report_schedules")
-      .update({ status: "cancelled" })
+      .update({ body: text, send_at: new Date(sendAt).toISOString(), error: null })
+      .eq("id", activeRows[0].id)
       .eq("user_id", session.user.id)
-      .eq("report_date", day)
-      .eq("status", "scheduled");
-    if (cancelError) return { ok: false, reason: "error" };
+      .eq("organization_id", session.organization.id)
+      .eq("status", "scheduled")
+      .select("status, send_at, sent_at, error, body")
+      .maybeSingle();
+    if (updateError) {
+      console.warn("[report-schedule] update failed:", updateError.message);
+      return { ok: false, reason: "error" };
+    }
+    if (!updated) return { ok: false, reason: "busy" };
+    revalidatePath("/mobile/tasks");
+    revalidatePath("/admin/tasks");
+    return { ok: true, schedule: view(updated as Row) };
   }
 
   const { data, error } = await service
@@ -149,6 +167,7 @@ export async function cancelDailyReportSchedule(date: string): Promise<{ ok: boo
     .from("task_report_schedules")
     .update({ status: "cancelled" })
     .eq("user_id", session.user.id)
+    .eq("organization_id", session.organization.id)
     .eq("report_date", day)
     .eq("status", "scheduled");
   if (error) return { ok: false };

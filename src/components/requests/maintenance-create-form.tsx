@@ -32,6 +32,13 @@ type MaintenanceCreateFormProps = {
 
 const URGENCY_TONES: readonly UrgencyTone[] = ["low", "normal", "high", "urgent"];
 
+/**
+ * 방 고르기의 「건물 전체」 값 — 번역된 라벨이 아니라 고정 토큰(2026-10-26). 예전엔 보는 사람 언어의 「건물 전체」가
+ * 그대로 room_label 에 저장돼 다른 언어 사용자에게 한국어 · 일본어가 남았다. 서버는 `is_building_only` + room_label "-" 로
+ * 저장하고, 화면은 플래그를 보고 사전의 `form.roomBuildingOnly` 를 그린다.
+ */
+const BUILDING_ONLY_ROOM = "__building_only__";
+
 export function MaintenanceCreateForm({
   buildingLabels,
   cleaningSessionId,
@@ -106,7 +113,7 @@ export function MaintenanceCreateForm({
     setPhotoCount(uploaderRef.current?.getItems().length ?? 0);
     setSummary({
       item: issueTitle,
-      room: `${selectedRoom} · ${localizePropertyName(selectedBuilding, buildingLabels)}`,
+      room: `${selectedRoom === BUILDING_ONLY_ROOM ? copy.form.roomBuildingOnly : selectedRoom} · ${localizePropertyName(selectedBuilding, buildingLabels)}`,
     });
     setConfirmOpen(true);
   }
@@ -137,10 +144,10 @@ export function MaintenanceCreateForm({
     const requestId = photos.requestId();
     formData.set("id", requestId);
     formData.set("propertyName", selectedBuilding);
-    formData.set("roomLabel", selectedRoom);
-    // The room dropdown's "건물 전체" entry stores the *localized* label as the room. Send an explicit
-    // flag so the server records a boolean instead of having to string-match a translated label.
-    formData.set("isBuildingOnly", selectedRoom === copy.form.roomBuildingOnly ? "1" : "0");
+    const isBuildingOnly = selectedRoom === BUILDING_ONLY_ROOM;
+    // 「건물 전체」는 번역된 라벨을 방 이름으로 보내지 않는다 — 플래그 + 고정값 "-"(서버도 같은 값으로 저장).
+    formData.set("roomLabel", isBuildingOnly ? "-" : selectedRoom);
+    formData.set("isBuildingOnly", isBuildingOnly ? "1" : "0");
     formData.set("issueTitle", issueTitle);
 
     const items = uploaderRef.current?.getItems() ?? [];
@@ -191,7 +198,7 @@ export function MaintenanceCreateForm({
               setValidationError(null);
             }}
             options={[
-              { value: copy.form.roomBuildingOnly, label: copy.form.roomBuildingOnly },
+              { value: BUILDING_ONLY_ROOM, label: copy.form.roomBuildingOnly },
               ...availableRooms.map((r) => ({ value: r, label: r })),
             ]}
             placeholder={selectedBuilding ? copy.form.roomPlaceholderSelectRoom : copy.form.roomPlaceholderSelectBuilding}

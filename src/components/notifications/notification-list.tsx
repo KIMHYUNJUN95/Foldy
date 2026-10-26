@@ -115,6 +115,7 @@ export function NotificationList({ items, todayKey, copy }: NotificationListProp
   };
 
   const fail = useCallback(() => {
+    haptic("error");
     setError(copy.actionFailed);
     window.setTimeout(() => setError(""), 3200);
   }, [copy.actionFailed]);
@@ -123,7 +124,7 @@ export function NotificationList({ items, todayKey, copy }: NotificationListProp
   const removeIds = useCallback(
     (ids: string[]) => {
       if (!ids.length) return;
-      haptic("medium");
+      haptic("light"); // 지우기 = light(햅틱 공용 규칙 — medium 은 꾹 눌러 집기 전용)
       setOpenRow(null);
       setGone((prev) => new Set([...prev, ...ids]));
       window.setTimeout(

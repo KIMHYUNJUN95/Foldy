@@ -19,6 +19,11 @@
  * - **새로고침 · 앱을 다시 연 뒤에도 쓰게(2026-10-20 점검)** — 맡긴 복제본을 한가할 때 HTML 로 sessionStorage 에도 둔다(최근
  *   `MAX_STORED` 개, 사용자별). 전에는 메모리에만 있어서 새로고침 뒤나 5단계보다 깊이 갔다 돌아올 때 밀면 아래가 빈 회색 판이었다.
  *   스크롤 위치는 복제본 요소의 `data-sb-scroll` 에 적어 두어 HTML 로 되살려도 맞춘다.
+ * - **개인정보(2026-10-26)** — 복제본에는 게스트 이름 · 연락처 같은 화면 내용이 그대로 들어 있다. 그래서 로그아웃할 때
+ *   (`clearSwipeSnapshots`) · 다른 사용자가 화면을 잡을 때(`trackScreen` 의 사용자가 바뀌면) 메모리 · sessionStorage 를 모두 비운다.
+ *   `data-no-snapshot` 이 붙은 요소는 속을 복제하지 않고 같은 크기의 빈 칸으로 둔다(민감한 칸 opt-out).
+ * - **`data-snapshot-ignore`** — 이 안의 변화(1초마다 바뀌는 경과 시계 · 당겨서 새로고침 띠)는 「화면이 바뀌었다」로 세지 않는다.
+ *   전엔 시계가 바뀔 때마다 다시 복제가 잡혀 1.5초마다 화면 전체를 복제했다.
  */
 
 type ScrollMark = [element: HTMLElement, top: number, left: number];
@@ -37,6 +42,10 @@ const STORAGE_KEY = "stayops:swipe-snapshots";
 const SCROLL_ATTR = "data-sb-scroll";
 /** 지금 로그인한 사용자 — 저장본은 이 사용자 것만 쓴다(같은 탭에서 다른 계정으로 바뀌어도 남의 화면이 깔리지 않게). */
 let owner = "";
+/** 로그아웃 뒤 — 사용자가 다시 화면을 잡을 때까지(`trackScreen`) 아무것도 저장하지 않는다(떠나는 화면의 마지막 맡김 포함). */
+let suspended = false;
+const NO_SNAPSHOT_ATTR = "data-no-snapshot";
+const IGNORE_SELECTOR = "[data-snapshot-ignore]";
 /** 화면 밖이라도 이 거리(px) 안이면 복제한다 — 경계에 걸친 줄의 그림자 · 테두리가 잘리지 않게. */
 const MARGIN = 48;
 const snapshots = new Map<number, ScreenSnapshot>();
@@ -114,6 +123,16 @@ function cloneVisible(source: Element, view: Viewport, scrolls: ScrollMark[]): E
     }
     if (!(child instanceof Element)) continue;
     const rect = child.getBoundingClientRect();
+    if (child.hasAttribute(NO_SNAPSHOT_ATTR)) {
+      // 복제 제외 — 자리만 같은 크기 빈 칸으로(내용은 메모리 · 저장본 어디에도 남지 않는다).
+      flush();
+      // 속성(aria-label · title · data-*)에도 내용이 들 수 있어 태그 · 클래스만 옮긴다.
+      const blank = document.createElement(child instanceof HTMLElement ? child.tagName.toLowerCase() : "div");
+      if (child.getAttribute("class")) blank.setAttribute("class", child.getAttribute("class")!);
+      blank.setAttribute("style", `box-sizing:border-box;width:${rect.width}px;height:${rect.height}px;overflow:hidden;visibility:hidden;`);
+      copy.appendChild(blank);
+      continue;
+    }
     if (isOutside(rect, view)) {
       // 흐름 순서대로 아래로 이어지는 형제만 묶는다(절대 위치 등 순서를 벗어난 것은 제 칸). 요소마다 getComputedStyle 을
       // 부르면 긴 목록에서 그것만으로 수백 ms 가 들어(2026-10-08 측정) 위치 비교로 대신한다.
@@ -202,9 +221,12 @@ function writeStored(entries: StoredSnapshot[]) {
 
 /** 맡긴 복제본을 한가할 때 HTML 로 저장한다. */
 function persist(index: number, url: string, node: HTMLElement) {
+  if (suspended || !owner) return;
   const idle = window.requestIdleCallback ?? ((callback: () => void) => window.setTimeout(callback, 200));
   const who = owner;
   idle(() => {
+    // 기다리는 사이 로그아웃 · 사용자가 바뀌었으면 쓰지 않는다.
+    if (suspended || who !== owner) return;
     const html = node.outerHTML;
     if (html.length > MAX_STORED_CHARS) return;
     const entries = readStored().filter((entry) => entry.index !== index && entry.owner === who);
@@ -234,9 +256,41 @@ function restoreStored(index: number | null, url: string): ScreenSnapshot | null
   return { node, scrolls, url };
 }
 
+/**
+ * 밑그림 전부 비우기 — 메모리 · sessionStorage. 로그아웃 버튼(`<form action={signOut}>` 의 onSubmit)에서 부른다. 다음
+ * `trackScreen` 까지는 새로 저장하지 않는다(로그아웃으로 떠나는 화면이 마지막으로 맡기는 복제본도 버린다).
+ */
+export function clearSwipeSnapshots(): void {
+  snapshots.clear();
+  owner = "";
+  suspended = true;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // 저장소를 못 쓰는 환경 — 메모리만 비운다.
+  }
+}
+
+/** 사용자가 바뀌었다 — 앞 사용자의 밑그림을 메모리 · 저장본에서 모두 버린다. */
+function adoptOwner(ownerId: string) {
+  suspended = false;
+  if (ownerId === owner) return;
+  snapshots.clear();
+  owner = ownerId;
+  const stored = readStored();
+  const mine = stored.filter((entry) => entry.owner === ownerId);
+  if (mine.length === stored.length) return;
+  try {
+    if (mine.length === 0) window.sessionStorage.removeItem(STORAGE_KEY);
+    else writeStored(mine);
+  } catch {
+    // 무시
+  }
+}
+
 /** `ownerId` — 지금 사용자(저장본을 사용자별로 가른다). */
 export function trackScreen(root: HTMLElement, ownerId: string): ScreenCapture {
-  owner = ownerId;
+  adoptOwner(ownerId);
   let latest: Omit<ScreenSnapshot, "url"> | null = null;
   let stale = true;
   let lastBuiltAt = 0;
@@ -277,15 +331,20 @@ export function trackScreen(root: HTMLElement, ownerId: string): ScreenCapture {
 
   // 스와이프 엔진이 판 · 루트 · 당겨서 새로고침 띠에 거는 인라인 스타일은 화면 내용이 바뀐 게 아니다. 띠를 세면 미는 동안
   // 다시 복제가 잡혀 놓은 뒤 움직임 한가운데서 메인 스레드를 수십 ms 잡았다(2026-10-21 120Hz 점검).
+  const isIgnored = (node: Node) => {
+    const element = node instanceof Element ? node : node.parentElement;
+    return Boolean(element?.closest(IGNORE_SELECTOR));
+  };
   const isContentChange = (records: MutationRecord[]) =>
     records.some(
       (record) =>
         !(
-          record.type === "attributes" &&
-          record.attributeName === "style" &&
-          (record.target === root ||
-            (record.target as Element).hasAttribute?.("data-swipe-surface") ||
-            (record.target as Element).hasAttribute?.("data-ptr-indicator"))
+          (record.type === "attributes" &&
+            (record.attributeName === "style" || record.attributeName === "data-ptr-active") &&
+            (record.target === root ||
+              (record.target as Element).hasAttribute?.("data-swipe-surface") ||
+              (record.target as Element).hasAttribute?.("data-ptr-indicator"))) ||
+          isIgnored(record.target)
         ),
     );
   const observer = new MutationObserver((records) => {
@@ -308,6 +367,8 @@ export function trackScreen(root: HTMLElement, ownerId: string): ScreenCapture {
 
   return {
     commit(index, url) {
+      // 로그아웃 중 — 떠나는 화면을 맡기지 않는다.
+      if (suspended) return;
       // 아직 전달 안 된 변경(같은 커밋 직전의 것)도 센다.
       if (isContentChange(observer.takeRecords())) stale = true;
       if (stale || !latest) build();

@@ -2195,6 +2195,9 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 쓰기는 서버 액션(service role)만 — `src/app/account/id-card/actions.ts`. 권한 키 `staff_documents.view` 시드도 같은 마이그레이션.
 표 권한(GRANT): service_role 전부 · authenticated 읽기 — `202610230002`(첫 마이그레이션에서 빠져 등록이 42501 로 실패했었다. 새 표를 만들면 GRANT 를 같이 쓴다).
 
+**2026-10-26 `uploaded_by`**(`202610260002`, 운영 적용): `uuid → profiles(id) on delete set null` — 관리자가 스캔본을 대신 올린 행이면 그 관리자, 본인이 올렸으면 null.
+대신 올린 행은 처음부터 `status = confirmed` · `confirmed_by = uploaded_by` · `ocr_used = false`. 쓰기는 `src/actions/staff-documents.ts`(41 「R4 구현」).
+
 ## 2026-10-23 `staff_id_ocr_reads` · `memberships.left_at` — 동의 기록 · 읽기 횟수 · 보관 기한 (`202610230003` · `202610230004`)
 
 `staff_id_ocr_reads` — 자동 읽기로 사진을 해외(미국) 서버에 보내기 **직전**에 서버 액션 `readIdCard` 가 한 줄 남긴다.

@@ -185,6 +185,11 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
   return { members, memberships, profileMap, emailMap, devIds, canViewIdDocs };
 }
 
+/** 「직원 서류」 탭 숫자 — 서류 목록과 같은 기준(이 조직 활성 멤버, 개발자 계정 제외). */
+export function countDocsPeople(members: DirectoryMemberVM[]): number {
+  return members.filter((m) => m.status === "active" && !m.isDeveloper).length;
+}
+
 /** 고른 사람의 상세(패널) — 목록에 없는 멤버십이면 null. */
 export async function loadMemberPanel(session: AppSession, directory: UserDirectory, membershipId: string): Promise<MemberPanelVM | null> {
   const selected = directory.memberships.find((membership) => membership.id === membershipId);

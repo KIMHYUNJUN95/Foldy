@@ -169,3 +169,27 @@ export function editedFieldsOf(read: IdDocumentFields | null, saved: IdDocumentF
   if (!read) return [];
   return fieldsForKind(kind).filter((key) => read[key] !== "" && read[key] !== saved[key]);
 }
+
+/**
+ * 관리자 대신 올리기(재류카드 R4, 2026-10-26)에서 채우는 칸 — 원본 종이를 보고 손으로 넣는다(자동 읽기 없음).
+ * 재류카드는 일하는 자격에 쓰는 다섯 칸, 마이넘버 카드는 만료일 하나. 이름 · 생년월일은 프로필에 있어 묻지 않는다.
+ */
+export function adminUploadFields(kind: IdDocumentKind): IdDocumentField[] {
+  return kind === "residence_card" ? ["cardNumber", "residenceStatus", "expiresOn", "workRestriction", "extraActivity"] : ["expiresOn"];
+}
+
+/** 대신 올리기 검사 — 재류카드는 다섯 칸 모두 · 카드 번호 모양, 마이넘버 카드는 칸이 비어도 된다(만료일은 있으면 남긴다). */
+export function validateAdminIdFields(
+  kind: IdDocumentKind,
+  fields: IdDocumentFields,
+): Partial<Record<IdDocumentField, IdFieldErrorKey>> {
+  const errors: Partial<Record<IdDocumentField, IdFieldErrorKey>> = {};
+  if (kind !== "residence_card") return errors;
+  if (!fields.expiresOn) errors.expiresOn = "required";
+  if (!fields.cardNumber) errors.cardNumber = "required";
+  else if (!CARD_NUMBER.test(fields.cardNumber)) errors.cardNumber = "card_number_invalid";
+  if (!fields.residenceStatus) errors.residenceStatus = "required";
+  if (!fields.workRestriction) errors.workRestriction = "required";
+  if (!fields.extraActivity) errors.extraActivity = "required";
+  return errors;
+}

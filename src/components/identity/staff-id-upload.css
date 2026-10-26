@@ -1,0 +1,90 @@
+/* 관리자 대신 올리기(재류카드 R4, 2026-10-26) — PC 「직원 서류」 패널 · 모바일 서류 상세 공용. 시안 M8bU3z… Upload-* */
+.siu { --siu-ink: #16141f; --siu-mute: #6f6c7c; --siu-line: #e0e0e6; --siu-purple: #7a52e6; color: var(--siu-ink); font-variant-numeric: tabular-nums; }
+.siu__title { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.siu__sub { margin: 4px 0 18px; font-size: 13px; line-height: 1.5; color: var(--siu-mute); }
+.siu__grid { display: flex; flex-direction: column; gap: 22px; }
+.siu__slots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+.siu__slot { min-width: 0; }
+.siu__lbl { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: #6b6878; }
+.siu__hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--siu-mute); }
+
+/* 사진 칸 — 카드 비율. 올린 사진은 0.15초 동안 0.97 → 1. */
+.siu__card { aspect-ratio: 85.6 / 54; border-radius: 12px; overflow: hidden; background: #f7f7f9; animation: siu-in 150ms cubic-bezier(.23, 1, .32, 1); }
+.siu__card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+@keyframes siu-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+
+.siu__drop { aspect-ratio: 85.6 / 54; border-radius: 12px; background: #f7f7f9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; font-size: 13px; color: var(--siu-mute); text-align: center; transition: background 150ms ease, box-shadow 150ms ease; }
+.siu__drop[data-over] { background: #f1ecfd; box-shadow: inset 0 0 0 1.5px var(--siu-purple); color: #5a30cf; }
+.siu__drop[data-busy] { opacity: .7; }
+.siu__pick { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: var(--siu-ink); box-shadow: 0 1px 2px rgba(22, 20, 31, .1); cursor: pointer; }
+.siu__pick:disabled { opacity: .5; cursor: default; }
+.siu__file { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; min-height: 24px; font-size: 12px; color: var(--siu-mute); }
+.siu__file span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.siu__file button, .siu__again button { padding: 4px 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #5a30cf; cursor: pointer; white-space: nowrap; }
+.siu__again { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; }
+
+.siu__empty { aspect-ratio: 85.6 / 54; border-radius: 12px; background: #f7f7f9; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 14px; font-size: 14px; color: var(--siu-mute); text-align: center; }
+.siu__empty button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: #fff; font: inherit; font-size: 15px; font-weight: 600; color: var(--siu-ink); box-shadow: 0 1px 2px rgba(22, 20, 31, .1); }
+.siu__input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* 이름표(notched) 칸 — 1px #E0E0E6 · 12px · 이름표가 윗선에 걸친다. */
+.siu__fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.siu__f { position: relative; min-width: 0; }
+.siu__fl { position: absolute; top: -8px; left: 11px; z-index: 1; padding: 0 5px; background: #fff; font-size: 12px; line-height: 16px; font-weight: 600; color: #6b6878; white-space: nowrap; pointer-events: none; transition: color 150ms ease; }
+.siu__f:focus-within > .siu__fl { color: #5a30cf; }
+.siu__in { display: block; width: 100%; height: 52px; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--siu-line); border-radius: 12px; background: #fff; font: inherit; font-size: 16px; color: var(--siu-ink); outline: none; -webkit-appearance: none; appearance: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.siu__in:focus { border-color: var(--siu-purple); box-shadow: 0 0 0 4px #eee8fc; }
+.siu__in::placeholder { color: #a3a0ad; }
+.siu__in--select { padding-right: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236F6C7C' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; text-overflow: ellipsis; }
+.siu__in--select[data-empty] { color: #a3a0ad; }
+.siu__in--other { margin-top: 8px; }
+.siu__f[data-error] .siu__in { border-color: #c4364b; }
+.siu__err { display: block; margin-top: 5px; font-size: 12px; font-weight: 600; color: #c4364b; }
+/* 대시보드 날짜 고르기(공용 `.adp`) — 칸 높이 · 테두리만 이름표 칸에 맞춘다. */
+.siu__f--expiresOn .adp { width: 100%; }
+.siu__date[data-empty] .adp__trigger { color: #a3a0ad; font-weight: 400; }
+.siu__f--expiresOn .adp__trigger { width: 100%; height: 48px; border: 1px solid var(--siu-line); border-radius: 12px; background: #fff; justify-content: flex-start; padding: 0 14px; font-size: 15px; }
+
+.siu__note { display: flex; gap: 8px; margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: #3a3746; }
+.siu__note svg { flex: none; margin-top: 2px; color: var(--siu-purple); }
+.siu__notice { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: #c4364b; }
+.siu__btns { display: flex; gap: 10px; margin-top: 16px; }
+.siu__btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease, opacity 150ms ease, background 150ms ease; }
+.siu__btn:active:not(:disabled) { transform: scale(.97); }
+.siu__btn:disabled { opacity: .5; cursor: default; }
+.siu__btn--pri { background: var(--siu-purple); color: #fff; }
+.siu__btn--pri[data-saved] { opacity: 1; }
+.siu__btn--sec { background: #f2f2f5; color: var(--siu-ink); }
+/* 저장 확인 — 체크를 그린다. */
+.siu__check path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: siu-draw 320ms cubic-bezier(.23, 1, .32, 1) forwards; }
+@keyframes siu-draw { to { stroke-dashoffset: 0; } }
+
+/* PC 패널 — 앞 · 뒤 나란히, 칸은 두 줄 격자(번호 · 재류자격 · 자격외활동은 한 줄 전체). */
+.siu--pc .siu__slots[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.siu--pc .siu__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+.siu--pc .siu__f--cardNumber, .siu--pc .siu__f--residenceStatus, .siu--pc .siu__f--extraActivity { grid-column: 1 / -1; }
+.siu--pc .siu__in { height: 48px; font-size: 15px; }
+.siu--pc .siu__btn { height: 46px; border-radius: 12px; font-size: 15px; }
+.siu--pc .siu__grid { gap: 20px; }
+
+/* 폴드(≥ 600) — 왼쪽 사진 · 오른쪽 칸. */
+@media (min-width: 600px) {
+  .siu--mobile .siu__title { font-size: 24px; }
+  .siu--mobile .siu__sub { font-size: 14px; margin-bottom: 22px; }
+  .siu--mobile .siu__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .siu--mobile .siu__side { padding-top: 22px; }
+}
+/* 태블릿 2분할 칸(프레임 안) — PC 패널과 같은 배치. */
+html[data-pane] .siu--mobile .siu__grid { display: flex; flex-direction: column; gap: 22px; }
+html[data-pane] .siu--mobile .siu__side { padding-top: 0; }
+html[data-pane] .siu--mobile .siu__slots[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+html[data-pane] .siu--mobile .siu__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+html[data-pane] .siu--mobile .siu__f--cardNumber,
+html[data-pane] .siu--mobile .siu__f--residenceStatus,
+html[data-pane] .siu--mobile .siu__f--extraActivity { grid-column: 1 / -1; }
+html[data-pane] .siu--mobile .siu__in { height: 48px; font-size: 15px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .siu__card { animation: none; }
+  .siu__check path { animation: none; stroke-dashoffset: 0; }
+}

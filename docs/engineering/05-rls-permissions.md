@@ -1537,6 +1537,10 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 버킷 `staff-documents`(비공개, 8MB, jpeg/png/webp): **올리기만** 본인 — 경로 `{조직}/{auth.uid()}/{uuid}/{front|back}-{임의}.jpg` · 그 조직 활성 멤버.
   읽기 · 지우기 정책 없음 — 보기는 서버의 10분 서명 URL, 지우기는 서버(쓰지 않은 사진 · 개인번호가 보인 사진).
 - 관리자 사용자 패널은 `staff_documents.view` 가 없으면 서류 데이터를 싣지 않는다(UI 숨김만이 아님).
+- **관리자 대신 올리기(2026-10-26)**: 버킷 올리기 정책은 그대로(본인 경로만). 남의 경로에 올리는 길은 서버 액션 `prepareStaffIdUpload` 하나 —
+  사용자 관리 문(`actorCanOpenUserManagement`) + `staff_documents.view` + 대상이 같은 조직 활성 멤버(개발자 계정 · 자기 자신 제외, 개발자 예외)를 본 뒤
+  service role 로 **그 경로 하나에 묶인 일회용 서명 업로드 주소**를 만든다. 저장(`saveStaffIdDocumentByAdmin`)은 경로 모양 · 폴더 실제 파일을 다시 대조하고,
+  모든 service role 쓰기에 `organization_id` 조건. 그만둔 사진은 `discardStaffIdUpload` 가 지운다(행이 있으면 안 지움). `/admin/users/documents` · `/mobile/users/documents` 화면도 같은 문.
 
 ## 2026-10-23 재류카드 「만료됨」 한 비트는 운영 화면 권한으로 본다
 

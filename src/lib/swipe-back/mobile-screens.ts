@@ -76,5 +76,7 @@ export const MOBILE_SCREENS: readonly string[] = [
   "/mobile/users",
   "/mobile/users/[id]",
   "/mobile/users/[id]/shift",
+  "/mobile/users/documents",
+  "/mobile/users/documents/[userId]",
   "/mobile/users/invites",
 ];

@@ -4,6 +4,7 @@ import { getDictionary } from "@/lib/i18n";
 import { DEFAULT_INVITE_MAX_USES, defaultInviteExpiry, generateInviteCode } from "@/lib/invite-code-gen";
 import { listManageableOrganizations, selectableInviteRoles } from "@/lib/invite-codes-server";
 import { getMobileNavBadges } from "@/lib/nav-badges";
+import { loadStaffDocumentRoster } from "@/lib/staff-documents/roster-server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { tokyoToday } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
@@ -44,6 +45,11 @@ export default async function MobileInvitesPage() {
     navBadgesPromise,
   ]);
   const invites = (inviteData ?? []) as InviteCodeRow[];
+  // 「서류」 탭(R4) — 권한이 있을 때만, 숫자는 서류 목록과 같은 기준.
+  const docsCount =
+    session.organization.id !== "platform" && session.capabilities.includes("staff_documents.view")
+      ? (await loadStaffDocumentRoster(session)).length
+      : null;
 
   const today = tokyoToday();
   const now = nowMs();
@@ -98,6 +104,7 @@ export default async function MobileInvitesPage() {
         defaultExpiresAt={defaultInviteExpiry(today)}
         defaultMaxUses={DEFAULT_INVITE_MAX_USES}
         memberCount={memberCountResult.count ?? null}
+        docsCount={docsCount}
         locale={locale}
       />
     </MobileShell>

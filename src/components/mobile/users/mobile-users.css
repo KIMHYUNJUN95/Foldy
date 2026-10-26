@@ -258,3 +258,28 @@ html[data-pane] .muw-d { max-width: 600px; }
   html:not([data-pane]) .mpay-hint, html:not([data-pane]) .mpay-err { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) { .mpay-step button { transition: none; } .mpay-step button:active { transform: none; } }
+
+/* ── 서류 탭(재류카드 R4, 2026-10-26, 시안 M8bU3z… Docs-*) ─────────────────────────── */
+.muw-tab-l { display: none; }
+@media (min-width: 600px) { .muw-tab-s { display: none; } .muw-tab-l { display: inline; } }
+/* 거르기 — 칩 대신 밑줄 글 단추 + 숫자, 좁으면 줄바꿈. 바꿀 때 움직임 없음. */
+.muw-dfl { display: flex; flex-wrap: wrap; gap: 0 16px; margin: 8px 0 4px; }
+.muw-dfl button { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; color: #6f6c7c; white-space: nowrap; }
+.muw-dfl button b { font-weight: 600; color: inherit; }
+.muw-dfl button b.is-red { color: #c4364b; }
+.muw-dfl button[aria-pressed="true"] { color: #16141f; font-weight: 600; box-shadow: inset 0 -2px 0 #16141f; }
+.muw-dlist { display: flex; flex-direction: column; margin-top: 4px; }
+.muw-dst { flex: none; max-width: 42%; font-size: 14px; font-weight: 600; color: #16141f; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muw-dst.is-red { color: #c4364b; }
+.muw-dst.is-mute { color: #6f6c7c; font-weight: 400; }
+.muw-dst.is-link { color: #5a30cf; }
+
+/* 서류 상세(폰 · 폴드 · 태블릿 칸) */
+.muw-doc-detail { color: #16141f; padding-bottom: 28px; }
+.muw-doc-detail .muw-dh { display: flex; align-items: center; gap: 12px; margin: 4px 0 2px; }
+.muw-doc-detail .muw-dh h1 { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.muw-doc-detail .muw-dsub { margin: 2px 0 16px; font-size: 14px; color: #6f6c7c; }
+.muw-doc-detail .idp { margin-top: 0; padding-top: 0; border-top: 0; }
+.muw-doc-detail .muw-dnew { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; font-size: 15px; font-weight: 600; color: #5a30cf; text-decoration: none; }
+.muw-doc-detail .muw-dnote { margin: 12px 0 0; font-size: 15px; line-height: 1.6; color: #3a3746; }
+@media (min-width: 600px) { .muw-doc-detail .muw-dh h1 { font-size: 28px; } }

@@ -4,7 +4,7 @@ import { UsersConsole } from "@/components/admin/users/users-console";
 import { requireAdminSession } from "@/lib/admin-session";
 import { actorCanOpenUserManagement } from "@/lib/user-management-access";
 import { getDictionary } from "@/lib/i18n";
-import { loadMemberPanel, loadUsableInviteCount, loadUserDirectory } from "@/lib/user-management-data";
+import { countDocsPeople, loadMemberPanel, loadUsableInviteCount, loadUserDirectory } from "@/lib/user-management-data";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -38,6 +38,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         locale={session.user.preferredLanguage}
         actorRole={session.user.role}
         inviteCount={inviteCount}
+        docsCount={directory.canViewIdDocs ? countDocsPeople(directory.members) : null}
       />
     </AdminShell>
   );

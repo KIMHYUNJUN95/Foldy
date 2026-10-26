@@ -135,7 +135,9 @@ export function IdDocumentPanel({
       </dl>
 
       <p className="idp__meta">
-        {copy.viewSubmitted.replace("{date}", formatDateKey(doc.submittedAt.slice(0, 10), locale))} · {doc.ocrUsed ? copy.adminOcr : copy.adminManual}
+        {doc.uploadedByAdmin
+          ? copy.adminUploadedByAdmin.replace("{date}", formatDateKey(doc.submittedAt.slice(0, 10), locale))
+          : `${copy.viewSubmitted.replace("{date}", formatDateKey(doc.submittedAt.slice(0, 10), locale))} · ${doc.ocrUsed ? copy.adminOcr : copy.adminManual}`}
         {editedLabels ? <><br />{copy.adminEdited.replace("{fields}", editedLabels)}</> : null}
         {doc.confirmedAt && doc.confirmedByName ? (
           <>

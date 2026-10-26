@@ -11,6 +11,7 @@ import { AdminShell } from "@/components/shell/admin-shell";
 import { InviteCreateForm } from "@/components/admin/users/invite-create-form";
 import { UsersSectionTabs } from "@/components/admin/users/users-section-tabs";
 import "@/components/admin/users/users-white.css";
+import { loadStaffDocumentRoster } from "@/lib/staff-documents/roster-server";
 import { listManageableOrganizations, selectableInviteRoles } from "@/lib/invite-codes-server";
 import { getDictionary } from "@/lib/i18n";
 import {
@@ -125,6 +126,9 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
           .from("memberships")
           .select("id", { count: "exact", head: true })
           .eq("organization_id", session.organization.id);
+  // 「직원 서류」 탭(R4) — 권한이 있을 때만 그리고, 숫자는 서류 목록과 같은 기준.
+  const canViewDocs = session.organization.id !== "platform" && session.capabilities.includes("staff_documents.view");
+  const docsCount = canViewDocs ? (await loadStaffDocumentRoster(session)).length : null;
   const flash = created
     ? settings.success.inviteCreated
     : deactivated
@@ -141,8 +145,8 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
       <div className="usi">
         <UsersSectionTabs
           active="invites"
-          labels={{ members: tabs.tabMembers, invites: tabs.tabInvites }}
-          counts={{ members: memberCount ?? undefined, invites: liveCount }}
+          labels={{ members: tabs.tabMembers, invites: tabs.tabInvites, documents: canViewDocs ? tabs.tabDocs : null }}
+          counts={{ members: memberCount ?? undefined, invites: liveCount, documents: docsCount ?? undefined }}
         />
         <div className="usi-grid">
           <section aria-labelledby="usi-new">

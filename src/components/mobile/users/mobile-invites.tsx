@@ -50,6 +50,7 @@ export function MobileInvites({
   defaultExpiresAt,
   defaultMaxUses,
   memberCount,
+  docsCount = null,
   locale,
 }: {
   rows: MobileInviteRow[];
@@ -60,6 +61,8 @@ export function MobileInvites({
   defaultExpiresAt: string;
   defaultMaxUses: number;
   memberCount: number | null;
+  /** 「서류」 탭 숫자(R4) — 권한이 없으면 null. */
+  docsCount?: number | null;
   locale: Locale;
 }) {
   const router = useRouter();
@@ -337,7 +340,7 @@ export function MobileInvites({
 
   return (
     <div className="muw">
-      <MobileUsersHead active="invites" locale={locale} memberCount={memberCount} inviteCount={live} />
+      <MobileUsersHead active="invites" locale={locale} memberCount={memberCount} inviteCount={live} docsCount={docsCount} />
       {/* 만든 직후에는 목록을 위로 — 방금 만든 코드를 바로 복사하게(시안 ⑫). */}
       {freshId ? (
         <>

@@ -84,6 +84,7 @@ export function UsersConsole({
   locale,
   actorRole,
   inviteCount,
+  docsCount,
 }: {
   members: DirectoryMemberVM[];
   panel: MemberPanelVM | null;
@@ -91,6 +92,8 @@ export function UsersConsole({
   locale: Locale;
   actorRole: string;
   inviteCount: number | null;
+  /** 「직원 서류」 탭 숫자 — `staff_documents.view` 가 없으면 null(탭 없음). */
+  docsCount: number | null;
 }) {
   const router = useRouter();
   const dict = getDictionary(locale);
@@ -149,8 +152,8 @@ export function UsersConsole({
       <div className="usw-bar">
         <UsersSectionTabs
           active="members"
-          labels={{ members: c.tabMembers, invites: c.tabInvites }}
-          counts={{ members: members.length, invites: inviteCount ?? undefined }}
+          labels={{ members: c.tabMembers, invites: c.tabInvites, documents: docsCount != null ? c.tabDocs : null }}
+          counts={{ members: members.length, invites: inviteCount ?? undefined, documents: docsCount ?? undefined }}
         />
         <form className="usw-search" role="search" onSubmit={(event) => event.preventDefault()}>
           <Search size={14} aria-hidden="true" />

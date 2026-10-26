@@ -234,7 +234,8 @@ export async function reviewIdDocument(input: ReviewIdDocumentInput): Promise<{ 
     )
     .eq("id", input.documentId);
   if (error) return { ok: false, errorKey: "failed" };
-  revalidatePath("/admin/users");
-  revalidatePath("/mobile/users");
+  // 「직원 서류」 탭(`/admin/users/documents` · `/mobile/users/documents`, R4)까지 — 그 아래 전부.
+  revalidatePath("/admin/users", "layout");
+  revalidatePath("/mobile/users", "layout");
   return { ok: true };
 }

@@ -35,10 +35,13 @@ function matches(m: DirectoryMemberVM, query: string, f: Filter) {
 export function MobileUsersList({
   members,
   inviteCount,
+  docsCount = null,
   locale,
 }: {
   members: DirectoryMemberVM[];
   inviteCount: number | null;
+  /** 「서류」 탭 숫자 — `staff_documents.view` 가 없으면 null(탭 없음). */
+  docsCount?: number | null;
   locale: Locale;
 }) {
   const dict = getDictionary(locale);
@@ -97,7 +100,7 @@ export function MobileUsersList({
 
   return (
     <div className="muw">
-      <MobileUsersHead active="members" locale={locale} memberCount={members.length} inviteCount={inviteCount} />
+      <MobileUsersHead active="members" locale={locale} memberCount={members.length} inviteCount={inviteCount} docsCount={docsCount} />
 
       <form className="muw-search" role="search" onSubmit={(event) => event.preventDefault()}>
         <Search aria-hidden="true" />

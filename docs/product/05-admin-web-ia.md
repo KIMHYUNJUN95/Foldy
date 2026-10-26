@@ -1273,6 +1273,9 @@ Management Console" → Current Implementation Note.
   초대 시 부여 가능한 기본 역할의 상한(개발자/owner/전무는 전체, 그 외는 `officeAdminAssignableRoles`만)은
   그대로 유지된다. 옛 경로(`/admin/settings/invite-codes`)는 새 경로로 리다이렉트만 하는 스텁으로 남아
   있다. 설정 페이지의 초대코드 카드는 제거됐다.
+- **직원 서류 — 세 번째 탭 (2026-10-26)**: `/admin/users/documents` 「직원 서류」 — `staff_documents.view` 가 있을 때만 탭이 보이고
+  서버도 같은 문(사용자 관리 + 이 권한)으로 막는다. 할 일 순 목록 · 숫자 거르기(밑줄 글 단추) · 검색 · 인쇄 · 오른쪽 공용 `.panel`(`?u=` 확인 칸 · `&upload=1` 관리자 대신 올리기).
+  표 머리 · 줄은 사용자 목록과 같은 `usw-th` · `usw-tr` 격자. 도메인 `docs/product/41-residence-card-workflow.md` 「R4 구현」.
 
   **초대코드 생성 폼 자동화 (2026-09-09).** 폼에서 손으로 채우는 항목은 **조직과 역할 2개뿐**이다.
   나머지 네 값은 자동으로 만들어진다.

@@ -37,6 +37,8 @@ export type IdDocumentView = {
   confirmedAt: string | null;
   confirmedByName: string | null;
   submittedAt: string;
+  /** 관리자가 종이 복사본으로 대신 올렸다(R4, 2026-10-26) — 「관리자가 올림」. 본인이 올렸으면 false. */
+  uploadedByAdmin: boolean;
   /** 만료까지 남은 날(도쿄). 만료일이 없으면 null. */
   expiryDays: number | null;
 };
@@ -102,6 +104,7 @@ export async function loadCurrentIdDocument(
     confirmedAt: row.confirmed_at,
     confirmedByName,
     submittedAt: row.created_at,
+    uploadedByAdmin: Boolean(row.uploaded_by),
     expiryDays: daysUntil(fields.expiresOn, tokyoToday()),
   };
 }

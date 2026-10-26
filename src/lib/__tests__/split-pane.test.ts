@@ -27,6 +27,13 @@ describe("split pane detail patterns", () => {
     expect(matchesDetail(P.users, "/mobile/users/cb934ba7-66b2-49a9-abdc-3fff26fa80ab")).toBe(true);
     expect(matchesDetail(P.users, "/mobile/users/invites")).toBe(false);
     expect(matchesDetail(P.users, "/mobile/users")).toBe(false);
+    expect(matchesDetail(P.users, "/mobile/users/documents")).toBe(false);
+  });
+
+  it("staff papers open one person, not the list (R4 2026-10-26)", () => {
+    expect(matchesDetail(P.staffDocs, "/mobile/users/documents/cb934ba7-66b2-49a9-abdc-3fff26fa80ab")).toBe(true);
+    expect(matchesDetail(P.staffDocs, "/mobile/users/documents/cb934ba7-66b2-49a9-abdc-3fff26fa80ab?upload=1")).toBe(true);
+    expect(matchesDetail(P.staffDocs, "/mobile/users/documents")).toBe(false);
   });
 
   it("notifications open any feature detail in the pane, nothing else (2026-10-05)", () => {

@@ -3,7 +3,7 @@ import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
-import { loadUsableInviteCount, loadUserDirectory } from "@/lib/user-management-data";
+import { countDocsPeople, loadUsableInviteCount, loadUserDirectory } from "@/lib/user-management-data";
 import { requireMobileUserManagement } from "./gate";
 
 /**
@@ -18,7 +18,12 @@ export default async function MobileUsersPage() {
   return (
     <MobileShell activeItem="users" badges={navBadges} title={getDictionary(locale).admin.users.title} split>
       <SplitList detail="users">
-        <MobileUsersList members={directory.members} inviteCount={inviteCount} locale={locale} />
+        <MobileUsersList
+          members={directory.members}
+          inviteCount={inviteCount}
+          docsCount={directory.canViewIdDocs ? countDocsPeople(directory.members) : null}
+          locale={locale}
+        />
       </SplitList>
     </MobileShell>
   );

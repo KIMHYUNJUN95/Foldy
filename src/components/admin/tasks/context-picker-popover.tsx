@@ -1,9 +1,9 @@
 "use client";
 
-// Admin-console counterpart of the mobile `ContextPickerSheet` — same building → room →
-// reservation data flow (see src/actions/task-context.ts), but rendered as a desktop
-// popover (`.pop`) instead of a bottom sheet, and driven by a local draft + single Apply button
-// to match this console's other popovers (see `SchedulePopover` in admin-tasks-console.tsx).
+// 모바일 `ContextPickerSheet` 의 관리자 콘솔 짝 — 같은 건물 → 방 →
+// 예약 데이터 흐름(src/actions/task-context.ts 참고)이지만, 하단 시트 대신 데스크톱
+// 팝오버(`.pop`)로 그리고, 로컬 초안 + 단일 적용 버튼으로 동작해
+// 이 콘솔의 다른 팝오버와 맞춘다 (admin-tasks-console.tsx 의 `SchedulePopover` 참고).
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Building2,
@@ -29,16 +29,16 @@ import {
   type RoomReservation,
 } from "@/actions/task-context";
 
-// The operational context a task can be linked to. Mirrors the mobile `LinkedContext` shape,
-// minus channel/date fields the admin console doesn't render.
+// 할 일에 연결할 수 있는 운영 컨텍스트. 모바일 `LinkedContext` 모양을 따르되,
+// 관리자 콘솔이 그리지 않는 채널/날짜 필드는 뺐다.
 export type TaskContextValue = {
   propertyId: string | null;
   roomId: string | null;
   reservationId: string | null;
   guestName: string | null;
-  /** Display-only — already localized (server actions resolve names via the session locale). */
+  /** 표시 전용 — 이미 현지화됨 (서버 액션이 세션 로케일로 이름을 해석한다). */
   propertyName: string | null;
-  /** Display-only room label. */
+  /** 표시 전용 방 라벨. */
   roomLabel: string | null;
 };
 
@@ -85,7 +85,7 @@ export type ContextPickerCopy = {
 
 type Step = "building" | "room";
 
-// ── Small presentational helpers ────────────────────────────────────────────────────────────
+// ── 작은 표시용 헬퍼 ────────────────────────────────────────────────────────────
 
 function Spinner({ label }: { label: string }) {
   return (
@@ -106,7 +106,7 @@ function EmptyPane({ icon, title, sub }: { icon: ReactNode; title: string; sub?:
 }
 
 function channelLabel(channel: "airbnb" | "booking" | "direct", directLabel: string): string {
-  // Channel brand names are left untranslated, matching the mobile picker's existing precedent.
+  // 채널 브랜드 이름은 번역하지 않는다. 모바일 피커의 기존 선례와 같다.
   return channel === "airbnb" ? "Airbnb" : channel === "booking" ? "Booking" : directLabel;
 }
 
@@ -215,14 +215,14 @@ function SearchResultRow({
   onTap,
 }: {
   result: ReservationSearchResult;
-  /** Localized building name, resolved by the caller against the already-fetched buildings list. */
+  /** 현지화된 건물 이름. 호출자가 이미 가져온 건물 목록에서 해석한다. */
   propertyLabel: string;
   copy: ContextPickerCopy;
   selected: boolean;
   onTap: () => void;
 }) {
-  // Okubo-style buildings resolve displayRoomLabel to the property name itself — omit the
-  // redundant room suffix in that case (mirrors the mobile sheet's same check).
+  // 오쿠보식 건물은 displayRoomLabel 이 프로퍼티 이름 그 자체로 해석되므로 그 경우
+  // 중복되는 방 접미사를 생략한다 (모바일 시트의 같은 검사와 같다).
   const showRoom = result.displayRoomLabel && result.displayRoomLabel !== result.propertyName;
   return (
     <button type="button" className={`ritem ${selected ? "on" : ""}`} onClick={onTap}>
@@ -251,7 +251,7 @@ function SearchResultRow({
   );
 }
 
-// ── Main component ──────────────────────────────────────────────────────────────────────────
+// ── 메인 컴포넌트 ──────────────────────────────────────────────────────────────────────────
 
 export function ContextPickerPopover({
   value,
@@ -286,14 +286,14 @@ export function ContextPickerPopover({
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Snapshot of the incoming value at mount time, used only to auto-resolve the building/room
-  // panes once when re-opening an already-linked task. `useRef` (not a dep) keeps this a one-time
-  // hydration hint — later `value` prop changes must not fight the user's in-progress draft.
+  // 마운트 시점의 들어온 값 스냅샷으로, 이미 연결된 할 일을 다시 열 때 건물/방 패널을
+  // 한 번 자동으로 해석하는 데만 쓴다. `useRef` (의존성 아님)로 일회성
+  // 하이드레이션 힌트로 둔다 — 이후 `value` prop 변경이 사용자가 작성 중인 초안과 다투면 안 된다.
   const initialValueRef = useRef(value);
 
-  // Buildings are the entry pane — fetch once on open. Room/reservation hydration for an
-  // already-linked task chains inside this same effect (nested awaits, no synchronous setState
-  // in the effect body) so re-opening the popover on a linked task restores the full path.
+  // 건물은 진입 패널이다 — 열릴 때 한 번 가져온다. 이미 연결된 할 일의 방/예약
+  // 하이드레이션은 같은 effect 안에서 이어진다 (중첩 await, effect 본문에서 동기
+  // setState 없음) 그래서 연결된 할 일에서 팝오버를 다시 열면 전체 경로가 복원된다.
   useEffect(() => {
     let cancelled = false;
     const initial = initialValueRef.current;
@@ -302,7 +302,7 @@ export function ContextPickerPopover({
       try {
         list = await fetchPickerBuildings();
       } catch {
-        // fall through with an empty list
+        // 빈 목록으로 이어짐
       }
       if (cancelled) return;
       setBuildings(list);
@@ -318,7 +318,7 @@ export function ContextPickerPopover({
       try {
         roomList = await fetchPickerRooms(b.id);
       } catch {
-        // fall through with an empty list
+        // 빈 목록으로 이어짐
       }
       if (cancelled) return;
       setRooms(roomList);
@@ -348,8 +348,8 @@ export function ContextPickerPopover({
     };
   }, []);
 
-  // Debounced cross-building reservation search (building pane only). Short-query resets happen
-  // at the call sites (query onChange / clear button), not synchronously in this effect body.
+  // 디바운스된 건물 간 예약 검색 (건물 패널에서만). 짧은 쿼리 리셋은
+  // 이 effect 본문이 아니라 호출 지점(쿼리 onChange / 지우기 버튼)에서 동기적으로 일어나지 않는다.
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     const q = query.trim();
@@ -376,9 +376,9 @@ export function ContextPickerPopover({
 
   const isSearchMode = query.trim().length >= 2;
 
-  // Fetches are triggered from the tap handler itself (not a state-reactive effect) — the pane
-  // "opens" exactly when the user taps into it, and every setState here is either synchronous
-  // (immediate UI feedback) or inside the async fetch's own callback.
+  // 가져오기는 탭 핸들러 자체에서 시작된다 (상태에 반응하는 effect 가 아니라) — 패널은
+  // 사용자가 탭해 들어가는 바로 그 순간 "열리며", 여기의 모든 setState 는 동기적이거나
+  // (즉각적인 UI 피드백) 비동기 fetch 자신의 콜백 안에 있다.
   const handleBuildingTap = (b: PickerBuilding) => {
     setSelectedBuilding(b);
     setSelectedRoom(null);

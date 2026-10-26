@@ -1,13 +1,13 @@
 import "server-only";
 
-// Real-data layer for the admin 분실물(lost & found) console. Mirrors `admin-maintenance.ts`:
-// presentation-ready flat view models, org-scoped queries, and a `loadError` flag so the KPI strip
-// can show "-" instead of a misleading zero.
+// 관리자 분실물(lost & found) 콘솔의 실제 데이터 계층. `admin-maintenance.ts` 와 같은 형태:
+// 표시용으로 평평하게 만든 뷰 모델, 조직 범위 쿼리, 그리고 KPI 줄이
+// 오해를 부르는 0 대신 "-" 를 보이게 하는 `loadError` 플래그.
 //
-// The lost & found console adds a DERIVED storage lifecycle on top of the maintenance shape:
+// 분실물 콘솔은 수리·점검 형태 위에 DERIVED 보관 생애주기를 더한다:
 //   · 보관 시계 — 발견 후 14일(또는 hold_until)까지 보관, 만료 3일 전부터 폐기예정, 만료 시 자동 폐기.
 //   · 삭제 시계 — 폐기 후 90일이 지나면 자동 하드 삭제(삭제 7일 전부터 임박).
-// 이 값들은 저장하지 않고 조회 시점에 도쿄 날짜로 계산한다. See docs/product/09-lost-found-workflow.md.
+// 이 값들은 저장하지 않고 조회 시점에 도쿄 날짜로 계산한다. docs/product/09-lost-found-workflow.md 참고.
 
 import {
   LOST_FOUND_DISPOSAL_RETENTION_DAYS,
@@ -37,7 +37,7 @@ export type AdminLostItemVM = {
   room: string | null;
   reporterId: string;
   reporterName: string;
-  /** "YYYY-MM-DD HH:MM" (Tokyo). */
+  /** "YYYY-MM-DD HH:MM" (도쿄). */
   foundAt: string;
   photoCount: number;
   photos: readonly string[];
@@ -45,7 +45,7 @@ export type AdminLostItemVM = {
   description: string;
   guest: { name: string; checkIn: string; checkOut: string } | null;
   // 보관 시계(도쿄, 파생 — 저장 안 함)
-  /** "YYYY-MM-DD" = hold_until ?? found+14. */
+  /** "YYYY-MM-DD" = hold_until ?? 발견일+14. */
   dueDate: string;
   storedDays: number;
   daysLeft: number;
@@ -76,7 +76,7 @@ export type AdminLostFoundData = {
 
 const TOKYO_TZ = "Asia/Tokyo";
 
-/** "YYYY-MM-DD" in Tokyo. */
+/** 도쿄 기준 "YYYY-MM-DD". */
 function tokyoDateKey(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: TOKYO_TZ,
@@ -86,7 +86,7 @@ function tokyoDateKey(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** "YYYY-MM-DD HH:MM" in Tokyo — the format the console's formatters expect. */
+/** 도쿄 기준 "YYYY-MM-DD HH:MM" — 콘솔 포매터가 기대하는 형식. */
 function tokyoStamp(iso: string | null): string | null {
   if (!iso) return null;
   const parts = new Intl.DateTimeFormat("en-GB", {

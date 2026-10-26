@@ -1,4 +1,4 @@
-// User-management access — the gate for /admin/users, /mobile/users and their server actions.
+// 사용자 관리 접근 — /admin/users, /mobile/users 및 그 서버 액션의 게이트.
 //
 // 접근 = 개발자 + **대표 · 전무(역할 기본, 2026-10-20 사용자 결정)** + `user.manage` 를 개인 부여받은 사람. 판정은 권한 레지스트리
 // (`evaluateCapability("user.manage")`) 한 곳 — 2026-07-13 모델은 「개발자가 기본, 개인에게 위임」이었고(위임 수단은 2026-09-10 에
@@ -23,7 +23,7 @@ async function canManageInOrg(organizationId: string, actorUserId: string, orgRo
   return evaluateCapability({ capability: "user.manage", role: orgRole, granted, denied: false });
 }
 
-/** May the actor OPEN the user-management screen at all? 개발자이거나, 어느 활성 조직에서든 대표 · 전무이거나 `user.manage` 를 받았다. */
+/** 행위자가 사용자 관리 화면을 열 수 있는가? 개발자이거나, 어느 활성 조직에서든 대표 · 전무이거나 `user.manage` 를 받았다. */
 export async function actorCanOpenUserManagement(actorUserId: string, actorRole: Role): Promise<boolean> {
   if (isDeveloper(actorRole)) return true;
   const service = getSupabaseServiceClient();
@@ -38,7 +38,7 @@ export async function actorCanOpenUserManagement(actorUserId: string, actorRole:
   return false;
 }
 
-/** May the actor manage users WITHIN a specific org? 개발자이거나 그 조직의 대표 · 전무이거나 그 조직에서 `user.manage` 를 받았다. */
+/** 행위자가 특정 조직 안에서 사용자를 관리할 수 있는가? 개발자이거나 그 조직의 대표 · 전무이거나 그 조직에서 `user.manage` 를 받았다. */
 export async function actorCanManageUsersInOrg(
   actorUserId: string,
   actorRole: Role,

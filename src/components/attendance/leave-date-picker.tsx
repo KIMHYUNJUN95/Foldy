@@ -55,7 +55,7 @@ export function LeaveDatePicker({
   startDate: string;
   endDate: string;
   singleDay?: boolean;
-  /** e.g. bereavement leave: tapping one day auto-fills this many days from that date. */
+  /** 예: 경조사 휴가 — 하루를 누르면 그 날짜부터 이 일수만큼 자동으로 채운다. */
   fixedRangeDays?: number;
   onApply: (start: string, end: string) => void;
   onClose: () => void;
@@ -69,25 +69,25 @@ export function LeaveDatePicker({
   const [viewYear, setViewYear] = useState(() => Number(startDate.slice(0, 4)));
 
   function tap(key: string) {
-    // Past dates are allowed — leave is sometimes taken first and the request filed afterward.
+    // 지난 날짜도 허용한다 — 휴가를 먼저 쓰고 나중에 신청하는 경우가 있다.
     if (fixedRangeDays) {
-      // e.g. bereavement leave: one tap picks the start date, the fixed span follows automatically
+      // 예: 경조사 휴가 — 한 번 탭하면 시작일이 정해지고 고정 기간이 자동으로 따라온다
       setDStart(key);
       setDEnd(addDaysISO(key, fixedRangeDays - 1));
       return;
     }
     if (singleDay) {
-      // half-day requests can only span a single calendar day
+      // 반차 신청은 하루만 선택할 수 있다
       setDStart(key);
       setDEnd(key);
       return;
     }
     if (dEnd !== null || key < dStart) {
-      // start a fresh range
+      // 새 범위 시작
       setDStart(key);
       setDEnd(null);
     } else {
-      // second tap completes the range (same day → 1-day range)
+      // 두 번째 탭으로 범위 완성(같은 날 → 1일 범위)
       setDEnd(key);
     }
   }

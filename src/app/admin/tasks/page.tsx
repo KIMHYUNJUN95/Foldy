@@ -6,7 +6,7 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 
 // 어드민 Todoist 콘솔 — 데스크톱 워크스페이스(모바일 코어 패리티 + 업무 지시).
 // AdminShell 이 사이드바/탑바를 소유하고, 그 안에 Todoist 콘솔(서브내비 + 뷰 + 상세/팝오버)을 렌더한다.
-// See docs/product/28-admin-todoist-console.md.
+// docs/product/28-admin-todoist-console.md 참고.
 export default async function AdminTasksPage() {
   const session = await requireAdminPageSession({ nextPath: "/admin/tasks" });
   const locale = session.user.preferredLanguage;

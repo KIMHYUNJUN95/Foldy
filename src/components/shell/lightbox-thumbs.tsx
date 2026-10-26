@@ -5,10 +5,10 @@ import { useState } from "react";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
 
 /**
- * A wrap of square photo thumbnails that open in the in-app {@link ImageLightbox} instead of a
- * `target="_blank"` new tab (which ejects an installed standalone PWA into Safari). The caller
- * passes the exact wrapper/thumb classes so each surface keeps its original look — this only
- * swaps the `<a>` breakout for a `<button>` that opens the shared viewer.
+ * 앱 안 {@link ImageLightbox} 로 열리는 정사각형 사진 썸네일 묶음. 설치된 독립 PWA 를 Safari 로 내쫓는
+ * `target="_blank"` 새 탭을 대신한다. 호출하는 쪽이
+ * 래퍼/썸네일 클래스를 정확히 넘겨 각 화면이 원래 모양을 유지한다 — 이것은
+ * `<a>` 이탈을 공용 뷰어를 여는 `<button>` 으로 바꿀 뿐이다.
  */
 export function LightboxThumbs({
   urls,
@@ -18,9 +18,9 @@ export function LightboxThumbs({
   sizes = "72px",
 }: {
   urls: string[];
-  /** Class for the flex-wrap container (matches the original markup). */
+  /** flex-wrap 컨테이너 클래스 (원래 마크업과 같음). */
   wrapClassName: string;
-  /** Class for each sized thumbnail box (the element that was inside the old `<a>`). */
+  /** 크기가 정해진 썸네일 상자 클래스 (예전 `<a>` 안에 있던 요소). */
   thumbClassName: string;
   closeLabel: string;
   sizes?: string;

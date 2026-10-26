@@ -49,9 +49,9 @@ export default async function OnboardingPage({
       : queryLocale;
 
   if (state.status === "ready") {
-    // Honour `safeNext` when present (e.g. user was mid-flow when session
-    // expired, or was redirected here after Google OAuth). Fall back to the
-    // role-appropriate default route.
+    // `safeNext` 가 있으면 따른다 (예: 사용자가 진행 중이었는데 세션이
+    // 만료됐거나 Google OAuth 후 여기로 리다이렉트된 경우). 없으면
+    // 역할에 맞는 기본 경로로 보낸다.
     redirect(safeNext || normalizePathForSurface(state.redirectTo, surface));
   }
 
@@ -188,7 +188,7 @@ export default async function OnboardingPage({
     );
   }
 
-  // ── needs_profile → multi-step wizard (Profile Setup redesign) ──────────────
+  // ── needs_profile → 다단계 마법사 (프로필 설정 리디자인) ──────────────
   if (state.status === "needs_profile") {
     return (
       <OnboardingWizard

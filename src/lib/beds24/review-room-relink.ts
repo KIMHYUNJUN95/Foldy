@@ -9,7 +9,7 @@ import { readBeds24Credits } from "./credits";
 /**
  * 객실이 비어 있는 외부 리뷰를 사후에 다시 연결한다.
  *
- * WHY THIS EXISTS
+ * 존재 이유
  * ---------------
  * Airbnb 리뷰는 `roomId` 로 조회하므로 객실이 처음부터 확정이다(실측 0/2,215 미연결).
  * **Booking.com 은 건물 단위(`propertyId`)로만 조회**돼서, 객실을 예약을 거쳐 역추적해야 한다.

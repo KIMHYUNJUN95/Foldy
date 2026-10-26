@@ -5,19 +5,19 @@ import { recordReviewSyncDone } from "@/lib/beds24/reviews-sync-manual";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 
-// Production collection trigger for Beds24 external reviews (Airbnb / Booking.com).
+// Beds24 외부 리뷰(Airbnb / Booking.com) 운영 수집 트리거.
 //
-// Reviews have no webhook, so they are the one Beds24 read path that must be pulled on a
-// schedule (see docs/engineering/01-beds24-integration.md → "External Reviews"). Both Beds24
-// endpoints require a unit parameter, so one cycle costs (Airbnb-linked room types) +
-// (Booking-linked properties) requests plus pagination. That is why the routine schedule is
-// once a day with a 30-day window, and the deep sweep is opt-in via `?full=1`.
+// 리뷰에는 웹훅이 없어서 Beds24 읽기 경로 중 유일하게 주기적으로 가져와야 한다
+// (docs/engineering/01-beds24-integration.md → "External Reviews" 참고). Beds24 두 엔드포인트 모두
+// unit 파라미터가 필요해서 한 주기에 (Airbnb 연동 객실 유형) +
+// (Booking 연동 숙소) 만큼 요청에 페이지네이션이 더해진다. 그래서 정기 실행은
+// 30일 구간으로 하루 한 번이고, 전체 훑기는 `?full=1` 로 직접 켜야 한다.
 //
-// Driven once a day by GitHub Actions (.github/workflows/beds24-reviews-sync.yml — not Vercel Cron).
-// Can also be triggered manually with the Beds24 webhook secret. Staff can collect on demand from
-// the 외부 리뷰 screen («지금 가져오기», src/app/mobile/complaints/review-sync-actions.ts), which runs
-// the same function and window. Collection is a pure upsert on (organization_id, provider,
-// external_review_id), so re-running is harmless.
+// 하루 한 번 GitHub Actions 가 실행한다 (.github/workflows/beds24-reviews-sync.yml — Vercel Cron 아님).
+// Beds24 웹훅 시크릿으로 수동 실행도 가능하다. 직원은
+// 외부 리뷰 화면(«지금 가져오기», src/app/mobile/complaints/review-sync-actions.ts)에서 필요할 때 수집할 수 있고, 같은 함수와 구간을
+// 쓴다. 수집은 (organization_id, provider,
+// external_review_id) 기준의 단순 upsert 라 다시 실행해도 문제없다.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -48,10 +48,10 @@ const ROUTINE_SINCE_DAYS = 30;
 const FULL_SINCE_DAYS = 180;
 
 /**
- * Authorize a review-collection call. Same contract as /api/beds24/reconcile:
- *  - Vercel Cron's `Authorization: Bearer <CRON_SECRET>` header, or
- *  - the Beds24 webhook secret (manual trigger via header/query).
- * If neither secret is configured server-side, the endpoint stays closed (404).
+ * 리뷰 수집 호출 인가. /api/beds24/reconcile 와 같은 규약:
+ * - Vercel Cron 의 `Authorization: Bearer <CRON_SECRET>` 헤더, 또는
+ * - Beds24 웹훅 시크릿 (헤더/쿼리로 수동 실행).
+ * 서버에 둘 다 설정돼 있지 않으면 엔드포인트는 닫힌 채(404) 유지한다.
  */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();

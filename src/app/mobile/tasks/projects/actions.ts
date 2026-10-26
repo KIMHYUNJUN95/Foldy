@@ -41,8 +41,8 @@ async function requireSession(): Promise<Session> {
   return session;
 }
 
-// getProjectDetail uses the RLS-scoped client, so a non-null result proves the acting user is a
-// project participant. Owner-only actions additionally check `project.viewerCanManage` (owner or platform developer).
+// getProjectDetail 은 RLS 범위 클라이언트를 쓰므로, null 이 아닌 결과는 행동하는 사용자가
+// 프로젝트 참여자임을 증명한다. 소유자 전용 액션은 `project.viewerCanManage`(소유자 또는 플랫폼 개발자)를 추가로 확인한다.
 async function requireProject(
   projectId: string,
 ): Promise<{ session: Session; project: ProjectDetailData }> {
@@ -54,7 +54,7 @@ async function requireProject(
   return { session, project };
 }
 
-// Validate requested invitees against the org's active members (fail closed); drops self.
+// 요청된 초대 대상을 조직의 활성 구성원과 대조한다(실패 시 막음). 본인은 뺀다.
 async function validateInvitees(session: Session, requested: string[]): Promise<string[]> {
   if (requested.length === 0) return [];
   const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
@@ -91,8 +91,8 @@ export async function createProject(formData: FormData) {
     redirect(`${PROJECTS_PATH}&error=save_failed`);
   }
 
-  // Owner row + invited member rows share the same key shape (see the tasks-create note on
-  // PostgREST filling omitted keys with NULL across a multi-row insert).
+  // 소유자 행과 초대된 구성원 행은 같은 키 모양을 쓴다(여러 행 insert 에서 PostgREST 가
+  // 빠진 키를 NULL 로 채우는 점은 tasks-create 메모 참고).
   const participantRows: Database["public"]["Tables"]["project_participants"]["Insert"][] = [
     {
       project_id: id,
@@ -138,7 +138,7 @@ export async function deleteProject(formData: FormData) {
     redirect(detailPath(id, "forbidden"));
   }
   const supabase = getSupabaseServiceClient();
-  // Cascade removes participants, sections, and project tasks (FKs on delete cascade).
+  // cascade 가 참여자, 섹션, 프로젝트 할 일을 지운다(FK on delete cascade).
   // 실패하면 목록으로 보내지 않는다(2026-10-26) — 「지워졌다」고 믿게 한 뒤 다시 나타나는 것을 막는다.
   const deleted = await mustWrite(
     "project: delete",
@@ -203,8 +203,8 @@ export async function deleteProjectSection(formData: FormData) {
     redirect(detailPath(id, "forbidden"));
   }
   const supabase = getSupabaseServiceClient();
-  // Spec: deleting a section also deletes its tasks. Soft-delete them (consistent with the rest of
-  // the deletion policy — reads filter deleted_at) before dropping the section.
+  // 명세: 섹션을 삭제하면 그 안의 할 일도 삭제한다. 섹션을 지우기 전에 소프트 삭제한다
+  // (삭제 정책의 나머지와 동일 — 읽기는 deleted_at 으로 거름).
   // 하위 작업 정리가 실패했는데 섹션만 지우면 그 작업들은 **없는 섹션을 가리킨 채 남는다** —
   // 어느 목록에도 안 뜨고 되돌릴 단서도 없다. 콘솔 `deleteConsoleProjectSection` 과 같은 판단.
   const cleared = await mustWrite(
@@ -220,8 +220,8 @@ export async function deleteProjectSection(formData: FormData) {
   redirect(detailPath(id));
 }
 
-// Persist a manual drag-reorder of a project's sections. `orderedIds` is the section ids in their
-// new top-to-bottom order; each row's sort_order is set to its index (0..n). Owner-only.
+// 프로젝트 섹션의 수동 드래그 순서 변경을 저장한다. `orderedIds` 는 섹션 id 를 위에서 아래
+// 새 순서로 담은 것이며, 각 행의 sort_order 를 인덱스(0..n)로 설정한다. 소유자 전용.
 export async function reorderProjectSections(projectId: string, orderedIds: string[]) {
   const id = String(projectId ?? "").trim();
   if (!id) return;
@@ -294,7 +294,7 @@ export async function removeProjectMember(formData: FormData) {
   if (!project.viewerCanManage) {
     redirect(detailPath(id, "forbidden"));
   }
-  // The owner / creator is never removable via this path.
+  // 소유자 / 작성자는 이 경로로 제거할 수 없다.
   if (targetUserId === project.createdByUserId) {
     redirect(detailPath(id, "forbidden"));
   }
@@ -319,7 +319,7 @@ export async function removeProjectMember(formData: FormData) {
 export async function leaveProject(formData: FormData) {
   const id = cleanText(formData.get("projectId"));
   const { session, project } = await requireProject(id);
-  // The owner can't leave — they delete the project instead.
+  // 소유자는 나갈 수 없다 — 대신 프로젝트를 삭제한다.
   if (project.viewerIsOwner) {
     redirect(detailPath(id, "forbidden"));
   }

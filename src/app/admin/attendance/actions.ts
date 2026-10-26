@@ -1,17 +1,17 @@
 "use server";
 
-// Attendance — admin correction-review actions (Step 7).
+// 출퇴근 — 관리자 정정 검토 액션 (Step 7).
 //
-// Privileged review of correction requests: claim (in_review), approve (with AUTHORITATIVE application
-// to the session + audit), reject (required comment). Only `owner` / `attendance_payroll_admin` (or
-// platform admins) may call these — enforced server-side via `attendanceCan`. User-submitted
-// desired values are only proposals; on approval the admin confirms the FINAL values (defaulting to the
-// proposals) and those are written to the session. The review-queue UI lives in the web dashboard
-// (deferred); these actions are the backend it will call. Self-view (worker history / request status)
-// reflects the new state on next load (dynamic routes; revalidated here too).
+// 정정 요청에 대한 권한 있는 검토: 담당(in_review), 승인(권위 있는 값을 세션에 적용 +
+// 감사 기록), 반려(코멘트 필수). `owner` / `attendance_payroll_admin`(또는
+// 플랫폼 관리자)만 호출할 수 있고 서버에서 `attendanceCan` 으로 강제한다. 사용자가 제출한
+// 희망 값은 제안일 뿐이며, 승인할 때 관리자가 최종 값(기본값은
+// 제안 값)을 확정해 세션에 기록한다. 검토 큐 UI 는 웹 대시보드에 있다
+// (보류). 이 액션들은 그 UI 가 호출할 백엔드다. 본인 조회(근무자 이력 / 요청 상태)는
+// 다음 로드 때 새 상태를 반영한다(동적 라우트이며 여기서도 revalidate 한다).
 //
-// Historical Step 7 boundary: later sections in this file now implement manual sessions, payroll,
-// finalization, dashboard actions, and exports too.
+// 과거 Step 7 경계: 이 파일의 뒷부분 섹션은 이제 수동 세션, 급여,
+// 마감, 대시보드 액션, 내보내기도 구현한다.
 
 import { revalidatePath } from "next/cache";
 import {
@@ -105,15 +105,15 @@ export type ReviewActionResult =
       reason: "forbidden" | "not_found" | "invalid" | "comment_required" | "overlap" | "already_handled" | "error";
     };
 
-/** Admin-confirmed final values on approval (default to the requester's proposals when omitted). */
+/** 승인 시 관리자가 확정한 최종 값 (생략하면 요청자의 제안 값이 기본값). */
 export type ApproveCorrectionInput = {
   requestId: string;
-  /** ISO instants; null/undefined → fall back to the request's desired value (then leave unchanged). */
+  /** ISO 시각. null/undefined → 요청의 희망 값으로 대체 (그것도 없으면 변경하지 않음). */
   finalClockInAt?: string | null;
   finalClockOutAt?: string | null;
   finalClockInSiteId?: string | null;
   finalClockOutSiteId?: string | null;
-  /** @deprecated Use finalClockInSiteId/finalClockOutSiteId when the caller can distinguish them. */
+  /** @deprecated 호출자가 둘을 구분할 수 있으면 finalClockInSiteId/finalClockOutSiteId 를 쓴다. */
   finalSiteId?: string | null;
   comment?: string | null;
 };
@@ -169,7 +169,7 @@ async function loadRequest(
   return (res.data as AttendanceCorrectionRequestRow | null) ?? null;
 }
 
-/** Move a `requested` correction to `in_review` (admin claims it). Request-only; no session change. */
+/** `requested` 정정을 `in_review` 로 옮긴다 (관리자가 담당). 요청만 바뀌고 세션은 그대로. */
 export async function setCorrectionInReview(requestId: string): Promise<ReviewActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
@@ -198,9 +198,9 @@ export async function setCorrectionInReview(requestId: string): Promise<ReviewAc
 }
 
 /**
- * Approve a correction request and APPLY the admin-confirmed final values to the linked session, with
- * an audit row. Session-less (exception) requests create the missing completed session from the approved
- * final clock/site values. Approve comment is optional.
+ * 정정 요청을 승인하고, 관리자가 확정한 최종 값을 연결된 세션에 적용한다. 감사
+ * 행도 남긴다. 세션이 없는(예외) 요청은 승인된 최종 출퇴근/근무지 값으로
+ * 빠져 있던 완료 세션을 만든다. 승인 코멘트는 선택.
  */
 export async function approveCorrectionRequest(
   input: ApproveCorrectionInput,
@@ -243,7 +243,7 @@ export async function approveCorrectionRequest(
     if (claim.error || !claim.data) return { ok: false, reason: "invalid" };
   }
 
-  // Final authoritative values: admin override, else the requester's proposal.
+  // 최종 권위 값: 관리자 지정 값, 없으면 요청자의 제안 값.
   const finalInAt = input.finalClockInAt ?? request.desired_clock_in_at;
   const finalOutAt = input.finalClockOutAt ?? request.desired_clock_out_at;
   const finalClockInSiteId =
@@ -282,7 +282,7 @@ export async function approveCorrectionRequest(
     if (finalOutAt != null) update.clock_out_at = finalOutAt;
     if (finalClockInSiteId != null) update.clock_in_site_id = finalClockInSiteId;
     if (finalClockOutSiteId != null) update.clock_out_site_id = finalClockOutSiteId;
-    // A now-complete session that was still open becomes completed.
+    // 이제 완결된 세션이 아직 열려 있었다면 completed 로 바뀐다.
     const resultingOut = finalOutAt ?? s.clock_out_at;
     const resultingIn = finalInAt ?? s.clock_in_at;
     if (!validClockOrder(resultingIn, resultingOut)) {
@@ -327,7 +327,7 @@ export async function approveCorrectionRequest(
       return !updRes.error && (updRes.data ?? []).length > 0;
     };
 
-    // Audit the authoritative change.
+    // 권위 있는 변경을 감사 기록한다.
     const before = {
       clock_in_at: s.clock_in_at,
       clock_out_at: s.clock_out_at,
@@ -483,9 +483,9 @@ export async function approveCorrectionRequest(
 }
 
 /**
- * Reject a correction request. A reject comment is REQUIRED. The session is left UNCHANGED (its values
- * and review state are preserved — a rejected proposal must not silently alter authoritative data); the
- * rejection itself is auditable on the request row (reviewer + time + comment).
+ * 정정 요청을 반려한다. 반려 코멘트는 필수다. 세션은 그대로 둔다 (값과
+ * 검토 상태가 유지된다 — 반려된 제안이 권위 있는 데이터를 몰래 바꾸면 안 된다).
+ * 반려 자체는 요청 행(검토자 + 시각 + 코멘트)에 감사 가능하게 남는다.
  */
 export async function rejectCorrectionRequest(
   requestId: string,
@@ -567,13 +567,13 @@ export async function rejectCorrectionRequest(
   return { ok: true };
 }
 
-// ── Manual session management (Step 8) ───────────────────────────────────────
-// Privileged manual attendance: create a session for a worker, authoritatively update one, or
-// invalidate (never delete) a bad one. owner / attendance_payroll_admin only (server-enforced). Every
-  // action requires an admin reason and writes an `attendance_session_audits` row. Manual sessions carry
-  // manual_created flags and stay compatible with later payroll/finalization (clock-in/out + breaks).
-  // These actions are consumed by the admin web dashboard. Site-master management stays owner-only
-  // (unchanged).
+// ── 수동 세션 관리 (Step 8) ───────────────────────────────────────
+// 권한 있는 수동 출퇴근: 근무자의 세션을 만들고, 권위 있게 수정하고, 잘못된 것은
+// 무효 처리한다(삭제하지 않는다). owner / attendance_payroll_admin 만 (서버에서 강제). 모든
+  // 액션은 관리자 사유를 요구하고 `attendance_session_audits` 행을 남긴다. 수동 세션은
+  // manual_created 플래그를 갖고, 이후 급여/마감(출퇴근 + 휴게)과 호환된다.
+  // 이 액션들은 관리자 웹 대시보드가 쓴다. 근무지 마스터 관리는 owner 전용으로
+  // 그대로 둔다.
 
 export type ManualSessionResult =
   | { ok: true; id: string }
@@ -611,19 +611,19 @@ export type SimpleManualResult =
 
 export type CreateManualSessionInput = {
   userId: string;
-  operatingDate: string; // YYYY-MM-DD (Tokyo)
+  operatingDate: string; // YYYY-MM-DD (도쿄)
   clockInTime: string; // "HH:mm"
-  clockOutTime: string | null; // "HH:mm" → completed; null → open
-  clockInSiteId?: string | null; // optional registered work-site
+  clockOutTime: string | null; // "HH:mm" → 완료; null → 열림
+  clockInSiteId?: string | null; // 선택: 등록된 근무지
   clockOutSiteId?: string | null;
-  manualLocation?: string | null; // free-text work location (off-site / no registered site)
+  manualLocation?: string | null; // 자유 입력 근무 장소 (현장 외 / 등록 근무지 없음)
   reason: string;
 };
 
 export type UpdateManualSessionInput = {
   sessionId: string;
   reason: string;
-  // Each field: omit (undefined) = leave unchanged; null = clear; value = set.
+  // 필드별: 생략(undefined) = 그대로 둠; null = 비움; 값 = 설정.
   clockInTime?: string | null;
   clockOutTime?: string | null;
   clockInSiteId?: string | null;
@@ -695,7 +695,7 @@ async function isOrgSite(
   return !!res.data;
 }
 
-/** Manually create an attendance session for a worker (privileged). */
+/** 근무자의 출퇴근 세션을 수동으로 만든다 (권한 필요). */
 export async function createManualAttendanceSession(
   input: CreateManualSessionInput,
 ): Promise<ManualSessionResult> {
@@ -712,7 +712,7 @@ export async function createManualAttendanceSession(
   if (!isYmd(input.operatingDate) || !isHhmm(input.clockInTime)) return { ok: false, reason: "invalid" };
   if (input.clockOutTime && !isHhmm(input.clockOutTime)) return { ok: false, reason: "invalid" };
 
-  // Target must be an active member of this org.
+  // 대상은 이 조직의 활성 멤버여야 한다.
   const member = await service
     .from("memberships")
     .select("id")
@@ -722,7 +722,7 @@ export async function createManualAttendanceSession(
     .maybeSingle();
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
-  // Location: either a registered work-site or a free-text manual location; at least one is required.
+  // 장소: 등록 근무지 또는 자유 입력 수동 장소 중 하나는 필수.
   const manualLocation = input.manualLocation?.trim() ? input.manualLocation.trim() : null;
   if (input.clockInSiteId && !(await isOrgSite(service, organizationId, input.clockInSiteId))) {
     return { ok: false, reason: "invalid" };
@@ -753,7 +753,7 @@ export async function createManualAttendanceSession(
   if (overlap) return { ok: false, reason: "overlap" };
 
   const status = clockOutAt ? "completed" : "open";
-  // An open manual session would collide with the worker's existing open session (partial unique).
+  // 열린 수동 세션은 근무자의 기존 열린 세션과 충돌한다 (부분 유니크).
   if (status === "open") {
     const open = await service
       .from("attendance_sessions")
@@ -808,7 +808,7 @@ export async function createManualAttendanceSession(
   return { ok: true, id: sessionId };
 }
 
-/** Authoritatively update an attendance session (privileged). Mandatory reason + audit. */
+/** 출퇴근 세션을 권위 있게 수정한다 (권한 필요). 사유 필수 + 감사 기록. */
 export async function updateAttendanceSessionAdmin(
   input: UpdateManualSessionInput,
 ): Promise<SimpleManualResult> {
@@ -882,11 +882,11 @@ export async function updateAttendanceSessionAdmin(
 
   if (Object.keys(update).length === 0) return { ok: false, reason: "invalid" };
 
-  // Status coherence: a session with both ends becomes completed; clearing an end re-opens it. Only
-  // recompute this when clock-in/out are actually part of THIS update — e.g. a review_state-only edit
-  // (marking reviewed) must never flip status based on a pre-existing (possibly already-inconsistent)
-  // clock_out_at, since re-opening a session can collide with the user's one-open-session-per-user
-  // constraint for an unrelated, currently-open session.
+  // 상태 정합성: 양쪽 끝이 있는 세션은 completed 가 되고, 한쪽을 비우면 다시 열린다. 이
+  // 재계산은 이번 수정에 출퇴근이 실제로 포함될 때만 한다 — 예: review_state 만 바꾸는 수정
+  // (검토 표시)이 기존의 (이미 어긋났을 수도 있는)
+  // clock_out_at 으로 status 를 뒤집으면 안 된다. 세션을 다시 열면 사용자당 열린 세션 1개
+  // 제약과, 무관하게 현재 열려 있는 다른 세션이 충돌할 수 있기 때문이다.
   const clockInChanged = "clock_in_at" in update;
   const clockOutChanged = "clock_out_at" in update;
   if (s.status !== "invalid" && (clockInChanged || clockOutChanged)) {
@@ -950,7 +950,7 @@ export async function updateAttendanceSessionAdmin(
   return { ok: true, updatedAt: updatedRow.updated_at };
 }
 
-/** Invalidate a session instead of deleting it (privileged). Mandatory reason + audit. */
+/** 세션을 삭제하지 않고 무효 처리한다 (권한 필요). 사유 필수 + 감사 기록. */
 export async function invalidateAttendanceSession(
   sessionId: string,
   reason: string,
@@ -1012,12 +1012,12 @@ export async function invalidateAttendanceSession(
 }
 
 /**
- * Restore a previously invalidated session (privileged) — the explicit, auditable reverse of
- * `invalidateAttendanceSession` for when an admin confirms the original clock-in/out was actually
- * legitimate. Restore always yields a `completed` session, so BOTH clock ends must already be present;
- * an invalid session still missing a clock-out must be fixed with `updateAttendanceSessionAdmin`
+ * 이전에 무효 처리한 세션을 복원한다 (권한 필요) — 원래 출퇴근이 실제로 정당했음을
+ * 관리자가 확인했을 때 쓰는 `invalidateAttendanceSession` 의 명시적이고 감사 가능한 역방향.
+ * 복원은 항상 `completed` 세션을 만들므로 출퇴근 양쪽이 이미 있어야 한다.
+ * 퇴근이 비어 있는 무효 세션은 `updateAttendanceSessionAdmin` 으로 고쳐야
  * (수동 정정) first (else `incomplete`) — restore must never resurrect an incomplete/open session.
- * Mandatory reason + audit.
+ * 사유 필수 + 감사 기록.
  */
 export async function restoreAttendanceSession(
   sessionId: string,
@@ -1045,9 +1045,9 @@ export async function restoreAttendanceSession(
     return { ok: false, reason: "finalized_locked" };
   }
   if (s.status !== "invalid") return { ok: false, reason: "invalid" };
-  // A restore must produce a COMPLETE session. If a clock end is still missing, the admin has to
-  // fill it via 수동 정정 (updateAttendanceSessionAdmin) first — otherwise "복구 및 완료" would
-  // silently leave an incomplete session that never counts toward pay.
+  // 복원하면 완결된 세션이 되어야 한다. 출퇴근 한쪽이 아직 없으면 관리자가
+  // 수동 정정(updateAttendanceSessionAdmin)으로 먼저 채워야 한다 — 그러지 않으면 "복구 및 완료" 가
+  // 급여에 절대 반영되지 않는 불완전한 세션이 조용히 남지 않게 한다.
   if (!s.clock_in_at || !s.clock_out_at) return { ok: false, reason: "incomplete" };
   if (!validClockOrder(s.clock_in_at, s.clock_out_at)) return { ok: false, reason: "invalid" };
   // 무효 처리 뒤 같은 시간대에 대신 넣은 세션이 있으면 복구하면 두 번 지급된다.
@@ -1098,13 +1098,13 @@ export async function restoreAttendanceSession(
   return { ok: true };
 }
 
-// ── Monthly finalization / reopen (Step 11) ──────────────────────────────────
-// Per-person per-month, MANUAL, privileged (owner / attendance_payroll_admin). Finalize is blocked
-// while unresolved items remain (review-required / pending corrections / open sessions / already
-// finalized). The final gross comes from the same expected-pay helpers. Snapshots are HISTORY-preserving
-// (never overwritten): reopen flips the finalized row to `reopened`; a later finalize supersedes prior
-// rows and links via `supersedes_snapshot_id`. Finalize + reopen are audited in `audit_logs`. The
-// admin finalize/reopen UI is in the deferred web dashboard — none is built here.
+// ── 월 마감 / 재개 (Step 11) ──────────────────────────────────
+// 사람별 · 월별, 수동, 권한 필요 (owner / attendance_payroll_admin). 미해결 항목이 남아 있으면
+// 마감할 수 없다 (검토 필요 / 대기 중 정정 / 열린 세션 / 이미
+// 마감됨). 최종 총액은 같은 예상 급여 헬퍼에서 나온다. 스냅샷은 이력을 보존한다
+// (덮어쓰지 않음): 재개하면 마감 행이 `reopened` 로 바뀌고, 이후 마감이 이전
+// 행을 대체하며 `supersedes_snapshot_id` 로 연결된다. 마감 + 재개는 `audit_logs` 에 감사 기록된다.
+// 관리자 마감/재개 UI 는 보류된 웹 대시보드에 있으며 여기서는 만들지 않는다.
 
 export type FinalizeResult =
   | { ok: true; id: string }
@@ -1122,7 +1122,7 @@ function revalidatePay() {
   revalidatePath("/mobile/attendance/pay");
 }
 
-/** Finalize one user-month for an hourly worker (privileged). Blocked while unresolved items remain. */
+/** 시급 근무자의 한 사용자-월을 마감한다 (권한 필요). 미해결 항목이 남아 있으면 막힌다. */
 export async function finalizeAttendanceMonth(input: {
   userId: string;
   ym: string;
@@ -1155,11 +1155,11 @@ export async function finalizeAttendanceMonth(input: {
 
   const firstDay = monthFirstDay(input.ym);
 
-  // History preservation: read prior rows first to capture the supersedes link,
-  // then INSERT the new snapshot before marking old rows superseded.
-  // This order ensures the "current finalized copy" is never lost: if the insert
-  // fails, the old snapshot stays intact; the supersede only runs after a
-  // successful insert.
+  // 이력 보존: 대체 연결을 잡으려고 이전 행을 먼저 읽고,
+  // 새 스냅샷을 INSERT 한 뒤에 옛 행을 대체됨으로 표시한다.
+  // 이 순서면 "현재 마감본"이 사라지지 않는다. insert 가
+  // 실패해도 옛 스냅샷은 그대로 남고, 대체 처리는 insert 가
+  // 성공한 뒤에만 실행된다.
   const priorRes = await service
     .from("attendance_month_snapshots")
     .select("id, status")
@@ -1201,7 +1201,7 @@ export async function finalizeAttendanceMonth(input: {
   }
   if (ins.error || !ins.data) return { ok: false, reason: "error" };
 
-  // Supersede old rows only after a confirmed successful insert — **읽어 둔 이전 행만**. 「내 것 빼고 전부」로
+  // 확인된 insert 성공 뒤에만 옛 행을 대체 처리한다 — **읽어 둔 이전 행만**. 「내 것 빼고 전부」로
   // 바꾸면 동시에 들어온 다른 마감본까지 지운다.
   if (priorRows.length > 0) {
     const sup = await service
@@ -1240,7 +1240,7 @@ export async function finalizeAttendanceMonth(input: {
   return { ok: true, id: ins.data.id };
 }
 
-/** Reopen a finalized user-month (privileged). Reason required; prior history preserved. */
+/** 마감된 사용자-월을 재개한다 (권한 필요). 사유 필수; 이전 이력은 보존된다. */
 export async function reopenAttendanceMonth(input: {
   userId: string;
   ym: string;
@@ -1260,8 +1260,8 @@ export async function reopenAttendanceMonth(input: {
   const snap = await getCurrentFinalizedSnapshot(service, organizationId, input.userId, input.ym);
   if (!snap) return { ok: false, reason: "not_finalized" };
 
-  // Flip the finalized row to `reopened` (kept as history; no `finalized` row remains → expected pay
-  // resumes). A later finalize will supersede it.
+  // 마감 행을 `reopened` 로 바꾼다 (이력으로 남음; `finalized` 행이 없어지므로 예상 급여가
+  // 다시 계산된다). 이후 마감이 이것을 대체한다.
   const updRes = await service
     .from("attendance_month_snapshots")
     .update({ status: "reopened" })
@@ -1295,12 +1295,12 @@ export async function reopenAttendanceMonth(input: {
   return { ok: true };
 }
 
-// ── Finalized-only payroll export (Step 13) ──────────────────────────────────
-// Privileged (owner / attendance_payroll_admin) export of FINALIZED data only — monthly bulk or
-// per-person. Privilege + finalized-only filtering + the `attendance_export_logs` audit row all live in
-// `runPayrollExport`; these thin actions resolve the session and return the CSV for the caller (the
-// deferred web dashboard) to download. The interim format is a structured CSV until the operator's final
-// Excel template is provided. No admin export UI is built here.
+// ── 마감분 전용 급여 내보내기 (Step 13) ──────────────────────────────────
+// 마감된 데이터만 내보내는 권한 있는(owner / attendance_payroll_admin) 기능 — 월 일괄 또는
+// 사람별. 권한 + 마감분 필터링 + `attendance_export_logs` 감사 행은 모두
+// `runPayrollExport` 에 있고, 이 얇은 액션들은 세션을 확인해 호출자(보류된
+// 웹 대시보드)가 내려받을 CSV 를 돌려준다. 최종 엑셀 양식이 정해질 때까지
+// 임시 형식은 구조화된 CSV 다. 관리자 내보내기 UI 는 여기서 만들지 않는다.
 
 export async function exportMonthlyPayroll(ym: string): Promise<PayrollExportResult> {
   const session = await getCurrentAppSession();
@@ -1323,11 +1323,11 @@ export async function exportUserPayroll(userId: string, ym: string): Promise<Pay
   });
 }
 
-// ── Localized styled payroll workbook (Excel-compatible .xlsx) ────────────────
-// Exports the month's per-user hours + expected pay + approved transport as a clean, styled workbook that Excel
-// and LibreOffice open with formatting. Localized to the caller's UI language (ko/ja/en). Unlike the
-// finalized-only CSV export, this reflects the LIVE monthly payroll view (all active members) so the
-// operator can hand off a tax/accounting-ready monthly summary at a glance.
+// ── 현지화된 서식 급여 통합 문서 (Excel 호환 .xlsx) ────────────────
+// 월별 사용자 근무시간 + 예상 급여 + 승인된 교통비를 Excel 과 LibreOffice 가 서식 그대로 여는
+// 깔끔한 통합 문서로 내보낸다. 호출자의 UI 언어(ko/ja/en)로 현지화된다. 마감분 전용
+// CSV 내보내기와 달리 이것은 실시간 월 급여 뷰(모든 활성 멤버)를 반영하므로
+// 운영자가 세무/회계용 월 요약을 한눈에 넘길 수 있다.
 
 export type PayrollWorkbookResult =
   | { ok: true; filename: string; base64: string; rowCount: number }
@@ -1512,8 +1512,8 @@ async function buildUserPayrollExportData(
     }
   }
 
-  // Work location per date: the free-text manual_location (off-site / manual entry) takes priority, else
-  // the registered site name. Feeds the "근무 위치" export column.
+  // 날짜별 근무 장소: 자유 입력 manual_location (현장 외 / 수동 입력)이 우선이고, 아니면
+  // 등록된 근무지 이름을 쓴다. "근무 위치" 내보내기 열에 들어간다.
   const locationByDate = new Map<string, string>();
   const locSessRes = await service
     .from("attendance_sessions")
@@ -1579,8 +1579,8 @@ async function buildUserPayrollExportData(
         cleaningNotes: Array.from(cleaningNotesByDate.get(date) ?? []).join(" / "),
       };
     });
-  // Reconcile the daily BASE wage column to the month's base total (grand total − allowance) so the
-  // base column sums exactly; allowance and transport stay in their own columns.
+  // 일별 기본급 열을 월 기본급 합계(총합 − 수당)에 맞춰
+  // 기본급 열 합이 정확히 맞게 한다. 수당과 교통비는 각자의 열에 둔다.
   const grandTotal = payView.finalization?.gross ?? payView.expectedGross;
   const baseTotal = grandTotal - payView.allowanceTotal;
   const rows = reconcileDailyPaysToTotal(rowsBeforeReconciliation, baseTotal);
@@ -1636,9 +1636,9 @@ export async function exportUserPayrollReport(
   return { ok: true, html, rowCount: result.data.rows.length };
 }
 
-// ── Print-quality payroll PDF report (localized HTML → browser print) ─────────
-// Returns a self-contained styled HTML document the client opens in a new window; the document
-// auto-triggers the print dialog so the operator can "Save as PDF" for tax/accounting hand-off.
+// ── 인쇄용 급여 PDF 보고서 (현지화된 HTML → 브라우저 인쇄) ─────────
+// 클라이언트가 새 창에서 여는 독립형 서식 HTML 문서를 돌려준다. 문서가
+// 인쇄 대화상자를 자동으로 띄워 운영자가 세무/회계 전달용으로 "PDF로 저장"할 수 있다.
 
 export type PayrollReportResult =
   | { ok: true; html: string; rowCount: number }
@@ -1707,16 +1707,16 @@ export async function exportMonthlyPayrollReport(
   return { ok: true, html, rowCount: exportRows.length };
 }
 
-// ── Transport reimbursement — admin review (Slice 5) ─────────────────────────
-// Privileged (owner / attendance_payroll_admin) status transitions on a transport report:
+// ── 교통비 정산 — 관리자 검토 (Slice 5) ─────────────────────────
+// 교통비 보고서에 대한 권한 있는(owner / attendance_payroll_admin) 상태 전이:
 //   submitted/reviewing → approved | rejected | changes_requested
-//   changes_requested → worker resubmission only
-//   approved/rejected → reopen (→ 'submitted')
-// `changes_requested` (migration 202607030001) sends the report back to the worker to fix & resubmit
-// (a softer middle path than reject). `reopen` un-decides an approved/rejected report so it can be
-// re-reviewed — reopening an APPROVED report drops it out of the payroll total until re-approved,
-// which is the practical reason it exists. Uses the report's own `status` / `reviewed_*` / `review_note`
-// columns.
+//   changes_requested → 근무자 재제출만 가능
+//   approved/rejected → 재개 (→ 'submitted')
+// `changes_requested` (마이그레이션 202607030001)는 보고서를 근무자에게 돌려보내 고쳐 다시 제출하게 한다
+// (반려보다 부드러운 중간 경로). `reopen` 은 승인/반려된 보고서의 결정을 풀어 다시
+// 검토할 수 있게 한다 — 승인된 보고서를 재개하면 다시 승인될 때까지 급여 합계에서 빠지며,
+// 이것이 존재하는 실질적인 이유다. 보고서 자체의 `status` / `reviewed_*` / `review_note`
+// 열을 쓴다.
 
 const TRANSPORT_IMAGE_BUCKET = "request-images";
 
@@ -1740,9 +1740,9 @@ export type TransportReviewAction =
   | "changes_requested"
   | "reopen";
 
-// Each admin action → the report status it results in. `reopen` is the odd one out: it doesn't have
-// its own status, it sends an already-decided (approved/rejected) report back to `submitted` so it
-// re-enters the review queue (and, if it was approved, drops out of the payroll total until re-approved).
+// 각 관리자 액션 → 그 결과가 되는 보고서 상태. `reopen` 은 예외다: 자체 상태가 없고,
+// 이미 결정된(승인/반려) 보고서를 `submitted` 로 돌려 검토 큐에
+// 다시 들어가게 한다 (승인됐던 것이라면 다시 승인될 때까지 급여 합계에서 빠진다).
 const TRANSPORT_ACTION_TARGET: Record<TransportReviewAction, TransportReportStatus> = {
   reviewing: "reviewing",
   approved: "approved",
@@ -1751,8 +1751,8 @@ const TRANSPORT_ACTION_TARGET: Record<TransportReviewAction, TransportReportStat
   reopen: "submitted",
 };
 
-// Which source statuses each action may run from. A `changes_requested` report is with the worker and
-// must be resubmitted before an admin can approve/reject/request another fix.
+// 각 액션이 실행될 수 있는 원래 상태. `changes_requested` 보고서는 근무자에게 있으며
+// 관리자가 승인/반려/다른 수정 요청을 하기 전에 다시 제출되어야 한다.
 const TRANSPORT_ACTION_VALID_FROM: Record<TransportReviewAction, string[]> = {
   reviewing: ["submitted"],
   approved: ["submitted", "reviewing"],
@@ -1761,7 +1761,7 @@ const TRANSPORT_ACTION_VALID_FROM: Record<TransportReviewAction, string[]> = {
   reopen: ["approved", "rejected"],
 };
 
-/** Move a transport report through its review lifecycle. */
+/** 교통비 보고서를 검토 수명주기에 따라 옮긴다. */
 export async function setTransportReportReview(input: {
   reportId: string;
   action: TransportReviewAction;
@@ -1776,8 +1776,8 @@ export async function setTransportReportReview(input: {
     return { ok: false, reason: "forbidden" };
   }
 
-  // Reject and "request changes" both send the report back to the worker, so a reason is mandatory —
-  // the worker needs to know what to fix.
+  // 반려와 "수정 요청" 모두 보고서를 근무자에게 돌려보내므로 사유가 필수다 —
+  // 근무자가 무엇을 고쳐야 하는지 알아야 한다.
   if (
     (input.action === "rejected" || input.action === "changes_requested") &&
     !(input.note ?? "").trim()
@@ -1808,7 +1808,7 @@ export async function setTransportReportReview(input: {
   const nowIso = new Date().toISOString();
   const update: Database["public"]["Tables"]["transport_reimbursement_reports"]["Update"] = { status: targetStatus };
   if (input.action === "reopen") {
-    // Back in the queue: clear the prior decision so it reads as freshly pending.
+    // 큐로 복귀: 이전 결정을 지워 새로 대기 중인 것처럼 보이게 한다.
     update.reviewed_by_user_id = null;
     update.reviewed_at = null;
     if (input.note != null) update.review_note = input.note.trim() || null;
@@ -1855,11 +1855,11 @@ export type AdminTransportDetailResult =
     }
   | { ok: false; reason: "forbidden" | "not_found" | "error" };
 
-// ── Hourly wage management (Slice 7) ─────────────────────────────────────────
-// Privileged (owner / attendance_payroll_admin) hourly-rate edits using the existing
-// `hourly_rate_history` table (no schema change). Closes the current open period
-// (effective_to=null) at `effective_from - 1 day` and inserts the new period.
-// The change-reason note is preserved via `audit_logs.metadata`.
+// ── 시급 관리 (Slice 7) ─────────────────────────────────────────
+// 기존 `hourly_rate_history` 테이블을 쓰는 권한 있는(owner / attendance_payroll_admin)
+// 시급 수정 (스키마 변경 없음). 현재 열린 기간(effective_to=null)을
+// `effective_from - 1 day` 로 닫고 새 기간을 삽입한다.
+// 변경 사유 메모는 `audit_logs.metadata` 에 보존된다.
 
 export type SetHourlyRateResult =
   | { ok: true; id: string }
@@ -1945,8 +1945,8 @@ export async function setHourlyRate(input: {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.effectiveFrom)) {
     return { ok: false, reason: "invalid" };
   }
-  // Disallow retroactive changes: effective_from must be today or later (Tokyo). Past dates would
-  // reinterpret a day that's already happened; today itself is fine since the day isn't over yet.
+  // 소급 변경 금지: effective_from 은 오늘(도쿄) 이후여야 한다. 과거 날짜는
+  // 이미 지난 날을 재해석하게 된다. 오늘은 아직 하루가 끝나지 않았으므로 괜찮다.
   // 예외: 아직 시급이 없는 앞쪽 빈 날 채우기(`planPastGapFill`, 2026-10-21).
   const todayTokyo = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
@@ -1968,7 +1968,7 @@ export async function setHourlyRate(input: {
     gapFill = { effectiveTo: plan.effectiveTo };
   }
 
-  // Target must be an active member of this org.
+  // 대상은 이 조직의 활성 멤버여야 한다.
   const member = await service
     .from("memberships")
     .select("id")
@@ -1978,7 +1978,7 @@ export async function setHourlyRate(input: {
     .maybeSingle();
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
-  // Current employment type — block on salaried.
+  // 현재 고용 형태 — 월급제면 막는다.
   const emp = await service
     .from("employment_type_history")
     .select("employment_type, effective_from, effective_to")
@@ -1992,19 +1992,19 @@ export async function setHourlyRate(input: {
   const empType = (emp.data as { employment_type: string } | null)?.employment_type ?? null;
   if (empType === "salaried") return { ok: false, reason: "salaried_member" };
 
-  // Compute close date = effective_from - 1 day
+  // 종료일 계산 = effective_from - 1 day
   const fromDate = new Date(`${input.effectiveFrom}T00:00:00Z`);
   const closeDate = new Date(fromDate.getTime() - 86400000);
   const closeIso = closeDate.toISOString().slice(0, 10);
 
-  // The existing open period (effective_to = null) is either:
-  // - already active (its effective_from is before the new change) → close it the day
-  //   before the new period starts, as before, or
-  // - a still-future scheduled change being revised before it ever took effect → its
-  //   effective_from would be >= the new effective_from, which would make closeIso fall
-  //   BEFORE that row's own effective_from and violate the `effective_to >= effective_from`
-  //   check constraint. In that case the pending row is superseded outright (deleted)
-  //   rather than "closed" with an invalid date.
+  // 기존 열린 기간(effective_to = null)은 다음 둘 중 하나다:
+  // - 이미 적용 중 (effective_from 이 새 변경보다 앞) → 이전처럼
+  //   새 기간이 시작되기 전날 닫는다, 또는
+  // - 효력이 생기기 전에 수정되는, 아직 미래인 예약 변경 →
+  //   effective_from 이 새 effective_from 이상이라 closeIso 가
+  //   그 행 자신의 effective_from 보다 앞서게 되어 `effective_to >= effective_from`
+  //   체크 제약을 어긴다. 이 경우 대기 행은 잘못된 날짜로 "닫는" 대신
+  //   아예 대체(삭제)된다.
   const openRes = await service
     .from("hourly_rate_history")
     .select("id, effective_from")
@@ -2083,12 +2083,12 @@ export async function setHourlyRate(input: {
 }
 
 // ── Employment-type management (시급 ↔ 정규직) ────────────────────────────────
-// Privileged (owner / attendance_payroll_admin) employment-type changes using the existing
-// `employment_type_history` table (no schema change), mirroring setHourlyRate's interval logic:
-// closes the current open period at effective_from-1 (or deletes a still-future pending row) and
-// inserts the new open period. No retroactive dates. Hourly rate history is left untouched — pay
-// branches on the active employment type, so an existing rate simply stops applying once salaried,
-// and resumes if switched back to hourly (the admin sets/updates the rate separately).
+// 기존 `employment_type_history` 테이블을 쓰는 권한 있는(owner / attendance_payroll_admin)
+// 고용 형태 변경 (스키마 변경 없음), setHourlyRate 의 구간 로직과 같다:
+// 현재 열린 기간을 effective_from-1 에 닫고 (또는 아직 미래인 대기 행을 삭제하고)
+// 새 열린 기간을 삽입한다. 소급 날짜 금지. 시급 이력은 건드리지 않는다 — 급여는
+// 현재 고용 형태에 따라 갈리므로, 기존 시급은 월급제가 되면 적용이 멈추고
+// 시급제로 돌아가면 다시 적용된다 (시급은 관리자가 따로 설정/수정한다).
 
 export type SetEmploymentTypeResult =
   | { ok: true; id: string }
@@ -2155,7 +2155,7 @@ export async function setEmploymentType(input: {
     .maybeSingle();
   if (!member.data) return { ok: false, reason: "target_invalid" };
 
-  // Current active type — block a redundant same-type change (null = never set, so any type is a change).
+  // 현재 활성 형태 — 중복된 같은 형태 변경은 막는다 (null = 설정된 적 없음이므로 어떤 형태든 변경이다).
   // 빈 날 채우기는 오늘 유형과 같아도 된다(10/5 부터 시급제인 사람의 10/1~10/4 를 시급제로 채우는 경우).
   const cur = await service
     .from("employment_type_history")
@@ -2242,10 +2242,10 @@ export async function setEmploymentType(input: {
 }
 
 // ── Attendance allowance (추가수당) management ──────────────────────────────────
-// Privileged (owner / attendance_payroll_admin) create/cancel of busy-day / short-staffed-day extra pay
-// applied to a specific Tokyo operating date. Base rates in hourly_rate_history are never touched.
-// Create/cancel is blocked for a user-month that already has a finalized snapshot (reopen first). All
-// writes go through this service-role action; there is no direct client/RLS write path.
+// 특정 도쿄 영업일에 적용되는 바쁜 날 / 인력 부족일 추가 수당의
+// 권한 있는(owner / attendance_payroll_admin) 생성/취소. hourly_rate_history 의 기본 시급은 건드리지 않는다.
+// 이미 마감 스냅샷이 있는 사용자-월은 생성/취소가 막힌다 (먼저 재개). 모든
+// 쓰기는 이 service-role 액션을 거치며, 클라이언트/RLS 직접 쓰기 경로는 없다.
 
 const ALLOWANCE_TYPES = ["daily_fixed", "hourly_extra"] as const;
 const ALLOWANCE_CATEGORIES = ["regular", "special"] as const;
@@ -2257,7 +2257,7 @@ export type AllowanceMutationResult =
       reason: "error" | "forbidden" | "invalid" | "amount_required" | "target_invalid" | "finalized";
     };
 
-/** True when that user-month has a finalized snapshot. */
+/** 마감 스냅샷이 있는 사용자-월이면 true. */
 async function isUserMonthFinalized(
   service: ReturnType<typeof getSupabaseServiceClient>,
   organizationId: string,
@@ -2275,7 +2275,7 @@ async function isUserMonthFinalized(
   return Boolean(r.data);
 }
 
-/** True when ANY user in the org has a finalized snapshot for that month (org-wide allowance guard). */
+/** 조직 내 어떤 사용자라도 그 달의 마감 스냅샷이 있으면 true (조직 전체 수당 가드). */
 async function anyUserMonthFinalized(
   service: ReturnType<typeof getSupabaseServiceClient>,
   organizationId: string,
@@ -2293,8 +2293,8 @@ async function anyUserMonthFinalized(
 }
 
 export async function createAttendanceAllowance(input: {
-  targetDate: string; // YYYY-MM-DD (Tokyo operating date)
-  targetUserId: string | null; // null = all hourly workers with paid work that date
+  targetDate: string; // YYYY-MM-DD (도쿄 영업일)
+  targetUserId: string | null; // null = 그날 유급 근무가 있는 모든 시급 근무자
   allowanceType: "daily_fixed" | "hourly_extra";
   amountYen: number;
   category: string; // 'regular' (추가수당) | 'special' (특별수당)
@@ -2319,7 +2319,7 @@ export async function createAttendanceAllowance(input: {
   }
   const amountYen = Math.round(input.amountYen);
 
-  // A specific target must be a member of this org — 비활성(퇴사)도 마지막 달 수당은 줄 수 있다(2026-10-22).
+  // 특정 대상은 이 조직의 멤버여야 한다 — 비활성(퇴사)도 마지막 달 수당은 줄 수 있다(2026-10-22).
   if (input.targetUserId) {
     const member = await service
       .from("memberships")
@@ -2330,8 +2330,8 @@ export async function createAttendanceAllowance(input: {
     if (!member.data) return { ok: false, reason: "target_invalid" };
   }
 
-  // Block changes to an already-finalized user-month (reopen first). For an org-wide allowance, any
-  // finalized snapshot for that month blocks it (it would retroactively change a closed month).
+  // 이미 마감된 사용자-월의 변경은 막는다 (먼저 재개). 조직 전체 수당이면, 그 달의
+  // 마감 스냅샷이 하나라도 있으면 막힌다 (닫힌 달을 소급해서 바꾸게 되므로).
   const monthFirstDayStr = monthFirstDay(input.targetDate.slice(0, 7));
   const finalized = input.targetUserId
     ? await isUserMonthFinalized(service, organizationId, input.targetUserId, monthFirstDayStr)
@@ -2448,7 +2448,7 @@ export async function cancelAttendanceAllowance(input: {
   return { ok: true, id: input.id };
 }
 
-/** Load full report + items + signed image urls for the admin transport panel. */
+/** 관리자 교통비 패널용으로 전체 보고서 + 항목 + 서명된 이미지 URL 을 불러온다. */
 export async function loadAdminTransportDetail(
   userId: string,
   ym: string,
@@ -2501,12 +2501,12 @@ export async function loadAdminTransportDetail(
   return { ok: true, report, items: views, missingCount, linkedCount };
 }
 
-// ── Transport reimbursement — monthly export (Excel + PDF) ───────────────────
-// Exports every reimbursement ITEM (not per-staff summary) for the month, across all staff with
-// entered items, as a PLAIN accounting ledger (No / staff / date / usage / building / status / amount)
-// — mirrors the payroll export pattern (localized Excel via exceljs + self-contained print-quality
-// PDF/HTML). No receipt images or links live in the exported file: receipts are reviewed in the
-// dedicated web receipt page (`/admin/attendance/transport/receipt`) reached from the transport panel.
+// ── 교통비 정산 — 월별 내보내기 (Excel + PDF) ───────────────────
+// 월의 모든 정산 항목(근무자별 요약이 아님)을, 입력된 항목이 있는 전 직원에 대해
+// 단순 회계 장부(번호 / 직원 / 날짜 / 용도 / 건물 / 상태 / 금액)로 내보낸다
+// — 급여 내보내기 패턴을 따른다 (exceljs 로 현지화한 Excel + 독립형 인쇄용
+// PDF/HTML). 내보낸 파일에는 영수증 이미지나 링크가 없다: 영수증은 교통비 패널에서 들어가는
+// 전용 웹 영수증 페이지(`/admin/attendance/transport/receipt`)에서 검토한다.
 
 type TransportExportItem = {
   userName: string;
@@ -2697,12 +2697,12 @@ export async function exportMonthlyTransportReport(ym: string): Promise<Transpor
   return { ok: true, html, rowCount: result.items.length };
 }
 
-// ── Session change history (audit trail viewer) ──────────────────────────────
-// Read-only, privileged (owner / attendance_payroll_admin) view of the
-// `attendance_session_audits` rows for one session — every manual edit / invalidate / restore /
-// correction-apply, with actor + reason + a human-readable before→after diff. Localized server-side
-// (ko/ja/en) so the client just renders. This surfaces the audit trail that was already being written
-// but had no viewing UI. Loaded on-demand when the queue's session detail panel opens.
+// ── 세션 변경 이력 (감사 추적 뷰어) ──────────────────────────────
+// 읽기 전용, 권한 있는(owner / attendance_payroll_admin) 사용자용으로
+// 한 세션의 `attendance_session_audits` 행을 보여준다 — 모든 수동 수정 / 무효 / 복원 /
+// 정정 적용을 행위자 + 사유 + 사람이 읽을 수 있는 전→후 diff 와 함께. 서버에서 현지화(ko/ja/en)해
+// 클라이언트는 그대로 그리기만 한다. 이미 기록되고 있었지만 볼 UI 가 없던
+// 감사 추적을 드러낸다. 큐의 세션 상세 패널이 열릴 때 필요에 따라 불러온다.
 
 const TZ_AUDIT = "Asia/Tokyo";
 
@@ -2751,7 +2751,7 @@ export async function loadSessionAuditTrail(sessionId: string): Promise<SessionA
   const rows = (res.data ?? []) as AuditRow[];
   if (rows.length === 0) return { ok: true, entries: [] };
 
-  // Resolve actor names + site names referenced anywhere in the diffs.
+  // diff 안에서 참조되는 행위자 이름과 근무지 이름을 해석한다.
   const actorIds = Array.from(new Set(rows.map((r) => r.actor_user_id)));
   const siteIds = new Set<string>();
   for (const r of rows) {
@@ -2902,10 +2902,10 @@ export async function loadSessionAuditTrail(sessionId: string): Promise<SessionA
 }
 
 // ── 수당(시급·고용형태) Excel / PDF 내보내기 ─────────────────────────────────
-// Implemented 2026-07-14, replacing the disabled placeholder button in the wage side panel. Two
-// sheets: a per-staff summary plus the full rate-change history (the placeholder was labelled
-// "이력 내보내기", so the history is what it actually has to carry). Same 급여관리자 gate as the
-// payroll export, and rendered through the canonical admin table exporters.
+// 2026-07-14 구현, 시급 사이드 패널의 비활성 자리표시 버튼을 대체했다. 시트 두 개:
+// 시트 두 개: 직원별 요약과 전체 시급 변경 이력 (자리표시 버튼의 라벨이
+// "이력 내보내기" 였으므로, 실제로 담아야 하는 것이 이력이다). 급여관리자 게이트는
+// 급여 내보내기와 같고, 공용 관리자 표 내보내기로 그린다.
 
 function wageEmploymentLabel(
   employment: AdminWageRow["employment"],

@@ -1,6 +1,6 @@
 "use client";
 
-// Shared admin-console date picker primitive.
+// 공용 관리자 콘솔 날짜 선택기 프리미티브.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
@@ -27,7 +27,7 @@ type InlineDatePickerProps = {
   display?: string;
   min?: string;
   max?: string;
-  /** Read-only display (e.g. an end date the form derives itself). The popover never opens. */
+  /** 읽기 전용 표시(예: 폼이 스스로 계산하는 종료일). 팝오버는 열리지 않는다. */
   disabled?: boolean;
   localeTag: string;
   ariaLabel: string;
@@ -137,8 +137,8 @@ function InlineDatePicker({
 }: InlineDatePickerProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
-  // Resilient to an empty value (nothing picked yet): fall back to min's month, else today's, so the
-  // calendar always renders a valid month even before the first selection.
+  // 값이 비어 있어도(아직 선택 전) 안전하게 동작한다: min 의 달로, 없으면 오늘의 달로 대체해,
+  // 첫 선택 전에도 달력이 항상 유효한 달을 그리게 한다.
   const [calendarMonth, setCalendarMonth] = useState(
     () => value.slice(0, 7) || min?.slice(0, 7) || formatDateKey(new Date()).slice(0, 7),
   );

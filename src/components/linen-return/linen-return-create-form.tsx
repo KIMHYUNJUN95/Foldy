@@ -31,7 +31,7 @@ type LinenReturnCreateFormProps = {
   organizationId: string;
   reporterName: string;
   serverError: string | null;
-  /** Edit mode reuses this form; defaults to create. */
+  /** 수정 모드에서 이 폼을 재사용하며, 기본은 생성 모드. */
   mode?: "create" | "edit";
   recordId?: string;
   initialLines?: (FormLine & { name?: string })[];

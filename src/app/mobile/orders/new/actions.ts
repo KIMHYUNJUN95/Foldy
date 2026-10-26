@@ -54,8 +54,8 @@ export async function createOrderRequest(formData: FormData) {
     redirect("/mobile/orders/new?error=missing_building");
   }
 
-  // Validate buildingName against the org's active room catalog.
-  // Fail closed when catalog is unavailable so spoofed values cannot be saved.
+  // buildingName 을 조직의 활성 방 카탈로그와 대조해 검증한다.
+  // 카탈로그를 쓸 수 없으면 실패 처리(fail closed)해 위조된 값이 저장되지 않게 한다.
   if (hasOrganizationContext(session)) {
     const catalog = await getActiveRoomCatalogServer(session.organization.id).catch(() => null);
     if (!catalog || catalog.length === 0) {

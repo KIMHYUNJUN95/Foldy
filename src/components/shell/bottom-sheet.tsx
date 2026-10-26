@@ -14,26 +14,26 @@ import { cn } from "@/lib/utils";
 import { useSheetDragDismiss } from "@/components/shell/use-sheet-drag-dismiss";
 
 /**
- * BottomSheet — the single canonical bottom sheet for the whole app.
+ * BottomSheet — 앱 전체에서 쓰는 유일한 표준 바텀 시트.
  *
- * Every slide-up sheet (anchored to the bottom of the screen, dimmed scrim behind)
- * must use this so they all look and feel identical:
- *   - portals to <body> (so the mobile shell's pull-to-refresh transform can't trap it)
- *   - slate scrim (`bg-slate-950/45`) that dims as you drag the sheet down
- *   - iOS-style drag-to-dismiss on the grab handle / header (shared `useSheetDragDismiss`)
- *   - rounded-top cream surface, 38px grab handle, 460px max width, 20px safe-area pad
- *   - body scroll lock + Esc-to-close while open
- *   - dismiss via drag past threshold, scrim tap, or Esc — NO top-right X button
+ * 화면 하단에 붙어 올라오는(뒤에 어두운 스크림이 깔리는) 모든 시트는
+ * 이것을 써서 모두 같은 모양과 느낌이 되게 해야 한다:
+ *   - <body> 로 포털 (모바일 셸의 당겨서 새로고침 transform 에 갇히지 않게)
+ *   - slate 스크림(`bg-slate-950/45`)이 시트를 아래로 끌수록 옅어짐
+ *   - 그랩 핸들 / 헤더에서 iOS 식 드래그로 닫기 (공용 `useSheetDragDismiss`)
+ *   - 위쪽이 둥근 크림색 면, 38px 그랩 핸들, 최대 너비 460px, 20px safe-area 패딩
+ *   - 열려 있는 동안 본문 스크롤 잠금 + Esc 로 닫기
+ *   - 임계값을 넘는 드래그, 스크림 탭, Esc 로 닫는다 — 오른쪽 위 X 버튼은 없음
  *
- * Mount-driven (matches every existing sheet): the parent conditionally renders the
- * sheet; it plays the slide-in on mount, and on dismiss it plays the slide-out and
- * THEN calls `onClose` (so the parent unmounts only after the exit animation).
+ * 마운트 기반(기존 모든 시트와 동일): 부모가 조건부로 시트를
+ * 렌더하면 마운트 시 슬라이드 인을 재생하고, 닫을 때는 슬라이드 아웃을 재생한 뒤
+ * `onClose` 를 호출한다 (부모는 퇴장 애니메이션이 끝난 뒤에야 언마운트).
  *
  *   {open && <BottomSheet onClose={() => setOpen(false)}>…</BottomSheet>}
  *
- * Programmatic close from inside (Cancel button, post-submit): use the render-prop
- * `children={({ close }) => …}` or `useBottomSheetClose()`. Make any extra element a
- * drag-to-dismiss zone with `useBottomSheetDragHandle()`.
+ * 안쪽에서 프로그래밍으로 닫기(취소 버튼, 제출 후): render-prop
+ * `children={({ close }) => …}` 또는 `useBottomSheetClose()` 를 쓴다. 다른 요소도
+ * `useBottomSheetDragHandle()` 로 드래그로 닫는 영역으로 만들 수 있다.
  */
 
 type HandleProps = ReturnType<typeof useSheetDragDismiss>["handleProps"];
@@ -133,26 +133,26 @@ export function isTopOverlay(id: symbol): boolean {
 const BottomSheetDragContext = createContext<HandleProps>({} as HandleProps);
 const BottomSheetCloseContext = createContext<() => void>(() => {});
 
-/** Spread onto any element inside a BottomSheet to make it a drag-to-dismiss zone. */
+/** BottomSheet 안의 아무 요소에나 펼치면 드래그로 닫는 영역이 된다. */
 export function useBottomSheetDragHandle() {
   return useContext(BottomSheetDragContext);
 }
-/** Animate the enclosing BottomSheet closed (slide-out, then the parent's onClose). */
+/** 둘러싼 BottomSheet 를 닫는 애니메이션을 재생한다 (슬라이드 아웃 후 부모의 onClose). */
 export function useBottomSheetClose() {
   return useContext(BottomSheetCloseContext);
 }
 
 type BottomSheetProps = {
-  /** Fired AFTER the slide-out completes — the parent should unmount the sheet here. */
+  /** 슬라이드 아웃이 끝난 뒤 호출됨 — 부모는 여기서 시트를 언마운트해야 한다. */
   onClose: () => void;
   children:
     | ReactNode
     | ((api: { close: () => void; dragHandleProps: HandleProps }) => ReactNode);
-  /** Optional title/header row rendered under the handle; it becomes a drag zone. */
+  /** 선택: 핸들 아래에 렌더되는 제목/헤더 행. 드래그 영역이 된다. */
   header?: ReactNode;
-  /** Extra classes for the sheet container (e.g. `max-h-[82dvh] flex flex-col`). */
+  /** 시트 컨테이너용 추가 클래스 (예: `max-h-[82dvh] flex flex-col`). */
   className?: string;
-  /** Scrim/sheet z-index. Default `z-[80]`; raise when stacking over another sheet. */
+  /** 스크림/시트 z-index. 기본 `z-[80]`; 다른 시트 위에 쌓을 때 올린다. */
   zIndexClassName?: string;
   ariaLabel?: string;
   ariaLabelledBy?: string;
@@ -191,7 +191,7 @@ export function BottomSheet({
   }, []);
   useEffect(() => {
     if (!closing) return;
-    const timer = setTimeout(() => onCloseRef.current(), SHEET_CLOSE_MS); // matches the slide-out transition
+    const timer = setTimeout(() => onCloseRef.current(), SHEET_CLOSE_MS); // 슬라이드 아웃 전환 시간과 일치
     return () => clearTimeout(timer);
   }, [closing]);
 
@@ -241,7 +241,7 @@ export function BottomSheet({
     };
   }, []);
 
-  // Slide in on mount (double rAF so the initial translate-y-full paints first).
+  // 마운트 시 슬라이드 인 (초기 translate-y-full 이 먼저 그려지도록 rAF 두 번).
   useEffect(() => {
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
     return () => cancelAnimationFrame(id);
@@ -338,12 +338,12 @@ export function BottomSheet({
             )}
             data-sheet
             onClick={(e) => e.stopPropagation()}
-            // Sheets portal to <body>, but React synthetic touch events still bubble through the
-            // React tree into the mobile shell's content div, whose pull-to-refresh / swipe-nav
-            // handlers would otherwise scroll/drag the background when the user touches a
-            // non-handle area of the sheet (gutter, padding, the gap above the scroll region).
-            // Isolating touchmove here keeps the background frozen while a sheet is open; the
-            // sheet's own scroll regions still scroll natively (stopPropagation ≠ preventDefault).
+            // 시트는 <body> 로 포털되지만 React 합성 터치 이벤트는 여전히 React 트리를 따라
+            // 모바일 셸의 콘텐츠 div 까지 버블링되고, 그곳의 당겨서 새로고침 / 스와이프 이동
+            // 핸들러가 시트의 핸들이 아닌 영역(여백, 패딩, 스크롤 영역 위의 틈)을 만질 때
+            // 배경을 스크롤/드래그해 버릴 수 있다.
+            // 여기서 touchmove 를 격리하면 시트가 열린 동안 배경이 고정된다. 시트 자체의
+            // 스크롤 영역은 그대로 네이티브로 스크롤된다 (stopPropagation ≠ preventDefault).
             onTouchMove={(e) => e.stopPropagation()}
             ref={sheetRef}
             role="dialog"

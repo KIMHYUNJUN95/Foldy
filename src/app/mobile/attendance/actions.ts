@@ -1,15 +1,15 @@
 "use server";
 
-// Attendance — GPS + QR clock-in / clock-out core (Step 3) + break tracking (Step 4).
+// 근태 — GPS + QR 출근 / 퇴근 핵심(Step 3) + 휴게 추적(Step 4).
 //
-// One server action drives clock-in/clock-out from the worker capture screen; two more drive break
-// start/end from the home screen. ALL validation is server-side (auth + org, QR token, GPS-vs-radius,
-// open-session + open-break rules); clock-in/out attempts — success or failure — are recorded in
-// `attendance_attempt_logs`. Writes use the service-role client (RLS denies direct authenticated
-// writes; see docs/engineering/05-rls-permissions.md). PWA active method is `gps_qr` only; Wi-Fi is not
-// activated here.
+// 서버 액션 하나가 근무자 촬영 화면의 출근/퇴근을 처리하고, 둘이 더 홈 화면의 휴게
+// 시작/종료를 처리한다. 검증은 전부 서버에서 한다(인증 + 조직, QR 토큰, GPS 대 반경,
+// 열린 세션 + 열린 휴게 규칙). 출근/퇴근 시도는 성공이든 실패든
+// `attendance_attempt_logs` 에 기록한다. 쓰기는 service-role 클라이언트를 쓴다(RLS 가 인증된 사용자의
+// 직접 쓰기를 막는다. docs/engineering/05-rls-permissions.md 참고). PWA 의 활성 방식은 `gps_qr` 뿐이고
+// Wi-Fi 는 여기서 켜지 않는다.
 //
-// Not in this step: correction requests, payroll, notifications.
+// 이 단계에 없는 것: 정정 요청, 급여, 알림.
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -58,12 +58,12 @@ export type AttendanceScanMode = "in" | "out";
 
 export type AttendanceScanInput = {
   mode: AttendanceScanMode;
-  /** Raw token string decoded from the on-site QR (null when the scan produced nothing). */
+  /** 현장 QR 에서 읽은 원문 토큰 문자열(스캔 결과가 없으면 null). */
   token: string | null;
   latitude: number | null;
   longitude: number | null;
   accuracy: number | null;
-  /** Set when the client could not obtain GPS at all. */
+  /** 클라이언트가 GPS 를 전혀 얻지 못했을 때 설정한다. */
   gpsError: "denied" | "unavailable" | null;
   userAgent?: string | null;
 };
@@ -92,7 +92,7 @@ export type AttendanceScanFailure = {
 
 export type AttendanceScanResult = AttendanceScanSuccess | AttendanceScanFailure;
 
-/** Tokyo calendar date (YYYY-MM-DD) of an instant — operational date boundary (Asia/Tokyo). */
+/** 시각이 속한 도쿄 달력 날짜(YYYY-MM-DD) — 운영 날짜 경계(Asia/Tokyo). */
 function tokyoDate(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
@@ -102,7 +102,7 @@ function tokyoDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** HH:mm in Asia/Tokyo, for the success summary shown in the UI. */
+/** Asia/Tokyo 기준 HH:mm. UI 의 성공 요약에 쓴다. */
 function tokyoTimeLabel(iso: string): string {
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Tokyo",
@@ -112,9 +112,9 @@ function tokyoTimeLabel(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** Great-circle distance in meters between two lat/long points (haversine). */
+/** 두 위경도 사이의 대원 거리(미터, haversine). */
 function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const R = 6371000; // Earth radius (m)
+  const R = 6371000; // 지구 반지름(m)
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(bLat - aLat);
   const dLng = toRad(bLng - aLng);
@@ -172,7 +172,7 @@ export async function submitAttendanceScan(
     );
   }
 
-  // 1) QR token must be present and resolve to an active token in THIS org.
+  // 1) QR 토큰이 있어야 하고 이 조직의 활성 토큰이어야 한다.
   if (!input.token) {
     await logAttempt({ success: false, failureReason: "qr_scan_failed", resolvedSiteId: null });
     return { ok: false, reason: "qr" };
@@ -190,7 +190,7 @@ export async function submitAttendanceScan(
     return { ok: false, reason: "qr" };
   }
 
-  // 2) Resolve the site behind the token; it must exist in-org and be active.
+  // 2) 토큰이 가리키는 사업장을 찾는다. 같은 조직에 있고 활성이어야 한다.
   const siteRes = await service
     .from("attendance_sites")
     .select("*, properties(display_name_ko, display_name_ja, display_name_en)")
@@ -297,7 +297,7 @@ export async function submitAttendanceScan(
     }
   }
 
-  // 4) GPS is mandatory.
+  // 4) GPS 는 필수.
   if (input.gpsError || input.latitude == null || input.longitude == null) {
     await logAttempt({
       success: false,
@@ -307,7 +307,7 @@ export async function submitAttendanceScan(
     return { ok: false, reason: "gps", siteName: localizedSiteName(site, locale) };
   }
 
-  // 5) GPS must be within the site's allowed radius.
+  // 5) GPS 가 사업장의 허용 반경 안이어야 한다.
   const dist = distanceMeters(site.latitude, site.longitude, input.latitude, input.longitude);
   if (dist > site.allowed_radius_meters) {
     await logAttempt({ success: false, failureReason: "outside_radius", resolvedSiteId: site.id });
@@ -420,17 +420,17 @@ export async function submitAttendanceScan(
   };
 }
 
-// ── Breaks (Step 4) ──────────────────────────────────────────────────────────
-// Break start/end is not a GPS/QR attendance action — it has no `attendance_attempt_logs` row (that
-// table's `method` is GPS-oriented and required). The `attendance_breaks` rows ARE the record. Same
-// logic for salaried and hourly users; only hourly pay later excludes recorded break time.
+// ── 휴게 (Step 4) ──────────────────────────────────────────────────────────
+// 휴게 시작/종료는 GPS/QR 근태 액션이 아니므로 `attendance_attempt_logs` 행이 없다(그 테이블의
+// `method` 는 GPS 중심이고 필수다). `attendance_breaks` 행이 곧 기록이다. 정규직과 시급직에
+// 같은 로직을 쓰고, 나중에 시급 계산에서만 기록된 휴게 시간을 뺀다.
 
 export type BreakActionResult =
   | { ok: true }
   | { ok: false; reason: "no_session" | "already_on_break" | "no_open_break" | "error" };
 
 /**
- * Resolve the caller's single open session id (status = 'open') within an org, or null.
+ * 조직 안에서 호출자의 열린 세션(status = 'open') id 하나를 찾는다. 없으면 null.
  * 지난 운영일의 열린 근무(퇴근 미기록)는 없는 것으로 본다 — 거기에 휴게를 붙이면 안 된다(`isStaleOpenSession`).
  */
 async function getOpenSessionId(
@@ -450,7 +450,7 @@ async function getOpenSessionId(
   return res.error ? null : (row?.id ?? null);
 }
 
-/** Start a break on the open session. Fails if there is no open session or a break is already open. */
+/** 열린 세션에서 휴게를 시작한다. 열린 세션이 없거나 이미 휴게 중이면 실패한다. */
 export async function startBreak(): Promise<BreakActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
@@ -489,7 +489,7 @@ export async function startBreak(): Promise<BreakActionResult> {
   return { ok: true };
 }
 
-/** End the currently open break. Fails if there is no open session or no open break. */
+/** 진행 중인 휴게를 끝낸다. 열린 세션이 없거나 열린 휴게가 없으면 실패한다. */
 export async function endBreak(): Promise<BreakActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
@@ -520,21 +520,21 @@ export async function endBreak(): Promise<BreakActionResult> {
   return { ok: true };
 }
 
-// ── Correction / exception requests (Step 6) ─────────────────────────────────
-// A user requests a correction for THEIR OWN record (current or previous Tokyo month only). The request
-// only SUGGESTS values — it never mutates the authoritative session. An admin confirms final values
-// later (Step 7). Supports session-linked requests and session-less exception requests (e.g. from a
-// failed clock-in). Self-only + month-range enforced server-side.
+// ── 정정 / 예외 요청 (Step 6) ─────────────────────────────────
+// 사용자가 본인 기록(이번 달 또는 지난달 도쿄 기준만)의 정정을 요청한다. 요청은
+// 값을 제안만 할 뿐 확정 세션은 절대 바꾸지 않는다. 관리자가 나중에 최종 값을 확정한다
+// (Step 7). 세션에 연결된 요청과 세션 없는 예외 요청(예: 실패한
+// 출근에서 낸 요청)을 지원한다. 본인만 + 월 범위를 서버에서 강제한다.
 
 export type CreateCorrectionInput = {
-  /** Source session (self-owned), or null for an exception request not tied to a session. */
+  /** 원본 세션(본인 것). 세션과 무관한 예외 요청이면 null. */
   sessionId: string | null;
   reasonType: AttendanceCorrectionReason;
   memo: string | null;
-  /** Desired clock-in/out wall time "HH:mm" (Tokyo), combined with the base date; null = unset. */
+  /** 기준 날짜와 합치는 희망 출근/퇴근 시각 "HH:mm"(도쿄). null = 미설정. */
   desiredInTime: string | null;
   desiredOutTime: string | null;
-  /** A single desired site applied to both in/out (the design's "출/퇴근 동일"); null = unset. */
+  /** 출근/퇴근 모두에 적용되는 희망 사업장 하나(디자인의 "출/퇴근 동일"). null = 미설정. */
   desiredSiteId: string | null;
   /**
    * 세션 없는 예외 요청의 근무 날짜 'YYYY-MM-DD'(도쿄). 세션이 있으면 무시하고 그 세션의 운영일을 쓴다.
@@ -548,12 +548,12 @@ export type CreateCorrectionResult =
   | { ok: true; id: string }
   | { ok: false; reason: "forbidden" | "out_of_range" | "invalid" | "error" };
 
-/** Tokyo YYYY-MM of "now". */
+/** 지금의 도쿄 YYYY-MM. */
 function tokyoYearMonthNow(): string {
   return tokyoDate(new Date().toISOString()).slice(0, 7);
 }
 
-/** The Tokyo YYYY-MM immediately before the given YYYY-MM. */
+/** 주어진 YYYY-MM 바로 앞의 도쿄 YYYY-MM. */
 function previousYearMonth(ym: string): string {
   const [y, m] = ym.split("-").map((n) => Number(n));
   if (m <= 1) return `${y - 1}-12`;
@@ -639,7 +639,7 @@ export async function createAttendanceCorrectionRequest(
   const imageUrls = (input.imageUrls ?? []).slice(0, ATTENDANCE_CORRECTION_MAX_IMAGES);
   if (!areOwnCorrectionImageUrls(imageUrls, organizationId)) return { ok: false, reason: "invalid" };
 
-  // Resolve the base date the correction concerns + verify self-ownership of any linked session.
+  // 정정 대상 기준 날짜를 정하고, 연결된 세션이 있으면 본인 소유인지 확인한다.
   let baseDate: string;
   let sessionId: string | null = null;
   let sessionClockInAt: string | null = null;
@@ -669,14 +669,14 @@ export async function createAttendanceCorrectionRequest(
     baseDate = picked ?? today;
   }
 
-  // Allowed window: current Tokyo month + previous month only.
+  // 허용 구간: 이번 도쿄 달 + 지난달만.
   const ym = baseDate.slice(0, 7);
   const currentYm = tokyoYearMonthNow();
   if (ym !== currentYm && ym !== previousYearMonth(currentYm)) {
     return { ok: false, reason: "out_of_range" };
   }
 
-  // Validate the optional desired site belongs to this org (drop if not found).
+  // 선택한 희망 사업장이 이 조직 것인지 검증한다(못 찾으면 버린다).
   let desiredSiteId: string | null = null;
   if (input.desiredSiteId) {
     const siteRes = await service
@@ -707,11 +707,11 @@ export async function createAttendanceCorrectionRequest(
     target_date: sessionId ? null : baseDate,
   };
 
-  // Re-submitting for the SAME target must replace the user's still-pending request, never stack a
-  // second one. Two pending rows for one day used to make the worker's status screen (latest 1) and
-  // the month-close blocker count (all rows) disagree — and gave the reviewer two contradictory
-  // requests to act on. Superseding resets the row to `requested` and drops any stale review verdict,
-  // because the values the reviewer was looking at no longer exist.
+  // 같은 대상으로 다시 제출하면 사용자의 아직 대기 중인 요청을 교체해야 하고, 쌓으면 안 된다.
+  // 하루에 대기 행이 둘이면 근무자의 상태 화면(최신 1건)과
+  // 월 마감 차단 건수(모든 행)가 서로 달랐고, 검토자에게도 상충하는 두 요청을
+  // 처리하라고 보였다. 대체하면 행이 `requested` 로 돌아가고 남아 있던 검토 결과도 지운다.
+  // 검토자가 보던 값이 더는 존재하지 않기 때문이다.
   let pendingQuery = service
     .from("attendance_correction_requests")
     .select("id")
@@ -746,7 +746,7 @@ export async function createAttendanceCorrectionRequest(
       .eq("id", existing.id)
       .eq("organization_id", organizationId)
       .eq("requested_by_user_id", userId)
-      // Guard the race where an admin resolves the request between the read and the write.
+      // 읽기와 쓰기 사이에 관리자가 요청을 처리해 버리는 경합을 막는다.
       .in("status", ["requested", "in_review"])
       .select("id")
       .maybeSingle()) as { data: { id: string } | null; error: { message: string } | null };
@@ -771,14 +771,14 @@ export async function createAttendanceCorrectionRequest(
     requestId = ins.data.id;
   }
 
-  // Admin alert: notify owner + attendance_payroll_admin (privileged only; never the requester).
+  // 관리자 알림: owner + attendance_payroll_admin 에게(권한 있는 사람만, 요청자 본인은 제외).
   const adminIds = await getMemberIdsWithCapability(service, organizationId, "attendance.manage");
   await notifyAttendanceAdmins(service, {
     organizationId,
     recipientUserIds: adminIds,
     actorUserId: userId,
-    // A re-submission reuses the row id, so the dedupe key carries the submission instant — otherwise
-    // the resubmitted (different) values would be silently swallowed as a duplicate alert.
+    // 재제출은 행 id 를 재사용하므로 중복 방지 키에 제출 시각이 들어간다. 그렇지 않으면
+    // 다시 낸(값이 다른) 요청이 중복 알림으로 조용히 삼켜진다.
     dedupeBase: superseded
       ? `attendance_correction:${requestId}:${submittedAt}`
       : `attendance_correction:${requestId}`,
@@ -798,10 +798,10 @@ export async function createAttendanceCorrectionRequest(
   return { ok: true, id: requestId };
 }
 
-// ── 18:30 open-session reminder response (Step 14) ───────────────────────────
-// Worker answers the once-per-Tokyo-day open-session prompt. `still_working` suppresses the prompt for
-// the rest of the day; `left_work` does NOT auto clock-out — the client routes to the correction flow.
-// Self-only: records against the authenticated user's own open session.
+// ── 18:30 열린 세션 알림 응답 (Step 14) ───────────────────────────
+// 근무자가 도쿄 기준 하루 한 번 뜨는 열린 세션 안내에 답한다. `still_working` 은 그날 남은
+// 시간 동안 안내를 끄고, `left_work` 는 자동 퇴근하지 않는다 — 클라이언트가 정정 흐름으로 보낸다.
+// 본인만: 인증된 사용자 자신의 열린 세션에 기록한다.
 
 export type ReminderResponse = "still_working" | "left_work";
 export type ReminderResult =

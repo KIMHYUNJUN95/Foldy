@@ -21,12 +21,12 @@ type PageProps = {
   searchParams: Promise<{ state?: string }>;
 };
 
-// `?state=` is a design-preview override (break/loading still render as static design previews);
-// without it the home renders from REAL session data (idle vs open).
+// `?state=` 는 디자인 미리보기용 덮어쓰기다 (휴게/로딩은 여전히 정적 디자인 미리보기로 렌더됨).
+// 이 값이 없으면 홈은 실제 세션 데이터(대기 vs 근무 중)로 렌더된다.
 const PREVIEW_STATES = ["idle", "open", "break", "loading"] as const;
 
-// Attendance / 근태 — home (ring-hero clock). Step 3: wired to real open-session state.
-// See docs/product/24-attendance-workflow.md and docs/product/21-attendance-payroll-workflow.md.
+// 근태 — 홈 (링 히어로 시계). 3단계: 실제 열린 세션 상태에 연결됨.
+// 참고: docs/product/24-attendance-workflow.md, docs/product/21-attendance-payroll-workflow.md.
 export default async function MobileAttendancePage({ searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
@@ -47,18 +47,18 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
 
   const navBadges = await navBadgesPromise;
 
-  // Explicit `?state=` keeps the design-preview switcher working (static visuals, no real data).
+  // 명시적 `?state=` 는 디자인 미리보기 전환기를 계속 동작하게 한다 (정적 화면, 실제 데이터 없음).
   const previewState = PREVIEW_STATES.includes((params.state ?? "") as (typeof PREVIEW_STATES)[number])
     ? (params.state as (typeof PREVIEW_STATES)[number])
     : null;
 
-  // Tokyo YM for monthly pay preview
+  // 월간 급여 미리보기용 도쿄 연월
   const tokyoYM = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" })
     .format(new Date())
     .slice(0, 7);
 
-  // Real state: open session with an open break → 휴게 중; open session → 근무 중; otherwise → 출근 전.
-  // Fetch monthly pay view in parallel (skip in preview mode; catch errors gracefully).
+  // 실제 상태: 휴게가 열린 세션 → 휴게 중, 열린 세션 → 근무 중, 그 외 → 출근 전.
+  // 월간 급여 뷰를 병렬로 가져온다 (미리보기 모드에서는 생략, 오류는 조용히 처리).
   const [openSession, monthlyPayView, abandonedSessions, weeklyLimit, idCardDaysLeft] = previewState
     ? [null, null, [], null, null]
     : await Promise.all([
@@ -80,16 +80,16 @@ export default async function MobileAttendancePage({ searchParams }: PageProps) 
     previewState ??
     (openSession ? (openSession.openBreakStartedAt ? "break" : "open") : "idle");
 
-  // 18:30 open-session reminder: shown once per Tokyo day while a session is still open and the user
-  // hasn't answered yet. Suppressed in design-preview mode.
+  // 18:30 미종료 근무 알림: 근무 세션이 아직 열려 있고 사용자가 아직 답하지 않았다면
+  // 도쿄 날짜 기준 하루에 한 번만 표시한다. 디자인 미리보기 모드에서는 숨긴다.
   let reminderOpenSessionId: string | null = null;
   if (!previewState && openSession && isPastReminderTimeTokyo()) {
     const answered = await hasOpenReminderResponseToday(session.organization.id, session.user.id);
     if (!answered) reminderOpenSessionId = openSession.id;
   }
 
-  // Format monthly hours / pay for the home shortcut cards.
-  // Skip when salaried (no hourly data) or values are zero.
+  // 홈 바로가기 카드에 표시할 월간 근무 시간 / 급여를 포맷한다.
+  // 월급제(시급 데이터 없음)이거나 값이 0이면 건너뛴다.
   let monthHours: string | null = null;
   let monthPay: string | null = null;
   if (monthlyPayView && !monthlyPayView.salariedOnly) {

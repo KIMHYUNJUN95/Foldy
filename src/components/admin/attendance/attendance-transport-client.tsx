@@ -369,7 +369,7 @@ function TransportPanel({
   const resolved = row.status === "approved" || row.status === "rejected";
   const reviewable = row.status === "submitted" || row.status === "reviewing";
 
-  // All receipt urls across items (flat) → shared ImageLightbox carousel; open by url index.
+  // 항목 전체의 영수증 URL(평면) → 공용 ImageLightbox 캐러셀; URL 인덱스로 연다.
   const allReceiptUrls = items.flatMap((it) => it.imageUrls);
   const openImage = (url: string) => {
     const idx = allReceiptUrls.indexOf(url);
@@ -474,7 +474,7 @@ function TransportPanel({
       });
       if (res.ok) {
         setModal(null);
-        // Reopen sends the report back to 'submitted' (pending review again).
+        // 재오픈은 보고서를 'submitted' 로 되돌린다(다시 검토 대기).
         onStatusChange(row.userId, "submitted", c.trActionDoneReopen);
         onClose();
       } else if (res.reason === "forbidden") {
@@ -548,7 +548,7 @@ function TransportPanel({
             </div>
           ) : (
             <>
-              {/* items (with inline receipt thumbnails, collapsible) */}
+              {/* 항목(인라인 영수증 썸네일, 접을 수 있음) */}
               <div className="pblock">
                 <div className="pblock__t">{c.trPanelItemsTitle(items.length)}</div>
                 {items.length === 0 ? (
@@ -617,7 +617,7 @@ function TransportPanel({
                 ) : null}
               </div>
 
-              {/* permission zone OR resolved note */}
+              {/* 권한 영역 또는 처리 완료 메모 */}
               {resolved ? (
                 <div className="pblock">
                   <div className="locknote">

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Staff Suggestions — comment composer (Step 5).
- * Wires the finalized `.ccomposer` bar to real comment creation for ANY visible participant
- * (author / recipient / referenced). Supports text and/or photos (max 5, reusing the shared
- * compression + `request-images` upload). A small preview strip sits above the bar when photos are
- * attached. Visual treatment of the bar itself is unchanged.
+ * 직원 건의 — 댓글 작성기(Step 5).
+ * 확정된 `.ccomposer` 바를 실제 댓글 생성에 연결한다. 보이는 모든 참여자(
+ * 작성자 / 수신자 / 참조)가 쓸 수 있다. 텍스트와/또는 사진(최대 5장, 공용
+ * 압축 + `request-images` 업로드 재사용)을 지원한다. 사진이 붙으면 바 위에 작은 미리보기 줄이 생긴다.
+ * 바 자체의 시각 처리는 바뀌지 않았다.
  */
 
 import { useRef, useState, useTransition } from "react";

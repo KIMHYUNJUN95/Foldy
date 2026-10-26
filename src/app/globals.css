@@ -33,7 +33,7 @@
   }
 }
 
-/* Launch splash — icon pops in (see src/components/pwa/splash-screen.tsx). */
+/* 런치 스플래시 — 아이콘이 팝하며 등장(src/components/pwa/splash-screen.tsx 참고). */
 @keyframes splash-pop {
   0% {
     opacity: 0;
@@ -54,31 +54,31 @@
   }
 }
 
-/* ── Native standalone touch behavior ──────────────────────────────────────
-   Make the installed PWA feel like a native app on iOS Safari / Android:
-   - kill the grey tap-highlight flash on every tappable element,
-   - stop the iOS long-press callout + accidental text-selection on UI chrome
-     (buttons, links, labels, the tab bar, the wordmark) — body text, inputs,
-     and message/announcement/suggestion content stay selectable,
-   - stop the whole document rubber-band/bounce (the inner scroll area already
-     uses overscroll-contain; this guards the body so no white gap shows above
-     the header / below the tab bar),
-   - on touch devices, fields render at ≥16px so iOS never zoom-snaps the
-     viewport on focus (desktop keeps its design sizes; inputs that intentionally
-     want a larger size opt out with data-keep-font-size). */
+/* ── 네이티브 독립 실행 터치 동작 ──────────────────────────────────────
+   설치된 PWA 가 iOS Safari / Android 에서 네이티브 앱처럼 느껴지게 한다:
+   - 탭 가능한 모든 요소에서 회색 탭 하이라이트 번쩍임을 없앰,
+   - UI 크롬에서 iOS 길게 누름 콜아웃과 의도치 않은 텍스트 선택을 막음
+     (버튼, 링크, 라벨, 탭바, 워드마크) — 본문 텍스트, 입력창,
+     메시지/공지/건의 내용은 계속 선택할 수 있음,
+   - 문서 전체의 고무줄/바운스 스크롤을 막음(내부 스크롤 영역은 이미
+     overscroll-contain 을 쓰며, 이 규칙은 body 를 지켜 헤더 위나
+     탭바 아래에 흰 틈이 보이지 않게 함),
+   - 터치 기기에서 입력창은 16px 이상으로 그려 포커스 때 iOS 가 뷰포트를
+     확대하지 않게 함(데스크톱은 설계 크기 유지; 의도적으로
+     더 큰 크기를 쓰는 입력창은 data-keep-font-size 로 제외). */
 * {
   -webkit-tap-highlight-color: transparent;
 }
 html,
 body {
   overscroll-behavior: none;
-  /* Canvas colour on BOTH html and body. In an installed/standalone iOS PWA the area behind the
-     status bar / notch (and any safe-area or overscroll region) shows the ROOT element's
-     background; with no background on <html> iOS paints those bands black — most visible
-     when the sidebar opens and the layout repaints. Painting <html> removes the black bands. */
-  /* Hardcoded fallback so the canvas is painted before CSS custom properties
-     resolve (e.g. before the stylesheet is parsed on cold launch). Prevents a white
-     flash on iOS PWA startup. Value matches --background exactly. */
+  /* html 과 body 양쪽에 캔버스 색을 지정한다. 설치된(독립 실행) iOS PWA 에서 상태바 /
+     노치 뒤 영역(및 safe-area, overscroll 영역)에는 루트 요소의 배경이 보인다.
+     <html> 에 배경이 없으면 iOS 가 그 띠를 검게 칠하며, 특히 사이드바가 열려
+     레이아웃이 다시 그려질 때 눈에 띈다. <html> 을 칠하면 검은 띠가 사라진다. */
+  /* 하드코딩 대체값으로, CSS 커스텀 속성이 해석되기 전에도(예: 콜드 런치에서
+     스타일시트가 파싱되기 전) 캔버스가 칠해진다. iOS PWA 시작 때의 흰
+     깜빡임을 막는다. 값은 --background 와 정확히 같다. */
   background: #ffffff;
   background: var(--background);
 }
@@ -129,13 +129,13 @@ summary,
     }
   }
 }
-/* Don't let iOS auto-inflate text (e.g. in landscape) — keep the designed sizes. */
+/* iOS 가 텍스트를 자동으로 키우지 못하게 한다(예: 가로 모드) — 설계한 크기를 유지. */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
-/* Tappable controls: remove the legacy 300ms double-tap delay + double-tap-to-zoom so taps
-   register instantly (native feel). Scoped to controls only — never to scroll containers. */
+/* 탭 가능한 컨트롤: 예전 300ms 더블탭 지연과 더블탭 확대를 없애 탭이
+   즉시 반응하게 한다(네이티브 느낌). 컨트롤에만 적용 — 스크롤 컨테이너에는 절대 적용하지 않음. */
 button,
 a,
 summary,
@@ -144,9 +144,9 @@ summary,
   touch-action: manipulation;
 }
 
-/* Keyboard focus ring: the global tap-highlight removal + per-component `outline-none` left keyboard
-   users with no visible focus. This baseline restores it (only for keyboard/:focus-visible, so it
-   never shows on touch/mouse). Components that draw their own ring still win. */
+/* 키보드 포커스 링: 전역 탭 하이라이트 제거와 컴포넌트별 `outline-none` 때문에 키보드
+   사용자에게 보이는 포커스가 없었다. 이 기본 규칙이 복원한다(키보드/:focus-visible 에만 적용되어
+   터치/마우스에는 나타나지 않음). 자체 링을 그리는 컴포넌트가 여전히 우선한다. */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -161,19 +161,19 @@ summary,
   outline-offset: 0 !important;
 }
 
-/* Respect reduced-motion for Tailwind's animate-spin (Tailwind does not disable it by default) —
-   covers every spinner (PTR, submit buttons, sheets). */
+/* Tailwind 의 animate-spin 도 reduced-motion 을 존중한다(Tailwind 는 기본으로 끄지 않음) —
+   모든 스피너(PTR, 제출 버튼, 시트)에 적용된다. */
 @media (prefers-reduced-motion: reduce) {
   .animate-spin {
     animation: none;
   }
 }
 
-/* Screen entrances for /mobile/* (2026-10-21 — driven by MobileShell, was src/app/mobile/template.tsx).
-   Only the CONTENT column ([data-shell-column]) moves; the tab bar and top bar are redrawn in the same place, so they
-   read as fixed chrome like a native tab bar. Forward = push in from the right; back = pop in from the left (a subtle
-   slide + fade, not a full 100% slide, so nothing reveals blank canvas). Tab switch = a short fade in place (native tab
-   bars never slide). Reveal = the real screen replacing a placeholder shell that already played the push. */
+/* /mobile/* 화면 진입 모션(2026-10-21 — MobileShell 이 구동하며, 예전엔 src/app/mobile/template.tsx).
+   콘텐츠 열([data-shell-column])만 움직이고, 탭바와 상단바는 같은 자리에 다시 그려져서
+   네이티브 탭바처럼 고정된 크롬으로 읽힌다. 앞으로 = 오른쪽에서 밀고 들어옴, 뒤로 = 왼쪽에서 들어옴(은은한
+   슬라이드 + 페이드이며 100% 슬라이드가 아니라 빈 캔버스가 드러나지 않음). 탭 전환 = 제자리 짧은 페이드(네이티브 탭
+   바는 슬라이드하지 않는다). Reveal = 이미 push 를 재생한 자리 셸을 실제 화면이 대체하는 것. */
 @keyframes screen-fade-in {
   from {
     opacity: 0;
@@ -226,19 +226,19 @@ summary,
 }
 
 :root {
-  /* White redesign (2026-10-09, docs/design/05-white-redesign.md): one white sheet —
-     page, chrome, cards and sheets are all white; areas are separated by spacing and
-     faint horizontal lines, never by boxes. Light fills (#F4F4F7 · #F7F7F9) stand in
-     for inputs and selected controls. */
+  /* 화이트 리디자인(2026-10-09, docs/design/05-white-redesign.md): 한 장의 흰 시트 —
+     페이지, 크롬, 카드, 시트가 모두 흰색이고, 영역은 여백과
+     옅은 가로선으로 나누며 박스는 쓰지 않는다. 옅은 채움(#F4F4F7 · #F7F7F9)이
+     입력창과 선택된 컨트롤을 대신한다. */
   --background: #ffffff;
   --foreground: #16141f;
   --muted: #f4f4f7;
   --muted-foreground: #6b6878;
-  /* Text roles (HIG 다듬기 2026-10-19 · docs/design/05-white-redesign.md). Small text needs 4.5:1 on white —
-     the old #8B8898 (3.46:1) and #9A97A6 (2.86:1) failed it. #8B8898 · #B4B1BF · #C9C6D3 stay for icons,
-     「·」 separators and chevrons only, never for text.
-       --text-3     dates · meta lines · times · unselected tabs (5.11:1)
-       --text-done  completed (struck-through) text · tab counts · group headings (4.64:1) */
+  /* 글자 역할(HIG 다듬기 2026-10-19 · docs/design/05-white-redesign.md). 작은 글자는 흰 바탕에서 4.5:1 이 필요하다 —
+     예전 #8B8898 (3.46:1) 과 #9A97A6 (2.86:1) 은 기준 미달이었다. #8B8898 · #B4B1BF · #C9C6D3 은 아이콘,
+     「·」 구분점, 화살표에만 쓰고 글자에는 쓰지 않는다.
+       --text-3     날짜 · 메타 줄 · 시간 · 선택 안 된 탭 (5.11:1)
+       --text-done  완료(취소선) 글자 · 탭 개수 · 그룹 제목 (4.64:1) */
   --text-3: #6f6c7c;
   --text-done: #76737f;
   --surface: #ffffff;
@@ -248,19 +248,19 @@ summary,
      시작점: 앞에 아이콘 · 고리가 있는 줄은 글자 시작점부터, 없는 줄은 내용 여백부터. 끝은 늘 내용 여백까지.
      회색 면으로 구분된 칸 아래에는 긋지 않는다. 예전의 #F1F1F4 · #F3F3F6 · #F7F7F9 · #E6E6EB · #ECECF0 가로선을 대신한다. */
   --separator: #e4e3e9;
-  /* Brand accent: soft violet (pressed #5A30CF). Replaces the former deep navy. */
+  /* 브랜드 강조색: 부드러운 바이올렛(눌림 #5A30CF). 예전의 짙은 네이비를 대체한다. */
   --primary: #7a52e6;
   --primary-foreground: #ffffff;
   --ring: #7a52e6;
 
-  /* ── Motion tokens ──────────────────────────────────────────────────────────
-     One native-feel vocabulary for every animated surface so the whole mobile app
-     moves the same way. JS-driven surfaces (mobile-shell, BottomSheet) inline the
-     SAME curves; keep these in sync if either changes.
-       --ease-ios     smooth iOS decel — sheets, slide-overs, screen transitions
-       --ease-out     snappy ease-out  — reveals, tap-press settle
-       --ease-spring  gentle overshoot — playful settles (pull-to-refresh, pops)
-     Durations are deliberately short; native taps feel instant. */
+  /* ── 모션 토큰 ──────────────────────────────────────────────────────────
+     모든 애니메이션 표면이 하나의 네이티브 느낌 어휘를 써서 모바일 앱 전체가
+     같게 움직인다. JS 로 구동되는 표면(mobile-shell, BottomSheet)은 같은 곡선을
+     인라인으로 쓴다. 둘 중 하나가 바뀌면 서로 동기화할 것.
+       --ease-ios     부드러운 iOS 감속 — 시트, 슬라이드오버, 화면 전환
+       --ease-out     경쾌한 ease-out  — 등장, 탭 눌림 복귀
+       --ease-spring  완만한 오버슈트 — 장난스러운 안착(당겨서 새로고침, 팝)
+     지속 시간은 의도적으로 짧다. 네이티브 탭은 즉각적으로 느껴진다. */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -271,7 +271,7 @@ summary,
   --primary-hsl: 256 75% 61%;
   --glass-shadow: 0 18px 70px hsl(252 20% 10% / 0.1);
   --calendar-grid-line: rgb(203, 213, 225);
-  /* Board feature: amber pin color + destructive */
+  /* 게시판 기능: 호박색 핀 색 + 파괴적 동작 */
   --board-pin: hsl(38 72% 42%);
   --board-pin-bg: hsl(40 78% 92%);
   --destructive: #c5282e;
@@ -333,12 +333,12 @@ summary,
 body {
   background: var(--background);
   color: var(--foreground);
-  /* Geist for Latin; Noto Sans KR/JP supply CJK glyphs (incl. true 900/black). */
+  /* 라틴 글자는 Geist, CJK 글리프는 Noto Sans KR/JP(진짜 900/black 포함)가 맡는다. */
   font-family: var(--font-geist-sans), "Geist", var(--font-noto-kr),
     var(--font-noto-jp), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Japanese pages prefer Noto Sans JP so kanji use JP (not KR) glyph variants. */
+/* 일본어 페이지는 한자가 KR 이 아닌 JP 글리프 변형을 쓰도록 Noto Sans JP 를 우선한다. */
 :lang(ja) body,
 body:lang(ja) {
   font-family: var(--font-geist-sans), "Geist", var(--font-noto-jp),
@@ -394,7 +394,7 @@ body:lang(ja) {
   letter-spacing: -0.005em;
 }
 
-/* ── Floating toast dock (mobile) ─────────────────────────────────────────────
+/* ── 플로팅 토스트 도크(모바일) ─────────────────────────────────────────────
    토스트가 앉는 높이를 한 곳에서 계산한다. 예전에는 호출부마다 `bottom-[92px]` 를 하드코딩했는데,
    그 값은 `env(safe-area-inset-bottom)` 을 무시한다. 탭바는 아래 패딩이 `max(16px, safe)` 라
    홈 인디케이터가 있는 기기에서 더 두꺼워지고, 중앙 스퀘어클 버튼은 탭바 위로 26px 더 솟는다.
@@ -541,12 +541,12 @@ html[data-pane] [data-shell-frame] { max-width: none !important; }
 html[data-pane] [data-shell-scroll] { padding: 18px 24px 32px !important; }
 html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline: auto; }
 
-/* Bottom tab bar — center action ("추가") button design (shared by all mobile pages). */
+/* 하단 탭 바 — 가운데 액션("추가") 버튼 디자인(모든 모바일 페이지 공용). */
 .tabbar {
   display: flex;
   align-items: flex-end;
-  /* White bottom bar — no border, a soft upward shadow separates it from the page
-     (white redesign 2026-10-09). */
+  /* 흰색 하단 바 — 테두리 없이 위쪽으로 옅은 그림자가 페이지와 구분한다
+     (화이트 리디자인 2026-10-09). */
   background: #ffffff;
   border-radius: 22px 22px 0 0;
   padding: 12px 14px max(16px, env(safe-area-inset-bottom));
@@ -566,7 +566,7 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   text-decoration: none;
   transition: transform var(--dur-press) var(--ease-out);
 }
-/* Native press feedback — the bottom tabs are the most-tapped controls. */
+/* 네이티브 눌림 반응 — 하단 탭은 가장 많이 누르는 컨트롤이다. */
 .tabbar__item:active {
   transform: scale(0.9);
 }
@@ -600,7 +600,7 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
 .tabbar__fab .circle {
   width: 52px;
   height: 52px;
-  /* Squircle (rounded square) center button — "Bottom Bar (Squircle Edit)" design. */
+  /* 스퀘어클(둥근 사각형) 중앙 버튼 — "Bottom Bar (Squircle Edit)" 디자인. */
   border-radius: 18px;
   background: var(--primary);
   color: var(--primary-foreground);
@@ -621,12 +621,12 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   color: var(--primary);
 }
 
-/* "추가" launcher sheet — colour-category shortcut grid (opened by the bottom FAB). */
+/* "추가" 런처 시트 — 색 카테고리 바로가기 그리드(하단 FAB 으로 열림). */
 .add-sheet__handle {
   width: 38px;
   height: 4px;
   border-radius: 999px;
-  /* Canonical bottom-sheet grab-handle colour (slate-200). */
+  /* 표준 바텀시트 그랩 핸들 색(slate-200). */
   background: #e2e8f0;
   margin: 5px auto 14px;
 }
@@ -666,7 +666,7 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   cursor: pointer;
   flex: 0 0 auto;
 }
-/* Scrollable region — grows with the item list; scrollbar hidden. */
+/* 스크롤 영역 — 항목 목록에 따라 늘어나며 스크롤바는 숨김. */
 .add-sheet__scroll {
   max-height: 58vh;
   overflow-y: auto;
@@ -716,7 +716,7 @@ html[data-pane] [data-shell-column] { max-width: 760px !important; margin-inline
   color: var(--foreground);
 }
 
-/* Brand wordmark — serif italic "Foldy" used across all shells. */
+/* 브랜드 워드마크 — 모든 셸에서 쓰는 세리프 이탤릭 "Foldy". */
 /* 워드마크 — 화이트 리디자인(2026-10-09): 세리프 이탤릭 대신 본문과 같은 Geist 굵게(시안 「Foldy」). */
 .wordmark {
   font-family: var(--font-sans);
@@ -794,7 +794,7 @@ svg [data-on] {
   }
 }
 
-/* Centered modal: pure fade + gentle scale — no translateY */
+/* 가운데 모달: 순수 페이드 + 완만한 스케일 — translateY 없음 */
 @keyframes modal-center-in {
   from {
     opacity: 0;

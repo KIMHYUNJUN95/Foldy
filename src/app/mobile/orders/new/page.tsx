@@ -35,7 +35,7 @@ export default async function MobileOrderNewPage({ searchParams }: PageProps) {
   const dict = getDictionary(locale);
   const copy = {
     ...dict.mobile.orderForm,
-    // Functions cannot be passed to Client Components from RSC props.
+    // RSC props 로는 Client Component 에 함수를 넘길 수 없다.
     confirmSummary: undefined,
     itemCardTitle: undefined,
   } as unknown as typeof dict.mobile.orderForm;
@@ -47,9 +47,9 @@ export default async function MobileOrderNewPage({ searchParams }: PageProps) {
     ? (copy.errors?.[params.error] ?? copy.errors?.save_failed ?? params.error)
     : null;
 
-  // Double-validate the URL from the Web Share Target redirect (route already checked once).
+  // Web Share Target 리다이렉트로 온 URL 을 한 번 더 검증한다(라우트에서 이미 한 번 확인함).
   const sharedUrl = sanitizeSharedUrl(params.sharedUrl ?? null);
-  // shareError=1 means a URL was shared but failed validation in the route handler.
+  // shareError=1 은 URL 이 공유됐지만 라우트 핸들러의 검증에 실패했다는 뜻이다.
   const shareError = !sharedUrl && params.shareError === "1";
 
   const catalog = (await getActiveRoomCatalogServer(session.organization.id)) ?? [];

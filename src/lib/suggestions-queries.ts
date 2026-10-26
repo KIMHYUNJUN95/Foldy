@@ -1,12 +1,12 @@
-// Staff Suggestions / Feedback Box — list queries (Step 3, read-only).
+// 직원 건의 / 의견함 — 목록 쿼리 (Step 3, 읽기 전용).
 //
-// Server-only module (uses the RLS-scoped server client). Kept SEPARATE from `src/lib/suggestions.ts`
-// because that module is imported by client components for its types/constants — pulling the server
-// client in there would drag `next/headers` into the client bundle.
+// 서버 전용 모듈(RLS 범위 서버 클라이언트 사용). `src/lib/suggestions.ts` 와 SEPARATE 로 둔다
+// 그 모듈은 클라이언트 컴포넌트가 타입/상수 때문에 import 하는데, 서버
+// 클라이언트를 거기 끌어오면 `next/headers` 가 클라이언트 번들에 딸려 들어오기 때문이다.
 //
-// Visibility is participant-only and enforced two ways: RLS (`can_view_staff_suggestion`) is the
-// backstop, and each query is also explicitly scoped to the organization + the current user's
-// relationship (author / recipient / referenced).
+// 가시성은 참여자 전용이며 두 겹으로 강제한다: RLS(`can_view_staff_suggestion`)가
+// 최후 방어선이고, 각 쿼리도 조직 + 현재 사용자의
+// 관계(작성자 / 수신자 / 참조)로 명시적으로 범위를 제한한다.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -15,7 +15,7 @@ import type { StaffSuggestionStatus } from "@/lib/suggestions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { isPlatformDeveloper } from "@/config/roles";
 
-// Resolve display names for a set of org members (active or not) via memberships→profiles.
+// 조직 멤버 집합(활성 여부 무관)의 표시 이름을 memberships→profiles 로 해석한다.
 async function fetchMemberNames(
   supabase: SupabaseClient<Database>,
   organizationId: string,
@@ -82,10 +82,10 @@ function countBy(rows: { suggestion_id: string }[] | null | undefined): Map<stri
 }
 
 /**
- * Load the three list segments for the current user in one pass: Sent (author), Received (recipient),
- * and Referenced (through `staff_suggestion_references`). Reference + comment counts and recipient
- * display names are resolved for the union of visible suggestions. Returns empty segments gracefully
- * if the schema is not present yet.
+ * 현재 사용자의 세 목록 구간을 한 번에 불러온다: 보낸(작성자), 받은(수신자),
+ * 참조된(`staff_suggestion_references` 경유). 참조 + 댓글 수와 수신자
+ * 표시 이름은 보이는 건의의 합집합에 대해 해석한다. 스키마가 아직 없으면
+ * 예외 없이 빈 구간을 돌려준다.
  */
 export async function getSuggestionListData(session: AppSession): Promise<SuggestionListData> {
   const supabase = await getSupabaseServerClient();
@@ -118,7 +118,7 @@ export async function getSuggestionListData(session: AppSession): Promise<Sugges
       .order("created_at", { ascending: false }),
   ]);
 
-  // Any error (incl. schema-not-applied) → treat that segment as empty rather than throwing.
+  // 어떤 오류(스키마 미적용 포함)든 던지지 않고 그 구간을 빈 것으로 처리한다.
   const sentRows = (sentRes.error ? [] : (sentRes.data ?? [])) as SuggestionRow[];
   const receivedRows = (receivedRes.error ? [] : (receivedRes.data ?? [])) as SuggestionRow[];
   const referencedRows = (
@@ -135,7 +135,7 @@ export async function getSuggestionListData(session: AppSession): Promise<Sugges
     new Set(allRows.flatMap((r) => [r.created_by_user_id, r.recipient_user_id])),
   );
 
-  // Reference + comment counts and author/recipient names for the union of visible suggestions.
+  // 보이는 건의의 합집합에 대한 참조 + 댓글 수와 작성자/수신자 이름.
   const [refCountRes, commentCountRes, nameById] = await Promise.all([
     ids.length
       ? supabase.from("staff_suggestion_references").select("suggestion_id").in("suggestion_id", ids)
@@ -170,7 +170,7 @@ export async function getSuggestionListData(session: AppSession): Promise<Sugges
   };
 }
 
-// ── Detail ─────────────────────────────────────────────────────────────────────
+// ── 상세 ──────────────────────────────────────────────────────
 
 export type SuggestionViewerRole = "author" | "recipient" | "referenced";
 
@@ -187,7 +187,7 @@ export type SuggestionComment = {
   createdAt: string;
 };
 
-// A status-change entry, shown inline in the comment thread (e.g. "○○ changed status to reviewing").
+// 상태 변경 항목, 댓글 스레드 안에 인라인으로 표시(예: "○○ 님이 상태를 검토 중으로 변경").
 export type SuggestionStatusEvent = {
   id: string;
   actorId: string;
@@ -241,10 +241,10 @@ type DetailRow = {
 };
 
 /**
- * Load one suggestion for the current user. Visibility is participant-only: RLS hides non-participant
- * rows (so `maybeSingle()` returns null), and we additionally derive the viewer's role and bail if
- * the user is neither author, recipient, nor a referenced user. Returns null when not found / not
- * allowed so callers can redirect without leaking existence.
+ * 현재 사용자의 건의 하나를 불러온다. 가시성은 참여자 전용: RLS 가 참여자가 아닌
+ * 행을 숨기고(`maybeSingle()` 이 null 을 돌려줌), 추가로 보는 사람의 역할을 도출해서
+ * 작성자도 수신자도 참조 사용자도 아니면 빠져나간다. 없거나 허용되지 않으면 null 을 돌려줘서
+ * 호출자가 존재 여부를 노출하지 않고 리다이렉트할 수 있다.
  */
 export async function getSuggestionDetail(
   session: AppSession,
@@ -279,7 +279,7 @@ export async function getSuggestionDetail(
   // 플랫폼 개발자는 관계없는 건의도 연다(보기 전용 자리 = referenced, 상태 변경은 아래 플래그로).
   const developer = isPlatformDeveloper(session.user.role);
   if (!viewerRole && developer) viewerRole = "referenced";
-  if (!viewerRole) return null; // defensive — RLS should already prevent this
+  if (!viewerRole) return null; // 방어적 처리 — RLS 가 이미 막아야 한다
   const viewerCanChangeStatus = viewerRole === "recipient" || developer;
 
   const { data: commentRows } = await supabase

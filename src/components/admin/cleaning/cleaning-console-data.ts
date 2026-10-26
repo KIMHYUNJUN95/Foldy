@@ -1,8 +1,8 @@
-// Shared domain constants + pure formatting helpers for the admin cleaning console. Real task/
-// history data comes from src/lib/admin-cleaning.ts (server) as of 2026-07-14 — this module only
-// keeps the stable domain facts (canonical building set, its fixed display order) and small
-// client-safe date/duration formatters reused across the today board, history board, detail panel,
-// and force-complete modal. See docs/product/07-cleaning-workflow.md →
+// 관리자 청소 콘솔의 공용 도메인 상수 + 순수 서식 헬퍼. 실제 작업/
+// 이력 데이터는 2026-07-14 부로 src/lib/admin-cleaning.ts(서버)에서 온다 — 이 모듈은
+// 변하지 않는 도메인 사실(표준 건물 집합과 고정 표시 순서)과 작은
+// 클라이언트 안전 날짜/소요시간 포매터만 두며, 오늘 보드 · 이력 보드 · 상세 패널 ·
+// 강제 완료 모달이 함께 쓴다. docs/product/07-cleaning-workflow.md →
 // "2026-07-14 어드민 청소 대시보드 — 백엔드 연동".
 
 import { CANONICAL_TO_BUILDING_KEY } from "@/lib/room-label-normalization";
@@ -47,7 +47,7 @@ export function buildingKeyOf(canonicalPropertyName: string): BuildingKey | null
 
 export type CleaningTaskType = "checkout" | "simple" | "longstay" | "setup";
 
-/* ---------------- helpers ---------------- */
+/* ---------------- 헬퍼 ---------------- */
 export function toMin(hhmm: string | null): number | null {
   if (!hhmm) return null;
   const [h, m] = hhmm.split(":").map(Number);

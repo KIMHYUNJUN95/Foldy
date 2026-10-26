@@ -7,10 +7,10 @@ import { getDictionary } from "@/lib/i18n";
 import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 import { isValidYm } from "@/lib/attendance-clock";
 
-// Admin · Attendance Overview (Slice 1).
-// Shell sub-tab bar + KPI bar + review/correction cards + payroll/transport summary.
-// The selected month is controlled by the shared attendance subnav month picker.
-// See docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
+// 관리자 · 근태 개요 (슬라이스 1).
+// 셸 서브 탭 바 + KPI 바 + 검토/정정 카드 + 급여/교통비 요약.
+// 선택한 달은 공용 근태 서브내비의 월 선택기가 제어한다.
+// 참고: docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
 export default async function AdminAttendanceOverviewPage({
   searchParams,
 }: {

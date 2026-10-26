@@ -158,7 +158,7 @@ function QuickAddSubmitButtons({
       </div>
       <div className="tkw-qa__foot">
         <span>{copy.mobileWhite.addKeepOpen}</span>
-        {/* Full organized create — carries any typed title across so the capture isn't lost. */}
+        {/* 정리된 전체 생성 — 입력해 둔 제목을 그대로 넘겨 잡은 내용이 사라지지 않게 한다. */}
         <Link href="/mobile/tasks/new" onClick={onDetailClick}>
           {copy.quickAddDetailed} ›
         </Link>
@@ -200,8 +200,8 @@ export function TasksWorkspace({
   /** 반복 회차의 날짜별 수동 순서(task_occurrence_order). 일회성은 tasks.sort_order 를 쓴다. */
   occurrenceOrders: OccurrenceOrderRecord[];
   occurrenceStates: OccurrenceStateRecord[];
-  // Completed project tasks, supplied separately so the Completed tab's project filter can show
-  // them. `tasks` itself excludes project tasks (they live only in the Projects tab).
+  // 완료 탭의 프로젝트 필터가 보여 줄 수 있도록 따로 받는 완료된 프로젝트 작업.
+  // `tasks` 자체는 프로젝트 작업을 제외한다 (프로젝트 탭에만 있음).
   projectCompletedTasks: TaskRecord[];
   projects: ProjectSummary[];
   shareableUsers: ShareableUser[];
@@ -351,8 +351,8 @@ export function TasksWorkspace({
     setQuickSeed(quickInputEl.current?.value ?? "");
     setQuickOpen(false);
   }, []);
-  // Body portals (FAB + sheet) are client-only; gate on hydration so server and the
-  // first client render agree (avoids a hydration mismatch). false on server, true after mount.
+  // 본문 포털(FAB + 시트)은 클라이언트 전용이라 하이드레이션 여부로 막아 서버와
+  // 첫 클라이언트 렌더가 일치하게 한다 (하이드레이션 불일치 방지). 서버에서는 false, 마운트 후 true.
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -367,7 +367,7 @@ export function TasksWorkspace({
   // 캘린더에서 고정 반복(표준 반복) 회차 숨김 — 세션 상태(새로고침 시 초기화), 기본 표시.
   const [hideRecurring, setHideRecurring] = useState(false);
 
-  // --- Long-press context menu + multi-select (edit/delete convenience).
+  // --- 길게 누르기 컨텍스트 메뉴 + 다중 선택 (편집/삭제 편의).
   const router = useRouter();
   const [pressTask, setPressTask] = useState<TaskRecord | null>(null);
   // 이동 거절 안내 — 쿼리로 들어온 값을 한 번만 띄우고 URL 을 정리한다(새로고침 시 재노출 방지).
@@ -432,8 +432,8 @@ export function TasksWorkspace({
     setMoveNotice("action_failed");
   }, []);
 
-  // Commit a delete (single from the menu, or the multi-select batch). Optimistically hide the
-  // rows, then run the server batch delete; only author-owned tasks are actually removed.
+  // 삭제 확정 (메뉴의 단건 또는 다중 선택 일괄). 낙관적으로 행을 숨긴 뒤
+  // 서버 일괄 삭제를 실행한다. 작성자 본인의 작업만 실제로 지워진다.
   const performDelete = useCallback(
     (ids: string[]) => {
       if (ids.length === 0) return;
@@ -517,7 +517,7 @@ export function TasksWorkspace({
     });
   }, [notifyActionFailed, skipUndo]);
 
-  // --- Overdue prompt (Today tab): reschedule / clear past unfinished.
+  // --- 지연 안내 (오늘 탭): 일정 변경 / 지난 미완료 정리.
   const [overduePending, startOverdue] = useTransition();
   const [overdueConfirm, setOverdueConfirm] = useState(false);
   /** 지연 묶음 「⋯」 시트 — 지우기처럼 무거운 동작은 머리 줄에 두지 않고 여기로(HIG 다듬기 06). */
@@ -530,7 +530,7 @@ export function TasksWorkspace({
    */
   const [overdueSelectMode, setOverdueSelectMode] = useState(false);
 
-  // --- Quick complete (status circle tap on any card) + undo toast.
+  // --- 빠른 완료 (아무 카드의 상태 원 탭) + 실행 취소 토스트.
   const [, startComplete] = useTransition();
   const [undoTask, setUndoTask] = useState<TaskRecord | null>(null);
   const [undoOcc, setUndoOcc] = useState<string | null>(null); // 반복 완료 undo 시 회차 날짜
@@ -633,8 +633,8 @@ export function TasksWorkspace({
     if (undoTimer.current) clearTimeout(undoTimer.current);
   }, [applyTaskOptimistic, notifyActionFailed, runStatus, undoTask, undoOcc]);
 
-  // Delete undo: deleteTask soft-deletes then redirects to ?deleted=<id>. Show a "삭제했습니다 · 실행
-  // 취소" toast that calls restoreTask. Guarded by a ref so it fires once per id (no re-show on refresh).
+  // 삭제 실행 취소: deleteTask 는 소프트 삭제한 뒤 ?deleted=<id> 로 리다이렉트한다. "삭제했습니다 · 실행
+  // 취소" 토스트를 보이고 restoreTask 를 호출한다. id 마다 한 번만 뜨도록 ref 로 막는다 (새로고침 시 다시 안 뜸).
   const searchParams = useSearchParams();
   // 상세에서 지우면 `?deleted=<id>` 로 돌아오고, 목록에서 일괄로 지우면 서버가 실제 지운 id 들을
   // 돌려준다. 두 경로가 같은 토스트를 쓰도록 **배열 하나로** 일반화했다(2026-07-31) — 예전에는
@@ -724,15 +724,15 @@ export function TasksWorkspace({
     });
   }, [deletedUndoIds, notifyActionFailed]);
 
-  // 완료/기록 tab: daily-report sheet target date (the day-group whose 보고서 button was tapped).
+  // 완료/기록 탭: 일지 시트 대상 날짜 (보고서 버튼을 누른 날짜 그룹).
   const [reportDate, setReportDate] = useState<string | null>(null);
-  // 완료/기록 tab: regular vs. project completions filter. Project tasks don't exist yet
-  // (data layer deferred), so "project" currently resolves to an empty set.
+  // 완료/기록 탭: 일반 vs. 프로젝트 완료 필터. 프로젝트 작업은 아직 없어서
+  // (데이터 레이어 보류) 현재 "project" 는 빈 집합으로 처리된다.
   const [completedFilter, setCompletedFilter] = useState<"all" | "regular" | "project">("all");
 
-  // Tokyo "tomorrow" (today + 1), used by the Tomorrow tab + its swipe defer action.
-  // Memoized: as a plain render const it flows into occurrence helpers in a way the React Compiler
-  // couldn't reconcile with their manual memoization (bailed the whole component).
+  // 도쿄 "내일" (오늘 + 1), 내일 탭 + 스와이프 미루기 액션에서 쓴다.
+  // 메모이즈: 일반 렌더 상수로 두면 회차 헬퍼로 흘러가는데 React Compiler 가 그 수동 메모와
+  // 조화시키지 못해 컴포넌트 전체 최적화를 포기했다.
   const tomorrowDate = useMemo(() => ymdShift(today, 1), [today]);
   // 떠 있는 토스트가 하나라도 있는가 — 아래 FAB 를 잠시 물러나게 하는 데 쓴다.
   const toastVisible = !!(
@@ -792,9 +792,9 @@ export function TasksWorkspace({
   /** 하루 안의 정렬 — 시간이 있는 항목이 먼저(빠른 시각 순), 없으면 우선순위. 콘솔 `tasksOn` 과 동일. */
   const timeThenPrio = (a: TaskRecord, b: TaskRecord) =>
     (a.timeLabel ?? "99").localeCompare(b.timeLabel ?? "99") || prioSort(a, b);
-  // Today-view ordering: a manual drag-reorder (sort_order) wins; unranked tasks (sort_order null)
-  // fall back to priority, preserving the original behaviour until the user drags. Ranked tasks
-  // always sort before unranked ones.
+  // 오늘 보기 정렬: 수동 드래그 순서(sort_order)가 우선이고, 순위 없는 작업(sort_order null)은
+  // 우선순위로 폴백해 사용자가 끌기 전까지 원래 동작을 유지한다. 순위 있는 작업은
+  // 항상 순위 없는 작업보다 앞에 온다.
   /**
    * 한 날짜의 일회성 + 반복 회차를 하나의 배열로 합쳐 정렬한다.
    * 수동 위치가 있는 항목이 먼저(작은 인덱스 순), 없는 항목은 뒤에서 우선순위 폴백.
@@ -832,9 +832,9 @@ export function TasksWorkspace({
     return oldestFirst(a, b);
   };
 
-  // --- First-slice search / filter: title + author text, and anchor-date single/range.
-  // One shared lightweight state across the list views; the date filter reuses the same
-  // `anchor()` (due wins over scheduled, Tokyo) used for grouping/listing/calendar.
+  // --- 첫 슬라이스 검색 / 필터: 제목 + 작성자 텍스트, 기준 날짜 단일/범위.
+  // 목록 보기 전체가 가벼운 상태 하나를 공유한다. 날짜 필터는 그룹화/목록/캘린더에 쓰는 것과 같은
+  // `anchor()` (due 가 scheduled 보다 우선, 도쿄)를 재사용한다.
   const [search, setSearch] = useState("");
   // 검색 칸(머리의 돋보기로 연다) · 그 안의 날짜 달력.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -857,7 +857,7 @@ export function TasksWorkspace({
 
   const matchesFilter = (t: TaskRecord) => {
     if (hasSearch) {
-      // case-insensitive partial match across title + author name + tags. 태그는 콘솔
+      // 제목 + 작성자 이름 + 태그 전체에서 대소문자 무시 부분 일치. 태그는 콘솔
       // (`helpers.ts` matchQuery)이 이미 검색 대상이라, 빠져 있으면 "#체크아웃" 으로 찾던 작업이
       // 모바일에서만 안 나온다. 필드를 이어붙이지 않고 각각 확인해 경계를 넘는 오탐을 막는다.
       if (
@@ -869,7 +869,7 @@ export function TasksWorkspace({
     }
     if (hasDate) {
       const a = anchor(t);
-      if (!a) return false; // dateless tasks never match an active date filter
+      if (!a) return false; // 날짜 없는 작업은 활성 날짜 필터와 절대 일치하지 않는다
       if (dateMode === "single") {
         if (a !== dateFrom) return false;
       } else {
@@ -922,8 +922,8 @@ export function TasksWorkspace({
     { key: "calendar", label: copy.viewCalendar },
   ];
 
-  // Swipe defer/pull action per view: Today → push to tomorrow; everywhere else → pull to today
-  // (in the Tomorrow tab this means "do it today"). Sent/Calendar render with swipe disabled.
+  // 보기별 스와이프 미루기/당기기 액션: 오늘 → 내일로 밀기, 그 외 → 오늘로 당기기
+  // (내일 탭에서는 "오늘 하기"). 보냄/캘린더는 스와이프를 끈 채 렌더한다.
   const swipeActionForView: "today" | "tomorrow" = view === "today" ? "tomorrow" : "today";
 
   const cardProps = {
@@ -937,10 +937,10 @@ export function TasksWorkspace({
     onToggleSelect: toggleSelect,
     onLongPress: openPressMenu,
     swipeAction: swipeActionForView,
-    // After the move the server action returns here; keep the user on the tab they swiped from.
+    // 이동 뒤 서버 액션이 여기로 돌아온다. 사용자가 스와이프한 탭에 그대로 둔다.
     swipeReturnView: view,
     detailReturnView: view,
-    // Status-circle tap completes (active) / reopens (completed) with an undo toast.
+    // 상태 원 탭은 완료(활성)/다시 열기(완료)를 실행하고 실행 취소 토스트를 띄운다.
     onCompleteToggle: handleCompleteToggle,
   };
 
@@ -976,8 +976,8 @@ export function TasksWorkspace({
     .filter((t) => t.createdByUserId === currentUserId)
     .map((t) => t.id);
 
-  // Overdue bulk reschedule handler — applies the chosen date to every targeted overdue task.
-  // The date is picked in the shared TaskSchedulePicker (date variant) rendered at the top-level
+  // 지연 일괄 일정 변경 핸들러 — 고른 날짜를 대상인 모든 지연 작업에 적용한다.
+  // 날짜는 최상위 return 에서 렌더하는 공용 TaskSchedulePicker (날짜 변형)에서 고른다.
   // return. 선택 모드가 아니면 내 지연 전체가 대상(오늘 뷰의 `overdueTargets` 와 같은 규칙).
   const rescheduleOverdue = (targetDate: string) =>
     startOverdue(async () => {
@@ -1042,7 +1042,7 @@ export function TasksWorkspace({
     return null;
   };
 
-  // Per-tab counts (same base lists as each view).
+  // 탭별 개수 (각 보기와 같은 기본 목록).
   const tabCounts: Record<View, number> = {
     // 목록의 **줄 수**와 맞춘다. 2026-09-08 부터 반복은 (오늘 회차든 밀린 것이든) 한 줄이므로
     // `todayRecBase` 가 곧 줄 수다 — 예전의 «두 줄» 보정은 더 이상 필요 없다.
@@ -1051,12 +1051,12 @@ export function TasksWorkspace({
       todayBase.length +
       todayRecBase.length,
     tomorrow: tomorrowBase.length + tomorrowRecBase.length,
-    // Archive = every active todo in one management list.
+    // 관리함 = 하나의 관리 목록에 있는 모든 활성 할 일.
     inbox: inboxBase.length,
-    // Projects badge stays 0 until the Projects data layer lands (deferred).
+    // 프로젝트 데이터 레이어가 들어오기 전까지 프로젝트 배지는 0 으로 둔다 (보류).
     projects: 0,
     instr: recvUnconfirmed,
-    // Completed badge = today's (Tokyo) completions, from the same completion log the list uses.
+    // 완료 배지 = 오늘(도쿄) 완료 건수. 목록이 쓰는 완료 기록과 같은 것에서 센다.
     completed:
       completionRows.filter((r) => r.completion.day === today).length +
       fieldActivities.filter((a) => a.day === today).length,
@@ -1069,9 +1069,9 @@ export function TasksWorkspace({
   const calDaysIn = new Date(Date.UTC(calMonth.y, calMonth.m, 0)).getUTCDate();
   const calMonthStart = `${calMonthPrefix}-01`;
   const calMonthEnd = `${calMonthPrefix}-${String(calDaysIn).padStart(2, "0")}`;
-  // Todoist-style virtual previews: a recurring task is a single row, but the calendar shows it
-  // on every occurrence within the visible month (computed from its rule — no extra rows). Each
-  // virtual occurrence points back to the same real task (tap/edit affects the series).
+  // Todoist 방식 가상 미리보기: 반복 작업은 한 줄이지만 캘린더는 보이는 달의 모든 회차에
+  // 표시한다 (규칙으로 계산 — 행을 더 만들지 않는다). 각 가상 회차는 같은 실제
+  // 작업을 가리킨다 (탭/편집은 시리즈 전체에 영향).
   const calOccurrences: { iso: string; task: TaskRecord }[] = [];
   for (const t of tasks) {
     if (!isActive(t)) continue;
@@ -1148,8 +1148,8 @@ export function TasksWorkspace({
     </div>
   );
 
-  // Shown when a view has tasks but the active search/filter matches none of them —
-  // distinct from a genuinely empty view, and offers a one-tap reset.
+  // 보기에 작업은 있지만 활성 검색/필터에 하나도 맞지 않을 때 보인다 —
+  // 정말 빈 보기와 구분되며 한 번 탭으로 초기화할 수 있다.
   const noMatchState = () => (
     <div className="tkw-empty">
       <SearchX aria-hidden="true" />
@@ -1318,7 +1318,7 @@ export function TasksWorkspace({
     ) : null;
 
   const viewBody = (() => {
-    // Projects tab — separate workspace (own list / create sheet / FAB).
+    // 프로젝트 탭 — 별도 워크스페이스 (자체 목록 / 생성 시트 / FAB).
     if (view === "projects") {
       return <ProjectsBoard copy={copy} projects={projects} shareableUsers={shareableUsers} />;
     }
@@ -1345,16 +1345,16 @@ export function TasksWorkspace({
       const todays = applyFilter(todayBase).sort(orderSort);
       const recToday = applyFilter(todayRecBase).sort(orderSort);
       const nothing = !over.length && !todays.length && !recToday.length && !doneRows.length;
-      // Drag-reorder is offered only on the plain Today list — disabled while a search/date filter
-      // is active (the list is a subset) or in multi-select mode (the row body owns the tap).
+      // 드래그 재정렬은 일반 오늘 목록에서만 제공한다 — 검색/날짜 필터가 켜져 있거나(목록이 부분집합)
+      // 다중 선택 모드(행 본문이 탭을 가짐)에서는 끈다.
       const reorderDisabled = filterActive || selectMode;
-      // Overdue actions: only the caller's own overdue tasks are actionable (the bulk actions are
-      // author-scoped server-side). Recurring tasks keep their next occurrence; one-offs move/delete.
+      // 지연 액션: 호출자 본인의 지연 작업만 처리할 수 있다 (일괄 액션은 서버에서 작성자 범위로 제한).
+      // 반복 작업은 다음 회차를 유지하고, 일회성은 이동/삭제한다.
       const ownedOverdue = ownedOverdueIds.length;
       const selectedCount = overdueSelectMode ? overdueSelection.size : 0;
       const toggleOverdueTask = (task: TaskRecord) => {
-        // Only the caller's own overdue tasks are actionable, so non-owned rows must not enter the
-        // selection — otherwise the action count would include items the server silently ignores.
+        // 호출자 본인의 지연 작업만 처리할 수 있으므로 본인이 아닌 행은 선택에 들어가면 안 된다 —
+        // 그렇지 않으면 액션 개수에 서버가 조용히 무시하는 항목이 포함된다.
         if (task.createdByUserId !== currentUserId) return;
         const next = new Set(overdueSelection);
         if (next.has(task.id)) next.delete(task.id);
@@ -1449,8 +1449,8 @@ export function TasksWorkspace({
       );
     }
 
-    // Tomorrow (내일): same shape/features as Today (drag-reorder), filtered to tasks anchored
-    // tomorrow. Swipe here pulls a task back to today (see swipeActionForView).
+    // 내일: 오늘과 같은 모양/기능(드래그 재정렬)이며 내일에 고정된 작업으로 거른다.
+    // 여기서 스와이프하면 작업을 오늘로 되돌린다 (swipeActionForView 참고).
     if (view === "tomorrow") {
       const total = tomorrowBase.length + tomorrowRecBase.length;
       const header = head(
@@ -1492,7 +1492,7 @@ export function TasksWorkspace({
       );
     }
 
-    // 관리함: every active todo, managed in one place. 수동 드래그 순서 허용(2026-07-30).
+    // 관리함: 모든 활성 할 일을 한곳에서 관리한다. 수동 드래그 순서 허용(2026-07-30).
     if (view === "inbox") {
       const base = inboxBase;
       const list = applyFilter(base).sort(inboxOrderSort);
@@ -1633,8 +1633,8 @@ export function TasksWorkspace({
       );
     }
 
-    // 완료·기록: every completion, grouped by the day it was logged (Tokyo), newest day first. Each
-    // day header carries an 업무일지 link that opens the daily-report sheet for that date.
+    // 완료·기록: 모든 완료를 기록한 날(도쿄)별로 묶고 최신 날이 먼저다. 각
+    // 날짜 헤더에는 그 날짜의 일지 시트를 여는 업무일지 링크가 있다.
     if (view === "completed") {
       const top = (
         <>
@@ -1741,7 +1741,7 @@ export function TasksWorkspace({
       );
     }
 
-    // calendar
+    // 캘린더
     return renderCalendar();
   })();
 

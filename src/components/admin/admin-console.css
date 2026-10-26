@@ -1,10 +1,10 @@
 /*
- * Admin operations console — desktop design system, ported 1:1 from the
- * "Stay Ari Admin Console" handoff (styles.css). Brand tokens lifted from the
- * mobile app (warm ivory ground, navy primary) with a dark warm-espresso
- * navigation rail. Everything scoped under `.adm` so generic class names
- * (.side / .top / .card / .opsbar …) never leak globally.
- * See docs/product/05-admin-web-ia.md → "Dashboard Home Screen".
+ * 관리자 운영 콘솔 — 데스크톱 디자인 시스템, "Stay Ari Admin Console" 핸드오프(styles.css)를 1:1로 옮김.
+ * 브랜드 토큰은 모바일 앱(따뜻한 아이보리 바탕, 네이비 프라이머리)에서 가져왔고
+ * 어두운 따뜻한 에스프레소 내비게이션 레일과 함께 쓴다.
+ * 일반적인 클래스 이름은 모두 `.adm` 아래로 범위를 한정해서
+ * (.side / .top / .card / .opsbar …) 전역으로 새지 않는다.
+ * 참고: docs/product/05-admin-web-ia.md → "Dashboard Home Screen".
  *
  * **CSS 변수 이름도 겹치면 안 된다 (2026-08-03).** 클래스는 `.adm` 이 막아 주지만 CSS 변수는
  * 상속되므로, globals 의 Tailwind 토큰과 같은 이름(`--muted` / `--surface` / `--primary`)을
@@ -32,7 +32,7 @@
   --primary-ink: #5a30cf;
   --primary-lift: #8a63f0;
   --primary-soft: color-mix(in oklab, #7a52e6 8%, #ffffff);
-  /* sidebar — white rail (white redesign 2026-10-09). No border, one sheet with the page. */
+  /* 사이드바 — 흰색 레일 (화이트 리디자인 2026-10-09). 테두리 없이 페이지와 한 장. */
   --nav: #ffffff;
   --nav2: #ffffff;
   --nav-line: var(--separator);
@@ -88,14 +88,14 @@
   display: block;
 }
 
-/* ── shell grid ── */
+/* ── 셸 격자 ── */
 .adm .app {
   display: grid;
   grid-template-columns: var(--adm-side-w) 1fr;
   height: 100dvh;
 }
 
-/* ── sidebar ── */
+/* ── 사이드바 ── */
 .adm .side {
   background: var(--nav);
   color: var(--nav-ink);
@@ -574,7 +574,7 @@
 .adm .side:focus-within .navi__t,
 .adm .side:focus-within .navi__badge { opacity: 1; }
 
-/* ── main column ── */
+/* ── 메인 열 ── */
 .adm .main {
   display: flex;
   flex-direction: column;
@@ -874,7 +874,7 @@
   padding: 28px 32px 60px;
 }
 
-/* ── shared bits ── */
+/* ── 공용 조각 ── */
 .adm .pill {
   display: inline-flex;
   align-items: center;
@@ -971,7 +971,7 @@
   flex: 0 0 auto;
 }
 
-/* ── card ── */
+/* ── 카드 ── */
 .adm .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -1043,7 +1043,7 @@
 
 .adm .grid { display: grid; gap: 16px; }
 
-/* ── ops summary bar ── */
+/* ── 운영 요약 바 ── */
 .adm .opsbar {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1099,14 +1099,14 @@
   background: var(--adm-primary);
 }
 
-/* ── mini stat row ── */
+/* ── 미니 통계 행 ── */
 .adm .minirow { display: flex; align-items: center; gap: 12px; }
 .adm .ministat { flex: 1; text-align: center; padding: 4px 0; }
 .adm .ministat__v { font-size: 21px; font-weight: 900; letter-spacing: -0.02em; }
 .adm .ministat__k { font-size: 11px; font-weight: 700; color: var(--adm-muted); margin-top: 3px; }
 .adm .minisep { width: 1px; align-self: stretch; background: var(--line-soft); }
 
-/* ── queue rows ── */
+/* ── 대기열 행 ── */
 .adm .qrow {
   display: flex;
   align-items: center;
@@ -1163,13 +1163,13 @@
 .adm .qrow__chev { color: var(--faint); width: 16px; height: 16px; flex: 0 0 auto; font-size: 16px; }
 .adm .qrow__av { width: 26px; height: 26px; border-radius: 8px; font-size: 11px; color: #fff; }
 
-/* progress bar */
+/* 진행 바 */
 .adm .pbar { height: 5px; border-radius: 999px; background: var(--adm-surface); overflow: hidden; width: 90px; }
 .adm .pbar i { display: block; height: 100%; border-radius: 999px; background: var(--adm-primary); }
 .adm .pbar.warn i { background: var(--warn); }
 .adm .pbar.done i { background: var(--done); }
 
-/* ── table ── */
+/* ── 표 ── */
 .adm .tbl { width: 100%; border-collapse: collapse; }
 .adm .tbl th {
   text-align: left;
@@ -1192,7 +1192,7 @@
 .adm .tbl tbody tr:hover { background: var(--card2); }
 .adm .tbl .room { font-family: var(--mono); font-weight: 800; }
 
-/* ── notice / todo ── */
+/* ── 공지 / 할 일 ── */
 .adm .nrow {
   display: flex;
   gap: 12px;
@@ -1253,7 +1253,7 @@
 .adm .todo.is-done .todo__t { color: var(--faint); text-decoration: line-through; }
 .adm .todo__tag { margin-left: auto; }
 
-/* ── timeline (reservation list) ── */
+/* ── 타임라인 (예약 목록) ── */
 .adm .tl { position: relative; padding-left: 22px; }
 .adm .tl::before {
   content: "";
@@ -1296,7 +1296,7 @@
   flex: 0 0 auto;
 }
 
-/* ── change history (audit trail) ── */
+/* ── 변경 이력 (감사 기록) ── */
 .adm .audlist { display: flex; flex-direction: column; gap: 8px; }
 .adm .audrow { border: 1px solid var(--line-soft); border-radius: 12px; background: var(--card2); padding: 11px 13px; }
 .adm .audrow__head { display: flex; align-items: baseline; gap: 8px; }
@@ -1312,7 +1312,7 @@
 .adm .audrow__reason { margin-top: 9px; padding-top: 8px; border-top: 0.5px solid var(--separator); font-size: 11.5px; font-weight: 600; color: var(--ink-soft); line-height: 1.5; }
 .adm .audrow__reasonlbl { font-weight: 800; color: var(--adm-muted); margin-right: 6px; }
 
-/* ── section heading ── */
+/* ── 섹션 제목 ── */
 .adm .secthead { display: flex; align-items: center; gap: 10px; margin: 22px 2px 12px; }
 .adm .secthead__t {
   font-size: 13px;
@@ -1331,7 +1331,7 @@
 }
 .adm .secthead__line { flex: 1; height: 0.5px; background: var(--separator); }
 
-/* ── icon-chip bg helpers ── */
+/* ── 아이콘 칩 배경 헬퍼 ── */
 .adm .bg-open { background: var(--open-bg); color: var(--open); }
 .adm .bg-done { background: var(--done-bg); color: var(--done); }
 .adm .bg-warn { background: var(--warn-bg); color: var(--warn); }
@@ -1348,7 +1348,7 @@
   padding: 26px 10px;
 }
 
-/* clickable cleaning rows */
+/* 클릭 가능한 청소 행 */
 .adm .tbl tbody tr.clickable {
   cursor: pointer;
 }
@@ -1356,7 +1356,7 @@
   background: var(--card2);
 }
 
-/* ── Notification popover (bell dropdown) ── */
+/* ── 알림 팝오버 (벨 드롭다운) ── */
 .adm .bellwrap {
   position: relative;
 }
@@ -1468,7 +1468,7 @@
   color: var(--adm-muted);
 }
 
-/* ── Right detail panel (slide-over) ── */
+/* ── 우측 상세 패널 (슬라이드 오버) ── */
 .adm .panel-scrim {
   position: fixed;
   inset: 0;
@@ -1657,7 +1657,7 @@
   align-items: center;
   gap: 7px;
 }
-/* panel activity timeline (absolute-dot variant) */
+/* 패널 활동 타임라인 (절대 위치 점 변형) */
 .adm .ptl {
   position: relative;
   padding-left: 22px;
@@ -1719,8 +1719,8 @@
 }
 
 
-/* ========== Attendance console — Slice 1 (overview) ==========
-   See docs/product/05-admin-web-ia.md → Attendance/Payroll/Transportation
+/* ========== 근태 콘솔 — 슬라이스 1 (개요) ==========
+   참고: docs/product/05-admin-web-ia.md → Attendance/Payroll/Transportation
    ============================================================== */
 .adm .subnav {
   display: flex; align-items: center; gap: 4px;
@@ -1749,9 +1749,9 @@
   border-color: color-mix(in oklab,var(--adm-primary) 18%,var(--line));
   box-shadow: 0 8px 18px -16px rgba(20,32,43,.55), inset 0 1px 0 rgba(255,255,255,.78);
 }
-/* NOTE: 출근자 명단 used to get a `.subnav__t--entry` solid-navy CTA treatment here. Removed
-   2026-07-29 — every attendance tab now shares one active style so the bar doesn't change
-   appearance depending on which tab is open. */
+/* 참고: 출근자 명단은 예전에 여기서 `.subnav__t--entry` 꽉 찬 네이비 CTA 처리를 받았다. 2026-07-29 에
+   제거했다 — 이제 모든 근태 탭이 활성 스타일 하나를 공유하므로, 어느 탭이 열렸느냐에 따라
+   바의 모양이 달라지지 않는다. */
 .adm .subnav__t .ic { font-size: 15px; color: var(--faint); }
 .adm .subnav__t.on .ic { color: var(--adm-primary); }
 .adm .subnav__t .cnt {
@@ -1803,8 +1803,8 @@
 
 
 
-/* ========== Attendance · Slice 2 (review queue + bulk + session panel) ==========
-   1:1 ports from design handoff (Foldy Admin · 근태 모듈 — shell + queue).
+/* ========== 근태 · 슬라이스 2 (검토 대기열 + 일괄 + 세션 패널) ==========
+   디자인 핸드오프(Foldy Admin · 근태 모듈 — 셸 + 대기열)를 1:1로 옮김.
    ================================================================== */
 .adm .toolbar { display:flex; align-items:center; gap:10px; margin:2px 2px 13px; flex-wrap:wrap; }
 .adm .toolbar__spacer { flex:1; }
@@ -1876,7 +1876,7 @@
   transform:translateX(16px);
 }
 
-/* ---- name search box (queue toolbar) ---- */
+/* ---- 이름 검색 박스 (대기열 툴바) ---- */
 .adm .qsearch { display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 10px; border-radius:9px; border:1px solid var(--line); background:var(--card); min-width:190px; }
 .adm .qsearch:focus-within { border-color:color-mix(in oklab,var(--adm-primary) 40%,var(--line)); box-shadow:0 0 0 3px color-mix(in oklab,var(--adm-primary) 14%,transparent); }
 .adm .qsearch .ic { font-size:15px; color:var(--adm-muted); flex:0 0 auto; }
@@ -1886,13 +1886,13 @@
 .adm .qsearch__clear:hover { color:var(--ink-soft); }
 .adm .qsearch__clear .ic { font-size:14px; }
 
-/* ---- month picker (payroll / transport pager) ---- */
+/* ---- 월 선택기 (급여 / 교통비 페이저) ---- */
 .adm .amp { position:relative; display:inline-flex; align-items:center; gap:6px; }
 .adm .amp__arw { padding:0 9px; }
 .adm .amp__label { min-width:132px; text-align:center; height:34px; padding:0 14px; border-radius:9px; border:1px solid var(--line); background:var(--card); font-size:13px; font-weight:900; color:var(--ink); cursor:pointer; }
 .adm .amp__label:hover { border-color:color-mix(in oklab,var(--adm-primary) 30%,var(--line)); }
-/* Month popover — same canonical chrome as `.calpop` / `.adp__pop`; only the grid differs (12 months
-   instead of a day matrix). The roster's day variant (`.amp__pop--day`) reuses the `.adp__*` day cells. */
+/* 월 팝오버 — `.calpop` / `.adp__pop` 과 같은 표준 크롬이며 격자만 다르다 (날짜 행렬 대신 12개월).
+   명단의 날짜 변형(`.amp__pop--day`)은 `.adp__*` 날짜 칸을 재사용한다. */
 .adm .amp__pop { position:absolute; z-index:70; top:calc(100% + 6px); right:0; width:292px; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--sh-pop); animation:ddIn .14s ease; }
 .adm .amp__pop--day { width:292px; }
 .adm .amp__hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
@@ -1903,7 +1903,7 @@
 .adm .amp__m.sel { background:var(--adm-primary); color:#fff; border-color:var(--adm-primary); }
 .adm .amp__today { width:100%; margin-top:12px; padding-top:12px; border:none; border-top:0.5px solid var(--separator); background:transparent; font-size:12px; font-weight:800; color:var(--adm-primary); cursor:pointer; text-align:center; }
 
-/* ---- bulk action bar (multi-select) ---- */
+/* ---- 일괄 액션 바 (다중 선택) ---- */
 .adm .bulkbar { display:flex; align-items:center; gap:12px; padding:10px 14px; margin:0 2px 13px; border-radius:13px;
   background:var(--primary-ink); color:#fff; box-shadow:0 16px 34px -22px rgb(122 82 230 / .8); flex-wrap:wrap; }
 .adm .bulkbar__n { font-size:13px; font-weight:800; display:flex; align-items:center; gap:9px; }
@@ -1919,7 +1919,7 @@
 .adm .bbtn--reject { background:transparent; }
 .adm .bbtn[disabled] { opacity:.5; cursor:not-allowed; }
 
-/* ---- queue table ---- */
+/* ---- 대기열 표 ---- */
 .adm .qtbl { width:100%; border-collapse:collapse; }
 .adm .qtbl th { text-align:left; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); padding:9px 14px; border-bottom:0.5px solid var(--separator); white-space:nowrap; }
 .adm .qtbl td { padding:12px 14px; border-bottom:0.5px solid var(--separator); font-size:12.5px; font-weight:600; vertical-align:middle; }
@@ -1943,7 +1943,7 @@
 .adm .ckbx.dash::after { content:""; width:9px; height:2.2px; border-radius:2px; background:#fff; }
 .adm .dim-cell { color:var(--faint); font-weight:600; }
 
-/* ---- per-employee group header (전체 세션 tab) ---- */
+/* ---- 직원별 묶음 헤더 (전체 세션 탭) ---- */
 .adm .qtbl tbody tr.grouphdr { cursor:pointer; background:var(--card2); }
 .adm .qtbl tbody tr.grouphdr:hover { background:var(--surface2); }
 .adm .qtbl tbody tr.grouphdr.on { background:var(--surface2); }
@@ -1959,7 +1959,7 @@
 .adm .grp__cnt { font-size:12px; font-weight:800; color:var(--ink-soft); margin-left:6px; font-variant-numeric:tabular-nums; }
 .adm .grp__badges { display:flex; align-items:center; gap:6px; margin-left:auto; flex-wrap:wrap; justify-content:flex-end; }
 
-/* ---- tag (method / linked / manual) ---- */
+/* ---- 태그 (방식 / 연결됨 / 수동) ---- */
 .adm .tag { display:inline-flex; align-items:center; gap:5px; height:21px; padding:0 8px; border-radius:7px; font-size:10.5px; font-weight:800; white-space:nowrap; }
 .adm .tag .ic { font-size:12px; }
 .adm .tag--method { background:var(--primary-soft); color:var(--adm-primary); border:1px solid color-mix(in oklab,var(--adm-primary) 16%,transparent); }
@@ -1967,7 +1967,7 @@
 .adm .tag--manual { background:var(--adm-surface); color:var(--adm-muted); }
 .adm .tag--ghost { background:transparent; color:var(--faint); border:1px dashed var(--line); }
 
-/* ---- transport item inline receipt thumbnails + lightbox ---- */
+/* ---- 교통비 항목 인라인 영수증 썸네일 + 라이트박스 ---- */
 .adm .trthumbs { display:inline-flex; align-items:center; gap:4px; }
 .adm .trthumb { width:34px; height:34px; flex:0 0 auto; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:var(--surface2); padding:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
 .adm .trthumb img { width:100%; height:100%; object-fit:cover; }
@@ -1976,7 +1976,7 @@
 .adm .trthumb--more { font-size:11px; font-weight:800; color:var(--ink-soft); }
 .adm .trthumb--more:hover { border-color:color-mix(in oklab,var(--adm-primary) 30%,var(--line)); }
 
-/* ---- side panel additions (session/correction detail) ---- */
+/* ---- 사이드 패널 추가분 (세션/정정 상세) ---- */
 .adm .panel__kicker { font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--adm-muted); }
 .adm .uhead__av { width:44px; height:44px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:15px; flex:0 0 auto; }
 .adm .errbar { display:flex; align-items:flex-start; gap:12px; padding:13px 15px; border-radius:13px; margin:0 2px 14px;
@@ -1994,7 +1994,7 @@
 .adm .errbar--link:hover { background:color-mix(in oklab,var(--warn) 15%,#fff); border-color:color-mix(in oklab,var(--warn) 42%,transparent); }
 .adm .errbar--link:hover .errbar__a { opacity:1; transform:translate(1px,-1px); }
 
-/* Attendance allowance (추가수당) section */
+/* 근태 수당 (추가수당) 구역 */
 .adm .alw { margin-top: 18px; padding: 20px 22px 22px; }
 .adm .alw__head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
 .adm .alw__headl { display:flex; align-items:flex-start; gap:13px; min-width:0; }
@@ -2005,7 +2005,7 @@
 .adm .alw__title { font-size:15px; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
 .adm .alw__sub { font-size:12px; font-weight:500; color:var(--adm-muted); margin-top:4px; line-height:1.55; max-width:58ch; }
 
-/* create form — full-width panel, flat navy-tinted surface, fields in a 4-col grid that fills the row */
+/* 생성 폼 — 전체 너비 패널, 옅은 네이비 톤의 평면 면, 필드는 한 줄을 채우는 4열 격자 */
 .adm .alw__form { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:15px 18px; align-items:start;
   margin-top:18px; padding:18px 20px 20px;
   border:1px solid var(--line); border-radius:15px;
@@ -2024,7 +2024,7 @@
 .adm .alw__note .ic { font-size:15px; color:var(--info); flex:0 0 auto; }
 .adm .alw__formfoot { display:flex; justify-content:flex-end; gap:9px; padding-top:2px; }
 
-/* empty state */
+/* 빈 상태 */
 .adm .alw__empty { display:flex; flex-direction:column; align-items:center; gap:11px; margin-top:18px; padding:36px 22px; text-align:center;
   border:1px solid var(--line-soft); border-radius:14px; background:var(--card2); }
 .adm .alw__emptyic { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center;
@@ -2032,7 +2032,7 @@
 .adm .alw__emptyic .ic { font-size:21px; }
 .adm .alw__empty > span:last-child { font-size:12.5px; font-weight:600; color:var(--adm-muted); }
 
-/* list — premium rows with a navy date chip + hover lift */
+/* 목록 — 네이비 날짜 칩과 호버 상승이 있는 고급스러운 행 */
 .adm .alw__list { display:flex; flex-direction:column; gap:9px; margin-top:18px; }
 .adm .alw__row { display:flex; align-items:center; gap:14px; padding:12px 14px; border:1px solid var(--line); border-radius:13px;
   background:var(--card); transition:border-color .13s ease, box-shadow .13s ease, transform .13s ease; }
@@ -2049,7 +2049,7 @@
 .adm .alw__rowsub { font-size:11.5px; font-weight:500; color:var(--adm-muted); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .adm .alw__rowend { flex:0 0 auto; }
 
-/* Manual work-session entry modal */
+/* 수동 근무 세션 입력 모달 */
 .adm .msmodal__scrim { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
   background:rgba(15,23,32,.45); padding:20px; }
 .adm .msmodal { width:100%; max-width:480px; background:var(--card); border-radius:16px; border:1px solid var(--line);
@@ -2064,7 +2064,7 @@
 .adm .msmodal__grid { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
 .adm .msmodal__foot { display:flex; justify-content:flex-end; gap:9px; margin-top:18px; }
 
-/* (Shared form select field `.selfield` retired 2026-07-14 → replaced by the single `.dd` dropdown.) */
+/* (공용 폼 선택 필드 `.selfield` 는 2026-07-14 에 폐기 → 단일 `.dd` 드롭다운으로 대체.) */
 .adm .permzone { border:1px solid color-mix(in oklab,var(--warn) 30%,transparent); border-radius:13px; background:color-mix(in oklab,var(--warn) 6%,var(--card)); padding:13px 15px; }
 .adm .permzone__h { display:flex; align-items:center; gap:9px; margin-bottom:11px; }
 .adm .permzone__h > div { min-width:0; }
@@ -2081,7 +2081,7 @@
 .adm .btn--danger-ghost:hover { background:color-mix(in oklab,var(--danger) 14%,#fff); }
 .adm .btn[disabled], .adm .btn.is-locked { opacity:.5; cursor:not-allowed; filter:grayscale(.3); }
 
-/* ---- inline empty/error state (slice 2 fallback) ---- */
+/* ---- 인라인 빈 상태/오류 상태 (슬라이스 2 대체) ---- */
 .adm .state { display:flex; flex-direction:column; align-items:center; text-align:center; padding:54px 24px; }
 .adm .state__ic { width:66px; height:66px; border-radius:19px; display:flex; align-items:center; justify-content:center; margin-bottom:18px; }
 .adm .state__ic .ic { font-size:31px; }
@@ -2093,8 +2093,8 @@
 .adm .state__act { margin-top:20px; display:flex; gap:9px; }
 
 
-/* ========== Attendance · Slice 5 (transport detail panel) ==========
-   psum / shots / amt — 1:1 ports from design handoff.
+/* ========== 근태 · 슬라이스 5 (교통비 상세 패널) ==========
+   psum / shots / amt — 디자인 핸드오프를 1:1로 옮김.
    ================================================================== */
 .adm .psum { display:flex; align-items:baseline; gap:8px; padding:14px 15px; border-radius:13px; background:var(--card2); border:1px solid var(--line-soft); }
 .adm .psum__amt { font-family:var(--mono); font-size:24px; font-weight:900; letter-spacing:-.02em; }
@@ -2111,8 +2111,8 @@
 .adm .sep { display:inline-block; width:3px; height:3px; border-radius:999px; background:var(--faint); margin:0 6px; vertical-align:middle; }
 
 
-/* ========== Attendance · Slice 6 (per-user monthly detail) ==========
-   uhead / dayrow — 1:1 ports from design handoff.
+/* ========== 근태 · 슬라이스 6 (사용자별 월 상세) ==========
+   uhead / dayrow — 디자인 핸드오프를 1:1로 옮김.
    ================================================================== */
 .adm .uhead { display:flex; align-items:center; gap:15px; padding:18px 20px; background:var(--card); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--sh-card); margin-bottom:16px; }
 .adm .uhead__av { width:56px !important; height:56px !important; border-radius:15px; font-size:21px; }
@@ -2142,7 +2142,7 @@
 .adm .dayrow__meta { font-size:11px; font-weight:600; color:var(--adm-muted); margin-top:3px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
 .adm .dayrow__r { margin-left:auto; display:flex; align-items:center; gap:10px; }
 
-/* ========== Attendance roster (admin daily live view) ========== */
+/* ========== 출근자 명단 (관리자 일일 실시간 보기) ========== */
 .adm .aroster { display:flex; flex-direction:column; gap:16px; }
 .adm .rtoolbar { position:relative; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .adm .rtoolbar__spacer { flex:1; min-width:16px; }
@@ -2226,7 +2226,7 @@
   .adm .card:has(.rtbl) { overflow-x:auto !important; }
 }
 
-/* ---- collapsible day ledger ---- */
+/* ---- 접을 수 있는 일별 장부 ---- */
 .adm .ledger__fade { position:absolute; left:0; right:0; bottom:0; height:88px; pointer-events:none;
   background:linear-gradient(to bottom, color-mix(in oklab,var(--card) 0%,transparent), var(--card)); }
 .adm .ledger__toggle { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:10px; padding:10px 0;
@@ -2237,8 +2237,8 @@
 .adm .ledger__toggle-chev.on { transform:rotate(180deg); }
 
 
-/* ========== Attendance · Slice 7 (hourly wage management) ==========
-   ratelist + wedit — 1:1 ports from design handoff.
+/* ========== 근태 · 슬라이스 7 (시급 관리) ==========
+   ratelist + wedit — 디자인 핸드오프를 1:1로 옮김.
    ================================================================== */
 .adm .ratelist { display:flex; flex-direction:column; gap:0; }
 .adm .ratelist__r { display:flex; align-items:center; gap:13px; padding:13px 4px; border-top:0.5px solid var(--separator); }
@@ -2276,9 +2276,9 @@
 .adm .adp__trigger:hover:not(:disabled) { border-color:color-mix(in oklab,var(--adm-primary) 30%,var(--line)); }
 .adm .adp__trigger:disabled { background:var(--surface2); color:var(--adm-muted); cursor:not-allowed; }
 .adm .adp__trigger-ic { width:14px; height:14px; flex-shrink:0; color:var(--adm-muted); }
-/* The single-day popover shares the canonical calendar chrome defined by `.calpop` (the cleaning
-   history range picker) — same width, radius, padding, nav buttons, weekday strip and 34px day cells.
-   Keep these two blocks in lockstep: one calendar design across the whole console. See CLAUDE.md →
+/* 단일 날짜 팝오버는 `.calpop` (청소 기록 기간 선택기)이 정의한 표준 캘린더 크롬을 공유한다 —
+   너비, 반경, 패딩, 이동 버튼, 요일 줄, 34px 날짜 칸이 모두 같다.
+   이 두 블록은 반드시 함께 맞춘다: 콘솔 전체에서 캘린더 디자인은 하나다. 참고: CLAUDE.md →
    "Admin dashboard shared design contract". */
 .adm .adp__pop { position:absolute; z-index:70; top:calc(100% + 6px); right:0; left:auto; width:292px; max-width:calc(100vw - 32px); padding:14px; background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--sh-pop); animation:ddIn .14s ease; }
 .adm .adp__hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
@@ -2315,10 +2315,10 @@
 .adm .adp__opt.sel .adp__optcnt { color:var(--adm-primary); }
 .adm .adp__optempty { padding:8px 9px; font-size:12px; font-weight:600; color:var(--faint); }
 
-/* ── date-RANGE picker (AdminDateRangePicker) — single combined trigger + range-select popover.
-   The popover is `position:fixed` with coordinates computed from the trigger's
-   getBoundingClientRect (component-side), not CSS `top:calc(100%+…)`, so it can never be clipped
-   by a scrollable ancestor (e.g. `.content`) or rendered under the sidebar. ── */
+/* ── 날짜 범위 선택기 (AdminDateRangePicker) — 하나로 합친 트리거 + 범위 선택 팝오버.
+   팝오버는 `position:fixed` 이며 좌표는 트리거의
+   getBoundingClientRect 로 (컴포넌트 쪽에서) 계산한다 — CSS `top:calc(100%+…)` 가 아니다. 그래서
+   스크롤되는 조상(예: `.content`)에 잘리거나 사이드바 밑에 그려지는 일이 없다. ── */
 .adm .dpick { position:relative; }
 .adm .datepick { display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 12px; border:1px solid var(--line); border-radius:9px; background:var(--card); font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer; }
 .adm .datepick:hover { background:var(--adm-surface); }
@@ -2372,7 +2372,7 @@
 .adm .chipbtn:disabled { opacity:.55; cursor:not-allowed; }
 .adm .chipbtn:disabled:hover { background:var(--card); }
 
-/* ---- custom time picker (.atp) ---- */
+/* ---- 커스텀 시간 선택기 (.atp) ---- */
 .adm .atp { position:relative; }
 .adm .atp__trigger { display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; padding:7px 10px; border:1px solid var(--line); background:var(--card); border-radius:9px; font-family:var(--mono); font-size:14px; font-weight:800; color:var(--ink); cursor:pointer; text-align:left; }
 .adm .atp__trigger:hover { border-color:color-mix(in oklab,var(--adm-primary) 30%,var(--line)); }
@@ -2388,7 +2388,7 @@
 .adm .atp__opt:hover { background:var(--surface2); }
 .adm .atp__opt.sel { background:var(--adm-primary); color:#fff; font-weight:800; }
 
-/* ---- toast (bottom-center, auto-dismiss) ---- */
+/* ---- 토스트 (하단 가운데, 자동 닫힘) ---- */
 .adm .adm-toast {
   position: fixed;
   left: 50%;
@@ -2418,8 +2418,8 @@
 .adm .wprev .ic { font-size:14px; margin-top:1px; }
 .adm .wedit__btns { display:flex; gap:8px; }
 
-/* ---- leave console: sub-tab bar (승인 심사 / 팀 캘린더 / 잔여·부여 / 승인자 관리 / 문서) ---- */
-/* View tabs — handoff .lviews (leave.css): icon+label pills, selected = filled navy with a lift shadow. */
+/* ---- 휴가 콘솔: 하위 탭 바 (승인 심사 / 팀 캘린더 / 잔여·부여 / 승인자 관리 / 문서) ---- */
+/* 보기 탭 — 핸드오프 .lviews (leave.css): 아이콘+라벨 알약, 선택됨 = 리프트 그림자가 있는 꽉 찬 네이비. */
 .adm .lvsubtabs { display:flex; gap:4px; margin:2px 2px 14px; flex-wrap:wrap; align-items:center; }
 .adm .lvsubtab { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 15px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink-soft); font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; }
 .adm .lvsubtab .ic { font-size:17px; color:var(--adm-muted); display:inline-flex; }
@@ -2427,7 +2427,7 @@
 .adm .lvsubtab.on { background:var(--adm-primary); border-color:var(--adm-primary); color:#fff; box-shadow:0 12px 26px -18px rgb(122 82 230 / .7); }
 .adm .lvsubtab.on .ic { color:#fff; }
 
-/* ---- leave console: summary cards row ---- */
+/* ---- 휴가 콘솔: 요약 카드 행 ---- */
 .adm .lvsummary { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:16px; }
 .adm .lvscard { background:var(--card); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--sh-card); padding:15px 16px; display:flex; align-items:flex-start; gap:12px; }
 .adm .lvscard__ic { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
@@ -2436,17 +2436,17 @@
 .adm .lvscard__v { font-size:22px; font-weight:900; letter-spacing:-0.02em; line-height:1.15; }
 .adm .lvscard__t { font-size:12px; font-weight:700; color:var(--adm-muted); margin-top:3px; }
 
-/* ---- leave console: type badges ---- */
+/* ---- 휴가 콘솔: 유형 배지 ---- */
 .adm .typebadge { display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
 .adm .typebadge--paid { background:#E1EFF9; color:#1F70AD; }
 .adm .typebadge--annual { background:#F1EDF8; color:#6E49A2; }
 .adm .typebadge--special { background:#FBEFDA; color:#AE6E13; }
 .adm .typebadge--other { background:#EBE7E0; color:#656C7B; }
 
-/* ---- leave console: half-day AM/PM tag ---- */
+/* ---- 휴가 콘솔: 반차 오전/오후 태그 ---- */
 .adm .halftag { display:inline-flex; align-items:center; height:18px; padding:0 6px; border-radius:6px; font-size:10px; font-weight:800; background:var(--adm-surface); color:var(--adm-muted); margin-left:5px; }
 
-/* ---- leave console: balance impact before→after bar (approval drawer) ---- */
+/* ---- 휴가 콘솔: 잔여 영향 전→후 바 (승인 서랍) ---- */
 .adm .limpact { border:1px solid var(--line-soft); border-radius:13px; background:var(--surface2); padding:13px 14px; }
 .adm .limpact__row { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; font-weight:700; color:var(--ink-soft); }
 .adm .limpact__row b { font-size:14px; font-weight:900; }
@@ -2459,7 +2459,7 @@
 .adm .limpact__note--warn { color: var(--danger); }
 .adm .limpact__note--warn .ic { color: var(--danger); }
 
-/* ---- leave console: team calendar (TimeTree-style continuous multi-day bars) ---- */
+/* ---- 휴가 콘솔: 팀 캘린더 (TimeTree 방식의 이어지는 다일 막대) ---- */
 .adm .calcard { display:flex; flex-direction:column; padding:16px 18px 18px; min-height:calc(100vh - 248px); }
 .adm .calcard .card__t { font-size:15px; }
 .adm .calcard__head { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
@@ -2498,7 +2498,7 @@
 .adm .ttbar__nm { overflow:hidden; text-overflow:ellipsis; }
 .adm .ttbar__h { display:inline-flex; align-items:center; justify-content:center; height:14px; min-width:19px; padding:0 4px; border-radius:4px; font-family:var(--mono); font-size:8.5px; font-weight:800; background:color-mix(in oklab,var(--c) 18%,#fff); color:var(--c); flex:0 0 auto; }
 
-/* ---- leave calendar: clickable empty day cell → new-request popover ---- */
+/* ---- 휴가 캘린더: 클릭 가능한 빈 날짜 칸 → 새 신청 팝오버 ---- */
 .adm .ttcell--open { cursor:pointer; position:relative; }
 .adm .ttcell--open:hover { background:var(--surface2); }
 .adm .ttcell--open:focus-visible { outline:2px solid var(--adm-primary); outline-offset:-2px; }
@@ -2511,14 +2511,14 @@
 .adm .ttmenu__b:hover { background:var(--surface2); }
 .adm .ttmenu__b .ic { font-size:16px; color:var(--adm-muted); display:inline-flex; }
 
-/* ---- leave console: coming-soon sub-tab placeholder card ---- */
+/* ---- 휴가 콘솔: 준비 중 하위 탭 자리표시 카드 ---- */
 .adm .lvsoon { display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:60px 24px; }
 .adm .lvsoon__ic { width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:var(--adm-surface); color:var(--adm-muted); }
 .adm .lvsoon__ic .ic { font-size:24px; }
 .adm .lvsoon__t { font-size:14.5px; font-weight:800; color:var(--ink); }
 .adm .lvsoon__s { font-size:12.5px; font-weight:600; color:var(--adm-muted); max-width:340px; }
 
-/* ── Annual leave — proxy/self request modal + form fields (handoff leave.css, .adm-scoped) ── */
+/* ── 연차 — 대리/본인 신청 모달 + 폼 필드 (핸드오프 leave.css, .adm 범위) ── */
 .adm .modal-scrim { position:fixed; inset:0; background:rgba(24,28,38,.4); backdrop-filter:blur(2px); z-index:60; opacity:0; transition:opacity .22s; }
 .adm .modal-scrim.on { opacity:1; }
 .adm .modal { position:fixed; z-index:61; top:50%; left:50%; width:560px; max-width:calc(100vw - 40px); max-height:calc(100vh - 60px); transform:translate(-50%,-46%); opacity:0; transition:.24s cubic-bezier(.2,.8,.2,1); background:var(--card); border:1px solid var(--line); border-radius:20px; box-shadow:var(--sh-pop); display:flex; flex-direction:column; overflow:hidden; }
@@ -2565,7 +2565,7 @@
 
 .adm .btn.is-disabled { opacity:.45; pointer-events:none; }
 
-/* ── Annual leave — detail drawer: reason box + same-period overlap list (handoff att.css/leave.css) ── */
+/* ── 연차 — 상세 서랍: 사유 박스 + 같은 기간 겹침 목록 (핸드오프 att.css/leave.css) ── */
 .adm .reason { padding:12px 14px; border-radius:12px; background:var(--card2); border:1px solid var(--line-soft); font-size:12.5px; font-weight:600; color:var(--ink-soft); line-height:1.6; }
 .adm .reason__q { font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin-bottom:6px; }
 .adm .pblock__cnt { display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px; padding:0 5px; border-radius:999px; background:var(--adm-surface); color:var(--adm-muted); font-family:var(--mono); font-size:10px; font-weight:800; margin-left:5px; vertical-align:middle; }
@@ -2580,7 +2580,7 @@
 .adm .cvrow__t { font-size:12.5px; font-weight:800; display:flex; align-items:center; gap:7px; }
 .adm .cvrow__s { font-size:11px; font-weight:600; color:var(--adm-muted); margin-top:2px; }
 
-/* ── Annual leave — staff balance & grants (handoff leave.css .balrow/.excl-flag/.editbox) ── */
+/* ── 연차 — 직원 잔여 및 부여 (핸드오프 leave.css .balrow/.excl-flag/.editbox) ── */
 .adm .balrow { display:flex; align-items:center; background:var(--card2); border:1px solid var(--line-soft); border-radius:13px; padding:14px 6px; }
 .adm .balrow__cell { flex:1; text-align:center; }
 .adm .balrow__v { font-size:24px; font-weight:900; letter-spacing:-.02em; line-height:1; font-family:var(--mono); }
@@ -2593,7 +2593,7 @@
 .adm .editbox__note { display:flex; align-items:flex-start; gap:7px; font-size:11px; font-weight:600; color:var(--adm-muted); line-height:1.5; }
 .adm .editbox__note .ic { font-size:14px; color:var(--info); flex:0 0 auto; margin-top:1px; }
 
-/* ── Annual leave — approver management (handoff leave.css .apbanner/.apchip/.switch) ── */
+/* ── 연차 — 승인자 관리 (핸드오프 leave.css .apbanner/.apchip/.switch) ── */
 .adm .apbanner { display:flex; align-items:center; gap:15px; padding:16px 18px; border:1px solid color-mix(in oklab,var(--adm-primary) 22%,transparent); border-radius:15px; background:linear-gradient(120deg, var(--primary-soft), color-mix(in oklab,var(--primary-soft) 40%, var(--card))); }
 .adm .apbanner__ic { width:42px; height:42px; border-radius:12px; background:var(--adm-primary); color:#fff; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 .adm .apbanner__ic .ic { font-size:22px; }
@@ -2612,7 +2612,7 @@
 .adm .switch__k { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .18s; }
 .adm .switch.on .switch__k { transform:translateX(20px); }
 
-/* ── Annual leave — documents (休暇届) view (handoff leave.css .dwrap/.demp/.ddoc/.dviewer/.jp*) ── */
+/* ── 연차 — 문서 (休暇届) 보기 (핸드오프 leave.css .dwrap/.demp/.ddoc/.dviewer/.jp*) ── */
 .adm .dwrap { display:flex; gap:14px; align-items:flex-start; }
 .adm .dlist { width:296px; flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--sh-card); overflow:hidden; align-self:flex-start; }
 .adm .dlist__h { padding:12px 14px; border-bottom:0.5px solid var(--separator); display:flex; align-items:center; gap:8px; }
@@ -2653,7 +2653,7 @@
 .adm .dviewer__stage { background:linear-gradient(180deg,#efece4,#e7e3d9); padding:26px; display:flex; justify-content:center; overflow:auto; max-height:calc(100vh - 330px); min-height:420px; }
 .adm .dviewer__wrap { position:relative; flex:0 0 auto; }
 
-/* 実際の会社様式「休暇届」— printed form is Japanese-only, not an i18n target (see CLAUDE.md multilingual rule scope). */
+/* 実際の会社様式「休暇届」— 인쇄 서식은 일본어 전용이며 i18n 대상이 아니다 (CLAUDE.md 다국어 규칙 범위 참고). */
 .adm .jp { width:210mm; min-height:297mm; box-sizing:border-box; flex:0 0 auto; background:#fff; border:1px solid #e2ddd2; box-shadow:0 2px 6px rgba(30,28,22,.08), 0 26px 60px -28px rgba(30,28,22,.55); padding:26mm 24mm; font-family:var(--font-noto-jp, "Noto Serif JP", "Noto Serif", serif); color:#1c1c1a; display:flex; flex-direction:column; }
 .adm .jp__title { text-align:center; font-size:33px; font-weight:700; letter-spacing:.1em; width:fit-content; margin:6px auto 0; padding-bottom:7px; position:relative; }
 .adm .jp__title::after { content:""; position:absolute; left:-6px; right:-6px; bottom:0; height:0; border-bottom:2.4px double #1c1c1a; }
@@ -2684,8 +2684,8 @@
 .adm .jp__stamps th { font-size:13px; font-weight:500; padding:5px 0; letter-spacing:.06em; }
 .adm .jp__stamps td { height:62px; vertical-align:middle; }
 .adm .jp__seal { display:inline-flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:50%; border:2px solid #c0392b; color:#c0392b; font-family:var(--font-noto-jp, "Noto Serif JP", serif); font-size:21px; font-weight:700; transform:rotate(-6deg); opacity:.92; box-shadow:inset 0 0 0 1px rgba(192,57,43,.25); }
-/* 専務(senior managing director) real 도장 — matches the photographed 鄭 hanko: upright, thin single
-   red ring, the character filling most of the circle. */
+/* 専務(전무) 실제 도장 — 촬영한 鄭 인장과 같게: 똑바르고, 가는 단일
+   빨간 고리, 글자가 원의 대부분을 채운다. */
 .adm .jp__seal--smd { border-width:1.5px; box-shadow:none; transform:rotate(-2deg); font-size:27px; font-weight:600; line-height:1; color:#c8352c; border-color:#c8352c; opacity:1; }
 
 @media print {
@@ -2693,9 +2693,9 @@
   html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
   body * { visibility:hidden; }
   #docSheet, #docSheet * { visibility:visible; }
-  /* The on-screen preview scales #docSheet down (inline transform) and nests it inside the console
-     layout. For print, escape that: fixed at the page origin, no transform, full A4 width so the 休暇届
-     prints as a full page instead of a shrunken corner fragment. */
+  /* 화면 미리보기는 #docSheet 를 (인라인 transform 으로) 축소해 콘솔
+     레이아웃 안에 넣는다. 인쇄에서는 이를 벗어난다: 페이지 원점에 고정, transform 없음, A4 전체 너비로 해서 休暇届 가
+     축소된 구석 조각이 아니라 한 페이지로 인쇄되게 한다. */
   #docSheet {
     position:fixed !important; left:0 !important; top:0 !important;
     width:210mm !important; max-width:none !important; margin:0 !important; padding:0 !important;
@@ -2707,10 +2707,10 @@
 }
 
 /* ===================================================================
-   CUSTOM DROPDOWN (.dd) — the single shared dropdown standard that replaces the
-   native <select> across every admin console (users / attendance / cleaning / …).
-   Moved here from users-console.css so all `.adm` pages get it. Do not add a
-   second dropdown style (the old chip `.adp` dropdown is retired).
+   커스텀 드롭다운 (.dd) — 모든 관리자 콘솔(사용자 / 근태 / 청소 / …)에서 네이티브
+   <select> 를 대체하는 단일 공용 드롭다운 표준.
+   users-console.css 에서 옮겨 와 모든 `.adm` 페이지가 쓴다. 두 번째
+   드롭다운 스타일을 추가하지 말 것 (예전 칩형 `.adp` 드롭다운은 폐기됨).
    =================================================================== */
 .adm .dd { position: relative; }
 .adm .dd__btn { width: 100%; display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 13.5px; font-weight: 700; text-align: left; cursor: pointer; }
@@ -2757,15 +2757,15 @@
 .adm .ddnone { padding: 12px 10px; font-size: 12px; font-weight: 700; color: var(--faint); text-align: center; }
 
 /* ===================================================================
-   SHARED OPERATIONS-CONSOLE PRIMITIVES
-   Promoted out of cleaning-console.css on 2026-07-14 when the 수리·점검 console
-   became the second screen to need them. Any /admin/* console that has a view
-   switcher, a live-sync chip, a filter toolbar, a status pill, linked-record
-   tiles or a result-count line uses THESE — do not re-declare them in a
-   screen-local stylesheet. See CLAUDE.md → "Admin dashboard shared design contract".
+   공용 운영 콘솔 프리미티브
+   2026-07-14 에 수리·점검 콘솔이 두 번째로 필요로 하게 되어 cleaning-console.css 에서 끌어올렸다.
+   보기 전환기, 실시간 동기화 칩, 필터 툴바, 상태 알약, 연결 레코드 타일,
+   결과 건수 줄이 있는 모든 /admin/* 콘솔은 이것들을 쓴다 —
+   화면 전용 스타일시트에 다시 선언하지 말 것.
+   참고: CLAUDE.md → "Admin dashboard shared design contract".
    =================================================================== */
 
-/* ── view switcher row + live-sync chip ── */
+/* ── 보기 전환 행 + 실시간 동기화 칩 ── */
 .adm .cviewbar { display: flex; align-items: center; gap: 12px; margin: 2px 2px 16px; flex-wrap: wrap; }
 .adm .lviews { display: inline-flex; background: var(--adm-surface); border-radius: 11px; padding: 4px; gap: 2px; }
 /* 탭은 <button>(청소·수리·주문·공지) 또는 <a>(쿼리스트링 내비게이션 — 컴플레인 콘솔)로 렌더될 수 있다.
@@ -2781,24 +2781,24 @@
 .adm .syncchip__dot { width: 7px; height: 7px; border-radius: 999px; background: var(--done); box-shadow: 0 0 0 3px var(--done-bg); flex: 0 0 auto; }
 .adm .syncchip .ic { font-size: 15px; color: var(--adm-muted); }
 
-/* ── KPI strip value modifiers (the .opsbar--N grid itself stays screen-local) ── */
+/* ── KPI 띠 값 수식어 (.opsbar--N 격자 자체는 화면 전용으로 남음) ── */
 .adm .opscell__v.is-danger { color: var(--danger); }
 .adm .opscell__v.is-progress { color: var(--info); }
 .adm .opscell__v.is-done { color: var(--done); }
 .adm .opscell__v.is-muted { color: var(--ink-soft); }
 
-/* ── filter toolbar ── */
+/* ── 필터 툴바 ── */
 .adm .ctoolbar { display: flex; align-items: center; gap: 9px; margin: 2px 2px 14px; flex-wrap: wrap; }
 .adm .ctoolbar__spacer { flex: 1; }
 .adm .ctoolbar .dd { width: 168px; flex: 0 0 auto; }
 .adm .ctoolbar .dpick { flex: 0 0 auto; }
 .adm .qsearch--inline { min-width: 180px; }
 
-/* ── result-count line above a table ── */
+/* ── 표 위의 결과 건수 줄 ── */
 .adm .hmeta { font-size: 11.5px; font-weight: 700; color: var(--adm-muted); margin: 0 4px 9px; display: flex; align-items: center; gap: 7px; }
 .adm .hmeta .sep { width: 3px; height: 3px; border-radius: 999px; background: var(--faint); }
 
-/* ── status pill (base + the variants shared across consoles) ── */
+/* ── 상태 알약 (기본 + 콘솔 간 공유되는 변형) ── */
 .adm .cstat { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.01em; white-space: nowrap; }
 .adm .cstat .ic { font-size: 13px; }
 .adm .cstat .d { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
@@ -2806,15 +2806,15 @@
 .adm .cstat--progress { background: var(--info-bg); color: var(--info); }
 .adm .cstat--done { background: var(--done-bg); color: var(--done); }
 
-/* ── table avatar cell ── */
+/* ── 표 아바타 칸 ── */
 .adm .qtbl .who__av { width: 26px; height: 26px; border-radius: 8px; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex: 0 0 auto; }
 
-/* ── detail-panel key/value rows stay on one line (CJK must not break mid-word) ── */
+/* ── 상세 패널의 키/값 줄은 한 줄 유지 (CJK 가 단어 중간에서 끊기면 안 됨) ── */
 .adm .panel .kv { gap: 16px; }
 .adm .panel .kv__k { white-space: nowrap; flex: 0 0 auto; }
 .adm .panel .kv__v { text-align: right; white-space: nowrap; }
 
-/* ── linked-record tiles in a detail panel (per-kind color variants stay screen-local) ── */
+/* ── 상세 패널의 연결 레코드 타일 (종류별 색 변형은 화면 전용으로 남음) ── */
 .adm .rptiles { display: flex; flex-direction: column; gap: 9px; }
 .adm .rptile { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 13px; border-radius: 13px; border: 1px solid var(--line); background: var(--card); text-align: left; cursor: pointer; transition: border-color 0.14s, background 0.14s, box-shadow 0.14s; }
 .adm .rptile:hover { background: var(--card2); box-shadow: 0 10px 24px -20px rgba(20, 32, 43, 0.5); }

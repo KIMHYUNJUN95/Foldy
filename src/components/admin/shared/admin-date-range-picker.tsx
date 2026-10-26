@@ -1,11 +1,11 @@
 "use client";
 
-// Shared admin-console date-RANGE picker primitive — single combined trigger ("시작일 – 종료일")
-// that opens a range-select calendar popover (matches the design handoff's `.dpick`/`.calpop`).
-// Renders the popover with `position: fixed` + viewport-clamped coordinates computed from the
-// trigger's getBoundingClientRect (same escape-ancestor-overflow approach as the day-menu popover
-// in leave-team-calendar.tsx) so it can never be clipped by a scrollable ancestor (e.g. `.content`)
-// or rendered behind the sidebar.
+// 공용 관리자 콘솔 날짜 범위 선택 프리미티브 — 하나로 합친 트리거 ("시작일 – 종료일")
+// 범위 선택 캘린더 팝오버를 여는 트리거 (디자인 핸드오프의 `.dpick`/`.calpop` 과 같음).
+// 팝오버는 트리거의 getBoundingClientRect 로 계산한 뷰포트 안 좌표와 `position: fixed` 로
+// 렌더링한다 (leave-team-calendar.tsx 의 날짜 메뉴 팝오버와 같은, 조상 overflow 를 벗어나는 방식).
+// 그래서 스크롤되는 조상(예: `.content`)에 잘리거나
+// 사이드바 뒤에 가려지는 일이 없다.
 import { Fragment, useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { shiftMonthKey } from "./admin-month-key";
@@ -182,8 +182,8 @@ export function AdminDateRangePicker({
       const top = fitsBelow ? rect.bottom + 6 : Math.max(12, rect.top - POPOVER_HEIGHT_ESTIMATE - 6);
       setPos({ top, left });
     }
-    // Opens to the trigger's current month for orientation, but starts with no range highlighted —
-    // the applied from/to only shows as blue once the user actually picks days in this session.
+    // 방향을 잡도록 트리거의 현재 달로 열되, 선택된 기간 강조는 없이 시작한다 —
+    // 적용된 from/to 는 이번 세션에서 사용자가 실제로 날짜를 고른 뒤에만 파랗게 표시된다.
     setCalendarMonth(calendarMonthOf(from));
     onMonthChange?.(calendarMonthOf(from));
     setDraftFrom(null);

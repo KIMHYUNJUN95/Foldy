@@ -17,11 +17,11 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 const LOCALE_COOKIE = "stayops_locale";
 
 /**
- * Origin used to build OAuth / email callback URLs. Derived from the actual
- * request host (so it matches whatever domain the user is on — production,
- * preview, or local LAN IP) instead of a static env var. Falls back to
- * NEXT_PUBLIC_APP_URL, then localhost. Supabase's redirect allow-list remains the
- * security boundary — a spoofed host can't redirect anywhere not on the list.
+ * OAuth / 이메일 콜백 URL 을 만들 때 쓰는 origin. 정적 환경 변수 대신 실제
+ * 요청 호스트에서 구한다(프로덕션, 프리뷰, 로컬 LAN IP 등
+ * 사용자가 접속한 도메인과 그대로 일치). 없으면
+ * NEXT_PUBLIC_APP_URL, 그다음 localhost 로 대체한다. 보안 경계는 계속 Supabase 의
+ * 리디렉트 허용 목록이다 — 위조된 호스트로는 목록에 없는 곳으로 보낼 수 없다.
  */
 async function getAppUrl() {
   const h = await headers();
@@ -133,8 +133,8 @@ function buildBlockedRedirect(
 }
 
 /**
- * Persists the selected locale in a first-party cookie so it survives
- * redirects through the full auth/onboarding flow.
+ * 선택한 로케일을 퍼스트파티 쿠키에 저장해
+ * 인증/온보딩 전체 흐름의 리디렉트를 거쳐도 유지되게 한다.
  */
 export async function setLocaleCookie(locale: Locale) {
   if (!isLocale(locale)) return;
@@ -149,8 +149,8 @@ export async function setLocaleCookie(locale: Locale) {
 }
 
 /**
- * Sign in with email + password.
- * Replaces the old magic-link (OTP) flow entirely.
+ * 이메일 + 비밀번호로 로그인.
+ * 기존 매직링크(OTP) 흐름을 완전히 대체한다.
  */
 export async function signInWithEmailPassword(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -171,7 +171,7 @@ export async function signInWithEmailPassword(formData: FormData) {
     redirect(`${errorBase}&error=${mapSupabaseError(error.message)}`);
   }
 
-  // Session is set — check onboarding state and route accordingly.
+  // 세션이 설정됨 — 온보딩 상태를 확인해 그에 맞게 보낸다.
   const state = await getOnboardingState();
 
   if (state.status === "unauthenticated") {
@@ -201,10 +201,10 @@ export async function signInWithEmailPassword(formData: FormData) {
 }
 
 /**
- * Sign up with email + password.
- * Sends a verification email. Does not auto-login until verified.
- * If the email is already registered (even with incomplete onboarding),
- * directs to login instead of creating a duplicate account.
+ * 이메일 + 비밀번호로 가입.
+ * 인증 메일을 보내며, 인증 전에는 자동 로그인하지 않는다.
+ * 이미 등록된 이메일이면(온보딩이 덜 끝난 경우 포함)
+ * 중복 계정을 만들지 않고 로그인으로 안내한다.
  */
 export async function signUpWithEmail(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -237,7 +237,7 @@ export async function signUpWithEmail(formData: FormData) {
     redirect(`${errorBase}&error=${mapSupabaseError(error.message)}`);
   }
 
-  // identities array empty → email already registered (Supabase deduplication) → login.
+  // identities 배열이 비어 있음 → 이미 등록된 이메일(Supabase 중복 방지) → 로그인.
   // 주의(2026-10-09 실측): 지금 Supabase 는 반복 가입이든 **새 가입이든** 오류 없이 user=null 을 돌려줄 수 있어
   // null 만으로는 기존 계정을 가려낼 수 없다(가렸더니 새 가입까지 「이미 가입됨」으로 막혔다). 그래서 null 은
   // 「메일 확인」 화면으로 보내고, 그 화면이 「메일이 안 오면 이미 가입된 이메일일 수 있다」고 안내한다.
@@ -247,7 +247,7 @@ export async function signUpWithEmail(formData: FormData) {
     );
   }
 
-  // Verification email sent — show the "check your inbox" state.
+  // 인증 메일 발송 완료 — "받은편지함을 확인하세요" 상태를 보여준다.
   redirect(
     `/auth/login?view=email&mode=signup&next=${encodeURIComponent(next)}${langParam}&sent=verify&email=${encodeURIComponent(email)}`,
   );
@@ -285,8 +285,8 @@ export async function resendSignupConfirmation(formData: FormData) {
 }
 
 /**
- * Request a password reset email.
- * Always shows success (does not reveal whether the email exists).
+ * 비밀번호 재설정 메일 요청.
+ * 항상 성공으로 표시한다(이메일 존재 여부를 알려주지 않음).
  */
 export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -314,15 +314,15 @@ export async function requestPasswordReset(formData: FormData) {
     redirect(`${errorBase}&error=${code}`);
   }
 
-  // Always redirect to success regardless of whether the email exists.
+  // 이메일이 존재하든 말든 항상 성공 화면으로 보낸다.
   redirect(`${errorBase}&sent=reset&email=${encodeURIComponent(email)}`);
 }
 
 /**
- * Update password after the user has clicked the email reset link.
- * Supabase has already validated the recovery token via the callback route
- * (which exchanged the code for a session), so the user is authenticated
- * by the time this action runs.
+ * 사용자가 메일의 재설정 링크를 누른 뒤 비밀번호를 갱신.
+ * 복구 토큰은 콜백 라우트에서 이미 Supabase 가 검증했고
+ * (코드를 세션으로 교환함), 따라서 이 액션이 실행될 때
+ * 사용자는 이미 인증된 상태다.
  */
 export async function updatePassword(formData: FormData) {
   const password = String(formData.get("password") ?? "");
@@ -354,20 +354,20 @@ export async function updatePassword(formData: FormData) {
 }
 
 /**
- * Sign in with Google (OAuth).
+ * Google(OAuth)로 로그인.
  *
- * "Same email = same account" policy: this relies on Supabase's automatic
- * identity linking — when the Google email matches an existing user's CONFIRMED
- * email, Supabase links the Google identity to that user instead of creating a
- * duplicate (verified in this project: the owner account carries both `email` and
- * `google` identities). This holds ONLY while the Supabase project keeps:
- *   - email confirmations required (so emails are verified), and
- *   - automatic account linking enabled (Auth settings).
- * If those change, a same-email Google sign-in could diverge into a separate
- * account. The email-signup path already handles the reverse collision
- * (`identities.length === 0` → resume existing account). A manual link-identity
- * flow (the "계정 연결" design screen) is intentionally NOT wired yet — Supabase
- * enforces uniqueness today, so it would be premature. See
+ * "같은 이메일 = 같은 계정" 정책: Supabase 의 자동
+ * 아이덴티티 연결에 의존한다 — Google 이메일이 기존 사용자의 인증 완료된
+ * 이메일과 같으면 새로 만들지 않고 Supabase 가 Google 아이덴티티를 그 사용자에
+ * 연결한다(이 프로젝트에서 확인함: 소유자 계정에 `email` 과
+ * `google` 아이덴티티가 모두 있다). 이는 Supabase 프로젝트가 아래를 유지하는 동안에만 성립한다:
+ *   - 이메일 인증 필수(이메일이 검증되도록), 그리고
+ *   - 자동 계정 연결 활성화(Auth 설정).
+ * 이 설정이 바뀌면 같은 이메일의 Google 로그인이 별개 계정으로
+ * 갈라질 수 있다. 이메일 가입 경로는 반대 충돌을 이미 처리한다
+ * (`identities.length === 0` → 기존 계정 이어가기). 수동 아이덴티티 연결은
+ * 흐름("계정 연결" 디자인 화면)은 의도적으로 아직 연결하지 않았다 — 현재는 Supabase 가
+ * 현재 유일성을 보장하므로 지금 도입하는 건 이르다. 참고:
  * docs/engineering/05-rls-permissions.md (auth/identity policy).
  */
 /** Google OAuth 시작 — 웹은 `/auth/callback`, 앱(`native`)은 앱 전용 스킴으로 돌아온다. */

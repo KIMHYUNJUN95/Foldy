@@ -49,7 +49,7 @@ export function BugComposeClient({ copy, myCount }: { copy: BugCopy; myCount: nu
   const [done, setDone] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // preview URL revoke on unmount
+  // 언마운트 시 미리보기 URL 해제
   const previewsRef = useRef(previews);
   useEffect(() => { previewsRef.current = previews; }, [previews]);
   useEffect(

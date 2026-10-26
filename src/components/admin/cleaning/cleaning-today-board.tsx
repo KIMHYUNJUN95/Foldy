@@ -1,10 +1,10 @@
 "use client";
 
-// Admin cleaning console — "오늘 현황" board: room tiles grouped either by building or by status
-// bucket, plus the 셋팅 대상 list and 직원별 오늘 요약 side by side below. White redesign (2026-10-13,
-// docs/design/05-white-redesign.md): tiles are light fills without borders or a left status bar, the
-// status is a small text badge, and section heads are a plain title + progress bar.
-// Data is real (src/lib/admin-cleaning.ts) as of 2026-07-14.
+// 관리자 청소 콘솔 — "오늘 현황" 보드: 방 타일을 건물별 또는 상태별
+// 묶음으로 보여 주고, 그 아래에 셋팅 대상 목록과 직원별 오늘 요약을 나란히 둔다. 화이트 리디자인 (2026-10-13,
+// docs/design/05-white-redesign.md): 타일은 테두리나 왼쪽 상태 막대 없이 옅은 채움이고,
+// 상태는 작은 텍스트 배지이며, 섹션 헤더는 단순 제목 + 진행 막대다.
+// 데이터는 2026-07-14 부로 실제 데이터다 (src/lib/admin-cleaning.ts).
 import type { ReactNode } from "react";
 import { Check, Search } from "lucide-react";
 import type { AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
@@ -124,9 +124,9 @@ function BuildingSections(props: {
 }) {
   const { tasks, t, buildingLabels, staffDirectory, propFilter, selectedId, onSelect } = props;
 
-  // Group by known BuildingKey first (fixed operational order); any task whose room label didn't
-  // resolve to one of the 7 canonical buildings gets its own group, appended after, keyed by the
-  // raw property name so real data never silently drops a room.
+  // 먼저 알려진 BuildingKey 로 묶는다 (고정 운영 순서). 7개 표준 건물 중 어느 것으로도
+  // 해석되지 않은 방 라벨의 작업은 자기 그룹을 갖고 뒤에 붙으며,
+  // 원래 프로퍼티 이름을 키로 삼아 실제 데이터에서 방이 조용히 빠지지 않게 한다.
   const knownGroups = new Map<BuildingKey, AdminCleaningTask[]>();
   const otherGroups = new Map<string, AdminCleaningTask[]>();
   for (const task of tasks) {

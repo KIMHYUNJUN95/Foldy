@@ -21,9 +21,9 @@ function currentTokyoYm(): string {
     .slice(0, 7);
 }
 
-// Attendance / 근태 — own monthly hourly pay (Step 10, EXPECTED pay). Self-view only: scoped to the
-// authenticated user server-side. New screen in the existing design language (no 급여 frame existed).
-// See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
+// 출퇴근 / 근태 — 본인 월 시급 급여 (Step 10, 예상 급여). 본인 조회 전용: 인증된
+// 사용자로 서버에서 범위를 건다. 기존 디자인 언어로 만든 새 화면이다 (급여 프레임은 없었다).
+// docs/product/21-attendance-payroll-workflow.md 와 docs/product/24-attendance-workflow.md 참고.
 export default async function MobileAttendancePayPage({ searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([

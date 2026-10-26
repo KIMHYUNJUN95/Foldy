@@ -80,13 +80,13 @@ function tokyoSubmittedLabel(iso: string, localeTag: string): string {
 }
 
 /**
- * Admin attendance/payroll/transport console aggregation (overview slice).
+ * 관리자 근태/급여/교통비 콘솔 집계(개요 조각).
  *
- * Aggregates the same server-side slices used by the dedicated queue, payroll,
- * and transport pages so the overview KPI bar cannot drift from the detail pages.
- * No new data model is introduced here.
+ * 전용 큐, 급여, 교통비 페이지가 쓰는 서버 쪽 조각을 그대로 모아서,
+ * 개요 KPI 바가 상세 페이지와 어긋나지 않게 한다.
+ * 여기서 새 데이터 모델을 만들지 않는다.
  *
- * See docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
+ * docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation" 참고.
  */
 
 export type AdminAttendanceOverviewData = {
@@ -303,7 +303,7 @@ export async function getAdminAttendanceOverview(
   let corrOpenCount = 0;
   let payrollKpi = EMPTY_PAYROLL_KPI;
   let transportKpi = EMPTY_TRANSPORT_KPI;
-  // Scope the review queue to the selected month so the overview reflects that month's data.
+  // 검토 큐를 선택한 달로 한정해 개요가 그 달의 데이터를 반영하게 한다.
   const monthFrom = `${ym}-01`;
   const monthTo = lastDayOfYm(ym);
   const organizationId = session.organization.id;
@@ -363,10 +363,10 @@ export async function getAdminAttendanceOverview(
     r.correctionStatus === "requested" || r.correctionStatus === "in_review";
   const isOpenCorrection = (r: AdminCorrectionRow) =>
     r.status === "requested" || r.status === "in_review";
-  // "Needs review" = the same rows the queue page's default `review` tab shows: flagged
-  // review_required and not already routed to the pending-correction bucket. `getAttendanceReviewQueue`
-  // with no filter returns ALL recent sessions (any status), so counting `review.length` here previously
-  // reported every fetched session — not just the ones actually requiring review.
+  // "검토 필요" = 큐 페이지의 기본 `review` 탭이 보여주는 행과 같다: review_required 로
+  // 표시됐고 이미 정정 대기 묶음으로 넘어가지 않은 것. `getAttendanceReviewQueue` 를
+  // 필터 없이 부르면 최근 세션 전부(상태 무관)를 돌려주므로, 예전에는 여기서 `review.length` 가 실제로 검토가 필요한 것만이 아니라
+  // 가져온 세션 전체를 보고했다.
   const reviewRequiredRows = review.filter(
     (r) => r.reviewState === "review_required" && !isPendingCorrection(r),
   );
@@ -396,10 +396,10 @@ export async function getAdminAttendanceOverview(
 }
 
 /**
- * Slice 2 — full review queue for the dashboard queue page.
+ * 2단계 — 대시보드 큐 페이지용 전체 검토 큐.
  *
- * Returns the same `ReviewQueueItem[]` (gated by `attendanceCan`) with no row limit,
- * so the queue page can render the full review/pending/all tables client-side.
+ * 행 제한 없이 같은 `ReviewQueueItem[]` 를 돌려준다(`attendanceCan` 으로 게이트),
+ * 그래서 큐 페이지가 검토/대기/전체 표를 클라이언트에서 전부 그릴 수 있다.
  */
 export type AdminAttendanceQueueData = {
   isPrivileged: boolean;
@@ -408,13 +408,13 @@ export type AdminAttendanceQueueData = {
 };
 
 /**
- * Slice 3 — admin-scoped correction requests for the queue page's `corr` tab.
+ * 3단계 — 큐 페이지 `corr` 탭용, 관리자 범위의 정정 요청.
  *
- * Wraps the existing `attendance_correction_requests` table (gated by
- * `attendanceCan`). Derives a single primary "field" per request
- * (clock-in / clock-out / site) from the desired_* columns, and pairs it with
- * the current session value as the "before" side of the diff. Session-less
- * (exception) requests render with `sessionId: null` and `beforeLabel: "—"`.
+ * 기존 `attendance_correction_requests` 테이블을 감싼다(`attendanceCan` 으로
+ * 게이트). desired_* 컬럼에서 요청당 주된 "항목" 하나(출근 / 퇴근 / 근무지)를
+ * 뽑고, 현재 세션 값을 차이의 "변경 전" 쪽으로 짝지운다. 세션 없는
+ * (예외) 요청은
+ * `sessionId: null` 과 `beforeLabel: "—"` 로 그려진다.
  */
 
 export type AdminCorrectionField = "clock_in" | "clock_out" | "site" | "other";
@@ -424,7 +424,7 @@ export type AdminCorrectionRow = {
   status: AttendanceCorrectionStatus;
   reasonType: AttendanceCorrectionReason;
   field: AdminCorrectionField;
-  /** All field-level diffs for this request (for the panel detail). */
+  /** 이 요청의 모든 항목별 차이(패널 상세용). */
   diffs: { field: AdminCorrectionField; beforeLabel: string; afterLabel: string }[];
   requesterUserId: string;
   requesterName: string;
@@ -436,9 +436,9 @@ export type AdminCorrectionRow = {
   afterLabel: string;
   memo: string | null;
   /**
-   * Evidence photos attached by the requester. Stored as ready-to-render public URLs in
-   * `attendance_correction_requests.image_urls` (same shape as maintenance / lost-found photos), so
-   * the reviewer never has to approve or reject a correction blind.
+   * 요청자가 붙인 증빙 사진. 바로 그릴 수 있는 공개 URL 로
+   * `attendance_correction_requests.image_urls` 에 저장된다(수리 / 분실물 사진과 같은 모양). 그래서
+   * 검토자가 정정을 내용을 모른 채 승인하거나 반려할 일이 없다.
    */
   imageUrls: string[];
   reviewComment: string | null;
@@ -628,13 +628,13 @@ export async function getAdminAttendanceCorrections(
 }
 
 /**
- * Slice 4 — admin payroll review for the `/admin/attendance/payroll` page.
+ * 4단계 — `/admin/attendance/payroll` 페이지용 관리자 급여 검토.
  *
- * Reads the month's sessions · breaks · rates · snapshots once per org and computes each member with
- * `computePayrollMonth` (same rules as `getMonthlyPayView` + `getFinalizationEligibility`), then
- * aggregates KPI totals. Honest empty defaults when the
- * caller is not an attendance-payroll admin or the org has no members. No new
- * schema, no new server actions.
+ * 조직별로 한 번에 그 달의 세션 · 휴게 · 시급 · 스냅샷을 읽고 각 구성원을
+ * `computePayrollMonth` 로 계산한다(`getMonthlyPayView` + `getFinalizationEligibility` 와 같은 규칙).
+ * 그다음 KPI 합계를 집계한다. 호출자가 근태 급여 관리자가 아니거나 조직에 구성원이 없으면
+ * 솔직한 빈 기본값을 돌려준다. 새
+ * 스키마도, 새 서버 액션도 없다.
  */
 
 export type AdminPayrollEmployment = "hourly" | "salaried" | "mixed" | "none";
@@ -651,14 +651,14 @@ export type AdminPayrollRow = {
   employmentMissing: boolean;
   totalPaidMinutes: number;
   recognizedLabel: string; // HHH:MM
-  workDays: number; // count of Tokyo operating days with paid minutes
-  primaryRate: number; // 0 when salaried-only / no rate
-  expectedGross: number; // base wage + attendance allowance (transport excluded)
-  baseGross: number; // base wage only (= expectedGross − allowanceTotal)
-  allowanceTotal: number; // applied attendance allowance total (regular + special) for the month (¥)
-  allowanceRegularTotal: number; // 추가수당 bucket total for the month (¥)
-  allowanceSpecialTotal: number; // 특별수당 bucket total for the month (¥)
-  transportApproved: number; // approved transport reimbursement total for the month (¥)
+  workDays: number; // 임금이 나온 도쿄 운영일 수
+  primaryRate: number; // 월급제만 / 시급 없음이면 0
+  expectedGross: number; // 기본급 + 근태 수당(교통비 제외)
+  baseGross: number; // 기본급만 (= expectedGross − allowanceTotal)
+  allowanceTotal: number; // 그 달에 적용된 근태 수당 합계(일반 + 특별) (¥)
+  allowanceRegularTotal: number; // 그 달 추가수당 구분 합계 (¥)
+  allowanceSpecialTotal: number; // 그 달 특별수당 구분 합계 (¥)
+  transportApproved: number; // 그 달 승인된 교통비 정산 합계 (¥)
   excludedCount: number;
   finalized: boolean;
   finalizedAtLabel: string | null;
@@ -1125,9 +1125,9 @@ export async function getAdminAttendancePayroll(
   const [membersRes, base, transportRes] = await Promise.all([
     service.from("memberships").select("user_id, role, status").eq("organization_id", organizationId),
     loadPayrollMonthBase(service, organizationId, ym),
-    // Approved transport reimbursement total per user for the month — same source/filter the payroll
-    // export uses (approved status, target_month = 'YYYY-MM-01', total_amount_cached), so the panel
-    // summary cannot drift from the exported PDF/Excel totals.
+    // 구성원별 그 달 승인된 교통비 정산 합계 — 급여 내보내기와 같은 출처/필터
+    // (승인 상태, target_month = 'YYYY-MM-01', total_amount_cached)를 써서 패널
+    // 요약이 내보낸 PDF/Excel 합계와 어긋나지 않게 한다.
     service
       .from("transport_reimbursement_reports")
       .select("user_id, total_amount_cached, status")
@@ -1215,8 +1215,8 @@ export async function getAdminAttendancePayroll(
 }
 
 /**
- * Active org members (id + name) for admin pickers such as manual attendance entry. Privileged
- * (owner / attendance_payroll_admin) only. Sorted by name.
+ * 관리자 선택기(예: 수동 근태 입력)용 활성 조직 구성원(id + 이름). 권한 있는 사용자
+ * (owner / attendance_payroll_admin)만. 이름순 정렬.
  */
 export async function listActiveAttendanceStaff(
   session: AppSession,
@@ -1244,13 +1244,13 @@ export async function listActiveAttendanceStaff(
   return rows;
 }
 
-// ── Attendance allowance (추가수당) admin list ─────────────────────────────────
+// ── 근태 수당(추가수당) 관리자 목록 ─────────────────────────────────
 
 export type AdminAllowanceRow = {
   id: string;
-  targetDate: string; // YYYY-MM-DD (Tokyo)
+  targetDate: string; // YYYY-MM-DD (도쿄)
   targetDateLabel: string;
-  targetUserId: string | null; // null = all hourly workers
+  targetUserId: string | null; // null = 모든 시급 근무자
   targetUserName: string | null;
   allowanceType: "daily_fixed" | "hourly_extra";
   amountYen: number;
@@ -1266,10 +1266,10 @@ export type AdminAllowanceListData = {
 };
 
 /**
- * Org-wide attendance allowance list for the wage-management surface. Privileged (owner /
- * attendance_payroll_admin) only. Active rows first, newest target date first — **every** active row is
- * returned (paged reads). Cancelled rows are kept for a short audit tail (`limit`) so operators can see
- * what was recently removed.
+ * 임금 관리 화면용 조직 전체 근태 수당 목록. 권한 있는 사용자(owner /
+ * attendance_payroll_admin)만. 활성 행이 먼저, 대상 날짜가 최신인 순 — 활성 행은 **전부**
+ * 돌려준다(페이지 단위 읽기). 취소된 행은 짧은 감사 꼬리(`limit`)만 남겨 운영자가
+ * 최근에 뭐가 제거됐는지 볼 수 있게 한다.
  */
 export async function listAttendanceAllowances(
   session: AppSession,
@@ -1361,15 +1361,15 @@ export async function listAttendanceAllowances(
 }
 
 /**
- * Slice 5 — admin transport reimbursement review for `/admin/attendance/transport`.
+ * 5단계 — `/admin/attendance/transport` 용 관리자 교통비 정산 검토.
  *
- * Wraps `getTransportReportSummaryForAdmin` (gated by `attendanceCan`)
- * and derives KPI totals + month pager. Per-user item details + receipt thumbnails
- * load on demand via the `loadAdminTransportDetail` server action when a panel opens.
+ * `getTransportReportSummaryForAdmin` 을 감싼다(`attendanceCan` 으로 게이트)
+ * 그리고 KPI 합계 + 월 이동기를 파생한다. 사용자별 항목 상세 + 영수증 썸네일은
+ * 패널이 열릴 때 `loadAdminTransportDetail` 서버 액션으로 필요할 때 불러온다.
  */
 
 export type AdminTransportRow = {
-  reportId: string; // synthesized when report row exists; empty string when none
+  reportId: string; // 보고서 행이 있으면 합성한 값, 없으면 빈 문자열
   userId: string;
   userName: string;
   status: TransportReportStatus | "none";
@@ -1467,7 +1467,7 @@ export async function getAdminAttendanceTransport(
     console.warn("[admin-attendance] transport summary failed", error);
   }
 
-  // Include active members with no report, plus any inactive member who has a report in this month.
+  // 보고서가 없는 활성 구성원과, 이 달에 보고서가 있는 비활성 구성원을 포함한다.
   const membersRes = await service
     .from("memberships")
     .select("user_id, role, status")
@@ -1480,7 +1480,7 @@ export async function getAdminAttendanceTransport(
   const byUser = new Map<string, TransportReportAdminSummary>();
   for (const s of summaries) byUser.set(s.userId, s);
 
-  // Need report ids — fetch directly.
+  // 보고서 id 가 필요하다 — 직접 가져온다.
   const reportIdsRes = await service
     .from("transport_reimbursement_reports")
     .select("id, user_id")
@@ -1534,18 +1534,18 @@ export async function getAdminAttendanceTransport(
   return { isPrivileged: true, ym, monthLabel, prevYm, nextYm, kpi: transportKpiOf(summaries), rows };
 }
 
-// ── Per-staff monthly receipt review (desktop master-detail viewer) ──────────
-// Privileged (owner / attendance_payroll_admin), organization-scoped: resolves ALL of one staff
-// member's reimbursement items for a month, each with its receipt photos as short-lived signed URLs.
-// Backs `/admin/attendance/transport/receipt?ym=&user=` — a desktop master-detail page (item list +
-// large receipt pane) entered from the transport panel, so a reviewer can flip through a whole
-// month's receipts in one screen instead of opening one per item.
+// ── 직원별 월 영수증 검토 (데스크톱 마스터-디테일 뷰어) ──────────
+// 권한 있는 사용자(owner / attendance_payroll_admin), 조직 범위: 한 직원의 그 달 정산 항목을
+// 모두 풀어서, 각 항목의 영수증 사진을 단기 서명 URL 로 준다.
+// `/admin/attendance/transport/receipt?ym=&user=` 를 받친다 — 교통비 패널에서 들어가는 데스크톱 마스터-디테일 페이지
+// (항목 목록 + 큰 영수증 영역)로, 검토자가 항목마다 따로 열지 않고
+// 한 달 영수증을 한 화면에서 넘겨볼 수 있다.
 
 const TRANSPORT_RECEIPT_BUCKET = "request-images";
 
 export type AdminReceiptItem = {
   itemId: string;
-  usageDate: string; // 'YYYY-MM-DD'
+  usageDate: string; // YYYY-MM-DD
   amountYen: number;
   buildingLabel: string | null;
   contextLabel: string | null;
@@ -1590,7 +1590,7 @@ export async function getAdminTransportReceiptsForUser(
     .maybeSingle();
   const staffName = (profileRes.data as { name: string } | null)?.name ?? "—";
 
-  // Report is (org, user, month) scoped inside getTransportReport → org isolation is enforced there.
+  // 보고서는 getTransportReport 안에서 (조직, 사용자, 월) 범위로 잡히므로 조직 격리가 거기서 강제된다.
   const report = await getTransportReport(service, session.organization.id, userId, `${ym}-01`);
   if (!report) {
     return {
@@ -1606,7 +1606,7 @@ export async function getAdminTransportReceiptsForUser(
 
   const rawItems = await getTransportItems(service, report.id);
 
-  // Sign every image path once, then map back per item.
+  // 이미지 경로마다 한 번씩 서명한 뒤 항목별로 다시 매핑한다.
   const allPaths = rawItems.flatMap((it) => it.images.map((img) => img.storagePath));
   const urlByPath = new Map<string, string>();
   if (allPaths.length > 0) {
@@ -1647,19 +1647,19 @@ export async function getAdminTransportReceiptsForUser(
 }
 
 /**
- * Slice 6 — per-user monthly detail for `/admin/attendance/staff/[userId]`.
+ * 6단계 — `/admin/attendance/staff/[userId]` 용 사용자별 월 상세.
  *
- * User header (avatar + name + role + KPI stats), day-by-day session ledger,
- * payroll summary, and transport summary — all wired to existing helpers
- * (`getMonthlyPayView`, attendance_sessions read with site join, transport
- * report+items). Honest empties when caller is not privileged or no data exists.
+ * 사용자 헤더(아바타 + 이름 + 역할 + KPI 수치), 일별 세션 원장,
+ * 급여 요약, 교통비 요약 — 모두 기존 헬퍼에 연결됐다
+ * (`getMonthlyPayView`, 근무지 join 을 포함한 attendance_sessions 읽기, 교통비
+ * 보고서+항목). 호출자가 권한이 없거나 데이터가 없으면 솔직한 빈 값을 돌려준다.
  */
 
 export type AdminStaffDaySession = {
   sessionId: string;
   clockInLabel: string | null;
   clockOutLabel: string | null;
-  paidDurationLabel: string; // HH:MM or "—"
+  paidDurationLabel: string; // HH:MM 또는 "—"
   breakLabel: string; // HH:MM
   siteName: string | null;
   status: "open" | "completed" | "invalid";
@@ -1715,7 +1715,7 @@ export type AdminStaffDetailData = {
 };
 
 function fmtDayKey(operatingDate: string, localeTag: string): { day: string; wd: string } {
-  // operatingDate format YYYY-MM-DD
+  // operatingDate 형식은 YYYY-MM-DD
   const day = String(parseInt(operatingDate.slice(8), 10));
   const d = new Date(`${operatingDate}T00:00:00+09:00`);
   const wd = new Intl.DateTimeFormat(localeTag, {
@@ -1829,7 +1829,7 @@ export async function getAdminStaffDetail(
   if (!member) return { ...baseEmpty, isPrivileged: true };
   const userName = (profileRes.data as { name: string } | null)?.name ?? "—";
 
-  // NOTE: breaks live in `attendance_breaks` (there is no `break_total_sec` column on the session).
+  // 참고: 휴게는 `attendance_breaks` 에 있다(세션에는 `break_total_sec` 컬럼이 없음).
   const sessionsAsc = base.sessions;
   const siteIds = Array.from(
     new Set(
@@ -1870,7 +1870,7 @@ export async function getAdminStaffDetail(
     siteNameById.set(row.id, localizeAttendanceSiteName(row, localeTag));
   }
 
-  // Compose day groups (most recent first)
+  // 날짜 그룹 구성(최신순)
   const daysMap = new Map<string, AdminStaffDay>();
   let doneSessions = 0;
   let issueSessions = 0;
@@ -1923,7 +1923,7 @@ export async function getAdminStaffDetail(
     if (r.status === "completed" && !isAbnormal) doneSessions += 1;
     if (issueKey !== "none" || r.status === "invalid") issueSessions += 1;
   }
-  // Day order: most recent first (already sorted by query)
+  // 날짜 순서: 최신순(쿼리에서 이미 정렬됨)
   const days = Array.from(daysMap.values());
 
   let trItemCount = 0;
@@ -1977,11 +1977,11 @@ export async function getAdminStaffDetail(
 }
 
 /**
- * Slice 7 — admin hourly wage management for `/admin/attendance/wages`.
+ * 7단계 — `/admin/attendance/wages` 용 관리자 시급 관리.
  *
- * Reads `hourly_rate_history` + `employment_type_history` per active member,
- * derives the current rate and the chronological tier list. No new schema;
- * `setHourlyRate` server action handles edits with audit logging.
+ * 활성 구성원별 `hourly_rate_history` + `employment_type_history` 를 읽고,
+ * 현재 시급과 시간순 구간 목록을 파생한다. 새 스키마 없음,
+ * 수정은 `setHourlyRate` 서버 액션이 감사 로그와 함께 처리한다.
  */
 
 export type WageEmployment = "hourly" | "salaried" | "unknown";
@@ -1990,10 +1990,10 @@ export type WageHistoryEntry = {
   id: string;
   rate: number | null;
   from: string; // YYYY-MM-DD
-  to: string | null; // null = current
-  /** True when this period has closed (effective_to set). Past closed periods are non-editable. */
+  to: string | null; // null = 현재
+  /** 이 구간이 닫혔는지 여부(effective_to 가 설정됨). 지난 닫힌 구간은 수정할 수 없다. */
   locked: boolean;
-  /** Change reason from the audit log (null when unavailable, e.g. dev-seeded rows). */
+  /** 감사 로그의 변경 사유(없으면 null, 예: 개발용 시드 행). */
   note: string | null;
 };
 
@@ -2001,7 +2001,7 @@ export type EmploymentHistoryEntry = {
   id: string;
   type: "hourly" | "salaried";
   from: string; // YYYY-MM-DD
-  to: string | null; // null = current
+  to: string | null; // null = 현재
   note: string | null;
 };
 
@@ -2020,9 +2020,9 @@ export type AdminWageRow = {
 
 export type AdminAttendanceWagesData = {
   isPrivileged: boolean;
-  /** Suggested default effective-from for the next change (1st of next Tokyo month). */
+  /** 다음 변경의 제안 기본 적용 시작일(다음 도쿄 달 1일). */
   defaultEffectiveFrom: string;
-  /** Earliest selectable effective-from (today, Tokyo) — matches the server's no-past-dates rule. */
+  /** 선택할 수 있는 가장 이른 적용 시작일(오늘, 도쿄) — 서버의 과거 날짜 금지 규칙과 같다. */
   minEffectiveFrom: string;
   /** 앞쪽 빈 날 채우기의 가장 이른 날(지난달 1일, `gapFillMinFrom`) — 그 사람의 이력이 이 날보다 늦게 시작할 때만 쓴다. */
   gapFillMinFrom: string;
@@ -2043,7 +2043,7 @@ function firstOfNextTokyoMonth(): string {
   return `${ny}-${String(nm).padStart(2, "0")}-01`;
 }
 
-/** Today's date (Tokyo) — the earliest effective-from the server's no-past-dates rule allows. */
+/** 오늘 날짜(도쿄) — 서버의 과거 날짜 금지 규칙이 허용하는 가장 이른 적용 시작일. */
 function todayTokyo(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
@@ -2095,8 +2095,8 @@ export async function getAdminAttendanceWages(
       .order("effective_from", { ascending: false }),
   ]);
 
-  // Change reasons are stored on `audit_logs.metadata.note`, keyed by the history row id (`target_id`).
-  // Join them back so each rate/employment period can show why it was changed (dev-seeded rows have none).
+  // 변경 사유는 `audit_logs.metadata.note` 에 이력 행 id(`target_id`) 별로 저장돼 있다.
+  // 그것을 다시 합쳐 각 시급/고용형태 구간이 왜 바뀌었는지 보여준다(개발용 시드 행에는 없음).
   const historyIds = [
     ...((ratesRes.data ?? []) as { id: string }[]).map((r) => r.id),
     ...((empRes.data ?? []) as { id: string }[]).map((e) => e.id),
@@ -2231,7 +2231,7 @@ export async function getAdminAttendanceQueue(
   if (!privileged) {
     return { isPrivileged: false, monthLabel, items: [] };
   }
-  // Scope the queue (incl. the "전체 세션" tab) to the selected Tokyo month.
+  // 큐("전체 세션" 탭 포함)를 선택한 도쿄 달로 한정한다.
   const from = `${ym}-01`;
   const to = lastDayOfYm(ym);
   let items: ReviewQueueItem[] = [];

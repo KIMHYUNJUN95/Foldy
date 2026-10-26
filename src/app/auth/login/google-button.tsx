@@ -17,11 +17,11 @@ function GoogleGlyph() {
 }
 
 /**
- * Google sign-in submit button with an in-place loading state.
+ * Google 로그인 제출 버튼(자리에서 로딩 상태 표시).
  *
- * On submit the page does NOT navigate — `useFormStatus` flips `pending`, the label
- * goes transparent, pointer-events lock, and a navy spinner spins in place (the
- * "Google 진행 중" frame). Must be rendered inside the `signInWithGoogle` <form>.
+ * 제출해도 페이지는 이동하지 않는다 — `useFormStatus` 가 `pending` 을 켜면 라벨이
+ * 투명해지고 pointer-events 가 잠기며 남색 스피너가 제자리에서 돈다(
+ * "Google 진행 중" 프레임). `signInWithGoogle` <form> 안에서 렌더해야 한다.
  *
  * **앱(Capacitor) 안에서는** 폼을 서버로 보내지 않는다(2026-10-06, 앱 출시 준비 B2). Google 이 WebView 로그인을
  * 막으므로, 같은 폼 값으로 로그인 URL 만 받아 시스템 브라우저(`@capacitor/browser`)로 연다. 앱 복귀는

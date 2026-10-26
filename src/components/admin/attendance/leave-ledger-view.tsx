@@ -76,7 +76,7 @@ function fmtPeriod(e: LeaveLedgerEntry, lc: Lc): string {
 
 const STATUS_ORDER: LeaveStatus[] = ["approved", "requested", "rejected", "cancelled"];
 
-/** `processedAt` is Tokyo "YYYY/MM/DD HH:mm" — reduce it to the "YYYY-MM-DD" key the picker speaks. */
+/** `processedAt` 은 도쿄 "YYYY/MM/DD HH:mm" 이다 — 선택기가 쓰는 "YYYY-MM-DD" 키로 줄인다. */
 const processedDateKey = leaveLedgerProcessedKey;
 
 function todayKey(): string {
@@ -100,8 +100,8 @@ export function LeaveLedgerView({
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | null>(null);
   const [query, setQuery] = useState("");
 
-  // The ledger arrives whole (listLeaveLedger has no date params), so the range starts wide enough to
-  // cover every row — narrowing is opt-in and nothing is hidden on first paint.
+  // 장부는 통째로 온다(listLeaveLedger 에 날짜 인자가 없다). 그래서 기간은 모든 행을 덮을 만큼
+  // 넓게 시작하고, 좁히기는 선택이며 처음 그릴 때는 아무것도 숨기지 않는다.
   const [range, setRange] = useState(() => {
     const keys = entries.map(processedDateKey).filter(Boolean).sort();
     const today = todayKey();

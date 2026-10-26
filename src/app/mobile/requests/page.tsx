@@ -54,7 +54,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
   const [lostItems, maintenanceReports, orderRequests, roomCatalog] = await Promise.all([
     getOrgLostItems(session, dateFilter),
     getOrgMaintenanceReports(session, dateFilter),
-    // Isolated catch: order fetch failure must not bring down the whole page.
+    // 분리된 catch: 주문 조회 실패가 페이지 전체를 무너뜨리면 안 된다.
     getOrgOrderRequests(session, dateFilter).catch((err: unknown) => {
       console.warn("[requests page] order requests unavailable:", err);
       return [];

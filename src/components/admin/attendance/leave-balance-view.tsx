@@ -30,7 +30,7 @@ function fmtYmd(iso: string): string {
   return iso.replace(/-/g, "/");
 }
 
-/** Grant schedule from hire date: 6/18/30/42/54/66/78 months → 10/11/12/14/16/18/20 days; +4 bonus at 48 months. */
+/** 입사일 기준 부여 일정: 6/18/30/42/54/66/78개월 → 10/11/12/14/16/18/20일, 48개월에 +4 보너스. */
 function grantSchedule(hire: string): { dateYm: string; amt: number; kind: "base" | "bonus" }[] {
   const months = [6, 18, 30, 42, 54, 66, 78];
   const amts = [10, 11, 12, 14, 16, 18, 20];
@@ -508,7 +508,7 @@ function EmployeeDrawer({
           <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
             {lc.balancePanelClose}
           </button>
-          {/* Same canonical export pair as the toolbar, scoped to this one employee. */}
+          {/* 툴바와 같은 공용 내보내기 한 쌍이며 이 직원 한 명으로 범위를 좁힌다. */}
           <AdminExportButtons
             onExportXls={() => exportLeaveBalanceWorkbook(emp.userId)}
             onExportPdf={() => exportLeaveBalanceReport(emp.userId)}

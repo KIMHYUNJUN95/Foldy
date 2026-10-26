@@ -86,7 +86,7 @@ function buildMembers(
       role: normalizeRole(r.role),
       isFirstRecipient: r.is_first_recipient,
     }))
-    // Owner first, then members in name order.
+    // 소유자 먼저, 그다음 구성원을 이름순으로.
     .sort((a, b) => {
       if (a.role !== b.role) return a.role === "owner" ? -1 : 1;
       return a.name.localeCompare(b.name);
@@ -94,7 +94,7 @@ function buildMembers(
 }
 
 /**
- * Projects the current user belongs to.
+ * 현재 사용자가 속한 프로젝트.
  *
  * 참여 판정은 `getTaskScope` 하나로 모은다 — RLS 의 `is_platform_admin()` 예외가 조직 전체
  * 프로젝트를 통과시키므로, 투두와 같은 규칙으로 앱에서 다시 좁힌다(2026-09-09).
@@ -172,7 +172,7 @@ export async function getVisibleProjects(session: AppSession): Promise<ProjectSu
   });
 }
 
-/** One project with members, sections, and its tasks (RLS-scoped to membership). */
+/** 구성원, 섹션, 할 일을 가진 프로젝트 하나 (RLS 로 멤버십 범위가 제한됨). */
 export async function getProjectDetail(
   session: AppSession,
   projectId: string,

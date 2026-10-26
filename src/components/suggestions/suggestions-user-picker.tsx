@@ -2,11 +2,11 @@
 
 /**
  * Frame 8 — member picker sheet (수신자 / 참조 선택).
- * Visual port of `framePicker()` from the Feedback Box.html handoff: a tall bottom sheet with a
- * search field, member rows, and a confirm button. Now data-driven and used for BOTH the required
- * single-select recipient and the optional multi-select references (mode prop). Visual treatment
- * (sheet, rows, radios) is unchanged from the design slice.
- * See docs/product/22-staff-suggestions-workflow.md.
+ * Feedback Box.html 핸드오프의 `framePicker()` 시각 이식: 큰 하단 시트에
+ * 검색 필드, 구성원 행, 확인 버튼이 있다. 이제 데이터 기반이며 필수
+ * 단일 선택 받는 사람과 선택적 다중 선택 참조(mode prop) 둘 다에 쓴다. 시각 처리
+ * (시트, 행, 라디오)는 디자인 슬라이스에서 바뀌지 않았다.
+ * 참고: docs/product/22-staff-suggestions-workflow.md.
  */
 
 import { useMemo, useState, useSyncExternalStore } from "react";

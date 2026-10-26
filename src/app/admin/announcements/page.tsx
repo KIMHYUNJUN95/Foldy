@@ -7,7 +7,7 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 
 // 공지 관리 콘솔 — 게시 중/초안/보관 탭 + 한 줄 요약 + 목록 + 우측 상세 패널(읽음 명단) + 작성 화면(화이트 리디자인 2026-10-15).
 // 모바일 공지의 배포·감사 관리 표면. AdminShell 이 사이드바/탑바를 소유한다.
-// See docs/product/11-announcement-workflow.md → "Admin Dashboard Management Console".
+// 참고: docs/product/11-announcement-workflow.md → "Admin Dashboard Management Console".
 export default async function AdminAnnouncementsPage() {
   const session = await requireAdminPageSession({
     nextPath: "/admin/announcements",

@@ -99,7 +99,7 @@ const FALLBACK_DICTIONARY = {
    */
   opsRevenue: {
     title: "Revenue",
-    /** Mobile revenue (`/mobile/ops/revenue`, 2026-10-15) — no function values, `{x}` + replace. */
+    /** 모바일 매출 (`/mobile/ops/revenue`, 2026-10-15) — 함수 값 없음, `{x}` + replace. */
     mobile: {
       totalExcluding: "Total · excl. {names}",
       totalAll: "Total of {n} properties",
@@ -901,7 +901,7 @@ const FALLBACK_DICTIONARY = {
       logChange: "{field} {before} → {after}",
       saveSettings: "Save settings",
     },
-    // Mobile automation (`/mobile/ops/automation`, 2026-10-15) — no function values, `{x}` + replace.
+    // 모바일 자동화 (`/mobile/ops/automation`, 2026-10-15) — 함수 값 없음, `{x}` + replace.
     mobile: {
       slackGroup: "Slack",
       openJob: "Open {name}",
@@ -1998,8 +1998,8 @@ const FALLBACK_DICTIONARY = {
     dashboardTitle: "Dashboard",
     navigationContract: "Admin navigation",
     searchPlaceholder: "Search",
-    // Canonical admin-console primitives shared by every /admin/* screen: the date-range picker
-    // labels and the Excel/PDF export buttons. Feature namespaces must NOT redefine these — see
+    // /admin/* 모든 화면이 공유하는 표준 관리자 콘솔 프리미티브: 날짜 범위 선택기
+    // 라벨과 Excel/PDF 내보내기 버튼. 기능별 네임스페이스에서 다시 정의하면 안 된다 — 참고:
     // CLAUDE.md → "Admin dashboard shared design contract".
     shared: {
       noAccessTitle: "You don’t have access to this screen",
@@ -2048,7 +2048,7 @@ const FALLBACK_DICTIONARY = {
       datePastTag: "Past",
       dateReset: "Reset",
       dateApply: "Apply",
-      // Default placeholder for the shared <AdmDropdown> when a caller passes none.
+      // 호출자가 넘기지 않을 때 공용 <AdmDropdown> 의 기본 플레이스홀더.
       selectPlaceholder: "Select",
     },
     console: {
@@ -3538,7 +3538,7 @@ const FALLBACK_DICTIONARY = {
       attendanceSiteListTitle: "Attendance sites",
       attendanceSiteName: "Site name",
       attendanceQrLink: "QR link (what the code encodes)",
-      // Settings redesign (2026-07-31) — master/detail site list + status pills.
+      // 설정 리디자인 (2026-07-31) — 마스터/디테일 사업장 목록 + 상태 알약.
       settingsSitesLabel: "Sites",
       settingsQrReadyLabel: "QR ready",
       settingsQrAttentionLabel: "Needs attention",
@@ -3551,8 +3551,8 @@ const FALLBACK_DICTIONARY = {
       attendanceMissingQrWarn:
         "{n} site(s) have no QR yet. Staff cannot clock in or out at those sites.",
       attendanceDeviceStaff: "Staff",
-      // Site cleanup (2026-07-31). Sites with attendance history cannot be deleted (FK restrict) —
-      // they are deactivated instead so payroll evidence survives.
+      // 사업장 정리 (2026-07-31). 근태 이력이 있는 사업장은 삭제할 수 없어서(FK restrict)
+      // 대신 비활성화하여 급여 증빙이 남게 한다.
       attendanceSiteDelete: "Delete site",
       attendanceSiteDeleteConfirm:
         "Delete this site and its QR for good? Printed QR codes for it stop working immediately.",
@@ -3560,7 +3560,7 @@ const FALLBACK_DICTIONARY = {
       attendanceSiteActivate: "Reactivate",
       attendanceSiteInactive: "Inactive",
       attendanceShowInactive: "Include inactive",
-      // QR print sheet (2026-07-31) — 80×80mm cards, QR + site name only.
+      // QR 인쇄 시트 (2026-07-31) — 80×80mm 카드, QR + 사업장 이름만.
       attendanceQrPrintAll: "Print all",
       attendanceQrPrintOne: "Print this site",
       attendancePrintCta: "Print",
@@ -3579,13 +3579,13 @@ const FALLBACK_DICTIONARY = {
         "Staff cannot clock in or out at an inactive site. Existing records are kept.",
       attendanceSiteInUseHint:
         "This site has attendance records, so it cannot be deleted. Deactivate it instead.",
-      // Pre-print safety check — a printed QR that opens nowhere costs a full re-print.
+      // 인쇄 전 안전 점검 — 어디로도 연결되지 않는 인쇄된 QR 은 전량 재인쇄 비용이 든다.
       attendanceQrReady: "Opens with the phone camera. Safe to print.",
       attendanceQrWarnMissing:
         "This QR will NOT open with a phone camera — it carries only the token because NEXT_PUBLIC_APP_URL is not set. Do not print it yet.",
       attendanceQrWarnLocal:
         "This QR points at a local address, so it will not open on staff phones. Check it again on the production site before printing.",
-      // Trusted devices — a device that already clocked in once stays remembered for 出退勤 only.
+      // 신뢰 기기 — 한 번 출근한 기기는 출퇴근(出退勤) 용으로만 기억된다.
       attendanceDevicesTitle: "Remembered devices",
       attendanceDevicesDescription:
         "Devices that may clock in/out without signing in again. They can do nothing else. Revoke one when a phone is lost or a member leaves.",
@@ -4156,8 +4156,8 @@ const FALLBACK_DICTIONARY = {
       signUpEmail: "Sign up with email",
       inviteNote:
         "After signing in, enter your team invite code and basic details to start working. Ask your organization's admin for the code.",
-      // Shown when the visitor arrived by scanning an on-site attendance QR while signed out.
-      // A wall QR can be scanned by anyone walking past, so this says plainly who it is for.
+      // 로그아웃 상태에서 현장 근태 QR 을 스캔해 들어온 방문자에게 보여준다.
+      // 벽에 붙은 QR 은 지나가는 누구나 스캔할 수 있어서, 누구를 위한 것인지 분명히 알려준다.
       qrNoticeTitle: "Attendance QR scanned",
       qrNoticeBody:
         "This is a staff-only screen. Sign in and you can clock in or out right away. If you don't work here, this code can't be used.",
@@ -4469,7 +4469,7 @@ const FALLBACK_DICTIONARY = {
     monthNext: "Next month",
     monthSelect: "Select month",
     userFallback: "User",
-    // Ring states
+    // 링 상태
     ringIdle: "Idle",
     ringIdleLabel: "Before clock-in",
     ringWorking: "Working",
@@ -4481,19 +4481,19 @@ const FALLBACK_DICTIONARY = {
     homeLogBreaks: "Breaks {n} · {min} min",
     homeLogOnBreak: "On break",
     ringWorkLabel: "Work time (excl. break)",
-    // Home actions
+    // 홈 액션
     clockIn: "Clock in",
     clockOut: "Clock out",
     clockOutDisabled: "Clock out (end break first)",
     startBreak: "Start break",
     endBreak: "End break",
-    // Home labels
+    // 홈 라벨
     clockInSite: "Clock-in location",
     clockInTime: "Clock-in time",
     breakTotal: "Total break",
     breakCount: "Break count",
     breakWarning: "You must end the break before clocking out.",
-    // Home greeting & shortcut list
+    // 홈 인사말 & 바로가기 목록
     homeGreetFull: (name: string) => `Hello, ${name}`,
     homeTitle: "Attendance",
     homeNameLine: "{name}",
@@ -4506,9 +4506,9 @@ const FALLBACK_DICTIONARY = {
     homePayTitle: "Pay",
     homePaySub: "This month estimate · not finalized",
     homePayHide: "Hide amount",
-    // Home tabs
+    // 홈 탭
     historyTab: "History",
-    // Method chips
+    // 방식 칩
     methodQrAvailable: "Available",
     methodWifiSoon: "Coming soon",
     methodGpsQr: "GPS + QR",
@@ -4525,10 +4525,10 @@ const FALLBACK_DICTIONARY = {
     rosterTodayTag: "Today",
     corrErrImageType: "Only JPEG, PNG, WebP, or HEIC images can be attached.",
     corrErrImageSize: "File size must be 10 MB or less.",
-    // Reminder sheet
+    // 알림 시트
     reminderTitle: "Still working?",
     reminderLeft: "I've already left",
-    // Capture
+    // 촬영
     captureInTitle: "Clock-in verification",
     captureOutTitle: "Clock-out verification",
     captureStep: "1 / 2 · QR Scan",
@@ -4546,8 +4546,8 @@ const FALLBACK_DICTIONARY = {
     resultLine: "{site} · {time} · GPS+QR",
     scanNoQr: "Can’t scan the QR? Request a fix",
     captureNoQr: "No QR? Submit a correction request",
-    // QR deep link — the landing state when the phone camera opened the site QR (2026-07-31).
-    // The building QR carries no direction, so the staff member picks clock-in or clock-out here.
+    // QR 딥링크 — 폰 카메라로 사업장 QR 을 열었을 때의 랜딩 상태 (2026-07-31).
+    // 건물 QR 에는 방향 정보가 없어서 여기서 직원이 출근/퇴근을 고른다.
     qrLandingTitle: "Verify attendance",
     qrLandingSub: "Scanned this building's QR. Choose clock-in or clock-out.",
     qrLandingIn: "Clock in",
@@ -4555,14 +4555,14 @@ const FALLBACK_DICTIONARY = {
     qrLandingInvalidTitle: "This QR can't be used",
     qrLandingInvalidSub: "It may be an old or reissued code. Scan again in the app, or submit a correction request.",
     qrLandingScanInstead: "Scan in the app instead",
-    // Remembered-device notice — shown when the QR was opened without a login session.
+    // 기억된 기기 안내 — 로그인 세션 없이 QR 을 열었을 때 보여준다.
     qrLandingRememberedAs: "Recording as {name}",
     qrLandingRememberedHint: "This device is remembered for clock-in/out only.",
     gpsOk: "Location confirmed",
     gpsDenied: "Location permission off",
     gpsUnavailable: "Location unavailable",
     gpsPending: "Checking location…",
-    // Capture result — success
+    // 촬영 결과 — 성공
     resultInTitle: "Clocked in",
     resultOutTitle: "Clocked out",
     resultInMessage: "Clock-in processed successfully",
@@ -4582,7 +4582,7 @@ const FALLBACK_DICTIONARY = {
     cinTrackOut: "{time} clock-out",
     cinRecording: "Recording your hours",
     cinDayDone: "Shift finished",
-    // Capture result — failures
+    // 촬영 결과 — 실패
     resultRadiusTitle: "Outside allowed area",
     resultRadiusSub: "Please try again from within the site boundary.",
     resultRadiusDetail: (site: string, radius: number | string) =>
@@ -4622,7 +4622,7 @@ const FALLBACK_DICTIONARY = {
     resultHomeButton: "Go home",
     resultRetry: "Try again",
     resultCorrection: "Correction request",
-    // Pay
+    // 급여
     payOnlySalaried: "Pay calculations are not shown",
     payOnlySalariedSub: "Full-time accounts use attendance records only. Hourly pay calculation is for hourly employees only.",
     payNoRecords: "No attendance records this month.",
@@ -4664,7 +4664,7 @@ const FALLBACK_DICTIONARY = {
     payPaidDuration: (dur: string) => `Paid ${dur}`,
     payFinalizedAt: (label: string) => ` · Finalized ${label}`,
     excludeDefault: "Excluded",
-    // Status / employment type chips
+    // 상태 / 고용 형태 칩
     statusOpen: "Incomplete",
     statusInvalid: "Invalid",
     statusReviewRequired: "Review required",
@@ -4672,7 +4672,7 @@ const FALLBACK_DICTIONARY = {
     empSalaried: "Full-time (not in pay)",
     empUnset: "Employment type not set",
     empHourlyRate: (rate: string) => `¥${rate}/hr`,
-    // Home — remaining
+    // 홈 — 나머지
     payTab: "Pay",
     reminderBody: "It's past 18:30. You still have an open session.",
     breakCountOrdinal: (n: number) => `Break #${n}`,
@@ -4681,7 +4681,7 @@ const FALLBACK_DICTIONARY = {
     siteOffice: "Office",
     siteSky: "Sky",
     siteLegacyTest: "Legacy test site",
-    // Session status chips (history)
+    // 세션 상태 칩 (이력)
     sessOpen: "In progress",
     sessDone: "Done",
     sessReopened: "Resumed",
@@ -4689,7 +4689,7 @@ const FALLBACK_DICTIONARY = {
     sessCorrInReview: "Correction in review",
     sessCorrApproved: "Correction approved",
     sessCorrRejected: "Correction rejected",
-    // History
+    // 이력
     histTodaySessions: "Today's sessions",
     histSessionCount: (n: number) => `${n}`,
     histTodayWork: "Today's work",
@@ -4748,7 +4748,7 @@ const FALLBACK_DICTIONARY = {
     payDisclaimerBase: "Amount shown is pre-tax gross with no deductions.",
     payDisclaimerFinal: "Finalized; will not change.",
     payDisclaimerPending: "Estimate only; finalized at month close.",
-    // Correction form
+    // 정정 폼
     corrPageTitle: "Correction Request",
     corrFormTitle: "Correction Request",
     corrSubWithSession: (dateLabel: string) =>
@@ -4816,7 +4816,7 @@ const FALLBACK_DICTIONARY = {
     reasonWrongSite: "Wrong site",
     reasonAuthFailed: "Authentication failure",
     reasonOther: "Other",
-    // Correction status
+    // 정정 상태
     corrStatusPageTitle: "Request Status",
     corrStatusTitle: "Correction status",
     corrStatusSubSession: (dateLabel: string) => `${dateLabel} session correction`,
@@ -4857,7 +4857,7 @@ const FALLBACK_DICTIONARY = {
     corrRejectedTitle: (name: string) => `Rejected — ${name}`,
     corrRejectedDefault: "Your request has been rejected.",
     corrRejectedAt: (label: string) => `Rejected ${label}`,
-    // Attendance roster (manager view)
+    // 근태 현황 (매니저 뷰)
     homeRosterTitle: "Attendance Roster",
     homeRosterSub: "Today's clocked-in staff · live",
     rosterPageTitle: "Attendance Roster",
@@ -5092,7 +5092,7 @@ const FALLBACK_DICTIONARY = {
     homeTransportSubNow: "This month's claim",
     homeTransportSub: "June settlement ledger",
     statusDraft: "Draft",
-    // Item detail sheet (tap a registered line item)
+    // 항목 상세 시트 (등록된 품목 줄을 탭)
     detailTitle: "Transport Detail",
     detailRoom: "Room",
     detailInput: "Entry",
@@ -5104,7 +5104,7 @@ const FALLBACK_DICTIONARY = {
     receiptLabel: (n: number) => `Receipt ${n}`,
     detailNoReceipt: "No receipt attached",
     detailNoMemo: "No memo",
-    // Edit sheet + delete confirm + toast
+    // 수정 시트 + 삭제 확인 + 토스트
     editSheetTitle: "Edit Transport Item",
     editSheetSubmit: "Save Changes",
     deleteTitle: "Delete this item?",
@@ -5149,9 +5149,9 @@ const FALLBACK_DICTIONARY = {
     submitSuccess: "Statement submitted",
   },
   complaints: {
-    // Admin console (/admin/complaints)
-    // Feature name is "Guest Feedback" (2026-08-11) — it covers reviews, not just complaints.
-    // The word "complaint" stays for the manual-complaint entity itself.
+    // 관리자 콘솔 (/admin/complaints)
+    // 기능 이름은 "Guest Feedback"(2026-08-11) — 컴플레인뿐 아니라 리뷰도 다룬다.
+    // "complaint" 라는 단어는 수기 컴플레인 엔터티 자체에 그대로 쓴다.
     adminTitle: "Guest Feedback",
     adminSubtitle: "Manual complaints and Airbnb / Booking.com external reviews in one console",
     viewManual: "Manual complaints",
@@ -5196,15 +5196,15 @@ const FALLBACK_DICTIONARY = {
     scoreOnlyNote: "Booking.com may legitimately send a score with no body - this is not an error or a gap.",
     breakdownTitle: "Sub-scores",
     breakdownSource: "As provided",
-    // Display labels for the provider-supplied sub-score keys. Booking.com sends
-    // `scoring{clean, comfort, facilities, location, staff, value}`; Airbnb sends
-    // `category_ratings[].category`. Only the label is localized — the stored
-    // `rating_breakdown` keeps the platform's own keys and structure.
+    // 제공처가 보내는 세부 점수 키의 표시 라벨. Booking.com 은
+    // `scoring{clean, comfort, facilities, location, staff, value}` 를, Airbnb 는
+    // `category_ratings[].category` 를 보낸다. 라벨만 현지화한다 — 저장된
+    // `rating_breakdown` 은 플랫폼 고유의 키와 구조를 유지한다.
     //
-    // `services` is kept here on purpose even though Booking.com never sends it (0/253 measured
-    // 2026-08-07): unknown keys fall back to humanize(), so a label costs nothing and is ready
-    // if the provider ever adds it. It is simply absent from BOOKING_SCORING_KEYS, so no empty
-    // row is rendered for it.
+    // `services` 는 Booking.com 이 보낸 적이 없어도(2026-08-07 측정 0/253) 일부러 여기 둔다:
+    // 모르는 키는 humanize() 로 대체되므로 라벨 하나는 비용이 없고, 제공처가 나중에
+    // 추가하면 바로 쓸 수 있다. BOOKING_SCORING_KEYS 에는 없으므로
+    // 그것을 위한 빈 행은 렌더되지 않는다.
     breakdownLabels: {
       clean: "Cleanliness",
       comfort: "Comfort",
@@ -5223,12 +5223,12 @@ const FALLBACK_DICTIONARY = {
     positiveLabel: "Liked",
     negativeLabel: "Disliked",
     noRoom: "No room info",
-    // Shown instead of `noRoom` when the reservation IS linked but the room is not: the guest booked
-    // several rooms on one reservation, so no single room can own the review. Different cause →
-    // different wording, so nobody hunts for a collection bug that is not there.
+    // 예약은 연결되어 있는데 방이 연결되지 않았을 때 `noRoom` 대신 보여준다: 게스트가 한 예약에
+    // 방을 여러 개 잡아서 리뷰를 소유할 단일 방이 없는 경우다. 원인이 다르면
+    // 문구도 달라야, 존재하지 않는 수집 버그를 찾아 헤매는 일이 없다.
     roomMultiBooking: "Multi-room booking",
-    // Both providers send a reservation identifier; it stays empty only when the review could
-    // not be tied to a reservation we hold locally. Never a platform-specific excuse.
+    // 두 제공처 모두 예약 식별자를 보내며, 리뷰를 우리가 가진 예약에
+    // 연결할 수 없을 때만 비어 있다. 특정 플랫폼 탓으로 돌리는 변명은 절대 쓰지 않는다.
     noReservationLink: "No linked reservation",
     noGuestName: "No name",
     noDescription: "No description was entered.",
@@ -5279,7 +5279,7 @@ const FALLBACK_DICTIONARY = {
     noDeletePermission: "No delete permission",
     deleteLinkedNote: "The linked external review is not deleted — it returns to the unlinked state.",
     sortRatio: "Highest low-rated share",
-    // List
+    // 목록
     pageTitle: "Guest Feedback",
     listTitle: "Guest Feedback",
     filterAll: "All",
@@ -5296,7 +5296,7 @@ const FALLBACK_DICTIONARY = {
     platformDirect: "Direct booking",
     platformOther: "Other",
     ratingNone: "Direct bookings have no guest rating.",
-    // Detail
+    // 상세
     metaBuilding: "Building",
     metaRoom: "Room",
     metaStay: "Stay",
@@ -5312,7 +5312,7 @@ const FALLBACK_DICTIONARY = {
     lightboxHint: "Pinch to zoom · Tap to close",
     lightboxClose: "Close",
     lightboxPhoto: (index: number) => `Photo ${index}`,
-    // Create
+    // 생성
     createTitle: "New Complaint",
     fieldPlatform: "Booking platform",
     fieldRating: "Rating",
@@ -5328,14 +5328,14 @@ const FALLBACK_DICTIONARY = {
     submit: "Register complaint",
     required: "*",
     optional: "Optional",
-    // Picker sheet
+    // 선택 시트
     pickerTitle: "Search a target to link",
     pickerSub: "Reservation · room · guest at once",
     pickerStaying: "Staying now",
     pickerUpcoming: "Upcoming",
     pickerLiveTag: "Staying",
     pickerRoomOnly: "Link room · building only (no guest)",
-    // Admin console — log a complaint directly (2026-08-06)
+    // 관리자 콘솔 — 컴플레인 직접 기록 (2026-08-06)
     createAction: "Log complaint",
     linkModeReservation: "Reservation",
     linkModePlace: "Building · room",
@@ -5348,7 +5348,7 @@ const FALLBACK_DICTIONARY = {
     titleRequired: "Enter a title",
     createFailed: "Could not save. Please try again.",
     ratingOf: (val: string, max: number) => `${val} / ${max}`,
-    // Mobile — external review list/detail (2026-08-05)
+    // 모바일 — 외부 리뷰 목록/상세 (2026-08-05)
     allBuildings: "All buildings",
     pagerPrev: "Previous",
     pagerNext: "Next",
@@ -5940,9 +5940,9 @@ const FALLBACK_DICTIONARY = {
     kindsUnit: " kinds",
     countUnit: " records",
     summaryMore: "+",
-    // Localized labels for the default catalog, keyed by linen_items.code.
-    // Retired legacy codes are kept for historical record display; custom
-    // (building-specific) items still fall back to their stored DB name.
+    // 기본 카탈로그의 현지화 라벨, linen_items.code 가 키.
+    // 폐기된 옛 코드는 과거 기록 표시용으로 남겨 둔다.
+    // 사용자 지정(건물별) 품목은 여전히 저장된 DB 이름으로 대체된다.
     items: {
       towel: "Towel",
       bath: "Bath towel",
@@ -5957,7 +5957,7 @@ const FALLBACK_DICTIONARY = {
       robe: "Robe",
       mat: "Bath mat",
     } as Record<string, string>,
-    // Building picker
+    // 건물 선택기
     pickerTitle: "Choose a building",
     pickerSubtitle: "Pick the building to log a linen return for",
     searchPlaceholder: "Search building name",
@@ -5968,7 +5968,7 @@ const FALLBACK_DICTIONARY = {
     noBuildingsSub: "No buildings are registered in the room master yet",
     lastReturnLabel: "Last",
     noRecordYet: "No records",
-    // Building list
+    // 건물 목록
     thisMonth: "This month",
     latestOrder: "Latest first",
     ledgerButton: "Ledger",
@@ -5976,7 +5976,7 @@ const FALLBACK_DICTIONARY = {
     listEmptySub: "Register the first return for this building",
     registerButton: "Register return",
     photoLabel: "Photo",
-    // Create
+    // 생성
     createTitle: "Register return",
     buildingFieldLabel: "Building",
     buildingLockedBadge: "Selected",
@@ -5994,14 +5994,14 @@ const FALLBACK_DICTIONARY = {
     photoSectionTitle: "Photos",
     totalPrefix: "Total",
     submitButton: "Register return",
-    // Validation (client)
+    // 검증 (클라이언트)
     errorNoLine: "Some lines have no item selected",
     errorDuplicate: "This item is already added",
     errorMinItems: "Add at least one item",
-    // Success
+    // 성공
     successTitle: "Return registered",
     successToListButton: "Back to list",
-    // Detail
+    // 상세
     detailTitle: "Return detail",
     backToList: "Back to list",
     editAction: "Edit",
@@ -6015,7 +6015,7 @@ const FALLBACK_DICTIONARY = {
     deleteConfirmBody: "This cannot be undone.",
     deleteConfirmCancel: "Cancel",
     deleteConfirmConfirm: "Delete",
-    // Ledger
+    // 장부
     ledgerTitle: "Ledger",
     periodThisMonth: "This month",
     modeRecords: "Records",
@@ -6057,8 +6057,8 @@ const FALLBACK_DICTIONARY = {
       too_many_photos: "You can attach up to 5 photos.",
       too_many_photos_merged: "This adds to today's record, which would go over 5 photos. Remove some photos and try again.",
     } as Record<string, string>,
-    // Admin dashboard console (/admin/linen-return). Office-side record management only —
-    // registration stays on mobile. See docs/product/19-linen-defect-workflow.md.
+    // 관리자 대시보드 콘솔 (/admin/linen-return). 사무실 쪽 기록 관리만 —
+    // 등록은 모바일에 남는다. 참고: docs/product/19-linen-defect-workflow.md.
     console: {
       intro:
         "Review and manage linen returns registered in the field. New returns are still registered in the mobile app.",
@@ -6400,7 +6400,7 @@ const FALLBACK_DICTIONARY = {
       boardMentionBody: "{actor} mentioned you in a comment on '{title}'.",
       boardMentionAllTitle: "Mention to everyone",
       boardMentionAllBody: "{actor} mentioned everyone in a comment on '{title}'.",
-      // Bug report notifications (2026-06-25)
+      // 버그 리포트 알림 (2026-06-25)
       bugReportKind: "Bug Report",
       notificationBugReportCreatedTitle: "New Bug Report",
       notificationBugReportCreatedBody: "{actor} reported '{title}'",
@@ -7523,8 +7523,8 @@ const FALLBACK_DICTIONARY = {
       pax: " guests",
       doneN: "done",
       avg: "avg",
-      // Date-picker + export labels intentionally live in `admin.shared` (one canonical set for the
-      // whole console) — do not re-add feature-local copies here.
+      // 날짜 선택기 + 내보내기 라벨은 의도적으로 `admin.shared` 에 둔다 (콘솔 전체의 표준 한 세트) —
+      // 여기에 기능별 사본을 다시 추가하지 말 것.
       unitRecords: " records",
       unitCount: "",
       searchStaff: "Search cleaner",
@@ -8008,8 +8008,8 @@ const FALLBACK_DICTIONARY = {
     },
   },
   maintenance: {
-    // Admin 수리·점검 console (/admin/maintenance). Ported from the Claude Design handoff on
-    // 2026-07-14 — see docs/product/08-maintenance-workflow.md.
+    // 관리자 수리·점검 콘솔 (/admin/maintenance). Claude Design 핸드오프에서 이식함,
+    // 2026-07-14 — docs/product/08-maintenance-workflow.md 참고.
     console: {
       countUnit: " records",
       crumb: "Operations Â· Facilities",
@@ -8307,7 +8307,7 @@ const FALLBACK_DICTIONARY = {
     errTooManyFiles: "Up to 5 files.",
     errInvalidFileType: "File type not supported.",
     errFileTooLarge: "File must be under 20 MB.",
-    // Feed (Page 2)
+    // 피드 (2페이지)
     title: "Board",
     compose: "Write",
     allTag: "All",
@@ -8320,7 +8320,7 @@ const FALLBACK_DICTIONARY = {
     loadMore: "Load more",
     loadingMore: "Loading…",
     unreadAria: "Unread",
-    // Detail (Page 3)
+    // 상세 (3페이지)
     postMore: "More options",
     commentLabel: "Comments",
     commentCountSuffix: '{count}',
@@ -8390,8 +8390,8 @@ const FALLBACK_DICTIONARY = {
     deleteConfirmCta: "Delete",
     shareCopied: "Link copied",
     shareFailed: "Couldn't share",
-    // Edit screen (Page 4). The header title and its save button — the compose screen's
-    // `composeTitle`/`publish` would read as "writing a new post" while editing an old one.
+    // 수정 화면 (4페이지). 헤더 제목과 저장 버튼 — 작성 화면의
+    // `composeTitle`/`publish` 는 옛 글을 수정하는데 "새 글 쓰기"처럼 읽힌다.
     editTitle: "Edit post",
     submitEdit: "Save changes",
     // Mention sheet (옵션 E — bottom sheet + search, 2026-06-25)
@@ -8404,7 +8404,7 @@ const FALLBACK_DICTIONARY = {
     mentionButtonAriaLabel: "Mention",
     mentionClearAriaLabel: "Clear mentions",
     errorMentionInvalidMember: "Invalid member in selection",
-    // Mobile white redesign (2026-10-15)
+    // 모바일 화이트 리디자인 (2026-10-15)
     reportsPending: "{count} reports to review",
     reactionAdd: "Add reaction",
     feedFiles: "Files {n}",
@@ -8467,7 +8467,7 @@ const FALLBACK_DICTIONARY = {
     emptyHint: "New reports will show up here.",
     unknownAuthor: "Unknown author",
   },
-  // Bug Report — Foldy product/system issue reporting (2026-06-25)
+  // 버그 리포트 — Foldy 제품/시스템 이슈 신고 (2026-06-25)
   bugs: {
     title: "Bug Report",
     white: {
@@ -25305,12 +25305,12 @@ export function resolveLocale(value: Locale | string | null | undefined): Locale
 }
 
 /**
- * Infers the best supported locale from an HTTP Accept-Language header.
- * Parses quality values (q=), sorts by preference, and maps to ko/ja/en.
- * A header that names only unsupported languages (zh, vi, …) falls back to "en" — such a visitor reads
- * English far more often than Korean (2026-10-23). No header at all stays "ko".
+ * HTTP Accept-Language 헤더에서 지원되는 가장 알맞은 로케일을 추론한다.
+ * 품질 값(q=)을 파싱해 선호도 순으로 정렬하고 ko/ja/en 으로 매핑한다.
+ * 지원하지 않는 언어(zh, vi, …)만 있는 헤더는 "en" 으로 대체한다 — 그런 방문자는
+ * 한국어보다 영어를 훨씬 더 자주 읽는다 (2026-10-23). 헤더가 아예 없으면 "ko" 유지.
  *
- * Examples:
+ * 예시:
  *   "ja-JP,ja;q=0.9,en-US;q=0.8"  → "ja"
  *   "ko-KR,ko;q=0.9"               → "ko"
  *   "en-US,en;q=0.9"               → "en"

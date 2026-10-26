@@ -1,14 +1,14 @@
 import "server-only";
 
-// Real-data layer for the admin 린넨 반품(Linen Return) console (/admin/linen-return).
-// Mirrors `admin-lost-found.ts` / `admin-maintenance.ts`: presentation-ready flat view models,
-// organization-scoped queries, and a `loadError` flag so the console can show an error state
-// instead of a misleading empty list.
+// 관리자 린넨 반품(Linen Return) 콘솔(/admin/linen-return)의 실데이터 레이어.
+// `admin-lost-found.ts` / `admin-maintenance.ts` 를 따른다: 화면용으로 가공된 평평한 뷰 모델,
+// 조직 범위 쿼리, 그리고 콘솔이 오류 상태를 보여 줄 수 있게 하는 `loadError` 플래그 —
+// 오해를 부르는 빈 목록 대신.
 //
-// The dashboard is a RECORD-MANAGEMENT console, not a second registration flow: field staff keep
-// registering on mobile, the office verifies (when / where / what / how many / who) and corrects.
-// `registered_at` / `registered_by_user_id` are field evidence and are never editable here.
-// See docs/product/19-linen-defect-workflow.md → "Admin Dashboard — Linen Return Record Management".
+// 이 대시보드는 두 번째 등록 흐름이 아니라 기록 관리 콘솔이다: 현장 직원은 계속
+// 모바일에서 등록하고, 사무실이 (언제 / 어디서 / 무엇을 / 몇 개 / 누가) 확인하고 바로잡는다.
+// `registered_at` / `registered_by_user_id` 는 현장 증거라서 여기서는 절대 수정할 수 없다.
+// 참고: docs/product/19-linen-defect-workflow.md → "Admin Dashboard — Linen Return Record Management".
 
 import { organizationRoles, type Role } from "@/config/roles";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -22,11 +22,11 @@ type RecordRow = Database["public"]["Tables"]["linen_return_records"]["Row"];
 type ItemRow = Database["public"]["Tables"]["linen_items"]["Row"];
 type LineRow = Database["public"]["Tables"]["linen_return_record_items"]["Row"];
 
-/** Admin-capable roles may edit/delete ANY record (mirrors the RLS policy set). */
+/** 관리자 권한 역할은 모든 기록을 수정/삭제할 수 있다 (RLS 정책 세트와 동일). */
 
 export type AdminLinenLine = {
   itemId: string;
-  /** Seeded-catalog code (null for building-specific custom items). */
+  /** 시드 카탈로그 코드 (건물별 사용자 정의 품목은 null). */
   code: string | null;
   name: string;
   quantity: number;
@@ -79,8 +79,8 @@ export type AdminLinenReturnData = {
 
 const TOKYO_TZ = "Asia/Tokyo";
 
-// Seeded default catalog rows carry a stable `code`; show its localized label. Building-specific
-// custom items have no code → fall back to the stored DB name. Same rule as linen-returns.ts.
+// 시드 기본 카탈로그 행은 안정적인 `code` 를 가지며 현지화된 라벨을 보인다. 건물별
+// 사용자 정의 품목은 code 가 없다 → 저장된 DB 이름으로 폴백. linen-returns.ts 와 같은 규칙.
 function localizeItemName(code: string | null, name: string, locale: Locale): string {
   if (code) {
     const label = getDictionary(locale).linenReturn.items[code];
@@ -89,7 +89,7 @@ function localizeItemName(code: string | null, name: string, locale: Locale): st
   return name;
 }
 
-/** "YYYY-MM-DD HH:MM" in Tokyo — the format the console formatters expect. */
+/** 도쿄 기준 "YYYY-MM-DD HH:MM" — 콘솔 포매터가 기대하는 형식. */
 function tokyoStamp(iso: string): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TOKYO_TZ,
@@ -104,7 +104,7 @@ function tokyoStamp(iso: string): string {
   return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
-/** "YYYY-MM-DD" in Tokyo, today. */
+/** 도쿄 기준 오늘의 "YYYY-MM-DD". */
 export function todayKeyTokyo(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: TOKYO_TZ,
@@ -122,8 +122,8 @@ export function defaultRangeTokyo(): { from: string; to: string } {
   return { from: `${today.slice(0, 7)}-01`, to: `${today.slice(0, 7)}-${String(lastDay).padStart(2, "0")}` };
 }
 
-// Inclusive Tokyo-day range [from 00:00 JST, to+1 00:00 JST). JST is UTC+9, so 00:00 JST on a day
-// is the UTC instant 9 hours earlier — never slice UTC ISO strings for operational dates.
+// 양끝 포함 도쿄 날짜 범위 [from 00:00 JST, to+1 00:00 JST). JST 는 UTC+9 이므로 어느 날의 00:00 JST 는
+// 그보다 9시간 앞선 UTC 시각이다 — 운영 날짜를 UTC ISO 문자열 자르기로 구하지 말 것.
 function tokyoDayRange(from: string, to: string): { fromIso: string; toIso: string } {
   const [fy, fm, fd] = from.split("-").map(Number);
   const [ty, tm, td] = to.split("-").map(Number);
@@ -178,9 +178,9 @@ export async function getOrgLinenItems(session: AppSession): Promise<AdminLinenI
 }
 
 /**
- * Records registered inside an inclusive Tokyo-day range, latest-registration first.
- * The date range is applied in the QUERY (server-side, organization-scoped) — the browser never
- * receives rows outside the requested period, and never another organization's rows.
+ * 양끝 포함 도쿄 날짜 범위 안에서 등록된 기록, 최근 등록 순.
+ * 날짜 범위는 쿼리(서버 측, 조직 범위)에서 적용한다 — 브라우저는
+ * 요청한 기간 밖의 행도, 다른 조직의 행도 절대 받지 않는다.
  */
 export async function getAdminLinenReturns(
   session: AppSession,
@@ -228,8 +228,8 @@ export async function getAdminLinenReturns(
       Pick<LineRow, "return_record_id" | "linen_item_id" | "quantity" | "sort_order">
     >;
 
-    // Line items may reference retired catalog rows (is_active=false) — resolve every referenced id
-    // so a historical record never loses its item label.
+    // 품목 줄이 폐기된 카탈로그 행(is_active=false)을 참조할 수 있다 — 참조된 모든 id 를
+    // 해석해서 과거 기록이 품목 라벨을 잃지 않게 한다.
     const itemMeta = new Map<string, { code: string | null; name: string }>();
     for (const item of items) itemMeta.set(item.id, { code: item.code, name: item.name });
     const missingItemIds = [
@@ -294,7 +294,7 @@ export async function getAdminLinenReturns(
   }
 }
 
-/** Canonical building names the org operates (same source as orders / mobile linen return). */
+/** 조직이 운영하는 정규 건물 이름 (주문 / 모바일 린넨 반품과 같은 출처). */
 export async function getLinenBuildingNames(
   session: AppSession,
   buildingLabels: Record<string, string>,

@@ -51,7 +51,7 @@ function isCancellable(s: LeaveStatus): boolean {
   return s === "requested" || s === "review";
 }
 
-// ── Row content (shared by plain rows and the swipeable draft rows) ──────────
+// ── 행 내용 (일반 행과 스와이프 가능한 임시저장 행이 함께 쓴다) ──────────
 function RowContent({ r, c, onClick }: { r: LeaveRequestView; c: LeaveCopy; onClick: () => void }) {
   const st = r.status as LeaveStatus;
   const range = r.startDate === r.endDate ? shortDate(r.startDate) : `${shortDate(r.startDate)} – ${shortDate(r.endDate)}`;
@@ -71,9 +71,9 @@ function RowContent({ r, c, onClick }: { r: LeaveRequestView; c: LeaveCopy; onCl
   );
 }
 
-// ── Swipe-to-delete wrapper — draft rows only. Physics/layout mirror
-// notifications' SwipeItem (src/components/notifications/notification-list.tsx): one row open at a
-// time, 76px reveal, 40px commit threshold, spring-back otherwise. ──
+// ── 스와이프 삭제 래퍼 — 임시저장 행 전용. 물리/레이아웃은
+// 알림의 SwipeItem(src/components/notifications/notification-list.tsx)을 따른다: 한 번에 한 행만 열림,
+// 76px 노출, 40px 확정 임계값, 그 외에는 원위치로 복귀. ──
 const SWIPE_WIDTH = 76;
 const SWIPE_COMMIT_THRESHOLD = 40;
 
@@ -115,8 +115,8 @@ function SwipeableDraftRow({
     }
   }, [isOpen, applyTransform]);
 
-  // Tapping/clicking anywhere outside this row while it's swiped open springs it back closed —
-  // not just tapping the row itself or swiping another row open.
+  // 스와이프로 열린 행 바깥을 탭/클릭하면 다시 닫힌다 —
+  // 그 행 자체를 탭하거나 다른 행을 스와이프해 열 때만이 아니다.
   useEffect(() => {
     if (!isOpen) return;
     function handleOutside(e: PointerEvent) {
@@ -212,7 +212,7 @@ export function LeaveHistory({ locale, requests }: { locale: string; requests: L
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<LeaveRequestView | null>(null);
-  // Only ONE sheet at a time: detail ↔ confirm are the same stack, never stacked.
+  // 시트는 한 번에 하나만: 상세 ↔ 확인은 같은 스택이며 겹쳐 쌓이지 않는다.
   const [mode, setMode] = useState<"detail" | "confirm" | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelErr, setCancelErr] = useState<null | "not_cancellable" | "generic">(null);

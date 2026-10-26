@@ -47,8 +47,8 @@ export async function canCurrentUserProcessOrders(): Promise<boolean> {
   return canProcessOrders(session.organization.id, session.user.id, session.user.role);
 }
 
-// Allowed status transitions (server is the single source of truth).
-// ordered requires approved first — requested → ordered direct is not allowed.
+// 허용되는 상태 전환(서버가 유일한 기준).
+// ordered 로 가려면 먼저 approved 여야 한다 — requested → ordered 직행은 허용하지 않는다.
 function isValidTransition(from: OrderStatus, to: OrderStatus): boolean {
   switch (to) {
     case "approved": return from === "requested";
@@ -58,7 +58,7 @@ function isValidTransition(from: OrderStatus, to: OrderStatus): boolean {
   }
 }
 
-// Accepts YYYY-MM-DD only.
+// YYYY-MM-DD 형식만 받는다.
 function isValidDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split("-").map(Number);
@@ -78,12 +78,12 @@ export async function updateOrderRequestStatus(
     return { ok: false, error: "unauthorized" };
   }
 
-  // Role-based authorization: office-level roles (or an `order_processor` override) may change status.
+  // 역할 기반 권한: 사무 이상 역할(또는 `order_processor` 예외)만 상태를 바꿀 수 있다.
   if (!(await canProcessOrders(session.organization.id, session.user.id, session.user.role))) {
     return { ok: false, error: "forbidden" };
   }
 
-  // Delivery date is required when transitioning to ordered.
+  // ordered 로 전환할 때는 배송일이 필수다.
   if (input.targetStatus === "ordered") {
     const mode = input.deliveryMode ?? "exact";
     if (mode === "range") {
@@ -167,8 +167,8 @@ export async function updateOrderRequestStatus(
     .update(updatePayload)
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
-    // Guard against a lost update: only transition from the status we validated against. If another
-    // user already moved it, 0 rows match and we report invalid_transition instead of overwriting.
+    // 동시 수정 덮어쓰기 방지: 검증한 상태에서만 전환한다. 다른
+    // 사용자가 이미 옮겼다면 일치하는 행이 0개라 덮어쓰지 않고 invalid_transition 을 돌려준다.
     .eq("status", current.status)
     .select("id");
 
@@ -219,9 +219,9 @@ type UpdateDeliveryInput = {
   deliveryEndDate?: string;
 };
 
-// Edit the delivery date of an already-ordered request (office-level roles). Status is unchanged —
-// only the delivery_date / range columns are updated. The Requests delivery calendar reads these
-// columns directly, so it reflects the edit automatically (no separate calendar entry).
+// 이미 ordered 인 요청의 배송일을 고친다(사무 이상 역할). 상태는 그대로 두고
+// delivery_date / 범위 컬럼만 갱신한다. 요청 배송 캘린더가 이 컬럼을
+// 직접 읽으므로 수정이 자동 반영된다(별도 캘린더 항목 없음).
 export async function updateOrderDeliveryDate(
   input: UpdateDeliveryInput,
 ): Promise<UpdateOrderStatusResult> {
@@ -268,7 +268,7 @@ export async function updateOrderDeliveryDate(
 
   if (fetchError) return { ok: false, error: "save_failed" };
   if (!current) return { ok: false, error: "not_found" };
-  // Delivery date is only meaningful once the order has been processed.
+  // 배송일은 주문 처리가 끝난 뒤에만 의미가 있다.
   if (current.status !== "ordered") return { ok: false, error: "invalid_transition" };
 
   const updatePayload: Database["public"]["Tables"]["order_requests"]["Update"] =
@@ -285,7 +285,7 @@ export async function updateOrderDeliveryDate(
     .update(updatePayload)
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
-    // Only edit while still in the status we validated (ordered); 0 rows → it changed under us.
+    // 검증한 상태(ordered)일 때만 수정한다. 0행이면 그 사이에 바뀐 것이다.
     .eq("status", current.status)
     .select("id");
 
@@ -300,7 +300,7 @@ export async function updateOrderDeliveryDate(
     return { ok: false, error: "invalid_transition" };
   }
 
-  // Notify the requester that the delivery date changed (self-suppressed for the editor).
+  // 요청자에게 배송일이 바뀐 것을 알린다(수정한 본인에게는 알리지 않음).
   await createOrderDeliveryUpdatedNotification({
     supabase,
     organizationId: session.organization.id,

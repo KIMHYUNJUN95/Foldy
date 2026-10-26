@@ -4,9 +4,9 @@ import { Lock } from "lucide-react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 
 /**
- * Canonical mobile "no permission" popup — same visual pattern as the report-sheet
- * forbidden state (lock icon + title + body), reused wherever a server action rejects
- * an action with `unauthorized`/`forbidden` on `/mobile/*`.
+ * 표준 모바일 "권한 없음" 팝업 — 리포트 시트의 forbidden 상태
+ * (자물쇠 아이콘 + 제목 + 본문)와 같은 시각 패턴으로, `/mobile/*` 에서 서버 액션이 동작을
+ * `unauthorized`/`forbidden` 으로 거부할 때마다 재사용한다.
  */
 export function PermissionDeniedSheet({
   title,

@@ -2,14 +2,14 @@ import "server-only";
 
 import type { AdminTableSheet, AdminTableWorkbookInput } from "@/lib/admin-table-workbook";
 
-// CANONICAL admin-console PDF/print export builder — a self-contained HTML document the client opens
-// in a new tab and prints to PDF. Takes the exact same input as buildAdminTableWorkbookBase64
-// (admin-table-workbook.ts) so the Excel file and the PDF of any given screen are the same table.
-// Plain green ledger language: #b6d7a8 title bar, #d9ead3 header, #e2f0d9 totals, #fbfcf8 zebra.
+// 정규 관리자 콘솔 PDF/인쇄 내보내기 빌더 — 클라이언트가 새 탭에서 열어
+// PDF 로 인쇄하는 독립 HTML 문서. buildAdminTableWorkbookBase64 와 완전히 같은 입력을 받으므로
+// (admin-table-workbook.ts) 어떤 화면이든 Excel 파일과 PDF 는 같은 표다.
+// 단순한 녹색 장부 언어: #b6d7a8 제목 줄, #d9ead3 헤더, #e2f0d9 합계, #fbfcf8 지브라.
 // See docs/product/05-admin-web-ia.md → "공용 프리미티브".
 
 export type AdminTableReportInput = AdminTableWorkbookInput & {
-  /** Localized label for the floating print button (hidden when printing). */
+  /** 떠 있는 인쇄 버튼의 현지화 라벨 (인쇄 시 숨김). */
   printLabel: string;
   localeTag: string;
 };

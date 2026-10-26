@@ -1,16 +1,16 @@
-// External Reviews (Beds24 → Airbnb / Booking.com) — server-only domain helpers.
+// 외부 리뷰 (Beds24 → Airbnb / Booking.com) — 서버 전용 도메인 헬퍼.
 //
-// Reads use the RLS-scoped server client (org isolation via has_active_membership). The
-// review rows themselves are never written from here: collection is service-role only and
-// lives in `src/lib/beds24/reviews-sync.ts`. The one write this module owns is converting a
-// review into a manual complaint, which re-checks the role and the organization first.
+// 읽기는 RLS 범위 서버 클라이언트를 쓴다 (has_active_membership 로 조직 격리). 리뷰
+// 행 자체는 여기서 절대 쓰지 않는다: 수집은 service-role 전용이며
+// `src/lib/beds24/reviews-sync.ts` 에 있다. 이 모듈이 소유한 쓰기는 하나뿐이다: 리뷰를
+// 수동 불만으로 바꾸는 일이며, 먼저 역할과 조직을 다시 확인한다.
 //
-// Domain contract: docs/product/25-complaint-workflow.md
-// Risk rules:      Airbnb <= 3 and Booking.com <= 7.0 are `risk` (boundary included).
-//                  Three values only — `unrated` / `normal` / `risk`.
+// 도메인 계약: docs/product/25-complaint-workflow.md
+// 위험 규칙:       Airbnb <= 3 이고 Booking.com <= 7.0 이면 `risk` (경계 포함).
+//                  값은 세 가지뿐 — `unrated` / `normal` / `risk`.
 //
-// Reviews are stored in full regardless of score; `riskLevel` is a classification, not a
-// filter. Building/room averages need the good reviews too.
+// 리뷰는 점수와 무관하게 전부 저장한다. `riskLevel` 은 분류일 뿐 필터가
+// 아니다. 건물/객실 평균에도 좋은 리뷰가 필요하다.
 
 import "server-only";
 
@@ -31,9 +31,9 @@ import { getDictionary } from "@/lib/i18n";
 import { readAllReviewPages, type ReviewPageResult } from "@/lib/external-review-pages";
 import type { Database } from "@/types/database";
 
-// The generated Database type does not line up with postgrest's select-string inference for
-// these tables, so the codebase convention (see `src/lib/complaints.ts`) is to drop the schema
-// generic at the call site and cast row shapes explicitly.
+// 생성된 Database 타입이 이 테이블들에 대한 postgrest select 문자열 추론과 맞지 않아서
+// 코드베이스 관례(`src/lib/complaints.ts` 참고)는 호출 지점에서 스키마 제네릭을 빼고
+// 행 모양을 명시적으로 캐스팅하는 것이다.
 function untyped(client: SupabaseClient<Database>): SupabaseClient {
   return client as unknown as SupabaseClient;
 }

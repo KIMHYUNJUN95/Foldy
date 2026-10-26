@@ -96,24 +96,24 @@ function capRejectedBody(body: unknown, rawText: string): unknown {
 }
 
 /**
- * Parse an inbound webhook body defensively. Beds24 deliveries have shipped as
- * JSON *and* as `application/x-www-form-urlencoded` (sometimes with a field whose
- * value is itself a JSON string) depending on account/config. We read the raw
- * text once and try both so the ingestion path never rejects a delivery merely
- * because of its transport encoding.
+ * 수신한 웹훅 본문을 방어적으로 파싱한다. Beds24 전송은 계정/설정에 따라
+ * JSON 으로도, `application/x-www-form-urlencoded` 로도(필드 값 자체가 JSON 문자열인 경우도)
+ * 온 적이 있다. 원문 텍스트를 한 번 읽어
+ * 두 방식을 모두 시도하므로 수신 경로가 단지
+ * 전송 인코딩 때문에 전달을 거부하는 일이 없다.
  */
 function parseWebhookBody(raw: string): { body: unknown; parsed: boolean } {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return { body: null, parsed: false };
 
-  // 1) JSON (Beds24 API v2 webhooks).
+  // 1) JSON (Beds24 API v2 웹훅).
   try {
     return { body: JSON.parse(trimmed), parsed: true };
   } catch {
-    // fall through
+    // 다음 단계로 넘어감
   }
 
-  // 2) Form-encoded. Each field value may itself be JSON.
+  // 2) 폼 인코딩. 각 필드 값이 JSON 일 수도 있다.
   try {
     const params = new URLSearchParams(trimmed);
     const keys = Array.from(params.keys());
@@ -129,7 +129,7 @@ function parseWebhookBody(raw: string): { body: unknown; parsed: boolean } {
       return { body: obj, parsed: true };
     }
   } catch {
-    // fall through
+    // 다음 단계로 넘어감
   }
 
   return { body: trimmed, parsed: false };
@@ -230,10 +230,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // No booking could be extracted (unparseable body or unrecognized envelope).
-  // NEVER drop this silently: persist the raw body so the shape is debuggable and
-  // the delivery is replayable, then ACK so Beds24 does not retry-storm. The daily
-  // reconciliation heals the missed reservation from the Beds24 API in the meantime.
+  // 예약을 추출하지 못했다 (파싱 불가 본문이거나 알 수 없는 봉투 형식).
+  // 절대 조용히 버리지 말 것: 원문 본문을 저장해 형태를 디버깅하고
+  // 전달을 재생할 수 있게 한 뒤, Beds24 가 재시도 폭주를 하지 않도록 ACK 한다. 그 사이 누락된 예약은
+  // 매일 하는 정합 작업이 Beds24 API 에서 복구한다.
   if (bookingPayloads.length === 0) {
     console.error("[beds24/webhook] no booking candidates in delivery", {
       contentType,
@@ -283,10 +283,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Observability: persist the batch result so a dropped/failed booking is traceable
-  // (see public.beds24_webhook_events). Written after the response (`after()`) so it
-  // never adds a DB round-trip to the webhook latency.
-  // When some bookings failed to process, keep their raw body for replay/debug.
+  // 관측성: 배치 결과를 저장해 누락/실패한 예약을 추적할 수 있게 한다
+  // (public.beds24_webhook_events 참고). 응답 뒤(`after()`)에 기록하므로
+  // 웹훅 지연에 DB 왕복이 더해지지 않는다.
+  // 일부 예약 처리에 실패하면 재생/디버깅을 위해 그 원문 본문을 보관한다.
   const anyFailed = failed > 0;
   const durationMs = Math.round(performance.now() - startedAt);
   after(() =>
@@ -300,9 +300,9 @@ export async function POST(request: NextRequest) {
     }),
   );
 
-  // Always ACK with 2xx, so Beds24 does not treat a partially-failed batch as a
-  // delivery failure and retry-storm; the failed rows are recorded above (after the
-  // response) and healed by reconciliation.
+  // 부분 실패한 배치를 Beds24 가 전달 실패로 보고 재시도 폭주를 하지 않도록
+  // 항상 2xx 로 ACK 한다. 실패한 행은 위에서(응답 뒤) 기록되고
+  // 정합 작업이 복구한다.
   return NextResponse.json(
     {
       ok: !anyFailed,

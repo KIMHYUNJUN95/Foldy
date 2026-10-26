@@ -42,7 +42,7 @@ function amPm(label: string | null, amLabel: string, pmLabel: string): string | 
   return h < 12 ? amLabel : pmLabel;
 }
 
-/** Groups sessions by operatingDate (preserves existing order = descending). */
+/** 세션을 operatingDate 로 묶는다(기존 순서 유지 = 내림차순). */
 function groupByDate(sessions: AttendanceSessionView[]) {
   const groups: { date: string; sessions: AttendanceSessionView[] }[] = [];
   for (const s of sessions) {
@@ -56,7 +56,7 @@ function groupByDate(sessions: AttendanceSessionView[]) {
   return groups;
 }
 
-/** Compact date group label: "Today 6/18" / "6/17" + locale weekday. */
+/** 간단한 날짜 그룹 라벨: "오늘 6/18" / "6/17" + 로케일 요일. */
 function dateGroupLabel(
   date: string,
   todayDate: string,

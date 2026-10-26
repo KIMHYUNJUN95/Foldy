@@ -67,8 +67,8 @@ const BUILDING_KEY_RANK = new Map<string, number>(
 );
 const ROOM_LABEL_MAPPING_WARNING_THRESHOLD = 3;
 
-// Extract the leading integer from a room label for numeric-aware sorting.
-// "101" -> 101, "202" -> 202, "No digits" -> Infinity (sort last).
+// 방 라벨의 앞쪽 정수를 뽑아 숫자 기준 정렬에 쓴다.
+// "101" -> 101, "202" -> 202, "No digits" -> Infinity (맨 뒤로 정렬).
 function roomSortKey(canonicalRoomLabel: string): number {
   const match = /\d+/.exec(canonicalRoomLabel);
   return match ? parseInt(match[0], 10) : Infinity;
@@ -79,10 +79,10 @@ type Groupable = {
   canonicalRoomLabel: string;
 };
 
-// Groups items by building key (canonical slug), sorts each group by room number
-// (numeric-aware, then label tiebreaker), and returns building groups in the fixed
-// BUILDING_KEY_ORDER (unknown keys appended alphabetically at end).
-// The returned buildingKey is used for both React key and i18n label lookup.
+// 항목을 건물 키(정규 slug)로 묶고, 각 그룹을 방 번호순(숫자 기준, 같으면 라벨순)으로 정렬해
+// 고정된 BUILDING_KEY_ORDER 순서의 건물 그룹으로 돌려준다
+// (모르는 키는 뒤에 알파벳순으로 붙임).
+// 돌려주는 buildingKey 는 React key 와 i18n 라벨 조회에 함께 쓴다.
 function groupByBuilding<T extends Groupable>(
   items: T[],
 ): { buildingKey: string; items: T[] }[] {
@@ -114,8 +114,8 @@ function getBuildingKey(canonicalPropertyName: string): string {
   return CANONICAL_TO_BUILDING_KEY[canonicalPropertyName] ?? canonicalPropertyName;
 }
 
-// Transforms the active room catalog into ManualBuildingOption[] for the manual form.
-// Buildings and rooms are sorted using the same ordering rules as the cleaning/setting lists.
+// 활성 방 카탈로그를 수동 입력 폼용 ManualBuildingOption[] 로 바꾼다.
+// 건물과 방은 청소/설정 목록과 같은 정렬 규칙으로 정렬한다.
 function buildManualRoomOptions(
   catalog: ActiveRoomCatalogItem[] | undefined,
 ): ManualBuildingOption[] {
@@ -132,9 +132,9 @@ function buildManualRoomOptions(
     const displayRoomLabel = getDisplayRoomLabel(item.propertyName, item.canonicalRoomLabel);
 
     const group = map.get(buildingKey)!;
-    // Collapse Arakicho sub-units (201 / 201_2 = same physical room) to one option keyed by the
-    // display label, so the picker shows "201" once — matching every other room-facing screen. Prefer
-    // the base account (canonical === display) as the representative sessionRoomLabel.
+    // 아라키초 하위 호실(201 / 201_2 = 같은 물리적 방)을 표시 라벨 기준 옵션 하나로 합쳐, 선택기에 "201" 이
+    // 한 번만 나오게 한다 — 방을 보여주는 다른 화면과 같다. 대표 sessionRoomLabel 은 기본 계정
+    // (canonical === display)을 우선한다.
     const existing = group.rooms.find((r) => r.displayRoomLabel === displayRoomLabel);
     if (!existing) {
       group.rooms.push({
@@ -191,8 +191,8 @@ function getLocalizedRoomTitle(
   const buildingKey = getBuildingKey(canonicalPropertyName);
   const buildingLabel = copy.buildingLabels[buildingKey] ?? canonicalPropertyName;
   if (canonicalRoomLabel === canonicalPropertyName) return buildingLabel;
-  // Collapse Arakicho sub-unit keys (e.g. 501_2 → 501) so the card matches the
-  // calendar's display label. Other properties are returned unchanged.
+  // 아라키초 하위 호실 키(예: 501_2 → 501)를 합쳐 카드가 캘린더의 표시 라벨과 같게 한다.
+  // 그 밖의 속성은 그대로 돌려준다.
   const displayRoomLabel = getDisplayRoomLabel(canonicalPropertyName, canonicalRoomLabel);
   return `${buildingLabel} ${displayRoomLabel}`;
 }
@@ -388,8 +388,8 @@ export default async function MobileCleaningPage({
 
   // 서로 기다릴 필요 없는 읽기는 한 번에 시작한다(2026-10-19 속도 — 전에는 9단계 직렬). 배지(`getMobileNavBadges`)도 함께.
   // 과거 날짜에서 담당자 이름을 그리려면 이름표가 필요하다. 오늘만 볼 때는 부르지 않는다.
-  // roomCatalog is always fetched (not gated on activeSession) because it serves
-  // both the catalog-based room label resolver and the manual form options.
+  // roomCatalog 는 항상 가져온다(activeSession 으로 막지 않음). 카탈로그 기반 방 라벨 해석기와
+  // 수동 입력 폼 옵션 둘 다에 쓰이기 때문이다.
   // 「이미 시작 · 완료한 방」은 서비스 키로 조직 전체를 읽는다(`getOrgProcessedCleaningRoomLabels`, 라벨 · 상태만, 2026-10-26) —
   // RLS 로 읽으면 `cleaning.read_all` 없는 직원에게 남이 맡은 방이 시작 가능한 채로 남았다. 지난 날 「누가 언제」 기록은
   // 담당자 · 시각이 필요해 RLS 조회(`getOrgTodayCleaningRoomLabels`)를 그대로 쓴다 — 지난 날짜일 때만.
@@ -428,9 +428,9 @@ export default async function MobileCleaningPage({
 
   const staffNameById = new Map(staffOptions.map((o) => [o.id, o.name] as const));
 
-  // Catalog-based map is the primary resolver (covers all active room master entries).
-  // Fallback: canonical prefix parse for legacy labels.
-  // Truly unknown labels return null and are excluded so they never produce false exclusions.
+  // 카탈로그 기반 맵이 기본 해석기다(활성 방 마스터 항목을 모두 포함).
+  // 대체: 옛 라벨은 canonical 접두어를 파싱한다.
+  // 끝까지 알 수 없는 라벨은 null 이 되어 제외되므로, 잘못 제외되는 일이 없다.
   const catalogLabelMap = buildSessionLabelToRoomKeyMap(roomCatalog ?? []);
   const legacyAliasMap = buildLegacyAliasToRoomKeyMap(roomCatalog ?? []);
   // 「이미 시작/완료한 방」 · 지난 날 기록은 **실제 방** 단위로 짝짓는다(2026-10-15). 아라키초는 한 방에 계정이 둘이라
@@ -481,7 +481,7 @@ export default async function MobileCleaningPage({
     (t) => !processedRoomKeys.has(roomKeyOfTarget(t)),
   );
 
-  // Pre-compute grouped lists outside JSX for readability
+  // 가독성을 위해 JSX 밖에서 그룹 목록을 미리 계산한다
   const cleaningGroups =
     filteredCleaningList.length > 0
       ? groupByBuilding(filteredCleaningList)
@@ -509,7 +509,7 @@ export default async function MobileCleaningPage({
     roomTitle: getLocalizedRoomTitle(target.canonicalPropertyName, target.canonicalRoomLabel, copy),
   }));
   const sessionLabelToLocalizedRoomTitleMap = buildSessionLabelToLocalizedRoomTitleMap(roomCatalog, copy);
-  // Org-wide in_progress count — same scope as the queue filter for KPI consistency
+  // 조직 전체의 in_progress 개수 — KPI 일관성을 위해 큐 필터와 같은 범위
   const inProgressCount = orgProcessedSessions.filter((s) => s.status === "in_progress").length;
 
   // 진행 중인 청소가 있으면 새로 시작할 수 없다(유니크 인덱스) — 목록은 보여 주되 시작 버튼은 감춘다(2026-10-13).

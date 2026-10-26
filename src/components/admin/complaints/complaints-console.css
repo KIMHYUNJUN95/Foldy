@@ -1,7 +1,7 @@
-/* Complaints console — screen-local pieces only.
-   Everything reusable (opsbar / lviews / tbl / rchip / dpick / dd) comes from
-   admin-console.css. Do not re-declare those here.
-   See CLAUDE.md → "Admin dashboard shared design contract". */
+/* 컴플레인 콘솔 — 이 화면에서만 쓰는 조각들.
+   재사용 가능한 것(opsbar / lviews / tbl / rchip / dpick / dd)은 모두
+   admin-console.css 에서 가져온다. 여기서 다시 선언하지 말 것.
+   참고: CLAUDE.md → "Admin dashboard shared design contract". */
 
 /* ── 카드 헤더 부제 / 우측 캡션 ──
    .card__t(공용 카드 제목) 옆에 오는 작은 muted 보조 텍스트. 기간 표기·척도 안내 등.

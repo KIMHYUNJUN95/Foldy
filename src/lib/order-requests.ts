@@ -123,7 +123,7 @@ export async function getOrderRequestById(
       console.warn("[order-requests] detail unavailable, returning null:", msg);
       return null;
     }
-    // A malformed (non-UUID) id in the URL → treat as not-found, not a 500 crash.
+    // URL 의 잘못된(UUID 아닌) id → 500 오류가 아니라 없음으로 처리한다.
     if (error.code === "22P02") return null;
     throw new Error(msg);
   }

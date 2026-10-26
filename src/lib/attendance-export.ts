@@ -1,15 +1,15 @@
-// Attendance — finalized-only payroll EXPORT (Step 13).
+// 근태 — 확정분만 대상인 급여 내보내기 (13단계).
 //
-// Privileged (owner / attendance_payroll_admin) export of FINALIZED payroll only — monthly bulk or
-// per-person. Draft / reopened / unresolved / non-finalized snapshots are NEVER included. Every export
-// writes an `attendance_export_logs` audit row.
+// 확정된 급여만 내보내는 권한 필요 기능 (owner / attendance_payroll_admin) — 월 일괄 또는
+// 개인별. 초안 / 재개 / 미해결 / 미확정 스냅샷은 절대 포함하지 않는다. 내보낼 때마다
+// `attendance_export_logs` 감사 행을 남긴다.
 //
-// LEGACY / SUPERSEDED (2026-07-03): the shipped final export is the monthly + per-user **Excel workbook
-// + PDF** in the admin 급여 검토 page (see attendance-payroll-workbook.ts, attendance-payroll-report.ts,
-// attendance-user-payroll-export.ts). This CSV path is kept as a back-compat foundation (structured rows
-// + audit log) and is still exercised by the dev test route, but it is NOT wired into the dashboard UI.
-// It produces a clean, structured CSV (UTF-8 BOM so Excel opens Korean correctly) whose columns map 1:1
-// to the documented finalized snapshot fields. The row builder is kept separate from the serializer.
+// 구버전 / 대체됨 (2026-07-03): 실제 최종 내보내기는 관리자 급여 검토 페이지의 월별 + 사용자별 **Excel 통합문서
+// + PDF** 이다 (attendance-payroll-workbook.ts, attendance-payroll-report.ts,
+// attendance-user-payroll-export.ts 참고). 이 CSV 경로는 하위 호환 기반(구조화된 행
+// + 감사 로그)으로 남겨 두었고 개발용 테스트 라우트에서는 여전히 실행되지만, 대시보드 UI 에는 연결되어 있지 않다.
+// 깔끔한 구조화 CSV(UTF-8 BOM 이라 Excel 에서 한국어가 정상으로 열림)를 만들며 열이 1:1로 대응한다
+// 문서화된 확정 스냅샷 필드에 맞춘다. 행 빌더는 직렬화기와 분리해 둔다.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -128,7 +128,7 @@ function csvCell(value: string | number): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-/** Structured CSV with a UTF-8 BOM (so Excel reads Korean). Interim format until the final template. */
+/** UTF-8 BOM 이 붙은 구조화 CSV (Excel 이 한국어를 읽도록). 최종 템플릿이 나올 때까지의 임시 형식. */
 function toCsv(rows: ExportRow[]): string {
   const lines = [CSV_HEADERS.join(",")];
   for (const r of rows) {
@@ -152,9 +152,9 @@ function toCsv(rows: ExportRow[]): string {
 }
 
 /**
- * Run a finalized-only payroll export. Privilege is enforced here (owner / attendance_payroll_admin).
- * `monthly_bulk` gathers every finalized user-month snapshot for the month; `single_user` gathers the
- * one finalized snapshot for that user-month. Writes an `attendance_export_logs` audit row.
+ * 확정분만 대상인 급여 내보내기를 실행한다. 권한은 여기서 강제한다 (owner / attendance_payroll_admin).
+ * `monthly_bulk` 는 그 달의 확정된 모든 사용자-월 스냅샷을, `single_user` 는
+ * 그 사용자-월의 확정 스냅샷 하나를 모은다. `attendance_export_logs` 감사 행을 남긴다.
  */
 export async function runPayrollExport(
   service: Service,
@@ -170,7 +170,7 @@ export async function runPayrollExport(
 
   const firstDay = monthFirstDay(params.ym);
 
-  // FINALIZED ONLY — never draft/reopened/superseded.
+  // 확정분만 — 초안/재개/대체된 것은 절대 포함하지 않는다.
   let query = service
     .from("attendance_month_snapshots")
     .select(
@@ -197,7 +197,7 @@ export async function runPayrollExport(
       ? `payroll_${params.ym}_${(params.userId as string).slice(0, 8)}.csv`
       : `payroll_${params.ym}_bulk.csv`;
 
-  // Audit row.
+  // 감사 행.
   const ins = (await service
     .from("attendance_export_logs")
     .insert({

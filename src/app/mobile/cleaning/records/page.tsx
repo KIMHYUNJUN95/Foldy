@@ -66,11 +66,11 @@ export default async function CleaningRecordsPage({ searchParams }: PageProps) {
   const statusFilter = (
     CLEANING_STATUSES.has(params.status ?? "") ? params.status : undefined
   ) as Database["public"]["Tables"]["cleaning_sessions"]["Row"]["status"] | undefined;
-  // Staff filter only honored for manager/office roles; regular users are RLS-scoped to their own.
+  // 직원 필터는 매니저/사무 역할에만 적용되고, 일반 사용자는 RLS 로 본인 것만 조회된다.
   const staffFilter = canViewOthers && params.staff ? params.staff : undefined;
 
-  // Room catalog first — it drives both the building filter options and building·room resolution,
-  // and `getOrgCleaningSessionsFiltered` needs it to filter by property.
+  // 방 카탈로그를 먼저 가져온다 — 건물 필터 옵션과 건물·방 해석을 모두 좌우하고,
+  // `getOrgCleaningSessionsFiltered` 가 숙소별 필터링을 위해 필요로 한다.
   const roomCatalog = await getActiveRoomCatalogServer(session.organization.id).catch(() => undefined);
   const buildingOptions = Array.from(new Set((roomCatalog ?? []).map((i) => i.propertyName)))
     .filter((name) => !isExcludedOperationalProperty(name))
@@ -99,7 +99,7 @@ export default async function CleaningRecordsPage({ searchParams }: PageProps) {
 
   const buildingLabels = dict.cleaning.buildingLabels;
   const roomSuffix = dict.cleaning.records.roomSuffix;
-  // "아라키초B 202호" for numbered rooms; just the building name for whole-house units (Okubo).
+  // 번호가 있는 방은 "아라키초B 202호", 통째로 쓰는 유닛(오쿠보)은 건물 이름만.
   const roomTitle = (buildingName: string | null, roomLabel: string): string => {
     if (!buildingName) return roomLabel;
     const buildingLabel = localizePropertyName(buildingName, buildingLabels);

@@ -1,8 +1,8 @@
 /*
-  Mobile home screen — design port of "Haru Ops · 홈 (빠른 출근)" / v2.
-  Every selector is scoped under `.hm` so it never leaks into other screens.
-  The top 3D hero image from the design is intentionally NOT used here; the
-  asset is preserved at src/assets/home-hero-3d.svg for future reuse.
+  모바일 홈 화면 — "Haru Ops · 홈 (빠른 출근)" / v2 디자인 이식.
+  모든 셀렉터는 `.hm` 범위로 한정해 다른 화면으로 새지 않는다.
+  디자인의 상단 3D 히어로 이미지는 여기서 일부러 쓰지 않는다.
+  에셋은 나중에 다시 쓸 수 있게 src/assets/home-hero-3d.svg 에 보존해 둔다.
 */
 .hm {
   --hm-card: #ffffff;
@@ -38,7 +38,7 @@
   color: inherit;
 }
 
-/* greeting */
+/* 인사 */
 .hm__greet {
   display: flex;
   align-items: center;
@@ -59,7 +59,7 @@
   text-wrap: balance;
 }
 
-/* attendance hero — no card: state pill, big timer, site/time tiles, full-width button (white redesign 2026-10-09) */
+/* 출퇴근 히어로 — 카드 없음: 상태 필, 큰 타이머, 근무지/시간 타일, 전체 폭 버튼 (화이트 리디자인 2026-10-09) */
 .hm__clockhero {
   display: flex;
   flex-direction: column;
@@ -158,7 +158,7 @@
   font-size: 19px;
 }
 
-/* sections — one sheet, a hairline between blocks */
+/* 섹션 — 한 장의 시트, 블록 사이에 헤어라인 */
 /* 섹션 제목 — iOS Headline(17 반굵게), HIG 다듬기 2차. */
 .hm__sectt {
   font-size: 17px;
@@ -188,7 +188,7 @@
   height: 13px;
 }
 
-/* check-in / check-out — label, big number (cards were removed) */
+/* 출근 / 퇴근 — 라벨, 큰 숫자 (카드는 없앴다) */
 .hm__stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -218,7 +218,7 @@
   grid-column: 1 / -1;
   text-align: center;
 }
-/* The count blocks double as buttons that open the check-in/out detail sheet. */
+/* 개수 블록은 출근/퇴근 상세 시트를 여는 버튼 역할도 한다. */
 .hm button.hm__stat {
   width: 100%;
   text-align: left;
@@ -233,7 +233,7 @@
   transform: scale(0.98);
 }
 
-/* check-in / check-out detail bottom sheet */
+/* 출근 / 퇴근 상세 하단 시트 */
 .hm__cio-head {
   display: flex;
   align-items: center;
@@ -333,7 +333,7 @@
   font-size: 14px;
 }
 
-/* notice — one row */
+/* 공지 — 한 줄 */
 .hm__notice {
   display: flex;
   gap: 12px;
@@ -378,7 +378,7 @@
   flex: none;
 }
 
-/* active task / empty */
+/* 진행 중인 할 일 / 빈 상태 */
 .hm__task {
   display: flex;
   align-items: center;
@@ -444,8 +444,8 @@
   color: var(--hm-muted);
   margin: 4px 0 8px;
 }
-/* Anchor-as-button: `.hm a { color: inherit }` would otherwise win over a plain
-   `.hm__taskempty-btn` rule, so this is scoped under `.hm` to keep the white label. */
+/* 앵커를 버튼으로 쓰기: `.hm a { color: inherit }` 가 그냥 `.hm__taskempty-btn`
+   규칙을 이겨 버리므로, 흰 라벨을 유지하려고 `.hm` 아래로 범위를 한정했다. */
 .hm .hm__taskempty-btn {
   display: inline-flex;
   align-items: center;
@@ -460,7 +460,7 @@
   font-weight: 600;
 }
 
-/* quick actions — soft violet tiles, no outer cards */
+/* 빠른 실행 — 부드러운 바이올렛 타일, 바깥 카드 없음 */
 .hm__qa {
   display: grid;
   /* minmax(0, …) — 긴 영어 이름이 한 칸만 넓혀 아이콘 간격이 흐트러지지 않게(2026-10-23). */
@@ -500,7 +500,7 @@
   text-align: center;
 }
 
-/* today's activity — dot · text · time, hairlines */
+/* 오늘의 활동 — 점 · 텍스트 · 시간, 헤어라인 */
 .hm__log-r {
   display: flex;
   align-items: center;
@@ -561,7 +561,7 @@
   color: var(--hm-primary);
 }
 
-/* phone: blocks stacked with a hairline between them */
+/* 폰: 블록을 쌓고 블록 사이에 헤어라인 */
 @media (max-width: 599px) {
   .hm__blk + .hm__blk:not(:empty) {
     margin-top: 20px;

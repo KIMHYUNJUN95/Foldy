@@ -1,6 +1,6 @@
-// Admin 분실물 console — shared display helpers: status pill, category chip, D-day badges (폐기 임박/
-// 만료 및 삭제 임박), 사진 배지, 연장 배지. Board, list, done, disposal, panel and modal all render
-// through these so every view stays visually identical. Mirrors maintenance-console-shared.tsx.
+// 관리자 분실물 콘솔 — 공용 표시 헬퍼: 상태 필, 카테고리 칩, D-day 배지 (폐기 임박/
+// 만료 및 삭제 임박), 사진 배지, 연장 배지. 보드, 목록, 완료, 폐기, 패널, 모달이 모두 렌더링한다
+// 이들을 거쳐 모든 뷰가 시각적으로 같게 유지된다. maintenance-console-shared.tsx 를 따른다.
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
   Briefcase,

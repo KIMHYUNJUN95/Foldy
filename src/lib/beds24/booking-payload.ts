@@ -27,7 +27,7 @@ function hasStayDateFields(record: Beds24JsonRecord): boolean {
   );
 }
 
-/** Strict shape used by backfill `/bookings` responses. */
+/** backfill `/bookings` 응답에 쓰는 엄격한 형태. */
 function looksLikeBookingRecord(record: Beds24JsonRecord): boolean {
   return !!readBeds24BookingId(record) && hasStayDateFields(record);
 }
@@ -58,7 +58,7 @@ function hasWebhookCancelSignals(record: Beds24JsonRecord): boolean {
 }
 
 /**
- * Relaxed webhook shape: accepts sparse cancellation payloads without stay dates.
+ * 느슨한 웹훅 형태: 숙박 날짜가 없는 간략한 취소 페이로드도 받는다.
  */
 export function looksLikeWebhookBookingRecord(record: Beds24JsonRecord): boolean {
   if (!readBeds24BookingId(record)) return false;
@@ -67,8 +67,8 @@ export function looksLikeWebhookBookingRecord(record: Beds24JsonRecord): boolean
   return false;
 }
 
-// Bound the recursion so a pathological/cyclic-looking payload can never spin.
-// Real Beds24 payloads nest a booking at most a couple of levels deep.
+// 병적이거나 순환처럼 보이는 페이로드가 무한히 돌지 않도록 재귀 깊이를 제한한다.
+// 실제 Beds24 페이로드는 예약을 기껏해야 두어 단계까지만 중첩한다.
 const MAX_EXTRACT_DEPTH = 8;
 
 function extractWithMatcher(
@@ -86,11 +86,11 @@ function extractWithMatcher(
   if (!record) return [];
 
   const results: Beds24JsonRecord[] = matchesRecord(record) ? [record] : [];
-  // Recurse into EVERY nested object/array value — not a fixed key list — so a
-  // booking wrapped under any envelope key (Beds24 webhooks have shipped it under
-  // "booking", "data", "bookings", etc. depending on account/config) is still
-  // found. Matching requires a booking id + stay dates (or a cancel signal), so
-  // over-recursion does not produce false positives; duplicates are removed below.
+  // 고정 키 목록이 아니라 중첩된 모든 객체/배열 값으로 재귀한다. 그래서
+  // 어떤 봉투 키 아래에 예약이 감싸여 있어도(Beds24 웹훅은 계정/설정에 따라
+  // "booking", "data", "bookings" 등으로 보낸 적이 있다) 여전히
+  // 찾는다. 매칭은 예약 id + 숙박 날짜(또는 취소 신호)를 요구하므로
+  // 과도한 재귀로 오탐이 생기지 않으며, 중복은 아래에서 제거한다.
   for (const key of Object.keys(record)) {
     const child = record[key];
     if (child !== null && typeof child === "object") {
@@ -101,7 +101,7 @@ function extractWithMatcher(
 }
 
 /**
- * Drop duplicate booking records (same booking id) surfaced from different envelope levels.
+ * 서로 다른 봉투 단계에서 나온 중복 예약 레코드(같은 예약 id)를 버린다.
  *
  * 같은 예약인지는 **Beds24 자기 번호**로 본다 (2026-10-01). `readBeds24BookingId` 는 채널 번호
  * (`apiReference`)를 먼저 읽어서, 한 응답에 함께 온 그룹(다객실) 예약의 방들이 하나만 남았다.
@@ -120,14 +120,14 @@ function dedupeBookingRecords(records: Beds24JsonRecord[]): Beds24JsonRecord[] {
 }
 
 /**
- * Strict extractor for backfill `/bookings` API responses.
+ * backfill `/bookings` API 응답용 엄격한 추출기.
  */
 export function extractBeds24BookingCandidates(value: unknown): Beds24JsonRecord[] {
   return dedupeBookingRecords(extractWithMatcher(value, looksLikeBookingRecord));
 }
 
 /**
- * Relaxed extractor for Beds24 webhooks (includes sparse cancellation payloads).
+ * Beds24 웹훅용 느슨한 추출기(간략한 취소 페이로드 포함).
  */
 export function extractBeds24WebhookBookingCandidates(value: unknown): Beds24JsonRecord[] {
   return dedupeBookingRecords(extractWithMatcher(value, looksLikeWebhookBookingRecord));

@@ -128,12 +128,12 @@ function toJstDateString(date: Date) {
   }).format(date);
 }
 
-// Operational completeness window (Asia/Tokyo), keyed by ARRIVAL/stay overlap — never by booking
-// date. A reservation made a year ago whose check-in falls inside this window is still pulled, because
-// the query filters `arrivalTo`/`departureFrom`, not creation time. The window spans the CURRENT month
-// plus the next TWO months (3 months total): any check-in in "당월 + 미래 2달" must never be missing.
-// `month` is 1-indexed here while Date.UTC's month arg is 0-indexed; `month + 2` therefore lands on the
-// first day of the month AFTER the third covered month (e.g. Jul → Oct 1, covering Jul/Aug/Sep).
+// 운영 완결성 구간(Asia/Tokyo). 예약일이 아니라 ARRIVAL/숙박 겹침 기준이다
+// — 예약일이 아니다. 1년 전에 예약했더라도 체크인이 이 구간 안이면 여전히 가져온다,
+// 쿼리가 생성 시각이 아니라 `arrivalTo`/`departureFrom` 으로 거르기 때문이다. 구간은 이번 달
+// + 다음 두 달(총 3개월)을 덮는다: "당월 + 미래 2달" 의 체크인은 절대 빠지면 안 된다.
+// `month` 는 여기서 1부터 시작하고 Date.UTC 의 month 인자는 0부터 시작한다. 그래서 `month + 2` 는
+// 세 번째로 덮는 달의 다음 달 1일이 된다(예: 7월 → 10월 1일, 7/8/9월을 덮음).
 function getOperationalWindow() {
   const today = toJstDateString(new Date());
   const currentJstMonth = today.slice(0, 7);
@@ -577,9 +577,9 @@ export async function backfillBeds24Reservations(
   supabase: SupabaseClient<Database>,
   options?: { organizationId?: string; dryRun?: boolean; from?: string; toExclusive?: string },
 ): Promise<Beds24ReservationsBackfillResult> {
-  // Default window = current + next operational month (used by the daily reconcile cron and webhooks).
-  // A one-time wide catch-up (e.g. the dev backfill route) may override both bounds to pull far-future
-  // reservations the narrow window would never reach. Both bounds must be provided together.
+  // 기본 구간 = 이번 + 다음 운영 월(일일 정합 크론과 웹훅이 사용).
+  // 한 번짜리 넓은 따라잡기(예: 개발 backfill 라우트)는 두 경계를 모두 덮어써서 먼 미래의
+  // 예약까지 가져올 수 있다(좁은 구간으로는 닿지 않음). 두 경계는 함께 줘야 한다.
   const explicitFrom = isIsoDate(options?.from) ? options.from : null;
   const explicitTo = isIsoDate(options?.toExclusive) ? options.toExclusive : null;
   const explicitWindow = explicitFrom !== null && explicitTo !== null;
@@ -706,8 +706,8 @@ export async function backfillBeds24Reservations(
       toIsoDate(readString(row, ["checkOut", "departure", "endDate"]));
     const propertyExternalId = readString(row, ["propId", "prop_id", "propertyId", "property_id"]);
     const propertyName = readString(row, ["propName", "prop_name", "propertyName", "property_name"]);
-    // Real Beds24 /bookings payloads in this account expose the joinable room
-    // identity in roomId. unitId is a local unit index and must stay fallback-only.
+    // 이 계정의 실제 Beds24 /bookings 페이로드는 조인 가능한 방
+    // 식별자를 roomId 에 담는다. unitId 는 로컬 유닛 인덱스이므로 폴백으로만 써야 한다.
     const externalRoomId = readString(row, ["roomId", "room_id", "unitId", "unit_id"]);
     const roomLabel = readString(row, ["unitName", "unit_name", "roomName", "room_name", "roomLabel"]);
     const guestFirstName = readString(row, ["guestFirstName", "guest_first_name", "firstName", "first_name"]);
@@ -753,12 +753,12 @@ export async function backfillBeds24Reservations(
       continue;
     }
 
-    // Prefer the operator-controlled property MASTER name (resolved by external
-    // property id) over the per-booking payload propName. Beds24 responses carry
-    // propName inconsistently — some bookings omit it and fall back to the raw
-    // property id — so trusting the payload split one building ("Kabukicho") into
-    // two ("Kabukicho" + "176431"). The master name is the single source of truth.
-    // See docs/planning/01-decision-log.md → 2026-07-22.
+    // 예약별 페이로드의 propName 보다 운영자가 관리하는 property MASTER 이름(외부
+    // property id 로 해석)을 우선한다. Beds24 응답은
+    // propName 이 일관되지 않다 — 일부 예약은 빠져 있고 원시
+    // property id 로 폴백한다 — 그래서 페이로드를 믿으면 한 건물("Kabukicho")이
+    // 둘("Kabukicho" + "176431")로 갈라졌다. 마스터 이름이 유일한 기준이다.
+    // docs/planning/01-decision-log.md → 2026-07-22 참고.
     const masterPropertyName = propertyExternalId
       ? propertyNameByExternalPropertyId.get(propertyExternalId) ?? null
       : null;
@@ -816,10 +816,10 @@ export async function backfillBeds24Reservations(
     roomLabelByExternalRoom.set(`${row.organization_id}:${ext}`, row.room_label);
   }
 
-  // Resolve every booking to a final reservation row in memory first, then write in
-  // bulk. Per-row upserts (one network round-trip each) were the bottleneck: ~hundreds
-  // of sequential round-trips from a serverless function exceeded the 60s timeout. A
-  // chunked bulk upsert collapses that to a handful of round-trips.
+  // 모든 예약을 먼저 메모리에서 최종 예약 행으로 풀고, 그다음
+  // 한꺼번에 쓴다. 행마다 upsert(왕복 한 번씩)가 병목이었다: 수백 번의
+  // 서버리스 함수 순차 왕복이 60초 타임아웃을 넘겼다.
+  // 청크로 나눈 벌크 upsert 는 이를 몇 번의 왕복으로 줄인다.
   type PreparedRow = {
     row: Database["public"]["Tables"]["reservations"]["Insert"];
     cancelled: boolean;
@@ -856,8 +856,8 @@ export async function backfillBeds24Reservations(
         : null;
     const resolvedRoomLabel = (resolvedRoomLabelFromExternalId ?? booking.roomLabel).trim();
 
-    // Store with "(unknown)" when room label can't be resolved rather than silently dropping.
-    // This preserves the reservation record; recoverReservationsRoomLabels can fix it later.
+    // 방 라벨을 풀 수 없으면 조용히 버리지 않고 "(unknown)" 으로 저장한다.
+    // 예약 레코드가 보존되고, 나중에 recoverReservationsRoomLabels 가 고칠 수 있다.
     const finalRoomLabel = resolvedRoomLabel || "(unknown)";
     if (!resolvedRoomLabel) {
       console.warn("[beds24/backfill] warn:room_label_unresolved — storing as (unknown)", {
@@ -909,8 +909,8 @@ export async function backfillBeds24Reservations(
       owners.push({ source_reservation_id: storedReservationId, bookingId: booking.beds24BookingId });
       existingKeyOwners.set(ownersKey, owners);
     }
-    // Dedup on the table's unique key so one bulk statement never tries to affect the
-    // same row twice (Postgres ON CONFLICT rejects that). Last write wins.
+    // 테이블의 유니크 키로 중복을 제거해서 벌크 문 하나가 같은 행을
+    // 두 번 건드리지 않게 한다(Postgres ON CONFLICT 가 거부함). 마지막 쓰기가 이긴다.
     preparedByKey.set(`${organizationId}:${booking.source}:${storedReservationId}`, {
       cancelled: booking.status === "cancelled",
       row: {
@@ -1086,7 +1086,7 @@ export async function recoverReservationsRoomLabels(
   supabase: SupabaseClient<Database>,
   organizationId?: string,
 ): Promise<{ processed: number; recovered: number; errors: string[] }> {
-  // 1. Fetch active rooms to build a mapping from external_room_id -> room_label
+  // 1. 활성 방을 가져와 external_room_id -> room_label 매핑을 만든다
   let roomQuery = supabase
     .from("rooms")
     .select("organization_id, external_room_id, room_label")
@@ -1102,7 +1102,7 @@ export async function recoverReservationsRoomLabels(
     return { processed: 0, recovered: 0, errors: [roomResult.error.message] };
   }
 
-  const roomMap = new Map<string, string>(); // key: "orgId:externalRoomId", value: room_label
+  const roomMap = new Map<string, string>(); // 키: "orgId:externalRoomId", 값: room_label
   const recoveryRoomRows = (roomResult.data ?? []) as Array<{
     organization_id: string;
     external_room_id: string | null;
@@ -1114,9 +1114,9 @@ export async function recoverReservationsRoomLabels(
     roomMap.set(`${r.organization_id}:${ext}`, r.room_label);
   }
 
-  // 2. Fetch existing reservations to check for mapping mismatch.
-  // Do not filter by source = "beds24": real rows are stored with channel names
-  // such as Booking.com / Airbnb, so historical broken rows would be skipped.
+  // 2. 매핑 불일치를 확인하려고 기존 예약을 가져온다.
+  // source = "beds24" 로 거르지 않는다: 실제 행은 Booking.com / Airbnb 같은 채널 이름으로
+  // 저장되므로 과거의 깨진 행이 건너뛰어지게 된다.
   //
   // **페이지로 끝까지 읽는다.** PostgREST 는 상한을 주지 않으면 **1,000행**만 돌려준다 — 조용히,
   // 오류 없이. 예약이 3,505건인 상태에서 복구를 돌렸더니 앞의 1,000건만 보고 나머지는 손도 대지
@@ -1194,8 +1194,8 @@ export async function recoverReservationsRoomLabels(
   const errors: string[] = [];
   for (const res of reservationRows) {
     processed++;
-    // Historical rows may have mixed payload shapes, but the joinable room key
-    // is roomId when present. Keep unitId as a last-resort fallback only.
+    // 과거 행은 페이로드 형태가 섞여 있을 수 있지만 조인 가능한 방 키는
+    // 있으면 roomId 다. unitId 는 최후의 폴백으로만 둔다.
     const rawRoomId = res.raw_room_id;
     if (!rawRoomId) continue;
 
@@ -1208,10 +1208,10 @@ export async function recoverReservationsRoomLabels(
       }
       const raw = asRecord((rawResult.data as { raw_payload: unknown } | null)?.raw_payload);
       if (!raw) continue;
-      // Compute the corrected source_reservation_id using the resolved room label.
-      // This prevents duplicate rows: if we only fix room_label but leave source_reservation_id
-      // as "...::room::(unknown)", the next backfill/webhook will create a new "...::room::5F"
-      // row instead of updating the existing one.
+      // 해석된 방 라벨로 올바른 source_reservation_id 를 계산한다.
+      // 중복 행을 막기 위해서다: room_label 만 고치고 source_reservation_id 를
+      // "...::room::(unknown)" 으로 두면 다음 backfill/웹훅이 기존 행을 갱신하지 않고
+      // 새 "...::room::5F" 행을 만들게 된다.
       const originalId = toOriginalReservationId(res.source_reservation_id);
       const target = await resolveRelabelTarget(supabase, {
         organizationId: res.organization_id,
@@ -1229,7 +1229,7 @@ export async function recoverReservationsRoomLabels(
       const conflictRow = target.sameBookingRow;
 
       if (conflictRow) {
-        // A properly-labeled row of the SAME Beds24 booking already exists — delete the stale row.
+        // 같은 Beds24 예약의 제대로 라벨링된 행이 이미 있다 — 오래된 행을 삭제한다.
         const keptId = conflictRow.id;
         console.warn("[beds24/recovery] dedup: deleting stale (unknown) row in favor of resolved row", {
           staleId: res.id,
@@ -1263,7 +1263,7 @@ export async function recoverReservationsRoomLabels(
           recovered++;
         }
       } else {
-        // No conflict — update room_label and source_reservation_id atomically.
+        // 충돌 없음 — room_label 과 source_reservation_id 를 원자적으로 갱신한다.
         const updateResult = await supabase
           .from("reservations")
           .update({ room_label: expectedRoomLabel, source_reservation_id: correctedSourceId })

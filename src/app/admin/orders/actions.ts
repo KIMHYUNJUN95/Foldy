@@ -27,11 +27,11 @@ import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/types/database";
 
-// Excel / PDF 내보내기 for 주문·비품. Replaced the old CSV download on 2026-07-14 — the client sends
-// only the current filter values and this action re-queries the list server-side, so the file always
-// matches exactly what the filtered screen shows. Rendering goes through the canonical admin table
-// exporters (src/lib/admin-table-workbook.ts / admin-table-report.ts) shared by every /admin/* export.
-// See docs/product/10-order-request-workflow.md.
+// 주문·비품 Excel / PDF 내보내기. 2026-07-14 에 예전 CSV 다운로드를 대체했다 — 클라이언트는
+// 현재 필터 값만 보내고 이 액션이 서버에서 목록을 다시 조회하므로, 파일은 항상
+// 필터링된 화면이 보여 주는 것과 정확히 같다. 렌더링은 모든 /admin/* 내보내기가 공유하는 공용 관리자 표
+// 내보내기 도구(src/lib/admin-table-workbook.ts / admin-table-report.ts)를 거친다.
+// 참고: docs/product/10-order-request-workflow.md.
 
 export type OrdersExportFilters = {
   startDate?: string;

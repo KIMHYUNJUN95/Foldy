@@ -6,15 +6,15 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
 /**
- * MobileFab — the single canonical bottom-right floating action button for mobile
- * list screens (create / compose entry point). Shared so every feature's FAB is
- * visually identical.
+ * MobileFab — 모바일 목록 화면(생성 / 작성 진입점)의 오른쪽 아래에 떠 있는
+ * 유일한 표준 플로팅 액션 버튼. 모든 기능의 FAB 이
+ * 시각적으로 동일하도록 공용으로 쓴다.
  *
- *   - portals to <body> so the mobile shell's pull-to-refresh transform can't drag it
- *   - fixed bottom-right, sits above the bottom tab bar, respects the safe-area inset
- *   - 56px navy circle, Plus glyph, soft navy shadow, press-scale feedback
+ *   - <body> 로 포털되어 모바일 셸의 당겨서 새로고침 transform 이 끌고 가지 못한다
+ *   - 오른쪽 아래 고정, 하단 탭 바 위에 놓이며 safe-area 인셋을 지킨다
+ *   - 56px 네이비 원, Plus 글리프, 은은한 네이비 그림자, 누름 시 축소 피드백
  *
- * Pass `href` to navigate, or `onClick` for custom behavior. `label` is the aria-label.
+ * 이동은 `href`, 커스텀 동작은 `onClick` 을 넘긴다. `label` 은 aria-label.
  */
 export function MobileFab({
   href,
@@ -25,12 +25,12 @@ export function MobileFab({
   href?: string;
   onClick?: () => void;
   label: string;
-  /** Optional glyph override (defaults to a plus). */
+  /** 선택: 글리프 교체 (기본은 플러스). */
   icon?: React.ReactNode;
 }) {
   const router = useRouter();
-  // Client-only: render after hydration so the portal target (document.body) exists
-  // and server/client markup match. useSyncExternalStore avoids set-state-in-effect.
+  // 클라이언트 전용: 하이드레이션 이후 렌더해 포털 대상(document.body)이 존재하고
+  // 서버/클라이언트 마크업이 일치하게 한다. useSyncExternalStore 로 set-state-in-effect 를 피한다.
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,

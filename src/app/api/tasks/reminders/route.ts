@@ -6,16 +6,16 @@ import { runIdDocumentExpiryReminders } from "@/lib/notifications/id-document-re
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 
-// Daily task-reminder evaluator for Todo / Shared Task (due-soon + overdue).
+// 할 일 / 공유 할 일의 일일 알림 평가기(마감 임박 + 기한 초과).
 //
-// These two notification types are inherently time-based — no user action triggers them —
-// so they need a low-frequency scheduled evaluation. This endpoint is that narrowly-scoped
-// path: it scans active tasks due today-or-earlier and fans out one deduped reminder per
-// task per recipient. It is NOT a general scheduler/instance-generation engine; see
-// `src/lib/notifications/task-reminders.ts` for the exact rules and dedupe strategy.
+// 이 두 알림 유형은 본질적으로 시간 기반이라 사용자 동작이 트리거하지 않는다 —
+// 그래서 저빈도 예약 평가가 필요하다. 이 엔드포인트가 그 용도로만 좁게 쓰인다:
+// 오늘 이하가 기한인 활성 할 일을 훑어, 할 일마다 수신자별로 중복 제거된 알림 한 건씩
+// 내보낸다. 범용 스케줄러/인스턴스 생성 엔진이 아니다. 정확한 규칙과 중복 제거 방식은
+// `src/lib/notifications/task-reminders.ts` 를 본다.
 //
-// Driven once daily by Vercel Cron (see vercel.json). Authorized with CRON_SECRET so it
-// cannot be triggered by anonymous callers.
+// Vercel Cron 이 하루 한 번 호출한다(vercel.json 참고). CRON_SECRET 으로 인증해
+// 익명 호출자가 트리거할 수 없다.
 //
 // 같은 하루 한 번에 「확인 안 된 오래된 가입 정리」도 돈다(2026-10-09) — 크론 칸을 하나 더 쓰지 않으려고 여기 붙였다.
 // 알림과 서로 막지 않게 따로 감싼다(정리가 실패해도 알림 결과는 그대로 돌려준다).

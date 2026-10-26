@@ -1,17 +1,17 @@
-// Attendance — site master + QR token backend helpers (Step 2).
+// 근태 — 사업장 마스터 + QR 토큰 백엔드 헬퍼 (2단계).
 //
-// Caller-agnostic, server-only data helpers for attendance SITE MASTER and QR LIFECYCLE. These are the
-// reusable primitives the future OWNER-ONLY web-dashboard server actions will call, and what the dev
-// temp-QR tool (src/app/api/dev/attendance/temp-qr) uses to provision test data.
+// 근태 사업장 마스터와 QR 수명 주기를 위한, 호출자에 구애받지 않는 서버 전용 데이터 헬퍼. 앞으로 만들
+// 소유자 전용 웹 대시보드 서버 액션이 호출할 재사용 가능한 기본 단위이며, 개발용
+// 임시 QR 도구(src/app/api/dev/attendance/temp-qr)가 테스트 데이터를 만들 때도 쓴다.
 //
-// IMPORTANT — authorization boundary:
-//   These functions DO NOT check who the caller is. Site master / QR issuance is OWNER-ONLY per the
-//   product rules (docs/product/21 → "Owner-only Authority"), and that check MUST be enforced by the
-//   caller BEFORE invoking these (the web-dashboard server action verifies `role === 'owner'`; the dev
-//   tool is gated to local development). Every helper is organization-scoped — always pass the owner's
-//   organization id so org isolation holds even though the service client bypasses RLS.
+// 중요 — 권한 경계:
+//   이 함수들은 호출자가 누구인지 확인하지 않는다. 사업장 마스터 / QR 발급은 제품 규칙(docs/product/21 → "Owner-only Authority")상
+//   소유자 전용이며, 그 확인은 이 함수들을 호출하기 전에
+//   호출자가 반드시 해야 한다 (웹 대시보드 서버 액션은 `role === 'owner'` 를 검증하고, 개발용
+//   도구는 로컬 개발에서만 열린다). 모든 헬퍼는 조직 단위로 동작한다 — service 클라이언트가 RLS 를 우회하더라도
+//   조직 격리가 유지되도록 항상 소유자의 조직 id 를 넘겨야 한다.
 //
-// No worker clock-in/out, break, correction, or payroll logic here — that is Step 3+.
+// 여기에는 작업자 출근/퇴근, 휴게, 정정, 급여 로직이 없다 — 그것은 3단계 이후.
 
 import "server-only";
 import { randomBytes } from "node:crypto";
@@ -21,8 +21,8 @@ import type { AttendanceSiteRow, AttendanceQrTokenRow } from "@/lib/attendance";
 import { ATTENDANCE_DEFAULT_RADIUS_METERS } from "@/lib/attendance";
 import type { Database } from "@/types/database";
 
-// The project's database.ts omits Relationships, so service.rpc() is not typed. This provides just
-// enough typing for the one RPC we call (mirrors src/app/onboarding/actions.ts).
+// 프로젝트의 database.ts 는 Relationships 를 생략해 service.rpc() 에 타입이 붙지 않는다. 호출하는 RPC 하나에
+// 필요한 최소한의 타입만 제공한다 (src/app/onboarding/actions.ts 와 같음).
 type IssueQrRpcClient = {
   rpc(
     fn: "issue_attendance_qr",
@@ -53,14 +53,14 @@ export type UpdateAttendanceSitePatch = {
   isActive?: boolean;
 };
 
-/** A site-specific, server-verifiable QR token value. */
+/** 사업장 고유의, 서버가 검증할 수 있는 QR 토큰 값. */
 export function generateAttendanceQrToken(): string {
   return `att_${randomBytes(24).toString("base64url")}`;
 }
 
-// ── Reads ───────────────────────────────────────────────────────────────────────
+// ── 조회 ──
 
-/** All sites for an org, newest first. (Active + inactive — the admin list shows both.) */
+/** 조직의 모든 사업장, 최신순. (활성 + 비활성 — 관리자 목록은 둘 다 보여준다.) */
 export async function listAttendanceSites(organizationId: string): Promise<AttendanceSiteRow[]> {
   const { data, error } = await getSupabaseServiceClient()
     .from("attendance_sites")
@@ -73,7 +73,7 @@ export async function listAttendanceSites(organizationId: string): Promise<Atten
   return (data ?? []) as AttendanceSiteRow[];
 }
 
-/** One site (org-scoped), or null if not found in that org. */
+/** 사업장 하나(조직 범위), 그 조직에 없으면 null. */
 export async function getAttendanceSite(
   organizationId: string,
   siteId: string,
@@ -90,7 +90,7 @@ export async function getAttendanceSite(
   return (data as AttendanceSiteRow | null) ?? null;
 }
 
-/** The single active QR token for a site, or null if none is active. */
+/** 사업장의 단일 활성 QR 토큰, 활성인 것이 없으면 null. */
 export async function getActiveQrToken(
   organizationId: string,
   siteId: string,
@@ -108,7 +108,7 @@ export async function getActiveQrToken(
   return (data as AttendanceQrTokenRow | null) ?? null;
 }
 
-/** Full QR token history for a site (active + revoked), newest first. */
+/** 사업장의 전체 QR 토큰 이력 (활성 + 폐기), 최신순. */
 export async function getQrTokenHistory(
   organizationId: string,
   siteId: string,
@@ -125,7 +125,7 @@ export async function getQrTokenHistory(
   return (data ?? []) as AttendanceQrTokenRow[];
 }
 
-// ── Writes (service-role; caller must already be authorized as owner) ─────────────
+// ── 쓰기 (service-role, 호출자는 이미 소유자로 권한이 확인되어 있어야 함) ──
 
 export async function createAttendanceSite(
   input: CreateAttendanceSiteInput,
@@ -178,7 +178,7 @@ export async function updateAttendanceSite(
   return data as AttendanceSiteRow;
 }
 
-/** Activate / deactivate a site without touching its other fields. */
+/** 다른 필드는 건드리지 않고 사업장을 활성화 / 비활성화한다. */
 export async function setAttendanceSiteActive(
   organizationId: string,
   siteId: string,
@@ -188,9 +188,9 @@ export async function setAttendanceSiteActive(
 }
 
 /**
- * Issue (or reissue) the active QR token for a site. Atomic via the `issue_attendance_qr` Postgres
- * function: the previous active token is deactivated and linked to the new one, preserving the
- * "one active token per site" guarantee and the audit chain.
+ * 사업장의 활성 QR 토큰을 발급(또는 재발급)한다. `issue_attendance_qr` Postgres
+ * 함수로 원자적으로 처리: 이전 활성 토큰은 비활성화되고 새 토큰에 연결되어
+ * "사업장당 활성 토큰은 하나" 보장과 감사 체인이 유지된다.
  */
 export async function issueAttendanceQr(params: {
   organizationId: string;
@@ -211,7 +211,7 @@ export async function issueAttendanceQr(params: {
   return data;
 }
 
-/** Deactivate the active QR token for a site without issuing a replacement. */
+/** 교체 토큰을 발급하지 않고 사업장의 활성 QR 토큰을 비활성화한다. */
 export async function revokeAttendanceQr(organizationId: string, siteId: string): Promise<void> {
   const { error } = await getSupabaseServiceClient()
     .from("attendance_qr_tokens")
@@ -224,7 +224,7 @@ export async function revokeAttendanceQr(organizationId: string, siteId: string)
   }
 }
 
-// ── QR deep link (2026-07-31) ──────────────────────────────────────────────
+// ── QR 딥링크 (2026-07-31) ──
 // 휴대폰 기본 카메라로 QR 을 찍으면 `/mobile/attendance/capture?token=…` 로 들어온다. 그 진입
 // 화면이 "어느 건물의 QR 인지"를 먼저 보여주고 출근/퇴근을 고르게 하려면, 제출 전에 토큰 →
 // 사이트 이름을 한 번 조회해야 한다.

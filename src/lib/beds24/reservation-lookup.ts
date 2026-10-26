@@ -31,8 +31,8 @@ function isActiveReservationStatus(status: Database["public"]["Enums"]["reservat
 }
 
 /**
- * Finds reservation rows sharing the same original (channel) id, regardless of channel source.
- * Matches exact original id and `originalId::room::*` suffix variants.
+ * 채널 소스와 무관하게 같은 원본(채널) id 를 공유하는 예약 행을 찾는다.
+ * 원본 id 와 정확히 일치하는 것, 그리고 `originalId::room::*` 접미사 변형과 매치한다.
  *
  * **`beds24BookingId` 를 넘기면 그 Beds24 예약의 행만 돌려준다** (2026-10-01). 채널 번호
  * (`apiReference`)가 같아도 Beds24 id 가 다르면 그룹(다객실) 예약의 **다른 방**이다 — 그 행을
@@ -134,7 +134,7 @@ export async function cancelReservationRowsByOriginalBookingId(params: {
 }
 
 /**
- * Ensures no active rows remain for a cancelled Beds24 booking (source-agnostic).
+ * 취소된 Beds24 예약에 활성 행이 남지 않게 한다 (소스 무관).
  */
 export async function cleanupActiveRowsForCancelledBooking(params: {
   supabase: SupabaseClient<Database>;
@@ -192,9 +192,9 @@ function pickPreferredCancelledRow(rows: ReservationLookupRow[], keepReservation
 }
 
 /**
- * Post-cancel consistency pass: cancel any remaining active rows and remove stale
- * duplicate rows for the same Beds24 booking (unknown/room suffix variants).
- * Group siblings (same channel id, different Beds24 id) are never touched.
+ * 취소 후 정합성 점검: 남아 있는 활성 행을 취소하고, 같은 Beds24 예약의
+ * 오래된 중복 행(알 수 없음/방 접미사 변형)을 제거한다.
+ * 그룹 형제(같은 채널 id, 다른 Beds24 id)는 절대 건드리지 않는다.
  */
 export async function finalizeCancelledBookingConsistency(params: {
   supabase: SupabaseClient<Database>;

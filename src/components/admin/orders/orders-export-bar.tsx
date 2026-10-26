@@ -9,8 +9,8 @@ import {
 } from "@/app/admin/orders/actions";
 
 /**
- * Client bridge between the server-rendered 주문·비품 filter bar and the canonical export buttons.
- * Only the current filter values cross the boundary — the server action re-queries the rows.
+ * 서버에서 렌더링한 주문·비품 필터 바와 공용 내보내기 버튼을 잇는 클라이언트 브리지.
+ * 현재 필터 값만 경계를 넘는다 — 서버 액션이 행을 다시 조회한다.
  */
 export function OrdersExportBar({
   filters,

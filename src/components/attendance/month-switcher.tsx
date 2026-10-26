@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * MonthSwitcher — shared month navigator for attendance history & pay screens.
- * Layout: ‹ prev · [month ▾] · next › — clicking the month label opens a custom
- * (non-native) dropdown listing the last 12 months. Navigates via `?ym=YYYY-MM`.
- * Scoped under `.att`; visual tokens reuse the attendance palette. UI-only.
+ * MonthSwitcher — 근태 기록 · 급여 화면이 함께 쓰는 월 이동기.
+ * 레이아웃: ‹ 이전 · [월 ▾] · 다음 › — 월 라벨을 누르면 최근 12개월을 나열하는 커스텀
+ * (비네이티브) 드롭다운이 열린다. `?ym=YYYY-MM` 으로 이동한다.
+ * `.att` 범위에서 동작하며 시각 토큰은 근태 팔레트를 재사용한다. UI 전용.
  */
 
 import { useState } from "react";
@@ -19,7 +19,7 @@ function shiftYm(ym: string, delta: number): string {
   return `${ny}-${String(nm).padStart(2, "0")}`;
 }
 
-/** "6월" / "6月" / "June"; prefixes the year when it differs from the reference ym. */
+/** "6월" / "6月" / "June"; 기준 ym 과 연도가 다르면 연도를 앞에 붙인다. */
 function ymLabel(ym: string, locale: string, refYm: string): string {
   const [y, m] = ym.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1, 1));

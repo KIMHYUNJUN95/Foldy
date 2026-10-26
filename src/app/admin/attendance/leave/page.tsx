@@ -21,10 +21,10 @@ import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 const STATUS_GROUPS: LeaveStatusGroup[] = ["pending", "approved", "rejectedCancelled", "all"];
 const LEAVE_TYPES: LeaveType[] = ["annual", "paid", "special", "other"];
 
-// Admin · Attendance · Leave approval review.
-// Sub-tabs: 승인 심사 / 팀 캘린더 / 직원 잔여·부여 / 문서 / 대장. Approver management moved to the
-// Users screen (/admin/users) where all role/permission granting is unified, so the former
-// 승인자 관리 sub-tab was removed. See docs/product/26-annual-leave-workflow.md.
+// 관리자 · 근태 · 휴가 승인 검토.
+// 하위 탭: 승인 심사 / 팀 캘린더 / 직원 잔여·부여 / 문서 / 대장. 승인자 관리는
+// 사용자 화면(/admin/users)에서 모든 역할/권한 부여를 통합하므로, 예전
+// 승인자 관리 하위 탭은 제거됐다. 참고: docs/product/26-annual-leave-workflow.md.
 export default async function AdminAttendanceLeavePage({
   searchParams,
 }: {
@@ -50,17 +50,17 @@ export default async function AdminAttendanceLeavePage({
     : undefined;
   const search = typeof params.q === "string" ? params.q : undefined;
 
-  // The client filters by status group / type / search locally (its tabs are buttons, not links) and
-  // needs the FULL set to compute the per-group counts, so always fetch every group here. The URL's
-  // statusGroup/type/search are passed through only as the client's initial UI state (deep-linking).
+  // 클라이언트가 상태 그룹 / 유형 / 검색으로 로컬 필터링하고(탭은 링크가 아니라 버튼), 그룹별 건수를
+  // 계산하려면 전체 데이터가 필요하므로 여기서는 항상 모든 그룹을 가져온다. URL 의
+  // statusGroup/type/search 는 클라이언트의 초기 UI 상태로만 전달한다 (딥링크).
   const [queue, applicants, balances, documents, ledger, badgeStats] = await Promise.all([
     getAdminLeaveQueue(session, { statusGroup: "all" }),
     listLeaveApplicants(session),
     listAdminLeaveBalances(session),
     listLeaveDocuments(session),
     listLeaveLedger(session),
-    // Same badge counts every other attendance tab shows. Without these the 검토 큐 / 급여 검토 /
-    // 교통비 검토 chips vanish on this tab only, and the whole tab row shifts left.
+    // 다른 모든 근태 탭이 보여주는 것과 같은 배지 건수. 이게 없으면 검토 큐 / 급여 검토 /
+    // 교통비 검토 칩이 이 탭에서만 사라지고, 탭 줄 전체가 왼쪽으로 밀린다.
     getAdminAttendanceBadgeStats(session),
   ]);
 

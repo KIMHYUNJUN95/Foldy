@@ -1,10 +1,10 @@
 "use client";
 
 // Admin · Attendance · 추가수당 (attendance allowance) management section.
-// Lives inside /admin/attendance/wages (no separate tab, per the MVP design). Privileged create/cancel
-// of busy-day / short-staffed-day extra pay for a specific Tokyo operating date. Base rates in
-// hourly_rate_history are never touched here. All writes go through service-role server actions that
-// also block changes to an already-finalized user-month.
+// /admin/attendance/wages 안에 있다(MVP 디자인대로 별도 탭 없음). 특정 도쿄 운영일의 바쁜 날 / 인력 부족일
+// 추가 수당을 권한자가 등록/취소한다. hourly_rate_history 의 기본 시급은 여기서
+// 절대 건드리지 않는다. 모든 쓰기는 service-role 서버 액션을 거치며,
+// 이미 마감된 사용자-월에 대한 변경도 막는다.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -46,7 +46,7 @@ export function AttendanceAllowancesSection({
 }: {
   allowances: AdminAllowanceRow[];
   staff: { userId: string; userName: string }[];
-  defaultDate: string; // today (Tokyo)
+  defaultDate: string; // 오늘(도쿄)
   locale: Locale;
   localeTag: string;
 }) {

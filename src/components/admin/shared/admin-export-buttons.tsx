@@ -1,9 +1,9 @@
 "use client";
 
-// CANONICAL admin-console export control: the Excel + PDF `chipbtn` pair. Every "내보내기" in
-// /admin/* renders through this component — do not hand-roll export buttons or reintroduce CSV.
-// Pair it with buildAdminTableWorkbookBase64 / buildAdminTableReportHtml on the server side.
-// See CLAUDE.md → "Admin dashboard shared design contract".
+// 관리자 콘솔의 표준 내보내기 컨트롤: Excel + PDF `chipbtn` 한 쌍. 모든 "내보내기"는
+// /admin/* 의 모든 내보내기는 이 컴포넌트로 그린다 — 내보내기 버튼을 직접 만들거나 CSV 를 되살리지 말 것.
+// 서버 쪽에서는 buildAdminTableWorkbookBase64 / buildAdminTableReportHtml 과 짝지어 쓴다.
+// CLAUDE.md → "Admin dashboard shared design contract" 참고.
 //
 // 모션(2026-10-15, 시안 Motion-PC-Export-PC) — 누름 → 도는 고리 → 결과가 같은 버튼 자리에서:
 // - Excel: 초록 체크 「다운로드됨」 + 버튼 아래 파일 카드(XLS · 파일 이름 · 크기)
@@ -22,11 +22,11 @@ import "./admin-export-buttons.css";
 export type AdminExportLabels = Dictionary["admin"]["shared"];
 
 type AdminExportButtonsProps = {
-  /** Server action returning the .xlsx as base64. */
+  /** .xlsx 를 base64 로 돌려주는 서버 액션. */
   onExportXls: () => Promise<AdminWorkbookExportResult>;
-  /** Server action returning the print-ready HTML document. */
+  /** 인쇄용 HTML 문서를 돌려주는 서버 액션. */
   onExportPdf: () => Promise<AdminReportExportResult>;
-  /** Pass `true` when there are no rows to export. */
+  /** 내보낼 행이 없으면 `true` 를 넘긴다. */
   disabled?: boolean;
   onToast: (message: string) => void;
   labels: AdminExportLabels;
@@ -119,8 +119,8 @@ export function AdminExportButtons({
   function handleExportPdf() {
     if (pdfPending) return;
     setCard(null);
-    // Open the tab synchronously (still inside the click handler) so pop-up blockers don't kill it
-    // once the server action's await resolves.
+    // 클릭 핸들러 안에서 동기적으로 탭을 연다. 서버 액션의 await 가 끝난 뒤 열면
+    // 팝업 차단기가 막아 버리기 때문이다.
     const win = window.open("", "_blank");
     startPdfExport(async () => {
       try {

@@ -78,7 +78,7 @@ export async function startCleaningSession(formData: FormData) {
     }
   }
 
-  // Block re-starting a room that already has an in_progress or completed session today — 같은 실제 방의 다른 계정
+  // 오늘 이미 in_progress 또는 completed 세션이 있는 방은 다시 시작하지 못하게 막는다 — 같은 실제 방의 다른 계정
   // 라벨로 시작한 것도 막는다(「401」로 시작했는데 「401_2_2」로 또 시작하지 않게).
   // 남이 시작한 방도 봐야 하므로 서비스 키로 읽는다(2026-10-26) — RLS 로는 `cleaning.read_all` 없는 직원이 본인 세션만
   // 받아 같은 방을 두 번 시작할 수 있었다. 읽기에 실패하면 막는다(확인 못 한 채 시작시키지 않는다).
@@ -161,8 +161,8 @@ export async function cancelCleaningSession(formData: FormData) {
     redirectWithError("not_allowed");
   }
 
-  // DB check constraint requires completed_at + duration_seconds to be non-null
-  // for both 'completed' and 'cancelled' statuses.
+  // DB check 제약은 'completed' 와 'cancelled' 상태 모두
+  // completed_at + duration_seconds 가 null 이 아닐 것을 요구한다.
   const cancelledAt = new Date();
   const durationSeconds = Math.max(
     0,

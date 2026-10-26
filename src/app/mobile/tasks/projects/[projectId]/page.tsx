@@ -41,7 +41,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     navBadgesPromise,
   ]);
 
-  // Not a participant (or missing project) → back to the Projects tab.
+  // 참여자가 아니거나 프로젝트가 없으면 → 프로젝트 탭으로 돌려보낸다.
   if (!project) {
     redirect("/mobile/tasks?view=projects");
   }

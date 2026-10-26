@@ -15,7 +15,7 @@ import {
 } from "@/lib/tasks";
 import { getVisibleProjects, type ProjectSummary } from "@/lib/projects";
 
-/** One net completion of a task on a Tokyo day (from the `completed`/`reopened` log). */
+/** 도쿄 하루 동안의 작업 순완료 한 건 (`completed`/`reopened` 로그에서). */
 export type CompletionRecord = { taskId: string; day: string; byUserId: string | null };
 
 export type AdminTasksData = {
@@ -46,11 +46,11 @@ async function getCompletionRecords(session: AppSession): Promise<CompletionReco
 }
 
 /**
- * Loads everything the admin Todoist console needs in one call — the viewer's visible tasks
- * (personal + shared + directed), their shared projects, the org's shareable members (for the
- * share / directive picker), the completion log, and the viewer identity. All reads are the existing
- * session-scoped task/project libs (surface-agnostic); the console filters per-view client-side,
- * exactly like the mobile TasksWorkspace. See docs/product/28-admin-todoist-console.md.
+ * 관리자 Todoist 콘솔이 필요로 하는 모든 것을 한 번에 불러온다 — 보는 사람에게 보이는 작업
+ * (개인 + 공유 + 지시), 공유 프로젝트, 조직의 공유 가능한 구성원(공유 / 지시 피커용),
+ * 완료 로그, 그리고 보는 사람 신원. 모든 읽기는 기존의
+ * 세션 범위 작업/프로젝트 라이브러리(화면 무관)를 쓰고, 콘솔은 보기별로 클라이언트에서 거른다 —
+ * 모바일 TasksWorkspace 와 똑같다. 참고: docs/product/28-admin-todoist-console.md.
  */
 export async function getAdminTasksData(session: AppSession): Promise<AdminTasksData> {
   const me = {

@@ -13,10 +13,10 @@ import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
 
-// Admin · Attendance · Hourly Wage Management (Slice 7).
-// Per-member hourly rate management with inline live editor wired to
-// `setHourlyRate` server action (audit-logged, gated by attendanceCan).
-// Past closed rate tiers are non-editable (no retroactive change).
+// 관리자 · 근태 · 시급 관리 (Slice 7).
+// 구성원별 시급 관리: 인라인 실시간 편집기가
+// `setHourlyRate` 서버 액션에 연결된다 (감사 로그 기록, attendanceCan 으로 게이트).
+// 마감된 과거 시급 구간은 수정할 수 없다 (소급 변경 불가).
 export default async function AdminAttendanceWagesPage({
   searchParams,
 }: {

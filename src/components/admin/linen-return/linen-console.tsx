@@ -6,7 +6,7 @@
 // 이 화면은 사무실의 기록 관리 콘솔이다. 신규 등록은 계속 현장 모바일 전용이라 "등록" 액션이 없고,
 // 대신 이미 등록된 기록의 확인 · 수정 · 삭제만 한다. 조회 기간은 URL(searchParams)로 관리해서
 // 서버에서 조직 스코프 쿼리로 좁힌다 — 다른 조직/기간의 행이 브라우저로 내려오지 않는다.
-// See docs/product/19-linen-defect-workflow.md → "Admin Dashboard — Linen Return Record Management".
+// 참고: docs/product/19-linen-defect-workflow.md → "Admin Dashboard — Linen Return Record Management".
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";

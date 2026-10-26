@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Staff Suggestions — one comment row (Step 5).
- * Renders a thread comment in the finalized `.cmt` style and adds the smallest edit/delete
- * affordances for the CURRENT user's own comments (author-only, independent of suggestion status).
- * Editing is inline text (existing photos are preserved); delete is a two-step inline confirm.
+ * 직원 건의 — 댓글 한 줄(Step 5).
+ * 스레드 댓글을 확정된 `.cmt` 스타일로 그리고, 현재 사용자 본인 댓글에 가장 작은 수정/삭제
+ * 기능을 더한다(작성자 전용, 건의 상태와 무관).
+ * 수정은 인라인 텍스트(기존 사진은 유지), 삭제는 2단계 인라인 확인.
  */
 
 import { useState, useTransition } from "react";
@@ -83,7 +83,7 @@ export function SuggestionCommentItem({
       const fd = new FormData();
       fd.set("commentId", comment.id);
       fd.set("body", editText.trim());
-      // Preserve the comment's existing photos on a text edit.
+      // 텍스트 수정 시 댓글의 기존 사진을 유지한다.
       for (const url of comment.imageUrls) fd.append("imageUrls", url);
       const result = await updateStaffSuggestionComment(fd);
       if (!result.ok) {

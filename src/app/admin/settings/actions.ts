@@ -110,7 +110,7 @@ export async function updateOrganization(formData: FormData) {
     redirect("/admin/settings/organization?error=invalid_organization");
   }
 
-  // Name only — slug is left fixed because it can be referenced by links/caches (see org settings UI).
+  // 이름만 변경 — slug 는 링크/캐시에서 참조될 수 있어 고정한다(조직 설정 UI 참고).
   const { error } = await getSupabaseServiceClient()
     .from("organizations")
     .update({ name })
@@ -141,9 +141,9 @@ export async function deleteOrganization(formData: FormData) {
 
   const service = getSupabaseServiceClient();
 
-  // Guard: only an EMPTY org (zero members) may be deleted. Every org-scoped table FKs
-  // organization_id with ON DELETE CASCADE, so deleting a populated org would silently wipe all of
-  // its data (members, attendance, cleaning, reservations, …). Block that here.
+  // 가드: 빈 조직(멤버 0명)만 삭제할 수 있다. 조직 단위 테이블은 모두
+  // organization_id 를 ON DELETE CASCADE 로 참조하므로, 멤버가 있는 조직을 지우면
+  // 모든 데이터(멤버, 근태, 청소, 예약 등)가 조용히 사라진다. 여기서 막는다.
   const { count, error: countError } = await service
     .from("memberships")
     .select("id", { count: "exact", head: true })

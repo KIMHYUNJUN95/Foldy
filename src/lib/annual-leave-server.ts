@@ -1,7 +1,7 @@
-// Annual leave — server-only DB read/write for the Phase 1 backend (hire_date + self-entered
-// balance baseline only; see migration 202607060001 and docs/product/26-annual-leave-workflow.md).
-// Strictly self-scoped: every query/write filters by the CURRENT user's id (passed by the caller
-// from the authenticated session) AND the organization id.
+// 연차 — Phase 1 백엔드용 서버 전용 DB 읽기/쓰기(hire_date + 본인이 입력한
+// 잔여 기준선만. 마이그레이션 202607060001 과 docs/product/26-annual-leave-workflow.md 참고).
+// 엄격히 본인 범위: 모든 조회/쓰기는 현재 사용자 id(호출자가 인증된 세션에서 넘긴다)와
+// 조직 id 로 거른다.
 
 import "server-only";
 import { isHourlyRole } from "@/config/roles";
@@ -17,7 +17,7 @@ export type AnnualLeaveBaselineRow = {
   baselineDate: string;
 };
 
-/** Reads `profiles.hire_date` + the user's `annual_leave_baselines` row. Null = not set up yet. */
+/** `profiles.hire_date` + 사용자의 `annual_leave_baselines` 행을 읽는다. Null = 아직 설정 안 됨. */
 export async function getAnnualLeaveBaseline(
   service: Service,
   organizationId: string,
@@ -46,8 +46,8 @@ export async function getAnnualLeaveBaseline(
 }
 
 /**
- * Sets hire_date on the profile and writes the balance baseline as of today. The admin path overwrites;
- * the employee self path (`mode: "self_once"`) only works once — see below.
+ * 프로필의 hire_date 를 정하고 오늘 기준 잔여 기준선을 쓴다. 관리자 경로는 덮어쓴다.
+ * 직원 본인 경로(`mode: "self_once"`)는 한 번만 된다 — 아래 참고.
  *
  * **검증이 여기 있는 이유 (2026-08-03).** 이 함수는 service-role 클라이언트로 쓰므로 RLS 가
  * 아무것도 막지 않는다. 상한·자격 검사가 관리자 경로(`saveEmployeeLeaveBaseline`)에만 있어서,
@@ -165,9 +165,9 @@ export async function setAnnualLeaveBaselineForUser(
 }
 
 /**
- * Approved leave days that draw down the balance pools: 유급(paid) → base pool, 특별(special) → bonus
- * pool. 경조(annual, company-granted) and 기타(other, unpaid) draw from neither. Single source of truth
- * so the mobile self-summary and the admin balance views always agree.
+ * 잔여 풀에서 차감되는 승인된 휴가 일수: 유급(paid) → base 풀, 특별(special) → bonus
+ * 풀. 경조(annual, 회사 부여)와 기타(other, 무급)는 둘 다에서 차감하지 않는다. 모바일 본인 요약과
+ * 관리자 잔여 화면이 항상 일치하도록 기준을 한 곳에 둔다.
  */
 export async function sumApprovedLeaveUsage(
   service: Service,
@@ -189,7 +189,7 @@ export async function sumApprovedLeaveUsage(
   return { base, bonus };
 }
 
-/** Reads the baseline and computes today's summary, with approved usage deducted. Null = not set up. */
+/** 기준선을 읽고 오늘의 요약을 계산하며 승인된 사용분을 뺀다. Null = 설정 안 됨. */
 export async function getMyAnnualLeaveSummary(
   service: Service,
   organizationId: string,

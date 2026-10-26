@@ -1,11 +1,11 @@
 "use client";
 
-// Admin cleaning console — force-complete confirmation modal (the console's only mutating action).
-// Admin enters the actual finish time so started_at → entered time drives the recorded duration,
-// picks who they're completing on behalf of, and may leave a note. Mirrors clean-views.js modal().
-// Data is real (src/lib/admin-cleaning.ts) as of 2026-07-14 — onConfirm's result maps 1:1 onto
-// ForceCompleteCleaningInput (src/app/admin/cleaning/actions.ts) so the parent can call the server
-// action directly with it.
+// 관리자 청소 콘솔 — 강제 완료 확인 모달(콘솔의 유일한 변경 액션).
+// 관리자가 실제 종료 시각을 입력하면 started_at → 입력 시각이 기록되는 소요 시간을 정하고,
+// 누구를 대신해 완료 처리하는지 고르며, 메모를 남길 수 있다. clean-views.js 의 modal() 을 따른다.
+// 데이터는 2026-07-14 부터 실제 데이터(src/lib/admin-cleaning.ts) — onConfirm 의 결과가
+// ForceCompleteCleaningInput(src/app/admin/cleaning/actions.ts)에 1:1 로 대응하므로 부모가 그 값으로
+// 서버 액션을 바로 호출할 수 있다.
 import { useState } from "react";
 import { Clock, ShieldCheck, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";

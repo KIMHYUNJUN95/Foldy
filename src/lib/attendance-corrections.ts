@@ -1,9 +1,9 @@
-// Attendance — correction / exception request reads (Step 6).
+// 근태 — 정정 / 예외 요청 읽기(Step 6).
 //
-// Server-only, self-scoped reads for the worker correction flow: the form's source-session context +
-// active site list, the status screen's request view, and the per-session correction status used to
-// surface request state in self-history. No admin/org-wide reads, no approve/reject (Step 7). Shapes
-// carry review_comment / reviewer so the later admin-review step can render without a rewrite.
+// 서버 전용, 본인 범위 읽기: 작업자 정정 흐름용 — 폼의 원본 세션 컨텍스트 +
+// 활성 현장 목록, 상태 화면의 요청 뷰, 그리고 본인 이력에서 요청 상태를
+// 보여 주는 세션별 정정 상태. 관리자/조직 전체 읽기나 승인/반려는 없다(Step 7). 형태는
+// review_comment / reviewer 를 담아 두어서 나중의 관리자 검토 단계가 재작성 없이 렌더할 수 있다.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -43,7 +43,7 @@ function dateLabelOf(operatingDate: string, locale = "ko-KR"): string {
 
 export type CorrectionSiteOption = { id: string; name: string };
 
-/** Active attendance sites in the org (for the desired-site picker). Read-only, member-readable. */
+/** 조직의 활성 근태 현장(희망 현장 선택기용). 읽기 전용, 멤버가 읽을 수 있음. */
 export async function listActiveAttendanceSites(
   organizationId: string,
   locale = "ko-KR",
@@ -69,7 +69,7 @@ export type CorrectionSessionContext = {
   siteName: string | null;
 };
 
-/** Source-session context for the correction form. Self-scoped (returns null if not the user's). */
+/** 정정 폼의 원본 세션 컨텍스트. 본인 범위(본인 것이 아니면 null). */
 export async function getSessionCorrectionContext(
   organizationId: string,
   userId: string,
@@ -115,7 +115,7 @@ export async function getSessionCorrectionContext(
   };
 }
 
-/** i18n key for each correction reason — maps to `copy.reasonMissingIn` etc. */
+/** 정정 사유별 i18n 키 — `copy.reasonMissingIn` 등에 대응한다. */
 export const CORRECTION_REASON_I18N_KEYS: Record<AttendanceCorrectionReason, string> = {
   missing_clock_in: "reasonMissingIn",
   missing_clock_out: "reasonMissingOut",
@@ -125,7 +125,7 @@ export const CORRECTION_REASON_I18N_KEYS: Record<AttendanceCorrectionReason, str
   other: "reasonOther",
 };
 
-/** i18n key for each correction status — maps to `copy.stepRequested` etc. */
+/** 정정 상태별 i18n 키 — `copy.stepRequested` 등에 대응한다. */
 export const CORRECTION_STATUS_I18N_KEYS: Record<AttendanceCorrectionStatus, string> = {
   requested: "stepRequested",
   in_review: "stepInReview",
@@ -144,15 +144,15 @@ function attendanceLabel(locale: string, key: string, fallback: string): string 
 export type CorrectionRequestView = {
   id: string;
   status: AttendanceCorrectionStatus;
-  /** @deprecated Use `statusKey` + dictionary lookup for localised label. */
+  /** @deprecated `statusKey` + 사전 조회를 써서 현지화된 라벨을 쓸 것. */
   statusLabel: string;
-  statusKey: string; // e.g. "stepRequested"
+  statusKey: string; // 예: "stepRequested"
   reasonType: AttendanceCorrectionReason;
-  /** @deprecated Use `reasonKey` + dictionary lookup for localised label. */
+  /** @deprecated `reasonKey` + 사전 조회를 써서 현지화된 라벨을 쓸 것. */
   reasonLabel: string;
-  reasonKey: string; // e.g. "reasonMissingIn"
+  reasonKey: string; // 예: "reasonMissingIn"
   sessionId: string | null;
-  targetDateLabel: string | null; // null = exception (session-less) request
+  targetDateLabel: string | null; // null = 예외(세션 없는) 요청
   desiredClockInLabel: string | null;
   desiredClockOutLabel: string | null;
   desiredSiteName: string | null;
@@ -171,7 +171,7 @@ async function toRequestView(
   row: AttendanceCorrectionRequestRow,
   locale = "ko-KR",
 ): Promise<CorrectionRequestView> {
-  // Step 1: session operating_date fetch (others may depend on nothing from here, but siteId is from `row`)
+  // Step 1: 세션 operating_date 조회(나머지는 여기에 의존하지 않을 수 있지만 siteId 는 `row` 에서 온다)
   const siteId = row.desired_clock_in_site_id ?? row.desired_clock_out_site_id;
 
   // Step 2: session + site + reviewer를 가능한 범위에서 병렬 실행
@@ -251,8 +251,8 @@ async function toRequestView(
 }
 
 /**
- * One of the user's OWN correction requests — by id, or the latest if `requestId` is null. Self-scoped
- * (returns null if the id is not the user's). Used by the status screen.
+ * 사용자 본인의 정정 요청 하나 — id 로, 또는 `requestId` 가 null 이면 최신. 본인 범위
+ * (id 가 본인 것이 아니면 null). 상태 화면에서 사용한다.
  */
 export async function getCorrectionRequestView(
   organizationId: string,
@@ -277,8 +277,8 @@ export async function getCorrectionRequestView(
 }
 
 /**
- * Latest correction status per session for the given session ids (self-scoped). Used to surface
- * request state on the self-history cards/detail.
+ * 주어진 세션 id 들의 세션별 최신 정정 상태(본인 범위). 본인 이력 카드/상세에서
+ * 요청 상태를 보여 주는 데 쓴다.
  */
 export async function getCorrectionStatusBySession(
   organizationId: string,

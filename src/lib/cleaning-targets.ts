@@ -59,12 +59,12 @@ export type CleaningTarget = {
   checkOutDate: string;
   departingGuestName: string;
   hasTurnover: boolean;
-  // populated when hasTurnover === true
+  // hasTurnover === true 일 때 채워짐
   arrivingGuestName: string | null;
   arrivingPax: number | null;
   /** 성인 + 어린이 합계(Slack 청소 명단 — 저쪽은 `numAdult + numChild`). `arrivingPax` 는 화면 호환용으로 성인만. */
   arrivingGuestsTotal: number | null;
-  // populated when hasTurnover === false and next check-in exists within 30 days
+  // hasTurnover === false 이고 30일 안에 다음 체크인이 있을 때 채워짐
   nextCheckInDate: string | null;
   nextCheckInGuestName: string | null;
   nextCheckInPax: number | null;
@@ -140,12 +140,12 @@ export async function getCleaningTargets(
   function canonicalize(row: ResRow) {
     const cp = getCanonicalPropertyName(row.property_name);
     const cr = getCanonicalRoomLabel(cp, row.room_label);
-    // Physical-room key: collapses Arakicho _N sub-listings (501 / 501_2 → 501). The same
-    // physical room carries two Beds24 listings (one per channel), so a same-day checkout and
-    // check-in of that one room can land under different room_labels. Turnover/setting detection
-    // must match on the physical room, not the per-listing key, or the arrival is misclassified
-    // as a setting target. Non-Arakicho keys are unchanged. Mirrors the admin console, which
-    // already keys these off the display-collapsed room. See docs/product/07-cleaning-workflow.md.
+    // 물리적 방 키: Arakicho _N 하위 리스팅을 합친다(501 / 501_2 → 501). 같은
+    // 물리적 방이 Beds24 리스팅 두 개(채널당 하나)를 가져서 그 방의 같은 날 체크아웃과
+    // 체크인이 서로 다른 room_label 아래에 놓일 수 있다. 턴오버/세팅 감지는
+    // 리스팅 키가 아니라 물리적 방으로 매칭해야 하며, 아니면 도착이 오분류된다
+    // (세팅 대상으로). Arakicho 가 아닌 키는 그대로다. 이미 이런 것을 표시용으로 합친 방 기준으로
+    // 키 잡는 관리자 콘솔과 같다. docs/product/07-cleaning-workflow.md 참고.
     const physicalKey = buildRoomKey(cp, getDisplayRoomLabel(cp, cr));
     return { cp, cr, key: buildRoomKey(cp, cr), physicalKey };
   }
@@ -165,14 +165,14 @@ export async function getCleaningTargets(
     }))
     .filter((r) => !excluded(r));
 
-  // Map: physicalKey → first departure row (edge-case: multiple checkouts same physical room)
+  // 맵: physicalKey → 첫 출발 행 (예외 상황: 같은 물리적 방에서 여러 체크아웃)
   const departureMap = new Map<string, { row: ResRow; cp: string; cr: string }>();
   for (const row of departures) {
     const { cp, cr, physicalKey } = canonicalize(row);
     if (!departureMap.has(physicalKey)) departureMap.set(physicalKey, { row, cp, cr });
   }
 
-  // Map: physicalKey → arrivals sorted ascending by check_in_date (already ordered from DB)
+  // 맵: physicalKey → check_in_date 오름차순으로 정렬된 도착(DB 에서 이미 정렬됨)
   const arrivalsByKey = new Map<string, ResRow[]>();
   for (const row of arrivals) {
     const { physicalKey } = canonicalize(row);
@@ -181,7 +181,7 @@ export async function getCleaningTargets(
     arrivalsByKey.set(physicalKey, list);
   }
 
-  // Build cleaning list
+  // 청소 목록 만들기
   const cleaningList: CleaningTarget[] = [];
   for (const [physicalKey, { row: dep, cp, cr }] of departureMap) {
     const roomArrivals = arrivalsByKey.get(physicalKey) ?? [];
@@ -209,10 +209,10 @@ export async function getCleaningTargets(
     });
   }
 
-  // Build setting list: today's arrivals whose physical room is NOT in the departure set.
-  // Keyed by physicalKey so a same-day turnover split across two Beds24 listings of the same
-  // physical room (checkout under 501_2, check-in under 501) is excluded here and surfaces as a
-  // turnover in the cleaning list instead.
+  // 세팅 목록 만들기: 물리적 방이 출발 집합에 없는 오늘 도착.
+  // physicalKey 로 키를 잡아서 같은 물리적 방의 Beds24 리스팅 두 개에 걸친 같은 날 턴오버
+  // (501_2 로 체크아웃, 501 로 체크인)는 여기서 제외되고 대신 청소 목록에서
+  // 턴오버로 나타난다.
   const settingList: SettingTarget[] = [];
   const settingKeysSeen = new Set<string>();
   for (const row of arrivals) {

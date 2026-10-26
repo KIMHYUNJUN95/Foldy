@@ -9,12 +9,12 @@ import {
   workbookBox,
 } from "@/lib/attendance-payroll-workbook";
 
-// Localized, print-quality native .xlsx transport-reimbursement ledger (built with exceljs), styled
-// to match the payroll workbook template (same green accounting palette, same "at least 50 rows"
-// pre-printed-ledger padding). One row per reimbursement item. This is a PLAIN LEDGER: no receipt
-// images or links — receipts are reviewed in the dedicated web receipt page. Columns are only the
-// essentials for a transport ledger: No / staff / date / building / status / amount. Every cell is
-// center-aligned.
+// 현지화된 인쇄 품질의 네이티브 .xlsx 교통비 정산 장부 (exceljs 로 생성). 급여 워크북 템플릿과
+// 같은 스타일 (같은 녹색 회계 팔레트, 같은 "최소 50행" 인쇄용
+// 장부 패딩). 정산 항목마다 한 행. 단순 장부다: 영수증
+// 이미지나 링크는 없다 — 영수증은 전용 웹 영수증 페이지에서 검토한다. 열은 교통비 장부에
+// 꼭 필요한 것만: No / 직원 / 날짜 / 건물 / 상태 / 금액. 모든 셀은
+// 가운데 정렬.
 
 export type TransportWorkbookItem = {
   userName: string;
@@ -67,21 +67,21 @@ export async function buildTransportWorkbookBase64(
     },
   });
 
-  // Every column center-aligned per the requested ledger layout.
+  // 모든 열을 요청된 장부 레이아웃대로 가운데 정렬.
   const cols: { width: number; numFmt?: string }[] = [
     { width: 6 }, // No
-    { width: 24 }, // staff
-    { width: 12 }, // date
-    { width: 24 }, // destination (building / office / other)
-    { width: 30 }, // memo
-    { width: 14 }, // status
-    { width: 18, numFmt: "¥#,##0" }, // amount
+    { width: 24 }, // 직원
+    { width: 12 }, // 날짜
+    { width: 24 }, // 목적지 (건물 / 사무실 / 기타)
+    { width: 30 }, // 메모
+    { width: 14 }, // 상태
+    { width: 18, numFmt: "¥#,##0" }, // 금액
   ];
   ws.columns = cols.map((c) => ({ width: c.width }));
   const LAST = cols.length;
   const AMOUNT_COL = 7;
 
-  // ── Title ──
+  // ── 제목 ──
   ws.mergeCells(1, 1, 1, LAST);
   const t = ws.getCell("A1");
   t.value = `${labels.monthLabel} ${labels.title}`;
@@ -91,7 +91,7 @@ export async function buildTransportWorkbookBase64(
   t.border = workbookBox();
   ws.getRow(1).height = 22;
 
-  // ── Header ──
+  // ── 헤더 ──
   const headerLabels = [
     labels.colNo,
     labels.colStaff,
@@ -112,7 +112,7 @@ export async function buildTransportWorkbookBase64(
     cell.border = workbookBox();
   });
 
-  // ── Data rows (one per item, padded to at least 50 like the payroll ledger) ──
+  // ── 데이터 행 (항목마다 한 행, 급여 장부처럼 최소 50행으로 채움) ──
   const firstDataRow = 3;
   const templateRows = Math.max(TEMPLATE_ROWS, items.length);
   for (let i = 0; i < templateRows; i++) {
@@ -138,7 +138,7 @@ export async function buildTransportWorkbookBase64(
     });
   }
 
-  // ── Total row ──
+  // ── 합계 행 ──
   const lastDataRow = firstDataRow + templateRows - 1;
   const totalRowIdx = lastDataRow + 1;
   const total = ws.getRow(totalRowIdx);

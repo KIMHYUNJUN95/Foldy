@@ -12,7 +12,7 @@
 //
 // 보안: 토큰이 URL 로 노출돼도 서버 검증(활성 토큰 + 활성 사이트 + 동일 조직 + GPS 필수 +
 // 사이트 반경 이내)은 그대로다. 현장 밖에서 링크만 열어서는 인증되지 않는다.
-// See docs/product/24-attendance-workflow.md → "QR Deep Link".
+// docs/product/24-attendance-workflow.md → "QR Deep Link" 참고.
 
 export const ATTENDANCE_QR_PATH = "/mobile/attendance/capture";
 

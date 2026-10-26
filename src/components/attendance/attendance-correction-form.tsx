@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * Attendance correction request — form (frame F of "Attendance Correction Request.html"), wired to the
- * real backend in Step 6. Same design: reason chips · desired in/out time · desired site · memo ·
- * photos (≤5) · fixed submit bar. Now functional: the desired-site box opens a shared drag-dismiss
- * picker sheet, photos use the app's compress + `request-images` upload, and submit calls
- * `createAttendanceCorrectionRequest` (self-scoped + current/previous-month only, server-enforced).
- * Supports session-linked requests (`sessionId` + context) and session-less EXCEPTION requests.
+ * 근태 정정 요청 — 폼("Attendance Correction Request.html" 의 프레임 F), Step 6 에서 연결한
+ * 실제 백엔드. 같은 디자인: 사유 칩 · 희망 출근/퇴근 시각 · 희망 사이트 · 메모 ·
+ * 사진(≤5) · 고정 제출 바. 이제 동작함: 희망 사이트 상자가 공용 드래그 닫기
+ * 선택 시트를 열고, 사진은 앱의 압축 + `request-images` 업로드를 쓰며, 제출은
+ * `createAttendanceCorrectionRequest` 를 호출한다(본인 한정 + 이번/지난달만, 서버에서 강제).
+ * 세션에 연결된 요청(`sessionId` + 컨텍스트)과 세션 없는 EXCEPTION 요청을 지원한다.
  * 화이트 리디자인(2026-10-13, 시안 AttCorr-Phone · Fold · Tablet): 제목 · 한 줄 설명 → (기록 없는 날이면 근무 날짜)
  * → 사유 6가지 → 출근 · 퇴근 · 현장 · 메모(테두리 이름표 칸) → 사진 → 보내기. 태블릿 가로는 오른쪽에 내 정정 요청(최근 30일).
  */
@@ -360,7 +360,7 @@ export function AttendanceCorrectionForm({
         ))}
       </aside>
 
-      {/* clock-in time picker */}
+      {/* 출근 시각 선택기 */}
       {inPickerOpen && (
         <TimePickerSheet
           value={inTime}
@@ -372,7 +372,7 @@ export function AttendanceCorrectionForm({
         />
       )}
 
-      {/* clock-out time picker */}
+      {/* 퇴근 시각 선택기 */}
       {outPickerOpen && (
         <TimePickerSheet
           value={outTime}
@@ -384,7 +384,7 @@ export function AttendanceCorrectionForm({
         />
       )}
 
-      {/* work-date picker (session-less exception request only) */}
+      {/* 근무 날짜 선택기(세션 없는 예외 요청만) */}
       {datePickerOpen && (
         <HireDatePicker
           locale={locale}
@@ -396,7 +396,7 @@ export function AttendanceCorrectionForm({
         />
       )}
 
-      {/* desired-site picker — canonical BottomSheet */}
+      {/* 희망 사이트 선택기 — 표준 BottomSheet */}
       {pickerOpen && (
         <BottomSheet onClose={() => setPickerOpen(false)} ariaLabel={copy.corrPickerAriaLabel}>
           {({ close }) => (

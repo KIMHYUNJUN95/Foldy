@@ -14,11 +14,11 @@ function toCanonicalUnknownSource(value: string) {
   });
 }
 
-// Canonicalization policy:
-// - Known channels map to fixed display/dedupe names.
-// - Unknown channels are case-normalized so foo/FOO/Foo do not split dedupe keys.
-// - Reservation identity for cancel/update matching uses the original Beds24 booking id
-//   (`toOriginalReservationId`), not the normalized source string.
+// 정규화 정책:
+// - 알려진 채널은 고정된 표시/중복 제거 이름으로 매핑한다.
+// - 알 수 없는 채널은 대소문자를 정규화해 foo/FOO/Foo 가 중복 제거 키를 쪼개지 않게 한다.
+// - 취소/수정 매칭의 예약 식별은 원래 Beds24 예약 id
+//   (`toOriginalReservationId`)를 쓰며, 정규화된 source 문자열은 쓰지 않는다.
 export function normalizeReservationSource(rawSource: string | null | undefined) {
   const trimmed = rawSource?.trim();
   if (!trimmed) return "beds24";

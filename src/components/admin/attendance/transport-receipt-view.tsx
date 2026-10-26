@@ -10,10 +10,10 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { adminTransportStatusPill } from "../shared/admin-format";
 import "@/components/admin/admin-console.css";
 
-// Desktop receipt reviewer — a CONTACT-SHEET grid of the month's receipts (all thumbnails at once,
-// each captioned with date/amount/building) so a whole month is scannable in one screen without the
-// wasted whitespace of a one-photo-at-a-time layout. Clicking a thumbnail opens a focused overlay
-// (large image, click-to-zoom, ←/→ across every receipt, "open original", Esc/backdrop to close).
+// 데스크톱 영수증 검토 화면 — 그 달 영수증의 컨택트 시트 그리드(썸네일 전부 한눈에,
+// 각각 날짜/금액/건물 캡션 포함)라서, 사진을 한 장씩 보는 레이아웃의 낭비되는 여백 없이
+// 한 달 치를 한 화면에서 훑어볼 수 있다. 썸네일을 누르면 포커스 오버레이가 열린다
+// (큰 이미지, 클릭 확대, 모든 영수증 간 ←/→ 이동, "원본 열기", Esc/배경 클릭으로 닫기).
 
 type PhotoCell = { url: string; item: AdminReceiptItem; photoNo: number; photoCount: number };
 
@@ -40,7 +40,7 @@ export function TransportReceiptView({
   const yen = useCallback((n: number) => `${c.yenSym}${nf.format(n)}`, [c.yenSym, nf]);
   const pill = adminTransportStatusPill(data.reportStatus, c);
 
-  // Flatten every receipt photo into one ordered sequence for the grid + focus navigation.
+  // 모든 영수증 사진을 순서 있는 하나의 시퀀스로 펼쳐 그리드 + 포커스 탐색에 쓴다.
   const photos = useMemo<PhotoCell[]>(
     () =>
       data.items.flatMap((item) =>
@@ -87,7 +87,7 @@ export function TransportReceiptView({
 
   return (
     <div className="adm" style={{ minHeight: "100dvh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
+      {/* 헤더 */}
       <div
         style={{
           display: "flex",
@@ -199,7 +199,7 @@ export function TransportReceiptView({
               </button>
             ))}
 
-            {/* Items with no receipt — shown so a missing day isn't invisible to accounting. */}
+            {/* 영수증이 없는 항목 — 빠진 날이 회계 쪽에서 눈에 안 띄는 일이 없도록 보여준다. */}
             {missingItems.map((item) => (
               <div
                 key={`empty-${item.itemId}`}
@@ -238,7 +238,7 @@ export function TransportReceiptView({
         </div>
       )}
 
-      {/* Focus overlay */}
+      {/* 포커스 오버레이 */}
       {focus ? (
         <div
           onClick={() => setFocusIdx(null)}
@@ -251,7 +251,7 @@ export function TransportReceiptView({
             flexDirection: "column",
           }}
         >
-          {/* Focus top bar */}
+          {/* 포커스 상단 바 */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", color: "#fff" }}
@@ -279,7 +279,7 @@ export function TransportReceiptView({
             </button>
           </div>
 
-          {/* Focus image area */}
+          {/* 포커스 이미지 영역 */}
           <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 64px 24px" }}>
             <button
               type="button"

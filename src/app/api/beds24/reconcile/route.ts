@@ -6,28 +6,28 @@ import { recordBeds24ReconciliationEvent } from "@/lib/beds24/webhook-events";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 
-// Production reconciliation safety net for Beds24 reservation ingestion.
+// Beds24 예약 수집의 운영 보정(안전망).
 //
-// Webhooks remain the primary update path (see docs/planning/01-decision-log.md
-// "Beds24 Webhook Strategy"). This endpoint is a low-frequency catch-up: it re-pulls
-// the operational window (current month + next month) directly from the Beds24
-// /bookings API and upserts anything missing, so a dropped/never-delivered webhook is
-// healed on the next run instead of staying invisibly absent from the calendar.
+// 웹훅이 여전히 주 갱신 경로다(docs/planning/01-decision-log.md
+// "Beds24 Webhook Strategy" 참고). 이 엔드포인트는 저빈도 보정용으로, 운영 구간(이번 달 + 다음 달)을
+// Beds24 /bookings API 에서 직접 다시 가져와
+// 빠진 것을 upsert 한다. 그래서 누락되었거나 전달되지 않은 웹훅이
+// 캘린더에서 보이지 않게 남지 않고 다음 실행 때 복구된다.
 //
-// Driven daily by Vercel Cron (see vercel.json). Can also be triggered manually with
-// the Beds24 webhook secret. This is NOT the dev-only backfill route — it is safe to
-// run in production and is intentionally idempotent (pure upsert).
+// Vercel Cron 이 매일 실행한다(vercel.json 참고). Beds24 웹훅 시크릿으로
+// 수동 실행도 가능하다. 개발 전용 backfill 라우트가 아니며 운영에서 실행해도
+// 안전하고 의도적으로 멱등이다(순수 upsert).
 
 export const dynamic = "force-dynamic";
-// Backfilling ~hundreds of rows in one window can exceed the default serverless
-// timeout; allow up to 60s (Vercel Hobby-compatible ceiling).
+// 한 구간에 수백 행을 보충하면 기본 서버리스 타임아웃을 넘을 수 있어
+// 최대 60초까지 허용한다(Vercel Hobby 에서 가능한 상한).
 export const maxDuration = 60;
 
 /**
- * Authorize a reconciliation call. Accepts either:
- *  - Vercel Cron's `Authorization: Bearer <CRON_SECRET>` header, or
- *  - the Beds24 webhook secret (manual trigger via header/query).
- * If neither secret is configured server-side, the endpoint stays closed (404).
+ * 보정 호출 인증. 아래 둘 중 하나를 허용한다:
+ *   - Vercel Cron 의 `Authorization: Bearer <CRON_SECRET>` 헤더, 또는
+ *   - Beds24 웹훅 시크릿(헤더/쿼리로 수동 실행).
+ * 서버에 두 시크릿이 모두 설정되지 않았으면 엔드포인트는 닫혀 있다(404).
  */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();

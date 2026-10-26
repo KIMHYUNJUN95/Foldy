@@ -1,4 +1,4 @@
-// External reviews — pure read helpers (no server imports, testable).
+// 외부 리뷰 — 순수 읽기 헬퍼(서버 import 없음, 테스트 가능).
 //
 // Contract: docs/product/25-complaint-workflow.md → 「기간 전부 읽기」
 

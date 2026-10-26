@@ -11,33 +11,33 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
 /**
- * Operational "unprocessed" counts shown as badges on the mobile side menu,
- * keyed by `mobileSidebarNavigation` item id.
+ * 모바일 사이드 메뉴에 배지로 보이는 운영 "미처리" 건수,
+ * `mobileSidebarNavigation` 항목 id 를 키로 한다.
  *
- * Definitions:
- * - cleaning:      today's (Tokyo operating date) cleanings still in progress — i.e. the
- *                  remaining-to-finish count; drops as each is completed.
- * - requests:      unapproved order requests (status 'requested') + unprocessed maintenance
- *                  reports (open / in_progress) + lost items registered today (Tokyo).
- * - linen-return:  today's (Tokyo) linen return records registered by ANY user in the org
- *                  (organization-wide shared count).
- * - announcements: published announcements the user has not read yet (clears on read).
- * - board:         org board posts (not authored by the user) without a read row (clears on open).
- * - users:         people whose residence / My Number card is waiting for confirmation — only for viewers
- *                  with `staff_documents.view` (other viewers get no key at all).
- * - notifications: unread notifications (read_at is null). [placeholder — to be revisited]
+ * 정의:
+ * - cleaning:      오늘(도쿄 운영 날짜) 아직 진행 중인 청소 — 즉
+ *                  끝내야 할 남은 건수이며 하나씩 완료될 때마다 줄어든다.
+ * - requests:      미승인 주문 요청 (status 'requested') + 미처리 유지보수
+ *                  보고 (open / in_progress) + 오늘 등록된 분실물 (도쿄).
+ * - linen-return:  조직의 누구든 등록한 오늘(도쿄) 린넨 반품 기록
+ *                  (조직 전체 공유 건수).
+ * - announcements: 사용자가 아직 읽지 않은 게시된 공지 (읽으면 사라짐).
+ * - board:         읽음 행이 없는 조직 게시판 글 (본인이 쓴 글 제외; 열면 사라짐).
+ * - users:         재류카드 / 마이넘버 카드 확인을 기다리는 사람 — `staff_documents.view` 권한이 있는
+ *                  보는 사람에게만 (다른 사람에게는 키 자체가 없음).
+ * - notifications: 읽지 않은 알림 (read_at 이 null). [임시 — 다시 살펴볼 것]
  *
- * Home, Calendar and Directory intentionally have no badge.
+ * 홈, 캘린더, 연락처는 의도적으로 배지가 없다.
  *
- * These are advisory UI counts only. Access/org-isolation is enforced by RLS +
- * server queries; every count fails closed to 0 so a missing table/migration
- * never breaks the shell.
+ * 이 값은 화면 안내용 건수일 뿐이다. 접근/조직 격리는 RLS +
+ * 서버 쿼리가 강제하며, 모든 건수는 실패 시 0 으로 닫히므로 테이블/마이그레이션이 없어도
+ * 셸이 깨지지 않는다.
  */
 export type NavBadgeCounts = Partial<Record<string, number>>;
 
 type SupabaseServerClient = SupabaseClient<Database>;
 
-/** Run a head count query, returning 0 on any error instead of throwing. */
+/** head count 쿼리를 실행하고, 오류가 나면 던지지 않고 0 을 반환한다. */
 async function safeCount(
   run: () => PromiseLike<{ count: number | null; error: unknown }>,
 ): Promise<number> {
@@ -49,7 +49,7 @@ async function safeCount(
   }
 }
 
-/** Unread = published announcements in the org minus those the user has read. */
+/** 읽지 않음 = 조직의 게시된 공지에서 사용자가 읽은 것을 뺀 것. */
 async function countUnreadAnnouncements(
   supabase: SupabaseServerClient,
   orgId: string,
@@ -96,8 +96,8 @@ async function countUnreadAnnouncements(
 }
 
 /**
- * Compute mobile side-menu badge counts for the current session.
- * `cache()` dedupes repeated calls within a single server request.
+ * 현재 세션의 모바일 사이드 메뉴 배지 건수를 계산한다.
+ * `cache()` 가 한 서버 요청 안의 반복 호출을 합친다.
  */
 export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
   // 페이지가 인증 확인 전에 미리 시작해 두고 끝에서 await 한다 — 여기서 던지면 처리되지 않은 거부가 된다.
@@ -110,7 +110,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
   const userId = session.user.id;
   const supabase = await getSupabaseServerClient();
 
-  // Today's Tokyo operating-day window (timestamptz columns: registered_at / created_at).
+  // 오늘 도쿄 운영일 구간 (timestamptz 컬럼: registered_at / created_at).
   const today = getCleaningOperatingDateKey();
   const dayStart = new Date(`${today}T00:00:00+09:00`);
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
@@ -119,7 +119,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
 
   const [cleaning, orders, maintenance, lostToday, linenReturn, announcements, board, notifications, users] =
     await Promise.all([
-      // Remaining cleanings for today (Tokyo): started but not yet completed.
+      // 오늘 남은 청소 (도쿄): 시작했지만 아직 완료하지 않은 것.
       safeCount(() =>
         supabase
           .from("cleaning_sessions")
@@ -128,7 +128,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
           .eq("cleaning_date", today)
           .eq("status", "in_progress"),
       ),
-      // Unapproved (new) order requests.
+      // 미승인(신규) 주문 요청.
       safeCount(() =>
         supabase
           .from("order_requests")
@@ -136,7 +136,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
           .eq("organization_id", orgId)
           .eq("status", "requested"),
       ),
-      // Unprocessed maintenance requests (open / in progress).
+      // 미처리 유지보수 요청 (open / in progress).
       safeCount(() =>
         supabase
           .from("maintenance_reports")
@@ -144,7 +144,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
           .eq("organization_id", orgId)
           .in("status", ["open", "in_progress"]),
       ),
-      // Lost items registered today (Tokyo).
+      // 오늘 등록된 분실물 (도쿄).
       safeCount(() =>
         supabase
           .from("lost_items")
@@ -154,7 +154,7 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
           .gte("created_at", dayStartIso)
           .lt("created_at", dayEndIso),
       ),
-      // Linen returns registered today by anyone in the org (shared count).
+      // 오늘 조직의 누구든 등록한 린넨 반품 (공유 건수).
       safeCount(() =>
         supabase
           .from("linen_return_records")

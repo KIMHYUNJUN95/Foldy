@@ -52,8 +52,8 @@ export function BoardComposeClient({
   const canPost = content.trim().length > 0 && !isSubmitting;
   const maxImages = BOARD_MAX_IMAGES;
 
-  // Revoke any outstanding preview object URLs on unmount (e.g. back/cancel or after publish navigates
-  // away) so the blob previews aren't leaked.
+  // 언마운트 시(예: 뒤로/취소, 또는 발행 후 이동) 남아 있는 미리보기 object URL 을 모두 해제해
+  // blob 미리보기가 새지 않게 한다.
   const imagesRef = useRef(images);
   useEffect(() => {
     imagesRef.current = images;

@@ -67,11 +67,11 @@ export function LostFoundCreateForm({
   const [selectedCategory, setSelectedCategory] = useState("");
   const [photoCount, setPhotoCount] = useState(0);
 
-  // Deduplicate and sort active properties
+  // 활성 건물을 중복 없이 정렬한다
   const buildings = Array.from(new Set(roomCatalog.map((item) => item.propertyName))).sort();
 
-  // Rooms for the selected building — deduped by displayRoomLabel so Arakicho sub-units (201 / 201_2
-  // = the same physical room, two Beds24 accounts) collapse to one "201" entry, matching the calendar.
+  // 선택한 건물의 방 — displayRoomLabel 로 중복을 제거해 Arakicho 하위 호실(201 / 201_2
+  // = 같은 물리적 방, Beds24 계정 두 개)이 캘린더처럼 "201" 하나로 합쳐진다.
   const availableRooms = (() => {
     const seen = new Set<string>();
     const result: string[] = [];

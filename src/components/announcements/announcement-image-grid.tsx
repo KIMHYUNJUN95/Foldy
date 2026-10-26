@@ -18,8 +18,8 @@ export function AnnouncementImageGrid({
   imageAltLabel,
   variant = "grid",
 }: AnnouncementImageGridProps) {
-  // Open photos in an in-app lightbox instead of `target="_blank"`, which would eject an installed
-  // standalone PWA into a separate Safari tab just to view an attachment.
+  // `target="_blank"` 는 설치된 독립 실행형 PWA 를 사진 하나 보려고 별도 Safari 탭으로 내보내므로,
+  // 그 대신 앱 안 라이트박스로 사진을 연다.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   if (imageUrls.length === 0) {

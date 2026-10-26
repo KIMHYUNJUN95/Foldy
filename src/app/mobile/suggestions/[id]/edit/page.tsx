@@ -14,8 +14,8 @@ import { withDisplayRoles } from "@/lib/platform-developers";
 
 type PageProps = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> };
 
-// Staff Suggestions — author edit of a `submitted` suggestion. Reuses the compose form in edit mode.
-// Guard: only the author may edit, and only while status is `submitted`; otherwise bounce to detail.
+// 직원 건의 — `submitted` 상태 건의의 작성자 수정. 작성 폼을 수정 모드로 재사용한다.
+// 가드: 작성자만, 상태가 `submitted` 일 때만 수정할 수 있으며 아니면 상세로 돌려보낸다.
 export default async function MobileSuggestionEditPage({ params, searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, { id }, sp] = await Promise.all([
@@ -39,7 +39,7 @@ export default async function MobileSuggestionEditPage({ params, searchParams }:
   if (!detail) {
     redirect("/mobile/suggestions");
   }
-  // Author-only, submitted-only (server action re-checks too).
+  // 작성자 전용, submitted 전용(서버 액션도 다시 확인함).
   if (detail.viewerRole !== "author" || detail.status !== "submitted") {
     redirect(`/mobile/suggestions/${id}`);
   }

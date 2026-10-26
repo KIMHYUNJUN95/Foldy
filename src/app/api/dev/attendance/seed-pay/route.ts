@@ -3,16 +3,16 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DEV-ONLY: seed the logged-in user's employment type + hourly rate so the self monthly pay screen
-// (/mobile/attendance/pay) shows real numbers during app testing. The proper owner/payroll_admin
-// employment-type + rate MANAGEMENT (Step 9) and the admin UI live in the deferred web dashboard; this
-// is only a local testing convenience, gated by ENABLE_LOCAL_DEV_TOOLS.
+// 개발 전용: 로그인한 사용자의 고용 형태 + 시급을 심어 두어 개인 월 급여 화면
+// (/mobile/attendance/pay) 이 앱 테스트 중 실제 숫자를 보이게 한다. 정식 owner/payroll_admin 의
+// 고용 형태 + 시급 관리(Step 9)와 관리자 UI 는 보류된 웹 대시보드에 있고, 이것은
+// ENABLE_LOCAL_DEV_TOOLS 로 막아 둔 로컬 테스트 편의 기능일 뿐이다.
 //
-// Usage (while logged into the app):
+// 사용법 (앱에 로그인한 상태에서):
 //   GET /api/dev/attendance/seed-pay                 → hourly, ¥1200/h, effective 2020-01-01
 //   GET /api/dev/attendance/seed-pay?rate=1500       → hourly, ¥1500/h
 //   GET /api/dev/attendance/seed-pay?type=salaried   → salaried (no pay)
-// Replaces the caller's existing history rows in this org (idempotent for testing).
+// 이 조직에서 호출자의 기존 이력 행을 교체한다 (테스트용 멱등).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EFFECTIVE_FROM = "2020-01-01";
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
   const userId = session.user.id;
 
   try {
-    // Reset this user's history in the org (testing idempotency), then insert one open-ended segment.
+    // 이 조직에서 이 사용자의 이력을 초기화(테스트 멱등성)한 뒤, 끝이 열린 구간 하나를 삽입한다.
     await service
       .from("employment_type_history")
       .delete()

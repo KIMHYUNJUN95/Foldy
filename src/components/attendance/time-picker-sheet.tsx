@@ -10,8 +10,8 @@ import {
 } from "react";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 
-const ITEM_H = 44; // px per drum item
-const PAD_H = ITEM_H * 2; // 2-item spacer top + bottom keeps selected row centered
+const ITEM_H = 44; // 드럼 항목당 px
+const PAD_H = ITEM_H * 2; // 위·아래 2칸 여백이 선택 행을 가운데 유지
 
 const HOUR_ITEMS = Array.from({ length: 12 }, (_, i) =>
   String(i + 1).padStart(2, "0"),
@@ -44,13 +44,13 @@ function parseValue(value: string): {
   hourIdx: number;
   minIdx: number;
 } {
-  if (!value) return { ampmIdx: 0, hourIdx: 8, minIdx: 0 }; // default 09:00 AM
+  if (!value) return { ampmIdx: 0, hourIdx: 8, minIdx: 0 }; // 기본값 09:00 AM
   const [hStr = "0", mStr = "0"] = value.split(":");
   const h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
   const ampmIdx = h >= 12 ? 1 : 0;
   const h12 = h % 12;
-  // h12=0 → display "12" (HOUR_ITEMS index 11), h12=1 → "01" (index 0), etc.
+  // h12=0 → "12" 표시(HOUR_ITEMS 인덱스 11), h12=1 → "01"(인덱스 0) 등.
   const hourIdx = h12 === 0 ? 11 : h12 - 1;
   return { ampmIdx, hourIdx, minIdx: m };
 }
@@ -66,7 +66,7 @@ function to24h(ampmIdx: number, hourIdx: number, minIdx: number): string {
   return `${String(h24).padStart(2, "0")}:${String(minIdx).padStart(2, "0")}`;
 }
 
-/** Formats a "HH:MM" 24-hour string for display (e.g. "오전 10:30"). */
+/** "HH:MM" 24시간 문자열을 표시용으로 바꾼다(예: "오전 10:30"). */
 export function formatTimeDisplay(value: string, locale: string): string {
   if (!value) return "--:--";
   const [hStr = "0", mStr = "0"] = value.split(":");
@@ -78,7 +78,7 @@ export function formatTimeDisplay(value: string, locale: string): string {
   return `${ampm} ${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-// ─── Drum column ──────────────────────────────────────────────────────────────
+// ─── 드럼 열 ──────────────────────────────────────────────────────────────
 
 type DrumColProps = {
   items: string[];
@@ -90,7 +90,7 @@ const DrumCol = forwardRef<HTMLDivElement, DrumColProps>(
   ({ items, initialIdx, onSettle }, ref) => {
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Set initial scroll position without triggering snap animation.
+    // 스냅 애니메이션을 일으키지 않고 초기 스크롤 위치를 설정한다.
     useEffect(() => {
       const el = (ref as RefObject<HTMLDivElement>).current;
       if (el) el.scrollTop = initialIdx * ITEM_H;
@@ -124,12 +124,12 @@ const DrumCol = forwardRef<HTMLDivElement, DrumColProps>(
 );
 DrumCol.displayName = "DrumCol";
 
-// ─── Sheet ────────────────────────────────────────────────────────────────────
+// ─── 시트 ────────────────────────────────────────────────────────────────────
 
 type Props = {
-  /** "HH:MM" 24-hour format, or empty string for no initial value. */
+  /** "HH:MM" 24시간 형식, 초기값이 없으면 빈 문자열. */
   value: string;
-  /** Short field label shown above the large time display. */
+  /** 큰 시간 표시 위에 나오는 짧은 필드 라벨. */
   label: string;
   confirmLabel: string;
   locale: string;
@@ -188,7 +188,7 @@ export function TimePickerSheet({
             <p className="tpick__display">{displayStr}</p>
 
             <div className="tpick__outer">
-              {/* selection highlight — not inside the masked cols div */}
+              {/* 선택 하이라이트 — 마스크된 열 div 안에 두지 않음 */}
               <div className="tpick__sel" aria-hidden="true" />
               <div className="tpick__cols">
                 <DrumCol

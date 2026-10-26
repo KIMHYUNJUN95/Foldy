@@ -319,7 +319,7 @@ export function AttendancePayrollClient({
         </table>
       )}
 
-      {/* Right detail panel */}
+      {/* 우측 상세 패널 */}
       {panelRow ? (
         <PayrollPanel
           ym={ym}
@@ -527,7 +527,7 @@ function PayrollPanel({
 
         <div className="panel__body" key={`b-${row.userId}`}>
           <WeeklyLimitNote chip={weekly} copy={c} />
-          {/* summary */}
+          {/* 요약 */}
           <div className="pblock">
             <div className="pblock__t">{c.payPanelSecSummary}</div>
             <div className="kv">
@@ -656,7 +656,7 @@ function PayrollPanel({
             ) : null}
           </div>
 
-          {/* blockers */}
+          {/* 막힘 항목 */}
           <div className="pblock">
             <div className="pblock__t">{c.payPanelSecBlockers}</div>
             {hasBlockers ? (
@@ -768,7 +768,7 @@ function PayrollPanel({
             )}
           </div>
 
-          {/* perm zone */}
+          {/* 권한 구역 */}
           <div className="pblock">
             <div className="permzone">
               <div className="permzone__h">

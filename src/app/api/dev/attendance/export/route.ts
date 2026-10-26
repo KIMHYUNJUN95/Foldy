@@ -4,12 +4,12 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { runPayrollExport, type ExportScope } from "@/lib/attendance-export";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DEV-ONLY: trigger a finalized-only payroll export DOWNLOAD for testing (the real owner/payroll_admin
-// export UI is in the deferred web dashboard). Gated by development + ENABLE_LOCAL_DEV_TOOLS +
-// local host AND still privilege-gated server-side by `runPayrollExport` (owner / attendance_payroll_admin)
-// — payroll data is never exportable by regular users even in dev.
+// 개발 전용: 테스트용으로 마감분 전용 급여 내보내기 다운로드를 실행한다 (실제 owner/payroll_admin
+// 내보내기 UI 는 보류된 웹 대시보드에 있다). 개발 환경 + ENABLE_LOCAL_DEV_TOOLS +
+// 로컬 호스트에서만 열리며, 서버에서도 `runPayrollExport` 로 권한을 다시 확인한다 (owner / attendance_payroll_admin)
+// — 개발 중에도 일반 사용자는 급여 데이터를 내보낼 수 없다.
 //
-// Usage (while logged in as an owner/payroll admin):
+// 사용법 (owner/급여 관리자로 로그인한 상태):
 //   GET /api/dev/attendance/export?scope=monthly_bulk&ym=2026-06
 //   GET /api/dev/attendance/export?scope=single_user&ym=2026-06&userId=<uuid>
 // ─────────────────────────────────────────────────────────────────────────────

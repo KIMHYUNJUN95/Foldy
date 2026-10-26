@@ -1,7 +1,7 @@
 // Admin 린넨 반품 콘솔 — 표현 헬퍼. lost-found-console-data.ts 와 같은 역할:
 // 필터 타입 · Tokyo 포맷터 · 필터 옵션 빌더 · 아바타 색상. 데이터(AdminLinenRecordVM)는 실제
 // 값이며 src/lib/admin-linen-returns.ts 에서 만든다.
-// See docs/product/19-linen-defect-workflow.md.
+// 참고: docs/product/19-linen-defect-workflow.md.
 
 import type {
   AdminLinenBuildingOption,
@@ -26,7 +26,7 @@ export function localeTagOf(locale: Locale): string {
   return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
 }
 
-// ── Tokyo formatters ────────────────────────────────────────────────────────
+// ── 도쿄 포매터 ────────────────────────────────────────────────────────
 // 입력은 모두 admin-linen-returns.ts 가 만든 Tokyo "YYYY-MM-DD[ HH:MM]" 문자열이다.
 // 이미 도쿄 벽시계 값이므로 여기서 다시 타임존 변환을 하지 않는다.
 
@@ -76,7 +76,7 @@ export function tpl(template: string, vars: Record<string, string | number>): st
   );
 }
 
-// ── record helpers ──────────────────────────────────────────────────────────
+// ── 기록 헬퍼 ──────────────────────────────────────────────────────────
 
 /** 행 요약 — "싱글 이불 커버 외 2종". 품목이 하나면 이름만. */
 export function summaryOf(record: AdminLinenRecordVM, moreLabel: string, kindsUnit: string): string {
@@ -196,7 +196,7 @@ export function quantityByItemOf(records: readonly AdminLinenRecordVM[]): Map<st
   return map;
 }
 
-// ── export payload (Excel / PDF) ────────────────────────────────────────────
+// ── 내보내기 페이로드 (Excel / PDF) ────────────────────────────────────────
 // 콘솔이 화면에 그린 것과 같은 값을 서버 액션에 그대로 넘긴다 — 다른 콘솔(청소·주문·근태)과 같은
 // 방식이라, 내보낸 파일은 언제나 "지금 보고 있는 조건 그대로"가 된다. 로케일은 서버가
 // `session.user.preferredLanguage` 에서 정하므로 여기서 넘기지 않는다.

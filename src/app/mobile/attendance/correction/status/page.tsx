@@ -11,9 +11,9 @@ type PageProps = {
   searchParams: Promise<{ id?: string }>;
 };
 
-// Attendance / 근태 — correction request status (Step 6). Shows one of the user's OWN requests by `?id=`
-// (or the latest). Self-scoped server-side; an id that isn't the user's resolves to null → no leak.
-// See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
+// 근태 / Attendance — 정정 요청 상태 (6단계). `?id=` 로 사용자 본인의 요청 하나를 보여준다
+// (또는 최신 건). 서버에서 본인 것만 조회하며, 본인 것이 아닌 id 는 null 로 풀려 정보가 새지 않는다.
+// 참고: docs/product/21-attendance-payroll-workflow.md, docs/product/24-attendance-workflow.md.
 export default async function MobileAttendanceCorrectionStatusPage({ searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
@@ -43,7 +43,7 @@ export default async function MobileAttendanceCorrectionStatusPage({ searchParam
     bcp47Locale,
   );
 
-  // No request found (new user, or an id that isn't theirs) → send to the form rather than leak/empty.
+  // 요청을 찾지 못함(신규 사용자이거나 본인 것이 아닌 id) → 정보를 흘리거나 빈 화면을 보이지 않고 폼으로 보낸다.
   if (!request) {
     redirect("/mobile/attendance/correction");
   }

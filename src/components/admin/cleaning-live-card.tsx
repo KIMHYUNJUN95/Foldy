@@ -37,7 +37,7 @@ export function CleaningLiveCard({
   locale,
 }: {
   cleaning: CleaningLive[];
-  /** locale tag (e.g. "ko-KR") — used for Intl + resolved to the console dictionary. */
+  /** 로케일 태그 (예: "ko-KR") — Intl 에 쓰이고 콘솔 사전으로 변환된다. */
   locale: string;
 }) {
   const dictionary = getDictionary(locale);

@@ -39,7 +39,7 @@ export type HomeActivityEventType =
 export type HomeActivityEvent = {
   id: string;
   room: string;
-  taskLabel?: string; // only present for cleaning_completed events
+  taskLabel?: string; // cleaning_completed 이벤트에만 존재
   timestamp: string; // ISO UTC
   type: HomeActivityEventType;
 };
@@ -49,7 +49,7 @@ export type HomeCheckInOutCounts = {
   checkOuts: number;
 };
 
-/** A single reservation checking in / out today, for the home detail sheet. */
+/** 오늘 체크인 / 체크아웃하는 예약 한 건 (홈 상세 시트용). */
 export type HomeReservationRow = {
   id: string;
   guestName: string;
@@ -75,7 +75,7 @@ export type HomeResult<T> =
   | { status: "empty" }
   | { status: "error" };
 
-/** UTC window covering today 00:00–24:00 in JST (Asia/Tokyo = UTC+9). */
+/** JST(Asia/Tokyo = UTC+9) 기준 오늘 00:00–24:00 을 덮는 UTC 구간. */
 function getTodayJstUtcRange() {
   const today = getCleaningOperatingDateKey();
   const start = new Date(`${today}T00:00:00+09:00`);
@@ -112,10 +112,10 @@ export async function getHomeCheckInOutCounts(
 }
 
 /**
- * Today's check-in / check-out reservations (the actual guest list behind the home
- * count cards). Returns sorted lists; counts are just the lengths. Cancelled / no-show
- * are excluded, matching `getHomeCheckInOutCounts`. Room/property localization is left
- * to the caller (it owns the building-label dictionary).
+ * 오늘의 체크인 / 체크아웃 예약 (홈 카운트 카드 뒤의 실제 게스트
+ * 목록). 정렬된 목록을 반환하며 카운트는 길이일 뿐이다. 취소 / 노쇼는
+ * `getHomeCheckInOutCounts` 와 같게 제외한다. 방/숙소 현지화는
+ * 호출자에게 맡긴다 (건물 라벨 사전은 호출자가 가지고 있다).
  */
 export async function getHomeCheckInOutReservations(
   session: AppSession,
@@ -126,9 +126,9 @@ export async function getHomeCheckInOutReservations(
   try {
     const supabase = await getSupabaseServerClient();
     const today = getCleaningOperatingDateKey();
-    // Fetch reservations + the room-master catalog together so we can resolve each
-    // reservation to its canonical room exactly like the calendar does (the catalog
-    // is the authoritative room axis; `raw_payload.roomId` disambiguates 2-account rooms).
+    // 예약 + 방 마스터 카탈로그를 함께 가져와 각 예약을
+    // 캘린더와 똑같이 정식 방으로 해석한다 (카탈로그가
+    // 권위 있는 방 축이며, `raw_payload.roomId` 로 계정 2개짜리 방을 구분한다).
     const [{ data, error }, catalog] = await Promise.all([
       supabase
         .from("reservations")
@@ -153,8 +153,8 @@ export async function getHomeCheckInOutReservations(
       raw_payload: Database["public"]["Tables"]["reservations"]["Row"]["raw_payload"];
     };
 
-    // Mirror the calendar's resolution: authoritative once the catalog is classified
-    // (string[] / non-undefined); provisional (normalized fallback) before that.
+    // 캘린더의 해석을 따른다: 카탈로그가 분류된 뒤에는 확정(string[] / undefined 아님),
+    // 그 전에는 임시(정규화된 폴백).
     const lookups = buildPropertyRoomLookups(catalog ?? []);
     const globalExternalRoomToCanonical = buildGlobalExternalRoomToCanonical(catalog ?? []);
     const isAuthoritative = catalog !== undefined;
@@ -166,10 +166,10 @@ export async function getHomeCheckInOutReservations(
         !isExcludedOperationalRoom(r.property_name ?? "", r.room_label ?? ""),
     );
 
-    // Resolve to the same canonical property + display room label the calendar renders.
-    // Never drop: if a reservation does not map to an active room-master row, fall back to
-    // the normalized room label so the guest still appears (mirrors the calendar + the
-    // in-house reference system, which never discards a booking).
+    // 캘린더가 그리는 것과 같은 정식 숙소 + 표시용 방 라벨로 해석한다.
+    // 절대 버리지 않는다: 예약이 활성 방 마스터 행과 매핑되지 않으면
+    // 정규화된 방 라벨로 대체해 게스트가 계속 보이게 한다 (캘린더 + 사내
+    // 참조 시스템과 동일하며, 예약을 버리지 않는다).
     const toItem = (r: ReservationListRow): HomeReservationRow => {
       const canonicalProperty = getCanonicalPropertyName((r.property_name ?? "").trim());
       const internalKey =
@@ -181,7 +181,7 @@ export async function getHomeCheckInOutReservations(
           },
           { lookups, globalExternalRoomToCanonical, isAuthoritative },
         ) || getCanonicalRoomLabel(canonicalProperty, (r.room_label ?? "").trim());
-      // Okubo (room key == property) or an empty fallback → show the building only.
+      // 오쿠보(방 키 == 숙소)이거나 빈 폴백 → 건물만 표시.
       const roomLabel =
         !internalKey || internalKey === canonicalProperty
           ? ""
@@ -316,7 +316,7 @@ export async function getHomeTodayActivity(
     for (const row of (orderRes.data ?? []) as OrderActivityRow[]) {
       events.push({
         id: `order-${row.id}`,
-        // building + room so the home log localizes it the same way as other events.
+        // 건물 + 방으로 두어 홈 로그가 다른 이벤트와 같은 방식으로 현지화하게 한다.
         room: `${row.building_name} ${row.room_label}`.trim(),
         timestamp: row.created_at,
         type: "order_requested",
@@ -365,7 +365,7 @@ export async function getHomeActiveCleaningSession(
   }
 }
 
-/** Format ISO UTC timestamp as HH:MM in JST. */
+/** ISO UTC 타임스탬프를 JST 의 HH:MM 으로 포맷. */
 export function formatActivityTimeJst(isoTimestamp: string): string {
   return new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",

@@ -1,11 +1,11 @@
-// Attendance — worker SELF-VIEW history queries (Step 5).
+// 근태 — 근로자 본인 보기 이력 쿼리 (Step 5).
 //
-// Server-only, strictly self-scoped: every query filters by the CURRENT user's id (passed by the
-// caller from the authenticated session) AND the organization id. There is no path to another user's
-// data — callers never accept a target user id from the client. Tokyo operating-date boundaries
-// throughout. No pay calculation, no admin/org-wide reads, no correction/finalization here (later
-// steps); the shapes leave room for those (e.g. reviewState / manualCreated / a future
-// correctionStatus) without a rewrite.
+// 서버 전용, 엄격히 본인 범위: 모든 쿼리가 현재 사용자 id (호출자가 인증된 세션에서
+// 넘김)와 조직 id 로 거른다. 다른 사용자의 데이터로 가는 경로는
+// 없다 — 호출자는 클라이언트에서 대상 사용자 id 를 절대 받지 않는다. 전반에 도쿄 운영 날짜 경계를
+// 쓴다. 급여 계산, 관리자/조직 전체 읽기, 정정/마감은 여기에 없다 (이후
+// 단계). 모양은 그런 것들(예: reviewState / manualCreated / 향후
+// correctionStatus)을 위한 여지를 남겨 다시 쓰지 않고도 붙일 수 있다.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -25,7 +25,7 @@ import { getCorrectionStatusBySession } from "@/lib/attendance-corrections";
 export type AttendanceBreakView = {
   startedAt: string;
   endedAt: string | null;
-  /** Closed-break duration in seconds; null while the break is still open. */
+  /** 닫힌 휴게 시간(초); 휴게가 아직 열려 있으면 null. */
   durationSec: number | null;
   startedLabel: string;
   endedLabel: string | null;
@@ -33,7 +33,7 @@ export type AttendanceBreakView = {
 
 export type AttendanceSessionView = {
   id: string;
-  operatingDate: string; // YYYY-MM-DD (Tokyo)
+  operatingDate: string; // YYYY-MM-DD (도쿄)
   dateLabel: string; // e.g. "6월 17일 (화)"
   status: AttendanceSessionStatus;
   reviewState: AttendanceReviewState;
@@ -49,21 +49,21 @@ export type AttendanceSessionView = {
   clockOutMethod: AttendanceMethod | null;
   breaks: AttendanceBreakView[];
   breakCount: number;
-  breakTotalSec: number; // closed breaks only
-  /** Worked seconds for a completed session (in→out minus closed breaks); null while open. */
+  breakTotalSec: number; // 닫힌 휴게만
+  /** 완료된 세션의 근무 초(출근→퇴근에서 닫힌 휴게 제외); 열려 있으면 null. */
   workedSec: number | null;
-  /** Latest correction request status for this session, if any (Step 6). */
+  /** 이 세션의 최근 정정 요청 상태, 있으면 (Step 6). */
   correctionStatus: AttendanceCorrectionStatus | null;
-  /** Latest correction request id for this session — used to deep-link to the specific request. */
+  /** 이 세션의 최근 정정 요청 id — 해당 요청으로 바로 연결하는 데 쓴다. */
   correctionRequestId: string | null;
 };
 
 export type AttendanceTodaySummary = {
-  date: string; // YYYY-MM-DD (Tokyo)
+  date: string; // YYYY-MM-DD (도쿄)
   sessionCount: number;
   hasOpenSession: boolean;
-  workedSec: number; // completed sessions today + the open session's elapsed-minus-break at load time
-  breakTotalSec: number; // closed breaks across today's sessions
+  workedSec: number; // 오늘 완료된 세션 + 열린 세션의 로드 시점 경과-휴게
+  breakTotalSec: number; // 오늘 세션들의 닫힌 휴게
 };
 
 const TZ = "Asia/Tokyo";
@@ -161,7 +161,7 @@ function buildSessionView(
   };
 }
 
-/** Resolve display names for a set of site ids (one query). */
+/** 현장 id 묶음의 표시 이름을 구한다 (쿼리 한 번). */
 async function loadSiteNames(
   service: ReturnType<typeof getSupabaseServiceClient>,
   organizationId: string,
@@ -181,7 +181,7 @@ async function loadSiteNames(
   return map;
 }
 
-/** Load break rows for a set of session ids (one query), grouped by session. */
+/** 세션 id 묶음의 휴게 행을 불러와 세션별로 묶는다 (쿼리 한 번). */
 async function loadBreaks(
   service: ReturnType<typeof getSupabaseServiceClient>,
   sessionIds: string[],
@@ -201,10 +201,10 @@ async function loadBreaks(
   return map;
 }
 
-/** [firstDay, firstDayOfNextMonth) for a YYYY-MM, as Tokyo operating-date strings. */
+/** YYYY-MM 의 [첫날, 다음 달 첫날), 도쿄 운영 날짜 문자열. */
 function monthRange(ym: string): { start: string; nextStart: string } {
   const [y, m] = ym.split("-").map(Number);
-  const nextIdx = y * 12 + m; // m is 1-based → this already points at the next month
+  const nextIdx = y * 12 + m; // m 은 1부터 시작 → 이미 다음 달을 가리킨다
   const ny = Math.floor(nextIdx / 12);
   const nm = (nextIdx % 12) + 1;
   return {
@@ -214,9 +214,9 @@ function monthRange(ym: string): { start: string; nextStart: string } {
 }
 
 /**
- * The current user's own attendance sessions (newest first), each with its break rows resolved.
- * Self-scoped: `userId` is the authenticated user, never a client-supplied target.
- * When `ym` (YYYY-MM, Tokyo) is given, results are limited to that operating month.
+ * 현재 사용자 본인의 근태 세션(최신순), 각각 휴게 행을 해석해 붙인다.
+ * 본인 범위: `userId` 는 인증된 사용자이며 클라이언트가 넘긴 대상이 아니다.
+ * `ym` (YYYY-MM, 도쿄)이 주어지면 결과를 그 운영 월로 제한한다.
  */
 export async function getAttendanceHistory(
   organizationId: string,
@@ -267,8 +267,8 @@ export async function getAttendanceHistory(
 }
 
 /**
- * Today's (Tokyo) self summary: session count, whether a session is open, worked + break totals.
- * Self-scoped. Worked for the open session is computed at load time (the home has the live ticker).
+ * 오늘(도쿄) 본인 요약: 세션 수, 열린 세션 여부, 근무 + 휴게 합계.
+ * 본인 범위. 열린 세션의 근무는 로드 시점에 계산한다 (홈에는 실시간 틱이 있다).
  */
 export async function getAttendanceTodaySummary(
   organizationId: string,

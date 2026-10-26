@@ -15,8 +15,8 @@ type MembershipRow = Pick<
   "organization_id" | "role"
 >;
 
-// Only allow /admin/announcements/{uuid} or /mobile/announcements/{uuid}.
-// Any other value is replaced with "/" to prevent open-redirect attacks.
+// /admin/announcements/{uuid} 또는 /mobile/announcements/{uuid} 만 허용한다.
+// 그 외 값은 open-redirect 공격을 막기 위해 "/" 로 바꾼다.
 const RETURN_TO_PATTERN =
   /^\/(?:admin|mobile)\/announcements\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
@@ -154,7 +154,7 @@ export async function createAnnouncementComment(formData: FormData) {
     redirectWithQuery(returnTo, "error=comment_invalid");
   }
 
-  // Verify returnTo points to the same announcement as the form's announcementId
+  // returnTo 가 폼의 announcementId 와 같은 공지를 가리키는지 확인
   const returnToId = extractReturnToAnnouncementId(returnTo);
   if (!returnToId || returnToId !== announcementId.toLowerCase()) {
     redirectWithQuery(returnTo, "error=comment_invalid");
@@ -224,7 +224,7 @@ export async function updateAnnouncementComment(formData: FormData) {
     redirectWithQuery(returnTo, "error=comment_forbidden");
   }
 
-  // Verify returnTo points to the same announcement as the comment
+  // returnTo 가 댓글과 같은 공지를 가리키는지 확인
   const returnToId = extractReturnToAnnouncementId(returnTo);
   if (!returnToId || returnToId !== comment.announcement_id.toLowerCase()) {
     redirectWithQuery(returnTo, "error=comment_not_found");
@@ -285,7 +285,7 @@ export async function deleteAnnouncementComment(formData: FormData) {
     redirectWithQuery(returnTo, "error=comment_forbidden");
   }
 
-  // Verify returnTo points to the same announcement as the comment
+  // returnTo 가 댓글과 같은 공지를 가리키는지 확인
   const returnToId = extractReturnToAnnouncementId(returnTo);
   if (!returnToId || returnToId !== comment.announcement_id.toLowerCase()) {
     redirectWithQuery(returnTo, "error=comment_not_found");

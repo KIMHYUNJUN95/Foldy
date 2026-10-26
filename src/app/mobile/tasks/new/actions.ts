@@ -76,7 +76,7 @@ export async function quickCreateTask(formData: FormData) {
   redirect("/mobile/tasks?view=inbox&created=1");
 }
 
-// Quick-create anchored to today's Tokyo date via all-day due_at — appears in the Today tab immediately.
+// 오늘 도쿄 날짜의 종일 due_at 으로 빠르게 만든다 — 오늘 탭에 바로 나타난다.
 export async function quickCreateTodayTask(formData: FormData) {
   const session = await getCurrentAppSession();
   if (!session) {
@@ -123,7 +123,7 @@ export async function quickCreateTodayTask(formData: FormData) {
   redirect("/mobile/tasks?view=today&created=1");
 }
 
-// Quick-create anchored to tomorrow's Tokyo date via all-day due_at — appears in the Tomorrow tab immediately.
+// 내일 도쿄 날짜의 종일 due_at 으로 빠르게 만든다 — 내일 탭에 바로 나타난다.
 export async function quickCreateTomorrowTask(formData: FormData) {
   const session = await getCurrentAppSession();
   if (!session) {
@@ -194,9 +194,9 @@ export async function createTask(formData: FormData) {
   const priorityRaw = cleanText(formData.get("priority"));
   const repeatRaw = cleanText(formData.get("repeat"));
   const priority = PRIORITIES.has(priorityRaw) ? priorityRaw : "normal";
-  // Create has no previous rule, so `custom` can never be newly assigned (→ null).
+  // 생성에는 이전 규칙이 없으므로 `custom` 은 새로 지정할 수 없다(→ null).
   const repeat = resolveRecurrenceRule(repeatRaw, null);
-  // A recurrence needs a date anchor; a repeat with no date anchors to today (Todoist), not rejected.
+  // 반복에는 날짜 기준점이 필요하다. 날짜 없는 반복은 오늘을 기준으로 삼는다(Todoist). 거절하지 않는다.
   if (repeat && !scheduledDate && !dueDate) scheduledDate = tokyoToday();
   const tags = parseStringArray(cleanText(formData.get("tagsJson")))
     .map((t) => t.trim())
@@ -205,8 +205,8 @@ export async function createTask(formData: FormData) {
   const requestedShare = parseStringArray(cleanText(formData.get("shareJson")));
   // 지시로 보내기 — 대상자의 일정으로 잡히고 지시자의 "오늘" 목록에는 들어가지 않는다.
   const directive = cleanText(formData.get("directive")) === "1";
-  // Upper safety bound (20); the real per-task cap (5 regular / 20 project) is applied at insert.
-  // Only our own `{org}/task-images/` storage objects are accepted (2026-10-26, lib/task-images).
+  // 안전 상한(20). 실제 할 일별 상한(일반 5 / 프로젝트 20)은 insert 때 적용한다.
+  // 우리 `{org}/task-images/` 저장소 객체만 받는다(2026-10-26, lib/task-images).
   const imageUrls = sanitizeTaskImageUrls(
     formData.getAll("imageUrls").map((v) => String(v)),
     true,
@@ -217,17 +217,17 @@ export async function createTask(formData: FormData) {
   const ctxReservationId = cleanText(formData.get("ctxReservationId")) || null;
   const ctxGuestName = cleanText(formData.get("ctxGuestName")) || null;
 
-  // A specific time needs a date anchor — reject rather than silently drop it.
+  // 특정 시각에는 날짜 기준점이 필요하다 — 조용히 버리지 말고 거절한다.
   if (taskTimeWithoutDate({ scheduledDate, dueDate, time })) {
     redirect("/mobile/tasks/new?error=time_needs_date");
   }
-  // One shared rule for date/time persistence (see lib/tasks normalizeTaskDateTime).
+  // 날짜/시각 저장 규칙은 하나로 공유한다(lib/tasks normalizeTaskDateTime 참고).
   const { scheduledDate: sched, dueAt, allDay, timeLabel } = normalizeTaskDateTime({
     scheduledDate,
     dueDate,
     time,
   });
-  // Duration is a time-block length (1–1440 min) and is only meaningful with a time-of-day.
+  // 소요 시간은 시간 블록 길이(1–1440분)이고 시각이 있을 때만 의미가 있다.
   const durationParsed = /^\d+$/.test(durationRaw) ? Number(durationRaw) : null;
   const durationMinutes =
     durationParsed && durationParsed >= 1 && durationParsed <= 1440 ? durationParsed : null;
@@ -237,9 +237,9 @@ export async function createTask(formData: FormData) {
     redirect("/mobile/tasks/new?error=repeat_needs_date");
   }
 
-  // Project-task linkage (optional). When present the task belongs to a project: validate the
-  // viewer is a participant (RLS-scoped read proves it) and that the section belongs to the project.
-  // Project tasks are never per-task shared — sharing is governed by project membership.
+  // 프로젝트 할 일 연결(선택). 있으면 할 일이 프로젝트에 속한다: 보는 사람이
+  // 참여자인지(RLS 범위 읽기로 증명) 섹션이 그 프로젝트 것인지 검증한다.
+  // 프로젝트 할 일은 개별 공유가 되지 않는다 — 공유는 프로젝트 멤버십이 관리한다.
   const projectIdRaw = cleanText(formData.get("projectId")) || null;
   const sectionIdRaw = cleanText(formData.get("sectionId")) || null;
   let linkedProjectId: string | null = null;
@@ -254,7 +254,7 @@ export async function createTask(formData: FormData) {
       sectionIdRaw && project.sections.some((s) => s.id === sectionIdRaw) ? sectionIdRaw : null;
   }
 
-  // Validate share recipients against the org's active members (fail closed); never for project tasks.
+  // 공유 대상은 조직의 활성 멤버로 검증한다(실패 시 닫힘). 프로젝트 할 일에는 하지 않는다.
   let shareIds: string[] = [];
   if (!linkedProjectId && requestedShare.length > 0) {
     const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
@@ -289,7 +289,7 @@ export async function createTask(formData: FormData) {
     recurrence_series_id: recurrenceSeriesId,
     recurrence_instance_date: recurrenceSeriesId ? anchorDate : null,
     tags,
-    // Project tasks allow up to 20 photos; regular tasks keep the standard 5.
+    // 프로젝트 할 일은 사진 20장까지, 일반 할 일은 기본 5장.
     image_urls: imageUrls.slice(0, linkedProjectId ? 20 : 5),
     property_id: ctxPropertyId,
     room_id: ctxRoomId,
@@ -303,10 +303,10 @@ export async function createTask(formData: FormData) {
     redirect("/mobile/tasks/new?error=save_failed");
   }
 
-  // The author row MUST carry the same keys as the participant rows below. PostgREST builds one
-  // multi-row INSERT from the union of keys across the array and fills any key a row omits with
-  // NULL — bypassing the column default — so an author row missing `is_first_recipient` would write
-  // NULL and violate its NOT NULL constraint whenever a share is included. Keep the shapes uniform.
+  // 작성자 행은 아래 참여자 행과 반드시 같은 키를 가져야 한다. PostgREST 는 배열 전체의
+  // 키 합집합으로 다중 행 INSERT 하나를 만들고, 행에서 빠진 키는
+  // 컬럼 기본값을 무시하고 NULL 로 채운다. 그래서 `is_first_recipient` 가 빠진 작성자 행은
+  // NULL 을 써서, 공유가 포함될 때마다 NOT NULL 제약을 어긴다. 형태를 통일해 둔다.
   const participantRows: Database["public"]["Tables"]["task_participants"]["Insert"][] = [
     {
       task_id: id,
@@ -350,7 +350,7 @@ export async function createTask(formData: FormData) {
     });
   }
 
-  // Project tasks return to the project detail; regular tasks open the new task.
+  // 프로젝트 할 일은 프로젝트 상세로, 일반 할 일은 새 할 일을 연다.
   if (linkedProjectId) {
     redirect(`/mobile/tasks/projects/${linkedProjectId}`);
   }

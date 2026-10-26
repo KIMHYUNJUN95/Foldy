@@ -8,8 +8,8 @@ import {
 } from "@/lib/room-label-normalization";
 import type { AppSession } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper } from "@/config/roles";
-// The custom-weekday rule format has exactly one parser, and it lives in the client-safe twin so
-// the two recurrence tables can't drift apart on it (see that file's header warning).
+// 커스텀 요일 규칙 형식의 파서는 정확히 하나이며 클라이언트 안전 쌍둥이에 있어서
+// 두 반복 테이블이 서로 어긋날 수 없다(그 파일 헤더의 경고 참고).
 import {
   buildCustomRecurrenceRule,
   isCustomWeekdayRecurrence,
@@ -37,9 +37,9 @@ export type TaskParticipant = {
   isFirstRecipient: boolean;
 };
 
-/** Resolved display data for a task's linked context (property, room, reservation). */
+/** 업무에 연결된 컨텍스트(property, room, reservation)의 해석된 표시 데이터. */
 export type LinkedTaskContext = {
-  /** Raw saved UUIDs — passed back to the edit form so a link round-trips without re-picking. */
+  /** 저장된 원본 UUID — 수정 폼에 되돌려 줘서 다시 고르지 않고도 연결이 왕복된다. */
   propertyId: string | null;
   roomId: string | null;
   propertyName: string | null;
@@ -116,7 +116,7 @@ type ProfileName = { id: string; name: string };
  */
 export { tokyoDateOf, tokyoToday, ymdShift };
 
-/** The single date a task is anchored to for list/calendar grouping (due wins over scheduled). */
+/** 목록/캘린더 묶음용으로 업무가 고정되는 단일 날짜(due 가 scheduled 보다 우선). */
 export function taskAnchorDate(task: TaskRecord): string | null {
   return tokyoDateOf(task.dueAt) ?? task.scheduledDate ?? null;
 }
@@ -129,20 +129,20 @@ export type NormalizedTaskDateTime = {
 };
 
 /**
- * Single source of truth for how task date/time form inputs persist — shared by
- * `createTask` and `updateTaskCore` so the two never drift.
+ * 업무 날짜/시간 폼 입력이 어떻게 저장되는지의 단일 기준 — 다음이 공유한다:
+ * `createTask` 와 `updateTaskCore` 가 어긋나지 않도록.
  *
- * Rule:
- * - `time_label` is the task's optional time-of-day ("HH:MM"); `all_day = no time-of-day`.
- * - a time is only kept when the task is anchored to a date (scheduled or due); with no
- *   date at all the time is dropped and the task stays all-day (no floating time).
- * - `due_at` carries the time only when a due date exists (Tokyo, +09:00); an all-day due
- *   date is stored at 00:00 local — the existing intentional pattern, since `anchor()`
- *   reads only the Tokyo calendar date. With no due date, `due_at` is null even if a time
- *   shows on the scheduled date (time_label drives display, not due_at).
- * - invalid/partial date or time strings are treated as unset.
+ * 규칙:
+ * - `time_label` 은 업무의 선택적 시각("HH:MM"); `all_day = 시각 없음`.
+ * - 시각은 업무가 날짜(scheduled 또는 due)에 고정될 때만 유지된다; 날짜가 전혀
+ *   없으면 시각은 버려지고 업무는 종일로 남는다(떠다니는 시각 없음).
+ * - `due_at` 은 due 날짜가 있을 때만 시각을 담는다(도쿄, +09:00); 종일 due
+ *   날짜는 현지 00:00 으로 저장한다 — 기존의 의도된 패턴이며 `anchor()` 가
+ *   도쿄 달력 날짜만 읽기 때문이다. due 날짜가 없으면 scheduled 날짜에 시각이
+ *   보여도 `due_at` 은 null 이다(표시는 time_label 이 맡고 due_at 이 아님).
+ * - 형식이 잘못되었거나 일부만 있는 날짜/시각 문자열은 미설정으로 본다.
  */
-/** Recurrence rules a user may newly assign in this slice (lightweight, display-only). */
+/** 이번 범위에서 사용자가 새로 지정할 수 있는 반복 규칙(가벼움, 표시 전용). */
 export const STANDARD_RECURRENCE_RULES = [
   "daily",
   "weekly",
@@ -197,20 +197,20 @@ export function taskNeedsRecurrenceDate(
   return !!recurrenceRule && !anchorDate;
 }
 
-/** The six literal rules only — use `hasRecurrenceMath` for the "is this recurring?" gate. */
+/** 여섯 개의 리터럴 규칙만 — 「반복인가?」 게이트에는 `hasRecurrenceMath` 를 쓴다. */
 function isStandardRecurrenceRule(value: string | null): value is StandardRecurrenceRule {
   return !!value && (STANDARD_RECURRENCE_RULES as readonly string[]).includes(value);
 }
 
 /**
- * True when the rule rolls forward — the six standard rules plus a custom weekday rule.
- * MUST stay in lockstep with `isStandardRecurrence` in `@/lib/tasks-recurrence`.
+ * 규칙이 다음으로 넘어가면 true — 표준 규칙 여섯 개 + 커스텀 요일 규칙.
+ * `@/lib/tasks-recurrence` 의 `isStandardRecurrence` 와 반드시 보조를 맞춰야 한다.
  */
 function hasRecurrenceMath(value: string | null): value is string {
   return isStandardRecurrenceRule(value) || isCustomWeekdayRecurrence(value);
 }
 
-/** Next date strictly after `fromDate` whose weekday is in the set. */
+/** `fromDate` 이후 엄격히 다음이면서 요일이 집합에 속하는 날짜. */
 function stepToWeekday(weekdays: readonly number[], fromDate: string, step: 1 | -1): string {
   let cursor = ymdShift(fromDate, step);
   for (let guard = 0; guard < 7; guard++) {
@@ -261,25 +261,25 @@ function previousOccurrenceDate(rule: string, fromDate: string): string {
   }
 }
 
-// ── Todoist-style recurrence (single live task, no pre-materialized instances) ────────────────
-// A recurring task is ONE row carrying a `recurrence_rule` + its current occurrence date.
-// Completing it rolls the same row forward to the next occurrence; the calendar expands future
-// occurrences virtually (display-only). The pure, client-safe date math (isStandardRecurrence /
-// recurringOccurrencesInRange) lives in `@/lib/tasks-recurrence`; the TaskRecord-bound helpers
-// below are used by the server actions.
+// ── Todoist 식 반복 (살아 있는 업무 하나, 미리 만든 인스턴스 없음) ──────
+// 반복 업무는 `recurrence_rule` + 현재 회차 날짜를 가진 행 하나다.
+// 완료하면 같은 행이 다음 회차로 넘어가고, 캘린더는 미래 회차를 가상으로 펼친다
+// (표시 전용). 클라이언트 안전한 순수 날짜 계산(isStandardRecurrence /
+// recurringOccurrencesInRange)은 `@/lib/tasks-recurrence` 에 있고, TaskRecord 에 묶인 헬퍼는
+// 아래에 두며 서버 액션이 쓴다.
 
-/** The task's current occurrence date (recurrence anchor), or null if not dated. */
+/** 업무의 현재 회차 날짜(반복 기준점), 날짜가 없으면 null. */
 function currentInstanceOf(task: TaskRecord): string | null {
   return task.recurrenceInstanceDate ?? taskAnchorDate(task);
 }
 
 /**
- * Next occurrence date for a recurring task, or null if it is not a standard recurring task.
+ * 반복 업무의 다음 회차 날짜, 표준 반복 업무가 아니면 null.
  *
- * If the task was completed late (its current occurrence is already in the past), the next
- * occurrence is advanced past today so it lands in the future — Todoist's "don't pile up overdue"
- * behavior, rather than grinding through every missed day one completion at a time. The rule's
- * weekday / day-of-month anchor is preserved (we iterate the rule, never jump to a raw `today`).
+ * 업무를 늦게 완료했다면(현재 회차가 이미 과거) 다음
+ * 회차를 오늘 이후로 넘겨서 미래에 놓는다 — Todoist 의 「연체를 쌓지 않는다」
+ * 동작이며, 놓친 날을 한 번 완료할 때마다 하나씩 따라가지 않는다. 규칙의
+ * 요일 / 월중 일자 기준점은 유지된다(규칙을 반복 계산하고 원시 `today` 로 점프하지 않음).
  */
 export function nextRecurringInstance(task: TaskRecord): string | null {
   if (!hasRecurrenceMath(task.recurrenceRule)) return null;
@@ -292,7 +292,7 @@ export function nextRecurringInstance(task: TaskRecord): string | null {
   return next;
 }
 
-/** Previous occurrence date (used to undo a roll-forward), or null if not standard recurring. */
+/** 이전 회차 날짜(넘긴 것을 되돌릴 때 사용), 표준 반복이 아니면 null. */
 export function previousRecurringInstance(task: TaskRecord): string | null {
   if (!hasRecurrenceMath(task.recurrenceRule)) return null;
   const current = currentInstanceOf(task);
@@ -300,8 +300,8 @@ export function previousRecurringInstance(task: TaskRecord): string | null {
 }
 
 /**
- * Date fields for moving a recurring task to `targetInstance`, preserving the scheduled/due offsets
- * and time-of-day. Returns null if the task has no current occurrence date.
+ * 반복 업무를 `targetInstance` 로 옮기기 위한 날짜 필드 — scheduled/due 오프셋을 유지하고
+ * 시각도 유지한다. 업무에 현재 회차 날짜가 없으면 null 을 돌려준다.
  */
 export function shiftRecurringTaskDates(
   task: TaskRecord,
@@ -319,22 +319,22 @@ export function shiftRecurringTaskDates(
 }
 
 /**
- * Resolve a submitted recurrence rule to its stored value — the server-side contract that
- * matches the documented product rule (not a UI-only restriction):
- * - a standard rule passes through;
- * - a **custom weekday rule** (`custom:1,3,5`) is re-parsed and re-serialized, so a crafted
- *   request can't store a malformed, duplicated, or unsorted set (added 2026-07-29);
- * - empty / unrecognized fails closed to `null` (non-recurring);
- * - bare `custom` (no weekday set) stays **round-trip only**: kept solely when the task already
- *   had it (`previousRule === "custom"`), never newly assignable. It predates the weekday builder
- *   and carries no schedule, so it must not become newly creatable.
+ * 제출된 반복 규칙을 저장 값으로 해석한다 — 문서화된 제품 규칙과
+ * 맞는 서버 측 계약이다(UI 전용 제한이 아님):
+ * - 표준 규칙은 그대로 통과한다;
+ * - **커스텀 요일 규칙**(`custom:1,3,5`)은 다시 파싱해 재직렬화하므로, 조작된
+ *   요청이 잘못되었거나 중복되거나 정렬되지 않은 집합을 저장할 수 없다(2026-07-29 추가);
+ * - 비었거나 인식할 수 없으면 실패 시 막아 `null`(비반복)로;
+ * - 요일 집합 없는 맨 `custom` 은 **왕복 전용**으로 남는다: 업무가 이미 갖고 있을 때만
+ *   유지하고(`previousRule === "custom"`) 새로 지정할 수는 없다. 요일 빌더보다 먼저 있었고
+ *   일정을 담지 않으므로 새로 만들 수 있게 되어서는 안 된다.
  */
 export function resolveRecurrenceRule(
   submitted: string,
   previousRule: string | null,
 ): string | null {
   if ((STANDARD_RECURRENCE_RULES as readonly string[]).includes(submitted)) return submitted;
-  // Normalize rather than pass through: `custom:5,1,1` is stored as `custom:1,5`.
+  // 그대로 통과시키지 않고 정규화한다: `custom:5,1,1` 은 `custom:1,5` 로 저장된다.
   const customDays = parseCustomWeekdays(submitted);
   if (customDays) return buildCustomRecurrenceRule(customDays);
   if (submitted === "custom" && previousRule === "custom") return "custom";
@@ -342,10 +342,10 @@ export function resolveRecurrenceRule(
 }
 
 /**
- * True when a specific time was entered but there is no date anchor (neither scheduled
- * nor due). Such a submission is rejected — `normalizeTaskDateTime` would otherwise drop
- * the time silently, which reads as data loss to the user. Enforced in the form and in
- * both server actions (create + edit).
+ * 구체적인 시각을 입력했는데 날짜 기준점이 없는 경우(scheduled 도
+ * due 도 없음) true. 이런 제출은 거절한다 — 그러지 않으면 `normalizeTaskDateTime` 이
+ * 시각을 조용히 버리게 되고, 사용자에게는 데이터 유실로 보인다. 폼과
+ * 서버 액션 둘 다(생성 + 수정)에서 강제한다.
  */
 export function taskTimeWithoutDate(input: {
   scheduledDate: string;
@@ -440,8 +440,8 @@ function buildLinkedContext(
       const nightsCount = Math.round(
         (new Date(res.check_out_date).getTime() - new Date(res.check_in_date).getTime()) / msPerDay,
       );
-      // Normalize to canonical property + merged display room label so chips/detail read the
-      // same as the calendar and picker (e.g. "荒木町A" / "201_2" → "아라키초A" / "201").
+      // 정규 property + 합쳐진 표시 방 라벨로 정규화해서 칩/상세가 읽히는 방식을
+      // 캘린더 · 선택기와 같게 한다(예: "荒木町A" / "201_2" → "아라키초A" / "201").
       const canonProp = getCanonicalPropertyName(res.property_name);
       const displayRoom = getDisplayRoomLabel(
         canonProp,
@@ -462,8 +462,8 @@ function buildLinkedContext(
     }
   }
 
-  // Room-only / property-only link: resolve raw names from the joined property/room rows, then
-  // normalize to canonical property + merged display room label (matches the reservation branch).
+  // 방만 / property 만 있는 링크: 조인된 property/room 행에서 원시 이름을 해석한 뒤
+  // 정규 property + 합쳐진 표시 방 라벨로 정규화한다(예약 분기와 같음).
   const rawPropertyName = r.property_id ? (propertyNameMap.get(r.property_id) ?? null) : null;
   const rawRoomLabel = r.room_id ? (roomLabelMap.get(r.room_id) ?? null) : null;
   const canonProp = rawPropertyName ? getCanonicalPropertyName(rawPropertyName) : null;
@@ -506,7 +506,7 @@ async function hydrate(rows: TaskRow[]): Promise<TaskRecord[]> {
   }
   for (const p of parts) userIds.add(p.user_id);
 
-  // Context resolution — collect IDs for batch joins
+  // 컨텍스트 해석 — 배치 조인을 위해 ID 를 모은다
   const reservationIds = rows.map((r) => r.reservation_id).filter((v): v is string => !!v);
   const propertyIdsNoRes = [
     ...new Set(
@@ -656,7 +656,7 @@ export function getTaskScope(session: AppSession): Promise<TaskScope> {
   return loadTaskScope(session.user.id, session.organization.id);
 }
 
-/** All tasks visible to the current user (RLS-scoped to participant membership). */
+/** 현재 사용자에게 보이는 모든 업무(RLS 로 참여자 멤버십 범위). */
 /**
  * 오래된 «끝난» 작업을 목록 로드에서 잘라내는 창(일). 완료 로그(`getTaskCompletions`, 120일)보다
  * 넉넉해야 한다 — 완료·기록 탭은 로그의 각 기록을 이 목록에서 찾아 행으로 그리므로, 창이 로그보다
@@ -687,7 +687,7 @@ export async function getVisibleTasks(session: AppSession): Promise<TaskRecord[]
     .from("tasks")
     .select(TASK_SELECT)
     .eq("organization_id", session.organization.id)
-    .is("deleted_at", null) // soft-delete: hide deleted tasks (undo restores them)
+    .is("deleted_at", null) // 소프트 삭제: 삭제된 업무를 숨긴다(실행 취소하면 복원됨)
     .or(
       [
         "status.eq.open",
@@ -735,7 +735,7 @@ export async function getTasksByIds(session: AppSession, ids: string[]): Promise
   return hydrate(((data ?? []) as TaskRow[]).filter((r) => scope.taskIds.has(r.id)));
 }
 
-/** One recurring occurrence's recorded state (completed/skipped/moved). See `task_occurrence_state`. */
+/** 반복 회차 하나의 기록된 상태(완료/건너뜀/이동). `task_occurrence_state` 참고. */
 export type OccurrenceStateRecord = {
   taskId: string;
   occurrenceDate: string;
@@ -745,11 +745,11 @@ export type OccurrenceStateRecord = {
 };
 
 /**
- * Occurrence-level state rows for the org's recurring tasks (RLS-scoped to participant membership).
- * Powers per-date occurrence rendering (done state), overdue detection (absence = still open), and
- * skip/move resolution. Bounded to a recent window for size — resolved states older than the window
- * only matter for pathologically stale backlogs. Rolled-forward legacy anchors are recent so this
- * window comfortably covers active tasks.
+ * 조직의 반복 업무에 대한 회차 단위 상태 행(RLS 로 참여자 멤버십 범위).
+ * 날짜별 회차 렌더(완료 상태), 지난 미완료 감지(기록 없음 = 아직 열림),
+ * 건너뜀/이동 해석에 쓴다. 크기를 위해 최근 구간으로 제한한다 — 구간보다 오래된 해석된 상태는
+ * 병적으로 오래된 밀린 항목에서만 의미가 있다. 넘겨진 옛 기준점은 최근 것이라 이
+ * 구간이 활성 업무를 충분히 덮는다.
  */
 export async function getOccurrenceStates(session: AppSession): Promise<OccurrenceStateRecord[]> {
   const supabase = await getSupabaseServerClient();
@@ -783,8 +783,8 @@ export async function getOccurrenceStates(session: AppSession): Promise<Occurren
 }
 
 /**
- * One net completion of a task on a Tokyo day, derived from the `completed`/`reopened` log.
- * `at` is the timestamp of the last `completed` event, used to order rows inside a day group.
+ * 도쿄 하루 동안의 업무 순 완료 하나, `completed`/`reopened` 로그에서 도출.
+ * `at` 은 마지막 `completed` 이벤트의 타임스탬프로, 하루 그룹 안에서 행을 정렬하는 데 쓴다.
  */
 export type TaskCompletionRecord = {
   taskId: string;
@@ -794,7 +794,7 @@ export type TaskCompletionRecord = {
 };
 
 /**
- * Completion history from `task_updates` (NOT `tasks.status`).
+ * `task_updates` 의 완료 이력 (`tasks.status` 가 아님).
  *
  * 2026-07-30 롤포워드 폐지 이후 **반복 완료는 행의 status 를 건드리지 않는다** — 완료는
  * `task_occurrence_state` 와 이 로그에만 남는다. 그래서 `status = "completed"` 만 보는 목록은
@@ -823,7 +823,7 @@ export async function getTaskCompletions(session: AppSession): Promise<TaskCompl
     created_at: string | null;
     created_by_user_id: string | null;
   };
-  // key = `${taskId}|${day}`
+  // 키 = `${taskId}|${day}`
   const net = new Map<string, { net: number; by: string | null; at: string }>();
   for (const r of (data ?? []) as Row[]) {
     if (!scope.taskIds.has(r.task_id)) continue;
@@ -849,7 +849,7 @@ export async function getTaskCompletions(session: AppSession): Promise<TaskCompl
   return out;
 }
 
-/** One recurring occurrence's manual sort position. See `task_occurrence_order`. */
+/** 반복 회차 하나의 수동 정렬 위치. `task_occurrence_order` 참고. */
 export type OccurrenceOrderRecord = {
   taskId: string;
   occurrenceDate: string;
@@ -857,10 +857,10 @@ export type OccurrenceOrderRecord = {
 };
 
 /**
- * Manual per-date positions for recurring occurrences (RLS-scoped).
+ * 반복 회차의 날짜별 수동 위치(RLS 범위).
  *
- * Kept to a rolling window like `getOccurrenceStates` — positions for dates far in the past are
- * never rendered, so there is no reason to ship them to the client.
+ * `getOccurrenceStates` 처럼 롤링 구간으로 제한한다 — 먼 과거 날짜의 위치는
+ * 렌더되지 않으므로 클라이언트로 보낼 이유가 없다.
  */
 export async function getOccurrenceOrders(session: AppSession): Promise<OccurrenceOrderRecord[]> {
   const supabase = await getSupabaseServerClient();
@@ -882,7 +882,7 @@ export async function getOccurrenceOrders(session: AppSession): Promise<Occurren
     }));
 }
 
-/** All tasks belonging to a project (RLS-scoped: viewer must be a project participant). */
+/** 프로젝트에 속한 모든 업무(RLS 범위: 보는 사람이 프로젝트 참여자여야 함). */
 export async function getProjectTasks(
   session: AppSession,
   projectId: string,
@@ -905,7 +905,7 @@ export async function getProjectTasks(
   return hydrate((data ?? []) as TaskRow[]);
 }
 
-/** One task with participants + full update log, scoped to the session org. */
+/** 참여자 + 전체 업데이트 로그를 가진 업무 하나, 세션 조직 범위. */
 export async function getTaskDetail(
   session: AppSession,
   id: string,
@@ -923,7 +923,7 @@ export async function getTaskDetail(
     .maybeSingle();
   if (error) {
     if (isMissingTable(error.message ?? "")) return null;
-    // A malformed (non-UUID) id in the URL → treat as not-found, not a 500 crash.
+    // URL 의 형식이 깨진(UUID 아님) id → 500 크래시가 아니라 not-found 로 처리한다.
     if (error.code === "22P02") return null;
     throw new Error(error.message);
   }
@@ -963,7 +963,7 @@ export async function getTaskDetail(
   return { ...record, updates };
 }
 
-/** Active org members (excluding self) selectable as share recipients. */
+/** 공유 수신자로 고를 수 있는 활성 조직 멤버(본인 제외). */
 export async function getShareableUsers(session: AppSession): Promise<ShareableUser[]> {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase

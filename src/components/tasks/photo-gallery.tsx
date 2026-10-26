@@ -9,16 +9,16 @@ import { useBodyScrollLock } from "@/components/shell/use-body-scroll-lock";
 import { cn } from "@/lib/utils";
 
 /**
- * Attachment gallery for task / update-log photos.
+ * 할 일 / 업데이트 로그 사진용 첨부 갤러리.
  *
- * Flow (as requested): a few **tiny inline thumbnails** → tap opens a **bottom sheet** listing every
- * attachment → tap a photo opens a **full-screen, swipeable lightbox** (scroll-snap carousel with a
- * live counter). Matches the app concept — ivory/white surfaces, deep-ink-navy accent, and selective
- * Liquid-Glass chrome on the dark lightbox overlay. Both overlays portal to <body> so the mobile
- * shell's transformed scroll container can't trap their `position: fixed`.
+ * 흐름(요청대로): 작은 **인라인 썸네일** 몇 장 → 탭하면 모든 첨부를 나열하는 **바텀 시트**가 열리고
+ * → 사진을 탭하면 **전체 화면 스와이프 라이트박스**(scroll-snap 캐러셀 +
+ * 실시간 카운터)가 열린다. 앱 콘셉트에 맞춰 — 아이보리/흰 면, 딥 잉크 네이비 강조, 어두운 라이트박스 오버레이에는 선택적으로
+ * Liquid Glass 크롬을 쓴다. 두 오버레이 모두 <body> 로 포털되어 모바일
+ * 셸의 transform 이 걸린 스크롤 컨테이너가 `position: fixed` 를 가두지 못한다.
  *
- * The list is the shared `BottomSheet`(2026-10-19 — 손으로 만든 시트를 공용으로: 태블릿 가운데 카드 · 끌어 닫기 ·
- * 바탕 잠금이 다른 시트와 같다). The lightbox is a full-screen overlay, not a sheet, so it stays here.
+ * 목록은 공용 `BottomSheet` 다(2026-10-19 — 손으로 만든 시트를 공용으로: 태블릿 가운데 카드 · 끌어 닫기 ·
+ * 바탕 잠금이 다른 시트와 같다). 라이트박스는 시트가 아니라 전체 화면 오버레이라서 여기에 그대로 둔다.
  */
 export function PhotoGallery({
   urls,
@@ -60,7 +60,7 @@ export function PhotoGallery({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [lightbox, closeLightbox]);
 
-  // After mount / index change, scroll the lightbox rail to the active slide (no smooth jump on open).
+  // 마운트 / 인덱스 변경 후 라이트박스 레일을 활성 슬라이드로 스크롤 (열 때는 부드러운 점프 없음).
   useEffect(() => {
     if (lightbox === null) return;
     const rail = railRef.current;
@@ -91,7 +91,7 @@ export function PhotoGallery({
 
   return (
     <>
-      {/* Inline thumbnails — tap any to open the sheet. */}
+      {/* 인라인 썸네일 — 아무거나 탭하면 시트가 열린다. */}
       <button
         aria-label={title}
         className="mt-2 flex items-center gap-1.5"
@@ -155,14 +155,14 @@ export function PhotoGallery({
         </BottomSheet>
       ) : null}
 
-      {/* Full-screen swipeable lightbox. */}
+      {/* 전체 화면 스와이프 라이트박스. */}
       {lightbox !== null && typeof document !== "undefined"
         ? createPortal(
             <div
               className="fixed inset-0 z-[95] flex flex-col bg-slate-950/95 backdrop-blur-sm"
               style={{ animation: "modal-overlay-in 200ms ease-out both" }}
             >
-              {/* Top glass bar — counter + close. */}
+              {/* 상단 글래스 바 — 카운터 + 닫기. */}
               <div className="flex items-center justify-between px-4 pb-3 pt-[max(14px,env(safe-area-inset-top))]">
                 <span className="rounded-full bg-white/12 px-3 py-1 text-[12.5px] font-bold tabular-nums text-white/90 backdrop-blur-md ring-1 ring-inset ring-white/15">
                   {activeIndex + 1} / {urls.length}
@@ -177,7 +177,7 @@ export function PhotoGallery({
                 </button>
               </div>
 
-              {/* Scroll-snap carousel. */}
+              {/* Scroll-snap 캐러셀. */}
               <div
                 className="flex flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 onScroll={onRailScroll}
@@ -199,7 +199,7 @@ export function PhotoGallery({
                 ))}
               </div>
 
-              {/* Prev / next (multi-photo) — large tap targets, hidden at the ends. */}
+              {/* 이전 / 다음 (여러 장일 때) — 큰 탭 영역, 양 끝에서는 숨김. */}
               {urls.length > 1 ? (
                 <>
                   {activeIndex > 0 ? (
@@ -223,7 +223,7 @@ export function PhotoGallery({
                     </button>
                   ) : null}
 
-                  {/* Dots. */}
+                  {/* 점. */}
                   <div className="flex items-center justify-center gap-1.5 pb-[max(18px,env(safe-area-inset-bottom))] pt-3">
                     {urls.map((_, i) => (
                       <button

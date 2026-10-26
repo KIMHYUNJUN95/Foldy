@@ -1,15 +1,15 @@
-// On-demand translation of external reviews (DeepL API Free). Server-only.
+// 외부 리뷰 온디맨드 번역 (DeepL API Free). 서버 전용.
 //
-// Contract: docs/product/25-complaint-workflow.md → "Review Translation"
+// 계약: docs/product/25-complaint-workflow.md → "Review Translation"
 //
-//   * The original text is always preserved; a translation never replaces or edits it.
-//   * Only a detail view triggers a call. Lists, sorting and filters never translate.
-//   * The same (review + body part + target locale) is answered from cache forever, as long as
-//     the source text still hashes to the stored value.
-//   * DeepL API Free allows 500,000 characters a month, counted on the *input* length. We stop
-//     issuing new translations at 450,000 so a burst cannot overshoot the free tier; already
-//     stored translations keep rendering.
-//   * The API key lives in a server env var only — never in the browser, logs or docs.
+//   * 원문은 항상 보존한다. 번역은 원문을 대체하거나 수정하지 않는다.
+//   * 상세 보기만 호출을 일으킨다. 목록, 정렬, 필터는 절대 번역하지 않는다.
+//   * 같은 (리뷰 + 본문 부분 + 대상 로케일)은 원문이 저장된 값과 계속 해시가 같은 한
+//     영구히 캐시에서 답한다.
+//   * DeepL API Free 는 월 500,000자를 허용하며 *입력* 길이로 센다. 새 번역은
+//     450,000자에서 멈춰 한 번에 몰려도 무료 한도를 넘지 않게 하며, 이미
+//     저장된 번역은 계속 렌더된다.
+//   * API 키는 서버 환경 변수에만 둔다 — 브라우저, 로그, 문서에는 절대 두지 않는다.
 
 import "server-only";
 
@@ -40,7 +40,7 @@ function hashSource(text: string): string {
 function getDeepLEnv(): { url: string; key: string } | null {
   const key = process.env.DEEPL_API_KEY?.trim();
   if (!key) return null;
-  // Free-tier keys end in ":fx" and must use the free host.
+  // 무료 등급 키는 ":fx" 로 끝나며 무료 호스트를 써야 한다.
   const url =
     process.env.DEEPL_API_URL?.trim() ??
     (key.endsWith(":fx") ? "https://api-free.deepl.com/v2/translate" : "https://api.deepl.com/v2/translate");

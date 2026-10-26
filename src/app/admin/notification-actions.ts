@@ -32,7 +32,7 @@ async function scopeFromSession() {
   };
 }
 
-// Admin console bell popover — recent notifications (white-redesign rows, grouped on the client) + true unread count.
+// 관리자 콘솔 벨 팝오버 — 최근 알림(화이트 리디자인 행, 클라이언트에서 묶음) + 실제 안 읽은 수.
 export async function getAdminNotifications(): Promise<AdminNotifData> {
   const ctx = await scopeFromSession();
   if (!ctx) return { unread: 0, items: [], copy: null };

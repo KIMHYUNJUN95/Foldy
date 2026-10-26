@@ -76,14 +76,14 @@ function isValidYmd(value: string): boolean {
 const detailPath = (id: string, error?: string) =>
   `/mobile/tasks/${id}${error ? `?error=${error}` : ""}`;
 
-// Project tasks are shown on their project page too, so a status change there must revalidate it —
-// otherwise the checkbox/progress in the project detail view won't refresh (only Today/detail did).
+// 프로젝트 할 일은 프로젝트 페이지에도 보이므로, 거기서 상태를 바꾸면 그 페이지도 revalidate 해야 한다 —
+// 안 그러면 프로젝트 상세의 체크박스/진행률이 갱신되지 않는다(오늘/상세만 갱신됐음).
 function revalidateProjectPath(projectId: string | null) {
   if (projectId) revalidatePath(`/mobile/tasks/projects/${projectId}`);
 }
 
-// getTaskDetail uses the RLS-scoped client, so a non-null result already proves the
-// acting user is a participant. Author actions additionally check authorship.
+// getTaskDetail 은 RLS 범위 클라이언트를 쓰므로, null 이 아닌 결과는 이미 행동하는 사용자가
+// 참여자임을 증명한다. 작성자 전용 액션은 작성 여부를 추가로 확인한다.
 async function requireSessionAndTask(taskId: string): Promise<{
   session: Session;
   task: TaskDetail;
@@ -113,22 +113,22 @@ async function requireSession(): Promise<Session> {
   return session;
 }
 
-// "Overdue" for the Today-tab prompt: the caller's own (authored), active, non-project task whose
-// due Tokyo date is before today — mirrors the Today view's overdue section. Scoped to authored
-// tasks so the bulk actions never reschedule/delete someone else's shared task.
+// 오늘 탭 안내용 "지난 할 일": 호출자 본인이 만든, 활성 상태의, 프로젝트가 아닌 할 일 중
+// 마감 도쿄 날짜가 오늘 이전인 것 — 오늘 보기의 지난 섹션과 같다. 일괄 액션이 남의 공유 할 일을
+// 옮기거나 지우지 않도록 본인이 만든 할 일로 한정한다.
 function isOverdueOwned(t: TaskRecord, today: string, userId: string): boolean {
   if (t.projectId || t.createdByUserId !== userId) return false;
   if (t.status === "completed" || t.status === "cancelled") return false;
-  // Recurring overdue is per-occurrence (task_occurrence_state), handled by the carry/skip actions
-  // below — never by the row-due bulk actions (2026-07-30 롤포워드 폐지).
+  // 반복 할 일의 지남은 회차(task_occurrence_state)별로 따지며, carry/skip 액션이
+  // 아래에서 처리한다 — 행 마감 기준 일괄 액션은 건드리지 않는다(2026-07-30 롤포워드 폐지).
   if (isStandardRecurrence(t.recurrenceRule)) return false;
   const due = tokyoDateOf(t.dueAt);
   return !!due && due < today;
 }
 
 /**
- * "일정변경" — move the selected overdue tasks to `targetDate` (YYYY-MM-DD, Tokyo).
- * `taskIds` are the IDs the user chose; server re-validates each is truly overdue + owned.
+ * "일정변경" — 선택한 지난 할 일을 `targetDate`(YYYY-MM-DD, 도쿄)로 옮긴다.
+ * `taskIds` 는 사용자가 고른 ID 이고, 서버가 각각 실제로 지났고 본인 소유인지 다시 검증한다.
  */
 export async function rescheduleOverdueTo(targetDate: string, taskIds: string[]) {
   // 날짜 모양을 먼저 본다(2026-10-26) — 이상한 값이 오면 `new Date(...).toISOString()` 이
@@ -145,7 +145,7 @@ export async function rescheduleOverdueTo(targetDate: string, taskIds: string[])
   const supabase = getSupabaseServiceClient();
   const orgId = session.organization.id;
   for (const t of overdue) {
-    // One-off only — recurring is excluded by isOverdueOwned (handled per-occurrence).
+    // 단발성만 — 반복은 isOverdueOwned 가 제외한다(회차별로 처리).
     const dueAt = new Date(`${date}T${t.timeLabel || "00:00"}:00+09:00`).toISOString();
     await supabase
       .from("tasks")
@@ -157,8 +157,8 @@ export async function rescheduleOverdueTo(targetDate: string, taskIds: string[])
 }
 
 /**
- * "지난 미완료 삭제" — soft-delete the selected overdue one-off tasks. Recurring tasks are excluded
- * from this path (isOverdueOwned) — their overdue occurrences are cleared via skipOverdueOccurrences.
+ * "지난 미완료 삭제" — 선택한 지난 단발성 할 일을 소프트 삭제한다. 반복 할 일은
+ * 이 경로에서 제외된다(isOverdueOwned) — 지난 회차는 skipOverdueOccurrences 로 정리한다.
  */
 export async function dismissOverdueTasks(taskIds: string[]) {
   const session = await requireSession();
@@ -288,9 +288,9 @@ export async function updateTaskCore(formData: FormData) {
     .map((t) => t.trim())
     .filter(Boolean)
     .slice(0, 10);
-  // Project tasks allow up to 20 photos; regular tasks keep the standard 5. Photos the task already
-  // has survive the cap (e.g. moved out of a project) — only new additions are capped. New URLs must
-  // be our own `{org}/task-images/` storage objects (2026-10-26) — see lib/task-images.
+  // 프로젝트 할 일은 사진 20장까지 허용하고, 일반 할 일은 기본 5장을 유지한다. 할 일에 이미 있는 사진은
+  // 상한을 넘어도 유지된다(예: 프로젝트에서 빼낸 경우) — 새로 추가하는 것만 상한을 적용한다. 새 URL 은
+  // 우리 `{org}/task-images/` 스토리지 객체여야 한다(2026-10-26) — lib/task-images 참고.
   const imageUrls = mergeTaskImageUrls(
     task.imageUrls,
     formData.getAll("imageUrls").map(String),
@@ -302,20 +302,20 @@ export async function updateTaskCore(formData: FormData) {
   const ctxReservationId = cleanText(formData.get("ctxReservationId")) || null;
   const ctxGuestName = cleanText(formData.get("ctxGuestName")) || null;
   const nextRecurrenceRule = resolveRecurrenceRule(repeatRaw, task.recurrenceRule);
-  // A recurrence needs a date anchor; a repeat with no date anchors to today (Todoist), not rejected.
+  // 반복에는 날짜 기준이 필요하다. 날짜 없는 반복은 거부하지 않고 오늘로 기준을 잡는다(Todoist 방식).
   if (nextRecurrenceRule && !scheduledDate && !dueDate) scheduledDate = tokyoToday();
-  // A specific time needs a date anchor — reject rather than silently drop it (back to edit).
+  // 특정 시각에는 날짜 기준이 필요하다 — 조용히 버리지 않고 거부한다(수정 화면으로 되돌림).
   if (taskTimeWithoutDate({ scheduledDate, dueDate, time })) {
     redirect(`/mobile/tasks/${id}/edit?error=time_needs_date`);
   }
-  // One shared rule for date/time persistence (see lib/tasks normalizeTaskDateTime) — keeps
-  // create and edit identical: toggling all-day clears time cleanly, no stale time_label/due_at.
+  // 날짜/시각 저장은 하나의 공용 규칙을 쓴다(lib/tasks normalizeTaskDateTime 참고) — 생성과
+  // 수정이 똑같다: 종일을 켜면 시각이 깔끔히 지워지고 time_label/due_at 이 남지 않는다.
   const { scheduledDate: sched, dueAt, allDay, timeLabel } = normalizeTaskDateTime({
     scheduledDate,
     dueDate,
     time,
   });
-  // Duration is a time-block length (1–1440 min) and is only meaningful with a time-of-day.
+  // 소요 시간은 시간 블록 길이(1–1440분)이며 시각이 있을 때만 의미가 있다.
   const durationParsed = /^\d+$/.test(durationRaw) ? Number(durationRaw) : null;
   const durationMinutes =
     durationParsed && durationParsed >= 1 && durationParsed <= 1440 ? durationParsed : null;
@@ -335,7 +335,7 @@ export async function updateTaskCore(formData: FormData) {
     time_label: timeLabel,
     duration_minutes: finalDuration,
     priority: PRIORITIES.has(priorityRaw) ? priorityRaw : "normal",
-    // `custom` is kept only if this task already had it; non-custom tasks can't become custom.
+    // `custom` 은 이 할 일이 이미 custom 이었던 경우에만 유지한다. custom 이 아닌 할 일은 custom 이 될 수 없다.
     recurrence_rule: nextRecurrenceRule,
     recurrence_series_id:
       task.recurrenceSeriesId ?? (nextRecurrenceRule ? task.id : null),
@@ -350,7 +350,7 @@ export async function updateTaskCore(formData: FormData) {
     reservation_id: ctxReservationId,
     guest_name: ctxGuestName,
   };
-  // Files the author detached in this edit (server-truth previous set minus the new set).
+  // 이번 수정에서 작성자가 뗀 파일(서버가 가진 이전 집합에서 새 집합을 뺀 것).
   const removedImageUrls = task.imageUrls.filter((u) => !imageUrls.includes(u));
   const { error } = await supabase
     .from("tasks")
@@ -360,7 +360,7 @@ export async function updateTaskCore(formData: FormData) {
   if (error) {
     redirect(`/mobile/tasks/${id}/edit?error=save_failed`);
   }
-  // Only after the DB no longer references them, hard-delete the detached files.
+  // DB 가 더는 참조하지 않게 된 뒤에만, 뗀 파일을 완전 삭제한다.
   await cleanupRemovedTaskImages(supabase, removedImageUrls, session.organization.id);
   await bestEffortWrite(
     "task_updates: insert",
@@ -400,8 +400,8 @@ export async function moveTaskOutOfInbox(formData: FormData) {
   await setInbox(formData, false);
 }
 
-// Allowed list views for the swipe-action return redirect (keeps the user on the tab they swiped
-// from). Mirrors the page's VIEWS allow-list.
+// 스와이프 액션 후 돌아갈 목록 보기 허용 목록(스와이프한 탭에 그대로 머물게 함).
+// 페이지의 VIEWS 허용 목록과 같다.
 // "sent" 는 구 탭 키(→ instr). 되돌아오기 쿼리에 남아 있을 수 있어 계속 받아 준다.
 const LIST_VIEWS = new Set(["today", "tomorrow", "inbox", "instr", "sent", "completed", "calendar"]);
 function listPathForView(formData: FormData, error?: string): string {
@@ -411,8 +411,8 @@ function listPathForView(formData: FormData, error?: string): string {
   return `${base}${base.includes("?") ? "&" : "?"}moveError=${error}`;
 }
 
-// Fields to anchor a task to `date` (Tokyo YYYY-MM-DD) via due_at, preserving any time-of-day.
-// Clears scheduled_date so due_at is the single anchor.
+// 할 일을 due_at 으로 `date`(도쿄 YYYY-MM-DD)에 맞추는 필드. 시각이 있으면 보존한다.
+// scheduled_date 를 비워 due_at 이 유일한 기준이 되게 한다.
 //
 // **`recurrence_instance_date` 는 여기서 절대 건드리지 않는다.** 반복 시리즈의 앵커는 고정이고
 // (2026-07-30 롤포워드 폐지), 밀린 회차는 앵커부터 계산되므로 앵커를 옮기면 지연 백로그가 통째로
@@ -428,8 +428,8 @@ function anchorToDate(task: TaskDetail, date: string): Database["public"]["Table
   };
 }
 
-// "To today" swipe action: anchor the task to the Tokyo operating date and pull it
-// out of Inbox. Returns to the originating tab so the card moves into Today.
+// "오늘로" 스와이프 액션: 할 일을 도쿄 운영 날짜로 맞추고 Inbox 에서
+// 꺼낸다. 시작한 탭으로 돌아가 카드가 오늘로 옮겨진 것을 보여준다.
 export async function moveTaskToToday(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
   const { task } = await requireSessionAndTask(id);
@@ -454,8 +454,8 @@ export async function moveTaskToToday(formData: FormData) {
   redirect(listPathForView(formData, moved ? undefined : "save_failed"));
 }
 
-// "To tomorrow" swipe action (Today tab): defer the task to the Tokyo next operating date and pull
-// it out of Inbox. Returns to the originating tab so the card moves into Tomorrow.
+// "내일로" 스와이프 액션(오늘 탭): 할 일을 도쿄 다음 운영 날짜로 미루고
+// Inbox 에서 꺼낸다. 시작한 탭으로 돌아가 카드가 내일로 옮겨진 것을 보여준다.
 export async function moveTaskToTomorrow(formData: FormData) {
   const id = cleanText(formData.get("taskId"));
   const { task } = await requireSessionAndTask(id);
@@ -476,18 +476,18 @@ export async function moveTaskToTomorrow(formData: FormData) {
   redirect(listPathForView(formData, moved ? undefined : "save_failed"));
 }
 
-// The occurrence date a recurring complete/reopen targets when the caller passes none: the task's
-// FIXED anchor (recurrence_instance_date), falling back to its due/scheduled date, then today.
+// 호출자가 날짜를 주지 않을 때 반복 할 일의 완료/재개가 대상으로 삼는 회차 날짜: 할 일의
+// 고정 기준(recurrence_instance_date), 없으면 마감/예정 날짜, 그것도 없으면 오늘.
 function recurringAnchorDate(task: TaskRecord): string {
   return task.recurrenceInstanceDate ?? tokyoDateOf(task.dueAt) ?? task.scheduledDate ?? tokyoToday();
 }
 
-// Mark a task complete. RECURRING (2026-07-30): completion never touches the row — it records the
-// given occurrence date in `task_occurrence_state` (no roll-forward), so every scheduled date stays
-// visible and independently completable. ONE-OFF: sets status + completion stamps as before. Both
-// log a `completed` update + notify participants. Programmatic (list card / detail view / calendar).
-// Returns the occurrence date a recurring completion actually recorded (it differs from the passed
-// date on a non-occurrence day) — undo must reopen that date.
+// 할 일을 완료한다. 반복(2026-07-30): 완료는 행을 건드리지 않고, 주어진 회차 날짜를
+// `task_occurrence_state` 에 기록한다(앞으로 넘기지 않음). 그래서 예정된 모든 날짜가
+// 계속 보이고 각각 따로 완료할 수 있다. 단발성: 예전처럼 상태 + 완료 도장을 찍는다. 둘 다
+// `completed` 갱신 로그를 남기고 참여자에게 알린다. 프로그램 호출용(목록 카드 / 상세 / 캘린더).
+// 반복 완료가 실제로 기록한 회차 날짜를 돌려준다(회차가 아닌 날에는 넘겨받은 날짜와 다름) —
+// 실행 취소는 그 날짜를 다시 열어야 한다.
 export type TaskStatusResult = { ok: boolean; occurrenceDate?: string };
 
 export async function completeTask(
@@ -584,9 +584,9 @@ export async function completeTask(
   return { ok: true };
 }
 
-// Re-open a completed task: clear status + completion stamps and log a `reopened` update. No
-// notification (re-opening is a quiet correction, typically the same user undoing a tap). Used by
-// the undo toast and the detail view's "다시 열기" button.
+// 완료한 할 일을 다시 연다: 상태 + 완료 도장을 지우고 `reopened` 갱신 로그를 남긴다.
+// 알림은 없다(다시 여는 것은 조용한 정정이며, 보통 같은 사용자가 탭을 되돌리는 경우다).
+// 실행 취소 토스트와 상세 화면의 "다시 열기" 버튼이 쓴다.
 export async function reopenTask(
   taskId: string,
   occurrenceDate?: string,
@@ -596,8 +596,8 @@ export async function reopenTask(
   const { session, task } = await requireSessionAndTask(id);
   const supabase = getSupabaseServiceClient();
 
-  // RECURRING (2026-07-30): reopening clears that occurrence's recorded state so it becomes open
-  // again (the row was never touched by completion). ONE-OFF: clears the row's completion stamps.
+  // 반복(2026-07-30): 다시 열면 그 회차에 기록된 상태를 지워 다시 열린 상태가 된다
+  // (완료가 행을 건드린 적이 없음). 단발성: 행의 완료 도장을 지운다.
   if (isStandardRecurrence(task.recurrenceRule)) {
     const occ = String(occurrenceDate ?? "").trim() || recurringAnchorDate(task);
     if (!(await clearOccurrenceState(id, occ))) return { ok: false };
@@ -730,9 +730,9 @@ export async function shareTaskWithUsers(formData: FormData) {
       added_by_user_id: session.user.id,
     }),
   );
-  // Fail-safe: if the participant rows do not land, do NOT mark the task shared,
-  // do NOT write the system_shared log, and do NOT emit notifications — otherwise
-  // the task would show a false shared state for a share that never happened.
+  // 안전장치: 참여자 행이 들어가지 않았다면 할 일을 공유됨으로 표시하지 않고,
+  // system_shared 로그도 쓰지 않으며, 알림도 보내지 않는다 — 안 그러면
+  // 일어나지 않은 공유 때문에 할 일이 잘못된 공유 상태로 보인다.
   const { error: pError } = await supabase.from("task_participants").insert(rows);
   if (pError) {
     redirect(detailPath(id, "save_failed"));
@@ -767,7 +767,7 @@ export async function removeTaskParticipant(formData: FormData) {
   const removingSelf = targetUserId === session.user.id;
   const supabase = getSupabaseServiceClient();
 
-  // Author leaving = full task deletion for everyone (soft delete → undoable).
+  // 작성자가 나가면 모두에게 할 일이 삭제된다(soft delete → 실행 취소 가능).
   if (isAuthor && removingSelf) {
     // 실패했는데 `?deleted=` 로 보내면 「삭제했습니다 · 실행 취소」 토스트가 뜬다 — 지워지지도
     // 않은 작업을 되살리라고 권하는 셈이다(2026-09-08).
@@ -782,11 +782,11 @@ export async function removeTaskParticipant(formData: FormData) {
     redirect(deleted ? `/mobile/tasks?deleted=${id}` : detailPath(id, "save_failed"));
   }
 
-  // Only the author (or the platform developer, 2026-10-23) may remove others; anyone may remove themselves.
+  // 작성자(또는 플랫폼 개발자, 2026-10-23)만 다른 사람을 내보낼 수 있고, 본인은 누구나 빠질 수 있다.
   if (!removingSelf && !canEditTaskCore(session, task)) {
     redirect(detailPath(id, "forbidden"));
   }
-  // Never remove the author via this path (author leaves only via self-delete above).
+  // 이 경로로 작성자를 제거하지 않는다(작성자는 위의 본인 삭제로만 나간다).
   if (targetUserId === task.createdByUserId) {
     redirect(detailPath(id, "forbidden"));
   }
@@ -801,7 +801,7 @@ export async function removeTaskParticipant(formData: FormData) {
     redirect(detailPath(id, "save_failed"));
   }
 
-  // If no non-author participants remain, the task returns to private.
+  // 작성자 외 참여자가 남지 않으면 할 일은 비공개로 돌아간다.
   const remainingNonAuthor = task.participants.filter(
     (p) => p.role !== "author" && p.userId !== targetUserId,
   ).length;
@@ -812,7 +812,7 @@ export async function removeTaskParticipant(formData: FormData) {
     );
   }
 
-  // A participant who removed themselves no longer sees the task.
+  // 스스로 빠진 참여자는 더는 그 할 일을 보지 못한다.
   if (removingSelf) {
     redirect("/mobile/tasks");
   }
@@ -834,12 +834,12 @@ export async function deleteTask(formData: FormData) {
   if (error) {
     redirect(detailPath(id, "delete_failed"));
   }
-  // ?deleted=<id> → the list shows a "삭제했습니다 · 실행 취소" toast that calls restoreTask.
+  // ?deleted=<id> → 목록이 restoreTask 를 부르는 "삭제했습니다 · 실행 취소" 토스트를 보여준다.
   redirect(`/mobile/tasks?deleted=${id}`);
 }
 
-// Undo a soft delete (from the list's delete toast). requireSessionAndTask filters deleted rows, so
-// read the row directly, verify org + authorship, then clear `deleted_at`.
+// 소프트 삭제 되돌리기(목록의 삭제 토스트에서). requireSessionAndTask 는 삭제된 행을 거르므로,
+// 행을 직접 읽어 조직 + 작성자를 확인한 뒤 `deleted_at` 을 지운다.
 export async function restoreTask(taskId: string): Promise<{ ok: boolean }> {
   const id = String(taskId ?? "").trim();
   if (!id) return { ok: false };
@@ -864,9 +864,9 @@ export async function restoreTask(taskId: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-// Batch delete from the list (multi-select). Only deletes tasks the acting user authored —
-// the `created_by_user_id` filter is the authorization boundary, so selecting tasks shared to
-// you (that you don't own) simply leaves them untouched. Stays on the list (revalidates).
+// 목록에서 일괄 삭제(다중 선택). 실행한 사용자가 만든 할 일만 지운다 —
+// `created_by_user_id` 필터가 권한 경계이므로, 공유받은(본인 것이 아닌) 할 일을 골라도
+// 그냥 건드리지 않고 둔다. 목록에 머문다(revalidate).
 export async function deleteTasksInList(taskIds: string[]): Promise<{ deletedIds: string[] }> {
   const ids = Array.from(
     new Set((taskIds ?? []).map((s) => String(s).trim()).filter(Boolean)),
@@ -922,11 +922,11 @@ export async function restoreTasksInList(taskIds: string[]): Promise<void> {
   revalidatePath("/mobile/tasks");
 }
 
-// Persist a manual drag-reorder of the Today view. `orderedIds` is the section's task ids in their
-// new top-to-bottom order; each row's sort_order is set to its index (0..n). Org-scoped, so a user
-// can only reorder tasks inside their own organization. sort_order is global to the task (not
-// per-user) — see the migration note. Stays on the list (revalidates); the optimistic client order
-// already reflects the change.
+// 오늘 보기의 수동 드래그 순서 변경을 저장한다. `orderedIds` 는 섹션의 할 일 id 를 위에서 아래
+// 새 순서로 담은 것이며, 각 행의 sort_order 를 인덱스(0..n)로 설정한다. 조직 범위라서
+// 사용자는 자기 조직 안의 할 일만 재정렬할 수 있다. sort_order 는 할 일 전체에 공통이다(사용자별
+// 아님) — 마이그레이션 메모 참고. 목록에 머문다(revalidate). 낙관적 클라이언트 순서가
+// 이미 변경을 반영하고 있다.
 export async function reorderTasks(orderedIds: string[]) {
   const ids = Array.from(
     new Set((orderedIds ?? []).map((s) => String(s).trim()).filter(Boolean)),

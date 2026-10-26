@@ -63,12 +63,12 @@ type StatusFilter = "all" | "active" | "closed";
 
 const DEFAULT_TYPE: TypeFilter = "all";
 
-// Whitelist of keys that belong to the list filter state.
+// 목록 필터 상태에 속하는 키의 화이트리스트.
 const LIST_FILTER_KEYS = [
   "scope", "type", "status", "building", "date", "startDate", "endDate",
 ] as const;
 
-// These sets are module-level constants; stable references across renders.
+// 이 집합들은 모듈 수준 상수이므로 렌더 사이에 참조가 안정적이다.
 const activeLostStatuses = new Set<LostItemStatus>([
   "registered",
   "stored",
@@ -79,8 +79,8 @@ const activeMaintenanceStatuses = new Set<MaintenanceStatus>(["open", "in_progre
 const activeOrderStatuses = new Set<OrderStatus>(["requested", "approved", "ordered"]);
 
 // ── Date grouping (Tokyo operating date) ─────────────────────────────────────
-// Requests are bucketed into Today / Yesterday / Earlier using the Asia/Tokyo
-// calendar date so grouping is stable regardless of the server/runner timezone.
+// 요청을 Asia/Tokyo 달력 날짜로 오늘 / 어제 / 이전으로
+// 나누므로, 서버/러너 시간대와 상관없이 묶음이 안정적이다.
 type DateGroupKey = "today" | "yesterday" | "earlier";
 
 function tokyoDateKey(value: string): string {
@@ -109,8 +109,8 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
-// delivery_date is date-only; use 03:00 UTC (= noon JST) + explicit Asia/Tokyo
-// so the calendar day is always stable regardless of runner timezone.
+// delivery_date 는 날짜만 있다. 03:00 UTC(= 일본 정오)와 명시적 Asia/Tokyo 를 써서
+// 러너 시간대와 상관없이 달력 날짜가 항상 안정적이게 한다.
 /** 오늘 · 어제는 시각만, 그 전은 「9/26 14:05」(도쿄) — 「이전」 묶음에서 날짜가 안 보이던 것. */
 function formatTime(value: string, locale: Locale) {
   const hm = new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
@@ -381,7 +381,7 @@ function sanitizeStatus(val: string | null): StatusFilter {
   return "all";
 }
 
-// Enriched item types: location pre-attached, avoids repeated catalog lookups.
+// 보강된 항목 타입: 위치를 미리 붙여 두어 카탈로그 조회를 반복하지 않는다.
 type EnrichedLostItem = LostItemWithReporter & { location: RequestLocationDisplay; buildingKey: string | null };
 type EnrichedMaintenance = MaintenanceReportWithReporter & { location: RequestLocationDisplay; buildingKey: string | null };
 
@@ -391,7 +391,7 @@ function buildingKeyOf(name: string | null | undefined): string | null {
   return trimmed ? getCanonicalPropertyName(trimmed) : null;
 }
 
-/** Roles that can delete ANY record (not just their own). Matches the DB RLS policy. */
+/** 모든 기록을 삭제할 수 있는 역할(본인 것만이 아님). DB RLS 정책과 같다. */
 
 type ListKind = "lost-found" | "maintenance" | "order";
 
@@ -428,7 +428,7 @@ export function RequestsFilterView({
   const [deliveryCalOpen, setDeliveryCalOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
-  // ── Delete state ──────────────────────────────────────────────────────────
+  // ── 삭제 상태 ──────────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
@@ -463,12 +463,12 @@ export function RequestsFilterView({
   }
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Refs for filter sheet focus management.
+  // 필터 시트 포커스 관리용 ref.
   const sheetTriggerRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetWasOpenRef = useRef(false);
 
-  // Move focus into the sheet on open; restore to trigger on close.
+  // 열릴 때 포커스를 시트 안으로 옮기고, 닫히면 트리거로 되돌린다.
   useEffect(() => {
     if (filterSheetOpen) {
       sheetWasOpenRef.current = true;
@@ -484,7 +484,7 @@ export function RequestsFilterView({
 
   // Esc 닫기 · 배경 스크롤 잠금은 공용 BottomSheet 가 한다(2026-10-26 — 예전엔 여기서 한 번 더 걸어 두 번 잠겼다).
 
-  // Constrain Tab focus inside the sheet panel.
+  // Tab 포커스를 시트 패널 안에 가둔다.
   function handleSheetKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key !== "Tab") return;
     const focusable = sheetRef.current?.querySelectorAll<HTMLElement>(
@@ -502,14 +502,14 @@ export function RequestsFilterView({
     }
   }
 
-  // URL-derived filter state; no local useState for scope/type/status.
+  // URL 에서 가져온 필터 상태. 범위/종류/상태에는 로컬 useState 를 쓰지 않는다.
   const scopeFilter = sanitizeScope(searchParams.get("scope"));
   const typeFilter = sanitizeType(searchParams.get("type"));
   const statusFilter = sanitizeStatus(searchParams.get("status"));
   const selectedBuildingKey = searchParams.get("building");
 
-  // Build a whitelist-filtered query string to append to card hrefs.
-  // Keeps detail-page-specific params (e.g. created=1) out of list URLs.
+  // 화이트리스트로 거른 쿼리 문자열을 만들어 카드 href 에 붙인다.
+  // 상세 페이지 전용 파라미터(예: created=1)가 목록 URL 에 섞이지 않게 한다.
   const listQueryString = useMemo(() => {
     const filtered = new URLSearchParams();
     for (const key of LIST_FILTER_KEYS) {
@@ -522,7 +522,7 @@ export function RequestsFilterView({
   const hasCustomRange = Boolean(startDate || endDate);
   const activePreset = hasCustomRange ? null : datePreset;
 
-  // Single URL update utility: null removes a key, string sets it.
+  // URL 갱신 유틸 하나: null 이면 키를 지우고, 문자열이면 설정한다.
   function updateQuery(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(updates)) {
@@ -571,7 +571,7 @@ export function RequestsFilterView({
       : formatRangeDate((startDate ?? endDate) as string)
     : filterLabels.filterCustomRange;
 
-  // Memoized: stable as long as roomCatalog/buildingLabels/locale don't change.
+  // 메모이즈: roomCatalog/buildingLabels/locale 이 바뀌지 않는 한 안정적이다.
   const buildingOptions = useMemo(
     () =>
       Array.from(
@@ -604,9 +604,9 @@ export function RequestsFilterView({
     updateQuery({ building: nextBuildingKey });
   }
 
-  // Pre-compute location for each item once.
-  // resolveRequestLocation does catalog find/filter (O(catalog)) per call;
-  // memoizing here prevents re-running on every scope/type/status filter change.
+  // 항목마다 위치를 한 번씩 미리 계산한다.
+  // resolveRequestLocation 은 호출마다 카탈로그 find/filter(O(catalog))를 하므로
+  // 여기서 메모이즈해 범위/종류/상태 필터가 바뀔 때마다 다시 돌지 않게 한다.
   const enrichedLostItems = useMemo<EnrichedLostItem[]>(
     () =>
       lostItems.map((item) => ({
@@ -636,8 +636,8 @@ export function RequestsFilterView({
     [maintenanceReports, roomCatalog, buildingLabels],
   );
 
-  // Single-pass filter pipeline: scope + type + status + building applied together.
-  // Only re-runs when the enriched data or active filters actually change.
+  // 한 번에 도는 필터 파이프라인: 범위 + 종류 + 상태 + 건물을 함께 적용한다.
+  // 보강된 데이터나 활성 필터가 실제로 바뀔 때만 다시 돈다.
   const baseLostItems = useMemo<EnrichedLostItem[]>(() => {
     return enrichedLostItems.filter((item) => {
       if (scopeFilter === "mine" && item.reported_by_user_id !== currentUserId) return false;
@@ -683,8 +683,8 @@ export function RequestsFilterView({
   const hasAnyResults =
     visibleLostItems.length > 0 || visibleMaintenance.length > 0 || visibleOrders.length > 0;
 
-  // Delivery calendar dataset — all org orders (or mine), independent of the list's status/building
-  // filters. The calendar component itself keeps only those with a delivery date/window.
+  // 배송 캘린더 데이터셋 — 조직 전체(또는 내) 발주, 목록의 상태/건물
+  // 필터와 무관하다. 캘린더 컴포넌트 자체가 배송 날짜/기간이 있는 것만 남긴다.
   const deliveryCalendarOrders = useMemo<DeliveryCalendarOrder[]>(
     () =>
       enrichedOrders
@@ -703,7 +703,7 @@ export function RequestsFilterView({
     [enrichedOrders, scopeFilter, currentUserId],
   );
 
-  // ── Date grouping (Tokyo operating date): Today / Yesterday / Earlier.
+  // ── 날짜 묶음(도쿄 운영 날짜): 오늘 / 어제 / 이전.
   const todayKey = useMemo(() => tokyoDateKey(new Date().toISOString()), []);
   const yesterdayKey = useMemo(() => shiftDateKey(todayKey, -1), [todayKey]);
 
@@ -739,9 +739,9 @@ export function RequestsFilterView({
           : null;
   const dateChipLabel = hasCustomRange ? rangeLabel : presetLabel;
 
-  // Active (non-default) filters surfaced as quick-clear chips below the tabs.
-  // Scope ("mine") is intentionally excluded here — it is now a dedicated toggle
-  // switch in the filter row, not a filter-sheet option.
+  // 기본값이 아닌 활성 필터를 탭 아래 빠른 해제 칩으로 보여 준다.
+  // 범위("내 것")는 일부러 뺀다 — 이제 필터 시트 옵션이 아니라
+  // 필터 줄의 전용 토글 스위치다.
   const activeChips: { id: string; label: string; onClear: () => void }[] = [];
   if (statusFilter === "active" || statusFilter === "closed") {
     activeChips.push({
@@ -784,7 +784,7 @@ export function RequestsFilterView({
     { id: "order", label: filterLabels.filterOrder, count: baseOrders.length },
   ];
 
-  // One row list for every tab — kinds mixed on 「전체」, grouped by Tokyo date.
+  // 모든 탭이 한 줄 목록을 쓴다 — 「전체」에서는 종류가 섞이고 도쿄 날짜별로 묶는다.
   type Row = { key: string; time: string; node: React.ReactNode; active?: boolean; daysLeft?: number; orderGroup?: "active" | "deliv" | "past"; sortKey?: string };
   const rows: Row[] = [
     ...visibleLostItems.map((item) => {
@@ -1000,7 +1000,7 @@ export function RequestsFilterView({
           </div>
         ) : null}
 
-        {/* Active filter chips (scope excluded — handled by the toggle above). */}
+        {/* 활성 필터 칩(범위는 제외 — 위 토글이 처리한다). */}
         {activeChips.length > 0 ? (
           <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {activeChips.map((chip) => (
@@ -1059,9 +1059,9 @@ export function RequestsFilterView({
               className="flex min-h-0 flex-1 flex-col"
               onKeyDown={handleSheetKeyDown}
             >
-                {/* Scrollable options area */}
+                {/* 스크롤되는 옵션 영역 */}
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-1 py-4">
-                  {/* Status */}
+                  {/* 상태 */}
                   <div className="space-y-2">
                     <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
                       {filterLabels.groupStatus}
@@ -1085,7 +1085,7 @@ export function RequestsFilterView({
                     </SegTrack>
                   </div>
 
-                  {/* Date */}
+                  {/* 날짜 */}
                   <div className="space-y-2">
                     <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
                       {filterLabels.groupDate}
@@ -1141,7 +1141,7 @@ export function RequestsFilterView({
                     </div>
                   </div>
 
-                  {/* Building */}
+                  {/* 건물 */}
                   {buildingOptions.length > 0 ? (
                     <div className="space-y-2">
                       <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground/70">
@@ -1186,7 +1186,7 @@ export function RequestsFilterView({
                   ) : null}
                 </div>
 
-                {/* Footer — action buttons */}
+                {/* 푸터 — 액션 버튼 */}
                 <div className="flex shrink-0 items-center gap-2 border-t-[0.5px] border-[var(--separator)] px-1 pt-4">
                   <button
                     className="h-11 flex-1 rounded-2xl border border-border bg-surface text-sm font-bold text-slate-700 shadow-[0_8px_16px_-14px_rgba(34,40,60,0.3)] transition-colors hover:bg-muted/60 disabled:opacity-40"
@@ -1221,7 +1221,7 @@ export function RequestsFilterView({
         ))}
       </LiveWash>
 
-      {/* ── Delete confirmation sheet ── */}
+      {/* ── 삭제 확인 시트 ── */}
       {deleteTarget ? (
         <BottomSheet
           ariaLabel={deleteCopy.confirmTitle}

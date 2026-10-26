@@ -31,8 +31,8 @@ export type SessionUser = {
   role: Role;
   preferredMode: AppMode;
   bottomNavTabs: string[];
-  // Per-user override for the daily-report generator. Combined with the role check in
-  // Legacy flag — the daily report is gated by the `can_generate_report` capability since 2026-10-21.
+  // 일일 보고서 생성기용 사용자별 오버라이드. 역할 확인과 결합됨
+  // 레거시 플래그 — 일일 보고서는 2026-10-21 부터 `can_generate_report` capability 로 게이트된다.
   canGenerateReport: boolean;
   /** 국적 + 한국어 · 일본어 · 영문 · 가타카나 이름(docs/product/41 §2). */
   identity: IdentityNames;
@@ -111,9 +111,9 @@ function isAuthError(error: unknown) {
   );
 }
 
-// Request-scoped memoization: the session is read on the layout AND the page AND inside
-// getMobileNavBadges on every mobile render, and it's a multi-query waterfall. `cache()` collapses
-// all calls within one server render pass into a single execution (it does NOT cache across requests).
+// 요청 범위 메모이제이션: 세션은 레이아웃과 페이지, 그리고
+// 모든 모바일 렌더의 getMobileNavBadges 안에서 읽히며 쿼리가 폭포처럼 이어진다. `cache()` 는
+// 한 서버 렌더 패스 안의 모든 호출을 한 번의 실행으로 합친다(요청 간 캐시는 하지 않음).
 export const getCurrentAppSession = cache(
   async (): Promise<AppSession | null> => {
   try {
@@ -207,7 +207,7 @@ export const getCurrentAppSession = cache(
         phoneNumber: profile.phone_number,
         preferredLanguage: profile.preferred_language,
         role,
-        // Default landing surface (field roles → mobile even though they can also access admin).
+        // 기본 도착 화면(현장 역할 → mobile, admin 에도 접근 가능하더라도).
         preferredMode: defaultsToAdminSurface(role) ? "admin" : "mobile",
         bottomNavTabs,
         canGenerateReport,

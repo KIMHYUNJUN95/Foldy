@@ -46,7 +46,7 @@ export type BoardComment = {
   reactions: { emoji: string; count: number }[];
 };
 
-// ── Page 3 (detail) — serializable shapes returned by getBoardPost() ──────────
+// ── 페이지 3(상세) — getBoardPost() 가 돌려주는 직렬화 가능한 형태 ──
 export type BoardReactionFace = {
   initial: string;
   color: AvatarColor;
@@ -78,13 +78,13 @@ export type BoardPostDetail = {
   authorName: string;
   authorRole: string;
   avatarColor: AvatarColor;
-  // All five board emojis in fixed order, each with the viewer's isMine flag (count may be 0).
+  // 고정 순서의 게시판 이모지 5개 전부, 각각 보는 사람의 isMine 플래그 포함(개수는 0일 수 있음).
   reactions: BoardReaction[];
-  // Up to 3 distinct reactors for the most-used emoji (for the stacked avatars).
+  // 가장 많이 쓰인 이모지에 반응한 서로 다른 사람 최대 3명(겹친 아바타용).
   reactionFaces: BoardReactionFace[];
-  // Total number of distinct reactors across all emojis (for the summary line).
+  // 모든 이모지를 통틀어 반응한 서로 다른 사람의 총 수(요약 줄용).
   reactionTotal: number;
-  // Display name of the first reactor (for the summary line); null when none.
+  // 첫 번째 반응자의 표시 이름(요약 줄용); 없으면 null.
   firstReactorName: string | null;
   comments: BoardCommentDetail[];
 };

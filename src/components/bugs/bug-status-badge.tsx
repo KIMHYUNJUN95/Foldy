@@ -15,7 +15,7 @@ export function BugStatusBadge({
 }: {
   status: BugStatus;
   size?: "sm" | "md";
-  /** Localized status label — callers resolve it via `bugStatusLabel(copy, status)`. */
+  /** 현지화된 상태 라벨 — 호출하는 쪽이 `bugStatusLabel(copy, status)` 로 구한다. */
   label: string;
 }) {
   return (

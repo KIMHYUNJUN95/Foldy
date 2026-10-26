@@ -9,9 +9,9 @@ type OrgDeleteButtonProps = {
 };
 
 /**
- * Organization delete control (developer-only page). Confirm modal before submitting the
- * `deleteOrganization` server action. The action itself only allows deleting an EMPTY org (no members)
- * because every org-scoped table cascades on delete — this button just gates the destructive submit.
+ * 조직 삭제 컨트롤(개발자 전용 페이지). 제출 전에 확인 모달을 띄우고
+ * `deleteOrganization` 서버 액션을 호출한다. 액션 자체는 비어 있는 조직(멤버 없음)만 삭제할 수 있다.
+ * 조직 범위 테이블은 모두 삭제 시 연쇄되기 때문이며, 이 버튼은 파괴적인 제출을 막아 둘 뿐이다.
  */
 export function OrgDeleteButton({ organizationId, labels }: OrgDeleteButtonProps) {
   return (

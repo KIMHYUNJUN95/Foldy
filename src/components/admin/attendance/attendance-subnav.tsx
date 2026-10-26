@@ -33,11 +33,11 @@ export async function AttendanceSubnav({
   datePicker,
 }: {
   active: Tab;
-  /** Accessible name for the right-side picker. Omit on tabs that have no month/date scope (연차). */
+  /** 오른쪽 선택기의 접근성 이름. 월/날짜 범위가 없는 탭(연차)에서는 생략한다. */
   monthLabel?: string;
   c: Att;
   badges?: Partial<Record<Tab, { n: number; urgent?: boolean }>>;
-  /** When set, carried as `?ym=` on every tab link so the selected month persists across tabs. */
+  /** 설정되면 선택한 월이 탭 사이에서 유지되도록 모든 탭 링크에 `?ym=` 으로 실어 보낸다. */
   ym?: string;
   localeTag?: string;
   monthPickerBasePath?: string;
@@ -56,9 +56,9 @@ export async function AttendanceSubnav({
   const activeTab = TABS.find((tab) => tab.id === active);
   const pickerBasePath = monthPickerBasePath ?? activeTab?.href ?? "/admin/attendance";
 
-  // Tabs without a month/date scope (연차) render no right-side control at all. There used to be a
-  // static-text fallback here, but it duplicated the page title and made the bar read as a different
-  // component from every other tab.
+  // 월/날짜 범위가 없는 탭(연차)은 오른쪽 컨트롤을 아예 그리지 않는다. 예전에는
+  // 정적 텍스트 대체가 있었는데 페이지 제목과 겹쳤고 이 막대가 다른 모든 탭과 다른
+  // 컴포넌트처럼 읽히게 만들었다.
   const picker =
     localeTag && datePicker ? (
       <AdminDatePicker

@@ -1,10 +1,10 @@
 "use client";
 
-// Admin · Attendance · manual work-session entry.
-// Field staff sometimes work off-site or forget to clock in/out, so a payroll admin enters the session by
-// hand: staff · date · clock-in · optional clock-out · free-text work location · reason. Wired to the
-// service-role `createManualAttendanceSession` (attendanceCan, blocks a finalized month).
-// Location is free text (no registered site required) and flows into per-user payroll exports.
+// Admin · 근태 · 수동 근무 세션 입력.
+// 현장 직원이 현장 밖에서 일하거나 출근/퇴근을 깜빡하는 일이 있어, 급여 관리자가 세션을
+// 직접 입력한다: 직원 · 날짜 · 출근 · 선택 퇴근 · 자유 입력 근무 장소 · 사유. service-role
+// `createManualAttendanceSession` 에 연결(attendanceCan, 마감된 달은 막음).
+// 장소는 자유 텍스트(등록된 사이트 불필요)이며 사용자별 급여 내보내기에 반영된다.
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CalendarClock, CircleAlert } from "lucide-react";
@@ -25,7 +25,7 @@ export function ManualSessionModal({
   onDone,
 }: {
   staff: { userId: string; userName: string }[];
-  defaultDate: string; // today (Tokyo)
+  defaultDate: string; // 오늘 (도쿄)
   locale: Locale;
   localeTag: string;
   onClose: () => void;

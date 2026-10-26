@@ -106,16 +106,16 @@ type MobileCalendarViewProps = {
     stayingToday: string;
     today: string;
   };
-  // Computed server-side: true when selectedMonth is outside the 2-month operational window.
-  // Passed as a prop to avoid recomputing on the client and to keep a single source of truth.
+  // 서버에서 계산: selectedMonth 가 2개월 운영 창 밖이면 true.
+  // 클라이언트에서 다시 계산하지 않도록 prop 으로 넘기며, 기준은 하나로 유지한다.
   isOutOfWindow: boolean;
   buildingInfos: PropertyMapMeta[];
   locale: Locale;
   reservations: CalendarReservationItem[];
   /** Beds24 캘린더 블락. 예약과 별개 통로로 들어온다(인벤토리 오버라이드). */
   roomBlocks: CalendarRoomBlock[];
-  // When populated with room labels from the room master table, Empty today switches
-  // to an authoritative count. Leave undefined while the rooms table does not exist.
+  // 방 마스터 테이블의 방 라벨로 채우면 빈 방 오늘 표시가
+  // 정확한 개수로 바뀐다. rooms 테이블이 없는 동안은 undefined 로 둔다.
   roomMasterRooms?: string[];
   propertyRoomsMap?: Record<string, string[]>;
   roomSourceDebug?: {
@@ -138,7 +138,7 @@ const DAY_WIDTH = 34;
 const ROOM_LABEL_WIDTH = 64;
 const CALENDAR_BAR_HEIGHT = 32;
 const CALENDAR_BAR_TOP = 8;
-/** Compact vertical offset per lane -> keeps all bars within the fixed row height. */
+/** 레인별 세로 오프셋을 촘촘하게 -> 모든 막대가 고정된 행 높이 안에 들어간다. */
 const CALENDAR_COMPACT_LANE_OFFSET = 4;
 const CALENDAR_SINGLE_ROW_HEIGHT = 48;
 const DEFAULT_CHECK_IN_TIME = "16:00";
@@ -209,7 +209,7 @@ function roundCalendarPx(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-/** Half-open rendered interval -> turnover at equal boundary is non-overlapping. */
+/** 반개구간으로 렌더링 -> 경계가 같은 교체(퇴실=입실)는 겹치지 않는 것으로 본다. */
 function reservationBarsOverlap(
   a: Pick<ReservationBarBounds, "leftPx" | "rightPx">,
   b: Pick<ReservationBarBounds, "leftPx" | "rightPx">,
@@ -263,7 +263,7 @@ function assignReservationLanes(
 function calendarRowHeightForBars(_bars: ReservationBarLayout[]) {
   return CALENDAR_SINGLE_ROW_HEIGHT;
 }
-// Centered pinned modal card (reservation detail / empty room / area info).
+// 가운데 고정 모달 카드(예약 상세 / 빈 방 / 구역 정보).
 
 function parseDate(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
@@ -373,12 +373,12 @@ export function MobileCalendarView({
   initialReservationId,
 }: MobileCalendarViewProps) {
   const searchParams = useSearchParams();
-  // Resolve the active building from the live URL first, falling back to the server prop.
-  // A soft client navigation (router.push) to /mobile/calendar may serve a prefetched/cached RSC
-  // payload whose searchParams differ from the URL (e.g. the param-less building-picker payload),
-  // leaving the server prop stale. The page fetches reservations/propertyRoomsMap/propertyOptions
-  // independently of the selected property, so deriving it from the URL renders the grid correctly
-  // without a manual refresh. Falls back to the prop on full document loads.
+  // 활성 건물은 실제 URL에서 먼저 구하고, 없으면 서버 prop 으로 대체한다.
+  // /mobile/calendar 로의 부드러운 클라이언트 이동(router.push)은 프리페치/캐시된 RSC
+  // 페이로드를 쓸 수 있고, 그 searchParams 가 URL 과 다를 수 있다(예: 파라미터 없는 건물 선택기 페이로드).
+  // 그러면 서버 prop 이 낡은 값이 된다. 페이지는 reservations/propertyRoomsMap/propertyOptions 를
+  // 선택된 건물과 무관하게 따로 가져오므로, URL 에서 구하면 수동 새로고침 없이
+  // 그리드가 올바르게 그려진다. 전체 문서 로드에서는 prop 으로 대체한다.
   const selectedProperty = useMemo(() => {
     const fromUrl = searchParams.get("property");
     if (fromUrl && propertyOptions.includes(fromUrl)) return fromUrl;
@@ -410,8 +410,8 @@ export function MobileCalendarView({
   // 바탕 잠금은 두 시트(예약 상세 · 건물 지도) 모두 공용 BottomSheet 가 한다(2026-10-19). 여기서 따로 잠그면 잠금이 두 겹이
   // 되어, 닫을 때 바깥 잠금이 「잠긴 값」을 되돌려 바탕이 안 넘어갈 수 있었다(BottomSheet 의 참조 수 잠금 주석 참고).
 
-  // isOutOfWindow is computed server-side and passed as a prop to keep a single source of truth.
-  // Server already passes reservations=[] when out-of-window; this guard is a defensive layer.
+  // isOutOfWindow 는 서버에서 계산해 prop 으로 넘긴다(기준을 하나로 유지).
+  // 서버는 창 밖일 때 이미 reservations=[] 를 넘기며, 이 가드는 방어용 안전장치다.
   const effectiveReservations = useMemo(() => {
     const base = isOutOfWindow ? [] : reservations;
     if (!selectedProperty) return base;
@@ -444,9 +444,9 @@ export function MobileCalendarView({
   const nextMonth = new Date(Date.UTC(selectedYear, selectedMonthNumber, 1))
     .toISOString()
     .slice(0, 7);
-  // Exclusive upper bound for bar width / overlap calculations.
-  // Using the first day of next month (not the last day of this month) ensures the final
-  // day column is fully included: a stay ending on 06-01 occupies all of 05-31.
+  // 막대 너비/겹침 계산의 배타적 상한.
+  // 이번 달 마지막 날이 아니라 다음 달 1일을 쓰면 마지막
+  // 날 열이 온전히 포함된다: 06-01 에 끝나는 숙박은 05-31 을 전부 차지한다.
   const rangeEndExclusive = `${nextMonth}-01`;
   const monthBaseParams = new URLSearchParams();
   if (selectedProperty) {
@@ -528,11 +528,11 @@ export function MobileCalendarView({
   }, [dates.length, rangeEndExclusive, rangeStart, scopedRoomBlocks]);
 
 
-  // today is passed from server (Asia/Tokyo) -> never recompute on client
-  // findIndex (not indexOf) makes the "date === today" predicate explicit
+  // today 는 서버(Asia/Tokyo)에서 넘어온다 -> 클라이언트에서 다시 계산하지 않는다
+  // findIndex(indexOf 아님)로 "date === today" 조건을 명시한다
   const todayIndex = dates.findIndex((date) => date === today);
   const isTodayInView = todayIndex !== -1;
-  // Lists mode always uses the real operational "today" snapshot, regardless of selectedMonth.
+  // 목록 모드는 selectedMonth 와 상관없이 항상 실제 운영 "오늘" 스냅샷을 쓴다.
   const listReferenceDate = today;
 
   const activeRoomSet = useMemo(() => new Set(rooms), [rooms]);
@@ -586,9 +586,9 @@ export function MobileCalendarView({
     return counts;
   }, [activeInRange, dates, rooms, scopedRoomBlocks]);
 
-  // Auto-scroll: bring today (and the day before) into view on first entry per month/property.
-  // Uses a Set so each selectedMonth+selectedProperty combo scrolls at most once per session.
-  // mode is in the dependency array so the effect re-runs when overview panel mounts.
+  // 자동 스크롤: 월/건물별 첫 진입 때 오늘(과 전날)이 보이게 한다.
+  // Set 으로 selectedMonth+selectedProperty 조합이 세션당 최대 한 번만 스크롤하게 한다.
+  // mode 를 의존성 배열에 넣어 개요 패널이 마운트될 때 이펙트가 다시 실행되게 한다.
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastDateLabelRef = useRef<string | null>(null);
   const autoScrolledKeys = useRef(new Set<string>());
@@ -606,9 +606,9 @@ export function MobileCalendarView({
         );
         label = `${formatDateLabel(dates[startIndex], locale)} - ${formatDateLabel(dates[endIndex], locale)}`;
       }
-      // Only re-render when the label text actually CHANGES. Calling setState on every scroll frame
-      // re-rendered the whole calendar each frame, which starved the main thread and made the
-      // JS-driven frozen header jitter as it fell behind the compositor-driven grid scroll.
+      // 라벨 텍스트가 실제로 바뀔 때만 다시 렌더한다. 스크롤 프레임마다 setState 를 부르면
+      // 캘린더 전체가 프레임마다 다시 그려져 메인 스레드가 굶고,
+      // JS로 움직이는 고정 헤더가 컴포지터가 처리하는 그리드 스크롤보다 뒤처져 떨렸다.
       if (label !== lastDateLabelRef.current) {
         lastDateLabelRef.current = label;
         setVisibleDateRangeLabel(label);
@@ -617,9 +617,9 @@ export function MobileCalendarView({
     [dates, locale],
   );
 
-  // The grid is now the native 2-axis scroll surface (sticky header + sticky room-label column
-  // ride along with zero JS sync), so it also owns vertical scroll — forward scrollTop to the
-  // shell's auto-hiding top chrome, which otherwise listens to the page scroller.
+  // 그리드는 이제 네이티브 2축 스크롤 면이다(sticky 헤더 + sticky 방 라벨 열이
+  // JS 동기화 없이 함께 움직임). 그래서 세로 스크롤도 맡으며, 페이지 스크롤러만 듣던
+  // 셸의 자동 숨김 상단 크롬에 scrollTop 을 전달한다.
   const handleGridScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
       const { scrollLeft, scrollTop, clientWidth } = event.currentTarget;
@@ -637,16 +637,16 @@ export function MobileCalendarView({
     setSelectedReservationId(reservationId);
   }, []);
 
-  // Auto-open the reservation sheet when arriving via deep-link from a task context.
-  // Read the reservationId from the live URL (useSearchParams) rather than the server prop, for the
-  // same stale-RSC-payload reason as selectedProperty above. The reservations list is fetched
-  // independently of this param, so the cached list still holds the target.
+  // 할 일 맥락에서 딥링크로 들어오면 예약 시트를 자동으로 연다.
+  // reservationId 는 위 selectedProperty 와 같은 낡은 RSC 페이로드 문제 때문에 서버 prop 이 아니라
+  // 실제 URL(useSearchParams)에서 읽는다. 예약 목록은 이 파라미터와 상관없이
+  // 따로 가져오므로, 캐시된 목록에도 대상이 들어 있다.
   const deepLinkReservationId =
     searchParams.get("reservationId") ?? initialReservationId ?? null;
-  // Guard set INSIDE the rAF callback (not before scheduling) so React StrictMode's mount→cleanup→
-  // mount double-invoke can't cancel the only scheduled open: the first cleanup cancels its frame
-  // without marking it done, and the second mount re-schedules. Deferring via rAF also keeps
-  // setState out of the effect body (lint: react-hooks/set-state-in-effect).
+  // 가드 Set 은 (예약 전이 아니라) rAF 콜백 안에서 설정한다. 그래야 React StrictMode 의 mount→cleanup→
+  // mount 이중 호출이 유일한 예약된 열기를 취소하지 못한다: 첫 cleanup 은 완료 표시 없이 그 프레임만
+  // 취소하고, 두 번째 mount 가 다시 예약한다. rAF 로 미루면 setState 가 이펙트 본문 밖에 있게 되기도 한다
+  // (lint: react-hooks/set-state-in-effect).
   const autoOpenedIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!deepLinkReservationId) return;
@@ -670,9 +670,9 @@ export function MobileCalendarView({
     if (!container) return;
     const scrollKey = `${selectedMonth}:${selectedProperty ?? ""}`;
     if (autoScrolledKeys.current.has(scrollKey)) return;
-    // Position so yesterday (today-1) sits at the left edge and today is the next column;
-    // the rest is reached by manual scroll. Defer with a double rAF so the scroll content has
-    // its full width before we set scrollLeft (otherwise the first-open scroll clamps to 0).
+    // 어제(today-1)가 왼쪽 가장자리에, 오늘이 그다음 열에 오도록 위치시키고,
+    // 나머지는 직접 스크롤해서 본다. 스크롤 내용의 전체 너비가 잡힌 뒤에 scrollLeft 를 설정하도록
+    // rAF 를 두 번 미룬다(안 그러면 첫 열기 스크롤이 0으로 막힘).
     autoScrolledKeys.current.add(scrollKey);
     const target = Math.max(0, todayIndex - 1) * DAY_WIDTH;
     const apply = () => {

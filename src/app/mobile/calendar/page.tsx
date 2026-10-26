@@ -226,18 +226,18 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
 
   const today = toJstDateString(new Date());
 
-  // Operational fetch window: always current month (today's month) + next month.
-  // Fixed relative to TODAY, not to selectedMonth (UI navigation).
-  const currentJstMonth = today.slice(0, 7); // e.g., "2026-05"
+  // 운영 조회 구간: 항상 이번 달(오늘이 속한 달) + 다음 달.
+  // UI 에서 이동하는 selectedMonth 가 아니라 오늘 기준으로 고정한다.
+  const currentJstMonth = today.slice(0, 7); // 예: "2026-05"
   const [opYear, opMonth] = currentJstMonth.split("-").map(Number);
-  const operationalMonthStart = `${currentJstMonth}-01`; // e.g., "2026-05-01"
-  // Exclusive upper bound: first day of the month after next (2 months from now)
-  const operationalWindowEnd = new Date(Date.UTC(opYear, opMonth + 1, 1)).toISOString().slice(0, 10); // e.g., "2026-07-01"
+  const operationalMonthStart = `${currentJstMonth}-01`; // 예: "2026-05-01"
+  // 배타적 상한: 다음 달의 다음 달 1일(지금부터 2개월 뒤)
+  const operationalWindowEnd = new Date(Date.UTC(opYear, opMonth + 1, 1)).toISOString().slice(0, 10); // 예: "2026-07-01"
 
-  // Server-side out-of-window check: skip the reservations query entirely when
-  // selectedMonth is outside the 2-month operational window. No DB read needed
-  // for a result we already know is empty.
-  // getActiveRoomLabels is always fetched for debug consistency and room-source display.
+  // 서버 측 구간 밖 확인: selectedMonth 가 2개월 운영 구간 밖이면
+  // 예약 쿼리를 아예 건너뛴다. 이미 비어 있는 걸 아는 결과를 위해
+  // DB 를 읽을 필요가 없다.
+  // getActiveRoomLabels 는 디버그 일관성과 방 출처 표시를 위해 항상 가져온다.
   const nextJstMonth = new Date(Date.UTC(opYear, opMonth, 1)).toISOString().slice(0, 7);
   const isOutOfWindow = selectedMonth !== currentJstMonth && selectedMonth !== nextJstMonth;
 
@@ -301,9 +301,9 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
     roomCatalog = catalog;
     const roomLookups = buildPropertyRoomLookups(roomCatalog ?? []);
 
-    // Cross-property externalRoomId lookup: handles property-name mismatch (e.g., Beds24
-    // sends Japanese "荒木町A" which may not normalize to canonical "아라키초A" depending on
-    // the normalizer's alias coverage). externalRoomId is unique across the rooms table.
+    // property 교차 externalRoomId 조회: 건물 이름 불일치를 처리한다(예: Beds24가
+    // 일본어 "荒木町A" 를 보내서 정규화기의 별칭 범위에 따라 정규 "아라키초A" 로
+    // 정규화되지 않을 수 있는 경우). externalRoomId 는 rooms 테이블 전체에서 유일하다.
     const globalExternalRoomToCanonical = new Map<string, string>(
       (roomCatalog ?? [])
         .filter((item) => item.externalRoomId !== null)
@@ -397,16 +397,16 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
 
     const mapToCalendarItem = (item: ReservationRow): CalendarReservationItem => {
       const canonicalProperty = getCanonicalPropertyName(item.property_name);
-      // Never drop a reservation. Resolve to the active-catalog room when possible; if it
-      // does not map (unknown/inactive room), fall back to the normalized room label so the
-      // booking still renders on a (fallback) row — mirrors the in-house reference system,
-      // which always assigns a room and never discards a booking. Orphan rooms are added to
-      // the room axis below so the bar has a row to sit on.
+      // 예약을 절대 버리지 않는다. 가능하면 활성 카탈로그 방으로 풀고, 매핑되지
+      // 않으면(알 수 없거나 비활성 방) 정규화된 방 라벨로 대체해서
+      // (대체) 행에라도 예약이 그려지게 한다 — 항상 방을 배정하고 예약을 버리지 않는
+      // 사내 기준 시스템과 같다. 고아 방은 아래에서
+      // 방 축에 추가되어 막대가 놓일 행이 생긴다.
       const internalRoomKey =
         resolveReservationCanonicalRoomLabel(item) ||
         getCanonicalRoomLabel(canonicalProperty, item.room_label) ||
         item.room_label.trim();
-      // Convert internal key → display label so 402 and 402_2 share one calendar row.
+      // 내부 키 → 표시 라벨로 바꿔서 402 와 402_2 가 한 캘린더 행을 공유한다.
       const roomLabel = getDisplayRoomLabel(canonicalProperty, internalRoomKey) || internalRoomKey;
       return {
         checkInDate: item.check_in_date,
@@ -424,12 +424,12 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       };
     };
 
-    // Authoritative mode: render only reservations that belong to active room-master rows.
-    // Company rule is already reflected in room master classification:
-    // external_minimum_stay >= 50 => inactive room (excluded).
-    // Never drop: map every reservation. Orphan rooms (room not in the active catalog) are
-    // added to the room axis (canonicalRoomMasterRooms / propertyRoomsMap) below so their
-    // bars still render instead of silently disappearing.
+    // 권위 모드: 활성 방 마스터 행에 속한 예약만 그린다.
+    // 회사 규칙은 이미 방 마스터 분류에 반영되어 있다:
+    // external_minimum_stay >= 50 => 비활성 방(제외).
+    // 절대 버리지 않는다: 모든 예약을 매핑한다. 고아 방(활성 카탈로그에 없는 방)은
+    // 아래에서 방 축(canonicalRoomMasterRooms / propertyRoomsMap)에 추가해 그 막대가
+    // 조용히 사라지지 않고 계속 그려지게 한다.
     reservations = filteredRows.map(mapToCalendarItem);
     const reservationNotes = pickReservationNotes(
       notesInWindow,
@@ -470,7 +470,7 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
               if (!acc[item.propertyName]) {
                 acc[item.propertyName] = [];
               }
-              // Use displayRoomLabel so sub-units (402, 402_2) share one calendar row per property.
+              // displayRoomLabel 을 써서 하위 호실(402, 402_2)이 property 당 한 캘린더 행을 공유한다.
               acc[item.propertyName].push(item.displayRoomLabel);
               return acc;
             }, {}),
@@ -508,9 +508,9 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       ? roomMasterRooms
       : [...new Set(roomCatalog.map((item) => item.displayRoomLabel))];
 
-  // Fallback axis rows: add any reservation room that is not already in the catalog axis so
-  // no booking is hidden for lack of a row (we no longer drop unmapped reservations). Orphan
-  // rooms are rare — mostly brand-new or fully long-stay (>=50) physical rooms.
+  // 대체 축 행: 카탈로그 축에 아직 없는 예약 방을 추가해서
+  // 행이 없다는 이유로 숨겨지는 예약이 없게 한다(매핑 안 된 예약을 더는 버리지 않음). 고아
+  // 방은 드물다 — 대부분 새로 생겼거나 전부 장기 숙박(>=50)인 물리적 방이다.
   if (canonicalRoomMasterRooms !== undefined) {
     const masterSet = new Set(canonicalRoomMasterRooms);
     for (const r of reservations) {

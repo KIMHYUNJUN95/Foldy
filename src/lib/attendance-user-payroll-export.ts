@@ -12,9 +12,9 @@ export type UserPayrollExportRow = {
   date: string;
   clockIn: string;
   clockOut: string;
-  location: string; // work location — manual text (off-site) or the registered site name
+  location: string; // 근무 장소 — 직접 입력 텍스트(현장 외) 또는 등록된 현장 이름
   workMinutes: number;
-  dailyPay: number; // base wage for the day
+  dailyPay: number; // 그날의 기본급
   allowanceRegular: number; // 추가수당 applied that day
   allowanceSpecial: number; // 특별수당 applied that day
   transport: number;
@@ -151,17 +151,17 @@ export async function buildUserPayrollWorkbookBase64(
   ws.pageSetup.printArea = `A1:K${TEMPLATE_ROWS + 4}`;
 
   const cols: { width: number; align: "center"; numFmt?: string }[] = [
-    { width: 12, align: "center" }, // date
-    { width: 10, align: "center" }, // clock in
-    { width: 10, align: "center" }, // clock out
-    { width: 16, align: "center" }, // location (manual text or site name)
-    { width: 13, align: "center" }, // work hours
-    { width: 14, align: "center", numFmt: "¥#,##0" }, // base wage
+    { width: 12, align: "center" }, // 날짜
+    { width: 10, align: "center" }, // 출근
+    { width: 10, align: "center" }, // 퇴근
+    { width: 16, align: "center" }, // 장소 (직접 입력 텍스트 또는 현장 이름)
+    { width: 13, align: "center" }, // 근무 시간
+    { width: 14, align: "center", numFmt: "¥#,##0" }, // 기본급
     { width: 12, align: "center", numFmt: "¥#,##0" }, // 추가수당
     { width: 12, align: "center", numFmt: "¥#,##0" }, // 특별수당
-    { width: 12, align: "center", numFmt: "¥#,##0" }, // transport
-    { width: 26, align: "center" }, // cleaning rooms
-    { width: 24, align: "center" }, // cleaning notes
+    { width: 12, align: "center", numFmt: "¥#,##0" }, // 교통비
+    { width: 26, align: "center" }, // 청소 객실
+    { width: 24, align: "center" }, // 청소 메모
   ];
   ws.columns = cols.map((c) => ({ width: c.width }));
   const LAST = cols.length;

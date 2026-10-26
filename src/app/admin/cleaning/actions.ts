@@ -37,12 +37,12 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 // 예전에는 여기에 같은 규칙을 한 번 더 구현해 두 벌이 갈릴 위험이 있었다.
 import { fmtDate, fmtDur, toMin, type BuildingKey, type CleaningTaskType } from "@/components/admin/cleaning/cleaning-console-data";
 
-// Server actions backing the 기록 (history) tab's Excel/PDF export. The client sends the raw,
-// already-filtered history rows (canonical building/type keys, not display strings) — every visible
-// string is resolved here from the actor's own session locale, so the exported file always matches
-// the signed-in user's language regardless of what the client happened to render. Builds through the
-// canonical admin table exporters (src/lib/admin-table-workbook.ts / admin-table-report.ts) that every
-// other /admin/* export also uses. See docs/product/07-cleaning-workflow.md →
+// 기록 탭의 Excel/PDF 내보내기를 받치는 서버 액션. 클라이언트는 원본인
+// 이미 필터링된 기록 행(표시 문자열이 아니라 정규 건물/유형 키)을 보내면, 눈에 보이는 모든
+// 문자열을 여기서 실행자 본인의 세션 로케일로 변환한다. 그래서 클라이언트가 어떻게 렌더했든
+// 내보낸 파일은 항상 로그인한 사용자의 언어와 일치한다. 다른 모든 /admin/* 내보내기도 쓰는
+// 공용 관리자 표 내보내기(src/lib/admin-table-workbook.ts / admin-table-report.ts)로 만든다.
+// 참고: docs/product/07-cleaning-workflow.md →
 // "2026-07-14 청소 기록 내보내기".
 
 export type CleaningHistoryExportRow = {
@@ -67,8 +67,8 @@ export type FetchCleaningHistoryResult =
   | { ok: true; items: AdminCleaningHistoryItem[] }
   | { ok: false; reason: "invalid" | "error" };
 
-// Called by the history board whenever the user picks a new date range in AdminDateRangePicker —
-// only the current month is preloaded server-side by page.tsx, so any other range is fetched here.
+// 기록 보드에서 AdminDateRangePicker 로 새 기간을 고를 때마다 호출된다 —
+// page.tsx 가 서버에서 미리 불러오는 건 이번 달뿐이므로, 그 밖의 기간은 여기서 가져온다.
 export async function fetchAdminCleaningHistory(
   from: string,
   to: string,
@@ -220,14 +220,14 @@ export async function exportCleaningHistoryReport(
 }
 
 // ── 강제완료 (관리자 대리 완료) ─────────────────────────────────────────────
-// The console's only mutating action. Writes via the service-role client (RLS bypass) after an
-// app-level role check, matching the attendance admin-write pattern
-// (attendanceCan + getSupabaseServiceClient in src/app/admin/attendance/actions.ts) —
-// the cleaning_sessions UPDATE/INSERT RLS policies have no admin-on-behalf-of-another-staff branch,
-// so this intentionally does not rely on RLS for authorization.
+// 콘솔의 유일한 변경 액션. 앱 수준 역할 확인 후 서비스 롤 클라이언트(RLS 우회)로 쓴다.
+// 근태 관리자 쓰기 패턴과 같다
+// (src/app/admin/attendance/actions.ts 의 attendanceCan + getSupabaseServiceClient) —
+// cleaning_sessions UPDATE/INSERT RLS 정책에는 관리자가 다른 직원을 대신하는 분기가 없으므로
+// 의도적으로 권한 판단을 RLS 에 맡기지 않는다.
 
 export type ForceCompleteCleaningInput = {
-  sessionId: string | null; // existing session → UPDATE; null (room never started) → INSERT
+  sessionId: string | null; // 기존 세션 → UPDATE, null(시작된 적 없는 객실) → INSERT
   /**
    * canonical `cleaning_sessions.room_label` — 예: "아라키초A 501_2", 오쿠보처럼 단독 건물은 "오쿠보A".
    * 콘솔 카드가 보여주는 축약 라벨("아라키초A 501")을 저장하면 getCleaningTargets 의 canonical
@@ -324,7 +324,7 @@ export async function forceCompleteCleaningSession(
     return { ok: false, reason: "invalid" };
   }
 
-  // Staff must be a real, active member of this org — never trust a client-supplied id blindly.
+  // 직원은 이 조직의 실제 활성 구성원이어야 한다 — 클라이언트가 보낸 id 를 무조건 믿지 않는다.
   const membership = await service
     .from("memberships")
     .select("user_id")

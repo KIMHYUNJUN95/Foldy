@@ -124,7 +124,7 @@ function isPending(item: ReviewQueueItem): boolean {
   );
 }
 
-/** Compact per-employee-group status breakdown for the collapsed 전체 세션 group header. */
+/** 접힌 전체 세션 묶음 헤더에 쓰는, 직원 묶음별 상태 요약. */
 function groupSummary(
   sessions: ReviewQueueItem[],
   c: Att,
@@ -150,7 +150,7 @@ function groupSummary(
   ].filter((x) => x.n > 0);
 }
 
-/** One session row in the queue table (shared by the flat list and the per-employee grouped list). */
+/** 대기열 표의 세션 한 줄 (평면 목록과 직원별 묶음 목록이 함께 쓴다). */
 function SessionRow({
   item,
   on,
@@ -336,10 +336,10 @@ export function AttendanceQueueClient({
   const [nameQuery, setNameQuery] = useState(initialSearch);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<PanelRoute>(() => {
-    // Explicit session deep link wins.
+    // 명시적인 세션 딥링크가 우선한다.
     if (initialSessionId) return { kind: "sess", id: initialSessionId };
-    // Payroll blocker-card deep link (?filter=&q=<name>): open the first matching session /
-    // correction panel for that staff member on arrival so their side panel appears immediately.
+    // 급여 막힘 카드 딥링크(?filter=&q=<이름>): 도착 시 해당 직원의 첫 일치 세션 /
+    // 정정 패널을 열어 그 직원의 사이드 패널이 바로 나타나게 한다.
     const q = initialSearch.trim().toLowerCase();
     if (q) {
       if (initialFilter === "corr") {
@@ -360,7 +360,7 @@ export function AttendanceQueueClient({
   const [bulkErr, setBulkErr] = useState<string | null>(null);
   const [bulkPending, startBulk] = useTransition();
 
-  // Auto-dismiss the toast ~1.8s after it appears (no click needed).
+  // 토스트가 뜬 뒤 약 1.8초 후 자동으로 닫는다 (클릭 불필요).
   useEffect(() => {
     if (!toast) return;
     if (toast.sticky) return;
@@ -412,8 +412,8 @@ export function AttendanceQueueClient({
     return corrections.filter((r) => r.requesterName.toLowerCase().includes(q));
   }, [corrections, nameQuery]);
 
-  // On the "전체 세션" tab, collapse the flat list into per-employee groups (expandable) so one
-  // worker's many sessions don't stretch the page. Other tabs stay flat (they're short + action-first).
+  // "전체 세션" 탭에서는 평면 목록을 직원별 묶음(펼치기 가능)으로 접어 한
+  // "전체 세션" 탭에서는 평면 목록을 직원별 묶음(펼치기 가능)으로 접어 한
   const grouped = useMemo(() => {
     if (filter !== "all") return null;
     const map = new Map<string, { userId: string; userName: string; sessions: ReviewQueueItem[] }>();
@@ -437,8 +437,8 @@ export function AttendanceQueueClient({
     });
   }
 
-  // Rows the header "select all" acts on: in grouped mode, only sessions inside EXPANDED groups
-  // (collapsed groups' sessions aren't visible, so selecting them would be surprising); flat otherwise.
+  // 헤더의 "전체 선택"이 적용되는 행: 묶음 모드에서는 펼쳐진 묶음 안의 세션만
+  // (접힌 묶음의 세션은 보이지 않아 선택되면 놀랄 수 있음), 평면 모드에서는 전체.
   const selectableRows = useMemo(() => {
     if (!grouped) return rows;
     return grouped.filter((g) => expandedGroups.has(g.userId)).flatMap((g) => g.sessions);
@@ -513,8 +513,8 @@ export function AttendanceQueueClient({
       setBulkErr(c.actionReasonRequired);
       return;
     }
-    // invalidate → any selected non-invalid session; mark-reviewed → only sessions flagged
-    // review_required (already-normal ones have nothing to review; invalid needs single-session restore).
+    // 무효 처리 → 무효가 아닌 선택된 모든 세션; 검토 완료 → 검토 필요로
+    // 표시된 세션만 (이미 정상인 것은 검토할 게 없고, 무효는 단건 복원이 필요).
     const targets = items.filter((i) => {
       if (!selected.has(i.sessionId) || i.status === "invalid") return false;
       return kind === "invalidate" ? true : i.reviewState === "review_required";
@@ -580,7 +580,7 @@ export function AttendanceQueueClient({
 
   return (
     <div style={{ position: "relative" }}>
-      {/* Filter toolbar */}
+      {/* 필터 툴바 */}
       <div className="toolbar">
         <div className="fseg" role="tablist">
           <button
@@ -677,7 +677,7 @@ export function AttendanceQueueClient({
         </button>
       </div>
 
-      {/* Bulk action bar */}
+      {/* 일괄 액션 바 */}
       {selectedCount > 0 && filter !== "corr" ? (
         <div className="bulkbar">
           <span className="bulkbar__n">
@@ -750,7 +750,7 @@ export function AttendanceQueueClient({
         />
       ) : null}
 
-      {/* Table or correction list */}
+      {/* 표 또는 정정 목록 */}
       {filter === "corr" ? (
         filteredCorrections.length === 0 ? (
           <div className="card">
@@ -1000,7 +1000,7 @@ export function AttendanceQueueClient({
         </div>
       )}
 
-      {/* Right detail panel — session OR correction */}
+      {/* 우측 상세 패널 — 세션 또는 정정 */}
       {panelSession ? (
         <SessionPanel
           item={panelSession}
@@ -1113,15 +1113,15 @@ function SessionPanel({
   const urgent = isUrgent(item);
   const isInvalid = item.status === "invalid";
   const needsReview = item.reviewState === "review_required";
-  // Restoring an invalid session must yield a COMPLETE session — if a clock end is still missing,
-  // the admin must fill it via 수동 정정 first, so "복구 및 완료 처리" is blocked until then.
+  // 무효 세션을 복원하면 완전한 세션이 되어야 한다 — 출퇴근 한쪽이 아직 비어 있으면
+  // 관리자가 먼저 수동 정정으로 채워야 하므로, 그때까지 "복구 및 완료 처리" 는 막힌다.
   const restoreBlocked = isInvalid && (!item.clockInLabel || !item.clockOutLabel);
-  // "검토 완료 처리" only makes sense for a session flagged review_required (or an invalid one → restore).
-  // An already-normal session has nothing to review, so the button is disabled (avoids no-op audit noise).
+  // "검토 완료 처리" 는 review_required 로 표시된 세션(또는 복원할 무효 세션)에만 의미가 있다.
+  // 이미 정상인 세션은 검토할 게 없으므로 버튼을 비활성화한다 (의미 없는 감사 기록 방지).
   const approveDisabled = pending || restoreBlocked || (!isInvalid && !needsReview);
 
   const auditKey = `${item.sessionId}:${auditReloadKey}`;
-  // Derived loading: null until the async load for the CURRENT key resolves (no sync setState in effect).
+  // 파생 로딩: 현재 키의 비동기 로드가 끝나기 전까지 null (effect 안에서 동기 setState 금지).
   const audits: SessionAuditEntry[] | null = auditState.key === auditKey ? auditState.entries : null;
 
   useEffect(() => {
@@ -1179,8 +1179,8 @@ function SessionPanel({
           updatedAt: res.updatedAt ?? item.updatedAt,
           clockInLabel: nextIn,
           clockOutLabel: nextOut,
-          // An invalid session stays invalid after a manual edit (server keeps it invalid); the admin
-          // still has to run "복구 및 완료 처리" — which is now unblocked since both ends are present.
+          // 무효 세션은 수동 수정 후에도 무효로 남는다 (서버가 무효로 유지함). 관리자가
+          // "복구 및 완료 처리" 를 실행해야 한다 — 이제 양쪽이 모두 채워져 막힘이 풀린다.
           status:
             item.status === "invalid" ? item.status : nextIn && nextOut ? "completed" : item.status,
         });
@@ -1752,7 +1752,7 @@ function CorrectionPanel({
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [modal, setModal] = useState<"approve" | "reject" | null>(null);
-  // Evidence photos the requester attached — same lightbox carousel the transport panel uses.
+  // 요청자가 첨부한 증빙 사진 — 교통비 패널이 쓰는 것과 같은 라이트박스 캐러셀.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const photos = row.imageUrls;
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, {
@@ -1880,7 +1880,7 @@ function CorrectionPanel({
         </div>
 
         <div className="panel__body">
-          {/* diffs */}
+          {/* 변경 내용 */}
           {row.diffs.map((d, i) => (
             <div className="pblock" key={i}>
               <div className="pblock__t">{c.corrPanelDiffSection(corrFieldLabel(d.field, c))}</div>
@@ -1902,7 +1902,7 @@ function CorrectionPanel({
             </div>
           ))}
 
-          {/* reason */}
+          {/* 사유 */}
           <div className="pblock">
             <div className="pblock__t">{c.corrPanelReasonSection}</div>
             <div className="reason">
@@ -1911,7 +1911,7 @@ function CorrectionPanel({
             </div>
           </div>
 
-          {/* evidence photos — the reviewer must never approve/reject without seeing them */}
+          {/* 증빙 사진 — 검토자는 사진을 보지 않고 승인/반려하면 안 된다 */}
           <div className="pblock">
             <div className="pblock__t">{c.trPanelEvidenceCount(photos.length)}</div>
             {photos.length > 0 ? (
@@ -1936,7 +1936,7 @@ function CorrectionPanel({
             )}
           </div>
 
-          {/* linked session */}
+          {/* 연결된 세션 */}
           {row.sessionId ? (
             <div className="pblock">
               <div className="pblock__t">{c.corrPanelLinkedSection}</div>
@@ -1968,7 +1968,7 @@ function CorrectionPanel({
             </div>
           ) : null}
 
-          {/* permission zone OR resolved note */}
+          {/* 권한 구역 또는 처리 완료 메모 */}
           {resolved ? (
             <div className="pblock">
               <div className="locknote">

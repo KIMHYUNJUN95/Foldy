@@ -6,11 +6,11 @@ type AnnouncementStatus = Database["public"]["Enums"]["announcement_status"];
 type AnnouncementTargetScope =
   Database["public"]["Enums"]["announcement_target_scope"];
 
-// Admin 공지 관리 콘솔 (desktop) — dashboard-only strings.
-// Mobile / legacy admin strings stay in the flat AnnouncementDictionary above.
-// Templated values use `{n}` / `{d}` / `{r}` placeholders resolved with String.replace in the UI.
+// Admin 공지 관리 콘솔 (데스크톱) — 대시보드 전용 문구.
+// 모바일 / 레거시 관리자 문구는 위의 평면 AnnouncementDictionary 에 남는다.
+// 템플릿 값은 `{n}` / `{d}` / `{r}` 자리표시자를 쓰며 UI 에서 String.replace 로 채운다.
 export type AnnouncementConsoleDictionary = {
-  // KPI ops bar
+  // KPI 운영 바
   kpiPublished: string;
   kpiPublishedSub: string;
   kpiDrafts: string;
@@ -22,7 +22,7 @@ export type AnnouncementConsoleDictionary = {
   kpiImpUnread: string;
   kpiImpUnreadRemain: string;
   kpiImpUnreadClear: string;
-  // Tabs + view bar
+  // 탭 + 보기 바
   tabPublished: string;
   tabDrafts: string;
   tabArchived: string;
@@ -31,7 +31,7 @@ export type AnnouncementConsoleDictionary = {
   channelNote: string;
   countUnit: string;
   searchResult: string;
-  // Table
+  // 표
   colStatus: string;
   colAnnouncement: string;
   colTarget: string;
@@ -43,20 +43,20 @@ export type AnnouncementConsoleDictionary = {
   dateKindUpdated: string;
   readUnsent: string;
   unreadN: string;
-  // Short status labels
+  // 짧은 상태 라벨
   stDraft: string;
   stPublished: string;
   stArchived: string;
-  // Flag chips
+  // 플래그 칩
   flImportant: string;
   flPinned: string;
   flPopup: string;
   flPopupOff: string;
   flImage: string;
-  // Target
+  // 대상
   everyone: string;
   targetMore: string;
-  // Empty states
+  // 빈 상태
   emptyPubT: string;
   emptyPubS: string;
   emptyDraftT: string;
@@ -64,7 +64,7 @@ export type AnnouncementConsoleDictionary = {
   emptyArcT: string;
   emptyArcS: string;
   emptySearchS: string;
-  // Detail panel
+  // 상세 패널
   pInfo: string;
   pOrg: string;
   pAuthor: string;
@@ -102,7 +102,7 @@ export type AnnouncementConsoleDictionary = {
   zOpLocked: string;
   mobileDetail: string;
   close: string;
-  // Form modal
+  // 폼 모달
   fNewKicker: string;
   fEditKicker: string;
   fNewTitle: string;
@@ -137,12 +137,12 @@ export type AnnouncementConsoleDictionary = {
   fPopup: string;
   fPopupSub: string;
   fPopupUntil: string;
-  /** aria-label for the popup-end date control (shared `AdminDatePicker`). */
+  /** 팝업 종료 날짜 컨트롤의 aria-label (공용 `AdminDatePicker`). */
   fPopupUntilDate: string;
   fPopupUntilDatePh: string;
-  /** aria-label for the popup-end time control (shared `AdminTimePicker`). */
+  /** 팝업 종료 시간 컨트롤의 aria-label (공용 `AdminTimePicker`). */
   fPopupUntilTime: string;
-  // Shared date-picker chrome labels (month nav + "today" shortcut).
+  // 공용 날짜 선택기 크롬 라벨 (월 이동 + "오늘" 바로가기).
   datePickerPrevMonth: string;
   datePickerNextMonth: string;
   datePickerToday: string;
@@ -155,7 +155,7 @@ export type AnnouncementConsoleDictionary = {
   vTitleRequired: string;
   vBodyRequired: string;
   vRolesRequired: string;
-  // Read-status modal
+  // 읽음 상태 모달
   rKicker: string;
   rSegAll: string;
   rSegRead: string;
@@ -169,7 +169,7 @@ export type AnnouncementConsoleDictionary = {
   rFootNote: string;
   rConfirm: string;
   rLoading: string;
-  // Confirm modal
+  // 확인 모달
   cFootNote: string;
   cPublishKicker: string;
   cPublishT: string;
@@ -191,9 +191,9 @@ export type AnnouncementConsoleDictionary = {
   cDelT: string;
   cDelS: string;
   cDelBtn: string;
-  // Image viewer
+  // 이미지 뷰어
   imgViewTitle: string;
-  // Toasts
+  // 토스트
   tSaved: string;
   tPublished: string;
   tRepublished: string;
@@ -202,7 +202,7 @@ export type AnnouncementConsoleDictionary = {
   tDeleted: string;
   tSynced: string;
   errProcess: string;
-  // Load error state
+  // 로드 오류 상태
   errT: string;
   errS: string;
   retry: string;

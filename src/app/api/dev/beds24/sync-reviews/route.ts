@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { syncOrganizationReviews } from "@/lib/beds24/reviews-sync";
 
-// Local-only trigger for Beds24 external review collection. Same collection path as the
-// production cron (/api/beds24/reviews-sync), but scoped to one organization and with a
-// caller-chosen window so a first import can be rehearsed before the cron owns it.
+// Beds24 외부 리뷰 수집을 위한 로컬 전용 트리거. 운영 크론(/api/beds24/reviews-sync)과 수집 경로는
+// 같지만 한 조직으로 범위를 좁히고, 크론이 맡기 전에 첫 가져오기를 리허설할 수 있도록
+// 호출자가 기간을 정할 수 있다.
 
 function ensureDevOnly(request: NextRequest) {
   if (process.env.NODE_ENV !== "development") {

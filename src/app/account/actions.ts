@@ -26,9 +26,9 @@ export async function deleteAccount(): Promise<never> {
 
   const service = getSupabaseServiceClient();
 
-  // Tombstone the profile: clear PII, mark as deleted.
-  // The row is kept so operational records (attendance, cleaning, tasks)
-  // retain their user_id FK and display "탈퇴한 사용자" instead of breaking.
+  // 프로필을 묘비 처리: 개인정보를 지우고 삭제됨으로 표시한다.
+  // 운영 기록(출퇴근, 청소, 할 일)이 남도록
+  // user_id FK 를 유지하고 깨지지 않고 "탈퇴한 사용자" 로 표시된다.
   //
   // **두 쓰기는 반드시 성공해야 한다.** 아래 `deleteUser` 는 되돌릴 수 없고, 그러고 나면 본인도
   // 다시 로그인해 재시도할 수 없다. 예전에는 결과를 받지 않아, 묘비 처리가 실패해도 그대로
@@ -51,7 +51,7 @@ export async function deleteAccount(): Promise<never> {
     redirect("/account?error=delete_failed");
   }
 
-  // Remove from all org memberships so the user no longer appears in rosters.
+  // 모든 조직 멤버십에서 제거해 명단에 더는 나타나지 않게 한다.
   const removed = await mustWrite(
     "account delete: membership removal",
     service.from("memberships").update({ status: "removed" }).eq("user_id", user.id),
@@ -60,8 +60,8 @@ export async function deleteAccount(): Promise<never> {
     redirect("/account?error=delete_failed");
   }
 
-  // Hard-delete the auth user — this frees the email for re-registration.
-  // The profiles row survives because we removed the ON DELETE CASCADE FK.
+  // auth 사용자를 하드 삭제 — 이메일을 재가입에 쓸 수 있게 풀어 준다.
+  // ON DELETE CASCADE FK 를 없앴으므로 profiles 행은 남는다.
   // 여기까지 왔다면 위 두 쓰기가 성공했다 — 이제 되돌릴 수 없는 단계로 넘어가도 안전하다.
   await service.auth.admin.deleteUser(user.id);
 
@@ -159,9 +159,9 @@ export async function updateAccountProfile(formData: FormData) {
 }
 
 /**
- * Persist the user's customized mobile bottom-bar tabs.
- * Called from the mobile shell's "edit bottom bar" sheet. Returns a small
- * result object instead of redirecting, so the client can update optimistically.
+ * 사용자가 편집한 모바일 하단 바 탭을 저장한다.
+ * 모바일 셸의 "하단 바 편집" 시트에서 호출한다. 리다이렉트하지 않고 작은
+ * 결과 객체를 돌려주므로, 클라이언트가 낙관적으로 갱신할 수 있다.
  */
 export async function updateBottomNavTabs(
   tabIds: string[],

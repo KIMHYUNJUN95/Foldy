@@ -16,8 +16,8 @@ export type PlatformRole = (typeof platformRoles)[number];
 export type OrganizationRole = (typeof organizationRoles)[number];
 export type Role = (typeof roles)[number];
 
-// Admin-web access = everyone except part_time_staff (confirmed 2026-07-13). field_manager/staff can
-// reach /admin/* too; sensitive pages (users, settings, payroll) apply their own stricter per-page gate.
+// 관리자 웹 접근 = part_time_staff 를 제외한 모두 (2026-07-13 확정). field_manager/staff 도
+// /admin/* 에 들어갈 수 있으며, 민감한 페이지(사용자, 설정, 급여)는 더 엄격한 페이지별 게이트를 따로 적용한다.
 export const adminWebRoles = [
   "developer_super_admin",
   "owner",
@@ -29,9 +29,9 @@ export const adminWebRoles = [
 ] as const satisfies readonly Role[];
 
 /**
- * Top org admins — `owner` and `senior_managing_director`(전무) are treated as fully equivalent
- * (every permission). Single source of truth so app-code owner-gates can include 전무 the same way the
- * DB does via `has_org_role` (see migration 202607130003). Platform developers are handled separately.
+ * 최상위 조직 관리자 — `owner` 와 `senior_managing_director`(전무)는 완전히 동등하게 취급한다
+ * (모든 권한). 앱 코드의 owner 게이트가 전무도 같은 방식으로 포함할 수 있게 하는 단일 출처이며,
+ * DB 가 `has_org_role` 로 하는 것과 동일(마이그레이션 202607130003 참고). 플랫폼 개발자는 별도로 처리한다.
  */
 export function isOrgTopAdmin(role: Role): boolean {
   return role === "owner" || role === "senior_managing_director";
@@ -101,10 +101,10 @@ export const fieldOperationRoles = [
 // 그 키의 역할 기본값과 같은 목록이고, 공지 대상 필터처럼 「역할 묶음」이 필요한 곳만 쓴다.
 
 /**
- * The surface a role LANDS on by default — separate from what it can *access*. Field roles
- * (field_manager/staff/part_time) default to mobile even though field_manager/staff can also open the
- * admin web; office/dev roles default to admin. Used for default routing / preferred mode, so granting
- * field roles admin access does not change where they land by default.
+ * 역할이 기본으로 도착하는 화면 — 접근 *가능한* 곳과는 별개다. 현장 역할
+ * (field_manager/staff/part_time)은 field_manager/staff 도 관리자 웹을 열 수 있지만
+ * 기본은 모바일이고, 사무/개발 역할은 기본이 관리자다. 기본 라우팅 / 선호 모드에 쓰이므로
+ * 현장 역할에 관리자 접근을 줘도 기본 도착 화면은 바뀌지 않는다.
  */
 export function defaultsToAdminSurface(role: Role) {
   return !(fieldModeRoles as readonly Role[]).includes(role);
@@ -117,8 +117,8 @@ export function canAccessFieldOperations(role: Role) {
 // 남의 청소 기록 보기(예전 `cleaningRecordViewerRoles` · `canViewOthersCleaning`)는 권한 키 `cleaning.read_all` 로 옮겼다(2026-10-20).
 
 /**
- * All org members may view the attendance roster (who is at work today).
- * Separate from `cleaning.read_all` — roster is not a privileged view.
+ * 모든 조직 멤버는 근태 현황(오늘 근무 중인 사람)을 볼 수 있다.
+ * `cleaning.read_all` 과는 별개 — 현황은 권한이 필요한 뷰가 아니다.
  */
 export const rosterViewerRoles = roles as readonly Role[];
 
@@ -130,9 +130,9 @@ export function canViewRoster(): boolean {
 // 마이그레이션에서 개인 부여로 옮겼다.
 
 /**
- * The 5 user-facing invite categories shown during onboarding.
- * Each maps to a single DB organization_role slug.
- * cs_staff is not exposed as a direct invite category (admin-assigned only).
+ * 온보딩에서 보여주는 사용자용 초대 카테고리 5개.
+ * 각각 DB organization_role 슬러그 하나에 대응한다.
+ * cs_staff 는 초대 카테고리로 직접 노출하지 않는다 (관리자 지정 전용).
  */
 export const INVITE_CATEGORIES = [
   "part_time_staff",
@@ -161,11 +161,11 @@ export const roleToInviteCategory: Partial<Record<OrganizationRole, InviteCatego
 };
 
 /**
- * Roles an `office_admin` (non-owner) may hand to someone else — via manual role change
- * (`src/actions/users.ts`) or invite-code creation (`src/app/admin/settings/actions.ts`).
- * Deliberately excludes `owner` and `office_admin` itself: only `owner`/`developer_super_admin` may
- * grant office_admin-or-above access, in either flow. Single source of truth so the two enforcement
- * points can't drift apart.
+ * `office_admin`(소유자 제외)이 다른 사람에게 부여할 수 있는 역할 — 수동 역할 변경
+ * (`src/actions/users.ts`) 또는 초대 코드 생성(`src/app/admin/settings/actions.ts`)을 통해서.
+ * `owner` 와 `office_admin` 자신은 일부러 제외했다: office_admin 이상의 접근은 두 흐름 모두에서
+ * `owner`/`developer_super_admin` 만 부여할 수 있다. 두 집행 지점이
+ * 어긋나지 않도록 하는 단일 출처.
  */
 export const officeAdminAssignableRoles = [
   "cs_staff",

@@ -27,7 +27,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
 
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Touch tracking in a plain object ref — no re-render during gesture
+  // 터치 추적은 일반 객체 ref 로 — 제스처 중 리렌더 없음
   const touch = useRef({
     n: 0,
     x0: 0, y0: 0,
@@ -37,7 +37,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
     dx: 0,
   });
 
-  // State refs read by the native touchmove handler (avoids stale closures)
+  // 네이티브 touchmove 핸들러가 읽는 상태 ref (오래된 클로저 방지)
   const live = useRef({ scale: 1, tx: 0, ty: 0, index });
   live.current = { scale, tx, ty, index };
 
@@ -71,7 +71,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
     };
   }, []);
 
-  // Keyboard
+  // 키보드
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -83,7 +83,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [images.length, onClose]);
 
-  // Non-passive touchmove — must be added via DOM API to call preventDefault
+  // non-passive touchmove — preventDefault 를 호출하려면 DOM API 로 추가해야 함
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -145,7 +145,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
     if (scale < 1) { setScale(1); setTx(0); setTy(0); }
   }
 
-  // Image transform: zoom takes priority over swipe feedback
+  // 이미지 변형: 확대가 스와이프 피드백보다 우선
   const imgTransform =
     scale > 1
       ? `scale(${scale}) translate(${tx / scale}px, ${ty / scale}px)`
@@ -155,7 +155,7 @@ export function ImageLightbox({ images, startIndex, onClose, labels }: Props) {
   const imgTransition =
     scale > 1 || touch.current.swiping ? "none" : "transform 0.22s cubic-bezier(.22,1,.36,1)";
 
-  // SSR guard — document is undefined in Node.js during SSR
+  // SSR 가드 — SSR 중 Node.js 에서는 document 가 없음
   if (typeof document === "undefined") return null;
 
   return createPortal(

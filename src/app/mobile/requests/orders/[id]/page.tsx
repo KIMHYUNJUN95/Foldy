@@ -37,7 +37,7 @@ const LIST_FILTER_KEYS = [
   "scope", "type", "status", "building", "date", "startDate", "endDate",
 ] as const;
 
-// "received" is not shown as an active step in MVP; map it to "ordered" for progress display.
+// "received" 는 MVP 에서 활성 단계로 보이지 않는다. 진행 표시용으로 "ordered" 에 대응시킨다.
 const TIMELINE_STATUSES = ["requested", "approved", "ordered"] as const;
 
 /**
@@ -104,7 +104,7 @@ function linkHost(link: string): string {
   }
 }
 
-// Only render clickable anchors for valid absolute http/https URLs.
+// 유효한 절대 http/https URL 만 클릭 가능한 앵커로 그린다.
 function isValidAbsoluteUrl(value: string): boolean {
   const trimmed = value.trim();
   try {
@@ -162,11 +162,11 @@ export default async function MobileOrderRequestDetailPage({
   }
 
   const locale = session.user.preferredLanguage;
-  // Only office-level roles (or an `order_processor` permission override) process orders
-  // (approve/order/reject/edit delivery). The decision is delegated to the server action module so
-  // the UI can never drift from the gate that actually enforces it. Non-processors (incl.
-  // field_manager) get no processing action, so hide the whole bar instead of showing buttons that
-  // would fail with "forbidden".
+  // 사무실 수준 역할(또는 `order_processor` 권한 override)만 주문을 처리한다
+  // (승인/주문/반려/배송 수정). 판단은 서버 액션 모듈에 맡겨서
+  // UI 가 실제로 강제하는 게이트와 어긋날 수 없다. 처리 권한이 없는 사용자(
+  // field_manager 포함)에게는 처리 액션이 없으므로, "forbidden" 으로 실패할 버튼을 보여주는 대신
+  // 바 전체를 숨긴다.
   const canProcessOrder = await canCurrentUserProcessOrders();
   const dictionary = getDictionary(locale);
   const copy = dictionary.mobile.orderDetail;
@@ -182,16 +182,16 @@ export default async function MobileOrderRequestDetailPage({
   const items = parseItems(order.items);
   const displayStatus = toDisplayStatus(order.status);
   const isClosed = order.status === "closed";
-  // closed: neutral timeline (all muted) -> the badge already communicates the terminal state.
-  // received: maps to ordered (MVP hides the received step).
+  // closed: 중립 타임라인 (전부 흐림) -> 배지가 이미 종결 상태를 알려준다.
+  // received: ordered 에 대응 (MVP 는 received 단계를 숨김).
   const progressStatus: (typeof TIMELINE_STATUSES)[number] | null = isClosed
     ? null
     : order.status === "requested"
       ? "requested"
       : order.status === "approved"
         ? "approved"
-        : "ordered"; // ordered / received -> show full active progress
-  // -1 when closed so every i <= currentIdx check is false -> all bars muted.
+        : "ordered"; // ordered / received -> 전체 활성 진행 표시
+  // closed 면 -1 이라 모든 i <= currentIdx 검사가 false -> 모든 막대가 흐림.
   const currentIdx = progressStatus !== null ? TIMELINE_STATUSES.indexOf(progressStatus) : -1;
 
   const navBadges = await navBadgesPromise;

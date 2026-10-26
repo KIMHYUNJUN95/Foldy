@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Desktop photo attach/preview control for the admin Todoist console.
- * Used at three call sites: the inline task-add row (compact), the detail-panel task photos
- * (full), and the note composer in the detail panel (compact). Selection/preview/removal only —
- * the actual upload is delegated to the caller via `uploadPendingTaskPhotos` /
- * `uploadPendingTaskUpdatePhotos` so no call site duplicates the upload loop.
+ * 관리자 Todoist 콘솔용 데스크톱 사진 첨부/미리보기 컨트롤.
+ * 호출처는 세 곳: 인라인 할 일 추가 행 (compact), 상세 패널의 할 일 사진
+ * (full), 상세 패널의 메모 작성기 (compact). 선택/미리보기/제거만 담당하고
+ * 실제 업로드는 `uploadPendingTaskPhotos` /
+ * `uploadPendingTaskUpdatePhotos` 로 호출자에게 맡겨, 어느 호출처도 업로드 루프를 중복하지 않는다.
  *
- * Reuses the existing upload contract rather than reinventing it:
- * - `compressImageFile` / `PreviewItem` from the announcement uploader (client-side compression
- *   policy — CLAUDE.md §8).
- * - `uploadRequestImages` from the shared request-image-upload helper.
+ * 새로 만들지 않고 기존 업로드 규약을 재사용한다:
+ * - 공지 업로더의 `compressImageFile` / `PreviewItem` (클라이언트 압축
+ *   정책 — CLAUDE.md §8).
+ * - 공용 요청 이미지 업로드 헬퍼의 `uploadRequestImages`.
  */
 
 import Image from "next/image";
@@ -22,29 +22,29 @@ import {
 } from "@/components/announcements/announcement-image-uploader";
 import { uploadRequestImages } from "@/components/requests/request-image-upload";
 
-// Matches the size cap already enforced by the announcement uploader — kept in lockstep so the
-// same file that would be rejected there is rejected here.
+// 공지 업로더가 이미 적용하는 크기 상한과 같다 — 같은 값으로 맞춰 두어
+// 거기서 거부될 파일은 여기서도 거부된다.
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/gif", "image/jpeg", "image/png", "image/webp"];
 
 export type PhotoUploaderCopy = {
-  /** Drop-zone label, non-compact variant. e.g. "사진 추가" */
+  /** 드롭존 라벨, 기본(non-compact) 변형. 예: "사진 추가" */
   add: string;
-  /** Drop-zone label, compact variant (inline-add row / note composer). e.g. "사진" */
+  /** 드롭존 라벨, compact 변형 (인라인 추가 행 / 메모 작성기). 예: "사진" */
   addCompact: string;
-  /** Subtext under the label, non-compact only. e.g. "클릭하거나 파일을 끌어다 놓으세요" */
+  /** 라벨 아래 보조 문구, 기본 변형에서만. 예: "클릭하거나 파일을 끌어다 놓으세요" */
   dropHint: string;
-  /** Count badge. Placeholders: {n} current count, {max} cap. e.g. "{n}/{max}" */
+  /** 개수 배지. 자리표시자: {n} 현재 개수, {max} 상한. 예: "{n}/{max}" */
   count: string;
-  /** aria-label for each thumbnail's remove button. e.g. "사진 삭제" */
+  /** 각 썸네일의 제거 버튼 aria-label. 예: "사진 삭제" */
   remove: string;
-  /** Shown when a selection would exceed the cap. Placeholder: {max}. e.g. "최대 {max}장까지 첨부할 수 있어요" */
+  /** 선택이 상한을 넘을 때 표시. 자리표시자: {max}. 예: "최대 {max}장까지 첨부할 수 있어요" */
   tooMany: string;
   /** Shown for a non-image file. e.g. "이미지 파일만 첨부할 수 있어요" */
   invalidType: string;
-  /** Shown for an over-size file. Placeholder: {max} (MB). e.g. "파일 용량은 {max}MB 이하만 가능해요" */
+  /** 파일이 너무 클 때 표시. 자리표시자: {max} (MB). 예: "파일 용량은 {max}MB 이하만 가능해요" */
   tooLarge: string;
-  /** Shown in place of the add label while `uploading` is true. e.g. "업로드 중…" */
+  /** `uploading` 이 true 인 동안 추가 라벨 대신 표시. 예: "업로드 중…" */
   uploading: string;
 };
 
@@ -56,18 +56,18 @@ function fillCopy(template: string, vars: Record<string, string | number>): stri
 }
 
 type Props = {
-  /** Already-uploaded public URLs (existing photos, e.g. when editing). */
+  /** 이미 업로드된 공개 URL (기존 사진, 예: 편집할 때). */
   value: string[];
-  /** Locally selected, not yet uploaded. */
+  /** 로컬에서 선택했지만 아직 업로드되지 않은 것. */
   pending: PreviewItem[];
   onChange: (next: { value: string[]; pending: PreviewItem[] }) => void;
-  /** Cap: caller passes 5 or 20 — project tasks get 20, everything else 5 (CLAUDE.md §8). */
+  /** 상한: 호출자가 5 또는 20 을 넘긴다 — 프로젝트 할 일은 20, 나머지는 5 (CLAUDE.md §8). */
   maxImages: number;
   copy: PhotoUploaderCopy;
   disabled?: boolean;
-  /** Smaller variant for the inline-add row and the note composer. */
+  /** 인라인 추가 행과 메모 작성기용 작은 변형. */
   compact?: boolean;
-  /** True while the caller is mid-upload (e.g. inside a submit transition) — locks the control. */
+  /** 호출자가 업로드 중일 때 true (예: 제출 transition 안) — 컨트롤을 잠근다. */
   uploading?: boolean;
 };
 
@@ -127,7 +127,7 @@ export function TaskPhotoUploader({
   const handlePick = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
-      // Reset so the same file can be re-selected after removal
+      // 제거 후에도 같은 파일을 다시 선택할 수 있게 초기화
       e.target.value = "";
       void addFiles(files);
     },
@@ -162,7 +162,7 @@ export function TaskPhotoUploader({
     [onChange, pending, value],
   );
 
-  // Revoke any still-pending object URLs on unmount so preview blobs don't leak.
+  // 언마운트 시 아직 대기 중인 object URL 을 해제해 미리보기 blob 이 새지 않게 한다.
   const pendingRef = useRef(pending);
   useEffect(() => {
     pendingRef.current = pending;
@@ -207,8 +207,8 @@ export function TaskPhotoUploader({
           {uploading ? copy.uploading : compact ? copy.addCompact : copy.add}
         </span>
         {!compact && !uploading && <span className="tphoto__hint">{copy.dropHint}</span>}
-        {/* Compact renders as a chip alongside 날짜/우선순위/대상 — a "0/5" suffix on an empty chip
-            is noise, so the count only appears once something is attached. */}
+        {/* compact 는 날짜/우선순위/대상 옆의 칩으로 렌더된다 — 빈 칩에 "0/5" 접미사는
+            잡음이므로, 무언가 첨부된 뒤에만 개수를 보여준다. */}
         {(!compact || total > 0) && (
           <span className="tphoto__count">{fillCopy(copy.count, { n: total, max: maxImages })}</span>
         )}
@@ -244,7 +244,7 @@ export function TaskPhotoUploader({
           ))}
           {pending.map((item) => (
             <div className="tphoto__thumb" key={item.id}>
-              {/* Blob URLs cannot be optimised by Next.js Image, use plain img */}
+              {/* Blob URL 은 Next.js Image 로 최적화할 수 없으므로 일반 img 를 쓴다 */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img alt="" className="tphoto__img" src={item.previewUrl} />
               <button
@@ -288,22 +288,22 @@ async function uploadTaskPhotos(params: {
 }
 
 /**
- * Uploads task-level photos (inline-add row + detail-panel task photos).
- * Storage path lands under `${organizationId}/task-images/...` — required by
- * `cleanupRemovedTaskImages` in src/lib/task-images.ts, which only recognizes that prefix.
+ * 할 일 단위 사진 업로드 (인라인 추가 행 + 상세 패널의 할 일 사진).
+ * 저장 경로는 `${organizationId}/task-images/...` 아래로 간다 — 그 접두사만 인식하는
+ * src/lib/task-images.ts 의 `cleanupRemovedTaskImages` 가 요구한다.
  */
 export async function uploadPendingTaskPhotos(params: {
   pending: PreviewItem[];
   organizationId: string;
-  taskId: string; // or a fresh uuid for a not-yet-created task
+  taskId: string; // 아직 만들어지지 않은 할 일이면 새 uuid
 }): Promise<string[]> {
   return uploadTaskPhotos({ ...params, requestId: params.taskId, requestType: "task-images" });
 }
 
 /**
- * Uploads note/update-log photos (detail-panel note composer). Separate `requestType` from
- * `uploadPendingTaskPhotos` — matches the folder split the mobile task detail view already uses
- * (`task-update-images` vs `task-images`) so admin and mobile land in the same storage layout.
+ * 메모/업데이트 로그 사진 업로드 (상세 패널 메모 작성기). `uploadPendingTaskPhotos` 와는 별도의 `requestType` —
+ * 모바일 할 일 상세가 이미 쓰는 폴더 분리(`task-update-images` 대 `task-images`)와 같게 맞춰
+ * 관리자와 모바일이 같은 스토리지 구조에 저장되게 한다.
  */
 export async function uploadPendingTaskUpdatePhotos(params: {
   pending: PreviewItem[];

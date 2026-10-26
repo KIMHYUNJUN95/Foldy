@@ -1,9 +1,9 @@
 "use client";
 
-// Admin cleaning console — right-side detail panel, shared by both the today board's room cards
-// and the history table's rows. Mirrors clean-views.js panel(). Uses the shared .panel/.panel-scrim/
-// .pblock/.kv/.locknote/.rptiles primitives from admin-console.css + cleaning-console.css. Data is
-// real (src/lib/admin-cleaning.ts) as of 2026-07-14.
+// 관리자 청소 콘솔 — 오늘 보드의 객실 카드와 이력 표의 행이 함께 쓰는 우측 상세 패널.
+// clean-views.js panel() 을 따른다. admin-console.css + cleaning-console.css 의 공용 .panel/.panel-scrim/
+// .pblock/.kv/.locknote/.rptiles primitive 를 쓴다. 데이터는
+// 2026-07-14 기준 실데이터(src/lib/admin-cleaning.ts)다.
 import { BedDouble, ChevronRight, Info, PackageSearch, ShieldCheck, Wrench, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";

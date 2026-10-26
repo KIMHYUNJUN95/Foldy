@@ -42,8 +42,8 @@ type SlackStatus =
   | "empty"
   | "error";
 
-// Clipboard write with a legacy fallback (mirrors the calendar's copy util) so it works in
-// non-secure contexts / older webviews.
+// 레거시 폴백이 있는 클립보드 쓰기(캘린더의 복사 유틸과 같음)라서
+// 보안 컨텍스트가 아니거나 오래된 웹뷰에서도 동작한다.
 async function copyText(value: string) {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
     try {
@@ -65,12 +65,12 @@ async function copyText(value: string) {
 }
 
 /**
- * Bottom sheet that generates and displays the AI daily work report for a given Tokyo date.
- * Same portal+animation pattern as PhotoGallery (mount→show, body scroll lock, Esc to close, portal
- * to <body> so the mobile shell's transformed scroll container can't trap `position: fixed`).
+ * 도쿄 날짜 기준 AI 일일 업무 보고서를 생성해 보여 주는 바텀 시트.
+ * PhotoGallery 와 같은 포털 + 애니메이션 패턴(mount→show, 바디 스크롤 잠금, Esc 로 닫기,
+ * 포털을 <body> 로 보내 모바일 셸의 transform 된 스크롤 컨테이너가 `position: fixed` 를 가두지 못하게 한다).
  *
- * Permission is enforced server-side: a non-staff caller gets `forbidden`, which renders the
- * "권한 없음" state in place of the report — satisfying the "권한 없는 사람이 누르면 팝업" requirement.
+ * 권한은 서버에서 강제한다: 직원이 아닌 호출자는 `forbidden` 을 받고, 그러면
+ * "권한 없음" 상태가 보고서 자리에 렌더된다 — "권한 없는 사람이 누르면 팝업" 요구사항을 충족한다.
  */
 export function ReportSheet({
   copy,
@@ -160,8 +160,8 @@ export function ReportSheet({
   const dirty = text !== builtText;
   const canSubmit = pickedCount > 0 && text.trim().length > 0;
 
-  // Kick off generation on mount (rAF-scheduled so the loading setState is not called
-  // synchronously inside the effect body).
+  // 마운트 시 생성을 시작한다(로딩 setState 를 effect 본문에서
+  // 동기로 호출하지 않도록 rAF 로 예약).
   useEffect(() => {
     const id = requestAnimationFrame(run);
     return () => cancelAnimationFrame(id);

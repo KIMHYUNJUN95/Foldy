@@ -18,7 +18,7 @@ type PageProps = {
  */
 export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  // User management is developer-only by default; a developer may delegate via `user.manage`.
+  // 사용자 관리는 기본적으로 개발자 전용이며, 개발자가 `user.manage` 로 위임할 수 있다.
   if (!(await actorCanOpenUserManagement(session.user.id, session.user.role))) {
     redirect("/admin");
   }

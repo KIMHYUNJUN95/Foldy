@@ -1,9 +1,9 @@
 /**
- * Generates iOS apple-touch-startup-image PNGs for all modern iPhone sizes.
- * Requires `sharp` (already a Next.js transitive dependency).
+ * 모든 최신 iPhone 크기용 iOS apple-touch-startup-image PNG 를 생성한다.
+ * `sharp` 필요 (Next.js 의 간접 의존성으로 이미 설치됨).
  *
- * Output: public/splash/apple-splash-{W}-{H}.png
- * Run:    node scripts/gen-splash.mjs
+ * 출력: public/splash/apple-splash-{W}-{H}.png
+ * 실행:   node scripts/gen-splash.mjs
  */
 
 import sharp from "sharp";
@@ -21,7 +21,7 @@ const OUT_DIR = path.join(ROOT, "public/splash");
 const BG = { r: 255, g: 255, b: 255, alpha: 1 };
 const ICON_PT = 110;
 
-// All unique physical-pixel dimensions for modern iPhones (portrait).
+// 최신 iPhone 의 고유 물리 픽셀 크기 전체 (세로 방향).
 // media query → (device-width: Wpt) and (device-height: Hpt) and (-webkit-device-pixel-ratio: R)
 const SIZES = [
   { w: 1320, h: 2868, dw: 440, dh: 956, dpr: 3 }, // iPhone 16 Pro Max
@@ -33,8 +33,8 @@ const SIZES = [
   { w: 1125, h: 2436, dw: 375, dh: 812, dpr: 3 }, // iPhone 13 mini / 12 mini / 11 Pro / XS / X
   { w: 1242, h: 2688, dw: 414, dh: 896, dpr: 3 }, // iPhone 11 Pro Max / XS Max
   { w: 828,  h: 1792, dw: 414, dh: 896, dpr: 2 }, // iPhone 11 / XR
-  { w: 1080, h: 2340, dw: 360, dh: 780, dpr: 3 }, // (legacy fallback size; no exact iPhone)
-  { w: 750,  h: 1334, dw: 375, dh: 667, dpr: 2 }, // iPhone SE (2nd / 3rd gen)
+  { w: 1080, h: 2340, dw: 360, dh: 780, dpr: 3 }, // (레거시 대체 크기; 정확히 대응하는 iPhone 없음)
+  { w: 750,  h: 1334, dw: 375, dh: 667, dpr: 2 }, // iPhone SE (2·3세대)
 ];
 
 if (!fs.existsSync(ICON_PATH)) {
@@ -59,7 +59,7 @@ for (const { w, h, dw, dh, dpr } of SIZES) {
 
 console.log(`\nDone — ${SIZES.length} splash images written to public/splash/`);
 
-// Print the <link> tags to paste into layout.tsx
+// layout.tsx 에 붙여 넣을 <link> 태그 출력
 console.log("\n--- <link> tags for layout.tsx ---");
 for (const { w, h, dw, dh, dpr } of SIZES) {
   const media = `(device-width: ${dw}px) and (device-height: ${dh}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`;

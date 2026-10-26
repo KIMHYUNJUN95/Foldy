@@ -1,22 +1,22 @@
-/* Foldy service worker.
+/* Foldy 서비스 워커.
  *
- * Goals: (1) installable PWA (Android's install prompt needs a SW with a fetch handler),
- * (2) friendly offline page, (3) fast static assets, (4) **instant cold-launch** for the installed
- * app via a stale-while-revalidate app-shell cache for full-document navigations.
+ * 목표: (1) 설치 가능한 PWA(Android 설치 프롬프트에는 fetch 핸들러가 있는 SW 가 필요),
+ * (2) 친절한 오프라인 페이지, (3) 빠른 정적 자산, (4) 설치된 앱의 **즉시 콜드 런치**
+ * (전체 문서 이동에 대한 stale-while-revalidate 앱 셸 캐시로 구현).
  *
- * Cold-launch strategy (2026-07-22): a full-document navigation (installed PWA open / hard refresh)
- * is served from the last cached copy INSTANTLY, then revalidated in the background. This trades a
- * brief moment of stale content for a screen that appears immediately instead of waiting on a full
- * server render. Two safeguards keep it honest for an auth'd ops app:
- *   - Only successful, same-origin, non-redirected HTML is cached. A redirect (e.g. logged-out →
- *     /auth/login) EVICTS the stale auth'd copy instead of being served as content.
- *   - After serving stale, clients are messaged so the page pulls fresh server data (router.refresh)
- *     — or hard-reloads if the revalidation redirected. So the user sees content instantly AND it
- *     self-corrects to fresh within a moment. Client-side (RSC) navigations inside the running app
- *     are NOT touched by this handler, so in-app data stays live as before.
- *   - A cached copy from an OLDER deployment is never painted (2026-10-19): the SW compares the copy's
- *     `x-foldy-build` header with `/api/build` and waits for the network document when they differ.
- * Bump the cache names to invalidate old caches on deploy. */
+ * 콜드 런치 전략(2026-07-22): 전체 문서 이동(설치된 PWA 열기 / 강제 새로고침)은
+ * 마지막으로 캐시한 사본을 즉시 내려주고 백그라운드에서 다시 검증한다. 잠깐 오래된 내용을 보여주는 대신
+ * 서버 렌더가 끝나길 기다리지 않고 화면이 바로 뜬다.
+ * 로그인이 필요한 운영 앱이라 두 가지 안전장치를 둔다.
+ *   - 성공한 same-origin 비리다이렉트 HTML 만 캐시한다. 리다이렉트(예: 로그아웃 →
+ *     /auth/login)가 나오면 콘텐츠로 내려주지 않고 오래된 로그인 상태 사본을 지운다(EVICT).
+ *   - 오래된 사본을 내려준 뒤 클라이언트에 메시지를 보내 페이지가 최신 서버 데이터를 가져오게 한다(router.refresh)
+ *     — 재검증이 리다이렉트로 끝났다면 강제 새로고침한다. 그래서 내용은 즉시 보이고
+ *     곧 최신 상태로 스스로 바로잡힌다. 실행 중인 앱 안의 클라이언트(RSC) 이동은
+ *     이 핸들러가 건드리지 않으므로 앱 내 데이터는 이전처럼 실시간이다.
+ *   - 이전 배포의 캐시 사본은 절대 화면에 그리지 않는다(2026-10-19): SW 가 사본의
+ *     `x-foldy-build` 헤더를 `/api/build` 와 비교해 다르면 네트워크 문서를 기다린다.
+ * 배포 시 이전 캐시를 무효화하려면 캐시 이름을 올린다. */
 const STATIC_CACHE = "stayops-static-v5"; // v3·v4 (2026-10-09): 로고 교체 · 흰 줄 복원 — /icons 는 cache-first 라 올려야 새 아이콘이 보인다. v5 (2026-10-22): 오프라인 화면 교체(React 없이 다시 불러오기 · 다시 시도) — 저장본을 새로 받게
 const NAV_CACHE = "stayops-nav-v3"; // v3 (2026-10-09): 이름 교체(Foldy) — 이름 바꾸기 전 화면 저장본(「Stay Ops」)을 버린다
 const OFFLINE_URL = "/offline";
@@ -44,9 +44,9 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// A full-document navigation we may cache for instant cold-launch. Auth flows and API/action
-// endpoints must always hit the network (never serve a stale auth'd shell for them, and never
-// cache a login/redirect as if it were app content).
+// 캐시해도 되는 전체 문서 이동(즉시 콜드 런치용). 인증 흐름과 API/액션
+// 엔드포인트는 항상 네트워크로 가야 한다(오래된 로그인 셸을 내려주지 않고,
+// 로그인/리다이렉트를 앱 콘텐츠처럼 캐시하지 않기 위해).
 function isCacheableNavigation(url) {
   if (url.origin !== self.location.origin) return false;
   const p = url.pathname;
@@ -119,8 +119,8 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
 
-  // Full-document navigations: stale-while-revalidate for cacheable app routes, network-first
-  // (with offline fallback) otherwise.
+  // 전체 문서 이동: 캐시 가능한 앱 경로는 stale-while-revalidate, 그 외에는 network-first
+  // (오프라인 폴백 포함).
   if (req.mode === "navigate") {
     event.respondWith(
       (async () => {
@@ -142,7 +142,7 @@ self.addEventListener("fetch", (event) => {
             if (res.ok && !res.redirected && res.type === "basic") {
               await putNavCached(navCache, req, res);
             } else {
-              // Redirect (logged out / moved) or error → drop any stale auth'd copy.
+              // 리다이렉트(로그아웃 / 이동됨) 또는 오류 → 오래된 로그인 상태 사본을 버린다.
               await navCache.delete(req);
             }
             return res;
@@ -174,7 +174,7 @@ self.addEventListener("fetch", (event) => {
           return cached;
         }
 
-        // No cached copy yet (first launch / just evicted): use the network, fall back to offline.
+        // 아직 캐시 사본이 없음(첫 실행 / 방금 삭제됨): 네트워크를 쓰고, 실패하면 오프라인 페이지로 폴백한다.
         const res = await revalidate;
         return res || offlineFallback();
       })(),
@@ -182,7 +182,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Immutable static assets: cache-first (they're content-hashed, so never stale).
+  // 변하지 않는 정적 자산: cache-first (콘텐츠 해시가 붙어 있어 오래될 일이 없다).
   const url = new URL(req.url);
   if (
     url.origin === self.location.origin &&

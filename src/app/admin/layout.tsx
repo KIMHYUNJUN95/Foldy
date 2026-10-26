@@ -6,13 +6,13 @@ import { getDictionary } from "@/lib/i18n";
 import { getCurrentAppSession } from "@/lib/session";
 import { countPendingIdDocumentPeople } from "@/lib/staff-documents/server";
 
-// The admin console is an installable PWA in its own right, kept fully separate from the
-// mobile app. Next.js metadata merges by segment, so overriding `manifest` here makes every
-// /admin/* route advertise the desktop-oriented manifest (standalone window, unlocked
-// orientation, /admin scope + start_url) instead of the root mobile manifest. Installing while
-// on an /admin page therefore registers a distinct "Foldy Admin" app (id "/admin"), separate
-// from the mobile "Foldy" app (id "/"). The shared service worker (scope "/") still serves
-// both. See docs/product/05-admin-web-ia.md → "Installable Admin PWA".
+// 관리자 콘솔은 모바일 앱과 완전히 분리된, 독립적으로 설치 가능한 PWA 다. Next.js 메타데이터는
+// 세그먼트별로 병합되므로 여기서 `manifest` 를 덮어쓰면 모든 /admin/* 경로가 루트 모바일 매니페스트 대신
+// 데스크톱용 매니페스트(standalone 창, 방향 잠금 해제,
+// /admin scope + start_url)를 내보낸다. 그래서 /admin 페이지에서 설치하면
+// "Foldy Admin" 앱(id "/admin")이 별도로 등록되고,
+// 모바일 "Foldy" 앱(id "/")과 구분된다. 공용 서비스 워커(scope "/")는 둘 다 처리한다.
+// 참고: docs/product/05-admin-web-ia.md → "Installable Admin PWA".
 export const metadata: Metadata = {
   manifest: "/manifest-admin.webmanifest",
   appleWebApp: {

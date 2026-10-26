@@ -12,8 +12,8 @@ import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 const LIVE_KINDS = ["reservations"] as const;
 
 // Admin · Cleaning — 오늘 현황 (real-time board) / 기록 (filterable history) console. Real
-// cleaning_sessions + reservation data (see src/lib/admin-cleaning.ts) as of 2026-07-14 — replaces
-// the earlier design-implementation mock. See docs/product/07-cleaning-workflow.md →
+// cleaning_sessions + 예약 데이터(src/lib/admin-cleaning.ts 참고) 기준, 2026-07-14 부터 실데이터 — 이전
+// 디자인 구현용 목업을 대체했다. 참고: docs/product/07-cleaning-workflow.md →
 // "2026-07-14 어드민 청소 대시보드 — 백엔드 연동".
 export default async function AdminCleaningPage({
   searchParams,

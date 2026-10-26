@@ -34,14 +34,14 @@ type Props = {
   imageAttachmentsLabel: string;
   imageLimitLabel: string;
   imageRemoveLabel: string;
-  /** Max selectable images. Defaults to 5 (the standard per-feature limit). */
+  /** 선택 가능한 최대 이미지 수. 기본값 5 (기능별 표준 한도). */
   maxImages?: number;
   /** "white" = 화이트 리디자인 요청 폼 모양(이름 · n/max · 72px 타일, order-form.css 의 .ofw-photos). */
   variant?: "default" | "white";
 };
 
 export async function compressImageFile(file: File): Promise<File> {
-  // GIF: skip compression to preserve animation
+  // GIF: 애니메이션을 보존하기 위해 압축 생략
   if (file.type === "image/gif") return file;
 
   const bitmap = await createImageBitmap(file);
@@ -65,7 +65,7 @@ export async function compressImageFile(file: File): Promise<File> {
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  // PNG keeps PNG (preserves transparency), WebP keeps WebP, others → JPEG
+  // PNG 는 PNG 유지(투명도 보존), WebP 는 WebP 유지, 나머지는 → JPEG
   const outputType =
     file.type === "image/png"
       ? "image/png"
@@ -110,15 +110,15 @@ export const AnnouncementImageUploader = forwardRef<
   const [items, setItems] = useState<PreviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pickInputRef = useRef<HTMLInputElement>(null);
-  // Track current items in a ref for use in cleanup effect
+  // 정리용 effect 에서 쓰도록 현재 항목을 ref 로 추적
   const itemsRef = useRef(items);
 
-  // Keep ref current after every render (must not be done during render)
+  // 매 렌더 뒤 ref 를 최신으로 유지 (렌더 중에 하면 안 됨)
   useEffect(() => {
     itemsRef.current = items;
   });
 
-  // Revoke all blob URLs on unmount
+  // 언마운트 시 모든 blob URL 해제
   useEffect(() => {
     return () => {
       for (const item of itemsRef.current) {
@@ -138,24 +138,24 @@ export const AnnouncementImageUploader = forwardRef<
   const handlePickChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const selected = Array.from(e.target.files ?? []);
-      // Reset so the same file can be re-selected after removal
+      // 삭제 후에 같은 파일을 다시 고를 수 있도록 초기화
       e.target.value = "";
       if (selected.length === 0) return;
 
-      // Validate: type
+      // 검증: 형식
       const invalidType = selected.find((f) => !ALLOWED_TYPES.includes(f.type));
       if (invalidType) {
         setError(errorTypeInvalid);
         return;
       }
 
-      // Validate: count (against current items)
+      // 검증: 개수 (현재 항목 기준)
       if (itemsRef.current.length + selected.length > maxImages) {
         setError(errorCountExceeded);
         return;
       }
 
-      // Validate: size (original file before compression)
+      // 검증: 크기 (압축 전 원본 파일 기준)
       const tooBig = selected.find((f) => f.size > MAX_BYTES);
       if (tooBig) {
         setError(errorSizeExceeded);
@@ -235,9 +235,9 @@ export const AnnouncementImageUploader = forwardRef<
     <div className="flex flex-col gap-2.5">
       <span className="text-xs font-semibold text-muted-foreground">{imageAttachmentsLabel}</span>
 
-      {/* Previews & Add button in a horizontal scrollable row */}
+      {/* 미리보기 & 추가 버튼을 가로 스크롤 행에 배치 */}
       <div className="flex items-center gap-3 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-        {/* Add button — hidden when limit reached */}
+        {/* 추가 버튼 — 한도에 도달하면 숨김 */}
         {items.length < maxImages && (
           <button
             className="flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border bg-background/40 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/40 hover:text-foreground active:scale-95"
@@ -249,13 +249,13 @@ export const AnnouncementImageUploader = forwardRef<
           </button>
         )}
 
-        {/* Previews */}
+        {/* 미리보기 */}
         {items.map((item) => (
           <div
             className="group relative size-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/20"
             key={item.id}
           >
-            {/* Blob URLs cannot be optimised by Next.js Image, use plain img */}
+            {/* Blob URL 은 Next.js Image 로 최적화할 수 없으므로 일반 img 사용 */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt=""

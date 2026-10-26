@@ -1,11 +1,11 @@
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import type { AppSession } from "@/lib/session";
 
-// Shared header/footer metadata for every admin-console Excel/PDF export.
+// 모든 관리자 콘솔 Excel/PDF 내보내기가 공유하는 머리글/바닥글 메타데이터.
 //
-// Locale rule (do not break it): the export locale is ALWAYS resolved server-side from the actor's
-// own `session.user.preferredLanguage`. Client components never pass a locale to an export action —
-// otherwise a file could come out in a language the signed-in user never chose.
+// 로케일 규칙 (깨지 말 것): 내보내기 로케일은 항상 행위자 본인의 `session.user.preferredLanguage` 에서
+// 서버가 해석한다. 클라이언트 컴포넌트는 내보내기 액션에 로케일을 넘기지 않는다 —
+// 그러지 않으면 로그인한 사용자가 고르지 않은 언어로 파일이 나올 수 있다.
 
 export type AdminExportMeta = {
   locale: Locale;
@@ -21,7 +21,7 @@ export function adminLocaleTag(locale: Locale): string {
   return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
 }
 
-/** "2026-07-01" → "20260701", for export filenames. */
+/** "2026-07-01" → "20260701", 내보내기 파일명용. */
 export function compactRangePart(value: string): string {
   return value.replace(/-/g, "");
 }

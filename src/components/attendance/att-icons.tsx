@@ -1,6 +1,6 @@
 /**
- * Inline SVG icons ported 1:1 from "Attendance Module v2.html" (the subset used by the Home and
- * Capture screens). Sized by the parent `.ic` wrapper (1em). UI/UX only.
+ * "Attendance Module v2.html" 에서 1:1 로 옮긴 인라인 SVG 아이콘 (홈과
+ * 캡처 화면에서 쓰는 부분집합). 부모의 `.ic` 래퍼(1em)가 크기를 정한다. UI/UX 전용.
  */
 import type { ReactNode } from "react";
 
@@ -255,7 +255,7 @@ export const AttIcon = {
   ),
 } satisfies Record<string, ReactNode>;
 
-/** SVG gradient defs used by the progress ring (navy = working, amber = break). Render once. */
+/** 진행 링이 쓰는 SVG 그라디언트 정의 (navy = 근무 중, amber = 휴게). 한 번만 렌더링. */
 export function AttRingDefs() {
   return (
     <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
@@ -273,7 +273,7 @@ export function AttRingDefs() {
   );
 }
 
-/** Wraps an icon in the `.ic` span used throughout the design (1em sizing). */
+/** 디자인 전반에서 쓰는 `.ic` span 으로 아이콘을 감싼다 (1em 크기). */
 export function AIc({ children }: { children: ReactNode }) {
   return <span className="ic">{children}</span>;
 }

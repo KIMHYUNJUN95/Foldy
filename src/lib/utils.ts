@@ -6,10 +6,10 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Split an array into fixed-size chunks. Used to keep PostgREST `.in(...)` filters below the
- * request URL-length limit — a single `.in()` with hundreds of UUIDs builds a multi-KB query
- * string that the Supabase gateway rejects (surfacing as a low-level `fetch failed`). Callers
- * run one query per chunk and merge the results.
+ * 배열을 고정 크기 조각으로 나눈다. PostgREST `.in(...)` 필터가 요청 URL 길이 제한
+ * 아래에 머물도록 쓴다 — UUID 수백 개를 담은 `.in()` 하나는 수 KB 짜리 쿼리
+ * 문자열이 되어 Supabase 게이트웨이가 거부한다 (낮은 수준의 `fetch failed` 로 드러남). 호출자는
+ * 조각마다 쿼리를 한 번씩 돌리고 결과를 합친다.
  */
 export function chunk<T>(items: readonly T[], size: number): T[][] {
   if (size <= 0) throw new Error("chunk size must be positive");

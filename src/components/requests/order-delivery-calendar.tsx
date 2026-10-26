@@ -12,13 +12,13 @@ import "@/components/requests/order-detail.css";
 import { localizeBuildingName } from "@/lib/room-label-normalization";
 
 /**
- * Order delivery calendar — a bottom sheet with a large month grid of supply-order deliveries.
+ * 주문 배송 캘린더 — 소모품 주문 배송을 큰 월 그리드로 보여주는 바텀시트.
  *
- * Opened from the calendar icon on the Requests "비품주문 (order)" tab. Entries are derived directly
- * from each order's `delivery_date` (point) or `delivery_start_date`..`delivery_end_date` (range), so
- * an admin saving / editing a delivery date is reflected automatically — there is no separate store.
- * Uses the shared canonical BottomSheet, so it slides up from the bottom with drag-to-dismiss, scrim
- * fade, body-lock and Esc — no close button.
+ * 요청 "비품주문 (order)" 탭의 캘린더 아이콘에서 연다. 항목은 직접
+ * 각 주문의 `delivery_date`(하루) 또는 `delivery_start_date`..`delivery_end_date`(범위)에서 계산하므로,
+ * 관리자가 배송일을 저장/수정하면 자동으로 반영된다 — 별도 저장소는 없다.
+ * 공용 정식 BottomSheet 를 써서 아래에서 올라오고 드래그로 닫히며, 스크림
+ * 페이드, body 잠금, Esc 를 지원한다 — 닫기 버튼 없음.
  */
 
 export type DeliveryCalendarOrder = {
@@ -49,8 +49,8 @@ type Copy = {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-// Tokyo "today" as YYYY-MM-DD (client-only popup, so a live Date is fine).
-// A day belongs to an order's delivery window. Range takes priority (delivery_date mirrors the start).
+// 도쿄 "오늘" YYYY-MM-DD(클라이언트 전용 팝업이라 현재 Date 를 써도 됨).
+// 하루가 주문의 배송 구간에 속하는지. 범위가 우선한다(delivery_date 는 시작일을 따라간다).
 function dayMatches(order: DeliveryCalendarOrder, iso: string): boolean {
   if (order.deliveryStartDate && order.deliveryEndDate) {
     return iso >= order.deliveryStartDate && iso <= order.deliveryEndDate;
@@ -91,7 +91,7 @@ export function OrderDeliveryCalendar({
   });
   const [selected, setSelected] = useState<string | null>(today);
 
-  // Only orders that actually carry a delivery date/window can appear.
+  // 배송일/구간이 실제로 있는 주문만 나타날 수 있다.
   const deliverable = useMemo(
     () => orders.filter((o) => o.deliveryDate || (o.deliveryStartDate && o.deliveryEndDate)),
     [orders],

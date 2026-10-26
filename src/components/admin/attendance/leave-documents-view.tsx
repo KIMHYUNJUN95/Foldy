@@ -1,4 +1,4 @@
-/* i18n-ignore-file -- Prescribed Japanese company leave form; fixed domain document, not application UI. */
+/* i18n-ignore-file -- 정해진 일본 회사 휴가 양식; 고정된 도메인 문서이며 앱 UI 가 아님. */
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
@@ -59,7 +59,7 @@ function fmtPeriod(doc: LeaveDocument, lc: Lc): string {
   return base;
 }
 
-/** 「休暇届」form period column — Japanese slash-date range. */
+/** 「休暇届」양식 기간 열 — 일본식 슬래시 날짜 범위. */
 function fmtFormPeriod(doc: LeaveDocument): string {
   const s = doc.startDate.replace(/-/g, "/");
   const e = doc.endDate.replace(/-/g, "/");
@@ -79,8 +79,8 @@ const JP_DUR_LABEL: Record<LeaveDurationUnit, string> = {
   pm: "午後半休",
 };
 
-/** A4 「休暇届」paper form — pixel-matched to .handoff/src/leave-views.js doc() + leave.css .jp*.
- * Form copy is the actual Japanese company form text, not app UI — not an i18n target. */
+/** A4 「休暇届」 용지 양식 — .handoff/src/leave-views.js doc() + leave.css .jp* 와 픽셀 단위로 맞췄다.
+ * 양식 문구는 실제 일본 회사 양식 텍스트이며 앱 UI 가 아니므로 i18n 대상이 아니다. */
 function LeaveFormSheet({ doc }: { doc: LeaveDocument }) {
   const [dy, dm, dd] = doc.appliedOn.split("/");
   const radioOption = (key: LeaveType) => (
@@ -146,9 +146,9 @@ function LeaveFormSheet({ doc }: { doc: LeaveDocument }) {
               <td>
                 <span className="jp__seal">{doc.applicantInitial}</span>
               </td>
-              {/* 部署長 — intentionally left blank for now (confirmed 2026-07-09). */}
+              {/* 部署長 — 지금은 의도적으로 비워 둠 (2026-07-09 확정). */}
               <td />
-              {/* 専務 — the senior managing director's actual seal (鄭). Shown only once a 전무 approves. */}
+              {/* 専務 — 전무의 실제 도장 (鄭). 전무가 승인한 뒤에만 표시한다. */}
               <td>
                 {doc.approverRole === "senior_managing_director" ? (
                   <span className="jp__seal jp__seal--smd">鄭</span>
@@ -184,7 +184,7 @@ export function LeaveDocumentsView({
   const paperRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Scale the fixed 210mm×297mm sheet to the stage width — mirrors handoff fitDoc().
+  // 고정된 210mm×297mm 용지를 스테이지 너비에 맞춘다 — handoff fitDoc() 과 같다.
   useLayoutEffect(() => {
     function fit() {
       const stage = stageRef.current;

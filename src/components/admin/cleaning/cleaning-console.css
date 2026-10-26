@@ -1,10 +1,10 @@
 /*
- * Admin cleaning console — screen-local additions on top of admin-console.css.
- * Ported from the Claude Design handoff (Foldy 청소 (admin) → clean.css). Reuses existing shared
- * primitives (.card/.opsbar/.dd/.panel/.modal/.fld/.qtbl/.qsearch/.chipbtn/.kv/.pblock/.state) as-is;
- * only genuinely new components for this screen live here (KPI 6-strip, room-status cards, status
- * buckets, setup/staff summary grids, history toolbar layout, force-complete time-picker fields).
- * See docs/product/07-cleaning-workflow.md → "2026-07-13 어드민 청소 대시보드 — 재기획".
+ * 관리자 청소 콘솔 — admin-console.css 위에 얹는 화면 전용 추가분.
+ * Claude Design 핸드오프(Foldy 청소 (admin) → clean.css)에서 이식. 기존 공용
+ * primitive(.card/.opsbar/.dd/.panel/.modal/.fld/.qtbl/.qsearch/.chipbtn/.kv/.pblock/.state)는 그대로 재사용하고,
+ * 이 화면에서 정말 새로 필요한 컴포넌트만 여기에 둔다 (KPI 6칸 띠, 객실 상태 카드, 상태
+ * 묶음, 설정/직원 요약 그리드, 이력 툴바 레이아웃, 강제 완료 시각 선택 필드).
+ * 참고: docs/product/07-cleaning-workflow.md → "2026-07-13 어드민 청소 대시보드 — 재기획".
  */
 
 /* ── status pill: 취소 상태 ──
@@ -14,7 +14,7 @@
 .adm .cstat--cancelled { background: var(--adm-surface); color: var(--faint); }
 .adm .cstat--cancelled .d { opacity: 0.6; }
 
-/* report / cancel badges (tile top-right, panel chips) */
+/* 리포트 / 취소 배지 (타일 우상단, 패널 칩) */
 .adm .rbadge { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .adm .rbadge .ic { font-size: 12px; }
 .adm .rbadge--lost { background: #eef3fb; color: #3f63a8; }
@@ -22,7 +22,7 @@
 .adm .rbadge--cancelled { background: #fff; color: var(--text-done); }
 .adm .proxytag { display: inline-flex; align-items: center; height: 19px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #f1ecfd; color: #5a30cf; white-space: nowrap; }
 
-/* ── detail panel: cleaning-specific blocks ── */
+/* ── 상세 패널: 청소 전용 블록 ── */
 .adm .cpanel__type { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: var(--adm-muted); margin-top: 2px; }
 .adm .cpanel__type .ic { font-size: 15px; }
 .adm .durbig { display: flex; align-items: baseline; gap: 8px; padding: 13px 15px; border-radius: 13px; background: var(--card2); border: 1px solid var(--line-soft); }
@@ -52,7 +52,7 @@
 .adm .rptile--lost .rptile__ic { background: var(--info-bg); color: var(--info); }
 .adm .rptile--lost:hover { border-color: color-mix(in oklab, var(--info) 40%, var(--line)); }
 
-/* ── force-complete modal: time-picker fields (reuses shared .fld2 for the two-up time row) ── */
+/* ── 강제 완료 모달: 시각 선택 필드 (두 칸 시각 행은 공용 .fld2 재사용) ── */
 .adm .mrow { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 12px; background: var(--card2); border: 1px solid var(--line-soft); }
 .adm .mrow__rm { font-family: var(--mono); font-size: 16px; font-weight: 900; color: var(--ink); }
 .adm .mrow__b { flex: 1; min-width: 0; }

@@ -6,15 +6,15 @@ import { setLocaleCookie } from "@/app/auth/actions";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import type { Locale } from "@/lib/i18n";
 
-// Native language names + romanization + flag glyph (shown identically in every locale).
-// i18n-ignore-start: language picker intentionally shows native language names.
+// 각 언어의 고유 이름 + 로마자 표기 + 국기 글리프 (모든 로케일에서 동일하게 표시).
+// i18n-ignore-start: 언어 선택기는 의도적으로 각 언어의 고유 이름을 보여준다.
 const OPTIONS: { code: Locale; name: string; roman: string; flag: string }[] = [
   { code: "ko", name: "한국어", roman: "Korean", flag: "한" },
   { code: "ja", name: "日本語", roman: "Japanese", flag: "あ" },
   { code: "en", name: "English", roman: "English", flag: "A" },
 ];
 
-// Deliberately bilingual, language-agnostic header (matches the design handoff).
+// 의도적으로 이중 언어이며 언어에 무관한 헤더 (디자인 핸드오프와 일치).
 const SHEET_TITLE = "언어 선택 · Language";
 const LANGUAGE_LABEL = "Language";
 // i18n-ignore-end
@@ -62,8 +62,8 @@ export function LanguageSheet({ locale, next, view }: LanguageSheetProps) {
 
   function select(code: Locale) {
     if (code !== locale) {
-      // Persist to cookie so the selection survives redirects through
-      // the auth/onboarding flow even without the ?lang= param.
+      // 쿠키에 저장해 ?lang= 파라미터가 없어도 선택이 인증/온보딩
+      // 흐름의 리디렉션 후에도 유지되게 한다.
       setLocaleCookie(code);
       const params = new URLSearchParams();
       params.set("lang", code);

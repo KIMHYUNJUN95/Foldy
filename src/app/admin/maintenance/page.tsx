@@ -4,9 +4,9 @@ import { getAdminMaintenance } from "@/lib/admin-maintenance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 
-// Admin · 수리·점검 — 현황 보드 / 목록·이력 / 완료 console. Design ported from the Claude Design
-// handoff on 2026-07-14 and wired to real data (maintenance_reports + linked reservation/cleaning)
-// the same day. See docs/product/08-maintenance-workflow.md → "2026-07-14 어드민 수리·점검 대시보드".
+// Admin · 수리·점검 — 현황 보드 / 목록·이력 / 완료 콘솔. 디자인은 Claude Design
+// 핸드오프(2026-07-14)에서 가져와 같은 날 실제 데이터(maintenance_reports + 연결된 예약/청소)에 연결했다.
+// docs/product/08-maintenance-workflow.md → "2026-07-14 어드민 수리·점검 대시보드" 참고.
 export default async function AdminMaintenancePage({
   searchParams,
 }: {

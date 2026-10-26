@@ -22,15 +22,15 @@ import {
 } from "@/lib/admin-building-map";
 
 /**
- * Admin dashboard home aggregation — the desktop operations console reads every
- * top-priority block from one server call. Each block is wrapped so a single
- * failing source never blanks the whole console (returns empty for that block).
+ * 관리자 대시보드 홈 집계 — 데스크톱 운영 콘솔이 모든
+ * 최우선 블록을 서버 호출 한 번으로 읽는다. 각 블록은 하나의
+ * 소스가 실패해도 콘솔 전체가 비지 않도록 감싸져 있다 (그 블록만 빈 값을 반환).
  *
- * Wires the real domain queries (cleaning / maintenance / lost-found / orders /
- * attendance review / announcements / tasks / reservations). The shape is built
- * to be auto-refresh-ready (re-fetch on the server and re-render).
+ * 실제 도메인 쿼리를 연결한다 (청소 / 유지보수 / 분실물 / 주문 /
+ * 근태 검토 / 공지 / 할 일 / 예약). 구조는
+ * 자동 새로고침을 받을 수 있게 만들어져 있다 (서버에서 다시 가져와 다시 렌더).
  *
- * See docs/product/05-admin-web-ia.md → "Dashboard Home".
+ * 참고: docs/product/05-admin-web-ia.md → "Dashboard Home".
  */
 
 export type CleaningLive = {

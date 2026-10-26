@@ -83,7 +83,7 @@ export function isProfileGender(value: string): value is ProfileGender {
 }
 
 export function getDefaultRouteForRole(role: Role) {
-  // Default landing (field roles → /mobile even though they can also access /admin).
+  // 기본 도착 화면(현장 역할 → /mobile, /admin 에도 접근 가능하더라도).
   return defaultsToAdminSurface(role) ? "/admin" : "/mobile";
 }
 

@@ -36,7 +36,7 @@ type LoginPageProps = {
   }>;
 };
 
-/* ── inline icons (1em, sized by the `.ic` wrapper) ── */
+/* ── 인라인 아이콘 (1em, `.ic` 래퍼가 크기를 정함) ── */
 const Mail = (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.8" /><path d="M4.5 7l7.5 5.5L19.5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
@@ -97,8 +97,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const c = t.console;
   const errorMessage = resolveAuthErrorMessage(params.error, dictionary);
 
-  // Mobile-first login: on a phone/tablet, always route into the mobile app after
-  // sign-in — overriding the role-based admin default and any ?next=/admin/... value.
+  // 모바일 우선 로그인: 폰/태블릿에서는 로그인 후 항상 모바일 앱으로
+  // 보낸다 — 역할 기반 관리자 기본값과 ?next=/admin/... 값을 덮어쓴다.
   const userAgent = (await headers()).get("user-agent");
   const isMobileDevice = isMobileUserAgent(userAgent);
   // 로그인 첫 화면 문구용 — 아이패드(Mac 사용자 에이전트)는 「터치 되는 Mac」 쿠키로 알아본다(`getDeviceSurfaceFromHeaders`).
@@ -122,10 +122,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       state.status === "removed" ||
       state.status === "disabled");
 
-  // Password-reset link lands here with a recovery SESSION (so the user is
-  // authenticated). This screen must render despite that — otherwise the gating
-  // below would bounce the user to their dashboard/onboarding before they can
-  // set a new password.
+  // 비밀번호 재설정 링크는 recovery SESSION 으로 여기에 도착한다 (그래서 사용자는
+  // 인증된 상태). 그래도 이 화면은 렌더링되어야 한다 — 아니면 아래의 게이트가
+  // 새 비밀번호를 정하기 전에 사용자를 대시보드/온보딩으로
+  // 돌려보낼 것이다.
   const isPasswordRecovery = params.view === "email" && params.mode === "new_password";
 
   if (state.status === "ready" && !isPasswordRecovery) {
@@ -143,7 +143,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const signupHref = `/auth/login?view=email&mode=signup&${langNext}`;
   const forgotHref = `/auth/login?view=email&mode=reset&${langNext}`;
 
-  // ===== Password reset — sent confirmation =====
+  // ===== 비밀번호 재설정 — 발송 확인 =====
   if (params.view === "email" && params.mode === "reset" && params.sent) {
     return (
       <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
@@ -165,7 +165,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== New password (recovery) =====
+  // ===== 새 비밀번호 (recovery) =====
   if (params.view === "email" && params.mode === "new_password") {
     return (
       <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
@@ -191,7 +191,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== Password reset request =====
+  // ===== 비밀번호 재설정 요청 =====
   if (params.view === "email" && params.mode === "reset") {
     return (
       <AuthFrame locale={locale} next={effectiveNext} view="email" backHref={emailHref} mobileCopy={showMobileCopy}>
@@ -214,7 +214,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== Email verification sent =====
+  // ===== 이메일 인증 발송 =====
   if (params.view === "email" && params.mode === "signup" && params.sent === "verify") {
     return (
       <AuthFrame locale={locale} next={effectiveNext} view="email" mobileCopy={showMobileCopy}>
@@ -252,7 +252,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== Blocked / suspended / removed / disabled =====
+  // ===== 차단 / 정지 / 제거 / 비활성 =====
   if (params.view === "blocked") {
     const b = t.blocked;
     const blockedEmail =
@@ -321,7 +321,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== Email signup =====
+  // ===== 이메일 가입 =====
   if (params.view === "email" && params.mode === "signup") {
     return (
       <AuthFrame locale={locale} next={effectiveNext} view="email" backHref={splitHref} mobileCopy={showMobileCopy}>
@@ -363,7 +363,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== Email login =====
+  // ===== 이메일 로그인 =====
   if (params.view === "email") {
     return (
       <AuthFrame locale={locale} next={effectiveNext} view="email" backHref={splitHref} mobileCopy={showMobileCopy}>
@@ -405,7 +405,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     );
   }
 
-  // ===== Entry =====
+  // ===== 진입 =====
   return (
     <AuthFrame locale={locale} next={effectiveNext} view={params.view} mobileCopy={showMobileCopy}>
       <div className="authw__col--center" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>

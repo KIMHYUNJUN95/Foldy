@@ -1,11 +1,11 @@
 "use client";
 
-// Admin cleaning console — "기록" (history) board: date-range + building/staff/status filter
-// toolbar over a flat table of past cleaning records, mirroring clean-views.js historyToolbar()/
-// historyBoard(). The date range uses the shared single-field AdminDateRangePicker (matches the
-// design handoff's combined "시작일 – 종료일" trigger 1:1, not two separate date fields). Data is
-// real (src/lib/admin-cleaning.ts) as of 2026-07-14 — the parent owns fetching a fresh range via
-// fetchAdminCleaningHistory; this component only filters/renders whatever range it's given.
+// 관리자 청소 콘솔 — "기록" 보드: 기간 + 건물/직원/상태 필터
+// 툴바와 지난 청소 기록의 평면 표 — clean-views.js historyToolbar()/
+// historyBoard() 를 따른다. 기간은 공용 단일 필드 AdminDateRangePicker 를 쓴다 (
+// 디자인 핸드오프의 "시작일 – 종료일" 합친 트리거를 1:1로 따른다 (날짜 필드 둘이 아님). 데이터는
+// 2026-07-14 기준 실제 데이터 (src/lib/admin-cleaning.ts) — 새 기간을 가져오는 일은 부모가 맡는다
+// fetchAdminCleaningHistory 로 하며, 이 컴포넌트는 받은 기간을 필터링/렌더링만 한다.
 import { LiveWash } from "@/components/shared/live-wash";
 import { Search, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";

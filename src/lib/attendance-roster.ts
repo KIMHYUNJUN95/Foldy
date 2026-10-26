@@ -12,14 +12,14 @@ import { localizeAttendanceSiteName, type AttendanceSiteDisplayRow } from "@/lib
 const ROSTER_SESSION_SELECT = "id, user_id, clock_in_at, clock_out_at, clock_in_site_id, clock_out_site_id, review_state, invalidated_at" as const;
 
 /**
- * Roster DISPLAY keys. These are NOT the DB enum — `needs_review` is the roster's own label for a
- * session whose `attendance_sessions.review_state` is the enum value `review_required`
- * (see `AttendanceReviewState` in `@/lib/attendance`). Keep the two apart: comparing a raw
- * `review_state` against the display key silently produces a status that can never occur.
+ * 현황 표시용 키. DB enum 이 아니다 — `needs_review` 는 `attendance_sessions.review_state` 가
+ * enum 값 `review_required` 인 세션을 현황이 부르는 자체 라벨이다
+ * (`@/lib/attendance` 의 `AttendanceReviewState` 참고). 둘을 섞지 말 것: 원본
+ * `review_state` 를 표시 키와 비교하면 절대 나오지 않는 상태가 조용히 만들어진다.
  */
 export type RosterStatusKey = "working" | "on_break" | "done" | "needs_review" | "void";
 
-/** The DB `review_state` value that maps to the roster's `needs_review` display key. */
+/** 현황의 `needs_review` 표시 키에 대응하는 DB `review_state` 값. */
 const ROSTER_REVIEW_STATE: AttendanceReviewState = "review_required";
 
 export type RosterEntry = {
@@ -27,12 +27,12 @@ export type RosterEntry = {
   userId: string;
   name: string;
   avatarInitial: string;
-  role: string;        // display role label
-  roleCode: string;    // raw role enum value from DB
+  role: string;        // 표시용 역할 라벨
+  roleCode: string;    // DB 의 원본 역할 enum 값
   phoneNumber: string | null;
   siteName: string;         // 출근 사이트명
   clockOutSiteName: string; // 퇴근 사이트명
-  clockInTimeLabel: string;    // HH:mm Asia/Tokyo
+  clockInTimeLabel: string;    // HH:mm (Asia/Tokyo)
   clockOutTimeLabel: string | null;
   breakCount: number;
   closedBreakSeconds: number;

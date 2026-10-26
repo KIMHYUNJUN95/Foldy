@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Attendance correction request — status read-back (frames 상태 1~4), wired to real data in Step 6.
- * Renders 요청됨 / 검토 중 / 승인 / 반려 from a real `CorrectionRequestView`. Admin approve/reject is
- * Step 7, so in practice requests are `requested` for now; the four-state rendering is kept so Step 7
- * can light up without redesign.
+ * 근태 정정 요청 — 상태 다시 읽기(프레임 상태 1~4), Step 6 에서 실제 데이터에 연결.
+ * 실제 `CorrectionRequestView` 로 요청됨 / 검토 중 / 승인 / 반려를 렌더한다. 관리자 승인/반려는
+ * Step 7 이라 현재는 사실상 요청이 `requested` 상태이고, 4단계 렌더링은 Step 7 이
+ * 재설계 없이 켜질 수 있도록 유지해 둔 것이다.
  * 화이트 리디자인(2026-10-13, 시안 AttCorrStatus-Phone · Fold): 상태 한 마디 + 큰 문장 → 세로 진행(요청됨 · 검토 중 ·
  * 승인/반려/철회) → 요청 내용(시각 · 현장 · 메모 · 사진) → 관리자 답변 → 다시 요청 / 근무 기록에서 보기 / 철회.
  */
@@ -21,9 +21,9 @@ import { haptic } from "@/lib/haptics";
 export type CorrectionRequestView = {
   id: string;
   status: AttendanceCorrectionStatus;
-  /** Localised reason label (deprecated — prefer reasonKey). */
+  /** 현지화된 사유 라벨(deprecated — reasonKey 를 쓸 것). */
   reasonLabel: string;
-  /** i18n key for reason, e.g. "reasonMissingIn". Looked up via dictionary at render time. */
+  /** 사유의 i18n 키. 예: "reasonMissingIn". 렌더 때 사전에서 찾는다. */
   reasonKey?: string;
   sessionId: string | null;
   targetDateLabel: string | null;

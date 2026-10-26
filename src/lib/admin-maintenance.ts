@@ -1,14 +1,14 @@
 import "server-only";
 
-// Real-data layer for the admin 수리·점검 console. Replaces the mock in
-// `src/components/admin/maintenance/maintenance-console-data.ts` (design-first port, 2026-07-14).
-// Mirrors the shape of `admin-cleaning.ts`: presentation-ready flat view models, org-scoped queries,
-// and a `loadError` flag so the KPI strip can show "-" instead of a misleading zero.
+// 관리자 수리·점검 콘솔의 실제 데이터 계층. 다음 파일의 목(mock)을 대체한다:
+// `src/components/admin/maintenance/maintenance-console-data.ts` (디자인 우선 이식, 2026-07-14).
+// `admin-cleaning.ts` 와 같은 형태: 표시용으로 평평하게 만든 뷰 모델, 조직 범위 쿼리,
+// 그리고 KPI 줄이 오해를 부르는 0 대신 "-" 를 보이게 하는 `loadError` 플래그.
 //
-// Two values are DERIVED at read time and never stored:
-//   · 재실 중(occupied) — the linked reservation covers today (Tokyo).
-//   · 오래된 미해결(aging) — `open` for more than MAINTENANCE_AGING_HOURS.
-// See docs/product/08-maintenance-workflow.md.
+// 두 값은 읽을 때 DERIVED 되며 저장하지 않는다:
+//   · 재실 중(occupied) — 연결된 예약이 오늘(도쿄)을 덮는다.
+//   · 오래된 미해결(aging) — `open` 상태로 MAINTENANCE_AGING_HOURS 를 넘김.
+// docs/product/08-maintenance-workflow.md 참고.
 
 import {
   MAINTENANCE_AGING_HOURS,
@@ -42,7 +42,7 @@ export type AdminMaintenanceReport = {
   description: string;
   reporterId: string;
   reporterName: string;
-  /** "YYYY-MM-DD HH:MM" (Tokyo). */
+  /** "YYYY-MM-DD HH:MM" (도쿄). */
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -65,7 +65,7 @@ export type AdminMaintenanceData = {
 
 const TOKYO_TZ = "Asia/Tokyo";
 
-/** "YYYY-MM-DD" in Tokyo. */
+/** 도쿄 기준 "YYYY-MM-DD". */
 function tokyoDateKey(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: TOKYO_TZ,
@@ -75,7 +75,7 @@ function tokyoDateKey(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** "YYYY-MM-DD HH:MM" in Tokyo — the format the console's formatters expect. */
+/** 도쿄 기준 "YYYY-MM-DD HH:MM" — 콘솔 포매터가 기대하는 형식. */
 function tokyoStamp(iso: string | null): string | null {
   if (!iso) return null;
   const parts = new Intl.DateTimeFormat("en-GB", {

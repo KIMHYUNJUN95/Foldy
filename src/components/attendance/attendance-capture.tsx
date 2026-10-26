@@ -1,21 +1,21 @@
 "use client";
 
 /**
- * Attendance capture — real GPS + QR clock-in / clock-out (Step 3).
+ * 출퇴근 캡처 — 실제 GPS + QR 출근 / 퇴근 (Step 3).
  *
- * Preserves the finalized design (Section B of "Attendance Module v2.html"): the scan viewfinder, the
- * GPS+QR / Wi-Fi(준비중) method chips, and ONE result sheet. What changed is that it is now FUNCTIONAL:
- *   - in-app camera QR scan (jsQR over a live <video> frame loop)
- *   - device GPS (Geolocation API)
- *   - both are sent to `submitAttendanceScan` (all validation + attempt logging happen server-side)
- *   - the result sheet renders the REAL success summary or the matching failure (gps / radius / qr /
- *     already-clocked-in / no-open-session), and reuses the app's shared drag-down-to-dismiss sheet.
+ * 확정된 디자인("Attendance Module v2.html" 의 Section B)을 유지한다: 스캔 뷰파인더,
+ * GPS+QR / Wi-Fi(준비중) 방식 칩, 그리고 결과 시트 하나. 달라진 점은 이제 실제로 동작한다는 것이다:
+ *   - 앱 안 카메라 QR 스캔 (jsQR, 실시간 <video> 프레임 루프)
+ *   - 기기 GPS (Geolocation API)
+ *   - 둘 다 `submitAttendanceScan` 으로 보낸다 (모든 검증 + 시도 기록은 서버에서 일어난다)
+ *   - 결과 시트는 실제 성공 요약 또는 해당 실패(gps / radius / qr /
+ *     이미 출근함 / 열린 세션 없음)를 그리고, 앱 공용 아래로 끌어 닫는 시트를 재사용한다.
  *
  * `mode` = "in" (출근 인증) or "out" (퇴근 인증). Wi-Fi stays inactive (`준비중`).
  *
- * QR deep link (2026-07-31): when the phone's own camera opened the printed site QR, the page passes
- * `qrToken` and we start in the **landing** phase instead of the camera — the building QR carries no
- * direction, so the staff member picks 출근/퇴근 here and we submit that token directly.
+ * QR 딥링크 (2026-07-31): 폰 자체 카메라로 인쇄된 근무지 QR 을 열면 페이지가
+ * `qrToken` 을 넘기고 카메라 대신 **랜딩** 단계에서 시작한다 — 건물 QR 에는
+ * 방향이 없으므로, 직원이 여기서 출근/퇴근을 고르고 그 토큰을 그대로 제출한다.
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -98,13 +98,13 @@ export function AttendanceCapture({
 }: {
   mode?: AttendanceScanMode;
   locale: string;
-  /** Set when the phone camera opened the printed site QR — starts in the landing phase. */
+  /** 폰 카메라가 인쇄된 근무지 QR 을 열었을 때 설정되며 — 랜딩 단계에서 시작한다. */
   qrToken?: string | null;
-  /** Building name behind `qrToken`; null means the token no longer resolves (reissued/revoked). */
+  /** `qrToken` 뒤의 건물 이름. null 이면 토큰이 더는 해석되지 않는다 (재발급/폐기). */
   qrSiteName?: string | null;
   /**
-   * Set when there is no login session and the staff member was identified by the remembered
-   * device instead (iOS Safari path). Shown prominently so nobody clocks in as someone else.
+   * 로그인 세션이 없고 기억해 둔 기기로 직원이 식별됐을 때 설정된다
+   * (iOS Safari 경로). 다른 사람 이름으로 출근하는 일이 없도록 눈에 띄게 보여 준다.
    */
   trustedDeviceName?: string | null;
   /** 첫 출근 환영 문구에 쓰는 이름. */
@@ -122,8 +122,8 @@ export function AttendanceCapture({
   const [result, setResult] = useState<AttendanceScanResult | null>(null);
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>("pending");
   const [cameraError, setCameraError] = useState(false);
-  // The direction actually submitted — from the `mode` prop in the scan flow, from the landing
-  // buttons in the QR flow. The result sheet reads this, not the prop.
+  // 실제로 제출된 방향 — 스캔 흐름에서는 `mode` prop, QR 흐름에서는
+  // 랜딩 버튼에서 온다. 결과 시트는 prop 이 아니라 이것을 읽는다.
   const [activeMode, setActiveMode] = useState<AttendanceScanMode>(mode);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -132,7 +132,7 @@ export function AttendanceCapture({
   const rafRef = useRef<number | null>(null);
   const gpsRef = useRef<Gps | null>(null);
   const submittedRef = useRef(false);
-  // Holds the latest scan tick so the rAF loop never references the callback before it is declared.
+  // 최신 스캔 틱을 쥐고 있어, rAF 루프가 선언되기 전에 콜백을 참조하는 일이 없다.
   const scanTickRef = useRef<() => void>(() => {});
 
   const isOut = activeMode === "out";
@@ -203,23 +203,23 @@ export function AttendanceCapture({
     const img = ctx.getImageData(0, 0, w, h);
     const code = jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
     if (code && code.data) {
-      // New QRs encode a URL, older printed ones the bare token — accept both. Anything else is
-      // forwarded as-is so the server answers with the familiar "QR 인식 실패" sheet.
+      // 새 QR 은 URL 을 담고 예전에 인쇄한 것은 토큰만 담는다 — 둘 다 받는다. 그 밖은 모두
+      // 그대로 전달해서 서버가 익숙한 "QR 인식 실패" 시트로 답하게 한다.
       void submit(extractAttendanceToken(code.data) ?? code.data, mode);
       return;
     }
     rafRef.current = requestAnimationFrame(() => scanTickRef.current());
   }, [mode, submit]);
 
-  // Keep the rAF loop pointed at the latest scanTick.
+  // rAF 루프가 항상 최신 scanTick 을 가리키게 한다.
   useEffect(() => {
     scanTickRef.current = scanTick;
   }, [scanTick]);
 
   const startScanning = useCallback(async () => {
-    // Initial state is already pending/no-error; retry() resets them in an event handler. No
-    // synchronous setState here keeps this safe to call from the mount effect.
-    // GPS runs in parallel; it updates the chip and is cached for submit.
+    // 초기 상태는 이미 대기/오류 없음이고, retry() 가 이벤트 핸들러에서 리셋한다. 여기에
+    // 동기 setState 가 없어서 마운트 effect 에서 호출해도 안전하다.
+    // GPS 는 병렬로 돌며, 칩을 갱신하고 제출용으로 캐시된다.
     void getGpsOnce().then((g) => {
       gpsRef.current = g;
       setGpsStatus("lat" in g ? "ok" : g.error);
@@ -243,8 +243,8 @@ export function AttendanceCapture({
   useEffect(() => {
     if (phase !== "scanning") return;
     submittedRef.current = false;
-    // Start the camera/GPS on the next tick (after paint) — keeps any state updates out of the
-    // synchronous effect commit.
+    // 다음 틱(페인트 뒤)에 카메라/GPS 를 시작한다 — 상태 갱신이 동기
+    // effect 커밋 안에 들어가지 않게 한다.
     const id = window.setTimeout(() => void startScanning(), 0);
     return () => {
       window.clearTimeout(id);
@@ -252,7 +252,7 @@ export function AttendanceCapture({
     };
   }, [phase, startScanning, stopCamera]);
 
-  // QR landing: no camera, but GPS still warms up so the chip is honest and submit is instant.
+  // QR 랜딩: 카메라는 없지만 GPS 는 미리 데워 두어 칩이 정직하고 제출이 즉시 된다.
   useEffect(() => {
     if (phase !== "landing") return;
     submittedRef.current = false;
@@ -279,7 +279,7 @@ export function AttendanceCapture({
     setCameraError(false);
     setGpsStatus("pending");
     setResult(null);
-    // Came in from a QR link → go back to the direction picker, not the camera.
+    // QR 링크로 들어왔다면 → 카메라가 아니라 방향 선택으로 돌아간다.
     setPhase(isQrLanding ? "landing" : "scanning");
   }, [isQrLanding]);
   const retryCamera = useCallback(() => {
@@ -331,7 +331,7 @@ export function AttendanceCapture({
     </button>
   );
 
-  // ── QR deep link landing: pick 출근 / 퇴근 for the building we just scanned ──
+  // ── QR 딥링크 랜딩: 방금 스캔한 건물의 출근 / 퇴근 선택 ──
   if (isQrLanding) {
     const submitting = phase === "submitting";
     const unusable = qrSiteName === null;

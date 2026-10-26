@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Attendance self monthly pay — redesigned to match screenshot handoff.
- * Structure: ptitle-row (seg-month) → paycard → excl banner → rate segments → daily ptbl.
- * Salaried → document icon empty state.
+ * 출석 본인 월 급여 — 스크린샷 핸드오프에 맞춰 다시 디자인.
+ * 구조: ptitle-row (seg-month) → paycard → excl 배너 → 시급 구간 → 일별 ptbl.
+ * 월급제 → 문서 아이콘 빈 상태.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -31,13 +31,13 @@ function shortMonthLabel(ym: string, locale: string): string {
   }).format(dt);
 }
 
-/** "M/D" from YYYY-MM-DD */
+/** YYYY-MM-DD 에서 "M/D" */
 function shortDate(date: string): string {
   const [, mm, dd] = date.split("-");
   return `${parseInt(mm, 10)}/${parseInt(dd, 10)}`;
 }
 
-/** Day/weekday for ptbl from YYYY-MM-DD */
+/** ptbl 용 일/요일, YYYY-MM-DD 에서 */
 function ptblDate(date: string, locale: string): { day: string; wd: string } {
   const dt = new Date(`${date}T00:00:00+09:00`);
   const day = dt.getDate().toString();
@@ -57,7 +57,7 @@ type SegmentWithRange = {
   isRaise: boolean;
 };
 
-/** Compute date ranges for rate segments from the days array. */
+/** 일 배열에서 시급 구간의 날짜 범위를 계산한다. */
 function computeSegmentsWithRanges(
   rateSegments: MonthlyPayView["rateSegments"],
   days: MonthlyPayView["days"],
@@ -123,7 +123,7 @@ export function AttendancePay({
   const selected = view.days.find((d) => d.date === selectedDate) ?? null;
   const close = () => setSelectedDate(null);
   const [excludedOpen, setExcludedOpen] = useState(false);
-  // Default hidden (true). Persisted across sessions; shared key with attendance-home.
+  // 기본은 숨김(true). 세션 간 유지되며 attendance-home 과 키를 공유한다.
   const [payHidden, togglePayHidden] = usePersistentToggle(
     "stayops:attendance:pay-amount-visible",
     true,
@@ -146,8 +146,8 @@ export function AttendancePay({
   const isFinal = !!view.finalization;
   const grossAmount = isFinal ? view.finalization!.gross : view.expectedGross;
   const paidMins = isFinal ? view.finalization!.paidMinutes : view.totalPaidMinutes;
-  // grossAmount already includes attendance allowances; base wage = total − allowance so the daily
-  // table foot (base wage) and the allowance section always add back up to the headline total.
+  // grossAmount 에는 이미 근태 수당이 포함돼 있다. 기본급 = 합계 − 수당이므로 일별
+  // 표 하단(기본급)과 수당 구간이 항상 헤드라인 합계로 다시 맞아떨어진다.
   const allowanceTotal = view.allowanceTotal;
   const baseSubtotal = grossAmount - allowanceTotal;
 
@@ -176,7 +176,7 @@ export function AttendancePay({
     </div>
   );
 
-  // Salaried empty state
+  // 월급제 빈 상태
   if (view.salariedOnly) {
     return (
       <div className="att">
@@ -193,7 +193,7 @@ export function AttendancePay({
     );
   }
 
-  // No records
+  // 기록 없음
   if (view.days.length === 0) {
     return (
       <div className="att">
@@ -390,7 +390,7 @@ export function AttendancePay({
         </p>
       </div>
 
-      {/* Excluded sessions list sheet */}
+      {/* 제외된 세션 목록 시트 */}
       {excludedOpen && (
         <BottomSheet onClose={() => setExcludedOpen(false)}>
           <div className="att">
@@ -445,7 +445,7 @@ export function AttendancePay({
         </BottomSheet>
       )}
 
-      {/* Detail bottom sheet for day */}
+      {/* 일별 상세 하단 시트 */}
       {selected && (
         <BottomSheet onClose={close}>
           <div className="att">

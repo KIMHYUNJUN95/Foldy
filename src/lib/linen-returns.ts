@@ -6,8 +6,8 @@ import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
-// Seeded default catalog rows carry a stable `code`; show its localized label.
-// Building-specific custom items (added later) have no code → fall back to the DB name.
+// 기본으로 심어 둔 카탈로그 행은 안정적인 `code` 를 가지며, 그 현지화 라벨을 보여 준다.
+// 건물별 커스텀 품목(나중에 추가)은 code 가 없다 → DB 이름으로 폴백한다.
 function localizeItemName(code: string | null, name: string, locale: Locale): string {
   if (code) {
     const label = getDictionary(locale).linenReturn.items[code];
@@ -45,7 +45,7 @@ type ItemRow = Database["public"]["Tables"]["linen_items"]["Row"];
 type LineRow = Database["public"]["Tables"]["linen_return_record_items"]["Row"];
 type ProfileName = { id: string; name: string };
 
-/** Author of the record, or an admin-capable org role, may edit/delete it. */
+/** 기록 작성자나 관리 권한이 있는 조직 역할은 수정/삭제할 수 있다. */
 export function canManageLinenRecord(
   session: AppSession,
   record: { registeredByUserId: string },
@@ -58,8 +58,8 @@ function isOrganizationRole(role: Role): boolean {
   return (organizationRoles as readonly string[]).includes(role);
 }
 
-// ── Tokyo month range ──────────────────────────────────────────────────────
-// Operational ledger periods use Tokyo wall-clock month boundaries, not naive UTC.
+// ── 도쿄 월 범위 ────────────────────────────────────────────
+// 운영 원장 기간은 단순 UTC 가 아니라 도쿄 벽시계 월 경계를 쓴다.
 export type TokyoYearMonth = { year: number; month: number }; // month: 1-12
 
 export function getCurrentTokyoYearMonth(): TokyoYearMonth {
@@ -73,7 +73,7 @@ export function getCurrentTokyoYearMonth(): TokyoYearMonth {
   return { year, month };
 }
 
-// JST is UTC+9: 00:00 JST on the 1st equals the UTC instant 9 hours earlier.
+// JST 는 UTC+9: 1일 00:00 JST 는 그보다 9시간 앞선 UTC 시점이다.
 function tokyoMonthRange({ year, month }: TokyoYearMonth) {
   const from = new Date(Date.UTC(year, month - 1, 1, -9, 0, 0)).toISOString();
   const to = new Date(Date.UTC(year, month, 1, -9, 0, 0)).toISOString();
@@ -103,8 +103,8 @@ export function revalidateLinenReturnPaths(): void {
 
 export { LINEN_LAST_BUILDING_COOKIE } from "@/lib/linen-return-constants";
 
-// ── Buildings ───────────────────────────────────────────────────────────────
-/** Distinct canonical building names the org operates (same source as orders). */
+// ── 건물 ───────────────────────────────────────────────────
+/** 조직이 운영하는 고유한 정규 건물 이름(주문과 같은 출처). */
 export async function getLinenBuildings(session: AppSession): Promise<string[]> {
   const catalog = (await getActiveRoomCatalogServer(session.organization.id)) ?? [];
   // 어드민 콘솔(`getLinenBuildingNames`)과 같은 정렬 규칙을 쓴다.
@@ -113,7 +113,7 @@ export async function getLinenBuildings(session: AppSession): Promise<string[]> 
   );
 }
 
-/** Per-building monthly record counts and last-return timestamps for the picker. */
+/** 선택기용 건물별 월간 기록 수와 마지막 반납 시각. */
 export async function getLinenBuildingStats(
   session: AppSession,
 ): Promise<Record<string, { count: number; lastAt: string | null }>> {
@@ -139,8 +139,8 @@ export async function getLinenBuildingStats(
   return stats;
 }
 
-// ── Linen item master ─────────────────────────────────────────────────────
-/** Active linen items available for one building (global items + building-specific). */
+// ── 리넨 품목 마스터 ───────────────────────────────────────
+/** 한 건물에서 쓸 수 있는 활성 리넨 품목(공통 품목 + 건물별). */
 export async function getActiveLinenItems(
   session: AppSession,
   building: string,
@@ -156,7 +156,7 @@ export async function getActiveLinenItems(
     if (isMissingTableError(error.message ?? "")) return [];
     throw new Error(error.message);
   }
-  // Global items (building_name null) apply everywhere; otherwise match the building.
+  // 공통 품목(building_name null)은 어디서나 적용되고, 그 외에는 건물과 맞춘다.
   const locale = session.user.preferredLanguage;
   return ((data ?? []) as ItemRow[])
     .filter((row) => row.building_name === null || row.building_name === building)
@@ -167,7 +167,7 @@ export async function getActiveLinenItems(
     }));
 }
 
-// ── Records ─────────────────────────────────────────────────────────────────
+// ── 기록 ───────────────────────────────────────────────────
 async function hydrateRecords(
   records: RecordRow[],
   locale: Locale,
@@ -236,7 +236,7 @@ async function hydrateRecords(
   });
 }
 
-/** Latest-first return records for one building. */
+/** 한 건물의 반납 기록, 최신순. */
 export async function getLinenReturnsByBuilding(
   session: AppSession,
   building: string,
@@ -258,7 +258,7 @@ export async function getLinenReturnsByBuilding(
   return hydrateRecords((data ?? []) as RecordRow[], session.user.preferredLanguage);
 }
 
-/** Single record (header + lines + registrant), scoped to the session org. */
+/** 단일 기록(헤더 + 줄 + 등록자), 세션 조직 범위. */
 export async function getLinenReturnRecordById(
   session: AppSession,
   id: string,
@@ -272,7 +272,7 @@ export async function getLinenReturnRecordById(
     .maybeSingle();
   if (error) {
     if (isMissingTableError(error.message ?? "")) return null;
-    // A malformed (non-UUID) id in the URL → treat as not-found, not a 500 crash.
+    // URL 의 형식이 깨진(UUID 아님) id → 500 크래시가 아니라 not-found 로 처리한다.
     if (error.code === "22P02") return null;
     throw new Error(error.message);
   }
@@ -281,7 +281,7 @@ export async function getLinenReturnRecordById(
   return record ?? null;
 }
 
-/** Building-scoped records for one Tokyo month (ledger source). */
+/** 한 도쿄 월의 건물별 기록(원장 출처). */
 export async function getLinenLedgerRecords(
   session: AppSession,
   building: string,
@@ -304,7 +304,7 @@ export async function getLinenLedgerRecords(
   return hydrateRecords((data ?? []) as RecordRow[], session.user.preferredLanguage);
 }
 
-// Inclusive Tokyo-day range [startDate 00:00 JST, endDate+1 00:00 JST).
+// 도쿄 날짜 범위 포함 구간 [startDate 00:00 JST, endDate+1 00:00 JST).
 function tokyoDayRange(startDate: string, endDate: string) {
   const [sy, sm, sd] = startDate.split("-").map(Number);
   const [ey, em, ed] = endDate.split("-").map(Number);
@@ -322,7 +322,7 @@ export function isValidIsoDate(value: string): boolean {
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
 }
 
-/** Building-scoped records for an explicit inclusive Tokyo-day range (ledger custom period). */
+/** 명시적으로 포함하는 도쿄 날짜 범위의 건물별 기록(원장 사용자 지정 기간). */
 export async function getLinenLedgerRecordsByRange(
   session: AppSession,
   building: string,
@@ -330,7 +330,7 @@ export async function getLinenLedgerRecordsByRange(
   endDate: string,
 ): Promise<LinenReturnRecord[]> {
   const supabase = await getSupabaseServerClient();
-  // Normalize reversed input so start <= end.
+  // 거꾸로 들어온 입력을 정규화해서 start <= end 가 되게 한다.
   const [start, end] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
   const { from, to } = tokyoDayRange(start, end);
   const { data, error } = await supabase
@@ -348,14 +348,14 @@ export async function getLinenLedgerRecordsByRange(
   return hydrateRecords((data ?? []) as RecordRow[], session.user.preferredLanguage);
 }
 
-/** Server-side guard: the building must exist in the org's room catalog. */
+/** 서버 측 가드: 건물은 조직의 방 카탈로그에 있어야 한다. */
 export async function isKnownBuilding(
   session: AppSession,
   building: string,
 ): Promise<boolean> {
   if (!building) return false;
   const buildings = await getLinenBuildings(session);
-  // When the catalog is unavailable for non-org (platform) sessions, do not block.
+  // 비조직(플랫폼) 세션에서 카탈로그를 쓸 수 없으면 막지 않는다.
   if (buildings.length === 0) return isOrganizationRole(session.user.role) ? false : true;
   return buildings.includes(building);
 }

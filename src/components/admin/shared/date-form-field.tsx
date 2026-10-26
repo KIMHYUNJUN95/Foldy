@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AdminDatePicker } from "./admin-date-picker";
 
 type DateFormFieldProps = {
-  /** form field name — a hidden input carries the "YYYY-MM-DD" value into a native <form> submit. */
+  /** 폼 필드 이름 — 숨김 input 이 "YYYY-MM-DD" 값을 네이티브 <form> 제출에 실어 보낸다. */
   name: string;
   defaultValue?: string;
   min?: string;
@@ -16,9 +16,9 @@ type DateFormFieldProps = {
 };
 
 /**
- * Form-friendly wrapper around the shared `AdminDatePicker`. Renders the branded calendar picker plus
- * a hidden input so it can replace a native `<input type="date">` inside a server-action <form>.
- * The server action still validates the submitted value.
+ * 공용 `AdminDatePicker` 를 감싼 폼 친화 래퍼. 브랜드 캘린더 피커와
+ * 숨김 input 을 그려서 서버 액션 <form> 안의 네이티브 `<input type="date">` 를 대체할 수 있다.
+ * 서버 액션은 제출된 값을 여전히 검증한다.
  */
 export function DateFormField({
   name,

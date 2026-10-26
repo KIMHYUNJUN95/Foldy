@@ -422,14 +422,14 @@ function WagePanel({
   const [empConfirm, setEmpConfirm] = useState(false);
   const [empPending, startEmpTransition] = useTransition();
   const [empErr, setEmpErr] = useState<string | null>(null);
-  // A change is applicable when the picked type differs from the current active one (unknown = never
-  // set, so any pick counts) and the date is valid.
+  // 선택한 형태가 현재 활성 형태와 다르고 (알 수 없음 = 설정된 적
+  // 없음이라 어떤 선택이든 해당) 날짜가 유효하면 변경을 적용할 수 있다.
   const empChanged = currentEmp === "unknown" ? true : empType !== currentEmp;
   const canApplyEmp = empChanged && /^\d{4}-\d{2}-\d{2}$/.test(empDate) && !empPending;
   const empTypeLabel = empType === "hourly" ? c.wageTagHourly : c.wageTagSalaried;
 
-  // Employment change is sensitive (alters pay model + leave eligibility), so it goes through a
-  // confirmation modal rather than applying on the first click. The reason is captured there.
+  // 고용 형태 변경은 민감하므로 (급여 모델 + 연차 자격이 바뀜) 첫 클릭에 바로 적용하지 않고
+  // 확인 모달을 거친다. 사유는 거기서 받는다.
   function doApplyEmp(reason: string) {
     setEmpErr(null);
     startEmpTransition(async () => {
@@ -469,8 +469,8 @@ function WagePanel({
 
   const parsedRate = Number(rate);
   const validRate = Number.isFinite(parsedRate) && parsedRate > 0;
-  // A change is applicable when either the rate or the effective date differs from the current
-  // tier — e.g. rescheduling an already-chosen rate to a different start date is a valid edit.
+  // 시급 또는 적용일 중 하나라도 현재 구간과 다르면 변경을 적용할 수 있다
+  // — 예: 이미 고른 시급의 시작일을 다른 날로 미루는 것도 유효한 수정이다.
   const hasChange =
     row.currentRate == null || parsedRate !== row.currentRate || date !== row.currentFrom;
   const canApply =
@@ -614,7 +614,7 @@ function WagePanel({
             <PayrollBlock row={row} pc={pc} c={c} localeTag={localeTag} onSave={onSavePayroll} />
           )}
 
-          {/* Employment-type change — available for both hourly and salaried members. */}
+          {/* 고용 형태 변경 — 시급제와 월급제 멤버 모두에게 제공. */}
           <div className="pblock">
             <div className="wedit">
               <div className="wedit__h">
@@ -713,7 +713,7 @@ function WagePanel({
             />
           ) : null}
 
-          {/* Employment-type history — always shown, with the change reason on each interval. */}
+          {/* 고용 형태 이력 — 항상 표시하며, 각 구간에 변경 사유를 보여준다. */}
           <div className="pblock">
             <div className="pblock__t">{c.wagePanelEmpHistoryTitle(row.employmentHistory.length)}</div>
             {row.employmentHistory.length === 0 ? (
@@ -785,7 +785,7 @@ function WagePanel({
             </>
           ) : (
             <>
-              {/* current rate */}
+              {/* 현재 시급 */}
               <div className="pblock">
                 <div className="pblock__t">{c.wagePanelCurrent}</div>
                 <div className="psum">
@@ -799,7 +799,7 @@ function WagePanel({
                 </div>
               </div>
 
-              {/* inline editor */}
+              {/* 인라인 편집기 */}
               <div className="pblock">
                 <div className="wedit">
                   <div className="wedit__h">
@@ -887,7 +887,7 @@ function WagePanel({
                 </div>
               </div>
 
-              {/* history */}
+              {/* 이력 */}
               <div className="pblock">
                 <div className="pblock__t">{c.wagePanelHistoryTitle(row.history.length)}</div>
                 <div className="ratelist">

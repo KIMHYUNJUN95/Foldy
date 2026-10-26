@@ -23,10 +23,10 @@ import {
   sanitizeBoardAttachments,
 } from "@/app/mobile/board/board-storage-guard";
 
-// The mention-sheet client component imports this type from the same module it calls
-// (`searchMentions`). A `export type { ... }` re-export is stripped by Turbopack's "use server"
-// bundler (treated as a runtime export and pruned), so the type is declared locally and kept in
-// shape with `MentionableMember` in src/lib/board-queries.ts.
+// 멘션 시트 클라이언트 컴포넌트는 이 타입을 자신이 호출하는 같은 모듈
+// (`searchMentions`)에서 가져온다. `export type { ... }` 재export 는 Turbopack 의 "use server"
+// 번들러가 런타임 export 로 보고 제거해 버리므로, 타입은 여기서 로컬로 선언하고
+// src/lib/board-queries.ts 의 `MentionableMember` 와 모양을 맞춰 둔다.
 export type MentionableMember = {
   id: string;
   name: string;
@@ -46,7 +46,7 @@ type PostMeta = {
   allow_comments: boolean;
 };
 
-/** Resolve the post row (service-role) and verify it belongs to the viewer's org. Null on mismatch. */
+/** 게시글 행을 조회(service-role)하고 보는 사람의 조직 소속인지 확인한다. 불일치면 null. */
 async function loadPostMeta(postId: string, orgId: string): Promise<PostMeta | null> {
   const service = getSupabaseServiceClient();
   const { data, error } = await service
@@ -66,7 +66,7 @@ function revalidateBoard(postId: string) {
   revalidatePath("/mobile/board");
 }
 
-/** Idempotent read receipt. Safe to call repeatedly. */
+/** 멱등한 읽음 처리. 반복 호출해도 안전하다. */
 export async function markBoardPostRead(postId: string): Promise<ActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
@@ -87,17 +87,17 @@ export async function markBoardPostRead(postId: string): Promise<ActionResult> {
 }
 
 export type AddBoardCommentOptions = {
-  /** Validated server-side: each id must be an active same-org member, caller excluded. */
+  /** 서버에서 검증: 각 id 는 같은 조직의 활성 멤버여야 하며 작성자는 제외. */
   mentionedUserIds?: string[];
-  /** @ALL mention — fans out to every active org member instead of individuals. */
+  /** @ALL 멘션 — 개인이 아니라 조직의 모든 활성 멤버에게 알림이 퍼진다. */
   mentionAll?: boolean;
 };
 
 /**
- * Add a comment (≤3 images, pre-uploaded by the client). Notifies the post author, and any
- * @mentioned users / @ALL fan-out. The mention author is always excluded from notifications.
- * When `mentionAll` is true, individual `mentioned` notifications are suppressed for the same
- * comment to avoid double-notifying recipients (single `mention_all` per user instead).
+ * 댓글 추가(이미지 3장 이하, 클라이언트가 미리 업로드). 게시글 작성자와 @멘션된
+ * 사용자 / @ALL 대상에게 알린다. 멘션 작성자는 항상 알림에서 제외된다.
+ * `mentionAll` 이 true 면 같은 댓글에 대한 개별 `mentioned` 알림은 억제해
+ * 수신자에게 이중 알림이 가지 않게 한다(사용자당 `mention_all` 한 건만).
  */
 export async function addBoardComment(
   postId: string,
@@ -108,8 +108,8 @@ export async function addBoardComment(
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
 
-  // The board_comments.content CHECK requires non-empty text, so a comment must carry text (photos
-  // are an optional supplement). Image-only comments would violate the DB constraint.
+  // board_comments.content CHECK 가 빈 텍스트를 허용하지 않으므로 댓글에는 텍스트가 있어야 한다(사진은
+  // 선택 보충). 이미지만 있는 댓글은 DB 제약을 위반한다.
   const trimmed = content.trim();
   if (!trimmed) return { error: "empty_comment" };
   if (imageUrls.length > 3) return { error: "too_many_photos" };
@@ -122,10 +122,10 @@ export async function addBoardComment(
     return { error: "invalid_image" };
   }
 
-  // Server-side mention validation: drop any id that is not an active same-org member or that is
-  // the author themselves. We do NOT reject the comment when an id is bogus — we just don't persist
-  // or notify it. This keeps a stale client (e.g. a member who was deactivated after the autocomplete
-  // returned them) from blocking a legitimate comment.
+  // 서버 측 멘션 검증: 같은 조직의 활성 멤버가 아니거나 작성자 본인인
+  // id 는 버린다. id 가 잘못돼도 댓글을 거부하지는 않고, 저장도 알림도 하지
+  // 않을 뿐이다. 이렇게 하면 오래된 클라이언트(예: 자동완성이 반환한 뒤 비활성화된 멤버)가
+  // 정상 댓글을 막지 못한다.
   const mentionAll = Boolean(options.mentionAll);
   const requestedMentions = Array.isArray(options.mentionedUserIds) ? options.mentionedUserIds : [];
   const validatedMentions = mentionAll
@@ -150,10 +150,10 @@ export async function addBoardComment(
 
   const commentId = (data as { id: string } | null)?.id ?? crypto.randomUUID();
 
-  // Resolve commenter display name once for mention notification payloads ({actor} body slot).
+  // 멘션 알림 페이로드({actor} 본문 자리)용으로 댓글 작성자 표시 이름을 한 번만 조회한다.
   let actorName: string | null = null;
   if (mentionAll || validatedMentions.length > 0) {
-    // profiles is keyed by `id` (= auth user id); there is no `user_id` column.
+    // profiles 는 `id`(= auth 사용자 id)가 키이며 `user_id` 컬럼은 없다.
     const { data: profile } = await service
       .from("profiles")
       .select("name")
@@ -162,8 +162,8 @@ export async function addBoardComment(
     actorName = (profile as { name: string | null } | null)?.name ?? null;
   }
 
-  // Resolve mention recipients first so we can skip the post-author notification when the author is
-  // already covered by a mention (avoids two notifications for the same comment on one user).
+  // 멘션 수신자를 먼저 구해 두면, 작성자가 이미 멘션으로 포함된 경우
+  // 게시글 작성자 알림을 건너뛸 수 있다(한 댓글에 한 사용자에게 알림 두 개가 가는 것을 방지).
   let mentionRecipients: string[] = [];
   if (mentionAll) {
     mentionRecipients = await getActiveOrgMemberIds(session);
@@ -185,7 +185,7 @@ export async function addBoardComment(
     });
   }
 
-  // Author notification: skip when the author was already notified via @mention/@ALL above.
+  // 작성자 알림: 위에서 @멘션/@ALL 로 이미 알린 경우에는 건너뛴다.
   const authorAlreadyMentioned =
     post.created_by_user_id === session.user.id || mentionRecipientSet.has(post.created_by_user_id);
   if (!authorAlreadyMentioned) {
@@ -209,9 +209,9 @@ export async function addBoardComment(
 }
 
 /**
- * Mention autocomplete for the comment composer. Returns up to 20 active same-org members whose
- * name starts with `query` (caller excluded). Returns [] when there is no org context — client
- * treats it as "no matches".
+ * 댓글 입력창의 멘션 자동완성. 이름이 `query` 로 시작하는 같은 조직의 활성 멤버를
+ * 최대 20명 반환한다(호출자 제외). 조직 컨텍스트가 없으면 []을 반환하고, 클라이언트는
+ * 이를 "일치 없음"으로 취급한다.
  */
 export async function searchMentions(query: string): Promise<MentionableMember[]> {
   const session = await getCurrentAppSession();
@@ -220,11 +220,11 @@ export async function searchMentions(query: string): Promise<MentionableMember[]
 }
 
 /**
- * Issue a short-lived signed download URL for a board post file attachment. The `board-attachments`
- * bucket is private, so a signed URL is required. We verify the requested storage `path` is actually
- * one of the (same-org, non-deleted) post's attachments before signing — a viewer can never sign an
- * arbitrary path. The `download` option sets Content-Disposition: attachment with the original
- * filename, so it downloads (not previews) on both mobile and desktop browsers.
+ * 게시글 파일 첨부용 단기 서명 다운로드 URL 발급. `board-attachments`
+ * 버킷은 비공개라 서명 URL 이 필요하다. 요청한 storage `path` 가 실제로 해당 게시글(같은 조직,
+ * 삭제되지 않은)의 첨부 중 하나인지 서명 전에 확인한다 — 보는 사람이 임의 경로에
+ * 서명을 받을 수 없다. `download` 옵션은 원래 파일명으로 Content-Disposition: attachment 를
+ * 설정해, 모바일과 데스크톱 브라우저 모두에서 미리보기가 아니라 다운로드가 되게 한다.
  */
 export async function getBoardAttachmentDownloadUrl(
   postId: string,
@@ -267,7 +267,7 @@ export async function getBoardAttachmentDownloadUrl(
   return { url: signed.signedUrl };
 }
 
-/** Soft-delete a comment. Comment author OR owner/office_admin. */
+/** 댓글 소프트 삭제. 댓글 작성자 또는 owner/office_admin. */
 export async function deleteBoardComment(commentId: string): Promise<ActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
@@ -301,7 +301,7 @@ export async function deleteBoardComment(commentId: string): Promise<ActionResul
   return { ok: true };
 }
 
-/** Toggle a reaction: insert if absent, delete if present. Rejects emojis outside the allowed set. */
+/** 반응 토글: 없으면 추가, 있으면 삭제. 허용된 목록 밖의 이모지는 거부한다. */
 export async function toggleBoardReaction(postId: string, emoji: string): Promise<ActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };
@@ -328,7 +328,7 @@ export async function toggleBoardReaction(postId: string, emoji: string): Promis
       .eq("emoji", emoji);
     if (error) return { error: "save_failed" };
   } else {
-    // upsert + ignoreDuplicates makes a concurrent double-tap idempotent instead of a PK violation.
+    // upsert + ignoreDuplicates 로 동시에 두 번 탭해도 PK 위반 없이 멱등하게 처리된다.
     const { error } = await service
       .from("board_reactions")
       .upsert({ post_id: postId, user_id: session.user.id, emoji }, {
@@ -338,7 +338,7 @@ export async function toggleBoardReaction(postId: string, emoji: string): Promis
     if (error) return { error: "save_failed" };
   }
 
-  // Reaction counts are shown on feed rows too, so revalidate both surfaces.
+  // 반응 수는 피드 행에도 표시되므로 두 화면 모두 revalidate 한다.
   revalidateBoard(postId);
   return { ok: true };
 }
@@ -391,7 +391,7 @@ type UpdateBoardPostInput = {
   isPinned?: boolean;
 };
 
-/** Edit a post. Author only (platform developer may edit any post, 2026-10-23). Pin flag updatable (kept consistent with pinned_at/by). */
+/** 게시글 수정. 작성자만 가능(플랫폼 개발자는 모든 게시글 수정 가능, 2026-10-23). 고정 플래그 수정 가능(pinned_at/by 와 일관되게 유지). */
 export async function updateBoardPost(
   postId: string,
   input: UpdateBoardPostInput,
@@ -478,7 +478,7 @@ export async function updateBoardPost(
   return { ok: true };
 }
 
-/** Soft-delete a post. Author OR owner/office_admin. */
+/** 게시글 소프트 삭제. 작성자 또는 owner/office_admin. */
 export async function deleteBoardPost(postId: string): Promise<ActionResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { error: "no_org" };

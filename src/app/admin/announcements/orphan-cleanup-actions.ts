@@ -11,9 +11,9 @@ type AnnouncementImageRow = Pick<
 >;
 
 const BUCKET = "announcement-images";
-// Objects uploaded less than GRACE_MS ago are skipped — the user may still be
-// filling in the create form after uploading images.
-const GRACE_MS = 60 * 60 * 1000; // 60 minutes
+// 업로드된 지 GRACE_MS 가 지나지 않은 객체는 건너뛴다 — 사용자가 이미지를 올린 뒤
+// 아직 작성 폼을 채우는 중일 수 있다.
+const GRACE_MS = 60 * 60 * 1000; // 60분
 const DELETE_BATCH = 100;
 
 const UUID_RE =
@@ -41,8 +41,8 @@ class ListingFailureError extends Error {
   }
 }
 
-// Mirrors the same validation logic in actions.ts so that only structurally
-// valid bucket paths are ever candidates for deletion.
+// actions.ts 의 검증 로직과 동일하게 맞춰, 구조가 올바른
+// 버킷 경로만 삭제 후보가 되도록 한다.
 function isValidStoragePath(name: string): boolean {
   const segs = name.split("/");
   if (segs.length !== 3) return false;
@@ -66,8 +66,8 @@ async function isPlatformAdmin(userId: string): Promise<boolean> {
   return Boolean(data);
 }
 
-// Build the set of Storage object paths that are currently referenced by at
-// least one announcement's image_urls column.
+// 현재 공지 한 건 이상의 image_urls 컬럼에서 참조 중인
+// Storage 객체 경로 집합을 만든다.
 async function getReferencedPaths(): Promise<Set<string>> {
   const { url } = getPublicSupabaseEnv();
   const supabaseHostname = new URL(url).hostname;
@@ -105,7 +105,7 @@ async function getReferencedPaths(): Promise<Set<string>> {
             if (path) paths.add(path);
           }
         } catch {
-          // skip malformed entries
+          // 형식이 잘못된 항목은 건너뜀
         }
       }
     }
@@ -117,9 +117,9 @@ async function getReferencedPaths(): Promise<Set<string>> {
   return paths;
 }
 
-// Traverse the three-level hierarchy: org → announcement → filename.
-// Each level is limited to 500 entries. This is sufficient for MVP usage;
-// add pagination per level if the bucket grows beyond that.
+// 3단계 계층(조직 → 공지 → 파일명)을 순회한다.
+// 각 단계는 500개로 제한한다. MVP 사용량에는 충분하며,
+// 버킷이 그보다 커지면 단계마다 페이지네이션을 추가한다.
 async function listBucketObjects(): Promise<
   Array<{ path: string; createdAt: Date | null }>
 > {
@@ -169,7 +169,7 @@ async function listBucketObjects(): Promise<
       }
 
       for (const f of fileEntries ?? []) {
-        if (f.id == null) continue; // virtual folder placeholder, not a real object
+        if (f.id == null) continue; // 가상 폴더 자리표시자이며 실제 객체가 아님
         results.push({
           path: `${orgEntry.name}/${annEntry.name}/${f.name}`,
           createdAt: f.created_at ? new Date(f.created_at) : null,
@@ -181,14 +181,14 @@ async function listBucketObjects(): Promise<
   return results;
 }
 
-// Platform-admin-only server action that deletes Storage objects in the
-// announcement-images bucket that are not referenced by any DB announcement.
+// 플랫폼 관리자 전용 서버 액션. announcement-images 버킷에서
+// DB 공지 어디에서도 참조하지 않는 Storage 객체를 삭제한다.
 //
-// Safety conditions (all must hold to delete an object):
-//   1. Caller is an active platform admin.
-//   2. Path passes the full three-segment UUID/filename validation.
-//   3. Object creation time is known and older than GRACE_MS.
-//   4. Object's reconstructed public URL is absent from every announcement's image_urls.
+// 안전 조건(객체를 지우려면 모두 충족해야 함):
+//   1. 호출자가 활성 플랫폼 관리자일 것.
+//   2. 경로가 UUID/파일명 3단계 전체 검증을 통과할 것.
+//   3. 객체 생성 시각을 알고 있고 GRACE_MS 보다 오래됐을 것.
+//   4. 객체의 공개 URL 을 재구성한 값이 어느 공지의 image_urls 에도 없을 것.
 export async function purgeOrphanAnnouncementImages(): Promise<OrphanCleanupResult> {
   const result: OrphanCleanupResult = {
     ok: true,
@@ -246,7 +246,7 @@ export async function purgeOrphanAnnouncementImages(): Promise<OrphanCleanupResu
   for (const obj of objects) {
     if (!isValidStoragePath(obj.path)) continue;
 
-    // Conservative: skip objects whose creation time is unknown.
+    // 보수적 처리: 생성 시각을 모르는 객체는 건너뛴다.
     if (obj.createdAt === null || obj.createdAt > graceCutoff) {
       result.skippedGrace++;
       continue;

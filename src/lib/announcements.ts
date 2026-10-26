@@ -8,10 +8,10 @@ import { bestEffortWrite } from "@/lib/db-write-guard";
 type OrgRoleMap = Map<string, OrganizationRole>;
 
 /**
- * Returns only announcements visible to the user based on target_scope / target_roles.
- * Platform admins (developer_super_admin) bypass all filters.
- * For everyone-scoped announcements, membership presence is sufficient.
- * For role-scoped announcements, the user's role in that org must be in target_roles.
+ * target_scope / target_roles 기준으로 사용자에게 보이는 공지만 반환한다.
+ * 플랫폼 관리자(developer_super_admin)는 모든 필터를 건너뛴다.
+ * 전체 대상 공지는 멤버십이 있으면 충분하다.
+ * 역할 대상 공지는 해당 조직에서의 사용자 역할이 target_roles 에 있어야 한다.
  */
 export function filterAnnouncementsByTargetVisibility<
   T extends Pick<

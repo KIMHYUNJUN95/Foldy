@@ -52,8 +52,8 @@ export async function uploadBoardImage(params: {
   file: File;
   organizationId: string;
   postId: string;
-  // `board-posts` for the post composer, `board-comments` for comment photos (both whitelisted in
-  // the request-images storage policy). Defaults to board-posts.
+  // `board-posts` 는 게시글 작성용, `board-comments` 는 댓글 사진용(둘 다 request-images 스토리지 정책에
+  // 화이트리스트됨). 기본값은 board-posts.
   folder?: "board-posts" | "board-comments";
 }): Promise<string> {
   const { file, organizationId, postId, folder = "board-posts" } = params;

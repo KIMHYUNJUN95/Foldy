@@ -73,7 +73,7 @@ export function SuggestionsDetail({
     () => false,
   );
 
-  // Author may edit/delete the main suggestion only while it is still `submitted`.
+  // 작성자는 `submitted` 상태인 동안에만 본 건의를 수정/삭제할 수 있다.
   const canAuthorEdit = data.viewerRole === "author" && data.status === "submitted";
   // 상태 바꾸기 — 받는 사람 또는 플랫폼 개발자(서버 changeSuggestionStatus 와 같은 규칙).
   const isRecipient = data.viewerCanChangeStatus;
@@ -86,7 +86,7 @@ export function SuggestionsDetail({
     });
   }
 
-  // Recipient-only status change. Reversible among the four statuses; on_hold/completed carry a note.
+  // 수신자 전용 상태 변경. 네 가지 상태 사이에서 되돌릴 수 있으며, on_hold/completed 는 메모를 동반한다.
   function changeStatus(
     target: StaffSuggestionStatus,
     opts?: { holdReason?: string; completionNote?: string },
@@ -140,7 +140,7 @@ export function SuggestionsDetail({
     hydrated ? tokyoStamp(data.createdAt, locale, true) : null,
   ].filter(Boolean);
 
-  // Comment thread = comments + status-change events, interleaved by time (events render as a log).
+  // 댓글 스레드 = 댓글 + 상태 변경 이벤트를 시간순으로 섞은 것 (이벤트는 로그로 렌더).
   const timeline = [
     ...data.comments.map((c) => ({ kind: "comment" as const, at: c.createdAt, comment: c })),
     ...data.events.map((e) => ({ kind: "event" as const, at: e.createdAt, event: e })),

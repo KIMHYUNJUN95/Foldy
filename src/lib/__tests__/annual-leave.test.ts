@@ -20,7 +20,7 @@ describe("annual-leave accrual schedule", () => {
       "2025-07-15",
       "2026-07-15",
     ]);
-    // stays flat at 20 after the cap is reached
+    // 상한에 도달한 뒤에는 20일로 유지된다
     expect(grants[7].amount).toBe(20);
   });
 
@@ -53,7 +53,7 @@ describe("computeAnnualLeaveSummary", () => {
       baselineAmount: 5,
       asOf: "2026-08-01",
     });
-    // the 2026-07-15 grant (20d, per the schedule above) lands after the baseline date
+    // 2026-07-15 부여분(20일, 위 표 기준)은 기준일 이후에 들어온다
     expect(summary.remaining).toBe(5 + 20);
   });
 
@@ -62,7 +62,7 @@ describe("computeAnnualLeaveSummary", () => {
       hireDate: "2020-01-15",
       baselineDate: "2022-08-01",
       baselineAmount: 0,
-      // the 2023-07-15 grant (14d) expires 2025-07-15 — ask one day after that
+      // 2023-07-15 부여분(14일)은 2025-07-15 에 만료된다 — 그 하루 뒤로 확인
       asOf: "2025-07-16",
     });
     const grantBucket = summary.buckets.find((b) => b.grantedOn === "2023-07-15");
@@ -80,8 +80,8 @@ describe("computeAnnualLeaveSummary", () => {
     });
     const baseline = summary.buckets.find((b) => b.kind === "baseline");
     const grant = summary.buckets.find((b) => b.kind === "base" && b.grantedOn === "2026-07-15");
-    expect(baseline?.remaining).toBe(0); // 5d fully consumed first
-    expect(grant?.remaining).toBe(17); // remaining 3d of usage eats into the 20d grant
+    expect(baseline?.remaining).toBe(0); // 5일 먼저 전부 소진
+    expect(grant?.remaining).toBe(17); // 남은 사용 3일이 20일 부여분에서 차감된다
     expect(summary.remaining).toBe(17);
   });
 
@@ -100,7 +100,7 @@ describe("computeAnnualLeaveSummary", () => {
       hireDate: "2020-01-15",
       baselineDate: "2023-06-01",
       baselineAmount: 0,
-      // bonus grants 2024-01-15; ask well before its 2-year expiry
+      // 보너스는 2024-01-15 에 부여; 2년 만료보다 한참 앞에서 확인
       asOf: "2024-02-01",
     });
     expect(summary.bonusRemaining).toBe(4);
@@ -111,16 +111,16 @@ describe("computeAnnualLeaveSummary", () => {
   it("only draws specialUsedDays from the bonus pool, never the paid-leave pool", () => {
     const summary = computeAnnualLeaveSummary({
       hireDate: "2020-01-15",
-      // after the 2023-07-15 base grant, before the 2024-07-15 one — only the
-      // 2024-01-15 bonus grant lands in this window
+      // 2023-07-15 기본 부여 뒤, 2024-07-15 부여 앞 — 오직
+      // 2024-01-15 보너스 부여분만 이 구간에 들어온다
       baselineDate: "2023-08-01",
       baselineAmount: 10,
       usedDays: 0,
       specialUsedDays: 3,
       asOf: "2024-02-01",
     });
-    expect(summary.bonusRemaining).toBe(1); // 4d bonus - 3d special usage
-    expect(summary.baseRemaining).toBe(10); // untouched by specialUsedDays
+    expect(summary.bonusRemaining).toBe(1); // 4일 보너스 - 3일 특별 사용
+    expect(summary.baseRemaining).toBe(10); // specialUsedDays 의 영향을 받지 않음
   });
 
   it("tracks a pre-existing 특별휴가 starting balance (bonusBaselineAmount) in the bonus pool, not the base pool", () => {
@@ -129,7 +129,7 @@ describe("computeAnnualLeaveSummary", () => {
       baselineDate: "2023-08-01",
       baselineAmount: 10,
       bonusBaselineAmount: 2,
-      // before the 4-year bonus grant (2024-01-15) so only the manual bonus baseline applies
+      // 4년차 보너스 부여(2024-01-15) 앞이라 수동 보너스 기준값만 적용된다
       asOf: "2023-12-01",
     });
     expect(summary.baseRemaining).toBe(10);

@@ -48,7 +48,7 @@ type TaskInitial = {
   imageUrls: string[];
 };
 
-// Context link initial state for edit mode — constructed from the task's resolved context.
+// 수정 모드의 컨텍스트 링크 초기 상태 — 업무의 해석된 컨텍스트에서 만든다.
 type TaskInitialCtx = Pick<
   LinkedContext,
   | "propertyId"
@@ -82,27 +82,27 @@ export function TaskCreateForm({
   taskId,
   users,
 }: {
-  // Page header is owned by the form so the top-right Save can be a native submit (keeps `isPending`).
+  // 페이지 헤더는 폼이 소유하므로 오른쪽 위 저장이 네이티브 submit 이 될 수 있다(`isPending` 유지).
   buildingLabels: Record<string, string>;
   copy: Copy;
   defaultDate: string | null;
   /** 지시 모드로 폼을 연다(모바일 "보낸 지시" 진입점). 대상을 고르면 토글이 켜진 채로 보인다. */
   defaultDirective?: boolean;
   locale: string;
-  // Prefilled title carried over from Quick Add (create mode only). Kept separate from
-  // `initial` so the Calendar date-prefill (`defaultDate`) keeps working.
+  // 빠른 추가(Quick Add)에서 넘어온 미리 채운 제목(생성 모드만). 캘린더 날짜 미리 채우기(`defaultDate`)가
+  // 계속 동작하도록 `initial` 과 따로 둔다.
   defaultTitle?: string;
   headerTitle: string;
   imgCopy: Dictionary["requestImages"];
   initial?: TaskInitial;
-  /** Pre-populated context link for edit mode (from the task's resolved context). */
+  /** 수정 모드용으로 미리 채운 컨텍스트 링크(업무의 해석된 컨텍스트에서). */
   initialCtx?: TaskInitialCtx | null;
-  /** Max attachable photos. 5 by default; project tasks raise it to 20. */
+  /** 첨부할 수 있는 최대 사진 수. 기본 5장; 프로젝트 업무는 20장으로 늘린다. */
   maxImages?: number;
   mode?: "create" | "edit";
   organizationId: string;
-  /** When set, this is a project task — persisted with project_id (+ optional section_id) and the
-   *  per-task Share section is hidden (project membership governs sharing). */
+  /** 설정되면 프로젝트 업무다 — project_id(+ 선택 section_id)와 함께 저장되고
+   *  업무별 공유 섹션은 숨긴다(프로젝트 멤버십이 공유를 결정). */
   projectId?: string;
   sectionId?: string;
   serverError: string | null;
@@ -113,8 +113,8 @@ export function TaskCreateForm({
   const formRef = useRef<HTMLFormElement>(null);
   const uploaderRef = useRef<AnnouncementImageUploaderHandle>(null);
 
-  // Single-date model (A안, 2026-07-24): the form exposes ONE date, mapped to due_at on submit.
-  // For edit, seed it from the task's anchor (due wins over legacy scheduled).
+  // 단일 날짜 모델(A안, 2026-07-24): 폼은 날짜를 하나만 노출하고 제출 때 due_at 에 매핑한다.
+  // 수정할 때는 업무의 기준점에서 채운다(due 가 예전 scheduled 보다 우선).
   const [date, setDate] = useState<string>(initial?.due || initial?.scheduled || defaultDate || "");
   const [time, setTime] = useState<string>(initial?.time ?? "");
   const [duration, setDuration] = useState<number>(initial?.duration ?? 0);
@@ -151,12 +151,12 @@ export function TaskCreateForm({
     }
   }
 
-  // ── In-progress draft persistence ──────────────────────────────────────────
-  // Tapping "예약 보기" navigates to the calendar (router.push) and a back-navigation remounts this
-  // form fresh, wiping everything typed. We mirror the in-progress values into sessionStorage so a
-  // round-trip (or any accidental leave) restores them. Cleared on a successful save and on an
-  // explicit back-to-list. (New, not-yet-uploaded photos are File objects and can't be serialized,
-  // so they are the one field a round-trip does not restore.)
+  // ── 작성 중 초안 보존 ──────────────────────────────────────
+  // "예약 보기" 를 누르면 캘린더로 이동하고(router.push) 뒤로 가기가 이
+  // 폼을 다시 마운트하므로 입력한 내용이 전부 사라진다. 작성 중인 값을 sessionStorage 에 복제해 두면
+  // 왕복(또는 실수로 나가는 경우)에도 복원된다. 저장에 성공하거나 명시적으로
+  // 목록으로 돌아갈 때 지운다. (아직 업로드하지 않은 새 사진은 File 객체라 직렬화할 수 없어서
+  // 왕복해도 복원되지 않는 유일한 필드다.)
   const draftKey = `taskDraft:${mode}:${taskId ?? "new"}`;
   const hydratedRef = useRef(false);
   const submittedRef = useRef(false);
@@ -176,7 +176,7 @@ export function TaskCreateForm({
     try {
       window.sessionStorage.removeItem(draftKey);
     } catch {
-      /* ignore storage errors (private mode / quota) */
+      /* 저장소 오류 무시 (사생활 보호 모드 / 용량 초과) */
     }
   }, [draftKey]);
 
@@ -251,11 +251,11 @@ export function TaskCreateForm({
     try {
       window.sessionStorage.setItem(draftKey, JSON.stringify(draft));
     } catch {
-      /* ignore storage errors */
+      /* 저장소 오류 무시 */
     }
   }, [draftKey, date, time, duration, priority, repeat, tags, shareIds, directive, linkedCtx, more, existingImgUrls]);
 
-  // Restore once on mount (before the persist effect can overwrite with initial state).
+  // 마운트 시 한 번 복원한다(저장 effect 가 초기 상태로 덮어쓰기 전에).
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
@@ -271,9 +271,9 @@ export function TaskCreateForm({
     try {
       d = JSON.parse(raw) as Record<string, unknown>;
     } catch {
-      return; // malformed draft — ignore
+      return; // 형식이 깨진 초안 — 무시
     }
-    // Uncontrolled inputs: restore their DOM value directly.
+    // 비제어 input: DOM 값을 직접 복원한다.
     const form = formRef.current;
     if (form) {
       const t = form.elements.namedItem("title") as HTMLInputElement | null;
@@ -281,8 +281,8 @@ export function TaskCreateForm({
       const ds = form.elements.namedItem("description") as HTMLTextAreaElement | null;
       if (ds && typeof d.description === "string") ds.value = d.description;
     }
-    // State fields: applied in a microtask so setState is not called synchronously in the effect
-    // body (react-hooks/set-state-in-effect), and still before paint so there is no flicker.
+    // 상태 필드: effect 본문에서 setState 를 동기 호출하지 않도록 마이크로태스크에서 적용하고
+    // (react-hooks/set-state-in-effect), 페인트 전에 끝나므로 깜빡임도 없다.
     queueMicrotask(() => {
       if (typeof d.date === "string") setDate(d.date);
       if (typeof d.time === "string") setTime(d.time);
@@ -305,15 +305,15 @@ export function TaskCreateForm({
     });
   }, [draftKey]);
 
-  // Persist whenever a tracked value changes (after the initial restore has run).
+  // 추적하는 값이 바뀔 때마다 저장한다(초기 복원이 끝난 뒤).
   useEffect(() => {
     if (!hydratedRef.current) return;
     persistDraft();
   }, [persistDraft]);
 
-  // `custom` is a recognized stored recurrence bucket but is NOT user-creatable in this slice
-  // (no rule builder). It is surfaced read-only only when the task being edited already uses it,
-  // so a legacy value is not silently lost and the selection never looks ambiguous.
+  // `custom` 은 저장된 반복 버킷으로 인정되지만 이번 범위에서는 사용자가 만들 수 없다
+  // (규칙 빌더 없음). 수정 중인 업무가 이미 쓰고 있을 때만 읽기 전용으로 보여 준다.
+  // 예전 값이 조용히 사라지지 않고 선택이 모호해 보이지 않게 하기 위해서다.
   const hadCustom = initial?.repeat === "custom";
 
   function addTag() {
@@ -347,7 +347,7 @@ export function TaskCreateForm({
       setIsSubmitting(false);
       return;
     }
-    // A specific time / repeat needs a date anchor — block submission instead of silently dropping it.
+    // 구체적인 시각 / 반복에는 날짜 기준점이 필요하다 — 조용히 버리지 않고 제출을 막는다.
     if (time && !date) {
       setError(copy.errors.time_needs_date);
       submitLockRef.current = false;
@@ -360,11 +360,11 @@ export function TaskCreateForm({
       setIsSubmitting(false);
       return;
     }
-    // Single-date model (A안): the one date maps to due_at; scheduled stays empty.
+    // 단일 날짜 모델(A안): 그 날짜가 due_at 에 매핑되고 scheduled 는 비어 있다.
     formData.set("scheduledDate", "");
     formData.set("dueDate", date);
     formData.set("time", time);
-    // Duration is a same-day time block; only meaningful with a time-of-day.
+    // 소요 시간은 같은 날 시간 블록이라 시각이 있을 때만 의미가 있다.
     formData.set("durationMinutes", time && duration > 0 ? String(duration) : "");
     formData.set("priority", priority);
     formData.set("repeat", repeat);
@@ -421,7 +421,7 @@ export function TaskCreateForm({
     submitAction(createTask, formData);
   }
 
-  // "더 보기 — 시간 · 우선순위 …" → bold lead + muted hint (every locale uses an em-dash separator).
+  // "더 보기 — 시간 · 우선순위 …" → 굵은 앞부분 + 흐린 힌트(모든 로케일이 em-dash 구분자를 쓴다).
   const dashIdx = copy.moreToggle.indexOf("—");
   const moreLead = dashIdx === -1 ? copy.moreToggle : copy.moreToggle.slice(0, dashIdx).trim();
   const moreHint = dashIdx === -1 ? "" : copy.moreToggle.slice(dashIdx + 1).trim();
@@ -472,7 +472,7 @@ export function TaskCreateForm({
 
   return (
     <form className="tkw tkw-form" onSubmit={handleSubmit} ref={formRef}>
-      {/* Project linkage — present only for project-task creation (hidden, read by createTask). */}
+      {/* 프로젝트 연결 — 프로젝트 업무 생성 때만 있음(숨김, createTask 가 읽음). */}
       {projectId ? <input name="projectId" type="hidden" value={projectId} /> : null}
       {sectionId ? <input name="sectionId" type="hidden" value={sectionId} /> : null}
       {/* 머리 — 제목 + 오른쪽 저장(뒤로가기는 화면 스와이프). 화이트 리디자인(2026-10-15): 이름표 칸 · 칩. */}
@@ -507,7 +507,7 @@ export function TaskCreateForm({
         />
       </label>
 
-      {/* Schedule — one date + time + repeat, all in a single Todoist-style sheet. */}
+      {/* 일정 — 날짜 + 시간 + 반복을 Todoist 스타일 시트 하나에서. */}
       <span className="tkw-nf">
         <span className="tkw-nf__l">{copy.scheduleTitle}</span>
         <button className="tkw-nf__in" onClick={() => setScheduleOpen(true)} type="button">
@@ -558,7 +558,7 @@ export function TaskCreateForm({
         </button>
       </span>
 
-      {/* Share — creation only; hidden for project tasks (sharing is governed by the project). */}
+      {/* 공유 — 생성 때만; 프로젝트 업무에서는 숨김(공유는 프로젝트가 결정). */}
       {!isEdit && !projectId ? (
         <div className="tkw-fsec">
           <span className="tkw-nf">
@@ -596,7 +596,7 @@ export function TaskCreateForm({
         </div>
       ) : null}
 
-      {/* Context link — optional; not available in quick-add, only detailed create/edit. */}
+      {/* 컨텍스트 링크 — 선택; 빠른 추가에서는 쓸 수 없고 상세 생성/수정에서만. */}
       <ContextLinkSection
         buildingLabels={buildingLabels}
         copy={copy}
@@ -606,7 +606,7 @@ export function TaskCreateForm({
         value={linkedCtx}
       />
 
-      {/* More — collapsible advanced section (priority / tags / photos). */}
+      {/* 더 보기 — 접을 수 있는 고급 섹션(우선순위 / 태그 / 사진). */}
       <button aria-expanded={more} className="tkw-moretog" onClick={() => setMore((v) => !v)} type="button">
         <ChevronDown aria-hidden="true" />
         {moreLead}

@@ -15,9 +15,9 @@ type PageProps = {
   searchParams: Promise<{ sessionId?: string }>;
 };
 
-// Attendance / 근태 — correction request form (Step 6). Optional `?sessionId=` ties the request to one
-// of the user's own sessions; without it, it's a session-less exception request. Self-scoped.
-// See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
+// 근태 — 정정 요청 폼(Step 6). 선택 사항인 `?sessionId=` 가 요청을 본인 세션 하나에
+// 연결한다. 없으면 세션 없는 예외 요청이다. 본인 범위.
+// docs/product/21-attendance-payroll-workflow.md 와 docs/product/24-attendance-workflow.md 참고.
 export default async function MobileAttendanceCorrectionPage({ searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([
@@ -49,8 +49,8 @@ export default async function MobileAttendanceCorrectionPage({ searchParams }: P
       : Promise.resolve(null),
   ]);
 
-  // A sessionId that isn't the user's own resolves to null context → treat as an exception request
-  // (do not leak another user's session existence).
+  // 본인 것이 아닌 sessionId 는 컨텍스트가 null 로 풀린다 → 예외 요청으로 처리한다
+  // (다른 사용자의 세션 존재 여부를 노출하지 않음).
   const effectiveSessionId = context ? sessionId : null;
 
   return (

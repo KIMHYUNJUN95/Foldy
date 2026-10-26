@@ -45,9 +45,9 @@ function optionalRating(formData: FormData): number | null {
 }
 
 function collectImageUrls(formData: FormData): string[] {
-  // Both individual `image_0..image_4` keys and a repeated `imageUrls` key are accepted (mirrors the
-  // bug-report action). Already-uploaded public URLs only — the actual upload goes through the
-  // dedicated upload action first so the server controls the storage path.
+  // `image_0..image_4` 개별 키와 반복되는 `imageUrls` 키를 둘 다 받는다(버그 리포트 액션과 같은
+  // 방식). 이미 업로드된 공개 URL만 받으며, 실제 업로드는 먼저 전용 업로드 액션을 거치게 해서
+  // 저장 경로를 서버가 직접 통제한다.
   const urls: string[] = [];
   for (let i = 0; i < 5; i += 1) {
     const v = pickString(formData.get(`image_${i}`));
@@ -250,8 +250,8 @@ export async function deleteComplaintCommentAction(commentId: string): Promise<O
 }
 
 // ────────────────────────────────────────────────────────────
-// External review → manual complaint conversion + on-demand translation.
-// See docs/product/25-complaint-workflow.md.
+// 외부 리뷰 → 수기 컴플레인 전환 + 요청 시 번역.
+// 참고: docs/product/25-complaint-workflow.md.
 // ────────────────────────────────────────────────────────────
 
 export async function convertReviewToComplaintAction(
@@ -318,8 +318,8 @@ export async function translateReviewPartAction(
             : review.privateFeedback;
   if (!sourceText?.trim()) return { status: "unavailable" };
 
-  // Locale is read from the session, never taken from the caller — keeps the translation
-  // cache keyed to the viewer's real app language.
+  // 로케일은 호출자가 넘긴 값이 아니라 세션에서 읽는다 — 번역 캐시가
+  // 보는 사람의 실제 앱 언어 기준으로 유지된다.
   const result = await translateReviewPart({
     organizationId: session.organization.id,
     externalReviewId: review.id,

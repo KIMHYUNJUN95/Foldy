@@ -1,13 +1,13 @@
 /**
- * Lightweight haptic feedback.
+ * 가벼운 햅틱 피드백.
  *
- * - **iOS · Android app (Capacitor):** `@capacitor/haptics` — the Taptic Engine on iOS, the system haptic
- *   motor on Android (2026-10-09, native quality N15). Without this the iOS app had no haptics at all.
- * - **Browser / PWA:** the Vibration API where it exists (Android Chrome). A safe no-op on iOS Safari /
- *   installed iOS PWAs, which do NOT expose `navigator.vibrate`.
+ * - **iOS · Android 앱(Capacitor):** `@capacitor/haptics` — iOS 는 Taptic Engine, Android 는 시스템 햅틱
+ *     모터(2026-10-09, 네이티브 품질 N15). 이게 없으면 iOS 앱에는 햅틱이 전혀 없었다.
+ * - **브라우저 / PWA:** 있는 곳에서는 Vibration API(Android Chrome). iOS Safari /
+ *     설치된 iOS PWA 에서는 안전한 no-op — `navigator.vibrate` 를 노출하지 않는다.
  *
- * Call sites never check capability — `haptic()` can be called from any interaction handler. If the
- * installed app predates the haptics plugin (`hasNativePlugin`), it falls back to the Vibration API.
+ * 호출부는 기능 여부를 확인하지 않는다 — `haptic()` 은 어떤 상호작용 핸들러에서든 호출할 수 있다.
+ * 설치된 앱이 햅틱 플러그인보다 오래됐다면(`hasNativePlugin`) Vibration API 로 대체한다.
  *
  * **어느 진동을 쓰나 — 공용 규칙 (2026-10-22 네이티브급 움직임 점검).** 같은 일엔 어느 화면이든 같은 진동.
  * - `success` — 기록이 남는 일이 **서버 확인 뒤** 끝났을 때(저장 · 제출 · 신청 · 완료 · 승인). 누른 순간이 아니라 결과가 왔을 때.
@@ -60,10 +60,10 @@ export function haptic(kind: HapticKind = "light"): void {
     return;
   }
   const vibrate = navigator.vibrate?.bind(navigator);
-  if (!vibrate) return; // iOS Safari / standalone: unsupported — no-op.
+  if (!vibrate) return; // iOS Safari / 독립 실행: 미지원 — no-op.
   try {
     vibrate(PATTERNS[kind]);
   } catch {
-    /* some browsers throw if called outside a user gesture — ignore */
+    /* 일부 브라우저는 사용자 제스처 밖에서 호출하면 예외를 던진다 — 무시 */
   }
 }

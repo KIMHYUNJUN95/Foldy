@@ -197,8 +197,8 @@ export function ProjectDetailView({
     });
   };
 
-  // Invite members — called directly with a constructed FormData (no hidden form), so the selected
-  // ids are guaranteed to reach the server action (the old hidden-input + requestSubmit raced state).
+  // 멤버 초대 — 숨은 폼 없이 만든 FormData 로 직접 호출하므로, 선택한
+  // id 가 반드시 서버 액션에 닿는다(예전 숨은 input + requestSubmit 방식은 상태와 경쟁했다).
   const [, startInvite] = useTransition();
   const inviteMembers = (ids: string[]) => {
     if (ids.length === 0) return;
@@ -217,7 +217,7 @@ export function ProjectDetailView({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
-  // Members sheet — the shared BottomSheet owns the slide + drag-to-dismiss + Esc lifecycle.
+  // 멤버 시트 — 공용 BottomSheet 가 슬라이드 + 드래그로 닫기 + Esc 생명주기를 맡는다.
   const [membersOpen, setMembersOpen] = useState(false);
   const openMembers = useCallback(() => setMembersOpen(true), []);
 
@@ -225,8 +225,8 @@ export function ProjectDetailView({
   const tasksOf = (sectionId: string) => project.tasks.filter((t) => t.sectionId === sectionId);
   const taskCountOf = (key: string) => (key === "none" ? unsectioned.length : tasksOf(key).length);
 
-  // "작업 추가" opens the full create form (so a project task can link a room/reservation, set a
-  // date, priority, etc.), pre-bound to this project and section; createTask returns here on save.
+  // "작업 추가" 는 전체 생성 폼을 연다(프로젝트 업무에 방/예약을 연결하고 설정할 수 있도록:
+  // 날짜, 우선순위 등), 이 프로젝트와 섹션에 미리 묶여 있다. 저장하면 createTask 가 여기로 돌아온다.
   const addTaskLink = (sectionId: string | null) => (
     <Link
       className="tkw-add"
@@ -306,7 +306,7 @@ export function ProjectDetailView({
         </section>
       ) : null}
 
-      {/* Named sections — drag-reorderable by the owner (grip handle). */}
+      {/* 이름 있는 섹션 — 소유자가 드래그로 순서 변경(그립 핸들). */}
       {project.sections.length > 0 ? (
         <ReorderableSectionList
           countLabel={w.count}
@@ -329,7 +329,7 @@ export function ProjectDetailView({
         />
       ) : null}
 
-      {/* Add section (Owner only) */}
+      {/* 섹션 추가(소유자만) */}
       {isOwner ? (
         addingSection ? (
           <form action={addProjectSection} className="tkw-secform" onSubmit={() => haptic("light")}>
@@ -398,7 +398,7 @@ export function ProjectDetailView({
         </BottomSheet>
       ) : null}
 
-      {/* Section delete confirm */}
+      {/* 섹션 삭제 확인 */}
       {deleteSection ? (
         <ConfirmSheet
           body={p.deleteSectionBody
@@ -461,7 +461,7 @@ export function ProjectDetailView({
           )
         : null}
 
-      {/* Delete project confirm */}
+      {/* 프로젝트 삭제 확인 */}
       {deleteProjectOpen ? (
         <ConfirmSheet
           body={p.deleteProjectBody}
@@ -478,7 +478,7 @@ export function ProjectDetailView({
         </ConfirmSheet>
       ) : null}
 
-      {/* Leave project confirm */}
+      {/* 프로젝트 나가기 확인 */}
       {leaveOpen ? (
         <ConfirmSheet
           body={p.leaveConfirmBody}
@@ -495,7 +495,7 @@ export function ProjectDetailView({
         </ConfirmSheet>
       ) : null}
 
-      {/* Members management */}
+      {/* 멤버 관리 */}
       {membersOpen ? (
         <BottomSheet ariaLabel={p.memberManage} onClose={() => setMembersOpen(false)}>
           {({ close, dragHandleProps }) => (

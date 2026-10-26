@@ -74,7 +74,7 @@ async function getMembership(membershipId: string): Promise<TargetMembership | n
   return (data as TargetMembership | null) ?? null;
 }
 
-/** Is the actor an active owner/전무 of THIS org? (The session role may come from another org.) */
+/** 이 조직의 활성 owner/전무인가? (세션 역할은 다른 조직에서 올 수 있다.) */
 async function isTopAdminInOrg(actorUserId: string, actorRole: Role, organizationId: string) {
   if (!isOrgTopAdmin(actorRole)) return false;
   const { data } = await getSupabaseServiceClient()
@@ -88,7 +88,7 @@ async function isTopAdminInOrg(actorUserId: string, actorRole: Role, organizatio
   return Boolean(data);
 }
 
-/** Top org admin (owner/전무, of the target org) or platform admin. Gates payroll / approver / overrides. */
+/** 대상 조직의 최상위 관리자(owner/전무) 또는 플랫폼 관리자. 급여 · 승인권자 · 예외 처리를 막는 관문. */
 async function canManagePermissions(actorUserId: string, actorRole: Role, membership: TargetMembership) {
   if (isDeveloper(actorRole)) return true;
   return isTopAdminInOrg(actorUserId, actorRole, membership.organization_id);
@@ -140,7 +140,7 @@ async function guardLastOwner(
   return removesLastOwner({ target: membership, change, activeOwnerCount }) ? "last_owner" : null;
 }
 
-/** The user's memberships in OTHER orgs — `activeOnly` for the auth-ban decision, any status for delete. */
+/** 다른 조직에서의 이 사용자의 멤버십 — 인증 차단 판단에는 `activeOnly`, 삭제에는 모든 상태. */
 async function countOtherOrgMemberships(membership: TargetMembership, activeOnly: boolean): Promise<number | null> {
   let query = getSupabaseServiceClient()
     .from("memberships")
@@ -155,7 +155,7 @@ async function countOtherOrgMemberships(membership: TargetMembership, activeOnly
 
 const LIST_PATH = "/admin/users";
 
-/** Resolves the acting user + target membership + revalidates, shared by every action. */
+/** 행위자 + 대상 멤버십을 확인하고 재검증한다. 모든 액션이 공유한다. */
 async function resolveActor(
   membershipId: string,
 ): Promise<ResolvedActor | { error: "unauthenticated" | "forbidden" | "invalid_member" }> {
@@ -234,8 +234,8 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
   if (otherActive === null) return { ok: false, error: "save_failed" };
 
   const service = getSupabaseServiceClient();
-  // The auth login is shared across orgs — ban it only when no org has an active membership left
-  // (`authBanAction`). Self-status is already blocked above, so an actor can't ban themselves.
+  // 인증 로그인은 조직끼리 공유된다 — 활성 멤버십이 남은 조직이 하나도 없을 때만 차단한다
+  // (`authBanAction`). 본인 상태 변경은 위에서 이미 막혀 있어 행위자가 자기 자신을 차단할 수 없다.
   // **로그인 잠금 · 풀기를 먼저**(2026-10-26 버그 수정) — 전에는 상태를 먼저 바꾸고 잠금이 실패하면 「정지」로 보이는데
   // 로그인은 되는 상태가 남았다. 잠금이 실패하면 아무것도 바꾸지 않고, 상태 저장이 실패하면 잠금을 되돌린다.
   const ban = authBanAction(status, otherActive);
@@ -281,9 +281,9 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
 }
 
 /**
- * Assign a member to a team (현장/사무실 소속, or a sub-team). `teamId` null clears it (미지정). Same
- * gate as role/status (`manage_users`/top admin). The team must belong to the member's org. Takes a
- * team id (not just a kind) so it already supports sub-teams once team CRUD lands.
+ * 멤버를 팀(현장/사무실 소속 또는 하위 팀)에 배정한다. `teamId` 가 null 이면 해제(미지정). 역할/상태와 같은
+ * 권한 게이트(`manage_users`/최상위 관리자)를 쓴다. 팀은 멤버의 조직에 속해야 한다. 종류만이 아니라
+ * 팀 id 를 받으므로 팀 CRUD 가 들어오면 하위 팀도 이미 지원된다.
  */
 export async function setMemberTeam(membershipId: string, teamId: string | null): Promise<ActionResult> {
   const ctx = await resolveActor(membershipId);
@@ -423,9 +423,9 @@ export async function revokePermissionOverrideAction(input: {
 }
 
 /**
- * Grant/revoke platform developer (`developer_super_admin`) status for a member's user. Developer-only
- * — the highest privilege, never exposed as an org-role dropdown option. Can't revoke your own
- * developer status (lockout guard). Writes `platform_admins`.
+ * 멤버 사용자의 플랫폼 개발자(`developer_super_admin`) 권한을 부여/회수한다. 개발자 전용
+ * — 가장 높은 권한이라 조직 역할 드롭다운에는 노출하지 않는다. 자기 자신의
+ * 개발자 권한은 회수할 수 없다(잠금 방지). `platform_admins` 에 쓴다.
  */
 export async function assignDeveloper(membershipId: string, grant: boolean): Promise<ActionResult> {
   const ctx = await resolveActor(membershipId);
@@ -466,12 +466,12 @@ export async function assignDeveloper(membershipId: string, grant: boolean): Pro
 }
 
 /**
- * Guarded hard delete of a member (2026-07-13 model rework). Deactivation is the default; hard delete
- * is only for erroneous / never-active accounts. BLOCKS deletion when the user has any operational or
- * financial history (attendance / cleaning / annual-leave) — deleting would cascade-destroy those
- * records. When allowed, removes this org's membership — plus profile + auth login only when the user has
- * no membership in any other org. Developer / manage_users gated; protected targets (owner/전무 ·
- * developer) and the last active owner are guarded; can't delete yourself.
+ * 멤버 하드 삭제 가드(2026-07-13 모델 개편). 기본은 비활성화이고, 하드 삭제는
+ * 잘못 만들었거나 한 번도 활성화되지 않은 계정에만 쓴다. 운영 또는
+ * 재무 이력(근태 / 청소 / 연차)이 있으면 삭제를 막는다 — 삭제하면 그 기록이 연쇄 삭제되기 때문이다.
+ * 허용되면 이 조직의 멤버십을 지우고, 다른 조직에 멤버십이 전혀 없을 때만 프로필 + 인증 로그인도 지운다.
+ * 개발자 / manage_users 권한 필요. 보호 대상(owner/전무 ·
+ * 개발자)과 마지막 활성 owner 는 지킨다. 자기 자신은 삭제할 수 없다.
  */
 export async function deleteMember(membershipId: string): Promise<ActionResult> {
   const ctx = await resolveActor(membershipId);
@@ -486,8 +486,8 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
   const service = getSupabaseServiceClient();
   const userId = ctx.membership.user_id;
 
-  // Activity guard (broad): any attendance / cleaning / leave history → block hard delete, keep the
-  // records intact. Deactivate such members instead.
+  // 활동 가드(넓게): 근태 / 청소 / 휴가 이력이 하나라도 있으면 하드 삭제를 막고 기록을 그대로
+  // 둔다. 그런 멤버는 비활성화한다.
   const [att, clean, leave] = await Promise.all([
     service.from("attendance_sessions").select("id", { count: "exact", head: true }).eq("user_id", userId),
     service.from("cleaning_sessions").select("id", { count: "exact", head: true }).eq("staff_user_id", userId),
@@ -505,9 +505,9 @@ export async function deleteMember(membershipId: string): Promise<ActionResult> 
     .eq("user_id", userId);
   if ((idDocs ?? 0) > 0) return { ok: false, error: "has_id_documents" };
 
-  // Profile + auth login are shared across orgs: if the user belongs to any other org (any status),
-  // remove only THIS org's membership. Otherwise remove the whole account (auth login first, then
-  // membership → profile explicitly so cleanup doesn't depend on a particular FK cascade config).
+  // 프로필 + 인증 로그인은 조직끼리 공유된다: 사용자가 다른 조직(어떤 상태든)에 속해 있으면
+  // 이 조직의 멤버십만 지운다. 아니면 계정 전체를 지운다(인증 로그인 먼저, 그다음
+  // 멤버십 → 프로필을 명시적으로 지워 정리가 특정 FK cascade 설정에 기대지 않게 한다).
   const otherOrgs = await countOtherOrgMemberships(ctx.membership, false);
   if (otherOrgs === null) return { ok: false, error: "delete_failed" };
   const wholeAccount = deleteScope(otherOrgs) !== "membership";

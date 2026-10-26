@@ -53,9 +53,9 @@ function isOkuboC(propertyName: string) {
   return hasAny(key, ["오쿠보c", "okuboc", "okubockr", "大久保c"]);
 }
 
-/** Maps canonical Korean property names to stable i18n building keys. */
+/** 정규 한국어 숙소 이름을 안정적인 i18n 건물 키로 매핑한다. */
 export const CANONICAL_TO_BUILDING_KEY: Record<string, string> = {
-  // Note: values must match keys in dictionary.cleaning.buildingLabels
+  // 참고: 값은 dictionary.cleaning.buildingLabels 의 키와 일치해야 한다
   아라키초A: "arakicho_a",
   아라키초B: "arakicho_b",
   가부키초: "kabukicho",
@@ -68,7 +68,7 @@ export const CANONICAL_TO_BUILDING_KEY: Record<string, string> = {
   사노: "sano",
 };
 
-/** Converts a canonical property name to its locale-appropriate display label. */
+/** 정규 숙소 이름을 로케일에 맞는 표시 라벨로 바꾼다. */
 export function localizePropertyName(
   canonicalPropertyName: string,
   buildingLabels: Record<string, string>,
@@ -145,8 +145,8 @@ function isArakichoProperty(canonicalPropertyName: string) {
 }
 
 /**
- * Preserves distinct Arakicho unit identities (e.g. A301, 301, 301_2, A301_2).
- * Do not collapse to digits-only — that merges different Beds24 / room-master rows.
+ * 서로 다른 아라키초 호실 정체성을 보존한다 (예: A301, 301, 301_2, A301_2).
+ * 숫자만으로 합치지 말 것 — Beds24 / 객실 마스터의 서로 다른 행이 합쳐진다.
  */
 export function normalizeArakichoRoomKey(raw: string) {
   const compact = raw.trim().replace(/\s+/g, "");
@@ -157,15 +157,15 @@ export function normalizeArakichoRoomKey(raw: string) {
     .replace(/^(?:room|unit|호|号室)/iu, "");
 
   const cleaned = (withoutPrefix || compact).replace(/-/g, "_").replace(/[()]/g, "");
-  // Arakicho B rooms are stored as "Ab101" — uppercase the leading alpha prefix so the internal key
-  // is a stable "AB101" regardless of how Beds24 cased it. (Arakicho A rooms are numeric, so this
-  // only affects the Arakicho B "Ab" prefix.) 사용자에게는 `getDisplayRoomLabel` 이 `101` 로 보여준다.
+  // 아라키초 B 객실은 "Ab101" 로 저장된다 — 앞쪽 알파벳 접두사를 대문자로 바꿔 내부 키가
+  // Beds24 가 어떻게 대소문자를 썼든 안정적인 "AB101" 이 되게 한다. (아라키초 A 객실은 숫자라서
+  // 아라키초 B 의 "Ab" 접두사에만 영향을 준다.) 사용자에게는 `getDisplayRoomLabel` 이 `101` 로 보여준다.
   return cleaned.replace(/^[A-Za-z]+/, (match) => match.toUpperCase());
 }
 
 /**
- * Operational room key used for calendar rows, cleaning targets, and reservation grouping.
- * Must stay aligned with room master catalog `canonicalRoomLabel`.
+ * 달력 행, 청소 대상, 예약 그룹화에 쓰는 운영 객실 키.
+ * 객실 마스터 카탈로그의 `canonicalRoomLabel` 과 계속 맞아야 한다.
  */
 export function getCanonicalRoomLabel(propertyName: string, roomLabel: string) {
   const canonicalPropertyName = getCanonicalPropertyName(propertyName);
@@ -189,7 +189,7 @@ export function getCanonicalRoomLabel(propertyName: string, roomLabel: string) {
 }
 
 /**
- * Strips numeric _N suffix from an Arakicho internal room key for display.
+ * 아라키초 내부 객실 키에서 숫자 _N 접미사를 떼어 표시용으로 만든다.
  * "402_2" → "402", "A301_2" → "A301", "402" → "402".
  *
  * 알파벳 접두어는 여기서 남긴다 — 이 단계는 아직 **내부 키**다(`A301` 과 `301` 은 서로 다른
@@ -238,13 +238,13 @@ function stripBuildingCodePrefix(label: string): string {
 }
 
 /**
- * Display-facing label for calendar rows and operational UI.
+ * 달력 행과 운영 UI 에 쓰는 표시용 라벨.
  *
- * For Arakicho: strips _N numeric suffix so sub-units share one calendar row
- * (internal keys 402 / 402_2 both display as 402).
+ * 아라키초: _N 숫자 접미사를 떼어 하위 호실이 한 달력 행을 공유한다
+ * (내부 키 402 / 402_2 는 모두 402 로 표시).
  *
- * For every property: strips the building-disambiguating alpha prefix
- * (`AB101` → `101`, `O102` → `102`). See `stripBuildingCodePrefix`.
+ * 모든 숙소: 건물 구분용 알파벳 접두사를 뗀다
+ * (`AB101` → `101`, `O102` → `102`). `stripBuildingCodePrefix` 참고.
  */
 export function getDisplayRoomLabel(propertyName: string, internalRoomKey: string): string {
   const canonical = getCanonicalPropertyName(propertyName);
@@ -256,11 +256,11 @@ export function getDisplayRoomLabel(propertyName: string, internalRoomKey: strin
 }
 
 /**
- * Collapses a stored cleaning **session** room label ("아라키초A 201_2") to its display form
- * ("아라키초A 201"), keeping the canonical property prefix. Okubo single-token labels (property ===
- * room) and non-Arakicho labels are returned unchanged. Use for USER-FACING display of session
- * labels (home feed, transport statement, dashboard cards); session↔reservation MATCHING keeps the
- * raw canonical value.
+ * 저장된 청소 **세션** 객실 라벨("아라키초A 201_2")을 표시 형태로 접는다
+ * ("아라키초A 201"), 정규 숙소 접두사는 유지한다. Okubo 단일 토큰 라벨(숙소 ===
+ * 객실)과 아라키초가 아닌 라벨은 그대로 반환한다. 세션 라벨의 사용자 대상 표시에 쓴다
+ * (홈 피드, 교통비 명세, 대시보드 카드). 세션↔예약 매칭은
+ * 원래 정규 값을 그대로 쓴다.
  */
 export function getDisplaySessionRoomLabel(sessionRoomLabel: string): string {
   const trimmed = sessionRoomLabel.trim();
@@ -272,10 +272,10 @@ export function getDisplaySessionRoomLabel(sessionRoomLabel: string): string {
 }
 
 /**
- * Canonical room-label ordering used wherever rooms are listed for operations staff
- * (청소 오늘 현황 / 기록, 셋팅 대상). Numeric collation so digit runs compare as numbers:
- * `202 < 302 < 402`, `AB201 < AB202 < AB301`, `8 < 9 < 10`. Purely lexical `localeCompare`
- * would put 402 before 8 and AB301 before AB202, which reads as random to the field team.
+ * 운영 직원에게 객실을 나열하는 모든 곳에서 쓰는 표준 객실 라벨 정렬
+ * (청소 오늘 현황 / 기록, 셋팅 대상). 숫자 정렬로 숫자 덩어리를 수로 비교한다:
+ * `202 < 302 < 402`, `AB201 < AB202 < AB301`, `8 < 9 < 10`. 순수 사전식 `localeCompare` 는
+ * 402 를 8 앞에, AB301 을 AB202 앞에 놓아 현장 팀에게 무작위처럼 보인다.
  */
 export function compareRoomLabel(a: string, b: string): number {
   return a.localeCompare(b, "ko", { numeric: true });
@@ -307,21 +307,21 @@ export function operationalRoomAliasOf(propertyName: string, roomLabel: string):
 }
 
 /* ============================================================
-   Session room-label ↔ roomKey resolution — shared by the mobile cleaning queue
-   (src/app/mobile/cleaning/page.tsx) and the admin cleaning console
-   (src/lib/admin-cleaning.ts). Previously duplicated privately in the mobile page; extracted here
-   so there's a single implementation. See docs/product/07-cleaning-workflow.md → roomKey resolution
-   priority.
+   세션 객실 라벨 ↔ roomKey 해석 — 모바일 청소 큐
+   (src/app/mobile/cleaning/page.tsx)와 관리자 청소 콘솔
+   (src/lib/admin-cleaning.ts)이 공유한다. 전에는 모바일 페이지에 비공개로 중복돼 있었고, 여기로 꺼내
+   구현을 하나로 만들었다. 참고: docs/product/07-cleaning-workflow.md → roomKey 해석
+   우선순위.
    ============================================================ */
 
-/** Room key = canonical property + "_" + canonical room — used for dedup/turnover/session matching. */
+/** 객실 키 = 정규 숙소 + "_" + 정규 객실 — 중복 제거/회전/세션 매칭에 쓴다. */
 export function buildRoomKey(canonicalPropertyName: string, canonicalRoomLabel: string): string {
   return `${canonicalPropertyName}_${canonicalRoomLabel}`;
 }
 
 /**
- * Label stored in `cleaning_sessions.room_label`. Okubo buildings return the property name as the
- * canonical room (single-unit buildings), so no room suffix is appended.
+ * `cleaning_sessions.room_label` 에 저장되는 라벨. Okubo 건물은 숙소 이름을 정규
+ * 객실로 반환하므로(단일 호실 건물) 객실 접미사를 붙이지 않는다.
  */
 export function buildSessionRoomLabel(canonicalPropertyName: string, canonicalRoomLabel: string): string {
   return canonicalRoomLabel === canonicalPropertyName
@@ -353,7 +353,7 @@ function normalizeRoomLabelInput(value: string): string {
   return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-/** sessionRoomLabel → roomKey, built from the active room catalog (primary lookup). */
+/** sessionRoomLabel → roomKey, 활성 객실 카탈로그에서 만든다 (1차 조회). */
 export function buildSessionLabelToRoomKeyMap(
   catalog: readonly ActiveRoomCatalogItem[],
 ): Map<string, string> {
@@ -365,7 +365,7 @@ export function buildSessionLabelToRoomKeyMap(
   return map;
 }
 
-/** Normalized (NFKC/whitespace/lowercase) alias → roomKey, covering historical ko/ja/en label variants. */
+/** 정규화된(NFKC/공백/소문자) 별칭 → roomKey, 과거 ko/ja/en 라벨 변형을 포함한다. */
 export function buildLegacyAliasToRoomKeyMap(
   catalog: readonly ActiveRoomCatalogItem[],
 ): Map<string, string> {
@@ -394,10 +394,10 @@ export type ResolveRoomKeyResult = {
 };
 
 /**
- * Resolves a `cleaning_sessions.room_label` to the canonical roomKey used by
- * CleaningTarget/SettingTarget. Returns null for unrecognised labels so callers can exclude them
- * rather than produce a spurious match. Three-stage fallback: catalog exact → canonical prefix
- * parse → legacy alias map.
+ * `cleaning_sessions.room_label` 을 다음이 쓰는 정규 roomKey 로 해석한다.
+ * CleaningTarget/SettingTarget. 알 수 없는 라벨은 null 을 반환해 호출자가 잘못된 매칭 대신 제외할 수 있다.
+ * 3단계 폴백: 카탈로그 정확 일치 → 정규 접두사
+ * 파싱 → 레거시 별칭 맵.
  */
 export function resolveRoomKey(
   roomLabel: string,

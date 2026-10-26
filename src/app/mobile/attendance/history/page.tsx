@@ -21,10 +21,10 @@ function currentTokyoYm(): string {
     .slice(0, 7);
 }
 
-// Attendance / 근태 — own attendance history (Step 5). Self-view only: every query is scoped to the
-// authenticated user's id server-side; there is no client-supplied target user. A `?ym=YYYY-MM`
-// param (Tokyo) selects the operating month; defaults to the current month.
-// See docs/product/21-attendance-payroll-workflow.md and docs/product/24-attendance-workflow.md.
+// 출퇴근 / 근태 — 본인 출퇴근 이력 (Step 5). 본인 조회 전용: 모든 쿼리는
+// 인증된 사용자의 id 로 서버에서 정한다. 클라이언트가 지정하는 대상 사용자는 없다. `?ym=YYYY-MM`
+// 파라미터(도쿄)로 영업 월을 고르며, 기본값은 이번 달이다.
+// docs/product/21-attendance-payroll-workflow.md 와 docs/product/24-attendance-workflow.md 참고.
 export default async function MobileAttendanceHistoryPage({ searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([

@@ -10,8 +10,8 @@ export type TeamRow = Pick<
 >;
 
 /**
- * Teams for an org (현장/사무실 소속). Ordered field-first then by name, so kind groups read cleanly in
- * assignment dropdowns and filters. Org-scoped like every other business read.
+ * 조직의 팀 (현장/사무실 소속). 현장 우선, 그다음 이름순으로 정렬되어 종류별 묶음이
+ * 배정 드롭다운과 필터에서 깔끔하게 읽힌다. 다른 모든 비즈니스 읽기처럼 조직 범위다.
  */
 export async function getOrgTeams(organizationId: string): Promise<TeamRow[]> {
   const { data } = await getSupabaseServiceClient()

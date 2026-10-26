@@ -19,8 +19,8 @@ export type SlackSendFailureReason =
 
 export type SendDailyReportToSlackResult = { ok: true } | { ok: false; reason: SlackSendFailureReason };
 
-// ── Localized template parts ─────────────────────────────────────────────────
-// i18n-ignore-start: localized server-action report templates live together here.
+// ── 현지화 템플릿 조각 ─────────────────────────────────────────────────
+// i18n-ignore-start: 서버 액션 보고서 현지화 템플릿은 여기에 모아 둔다.
 // 합계 문구는 `{n}` 자리표시자를 쓴다 — 클라이언트가 선택 개수에 맞춰 다시 조립하는데
 // 함수는 서버 액션 경계를 넘지 못하기 때문이다(`src/lib/daily-report.ts` 참고).
 type ReportTemplateParts = {
@@ -65,43 +65,43 @@ const REPORT_TEMPLATE: Record<string, ReportTemplateParts> = {
 // i18n-ignore-end
 
 /**
- * Deterministic, no-cost text tidy-up for a single rough item line. We can't do dictionary-grade
- * 맞춤법 correction without an LLM, but we can reliably normalize the things people get wrong when
- * jotting tasks: stray whitespace, leading bullet glyphs, and spacing around punctuation. Kept
- * conservative so it never changes the meaning of what the user typed.
+ * 거친 항목 한 줄을 다듬는, 결정적이고 비용 없는 텍스트 정리. LLM 없이 사전 수준의
+ * 맞춤법 교정까지는 못 하지만, 사람들이 흔히 틀리는 부분은 믿을 수 있게 정리할 수 있다 — 업무를
+ * 빠르게 적은 업무에 흔한 문제를 바로잡는다: 불필요한 공백, 앞쪽 글머리 기호, 문장부호 주변 띄어쓰기. 사용자가
+ * 입력한 의미를 바꾸지 않도록 보수적으로 유지한다.
  */
 function tidy(raw: string): string {
   let s = (raw ?? "").trim();
   if (!s) return "";
-  // Collapse all whitespace runs to a single space.
+  // 연속된 공백을 한 칸으로 합친다.
   s = s.replace(/\s+/g, " ");
-  // Drop any leading bullet / dash / list glyphs the user typed themselves.
+  // 사용자가 직접 넣은 앞쪽 글머리 / 대시 / 목록 기호를 지운다.
   s = s.replace(/^[-–—•·*▪◦●○▶▷>]+\s*/, "");
-  // One space after commas / Korean enumeration commas, none before.
+  // 쉼표 / 한국어 열거 쉼표 뒤에는 한 칸, 앞에는 공백 없음.
   s = s.replace(/\s*[,，、]\s*/g, ", ");
-  // Even spacing around common separators.
+  // 자주 쓰는 구분자 주변 간격을 고르게 맞춘다.
   s = s.replace(/\s*\/\s*/g, " / ");
   s = s.replace(/\s*·\s*/g, " · ");
   s = s.replace(/\s*&\s*/g, " & ");
   s = s.replace(/\s*~\s*/g, "~");
-  // Tighten parentheses/brackets: no padding just inside, a single space just before an opener.
+  // 괄호: 안쪽 공백 없음, 여는 괄호 바로 앞에는 한 칸.
   s = s.replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
   s = s.replace(/\[\s+/g, "[").replace(/\s+\]/g, "]");
   s = s.replace(/(\S)\(/g, "$1 (");
-  // No space before sentence punctuation; collapse repeats.
+  // 문장부호 앞 공백 없음, 반복되는 부호는 하나로.
   s = s.replace(/\s+([.!?…])/g, "$1");
   s = s.replace(/([.,!?])\1+/g, "$1");
-  // Final pass: re-collapse, trim, and drop a trailing period (work-log bullets read better without).
+  // 마지막 정리: 다시 공백을 합치고 trim 하며 끝의 마침표를 지운다(업무일지 항목은 마침표 없는 편이 읽기 좋다).
   s = s.replace(/\s+/g, " ").trim();
   s = s.replace(/[.\s]+$/, "");
   return s;
 }
 
 /**
- * Build the daily work report ("업무일지") for the given Tokyo date from the current user's completed
- * tasks. Free / template-based — no LLM call, no per-use cost. Gated by the `can_generate_report` capability.
- * Outputs a formal business report: title, date, staff name, numbered task list, total count.
- * Tags and descriptions are intentionally excluded — titles only.
+ * 현재 사용자가 완료한 업무로 주어진 도쿄 날짜의 일일 업무 보고서("업무일지")를 만든다.
+ * 무료 / 템플릿 기반 — LLM 호출 없음, 사용당 비용 없음. `can_generate_report` 권한으로 제한한다.
+ * 공식 업무 보고서를 출력한다: 제목, 날짜, 직원 이름, 번호 매긴 업무 목록, 총 건수.
+ * 태그와 설명은 의도적으로 제외하고 제목만 쓴다.
  */
 export async function generateDailyReport(date: string): Promise<DailyReportResult> {
   const day = String(date ?? "").trim();
@@ -117,14 +117,14 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
   const locale = session.user.preferredLanguage;
   const tmpl = REPORT_TEMPLATE[locale] ?? REPORT_TEMPLATE.ko;
 
-  // The user's own completions on this Tokyo day, derived from the `completed`/`reopened` events in
-  // `task_updates` (NOT `tasks.status`). A recurring task completion rolls the row forward and keeps
-  // it `open`, so it never has `status=completed` — the completion only lives in the log. Counting a
-  // per-task net (completed − reopened) captures recurring completions too and cancels a same-day undo.
+  // 이 도쿄 날짜에 본인이 완료한 것. `task_updates` 의 `completed`/`reopened` 이벤트에서 계산한다
+  // (`tasks.status` 가 아님). 반복 업무는 완료하면 행을 다음 회차로 넘기고 `open` 으로 두므로
+  // `status=completed` 가 되지 않아 완료 기록은 로그에만 남는다. 업무별 순증(completed − reopened)으로
+  // 세면 반복 완료도 잡히고 같은 날 되돌린 것은 상쇄된다.
   const supabase = await getSupabaseServerClient();
   const dayStart = new Date(`${day}T00:00:00+09:00`);
   const dayStartIso = dayStart.toISOString();
-  const dayEndIso = new Date(dayStart.getTime() + 86_400_000).toISOString(); // +09:00 range == the Tokyo day
+  const dayEndIso = new Date(dayStart.getTime() + 86_400_000).toISOString(); // +09:00 범위 == 도쿄 하루
   const { data: updData, error: updErr } = await supabase
     .from("task_updates")
     .select("task_id, update_type, created_at")
@@ -137,7 +137,7 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
 
   type Upd = { task_id: string; update_type: string };
   const net = new Map<string, number>();
-  const order: string[] = []; // task_ids in first-completion order
+  const order: string[] = []; // 첫 완료 순서대로 task_id
   for (const r of (updData ?? []) as Upd[]) {
     if (!net.has(r.task_id)) {
       net.set(r.task_id, 0);
@@ -147,7 +147,7 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
   }
   const completedIds = order.filter((id) => (net.get(id) ?? 0) > 0);
 
-  // Resolve titles (org-scoped; a task deleted after completion simply drops out).
+  // 제목을 가져온다(조직 범위. 완료 뒤 삭제된 업무는 그냥 빠진다).
   const titleById = new Map<string, string>();
   if (completedIds.length > 0) {
     const { data: taskData, error: taskErr } = await supabase
@@ -160,7 +160,7 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
     for (const t of (taskData ?? []) as { id: string; title: string }[]) titleById.set(t.id, t.title);
   }
 
-  // Collect unique titles only (no tags, no descriptions), in completion order.
+  // 제목만 중복 없이 완료 순서대로 모은다(태그 · 설명 제외).
   const seen = new Set<string>();
   const items: DailyReportItem[] = [];
   for (const id of completedIds) {
@@ -186,7 +186,7 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
 
   if (items.length === 0) return { ok: false, reason: "empty" };
 
-  // Format the date in the user's locale.
+  // 사용자 로케일에 맞춰 날짜를 포맷한다.
   const dateLabel = new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "long",
@@ -202,12 +202,12 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
 }
 
 /**
- * Posts the caller-reviewed daily report to the single company Slack channel.
+ * 본인이 검토한 일일 보고서를 회사 단일 Slack 채널에 올린다.
  *
- * The webhook URL stays exclusively in `SLACK_DAILY_REPORT_WEBHOOK_URL`; the client never receives
- * it. We deliberately send the textarea body unchanged so the existing report template and the
- * user's final edits are what appear in Slack. Re-generating first is an authorization + empty-report
- * guard, not a replacement for the edited text.
+ * 웹훅 URL 은 `SLACK_DAILY_REPORT_WEBHOOK_URL` 에만 두며 클라이언트는 받지 않는다.
+ * 기존 보고서 템플릿과 사용자의 최종 수정이 그대로 Slack 에 나가도록 텍스트 영역 본문은
+ * 일부러 바꾸지 않고 보낸다. 먼저 다시 생성하는 것은 권한 + 빈 보고서
+ * 가드이지 수정한 텍스트를 대체하는 것이 아니다.
  */
 export async function sendDailyReportToSlack(
   date: string,
@@ -224,7 +224,7 @@ export async function sendDailyReportToSlack(
   const day = String(date ?? "").trim();
   const text = String(editedText ?? "").trim();
   if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day) || !text) return fail("error");
-  // Slack truncates text above 40,000 characters. Reject rather than silently posting a partial report.
+  // Slack 은 40,000자를 넘는 텍스트를 잘라낸다. 일부만 올라가지 않도록 거절한다.
   if (text.length > 40_000) return fail("too_long");
 
   const generated = await generateDailyReport(day);

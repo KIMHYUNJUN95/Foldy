@@ -1,8 +1,8 @@
 /*
- * Attendance / 근태 — visual design ported 1:1 from "Attendance Module v2.html".
- * Scoped under `.att` so the generic class names never leak globally. UI/UX only — no backend.
- * Palette reuses the app theme (ivory + deep-ink navy) plus attendance status hues.
- * See docs/product/24-attendance-workflow.md.
+ * 출퇴근 / 근태 — "Attendance Module v2.html" 에서 1:1 로 옮긴 비주얼 디자인.
+ * 일반 클래스 이름이 전역으로 새지 않도록 `.att` 범위로 한정. UI/UX 전용 — 백엔드 없음.
+ * 팔레트는 앱 테마(아이보리 + 짙은 잉크 네이비)에 출석 상태 색조를 더해 재사용한다.
+ * docs/product/24-attendance-workflow.md 참고.
  */
 
 .att {
@@ -63,7 +63,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== chips ===== */
+/* ===== 칩 ===== */
 .att .chip {
   display: inline-flex;
   align-items: center;
@@ -119,7 +119,7 @@
   border: 1px solid color-mix(in oklab, var(--att-primary) 18%, transparent);
 }
 
-/* ===== HOME — greeting + ring hero ===== */
+/* ===== 홈 — 인사 + 링 히어로 ===== */
 .att .greet {
   margin: 4px 2px 4px;
 }
@@ -135,7 +135,7 @@
   margin-top: 3px;
 }
 
-/* ── Home entry shortcut list ───────────────────────────────────────────── */
+/* ── 홈 진입 바로가기 목록 ───────────────────────────────────────────── */
 .att .seclbl {
   font-size: 12px;
   font-weight: 800;
@@ -243,10 +243,10 @@
 .att a.entryrow.pay .entryrow__val {
   color: var(--done);
 }
-/* Hide the amount with TRANSPARENT TEXT + a soft text-shadow blur — NOT `filter: blur()`.
-   On iOS Safari `filter: blur()` on text inside an `overflow: hidden` card clips the blur
-   halo into a hard rectangle / white hairline (the reported "네모·흰 테두리"). A text-shadow
-   has no element-box filter region, so it obscures cleanly with no edge artifact. */
+/* 금액을 투명 텍스트 + 부드러운 text-shadow 블러로 가린다 — `filter: blur()` 가 아니다.
+   iOS Safari 에서는 `overflow: hidden` 카드 안의 텍스트에 `filter: blur()` 를 쓰면 블러
+   이 단단한 사각형 / 흰 헤어라인으로 잘린다 (제보된 "네모·흰 테두리"). text-shadow 는
+   요소 박스 필터 영역이 없어 가장자리 흔적 없이 깔끔하게 가려진다. */
 .att .entryrow__val.masked {
   color: transparent;
   text-shadow: 0 0 8px var(--ink);
@@ -314,8 +314,8 @@
   padding: 8px 0 4px;
   margin-bottom: 18px;
 }
-/* NOTE: container class is `att-ring`, not `ring` — `ring` collides with Tailwind's `ring` utility
-   (a box-shadow ring), which painted a square outline around the timer. */
+/* 참고: 컨테이너 클래스는 `ring` 이 아니라 `att-ring` 이다 — `ring` 은 Tailwind 의 `ring` 유틸리티
+   (box-shadow 링)와 충돌해 타이머 주위에 사각 윤곽을 그렸다. */
 .att .att-ring {
   position: relative;
   width: 252px;
@@ -625,7 +625,7 @@
   font-size: 15px;
 }
 
-/* skeleton */
+/* 스켈레톤 */
 .att .skel {
   background: linear-gradient(
     100deg,
@@ -662,7 +662,7 @@
   }
 }
 
-/* ===== CAPTURE ===== */
+/* ===== 캡처 ===== */
 .att .caphead {
   display: flex;
   align-items: center;
@@ -809,7 +809,7 @@
   animation: none;
 }
 
-/* result sheet (capture success / failure) */
+/* 결과 시트 (캡처 성공 / 실패) */
 .att .att__result-sheet {
   background: var(--card);
 }
@@ -1173,7 +1173,7 @@
   background: var(--card);
   padding: 13px 14px;
   font: inherit;
-  /* 16px so iOS doesn't zoom-snap on focus (was 14px). */
+  /* iOS 가 포커스 때 확대하지 않도록 16px (이전엔 14px). */
   font-size: 16px;
   font-weight: 500;
   color: var(--ink);
@@ -1250,7 +1250,7 @@
   position: fixed;
   left: 0;
   right: 0;
-  /* Sit above the on-screen keyboard (var set by KeyboardInsetSync); 0 when closed. */
+  /* 화면 키보드 위에 놓는다 (KeyboardInsetSync 가 설정한 변수); 닫혀 있으면 0. */
   bottom: var(--keyboard-inset, 0px);
   z-index: 10;
   padding: 13px 18px max(18px, env(safe-area-inset-bottom));
@@ -1281,7 +1281,7 @@
   filter: brightness(0.92);
 }
 
-/* ===== CORRECTION status read-back ===== */
+/* ===== 정정 상태 되읽기 ===== */
 .att .c-danger {
   background: var(--danger-bg);
   color: var(--danger);
@@ -1462,7 +1462,7 @@
   font-size: 17px;
 }
 
-/* ── Self-view history (Step 5) — built in the existing token language ───────── */
+/* ── 셀프 뷰 이력 (Step 5) — 기존 토큰 언어로 만들었다 ───────── */
 .att .histsum {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1617,7 +1617,7 @@
   font-size: 14px;
 }
 
-/* ── Time Picker Sheet ───────────────────────────────────────────────────── */
+/* ── 시간 선택 시트 ───────────────────────────────────────────────────── */
 .att .tpick {
   padding-bottom: 4px;
 }
@@ -1649,7 +1649,7 @@
   overflow: hidden;
   margin-bottom: 14px;
 }
-/* center-row highlight — sibling of .tpick__cols so mask doesn't affect it */
+/* 가운데 행 강조 — .tpick__cols 의 형제라서 마스크가 영향을 주지 않는다 */
 .att .tpick__sel {
   position: absolute;
   left: 8px;
@@ -1663,7 +1663,7 @@
   pointer-events: none;
   z-index: 2;
 }
-/* mask fades items at top/bottom without needing to match the background color */
+/* 마스크는 배경색을 맞추지 않아도 위/아래 항목이 흐려진다 */
 .att .tpick__cols {
   display: flex;
   height: 220px;
@@ -1727,7 +1727,7 @@
   opacity: 0.82;
 }
 
-/* ── Correction form wiring (Step 6) ───────────────────────────────────────── */
+/* ── 정정 폼 연결 (Step 6) ───────────────────────────────────────── */
 .att .timein {
   border: 0;
   background: transparent;
@@ -1738,7 +1738,7 @@
   padding: 0;
   outline: none;
 }
-/* ibox as a tap target (time picker trigger) */
+/* 탭 대상으로 쓰는 ibox (시간 선택 트리거) */
 .att button.ibox {
   width: 100%;
   text-align: left;
@@ -1796,7 +1796,7 @@
   font-size: 13px;
 }
 
-/* ── Self monthly pay (Step 10) ─────────────────────────────────────────────── */
+/* ── 본인 월 급여 (Step 10) ─────────────────────────────────────────────── */
 .att .paynav {
   display: flex;
   align-items: center;
@@ -1928,7 +1928,7 @@
   font-weight: 600;
 }
 
-/* Finalization badge on the pay hero (Step 11). */
+/* 급여 히어로의 마감 배지 (Step 11). */
 .att .payhero__badge {
   display: inline-block;
   margin-left: 8px;
@@ -1941,9 +1941,9 @@
   vertical-align: middle;
 }
 
-/* ===== HISTORY & PAY — redesign (Haru Ops handoff) ===== */
+/* ===== 이력 & 급여 — 리디자인 (Haru Ops 핸드오프) ===== */
 
-/* page title row */
+/* 페이지 제목 행 */
 .att .ptitle-row {
   display: flex;
   align-items: center;
@@ -1963,7 +1963,7 @@
   margin-top: 3px;
 }
 
-/* month segment switcher (pay page) */
+/* 월 세그먼트 전환기 (급여 페이지) */
 .att .seg-month {
   display: inline-flex;
   align-items: center;
@@ -1993,7 +1993,7 @@
   box-shadow: 0 1px 3px rgba(20, 32, 43, 0.12);
 }
 
-/* ── month switcher (history + pay) ── */
+/* ── 월 전환기 (이력 + 급여) ── */
 .att .msw {
   position: relative;
   display: inline-flex;
@@ -2100,7 +2100,7 @@
   .att .msw__label .ic { transition: none; }
 }
 
-/* ── summary card (top of history page) ── */
+/* ── 요약 카드 (이력 페이지 상단) ── */
 .att .summary {
   border-radius: 22px;
   padding: 18px 18px 16px;
@@ -2221,7 +2221,7 @@
   margin-top: 4px;
 }
 
-/* ── attention banner ── */
+/* ── 주의 배너 ── */
 .att .attn {
   display: flex;
   align-items: center;
@@ -2264,7 +2264,7 @@
 .att .attn__chev { color: var(--att-muted); flex: 0 0 auto; }
 .att .attn__chev svg { width: 17px; height: 17px; }
 
-/* ── date group ── */
+/* ── 날짜 그룹 ── */
 .att .dgroup {
   display: flex;
   align-items: center;
@@ -2275,7 +2275,7 @@
 .att .dgroup__wd { font-size: 11px; font-weight: 700; color: var(--faint); }
 .att .dgroup__sum { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--att-muted); font-family: var(--mono); }
 
-/* ── session row ── */
+/* ── 세션 행 ── */
 .att .srow {
   background: var(--card);
   border: 1px solid var(--line);
@@ -2310,7 +2310,7 @@
 }
 .att .srow__paid .k { font-size: 10px; font-weight: 700; color: var(--faint); }
 
-/* in/out timeline */
+/* 출근/퇴근 타임라인 */
 .att .inout { display: flex; align-items: center; gap: 10px; }
 .att .io__col { flex: 1; min-width: 0; }
 .att .io__lbl {
@@ -2374,7 +2374,7 @@
 .att .sfi .ic { font-size: 13px; color: var(--faint); }
 .att .sfi.note { margin-left: auto; }
 
-/* ── paycard ── */
+/* ── 급여 카드 ── */
 .att .paycard {
   border-radius: 22px;
   padding: 20px;
@@ -2468,8 +2468,8 @@
   transition: color 0.22s var(--ease-out), text-shadow 0.22s var(--ease-out);
 }
 .att .pc__amt .yen { font-size: 24px; opacity: 0.7; margin-right: 2px; }
-/* Transparent text + text-shadow blur (see entryrow note) — avoids the iOS `filter: blur()`
-   rectangular-clip / white-edge artifact inside the `overflow: hidden` pay card. */
+/* 투명 텍스트 + text-shadow 블러 (entryrow 주석 참고) — `overflow: hidden` 급여 카드 안에서
+   iOS 의 `filter: blur()` 사각 잘림 / 흰 가장자리 현상을 피한다. */
 .att .paycard.hide .pc__amt { color: transparent; text-shadow: 0 0 16px var(--ink); user-select: none; -webkit-user-select: none; }
 .att .paycard--final.hide .pc__amt { text-shadow: 0 0 16px rgba(255, 255, 255, 0.9); }
 .att .pc__gross {
@@ -2513,7 +2513,7 @@
 .att .paycard.hide .pc__v { color: transparent; text-shadow: 0 0 12px var(--ink); user-select: none; -webkit-user-select: none; }
 .att .paycard--final.hide .pc__v { text-shadow: 0 0 12px rgba(255, 255, 255, 0.9); }
 
-/* ── excluded notice ── */
+/* ── 제외 안내 ── */
 .att .excl {
   display: flex;
   gap: 11px;
@@ -2546,7 +2546,7 @@
 .att .excl__chev { color: var(--warn); flex: 0 0 auto; align-self: center; }
 .att .excl__chev svg { width: 17px; height: 17px; }
 
-/* ── daily pay table ── */
+/* ── 일별 급여 표 ── */
 .att .ptbl {
   background: var(--card);
   border: 1px solid var(--line);
@@ -2643,7 +2643,7 @@
   letter-spacing: -0.01em;
 }
 
-/* ── rate breakdown ── */
+/* ── 시급 구성 ── */
 .att .rate {
   background: var(--card);
   border: 1px solid var(--line);
@@ -2661,7 +2661,7 @@
 .att .rate__min { font-size: 11px; font-weight: 700; color: var(--att-muted); font-family: var(--mono); }
 .att .rate__amt { font-size: 14px; font-weight: 800; font-family: var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
 
-/* ── salaried note ── */
+/* ── 월급제 안내 ── */
 .att .salaried {
   display: flex;
   flex-direction: column;
@@ -2700,7 +2700,7 @@
   gap: 8px;
 }
 
-/* gross note */
+/* 총액 안내 */
 .att .gross-note {
   font-size: 11.5px;
   color: var(--att-muted);
@@ -2712,7 +2712,7 @@
 
 /* ── 출근자 명단 (Roster) ───────────────────────────────────────────── */
 
-/* roster-specific status/work colors not already in the scope */
+/* 이 범위에 아직 없는 명단 전용 상태/근무 색 */
 .att {
   --work: hsl(150 56% 27%);
   --work-bg: hsl(146 44% 92%);

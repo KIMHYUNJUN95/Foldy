@@ -185,9 +185,9 @@
   border-color: color-mix(in oklab, var(--ink) 10%, var(--line));
 }
 
-/* Kicker and value must share font-size + line-height. Flex centers each span's BOX, so a smaller
-   kicker would sit on a different text baseline than the value and the two words would look
-   vertically misaligned. Hierarchy comes from color/weight only. */
+/* 키커와 값은 font-size 와 line-height 를 같게 맞춰야 한다. Flex 는 각 span 의 BOX 를 가운데 정렬하므로, 키커가 더 작으면
+   값과 텍스트 기준선이 달라져 두 단어가 세로로 어긋나 보인다.
+   위계는 색/굵기로만 만든다. */
 .adm .admcal__menu-kicker {
   color: var(--adm-muted);
   font-size: 12px;

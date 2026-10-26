@@ -4,7 +4,7 @@
  * 상태 타임라인 · 배송 캘린더 · 모달 확장(배송일 피커/상태칩/품목 편집기)만 둔다. Claude Design
  * orders.css를 .adm 스코프로 이식. See docs/product/10-order-request-workflow.md. */
 
-/* ── STATUS PILL — 4 order statuses (extend .cstat) ── */
+/* ── 상태 알약 — 주문 상태 4개 (.cstat 확장) ── */
 .adm .cstat--requested { background: var(--info-bg); color: var(--info); }
 .adm .cstat--approved  { background: var(--primary-soft); color: var(--adm-primary); }
 .adm .cstat--ordered   { background: var(--done-bg); color: var(--done); }
@@ -15,14 +15,14 @@
 .adm .urg { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 7px; font-size: 10.5px; font-weight: 900; white-space: nowrap; background: var(--danger-bg); color: var(--danger); border: 1px solid color-mix(in oklab, var(--danger) 26%, transparent); }
 .adm .urg .ic { font-size: 12px; }
 
-/* delivery D-day badge */
+/* 배송 D-day 배지 */
 .adm .dday { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 7px; font-size: 10.5px; font-weight: 900; letter-spacing: .01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .adm .dday .ic { font-size: 12px; }
 .adm .dday--soon { background: var(--primary-soft); color: var(--adm-primary); }
 .adm .dday--today { background: var(--warn-bg); color: var(--warn); }
 .adm .dday--over { background: var(--danger-bg); color: var(--danger); }
 
-/* ── BOARD COLUMNS ── */
+/* ── 보드 열 ── */
 .adm .mbkcol--requested { border-top: 3px solid var(--info); }
 .adm .mbkcol--approved  { border-top: 3px solid var(--adm-primary); }
 .adm .mbkcol--ordered   { border-top: 3px solid var(--done); }
@@ -30,7 +30,7 @@
 .adm .mbkcol--approved .mbkcol__ic  { background: var(--primary-soft); color: var(--adm-primary); }
 .adm .mbkcol--ordered .mbkcol__ic   { background: var(--done-bg); color: var(--done); }
 
-/* ── CARD ── */
+/* ── 카드 ── */
 .adm .mcard.is-requested { border-left-color: var(--info); }
 .adm .mcard.is-approved  { border-left-color: var(--adm-primary); }
 .adm .mcard.is-ordered   { border-left-color: var(--done); }
@@ -43,21 +43,21 @@
 .adm .mcard__items .lk { color: var(--adm-primary); display: inline-flex; }
 .adm .mcard__items .lk .ic { font-size: 13px; color: var(--adm-primary); }
 
-/* ── LIST / CLOSED table ── */
+/* ── 목록 / 종료 표 ── */
 .adm .mtbl .deliv-cell { font-family: var(--mono); font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
 .adm .mtbl .deliv-cell.is-tbd { color: var(--faint); font-family: var(--font); font-weight: 700; }
 .adm .mtbl tr.row-urg td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .adm .mtbl .items-cell { font-size: 11.5px; color: var(--adm-muted); font-weight: 700; }
 .adm .filterbar .dd { width: 150px; flex: 0 0 auto; }
 
-/* export chip buttons */
+/* 내보내기 칩 버튼 */
 .adm .expbar { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .adm .expbar__lb { font-size: 11px; font-weight: 800; color: var(--adm-muted); margin-right: 2px; }
 .adm .chipbtn { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink-soft); font-size: 12.5px; font-weight: 800; white-space: nowrap; }
 .adm .chipbtn .ic { font-size: 15px; color: var(--adm-muted); }
 .adm .chipbtn:hover { background: var(--adm-surface); border-color: color-mix(in oklab, var(--adm-primary) 30%, var(--line)); }
 
-/* ── DETAIL PANEL — item rows, delivery, timeline ── */
+/* ── 상세 패널 — 품목 행, 배송, 타임라인 ── */
 .adm .oitems { display: flex; flex-direction: column; gap: 9px; }
 .adm .oitem { padding: 12px 13px; border-radius: 12px; background: var(--card2); border: 1px solid var(--line-soft); }
 .adm .oitem__top { display: flex; align-items: baseline; gap: 10px; }
@@ -109,7 +109,7 @@
 .adm .onote { font-size: 12px; font-weight: 600; color: var(--ink-soft); line-height: 1.6; background: var(--card2); border: 1px solid var(--line-soft); border-radius: 11px; padding: 11px 13px; }
 .adm .onote--reject { background: var(--danger-bg); border-color: color-mix(in oklab, var(--danger) 22%, transparent); color: color-mix(in oklab, var(--danger) 70%, var(--ink)); }
 
-/* ── ACTIVE-ACTION ZONE ── */
+/* ── 진행 중 액션 구역 ── */
 .adm .actzone { padding: 14px; border-radius: 14px; background: color-mix(in oklab, var(--adm-primary) 3.5%, var(--card2)); border: 1px solid color-mix(in oklab, var(--adm-primary) 15%, var(--line-soft)); }
 .adm .actzone__t { font-size: 11.5px; font-weight: 900; color: var(--ink); display: flex; align-items: center; gap: 7px; }
 .adm .actzone__t .ic { font-size: 15px; color: var(--adm-primary); }
@@ -123,7 +123,7 @@
 .adm .actbtn--reject { color: var(--danger); }
 .adm .actbtn--reject:hover { border-color: color-mix(in oklab, var(--danger) 42%, var(--line)); background: var(--danger-bg); }
 
-/* ── DELIVERY CALENDAR ── */
+/* ── 배송 캘린더 ── */
 .adm .ocalwrap { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
 @media (max-width: 1180px) { .adm .ocalwrap { grid-template-columns: 1fr; } }
 .adm .ocal { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 18px 44px -34px rgba(20, 32, 43, .5); padding: 22px 24px 24px; }
@@ -186,7 +186,7 @@
 .adm .oday__empty .ic { font-size: 30px; color: var(--faint); }
 .adm .oday__empty .t { font-size: 12.5px; font-weight: 700; margin-top: 10px; line-height: 1.5; }
 
-/* ── MODAL EXTRAS ── */
+/* ── 모달 추가분 ── */
 .adm .segradio { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .adm .segopt { display: flex; align-items: center; gap: 10px; padding: 12px 13px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer; text-align: left; transition: border-color .14s, background .14s; }
 .adm .segopt__ic { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; background: var(--adm-surface); color: var(--adm-muted); }
@@ -232,7 +232,7 @@
 .adm .eadd .ic { font-size: 15px; }
 .adm .eadd:hover { border-color: var(--adm-primary); background: var(--primary-soft); }
 
-/* field-inline date picker button (opens .calpop) */
+/* 필드 인라인 날짜 선택기 버튼 (.calpop 을 연다) */
 .adm .datepick { display: inline-flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px; border-radius: 11px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
 .adm .datepick .ic { font-size: 16px; color: var(--adm-muted); }
 .adm .datepick .v { font-variant-numeric: tabular-nums; }

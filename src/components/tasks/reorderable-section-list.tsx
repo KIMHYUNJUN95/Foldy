@@ -18,11 +18,11 @@ function moveItem<T>(list: T[], from: number, to: number): T[] {
 }
 
 /**
- * Vertical drag-reorder for a project's sections. Mirrors `reorderable-task-list`, but each draggable
- * "row" is a whole section block. The component renders the section header (grip handle for owners,
- * title, count, edit/delete); the body (task rows + add link) comes from `renderBody`. `beginDrag` is
- * used only in the grip's pointer handler — never passed into `renderBody` — so it stays out of render
- * (satisfies react-hooks/refs). When `disabled`, the grip is replaced by a static chevron and no drag.
+ * 프로젝트 섹션의 세로 드래그 재정렬. `reorderable-task-list` 를 따르지만, 드래그되는 각
+ * "행"이 섹션 블록 전체다. 컴포넌트가 섹션 헤더(소유자용 그립 핸들,
+ * 제목, 개수, 수정/삭제)를 그리고, 본문(할 일 행 + 추가 링크)은 `renderBody` 에서 온다. `beginDrag` 는
+ * 그립의 포인터 핸들러에서만 쓰고 `renderBody` 로는 넘기지 않으므로 렌더 밖에 머문다
+ * (react-hooks/refs 만족). `disabled` 면 그립이 정적 쉐브론으로 바뀌고 드래그는 없다.
  */
 export function ReorderableSectionList({
   sections,
@@ -78,7 +78,7 @@ export function ReorderableSectionList({
     onPersistRef.current = onPersist;
   }, [onPersist]);
 
-  // Resync from the server list whenever it changes — but never mid-drag.
+  // 서버 목록이 바뀔 때마다 다시 맞추되 — 드래그 중에는 절대 하지 않는다.
   useEffect(() => {
     if (draggingRef.current) return;
     setOrder(sections);

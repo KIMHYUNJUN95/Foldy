@@ -24,15 +24,15 @@ function moveItem<T>(list: T[], from: number, to: number): T[] {
 }
 
 /**
- * Vertical drag-reorder list for the Todo "Today" sections.
+ * Todo "오늘" 구역용 세로 드래그 정렬 목록.
  *
- * The drag is started only from each card's dedicated grip handle (see TaskCard `reorderable`),
- * so it never conflicts with the card's tap, long-press menu, or swipe. While dragging, the order
- * array is held fixed and the move is previewed by translating the dragged row to follow the finger
- * and shifting the crossed rows by one slot; the array is committed once on drop and persisted.
+ * 드래그는 각 카드 전용 그립 핸들(TaskCard `reorderable` 참고)에서만 시작하므로
+ * 카드의 탭, 길게 눌러 메뉴, 스와이프와 부딪히지 않는다. 드래그하는 동안 순서
+ * 배열은 고정하고, 끌고 있는 행을 손가락 따라 옮기고 지나친 행을 한 칸씩 밀어서
+ * 미리 보여 준다. 배열은 놓을 때 한 번 확정해 저장한다.
  *
- * When `disabled` (active search/filter, or multi-select mode) it renders plain cards with no handle
- * and no drag — the list still honours whatever order the parent passed in.
+ * `disabled`(검색/필터 활성 또는 다중 선택 모드)이면 핸들도 드래그도 없는 일반 카드를 그리고
+ * 부모가 넘긴 순서는 그대로 따른다.
  */
 export function ReorderableTaskList({
   items,
@@ -64,9 +64,9 @@ export function ReorderableTaskList({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
   const [overIndex, setOverIndex] = useState(0);
-  // State copies of the drag start index / slot height for use during render (the matching refs
-  // below feed the window listeners, which can't read render state). Reading refs during render is
-  // disallowed, so the sibling-shift math reads these instead.
+  // 드래그 시작 인덱스 / 칸 높이의 state 사본으로 렌더 중에 쓴다(짝이 되는 ref 는
+  // window 리스너에 쓰이고 렌더 state 를 읽을 수 없다). 렌더 중 ref 읽기는
+  // 허용되지 않으므로 형제 밀기 계산은 이 값을 읽는다.
   const [dragStartIndex, setDragStartIndex] = useState(0);
   const [dragSlot, setDragSlot] = useState(0);
 
@@ -84,8 +84,8 @@ export function ReorderableTaskList({
   const onPersistDateRef = useRef(onPersistDate);
   const occurrenceDateRef = useRef(occurrenceDate);
 
-  // Mirror live render state/props into refs so the once-attached window listeners (below) read
-  // current values. Refs may not be written during render, so this happens post-commit in effects.
+  // 한 번만 붙는 window 리스너(아래)가 현재 값을 읽도록 렌더 state/props 를 ref 에 비춘다.
+  // 렌더 중에는 ref 에 쓸 수 없으므로 커밋 뒤 effect 에서 한다.
   useEffect(() => {
     orderRef.current = order;
   }, [order]);
@@ -98,8 +98,8 @@ export function ReorderableTaskList({
     occurrenceDateRef.current = occurrenceDate;
   }, [onPersist, onPersistDate, occurrenceDate]);
 
-  // Resync from the server list — but never mid-drag (that would yank the row out from under the
-  // finger). After a persisted reorder the revalidated list arrives here.
+  // 서버 목록으로 다시 맞춘다 — 단, 드래그 중에는 하지 않는다(손가락 밑에서 행이 빠져나간다).
+  // 저장된 정렬 뒤에는 다시 검증된 목록이 여기로 도착한다.
   //
   // 부모는 렌더마다 새 배열을 만든다. 예전엔 그때마다 순서를 덮어써, 방금 끌어 놓은 순서가 저장
   // 응답이 오기도 전에(다른 상태 변화로 부모가 다시 그려지면) 옛 순서로 튀었다(2026-10-26).
@@ -120,8 +120,8 @@ export function ReorderableTaskList({
     setOrder(items);
   }, [items]);
 
-  // Window listeners are attached once and gated on `draggingRef`, so their references stay stable
-  // (clean add/remove) and they always read live values through refs.
+  // window 리스너는 한 번만 붙이고 `draggingRef` 로 게이트하므로 참조가 안정적이고
+  // (깔끔한 추가/제거) ref 로 항상 최신 값을 읽는다.
   useEffect(() => {
     function finishDrag() {
       draggingRef.current = false;
@@ -169,10 +169,10 @@ export function ReorderableTaskList({
       if (!draggingRef.current) return;
       finishDrag();
     }
-    // While dragging, swallow touchmove in the CAPTURE phase so it never reaches the mobile shell's
-    // pull-to-refresh / scroll handlers (which are touchmove-driven and would otherwise translate the
-    // whole page along with the finger). preventDefault stops native scroll; stopPropagation stops the
-    // shell's JS pull. No-op when not dragging, so normal scrolling/PTR are untouched.
+    // 드래그 중에는 touchmove 를 CAPTURE 단계에서 삼켜 모바일 셸의
+    // pull-to-refresh / 스크롤 핸들러(touchmove 기반이라 막지 않으면 손가락을 따라
+    // 페이지 전체를 옮긴다)에 닿지 않게 한다. preventDefault 는 네이티브 스크롤을, stopPropagation 은
+    // 셸의 JS 당기기를 막는다. 드래그 중이 아니면 아무 일도 하지 않아 평소 스크롤/PTR 은 그대로다.
     function blockTouch(e: TouchEvent) {
       if (!draggingRef.current) return;
       if (e.cancelable) e.preventDefault();
@@ -195,12 +195,12 @@ export function ReorderableTaskList({
     const cur = orderRef.current;
     const si = cur.findIndex((t) => t.id === task.id);
     if (si < 0) return;
-    // Snapshot every row's geometry up front; the preview math runs off this cache (no reflow reads
-    // mid-drag). Variable card heights are fine — each row carries its own measured height.
+    // 모든 행의 위치/크기를 미리 찍어 둔다. 미리 보기 계산은 이 캐시로 돈다(드래그 중에
+    // 리플로우 읽기가 없다). 카드 높이가 제각각이어도 된다 — 행마다 잰 높이를 가진다.
     const rows: RowMetric[] = [];
     for (const t of cur) {
       const el = rowRefs.current.get(t.id);
-      if (!el) return; // a row isn't mounted yet — abort rather than drag with stale metrics
+      if (!el) return; // 행이 아직 마운트되지 않았다 — 오래된 측정값으로 드래그하지 말고 중단한다
       const r = el.getBoundingClientRect();
       rows.push({ id: t.id, top: r.top, height: r.height });
     }

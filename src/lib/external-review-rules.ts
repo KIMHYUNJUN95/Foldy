@@ -1,12 +1,12 @@
-// External review scoring rules — pure domain values, safe on both server and client.
+// 외부 리뷰 점수 규칙 — 순수 도메인 값, 서버와 클라이언트 양쪽에서 안전.
 //
-// This module deliberately has NO `server-only` marker and NO imports: the review scale and
-// the risk thresholds are needed by server helpers (`external-reviews.ts`, the Beds24 sync)
-// *and* by client components that render a score. Importing a value out of the server-only
-// module from a client component drags the whole Supabase/`next/headers` chain into the
-// browser bundle and fails the build, so the shared constants live here instead.
+// 이 모듈에는 `server-only` 마커도 import 도 일부러 없다: 리뷰 척도와
+// 위험 임계값은 서버 헬퍼(`external-reviews.ts`, Beds24 동기화)
+// *와* 점수를 그리는 클라이언트 컴포넌트 양쪽에서 필요하다. 서버 전용
+// 모듈에서 클라이언트 컴포넌트로 값을 가져오면 Supabase/`next/headers` 체인 전체가
+// 브라우저 번들로 끌려와 빌드가 깨지므로, 공유 상수는 여기에 둔다.
 //
-// Contract: docs/product/25-complaint-workflow.md → "Rating Risk Rules"
+// 계약: docs/product/25-complaint-workflow.md → "Rating Risk Rules"
 
 export type ReviewProvider = "airbnb" | "booking";
 export type ReviewRiskLevel = "unrated" | "normal" | "risk";

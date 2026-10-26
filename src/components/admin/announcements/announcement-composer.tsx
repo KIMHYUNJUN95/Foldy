@@ -3,7 +3,7 @@
 // 공지 작성 · 수정 — 화이트 리디자인(2026-10-15, 시안 NoticeNew-PC). 모달 대신 목록 자리에 펼치는 작성 화면.
 // 왼쪽은 제목 · 본문 · 사진(≤5), 오른쪽은 게시 설정(대상 · 중요 · 고정 · 팝업 + 끝나는 날)과 저장 버튼.
 // 사진은 저장할 때 브라우저에서 Storage 로 바로 올리고(Server Action 크기 제한 우회) URL 만 액션에 넘긴다.
-// See docs/product/11-announcement-workflow.md → Composer / Edit Flow.
+// docs/product/11-announcement-workflow.md → Composer / Edit Flow 참고.
 import Image from "next/image";
 import { startTransition, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ChevronLeft, Plus, X } from "lucide-react";

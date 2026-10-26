@@ -17,12 +17,12 @@ function isIsoDate(value: string | undefined): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-// ── Tokyo operating date (see docs/product/07-cleaning-workflow.md) ──────────
-// These filters run on the server (mobile requests page + admin orders export), so any
-// host-local date math would drift by 9 hours on a UTC runner. Day boundaries are therefore
-// derived as Asia/Tokyo `YYYY-MM-DD` keys — the same pattern as `tokyoToday()` in
-// src/lib/tasks.ts and the Today/Yesterday grouping in requests-filter-view.tsx — and only
-// converted to an instant at the very end via the fixed +09:00 offset (Japan has no DST).
+// ── 도쿄 운영 날짜 (docs/product/07-cleaning-workflow.md 참고) ──────────
+// 이 필터들은 서버(모바일 요청 페이지 + admin 주문 내보내기)에서 실행되므로
+// 호스트 로컬 날짜 계산은 UTC 러너에서 9시간 어긋난다. 그래서 날짜 경계는
+// Asia/Tokyo `YYYY-MM-DD` 키로 도출한다 — `tokyoToday()` 와 같은 패턴이며,
+// src/lib/tasks.ts 및 requests-filter-view.tsx 의 오늘/어제 묶음과 같다 — 맨 마지막에만
+// 고정 +09:00 오프셋으로 시점으로 변환한다(일본은 서머타임이 없음).
 const TOKYO_TIME_ZONE = "Asia/Tokyo";
 const TOKYO_UTC_OFFSET = "+09:00";
 
@@ -33,12 +33,12 @@ const tokyoDateKeyFormatter = new Intl.DateTimeFormat("en-CA", {
   year: "numeric",
 });
 
-/** Tokyo calendar date (YYYY-MM-DD) of an instant. */
+/** 시점의 도쿄 달력 날짜(YYYY-MM-DD). */
 function tokyoDateKey(date: Date = new Date()) {
   return tokyoDateKeyFormatter.format(date);
 }
 
-/** Shift a YYYY-MM-DD key by whole days, staying in string space. */
+/** YYYY-MM-DD 키를 문자열 공간에 머무른 채 일 단위로 옮긴다. */
 function shiftDateKey(key: string, deltaDays: number) {
   const [year, month, day] = key.split("-").map(Number);
   const shifted = new Date(Date.UTC(year, month - 1, day));
@@ -46,12 +46,12 @@ function shiftDateKey(key: string, deltaDays: number) {
   return shifted.toISOString().slice(0, 10);
 }
 
-/** Instant (UTC ISO) of 00:00 Asia/Tokyo on the given date key. */
+/** 주어진 날짜 키의 Asia/Tokyo 00:00 시점(UTC ISO). */
 function tokyoDayStartIso(key: string) {
   return new Date(`${key}T00:00:00${TOKYO_UTC_OFFSET}`).toISOString();
 }
 
-/** Exclusive upper bound: 00:00 Asia/Tokyo of the day after `key`. */
+/** 배타적 상한: `key` 다음 날의 Asia/Tokyo 00:00. */
 function tokyoDayEndExclusiveIso(key: string) {
   return tokyoDayStartIso(shiftDateKey(key, 1));
 }
@@ -90,8 +90,8 @@ export function getTimestampRange(filter: RequestDateFilter): {
   switch (filter.datePreset) {
     case "today":
       return { from: tokyoDayStartIso(today), to: tokyoDayEndExclusiveIso(today) };
-    // "7일" / "30일" mean whole Tokyo calendar days including today (today - 6 / today - 29),
-    // matching the Today/Yesterday group headers instead of a rolling 7×24h window.
+    // "7일" / "30일" 은 오늘을 포함한 도쿄 달력 일수 전체를 뜻한다(오늘 - 6 / 오늘 - 29),
+    // 오늘/어제 묶음 헤더와 맞추고, 흘러가는 7×24h 창이 아닌 달력 날짜 기준으로 한다.
     case "7d":
       return { from: tokyoDayStartIso(shiftDateKey(today, -6)) };
     case "30d":

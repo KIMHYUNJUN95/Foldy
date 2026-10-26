@@ -6,7 +6,7 @@
 // 상자·세로 구분선 없음, 선택은 옅은 보라 바탕만. CSS: admin-tasks-white.css(`atw-`, 레이아웃·목록·상세)
 // + admin-tasks-console.css(팝오버·모달·업로더 — 예전 그대로 쓰는 부분).
 // 서버 액션(@/app/admin/tasks/actions)이 모든 쓰기를 처리하고, revalidatePath 로 갱신한다(성공 뒤 router.refresh() 를 더 부르지 않는다 — 이중 렌더).
-// See docs/product/28-admin-todoist-console.md.
+// 참고: docs/product/28-admin-todoist-console.md.
 import Image from "next/image";
 import {
   Fragment,
@@ -206,7 +206,7 @@ type AddDraft = {
   /** "instr" = 지시 탭에서 바로 보내기. 대상이 반드시 있어야 저장된다(아래 `saveInlineAdd`). */
   ctx: "today" | "tomorrow" | "inbox" | "project" | "day" | "instr";
   sectionId: string | null;
-  onDate: string; // for "day"/day-anchored adds
+  onDate: string; // "day"/날짜 기준 추가용
   // 제목·설명·태그 입력 버퍼는 **여기 없다.** 비제어 입력이라 `addTextRef` 가 들고 있다
   // (한 글자마다 이 4900줄 컴포넌트를 다시 그리지 않기 위해 — 2026-09-04).
   date: string;
@@ -277,13 +277,13 @@ const EMPTY_TASK_CONTEXT: TaskContextValue = {
   roomLabel: null,
 };
 
-// useLayoutEffect on the client (positions before paint → no flicker), useEffect on the server
-// (avoids the SSR warning; the popover never renders during SSR anyway).
+// 클라이언트에서는 useLayoutEffect (페인트 전에 배치 → 깜빡임 없음), 서버에서는 useEffect
+// (SSR 경고를 피한다. 팝오버는 어차피 SSR 중에는 렌더되지 않는다).
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-// Detail-panel status segments, in display order. The CSS thumb assumes exactly these three, in
-// this order (it translates by whole segment widths) — adding a fourth means updating
-// `.atw-status__thumb` width/offsets in admin-tasks-white.css too.
+// 상세 패널 상태 분할 항목, 표시 순서. CSS thumb 는 정확히 이 세 개가 이 순서일 것을 가정한다
+// (분할 폭 단위로 이동한다) — 네 번째를 추가하면
+// admin-tasks-white.css 의 `.atw-status__thumb` 너비/오프셋도 고쳐야 한다.
 const STATUS_SEGMENTS = [
   { status: "open", labelKey: "stOpen" },
   { status: "in_progress", labelKey: "stInProgress" },
@@ -306,7 +306,7 @@ export function AdminTasksConsole({
 }: {
   locale: Locale;
   data: AdminTasksData;
-  /** Needed for the photo Storage path (`${organizationId}/task-images/...`). */
+  /** 사진 Storage 경로(`${organizationId}/task-images/...`)에 필요. */
   organizationId: string;
 }) {
   const dict = getAdminTasksDictionary(locale);
@@ -341,8 +341,8 @@ export function AdminTasksConsole({
   // 플랫폼 개발자는 남의 작업 · 프로젝트도 작성자처럼 고친다(2026-10-23, 서버 canEditTaskCore · project.viewerCanManage 와 같은 규칙).
   // isPlatformDeveloper() 와 같은 판정. 여기서 함수를 부르면 React Compiler 가 이 컴포넌트의 수동 메모를 못 지켜 최적화를 건너뛴다(린트 오류) — 그래서 비교를 그대로 쓴다.
   const meIsDeveloper = data.me.role === "developer_super_admin";
-  // Tokyo operating date. Kept live so a console left open across Tokyo midnight rolls today/내일/
-  // overdue over without a manual refresh (checked each minute + on focus/visibility change).
+  // 도쿄 운영 날짜. 콘솔을 연 채 도쿄 자정을 넘겨도 오늘/내일/
+  // 지연이 새로고침 없이 넘어가도록 계속 최신으로 유지한다 (1분마다 + 포커스/가시성 변경 시 확인).
   const [today, setToday] = useState(() => tokyoToday());
 
   const [view, setView] = useState<View>("today");
@@ -352,22 +352,22 @@ export function AdminTasksConsole({
   /** 상세를 연 줄의 회차 날짜 — 반복 작업의 상태 · 완료는 이 회차가 대상이다(없으면 완료를 막는다). */
   const [selOcc, setSelOcc] = useState<string | null>(null);
   const [detail, setDetail] = useState<TaskDetail | null>(null);
-  // Optimistic status for the detail panel's 대기/진행 중/완료 segmented control. `setConsoleTaskStatus`
-  // + `router.refresh()` is a full server round-trip, so without this the segment sits frozen on the
-  // old value until fresh data lands and then jumps. Lives here (not in DetailPanel) because
-  // DetailPanel is a conditionally-called plain function — hooks inside it would break hook order.
+  // 상세 패널 대기/진행 중/완료 분할 컨트롤의 낙관적 상태. `setConsoleTaskStatus`
+  // + `router.refresh()` 는 서버 왕복이 한 번 다 돌아야 해서, 이게 없으면 새 데이터가 올 때까지 분할 컨트롤이
+  // 이전 값에 멈춰 있다가 갑자기 뛴다. DetailPanel 이 아니라 여기에 두는 이유는
+  // DetailPanel 이 조건부로 호출되는 일반 함수라 그 안의 훅은 훅 순서를 깨뜨리기 때문이다.
   //
-  // `from` is what makes this self-expiring without a clean-up effect: the draft only applies while
-  // the task still reads as `from`. The moment the server (or the separately-refetched `detail`)
-  // catches up, the guard fails and the real status takes over on its own.
+  // `from` 이 정리용 effect 없이 스스로 만료되게 한다: 초안은 작업이 아직 `from` 으로 읽히는 동안만 적용된다.
+  // 서버(또는 따로 다시 불러온 `detail`)가
+  // 따라잡는 순간 가드가 실패해 실제 상태가 알아서 이어받는다.
   const [statusDraft, setStatusDraft] = useState<{
     id: string;
     from: string;
     status: "open" | "in_progress" | "completed";
   } | null>(null);
-  // 상세 패널 제목·본문·태그 인라인 편집. Lives here (not in DetailPanel) for the same reason
-  // `statusDraft` does — DetailPanel is a conditionally-called plain function, so hooks inside it
-  // would break hook order.
+  // 상세 패널 제목·본문·태그 인라인 편집. 같은 이유로 DetailPanel 이 아니라 여기에 둔다:
+  // `statusDraft` 와 마찬가지로 DetailPanel 은 조건부로 호출되는 일반 함수라 그 안의 훅은
+  // 훅 순서를 깨뜨린다.
   const [coreEdit, setCoreEdit] = useState<{
     id: string;
     title: string;
@@ -476,8 +476,8 @@ export function AdminTasksConsole({
    * 반복 작업을 회차로 보고 있을 때만 뜬다. 모바일 `recurDelete` 시트와 같은 규칙.
    */
   const [recurDel, setRecurDel] = useState<{ task: TaskRecord; date: string } | null>(null);
-  // ── selection mode (bulk delete) ──
-  // `picked` holds ids across every section of the current view.
+  // ── 선택 모드 (일괄 삭제) ──
+  // `picked` 는 현재 보기의 모든 섹션에 걸친 id 를 담는다.
   const [selMode, setSelMode] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
   /**
@@ -493,7 +493,7 @@ export function AdminTasksConsole({
   // Undo toast (Todoist-style): dark bottom-left toast with a "실행 취소" action, ~6s.
   const [undo, setUndo] = useState<{ id: number; message: string; sub?: string; onUndo: () => void } | null>(null);
 
-  // ── name map ──────────────────────────────────────────────────────────
+  // ── 이름 맵 ──────────────────────────────────────────────────────────
   const nameMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const u of data.users) m.set(u.id, u.name);
@@ -629,7 +629,7 @@ export function AdminTasksConsole({
     [occursOn, occState],
   );
 
-  // ── action runner ──────────────────────────────────────────────────────────────
+  // ── 액션 실행기 ──────────────────────────────────────────────────────────────
   // 서버 액션이 돌려주는 모든 코드를 실제 문구로 매핑한다. 예전에는 auth/forbidden/save_failed 외
   // 전부가 errGeneric("처리하지 못했습니다")으로 뭉개져, 제목 누락인지 날짜 누락인지 화면에서
   // 구분할 수 없었다(2026-07-30 수정).
@@ -686,7 +686,7 @@ export function AdminTasksConsole({
   );
 
 
-  // Auto-dismiss the undo toast (~6s). Clicking undo or a new toast replaces it.
+  // 실행 취소 토스트 자동 닫힘 (~6초). 실행 취소를 누르거나 새 토스트가 뜨면 교체된다.
   useEffect(() => {
     if (!undo) return;
     const t = setTimeout(() => setUndo(null), 6000);
@@ -706,7 +706,7 @@ export function AdminTasksConsole({
     // 상세를 열면 떠 있는 팝오버는 닫는다(스크림이 상세 칸을 덮지 않게).
     setPop(null);
     setNoteDraft("");
-    setStatusDraft(null); // never carry a pending segment click into another task
+    setStatusDraft(null); // 대기 중인 분할 클릭을 다른 작업으로 넘기지 않는다
     setSel(id);
     setSelOcc(occurrenceDate ?? null);
     setDetailClosed(false);
@@ -723,8 +723,8 @@ export function AdminTasksConsole({
     setDetailClosed(false);
     setOdMode(null);
     setOdPicked(new Set());
-    // Selection is scoped to the list you can see — leaving the view drops it rather than carrying
-    // invisible picks into a bulk delete.
+    // 선택은 보이는 목록 범위에 한정된다 — 보기를 벗어나면 안 보이는 선택을
+    // 일괄 삭제로 끌고 가지 않도록 선택을 버린다.
     setSelMode(false);
     setPicked(new Set());
     // 캘린더는 필터바가 없어 활성 필터를 해제할 UI가 없으므로, 진입 시 검색/우선순위/날짜 필터를 초기화한다.
@@ -734,7 +734,7 @@ export function AdminTasksConsole({
       setDateFilter(null);
     }
   }, []);
-  // "다음: {date}" for a recurring task (its next occurrence after today), else undefined.
+  // 반복 작업이면 "다음: {date}" (오늘 이후 다음 회차), 아니면 undefined.
   const recurringNextLabel = useCallback(
     (t: TaskRecord): string | undefined => {
       if (!isStandardRecurrence(t.recurrenceRule)) return undefined;
@@ -748,8 +748,8 @@ export function AdminTasksConsole({
     },
     [today, dict, locale],
   );
-  // Toggle complete; on completing show a "완료 · 실행 취소" undo toast (reopen). Reopen is itself the
-  // correction → plain toast, no undo.
+  // 완료 토글. 완료하면 "완료 · 실행 취소" 토스트를 보인다 (다시 열기). 다시 열기 자체가
+  // 정정이므로 → 일반 토스트, 실행 취소 없음.
   // ── 상세 패널 코어 편집(제목·본문·태그) ────────────────────────────────────────────
   const startCoreEdit = useCallback((t: TaskRecord) => {
     setCoreEdit({ id: t.id, title: t.title, desc: t.description ?? "", tags: [...t.tags], tagInput: "" });
@@ -763,7 +763,7 @@ export function AdminTasksConsole({
     setCoreEdit((prev) => {
       if (!prev) return prev;
       const tag = prev.tagInput.trim().replace(/^#/, "");
-      // Server slices to 10; stop at the same cap here so the UI never shows a tag that won't persist.
+      // 서버는 10개로 자른다. 저장되지 않을 태그를 UI 가 보여 주지 않도록 여기서도 같은 상한에서 멈춘다.
       if (!tag || prev.tags.includes(tag) || prev.tags.length >= 10) return { ...prev, tagInput: "" };
       return { ...prev, tags: [...prev.tags, tag], tagInput: "" };
     });
@@ -771,8 +771,8 @@ export function AdminTasksConsole({
   const saveCoreEdit = useCallback(
     (t: TaskRecord, draft: NonNullable<typeof coreEdit>) => {
       if (!draft.title.trim()) return;
-      // Date/time/repeat/priority are not edited here, but the action rewrites all of them — pass the
-      // task's current values back or this edit would silently clear its schedule.
+      // 날짜/시각/반복/우선순위는 여기서 편집하지 않지만 액션이 전부 다시 쓴다 — 작업의
+      // 현재 값을 되돌려 넘기지 않으면 이 편집이 일정을 조용히 지운다.
       const photos = editPhotos;
       run(
         async () => {
@@ -793,8 +793,8 @@ export function AdminTasksConsole({
             durationMinutes: t.durationMinutes,
             repeat: t.recurrenceRule ?? "none",
             priority: t.priority,
-            // Kept photos + newly uploaded ones. The action treats this as the full replacement
-            // set and hard-deletes whatever the user removed.
+            // 유지한 사진 + 새로 올린 사진. 액션은 이것을 전체 교체 목록으로 보고
+            // 사용자가 뺀 것은 하드 삭제한다.
             imageUrls: [...photos.value, ...uploaded],
           });
         },
@@ -812,16 +812,16 @@ export function AdminTasksConsole({
 
   const toggleComplete = useCallback(
     (t: TaskRecord, occ?: { date: string; done: boolean }) => {
-      // The checkbox can move status behind the segmented control's back; drop any pending segment
-      // click so it can't re-apply if the status happens to land back on its `from` value.
+      // 체크박스는 분할 컨트롤 몰래 상태를 바꿀 수 있다. 대기 중인 분할 클릭을 버려서
+      // 상태가 우연히 `from` 값으로 되돌아와도 다시 적용되지 않게 한다.
       setStatusDraft(null);
-      // Recurring: completion is per-occurrence (occ.date) and the done state comes from the
-      // occurrence, not the row's status (which stays open). One-off: row status.
+      // 반복: 완료는 회차(occ.date) 단위이고 완료 상태는 행 상태(열린 채 유지)가 아니라
+      // 회차에서 가져온다. 일회성: 행 상태.
       const occDate = occ?.date;
       const isDone = occ ? occ.done : t.status === "completed";
       if (isDone) {
-        // Reopen: no optimistic update — the row must wait for fresh server data to reappear, and
-        // the undo toast already gives instant feedback (same call as mobile).
+        // 다시 열기: 낙관적 갱신 없음 — 행이 다시 나타나려면 새 서버 데이터를 기다려야 하고,
+        // 실행 취소 토스트가 이미 즉각 피드백을 준다 (모바일과 같은 방식).
         run(() => toggleConsoleComplete(t.id, false, occDate), { toast: dict.tReopened });
         return;
       }
@@ -875,7 +875,7 @@ export function AdminTasksConsole({
     },
     [toggleComplete],
   );
-  // Immediate (soft) delete + undo toast — replaces the confirm modal for single-task delete.
+  // 즉시(소프트) 삭제 + 실행 취소 토스트 — 단건 삭제의 확인 모달을 대체한다.
   const deleteWithUndo = useCallback(
     (t: TaskRecord) => {
       run(() => deleteConsoleTask(t.id), {
@@ -906,8 +906,8 @@ export function AdminTasksConsole({
     },
     [run, dict, locale, showUndo],
   );
-  // ── project detail loading ───────────────────────────────────────────────────────
-  // Load project sections+tasks for the project view. Gated on `projectDetail.id === projectId`.
+  // ── 프로젝트 상세 불러오기 ───────────────────────────────────────────────────────
+  // 프로젝트 보기용으로 프로젝트 섹션+작업을 불러온다. `projectDetail.id === projectId` 일 때만 실행.
   useEffect(() => {
     if (!projectId) return;
     let alive = true;
@@ -919,7 +919,7 @@ export function AdminTasksConsole({
     };
   }, [projectId, data]);
 
-  // ── global close on outside click / Esc ──────────────────────────────────────────
+  // ── 바깥 클릭 / Esc 로 전역 닫기 ──────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -942,7 +942,7 @@ export function AdminTasksConsole({
     return () => window.removeEventListener("keydown", onKey);
   }, [confirm, pop, rptWhenOpen, report, newProj, recurDel, sel, add, odMode, closePanel]);
 
-  // ── keep the Tokyo operating date live (roll over at Tokyo midnight without a refresh) ──────
+  // ── 도쿄 운영 날짜를 실시간으로 유지 (새로고침 없이 도쿄 자정에 넘김) ──────
   useEffect(() => {
     const check = () => setToday((prev) => (tokyoToday() !== prev ? tokyoToday() : prev));
     const id = setInterval(check, 60_000);
@@ -955,9 +955,9 @@ export function AdminTasksConsole({
     };
   }, []);
 
-  // ── popover placement: put the whole popover on screen (no scroll on normal viewports) ──────
-  // Measured before paint (useLayoutEffect): fit below the trigger, else above, else clamp.
-  // Positioned imperatively via the DOM (no setState) so there's no re-render/flicker/jump.
+  // ── 팝오버 배치: 팝오버 전체를 화면 안에 둔다 (일반 뷰포트에서는 스크롤 없음) ──────
+  // 페인트 전에 측정(useLayoutEffect): 트리거 아래에 맞추고, 안 되면 위, 그래도 안 되면 clamp.
+  // DOM 으로 직접 위치를 잡아(setState 없음) 리렌더/깜빡임/튐이 없다.
   useIsoLayoutEffect(() => {
     const el = popAnchorRef.current;
     if (!el || !pop) return;
@@ -967,18 +967,18 @@ export function AdminTasksConsole({
       const h = el.offsetHeight;
       const w = el.offsetWidth;
       const left = Math.max(8, Math.min(pop.x, vw - w - 8));
-      let top = pop.y; // below the trigger
+      let top = pop.y; // 트리거 아래
       if (top + h > vh - 8) {
-        const above = pop.aTop - 6 - h; // flip above the trigger
+        const above = pop.aTop - 6 - h; // 트리거 위로 뒤집기
         top = above >= 8 ? above : Math.max(8, vh - 8 - h);
       }
       el.style.left = `${left}px`;
       el.style.top = `${top}px`;
     };
     place();
-    // Popovers that load their content async (컨텍스트 피커) or expand a section (일정 피커) grow
-    // AFTER this effect measured them, and a one-shot placement leaves the grown part off-screen.
-    // Re-clamping on resize keeps the footer reachable without special-casing any one popover.
+    // 비동기로 내용을 불러오는 팝오버(컨텍스트 피커)나 섹션이 펼쳐지는 팝오버(일정 피커)는
+    // 이 effect 가 측정한 뒤에 커지는데, 한 번만 배치하면 커진 부분이 화면 밖에 남는다.
+    // 리사이즈 때 다시 clamp 하면 팝오버별 예외 없이 푸터에 닿을 수 있다.
     const ro = new ResizeObserver(place);
     ro.observe(el);
     return () => ro.disconnect();
@@ -1034,7 +1034,7 @@ export function AdminTasksConsole({
   );
   const hasActiveFilter = !!(q || prioFilter || dateFilter);
 
-  // ── small building blocks ─────────────────────────────────────────────────────────
+  // ── 작은 구성 요소 ─────────────────────────────────────────────────────────
   // 아바타는 한 가지 옅은 보라 톤(화이트 리디자인) — 사람마다 다른 색을 칠하지 않는다.
   const Avatar = ({ id, cls }: { id: string; cls?: string }) => (
     <span className={cls ? `av ${cls}` : "av"}>{initial(nameOf(id))}</span>
@@ -1065,7 +1065,7 @@ export function AdminTasksConsole({
   const dayLabel = (d: string) =>
     d === today ? dict.today : d === addDays(today, 1) ? dict.tomorrow : `${md(d)} (${fmtWeekday(d, locale)})`;
 
-  // ── TASK ROW ──────────────────────────────────────────────────────────────────────
+  // ── 작업 줄 ──────────────────────────────────────────────────────────────────────
   // 한 줄 = 우선순위 고리 · 제목 · 회색 메타 한 줄(지연이면 빨강). 칩·깃발·배지를 늘어놓지 않고
   // 「긴급 · 15:00 · 가부키초 K302 · #태그 · 진행 중 · 공유 2명」처럼 낱말로 잇는다(시안 Todo-PC).
   const renderRow = (
@@ -1280,7 +1280,7 @@ export function AdminTasksConsole({
     </div>
   );
 
-  // ── INLINE ADD ──────────────────────────────────────────────────────────────────────
+  // ── 인라인 추가 ──────────────────────────────────────────────────────────────────────
   const openInlineAdd = (ctx: AddDraft["ctx"], onDate = "", sectionId: string | null = null) => {
     // 지시는 날짜 없이 보내면 대상자의 관리함에 묻히기 쉬워 오늘로 잡아 둔다(스케줄 칩에서 변경 가능).
     const date =
@@ -1312,10 +1312,10 @@ export function AdminTasksConsole({
     const draft = add;
     const text = { ...addTextRef.current }; // 비제어 입력의 현재 값(제출 시점 스냅샷)
     const photos = addPhotos;
-    // The task id is minted here so the photos can be uploaded to their final
-    // `${organizationId}/task-images/${id}/` path BEFORE the row exists — the same order the mobile
-    // form uses. If the insert then fails the objects are orphaned, which is the accepted trade
-    // (an orphan file beats a row referencing an upload that never happened).
+    // 작업 id 는 여기서 만든다. 사진을 행이 생기기 전에 최종 경로
+    // `${organizationId}/task-images/${id}/` 에 올릴 수 있게 하기 위함이며 모바일 폼과 같은 순서다.
+    // 이후 insert 가 실패하면 객체가 고아가 되는데, 이는 받아들인 절충이다
+    // (올라가지 않은 업로드를 가리키는 행보다 고아 파일이 낫다).
     const newTaskId = crypto.randomUUID();
 
     // ── 입력을 **즉시** 비운다 ──────────────────────────────────────────────────
@@ -1595,7 +1595,7 @@ export function AdminTasksConsole({
     );
   };
 
-  // ── POPOVER OPENERS ─────────────────────────────────────────────────────────────────
+  // ── 팝오버 여는 곳 ─────────────────────────────────────────────────────────────────
   const openSchedulePop = (e: ReactMouseEvent, t: TaskRecord | null) => {
     e.stopPropagation();
     const a = anchorFrom(e);
@@ -1655,7 +1655,7 @@ export function AdminTasksConsole({
     setPop({ kind: "rowmenu", taskId, occ, fromDetail, ...anchorFrom(e) });
   };
 
-  // ── SCHEDULE / PRIO / SHARE APPLY ─────────────────────────────────────────────────────
+  // ── 일정 / 우선순위 / 공유 적용 ─────────────────────────────────────────────────────
   const applySchedule = (p: SchedulePop) => {
     if (p.src === "add") {
       if (add) setAdd({ ...add, date: p.draft.date, time: p.draft.time, dur: p.draft.dur, repeat: p.draft.repeat });
@@ -1683,7 +1683,7 @@ export function AdminTasksConsole({
       setPop(null);
       return;
     }
-    // Empty date is allowed here: rescheduleConsoleTask clears the schedule → task moves to Inbox.
+    // 여기서는 빈 날짜를 허용한다: rescheduleConsoleTask 가 일정을 지우고 → 작업은 관리함으로 이동한다.
     const id = p.taskId;
     const d = p.draft;
     run(() => rescheduleConsoleTask(id, { date: d.date, time: d.time, durationMinutes: d.dur, repeat: d.repeat }), {
@@ -1791,7 +1791,7 @@ export function AdminTasksConsole({
     });
   };
 
-  // ── SELECTION MODE + BULK DELETE ────────────────────────────────────────────────────
+  // ── 선택 모드 + 일괄 삭제 ────────────────────────────────────────────────────
   const clearSel = useCallback(() => setPicked(new Set()), []);
   const exitSelMode = useCallback(() => {
     setSelMode(false);
@@ -1805,11 +1805,11 @@ export function AdminTasksConsole({
       return next;
     });
   }, []);
-  /** "전체 선택" = every row currently on screen, read from the rendered list at click time.
-   *  Each view builds its own list inline (today = 지난 + 오늘, 공유함 = 받음 + 보냄, …) with the
-   *  search/date/priority filters already applied, so reading the DOM is what actually matches what
-   *  the user sees — recomputing those seven filter expressions here would be a second source of
-   *  truth that silently drifts. This only ever runs from a click, never during render. */
+  /** "전체 선택" = 지금 화면에 있는 모든 행, 클릭 시점에 렌더된 목록에서 읽는다.
+   *  각 보기는 자기 목록을 인라인으로 만든다 (오늘 = 지난 + 오늘, 공유함 = 받음 + 보냄, …). 거기에
+   *  검색/날짜/우선순위 필터가 이미 적용돼 있어서, DOM 을 읽는 것이 사용자가 보는 것과 실제로 일치한다 —
+   *  일곱 개의 필터 식을 여기서 다시 계산하면 조용히 어긋나는 두 번째 진실 공급원이
+   *  된다. 클릭에서만 실행되며 렌더 중에는 절대 실행되지 않는다. */
   const selectAllVisible = useCallback(() => {
     const ids = Array.from(document.querySelectorAll<HTMLElement>(".atw-main .atw-row[data-task-id]"))
       .map((el) => el.dataset.taskId)
@@ -1817,8 +1817,8 @@ export function AdminTasksConsole({
     setPicked(new Set(ids));
   }, []);
 
-  /** Delete every id in one round trip. Only rows the user authored come back as `deletedIds`, so
-   *  the undo toast is offered for those alone — a "leave" can't be reversed by clearing deleted_at. */
+  /** 모든 id 를 한 번의 왕복으로 삭제한다. 사용자가 작성한 행만 `deletedIds` 로 돌아오므로
+   *  실행 취소 토스트는 그것들에만 제공한다 — "나가기"는 deleted_at 을 지워도 되돌릴 수 없다. */
   const runBulkDelete = useCallback(
     (ids: string[], onDone?: () => void) => {
       if (!ids.length) return;
@@ -1860,7 +1860,7 @@ export function AdminTasksConsole({
     });
   };
 
-  // ── OVERDUE BULK ────────────────────────────────────────────────────────────────────
+  // ── 지연 일괄 ────────────────────────────────────────────────────────────────────
   // 대상은 사용자가 고른 `odPicked` 뿐이고, 서버가 다시 "내가 만든 · 일회성 · 진짜 지연"만 남긴다
   // (`dismissConsoleOverdue`). 전부 내 작업이므로 실행 취소(복원)를 그대로 제공할 수 있다.
   const clearOverdue = () => {
@@ -1884,7 +1884,7 @@ export function AdminTasksConsole({
     });
   };
 
-  // ── VIEWS ────────────────────────────────────────────────────────────────────────────
+  // ── 보기 ────────────────────────────────────────────────────────────────────────────
   // 목록 데이터는 화면과 상세 칸의 기본 선택(보기의 첫 작업)이 **같은 순서**를 보도록 함수로 뺀다.
 
   /**
@@ -2404,7 +2404,7 @@ export function AdminTasksConsole({
     </>
   );
 
-  // ── COMPLETED ────────────────────────────────────────────────────────────────────────
+  // ── 완료 ────────────────────────────────────────────────────────────────────────
   /** 완료·기록 = task_updates 완료 로그(net) 기준 — 보고서(같은 소스)와 목록이 일치한다. */
   const completedRows = () => {
     type CmpRow = { task: TaskRecord; day: string; byUserId: string | null };
@@ -2496,7 +2496,7 @@ export function AdminTasksConsole({
     );
   };
 
-  // ── CALENDAR ─────────────────────────────────────────────────────────────────────────
+  // ── 캘린더 ─────────────────────────────────────────────────────────────────────────
   // 월요일 시작(시안 TodoCal-PC). 칸은 남은 높이를 다 채운다(5~6줄).
   const calendarView = () => {
     const [y, m] = calMonth.split("-").map(Number);
@@ -2693,7 +2693,7 @@ export function AdminTasksConsole({
     );
   };
 
-  // ── PROJECT ───────────────────────────────────────────────────────────────────────────
+  // ── 프로젝트 ───────────────────────────────────────────────────────────────────────────
   const projectInfo = () => {
     const summary = projectId ? projById.get(projectId) : null;
     if (!summary) return null;
@@ -2814,7 +2814,7 @@ export function AdminTasksConsole({
     );
   };
 
-  // ── report ────────────────────────────────────────────────────────────────────────────────
+  // ── 일지 ────────────────────────────────────────────────────────────────────────────────
   const openReport = (date: string) => {
     setReport({ date, text: "", loading: true, sending: false, error: null });
     setReportEdited("");
@@ -3040,7 +3040,7 @@ export function AdminTasksConsole({
     return () => clearInterval(id);
   }, [report, rptWhenOpen, rptSched?.status]);
 
-  // ── note send ────────────────────────────────────────────────────────────────────────────
+  // ── 노트 보내기 ────────────────────────────────────────────────────────────────────────────
   const sendNote = () => {
     // 사진만 있고 본문이 비어도 보낼 수 있다(서버도 같은 규칙).
     if (!activeId || (!noteDraft.trim() && notePhotos.length === 0)) return;
@@ -3375,7 +3375,7 @@ export function AdminTasksConsole({
   const filterableView = view !== "calendar" || !!projectId;
   const isCal = !projectId && view === "calendar";
 
-  // ── body routing ───────────────────────────────────────────────────────────────────────
+  // ── 본문 라우팅 ───────────────────────────────────────────────────────────────────────
   const body = projectId
     ? projectView()
     : view === "today"
@@ -3463,8 +3463,8 @@ export function AdminTasksConsole({
     const done = realStatus === "completed" || completing.has(motionKey);
     // 코어 편집 드래프트가 이 작업의 것일 때만 편집 모드로 렌더한다.
     const editing = coreEdit && coreEdit.id === t.id ? coreEdit : null;
-    // What the segmented control shows: the pending click while the data still reads as it did when
-    // the click happened, else server truth.
+    // 분할 컨트롤이 보여 주는 값: 클릭한 시점의 값으로 데이터가 아직 읽히는 동안은 대기 중인 클릭,
+    // 그 외에는 서버의 진실.
     const shownStatus =
       statusDraft && statusDraft.id === t.id && realStatus === statusDraft.from
         ? statusDraft.status
@@ -3581,7 +3581,7 @@ export function AdminTasksConsole({
                     placeholder={dict.dpTagAdd}
                     onChange={(e) => setCoreEdit({ ...editing, tagInput: e.target.value })}
                     onKeyDown={(e) => {
-                      // Enter/comma commit; Backspace on an empty input pops the last chip.
+                      // Enter/쉼표로 확정, 빈 입력에서 Backspace 를 누르면 마지막 칩을 뺀다.
                       if (e.key === "Enter" || e.key === ",") {
                         e.preventDefault();
                         addCoreTag();
@@ -3909,11 +3909,11 @@ export function AdminTasksConsole({
   }
 
   // ────────────────────────────────────────────────────────────────────────────────────────────
-  // POPOVER LAYER
+  // 팝오버 레이어
   // ────────────────────────────────────────────────────────────────────────────────────────────
   function PopoverLayer() {
     if (!pop) return null;
-    // Initial guess (below the trigger); the layout effect measures and repositions before paint.
+    // 초기 추정(트리거 아래); 레이아웃 effect 가 측정해 페인트 전에 위치를 다시 잡는다.
     const style: CSSProperties = { left: pop.x, top: pop.y };
     return (
       <>
@@ -3975,9 +3975,9 @@ export function AdminTasksConsole({
     );
     const curRep = p.draft.repeat || "none";
     const anchorForRepeat = sel0 || today;
-    // `customDays` is the picker's mode flag AND its value: an array (possibly empty) while the
-    // 사용자 지정 row is on, null otherwise. `custom:` with an empty body parses to null, so the
-    // in-progress "custom mode, nothing picked yet" state needs this explicit prefix check.
+    // `customDays` 는 피커의 모드 플래그이자 값이다: 배열(비어 있을 수도 있음)이면
+    // 사용자 지정 행이 켜진 것이고 아니면 null 이다. 본문이 빈 `custom:` 은 null 로 파싱되므로
+    // “사용자 지정 모드인데 아직 아무것도 고르지 않은” 진행 중 상태에는 이 명시적 접두사 검사가 필요하다.
     const inCustomMode = curRep.startsWith(CUSTOM_RECURRENCE_PREFIX);
     const customDays = inCustomMode ? (parseCustomWeekdays(curRep) ?? []) : null;
     const repeatIncomplete = inCustomMode && customDays!.length === 0;
@@ -4517,7 +4517,7 @@ export function AdminTasksConsole({
     );
   }
 
-  // ── REPORT MODAL ─────────────────────────────────────────────────────────────────────────
+  // ── 일지 모달 ─────────────────────────────────────────────────────────────────────────
   function ReportModal() {
     if (!report) return null;
     // 화이트 리디자인(2026-10-15, 시안 TodoReport-PC): 제목 + 「날짜 · 완료 n건 중 m건 포함」 → 포함할 항목 → 본문 → 안내 · 원본으로 → 닫기 / Slack / 전체 복사.
@@ -4767,7 +4767,7 @@ export function AdminTasksConsole({
     );
   }
 
-  // ── NEW PROJECT MODAL ────────────────────────────────────────────────────────────────────
+  // ── 새 프로젝트 모달 ────────────────────────────────────────────────────────────────────
   function NewProjectModal() {
     if (!newProj) return null;
     const list = data.users.filter(
@@ -4879,7 +4879,7 @@ export function AdminTasksConsole({
     return opt ? dict[opt.key] : "";
   }
 
-  // ── CONFIRM MODAL (destructive actions) ─────────────────────────────────────────────────────
+  // ── 확인 모달 (되돌릴 수 없는 작업) ─────────────────────────────────────────────────────
   /**
    * 반복 삭제 선택 모달 — 회차 하나 vs 시리즈 전체.
    *
@@ -4960,7 +4960,7 @@ export function AdminTasksConsole({
                 <X size={16} />
               </button>
             </div>
-            {/* pre-line: the bulk-delete message appends a second line about shared tasks. */}
+            {/* pre-line: 일괄 삭제 메시지는 공유 작업에 대한 둘째 줄을 덧붙인다. */}
             <div
               style={{
                 padding: "6px 20px 16px",
@@ -5020,7 +5020,7 @@ export function AdminTasksConsole({
 
       {sideNode}
 
-      {/* POPOVERS / SHEETS / MODALS */}
+      {/* 팝오버 / 시트 / 모달 */}
       {pop && PopoverLayer()}
       {report && ReportModal()}
       {newProj && NewProjectModal()}
@@ -5059,7 +5059,7 @@ export function AdminTasksConsole({
   );
 }
 
-// ── tiny helpers (module scope) ───────────────────────────────────────────────────────────────
+// ── 작은 헬퍼 (모듈 범위) ───────────────────────────────────────────────────────────────
 // 옵셔널 체이닝이 든 논리식을 JSX 안에 두면 React Compiler 가 이 콘솔 전체를 건너뛴다 — 함수로 뺀다.
 function addContextSet(c: AddDraft["context"]): boolean {
   return Boolean(c && (c.propertyId || c.reservationId));

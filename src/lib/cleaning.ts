@@ -148,8 +148,8 @@ export async function getMyTodayCleaningSessions(session: AppSession) {
   return (data ?? []) as CleaningSessionRow[];
 }
 
-// Returns room_label + status for all sessions in the org today.
-// Used by the cleaning page to build the "already processed" exclusion set.
+// 오늘 조직의 모든 세션의 room_label + status 를 돌려준다.
+// 청소 페이지가 "이미 처리됨" 제외 집합을 만들 때 쓴다.
 export async function getOrgTodayCleaningRoomLabels(
   organizationId: string,
   date?: string,
@@ -198,8 +198,8 @@ export async function getOrgProcessedCleaningRoomLabels(
   return (data ?? []) as { room_label: string; status: "in_progress" | "completed" }[];
 }
 
-// Full session rows for the org on one operating date (org-wide, every staff member) — used by the
-// admin console to overlay real cleaning-session status onto the reservation-derived targets.
+// 한 운영 날짜의 조직 전체(모든 직원) 세션 행 전체 — 관리자
+// 콘솔이 예약에서 나온 대상 위에 실제 청소 세션 상태를 겹쳐 보일 때 쓴다.
 // `date` 를 열어 과거·미래 날짜도 같은 화면으로 볼 수 있게 한다(2026-08-04). 과거 날짜에서는 이
 // 값이 "그날 실제로 누가 무엇을 했는가"의 유일한 근거다 — 대상은 재계산이지만 세션은 사실이다.
 export async function getOrgTodayCleaningSessions(
@@ -220,9 +220,9 @@ export async function getOrgTodayCleaningSessions(
 
 export type CleaningStaffOption = { id: string; name: string };
 
-// Org members eligible to be assigned a cleaning session (mobile field roles), for the admin
-// console's staff filter/summary/force-complete assignee picker. Narrower than
-// getOrgMemberOptions, which returns every org member regardless of role.
+// 관리자 콘솔의 직원 필터/요약/강제 완료 담당자 선택기용으로, 세션을 배정받을 수 있는
+// 조직 멤버(모바일 현장 역할). getOrgMemberOptions 보다 좁다. 그쪽은
+// 역할과 관계없이 모든 조직 멤버를 돌려준다.
 export async function getCleaningStaffOptions(
   organizationId: string,
 ): Promise<CleaningStaffOption[]> {

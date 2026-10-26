@@ -1,6 +1,6 @@
 "use client";
 
-// Shared admin-console reason modal primitive.
+// 관리자 콘솔 공용 사유 모달 프리미티브.
 import { useEffect, useRef, useState } from "react";
 
 export type AdminReasonModalProps = {
@@ -16,8 +16,8 @@ export type AdminReasonModalProps = {
   onCancel: () => void;
 };
 
-/** Centered reason-entry dialog — replaces `window.prompt` for admin console actions
- * that require an optional/required text reason (approve / invalidate / reject). */
+/** 가운데 정렬 사유 입력 대화상자 — 관리자 콘솔 액션의 `window.prompt` 를 대체한다.
+ * 선택/필수 텍스트 사유가 필요한 경우 (승인 / 무효 / 반려). */
 export function AdminReasonModal({
   title,
   description,

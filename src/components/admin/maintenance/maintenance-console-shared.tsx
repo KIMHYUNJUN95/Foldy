@@ -1,6 +1,6 @@
-// Shared display helpers for the admin 수리·점검 console — the status pill, priority badge, category
-// chip and derived (재실 중 / 오래 방치 / 사진 개수) badges. Board, list, panel and modal all render
-// through these so the four stay visually identical.
+// 관리자 수리·점검 콘솔의 공용 표시 헬퍼 — 상태 필, 우선순위 배지, 카테고리
+// 칩, 파생 (재실 중 / 오래 방치 / 사진 개수) 배지. 보드, 목록, 패널, 모달이 모두 렌더링한다
+// 이들을 거쳐 넷이 시각적으로 같게 유지된다.
 import type { ComponentType, SVGProps } from "react";
 import {
   Ban,
@@ -71,7 +71,7 @@ export function categoryLabel(category: MaintCategory, t: MaintCopy): string {
   return copyOf(t, MAINT_CATEGORY[category].key);
 }
 
-/** open / in_progress show the status icon; terminal states show a plain dot (design handoff rule). */
+/** open / in_progress 는 상태 아이콘을 보이고, 종료 상태는 단순 점을 보인다 (디자인 핸드오프 규칙). */
 export function StatusPill({ status, t }: { status: MaintStatus; t: MaintCopy }) {
   const Icon = STATUS_ICON[status];
   const showIcon = status === "open" || status === "in_progress";

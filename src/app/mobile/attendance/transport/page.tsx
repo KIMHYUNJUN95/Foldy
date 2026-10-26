@@ -41,7 +41,7 @@ function resolveMonthKey(ym: string | undefined, current: string): string {
 }
 
 // Mobile — 교통비 정산서 (Transport Expense Statement).
-// See docs/product/24-attendance-workflow.md.
+// 참고: docs/product/24-attendance-workflow.md.
 export default async function MobileTransportPage({
   searchParams,
 }: {

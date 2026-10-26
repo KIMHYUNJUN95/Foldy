@@ -1,8 +1,8 @@
 "use server";
 
-// Annual leave — self-service server action for the Phase 1 backend (hire_date + starting balance
-// only). Self-only: acts on the authenticated user's own profile/baseline row, never another user's.
-// All writes use the service-role client (RLS denies direct authenticated writes).
+// 연차 — Phase 1 백엔드(hire_date + 시작 잔여
+// 일수만)용 본인 서비스 서버 액션. 본인 한정: 인증된 사용자 본인의 프로필/기준 행에만 작용하며 다른 사용자에게는 절대 쓰지 않는다.
+// 모든 쓰기는 service-role 클라이언트를 쓴다(RLS 가 인증 사용자의 직접 쓰기를 막음).
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -59,7 +59,7 @@ export async function setAnnualLeaveBaselineAction(input: {
   return { ok: true };
 }
 
-// ── Request submission (Phase 2, stage 1 — approval action is not implemented yet) ──
+// ── 신청 제출 (Phase 2, 1단계 — 승인 액션은 아직 구현되지 않음) ──
 
 export type SubmitLeaveRequestResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -69,7 +69,7 @@ export type SubmitLeaveRequestResult = { ok: true; id: string } | { ok: false; e
  * 이름은 세션 프로필, 일수는 `normalizeLeaveDays` 로 서버가 정한다 — 관리자 대리 신청과 같은 규칙이다.
  */
 export async function submitLeaveRequestAction(input: {
-  /** Set when continuing an existing draft — updates that row instead of creating a new one. */
+  /** 기존 임시저장을 이어갈 때 설정되며, 새 행을 만드는 대신 그 행을 갱신한다. */
   requestId?: string;
   leaveType: string;
   startDate: string;

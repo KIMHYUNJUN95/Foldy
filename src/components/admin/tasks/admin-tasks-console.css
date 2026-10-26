@@ -7,7 +7,7 @@
  * 일정 팝오버의 작은 달력(`.cal-head/.cal-nav/.cal-wd/.cal-grid/.cal-c`)은 공용 `.calpop` 을 쓰지 않는
  * 문서화된 예외다(CLAUDE.md §4a) — 모바일의 날짜·빠른 선택·기간·반복 통합 피커와 짝을 맞춘다
  * (docs/product/28-admin-todoist-console.md §3, §5, §11).
- * Spec: docs/product/28-admin-todoist-console.md
+ * 명세: docs/product/28-admin-todoist-console.md
  */
 
 .adm {

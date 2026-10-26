@@ -1,16 +1,16 @@
 /*
- * Admin 분실물(Lost & Found) console — screen-local additions on top of admin-console.css +
- * maintenance-console.css (imported by lost-found-console.tsx for the primitives this screen shares
- * with 수리·점검: .opsbar--5/.robadge/.mboard-wrap/.mbkgrid/.mbkcol/.mcard/.pgal/.pshot/.pnophoto/
+ * 관리자 분실물(Lost & Found) 콘솔 — admin-console.css + maintenance-console.css 위에 얹는 화면 전용 추가분.
+ * (lost-found-console.tsx 가 이 화면이 공유하는 프리미티브를 위해 가져온다)
+ * 수리·점검과 공유: .opsbar--5/.robadge/.mboard-wrap/.mbkgrid/.mbkcol/.mcard/.pgal/.pshot/.pnophoto/
  * .mdesc/.infonote/.dimnote/.mpanel__title/.mpanel__chips/.cfhead/.cficon/.cfbody-t/.cfbody-s/.cfrec/
- * .exczone/.excbtn/.btn--danger/.btn--warnsolid/.mtbl .tt-x/.el-cell/.filterbar .dd). Ported 1:1 from
- * the Claude Design handoff (lf-design.css) — only genuinely NEW components for this screen live here.
- * See docs/product/09-lost-found-workflow.md.
+ * .exczone/.excbtn/.btn--danger/.btn--warnsolid/.mtbl .tt-x/.el-cell/.filterbar .dd). Claude Design 핸드오프
+ * (lf-design.css)에서 1:1로 옮김 — 이 화면에 정말 새로운 컴포넌트만 여기에 둔다.
+ * 참고: docs/product/09-lost-found-workflow.md.
  */
 
 .adm .opscell__flag.is-soon { color: var(--warn); }
 
-/* STATUS PILL — lost&found statuses (extend .cstat base from admin-console.css) */
+/* 상태 알약 — 분실물 상태 (admin-console.css 의 .cstat 기본을 확장) */
 .adm .cstat--received { background: var(--info-bg); color: var(--info); }
 .adm .cstat--stored { background: var(--primary-soft); color: var(--primary-ink, var(--adm-primary)); }
 .adm .cstat--pending { background: var(--warn-bg); color: var(--warn); }
@@ -26,7 +26,7 @@
 .adm .mbkcol--stored .mbkcol__ic { background: var(--primary-soft); color: var(--adm-primary); }
 .adm .mbkcol--pending .mbkcol__ic { background: var(--warn-bg); color: var(--warn); }
 
-/* CARD — item-led (thumb + type + due badge + storage) */
+/* 카드 — 물품 중심 (썸네일 + 유형 + 기한 배지 + 보관) */
 .adm .mcard.is-received { border-left-color: var(--info); }
 .adm .mcard.is-stored { border-left-color: var(--adm-primary); }
 .adm .mcard.is-pending { border-left-color: var(--warn); }
@@ -58,7 +58,7 @@
   background: var(--info-bg); border: 1px solid color-mix(in oklab, var(--info) 26%, transparent); }
 .adm .lfbanner .ic { font-size: 17px; color: var(--info); flex: 0 0 auto; }
 
-/* delete-imminent table row emphasis */
+/* 삭제 임박 표 행 강조 */
 .adm .mtbl tr.row-warn td { background: color-mix(in oklab, var(--danger) 4%, transparent); }
 
 /* storage-extended badge (기간 연장) */
@@ -69,7 +69,7 @@
 .adm .mcard__el.is-soon { color: var(--warn); }
 .adm .mcard__el.is-soon .ic { color: var(--warn); }
 
-/* LIST / DONE / DISPOSAL table specifics (reuse .qtbl / .mtbl from admin-console.css) */
+/* 목록 / 완료 / 폐기 표 세부 (admin-console.css 의 .qtbl / .mtbl 재사용) */
 .adm .mtbl .due-cell { font-family: var(--mono); font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
 .adm .mtbl .due-cell.is-soon { color: var(--warn); }
 .adm .mtbl .due-cell.is-expired { color: var(--danger); }
@@ -78,7 +78,7 @@
 .adm .mtbl .trk { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--adm-muted); }
 .adm .mtbl .trk.is-none { color: var(--faint); }
 
-/* DETAIL PANEL — storage / delete state box */
+/* 상세 패널 — 보관 / 삭제 상태 박스 */
 .adm .stnote { display: flex; gap: 11px; padding: 12px 14px; border-radius: 13px; }
 .adm .stnote__ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .adm .stnote__ic .ic { font-size: 16px; }
@@ -127,7 +127,7 @@
 .adm .actbtn--extend { color: var(--ink); }
 .adm .actbtn--extend:hover { border-color: color-mix(in oklab, var(--ink) 24%, var(--line)); }
 
-/* MODAL EXTRAS — return-method radio, tracking reveal, status-pick chips */
+/* 모달 추가분 — 반환 방법 라디오, 운송장 펼침, 상태 선택 칩 */
 .adm .segradio { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .adm .segopt { display: flex; align-items: center; gap: 11px; padding: 12px 13px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer; text-align: left; transition: border-color 0.14s, background 0.14s; }
 .adm .segopt__ic { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; background: var(--adm-surface); color: var(--adm-muted); }

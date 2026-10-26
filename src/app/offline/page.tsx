@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-// i18n-ignore-file: offline fallback is static and trilingual because session locale may be unavailable.
+// i18n-ignore-file: 오프라인 대체 화면은 정적이고, 세션 로케일을 쓸 수 없을 수 있어 3개 국어로 둔다.
 
 export const metadata: Metadata = {
   // 언어 중립 — 아래 스크립트가 기기 언어로 「오프라인 · Foldy」 / 「オフライン · Foldy」 / 「Offline · Foldy」 로 바꾼다.
@@ -42,9 +42,9 @@ const COPY = [
 ];
 
 /**
- * Offline fallback served by the service worker when a navigation fails with no network.
- * Static + self-contained (no session / data / i18n context, since it must render offline).
- * Trilingual to match the product's ko/ja/en requirement — the inline script shows only the device language.
+ * 네트워크 없이 이동이 실패했을 때 서비스 워커가 내려주는 오프라인 대체 화면.
+ * 정적이고 자체 완결적(세션 / 데이터 / i18n 컨텍스트 없음 — 오프라인에서 렌더링해야 하므로).
+ * 제품의 ko/ja/en 요구에 맞춰 3개 국어로 둔다 — 인라인 스크립트가 기기 언어만 보여준다.
  */
 export default function OfflinePage() {
   return (

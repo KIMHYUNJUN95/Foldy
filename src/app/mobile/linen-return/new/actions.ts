@@ -86,7 +86,7 @@ export async function createLinenReturnRecord(formData: FormData) {
   const note = cleanText(formData.get("note"));
   const rawLines = parseLines(cleanText(formData.get("linesJson")));
 
-  // Validate item ids against the building's active catalog (fail closed).
+  // 항목 id 를 건물의 활성 카탈로그와 대조해 검증한다(실패 시 닫힘).
   const catalog = await getActiveLinenItems(session, building);
   const validItemIds = new Set(catalog.map((item) => item.id));
 
@@ -120,9 +120,9 @@ export async function createLinenReturnRecord(formData: FormData) {
     redirect(newPath(building, "too_many_photos"));
   }
 
-  // Reuse the client-generated id (also used as the image folder) when valid so
-  // photo storage paths and the record id stay aligned on brand-new records;
-  // same-day merge saves may append new photos from a follow-up upload folder.
+  // 유효하면 클라이언트가 만든 id(이미지 폴더로도 쓰임)를 재사용해
+  // 새 기록에서 사진 저장 경로와 기록 id 가 일치하게 하고,
+  // 같은 날 병합 저장은 후속 업로드 폴더의 새 사진을 덧붙일 수 있다.
   const requestedId = cleanText(formData.get("id"));
   const recordId = requestedId && isValidUuid(requestedId) ? requestedId : crypto.randomUUID();
   const supabase = await getSupabaseServerClient();
@@ -251,13 +251,13 @@ export async function createLinenReturnRecord(formData: FormData) {
     .from("linen_return_record_items")
     .insert(lineInserts);
   if (linesError) {
-    // Roll back the orphan header so a failed save leaves no partial record.
+    // 고아 헤더를 롤백해 저장이 실패해도 부분 기록이 남지 않게 한다.
     await supabase.from("linen_return_records").delete().eq("id", recordId);
     redirect(newPath(building, "save_failed"));
   }
 
-  // Return to the building list and surface a completion moment there
-  // (created=<id> highlights the affected row, whether newly created or merged).
+  // 건물 목록으로 돌아가 거기서 완료 연출을 보여준다
+  // (created=<id> 가 영향받은 행을 강조하며, 새로 만들었든 병합했든 동일).
   revalidateLinenReturnPaths();
   redirect(
     `/mobile/linen-return/list?building=${encodeURIComponent(building)}&created=${recordId}`,

@@ -1,10 +1,10 @@
 "use client";
 
-// Admin 주문·비품 console — content area for /admin/orders (AdminShell owns the sidebar/topbar).
+// 관리자 주문·비품 콘솔 — /admin/orders 의 콘텐츠 영역 (사이드바/상단바는 AdminShell 이 맡는다).
 // 화이트 리디자인(2026-10-14, 시안 Order-PC · OrderCal-PC · OrderAll-PC): 보기 셋 — 처리 중 / 배송 캘린더 / 전체 기록.
 // 예전 「현황 보드」 · 「완료」는 처리 중 큐와 전체 기록(상태 고르기)으로 합쳤다. 처리형 콘솔: 승인 → 주문 처리 →
 // 배송일 기입 → 캘린더 반영을 사무실에서 직접 진행하고, 예외 개입(요청 수정/상태 정정/다시 열기/삭제)도 여기서 한다.
-// See docs/product/10-order-request-workflow.md.
+// 참고: docs/product/10-order-request-workflow.md.
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
@@ -228,7 +228,7 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
         return;
       }
 
-      // delete
+      // 삭제
       const result = await deleteOrderRequest(id);
       if (!result.ok) {
         showToast(t.errS);

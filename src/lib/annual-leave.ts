@@ -1,20 +1,20 @@
-// Annual-leave accrual calculation, based on hire date.
-// Policy confirmed 2026-07-06 (see docs/product/26-annual-leave-workflow.md):
-//   - first grant 10d at 6 months, then 11d/12d at each of the next two
-//     anniversaries of that grant, then +2d per year, capped at 20d — this is the
-//     "유급 휴가"(paid leave) pool, used by the "paid" leave-request type
-//   - a separate one-time +4d bonus at the 4-year mark (outside the 20d cap) — this
-//     bucket is its own pool, spent only via the "특별휴가"(special) leave-request
-//     type, never mixed with the paid-leave pool
-//   - unused leave lapses 2 years after its grant date (confirmed up to 2 years;
-//     policy beyond 2 years is still pending company confirmation)
-//   - bereavement leave ("경조휴가", the "annual" request type) and unpaid leave
-//     ("기타") are NOT part of this hire-date accrual at all — see leave-form.tsx
+// 입사일 기준 연차 발생 계산.
+// 정책 2026-07-06 확정 (docs/product/26-annual-leave-workflow.md 참고):
+//   - 첫 부여는 6개월 시점에 10일, 이후 그 부여의 다음 두 기념일마다 11일/12일,
+//     그다음부터 매년 +2일, 상한 20일 — 이것이
+//     "유급 휴가" 풀이며 "paid" 휴가 신청 유형으로 사용한다
+//   - 4년 시점에 별도로 한 번 +4일 보너스 (20일 상한 밖) — 이 묶음은
+//     독립된 풀이며 "특별휴가" 휴가 신청
+//     유형으로만 소진하고, 유급휴가 풀과 절대 섞이지 않는다
+//   - 쓰지 않은 연차는 부여일로부터 2년 뒤 소멸 (2년까지 확정,
+//     2년 이후 정책은 아직 회사 확인 대기)
+//   - 경조 휴가("경조휴가", "annual" 신청 유형)와 무급 휴가
+//     ("기타")는 이 입사일 기준 발생에 전혀 포함되지 않는다 — leave-form.tsx 참고
 //
-// This module is pure (no Supabase/session imports) so it can run on both server and client.
-// `hire_date` lives on `profiles`; the self-entered starting balance lives in
-// `annual_leave_baselines` (migration 202607060001) — see src/lib/annual-leave-server.ts for the
-// DB read/write side and src/app/mobile/attendance/leave/actions.ts for the self-service action.
+// 이 모듈은 순수(Supabase/세션 import 없음)라 서버와 클라이언트 모두에서 실행할 수 있다.
+// `hire_date` 는 `profiles` 에 있고, 본인이 입력한 시작 잔여는
+// `annual_leave_baselines`(마이그레이션 202607060001)에 있다 — DB 읽기/쓰기 쪽은 src/lib/annual-leave-server.ts,
+// 셀프서비스 액션은 src/app/mobile/attendance/leave/actions.ts 를 본다.
 
 const BASE_SCHEDULE_MONTHS = [6, 18, 30, 42, 54, 66, 78];
 const BASE_SCHEDULE_AMOUNTS = [10, 11, 12, 14, 16, 18, 20];
@@ -28,7 +28,7 @@ export const LEAVE_EXPIRY_YEARS = 2;
 
 export type LeaveGrantEvent = {
   kind: "base" | "bonus";
-  date: string; // ISO date (YYYY-MM-DD)
+  date: string; // ISO 날짜 (YYYY-MM-DD)
   amount: number;
 };
 
@@ -39,24 +39,24 @@ export type LeaveBucket = {
   kind: LeaveBucketKind;
   grantedOn: string;
   amount: number;
-  expiresOn: string | null; // null = engine does not manage this bucket's expiry (baseline)
+  expiresOn: string | null; // null = 엔진이 이 묶음의 소멸을 관리하지 않음 (기준 잔여)
 };
 
 export type LeaveBucketState = LeaveBucket & { remaining: number; expired: boolean };
 
 export type AnnualLeaveSummary = {
-  /** "유급 휴가" pool remaining — baseline + base-schedule grants only. */
+  /** "유급 휴가" 풀 잔여 — 기준 + 기본 일정 부여분만. */
   baseRemaining: number;
-  /** "특별휴가" pool remaining — the one-time 4-year bonus, spent separately. */
+  /** "특별휴가" 풀 잔여 — 4년 시점 일회성 보너스이며 별도로 소진한다. */
   bonusRemaining: number;
-  /** baseRemaining + bonusRemaining, for callers that just want a single total. */
+  /** baseRemaining + bonusRemaining. 합계 하나만 필요한 호출자용. */
   remaining: number;
   buckets: LeaveBucketState[];
-  /** Earliest upcoming grant across both pools, for a generic "next grant" display. */
+  /** 두 풀을 통틀어 가장 이른 다가오는 부여일. 일반적인 "다음 부여" 표시용. */
   nextGrant: LeaveGrantEvent | null;
   /** Earliest upcoming "유급 휴가" (base-schedule) grant only. */
   nextBaseGrant: LeaveGrantEvent | null;
-  /** The 4-year bonus grant, only while it's still upcoming (null once it has landed). */
+  /** 4년 보너스 부여 — 아직 다가오는 동안에만 있다 (이미 들어왔으면 null). */
   nextBonusGrant: LeaveGrantEvent | null;
 };
 
@@ -74,7 +74,7 @@ function compareISO(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** All automatic base + bonus grant events from hire date up to just past `asOf`. */
+/** 입사일부터 `asOf` 직후까지 발생하는 모든 자동 기본 + 보너스 부여 이벤트. */
 export function getScheduledGrants(hireDate: string, asOf: string): LeaveGrantEvent[] {
   const events: LeaveGrantEvent[] = BASE_SCHEDULE_MONTHS.map((months, i) => ({
     kind: "base" as const,
@@ -96,9 +96,9 @@ export function getScheduledGrants(hireDate: string, asOf: string): LeaveGrantEv
 }
 
 /**
- * Baseline bucket (the employee-entered current balance) plus every automatic
- * grant that lands *after* the baseline was recorded — grants on or before that
- * date are assumed to already be reflected in the baseline number.
+ * 기준 묶음(직원이 입력한 현재 잔여)과, 기준이 기록된 *이후*에 들어오는
+ * 모든 자동 부여. 그 날짜 당일이거나 이전인 부여는
+ * 이미 기준 숫자에 반영된 것으로 간주한다.
  */
 export function buildLeaveBuckets(params: {
   hireDate: string;
@@ -112,8 +112,8 @@ export function buildLeaveBuckets(params: {
     { id: "baseline", kind: "baseline", grantedOn: baselineDate, amount: baselineAmount, expiresOn: null },
   ];
   if (bonusBaselineAmount > 0) {
-    // a pre-existing 특별휴가 balance the employee already had — opaque to the engine (no known grant
-    // date to expire it against), same reasoning as the base baseline bucket above.
+    // 직원이 이미 가지고 있던 기존 특별휴가 잔여 — 엔진 입장에서는 불투명(소멸 기준이 될 부여
+    // 날짜를 알 수 없음), 위의 기본 기준 묶음과 같은 이유.
     buckets.push({ id: "baseline-bonus", kind: "bonus", grantedOn: baselineDate, amount: bonusBaselineAmount, expiresOn: null });
   }
 
@@ -133,10 +133,10 @@ export function buildLeaveBuckets(params: {
 }
 
 /**
- * Applies used days FIFO (oldest bucket first) within each pool, then lapses
- * whatever is left past expiry. `usedDays` only draws from the baseline/base
- * ("유급 휴가") pool; `specialUsedDays` only draws from the bonus ("특별휴가")
- * pool — the two pools are never mixed.
+ * 사용 일수를 각 풀 안에서 FIFO(오래된 묶음부터)로 차감한 뒤,
+ * 남은 것 중 만료가 지난 것을 소멸시킨다. `usedDays` 는 기준/기본
+ * ("유급 휴가") 풀에서만, `specialUsedDays` 는 보너스("특별휴가")
+ * 풀에서만 차감한다 — 두 풀은 절대 섞이지 않는다.
  */
 export function computeAnnualLeaveSummary(params: {
   hireDate: string;

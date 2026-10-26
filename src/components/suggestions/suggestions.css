@@ -1,13 +1,13 @@
 /*
- * Staff Suggestions / Feedback Box — visual design ported 1:1 from the
- * "Feedback Box.html" handoff mockup. All selectors are scoped under `.sg`
- * so the generic class names (.fcard, .field, .route …) never leak globally.
+ * 직원 건의 / 피드백함 — "Feedback Box.html" 핸드오프 목업에서
+ * 1:1 로 옮긴 비주얼 디자인. 모든 셀렉터는 `.sg` 아래로 한정해서
+ * .fcard, .field, .route … 같은 일반적인 클래스 이름이 전역으로 새지 않게 한다.
  *
- * The palette matches the app theme (ivory + deep-ink navy). Status hues and
- * a few aliases (--card / --ink / --line …) are redeclared on `.sg` so the
- * port renders identically regardless of future theme-variable drift.
+ * 팔레트는 앱 테마(아이보리 + 딥 잉크 네이비)와 맞춘다. 상태 색상과
+ * 몇몇 별칭(--card / --ink / --line …)은 `.sg` 에서 다시 선언해
+ * 나중에 테마 변수가 달라져도 이식본이 똑같이 렌더되게 한다.
  *
- * NOTE: UI/UX only — no backend wiring. See docs/product/22-staff-suggestions-workflow.md.
+ * 참고: UI/UX 만 — 백엔드 연결 없음. docs/product/22-staff-suggestions-workflow.md 참고.
  */
 
 .sg {
@@ -22,7 +22,7 @@
   --sg-surface: #f4f4f7;
   --sg-primary: #7a52e6;
   --primary-soft: color-mix(in oklab, #7a52e6 9%, #ffffff);
-  /* status hues */
+  /* 상태 색조 */
   --sub: hsl(223 38% 40%);
   --sub-bg: hsl(223 40% 94%);
   --rev: hsl(35 78% 38%);
@@ -60,9 +60,9 @@
   height: 1em;
 }
 
-/* the scroll body inside the shell content area */
+/* 셸 콘텐츠 영역 안의 스크롤 본문 */
 .sg .scroll {
-  /* Bottom clears the iOS home indicator (was a flat 26px, which let the last row sit under it). */
+  /* 아래쪽은 iOS 홈 인디케이터를 피한다 (예전엔 고정 26px 라서 마지막 행이 그 밑에 걸렸음). */
   padding: 2px 16px max(26px, env(safe-area-inset-bottom));
 }
 
@@ -80,7 +80,7 @@
   white-space: nowrap;
 }
 
-/* segmented (sent/received/referenced) */
+/* 세그먼트 (보낸 / 받은 / 참조) */
 .sg .seg {
   display: flex;
   gap: 4px;
@@ -123,7 +123,7 @@
   color: #fff;
 }
 
-/* status filter pills */
+/* 상태 필터 알약 */
 .sg .fbar {
   display: flex;
   gap: 7px;
@@ -162,7 +162,7 @@
   color: #fff;
 }
 
-/* feedback list card */
+/* 피드백 목록 카드 */
 .sg .flist {
   display: flex;
   flex-direction: column;
@@ -327,11 +327,11 @@
   font-size: 11px;
 }
 
-/* The "+" create FAB is rendered with Tailwind classes and portaled to <body>
-   (see suggestions-list.tsx), matching the Tasks quick-add button, so it has no
-   scoped `.fab` rule here. */
+/* "+" 생성 FAB 는 Tailwind 클래스로 렌더되어 <body> 로 포털된다
+   (suggestions-list.tsx 참고). 할 일의 빠른 추가 버튼과 같으므로 여기에는
+   범위가 한정된 `.fab` 규칙이 없다. */
 
-/* ── compose ── */
+/* ── 작성 ── */
 .sg .ctxbar {
   display: flex;
   align-items: center;
@@ -401,7 +401,7 @@
   letter-spacing: 0;
   white-space: nowrap;
 }
-/* recipient selector (filled) */
+/* 수신자 선택기 (채워진 형태) */
 .sg .recip {
   display: flex;
   align-items: center;
@@ -525,7 +525,7 @@
   padding: 13px 14px;
   resize: none;
   line-height: 1.55;
-  /* 16px so iOS doesn't zoom-snap on focus (was 14px). */
+  /* 포커스 시 iOS 가 확대되며 튀지 않도록 16px (기존 14px). */
   font-size: 16px;
   font-weight: 500;
 }
@@ -551,8 +551,8 @@
   font-size: 12.5px;
   font-weight: 700;
   color: var(--ink-soft);
-  /* keep the fixed label (e.g. "건물") on one line — without this it can break
-     character-by-character into a vertical stack when the row gets narrow. */
+  /* 고정 라벨(예: "건물")을 한 줄로 유지 — 이게 없으면 줄바꿈될 수 있고
+     행이 좁아지면 글자 단위로 세로로 쌓이는 것을 막는다. */
   white-space: nowrap;
   overflow: hidden;
 }
@@ -617,7 +617,7 @@
   height: 11px;
 }
 
-/* ── detail ── */
+/* ── 상세 ── */
 .sg .who {
   display: flex;
   align-items: center;
@@ -659,8 +659,8 @@
   line-height: 1.3;
   margin: 0 0 12px;
 }
-/* status chip as a tappable button (recipient) — opens the status sheet; chevron points UP because
-   the sheet slides up from the bottom. Colors come from the companion `s-{cls}` class. */
+/* 탭 가능한 버튼 형태의 상태 칩(수신자용) — 상태 시트를 연다. 시트가 아래에서 올라오므로
+   쉐브론은 위쪽을 가리킨다. 색상은 함께 붙는 `s-{cls}` 클래스에서 온다. */
 .sg .statbtn {
   display: inline-flex;
   align-items: center;
@@ -690,8 +690,8 @@
   height: 13px;
 }
 
-/* ===== Instagram-style detail: actions row + bottom status control + two sheets ===== */
-/* like + comment icon actions (replaces the inline comment thread in the body) */
+/* ===== 인스타그램 스타일 상세: 액션 행 + 하단 상태 컨트롤 + 시트 두 개 ===== */
+/* 좋아요 + 댓글 아이콘 액션 (본문 안의 인라인 댓글 스레드를 대체) */
 .sg .actions {
   display: flex;
   align-items: center;
@@ -727,7 +727,7 @@
   fill: #e0245e;
   stroke: #e0245e;
 }
-/* heart "pop" bounce on like (Twitter/Instagram style) */
+/* 좋아요 시 하트가 "팝" 하고 튀는 효과 (Twitter/Instagram 스타일) */
 .sg .actbtn .ic.pop {
   animation: sg-heart-pop 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -753,7 +753,7 @@
     animation: none;
   }
 }
-/* always-visible like summary — facepile + "○○님이 좋아합니다" (taps open the who-liked sheet) */
+/* 항상 보이는 좋아요 요약 — 아바타 묶음 + "○○님이 좋아합니다" (탭하면 좋아요 누른 사람 시트가 열림) */
 .sg .likesum {
   display: flex;
   align-items: center;
@@ -793,7 +793,7 @@
   text-align: left;
 }
 
-/* bottom = STATUS control (recipient): compact right-aligned pill → opens the STATUS sheet */
+/* 하단 = 상태(STATUS) 컨트롤(수신자): 오른쪽 정렬의 컴팩트한 알약 → 상태 시트를 연다 */
 .sg .statusbar-bottom {
   position: fixed;
   left: 0;
@@ -844,7 +844,7 @@
   width: 16px;
   height: 16px;
 }
-/* author/referenced see a small note instead of the status control */
+/* 작성자/참조자는 상태 컨트롤 대신 작은 안내문을 본다 */
 .sg .permnote-bottom {
   position: fixed;
   left: 0;
@@ -865,7 +865,7 @@
   font-size: 14px;
 }
 
-/* ===== COMMENT sheet (distinct from the status sheet): tall, header + close, thread + composer ===== */
+/* ===== 댓글(COMMENT) 시트 (상태 시트와 별개): 키가 큼, 헤더 + 닫기, 스레드 + 입력창 ===== */
 .sg .csheet {
   position: fixed;
   left: 0;
@@ -888,12 +888,12 @@
   width: 38px;
   height: 4px;
   border-radius: 999px;
-  /* Canonical grab-handle colour (slate-200). */
+  /* 표준 그랩 핸들 색 (slate-200). */
   background: #e2e8f0;
   margin: 9px auto 5px;
   flex: 0 0 auto;
 }
-/* Enlarged drag-to-dismiss grab zone (handle + header) so the comment sheet pulls down reliably. */
+/* 확대한 드래그로 닫기 그랩 영역(핸들 + 헤더) — 댓글 시트가 안정적으로 내려가게 한다. */
 .sg .csheet__grab {
   flex: 0 0 auto;
   cursor: grab;
@@ -950,7 +950,7 @@
   font-size: 13px;
   font-weight: 600;
 }
-/* composer docked at the bottom of the comment sheet (in-flow within the sheet) */
+/* 댓글 시트 하단에 도킹된 입력창 (시트 안 흐름 안에 위치) */
 .sg .csheet__footer {
   flex: 0 0 auto;
   background: var(--card);
@@ -988,7 +988,7 @@
   background: var(--bg);
   padding: 0 14px;
   font: inherit;
-  /* 16px so iOS doesn't zoom-snap on focus (was 13px). */
+  /* 포커스 시 iOS 가 확대되며 튀지 않도록 16px (기존 13px). */
   font-size: 16px;
   color: var(--ink);
   outline: none;
@@ -1193,7 +1193,7 @@
   background: linear-gradient(135deg, #cdd5dd, #aeb9c5);
   flex: 0 0 auto;
 }
-/* hold reason banner */
+/* 보류 사유 배너 */
 .sg .holdbanner {
   display: flex;
   gap: 10px;
@@ -1243,7 +1243,7 @@
   border-radius: 999px;
 }
 
-/* comments — work-record style */
+/* 댓글 — 작업 기록 스타일 */
 .sg .cthread {
   display: flex;
   flex-direction: column;
@@ -1307,7 +1307,7 @@
   font-weight: 600;
   margin-left: auto;
 }
-/* Instagram-style: plain comment body (no card bubble) inside the comment sheet. */
+/* 인스타그램 스타일: 댓글 시트 안의 평문 댓글 본문 (카드 말풍선 없음). */
 .sg .cmt__body {
   font-size: 13px;
   color: var(--ink-soft);
@@ -1328,7 +1328,7 @@
 .sg .cmt__photo .ic {
   font-size: 12px;
 }
-/* system log entry */
+/* 시스템 로그 항목 */
 .sg .clog {
   display: flex;
   align-items: center;
@@ -1360,7 +1360,7 @@
   background: var(--rev);
 }
 
-/* comment composer (sticky) — fixed to viewport bottom in the full-screen detail flow */
+/* 댓글 입력창(고정) — 전체 화면 상세 흐름에서는 뷰포트 하단에 고정 */
 .sg .ccomposer {
   position: fixed;
   left: 0;
@@ -1418,7 +1418,7 @@
   height: 19px;
 }
 
-/* status action bar (recipient only) — fixed to viewport bottom (hideBottomNav flow) */
+/* 상태 액션 바(수신자 전용) — 뷰포트 하단에 고정 (hideBottomNav 흐름) */
 .sg .dbar {
   position: fixed;
   left: 0;
@@ -1486,11 +1486,11 @@
   font-size: 14px;
 }
 
-/* ── status change sheet ── (fixed to viewport; slides up over the shell) */
+/* ── 상태 변경 시트 ── (뷰포트에 고정, 셸 위로 슬라이드 업) */
 .sg .dim {
   position: fixed;
   inset: 0;
-  /* Canonical app bottom-sheet scrim (slate-950/45) — unified across all sheets. */
+  /* 앱 표준 바텀 시트 스크림 (slate-950/45) — 모든 시트에서 통일. */
   background: rgba(2, 6, 23, 0.45);
   z-index: 60;
   opacity: 0;
@@ -1527,12 +1527,12 @@
   width: 38px;
   height: 4px;
   border-radius: 999px;
-  /* Canonical grab-handle colour (slate-200). */
+  /* 표준 그랩 핸들 색 (slate-200). */
   background: #e2e8f0;
   margin: 4px auto 16px;
 }
-/* Enlarged grab zone — the bare 38×4 handle is too small to drag; this spans the
-   full sheet width and is tall enough to grab reliably (drag-to-dismiss target). */
+/* 확대한 그랩 영역 — 38×4 핸들만으로는 끌기에 너무 작다. 이 영역은
+   시트 전체 너비에 걸치고 안정적으로 잡을 만큼 높다 (드래그로 닫기 대상). */
 .sg .sheet__grab {
   margin: 0 -20px;
   padding: 2px 0 4px;
@@ -1634,7 +1634,7 @@
   background: var(--done-bg);
 }
 
-/* reason / completion input sheet */
+/* 사유 / 완료 입력 시트 */
 .sg .rsheet-h {
   display: flex;
   align-items: center;
@@ -1710,7 +1710,7 @@
   margin-top: 4px;
 }
 
-/* user picker */
+/* 사용자 선택기 */
 .sg .search {
   position: relative;
   display: flex;
@@ -1821,7 +1821,7 @@
 }
 
 /* standalone notifications screen (frame 9) — minimal centered "알림" header,
-   no app wordmark bar / no bottom tab bar, matching the design mockup. */
+   앱 워드마크 바 없음 / 하단 탭 바 없음, 디자인 목업과 동일. */
 .sg--screen {
   min-height: 100dvh;
   background: var(--bg);
@@ -1841,7 +1841,7 @@
   color: var(--ink);
 }
 
-/* notification → detail */
+/* 알림 → 상세 */
 .sg .notif {
   display: flex;
   align-items: flex-start;
@@ -1851,7 +1851,7 @@
   border-radius: 15px;
   background: var(--card);
   margin-bottom: 9px;
-  /* also used as a <button> on the notifications screen */
+  /* 알림 화면에서는 <button> 으로도 쓰인다 */
   width: 100%;
   text-align: left;
   font: inherit;

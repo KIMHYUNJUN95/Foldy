@@ -73,15 +73,15 @@ type Session = NonNullable<Awaited<ReturnType<typeof getCurrentAppSession>>>;
 const PRIORITIES = new Set(["normal", "important", "urgent", "medium"]);
 const CONSOLE_PATH = "/admin/tasks";
 
-// Session + org-context guard for the result-returning console actions (no redirect).
+// 결과를 돌려주는 콘솔 액션(리다이렉트 없음)용 세션 + 조직 컨텍스트 가드.
 async function resolveSession(): Promise<Session | null> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return null;
   return session;
 }
 
-// getTaskDetail is RLS-scoped, so a non-null result already proves the acting user is a
-// participant. Author-only actions additionally check authorship.
+// getTaskDetail 은 RLS 범위라 null 이 아니면 행위자가 이미 참여자임이 증명된다.
+// 작성자 전용 액션은 작성자 여부를 추가로 확인한다.
 async function resolveTask(
   taskId: string,
 ): Promise<{ session: Session; task: TaskDetail } | null> {
@@ -121,12 +121,12 @@ async function notify(
 }
 
 /**
- * Linked operational context (건물 / 객실 / 예약 / 게스트) submitted from the console.
+ * 콘솔에서 제출한 연결 운영 컨텍스트(건물 / 객실 / 예약 / 게스트).
  *
- * Same four columns the mobile form writes (`property_id` / `room_id` / `reservation_id` /
- * `guest_name`), so a task links identically no matter which surface created it. Ids are opaque
- * here — they come from the picker's own org-scoped fetches (`fetchPickerBuildings` /
- * `fetchPickerRooms` / `fetchRoomReservations`), and the row itself is org-scoped on write.
+ * 모바일 폼이 쓰는 네 컬럼(`property_id` / `room_id` / `reservation_id` /
+ * `guest_name`)과 같아서, 어느 화면에서 만들든 할 일이 똑같이 연결된다. id 는 여기서
+ * 불투명 값이다 — 선택기가 직접 조직 범위로 가져온 것(`fetchPickerBuildings` /
+ * `fetchPickerRooms` / `fetchRoomReservations`)이고, 행 자체도 쓸 때 조직 범위로 저장된다.
  */
 export type ConsoleTaskContext = {
   propertyId?: string | null;
@@ -148,14 +148,14 @@ function normalizeContext(ctx: ConsoleTaskContext | undefined) {
   };
 }
 
-// Clamp a submitted duration to the 1–1440 minute block length, or null if out of range/absent.
+// 제출된 소요 시간을 1–1440분 블록 길이로 제한하고, 범위를 벗어나거나 없으면 null.
 function clampDuration(value: number | null): number | null {
   if (value == null || !Number.isFinite(value)) return null;
   const n = Math.floor(value);
   return n >= 1 && n <= 1440 ? n : null;
 }
 
-// ── 1. Create ─────────────────────────────────────────────────────────────────
+// ── 1. 생성 ─────────────────────────────────────────────────────────────────
 export async function createConsoleTask(input: {
   title: string;
   desc: string;
@@ -169,9 +169,9 @@ export async function createConsoleTask(input: {
   sectionId?: string | null;
   targetUserIds: string[];
   isDirective: boolean;
-  /** Linked 건물/객실/예약/게스트 (2026-07-29 — parity with the mobile form). */
+  /** 연결된 건물/객실/예약/게스트(2026-07-29 — 모바일 폼과 동일). */
   context?: ConsoleTaskContext;
-  /** Already-uploaded public URLs; the browser uploads to Storage first, same as mobile. */
+  /** 이미 업로드된 공개 URL. 브라우저가 모바일과 같이 Storage 에 먼저 올린다. */
   imageUrls?: string[];
 }): Promise<TaskActionResult> {
   const session = await resolveSession();
@@ -184,14 +184,14 @@ export async function createConsoleTask(input: {
   let date = input.date.trim();
   const time = input.time.trim();
   const priority = PRIORITIES.has(input.priority) ? input.priority : "normal";
-  // Create has no previous rule, so `custom` can never be newly assigned (→ null).
+  // 생성에는 이전 규칙이 없으므로 `custom` 은 새로 지정할 수 없다(→ null).
   const repeat = resolveRecurrenceRule(input.repeat, null);
   const tags = input.tags.map((t) => t.trim()).filter(Boolean).slice(0, 10);
-  // A recurrence needs a date anchor; if the user set a repeat but no date, anchor to today
-  // (Todoist: "매주 월수금" starts today) instead of rejecting with repeat_needs_date.
+  // 반복에는 날짜 기준점이 필요하다. 반복만 정하고 날짜가 없으면 오늘을 기준으로 삼는다
+  // (Todoist: "매주 월수금" 은 오늘부터 시작) — repeat_needs_date 로 거절하지 않는다.
   if (repeat && !date) date = tokyoToday();
 
-  // Single-date model: scheduledDate is always empty; dueDate carries the single date.
+  // 단일 날짜 모델: scheduledDate 는 항상 비어 있고 dueDate 가 그 하나의 날짜를 가진다.
   if (taskTimeWithoutDate({ scheduledDate: "", dueDate: date, time })) {
     return { ok: false, error: "time_needs_date" };
   }
@@ -200,15 +200,15 @@ export async function createConsoleTask(input: {
     dueDate: date,
     time,
   });
-  // Duration is a time-block length and is only meaningful with a time-of-day.
+  // 소요 시간은 시간 블록 길이이고 시각이 있을 때만 의미가 있다.
   const finalDuration = timeLabel ? clampDuration(input.durationMinutes) : null;
   const anchorDate = taskAnchorDateInput({ scheduledDate: sched, dueAt });
   if (taskNeedsRecurrenceDate(repeat, anchorDate)) {
     return { ok: false, error: "repeat_needs_date" };
   }
 
-  // Optional project link: getProjectDetail is RLS-scoped, so a non-null result proves the acting
-  // user is a project participant. Project tasks are never per-task shared/directive.
+  // 선택적 프로젝트 연결: getProjectDetail 은 RLS 범위라 null 이 아니면 행위자가
+  // 프로젝트 참여자임이 증명된다. 프로젝트 할 일은 개별 공유/지시가 되지 않는다.
   let linkedProjectId: string | null = null;
   let linkedSectionId: string | null = null;
   if (input.projectId) {
@@ -221,7 +221,7 @@ export async function createConsoleTask(input: {
         : null;
   }
 
-  // Validate targets against the org's active members (fail closed); never for project tasks.
+  // 대상은 조직의 활성 멤버로 검증한다(실패 시 닫힘). 프로젝트 할 일에는 하지 않는다.
   let shareIds: string[] = [];
   if (!linkedProjectId && input.targetUserIds.length > 0) {
     const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
@@ -230,8 +230,8 @@ export async function createConsoleTask(input: {
     );
   }
   const isDirective = !linkedProjectId && input.isDirective && shareIds.length > 0;
-  // Dateless personal/shared quick-adds land in the staging Inbox (Todoist parity); dated tasks
-  // and project tasks are never inbox.
+  // 날짜 없는 개인/공유 빠른 추가는 대기 중인 Inbox 로 들어간다(Todoist 와 동일). 날짜가 있는 할 일과
+  // 프로젝트 할 일은 inbox 가 아니다.
   const isInboxTask = !sched && !dueAt && !linkedProjectId;
 
   const id = crypto.randomUUID();
@@ -258,7 +258,7 @@ export async function createConsoleTask(input: {
     recurrence_series_id: recurrenceSeriesId,
     recurrence_instance_date: recurrenceSeriesId ? anchorDate : null,
     tags,
-    // Cap is re-applied here, not trusted from the client (CLAUDE.md §8).
+    // 상한은 클라이언트를 믿지 않고 여기서 다시 적용한다(CLAUDE.md §8).
     image_urls: sanitizeTaskImageUrls(input.imageUrls ?? [], !!linkedProjectId, session.organization.id),
     project_id: linkedProjectId,
     section_id: linkedSectionId,
@@ -267,8 +267,8 @@ export async function createConsoleTask(input: {
   const { error } = await supabase.from("tasks").insert(insert);
   if (error) return { ok: false, error: "save_failed" };
 
-  // The author row MUST carry the same keys as the participant rows so PostgREST does not fill an
-  // omitted NOT NULL column with NULL across the multi-row insert (see the mobile create note).
+  // 작성자 행은 참여자 행과 반드시 같은 키를 가져야 한다. 안 그러면 PostgREST 가 다중 행 insert 에서
+  // 빠진 NOT NULL 컬럼을 NULL 로 채운다(모바일 생성 주석 참고).
   const participantRows: Database["public"]["Tables"]["task_participants"]["Insert"][] = [
     {
       task_id: id,
@@ -319,14 +319,14 @@ export async function createConsoleTask(input: {
   return { ok: true, id };
 }
 
-// The occurrence date a recurring complete/reopen targets when none is passed: the FIXED anchor.
+// 반복 완료/재개에서 날짜를 넘기지 않았을 때 대상이 되는 발생 날짜: 고정된 기준점.
 function recurringAnchorDate(task: TaskDetail): string {
   return task.recurrenceInstanceDate ?? tokyoDateOf(task.dueAt) ?? task.scheduledDate ?? tokyoToday();
 }
 
-// Shared completion (2026-07-30): RECURRING tasks record the given occurrence date in
-// `task_occurrence_state` and never touch the row (no roll-forward); ONE-OFFs are stamped completed.
-// Both log `completed` + notify participants.
+// 공유 완료(2026-07-30): 반복 할 일은 주어진 발생 날짜를
+// `task_occurrence_state` 에 기록하고 행은 건드리지 않는다(앞으로 굴리지 않음). 1회성은 완료 시각을 찍는다.
+// 둘 다 `completed` 를 기록하고 참여자에게 알린다.
 async function completeInternal(
   session: Session,
   task: TaskDetail,
@@ -400,8 +400,8 @@ async function completeInternal(
   return { ok: true, recorded };
 }
 
-// Shared reopen: RECURRING clears that occurrence's recorded state; ONE-OFF clears completion
-// stamps. Logs `reopened`, no notification.
+// 공유 재개: 반복은 그 발생분의 기록된 상태를 지우고, 1회성은 완료
+// 표시를 지운다. `reopened` 를 기록하고 알림은 없다.
 async function reopenInternal(
   session: Session,
   task: TaskDetail,
@@ -440,7 +440,7 @@ async function reopenInternal(
   return true;
 }
 
-// ── 2. Status ───────────────────────────────────────────────────────────────
+// ── 2. 상태 ───────────────────────────────────────────────────────────────
 export async function setConsoleTaskStatus(
   taskId: string,
   status: "open" | "in_progress" | "completed",
@@ -456,8 +456,8 @@ export async function setConsoleTaskStatus(
     revalidatePath(CONSOLE_PATH);
     return { ok: true, occurrenceDate: done.recorded };
   }
-  // Reopening a completed recurring occurrence (status→open) clears that occurrence's state, not the
-  // row. An open occurrence going 진행 중 → 대기 is a row change and falls through below.
+  // 완료된 반복 발생분을 다시 여는 것(status→open)은 그 발생분의 상태를 지울 뿐 행은 건드리지 않는다.
+  // 열린 발생분이 진행 중 → 대기로 가는 것은 행 변경이라 아래로 넘어간다.
   if (status === "open" && isStandardRecurrence(task.recurrenceRule)) {
     const occ = String(occurrenceDate ?? "").trim();
     const states = occ ? await occurrenceStatesForTask(task.id) : null;
@@ -485,7 +485,7 @@ export async function setConsoleTaskStatus(
     supabase.from("task_updates").insert({
         task_id: task.id,
         created_by_user_id: session.user.id,
-        // Clearing a completed task back to open reads as a reopen; other transitions are status changes.
+        // 완료된 할 일을 open 으로 되돌리면 재개로 보고, 다른 전환은 상태 변경으로 본다.
         update_type: task.status === "completed" && status === "open" ? "reopened" : "status_changed",
       })
   );
@@ -493,7 +493,7 @@ export async function setConsoleTaskStatus(
   return { ok: true };
 }
 
-// ── 3. Toggle complete (checkbox) ──────────────────────────────────────────────
+// ── 3. 완료 토글(체크박스) ──────────────────────────────────────────────
 export async function toggleConsoleComplete(
   taskId: string,
   complete: boolean,
@@ -515,7 +515,7 @@ export async function toggleConsoleComplete(
   return { ok: true };
 }
 
-// ── Recurring overdue backlog resolution (2026-07-30, mirrors the mobile actions) ────────────
+// ── 반복 지연 밀림 해소(2026-07-30, 모바일 액션과 동일) ────────────────
 /**
  * 반복 작업의 **한 회차만** 건너뛰기 / 되돌리기 (2026-07-30) — 모바일 `skipOccurrenceOn` 과 같은 규칙.
  *
@@ -577,7 +577,7 @@ export async function unskipConsoleOccurrence(
   return { ok: true };
 }
 
-// ── 4. Edit core (author only) ─────────────────────────────────────────────────
+// ── 4. 핵심 수정(작성자만) ─────────────────────────────────────────────────
 export async function updateConsoleTaskCore(input: {
   taskId: string;
   title: string;
@@ -588,9 +588,9 @@ export async function updateConsoleTaskCore(input: {
   repeat: string;
   priority: string;
   tags: string[];
-  /** Linked 건물/객실/예약/게스트. Omit to leave the existing link untouched. */
+  /** 연결된 건물/객실/예약/게스트. 생략하면 기존 연결을 그대로 둔다. */
   context?: ConsoleTaskContext;
-  /** Full replacement set of already-uploaded URLs. Omit to leave photos untouched. */
+  /** 이미 업로드된 URL 전체로 교체한다. 생략하면 사진을 그대로 둔다. */
   imageUrls?: string[];
 }): Promise<TaskActionResult> {
   const resolved = await resolveTask(input.taskId);
@@ -640,8 +640,8 @@ export async function updateConsoleTaskCore(input: {
         : null,
     tags,
   };
-  // Photos and context are optional patches: an omitted field leaves the stored value alone, so a
-  // caller that only edits the title can't silently wipe a link or detach every photo.
+  // 사진과 컨텍스트는 선택적 패치다. 생략한 필드는 저장된 값을 그대로 두므로
+  // 제목만 고치는 호출자가 링크나 사진 연결을 모르는 사이에 지우지 않는다.
   const nextImageUrls =
     input.imageUrls === undefined
       ? null
@@ -649,7 +649,7 @@ export async function updateConsoleTaskCore(input: {
   if (nextImageUrls) update.image_urls = nextImageUrls;
   if (input.context !== undefined) Object.assign(update, normalizeContext(input.context));
 
-  // Files detached in this edit — from server truth, never from client input.
+  // 이번 수정에서 분리된 파일 — 클라이언트 입력이 아니라 서버가 아는 값으로 정한다.
   const removedImageUrls = nextImageUrls
     ? task.imageUrls.filter((u) => !nextImageUrls.includes(u))
     : [];
@@ -659,7 +659,7 @@ export async function updateConsoleTaskCore(input: {
     .eq("id", task.id)
     .eq("organization_id", session.organization.id);
   if (error) return { ok: false, error: "save_failed" };
-  // Only after the DB no longer references them, hard-delete the detached files.
+  // DB 가 더는 참조하지 않는 것을 확인한 뒤에만, 분리된 파일을 하드 삭제한다.
   await cleanupRemovedTaskImages(supabase, removedImageUrls, session.organization.id);
   await bestEffortWrite(
     "task_updates: insert",
@@ -683,7 +683,7 @@ export async function updateConsoleTaskCore(input: {
   return { ok: true };
 }
 
-// ── 5. Reschedule (author only) ────────────────────────────────────────────────
+// ── 5. 일정 변경(작성자만) ────────────────────────────────────────────────
 /**
  * 작성자 전용이다(2026-07-31 수정). `resolveTask` 는 "이 작업을 **볼 수** 있는가"(참여자 포함)만
  * 증명하므로, 예전에는 공유만 받은 참여자가 남의 작업 마감일·시간·반복 주기를 바꿀 수 있었다.
@@ -702,8 +702,8 @@ export async function rescheduleConsoleTask(
 
   const date = input.date.trim();
   const time = input.time.trim();
-  // Empty date clears the schedule → the task returns to the no-date Inbox (Todoist "remove date").
-  // Without an anchor a recurrence rule is meaningless, so it is cleared too.
+  // 날짜를 비우면 일정이 지워져 할 일이 날짜 없는 Inbox 로 돌아간다(Todoist "날짜 제거").
+  // 기준점이 없으면 반복 규칙이 의미가 없으므로 같이 지운다.
   if (!date) {
     const supabase = getSupabaseServiceClient();
     const { error } = await supabase
@@ -838,7 +838,7 @@ export async function dismissConsoleOverdue(taskIds: string[]): Promise<OverdueB
   return { ok: true, deletedIds: ids };
 }
 
-// ── 6. Share / assign as directive (author only) ──────────────────────────────
+// ── 6. 공유 / 지시로 배정(작성자만) ──────────────────────────────────────
 export async function shareConsoleTask(
   taskId: string,
   userIds: string[],
@@ -847,15 +847,15 @@ export async function shareConsoleTask(
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
-  // Project tasks are governed by project membership, not per-task sharing.
+  // 프로젝트 할 일은 개별 공유가 아니라 프로젝트 멤버십이 관리한다.
   if (task.projectId) return { ok: false, error: "forbidden" };
   // 플랫폼 개발자는 작성자와 같은 힘(빼기 · 지시 바꾸기)을 갖는다(2026-10-23).
   const isAuthor = canEditTaskCore(session, task);
   const isParticipant = task.participants.some((p) => p.userId === session.user.id);
   if (!isAuthor && !isParticipant) return { ok: false, error: "forbidden" };
 
-  // Reconcile the participant set to exactly `userIds` (the picker shows existing participants
-  // pre-checked, so unchecking one must REMOVE them — not just add). Author is never touched.
+  // 참여자 집합을 정확히 `userIds` 로 맞춘다(선택기가 기존 참여자를 미리 체크해 보여 주므로
+  // 체크를 풀면 추가만이 아니라 제거도 해야 한다). 작성자는 건드리지 않는다.
   const allowed = new Set((await getShareableUsers(session)).map((u) => u.id));
   const desired = new Set(
     Array.from(new Set(userIds)).filter((uid) => uid !== session.user.id && allowed.has(uid)),
@@ -881,7 +881,7 @@ export async function shareConsoleTask(
       .in("user_id", toRemove);
   }
   if (toAdd.length > 0) {
-    // A first-recipient still remains only if a kept (not-removed) participant already had it.
+    // 첫 수신자는 남겨 둔(제거되지 않은) 참여자가 이미 가지고 있을 때만 그대로 남는다.
     const hadFirst = task.participants.some((p) => p.isFirstRecipient && !toRemove.includes(p.userId));
     const rows: Database["public"]["Tables"]["task_participants"]["Insert"][] = toAdd.map(
       (uid, index) => ({
@@ -939,7 +939,7 @@ export async function shareConsoleTask(
   return { ok: true };
 }
 
-// ── 7. Add note (participant) ──────────────────────────────────────────────────
+// ── 7. 메모 추가(참여자) ──────────────────────────────────────────────────
 export async function addConsoleNote(
   taskId: string,
   body: string,
@@ -949,7 +949,7 @@ export async function addConsoleNote(
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
   const text = String(body ?? "").trim();
-  // Update-log photos stay at 5 even on a project task — the 20 cap is task-level only.
+  // 업데이트 기록 사진은 프로젝트 할 일이어도 5장이다 — 20장 상한은 할 일 단위에만 적용된다.
   // 메모 사진은 우리 스토리지의 `{org}/task-update-images/` 객체만(2026-10-26, 모바일 addTaskUpdate 와 같다).
   const photos = Array.from(new Set((imageUrls ?? []).map((v) => String(v))))
     .filter((u) => isOrgTaskImageUrl(u, session.organization.id, "task-update-images"))
@@ -981,9 +981,9 @@ export async function addConsoleNote(
   return { ok: true };
 }
 
-// ── 8. Delete (author) / leave (participant) ───────────────────────────────────
-// User deletion is now a SOFT delete (`deleted_at`) so the undo toast / restoreConsoleTask can bring
-// it back. Reads filter `deleted_at is null`, so a soft-deleted task disappears from every view.
+// ── 8. 삭제(작성자) / 나가기(참여자) ───────────────────────────────────
+// 사용자 삭제는 이제 소프트 삭제(`deleted_at`)라 실행 취소 토스트 / restoreConsoleTask 가
+// 되살릴 수 있다. 읽기는 `deleted_at is null` 로 거르므로 소프트 삭제된 할 일은 모든 화면에서 사라진다.
 export async function deleteConsoleTask(taskId: string): Promise<TaskActionResult> {
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
@@ -1000,8 +1000,8 @@ export async function deleteConsoleTask(taskId: string): Promise<TaskActionResul
   return { ok: true };
 }
 
-// Undo a soft delete. getTaskDetail filters deleted rows, so this reads the row directly and checks
-// authorship before clearing `deleted_at`.
+// 소프트 삭제 실행 취소. getTaskDetail 은 삭제된 행을 거르므로 여기서는 행을 직접 읽고
+// `deleted_at` 을 지우기 전에 작성자 여부를 확인한다.
 export async function restoreConsoleTask(taskId: string): Promise<TaskActionResult> {
   const session = await resolveSession();
   if (!session) return { ok: false, error: "auth" };
@@ -1033,7 +1033,7 @@ export async function leaveConsoleTask(taskId: string): Promise<TaskActionResult
   const { session, task } = resolved;
   const supabase = getSupabaseServiceClient();
 
-  // Author leaving = full deletion for everyone (soft delete, so it's undoable like a normal delete).
+  // 작성자가 나가면 모두에게 삭제된 것이다(소프트 삭제라 일반 삭제처럼 실행 취소할 수 있다).
   if (task.createdByUserId === session.user.id) {
     const { error } = await supabase
       .from("tasks")
@@ -1050,7 +1050,7 @@ export async function leaveConsoleTask(taskId: string): Promise<TaskActionResult
     .delete()
     .eq("task_id", task.id)
     .eq("user_id", session.user.id);
-  // If no non-author participants remain, the task returns to private (and non-directive).
+  // 작성자 외 참여자가 없으면 할 일은 비공개로(지시도 해제) 돌아간다.
   const remainingNonAuthor = task.participants.filter(
     (p) => p.role !== "author" && p.userId !== session.user.id,
   ).length;
@@ -1066,14 +1066,14 @@ export async function leaveConsoleTask(taskId: string): Promise<TaskActionResult
 }
 
 // ── 8b. Bulk delete (selection mode + 지난 미완료 정리) ─────────────────────────
-// Mirrors what a per-task delete does, but resolves the whole selection in one round trip: tasks the
-// caller authored are soft-deleted (undoable), tasks they merely participate in are left instead
-// (removing the caller from `task_participants`) — the same author/participant split
-// `leaveConsoleTask` makes, because a participant has no right to delete someone else's task.
+// 할 일 하나를 삭제할 때와 똑같이 하되 선택 전체를 한 번의 왕복으로 처리한다: 내가 만든 할 일은
+// 소프트 삭제(실행 취소 가능), 참여만 하는 할 일은 대신 나간다
+// (`task_participants` 에서 나를 제거) — `leaveConsoleTask` 와 같은 작성자/참여자 구분이다.
+// 참여자에게는 남의 할 일을 삭제할 권한이 없기 때문이다.
 //
-// Persist a manual drag-reorder of the 관리함(Inbox) list (2026-07-30). `orderedIds` is the new
-// top-to-bottom order; each row's `sort_order` is set to its index. Org-scoped. Mirrors the mobile
-// `reorderTasks`; `sort_order` is global to the task (shared with the Today drag order).
+// 관리함(Inbox) 목록의 수동 드래그 순서를 저장한다(2026-07-30). `orderedIds` 가 새
+// 위에서 아래 순서이고, 각 행의 `sort_order` 를 그 인덱스로 정한다. 조직 범위. 모바일
+// `reorderTasks` 와 같다. `sort_order` 는 할 일 전체에 대해 하나이며 오늘 드래그 순서와 공유한다.
 export async function reorderConsoleTasks(orderedIds: string[]): Promise<TaskActionResult> {
   const session = await resolveSession();
   if (!session) return { ok: false, error: "auth" };
@@ -1142,8 +1142,8 @@ export async function reorderConsoleDateTasks(
   return { ok: true };
 }
 
-// `deletedIds` is what `restoreConsoleTasks` can undo. `leftIds` cannot be undone this way (undoing
-// a leave means re-adding participant rows), so the caller must not promise undo for those.
+// `deletedIds` 는 `restoreConsoleTasks` 가 되돌릴 수 있는 것이다. `leftIds` 는 이렇게 되돌릴 수 없으므로
+// (나가기를 되돌리려면 참여자 행을 다시 넣어야 한다) 호출자는 그쪽에 실행 취소를 약속하면 안 된다.
 export type BulkDeleteResult =
   | { ok: true; deletedIds: string[]; leftIds: string[]; failedIds: string[] }
   | { ok: false; error: string };
@@ -1203,7 +1203,7 @@ export async function bulkDeleteConsoleTasks(taskIds: string[]): Promise<BulkDel
       failedIds.push(...theirs);
     } else {
       leftIds.push(...theirs);
-      // Same rule as the single leave: a task with no non-author participants left goes private.
+      // 한 건 나가기와 같은 규칙: 작성자 외 참여자가 남지 않은 할 일은 비공개로 돌아간다.
       const orphaned = resolved
         .filter(
           ({ id, task }) =>
@@ -1227,14 +1227,14 @@ export async function bulkDeleteConsoleTasks(taskIds: string[]): Promise<BulkDel
   return { ok: true, deletedIds, leftIds, failedIds };
 }
 
-/** Undo for `bulkDeleteConsoleTasks` — restores only rows the caller authored (see above). */
+/** `bulkDeleteConsoleTasks` 의 실행 취소 — 호출자가 만든 행만 되살린다(위 참고). */
 export async function restoreConsoleTasks(taskIds: string[]): Promise<TaskActionResult> {
   const session = await resolveSession();
   if (!session) return { ok: false, error: "auth" };
   const ids = [...new Set((taskIds ?? []).map((v) => String(v ?? "").trim()).filter(Boolean))];
   if (!ids.length) return { ok: true };
   const supabase = getSupabaseServiceClient();
-  // Deleted rows are filtered out of getTaskDetail, so authorship is checked directly here.
+  // 삭제된 행은 getTaskDetail 에서 걸러지므로 여기서 작성자 여부를 직접 확인한다.
   const { data } = await supabase
     .from("tasks")
     .select("id, created_by_user_id")
@@ -1254,7 +1254,7 @@ export async function restoreConsoleTasks(taskIds: string[]): Promise<TaskAction
   return { ok: true };
 }
 
-// ── 9. Move to today / inbox (participant) ─────────────────────────────────────
+// ── 9. 오늘 / Inbox 로 옮기기(참여자) ──────────────────────────────────
 export async function moveConsoleToToday(taskId: string): Promise<TaskActionResult> {
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
@@ -1272,7 +1272,7 @@ export async function moveConsoleToToday(taskId: string): Promise<TaskActionResu
     return { ok: false, error: "duplicate_occurrence" };
   }
   const supabase = getSupabaseServiceClient();
-  // Anchor to the Tokyo operating date via due_at, preserving any time-of-day; pull out of Inbox.
+  // due_at 으로 도쿄 운영 날짜에 맞추되 시각은 유지하고, Inbox 에서 꺼낸다.
   // `recurrence_instance_date` 는 건드리지 않는다 — 위 주석의 고정 앵커 계약.
   const dueAt = new Date(`${today}T${task.timeLabel ?? "00:00"}:00+09:00`).toISOString();
   const update: Database["public"]["Tables"]["tasks"]["Update"] = {
@@ -1291,7 +1291,7 @@ export async function moveConsoleToToday(taskId: string): Promise<TaskActionResu
   return { ok: true };
 }
 
-/** Same anchor logic as `moveConsoleToToday`, one Tokyo day later. */
+/** `moveConsoleToToday` 와 같은 기준점 로직이고 도쿄 기준 하루 뒤. */
 export async function moveConsoleToTomorrow(taskId: string): Promise<TaskActionResult> {
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
@@ -1341,7 +1341,7 @@ export async function moveConsoleToInbox(taskId: string): Promise<TaskActionResu
   return { ok: true };
 }
 
-// ── 10. Create project ─────────────────────────────────────────────────────────
+// ── 10. 프로젝트 생성 ─────────────────────────────────────────────────────
 export async function createConsoleProject(
   title: string,
   memberIds: string[],
@@ -1408,7 +1408,7 @@ export async function createConsoleProject(
   return { ok: true, id };
 }
 
-// ── 11. Daily report (delegate to the shared staff-only generator) ─────────────
+// ── 11. 일일 보고(공용 직원 전용 생성기에 위임) ───────────────────────
 export async function generateConsoleReport(date: string): Promise<DailyReportResult> {
   return generateDailyReport(date);
 }
@@ -1420,8 +1420,8 @@ export async function sendConsoleReportToSlack(
   return sendDailyReportToSlack(date, text);
 }
 
-// ── 12. Load full task detail (updates + resolved context) for the right panel ─────────────
-// getTaskDetail is RLS-scoped, so a non-null result already proves the viewer participates.
+// ── 12. 오른쪽 패널용 할 일 상세 전체 불러오기(업데이트 + 해석된 컨텍스트) ─────
+// getTaskDetail 은 RLS 범위라 null 이 아니면 보는 사람이 참여자임이 이미 증명된다.
 export type ConsoleTaskDetailResult =
   | { ok: true; task: TaskDetail }
   | { ok: false; error: string };
@@ -1434,8 +1434,8 @@ export async function getConsoleTaskDetail(taskId: string): Promise<ConsoleTaskD
   return { ok: true, task };
 }
 
-// ── 13. Load a project's sections + tasks for the console project view ─────────
-// getProjectDetail is RLS-scoped, so a non-null result proves the viewer is a project member.
+// ── 13. 콘솔 프로젝트 보기용 프로젝트의 섹션 + 할 일 불러오기 ───────────────
+// getProjectDetail 은 RLS 범위라 null 이 아니면 보는 사람이 프로젝트 멤버임이 증명된다.
 export type ConsoleProjectDetailResult =
   | { ok: true; project: ProjectDetailData }
   | { ok: false; error: string };
@@ -1453,11 +1453,11 @@ export async function getConsoleProjectDetail(
 }
 
 /**
- * Owner-only project delete. Hard delete that cascades to participants, sections, and the project's
- * tasks (FK `on delete cascade`) — deleting a whole project is a deliberate, non-undoable action
- * (kept behind a confirm in the UI), so it intentionally does NOT use the task soft-delete/undo path.
- * Mirrors the mobile `deleteProject`. Org-scoped service-role write; `getProjectDetail` is RLS-scoped
- * so a non-null result already proves the caller is a member, and `viewerIsOwner` gates the delete.
+ * 프로젝트 소유자 전용 삭제. 참여자, 섹션, 프로젝트의 할 일까지 연쇄 삭제하는 하드 삭제다
+ * (FK `on delete cascade`) — 프로젝트 전체를 지우는 것은 의도적이고 되돌릴 수 없는 동작이며
+ * (UI 에서 확인 단계를 거친다) 그래서 일부러 할 일 소프트 삭제/실행 취소 경로를 쓰지 않는다.
+ * 모바일 `deleteProject` 와 같다. 조직 범위 service-role 쓰기. `getProjectDetail` 은 RLS 범위라
+ * null 이 아니면 호출자가 멤버임이 이미 증명되고, 삭제는 `viewerIsOwner` 로 막는다.
  */
 /* ── 프로젝트 섹션 · 멤버 (2026-07-30) ───────────────────────────────────────────
    모바일에만 있던 프로젝트 구성 기능을 콘솔로 가져온다. 관리자가 프로젝트를 짜는 화면인데 섹션과

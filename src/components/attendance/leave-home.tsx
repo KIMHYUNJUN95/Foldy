@@ -49,8 +49,8 @@ export function LeaveHome({
   const rules = [c.rule1, c.rule2, c.rule3, c.rule4];
   const today = tokyoToday();
 
-  // main card tracks the "유급 휴가" pool only — the 특별휴가(4-year bonus) pool is
-  // a separate, parallel entitlement and is not part of this progress bar/total.
+  // 메인 카드는 "유급 휴가" 풀만 추적한다 — 특별휴가(4년 보너스) 풀은
+  // 별개의 병렬 부여분이며 이 진행 막대/합계에 포함되지 않는다.
   const basePool = summary.buckets.filter((b) => b.kind !== "bonus");
   const totalPool = basePool.reduce((sum, b) => sum + b.amount, 0);
   const used = Math.max(0, totalPool - summary.baseRemaining);

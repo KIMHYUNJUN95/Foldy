@@ -1,7 +1,7 @@
 // Admin 주문·비품 console — 순수 표시 조각: 아이콘 매핑, 상태 pill, 긴급/배송 D-day 배지, 요청자
 // 아바타, 품목 요약, 상품 링크 배지, 빈/에러 상태. Board/list/calendar/closed/panel/modal이 전부 이
 // 조각을 통해서만 렌더해 시각 일관성을 유지한다. Mirrors lost-found-console-shared.tsx /
-// maintenance-console-shared.tsx. See docs/product/10-order-request-workflow.md.
+// maintenance-console-shared.tsx 와 같은 구조. 참고: docs/product/10-order-request-workflow.md.
 import type { ComponentType, SVGProps } from "react";
 import {
   ArrowRight,
@@ -122,8 +122,8 @@ export function reporterOptionsOf(orders: readonly AdminOrderVM[]): ReporterOpti
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
-// Avatar palette — same approach as the lost-found/maintenance consoles (deterministic hash → stable
-// color per user).
+// 아바타 팔레트 — 분실물/유지보수 콘솔과 같은 방식 (결정적 해시 → 사용자별로 고정된
+// 색).
 const AVATAR_PALETTE = [
   "#3f7d5a",
   "#a86b3c",

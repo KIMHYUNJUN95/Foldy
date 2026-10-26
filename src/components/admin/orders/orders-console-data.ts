@@ -1,7 +1,7 @@
 // 주문·비품(Orders) 콘솔 — 순수 표시 헬퍼. 서버 VM(admin-orders.ts)을 받아 상태 맵·포매터·
 // 배송 D-day·배송 캘린더 레인 패킹을 계산한다. 부수효과 없음(Asia/Tokyo 기준일은 VM.todayKey로
 // 주입받아 Date.now()에 의존하지 않음). Claude Design orders-data.js 헬퍼를 TS로 이식.
-// See docs/product/10-order-request-workflow.md.
+// docs/product/10-order-request-workflow.md 참고.
 
 import type { AdminOrderVM, OrderDeliv } from "@/lib/admin-orders";
 import { dictionaries } from "@/lib/i18n";
@@ -27,7 +27,7 @@ export function isActiveStatus(s: OrderStatus): boolean {
   return ACTIVE.includes(s);
 }
 
-/* ---------------- date helpers ---------------- */
+/* ---------------- 날짜 헬퍼 ---------------- */
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -49,7 +49,7 @@ export function parseTs(ts: string | null | undefined): number | null {
   return Date.UTC(y, m - 1, dd) / 60000 + h * 60 + mm;
 }
 
-/* ---------------- delivery ---------------- */
+/* ---------------- 배송 ---------------- */
 export function delivStart(deliv: OrderDeliv | null): string | null {
   if (!deliv) return null;
   return deliv.mode === "range" ? deliv.start : deliv.date;
@@ -119,12 +119,12 @@ export function inThisMonth(d: string | null | undefined, todayKey: string): boo
 export function weekWindow(todayKey: string): { from: number; to: number } {
   const todayNum = dateToNum(todayKey);
   const dt = new Date(todayNum * 86400000);
-  const dow = (dt.getUTCDay() + 6) % 7; // Mon=0
+  const dow = (dt.getUTCDay() + 6) % 7; // 월=0
   const from = todayNum - dow;
   return { from, to: from + 6 };
 }
 
-/* ---------------- formatters ---------------- */
+/* ---------------- 포매터 ---------------- */
 export function fmtDate(d: string, lang: OrdersLang): string {
   return new Intl.DateTimeFormat(lang, {
     month: "short",
@@ -158,7 +158,7 @@ export const WD: Record<OrdersLang, string[]> = {
   en: weekdayLabels("en"),
 };
 
-/* ---------------- board sort ---------------- */
+/* ---------------- 보드 정렬 ---------------- */
 /** 긴급(high) 우선, 그다음 오래된 요청 우선. */
 export function sortForBoard(list: AdminOrderVM[]): AdminOrderVM[] {
   return list.slice().sort((a, b) => {
@@ -169,7 +169,7 @@ export function sortForBoard(list: AdminOrderVM[]): AdminOrderVM[] {
   });
 }
 
-/* ---------------- delivery calendar (lane packing) ---------------- */
+/* ---------------- 배송 캘린더(레인 배치) ---------------- */
 export type CalEvent = { o: AdminOrderVM; s: number; e: number; urgent: boolean; lane: number };
 export type CalEvents = { evs: CalEvent[]; lanes: number; dayMap: Record<string, AdminOrderVM[]> };
 

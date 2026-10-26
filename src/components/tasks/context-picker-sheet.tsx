@@ -34,10 +34,10 @@ import { cn } from "@/lib/utils";
 
 type Copy = Dictionary["tasks"];
 
-// ── Step type ────────────────────────────────────────────────────────────────────────────────
+// ── 단계 타입 ────────────────────────────────────────────────────────────────────────────────
 type Step = "building" | "room" | "guest-only";
 
-// ── Stepper bar (Screen 2 only) ──────────────────────────────────────────────────────────────
+// ── 스테퍼 바(화면 2 전용) ──────────────────────────────────────────────────────────────
 function StepBar({ copy, activeStep }: { copy: Copy; activeStep: 1 | 2 | 3 }) {
   const steps = [copy.contextPickerBuilding, copy.contextPickerRoom, copy.contextPickerReservation];
   return (
@@ -80,7 +80,7 @@ function StepBar({ copy, activeStep }: { copy: Copy; activeStep: 1 | 2 | 3 }) {
   );
 }
 
-// ── Breadcrumb (Screen 3) ────────────────────────────────────────────────────────────────────
+// ── 브레드크럼(화면 3) ────────────────────────────────────────────────────────────────────
 function Breadcrumb({
   buildingLabels,
   buildingName,
@@ -94,9 +94,9 @@ function Breadcrumb({
   roomNumber: string | null;
   onBuildingTap: () => void;
 }) {
-  // For buildings where getCanonicalRoomLabel() returns the property name as the room label
-  // (e.g. Okubo buildings), the room number is itself a canonical name → localize it and
-  // omit the room suffix so we don't show "大久保A号室" or "오쿠보A호".
+  // getCanonicalRoomLabel() 이 방 라벨로 숙소 이름을 돌려주는 건물에서
+  // (예: 오쿠보 건물) 방 번호 자체가 정식 이름이므로 → 현지화하고
+  // 방 접미사를 생략해 "大久保A号室" 이나 "오쿠보A호" 가 나오지 않게 한다.
   const isPropertyLabel = roomNumber ? !!CANONICAL_TO_BUILDING_KEY[roomNumber] : false;
   const displayRoomNumber = roomNumber
     ? isPropertyLabel
@@ -128,7 +128,7 @@ function Breadcrumb({
   );
 }
 
-// ── Building row ─────────────────────────────────────────────────────────────────────────────
+// ── 건물 행 ─────────────────────────────────────────────────────────────────────────────
 function BuildingRow({
   building,
   copy,
@@ -162,7 +162,7 @@ function BuildingRow({
   );
 }
 
-// ── Room cell ────────────────────────────────────────────────────────────────────────────────
+// ── 방 칸 ────────────────────────────────────────────────────────────────────────────────
 function RoomCell({
   buildingLabels,
   room,
@@ -176,7 +176,7 @@ function RoomCell({
   copy: Copy;
   onTap: () => void;
 }) {
-  // Okubo-style buildings use the canonical property name as the room label — localize it.
+  // 오쿠보 방식 건물은 정식 숙소 이름을 방 라벨로 쓰므로 — 현지화한다.
   const displayLabel = localizePropertyName(room.label, buildingLabels);
   return (
     <button
@@ -189,7 +189,7 @@ function RoomCell({
       onClick={onTap}
       type="button"
     >
-      {/* Check mark */}
+      {/* 체크 표시 */}
       {selected ? (
         <span className="absolute right-[5px] top-[5px] flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Check className="size-2.5" strokeWidth={3} aria-hidden="true" />
@@ -224,7 +224,7 @@ function RoomCell({
   );
 }
 
-// ── Reservation row ──────────────────────────────────────────────────────────────────────────
+// ── 예약 행 ──────────────────────────────────────────────────────────────────────────
 function ReservationRow({
   res,
   selected,
@@ -248,7 +248,7 @@ function ReservationRow({
       onClick={onTap}
       type="button"
     >
-      {/* Avatar */}
+      {/* 아바타 */}
       <span
         className={cn(
           "flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-[14px] font-black text-white",
@@ -277,7 +277,7 @@ function ReservationRow({
         </div>
       </div>
 
-      {/* Circle check */}
+      {/* 원형 체크 */}
       <span
         className={cn(
           "flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
@@ -290,7 +290,7 @@ function ReservationRow({
   );
 }
 
-// ── Reservation search result row ────────────────────────────────────────────────────────────
+// ── 예약 검색 결과 행 ────────────────────────────────────────────────────────────
 function ReservationSearchRow({
   buildingLabels,
   copy,
@@ -306,7 +306,7 @@ function ReservationSearchRow({
   const channelLabel = isAir ? "Airbnb" : result.channel === "booking" ? "Booking" : copy.contextChannelDirect;
   const nightsLabel = `${result.nightsCount}${copy.contextPickerNightsUnit}`;
   const localizedBuilding = localizePropertyName(result.propertyName, buildingLabels);
-  // For Okubo-style buildings, displayRoomLabel === propertyName — omit the room suffix.
+  // 오쿠보 방식 건물은 displayRoomLabel === propertyName 이므로 방 접미사를 생략한다.
   const showRoom = result.displayRoomLabel && result.displayRoomLabel !== result.propertyName;
   const locationStr = showRoom
     ? `${localizedBuilding} · ${result.displayRoomLabel}${copy.contextPickerRoomSuffix}`
@@ -318,7 +318,7 @@ function ReservationSearchRow({
       onClick={onTap}
       type="button"
     >
-      {/* Avatar */}
+      {/* 아바타 */}
       <span
         className={cn(
           "flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-[14px] font-black text-white",
@@ -334,7 +334,7 @@ function ReservationSearchRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        {/* Guest name + live badge */}
+        {/* 게스트 이름 + 라이브 배지 */}
         <div className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-foreground">
           <span className="truncate">{result.guestName}</span>
           {result.isLive ? (
@@ -343,17 +343,17 @@ function ReservationSearchRow({
             </span>
           ) : null}
         </div>
-        {/* Beds24 booking ID */}
+        {/* Beds24 예약 ID */}
         {result.sourceReservationId ? (
           <div className="mt-[2px] text-[10.5px] font-semibold text-muted-foreground/70">
             {copy.contextPickerBookingId} {result.sourceReservationId}
           </div>
         ) : null}
-        {/* Building · Room */}
+        {/* 건물 · 방 */}
         <div className="mt-[3px] text-[11.5px] font-semibold text-muted-foreground">
           {locationStr}
         </div>
-        {/* Channel · dates · nights */}
+        {/* 채널 · 날짜 · 박수 */}
         <div className="mt-[2px] text-[11px] font-semibold text-muted-foreground/70">
           {channelLabel} · {result.dateRange} · {nightsLabel}
         </div>
@@ -362,7 +362,7 @@ function ReservationSearchRow({
   );
 }
 
-// ── Alt button row ───────────────────────────────────────────────────────────────────────────
+// ── 보조 버튼 행 ───────────────────────────────────────────────────────────────────────────
 function AltButton({
   icon,
   label,
@@ -391,7 +391,7 @@ function AltButton({
   );
 }
 
-// ── Main component ───────────────────────────────────────────────────────────────────────────
+// ── 메인 컴포넌트 ───────────────────────────────────────────────────────────────────────────
 type ContextPickerProps = {
   buildingLabels: Record<string, string>;
   copy: Copy;
@@ -472,15 +472,15 @@ function ContextPickerBody({
       .finally(() => setBuildingsLoading(false));
   }, [initialPropertyName]);
 
-  // Focus search when entering building step
+  // 건물 단계에 들어가면 검색창에 포커스
   useEffect(() => {
     if (step === "building") {
       setTimeout(() => searchRef.current?.focus(), 80);
     }
   }, [step]);
 
-  // Debounced reservation search — triggers when search reaches ≥2 chars.
-  // All setState calls are inside async callbacks to avoid synchronous-setState-in-effect lint errors.
+  // 디바운스된 예약 검색 — 검색어가 2자 이상일 때 실행된다.
+  // effect 안의 동기 setState lint 오류를 피하려고 모든 setState 는 비동기 콜백 안에 둔다.
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     const q = search.trim();
@@ -573,7 +573,7 @@ function ContextPickerBody({
     setSelectedResIdx((prev) => (prev === idx ? null : idx));
   };
 
-  // The currently selected room cell (carries the room/property UUIDs persisted on the link).
+  // 현재 선택된 방 칸(링크에 저장되는 방/숙소 UUID 를 가진다).
   const selectedRoomObj = selectedRoom
     ? (buildingRooms.find((r) => r.label === selectedRoom) ?? null)
     : null;
@@ -658,7 +658,7 @@ function ContextPickerBody({
 
   return (
     <>
-        {/* ── Fixed header ── */}
+        {/* ── 고정 헤더 ── */}
         <div className="shrink-0">
           <div className="mb-3.5 flex items-start gap-3" {...dragHandleProps}>
             {step !== "building" ? (
@@ -685,14 +685,14 @@ function ContextPickerBody({
             </div>
           </div>
 
-          {/* Stepper — building step only */}
+          {/* 스테퍼 — 건물 단계만 */}
           {step === "building" || step === "guest-only" ? (
             <div className="mb-3.5">
               <StepBar activeStep={1} copy={copy} />
             </div>
           ) : null}
 
-          {/* Breadcrumb — room step only */}
+          {/* 브레드크럼 — 방 단계만 */}
           {isRoomStep && selectedBuilding ? (
             <Breadcrumb
               buildingLabels={buildingLabels}
@@ -703,7 +703,7 @@ function ContextPickerBody({
             />
           ) : null}
 
-          {/* Search — building step only */}
+          {/* 검색 — 건물 단계만 */}
           {step === "building" ? (
             <div className="relative mb-3">
               <Search
@@ -735,14 +735,14 @@ function ContextPickerBody({
           ) : null}
         </div>
 
-        {/* ── Scrollable body ── */}
+        {/* ── 스크롤 본문 ── */}
         <div className="min-h-0 flex-1 overflow-y-auto pb-5 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
-          {/* ── Step: Building ── */}
+          {/* ── 단계: 건물 ── */}
           {step === "building" ? (
             <>
               {isSearchMode ? (
-                /* ── Search results mode ── */
+                /* ── 검색 결과 모드 ── */
                 <>
                   {resSearchLoading ? (
                     <div className="flex items-center justify-center py-10">
@@ -772,7 +772,7 @@ function ContextPickerBody({
                     </div>
                   )}
 
-                  {/* Alt buttons: browse buildings + guest-only */}
+                  {/* 보조 버튼: 건물 둘러보기 + 게스트만 */}
                   <div className="mt-3 flex gap-2">
                     <AltButton
                       icon={<Building2 className="size-[15px] text-muted-foreground" aria-hidden="true" />}
@@ -790,7 +790,7 @@ function ContextPickerBody({
                   </div>
                 </>
               ) : (
-                /* ── Building list mode ── */
+                /* ── 건물 목록 모드 ── */
                 <>
                   {buildingsLoading ? (
                     <div className="flex items-center justify-center py-10">
@@ -811,7 +811,7 @@ function ContextPickerBody({
                     </div>
                   )}
 
-                  {/* Guest-only alt */}
+                  {/* 게스트만 보조 */}
                   <div className="mt-3 flex gap-2">
                     <AltButton
                       icon={<UserRound className="size-[15px] text-muted-foreground" aria-hidden="true" />}
@@ -827,7 +827,7 @@ function ContextPickerBody({
             </>
           ) : null}
 
-          {/* ── Step: Room + Reservations ── */}
+          {/* ── 단계: 방 + 예약 ── */}
           {isRoomStep ? (
             <>
               <p className="mb-2 text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">
@@ -861,7 +861,7 @@ function ContextPickerBody({
 
               {selectedRoom ? (
                 <>
-                  {/* Section label with period */}
+                  {/* 기간이 있는 섹션 라벨 */}
                   <div className="mb-2 mt-[14px] flex items-center gap-1.5">
                     <p className="text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">
                       {copy.contextPickerResSec}
@@ -873,7 +873,7 @@ function ContextPickerBody({
                     ) : null}
                   </div>
 
-                  {/* Loading */}
+                  {/* 로딩 */}
                   {resLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="size-5 animate-spin text-muted-foreground/40" aria-hidden="true" />
@@ -891,7 +891,7 @@ function ContextPickerBody({
                       ))}
                     </div>
                   ) : (
-                    /* Empty state */
+                    /* 빈 상태 */
                     <div className="flex flex-col items-center rounded-2xl border border-dashed border-border py-8 text-center">
                       <p className="text-[12.5px] font-semibold text-muted-foreground">
                         {copy.contextPickerNoReservations}
@@ -904,7 +904,7 @@ function ContextPickerBody({
                 </>
               ) : null}
 
-              {/* Alt buttons */}
+              {/* 보조 버튼 */}
               <div className="mt-3 flex gap-2">
                 <AltButton
                   icon={<Building2 className="size-[15px]" aria-hidden="true" />}
@@ -922,10 +922,10 @@ function ContextPickerBody({
             </>
           ) : null}
 
-          {/* ── Step: Guest-only ── */}
+          {/* ── 단계: 게스트만 ── */}
           {step === "guest-only" ? (
             <div className="flex flex-col gap-3 pt-1">
-              {/* Emergency context callout */}
+              {/* 긴급 컨텍스트 콜아웃 */}
               <div className="rounded-2xl border border-amber-200/60 bg-amber-50/60 px-4 py-3">
                 <p className="text-[11.5px] font-semibold leading-[1.6] text-amber-800/90">
                   {copy.contextPickerGuestHint}
@@ -963,7 +963,7 @@ function ContextPickerBody({
           ) : null}
         </div>
 
-        {/* ── Sticky footer CTA — room step only ── */}
+        {/* ── 고정 하단 CTA — 방 단계만 ── */}
         {isRoomStep ? (
           <div className="-mx-5 shrink-0 border-t-[0.5px] border-[var(--separator)] bg-surface px-5 pt-3">
             <button

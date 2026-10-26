@@ -200,9 +200,9 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
 
         .admcal-print__grid {
           --label-width: 34mm;
-          /* Fit the label column + all day columns inside the A4 sheet content
-             width (~257mm; 256mm leaves ~1mm slack for the grid border) so 30/31-day
-             months no longer overflow and clip the right-side dates. */
+          /* 라벨 열 + 모든 날짜 열을 A4 용지 내용 영역 안에 맞춘다
+             (폭 약 257mm; 256mm 로 두면 그리드 테두리용 여유 ~1mm 가 남음) 그래서 30/31일
+             달에서도 더 이상 넘치거나 오른쪽 날짜가 잘리지 않는다. */
           --day-width: calc((256mm - var(--label-width)) / ${data.dates.length});
           border: 1px solid #ded7cc;
           border-radius: 12px;

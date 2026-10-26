@@ -28,7 +28,7 @@ function normalizeBeds24StatusValue(raw: unknown): ReservationStatus {
   if (typeof raw === "number") {
     if (raw === 0) return "cancelled";
     if (raw === 1 || raw === 2 || raw === 3 || raw === 5 || raw === -2) return "confirmed";
-    if (raw === 4) return "confirmed"; // Black — still occupies calendar in Beds24
+    if (raw === 4) return "confirmed"; // 검정 — Beds24 에서 여전히 캘린더를 점유함
     return "confirmed";
   }
 
@@ -72,8 +72,8 @@ function normalizeBeds24StatusValue(raw: unknown): ReservationStatus {
 const ACTIVE_EXPLICIT_STATUSES = new Set(["confirmed", "new", "request", "inquiry", "black", "1", "2", "3", "4", "5"]);
 
 /**
- * Maps Beds24 booking/webhook payload fields to Foldy reservation status.
- * Note: Beds24 API v2 may expose statusCode: 0 on active bookings — do not use statusCode alone.
+ * Beds24 예약/웹훅 payload 필드를 Foldy 예약 상태로 매핑한다.
+ * 참고: Beds24 API v2 는 활성 예약에 statusCode: 0 을 줄 수 있으므로 — statusCode 만으로 판단하지 말 것.
  *
  * **명시적 상태가 살아 있으면 그것을 따른다** (2026-10-07). Beds24 는 취소했다가 되살린 예약에도
  * `cancelTime` 을 지우지 않는다(실측 7건 — `status: "confirmed"` + `cancelTime` 있음, 예: 86444948 ·

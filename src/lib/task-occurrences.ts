@@ -10,17 +10,17 @@ import {
 import type { Database } from "@/types/database";
 
 /**
- * Server-only mutations for `task_occurrence_state` — the per-occurrence completion/skip/move state
- * for recurring tasks (2026-07-30 롤포워드 폐지, see docs/planning/01-decision-log.md). Shared by the
- * mobile and admin task actions so the two surfaces write identical state (twin-drift guard).
+ * `task_occurrence_state` 의 서버 전용 변경 — 반복 할 일의 회차별 완료/건너뜀/이동 상태.
+ * 반복 할 일용이다(2026-07-30 롤포워드 폐지, docs/planning/01-decision-log.md 참고).
+ * 모바일과 관리자 할 일 액션이 함께 써서 두 화면이 똑같은 상태를 쓴다(쌍둥이 어긋남 방지).
  *
- * A recurring task's row is a fixed rule + anchor and is never rolled forward or marked completed;
- * completion lives here keyed by `(task_id, occurrence_date)`.
+ * 반복 할 일의 행은 고정된 규칙 + 기준이며 앞으로 넘기거나 완료 처리하지 않는다.
+ * 완료는 여기에 `(task_id, occurrence_date)` 를 키로 저장한다.
  */
 
 type OccurrenceInsert = Database["public"]["Tables"]["task_occurrence_state"]["Insert"];
 
-/** Mark one occurrence date completed (idempotent upsert on the PK). */
+/** 회차 날짜 하나를 완료로 표시한다(PK 기준 멱등 upsert). */
 export async function completeOccurrence(args: {
   taskId: string;
   organizationId: string;
@@ -48,7 +48,7 @@ export async function completeOccurrence(args: {
   return true;
 }
 
-/** Remove an occurrence's recorded state (used to reopen/undo a completed occurrence). */
+/** 회차에 기록된 상태를 지운다(완료한 회차를 다시 열거나 취소할 때 사용). */
 export async function clearOccurrenceState(taskId: string, occurrenceDate: string): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
   const { error } = await supabase
@@ -63,7 +63,7 @@ export async function clearOccurrenceState(taskId: string, occurrenceDate: strin
   return true;
 }
 
-/** Resolve a set of overdue occurrence dates as skipped ("삭제") — kept forever, never re-appears. */
+/** 지난 회차 날짜들을 건너뜀("삭제")으로 처리한다 — 영구 보관되며 다시 나타나지 않는다. */
 export async function skipOccurrences(args: {
   taskId: string;
   organizationId: string;
@@ -89,7 +89,7 @@ export async function skipOccurrences(args: {
   return true;
 }
 
-/** Resolve overdue occurrence dates as moved to `movedTo` ("오늘로 가져오기"). */
+/** 지난 회차 날짜들을 `movedTo` 로 옮김("오늘로 가져오기")으로 처리한다. */
 export async function moveOccurrences(args: {
   taskId: string;
   organizationId: string;
@@ -111,7 +111,7 @@ export async function moveOccurrences(args: {
     .upsert(rows, { onConflict: "task_id,occurrence_date" });
 }
 
-/** Occurrence dates that already carry a state row for a task (used to compute what's still open). */
+/** 할 일에서 이미 상태 행이 있는 회차 날짜(아직 열려 있는 것을 계산할 때 사용). */
 export async function resolvedOccurrenceDates(taskId: string): Promise<Set<string>> {
   const supabase = getSupabaseServiceClient();
   const { data } = await supabase

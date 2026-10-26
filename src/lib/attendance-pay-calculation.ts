@@ -1,4 +1,4 @@
-/** Effective-date row resolution: the row whose [effective_from, effective_to] covers `date`, latest. */
+/** 유효일 행 결정: [effective_from, effective_to] 가 `date` 를 포함하는 행 중 가장 최근 것. */
 export function resolveEffective<T extends { effective_from: string; effective_to: string | null }>(
   rows: readonly T[],
   date: string,
@@ -46,7 +46,7 @@ export function breakSecondsBySession(
   return totals;
 }
 
-/** Paid seconds for one resolved session = worked - closed breaks (never negative). */
+/** 한 세션의 유급 초 = 근무 - 닫힌 휴게 (음수 불가). */
 export function paidSecondsForSession(
   clockInAt: string,
   clockOutAt: string,
@@ -65,21 +65,21 @@ export function settleYen(yen: number): number {
   return Math.round(yen * 1e6) / 1e6;
 }
 
-/** Round a yen amount up to the nearest 10-yen ceiling. e.g. 93 -> 100, 100 -> 100. Float noise is settled first. */
+/** 엔 금액을 10엔 단위로 올림. 예: 93 -> 100, 100 -> 100. 부동소수 오차를 먼저 정리한다. */
 export function roundToNearest10(yen: number): number {
   return Math.ceil(settleYen(yen) / 10) * 10;
 }
 
-/** Daily gross (exact yen, unrounded) for paid minutes at a rate. 1-minute units. */
+/** 유급 분 × 시급의 일 총액 (정확한 엔, 반올림 안 함). 1분 단위. */
 export function dailyGrossExact(paidMinutes: number, hourlyRate: number): number {
   return (hourlyRate * paidMinutes) / 60;
 }
 
 /**
- * Exact (unrounded) applied yen for one attendance allowance on a date that has recognized paid work.
- *   daily_fixed  → the flat amount once for the day (paid minutes irrelevant beyond "has paid work")
- *   hourly_extra → amount is an extra yen-per-hour, multiplied by the date's recognized paid minutes
- * Never rounds; the monthly gross layer applies the single 10-yen ceiling.
+ * 인정된 유급 근무가 있는 날의 근태 수당 하나의 정확한(반올림 안 한) 적용 엔.
+ *   daily_fixed  → 그날 정액을 한 번 ("유급 근무 있음" 외에는 유급 분과 무관)
+ *   hourly_extra → 시간당 추가 엔이며, 그날 인정된 유급 분을 곱한다
+ * 절대 반올림하지 않는다. 월 총액 단계에서 10엔 올림을 한 번만 적용한다.
  */
 export function allowanceCalculatedExact(
   type: "daily_fixed" | "hourly_extra",
@@ -148,7 +148,7 @@ export type PayCalcAllowanceResult = {
   memo: string | null;
   amountYen: number;
   paidMinutes: number;
-  /** Exact (unrounded) yen applied for the day. */
+  /** 그날 적용된 정확한(반올림 안 한) 엔. */
   calculatedAmount: number;
 };
 
@@ -319,7 +319,7 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
       const usable = reason === null;
       let paidMinutes = 0;
       let grossExact = 0;
-      // Pay only applies to hourly days with a known rate and a usable session.
+      // 급여는 시급이 있고 쓸 수 있는 세션이 있는 시급제 날에만 적용된다.
       if (isHourly && usable && dayRate != null && s.clock_in_at && s.clock_out_at) {
         paidMinutes = Math.floor(paidSecondsForSession(s.clock_in_at, s.clock_out_at, breakTotalSec) / 60);
         grossExact = dailyGrossExact(paidMinutes, dayRate);
@@ -342,9 +342,9 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
         excludeReason: reason,
       });
     }
-    // Attendance allowances apply only to hourly days that have recognized paid work. daily_fixed pays
-    // its flat amount once for the day (regardless of session count); hourly_extra scales with the day's
-    // recognized paid minutes. Base rates in hourly_rate_history are never touched.
+    // 근태 수당은 인정된 유급 근무가 있는 시급제 날에만 적용된다. daily_fixed 는
+    // 그날 정액을 한 번 지급하고 (세션 수와 무관), hourly_extra 는 그날
+    // 인정된 유급 분에 비례한다. hourly_rate_history 의 기본 시급은 건드리지 않는다.
     const allowances =
       isHourly && dayPaidMinutes > 0
         ? appliedAllowances(date, allowancesByDate.get(date) ?? [], dayPaidMinutes)
@@ -352,9 +352,9 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
     pushDay(date, empType, dayRate, sessionResults, allowances);
   }
 
-  // Allowance-only days: an allowance can target a date the worker didn't clock in. A `daily_fixed`
-  // allowance still applies as a flat grant for an hourly worker on that date; `hourly_extra` needs
-  // recognized minutes (0 → not applied). These days carry no base wage, only the allowance.
+  // 수당만 있는 날: 수당은 직원이 출근하지 않은 날짜를 대상으로 할 수 있다. `daily_fixed`
+  // 수당은 그 날짜의 시급제 직원에게 여전히 정액으로 적용되고, `hourly_extra` 는
+  // 인정된 분이 필요하다 (0 → 미적용). 이런 날은 기본 급여 없이 수당만 있다.
   for (const [date, rows] of allowancesByDate) {
     if (byDate.has(date)) continue;
     const empType = resolveEffective(employment, date)?.employment_type ?? null;
@@ -378,10 +378,10 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
   const allowances = days.flatMap((d) => d.allowances);
   days.sort((a, b) => a.date.localeCompare(b.date));
 
-  // Monthly ceiling to 10 yen applies once, AFTER base wage + allowance are summed (design rule).
+  // 월 10엔 올림은 기본 급여 + 수당을 합산한 뒤에 한 번만 적용한다 (설계 규칙).
   const expectedGross = roundToNearest10(totalGrossExact + totalRegularExact + totalSpecialExact);
-  // Each bucket rounds to the nearest yen; base absorbs the 10-yen monthly ceiling so
-  // base + 추가수당 + 특별수당 always sum back to expectedGross exactly.
+  // 각 항목은 가장 가까운 엔으로 반올림하고, 기본 급여가 월 10엔 올림을 흡수해
+  // base + 추가수당 + 특별수당이 항상 정확히 expectedGross 로 합쳐지게 한다.
   const allowanceRegularTotal = Math.round(settleYen(totalRegularExact));
   const allowanceSpecialTotal = Math.round(settleYen(totalSpecialExact));
 

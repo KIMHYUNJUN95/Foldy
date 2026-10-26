@@ -31,9 +31,9 @@ function isBlockedAuthState(request: NextRequest) {
 }
 
 /**
- * Password-reset links land on /auth/login with a recovery SESSION (authenticated),
- * so the user must NOT be bounced to /onboarding before they can set a new password.
- * The login page renders this state; the middleware must let it through too.
+ * 비밀번호 재설정 링크는 recovery SESSION(인증된 상태)으로 /auth/login 에 도착하므로,
+ * 새 비밀번호를 정하기 전에 사용자를 /onboarding 으로 보내면 안 된다.
+ * 로그인 페이지가 이 상태를 그리므로 미들웨어도 통과시켜야 한다.
  */
 function isPasswordRecoveryState(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -151,9 +151,9 @@ export async function middleware(request: NextRequest) {
     if (isBlockedAuthState(request) || isPasswordRecoveryState(request)) {
       return response;
     }
-    // Preserve `next` and `lang` so the onboarding page (or login page's own
-    // server-side check) can redirect to the correct destination once the user
-    // is confirmed to be fully onboarded.
+    // `next` 와 `lang` 을 유지해서, 온보딩을 끝낸 사용자를 온보딩 페이지(또는 로그인 페이지의
+    // 서버 측 검사)가 올바른 목적지로
+    // 보낼 수 있게 한다.
     const next = normalizeNextPathForSurface(
       request.nextUrl.searchParams.get("next"),
       surface,

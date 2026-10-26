@@ -113,8 +113,8 @@ export type AdminCalendarRoomAxisRow = {
   propertyName: string;
 };
 
-// Building display order = canonical property order from the shared property map (single source of
-// truth; avoids hardcoded / encoding-fragile building-name literals).
+// 건물 표시 순서 = 공용 property 맵의 정규 property 순서(단일 기준.
+// 하드코딩 / 인코딩에 취약한 건물 이름 리터럴을 피한다).
 // 순서의 근거는 `CALENDAR_BUILDING_ORDER` 하나다 — 어드민·모바일 캘린더가 같이 쓴다.
 const BUILDING_DISPLAY_ORDER: readonly string[] = CALENDAR_BUILDING_ORDER;
 

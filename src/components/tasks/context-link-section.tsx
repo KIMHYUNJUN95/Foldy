@@ -8,18 +8,18 @@ import { localizePropertyName } from "@/lib/room-label-normalization";
 
 type Copy = Dictionary["tasks"];
 
-// Context that can be linked to a task — UUIDs (persisted on the task row) plus display fields
-// (shown in the link card; resolved from the UUIDs/reservation on read).
+// 할 일에 연결할 수 있는 컨텍스트 — UUID(할 일 행에 저장됨)와 표시용 필드
+// (링크 카드에 표시되며, 읽을 때 UUID/예약에서 해석됨).
 export type LinkedContext = {
   propertyId: string | null;
   roomId: string | null;
   propertyName: string | null;
   roomLabel: string | null;
-  reservationId: string | null; // null = building-only / room-only / guest-direct link
+  reservationId: string | null; // null = 건물만 / 방만 / 게스트 직접 연결
   guestName: string | null;
   channel: "airbnb" | "booking" | "direct" | null;
-  checkinDate: string | null; // YYYY-MM-DD Tokyo
-  checkoutDate: string | null; // YYYY-MM-DD Tokyo
+  checkinDate: string | null; // YYYY-MM-DD (도쿄)
+  checkoutDate: string | null; // YYYY-MM-DD (도쿄)
 };
 
 function fmtShortDate(ymd: string, locale: string): string {
@@ -60,7 +60,7 @@ export function ContextLinkSection({
 }) {
   const router = useRouter();
   // 화이트 리디자인(2026-10-15) — 이름표 칸 모양의 버튼 한 줄. 비어 있으면 「연결하기」, 차 있으면 이름 + 회색 한 줄.
-  // ── Empty state ──────────────────────────────────────────────────────────────
+  // ── 빈 상태 ──
   if (!value) {
     return (
       <span className="tkw-nf">
@@ -77,12 +77,12 @@ export function ContextLinkSection({
     );
   }
 
-  // ── Filled state ─────────────────────────────────────────────────────────────
+  // ── 채워진 상태 ──
   const localizedPropertyName = value.propertyName
     ? localizePropertyName(value.propertyName, buildingLabels)
     : null;
-  // For Okubo-style buildings, getCanonicalRoomLabel returns the property name as the room label.
-  // In that case, suppress the room portion to avoid "大久保A · 大久保A号室" redundancy.
+  // 오쿠보 방식 건물은 getCanonicalRoomLabel 이 숙소 이름을 방 라벨로 돌려준다.
+  // 이 경우 "大久保A · 大久保A号室" 처럼 겹치지 않게 방 부분을 생략한다.
   const showRoom = value.roomLabel && value.roomLabel !== value.propertyName;
   const nameStr = [
     localizedPropertyName,

@@ -48,9 +48,9 @@ function formatDate(value: string | null, locale: string) {
     return "";
   }
 
-  // Announcement timestamps are UTC instants but the product reads them as Tokyo
-  // operating dates (mobile groups the list by the Tokyo `published_at` day), so the
-  // admin detail must pin the same zone or it drifts a day before 09:00 JST.
+  // 공지 타임스탬프는 UTC 시점이지만 제품은 이를 도쿄
+  // 운영 날짜로 읽는다(모바일은 목록을 도쿄 `published_at` 날짜로 묶음). 그래서
+  // 관리자 상세도 같은 시간대로 고정해야 09:00 JST 이전에 하루가 어긋나지 않는다.
   return new Intl.DateTimeFormat(locale, {
     timeZone: "Asia/Tokyo",
     day: "2-digit",
@@ -86,13 +86,13 @@ export default async function AdminAnnouncementDetailPage({
     notFound();
   }
 
-  // Authorization: developer_super_admin can view any org's announcement.
-  // All other admin users must have an active membership in the announcement's
-  // organization with an admin-web-capable role (owner, office_admin, cs_staff).
-  // field_manager / staff / part_time_staff memberships in another org do not grant access.
+  // 권한: developer_super_admin 은 모든 조직의 공지를 볼 수 있다.
+  // 그 외 관리자는 해당 공지 조직의 활성 멤버십이 있어야 하며
+  // 그 역할이 관리자 웹 접근이 가능한 역할(owner, office_admin, cs_staff)이어야 한다.
+  // 다른 조직의 field_manager / staff / part_time_staff 멤버십은 접근 권한을 주지 않는다.
   if (session.user.role !== "developer_super_admin") {
-    // adminWebRoles includes "developer_super_admin" (platform-only); filter it out
-    // because organization memberships only carry organization roles.
+    // adminWebRoles 에는 "developer_super_admin"(플랫폼 전용)이 포함되어 있어 걸러낸다.
+    // 조직 멤버십에는 조직 역할만 담기기 때문이다.
     const orgAdminWebRoles = adminWebRoles.filter(
       (r) => r !== "developer_super_admin",
     );

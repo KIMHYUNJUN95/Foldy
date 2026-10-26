@@ -3,15 +3,15 @@
  * 이 스크립트를 돌리면 옛 남색 "S" 임시 마크로 **덮어쓴다**. 앱 아이콘 · 시작 화면은 `generate-app-icons.mjs`(실제 로고 기준)를 쓴다.
  */
 /**
- * One-off: generate Foldy PWA / home-screen icons from an inline SVG (no binary asset needed).
+ * 1회용: 인라인 SVG로 Foldy PWA / 홈 화면 아이콘을 생성한다 (바이너리 에셋 불필요).
  *
- * Brand mark: deep ink-navy gradient squircle + ivory serif italic "S" (the "Foldy" wordmark is
- * serif italic). This is a clean placeholder mark; swap the SVG for a real logo later and re-run.
+ * 브랜드 마크: 깊은 잉크 네이비 그라데이션 스쿼클 + 아이보리 세리프 이탤릭 "S" ("Foldy" 워드마크가
+ * 세리프 이탤릭이다). 임시로 쓰는 깔끔한 마크이므로 나중에 실제 로고 SVG로 바꾸고 다시 실행한다.
  *
  *   node scripts/dev/generate-pwa-icons.mjs
  *
- * Emits into public/icons/: icon-192.png, icon-512.png (purpose "any", rounded),
- * maskable-512.png (full-bleed for Android adaptive), apple-touch-icon.png (180, full square).
+ * public/icons/ 에 출력: icon-192.png, icon-512.png (purpose "any", 둥근 모서리),
+ * maskable-512.png (Android 적응형용 풀블리드), apple-touch-icon.png (180, 꽉 찬 정사각형).
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -23,8 +23,8 @@ const NAVY_DARK = "#1a2c4f"; // hsl(223 54% 22%)
 const IVORY = "#f7f4ee";
 
 function svg(size, { maskable = false } = {}) {
-  const radius = maskable ? 0 : Math.round(size * 0.22); // OS masks adaptive icons itself
-  // Serif italic "S", slightly smaller on maskable so it sits inside the adaptive safe zone.
+  const radius = maskable ? 0 : Math.round(size * 0.22); // OS가 적응형 아이콘을 직접 마스킹함
+  // 세리프 이탤릭 "S": 마스커블에서는 적응형 안전 영역 안에 들어오도록 조금 작게.
   const fontSize = Math.round(size * (maskable ? 0.52 : 0.62));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <defs>

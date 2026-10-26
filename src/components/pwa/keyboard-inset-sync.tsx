@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 
 /**
- * Publishes the on-screen keyboard height as a `--keyboard-inset` CSS variable on <html>, using the
- * VisualViewport API. Fixed bottom bars (e.g. form submit bars) can then sit at
- * `bottom: var(--keyboard-inset, 0px)` so the keyboard never covers them — the single biggest
- * keyboard-related native-feel gap on iOS (where the layout viewport doesn't resize on keyboard
- * open). Renders nothing; no-op where VisualViewport is unavailable.
+ * 화면 키보드 높이를 <html> 의 `--keyboard-inset` CSS 변수로 내보낸다 (VisualViewport
+ * API 사용). 하단 고정 바(예: 폼 제출 바)는 이제
+ * `bottom: var(--keyboard-inset, 0px)` 에 놓아 키보드가 가리지 않게 할 수 있다 — iOS(키보드가 열려도
+ * 레이아웃 뷰포트가 줄지 않음)에서 네이티브 느낌을 해치던 키보드 관련 가장 큰 격차다.
+ * 아무것도 렌더하지 않으며, VisualViewport 가 없으면 아무 동작도 하지 않는다.
  */
 export function KeyboardInsetSync() {
   useEffect(() => {
@@ -15,7 +15,7 @@ export function KeyboardInsetSync() {
     if (!vv) return;
     const root = document.documentElement;
     const update = () => {
-      // How much the keyboard (and any bottom browser UI) overlaps the layout viewport bottom.
+      // 키보드(및 하단 브라우저 UI)가 레이아웃 뷰포트 하단을 얼마나 가리는지.
       const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       root.style.setProperty("--keyboard-inset", `${Math.round(inset)}px`);
     };

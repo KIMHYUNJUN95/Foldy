@@ -33,8 +33,8 @@ function isValidUUID(v: string): boolean {
 
 const SAFE_FILENAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]*[A-Za-z0-9]$/;
 
-// Parse and validate a Storage object path for the announcement-images bucket.
-// Returns the three path segments if valid, null otherwise.
+// announcement-images 버킷의 Storage 객체 경로를 파싱하고 검증한다.
+// 유효하면 세 경로 조각을, 아니면 null 을 돌려준다.
 function parseAnnouncementImagePath(
   path: string,
 ): { orgId: string; announcementId: string; filename: string } | null {
@@ -113,7 +113,7 @@ async function canManageAnnouncement(
   userId: string,
   announcement: AnnouncementRow,
 ) {
-  // developer_super_admin can manage announcements across all organizations.
+  // developer_super_admin 은 모든 조직의 공지를 관리할 수 있다.
   if (await isPlatformAdmin(userId)) {
     return true;
   }
@@ -140,13 +140,13 @@ async function cleanupStoragePaths(paths: string[]) {
     .storage.from(announcementImageBucket)
     .remove(paths);
   if (error) {
-    // Orphaned files will be caught by purgeOrphanAnnouncementImages.
+    // 고아 파일은 purgeOrphanAnnouncementImages 가 정리한다.
     console.error("[cleanupStoragePaths] Storage remove failed:", error.message);
   }
 }
 
-// Extract the Storage object path from a Supabase public URL.
-// Returns null for URLs that do not belong to the announcement-images bucket.
+// Supabase 공개 URL 에서 Storage 객체 경로를 뽑는다.
+// announcement-images 버킷에 속하지 않는 URL 은 null 을 돌려준다.
 function extractStoragePath(publicUrl: string): string | null {
   try {
     const storageUrl = new URL(publicUrl);
@@ -173,8 +173,8 @@ function extractStoragePath(publicUrl: string): string | null {
   }
 }
 
-// Extract validated Storage paths from a client-submitted URL list,
-// keeping only paths that structurally match the submitted org and announcement IDs.
+// 클라이언트가 보낸 URL 목록에서 검증된 Storage 경로만 뽑는다.
+// 제출된 조직 · 공지 ID 와 구조가 맞는 경로만 남긴다.
 function getValidatedAnnouncementImagePaths(
   imageUrls: string[],
   organizationId: string,
@@ -191,9 +191,9 @@ function getValidatedAnnouncementImagePaths(
   });
 }
 
-// Remove announcement images that were uploaded to Storage but not persisted to the DB.
-// Only deletes paths that belong to this Supabase project, the announcement-images bucket,
-// the submitted organization ID, and the submitted announcement ID.
+// Storage 에는 올라갔지만 DB 에 저장되지 않은 공지 이미지를 지운다.
+// 이 Supabase 프로젝트, announcement-images 버킷,
+// 제출된 조직 ID, 제출된 공지 ID 에 속하는 경로만 지운다.
 async function cleanupSubmittedAnnouncementImages(
   imageUrls: string[],
   organizationId: string,
@@ -209,8 +209,8 @@ async function cleanupSubmittedAnnouncementImages(
   await cleanupStoragePaths(paths);
 }
 
-// Validate that an image URL uploaded by the client belongs to our Supabase project,
-// the announcement-images bucket, and matches the submitted org and announcement IDs.
+// 클라이언트가 올린 이미지 URL 이 우리 Supabase 프로젝트,
+// announcement-images 버킷에 속하고 제출된 조직 · 공지 ID 와 맞는지 검증한다.
 function isValidAnnouncementImageUrl(
   url: string,
   organizationId: string,
@@ -227,10 +227,10 @@ function announcementsRedirect(query: string): never {
   redirect(`/admin/announcements?${query}`);
 }
 
-// Server action called by the client to clean up partially-uploaded images
-// when an upload batch fails mid-way.
-// The announcementId parameter pins the cleanup to a specific upload session —
-// only paths for that announcement under one org the user can create in are removed.
+// 업로드 묶음이 중간에 실패했을 때 일부만 올라간 이미지를 정리하려고
+// 클라이언트가 호출하는 서버 액션.
+// announcementId 매개변수로 정리 범위를 특정 업로드 세션에 고정한다 —
+// 그 공지의 경로 중, 사용자가 만들 수 있는 한 조직 아래 것만 지운다.
 export async function cleanupAnnouncementImagePaths(
   announcementId: string,
   paths: string[],
@@ -254,8 +254,8 @@ export async function cleanupAnnouncementImagePaths(
     if (paths.some((p) => inUse.has(p) || p.split("/")[0] !== existing.organization_id)) return;
   }
 
-  // Every path must be structurally valid and belong to the submitted announcementId.
-  // If ANY path fails validation, reject the entire request — delete nothing.
+  // 모든 경로가 구조상 유효하고 제출된 announcementId 에 속해야 한다.
+  // 경로 하나라도 검증에 실패하면 요청 전체를 거부한다 — 아무것도 지우지 않는다.
   const parsedPaths = paths.map((p) => {
     const parsed = parseAnnouncementImagePath(p);
     return parsed !== null && parsed.announcementId === announcementId ? p : null;
@@ -263,14 +263,14 @@ export async function cleanupAnnouncementImagePaths(
   if (parsedPaths.some((p) => p === null)) return;
   const validPaths = parsedPaths as string[];
 
-  // All paths must belong to exactly one organization.
-  // Reject if multiple orgs appear to prevent cross-org cleanup.
+  // 모든 경로는 정확히 한 조직에 속해야 한다.
+  // 여러 조직이 섞여 있으면 조직 간 정리를 막으려고 거부한다.
   const orgIds = [...new Set(validPaths.map((p) => p.split("/")[0]!))];
   if (orgIds.length !== 1) return;
 
   const orgId = orgIds[0]!;
 
-  // Verify the current user is allowed to create announcements in that organization.
+  // 현재 사용자가 그 조직에서 공지를 만들 수 있는지 확인한다.
   if (!(await canCreateInOrganization(userId, orgId))) return;
 
   await cleanupStoragePaths(validPaths);
@@ -316,7 +316,7 @@ export async function createAnnouncement(formData: FormData) {
     announcementsRedirect("error=invalid_announcement");
   }
 
-  // Validate URL structure for all submitted image URLs
+  // 제출된 모든 이미지 URL 의 구조를 검증한다
   if (
     imageUrls.length > maxAnnouncementImages ||
     imageUrls.some(
@@ -463,9 +463,9 @@ export async function deleteAnnouncement(formData: FormData) {
     announcementsRedirect("error=save_failed");
   }
 
-  // DB row deleted successfully. Now clean up attached Storage images.
-  // Storage cleanup runs after DB deletion to avoid leaving a row that points
-  // to already-deleted files. A cleanup failure does not roll back the deletion.
+  // DB 행 삭제 성공. 이제 붙어 있던 Storage 이미지를 정리한다.
+  // 이미 지워진 파일을 가리키는 행이 남지 않도록
+  // Storage 정리는 DB 삭제 뒤에 한다. 정리에 실패해도 삭제를 되돌리지 않는다.
   if (announcement.image_urls.length > 0) {
     const storagePaths = getValidatedAnnouncementImagePaths(
       announcement.image_urls,
@@ -479,7 +479,7 @@ export async function deleteAnnouncement(formData: FormData) {
         .remove(storagePaths);
 
       if (storageError) {
-        // TODO: Replace with structured logging once a logging system is in place.
+        // TODO: 로깅 시스템이 갖춰지면 구조화된 로깅으로 바꾼다.
         console.error(
           "[deleteAnnouncement] Storage cleanup failed for announcement",
           announcementId,
@@ -493,9 +493,9 @@ export async function deleteAnnouncement(formData: FormData) {
 }
 
 // ===========================================================================
-// Admin 공지 관리 콘솔 — client-driven actions (return a result instead of
-// redirecting, so the console can toast + router.refresh() in place).
-// Reuses the same validation / permission / notification helpers as above.
+// Admin 공지 관리 콘솔 — 클라이언트 구동 액션 (리다이렉트 대신
+// 리다이렉트 대신 결과를 돌려준다(콘솔이 토스트 + router.refresh() 를 제자리에서 하도록).
+// 위와 같은 검증 · 권한 · 알림 헬퍼를 재사용한다.
 // ===========================================================================
 
 export type AnnouncementConsoleResult =
@@ -523,11 +523,11 @@ function normalizeConsoleTargetRoles(roles: string[]): OrganizationRole[] {
   );
 }
 
-// A datetime-local value ("YYYY-MM-DDTHH:mm", optionally with seconds) carries no
-// timezone, so `new Date()` would resolve it against the *server's* zone — UTC in
-// production. The console form asks for a Tokyo wall clock ("팝업 노출 종료일"), so a
-// naive value is interpreted as Asia/Tokyo (+09:00) here; anything already carrying
-// an explicit offset or `Z` is passed through untouched.
+// datetime-local 값("YYYY-MM-DDTHH:mm", 초는 있어도 됨)에는 시간대 정보가 없어서
+// `new Date()` 는 *서버* 타임존(운영에서는 UTC) 기준으로 해석한다. 콘솔 폼은
+// 도쿄 벽시계 시각("팝업 노출 종료일")을 묻기 때문에, 시간대 정보 없는 값은
+// 여기서 Asia/Tokyo(+09:00)로 해석하고, 이미 명시적 오프셋이나
+// `Z` 가 붙은 값은 그대로 통과시킨다.
 const NAIVE_LOCAL_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 function normalizeConsolePopupUntil(
@@ -581,7 +581,7 @@ export async function saveAnnouncementConsole(
   const popupUntil = normalizeConsolePopupUntil(input.showPopup, input.popupUntil);
 
   if (existing) {
-    // Edit path — organization is immutable; validate against the stored org.
+    // 수정 경로 — 조직은 바꿀 수 없으므로 저장된 조직 기준으로 검증한다.
     const organizationId = existing.organization_id;
     // 이번 저장에서 새로 올라온 사진(원래 목록에 없던 것) — 저장이 실패하면 고아가 되므로 치운다(2026-10-26).
     const newlyUploaded = getValidatedAnnouncementImagePaths(
@@ -604,8 +604,8 @@ export async function saveAnnouncementConsole(
     }
 
     const wasPublished = existing.status === "published";
-    // The edit form only produces draft/published, so the row never stays archived
-    // after an edit — clear archived_at unconditionally to avoid a stale timestamp.
+    // 수정 폼은 draft/published 만 만들므로 행이 보관됨으로 남지 않는다.
+    // 오래된 타임스탬프가 남지 않도록 수정 뒤에는 archived_at 을 무조건 비운다.
     const { error } = await service
       .from("announcements")
       .update({
@@ -663,7 +663,7 @@ export async function saveAnnouncementConsole(
     return { ok: true };
   }
 
-  // Create path.
+  // 생성 경로.
   const organizationId = input.organizationId;
   if (!organizationId || !isValidUUID(organizationId)) {
     await cleanupSubmittedAnnouncementImages(imageUrls, organizationId, announcementId);

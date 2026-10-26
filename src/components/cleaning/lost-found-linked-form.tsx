@@ -68,8 +68,8 @@ export function LostFoundLinkedForm({
 
   const resolvedLocation = resolveRequestCatalogLocation(defaultRoom, roomCatalog, buildingLabels);
   const defaultBuilding = initialPropertyName || resolvedLocation.buildingName || "";
-  // Collapse Arakicho sub-units (201_2 → 201) to match the picker / calendar. The cleaning_session_id
-  // FK keeps the exact session link regardless of the room label.
+  // Arakicho 하위 호실(201_2 → 201)을 합쳐서 선택기 / 캘린더와 맞춘다. cleaning_session_id
+  // FK 가 방 라벨과 무관하게 정확한 세션 연결을 유지한다.
   const canonicalRoom = getDisplayRoomLabel(defaultBuilding, resolvedLocation.canonicalRoomLabel);
   const buildingDisplay = resolvedLocation.buildingLabel ?? copy.form.noBuildingInfo;
   const roomDisplay = canonicalRoom || copy.form.noRoomInfo;

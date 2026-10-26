@@ -11,7 +11,7 @@ type Copy = Dictionary["tasks"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 
-// ── Inline month calendar (full-width card; never overflows the form padding) ──────────────
+// ── 인라인 월 캘린더(전체 폭 카드; 폼 패딩을 절대 넘지 않음) ──────────────
 export function MiniCalendar({
   value,
   onSelect,
@@ -127,7 +127,7 @@ export function MiniCalendar({
   );
 }
 
-// ── Inline time picker: 오전/오후 + 시 + 분 wheels, plus direct text entry ───────────────────
+// ── 인라인 시간 선택기: 오전/오후 + 시 + 분 휠, 직접 텍스트 입력도 지원 ───────────────────
 export function TimeWheels({
   value,
   onChange,
@@ -160,7 +160,7 @@ export function TimeWheels({
 
   return (
     <div className="mt-2 rounded-2xl border border-border bg-surface p-3 shadow-[0_14px_44px_-28px_rgba(15,23,42,0.4)]">
-      {/* Direct entry */}
+      {/* 직접 입력 */}
       <input
         className="mb-2.5 h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-center text-sm font-bold tracking-wide text-foreground outline-none focus:border-primary"
         inputMode="numeric"
@@ -173,7 +173,7 @@ export function TimeWheels({
           }
         }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") e.preventDefault(); // don't submit the form from here
+          if (e.key === "Enter") e.preventDefault(); // 여기서 폼을 제출하지 않는다
         }}
         placeholder={copy.timeManualHint}
         value={draft}
@@ -195,7 +195,7 @@ export function TimeWheels({
             </button>
           ))}
         </div>
-        {/* Hour 1–12 */}
+        {/* 시 1–12 */}
         <div className={cn(col, "rounded-xl bg-slate-50/70")}>
           {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
             <button
@@ -208,7 +208,7 @@ export function TimeWheels({
             </button>
           ))}
         </div>
-        {/* Minute 0–59 */}
+        {/* 분 0–59 */}
         <div className={cn(col, "rounded-xl bg-slate-50/70")}>
           {Array.from({ length: 60 }, (_, i) => i).map((m) => (
             <button

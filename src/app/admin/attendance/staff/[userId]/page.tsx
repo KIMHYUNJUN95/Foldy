@@ -13,10 +13,10 @@ import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
 import { isValidYm } from "@/lib/attendance-clock";
 
-// Admin · Attendance · Staff Detail (Slice 6).
-// Per-user monthly detail page wired to `getAdminStaffDetail` — header KPIs,
-// daily session ledger (click → side panel), payroll + transport summary cards.
-// Month is controlled by the shared attendance subnav picker.
+// 관리자 · 출퇴근 · 직원 상세 (Slice 6).
+// `getAdminStaffDetail` 에 연결된 사용자별 월 상세 페이지 — 헤더 KPI,
+// 일별 세션 장부(클릭 → 사이드 패널), 급여 + 교통비 요약 카드.
+// 월은 공용 출퇴근 서브내비 피커로 제어한다.
 export default async function AdminAttendanceStaffPage({
   params,
   searchParams,

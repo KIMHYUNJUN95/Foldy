@@ -268,8 +268,8 @@ export function TaskDetailView({
         });
         for (const url of imageUrls) formData.append("imageUrls", url);
       } catch {
-        // Surface the failure instead of swallowing it: keep the typed text and the
-        // selected photos in place so the user can retry. Nothing is submitted.
+        // 실패를 삼키지 말고 드러낸다: 입력한 텍스트와
+        // 선택한 사진을 그대로 두어 다시 시도할 수 있게 한다. 아무것도 제출되지 않았다.
         setUpdateError(copy.errors.upload_failed);
         return;
       }
@@ -556,7 +556,7 @@ export function TaskDetailView({
         ) : null}
       </div>
 
-      {/* Hidden share-more form (submitted by the picker) */}
+      {/* 숨은 공유 추가 폼 (선택기가 제출) */}
       <form action={shareTaskWithUsers} className="hidden" ref={shareFormRef}>
         <input name="taskId" type="hidden" value={task.id} />
         <input defaultValue="[]" name="shareJson" ref={shareInputRef} type="hidden" />

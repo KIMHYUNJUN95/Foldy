@@ -10,7 +10,7 @@ export type LoadMoreBoardResult =
   | { posts: BoardPost[]; nextCursor: string | null }
   | { error: string };
 
-/** Load the next page of non-pinned board posts (cursor = last loaded created_at). */
+/** 고정되지 않은 게시글의 다음 페이지를 불러온다(커서 = 마지막으로 불러온 created_at). */
 export async function loadMoreBoardPosts(params: {
   category: string | null;
   before: string;

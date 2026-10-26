@@ -1,15 +1,15 @@
-// Customer Complaint (OTA 고객 컴플레인 기록) — server-only domain helpers.
+// 고객 컴플레인(OTA 고객 컴플레인 기록) — 서버 전용 도메인 헬퍼.
 //
-// Reads use the RLS-scoped server client (RLS is the first defense line, org-isolated by
-// has_active_membership). Writes use the service-role client AFTER an explicit code-level org +
-// role gate, mirroring `src/lib/bug-reports.ts`. Image uploads are forced into a canonical storage
-// path built from the session organization id so a client cannot write under another org/record.
+// 읽기는 RLS 범위 서버 클라이언트를 쓴다(RLS 가 1차 방어선이며 조직 격리는
+// has_active_membership 으로). 쓰기는 명시적인 코드 수준 조직 +
+// 역할 게이트를 거친 뒤 service-role 클라이언트를 쓰며, `src/lib/bug-reports.ts` 를 따른다. 이미지 업로드는 정식 스토리지
+// 경로로 강제되며 세션 조직 id 로 만들어져 클라이언트가 다른 조직/기록 아래에 쓸 수 없다.
 //
-// Top-level complaints are hard-deleted (MVP policy). Comments carry a `deleted_at` column and are
-// soft-deleted, matching announcement/board comment convention.
+// 최상위 불만은 하드 삭제한다(MVP 정책). 댓글에는 `deleted_at` 컬럼이 있고
+// 소프트 삭제하며 공지/게시판 댓글 규칙과 같다.
 //
-// NOTE: `customer_complaints` / `complaint_comments` are not yet in the generated Database types, so
-// table access goes through an untyped client view and row shapes are cast explicitly.
+// 참고: `customer_complaints` / `complaint_comments` 는 아직 생성된 Database 타입에 없어서
+// 테이블 접근은 타입 없는 클라이언트 뷰를 거치고 행 형태는 명시적으로 캐스팅한다.
 
 import "server-only";
 
@@ -128,8 +128,8 @@ const COMPLAINT_COLS =
 const COMMENT_COLS =
   "id, complaint_id, organization_id, created_by_user_id, content, image_urls, created_at, updated_at, deleted_at";
 
-// `customer_complaints` / `complaint_comments` are not in the generated Database types yet; this view
-// drops the schema generic so table access type-checks until types are regenerated.
+// `customer_complaints` / `complaint_comments` 는 아직 생성된 Database 타입에 없다. 이 뷰는
+// 스키마 제네릭을 떼어 타입이 재생성될 때까지 테이블 접근이 타입 검사를 통과하게 한다.
 function untyped(client: SupabaseClient<Database>): SupabaseClient {
   return client as unknown as SupabaseClient;
 }
@@ -237,8 +237,8 @@ function assertRecordId(id: string, message: string): void {
 }
 
 /**
- * Upload one complaint screenshot. The storage path is server-constructed from the session org id +
- * the supplied complaintId, so the caller cannot write outside their org or under a different id.
+ * 불만 스크린샷 하나를 업로드한다. 스토리지 경로는 세션 조직 id +
+ * 전달받은 complaintId 로 서버가 만들기 때문에 호출자가 자기 조직 밖이나 다른 id 아래에 쓸 수 없다.
  * Path: `{org_id}/complaint-images/{complaint_id}/{uuid}.{ext}`.
  */
 export async function uploadComplaintImage(input: {
@@ -264,7 +264,7 @@ export async function uploadComplaintImage(input: {
 }
 
 /**
- * Upload one complaint-comment image.
+ * 불만 댓글 이미지 하나를 업로드한다.
  * Path: `{org_id}/complaint-comment-images/{complaint_id}/{comment_id}/{uuid}.{ext}`.
  */
 export async function uploadComplaintCommentImage(input: {

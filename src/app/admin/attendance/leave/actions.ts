@@ -1,9 +1,9 @@
 "use server";
 
-// Annual leave — admin approval actions (Phase 2, stage 2). Thin wrappers over
-// annual-leave-approvals-server.ts. Approver rights (platform admin / org membership with a non-null
-// leave_approver_role) are enforced inside those lib functions. See migration 202607060002 and
-// docs/product/26-annual-leave-workflow.md.
+// 연차 — 관리자 승인 액션(2단계 Phase 2). annual-leave-approvals-server.ts 를 얇게 감싼다.
+// 승인 권한(플랫폼 관리자 / leave_approver_role 이 null 이 아닌 조직 멤버십)은 그 lib 함수 안에서
+// 검사한다. 마이그레이션 202607060002 와
+// docs/product/26-annual-leave-workflow.md 참고.
 
 import { revalidatePath } from "next/cache";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
@@ -78,7 +78,7 @@ export async function createAdminLeaveRequestAction(
   return result.ok ? { ok: true, id: result.id } : { ok: false, error: result.error };
 }
 
-/** Edit an employee's hire date + granted balance (직원 잔여·부여 drawer editor). Approver-gated. */
+/** 직원의 입사일 + 부여 잔여를 수정한다(직원 잔여·부여 drawer 편집기). 승인권자만. */
 export async function saveEmployeeLeaveBaselineAction(input: {
   userId: string;
   hireDate: string;
@@ -93,15 +93,15 @@ export async function saveEmployeeLeaveBaselineAction(input: {
 }
 
 // ── Excel / PDF 내보내기 (이력 / 잔여) ──────────────────────────────────────
-// Replaced the ledger's client-side Blob CSV and the balance tab's placeholder toast on 2026-07-14.
-// Both render through the canonical admin table exporters (src/lib/admin-table-workbook.ts /
-// admin-table-report.ts) and are approver-gated, exactly like the mutations above.
+// 2026-07-14 에 이력 탭의 클라이언트 Blob CSV 와 잔여 탭의 임시 토스트를 대체했다.
+// 둘 다 공용 관리자 표 내보내기(src/lib/admin-table-workbook.ts /
+// admin-table-report.ts)로 그리고, 위 변경 액션과 똑같이 승인권자만 쓸 수 있다.
 //
-// 이력 (ledger): the client sends only its filter (status / search / date range). The server re-reads
-// the ledger with listLeaveLedger and applies the same pure filter (`filterLeaveLedger`) — rows sent by
-// a client are never trusted into an export (2026-10-26). Every visible *label* is resolved here from
-// the actor's own locale.
-// 잔여 (balance): a snapshot with no filters, so the rows are re-queried server-side.
+// 이력(ledger): 클라이언트는 필터(상태 / 검색 / 기간)만 보낸다. 서버가 listLeaveLedger 로 장부를 다시 읽고
+// 같은 순수 필터(`filterLeaveLedger`)를 적용한다 — 클라이언트가 보낸 행은 내보내기에 절대 믿고 쓰지 않는다
+// (2026-10-26). 눈에 보이는 *라벨*은 모두 여기서
+// 행위자 본인의 언어로 정한다.
+// 잔여(balance): 필터 없는 스냅샷이라 행을 서버에서 다시 조회한다.
 
 type Lc = Dictionary["admin"]["leaveConsole"];
 
@@ -262,7 +262,7 @@ async function balanceSheet(
   return {
     sheetName: lc.subTabBalance,
     title: lc.subTabBalance,
-    // Snapshot, not a range — stamp the as-of date so a printed copy is unambiguous.
+    // 기간이 아닌 스냅샷 — 기준일을 찍어 두어 인쇄본이 헷갈리지 않게 한다.
     rangeLabel: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date()),
     colNoLabel: meta.shared.colNo,
     totalLabel: meta.shared.exportTotalLabel,

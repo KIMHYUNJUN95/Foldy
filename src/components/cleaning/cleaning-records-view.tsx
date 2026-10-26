@@ -34,8 +34,8 @@ export type CleaningRecordItem = {
   notes: string | null;
 };
 
-// Compact, human duration ("1h 54m" / "8m 47s" / "34s"). Pure — can't import lib/cleaning into a
-// client component (it pulls in the server-only Supabase client).
+// 간결한 사람용 시간 표기("1h 54m" / "8m 47s" / "34s"). 순수 함수 — lib/cleaning 을 클라이언트
+// 컴포넌트로 가져올 수 없다(서버 전용 Supabase 클라이언트를 끌어들이므로).
 function formatDuration(totalSeconds: number | null): string {
   if (totalSeconds === null) return "-";
   const h = Math.floor(totalSeconds / 3600);
@@ -86,16 +86,16 @@ export function CleaningRecordsView({
   const r = copy.records;
   const router = useRouter();
 
-  // Tap a record → detail bottom sheet (shared BottomSheet handles slide + drag-to-dismiss).
+  // 기록을 누르면 → 상세 바텀시트(공용 BottomSheet 가 슬라이드 + 드래그 닫기 처리).
   const isTablet = useIsTablet();
   const [selected, setSelected] = useState<CleaningRecordItem | null>(null);
   const openDetail = useCallback((rec: CleaningRecordItem) => setSelected(rec), []);
 
-  // Filter picker bottom sheet (building / staff) — replaces the native <select> dropdowns.
+  // 필터 선택 바텀시트(건물 / 직원) — 네이티브 <select> 드롭다운을 대체한다.
   const [picker, setPicker] = useState<"building" | "staff" | null>(null);
   const openPicker = useCallback((kind: "building" | "staff") => setPicker(kind), []);
 
-  // Build a URL for /mobile/cleaning/records preserving the other filters.
+  // 다른 필터는 유지한 채 /mobile/cleaning/records URL 을 만든다.
   const hrefWith = (next: { month?: string; staff?: string; status?: string; building?: string }) => {
     const p = new URLSearchParams();
     const month = next.month ?? monthKey;
@@ -126,7 +126,7 @@ export function CleaningRecordsView({
     timeZone: "Asia/Tokyo",
   }).format(new Date(`${monthKey}-15T00:00:00+09:00`));
 
-  // Group by date (newest first); records already arrive ordered by date asc then time desc.
+  // 날짜별로 묶는다(최신순). 기록은 이미 날짜 오름차순, 시간 내림차순으로 들어온다.
   const byDate = new Map<string, CleaningRecordItem[]>();
   for (const rec of records) byDate.set(rec.dateKey, [...(byDate.get(rec.dateKey) ?? []), rec]);
   const dateKeys = Array.from(byDate.keys()).sort((a, b) => b.localeCompare(a));
@@ -217,7 +217,7 @@ export function CleaningRecordsView({
     // 두 칸은 **상세 칸이 있을 때만**(2026-10-06 아이패드 점검) — 기록이 없는 달에도 오른쪽 자리를 비워 두면 왼쪽이 반쪽 폭으로 보였다.
     <div className={paneRecord ? "tablet:grid tablet:grid-cols-[minmax(0,1fr)_400px] tablet:items-start tablet:gap-5" : undefined}>
     <div className="pb-10">
-      {/* Month + summary — a clean dashboard header */}
+      {/* 월 + 요약 — 깔끔한 대시보드 헤더 */}
       <div className="mb-3 overflow-hidden rounded-[22px] border border-border bg-surface shadow-[0_18px_44px_-30px_rgba(15,23,42,0.5)]">
         <div className="flex items-center justify-between px-2.5 py-2.5">
           <Link
@@ -267,7 +267,7 @@ export function CleaningRecordsView({
         </div>
       </div>
 
-      {/* Building + staff — custom pill triggers that open a bottom-sheet picker */}
+      {/* 건물 + 직원 — 바텀시트 선택기를 여는 맞춤 알약 트리거 */}
       <div className="mb-2.5 flex gap-2">
         <button
           className={cn(
@@ -299,7 +299,7 @@ export function CleaningRecordsView({
         ) : null}
       </div>
 
-      {/* Status — segmented control */}
+      {/* 상태 — 세그먼트 컨트롤 */}
       <div className="mb-4 flex gap-1 rounded-2xl bg-slate-100 p-1">
         <Link
           className={cn(
@@ -324,7 +324,7 @@ export function CleaningRecordsView({
         ))}
       </div>
 
-      {/* Records grouped by date — horizontal text rows, no horizontal scroll */}
+      {/* 날짜별로 묶은 기록 — 가로 텍스트 행, 가로 스크롤 없음 */}
       {dateKeys.length === 0 ? (
         <div className="flex flex-col items-center px-6 py-16 text-center">
           <span className="mb-4 flex size-[60px] items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
@@ -390,14 +390,14 @@ export function CleaningRecordsView({
         </div>
       )}
 
-      {/* Record detail — bottom sheet; shows the full info for the tapped record. */}
+      {/* 기록 상세 — 바텀시트. 누른 기록의 전체 정보를 보여준다. */}
       {!isTablet && selected ? (
         <BottomSheet ariaLabel={r.detailTitle} header={detailHeader(selected)} onClose={() => setSelected(null)}>
           {detailBody(selected)}
         </BottomSheet>
       ) : null}
 
-      {/* Filter picker — building / staff bottom sheet */}
+      {/* 필터 선택기 — 건물 / 직원 바텀시트 */}
       {picker ? (
         <BottomSheet
           ariaLabel={picker === "building" ? r.buildingTitle : r.staffTitle}

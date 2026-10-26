@@ -5,9 +5,9 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import "@/components/admin/admin-console.css";
 
-// Desktop master-detail receipt review page for ONE staff member's month, entered from a button in
-// the transport panel. Privileged + organization-scoped (enforced in getAdminTransportReceiptsForUser).
-// Not wrapped in AdminShell — it is a focused reviewer meant to open in its own tab.
+// 직원 한 명의 한 달을 보는 데스크톱 마스터-디테일 영수증 검토 페이지. 교통비 패널의 버튼으로 들어온다.
+// 권한 필요 + 조직 범위 (getAdminTransportReceiptsForUser 에서 강제).
+// AdminShell 로 감싸지 않는다 — 자기 탭에서 여는 집중형 검토 화면이다.
 export default async function TransportReceiptPage({
   searchParams,
 }: {

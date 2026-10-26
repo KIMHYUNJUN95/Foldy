@@ -76,8 +76,8 @@ export function MaintenanceCreateForm({
   const [photoCount, setPhotoCount] = useState(0);
   const buildings = Array.from(new Set(roomCatalog.map((item) => item.propertyName))).sort();
 
-  // Use displayRoomLabel (not canonicalRoomLabel) so Arakicho sub-units (201 / 201_2 = the same
-  // physical room, two Beds24 accounts) collapse to one "201" entry — matching the reservation calendar.
+  // displayRoomLabel(canonicalRoomLabel 아님)을 쓴다. 아라키초 하위 호실(201 / 201_2 = 같은
+  // 실제 객실, Beds24 계정 둘)이 "201" 하나로 합쳐져 예약 캘린더와 일치한다.
   const availableRooms = (() => {
     const seen = new Set<string>();
     const result: string[] = [];

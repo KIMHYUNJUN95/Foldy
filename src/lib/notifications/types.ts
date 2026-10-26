@@ -14,8 +14,8 @@ export type OrderProcessedNotificationPayload = {
   deliveryStartDate: string | null;
   deliveryEndDate: string | null;
   processedByUserId: string | null;
-  // Distinguishes the original "order processed" fan-out from a later delivery-date edit. Both reuse
-  // the `order_processed` notification type (no enum migration); the display branches on this.
+  // 원래의 "주문 처리됨" 팬아웃과 이후의 납품일 수정을 구분한다. 둘 다
+  // `order_processed` 알림 유형을 재사용하며(enum 마이그레이션 없음) 표시가 이 값으로 분기한다.
   kind?: "processed" | "delivery_updated";
 };
 
@@ -23,7 +23,7 @@ export type TaskNotificationPayload = {
   taskId: string;
   taskTitle: string;
   actorUserId: string | null;
-  // `due_soon`/`overdue` are system reminders (no actor); the rest are activity events.
+  // `due_soon`/`overdue` 는 시스템 리마인더(행위자 없음)이고 나머지는 활동 이벤트다.
   event: "shared" | "edited" | "note" | "completed" | "reopened" | "due_soon" | "overdue";
 };
 
@@ -38,9 +38,9 @@ export type SuggestionNotificationPayload = {
   suggestionId: string;
   suggestionTitle: string;
   actorUserId: string | null;
-  // One discriminated `suggestion_activity` type carries every event (no enum value per event).
+  // 구분 가능한 `suggestion_activity` 유형 하나가 모든 이벤트를 담는다 (이벤트마다 enum 값을 두지 않음).
   event: "created" | "referenced" | "status" | "comment";
-  // Present for `status` events so the display can name the new status (e.g. on_hold / completed).
+  // `status` 이벤트에만 있어, 표시가 새 상태를 이름으로 말할 수 있다 (예: on_hold / completed).
   status?: "submitted" | "reviewing" | "on_hold" | "completed" | null;
 };
 
@@ -54,9 +54,9 @@ export type AnnouncementNotificationPayload = {
 export type BugReportNotificationPayload = {
   reportId: string;
   reportTitle: string;
-  // One discriminated `bug_report_activity` type carries both events (no enum value per event):
-  // `created` fans out to org reviewers; `status_changed` notifies the original reporter and the
-  // display branches on `status` to pick the right body string.
+  // 구분 가능한 `bug_report_activity` 유형 하나가 두 이벤트를 담는다 (이벤트마다 enum 값을 두지 않음):
+  // `created` 는 조직의 검토자들에게 퍼지고, `status_changed` 는 최초 신고자에게 알린다.
+  // 표시가 `status` 로 분기해 알맞은 본문 문구를 고른다.
   event: "created" | "status_changed";
   status?: "submitted" | "reviewing" | "fixed" | "closed";
   actorUserId?: string | null;
@@ -67,24 +67,24 @@ export type BoardNotificationPayload = {
   postId: string;
   postTitle: string;
   actorUserId: string | null;
-  // One discriminated `board_activity` type. `commented` notifies the post author of any new
-  // comment; `mentioned` is a direct @mention in a comment body; `mention_all` is the @ALL fan-out.
-  // When mention_all goes out, individual `mentioned` notifications for the same comment are
-  // suppressed to avoid double-notifying everyone (see notifyBoardCommentMentions).
+  // 구분 가능한 `board_activity` 유형 하나. `commented` 는 새 댓글이 달리면 게시글 작성자에게
+  // 알리고, `mentioned` 는 댓글 본문의 직접 @멘션이며, `mention_all` 은 @ALL 팬아웃이다.
+  // mention_all 이 나가면 같은 댓글에 대한 개별 `mentioned` 알림은
+  // 모두에게 이중 알림이 가지 않도록 억제한다 (notifyBoardCommentMentions 참고).
   event: "commented" | "mentioned" | "mention_all";
   actorName?: string | null;
 };
 
 export type AttendanceNotificationPayload = {
-  // One discriminated `attendance_activity` type carries every event (no enum value per event).
-  // `open_session_reminder` is worker-facing (the 18:30 reminder); the others are admin/user alerts.
+  // 구분 가능한 `attendance_activity` 유형 하나가 모든 이벤트를 담는다 (이벤트마다 enum 값을 두지 않음).
+  // `open_session_reminder` 는 작업자 대상(18:30 리마인더)이고, 나머지는 관리자/사용자 알림이다.
   event:
     | "correction_created"
     | "correction_approved"
     | "correction_rejected"
     | "abnormal_session"
     | "open_session_reminder";
-  /** The worker the alert is about (admin alerts); the recipient themselves for the reminder. */
+  /** 알림의 대상 작업자 (관리자 알림); 리마인더에서는 수신자 본인. */
   subjectUserId?: string | null;
   subjectName?: string | null;
   sessionId?: string | null;

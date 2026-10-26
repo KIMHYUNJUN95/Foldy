@@ -21,8 +21,8 @@ export type { RosterDay, RosterEntry };
 
 type Props = {
   rosterDay: RosterDay;
-  operatingDate: string;  // currently selected date "YYYY-MM-DD"
-  todayDate: string;      // today in Tokyo "YYYY-MM-DD"
+  operatingDate: string;  // 현재 선택된 날짜 "YYYY-MM-DD"
+  todayDate: string;      // 도쿄 기준 오늘 "YYYY-MM-DD"
   locale: string;
   /** 「주 28시간」 칩(docs/product/41 R4) — 서버가 `staff_documents.view` 를 본 뒤에만 채운다. */
   weeklyLimit?: Record<string, WeeklyLimitChip>;

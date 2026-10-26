@@ -3,12 +3,12 @@ import "server-only";
 import ExcelJS from "exceljs";
 import type { AdminPayrollRow } from "@/lib/admin-attendance";
 
-// Localized, print-quality native .xlsx payroll workbook (built with exceljs).
+// 현지화된 인쇄 품질 네이티브 .xlsx 급여 워크북(exceljs 로 생성).
 //
-// Designed as a practical accounting sheet: plain grid, compact rows, strong cell borders, and up to
-// 50 staff rows like a spreadsheet template rather than a styled report. Returned as base64 for the
-// server action to hand to the browser.
-// All visible strings arrive already localized (ko/ja/en) from the caller.
+// 실무용 회계 시트로 설계: 단순한 격자, 촘촘한 행, 굵은 셀 테두리, 최대
+// 50명 직원 행을 가진 스프레드시트 템플릿 형태이지 꾸민 보고서가 아니다. 서버 액션이 브라우저에
+// 넘기도록 base64 로 돌려준다.
+// 보이는 문자열은 모두 호출자가 이미 현지화(ko/ja/en)해서 넘긴다.
 
 export type PayrollWorkbookLabels = {
   title: string;
@@ -35,9 +35,9 @@ export type PayrollWorkbookRow = AdminPayrollRow & {
   totalWithTransport: number;
 };
 
-// Shared accounting-template palette + border helper — reused by other admin attendance workbook
-// builders (e.g. attendance-transport-workbook.ts) so every exported .xlsx in this console looks
-// like one consistent template rather than diverging per feature.
+// 공용 회계 템플릿 팔레트 + 테두리 헬퍼 — 다른 관리자 근태 워크북
+// 빌더(예: attendance-transport-workbook.ts)가 재사용해서 이 콘솔에서 내보내는 모든 .xlsx 가
+// 기능마다 달라지지 않고 하나의 일관된 템플릿처럼 보이게 한다.
 export const WORKBOOK_TITLE_FILL = "FFB6D7A8";
 export const WORKBOOK_HEADER_FILL = "FFD9EAD3";
 export const WORKBOOK_TOTAL_FILL = "FFE2F0D9";
@@ -96,24 +96,24 @@ export async function buildPayrollWorkbookBase64(
   ws.properties.defaultRowHeight = 18;
   ws.pageSetup.printArea = `A1:J${TEMPLATE_ROWS + 4}`;
 
-  // Compact payroll ledger layout. Base wage, extra allowance (추가수당), special allowance (특별수당),
-  // and transport are kept in separate columns so they never blend; the final column sums all four.
+  // 촘촘한 급여 원장 레이아웃. 기본급, 추가수당, 특별수당,
+  // 교통비는 별도 열로 두어 섞이지 않게 하고, 마지막 열이 네 가지를 합산한다.
   const cols: { width: number; align: "center"; numFmt?: string }[] = [
-    { width: 6, align: "center" }, // No
-    { width: 22, align: "center" }, // name
-    { width: 10, align: "center", numFmt: "0" }, // work days
-    { width: 14, align: "center" }, // hours
-    { width: 11, align: "center", numFmt: "¥#,##0" }, // rate
-    { width: 15, align: "center", numFmt: "¥#,##0" }, // base wage
+    { width: 6, align: "center" }, // 번호
+    { width: 22, align: "center" }, // 이름
+    { width: 10, align: "center", numFmt: "0" }, // 근무일수
+    { width: 14, align: "center" }, // 시간
+    { width: 11, align: "center", numFmt: "¥#,##0" }, // 시급
+    { width: 15, align: "center", numFmt: "¥#,##0" }, // 기본급
     { width: 14, align: "center", numFmt: "¥#,##0" }, // extra allowance (추가수당)
     { width: 14, align: "center", numFmt: "¥#,##0" }, // special allowance (특별수당)
-    { width: 14, align: "center", numFmt: "¥#,##0" }, // transport
-    { width: 20, align: "center", numFmt: "¥#,##0" }, // total (base + allowances + transport)
+    { width: 14, align: "center", numFmt: "¥#,##0" }, // 교통비
+    { width: 20, align: "center", numFmt: "¥#,##0" }, // 합계(기본급 + 수당 + 교통비)
   ];
   ws.columns = cols.map((c) => ({ width: c.width }));
   const LAST = cols.length;
 
-  // ── Plain workbook title ──
+  // ── 단순 워크북 제목 ──
   ws.mergeCells(1, 1, 1, LAST);
   const t = ws.getCell("A1");
   t.value = `${labels.monthLabel} ${labels.title}`;
@@ -123,7 +123,7 @@ export async function buildPayrollWorkbookBase64(
   t.border = box();
   ws.getRow(1).height = 22;
 
-  // ── Header (row 2) ──
+  // ── 헤더(2행) ──
   const headerLabels = [
     labels.colNo,
     labels.colName,
@@ -152,7 +152,7 @@ export async function buildPayrollWorkbookBase64(
     cell.border = box();
   });
 
-  // ── Data rows ──
+  // ── 데이터 행 ──
   const firstDataRow = 3;
   const templateRows = Math.max(TEMPLATE_ROWS, rows.length);
   for (let i = 0; i < templateRows; i++) {
@@ -190,7 +190,7 @@ export async function buildPayrollWorkbookBase64(
     });
   }
 
-  // ── Totals row ──
+  // ── 합계 행 ──
   const lastDataRow = firstDataRow + templateRows - 1;
   const totalRowIdx = lastDataRow + 1;
   const total = ws.getRow(totalRowIdx);

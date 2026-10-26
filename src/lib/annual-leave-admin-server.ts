@@ -1,8 +1,8 @@
-// Annual leave — admin-side request creation (Phase 2, stage 1b). The admin console lets an approver
-// file a leave request on behalf of another employee (proxy) or for themselves. Every query/write runs
-// on the service-role client and is filtered by the CURRENT organization id. Reuses createLeaveRequest
-// (self-scope submission) for the actual insert. Day-count normalization mirrors the mobile leave-form
-// (src/components/attendance/leave-form.tsx) exactly. See docs/product/26-annual-leave-workflow.md.
+// 연차 — 관리자 쪽 신청 생성(Phase 2, 1b 단계). 관리자 콘솔에서 승인권자가
+// 다른 직원 대신(대리) 또는 본인 휴가 신청을 올린다. 모든 조회/쓰기는
+// service-role 클라이언트로 하고 현재 조직 id 로 거른다. 실제 insert 는 createLeaveRequest
+// (본인 범위 제출)를 재사용한다. 일수 정규화는 모바일 휴가 폼
+// (src/components/attendance/leave-form.tsx)과 똑같다. docs/product/26-annual-leave-workflow.md 참고.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -22,11 +22,11 @@ import { computeAnnualLeaveSummary, getScheduledGrants, normalizeLeaveDays, toky
 // 시급제 역할(아르바이트 · 아르바이트 리더)은 연차 대상이 아니다(확정 정책). 판정은 `annual-leave-server.ts` 의
 // `isLeaveHourlyRole` 하나만 쓴다(유일한 baseline 쓰기 지점이 거기라 검증도 거기 있다) — 복사하면 두 정의가 갈라진다.
 
-// Days-out window used to surface a bucket that lapses "soon" in the balance table's 소멸 예정 column.
+// 곧 소멸하는 묶음을 잔여 표의 소멸 예정 열에 보여 주는 남은 일수 기준.
 const EXPIRING_SOON_DAYS = 180;
 
-// Deterministic avatar background palette (mirrors the handoff's per-person colors). Index by a stable
-// hash of the user id so the same person always keeps the same color across renders/sessions.
+// 결정적 아바타 배경 팔레트(핸드오프의 사람별 색과 같다). 사용자 id 의 안정적인
+// 해시로 인덱싱해 같은 사람이 렌더/세션이 바뀌어도 항상 같은 색을 갖는다.
 const AVATAR_BG = ["#9a4d6d", "#557a8a", "#7a5ea8", "#4d6db5", "#3f7d5a", "#b5683f", "#9c5a2c", "#4d7a6d"];
 
 function avatarBgFor(userId: string): string {
@@ -41,9 +41,9 @@ function daysBetweenISO(fromIso: string, toIso: string): number {
   return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
 }
 
-// Platform super-admins (developer_super_admin) outrank any org role. In the admin tables we surface
-// them by their platform role ("개발자") instead of their incidental membership role
-// (e.g. owner/"대표"), matching how the session resolves role everywhere else.
+// 플랫폼 슈퍼 관리자(developer_super_admin)는 어떤 조직 역할보다 높다. 관리자 표에서는
+// 그들을 우연한 멤버십 역할이 아니라 플랫폼 역할("개발자")로 보여 준다
+// (예: owner/"대표"). 세션이 역할을 정하는 다른 모든 곳과 같다.
 const PLATFORM_ADMIN_ROLE = "developer_super_admin";
 
 async function platformAdminIdSet(
@@ -61,8 +61,8 @@ async function platformAdminIdSet(
 
 export type LeaveApplicantOption = { id: string; name: string };
 
-/** Balance snapshot for a prospective applicant — powers the request modal's live "잔여 영향" preview.
- *  `ineligible` = no hire-date/baseline set yet (treated as not-yet-accrued / 미도래). */
+/** 신청 예정자의 잔여 스냅샷 — 신청 모달의 실시간 "잔여 영향" 미리 보기에 쓴다.
+ * `ineligible` = 아직 입사일/기준선이 없음(아직 발생하지 않음으로 취급 / 미도래). */
 export type ApplicantLeaveSummary = {
   userId: string;
   name: string;
@@ -144,8 +144,8 @@ export type AdminLeaveRequestInput = {
   emergencyContact: string;
 };
 
-/** Active org members eligible as proxy-request targets (active-only — invited members can't yet
- *  receive requests, and createAdminLeaveRequest validates active membership anyway). */
+/** 신청 대상이 될 수 있는 활성 조직 멤버(활성만 — 초대된 멤버는 아직
+ * 요청을 받을 수 없고, createAdminLeaveRequest 가 어차피 활성 멤버십을 검증한다). */
 export async function listLeaveApplicants(session: AppSession): Promise<LeaveApplicantOption[]> {
   const service = getSupabaseServiceClient();
   const { data: memberships } = await service
@@ -164,7 +164,7 @@ export async function listLeaveApplicants(session: AppSession): Promise<LeaveApp
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
-/** One row per active salary-based employee for the 직원 잔여·부여 table (hourly/part-time excluded). */
+/** 직원 잔여·부여 표의 활성 정규직 직원 한 명당 한 행(시급/파트타임 제외). */
 export type AdminLeaveBalanceRow = {
   userId: string;
   name: string;
@@ -172,21 +172,21 @@ export type AdminLeaveBalanceRow = {
   bg: string;
   role: string | null;
   hireDate: string | null;
-  grant: number; // 유급 pool granted total (= baseRemaining + usedBase)
+  grant: number; // 유급 풀 부여 합계 (= baseRemaining + usedBase)
   usedBase: number;
-  bonus: number; // 특별 pool granted total (= bonusRemaining + usedBonus)
+  bonus: number; // 특별 풀 부여 합계 (= bonusRemaining + usedBonus)
   usedBonus: number;
   nextGrantDate: string | null;
   nextGrantAmount: number | null;
   expiringDate: string | null;
   expiringAmount: number | null;
-  ineligible: boolean; // 미도래 — no baseline yet, or nothing accrued so far
+  ineligible: boolean; // 미도래 — 아직 기준선이 없거나 지금까지 발생한 것이 없음
 };
 
 /**
- * Balances for every active salary-based employee. Approved 유급/특별 leave is deducted from the
- * respective pool via computeAnnualLeaveSummary; hourly roles (part_time_staff · staff) are excluded.
- * Org-isolated (service-role, filtered by session org).
+ * 모든 활성 정규직 직원의 잔여. 승인된 유급/특별 휴가는 computeAnnualLeaveSummary 로
+ * 각 풀에서 차감하며, 시급 역할(part_time_staff · staff)은 제외한다.
+ * 조직 격리(service-role, 세션 조직으로 거름).
  */
 export async function listAdminLeaveBalances(session: AppSession): Promise<AdminLeaveBalanceRow[]> {
   const service = getSupabaseServiceClient();
@@ -235,7 +235,7 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
     ).map((b) => [b.user_id, b]),
   );
 
-  // Approved usage per user, split by pool: 유급(paid) → base, 특별(special) → bonus.
+  // 사용자별 승인된 사용량을 풀로 나눈다: 유급(paid) → base, 특별(special) → bonus.
   const usage = new Map<string, { base: number; bonus: number }>();
   for (const r of (reqData ?? []) as { user_id: string; leave_type: string; days_count: number }[]) {
     const u = usage.get(r.user_id) ?? { base: 0, bonus: 0 };
@@ -271,7 +271,7 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
         specialUsedDays: used.bonus,
         asOf: today,
       });
-      // grant reconciles as remaining + used, so "remaining / grant" always adds up in the UI.
+      // 부여는 잔여 + 사용으로 맞추므로 UI 의 "잔여 / 부여"가 항상 맞아떨어진다.
       const grant = summary.baseRemaining + used.base;
       const bonus = summary.bonusRemaining + used.bonus;
       const expiring = summary.buckets
@@ -296,7 +296,7 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
       };
     }
 
-    // No baseline yet → 미도래. If a hire date is on file, still surface the first upcoming grant.
+    // 아직 기준선이 없으면 → 미도래. 입사일이 있으면 곧 올 첫 부여는 그래도 보여 준다.
     const nextGrant = hireDate
       ? getScheduledGrants(hireDate, today).find((g) => g.date > today) ?? null
       : null;
@@ -316,8 +316,8 @@ export async function listAdminLeaveBalances(session: AppSession): Promise<Admin
 }
 
 /**
- * Admin edit of an employee's hire date + granted balance (직원 잔여·부여 drawer editor).
- * Org-isolated + active-member + not-hourly guarded; approver-gating is enforced by the caller/action.
+ * 직원의 입사일 + 부여 잔여 관리자 수정(직원 잔여·부여 drawer 편집기).
+ * 조직 격리 + 활성 멤버 + 시급 제외 가드. 승인권자 확인은 호출자/액션이 한다.
  */
 export async function saveEmployeeLeaveBaseline(
   session: AppSession,
@@ -354,7 +354,7 @@ export async function saveEmployeeLeaveBaseline(
 // 결재자 관리(예전 `leave_approver_role` 표시 + 승인자 목록 · 토글)는 권한 키 `leave.approve` 로 옮겨 지웠다(2026-10-21).
 // 사용자 화면의 개인 부여 · 차단으로 켜고 끈다. 판정: `annual-leave-approvals-server.ts` `getLeaveApproverRole`.
 
-/** One approved leave request rendered as a 休暇届 document (for the 문서 sub-tab). */
+/** 休暇届 문서로 그려지는 승인된 휴가 신청 하나(문서 하위 탭용). */
 export type LeaveDocument = {
   id: string;
   documentNumber: string;
@@ -362,7 +362,7 @@ export type LeaveDocument = {
   applicantName: string;
   applicantInitial: string;
   applicantBg: string;
-  applicantRole: string | null; // raw org role, labeled in the client
+  applicantRole: string | null; // 원본 조직 역할. 라벨은 클라이언트에서 붙인다
   leaveType: LeaveType;
   startDate: string;
   endDate: string;
@@ -370,11 +370,11 @@ export type LeaveDocument = {
   daysCount: number;
   reason: string;
   emergencyContact: string;
-  appliedOn: string; // YYYY/MM/DD (申請日, Tokyo)
+  appliedOn: string; // YYYY/MM/DD (申請日, 도쿄)
   approverName: string | null;
   approverInitial: string | null;
   approverRole: string | null; // 'department_head' | 'senior_managing_director'
-  decidedAt: string; // "MM/DD HH:mm" (Tokyo) — empty string if not recorded
+  decidedAt: string; // "MM/DD HH:mm" (도쿄) — 기록이 없으면 빈 문자열
 };
 
 function tokyoYmdSlash(iso: string | null): string {
@@ -403,8 +403,8 @@ function tokyoMdHm(iso: string | null): string {
 }
 
 /**
- * Approved leave requests that have a 休暇届 document number, for the 문서 sub-tab. Org-isolated.
- * Resilient: returns [] if the `document_number` column isn't migrated yet.
+ * 休暇届 문서 번호가 있는 승인된 휴가 신청(문서 하위 탭용). 조직 격리.
+ * 복원력: `document_number` 컬럼이 아직 마이그레이션되지 않았으면 []를 돌려준다.
  */
 export async function listLeaveDocuments(session: AppSession): Promise<LeaveDocument[]> {
   const service = getSupabaseServiceClient();
@@ -494,7 +494,7 @@ function tokyoYmdHm(iso: string | null): string {
   return `${g("year")}/${g("month")}/${g("day")} ${g("hour")}:${g("minute")}`;
 }
 
-/** One row per leave request (all statuses except draft) for the 이력(승인 장부) sub-tab. */
+/** 휴가 신청 하나당 한 행(초안 제외 모든 상태), 이력(승인 장부) 하위 탭용. */
 export type LeaveLedgerEntry = {
   id: string;
   documentNumber: string | null;
@@ -511,13 +511,13 @@ export type LeaveLedgerEntry = {
   reason: string; // 신청 사유
   decisionReason: string | null; // 반려/취소 사유 (해당 시)
   processorName: string | null; // 승인/반려/취소 처리자
-  processedAt: string; // decision time (Tokyo, "YYYY/MM/DD HH:mm"); submitted time for pending
+  processedAt: string; // 결정 시각(도쿄, "YYYY/MM/DD HH:mm"). 대기 중이면 제출 시각.
   submittedAt: string; // 신청일 (Tokyo, "YYYY/MM/DD")
 };
 
 /**
- * The full approval ledger — every leave request (draft excluded), newest first, with who processed it
- * and when. Org-isolated. Resilient: `document_number` may be null for pre-migration approved rows.
+ * 전체 승인 장부 — 모든 휴가 신청(초안 제외), 최신순, 누가 처리했는지
+ * 와 언제인지 포함. 조직 격리. 복원력: 마이그레이션 이전에 승인된 행은 `document_number` 가 null 일 수 있다.
  */
 export async function listLeaveLedger(session: AppSession): Promise<LeaveLedgerEntry[]> {
   const service = getSupabaseServiceClient();
@@ -623,8 +623,8 @@ export async function listLeaveLedger(session: AppSession): Promise<LeaveLedgerE
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Files a leave request (self or proxy) from the admin console. Lands as `requested` in the approval
- * queue. `targetUserId` must be an active member of the session org (org isolation). 남의 이름으로 내는
+ * 관리자 콘솔에서 (본인 또는 대리) 휴가 신청을 올린다. 승인 대기열에 `requested` 로 들어간다.
+ * `targetUserId` 는 세션 조직의 활성 멤버여야 한다(조직 격리). 남의 이름으로 내는
  * 대리 신청은 휴가 승인권자만 할 수 있다(액션 `createAdminLeaveRequestAction` 이 검사, 2026-10-26).
  * 시급직의 유급 · 특별휴가는 모바일과 같이 막는다(`hourly_excluded`).
  */

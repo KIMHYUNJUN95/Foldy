@@ -1,10 +1,10 @@
 "use client";
 
-// Admin console — leave request creation modal (proxy or self). Markup mirrors the design handoff
-// (design_handoff_annual_leave → agentForm in leave-views.js) 1:1 using the .adm-scoped handoff
-// classes (.modal / .fld / .selwrap / .seg / .segb / .fpill / .fdays / .fpv). Day-count /
-// bereavement / half-day rules match the mobile leave-form; the balance preview reads the selected
-// applicant's live remaining balance. See docs/product/26-annual-leave-workflow.md.
+// 관리자 콘솔 — 휴가 신청 생성 모달 (대리 또는 본인). 마크업은 디자인 핸드오프를 그대로 따르며
+// (design_handoff_annual_leave → leave-views.js 의 agentForm) 1:1, .adm 범위의 핸드오프
+// 클래스(.modal / .fld / .selwrap / .seg / .segb / .fpill / .fdays / .fpv)를 쓴다. 일수 /
+// 경조사 / 반차 규칙은 모바일 휴가 폼과 같고, 잔여 미리보기는 선택된
+// 신청자의 실시간 잔여를 읽는다. docs/product/26-annual-leave-workflow.md 참고.
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,7 @@ function typeLabel(type: LeaveType, lc: Lc): string {
   }
 }
 
-/** Which balance pool a leave type draws from. */
+/** 휴가 종류가 어느 잔여 풀에서 차감되는지. */
 function poolOf(type: LeaveType): "base" | "bonus" | "none" {
   if (type === "paid") return "base";
   if (type === "special") return "bonus";
@@ -100,7 +100,7 @@ export function LeaveRequestModal({
   onCreated,
 }: {
   mode: "proxy" | "self";
-  /** Pre-filled start/end date (YYYY-MM-DD), e.g. when opened from a team-calendar day cell. */
+  /** 미리 채우는 시작/종료일 (YYYY-MM-DD), 예: 팀 캘린더 날짜 칸에서 열 때. */
   prefillDate?: string;
   applicants: LeaveApplicantOption[];
   currentUserId: string;
@@ -138,7 +138,7 @@ export function LeaveRequestModal({
   const half = (durationUnit === "am" || durationUnit === "pm") && !isBereavement;
   const days = useMemo(() => calcDays(startDate, endDate, durationUnit), [startDate, endDate, durationUnit]);
 
-  // Entrance transition (scrim + modal scale-in) — add `.on` after mount.
+  // 진입 전환 (스크림 + 모달 스케일 인) — 마운트 뒤에 `.on` 을 붙인다.
   useEffect(() => {
     const t = requestAnimationFrame(() => setShown(true));
     return () => cancelAnimationFrame(t);
@@ -152,7 +152,7 @@ export function LeaveRequestModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Live balance for the selected applicant (self loads its own on mount).
+  // 선택된 신청자의 실시간 잔여 (본인이면 마운트 때 직접 불러온다).
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -214,7 +214,7 @@ export function LeaveRequestModal({
     });
   }
 
-  // Balance preview (mirrors handoff agentForm preview logic).
+  // 잔여 미리보기 (핸드오프 agentForm 미리보기 로직과 같다).
   const preview = useMemo(() => {
     const pool = poolOf(leaveType);
     if (!summary) {
@@ -242,7 +242,7 @@ export function LeaveRequestModal({
         ),
       };
     }
-    // none pool (annual = company-granted, other = unpaid)
+    // 풀 없음 (연차 = 회사 부여, 기타 = 무급)
     return {
       cls: "",
       icon: <Info />,
@@ -350,7 +350,7 @@ export function LeaveRequestModal({
               <span className="fld__l">
                 {lc.formEnd} <b className="req">*</b>
               </span>
-              {/* Bereavement + half-day derive the end date from the start date — read-only, not editable. */}
+              {/* 경조사와 반차는 종료일을 시작일에서 정하므로 — 읽기 전용이며 편집할 수 없다. */}
               <AdminDatePicker
                 value={endDate}
                 onChange={setEndDate}

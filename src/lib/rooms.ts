@@ -12,7 +12,7 @@ import type { Database } from "@/types/database";
 
 type RawPayload = Database["public"]["Tables"]["reservations"]["Row"]["raw_payload"];
 
-/** Reads the first non-empty string/number value from a reservation raw_payload under any of `keys`. */
+/** 예약 raw_payload 에서 `keys` 중 어느 이름으로든 처음 나오는 비어 있지 않은 문자열/숫자 값을 읽는다. */
 export function getRawPayloadString(rawPayload: RawPayload, keys: string[]): string | null {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -30,7 +30,7 @@ export function getRawPayloadString(rawPayload: RawPayload, keys: string[]): str
   return null;
 }
 
-/** Catalog row shape needed to resolve a reservation to its active-room canonical key. */
+/** 예약을 활성 객실 정규 키로 풀어내는 데 필요한 카탈로그 행 모양. */
 export type ReservationRoomResolveInput = {
   property_name: string;
   room_label: string;
@@ -38,8 +38,8 @@ export type ReservationRoomResolveInput = {
 };
 
 /**
- * Builds the cross-property externalRoomId → canonical map. Handles property-name mismatch
- * (e.g. Beds24 "荒木町A" not normalizing to canonical "아라키초A"); externalRoomId is globally unique.
+ * 건물 간 externalRoomId → 정규 키 맵을 만든다. property 이름 불일치를 처리한다
+ * (예: Beds24 "荒木町A" 가 정규 "아라키초A" 로 정규화되지 않는 경우); externalRoomId 는 전역에서 고유하다.
  */
 export function buildGlobalExternalRoomToCanonical(
   catalog: ActiveRoomCatalogItem[],
@@ -52,15 +52,15 @@ export function buildGlobalExternalRoomToCanonical(
 }
 
 /**
- * Resolves a reservation to its active-room **internal canonical key** (e.g. "402_2"), or null.
+ * 예약을 활성 객실의 **내부 정규 키**(예: "402_2")로 풀어낸다. 없으면 null.
  *
- * Single source of truth shared by the reservation calendar and the task context picker so the
- * two never drift. Mirrors the calendar's resolution priority:
- *   raw_payload room/unit id → raw_payload unit name → reservation room_label (exact then normalized).
- * In authoritative mode (room master classified) an unresolved id/label drops the reservation;
- * in provisional mode it falls back to the normalized room_label.
+ * 예약 캘린더와 작업 컨텍스트 선택기가 공유하는 단일 진실 공급원으로, 둘이
+ * 어긋나지 않게 한다. 캘린더의 해석 우선순위를 따른다:
+ *   raw_payload 객실/유닛 id → raw_payload 유닛 이름 → 예약 room_label (정확 일치 후 정규화 일치).
+ * 확정 모드(객실 마스터 분류됨)에서는 풀리지 않은 id/라벨이 예약을 제외하고,
+ * 임시 모드에서는 정규화된 room_label 로 대체한다.
  *
- * Use `getDisplayRoomLabel(canonicalProperty, <result>)` to collapse sub-units (402 / 402_2 → 402).
+ * 하위 호실을 합치려면 `getDisplayRoomLabel(canonicalProperty, <결과>)` 를 쓴다 (402 / 402_2 → 402).
  */
 export function resolveReservationCanonicalRoomLabel(
   item: ReservationRoomResolveInput,
@@ -136,9 +136,9 @@ export function resolveReservationCanonicalRoomLabel(
   return normalizedRoomLabel;
 }
 
-// Company internal rule: Beds24 room IDs with minimum_stay >= this threshold are inactive
-// for that period and must be excluded from room axis, empty-today counts, and operational lists.
-// See docs/engineering/01-beds24-integration.md for full rule documentation.
+// 회사 내부 규칙: minimum_stay 가 이 기준 이상인 Beds24 객실 ID 는 그 기간 동안 비활성이며
+// 객실 축, 오늘 빈 객실 수, 운영 목록에서 제외해야 한다.
+// 전체 규칙 문서는 docs/engineering/01-beds24-integration.md 참고.
 export const BEDS24_INACTIVE_MIN_STAY_THRESHOLD = 50;
 
 export function isInactiveBeds24Room(minimumStay: number): boolean {
@@ -146,16 +146,16 @@ export function isInactiveBeds24Room(minimumStay: number): boolean {
 }
 
 export type ActiveRoomCatalogItem = {
-  /** Internal key used for reservation matching. Never collapse distinct physical rooms. */
+  /** 예약 매칭에 쓰는 내부 키. 서로 다른 물리 객실을 절대 합치지 않는다. */
   canonicalRoomLabel: string;
-  /** Display label for calendar rows. Strips _N suffix for Arakicho sub-units. */
+  /** 캘린더 행의 표시 라벨. 아라키초 하위 호실은 _N 접미사를 뗀다. */
   displayRoomLabel: string;
   externalRoomId: string | null;
   propertyName: string;
   roomLabel: string;
-  /** rooms.id — the physical room row's UUID (for context linking). */
+  /** rooms.id — 물리 객실 행의 UUID (컨텍스트 연결용). */
   roomId: string;
-  /** rooms.property_id — the owning property's UUID (for context linking). */
+  /** rooms.property_id — 소유 property 의 UUID (컨텍스트 연결용). */
   propertyId: string;
 };
 
@@ -226,21 +226,21 @@ function warnDuplicateCanonicalRoomKeys(catalog: ActiveRoomCatalogItem[]) {
   }
 }
 
-// Returns the room_label list for all active rooms in the organization.
-// "Active" = status='active' AND:
-//   - non-Beds24 room, OR
-//   - Beds24 room with an explicit minimum stay value below the inactive threshold.
+// 조직의 모든 활성 객실의 room_label 목록을 반환한다.
+// "활성" = status='active' AND:
+//   - Beds24 가 아닌 객실, 또는
+//   - 최소 숙박 값이 비활성 기준 미만으로 명시된 Beds24 객실.
 //
-// Beds24 rows with external_minimum_stay = null are excluded on purpose.
-// Our company rule needs minimum_stay to decide active vs inactive room IDs, so
-// "unknown" must not be treated as active inventory.
+// external_minimum_stay = null 인 Beds24 행은 의도적으로 제외한다.
+// 우리 회사 규칙은 활성/비활성 객실 ID 를 가르려면 minimum_stay 가 필요하므로
+// "알 수 없음" 을 활성 재고로 취급해서는 안 된다.
 //
-// Returns undefined while the org does not yet have any classified room-master rows.
-// "Classified" means:
-//   - non-Beds24 room row, OR
-//   - Beds24 room row with external_minimum_stay present.
-// Returns string[] (including []) once classified room-master rows exist.
-// The calendar component uses undefined vs string[] to switch provisional/authoritative mode.
+// 조직에 분류된 객실 마스터 행이 아직 없으면 undefined 를 반환한다.
+// "분류됨" 의 의미:
+//   - Beds24 가 아닌 객실 행, 또는
+//   - external_minimum_stay 가 있는 Beds24 객실 행.
+// 분류된 객실 마스터 행이 있으면 string[] (빈 배열 포함)을 반환한다.
+// 캘린더 컴포넌트는 undefined 와 string[] 로 임시/확정 모드를 전환한다.
 export async function getActiveRoomLabels(
   organizationId: string,
   supabase: SupabaseClient<Database>,
@@ -253,7 +253,7 @@ export async function getActiveRoomLabels(
   return [...new Set(catalog.map((item) => item.roomLabel))];
 }
 
-// Convenience wrapper for RSC/server action contexts that don't already hold a client.
+// 이미 클라이언트를 가지고 있지 않은 RSC/서버 액션 컨텍스트용 편의 래퍼.
 export async function getActiveRoomCatalogServer(
   organizationId: string,
 ): Promise<ActiveRoomCatalogItem[] | undefined> {
@@ -359,9 +359,9 @@ export function buildActiveRoomCatalog(
   rows: RoomCatalogRow[],
   options: ActiveRoomCatalogOptions = {},
 ): ActiveRoomCatalogItem[] | undefined {
-  // A room row counts as "classified" (org has a usable room master) as soon as it exists.
-  // minStay = null no longer disqualifies a beds24 room — unknown min-stay must not hide a
-  // real room. Only an explicit >= 50 marks it inactive (applied in the active filter below).
+  // 객실 행이 존재하기만 하면 "분류됨" (조직에 쓸 수 있는 객실 마스터가 있음)으로 센다.
+  // minStay = null 이라도 더는 beds24 객실을 탈락시키지 않는다 — 알 수 없는 최소 숙박이 실제
+  // 객실을 숨겨서는 안 된다. 명시적으로 >= 50 일 때만 비활성으로 본다 (아래 활성 필터에서 적용).
   const classifiedRows = rows;
 
   if (classifiedRows.length === 0) {
@@ -384,8 +384,8 @@ export function buildActiveRoomCatalog(
       if (row.external_provider !== "beds24") {
         return true;
       }
-      // null minStay → active (unknown, not yet inventory-synced). Only an explicit
-      // >= 50 marks the room inactive, matching classifyBeds24Room in room-sync.ts.
+      // null minStay → 활성 (알 수 없음, 아직 재고 동기화 전). 명시적으로
+      // >= 50 일 때만 비활성으로 본다 (room-sync.ts 의 classifyBeds24Room 과 같음).
       return (
         row.external_minimum_stay === null ||
         !isInactiveBeds24Room(row.external_minimum_stay)

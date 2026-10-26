@@ -1,7 +1,7 @@
-// Annual leave — request submission (Phase 2, stage 1). Self-only: every query/write filters by the
-// CURRENT user's id (passed by the caller from the authenticated session) AND the organization id.
-// Approval (stage 2) and document output (stage 3) are not implemented here — see migration
-// 202607060002 and docs/product/26-annual-leave-workflow.md.
+// 연차 — 신청 제출 (Phase 2, stage 1). 본인 전용: 모든 조회/쓰기는
+// 현재 사용자의 id(호출자가 인증된 세션에서 넘김)와 조직 id 로 거른다.
+// 승인(stage 2)과 문서 출력(stage 3)은 여기서 구현하지 않는다 — 마이그레이션
+// 202607060002 와 docs/product/26-annual-leave-workflow.md 참고.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -107,9 +107,9 @@ export async function createLeaveRequest(
 }
 
 /**
- * Continues a draft: overwrites its fields and, if not saving as a draft again, transitions it to
- * `requested`. Only callable while the row is still `draft` — once submitted/decided, editing goes
- * through cancel (self, while `requested`) rather than this path.
+ * 초안을 이어서 작성한다: 필드를 덮어쓰고, 다시 초안으로 저장하는 게 아니면
+ * `requested` 로 전이한다. 행이 아직 `draft` 일 때만 호출할 수 있다 — 제출/결정된 뒤의 수정은
+ * 이 경로가 아니라 취소(본인, `requested` 동안)를 거친다.
  */
 export async function updateDraftLeaveRequest(
   service: Service,
@@ -157,7 +157,7 @@ export async function updateDraftLeaveRequest(
   return { ok: true, id: requestId };
 }
 
-/** Hard-deletes a draft (self, own row only) — a draft was never submitted, so nothing to cancel. */
+/** 초안을 하드 삭제한다 (본인, 자기 행만) — 초안은 제출된 적이 없으니 취소할 것이 없다. */
 export async function deleteLeaveRequestDraft(
   service: Service,
   organizationId: string,
@@ -271,11 +271,11 @@ export type ApprovedLeaveEntry = {
 };
 
 /**
- * Org-wide, approved-only leave overlapping the given Tokyo month — the mobile team calendar (L5).
- * Confirmed 2026-07-06: every employee sees everyone's APPROVED leave (including their own);
- * pending/rejected/draft/cancelled stay private. Backed by the
- * `annual_leave_requests_org_approved_select` RLS policy (migration 202607060003) — this query uses
- * the service-role client, but the grant mirrors what that policy allows directly too.
+ * 조직 전체에서, 주어진 도쿄 월과 겹치는 승인된 휴가만 — 모바일 팀 캘린더 (L5).
+ * 2026-07-06 확정: 모든 직원이 (본인 것을 포함해) 모두의 승인된 휴가를 본다.
+ * 대기/반려/초안/취소는 비공개로 남는다. 뒷받침은
+ * `annual_leave_requests_org_approved_select` RLS 정책 (마이그레이션 202607060003) — 이 쿼리는
+ * service-role 클라이언트를 쓰지만, 부여 범위는 그 정책이 직접 허용하는 것과도 같다.
  */
 export async function listApprovedLeaveForMonth(
   service: Service,
@@ -312,7 +312,7 @@ export async function listApprovedLeaveForMonth(
   }));
 }
 
-/** Requests still awaiting approval — used for the "pending" mini-stat on the leave home screen. */
+/** 아직 승인 대기 중인 신청 — 휴가 홈 화면의 "대기" 미니 통계에 쓴다. */
 export async function countMyPendingLeaveRequests(
   service: Service,
   organizationId: string,

@@ -31,7 +31,7 @@ import type { ProfileGender } from "@/lib/onboarding";
 import { haptic } from "@/lib/haptics";
 import "./onboarding-done.css";
 
-// Navy accent gradient + shadow pulled from the design tokens (matches the auth screens).
+// 네이비 강조 그라디언트 + 그림자를 디자인 토큰에서 가져옴(인증 화면과 동일).
 const GRADIENT = "#7a52e6";
 const SHADOW = "none";
 // 흰 한 장(화이트 리디자인 2026-10-09) — 예전 아이보리 방사 그라데이션 대신.
@@ -39,8 +39,8 @@ const IVORY_BG = "#ffffff";
 const PRIMARY_SOFT =
   "color-mix(in oklab, #7a52e6 8%, #ffffff)";
 
-// Numbered steps shown in the progress bar: name → dob → phone → invite.
-// (Language is intentionally not a wizard step — it's already chosen at login.)
+// 진행 막대에 보이는 번호 단계: 이름 → 생년월일 → 전화 → 초대.
+// (언어는 로그인 때 이미 선택하므로 일부러 마법사 단계에 넣지 않는다.)
 const TOTAL_STEPS = 5;
 
 export type OnboardingIntroCopy = {
@@ -104,7 +104,7 @@ export type OnboardingJoinCopy = {
   verified: string;
   reviewCta: string;
   submitCta: string;
-  // reused copy
+  // 재사용 문구
   codePlaceholder: string;
   orgLabel: string;
   errors: Record<string, string>;
@@ -146,7 +146,7 @@ const GENDER_ORDER: ProfileGender[] = [
   "male",
 ];
 
-// Curated country codes (common for hospitality staff in Japan). Names are i18n-driven.
+// 엄선한 국가 코드(일본 숙박업 직원에게 흔한 것). 이름은 i18n 으로 제공.
 const COUNTRIES: Country[] = [
   { iso: "jp", flag: "🇯🇵", dial: "+81" },
   { iso: "kr", flag: "🇰🇷", dial: "+82" },
@@ -267,7 +267,7 @@ function InfoIcon() {
   );
 }
 
-/** Primary submit button with an in-place spinner (final join submission). */
+/** 제자리 스피너가 있는 기본 제출 버튼(최종 가입 제출). */
 function SpinnerButton({
   label,
   onClick,
@@ -328,7 +328,7 @@ function ChecklistRow({
 }
 
 /**
- * Progress header — numbered count + bar, with a back control in the left slot.
+ * 진행 헤더 — 번호 카운트 + 막대, 왼쪽 슬롯에 뒤로가기 컨트롤.
  *
  * 원래는 뒤로 버튼이 없었다(스와이프 / OS 백이 공통 패턴). 하지만 PC 에는 엣지 스와이프가 없어
  * 브라우저 뒤로가기 말고는 되돌아갈 방법이 없었다(2026-09-09). 좌측 112px 슬롯은 이미 비워져
@@ -489,7 +489,7 @@ function Wheel({
 
   const labelOf = (v: number) => (format ? format(v) : String(v));
 
-  // Snap to the bound value on mount and whenever it changes externally (e.g. day clamp).
+  // 마운트 시, 그리고 외부에서 값이 바뀔 때마다(예: 일 보정) 바인딩 값에 맞춘다.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -686,7 +686,7 @@ function BirthDateSheet({
   const maxDay = daysInMonth(year, month);
   const days = range(1, maxDay);
 
-  // Clamp the day in the year/month handlers (not an effect) when the range shrinks.
+  // 범위가 줄어들 때 연/월 핸들러에서(effect 가 아니라) 일을 보정한다.
   function pickYear(y: number) {
     setYear(y);
     setDay((d) => Math.min(d, daysInMonth(y, month)));
@@ -927,14 +927,14 @@ function CountrySheet({
 }
 
 /**
- * Multi-step onboarding wizard (redesign — Profile Setup handoff).
+ * 다단계 온보딩 마법사(리디자인 — 프로필 설정 핸드오프).
  *
- * Implemented screens: 0 intro · 1 name · 2 date of birth (wheel picker). Advancing
- * past dob reveals the existing profile form (with name + birth date carried forward)
- * so the flow stays fully functional while the remaining steps are redesigned.
+ * 구현된 화면: 0 소개 · 1 이름 · 2 생년월일(휠 피커). 생년월일을 지나면
+ * 기존 프로필 폼(이름 + 생년월일 이어받음)이 나타나서
+ * 남은 단계를 리디자인하는 동안에도 흐름이 완전히 동작한다.
  *
- * Back navigation uses the browser history (push/popstate) so OS / edge-swipe back
- * moves to the previous step — no in-screen back button (shared navigation pattern).
+ * 뒤로가기는 브라우저 기록(push/popstate)을 써서 OS / 가장자리 스와이프 뒤로가기가
+ * 이전 단계로 이동한다 — 화면 안 뒤로가기 버튼 없음(공용 내비게이션 패턴).
  */
 export function OnboardingWizard({
   intro,
@@ -1152,7 +1152,7 @@ export function OnboardingWizard({
 
   const selectedCountry =
     COUNTRIES.find((c) => c.iso === countryIso) ?? COUNTRIES[0];
-  // E.164: country dial code + national number with the leading trunk "0" stripped.
+  // E.164: 국가 전화 코드 + 앞의 국내 접두 "0" 을 뗀 국내 번호.
   const nationalDigits = phone.replace(/\D/g, "").replace(/^0+/, "");
   const phoneE164 = nationalDigits
     ? `${selectedCountry.dial}${nationalDigits}`
@@ -1163,7 +1163,7 @@ export function OnboardingWizard({
     <ExitToLoginForm label={exit.backToLogin} locale={profile.locale} compact />
   ) : null;
 
-  // ── Fallback · existing all-in-one profile form (unreachable in the normal flow) ─
+  // ── 대체 · 기존 올인원 프로필 폼(정상 흐름에서는 도달하지 않음) ─
   if (step >= 9) {
     return (
       <main
@@ -1190,7 +1190,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 7 · Success / welcome ───────────────────────────────────────────────
+  // ── 7단계 · 성공 / 환영 ───────────────────────────────────────────────
   if (step === 8) {
     const roleLabel = preview
       ? join.roleCategories[preview.roleCategory] ?? preview.roleCategory
@@ -1271,7 +1271,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 6 · Review all entered info ─────────────────────────────────────────
+  // ── 6단계 · 입력한 정보 전체 확인 ─────────────────────────────────────────
   if (step === 7) {
     const roleLabel = preview
       ? join.roleCategories[preview.roleCategory] ?? preview.roleCategory
@@ -1329,7 +1329,7 @@ export function OnboardingWizard({
                 onEdit={() => goTo(4)}
                 divider
               />
-              {/* Language is chosen at login (not a wizard step) — shown read-only. */}
+              {/* 언어는 로그인 때 선택하며(마법사 단계 아님) 읽기 전용으로 보여준다. */}
               <ReviewRow
                 label={review.rowLang}
                 value={languageName}
@@ -1396,7 +1396,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 5 · Organization / role confirmation (after a verified invite code) ──
+  // ── 5단계 · 조직 / 역할 확인(초대 코드 검증 후) ──
   if (step === 6 && preview) {
     const roleLabel = join.roleCategories[preview.roleCategory] ?? preview.roleCategory;
     return (
@@ -1466,7 +1466,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 4 · Invite code entry (verify → preview, or skip) ───────────────────
+  // ── 4단계 · 초대 코드 입력(검증 → 미리보기, 또는 건너뛰기) ───────────────────
   if (step === 5) {
     const verifying = inviteStatus === "verifying";
     return (
@@ -1513,8 +1513,8 @@ export function OnboardingWizard({
                 spellCheck={false}
                 autoComplete="off"
                 enterKeyHint="done"
-                // Oversized segmented code field (19px) — opt out of the touch ≥16px rule so it
-                // keeps its intended large size (still ≥16px, so it never triggers iOS focus zoom).
+                // 큼직한 분할 코드 입력(19px) — 터치 16px 이상 규칙에서 제외해
+                // 의도한 큰 크기를 유지한다(여전히 16px 이상이라 iOS 포커스 확대는 일어나지 않음).
                 data-keep-font-size
                 className={`h-[56px] w-full rounded-[14px] border bg-surface px-[15px] text-center font-mono text-[19px] font-bold tracking-[0.12em] text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:font-medium placeholder:tracking-normal placeholder:text-text-done ${
                   inviteStatus === "error"
@@ -1579,7 +1579,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 3 · Phone number ────────────────────────────────────────────────────
+  // ── 3단계 · 전화번호 ────────────────────────────────────────────────────
   if (step === 4) {
     return (
       <main
@@ -1691,7 +1691,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 2 · Date of birth ───────────────────────────────────────────────────
+  // ── 2단계 · 생년월일 ───────────────────────────────────────────────────
   if (step === 2) {
     return (
       <main
@@ -1767,7 +1767,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 1 · Name ────────────────────────────────────────────────────────────
+  // ── 1단계 · 이름 ────────────────────────────────────────────────────────────
   if (step === 3) {
     return (
       <main
@@ -1887,7 +1887,7 @@ export function OnboardingWizard({
     );
   }
 
-  // ── Step 0 · Intro ───────────────────────────────────────────────────────────
+  // ── 0단계 · 소개 ───────────────────────────────────────────────────────────
   return (
     <main
       lang={profile.locale}

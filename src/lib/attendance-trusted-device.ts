@@ -14,7 +14,7 @@ import "server-only";
 //    · GPS 필수 + 사이트 반경 검증은 그대로다 → 쿠키만으로 현장 밖에서 打刻할 수 없다
 //
 // 원문 토큰은 쿠키에만 있고 DB 에는 sha256 해시만 둔다.
-// See docs/product/24-attendance-workflow.md → "Trusted Device".
+// 참고: docs/product/24-attendance-workflow.md → "Trusted Device".
 
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";

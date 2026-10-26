@@ -50,11 +50,11 @@ export function ProjectsBoard({
     () => false,
   );
 
-  // Create sheet — the shared BottomSheet owns the slide + drag-to-dismiss + Esc lifecycle.
+  // 생성 시트 — 공용 BottomSheet 가 슬라이드 + 드래그 닫기 + Esc 생명주기를 맡는다.
   const [createOpen, setCreateOpen] = useState(false);
   const open = useCallback(() => setCreateOpen(true), []);
 
-  // Create-sheet form state. Share defaults ON so the invite search is visible (matches the design).
+  // 생성 시트 폼 상태. 초대 검색이 보이도록 공유는 기본 켜짐 (디자인과 같음).
   const [shareOn, setShareOn] = useState(true);
   const [inviteIds, setInviteIds] = useState<string[]>([]);
   const [inviteQuery, setInviteQuery] = useState("");

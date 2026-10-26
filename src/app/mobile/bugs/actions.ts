@@ -25,9 +25,9 @@ function pickString(value: FormDataEntryValue | null): string {
 }
 
 function collectImageUrls(formData: FormData): string[] {
-  // Both individual `image_0..image_4` keys and a repeated `imageUrls` key are accepted to keep the
-  // frontend flexible. Already-uploaded public URLs only — the actual upload uses
-  // `uploadBugReportImageAction` first so the server controls the storage path.
+  // 개별 `image_0..image_4` 키와 반복되는 `imageUrls` 키를 모두 받아 프런트를
+  // 유연하게 둔다. 이미 업로드된 공개 URL 만 받는다 — 실제 업로드는 먼저
+  // `uploadBugReportImageAction` 으로 하므로 저장 경로는 서버가 통제한다.
   const urls: string[] = [];
   for (let i = 0; i < 5; i += 1) {
     const v = pickString(formData.get(`image_${i}`));
@@ -46,10 +46,10 @@ function revalidateBugSurfaces(reportId?: string) {
 }
 
 /**
- * Upload a screenshot for a draft report. The frontend should generate a draft id, request
- * uploads against it, then call `createBugReportAction` with the resulting image URLs. The
- * helper rebuilds the storage path from session.organization.id + the supplied reportId so the
- * client cannot write outside its own org or under a different report id.
+ * 초안 보고서의 스크린샷을 업로드한다. 프런트는 초안 ID 를 만들어 그 ID 로 업로드를
+ * 요청한 뒤 결과 이미지 URL 로 `createBugReportAction` 을 호출해야 한다.
+ * 헬퍼가 session.organization.id + 전달된 reportId 로 저장 경로를 다시 만들어서
+ * 클라이언트가 자기 조직 밖이나 다른 report id 아래에 쓸 수 없다.
  */
 export async function uploadBugReportImageAction(
   reportId: string,

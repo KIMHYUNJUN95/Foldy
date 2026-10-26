@@ -3,7 +3,7 @@ import type { Locale } from "@/lib/i18n";
 // Admin Todoist 콘솔(데스크톱) 전용 i18n. 모바일/공용 tasks 문자열과 분리(공지 콘솔 패턴).
 // 뷰 라벨·섹션·우선순위·상태·반복·기간·일정/공유 팝오버·빈 상태·상세·보고서·토스트.
 export type AdminTasksDictionary = {
-  // views
+  // 보기
   vInbox: string;
   vToday: string;
   vTomorrow: string;
@@ -18,11 +18,11 @@ export type AdminTasksDictionary = {
   mobileView: string;
   sharedProjects: string;
   newProject: string;
-  // filter
+  // 필터
   filterSearch: string;
   filterDate: string;
   filterPrio: string;
-  // sections / banners
+  // 섹션 / 배너
   secOverdue: string;
   secToday: string;
   overdueTitle: string; // "지난(지연) 작업 {n}건"
@@ -32,7 +32,7 @@ export type AdminTasksDictionary = {
   previewOnlyHint: string; // 다가오는 일정에서 완료 불가 안내(툴팁)
   odDaysBehind: string; // 반복 지연 묶음 "{n}일 밀림"
   inboxNote: string;
-  // priority / status / repeat / duration
+  // 우선순위 / 상태 / 반복 / 소요 시간
   prioNormal: string; // 우선순위 4 (기본)
   prioImportant: string; // 우선순위 2
   prioUrgent: string; // 우선순위 1
@@ -62,14 +62,14 @@ export type AdminTasksDictionary = {
   dur60: string;
   dur120: string;
   durCustom: string;
-  // chips / row
+  // 칩 / 행
   today: string;
   tomorrow: string;
   noDate: string;
   instructedBy: string; // "{name} 지시"
   sharedWith: string; // "공유됨"
   andMore: string; // "{name} 외 {n}명"
-  // inline add
+  // 인라인 추가
   iaTitle: string;
   iaDesc: string;
   iaSchedule: string;
@@ -82,7 +82,7 @@ export type AdminTasksDictionary = {
   iaInbox: string;
   iaSendInstr: string; // "지시로 전송"
   iaSendInstrCta: string; // 지시 탭의 추가 트리거 · 저장 버튼
-  // detail panel
+  // 상세 패널
   dpTask: string;
   dpInbox: string;
   dpStatus: string;
@@ -169,7 +169,7 @@ export type AdminTasksDictionary = {
   ctxBed: string;
   ctxTicket: string;
   ctxGuest: string;
-  // schedule popover
+  // 일정 팝오버
   schApply: string;
   schCancel: string;
   schNoRepeat: string;
@@ -182,7 +182,7 @@ export type AdminTasksDictionary = {
   schTimeNone: string;
   schRepeat: string;
   schDuration: string;
-  // share / target popover
+  // 공유 / 대상 팝오버
   shTargetTitle: string;
   shShareTitle: string;
   shTargetSub: string;
@@ -193,7 +193,7 @@ export type AdminTasksDictionary = {
   shShareCta: string; // "{n}명에게 공유" / "공유할 멤버 선택"
   shNoResult: string;
   shManager: string;
-  // menus
+  // 메뉴
   mScheduleChange: string;
   mPriority: string;
   mShareInstr: string;
@@ -202,7 +202,7 @@ export type AdminTasksDictionary = {
   mMoveInbox: string;
   mDelete: string;
   mLeave: string;
-  // instr view
+  // 지시 보기
   // 반복 회차 건너뛰기 (2026-07-30)
   recurDeleteTitle: string;
   recurSkipOne: string;
@@ -228,16 +228,16 @@ export type AdminTasksDictionary = {
   instrEmptyRecvT: string;
   instrEmptyRecvS: string;
   instrCommon: string; // "공동 {n}명"
-  // shared view
+  // 공유 보기
   sharedRecvSec: string;
   sharedSentSec: string;
-  // completed
+  // 완료
   cmpDone: string; // "{n}건 완료"
   cmpReport: string;
   cmpBy: string; // "{name} 완료"
   cmpToday: string;
   cmpYesterday: string;
-  // calendar
+  // 캘린더
   calThisMonth: string;
   calPreviousMonth: string;
   calNextMonth: string;
@@ -250,7 +250,7 @@ export type AdminTasksDictionary = {
   calHideRepeat: string; // 반복 숨기기 토글
   calAddOnDay: string;
   calDayEmpty: string;
-  // project
+  // 프로젝트
   pjBanner: string; // "공유 프로젝트 · 멤버 {n}명"
   pjMembers: string;
   pjAddTaskTo: string; // "{name}에 작업 추가"
@@ -266,7 +266,7 @@ export type AdminTasksDictionary = {
   pjSectionDeleteMsg: string; // "'{title}' 섹션과 그 안의 작업을 삭제할까요?"
   pjMembersManage: string;
   pjDeleted: string; // 삭제 완료 토스트
-  // new project modal
+  // 새 프로젝트 모달
   npTitle: string;
   npName: string;
   npNamePh: string;
@@ -275,7 +275,7 @@ export type AdminTasksDictionary = {
   npHint: string;
   npCancel: string;
   npCreate: string;
-  // report
+  // 일지
   rptTitle: string; // "업무일지 · {date}"
   rptHint: string;
   /** 화이트 리디자인(2026-10-15) 업무일지 창 부제 — "{date} · 완료 {total}건 중 {selected}건 포함" */
@@ -333,7 +333,7 @@ export type AdminTasksDictionary = {
   rptListScheduled: string;
   rptListSent: string;
   rptListFailed: string;
-  // empty / loading / error
+  // 빈 / 로딩 / 오류
   emToday: string;
   emTodayS: string;
   emTomorrow: string;
@@ -351,7 +351,7 @@ export type AdminTasksDictionary = {
   errT: string;
   errS: string;
   retry: string;
-  // toasts / errors
+  // 토스트 / 오류
   errAuth: string;
   errForbidden: string;
   errSave: string;
@@ -377,22 +377,22 @@ export type AdminTasksDictionary = {
   tNoteAdded: string;
   tProjectCreated: string;
   tReminded: string;
-  // confirm modal (destructive)
+  // 확인 모달 (되돌릴 수 없는 작업)
   confirmTitle: string;
   confirmDeleteMsg: string;
   confirmLeaveMsg: string;
   confirmClearMsg: string;
   confirmDeleteBtn: string;
-  // rail
+  // 레일
   railTodayTitle: string;
   railTodayProgress: string;
   railDoneToday: string; // 진행 현황 "오늘 완료" 스탯 라벨
   railUpcomingEmpty: string;
-  // undo toast
+  // 실행 취소 토스트
   undoBtn: string;
   undoNext: string; // "다음: {date}"
   tDeletedUndoable: string;
-  // selection mode + bulk delete
+  // 선택 모드 + 일괄 삭제
   selMode: string;
   selHint: string;
   selSelected: string; // "{n}개 선택"

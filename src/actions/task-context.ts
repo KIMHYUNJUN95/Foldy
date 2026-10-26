@@ -21,22 +21,22 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
 export type PickerBuilding = {
-  /** Canonical property name — used as the building identifier passed back to room/reservation fetches. */
+  /** 정규 건물명 — 객실/예약 조회에 다시 넘기는 건물 식별자로 쓴다. */
   id: string;
-  /** properties.id UUID for the building (persisted on a room-only context link). */
+  /** 건물의 properties.id UUID (객실만 연결한 컨텍스트 링크에 저장됨). */
   propertyId: string | null;
-  /** Localized display name. */
+  /** 현지화된 표시 이름. */
   name: string;
   totalRooms: number;
   todayGuests: number;
 };
 
 export type PickerRoom = {
-  /** Display label (sub-units already merged, e.g. 201_2 → 201). */
+  /** 표시용 라벨 (하위 호실은 이미 병합됨, 예: 201_2 → 201). */
   label: string;
-  /** rooms.id UUID of the representative room row (persisted on a context link). */
+  /** 대표 객실 행의 rooms.id UUID (컨텍스트 링크에 저장됨). */
   roomId: string | null;
-  /** properties.id UUID of the owning building. */
+  /** 소속 건물의 properties.id UUID. */
   propertyId: string | null;
   occupied: boolean;
   /**
@@ -53,7 +53,7 @@ export type RoomReservation = {
   guestName: string;
   initials: string;
   channel: "airbnb" | "booking" | "direct";
-  /** Display string e.g. "6/1 – 6/4" */
+  /** 표시 문자열 (예: "6/1 – 6/4") */
   dateRange: string;
   nightsCount: number;
   checkinDate: string; // YYYY-MM-DD
@@ -67,8 +67,8 @@ export type FetchRoomReservationsResult = {
   periodLabel: string;
 };
 
-// Row shapes — explicit casts work around a supabase-js v2 bug where chained filter methods
-// on the enum `status` column collapse the inferred row type to `never`.
+// 행 모양 — supabase-js v2 버그(enum `status` 컬럼에 필터 메서드를 이어 붙이면 추론된 행 타입이 `never`로
+// 무너짐)를 피하려고 명시적으로 캐스팅한다.
 type LiveResolveRow = {
   property_name: string;
   room_label: string;
@@ -91,7 +91,7 @@ function ymdToMD(ymd: string): string {
   return `${m}/${d}`;
 }
 
-/** Sorts display room labels numerically where possible (201 < 202 < 301), lexically otherwise. */
+/** 표시용 객실 라벨을 가능하면 숫자순(201 < 202 < 301), 아니면 사전순으로 정렬한다. */
 function compareRoomLabel(a: string, b: string): number {
   const na = Number.parseInt(a, 10);
   const nb = Number.parseInt(b, 10);
@@ -99,7 +99,7 @@ function compareRoomLabel(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-/** Today's live reservations (checked in, not yet departed) for resolving occupancy/guest counts. */
+/** 오늘의 유효 예약(체크인했고 아직 퇴실 전) — 점유/투숙객 수 계산용. */
 async function loadLiveTodayRows(
   supabase: ReturnType<typeof getSupabaseServiceClient>,
   orgId: string,
@@ -148,9 +148,9 @@ async function loadBlockedRoomLabels(
 }
 
 /**
- * Active buildings for the org, mirroring the reservation calendar's active-room catalog.
- * Only buildings with active rooms appear; sub-units are merged; Sano is excluded.
- * Falls back to the raw `properties` list when the org has no classified room-master rows.
+ * 조직의 활성 건물 — 예약 캘린더의 활성 객실 카탈로그와 같은 기준이다.
+ * 활성 객실이 있는 건물만 나오고, 하위 호실은 병합되며, 사노는 제외된다.
+ * 조직에 분류된 객실 마스터 행이 없으면 원본 `properties` 목록으로 대체한다.
  */
 export async function fetchPickerBuildings(): Promise<PickerBuilding[]> {
   const session = await getCurrentAppSession();
@@ -167,8 +167,8 @@ export async function fetchPickerBuildings(): Promise<PickerBuilding[]> {
     return fetchLegacyBuildings(supabase, orgId);
   }
 
-  // Group active rooms by canonical property; count unique display labels and capture a
-  // representative property UUID (rooms in one canonical building share the same property_id).
+  // 활성 객실을 정규 건물별로 묶어 고유 표시 라벨 수를 세고, 대표
+  // property UUID를 잡는다 (같은 정규 건물의 객실은 property_id가 같다).
   const displayLabelsByProperty = new Map<string, Set<string>>();
   const propertyIdByCanon = new Map<string, string>();
   for (const item of catalog) {
@@ -182,7 +182,7 @@ export async function fetchPickerBuildings(): Promise<PickerBuilding[]> {
     }
   }
 
-  // Today's live guests per canonical property (resolved through the same lookups as the calendar).
+  // 정규 건물별 오늘의 투숙객 (캘린더와 같은 조회로 계산).
   const lookups = buildPropertyRoomLookups(catalog);
   const globalExternalRoomToCanonical = buildGlobalExternalRoomToCanonical(catalog);
   const liveRows = await loadLiveTodayRows(supabase, orgId, todayYmd);
@@ -210,7 +210,7 @@ export async function fetchPickerBuildings(): Promise<PickerBuilding[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Active rooms for a building (display labels, sub-units merged), with today's occupancy flag. */
+/** 건물의 활성 객실 (표시 라벨, 하위 호실 병합) + 오늘 점유 여부. */
 export async function fetchPickerRooms(propertyId: string): Promise<PickerRoom[]> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return [];
@@ -218,15 +218,15 @@ export async function fetchPickerRooms(propertyId: string): Promise<PickerRoom[]
   const orgId = session.organization.id;
   const todayYmd = tokyoYmd();
   const supabase = getSupabaseServiceClient();
-  const canonProp = propertyId; // building.id is the canonical property name
+  const canonProp = propertyId; // building.id 가 정규 건물명이다
 
   const catalog = await getActiveRoomCatalog(orgId, supabase);
   if (catalog === undefined) {
     return fetchLegacyRooms(supabase, orgId, propertyId);
   }
 
-  // Unique display labels for this property, each with a representative room UUID. Sub-units
-  // (201 / 201_2) collapse to one cell; prefer the base unit (canonical key === display label).
+  // 이 건물의 고유 표시 라벨과 각각의 대표 객실 UUID. 하위 호실
+  // (201 / 201_2)은 한 칸으로 합치고, 기본 호실(정규 키 === 표시 라벨)을 우선한다.
   const repByDisplay = new Map<string, { roomId: string; propertyId: string; isBase: boolean }>();
   for (const item of catalog) {
     if (item.propertyName !== canonProp) continue;
@@ -242,7 +242,7 @@ export async function fetchPickerRooms(propertyId: string): Promise<PickerRoom[]
     }
   }
 
-  // Occupancy: today's live reservations resolved to display labels.
+  // 점유: 오늘의 유효 예약을 표시 라벨로 변환한다.
   const lookups = buildPropertyRoomLookups(catalog);
   const globalExternalRoomToCanonical = buildGlobalExternalRoomToCanonical(catalog);
   const [liveRows, blockedLabels] = await Promise.all([
@@ -273,9 +273,9 @@ export async function fetchPickerRooms(propertyId: string): Promise<PickerRoom[]
 }
 
 /**
- * Reservations for one display room across the 2-month window (current + next month, Tokyo).
- * Reservations are resolved through the active-room catalog so sub-unit bookings (201 / 201_2)
- * surface under the merged display label.
+ * 한 표시 객실의 2개월 구간(이번 달 + 다음 달, 도쿄) 예약.
+ * 예약은 활성 객실 카탈로그를 거쳐 매칭하므로 하위 호실(201 / 201_2) 예약도
+ * 병합된 표시 라벨 아래에 나타난다.
  */
 export async function fetchRoomReservations(
   propertyId: string,
@@ -291,7 +291,7 @@ export async function fetchRoomReservations(
   const todayYmd = tokyoYmd();
   const [year, month] = todayYmd.split("-").map(Number);
 
-  // Window: 1st of current month → last day of next month (Tokyo).
+  // 구간: 이번 달 1일 → 다음 달 말일 (도쿄).
   const windowStart = `${year}-${String(month).padStart(2, "0")}-01`;
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
@@ -324,7 +324,7 @@ export async function fetchRoomReservations(
 
   let matched: ResWindowRow[];
   if (catalog === undefined) {
-    // Provisional org (no room master): fall back to exact raw room_label match.
+    // 임시 조직(객실 마스터 없음): 원본 room_label 정확 일치로 대체한다.
     matched = rows.filter((r) => r.room_label === displayRoomLabel);
   } else {
     const lookups = buildPropertyRoomLookups(catalog);
@@ -374,7 +374,7 @@ export async function fetchRoomReservations(
   return { reservations, periodLabel };
 }
 
-// ── Reservation search ────────────────────────────────────────────────────────────────────────
+// ── 예약 검색 ────────────────────────────────────────────────────────────────────────
 
 type ReservationSearchRow = LiveResolveRow & {
   id: string;
@@ -396,15 +396,15 @@ export type ReservationSearchResult = {
   checkinDate: string;
   checkoutDate: string;
   isLive: boolean;
-  /** Canonical Korean property name. */
+  /** 정규 한국어 건물명. */
   propertyName: string;
   propertyId: string | null;
   roomId: string | null;
-  /** Localized display room label (same value as getDisplayRoomLabel result). */
+  /** 현지화된 표시 객실 라벨 (getDisplayRoomLabel 결과와 같은 값). */
   displayRoomLabel: string;
 };
 
-/** Months-based date arithmetic: returns YYYY-MM-01 for (year, month) offset by `delta` months. */
+/** 월 단위 날짜 계산: (year, month)에서 `delta`개월 이동한 YYYY-MM-01 을 반환한다. */
 function offsetYm(year: number, month: number, delta: number): string {
   const total = year * 12 + (month - 1) + delta;
   const y = Math.floor(total / 12);
@@ -413,8 +413,8 @@ function offsetYm(year: number, month: number, delta: number): string {
 }
 
 /**
- * Cross-building reservation search by guest name or Beds24 reservation number.
- * Searches a 4-month window (1 month back → 3 months ahead, Tokyo) and returns up to 20 results.
+ * 게스트 이름 또는 Beds24 예약번호로 하는 건물 간 예약 검색.
+ * 4개월 구간(1개월 전 → 3개월 후, 도쿄)을 검색해 최대 20건을 반환한다.
  */
 export async function searchReservations(query: string): Promise<ReservationSearchResult[]> {
   // PostgREST `or()` 필터 문법 글자(`,` `(` `)` `%` …)를 뺀다(2026-10-26) — 손님 이름에 쉼표나 괄호가
@@ -452,7 +452,7 @@ export async function searchReservations(query: string): Promise<ReservationSear
 
   const catalog = await getActiveRoomCatalog(orgId, supabase);
 
-  // Build UUID lookup: "<canonProp>::<canonRoom>" → { propertyId, roomId }
+  // UUID 조회표 생성: "<canonProp>::<canonRoom>" → { propertyId, roomId }
   const catalogUuidByKey = new Map<string, { propertyId: string; roomId: string }>();
   if (catalog) {
     for (const item of catalog) {
@@ -523,8 +523,8 @@ export async function searchReservations(query: string): Promise<ReservationSear
   });
 }
 
-// ── Legacy fallbacks (org without classified room-master rows) ────────────────────────────────
-// Mirrors the calendar's provisional mode: lean directly on the properties/rooms tables.
+// ── 레거시 대체 경로 (객실 마스터 분류가 없는 조직) ────────────────────────────────
+// 캘린더의 임시 모드와 같다: properties/rooms 테이블에 직접 의존한다.
 
 type LegacyPropertyRow = { id: string; name: string };
 type LegacyRoomRow = { id: string; property_id: string; room_label: string };
@@ -555,7 +555,7 @@ async function fetchLegacyBuildings(
   }
 
   return properties.map((p) => ({
-    id: p.name, // legacy: identify by raw property name
+    id: p.name, // 레거시: 원본 property 이름으로 식별
     propertyId: p.id,
     name: p.name,
     totalRooms: roomCounts.get(p.id) ?? 0,

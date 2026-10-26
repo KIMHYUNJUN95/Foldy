@@ -17,7 +17,7 @@ import type { PsAction } from "./person-shift-text";
  * 가림막 없이 열어 둔다: 보드의 다른 이름을 누르거나 ↑↓ 로 바로 다음 사람으로 넘어간다(한 명씩 차례로 확인).
  * 날짜를 누르면 그날 방 · 같이 · 누가 배정 · 그 사람 청소 기록. 보드가 새로 읽히면(실시간 신호 · 동작 뒤) 패널도 다시 읽는다.
  * 사람이 바뀌면 보드가 `key` 를 바꿔 새로 연다(고른 날도 비워짐).
- * docs/product/37-cleaning-shift-assignment.md 「4-6」
+ * 참고: docs/product/37-cleaning-shift-assignment.md 「4-6」
  */
 
 export function AssignPersonPanel({

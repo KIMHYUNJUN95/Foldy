@@ -2,7 +2,7 @@
 
 // Admin 수리·점검 console — 목록·이력 뷰와 완료 뷰. 두 뷰가 같은 필터바(기간 + 드롭다운 + 검색)를
 // 공유하고, 완료 뷰만 상태 드롭다운을 빼고 완료시각·완료 처리 컬럼을 더 보여준다.
-// Data is real (src/lib/admin-maintenance.ts) as of 2026-07-14.
+// 데이터는 2026-07-14 기준 실제 값이다(src/lib/admin-maintenance.ts).
 import { LiveWash } from "@/components/shared/live-wash";
 import { CheckCircle2, History, Search, TriangleAlert, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";

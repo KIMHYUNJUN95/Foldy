@@ -56,8 +56,8 @@ async function handle(request: NextRequest) {
 
   const dryRun = request.nextUrl.searchParams.get("dryRun") === "true";
 
-  // Optional one-time wide window (dev-only catch-up for far-future reservations the default
-  // current+next-month window never reaches). Both bounds must be valid YYYY-MM-DD and from < to.
+  // 선택적 일회성 넓은 구간 (기본 이번 달+다음 달 구간이 닿지 않는 먼 미래 예약을 따라잡는 개발 전용 기능).
+  // 두 경계 모두 올바른 YYYY-MM-DD 여야 하고 from < to 여야 한다.
   const isoDate = /^\d{4}-\d{2}-\d{2}$/;
   const fromParam = request.nextUrl.searchParams.get("from");
   const toParam = request.nextUrl.searchParams.get("to");

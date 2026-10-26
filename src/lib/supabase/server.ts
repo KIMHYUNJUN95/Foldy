@@ -19,7 +19,7 @@ export async function getSupabaseServerClient() {
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Server Components cannot set cookies. Middleware/route handlers can.
+          // 서버 컴포넌트는 쿠키를 설정할 수 없다. 미들웨어/라우트 핸들러는 가능하다.
         }
       },
     },

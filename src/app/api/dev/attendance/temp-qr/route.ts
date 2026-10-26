@@ -13,25 +13,25 @@ import type { AttendanceSiteRow } from "@/lib/attendance";
 // i18n-ignore-file: development-only local QR helper, unreachable in production.
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DEV-ONLY temporary QR provisioning for app attendance testing.
+// DEV 전용 임시 QR 발급 — 앱 근태 테스트용.
 //
-// The owner-only site/QR admin UI will live in the WEB DASHBOARD later. Until then, this dev tool
-// ensures a temporary attendance site exists and issues an ACTIVE QR token for it, then renders a
-// scannable QR (so the app's clock-in capture flow can be tested once it is wired in Step 3+).
+// 소유자 전용 사이트/QR 관리 UI 는 나중에 웹 대시보드에 들어간다. 그전까지 이 개발 도구가
+// 임시 근태 사이트가 있도록 보장하고 거기에 ACTIVE QR 토큰을 발급한 뒤, 스캔 가능한
+// QR 을 그린다(Step 3+ 에 연결되면 앱의 출근 촬영 흐름을 테스트할 수 있도록).
 //
-// Gated by development NODE_ENV + the ENABLE_LOCAL_DEV_TOOLS opt-in + a local/LAN host. It is never
-// reachable in production. It is NOT owner-gated (it's a local testing
-// tool); the real web-dashboard server actions WILL enforce owner-only.
+// development NODE_ENV + ENABLE_LOCAL_DEV_TOOLS 옵트인 + 로컬/LAN 호스트로 막혀 있다.
+// 운영에서는 절대 접근할 수 없다. 소유자 전용이 아니다(로컬 테스트
+// 도구이므로). 실제 웹 대시보드 서버 액션은 소유자 전용을 강제한다.
 //
-// Usage (while logged into the app in the same browser):
-//   GET /api/dev/attendance/temp-qr             → HTML page with the active QR (issues one if needed)
-//   GET /api/dev/attendance/temp-qr?reissue=1    → force a brand-new active token (old one revoked)
+// 사용법(같은 브라우저에서 앱에 로그인한 상태로):
+//   GET /api/dev/attendance/temp-qr             → 활성 QR 이 있는 HTML 페이지(필요하면 발급)
+//   GET /api/dev/attendance/temp-qr?reissue=1    → 새 활성 토큰을 강제로 발급(기존 것은 폐기)
 //   GET /api/dev/attendance/temp-qr?format=json  → JSON { site, token, qrSvgDataUrl }
-//   optional: &lat=..&lng=..&radius=..&name=..&ssid=..  (only used when first creating the temp site)
+//   선택: &lat=..&lng=..&radius=..&name=..&ssid=..  (임시 사이트를 처음 만들 때만 사용)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TEMP_SITE_NAME = "임시 테스트 현장";
-// Default coordinates: central Tokyo (Tokyo Tower area). Override with ?lat/?lng on first creation.
+// 기본 좌표: 도쿄 중심부(도쿄타워 일대). 처음 생성할 때 ?lat/?lng 로 덮어쓴다.
 const DEFAULT_LAT = 35.6586;
 const DEFAULT_LNG = 139.7454;
 const DEFAULT_SSID = "Foldy-Test";
@@ -41,9 +41,9 @@ function isLocalDevHost(host: string) {
   if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
   if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
-  // Cloudflare quick tunnel (dev-only): lets this temp-QR page open on a phone over
-  // any network. Still gated by NODE_ENV=development + ENABLE_LOCAL_DEV_TOOLS, so it is
-  // never reachable in production regardless of host.
+  // Cloudflare quick tunnel(개발 전용): 이 임시 QR 페이지를 어떤 네트워크의
+  // 폰에서도 열 수 있게 한다. 여전히 NODE_ENV=development + ENABLE_LOCAL_DEV_TOOLS 로 막혀 있어
+  // 호스트와 무관하게 운영에서는 접근할 수 없다.
   return host.endsWith(".trycloudflare.com");
 }
 
@@ -76,7 +76,7 @@ function parseNumber(value: string | null, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** Find the temp site for this org by its well-known name, or create it. */
+/** 조직의 임시 사이트를 잘 알려진 이름으로 찾고, 없으면 만든다. */
 async function ensureTempSite(
   organizationId: string,
   opts: { lat: number; lng: number; radius: number; name: string; ssid: string },

@@ -27,14 +27,14 @@ export function LeaveDone({ copy: c, request }: { copy: LeaveCopy; request: Leav
         <span className="pagehead__t">{c.appTitle}</span>
       </div>
 
-      {/* success burst */}
+      {/* 성공 버스트 */}
       <div className="doneburst">
         <div className="doneburst__ic">{AttIcon.checkc}</div>
         <h3 className="doneburst__t">{c.doneT}</h3>
         <p className="doneburst__s">{c.doneS}</p>
       </div>
 
-      {/* request recap */}
+      {/* 요청 요약 */}
       <div className="reqcard">
         <div className="reqcard__h">
           <span className="chip c-info">{typeLabel(request.leaveType, c)}</span>
@@ -67,7 +67,7 @@ export function LeaveDone({ copy: c, request }: { copy: LeaveCopy; request: Leav
         </div>
       </div>
 
-      {/* approval timeline */}
+      {/* 승인 타임라인 */}
       <div className="slabel">
         {c.apTitle} ·{" "}
         <span className="now">
@@ -98,7 +98,7 @@ export function LeaveDone({ copy: c, request }: { copy: LeaveCopy; request: Leav
         </div>
       </div>
 
-      {/* sticky actions */}
+      {/* 하단 고정 액션 */}
       <div className="lv-foot">
         <Link className="fbtn fbtn--draft" href="/mobile/attendance/leave" aria-label={c.appTitle}>
           <AIc>{AttIcon.home}</AIc>

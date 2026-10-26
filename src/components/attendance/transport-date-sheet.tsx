@@ -164,7 +164,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack, month
           <span className="trn-cal-spacer" />
         </div>
 
-        {/* Weekday labels */}
+        {/* 요일 라벨 */}
         <div className="trn-cal-wk">
           {weekdays.map((w, i) => (
             <span
@@ -176,7 +176,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack, month
           ))}
         </div>
 
-        {/* Day grid */}
+        {/* 일자 그리드 */}
         <div className="trn-cal-grid">
           {cells.map((c) => {
             const isSel = c.iso === selected;
@@ -204,7 +204,7 @@ export function CalendarPanel({ value, dict, localeTag, onConfirm, onBack, month
           })}
         </div>
 
-        {/* Footer */}
+        {/* 푸터 */}
         <div className="trn-cal-foot">
           <button type="button" className="trn-cal-today" onClick={goToday} disabled={!inLockedMonth(today)}>
             {t.calToday}

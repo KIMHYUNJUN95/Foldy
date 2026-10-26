@@ -56,7 +56,7 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
     <main className="adm">
       <div className="app">
         {/*
-         * ── Sidebar (warm espresso rail) ──
+         * ── 사이드바 (따뜻한 에스프레소 레일) ──
          *
          * 평소에는 **아이콘만** 보이고 커서를 올리면 펼쳐진다. 조작 수단은 커서뿐이라
          * 접기/펴기 버튼도, 저장할 상태도 없다 — 규칙이 전부 CSS 안에서 끝난다
@@ -122,7 +122,7 @@ export function AdminShell({ activeItem, children, mobileHref = "/mobile", title
           </div>
         </aside>
 
-        {/* ── Main ── */}
+        {/* ── 메인 ── */}
         <section className="main">
           <header className="top">
             <div className="top__title">

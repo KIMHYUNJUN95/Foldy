@@ -18,9 +18,9 @@ import type { Database } from "@/types/database";
  * (개발자이거나 그 조직에서 `user.manage` 를 받음). docs/product/17-user-profile-directory.md
  */
 
-// Owner and cs_staff are deliberately excluded from self-service invite-code creation (2026-07-09):
-// owner needs a separate single-use flow not built yet, and cs_staff has no invite category at all
-// (admin-assigned only, src/config/roles.ts).
+// owner 와 cs_staff 는 초대 코드 셀프 생성에서 일부러 뺐다(2026-07-09):
+// owner 는 아직 만들지 않은 별도 1회용 흐름이 필요하고, cs_staff 는 초대 분류 자체가 없다
+// (관리자 지정 전용, src/config/roles.ts).
 export const INVITE_DEFAULT_ROLES = [
   "staff",
   "part_time_staff",
@@ -98,8 +98,8 @@ export async function createInviteCodeAs(
   if (!(await actorCanManageUsersInOrg(actor.userId, actor.role, organizationId))) {
     return { ok: false, error: "forbidden" };
   }
-  // office_admin may not hand out office_admin-or-above access via invite code — mirrors the same
-  // tiering already enforced for manual role changes (canAssignRole, src/actions/users.ts).
+  // office_admin 은 초대 코드로 office_admin 이상 권한을 줄 수 없다 — 수동 역할 변경에
+  // 이미 적용된 같은 단계 규칙을 따른다(canAssignRole, src/actions/users.ts).
   // 판정은 **그 조직의 멤버십 역할**로(세션 역할 아님).
   if (!(await selectableInviteRolesInOrg(actor, organizationId)).includes(defaultRole)) {
     return { ok: false, error: "invalid_invite" };
@@ -163,8 +163,8 @@ export async function setInviteCodeActiveAs(
   if (!(await actorCanManageUsersInOrg(actor.userId, actor.role, input.organizationId))) {
     return { ok: false, error: "forbidden" };
   }
-  // Org-scope the write — the gate only proves the caller may manage THIS org's invites, not that the
-  // given code belongs to it, so without this an invite manager could toggle another org's code by id.
+  // 쓰기를 조직 범위로 제한한다 — 게이트는 호출자가 이 조직의 초대를 관리할 수 있다는 것만 증명할 뿐,
+  // 주어진 코드가 이 조직의 것임은 증명하지 않는다. 이게 없으면 초대 관리자가 id 로 다른 조직의 코드를 켜고 끌 수 있다.
   const { error } = await getSupabaseServiceClient()
     .from("invite_codes")
     .update({ is_active: input.active })
@@ -190,8 +190,8 @@ export async function deleteInviteCodeAs(
   if (!(await actorCanManageUsersInOrg(actor.userId, actor.role, input.organizationId))) {
     return { ok: false, error: "forbidden" };
   }
-  // Hard delete (MVP deletion policy). Org-scoped. Members who already joined with this code keep
-  // their memberships — only the code record is removed.
+  // 완전 삭제(MVP 삭제 정책). 조직 범위. 이 코드로 이미 가입한 구성원은
+  // 멤버십을 그대로 유지하며, 코드 레코드만 지워진다.
   const { error } = await getSupabaseServiceClient()
     .from("invite_codes")
     .delete()

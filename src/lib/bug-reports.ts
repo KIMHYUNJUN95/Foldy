@@ -1,10 +1,10 @@
-// Bug Report (Foldy product issue report) — server-only domain helpers.
+// 버그 리포트(Foldy 제품 이슈 보고) — 서버 전용 도메인 헬퍼.
 //
-// Reads use the RLS-scoped server client (RLS is the first defense line). Writes use the service
-// role client AFTER an explicit code-level org + role gate, mirroring the pattern in
-// `src/lib/board.ts`/board actions. Image uploads are forced into the canonical storage path
-// `{organization_id}/bug-reports/{report_id}/{filename}` so a malicious client can't write under
-// another org or another report.
+// 읽기는 RLS 범위 서버 클라이언트를 쓴다(RLS 가 첫 방어선). 쓰기는 코드 수준의 조직 + 역할 게이트를
+// 명시적으로 거친 뒤 service role 클라이언트를 쓰며, `src/lib/board.ts`/게시판 액션의 패턴을
+// 따른다. 이미지 업로드는 정해진 저장 경로
+// `{organization_id}/bug-reports/{report_id}/{filename}` 로 강제해서 악의적인 클라이언트가
+// 다른 조직이나 다른 리포트 아래에 쓰지 못하게 한다.
 
 import "server-only";
 
@@ -113,9 +113,9 @@ function safeExt(file: File): string {
 }
 
 /**
- * Upload one screenshot for a bug report. The storage path is server-constructed from the session
- * organization id + the supplied reportId, so the caller cannot write outside their org or under a
- * different report id. MIME is validated to image/* before upload.
+ * 버그 리포트의 스크린샷 하나를 업로드한다. 저장 경로는 세션
+ * 조직 id + 전달된 reportId 로 서버가 만들어서 호출자가 자기 조직 밖이나
+ * 다른 report id 아래에 쓸 수 없다. 업로드 전에 MIME 이 image/* 인지 검증한다.
  */
 export async function uploadBugReportImage(input: {
   session: AppSession;
@@ -232,13 +232,13 @@ async function hydrateReports(
 }
 
 /**
- * Create a new bug report. Always begins as `submitted`. The id is generated server-side so the
- * caller can't reuse another report's id (and so the storage path the client uploaded into is
- * actually tied to this new row — the client must request the upload AFTER receiving this id, or
- * the upload helper validates the id shape and the path is rebuilt server-side anyway).
+ * 새 버그 리포트를 만든다. 항상 `submitted` 로 시작한다. id 는 서버에서 생성되므로
+ * 호출자가 다른 리포트의 id 를 재사용할 수 없다(그리고 클라이언트가 업로드한 저장 경로가
+ * 이 새 행에 실제로 묶이도록 — 클라이언트는 이 id 를 받은 뒤에 업로드를 요청해야 하며,
+ * 그렇지 않아도 업로드 헬퍼가 id 형태를 검증하고 경로는 어차피 서버에서 다시 만든다).
  *
- * Returns the new report id and fans out a `bug_report_activity:created` notification to every
- * reviewer (owner/office_admin) in the org. The reporter is suppressed.
+ * 새 리포트 id 를 돌려주고 조직의 모든 검토자(owner/office_admin)에게 `bug_report_activity:created` 알림을
+ * 보낸다. 작성자 본인은 제외한다.
  */
 export async function createBugReport(input: {
   session: AppSession;
@@ -294,9 +294,9 @@ async function loadReportForWrite(reportId: string, organizationId: string): Pro
 }
 
 /**
- * Edit own report. Allowed ONLY when the caller is the reporter AND the report is still
- * `submitted`. Both conditions are enforced in code (not relying on RLS alone).
- * Platform developer bypasses both (2026-10-23 「개발자는 전부 가능」).
+ * 본인 리포트 수정. 호출자가 작성자이고 리포트가 아직
+ * `submitted` 일 때만 허용한다. 두 조건 모두 RLS 에만 기대지 않고 코드에서 강제한다.
+ * 플랫폼 개발자는 둘 다 우회한다(2026-10-23 「개발자는 전부 가능」).
  */
 export async function updateBugReport(input: {
   session: AppSession;
@@ -332,9 +332,9 @@ export async function updateBugReport(input: {
 }
 
 /**
- * Hard-delete own report. Same gate as update: reporter + status='submitted' only. Hard delete is
- * the MVP policy (CLAUDE.md); the storage objects are NOT cascaded here — the migration's RLS
- * already keeps them inaccessible once the row is gone, and a periodic sweep can prune orphans.
+ * 본인 리포트 하드 삭제. 수정과 같은 게이트: 작성자 + status='submitted' 만. 하드 삭제는
+ * MVP 정책(CLAUDE.md)이다; 저장소 객체는 여기서 연쇄 삭제되지 않는다 — 마이그레이션의 RLS 가
+ * 행이 사라진 뒤에는 이미 접근을 막고, 고아는 주기적 정리로 지울 수 있다.
  */
 export async function deleteBugReport(input: {
   session: AppSession;
@@ -359,9 +359,9 @@ export async function deleteBugReport(input: {
 }
 
 /**
- * Reviewer-only status update. Sets reviewed_by_user_id on first transition out of `submitted`, and
- * stamps closed_by_user_id + closed_at when the new status is `closed`. Notifies the original
- * reporter (self-suppressed when the reviewer is also the reporter — edge case but handled).
+ * 검토자 전용 상태 변경. `submitted` 를 처음 벗어날 때 reviewed_by_user_id 를 설정하고,
+ * 새 상태가 `closed` 면 closed_by_user_id + closed_at 을 찍는다. 원래
+ * 작성자에게 알린다(검토자가 작성자이기도 하면 자기 알림은 제외 — 예외적이지만 처리됨).
  */
 export async function updateBugReportStatus(input: {
   session: AppSession;
@@ -390,7 +390,7 @@ export async function updateBugReportStatus(input: {
     patch.closed_by_user_id = session.user.id;
     patch.closed_at = now;
   } else if (existing.closed_at) {
-    // Re-opening a previously closed report clears the closure stamp so it doesn't lie.
+    // 이미 닫힌 리포트를 다시 열면 거짓이 되지 않도록 닫힘 도장을 지운다.
     patch.closed_by_user_id = null;
     patch.closed_at = null;
   }
@@ -415,7 +415,7 @@ export async function updateBugReportStatus(input: {
 const SELECT_COLS =
   "id, organization_id, reported_by_user_id, title, description, image_urls, status, reviewed_by_user_id, closed_by_user_id, closed_at, created_at, updated_at";
 
-/** Reports owned by the current user. RLS scopes to (org, reporter), the code re-applies both. */
+/** 현재 사용자가 소유한 리포트. RLS 가 (조직, 작성자)로 제한하고 코드가 둘 다 다시 적용한다. */
 export async function getMyBugReports(session: AppSession): Promise<BugReport[]> {
   const organizationId = requireOrg(session);
   const supabase = await getSupabaseServerClient();
@@ -430,8 +430,8 @@ export async function getMyBugReports(session: AppSession): Promise<BugReport[]>
 }
 
 /**
- * Detail by id. Visible to the reporter, or to any reviewer in the same org. Returns null on cross-
- * org access or missing row (RLS is the first line; this check is the second).
+ * id 로 상세. 작성자 또는 같은 조직의 모든 검토자에게 보인다. 조직 간
+ * 접근이거나 행이 없으면 null (RLS 가 첫째 방어선이고 이 확인이 둘째).
  */
 export async function getBugReportDetail(
   session: AppSession,
@@ -455,7 +455,7 @@ export async function getBugReportDetail(
   return hydrated[0] ?? null;
 }
 
-/** Reviewer-only: every report in the org, newest first. Optional status filter. */
+/** 검토자 전용: 조직의 모든 리포트, 최신순. 선택적 상태 필터. */
 export async function getOrgBugReports(
   session: AppSession,
   filters?: { status?: BugStatus },

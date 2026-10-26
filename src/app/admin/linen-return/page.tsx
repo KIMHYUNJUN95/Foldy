@@ -11,7 +11,7 @@ import { getDictionary, getLocalizedText, localizedNavigationLabels } from "@/li
 // Admin · 린넨 반품 — 사무실 기록 관리 콘솔. 현장(모바일)에서 등록된 반품 기록을 확인하고
 // 수정 · 삭제한다. 신규 등록은 모바일 전용이므로 이 화면에는 등록 경로가 없다.
 // 조회 기간은 URL 로 받아 서버에서 조직 스코프 쿼리로 좁힌다(기본 = 이번 달 Tokyo).
-// See docs/product/19-linen-defect-workflow.md → "Admin Dashboard — Linen Return Record Management".
+// 참고: docs/product/19-linen-defect-workflow.md → "Admin Dashboard — Linen Return Record Management".
 export default async function AdminLinenReturnPage({
   searchParams,
 }: {

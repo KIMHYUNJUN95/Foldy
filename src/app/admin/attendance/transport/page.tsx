@@ -11,10 +11,10 @@ import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
 
-// Admin · Attendance · Transport (Slice 5).
-// Monthly per-user transport reimbursement review wired to
+// 관리자 · 출퇴근 · 교통비 (Slice 5).
+// 사용자별 월 교통비 정산 검토, 연결 대상:
 // `getTransportReportSummaryForAdmin` + `loadAdminTransportDetail` +
-// `setTransportReportReview`. Month is controlled by the shared attendance subnav picker.
+// `setTransportReportReview`. 월은 공용 출퇴근 서브내비 피커로 제어한다.
 export default async function AdminAttendanceTransportPage({
   searchParams,
 }: {

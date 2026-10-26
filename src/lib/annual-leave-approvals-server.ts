@@ -1,9 +1,9 @@
-// Annual leave — approval review queue (Phase 2, stage 2). Admin/approver-scoped: every query/write
-// runs on the service-role client and is filtered by the CURRENT organization id. Approver rights are
-// verified server-side here (platform admin, or an active org membership with a non-null
-// `leave_approver_role`) — the SQL `is_leave_approver()` helper needs an auth context and is NOT used
-// on this service-role path. Self-scope request submission lives in annual-leave-requests-server.ts.
-// See migration 202607060002 and docs/product/26-annual-leave-workflow.md.
+// 연차 — 승인 검토 대기열(Phase 2, 2단계). 관리자/승인자 범위: 모든 쿼리/쓰기가
+// service-role 클라이언트로 실행되며 현재 조직 id 로 필터링된다. 승인 권한은
+// 여기서 서버 측으로 검증한다(플랫폼 관리자, 또는 null 이 아닌
+// `leave_approver_role` 이 있는 활성 조직 멤버십) — SQL `is_leave_approver()` 헬퍼는 인증 컨텍스트가 필요해 쓰지
+// 않는다(이 service-role 경로에서는). 본인 범위 신청 제출은 annual-leave-requests-server.ts 에 있다.
+// 참고: 마이그레이션 202607060002 와 docs/product/26-annual-leave-workflow.md.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -122,9 +122,9 @@ async function getLeaveApproverRole(
 /** 휴가계 문서의 결재 도장 칸 — 2026-07-13 「연차 결재는 전무가 담당」 결정 때부터의 기본값. */
 const LEAVE_STAMP_ROLE = "senior_managing_director";
 
-/** Public approver check (platform admin, or `leave.approve`).
- *  Used to gate management writes (balance edit, approver toggle) that live behind the approver-only
- *  console but must still be re-verified server-side. */
+/** 공개 승인자 확인(플랫폼 관리자, 또는 `leave.approve`).
+ *  승인자 전용 콘솔 뒤에 있는 관리 쓰기(잔여 수정, 승인자 토글)를 막는 데 쓰지만
+ *  서버에서 다시 검증해야 한다. */
 export async function isSessionLeaveApprover(session: AppSession): Promise<boolean> {
   const service = getSupabaseServiceClient();
   const { isApprover } = await getLeaveApproverRole(service, session.organization.id, session.user.id);
@@ -167,11 +167,11 @@ async function rolesByUser(
   return map;
 }
 
-/** Tokyo week (Mon–Sun) containing `today` (YYYY-MM-DD), returned as inclusive date strings. */
+/** `today`(YYYY-MM-DD)가 속한 도쿄 주(월–일), 양끝 포함 날짜 문자열로 반환. */
 function tokyoWeekRange(today: string): { weekStart: string; weekEnd: string } {
   const [y, m, d] = today.split("-").map(Number);
   const base = new Date(Date.UTC(y, m - 1, d));
-  const dow = base.getUTCDay(); // 0=Sun..6=Sat
+  const dow = base.getUTCDay(); // 0=일..6=토
   const daysSinceMonday = (dow + 6) % 7;
   const start = new Date(base);
   start.setUTCDate(start.getUTCDate() - daysSinceMonday);
@@ -184,17 +184,17 @@ function tokyoWeekRange(today: string): { weekStart: string; weekEnd: string } {
 }
 
 /**
- * Remaining days in one balance pool for `userId`, **with already-approved usage deducted**.
+ * `userId` 의 한 잔여 풀에서 남은 일수, **이미 승인된 사용 분을 차감한** 값.
  *
- * Delegates to `getMyAnnualLeaveSummary` — the same function the mobile 잔여 screen
- * (`/mobile/attendance/leave`) and the admin 잔여 table read from. This used to call
- * `computeAnnualLeaveSummary` directly *without* `usedDays`/`specialUsedDays`, so the approval
- * screen reported the gross grant (e.g. "12일") while the applicant's own screen showed the net
- * balance ("2일"). The 잔여 초과 warning is derived from this number, so it effectively never fired
- * and over-balance requests approved silently. Do not re-inline the computation here: two screens
- * showing the same number must share one code path.
+ * `getMyAnnualLeaveSummary` 에 위임한다 — 모바일 잔여 화면
+ * (`/mobile/attendance/leave`)과 admin 잔여 표가 읽는 것과 같은 함수. 예전에는
+ * `computeAnnualLeaveSummary` 를 `usedDays`/`specialUsedDays` 없이 직접 호출해서 승인
+ * 화면은 총 부여량(예: "12일")을 보고했고 신청자 본인 화면은 순
+ * 잔여("2일")를 보여줬다. 잔여 초과 경고는 이 숫자에서 도출되므로 사실상 한 번도 발동하지 않았고
+ * 잔여를 넘는 신청이 조용히 승인됐다. 계산을 여기에 다시 인라인하지 말 것: 두 화면이
+ * 같은 숫자를 보여주려면 하나의 코드 경로를 공유해야 한다.
  *
- * Returns null when the employee has no leave baseline yet (hire+6mo not reached / not set up).
+ * 직원에게 아직 연차 기준이 없으면 null(입사 6개월 미도달 / 미설정).
  */
 async function poolRemainingFor(
   service: Service,
@@ -255,7 +255,7 @@ async function buildSummary(
     if (pool === "none") continue;
     const remaining = await poolRemainingFor(service, organizationId, r.user_id, pool);
     if (remaining === null) {
-      // no baseline: hire+6mo not yet reached / not set up — best-effort "미도래" flag
+      // 기준 없음: 입사 6개월 미도달 / 미설정 — 최선 노력으로 "미도래" 표시
       balanceWarningName = r.applicant_name;
       break;
     }
@@ -383,9 +383,9 @@ export async function getAdminLeaveApprovalDetail(
 }
 
 /**
- * Best-effort assignment of the 休暇届 document number (AL-YYYY-MM-NNN) after approval.
- * Never fails the approval: if the column isn't migrated yet or any non-conflict error occurs it just
- * returns. On a unique-violation race with a concurrent approval it recomputes and retries.
+ * 승인 후 休暇届 문서 번호(AL-YYYY-MM-NNN)를 최선 노력으로 부여한다.
+ * 승인을 절대 실패시키지 않는다: 컬럼이 아직 마이그레이션되지 않았거나 충돌 외 오류가 나면
+ * 그냥 반환한다. 동시 승인과 unique 위반 경합이 나면 다시 계산해 재시도한다.
  */
 async function assignLeaveDocumentNumber(
   service: Service,
@@ -417,7 +417,7 @@ async function assignLeaveDocumentNumber(
       .eq("organization_id", organizationId)
       .is("document_number", null);
     if (!error) return;
-    // Only a unique-violation race is worth retrying; anything else (e.g. column not migrated) → give up.
+    // unique 위반 경합만 재시도할 가치가 있다. 그 밖의 것(예: 컬럼 미마이그레이션)은 → 포기.
     if ((error as { code?: string }).code !== "23505") return;
   }
 }
@@ -491,7 +491,7 @@ export async function approveLeaveRequestForApprover(
   // 0행 = 그 사이 다른 사람이 먼저 처리했다(승인 · 반려 · 취소). 성공으로 보이면 안 된다.
   if (!updated || updated.length === 0) return { ok: false, error: "not_requested" };
 
-  // Assign the 休暇届 document number (best-effort — never blocks the approval).
+  // 休暇届 문서 번호를 부여한다(최선 노력 — 승인을 막지 않음).
   await assignLeaveDocumentNumber(service, organizationId, requestId);
 
   return { ok: true };
@@ -537,10 +537,10 @@ export async function rejectLeaveRequestForApprover(
 }
 
 /**
- * Revokes an already-approved leave (대시보드 "승인 취소"). Sets the request to `cancelled` and records
- * who/why. Approved usage is keyed off `status = 'approved'`, so cancelling automatically restores the
- * applicant's balance and drops the request from the calendar/documents. Approver-gated, org-isolated,
- * only from `approved`. The 休暇届 document number is kept (audit trail) but no longer surfaces.
+ * 이미 승인된 휴가를 철회한다(대시보드 "승인 취소"). 요청을 `cancelled` 로 바꾸고 다음을 기록한다:
+ * 누가/왜. 승인된 사용 분은 `status = 'approved'` 로 판정하므로 취소하면 자동으로
+ * 신청자의 잔여가 복원되고 캘린더/문서에서 신청이 빠진다. 승인자 전용, 조직 격리,
+ * `approved` 에서만 가능. 休暇届 문서 번호는 유지되지만(감사 기록) 더 이상 노출되지 않는다.
  */
 export async function cancelApprovedLeaveForApprover(
   session: AppSession,

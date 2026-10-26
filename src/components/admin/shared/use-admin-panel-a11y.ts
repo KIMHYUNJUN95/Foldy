@@ -1,11 +1,11 @@
 "use client";
 
-// Shared admin-console side-panel / centered-modal behavior hook.
-// Esc to close, body scroll lock, focus the panel on open, restore focus on close.
-// `trapFocus` (opt-in, 2026-09-30 — sales summary modal) keeps Tab / Shift+Tab inside the panel.
-// `quietRestore` (opt-in, 2026-10-01 — ops calendar toolbar panels) still returns focus to the trigger
-// but without the focus ring: closing with Esc made the browser treat it as keyboard use and ring
-// the toolbar toggle that opened it, so a closed panel's button looked switched on.
+// 관리자 콘솔 공용 사이드 패널 / 가운데 모달 동작 훅.
+// Esc 로 닫기, body 스크롤 잠금, 열릴 때 패널에 포커스, 닫힐 때 포커스 복원.
+// `trapFocus` (옵트인, 2026-09-30 — 매출 요약 모달)는 Tab / Shift+Tab 을 패널 안에 가둔다.
+// `quietRestore` (옵트인, 2026-10-01 — 운영 캘린더 툴바 패널)는 포커스를 트리거로 돌려주지만
+// 포커스 링은 그리지 않는다: Esc 로 닫으면 브라우저가 키보드 사용으로 보고
+// 열어 둔 툴바 토글에 링을 그려서, 닫힌 패널의 버튼이 켜져 있는 것처럼 보였다.
 import { useEffect, useRef } from "react";
 
 const FOCUSABLE =
@@ -76,7 +76,7 @@ export function useAdminPanelA11y<T extends HTMLElement>(
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
       document.body.style.paddingRight = previousPaddingRight;
-      // `focusVisible` is newer than the TS DOM lib here; browsers without it ignore the key.
+      // `focusVisible` 은 여기 TS DOM lib 보다 최신이라, 지원하지 않는 브라우저는 이 키를 무시한다.
       previousActive?.focus({ preventScroll: true, ...(quietRestore ? { focusVisible: false } : {}) } as FocusOptions);
     };
   }, [trapFocus, quietRestore]);

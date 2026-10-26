@@ -9,7 +9,7 @@ type RequireAdminPageSessionOptions = {
   nextPath: string;
 };
 
-/** Shared admin-page gate: auth -> onboarding/org context -> admin-web role access. */
+/** 공용 관리자 페이지 게이트: 인증 -> 온보딩/조직 컨텍스트 -> 관리자 웹 역할 접근. */
 export async function requireAdminPageSession({
   nextPath,
 }: RequireAdminPageSessionOptions): Promise<AppSession> {

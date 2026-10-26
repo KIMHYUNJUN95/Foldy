@@ -17,10 +17,10 @@ import { payrollPrepAvailable } from "@/lib/payroll-prep";
 import { getPayrollPrep } from "@/lib/payroll-prep-server";
 import { isValidYm } from "@/lib/attendance-clock";
 
-// Admin · Attendance · Payroll (Slice 4).
-// Monthly per-user payroll review wired to existing `getMonthlyPayView` +
-// finalize/reopen/export server actions. Month is controlled by the shared attendance subnav picker.
-// See docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
+// 관리자 · 근태 · 급여 (Slice 4).
+// 기존 `getMonthlyPayView` + finalize/reopen/export 서버 액션에 연결한 월별 사용자 급여 검토 화면.
+// 월은 공용 근태 서브내비 피커로 제어한다.
+// 참고: docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
 export default async function AdminAttendancePayrollPage({
   searchParams,
 }: {

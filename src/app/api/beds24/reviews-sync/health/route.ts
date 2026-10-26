@@ -6,7 +6,7 @@ import { requestMatchesSecret } from "@/lib/api-secret";
 /**
  * 리뷰 수집이 «조용히 멈췄는지» 점검한다.
  *
- * WHY THIS EXISTS
+ * 존재 이유
  * ---------------
  * 2026-08-06~07, 리뷰 수집 크론이 **한 번도 성공한 적이 없는데 이틀간 아무도 몰랐다.**
  * 워크플로는 빨간불이었고 DB 는 비어가고 있었지만 알아챌 장치가 없었다.
@@ -14,7 +14,7 @@ import { requestMatchesSecret } from "@/lib/api-secret";
  * **점검은 수집 밖에 있어야 한다.** 수집이 안 도는 것이 문제인데 수집이 스스로 알릴 수는 없다.
  * 그래서 하루 4회 안정적으로 도는 reconcile 워크플로가 이 엔드포인트를 부른다.
  *
- * WHY NO NEW TABLE
+ * 새 테이블이 없는 이유
  * ----------------
  * `external_reviews_set_updated_at` 트리거가 **upsert 마다** `updated_at` 을 갱신한다. 수집은
  * 받아온 리뷰를 전부 다시 upsert 하므로, 한 주기라도 성공하면 `max(updated_at)` 이 그 시각으로

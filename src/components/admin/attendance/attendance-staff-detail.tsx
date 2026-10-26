@@ -87,7 +87,7 @@ export function AttendanceStaffDetail({
           .find((p) => p.session.sessionId === panelSel) ?? null
       : null;
 
-  // Flatten day → session rows, marking the first row of each day (which shows the date column).
+  // 날짜 → 세션 행으로 펼치고, 날짜별 첫 행(날짜 열을 보여 줌)에 표시를 한다.
   const ledgerRows = data.days.flatMap((d) =>
     d.sessions.map((s, sIdx) => ({ day: d, session: s, showDate: sIdx === 0 })),
   );
@@ -114,7 +114,7 @@ export function AttendanceStaffDetail({
         {c.staffBackToPayroll}
       </Link>
 
-      {/* User header */}
+      {/* 사용자 헤더 */}
       <div className="uhead">
         <span
           className="uhead__av"
@@ -183,7 +183,7 @@ export function AttendanceStaffDetail({
 
       <WeeklyLimitNote chip={weekly} copy={c} />
 
-      {/* Daily ledger */}
+      {/* 일별 원장 */}
       <div className="secthead">
         <span className="secthead__t">{c.staffSecLedger}</span>
         <span className="secthead__c">
@@ -245,7 +245,7 @@ export function AttendanceStaffDetail({
         </>
       )}
 
-      {/* Payroll + Transport summary */}
+      {/* 급여 + 교통비 요약 */}
       {data.canSeePay || data.canSeeTransport ? (
         <>
       <div className="secthead">
@@ -253,7 +253,7 @@ export function AttendanceStaffDetail({
         <span className="secthead__line" />
       </div>
       <div className="grid" style={{ gridTemplateColumns: "repeat(12,1fr)" }}>
-        {/* Payroll card */}
+        {/* 급여 카드 */}
         {!data.canSeePay ? null : isSalaried ? (
           <div className="card" style={{ gridColumn: "span 6" }}>
             <div className="card__h">
@@ -339,7 +339,7 @@ export function AttendanceStaffDetail({
           </div>
         )}
 
-        {/* Transport card */}
+        {/* 교통비 카드 */}
         {data.canSeeTransport ? (
         <div className="card" style={{ gridColumn: "span 6" }}>
           <div className="card__h">
@@ -407,7 +407,7 @@ export function AttendanceStaffDetail({
         </>
       ) : null}
 
-      {/* Side panel — day session detail */}
+      {/* 사이드 패널 — 날짜별 세션 상세 */}
       {selSession ? (
         <DaySessionPanel
           day={selSession.day}

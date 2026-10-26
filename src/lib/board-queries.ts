@@ -1,9 +1,9 @@
-// Board (자유 게시판) — server-only feed + detail queries (Pages 2–3).
+// 게시판 (자유 게시판) — 서버 전용 피드 + 상세 쿼리 (Pages 2–3).
 //
-// Kept SEPARATE from `src/lib/board.ts` because that module uses the BROWSER Supabase client and is
-// imported by client components (the composer). Pulling the server client / `next/headers` in there
-// would drag server-only code into the client bundle. Mirrors the suggestions.ts ↔ suggestions-queries.ts
-// split. Visibility/org-isolation is enforced by RLS; every query also scopes to session.organization.id.
+// `src/lib/board.ts` 와 분리해 둔다. 그 모듈은 BROWSER Supabase 클라이언트를 쓰고
+// 클라이언트 컴포넌트(작성기)가 가져오기 때문이다. 거기에 서버 클라이언트 / `next/headers` 를 끌어오면
+// 서버 전용 코드가 클라이언트 번들로 딸려 들어간다. suggestions.ts ↔ suggestions-queries.ts 분리를 따른다.
+// 가시성/조직 격리는 RLS 가 강제하고, 모든 쿼리는 session.organization.id 로도 범위를 건다.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/types/database";
@@ -31,7 +31,7 @@ export type MentionableMember = {
   avatarColor: AvatarColor;
 };
 
-// Deterministic avatar tint from a user id (adds variety to stacked reactor/comment avatars).
+// 사용자 id 에서 결정적으로 정한 아바타 색조 (겹쳐 쌓인 반응자/댓글 아바타에 변화를 준다).
 const AVATAR_COLORS: AvatarColor[] = ["default", "green", "blue", "red"];
 function avatarColorFor(userId: string): AvatarColor {
   let hash = 0;
@@ -42,7 +42,7 @@ function avatarColorFor(userId: string): AvatarColor {
 const FEED_COLS =
   "id, title, content, tags, image_urls, file_attachments, is_pinned, pinned_at, allow_comments, created_at, created_by_user_id";
 
-// Emoji order used across the board (matches the reaction bar). Reactions are returned in this order.
+// 게시판 전반에서 쓰는 이모지 순서 (반응 바와 같다). 반응은 이 순서로 돌려준다.
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"] as const;
 
 type PostRow = {
@@ -61,7 +61,7 @@ type PostRow = {
 
 type MemberInfo = { name: string; roleLabel: string };
 
-/** Resolve display name + localized role label for a set of author user ids. */
+/** 작성자 사용자 id 모음의 표시 이름 + 현지화된 역할 라벨을 해석한다. */
 async function fetchAuthorInfo(
   supabase: SupabaseClient<Database>,
   organizationId: string,
@@ -96,7 +96,7 @@ async function fetchAuthorInfo(
   return map;
 }
 
-/** Hydrate raw post rows into BoardPost objects (author, comment count, reactions, unread). */
+/** 원본 게시글 행을 BoardPost 객체(작성자, 댓글 수, 반응, 안 읽음)로 채운다. */
 async function hydratePosts(
   supabase: SupabaseClient<Database>,
   session: AppSession,
@@ -174,18 +174,18 @@ async function hydratePosts(
       avatarColor: "default",
       commentCount: commentCounts.get(row.id) ?? 0,
       reactions,
-      // Own posts are treated as read; otherwise unread until a read row exists.
+      // 본인 글은 읽은 것으로 보고, 아니면 읽음 행이 생길 때까지 안 읽음이다.
       isUnread: row.created_by_user_id !== uid && !readSet.has(row.id),
-      // The list badge uses the first tag as the post's "category".
+      // 목록 배지는 첫 번째 태그를 글의 "카테고리"로 쓴다.
       category: row.tags && row.tags.length > 0 ? row.tags[0] : null,
     } satisfies BoardPost;
   });
 }
 
 /**
- * Board feed for the current org. Pinned posts first (pinned_at DESC, fetched in full on the first
- * page only), then non-pinned (created_at DESC) cursor-paginated by `before` (= last non-pinned
- * created_at). `category` filters posts whose `tags` array contains the value. Excludes soft-deleted.
+ * 현재 조직의 게시판 피드. 고정 글이 먼저 (pinned_at DESC, 첫
+ * 페이지에서만 전부 가져옴), 그다음 고정되지 않은 글 (created_at DESC)을 `before` (= 마지막 비고정
+ * created_at)로 커서 페이지네이션한다. `category` 는 `tags` 배열에 그 값이 있는 글만 거른다. 소프트 삭제 제외.
  */
 export async function getBoardFeed(params: {
   session: AppSession;
@@ -197,7 +197,7 @@ export async function getBoardFeed(params: {
   const supabase = await getSupabaseServerClient();
   const orgId = session.organization.id;
 
-  // Pinned posts: first page only (omitted when paginating to avoid duplicates).
+  // 고정 글: 첫 페이지에서만 (중복을 피하려고 페이지네이션 때는 생략).
   let pinnedRows: PostRow[] = [];
   if (!before) {
     let pq = supabase
@@ -212,9 +212,9 @@ export async function getBoardFeed(params: {
     if (!error) pinnedRows = (data ?? []) as PostRow[];
   }
 
-  // Non-pinned posts: keyset pagination on (created_at, id) DESC. The `id` tiebreaker makes the order
-  // stable and prevents the strict-`<` cursor from silently dropping posts that share an identical
-  // created_at at the page boundary. The cursor encodes both fields as `${created_at}|${id}`.
+  // 고정되지 않은 글: (created_at, id) DESC 키셋 페이지네이션. `id` 동률 처리가 순서를
+  // 안정적으로 만들고, 엄격한 `<` 커서가 페이지 경계에서 created_at 이 똑같은 글을
+  // 조용히 빠뜨리는 일을 막는다. 커서는 두 필드를 `${created_at}|${id}` 로 인코딩한다.
   let nq = supabase
     .from("board_posts")
     .select(FEED_COLS)
@@ -255,7 +255,7 @@ export async function getBoardFeed(params: {
   return { posts, nextCursor };
 }
 
-/** Distinct tag values across the org's non-deleted posts (for the filter chips), capped + sorted. */
+/** 조직의 삭제되지 않은 글 전체에서 고유한 태그 값 (필터 칩용), 개수 제한 + 정렬. */
 export async function getBoardTags(session: AppSession): Promise<string[]> {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
@@ -276,8 +276,8 @@ export async function getBoardTags(session: AppSession): Promise<string[]> {
 }
 
 /**
- * Unread board posts for the current user: non-deleted org posts not authored by the user and without
- * a read row. Mirrors countUnreadAnnouncements; fails closed to 0 if the schema is not present.
+ * 현재 사용자의 안 읽은 게시글: 본인이 쓰지 않았고 읽음 행이 없는
+ * 삭제되지 않은 조직 글. countUnreadAnnouncements 를 따르며, 스키마가 없으면 0 으로 닫힌다.
  */
 export async function getBoardUnreadCount(session: AppSession): Promise<number> {
   try {
@@ -332,10 +332,10 @@ const DETAIL_COLS =
 type DetailRow = PostRow & { organization_id: string; deleted_at: string | null };
 
 /**
- * Full post detail for the viewer: post fields + author + comments (non-deleted, oldest-first) +
- * reactions aggregated with the viewer's isMine flag per emoji + up to 3 reactor faces for the
- * most-used emoji. Returns null when the post does not exist, is soft-deleted, or belongs to another
- * org (RLS is the backstop; the org match is also checked explicitly).
+ * 열람자용 게시글 상세: 글 필드 + 작성자 + 댓글(삭제되지 않은 것, 오래된 순) +
+ * 이모지별 열람자 isMine 플래그와 함께 집계한 반응 + 가장 많이 쓴
+ * 이모지의 반응자 얼굴 최대 3개. 글이 없거나, 소프트 삭제됐거나, 다른
+ * 조직 것이면 null 을 돌려준다 (RLS 가 최후 방어선이며, 조직 일치도 명시적으로 확인한다).
  */
 export async function getBoardPost(params: {
   session: AppSession;
@@ -384,11 +384,11 @@ export async function getBoardPost(params: {
     user_id: string;
   }>;
 
-  // Resolve author + commenter names/roles in one membership lookup.
+  // 작성자와 댓글 작성자의 이름/역할을 멤버십 조회 한 번으로 해석한다.
   const personIds = [post.created_by_user_id, ...commentRows.map((c) => c.created_by_user_id)];
   const authorInfo = await fetchAuthorInfo(supabase, orgId, personIds, session.user.preferredLanguage);
 
-  // Reactions: count + isMine per emoji (fixed order), plus reactor faces for the most-used emoji.
+  // 반응: 이모지별 개수 + isMine (고정 순서), 그리고 가장 많이 쓴 이모지의 반응자 얼굴.
   const countByEmoji = new Map<string, number>();
   const mineByEmoji = new Set<string>();
   const reactorsByEmoji = new Map<string, string[]>();
@@ -457,10 +457,10 @@ export async function getBoardPost(params: {
 }
 
 /**
- * Mention autocomplete: active same-org members whose display name starts with `query` (case-
- * insensitive, trimmed). Empty query returns the first N members alphabetically (still scoped to the
- * org, still excluding the caller). The caller is always excluded — self-mentions are pointless and
- * would self-notify. Used by the comment composer; capped at 20 to keep the dropdown bounded.
+ * 멘션 자동완성: 표시 이름이 `query` 로 시작하는 활성 같은 조직 멤버 (대소문자
+ * 무시, 트림). 쿼리가 비면 가나다순 처음 N명을 돌려준다 (여전히 조직 범위이고
+ * 호출자는 제외). 호출자는 항상 제외한다 — 자기 멘션은 의미가 없고
+ * 스스로에게 알림이 간다. 댓글 작성기가 쓰며, 드롭다운이 무한정 커지지 않게 20개로 제한한다.
  */
 export async function searchMentionableMembers(
   session: AppSession,
@@ -477,12 +477,12 @@ export async function searchMentionableMembers(
     .eq("organization_id", session.organization.id)
     .eq("status", "active");
 
-  // ilike with an escaped prefix; the LIKE meta-chars in the user-supplied query are neutralized so
-  // someone typing `%` or `_` cannot turn the search into a wildcard scan.
+  // 이스케이프한 접두사로 ilike 한다. 사용자가 넣은 쿼리의 LIKE 메타 문자는 무력화해서
+  // `%` 나 `_` 를 입력해도 검색이 와일드카드 스캔으로 바뀌지 않는다.
   if (trimmed) {
     const escaped = trimmed.replace(/[\\%_]/g, (m) => `\\${m}`);
-    // PostgREST embedded-resource filter: filter `memberships` rows whose joined profile name starts
-    // with the query.
+    // PostgREST 임베디드 리소스 필터: 조인된 프로필 이름이 쿼리로 시작하는
+    // `memberships` 행을 거른다.
     q = q.ilike("profiles.name", `${escaped}%`);
   }
 
@@ -507,18 +507,18 @@ export async function searchMentionableMembers(
         avatarColor: avatarColorFor(r.user_id),
       } satisfies MentionableMember;
     })
-    // Embedded `profiles.name` filter doesn't drop the membership row when the join misses, and the
-    // caller is always excluded; both filters happen here in JS.
+    // 임베디드 `profiles.name` 필터는 조인이 안 맞아도 멤버십 행을 버리지 않고,
+    // 호출자는 항상 제외된다. 두 필터 모두 여기 JS 에서 일어난다.
     .filter((m) => m.id !== session.user.id && (!trimmed || m.name))
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, limit);
 }
 
 /**
- * Validate a set of @mention target ids: each must be an active same-org member and must not be the
- * caller. Returns the subset that passed. Used by `addBoardComment` to keep an attacker from sneaking
- * a cross-org id into the mentioned_user_ids array and triggering a notification on someone they
- * shouldn't see.
+ * @mention 대상 id 모음을 검증한다: 각각 활성 같은 조직 멤버여야 하고
+ * 호출자가 아니어야 한다. 통과한 부분집합을 돌려준다. `addBoardComment` 가 공격자가
+ * mentioned_user_ids 배열에 다른 조직 id 를 몰래 넣어, 볼 수 없어야 할 사람에게
+ * 알림이 가게 하는 일을 막으려고 쓴다.
  */
 export async function validateMentionTargets(
   session: AppSession,
@@ -541,7 +541,7 @@ export async function validateMentionTargets(
   return ((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
 }
 
-/** All active same-org member ids (caller excluded). Used to fan out an @ALL mention. */
+/** 활성 같은 조직 멤버 id 전체 (호출자 제외). @ALL 멘션을 퍼뜨릴 때 쓴다. */
 export async function getActiveOrgMemberIds(session: AppSession): Promise<string[]> {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
@@ -572,9 +572,9 @@ export async function hasReadBoardPost(session: AppSession, postId: string): Pro
 }
 
 /**
- * Mark a post read for the current user (idempotent upsert). Service-role write; no revalidation.
- * The detail page runs it in `after()` (post-response) and subtracts the post from the badge it
- * already computed, so the badge still clears on open.
+ * 현재 사용자에 대해 게시글을 읽음으로 표시한다 (멱등 upsert). service-role 쓰기이며 revalidation 은 없다.
+ * 상세 페이지는 이것을 `after()`(응답 후)에서 실행하고, 이미 계산한 배지에서
+ * 그 글을 빼므로 열면 배지가 그대로 사라진다.
  */
 export async function ensureBoardPostRead(session: AppSession, postId: string): Promise<void> {
   try {
@@ -587,6 +587,6 @@ export async function ensureBoardPostRead(session: AppSession, postId: string): 
       )
     );
   } catch {
-    // best-effort; a missing read row only means the badge stays one higher
+    // 최선 노력: 읽음 행이 없어도 배지가 하나 더 높게 남을 뿐이다
   }
 }

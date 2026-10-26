@@ -2,15 +2,15 @@
 
 /**
  * Frame 2 — Staff Suggestions compose (의견 작성).
- * Visual port of `frameCompose()` from the Feedback Box.html handoff:
- * recipient (required) · references (optional) · title · body · category ·
- * building/room tags · up to 5 photos.
+ * Feedback Box.html 핸드오프의 `frameCompose()` 시각 이식:
+ * 받는 사람(필수) · 참조(선택) · 제목 · 본문 · 분류 ·
+ * 건물/객실 태그 · 사진 최대 5장.
  *
- * Step 2 (2026-06-16): wired to a real create flow. The visual structure / `.sg` classes are kept;
- * fields are now controlled, the member pickers are data-driven (recipient single / references
- * multi), building·room reuse the shared `ContextPickerSheet`, photos reuse the shared
- * `uploadRequestImages` + `compressImageFile`, and submit calls `createStaffSuggestion`.
- * See docs/product/22-staff-suggestions-workflow.md.
+ * Step 2 (2026-06-16): 실제 생성 흐름에 연결. 시각 구조/`.sg` 클래스는 유지하고,
+ * 필드는 이제 제어 입력이며, 구성원 피커는 데이터 기반(받는 사람 단일 / 참조
+ * 다중), 건물·객실은 공용 `ContextPickerSheet` 를 재사용하고, 사진은 공용
+ * `uploadRequestImages` + `compressImageFile` 을 재사용하며, 제출은 `createStaffSuggestion` 을 호출한다.
+ * 참고: docs/product/22-staff-suggestions-workflow.md.
  */
 
 import { useRef, useState, useTransition } from "react";
@@ -87,7 +87,7 @@ export function SuggestionsCompose({
   const [category, setCategory] = useState(initial?.category ?? "");
   const [ctx, setCtx] = useState<SuggestionContext | null>(initial?.ctx ?? null);
   const [photos, setPhotos] = useState<PreviewItem[]>([]);
-  // Edit mode keeps already-uploaded images (URLs) separate from newly picked Files; both count to 5.
+  // 수정 모드는 이미 올라간 이미지(URL)와 새로 고른 File 을 따로 두며, 둘 다 5장 한도에 포함된다.
   const [existingImages, setExistingImages] = useState<string[]>(initial?.imageUrls ?? []);
 
   const [error, setError] = useState<string | null>(
@@ -173,7 +173,7 @@ export function SuggestionsCompose({
       fd.set("roomId", ctx?.roomId ?? "");
       fd.set("roomLabel", ctx?.roomLabel ?? "");
 
-      // In edit mode, keep the existing (un-removed) images first.
+      // 수정 모드: 지우지 않은 기존 이미지를 먼저 유지한다.
       if (isEdit) for (const url of existingImages) fd.append("imageUrls", url);
 
       const newSlots = MAX_PHOTOS - (isEdit ? existingImages.length : 0);
@@ -411,7 +411,7 @@ export function SuggestionsCompose({
         <div style={{ height: "10px" }} />
       </div>
 
-      {/* Member pickers — recipient (single) / references (multi) */}
+      {/* 구성원 피커 — 받는 사람(단일) / 참조(다중) */}
       <SuggestionsUserPicker
         open={pickerMode === "recipient"}
         onClose={() => setPickerMode(null)}
@@ -450,7 +450,7 @@ export function SuggestionsCompose({
         }
       />
 
-      {/* Building · room tag picker — reuses the shared context picker (property/room only). */}
+      {/* 건물 · 객실 태그 피커 — 공용 컨텍스트 피커를 재사용 (숙소/객실만). */}
       {ctxOpen ? (
         <ContextPickerSheet
           buildingLabels={buildingLabels}

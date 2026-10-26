@@ -2,7 +2,7 @@
 
 // Admin 수리·점검 console — 우측 상세 패널. Read-centric: 처리(확인·상태 변경·메모)는 현장 모바일이
 // 담당하고, 여기서는 기록 열람 + 관리자 예외 개입(강제 완료 / 무효 / 삭제)만 한다.
-// Mirrors maint-views.js panel().
+// maint-views.js 의 panel() 을 따른다.
 import Image from "next/image";
 import { Trash2, TriangleAlert, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";

@@ -13,10 +13,10 @@ import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
 
-// Admin · Attendance · Review Queue (Slice 2).
-// Sessions table + multi-select bulk bar + right-detail session panel.
-// Corrections list/panel ships in Slice 3.
-// See docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
+// 관리자 · 근태 · 검토 대기열 (슬라이스 2).
+// 세션 표 + 다중 선택 일괄 바 + 오른쪽 세션 상세 패널.
+// 정정 목록/패널은 슬라이스 3에서 제공한다.
+// 참고: docs/product/05-admin-web-ia.md → "Attendance / Payroll / Transportation".
 export default async function AdminAttendanceQueuePage({
   searchParams,
 }: {

@@ -31,7 +31,7 @@ function md(iso: string | null): string {
 /** 낮은 평점 경계 — 세부 점수 막대를 빨갛게 칠할 때만(서버 위험도 규칙과 같다). */
 const LOW_AT = { airbnb: 3, booking: 7 } as const;
 
-/** Only used to skip an obviously-redundant translate offer (Booking gives a source language). */
+/** 명백히 불필요한 번역 제안을 건너뛰는 데만 쓴다 (Booking 은 원문 언어를 제공함). */
 function isSameLanguage(sourceLanguageCode: string | null, locale: string): boolean {
   if (!sourceLanguageCode) return false;
   return sourceLanguageCode.trim().slice(0, 2).toLowerCase() === locale;
@@ -60,7 +60,7 @@ export function ReviewDetail({
   const hasBody = Boolean(
     review.reviewText || review.positiveReviewText || review.negativeReviewText,
   );
-  // Sub-score labels are localized from the dictionary; the stored keys stay as the platform sent them.
+  // 세부 점수 라벨은 사전에서 현지화한다. 저장된 키는 플랫폼이 보낸 그대로 둔다.
   const breakdown = parseReviewBreakdown(review.provider, review.ratingBreakdown, t.breakdownLabels);
 
   // 원문 언어를 안정적으로 아는 건 Booking.com뿐이다(source_language_code). Airbnb는 항상

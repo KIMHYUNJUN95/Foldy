@@ -1,9 +1,9 @@
 import { CxIcon } from "./cx-icons";
 import type { Dictionary } from "@/lib/i18n";
 
-// Local mirror of ComplaintPlatform from src/lib/complaints.ts.
-// Defined here (not imported) so client components can use it without
-// triggering the server-only guard at bundle time.
+// src/lib/complaints.ts 의 ComplaintPlatform 로컬 복제.
+// 여기에 정의(가져오지 않음)해서 클라이언트 컴포넌트가
+// 번들 시점에 server-only 가드를 건드리지 않고 쓸 수 있다.
 export type ComplaintPlatform =
   | "airbnb"
   | "booking"
@@ -107,7 +107,7 @@ export function platformName(plat: ComplaintPlatform, dict: Dictionary): string 
   return plat === "direct" ? dict.complaints.platformDirect : PLATFORMS[plat].name;
 }
 
-/** Square source badge (list card / create cells). */
+/** 정사각형 출처 배지 (목록 카드 / 생성 셀). */
 export function PlatformBadge({ plat, sm = false }: { plat: ComplaintPlatform; sm?: boolean }) {
   const p = PLATFORMS[plat];
   return (
@@ -117,7 +117,7 @@ export function PlatformBadge({ plat, sm = false }: { plat: ComplaintPlatform; s
   );
 }
 
-/** Pill chip with a colored dot + platform name. */
+/** 색 점 + 플랫폼 이름이 있는 알약 칩. */
 export function PlatformSource({ plat, dict }: { plat: ComplaintPlatform; dict: Dictionary }) {
   const p = PLATFORMS[plat];
   return (
@@ -128,7 +128,7 @@ export function PlatformSource({ plat, dict }: { plat: ComplaintPlatform; dict: 
   );
 }
 
-/** Compact rating pill for list cards (e.g. ★ 2.0 / 5). */
+/** 목록 카드용 컴팩트 평점 알약 (예: ★ 2.0 / 5). */
 export function RatingPill({ plat, rating }: { plat: ComplaintPlatform; rating: number | null }) {
   const max = ratingMax(plat);
   if (!max || rating == null) return null;
@@ -141,7 +141,7 @@ export function RatingPill({ plat, rating }: { plat: ComplaintPlatform; rating: 
   );
 }
 
-/** Filled star pips for the detail meta row. Booking (max 10) shows a single star. */
+/** 상세 메타 행용 채워진 별 점. Booking (최대 10)은 별 하나만 표시한다. */
 export function StarPips({ plat, rating }: { plat: ComplaintPlatform; rating: number | null }) {
   const max = ratingMax(plat);
   if (!max || rating == null) return null;

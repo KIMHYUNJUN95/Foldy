@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Attendance home — redesigned to match "Attendance Home (entry buttons).html" handoff.
- * Idle state: greeting header · ring hero · clock-in button · methods · shortcut entry list.
- * Open/break states: same greeting header + live ring data (unchanged).
+ * 출근 홈 — "Attendance Home (entry buttons).html" 핸드오프에 맞춰 재디자인.
+ * 대기 상태: 인사 헤더 · 링 히어로 · 출근 버튼 · 방법 · 바로가기 진입 목록.
+ * 근무 중/휴게 상태: 같은 인사 헤더 + 실시간 링 데이터 (변경 없음).
  */
 
 import Link from "next/link";
@@ -224,10 +224,10 @@ function ReminderPrompt({ sessionId, copy }: { sessionId: string; copy: Attendan
 
   if (!open) return null;
 
-  // NOTE: this sheet portals to <body> via BottomSheet, so the `.att`-scoped CSS does
-  // NOT reach it. Styling is intentionally self-contained (Tailwind) — do not rely on
-  // `.att .rsheet*` / `.att .rbtn*` here. Buttons stack full-width so longer ja/en labels
-  // never clip (multilingual-safe).
+  // 참고: 이 시트는 BottomSheet 를 통해 <body> 로 포털되므로 `.att` 범위 CSS 가 닿지 않는다.
+  // 스타일은 의도적으로 자체 완결형(Tailwind)이다 — 의존하지 말 것
+  // 여기서 `.att .rsheet*` / `.att .rbtn*` 에 의존하지 말 것. 버튼은 가로 전체로 쌓여서 긴 ja/en 라벨도
+  // 잘리지 않는다 (다국어 안전).
   return (
     <BottomSheet onClose={() => setOpen(false)} ariaLabel={copy.reminderTitle}>
       <div className="px-1 pb-1 pt-3 text-center">
@@ -336,11 +336,11 @@ export function AttendanceHome({
   /** 퇴근을 안 찍고 넘어간 운영일들(YYYY-MM-DD). 비어 있으면 배너를 그리지 않는다. */
   abandonedDates?: string[];
   reminderOpenSessionId?: string | null;
-  /** Formatted monthly worked hours (e.g. "32:10"). null = no data to show. */
+  /** 포맷된 월간 근무 시간 (예: "32:10"). null = 보여줄 데이터 없음. */
   monthHours?: string | null;
-  /** Formatted monthly pay string (e.g. "¥184,260"). null = salaried or no data. */
+  /** 포맷된 월간 급여 문자열 (예: "¥184,260"). null = 월급제이거나 데이터 없음. */
   monthPay?: string | null;
-  /** Whether the current user may view the attendance roster (manager roles only). */
+  /** 현재 사용자가 출근 명단을 볼 수 있는지 (관리자 역할만). */
   canSeeRoster?: boolean;
   /** 「주 28시간」(docs/product/41 R4) — 자격외활동 대상자의 최근 7일이 근접 · 초과일 때만. */
   weeklyLimit?: { status: "over" | "near"; minutes: number } | null;
@@ -353,7 +353,7 @@ export function AttendanceHome({
   const dict = fullDict;
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Default hidden (true). Persisted across sessions; shared key with attendance-pay.
+  // 기본값은 숨김(true). 세션을 넘어 유지되며, attendance-pay 와 같은 키를 쓴다.
   const [payMasked, togglePayMasked] = usePersistentToggle(
     "stayops:attendance:pay-amount-visible",
     true,
@@ -407,7 +407,7 @@ export function AttendanceHome({
   }, [state]);
   const showLoading = state === "loading" || booting;
 
-  // Greeting header — replaces old topline with avatar/links
+  // 인사 헤더 — 예전 상단 줄을 아바타/링크로 대체
   // 화이트 리디자인(2026-10-13): 인사말 대신 제목 「근태」 + 「10월 13일 화요일 · 김현준 님」.
   const greet = (
     <div className="greet greet--title">

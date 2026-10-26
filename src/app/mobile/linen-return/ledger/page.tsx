@@ -108,7 +108,7 @@ export default async function LinenReturnLedgerPage({ searchParams }: PageProps)
   }
 
   const [navBadges, catalog] = await Promise.all([navBadgesPromise, getActiveLinenItems(session, building)]);
-  // Do not allow paging into the future beyond the current Tokyo month.
+  // 현재 도쿄 월 이후의 미래로는 넘기지 못하게 한다.
   const canGoNext =
     baseMonth.year < current.year ||
     (baseMonth.year === current.year && baseMonth.month < current.month);

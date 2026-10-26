@@ -1,9 +1,9 @@
 "use client";
 
-// Admin 분실물 console — content area for /admin/lost-found (AdminShell owns the sidebar/topbar).
-// Four views: 보관 중 / 반환 / 폐기 내역 / 전체 기록 (화이트 리디자인 2026-10-14, 시안 LF-PC · LFReturn-PC · LFDisposed-PC · LFAll-PC). Unlike 수리·점검 (read-centric), this console is
-// where admins actively process items — 반환 / 폐기 / 보관 연장 — plus 예외 개입(상태 정정 / 삭제).
-// Mirrors maintenance-console.tsx wiring 1:1. See docs/product/09-lost-found-workflow.md.
+// 관리자 분실물 콘솔 — /admin/lost-found 의 콘텐츠 영역 (사이드바/탑바는 AdminShell 소유).
+// 네 가지 뷰: 보관 중 / 반환 / 폐기 내역 / 전체 기록 (화이트 리디자인 2026-10-14, 시안 LF-PC · LFReturn-PC · LFDisposed-PC · LFAll-PC). 수리·점검(조회 중심)과 달리 이 콘솔은
+// 관리자가 직접 물품을 처리하는 곳이다 — 반환 / 폐기 / 보관 연장 — 그리고 예외 개입(상태 정정 / 삭제).
+// maintenance-console.tsx 의 구성을 1:1 로 따른다. 참고: docs/product/09-lost-found-workflow.md.
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search, TriangleAlert, X } from "lucide-react";
@@ -202,7 +202,7 @@ export function LostFoundConsole({ locale, items, loadError }: LostFoundConsoleP
         return;
       }
 
-      // correct
+      // 정정
       const result = await correctLostItemStatus({
         itemId: id,
         status: (payload.status ?? "registered") as "registered" | "stored" | "disposal_scheduled",

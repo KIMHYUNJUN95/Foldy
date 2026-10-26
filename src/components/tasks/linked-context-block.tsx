@@ -18,9 +18,9 @@ type Copy = Pick<
 >;
 
 /**
- * Deep-link target into the reservation calendar. The calendar only accepts `property` (canonical
- * name) + `month` (YYYY-MM) — there is no per-reservation highlight — so a linked task lands on its
- * building, scrolled to the reservation's check-in month (or the current month for room-only links).
+ * 예약 캘린더로 가는 딥링크 대상. 캘린더는 `property`(정식
+ * 이름) + `month`(YYYY-MM)만 받으며 — 예약별 하이라이트는 없다 — 그래서 연결된 업무는
+ * 해당 건물로 이동해 예약의 체크인 월(방만 연결된 경우 이번 달)로 스크롤된다.
  */
 export function calendarHref(context: LinkedTaskContext): string | null {
   if (!context.propertyName) return null;
@@ -71,8 +71,8 @@ export function LinkedContextBlock({
   const localizedPropertyName = context.propertyName
     ? localizePropertyName(context.propertyName, buildingLabels)
     : null;
-  // For Okubo-style buildings, getCanonicalRoomLabel returns the property name as the room label.
-  // Suppress the room portion in that case to avoid "大久保A · 大久保A号室" redundancy.
+  // 오쿠보 방식 건물은 getCanonicalRoomLabel 이 방 라벨로 숙소 이름을 돌려준다.
+  // 그 경우 방 부분을 생략해 "大久保A · 大久保A号室" 중복을 피한다.
   const showRoom = context.roomLabel && context.roomLabel !== context.propertyName;
   const nameStr = [
     localizedPropertyName,
@@ -93,7 +93,7 @@ export function LinkedContextBlock({
 
   return (
     <div className="mt-4">
-      {/* Section header */}
+      {/* 섹션 헤더 */}
       <div className="mb-[9px] ml-0.5 flex items-center gap-[7px]">
         <Link2 className="size-[15px] text-primary" aria-hidden="true" />
         <span className="text-[12.5px] font-extrabold text-foreground">
@@ -101,7 +101,7 @@ export function LinkedContextBlock({
         </span>
       </div>
 
-      {/* lctx card — tappable only when it can deep-link to the reservation calendar */}
+      {/* lctx 카드 — 예약 캘린더로 딥링크할 수 있을 때만 탭 가능 */}
       <button
         className="flex w-full items-center gap-3 rounded-2xl p-3.5 text-left transition-opacity disabled:cursor-default enabled:cursor-pointer enabled:active:opacity-80"
         disabled={!href}
@@ -157,7 +157,7 @@ export function LinkedContextBlock({
             </div>
           ) : null}
 
-          {/* lctx__go — only when the card can navigate */}
+          {/* lctx__go — 카드가 이동할 수 있을 때만 */}
           {href ? (
             <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-extrabold text-primary">
               <ArrowUpRight className="size-[13px]" aria-hidden="true" />

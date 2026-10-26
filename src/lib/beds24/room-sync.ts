@@ -1,26 +1,26 @@
-// Beds24 properties/rooms room master sync helpers.
-// Called opportunistically from the Beds24 webhook route on every booking event.
+// Beds24 property/room 방 마스터 동기화 헬퍼.
+// 모든 예약 이벤트에서 Beds24 웹훅 라우트가 기회가 될 때마다 호출한다.
 //
-// Design decisions:
-//   - Property upsert key: prefer (organization_id, external_provider, external_property_id)
-//     when an external property ID is present. Fall back to (organization_id, name) only
-//     for payloads that do not include a Beds24 property ID.
-//   - Room identity key: (organization_id, external_provider, external_room_id).
+// 설계 결정:
+//   - Property upsert 키: 외부 property ID 가 있으면 (organization_id, external_provider, external_property_id) 우선.
+//     Beds24 property ID 를 담지 않은 페이로드에서만
+//     (organization_id, name) 으로 폴백한다.
+//   - 방 식별 키: (organization_id, external_provider, external_room_id).
 //     같은 이름의 방 둘이 들어오면 라벨로 맞추던 예전 방식이 한쪽을 조용히 덮어썼다
 //     (2026-09-17 아라키초A 401호). 라벨이 겹치면 `_2` 를 붙여 각자 행을 갖는다.
-//   - Failure policy: property/room sync failures are logged but do not block reservation upsert.
-//   - inactive rooms are stored with status='inactive' (not omitted) for traceability.
+//   - 실패 정책: property/room 동기화 실패는 로그만 남기고 예약 upsert 를 막지 않는다.
+//   - 비활성 방은 추적을 위해 생략하지 않고 status='inactive' 로 저장한다.
 //
-// Company internal active/inactive classification rule (not a Beds24 standard):
-//   minimum_stay >= 50 nights -> inactive room ID for that period.
-//   minimum_stay in 1..49     -> active room ID for that period.
-//   minimum_stay = NULL       -> active (unknown). Webhook booking payloads do NOT carry
-//                                minimumStay, so a freshly-synced room would otherwise be
-//                                hidden (and its reservations dropped from the calendar)
-//                                until a separate inventory sync populates minStay. We must
-//                                never hide a real room just because minStay is not yet
-//                                known — only an explicit >= 50 signal marks it inactive.
-//                                See docs/engineering/01-beds24-integration.md.
+// 회사 내부 활성/비활성 분류 규칙(Beds24 표준이 아님):
+//   minimum_stay >= 50 박 -> 그 기간의 비활성 방 ID.
+//   minimum_stay 1..49    -> 그 기간의 활성 방 ID.
+//   minimum_stay = NULL   -> 활성(알 수 없음). 웹훅 예약 페이로드는 minimumStay 를 담지 않으므로,
+//                                갓 동기화된 방이 별도 재고 동기화가 minStay 를 채울 때까지
+//                                숨겨지고(예약이 캘린더에서 빠짐) 만다.
+//                                minStay 를 아직 모른다는 이유만으로
+//                                실제 방을 숨기면 안 된다 —
+//                                명시적인 >= 50 신호만 비활성으로 표시한다.
+//                                docs/engineering/01-beds24-integration.md 참고.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -30,9 +30,9 @@ import { buildRoomIdentityUpdate } from "@/lib/beds24/room-identity";
 
 type RawPayload = Record<string, unknown>;
 
-// Classify a Beds24 room based on its minimum stay value.
-// Only an explicit minimum_stay >= 50 marks a room inactive. NULL (unknown, e.g. not yet
-// inventory-synced) stays active so the room — and its reservations — are never hidden.
+// 최소 숙박 값으로 Beds24 방을 분류한다.
+// 명시적인 minimum_stay >= 50 만 방을 비활성으로 표시한다. NULL(알 수 없음, 예: 아직
+// 재고 동기화 전)은 활성으로 두어 방과 그 예약이 숨겨지지 않게 한다.
 export function classifyBeds24Room(minimumStay: number | null): "active" | "inactive" {
   if (minimumStay !== null && minimumStay >= BEDS24_INACTIVE_MIN_STAY_THRESHOLD) {
     return "inactive";
@@ -69,26 +69,26 @@ export type Beds24RoomSyncFields = {
   minimumStay: number | null;
 };
 
-// NOTE: minimumStay is NOT present in Beds24 v2 booking webhook payloads.
-// It is a room inventory setting available only via GET /v2/inventory/rooms.
-// Rooms synced from booking webhooks will always have minimumStay=null -> stored as inactive.
-// To activate authoritative mode, minimumStay must be populated from a separate inventory API call.
+// NOTE: minimumStay 는 Beds24 v2 예약 웹훅 페이로드에 없다.
+// GET /v2/inventory/rooms 로만 얻을 수 있는 방 재고 설정이다.
+// 예약 웹훅으로 동기화된 방은 항상 minimumStay=null -> 비활성으로 저장된다.
+// 권위 모드를 켜려면 별도의 재고 API 호출로 minimumStay 를 채워야 한다.
 export function extractBeds24RoomSyncFields(payload: RawPayload): Beds24RoomSyncFields {
   return {
     propertyName: readStr(payload, [
-      "propName",         // Beds24 v2 native
+      "propName",         // Beds24 v2 기본 필드
       "prop_name",
       "propertyName",
       "property_name",
     ]),
     externalPropertyId: readStr(payload, [
-      "propId",           // Beds24 v2 native (integer ID sent as number, readStr handles it)
+      "propId",           // Beds24 v2 기본 필드 (정수 ID 가 숫자로 오며 readStr 이 처리)
       "prop_id",
       "propertyId",
       "property_id",
     ]),
     roomLabel: readStr(payload, [
-      "unitName",         // Beds24 v2 native
+      "unitName",         // Beds24 v2 기본 필드
       "unit_name",
       "unitLabel",
       "unit_label",
@@ -101,8 +101,8 @@ export function extractBeds24RoomSyncFields(payload: RawPayload): Beds24RoomSync
       "roomId",
       "room_id",
     ]),
-    // minimumStay is absent from booking webhooks (it's an inventory field).
-    // Searching anyway in case a future payload format includes it.
+    // minimumStay 는 예약 웹훅에 없다(재고 필드이다).
+    // 나중 페이로드 형식에 포함될 수 있으니 그래도 찾아 본다.
     minimumStay: readNum(payload, [
       "minimumStay",
       "minimum_stay",
@@ -135,10 +135,10 @@ async function upsertPropertyByExternalId(
 
   if (existingByExternalId.data) {
     const existingProperty = existingByExternalId.data as { id: string };
-    // Only overwrite the display name when the payload actually carried one.
-    // A booking without propName must NEVER rename an existing property to its raw
-    // external id — that is exactly what produced the duplicate "176431" building
-    // (see docs/planning/01-decision-log.md → 2026-07-22). We still (re)activate it.
+    // 페이로드가 실제로 이름을 담고 있을 때만 표시 이름을 덮어쓴다.
+    // propName 이 없는 예약이 기존 property 의 이름을 원시
+    // 외부 id 로 바꿔서는 절대 안 된다 — 바로 그것이 "176431" 건물을 중복으로 만든 원인이다
+    // (docs/planning/01-decision-log.md → 2026-07-22 참고). (재)활성화는 계속 한다.
     const patch: { status: "active"; name?: string } = { status: "active" };
     if (name) patch.name = name;
     const updateResult = await supabase
@@ -156,9 +156,9 @@ async function upsertPropertyByExternalId(
     return (updateResult.data as { id: string } | null)?.id ?? null;
   }
 
-  // Brand-new property (external id not seen before). We need SOME display name to
-  // create the row; use the payload name when present, otherwise fall back to the raw
-  // external id purely as a last-resort placeholder for the initial insert.
+  // 완전히 새 property(처음 보는 외부 id). 행을 만들려면 어떤 표시 이름이든 필요하다.
+  // 페이로드 이름이 있으면 그것을 쓰고, 없으면 최초 insert 의 마지막 수단인 자리표시자로만
+  // 원시 외부 id 로 폴백한다.
   const effectiveName = name ?? externalPropertyId;
 
   const existingByName = await supabase
@@ -247,8 +247,8 @@ async function upsertPropertyByName(
   return (result.data as { id: string } | null)?.id ?? null;
 }
 
-// Upsert a Beds24 property.
-// Prefer external property ID as the stable key; only fall back to name when the payload omits it.
+// Beds24 property 를 upsert 한다.
+// 외부 property ID 를 안정적인 키로 우선하고, 페이로드에 없을 때만 이름으로 폴백한다.
 async function upsertProperty(
   organizationId: string,
   name: string | null,
@@ -494,9 +494,9 @@ export async function syncBeds24PropertyAndRoom(
 ): Promise<Beds24SyncResult> {
   const skipped: string[] = [];
 
-  // Pass the payload name as-is (may be null). upsertProperty resolves by external id
-  // first and will NOT clobber an existing property's name with the raw external id
-  // when the payload omits propName.
+  // 페이로드 이름을 그대로 넘긴다(null 일 수 있음). upsertProperty 는 외부 id 로 먼저
+  // 해석하며 페이로드에 propName 이 없을 때 기존 property 의 이름을 원시 외부 id 로
+  // 덮어쓰지 않는다.
   const propertyName = fields.propertyName;
   if (!propertyName && !fields.externalPropertyId) {
     skipped.push("property:no-name-or-id");

@@ -1,16 +1,16 @@
-// Attendance / Clock-In-Out / Payroll — shared types + constants (Step 1, schema-adjacent only).
+// 근태 / 출퇴근 / 급여 — 공용 타입 + 상수 (1단계, 스키마 인접 부분만).
 //
-// This module intentionally holds NO queries, server actions, or UI wiring yet. It exists so later
-// steps (clock-in/out, breaks, history, corrections, admin review, payroll, finalization, export) can
-// share the row types, the status/method/reason unions, and the schema-mirrored constants without
-// re-deriving them. See docs/engineering/11-attendance-payroll-technical-design.md.
+// 이 모듈은 의도적으로 쿼리, 서버 액션, UI 연결을 담지 않는다. 이후
+// 단계들(출퇴근, 휴게, 기록, 정정, 관리자 검토, 급여, 확정, 내보내기)이
+// 행 타입, 상태/방식/사유 유니온, 스키마를 반영한 상수를 다시 도출하지 않고
+// 공유할 수 있게 하려는 것이다. 참고: docs/engineering/11-attendance-payroll-technical-design.md.
 //
-// IMPORTANT: every union below mirrors a DB CHECK constraint in
-// supabase/migrations/202606170001_attendance_payroll.sql. Keep them in sync.
+// 중요: 아래 모든 유니온은 DB CHECK 제약을 반영한다:
+// supabase/migrations/202606170001_attendance_payroll.sql. 동기화를 유지할 것.
 
 import type { Database } from "@/types/database";
 
-// ── Row type aliases ──────────────────────────────────────────────────────────
+// ── 행 타입 별칭 ──────────────────────────────────────────────────────
 export type AttendanceSiteRow = Database["public"]["Tables"]["attendance_sites"]["Row"];
 export type AttendanceQrTokenRow = Database["public"]["Tables"]["attendance_qr_tokens"]["Row"];
 export type AttendanceSessionRow = Database["public"]["Tables"]["attendance_sessions"]["Row"];
@@ -29,8 +29,8 @@ export type AttendanceMonthSnapshotRow =
 export type AttendanceExportLogRow =
   Database["public"]["Tables"]["attendance_export_logs"]["Row"];
 
-// ── Session lifecycle ─────────────────────────────────────────────────────────
-/** Session status. Only one `open` session per user is allowed at a time (DB partial unique index). */
+// ── 세션 생명주기 ─────────────────────────────────────────────────────
+/** 세션 상태. 사용자당 한 번에 `open` 세션 하나만 허용된다 (DB 부분 유니크 인덱스). */
 /**
  * `abandoned` = 퇴근을 찍지 않은 채 운영일이 넘어간 세션(2026-08-04).
  *
@@ -54,7 +54,7 @@ export const ATTENDANCE_SESSION_STATUSES: readonly AttendanceSessionStatus[] = [
   "abandoned",
 ];
 
-/** Review state. Abnormal sessions (e.g. midnight-crossing, missing clock-out) are `review_required`. */
+/** 검토 상태. 비정상 세션(예: 자정 넘김, 퇴근 누락)은 `review_required` 이다. */
 export type AttendanceReviewState =
   | "normal"
   | "review_required"
@@ -70,23 +70,23 @@ export const ATTENDANCE_REVIEW_STATES: readonly AttendanceReviewState[] = [
   "rejected_correction",
 ];
 
-// ── Authentication methods ──────────────────────────────────────────────────────
+// ── 인증 방식 ──────────────────────────────────────────────────────
 /**
- * Attendance auth method. The PWA first release only uses `gps_qr` (and `manual` for admin-created
- * sessions). `gps_wifi` is MODELED for a later non-PWA / extended release and must stay inactive in
- * the current PWA — the UI shows Wi-Fi attendance as `준비중`.
+ * 근태 인증 방식. PWA 첫 출시는 `gps_qr` 만 쓴다 (관리자가 만든
+ * 세션은 `manual`). `gps_wifi` 는 이후 비PWA / 확장 출시를 위해 모델링만 해 두었고 현재 PWA 에서는
+ * 비활성이어야 한다 — UI 는 Wi-Fi 출근을 `준비중` 으로 보여준다.
  */
 export type AttendanceMethod = "gps_qr" | "gps_wifi" | "manual";
 
 export const ATTENDANCE_METHODS: readonly AttendanceMethod[] = ["gps_qr", "gps_wifi", "manual"];
 
-/** Methods a normal (non-admin) PWA clock-in/out may produce in this release. */
+/** 이번 출시에서 일반(비관리자) PWA 출퇴근이 만들 수 있는 방식. */
 export const ATTENDANCE_ACTIVE_PWA_METHODS: readonly AttendanceMethod[] = ["gps_qr"];
 
-/** Wi-Fi is designed but not active in the current PWA. */
+/** Wi-Fi 는 설계만 되어 있고 현재 PWA 에서는 비활성이다. */
 export const ATTENDANCE_WIFI_ACTIVE = false;
 
-// ── Attempt logs ────────────────────────────────────────────────────────────────
+// ── 시도 로그 ────────────────────────────────────────────────────────
 export type AttendanceActionType = "clock_in" | "clock_out" | "break_start" | "break_end";
 
 export const ATTENDANCE_ACTION_TYPES: readonly AttendanceActionType[] = [
@@ -121,7 +121,7 @@ export const ATTENDANCE_FAILURE_REASONS: readonly AttendanceFailureReason[] = [
   "open_session_exists",
 ];
 
-// ── Correction / exception requests ─────────────────────────────────────────────
+// ── 정정 / 예외 요청 ─────────────────────────────────────────────────
 // `cancelled` = 요청자가 스스로 철회(2026-08-03, 마이그레이션 202608030001).
 // 대기 큐와 마감 판정은 `requested|in_review` 만 세므로 취소된 요청은 두 곳 모두에서 빠진다.
 export type AttendanceCorrectionStatus =
@@ -162,7 +162,7 @@ export const ATTENDANCE_CORRECTION_REASONS: readonly AttendanceCorrectionReason[
   "other",
 ];
 
-// ── Session audit actions ────────────────────────────────────────────────────────
+// ── 세션 감사 액션 ───────────────────────────────────────────────────
 export type AttendanceAuditAction =
   | "manual_create"
   | "manual_update"
@@ -180,7 +180,7 @@ export const ATTENDANCE_AUDIT_ACTIONS: readonly AttendanceAuditAction[] = [
   "finalize",
 ];
 
-// ── Employment / payroll ─────────────────────────────────────────────────────────
+// ── 고용 / 급여 ─────────────────────────────────────────────────────
 export type EmploymentType = "hourly" | "salaried";
 
 export const EMPLOYMENT_TYPES: readonly EmploymentType[] = ["hourly", "salaried"];
@@ -201,17 +201,17 @@ export const ATTENDANCE_EXPORT_SCOPES: readonly AttendanceExportScope[] = [
   "single_user",
 ];
 
-// ── Schema-mirrored constants ────────────────────────────────────────────────────
-/** Default allowed GPS radius for a site, in meters (per-site override allowed). Mirrors DB default. */
+// ── 스키마를 반영한 상수 ─────────────────────────────────────────────
+/** 현장의 기본 허용 GPS 반경 (미터, 현장별 덮어쓰기 가능). DB 기본값과 같다. */
 export const ATTENDANCE_DEFAULT_RADIUS_METERS = 100;
 
-/** Max photos on a correction request — mirrors the DB CHECK constraint. */
+/** 정정 요청의 최대 사진 수 — DB CHECK 제약과 같다. */
 export const ATTENDANCE_CORRECTION_MAX_IMAGES = 5;
 
-/** Hourly monthly gross is rounded to the nearest this many yen at calculation time. */
+/** 시급제 월 총액은 계산 시점에 이 엔 단위로 가장 가깝게 반올림한다. */
 export const ATTENDANCE_GROSS_ROUNDING_YEN = 10;
 
-/** Tokyo-time hour for the once-per-day open-session reminder (18:30). */
+/** 하루 한 번 열린 세션 알림을 보내는 도쿄 시각 (18:30). */
 export const ATTENDANCE_OPEN_SESSION_REMINDER_HOUR = 18;
 export const ATTENDANCE_OPEN_SESSION_REMINDER_MINUTE = 30;
 

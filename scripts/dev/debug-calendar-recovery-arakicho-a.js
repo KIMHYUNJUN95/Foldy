@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 /**
- * Diagnoses why 아라키초A reservation bars may not appear on /mobile/calendar.
+ * 아라키초A 예약 막대가 /mobile/calendar 에 보이지 않을 수 있는 이유를 진단한다.
  *
- * Queries:
- *   1. rooms table → active canonical room set for 아라키초A
- *   2. reservations table → raw room_label values for 아라키초A in the current operational window
+ * 쿼리:
+ *   1. rooms 테이블 → 아라키초A 의 활성 정규 객실 집합
+ *   2. reservations 테이블 → 현재 운영 구간에서 아라키초A 의 원본 room_label 값
  *
- * Outputs a JSON report showing success/fail counts and sample failed rows.
+ * 성공/실패 건수와 실패 행 샘플을 JSON 리포트로 출력한다.
  *
- * Usage:
+ * 사용법:
  *   node scripts/dev/debug-calendar-recovery-arakicho-a.js [YYYY-MM]
  *
- * Requires: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local
+ * 필요: .env.local 의 NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
 const fs = require("fs");
 const path = require("path");
 
 // ---------------------------------------------------------------------------
-// Load .env.local
+// .env.local 불러오기
 // ---------------------------------------------------------------------------
 const envPath = path.join(__dirname, "../../.env.local");
 if (!fs.existsSync(envPath)) {
@@ -46,7 +46,7 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 // ---------------------------------------------------------------------------
-// Minimal fetch-based Supabase REST client (no npm import needed)
+// fetch 기반 최소 Supabase REST 클라이언트 (npm import 불필요)
 // ---------------------------------------------------------------------------
 async function supabaseSelect(table, query) {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
@@ -65,7 +65,7 @@ async function supabaseSelect(table, query) {
 }
 
 // ---------------------------------------------------------------------------
-// Normalization (mirrors src/lib/room-label-normalization.ts)
+// 정규화 (src/lib/room-label-normalization.ts 와 동일하게 맞춤)
 // ---------------------------------------------------------------------------
 function normalizeKey(value) {
   return value.replace(/\s+/g, "").replace(/[_()\-]/g, "").toLowerCase();
@@ -83,10 +83,10 @@ function getCanonicalRoomLabel(propertyName, roomLabel) {
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// 메인
 // ---------------------------------------------------------------------------
 (async () => {
-  // Operational window (current month + next month, JST)
+  // 운영 구간 (이번 달 + 다음 달, JST)
   const now = new Date();
   const jstOffset = 9 * 60 * 60 * 1000;
   const jstNow = new Date(now.getTime() + jstOffset);
@@ -112,8 +112,8 @@ function getCanonicalRoomLabel(propertyName, roomLabel) {
   );
 
   const arakichoRooms = roomsRaw.filter((r) => {
-    // Filter rooms that belong to 아라키초A property via external_room_id prefix or room_label pattern
-    // We check all rooms with status=active and external_minimum_stay < 50 (or non-beds24)
+    // external_room_id 접두사 또는 room_label 패턴으로 아라키초A 숙소에 속한 객실을 거른다
+    // status=active 이고 external_minimum_stay < 50 인 모든 객실(또는 beds24 가 아닌 객실)을 확인한다
     if (r.external_provider === "beds24") {
       if (r.external_minimum_stay === null) return false;
       if (r.external_minimum_stay >= 50) return false;
@@ -121,7 +121,7 @@ function getCanonicalRoomLabel(propertyName, roomLabel) {
     return true;
   });
 
-  // Fetch with property join to filter by 아라키초A
+  // 숙소 조인으로 가져와 아라키초A 로 거른다
   const roomsWithProperty = await supabaseSelect(
     "rooms",
     new URLSearchParams({
@@ -156,7 +156,7 @@ function getCanonicalRoomLabel(propertyName, roomLabel) {
       }),
   );
 
-  // 2. Reservations in window
+  // 2. 구간 내 예약
   const reservations = await supabaseSelect(
     "reservations",
     new URLSearchParams({

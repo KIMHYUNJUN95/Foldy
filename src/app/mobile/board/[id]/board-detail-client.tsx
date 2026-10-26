@@ -141,8 +141,8 @@ export function BoardDetailClient({
     try {
       const result = await getBoardAttachmentDownloadUrl(post.id, path);
       if ("url" in result) {
-        // The signed URL carries Content-Disposition: attachment, so this downloads (not navigates)
-        // on both mobile and desktop without ejecting the PWA.
+        // 서명 URL 에 Content-Disposition: attachment 가 있어서 이동하지 않고 내려받기가 된다.
+        // PWA 를 벗어나지 않고 모바일과 데스크톱 모두에서 동작한다.
         const a = document.createElement("a");
         a.href = result.url;
         a.rel = "noopener";

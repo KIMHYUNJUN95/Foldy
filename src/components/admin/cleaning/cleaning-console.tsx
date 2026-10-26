@@ -1,11 +1,11 @@
 "use client";
 
-// Admin cleaning console — content area for /admin/cleaning (AdminShell owns the sidebar/topbar).
-// Two segmented views: 오늘 현황 (live room-status board) and 기록 (filterable history table), plus
-// a shared right-side detail panel and the force-complete modal. Data is real (cleaning_sessions +
-// reservations, via src/lib/admin-cleaning.ts) as of 2026-07-14 — see docs/product/07-cleaning-workflow.md
-// → "2026-07-14 어드민 청소 대시보드 — 백엔드 연동". Mirrors clean-views.js shell()/opsbar()/viewtabs()
-// from the original design handoff.
+// 관리자 청소 콘솔 — /admin/cleaning 의 내용 영역(사이드바/상단바는 AdminShell 이 맡음).
+// 두 개의 분할 보기: 오늘 현황 (실시간 객실 상태 보드)과 기록 (필터 가능한 기록 표), 그리고
+// 공용 오른쪽 상세 패널과 강제 완료 모달. 데이터는 2026-07-14 부터 실제 데이터다(cleaning_sessions +
+// reservations, src/lib/admin-cleaning.ts 경유) — docs/product/07-cleaning-workflow.md 참고
+// → "2026-07-14 어드민 청소 대시보드 — 백엔드 연동". 원래 디자인 인계본의 clean-views.js shell()/opsbar()/viewtabs() 를
+// 따른다.
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
@@ -52,8 +52,8 @@ function syncAgoText(lastSyncAt: number, t: Dictionary["cleaning"]["console"], l
   return new Intl.RelativeTimeFormat(locale, { numeric: "always", style: "short" }).format(-mins, "minute");
 }
 
-// Kept as a module-level helper (not inline in the component) so the impure `Date.now()` call sits
-// outside the render-scope purity check; only invoked from event handlers below.
+// 컴포넌트 안에 두지 않고 모듈 수준 헬퍼로 둔 것은 순수하지 않은 `Date.now()` 호출이 렌더 범위의
+// 순수성 검사 밖에 있게 하기 위해서다. 아래의 이벤트 핸들러에서만 호출한다.
 function nowTimestamp(): number {
   return Date.now();
 }
@@ -171,9 +171,9 @@ export function CleaningConsole({
     setSelectedSetupKey(null);
   }
 
-  // Navigates to the linked lost-item/maintenance-report record. History rows never carry `reports`
-  // (only today's session-backed tasks do — see admin-cleaning.ts), so this only fires for the today
-  // board. Multiple linked records for one session are rare; falls back to the list screen for them.
+  // 연결된 분실물/수리 보고 기록으로 이동한다. 기록 행에는 `reports` 가 없고
+  // (오늘의 세션 기반 작업만 있음 — admin-cleaning.ts 참고), 그래서 오늘 보드에서만 실행된다.
+  // 한 세션에 연결된 기록이 여럿인 경우는 드물며, 그때는 목록 화면으로 대체한다.
   function handleOpenReport(kind: "lost" | "issue") {
     const reports = selectedTask?.reports ?? selectedHistory?.reports;
     const ids = kind === "lost" ? reports?.lostIds : reports?.issueIds;

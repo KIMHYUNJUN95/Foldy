@@ -1,11 +1,11 @@
 "use client";
 
-// Shared admin-console time picker primitive.
+// 공용 관리자 콘솔 시간 선택 프리미티브.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock } from "lucide-react";
 
 type AdminTimePickerProps = {
-  /** "HH:mm" (24h) or "" when unset. */
+  /** "HH:mm" (24시간) 또는 미설정이면 "". */
   value: string;
   onChange: (v: string) => void;
   ariaLabel: string;
@@ -53,7 +53,7 @@ export function AdminTimePicker({ value, onChange, ariaLabel, placeholder = "--:
     };
   }, [open]);
 
-  // On open, scroll the selected hour/minute into view (centered) without animation.
+  // 열릴 때 선택된 시/분을 애니메이션 없이 (가운데로) 스크롤해 보여준다.
   useEffect(() => {
     if (!open) return;
     const scrollToSel = (col: HTMLDivElement | null) => {

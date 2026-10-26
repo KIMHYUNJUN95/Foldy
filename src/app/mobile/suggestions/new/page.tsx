@@ -12,8 +12,8 @@ type PageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
-// Staff Suggestions / Feedback Box — Frame 2 (compose). Step 2 (2026-06-16): wired to a real create
-// flow via createStaffSuggestion. See docs/product/22-staff-suggestions-workflow.md.
+// 직원 건의 / 의견함 — Frame 2(작성). Step 2(2026-06-16): createStaffSuggestion 으로 실제 생성
+// 흐름에 연결했다. docs/product/22-staff-suggestions-workflow.md 참고.
 export default async function MobileSuggestionsNewPage({ searchParams }: PageProps) {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session, params] = await Promise.all([

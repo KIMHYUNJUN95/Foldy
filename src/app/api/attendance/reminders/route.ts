@@ -3,13 +3,13 @@ import { runAttendanceReminders } from "@/lib/notifications/attendance-reminders
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { requestMatchesSecret } from "@/lib/api-secret";
 
-// Scheduled attendance reminder/abnormal evaluator (Step 14): the worker 18:30 open-session reminder
-// (once/Tokyo-day, deduped) + the admin incomplete/stale-session alert. Time-based — no user action
-// triggers them — so this is a narrowly-scoped scheduled path (mirrors /api/tasks/reminders).
+// 예약 실행 근태 알림/이상 평가기(Step 14): 근무자 18:30 미종료 세션 알림
+// (도쿄 날짜당 1회, 중복 제거) + 관리자용 미완료/오래된 세션 경고. 시간 기반이라 사용자 동작이
+// 트리거하지 않으므로, 범위를 좁힌 예약 실행 경로다(/api/tasks/reminders 와 동일).
 //
-// Authorized with CRON_SECRET so anonymous callers cannot fire it. This route is not currently one of
-// the two Hobby-plan jobs in vercel.json; any production schedule must call it explicitly (for example
-// from an external scheduler) and send the bearer secret.
+// CRON_SECRET 으로 인증해 익명 호출로는 실행할 수 없다. 이 라우트는 현재 vercel.json 의
+// Hobby 플랜 작업 2개에 포함되어 있지 않다. 운영 스케줄이 필요하면 명시적으로 호출해야 한다(예:
+// 외부 스케줄러에서) — 이때 bearer 시크릿을 보낸다.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

@@ -8,9 +8,9 @@ import { dictionaries } from "@/lib/i18n";
 export type AdmOption = {
   value: string;
   label: string;
-  /** rich mode only: the mono permission_key shown on the left */
+  /** rich 모드 전용: 왼쪽에 표시되는 고정폭 permission_key */
   key?: string;
-  /** rich mode only: secondary description line */
+  /** rich 모드 전용: 보조 설명 줄 */
   desc?: string;
 };
 
@@ -25,7 +25,7 @@ type AdmDropdownProps = {
    * 하드코딩하면 ja/en 관리자에게 한국어가 노출되기 때문이다.
    */
   placeholder?: string;
-  /** rich = permission-key picker (mono key + label + description) */
+  /** rich = 권한 키 선택기(고정폭 키 + 라벨 + 설명) */
   rich?: boolean;
   wide?: boolean;
   ariaLabel?: string;
@@ -46,10 +46,10 @@ type AdmDropdownProps = {
 };
 
 /**
- * The single shared admin dropdown that replaces the native <select> across every admin console
- * (users / attendance / cleaning / …). Matches the design-handoff `.dd` component; its CSS lives in
- * admin-console.css so all `.adm` pages pick it up. Self-manages open state with outside-click + Esc.
- * Do not add a second dropdown style — this is the one.
+ * 모든 관리자 콘솔(사용자 / 근태 / 청소 / …)에서 네이티브 <select> 를 대체하는
+ * 단일 공용 관리자 드롭다운. 디자인 핸드오프의 `.dd` 컴포넌트와 같으며, CSS 는
+ * admin-console.css 에 있어 모든 `.adm` 페이지가 가져다 쓴다. 바깥 클릭 + Esc 로 열림 상태를 스스로 관리한다.
+ * 두 번째 드롭다운 스타일을 추가하지 말 것 — 이것이 유일한 것이다.
  */
 export function AdmDropdown({
   options,

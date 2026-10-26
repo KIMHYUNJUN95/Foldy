@@ -148,14 +148,14 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
     ((profileData ?? []) as Pick<ProfileRow, "id" | "name" | "phone_number" | "can_generate_report" | "nationality" | "name_ko" | "name_ja" | "name_en" | "name_katakana">[]).map((profile) => [profile.id, profile]),
   );
 
-  // Platform developers are shown as "개발자" regardless of their org role.
+  // 플랫폼 개발자는 조직 역할과 무관하게 "개발자" 로 표시한다.
   const { data: paData } =
     userIds.length > 0
       ? await service.from("platform_admins").select("user_id").in("user_id", userIds).eq("is_active", true)
       : { data: [] as { user_id: string }[] };
   const devIds = new Set(((paData ?? []) as { user_id: string }[]).map((row) => row.user_id));
 
-  // Team kind (현장/사무실) per membership, resolved from the org's teams.
+  // 멤버십별 팀 종류 (현장/사무실), 조직의 팀에서 해석한다.
   const orgIds = [...new Set(memberships.map((membership) => membership.organization_id))];
   const { data: teamData } =
     orgIds.length > 0 ? await service.from("teams").select("id, kind").in("organization_id", orgIds) : { data: [] as { id: string; kind: string }[] };

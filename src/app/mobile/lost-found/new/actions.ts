@@ -66,14 +66,14 @@ export async function createLostItem(formData: FormData) {
     redirect(`/mobile/lost-found/new?error=invalid_room${sessionParam}`);
   }
 
-  // Fetch active room catalog to double-check validation on server
+  // 서버에서도 검증하려고 활성 방 카탈로그를 가져온다
   const catalog = await getActiveRoomCatalogServer(session.organization.id);
   if (!catalog) {
     redirect(`/mobile/lost-found/new?error=save_failed${sessionParam}`);
   }
 
-  // The form submits the collapsed displayRoomLabel ("201", not "201_2"), so validate against
-  // displayRoomLabel — otherwise a room whose only active Beds24 account is a "_2" sub-unit would fail.
+  // 폼은 합쳐진 displayRoomLabel("201_2" 가 아닌 "201")을 제출하므로 displayRoomLabel 로
+  // 검증한다 — 아니면 활성 Beds24 계정이 "_2" 하위 호실뿐인 방은 실패한다.
   const isValidCombination = catalog.some(
     (item) => item.propertyName === propertyName && item.displayRoomLabel === roomLabel
   );
@@ -99,7 +99,7 @@ export async function createLostItem(formData: FormData) {
 
   const supabase = await getSupabaseServerClient();
 
-  // Validate the cleaning session link: must belong to this user/org (any status).
+  // 청소 세션 연결 검증: 이 사용자/조직의 것이어야 한다(상태는 무관).
   let cleaningSessionId: string | null = null;
   if (rawCleaningSessionId) {
     const { data } = await supabase
@@ -142,7 +142,7 @@ export async function createLostItem(formData: FormData) {
     const linkedCanonical =
       getCanonicalRoomLabel(linkedPropertyName, linkedReservation.room_label) ??
       linkedReservation.room_label.trim();
-    // Compare against the collapsed display label — the form sends "201", the reservation may be "201_2".
+    // 합쳐진 표시 라벨과 비교한다 — 폼은 "201" 을 보내지만 예약은 "201_2" 일 수 있다.
     const linkedRoomLabel = getDisplayRoomLabel(linkedPropertyName, linkedCanonical);
 
     if (linkedPropertyName !== propertyName || linkedRoomLabel !== roomLabel) {
@@ -153,9 +153,9 @@ export async function createLostItem(formData: FormData) {
     reservationId = linkedReservation.id;
   }
 
-  // Store the room_label in combined format "{propertyName} {canonicalRoom}" so that
-  // resolveRequestLocation() can recover the building via its combinedMatch path.
-  // When propertyName === roomLabel (Okubo pattern) just use roomLabel as-is.
+  // room_label 은 "{propertyName} {canonicalRoom}" 결합 형식으로 저장해서
+  // resolveRequestLocation() 이 combinedMatch 경로로 건물을 복원할 수 있게 한다.
+  // propertyName === roomLabel 이면(Okubo 패턴) roomLabel 을 그대로 쓴다.
   const combinedRoomLabel =
     propertyName && propertyName !== roomLabel
       ? `${propertyName} ${roomLabel}`

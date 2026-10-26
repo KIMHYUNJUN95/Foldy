@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 /**
- * Launch splash — shows the app icon centered on the ivory canvas for a brief
- * moment when the document first loads (cold launch / refresh / installed PWA),
- * then fades out and unmounts. Because this is a client component it is still
- * server-rendered, so the splash is present in the initial HTML and visible at
- * first paint (no flash of empty canvas before hydration). App-internal route
- * transitions don't reload the document, so it only appears on a real launch.
+ * 실행 스플래시 — 문서가 처음 로드될 때(콜드 런치 / 새로고침 / 설치된 PWA) 잠깐
+ * 아이보리 캔버스 가운데에 앱 아이콘을 보여 주고,
+ * 이후 페이드 아웃하며 언마운트된다. 클라이언트 컴포넌트지만
+ * 서버 렌더되므로 스플래시가 초기 HTML 에 들어 있어 첫 페인트에서 보인다
+ * (하이드레이션 전 빈 캔버스가 번쩍이지 않음). 앱 내부 라우트
+ * 전환은 문서를 다시 로드하지 않으므로 실제 실행 때만 나타난다.
  */
 const HOLD_MS = 160;
 const FADE_MS = 180;
@@ -44,7 +44,7 @@ export function SplashScreen() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        /* Hardcoded so the ivory appears before CSS vars resolve on cold PWA launch. */
+        /* 콜드 PWA 실행에서 CSS 변수가 풀리기 전에도 아이보리가 보이도록 하드코딩한다. */
         background: "#ffffff",
         opacity: phase === "fading" ? 0 : 1,
         transition: `opacity ${FADE_MS}ms ease`,

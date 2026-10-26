@@ -6,26 +6,26 @@ import type { Locale } from "@/lib/i18n";
 export type LanguageOption = { code: Locale; label: string };
 
 type LanguageSegmentedProps = {
-  /** Form field name; a hidden input carries the value so server actions still receive it. */
+  /** 폼 필드 이름. 숨은 input 이 값을 실어 서버 액션이 그대로 받는다. */
   name: string;
-  /** Initial selected locale. */
+  /** 처음 선택된 로케일. */
   defaultValue: Locale;
-  /** Localized options (labels are language autonyms from the dictionary). */
+  /** 현지화된 선택지(라벨은 사전에 있는 각 언어의 자국어 표기). */
   options: LanguageOption[];
-  /** Accessible label for the radiogroup. */
+  /** radiogroup 의 접근성 라벨. */
   ariaLabel: string;
-  /** Optional change hook for callers that also track the value in React state. */
+  /** 값을 React 상태로도 추적하는 호출부를 위한 선택적 변경 훅. */
   onChange?: (value: Locale) => void;
 };
 
 /**
- * Pill-style 3-way segmented toggle for language selection.
+ * 언어 선택용 알약 형태 3택 세그먼트 토글.
  *
- * A white indicator (`thumb`) slides between options and resizes to the active
- * label's width, so differing label lengths stay aligned. Replaces the native
- * `<select>` while keeping the existing form/server-action flow via a hidden
- * input. Colors use the project's semantic tokens (teal `--primary`, `--muted`
- * track, `--surface` thumb, `--muted-foreground` for inactive text).
+ * 흰색 표시자(`thumb`)가 선택지 사이를 미끄러지며 활성
+ * 라벨의 너비에 맞게 크기가 바뀌어 라벨 길이가 달라도 정렬이 유지된다. 네이티브
+ * `<select>` 를 대체하면서 숨은 input 으로 기존 폼/서버 액션 흐름을
+ * 유지한다. 색은 프로젝트의 의미 토큰을 쓴다(청록 `--primary`, `--muted`
+ * 트랙, `--surface` thumb, 비활성 텍스트는 `--muted-foreground`).
  */
 export function LanguageSegmented({
   name,
@@ -41,9 +41,9 @@ export function LanguageSegmented({
     width: 0,
   });
 
-  // Measure the active option and position the thumb. Re-measures on value
-  // change and whenever the track resizes (container width, async font load),
-  // so the indicator always matches the active label's width/position.
+  // 활성 옵션을 측정해 thumb 위치를 잡는다. 값이
+  // 바뀔 때와 트랙 크기가 바뀔 때(컨테이너 너비, 비동기 폰트 로드) 다시 측정해
+  // 표시자가 항상 활성 라벨의 너비/위치와 맞는다.
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;

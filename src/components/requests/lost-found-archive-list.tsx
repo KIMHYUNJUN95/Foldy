@@ -21,11 +21,11 @@ export type ArchiveItemVM = {
   /** 처리자 이름 — 자동 폐기면 「시스템(자동)」 문구가 이미 들어 있다. */
   handlerLabel: string;
   atIso: string | null;
-  /** Tokyo YYYY-MM-DD */
+  /** 도쿄 YYYY-MM-DD */
   dateKey: string | null;
   /** 둘째 줄(반환 방식 · 송장번호). 없으면 null. */
   extra: string | null;
-  /** Tokyo YYYY-MM */
+  /** 도쿄 YYYY-MM */
   monthKey: string;
   relativeGroup: "thisMonth" | "lastMonth" | null;
 };

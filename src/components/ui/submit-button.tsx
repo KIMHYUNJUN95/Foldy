@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 type SubmitButtonProps = {
   children: ReactNode;
-  /** Shown while the enclosing form's action is pending. Defaults to a spinner + the label. */
+  /** 둘러싼 폼 액션이 진행 중일 때 보인다. 기본은 스피너 + 라벨. */
   pendingChildren?: ReactNode;
   className?: string;
   variant?: "primary" | "secondary" | "ghost" | "glass" | "destructive";
@@ -16,9 +16,9 @@ type SubmitButtonProps = {
 };
 
 /**
- * Submit button that disables itself + shows a spinner while the enclosing `<form action={...}>`
- * server action is in flight (via `useFormStatus`). Prevents double-submit and the "dead" feel of a
- * still-tappable button during the round-trip. Must be rendered INSIDE the `<form>`.
+ * 제출 버튼: 둘러싼 `<form action={...}>`
+ * 서버 액션이 진행 중인 동안 스스로 비활성화되고 스피너를 보인다 (`useFormStatus`). 이중 제출과 왕복 중
+ * 여전히 눌릴 것 같은 버튼의 "죽은" 느낌을 막는다. 반드시 `<form>` 안쪽에서 렌더해야 한다.
  */
 export function SubmitButton({
   children,

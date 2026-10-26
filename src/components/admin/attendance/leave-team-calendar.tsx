@@ -7,7 +7,7 @@ import type { Dictionary, Locale } from "@/lib/i18n";
 
 type Lc = Dictionary["admin"]["leaveConsole"];
 
-/** Internal calendar-bar shape, derived from real approved requests (LeaveQueueItem). */
+/** 내부 캘린더 막대 형태. 실제 승인된 신청(LeaveQueueItem)에서 만든다. */
 type CalLeave = {
   id: string;
   name: string;
@@ -17,7 +17,7 @@ type CalLeave = {
   dur: LeaveQueueItem["durationUnit"];
 };
 
-// Bar accent (--c) / background (--b) per leave type — CSS vars, matching the handoff exactly.
+// 휴가 종류별 막대 강조색(--c) / 배경(--b) — CSS 변수, 핸드오프와 정확히 일치.
 function typeAccent(type: LeaveType): { c: string; b: string } {
   switch (type) {
     case "paid":
@@ -44,7 +44,7 @@ function typeLabel(type: LeaveType, lc: Lc): string {
   }
 }
 
-/** yyyy-mm-dd → day-of-month number */
+/** yyyy-mm-dd → 일(day) 숫자 */
 function dayNum(iso: string): number {
   return Number(iso.slice(8, 10));
 }
@@ -59,7 +59,7 @@ type WeekSeg = {
 };
 
 function weekdayLabels(locale: Locale): string[] {
-  const base = new Date(Date.UTC(2026, 0, 4)); // a Sunday
+  const base = new Date(Date.UTC(2026, 0, 4)); // 일요일
   const tag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(base);
@@ -77,17 +77,17 @@ export function LeaveTeamCalendar({
 }: {
   lc: Lc;
   locale: Locale;
-  /** Approved org-wide leave requests (calendar shows approved-only). */
+  /** 조직 전체의 승인된 휴가 신청(캘린더는 승인된 것만 보여 준다). */
   items: LeaveQueueItem[];
-  /** Called with the request id when a calendar bar is clicked → opens the detail panel. */
+  /** 캘린더 막대를 클릭하면 요청 id 와 함께 호출된다 → 상세 패널을 연다. */
   onSelect: (requestId: string) => void;
-  /** Called when an empty day cell's popover action is chosen → opens the request modal for that date. */
+  /** 빈 날짜 칸의 팝오버 액션을 고르면 호출된다 → 그 날짜로 신청 모달을 연다. */
   onCreateRequest: (mode: "proxy" | "self", date: string) => void;
 }) {
   const today = new Date();
   const [y, setY] = useState(today.getFullYear());
   const [m, setM] = useState(today.getMonth() + 1); // 1-12
-  // Popover anchored to a clicked empty day cell (viewport coords).
+  // 빈 날짜 칸을 클릭하면 그 위치(뷰포트 좌표)에 붙는 팝오버.
   const [dayMenu, setDayMenu] = useState<{ iso: string; x: number; y: number } | null>(null);
 
   const WD = weekdayLabels(locale);
@@ -139,7 +139,7 @@ export function LeaveTeamCalendar({
       }
     });
 
-    // greedy lane packing per week
+    // 주 단위로 탐욕적(greedy) 레인 배치
     const weeks = weekSegs.map((segs, wk) => {
       const sorted = segs.slice().sort((a, b) => a.startDow - b.startDow || b.span - a.span);
       const laneEnd: number[] = [];
@@ -173,7 +173,7 @@ export function LeaveTeamCalendar({
   const isThisMonth = y === today.getFullYear() && m === today.getMonth() + 1;
   const todayDay = isThisMonth ? today.getDate() : 0;
 
-  // Close the day-cell popover on Escape.
+  // Escape 로 날짜 칸 팝오버를 닫는다.
   useEffect(() => {
     if (!dayMenu) return;
     function onKey(e: KeyboardEvent) {

@@ -449,10 +449,10 @@ export async function processBeds24WebhookBooking(params: {
     (guestFullName.length > 0 ? guestFullName : null) ??
     readBeds24String(payload, ["guestName", "guest_name", "customerName", "customer_name", "name"]);
 
-  // Read ONLY the human property name from the payload. The raw property id
-  // (propId) is intentionally NOT a fallback here — using it as the reservation's
-  // property_name split one building into a duplicate raw-id building ("176431").
-  // The canonical name is resolved from the property master after room sync below.
+  // 페이로드에서 사람이 읽는 프로퍼티 이름만 읽는다. 원본 property id
+  // (propId)는 여기서 일부러 대체값으로 쓰지 않는다 — 예약의
+  // property_name 으로 쓰면 한 건물이 원본 id 건물("176431")로 중복 분리됐다.
+  // 표준 이름은 아래 방 동기화 뒤에 프로퍼티 마스터에서 해석한다.
   const payloadPropertyName = readBeds24String(payload, [
     "propName",
     "prop_name",
@@ -509,10 +509,10 @@ export async function processBeds24WebhookBooking(params: {
     syncBeds24InventoryMinimumStayThrottled(organizationId, externalPropertyIdForInventory, supabase),
   );
 
-  // Resolve the reservation's property_name from the operator-controlled property
-  // MASTER (by the just-synced property id), preferring it over the payload propName.
-  // We never fall back to the raw external property id — the master is the single
-  // source of truth for the building name. See decision-log 2026-07-22.
+  // 예약의 property_name 을 운영자가 관리하는 프로퍼티
+  // 마스터(방금 동기화한 property id 기준)에서 해석하며, 페이로드 propName 보다 우선한다.
+  // 원본 외부 property id 로는 절대 대체하지 않는다 — 마스터가 건물 이름의 유일한
+  // 단일 진실 공급원이다. decision-log 2026-07-22 참고.
   let propertyName = payloadPropertyName;
   if (roomSync.propertyId) {
     const masterProperty = await supabase

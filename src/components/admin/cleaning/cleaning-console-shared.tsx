@@ -1,6 +1,6 @@
-// Shared display helpers for the admin cleaning console — status/type icon+label lookups and small
-// reusable pieces (status pill, staff avatar, report badges) used by both the today board, history
-// board, and detail panel so the three stay visually identical.
+// 관리자 청소 콘솔의 공용 표시 헬퍼 — 상태/유형 아이콘+라벨 조회와 작은
+// 재사용 조각(상태 필, 직원 아바타, 보고 배지)을 오늘 보드, 이력
+// 보드, 상세 패널이 함께 써서 셋이 시각적으로 같게 유지된다.
 import type { ComponentType, SVGProps } from "react";
 import {
   Ban,
@@ -90,10 +90,10 @@ export function StatusPill({ status, t }: { status: AdminCleaningStatus; t: Cons
   );
 }
 
-/* ---------------- staff directory ----------------
-   Real staff have one plain name (no per-locale variants like the old mock) and no stored avatar
-   color, so the avatar color is derived deterministically from the user id — same person always
-   gets the same color across a session without needing a DB column for it. */
+/* ---------------- 직원 디렉터리 ----------------
+   실제 직원은 이름이 하나뿐이고(옛 목업처럼 로케일별 변형 없음) 저장된 아바타
+   색도 없으므로, 아바타 색은 사용자 id 에서 결정적으로 정한다 — 같은 사람은 항상
+   한 세션 동안 같은 색을 받고, 이를 위한 DB 컬럼이 필요 없다. */
 
 export type StaffDirectoryEntry = { id: string; name: string; bg: string };
 export type StaffDirectory = Map<string, StaffDirectoryEntry>;
@@ -206,8 +206,8 @@ export function localeTagOf(locale: Locale): string {
   return locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
 }
 
-/** Localized building label with a raw-name fallback for rooms that didn't resolve to one of the
- * 7 canonical buildings (unmatched room labels — see admin-cleaning.ts). */
+/** 현지화된 건물 라벨. 7개 표준 건물 중 어느 것으로도 해석되지 않은 방에는
+ * 원래 이름으로 대체한다 (매칭되지 않은 방 라벨 — admin-cleaning.ts 참고). */
 export function buildingLabelOf(
   item: { building: string | null; buildingRaw: string },
   buildingLabels: Record<string, string>,

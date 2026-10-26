@@ -13,12 +13,12 @@ const Back = (
 );
 
 /**
- * AuthFrame — login / signup / reset surface (white redesign 2026-10-09).
+ * AuthFrame — 로그인 / 가입 / 재설정 화면 (화이트 리디자인 2026-10-09).
  *
- * One white page, no brand panel. Wide screens (≥ 1200px): a header (mark · Foldy · 「운영 콘솔」,
- * Language on the right — help lives only in the footer, 2026-10-09), a centred 400px stage and a footer (staff-only note · legal links).
- * Narrower (phone · fold · tablet landscape): a single centred column — back + Language on top,
- * legal links at the bottom. See docs/product/05-admin-web-ia.md → 「Admin Login Screen」 and
+ * 흰 바탕 한 페이지, 브랜드 패널 없음. 넓은 화면 (≥ 1200px): 헤더 (마크 · Foldy · 「운영 콘솔」,
+ * 오른쪽에 언어 선택 — 도움말은 푸터에만 있음, 2026-10-09), 가운데 400px 스테이지, 푸터 (직원 전용 안내 · 약관 링크).
+ * 더 좁은 화면 (폰 · 폴드 · 태블릿 가로): 가운데 한 단 — 위에 뒤로 + 언어,
+ * 맨 아래에 약관 링크. 참고: docs/product/05-admin-web-ia.md → 「Admin Login Screen」 및
  * docs/design/05-white-redesign.md.
  */
 export function AuthFrame({
@@ -32,7 +32,7 @@ export function AuthFrame({
   locale: Locale;
   next: string;
   view?: string;
-  /** Shows a back control (top-left chevron on narrow screens, text link on wide screens). */
+  /** 뒤로 가기 컨트롤을 표시한다 (좁은 화면은 왼쪽 위 화살표, 넓은 화면은 텍스트 링크). */
   backHref?: string;
   /** Phone · tablet · app — hides the 「운영 콘솔」 label (app-review copy rule, 2026-10-08). */
   mobileCopy?: boolean;

@@ -2,11 +2,11 @@ import "server-only";
 
 import type { AdminPayrollRow } from "@/lib/admin-attendance";
 
-// Print-quality payroll REPORT (self-contained HTML document for PDF).
+// 인쇄 품질의 급여 REPORT(PDF 용 자체 완결 HTML 문서).
 //
-// Uses the same plain green ledger language as the workbook export so monthly/user PDF and Excel stay
-// visually unified. All strings are passed in already localized (ko/ja/en). Auto-triggers the browser
-// print dialog on load.
+// 워크북 내보내기와 같은 단순한 녹색 장부 언어를 써서 월간/사용자별 PDF 와 Excel 이
+// 시각적으로 통일된다. 모든 문자열은 이미 현지화(ko/ja/en)되어 전달된다. 로드 시 브라우저
+// 인쇄 대화상자를 자동으로 띄운다.
 
 export type PayrollReportLabels = {
   title: string;

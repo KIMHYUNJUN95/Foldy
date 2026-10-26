@@ -62,7 +62,7 @@ function addMonths(date: Date, months: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + months, 1);
 }
 
-// 2021-08-01 is a Sunday — used to derive localized short weekday names.
+// 2021-08-01 은 일요일 — 현지화된 짧은 요일 이름을 구하는 데 쓴다.
 function getWeekdayNames(locale: Locale): string[] {
   const formatter = new Intl.DateTimeFormat(locale, {
     weekday: "short",
@@ -75,8 +75,8 @@ function getWeekdayNames(locale: Locale): string[] {
 
 export function DateRangeCalendar({ open, ...rest }: DateRangeCalendarProps) {
   if (!open) return null;
-  // Remount the panel every time the popup opens so its draft state is
-  // re-seeded from the latest `value` without a state-syncing effect.
+  // 팝업이 열릴 때마다 패널을 다시 마운트해, 상태 동기화 effect 없이
+  // 초안 상태가 최신 `value` 로 다시 채워지게 한다.
   return <CalendarPanel {...rest} />;
 }
 
@@ -129,13 +129,13 @@ function CalendarPanel({
   const todayIso = toIsoDate(new Date());
 
   function handleDayClick(iso: string) {
-    // No start yet, or a full range already chosen → begin a new range.
+    // 시작일이 없거나 이미 완성된 범위가 있으면 → 새 범위를 시작한다.
     if (!draftStart || (draftStart && draftEnd)) {
       setDraftStart(iso);
       setDraftEnd(undefined);
       return;
     }
-    // Second click completes the range, auto-swapping if reversed.
+    // 두 번째 클릭이 범위를 완성하며, 역순이면 자동으로 바꾼다.
     if (iso < draftStart) {
       setDraftEnd(draftStart);
       setDraftStart(iso);

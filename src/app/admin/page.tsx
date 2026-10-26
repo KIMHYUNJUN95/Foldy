@@ -14,9 +14,9 @@ import { getDashboardOpsSummary } from "@/lib/ops-revenue-server";
 // 홈은 예약에서 나온 숫자만 보인다 — 요금 · 차단 신호마다 홈 전체(36쿼리)를 다시 읽지 않는다(2026-10-19).
 const LIVE_KINDS = ["reservations"] as const;
 
-// Admin operations console — desktop dashboard home. Top-priority blocks wired to
-// real domain data (cleaning / requests / attendance / announcements / tasks /
-// reservations). See docs/product/05-admin-web-ia.md → "Dashboard Home Screen".
+// 관리자 운영 콘솔 — 데스크톱 대시보드 홈. 우선순위가 높은 블록을
+// 실제 도메인 데이터(청소 / 요청 / 근태 / 공지 / 할 일 /
+// 예약)에 연결했다. 참고: docs/product/05-admin-web-ia.md → "Dashboard Home Screen".
 export default async function AdminDashboardPage({ searchParams }: { searchParams: Promise<{ ym?: string }> }) {
   const [state, session] = await Promise.all([getOnboardingState(), getCurrentAppSession()]);
 

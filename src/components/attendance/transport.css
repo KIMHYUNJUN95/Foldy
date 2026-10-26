@@ -1,7 +1,7 @@
 /*
- * Transport Expense Statement — visual design ported from "교통비 제출 09 - 정산서" HTML mockup.
- * Scoped under `.trn` so class names never leak globally.
- * See docs/product/24-attendance-workflow.md.
+ * 교통비 정산서 — "교통비 제출 09 - 정산서" HTML 목업에서 옮긴 시각 디자인.
+ * `.trn` 범위로 한정해서 클래스 이름이 전역으로 새지 않는다.
+ * 참고: docs/product/24-attendance-workflow.md.
  */
 
 .trn {
@@ -37,7 +37,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Top action bar ── */
+/* ── 상단 액션 바 ── */
 .trn-top {
   display: flex;
   gap: 8px;
@@ -83,7 +83,7 @@
   color: var(--att-muted);
 }
 
-/* ── Document card ── */
+/* ── 문서 카드 ── */
 .trn-doc {
   margin: 14px 6px;
   background: var(--card);
@@ -128,7 +128,7 @@
   letter-spacing: -0.03em;
 }
 
-/* ── Line items ── */
+/* ── 항목 줄 ── */
 .trn-line {
   display: flex;
   align-items: flex-start;
@@ -184,7 +184,7 @@
   color: var(--miss);
 }
 
-/* ── Summary footer ── */
+/* ── 요약 푸터 ── */
 .trn-sum {
   display: flex;
   align-items: center;
@@ -203,7 +203,7 @@
   letter-spacing: -0.02em;
 }
 
-/* ── Submit action ── */
+/* ── 제출 액션 ── */
 .trn-acts {
   display: flex;
   gap: 9px;
@@ -228,7 +228,7 @@
   opacity: 0.88;
 }
 
-/* ── Add item form fields (inside BottomSheet) ── */
+/* ── 항목 추가 폼 필드 (BottomSheet 안) ── */
 .trn-form {
   /* 바텀시트 내부 폼: 통계서용 음수 마진을 상쇄하고 양옆 여백 확보 */
   margin: 0;
@@ -332,7 +332,7 @@
   min-width: 0;
 }
 
-/* Segmented control */
+/* 세그먼트 컨트롤 */
 .trn-seg {
   display: flex;
   background: var(--soft);
@@ -366,7 +366,7 @@
   box-shadow: 0 1px 3px rgba(20, 28, 40, 0.12);
 }
 
-/* Receipt thumbnails */
+/* 영수증 썸네일 */
 .trn-shots {
   display: flex;
   gap: 8px;
@@ -418,7 +418,7 @@
   flex-shrink: 0;
 }
 
-/* Add submit button */
+/* 추가 제출 버튼 */
 .trn-add-submit {
   width: 100%;
   height: 42px;
@@ -438,7 +438,7 @@
   opacity: 0.88;
 }
 
-/* ── Line item: clickable (opens detail sheet) ── */
+/* ── 항목 줄: 클릭 가능 (상세 시트를 연다) ── */
 .trn-line {
   width: 100%;
   border: none;
@@ -456,7 +456,7 @@
   background: rgb(122 82 230 / 0.07);
 }
 
-/* ── Item detail sheet (05) ── */
+/* ── 항목 상세 시트 (05) ── */
 .trn-detail {
   /* 음수 마진 상쇄 + 바텀시트 내부 스크롤 */
   margin: 0;
@@ -473,7 +473,7 @@
   letter-spacing: -0.02em;
   margin-bottom: 12px;
 }
-/* Receipt photo strip */
+/* 영수증 사진 띠 */
 .trn-dshots {
   display: flex;
   gap: 8px;
@@ -517,7 +517,7 @@
   color: var(--miss);
   margin-bottom: 6px;
 }
-/* Mode chip */
+/* 이동수단 칩 */
 .trn-mode {
   display: inline-flex;
   align-items: center;
@@ -539,7 +539,7 @@
   background: hsl(220 16% 94%);
   color: hsl(222 9% 48%);
 }
-/* Detail rows */
+/* 상세 줄 */
 .trn-row {
   display: flex;
   align-items: center;
@@ -583,7 +583,7 @@
   font-family: var(--mono);
   font-weight: 800;
 }
-/* Detail actions */
+/* 상세 액션 */
 .trn-dacts {
   display: flex;
   gap: 9px;
@@ -621,7 +621,7 @@
   color: var(--miss);
 }
 
-/* ── Edit form inputs (controlled, verifiable) ── */
+/* ── 수정 폼 입력 (제어 컴포넌트, 검증 가능) ── */
 .trn-input {
   flex: 1;
   min-width: 0;
@@ -646,7 +646,7 @@
   box-shadow: 0 0 0 3px var(--primary-09);
 }
 
-/* ── Delete confirm modal (center-aligned exception) ── */
+/* ── 삭제 확인 모달 (가운데 정렬 예외) ── */
 .trn-confirm-head {
   display: flex;
   flex-direction: column;
@@ -759,7 +759,7 @@
   }
 }
 
-/* ── Toast (action feedback) ── */
+/* ── 토스트 (액션 피드백) ── */
 .trn-toast {
   position: fixed;
   left: 50%;
@@ -820,7 +820,7 @@
   }
 }
 
-/* ── Custom date picker (replaces native input[type=date]) ── */
+/* ── 커스텀 날짜 선택기 (네이티브 input[type=date] 대체) ── */
 .trn-cal-root {
   /* 시트 안에서는 통계서용 음수 마진을 상쇄 */
   margin: 0;
@@ -983,7 +983,7 @@
   opacity: 0.88;
 }
 
-/* ── Building dropdown ── */
+/* ── 건물 드롭다운 ── */
 .trn-bld-wrap {
   position: relative;
 }

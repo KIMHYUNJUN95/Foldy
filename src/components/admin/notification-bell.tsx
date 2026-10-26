@@ -13,10 +13,10 @@ import { groupNotificationViews, type NotificationGroup } from "@/lib/notificati
 import "@/components/notifications/notification-white.css";
 
 /**
- * Admin console notification bell — a dropdown popover anchored to the bell
- * (NOT a navigation to the mobile notifications page). Fetches recent
- * notifications + true unread count, supports "mark all read", and links to
- * the full notification center. See docs/product/05-admin-web-ia.md → "Notification Center".
+ * Admin 콘솔 알림 벨 — 벨에 고정되는 드롭다운 팝오버
+ * (모바일 알림 페이지로 이동하지 않음). 최근 알림과 실제 안 읽은 수를
+ * 가져오고 "모두 읽음"을 지원하며
+ * 전체 알림 센터로 연결한다. docs/product/05-admin-web-ia.md → "Notification Center" 참고.
  *
  * 화이트 리디자인(2026-10-15, 시안 NotifPop-PC): 400px · 머리 「알림 · 안 읽음 N · 모두 읽음」 · 모바일 알림 화면과 같은 줄
  * (짧은 제목 · 대상 · 시각 · 어디서, 같은 날 같은 종류는 묶어서 「N개 더」) · 아래 「알림 전체 보기 →」.

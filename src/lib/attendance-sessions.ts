@@ -1,8 +1,8 @@
-// Attendance — worker session reads (Step 3).
+// 근태 — 근무자 세션 읽기(Step 3).
 //
-// Server-only helpers for rendering the worker attendance home from REAL data. Step 3 only needs the
-// current open session (to switch the home between 출근 전 / 근무 중); breaks, history, corrections, and
-// payroll come in later steps.
+// 실제 데이터로 근무자 근태 홈을 그리는 서버 전용 헬퍼. Step 3 에 필요한 것은
+// 현재 열린 세션뿐(홈을 출근 전 / 근무 중으로 전환하기 위해)이고, 휴게, 이력, 정정,
+// 급여는 이후 단계에서 다룬다.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -19,15 +19,15 @@ export type OpenAttendanceSession = {
   clockInTimeLabel: string;
   siteId: string | null;
   siteName: string;
-  /** Non-null when a break is currently open (the user is on break). */
+  /** 휴게가 현재 열려 있으면 null 이 아님(사용자가 휴게 중). */
   openBreakStartedAt: string | null;
-  /** Sum of CLOSED break durations on this session, in seconds. */
+  /** 이 세션의 닫힌 휴게 시간 합계(초). */
   closedBreakSeconds: number;
-  /** Total break count on this session (closed + the open one). */
+  /** 이 세션의 전체 휴게 횟수(닫힌 것 + 열린 것). */
   breakCount: number;
 };
 
-/** Has the user already answered the 18:30 open-session reminder today (Tokyo)? */
+/** 사용자가 오늘(도쿄) 18:30 미종료 세션 알림에 이미 답했는가? */
 export async function hasOpenReminderResponseToday(
   organizationId: string,
   userId: string,
@@ -48,7 +48,7 @@ export async function hasOpenReminderResponseToday(
   return !!res.data;
 }
 
-/** True when Tokyo wall-clock time is at/after 18:30 (the open-session reminder threshold). */
+/** 도쿄 벽시계 시각이 18:30 이상이면 true(미종료 세션 알림 기준). */
 export function isPastReminderTimeTokyo(): boolean {
   const hm = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Tokyo",
@@ -60,7 +60,7 @@ export function isPastReminderTimeTokyo(): boolean {
   return h * 60 + m >= 18 * 60 + 30;
 }
 
-/** HH:mm in Asia/Tokyo. */
+/** Asia/Tokyo 기준 HH:mm. */
 function tokyoTimeLabel(iso: string | null): string {
   if (!iso) return "--:--";
   return new Intl.DateTimeFormat("ko-KR", {
@@ -100,8 +100,8 @@ export async function getAbandonedSessions(
 }
 
 /**
- * The user's current open work session (status = 'open'), or null. Org-scoped; the partial unique
- * index guarantees at most one. Resolves the clock-in site name for the home's info strip.
+ * 사용자의 현재 열린 근무 세션(status = 'open'), 없으면 null. 조직 범위; 부분 unique
+ * 인덱스가 최대 하나를 보장한다. 홈의 정보 스트립용으로 출근 사이트 이름을 해석한다.
  * 지난 운영일의 열린 근무는 null — 퇴근을 잊은 것이지 근무 중이 아니다(`isStaleOpenSession`, 2026-10-21).
  * 홈은 출근 버튼과 퇴근 미기록 배너(`getAbandonedSessions`)를 보여 준다.
  */
@@ -135,8 +135,8 @@ export async function getCurrentOpenSession(
         .maybeSingle()
     : Promise.resolve({ data: null });
 
-  // Break aggregation: keep individual rows in the DB; here we only derive the live summary the home
-  // needs (on-break? + closed-break total + count). Open-break duration is computed live on the client.
+  // 휴게 집계: 개별 행은 DB 에 두고, 여기서는 홈이 필요로 하는 실시간 요약만
+  // 도출한다(휴게 중인지 + 닫힌 휴게 합계 + 횟수). 열린 휴게의 시간은 클라이언트에서 실시간 계산한다.
   const breaksPromise = service
     .from("attendance_breaks")
     .select("started_at, ended_at")

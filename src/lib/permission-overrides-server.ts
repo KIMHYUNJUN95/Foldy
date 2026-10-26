@@ -1,7 +1,7 @@
-// Permission override data layer — service-role reads/writes for the per-user, time-bound feature
-// exceptions granted from /admin/users/[id]. The table has NO write RLS policies (service-role only);
-// authorization (owner/developer, org scope, self-grant block) is enforced by the calling server
-// action. See migration 202607090002 and docs/product/27-permission-override-workflow.md.
+// 권한 예외 데이터 레이어 — /admin/users/[id] 에서 부여하는 사용자별, 기간 한정 기능
+// 예외에 대한 service-role 읽기/쓰기. 이 테이블에는 쓰기 RLS 정책이 없다(service-role 전용).
+// 권한 검사(owner/developer, 조직 범위, 자기 부여 차단)는 호출하는 서버
+// 액션이 집행한다. 마이그레이션 202607090002 와 docs/product/27-permission-override-workflow.md 참고.
 
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
@@ -22,7 +22,7 @@ export type MemberOverride = {
   /** ISO. `null` 이면 무기한(2026-10-20 부터 모든 키에서 고를 수 있다). */
   expires: string | null;
   granted: string; // ISO (created_at)
-  by: string; // granter display name ("—" if unknown)
+  by: string; // 부여자 표시 이름 (모르면 "—")
 };
 
 type OverrideRow = {
@@ -35,7 +35,7 @@ type OverrideRow = {
   granted_by_user_id: string | null;
 };
 
-/** Active (not revoked, not expired) overrides for one member, newest first, with granter names. */
+/** 한 멤버의 활성(폐기되지 않고 만료되지 않은) 예외, 부여자 이름 포함, 최신순. */
 export async function listMemberOverrides(
   organizationId: string,
   userId: string,
@@ -213,12 +213,12 @@ export async function grantMemberOverride(input: {
       reason,
       expires: expiresIso,
       granted: row.created_at,
-      by: "", // filled by the caller from the actor's name
+      by: "", // 호출자가 행위자의 이름으로 채운다
     },
   };
 }
 
-/** Soft-revoke: set revoked_at + revoked_by. Org-scoped so an override can't be revoked cross-org. */
+/** 소프트 폐기: revoked_at + revoked_by 를 설정한다. 조직 범위라 다른 조직의 예외는 폐기할 수 없다. */
 export async function revokeMemberOverride(input: {
   overrideId: string;
   organizationId: string;

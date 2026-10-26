@@ -38,8 +38,8 @@ import { OfflinePill } from "@/components/shell/offline-pill";
 import { useToastMotion } from "@/components/shell/use-toast-motion";
 
 type MobileShellProps = {
-  // Bug Report is not in the sidebar nav list (it lives in the footer next to Logout), but its
-  // pages still mark themselves active — so allow its id alongside the sidebar ids.
+  // 버그 신고는 사이드바 내비 목록에 없지만(로그아웃 옆 푸터에 있다)
+  // 그 페이지들이 스스로 활성으로 표시하므로, 사이드바 id 와 함께 그 id 도 허용한다.
   activeItem?:
     | (typeof mobileSidebarNavigation)[number]["id"]
     | (typeof mobileOpsAdminNavigation)[number]["id"]
@@ -47,12 +47,12 @@ type MobileShellProps = {
   appearance?: "default" | "announcement" | "cleaning";
   children: React.ReactNode;
   title: string;
-  /** Operational unprocessed counts keyed by sidebar nav id (e.g. requests, notifications). */
+  /** 사이드바 내비 id 별 미처리 운영 건수(예: requests, notifications). */
   badges?: Partial<Record<string, number>>;
   /**
-   * Hide the bottom tab bar for focused full-screen flows (e.g. a create form with its own sticky
-   * submit bar, which would otherwise overlap the tab bar). Defaults to false — the side menu still
-   * reaches every feature. When true the content's bottom padding shrinks (no tab bar to clear).
+   * 자체 하단 고정 제출 바가 있는 생성 폼처럼, 집중하는 전체 화면 흐름에서는 하단 탭 바를 숨긴다
+   * (안 그러면 탭 바와 겹친다). 기본은 false — 사이드 메뉴로 모든 기능에 닿을 수 있다.
+   * true 이면 비울 탭 바가 없으므로 콘텐츠 아래 여백이 줄어든다.
    */
   hideBottomNav?: boolean;
   /**
@@ -103,7 +103,7 @@ const SIDEBAR_TRANSITION_MS = 360;
  */
 const FOLD_QUERY = "(min-width: 600px)";
 
-// Center FAB icon — app-grid squircle ("Bottom Bar (Squircle Edit)" design); opens the editor sheet.
+// 가운데 FAB 아이콘 — 앱 그리드 스퀴클("Bottom Bar (Squircle Edit)" 디자인). 편집 시트를 연다.
 const EDIT_ICON = (
   <svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <rect x="4" y="4" width="6.5" height="6.5" rx="1.6" stroke="currentColor" strokeWidth="1.9" />
@@ -114,10 +114,10 @@ const EDIT_ICON = (
 );
 
 /**
- * "추가" launcher metadata, keyed by sidebar-navigation item id.
- * Each feature gets a distinct hue; the launcher grid is generated from
- * `mobileSidebarNavigation`, so adding a nav item automatically adds a tile.
- * Colours fix lightness/chroma and vary only hue → a unified palette.
+ * "추가" 런처 메타데이터, 사이드바 내비 항목 id 기준.
+ * 기능마다 색조가 다르다. 런처 그리드는
+ * `mobileSidebarNavigation` 에서 만들어지므로 내비 항목을 추가하면 타일이 자동으로 늘어난다.
+ * 색은 명도/채도를 고정하고 색조만 바꿔 통일된 팔레트로 만든다.
  */
 const LAUNCHER_META: Record<string, { hue: number; icon: ReactNode }> = {
   home: { hue: 185, icon: NAV_GLYPHS.home },
@@ -156,16 +156,16 @@ function ShellErrorToast({ text, onDismiss }: { text: string; onDismiss: () => v
   );
 }
 
-/** Rubber-band resistance: fast start, asymptotic ceiling at MAX_DISPLAY_H. */
+/** 고무줄 저항: 빠르게 시작해 MAX_DISPLAY_H 에서 점근적으로 한계에 닿는다. */
 function computeContentOffset(raw: number): number {
   if (raw <= 0) return 0;
   return MAX_DISPLAY_H * raw / (raw + MAX_PULL * 0.4);
 }
 
-// Per-route scroll restoration. The app scrolls an INNER div (not the window), which Next's
-// built-in scroll restoration can't track, so navigating back always lost your place in long
-// lists. Keyed by pathname, module-scoped so it survives the shell's per-route remount within a
-// session (the shell is rendered per page, so this Map is the only thing that persists).
+// 라우트별 스크롤 복원. 앱은 창이 아니라 안쪽 div 를 스크롤하는데, Next 의
+// 기본 스크롤 복원은 이를 추적하지 못해서 뒤로 가면 긴 목록에서 보던 위치를
+// 항상 잃었다. 경로 기준 키이고 모듈 범위라 라우트별 셸 재마운트 사이에도 유지된다
+// (셸은 페이지마다 그려지므로 이 Map 만 세션 동안 남는다).
 const SCROLL_POSITIONS = new Map<string, number>();
 
 // useSyncExternalStore 로 「지금 하이드레이션 중인가」를 읽는다 — 서버 · 하이드레이션 그림은 true, 그 뒤 클라이언트 그림은 false.
@@ -237,12 +237,12 @@ export function MobileShell({
   const touchStartXRef = useRef(0);
   const isPullingRef = useRef(false);
   const pullDistanceRef = useRef(0);
-  // PTR may only arm on a gesture that STARTED at the top. Cleared the moment scrollTop goes >0 so a
-  // momentum/rubber-band coast back to 0 under a held finger can't activate PTR against a stale anchor.
+  // PTR 은 맨 위에서 시작한 제스처에서만 켤 수 있다. scrollTop 이 0보다 커지는 순간 해제하여,
+  // 손가락을 댄 채 관성/고무줄로 0까지 돌아와도 오래된 기준점으로 PTR 이 켜지지 않는다.
   const ptrEligibleRef = useRef(false);
   const sidebarChromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // rAF-coalesce touchmove → setState: refs update synchronously every sample, but the visible React
-  // state setter fires at most once per animation frame (avoids a full subtree re-render at ~120Hz).
+  // rAF 로 모은 touchmove → setState: ref 는 샘플마다 동기적으로 갱신하지만, 화면에 보이는 React
+  // state setter 는 애니메이션 프레임당 최대 한 번만 호출한다(~120Hz 에서 전체 하위 트리 재렌더를 피한다).
   const pullRafRef = useRef(0);
   const { session } = useSession();
 
@@ -283,7 +283,7 @@ export function MobileShell({
     };
   }, [pathname, contentKey]);
 
-  // Per-user bottom-bar tabs (customized via the center "추가" editor sheet).
+  // 사용자 맞춤 하단 탭(가운데 "추가" 편집 시트로 바꾼다).
   const initialNavIds = resolveBottomNavItems(session?.user.bottomNavTabs).map(
     (item) => item.id,
   );
@@ -370,9 +370,9 @@ export function MobileShell({
     [updateVisibility],
   );
 
-  // Key restore by the FULL url (path + query), not just pathname — list screens vary their content
-  // by query (?view=, ?month=, ?date=) on a single pathname, so a path-only key restored a position
-  // saved from a different (taller/shorter) variant.
+  // 복원 키는 경로만이 아니라 전체 url(경로 + 쿼리)로 잡는다 — 목록 화면은 한 경로에서도 쿼리(?view=, ?month=, ?date=)에 따라
+  // 내용이 달라서, 경로만의 키는 다른(더 길거나 짧은)
+  // 변형에서 저장한 위치를 복원했다.
   const routeKey = useCallback(
     () =>
       typeof window !== "undefined"
@@ -385,8 +385,8 @@ export function MobileShell({
     const top = event.currentTarget.scrollTop;
     if (placeholder) return requestVisibilityUpdate(top);
     const key = routeKey();
-    // Remember where we are for back-nav restore. Re-set after delete to keep this key the most
-    // recent (Map preserves insertion order) and cap the Map so it can't grow unbounded.
+    // 뒤로 가기 복원을 위해 현재 위치를 기억한다. 지운 뒤 다시 넣어 이 키가 가장 최근이 되게 하고
+    // (Map 은 삽입 순서를 유지한다) Map 이 무한히 커지지 않도록 개수를 제한한다.
     SCROLL_POSITIONS.delete(key);
     SCROLL_POSITIONS.set(key, top);
     if (SCROLL_POSITIONS.size > 30) {
@@ -395,9 +395,9 @@ export function MobileShell({
     requestVisibilityUpdate(top);
   };
 
-  // Restore the saved scroll position for this route on mount (native back-nav behavior). Runs once
-  // per shell mount (the shell remounts per route navigation). A layout effect, so the first painted frame is already at
-  // the saved position — after a swipe back the screen must match the snapshot that was just under the finger.
+  // 마운트할 때 이 라우트에 저장된 스크롤 위치를 복원한다(네이티브 뒤로 가기 동작). 셸이 마운트될 때
+  // 한 번 실행된다(라우트 이동마다 셸이 다시 마운트된다). layout effect 라서 처음 그려진 프레임이 이미
+  // 저장된 위치에 있다 — 스와이프 뒤로 뒤에는 화면이 손가락 바로 밑에 있던 밑그림과 같아야 한다.
   //
   // 2026-10-21: **앞으로 들어온 화면(push)은 맨 위에서** 시작한다 — 네이티브 앱에서 새로 연 화면은 늘 맨 위다. 예전에는 링크로 다시
   // 들어와도 지난번 위치로 내려가 있었다. 되돌아온 화면(뒤로 · 스와이프) · 탭 전환 · 같은 화면은 그대로 복원.
@@ -408,7 +408,7 @@ export function MobileShell({
     const saved = SCROLL_POSITIONS.get(routeKey());
     if (saved && saved > 0) {
       el.scrollTop = saved;
-      lastScrollYRef.current = saved; // avoid a spurious large delta on the first scroll event
+      lastScrollYRef.current = saved; // 첫 스크롤 이벤트에서 큰 델타가 튀지 않게 한다
     }
   }, [pathname, restoreScroll, routeKey]);
 
@@ -428,12 +428,12 @@ export function MobileShell({
     });
   }
 
-  // Numeric offset — used for indicator opacity/scale animations (0..REFRESH_DISPLAY_H range).
+  // 숫자 오프셋 — 표시기의 불투명도/크기 애니메이션에 쓴다(0..REFRESH_DISPLAY_H 범위).
   const contentOffset = isRefreshPending
     ? REFRESH_DISPLAY_H
     : computeContentOffset(pullDistanceState);
-  // CSS value for the shell translateY. When refreshing we add env(safe-area-inset-top) so the
-  // indicator content is positioned fully BELOW the notch/status-bar, not hidden behind it.
+  // 셸 translateY 용 CSS 값. 새로 고치는 중에는 env(safe-area-inset-top)를 더해
+  // 표시기 내용이 노치/상태 바 뒤에 숨지 않고 완전히 그 아래에 놓이게 한다.
   const shellY = isRefreshPending
     ? `calc(env(safe-area-inset-top, 0px) + ${REFRESH_DISPLAY_H}px)`
     : `${computeContentOffset(pullDistanceState)}px`;
@@ -451,7 +451,7 @@ export function MobileShell({
   function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
     if (isRefreshPending || e.touches.length !== 1) return;
     if (e.currentTarget.scrollTop > 0) {
-      // Mark ineligible and re-anchor, so a later coast back to 0 doesn't compare against ancient Y.
+      // 부적격으로 표시하고 기준점을 다시 잡아, 나중에 0으로 돌아와도 오래된 Y 와 비교하지 않게 한다.
       ptrEligibleRef.current = false;
       touchStartYRef.current = e.touches[0].clientY;
       touchStartXRef.current = e.touches[0].clientX;
@@ -463,7 +463,7 @@ export function MobileShell({
       return;
     }
     if (!ptrEligibleRef.current) {
-      // At the top, but this gesture started/passed through scrollTop>0 — don't arm PTR. Keep anchor fresh.
+      // 맨 위이지만 이 제스처가 scrollTop>0 에서 시작했거나 지나갔다 — PTR 을 켜지 않는다. 기준점은 최신으로 유지한다.
       touchStartYRef.current = e.touches[0].clientY;
       touchStartXRef.current = e.touches[0].clientX;
       return;
@@ -482,7 +482,7 @@ export function MobileShell({
       isPullingRef.current = true;
       setIsPulling(true);
     }
-    // Haptic pulse at the commit threshold — fires once per gesture as the user crosses 72px.
+    // 확정 임계값에서 햅틱 한 번 — 사용자가 72px 를 넘을 때 제스처당 한 번만 울린다.
     const wasBelowThreshold = pullDistanceRef.current < PULL_THRESHOLD;
     syncPullDistance(deltaY);
     if (wasBelowThreshold && deltaY >= PULL_THRESHOLD) {
@@ -532,7 +532,7 @@ export function MobileShell({
     isPullingRef.current = false;
     setIsPulling(false);
     syncPullDistance(0);
-    // Cancel any pending frame and commit the resting 0 now, so spring-back animates without delay.
+    // 대기 중인 프레임을 취소하고 쉬는 값 0을 지금 확정해, 되돌아가는 애니메이션이 지연 없이 돈다.
     if (pullRafRef.current) {
       cancelAnimationFrame(pullRafRef.current);
       pullRafRef.current = 0;
@@ -547,11 +547,11 @@ export function MobileShell({
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // This app uses an overflow-hidden shell with an INNER scroll container,
-    // not window scrolling. Listening to window "scroll" or "resize" would pass
-    // scrollY=0 every time, resetting headerVisible→true and undoing any
-    // scroll-back hiding. Only the custom mobile-shell-scroll event (dispatched
-    // by calendar view) and the onScroll handler on the content div are used.
+    // 이 앱은 overflow-hidden 셸과 안쪽 스크롤 컨테이너를 쓰며
+    // 창 스크롤을 쓰지 않는다. window "scroll" 이나 "resize" 를 들으면
+    // 매번 scrollY=0 이 넘어와 headerVisible→true 로 되돌리고
+    // 스크롤 뒤로 숨김을 취소해 버린다. 캘린더 뷰가 보내는 커스텀 mobile-shell-scroll 이벤트와
+    // 콘텐츠 div 의 onScroll 핸들러만 쓴다.
     const onShellScroll = (event: Event) => {
       const detail = event as CustomEvent<{ scrollTop?: number }>;
       if (typeof detail.detail?.scrollTop !== "number") return;
@@ -622,7 +622,7 @@ export function MobileShell({
     );
   }, [pathname]);
 
-  // Persist bottom-bar edits when the sheet closes (any close path), if changed.
+  // 시트가 닫힐 때(어떤 닫기 경로든) 바뀐 하단 바 편집을 저장한다.
   useEffect(() => {
     if (createOpen) {
       sheetWasOpenRef.current = true;
@@ -663,7 +663,7 @@ export function MobileShell({
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
 
-  // User-customized bottom tabs, split into left / right around the center FAB.
+  // 사용자 맞춤 하단 탭을 가운데 FAB 기준 왼쪽 / 오른쪽으로 나눈다.
   // 권한이 붙은 항목은 권한이 없으면 하단 바에 고정돼 있어도 그리지 않는다(운영 관리자 메뉴는 애초에 후보가 아니다).
   // 판매 캘린더 페이지는 권한 키에 더해 **관리자 웹 역할**도 요구한다(쓰기 액션이 `requireAdminSession` 을 거친다).
   // 메뉴도 같은 두 조건으로 거른다 — 키만 받은 현장 역할에게 메뉴를 보여 주면 눌러도 홈으로 튕긴다(2026-10-01).
@@ -732,9 +732,9 @@ export function MobileShell({
       {/* 하단 탭 저장 실패 알림 — 셸(당겨서 새로고침으로 transform 이 걸리는 판) 밖에 두어 화면 기준으로 고정한다. */}
       {navSaveFailed ? <ShellErrorToast onDismiss={dismissNavSaveFailed} text={dictionary.common.bottomNavSaveFailed} /> : null}
 
-      {/* ── Option-B PTR indicator — fixed at the top, revealed as the whole shell slides down ── */}
-      {/* The shell (header + content + bottom nav) all translate together; this fixed layer fills
-          the gap that opens above them. Background matches the canvas so the reveal looks seamless. */}
+      {/* Option-B PTR 표시기 — 맨 위 고정, 셸 전체가 내려오면서 드러난다 */}
+      {/* 셸(헤더 + 콘텐츠 + 하단 내비)이 함께 이동하고, 이 고정 레이어가
+          그 위에 열리는 틈을 채운다. 배경을 캔버스와 맞춰 드러나는 모습이 매끄럽다. */}
       <div
         aria-atomic="true"
         aria-live="polite"
@@ -744,7 +744,7 @@ export function MobileShell({
         className="pointer-events-none fixed inset-x-0 top-0 z-[1] flex flex-col items-center justify-start bg-background"
         style={{
           height: `calc(env(safe-area-inset-top, 0px) + ${REFRESH_DISPLAY_H}px)`,
-          // Push content below the notch/status-bar so it's visible when the shell slides down.
+          // 셸이 내려올 때 보이도록 콘텐츠를 노치/상태 바 아래로 민다.
           paddingTop: "env(safe-area-inset-top, 0px)",
         }}
       >
@@ -888,9 +888,9 @@ export function MobileShell({
           data-ptr-active={isPulling || isRefreshPending || pullDistanceState > 0 ? "" : undefined}
           ref={surfaceRef}
           style={{
-            // z-index: 2 makes this stacking context sit ABOVE the fixed PTR indicator (z-1),
-            // so the header is not covered when contentOffset = 0. When pulling, the shell slides
-            // down revealing the indicator through the gap at the top.
+            // z-index: 2 로 이 쌓임 맥락을 고정 PTR 표시기(z-1) 위에 올려,
+            // contentOffset = 0 일 때 헤더가 가려지지 않게 한다. 당기는 동안에는 셸이
+            // 내려가며 맨 위 틈으로 표시기가 드러난다.
             zIndex: 2,
             transform: `translateY(${shellY})`,
             transition: isPulling
@@ -899,12 +899,12 @@ export function MobileShell({
             willChange: isPulling || isRefreshPending || contentOffset > 0 ? "transform" : "auto",
           }}
         >
-          {/* Top bar — OVERLAY (mirrors the bottom tab bar). It used to be an in-flow h-16
-              block whose inner content merely faded on scroll, leaving the 64px slot occupied.
-              Now it is absolutely positioned and slides fully up on scroll-down (and back on
-              scroll-up), so the content reclaims that space — exactly like the bottom bar. The
-              scroll container carries a CONSTANT top padding to clear it, so there is no reflow
-              jump (the height never changes; only the overlay translates). */}
+          {/* 상단 바 — OVERLAY(하단 탭 바와 같은 방식). 예전에는 흐름 안의 h-16
+              블록이었고 안쪽 내용만 스크롤하면 흐려져서 64px 자리가 계속 차지됐다.
+              이제는 절대 위치로 놓여 아래로 스크롤하면 완전히 위로 올라가고(위로 스크롤하면 다시 내려와),
+              콘텐츠가 그 공간을 되찾는다 — 하단 바와 똑같다. 스크롤
+              컨테이너는 이를 비키도록 항상 같은 위 패딩을 가지므로 레이아웃이 튀지
+              않는다(높이는 변하지 않고 오버레이만 움직인다). */}
           <div
             data-shell-top=""
             className={cn(
@@ -917,8 +917,8 @@ export function MobileShell({
               transform: topChromeVisible
                 ? "translateY(0)"
                 : "translateY(calc(-100% - env(safe-area-inset-top)))",
-              // Hide (scroll-down): fast ease-in — bar follows the finger quickly.
-              // Show (scroll-up):  spring ease — bar settles into place naturally.
+              // 숨김(아래로 스크롤): 빠른 ease-in — 바가 손가락을 빠르게 따라온다.
+              // 표시(위로 스크롤): 스프링 ease — 바가 자연스럽게 자리 잡는다.
               transition: topChromeVisible
                 ? "transform 400ms cubic-bezier(0.22, 1, 0.36, 1)"
                 : "transform 200ms cubic-bezier(0.4, 0, 1, 1)",
@@ -955,7 +955,7 @@ export function MobileShell({
                   </button>
                 </div>
 
-                {/* Notification bell — top-bar shortcut, left of profile */}
+                {/* 알림 벨 — 상단 바 바로가기, 프로필 왼쪽 */}
                 <div className="relative z-10 flex items-center gap-1.5">
                   <Link
                     aria-label={dictionary.navigation.utility.notifications}
@@ -986,10 +986,10 @@ export function MobileShell({
             </div>
           </div>
 
-          {/* Pull-to-refresh wrapper — content scrolls normally; the outer shell div above
-              carries the translateY so the entire chrome (header + content + bottom nav) slides
-              together (Option-B full-screen pull). The fixed indicator at the top is revealed as
-              the shell moves down. No translateY here; no gradient curtain needed. */}
+          {/* Pull-to-refresh 래퍼 — 콘텐츠는 평소처럼 스크롤된다. 위의 바깥 셸 div 가
+              translateY 를 가지므로 크롬 전체(헤더 + 콘텐츠 + 하단 내비)가 함께
+              내려온다(Option-B 전체 화면 당기기). 맨 위의 고정 표시기는
+              셸이 내려가면서 드러난다. 여기에는 translateY 가 없고 그라디언트 커튼도 필요 없다. */}
           <div className="relative flex-1 overflow-hidden">
             <OfflinePill label={dictionary.common.offlineBanner} />
             <div
@@ -1073,7 +1073,7 @@ export function MobileShell({
             </nav>
           )}
 
-          {/* Center action ("추가") sheet — bottom-bar editor (pick up to 4 tabs). */}
+          {/* 가운데 액션("추가") 시트 — 하단 바 편집기(탭 최대 4개 선택). */}
           {createOpen ? (
             <BottomSheet
               ariaLabel={dictionary.common.editBottomBar}

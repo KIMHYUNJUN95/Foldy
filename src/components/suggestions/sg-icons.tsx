@@ -1,7 +1,7 @@
 /**
- * Inline SVG icons ported 1:1 from the "Feedback Box.html" handoff mockup.
- * Each icon inherits color via `currentColor` and is sized by the parent `.ic`
- * wrapper (`width/height: 1em`). UI/UX only — no behavior attached.
+ * "Feedback Box.html" 핸드오프 목업에서 1:1 로 가져온 인라인 SVG 아이콘.
+ * 각 아이콘은 `currentColor` 로 색을 상속받고 부모 `.ic`
+ * 래퍼(`width/height: 1em`)가 크기를 정한다. UI/UX 전용 — 동작은 붙어 있지 않다.
  */
 import type { ReactNode } from "react";
 
@@ -152,7 +152,7 @@ export const SgIcon = {
   ),
 } satisfies Record<string, ReactNode>;
 
-/** Wraps an icon in the `.ic` span used throughout the design (1em sizing). */
+/** 디자인 전반에서 쓰는 `.ic` span(1em 크기)으로 아이콘을 감싼다. */
 export function Ic({ children }: { children: ReactNode }) {
   return <span className="ic">{children}</span>;
 }

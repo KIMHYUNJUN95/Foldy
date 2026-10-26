@@ -1,29 +1,29 @@
 import { consumeRecentTraverse } from "@/lib/swipe-back/history-tracker";
 
 /**
- * Direction of the next mobile navigation, so the route transition (`src/app/mobile/template.tsx`) can play an iOS-style
- * push (forward) vs pop (back) slide — or nothing when the screen already moved under the user's finger.
+ * 다음 모바일 이동의 방향. 라우트 전환(`src/app/mobile/template.tsx`)이 iOS 식
+ * 푸시(앞으로) 대 팝(뒤로) 슬라이드를 재생하게 하며 — 화면이 이미 사용자 손가락 아래에서 움직였다면 아무것도 재생하지 않는다.
  *
- * - **"none"** — set by the swipe-back gesture right before it navigates: the screen was already dragged off and the
- *   previous screen is sitting underneath, so a second slide would play the transition twice.
- * - **back / forward history traversal** (OS edge swipe, browser back, Android back button) is read from the history
- *   tracker. Until 2026-10-08 nothing set "back", so every back navigation played the *forward* push slide. When the
- *   browser already animated the traversal itself (Safari edge swipe — `PopStateEvent.hasUAVisualTransition`), we play
- *   nothing, for the same double-animation reason.
+ * - **"none"** — 스와이프 뒤로가기 제스처가 이동 직전에 설정한다: 화면은 이미 끌려 나갔고
+ *   이전 화면이 아래에 깔려 있어서, 슬라이드를 또 하면 전환이 두 번 재생된다.
+ * - **뒤로 / 앞으로 히스토리 이동** (OS 가장자리 스와이프, 브라우저 뒤로, Android 뒤로 버튼)은 히스토리
+ *   트래커에서 읽는다. 2026-10-08 까지는 아무도 "back" 을 설정하지 않아 모든 뒤로 이동이 *앞으로* 푸시 슬라이드를 재생했다.
+ *   브라우저가 이미 이동을 직접 애니메이션했으면 (Safari 가장자리 스와이프 — `PopStateEvent.hasUAVisualTransition`),
+ *   같은 이중 애니메이션 이유로 아무것도 재생하지 않는다.
  *
- * - **"tab"** — set by the bottom tab bar, side menu and rail (2026-10-21): switching sections is a tab switch, not a
- *   push — native tab bars swap the content in place (a short fade), they never slide the screen in.
+ * - **"tab"** — 하단 탭 바, 사이드 메뉴, 레일이 설정한다 (2026-10-21): 섹션 전환은 탭 전환이지
+ *   푸시가 아니다 — 네이티브 탭 바는 콘텐츠를 제자리에서 바꾸고 (짧은 페이드), 화면을 밀어 넣지 않는다.
  *
- * The mobile shell consumes the value once on mount (`consumeScreenEntrance`), then it resets to "forward".
+ * 모바일 셸은 값을 마운트 때 한 번 소비하고 (`consumeScreenEntrance`), 이후 "forward" 로 되돌린다.
  */
 export type NavDirection = "forward" | "back" | "none" | "tab";
 
 let pending: NavDirection | null = null;
 let stampedAt = 0;
 
-/** An explicit direction is only honored briefly — a navigation that never mounts the mobile template must not leave it stuck. */
+/** 명시적 방향은 잠깐만 유효하다 — 모바일 템플릿을 마운트하지 않는 이동이 값을 붙들고 있으면 안 된다. */
 const EXPLICIT_TTL_MS = 3000;
-/** A popstate older than this is not the reason the template is mounting now. */
+/** 이보다 오래된 popstate 는 지금 템플릿이 마운트되는 이유가 아니다. */
 const TRAVERSE_TTL_MS = 3000;
 
 export function setNavDirection(direction: NavDirection): void {
@@ -36,7 +36,7 @@ export function clearNavDirection(): void {
   stampedAt = 0;
 }
 
-/** Read and reset the pending direction (defaults to "forward"). */
+/** 대기 중인 방향을 읽고 리셋한다 (기본값 "forward"). */
 export function consumeNavDirection(): NavDirection {
   const now = typeof performance !== "undefined" ? performance.now() : 0;
   const explicit = pending && stampedAt > 0 && now - stampedAt < EXPLICIT_TTL_MS ? pending : null;
@@ -49,14 +49,14 @@ export function consumeNavDirection(): NavDirection {
 }
 
 /**
- * How a mobile screen enters — the nav direction, or **"reveal"** when a placeholder shell (`loading.tsx` →
- * `MobileShellPlaceholder`) already played the entrance for this path and the real screen only needs to fade its content in.
- * `"same"` = the shell remounted on the same path (search-param change etc.) — no animation, no scroll restore change.
+ * 모바일 화면이 들어오는 방식 — 내비 방향, 또는 플레이스홀더 셸(`loading.tsx` →
+ * `MobileShellPlaceholder`)이 이 경로의 진입을 이미 재생해서 실제 화면은 콘텐츠만 페이드인하면 될 때 **"reveal"**.
+ * `"same"` = 같은 경로에서 셸이 다시 마운트됨 (search-param 변경 등) — 애니메이션 없음, 스크롤 복원 변경 없음.
  *
- * Placeholder → real: the direction is consumed by the placeholder (it shows right after the tap — the push starts
- * immediately, like a native app), remembered with its path, and the real screen of that path takes "reveal" plus the
- * remembered direction (so the scroll restore still knows it was a back navigation). A second placeholder for the same
- * path (outer `/mobile` boundary, then the section's own) takes "none".
+ * 플레이스홀더 → 실제: 방향은 플레이스홀더가 소비하고 (탭 직후 보이므로 — 푸시가
+ * 네이티브 앱처럼 즉시 시작된다), 경로와 함께 기억해 두며, 그 경로의 실제 화면은 "reveal" 과
+ * 기억해 둔 방향을 받는다 (스크롤 복원이 뒤로 이동이었음을 계속 알 수 있게). 같은 경로의 두 번째
+ * 플레이스홀더 (바깥 `/mobile` 경계, 그다음 섹션 자체의 것)는 "none" 을 받는다.
  */
 export type ScreenEntrance = { kind: NavDirection | "reveal" | "same"; direction: NavDirection };
 

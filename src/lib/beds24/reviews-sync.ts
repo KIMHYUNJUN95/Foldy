@@ -1,43 +1,43 @@
-// Beds24 → external_reviews collection. Server-only, service-role, never called from UI.
+// Beds24 → external_reviews 수집. 서버 전용, service-role, UI 에서 절대 호출하지 않음.
 //
-// Endpoint contract (measured 2026-08-04 against https://beds24.com/api/v2/apiV2.yaml —
-// see docs/engineering/01-beds24-integration.md → External Reviews):
+// 엔드포인트 계약(2026-08-04 에 https://beds24.com/api/v2/apiV2.yaml 대조 측정 —
+// docs/engineering/01-beds24-integration.md → External Reviews 참고):
 //
-//   GET /channels/airbnb/reviews?roomId={int}        Beta   — no date filter, HARD CAP 50/room
+//   GET /channels/airbnb/reviews?roomId={int}        Beta   — 날짜 필터 없음, 방당 HARD CAP 50
 //   GET /channels/booking/reviews?propertyId={int}&from=YYYY-MM-DD
-//                                                   Alpha  — 100/page
+//                                                   Alpha  — 페이지당 100
 //
-// Because both endpoints require a unit parameter, "once per channel" is not achievable: one
-// cycle issues (Airbnb-linked room types) + (Booking-linked properties) requests. The schedule
-// is twice a day per unit.
+// 두 엔드포인트 모두 단위 파라미터가 필요하므로 "채널당 1회"는 불가능하다: 한
+// 사이클에 (Airbnb 연결 객실 유형) + (Booking 연결 숙소) 만큼 요청한다. 스케줄은
+// 단위당 하루 두 번이다.
 //
-// Field availability is asymmetric and we never infer what a provider did not send:
-//   * Airbnb  — the queried roomId pins the room. No reviewer NAME (numeric `reviewer_id`
-//               only), but it does send `reservation_confirmation_code`, which matches our
-//               reservations at `raw_payload->>apiReference` — that match supplies both the
-//               reservation link and the guest name. Reviews are bidirectional, so only
-//               guest-authored, submitted, non-hidden ones are stored.
-//   * Booking — no room at all; the room is recovered by resolving `reservation_id` against
-//               local reservations.source_reservation_id, and stays null when that misses.
-// Either way an unmatched review keeps NULLs rather than a guess.
+// 필드 제공 여부는 비대칭이며, 제공자가 보내지 않은 것은 절대 추정하지 않는다:
+//   * Airbnb  — 조회한 roomId 가 방을 고정한다. 리뷰어 이름은 없고(숫자 `reviewer_id`
+//               뿐), 대신 `reservation_confirmation_code` 를 보내며 이것이 우리
+//               예약의 `raw_payload->>apiReference` 와 일치한다 — 이 매칭이
+//               예약 연결과 게스트 이름을 모두 채운다. 리뷰는 양방향이므로
+//               게스트가 쓴, 제출된, 숨기지 않은 것만 저장한다.
+//   * Booking — 방 정보가 전혀 없다. `reservation_id` 를 로컬
+//               reservations.source_reservation_id 로 해석해 방을 복원하며, 못 찾으면 null 로 남는다.
+// 어느 쪽이든 매칭되지 않은 리뷰는 추측하지 않고 NULL 로 둔다.
 //
-// Both endpoints are Beta/Alpha, so `raw_payload` is always kept and a row that fails to parse
-// is skipped individually rather than aborting the run.
+// 두 엔드포인트 모두 Beta/Alpha 이므로 `raw_payload` 를 항상 보관하고, 파싱에 실패한 행은
+// 실행 전체를 중단하지 않고 개별로 건너뛴다.
 //
-// AIRBNB 50-REVIEW CAP (measured 2026-08-05, the spec is wrong about this)
+// AIRBNB 리뷰 50건 상한(2026-08-05 측정, 스펙은 이 부분이 틀림)
 // ------------------------------------------------------------------------
-// The spec claims "Maximum of 100 reviews will be returned at once" and exposes a `pages`
-// object, but neither holds for this endpoint:
-//   * a room with more than 50 reviews returns exactly 50 and still reports
-//     `pages.nextPageExists: false` — the flag lies;
-//   * `?page=2` and `?page=3` return the SAME 50 rows (identical first id), so the
-//     documented pagination parameter is simply ignored.
-// There is therefore no way to reach review 51+ through Beds24. Consequences:
-//   * back-filling full Airbnb history is impossible; a room already at 50 has older
-//     reviews we can never fetch. `truncatedTargets` reports which rooms are in that state
-//     so the gap is visible instead of silently looking complete.
-//   * ongoing collection is unaffected — a daily run will never see 50 new reviews in a day.
-// Booking.com is not affected: it takes a real `from` date and paginates properly.
+// 스펙은 "한 번에 최대 100건 반환"이라 하고 `pages`
+// 객체도 노출하지만, 이 엔드포인트에서는 둘 다 맞지 않다:
+//   * 리뷰가 50건을 넘는 방도 정확히 50건만 돌려주면서 여전히
+//     `pages.nextPageExists: false` 를 보고한다 — 이 플래그는 거짓말이다;
+//   * `?page=2` 와 `?page=3` 이 같은 50행(첫 id 동일)을 돌려주므로
+//     문서화된 페이지네이션 파라미터는 그냥 무시된다.
+// Beds24 로는 51번째 이후 리뷰에 닿을 방법이 없다. 결과:
+//   * Airbnb 전체 이력 백필은 불가능하다. 이미 50건인 방은 우리가 영영 가져올 수 없는
+//     오래된 리뷰가 있다. `truncatedTargets` 가 어느 방이 그 상태인지 보고해서
+//     공백이 조용히 완전해 보이는 대신 드러나게 한다.
+//   * 이후 수집은 영향이 없다 — 하루 한 번 실행에서 하루에 새 리뷰 50건이 나올 일은 없다.
+// Booking.com 은 영향이 없다: 실제 `from` 날짜를 받고 제대로 페이지를 나눈다.
 
 import "server-only";
 
@@ -101,7 +101,7 @@ async function fetchPage(url: string, token: string): Promise<PageResult | { err
 }
 
 // ────────────────────────────────────────────────────────────
-// payload → row
+// payload → 행
 // ────────────────────────────────────────────────────────────
 
 function str(value: unknown): string | null {
@@ -116,7 +116,7 @@ function num(value: unknown): number | null {
 function iso(value: unknown): string | null {
   const raw = str(value);
   if (!raw) return null;
-  // Booking.com sends "2018-05-13 12:16:33" (no timezone marker); Airbnb sends ISO.
+  // Booking.com 은 "2018-05-13 12:16:33"(시간대 표시 없음)을 보내고, Airbnb 는 ISO 를 보낸다.
   const normalized = raw.includes("T") ? raw : raw.replace(" ", "T") + "Z";
   const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
@@ -151,10 +151,10 @@ export type ParsedReview = {
 };
 
 /**
- * Airbnb `airbnbReview` → row.
+ * Airbnb `airbnbReview` → 행.
  *
- * Airbnb reviews are bidirectional. Returning null for host-authored, unsubmitted or hidden
- * entries is what keeps our own reviews *of guests* out of the table.
+ * Airbnb 리뷰는 양방향이다. 호스트가 쓴, 미제출, 숨김
+ * 항목에 null 을 돌려주는 것이 우리가 게스트에 대해 쓴 리뷰가 테이블에 들어오지 않게 한다.
  */
 export function parseAirbnbReview(payload: unknown): ParsedReview | null {
   if (!payload || typeof payload !== "object") return null;
@@ -166,8 +166,8 @@ export function parseAirbnbReview(payload: unknown): ParsedReview | null {
   if (row.hidden === true) return null;
 
   const reviewerRole = (str(row.reviewer_role) ?? "").toLowerCase();
-  // Only keep what the guest wrote about us. Beds24 passes Airbnb's roles straight through, so
-  // an unexpected value is treated as "not a guest review" rather than silently ingested.
+  // 게스트가 우리에 대해 쓴 것만 보관한다. Beds24 는 Airbnb 의 역할을 그대로 넘기므로
+  // 예상치 못한 값은 조용히 수집하지 않고 "게스트 리뷰 아님"으로 취급한다.
   if (reviewerRole && reviewerRole !== "guest") return null;
 
   const rating = num(row.overall_rating);
@@ -183,8 +183,8 @@ export function parseAirbnbReview(payload: unknown): ParsedReview | null {
     // Airbnb는 작성자 이름을 주지 않는다 (`reviewer_id` 숫자 ID만). 이름은 아래에서 확인 코드로
     // 찾은 로컬 예약의 `guest_name`으로 채운다 — 페이로드에서 추정하는 것이 아니다.
     guestDisplayName: null,
-    headline: null, // Airbnb has no review title
-    sourceLanguageCode: null, // no language code → DeepL auto-detect
+    headline: null, // Airbnb 에는 리뷰 제목이 없음
+    sourceLanguageCode: null, // 언어 코드 없음 → DeepL 자동 감지
     reviewText: str(row.public_review),
     positiveReviewText: null,
     negativeReviewText: null,
@@ -198,7 +198,7 @@ export function parseAirbnbReview(payload: unknown): ParsedReview | null {
   };
 }
 
-/** Booking.com `bookingReview` → row. A score-only review (no bodies) is valid, not an error. */
+/** Booking.com `bookingReview` → 행. 점수만 있는 리뷰(본문 없음)도 유효하며 오류가 아니다. */
 export function parseBookingReview(payload: unknown): ParsedReview | null {
   if (!payload || typeof payload !== "object") return null;
   const row = payload as Record<string, unknown>;
@@ -238,7 +238,7 @@ export function parseBookingReview(payload: unknown): ParsedReview | null {
     reviewText: null,
     positiveReviewText: str(content.positive),
     negativeReviewText: str(content.negative),
-    privateFeedback: null, // Booking.com has no equivalent
+    privateFeedback: null, // Booking.com 에는 대응 항목이 없음
     otaReplyText: str(reply.text),
     otaRepliedAt: iso(reply.last_change_timestamp),
     sourceReservationId: reservation === null ? null : String(reservation),
@@ -247,7 +247,7 @@ export function parseBookingReview(payload: unknown): ParsedReview | null {
 }
 
 // ────────────────────────────────────────────────────────────
-// sync
+// 동기화
 // ────────────────────────────────────────────────────────────
 
 export type ReviewSyncResult = {

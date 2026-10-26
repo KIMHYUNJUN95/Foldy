@@ -76,13 +76,13 @@ function localizeRoomLabel(rawRoom: string, buildingLabels: Record<string, strin
   const localizedBuilding = buildingLabels[buildingKey];
   if (!localizedBuilding) return rawRoom;
   const roomPart = rawRoom.slice(canonicalProperty.length).trim();
-  // Collapse Arakicho sub-units (201_2 → 201) so the label matches every other room-facing screen.
+  // Arakicho 하위 호실(201_2 → 201)을 합쳐서 다른 방 화면들과 라벨이 같게 한다.
   const displayRoom = roomPart ? getDisplayRoomLabel(canonicalProperty, roomPart) : "";
   return displayRoom ? `${localizedBuilding} ${displayRoom}` : localizedBuilding;
 }
 
-// Activity-event → log-row icon accent (mirrors the timeline dot meaning of the
-// previous home so each event type stays distinguishable across the redesign).
+// 활동 이벤트 → 로그 행 아이콘 강조색(이전 홈의 타임라인 점 의미를
+// 그대로 이어받아 리디자인 뒤에도 이벤트 종류가 구분되게 한다).
 function getActivityLogClass(event: HomeActivityEvent): string {
   if (event.type === "lost_item_reported") return "lost";
   if (event.type === "maintenance_reported") return "maint";
@@ -147,13 +147,13 @@ function formatGreetingDate(locale: Locale): string {
 }
 
 /**
- * Streaming boundary — the data-heavy body of the home screen.
+ * 스트리밍 경계 — 홈 화면에서 데이터가 많은 본문.
  *
- * The shell + greeting render immediately (they only need the already-resolved session), while this
- * component's Supabase reads (check-in/out, today's activity, active cleaning, announcement, open
- * attendance session) run and stream in behind a Suspense skeleton. This keeps the cold-start "first
- * paint" fast without going stale — the data is still fetched fresh on every load, just not blocking
- * the initial byte. See docs/planning/06-current-status.md → 2026-07-22 PWA cold start.
+ * 셸 + 인사말은 이미 확정된 세션만 필요하므로 바로 렌더되고, 이 컴포넌트의
+ * Supabase 읽기(출퇴근 · 오늘 활동 · 진행 중 청소 · 공지 · 열린
+ * 근태 세션)는 Suspense 스켈레톤 뒤에서 실행되어 스트리밍된다. 이렇게 하면 콜드 스타트의 첫
+ * 페인트가 빠르면서도 데이터는 로드마다 새로 가져오므로 오래되지 않는다 — 다만 초기 바이트를
+ * 막지 않는다. docs/planning/06-current-status.md → 2026-07-22 PWA 콜드 스타트 참고.
  */
 async function HomeBody({
   session,
@@ -216,7 +216,7 @@ async function HomeBody({
       <div className="hm__blk hm__blk--hero">
         {/* 넓은 화면에서만 보이는 칸 제목(2026-10-06) — 다른 칸(체크인/아웃 · 오늘 기록)과 제목 · 카드 윗선을 맞춘다. 폰은 숨김. */}
         <div className="hm__sectt hm__wide-only">{a.pageTitle}</div>
-        {/* Quick attendance hero — reflects the real open attendance session state. */}
+        {/* 빠른 출퇴근 히어로 — 실제 열린 근태 세션 상태를 반영한다. */}
         <Link
           aria-label={openAttendanceSession ? m.homeClockOpenTitle : m.homeClockIdleTitle}
           className="hm__clockhero"
@@ -267,7 +267,7 @@ async function HomeBody({
 
       </div>
       <div className="hm__blk hm__blk--notice">
-        {/* Important announcement */}
+        {/* 중요 공지 */}
         {latestAnnouncement ? (
           <Link aria-label={latestAnnouncement.title} href={announcementHref}>
             <div className="hm__notice">
@@ -285,7 +285,7 @@ async function HomeBody({
 
       </div>
       <div className="hm__blk hm__blk--stats">
-        {/* Today's check-in / check-out — cards tap to open a detail sheet */}
+        {/* 오늘 체크인 / 체크아웃 — 카드를 탭하면 상세 시트가 열린다 */}
         <div className="hm__sectt">{m.homeStatsSectionLabel}</div>
         <section aria-label={m.homeStatsSectionLabel}>
           {checkInOut.status === "ok" ? (
@@ -310,7 +310,7 @@ async function HomeBody({
 
       </div>
       <div className="hm__blk hm__blk--task">
-        {/* Active cleaning task */}
+        {/* 진행 중인 청소 업무 */}
         <div className="hm__sectt">{m.homeActiveTaskTitle}</div>
         <section aria-label={m.homeActiveTaskTitle}>
           {activeSession.status === "ok" ? (
@@ -346,7 +346,7 @@ async function HomeBody({
 
       </div>
       <div className="hm__blk hm__blk--qa">
-        {/* Quick actions */}
+        {/* 빠른 실행 */}
         <div className="hm__sectt-row">
           <span className="hm__sectt">{m.homeQuickActionsTitle}</span>
         </div>
@@ -363,7 +363,7 @@ async function HomeBody({
 
       </div>
       <div className="hm__blk hm__blk--log">
-        {/* Today's activity timeline */}
+        {/* 오늘 활동 타임라인 */}
         <div className="hm__sectt-row">
           <span className="hm__sectt">{m.homeTodayActivityTitle}</span>
         </div>
@@ -449,7 +449,7 @@ export default async function MobileHomePage() {
       <Beds24LiveRefresh organizationId={session.organization.id} />
       {/* 앱을 켤 때(세션당 한 번) 스플래시 — 시안 Motion-B-Splash-Phone */}
       <div className="hm pb-2">
-        {/* Greeting — renders immediately with the shell (no data reads). */}
+        {/* 인사말 — 셸과 함께 바로 렌더된다(데이터 읽기 없음). */}
         <div className="hm__greet">
           <div>
             <div className="hm__greet-d">{greetDate}</div>
@@ -463,7 +463,7 @@ export default async function MobileHomePage() {
         </div>
 
 
-        {/* Data-heavy sections stream in behind a skeleton so first paint stays fast. */}
+        {/* 데이터가 많은 섹션은 스켈레톤 뒤에서 스트리밍되어 첫 페인트가 빠르게 유지된다. */}
         <Suspense fallback={<FoldyLoader />}>
           <HomeBody session={session} dictionary={dictionary} />
         </Suspense>

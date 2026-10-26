@@ -14,7 +14,7 @@ import { BottomSheet } from "@/components/shell/bottom-sheet";
 
 export type ManualRoomEntry = {
   canonicalRoomLabel: string;
-  /** Collapsed label shown to the user (Arakicho 201_2 → 201). sessionRoomLabel stays canonical. */
+  /** 사용자에게 보여주는 합쳐진 라벨 (Arakicho 201_2 → 201). sessionRoomLabel 은 정식 값 그대로 둔다. */
   displayRoomLabel: string;
   sessionRoomLabel: string;
   /** 이미 청소 목록에 잡혀 있거나 오늘 시작한 방 — 여기서는 못 고른다. */

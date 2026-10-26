@@ -8,8 +8,8 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSuggestionListData } from "@/lib/suggestions-queries";
 
-// Staff Suggestions / Feedback Box — Frame 1 (main list). Step 3 (2026-06-16): wired to real
-// Sent / Received / Referenced data. See docs/product/22-staff-suggestions-workflow.md.
+// 직원 건의 / 의견함 — Frame 1(메인 목록). Step 3(2026-06-16): 실제
+// 보낸 / 받은 / 참조된 데이터에 연결. docs/product/22-staff-suggestions-workflow.md 참고.
 export default async function MobileSuggestionsPage() {
   const navBadgesPromise = getMobileNavBadges();
   const [state, session] = await Promise.all([

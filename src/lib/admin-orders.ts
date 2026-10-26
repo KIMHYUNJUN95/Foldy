@@ -1,12 +1,12 @@
 import "server-only";
 
-// Real-data layer for the admin 주문·비품(order requests) console. Mirrors `admin-lost-found.ts`:
-// presentation-ready flat view models, org-scoped queries (via getOrgOrderRequests), and a
-// `loadError` flag so the KPI strip can show "-" instead of a misleading zero.
+// 관리자 주문·비품(order requests) 콘솔의 실데이터 레이어. `admin-lost-found.ts` 를 따른다:
+// 화면용으로 가공된 평평한 뷰 모델, 조직 범위 쿼리(getOrgOrderRequests 경유), 그리고
+// KPI 띠가 오해를 부르는 0 대신 "-" 를 보일 수 있게 하는 `loadError` 플래그.
 //
 // 상태 표시는 4상태(requested/approved/ordered/closed)로 좁힌다. DB enum의 비활성 단계 'received'는
 // 콘솔에서 'ordered'로 매핑한다. 배송일/도쿄 날짜는 조회 시점에 파생한다.
-// See docs/product/10-order-request-workflow.md.
+// 참고: docs/product/10-order-request-workflow.md.
 
 import {
   getOrgOrderRequests,
@@ -40,7 +40,7 @@ export type AdminOrderVM = {
   /** 표시용 짧은 번호. "#" + id.slice(0,6). */
   shortId: string;
   title: string;
-  /** raw building_name. */
+  /** building_name 원본. */
   buildingKey: string;
   /** resolveRequestLocation 라벨 (없으면 building_name). */
   buildingLabel: string;
@@ -77,7 +77,7 @@ export type AdminOrdersData = {
 
 const TOKYO_TZ = "Asia/Tokyo";
 
-/** "YYYY-MM-DD" in Tokyo. */
+/** 도쿄 기준 "YYYY-MM-DD". */
 function tokyoDateKey(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: TOKYO_TZ,
@@ -87,7 +87,7 @@ function tokyoDateKey(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** "YYYY-MM-DD HH:MM" in Tokyo. */
+/** 도쿄 기준 "YYYY-MM-DD HH:MM". */
 function tokyoStamp(iso: string): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TOKYO_TZ,

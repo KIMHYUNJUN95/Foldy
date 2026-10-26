@@ -2,7 +2,7 @@
 //
 // 2026-07-31 에 QR 인코딩을 "토큰만" → "절대 URL" 로 바꿨다. 현장에 이미 붙어 있는 인쇄물은
 // 여전히 토큰만 담고 있으므로, 스캐너가 두 형식을 모두 받지 못하면 기존 QR 이 전부 죽는다.
-// See src/lib/attendance-qr.ts / docs/product/24-attendance-workflow.md → "QR Deep Link".
+// src/lib/attendance-qr.ts / docs/product/24-attendance-workflow.md → "QR Deep Link" 참고.
 
 import { describe, expect, it } from "vitest";
 import { attendanceQrLinkState, extractAttendanceToken } from "@/lib/attendance-qr";

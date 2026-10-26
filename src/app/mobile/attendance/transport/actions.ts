@@ -1,11 +1,11 @@
 "use server";
 
-// Transport Reimbursement — worker-facing server actions (per-user monthly ledger).
+// 교통비 정산 — 근무자용 서버 액션(사용자별 월 원장).
 //
-// Self-only: every mutation acts on the authenticated user's OWN report/items, never another user's.
-// All writes use the service-role client (RLS denies direct authenticated writes). Org isolation is
-// enforced on every query. This ledger is fully separate from payroll — no wage values are read here.
-// Reports are editable only while `draft` or `rejected`; once submitted they lock until an admin acts.
+// 본인 전용: 모든 변경은 인증된 사용자 본인의 보고서/항목에만 적용하며, 다른 사용자의 것은 건드리지 않는다.
+// 모든 쓰기는 service-role 클라이언트를 쓴다(RLS가 인증 사용자의 직접 쓰기를 막음). 조직 격리는
+// 모든 쿼리에서 강제한다. 이 원장은 급여와 완전히 분리되어 있어 시급 값은 여기서 읽지 않는다.
+// 보고서는 `draft` 또는 `rejected` 상태일 때만 수정할 수 있고, 제출하면 관리자가 처리할 때까지 잠긴다.
 
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -23,8 +23,8 @@ const IMAGE_BUCKET = "request-images";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
-// The transport_reimbursement_* tables are not yet in the generated Database types; service-client
-// table access is cast through `untyped`. Remove once src/types/database.ts is regenerated.
+// transport_reimbursement_* 테이블은 아직 생성된 Database 타입에 없어서, service 클라이언트의
+// 테이블 접근은 `untyped` 로 캐스팅한다. src/types/database.ts 를 다시 생성하면 제거한다.
 function untyped(service: Service) {
   return service as unknown as {
     from: (table: string) => {
@@ -40,11 +40,11 @@ function untyped(service: Service) {
   };
 }
 
-// A report is editable by its owner while draft/rejected, and also while `changes_requested` — that
-// state exists precisely so the worker can fix the flagged items and resubmit.
+// 보고서는 소유자가 draft/rejected 상태일 때 수정할 수 있고, `changes_requested` 상태에서도 수정할 수 있다 —
+// 이 상태는 근무자가 표시된 항목을 고쳐 다시 제출하게 하려고 있는 것이다.
 const EDITABLE_STATUSES = new Set(["draft", "rejected", "changes_requested"]);
 
-/** Convert a 'YYYY-MM' month key to the 'YYYY-MM-01' first-day form used by target_month. */
+/** 'YYYY-MM' 월 키를 target_month 에 쓰는 'YYYY-MM-01' 첫날 형식으로 바꾼다. */
 function monthKeyToFirstDay(targetMonth: string): string | null {
   // 실제 달(01~12)만 — 「2026-13」 같은 키로 보고서 행이 생기지 않게(2026-10-26).
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)) return null;
@@ -82,7 +82,7 @@ function isOwnItemImagePath(
   return file.length > 0 && file !== "." && file !== ".." && SAFE_FILE.test(file);
 }
 
-// ── Create ─────────────────────────────────────────────────────────────────
+// ── 생성 ─────────────────────────────────────────────────────────────────
 
 export type CreateTransportItemInput = {
   targetMonth: string; // 'YYYY-MM'
@@ -197,7 +197,7 @@ export async function createTransportItemAction(
   return { ok: true, itemId: (ins.data as { id: string }).id, reportId: report.id };
 }
 
-// ── Update ─────────────────────────────────────────────────────────────────
+// ── 수정 ─────────────────────────────────────────────────────────────────
 
 export type UpdateTransportItemInput = {
   itemId: string;
@@ -210,8 +210,8 @@ export type UpdateTransportItemInput = {
 export type TransportActionResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Resolve a self-owned item + its report status (org-scoped). Returns an error code when the item is
- * missing, owned by someone else, or its report is not editable.
+ * 본인 소유 항목과 그 보고서 상태를 찾는다(조직 범위). 항목이 없거나, 다른 사람 소유이거나,
+ * 보고서를 수정할 수 없으면 오류 코드를 돌려준다.
  */
 async function loadEditableOwnItem(
   service: Service,
@@ -307,7 +307,7 @@ export async function updateTransportItemAction(
   return { ok: true };
 }
 
-// ── Delete item ──────────────────────────────────────────────────────────────
+// ── 항목 삭제 ──────────────────────────────────────────────────────────────
 
 export async function deleteTransportItemAction(itemId: string): Promise<TransportActionResult> {
   const session = await getCurrentAppSession();
@@ -320,7 +320,7 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
   if (!loaded.ok) return loaded;
   const reportId = loaded.item.report_id;
 
-  // Hard-delete the item's storage files first (DB cascade removes the image rows).
+  // 항목의 스토리지 파일을 먼저 완전 삭제한다(DB cascade 가 이미지 행을 지운다).
   const imgRes = await untyped(service)
     .from("transport_reimbursement_item_images")
     .select("storage_path")
@@ -333,7 +333,7 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
   if (paths.length > 0) {
     const { error } = await service.storage.from(IMAGE_BUCKET).remove(paths);
     if (error) {
-      // Non-fatal: a stray file is the worst case; the DB rows are removed by cascade below.
+      // 치명적이지 않음: 남은 파일이 있어도 최악일 뿐이고, DB 행은 아래 cascade 로 지워진다.
       console.error("[deleteTransportItemAction] storage remove failed:", error.message);
     }
   }
@@ -351,7 +351,7 @@ export async function deleteTransportItemAction(itemId: string): Promise<Transpo
   return { ok: true };
 }
 
-// ── Item images ────────────────────────────────────────────────────────────
+// ── 항목 이미지 ────────────────────────────────────────────────────────────
 
 export async function addTransportItemImageAction(
   itemId: string,
@@ -370,7 +370,7 @@ export async function addTransportItemImageAction(
     return { ok: false, error: "invalid_path" };
   }
 
-  // Next sort_order: append after existing images. 5장이 차 있으면 더 받지 않는다(서버가 상한을 다시 건다).
+  // 다음 sort_order: 기존 이미지 뒤에 붙인다. 5장이 차 있으면 더 받지 않는다(서버가 상한을 다시 건다).
   const countRes = await untyped(service)
     .from("transport_reimbursement_item_images")
     .select("id")
@@ -421,7 +421,7 @@ export async function deleteTransportItemImageAction(
     return { ok: false, error: "forbidden" };
   }
 
-  // The owning report must still be editable.
+  // 해당 보고서는 아직 수정할 수 있는 상태여야 한다.
   const loaded = await loadEditableOwnItem(service, organizationId, userId, image.item_id);
   if (!loaded.ok) return loaded;
 
@@ -448,7 +448,7 @@ export async function deleteTransportItemImageAction(
   return { ok: true };
 }
 
-// ── Submit ─────────────────────────────────────────────────────────────────
+// ── 제출 ─────────────────────────────────────────────────────────────────
 
 export async function submitTransportReportAction(
   targetMonth: string,
@@ -466,7 +466,7 @@ export async function submitTransportReportAction(
   if (!report) return { ok: false, error: "no_report" };
   if (!EDITABLE_STATUSES.has(report.status)) return { ok: false, error: "report_not_editable" };
 
-  // At least one item.
+  // 항목이 최소 1개 있어야 한다.
   const itemsRes = await untyped(service)
     .from("transport_reimbursement_items")
     .select("id")
@@ -475,7 +475,7 @@ export async function submitTransportReportAction(
   const itemIds = ((itemsRes.data ?? []) as { id: string }[]).map((r) => r.id);
   if (itemIds.length === 0) return { ok: false, error: "no_items" };
 
-  // Every item must carry at least one evidence image.
+  // 모든 항목에는 증빙 이미지가 최소 1장 있어야 한다.
   const imgRes = await untyped(service)
     .from("transport_reimbursement_item_images")
     .select("item_id")

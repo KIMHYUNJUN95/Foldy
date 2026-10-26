@@ -32,10 +32,10 @@ import { getActiveRoomCatalogServer, type ActiveRoomCatalogItem } from "@/lib/ro
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppSession } from "@/lib/session";
 
-// Real-data layer for the admin cleaning console's "오늘 현황" (today) board — overlays real
-// cleaning_sessions status onto the reservation-derived today targets (same source as
-// /mobile/cleaning), but unlike the mobile "unprocessed queue" the admin board keeps every room
-// visible with its current status instead of removing processed ones. See
+// 관리자 청소 콘솔 "오늘 현황" 보드의 실데이터 레이어 — 예약에서 나온 오늘 대상 위에 실제
+// cleaning_sessions 상태를 얹는다 (/mobile/cleaning 과 같은 출처). 다만 모바일 "미처리 큐"와 달리 관리자 보드는
+// 처리된 방을 빼지 않고 모든 방을 현재 상태와 함께 계속
+// 보여 준다. 참고:
 // docs/product/07-cleaning-workflow.md → "2026-07-14 어드민 청소 대시보드 — 백엔드 연동".
 
 export type AdminCleaningStatus = "pending" | "progress" | "done" | "cancelled";
@@ -89,7 +89,7 @@ export type AdminCleaningTodayData = {
   tasks: AdminCleaningTask[];
   setupTargets: AdminSettingTarget[];
   staff: CleaningStaffOption[];
-  /** True if any of today's data sources failed to load — KPI strip shows "-" instead of a count. */
+  /** 오늘 데이터 소스가 하나라도 로드에 실패하면 true — KPI 띠가 건수 대신 "-" 를 보인다. */
   loadError: boolean;
 };
 
@@ -100,7 +100,7 @@ function taskLabelToType(taskLabel: string): CleaningTaskType {
 }
 
 
-/** Fixed operational building order; unknown/unmapped properties sort after the 7 canonical ones. */
+/** 고정된 운영 건물 순서. 알 수 없거나 매핑되지 않은 숙소는 표준 7개 뒤로 정렬된다. */
 function buildingRank(building: BuildingKey | null): number {
   if (!building) return BUILDING_ORDER.length;
   const index = BUILDING_ORDER.indexOf(building);
@@ -129,13 +129,13 @@ function formatTokyoTime(iso: string | null): string | null {
   }).format(new Date(iso));
 }
 
-/** Most relevant session for a room today: prefer in_progress, then completed; cancelled-only → none. */
+/** 오늘 객실의 가장 관련 있는 세션: in_progress, 그다음 completed 를 우선하고, cancelled 뿐이면 없음. */
 function pickRelevantSession(sessions: CleaningSessionRow[]): CleaningSessionRow | null {
   const live = sessions.filter((s) => s.status !== "cancelled");
   if (live.length === 0) return null;
   const inProgress = live.find((s) => s.status === "in_progress");
   if (inProgress) return inProgress;
-  return live[0]; // already ordered started_at desc by getOrgTodayCleaningSessions
+  return live[0]; // getOrgTodayCleaningSessions 가 이미 started_at 내림차순으로 정렬해 줌
 }
 
 function countCancelled(sessions: CleaningSessionRow[]): number {
@@ -151,8 +151,8 @@ function sessionStatusToAdminStatus(status: string): AdminCleaningStatus {
 
 type ReportLinks = { lostIds: string[]; issueIds: string[] };
 
-// Collects the actual lost-item/maintenance-report ids per session (not just counts) so the detail
-// panel's report tiles can navigate straight to the linked record instead of just showing a number.
+// 세션별로 실제 분실물/유지보수 신고 id 를 모은다(건수만이 아니라) — 상세
+// 패널의 신고 타일이 숫자만 보이는 대신 연결된 기록으로 바로 이동할 수 있게 한다.
 async function collectReportLinksBySession(
   organizationId: string,
   sessionIds: string[],
@@ -231,8 +231,8 @@ export async function getAdminCleaningToday(
   const legacyAliasMap = buildLegacyAliasToRoomKeyMap(catalog);
   const staffNameById = new Map(staff.map((s) => [s.id, s.name] as const));
 
-  // Resolve every today session to a roomKey; group by roomKey to find the one relevant session
-  // (in_progress > completed > none-if-only-cancelled) per room.
+  // 오늘의 모든 세션을 roomKey 로 해석한다. roomKey 별로 묶어 가장 관련 있는 세션을
+  // (in_progress > completed > cancelled 뿐이면 없음) 방마다 찾는다.
   //
   // 짝짓기는 **실제 방** 단위(2026-10-15) — 아라키초는 한 방에 계정이 둘이라 「401」 예약 카드와 「401_2_2」 로 시작한 세션이
   // 같은 방이다. 글자 키로 짝지으면 카드는 「대기」로 남고 세션은 따로 「기타」 카드가 된다.
@@ -276,7 +276,7 @@ export async function getAdminCleaningToday(
         start: formatTokyoTime(matched?.started_at ?? null),
         end: matched?.closed_without_cleaning ? null : formatTokyoTime(matched?.completed_at ?? null),
         note: matched?.notes ?? "",
-        reports: null, // filled below once session ids are known
+        reports: null, // 아래에서 세션 id 를 알게 되면 채움
         proxy: Boolean(matched?.completed_by_admin),
         closed: Boolean(matched?.closed_without_cleaning),
         cancelledCount: countCancelled(roomSessions),
@@ -287,14 +287,14 @@ export async function getAdminCleaningToday(
     }
   }
 
-  // Sessions today that don't correspond to any reservation-driven target (manual / long-stay
-  // cleanings started from the mobile "기타" section, or ad-hoc rooms) — still surfaced as cards
-  // so real data never silently drops work that's actually happening.
+  // 오늘 세션 중 예약 기반 대상에 해당하지 않는 것 (수동 / 장기 체류
+  // 청소를 모바일 "기타" 섹션에서 시작했거나 임시 객실) — 그래도 카드로 보여 줘서
+  // 실제로 일어나는 작업이 실데이터에서 조용히 사라지지 않게 한다.
   // 취소만 있는 방은 되돌아갈 예약 대상이 없으므로 "취소" 카드로 노출한다 — 예전처럼 통째로
   // 버리면 콘솔에서 그 세션이 존재조차 하지 않게 된다.
   for (const [roomKey, sessions] of sessionsByRoomKey) {
     if (targetRoomKeys.has(roomKey)) continue;
-    const relevant = pickRelevantSession(sessions) ?? sessions[0]; // started_at desc
+    const relevant = pickRelevantSession(sessions) ?? sessions[0]; // started_at 내림차순
     if (!relevant) continue;
 
     let buildingRaw = relevant.room_label;
@@ -334,8 +334,8 @@ export async function getAdminCleaningToday(
     });
   }
 
-  // Attach linked lost-item/maintenance-report ids (and derived counts) for every task backed by a
-  // real session, so the detail panel's report tiles can navigate straight to the linked record.
+  // 실제 세션이 있는 모든 작업에 연결된 분실물/유지보수 신고 id (와 파생 건수)를 붙여서
+  // 상세 패널의 신고 타일이 연결된 기록으로 바로 이동할 수 있게 한다.
   const sessionIds = tasks.map((t) => t.sessionId).filter((id): id is string => id !== null);
   const reportLinks = await collectReportLinksBySession(organizationId, sessionIds).catch(
     () => new Map<string, ReportLinks>(),
@@ -363,9 +363,9 @@ export async function getAdminCleaningToday(
       }))
     : [];
 
-  // Targets arrive in reservation order and ad-hoc sessions are appended afterwards, so without this
-  // the cards render in effectively arbitrary room order (402 → 302 → 202). Sorting here — not in the
-  // board component — keeps 건물별 그룹 / 상태별 버킷 / 셋팅 대상 on one ordering.
+  // 대상은 예약 순서로 오고 임시 세션은 그 뒤에 붙으므로, 이게 없으면
+  // 카드가 사실상 임의의 객실 순서(402 → 302 → 202)로 렌더된다. 정렬을 보드 컴포넌트가 아니라 여기서 하면
+  // 건물별 그룹 / 상태별 버킷 / 셋팅 대상이 하나의 순서를 쓰게 된다.
   tasks.sort(compareByBuildingThenRoom);
   setupTargets.sort(compareByBuildingThenRoom);
 
@@ -373,8 +373,8 @@ export async function getAdminCleaningToday(
 }
 
 /* ============================================================
-   기록 (history) tab — thin wrapper over the existing getOrgCleaningSessionsFiltered, mapped into
-   the shape the admin console's history table/export already expect.
+   기록 (history) 탭 — 기존 getOrgCleaningSessionsFiltered 위의 얇은 래퍼로,
+   관리자 콘솔의 이력 표/내보내기가 이미 기대하는 모양으로 매핑한다.
    ============================================================ */
 
 export type AdminCleaningHistoryItem = {
@@ -447,9 +447,9 @@ export async function getAdminCleaningHistory(
 ): Promise<AdminCleaningHistoryItem[]> {
   const catalog = roomCatalog ?? (await getActiveRoomCatalogServer(session.organization.id).catch(() => undefined)) ?? [];
   const sessions = await getOrgCleaningSessionsFiltered(session, filters, catalog);
-  // Query order is cleaning_date ASC, started_at DESC — keep the day ordering, but make rooms within
-  // one day read in operational order instead of start-time order. Table rows and the Excel/PDF
-  // export both derive from this array, so they stay in sync.
+  // 쿼리 순서는 cleaning_date ASC, started_at DESC — 날짜 순서는 유지하되 하루 안의 객실은
+  // 시작 시각 순이 아니라 운영 순서로 읽히게 한다. 표 행과 Excel/PDF
+  // 내보내기가 모두 이 배열에서 나오므로 서로 동기화된다.
   const items = sessions
     .map((s) => mapSessionToHistoryItem(s, catalog))
     .sort((a, b) => a.date.localeCompare(b.date) || compareByBuildingThenRoom(a, b));

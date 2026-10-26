@@ -42,7 +42,7 @@ function firstParam(value: string | string[] | undefined) {
 
 export default async function AdminUsersInvitesPage({ searchParams }: PageProps) {
   const session = await requireAdminSession();
-  // Same gate as /admin/users: developer, or an org holding delegated manage_users.
+  // /admin/users 와 같은 게이트: developer, 또는 위임된 manage_users 를 가진 조직.
   if (!(await actorCanOpenUserManagement(session.user.id, session.user.role))) {
     redirect("/admin");
   }
@@ -52,8 +52,8 @@ export default async function AdminUsersInvitesPage({ searchParams }: PageProps)
   const settings = dictionary.admin.settings;
   const tabs = dictionary.admin.users.console;
 
-  // office_admin can't grant office_admin-or-above via invite code (matches canAssignRole's manual
-  // role-change tiering) — hide the option instead of letting them pick it and get rejected server-side.
+  // office_admin 은 초대 코드로 office_admin 이상을 부여할 수 없다(canAssignRole 의 수동
+  // 역할 변경 단계와 같음) — 골랐다가 서버에서 거절되게 두지 않고 옵션을 숨긴다.
   const selectableDefaultRoles = selectableInviteRoles(session.user.role);
 
   const organizations = await listManageableOrganizations(session.user.id, session.user.role);

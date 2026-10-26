@@ -57,11 +57,11 @@ export type ProfileFormCopy = {
 };
 
 /**
- * needs_profile step — collects the required operational profile (name, birth
- * date, phone, language) plus an OPTIONAL invite code. When a code is verified
- * via the preview flow, the CTA becomes "join this team" and `completeProfile`
- * saves the profile and joins in one step; otherwise the user is routed to the
- * membership step.
+ * needs_profile 단계 — 필수 운영 프로필(이름, 생년
+ * 월일, 전화번호, 언어)과 선택 사항인 초대 코드를 받는다. 미리보기 흐름에서 코드가
+ * 확인되면 CTA 가 "이 팀에 합류"로 바뀌고 `completeProfile` 이
+ * 프로필 저장과 합류를 한 번에 처리한다. 코드가 없으면 사용자는
+ * 멤버십 단계로 이동한다.
  */
 export function ProfileForm({
   copy,
@@ -173,9 +173,9 @@ export type JoinFormCopy = {
 };
 
 /**
- * needs_membership step — the profile is already complete; the user just needs
- * to join an organization. The join button is disabled until an invite code is
- * verified via the preview flow.
+ * needs_membership 단계 — 프로필은 이미 완료되어 있고, 사용자는 조직에
+ * 합류하기만 하면 된다. 합류 버튼은 초대 코드가 미리보기 흐름으로
+ * 확인되기 전까지 비활성이다.
  */
 export function JoinForm({
   copy,

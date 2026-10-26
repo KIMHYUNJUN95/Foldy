@@ -15,7 +15,7 @@ type LinenLedgerPeriodProps = {
   copy: Dictionary["linenReturn"];
   label: string;
   locale: Locale;
-  /** Base month used by the prev/next arrows. */
+  /** 이전/다음 화살표가 쓰는 기준 월. */
   month: number;
   range: DateRangeValue;
   year: number;

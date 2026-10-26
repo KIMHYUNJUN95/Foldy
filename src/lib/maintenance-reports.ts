@@ -7,8 +7,8 @@ import type { MaintenanceStatus } from "@/lib/maintenance-constants";
 export type MaintenanceReportRow =
   Database["public"]["Tables"]["maintenance_reports"]["Row"];
 
-// Domain constants live in a client-safe module (this one pulls in the server Supabase client, which
-// drags `next/headers` into any client component that touches it). Re-exported for existing callers.
+// 도메인 상수는 클라이언트 안전 모듈에 둔다 (이 모듈은 서버 Supabase 클라이언트를 끌어오고,
+// 그러면 이를 쓰는 클라이언트 컴포넌트에 `next/headers` 가 딸려 온다). 기존 호출처를 위해 다시 내보낸다.
 export {
   maintenanceCategories,
   maintenancePriorities,

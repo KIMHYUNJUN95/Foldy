@@ -56,17 +56,17 @@ export async function createMaintenanceReport(formData: FormData) {
     .map((v) => cleanText(v))
     .filter(Boolean);
 
-  // Category and priority were rendered by the form but silently dropped here until 2026-07-14 —
-  // there were no columns to store them. Both now persist; unknown values fall back to the defaults
-  // rather than rejecting the submission (a stale client must never lose a field report).
+  // 카테고리와 우선순위는 폼에서 보여줬지만 2026-07-14 전까지 여기서 조용히 버려졌다 —
+  // 저장할 컬럼이 없었다. 이제 둘 다 저장되며, 알 수 없는 값은 제출을 거부하지 않고 기본값으로
+  // 대체한다(오래된 클라이언트가 현장 신고를 잃어서는 안 된다).
   const rawCategory = cleanText(formData.get("category"));
   const category: MaintenanceCategory = isMaintenanceCategory(rawCategory) ? rawCategory : "other";
   const rawPriority = cleanText(formData.get("priority"));
   const priority: MaintenancePriority = isMaintenancePriority(rawPriority) ? rawPriority : "normal";
 
-  // "건물 전체"(whole-building) reports used to be detected by string-matching the reporter's
-  // localized label, so a Japanese reporter's report looked room-specific to a Korean reader. The
-  // form now sends an explicit flag and the DB stores a boolean.
+  // "건물 전체" 신고를 예전에는 신고자의 라벨 문자열 매칭으로 판별했는데,
+  // 현지화된 라벨이라 일본어 신고자의 신고가 한국어 독자에게는 방 지정처럼 보였다.
+  // 이제 폼이 명시적 플래그를 보내고 DB 에 boolean 으로 저장한다.
   const isBuildingOnly = cleanText(formData.get("isBuildingOnly")) === "1";
   // 「건물 전체」는 방 자리에 번역된 라벨이 아니라 고정값 "-" 를 둔다(2026-10-26). 화면은 is_building_only 를 보고
   // 보는 사람 언어로 「건물 전체」를 그린다.
@@ -98,7 +98,7 @@ export async function createMaintenanceReport(formData: FormData) {
 
   const supabase = await getSupabaseServerClient();
 
-  // Validate the cleaning session link: must belong to this user/org (any status).
+  // 청소 세션 연결 검증: 이 사용자/조직의 것이어야 한다(상태는 무관).
   let cleaningSessionId: string | null = null;
   if (rawCleaningSessionId) {
     const { data } = await supabase
@@ -141,7 +141,7 @@ export async function createMaintenanceReport(formData: FormData) {
     const linkedCanonical =
       getCanonicalRoomLabel(linkedPropertyName, linkedReservation.room_label) ??
       linkedReservation.room_label.trim();
-    // Compare against the collapsed display label — the form sends "201", the reservation may be "201_2".
+    // 합쳐서 표시하는 라벨과 비교한다 — 폼은 "201" 을 보내지만 예약은 "201_2" 일 수 있다.
     const linkedRoomLabel = getDisplayRoomLabel(linkedPropertyName, linkedCanonical);
 
     if (linkedPropertyName !== propertyName || linkedRoomLabel !== roomLabel) {

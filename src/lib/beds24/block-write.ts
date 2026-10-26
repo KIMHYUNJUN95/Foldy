@@ -15,7 +15,7 @@
  *
  * ```
  * ① 되읽기(전)  numAvail 스냅샷 + 이미 막혀 있는지 확인
- * ② POST        override: blackout
+ * ② POST        오버라이드: 블랙아웃
  * ③ 되읽기(후)  정말 들어갔는지 — Beds24 는 안 들어가도 success 를 준다
  * ④ 로컬 저장   스냅샷 · room_blocks · room_daily_rates
  * ⑤ 실패하면    ②를 되돌린다 (보상 롤백)

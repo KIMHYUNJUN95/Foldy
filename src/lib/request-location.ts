@@ -50,7 +50,7 @@ function fromCatalogItem(
 ): RequestLocationDisplay {
   return {
     buildingLabel: localizePropertyName(item.propertyName, buildingLabels),
-    // Display the collapsed room (Arakicho 201_2 → 201), never the raw sub-unit.
+    // 합쳐진 객실을 표시한다 (아라키초 201_2 → 201). 원본 하위 호실은 절대 표시하지 않는다.
     roomLabel: displayRoom(item.displayRoomLabel, buildingLabels),
   };
 }
@@ -95,9 +95,9 @@ export function resolveRequestCatalogLocation(
       item.roomLabel === trimmed ||
       item.displayRoomLabel === trimmed,
   );
-  // Sub-units (201, 201_2) map to one physical room, so 1+ matches that all resolve to the same
-  // building+display room is unambiguous — take the first. (displayRoomLabel matching also recovers
-  // the building for newer records stored as the collapsed "201".)
+  // 하위 호실(201, 201_2)은 하나의 물리 객실로 매핑되므로, 모두 같은
+  // 건물+표시 객실로 귀결되는 1건 이상의 일치는 모호하지 않다 — 첫 번째를 쓴다. (displayRoomLabel 매칭은 합쳐진
+  // "201" 로 저장된 최신 기록의 건물도 복구한다.)
   const samePhysical = new Set(exactMatches.map((m) => `${m.propertyName}::${m.displayRoomLabel}`));
   if (exactMatches.length >= 1 && samePhysical.size === 1) {
     const match = exactMatches[0];
@@ -127,7 +127,7 @@ export function resolveRequestLocation(
 ): RequestLocationDisplay {
   const trimmed = roomLabel.trim();
 
-  // When property_name is stored directly, use it — no catalog lookup needed.
+  // property_name 이 직접 저장돼 있으면 그대로 쓴다 — 카탈로그 조회 불필요.
   if (propertyName) {
     return {
       buildingLabel: localizePropertyName(propertyName, buildingLabels),

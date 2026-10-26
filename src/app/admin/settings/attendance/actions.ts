@@ -121,7 +121,7 @@ export async function issueAttendanceSiteQr(formData: FormData) {
  *
  * 휴대폰 분실·퇴사처럼 그 기기에서 더 이상 打刻하면 안 되는 상황에서 쓴다. 해지하면 그 기기는
  * 즉시 정상 로그인을 다시 요구한다. 조직 스코프로 제한해 다른 조직 기기는 건드릴 수 없다.
- * See docs/product/24-attendance-workflow.md → "Trusted Device".
+ * 참고: docs/product/24-attendance-workflow.md → "Trusted Device".
  */
 export async function revokeAttendanceTrustedDevice(formData: FormData) {
   const session = await requireOwnerOrgSession();

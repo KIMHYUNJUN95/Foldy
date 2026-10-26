@@ -10,21 +10,21 @@ import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * Controlled full-screen, swipeable image viewer (scroll-snap carousel + counter) with
- * **pinch-to-zoom**, double-tap zoom, and drag-to-pan while zoomed.
+ * 제어형 전체 화면 이미지 뷰어(scroll-snap 캐러셀 + 카운터)로,
+ * **핀치 줌**, 더블탭 줌, 확대 중 드래그 이동을 지원한다.
  *
- * Why this exists: in an installed standalone PWA, opening an image via `<a target="_blank">`
- * ejects the user into a separate mobile-Safari tab. This keeps photo viewing **inside the app** —
- * tap a thumbnail to open, swipe between photos, pinch to zoom, double-tap to toggle, drag to pan,
- * close to return exactly where you were. Portals to <body> so the mobile shell's transformed scroll
- * container can't trap its `position: fixed`.
+ * 만든 이유: 설치된 standalone PWA 에서 `<a target="_blank">` 로 이미지를 열면
+ * 사용자가 별도의 모바일 Safari 탭으로 튕겨 나간다. 이 뷰어는 사진 보기를 **앱 안에서** 하게 한다 —
+ * 썸네일을 눌러 열고, 사진 사이를 스와이프하고, 핀치로 확대하고, 더블탭으로 전환하고, 드래그로 이동하고,
+ * 닫으면 있던 자리로 정확히 돌아온다. <body> 로 portal 하므로 모바일 셸의 transform 된 스크롤
+ * 컨테이너가 `position: fixed` 를 가두지 못한다.
  *
- * Zoom is implemented directly (no library): while at scale 1 the native scroll-snap carousel handles
- * horizontal swiping between photos; a two-finger pinch (or double-tap) zooms the ACTIVE photo and
- * disables the carousel (`touch-action: none` + `overflow: hidden`) so a one-finger drag pans instead
- * of switching photos. Releasing back to scale 1 re-enables swiping. Zoom resets on slide change/close.
+ * 줌은 라이브러리 없이 직접 구현했다: 배율 1에서는 네이티브 scroll-snap 캐러셀이
+ * 사진 사이 가로 스와이프를 맡고, 두 손가락 핀치(또는 더블탭)는 활성 사진을 확대하며
+ * 캐러셀을 끈다(`touch-action: none` + `overflow: hidden`). 그러면 한 손가락 드래그가 사진 전환 대신 이동이 된다.
+ * 배율 1로 돌아오면 스와이프가 다시 켜진다. 줌은 슬라이드 전환/닫기 때 초기화된다.
  *
- * Controlled: parent owns `openIndex` (the index to show, or null when closed) and `onClose`.
+ * 제어형: 부모가 `openIndex`(보여줄 인덱스, 닫혀 있으면 null)와 `onClose` 를 가진다.
  */
 const MAX_SCALE = 4;
 
@@ -84,7 +84,7 @@ export function ImageLightbox({
     };
   }, [open, onClose]);
 
-  // On open / requested index change, jump the rail to the slide and reset any zoom.
+  // 열릴 때 / 요청된 인덱스가 바뀔 때, 레일을 해당 슬라이드로 옮기고 줌을 초기화한다.
   useEffect(() => {
     if (openIndex === null) return;
     const rail = railRef.current;
@@ -101,7 +101,7 @@ export function ImageLightbox({
     rail.scrollTo({ left: index * rail.clientWidth, behavior: "smooth" });
   };
 
-  // Only reachable at scale 1 (zoom disables native scroll), so the active slide is never zoomed.
+  // 배율 1에서만 닿을 수 있다(줌이면 네이티브 스크롤이 꺼짐). 그래서 활성 슬라이드는 확대된 상태가 아니다.
   const onRailScroll = useCallback(() => {
     const rail = railRef.current;
     if (!rail) return;
@@ -109,8 +109,8 @@ export function ImageLightbox({
     setActiveIndex((prev) => (i === prev ? prev : i));
   }, [urls.length]);
 
-  // Touch gesture handling (pinch / pan / double-tap) attached as non-passive native listeners so
-  // we can preventDefault during a zoom gesture.
+  // 터치 제스처 처리(핀치 / 이동 / 더블탭)를 non-passive 네이티브 리스너로 붙여서
+  // 줌 제스처 중에 preventDefault 를 호출할 수 있게 한다.
   const gesture = useRef({
     mode: "none" as "none" | "pinch" | "pan",
     startDist: 0,
@@ -210,7 +210,7 @@ export function ImageLightbox({
           applyTransform(IDENTITY);
           g.mode = "none";
         } else if (e.touches.length === 1) {
-          // one finger remains on a still-zoomed image → continue as a pan
+          // 손가락 하나가 확대된 이미지에 남아 있음 → 이동으로 이어간다
           g.mode = "pan";
           g.panStart = {
             x: e.touches[0].clientX,
@@ -229,7 +229,7 @@ export function ImageLightbox({
         return;
       }
 
-      // Double-tap toggle (only when not mid-gesture).
+      // 더블탭 전환(제스처 중이 아닐 때만).
       if (e.changedTouches.length === 1 && e.touches.length === 0) {
         const t = e.changedTouches[0];
         const now = Date.now();
@@ -286,7 +286,7 @@ export function ImageLightbox({
       role="dialog"
       style={{ animation: "modal-overlay-in 200ms ease-out both" }}
     >
-      {/* Top glass bar — counter + close. */}
+      {/* 상단 글래스 바 — 카운터 + 닫기. */}
       <div className="flex items-center justify-between px-4 pb-3 pt-[max(14px,env(safe-area-inset-top))]">
         <span className="rounded-full bg-white/12 px-3 py-1 text-[12.5px] font-bold tabular-nums text-white/90 backdrop-blur-md ring-1 ring-inset ring-white/15">
           {activeIndex + 1} / {urls.length}
@@ -301,7 +301,7 @@ export function ImageLightbox({
         </button>
       </div>
 
-      {/* Scroll-snap carousel. Zooming disables native horizontal scroll so panning takes over. */}
+      {/* scroll-snap 캐러셀. 줌 중에는 네이티브 가로 스크롤이 꺼져 이동이 대신한다. */}
       <div
         className={cn(
           "flex flex-1 overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -325,7 +325,7 @@ export function ImageLightbox({
                 className="max-h-full max-w-full select-none rounded-lg object-contain shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)]"
                 draggable={false}
                 onDoubleClick={() => {
-                  // Desktop parity for double-tap.
+                  // 더블탭과 같은 데스크톱 동작.
                   setSmooth(true);
                   if (isActive && transform.scale > 1.01) applyTransform(IDENTITY);
                   else if (isActive) applyTransform({ scale: 2.5, tx: 0, ty: 0 });
@@ -344,7 +344,7 @@ export function ImageLightbox({
         })}
       </div>
 
-      {/* Prev / next (multi-photo, pointer devices) + dots. Hidden while zoomed. */}
+      {/* 이전 / 다음(사진이 여러 장일 때, 포인터 기기) + 점. 확대 중에는 숨김. */}
       {urls.length > 1 && !zoomed ? (
         <>
           {activeIndex > 0 ? (

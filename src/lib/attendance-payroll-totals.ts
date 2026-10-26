@@ -1,18 +1,18 @@
-// Attendance — privileged org-wide PAYROLL TOTALS data layer (Step 12).
+// 근태 — 권한자 조직 전체 급여 합계 데이터 레이어 (Step 12).
 //
-// Backend/query-only. Produces the org-wide totals a future admin dashboard will show (finalized vs
-// expected labor total, unfinalized worker count, site-based totals by clock-in site). **No dashboard
-// UI is built** — the admin/web dashboard is deferred until the app is complete; this is the reusable
-// data layer it (and export) will call.
+// 백엔드/쿼리 전용. 향후 관리자 대시보드가 보여 줄 조직 전체 합계를 만든다 (확정 vs.
+// 예상 인건비 합계, 미확정 근로자 수, 출근 현장별 합계). **대시보드
+// UI 는 만들지 않았다** — 관리자/웹 대시보드는 앱이 완성될 때까지 보류이고, 이것은 대시보드(와 내보내기)가
+// 부를 재사용 가능한 데이터 레이어다.
 //
-// PRIVILEGE: org-wide compensation is owner / attendance_payroll_admin only. This function is
-// caller-agnostic (org + ym); the CALLER MUST gate it with `attendanceCan` (the same pattern
-// as the review queue), and the `attendance_month_snapshots` admin-only SELECT RLS is the backstop.
-// Regular users / hourly workers never reach this — they only see their own pay via getMonthlyPayView.
+// 권한: 조직 전체 보상은 owner / attendance_payroll_admin 전용이다. 이 함수는
+// 호출자 무관(org + ym)이므로, 호출자는 반드시 `attendanceCan` 으로 막아야 한다 (검토 큐와 같은 패턴).
+// 그리고 `attendance_month_snapshots` 의 관리자 전용 SELECT RLS 가 안전망이다.
+// 일반 사용자 / 시급 근로자는 여기에 닿지 않는다 — 본인 급여는 getMonthlyPayView 로만 본다.
 //
-// Numbers come from the ALREADY-BUILT helpers so expected/finalized stay consistent: expected = the sum
-// of each relevant hourly worker's current `getMonthlyPayView` expected gross; finalized = the sum of
-// `finalized` monthly snapshots (Step 11). The two are kept explicitly separate.
+// 숫자는 이미 만들어진 헬퍼에서 가져와 예상/확정이 일관되게 유지된다: 예상 = 관련
+// 시급 근로자 각자의 현재 `getMonthlyPayView` 예상 총액 합; 확정 = `finalized` 월 스냅샷의 합
+// (Step 11). 둘은 명확히 분리해서 둔다.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -25,26 +25,26 @@ type Service = ReturnType<typeof getSupabaseServiceClient>;
 export type PayrollSiteTotal = {
   siteId: string | null;
   siteName: string;
-  /** Expected gross attributed to this clock-in site (yen, rounded). */
+  /** 이 출근 현장에 귀속된 예상 총액 (엔, 반올림). */
   gross: number;
   paidMinutes: number;
 };
 
 export type PayrollTotals = {
-  ym: string; // YYYY-MM (Tokyo)
+  ym: string; // YYYY-MM (도쿄)
   monthLabel: string;
-  /** Sum of `finalized` per-person monthly snapshots (locked) — finalized data only. */
+  /** `finalized` 사람별 월 스냅샷(잠금)의 합 — 확정 데이터만. */
   finalizedLaborTotal: number;
   finalizedPaidMinutes: number;
   finalizedWorkerCount: number;
-  /** Currently projected gross across relevant hourly workers (expected, NOT finalized). */
+  /** 관련 시급 근로자 전체에 대해 현재 예상되는 총액 (예상, 확정 아님). */
   expectedLaborTotal: number;
   expectedPaidMinutes: number;
-  /** Hourly workers with attendance this month (the finalization-relevant population). */
+  /** 이번 달 근태가 있는 시급 근로자 (마감 관련 모집단). */
   relevantHourlyWorkerCount: number;
-  /** Relevant hourly workers without a finalized snapshot for the month. */
+  /** 그 달의 확정 스냅샷이 없는 관련 시급 근로자. */
   unfinalizedWorkerCount: number;
-  /** Expected labor totals aggregated by CLOCK-IN site (first-slice rule). */
+  /** 출근 현장별로 집계한 예상 인건비 합계 (1차 규칙). */
   siteTotals: PayrollSiteTotal[];
 };
 
@@ -76,8 +76,8 @@ async function loadSiteNames(
 }
 
 /**
- * Org-wide payroll totals for a Tokyo `ym`. Caller MUST have verified privilege first. O(relevant
- * hourly workers) — each worker reuses `getMonthlyPayView`, so expected totals match the self-view.
+ * 도쿄 `ym` 의 조직 전체 급여 합계. 호출자는 먼저 권한을 확인해야 한다. O(관련
+ * 시급 근로자) — 근로자마다 `getMonthlyPayView` 를 재사용하므로 예상 합계가 본인 보기와 일치한다.
  */
 export async function getPayrollTotals(
   organizationId: string,
@@ -87,7 +87,7 @@ export async function getPayrollTotals(
   const firstDay = monthFirstDay(ym);
   const lastDay = monthLastDay(ym);
 
-  // 1) Distinct workers with attendance this month + a session → clock-in-site map (first-slice rule).
+  // 1) 이번 달 근태가 있는 서로 다른 근로자 + 세션 → 출근 현장 맵 (1차 규칙).
   const sessRes = await service
     .from("attendance_sessions")
     .select("id, user_id, clock_in_site_id")
@@ -103,7 +103,7 @@ export async function getPayrollTotals(
   for (const s of monthSessions) sessionSite.set(s.id, s.clock_in_site_id);
   const candidateUserIds = Array.from(new Set(monthSessions.map((s) => s.user_id)));
 
-  // 2) Finalized snapshots for the month (finalized labor total — finalized data ONLY).
+  // 2) 그 달의 확정 스냅샷 (확정 인건비 합계 — 확정 데이터만).
   const snapRes = await service
     .from("attendance_month_snapshots")
     .select("user_id, gross_amount, total_paid_minutes")
@@ -119,7 +119,7 @@ export async function getPayrollTotals(
   const finalizedLaborTotal = finalizedRows.reduce((sum, r) => sum + Number(r.gross_amount), 0);
   const finalizedPaidMinutes = finalizedRows.reduce((sum, r) => sum + Number(r.total_paid_minutes), 0);
 
-  // 3) Expected per relevant hourly worker (reuses the self-view calc → consistent numbers).
+  // 3) 관련 시급 근로자별 예상 (본인 보기 계산 재사용 → 일관된 숫자).
   const views = await Promise.all(
     candidateUserIds.map((uid) => getMonthlyPayView(organizationId, uid, ym)),
   );
@@ -130,12 +130,12 @@ export async function getPayrollTotals(
   const siteAccum = new Map<string | null, { grossExact: number; paidMinutes: number }>();
 
   views.forEach((view) => {
-    if (!view.hourlyEligible) return; // salaried-only months are not payroll-finalization targets
+    if (!view.hourlyEligible) return; // 월급제만 있는 달은 급여 마감 대상이 아니다
     relevantHourlyWorkerCount += 1;
     expectedLaborTotal += view.expectedGross;
     expectedPaidMinutes += view.totalPaidMinutes;
 
-    // Site rollup by clock-in site, from each included session's exact gross.
+    // 출근 현장별 집계, 각 포함 세션의 정확한 총액에서.
     for (const day of view.days) {
       for (const s of day.sessions) {
         if (!s.included) continue;
@@ -148,7 +148,7 @@ export async function getPayrollTotals(
     }
   });
 
-  // Relevant hourly workers not finalized for the month.
+  // 그 달 마감되지 않은 관련 시급 근로자.
   const relevantHourlyUserIds = candidateUserIds.filter((_, i) => views[i].hourlyEligible);
   const unfinalizedWorkerCount = relevantHourlyUserIds.filter(
     (uid) => !finalizedUserIds.has(uid),

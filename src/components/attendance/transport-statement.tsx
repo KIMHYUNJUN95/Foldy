@@ -134,7 +134,7 @@ function HandIcon() {
     </svg>
   );
 }
-// Detail-sheet row icons (ported from "05" mockup)
+// 상세 시트 행 아이콘("05" 목업에서 가져옴)
 function CalIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -241,7 +241,7 @@ function shortDateLabel(isoDate: string): string {
   return `${m}/${d}`;
 }
 
-/** context "201, 202, 301" → "201 · 202 · 301" */
+/** 방 컨텍스트 "201, 202, 301" → "201 · 202 · 301" */
 function roomsLabel(item: TransportItem): string {
   const raw = item.rooms ?? item.context;
   if (!raw) return "-";
@@ -711,7 +711,7 @@ function DetailSheet({
         <div className="trn trn-detail">
           <div className="trn-detail-title">{t.detailTitle}</div>
 
-          {/* Receipt photo strip */}
+          {/* 영수증 사진 스트립 */}
           {item.receiptCount > 0 ? (
             <div className="trn-dshots">
               {Array.from({ length: Math.min(item.receiptCount, 2) }).map((_, i) => (
@@ -724,7 +724,7 @@ function DetailSheet({
             <div className="trn-dshot-empty">{t.detailNoReceipt}</div>
           )}
 
-          {/* Rows */}
+          {/* 행 */}
           <DetailRow icon={<CalIcon />} label={t.fieldDate}>
             {full} ({weekday})
           </DetailRow>
@@ -747,7 +747,7 @@ function DetailSheet({
             {memo}
           </DetailRow>
 
-          {/* Actions — slide the detail out first, then open the next sheet */}
+          {/* 동작 — 먼저 상세를 밀어 내보낸 뒤 다음 시트를 연다 */}
           <div className="trn-dacts">
             <button
               type="button"
@@ -986,7 +986,7 @@ function EditItemSheet({
   );
 }
 
-/** Delete confirmation — center-aligned alert modal (intentional BottomSheet exception). */
+/** 삭제 확인 — 가운데 정렬 알럿 모달(BottomSheet 의 의도된 예외). */
 function DeleteConfirmSheet({
   item,
   dict,
@@ -1060,7 +1060,7 @@ function DeleteConfirmSheet({
   );
 }
 
-/** Lightweight action-feedback toast (auto-dismiss). */
+/** 가벼운 동작 피드백 토스트(자동으로 사라짐). */
 function Toast({
   message,
   tone,
@@ -1343,7 +1343,7 @@ export function TransportStatement({
         />
       )}
 
-      {/* Detail sheet — only shows when neither edit nor delete is active (one sheet at a time) */}
+      {/* 상세 시트 — 수정도 삭제도 활성이 아닐 때만 표시(한 번에 시트 하나) */}
       {selectedItem && !showEdit && !showDelete && (
         <DetailSheet
           item={selectedItem}
@@ -1359,7 +1359,7 @@ export function TransportStatement({
         />
       )}
 
-      {/* Edit sheet — opens after the detail finishes sliding out */}
+      {/* 수정 시트 — 상세가 밀려 나간 뒤에 열린다 */}
       {selectedItem && showEdit && isEditable && (
         <EditItemSheet
           item={selectedItem}
@@ -1375,7 +1375,7 @@ export function TransportStatement({
         />
       )}
 
-      {/* Delete confirm — opens after the detail finishes sliding out */}
+      {/* 삭제 확인 — 상세가 밀려 나간 뒤에 열린다 */}
       {selectedItem && showDelete && isEditable && (
         <DeleteConfirmSheet
           item={selectedItem}

@@ -58,7 +58,7 @@ type EmailSignupFormCopy = {
   termsConPost: string;
 };
 
-/** Same minimum as the server (`MIN_PASSWORD_LENGTH` in src/app/auth/actions.ts). */
+/** 서버와 같은 최소값(src/app/auth/actions.ts 의 `MIN_PASSWORD_LENGTH`). */
 const MIN_PASSWORD_LENGTH = 10;
 
 function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {

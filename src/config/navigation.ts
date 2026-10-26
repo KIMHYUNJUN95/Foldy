@@ -93,7 +93,7 @@ const mobileNavCalendar = {
 } as const satisfies NavigationItem;
 
 // 판매 캘린더(운영 관리자) — `ops_admin.access` 보유자에게만 보인다. 데스크톱 `/admin/ops/calendar` 의 모바일판.
-// See docs/product/33-calendar-write-features.md → 「모바일 판매 캘린더」.
+// docs/product/33-calendar-write-features.md → 「모바일 판매 캘린더」 참고.
 const mobileNavOpsCalendar = {
   id: "ops-calendar",
   label: localizedNavigationLabels.mobile.opsCalendar,
@@ -116,7 +116,7 @@ const mobileNavRoomLinks = {
 
 // 가동률(운영 관리자) — 데스크톱 `/admin/ops/occupancy` 의 모바일 요약판(2026-10-15, 시안 Occ-Phone · Fold · Tablet).
 // 데스크톱 페이지가 관리자 웹 역할 + `ops_admin.access` 를 둘 다 요구하므로 모바일도 같다(`MOBILE_ADMIN_WEB_ONLY_IDS`).
-// See docs/product/34-metrics-and-automation.md → 「모바일 가동률」.
+// docs/product/34-metrics-and-automation.md → 「모바일 가동률」 참고.
 const mobileNavOpsOccupancy = {
   id: "ops-occupancy",
   label: localizedNavigationLabels.mobile.opsOccupancy,
@@ -127,7 +127,7 @@ const mobileNavOpsOccupancy = {
 
 // 매출(운영 관리자) — 데스크톱 `/admin/ops/revenue` 의 모바일 요약판(2026-10-15, 시안 Rev-Phone · Fold · Tablet).
 // 권한은 가동률과 같다 — 관리자 웹 역할 + `ops_admin.access`(`MOBILE_ADMIN_WEB_ONLY_IDS`). 아이콘은 데스크톱 매출과 같은 TrendingUp.
-// See docs/product/34-metrics-and-automation.md → 「모바일 매출」.
+// docs/product/34-metrics-and-automation.md → 「모바일 매출」 참고.
 const mobileNavOpsRevenue = {
   id: "ops-revenue",
   label: localizedNavigationLabels.mobile.opsRevenue,
@@ -156,7 +156,7 @@ const mobileNavCleaning = {
 } as const satisfies NavigationItem;
 
 // 내 시프트 · 오늘 내 방(2026-10-20) — 알바가 일할 날을 신청하고, 배정된 방을 본다. 청소 작업자(`cleaning.work`)만.
-// See docs/product/37-cleaning-shift-assignment.md.
+// docs/product/37-cleaning-shift-assignment.md 참고.
 const mobileNavShift = {
   id: "shift",
   label: localizedNavigationLabels.mobile.shift,
@@ -189,8 +189,8 @@ const mobileNavAnnouncements = {
   icon: BellRing,
 } as const satisfies NavigationItem;
 
-// Linen Return lives in the side menu (and the pinnable bottom-bar pool), not as a
-// default bottom tab. See docs/product/19-linen-defect-workflow.md.
+// 린넨 반품은 사이드 메뉴(와 고정 가능한 하단 바 풀)에 있고 기본
+// 하단 탭은 아니다. docs/product/19-linen-defect-workflow.md 참고.
 const mobileNavLinenReturn = {
   id: "linen-return",
   label: localizedNavigationLabels.mobile.linenReturn,
@@ -198,8 +198,8 @@ const mobileNavLinenReturn = {
   icon: BedDouble,
 } as const satisfies NavigationItem;
 
-// Todo / Shared Task — side-menu entry + pinnable bottom-bar candidate.
-// See docs/product/18-todo-task-workflow.md.
+// Todo / 공유 할 일 — 사이드 메뉴 항목 + 하단 바 고정 후보.
+// docs/product/18-todo-task-workflow.md 참고.
 const mobileNavTasks = {
   id: "tasks",
   label: localizedNavigationLabels.mobile.tasks,
@@ -207,8 +207,8 @@ const mobileNavTasks = {
   icon: ListChecks,
 } as const satisfies NavigationItem;
 
-// Staff Suggestions / Feedback Box — side-menu entry + pinnable bottom-bar candidate.
-// See docs/product/22-staff-suggestions-workflow.md.
+// 직원 제안 / 의견함 — 사이드 메뉴 항목 + 하단 바 고정 후보.
+// docs/product/22-staff-suggestions-workflow.md 참고.
 const mobileNavSuggestions = {
   id: "suggestions",
   label: localizedNavigationLabels.mobile.suggestions,
@@ -216,7 +216,7 @@ const mobileNavSuggestions = {
   icon: Inbox,
 } as const satisfies NavigationItem;
 
-// Board / 게시판 — free bulletin board for all staff. See docs/product/23-board-workflow.md.
+// 게시판 / Board — 모든 직원용 자유 게시판. docs/product/23-board-workflow.md 참고.
 const mobileNavBoard = {
   id: "board",
   label: localizedNavigationLabels.mobile.board,
@@ -224,9 +224,9 @@ const mobileNavBoard = {
   icon: Newspaper,
 } as const satisfies NavigationItem;
 
-// Bug Report — internal product/system issue reporting. Intentionally NOT in the side-menu nav
-// list (nor the pinnable bottom-bar pool): it is a utility surfaced in the sidebar footer next to
-// Logout. See docs/product/25-bug-report-workflow.md + docs/product/16-mobile-navigation.md.
+// 버그 신고 — 내부 제품/시스템 문제 신고. 일부러 사이드 메뉴 내비
+// 목록(고정 가능한 하단 바 풀도 아님)에 넣지 않았다. 로그아웃 옆
+// 사이드바 푸터에 있는 유틸리티다. docs/product/25-bug-report-workflow.md + docs/product/16-mobile-navigation.md 참고.
 export const mobileNavBugs = {
   id: "bugs",
   label: localizedNavigationLabels.mobile.bugs,
@@ -234,8 +234,8 @@ export const mobileNavBugs = {
   icon: Bug,
 } as const satisfies NavigationItem;
 
-// Attendance / 근태 (clock-in/out, live timer, capture) — implemented side-menu entry + pinnable
-// bottom-bar candidate. See docs/product/24-attendance-workflow.md.
+// 근태 / Attendance (출근/퇴근, 실시간 타이머, 촬영) — 구현된 사이드 메뉴 항목 + 고정 가능한
+// 하단 바 후보. docs/product/24-attendance-workflow.md 참고.
 const mobileNavAttendance = {
   id: "attendance",
   label: localizedNavigationLabels.mobile.attendance,
@@ -244,7 +244,7 @@ const mobileNavAttendance = {
 } as const satisfies NavigationItem;
 
 // 급여 준비(2026-10-25) — 알바 한 달 급여를 이름별로 보고 손 입력을 채운다. 키 `payroll.view`(입력은 서버 액션이 `payroll.manage` 를 다시 본다).
-// See docs/product/39 §5-A.
+// docs/product/39 §5-A 참고.
 const mobileNavPayroll = {
   id: "payroll",
   label: localizedNavigationLabels.mobile.payroll,
@@ -254,8 +254,8 @@ const mobileNavPayroll = {
   capability: "payroll.view",
 } as const satisfies NavigationItem;
 
-// Complaints / 컴플레인 — implemented manual complaint + external-review workspace. Side-menu entry
-// + pinnable bottom-bar candidate. See docs/product/25-complaint-workflow.md.
+// 컴플레인 / Complaints — 구현된 수동 컴플레인 + 외부 리뷰 작업 공간. 사이드 메뉴 항목
+// + 고정 가능한 하단 바 후보. docs/product/25-complaint-workflow.md 참고.
 const mobileNavComplaints = {
   id: "complaints",
   label: localizedNavigationLabels.mobile.complaints,
@@ -264,8 +264,8 @@ const mobileNavComplaints = {
   icon: MessageSquareWarning,
 } as const satisfies NavigationItem;
 
-// Bottom tab bar uses a center action ("추가") button, so it holds only 4 tabs.
-// "Cleaning" intentionally lives in the side menu (hamburger) instead of the bottom bar.
+// 하단 탭 바는 가운데 액션("추가") 버튼을 쓰므로 탭이 4개뿐이다.
+// "청소"는 하단 바가 아니라 사이드 메뉴(햄버거)에 일부러 둔다.
 export const mobileBottomNavigation = [
   mobileNavHome,
   mobileNavCalendar,
@@ -274,7 +274,7 @@ export const mobileBottomNavigation = [
 ] as const satisfies readonly NavigationItem[];
 
 // Operational ordering: 진입점 → 일일 코어(예약·청소·할일·요청·근태) → 커뮤니케이션(공지·게시판·제안함)
-// → 참조(린넨 반품·직원 목록). Bug Report is intentionally excluded (sidebar footer, next to Logout).
+// → 참조(린넨 반품·직원 목록). 버그 신고는 일부러 뺐다(사이드바 푸터, 로그아웃 옆).
 export const mobileSidebarNavigation = [
   mobileNavHome,
   mobileNavCalendar,
@@ -322,15 +322,15 @@ export const mobileOpsAdminNavigation = [
   mobileNavRoomLinks,
 ] as const satisfies readonly NavigationItem[];
 
-// ── Per-user bottom-bar customization ────────────────────────────────────────
-// The center FAB opens an editor where each user picks which features sit in
-// their mobile bottom tab bar. The selectable pool is the mobile side menu, and
-// the chosen ids are persisted per user (profiles.bottom_nav_tabs).
+// ── 사용자별 하단 바 맞춤 ────────────────────────────────────────
+// 가운데 FAB 는 각 사용자가 모바일 하단 탭 바에 둘 기능을
+// 고르는 편집기를 연다. 고를 수 있는 풀은 모바일 사이드 메뉴이고
+// 고른 id 는 사용자별로 저장된다(profiles.bottom_nav_tabs).
 
-/** Maximum number of user-pinned bottom tabs (the center FAB is always shown). */
+/** 사용자가 고정할 수 있는 하단 탭 최대 개수(가운데 FAB 는 항상 보인다). */
 export const MAX_BOTTOM_NAV_TABS = 4;
 
-/** Default bottom-bar tab ids for a new/unset user. */
+/** 새/미설정 사용자의 기본 하단 바 탭 id. */
 export const defaultBottomNavTabIds = [
   "home",
   "calendar",
@@ -338,7 +338,7 @@ export const defaultBottomNavTabIds = [
   "announcements",
 ] as const satisfies readonly string[];
 
-/** Features a user may pin to the bottom bar (the side menu + the ops-admin section, filtered per user). */
+/** 사용자가 하단 바에 고정할 수 있는 기능(사이드 메뉴 + 운영 관리자 구역, 사용자별로 걸러짐). */
 export const customizableBottomNavItems = [
   ...mobileSidebarNavigation,
   ...mobileOpsAdminNavigation,
@@ -365,7 +365,7 @@ export function canSeeNavItem(item: object, capabilities: readonly string[] | nu
   return !capability || Boolean(capabilities?.includes(capability));
 }
 
-/** Resolve stored bottom-nav ids into ordered navigation items (max enforced). */
+/** 저장된 하단 내비 id 를 순서 있는 내비 항목으로 바꾼다(최대 개수 적용). */
 export function resolveBottomNavItems(
   ids: readonly string[] | null | undefined,
 ): NavigationItem[] {
@@ -385,7 +385,7 @@ export function resolveBottomNavItems(
     if (resolved.length >= MAX_BOTTOM_NAV_TABS) break;
   }
 
-  // Never render an empty bottom bar — fall back to defaults if nothing resolved.
+  // 하단 바를 비워 두지 않는다 — 아무것도 확정되지 않으면 기본값으로 돌아간다.
   if (resolved.length === 0) {
     for (const id of defaultBottomNavTabIds) {
       const item = byId.get(id);
@@ -396,7 +396,7 @@ export function resolveBottomNavItems(
   return resolved;
 }
 
-/** Sanitize an arbitrary id list before persisting (valid, unique, capped). */
+/** 저장 전에 임의의 id 목록을 정리한다(유효, 중복 없음, 개수 제한). */
 export function sanitizeBottomNavTabIds(ids: readonly string[]): string[] {
   const valid = new Set<string>(customizableBottomNavItems.map((item) => item.id));
   const seen = new Set<string>();
@@ -572,9 +572,9 @@ export const adminNavigation = [
   },
 ] as const satisfies readonly NavigationItem[];
 
-// Desktop console sidebar grouping — matches the design handoff: 운영 / 인력 / 정보.
-// Maps each admin nav id to a group bucket; ids not listed fall under "operations".
-// See docs/product/05-admin-web-ia.md → "Primary Navigation".
+// 데스크톱 콘솔 사이드바 묶음 — 디자인 핸드오프와 같다: 운영 / 인력 / 정보.
+// 관리자 내비 id 를 묶음 그룹에 매핑한다. 목록에 없는 id 는 "operations" 에 들어간다.
+// docs/product/05-admin-web-ia.md → "Primary Navigation" 참고.
 export type AdminNavGroupKey = "operations" | "people" | "info" | "ops";
 
 export const adminNavGroupOf: Record<string, AdminNavGroupKey> = {

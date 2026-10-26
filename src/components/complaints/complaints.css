@@ -1,8 +1,8 @@
 /*
- * Complaints / 컴플레인 — visual design ported from "컴플레인 기록 (3 화면)" mockup.
- * Content-only styles scoped under `.cx`; the device chrome (status bar, header,
- * bottom nav) comes from MobileShell. Palette reuses the app theme (ivory + deep-ink navy).
- * Design-only — no backend. See docs/product/26-complaint-workflow.md.
+ * 컴플레인 — "컴플레인 기록 (3 화면)" 목업에서 옮긴 비주얼 디자인.
+ * `.cx` 로 범위를 한정한 콘텐츠 전용 스타일. 기기 크롬(상태 바, 헤더,
+ * 하단 내비)은 MobileShell 이 제공한다. 팔레트는 앱 테마(아이보리 + 짙은 잉크 네이비)를 재사용한다.
+ * 디자인 전용 — 백엔드 없음. docs/product/26-complaint-workflow.md 참고.
  */
 
 .cx {
@@ -55,7 +55,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* platform badge + source chip */
+/* 플랫폼 배지 + 출처 칩 */
 .cx-pbadge {
   display: inline-flex;
   align-items: center;
@@ -91,7 +91,7 @@
   flex: 0 0 auto;
 }
 
-/* status dot + pill */
+/* 상태 점 + 필 */
 .cx-sdot {
   width: 9px;
   height: 9px;
@@ -135,7 +135,7 @@
   background: currentColor;
 }
 
-/* rating */
+/* 평점 */
 .cx-rpill {
   display: inline-flex;
   align-items: center;
@@ -169,7 +169,7 @@
   color: var(--star);
 }
 
-/* external review — risk classification chip (list card + detail top row) */
+/* 외부 리뷰 — 위험 분류 칩 (목록 카드 + 상세 상단 행) */
 .cx-risk-chip {
   display: inline-flex;
   align-items: center;
@@ -194,7 +194,7 @@
   color: var(--cx-muted);
 }
 
-/* external review — Airbnb private feedback block, visually distinct from the public review */
+/* 외부 리뷰 — Airbnb 비공개 피드백 블록, 공개 리뷰와 시각적으로 구분 */
 .cx-priv-badge {
   display: inline-flex;
   align-items: center;
@@ -216,7 +216,7 @@
   margin-bottom: 0;
 }
 
-/* external review — translate toggle */
+/* 외부 리뷰 — 번역 토글 */
 .cx-translate-btn {
   display: inline-flex;
   align-items: center;
@@ -234,7 +234,7 @@
   cursor: default;
 }
 
-/* ── list ── */
+/* ── 목록 ── */
 .cx-lhead {
   padding: 6px 2px 2px;
 }
@@ -316,8 +316,8 @@
 .cx-seg button.on .cnt {
   color: var(--cx-primary);
 }
-/* view-switch tabs (manual complaints / external reviews) render as <Link> anchors —
-   mirror the existing button segment look without touching the button rule above. */
+/* 보기 전환 탭 (수동 불만 / 외부 리뷰)은 <Link> 앵커로 그려진다 —
+   위의 버튼 규칙을 건드리지 않고 기존 버튼 세그먼트 모양을 따른다. */
 .cx-seg a {
   flex: 1;
   height: 36px;
@@ -431,7 +431,7 @@
   padding: 48px 0;
 }
 
-/* ── detail ── */
+/* ── 상세 ── */
 .cx-detail {
   padding: 4px 0 12px;
 }
@@ -742,7 +742,7 @@
   height: 18px;
 }
 
-/* lightbox (portal to body) */
+/* 라이트박스 (body 로 포털) */
 .cx-lightbox {
   position: fixed;
   inset: 0;
@@ -828,7 +828,7 @@
   height: 14px;
 }
 
-/* ── create form ── */
+/* ── 작성 폼 ── */
 .cx-create {
   padding: 4px 0 30px;
 }
@@ -1140,7 +1140,7 @@ textarea.cx-fld {
   height: 18px;
 }
 
-/* picker sheet content (inside canonical BottomSheet) */
+/* 피커 시트 콘텐츠 (표준 BottomSheet 안) */
 .cx-sheet {
   padding-top: 2px;
   display: flex;
@@ -1380,7 +1380,7 @@ textarea.cx-fld {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* safe-area insets */
+  /* 세이프에어리어 인셋 */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .cx-lb__scrim {

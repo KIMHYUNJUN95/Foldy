@@ -41,7 +41,7 @@ export type AdminAnnouncementVM = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  // Derived
+  // 파생 값
   targetTotal: number;
   readCount: number;
   unreadCount: number;
@@ -59,16 +59,16 @@ export type AdminAnnouncementRoleCount = {
 export type AdminAnnouncementsData = {
   announcements: AdminAnnouncementVM[];
   organizations: OrganizationRow[];
-  /** Active member counts per role, keyed by organization id (for target-role chips). */
+  /** 역할별 활성 구성원 수, 조직 id 기준(대상 역할 칩용). */
   roleCountsByOrg: Record<string, AdminAnnouncementRoleCount[]>;
-  /** Total active members per organization (for the "everyone" recipient count). */
+  /** 조직별 전체 활성 구성원 수("전체" 수신자 수용). */
   orgMemberTotal: Record<string, number>;
   me: { id: string; name: string; role: string };
   isPlatformAdmin: boolean;
   /**
-   * Organizations this user may create an announcement in — i.e. the orgs where the
-   * server action would actually accept the insert. Empty means the composer must not
-   * be offered at all.
+   * 이 사용자가 공지를 만들 수 있는 조직 — 즉 서버 액션이
+   * 실제로 insert 를 받아 주는 조직. 비어 있으면 작성창을
+   * 아예 보여주지 않아야 한다.
    */
   creatableOrganizationIds: string[];
   loadError: boolean;
@@ -91,9 +91,9 @@ function isPopupActive(row: AnnouncementRow, nowIso: string): boolean {
 }
 
 /**
- * Loads every announcement the current admin can see (across writable organizations),
- * enriched with author / organization names and derived reach + read metrics for the
- * dashboard console. Read-only; mutations go through the console server actions.
+ * 현재 관리자가 볼 수 있는 모든 공지(쓰기 가능한 조직 전체)를 불러와, 작성자 / 조직 이름과
+ * 파생된 도달 수 + 읽음 지표를 붙여 대시보드 콘솔에 준다. 읽기 전용이며,
+ * 변경은 콘솔 서버 액션이 한다.
  */
 export async function getAdminAnnouncements(
   session: AppSession,
@@ -118,7 +118,7 @@ export async function getAdminAnnouncements(
   };
 
   try {
-    // 1. Resolve writable organizations + this user's role per org.
+    // 1. 쓰기 가능한 조직 + 조직별 이 사용자의 역할을 구한다.
     let organizations: OrganizationRow[] = [];
     const membershipRoleByOrgId = new Map<string, OrganizationRole>();
 
@@ -179,13 +179,13 @@ export async function getAdminAnnouncements(
     }
     const orgNameById = new Map(organizations.map((o) => [o.id, o.name]));
 
-    // Mirror of the server action's `canCreateInOrganization` gate, so the console can
-    // hide the composer instead of letting the user hit a forbidden on submit.
+    // 서버 액션의 `canCreateInOrganization` 게이트를 그대로 따라, 콘솔이
+    // 제출 시 forbidden 을 맞기 전에 작성창을 숨길 수 있게 한다.
     const creatableOrganizationIds = isPlatformAdmin
       ? orgIds
       : orgIds.filter((org) => capsByOrg.get(org)?.includes("announcement.create") ?? false);
 
-    // 2. Announcements across those orgs.
+    // 2. 그 조직들의 공지.
     const { data: announcementData } = await service
       .from("announcements")
       .select(announcementSelect)
@@ -196,7 +196,7 @@ export async function getAdminAnnouncements(
     const rows = (announcementData ?? []) as AnnouncementRow[];
     const announcementIds = rows.map((row) => row.id);
 
-    // 3. Active memberships across orgs — role counts + everyone totals.
+    // 3. 조직 전체의 활성 멤버십 — 역할별 수 + 전체 합계.
     const { data: allMembershipData } = await service
       .from("memberships")
       .select("organization_id, role, user_id")
@@ -221,7 +221,7 @@ export async function getAdminAnnouncements(
         : [];
     }
 
-    // 4. Author names.
+    // 4. 작성자 이름.
     const authorIds = [...new Set(rows.map((row) => row.created_by_user_id))];
     const authorNames = new Map<string, string>();
     if (authorIds.length > 0) {
@@ -234,7 +234,7 @@ export async function getAdminAnnouncements(
       }
     }
 
-    // 5. Read counts + popup dismissals (batched).
+    // 5. 읽음 수 + 팝업 닫기(묶음 조회).
     const readCountById = new Map<string, number>();
     // 현재 대상 구성원(활성 + 대상 역할)이 읽은 것만 센다(2026-10-26) — 읽고 나서 퇴사 · 역할 변경 ·
     // 대상 축소가 된 사람이 «읽음» 분자에 남아 상세 화면(getAnnouncementReadSummary)과 어긋났다.

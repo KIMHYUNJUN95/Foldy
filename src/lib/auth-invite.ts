@@ -4,8 +4,8 @@ import type { OrganizationRole } from "@/config/roles";
 import type { Database } from "@/types/database";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
-// service.rpc() is not typed because database.ts omits Relationships.
-// This provides just enough typing for the invite code join RPC.
+// database.ts 에 Relationships 가 없어서 service.rpc() 에 타입이 붙지 않는다.
+// 초대 코드 가입 RPC 에 필요한 만큼만 타입을 준다.
 type JoinRpcRow = {
   organization_id: string;
   role: Database["public"]["Enums"]["organization_role"];
@@ -23,8 +23,8 @@ export type InviteValidationResult =
   | { ok: false; error: "invalid" | "expired" | "inactive" | "maxed_out" };
 
 /**
- * Validates an invite code without consuming it.
- * Returns the target organization and default role if the code is usable.
+ * 초대 코드를 소비하지 않고 검증한다.
+ * 코드가 쓸 수 있으면 대상 조직과 기본 역할을 돌려준다.
  */
 export async function validateInviteCode(
   code: string,
@@ -78,9 +78,9 @@ export type JoinResult =
     };
 
 /**
- * Joins an organization using an invite code.
- * Validates the code first, then calls the join_organization_with_invite_code RPC.
- * The RPC atomically increments used_count and creates the membership row.
+ * 초대 코드로 조직에 가입한다.
+ * 먼저 코드를 검증한 뒤 join_organization_with_invite_code RPC 를 호출한다.
+ * RPC 가 원자적으로 used_count 를 올리고 멤버십 행을 만든다.
  */
 export async function joinOrganizationWithInviteCode(
   userId: string,

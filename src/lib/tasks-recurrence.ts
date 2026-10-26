@@ -1,18 +1,18 @@
 /**
- * Pure recurrence date math — **no server imports**, so this is safe to use from client components
- * (e.g. the calendar in `tasks-workspace.tsx`). The TaskRecord-bound recurrence helpers (rollover,
- * next/previous instance) live in `@/lib/tasks`, which pulls in server-only modules.
+ * 순수 반복 날짜 계산 — **서버 import 없음**, 그래서 클라이언트 컴포넌트에서 안전하게 쓸 수 있다
+ * (예: `tasks-workspace.tsx` 의 캘린더). TaskRecord 에 묶인 반복 헬퍼(롤오버,
+ * 다음/이전 인스턴스)는 server-only 모듈을 끌어오는 `@/lib/tasks` 에 있다.
  *
- * Todoist-style recurrence (2026-06-16): a recurring task is a single live row; future occurrences
- * are computed on the fly (here) for calendar previews rather than stored as rows.
+ * Todoist 방식 반복 (2026-06-16): 반복 작업은 살아 있는 행 하나이고, 앞으로의 회차는
+ * 행으로 저장하지 않고 캘린더 미리보기용으로 즉석에서(여기서) 계산한다.
  */
 
 import { ymdShift } from "@/lib/tokyo-date";
 
-// MUST stay in sync with `STANDARD_RECURRENCE_RULES` in `@/lib/tasks` (the server-only twin).
-// A rule present in one but not the other silently diverges the two code paths — e.g. an overdue
-// `yearly` task would roll forward via tasks.ts but be **hard-deleted** by the dismiss/reschedule
-// branch that gates on this file's `isStandardRecurrence`.
+// 반드시 `@/lib/tasks` 의 `STANDARD_RECURRENCE_RULES` (서버 전용 쌍둥이)와 동기화해야 한다.
+// 한쪽에만 있는 규칙은 두 코드 경로를 조용히 어긋나게 한다 — 예: 지연된
+// `yearly` 작업은 tasks.ts 로는 앞으로 굴러가지만 이 파일의 `isStandardRecurrence` 로 거르는
+// 닫기/일정 변경 분기에서는 **하드 삭제**된다.
 export const STANDARD_RECURRENCE_RULES = [
   "daily",
   "weekly",
@@ -25,20 +25,20 @@ type StandardRecurrenceRule = (typeof STANDARD_RECURRENCE_RULES)[number];
 
 /* ============================================================
    사용자 지정 요일 반복 (2026-07-29)
-   Stored in the same `tasks.recurrence_rule` text column as `custom:<d>,<d>,…` where each digit is
-   a JS weekday (0=Sun … 6=Sat), deduped and ascending — e.g. `custom:1,3,5` = 매주 월·수·금.
-   No schema change: the column was already free-form text.
+   `tasks.recurrence_rule` 텍스트 컬럼에 같이 `custom:<d>,<d>,…` 로 저장되며 각 숫자는
+   JS 요일(0=일 … 6=토), 중복 제거 후 오름차순이다 — 예: `custom:1,3,5` = 매주 월·수·금.
+   스키마 변경 없음: 컬럼은 이미 자유 형식 텍스트였다.
 
-   This is the ONE parser for the format; the server twin (`@/lib/tasks`) imports it from here
-   rather than re-implementing, because the two files' recurrence tables drifting apart is exactly
-   the failure the header warning above describes.
+   이 형식의 파서는 이것 하나뿐이다. 서버 쌍둥이(`@/lib/tasks`)는 다시 구현하지 않고
+   여기서 가져다 쓴다. 두 파일의 반복 표가 어긋나는 것이야말로
+   위 헤더 경고가 설명하는 실패이기 때문이다.
    ============================================================ */
 export const CUSTOM_RECURRENCE_PREFIX = "custom:";
 
-/** 0=일 … 6=토. Admin and mobile weekday pickers share this order so the two read identically. */
+/** 0=일 … 6=토. 관리자와 모바일 요일 피커가 이 순서를 공유해서 둘이 똑같이 읽힌다. */
 export const WEEKDAY_ORDER = [0, 1, 2, 3, 4, 5, 6] as const;
 
-/** One weekday's short name in `locale` ("월"/"月"/"Mon"). 1970-01-04 was a Sunday. */
+/** `locale` 의 요일 하나의 짧은 이름 ("월"/"月"/"Mon"). 1970-01-04 는 일요일이었다. */
 export function formatWeekday(weekday: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     weekday: locale.startsWith("en") ? "short" : "narrow",
@@ -46,7 +46,7 @@ export function formatWeekday(weekday: number, locale: string): string {
   }).format(new Date(Date.UTC(1970, 0, 4 + weekday)));
 }
 
-/** `custom:1,3,5` → `[1,3,5]`. Returns null for anything that isn't a well-formed custom rule. */
+/** `custom:1,3,5` → `[1,3,5]`. 올바른 형식의 사용자 지정 규칙이 아니면 null 을 반환한다. */
 export function parseCustomWeekdays(rule: string | null): number[] | null {
   if (!rule || !rule.startsWith(CUSTOM_RECURRENCE_PREFIX)) return null;
   const body = rule.slice(CUSTOM_RECURRENCE_PREFIX.length);
@@ -61,7 +61,7 @@ export function parseCustomWeekdays(rule: string | null): number[] | null {
   return days.sort((a, b) => a - b);
 }
 
-/** `[5,1,3]` → `custom:1,3,5`. Returns null for an empty/invalid set (never store an empty rule). */
+/** `[5,1,3]` → `custom:1,3,5`. 빈/잘못된 집합이면 null (빈 규칙은 절대 저장하지 않는다). */
 export function buildCustomRecurrenceRule(weekdays: readonly number[]): string | null {
   const days = [...new Set(weekdays.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort(
     (a, b) => a - b,
@@ -69,17 +69,17 @@ export function buildCustomRecurrenceRule(weekdays: readonly number[]): string |
   return days.length ? `${CUSTOM_RECURRENCE_PREFIX}${days.join(",")}` : null;
 }
 
-/** True for a custom weekday rule specifically (bare legacy `"custom"` is NOT one — see below). */
+/** 요일 사용자 지정 규칙에만 true (옛 `"custom"` 단독은 해당 없음 — 아래 참고). */
 export function isCustomWeekdayRecurrence(rule: string | null): boolean {
   return parseCustomWeekdays(rule) !== null;
 }
 
 /**
- * `custom:1,3,5` → "월·수·금" (en: "Mon, Wed, Fri"); "" when the rule isn't a custom one.
+ * `custom:1,3,5` → "월·수·금" (en: "Mon, Wed, Fri"); 사용자 지정 규칙이 아니면 "".
  *
- * Weekday names are locale data, not product copy, so this uses `Intl` like the rest of the task
- * date rendering rather than dictionary keys. `locale` is any BCP-47 tag ("ko", "ja-JP", …).
- * 1970-01-04 was a Sunday, which is why it anchors the weekday-0 lookup.
+ * 요일 이름은 제품 문구가 아니라 로케일 데이터이므로, 다른 작업 날짜 렌더링처럼
+ * 사전 키가 아니라 `Intl` 을 쓴다. `locale` 은 BCP-47 태그 ("ko", "ja-JP", …).
+ * 1970-01-04 가 일요일이었으므로 요일 0 조회의 기준으로 쓴다.
  */
 export function formatCustomWeekdays(rule: string | null, locale: string): string {
   const days = parseCustomWeekdays(rule);
@@ -88,7 +88,7 @@ export function formatCustomWeekdays(rule: string | null, locale: string): strin
   return locale.startsWith("en") ? names.join(", ") : names.join("·");
 }
 
-/** Next date strictly after `fromDate` whose weekday is in `weekdays`. */
+/** `fromDate` 이후 엄격히 다음 날짜 중 요일이 `weekdays` 에 속하는 것. */
 function nextWeekdayOccurrence(weekdays: readonly number[], fromDate: string, step: 1 | -1): string {
   let cursor = ymdShift(fromDate, step);
   for (let guard = 0; guard < 7; guard++) {
@@ -96,7 +96,7 @@ function nextWeekdayOccurrence(weekdays: readonly number[], fromDate: string, st
     if (weekdays.includes(new Date(Date.UTC(year, month - 1, day)).getUTCDay())) return cursor;
     cursor = ymdShift(cursor, step);
   }
-  return cursor; // unreachable for a non-empty set; keeps the return type total
+  return cursor; // 비어 있지 않은 집합에서는 도달 불가; 반환 타입을 완전하게 유지한다
 }
 
 function formatYmd(year: number, month: number, day: number): string {
@@ -126,13 +126,13 @@ function isStd(value: string | null): value is StandardRecurrenceRule {
 }
 
 /**
- * True when this module can compute the rule's occurrences — the six standard rules plus a custom
- * weekday rule (`custom:1,3,5`). Bare legacy `"custom"` carries no weekday set, so it stays false
- * and keeps its existing display-only behavior.
+ * 이 모듈이 규칙의 회차를 계산할 수 있으면 true — 표준 규칙 여섯 개와 사용자 지정
+ * 요일 규칙(`custom:1,3,5`). 옛 `"custom"` 단독은 요일 집합이 없으므로 false 로 남아
+ * 기존의 표시 전용 동작을 유지한다.
  *
- * Callers use this as the "is this a live recurring task?" gate, so it MUST agree with the server
- * twin. See the header warning: a rule that rolls forward there but returns false here is hard-
- * deleted by the dismiss/reschedule branch.
+ * 호출자는 이것을 "살아 있는 반복 작업인가?" 게이트로 쓰므로 서버
+ * 쌍둥이와 반드시 일치해야 한다. 위 헤더 경고 참고: 거기서는 앞으로 굴러가지만 여기서는 false 를 반환하는 규칙은
+ * 닫기/일정 변경 분기에서 하드 삭제된다.
  */
 export function isStandardRecurrence(value: string | null): boolean {
   return isStd(value) || isCustomWeekdayRecurrence(value);
@@ -177,8 +177,8 @@ export function canMoveRecurringTo(
 }
 
 /**
- * All occurrence dates of a recurring task within [start, end] (inclusive), for calendar previews.
- * Generated forward from `anchor`; dates before `start` are skipped (no past previews).
+ * 반복 작업이 [start, end] (양끝 포함) 안에서 갖는 모든 회차 날짜, 캘린더 미리보기용.
+ * `anchor` 부터 앞으로 생성하고, `start` 이전 날짜는 건너뛴다 (과거 미리보기 없음).
  */
 export function recurringOccurrencesInRange(
   rule: string | null,
@@ -199,11 +199,11 @@ export function recurringOccurrencesInRange(
 }
 
 /**
- * True only when `occurrenceDate` is a real occurrence generated by `rule` from `anchor`.
+ * `occurrenceDate` 가 `anchor` 에서 `rule` 로 생성된 실제 회차일 때만 true.
  *
- * Detail routes receive the date through the URL, so callers must treat it as an untrusted
- * candidate. Keeping this check in the pure recurrence module makes the page and server actions
- * use the same validation rule.
+ * 상세 경로는 날짜를 URL 로 받으므로, 호출자는 이것을 신뢰할 수 없는
+ * 후보로 다뤄야 한다. 이 검사를 순수 반복 모듈에 두면 페이지와 서버 액션이
+ * 같은 검증 규칙을 쓴다.
  */
 export function isRecurringOccurrenceDate(
   rule: string | null,
@@ -224,17 +224,17 @@ export function isRecurringOccurrenceDate(
    ============================================================ */
 export type OccurrenceState = "completed" | "skipped" | "moved";
 
-/** True when a state resolves an occurrence (removes it from "open"/overdue). All three do. */
+/** 상태가 회차를 해결하면 true ("열림"/지연에서 제외). 셋 다 해당한다. */
 export function isResolvedOccurrenceState(state: OccurrenceState | undefined): boolean {
   return state === "completed" || state === "skipped" || state === "moved";
 }
 
 /**
- * Outstanding (still-open) OVERDUE occurrence dates of a recurring task: rule occurrences in
- * `[anchor, today)` that have no recorded state. `resolvedDates` is the set of occurrence_date
- * strings that already carry a `task_occurrence_state` row (completed/skipped/moved) for this task.
- * Empty for non-standard rules or when nothing is overdue. Never auto-expires — a date stays here
- * until it is completed, skipped, or moved (see decision log 2026-07-30).
+ * 반복 작업의 아직 열려 있는 **지연** 회차 날짜: `[anchor, today)` 안의 규칙 회차 중
+ * 기록된 상태가 없는 것. `resolvedDates` 는 이 작업에 대해 이미 `task_occurrence_state` 행(완료/건너뜀/이동)을
+ * 가진 occurrence_date 문자열 집합이다.
+ * 표준이 아닌 규칙이거나 지연이 없으면 비어 있다. 자동 만료되지 않는다 — 날짜는 완료, 건너뜀,
+ * 이동될 때까지 남는다 (결정 로그 2026-07-30 참고).
  */
 /**
  * `from`(포함) 이후 첫 회차. 반복이 아니거나 앵커가 없으면 null.

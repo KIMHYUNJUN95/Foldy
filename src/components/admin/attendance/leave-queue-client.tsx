@@ -76,7 +76,7 @@ function fmtYmd(dateStr: string): string {
   return dateStr.replace(/-/g, "/");
 }
 
-/** ISO timestamp → Tokyo "MM/DD HH:mm"; null → "—". */
+/** ISO 타임스탬프 → 도쿄 "MM/DD HH:mm"; null → "—". */
 function fmtSubmitted(iso: string | null, localeTag: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -129,15 +129,15 @@ function durationLabel(unit: LeaveDurationUnit, lc: Lc): string {
   return lc.durationFull;
 }
 
-/** `value / total` as a CSS width, clamped to 0–100%. Guards the over-balance case where the
- *  post-approval balance is negative and a raw percentage would be an invalid width. */
+/** `value / total` 을 CSS 너비로 변환하고 0–100% 로 제한한다. 승인 후 잔액이
+ *  음수가 되는 초과 잔액 경우에 원시 퍼센트가 잘못된 너비가 되는 것을 막는다. */
 function barPct(value: number, total: number): string {
   if (!total || total <= 0) return "0%";
   return `${Math.min(100, Math.max(0, (value / total) * 100))}%`;
 }
 
-/** Tokyo "today" as YYYY-MM-DD — matches the server's operational-date convention. */
-/** Pending requests starting within 5 days get a left-edge urgency indicator (row.urgent CSS). */
+/** 도쿄 기준 오늘의 YYYY-MM-DD — 서버의 운영 날짜 규칙과 맞춘다. */
+/** 5일 안에 시작하는 대기 요청은 왼쪽 가장자리에 긴급 표시를 단다(row.urgent CSS). */
 function isUrgent(item: LeaveQueueItem, today: string): boolean {
   if (item.status !== "requested") return false;
   const start = new Date(`${item.startDate}T00:00:00+09:00`).getTime();
@@ -188,9 +188,9 @@ function errLabel(reason: string | undefined, lc: Lc): string {
 
 type LeaveView = "review" | "calendar" | "balance" | "documents" | "ledger";
 
-// View tabs (handoff .lviews): icon + label, selected = filled navy. Matches leave-views.js order/icons.
-// Approver management moved to the Users screen (/admin/users) — all role/permission granting is
-// unified there — so the former 승인자 관리 sub-tab was removed.
+// 보기 탭(핸드오프 .lviews): 아이콘 + 라벨, 선택됨 = 채운 남색. leave-views.js 의 순서/아이콘과 같다.
+// 승인자 관리는 사용자 화면(/admin/users)으로 옮겼다 — 모든 역할/권한 부여는
+// 거기로 통합되었으므로 예전 승인자 관리 하위 탭은 제거했다.
 const SUB_TABS: { view: LeaveView; key: keyof Lc; icon: React.ReactNode }[] = [
   { view: "review", key: "subTabReview", icon: <Clock /> },
   { view: "calendar", key: "subTabCalendar", icon: <Calendar /> },
@@ -199,7 +199,7 @@ const SUB_TABS: { view: LeaveView; key: keyof Lc; icon: React.ReactNode }[] = [
   { view: "ledger", key: "subTabLedger", icon: <ScrollText /> },
 ];
 
-/** Sub-tab bar for the leave section — all five views now render real content. */
+/** 휴가 섹션의 하위 탭 바 — 다섯 보기 모두 이제 실제 내용을 렌더한다. */
 function LeaveSubTabs({
   view,
   onChange,
@@ -286,8 +286,8 @@ export function LeaveQueueClient({
   const [statusGroup, setStatusGroup] = useState<LeaveStatusGroup>(initialStatusGroup);
   const [typeFilter, setTypeFilter] = useState<LeaveType | null>(initialType);
   const [nameQuery, setNameQuery] = useState(initialSearch);
-  // Sort: null = newest submission first (default), "days" = most days, "soon" = start date
-  // soonest, "name" = applicant name ascending.
+  // 정렬: null = 제출 최신순(기본), "days" = 일수 많은 순, "soon" = 시작일
+  // 가까운 순, "name" = 신청자 이름 오름차순.
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialRequestId);
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
@@ -296,9 +296,9 @@ export function LeaveQueueClient({
   );
   const showToast = (msg: string) => setToast({ id: Date.now(), msg });
 
-  // After an approve/reject, update the resolved request in-place so it leaves 승인 대기 and the
-  // tab counts refresh — the list is client-held, so without this it would still show as pending
-  // (and re-opening it would hit "already processed").
+  // 승인/거절 뒤에는 처리된 요청을 그 자리에서 갱신해서 승인 대기에서 빠지고
+  // 탭 개수가 갱신된다 — 목록은 클라이언트가 들고 있으므로 이게 없으면 여전히 대기로 보이고
+  // (다시 열면 "이미 처리됨" 이 된다).
   function handleResolved(msg: string, resolvedId?: string, resolvedStatus?: LeaveStatus) {
     if (resolvedId && resolvedStatus) {
       setItems((prev) => prev.map((i) => (i.id === resolvedId ? { ...i, status: resolvedStatus } : i)));
@@ -325,8 +325,8 @@ export function LeaveQueueClient({
     return { pending, approved, rejectedCancelled, all: items.length };
   }, [items]);
 
-  // Plain const (not useMemo): the React Compiler auto-memoizes, and a manual memo here trips the
-  // preserve-manual-memoization rule.
+  // 일반 const(useMemo 아님): React Compiler 가 자동으로 메모이제이션하고, 여기에 수동 memo 를 두면
+  // preserve-manual-memoization 규칙에 걸린다.
   const typeOptions = (["paid", "annual", "special", "other"] as LeaveType[]).map((t) => ({
     value: t,
     label: typeLabel(t, lc),
@@ -457,7 +457,7 @@ export function LeaveQueueClient({
     <div style={{ position: "relative" }}>
       <LeaveSubTabs view={view} onChange={setView} lc={lc} onRequest={(mode) => setRequestModal({ mode })} />
 
-      {/* Filter toolbar */}
+      {/* 필터 툴바 */}
       <div className="toolbar">
         <div className="fseg" role="tablist">
           <button
@@ -866,9 +866,9 @@ function LeavePanel({
                   </b>
                 </div>
                 <div className="limpact__bar">
-                  {/* balanceAfter goes negative when the request exceeds the remaining balance
-                      (an over-balance approval). A negative CSS width is invalid and would leave the
-                      previous width painted, so both segments are clamped to 0–100%. */}
+                  {/* balanceAfter 는 신청이 남은 잔액을 넘으면 음수가 된다
+                      (잔액 초과 승인). 음수 CSS 너비는 유효하지 않아 이전 너비가 그대로 남으므로
+                      두 구간 모두 0–100% 로 제한한다. */}
                   <i style={{ width: barPct(detail.balanceAfter, detail.balanceBefore) }} />
                   <em style={{ width: barPct(item.daysCount, detail.balanceBefore) }} />
                 </div>

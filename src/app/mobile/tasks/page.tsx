@@ -84,8 +84,8 @@ export default async function MobileTasksPage({ searchParams }: PageProps) {
       locale,
     }),
   ]);
-  // Project tasks live only in the Projects tab; the Completed tab still surfaces project
-  // completions via its filter, so those are passed separately.
+  // 프로젝트 할 일은 프로젝트 탭에만 있다. 완료 탭은 필터로 프로젝트
+  // 완료분을 여전히 보여주므로 따로 넘긴다.
   const tasks = allVisible.filter((t) => !t.projectId);
   // 완료·기록 탭은 완료 **로그** 기준이다(반복 완료는 행 status 를 건드리지 않는다 — getTaskCompletions
   // 주석 참고). 그래서 status=completed 뿐 아니라 로그에 완료가 찍힌 프로젝트 작업도 함께 넘겨야

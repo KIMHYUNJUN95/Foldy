@@ -1,7 +1,7 @@
-// Admin 분실물 console — presentation helpers. Mirrors maintenance-console-data.ts 1:1: status/category →
-// CSS-class + i18n-key maps, board column order, and the Tokyo time formatters the cards/tables render
-// with. Data (AdminLostItemVM) is real — see src/lib/admin-lost-found.ts.
-// See docs/product/09-lost-found-workflow.md.
+// 관리자 분실물 콘솔 — 표시 헬퍼. maintenance-console-data.ts 와 1:1로 같다: 상태/카테고리 →
+// CSS 클래스 + i18n 키 맵, 보드 컬럼 순서, 카드/표가 렌더링에 쓰는 도쿄 시간 포맷터.
+// 데이터(AdminLostItemVM)는 실제 값이다 — src/lib/admin-lost-found.ts 참고.
+// 참고: docs/product/09-lost-found-workflow.md.
 
 import type { AdminLostItemVM, AdminLostFoundData } from "@/lib/admin-lost-found";
 import { isLostItemTerminal, type LostItemCategory, type LostItemStatus } from "@/lib/lost-found-constants";
@@ -20,7 +20,7 @@ export type LFFilters = {
   query: string;
 };
 
-// ── status meta (design status name → DB status → CSS class + i18n key) ──
+// ── 상태 메타 (디자인 상태명 → DB 상태 → CSS 클래스 + i18n 키) ──
 export const LOST_STATUS: Record<LostItemStatus, { cls: string; key: string }> = {
   registered: { cls: "received", key: "stReceived" },
   stored: { cls: "stored", key: "stStored" },
@@ -54,7 +54,7 @@ export function tpl(template: string, n: number | string): string {
   return template.replace("{n}", String(n));
 }
 
-// ── time helpers (all inputs are Tokyo "YYYY-MM-DD[ HH:MM]" from admin-lost-found.ts) ──
+// ── 시간 헬퍼 (모든 입력은 admin-lost-found.ts 의 도쿄 "YYYY-MM-DD[ HH:MM]") ──
 function toAbsMinutes(dateStr: string, minutes: number): number {
   const [y, m, d] = dateStr.split("-").map(Number);
   return Date.UTC(y, m - 1, d) / 60000 + minutes;
@@ -95,7 +95,7 @@ export function sortForBoard(list: AdminLostItemVM[]): AdminLostItemVM[] {
   });
 }
 
-// ── filter option builders (derived from the loaded rows, not a hardcoded master) ──
+// ── 필터 옵션 빌더 (하드코딩 마스터가 아니라 불러온 행에서 파생) ──
 export function buildingOptionsOf(items: readonly AdminLostItemVM[]): string[] {
   return [...new Set(items.map((i) => i.buildingLabel).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, "ko"),
@@ -114,8 +114,8 @@ export function reporterOptionsOf(items: readonly AdminLostItemVM[]): ReporterOp
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
-// Avatar palette — same approach as the cleaning/maintenance consoles (deterministic hash → stable
-// color per user).
+// 아바타 팔레트 — 청소/유지보수 콘솔과 같은 방식 (결정적 해시 → 사용자별 고정
+// 색상).
 const AVATAR_PALETTE = [
   "#3f7d5a",
   "#a86b3c",

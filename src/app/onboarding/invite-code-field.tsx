@@ -12,9 +12,9 @@ export type InviteCodeFieldCopy = {
   orgLabel: string;
   roleLabel: string;
   changeCode: string;
-  /** `onboarding.errors.*` map, for resolving the returned error key. */
+  /** `onboarding.errors.*` 맵. 반환된 에러 키를 해석하는 데 쓴다. */
   errors: Record<string, string>;
-  /** `onboarding.roleCategories.*` map, for resolving the returned category key. */
+  /** `onboarding.roleCategories.*` 맵. 반환된 카테고리 키를 해석하는 데 쓴다. */
   roleCategories: Record<string, string>;
 };
 
@@ -26,12 +26,12 @@ const inputClass =
 type Status = "idle" | "verifying" | "ok" | "error";
 
 /**
- * Invite-code input with a "verify → preview → confirm" flow.
+ * "확인 → 미리보기 → 확정" 흐름의 초대 코드 입력.
  *
- * On verify it calls the real `previewInviteCode` server action and, on success,
- * renders the resolved organization + role-category preview. It reports the
- * verified code (or null when cleared) to the parent via `onVerifiedChange` so
- * the parent form can submit it and gate its join button on a confirmed preview.
+ * 확인을 누르면 실제 `previewInviteCode` 서버 액션을 호출하고, 성공하면
+ * 해석된 조직 + 역할 카테고리 미리보기를 렌더한다. 확인된
+ * 코드(비워지면 null)를 `onVerifiedChange` 로 부모에 알려, 부모 폼이
+ * 이를 제출하고 미리보기가 확정된 뒤에야 가입 버튼을 활성화할 수 있게 한다.
  */
 export function InviteCodeField({
   copy,
@@ -81,7 +81,7 @@ export function InviteCodeField({
     onVerifiedChange(null);
   }
 
-  // ── Confirmed preview state ───────────────────────────────────────────────
+  // ── 확정된 미리보기 상태 ──
   if (status === "ok" && preview) {
     const roleLabel = copy.roleCategories[preview.roleCategory] ?? preview.roleCategory;
     return (
@@ -126,7 +126,7 @@ export function InviteCodeField({
     );
   }
 
-  // ── Input / verify state ──────────────────────────────────────────────────
+  // ── 입력 / 확인 상태 ──
   return (
     <div className="space-y-2">
       <span className="text-sm font-bold text-foreground">{copy.label}</span>

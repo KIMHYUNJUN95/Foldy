@@ -52,9 +52,9 @@ export default async function BoardPostPage({ params }: PageProps) {
     : rawNavBadges;
   const copy = getDictionary(session.user.preferredLanguage).board;
 
-  // MobileShell + hideBottomNav — same pattern as the Suggestions detail page so the top chrome
-  // (hamburger + wordmark + notification bell) is consistent across detail surfaces. The bottom
-  // tab bar is hidden so the comment composer can sit at the viewport bottom without overlap.
+  // MobileShell + hideBottomNav — 건의함 상세 페이지와 같은 패턴으로 상단 크롬
+  // (햄버거 + 워드마크 + 알림 벨)이 상세 화면 전반에서 일관되게 한다. 하단
+  // 탭 바는 숨겨서 댓글 입력창이 화면 맨 아래에 겹침 없이 놓이게 한다.
   return (
     <MobileShell activeItem="board" badges={navBadges} title={copy.title} hideBottomNav>
       <BoardDetailClient

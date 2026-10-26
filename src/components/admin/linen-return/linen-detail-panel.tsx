@@ -5,7 +5,7 @@
 // 수정 창 = 건물 · 이 건물에서 고를 수 있는 품목 전부를 ± 로(0 이면 저장하지 않음 — 중복 행이 생길 수 없다) · 메모 · 사진 → [취소][저장].
 // 등록 일시/등록자는 현장 증빙값이라 수정 창 머리에 적어만 두고, 서버 액션도 이 두 컬럼을 payload 에 넣지 않는다.
 // 사진은 기존 업로드 계약(compressImageFile → uploadRequestImages, 기능당 5장)을 그대로 쓴다.
-// See docs/product/19-linen-defect-workflow.md → "Record Management Contract".
+// 참고: docs/product/19-linen-defect-workflow.md → "Record Management Contract".
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Minus, Plus, Trash2, X } from "lucide-react";

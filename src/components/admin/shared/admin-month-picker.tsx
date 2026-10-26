@@ -1,6 +1,6 @@
 "use client";
 
-// Shared admin-console month picker primitive.
+// 공용 admin 콘솔 월 선택 프리미티브.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -16,12 +16,12 @@ export type AdminMonthPickerLabels = {
 };
 
 type AdminMonthPickerProps = {
-  /** Current month, "YYYY-MM". */
+  /** 현재 월, "YYYY-MM". */
   ym: string;
   localeTag: string;
-  /** Path the ?ym= query is appended to (e.g. "/admin/attendance/payroll"). */
+  /** ?ym= 쿼리가 덧붙는 경로(예: "/admin/attendance/payroll"). */
   basePath: string;
-  /** Optional non-month query keys preserved while switching months (e.g. selected user/panel). */
+  /** 월을 바꿀 때 유지되는 월 외 쿼리 키(선택, 예: 선택된 사용자/패널). */
   preserveQueryKeys?: string[];
   labels: AdminMonthPickerLabels;
   /**

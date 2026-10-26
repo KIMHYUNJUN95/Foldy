@@ -1,10 +1,10 @@
 "use client";
 
-// Unified schedule picker (mobile) — one clean sheet for 날짜 · 시간 · 반복, benchmarked on
-// Todoist's date popover. Quick relative options (오늘/내일/다음 주/다음 주말/날짜 없음) with computed
-// date labels + an inline month calendar + expandable Time / Repeat rows.
-// Single-date model (A안, 2026-07-24): the picker sets ONE date; the form maps it to `due_at`.
-// See docs/product/18-todo-task-workflow.md → "Dates And Time".
+// 통합 일정 피커 (모바일) — 날짜 · 시간 · 반복을 한 장에 담은 깔끔한 시트로, 벤치마크는
+// Todoist 의 날짜 팝오버. 빠른 상대 옵션 (오늘/내일/다음 주/다음 주말/날짜 없음)과 계산된
+// 날짜 라벨 + 인라인 월 캘린더 + 펼치는 시간 / 반복 행.
+// 단일 날짜 모델 (A안, 2026-07-24): 피커는 날짜 하나만 정하고, 폼이 그것을 `due_at` 에 대응시킨다.
+// docs/product/18-todo-task-workflow.md → "Dates And Time" 참고.
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Armchair,
@@ -48,7 +48,7 @@ function dowOf(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
-// Next Monday strictly after today (Monday → +7).
+// 오늘 다음 첫 월요일 (월요일이면 +7).
 function nextMonday(ymd: string): string {
   const dow = dowOf(ymd);
   const delta = ((1 - dow + 7) % 7) || 7;
@@ -77,17 +77,17 @@ export function TaskSchedulePicker({
   initialDuration: number;
   hadCustom: boolean;
   /**
-   * "full" (default) — date + time + repeat, commit-on-close (Todoist-style; any dismiss keeps it).
-   * "date" — date only (no time/repeat, no 날짜 없음), commit-on-confirm: only the 완료 button applies;
-   *          a scrim tap / drag / Esc cancels. Used for the overdue bulk reschedule.
+   * "full" (기본) — 날짜 + 시간 + 반복, 닫을 때 확정 (Todoist 식; 어떻게 닫아도 유지).
+   * "date" — 날짜만 (시간/반복 없음, "날짜 없음" 옵션도 없음), 확인 시 확정: 완료 버튼만 적용한다;
+   *          스크림 탭 / 드래그 / Esc 는 취소한다. 지난 일정 일괄 변경에 쓴다.
    */
   variant?: "full" | "date";
-  /** Header title override shown when no date is selected (defaults to 일정). */
+  /** 날짜가 선택되지 않았을 때 보이는 헤더 제목 재정의 (기본값은 일정). */
   title?: string;
-  /** Confirm-button label override (defaults to 완료). */
+  /** 확인 버튼 라벨 재정의 (기본값은 완료). */
   confirmLabel?: string;
   onApply: (value: ScheduleValue) => void;
-  /** date variant only — called when the sheet is dismissed without confirming. */
+  /** date 변형 전용 — 확인 없이 시트를 닫았을 때 호출된다. */
   onCancel?: () => void;
 }) {
   const isDate = variant === "date";
@@ -103,19 +103,19 @@ export function TaskSchedulePicker({
   const base = YMD.test(date) ? date : today;
   const [cur, setCur] = useState({ y: Number(base.slice(0, 4)), m: Number(base.slice(5, 7)) });
 
-  // Commit-on-close: capture the latest draft and hand it to the parent when the sheet closes.
+  // 닫을 때 확정: 최신 초안을 잡아 시트가 닫힐 때 부모에게 넘긴다.
   const draftRef = useRef<ScheduleValue>({ date, time, repeat, duration });
   useEffect(() => {
-    // Duration only makes sense with a time-of-day; drop it otherwise so it never leaks out.
-    // A half-finished custom rule (`custom:` with no weekdays) commits as 반복 없음 — this sheet is
-    // commit-on-close, so a drag-down while the picker is open must not persist an unschedulable
-    // rule. The server fails it closed to null anyway; normalizing here keeps UI and stored value
-    // in agreement instead of silently disagreeing.
+    // 소요 시간은 시각이 있을 때만 의미가 있다. 아니면 버려서 새어 나가지 않게 한다.
+    // 미완성 커스텀 규칙(요일 없는 `custom:`)은 반복 없음으로 확정된다 — 이 시트는
+    // 닫을 때 확정이므로, 피커가 열린 채로 아래로 드래그하면 일정으로 만들 수 없는
+    // 규칙이 저장되면 안 된다. 서버가 어차피 null 로 닫지만, 여기서 정규화해야 UI 와 저장 값이
+    // 조용히 어긋나지 않고 일치한다.
     const committedRepeat =
       repeat.startsWith(CUSTOM_RECURRENCE_PREFIX) && !parseCustomWeekdays(repeat) ? "" : repeat;
     draftRef.current = { date, time, repeat: committedRepeat, duration: time ? duration : 0 };
   }, [date, time, repeat, duration]);
-  // "full": commit on any close. "date": commit only when 완료 was tapped (confirmedRef); else cancel.
+  // "full": 어떤 방식으로 닫아도 확정. "date": 완료를 탭했을 때만 확정 (confirmedRef); 아니면 취소.
   const confirmedRef = useRef(false);
   const handleClose = useCallback(() => {
     if (!isDate || confirmedRef.current) onApply(draftRef.current);
@@ -165,7 +165,7 @@ export function TaskSchedulePicker({
     setCur({ y: Number(ymd.slice(0, 4)), m: Number(ymd.slice(5, 7)) });
   }
 
-  // ── inline month calendar ──────────────────────────────────────────────────
+  // ── 인라인 월 캘린더 ──────────────────────────────────────────────────
   const first = new Date(Date.UTC(cur.y, cur.m - 1, 1)).getUTCDay();
   const daysIn = new Date(Date.UTC(cur.y, cur.m, 0)).getUTCDate();
   const monthLabel = new Intl.DateTimeFormat(locale, {
@@ -220,7 +220,7 @@ export function TaskSchedulePicker({
     return `${h >= 12 ? copy.pmLabel : copy.amLabel} ${h12}:${pad2(m)}`;
   })();
 
-  // Duration (time-block length) — options + display label.
+  // 소요 시간 (시간 블록 길이) — 옵션 + 표시 라벨.
   const durationOptLabel = (d: number) =>
     d === 15
       ? copy.duration15
@@ -233,7 +233,7 @@ export function TaskSchedulePicker({
             : `${d}${copy.durationMinUnit}`;
   const durationText = duration > 0 ? durationOptLabel(duration) : copy.durationNone;
 
-  // Repeat — contextual options keyed off the selected date (Todoist-style).
+  // 반복 — 선택한 날짜에 맞춘 맥락 옵션 (Todoist 식).
   const wdLong = YMD.test(date)
     ? new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }).format(
         new Date(`${date}T00:00:00Z`),
@@ -250,9 +250,9 @@ export function TaskSchedulePicker({
     { rule: "monthly", label: fill(copy.repeatMonthlyOn, { d: dayNum }) },
     { rule: "yearly", label: fill(copy.repeatYearlyOn, { md: mdLabel }) },
   ];
-  // 사용자 지정 요일 반복 — `customDays` is the mode flag AND the value: an array (possibly empty)
-  // while the row is on, null otherwise. `custom:` with an empty body parses to null, so the
-  // "custom mode, nothing picked yet" state needs the explicit prefix check.
+  // 사용자 지정 요일 반복 — `customDays` 는 모드 플래그이자 값이다: 배열 (비어 있을 수도 있음)은
+  // 행이 켜져 있는 동안은 값이고 아니면 null 이다. 빈 본문의 `custom:` 은 null 로 파싱되므로
+  // "커스텀 모드인데 아직 아무것도 고르지 않음" 상태는 명시적인 접두사 검사가 필요하다.
   const inCustomMode = repeat.startsWith(CUSTOM_RECURRENCE_PREFIX);
   const customDays = inCustomMode ? (parseCustomWeekdays(repeat) ?? []) : null;
   const repeatIncomplete = inCustomMode && customDays!.length === 0;
@@ -295,7 +295,7 @@ export function TaskSchedulePicker({
       {({ close }) => (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto pb-1">
-            {/* Quick relative options (date variant hides 날짜 없음 — you must move to a date) */}
+            {/* 빠른 상대 옵션 (date 변형은 날짜 없음을 숨긴다 — 날짜로 옮겨야 한다) */}
             <div className="flex flex-col">
               {quick
                 .filter((o) => !isDate || o.ymd !== null)
@@ -326,7 +326,7 @@ export function TaskSchedulePicker({
                     {o.hint ? (
                       <span className="text-[12.5px] font-semibold text-muted-foreground">{o.hint}</span>
                     ) : null}
-                    {/* Fixed-width check slot so the hint (요일/날짜) never shifts left when selected. */}
+                    {/* 고정 폭 체크 칸으로, 선택돼도 힌트(요일/날짜)가 왼쪽으로 밀리지 않는다. */}
                     <span className="flex w-4 shrink-0 items-center justify-center">
                       {on ? (
                         <Check className="size-4 text-primary" strokeWidth={3} aria-hidden="true" />
@@ -337,7 +337,7 @@ export function TaskSchedulePicker({
               })}
             </div>
 
-            {/* Inline month calendar */}
+            {/* 인라인 월 캘린더 */}
             <div className="mt-2 border-t-[0.5px] border-[var(--separator)] pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <button
@@ -368,10 +368,10 @@ export function TaskSchedulePicker({
               <div className="mt-1 grid grid-cols-7 gap-0.5">{cells}</div>
             </div>
 
-            {/* Time + Repeat — full variant only (date variant is date-only for bulk reschedule). */}
+            {/* 시간 + 반복 — full 변형에서만 (date 변형은 일괄 일정 변경용이라 날짜만). */}
             {!isDate ? (
               <>
-            {/* Time */}
+            {/* 시간 */}
             <div className="mt-3 border-t-[0.5px] border-[var(--separator)] pt-3">
               <button
                 aria-expanded={timeOpen}
@@ -429,7 +429,7 @@ export function TaskSchedulePicker({
                   </div>
                   <TimeWheels copy={copy} onChange={setTime} value={time} />
 
-                  {/* Duration — Todoist-style time-block length (single day). */}
+                  {/* 소요 시간 — Todoist 식 시간 블록 길이 (단일 일). */}
                   <div className="mt-3 flex items-center justify-between rounded-2xl border border-border bg-surface px-3.5 py-2.5">
                     <span className="text-[13.5px] font-bold text-foreground">{copy.durationLabel}</span>
                     <button
@@ -499,7 +499,7 @@ export function TaskSchedulePicker({
               ) : null}
             </div>
 
-            {/* Repeat */}
+            {/* 반복 */}
             <div className="mt-3 border-t-[0.5px] border-[var(--separator)] pt-3">
               <button
                 aria-expanded={repeatOpen}

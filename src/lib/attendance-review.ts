@@ -1,12 +1,12 @@
-// Attendance — admin REVIEW query layer + privilege guard (Step 7).
+// 근태 — 관리자 REVIEW 쿼리 계층 + 권한 가드(Step 7).
 //
-// Org-wide read layer for the attendance review queue + the server-side privilege gate. Gated by
-// capability keys since 2026-10-21 (`attendanceCan` — attendance.manage / payroll.view / payroll.manage /
-// wages.manage / transport.manage). Site-master management stays owner-only elsewhere (unchanged here).
+// 근태 검토 대기열용 조직 전체 읽기 계층 + 서버 측 권한 게이트. 2026-10-21 부터
+// capability 키로 게이트한다(`attendanceCan` — attendance.manage / payroll.view / payroll.manage /
+// wages.manage / transport.manage). 사이트 마스터 관리는 다른 곳에서 owner 전용으로 유지된다(여기서는 변경 없음).
 //
-// The review-queue UI is built later in the WEB DASHBOARD (user-confirmed 2026-06-17); this layer is
-// caller-agnostic so that dashboard can consume it. The privilege guard MUST be checked by any caller
-// before exposing org-wide data; the write actions (admin-actions) enforce it themselves.
+// 검토 대기열 UI 는 나중에 WEB DASHBOARD 에 만든다(사용자 확인 2026-06-17). 이 계층은
+// 호출자에 의존하지 않아 그 대시보드가 쓸 수 있다. 조직 전체 데이터를 노출하기 전에 모든 호출자는 권한 가드를 반드시 확인해야
+// 한다. 쓰기 액션(admin-actions)은 스스로 강제한다.
 
 import "server-only";
 import type { Capability } from "@/config/capabilities";
@@ -106,18 +106,18 @@ export type ReviewQueueItem = {
   manualCreated: boolean;
   isAbnormal: boolean;
   clockInLabel: string | null;
-  /** Tokyo calendar date (YYYY-MM-DD) of the clock-in instant — may differ from `operatingDate`. */
+  /** 출근 시각의 도쿄 달력 날짜(YYYY-MM-DD) — `operatingDate` 와 다를 수 있다. */
   clockInDate: string | null;
   clockInSiteName: string | null;
   clockInMethod: AttendanceMethod | null;
   clockOutLabel: string | null;
-  /** Tokyo calendar date (YYYY-MM-DD) of the clock-out instant — e.g. the next day for a
-   *  midnight-crossing session. */
+  /** 퇴근 시각의 도쿄 달력 날짜(YYYY-MM-DD) — 예: 자정을 넘긴
+   *  세션이면 다음 날. */
   clockOutDate: string | null;
   clockOutSiteName: string | null;
   clockOutMethod: AttendanceMethod | null;
   breakTotalSec: number;
-  /** Paid duration for a completed session (worked minus closed breaks); null while open. */
+  /** 완료된 세션의 유급 시간(근무에서 닫힌 휴게를 뺀 값). 열려 있는 동안은 null. */
   paidDurationSec: number | null;
   correctionStatus: AttendanceCorrectionStatus | null;
   /** 세션 행의 `updated_at` — 관리자 직접 수정이 낙관적 동시성 검사에 쓴다(2026-10-26). */
@@ -158,7 +158,7 @@ function dateLabelOf(operatingDate: string, localeTag: string): string {
   }).format(d);
 }
 
-/** Priority rank for the documented review ordering (lower = surfaces first). */
+/** 문서화된 검토 순서의 우선순위 등급(낮을수록 먼저 표시). */
 function priorityRank(item: ReviewQueueItem): number {
   if (item.reviewState === "review_required") return 0;
   if (item.correctionStatus === "requested" || item.correctionStatus === "in_review") return 1;
@@ -167,9 +167,9 @@ function priorityRank(item: ReviewQueueItem): number {
 }
 
 /**
- * The org-wide attendance review queue. Caller MUST have verified `attendanceCan` first.
- * Resolves worker names, site names, break totals, and correction status; applies the documented
- * filters + name/date/site; orders by review priority then most-recent operating date.
+ * 조직 전체 근태 검토 대기열. 호출자는 먼저 `attendanceCan` 을 반드시 확인해야 한다.
+ * 근무자 이름, 사이트 이름, 휴게 합계, 정정 상태를 해석하고, 문서화된
+ * 필터 + 이름/날짜/사이트를 적용하며, 검토 우선순위 → 최신 운영 날짜 순으로 정렬한다.
  */
 export async function getAttendanceReviewQueue(
   organizationId: string,
@@ -179,7 +179,7 @@ export async function getAttendanceReviewQueue(
   const service = getSupabaseServiceClient();
   const limit = params.limit ?? 100;
 
-  // For the correction-requested filter, pre-resolve the session ids with an open request.
+  // 정정 요청됨 필터를 위해 열린 요청이 있는 세션 id 를 미리 해석한다.
   let correctionSessionIds: string[] | null = null;
   if (params.filter === "correction_requested") {
     const cr = await service
@@ -197,7 +197,7 @@ export async function getAttendanceReviewQueue(
     if (correctionSessionIds.length === 0) return [];
   }
 
-  // Name search → matching user ids (sessions are org-scoped, so filtering by user id is sufficient).
+  // 이름 검색 → 일치하는 사용자 id (세션은 조직 범위이므로 사용자 id 로 거르면 충분하다).
   let nameUserIds: string[] | null = null;
   const q = params.nameQuery?.trim();
   if (q) {
@@ -231,8 +231,8 @@ export async function getAttendanceReviewQueue(
         query = query.eq("manual_created", true);
         break;
       case "not_finalized":
-        // No finalized snapshots exist until Step 8; current-Tokyo-month sessions are the not-finalized
-        // set for now (the finalized-snapshot exclusion plugs in when finalization lands).
+        // Step 8 전에는 확정 스냅샷이 없으므로 현재 도쿄 달의 세션이 마감 전
+        // 집합이다(확정 스냅샷 제외는 마감이 들어오면 연결된다).
         query = query.gte("operating_date", `${tokyoDateKey(new Date()).slice(0, 7)}-01`);
         break;
       default:
@@ -307,7 +307,7 @@ export async function getAttendanceReviewQueue(
     };
   });
 
-  // Documented ordering: review-required → correction-requested → incomplete → normal; then recency.
+  // 문서화된 순서: 검토 필요 → 정정 요청됨 → 미완료 → 정상; 그다음 최신순.
   return items.sort((a, b) => {
     const pr = priorityRank(a) - priorityRank(b);
     if (pr !== 0) return pr;

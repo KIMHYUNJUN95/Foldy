@@ -10,45 +10,45 @@ import {
   workbookBox,
 } from "@/lib/attendance-payroll-workbook";
 
-// CANONICAL admin-console .xlsx export builder. Every "Excel 내보내기" button in /admin/* renders
-// through this one function so the whole console ships a single green-ledger template: merged title
-// bar → header row → numbered data rows → totals row → org/generated footer, all centered, Meiryo 9pt.
-// Fills/borders come from attendance-payroll-workbook.ts — do NOT introduce new colors here.
-// The paired PDF/print builder is admin-table-report.ts and takes the exact same input shape.
+// 정규 관리자 콘솔 .xlsx 내보내기 빌더. /admin/* 의 모든 "Excel 내보내기" 버튼이
+// 이 함수 하나를 거쳐 콘솔 전체가 하나의 녹색 장부 템플릿을 쓴다: 병합 제목
+// 줄 → 헤더 행 → 번호 붙은 데이터 행 → 합계 행 → 조직/생성 푸터, 모두 가운데 정렬, Meiryo 9pt.
+// 채우기/테두리는 attendance-payroll-workbook.ts 에서 가져온다 — 여기서 새 색을 쓰지 말 것.
+// 짝이 되는 PDF/인쇄 빌더는 admin-table-report.ts 이며 완전히 같은 입력 형태를 받는다.
 // See docs/product/05-admin-web-ia.md → "공용 프리미티브".
 
 export type AdminTableColumn = {
-  /** Row lookup key. */
+  /** 행 조회 키. */
   key: string;
-  /** Localized header label. */
+  /** 현지화된 헤더 라벨. */
   label: string;
-  /** Excel column width (characters). */
+  /** Excel 열 너비 (글자 수). */
   width: number;
-  /** Print/PDF column width as a percentage of the table. */
+  /** 인쇄/PDF 열 너비, 표에 대한 백분율. */
   printWidth: number;
-  /** Emphasize values (numbers, durations, money). */
+  /** 값 강조 (숫자, 시간, 금액). */
   bold?: boolean;
-  /** Allow the cell to wrap (long free-text columns such as 비고). */
+  /** 셀 줄바꿈을 허용 (비고 같은 긴 자유 텍스트 열). */
   wrap?: boolean;
 };
 
-/** One data row: column key → already-localized display string. */
+/** 데이터 행 하나: 열 키 → 이미 현지화된 표시 문자열. */
 export type AdminTableExportRow = Record<string, string>;
 
 export type AdminTableSheet = {
-  /** Worksheet tab name (truncated to Excel's 31-char limit). */
+  /** 워크시트 탭 이름 (Excel 의 31자 제한으로 자름). */
   sheetName: string;
-  /** Document title, e.g. "청소 기록". */
+  /** 문서 제목, 예: "청소 기록". */
   title: string;
-  /** Prefix shown before the title in the title bar, e.g. "7월 1일 – 7월 31일". Optional. */
+  /** 제목 줄의 제목 앞에 표시할 접두사, 예: "7월 1일 – 7월 31일". 선택. */
   rangeLabel?: string;
-  /** Header label for the auto-generated row-number column. */
+  /** 자동 생성되는 행 번호 열의 헤더 라벨. */
   colNoLabel: string;
-  /** Label rendered in the totals row (first data column). */
+  /** 합계 행에 그려지는 라벨 (첫 데이터 열). */
   totalLabel: string;
   columns: AdminTableColumn[];
   rows: AdminTableExportRow[];
-  /** Optional totals-row values keyed by column key. The row count always fills the No. cell. */
+  /** 열 키별 선택적 합계 행 값. 행 수는 항상 No. 셀을 채운다. */
   totals?: Record<string, string>;
 };
 
@@ -61,7 +61,7 @@ export type AdminTableWorkbookInput = {
 
 const NO_COLUMN_WIDTH = 5;
 
-// ── Row height for wrapped cells ────────────────────────────────────────────
+// ── 줄바꿈 셀의 행 높이 ────────────────────────────────────────────
 // 데이터 행 높이를 18pt 로 고정해 두면 `wrap: true` 열(메모/비고/반품 품목 등)의 두 번째 줄부터가
 // 잘려 보인다 — 명시적 높이가 있으면 Excel/LibreOffice 모두 자동 맞춤을 하지 않기 때문이다.
 // 그래서 줄 수를 추정해 필요한 만큼만 행을 키운다(줄바꿈이 없는 행은 그대로 18pt).
@@ -173,13 +173,13 @@ function addSheet(wb: ExcelJS.Workbook, sheet: AdminTableSheet, input: AdminTabl
   });
 
   ws.properties.defaultRowHeight = 18;
-  const lastCol = sheet.columns.length + 1; // +1 for the auto No. column
+  const lastCol = sheet.columns.length + 1; // 자동 No. 열 몫으로 +1
   ws.columns = [
     { width: NO_COLUMN_WIDTH },
     ...sheet.columns.map((c) => ({ width: fittedWidth(c, sheet.rows) })),
   ];
 
-  // ── Title ──
+  // ── 제목 ──
   ws.mergeCells(1, 1, 1, lastCol);
   const title = ws.getCell("A1");
   title.value = titleText(sheet);
@@ -189,7 +189,7 @@ function addSheet(wb: ExcelJS.Workbook, sheet: AdminTableSheet, input: AdminTabl
   title.border = workbookBox();
   ws.getRow(1).height = 22;
 
-  // ── Header ──
+  // ── 헤더 ──
   const header = ws.getRow(2);
   header.height = 22;
   [sheet.colNoLabel, ...sheet.columns.map((c) => c.label)].forEach((label, i) => {
@@ -201,7 +201,7 @@ function addSheet(wb: ExcelJS.Workbook, sheet: AdminTableSheet, input: AdminTabl
     cell.border = workbookBox();
   });
 
-  // ── Data rows ──
+  // ── 데이터 행 ──
   const firstDataRow = 3;
   sheet.rows.forEach((r, i) => {
     const row = ws.getRow(firstDataRow + i);
@@ -222,7 +222,7 @@ function addSheet(wb: ExcelJS.Workbook, sheet: AdminTableSheet, input: AdminTabl
     });
   });
 
-  // ── Totals row ──
+  // ── 합계 행 ──
   const totalRowIdx = firstDataRow + sheet.rows.length;
   const total = ws.getRow(totalRowIdx);
   total.height = 20;
@@ -242,7 +242,7 @@ function addSheet(wb: ExcelJS.Workbook, sheet: AdminTableSheet, input: AdminTabl
     cell.border = workbookBox();
   }
 
-  // ── Footer ──
+  // ── 푸터 ──
   const footer = ws.getCell(`A${totalRowIdx + 2}`);
   footer.value = `${input.orgName} / ${input.generatedLabel}`;
   footer.font = { name: "Meiryo", size: 8, color: { argb: WORKBOOK_INK } };

@@ -11,7 +11,7 @@ import { getStoredTranslations } from "@/lib/review-translate";
 
 type PageProps = { params: Promise<{ id: string }> };
 
-// External Reviews — Screen 2 (read-only detail). See docs/product/25-complaint-workflow.md.
+// 외부 리뷰 — 화면 2 (읽기 전용 상세). 참고: docs/product/25-complaint-workflow.md.
 export default async function MobileReviewDetailPage({ params }: PageProps) {
   const [state, session, { id }] = await Promise.all([
     getOnboardingState(),

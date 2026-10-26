@@ -27,8 +27,8 @@ export function SharePicker({
   const q = query.trim().toLowerCase();
   const list = q ? users.filter((u) => u.name.toLowerCase().includes(q)) : users;
 
-  // The sheet's exit animation runs first; on completion BottomSheet fires onClose. We branch
-  // there so "apply" still slides the sheet down before committing the selection.
+  // 시트의 종료 애니메이션이 먼저 돌고, 끝나면 BottomSheet 가 onClose 를 호출한다. 여기서
+  // 갈라서 "적용"도 선택을 확정하기 전에 시트를 아래로 내리게 한다.
   const applyingRef = useRef(false);
   const selectedRef = useRef(selected);
   useEffect(() => {

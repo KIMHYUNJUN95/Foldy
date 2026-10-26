@@ -63,7 +63,7 @@ export async function deleteLinenReturnRecord(formData: FormData) {
   }
 
   const supabase = await getSupabaseServerClient();
-  // Line items cascade-delete with the header.
+  // 라인 항목은 헤더와 함께 cascade 삭제된다.
   const { error } = await supabase
     .from("linen_return_records")
     .delete()

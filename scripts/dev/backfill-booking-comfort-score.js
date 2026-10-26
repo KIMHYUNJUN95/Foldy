@@ -8,7 +8,7 @@
  *
  * 재실행해도 무해하다(이미 값이 있으면 건너뛴다).
  *
- * Usage: node scripts/dev/backfill-booking-comfort-score.js [--apply]
+ * 사용법: node scripts/dev/backfill-booking-comfort-score.js [--apply]
  *   --apply 없이 실행하면 무엇이 바뀌는지만 출력한다.
  */
 const fs = require("fs");

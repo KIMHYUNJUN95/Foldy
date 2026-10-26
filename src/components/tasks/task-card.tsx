@@ -46,7 +46,7 @@ export function repeatLabel(rule: string, copy: Copy, locale: Locale): string {
   return map[rule] ?? rule;
 }
 
-// End of a time block (start "HH:MM" + duration minutes), wrapping within the day.
+// 시간 블록의 끝 (시작 "HH:MM" + 소요 분), 하루 안에서 넘어가며 계산.
 export function addMinutesHHMM(hhmm: string, mins: number): string {
   const [h, m] = hhmm.split(":").map(Number);
   const total = (((h * 60 + m + mins) % 1440) + 1440) % 1440;
@@ -78,7 +78,7 @@ export function contextLabelOf(
   return (
     [
       ctx.propertyName ? localizePropertyName(ctx.propertyName, buildingLabels) : null,
-      // For Okubo-style buildings, roomLabel === propertyName (canonical); suppress to avoid redundancy.
+      // 오쿠보식 건물은 roomLabel === propertyName (표준)이므로 중복을 피하려고 숨긴다.
       ctx.roomLabel && ctx.roomLabel !== ctx.propertyName ? `${ctx.roomLabel}${roomSuffix}` : null,
     ]
       .filter(Boolean)
@@ -139,8 +139,8 @@ export function TaskCard({
    */
   instrMode?: "recv" | "sent";
   sentMode?: boolean;
-  // Multi-select: in select mode tapping toggles selection (instead of navigating) and a
-  // checkbox replaces the complete circle. Long-press (outside select mode) opens the context menu.
+  // 다중 선택: 선택 모드에서 탭하면 이동 대신 선택이 토글되고
+  // 완료 원 대신 체크박스가 나온다. 길게 누르기(선택 모드 밖)는 컨텍스트 메뉴를 연다.
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (task: TaskRecord) => void;
@@ -149,9 +149,9 @@ export function TaskCard({
    * 지울지 그 날짜만 건너뛸지 고르려면 메뉴가 이 날짜를 알아야 한다.
    */
   onLongPress?: (task: TaskRecord, occurrence?: { date: string; done: boolean }) => void;
-  // Swipe reveal action: "today" pulls the task to today (Tomorrow/Inbox tabs), "tomorrow" defers
-  // it to tomorrow (Today tab). `swipeReturnView` is posted with the action so the server redirect
-  // keeps the user on the tab they swiped from.
+  // 스와이프 노출 액션: "today" 는 할 일을 오늘로 당기고 (내일/인박스 탭), "tomorrow" 는
+  // 내일로 미룬다 (오늘 탭). `swipeReturnView` 를 액션과 함께 보내서 서버 리다이렉트가
+  // 사용자를 스와이프한 탭에 그대로 둔다.
   swipeAction?: "today" | "tomorrow";
   /**
    * 반복 작업이 밀린 회차 수. 0/undefined 면 표시하지 않는다(2026-09-08).
@@ -159,22 +159,22 @@ export function TaskCard({
    */
   behindDays?: number;
   swipeReturnView?: string;
-  // Drag-reorder: shows a dedicated grip handle. The handle owns its own pointer gesture and stops
-  // propagation, so it never triggers tap / long-press / swipe on the row body.
-  // `reordering` is true on the row currently being dragged (suppresses tap navigation on drop).
+  // 드래그 재정렬: 전용 그립 핸들을 보여준다. 핸들이 자기 포인터 제스처를 갖고
+  // 전파를 막으므로, 행 본문의 탭 / 길게 누르기 / 스와이프를 절대 일으키지 않는다.
+  // `reordering` 은 현재 드래그 중인 행에서 true 다 (드롭 시 탭 이동을 막는다).
   reorderable?: boolean;
   reordering?: boolean;
   onReorderHandleDown?: (e: React.PointerEvent, task: TaskRecord) => void;
-  // Tapping the leading ring toggles completion. Active → complete, completed → reopen. Omit to render
-  // the ring as a static indicator.
+  // 앞쪽 링을 탭하면 완료가 토글된다. 진행 중 → 완료, 완료 → 다시 열기. 생략하면
+  // 링은 정적 표시기로 그려진다.
   onCompleteToggle?: (task: TaskRecord, occurrence?: { date: string; done: boolean }) => void;
   // 미래 날짜의 미리보기 줄. 완료 토글을 주지 않을 뿐 아니라 **고리 자체를 점 마커로 바꾼다**(2026-09-09) — 못 누르는
   // 체크박스를 남겨 두면 고장난 버튼으로 보인다. 점은 자리(22px)를 그대로 지켜 정렬이 어긋나지 않는다.
   preview?: boolean;
-  // Recurring occurrence row (2026-07-30): completion/done state is per this date, not the row's
-  // `status` (which stays open). When set, the checkbox toggles this occurrence.
+  // 반복 발생 행 (2026-07-30): 완료/끝남 상태는 행의 `status`(계속 열림)가 아니라 이 날짜 기준이다.
+  // 설정하면 체크박스가 이 발생분을 토글한다.
   occurrence?: { date: string; done: boolean };
-  /** List tab to restore after a detail action such as skipping one recurring occurrence. */
+  /** 반복 발생 하나 건너뛰기 같은 상세 액션 뒤에 복원할 목록 탭. */
   detailReturnView?: string;
   /** 줄 오른쪽 끝 회색 글자(완료 · 기록의 완료 시각 등). */
   trailing?: string;
@@ -200,20 +200,20 @@ export function TaskCard({
   /** 지연 판정에서 반복을 뺀다 — 반복의 밀림은 「N일 밀림」(behindDays)이 맡는다. */
   const overdue = !occurrence && !recurringRow && !done && !!dueDate && dueDate < today;
 
-  // One swipe action (today / tomorrow), revealed at a fixed width sized to its single button.
+  // 스와이프 액션 하나 (today / tomorrow), 단일 버튼 크기에 맞춘 고정 폭으로 노출된다.
   const swipeOpen = 70;
   const swipeSnap = swipeOpen / 2;
 
   const [offset, setOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [pressed, setPressed] = useState(false); // "press-down" scale while held
+  const [pressed, setPressed] = useState(false); // 잡고 있는 동안 "눌림" 스케일
   // 완료 고리를 누른 직후 — 채움 + 체크 그리기를 보여 준 뒤에 실제 완료를 부른다.
   const [checking, setChecking] = useState(false);
   const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startX = useRef(0);
   const startY = useRef(0);
   const dragging = useRef(false);
-  const axis = useRef<null | "h" | "v">(null); // direction lock so taps/scrolls don't open swipe
+  const axis = useRef<null | "h" | "v">(null); // 방향 잠금으로 탭/스크롤이 스와이프를 열지 않게 한다
   const didSwipe = useRef(false);
   const wasOpen = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -225,7 +225,7 @@ export function TaskCard({
     [],
   );
 
-  // Tapping anywhere outside an opened row closes its swipe naturally.
+  // 열린 행 바깥 어디든 탭하면 스와이프가 자연스럽게 닫힌다.
   useEffect(() => {
     if (offset === 0) return;
     const onDown = (e: PointerEvent) => {
@@ -244,7 +244,7 @@ export function TaskCard({
   const alreadyOnTarget = !isRecurringTask && anchorDate ? anchorDate === swipeTarget : false;
   const canSwipe = swipe && !done && !selectMode && !isRecurringTask && !alreadyOnTarget;
 
-  // Long-press → context menu. A 480ms hold with little movement fires; a drag/scroll cancels it.
+  // 길게 누르기 → 컨텍스트 메뉴. 움직임이 적은 480ms 누름이 발동하고, 드래그/스크롤은 취소한다.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStart = useRef({ x: 0, y: 0 });
   const longFired = useRef(false);
@@ -255,7 +255,7 @@ export function TaskCard({
     pressTimer.current = setTimeout(() => {
       longFired.current = true;
       setPressed(false);
-      setOffset(0); // close any open swipe so the menu opens over a clean row
+      setOffset(0); // 메뉴가 깨끗한 행 위에 열리도록 열린 스와이프를 닫는다
       haptic("medium");
       onLongPress(task, occurrence);
     }, 480);
@@ -296,15 +296,15 @@ export function TaskCard({
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) setPressed(false);
     movePress(x, y);
     if (!dragging.current) return;
-    // Lock to an axis only once the finger has clearly moved — a tap or a vertical scroll
-    // must never reveal the swipe action.
+    // 손가락이 확실히 움직인 뒤에만 한 축으로 잠근다 — 탭이나 세로 스크롤이
+    // 스와이프 액션을 드러내면 안 된다.
     if (axis.current === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
       axis.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
     }
     if (axis.current !== "h") return;
     didSwipe.current = true;
     const sdx = x - startX.current;
-    // Track the finger 1:1 up to fully-open, then add elastic resistance past it.
+    // 완전히 열릴 때까지 손가락을 1:1 로 따라가고, 그 이후엔 탄성 저항을 더한다.
     const next = sdx >= 0 ? 0 : sdx < -swipeOpen ? -swipeOpen + (sdx + swipeOpen) * 0.18 : sdx;
     setOffset(next);
   }
@@ -334,21 +334,21 @@ export function TaskCard({
     return `/mobile/tasks/${task.id}${query ? `?${query}` : ""}`;
   })();
 
-  // Row body tap: suppress the click that follows a long-press; toggle in select mode; else open.
+  // 행 본문 탭: 길게 누르기 뒤에 오는 클릭은 무시하고, 선택 모드에서는 토글하고, 그 외엔 연다.
   function onBodyClick(e: React.MouseEvent) {
     e.preventDefault();
     const wasLong = longFired.current;
     const wasSwipe = didSwipe.current;
     longFired.current = false;
     didSwipe.current = false;
-    // Ignore the synthetic click that can land on the row right after a drag-reorder drop.
+    // 드래그 재정렬 드롭 직후 행에 떨어질 수 있는 합성 클릭은 무시한다.
     if (reordering) return;
     if (selectMode) {
       onToggleSelect?.(task);
       return;
     }
     if (offset !== 0) {
-      setOffset(0); // tap an open row to close it
+      setOffset(0); // 열린 행을 탭하면 닫힌다
       return;
     }
     if (wasLong || wasSwipe) return;
@@ -513,8 +513,8 @@ export function TaskCard({
         </a>
       )}
       {trailing ? <span className="tkw-row__tr">{trailing}</span> : null}
-      {/* Drag handle. Owns its own pointer gesture; stops touch/pointer/click propagation and sets
-          touch-action:none so it never starts the row's tap, long-press, or swipe. */}
+      {/* 드래그 핸들. 자기 포인터 제스처를 갖고, touch/pointer/click 전파를 막고
+          touch-action:none 을 설정해서 행의 탭, 길게 누르기, 스와이프를 시작하지 않는다. */}
       {reorderable ? (
         <button
           aria-label={copy.reorderHandle}

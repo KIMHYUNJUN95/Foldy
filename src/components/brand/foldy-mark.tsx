@@ -1,4 +1,4 @@
-/** Foldy app mark — the same three-bar logo as the app icon. Safe in server and client components. */
+/** Foldy 앱 마크 — 앱 아이콘과 같은 세 줄 로고. 서버/클라이언트 컴포넌트 어디서나 안전하다. */
 export function FoldyMark({ size = 42 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">

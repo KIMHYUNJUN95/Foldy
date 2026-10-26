@@ -32,10 +32,10 @@ type PlatformAdminInsert =
   Database["public"]["Tables"]["platform_admins"]["Insert"];
 type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 
-// The project's database.ts omits Relationships on all tables, which prevents
-// Database["public"] from satisfying GenericSchema. service.from() has an untyped
-// fallback overload so it works anyway, but service.rpc() does not. This interface
-// provides just enough typing for the one RPC call we make.
+// 프로젝트의 database.ts 는 모든 테이블에서 Relationships 를 생략해
+// Database["public"] 이 GenericSchema 를 만족하지 못한다. service.from() 에는 타입 없는
+// 폴백 오버로드가 있어 그래도 동작하지만 service.rpc() 는 그렇지 않다. 이 인터페이스는
+// 우리가 호출하는 RPC 하나에 필요한 최소한의 타입만 제공한다.
 type JoinRpcRow = {
   organization_id: string;
   role: Database["public"]["Enums"]["organization_role"];
@@ -60,7 +60,7 @@ function normalizeInviteCode(value: FormDataEntryValue | null) {
   return cleanText(value).toUpperCase();
 }
 
-/** Redirects to /onboarding with an error key, preserving a safe `next` path if present. */
+/** `/onboarding` 으로 에러 키와 함께 리디렉트하며, 안전한 `next` 경로가 있으면 유지한다. */
 function onboardingError(errorKey: string, next: string): never {
   const nextSuffix = next ? `&next=${encodeURIComponent(next)}` : "";
   redirect(`/onboarding?error=${errorKey}${nextSuffix}`);
@@ -84,12 +84,12 @@ async function getCurrentSurface() {
 }
 
 /**
- * Validates an invite code WITHOUT consuming it and resolves the target
- * organization name + user-facing role category, so onboarding can show the
- * "조직·역할 미리보기" confirmation before the user commits to joining.
+ * 초대 코드를 소모하지 않고 검증하며 대상
+ * 조직 이름 + 사용자에게 보이는 역할 카테고리를 풀어내, 온보딩이
+ * 가입을 확정하기 전에 "조직·역할 미리보기" 확인을 보여줄 수 있게 한다.
  *
- * Returns serializable data (callable directly from a client component).
- * Error keys map onto `onboarding.errors.*` i18n keys.
+ * 직렬화 가능한 데이터를 반환한다(클라이언트 컴포넌트에서 직접 호출 가능).
+ * 에러 키는 `onboarding.errors.*` i18n 키에 대응한다.
  */
 type InvitePreviewResult =
   | { ok: true; organizationName: string; roleCategory: string }
@@ -105,8 +105,8 @@ const INVITE_PREVIEW_ERROR_MAP: Record<string, string> = {
 export async function previewInviteCode(
   code: string,
 ): Promise<InvitePreviewResult> {
-  // Require an authenticated onboarding user so this is not an open
-  // invite-probing endpoint.
+  // 인증된 온보딩 사용자만 허용해 이 액션이 열린
+  // 초대 코드 탐색 엔드포인트가 되지 않게 한다.
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
@@ -132,8 +132,8 @@ export async function previewInviteCode(
     .maybeSingle();
 
   const organizationName = (org as { name: string } | null)?.name ?? "";
-  // Expose the user-facing invite category (e.g. "office_staff"), not the raw
-  // DB role slug. cs_staff (not an invite category) falls back to its slug.
+  // 원시 DB 역할 슬러그가 아니라 사용자에게 보이는 초대 카테고리(예: "office_staff")를
+  // 노출한다. cs_staff(초대 카테고리 아님)는 슬러그로 대체된다.
   const roleCategory =
     roleToInviteCategory[validation.defaultRole] ?? validation.defaultRole;
 
@@ -221,7 +221,7 @@ export async function completeProfile(formData: FormData) {
     redirect(next || normalizePathForSurface(getDefaultRouteForRole(membership.role), surface));
   }
 
-  // No invite code submitted — needs membership step. Preserve next for the join form.
+  // 초대 코드가 제출되지 않음 — 멤버십 단계가 필요하다. 가입 폼에서 쓸 next 를 보존한다.
   redirect(next ? `/onboarding?next=${encodeURIComponent(next)}` : "/onboarding");
 }
 
@@ -290,8 +290,8 @@ export type SubmitOnboardingResult =
     };
 
 /**
- * needs_membership wizard submit — joins via invite code only (profile already exists).
- * Returns a destination instead of redirecting so the wizard can show its success screen.
+ * needs_membership 마법사 제출 — 초대 코드로만 가입한다(프로필은 이미 있음).
+ * 리디렉트 대신 목적지를 반환해 마법사가 성공 화면을 보여줄 수 있게 한다.
  */
 export async function joinWithInviteCode(input: {
   inviteCode: string;
@@ -320,9 +320,9 @@ export async function joinWithInviteCode(input: {
 }
 
 /**
- * Wizard submit — upserts the profile and (optionally) joins via invite code,
- * then RETURNS the destination instead of redirecting. This lets the onboarding
- * wizard show its own "welcome / success" screen before entering the app.
+ * 마법사 제출 — 프로필을 upsert 하고 (선택적으로) 초대 코드로 가입한 뒤,
+ * 리디렉트하지 않고 목적지를 반환한다. 이렇게 하면 온보딩
+ * 마법사가 앱에 들어가기 전에 자체 "환영 / 성공" 화면을 보여줄 수 있다.
  */
 export async function submitOnboardingProfile(input: {
   /** 국적 + 한국어 · 일본어 · 영문 · 가타카나 이름 — 앱에 보이는 이름은 여기서 만든다. */
@@ -398,8 +398,8 @@ export async function submitOnboardingProfile(input: {
     };
   }
 
-  // No invite code — re-evaluate so platform admins / existing members route in,
-  // and users who still need a team land back on onboarding's join step.
+  // 초대 코드 없음 — 플랫폼 관리자 / 기존 멤버가 들어갈 수 있도록 다시 평가하고,
+  // 아직 팀이 필요한 사용자는 온보딩의 가입 단계로 돌려보낸다.
   const state = await getOnboardingState();
   if (state.status === "ready") {
     return { ok: true, redirectTo: next || normalizePathForSurface(state.redirectTo, surface) };

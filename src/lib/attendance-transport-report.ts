@@ -1,12 +1,12 @@
 import "server-only";
 
-// Print-quality transport-reimbursement REPORT (self-contained HTML document for PDF).
+// 인쇄 품질 교통비 정산 REPORT (PDF 용 독립 HTML 문서).
 //
-// Uses the exact same plain green ledger language as attendance-payroll-report.ts (same title bar,
-// header/zebra/total colors, borders, fonts, toolbar/print-button styling) so every PDF export in this
-// console is visually one family. One row per reimbursement item. This is a PLAIN LEDGER: no receipt
-// images or links — receipts are reviewed in the dedicated web receipt page
-// (`/admin/attendance/transport/receipt`), not from the exported file. Every cell is center-aligned.
+// attendance-payroll-report.ts 와 똑같은 단순 초록 원장 언어를 쓴다(같은 제목 막대,
+// 헤더/지브라/합계 색, 테두리, 글꼴, 툴바/인쇄 버튼 스타일). 그래서 이 콘솔의 모든 PDF 내보내기가
+// 시각적으로 한 가족이다. 정산 항목 하나가 한 행. 이것은 PLAIN LEDGER 다: 영수증
+// 이미지나 링크가 없다 — 영수증은 전용 웹 영수증 페이지에서 검토하고
+// (`/admin/attendance/transport/receipt`) 내보낸 파일에서는 보지 않는다. 모든 셀은 가운데 정렬.
 
 export type TransportReportItem = {
   userName: string;

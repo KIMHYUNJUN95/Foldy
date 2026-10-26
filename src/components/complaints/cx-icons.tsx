@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Inline SVG icon set ported from the "컴플레인 기록" mockup. Sized by `.ic` (1em). */
+/** "컴플레인 기록" 목업에서 가져온 인라인 SVG 아이콘 세트. 크기는 `.ic`(1em)가 정한다. */
 export const CxIcon = {
   building: (
     <svg viewBox="0 0 24 24" fill="none">
@@ -149,7 +149,7 @@ export const CxIcon = {
   ),
 } satisfies Record<string, ReactNode>;
 
-/** Wrap an icon in the `.ic` span (1em sizing). */
+/** 아이콘을 `.ic` span(1em 크기)으로 감싼다. */
 export function CIc({ children }: { children: ReactNode }) {
   return <span className="ic">{children}</span>;
 }

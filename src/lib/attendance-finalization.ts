@@ -1,9 +1,9 @@
-// Attendance — monthly finalization eligibility + snapshot reads (Step 11).
+// 근태 — 월 확정 자격 + 스냅샷 읽기 (11단계).
 //
-// Per-person per-month finalization is MANUAL and privileged (owner / attendance_payroll_admin). This
-// module holds the server-side eligibility checks (the documented blocking rules) and the snapshot
-// reads; the privileged finalize/reopen ACTIONS live in src/app/admin/attendance/actions.ts. The admin
-// review/finalize UI is in the deferred web dashboard — there is no admin app UI here.
+// 사람별 월 확정은 수동이며 권한이 필요하다 (owner / attendance_payroll_admin). 이
+// 모듈은 서버 측 자격 확인(문서화된 차단 규칙)과 스냅샷
+// 읽기를 담당하고, 권한 필요한 확정/재개 액션은 src/app/admin/attendance/actions.ts 에 있다. 관리자
+// 검토/확정 UI 는 보류된 웹 대시보드에 있으며 여기에는 관리자 앱 UI 가 없다.
 
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -11,12 +11,12 @@ import type { AttendanceMonthSnapshotRow } from "@/lib/attendance";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
-/** First day (YYYY-MM-01) the snapshot's target_month is keyed on. */
+/** 스냅샷의 target_month 가 기준으로 삼는 첫날 (YYYY-MM-01). */
 export function monthFirstDay(ym: string): string {
   return `${ym}-01`;
 }
 
-/** Inclusive last day (YYYY-MM-DD) of a Tokyo YYYY-MM. */
+/** 도쿄 YYYY-MM 의 마지막 날 (YYYY-MM-DD, 포함). */
 export function monthLastDay(ym: string): string {
   const [y, m] = ym.split("-").map(Number);
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -60,8 +60,8 @@ export function countBlockingSessions(
 }
 
 /**
- * The current FINALIZED snapshot for a user-month, or null. After a reopen the row becomes `reopened`
- * (no `finalized` row), so this returns null and expected-pay resumes.
+ * 사용자-월의 현재 확정된 스냅샷, 없으면 null. 재개하면 행이 `reopened` 가 되어
+ * (`finalized` 행 없음) null 을 반환하고 예상 급여 계산이 재개된다.
  */
 export async function getCurrentFinalizedSnapshot(
   service: Service,
@@ -81,9 +81,9 @@ export async function getCurrentFinalizedSnapshot(
 }
 
 /**
- * Can this user-month be finalized? Blocked while any unresolved item remains: review-required
- * sessions, pending correction requests (on month sessions), open/incomplete sessions, or an
- * already-finalized snapshot (must reopen first). Server-side; never rely on UI disabling.
+ * 이 사용자-월을 확정할 수 있는가? 미해결 항목이 남아 있으면 막힌다: 검토 필요
+ * 세션, 대기 중인 정정 요청(해당 월 세션), 열려 있거나 미완료인 세션, 또는
+ * 이미 확정된 스냅샷(먼저 재개해야 함). 서버 측 검사이며 UI 비활성화에 의존하지 않는다.
  * `unpricedCount` 는 호출자가 계산한 급여(`getMonthlyPayView`)에서 넘긴다 — 고용형태 · 시급이 없는 근무.
  */
 export async function getFinalizationEligibility(
@@ -114,7 +114,7 @@ export async function getFinalizationEligibility(
 
   const sessionIds = sessions.map((s) => s.id);
   let pendingCorrections = 0;
-  // Session-linked corrections: any pending request tied to a session in this month.
+  // 세션에 연결된 정정: 이 달의 세션에 걸린 대기 중 요청.
   if (sessionIds.length > 0) {
     const cr = await service
       .from("attendance_correction_requests")
@@ -125,7 +125,7 @@ export async function getFinalizationEligibility(
       .in("session_id", sessionIds);
     pendingCorrections += (cr.data ?? []).length;
   }
-  // Session-less corrections: exception requests not tied to any session, targeting this month.
+  // 세션 없는 정정: 어느 세션에도 걸리지 않고 이 달을 대상으로 한 예외 요청.
   const crNull = await service
     .from("attendance_correction_requests")
     .select("id")

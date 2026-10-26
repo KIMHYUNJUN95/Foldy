@@ -185,6 +185,15 @@ describe("payroll book", () => {
     expect(texts).not.toContain("丙欄アルバイト");
   });
 
+  it("세무사 엑셀 — 원천세 구분 없는 사람도 빠지지 않고 「区分未設定」 블록에", () => {
+    const rows = rich();
+    const [sheet] = buildTaxAccountantBook({ ym: "2026-10", rows });
+    const texts = [...sheet.cells.values()].map((c) => c.v);
+    expect(texts).toContain("区分未設定アルバイト");
+    expect(texts).toContain("マ");
+    expect(texts.filter((v) => typeof v === "string" && ["カ", "ナ", "ダ", "ラ", "マ", "バ", "サ", "ア", "ジャ"].includes(v))).toHaveLength(rows.length);
+  });
+
   it("엑셀 파일 — exceljs 로 다시 읽어도 수식 · 값 · 병합이 그대로", async () => {
     const { renderWorkbookBase64 } = await import("@/lib/payroll-export/render-xlsx");
     const b64 = await renderWorkbookBase64(book());
@@ -217,5 +226,60 @@ describe("payroll book", () => {
     const html = buildSheetsHtml({ title: "t", sheets: [slip], printLabel: "Print", lang: "ja" });
     expect(html).toContain("給与明細書");
     expect(html).toContain('colspan="4"');
+  });
+});
+
+/** 여러 경우를 섞은 가짜 9명 — 고용보험 · 연말정산 · 원천세 직접 · 丙 · 구분 없음 · 부양 2명 · 교통비 조정 · 고액 · 마이너스 조정. */
+function rich(): PrepRow[] {
+  const s = (over: Partial<typeof EMPTY_MEMBER_PAYROLL_SETTING>) => ({
+    ...EMPTY_MEMBER_PAYROLL_SETTING,
+    paymentMethod: "transfer" as const,
+    withholdingClass: "kou" as const,
+    ...over,
+  });
+  const seg = (rate: number, minutes: number) => ({ rate, paidMinutes: minutes });
+  const rates = { "2026": 5.5 };
+  return [
+    buildPrepRow(input({ userId: "1", name: "가", nameKatakana: "カ", setting: s({ employmentInsurance: true }), insuranceRates: rates, paidMinutes: 9000, workDays: 21, rateSegments: [seg(1300, 9000)], commuteApproved: 12000 })),
+    buildPrepRow(input({ userId: "2", name: "나", nameKatakana: "ナ", setting: s({ dependents: 2, employmentInsurance: true }), insuranceRates: rates, paidMinutes: 10000, workDays: 22, rateSegments: [seg(1500, 10000)], manual: { ...EMPTY_PREP_MANUAL, yearEndAdjustment: -4321 } })),
+    buildPrepRow(input({ userId: "3", name: "다", nameKatakana: "ダ", setting: s({ withholdingClass: "otsu", paymentMethod: "cash" }), paidMinutes: 6000, workDays: 15, rateSegments: [seg(1200, 6000)], manual: { ...EMPTY_PREP_MANUAL, prevAdjustment: 1500, prevAdjustmentKind: "commute", prevAdjustmentYm: "2026-09" } })),
+    buildPrepRow(input({ userId: "4", name: "라", nameKatakana: "ラ", setting: s({ withholdingClass: "hei", paymentMethod: "cash" }), paidMinutes: 960, workDays: 2, rateSegments: [seg(1200, 960)], dailyTaxable: [9600, 9600] })),
+    buildPrepRow(input({ userId: "5", name: "마", nameKatakana: "マ", setting: s({ withholdingClass: null }), paidMinutes: 3000, workDays: 8, rateSegments: [seg(1200, 3000)] })),
+    buildPrepRow(input({ userId: "6", name: "바", nameKatakana: "バ", paidMinutes: 6000, workDays: 15, rateSegments: [seg(1250, 6000)], manual: { ...EMPTY_PREP_MANUAL, withholdingOverride: 777, withholdingOverrideReason: "x" } })),
+    buildPrepRow(input({ userId: "7", name: "사", nameKatakana: "サ", paidMinutes: 30000, workDays: 25, rateSegments: [seg(3000, 30000)] })),
+    buildPrepRow(input({ userId: "8", name: "아", nameKatakana: "ア", paidMinutes: 7333, workDays: 17, rateSegments: [seg(1201, 2333), seg(1251, 3000), seg(1301, 2000)], allowanceRegular: 3000, allowanceSpecial: 1500, manual: { ...EMPTY_PREP_MANUAL, prevAdjustment: -2500, prevAdjustmentYm: "2026-08", overtime: 1000, memo: "메모" } })),
+    buildPrepRow(input({ userId: "9", name: "자", nameKatakana: "ジャ", setting: s({ withholdingClass: "otsu" }), paidMinutes: 7777, workDays: 18, rateSegments: [seg(1333, 7777)] })),
+  ];
+}
+
+describe("rich sample", () => {
+  it("입력 시트 값 — P · Q · V · Z 가 칸 합과 같고 AB == CEILING(Q−Z)", () => {
+    const rows = rich();
+    const sheets = buildPayrollBook({ ym: "2026-10", paydayDate: "2026-11-10", companyName: "テスト", taxYear: 2026, rows });
+    for (const name of [SHEET.cashInput, SHEET.transferInput]) {
+      const sh = sheets.find((x) => x.name === name)!;
+      const n = (a: string) => {
+        const v = sh.cells.get(a)?.v;
+        return typeof v === "number" ? v : 0;
+      };
+      for (let r = 3; r <= sh.maxRow; r++) {
+        if (!sh.cells.get(`B${r}`)?.v) continue;
+        const p = n(`F${r}`) + n(`I${r}`) + ["J", "K", "L", "M", "N"].reduce((a, c) => a + n(`${c}${r}`), 0);
+        expect(n(`P${r}`), `${name} P${r}`).toBe(p);
+        expect(n(`Q${r}`), `${name} Q${r}`).toBe(p + n(`O${r}`));
+        expect(n(`V${r}`)).toBe(["R", "S", "T", "U"].reduce((a, c) => a + n(`${c}${r}`), 0));
+        expect(n(`Z${r}`)).toBe(["V", "W", "X", "Y"].reduce((a, c) => a + n(`${c}${r}`), 0));
+        const ab = sh.cells.get(`AB${r}`)!;
+        if (ab.v !== "") expect(ab.v).toBe(Math.ceil((n(`Q${r}`) - n(`Z${r}`)) / 10) * 10);
+      }
+    }
+    const out = process.env.PAYROLL_EXPORT_OUT;
+    if (out) {
+      return import("@/lib/payroll-export/render-xlsx").then(async ({ renderWorkbookBase64 }) => {
+        writeFileSync(`${out}/rich.xlsx`, Buffer.from(await renderWorkbookBase64(sheets), "base64"));
+        writeFileSync(`${out}/rich-tax.xlsx`, Buffer.from(await renderWorkbookBase64(buildTaxAccountantBook({ ym: "2026-10", rows })), "base64"));
+        writeFileSync(`${out}/rich.html`, buildSheetsHtml({ title: "t", sheets: sheets.filter((x) => [SHEET.owner, SHEET.check, SHEET.cashSlip, SHEET.transferSlip].includes(x.name as never)), printLabel: "Print", lang: "ja" }));
+      });
+    }
   });
 });

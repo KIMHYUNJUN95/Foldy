@@ -108,6 +108,11 @@ function classLabel(row: PrepRow): string {
   return row.withholdingClass === "kou" ? "甲" : row.withholdingClass === "otsu" ? "乙" : row.withholdingClass === "hei" ? "丙" : "";
 }
 
+/** 다른 칸 참조 — 빈 칸이면 빈칸(그냥 `=칸` 은 엑셀에서 0 으로 보여 PDF 와 어긋난다). 원본 사장 확인표와 같은 방식. */
+function orBlank(ref: string): string {
+  return `IF(${ref}="","",${ref})`;
+}
+
 function hm(minutes: number): string {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 }
@@ -326,9 +331,9 @@ function slipSheet(name: string, inputName: string, rows: readonly PrepRow[], se
     for (const c of ["E", "F", "G", "H", "I", "J"]) b.set(`${c}${R(2)}`, null, SLIP_PLAIN);
     b.merge(`K${R(2)}:L${R(4)}`, null, SLIP_PLAIN);
     b.merge(`A${R(3)}:B${R(3)}`, "韓国名", SLIP_PLAIN);
-    b.merge(`C${R(3)}:D${R(3)}`, row.name, SLIP_PLAIN, ref("B"));
+    b.merge(`C${R(3)}:D${R(3)}`, row.name, SLIP_PLAIN, orBlank(ref("B")));
     b.merge(`E${R(3)}:F${R(3)}`, "氏名", SLIP_PLAIN);
-    b.merge(`G${R(3)}:J${R(3)}`, row.nameKatakana ?? "", SLIP_PLAIN, ref("C"));
+    b.merge(`G${R(3)}:J${R(3)}`, row.nameKatakana ?? "", SLIP_PLAIN, orBlank(ref("C")));
     b.merge(`A${R(4)}:J${R(4)}`, settings.company, { ...SLIP_PLAIN, font: { size: 8, bold: true } }, `${set}!B6`);
 
     const seg2 = row.segments.length === 2 ? row.segments[1] : null;
@@ -345,7 +350,7 @@ function slipSheet(name: string, inputName: string, rows: readonly PrepRow[], se
         const lr = `${a}${R(labelRow)}${z ? `:${z}${R(labelRow)}` : ""}`;
         const vr = `${a}${R(labelRow + 1)}${z ? `:${z}${R(labelRow + 1)}` : ""}`;
         b.merge(lr, c.label ?? null, SLIP_LABEL);
-        if (c.ref) b.merge(vr, c.value ?? "", SLIP_VALUE(c.numFmt), c.f ?? ref(c.ref));
+        if (c.ref) b.merge(vr, c.value ?? "", SLIP_VALUE(c.numFmt), c.f ?? orBlank(ref(c.ref)));
         else b.merge(vr, null, SLIP_VALUE(c.numFmt));
       }
     };
@@ -430,14 +435,14 @@ function slipSheet(name: string, inputName: string, rows: readonly PrepRow[], se
         label: "給与振込",
         ref: "AI",
         value: transfer ? v(net) : 0,
-        f: `IF(${ref("AI")}="振込",${ref("AB")},0)`,
+        f: `IF(${ref("AI")}="振込",${orBlank(ref("AB"))},0)`,
       },
       {
         range: "H:I",
         label: "現金支給額",
         ref: "AI",
         value: transfer ? 0 : v(net),
-        f: `IF(${ref("AI")}="現金",${ref("AB")},0)`,
+        f: `IF(${ref("AI")}="現金",${orBlank(ref("AB"))},0)`,
       },
       { range: "J:L", label: "差引支給額", ref: "AB", value: v(net) },
     ]);
@@ -556,12 +561,12 @@ function ownerSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[], titl
       const note = rowNote(row);
       const days = `${row.workDays}日${note ? ` / ${note}` : ""}`;
       b.height(r, 15.95);
-      b.set(`A${r}`, row.segments[0]?.rate ?? "", st.cell(YEN, 9), `${inp}!D${ir}`);
+      b.set(`A${r}`, row.segments[0]?.rate ?? "", st.cell(YEN, 9), orBlank(`${inp}!D${ir}`));
       b.set(`B${r}`, i + 1, st.cell(undefined, 9), `${inp}!A${ir}`);
       b.set(`C${r}`, row.name, st.cell(undefined, 9), `${inp}!B${ir}`);
-      b.set(`D${r}`, row.nameKatakana ?? "", st.cell(undefined, 9), `${inp}!C${ir}`);
+      b.set(`D${r}`, row.nameKatakana ?? "", st.cell(undefined, 9), orBlank(`${inp}!C${ir}`));
       b.set(`E${r}`, "給与支給", st.cell(undefined, 9));
-      b.set(`F${r}`, row.net ?? "", st.cell(YEN, 9), `${inp}!AB${ir}`);
+      b.set(`F${r}`, row.net ?? "", st.cell(YEN, 9), orBlank(`${inp}!AB${ir}`));
       b.set(`G${r}`, method, st.cell(undefined, 9));
       b.set(
         `H${r}`,
@@ -569,7 +574,7 @@ function ownerSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[], titl
         st.cell(undefined, 9),
         `${inp}!AC${ir}&"日"&IF(${inp}!AL${ir}<>""," / "&${inp}!AL${ir},"")`,
       );
-      b.set(`I${r}`, classLabel(row), st.cell(undefined, 9), `${inp}!AM${ir}`);
+      b.set(`I${r}`, classLabel(row), st.cell(undefined, 9), orBlank(`${inp}!AM${ir}`));
       r += 1;
     });
     const last = r - 1;
@@ -627,13 +632,13 @@ function checkSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[]): Mod
       b.set(`A${r}`, m, st.cell(undefined, 9), `${inp}!AI${ir}`);
       b.set(`B${r}`, i + 1, st.cell(undefined, 9), `${inp}!A${ir}`);
       b.set(`C${r}`, row.name, st.cell(undefined, 9), `${inp}!B${ir}`);
-      b.set(`D${r}`, row.nameKatakana ?? "", st.cell(undefined, 9), `${inp}!C${ir}`);
+      b.set(`D${r}`, row.nameKatakana ?? "", st.cell(undefined, 9), orBlank(`${inp}!C${ir}`));
       b.set(`E${r}`, row.workDays, st.cell(undefined, 9), `${inp}!AC${ir}`);
-      b.set(`F${r}`, row.net ?? "", st.cell(YEN, 9), `${inp}!AB${ir}`);
+      b.set(`F${r}`, row.net ?? "", st.cell(YEN, 9), orBlank(`${inp}!AB${ir}`));
       b.set(`G${r}`, m, st.cell(undefined, 9), `${inp}!AI${ir}`);
       b.set(`H${r}`, null, st.cell(undefined, 9));
       b.set(`I${r}`, null, st.cell(undefined, 9));
-      b.set(`J${r}`, rowNote(row), st.cell(undefined, 9, left), `${inp}!AL${ir}`);
+      b.set(`J${r}`, rowNote(row), st.cell(undefined, 9, left), orBlank(`${inp}!AL${ir}`));
       checks.push(`H${r}`, `I${r}`);
       r += 1;
     });

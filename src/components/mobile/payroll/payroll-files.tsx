@@ -67,7 +67,7 @@ function XlsButton({ label, run, copy, showToast }: {
             return;
           }
           downloadAdminWorkbook(res.base64, res.filename);
-          haptic("success");
+          haptic("light");
           showToast({ kind: "done", text: fillCopy(copy.fileSaved, { name: res.filename }) });
         })
       }
@@ -109,7 +109,7 @@ function PdfButton({ label, run, copy, showToast }: {
           win.document.open();
           win.document.write(res.html);
           win.document.close();
-          haptic("success");
+          haptic("light");
           showToast({ kind: "done", text: copy.fileOpened });
         });
       }}

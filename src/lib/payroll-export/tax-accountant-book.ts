@@ -6,7 +6,7 @@ import { SheetBuilder, type CellStyle, type ModelSheet } from "./sheet-model";
  *
  * 세무사에게 보내던 양식 그대로: 시트 하나(`YYYY.M月分`), 甲 · 乙 · 丙 블록마다 머리 줄 · 사람 · 합계.
  * 칸: 氏名(가타카나) · 支給額(課税計, 교통비 뺌) · 交通費 · 総支給額 · 源泉所得税 · 差引支給額(10엔 올림 뒤 실수령) · 出勤日数.
- * 사람이 없는 구분은 블록을 만들지 않는다.
+ * 사람이 없는 구분은 블록을 만들지 않는다. 원천세 구분이 아직 없는 사람은 「区分未設定」 블록(빠뜨리지 않게).
  */
 
 export type TaxAccountantInput = {
@@ -25,6 +25,8 @@ const CLASSES = [
   { key: "kou", label: "甲欄アルバイト" },
   { key: "otsu", label: "乙欄アルバイト" },
   { key: "hei", label: "丙欄アルバイト" },
+  // 구분이 아직 없는 사람(급여 준비 「확인 필요」) — 빠뜨리지 않고 맨 아래에 따로.
+  { key: null, label: "区分未設定アルバイト" },
 ] as const;
 
 export function taxAccountantSheetName(ym: string): string {

@@ -321,7 +321,7 @@ completed.filter_project    // "프로젝트 작업" / "Projects" / "プロジ�
 - [`docs/product/18-todo-task-workflow.md`](./18-todo-task-workflow.md) — 할 일 전체 워크플로우
 - [`docs/engineering/09-todo-task-technical-design.md`](../engineering/09-todo-task-technical-design.md) — 기존 tasks 테이블 스키마
 - [`docs/product/16-mobile-navigation.md`](./16-mobile-navigation.md) — 탭 IA 전체 구조
-- [`docs/planning/15-feature-batch-plan.md`](../planning/15-feature-batch-plan.md) — 배치 기능 계획
+- [`docs/archive/15-feature-batch-plan.md`](../archive/15-feature-batch-plan.md) — 배치 기능 계획
 
 ---
 

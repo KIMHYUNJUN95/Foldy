@@ -3,7 +3,7 @@
 > 상태: **판매 캘린더 PC · 모바일 이식 완료(모바일은 실기기 확인 남음) · 실제 운영 사용 중 · 지표(가동률 · 매출 · 전표) · 자동화 남음** (2026-09-16 기획, 2026-10-01 갱신)
 >
 > **이 문서가 이식 작업의 시작점이다.** 언제 다시 시작하든 맨 아래 「다시 시작할 때」부터 읽는다.
-> 관련: [32-ops-admin-area.md](32-ops-admin-area.md) · [33-calendar-write-features.md](33-calendar-write-features.md) · [34-metrics-and-automation.md](34-metrics-and-automation.md) · [36-automation-control.md](36-automation-control.md)
+> 관련: [32-ops-admin-area.md](../product/32-ops-admin-area.md) · [33-calendar-write-features.md](../product/33-calendar-write-features.md) · [34-metrics-and-automation.md](../product/34-metrics-and-automation.md) · [36-automation-control.md](../product/36-automation-control.md)
 
 ## 무엇을 왜 하는가
 
@@ -26,7 +26,7 @@ Foldy 로 옮기면서 **읽기와 쓰기 모두 모바일에서 가능해야 �
 저쪽 캘린더의 핵심 상호작용은 **마우스 드래그**로 기간을 고르는 방식이다
 (`handleCalendarMouseDown → MouseMove → MouseUp`). 손가락으로는 스크롤과 충돌하고, 좁은 화면에서
 30일 × 26객실을 드래그하는 것은 실용적이지 않다. **그대로 옮길 수 없다.** 입력 방식을 새로
-설계한다 → [33-calendar-write-features.md](33-calendar-write-features.md)
+설계한다 → [33-calendar-write-features.md](../product/33-calendar-write-features.md)
 
 ## 이식 원칙 — 항상 「읽고 → 개선해서 → 짓는다」 (확정, 2026-10-01 사용자 지시)
 
@@ -71,11 +71,11 @@ Foldy 는 Next.js 16 + Supabase 다. **스택이 겹치지 않는다 — 코드�
 
 | # | 영역 | 상태 | 문서 |
 | --- | --- | --- | --- |
-| 1 | 판매 캘린더 (PC) | ✅ **완료 · 운영 사용 중** — 아래 「캘린더 — 된 것」 | [33](33-calendar-write-features.md) 「이식 상태」 |
-| 1-m | 판매 캘린더 (모바일) | ✅ **구현 — 데스크톱 기능 전부**(2026-10-01, 시안 `1a 그리드` v2) — `/mobile/ops/calendar`. 10/02 속도 · 손끝 다듬기 2차까지. **남은 것: 시트를 시안 2a · 2b 모양으로(디자인 먼저) · 실기기 확인** | [33](33-calendar-write-features.md) 「모바일 판매 캘린더」 · [16](16-mobile-navigation.md) |
-| 2 | 가동률 | ✅ **PC 화면 구현**(2026-10-07, 시안 A · B · C 를 탭 셋으로) — `/admin/ops/occupancy`: 추이 · 건물별(등급 · 60% 기준선) · 객실 × 월 히트맵 · 앞으로 6달 빈 박. 숫자는 매출 화면과 같은 칸(저쪽과 243칸 일치). 남은 것: 화면 확인 · 국가별 · 모바일 | [34](34-metrics-and-automation.md) 「가동률 화면」 |
-| 3 | 매출 · 전표 | ✅ **매출 화면 구현**(2026-10-06, 시안 A v2 — 보고서형 + 「건물 × 월」 탭) — `/admin/ops/revenue`. ✅ **저쪽과 숫자 일치**(2026-10-07 — 2024-07 ~ 2026-09 건물 × 월 243칸, 매출 · 판매 박 · 전체 박, 34번 「저쪽과 숫자 대조」). ❌ 전표 착수 전(`/ledger`). **전표는 향후 8개월 스냅샷**이라 과거분은 원본 이관 필수 | [34](34-metrics-and-automation.md) 「매출 화면」 · 「전표」 |
-| 4 | 자동화 | ✅ **1차 구현**(2026-10-06 — 매출 · 가동률보다 먼저, 사용자 결정) — `/admin/ops/automation` 자동화 관제실: Slack 5종(일일 운영 리포트 · 청소/셋팅 명단 · 취소 · 당일예약 · 실패 알림), 발송 토글 · 시각/요일/재시도 마감 · 받는 곳별 언어 체크박스 · 변동 재전송 · 정정본 · 담당자 수기 입력 · 1분 틱. 운영 DB 적용. Slack 채널 4개 Vercel 등록 · 저쪽 메시지 대조 · 표시 형식 맞춤(2026-10-07). **남은 것: 받는 곳 체크 → 발송 켜기(청소 명단 · 일일 리포트부터) · 실패 알림 채널 · 실패 알림에 Beds24 경보 연결**, 구글 시트 · Notion. 저쪽 프로젝트는 2026-10-06 정지 | [36](36-automation-control.md) · [34](34-metrics-and-automation.md) 「자동화 — 실제 목록」 |
+| 1 | 판매 캘린더 (PC) | ✅ **완료 · 운영 사용 중** — 아래 「캘린더 — 된 것」 | [33](../product/33-calendar-write-features.md) 「이식 상태」 |
+| 1-m | 판매 캘린더 (모바일) | ✅ **구현 — 데스크톱 기능 전부**(2026-10-01, 시안 `1a 그리드` v2) — `/mobile/ops/calendar`. 10/02 속도 · 손끝 다듬기 2차까지. **남은 것: 시트를 시안 2a · 2b 모양으로(디자인 먼저) · 실기기 확인** | [33](../product/33-calendar-write-features.md) 「모바일 판매 캘린더」 · [16](../product/16-mobile-navigation.md) |
+| 2 | 가동률 | ✅ **PC 화면 구현**(2026-10-07, 시안 A · B · C 를 탭 셋으로) — `/admin/ops/occupancy`: 추이 · 건물별(등급 · 60% 기준선) · 객실 × 월 히트맵 · 앞으로 6달 빈 박. 숫자는 매출 화면과 같은 칸(저쪽과 243칸 일치). 남은 것: 화면 확인 · 국가별 · 모바일 | [34](../product/34-metrics-and-automation.md) 「가동률 화면」 |
+| 3 | 매출 · 전표 | ✅ **매출 화면 구현**(2026-10-06, 시안 A v2 — 보고서형 + 「건물 × 월」 탭) — `/admin/ops/revenue`. ✅ **저쪽과 숫자 일치**(2026-10-07 — 2024-07 ~ 2026-09 건물 × 월 243칸, 매출 · 판매 박 · 전체 박, 34번 「저쪽과 숫자 대조」). ❌ 전표 착수 전(`/ledger`). **전표는 향후 8개월 스냅샷**이라 과거분은 원본 이관 필수 | [34](../product/34-metrics-and-automation.md) 「매출 화면」 · 「전표」 |
+| 4 | 자동화 | ✅ **1차 구현**(2026-10-06 — 매출 · 가동률보다 먼저, 사용자 결정) — `/admin/ops/automation` 자동화 관제실: Slack 5종(일일 운영 리포트 · 청소/셋팅 명단 · 취소 · 당일예약 · 실패 알림), 발송 토글 · 시각/요일/재시도 마감 · 받는 곳별 언어 체크박스 · 변동 재전송 · 정정본 · 담당자 수기 입력 · 1분 틱. 운영 DB 적용. Slack 채널 4개 Vercel 등록 · 저쪽 메시지 대조 · 표시 형식 맞춤(2026-10-07). **남은 것: 받는 곳 체크 → 발송 켜기(청소 명단 · 일일 리포트부터) · 실패 알림 채널 · 실패 알림에 Beds24 경보 연결**, 구글 시트 · Notion. 저쪽 프로젝트는 2026-10-06 정지 | [36](../product/36-automation-control.md) · [34](../product/34-metrics-and-automation.md) 「자동화 — 실제 목록」 |
 
 > 계산식은 이미 하나 있다: 판매 캘린더 「매출 요약」(`src/lib/ops-sales-summary.ts`)이 저쪽 건물 캘린더 분석
 > 카드 식을 **그대로** 옮겼다(2026-09-30, 운영 DB·Beds24 원본과 1엔 단위 대조 완료). 가동률·매출 화면은
@@ -326,7 +326,7 @@ host = 리스팅 편집 페이지(`/hosting/listings/editor/<리스팅ID>`), gue
 - [x] **가동률 화면**(`/admin/ops/occupancy`, 2026-10-07) — 시안 3개(claude.ai 디자인 캔버스 「가동률 대시보드 시안」) → 사용자 「이대로 구현」 → 탭 셋(추이 · 건물별 / 객실 × 월 / 앞으로). 34번 「가동률 화면」. 남은 것: 사용자 화면 확인 · 국가별(전화번호 추정 국가 결정 대기) · 모바일.
 
 1. **공통 지표 계층** — `ops-sales-summary.ts` 를 기간 · 건물 · 채널 축의 공통 모듈로.
-2. ~~**가동률** → **매출 · 전표** → **자동화**~~ → **2026-10-06 사용자 결정: 자동화(Slack)부터**, 매출 · 가동률은 나중. 자동화 기획 = [36](36-automation-control.md).
+2. ~~**가동률** → **매출 · 전표** → **자동화**~~ → **2026-10-06 사용자 결정: 자동화(Slack)부터**, 매출 · 가동률은 나중. 자동화 기획 = [36](../product/36-automation-control.md).
    이어서 가동률 → 매출 · 전표. 각 단계 착수 전에 저쪽 코드를 먼저 읽는다
    (「이식 원칙」).
 3. 착수 전에 필요한 결정(34번 「착수 전에 정할 것」): ② 제외 건물 · 채널 기준 통일 ③ Hotelsmart 청소 명단을 이번에
@@ -401,7 +401,7 @@ host = 리스팅 편집 페이지(`/hosting/listings/editor/<리스팅ID>`), gue
 ~~**알려진 구멍**: 가격이 있는 예약이 87% 뿐이다~~ → **착시였다**(2026-09-16 전량 백필 후 재측정:
 취소 제외 11,332건 중 98.8% 에 가격이 있다. 빠져 보인 것은 취소분 — Beds24 가 취소 시 금액을 0 으로
 비운다). 매출 금액도 `netRevenue` 우선이 아니라 **총액**이다(2026-09-28 저쪽 코드 조사).
-→ [34-metrics-and-automation.md](34-metrics-and-automation.md) 「데이터 정합성」 · 「지표 정의」
+→ [34-metrics-and-automation.md](../product/34-metrics-and-automation.md) 「데이터 정합성」 · 「지표 정의」
 
 ~~**남은 데이터 구멍**: 예약 정합성 작업이 3개월만 훑는다~~ → **이미 닫혀 있었다**(2026-09-16 증분 정합성 `modifiedFrom` —
 기간 제한 없음). 고치기 전 코드가 과거에 남긴 빈칸은 2026-10-07 에 넓게 다시 읽어 메웠다 → 34번 「기간」 · 「저쪽과 숫자 대조」.
@@ -410,7 +410,7 @@ host = 리스팅 편집 페이지(`/hosting/listings/editor/<리스팅ID>`), gue
 
 가져오는 기능은 **기존 Foldy 콘솔에 섞지 않는다.** 사무실 직원 소수만 들어가는 별도 영역을
 만들고 그 안에서만 쓴다. 특히 캘린더는 **기존 예약 캘린더와 물건이 다르다**(읽기 전용 vs 쓰기).
-→ [32-ops-admin-area.md](32-ops-admin-area.md)
+→ [32-ops-admin-area.md](../product/32-ops-admin-area.md)
 
 ## 열린 질문
 
@@ -429,8 +429,8 @@ host = 리스팅 편집 페이지(`/hosting/listings/editor/<리스팅ID>`), gue
 
 1. **이 문서**의 「진행 상황」 → 「2026-10-02 작업 기록」 · 「2026-10-01 작업 기록」(최근 세션에 한 일 · 커밋) → 「다음 순서 — 해야 할 것 전부」(체크리스트) → 지금 어디까지 왔는가.
 2. [06-current-status.md](../planning/06-current-status.md) 맨 위 날짜 항목들 → 최근에 무엇을 고쳤는가.
-3. 하려는 영역의 문서 — 캘린더 [33](33-calendar-write-features.md) · 지표/자동화 [34](34-metrics-and-automation.md) ·
-   영역/권한 [32](32-ops-admin-area.md) · Beds24 연동 [01-beds24-integration](../engineering/01-beds24-integration.md).
+3. 하려는 영역의 문서 — 캘린더 [33](../product/33-calendar-write-features.md) · 지표/자동화 [34](../product/34-metrics-and-automation.md) ·
+   영역/권한 [32](../product/32-ops-admin-area.md) · Beds24 연동 [01-beds24-integration](../engineering/01-beds24-integration.md).
 4. **저쪽 원본**: Windows `C:\-stay-ari-manager-main` = WSL `/mnt/c/-stay-ari-manager-main`
    (CRA + Firebase). 참고 자료로만 읽는다 — 코드를 옮기지 않고 규칙을 옮긴다. 먼저 `git log --oneline` 으로
    위 「10/01 기준 최신」 이후 바뀐 것이 있는지 본다.

@@ -297,8 +297,7 @@ RLS 정책도 역할 배열이 아니라 `has_capability(org, uid, 'job_applicat
 
 ## 8-1. 콘솔 `/admin/recruit` (2026-09-09 구현)
 
-디자인 「Foldy Recruiting Console」을 그대로 옮겼다. 브리프:
-`docs/design/03-recruit-console-design-brief.md`.
+디자인 「Foldy Recruiting Console」을 그대로 옮겼다(디자인 브리프 문서는 2026-10-26 정리하며 지움).
 
 ### 목록 — 표 + 신호 칩
 

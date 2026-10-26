@@ -262,7 +262,6 @@ All mobile screens that use `MobileShell` must inherit the unified mobile shell 
 - For mobile UI, shared `MobileShell` structure and behavior must stay globally consistent across pages.
 - Any change to shared shell behavior must be reflected in:
   - `docs/planning/06-current-status.md`
-  - `docs/engineering/06-implementation-plan.md`
   - `docs/product/16-mobile-navigation.md`
 
 ## 2026-05-22 Baseline Documentation Rule

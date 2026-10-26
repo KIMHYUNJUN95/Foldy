@@ -198,7 +198,7 @@ App Store 1.2 · Google Play UGC 정책이 신고 · 차단을 요구하는 대�
 | 항목 | 값 | 근거 |
 | --- | --- | --- |
 | 모으는 것 | 재류카드 앞 · 뒤 사진(일본 국적은 마이넘버 카드 **앞면만** — 12자리 개인번호는 받지 않음, 보이면 사진 삭제 후 다시 찍게 함) + 칸: 로마자 이름 · 생년월일 · 성별 · 국적 · **주소(住居地)** · 카드 번호 · 재류자격 · 만료일 · 취로 제한 · 자격외활동 · 읽은 값(`ocr_values`) · 고친 칸 | `staff_id_documents`(마이그레이션 `202610230001`) · `src/lib/staff-documents/fields.ts` |
-| 원본 저장 | Supabase 비공개 버킷 `staff-documents` — **도쿄(`ap-northeast-1`)**. 앱 서버(Vercel 함수)도 도쿄 `hnd1` | `docs/engineering/06-implementation-plan.md`(Tokyo region) · `vercel.json` `regions: ["hnd1"]` · `docs/product/15-reservation-calendar.md` |
+| 원본 저장 | Supabase 비공개 버킷 `staff-documents` — **도쿄(`ap-northeast-1`)**. 앱 서버(Vercel 함수)도 도쿄 `hnd1` | `docs/archive/06-implementation-plan.md`(Tokyo region) · `vercel.json` `regions: ["hnd1"]` · `docs/product/15-reservation-calendar.md` |
 | 해외로 가는 것 | **동의(기본 꺼짐)한 경우에만** 사진을 Anthropic API 로 보냄. 동의 안 하면 사진만 저장 · 직접 입력 | `src/lib/staff-documents/ocr.ts` · `id-card-flow.tsx` |
 | Anthropic 보관 | API 입력 · 출력은 **30일 안에 자동 삭제**. 단 안전 분류기에 걸리면 **최대 2년**(분류 점수 최대 7년), 법적 의무가 있으면 그 기간 | [Anthropic — How long do you store my organization's data](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data) · [API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) |
 | 학습 사용 | 상용 약관: 「Anthropic may not train models on Customer Content from Services」 · API 문서: 「Retained data is never used for model training without your express permission」 | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) · [API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) |

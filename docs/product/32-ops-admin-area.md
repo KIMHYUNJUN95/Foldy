@@ -1,7 +1,7 @@
 # 운영 관리자 영역 (Ops Admin)
 
 > 상태: **골격 구현됨** (2026-09-17) — 권한 · 메뉴 · 라우트 5개 · 판매 캘린더 읽기
-> 상위: [31-stay-ari-migration-overview.md](31-stay-ari-migration-overview.md)
+> 상위: [31-stay-ari-migration-overview.md](../archive/31-stay-ari-migration-overview.md)
 
 ## 구현 현황 (2026-09-17)
 
@@ -137,7 +137,7 @@ Slack 자동화 5종(일일 운영 리포트 · 청소/셋팅 명단 · 취소 �
 합치는 쪽이 오히려 원본에서 멀어진다.
 
 **모바일에서도 같은 5개를 전부 쓴다.** 축소판이 아니다 — 저쪽 웹의 가장 큰 불만이 「모바일에서
-제대로 안 된다」였다. → [31](31-stay-ari-migration-overview.md) 「모바일이 설계의 출발점이다」
+제대로 안 된다」였다. → [31](../archive/31-stay-ari-migration-overview.md) 「모바일이 설계의 출발점이다」
 
 ## 기존 화면과의 관계
 

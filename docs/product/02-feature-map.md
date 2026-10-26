@@ -84,7 +84,7 @@ Examples:
 - Property notes
 - Team communication
 
-Permissions: **all active roles including Part-Time Staff can create posts** (confirmed 2026-06-09) — unlike Announcements, where part-time staff cannot create. See `docs/product/20-internal-board-workflow.md`.
+Permissions: **all active roles including Part-Time Staff can create posts** (confirmed 2026-06-09) — unlike Announcements, where part-time staff cannot create. See `docs/product/23-board-workflow.md`.
 
 ### 4A. Customer Complaints
 
@@ -336,7 +336,7 @@ See `docs/product/25-bug-report-workflow.md` + `docs/engineering/13-bug-report-t
 
 ## Post-MVP Approved Batch (confirmed 2026-06-09)
 
-These five features are the approved next build scope after the Phase 6–13 MVP. Build order: Linen Defect → Personal Todo / Shared Task Inbox → Staff Suggestions → Internal Board → Attendance/Payroll. The Todo and Internal Board entries above (#2, #4) are part of this batch. See `docs/planning/15-feature-batch-plan.md` and `docs/planning/01-decision-log.md` (2026-06-09).
+These five features are the approved next build scope after the Phase 6–13 MVP. Build order: Linen Defect → Personal Todo / Shared Task Inbox → Staff Suggestions → Internal Board → Attendance/Payroll. The Todo and Internal Board entries above (#2, #4) are part of this batch. See `docs/archive/15-feature-batch-plan.md` and `docs/planning/01-decision-log.md` (2026-06-09).
 
 ### 13. Linen Defect Registration
 

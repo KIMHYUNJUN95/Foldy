@@ -118,7 +118,7 @@ All roles except Part-time Staff can create announcements. Part-time Staff can r
 
 ### Internal Board
 
-Teams can share operational posts, updates, and internal records. Lighter than announcements (no required read tracking or popup in MVP). **All active roles including Part-Time Staff can create posts** (confirmed 2026-06-09). See `docs/product/20-internal-board-workflow.md`.
+Teams can share operational posts, updates, and internal records. Lighter than announcements (no required read tracking or popup in MVP). **All active roles including Part-Time Staff can create posts** (confirmed 2026-06-09). See `docs/product/23-board-workflow.md`.
 
 ### Linen Defect Registration
 

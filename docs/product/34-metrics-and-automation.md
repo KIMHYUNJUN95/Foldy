@@ -1,7 +1,7 @@
 # 가동률 · 매출 · 자동화
 
 > 상태: **매출 화면 구현(2026-10-06) · 저쪽과 숫자 일치 확인(2026-10-07, 2024-07 ~ 2026-09 건물 × 월 243칸) · 가동률 화면 구현(2026-10-07)** · 자동화 1차 구현(36번) · 전표 착수 전 (2026-09-16 기획, 2026-09-28 조사 반영)
-> 상위: [31-stay-ari-migration-overview.md](31-stay-ari-migration-overview.md) · 진입: [32-ops-admin-area.md](32-ops-admin-area.md)
+> 상위: [31-stay-ari-migration-overview.md](../archive/31-stay-ari-migration-overview.md) · 진입: [32-ops-admin-area.md](32-ops-admin-area.md)
 
 전환 순서에서 **가장 먼저** 넘기는 부분이다. 읽기라 위험이 없고, 숫자가 저쪽과 맞는지 대조하면
 「우리 데이터가 맞다」는 확신이 생긴다. 그 확신 위에서 캘린더 쓰기를 켠다.

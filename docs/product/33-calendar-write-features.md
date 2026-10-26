@@ -1,7 +1,7 @@
 # 운영 캘린더 — 쓰기 기능
 
 > 상태: **기획 확정 · 개발 착수 전** (2026-09-16)
-> 상위: [31-stay-ari-migration-overview.md](31-stay-ari-migration-overview.md) · 진입: [32-ops-admin-area.md](32-ops-admin-area.md)
+> 상위: [31-stay-ari-migration-overview.md](../archive/31-stay-ari-migration-overview.md) · 진입: [32-ops-admin-area.md](32-ops-admin-area.md)
 
 이번 이전에서 **가장 크고 가장 위험한** 부분이다. 저쪽 원본은 단일 파일 **11,672줄**
 (`BuildingCalendar.jsx`).

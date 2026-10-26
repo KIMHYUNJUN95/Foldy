@@ -4,7 +4,7 @@
 > 시안 1a 확정 · 모든 자동화는 발송 꺼짐으로 시작.
 > 구현 내용은 아래 「구현 (2026-10-06 1차)」 — 기획 절과 다른 점은 거기에 적었다.
 >
-> 관련: [31-stay-ari-migration-overview.md](31-stay-ari-migration-overview.md)(이식 현황) ·
+> 관련: [31-stay-ari-migration-overview.md](../archive/31-stay-ari-migration-overview.md)(이식 현황) ·
 > [34-metrics-and-automation.md](34-metrics-and-automation.md)(자동화 전체 목록 · 전환 원칙) ·
 > [32-ops-admin-area.md](32-ops-admin-area.md)(운영 관리자 영역 · 권한)
 

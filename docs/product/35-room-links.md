@@ -2,7 +2,7 @@
 
 > 상태: **구현(2026-10-02)** · 관리자 웹 `/admin/ops/room-links` · 모바일 `/mobile/ops/room-links`(2026-10-05) · 화이트 리디자인(2026-10-15) · 건물 · 객실 직접 추가(2026-10-15, 마이그레이션 `202610150002`)
 > 원본: STAY ARI Manager `src/components/RoomLinksDashboard.jsx` + `src/constants/roomLinks.js`(Firestore `roomLinks/{companyId}`)
-> 관련: [31 이식 현황](31-stay-ari-migration-overview.md) · [32 운영 관리자 영역](32-ops-admin-area.md) · 시안: Claude Design `a3c6ed81-b1de-4f3a-aab4-da60487a139c`(1b · 1b v2)
+> 관련: [31 이식 현황](../archive/31-stay-ari-migration-overview.md) · [32 운영 관리자 영역](32-ops-admin-area.md) · 시안: Claude Design `a3c6ed81-b1de-4f3a-aab4-da60487a139c`(1b · 1b v2)
 
 ## 무엇을 위한 화면인가
 

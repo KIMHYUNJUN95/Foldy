@@ -36,9 +36,8 @@ Before making changes, read in this order:
 5. `docs/planning/06-current-status.md`
 6. `docs/engineering/07-environment-setup.md`
 7. Relevant files under `docs/product`, `docs/engineering`, and `docs/design`
-8. **STAY ARI Manager 이식 작업**(판매 캘린더 · 가동률 · 매출 · 자동화 — 원본 `C:\-stay-ari-manager-main` =
-   `/mnt/c/-stay-ari-manager-main`)을 이어갈 때는 `docs/product/31-stay-ari-migration-overview.md` 를 먼저 읽는다 —
-   진행 상황 · 다음 순서 · 재개 가이드가 거기 있다.
+8. **STAY ARI Manager 이식**(판매 캘린더 · 가동률 · 매출 · 자동화)은 2026-10-23 끝났다. 이식 기록은
+   `docs/archive/31-stay-ari-migration-overview.md`(참고용). 지금 기준은 32~37번 기능 문서다.
    **이식은 항상 저쪽 구조와 설계를 먼저 읽고, 우리 쪽에 맞게 업그레이드해서 짓는다** — 복사도, 추측으로 다시 만들기도
    하지 않는다(31번 「이식 원칙」).
 

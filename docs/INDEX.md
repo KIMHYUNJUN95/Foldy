@@ -23,7 +23,6 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Decision Log](./planning/01-decision-log.md) | Living | Confirmed decisions |
 | [Project Workflow](./planning/04-project-workflow.md) | Confirmed | How the project is run |
 | [AI Collaboration Rules](./planning/05-ai-collaboration-rules.md) | Confirmed | Rules for Codex/Claude/Cursor/other AI |
-| [Implementation Plan](./engineering/06-implementation-plan.md) | Living | Phase-based build history and current delivery state |
 
 ## Planning Docs
 
@@ -31,15 +30,12 @@ Historical: Retained for decision history but superseded by a newer document or 
 |---|---:|---|
 | [Project Brief](./planning/00-project-brief.md) | Living | Project identity and context |
 | [Decision Log](./planning/01-decision-log.md) | Living | Source of confirmed decisions |
-| [Next Meeting Agenda](./planning/02-next-meeting-agenda.md) | Draft | Early planning agenda |
-| [MVP Priority](./planning/03-mvp-priority.md) | Confirmed | First mobile workflow priorities |
 | [Project Workflow](./planning/04-project-workflow.md) | Confirmed | Work process |
 | [AI Collaboration Rules](./planning/05-ai-collaboration-rules.md) | Confirmed | Shared AI rules |
 | [Current Status](./planning/06-current-status.md) | Living | Completed/in-progress/remaining tracker |
 | [QA Checklist Announcement Images](./planning/07-qa-checklist-announcement-images.md) | Living | Historical QA checklist for announcement-image rollout |
 | [QA Checklist](./planning/13-qa-checklist.md) | Living | Full system QA and release-readiness checklist |
 | [Rollout Guide](./planning/14-rollout-guide.md) | Living | Internal rollout sequence and operational checks |
-| [Feature Batch Plan](./planning/15-feature-batch-plan.md) | Historical | Implemented feature-batch scope and delivery history |
 | [Admin Dashboard Workflow](./planning/16-admin-dashboard-workflow.md) | Living | Active workflow board for dashboard planning and implementation |
 
 ## Product Docs
@@ -66,7 +62,6 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [User Profile and Directory](./product/17-user-profile-directory.md) | Confirmed | Profile and user directory |
 | [Todo / Task Workflow](./product/18-todo-task-workflow.md) | Living | Implemented CS follow-up and operational task memory |
 | [Linen Defect Workflow](./product/19-linen-defect-workflow.md) | Living | Implemented property-scoped linen defect workflow |
-| [Internal Board Workflow](./product/20-internal-board-workflow.md) | Historical | Early concept superseded by the current Board Workflow |
 | [Attendance / Payroll Workflow](./product/21-attendance-payroll-workflow.md) | Living | Implemented PWA attendance and hourly gross-pay operations |
 | [Staff Suggestions Workflow](./product/22-staff-suggestions-workflow.md) | Living | Implemented staff suggestion and feedback workflow |
 | [Board Workflow](./product/23-board-workflow.md) | Living | Implemented free internal board for active members |
@@ -84,27 +79,34 @@ Historical: Retained for decision history but superseded by a newer document or 
 | Document | Status | Purpose |
 |---|---:|---|
 | [Design Direction](./design/00-design-direction.md) | Confirmed | Warm ivory + deep navy + selective Liquid Glass + readability |
-| [Google Stitch Handoff](./design/01-stitch-handoff.md) | Confirmed | How to pass Stitch designs |
-| [Stitch Screen List](./design/02-stitch-screen-list.md) | Historical | Historical Stitch tracker; current code and design contracts govern |
 
 ## Engineering Docs
 
 | Document | Status | Purpose |
 |---|---:|---|
-| [Technical Options](./engineering/00-technical-options.md) | Confirmed | Selected MVP stack and alternatives |
 | [Beds24 Integration](./engineering/01-beds24-integration.md) | Living | Implemented webhook and reconciliation integration |
 | [Platform Architecture](./engineering/02-platform-architecture.md) | Confirmed | PWA/admin/backend architecture |
 | [Deployment Strategy](./engineering/03-deployment-strategy.md) | Confirmed | Vercel/PWA/internal deployment |
 | [Data Model](./engineering/04-data-model.md) | Living | Implemented Supabase/PostgreSQL schema contract |
 | [RLS Permissions](./engineering/05-rls-permissions.md) | Living | Implemented RLS and server-side permission contract |
-| [Implementation Plan](./engineering/06-implementation-plan.md) | Living | Development phases and delivery history |
 | [Environment Setup](./engineering/07-environment-setup.md) | Living | Environment variables and service setup |
 | [Linen Defect Technical Design](./engineering/08-linen-defect-technical-design.md) | Living | Implemented linen schema, RLS, and action design |
 | [Todo / Task Technical Design](./engineering/09-todo-task-technical-design.md) | Living | Implemented task, sharing, recurrence, and calendar design |
-| [Internal Board Technical Design](./engineering/10-internal-board-technical-design.md) | Historical | Early internal-board design superseded by the current board implementation |
 | [Attendance / Payroll Technical Design](./engineering/11-attendance-payroll-technical-design.md) | Living | Implemented attendance and hourly gross-pay technical design |
 | [Staff Suggestions Technical Design](./engineering/12-staff-suggestions-technical-design.md) | Living | Implemented visibility-aware suggestion technical design |
 | [Bug Report Technical Design](./engineering/13-bug-report-technical-design.md) | Living | Implemented bug-report schema, RLS, actions, and notification design |
+
+## Archive
+
+지금 기준이 아닌 지난 계획 · 끝난 작업 기록(2026-10-26 옮김). 참고만 한다.
+
+| Document | Purpose |
+|---|---|
+| [Technical Options](./archive/00-technical-options.md) | 초기 기술 스택 비교 |
+| [Implementation Plan](./archive/06-implementation-plan.md) | 초기 MVP 단계별 개발 순서 · 이력 |
+| [MVP Priority](./archive/03-mvp-priority.md) | 초기 모바일 우선순위 |
+| [Feature Batch Plan](./archive/15-feature-batch-plan.md) | 2026-06 기능 묶음 계획(구현 완료) |
+| [STAY ARI Migration Overview](./archive/31-stay-ari-migration-overview.md) | 판매 캘린더 · 자동화 이식 기록(2026-10-23 끝) |
 
 ## Current Delivery Checklist
 

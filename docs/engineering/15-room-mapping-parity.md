@@ -1,7 +1,7 @@
 # 룸 매핑 대조 — Foldy ↔ STAY ARI Manager
 
 > 실측: **2026-09-17** (roomId 단위 전수 비교)
-> 상위: [../product/31-stay-ari-migration-overview.md](../product/31-stay-ari-migration-overview.md)
+> 상위: [../archive/31-stay-ari-migration-overview.md](../archive/31-stay-ari-migration-overview.md)
 
 STAY ARI Manager 를 이전하면서 **같은 방을 양쪽이 같은 방으로 보는지**를 확인한 기록이다.
 가격을 쓰기 시작하면 이 대조가 틀린 만큼 엉뚱한 방의 가격이 바뀐다.

@@ -1141,7 +1141,7 @@ GET /bookings?modifiedFrom=<커서−30분>&status=cancelled             (취소
 ## 2026-09-16 과거 예약 백필에서 드러난 두 가지
 
 STAY ARI Manager 이전을 위해 2022년부터의 예약을 가져오다 발견했다
-([31-stay-ari-migration-overview.md](../product/31-stay-ari-migration-overview.md)).
+([31-stay-ari-migration-overview.md](../archive/31-stay-ari-migration-overview.md)).
 
 ### ① 이름이 지워진 예약을 통째로 버리고 있었다
 

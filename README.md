@@ -156,7 +156,6 @@ Read these first:
 - [Decision Log](./docs/planning/01-decision-log.md)
 - [Project Workflow](./docs/planning/04-project-workflow.md)
 - [AI Collaboration Rules](./docs/planning/05-ai-collaboration-rules.md)
-- [Implementation Plan](./docs/engineering/06-implementation-plan.md)
 - [Environment Setup](./docs/engineering/07-environment-setup.md)
 
 ## Product Docs
@@ -181,7 +180,6 @@ Read these first:
 - [User Profile and Directory](./docs/product/17-user-profile-directory.md)
 - [Todo / Task Workflow](./docs/product/18-todo-task-workflow.md)
 - [Linen Defect Workflow](./docs/product/19-linen-defect-workflow.md)
-- [Internal Board Concept (historical)](./docs/product/20-internal-board-workflow.md)
 - [Attendance / Payroll Workflow](./docs/product/21-attendance-payroll-workflow.md)
 - [Staff Suggestions Workflow](./docs/product/22-staff-suggestions-workflow.md)
 - [Board Workflow](./docs/product/23-board-workflow.md)
@@ -197,25 +195,24 @@ Read these first:
 ## Design Docs
 
 - [Design Direction](./docs/design/00-design-direction.md)
-- [Google Stitch Handoff](./docs/design/01-stitch-handoff.md)
-- [Stitch Screen List](./docs/design/02-stitch-screen-list.md)
 
 ## Engineering Docs
 
-- [Technical Options](./docs/engineering/00-technical-options.md)
 - [Beds24 Integration](./docs/engineering/01-beds24-integration.md)
 - [Platform Architecture](./docs/engineering/02-platform-architecture.md)
 - [Deployment Strategy](./docs/engineering/03-deployment-strategy.md)
 - [Data Model](./docs/engineering/04-data-model.md)
 - [RLS Permissions](./docs/engineering/05-rls-permissions.md)
-- [Implementation Plan](./docs/engineering/06-implementation-plan.md)
 - [Environment Setup](./docs/engineering/07-environment-setup.md)
 - [Linen Defect Technical Design](./docs/engineering/08-linen-defect-technical-design.md)
 - [Todo / Task Technical Design](./docs/engineering/09-todo-task-technical-design.md)
-- [Internal Board Technical Design](./docs/engineering/10-internal-board-technical-design.md)
 - [Attendance / Payroll Technical Design](./docs/engineering/11-attendance-payroll-technical-design.md)
 - [Staff Suggestions Technical Design](./docs/engineering/12-staff-suggestions-technical-design.md)
 - [Bug Report Technical Design](./docs/engineering/13-bug-report-technical-design.md)
+
+## Archive
+
+지난 계획 · 끝난 이식 기록은 [docs/archive](./docs/archive/)에 둔다(2026-10-26). 지금 기준은 아니다.
 
 ## Work Process
 
@@ -237,7 +234,7 @@ For each feature:
 ```txt
 1. Confirm requirements
 2. Update docs
-3. Design in Stitch if UI-heavy
+3. Design in Claude Design if UI-heavy
 4. Implement small vertical slice
 5. Test mobile/admin, light mode, ko/ja/en
 6. Update docs if implementation differs

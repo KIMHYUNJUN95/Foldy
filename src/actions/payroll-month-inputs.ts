@@ -8,6 +8,7 @@ import { bestEffortWrite } from "@/lib/db-write-guard";
 import { payrollPrepAvailable, type PrepManual } from "@/lib/payroll-prep";
 import { shiftYm } from "@/lib/payroll-settings-rules";
 import { PAYROLL_MONTH_INPUT_SELECT, rowToPrepManual } from "@/lib/payroll-prep-server";
+import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
 
 /**
  * 알바 급여 P3 — 급여 준비 손 입력 저장(PC 근태 › 급여 패널 · 모바일 급여 준비 시트가 같이 부른다 → src/actions).
@@ -19,7 +20,7 @@ export type PrepManualPatch = Partial<PrepManual>;
 
 export type SavePayrollMonthInputResult =
   | { ok: true; manual: PrepManual; before: PrepManual }
-  | { ok: false; reason: "forbidden" | "invalid" | "not_member" | "closed" | "error" };
+  | { ok: false; reason: "forbidden" | "invalid" | "not_member" | "closed" | "locked" | "error" };
 
 const YM_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MAX_YEN = 10_000_000;
@@ -122,6 +123,8 @@ export async function savePayrollMonthInput(input: {
   if (!payrollPrepAvailable(input.ym)) return { ok: false, reason: "closed" };
   const update = toUpdate(input.patch);
   if (!update) return { ok: false, reason: "invalid" };
+  // P5 — 결재 요청 이후엔 잠금(고치려면 돌려보내기 · 결재 되돌리기로 급여 준비에 돌아온 뒤).
+  if (await isPayrollMonthLocked(service, organizationId, input.ym)) return { ok: false, reason: "locked" };
 
   const memberRes = await service
     .from("memberships")

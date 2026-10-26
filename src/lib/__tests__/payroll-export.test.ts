@@ -283,3 +283,35 @@ describe("rich sample", () => {
     }
   });
 });
+
+describe("P5 — 결재 도장 · 지급 확인", () => {
+  it("결재 도장은 사장 확인표 G3 · H3, 지급 체크는 지급 확인 목록 「済」", () => {
+    const rows = sample();
+    const cash = rows.find((r) => r.paymentMethod === "cash")!;
+    const transfer = rows.find((r) => r.paymentMethod === "transfer")!;
+    const sheets = buildPayrollBook({
+      ym: "2026-10",
+      paydayDate: "2026-11-10",
+      companyName: "テスト株式会社",
+      taxYear: 2026,
+      rows,
+      stamps: { senmu: null, president: { name: "가명", at: "2026-11-05T01:00:00Z" } },
+      checks: {
+        [cash.userId]: { envelope: true, received: true, transfer: false },
+        [transfer.userId]: { envelope: false, received: false, transfer: true },
+      },
+    });
+    const owner = sheets.find((s) => s.name === SHEET.owner)!;
+    expect(owner.cells.get("G3")?.v ?? null).toBeNull();
+    expect(owner.cells.get("H3")?.v).toBe("가명\n11/5");
+    const check = sheets.find((s) => s.name === SHEET.check)!;
+    const rowOf = (name: string) =>
+      [...check.cells.entries()].find(([k, c]) => k.startsWith("C") && c.v === name)![0].slice(1);
+    const cr = rowOf(cash.name);
+    const tr = rowOf(transfer.name);
+    expect(check.cells.get(`H${cr}`)?.v).toBe("済");
+    expect(check.cells.get(`I${cr}`)?.v).toBe("済");
+    expect(check.cells.get(`H${tr}`)?.v).toBe("済");
+    expect(check.cells.get(`I${tr}`)?.v ?? null).toBeNull();
+  });
+});

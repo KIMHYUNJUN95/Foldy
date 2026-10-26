@@ -34,3 +34,20 @@ export function formatPrepDay(date: string, localeTag: string): string {
 export function prepInitial(row: Pick<PrepRow, "name">): string {
   return Array.from(row.name.trim())[0] ?? "·";
 }
+
+/** ISO 시각 → 도쿄 기준 「10/28 14:02」(결재 도장 · 지급 체크 · 기록). 숫자만이라 세 언어 공통. */
+export function formatPrepStamp(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const p = (t: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${p("month")}/${p("day")} ${p("hour")}:${p("minute")}`;
+}

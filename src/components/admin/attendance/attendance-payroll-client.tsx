@@ -467,6 +467,8 @@ function PayrollPanel({
         setErr(c.actionForbidden);
       } else if (res.reason === "reason_required") {
         setErr(c.actionReasonRequired);
+      } else if (res.reason === "payroll_locked") {
+        setErr(c.payReopenLocked);
       } else {
         setErr(c.actionFailed);
       }

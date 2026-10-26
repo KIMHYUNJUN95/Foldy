@@ -14,6 +14,7 @@ export const CAPABILITY_GROUPS = [
       "attendance.settings",
       "payroll.view",
       "payroll.manage",
+      "payroll.approve",
       "wages.manage",
       "transport.manage",
       "leave.approve",

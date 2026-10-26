@@ -28,7 +28,24 @@ export type PayrollBookInput = {
   /** 세금표의 해(지급일의 해). */
   taxYear: number;
   rows: readonly PrepRow[];
+  /** P5 — 결재 도장(사장 확인표 G3 · H3). 결재 전이면 비워 둬 종이 도장 칸으로 남는다. */
+  stamps?: { senmu?: PayrollStamp | null; president?: PayrollStamp | null };
+  /** P5 — 사람별 지급 확인(지급 확인 목록 封入確認 · 本人確認 = 「済」). */
+  checks?: Readonly<Record<string, PayrollBookCheck>>;
 };
+
+export type PayrollStamp = { name: string | null; at: string | null };
+/** 현금: envelope = 封入確認, received = 本人確認. 이체: transfer = 封入確認 칸(振込 완료). */
+export type PayrollBookCheck = { envelope: boolean; received: boolean; transfer: boolean };
+
+/** 도장 칸 글 — 「이름\nM/D」(도쿄 날짜). */
+export function stampText(stamp: PayrollStamp | null | undefined): string | null {
+  if (!stamp?.at) return null;
+  const d = new Date(stamp.at);
+  if (Number.isNaN(d.getTime())) return stamp.name ?? null;
+  const md = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric" }).format(d);
+  return stamp.name ? `${stamp.name}\n${md}` : md;
+}
 
 export const SHEET = {
   guide: "印刷方法",
@@ -533,7 +550,12 @@ function guideSheet(values: SettingsValues): ModelSheet {
 
 // ── 사장 확인표 ──
 
-function ownerSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[], title: string): ModelSheet {
+function ownerSheet(
+  cash: readonly PrepRow[],
+  transfer: readonly PrepRow[],
+  title: string,
+  stamps: PayrollBookInput["stamps"],
+): ModelSheet {
   const b = new SheetBuilder(SHEET.owner, [8, 5, 12, 18.5, 18, 14, 12.875, 14.5, 6.25], {
     orientation: "portrait",
     fitToWidth: true,
@@ -543,8 +565,13 @@ function ownerSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[], titl
   b.height(1, 22.5).height(2, 21.6).height(3, 33.95).height(4, 11.1).height(5, 24);
   b.set("G2", "専務", { font: { name: "Meiryo UI", size: 11, bold: true }, border: "all", align: { h: "center" } });
   b.set("H2", "社長", { font: { name: "Meiryo UI", size: 11, bold: true }, border: "all", align: { h: "center" } });
-  b.set("G3", null, { border: "all" });
-  b.set("H3", null, { border: "all" });
+  const stampStyle: CellStyle = {
+    font: { name: "Meiryo UI", size: 8, color: RED },
+    border: "all",
+    align: { h: "center", v: "middle", wrap: true },
+  };
+  b.set("G3", stampText(stamps?.senmu), stampStyle);
+  b.set("H3", stampText(stamps?.president), stampStyle);
   ["時給", "No", "韓国名", "氏名", "内容", "金額(税込)", "支払方法", "出勤日数", "区分"].forEach((h, i) =>
     b.set(`${colLetter(i)}5`, h, st.head(9)),
   );
@@ -610,7 +637,11 @@ function ownerSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[], titl
 
 // ── 지급 확인 목록 ──
 
-function checkSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[]): ModelSheet {
+function checkSheet(
+  cash: readonly PrepRow[],
+  transfer: readonly PrepRow[],
+  done: PayrollBookInput["checks"],
+): ModelSheet {
   const b = new SheetBuilder(SHEET.check, [8, 9.625, 12, 18.5, 8.5, 12, 10, 10.125, 15.875, 12.25], {
     orientation: "portrait",
     fitToWidth: true,
@@ -636,8 +667,10 @@ function checkSheet(cash: readonly PrepRow[], transfer: readonly PrepRow[]): Mod
       b.set(`E${r}`, row.workDays, st.cell(undefined, 9), `${inp}!AC${ir}`);
       b.set(`F${r}`, row.net ?? "", st.cell(YEN, 9), orBlank(`${inp}!AB${ir}`));
       b.set(`G${r}`, m, st.cell(undefined, 9), `${inp}!AI${ir}`);
-      b.set(`H${r}`, null, st.cell(undefined, 9));
-      b.set(`I${r}`, null, st.cell(undefined, 9));
+      const c = done?.[row.userId];
+      const h = row.paymentMethod === "transfer" ? c?.transfer : c?.envelope;
+      b.set(`H${r}`, h ? "済" : null, st.cell(undefined, 9));
+      b.set(`I${r}`, row.paymentMethod === "cash" && c?.received ? "済" : null, st.cell(undefined, 9));
       b.set(`J${r}`, rowNote(row), st.cell(undefined, 9, left), orBlank(`${inp}!AL${ir}`));
       checks.push(`H${r}`, `I${r}`);
       r += 1;
@@ -756,10 +789,10 @@ export function buildPayrollBook(input: PayrollBookInput): ModelSheet[] {
     settings,
     inputSheet(SHEET.cashInput, "現金入力　※ここを直すと、明細・社長確認表・支給確認一覧へ自動反映", cash, input.taxYear),
     inputSheet(SHEET.transferInput, "振込入力　※ここを直すと、明細・社長確認表・支給確認一覧へ自動反映", transfer, input.taxYear),
-    ownerSheet(cash, transfer, values.title),
+    ownerSheet(cash, transfer, values.title, input.stamps),
     slipSheet(SHEET.cashSlip, SHEET.cashInput, cash, values),
     slipSheet(SHEET.transferSlip, SHEET.transferInput, transfer, values),
-    checkSheet(cash, transfer),
+    checkSheet(cash, transfer, input.checks),
   ];
   const tax = taxSheet(input.taxYear);
   if (tax) sheets.push(tax);

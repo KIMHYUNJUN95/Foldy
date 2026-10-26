@@ -2646,6 +2646,7 @@ const FALLBACK_DICTIONARY = {
       payActionExporting: "Exporting…",
       payActionDoneFinalize: "Month finalized.",
       payActionDoneReopen: "Month reopened.",
+      payReopenLocked: "This month’s pay is in approval. Send it back to Pay prep first.",
       payUndoOne: "Finalized {name}",
       payUndoMany: "Finalized {n} people",
       payUndoReason: "Undone right after finalizing",
@@ -3846,6 +3847,7 @@ const FALLBACK_DICTIONARY = {
           "staff_documents.view": "See staff residence cards (and the front of My Number cards for Japanese staff), confirm them or ask for a new photo. Everyone can always see their own.",
           "payroll.view": "On Attendance › Payroll: see the monthly payroll table and each person’s amounts (rate, hours, extra pay, total with transport) and export Excel or PDF. Also shows the amounts in the monthly cleaning comparison.",
           "payroll.manage": "Close or reopen a person’s pay for the month, and create or cancel extra pay for busy or short-staffed days. A closed month can’t have shifts, transport or extra pay changed.",
+          "payroll.approve": "Approve the month’s part-time pay as managing director or president (only the person set in Settings › Payroll), undo your approval, or send it back to Pay prep with a reason.",
           "wages.manage": "On Attendance › Hourly rates: see and set each person’s hourly rate and employment type (hourly or salaried). Past dates can only fill empty days before the first entry.",
           "transport.manage": "On Attendance › Transport: see staff transport claims and receipts, and approve, return or ask for changes. Approved amounts are added to the pay total.",
           "leave.approve": "On Attendance › Leave: approve or reject leave requests, see the leave form, and manage each person’s remaining and granted days.",
@@ -4115,6 +4117,10 @@ const FALLBACK_DICTIONARY = {
           "payroll.manage": {
             label: "Payroll — close",
             desc: "Close and reopen months, create or cancel extra pay",
+          },
+          "payroll.approve": {
+            label: "Payroll — approve",
+            desc: "Approve pay as MD or president, send back",
           },
           "wages.manage": {
             label: "Hourly rate · employment type",
@@ -11122,6 +11128,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         payActionExporting: "내보내는 중…",
         payActionDoneFinalize: "이번 달을 마감했습니다.",
         payActionDoneReopen: "마감을 해제했습니다.",
+        payReopenLocked: "이 달 급여가 결재 중이에요. 먼저 급여 준비로 돌려보내 주세요.",
         payUndoOne: "{name} 님 마감했어요",
         payUndoMany: "{n}명 마감했어요",
         payUndoReason: "마감 직후 실행 취소",
@@ -12304,6 +12311,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "staff_documents.view": "직원의 재류카드(일본 국적은 마이넘버 카드 앞면)를 보고, 확인하거나 다시 찍어 달라고 요청해요. 자기 카드는 누구나 볼 수 있어요.",
             "payroll.view": "근태 › 급여 화면에서 월 급여표와 직원별 금액(시급 · 근무 시간 · 추가수당 · 교통비 포함 총액)을 보고 Excel · PDF 로 내보내요. 청소 월 비교표의 금액도 이 권한으로 보여요.",
             "payroll.manage": "직원별 그 달 급여를 마감하거나 마감을 취소하고, 바쁜 날 · 인원 부족한 날의 추가수당을 만들거나 취소해요. 마감된 달은 근무 · 교통비 · 수당을 바꿀 수 없어요.",
+            "payroll.approve": "알바 급여를 전무 · 사장으로 결재하고(설정 › 급여에 정한 사람만), 내 결재를 취소하거나 사유를 적어 급여 준비로 돌려보내요.",
             "wages.manage": "근태 › 시급 화면에서 직원별 시급과 고용형태(시급제 · 월급제)를 보고 정해요. 지난 날짜는 아직 값이 없는 앞쪽 빈 날만 채울 수 있어요.",
             "transport.manage": "근태 › 교통비 화면에서 직원이 낸 교통비 신청과 영수증을 보고 승인 · 반려 · 수정 요청해요. 승인한 금액은 급여 총액에 더해져요.",
             "leave.approve": "근태 › 연차 화면에서 연차 신청을 승인 · 반려하고, 휴가계 문서를 보고, 직원별 연차 잔여 · 부여일수를 관리해요.",
@@ -12573,6 +12581,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "payroll.manage": {
               label: "급여 — 마감",
               desc: "월 마감 · 마감 취소 · 추가수당 만들기/취소",
+            },
+            "payroll.approve": {
+              label: "급여 — 결재",
+              desc: "전무 · 사장 결재 · 돌려보내기",
             },
             "wages.manage": {
               label: "시급 · 고용형태",
@@ -19442,6 +19454,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         payActionExporting: "エクスポート中…",
         payActionDoneFinalize: "今月を確定しました。",
         payActionDoneReopen: "確定を解除しました。",
+        payReopenLocked: "この月の給与は決裁中です。先に給与準備へ差し戻してください。",
         payUndoOne: "{name}さんを確定しました",
         payUndoMany: "{n}人を確定しました",
         payUndoReason: "確定直後の取り消し",
@@ -20627,6 +20640,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "staff_documents.view": "スタッフの在留カード（日本国籍はマイナンバーカード表面）を見て、確認したり撮り直しを依頼したりします。自分のカードは誰でも見られます。",
             "payroll.view": "勤怠 › 給与画面で月の給与表とスタッフ別の金額（時給・勤務時間・追加手当・交通費込みの合計）を見て、Excel・PDF で書き出します。清掃の月比較表の金額もこの権限で見えます。",
             "payroll.manage": "スタッフ別にその月の給与を締めたり締めを解除したりし、忙しい日・人手不足の日の追加手当を作成・取消します。締めた月は勤務・交通費・手当を変更できません。",
+            "payroll.approve": "アルバイトの給与を専務・社長として決裁し（設定 › 給与で決めた人のみ）、自分の決裁を取り消したり、理由を書いて給与準備へ差し戻したりします。",
             "wages.manage": "勤怠 › 時給画面でスタッフ別の時給と雇用形態（時給制・月給制）を見て設定します。過去の日付は、まだ値がない前の空いた日だけ埋められます。",
             "transport.manage": "勤怠 › 交通費画面でスタッフの交通費申請と領収書を見て、承認・却下・修正依頼をします。承認した金額は給与の合計に加わります。",
             "leave.approve": "勤怠 › 年休画面で年休申請を承認・却下し、休暇届を見て、スタッフ別の年休残り・付与日数を管理します。",
@@ -20896,6 +20910,10 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
             "payroll.manage": {
               label: "給与 — 締め",
               desc: "月の締め・締め解除・追加手当の作成/取消",
+            },
+            "payroll.approve": {
+              label: "給与 — 決裁",
+              desc: "専務・社長の決裁・差し戻し",
             },
             "wages.manage": {
               label: "時給・雇用形態",

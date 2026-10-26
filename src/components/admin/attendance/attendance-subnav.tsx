@@ -14,7 +14,7 @@ type Att = Dictionary["admin"]["attendanceConsole"];
 const TABS: { id: Tab; href: string; icon: ReactNode; labelKey: keyof Att; needs?: Capability[] }[] = [
   { id: "overview", href: "/admin/attendance", icon: <ChartColumn />, labelKey: "tabOverview" },
   { id: "queue", href: "/admin/attendance/queue", icon: <Clock />, labelKey: "tabQueue", needs: ["attendance.manage"] },
-  { id: "payroll", href: "/admin/attendance/payroll", icon: <Wallet />, labelKey: "tabPayroll", needs: ["payroll.view"] },
+  { id: "payroll", href: "/admin/attendance/payroll", icon: <Wallet />, labelKey: "tabPayroll", needs: ["payroll.view", "payroll.approve"] },
   { id: "wages", href: "/admin/attendance/wages", icon: <Tags />, labelKey: "tabWages", needs: ["wages.manage"] },
   { id: "transport", href: "/admin/attendance/transport", icon: <Bus />, labelKey: "tabTransport", needs: ["transport.manage"] },
   { id: "roster", href: "/admin/attendance/roster", icon: <Users />, labelKey: "tabRoster" },

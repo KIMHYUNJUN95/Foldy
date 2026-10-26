@@ -2213,10 +2213,38 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, au
 떠난 상태끼리 바뀌면 처음 값 유지). 기존 suspended · removed 행은 `updated_at` 으로 채웠다(근사 — 실제보다 늦을 수는 있어도 이르지 않다).
 신분 서류 보관 기한(퇴사 3년 뒤 삭제)의 기준 — `docs/product/41` §6.
 
+## 2026-10-26 `payroll_month_approvals` · `payroll_month_approval_events` · `payroll_payment_checks` — 알바 급여 P5 (`202610260001`)
+
+알바 급여 P5(`docs/product/40` §4-3 ~ §6, `39` 「P5 구현」). 같은 마이그레이션이 권한 키 `payroll.approve`(대표 · 전무)를 `capability_policies` · `capability_roles` 에 넣는다.
+
+**`payroll_month_approvals`** — 급여 회차(PK `organization_id, target_month`, 그 달 1일). 줄이 없으면 「급여 준비」.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `status` | `preparing` · `approval_senmu` · `approval_president` · `paying` · `paid` · `sent_to_accountant` |
+| `snapshot` | 결재 요청 순간의 급여 준비 값 jsonb `{ v: 1, rows: PrepRow[], totals, payday, companyName, takenAt }`. `preparing` 이 아니면 꼭 있다(check). 돌려보내면 null |
+| `requested_by` · `requested_at` | 결재 요청한 사람 · 시각 |
+| `senmu_approver_id` · `president_approver_id` | 요청 순간 설정 › 급여의 결재자(専務 없으면 null → 社長 칸만, 같은 사람이면 社長 칸만) |
+| `senmu_approved_by/at` · `president_approved_by/at` | 결재한 사람 · 시각 |
+| `paid_at` | 지급 확인이 다 찬 시각(체크를 풀면 null) |
+| `sent_by` · `sent_at` | 세무사 「보냄」 |
+| `updated_at` | |
+
+**`payroll_month_approval_events`** — 상태가 바뀔 때마다 한 줄(`id`, 조직 · 달 · `action` · `slot` senmu/president · `actor_user_id` · `reason` · `created_at`).
+`action` = `request` · `cancel_request` · `approve` · `undo_approve` · `return`(결재 중 돌려보냄) · `revert`(지급 중 결재 되돌리기) · `paid` · `unpaid` · `sent` · `unsent`.
+
+**`payroll_payment_checks`** — 사람 · 달마다 지급 확인(PK `organization_id, user_id, target_month`).
+`envelope_by/at`(현금 봉투 넣음) · `received_by/at`(현금 본인 확인 — check: 봉투 없이 불가) · `transferred_by/at`(이체 완료) · `updated_at`.
+풀면 칸을 비운다(지금 값만). 하나하나의 기록은 `audit_logs.action = 'payroll_payment_check'`(`metadata = { ym, kind, on, userIds }`).
+
+쓰기 = `src/actions/payroll-approval.ts`(PC · 모바일 공용, 요청 · 체크 · 보냄 = `payroll.manage`, 결재 · 돌려보내기 = `payroll.approve` + 그 칸 결재자 본인, 지급 중 결재 되돌리기 = `payroll.manage` 또는 결재자),
+읽기 = `loadPayrollRound`(`src/lib/payroll-approval-server.ts`) ← `getPayrollPrep`. 상태 바꾸기는 `.eq("status", 지금)` 조건부 update(0줄이면 `conflict`).
+잠금: `preparing` 이 아니면 `payroll_month_inputs` 쓰기 · 근태 마감 풀기가 막힌다. 셋 다 RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
+
 ## 2026-10-25 `payroll_month_inputs` — 알바 급여 P3 급여 준비 손 입력 (`202610250002`)
 
 알바 급여 P3(`docs/product/39` §3-B · §5-A · §9). 사람 · 달마다 **손으로 넣는 값만** 둔다 — 총지급 · 원천세 · 실수령은 저장하지 않고 화면을 그릴 때마다
-P2 엔진(`calculatePayrollMonth`, `src/lib/payroll-prep.ts` `buildPrepRow`)으로 낸다. 결재 · 지급 때 굳히는 건 P5 스냅샷.
+P2 엔진(`calculatePayrollMonth`, `src/lib/payroll-prep.ts` `buildPrepRow`)으로 낸다. 결재 요청 때 굳히는 건 P5 스냅샷(`payroll_month_approvals.snapshot`).
 
 PK `(organization_id, user_id, target_month)` — `target_month` 는 그 달 1일.
 

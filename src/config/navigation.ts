@@ -76,6 +76,8 @@ export type NavigationItem = {
    * 들어 있고, 실제 차단은 페이지·서버 액션·RLS 가 한다.
    */
   capability?: Capability;
+  /** `capability` 대신 이 키 중 하나만 있어도 보인다 — 급여 결재자(`payroll.approve`)가 급여 화면을 찾게(2026-10-26). */
+  orCapabilities?: readonly Capability[];
 };
 
 const mobileNavHome = {
@@ -252,6 +254,7 @@ const mobileNavPayroll = {
   href: "/mobile/payroll",
   icon: Wallet,
   capability: "payroll.view",
+  orCapabilities: ["payroll.approve"],
 } as const satisfies NavigationItem;
 
 // 컴플레인 / Complaints — 구현된 수동 컴플레인 + 외부 리뷰 작업 공간. 사이드 메뉴 항목
@@ -361,8 +364,9 @@ export function isMobileOpsAdminNavItem(id: string): boolean {
  * UX 필터일 뿐이다(실제 차단은 페이지 · 서버 액션 · RLS).
  */
 export function canSeeNavItem(item: object, capabilities: readonly string[] | null | undefined): boolean {
-  const capability = (item as { capability?: Capability }).capability;
-  return !capability || Boolean(capabilities?.includes(capability));
+  const { capability, orCapabilities } = item as { capability?: Capability; orCapabilities?: readonly Capability[] };
+  if (!capability) return true;
+  return [capability, ...(orCapabilities ?? [])].some((key) => capabilities?.includes(key));
 }
 
 /** 저장된 하단 내비 id 를 순서 있는 내비 항목으로 바꾼다(최대 개수 적용). */

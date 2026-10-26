@@ -41,6 +41,20 @@ function bookOf(data: PayrollPrepData) {
     companyName: data.companyName,
     taxYear: Number(data.payday.date.slice(0, 4)),
     rows: data.rows,
+    stamps: {
+      senmu: data.round.senmu?.approvedAt
+        ? { name: data.round.senmu.approvedByName, at: data.round.senmu.approvedAt }
+        : null,
+      president: data.round.president.approvedAt
+        ? { name: data.round.president.approvedByName, at: data.round.president.approvedAt }
+        : null,
+    },
+    checks: Object.fromEntries(
+      Object.entries(data.round.checks).map(([userId, c]) => [
+        userId,
+        { envelope: Boolean(c.envelopeAt), received: Boolean(c.receivedAt), transfer: Boolean(c.transferredAt) },
+      ]),
+    ),
   });
 }
 

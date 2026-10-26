@@ -16,11 +16,15 @@ import {
 import { loadMemberPayrollViews, loadOrgPayrollSettings } from "@/lib/payroll-settings-server";
 import { paydayFor, type Payday } from "@/lib/payroll-settings-rules";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { loadPayrollRound } from "@/lib/payroll-approval-server";
+import type { PayrollRound } from "@/lib/payroll-approval";
 import { tokyoToday } from "@/lib/tokyo-date";
 
 /**
  * 알바 급여 P3 — 급여 준비 읽기(서버 전용, service role). PC 근태 › 급여 · 모바일 급여 준비가 같이 쓴다.
  * 보기 = `payroll.view`, 입력 = `payroll.manage`(`canManage`). docs/product/39 §5-A · §8, 40 §4-2.
+ * P5: 결재 요청 이후(잠긴 달)는 숫자를 다시 셈하지 않고 요청 때 굳힌 스냅샷을 돌려준다 — 결재 · 지급 · 출력이 같은 숫자.
+ * 결재자(`payroll.approve`)는 `payroll.view` 가 없어도 결재할 숫자를 본다.
  */
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
@@ -31,6 +35,8 @@ export type PayrollPrepData = {
   available: boolean;
   canView: boolean;
   canManage: boolean;
+  /** 급여 결재(`payroll.approve`). */
+  canApprove: boolean;
   payday: Payday;
   /** 설정 › 급여의 会社名(명세서 · 급여 엑셀에 찍힘). 비어 있으면 빈 글. */
   companyName: string;
@@ -38,6 +44,8 @@ export type PayrollPrepData = {
   allFinalized: boolean;
   rows: PrepRow[];
   totals: PrepTotals;
+  /** 급여 회차(P5) — 상태 · 결재 칸 · 지급 체크 · 기록. */
+  round: PayrollRound;
 };
 
 type InputRow = {
@@ -75,12 +83,32 @@ export function rowToPrepManual(row: Omit<InputRow, "user_id"> | null | undefine
   };
 }
 
+const EMPTY_ROUND: PayrollRound = {
+  status: "preparing",
+  requestedByName: null,
+  requestedAt: null,
+  senmu: null,
+  president: { approverId: null, approverName: null, approvedByName: null, approvedAt: null },
+  paidAt: null,
+  sentAt: null,
+  sentByName: null,
+  checks: {},
+  paidPeople: 0,
+  events: [],
+  myTurn: null,
+  viewerIsApprover: false,
+  approversReady: false,
+  lastReturn: null,
+};
+
 function emptyData(ym: string, payday: Payday): PayrollPrepData {
   return {
     ym,
     available: payrollPrepAvailable(ym),
     canView: false,
     canManage: false,
+    canApprove: false,
+    round: EMPTY_ROUND,
     payday,
     companyName: "",
     allFinalized: false,
@@ -94,29 +122,51 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
   const service = getSupabaseServiceClient();
   if (session.organization.id === "platform") return emptyData(ym, paydayFor(ym, 10));
   const organizationId = session.organization.id;
-  const [canView, canManage, org] = await Promise.all([
+  const [canViewPayroll, canManage, canApprove, org] = await Promise.all([
     attendanceCan(service, organizationId, session.user.id, "payroll.view"),
     attendanceCan(service, organizationId, session.user.id, "payroll.manage"),
+    attendanceCan(service, organizationId, session.user.id, "payroll.approve"),
     loadOrgPayrollSettings(service, organizationId),
   ]);
+  const canView = canViewPayroll || canApprove;
   const payday = paydayFor(ym, org.payDay);
   const companyName = org.companyName;
-  if (!canView || !payrollPrepAvailable(ym)) return { ...emptyData(ym, payday), companyName, canView, canManage };
+  if (!canView || !payrollPrepAvailable(ym)) return { ...emptyData(ym, payday), companyName, canView, canManage, canApprove };
+  const { round, snapshot } = await loadPayrollRound(service, organizationId, ym, session.user.id, org, canApprove);
+  if (snapshot) {
+    // 잠긴 달 — 요청 때 굳힌 값 그대로(근태 · 설정이 그 뒤 바뀌어도 결재한 숫자가 안 바뀐다).
+    return {
+      ym,
+      available: true,
+      canView,
+      canManage,
+      canApprove,
+      payday: snapshot.payday,
+      companyName: snapshot.companyName,
+      allFinalized: true,
+      rows: snapshot.rows,
+      totals: snapshot.totals,
+      round,
+    };
+  }
   return {
     ...(await loadPrepRows(service, organizationId, ym, payday, org.employmentInsuranceRates)),
     companyName,
     canView,
     canManage,
+    canApprove,
+    round,
   };
 }
 
-async function loadPrepRows(
+/** 지금 값으로 다시 셈한 급여 준비(스냅샷 무시) — 결재 요청이 굳힐 값. */
+export async function loadPrepRows(
   service: Service,
   organizationId: string,
   ym: string,
   payday: Payday,
   insuranceRates: Record<string, number>,
-): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "companyName">> {
+): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "canApprove" | "companyName" | "round">> {
   const firstDay = `${ym}-01`;
   const today = tokyoToday();
   const [membersRes, base, transportRes, inputsRes] = await Promise.all([

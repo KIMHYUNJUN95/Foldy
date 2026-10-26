@@ -13,6 +13,7 @@
 // 과거 Step 7 경계: 이 파일의 뒷부분 섹션은 이제 수동 세션, 급여,
 // 마감, 대시보드 액션, 내보내기도 구현한다.
 
+import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
 import { revalidatePath } from "next/cache";
 import {
   createNotification,
@@ -1116,7 +1117,7 @@ export type FinalizeResult =
 
 export type ReopenResult =
   | { ok: true }
-  | { ok: false; reason: "forbidden" | "reason_required" | "not_finalized" | "invalid" | "error" };
+  | { ok: false; reason: "forbidden" | "reason_required" | "not_finalized" | "payroll_locked" | "invalid" | "error" };
 
 function revalidatePay() {
   revalidatePath("/mobile/attendance/pay");
@@ -1256,6 +1257,8 @@ export async function reopenAttendanceMonth(input: {
   }
   if (!isValidYm(input.ym)) return { ok: false, reason: "invalid" };
   if (!input.reason.trim()) return { ok: false, reason: "reason_required" };
+  // 알바 급여 P5 — 그 달 급여 결재가 시작됐으면 근태 마감을 풀 수 없다(먼저 돌려보내기 · 결재 되돌리기, 문서 40 §4-1).
+  if (await isPayrollMonthLocked(service, organizationId, input.ym)) return { ok: false, reason: "payroll_locked" };
 
   const snap = await getCurrentFinalizedSnapshot(service, organizationId, input.userId, input.ym);
   if (!snap) return { ok: false, reason: "not_finalized" };

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import { savePayrollMonthInput } from "@/actions/payroll-month-inputs";
+import { cancelPayrollApprovalRequest, requestPayrollApproval } from "@/actions/payroll-approval";
 import {
   exportPayrollBookReport,
   exportPayrollBookWorkbook,
@@ -12,6 +13,7 @@ import {
 } from "@/actions/payroll-exports";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { prepTotals, type PrepManual, type PrepRow } from "@/lib/payroll-prep";
+import { canRequestApproval, isRoundLocked } from "@/lib/payroll-approval";
 import type { PayrollPrepData } from "@/lib/payroll-prep-server";
 import { getPayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import {
@@ -21,7 +23,6 @@ import {
 } from "@/lib/payroll-settings-i18n";
 import { WITHHOLDING_CLASSES } from "@/lib/payroll-settings-rules";
 import { AdminExportButtons } from "../../shared/admin-export-buttons";
-import { AdminUndoToast } from "../../shared/admin-undo-toast";
 import {
   formatPrepMonth,
   formatPrepPayday,
@@ -29,19 +30,22 @@ import {
   prepInitial,
 } from "./prep-format";
 import { PayrollPrepPanel } from "./payroll-prep-panel";
+import type { RoundToast } from "./payroll-round-client";
+import { roundFailMessage, stageHref } from "./round-ui";
 import "./payroll-prep.css";
 
 type Filter = "all" | "transfer" | "cash";
-type Toast = { stamp: number; message: string; undo?: () => Promise<void> };
 
 export function PayrollPrepClient({
   data,
   locale,
   localeTag,
+  toast,
 }: {
   data: PayrollPrepData;
   locale: Locale;
   localeTag: string;
+  toast: RoundToast;
 }) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
@@ -49,14 +53,15 @@ export function PayrollPrepClient({
   const settings = getPayrollSettingsCopy(locale);
   const shared = dictionary.admin.shared;
   const c = dictionary.admin.attendanceConsole;
-  const { ym, canManage, payday } = data;
+  const { ym, payday, round } = data;
+  // 결재 요청 뒤(잠긴 달)엔 숫자를 못 고친다 — 보기만(docs/product/40 §4-3).
+  const locked = isRoundLocked(round.status);
+  const canManage = data.canManage && !locked;
 
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast | null>(null);
-  const [plain, setPlain] = useState<string | null>(null);
   const [, startRefresh] = useTransition();
-  const [undoPending, startUndo] = useTransition();
+  const [requesting, startRequest] = useTransition();
 
   const money = new Intl.NumberFormat(localeTag);
   const num = (n: number | null) => (n == null ? "—" : money.format(n));
@@ -72,19 +77,30 @@ export function PayrollPrepClient({
     ? (all.find((r) => r.userId === selectedId) ?? null)
     : null;
 
-  function announce(message: string, undo?: () => Promise<void>) {
-    setPlain(null);
-    setToast((prev) => ({ stamp: (prev?.stamp ?? 0) + 1, message, undo }));
-  }
-  function notice(message: string) {
-    setToast(null);
-    setPlain(message);
-    window.setTimeout(() => setPlain((p) => (p === message ? null : p)), 2200);
-  }
+  const { announce, notice } = toast;
   const refresh = () => startRefresh(() => router.refresh());
 
-  const failMessage = (reason: string) =>
-    reason === "forbidden" ? copy.errorForbidden : copy.errorSave;
+  const failMessage = (reason: string) => {
+    if (reason === "conflict" || reason === "locked") refresh();
+    return roundFailMessage(copy, reason);
+  };
+
+  // 결재 요청 — 확인 필요 0 · 모두 계산 · 근태 마감 끝 · 사장 결재자 있음(설정 › 급여).
+  const ready = canRequestApproval(all, data.totals);
+  const canRequest = canManage && ready && round.approversReady && round.status === "preparing";
+  function requestApproval() {
+    startRequest(async () => {
+      const res = await requestPayrollApproval(ym);
+      if (!res.ok) return notice(failMessage(res.reason));
+      router.replace(stageHref(ym, "approval"), { scroll: false });
+      announce(copy.requestedToast, async () => {
+        const back = await cancelPayrollApprovalRequest(ym);
+        if (!back.ok) return notice(failMessage(back.reason));
+        router.replace(stageHref(ym, "prep"), { scroll: false });
+        notice(copy.cancelledToast);
+      });
+    });
+  }
 
   async function saveInput(
     row: PrepRow,
@@ -177,6 +193,20 @@ export function PayrollPrepClient({
           })}
         </span>
       </div>
+
+      {round.lastReturn ? (
+        <p className="ppr-note">
+          {fillCopy(copy.returnedNote, {
+            name: round.lastReturn.actorName ?? "",
+            reason: round.lastReturn.reason ?? "",
+          })}
+        </p>
+      ) : locked ? (
+        <p className="ppr-note ppr-note--lock">
+          <LockIcon />
+          {copy.lockedShort}
+        </p>
+      ) : null}
 
       <div className="ppr-tools">
         <div className="ppr-seg" role="group" aria-label={copy.filterLabel}>
@@ -352,21 +382,28 @@ export function PayrollPrepClient({
           <span className="v2">{yen(totals.cash.net)}</span>
         </span>
         <span className="ppr-bar__r">
-          {totals.needsCheck > 0 ? (
+          {locked ? (
+            <span>{copy.lockedShort}</span>
+          ) : totals.needsCheck > 0 ? (
             <span className="ppr-dot">
               {fillCopy(copy.checkPeople, { n: totals.needsCheck })}
             </span>
+          ) : data.canManage && !round.approversReady ? (
+            <span className="ppr-dot">{copy.errorNoApprover}</span>
           ) : (
             <span>{copy.noChecks}</span>
           )}
-          <button
-            type="button"
-            className="ppr-go"
-            disabled
-            title={copy.approvalLater}
-          >
-            {copy.requestApproval}
-          </button>
+          {data.canManage && !locked ? (
+            <button
+              type="button"
+              className="ppr-go"
+              disabled={!canRequest || requesting}
+              aria-busy={requesting || undefined}
+              onClick={requestApproval}
+            >
+              {copy.requestApproval}
+            </button>
+          ) : null}
         </span>
       </div>
 
@@ -385,21 +422,15 @@ export function PayrollPrepClient({
           onClose={closePanel}
         />
       ) : null}
-
-      {toast?.undo ? (
-        <AdminUndoToast
-          stamp={toast.stamp}
-          message={toast.message}
-          undoLabel={copy.undo}
-          pending={undoPending}
-          onUndo={() => startUndo(async () => void (await toast.undo?.()))}
-          onExpire={() => setToast(null)}
-        />
-      ) : plain ? (
-        <div className="ppr-toast" role="status">
-          {plain}
-        </div>
-      ) : null}
     </div>
+  );
+}
+
+export function LockIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
   );
 }

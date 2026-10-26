@@ -4194,6 +4194,96 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_month_approval_events: {
+        Row: {
+          id: string
+          organization_id: string
+          target_month: string
+          action: string
+          slot: string | null
+          actor_user_id: string | null
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          target_month: string
+          action: string
+          slot?: string | null
+          actor_user_id?: string | null
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          target_month?: string
+          action?: string
+          slot?: string | null
+          actor_user_id?: string | null
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      payroll_month_approvals: {
+        Row: {
+          organization_id: string
+          target_month: string
+          status: string
+          snapshot: Json | null
+          requested_by: string | null
+          requested_at: string | null
+          senmu_approver_id: string | null
+          president_approver_id: string | null
+          senmu_approved_by: string | null
+          senmu_approved_at: string | null
+          president_approved_by: string | null
+          president_approved_at: string | null
+          paid_at: string | null
+          sent_by: string | null
+          sent_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          target_month: string
+          status?: string
+          snapshot?: Json | null
+          requested_by?: string | null
+          requested_at?: string | null
+          senmu_approver_id?: string | null
+          president_approver_id?: string | null
+          senmu_approved_by?: string | null
+          senmu_approved_at?: string | null
+          president_approved_by?: string | null
+          president_approved_at?: string | null
+          paid_at?: string | null
+          sent_by?: string | null
+          sent_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          organization_id?: string
+          target_month?: string
+          status?: string
+          snapshot?: Json | null
+          requested_by?: string | null
+          requested_at?: string | null
+          senmu_approver_id?: string | null
+          president_approver_id?: string | null
+          senmu_approved_by?: string | null
+          senmu_approved_at?: string | null
+          president_approved_by?: string | null
+          president_approved_at?: string | null
+          paid_at?: string | null
+          sent_by?: string | null
+          sent_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payroll_month_inputs: {
         Row: {
           organization_id: string
@@ -4250,6 +4340,45 @@ export type Database = {
           memo?: string | null
           updated_by?: string | null
           created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payroll_payment_checks: {
+        Row: {
+          organization_id: string
+          user_id: string
+          target_month: string
+          envelope_by: string | null
+          envelope_at: string | null
+          received_by: string | null
+          received_at: string | null
+          transferred_by: string | null
+          transferred_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          organization_id: string
+          user_id: string
+          target_month: string
+          envelope_by?: string | null
+          envelope_at?: string | null
+          received_by?: string | null
+          received_at?: string | null
+          transferred_by?: string | null
+          transferred_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          organization_id?: string
+          user_id?: string
+          target_month?: string
+          envelope_by?: string | null
+          envelope_at?: string | null
+          received_by?: string | null
+          received_at?: string | null
+          transferred_by?: string | null
+          transferred_at?: string | null
           updated_at?: string
         }
         Relationships: []

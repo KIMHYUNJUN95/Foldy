@@ -36,6 +36,77 @@ export type PayrollPrepCopy = {
   noChecks: string;
   requestApproval: string;
   approvalLater: string;
+  /** P5 — 결재 · 지급 확인 · 세무사 송부(2026-10-26). */
+  lockedNote: string; // 결재 화면 — 결재자에게
+  lockedShort: string;
+  errorLocked: string;
+  errorConflict: string;
+  errorHasChecks: string;
+  errorOrder: string;
+  errorNotReady: string;
+  errorNoApprover: string;
+  reasonRequired: string;
+  ownerSheet: string;
+  approvalTitle: string;
+  slotSenmu: string;
+  slotPresident: string;
+  slotSenmuShort: string; // 좁은 도장 칸
+  slotPresidentShort: string;
+  stampWaiting: string;
+  approve: string;
+  returnAction: string;
+  returnBody: string;
+  revertAction: string;
+  revertBody: string;
+  reasonLabel: string;
+  cancel: string;
+  cancelRequest: string;
+  requestedToast: string;
+  cancelledToast: string;
+  approvedToast: string; // {slot} = 전무 · 사장
+  returnedToast: string;
+  turnOf: string;
+  myTurnCard: string; // 모바일 카드 머리
+  approveCardTitle: string;
+  approveCardSub: string;
+  returnedNote: string;
+  stampNote: string;
+  historyTitle: string;
+  evRequest: string;
+  evCancel: string;
+  evApprove: string;
+  evUndo: string;
+  evReturn: string;
+  evRevert: string;
+  evPaid: string;
+  evUnpaid: string;
+  evSent: string;
+  evUnsent: string;
+  stPreparing: string;
+  stApprovalSenmu: string;
+  stApprovalPresident: string;
+  stPaying: string;
+  stPaid: string;
+  stSent: string;
+  approvalWait: string;
+  payProgressLabel: string;
+  payProgress: string;
+  envelope: string;
+  envelopeShort: string; // 좁은 칸
+  received: string;
+  transferDone: string;
+  allTransferred: string;
+  cashGroup: string;
+  transferGroup: string;
+  cashHint: string;
+  checkToast: string; // {name} · {what}
+  uncheckToast: string;
+  allTransferredToast: string;
+  paidAllToast: string;
+  taxSend: string;
+  taxSendHint: string;
+  taxSentToast: string;
+  taxFiles: string;
   /** P4 — 급여 준비 값으로 만드는 출력 파일. */
   filesTitle: string;
   fileBook: string;
@@ -128,6 +199,76 @@ const ko: PayrollPrepCopy = {
   noChecks: "확인할 사람 없음",
   requestApproval: "결재 요청",
   approvalLater: "결재는 다음 단계에서 열려요",
+  lockedNote: "결재가 진행 중이라 숫자를 고칠 수 없어요. 고칠 게 있으면 돌려보내 주세요.",
+  lockedShort: "결재 중이라 숫자가 잠겨 있어요",
+  errorLocked: "결재 중이라 고칠 수 없어요",
+  errorConflict: "다른 사람이 먼저 바꿨어요. 화면을 새로 고쳤어요.",
+  errorHasChecks: "지급 체크가 있어 되돌릴 수 없어요",
+  errorOrder: "봉투를 먼저 넣어 주세요",
+  errorNotReady: "확인할 사람이 남아 있어요",
+  errorNoApprover: "설정 › 급여에서 사장 결재자를 정해 주세요",
+  reasonRequired: "이유를 적어 주세요",
+  ownerSheet: "사장 확인표",
+  approvalTitle: "결재",
+  slotSenmu: "전무",
+  slotPresident: "사장",
+  slotSenmuShort: "전무",
+  slotPresidentShort: "사장",
+  stampWaiting: "대기",
+  approve: "결재",
+  returnAction: "돌려보내기",
+  returnBody: "급여 준비로 돌아가고, 결재도 함께 풀려요. 고칠 점을 남겨 주세요.",
+  revertAction: "결재 되돌리기",
+  revertBody: "급여 준비로 돌아가고 결재가 모두 풀려요. 이유를 남겨 주세요.",
+  reasonLabel: "이유",
+  cancel: "취소",
+  cancelRequest: "요청 취소",
+  requestedToast: "결재를 요청했어요",
+  cancelledToast: "결재 요청을 취소했어요",
+  approvedToast: "{slot} 결재했어요",
+  returnedToast: "급여 준비로 돌려보냈어요",
+  turnOf: "{slot} 결재 차례",
+  myTurnCard: "결재할 급여",
+  approveCardTitle: "{month}분 급여",
+  approveCardSub: "{n}명 · 실수령 {amount}",
+  returnedNote: "{name} 님이 돌려보냈어요 · {reason}",
+  stampNote: "결재 도장이 같이 찍혀 나가요",
+  historyTitle: "기록",
+  evRequest: "결재 요청",
+  evCancel: "결재 요청 취소",
+  evApprove: "{slot} 결재",
+  evUndo: "{slot} 결재 취소",
+  evReturn: "돌려보냄",
+  evRevert: "결재 되돌림",
+  evPaid: "지급 완료",
+  evUnpaid: "지급 완료 풀림",
+  evSent: "세무사에게 보냄",
+  evUnsent: "세무사 송부 취소",
+  stPreparing: "급여 준비",
+  stApprovalSenmu: "전무 결재 중",
+  stApprovalPresident: "사장 결재 중",
+  stPaying: "지급 중",
+  stPaid: "지급 완료",
+  stSent: "세무사 송부 끝",
+  approvalWait: "결재를 기다리고 있어요",
+  payProgressLabel: "지급 확인",
+  payProgress: "{done} / {n}명",
+  envelope: "봉투 넣음",
+  envelopeShort: "봉투",
+  received: "본인 확인",
+  transferDone: "이체 완료",
+  allTransferred: "모두 이체 완료",
+  cashGroup: "현금",
+  transferGroup: "이체",
+  cashHint: "봉투에 넣고, 받은 사람이 확인해요",
+  checkToast: "{name} {what}",
+  uncheckToast: "{name} {what} 취소",
+  allTransferredToast: "{n}명 이체 완료",
+  paidAllToast: "지급이 모두 끝났어요",
+  taxSend: "세무사에게 보냄",
+  taxSendHint: "지급이 모두 끝나면 체크할 수 있어요",
+  taxSentToast: "세무사에게 보냈다고 표시했어요",
+  taxFiles: "세무사용 파일",
   filesTitle: "파일",
   fileBook: "급여 파일",
   fileBookHint: "명세서 · 사장 확인표 · 지급 확인 목록",
@@ -231,6 +372,76 @@ const ja: PayrollPrepCopy = {
   noChecks: "要確認なし",
   requestApproval: "決裁を依頼",
   approvalLater: "決裁は次の段階で使えます",
+  lockedNote: "決裁中のため数字は変更できません。直す点があれば差し戻してください。",
+  lockedShort: "決裁中のため数字はロックされています",
+  errorLocked: "決裁中のため変更できません",
+  errorConflict: "他の人が先に変更しました。画面を更新しました。",
+  errorHasChecks: "支給チェックがあるため戻せません",
+  errorOrder: "先に封入してください",
+  errorNotReady: "確認が必要な人が残っています",
+  errorNoApprover: "設定 › 給与で社長の決裁者を決めてください",
+  reasonRequired: "理由を入力してください",
+  ownerSheet: "社長確認表",
+  approvalTitle: "決裁",
+  slotSenmu: "専務",
+  slotPresident: "社長",
+  slotSenmuShort: "専務",
+  slotPresidentShort: "社長",
+  stampWaiting: "未",
+  approve: "決裁する",
+  returnAction: "差し戻す",
+  returnBody: "給与準備に戻り、決裁も解除されます。直す点を書いてください。",
+  revertAction: "決裁を戻す",
+  revertBody: "給与準備に戻り、決裁はすべて解除されます。理由を書いてください。",
+  reasonLabel: "理由",
+  cancel: "キャンセル",
+  cancelRequest: "依頼を取り消す",
+  requestedToast: "決裁を依頼しました",
+  cancelledToast: "決裁依頼を取り消しました",
+  approvedToast: "{slot}として決裁しました",
+  returnedToast: "給与準備に差し戻しました",
+  turnOf: "{slot}の決裁待ち",
+  myTurnCard: "決裁する給与",
+  approveCardTitle: "{month}分 給与",
+  approveCardSub: "{n}人 · 差引支給 {amount}",
+  returnedNote: "{name}さんが差し戻しました · {reason}",
+  stampNote: "決裁の印が一緒に印字されます",
+  historyTitle: "履歴",
+  evRequest: "決裁依頼",
+  evCancel: "決裁依頼の取消",
+  evApprove: "{slot} 決裁",
+  evUndo: "{slot} 決裁取消",
+  evReturn: "差し戻し",
+  evRevert: "決裁を戻した",
+  evPaid: "支給完了",
+  evUnpaid: "支給完了を解除",
+  evSent: "税理士に送付",
+  evUnsent: "税理士送付の取消",
+  stPreparing: "給与準備",
+  stApprovalSenmu: "専務 決裁中",
+  stApprovalPresident: "社長 決裁中",
+  stPaying: "支給中",
+  stPaid: "支給完了",
+  stSent: "税理士送付済み",
+  approvalWait: "決裁を待っています",
+  payProgressLabel: "支給確認",
+  payProgress: "{done} / {n}人",
+  envelope: "封入済み",
+  envelopeShort: "封入",
+  received: "本人確認",
+  transferDone: "振込済み",
+  allTransferred: "すべて振込済み",
+  cashGroup: "現金",
+  transferGroup: "振込",
+  cashHint: "封入して、受け取った本人が確認します",
+  checkToast: "{name} {what}",
+  uncheckToast: "{name} {what}を取消",
+  allTransferredToast: "{n}人 振込済み",
+  paidAllToast: "支給がすべて完了しました",
+  taxSend: "税理士に送付済み",
+  taxSendHint: "支給がすべて終わるとチェックできます",
+  taxSentToast: "税理士に送付済みにしました",
+  taxFiles: "税理士用ファイル",
   filesTitle: "ファイル",
   fileBook: "給与ファイル",
   fileBookHint: "明細・社長確認表・支給確認一覧",
@@ -334,6 +545,76 @@ const en: PayrollPrepCopy = {
   noChecks: "Nothing to check",
   requestApproval: "Request approval",
   approvalLater: "Approval opens in a later step",
+  lockedNote: "Numbers are locked during approval. Send it back if something needs fixing.",
+  lockedShort: "Numbers are locked during approval",
+  errorLocked: "Locked during approval",
+  errorConflict: "Someone else changed this first. The screen has been refreshed.",
+  errorHasChecks: "Can’t undo: payments are already checked",
+  errorOrder: "Mark the envelope first",
+  errorNotReady: "Some people still need checking",
+  errorNoApprover: "Set the president approver in Settings › Payroll",
+  reasonRequired: "Enter a reason",
+  ownerSheet: "Owner sheet",
+  approvalTitle: "Approval",
+  slotSenmu: "Managing director",
+  slotPresident: "President",
+  slotSenmuShort: "MD",
+  slotPresidentShort: "Pres.",
+  stampWaiting: "Waiting",
+  approve: "Approve",
+  returnAction: "Send back",
+  returnBody: "It goes back to Pay prep and approvals are cleared. Say what needs fixing.",
+  revertAction: "Undo approval",
+  revertBody: "It goes back to Pay prep and all approvals are cleared. Give a reason.",
+  reasonLabel: "Reason",
+  cancel: "Cancel",
+  cancelRequest: "Cancel request",
+  requestedToast: "Approval requested",
+  cancelledToast: "Request cancelled",
+  approvedToast: "Approved as {slot}",
+  returnedToast: "Sent back to Pay prep",
+  turnOf: "{slot} to approve",
+  myTurnCard: "Pay to approve",
+  approveCardTitle: "{month} pay",
+  approveCardSub: "{n} people · take-home {amount}",
+  returnedNote: "{name} sent it back · {reason}",
+  stampNote: "Approval stamps are printed on the files",
+  historyTitle: "History",
+  evRequest: "Approval requested",
+  evCancel: "Request cancelled",
+  evApprove: "{slot} approved",
+  evUndo: "{slot} approval undone",
+  evReturn: "Sent back",
+  evRevert: "Approval undone",
+  evPaid: "Paid",
+  evUnpaid: "Paid status cleared",
+  evSent: "Sent to accountant",
+  evUnsent: "Accountant send undone",
+  stPreparing: "Pay prep",
+  stApprovalSenmu: "Waiting for MD",
+  stApprovalPresident: "Waiting for president",
+  stPaying: "Paying",
+  stPaid: "Paid",
+  stSent: "Sent to accountant",
+  approvalWait: "Waiting for approval",
+  payProgressLabel: "Payments checked",
+  payProgress: "{done} / {n}",
+  envelope: "In envelope",
+  envelopeShort: "Envelope",
+  received: "Received",
+  transferDone: "Transferred",
+  allTransferred: "Mark all transferred",
+  cashGroup: "Cash",
+  transferGroup: "Transfer",
+  cashHint: "Put it in an envelope; the person confirms receipt",
+  checkToast: "{name}: {what}",
+  uncheckToast: "{name}: {what} undone",
+  allTransferredToast: "{n} marked transferred",
+  paidAllToast: "All payments are done",
+  taxSend: "Sent to accountant",
+  taxSendHint: "Available once all payments are done",
+  taxSentToast: "Marked as sent to accountant",
+  taxFiles: "Files for accountant",
   filesTitle: "Files",
   fileBook: "Payroll file",
   fileBookHint: "Payslips · owner sheet · payment check",

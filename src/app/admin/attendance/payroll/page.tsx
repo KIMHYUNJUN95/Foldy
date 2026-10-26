@@ -10,8 +10,9 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { loadWeeklyLimitChips, monthWeeklyRange } from "@/lib/staff-documents/weekly-limit-server";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
-import { PayrollPrepClient } from "@/components/admin/attendance/payroll-prep/payroll-prep-client";
+import { PayrollRoundClient } from "@/components/admin/attendance/payroll-prep/payroll-round-client";
 import { PrepSteps, type PrepStage } from "@/components/admin/attendance/payroll-prep/prep-steps";
+import { approvalOpen, payOpen } from "@/components/admin/attendance/payroll-prep/round-ui";
 import { getPayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { payrollPrepAvailable } from "@/lib/payroll-prep";
 import { getPayrollPrep } from "@/lib/payroll-prep-server";
@@ -49,12 +50,23 @@ export default async function AdminAttendancePayrollPage({
     payrollPrepAvailable(requestedYm) ? getPayrollPrep(session, requestedYm) : Promise.resolve(null),
   ]);
   const showPrep = Boolean(prep?.canView);
+  // P5 — 결재는 요청 뒤, 지급은 사장 결재 뒤에 열린다. `?stage=` 가 없으면 회차 상태가 정한다.
+  const status = prep?.round.status ?? "preparing";
+  const requested = params.stage;
   const stage: PrepStage =
-    params.stage === "prep" || params.stage === "close"
-      ? params.stage
-      : prep && prep.allFinalized && prep.rows.length > 0
-        ? "prep"
-        : "close";
+    requested === "prep" || requested === "close"
+      ? requested
+      : requested === "approval" && approvalOpen(status)
+        ? "approval"
+        : requested === "pay" && payOpen(status)
+          ? "pay"
+          : payOpen(status)
+            ? "pay"
+            : approvalOpen(status)
+              ? "approval"
+              : prep && prep.allFinalized && prep.rows.length > 0
+                ? "prep"
+                : "close";
   const prepCopy = getPayrollPrepCopy(locale);
 
   return (
@@ -75,10 +87,10 @@ export default async function AdminAttendancePayrollPage({
         }}
       />
 
-      {showPrep && prep ? <PrepSteps ym={payroll.ym} stage={stage} copy={prepCopy} /> : null}
+      {showPrep && prep ? <PrepSteps ym={payroll.ym} stage={stage} status={status} copy={prepCopy} /> : null}
 
-      {showPrep && prep && stage === "prep" ? (
-        <PayrollPrepClient key={payroll.ym} data={prep} locale={locale} localeTag={localeTag} />
+      {showPrep && prep && stage !== "close" ? (
+        <PayrollRoundClient key={payroll.ym} data={prep} locale={locale} localeTag={localeTag} stage={stage} />
       ) : payroll.isPrivileged ? (
         <AttendancePayrollClient
           key={payroll.ym}

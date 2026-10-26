@@ -63,6 +63,7 @@ export type AttendanceCapability =
   | "attendance.manage"
   | "payroll.view"
   | "payroll.manage"
+  | "payroll.approve"
   | "wages.manage"
   | "transport.manage";
 

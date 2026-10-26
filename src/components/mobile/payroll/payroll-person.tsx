@@ -24,6 +24,7 @@ export function PayrollPerson({
   withholdingLabels,
   saveInput,
   saveClass,
+  readOnlyNote,
 }: {
   row: PrepRow;
   ym: string;
@@ -36,6 +37,8 @@ export function PayrollPerson({
   withholdingLabels: Record<WithholdingClass, string>;
   saveInput: PayrollSaveInput;
   saveClass: (row: PrepRow, cls: WithholdingClass) => Promise<boolean>;
+  /** 읽기 전용일 때 보일 말 — 결재가 시작돼 잠긴 달이면 「결재 중이라 숫자가 잠겨 있어요」(P5). 없으면 `copy.readOnly`. */
+  readOnlyNote?: string;
 }) {
   // 저장 응답으로 입력 칸을 바로 맞추고, 서버에서 새 줄이 오면(새로 읽기 · 되돌리기) 그쪽을 따른다.
   const [local, setLocal] = useState<PrepManual | null>(null);
@@ -116,7 +119,7 @@ export function PayrollPerson({
         </div>
       </div>
 
-      {readOnly ? <p className="mpp-p__ro">{copy.readOnly}</p> : null}
+      {readOnly ? <p className="mpp-p__ro">{readOnlyNote ?? copy.readOnly}</p> : null}
 
       {row.issues.length > 0 ? (
         <ul className="mpp-p__issues">

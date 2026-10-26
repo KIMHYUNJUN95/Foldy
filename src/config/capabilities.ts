@@ -545,6 +545,16 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /** 급여 결재 — 전무 · 사장 결재 · 돌려보내기 · 결재 되돌리기(알바 급여 P5). 결재 칸은 설정 › 급여의 결재자. */
+  "payroll.approve": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: true,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
   /** 시급 · 고용형태 보기와 설정. */
   "wages.manage": {
     roles: ["owner", "senior_managing_director"],

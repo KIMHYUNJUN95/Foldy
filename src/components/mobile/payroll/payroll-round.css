@@ -1,0 +1,229 @@
+/* 모바일 급여 P5 — 결재 · 지급 확인 · 세무사 송부(시안 Inbox-Phone · Approve-* · Return-Phone · Pay-*, 2026-10-26).
+   급여 준비와 같은 화이트 가족: 카드 테두리 없음 · 세로줄 없음 · 0.5px 가로줄 · 보라 #7a52e6 · 왼쪽 막대 없음.
+   폭: 폰(<600) · 폴드(≥600, 레일) · 태블릿 가로(≥1000 & ≥600 높이, 사이드바). 사유 시트는 body 포털이라 `.mpp` 변수 밖 — 색을 직접 쓴다. */
+
+/* 결재 단계에서 폰은 잠긴 목록, 넓은 화면은 결재 화면 — 둘 다 그려 두고 폭으로 고른다. */
+.mpr-wide-only { display: none; }
+
+/* ── 급여 준비 버튼 · 줄 ── */
+.mpp-go:not(:disabled) { background: var(--mpp-pri); color: #fff; }
+.mpp-go[aria-busy="true"] { opacity: .6; }
+.mpr-st { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 13px; color: var(--mpp-mid); overflow-wrap: anywhere; }
+.mpr-st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--mpp-pri); flex: none; }
+.mpr-returned { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 0; font-size: 14px; line-height: 1.45; color: var(--mpp-mid); overflow-wrap: anywhere; }
+.mpr-returned::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mpp-red); flex: none; align-self: center; }
+
+/* ── 결재할 급여 카드(폰 맨 위) ── */
+.mpr-entry { margin: 4px 0 22px; }
+.mpr-card { display: flex; align-items: center; gap: 14px; padding: 16px 12px 16px 16px; border-radius: 18px; background: var(--mpp-tint); color: var(--mpp-ink); text-decoration: none; }
+.mpr-card--plain { background: #f6f5f9; }
+.mpr-card > svg { width: 20px; height: 20px; flex: none; color: var(--mpp-soft); }
+.mpr-card:focus-visible { outline: 2px solid var(--mpp-pri); outline-offset: 2px; }
+.mpr-card__mini { display: flex; gap: 4px; flex: none; }
+.mpr-card__mini i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--mpp-pri); color: var(--mpp-link); font-style: normal; font-size: 11px; font-weight: 700; transform: rotate(-8deg); }
+.mpr-card__mini i.is-wait { border: 1.5px dashed #b9b6c6; transform: none; }
+.mpr-card__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mpr-card__t small { font-size: 12.5px; font-weight: 600; color: var(--mpp-link); }
+.mpr-card--plain .mpr-card__t small { color: var(--mpp-soft); font-weight: 500; }
+.mpr-card__t b { font-size: 16px; overflow-wrap: anywhere; }
+.mpr-card__t span { font-size: 13px; color: var(--mpp-mid); }
+
+/* ── 버튼 ── */
+.mpr-btn { min-height: 50px; padding: 0 18px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600; line-height: 1.2; }
+.mpr-btn--pri { background: #7a52e6; color: #fff; }
+.mpr-btn--sec { background: #f2f2f5; color: #16141f; }
+.mpr-btn--warn { background: #c5282e; color: #fff; }
+.mpr-btn:disabled { opacity: .55; }
+.mpr-btn:focus-visible, .mpr-lnk:focus-visible, .mpr-ck:focus-visible { outline: 2px solid #7a52e6; outline-offset: 2px; }
+.mpr-lnk { flex: none; min-height: 44px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--mpp-link); text-align: right; }
+.mpr-lnk:disabled { opacity: .55; }
+.mpp-phone-go .mpr-btn { width: 100%; }
+
+/* ── 결재 화면 ── */
+.mpr-ap { display: flex; flex-direction: column; margin-top: 18px; }
+.mpr-ap__top { display: flex; flex-direction: column; }
+.mpr-ap__h { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mpr-ap__h h2 { margin: 0; font-size: 22px; line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; }
+.mpr-ap__h > span { font-size: 14px; color: var(--mpp-mid); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.mpr-lock { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12.5px; color: var(--mpp-soft); }
+.mpr-lock svg { width: 13px; height: 13px; flex: none; }
+.mpr-h2 { margin: 0 0 10px; font-size: 13px; font-weight: 400; color: var(--mpp-soft); }
+
+/* 도장 칸 */
+.mpr-stamps { display: flex; justify-content: center; gap: 44px; margin: 0; padding: 22px 0 14px; list-style: none; }
+.mpr-slot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.mpr-slot em { font-style: normal; font-size: 13px; color: var(--mpp-soft); }
+.mpr-stamp {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; box-sizing: border-box;
+  min-width: 74px; min-height: 74px; max-width: 96px; padding: 6px; border-radius: 50%; border: 1.5px solid var(--mpp-pri);
+  color: var(--mpp-link); text-align: center; transform: rotate(-8deg);
+}
+.mpr-stamp b { font-size: 14px; line-height: 1.1; overflow-wrap: anywhere; }
+.mpr-stamp small { font-size: 11px; }
+.mpr-stamp.is-wait { border: 1.5px dashed #c9c7d3; color: var(--mpp-soft); font-size: 13px; transform: none; }
+/* 찍힘 — 280ms, transform · opacity 만 */
+.mpr-stamp.is-new { animation: mpr-stamp 280ms cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes mpr-stamp { from { opacity: 0; transform: rotate(-14deg) scale(1.35); } to { opacity: 1; transform: rotate(-8deg) scale(1); } }
+
+/* 확인표 — 폰은 이름 + 작은 줄 + 실수령, 폴드부터 표 */
+.mpr-tbl { margin-top: 6px; }
+.mpr-tr { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; border-top: 0.5px solid var(--mpp-line); font-size: 15px; }
+.mpr-tr--h { display: none; }
+.mpr-grp__h + .mpr-tr { border-top: 0; }
+.mpr-tr__nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mpr-tr__nm b { font-weight: 600; overflow-wrap: anywhere; }
+.mpr-tr__nm small { font-size: 12.5px; line-height: 1.35; color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpr-tr__wide { display: none; }
+.mpr-tr__net { flex: none; font-weight: 600; }
+.mpr-tr .r { text-align: right; }
+.mpr-tr--tot { justify-content: space-between; font-weight: 700; }
+.mpr-grp__h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 16px 0 4px; font-size: 13px; color: var(--mpp-soft); }
+.mpr-grp__h b { font-size: 14px; color: var(--mpp-ink); }
+
+/* 기록 */
+.mpr-hist { margin-top: 26px; }
+.mpr-hist ol { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.mpr-hist li { display: flex; flex-direction: column; gap: 1px; padding: 9px 0; border-top: 0.5px solid var(--mpp-line); }
+.mpr-hist li:first-child { border-top: 0; }
+.mpr-hist li b { font-weight: 600; }
+.mpr-hist li span { color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpr-hist li .mpr-hist__why { color: var(--mpp-mid); }
+.mpr-hist li.is-now b { color: var(--mpp-link); }
+
+/* 아래 막대 — 폰은 탭바 위에 떠 있다(가운데 버튼이 26px 솟아서 그만큼 더 띄운다) */
+.mpr-ap__pane { display: none; }
+.mpr-bar {
+  position: sticky; bottom: calc(var(--tabbar-h, 67px) + 30px); z-index: 5; display: flex; flex-direction: column; gap: 10px;
+  margin-top: 20px; padding: 12px 16px 14px; border-radius: 18px; background: #fff; box-shadow: 0 6px 28px -12px rgba(22, 20, 31, .35);
+}
+.mpr-sum { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; color: var(--mpp-soft); }
+.mpr-sum b { font-size: 19px; color: var(--mpp-ink); }
+.mpr-wait { margin: 0; font-size: 13px; color: var(--mpp-soft); }
+.mpr-acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.mpr-acts .mpr-btn { flex: 1 1 120px; }
+.mpr-acts .mpr-btn--pri { flex: 2 1 160px; }
+
+/* ── 지급 확인 ── */
+.mpr-pay { display: flex; flex-direction: column; margin-top: 18px; }
+.mpr-pay__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mpr-prog { display: flex; flex-direction: column; gap: 8px; margin: 18px 0 4px; }
+.mpr-prog__n { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mpr-prog__n b { font-size: 26px; letter-spacing: -.01em; }
+.mpr-prog__n span { font-size: 14px; color: var(--mpp-soft); }
+.mpr-track { height: 6px; border-radius: 3px; background: #eeedf2; overflow: hidden; }
+.mpr-track i { display: block; height: 100%; border-radius: 3px; background: var(--mpp-pri); transform-origin: left; transition: transform 280ms var(--mpp-ease); }
+.mpr-pgrp ul { margin: 0; padding: 0; list-style: none; }
+.mpr-pgrp__h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 0 4px; font-size: 13px; color: var(--mpp-soft); }
+.mpr-pgrp__h > span { min-width: 0; overflow-wrap: anywhere; }
+.mpr-pgrp__h b { margin-right: 6px; font-size: 15px; color: var(--mpp-ink); }
+.mpr-pgrp__hint { margin: 0 0 4px; font-size: 12.5px; color: var(--mpp-soft); }
+.mpr-prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 10px; padding: 12px 0; border-top: 0.5px solid var(--mpp-line); }
+.mpr-pgrp__h + ul > .mpr-prow:first-child, .mpr-pgrp__hint + ul > .mpr-prow:first-child { border-top: 0; }
+.mpr-prow__nm { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mpr-prow__nm b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.mpr-prow__nm small { font-size: 12.5px; color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpr-prow__amt { font-size: 16px; font-weight: 600; text-align: right; }
+.mpr-prow__cks { display: flex; flex-wrap: wrap; gap: 8px; }
+.mpr-prow--cash .mpr-prow__cks { grid-column: 1 / -1; }
+.mpr-prow--cash .mpr-ck { flex: 1 1 0; justify-content: center; }
+.mpr-prow--tr { grid-template-columns: minmax(0, 1fr) auto auto; }
+
+/* 체크 — 동그라미 안 체크가 160ms 에 그려진다 */
+.mpr-ck {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 10px; border: 0; border-radius: 12px;
+  background: #f2f2f5; font: inherit; font-size: 15px; font-weight: 600; color: #3a3746; white-space: nowrap;
+  transition: background 150ms ease, color 150ms ease;
+}
+.mpr-ck__o { display: grid; place-items: center; flex: none; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid #b9b6c6; background: #fff; transition: background 120ms ease, border-color 120ms ease; }
+.mpr-ck__o svg { width: 12px; height: 12px; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.mpr-ck__o path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 160ms var(--mpp-ease, ease-out); }
+.mpr-ck.is-on { background: #f4f1fd; color: #16141f; }
+.mpr-ck.is-on .mpr-ck__o { background: #7a52e6; border-color: #7a52e6; }
+.mpr-ck.is-on .mpr-ck__o path { stroke-dashoffset: 0; }
+.mpr-ck:disabled { opacity: .45; }
+.mpr-ck.is-on:disabled { opacity: .75; }
+.mpr-tax { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 22px; padding-top: 16px; border-top: 0.5px solid var(--mpp-line); }
+.mpr-tax small { font-size: 12.5px; color: var(--mpp-soft); }
+
+/* ── 사유 시트(포털) ── */
+.mpr-reason { display: flex; flex-direction: column; gap: 12px; padding: 4px 20px 28px; color: #16141f; }
+.mpr-reason h2 { margin: 0; font-size: 19px; }
+.mpr-reason p { margin: 0; font-size: 15px; line-height: 1.45; color: #3a3746; }
+.mpr-reason label { margin-top: 4px; font-size: 13px; color: #6f6c7c; }
+.mpr-reason textarea {
+  box-sizing: border-box; width: 100%; min-height: 112px; resize: none; padding: 12px 14px; border: 1px solid #e0e0e6; border-radius: 14px;
+  font: inherit; font-size: 16px; color: #16141f; background: #fff; outline: none;
+}
+.mpr-reason textarea:focus { border-color: #7a52e6; box-shadow: 0 0 0 3px #ede7fc; }
+.mpr-reason textarea[aria-invalid="true"] { border-color: #c5282e; }
+.mpr-reason__err { font-size: 13px; color: #c5282e; }
+.mpr-reason .mpr-btn { margin-top: 4px; min-height: 52px; }
+
+/* ── 폴드(≥600) ── */
+@media (min-width: 600px) {
+  .mpr-phone-only { display: none; }
+  .mpr-wide-only { display: block; }
+  .mpr-ap__top { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .mpr-ap__h h2 { font-size: 24px; }
+  .mpr-stamps--head { flex: none; gap: 22px; padding: 0; }
+  .mpr-stamps--head .mpr-stamp { min-width: 66px; min-height: 66px; }
+  .mpr-stamps--head .mpr-slot em { font-size: 12.5px; }
+  .mpr-tr { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1.1fr) minmax(0, 1.1fr); column-gap: 12px; min-height: 48px; padding: 0 6px; }
+  .mpr-tr--h { display: grid; min-height: 34px; margin-top: 14px; border-top: 0; font-size: 12px; color: var(--mpp-soft); }
+  .mpr-tr__nm small { display: none; }
+  .mpr-tr__wide { display: block; }
+  .mpr-grp__h { padding: 18px 6px 4px; }
+  .mpr-tr--tot { border-top: 1px solid var(--mpp-ink); margin-top: 4px; }
+  .mpr-bar {
+    bottom: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 16px; min-height: 84px; margin-top: 16px;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); border-radius: 0; background: var(--background, #fff);
+    box-shadow: 0 -14px 28px -22px rgba(22, 20, 31, .3);
+  }
+  .mpr-sum { flex-direction: column; align-items: flex-start; gap: 0; font-size: 12px; }
+  .mpr-sum b { font-size: 20px; }
+  .mpr-acts { margin-left: auto; flex-wrap: nowrap; }
+  .mpr-acts .mpr-btn, .mpr-acts .mpr-btn--pri { flex: none; padding: 0 22px; }
+  .mpr-acts .mpr-btn--pri { padding: 0 34px; }
+
+  .mpr-prog { flex-direction: row; align-items: center; gap: 14px; }
+  .mpr-prog__n b { font-size: 22px; }
+  .mpr-track { flex: 1; }
+  .mpr-prow, .mpr-prow--tr { grid-template-columns: minmax(0, 1fr) minmax(88px, auto) auto; min-height: 60px; padding: 8px 0; }
+  .mpr-prow__nm b { font-size: 15px; }
+  .mpr-prow__amt { font-size: 15px; }
+  .mpr-prow--cash .mpr-prow__cks { grid-column: auto; justify-content: flex-end; gap: 6px; }
+  .mpr-prow--cash .mpr-ck { flex: none; }
+  .mpr-ck { font-size: 14px; padding: 0 12px 0 9px; gap: 7px; }
+  .mpr-tax { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; }
+}
+
+/* ── 태블릿 가로: 확인표 | 결재 칸 320px · 지급은 현금 | 이체 두 단 ── */
+@media (min-width: 1000px) and (min-height: 600px) {
+  /* `.mpp` 의 태블릿 grid(400px | 칸)보다 이겨야 한다 — mobile-payroll.css 가 이 파일보다 뒤에 실려서 같은 특이도면 진다. */
+  .mpp.mpp--flow { display: block; }
+  .mpr-ap { display: grid; grid-template-columns: minmax(0, 1fr) 320px; column-gap: 32px; align-items: start; }
+  .mpr-stamps--head, .mpr-ap__sheet .mpr-hist, .mpr-bar { display: none; }
+  .mpr-ap__pane {
+    position: sticky; top: 16px; display: flex; flex-direction: column; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 26px; box-sizing: border-box; border-radius: 20px; background: #fff; box-shadow: 0 1px 2px rgba(22, 20, 31, .06);
+  }
+  .mpr-ap__pane .mpr-stamps { justify-content: flex-start; gap: 34px; padding: 2px 0 8px 4px; }
+  .mpr-ap__pane .mpr-hist { margin-top: 14px; }
+  .mpr-ap__paneacts { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  .mpr-ap__paneacts .mpr-acts { flex-direction: column-reverse; }
+  .mpr-ap__paneacts .mpr-acts { flex-wrap: nowrap; }
+  .mpr-ap__paneacts .mpr-acts .mpr-btn { flex: none; width: 100%; }
+  .mpr-ap__paneacts .mpr-sum b { font-size: 20px; }
+  .mpr-tr { min-height: 44px; }
+
+  .mpr-pay .mpr-prog { max-width: 520px; }
+  .mpr-pay__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 36px; align-items: start; }
+  .mpr-prow--cash { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 0; }
+  .mpr-prow--cash .mpr-prow__cks { grid-column: 1 / -1; justify-content: flex-start; gap: 8px; }
+  .mpr-pay > .mpr-tax, .mpr-pay > .mpr-hist { max-width: 520px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mpr-stamp.is-new { animation: none !important; }
+  .mpr-ck, .mpr-ck__o, .mpr-ck__o path, .mpr-track i { transition: none !important; }
+}

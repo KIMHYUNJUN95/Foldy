@@ -3,6 +3,7 @@ import {
   calculatePayrollMonth,
   ceilTo10,
   DEFAULT_PAYROLL_TAX_RULES,
+  EXCEL_LEGACY_TAX_RULES,
   employmentInsurancePremium,
   excelRound,
   insuranceFiscalYear,
@@ -122,32 +123,31 @@ describe("calculatePayrollMonth", () => {
         }),
       ).withholding;
 
-    it("지금 기본값은 엑셀처럼 9,300엔 미만 0", () => {
-      expect(otsu(9000)).toBe(0);
+    it("기본값은 국세청 표대로 하한 없이 소액도 3.063%", () => {
+      expect(otsu(9000)).toBe(275);
       expect(otsu(9300)).toBe(284);
     });
 
-    it("하한을 끄면 국세청 표대로 소액도 3.063%", () => {
-      expect(otsu(9000, { ...DEFAULT_PAYROLL_TAX_RULES, otsuExcelFloor: false })).toBe(275);
+    it("옛 엑셀 방식은 9,300엔 미만 0", () => {
+      expect(otsu(9000, EXCEL_LEGACY_TAX_RULES)).toBe(0);
+      expect(otsu(9300, EXCEL_LEGACY_TAX_RULES)).toBe(284);
     });
   });
 
-  it("甲 부양 인원은 규칙을 켤 때만", () => {
+  it("甲 부양 인원 — 기본값은 반영, 옛 엑셀은 늘 0人", () => {
     const base = input({
       segments: [{ hourlyRate: 1500, paidMinutes: 60 * 200 }], // 300,000
       withholding: { cls: "kou", dependents: 1, taxYear: 2026 },
     });
-    expect(calculatePayrollMonth(base).withholding).toBe(7930);
-    expect(
-      calculatePayrollMonth({ ...base, rules: { ...DEFAULT_PAYROLL_TAX_RULES, applyDependents: true } }).withholding,
-    ).toBe(6320);
+    expect(calculatePayrollMonth(base).withholding).toBe(6320);
+    expect(calculatePayrollMonth({ ...base, rules: EXCEL_LEGACY_TAX_RULES }).withholding).toBe(7930);
   });
 
   it("丙 — 근무한 날마다 日額表, 엑셀 방식이면 0", () => {
     const hei = input({ withholding: { cls: "hei", dependents: 0, taxYear: 2026, heiDailyTaxable: [9000, 9800, 12000] } });
     const r = calculatePayrollMonth(hei);
     expect(r.withholding).toBe(0 + 1 + 79);
-    expect(calculatePayrollMonth({ ...hei, rules: { ...DEFAULT_PAYROLL_TAX_RULES, heiMode: "excel_zero" } }).withholding).toBe(0);
+    expect(calculatePayrollMonth({ ...hei, rules: EXCEL_LEGACY_TAX_RULES }).withholding).toBe(0);
   });
 
   it("雇用保険 — 가입자만, 賃金総額(교통비 포함) × 율, 율 없으면 확인 필요", () => {
@@ -169,16 +169,15 @@ describe("calculatePayrollMonth", () => {
     expect(overridden.employmentInsurance).toBe(500);
   });
 
-  it("조회 금액을 사회보험 뺀 뒤로 바꿀 수 있다", () => {
-    const r = calculatePayrollMonth(
-      input({
-        segments: [{ hourlyRate: 1000, paidMinutes: 60 * 105 }], // 105,000
-        employmentInsurance: { enrolled: true, ratePerMille: 5.5 },
-        rules: { ...DEFAULT_PAYROLL_TAX_RULES, lookupBasis: "after_social_insurance" },
-      }),
-    );
+  it("조회 금액 — 기본값은 사회보험 뺀 뒤, 옛 엑셀은 課税計 그대로", () => {
+    const base = input({
+      segments: [{ hourlyRate: 1000, paidMinutes: 60 * 105 }], // 105,000
+      employmentInsurance: { enrolled: true, ratePerMille: 5.5 },
+    });
+    const r = calculatePayrollMonth(base);
     expect(r.withholdingBasis).toBe(105000 - 577);
     expect(r.withholding).toBe(0);
+    expect(calculatePayrollMonth({ ...base, rules: EXCEL_LEGACY_TAX_RULES }).withholdingBasis).toBe(105000);
   });
 
   it("세금표 없는 해 · 구분 없음은 확인 필요", () => {

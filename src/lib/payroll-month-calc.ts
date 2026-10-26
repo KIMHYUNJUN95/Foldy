@@ -15,33 +15,42 @@ import { dailyHeiWithholding, monthlyWithholding } from "@/lib/withholding-tax";
  * 控除合計 Z = V + W + 年末調整
  * 差引 AB    = CEILING(Q − Z, 10)               ← 실수령 10엔 올림
  * ```
- * 세무사 확인이 남은 규칙은 `PayrollTaxRules` 로 따로 둔다 — 답이 오면 기본값만 바꾼다(§11-5 · §11-12).
+ * 원천세 규칙은 `PayrollTaxRules` 로 갈라 둔다 — 기본값은 국세청 표 기준(인사팀 답변 2026-10-26), 엑셀 방식은
+ * `EXCEL_LEGACY_TAX_RULES` 로 남겨 9월분 대조에 쓴다(§11-5 · §11-12).
  */
 
-/** 세무사 확인 전까지 갈라 둔 규칙. 기본값 = `DEFAULT_PAYROLL_TAX_RULES`. */
+/** 원천세 규칙 스위치. 기본값 = `DEFAULT_PAYROLL_TAX_RULES`(국세청), 옛 엑셀 = `EXCEL_LEGACY_TAX_RULES`. */
 export type PayrollTaxRules = {
-  /** 乙: 표 조회 금액이 9,300엔 미만이면 0(지금 엑셀). 국세청 月額表 乙欄에는 이 하한이 없다. */
+  /** 乙: 표 조회 금액이 9,300엔 미만이면 0(옛 엑셀). 국세청 月額表 乙欄에는 이 하한이 없다. */
   otsuExcelFloor: boolean;
-  /** 표 조회 금액 — 課税計 그대로(지금 엑셀) / 사회보험(雇用保険) 뺀 뒤(국세청 표 기준). */
+  /** 표 조회 금액 — 課税計 그대로(옛 엑셀) / 사회보험(雇用保険) 뺀 뒤(국세청 표 기준). */
   lookupBasis: "taxable" | "after_social_insurance";
-  /** 甲 부양 인원 열을 쓸지. false = 늘 0人 열(지금 엑셀). */
+  /** 甲 부양 인원 열을 쓸지. false = 늘 0人 열(옛 엑셀). */
   applyDependents: boolean;
-  /** 丙: 근무한 날마다 日額表 丙欄(Foldy 기획) / 늘 0(지금 엑셀). */
+  /** 丙: 근무한 날마다 日額表 丙欄(국세청) / 늘 0(옛 엑셀). */
   heiMode: "daily_table" | "excel_zero";
 };
 
 /**
- * 지금 기본값 — 엑셀과 같은 숫자를 내되, 丙만 기획대로 日額表(§4-B). 세무사 답(19 A4)이 오면 여기만 고친다.
- * 지금은 雇用保険 가입자가 없어 `lookupBasis` 는 숫자를 바꾸지 않는다.
+ * 기본값 — 최신 국세청 표 그대로(인사팀 답변 2026-10-26): 乙 하한 없음 · 사회보험 뺀 금액으로 조회 ·
+ * 甲 부양 인원 열 · 丙 日額表. 표의 해는 지급일의 해(`taxYear`).
  */
 export const DEFAULT_PAYROLL_TAX_RULES: PayrollTaxRules = {
-  otsuExcelFloor: true,
-  lookupBasis: "taxable",
-  applyDependents: false,
+  otsuExcelFloor: false,
+  lookupBasis: "after_social_insurance",
+  applyDependents: true,
   heiMode: "daily_table",
 };
 
-/** 엑셀이 쓰던 乙 하한(사실은 옛 日額表 丙欄의 하루 기준) — `otsuExcelFloor` 일 때만. */
+/** 옛 엑셀(2026-09분까지)과 같은 숫자 — 운영엔 쓰지 않고 지난 달 대조(골든 테스트)에만. */
+export const EXCEL_LEGACY_TAX_RULES: PayrollTaxRules = {
+  otsuExcelFloor: true,
+  lookupBasis: "taxable",
+  applyDependents: false,
+  heiMode: "excel_zero",
+};
+
+/** 옛 엑셀이 쓰던 乙 하한(사실은 옛 日額表 丙欄의 하루 기준) — `otsuExcelFloor` 일 때만. */
 export const OTSU_EXCEL_FLOOR_YEN = 9300;
 
 export type PayrollMonthInput = {

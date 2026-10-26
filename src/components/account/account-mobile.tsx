@@ -21,7 +21,12 @@ import { signOut } from "@/app/auth/actions";
 import { BlockedUsersList } from "@/components/account/blocked-users-list";
 import { DeleteAccountSheet } from "@/components/account/delete-account-sheet";
 import { MyReportsList, type MyReportRow } from "@/components/account/my-reports-list";
+import { saveMemberBank } from "@/actions/payroll-bank";
+import { BankForm, bankSummary } from "@/components/shared/payroll-bank/payroll-bank";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { haptic } from "@/lib/haptics";
+import type { MemberBank } from "@/lib/payroll-bank";
+import type { PayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import {
   IdentityNamesFields,
   type IdentityCopy,
@@ -81,6 +86,8 @@ type Props = {
   openIdentity?: boolean;
   /** 신분 서류 줄(재류카드 · 마이넘버 카드) — 조직 멤버만. 누르면 등록 · 보기 화면(docs/product/41 R2). */
   idCard?: { label: string; value: string; missing: boolean } | null;
+  /** 「급여 계좌」 줄 — 시급제이거나 계좌가 있는 조직 멤버만(docs/product/39 §3-A). */
+  payrollBank?: { userId: string; copy: PayrollBankCopy; bank: MemberBank | null } | null;
 };
 
 const LANGS: Locale[] = ["ko", "ja", "en"];
@@ -181,7 +188,7 @@ function Row({ label, value, empty, onClick, href }: { label: string; value?: Re
   return <div className="acw-row">{inner}</div>;
 }
 
-export function AccountMobile({ user, organization, bottomTabsLabel, blockedUsers, myReports, help, saved, copy, openIdentity = false, idCard = null }: Props) {
+export function AccountMobile({ user, organization, bottomTabsLabel, blockedUsers, myReports, help, saved, copy, openIdentity = false, idCard = null, payrollBank = null }: Props) {
   const w = copy.white;
   const locale = user.language;
   const [editing, setEditing] = useState<Field | null>(openIdentity && !saved ? "name" : null);
@@ -190,6 +197,9 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
   const [lang, setLang] = useState<Locale>(user.language);
   const [version, setVersion] = useState<string | null>(null);
   const langFormRef = useRef<HTMLFormElement>(null);
+  const [bank, setBank] = useState<MemberBank | null>(payrollBank?.bank ?? null);
+  const [bankOpen, setBankOpen] = useState(false);
+  const [bankToast, setBankToast] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -245,6 +255,11 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
         </div>
       </div>
 
+      {bankToast ? (
+        <p className="acw-msg" data-tone="ok" role="status">
+          {bankToast}
+        </p>
+      ) : null}
       {saved ? (
         <p className="acw-msg" data-tone="ok" role="status">
           {copy.saved}
@@ -321,6 +336,27 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
         {idCard ? <Row empty={idCard.missing} href="/account/id-card" label={idCard.label} value={idCard.value} /> : null}
       </section>
 
+      {payrollBank ? (
+        <section className="acw-grp" style={grp()}>
+          <span className="acw-sec">{payrollBank.copy.section}</span>
+          <Row
+            empty={!bank}
+            label={payrollBank.copy.title}
+            onClick={() => setBankOpen(true)}
+            value={
+              bank ? (
+                <>
+                  {bankSummary(bank)}
+                  {bank.pending ? <small className="acw-row__sub">{payrollBank.copy.pendingSelf}</small> : null}
+                </>
+              ) : (
+                payrollBank.copy.empty
+              )
+            }
+          />
+        </section>
+      ) : null}
+
       <section className="acw-grp" style={grp()}>
         <span className="acw-sec">{w.secApp}</span>
         <Row label={w.bottomTabs} onClick={openBottomTabs} value={bottomTabsLabel} />
@@ -396,6 +432,39 @@ export function AccountMobile({ user, organization, bottomTabsLabel, blockedUser
                 {w.cancel}
               </button>
             </form>
+          )}
+        </BottomSheet>
+      ) : null}
+
+      {payrollBank && bankOpen ? (
+        <BottomSheet ariaLabel={payrollBank.copy.title} onClose={() => setBankOpen(false)}>
+          {({ close }) => (
+            <div className="acw-sh">
+              <div className="acw-sh__h">
+                <b>{payrollBank.copy.title}</b>
+              </div>
+              <BankForm
+                initial={bank?.current ?? null}
+                copy={payrollBank.copy}
+                hint={payrollBank.copy.selfHint}
+                variant="sheet"
+                onSubmit={async (account) => {
+                  const res = await saveMemberBank({ userId: payrollBank.userId, account });
+                  if (!res.ok) {
+                    return {
+                      ok: false as const,
+                      field: res.field,
+                      message: res.reason === "forbidden" ? payrollBank.copy.errForbidden : payrollBank.copy.errSave,
+                    };
+                  }
+                  haptic("success");
+                  setBank(res.bank);
+                  setBankToast(res.bank?.pending === false ? payrollBank.copy.savedToast : payrollBank.copy.savedSelfToast);
+                  close();
+                  return { ok: true as const };
+                }}
+              />
+            </div>
           )}
         </BottomSheet>
       ) : null}

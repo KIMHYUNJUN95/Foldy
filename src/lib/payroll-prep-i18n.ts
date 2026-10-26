@@ -126,6 +126,38 @@ export type PayrollPrepCopy = {
   hintWithholding: string;
   hintKatakana: string;
   hintNotFinalized: string;
+  /** 그 달만 지급 방식 · 지난달 값 가져오기 · 급여 계좌(2026-10-26). */
+  monthMethod: string;
+  monthMethodDiffers: string;
+  monthMethodReset: string;
+  monthOnlyTag: string;
+  carryOpen: string;
+  carryTitle: string;
+  carryBody: string;
+  carrySpecial: string;
+  carrySpecialHint: string;
+  carryWithholding: string;
+  carryMemo: string;
+  carryOvertimeWeekend: string;
+  carryOvertimeWeekendHint: string;
+  carryNever: string;
+  carryCount: string;
+  carryRun: string;
+  carryNothing: string;
+  carryDone: string;
+  carryLoading: string;
+  bankChanged: string;
+  bankChangedLine: string;
+  bankFirstLine: string;
+  bankConfirm: string;
+  bankConfirmedToast: string;
+  bankBeforeConfirm: string;
+  bankView: string;
+  bankAdd: string;
+  bankCopy: string;
+  bankCopied: string;
+  bankAccount: string;
+  bankNoticeTitle: string;
   work: string; // "근무 {time}"
   rateLine: string; // "{rate}엔 × {time}"
   rateSince: string; // "{date}부터"
@@ -295,10 +327,42 @@ const ko: PayrollPrepCopy = {
     override_no_reason: "원천세를 바꾼 사유가 없어요",
     no_insurance_rate: "그해 고용보험 율이 없어요",
     allowance_without_work: "근무 없이 수당만 있어요",
+    bank_missing: "계좌 이체인데 계좌가 없어요",
   },
   hintWithholding: "여기가 주된 일터면 갑",
   hintKatakana: "본인이 앱 「내 정보」에서 넣어요",
   hintNotFinalized: "근태 마감 단계에서 마감해 주세요",
+  monthMethod: "이번 달 지급",
+  monthMethodDiffers: "기본은 {base} · 이번 달만 {method}",
+  monthMethodReset: "기본으로",
+  monthOnlyTag: "이번 달만 {method}",
+  carryOpen: "지난달 값 가져오기",
+  carryTitle: "{month}분 값을 가져올까요",
+  carryBody: "비어 있는 칸만 채워요. 이미 적은 칸은 그대로예요.",
+  carrySpecial: "특별수당",
+  carrySpecialHint: "손으로 적은 몫만",
+  carryWithholding: "원천세 직접 입력 · 사유",
+  carryMemo: "메모",
+  carryOvertimeWeekend: "잔업 · 주말 손 입력분",
+  carryOvertimeWeekendHint: "달마다 달라서 기본은 빼요",
+  carryNever: "지난달 조정 · 연말정산 · 이번 달만 지급 방식은 그 달 값이라 가져오지 않아요.",
+  carryCount: "{n}명",
+  carryRun: "가져오기",
+  carryNothing: "가져올 값이 없어요",
+  carryDone: "{people}명 {cells}칸 채웠어요",
+  carryLoading: "확인 중…",
+  bankChanged: "계좌 바뀜",
+  bankChangedLine: "{date} 본인이 바꿈 · {from} → {to}",
+  bankFirstLine: "{date} 본인이 처음 적음 · {to}",
+  bankConfirm: "확인함",
+  bankConfirmedToast: "{name} 계좌를 확인했어요",
+  bankBeforeConfirm: "확인 전 · 이전 계좌로",
+  bankView: "보기",
+  bankAdd: "계좌 넣기",
+  bankCopy: "계좌번호 복사",
+  bankCopied: "계좌번호를 복사했어요",
+  bankAccount: "계좌",
+  bankNoticeTitle: "계좌 확인",
   work: "근무 {time}",
   rateLine: "{rate}엔 × {time}",
   rateSince: "{date}부터",
@@ -468,10 +532,42 @@ const ja: PayrollPrepCopy = {
     override_no_reason: "源泉税の変更理由がありません",
     no_insurance_rate: "雇用保険料率が未設定です",
     allowance_without_work: "勤務なしで手当だけあります",
+    bank_missing: "振込なのに口座がありません",
   },
   hintWithholding: "ここが主たる勤務先なら甲",
   hintKatakana: "本人がアプリの「マイ情報」で入力します",
   hintNotFinalized: "勤怠締めの段階で締めてください",
+  monthMethod: "今月の支払方法",
+  monthMethodDiffers: "通常は{base} · 今月のみ{method}",
+  monthMethodReset: "通常に戻す",
+  monthOnlyTag: "今月のみ{method}",
+  carryOpen: "前月の値を引き継ぐ",
+  carryTitle: "{month}分の値を引き継ぎますか",
+  carryBody: "空欄だけを埋めます。入力済みの欄はそのままです。",
+  carrySpecial: "特別手当",
+  carrySpecialHint: "手入力分のみ",
+  carryWithholding: "源泉税の直接入力 · 理由",
+  carryMemo: "メモ",
+  carryOvertimeWeekend: "残業 · 週末の手入力分",
+  carryOvertimeWeekendHint: "毎月変わるので初期は外しています",
+  carryNever: "前月調整額 · 年末調整 · 今月のみの支払方法はその月だけの値なので引き継ぎません。",
+  carryCount: "{n}人",
+  carryRun: "引き継ぐ",
+  carryNothing: "引き継ぐ値がありません",
+  carryDone: "{people}人 {cells}欄を埋めました",
+  carryLoading: "確認中…",
+  bankChanged: "口座変更",
+  bankChangedLine: "{date} 本人が変更 · {from} → {to}",
+  bankFirstLine: "{date} 本人が初めて登録 · {to}",
+  bankConfirm: "確認済みにする",
+  bankConfirmedToast: "{name}の口座を確認しました",
+  bankBeforeConfirm: "確認前 · 以前の口座へ",
+  bankView: "見る",
+  bankAdd: "口座を登録",
+  bankCopy: "口座番号をコピー",
+  bankCopied: "口座番号をコピーしました",
+  bankAccount: "口座",
+  bankNoticeTitle: "口座の確認",
   work: "勤務 {time}",
   rateLine: "{rate}円 × {time}",
   rateSince: "{date}から",
@@ -641,10 +737,42 @@ const en: PayrollPrepCopy = {
     override_no_reason: "Withholding needs a reason",
     no_insurance_rate: "No insurance rate for that year",
     allowance_without_work: "Allowance with no work",
+    bank_missing: "Bank transfer but no account",
   },
   hintWithholding: "甲 if this is their main job",
   hintKatakana: "They add it in the app under My info",
   hintNotFinalized: "Close it in the attendance step",
+  monthMethod: "Payment this month",
+  monthMethodDiffers: "Usually {base} · {method} this month only",
+  monthMethodReset: "Use default",
+  monthOnlyTag: "{method} this month only",
+  carryOpen: "Copy last month",
+  carryTitle: "Copy values from {month}?",
+  carryBody: "Only empty fields are filled. Fields you already entered stay as they are.",
+  carrySpecial: "Special allowance",
+  carrySpecialHint: "Hand-entered part only",
+  carryWithholding: "Withholding override · reason",
+  carryMemo: "Memo",
+  carryOvertimeWeekend: "Overtime · weekend hand-entered part",
+  carryOvertimeWeekendHint: "Off by default — it changes every month",
+  carryNever: "Previous-month adjustment, year-end adjustment and this month’s payment method belong to that month, so they aren’t copied.",
+  carryCount: "{n}",
+  carryRun: "Copy",
+  carryNothing: "Nothing to copy",
+  carryDone: "Filled {cells} fields for {people} people",
+  carryLoading: "Checking…",
+  bankChanged: "Account changed",
+  bankChangedLine: "{date} changed by staff · {from} → {to}",
+  bankFirstLine: "{date} first entered by staff · {to}",
+  bankConfirm: "Mark checked",
+  bankConfirmedToast: "Checked {name}’s account",
+  bankBeforeConfirm: "Not checked · paying to previous account",
+  bankView: "View",
+  bankAdd: "Add account",
+  bankCopy: "Copy account number",
+  bankCopied: "Account number copied",
+  bankAccount: "Account",
+  bankNoticeTitle: "Bank account check",
   work: "Worked {time}",
   rateLine: "¥{rate} × {time}",
   rateSince: "from {date}",

@@ -23,6 +23,8 @@ import {
   setEmploymentType,
   setHourlyRate,
 } from "@/app/admin/attendance/actions";
+import { MemberBankBlock } from "@/components/shared/payroll-bank/payroll-bank";
+import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import {
   fillCopy,
@@ -68,6 +70,7 @@ export function AttendanceWagesClient({
   gapFillMinFrom,
   locale,
   localeTag,
+  canViewBank,
 }: {
   initialRows: AdminWageRow[];
   ym: string;
@@ -76,6 +79,8 @@ export function AttendanceWagesClient({
   gapFillMinFrom: string;
   locale: Locale;
   localeTag: string;
+  /** 보는 사람에게 payroll.view 가 있을 때만 급여 계좌 묶음을 그린다. */
+  canViewBank: boolean;
 }) {
   const dictionary = getDictionary(locale);
   const c = dictionary.admin.attendanceConsole;
@@ -343,6 +348,9 @@ export function AttendanceWagesClient({
           pc={pc}
           onSavePayroll={savePayroll}
           localeTag={localeTag}
+          locale={locale}
+          canViewBank={canViewBank}
+          onToast={showToast}
           defaultEffectiveFrom={defaultEffectiveFrom}
           minEffectiveFrom={minEffectiveFrom}
           gapFillMinFrom={gapFillMinFrom}
@@ -388,6 +396,9 @@ function WagePanel({
   pc,
   onSavePayroll,
   localeTag,
+  locale,
+  canViewBank,
+  onToast,
   defaultEffectiveFrom,
   minEffectiveFrom,
   gapFillMinFrom,
@@ -400,6 +411,9 @@ function WagePanel({
   pc: PayrollSettingsCopy;
   onSavePayroll: (userId: string, patch: Partial<MemberPayrollSetting>, field: string, value: string) => void;
   localeTag: string;
+  locale: Locale;
+  canViewBank: boolean;
+  onToast: (msg: string) => void;
   defaultEffectiveFrom: string;
   minEffectiveFrom: string;
   gapFillMinFrom: string;
@@ -611,7 +625,21 @@ function WagePanel({
               </p>
             </div>
           ) : (
-            <PayrollBlock row={row} pc={pc} c={c} localeTag={localeTag} onSave={onSavePayroll} />
+            <>
+              <PayrollBlock row={row} pc={pc} c={c} localeTag={localeTag} onSave={onSavePayroll} />
+              {canViewBank ? (
+                <div className="pblock">
+                  <MemberBankBlock
+                    key={row.userId}
+                    userId={row.userId}
+                    copy={getPayrollBankCopy(locale)}
+                    localeTag={localeTag}
+                    variant="panel"
+                    onToast={onToast}
+                  />
+                </div>
+              ) : null}
+            </>
           )}
 
           {/* 고용 형태 변경 — 시급제와 월급제 멤버 모두에게 제공. */}

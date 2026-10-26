@@ -1600,6 +1600,9 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 세 표 모두 RLS 켜짐 · **정책 없음** — authenticated 는 막힘, GRANT 는 `service_role` 만. 화면 · 액션은 서버가 권한 키를 확인하고 service role 로 읽고 쓴다.
 - 새 권한 키 **`payroll.approve`**(급여 결재, 역할 기본 대표 · 전무, 개인 부여 · 차단 가능, 플랫폼 우회). 이 키만 있어도 급여 화면(PC 급여 탭 · `/mobile/payroll`)을 볼 수 있다(`canView = payroll.view || payroll.approve`).
 - 결재 · 내 결재 취소 · 돌려보내기 = `payroll.approve` **그리고** 그 칸의 결재자 본인(회차에 적힌 `senmu_approver_id` / `president_approver_id`). 키만 있고 결재자가 아니면 `forbidden`.
+- **급여 계좌(2026-10-26, `member_bank_accounts` · `member_bank_account_changes`)**: RLS 켜짐 · 정책 없음, 서버 액션(`src/actions/payroll-bank.ts`)만.
+  보기 = 본인 또는 `payroll.view`. 고치기 = 본인(확인 전 상태가 됨) 또는 `payroll.manage`(바로 확인됨). 「확인함」 = `payroll.manage`. 다른 조직 사람은 못 봄(조직 키로 거름).
+  급여 준비 데이터의 `banks` 는 `payroll.view` 일 때만 실린다. 「지난달 값 가져오기」 = `payroll.manage` + 잠기지 않은 달.
 - 결재 요청 · 요청 취소 · 지급 확인 체크 · 세무사 「보냄」 = `payroll.manage`. 결재 되돌리기(지급 중 · 체크 0) = `payroll.manage` 또는 그 회차 결재자.
 - 액션은 `src/actions/payroll-approval.ts`(모바일 · 대시보드 공용) — 막히면 redirect 대신 `forbidden`. 모든 대상은 `session.organization` 범위, 체크는 그 회차 스냅샷에 있는 사람만.
 - 잠금: 회차가 `preparing` 이 아니면 `savePayrollMonthInput` → `locked`, `reopenAttendanceMonth` → `payroll_locked`.

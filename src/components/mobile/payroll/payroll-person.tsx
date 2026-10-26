@@ -2,7 +2,9 @@
 
 import { useId, useState } from "react";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
+import { MemberBankBlock, type BankVariant } from "@/components/shared/payroll-bank/payroll-bank";
 import { haptic } from "@/lib/haptics";
+import type { PayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { manualFromTotal, type PrepManual, type PrepRow } from "@/lib/payroll-prep";
 import type { PayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { fillCopy } from "@/lib/payroll-settings-i18n";
@@ -25,6 +27,7 @@ export function PayrollPerson({
   saveInput,
   saveClass,
   readOnlyNote,
+  bank,
 }: {
   row: PrepRow;
   ym: string;
@@ -39,6 +42,8 @@ export function PayrollPerson({
   saveClass: (row: PrepRow, cls: WithholdingClass) => Promise<boolean>;
   /** 읽기 전용일 때 보일 말 — 결재가 시작돼 잠긴 달이면 「결재 중이라 숫자가 잠겨 있어요」(P5). 없으면 `copy.readOnly`. */
   readOnlyNote?: string;
+  /** 급여 계좌 묶음 — `payroll.view` 가 있을 때만 넘어온다. */
+  bank?: { copy: PayrollBankCopy; variant: BankVariant; onToast: (message: string) => void; onChange: () => void };
 }) {
   // 저장 응답으로 입력 칸을 바로 맞추고, 서버에서 새 줄이 오면(새로 읽기 · 되돌리기) 그쪽을 따른다.
   const [local, setLocal] = useState<PrepManual | null>(null);
@@ -84,10 +89,16 @@ export function PayrollPerson({
     />
   );
 
-  const methodLabel = row.paymentMethod === "cash" ? copy.cash : row.paymentMethod === "transfer" ? copy.transfer : copy.noMethod;
-  const sub = [methodLabel, row.withholdingClass ? fillCopy(copy.classLine, { cls: withholdingLabels[row.withholdingClass] }) : null]
-    .filter(Boolean)
-    .join(", ");
+  const methodName = (m: "transfer" | "cash") => (m === "cash" ? copy.cash : copy.transfer);
+  const sub = row.withholdingClass ? fillCopy(copy.classLine, { cls: withholdingLabels[row.withholdingClass] }) : "";
+  const methodDefault = row.paymentMethodDefault ?? null;
+  const methodOverride = manual.paymentMethodOverride ?? null;
+  const methodDiffers = methodOverride != null && methodDefault != null && methodOverride !== methodDefault;
+  const pickMethod = (m: "transfer" | "cash") => {
+    if (row.paymentMethod === m) return;
+    haptic("light");
+    void field({ paymentMethodOverride: m === methodDefault ? null : m }, copy.monthMethod);
+  };
 
   const monthLabel = (month: string) =>
     new Intl.DateTimeFormat(localeTag, { year: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${month}-15T00:00:00Z`));
@@ -111,13 +122,32 @@ export function PayrollPerson({
         </span>
         <div className="mpp-p__who">
           <b>{row.name}</b>
-          <span>{sub}</span>
+          {sub ? <span>{sub}</span> : null}
         </div>
         <div className="mpp-p__net">
           <span>{copy.net}</span>
           <b className={`num${stale ? " is-stale" : ""}`}>{row.net == null ? "—" : `¥${num(row.net)}`}</b>
         </div>
       </div>
+
+      <h3 className="mpp-h4">{copy.monthMethod}</h3>
+      <div className="mpp-seg mpp-seg--method" role="radiogroup" aria-label={copy.monthMethod}>
+        {(["transfer", "cash"] as const).map((m) => (
+          <button key={m} type="button" role="radio" aria-checked={row.paymentMethod === m} disabled={readOnly} onClick={() => pickMethod(m)}>
+            {methodName(m)}
+          </button>
+        ))}
+      </div>
+      {methodDiffers && methodDefault && methodOverride ? (
+        <div className="mpp-mdiff">
+          <span>{fillCopy(copy.monthMethodDiffers, { base: methodName(methodDefault), method: methodName(methodOverride) })}</span>
+          {!readOnly ? (
+            <button type="button" className="mpp-lnk mpp-lnk--in" onClick={() => pickMethod(methodDefault)}>
+              {copy.monthMethodReset}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {readOnly ? <p className="mpp-p__ro">{readOnlyNote ?? copy.readOnly}</p> : null}
 
@@ -317,6 +347,10 @@ export function PayrollPerson({
           <b>{row.net == null ? "—" : num(row.net)}</b>
         </div>
       </div>
+
+      {bank ? (
+        <MemberBankBlock key={row.userId} userId={row.userId} copy={bank.copy} localeTag={localeTag} variant={bank.variant} onToast={bank.onToast} onChange={bank.onChange} />
+      ) : null}
     </div>
   );
 }

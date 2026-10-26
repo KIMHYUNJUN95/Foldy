@@ -253,6 +253,13 @@ html[data-pane] .muw-d { max-width: 600px; }
 .mpay-pick { display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0; border: 0; background: transparent; font-size: 16px; color: #3a3746; cursor: pointer; }
 .mpay-pick svg { width: 16px; height: 16px; }
 .mpay-kv .muw-seg { max-width: 100%; }
+/* 급여 계좌 줄 — 누르면 시트. 확인 전이면 값 아래에 붉은 작은 줄. */
+.mpay-bankrow { width: 100%; border-width: 0; border-radius: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.mpay-bankrow:focus-visible { outline: 2px solid #7a52e6; outline-offset: -2px; }
+.mpay-bankv { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; }
+.mpay-bankv > span { overflow-wrap: anywhere; }
+.mpay-val small.mpay-bankpend { font-size: 12px; line-height: 16px; color: #c4364b; }
+.mpay-banksheet { padding: 0 2px 8px; }
 @media (min-width: 600px) {
   html:not([data-pane]) .mpay-g { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
   html:not([data-pane]) .mpay-hint, html:not([data-pane]) .mpay-err { grid-column: 1 / -1; }

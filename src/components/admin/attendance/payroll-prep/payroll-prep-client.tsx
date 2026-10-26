@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import { savePayrollMonthInput } from "@/actions/payroll-month-inputs";
@@ -11,6 +11,15 @@ import {
   exportTaxAccountantReport,
   exportTaxAccountantWorkbook,
 } from "@/actions/payroll-exports";
+import {
+  previewPayrollCarryOver,
+  runPayrollCarryOver,
+  undoPayrollCarryOver,
+} from "@/actions/payroll-carry-over";
+import { confirmMemberBank } from "@/actions/payroll-bank";
+import { bankSummary, formatBankDay } from "@/components/shared/payroll-bank/payroll-bank";
+import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
+import { CARRY_DEFAULT_FIELDS, CARRY_FIELDS, type CarryField } from "@/lib/payroll-carry-over";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { prepTotals, type PrepManual, type PrepRow } from "@/lib/payroll-prep";
 import { canRequestApproval, isRoundLocked } from "@/lib/payroll-approval";
@@ -41,11 +50,13 @@ export function PayrollPrepClient({
   locale,
   localeTag,
   toast,
+  canViewBank,
 }: {
   data: PayrollPrepData;
   locale: Locale;
   localeTag: string;
   toast: RoundToast;
+  canViewBank: boolean;
 }) {
   const router = useRouter();
   const dictionary = getDictionary(locale);
@@ -62,6 +73,14 @@ export function PayrollPrepClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [, startRefresh] = useTransition();
   const [requesting, startRequest] = useTransition();
+  const [carry, setCarry] = useState<{
+    fromYm: string;
+    counts: Record<CarryField, number>;
+    picked: CarryField[];
+  } | null>(null);
+  const [carryBusy, setCarryBusy] = useState(false);
+  const [confirmingBank, setConfirmingBank] = useState<string | null>(null);
+  const bankCopy = getPayrollBankCopy(locale);
 
   const money = new Intl.NumberFormat(localeTag);
   const num = (n: number | null) => (n == null ? "—" : money.format(n));
@@ -151,6 +170,45 @@ export function PayrollPrepClient({
     );
   }
 
+  async function openCarry() {
+    if (carryBusy) return;
+    setCarryBusy(true);
+    const res = await previewPayrollCarryOver({ ym });
+    setCarryBusy(false);
+    if (!res.ok) return notice(failMessage(res.reason));
+    setCarry({ fromYm: res.fromYm, counts: res.counts, picked: [...CARRY_DEFAULT_FIELDS] });
+  }
+
+  async function runCarry(fields: CarryField[]) {
+    if (carryBusy) return;
+    setCarryBusy(true);
+    const res = await runPayrollCarryOver({ ym, fields });
+    setCarryBusy(false);
+    if (!res.ok) {
+      setCarry(null);
+      return notice(failMessage(res.reason));
+    }
+    setCarry(null);
+    refresh();
+    const entries = res.entries;
+    announce(fillCopy(copy.carryDone, { people: res.people, cells: res.cells }), async () => {
+      const back = await undoPayrollCarryOver({ ym, entries });
+      if (!back.ok) return notice(failMessage(back.reason));
+      refresh();
+      notice(copy.undone);
+    });
+  }
+
+  async function confirmBank(row: PrepRow) {
+    if (confirmingBank) return;
+    setConfirmingBank(row.userId);
+    const res = await confirmMemberBank({ userId: row.userId });
+    setConfirmingBank(null);
+    if (!res.ok) return notice(copy.errorSave);
+    refresh();
+    notice(fillCopy(copy.bankConfirmedToast, { name: row.name }));
+  }
+
   function closePanel() {
     const id = selectedId;
     setSelectedId(null);
@@ -168,6 +226,10 @@ export function PayrollPrepClient({
     open: c.monthPickerOpen,
     thisMonth: c.monthPickerThisMonth,
   };
+
+  const bankNotices = data.canView
+    ? all.filter((r) => data.banks[r.userId]?.pending)
+    : [];
 
   const filters: { id: Filter; label: string; n: number }[] = [
     { id: "all", label: copy.all, n: all.length },
@@ -222,6 +284,17 @@ export function PayrollPrepClient({
           ))}
         </div>
         <span className="ppr-tools__sp" />
+        {canManage ? (
+          <button
+            type="button"
+            className="ppr-btn sm"
+            disabled={carryBusy}
+            aria-busy={carryBusy || undefined}
+            onClick={() => void openCarry()}
+          >
+            {carryBusy && !carry ? copy.carryLoading : copy.carryOpen}
+          </button>
+        ) : null}
         {/* P4 — 급여 파일(명세서 · 사장 확인표 · 지급 확인) · 세무사용. 둘 다 Excel + PDF(CLAUDE.md 4b). */}
         <span className="ppr-file" title={copy.fileBookHint}>
           <span className="ppr-file__l">{copy.fileBook}</span>
@@ -244,6 +317,43 @@ export function PayrollPrepClient({
           />
         </span>
       </div>
+
+      {bankNotices.length > 0 ? (
+        <section className="ppr-bn" aria-label={copy.bankNoticeTitle}>
+          {bankNotices.map((r) => {
+            const bank = data.banks[r.userId];
+            const to = bankSummary(bank) ?? "";
+            const from = bank.confirmed ? bankSummary({ ...bank, current: bank.confirmed }) : null;
+            const date = formatBankDay(bank.updatedAt, localeTag);
+            return (
+              <div className="ppr-bn__i" key={r.userId}>
+                <span className="ppr-bn__t">
+                  <b className="ppr-dot">
+                    {r.name} · {copy.bankChanged}
+                  </b>
+                  <small className="ppr-jp">
+                    {fillCopy(from ? copy.bankChangedLine : copy.bankFirstLine, { date, from: from ?? "", to })}
+                  </small>
+                </span>
+                <button type="button" className="ppr-lnk" onClick={() => setSelectedId(r.userId)}>
+                  {copy.bankView}
+                </button>
+                {data.canManage ? (
+                  <button
+                    type="button"
+                    className="ppr-btn sm"
+                    disabled={confirmingBank !== null}
+                    aria-busy={confirmingBank === r.userId || undefined}
+                    onClick={() => void confirmBank(r)}
+                  >
+                    {copy.bankConfirm}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </section>
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="ppr-empty">{copy.empty}</p>
@@ -291,12 +401,23 @@ export function PayrollPrepClient({
                     <span className="ppr-av" aria-hidden="true">
                       {prepInitial(r)}
                     </span>
-                    <b>{r.name}</b>
-                    {r.paymentMethod ? (
-                      <small>
-                        {r.paymentMethod === "cash" ? copy.cash : copy.transfer}
-                      </small>
-                    ) : null}
+                    <span className="ppr-nm">
+                      <span className="ppr-nm__l">
+                        <b>{r.name}</b>
+                        {r.paymentMethod ? (
+                          <small>
+                            {r.paymentMethod === "cash" ? copy.cash : copy.transfer}
+                          </small>
+                        ) : null}
+                      </span>
+                      {r.manual.paymentMethodOverride ?? null ? (
+                        <em>
+                          {fillCopy(copy.monthOnlyTag, {
+                            method: r.manual.paymentMethodOverride === "cash" ? copy.cash : copy.transfer,
+                          })}
+                        </em>
+                      ) : null}
+                    </span>
                   </span>
                   <span className="ppr-r">{formatPrepTime(r.paidMinutes)}</span>
                   <span className="ppr-r ppr-x">{num(r.basePay)}</span>
@@ -341,6 +462,11 @@ export function PayrollPrepClient({
                           </button>
                         ))}
                       </span>
+                    ) : null}
+                    {r.issues.includes("bank_missing") && canViewBank ? (
+                      <button type="button" className="ppr-lnk" onClick={() => setSelectedId(r.userId)}>
+                        {copy.bankAdd}
+                      </button>
                     ) : null}
                     {hint ? <small>{hint}</small> : null}
                   </div>
@@ -418,10 +544,132 @@ export function PayrollPrepClient({
           settings={settings}
           localeTag={localeTag}
           monthLabels={monthLabels}
+          bankCopy={bankCopy}
+          canViewBank={canViewBank}
+          onBankToast={notice}
+          onBankChange={refresh}
           onSave={saveInput}
           onClose={closePanel}
         />
       ) : null}
+
+      {carry ? (
+        <CarryModal
+          copy={copy}
+          monthLabel={formatPrepMonth(carry.fromYm, localeTag)}
+          counts={carry.counts}
+          picked={carry.picked}
+          busy={carryBusy}
+          onPick={(picked) => setCarry({ ...carry, picked })}
+          onCancel={() => setCarry(null)}
+          onRun={(fields) => void runCarry(fields)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CarryModal({
+  copy,
+  monthLabel,
+  counts,
+  picked,
+  busy,
+  onPick,
+  onCancel,
+  onRun,
+}: {
+  copy: ReturnType<typeof getPayrollPrepCopy>;
+  monthLabel: string;
+  counts: Record<CarryField, number>;
+  picked: CarryField[];
+  busy: boolean;
+  onPick: (picked: CarryField[]) => void;
+  onCancel: () => void;
+  onRun: (fields: CarryField[]) => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    ref.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  const label: Record<CarryField, { name: string; hint?: string }> = {
+    special: { name: copy.carrySpecial, hint: copy.carrySpecialHint },
+    withholding: { name: copy.carryWithholding },
+    memo: { name: copy.carryMemo },
+    overtimeWeekend: { name: copy.carryOvertimeWeekend, hint: copy.carryOvertimeWeekendHint },
+  };
+  const nothing = CARRY_FIELDS.every((f) => counts[f] === 0);
+  const fields = picked.filter((f) => counts[f] > 0);
+
+  return (
+    <div className="ppr-cm" onClick={onCancel}>
+      <div
+        className="ppr-cm__box"
+        role="dialog"
+        aria-modal="true"
+        aria-label={fillCopy(copy.carryTitle, { month: monthLabel })}
+        tabIndex={-1}
+        ref={ref}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2>{fillCopy(copy.carryTitle, { month: monthLabel })}</h2>
+        <p>{copy.carryBody}</p>
+        {nothing ? (
+          <p className="ppr-cm__none">{copy.carryNothing}</p>
+        ) : (
+          <div className="ppr-cm__list">
+            {CARRY_FIELDS.map((f) => {
+              const n = counts[f];
+              const on = picked.includes(f) && n > 0;
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={n === 0}
+                  className="ppr-cm__row"
+                  onClick={() => onPick(on ? picked.filter((x) => x !== f) : [...picked, f])}
+                >
+                  <span className={`ppr-cm__ck${on ? " on" : ""}`} aria-hidden="true">
+                    {on ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span className="ppr-cm__t">
+                    <b>{label[f].name}</b>
+                    {label[f].hint ? <small>{label[f].hint}</small> : null}
+                  </span>
+                  <span className="ppr-cm__n">{fillCopy(copy.carryCount, { n })}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <p className="ppr-cm__never">{copy.carryNever}</p>
+        <div className="ppr-cm__act">
+          <button type="button" className="ppr-btn" onClick={onCancel}>
+            {copy.cancel}
+          </button>
+          <button
+            type="button"
+            className="ppr-btn pri"
+            disabled={busy || fields.length === 0}
+            aria-busy={busy || undefined}
+            onClick={() => onRun(fields)}
+          >
+            {copy.carryRun}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

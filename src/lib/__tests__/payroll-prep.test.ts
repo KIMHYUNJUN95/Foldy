@@ -155,3 +155,37 @@ describe("helpers", () => {
     expect(text).not.toMatch(/[甲乙丙専社雇残週特前総差源]/);
   });
 });
+
+describe("그 달만 지급 방식 · 계좌 없음 (2026-10-26)", () => {
+  it("그 달만 고르면 이번 달 방식이 바뀌고 기본은 따로 남는다", () => {
+    const row = buildPrepRow(input({ manual: { ...EMPTY_PREP_MANUAL, paymentMethodOverride: "cash" } }));
+    expect(row.paymentMethod).toBe("cash");
+    expect(row.paymentMethodDefault).toBe("transfer");
+  });
+
+  it("기본이 비어 있어도 그 달만 골랐으면 「지급 방식이 없어요」는 안 뜬다", () => {
+    const setting = { ...EMPTY_MEMBER_PAYROLL_SETTING, withholdingClass: "kou" as const };
+    expect(buildPrepRow(input({ setting })).issues).toContain("payment_method");
+    const row = buildPrepRow(input({ setting, manual: { ...EMPTY_PREP_MANUAL, paymentMethodOverride: "transfer" } }));
+    expect(row.issues).not.toContain("payment_method");
+  });
+
+  it("이번 달 계좌 이체인데 계좌가 없으면 bank_missing, 현금이면 안 뜸, 모르면(undefined) 안 봄", () => {
+    expect(buildPrepRow(input({ hasBankAccount: false })).issues).toContain("bank_missing");
+    expect(buildPrepRow(input({ hasBankAccount: true })).issues).not.toContain("bank_missing");
+    expect(buildPrepRow(input({})).issues).not.toContain("bank_missing");
+    const cash = buildPrepRow(input({ hasBankAccount: false, manual: { ...EMPTY_PREP_MANUAL, paymentMethodOverride: "cash" } }));
+    expect(cash.issues).not.toContain("bank_missing");
+  });
+
+  it("옛 스냅샷 손 입력(paymentMethodOverride 없음)도 읽는다", () => {
+    const legacy = { ...EMPTY_PREP_MANUAL } as Partial<typeof EMPTY_PREP_MANUAL>;
+    delete legacy.paymentMethodOverride;
+    const row = buildPrepRow(input({ manual: legacy as typeof EMPTY_PREP_MANUAL }));
+    expect(row.paymentMethod).toBe("transfer");
+  });
+
+  it("문구 — bank_missing 이 세 언어에 있다", () => {
+    for (const loc of ["ko", "ja", "en"]) expect(getPayrollPrepCopy(loc).issues.bank_missing).toBeTruthy();
+  });
+});

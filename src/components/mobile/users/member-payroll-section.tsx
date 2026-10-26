@@ -3,9 +3,13 @@
 import { useRef, useState } from "react";
 import { ChevronRight, Info, Minus, Plus } from "lucide-react";
 import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
+import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { bankSummary, MemberBankBlock } from "@/components/shared/payroll-bank/payroll-bank";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { haptic } from "@/lib/haptics";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import type { MemberBank } from "@/lib/payroll-bank";
+import type { PayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { fillCopy, withholdingLabel, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import type { MemberPayrollPanel } from "@/lib/payroll-settings-server";
 import {
@@ -27,12 +31,14 @@ const shortDate = (key: string) => key.slice(2).replace(/-/g, ".");
 export function MemberPayrollSection({
   panel,
   copy,
+  bankCopy,
   locale,
   memberName,
   today,
 }: {
   panel: MemberPayrollPanel;
   copy: PayrollSettingsCopy;
+  bankCopy: PayrollBankCopy;
   locale: Locale;
   memberName: string;
   today: string;
@@ -41,6 +47,8 @@ export function MemberPayrollSection({
   const [setting, setSetting] = useState<MemberPayrollSetting>(view.setting);
   const [toast, setToast] = useState<UsersToast | null>(null);
   const [dateOpen, setDateOpen] = useState(false);
+  const [bank, setBank] = useState<MemberBank | null>(panel.bank.summary);
+  const [bankOpen, setBankOpen] = useState(false);
   // 저장이 겹치면 늦게 끝난 옛 응답이 화면을 덮지 않게, 마지막 요청만 서버 값을 반영한다.
   const seq = useRef(0);
   const c = getDictionary(locale).admin.users.console;
@@ -245,7 +253,35 @@ export function MemberPayrollSection({
             </button>
           </div>
         ) : null}
+
+        {panel.bank.canView ? (
+          <button type="button" className="mpay-kv mpay-bankrow" aria-haspopup="dialog" onClick={() => setBankOpen(true)}>
+            <span>{bankCopy.title}</span>
+            <span className={`mpay-val${bank ? " mpay-jp" : " is-dim"}`}>
+              <span className="mpay-bankv">
+                <span>{bankSummary(bank) ?? bankCopy.empty}</span>
+                {bank?.pending ? <small className="mpay-bankpend">{bankCopy.pendingShort}</small> : null}
+              </span>
+            </span>
+            <ChevronRight className="muw-chev" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
+
+      {bankOpen ? (
+        <BottomSheet ariaLabel={bankCopy.title} onClose={() => setBankOpen(false)}>
+          <div className="mpay-banksheet">
+            <MemberBankBlock
+              userId={userId}
+              copy={bankCopy}
+              localeTag={locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US"}
+              variant="sheet"
+              onChange={setBank}
+              onToast={(text) => show({ kind: "done", text })}
+            />
+          </div>
+        </BottomSheet>
+      ) : null}
 
       {dateOpen ? (
         <DatePickerSheet

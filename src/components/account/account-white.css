@@ -39,6 +39,7 @@
 .acw-row:is(a, button):active > * { transform: scale(.98); }
 .acw-row__l { flex: 1; min-width: 0; }
 .acw-row__v { min-width: 0; max-width: 62%; font-size: 14px; color: var(--w-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.acw-row__v small.acw-row__sub { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; white-space: normal; text-align: right; }
 .acw-row__v[data-empty] { color: var(--w-red); }
 .acw-row svg { flex: none; color: var(--w-mute); }
 

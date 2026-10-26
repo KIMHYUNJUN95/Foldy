@@ -2244,6 +2244,22 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`, au
 읽기 = `loadPayrollRound`(`src/lib/payroll-approval-server.ts`) ← `getPayrollPrep`. 상태 바꾸기는 `.eq("status", 지금)` 조건부 update(0줄이면 `conflict`).
 잠금: `preparing` 이 아니면 `payroll_month_inputs` 쓰기 · 근태 마감 풀기가 막힌다. 셋 다 RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
 
+## 2026-10-26 `member_bank_accounts` · `member_bank_account_changes` · `payroll_month_inputs.payment_method_override` (`202610260003`)
+
+알바 급여 — 급여 계좌 · 그 달만 지급 방식(`docs/product/39` 「지급 방식 · 지난달 값 · 급여 계좌 구현」).
+
+**`member_bank_accounts`** — 사람마다 한 줄(PK `organization_id, user_id`).
+`bank_name` · `branch_name` · `account_type`(`ordinary` / `current`) · `account_number`(check `^[0-9]{7}$`) · `holder_kana` — 지금 적힌 계좌.
+`pending`(본인이 바꾸고 아직 확인 전) · `confirmed_bank_name` … `confirmed_holder_kana`(마지막으로 확인된 계좌 — 확인 전 이체는 이쪽) · `confirmed_by/at` · `updated_by/at` · `created_at`.
+관리자가 저장하면 `confirmed_*` = 지금 값 · `pending=false`. 확인은 지금 번호 · 은행이 그대로일 때만(`.eq` 조건 — 그 사이 본인이 또 바꾸면 확인되지 않음).
+
+**`member_bank_account_changes`** — 등록 · 변경 · 확인마다 한 줄(`id` identity, 조직 · 사람 · `kind` created/updated/confirmed · `by_self` · `changed_by` ·
+`prev_bank_name` · `prev_last4` · `new_bank_name` · `new_last4` · `created_at`). 번호 전체는 남기지 않는다. 지우지 않음.
+
+**`payroll_month_inputs.payment_method_override`** — `cash` / `transfer` / null. 그 달만 지급 방식(null = 사람별 기본). 지난달 값 가져오기로 넘어가지 않는다.
+
+쓰기 = `src/actions/payroll-bank.ts`(본인 · `payroll.manage`), 읽기 = `src/lib/payroll-bank-server.ts`(본인 · `payroll.view`). 둘 다 RLS 켜짐 · 정책 없음 — service_role 만.
+
 ## 2026-10-25 `payroll_month_inputs` — 알바 급여 P3 급여 준비 손 입력 (`202610250002`)
 
 알바 급여 P3(`docs/product/39` §3-B · §5-A · §9). 사람 · 달마다 **손으로 넣는 값만** 둔다 — 총지급 · 원천세 · 실수령은 저장하지 않고 화면을 그릴 때마다

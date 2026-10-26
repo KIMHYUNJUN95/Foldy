@@ -34,13 +34,15 @@ export type PrepIssue =
   | "no_insurance_rate"
   | "prev_adjustment_month_missing"
   | "override_no_reason"
-  | "allowance_without_work";
+  | "allowance_without_work"
+  | "bank_missing";
 
 /** 확인 필요를 보여 주는 순서 — 막힌 이유가 큰 것부터. */
 export const PREP_ISSUE_ORDER: readonly PrepIssue[] = [
   "not_finalized",
   "withholding",
   "payment_method",
+  "bank_missing",
   "no_tax_table",
   "hei_over",
   "hei_no_hire_date",
@@ -64,6 +66,8 @@ export type PrepManual = {
   withholdingOverrideReason: string | null;
   employmentInsuranceOverride: number | null;
   memo: string | null;
+  /** 그 달만 지급 방식 — null = 사람별 기본 설정(39 §3-B). 2026-10-26 전 스냅샷엔 없을 수 있다. */
+  paymentMethodOverride: PaymentMethod | null;
 };
 
 export const EMPTY_PREP_MANUAL: PrepManual = {
@@ -78,6 +82,7 @@ export const EMPTY_PREP_MANUAL: PrepManual = {
   withholdingOverrideReason: null,
   employmentInsuranceOverride: null,
   memo: null,
+  paymentMethodOverride: null,
 };
 
 export type PrepRow = {
@@ -87,7 +92,10 @@ export type PrepRow = {
   nameKatakana: string | null;
   /** 甲 부양 인원 — 출력 엑셀의 원천세 수식이 표의 몇 人 열을 볼지. */
   dependents: number;
+  /** 이번 달 지급 방식 — 그 달만 바꾼 값이 있으면 그것, 없으면 사람별 기본 설정. */
   paymentMethod: PaymentMethod | null;
+  /** 사람별 기본 지급 방식(그 달만 바꿨는지 보여 줄 때). 2026-10-26 전 스냅샷엔 없다. */
+  paymentMethodDefault?: PaymentMethod | null;
   withholdingClass: WithholdingClass | null;
   finalized: boolean;
   paidMinutes: number;
@@ -148,6 +156,8 @@ export type PrepRowInput = {
   ym: string;
   insuranceRates: Record<string, number>;
   kintai?: PayrollKintai;
+  /** 급여 계좌가 있는지 — 이번 달 계좌 이체인데 없으면 「계좌 없음」. undefined = 보지 않음. */
+  hasBankAccount?: boolean;
 };
 
 function engineIssue(issue: PayrollMonthIssue): PrepIssue | null {
@@ -156,7 +166,8 @@ function engineIssue(issue: PayrollMonthIssue): PrepIssue | null {
 }
 
 export function buildPrepRow(input: PrepRowInput): PrepRow {
-  const manual = input.manual ?? EMPTY_PREP_MANUAL;
+  const manual = { ...EMPTY_PREP_MANUAL, ...input.manual };
+  const paymentMethod = manual.paymentMethodOverride ?? input.setting.paymentMethod;
   const auto = autoAllowanceColumns(input.allowanceRegular, input.allowanceSpecial);
   const result = calculatePayrollMonth({
     segments: input.rateSegments.map((s) => ({ hourlyRate: s.rate, paidMinutes: s.paidMinutes })),
@@ -194,8 +205,11 @@ export function buildPrepRow(input: PrepRowInput): PrepRow {
     hireDate: input.hireDate,
     today: input.today,
   })) {
+    // 지급 방식을 그 달만 골랐으면 이번 달은 비어 있지 않다.
+    if (i === "payment_method" && paymentMethod) continue;
     issues.add(i);
   }
+  if (paymentMethod === "transfer" && input.hasBankAccount === false) issues.add("bank_missing");
   for (const i of result.issues) {
     const mapped = engineIssue(i);
     if (mapped) issues.add(mapped);
@@ -214,7 +228,8 @@ export function buildPrepRow(input: PrepRowInput): PrepRow {
     name: input.name,
     nameKatakana: input.nameKatakana,
     dependents: input.setting.dependents,
-    paymentMethod: input.setting.paymentMethod,
+    paymentMethod,
+    paymentMethodDefault: input.setting.paymentMethod,
     withholdingClass: input.setting.withholdingClass,
     finalized: input.finalized,
     paidMinutes: input.paidMinutes,

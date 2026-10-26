@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Copy } from "lucide-react";
 import { returnPayroll, setAccountantSent, setPaymentChecks } from "@/actions/payroll-approval";
 import {
   exportPayrollBookReport,
@@ -9,6 +10,9 @@ import {
   exportTaxAccountantReport,
   exportTaxAccountantWorkbook,
 } from "@/actions/payroll-exports";
+import { usableAccount } from "@/components/shared/payroll-bank/payroll-bank";
+import { bankTypeLabel, getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
+import { haptic } from "@/lib/haptics";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   anyPaymentCheck,
@@ -66,11 +70,13 @@ export function PayrollPayView({
   locale,
   localeTag,
   toast,
+  canViewBank,
 }: {
   data: PayrollPrepData;
   locale: Locale;
   localeTag: string;
   toast: RoundToast;
+  canViewBank: boolean;
 }) {
   const router = useRouter();
   const copy = getPayrollPrepCopy(locale);
@@ -250,8 +256,43 @@ export function PayrollPayView({
     );
   }
 
-  const row = (r: PrepRow, kinds: PaymentCheckKind[]) => (
-    <div className="ppy-row" key={r.userId}>
+  const bankCopy = getPayrollBankCopy(locale);
+  async function copyNumber(value: string) {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(value);
+      ok = true;
+    } catch {
+      // 권한 없음 — 아래에서 실패로 알림
+    }
+    haptic(ok ? "light" : "error");
+    notice(ok ? copy.bankCopied : copy.errorSave);
+  }
+
+  function accountCell(r: PrepRow) {
+    const bank = data.banks[r.userId];
+    if (!bank) return <span className="ppy-acct ppy-acct--none">{copy.issues.bank_missing}</span>;
+    const a = usableAccount(bank);
+    return (
+      <span className="ppy-acct">
+        <span className="ppy-acct__b ppr-jp">
+          {a.bankName} {a.branchName}
+        </span>
+        <span className="ppy-acct__n">
+          <span>
+            {bankTypeLabel(bankCopy, a.accountType)} {a.accountNumber}
+          </span>
+          <button type="button" aria-label={copy.bankCopy} onClick={() => void copyNumber(a.accountNumber)}>
+            <Copy aria-hidden="true" size={15} />
+          </button>
+        </span>
+        {bank.pending ? <small>{copy.bankBeforeConfirm}</small> : null}
+      </span>
+    );
+  }
+
+  const row = (r: PrepRow, kinds: PaymentCheckKind[], withAccount = false) => (
+    <div className={`ppy-row${withAccount ? " ppy-row--acct" : ""}`} key={r.userId}>
       <span className="ppr-who">
         <span className="ppr-av" aria-hidden="true">
           {prepInitial(r)}
@@ -259,6 +300,7 @@ export function PayrollPayView({
         <b>{r.name}</b>
       </span>
       <span className="ppr-r ppr-net">{yen(r.net)}</span>
+      {withAccount ? accountCell(r) : null}
       <span className="ppy-cks">
         {kinds.map((k) => checkButton(r, k))}
       </span>
@@ -343,7 +385,7 @@ export function PayrollPayView({
               </button>
             ) : null}
           </div>
-          {transfer.map((r) => row(r, ["transfer"]))}
+          {transfer.map((r) => row(r, ["transfer"], canViewBank))}
         </section>
       ) : null}
 

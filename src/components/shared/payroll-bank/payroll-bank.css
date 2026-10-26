@@ -1,0 +1,70 @@
+/* 급여 계좌 — 내 계정 · PC 근태 › 시급 패널 · 모바일 사용자 상세 · 급여 준비 공용(시안 6PcLUew4…). docs/product/39 §3-A */
+.pbk { --pbk-sep: #E4E3E9; --pbk-gray: #6F6C7C; --pbk-ink: #16141F; --pbk-sub: #3A3746; --pbk-link: #5A30CF; --pbk-accent: #7A52E6; --pbk-red: #C4364B; color: var(--pbk-ink); font-variant-numeric: tabular-nums; }
+.pbk-jp { font-family: "Noto Sans JP", "Noto Sans KR", sans-serif; }
+
+/* 통장 한 줄 — 은행 지점 / 종류 번호(크게) / 명의 */
+.pbk-book { padding: 4px 0 12px; }
+.pbk-book__b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.pbk-book__n { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 22px; font-weight: 600; letter-spacing: .06em; }
+.pbk-book__h { margin-top: 2px; font-size: 13.5px; color: var(--pbk-sub); overflow-wrap: anywhere; }
+.pbk-copy { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--pbk-link); cursor: pointer; transition: transform 160ms cubic-bezier(.23, 1, .32, 1); }
+.pbk-copy:active { transform: scale(.94); }
+.pbk-copy:focus-visible { outline: 2px solid var(--pbk-accent); outline-offset: 1px; }
+.pbk-copy svg { width: 17px; height: 17px; }
+.pbk-empty { padding: 4px 0 12px; font-size: 14px; color: var(--pbk-gray); }
+
+/* 머리 줄 — 제목 + 바꾸기 */
+.pbk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 18px 0 6px; font-size: 15px; font-weight: 600; }
+.pbk-lnk { border: 0; background: transparent; padding: 0; min-height: 32px; color: var(--pbk-link); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.pbk-lnk:disabled { opacity: .5; cursor: default; }
+.pbk-lnk:focus-visible { outline: 2px solid var(--pbk-accent); border-radius: 6px; }
+
+/* 확인 전 알림 — 옅은 회색 판(왼쪽 막대 없음) */
+.pbk-note { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #F7F7F9; }
+.pbk-note__t { flex: 1; min-width: 0; font-size: 13.5px; }
+.pbk-note__t b { display: block; font-weight: 600; }
+.pbk-note__t span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--pbk-gray); }
+.pbk--sheet .pbk-note { flex-direction: column; align-items: stretch; }
+
+.pbk-btn { height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--pbk-accent); color: #fff; font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: transform 160ms cubic-bezier(.23, 1, .32, 1), opacity 160ms; }
+.pbk-btn:active { transform: scale(.97); }
+.pbk-btn:disabled { opacity: .55; cursor: default; transform: none; }
+.pbk-btn:focus-visible { outline: 2px solid var(--pbk-ink); outline-offset: 2px; }
+.pbk-btn--2 { background: #F1F0F4; color: var(--pbk-ink); }
+.pbk--sheet .pbk-btn { height: 48px; font-size: 15px; border-radius: 12px; }
+
+/* 바뀐 기록 */
+.pbk-hist__t { margin: 18px 0 4px; font-size: 13.5px; font-weight: 500; color: var(--pbk-gray); }
+.pbk-hist { margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--pbk-sub); }
+.pbk-hist li { display: flex; gap: 12px; padding: 9px 0; border-top: 0.5px solid var(--pbk-sep); }
+.pbk-hist li:first-child { border-top: 0; }
+.pbk-hist time { width: 72px; flex: none; color: var(--pbk-gray); }
+
+/* 입력 — 떠 있는 라벨 */
+.pbk-form { display: grid; gap: 18px; padding-top: 8px; }
+.pbk-form__hint { margin: 0 0 4px; font-size: 13px; line-height: 1.5; color: var(--pbk-gray); }
+.pbk-fl { position: relative; display: block; }
+.pbk-fl > label { position: absolute; left: 10px; top: -7px; z-index: 1; padding: 0 4px; background: #fff; font-size: 12px; font-weight: 600; line-height: 14px; color: #6B6878; }
+.pbk-fl input { box-sizing: border-box; width: 100%; height: 44px; border: 1px solid #E0E0E6; border-radius: 12px; background: #fff; padding: 0 12px; font: inherit; font-size: 15px; color: var(--pbk-ink); outline: none; transition: border-color 160ms, box-shadow 160ms; }
+.pbk--sheet .pbk-fl input { height: 48px; font-size: 16px; }
+.pbk-fl input:focus { border-color: var(--pbk-accent); box-shadow: 0 0 0 3px #EDE7FC; }
+.pbk-fl input[aria-invalid="true"] { border-color: var(--pbk-red); }
+.pbk-fl input.num { letter-spacing: .08em; }
+.pbk-fl small { display: block; margin-top: 4px; font-size: 12px; color: var(--pbk-gray); }
+.pbk-fl small.err { color: var(--pbk-red); font-weight: 500; }
+.pbk-g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+.pbk-type { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; }
+.pbk-seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: 10px; background: #F1F0F4; }
+.pbk-seg button { height: 36px; min-width: 56px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13.5px; color: var(--pbk-sub); white-space: nowrap; cursor: pointer; }
+.pbk-seg button[aria-checked="true"] { background: #fff; color: var(--pbk-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
+.pbk-seg button:focus-visible { outline: 2px solid var(--pbk-accent); }
+.pbk--sheet .pbk-type { grid-template-columns: minmax(0, 1fr); }
+.pbk--sheet .pbk-seg { display: grid; }
+.pbk--sheet .pbk-seg button { height: 40px; font-size: 15px; }
+.pbk-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.pbk--sheet .pbk-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+.pbk-err { margin: 0; font-size: 13px; color: var(--pbk-red); font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pbk-copy, .pbk-btn { transition: none; }
+}

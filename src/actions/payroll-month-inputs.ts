@@ -50,6 +50,7 @@ type Update = {
   withholding_override_reason?: string | null;
   employment_insurance_override?: number | null;
   memo?: string | null;
+  payment_method_override?: string | null;
 };
 
 function toUpdate(p: PrepManualPatch): Update | null {
@@ -93,6 +94,11 @@ function toUpdate(p: PrepManualPatch): Update | null {
     const t = cleanText(p.memo);
     if (t === undefined) return null;
     u.memo = t;
+  }
+  if ("paymentMethodOverride" in p) {
+    const m = p.paymentMethodOverride;
+    if (m !== null && m !== "cash" && m !== "transfer") return null;
+    u.payment_method_override = m ?? null;
   }
   return Object.keys(u).length > 0 ? u : null;
 }

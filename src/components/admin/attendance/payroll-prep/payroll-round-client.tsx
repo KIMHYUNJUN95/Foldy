@@ -28,11 +28,13 @@ export function PayrollRoundClient({
   locale,
   localeTag,
   stage,
+  canViewBank,
 }: {
   data: PayrollPrepData;
   locale: Locale;
   localeTag: string;
   stage: "prep" | "approval" | "pay";
+  canViewBank: boolean;
 }) {
   const copy = getPayrollPrepCopy(locale);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -73,9 +75,9 @@ export function PayrollRoundClient({
       {stage === "approval" ? (
         <PayrollApprovalView data={data} locale={locale} localeTag={localeTag} toast={t} />
       ) : stage === "pay" ? (
-        <PayrollPayView data={data} locale={locale} localeTag={localeTag} toast={t} />
+        <PayrollPayView data={data} locale={locale} localeTag={localeTag} toast={t} canViewBank={canViewBank} />
       ) : (
-        <PayrollPrepClient data={data} locale={locale} localeTag={localeTag} toast={t} />
+        <PayrollPrepClient data={data} locale={locale} localeTag={localeTag} toast={t} canViewBank={canViewBank} />
       )}
 
       {toast?.undo ? (

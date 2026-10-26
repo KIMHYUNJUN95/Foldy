@@ -17,11 +17,17 @@ import { LanguageSegmented } from "@/components/account/language-segmented";
 import { DateFormField } from "@/components/admin/shared/date-form-field";
 import { AdminShell } from "@/components/shell/admin-shell";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { loadEmploymentNow } from "@/lib/payroll-settings-server";
+import { loadMemberBanks } from "@/lib/payroll-bank-server";
+import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
+import { tokyoToday } from "@/lib/tokyo-date";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { loadCurrentIdDocument } from "@/lib/staff-documents/server";
 import { getDictionary, localizedNavigationLabels } from "@/lib/i18n";
 import { resolveBottomNavItems } from "@/config/navigation";
+import type { MemberBank } from "@/lib/payroll-bank";
 import { adminLocaleTag } from "@/lib/admin-export-meta";
 import { hasAdminWebAccess } from "@/config/capabilities";
 import { updateAccountProfile } from "@/app/account/actions";
@@ -401,6 +407,19 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             missing: !idDoc,
           }
         : null;
+    // 「급여 계좌」 줄(docs/product/39 §3-A) — 시급제이거나 이미 적어 둔 계좌가 있는 조직 멤버에게만.
+    let payrollBank: { userId: string; copy: ReturnType<typeof getPayrollBankCopy>; bank: MemberBank | null } | null = null;
+    if (hasOrganizationContext(session)) {
+      const service = getSupabaseServiceClient();
+      const [emp, banks] = await Promise.all([
+        loadEmploymentNow(service, session.organization.id, session.user.id, tokyoToday()).catch(() => null),
+        loadMemberBanks(service, session.organization.id, [session.user.id]).catch(() => new Map<string, MemberBank>()),
+      ]);
+      const bank = banks.get(session.user.id) ?? null;
+      if (bank || emp?.employment === "hourly") {
+        payrollBank = { userId: session.user.id, copy: getPayrollBankCopy(locale), bank };
+      }
+    }
     return (
       <MobileShell title={dictionary.common.account}>
         <AccountMobile
@@ -477,6 +496,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           saved={Boolean(savedKey)}
           openIdentity={firstParam(params?.fill) === "identity" || errorKey === "identity_invalid"}
           idCard={idCardRow}
+          payrollBank={payrollBank}
           user={{
             name: session.user.name,
             birthDate: session.user.birthDate ?? null,

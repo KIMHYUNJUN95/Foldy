@@ -205,3 +205,44 @@
   .mpp-toast__life { display: none; }
 }
 .mpp button, .mpp select, .mpp-sheet button { touch-action: manipulation; }
+
+/* ── 그 달만 지급 방식 · 지난달 값 가져오기 · 계좌 바뀜 알림(2026-10-26) ── */
+.mpp-seg--method { margin-top: 0; }
+.mpp-seg button:disabled { opacity: .55; }
+.mpp-mdiff { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; margin-top: 6px; font-size: 13px; color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpp-mdiff .mpp-lnk { margin-top: 0; }
+.mpp-carry-open { align-self: flex-start; min-height: 44px; margin-top: 4px; padding: 0; border: 0; background: transparent; color: #5a30cf; font: inherit; font-size: 14.5px; font-weight: 600; text-align: left; }
+.mpp-carry-open:disabled { opacity: .55; }
+.mpp-bn { list-style: none; margin: 14px 0 0; padding: 0; }
+.mpp-bn li { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.mpp-bn li + li { border-top: 0.5px solid var(--mpp-line); }
+.mpp-bn__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mpp-bn__t b { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600; color: var(--mpp-mid); overflow-wrap: anywhere; }
+.mpp-bn__t b::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mpp-red); flex: none; align-self: center; }
+.mpp-bn__t small { font-size: 12.5px; line-height: 1.4; color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpp-bn__go { flex: none; margin-top: 0; }
+
+/* 가져오기 시트(body 포털 — 색을 직접 쓴다) */
+.mpp-carry { display: flex; flex-direction: column; gap: 10px; padding: 4px 20px 28px; color: #16141f; }
+.mpp-carry h2 { margin: 0; font-size: 19px; overflow-wrap: anywhere; }
+.mpp-carry p { margin: 0; font-size: 14.5px; line-height: 1.45; color: #3a3746; }
+.mpp-carry ul { list-style: none; margin: 4px 0 0; padding: 0; }
+.mpp-carry li + li { border-top: 0.5px solid #e4e3e9; }
+.mpp-carry li button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
+.mpp-carry li button:disabled { opacity: .45; }
+.mpp-carry__box { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #b9b6c6; background: #fff; transition: background 150ms ease, border-color 150ms ease; }
+.mpp-carry__box svg { width: 16px; height: 16px; }
+.mpp-carry__box path { stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 160ms ease; }
+.mpp-carry li button[aria-checked="true"] .mpp-carry__box { background: #7a52e6; border-color: #7a52e6; }
+.mpp-carry li button[aria-checked="true"] .mpp-carry__box path { stroke-dashoffset: 0; }
+.mpp-carry__l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mpp-carry__l b { font-size: 15.5px; font-weight: 500; overflow-wrap: anywhere; }
+.mpp-carry__l small { font-size: 12.5px; color: #6f6c7c; overflow-wrap: anywhere; }
+.mpp-carry__n { flex: none; font-size: 14px; color: #6f6c7c; font-variant-numeric: tabular-nums; }
+.mpp-carry__none { padding: 16px 0; text-align: center; color: #6f6c7c !important; }
+.mpp-carry .mpp-carry__never { font-size: 12.5px; color: #6f6c7c; }
+.mpp-carry .mpr-btn { width: 100%; min-height: 50px; margin-top: 4px; }
+
+@media (min-width: 1000px) and (min-height: 600px) {
+  .mpp-seg--method { max-width: none; }
+}

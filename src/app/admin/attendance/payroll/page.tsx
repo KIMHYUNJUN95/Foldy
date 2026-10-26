@@ -15,6 +15,8 @@ import { PrepSteps, type PrepStage } from "@/components/admin/attendance/payroll
 import { approvalOpen, payOpen } from "@/components/admin/attendance/payroll-prep/round-ui";
 import { getPayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { payrollPrepAvailable } from "@/lib/payroll-prep";
+import { attendanceCan } from "@/lib/attendance-review";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getPayrollPrep } from "@/lib/payroll-prep-server";
 import { isValidYm } from "@/lib/attendance-clock";
 
@@ -67,6 +69,8 @@ export default async function AdminAttendancePayrollPage({
               : prep && prep.allFinalized && prep.rows.length > 0
                 ? "prep"
                 : "close";
+  const canViewBank =
+    showPrep && (await attendanceCan(getSupabaseServiceClient(), session.organization.id, session.user.id, "payroll.view"));
   const prepCopy = getPayrollPrepCopy(locale);
 
   return (
@@ -90,7 +94,7 @@ export default async function AdminAttendancePayrollPage({
       {showPrep && prep ? <PrepSteps ym={payroll.ym} stage={stage} status={status} copy={prepCopy} /> : null}
 
       {showPrep && prep && stage !== "close" ? (
-        <PayrollRoundClient key={payroll.ym} data={prep} locale={locale} localeTag={localeTag} stage={stage} />
+        <PayrollRoundClient key={payroll.ym} data={prep} locale={locale} localeTag={localeTag} stage={stage} canViewBank={canViewBank} />
       ) : payroll.isPrivileged ? (
         <AttendancePayrollClient
           key={payroll.ym}

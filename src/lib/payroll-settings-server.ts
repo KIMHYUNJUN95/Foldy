@@ -2,6 +2,8 @@ import "server-only";
 
 import type { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { attendanceCan } from "@/lib/attendance-review";
+import type { MemberBank } from "@/lib/payroll-bank";
+import { loadMemberBanks } from "@/lib/payroll-bank-server";
 import {
   EMPTY_MEMBER_PAYROLL_SETTING,
   parseInsuranceRates,
@@ -141,6 +143,8 @@ export type MemberPayrollPanel = {
   currentRate: number | null;
   currentFrom: string | null;
   view: MemberPayrollView;
+  /** 급여 계좌 — `payroll.view` 가 없으면 canView=false · summary=null(계좌는 읽지도 않는다). */
+  bank: { canView: boolean; summary: MemberBank | null };
 };
 
 /**
@@ -166,7 +170,9 @@ export async function loadMemberPayrollPanel(
   const views = await loadMemberPayrollViews(service, organizationId, [{ userId, hourly: emp.employment === "hourly" }], today);
   const view = views.get(userId);
   if (!view) return null;
-  return { userId, ...emp, view };
+  const canViewBank = await attendanceCan(service, organizationId, viewerId, "payroll.view");
+  const summary = canViewBank ? ((await loadMemberBanks(service, organizationId, [userId])).get(userId) ?? null) : null;
+  return { userId, ...emp, view, bank: { canView: canViewBank, summary } };
 }
 
 export type OrgPayrollSettings = {

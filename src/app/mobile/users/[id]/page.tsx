@@ -3,6 +3,7 @@ import { MobileMemberDetail } from "@/components/mobile/users/mobile-member-deta
 import { MemberShiftRow } from "@/components/mobile/shift/member-shift-row";
 import { MemberPayrollSection } from "@/components/mobile/users/member-payroll-section";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { loadMemberPayrollPanel } from "@/lib/payroll-settings-server";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
@@ -53,6 +54,7 @@ export default async function MobileMemberPage({ params }: { params: Promise<{ i
               key={panel.member.membershipId}
               panel={payroll}
               copy={getPayrollSettingsCopy(locale)}
+              bankCopy={getPayrollBankCopy(locale)}
               locale={locale}
               memberName={panel.member.name}
               today={today}

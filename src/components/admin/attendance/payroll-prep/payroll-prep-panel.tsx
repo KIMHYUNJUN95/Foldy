@@ -7,6 +7,8 @@ import { shiftMonthKey } from "../../shared/admin-month-key";
 import { manualFromTotal, type PrepManual, type PrepRow } from "@/lib/payroll-prep";
 import type { PayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { fillCopy, withholdingLabel, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
+import { MemberBankBlock } from "@/components/shared/payroll-bank/payroll-bank";
+import type { PayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { formatPrepDay, formatPrepTime, prepInitial } from "./prep-format";
 import "./payroll-prep.css";
 
@@ -128,6 +130,10 @@ export function PayrollPrepPanel({
   settings,
   localeTag,
   monthLabels,
+  bankCopy,
+  canViewBank,
+  onBankToast,
+  onBankChange,
   onSave,
   onClose,
 }: {
@@ -139,6 +145,10 @@ export function PayrollPrepPanel({
   settings: PayrollSettingsCopy;
   localeTag: string;
   monthLabels: AdminMonthPickerLabels;
+  bankCopy: PayrollBankCopy;
+  canViewBank: boolean;
+  onBankToast: (message: string) => void;
+  onBankChange: () => void;
   onSave: PrepSave;
   onClose: () => void;
 }) {
@@ -170,10 +180,14 @@ export function PayrollPrepPanel({
   const total = (key: "overtime" | "weekend" | "special", label: string) => (n: number) =>
     save({ [key]: manualFromTotal(n, row.auto[key]) }, label);
 
-  const method =
-    row.paymentMethod === "transfer" ? copy.transfer : row.paymentMethod === "cash" ? copy.cash : copy.noMethod;
+  const methodLabel = (x: "transfer" | "cash") => (x === "cash" ? copy.cash : copy.transfer);
+  const methodDefault = row.paymentMethodDefault ?? null;
+  const methodOverride = m.paymentMethodOverride ?? null;
+  const chooseMethod = (next: "transfer" | "cash") => {
+    if (next === row.paymentMethod) return;
+    void save({ paymentMethodOverride: next === methodDefault ? null : next }, copy.monthMethod);
+  };
   const sub = [
-    method,
     row.withholdingClass ? fillCopy(copy.classLine, { cls: withholdingLabel(settings, row.withholdingClass) }) : null,
   ]
     .filter(Boolean)
@@ -197,6 +211,41 @@ export function PayrollPrepPanel({
         </button>
       </div>
       {ro ? <p className="ppr-ro">{copy.readOnly}</p> : null}
+
+      <div className="ppr-mm">
+        <div className="ppr-mm__r">
+          <b>{copy.monthMethod}</b>
+          <span className="ppr-pick" role="radiogroup" aria-label={copy.monthMethod}>
+            {(["transfer", "cash"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={row.paymentMethod === k}
+                disabled={ro}
+                onClick={() => chooseMethod(k)}
+              >
+                {methodLabel(k)}
+              </button>
+            ))}
+          </span>
+        </div>
+        {methodOverride && methodDefault && methodOverride !== methodDefault ? (
+          <div className="ppr-mm__n">
+            <span>
+              {fillCopy(copy.monthMethodDiffers, { base: methodLabel(methodDefault), method: methodLabel(methodOverride) })}
+            </span>
+            <button
+              type="button"
+              className="ppr-lnk"
+              disabled={ro}
+              onClick={() => void save({ paymentMethodOverride: null }, copy.monthMethod)}
+            >
+              {copy.monthMethodReset}
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       <h3 className="ppr-h4">{fillCopy(copy.work, { time: formatPrepTime(row.paidMinutes) })}</h3>
       <div>
@@ -397,6 +446,18 @@ export function PayrollPrepPanel({
           <b>{row.net == null ? "—" : fillCopy(copy.yen, { n: money.format(row.net) })}</b>
         </div>
       </div>
+
+      {canViewBank ? (
+        <MemberBankBlock
+          key={row.userId}
+          variant="panel"
+          userId={row.userId}
+          copy={bankCopy}
+          localeTag={localeTag}
+          onToast={onBankToast}
+          onChange={onBankChange}
+        />
+      ) : null}
     </aside>
   );
 }

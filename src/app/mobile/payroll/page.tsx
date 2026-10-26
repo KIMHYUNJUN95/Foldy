@@ -7,6 +7,9 @@ import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { PAYROLL_PREP_START_YM } from "@/lib/payroll-prep";
+import { attendanceCan } from "@/lib/attendance-review";
+import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getPayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { getPayrollPrep } from "@/lib/payroll-prep-server";
 import { getPayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
@@ -39,7 +42,11 @@ export default async function MobilePayrollPage({ searchParams }: { searchParams
   const requested = typeof params.ym === "string" && YM_RE.test(params.ym) ? params.ym : defaultYm;
   const ym = requested < PAYROLL_PREP_START_YM ? PAYROLL_PREP_START_YM : requested;
 
-  const [data, badges] = await Promise.all([getPayrollPrep(session, ym), navBadgesPromise]);
+  const [data, badges, canViewBank] = await Promise.all([
+    getPayrollPrep(session, ym),
+    navBadgesPromise,
+    attendanceCan(getSupabaseServiceClient(), session.organization.id, session.user.id, "payroll.view"),
+  ]);
   if (!data.canView) redirect("/mobile");
 
   const locale = session.user.preferredLanguage;
@@ -51,6 +58,8 @@ export default async function MobilePayrollPage({ searchParams }: { searchParams
     <MobileShell activeItem="payroll" badges={badges} split title={dictionary.navigation.mobile.payroll}>
       <MobilePayroll
         copy={getPayrollPrepCopy(locale)}
+        bankCopy={getPayrollBankCopy(locale)}
+        canViewBank={canViewBank}
         data={data}
         localeTag={adminLocaleTag(locale)}
         maxYm={todayMonth}

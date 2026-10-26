@@ -9,7 +9,10 @@ import {
   listAttendanceAllowances,
 } from "@/lib/admin-attendance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
+import { attendanceCan } from "@/lib/attendance-review";
 import { getDictionary } from "@/lib/i18n";
+import { hasOrganizationContext } from "@/lib/session";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
 
@@ -50,6 +53,10 @@ export default async function AdminAttendanceWagesPage({
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  const canViewBank =
+    wages.isPrivileged &&
+    hasOrganizationContext(session) &&
+    (await attendanceCan(getSupabaseServiceClient(), session.organization.id, session.user.id, "payroll.view"));
   const allowanceStaff = wages.rows
     .filter((r) => r.employment === "hourly")
     .map((r) => ({ userId: r.userId, userName: r.userName }));
@@ -82,6 +89,7 @@ export default async function AdminAttendanceWagesPage({
             gapFillMinFrom={wages.gapFillMinFrom}
             locale={locale}
             localeTag={localeTag}
+            canViewBank={canViewBank}
           />
           <AttendanceAllowancesSection
             allowances={allowances.rows}

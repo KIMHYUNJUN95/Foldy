@@ -3803,6 +3803,111 @@ export type Database = {
           },
         ]
       }
+      member_bank_account_changes: {
+        Row: {
+          id: number
+          organization_id: string
+          user_id: string
+          kind: string
+          by_self: boolean
+          changed_by: string | null
+          prev_bank_name: string | null
+          prev_last4: string | null
+          new_bank_name: string | null
+          new_last4: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          organization_id: string
+          user_id: string
+          kind: string
+          by_self?: boolean
+          changed_by?: string | null
+          prev_bank_name?: string | null
+          prev_last4?: string | null
+          new_bank_name?: string | null
+          new_last4?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          organization_id?: string
+          user_id?: string
+          kind?: string
+          by_self?: boolean
+          changed_by?: string | null
+          prev_bank_name?: string | null
+          prev_last4?: string | null
+          new_bank_name?: string | null
+          new_last4?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      member_bank_accounts: {
+        Row: {
+          organization_id: string
+          user_id: string
+          bank_name: string
+          branch_name: string
+          account_type: string
+          account_number: string
+          holder_kana: string
+          pending: boolean
+          confirmed_bank_name: string | null
+          confirmed_branch_name: string | null
+          confirmed_account_type: string | null
+          confirmed_account_number: string | null
+          confirmed_holder_kana: string | null
+          confirmed_by: string | null
+          confirmed_at: string | null
+          updated_by: string | null
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          organization_id: string
+          user_id: string
+          bank_name: string
+          branch_name: string
+          account_type: string
+          account_number: string
+          holder_kana: string
+          pending?: boolean
+          confirmed_bank_name?: string | null
+          confirmed_branch_name?: string | null
+          confirmed_account_type?: string | null
+          confirmed_account_number?: string | null
+          confirmed_holder_kana?: string | null
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          updated_by?: string | null
+          updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          organization_id?: string
+          user_id?: string
+          bank_name?: string
+          branch_name?: string
+          account_type?: string
+          account_number?: string
+          holder_kana?: string
+          pending?: boolean
+          confirmed_bank_name?: string | null
+          confirmed_branch_name?: string | null
+          confirmed_account_type?: string | null
+          confirmed_account_number?: string | null
+          confirmed_holder_kana?: string | null
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          updated_by?: string | null
+          updated_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       memberships: {
         Row: {
           attendance_payroll_admin: boolean
@@ -4300,6 +4405,7 @@ export type Database = {
           withholding_override_reason: string | null
           employment_insurance_override: number | null
           memo: string | null
+          payment_method_override: string | null
           updated_by: string | null
           created_at: string
           updated_at: string
@@ -4319,6 +4425,7 @@ export type Database = {
           withholding_override_reason?: string | null
           employment_insurance_override?: number | null
           memo?: string | null
+          payment_method_override?: string | null
           updated_by?: string | null
           created_at?: string
           updated_at?: string
@@ -4338,6 +4445,7 @@ export type Database = {
           withholding_override_reason?: string | null
           employment_insurance_override?: number | null
           memo?: string | null
+          payment_method_override?: string | null
           updated_by?: string | null
           created_at?: string
           updated_at?: string

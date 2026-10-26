@@ -10,7 +10,13 @@ import { useIsTablet } from "@/components/shell/split-list";
 import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import { savePayrollMonthInput } from "@/actions/payroll-month-inputs";
 import { cancelPayrollApprovalRequest, requestPayrollApproval } from "@/actions/payroll-approval";
+import { confirmMemberBank } from "@/actions/payroll-bank";
+import { previewPayrollCarryOver, runPayrollCarryOver, undoPayrollCarryOver } from "@/actions/payroll-carry-over";
+import { formatBankDay } from "@/components/shared/payroll-bank/payroll-bank";
 import { haptic } from "@/lib/haptics";
+import { maskedNumber } from "@/lib/payroll-bank";
+import type { PayrollBankCopy } from "@/lib/payroll-bank-i18n";
+import { CARRY_DEFAULT_FIELDS, CARRY_FIELDS, type CarryField } from "@/lib/payroll-carry-over";
 import { canRequestApproval, currentSlot } from "@/lib/payroll-approval";
 import type { PrepManual, PrepRow } from "@/lib/payroll-prep";
 import type { PayrollPrepCopy } from "@/lib/payroll-prep-i18n";
@@ -46,6 +52,8 @@ export function MobilePayroll({
   minYm,
   maxYm,
   withholdingLabels,
+  bankCopy,
+  canViewBank,
   view = null,
 }: {
   data: PayrollPrepData;
@@ -54,6 +62,9 @@ export function MobilePayroll({
   minYm: string;
   maxYm: string;
   withholdingLabels: Record<WithholdingClass, string>;
+  bankCopy: PayrollBankCopy;
+  /** `payroll.view` — 계좌 묶음 · 계좌 바뀜 알림을 그린다. */
+  canViewBank: boolean;
   /** `approve` — 폰에서 결재 화면(사장 확인표)을 연다. 결재 단계가 아니면 무시. */
   view?: "approve" | null;
 }) {
@@ -75,6 +86,10 @@ export function MobilePayroll({
   const showToast = (next: Omit<PayrollToastState, "id">) => setToast((prev) => ({ ...next, id: (prev?.id ?? 0) + 1 }));
   const refresh = () => startRefresh(() => router.refresh());
   const [requestPending, startRequest] = useTransition();
+  const [carry, setCarry] = useState<{ fromYm: string; counts: Record<CarryField, number> } | null>(null);
+  const [carryLoading, setCarryLoading] = useState(false);
+  const [bankBusy, setBankBusy] = useState<string | null>(null);
+  const banks = canViewBank ? data.banks : {};
 
   const onFail = (reason: RoundFail) => {
     haptic("error");
@@ -143,10 +158,72 @@ export function MobilePayroll({
     return true;
   };
 
+  const openCarry = async () => {
+    if (carryLoading) return;
+    haptic("light");
+    setCarryLoading(true);
+    const res = await previewPayrollCarryOver({ ym }).catch(() => ({ ok: false as const, reason: "error" as const }));
+    setCarryLoading(false);
+    if (!res.ok) {
+      onFail(res.reason === "forbidden" || res.reason === "locked" ? res.reason : "error");
+      return;
+    }
+    setCarry({ fromYm: res.fromYm, counts: res.counts });
+  };
+
+  const runCarry = async (fields: CarryField[]): Promise<boolean> => {
+    const res = await runPayrollCarryOver({ ym, fields }).catch(() => ({ ok: false as const, reason: "error" as const }));
+    if (!res.ok) {
+      onFail(res.reason === "forbidden" || res.reason === "locked" ? res.reason : "error");
+      return false;
+    }
+    haptic("success");
+    showToast({
+      kind: "undo",
+      text: fillCopy(copy.carryDone, { people: res.people, cells: res.cells }),
+      onUndo: () => void undoCarry(res.entries),
+    });
+    refresh();
+    return true;
+  };
+
+  const undoCarry = async (entries: Parameters<typeof undoPayrollCarryOver>[0]["entries"]) => {
+    const res = await undoPayrollCarryOver({ ym, entries }).catch(() => ({ ok: false as const, reason: "error" as const }));
+    if (!res.ok) {
+      onFail(res.reason === "locked" ? "locked" : "error");
+      return;
+    }
+    haptic("light");
+    showToast({ kind: "done", text: copy.undone });
+    refresh();
+  };
+
+  const confirmBank = async (row: PrepRow) => {
+    if (bankBusy) return;
+    setBankBusy(row.userId);
+    const res = await confirmMemberBank({ userId: row.userId }).catch(() => ({ ok: false as const, reason: "error" as const }));
+    setBankBusy(null);
+    if (!res.ok) {
+      haptic("error");
+      showToast({ kind: "bad", text: res.reason === "forbidden" ? copy.errorForbidden : copy.errorSave });
+      return;
+    }
+    haptic("success");
+    showToast({ kind: "done", text: fillCopy(copy.bankConfirmedToast, { name: row.name }) });
+    refresh();
+  };
+
   const open = (row: PrepRow) => {
     haptic("light");
     setSelectedId(row.userId);
     if (!isTablet) setSheetOpen(true);
+  };
+
+  /** 그 달만 바꾼 지급 방식 — 이름 밑 작은 회색 줄. */
+  const monthOnly = (row: PrepRow, Tag: "span" | "small") => {
+    const o = row.manual.paymentMethodOverride ?? null;
+    if (!o || o === (row.paymentMethodDefault ?? null) || row.paymentMethod !== o) return null;
+    return <Tag className="mpp-sub">{fillCopy(copy.monthOnlyTag, { method: o === "cash" ? copy.cash : copy.transfer })}</Tag>;
   };
 
   const methodLabel = (row: PrepRow) =>
@@ -173,6 +250,7 @@ export function MobilePayroll({
     return <small className="mpp-sub">{methodLabel(row)}</small>;
   };
 
+  const bankNotices = rows.filter((r) => banks[r.userId]?.pending);
   const counts = { all: rows.length, transfer: totals.transfer.people, cash: totals.cash.people };
   const filters: { key: Filter; label: string }[] = [
     { key: "all", label: copy.all },
@@ -195,6 +273,16 @@ export function MobilePayroll({
       saveInput={saveInput}
       saveClass={saveClass}
       readOnlyNote={locked ? copy.lockedShort : undefined}
+      bank={
+        canViewBank
+          ? {
+              copy: bankCopy,
+              variant: isTablet ? "panel" : "sheet",
+              onToast: (text) => showToast({ kind: "done", text }),
+              onChange: refresh,
+            }
+          : undefined
+      }
     />
   );
 
@@ -289,6 +377,11 @@ export function MobilePayroll({
         </section>
       ) : null}
       {header}
+      {phase === "prep" && canManage ? (
+        <button type="button" className="mpp-carry-open" disabled={carryLoading} aria-busy={carryLoading} onClick={() => void openCarry()}>
+          {carryLoading ? copy.carryLoading : copy.carryOpen}
+        </button>
+      ) : null}
 
       <section className="mpp-hero" aria-label={copy.netTotal}>
         <div className="mpp-hero__net">
@@ -322,6 +415,34 @@ export function MobilePayroll({
         <p className="mpp-empty">{copy.empty}</p>
       ) : (
         <>
+          {bankNotices.length > 0 ? (
+            <ul className="mpp-bn" aria-label={copy.bankNoticeTitle}>
+              {bankNotices.map((row) => {
+                const b = banks[row.userId]!;
+                const date = formatBankDay(b.updatedAt, localeTag);
+                const to = `${b.current.bankName} ${maskedNumber(b.current.accountNumber)}`;
+                const line = b.confirmed
+                  ? fillCopy(copy.bankChangedLine, { date, from: `${b.confirmed.bankName} ${maskedNumber(b.confirmed.accountNumber)}`, to })
+                  : fillCopy(copy.bankFirstLine, { date, to });
+                return (
+                  <li key={row.userId}>
+                    <span className="mpp-bn__t">
+                      <b>
+                        {row.name} · {copy.bankChanged}
+                      </b>
+                      <small className="pbk-jp">{line}</small>
+                    </span>
+                    {data.canManage && !locked ? (
+                      <button type="button" className="mpp-lnk mpp-bn__go" disabled={bankBusy === row.userId} onClick={() => void confirmBank(row)}>
+                        {copy.bankConfirm}
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+
           <div className="mpp-seg" role="radiogroup" aria-label={copy.filterLabel}>
             {filters.map((f) => (
               <button
@@ -355,6 +476,7 @@ export function MobilePayroll({
                   <span className="mpp-row__b">
                     <span className="mpp-row__t">{row.name}</span>
                     {subLine(row, true, !isTablet)}
+                    {monthOnly(row, "span")}
                   </span>
                   <span className={`mpp-amt num${row.net == null ? " is-none" : ""}`}>{row.net == null ? "—" : yenMark(row.net)}</span>
                 </button>
@@ -395,6 +517,7 @@ export function MobilePayroll({
                       <span className="mpp-who__t">
                         <b>{row.name}</b>
                         {tableSub(row)}
+                        {monthOnly(row, "small")}
                       </span>
                     </button>
                   </td>
@@ -470,6 +593,8 @@ export function MobilePayroll({
     showToast,
     onFail,
     refresh,
+    bankCopy,
+    banks,
   };
 
   // ── 지급 중 이후 ──
@@ -531,7 +656,94 @@ export function MobilePayroll({
         </BottomSheet>
       ) : null}
 
+      {carry ? <CarrySheet copy={copy} month={month(carry.fromYm)} counts={carry.counts} onClose={() => setCarry(null)} onRun={runCarry} /> : null}
+
       {toastEl}
     </div>
+  );
+}
+
+/** 지난달 값 가져오기 확인 — 칸 종류마다 체크(채워질 사람 수 0 이면 못 고름), 가져오기는 서버가 비어 있는 칸만 채운다. */
+function CarrySheet({
+  copy,
+  month,
+  counts,
+  onClose,
+  onRun,
+}: {
+  copy: PayrollPrepCopy;
+  month: string;
+  counts: Record<CarryField, number>;
+  onClose: () => void;
+  onRun: (fields: CarryField[]) => Promise<boolean>;
+}) {
+  const [picked, setPicked] = useState<CarryField[]>(() => CARRY_DEFAULT_FIELDS.filter((f) => counts[f] > 0));
+  const [pending, setPending] = useState(false);
+  const label: Record<CarryField, [string, string | null]> = {
+    special: [copy.carrySpecial, copy.carrySpecialHint],
+    withholding: [copy.carryWithholding, null],
+    memo: [copy.carryMemo, null],
+    overtimeWeekend: [copy.carryOvertimeWeekend, copy.carryOvertimeWeekendHint],
+  };
+  const nothing = CARRY_FIELDS.every((f) => counts[f] === 0);
+  return (
+    <BottomSheet ariaLabelledBy="mpp-carry-title" onClose={onClose}>
+      {({ close }) => (
+        <div className="mpp-carry">
+          <h2 id="mpp-carry-title">{fillCopy(copy.carryTitle, { month })}</h2>
+          <p>{copy.carryBody}</p>
+          {nothing ? (
+            <p className="mpp-carry__none">{copy.carryNothing}</p>
+          ) : (
+            <ul>
+              {CARRY_FIELDS.map((f) => {
+                const on = picked.includes(f);
+                const none = counts[f] === 0;
+                return (
+                  <li key={f}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      disabled={none}
+                      onClick={() => {
+                        haptic("light");
+                        setPicked((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
+                      }}
+                    >
+                      <span className="mpp-carry__box" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <path d="M5 12.5l4.5 4.5L19 7.5" pathLength={1} />
+                        </svg>
+                      </span>
+                      <span className="mpp-carry__l">
+                        <b>{label[f][0]}</b>
+                        {label[f][1] ? <small>{label[f][1]}</small> : null}
+                      </span>
+                      <span className="mpp-carry__n">{fillCopy(copy.carryCount, { n: counts[f] })}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="mpp-carry__never">{copy.carryNever}</p>
+          <button
+            type="button"
+            className="mpr-btn mpr-btn--pri"
+            disabled={pending || nothing || picked.length === 0}
+            aria-busy={pending}
+            onClick={async () => {
+              setPending(true);
+              const ok = await onRun(picked);
+              setPending(false);
+              if (ok) close();
+            }}
+          >
+            {copy.carryRun}
+          </button>
+        </div>
+      )}
+    </BottomSheet>
   );
 }

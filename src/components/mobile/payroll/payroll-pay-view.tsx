@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Copy } from "lucide-react";
 import { returnPayroll, setAccountantSent, setPaymentChecks } from "@/actions/payroll-approval";
 import { haptic } from "@/lib/haptics";
+import { usableAccount, type MemberBank } from "@/lib/payroll-bank";
+import { bankTypeLabel, type PayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { checkAt, type PaymentCheckKind, type PaymentCheckState } from "@/lib/payroll-approval";
 import type { PrepRow } from "@/lib/payroll-prep";
 import type { PayrollPrepCopy } from "@/lib/payroll-prep-i18n";
@@ -29,6 +32,8 @@ export function PayrollPayView({
   showToast,
   onFail,
   refresh,
+  bankCopy,
+  banks,
 }: {
   data: PayrollPrepData;
   copy: PayrollPrepCopy;
@@ -38,6 +43,9 @@ export function PayrollPayView({
   showToast: ShowToast;
   onFail: (reason: RoundFail) => void;
   refresh: () => void;
+  bankCopy: PayrollBankCopy;
+  /** 계좌 — `payroll.view` 가 없으면 빈 객체(계좌 줄을 그리지 않는다). */
+  banks: Record<string, MemberBank>;
 }) {
   const { ym, rows, round, canManage } = data;
   const status = round.status;
@@ -199,6 +207,42 @@ export function PayrollPayView({
     return true;
   };
 
+  /** 이체 줄의 계좌 — 이체에는 확인한 계좌(확인 전이면 이전 계좌)를 쓴다. 계좌를 볼 권한이 없으면 그리지 않는다. */
+  const canSeeBanks = Object.keys(banks).length > 0 || rows.some((r) => r.issues.includes("bank_missing"));
+  const copyNumber = async (value: string) => {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(value);
+      ok = true;
+    } catch {
+      // 권한 없음 — 아래 실패 알림
+    }
+    haptic(ok ? "light" : "error");
+    showToast({ kind: ok ? "done" : "bad", text: ok ? copy.bankCopied : copy.errorSave });
+  };
+  const bankLine = (row: PrepRow) => {
+    if (!canSeeBanks) return null;
+    const bank = banks[row.userId];
+    if (!bank) return <small className="mpr-bank__miss">{copy.issues.bank_missing}</small>;
+    const acct = usableAccount(bank);
+    return (
+      <span className="mpr-bank">
+        <small className="mpr-bank__b">
+          {acct.bankName} {acct.branchName}
+        </small>
+        <span className="mpr-bank__n">
+          <span className="num">
+            {bankTypeLabel(bankCopy, acct.accountType)} {acct.accountNumber}
+          </span>
+          <button type="button" aria-label={copy.bankCopy} onClick={() => void copyNumber(acct.accountNumber)}>
+            <Copy aria-hidden="true" />
+          </button>
+        </span>
+        {bank.pending ? <small>{copy.bankBeforeConfirm}</small> : null}
+      </span>
+    );
+  };
+
   /** 줄 아래 작은 글 — 마지막 체크의 사람 · 시각. */
   const meta = (row: PrepRow) => {
     const c: PaymentCheckState | undefined = round.checks[row.userId];
@@ -327,6 +371,7 @@ export function PayrollPayView({
                     <li key={row.userId} className="mpr-prow mpr-prow--tr">
                       <span className="mpr-prow__nm">
                         <b>{row.name}</b>
+                        {bankLine(row)}
                         {metaLine(row)}
                       </span>
                       <span className="mpr-prow__amt num">{row.net == null ? "—" : num(row.net)}</span>

@@ -22,6 +22,8 @@ import { tokyoToday } from "@/lib/tokyo-date";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { breakSecondsBySession } from "@/lib/attendance-pay-calculation";
 import { computePayrollKintai, type KintaiAudit } from "@/lib/payroll-kintai";
+import { loadMemberBanks } from "@/lib/payroll-bank-server";
+import type { MemberBank } from "@/lib/payroll-bank";
 
 /**
  * 알바 급여 P3 — 급여 준비 읽기(서버 전용, service role). PC 근태 › 급여 · 모바일 급여 준비가 같이 쓴다.
@@ -49,6 +51,11 @@ export type PayrollPrepData = {
   totals: PrepTotals;
   /** 급여 회차(P5) — 상태 · 결재 칸 · 지급 체크 · 기록. */
   round: PayrollRound;
+  /**
+   * 급여 계좌(지금 값 — 스냅샷에 넣지 않는다). `payroll.view` 가 있을 때만 채운다(결재만 하는 사람에겐 빈 객체).
+   * 이체 목록 · 「계좌 바뀜」 확인에 쓴다. docs/product/39 §3-A
+   */
+  banks: Record<string, MemberBank>;
 };
 
 type InputRow = {
@@ -64,10 +71,11 @@ type InputRow = {
   withholding_override_reason: string | null;
   employment_insurance_override: number | null;
   memo: string | null;
+  payment_method_override: string | null;
 };
 
 export const PAYROLL_MONTH_INPUT_SELECT =
-  "user_id, overtime, weekend, special, prev_adjustment, prev_adjustment_kind, prev_adjustment_month, year_end_adjustment, withholding_override, withholding_override_reason, employment_insurance_override, memo";
+  "user_id, overtime, weekend, special, prev_adjustment, prev_adjustment_kind, prev_adjustment_month, year_end_adjustment, withholding_override, withholding_override_reason, employment_insurance_override, memo, payment_method_override";
 
 export function rowToPrepManual(row: Omit<InputRow, "user_id"> | null | undefined): PrepManual {
   if (!row) return { ...EMPTY_PREP_MANUAL };
@@ -83,6 +91,8 @@ export function rowToPrepManual(row: Omit<InputRow, "user_id"> | null | undefine
     withholdingOverrideReason: row.withholding_override_reason,
     employmentInsuranceOverride: row.employment_insurance_override,
     memo: row.memo,
+    paymentMethodOverride:
+      row.payment_method_override === "cash" || row.payment_method_override === "transfer" ? row.payment_method_override : null,
   };
 }
 
@@ -117,6 +127,7 @@ function emptyData(ym: string, payday: Payday): PayrollPrepData {
     allFinalized: false,
     rows: [],
     totals: prepTotals([]),
+    banks: {},
   };
 }
 
@@ -136,6 +147,8 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
   const companyName = org.companyName;
   if (!canView || !payrollPrepAvailable(ym)) return { ...emptyData(ym, payday), companyName, canView, canManage, canApprove };
   const { round, snapshot } = await loadPayrollRound(service, organizationId, ym, session.user.id, org, canApprove);
+  const banksFor = async (rows: readonly PrepRow[]): Promise<Record<string, MemberBank>> =>
+    canViewPayroll ? Object.fromEntries(await loadMemberBanks(service, organizationId, rows.map((r) => r.userId))) : {};
   if (snapshot) {
     // 잠긴 달 — 요청 때 굳힌 값 그대로(근태 · 설정이 그 뒤 바뀌어도 결재한 숫자가 안 바뀐다).
     return {
@@ -150,15 +163,18 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
       rows: snapshot.rows,
       totals: snapshot.totals,
       round,
+      banks: await banksFor(snapshot.rows),
     };
   }
+  const prep = await loadPrepRows(service, organizationId, ym, payday, org.employmentInsuranceRates);
   return {
-    ...(await loadPrepRows(service, organizationId, ym, payday, org.employmentInsuranceRates)),
+    ...prep,
     companyName,
     canView,
     canManage,
     canApprove,
     round,
+    banks: await banksFor(prep.rows),
   };
 }
 
@@ -169,7 +185,7 @@ export async function loadPrepRows(
   ym: string,
   payday: Payday,
   insuranceRates: Record<string, number>,
-): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "canApprove" | "companyName" | "round">> {
+): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "canApprove" | "companyName" | "round" | "banks">> {
   const firstDay = `${ym}-01`;
   const today = tokyoToday();
   const [membersRes, base, transportRes, inputsRes] = await Promise.all([
@@ -211,7 +227,7 @@ export async function loadPrepRows(
 
   const hourlySet = new Set(hourlyIds);
   const hourlySessions = base.sessions.filter((s) => hourlySet.has(s.user_id));
-  const [profilesRes, views, kintaiSources] = await Promise.all([
+  const [profilesRes, views, kintaiSources, banks] = await Promise.all([
     service.from("profiles").select("id, name").in("id", hourlyIds),
     loadMemberPayrollViews(
       service,
@@ -220,6 +236,7 @@ export async function loadPrepRows(
       today,
     ),
     loadKintaiSources(service, organizationId, ym, hourlySessions, hourlyIds),
+    loadMemberBanks(service, organizationId, hourlyIds),
   ]);
   const breakSecs = breakSecondsBySession(links.breaks, base.sessions);
   const nameById = new Map<string, string>();
@@ -252,6 +269,7 @@ export async function loadPrepRows(
       taxYear,
       ym,
       insuranceRates,
+      hasBankAccount: banks.has(userId),
       kintai: computePayrollKintai({
         days: month.prep.dailyPaid,
         sessions: hourlySessions.filter((s) => s.user_id === userId),

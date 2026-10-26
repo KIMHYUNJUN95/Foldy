@@ -227,3 +227,11 @@
   .mpr-stamp.is-new { animation: none !important; }
   .mpr-ck, .mpr-ck__o, .mpr-ck__o path, .mpr-track i { transition: none !important; }
 }
+
+/* ── 이체 줄 계좌(2026-10-26) ── */
+.mpr-bank { display: flex; flex-direction: column; gap: 0; margin-top: 2px; font-family: "Noto Sans JP", "Noto Sans KR", sans-serif; }
+.mpr-bank__b { font-size: 13px; color: var(--mpp-soft); }
+.mpr-bank__n { display: flex; align-items: center; gap: 2px; font-size: 14px; font-weight: 600; color: var(--mpp-ink); letter-spacing: .02em; }
+.mpr-bank__n button { display: grid; place-items: center; width: 44px; height: 36px; margin: -4px 0; border: 0; background: transparent; color: var(--mpp-link); }
+.mpr-bank__n svg { width: 16px; height: 16px; }
+.mpr-bank__miss { color: var(--mpp-red) !important; }

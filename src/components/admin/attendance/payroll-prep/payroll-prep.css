@@ -23,6 +23,10 @@
 .adm .ppr-seg button[aria-pressed="true"] { background: #fff; color: var(--ppr-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(22, 20, 31, .12); }
 .adm .ppr-seg i { font-style: normal; color: var(--ppr-gray); }
 .adm .ppr-tools__sp { margin-left: auto; }
+/* P4 — 출력 파일 두 쌍(급여 파일 · 세무사용): 작은 이름 + Excel · PDF. */
+.adm .ppr-file { display: inline-flex; align-items: center; gap: 8px; }
+.adm .ppr-file__l { font-size: 12px; color: var(--ppr-gray); white-space: nowrap; }
+.adm .ppr-file + .ppr-file { margin-left: 6px; }
 
 .adm .ppr-th, .adm .ppr-tr { display: grid; grid-template-columns: 2fr .8fr .95fr .95fr .85fr .95fr .85fr 1.05fr; column-gap: 12px; padding: 0 12px; align-items: center; width: 100%; box-sizing: border-box; }
 .adm .ppr.has-panel .ppr-th, .adm .ppr.has-panel .ppr-tr { grid-template-columns: 1.9fr .7fr 1fr 1fr; }

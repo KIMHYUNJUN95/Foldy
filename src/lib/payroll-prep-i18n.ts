@@ -36,6 +36,18 @@ export type PayrollPrepCopy = {
   noChecks: string;
   requestApproval: string;
   approvalLater: string;
+  /** P4 — 급여 준비 값으로 만드는 출력 파일. */
+  filesTitle: string;
+  fileBook: string;
+  fileBookHint: string;
+  fileTax: string;
+  fileTaxHint: string;
+  fileSaved: string; // "{name} 저장됨"
+  fileOpened: string;
+  fileFailed: string;
+  fileBlocked: string;
+  fileXls: string;
+  filePdf: string;
   empty: string;
   readOnly: string;
   classLine: string; // "원천세 {cls}"
@@ -116,6 +128,17 @@ const ko: PayrollPrepCopy = {
   noChecks: "확인할 사람 없음",
   requestApproval: "결재 요청",
   approvalLater: "결재는 다음 단계에서 열려요",
+  filesTitle: "파일",
+  fileBook: "급여 파일",
+  fileBookHint: "명세서 · 사장 확인표 · 지급 확인 목록",
+  fileTax: "세무사용",
+  fileTaxHint: "원천세 구분별 지급 목록",
+  fileSaved: "{name} 저장됨",
+  fileOpened: "PDF 를 새 탭에 열었어요",
+  fileFailed: "파일을 만들지 못했어요",
+  fileBlocked: "팝업이 막혔어요. 허용한 뒤 다시 눌러 주세요",
+  fileXls: "Excel",
+  filePdf: "PDF",
   empty: "이 달엔 시급 근무가 없어요.",
   readOnly: "보기만 할 수 있어요",
   classLine: "원천세 {cls}",
@@ -208,6 +231,17 @@ const ja: PayrollPrepCopy = {
   noChecks: "要確認なし",
   requestApproval: "決裁を依頼",
   approvalLater: "決裁は次の段階で使えます",
+  filesTitle: "ファイル",
+  fileBook: "給与ファイル",
+  fileBookHint: "明細・社長確認表・支給確認一覧",
+  fileTax: "税理士用",
+  fileTaxHint: "源泉区分ごとの支給一覧",
+  fileSaved: "{name} を保存しました",
+  fileOpened: "PDFを新しいタブで開きました",
+  fileFailed: "ファイルを作れませんでした",
+  fileBlocked: "ポップアップがブロックされました。許可してからもう一度押してください",
+  fileXls: "Excel",
+  filePdf: "PDF",
   empty: "この月は時給の勤務がありません。",
   readOnly: "閲覧のみ",
   classLine: "源泉 {cls}",
@@ -300,6 +334,17 @@ const en: PayrollPrepCopy = {
   noChecks: "Nothing to check",
   requestApproval: "Request approval",
   approvalLater: "Approval opens in a later step",
+  filesTitle: "Files",
+  fileBook: "Payroll file",
+  fileBookHint: "Payslips · owner sheet · payment check",
+  fileTax: "Tax accountant",
+  fileTaxHint: "Pay list by tax column",
+  fileSaved: "Saved {name}",
+  fileOpened: "Opened the PDF in a new tab",
+  fileFailed: "Couldn't create the file",
+  fileBlocked: "Pop-up blocked. Allow pop-ups and try again",
+  fileXls: "Excel",
+  filePdf: "PDF",
   empty: "No hourly work this month.",
   readOnly: "View only",
   classLine: "Withholding {cls}",

@@ -32,6 +32,8 @@ export type PayrollPrepData = {
   canView: boolean;
   canManage: boolean;
   payday: Payday;
+  /** 설정 › 급여의 会社名(명세서 · 급여 엑셀에 찍힘). 비어 있으면 빈 글. */
+  companyName: string;
   /** 근태 마감이 다 끝났는지 — 끝났으면 급여 탭이 「급여 준비」 단계로 열린다. */
   allFinalized: boolean;
   rows: PrepRow[];
@@ -80,6 +82,7 @@ function emptyData(ym: string, payday: Payday): PayrollPrepData {
     canView: false,
     canManage: false,
     payday,
+    companyName: "",
     allFinalized: false,
     rows: [],
     totals: prepTotals([]),
@@ -97,8 +100,14 @@ export async function getPayrollPrep(session: AppSession, ym: string): Promise<P
     loadOrgPayrollSettings(service, organizationId),
   ]);
   const payday = paydayFor(ym, org.payDay);
-  if (!canView || !payrollPrepAvailable(ym)) return { ...emptyData(ym, payday), canView, canManage };
-  return { ...(await loadPrepRows(service, organizationId, ym, payday, org.employmentInsuranceRates)), canView, canManage };
+  const companyName = org.companyName;
+  if (!canView || !payrollPrepAvailable(ym)) return { ...emptyData(ym, payday), companyName, canView, canManage };
+  return {
+    ...(await loadPrepRows(service, organizationId, ym, payday, org.employmentInsuranceRates)),
+    companyName,
+    canView,
+    canManage,
+  };
 }
 
 async function loadPrepRows(
@@ -107,7 +116,7 @@ async function loadPrepRows(
   ym: string,
   payday: Payday,
   insuranceRates: Record<string, number>,
-): Promise<Omit<PayrollPrepData, "canView" | "canManage">> {
+): Promise<Omit<PayrollPrepData, "canView" | "canManage" | "companyName">> {
   const firstDay = `${ym}-01`;
   const today = tokyoToday();
   const [membersRes, base, transportRes, inputsRes] = await Promise.all([

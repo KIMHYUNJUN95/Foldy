@@ -16,6 +16,7 @@ import { fillCopy } from "@/lib/payroll-settings-i18n";
 import type { WithholdingClass } from "@/lib/payroll-settings-rules";
 import { fmtTime, initialOf, num, signedNum, yenMark } from "./payroll-format";
 import { PayrollPerson } from "./payroll-person";
+import { PayrollFiles } from "./payroll-files";
 import { PayrollToast, type PayrollToastState } from "./payroll-toast";
 import "./mobile-payroll.css";
 
@@ -300,6 +301,8 @@ export function MobilePayroll({
                 ))}
               </tbody>
             </table>
+
+            <PayrollFiles ym={ym} copy={copy} showToast={showToast} />
 
             <div className="mpp-phone-go">
               <button type="button" className="mpp-go" disabled aria-describedby="mpp-go-note">

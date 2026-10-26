@@ -79,6 +79,11 @@ const TIERS: Record<
 /** 乙 소액 구간 세율 3.063%(소득세 3% × 부흥특별소득세 포함 1.021). */
 const FLAT_RATE = 0.03063;
 
+/** 그해 국세청 표(출력 엑셀의 세금표 시트용). 없으면 `null`. */
+export function withholdingTable(year: number): WithholdingTable | null {
+  return TABLES[year] ?? null;
+}
+
 /** 그해 표가 있나. */
 export function hasWithholdingTable(year: number): boolean {
   return year in TABLES && year in TIERS;

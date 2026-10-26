@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { saveMemberPayrollSetting } from "@/actions/payroll-settings";
 import { savePayrollMonthInput } from "@/actions/payroll-month-inputs";
 import {
-  exportPayrollPrepReport,
-  exportPayrollPrepWorkbook,
-} from "@/app/admin/attendance/payroll-prep-actions";
+  exportPayrollBookReport,
+  exportPayrollBookWorkbook,
+  exportTaxAccountantReport,
+  exportTaxAccountantWorkbook,
+} from "@/actions/payroll-exports";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { prepTotals, type PrepManual, type PrepRow } from "@/lib/payroll-prep";
 import type { PayrollPrepData } from "@/lib/payroll-prep-server";
@@ -190,13 +192,27 @@ export function PayrollPrepClient({
           ))}
         </div>
         <span className="ppr-tools__sp" />
-        <AdminExportButtons
-          labels={shared}
-          disabled={all.length === 0}
-          onExportXls={() => exportPayrollPrepWorkbook(ym)}
-          onExportPdf={() => exportPayrollPrepReport(ym)}
-          onToast={notice}
-        />
+        {/* P4 — 급여 파일(명세서 · 사장 확인표 · 지급 확인) · 세무사용. 둘 다 Excel + PDF(CLAUDE.md 4b). */}
+        <span className="ppr-file" title={copy.fileBookHint}>
+          <span className="ppr-file__l">{copy.fileBook}</span>
+          <AdminExportButtons
+            labels={shared}
+            disabled={all.length === 0}
+            onExportXls={() => exportPayrollBookWorkbook(ym)}
+            onExportPdf={() => exportPayrollBookReport(ym)}
+            onToast={notice}
+          />
+        </span>
+        <span className="ppr-file" title={copy.fileTaxHint}>
+          <span className="ppr-file__l">{copy.fileTax}</span>
+          <AdminExportButtons
+            labels={shared}
+            disabled={all.length === 0}
+            onExportXls={() => exportTaxAccountantWorkbook(ym)}
+            onExportPdf={() => exportTaxAccountantReport(ym)}
+            onToast={notice}
+          />
+        </span>
       </div>
 
       {rows.length === 0 ? (

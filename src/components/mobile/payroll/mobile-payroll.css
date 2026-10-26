@@ -75,6 +75,19 @@
 .mpp-phone-go { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .mpp-phone-go .mpp-go { width: 100%; }
 .mpp-phone-go p { margin: 0; font-size: 13px; color: var(--mpp-soft); text-align: center; }
+/* P4 — 출력 파일(급여 파일 · 세무사용 × Excel · PDF). 구분선은 공용 0.5px, 버튼은 회색 알약. */
+.mpp-files { margin-top: 28px; }
+.mpp-files__h { margin: 0 0 4px; font-size: 13px; font-weight: 400; color: var(--mpp-soft); }
+.mpp-files ul { margin: 0; padding: 0; list-style: none; }
+.mpp-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; }
+.mpp-file + .mpp-file { border-top: 0.5px solid var(--mpp-line); }
+.mpp-file__b { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mpp-file__b b { font-size: 16px; font-weight: 600; }
+.mpp-file__b small { font-size: 13px; line-height: 1.35; color: var(--mpp-soft); }
+.mpp-file__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 76px; height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: #f2f2f5; color: var(--mpp-ink); font-size: 15px; font-weight: 600; }
+.mpp-file__btn svg { width: 17px; height: 17px; color: var(--mpp-link); }
+.mpp-file__btn[aria-busy="true"] { opacity: .55; }
+.mpp-file__btn:focus-visible { outline: 2px solid var(--mpp-pri); outline-offset: 2px; }
 .mpp-bar { display: none; }
 .mpp-bar__ok { font-size: 14px; color: var(--mpp-soft); }
 

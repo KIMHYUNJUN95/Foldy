@@ -82,6 +82,10 @@ export const EMPTY_PREP_MANUAL: PrepManual = {
 export type PrepRow = {
   userId: string;
   name: string;
+  /** 일본 이름(가타카나) — 출력 양식의 氏名 · 세무사용 이름. */
+  nameKatakana: string | null;
+  /** 甲 부양 인원 — 출력 엑셀의 원천세 수식이 표의 몇 人 열을 볼지. */
+  dependents: number;
   paymentMethod: PaymentMethod | null;
   withholdingClass: WithholdingClass | null;
   finalized: boolean;
@@ -204,6 +208,8 @@ export function buildPrepRow(input: PrepRowInput): PrepRow {
   return {
     userId: input.userId,
     name: input.name,
+    nameKatakana: input.nameKatakana,
+    dependents: input.setting.dependents,
     paymentMethod: input.setting.paymentMethod,
     withholdingClass: input.setting.withholdingClass,
     finalized: input.finalized,

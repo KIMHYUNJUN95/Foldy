@@ -17,6 +17,7 @@ import {
 } from "@/lib/lost-found-constants";
 import { appendAdminRestoreMemo } from "@/lib/lost-found-memo";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { tokyoToday } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 
 type LostActionResult =
@@ -42,6 +43,21 @@ function tokyoDateKeyPlusDays(days: number): string {
   }).format(new Date());
   const [y, m, d] = todayKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// 진행 중(반환/폐기/연장/정정 대상) 상태. 종결 건은 복원 경로(restoreLostItem)만 건드린다.
+const IN_PROGRESS_STATUSES = ["registered", "stored", "disposal_scheduled"] as const;
+type InProgressStatus = (typeof IN_PROGRESS_STATUSES)[number];
+
+function isInProgressStatus(value: string): value is InProgressStatus {
+  return (IN_PROGRESS_STATUSES as readonly string[]).includes(value);
+}
+
+// 기존 처리 메모 뒤에 덧붙인다(덮어쓰지 않음 — 감사 흔적).
+function appendMemo(previous: string | null, addition: string): string | null {
+  const prev = previous ?? "";
+  const merged = addition ? (prev ? `${prev}\n${addition}` : addition) : prev;
+  return merged || null;
 }
 
 function revalidateItem(itemId: string) {
@@ -79,23 +95,35 @@ export async function returnLostItem(input: {
   const memo = input.memo.trim();
 
   const supabase = await getSupabaseServerClient();
+  const { data: existing } = await supabase
+    .from("lost_items")
+    .select("id, status, handling_memo")
+    .eq("id", input.itemId)
+    .eq("organization_id", session.organization.id)
+    .maybeSingle();
+  if (!existing) return { ok: false, reason: "not_found" };
+  const current = existing as { status: string; handling_memo: string | null };
+  if (!isInProgressStatus(current.status)) return { ok: false, reason: "invalid" };
+
   const { data: updated, error } = await supabase
     .from("lost_items")
     .update({
       status: "returned",
       return_method: input.method,
       return_tracking_no: trackingNo,
-      handling_memo: memo || null,
+      handling_memo: appendMemo(current.handling_memo, memo),
       handled_at: new Date().toISOString(),
       handled_by: session.user.id,
       handled_by_admin: true,
     })
     .eq("id", input.itemId)
     .eq("organization_id", session.organization.id)
+    .eq("status", current.status)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  // 0행 = 읽은 뒤 다른 사람이 상태를 바꿨다.
+  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
 
   revalidateItem(input.itemId);
   return { ok: true };
@@ -112,21 +140,32 @@ export async function disposeLostItem(input: {
   const memo = input.memo.trim();
 
   const supabase = await getSupabaseServerClient();
+  const { data: existing } = await supabase
+    .from("lost_items")
+    .select("id, status, handling_memo")
+    .eq("id", input.itemId)
+    .eq("organization_id", session.organization.id)
+    .maybeSingle();
+  if (!existing) return { ok: false, reason: "not_found" };
+  const current = existing as { status: string; handling_memo: string | null };
+  if (!isInProgressStatus(current.status)) return { ok: false, reason: "invalid" };
+
   const { data: updated, error } = await supabase
     .from("lost_items")
     .update({
       status: "disposed",
-      handling_memo: memo || null,
+      handling_memo: appendMemo(current.handling_memo, memo),
       handled_at: new Date().toISOString(),
       handled_by: session.user.id,
       handled_by_admin: true,
     })
     .eq("id", input.itemId)
     .eq("organization_id", session.organization.id)
+    .eq("status", current.status)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
 
   revalidateItem(input.itemId);
   return { ok: true };
@@ -141,7 +180,8 @@ export async function extendLostItemStorage(input: {
   if (!gate.ok) return gate.result;
   const { session } = gate;
 
-  if (!isValidDateKey(input.dueDate)) {
+  // 연장일은 도쿄 오늘 이후여야 한다 — 과거 날짜면 곧바로 자동 폐기 배치에 걸린다.
+  if (!isValidDateKey(input.dueDate) || input.dueDate <= tokyoToday()) {
     return { ok: false, reason: "invalid" };
   }
   const reason = input.reason.trim();
@@ -154,6 +194,10 @@ export async function extendLostItemStorage(input: {
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
+  // 진행 중인 건만 연장한다 — 종결 건을 연장하면 상태가 어긋난다(복원 경로 사용).
+  if (!isInProgressStatus((existing as { status: string }).status)) {
+    return { ok: false, reason: "invalid" };
+  }
 
   // 폐기예정 건을 연장하면 다시 보관중으로 되돌린다(종결 아님). 그 외 상태는 유지.
   const currentStatus = (existing as { status: string }).status;
@@ -170,6 +214,7 @@ export async function extendLostItemStorage(input: {
     })
     .eq("id", input.itemId)
     .eq("organization_id", session.organization.id)
+    .eq("status", currentStatus as InProgressStatus)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
@@ -196,25 +241,42 @@ export async function correctLostItemStatus(input: {
   const supabase = await getSupabaseServerClient();
   const { data: existing } = await supabase
     .from("lost_items")
-    .select("id, handling_memo")
+    .select("id, status, handling_memo")
     .eq("id", input.itemId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
 
-  const previousMemo = (existing as { handling_memo: string | null }).handling_memo ?? "";
+  const currentRow = existing as { status: Database["public"]["Tables"]["lost_items"]["Row"]["status"]; handling_memo: string | null };
+  const previousMemo = currentRow.handling_memo ?? "";
   const addition = input.memo.trim();
   // 정정 사유는 기존 처리 메모를 덮어쓰지 않고 덧붙인다 — 감사 흔적을 남긴다.
   const memo = addition ? (previousMemo ? `${previousMemo}\n${addition}` : addition) : previousMemo;
+
+  // 종결(반환/폐기) 건을 진행 상태로 되돌리면 restoreLostItem 과 똑같이 처리 정보를 비우고 보관 시계를 새로 준다.
+  const wasTerminal = currentRow.status === "returned" || currentRow.status === "disposed";
+  const resetFields = wasTerminal
+    ? {
+        hold_until: tokyoDateKeyPlusDays(LOST_FOUND_STORAGE_DAYS),
+        hold_reason: null,
+        return_method: null,
+        return_tracking_no: null,
+        handled_at: null,
+        handled_by: null,
+        handled_by_admin: false,
+      }
+    : {};
 
   const { data: updated, error } = await supabase
     .from("lost_items")
     .update({
       status: input.status,
       handling_memo: memo || null,
+      ...resetFields,
     })
     .eq("id", input.itemId)
     .eq("organization_id", session.organization.id)
+    .eq("status", currentRow.status)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };

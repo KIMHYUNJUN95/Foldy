@@ -87,6 +87,8 @@ export type MovedReservation = {
   guestName: string;
   from: { room: MoveRoom; arrival: string; departure: string };
   to: { room: MoveRoom; arrival: string; departure: string };
+  /** 옮겨졌지만 우리 표를 다시 맞추지 못했다 — 알림에 「반영 지연」을 함께 적는다(2026-10-26). */
+  stale?: boolean;
 };
 
 const CHANNEL_NAME: Record<string, string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "", other: "" };
@@ -222,6 +224,7 @@ export function OpsReservationMoveForm({
           from: { arrival: bar.checkIn, departure: bar.checkOut, room: currentRoom },
           guestName: bar.guestName,
           reservationId: bar.id,
+          stale: !!result.stale,
           to: { arrival, departure, room: pickedRoom },
         });
         return;

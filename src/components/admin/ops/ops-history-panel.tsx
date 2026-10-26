@@ -79,6 +79,7 @@ export type HistoryPanelCopy = {
   hsRevertSkipped: string;
   hsRevertNothing: string;
   hsRevertFailed: string;
+  hsRevertPartial: string;
   panelCancel: string;
   bkPending: string;
   hsHideCells: string;
@@ -385,7 +386,16 @@ export function OpsHistoryPanel({ canWrite = true, copy, onClose }: { canWrite?:
       };
       haptic("success");
     } else {
-      next = { text: result.error === "nothing_to_revert" ? copy.hsRevertNothing : copy.hsRevertFailed, tone: "warn" };
+      // 차단 되돌리기가 중간에 멈췄으면 몇 칸까지 됐는지 적는다 — 「실패」만 보면 전부 안 된 줄 안다(2026-10-26).
+      next = {
+        text:
+          result.error === "nothing_to_revert"
+            ? copy.hsRevertNothing
+            : result.appliedCells
+              ? copy.hsRevertPartial.replace("{n}", String(result.appliedCells))
+              : copy.hsRevertFailed,
+        tone: "warn",
+      };
     }
     setReverts((previous) => ({ ...previous, [jobId]: next }));
     await loadSends(null);

@@ -201,6 +201,8 @@ Usage:
   automatically only to routes declared in `vercel.json`; GitHub Actions and manual callers send the
   bearer header (Beds24 paths also accept `BEDS24_WEBHOOK_SECRET` where documented). An unset reminder
   secret returns 404; invalid/missing caller credentials return 403.
+- **시크릿 비교 공용 규칙 (2026-10-26)**: 모든 API 시크릿 확인은 `src/lib/api-secret.ts`(상수 시간 · 길이 무관). Bearer / 지정 헤더 / (허용된 경로만) `?secret=` 중 **하나라도 맞으면** 통과 — 예전 `a ?? b ?? c` 는 첫 값만 봤다. 쿼리 시크릿은 호환을 위해 유지. `BEDS24_WEBHOOK_SECRET` 미설정 시 웹훅이 열린 채 통과하는 기존 동작(fail-open)은 운영 환경변수 확인 전이라 그대로 두었다(코드에 TODO).
+- 웹훅 로그에는 본문 표본을 남기지 않고(키 · 길이만), 저장하는 거절 본문은 20,000자 상한(넘으면 표본 4,000자 + 길이). `/api/recruit/sync` 최신분(`mode=recent`)은 `{ok, count}` 만 돌려준다.
 - Existing Beds24-linked properties can be backfilled locally through `POST /api/dev/beds24/backfill-inventory`
 
 ### Beds24 토큰 재발급 (rotation)

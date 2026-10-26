@@ -5,7 +5,7 @@ import { canEditPropertyOperationInfo } from "@/lib/admin-calendar-dashboard";
 import { requireAdminSession } from "@/lib/admin-session";
 import type { PropertyMapMeta } from "@/lib/property-map-links";
 import { savePropertyOperationInfo } from "@/lib/property-operation-info";
-import { saveReservationInternalNote } from "@/lib/reservation-internal-notes";
+import { ReservationInternalNoteError, saveReservationInternalNote } from "@/lib/reservation-internal-notes";
 
 function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -21,6 +21,8 @@ export async function saveReservationInternalNoteAction(
     return { error: "invalid_reservation_id", ok: false };
   }
 
+  if (typeof note !== "string") return { error: "invalid_note", ok: false };
+
   try {
     const savedNote = await saveReservationInternalNote({
       note,
@@ -30,10 +32,8 @@ export async function saveReservationInternalNoteAction(
     revalidatePath("/admin/calendar");
     return { note: savedNote, ok: true };
   } catch (error) {
-    return {
-      error: error instanceof Error && error.message ? error.message : "save_failed",
-      ok: false,
-    };
+    // DB 원문 메시지는 돌려주지 않는다 — 코드만.
+    return { error: error instanceof ReservationInternalNoteError ? error.code : "save_failed", ok: false };
   }
 }
 

@@ -37,6 +37,12 @@ export type OrdersExportFilters = {
   startDate?: string;
   endDate?: string;
   status?: string;
+  /** "high" | "normal" — 그 외 값은 무시. */
+  urgency?: string;
+  /** 건물 한국어 원본 이름(= order_requests.building_name). */
+  building?: string;
+  /** 제목 · 요청자 · 품목명 검색어(콘솔 전체 기록 보기와 같은 규칙). */
+  query?: string;
 };
 
 function parseStatus(value: string | undefined): OrderRequestStatus | undefined {
@@ -63,10 +69,30 @@ async function buildOrdersSheet(
   const dateRange = parseRequestDateRange(filters);
   const status = parseStatus(filters.status);
 
-  const [orders, roomCatalog] = await Promise.all([
+  const [allOrders, roomCatalog] = await Promise.all([
     getOrgOrderRequests(session, { ...dateRange, status }),
     getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
   ]);
+
+  // 화면에 보이는 것과 같은 결과가 나가도록 긴급도 · 건물 · 검색어도 서버에서 거른다.
+  const urgency = filters.urgency === "high" || filters.urgency === "normal" ? filters.urgency : undefined;
+  const building = filters.building?.trim() || undefined;
+  const q = filters.query?.trim().toLowerCase().slice(0, 100) || undefined;
+  const orders = allOrders.filter((order) => {
+    if (urgency && order.urgency !== urgency) return false;
+    if (building && order.building_name !== building) return false;
+    if (
+      q &&
+      !(
+        order.title.toLowerCase().includes(q) ||
+        order.reporter_name.toLowerCase().includes(q) ||
+        parseOrderItems(order.items).some((item) => item.name.toLowerCase().includes(q))
+      )
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   const columns: AdminTableColumn[] = [
     { key: "building", label: dictionary.cleaning.manualBuildingLabel, width: 15, printWidth: 12 },
@@ -220,12 +246,13 @@ export async function rejectOrder(input: {
   const supabase = await getSupabaseServerClient();
   const { data: existing } = await supabase
     .from("order_requests")
-    .select("id, status")
+    .select("id, status, admin_memo")
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
-  if ((existing as { status: string }).status === "closed") {
+  const current = existing as { status: Database["public"]["Tables"]["order_requests"]["Row"]["status"]; admin_memo: string | null };
+  if (current.status === "closed") {
     return { ok: false, reason: "invalid" };
   }
 
@@ -233,17 +260,20 @@ export async function rejectOrder(input: {
     .from("order_requests")
     .update({
       status: "closed",
-      admin_memo: input.reason.trim() || null,
+      // 사유를 안 적었으면 기존 메모를 지우지 않는다.
+      admin_memo: input.reason.trim() || current.admin_memo,
       delivery_date: null,
       delivery_start_date: null,
       delivery_end_date: null,
     })
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
+    .eq("status", current.status)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  // 0행 = 읽은 뒤 다른 사람이 상태를 바꿨다.
+  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
 
   revalidateOrders();
   return { ok: true };
@@ -280,10 +310,11 @@ export async function reopenOrder(input: {
     })
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
+    .eq("status", "closed")
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
 
   revalidateOrders();
   return { ok: true };
@@ -304,29 +335,49 @@ export async function correctOrderStatus(input: {
     return { ok: false, reason: "invalid" };
   }
 
+  const supabase = await getSupabaseServerClient();
+  const { data: existing } = await supabase
+    .from("order_requests")
+    .select("id, status, admin_memo, delivery_date, delivery_start_date")
+    .eq("id", input.orderId)
+    .eq("organization_id", session.organization.id)
+    .maybeSingle();
+  if (!existing) return { ok: false, reason: "not_found" };
+  const current = existing as {
+    status: Database["public"]["Tables"]["order_requests"]["Row"]["status"];
+    admin_memo: string | null;
+    delivery_date: string | null;
+    delivery_start_date: string | null;
+  };
+  if (current.status === input.status) return { ok: false, reason: "invalid" };
+
   const updatePayload: Database["public"]["Tables"]["order_requests"]["Update"] = { status: input.status };
   if (input.status === "requested" || input.status === "approved") {
     updatePayload.delivery_date = null;
     updatePayload.delivery_start_date = null;
     updatePayload.delivery_end_date = null;
+  } else if (input.status === "ordered" && !current.delivery_date && !current.delivery_start_date) {
+    // 주문처리(ordered)는 배송일이 있어야 한다 — 없으면 정정이 아니라 배송일 지정부터.
+    return { ok: false, reason: "invalid" };
   }
-  if (input.status !== "closed") {
-    updatePayload.admin_memo = null;
-  } else {
-    const memo = input.memo.trim();
+  const memo = input.memo.trim();
+  if (input.status === "closed") {
     if (memo) updatePayload.admin_memo = memo;
+  } else if (current.status === "closed") {
+    // 종결(거절) 건을 되돌릴 때만 거절 사유를 지운다. 그 외 상태 사이 정정은 메모를 건드리지 않는다.
+    updatePayload.admin_memo = null;
   }
 
-  const supabase = await getSupabaseServerClient();
   const { data: updated, error } = await supabase
     .from("order_requests")
     .update(updatePayload)
     .eq("id", input.orderId)
     .eq("organization_id", session.organization.id)
+    .eq("status", current.status)
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "not_found" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
 
   revalidateOrders();
   return { ok: true };

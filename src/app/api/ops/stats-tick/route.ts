@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { processDirtyOpsStats } from "@/lib/ops-stats";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { safeEqualSecret } from "@/lib/api-secret";
 
 /**
  * 객실 × 월 집계 틱 — dirty 달을 미리 계산해 둔다(화면을 열 때 기다리지 않게).
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   const provided = providedSecret(request);
   if (!provided) return NextResponse.json({ ok: false }, { status: 401 });
   const cronSecret = process.env.CRON_SECRET?.trim();
-  let allowed = !!cronSecret && provided === cronSecret;
+  let allowed = !!cronSecret && safeEqualSecret(provided, cronSecret);
   if (!allowed) {
     const checked = await supabase.rpc("beds24_tick_token_ok", { p_token: provided });
     allowed = !checked.error && checked.data === true;

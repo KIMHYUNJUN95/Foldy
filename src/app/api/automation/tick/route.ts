@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runAutomationTick } from "@/lib/automation/runner";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { safeEqualSecret } from "@/lib/api-secret";
 
 /**
  * 자동화 틱 — 정시 발송 · 재시도 · 변동 재전송 · 정정본 · 취소/당일예약 알림.
@@ -23,7 +24,7 @@ async function authorize(request: NextRequest, supabase: ReturnType<typeof getSu
   const provided = providedSecret(request);
   if (!provided) return false;
   const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret && provided === cronSecret) return true;
+  if (cronSecret && safeEqualSecret(provided, cronSecret)) return true;
   const checked = await supabase.rpc("automation_tick_token_ok", { p_token: provided });
   if (checked.error) {
     console.error("[automation/tick] token check failed", { code: checked.error.code });

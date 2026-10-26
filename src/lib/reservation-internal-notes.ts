@@ -49,14 +49,29 @@ export function pickReservationNotes(notes: Map<string, string>, reservationIds:
   return result;
 }
 
+export const RESERVATION_INTERNAL_NOTE_MAX_LENGTH = 2000;
+
+/** 코드가 붙은 오류 — 화면에는 DB 원문 대신 이 코드만 넘긴다. */
+export class ReservationInternalNoteError extends Error {
+  constructor(readonly code: "note_too_long" | "reservation_not_found" | "save_failed") {
+    super(code);
+  }
+}
+
 export async function saveReservationInternalNote(input: {
   note: string;
   reservationId: string;
   session: AppSession;
 }): Promise<string> {
   const { note, reservationId, session } = input;
-  const trimmed = note.trim();
+  const trimmed = String(note ?? "").trim();
+  if (trimmed.length > RESERVATION_INTERNAL_NOTE_MAX_LENGTH) throw new ReservationInternalNoteError("note_too_long");
   const supabase = await getSupabaseServerClient();
+
+  // 이 조직의 예약인지 먼저 본다 — 남의 조직 예약 id 에 메모 줄이 생기지 않게(RLS 와 별개로 서버에서 한 번 더).
+  const owned = await supabase.from("reservations").select("id").eq("organization_id", session.organization.id).eq("id", reservationId).maybeSingle();
+  if (owned.error) throw new ReservationInternalNoteError("save_failed");
+  if (!owned.data) throw new ReservationInternalNoteError("reservation_not_found");
 
   if (!trimmed) {
     const { error } = await untyped(supabase)
@@ -66,7 +81,8 @@ export async function saveReservationInternalNote(input: {
       .eq("reservation_id", reservationId);
 
     if (error) {
-      throw new Error(error.message);
+      console.error("[reservation-note] delete failed", { code: error.code });
+      throw new ReservationInternalNoteError("save_failed");
     }
 
     return "";
@@ -88,7 +104,8 @@ export async function saveReservationInternalNote(input: {
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message ?? "save_failed");
+    console.error("[reservation-note] save failed", { code: error?.code });
+    throw new ReservationInternalNoteError("save_failed");
   }
 
   return (data as Pick<ReservationInternalNoteRow, "note">).note;

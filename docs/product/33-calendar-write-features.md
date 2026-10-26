@@ -3406,3 +3406,36 @@ HIG 캔버스 「A2Sales-*」 승인 후 구현. 크기 · 대비만 바꾸고 �
 누름 `scale(.97~.98)` 140ms · 패널/드롭다운/모달 ease-out 200~240ms 등장(origin 은 trigger) · 목록 · 숫자 줄 차례로 떠오름 · 비중 막대 채워짐 ·
 실패 · 보내는 중 점 숨쉬기 · 반영 중 칸 숨쉬기 → 보라 → 원래 색 · 호버 카드 0.14초 지연(옆 칸은 즉시) · 성공 체크 그리기 + 햅틱.
 `prefers-reduced-motion: reduce` 이면 모두 끈다.
+
+## 쓰기 경로 버그 수정 — 차단 이력 · 방 잠금 · 입력 검사 · 합치기 · 반영 지연 (2026-10-26, 코드 리뷰)
+
+1. **차단 이력은 정말 바뀐 밤만 적는다.** `createRoomBlock` · `clearRoomBlock`(`block-write.ts`)이 `changedNights` 를 돌려준다 —
+   걸기는 막기 전(① 읽기) 하나라도 열려 있던 밤, 풀기는 풀기 전 하나라도 막혀 있던 밤. 풀기도 이제 쓰기 전에 Beds24 를 한 번
+   읽는다(걸기의 ① 과 같은 `readNights`; 못 읽으면 아무것도 쓰지 않는다). `runBlockChange` 는 이 밤만 `price_change_logs` 에
+   「0 → 1」(풀기는 「1 → 0」)로 적는다. 전에는 구간 전부를 적어서 **되돌리기(`revertBlockChange` → `planRevertCells`)가 원래 있던
+   차단을 풀거나, 원래 열려 있던 밤을 막았다.** 되돌리기의 「지금 값」은 그대로 요금 표 `override_kind` 다(`revertLogsOfField`).
+2. **차단도 방 잠금을 잡는다** — 수기 예약 · 예약 수정 · 옮기기와 같은 `manualBookingLockName(조직, 행 키)`. 여러 방이면 행 키 순서로
+   모두 잡고, 하나라도 못 잡으면 `room_busy`(「같은 방에서 다른 작업이 진행 중」 `errBkRoomBusy`). 수명은 구간 수에 비례(90초 + 구간당
+   30초, 최대 15분). **예약이 있는 밤의 차단은 그대로 허용한다** — 남은 판매만 멈추는 용도라는 사용자 결정(2026-10-01 · 10-06, 위
+   「차단이 예약과 겹치면 층을 나눈다」 · 「차단한 날도 수기 예약」). 리뷰에서 「예약 있는 밤 거절」이 제안됐지만 이 결정과 어긋나 넣지 않았다.
+3. **가격 · 최소숙박 입력을 서버가 검사한다.** 날짜 형식 · **지난 밤(도쿄 오늘 전) → `past_date`** · 한 번에 1만 칸 초과 →
+   `too_many_cells`(`errPastDate` · `errTooManyCells`, PC 패널). 가격은 종류(`amount` / `percent`) · 금액 1엔 ~ 1,000만 엔 · 퍼센트
+   -100% 초과 ~ +1000%, 그리고 계산된 새 가격이 하나라도 1엔 미만(퍼센트로 깎다 0엔) · 상한 초과면 **통째로** `invalid_values`.
+   최소숙박은 지금처럼 1~49. 모바일 시트는 새 코드 두 개를 아직 기본 실패 문구로 보인다.
+4. **작업 합치기는 같은 사람 · 같은 방식만**(`isMergeableSibling` — 같은 건물 · 종류 · 2분 창에 더해 `requested_by` · `adjust_mode` ·
+   `percent_value`). 그리고 칸 이력의 `job_id` 는 **그 칸의 값을 낸 작업**이다(`cellOwnerJobIds` — 날짜 단위로 늦은 작업이 이긴다).
+   전에는 다른 사람의 작업까지 흡수해 이력이 첫 작업의 사람 · 방식으로 남았고, 흡수된 작업의 「되돌리기」는 칸을 못 찾았다.
+5. **예약 수정 · 옮기기 · 취소의 「반영 지연」.** Beds24 에는 반영됐는데 우리 표를 못 맞췄으면(다시 읽기 실패 · 웹훅 처리기가 건너뜀 ·
+   취소 상태 쓰기 실패) `{ ok: true, stale: true }`. PC 상세 패널은 성공 문구 아래 `writeSyncDelayed`(「반영 지연 — 같은 수정을 다시
+   하지 마세요」), 취소는 패널을 닫지 않고 같은 문구, 옮기기는 완료 알림에 같은 문구를 붙인다. 모바일 시트는 아직 성공만 보인다.
+6. **옮기기는 지금 건물을 모르면 거절한다.** 원본에 `propertyId` 가 없으면 지금 유닛(roomId)의 건물을 우리 표에서 찾고, 그래도 모르면
+   `other_building`. 전에는 건물 검사를 건너뛰어 다른 건물로 옮길 수 있었다.
+7. **`room_blocks` 미리 넣기가 같은 시작일의 더 긴 줄을 줄이지 않는다** — 겹침 키가 시작일까지라 덮어쓰면 끝 날짜가 줄었다. 끝 날짜는
+   기존 줄과 이번 구간 중 늦은 쪽.
+8. **차단 되돌리기가 중간에 실패하면 몇 칸까지 됐는지 돌려준다**(`appliedCells`, `runBlockChange` 실패 결과의 `appliedNights`). 이력
+   패널은 「N칸은 되돌렸지만 나머지는 되돌리지 못했습니다」(`hsRevertPartial`).
+9. 매출 · 가동률 · 매출 비교 엑셀 파일 이름의 날짜를 **도쿄 날짜**로(`tokyoToday()`) — 전에는 UTC 라 도쿄 0~9시에 전날로 찍혔다.
+
+회귀 테스트: `ops-manual-booking-concurrency.test.ts`(차단 방 잠금 · 바뀐 밤만 이력 · 되돌리기는 그 밤만 · 반영 지연) ·
+`ops-calendar-write-integrity.test.ts`(`changedNights` · 풀기 전 읽기 실패 · `room_blocks` 끝 날짜) · `beds24-price-job-merge.test.ts`
+(`isMergeableSibling` · `cellOwnerJobIds`).

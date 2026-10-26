@@ -3200,6 +3200,7 @@ export function OpsCalendarGrid({
                   .replace("{from}", moveToast.moved.from.room.label)
                   .replace("{to}", moveToast.moved.to.room.label)}
               </span>
+              {moveToast.moved.stale && <span className="spw-toast__s">{copy.writeSyncDelayed}</span>}
               <button
                 className="spw-toast__btn"
                 disabled={moveToast.phase === "undoing"}

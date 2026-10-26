@@ -1342,3 +1342,14 @@ myOwn(t, meId)      // !sentInstr — 내 일정 뷰(오늘/내일/관리함/캘
 - 옵셔널 체이닝이 든 논리식(`a?.b || c?.d ? x : y`, `[a?.x, a?.y].filter().join() || z`) 이 JSX · 정렬 콜백 안에 — 모듈 함수로 뺀다.
 - 함수 안의 `x++`(람다가 잡은 변수) — 인덱스를 값으로 계산한다.
 - `return` 뒤에 선언한 함수 선언 · 쓰기 전에 선언하지 않은 함수(`closePanel`) — 쓰는 곳보다 위로 올린다.
+
+## 콘솔 투두 서버 액션 점검 반영 (2026-10-26)
+
+모바일 점검(30c3a23d)과 같은 규칙을 `src/app/admin/tasks/actions.ts` 에 맞췄다.
+
+- **순서 저장**(`reorderConsoleTasks` · `reorderConsoleDateTasks`)은 `getTaskScope(session).taskIds` 에 든 작업만 쓴다 — 같은 조직 남의 개인 작업 순서를 서비스 키로 바꾸지 못한다.
+- **사진 주소**는 조직 폴더만: 작업 사진 `{org}/task-images/`(생성 `sanitizeTaskImageUrls`, 수정 `mergeTaskImageUrls` 에 `organizationId`), 메모 사진 `{org}/task-update-images/`(`isOrgTaskImageUrl`, 5장 상한).
+- **회차 쓰기 실패**(`completeOccurrence` · `clearOccurrenceState` · `skipOccurrences` — 셋 다 boolean 반환)는 `save_failed` 로 돌려주고 완료 기록 · 알림을 남기지 않는다. 일회성 완료/다시 열기도 `mustWrite`.
+- **이미 완료된 일회성 작업**을 다시 완료하면 아무것도 하지 않는다(완료 기록 · 알림 중복 방지).
+- **회차 건너뛰기**(`skipConsoleOccurrence`)는 이미 상태(완료 · 옮김)가 있는 회차를 덮어쓰지 않는다(`already_resolved`, 이미 건너뜀이면 성공 처리).
+- **프로젝트 작업을 관리함으로 이동**(`moveConsoleToInbox`)은 작성자(또는 개발자, `canEditTaskCore`)만.

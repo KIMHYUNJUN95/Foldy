@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { relinkReviewRooms } from "@/lib/beds24/review-room-relink";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 /**
  * 객실이 비어 있는 외부 리뷰를 **일회성으로 전량 재연결**한다.
@@ -30,13 +31,15 @@ function authorize(request: NextRequest): { ok: true } | { ok: false; status: nu
   const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
   if (!cronSecret && !webhookSecret) return { ok: false, status: 404 };
 
-  const provided =
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    request.headers.get("x-beds24-webhook-secret") ??
-    request.nextUrl.searchParams.get("secret");
-  if (!provided) return { ok: false, status: 403 };
-  if (cronSecret && provided === cronSecret) return { ok: true };
-  if (webhookSecret && provided === webhookSecret) return { ok: true };
+  // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
+  if (
+    requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      headers: ["x-beds24-webhook-secret"],
+      query: true,
+    })
+  ) {
+    return { ok: true };
+  }
   return { ok: false, status: 403 };
 }
 

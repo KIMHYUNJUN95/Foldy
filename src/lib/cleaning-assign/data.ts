@@ -588,6 +588,31 @@ export type MonthBoard = {
 };
 
 /**
+ * 날짜 범위 안에서 이미 청소 중이거나 끝난 방(`날짜|물리 방 키`) — 하루 보기처럼 월 제안 · 미배정 수에서도 뺀다.
+ * 오늘 이미 끝낸 방에 월 자동 제안이 사람을 또 넣지 않게 한다.
+ */
+async function loadFinishedRoomKeys(supabase: Client, organizationId: string, from: string, to: string): Promise<Set<string>> {
+  const rows = await readAllPages<{ room_label: string; cleaning_date: string }>((start, end) =>
+    supabase
+      .from("cleaning_sessions")
+      .select("room_label, cleaning_date")
+      .eq("organization_id", organizationId)
+      .gte("cleaning_date", from)
+      .lte("cleaning_date", to)
+      .in("status", ["in_progress", "completed"])
+      .order("id")
+      .range(start, end),
+  );
+  if (rows.error) throw new Error(rows.error.message);
+  const out = new Set<string>();
+  for (const row of rows.data) {
+    const key = physicalRoomKeyOfSessionLabel(row.room_label);
+    if (key) out.add(`${row.cleaning_date}|${key}`);
+  }
+  return out;
+}
+
+/**
  * 날짜별 미배정 방 수(오늘부터 그달 끝까지) — 하루 보기 날짜 고르기 달력에 숫자로 표시. 월 보기 미배정 수와 같은 기준(퇴실 + 수기 추가 − 배정 − 미룸 · 처리 끝).
  * 지난날은 세지 않는다(월 보기도 지난날 경고를 빨갛게 그리지 않는다).
  */
@@ -596,11 +621,13 @@ export async function loadMonthOpenCounts(supabase: Client, organizationId: stri
   if (days.length === 0) return {};
   const from = days[0];
   const to = days.at(-1)!;
-  const [range, assignments, held] = await Promise.all([
+  const [range, assignments, heldKeys, finished] = await Promise.all([
     loadRangeRooms(supabase, organizationId, from, to),
     loadAssignments(supabase, organizationId, from, to),
     loadHeldRoomKeys(supabase, organizationId, from, to),
+    loadFinishedRoomKeys(supabase, organizationId, from, to),
   ]);
+  const held = new Set([...heldKeys, ...finished]);
   const assigned = new Set(assignments.map((row) => `${row.workDate}|${row.roomKey}`));
   const out: Record<string, number> = {};
   for (const date of days) {
@@ -686,7 +713,7 @@ export async function computeMonthSuggestions(
 ): Promise<{ suggestions: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }>; openTotal: number; shortDays: string[] }> {
   const days = monthDays(ym).filter((date) => date >= fromDate);
   if (days.length === 0) return { openTotal: 0, shortDays: [], suggestions: [] };
-  const [range, members, profiles, fixedTiers, settings, assignments, applications, roomSettings, held] = await Promise.all([
+  const [range, members, profiles, fixedTiers, settings, assignments, applications, roomSettings, heldKeys, finished] = await Promise.all([
     loadRangeRooms(supabase, organizationId, days[0], days.at(-1)!),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, ownerId),
@@ -696,7 +723,9 @@ export async function computeMonthSuggestions(
     loadApplications(supabase, organizationId, days[0], days.at(-1)!),
     supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId).eq("owner_id", ownerId),
     loadHeldRoomKeys(supabase, organizationId, days[0], days.at(-1)!),
+    loadFinishedRoomKeys(supabase, organizationId, days[0], days.at(-1)!),
   ]);
+  const held = new Set([...heldKeys, ...finished]);
   const usual = new Map((roomSettings.data ?? []).map((row) => [row.room_key, row.usual_headcount]));
   const memberById = new Map(members.map((m) => [m.userId, m]));
   // 이번 달 근무 일수(방 수가 아니라 날 수) — 앞날에 제안한 날도 더해 가며 센다(「근무 일수 적은 사람 먼저」).

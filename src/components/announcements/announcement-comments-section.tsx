@@ -142,6 +142,7 @@ export function AnnouncementCommentsSection({
           )}
         >
           <textarea
+            maxLength={2000}
             className={cn(
               "announcement-comment-input max-h-40 min-h-8 flex-1 resize-y appearance-none border-0 bg-transparent px-1 py-1 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-60",
               isAnnouncement &&
@@ -268,6 +269,7 @@ function AnnouncementCommentCard({
           <input name="commentId" type="hidden" value={comment.id} />
           <input name="returnTo" type="hidden" value={returnTo} />
           <textarea
+            maxLength={2000}
             className={cn(
               "min-h-24 w-full resize-y rounded-lg border border-border bg-surface/80 px-3 py-3 text-sm font-semibold text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15",
               isAnnouncement &&

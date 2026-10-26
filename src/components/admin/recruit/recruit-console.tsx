@@ -12,7 +12,7 @@ import {
   exportRecruitReport,
   exportRecruitWorkbook,
   setApplicationStatus,
-  type RecruitExportRow,
+  type RecruitExportRequest,
 } from "@/app/admin/recruit/actions";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import type {
@@ -64,6 +64,8 @@ type Props = {
   selectedId: string | null;
   /** 도쿄 오늘(YYYY-MM-DD) — 「새 지원」 표시. 서버가 정해 넘겨 하이드레이션이 갈리지 않게 한다. */
   todayKey: string;
+  /** 목록이 조회 상한에 닿았다 — 더 있을 수 있다. */
+  truncated?: boolean;
 };
 
 export function RecruitConsole({
@@ -76,6 +78,7 @@ export function RecruitConsole({
   filter,
   selectedId,
   todayKey,
+  truncated = false,
 }: Props) {
   const router = useRouter();
   const { toast, showToast, dismiss } = useAdminToast();
@@ -169,36 +172,15 @@ export function RecruitConsole({
     [rows, visibleRows, picked],
   );
 
-  const exportPayload = useMemo(
+  // 행 내용은 보내지 않는다 — id 만 넘기고 서버가 DB 에서 다시 읽어 만든다.
+  const exportPayload = useMemo<RecruitExportRequest>(
     () => ({
-      rows: exportRows.map<RecruitExportRow>((row) => ({
-        appliedAt: row.appliedAt ? row.appliedAt.slice(0, 10) : "—",
-        name: row.name,
-        age: row.age ?? "—",
-        gender: localizeRecruitGender(row.gender, copy.choice) ?? "—",
-        jobTitle: row.jobTitle ?? "—",
-        employmentType: localizeRecruitEmployment(row.employmentType, copy.choice) ?? "—",
-        daysPerWeek: localizeRecruitDaysPerWeek(row.daysPerWeek, copy.choice) ?? "—",
-        workDays: localizeRecruitWorkDays(row.workDays, copy.weekDays).join(" "),
-        startDate: localizeRecruitStartDate(row.startDate, copy.choice) ?? "—",
-        experience: row.hasIndustryExp ? copy.labelExperienceYes : copy.labelExperienceNo,
-        visa:
-          row.visaDaysLeft === null
-            ? "—"
-            : copy.chipVisaDays.replace("{n}", String(row.visaDaysLeft)),
-        resume: row.hasResume ? "O" : "—",
-        status: row.status,
-      })),
-      // 파일 제목에도 「선택분」임을 남긴다. 1건짜리 파일에 「전체 기간」이 찍혀 있으면 나중에
-      // 그 파일을 받은 사람이 전수로 오해한다.
-      rangeLabel:
-        picked.length > 0
-          ? copy.exportSelected.replace("{n}", String(picked.length))
-          : filter.from && filter.to
-            ? `${filter.from} ~ ${filter.to}`
-            : copy.exportRangeAll,
+      ids: exportRows.map((row) => row.id),
+      from: filter.from,
+      to: filter.to,
+      selected: picked.length > 0,
     }),
-    [exportRows, picked.length, filter.from, filter.to, copy],
+    [exportRows, picked.length, filter.from, filter.to],
   );
 
   const statusTabs: { key: JobApplicationStatus | "all"; label: string; count: number }[] = [
@@ -361,6 +343,12 @@ export function RecruitConsole({
           ) : null}
         </form>
       </div>
+
+      {truncated ? (
+        <p className="rcw-note" role="status">
+          {copy.listTruncated.replace("{n}", String(rows.length))}
+        </p>
+      ) : null}
 
       {picked.length > 0 ? (
         <div className="rcw-bulk" role="region" aria-label={copy.bulkSelected.replace("{n}", String(picked.length))}>

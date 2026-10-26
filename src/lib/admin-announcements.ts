@@ -153,6 +153,26 @@ export async function getAdminAnnouncements(
       organizations = (data ?? []) as OrganizationRow[];
     }
 
+    // 조직마다 이 사람의 권한(역할 기본 + 개인 부여 · 차단, 2026-10-21). 예전엔 역할만 봤다.
+    const capsByOrg = new Map<string, readonly string[]>(
+      isPlatformAdmin
+        ? []
+        : await Promise.all(
+            organizations.map(async (o) => [o.id, await memberCapabilities(o.id, me.id)] as const),
+          ),
+    );
+    // 관리자 웹 · 공지 권한이 있는 조직만(2026-10-26) — 여러 조직에 속한 사람이 권한 없는 조직의
+    // 공지 · 읽음 현황까지 보던 것을 막는다.
+    if (!isPlatformAdmin) {
+      organizations = organizations.filter((o) => {
+        const caps = capsByOrg.get(o.id) ?? [];
+        return (
+          caps.includes("admin_web.access") ||
+          caps.includes("announcement.create") ||
+          caps.includes("announcement.manage")
+        );
+      });
+    }
     const orgIds = organizations.map((organization) => organization.id);
     if (orgIds.length === 0) {
       return empty;
@@ -161,12 +181,6 @@ export async function getAdminAnnouncements(
 
     // Mirror of the server action's `canCreateInOrganization` gate, so the console can
     // hide the composer instead of letting the user hit a forbidden on submit.
-    // 조직마다 이 사람의 권한(역할 기본 + 개인 부여 · 차단, 2026-10-21). 예전엔 역할만 봤다.
-    const capsByOrg = new Map<string, readonly string[]>(
-      isPlatformAdmin
-        ? []
-        : await Promise.all(orgIds.map(async (org) => [org, await memberCapabilities(org, me.id)] as const)),
-    );
     const creatableOrganizationIds = isPlatformAdmin
       ? orgIds
       : orgIds.filter((org) => capsByOrg.get(org)?.includes("announcement.create") ?? false);
@@ -222,19 +236,33 @@ export async function getAdminAnnouncements(
 
     // 5. Read counts + popup dismissals (batched).
     const readCountById = new Map<string, number>();
+    // 현재 대상 구성원(활성 + 대상 역할)이 읽은 것만 센다(2026-10-26) — 읽고 나서 퇴사 · 역할 변경 ·
+    // 대상 축소가 된 사람이 «읽음» 분자에 남아 상세 화면(getAnnouncementReadSummary)과 어긋났다.
+    const memberRoleByOrgUser = new Map<string, OrganizationRole>();
+    for (const m of allMemberships) {
+      memberRoleByOrgUser.set(`${m.organization_id}:${m.user_id}`, m.role as OrganizationRole);
+    }
+    const rowById = new Map(rows.map((r) => [r.id, r]));
     const dismissCountById = new Map<string, number>();
     if (announcementIds.length > 0) {
       const [{ data: readData }, { data: dismissData }] = await Promise.all([
         service
           .from("announcement_reads")
-          .select("announcement_id")
+          .select("announcement_id, user_id")
           .in("announcement_id", announcementIds),
         service
           .from("announcement_popup_dismissals")
           .select("announcement_id")
           .in("announcement_id", announcementIds),
       ]);
-      for (const read of (readData ?? []) as { announcement_id: string }[]) {
+      for (const read of (readData ?? []) as { announcement_id: string; user_id: string }[]) {
+        const ann = rowById.get(read.announcement_id);
+        if (!ann) continue;
+        const role = memberRoleByOrgUser.get(`${ann.organization_id}:${read.user_id}`);
+        if (!role) continue;
+        if (ann.target_scope === "roles" && !((ann.target_roles ?? []) as string[]).includes(role)) {
+          continue;
+        }
         readCountById.set(
           read.announcement_id,
           (readCountById.get(read.announcement_id) ?? 0) + 1,

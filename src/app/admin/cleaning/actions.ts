@@ -318,10 +318,11 @@ export async function forceCompleteCleaningSession(
   if (!startIso || !endIso) {
     return { ok: false, reason: "invalid" };
   }
-  const durationSeconds = Math.max(
-    0,
-    Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 1000),
-  );
+  const durationSeconds = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 1000);
+  // 종료가 시작보다 늦지 않으면 소요 0초 완료 기록이 생긴다 — 서버에서 막는다.
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return { ok: false, reason: "invalid" };
+  }
 
   // Staff must be a real, active member of this org — never trust a client-supplied id blindly.
   const membership = await service

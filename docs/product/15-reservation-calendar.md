@@ -1356,3 +1356,9 @@ PostgREST 는 한 번에 1,000행까지만 주고 초과분은 **오류 없이 �
 - 문구: `mobile.calendarW.viewMap/viewList/viewAria/mapAria/mapSummary/mapEmptyN/mapFull/mapRoomsN/mapOpen/mapMore/mapReset/stationShinjuku/stationYotsuya` (ko/ja/en).
 - 코드: `src/components/calendar/building-picker.tsx`(+css) · `building-map/building-map.tsx`(+css) · 연결은 `mobile-calendar-view.tsx` 의 건물 없는 분기 한 곳.
 
+
+## 2026-10-26 — 인쇄 · 블락 · 내부 메모 수정
+
+- 인쇄 캘린더(`/admin/calendar/print`)도 방 차단(블락)을 그린다 — 화면과 같이 양끝 포함 밤, 끝에 하루를 더해 예약 막대와 눈금을 맞춘다. 운영 창 밖 달은 기존대로 안내 문구만 인쇄한다.
+- 블락 → 행 매칭은 예약과 같은 해석기(`resolveReservationCanonicalRoomLabel`)를 쓰고, 맞는 행이 없는 블락은 `console.warn` 으로 남긴다.
+- 예약 내부 메모: 최대 2000자, 이 조직의 예약인지 서버에서 확인, 오류는 코드(`note_too_long` · `reservation_not_found` · `save_failed` · `invalid_note`)만 돌려준다.

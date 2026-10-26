@@ -287,12 +287,60 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
 
   // 받는 곳: **새 것을 먼저 넣고(upsert) 빠진 것만 지운다.** 예전처럼 다 지우고 넣으면 넣기가 실패했을 때 받는 곳이 통째로
   // 사라져 다음 발송이 「받는 곳 없음」으로 건너뛴다.
+  //
+  // 여기서 실패하면 **앞에서 바꾼 설정 줄과 받는 곳을 저장 전으로 되돌린다**(2026-10-26). 전에는 설정(시각 · 요일)만 바뀌고
+  // 받는 곳은 옛것인 반쯤 저장된 상태가 남았는데, 화면은 「저장 실패」라 사람은 아무것도 안 바뀐 줄 알았다.
+  const restore = async (step: string) => {
+    console.error("[automation] save job failed — restoring", { jobKey, step });
+    const jobRestored = current.stored
+      ? await supabase
+          .from("automation_jobs")
+          .update({
+            next_wake_at: current.nextWakeAt,
+            retry_until: current.retryUntil,
+            send_time: current.sendTime,
+            settings: current.settings as unknown as Json,
+            updated_at: current.updatedAt ?? now.toISOString(),
+            weekdays: current.weekdays,
+          })
+          .eq("organization_id", organizationId)
+          .eq("job_key", jobKey)
+      : await supabase.from("automation_jobs").delete().eq("organization_id", organizationId).eq("job_key", jobKey);
+    const previous = currentDestinations[jobKey];
+    const destRestored =
+      previous.length > 0
+        ? await supabase.from("automation_destinations").upsert(
+            previous.map((item) => ({ channel_key: item.channelKey, job_key: jobKey, locales: item.locales, organization_id: organizationId })),
+            { onConflict: "organization_id,job_key,channel_key" },
+          )
+        : { error: null };
+    const added = destinations.map((item) => item.channelKey).filter((key) => !previous.some((item) => item.channelKey === key));
+    const addedRemoved =
+      added.length > 0
+        ? await supabase
+            .from("automation_destinations")
+            .delete()
+            .eq("organization_id", organizationId)
+            .eq("job_key", jobKey)
+            .in("channel_key", added)
+        : { error: null };
+    if (jobRestored.error || destRestored.error || addedRemoved.error) {
+      console.error("[automation] restore after failed save also failed", {
+        dest: destRestored.error?.code ?? addedRemoved.error?.code ?? null,
+        job: jobRestored.error?.code ?? null,
+        jobKey,
+      });
+    }
+  };
   if (destinations.length > 0) {
     const upserted = await supabase.from("automation_destinations").upsert(
       destinations.map((item) => ({ channel_key: item.channelKey, job_key: jobKey, locales: item.locales, organization_id: organizationId })),
       { onConflict: "organization_id,job_key,channel_key" },
     );
-    if (upserted.error) return { error: "save_failed", ok: false };
+    if (upserted.error) {
+      await restore("destinations_upsert");
+      return { error: "save_failed", ok: false };
+    }
   }
   const dropped = currentDestinations[jobKey]
     .map((item) => item.channelKey)
@@ -304,7 +352,10 @@ export async function saveAutomationJob(input: SaveJobInput): Promise<{ ok: true
       .eq("organization_id", organizationId)
       .eq("job_key", jobKey)
       .in("channel_key", dropped);
-    if (removed.error) return { error: "save_failed", ok: false };
+    if (removed.error) {
+      await restore("destinations_delete");
+      return { error: "save_failed", ok: false };
+    }
   }
 
   await writeLog(
@@ -341,25 +392,41 @@ export async function setAutomationEnabled(jobKey: string, enabled: boolean): Pr
           now,
         )
       : null;
-  const result = await supabase.from("automation_jobs").upsert(
-    {
-      enabled,
-      // 이벤트형은 켠 순간부터 본다 — 켜기 전에 바뀐 예약으로 알림이 몰려 가지 않게.
-      ...(AUTOMATION_JOB_KIND[jobKey] === "event" && enabled ? { event_cursor: now.toISOString() } : {}),
-      // 꺼짐 → 켜짐일 때만 켠 시각을 새로 적는다 — 취소 · 당일예약 알림은 이 뒤에 생긴 일만 보낸다.
-      ...(enabled && !current.enabled ? { enabled_at: now.toISOString() } : {}),
+  // **켜짐 관련 칸만** 고친다(2026-10-26). 전에는 위에서 읽은 줄 전체(보낼 시각 · 요일 · 설정)를 다시 써서, 그 사이 다른
+  // 사람이 저장한 설정을 옛 값으로 덮었다. 줄이 아직 없을 때만(처음 켜기) 기본값으로 새로 넣는다.
+  const toggled = {
+    enabled,
+    // 이벤트형은 켠 순간부터 본다 — 켜기 전에 바뀐 예약으로 알림이 몰려 가지 않게.
+    ...(AUTOMATION_JOB_KIND[jobKey] === "event" && enabled ? { event_cursor: now.toISOString() } : {}),
+    // 꺼짐 → 켜짐일 때만 켠 시각을 새로 적는다 — 취소 · 당일예약 알림은 이 뒤에 생긴 일만 보낸다.
+    ...(enabled && !current.enabled ? { enabled_at: now.toISOString() } : {}),
+    next_wake_at: nextWake?.toISOString() ?? null,
+    updated_at: now.toISOString(),
+    updated_by: session.user.id,
+  };
+  let result: { error: { code?: string } | null } = await supabase
+    .from("automation_jobs")
+    .update(toggled)
+    .eq("organization_id", organizationId)
+    .eq("job_key", jobKey)
+    .select("job_key");
+  const updatedRows = (result as { data?: unknown[] | null }).data ?? [];
+  if (!result.error && updatedRows.length === 0) {
+    const inserted = await supabase.from("automation_jobs").insert({
+      ...toggled,
       job_key: jobKey,
-      next_wake_at: nextWake?.toISOString() ?? null,
       organization_id: organizationId,
       retry_until: current.retryUntil,
       send_time: current.sendTime,
       settings: current.settings as unknown as Json,
-      updated_at: now.toISOString(),
-      updated_by: session.user.id,
       weekdays: current.weekdays,
-    },
-    { onConflict: "organization_id,job_key" },
-  );
+    });
+    // 그 사이 다른 요청이 줄을 만들었으면(23505) 켜짐 칸만 다시 고친다.
+    result =
+      inserted.error?.code === "23505"
+        ? await supabase.from("automation_jobs").update(toggled).eq("organization_id", organizationId).eq("job_key", jobKey)
+        : inserted;
+  }
   if (result.error) {
     console.error("[automation] toggle failed", { code: result.error.code });
     return { error: "save_failed", ok: false };

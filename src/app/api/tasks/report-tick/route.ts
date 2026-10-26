@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { canSendDailyReport, logDailyReportSent, postDailyReportToSlack } from "@/lib/daily-report-slack";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { safeEqualSecret } from "@/lib/api-secret";
 
 /**
  * 업무일지 예약 보내기 틱(2026-10-20).
@@ -25,7 +26,7 @@ async function authorize(request: NextRequest, supabase: ReturnType<typeof getSu
   const provided = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   if (!provided) return false;
   const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret && provided === cronSecret) return true;
+  if (cronSecret && safeEqualSecret(provided, cronSecret)) return true;
   const checked = await supabase.rpc("task_report_tick_token_ok", { p_token: provided });
   if (checked.error) {
     console.error("[report-tick] token check failed", { code: checked.error.code });

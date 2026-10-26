@@ -101,6 +101,8 @@ async function getAnnouncementComment(commentId: string) {
   return data as AnnouncementCommentRow | null;
 }
 
+const MAX_COMMENT_LENGTH = 2000;
+
 async function getMembership(
   userId: string,
   organizationId: string,
@@ -147,7 +149,8 @@ export async function createAnnouncementComment(formData: FormData) {
   const announcementId = String(formData.get("announcementId") ?? "");
   const content = String(formData.get("content") ?? "").trim();
 
-  if (!announcementId || !content) {
+  // 댓글은 2000자까지(2026-10-26, 서버 상한) — 넘으면 「내용을 확인하세요」 오류.
+  if (!announcementId || !content || content.length > MAX_COMMENT_LENGTH) {
     redirectWithQuery(returnTo, "error=comment_invalid");
   }
 
@@ -207,7 +210,7 @@ export async function updateAnnouncementComment(formData: FormData) {
   const commentId = String(formData.get("commentId") ?? "");
   const content = String(formData.get("content") ?? "").trim();
 
-  if (!commentId || !content) {
+  if (!commentId || !content || content.length > MAX_COMMENT_LENGTH) {
     redirectWithQuery(returnTo, "error=comment_invalid");
   }
 

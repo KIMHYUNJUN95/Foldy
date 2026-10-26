@@ -81,7 +81,7 @@ export type AttendanceScanSuccess = {
 
 export type AttendanceScanFailure = {
   ok: false;
-  reason: "gps" | "radius" | "qr" | "open_session" | "no_session" | "open_break" | "stale_session" | "error";
+  reason: "gps" | "radius" | "qr" | "open_session" | "no_session" | "open_break" | "stale_session" | "month_finalized" | "error";
   siteName?: string;
   distanceMeters?: number;
   radiusMeters?: number;
@@ -275,6 +275,25 @@ export async function submitAttendanceScan(
     if (openBreakRes.data) {
       await logAttempt({ success: false, failureReason: "open_break_blocks_clock_out", resolvedSiteId: site.id });
       return { ok: false, reason: "open_break", siteName: localizedSiteName(site, locale) };
+    }
+  }
+
+  // 3-1) 마감된 달에는 打刻하지 않는다(2026-10-26). 마감 스냅숏이 급여 금액으로 굳어 있어서, 그 달에 근무가
+  // 더 생기면 마감 금액과 기록이 어긋난다. 관리자가 마감을 풀어야 기록할 수 있다.
+  // 출근만 막는다 — 이미 시작한 근무의 퇴근까지 막으면 그 근무가 다음 날 abandoned 로 남아 정정만 늘어난다.
+  if (input.mode === "in") {
+    const ym = tokyoDate(new Date().toISOString()).slice(0, 7);
+    const finalized = await service
+      .from("attendance_month_snapshots")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("target_month", `${ym}-01`)
+      .eq("status", "finalized")
+      .limit(1);
+    if ((finalized.data ?? []).length > 0) {
+      await logAttempt({ success: false, failureReason: null, resolvedSiteId: site.id });
+      return { ok: false, reason: "month_finalized", siteName: localizedSiteName(site, locale) };
     }
   }
 

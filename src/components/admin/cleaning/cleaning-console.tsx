@@ -6,7 +6,7 @@
 // reservations, via src/lib/admin-cleaning.ts) as of 2026-07-14 — see docs/product/07-cleaning-workflow.md
 // → "2026-07-14 어드민 청소 대시보드 — 백엔드 연동". Mirrors clean-views.js shell()/opsbar()/viewtabs()
 // from the original design handoff.
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Info } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
@@ -104,6 +104,8 @@ export function CleaningConsole({
   const [historySessionStatus, setHistorySessionStatus] = useState<HistorySessionStatusFilter>("all");
   const [historyCompletion, setHistoryCompletion] = useState<HistoryCompletionFilter>("all");
   const [isHistoryPending, startHistoryFetch] = useTransition();
+  // 기간을 빨리 바꿔 요청이 겹치면 늦게 온 옛 응답이 새 기간 위에 덮이지 않게 — 마지막 요청만 반영한다.
+  const historyRequestSeq = useRef(0);
   const [isForcePending, startForceComplete] = useTransition();
 
   const [lastSyncAt, setLastSyncAt] = useState(() => Date.now());
@@ -183,8 +185,14 @@ export function CleaningConsole({
   function handleHistoryRangeChange(from: string, to: string) {
     setHistoryFrom(from);
     setHistoryTo(to);
+    reloadHistory(from, to);
+  }
+
+  function reloadHistory(from: string, to: string) {
+    const seq = ++historyRequestSeq.current;
     startHistoryFetch(async () => {
       const res = await fetchAdminCleaningHistory(from, to);
+      if (seq !== historyRequestSeq.current) return;
       if (res.ok) {
         setHistory(res.items);
       } else {
@@ -200,6 +208,8 @@ export function CleaningConsole({
       if (res.ok) {
         showToast(`${t.tDone} · ${roomLabel}`);
         setModalTask(null);
+        // 기록 탭이 낡은 채로 남지 않게 지금 보는 기간을 다시 읽는다.
+        reloadHistory(historyFrom, historyTo);
       } else {
         showToast(t.tDoneFailed);
       }

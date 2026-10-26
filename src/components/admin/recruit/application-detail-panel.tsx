@@ -157,7 +157,7 @@ export function ApplicationDetailPanel({ application: a, history, resumeUrl, cop
                 {history.map((row) => (
                   <li key={row.id}>
                     <span className="rcw-hist__h">
-                      <b className="num">{row.appliedAt?.slice(0, 10).replaceAll("-", ".") ?? "—"}</b>
+                      <b className="num">{tokyoDateOf(row.appliedAt)?.replaceAll("-", ".") ?? "—"}</b>
                       <span>{join([row.jobTitle, row.employmentType])}</span>
                       <em>{copy.historyStoppedAt.replace("{status}", copy.status[row.status])}</em>
                     </span>

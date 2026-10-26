@@ -33,6 +33,7 @@ import { replaceLinenRecordLines } from "@/lib/linen-return-lines";
 import { revalidateLinenReturnPaths } from "@/lib/linen-returns";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { hasOrganizationContext, type AppSession } from "@/lib/session";
+import { isOwnStoragePublicUrl } from "@/lib/storage-url-guard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
@@ -151,8 +152,15 @@ export async function updateAdminLinenRecord(input: {
   const building = input.buildingName.trim();
   if (!(await isKnownBuilding(session, building))) return { ok: false, reason: "invalid_building" };
 
-  const photos = (input.photos ?? []).filter((url) => typeof url === "string" && url.length > 0);
+  const photos = [...new Set((Array.isArray(input.photos) ? input.photos : []).filter((url): url is string => typeof url === "string" && url.length > 0))];
   if (photos.length > MAX_PHOTOS) return { ok: false, reason: "too_many_photos" };
+  // 새로 붙은 사진 주소는 업로더가 쓰는 우리 저장소 `{조직}/linen-returns/{기록 id}/` 아래 파일만 받는다.
+  // 이미 저장돼 있던 주소(모바일 등록 때의 다른 폴더 포함)는 그대로 둔다.
+  const keptUrls = new Set(record.image_urls ?? []);
+  const photoPrefix = `${session.organization.id}/linen-returns/${record.id}/`;
+  if (!photos.every((url) => keptUrls.has(url) || isOwnStoragePublicUrl(url, "request-images", photoPrefix))) {
+    return { ok: false, reason: "error" };
+  }
 
   const supabase = await getSupabaseServerClient();
 

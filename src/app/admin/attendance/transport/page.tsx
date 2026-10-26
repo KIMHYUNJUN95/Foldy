@@ -9,6 +9,7 @@ import {
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { isValidYm } from "@/lib/attendance-clock";
 
 // Admin · Attendance · Transport (Slice 5).
 // Monthly per-user transport reimbursement review wired to
@@ -29,7 +30,7 @@ export default async function AdminAttendanceTransportPage({
   const c = dictionary.admin.attendanceConsole;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const requestedYm =
-    typeof params.ym === "string" && /^\d{4}-\d{2}$/.test(params.ym)
+    isValidYm(params.ym)
       ? params.ym
       : currentTokyoYm();
 

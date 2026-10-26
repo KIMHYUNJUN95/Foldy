@@ -15,6 +15,7 @@ import { PrepSteps, type PrepStage } from "@/components/admin/attendance/payroll
 import { getPayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { payrollPrepAvailable } from "@/lib/payroll-prep";
 import { getPayrollPrep } from "@/lib/payroll-prep-server";
+import { isValidYm } from "@/lib/attendance-clock";
 
 // Admin · Attendance · Payroll (Slice 4).
 // Monthly per-user payroll review wired to existing `getMonthlyPayView` +
@@ -35,7 +36,7 @@ export default async function AdminAttendancePayrollPage({
   const c = dictionary.admin.attendanceConsole;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const requestedYm =
-    typeof params.ym === "string" && /^\d{4}-\d{2}$/.test(params.ym)
+    isValidYm(params.ym)
       ? params.ym
       : currentTokyoYm();
 

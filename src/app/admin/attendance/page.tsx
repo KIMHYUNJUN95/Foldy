@@ -5,6 +5,7 @@ import { currentTokyoYm, getAdminAttendanceOverview } from "@/lib/admin-attendan
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
+import { isValidYm } from "@/lib/attendance-clock";
 
 // Admin · Attendance Overview (Slice 1).
 // Shell sub-tab bar + KPI bar + review/correction cards + payroll/transport summary.
@@ -25,7 +26,7 @@ export default async function AdminAttendanceOverviewPage({
   const c = dictionary.admin.attendanceConsole;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const requestedYm =
-    typeof params.ym === "string" && /^\d{4}-\d{2}$/.test(params.ym)
+    isValidYm(params.ym)
       ? params.ym
       : currentTokyoYm();
   const data = await getAdminAttendanceOverview(session, localeTag, requestedYm);

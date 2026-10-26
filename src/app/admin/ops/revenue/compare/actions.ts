@@ -2,6 +2,7 @@
 
 import { requireAdminSession } from "@/lib/admin-session";
 import { buildAdminExportMeta, type AdminExportMeta } from "@/lib/admin-export-meta";
+import { tokyoToday } from "@/lib/tokyo-date";
 import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/admin-export-result";
 import { buildAdminTableReportHtml } from "@/lib/admin-table-report";
 import { buildAdminTableWorkbookBase64, type AdminTableSheet } from "@/lib/admin-table-workbook";
@@ -119,7 +120,7 @@ export async function exportOpsCompareWorkbook(payload: OpsCompareExportPayload)
   try {
     const meta = buildAdminExportMeta(session);
     const base64 = await buildAdminTableWorkbookBase64({ generatedLabel: meta.generatedLabel, orgName: meta.orgName, sheets: sheetsOf(payload, meta) });
-    return { base64, filename: `revenue_compare_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`, ok: true, rowCount: payload.rows.length };
+    return { base64, filename: `revenue_compare_${tokyoToday().replace(/-/g, "")}.xlsx`, ok: true, rowCount: payload.rows.length };
   } catch {
     return { ok: false, reason: "error" };
   }

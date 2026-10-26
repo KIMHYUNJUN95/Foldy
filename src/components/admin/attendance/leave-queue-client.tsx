@@ -174,6 +174,8 @@ function errLabel(reason: string | undefined, lc: Lc): string {
     case "not_requested":
     case "not_approved":
       return lc.errNotRequested;
+    case "overlap":
+      return lc.errOverlap;
     case "reject_failed":
       return lc.errRejectFailed;
     case "cancel_failed":

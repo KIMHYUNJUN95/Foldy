@@ -12,6 +12,7 @@ import {
   exportLeaveLedgerWorkbook,
 } from "@/app/admin/attendance/leave/actions";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
+import { filterLeaveLedger, leaveLedgerProcessedKey, type LeaveLedgerFilter } from "@/lib/annual-leave";
 
 type Lc = Dictionary["admin"]["leaveConsole"];
 
@@ -76,9 +77,7 @@ function fmtPeriod(e: LeaveLedgerEntry, lc: Lc): string {
 const STATUS_ORDER: LeaveStatus[] = ["approved", "requested", "rejected", "cancelled"];
 
 /** `processedAt` is Tokyo "YYYY/MM/DD HH:mm" — reduce it to the "YYYY-MM-DD" key the picker speaks. */
-function processedDateKey(entry: LeaveLedgerEntry): string {
-  return entry.processedAt.slice(0, 10).replace(/\//g, "-");
-}
+const processedDateKey = leaveLedgerProcessedKey;
 
 function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
@@ -109,19 +108,12 @@ export function LeaveLedgerView({
     return { from: keys[0] ?? today, to: today };
   });
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return entries.filter((e) => {
-      if (statusFilter && e.status !== statusFilter) return false;
-      const key = processedDateKey(e);
-      if (key && (key < range.from || key > range.to)) return false;
-      if (q) {
-        const hay = `${e.applicantName} ${e.reason} ${e.documentNumber ?? ""} ${e.processorName ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [entries, statusFilter, query, range]);
+  // 화면과 내보내기가 같은 조건 · 같은 규칙 — 내보내기는 이 조건만 보내고 서버가 이력을 다시 읽는다(2026-10-26).
+  const filter = useMemo<LeaveLedgerFilter>(
+    () => ({ status: statusFilter, query, from: range.from, to: range.to }),
+    [statusFilter, query, range],
+  );
+  const filtered = useMemo(() => filterLeaveLedger(entries, filter), [entries, filter]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -185,8 +177,8 @@ export function LeaveLedgerView({
           />
         </div>
         <AdminExportButtons
-          onExportXls={() => exportLeaveLedgerWorkbook(filtered)}
-          onExportPdf={() => exportLeaveLedgerReport(filtered)}
+          onExportXls={() => exportLeaveLedgerWorkbook(filter)}
+          onExportPdf={() => exportLeaveLedgerReport(filter)}
           disabled={filtered.length === 0}
           onToast={onToast}
           labels={shared}

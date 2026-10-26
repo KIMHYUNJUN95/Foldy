@@ -83,6 +83,8 @@ export type PanelCopy = OpsWriteOutcomeCopy & SpwCopy & {
   errBadMinStay: string;
   errNoWritableRoom: string;
   errInvalidValues: string;
+  errPastDate: string;
+  errTooManyCells: string;
   errEnqueueFailed: string;
   warnZero: string;
   warnDrop: string;
@@ -354,6 +356,10 @@ function errorText(copy: PanelCopy, code: PriceChangeError): string {
       return copy.errNoWritableRoom;
     case "invalid_values":
       return copy.errInvalidValues;
+    case "past_date":
+      return copy.errPastDate;
+    case "too_many_cells":
+      return copy.errTooManyCells;
     default:
       return copy.errEnqueueFailed;
   }

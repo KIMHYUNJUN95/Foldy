@@ -965,3 +965,8 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 보기는 누구나. 컴플레인 등록 · 리뷰를 컴플레인으로 가져오기(`complaint.write`), 해결 · 다시 열기 · 남의 것 관리(`complaint.manage`), 댓글(`complaint.comment`)은
 역할 기본으로 대표 · 전무 · CS 관리자만(개발자는 늘 가능). 다른 사람은 대표 · 전무 · 개발자가 사용자 화면에서 사람마다 켠다.
 상세 `docs/product/27-permission-override-workflow.md` 「게스트 피드백 = CS 관리자」.
+
+## 2026-10-26 이미지 업로드 가드
+
+- 컴플레인 이미지 업로드는 `complaint.write`, 코멘트 이미지는 `complaint.comment` 권한이 있어야 한다(서버 `lib/complaints.ts`).
+- 허용 형식은 JPEG · PNG · WebP · HEIC/HEIF 만(SVG 불가). 저장 확장자는 파일명이 아니라 MIME 에서 정한다.

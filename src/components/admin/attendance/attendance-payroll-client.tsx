@@ -441,6 +441,8 @@ function PayrollPanel({
         setErr(c.payActionBlocked);
       } else if (res.reason === "not_hourly") {
         setErr(c.payActionNotHourly);
+      } else if (res.reason === "not_ended") {
+        setErr(c.payActionNotEnded);
       } else {
         setErr(c.actionFailed);
       }

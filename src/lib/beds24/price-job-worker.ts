@@ -270,13 +270,53 @@ async function claimNextJob(supabase: Client, organizationId?: string): Promise<
   return row;
 }
 
-/** 같은 건물·같은 종류의 `queued` 작업을 2분 창 안에서 흡수한다. */
+/** 합치기 판단에 쓰는 작업 칸. */
+export type CoalesceCandidate = {
+  created_at: string;
+  requested_by: string | null;
+  adjust_mode: string | null;
+  percent_value: number | null;
+};
+
+/**
+ * 형제 작업을 이 작업에 **합쳐도 되는가**(2026-10-26).
+ *
+ * 같은 건물 · 같은 종류(쿼리가 거른다)에 더해 **같은 사람 · 같은 방식(금액 / 퍼센트 / 최소숙박 / 되돌리기) · 같은 퍼센트**여야 한다.
+ * 전에는 건물 · 종류 · 2분 창만 봐서, 다른 사람의 작업이 흡수되면 그 칸의 변경 이력이 **첫 작업을 누른 사람 · 방식**으로 남고,
+ * 그 사람의 「되돌리기」(`revertPriceJob` — 자기 작업 번호)는 칸 이력이 없어 아무것도 못 했다.
+ */
+export function isMergeableSibling(primary: CoalesceCandidate, sibling: CoalesceCandidate): boolean {
+  return (
+    isWithinCoalesceWindow(primary.created_at, sibling.created_at) &&
+    (primary.requested_by ?? null) === (sibling.requested_by ?? null) &&
+    (primary.adjust_mode ?? null) === (sibling.adjust_mode ?? null) &&
+    (primary.percent_value ?? null) === (sibling.percent_value ?? null)
+  );
+}
+
+/**
+ * 합친 결과에서 `(유닛, 날짜)` 칸마다 **값을 낸 작업**(2026-10-26) — 합치기는 날짜 단위로 늦은 작업이 이긴다
+ * (`mergePriceJobRoomUpdates`). 변경 이력의 `job_id` 를 이 작업으로 적어야, 흡수된 작업의 「되돌리기」가 자기 칸을 찾는다.
+ */
+export function cellOwnerJobIds(jobs: readonly MergeableJob[]): Map<string, string> {
+  const owner = new Map<string, string>();
+  for (const job of [...jobs].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    for (const update of job.roomUpdates) {
+      for (const date of Object.keys(update.dates ?? {})) owner.set(`${String(update.externalRoomId)}|${date}`, job.id);
+    }
+  }
+  return owner;
+}
+
+/** 같은 건물 · 같은 종류 · **같은 사람 · 같은 방식**의 `queued` 작업을 2분 창 안에서 흡수한다(`isMergeableSibling`). */
 async function absorbSiblingJobs(
   supabase: Client,
   job: JobRow,
 ): Promise<{
   roomUpdates: PriceJobRoomUpdate[];
   coalescedJobIds: string[];
+  /** `${externalRoomId}|${date}` → 그 칸의 값을 낸 작업(`cellOwnerJobIds`). 변경 이력의 `job_id`. */
+  ownerByCell: Map<string, string>;
   /** 이어 돌기 판단용(`planPriceJobResume`) — 이 작업과 흡수한 작업 각각의 객실·지난 결과. */
   sources: Array<{ roomUpdates: PriceJobRoomUpdate[]; results: unknown }>;
 }> {
@@ -287,6 +327,7 @@ async function absorbSiblingJobs(
   };
   const alone = {
     coalescedJobIds: [],
+    ownerByCell: cellOwnerJobIds([primary]),
     roomUpdates: primary.roomUpdates,
     sources: [{ results: job.results, roomUpdates: primary.roomUpdates }],
   };
@@ -294,7 +335,7 @@ async function absorbSiblingJobs(
 
   const siblings = await supabase
     .from("beds24_price_jobs")
-    .select("id, created_at, room_updates, results")
+    .select("id, created_at, room_updates, results, requested_by, adjust_mode, percent_value")
     .eq("status", "queued")
     .eq("organization_id", job.organization_id)
     .eq("property_id", job.property_id)
@@ -302,12 +343,13 @@ async function absorbSiblingJobs(
     .neq("id", job.id);
   if (siblings.error) return alone;
 
-  const inWindow = ((siblings.data ?? []) as Array<{
-    id: string;
-    created_at: string;
-    room_updates: unknown;
-    results: unknown;
-  }>).filter((row) => isWithinCoalesceWindow(job.created_at, row.created_at));
+  const inWindow = ((siblings.data ?? []) as Array<
+    CoalesceCandidate & {
+      id: string;
+      room_updates: unknown;
+      results: unknown;
+    }
+  >).filter((row) => isMergeableSibling(job, row));
   if (inWindow.length === 0) return alone;
 
   // 흡수한다고 표시해 둔다 — 다른 워커가 같은 것을 또 집지 않게.
@@ -337,6 +379,7 @@ async function absorbSiblingJobs(
   }
   return {
     coalescedJobIds,
+    ownerByCell: cellOwnerJobIds([primary, ...absorbed]),
     roomUpdates: merged,
     sources: [
       ...alone.sources,
@@ -565,7 +608,7 @@ export async function runNextPriceJob(
       roomIdByExternal.set(String(row.external_room_id), row.id);
     }
 
-    const { coalescedJobIds, roomUpdates, sources } = await absorbSiblingJobs(supabase, job);
+    const { coalescedJobIds, ownerByCell, roomUpdates, sources } = await absorbSiblingJobs(supabase, job);
     const jobIds = [job.id, ...coalescedJobIds];
     const { carried, skip } = planPriceJobResume(sources);
     const results: PriceJobRoomResult[] = [];
@@ -724,6 +767,7 @@ export async function runNextPriceJob(
             dates: updateByRoomId.get(externalRoomId)?.dates ?? {},
             externalRoomId,
             job,
+            ownerByCell,
             roomIdByExternal,
             roomLabel: updateByRoomId.get(externalRoomId)?.roomLabel ?? null,
             supabase,
@@ -870,6 +914,8 @@ async function writeChangeLogs(args: {
   dates: Record<string, CalendarDateValues>;
   externalRoomId: string;
   job: JobRow;
+  /** 칸마다 값을 낸 작업(흡수한 형제 포함) — 없으면 이 작업. */
+  ownerByCell?: Map<string, string>;
   roomIdByExternal: Map<string, string>;
   roomLabel: string | null;
   supabase: Client;
@@ -884,7 +930,7 @@ async function writeChangeLogs(args: {
       changed_by: args.job.requested_by,
       changed_by_name: args.job.requested_by_name,
       external_room_id: args.externalRoomId,
-      job_id: args.job.id,
+      job_id: args.ownerByCell?.get(`${args.externalRoomId}|${stayDate}`) ?? args.job.id,
       organization_id: args.job.organization_id,
       percent_value: args.job.percent_value,
       room_id: roomId,

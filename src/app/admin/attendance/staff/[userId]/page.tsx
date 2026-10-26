@@ -11,6 +11,7 @@ import { getDictionary } from "@/lib/i18n";
 import { loadWeeklyLimitChips, monthWeeklyRange } from "@/lib/staff-documents/weekly-limit-server";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { loadExpiredResidenceCardUserIds } from "@/lib/staff-documents/server";
+import { isValidYm } from "@/lib/attendance-clock";
 
 // Admin · Attendance · Staff Detail (Slice 6).
 // Per-user monthly detail page wired to `getAdminStaffDetail` — header KPIs,
@@ -33,7 +34,7 @@ export default async function AdminAttendanceStaffPage({
   const c = dictionary.admin.attendanceConsole;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const requestedYm =
-    typeof q.ym === "string" && /^\d{4}-\d{2}$/.test(q.ym) ? q.ym : currentTokyoYm();
+    isValidYm(q.ym) ? q.ym : currentTokyoYm();
 
   // 「주 28시간」(docs/product/41 R4) — `staff_documents.view` 가 있을 때만, 이 조직 서류로만 읽는다.
   const [badgeStats, detail, weeklyLimit, expiredCardUserIds] = await Promise.all([

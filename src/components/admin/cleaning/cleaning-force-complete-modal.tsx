@@ -65,6 +65,7 @@ export function CleaningForceCompleteModal({
   const [note, setNote] = useState(task.note ?? "");
 
   const durMin = toMin(end) != null && toMin(start) != null ? (toMin(end) as number) - (toMin(start) as number) : null;
+  const durInvalid = durMin != null && durMin <= 0;
   const durText = durMin != null && durMin > 0 ? fmtDur(durMin) : "—";
 
   const staffOptions = [...staffDirectory.values()].sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -131,6 +132,7 @@ export function CleaningForceCompleteModal({
           <div className="mdur">
             <Clock className="ic" aria-hidden="true" />
             {t.mDurLabel} · <b>{durText}</b>
+            {durInvalid ? <span role="alert" style={{ marginLeft: 8, color: "#c4364b" }}>{t.mDurInvalid}</span> : null}
           </div>
 
           <div className="fld">
@@ -150,7 +152,7 @@ export function CleaningForceCompleteModal({
             <button
               type="button"
               className="btn btn--pri"
-              disabled={!staffId || pending}
+              disabled={!staffId || pending || durMin == null || durMin <= 0}
               onClick={() =>
                 onConfirm({
                   sessionId: task.sessionId,

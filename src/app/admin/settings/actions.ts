@@ -3,12 +3,16 @@
 import { redirect } from "next/navigation";
 import type { Role } from "@/config/roles";
 import { createInviteCodeAs, deleteInviteCodeAs, setInviteCodeActiveAs } from "@/lib/invite-codes-server";
+import { getCurrentAppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 
 type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
 type MembershipInsert = Database["public"]["Tables"]["memberships"]["Insert"];
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function normalizeSlug(value: string) {
   return value
@@ -27,31 +31,12 @@ async function getCurrentUserId() {
   return user?.id ?? null;
 }
 
+// 역할은 세션의 역할(현재 조직 기준, 플랫폼 관리자는 developer_super_admin)을 쓴다(2026-10-26).
+// 예전엔 «아무 조직의 첫 멤버십» 역할을 읽어, 여러 조직 소속이면 어느 조직 역할인지 불분명했다.
 async function getCurrentRole(userId: string): Promise<Role | null> {
-  const service = getSupabaseServiceClient();
-
-  const { data: platformAdminResult } = await service
-    .from("platform_admins")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  const platformAdmin = platformAdminResult as { role: Role } | null;
-  if (platformAdmin) {
-    return platformAdmin.role;
-  }
-
-  const { data: membershipResult } = await service
-    .from("memberships")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-
-  const membership = membershipResult as { role: Role } | null;
-  return membership?.role ?? null;
+  const session = await getCurrentAppSession();
+  if (!session || session.user.id !== userId) return null;
+  return session.user.role as Role;
 }
 
 export async function createOrganization(formData: FormData) {
@@ -121,7 +106,7 @@ export async function updateOrganization(formData: FormData) {
 
   const organizationId = String(formData.get("organizationId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!organizationId || !name) {
+  if (!organizationId || !UUID_RE.test(organizationId) || !name) {
     redirect("/admin/settings/organization?error=invalid_organization");
   }
 
@@ -150,7 +135,7 @@ export async function deleteOrganization(formData: FormData) {
   }
 
   const organizationId = String(formData.get("organizationId") ?? "");
-  if (!organizationId) {
+  if (!organizationId || !UUID_RE.test(organizationId)) {
     redirect("/admin/settings/organization?error=invalid_organization");
   }
 

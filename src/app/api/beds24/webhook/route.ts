@@ -9,6 +9,7 @@ import {
 } from "@/lib/beds24/webhook-events";
 import { forwardBeds24Delivery, parseForwardTargets } from "@/lib/beds24/webhook-forward";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 /**
  * 가격 웹훅이 건물 다시 읽기(「창이 끝나면 한 번 더」면 최대 20초 대기 + 건물 하나 동기화)를 응답
@@ -75,12 +76,23 @@ function schedulePriceDeferred<T extends object>(result: T) {
   return rest;
 }
 
-function resolveWebhookSecret(request: NextRequest) {
-  const fromHeader = request.headers.get("x-beds24-webhook-secret");
-  const fromBearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const fromQuery = request.nextUrl.searchParams.get("secret");
+/** 거절 · 미분류 배달 원문 저장 상한(글자). 넘으면 앞부분 표본과 길이만 남긴다(2026-10-26). */
+const MAX_STORED_REJECTED_BODY_CHARS = 20_000;
+const REJECTED_BODY_SAMPLE_CHARS = 4_000;
 
-  return fromHeader ?? fromBearer ?? fromQuery;
+function capRejectedBody(body: unknown, rawText: string): unknown {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(body ?? rawText) ?? "";
+  } catch {
+    serialized = rawText;
+  }
+  if (serialized.length <= MAX_STORED_REJECTED_BODY_CHARS) return body ?? rawText;
+  return {
+    truncated: true,
+    length: serialized.length,
+    sample: serialized.slice(0, REJECTED_BODY_SAMPLE_CHARS),
+  };
 }
 
 /**
@@ -125,9 +137,14 @@ function parseWebhookBody(raw: string): { body: unknown; parsed: boolean } {
 
 function isAuthorized(request: NextRequest): boolean {
   const requiredSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
+  // TODO(2026-10-26, 운영 환경변수 미확인): 시크릿이 설정되지 않으면 통과(fail-open)한다 — 설정 전 배포를 견디려는
+  // 기존 동작이라 바꾸지 않았다. 운영에 BEDS24_WEBHOOK_SECRET 이 확실히 있음을 확인한 뒤 닫을 것.
   if (!requiredSecret) return true;
-  const provided = resolveWebhookSecret(request);
-  return Boolean(provided) && provided === requiredSecret;
+  // 상수 시간 비교 · 헤더 / Bearer / 쿼리 중 하나라도 맞으면 통과(api-secret). 쿼리 시크릿은 기존 배달 호환으로 유지.
+  return requestMatchesSecret(request, [requiredSecret], {
+    headers: ["x-beds24-webhook-secret"],
+    query: true,
+  });
 }
 
 /**
@@ -171,7 +188,7 @@ export async function GET(request: NextRequest) {
     supabase,
     httpStatus: 200,
     reason: `get_not_price_delivery:${priceResult.reason}`,
-    rawBody: body,
+    rawBody: capRejectedBody(body, ""),
     contentType: null,
   });
   return NextResponse.json(
@@ -226,13 +243,14 @@ export async function POST(request: NextRequest) {
           : Array.isArray(body)
             ? "(array)"
             : typeof body,
-      rawSample: rawText.slice(0, 500),
+      // 원문 표본은 남기지 않는다(2026-10-26) — 예약자 개인정보가 로그에 흐르지 않게 키 · 길이만.
+      rawLength: rawText.length,
     });
     await recordBeds24WebhookRejection({
       supabase,
       httpStatus: 200,
       reason: "no_booking_candidates",
-      rawBody: body ?? rawText,
+      rawBody: capRejectedBody(body, rawText),
       contentType,
     });
     return NextResponse.json(

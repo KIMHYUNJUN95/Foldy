@@ -987,3 +987,22 @@ FK 를 채우는 것이 정답이지만 그건 운영 데이터 정리다. 그 �
     읽기만 하고, 없으면 빈 「작성 중」으로 그린다. 첫 항목을 넣을 때 `createTransportItemAction` 이 만들고 `reportId` 를 돌려준다(영수증 경로에 씀).
   - 실패 표시 — 제출 실패(이미 제출됨 `submitErrorLocked` · 그 외 `submitErrorFailed`)도 토스트, 항목 추가 · 수정 실패는 시트 안 `saveFailed`,
     수정에서 금액이 비면 `amountRequired`(예전에는 0 으로 보내져 조용히 거절). 영수증 일부만 올라가면 햅틱 `warning` + `receiptUploadPartial` 토스트.
+
+## 버그 수정 — 관리자 근태 (2026-10-26)
+
+- **교통비 월 내보내기는 승인된 청구만.** 엑셀 · PDF 가 작성 중 · 제출 · 반려 · 보완 요청 청구까지 합계에 넣어 급여와 금액이 달랐다 →
+  `buildTransportExportItems` 가 `status === "approved"` 인 보고서만 쓴다(상태 열은 그대로 「승인」).
+- **끝나지 않은 달은 마감 불가.** `finalizeAttendanceMonth` 가 도쿄 이번 달 · 미래 달이면 `not_ended`(`payActionNotEnded`)로 거절
+  (`isMonthEnded`, `src/lib/attendance-clock.ts`).
+- **마감된 달에는 打刻 불가.** `submitAttendanceScan` 이 오늘(도쿄) 달에 `finalized` 스냅숏이 있으면 GPS 검사 전에 `month_finalized` 로
+  거절하고, 출근 화면이 「이번 달은 이미 마감됐어요」(`resultMonthFinalizedTitle/Sub`)를 띄운다. 관리자가 마감을 풀어야 기록된다.
+- **정정 승인 뒤 세션 목록 갱신.** 승인 · 무효 · 복구 · 직접 수정 · 일괄 처리 뒤 `router.refresh()` 하고, 큐 클라이언트가 새 `initialItems`
+  · `initialCorrections` 로 상태를 맞춘다(렌더 중 조정).
+- **관리자 직접 수정 — 낙관적 동시성.** `ReviewQueueItem.updatedAt`(세션 `updated_at`)을 화면이 `expectedUpdatedAt` 으로 보내고, 서버는 읽은
+  값과 다르면 `stale`, 쓰기도 `.eq("updated_at", 읽은 값)` 으로 걸어 0행이면 `stale`(`actionStale` + 목록 다시 받기). 성공하면 새 `updatedAt` 을 돌려준다.
+- **정정 요청 「가져가기」 0행.** `setCorrectionInReview` 가 이미 처리 · 취소된 요청이면 `already_handled`(`corrActionAlreadyHandled`) + 목록 갱신.
+- **시급 · 고용형태 변경 순서.** `setHourlyRate` · `setEmploymentType` 이 새 행을 **먼저** 넣고, 그 뒤 옛 행을 닫거나(예약분은) 지운다.
+  넣기가 실패하면 옛 행은 그대로, 닫기 · 지우기가 실패하면 넣은 행을 지워 되돌린다.
+- **수당 목록.** `listAttendanceAllowances` 가 유효(active) 수당은 `readAllPages` 로 전부, 취소된 것만 최근 80개 — 전에는 합쳐 80행에서 잘려
+  오래된 유효 수당이 안 보였다.
+- **`?ym` 검사.** 관리자 근태 화면(개요 · 큐 · 급여 · 시급 · 교통비 · 사람별)과 근태 액션이 `isValidYm`(월 01~12)으로 거르고, 틀리면 도쿄 이번 달.

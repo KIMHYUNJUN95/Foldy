@@ -1,6 +1,7 @@
 "use client";
 
 import type { Dictionary } from "@/lib/i18n";
+import { tokyoDateOf, tokyoToday } from "@/lib/tokyo-date";
 import type { ApplicationDetail } from "@/lib/recruit/applications";
 import {
   localizeRecruitCommute,
@@ -69,7 +70,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function ApplicationPrintSheet({ application, copy, variant = "print" }: Props) {
   // 출력일은 인쇄 시점이 아니라 렌더 시점이다. 초 단위 정확도가 필요한 값이 아니고, 인쇄
   // 다이얼로그를 여는 순간 DOM 을 건드리면 브라우저마다 반영 시점이 갈린다.
-  const printedOn = new Date().toISOString().slice(0, 10);
+  const printedOn = tokyoToday();
   // 채용 폼의 한국어 선택지 그대로 저장돼 있다 — 보는 사람 언어로(2026-10-23, src/lib/recruit/choice-labels.ts).
   const choice = copy.choice;
   const workDays =
@@ -91,7 +92,7 @@ export function ApplicationPrintSheet({ application, copy, variant = "print" }: 
         <dl className="rcps__meta">
           <div>
             <dt>{copy.printAppliedAt}</dt>
-            <dd>{val(application.appliedAt?.slice(0, 10))}</dd>
+            <dd>{val(tokyoDateOf(application.appliedAt))}</dd>
           </div>
           {/* 검토 단계는 인쇄물에 넣지 않는다(2026-09-24) — 종이는 지원자 정보를 보는 물건이고,
               심사 진행 상황은 콘솔에서 바뀌므로 인쇄된 순간 이미 낡은 값이다. */}

@@ -67,6 +67,8 @@ export type MinStayPanelCopy = OpsWriteOutcomeCopy & {
   errForbidden: string;
   errNoCells: string;
   errBadMinStay: string;
+  errPastDate: string;
+  errTooManyCells: string;
   errNoWritableRoom: string;
   errEnqueueFailed: string;
 };
@@ -91,6 +93,10 @@ export function minStayErrorText(copy: MinStayPanelCopy, error: PriceChangeError
       return copy.errBadMinStay;
     case "no_writable_room":
       return copy.errNoWritableRoom;
+    case "past_date":
+      return copy.errPastDate;
+    case "too_many_cells":
+      return copy.errTooManyCells;
     default:
       return copy.errEnqueueFailed;
   }

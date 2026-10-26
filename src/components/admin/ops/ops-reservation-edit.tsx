@@ -148,7 +148,8 @@ export function OpsReservationEditForm({
   detail: OpsReservationDetail;
   localeTag: string;
   onDiscard: () => void;
-  onSaved: () => void;
+  /** `stale` — Beds24 엔 반영됐지만 우리 표를 다시 맞추지 못했다(「반영 지연」을 함께 적는다). */
+  onSaved: (stale: boolean) => void;
   reservationId: string;
   roomIds: string[];
   roomKey: string;
@@ -198,7 +199,7 @@ export function OpsReservationEditForm({
     startTransition(async () => {
       const result = await submitReservationEdit({ changes, reservationId, roomIds, roomKey });
       if (result.ok) {
-        onSaved();
+        onSaved(!!result.stale);
         return;
       }
       setMessage(reservationEditErrorText(copy, result.error, result.conflictDates));

@@ -42,6 +42,7 @@ import {
 import { resolveLocale } from "@/lib/i18n";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { chunk } from "@/lib/utils";
+import { isValidYm } from "@/lib/attendance-clock";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
 
@@ -1266,8 +1267,9 @@ export type AdminAllowanceListData = {
 
 /**
  * Org-wide attendance allowance list for the wage-management surface. Privileged (owner /
- * attendance_payroll_admin) only. Active rows first, newest target date first. Cancelled rows are kept
- * for a short audit tail so operators can see what was recently removed.
+ * attendance_payroll_admin) only. Active rows first, newest target date first — **every** active row is
+ * returned (paged reads). Cancelled rows are kept for a short audit tail (`limit`) so operators can see
+ * what was recently removed.
  */
 export async function listAttendanceAllowances(
   session: AppSession,
@@ -1279,17 +1281,7 @@ export async function listAttendanceAllowances(
   const privileged = await attendanceCan(service, session.organization.id, session.user.id, "payroll.view");
   if (!privileged) return { isPrivileged: false, rows: [] };
 
-  const res = await service
-    .from("attendance_pay_allowances")
-    .select(
-      "id, target_date, target_user_id, allowance_type, amount_yen, category, memo, status, created_at",
-    )
-    .eq("organization_id", session.organization.id)
-    .order("status", { ascending: true }) // 'active' < 'cancelled'
-    .order("target_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  const rawRows = (res.data ?? []) as {
+  type RawAllowance = {
     id: string;
     target_date: string;
     target_user_id: string | null;
@@ -1299,7 +1291,31 @@ export async function listAttendanceAllowances(
     memo: string | null;
     status: string;
     created_at: string;
-  }[];
+  };
+  const cols = "id, target_date, target_user_id, allowance_type, amount_yen, category, memo, status, created_at";
+  // 유효(active) 수당은 **전부** 읽는다 — 급여에 들어가는 행이 목록에서 숨으면 안 된다(2026-10-26, 전에는 취소 포함
+  // 80행에서 잘려 오래된 유효 수당이 안 보였다). `readAllPages` 로 끝까지. 취소된 행만 최근 `limit` 개로 자른다.
+  const activeRes = await readAllPages<RawAllowance>((from, to) =>
+    service
+      .from("attendance_pay_allowances")
+      .select(cols)
+      .eq("organization_id", session.organization.id)
+      .eq("status", "active")
+      .order("target_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to) as unknown as PromiseLike<{ data: RawAllowance[] | null; error: { message: string } | null }>,
+  );
+  const activeRows = activeRes.data;
+  const cancelledRes = await service
+    .from("attendance_pay_allowances")
+    .select(cols)
+    .eq("organization_id", session.organization.id)
+    .neq("status", "active")
+    .order("target_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rawRows: RawAllowance[] = [...activeRows, ...((cancelledRes.data ?? []) as RawAllowance[])];
 
   const userIds = Array.from(
     new Set(rawRows.map((r) => r.target_user_id).filter((v): v is string => Boolean(v))),
@@ -1553,7 +1569,7 @@ export async function getAdminTransportReceiptsForUser(
   localeTag: string,
 ): Promise<AdminTransportReceiptsView | null> {
   if (session.organization.id === "platform") return null;
-  if (!/^\d{4}-\d{2}$/.test(ym)) return null;
+  if (!isValidYm(ym)) return null;
   const service = getSupabaseServiceClient();
   const privileged = await attendanceCan(service, session.organization.id, session.user.id, "transport.manage");
   if (!privileged) return null;

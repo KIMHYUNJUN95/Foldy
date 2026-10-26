@@ -6,7 +6,7 @@ import { RecruitLiveRefresh } from "@/components/admin/recruit/recruit-live-refr
 import "@/components/admin/recruit/recruit-console.css";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { tokyoToday } from "@/lib/tokyo-date";
+import { isYmd, tokyoToday } from "@/lib/tokyo-date";
 import {
   canReadJobApplications,
   getJobApplication,
@@ -16,6 +16,7 @@ import {
   signResumeUrl,
   summarizeJobApplications,
   type ApplicationFilter,
+  APPLICATION_LIST_LIMIT,
   type JobApplicationStatus,
 } from "@/lib/recruit/applications";
 
@@ -48,6 +49,14 @@ function readStatus(value: string | undefined): JobApplicationStatus | "all" {
   return "pending";
 }
 
+/** YYYY-MM-DD 이면서 실제 달력에 있는 날짜만. 아니면 null(기간 없음). */
+function readDate(value: string | undefined): string | null {
+  const v = value?.trim();
+  if (!isYmd(v)) return null;
+  const parsed = new Date(`${v}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== v ? null : v;
+}
+
 export default async function AdminRecruitPage({
   searchParams,
 }: {
@@ -64,8 +73,8 @@ export default async function AdminRecruitPage({
     status: readStatus(params.status),
     jobTitle: params.job?.trim() || null,
     employmentType: params.employment?.trim() || null,
-    from: params.from?.trim() || null,
-    to: params.to?.trim() || null,
+    from: readDate(params.from),
+    to: readDate(params.to),
     withResumeOnly: params.resume === "1",
     query: params.q?.trim() || null,
   };
@@ -113,6 +122,7 @@ export default async function AdminRecruitPage({
         filter={filter}
         selectedId={application?.id ?? null}
         todayKey={tokyoToday()}
+        truncated={rows.length >= APPLICATION_LIST_LIMIT}
       />
       {application && (
         <ApplicationDetailPanel

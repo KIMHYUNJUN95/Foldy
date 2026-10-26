@@ -4,6 +4,7 @@ import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { syncBeds24RoomBlocks, type RoomBlockSyncResult } from "@/lib/beds24/room-blocks-sync";
 import { recordBeds24ReconciliationEvent } from "@/lib/beds24/webhook-events";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 // Production reconciliation safety net for Beds24 reservation ingestion.
 //
@@ -22,13 +23,6 @@ export const dynamic = "force-dynamic";
 // timeout; allow up to 60s (Vercel Hobby-compatible ceiling).
 export const maxDuration = 60;
 
-function resolveProvidedSecret(request: NextRequest) {
-  const fromBearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const fromHeader = request.headers.get("x-beds24-webhook-secret");
-  const fromQuery = request.nextUrl.searchParams.get("secret");
-  return fromBearer ?? fromHeader ?? fromQuery ?? null;
-}
-
 /**
  * Authorize a reconciliation call. Accepts either:
  *  - Vercel Cron's `Authorization: Bearer <CRON_SECRET>` header, or
@@ -42,10 +36,15 @@ function authorize(request: NextRequest): { ok: true } | { ok: false; status: nu
     return { ok: false, status: 404 };
   }
 
-  const provided = resolveProvidedSecret(request);
-  if (!provided) return { ok: false, status: 403 };
-  if (cronSecret && provided === cronSecret) return { ok: true };
-  if (webhookSecret && provided === webhookSecret) return { ok: true };
+  // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
+  if (
+    requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      headers: ["x-beds24-webhook-secret"],
+      query: true,
+    })
+  ) {
+    return { ok: true };
+  }
   return { ok: false, status: 403 };
 }
 

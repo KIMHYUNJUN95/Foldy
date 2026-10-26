@@ -13,7 +13,17 @@ import {
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
 import { getDictionary } from "@/lib/i18n";
 import {
+  localizeRecruitDaysPerWeek,
+  localizeRecruitEmployment,
+  localizeRecruitGender,
+  localizeRecruitStartDate,
+  localizeRecruitWorkDays,
+} from "@/lib/recruit/choice-labels";
+import { isYmd, tokyoDateOf, tokyoToday } from "@/lib/tokyo-date";
+import {
   canDeleteJobApplications,
+  isUuid,
+  listJobApplicationsByIds,
   canReadJobApplications,
   canTriageJobApplications,
   JOB_APPLICATION_STATUSES,
@@ -32,6 +42,8 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
  */
 
 const CONSOLE_PATH = "/admin/recruit";
+/** 한 번에 바꿀 수 있는 지원서 수 상한(목록 조회 상한과 같다). */
+const MAX_BULK_IDS = 500;
 
 export type RecruitActionResult =
   | { ok: true; count?: number }
@@ -86,8 +98,11 @@ export async function setApplicationStatus(
   if (!session) return { ok: false, error: "forbidden" };
   if (!isStatus(status)) return { ok: false, error: "invalid" };
 
-  const targets = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
-  if (targets.length === 0) return { ok: false, error: "invalid" };
+  if (!Array.isArray(ids)) return { ok: false, error: "invalid" };
+  const targets = Array.from(
+    new Set(ids.filter((id): id is string => typeof id === "string").map((id) => id.trim()).filter(isUuid)),
+  );
+  if (targets.length === 0 || targets.length > MAX_BULK_IDS) return { ok: false, error: "invalid" };
 
   const supabase = getSupabaseServiceClient();
   const ok = await mustWrite(
@@ -113,7 +128,7 @@ export async function saveApplicationNote(id: string, note: string): Promise<Rec
   const session = await requireTriageSession();
   if (!session) return { ok: false, error: "forbidden" };
   const target = id.trim();
-  if (!target) return { ok: false, error: "invalid" };
+  if (!isUuid(target)) return { ok: false, error: "invalid" };
 
   const trimmed = note.trim();
   const supabase = getSupabaseServiceClient();
@@ -143,7 +158,7 @@ export async function deleteApplication(id: string): Promise<RecruitActionResult
   const session = await requireDeleteSession();
   if (!session) return { ok: false, error: "forbidden" };
   const target = id.trim();
-  if (!target) return { ok: false, error: "invalid" };
+  if (!isUuid(target)) return { ok: false, error: "invalid" };
 
   const supabase = getSupabaseServiceClient();
   const { data: row, error: lookupError } = await supabase
@@ -221,10 +236,56 @@ export type RecruitExportRow = {
   status: JobApplicationStatus;
 };
 
-export type RecruitExportPayload = {
+/**
+ * 내보내기 요청 — 행 내용은 받지 않는다. 클라이언트가 넘긴 값을 그대로 파일에 찍으면 조작된 내용이
+ * 「회사 문서」가 된다. id 만 받아 서버가 DB 에서 다시 읽고 로케일에 맞게 만든다.
+ */
+export type RecruitExportRequest = {
+  ids: string[];
+  /** 파일 제목에 찍을 기간(도쿄 날짜). 선택 내보내기면 비운다. */
+  from: string | null;
+  to: string | null;
+  selected: boolean;
+};
+
+type RecruitExportPayload = {
   rows: RecruitExportRow[];
   rangeLabel: string;
 };
+
+async function buildExportPayload(
+  session: NonNullable<Awaited<ReturnType<typeof requireRecruitSession>>>,
+  request: RecruitExportRequest,
+  meta: AdminExportMeta,
+): Promise<RecruitExportPayload> {
+  const copy = getDictionary(meta.locale).recruit;
+  const ids = Array.isArray(request.ids)
+    ? request.ids.filter((id): id is string => typeof id === "string")
+    : [];
+  const list = await listJobApplicationsByIds({ session, ids });
+  const rows = list.map<RecruitExportRow>((row) => ({
+    appliedAt: tokyoDateOf(row.appliedAt) ?? "—",
+    name: row.name,
+    age: row.age ?? "—",
+    gender: localizeRecruitGender(row.gender, copy.choice) ?? "—",
+    jobTitle: row.jobTitle ?? "—",
+    employmentType: localizeRecruitEmployment(row.employmentType, copy.choice) ?? "—",
+    daysPerWeek: localizeRecruitDaysPerWeek(row.daysPerWeek, copy.choice) ?? "—",
+    workDays: localizeRecruitWorkDays(row.workDays, copy.weekDays).join(" "),
+    startDate: localizeRecruitStartDate(row.startDate, copy.choice) ?? "—",
+    experience: row.hasIndustryExp ? copy.labelExperienceYes : copy.labelExperienceNo,
+    visa: row.visaDaysLeft === null ? "—" : copy.chipVisaDays.replace("{n}", String(row.visaDaysLeft)),
+    resume: row.hasResume ? "O" : "—",
+    status: row.status,
+  }));
+  // 파일 제목에도 「선택분」임을 남긴다. 1건짜리 파일에 「전체 기간」이 찍혀 있으면 나중에 받은 사람이 전수로 오해한다.
+  const rangeLabel = request.selected
+    ? copy.exportSelected.replace("{n}", String(rows.length))
+    : isYmd(request.from) && isYmd(request.to)
+      ? `${request.from} ~ ${request.to}`
+      : copy.exportRangeAll;
+  return { rows, rangeLabel };
+}
 
 function columnsOf(meta: AdminExportMeta): AdminTableColumn[] {
   const t = getDictionary(meta.locale).recruit;
@@ -273,13 +334,14 @@ function sheetsOf(payload: RecruitExportPayload, meta: AdminExportMeta): AdminTa
 }
 
 export async function exportRecruitWorkbook(
-  payload: RecruitExportPayload,
+  request: RecruitExportRequest,
 ): Promise<AdminWorkbookExportResult> {
   const session = await requireRecruitSession();
   if (!session) return { ok: false, reason: "error" };
-  if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);
+    const payload = await buildExportPayload(session, request, meta);
+    if (payload.rows.length === 0) return { ok: false, reason: "empty" };
     const base64 = await buildAdminTableWorkbookBase64({
       orgName: meta.orgName,
       generatedLabel: meta.generatedLabel,
@@ -287,7 +349,7 @@ export async function exportRecruitWorkbook(
     });
     return {
       ok: true,
-      filename: `job-applications_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`,
+      filename: `job-applications_${tokyoToday().replace(/-/g, "")}.xlsx`,
       base64,
       rowCount: payload.rows.length,
     };
@@ -297,13 +359,14 @@ export async function exportRecruitWorkbook(
 }
 
 export async function exportRecruitReport(
-  payload: RecruitExportPayload,
+  request: RecruitExportRequest,
 ): Promise<AdminReportExportResult> {
   const session = await requireRecruitSession();
   if (!session) return { ok: false, reason: "error" };
-  if (payload.rows.length === 0) return { ok: false, reason: "empty" };
   try {
     const meta = buildAdminExportMeta(session);
+    const payload = await buildExportPayload(session, request, meta);
+    if (payload.rows.length === 0) return { ok: false, reason: "empty" };
     const html = buildAdminTableReportHtml({
       orgName: meta.orgName,
       generatedLabel: meta.generatedLabel,

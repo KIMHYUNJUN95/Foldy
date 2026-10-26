@@ -752,6 +752,7 @@
 .adm .rcw-search:focus-within { box-shadow: 0 0 0 2px #7a52e6; }
 .adm .rcw-search__x { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: #6b6878; cursor: pointer; }
 
+.adm .rcw-note { margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: #f4f1fd; color: #55526a; font-size: 13px; line-height: 1.5; }
 .adm .rcw-bulk { display: flex; align-items: center; gap: 14px; min-height: 52px; margin: 4px 0 8px; padding: 0 12px; border-radius: 12px; background: #f4f1fd; color: #16141f; animation: rcw-up 180ms cubic-bezier(.23, 1, .32, 1) both; }
 .adm .rcw-bulk b { font-size: 14px; }
 .adm .rcw-bulk > span:not(.rcw-sp) { font-size: 12px; color: #6b6878; }

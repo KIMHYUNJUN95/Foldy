@@ -121,7 +121,11 @@ export type PriceChangeError =
   | "bad_min_stay"
   | "no_writable_room"
   | "invalid_values"
-  | "enqueue_failed";
+  | "enqueue_failed"
+  /** 지난 밤(도쿄 오늘 전)이 섞였다 — 지난 날은 팔 수 없어 바꿀 이유가 없다(2026-10-26). */
+  | "past_date"
+  /** 한 번에 보낼 수 있는 칸 수(`MAX_WRITE_CELLS`)를 넘었다. */
+  | "too_many_cells";
 
 export type PriceChangeResult =
   | { ok: false; error: PriceChangeError }
@@ -137,6 +141,46 @@ export type PriceChangeCell = {
   /** 지금 화면에 보이는 가격. 퍼센트 계산의 기준이다. */
   currentPrice: number | null;
 };
+
+/**
+ * 가격 · 최소숙박 한 번에 보낼 수 있는 칸 수(2026-10-26). 「전 객실 × 3개월」(약 67 × 93 ≈ 6,200칸)이 넉넉히 들어가고,
+ * 격자 전체를 실수로 고르거나 조작된 요청이 큐를 수만 칸으로 채우는 것은 막는다.
+ */
+const MAX_WRITE_CELLS = 10_000;
+/** 가격 상한(엔) — 자릿수를 잘못 넣은 값이 채널로 나가지 않게. 하한은 1엔(0 · 음수는 Beds24 에서 「가격 없음」과 같다). */
+const MAX_PRICE_YEN = 10_000_000;
+const WRITE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * 가격 · 최소숙박 칸 검사 — **화면이 보낸 것을 그대로 믿지 않는다**(2026-10-26). 날짜 형식 · 지난 밤(도쿄 오늘 전) ·
+ * 칸 수 상한. 화면도 지난 칸은 고르지 못하게 하지만, 서버 액션은 누구나 직접 부를 수 있다.
+ */
+function validateWriteCells(
+  cells: ReadonlyArray<{ date: unknown; roomIds: unknown }> | unknown,
+  today: string,
+): "no_cells" | "too_many_cells" | "invalid_values" | "past_date" | null {
+  if (!Array.isArray(cells) || cells.length === 0) return "no_cells";
+  if (cells.length > MAX_WRITE_CELLS) return "too_many_cells";
+  for (const cell of cells as Array<{ date: unknown; roomIds: unknown }>) {
+    if (typeof cell?.date !== "string" || !WRITE_DATE_PATTERN.test(cell.date)) return "invalid_values";
+    if (!Array.isArray(cell.roomIds) || cell.roomIds.some((id) => typeof id !== "string")) return "invalid_values";
+  }
+  if ((cells as Array<{ date: string }>).some((cell) => cell.date < today)) return "past_date";
+  return null;
+}
+
+/** 가격 입력 검사 — 종류 · 금액(1엔~상한) · 퍼센트(-100% 초과 — 0엔이 되면 안 된다). */
+function isValidAdjustmentInput(input: unknown): input is AdjustmentInput {
+  if (!input || typeof input !== "object") return false;
+  const value = input as { kind?: unknown; amount?: unknown; percent?: unknown };
+  if (value.kind === "amount") {
+    return typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 1 && value.amount <= MAX_PRICE_YEN;
+  }
+  if (value.kind === "percent") {
+    return typeof value.percent === "number" && Number.isFinite(value.percent) && value.percent > -100 && value.percent <= 1000;
+  }
+  return false;
+}
 
 /** 보기(읽기) — 운영 관리자 영역에 들어올 수 있으면 된다(`ops_admin.access`). */
 async function requireOpsReader() {
@@ -210,7 +254,9 @@ export async function submitPriceChange(args: {
 }): Promise<PriceChangeResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
-  if (args.cells.length === 0) return { error: "no_cells", ok: false };
+  const cellError = validateWriteCells(args.cells, toJstDateString(new Date()));
+  if (cellError) return { error: cellError, ok: false };
+  if (!isValidAdjustmentInput(args.input)) return { error: "invalid_values", ok: false };
 
   const supabase = getSupabaseServiceClient();
 
@@ -235,6 +281,10 @@ export async function submitPriceChange(args: {
   );
   if (preview.rows.length === 0) {
     return { error: "no_priced_cells", ok: false };
+  }
+  // 퍼센트로 깎다 반올림해 0엔이 되거나, 상한을 넘는 칸이 하나라도 있으면 **통째로** 거절한다 — 일부만 보내면 확인 화면과 다르다.
+  if (preview.rows.some((row) => !Number.isInteger(row.newPrice) || row.newPrice < 1 || row.newPrice > MAX_PRICE_YEN)) {
+    return { error: "invalid_values", ok: false };
   }
 
   const roomIdsByCell = new Map(
@@ -288,7 +338,8 @@ export async function submitMinStayChange(args: {
 }): Promise<PriceChangeResult> {
   const session = await requireOpsWriter();
   if (!session) return { error: "forbidden", ok: false };
-  if (args.cells.length === 0) return { error: "no_cells", ok: false };
+  const cellError = validateWriteCells(args.cells, toJstDateString(new Date()));
+  if (cellError) return { error: cellError, ok: false };
   // 0은 Beds24 에서 「비활성」과 구별이 안 된다. 상한은 비활성 문턱(50) 바로 아래.
   if (!Number.isInteger(args.minStay) || args.minStay < 1 || args.minStay > 49) {
     return { error: "bad_min_stay", ok: false };
@@ -350,7 +401,14 @@ async function kickWorker(): Promise<void> {
  * 뜻이고, 잠긴 유닛에 `override: blackout` 을 걸어도 잠금(minStay)은 그대로라 부작용이 없다.
  * 오히려 한 유닛만 막으면 나머지 listing 으로 그 방이 팔린다.
  */
-export type BlockChangeError = BlockWriteFailure | "forbidden" | "no_cells" | "unknown_room" | "past_date";
+export type BlockChangeError =
+  | BlockWriteFailure
+  | "forbidden"
+  | "no_cells"
+  | "unknown_room"
+  | "past_date"
+  /** 같은 방에 수기 예약 · 예약 수정 · 옮기기 · 다른 차단이 진행 중(방 잠금 · 2026-10-26). 잠깐 뒤 다시. */
+  | "room_busy";
 
 export type BlockChangeResult =
   /**
@@ -367,6 +425,8 @@ export type BlockChangeResult =
        * 그대로다(실패 구간은 `block-write.ts` 가 되돌린다). 화면이 「어느 방 · 며칠」인지 적어 다시 고르게 한다.
        */
       unappliedRanges?: BlockUnappliedRange[];
+      /** 실패 앞에서 이미 반영된 구간의 밤 수(되돌리기가 「몇 칸까지 됐는지」를 알린다 · 2026-10-26). */
+      appliedNights?: number;
     }
   /** `at` — 이 한 번의 누름이 이력에 남긴 시각(`price_change_logs.created_at`). 알림의 「되돌리기」가 그대로 넘긴다(`revertBlockChange`). */
   | { ok: true; ranges: number; nights: number; at: string };
@@ -385,17 +445,9 @@ type BlockRoomRow = {
   properties: { name: string } | { name: string }[] | null;
 };
 
-/** `YYYY-MM-DD` 양끝 포함 — 차단 구간의 밤들. */
-function eachNightInclusive(startDate: string, endDate: string): string[] {
-  const nights: string[] = [];
-  const cursor = new Date(`${startDate}T12:00:00Z`);
-  for (let guard = 0; guard < 400; guard += 1) {
-    const date = cursor.toISOString().slice(0, 10);
-    if (date > endDate) break;
-    nights.push(date);
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return nights;
+/** 차단 방 잠금 수명 — 구간마다 Beds24 왕복(읽기 · 쓰기 · 되읽기)이 몇 번씩이라 구간 수에 비례해 잡는다. 함수가 죽어도 이만큼 뒤에 풀린다. */
+function blockLockTtlMs(rangeCount: number): number {
+  return Math.min(15 * 60_000, 90_000 + rangeCount * 30_000);
 }
 
 /** 차단 사유 코드 — 화면이 번역한다(`bkPurposes`). DB 체크 제약과 같다(`202610010001`). */
@@ -466,90 +518,137 @@ async function runBlockChange(
   // 쓸 수 없는 방은 **아무것도 쓰기 전에** 거절한다 — 중간에 멈추면 앞 구간만 반영된다.
   if (ranges.some((range) => unitsOfRange(range.roomKey).length === 0)) return { error: "unknown_room", ok: false };
 
-  let nights = 0;
-  let appliedRanges = 0;
-  const labelByKey = new Map(args.cells.map((cell) => [cell.roomKey, cell.roomLabel]));
-  // 한 번 누른 것은 **같은 시각**으로 남긴다 — 변경 이력이 이 시각으로 한 줄로 묶는다(`groupChangeRows`).
-  const actedAt = new Date().toISOString();
-  for (const range of ranges) {
-    const units = unitsOfRange(range.roomKey);
-
-    const property = Array.isArray(units[0].properties) ? units[0].properties[0] : units[0].properties;
-    const shared = {
-      externalRoomIds: units.map((unit) => String(unit.external_room_id)),
-      organizationId: session.organization.id,
-      propertyName: property?.name ?? "",
-      range: { endDate: range.endDate, startDate: range.startDate },
-      roomLabel: units[0].room_label,
-      supabase,
-    };
-
-    const result =
-      mode === "block"
-        ? await createRoomBlock({ ...shared, actorUserId: session.user.id })
-        : await clearRoomBlock(shared);
-
-    // 변경 이력 — 가격·최소숙박과 같은 표(`price_change_logs.field = 'blackout'`, 1 = 차단 · 0 = 열림).
-    // 방당 **유닛 하나**만 적는다 — 유닛이 둘인 방도 화면에서는 한 칸이다.
-    if (result.ok) {
-      const historyRows = eachNightInclusive(range.startDate, range.endDate).map((date) => ({
-        adjust_mode: "block",
-        changed_by: session.user.id,
-        changed_by_name: session.user.name ?? null,
-        created_at: actedAt,
-        external_room_id: String(units[0].external_room_id),
-        field: "blackout",
-        job_id: null,
-        new_value: mode === "block" ? 1 : 0,
-        old_value: mode === "block" ? 0 : 1,
-        organization_id: session.organization.id,
-        percent_value: null,
-        room_id: units[0].id,
-        room_label: units[0].room_label,
-        stay_date: date,
-      }));
-      const logged = await supabase.from("price_change_logs").insert(historyRows as never);
-      if (logged.error) console.error("[ops/calendar] block history log failed", logged.error);
+  // **방 잠금**(2026-10-26) — 수기 예약 · 예약 수정 · 옮기기와 같은 이름(`manualBookingLockName`). 잠금 없이는 같은 방의 두 차단
+  // 요청이나 차단 · 수기 예약이 동시에 돌아 서로의 「막기 전 읽기 → 쓰기 → 되읽기」 사이에 끼었다(이력의 이전 값 · 재고 스냅샷 ·
+  // 보상 롤백이 남의 쓰기를 기준으로 계산된다). 여러 방이면 행 키 순서로 모두 잡고(교착 방지), 하나라도 못 잡으면 잡은 것을 놓고 「방 사용 중」.
+  const held: Array<{ name: string; lockId: string | null }> = [];
+  const releaseAll = async () => {
+    for (const lock of held.splice(0)) await releaseBeds24Lock(supabase, lock.name, lock.lockId);
+  };
+  const lockTtl = blockLockTtlMs(ranges.length);
+  try {
+    for (const roomKey of [...new Set(ranges.map((range) => range.roomKey))].sort()) {
+      const name = manualBookingLockName(session.organization.id, roomKey);
+      const lock = await acquireBeds24Lock(supabase, name, session.user.id, lockTtl);
+      if (!lock.acquired) {
+        await releaseAll();
+        return lock.reason === "busy"
+          ? { error: "room_busy", ok: false }
+          : { detail: "lock_error", error: "beds24_unavailable", ok: false };
+      }
+      held.push({ lockId: lock.lockId, name });
     }
-
-    // 성공이든 실패든 **구간마다** 남긴다 — 「이력 → Beds24 전송」 탭(`beds24_block_logs`).
-    await recordBlockLog(supabase, {
-      action: mode,
-      detail: result.ok ? null : Array.isArray(result.detail) ? result.detail.join(", ") : (result.detail ?? null),
-      end_date: range.endDate,
-      external_room_ids: shared.externalRoomIds,
-      memo,
-      nights: result.ok ? result.nights : null,
-      organization_id: session.organization.id,
-      property_name: shared.propertyName || null,
-      purpose,
-      reason: result.ok ? null : result.reason,
-      requested_by: session.user.id,
-      requested_by_name: session.user.name ?? null,
-      room_label: shared.roomLabel,
-      start_date: range.startDate,
-      status: result.ok ? "succeeded" : "failed",
-    });
-
-    // **첫 실패에서 멈춘다.** 이어서 더 쓰면 「어디까지 됐는지」를 사람이 알 수 없다.
-    // 이미 성공한 구간은 되읽기로 검증된 상태라 그대로 두어도 안전하다 — 다만 **화면은 새로 그려야 한다.**
-    // 예전에는 여기서 바로 돌아가 앞 구간이 막힌 것이 격자에 안 보였다(2026-10-01).
-    if (!result.ok) {
-      if (appliedRanges > 0) revalidateOpsCalendars();
-      const unappliedRanges = ranges.slice(appliedRanges).map((item) => ({
-        endDate: item.endDate,
-        roomKey: item.roomKey,
-        roomLabel: labelByKey.get(item.roomKey) ?? item.roomKey,
-        startDate: item.startDate,
-      }));
-      return { appliedRanges, detail: result.detail, error: result.reason, ok: false, unappliedRanges };
-    }
-    nights += result.nights;
-    appliedRanges += 1;
+  } catch (error) {
+    // 잡는 도중 예외 — 이미 잡은 잠금을 TTL 까지 남기지 않는다.
+    await releaseAll();
+    throw error;
   }
 
-  revalidateOpsCalendars();
-  return { at: actedAt, nights, ok: true, ranges: ranges.length };
+  // 예약이 있는 밤에도 **건다** — 남은 판매만 멈추는 용도라는 사용자 결정(2026-10-01 「차단이 예약과 겹치면 층을 나눈다」 ·
+  // 2026-10-06 「차단 모드에서는 예약이 있는 밤도 고른다」). 그래서 여기서 예약 겹침은 보지 않는다.
+  const writeLocked = async (): Promise<BlockChangeResult> => {
+    let nights = 0;
+    let appliedRanges = 0;
+    const labelByKey = new Map(args.cells.map((cell) => [cell.roomKey, cell.roomLabel]));
+    // 한 번 누른 것은 **같은 시각**으로 남긴다 — 변경 이력이 이 시각으로 한 줄로 묶는다(`groupChangeRows`).
+    const actedAt = new Date().toISOString();
+    for (const range of ranges) {
+      const units = unitsOfRange(range.roomKey);
+
+      const property = Array.isArray(units[0].properties) ? units[0].properties[0] : units[0].properties;
+      const shared = {
+        externalRoomIds: units.map((unit) => String(unit.external_room_id)),
+        organizationId: session.organization.id,
+        propertyName: property?.name ?? "",
+        range: { endDate: range.endDate, startDate: range.startDate },
+        roomLabel: units[0].room_label,
+        supabase,
+      };
+
+      const result =
+        mode === "block"
+          ? await createRoomBlock({ ...shared, actorUserId: session.user.id })
+          : await clearRoomBlock(shared);
+
+      // 변경 이력 — 가격·최소숙박과 같은 표(`price_change_logs.field = 'blackout'`, 1 = 차단 · 0 = 열림).
+      // 방당 **유닛 하나**만 적는다 — 유닛이 둘인 방도 화면에서는 한 칸이다.
+      //
+      // **정말 바뀐 밤만** 적는다(`changedNights` — 쓰기 전 Beds24 상태 기준, 2026-10-26). 전에는 구간의 밤 전부를 「열림 → 막힘」
+      // (풀기는 반대)으로 적어서, 되돌리기(`revertBlockChange` → `planRevertCells`)가 원래 있던 차단을 풀거나 원래 열려 있던
+      // 밤을 막았다.
+      if (result.ok && result.changedNights.length > 0) {
+        const historyRows = result.changedNights.map((date) => ({
+          adjust_mode: "block",
+          changed_by: session.user.id,
+          changed_by_name: session.user.name ?? null,
+          created_at: actedAt,
+          external_room_id: String(units[0].external_room_id),
+          field: "blackout",
+          job_id: null,
+          new_value: mode === "block" ? 1 : 0,
+          old_value: mode === "block" ? 0 : 1,
+          organization_id: session.organization.id,
+          percent_value: null,
+          room_id: units[0].id,
+          room_label: units[0].room_label,
+          stay_date: date,
+        }));
+        const logged = await supabase.from("price_change_logs").insert(historyRows as never);
+        if (logged.error) console.error("[ops/calendar] block history log failed", logged.error);
+      }
+
+      // 성공이든 실패든 **구간마다** 남긴다 — 「이력 → Beds24 전송」 탭(`beds24_block_logs`).
+      await recordBlockLog(supabase, {
+        action: mode,
+        detail: result.ok ? null : Array.isArray(result.detail) ? result.detail.join(", ") : (result.detail ?? null),
+        end_date: range.endDate,
+        external_room_ids: shared.externalRoomIds,
+        memo,
+        nights: result.ok ? result.nights : null,
+        organization_id: session.organization.id,
+        property_name: shared.propertyName || null,
+        purpose,
+        reason: result.ok ? null : result.reason,
+        requested_by: session.user.id,
+        requested_by_name: session.user.name ?? null,
+        room_label: shared.roomLabel,
+        start_date: range.startDate,
+        status: result.ok ? "succeeded" : "failed",
+      });
+
+      // **첫 실패에서 멈춘다.** 이어서 더 쓰면 「어디까지 됐는지」를 사람이 알 수 없다.
+      // 이미 성공한 구간은 되읽기로 검증된 상태라 그대로 두어도 안전하다 — 다만 **화면은 새로 그려야 한다.**
+      // 예전에는 여기서 바로 돌아가 앞 구간이 막힌 것이 격자에 안 보였다(2026-10-01).
+      if (!result.ok) {
+        if (appliedRanges > 0) revalidateOpsCalendars();
+        const unappliedRanges = ranges.slice(appliedRanges).map((item) => ({
+          endDate: item.endDate,
+          roomKey: item.roomKey,
+          roomLabel: labelByKey.get(item.roomKey) ?? item.roomKey,
+          startDate: item.startDate,
+        }));
+        return {
+          appliedNights: nights,
+          appliedRanges,
+          detail: result.detail,
+          error: result.reason,
+          ok: false,
+          unappliedRanges,
+        };
+      }
+      nights += result.nights;
+      appliedRanges += 1;
+    }
+
+    revalidateOpsCalendars();
+    return { at: actedAt, nights, ok: true, ranges: ranges.length };
+  };
+
+  try {
+    return await writeLocked();
+  } finally {
+    await releaseAll();
+  }
 }
 
 export async function submitRoomBlock(args: {
@@ -1023,8 +1122,12 @@ export async function loadReservationDetail(
   return { detail: buildOpsReservationDetail(result.data), ok: true };
 }
 
+/**
+ * `stale` — Beds24 에는 반영됐지만 **우리 표를 다시 맞추지 못했다**(다시 읽기 실패 · 처리기 건너뜀 · 우리 표 쓰기 실패, 2026-10-26).
+ * 화면은 성공으로 닫되 「반영 지연」을 함께 적는다 — 격자가 옛 값을 그리는 동안 사람이 같은 수정을 또 하지 않게. 웹훅 · 정합성이 곧 맞춘다.
+ */
 export type ReservationEditResult =
-  | { ok: true }
+  | { ok: true; stale?: boolean }
   | {
       ok: false;
       error:
@@ -1264,15 +1367,18 @@ export async function submitReservationEdit(args: {
     // 다시 읽은 날짜 · 인원 · 금액이 보낸 값과 다르면 「반영 안 됨」으로 돌린다(2026-10-08 — Beds24 는 받기만 하고 안 바꾼 것도
     // 성공으로 답할 수 있다). 다시 읽기 자체가 안 되면(네트워크) Beds24 가 받아들인 대로 성공 — 웹훅 · 정합성이 곧 맞춘다.
     let notApplied: string[] = [];
+    let stale = true;
     try {
       const fetched = await fetchBeds24BookingById(bookingId);
       if (!("skipped" in fetched) && fetched.ok) {
         notApplied = diffBookingReadback(updatePayload, fetched.booking);
-        await processBeds24WebhookBooking({
+        const saved = await processBeds24WebhookBooking({
           organizationIdDefault: session.organization.id,
           payload: fetched.booking,
           supabase,
         });
+        if (saved.ok) stale = false;
+        else console.error("[ops/reservation-edit] local upsert skipped", { bookingId, result: saved });
       }
     } catch (error) {
       console.error("[ops/reservation-edit] local refresh failed", error);
@@ -1283,7 +1389,7 @@ export async function submitReservationEdit(args: {
       console.error("[ops/reservation-edit] Beds24 readback mismatch", { bookingId, fields: notApplied });
       return { detail: notApplied.join(","), error: "not_applied", ok: false };
     }
-    return { ok: true };
+    return stale ? { ok: true, stale: true } : { ok: true };
   };
 
   if (!lockedAxis) return editLocked();
@@ -1300,7 +1406,8 @@ export async function submitReservationEdit(args: {
 }
 
 export type ReservationMoveResult =
-  | { ok: true }
+  /** `stale` — 옮겨졌지만 우리 표를 다시 맞추지 못했다(`ReservationEditResult` 와 같다). */
+  | { ok: true; stale?: boolean }
   | {
       ok: false;
       error:
@@ -1510,7 +1617,22 @@ export async function submitReservationMove(args: {
       ? (row.raw_payload as Record<string, unknown>)
       : {};
   const currentRoomId = String(raw.roomId ?? "");
-  const currentPropertyId = String(raw.propertyId ?? "");
+  // 지금 건물(프로퍼티)을 **모르면 옮기지 않는다**(2026-10-26). 전에는 원본에 `propertyId` 가 없으면 건물 검사를 건너뛰어 다른
+  // 건물로 옮길 수 있었다. 원본에 없으면 지금 유닛(roomId)의 건물을 우리 표에서 찾는다.
+  let currentPropertyId = String(raw.propertyId ?? "").trim();
+  if (!currentPropertyId && currentRoomId) {
+    const currentUnit = await supabase
+      .from("rooms")
+      .select("properties(external_property_id)")
+      .eq("organization_id", session.organization.id)
+      .eq("external_room_id", currentRoomId)
+      .limit(1);
+    type CurrentUnitRow = { properties: { external_property_id: string | null } | { external_property_id: string | null }[] | null };
+    const property = ((currentUnit.data ?? []) as unknown as CurrentUnitRow[])[0]?.properties;
+    currentPropertyId = String((Array.isArray(property) ? property[0] : property)?.external_property_id ?? "").trim();
+  }
+  // 다른 건물이라고 단정할 수 없으니 「방을 찾을 수 없음」으로 알린다.
+  if (!currentPropertyId) return { error: "unknown_room", ok: false };
 
   const original = { arrival: row.check_in_date, departure: row.check_out_date };
   const next = { arrival: args.arrival ?? original.arrival, departure: args.departure ?? original.departure };
@@ -1537,7 +1659,7 @@ export async function submitReservationMove(args: {
   const units = unitRows.filter((unit) => !!unit.external_room_id);
   if (units.length === 0) return { error: "unknown_room", ok: false };
   const propertyOf = (unit: UnitRow) => (Array.isArray(unit.properties) ? unit.properties[0] : unit.properties);
-  if (currentPropertyId && units.some((unit) => String(propertyOf(unit)?.external_property_id ?? "") !== currentPropertyId)) {
+  if (units.some((unit) => String(propertyOf(unit)?.external_property_id ?? "") !== currentPropertyId)) {
     return { error: "other_building", ok: false };
   }
   const sameRow = units.some((unit) => String(unit.external_room_id) === currentRoomId);
@@ -1658,11 +1780,14 @@ export async function submitReservationMove(args: {
     // 다시 읽어 옮겨졌는지 보고 우리 표를 맞춘다(예약 수정과 같다). 다시 읽기 자체가 안 되면 Beds24 가 받은 대로 성공 —
     // 정합성이 곧 맞춘다.
     let notApplied: string[] = [];
+    let stale = true;
     try {
       const fetched = await fetchBeds24BookingById(bookingId, { timeoutMs: MOVE_READ_TIMEOUT_MS });
       if (!("skipped" in fetched) && fetched.ok) {
         notApplied = diffMoveReadback(payload, fetched.booking);
-        await processBeds24WebhookBooking({ organizationIdDefault: session.organization.id, payload: fetched.booking, supabase });
+        const saved = await processBeds24WebhookBooking({ organizationIdDefault: session.organization.id, payload: fetched.booking, supabase });
+        if (saved.ok) stale = false;
+        else console.error("[ops/reservation-move] local upsert skipped", { bookingId, result: saved });
       }
     } catch (error) {
       console.error("[ops/reservation-move] local refresh failed", error);
@@ -1674,7 +1799,7 @@ export async function submitReservationMove(args: {
       console.error("[ops/reservation-move] Beds24 readback mismatch", { bookingId, fields: notApplied });
       return { detail: notApplied.join(","), error: "not_applied", ok: false };
     }
-    return { ok: true };
+    return stale ? { ok: true, stale: true } : { ok: true };
   };
 
   try {
@@ -1685,7 +1810,8 @@ export async function submitReservationMove(args: {
 }
 
 export type CancelReservationResult =
-  | { ok: true }
+  /** `stale` — 취소됐지만 우리 표를 「취소」로 바꾸지 못했다(`ReservationEditResult` 와 같다). */
+  | { ok: true; stale?: boolean }
   | {
       ok: false;
       error:
@@ -1755,15 +1881,16 @@ export async function submitReservationCancel(args: {
     revalidateOpsCalendars();
     return { error: "not_applied", ok: false };
   }
-  await supabase
+  const marked = await supabase
     .from("reservations")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("organization_id", session.organization.id)
     .eq("id", row.id);
+  if (marked.error) console.error("[ops/reservation-cancel] local status update failed", { bookingId, code: marked.error.code });
   await signalBeds24Change(session.organization.id, "reservations");
 
   revalidateOpsCalendars();
-  return { ok: true };
+  return marked.error ? { ok: true, stale: true } : { ok: true };
 }
 
 // ───────────────────────── 이력 · 전송 로그 ─────────────────────────
@@ -1874,7 +2001,11 @@ export type RevertError =
 
 export type RevertPriceJobResult =
   | { ok: true; cells: number; skippedChanged: number }
-  | { ok: false; error: RevertError };
+  /**
+   * `appliedCells` — 차단 되돌리기가 중간에 실패했을 때 **이미 되돌린 칸 수**(2026-10-26). 0 보다 크면 일부는 돌아갔다는 뜻이라
+   * 화면이 「N칸은 되돌렸고 나머지는 못 했다」고 알린다 — 「실패」만 보면 전부 안 된 줄 알고 다시 누른다.
+   */
+  | { ok: false; error: RevertError; appliedCells?: number };
 
 type RevertLogRow = {
   room_id: string | null;
@@ -1895,7 +2026,7 @@ async function revertLogsOfField(
   supabase: ReturnType<typeof getSupabaseServiceClient>,
   field: RevertField,
   logs: readonly RevertLogRow[],
-): Promise<{ ok: true; cells: number; skippedChanged: number } | { ok: false; error: RevertError }> {
+): Promise<{ ok: true; cells: number; skippedChanged: number } | { ok: false; error: RevertError; appliedCells?: number }> {
   const roomIds = [...new Set(logs.map((log) => log.room_id).filter((id): id is string => !!id))];
   const dates = [...new Set(logs.map((log) => log.stay_date))];
   if (roomIds.length === 0) return { cells: 0, ok: true, skippedChanged: 0 };
@@ -1968,6 +2099,8 @@ async function revertLogsOfField(
     }
     // 지난 밤은 다시 막지 않는다 — 걸기 경로가 지난 날짜를 거절한다(`past_date`). 풀기는 그대로.
     const todayKey = toJstDateString(new Date());
+    // 이미 되돌린 칸 수 — 중간에 실패하면 화면이 「몇 칸까지 됐는지」 알린다(2026-10-26).
+    let appliedCells = 0;
     for (const target of [0, 1] as const) {
       const cells: BlockChangeCell[] = plan.cells
         .filter((cell) => cell.value === target && keyById.has(cell.roomId))
@@ -1985,7 +2118,8 @@ async function revertLogsOfField(
       // 통째로 거절되지 않게(2026-10-19).
       for (const chunk of chunkCellsByRanges(cells, MAX_BLOCK_RANGES)) {
         const result = await runBlockChange({ cells: chunk }, target === 0 ? "unblock" : "block");
-        if (!result.ok) return { error: "block_failed", ok: false };
+        if (!result.ok) return { appliedCells: appliedCells + (result.appliedNights ?? 0), error: "block_failed", ok: false };
+        appliedCells += result.nights;
       }
     }
     return { cells: plan.cells.length, ok: true, skippedChanged: plan.skippedChanged };
@@ -2014,7 +2148,7 @@ async function revertLogsOfField(
 
 /** 필드별 결과를 하나로 — 하나라도 실패하면 실패, 아무 칸도 없으면 「되돌릴 것 없음」. */
 function mergeRevertResults(
-  results: Array<{ ok: true; cells: number; skippedChanged: number } | { ok: false; error: RevertError }>,
+  results: Array<{ ok: true; cells: number; skippedChanged: number } | { ok: false; error: RevertError; appliedCells?: number }>,
 ): RevertPriceJobResult {
   let cells = 0;
   let skippedChanged = 0;

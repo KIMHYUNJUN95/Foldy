@@ -497,6 +497,8 @@ function ResultSheet({
       return fail(copy.resultNoSessionTitle, [copy.resultNoSessionSub, copy.resultNoSessionHint], "home", true, "warn");
     case "open_break":
       return fail(copy.resultOpenBreakTitle, [copy.resultOpenBreakSub, copy.resultOpenBreakHint], "home", false, "warn");
+    case "month_finalized":
+      return fail(copy.resultMonthFinalizedTitle, [copy.resultMonthFinalizedSub], "home", false, "warn");
     case "stale_session": {
       // 지난 근무(퇴근 미기록) — 그 근무에 묶인 정정 요청으로 바로 보낸다.
       const date = result.staleDate

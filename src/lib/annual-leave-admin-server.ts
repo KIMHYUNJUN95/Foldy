@@ -624,8 +624,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Files a leave request (self or proxy) from the admin console. Lands as `requested` in the approval
- * queue. `targetUserId` must be an active member of the session org (org isolation). Any admin-web
- * accessor may file — this console is a management surface, so no separate approver right is required.
+ * queue. `targetUserId` must be an active member of the session org (org isolation). 남의 이름으로 내는
+ * 대리 신청은 휴가 승인권자만 할 수 있다(액션 `createAdminLeaveRequestAction` 이 검사, 2026-10-26).
+ * 시급직의 유급 · 특별휴가는 모바일과 같이 막는다(`hourly_excluded`).
  */
 export async function createAdminLeaveRequest(
   session: AppSession,
@@ -639,12 +640,17 @@ export async function createAdminLeaveRequest(
 
   const membership = await service
     .from("memberships")
-    .select("status")
+    .select("status, role")
     .eq("organization_id", organizationId)
     .eq("user_id", input.targetUserId)
     .maybeSingle();
-  if ((membership.data as { status: string } | null)?.status !== "active") {
+  const member = membership.data as { status: string; role: string } | null;
+  if (member?.status !== "active") {
     return { ok: false, error: "target_not_found" };
+  }
+  // 유급 · 특별휴가는 잔여에서 빠지는 종류 — 시급직은 낼 수 없다(모바일 신청과 같은 규칙, 2026-10-26).
+  if ((input.leaveType === "paid" || input.leaveType === "special") && isLeaveHourlyRole(member.role)) {
+    return { ok: false, error: "hourly_excluded" };
   }
 
   const profile = await service

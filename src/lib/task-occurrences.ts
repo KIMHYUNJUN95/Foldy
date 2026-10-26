@@ -68,8 +68,8 @@ export async function skipOccurrences(args: {
   taskId: string;
   organizationId: string;
   dates: string[];
-}): Promise<void> {
-  if (args.dates.length === 0) return;
+}): Promise<boolean> {
+  if (args.dates.length === 0) return true;
   const supabase = getSupabaseServiceClient();
   const rows: OccurrenceInsert[] = args.dates.map((d) => ({
     task_id: args.taskId,
@@ -79,9 +79,14 @@ export async function skipOccurrences(args: {
     completed_by_user_id: null,
     moved_to_date: null,
   }));
-  await supabase
+  const { error } = await supabase
     .from("task_occurrence_state")
     .upsert(rows, { onConflict: "task_id,occurrence_date" });
+  if (error) {
+    console.error("[skipOccurrences] upsert failed:", error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Resolve overdue occurrence dates as moved to `movedTo` ("오늘로 가져오기"). */

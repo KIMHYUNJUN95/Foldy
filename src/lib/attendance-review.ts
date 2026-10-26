@@ -120,6 +120,8 @@ export type ReviewQueueItem = {
   /** Paid duration for a completed session (worked minus closed breaks); null while open. */
   paidDurationSec: number | null;
   correctionStatus: AttendanceCorrectionStatus | null;
+  /** 세션 행의 `updated_at` — 관리자 직접 수정이 낙관적 동시성 검사에 쓴다(2026-10-26). */
+  updatedAt: string;
 };
 
 function tokyoDateKey(d: Date): string {
@@ -282,6 +284,7 @@ export async function getAttendanceReviewQueue(
     const reviewState = s.review_state as AttendanceReviewState;
     return {
       sessionId: s.id,
+      updatedAt: s.updated_at,
       userId: s.user_id,
       userName: names.get(s.user_id) ?? "—",
       operatingDate: s.operating_date,

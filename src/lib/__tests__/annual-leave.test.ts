@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeAnnualLeaveSummary, getScheduledGrants, normalizeLeaveDays } from "../annual-leave";
+import {
+  computeAnnualLeaveSummary,
+  filterLeaveLedger,
+  getScheduledGrants,
+  leaveSpansOverlap,
+  normalizeLeaveDays,
+} from "../annual-leave";
 
 describe("annual-leave accrual schedule", () => {
   it("grants 10/11/12 days at 6/18/30 months, then +2/year up to the 20-day cap", () => {
@@ -157,5 +163,38 @@ describe("normalizeLeaveDays — 신청 일수는 서버가 정한다 (2026-10-0
     expect(
       normalizeLeaveDays({ leaveType: "paid", startDate: "2026/10/05", endDate: "2026-10-05", durationUnit: "full" }),
     ).toBeNull();
+  });
+});
+
+describe("leaveSpansOverlap — 같은 사람 휴가 이중 차감 방지", () => {
+  const full = (startDate: string, endDate: string) => ({ startDate, endDate, durationUnit: "full" as const });
+  const half = (date: string, unit: "am" | "pm") => ({ startDate: date, endDate: date, durationUnit: unit });
+
+  it("separate date ranges do not overlap", () => {
+    expect(leaveSpansOverlap(full("2026-11-01", "2026-11-03"), full("2026-11-04", "2026-11-05"))).toBe(false);
+  });
+  it("touching or nested ranges overlap", () => {
+    expect(leaveSpansOverlap(full("2026-11-01", "2026-11-03"), full("2026-11-03", "2026-11-05"))).toBe(true);
+    expect(leaveSpansOverlap(full("2026-11-01", "2026-11-10"), full("2026-11-04", "2026-11-05"))).toBe(true);
+  });
+  it("AM + PM on the same day do not overlap, same half does", () => {
+    expect(leaveSpansOverlap(half("2026-11-02", "am"), half("2026-11-02", "pm"))).toBe(false);
+    expect(leaveSpansOverlap(half("2026-11-02", "am"), half("2026-11-02", "am"))).toBe(true);
+  });
+  it("a half day inside a full-day range overlaps", () => {
+    expect(leaveSpansOverlap(half("2026-11-02", "pm"), full("2026-11-01", "2026-11-03"))).toBe(true);
+  });
+});
+
+describe("filterLeaveLedger — 화면과 내보내기 같은 규칙", () => {
+  const rows = [
+    { status: "approved", processedAt: "2026/10/01 09:00", applicantName: "Kim", reason: "rest", documentNumber: "AL-1", processorName: "Lee" },
+    { status: "rejected", processedAt: "2026/10/15 18:00", applicantName: "Sato", reason: "trip", documentNumber: null, processorName: null },
+  ];
+  it("filters by status, Tokyo processed date range and search", () => {
+    expect(filterLeaveLedger(rows, { status: null, query: "", from: "2026-10-01", to: "2026-10-31" })).toHaveLength(2);
+    expect(filterLeaveLedger(rows, { status: "approved", query: "", from: "2026-10-01", to: "2026-10-31" })).toHaveLength(1);
+    expect(filterLeaveLedger(rows, { status: null, query: "", from: "2026-10-02", to: "2026-10-31" })).toHaveLength(1);
+    expect(filterLeaveLedger(rows, { status: null, query: "sato", from: "2026-10-01", to: "2026-10-31" })[0].applicantName).toBe("Sato");
   });
 });

@@ -1,3 +1,5 @@
+import { tokyoToday } from "@/lib/tokyo-date";
+
 /**
  * 달 키(`YYYY-MM`) 산술 — 공용 날짜 피커 세 형제가 **같은 구현을 쓴다** (2026-09-11).
  *
@@ -23,7 +25,10 @@
 
 /** `YYYY-MM` 에 `delta` 달을 더한다. 연도 넘김을 포함해 항상 정확히 한 달씩 움직인다. */
 export function shiftMonthKey(monthKey: string, delta: number): string {
-  const [year, month] = monthKey.split("-").map(Number);
+  // 잘못된 입력(빈 값 · NaN · 1~12 밖의 달)은 NaN-NaN 을 퍼뜨리지 않고 «이번 달(도쿄)» 에서 이어 간다(2026-10-26).
+  const match = /^(\d{4})-(\d{2})$/.exec(String(monthKey ?? ""));
+  const base = match && Number(match[2]) >= 1 && Number(match[2]) <= 12 ? match[0] : tokyoToday().slice(0, 7);
+  const [year, month] = base.split("-").map(Number);
   const total = year * 12 + (month - 1) + delta;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
 }

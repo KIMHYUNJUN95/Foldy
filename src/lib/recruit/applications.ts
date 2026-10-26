@@ -5,7 +5,7 @@ import type { JobApplicationStatus } from "@/lib/recruit/status";
 import { parseVisaExpiry, visaAlertOf, visaDaysLeft, type VisaAlert } from "@/lib/recruit/visa-expiry";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { tokyoDayEndExclusive, tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
+import { tokyoDateOf, tokyoDayEndExclusive, tokyoDayStart, tokyoToday } from "@/lib/tokyo-date";
 
 /**
  * 채용 콘솔이 읽는 것들.
@@ -229,6 +229,9 @@ async function loadRepeatCounts(organizationId: string): Promise<Map<string, num
   return counts;
 }
 
+/** 목록 한 번에 읽는 최대 건수. 이만큼 오면 더 있을 수 있다(콘솔이 안내를 띄운다). */
+export const APPLICATION_LIST_LIMIT = 500;
+
 export async function listJobApplications(args: {
   session: AppSession;
   filter: ApplicationFilter;
@@ -260,7 +263,7 @@ export async function listJobApplications(args: {
   }
 
   const [{ data, error }, repeatCounts] = await Promise.all([
-    query.order("applied_at", { ascending: false, nullsFirst: false }).limit(500),
+    query.order("applied_at", { ascending: false, nullsFirst: false }).limit(APPLICATION_LIST_LIMIT),
     loadRepeatCounts(organizationId),
   ]);
   if (error) {
@@ -270,6 +273,37 @@ export async function listJobApplications(args: {
 
   const today = tokyoToday();
   return ((data ?? []) as unknown as ListRecord[]).map((row) => toListRow(row, today, repeatCounts));
+}
+
+/** 내보내기용 — 클라이언트가 넘긴 행 대신 id 로 DB 에서 다시 읽는다(조직 범위, 최대 500건). */
+export async function listJobApplicationsByIds(args: {
+  session: AppSession;
+  ids: string[];
+}): Promise<ApplicationListRow[]> {
+  if (!canReadJobApplications(args.session)) return [];
+  const ids = args.ids.filter(isUuid).slice(0, 500);
+  if (ids.length === 0) return [];
+  const organizationId = args.session.organization.id;
+  const supabase = getSupabaseServiceClient();
+  const [{ data, error }, repeatCounts] = await Promise.all([
+    supabase
+      .from("job_applications")
+      .select(LIST_COLUMNS)
+      .eq("organization_id", organizationId)
+      .in("id", ids)
+      .order("applied_at", { ascending: false, nullsFirst: false }),
+    loadRepeatCounts(organizationId),
+  ]);
+  if (error) {
+    console.error("[recruit/applications] list by ids failed:", error.message);
+    return [];
+  }
+  const today = tokyoToday();
+  return ((data ?? []) as unknown as ListRecord[]).map((row) => toListRow(row, today, repeatCounts));
+}
+
+export function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 export async function summarizeJobApplications(session: AppSession): Promise<ApplicationSummary> {
@@ -303,7 +337,8 @@ export async function summarizeJobApplications(session: AppSession): Promise<App
     summary.byStatus[row.status] += 1;
     if (row.status === "pending") summary.pending += 1;
     if (row.resume_source_url) summary.withResume += 1;
-    const day = row.applied_at ? row.applied_at.slice(0, 10) : null;
+    // 도쿄 달력 날짜로 센다 — UTC 로 자르면 오전 0~9시(도쿄) 지원이 전날로 센다.
+    const day = tokyoDateOf(row.applied_at);
     if (day === today) summary.today += 1;
     if (day && day >= weekAgo) summary.last7 += 1;
     // 「확인 필요」는 90일 이내 만료만 센다. 읽지 못한 값과 영주는 빠진다.

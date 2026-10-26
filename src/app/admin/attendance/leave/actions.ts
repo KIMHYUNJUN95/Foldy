@@ -26,11 +26,13 @@ import {
 import {
   createAdminLeaveRequest,
   listAdminLeaveBalances,
+  listLeaveLedger,
   saveEmployeeLeaveBaseline,
   type AdminLeaveRequestInput,
   type LeaveLedgerEntry,
 } from "@/lib/annual-leave-admin-server";
 import { getDictionary, type Dictionary } from "@/lib/i18n";
+import { filterLeaveLedger, type LeaveLedgerFilter } from "@/lib/annual-leave";
 
 const LEAVE_PATH = "/admin/attendance/leave";
 
@@ -67,6 +69,10 @@ export async function createAdminLeaveRequestAction(
   input: AdminLeaveRequestInput,
 ): Promise<{ ok: boolean; error?: string; id?: string }> {
   const session = await requireAdminPageSession({ nextPath: LEAVE_PATH });
+  // 대리 신청(남의 이름)은 휴가 승인권자만 — 본인 신청은 누구나(모바일과 같은 권한, 2026-10-26).
+  if (input.targetUserId !== session.user.id && !(await isSessionLeaveApprover(session))) {
+    return { ok: false, error: "forbidden" };
+  }
   const result = await createAdminLeaveRequest(session, input);
   if (result.ok) revalidatePath(LEAVE_PATH);
   return result.ok ? { ok: true, id: result.id } : { ok: false, error: result.error };
@@ -91,9 +97,10 @@ export async function saveEmployeeLeaveBaselineAction(input: {
 // Both render through the canonical admin table exporters (src/lib/admin-table-workbook.ts /
 // admin-table-report.ts) and are approver-gated, exactly like the mutations above.
 //
-// 이력 (ledger): the client sends the rows it is currently showing — status/search/date filtering all
-// happen client-side over an already-hydrated array, so re-deriving the same filter server-side would
-// just duplicate that logic. Every visible *label* is still resolved here from the actor's own locale.
+// 이력 (ledger): the client sends only its filter (status / search / date range). The server re-reads
+// the ledger with listLeaveLedger and applies the same pure filter (`filterLeaveLedger`) — rows sent by
+// a client are never trusted into an export (2026-10-26). Every visible *label* is resolved here from
+// the actor's own locale.
 // 잔여 (balance): a snapshot with no filters, so the rows are re-queried server-side.
 
 type Lc = Dictionary["admin"]["leaveConsole"];
@@ -162,11 +169,34 @@ function ledgerSheet(entries: LeaveLedgerEntry[], meta: AdminExportMeta): AdminT
   };
 }
 
+const LEDGER_STATUSES = new Set(["requested", "approved", "rejected", "cancelled"]);
+const LEDGER_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 클라이언트가 보낸 조건을 검증하고, 서버에서 다시 읽은 이력을 같은 규칙으로 거른다. 조건이 틀리면 null. */
+async function ledgerEntriesFor(
+  session: Awaited<ReturnType<typeof requireAdminPageSession>>,
+  filter: LeaveLedgerFilter,
+): Promise<LeaveLedgerEntry[] | null> {
+  if (!filter || typeof filter !== "object") return null;
+  if (filter.status !== null && !LEDGER_STATUSES.has(filter.status)) return null;
+  if (typeof filter.query !== "string" || filter.query.length > 200) return null;
+  if (!LEDGER_DATE.test(filter.from) || !LEDGER_DATE.test(filter.to)) return null;
+  const all = await listLeaveLedger(session);
+  return filterLeaveLedger(all, {
+    status: filter.status,
+    query: filter.query,
+    from: filter.from,
+    to: filter.to,
+  });
+}
+
 export async function exportLeaveLedgerWorkbook(
-  entries: LeaveLedgerEntry[],
+  filter: LeaveLedgerFilter,
 ): Promise<AdminWorkbookExportResult> {
   const session = await requireAdminPageSession({ nextPath: LEAVE_PATH });
   if (!(await isSessionLeaveApprover(session))) return { ok: false, reason: "forbidden" };
+  const entries = await ledgerEntriesFor(session, filter);
+  if (!entries) return { ok: false, reason: "error" };
   if (entries.length === 0) return { ok: false, reason: "empty" };
 
   try {
@@ -184,10 +214,12 @@ export async function exportLeaveLedgerWorkbook(
 }
 
 export async function exportLeaveLedgerReport(
-  entries: LeaveLedgerEntry[],
+  filter: LeaveLedgerFilter,
 ): Promise<AdminReportExportResult> {
   const session = await requireAdminPageSession({ nextPath: LEAVE_PATH });
   if (!(await isSessionLeaveApprover(session))) return { ok: false, reason: "forbidden" };
+  const entries = await ledgerEntriesFor(session, filter);
+  if (!entries) return { ok: false, reason: "error" };
   if (entries.length === 0) return { ok: false, reason: "empty" };
 
   try {

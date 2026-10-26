@@ -60,6 +60,8 @@ import "./ops-calendar-panels-white.css";
 export type ReservationCardCopy = ReservationEditCopy & ReservationMoveCopy & {
   reEdit: string;
   reSaved: string;
+  /** Beds24 엔 반영됐지만 우리 표가 늦다 — 「반영 지연」. */
+  writeSyncDelayed: string;
   rcTitle: string;
   rcNights: string;
   rcChannel: string;
@@ -234,6 +236,8 @@ export function OpsReservationPanel({
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  // 쓰기는 됐지만 우리 표가 늦다(`stale`) — 성공 문구 아래에 「반영 지연」을 붙인다(2026-10-26).
+  const [stale, setStale] = useState(false);
   const [pending, startTransition] = useTransition();
   const [detail, setDetail] = useState<OpsReservationDetail | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -267,6 +271,12 @@ export function OpsReservationPanel({
       const result = await submitReservationCancel({ reason, reservationId: bar.id });
       if (result.ok) {
         setMessage(copy.rcDone);
+        // 우리 표를 못 맞췄으면 닫지 않고 「반영 지연」을 보여 준다 — 격자에 막대가 남아 있어 또 취소하려 들지 않게.
+        if (result.stale) {
+          setStale(true);
+          setConfirming(false);
+          return;
+        }
         onClose();
         return;
       }
@@ -382,9 +392,10 @@ export function OpsReservationPanel({
             detail={detail}
             localeTag={localeTag}
             onDiscard={() => setEditing(false)}
-            onSaved={() => {
+            onSaved={(stale) => {
               setEditing(false);
               setMessage(copy.reSaved);
+              setStale(stale);
               // 상세는 다시 읽고, 격자(막대 이름·날짜)는 서버 데이터만 다시 받는다.
               setReloadKey((key) => key + 1);
               router.refresh();
@@ -538,10 +549,11 @@ export function OpsReservationPanel({
           )}
 
           {message && (
-            <p className={`spw-msg${message === copy.reSaved ? " is-ok" : " is-err"}`} role="status">
+            <p className={`spw-msg${message === copy.reSaved || message === copy.rcDone ? " is-ok" : " is-err"}`} role="status">
               {message}
             </p>
           )}
+          {stale && (message === copy.reSaved || message === copy.rcDone) && <p className="spw-note">{copy.writeSyncDelayed}</p>}
         </div>
 
         <div className="spw-foot is-panel is-even">

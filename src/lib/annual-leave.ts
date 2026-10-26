@@ -248,3 +248,56 @@ export function normalizeLeaveDays(input: {
   if (rangeDays < 1) return null;
   return { startDate, endDate, durationUnit: "full", daysCount: rangeDays };
 }
+
+// ── 같은 사람 휴가 겹침 (2026-10-26) ──────────────────────────────────────────
+// 같은 사람의 승인된 휴가가 날짜가 겹치면 잔여가 두 번 빠진다. 승인 직전에 이 규칙으로 막는다.
+// 반차는 하루짜리라 오전 · 오후가 서로 다르면 겹치지 않는다(같은 날 오전 + 오후 = 하루).
+
+export type LeaveSpan = { startDate: string; endDate: string; durationUnit: "full" | "am" | "pm" };
+
+export function leaveSpansOverlap(a: LeaveSpan, b: LeaveSpan): boolean {
+  if (a.startDate > b.endDate || b.startDate > a.endDate) return false;
+  const aHalf = a.durationUnit === "am" || a.durationUnit === "pm";
+  const bHalf = b.durationUnit === "am" || b.durationUnit === "pm";
+  if (aHalf && bHalf && a.durationUnit !== b.durationUnit) return false;
+  return true;
+}
+
+// ── 이력(ledger) 거르기 (2026-10-26) ──────────────────────────────────────────
+// 화면과 내보내기가 같은 규칙을 쓴다. 내보내기는 화면이 보낸 줄을 믿지 않고, 이 조건만 받아 서버에서 다시 읽은
+// 이력을 거른다(`exportLeaveLedger*`). 처리 시각(`processedAt`)은 도쿄 "YYYY/MM/DD HH:mm".
+
+export type LeaveLedgerFilter = {
+  status: "requested" | "approved" | "rejected" | "cancelled" | null;
+  query: string;
+  /** 도쿄 YYYY-MM-DD, 양끝 포함. */
+  from: string;
+  to: string;
+};
+
+export type LeaveLedgerFilterable = {
+  status: string;
+  processedAt: string;
+  applicantName: string;
+  reason: string;
+  documentNumber: string | null;
+  processorName: string | null;
+};
+
+export function leaveLedgerProcessedKey(entry: { processedAt: string }): string {
+  return entry.processedAt.slice(0, 10).replace(/\//g, "-");
+}
+
+export function filterLeaveLedger<T extends LeaveLedgerFilterable>(entries: readonly T[], f: LeaveLedgerFilter): T[] {
+  const q = f.query.trim().toLowerCase();
+  return entries.filter((e) => {
+    if (f.status && e.status !== f.status) return false;
+    const key = leaveLedgerProcessedKey(e);
+    if (key && (key < f.from || key > f.to)) return false;
+    if (q) {
+      const hay = `${e.applicantName} ${e.reason} ${e.documentNumber ?? ""} ${e.processorName ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}

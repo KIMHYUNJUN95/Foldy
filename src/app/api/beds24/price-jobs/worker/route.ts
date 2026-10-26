@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { runNextPriceJob } from "@/lib/beds24/price-job-worker";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 /**
  * 가격·최소숙박 작업 워커.
@@ -24,23 +25,21 @@ export const maxDuration = 60;
 const MAX_JOBS_PER_RUN = 5;
 const MAX_RUNTIME_MS = 45_000;
 
-function resolveProvidedSecret(request: NextRequest) {
-  const fromBearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const fromHeader = request.headers.get("x-beds24-webhook-secret");
-  const fromQuery = request.nextUrl.searchParams.get("secret");
-  return fromBearer ?? fromHeader ?? fromQuery ?? null;
-}
-
 /** `rates-sync` 와 같은 규칙 — 크론 시크릿 또는 Beds24 웹훅 시크릿. 둘 다 없으면 닫아 둔다. */
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
   const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
   if (!cronSecret && !webhookSecret) return { ok: false, status: 404 };
 
-  const provided = resolveProvidedSecret(request);
-  if (!provided) return { ok: false, status: 403 };
-  if (cronSecret && provided === cronSecret) return { ok: true };
-  if (webhookSecret && provided === webhookSecret) return { ok: true };
+  // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
+  if (
+    requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      headers: ["x-beds24-webhook-secret"],
+      query: true,
+    })
+  ) {
+    return { ok: true };
+  }
   return { ok: false, status: 403 };
 }
 

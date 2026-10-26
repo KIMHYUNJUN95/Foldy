@@ -491,3 +491,10 @@
 - 되돌리기 = 같은 액션을 거꾸로(5초 토스트). 바뀐 줄은 4초 동안 옅은 보라로 표시. 방 ⋯ 메뉴로 열면 그 방만 체크된 창, 여러 명이 든 방은 먼저 누구 자리인지 고른다.
 - 파일: `src/components/admin/cleaning-assign/swap-dialog.tsx`(창) · `assign-day-board.tsx`(입구 · 토스트) · `cleaning-assign.css` · 문구 `swap*` · `give*`(ko/ja/en).
 - 확인: 운영 DB · 12/15 테스트 배정으로 서로 바꾸기 4개 → 방 ⋯ 메뉴 1개 바꾸기 → 되돌리기까지 화면 · DB 확인 후 테스트 데이터 삭제.
+
+## 2026-10-26 — 관리자 서버 액션 버그 수정 (코드 리뷰)
+
+- `holdRoom`: 방이 `pending` 이 아니거나(청소 중 · 끝) 이미 미룸 · 처리 끝이면 거절. `originDate` 는 서버가 아는 값(`carriedFrom ?? date`)과 같아야 한다. 같은 줄을 바꿔 걸 때 전에 남긴 「처리 끝」 청소 기록은 먼저 지운다(고아 완료 기록 방지).
+- `releaseHold`: 지우기 전에 줄을 읽어 되돌릴 사람이 있는데 방을 못 찾으면 줄을 남기고 `conflict`. 줄이 없으면 `conflict`.
+- `assignToRoom`: `pending` 인 방에만 넣는다. `answerTraineeCheck`: 현장 멤버만. `saveFixedStaff`: 지운 뒤 넣기가 실패하면 원래 목록을 되살린다.
+- 월 자동 제안 · 하루 달력 미배정 수: 오늘 이미 청소 중 · 끝난 방(`cleaning_sessions`)은 뺀다(`loadFinishedRoomKeys`).

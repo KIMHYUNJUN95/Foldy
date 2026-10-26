@@ -13,6 +13,7 @@ import { ingestJobApplication } from "@/lib/recruit/ingest";
 import type { RecruitSource } from "@/lib/recruit/payload";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Json } from "@/types/database";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 /**
  * 채용 지원서 당겨오기 (2026-09-09).
@@ -151,14 +152,12 @@ async function ingestAll(records: FirestoreRecord[], source: RecruitSource, summ
  * `Authorization: Bearer` 나 `x-recruit-sync-secret` 헤더로 받는다. 서버에 둘 다 없으면 닫는다.
  */
 function authorizeFullSync(request: NextRequest): boolean {
-  const allowed = [process.env.CRON_SECRET?.trim(), process.env.BEDS24_WEBHOOK_SECRET?.trim()].filter(
-    (value): value is string => Boolean(value),
+  // 상수 시간 비교 · 후보 중 하나라도 맞으면 통과(2026-10-26, api-secret).
+  return requestMatchesSecret(
+    request,
+    [process.env.CRON_SECRET, process.env.BEDS24_WEBHOOK_SECRET],
+    { headers: ["x-recruit-sync-secret"] },
   );
-  if (allowed.length === 0) return false;
-  const provided =
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    request.headers.get("x-recruit-sync-secret");
-  return Boolean(provided) && allowed.includes(provided as string);
 }
 
 export async function POST(request: NextRequest) {
@@ -235,10 +234,20 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[recruit/sync] firestore read failed:", message);
     await writeState({ ok: false, result: { mode, error: message } });
-    return NextResponse.json({ ok: false, error: "firestore_read_failed", detail: message }, { status: 502 });
+    // 최신분 호출은 콘솔 화면에서도 부르므로 내부 오류 문구를 돌려주지 않는다(2026-10-26) — 전량 훑기(시크릿)만 상세.
+    return NextResponse.json(
+      mode === "full"
+        ? { ok: false, error: "firestore_read_failed", detail: message }
+        : { ok: false, error: "firestore_read_failed" },
+      { status: 502 },
+    );
   }
 
   await writeState({ ok: summary.failed.length === 0, result: summary as unknown as Json });
 
+  // 최신분(mode=recent)은 실패 상세 · 문서 ID 를 돌려주지 않고 {ok, count} 만(2026-10-26) — 시크릿 없이 부를 수 있는 경로다.
+  if (mode === "recent") {
+    return NextResponse.json({ ok: summary.failed.length === 0, count: summary.created + summary.updated });
+  }
   return NextResponse.json({ ok: summary.failed.length === 0, ...summary });
 }

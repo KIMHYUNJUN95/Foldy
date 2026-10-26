@@ -481,3 +481,16 @@ hourly-staff exclusion by real
 - **취소 · 임시 저장 수정 · 삭제 경쟁.** 읽고 나서 쓰기 전에 관리자가 승인하면 승인된 휴가가 「취소」로 덮어써졌다. 쓰기에도 상태 조건을 건다 —
   취소는 `.eq("status", 읽은 상태)` 후 0행이면 `not_cancellable`, 임시 저장 이어쓰기 · 삭제는 `.eq("status","draft")`(0행이면 `not_editable`).
 - **취소 실패 표시.** 신청 내역 「취소하기」가 실패하면 아무 반응이 없었다 → 확인 시트 안에 문구(`leave.cancelNotCancellable` · `cancelFailed`) + 햅틱 `error`.
+
+## 버그 수정 — 관리자 결재 · 대리 신청 · 이력 내보내기 (2026-10-26)
+
+- **승인 · 반려 · 승인 취소 0행.** 상태 조건을 건 갱신에 `.select("id")` 를 붙여 0행(그 사이 다른 결재자가 처리)이면 승인 · 반려는
+  `not_requested`, 승인 취소는 `not_approved` → 패널에 「이미 처리된 신청입니다」(`errNotRequested`).
+- **같은 사람 휴가 겹침.** 승인 직전에 같은 사람의 **승인된** 휴가 중 날짜가 겹치는 게 있으면 `overlap`(`errOverlap`)으로 거절 — 잔여가
+  두 번 빠지지 않게. 같은 날 오전 반차 + 오후 반차는 겹침이 아니다(`leaveSpansOverlap`, `src/lib/annual-leave.ts`).
+  잔여 초과 승인은 **막지 않는다**(결재 화면의 잔여 미리보기 경고만 — 정책 결정 대기).
+- **관리자 대리 신청 권한.** `createAdminLeaveRequestAction` — 남의 이름으로 내는 대리 신청은 휴가 승인권자(`isSessionLeaveApprover`)만,
+  본인 신청은 누구나. 시급직 대상의 유급 · 특별휴가는 모바일과 같이 `hourly_excluded`(`formErrHourlyExcluded`).
+- **이력 내보내기.** `exportLeaveLedgerWorkbook/Report` 가 화면이 보낸 줄 대신 **조건**(상태 · 검색어 · 처리일 범위)만 받아 서버에서
+  `listLeaveLedger` 로 다시 읽고 같은 규칙(`filterLeaveLedger`)으로 거른다 — 화면과 결과가 같고, 클라이언트가 만든 줄은 파일에 들어가지 않는다.
+- **남은 것(이번엔 안 고침).** 연차 소멸 순서(FIFO) 문제는 별도로 다룬다.

@@ -318,6 +318,18 @@ export function AttendanceQueueClient({
   const [manualOpen, setManualOpen] = useState(false);
   const [items, setItems] = useState(initialItems);
   const [corrections, setCorrections] = useState(initialCorrections);
+  // router.refresh() 로 서버가 새 목록을 내려주면 그걸로 맞춘다 — 정정 승인 · 직접 수정 뒤 세션 목록이
+  // 옛 값(시각 · updated_at)으로 남지 않게(2026-10-26). 렌더 중 조정 패턴(effect 없이).
+  const [syncedItems, setSyncedItems] = useState(initialItems);
+  const [syncedCorrections, setSyncedCorrections] = useState(initialCorrections);
+  if (initialItems !== syncedItems) {
+    setSyncedItems(initialItems);
+    setItems(initialItems);
+  }
+  if (initialCorrections !== syncedCorrections) {
+    setSyncedCorrections(initialCorrections);
+    setCorrections(initialCorrections);
+  }
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [issueFilter, setIssueFilter] = useState<IssueKind | null>(null);
@@ -521,6 +533,7 @@ export function AttendanceQueueClient({
                 sessionId: i.sessionId,
                 reason: reason.trim(),
                 reviewState: "normal",
+                expectedUpdatedAt: i.updatedAt,
               }),
         ),
       );
@@ -540,6 +553,7 @@ export function AttendanceQueueClient({
       );
       setSelected(new Set());
       setBulkModal(null);
+      router.refresh();
       if (failCount > 0) {
         const failedNames = failed
           .slice(0, 3)
@@ -995,19 +1009,24 @@ export function AttendanceQueueClient({
           onInvalidated={(id) => {
             removeOrUpdateAfterInvalidate(id);
             showToast(c.actionDoneInvalidate);
+            router.refresh();
           }}
           onApproved={(updated) => {
             applyUpdated(updated);
             showToast(c.actionDoneApprove);
+            router.refresh();
           }}
           onRestored={(updated) => {
             applyUpdated(updated);
             showToast(c.actionDoneRestore);
+            router.refresh();
           }}
           onEdited={(updated) => {
             applyUpdated(updated);
             showToast(c.actionDoneEdit);
+            router.refresh();
           }}
+          onStale={() => router.refresh()}
         />
       ) : null}
       {panelCorrection ? (
@@ -1018,7 +1037,10 @@ export function AttendanceQueueClient({
           onUpdated={(updated, msg) => {
             updateCorrection(updated);
             showToast(msg);
+            // 승인은 세션 시각을 바꾼다 — 세션 목록도 서버에서 다시 받는다(2026-10-26).
+            router.refresh();
           }}
+          onStale={() => router.refresh()}
           onOpenSession={(sessionId) => setPanel({ kind: "sess", id: sessionId })}
         />
       ) : null}
@@ -1060,10 +1082,13 @@ function SessionPanel({
   onApproved,
   onRestored,
   onEdited,
+  onStale,
 }: {
   item: ReviewQueueItem;
   c: Att;
   onClose: () => void;
+  /** 그 사이 다른 사람이 세션을 바꿨을 때(`stale`) — 부모가 서버에서 목록을 다시 받는다. */
+  onStale: () => void;
   onInvalidated: (sessionId: string) => void;
   onApproved: (updated: ReviewQueueItem) => void;
   onRestored: (updated: ReviewQueueItem) => void;
@@ -1128,7 +1153,8 @@ function SessionPanel({
       reason: string;
       clockInTime?: string | null;
       clockOutTime?: string | null;
-    } = { sessionId: item.sessionId, reason: editReason.trim() };
+      expectedUpdatedAt?: string;
+    } = { sessionId: item.sessionId, reason: editReason.trim(), expectedUpdatedAt: item.updatedAt };
 
     const baseIn = item.clockInLabel ?? "";
     const baseOut = item.clockOutLabel ?? "";
@@ -1150,6 +1176,7 @@ function SessionPanel({
           input.clockOutTime !== undefined ? input.clockOutTime : item.clockOutLabel;
         onEdited({
           ...item,
+          updatedAt: res.updatedAt ?? item.updatedAt,
           clockInLabel: nextIn,
           clockOutLabel: nextOut,
           // An invalid session stays invalid after a manual edit (server keeps it invalid); the admin
@@ -1166,6 +1193,9 @@ function SessionPanel({
         setErr(c.actionInvalidTime);
       } else if (res.reason === "overlap") {
         setErr(c.actionOverlap);
+      } else if (res.reason === "stale") {
+        setErr(c.actionStale);
+        onStale();
       } else {
         setErr(c.actionFailed);
       }
@@ -1231,15 +1261,19 @@ function SessionPanel({
         sessionId: item.sessionId,
         reason: comment.trim() || c.auditDefaultReviewedReason,
         reviewState: "normal",
+        expectedUpdatedAt: item.updatedAt,
       });
       if (res.ok) {
         setModal(null);
-        onApproved({ ...item, reviewState: "normal", isAbnormal: false });
+        onApproved({ ...item, reviewState: "normal", isAbnormal: false, updatedAt: res.updatedAt ?? item.updatedAt });
         onClose();
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
       } else if (res.reason === "reason_required") {
         setErr(c.actionReasonRequired);
+      } else if (res.reason === "stale") {
+        setErr(c.actionStale);
+        onStale();
       } else {
         setErr(c.actionFailed);
       }
@@ -1705,12 +1739,15 @@ function CorrectionPanel({
   onClose,
   onUpdated,
   onOpenSession,
+  onStale,
 }: {
   row: AdminCorrectionRow;
   c: Att;
   onClose: () => void;
   onUpdated: (updated: AdminCorrectionRow, toast: string) => void;
   onOpenSession: (sessionId: string) => void;
+  /** 그 사이 바뀐 걸 알았을 때 — 부모가 서버에서 목록을 다시 받는다. */
+  onStale: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -1779,6 +1816,9 @@ function CorrectionPanel({
         onUpdated({ ...row, status: "in_review" }, c.corrActionDoneClaim);
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
+      } else if (res.reason === "already_handled") {
+        setErr(c.corrActionAlreadyHandled);
+        onStale();
       } else {
         setErr(c.actionFailed);
       }

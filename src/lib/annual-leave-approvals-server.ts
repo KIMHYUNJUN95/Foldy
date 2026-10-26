@@ -10,7 +10,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { memberCapabilities } from "@/lib/capabilities-server";
 import { displayRoleKey, fetchPlatformDeveloperIds } from "@/lib/platform-developers";
 import type { AppSession } from "@/lib/session";
-import { tokyoToday } from "@/lib/annual-leave";
+import { leaveSpansOverlap, tokyoToday, type LeaveSpan } from "@/lib/annual-leave";
 import { getMyAnnualLeaveSummary } from "@/lib/annual-leave-server";
 
 type Service = ReturnType<typeof getSupabaseServiceClient>;
@@ -438,15 +438,44 @@ export async function approveLeaveRequestForApprover(
 
   const { data: existing } = await service
     .from("annual_leave_requests")
-    .select("status")
+    .select("status, user_id, start_date, end_date, duration_unit")
     .eq("id", requestId)
     .eq("organization_id", organizationId)
     .maybeSingle();
-  const row = existing as { status: string } | null;
+  const row = existing as
+    | { status: string; user_id: string; start_date: string; end_date: string; duration_unit: string }
+    | null;
   if (!row) return { ok: false, error: "not_found" };
   if (row.status !== "requested") return { ok: false, error: "not_requested" };
 
-  const { error } = await service
+  // 같은 사람의 이미 승인된 휴가와 겹치면 승인하지 않는다 — 잔여가 두 번 빠진다(2026-10-26).
+  // 잔여 초과 승인은 막지 않는다(경고만 — 정책 결정 대기).
+  const span: LeaveSpan = {
+    startDate: row.start_date,
+    endDate: row.end_date,
+    durationUnit: row.duration_unit as LeaveSpan["durationUnit"],
+  };
+  const { data: sameUserApproved, error: overlapError } = await service
+    .from("annual_leave_requests")
+    .select("start_date, end_date, duration_unit")
+    .eq("organization_id", organizationId)
+    .eq("user_id", row.user_id)
+    .eq("status", "approved")
+    .neq("id", requestId)
+    .lte("start_date", row.end_date)
+    .gte("end_date", row.start_date);
+  if (overlapError) return { ok: false, error: "approve_failed" };
+  const clash = ((sameUserApproved ?? []) as { start_date: string; end_date: string; duration_unit: string }[]).some(
+    (o) =>
+      leaveSpansOverlap(span, {
+        startDate: o.start_date,
+        endDate: o.end_date,
+        durationUnit: o.duration_unit as LeaveSpan["durationUnit"],
+      }),
+  );
+  if (clash) return { ok: false, error: "overlap" };
+
+  const { data: updated, error } = await service
     .from("annual_leave_requests")
     .update({
       status: "approved",
@@ -456,8 +485,11 @@ export async function approveLeaveRequestForApprover(
     })
     .eq("id", requestId)
     .eq("organization_id", organizationId)
-    .eq("status", "requested");
+    .eq("status", "requested")
+    .select("id");
   if (error) return { ok: false, error: "approve_failed" };
+  // 0행 = 그 사이 다른 사람이 먼저 처리했다(승인 · 반려 · 취소). 성공으로 보이면 안 된다.
+  if (!updated || updated.length === 0) return { ok: false, error: "not_requested" };
 
   // Assign the 休暇届 document number (best-effort — never blocks the approval).
   await assignLeaveDocumentNumber(service, organizationId, requestId);
@@ -486,7 +518,7 @@ export async function rejectLeaveRequestForApprover(
   if (!row) return { ok: false, error: "not_found" };
   if (row.status !== "requested") return { ok: false, error: "not_requested" };
 
-  const { error } = await service
+  const { data: updated, error } = await service
     .from("annual_leave_requests")
     .update({
       status: "rejected",
@@ -496,8 +528,10 @@ export async function rejectLeaveRequestForApprover(
     })
     .eq("id", requestId)
     .eq("organization_id", organizationId)
-    .eq("status", "requested");
+    .eq("status", "requested")
+    .select("id");
   if (error) return { ok: false, error: "reject_failed" };
+  if (!updated || updated.length === 0) return { ok: false, error: "not_requested" };
 
   return { ok: true };
 }
@@ -529,7 +563,7 @@ export async function cancelApprovedLeaveForApprover(
   if (!row) return { ok: false, error: "not_found" };
   if (row.status !== "approved") return { ok: false, error: "not_approved" };
 
-  const { error } = await service
+  const { data: updated, error } = await service
     .from("annual_leave_requests")
     .update({
       status: "cancelled",
@@ -539,8 +573,10 @@ export async function cancelApprovedLeaveForApprover(
     })
     .eq("id", requestId)
     .eq("organization_id", organizationId)
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .select("id");
   if (error) return { ok: false, error: "cancel_failed" };
+  if (!updated || updated.length === 0) return { ok: false, error: "not_approved" };
 
   return { ok: true };
 }

@@ -743,3 +743,10 @@ Firestore 규칙은 `applications`/`applicants` 의 `create` 허용을 **유지*
 지원자가 보는 채용 사이트(`https://stayari.web.app`)가 열린다 — 공고가 제대로 떠 있는지 확인하거나 링크를 남에게 보낼 때 쓴다.
 모양은 내보내기와 같은 `chipbtn`(바깥 링크 아이콘). 주소는 `recruit-console.tsx` 의 `RECRUIT_SITE_URL` 하나에 둔다 —
 `haru-recruit.web.app` 은 같은 번들의 복제본이라 하나만 건다. 권한은 목록을 볼 수 있는 사람이면 누구나(공개 사이트다).
+
+## 2026-10-26 정합성 수정
+
+- 지원일(`applied_at`)은 어디서나 **도쿄 날짜**로 표시 · 집계한다(요약의 오늘/최근 7일, 상세 패널, 인쇄지, 내보내기 파일명).
+- `setApplicationStatus` 는 UUID 만 받고 한 번에 500건까지. 검토 메모 · 삭제도 UUID 검증.
+- 내보내기(Excel/PDF)는 클라이언트 행을 받지 않는다 — 표시 중인 행의 **id 만** 넘기면 서버가 DB 에서 다시 읽어(조직 범위, 최대 500) 서버 로케일로 만든다 (`RecruitExportRequest`).
+- 목록 `from`/`to` 쿼리는 실제 달력에 있는 `YYYY-MM-DD` 만 받고 아니면 무시. 목록이 조회 상한(500건)에 닿으면 안내 문구(`recruit.listTruncated`)를 띄운다.

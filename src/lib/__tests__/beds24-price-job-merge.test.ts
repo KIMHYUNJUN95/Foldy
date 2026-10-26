@@ -4,6 +4,7 @@ import {
   mergePriceJobRoomUpdates,
   type MergeableJob,
 } from "@/lib/beds24/price-job-merge";
+import { cellOwnerJobIds, isMergeableSibling } from "@/lib/beds24/price-job-worker";
 
 /**
  * 작업 합치기.
@@ -93,5 +94,43 @@ describe("mergePriceJobRoomUpdates", () => {
 
   it("빈 목록이면 빈 결과", () => {
     expect(mergePriceJobRoomUpdates([])).toEqual([]);
+  });
+});
+
+/**
+ * 합쳐도 되는 형제(2026-10-26) — 다른 사람 · 다른 방식의 작업을 흡수하면 이력이 첫 작업 사람 · 방식으로 남고, 흡수된 사람의
+ * 「되돌리기」가 칸을 못 찾았다.
+ */
+describe("isMergeableSibling", () => {
+  const base = { adjust_mode: "amount", created_at: "2026-10-01T00:00:00Z", percent_value: null, requested_by: "u1" };
+
+  it("같은 사람 · 같은 방식 · 2분 안이면 합친다", () => {
+    expect(isMergeableSibling(base, { ...base, created_at: "2026-10-01T00:01:00Z" })).toBe(true);
+  });
+
+  it("다른 사람의 작업은 합치지 않는다", () => {
+    expect(isMergeableSibling(base, { ...base, requested_by: "u2" })).toBe(false);
+  });
+
+  it("방식이나 퍼센트가 다르면 합치지 않는다", () => {
+    expect(isMergeableSibling(base, { ...base, adjust_mode: "percent", percent_value: 10 })).toBe(false);
+    const percent = { ...base, adjust_mode: "percent", percent_value: 10 };
+    expect(isMergeableSibling(percent, { ...percent, percent_value: -10 })).toBe(false);
+    expect(isMergeableSibling(base, { ...base, adjust_mode: "revert" })).toBe(false);
+  });
+
+  it("2분을 넘으면 같은 사람이어도 합치지 않는다", () => {
+    expect(isMergeableSibling(base, { ...base, created_at: "2026-10-01T00:03:00Z" })).toBe(false);
+  });
+});
+
+describe("cellOwnerJobIds — 칸마다 값을 낸 작업(변경 이력의 job_id)", () => {
+  it("같은 칸은 늦은 작업, 다른 칸은 각자의 작업", () => {
+    const owner = cellOwnerJobIds([
+      job("late", "2026-10-01T00:01:00Z", { "2026-10-05": { p1: 12000 } }),
+      job("early", "2026-10-01T00:00:00Z", { "2026-10-05": { p1: 10000 }, "2026-10-06": { p1: 10000 } }),
+    ]);
+    expect(owner.get("450096|2026-10-05")).toBe("late");
+    expect(owner.get("450096|2026-10-06")).toBe("early");
   });
 });

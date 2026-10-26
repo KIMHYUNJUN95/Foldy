@@ -20,6 +20,9 @@ type AnnouncementTargetScope =
 
 const announcementImageBucket = "announcement-images";
 const maxAnnouncementImages = 5;
+// 서버 글자 수 상한(2026-10-26) — 클라이언트 입력 제한만 믿지 않는다.
+const maxAnnouncementTitleLength = 200;
+const maxAnnouncementContentLength = 10000;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -239,7 +242,17 @@ export async function cleanupAnnouncementImagePaths(
   const userId = await getCurrentUserId();
   if (!userId) return;
 
-  if (await announcementExists(announcementId)) return;
+  // 이미 있는 공지(수정 중 업로드 실패)면: 관리 권한이 있고, 지금 공지가 쓰는 사진이 아닌 경로만 지운다(2026-10-26).
+  const existing = await getAnnouncement(announcementId);
+  if (existing) {
+    if (!(await canManageAnnouncement(userId, existing))) return;
+    const inUse = new Set(
+      existing.image_urls
+        .map((u) => extractStoragePath(u))
+        .filter((p): p is string => !!p),
+    );
+    if (paths.some((p) => inUse.has(p) || p.split("/")[0] !== existing.organization_id)) return;
+  }
 
   // Every path must be structurally valid and belong to the submitted announcementId.
   // If ANY path fails validation, reject the entire request — delete nothing.
@@ -291,6 +304,8 @@ export async function createAnnouncement(formData: FormData) {
   if (
     !title ||
     !content ||
+    title.length > maxAnnouncementTitleLength ||
+    content.length > maxAnnouncementContentLength ||
     !announcementId ||
     !isValidUUID(announcementId) ||
     !["draft", "published"].includes(status) ||
@@ -547,10 +562,16 @@ export async function saveAnnouncementConsole(
   if (
     !title ||
     !content ||
+    title.length > maxAnnouncementTitleLength ||
+    content.length > maxAnnouncementContentLength ||
     !["draft", "published"].includes(status) ||
     !["everyone", "roles"].includes(targetScope) ||
     (targetScope === "roles" && targetRoles.length === 0)
   ) {
+    // 새 글이면 방금 올린 사진이 고아가 되지 않게 치운다(수정이면 아래 편집 경로가 따로 정리).
+    if (announcementId && isValidUUID(announcementId) && input.organizationId && isValidUUID(input.organizationId)) {
+      await cleanupSubmittedAnnouncementImages(imageUrls, input.organizationId, announcementId);
+    }
     return { ok: false, error: "invalid_announcement" };
   }
 
@@ -562,12 +583,20 @@ export async function saveAnnouncementConsole(
   if (existing) {
     // Edit path — organization is immutable; validate against the stored org.
     const organizationId = existing.organization_id;
+    // 이번 저장에서 새로 올라온 사진(원래 목록에 없던 것) — 저장이 실패하면 고아가 되므로 치운다(2026-10-26).
+    const newlyUploaded = getValidatedAnnouncementImagePaths(
+      imageUrls.filter((u) => !existing.image_urls.includes(u)),
+      organizationId,
+      announcementId,
+    );
     if (
       imageUrls.length > maxAnnouncementImages ||
       imageUrls.some(
         (url) => !isValidAnnouncementImageUrl(url, organizationId, announcementId),
       )
     ) {
+      // 권한 확인 전에는 지우지 않는다 — 남의 공지 폴더를 지우는 통로가 되면 안 된다.
+      if (await canManageAnnouncement(userId, existing)) await cleanupStoragePaths(newlyUploaded);
       return { ok: false, error: "invalid_images" };
     }
     if (!(await canManageAnnouncement(userId, existing))) {
@@ -596,9 +625,32 @@ export async function saveAnnouncementConsole(
       })
       .eq("id", announcementId);
 
-    if (error) return { ok: false, error: "save_failed" };
+    if (error) {
+      await cleanupStoragePaths(newlyUploaded);
+      return { ok: false, error: "save_failed" };
+    }
 
-    if (status === "published" && !wasPublished && input.isImportant) {
+    // 편집에서 뺀 사진은 DB가 더 이상 가리키지 않게 된 뒤에 서버에서 지운다(2026-10-26) —
+    // 우리 조직 · 이 공지 폴더 경로만.
+    const removedPaths = getValidatedAnnouncementImagePaths(
+      existing.image_urls.filter((u) => !imageUrls.includes(u)),
+      organizationId,
+      announcementId,
+    );
+    await cleanupStoragePaths(removedPaths);
+
+    // 게시된 공지를 «중요»로 올리거나 대상 역할을 넓히면 새로 대상이 된 사람에게도 알린다(2026-10-26).
+    // 알림 중복 키가 사람마다 있어 이미 받은 사람에게는 다시 가지 않는다.
+    const nextRoles = targetScope === "roles" ? targetRoles : [];
+    const sameRoles =
+      existing.target_roles.length === nextRoles.length &&
+      existing.target_roles.every((r) => (nextRoles as string[]).includes(r));
+    const targetChanged = existing.target_scope !== targetScope || !sameRoles;
+    if (
+      status === "published" &&
+      input.isImportant &&
+      (!wasPublished || !existing.is_important || targetChanged)
+    ) {
       await createImportantAnnouncementNotifications(service, {
         organizationId,
         announcementId,

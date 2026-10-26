@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runAttendanceReminders } from "@/lib/notifications/attendance-reminders";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 // Scheduled attendance reminder/abnormal evaluator (Step 14): the worker 18:30 open-session reminder
 // (once/Tokyo-day, deduped) + the admin incomplete/stale-session alert. Time-based — no user action
@@ -16,12 +17,8 @@ export const maxDuration = 60;
 function authorize(request: NextRequest): { ok: true } | { ok: false; status: number } {
   const cronSecret = process.env.CRON_SECRET?.trim();
   if (!cronSecret) return { ok: false, status: 404 };
-  const provided =
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    request.nextUrl.searchParams.get("secret") ??
-    null;
-  if (!provided) return { ok: false, status: 403 };
-  if (provided !== cronSecret) return { ok: false, status: 403 };
+  // 비교는 상수 시간 · 길이 무관(api-secret). 헤더와 쿼리 중 하나라도 맞으면 통과한다(2026-10-26).
+  if (!requestMatchesSecret(request, [cronSecret], { query: true })) return { ok: false, status: 403 };
   return { ok: true };
 }
 

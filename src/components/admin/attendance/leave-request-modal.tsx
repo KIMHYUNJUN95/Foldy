@@ -80,6 +80,8 @@ function errLabel(reason: string | undefined, lc: Lc): string {
       return lc.formErrInvalidReason;
     case "invalid_dates":
       return lc.formErrInvalidDates;
+    case "hourly_excluded":
+      return lc.formErrHourlyExcluded;
     case "create_failed":
     default:
       return lc.formErrCreateFailed;

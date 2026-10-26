@@ -54,6 +54,11 @@ function accepted(roomIds: string[]) {
   };
 }
 
+/** 풀기 전 읽기(2026-10-26) — 그 밤들이 막혀 있다. */
+function blockedBefore(roomId: string, nights: string[]) {
+  return calendarResponse({ [roomId]: Object.fromEntries(nights.map((night) => [night, { override: "blackout" }])) });
+}
+
 beforeEach(() => {
   fetchCalendar.mockReset();
   postCalendar.mockReset();
@@ -125,9 +130,11 @@ describe("clearRoomBlock — 일부 해제와 실패", () => {
   it("10~14 차단에서 11~12 만 풀어도 그 밤의 재고를 복원하고, 스냅샷은 남는 밤만 들고 쪼갠다", async () => {
     const fake = seed();
     postCalendar.mockResolvedValueOnce(accepted(["101"]) as never);
-    fetchCalendar.mockResolvedValueOnce(
-      calendarResponse({ "101": { "2026-11-11": { override: null }, "2026-11-12": { override: null } } }) as never,
-    );
+    fetchCalendar
+      .mockResolvedValueOnce(blockedBefore("101", ["2026-11-11", "2026-11-12"]) as never)
+      .mockResolvedValueOnce(
+        calendarResponse({ "101": { "2026-11-11": { override: null }, "2026-11-12": { override: null } } }) as never,
+      );
 
     const result = await clearRoomBlock({
       externalRoomIds: ["101"],
@@ -153,7 +160,7 @@ describe("clearRoomBlock — 일부 해제와 실패", () => {
     postCalendar
       .mockResolvedValueOnce(accepted(["101"]) as never)
       .mockResolvedValueOnce(accepted(["101"]) as never);
-    fetchCalendar.mockResolvedValueOnce(
+    fetchCalendar.mockResolvedValueOnce(blockedBefore("101", dates("2026-11-10", 5)) as never).mockResolvedValueOnce(
       calendarResponse({
         "101": {
           "2026-11-10": { override: null },
@@ -184,7 +191,9 @@ describe("clearRoomBlock — 일부 해제와 실패", () => {
   it("다시 막기도 실패하면 사람에게 Beds24 확인을 요청한다", async () => {
     const fake = seed();
     postCalendar.mockResolvedValueOnce(accepted(["101"]) as never).mockRejectedValueOnce(new Error("network"));
-    fetchCalendar.mockRejectedValueOnce(new Error("timeout"));
+    fetchCalendar
+      .mockResolvedValueOnce(blockedBefore("101", dates("2026-11-10", 5)) as never)
+      .mockRejectedValueOnce(new Error("timeout"));
 
     const result = await clearRoomBlock({
       externalRoomIds: ["101"],
@@ -196,6 +205,48 @@ describe("clearRoomBlock — 일부 해제와 실패", () => {
     });
 
     expect(result).toMatchObject({ ok: false, reason: "unblock_not_restored" });
+  });
+});
+
+describe("clearRoomBlock — 바뀐 밤(변경 이력 기준, 2026-10-26)", () => {
+  it("풀기 전에 막혀 있던 밤만 `changedNights` 로 돌려준다 — 원래 열려 있던 밤은 이력에 「막힘 → 열림」으로 남기지 않는다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar
+      .mockResolvedValueOnce(
+        calendarResponse({ "101": { "2026-11-10": { override: "blackout" }, "2026-11-11": { override: null } } }) as never,
+      )
+      .mockResolvedValueOnce(
+        calendarResponse({ "101": { "2026-11-10": { override: null }, "2026-11-11": { override: null } } }) as never,
+      );
+    postCalendar.mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await clearRoomBlock({
+      externalRoomIds: ["101"],
+      organizationId: ORG,
+      propertyName: "P",
+      range: { endDate: "2026-11-11", startDate: "2026-11-10" },
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ changedNights: ["2026-11-10"], ok: true });
+  });
+
+  it("풀기 전 상태를 못 읽으면 아무것도 보내지 않는다", async () => {
+    const fake = createFakeSupabase({ room_block_snapshots: [], room_blocks: [], room_daily_rates: [], rooms: [] });
+    fetchCalendar.mockRejectedValueOnce(new Error("timeout"));
+
+    const result = await clearRoomBlock({
+      externalRoomIds: ["101"],
+      organizationId: ORG,
+      propertyName: "P",
+      range: { endDate: "2026-11-11", startDate: "2026-11-10" },
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "beds24_unavailable" });
+    expect(postCalendar).not.toHaveBeenCalled();
   });
 });
 
@@ -288,5 +339,45 @@ describe("createRoomBlock — 되읽기 불일치 보상 롤백", () => {
 
     expect(result.ok).toBe(true);
     expect(fake.tables.room_block_snapshots[0].pre_block_num_avail).toEqual({ "2026-11-10": 1 });
+    // 이미 막혀 있던 11일은 「바뀐 밤」이 아니다 — 변경 이력 · 되돌리기가 그 차단을 건드리지 않게(2026-10-26).
+    expect(result).toMatchObject({ changedNights: ["2026-11-10"] });
+  });
+
+  it("같은 시작일의 더 긴 차단 줄이 있으면 우리 표의 끝 날짜를 줄이지 않는다(늦은 쪽)", async () => {
+    const fake = createFakeSupabase({
+      room_block_snapshots: [],
+      room_blocks: [
+        {
+          end_date: "2026-11-20",
+          external_room_id: "101",
+          id: "blk-1",
+          organization_id: ORG,
+          override_kind: "blackout",
+          property_name: "P",
+          room_label: "101",
+          source: "beds24",
+          start_date: "2026-11-10",
+        },
+      ],
+      room_daily_rates: [],
+      rooms: [],
+    });
+    fetchCalendar
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { numAvail: 1, override: null } } }) as never)
+      .mockResolvedValueOnce(calendarResponse({ "101": { "2026-11-10": { override: "blackout" } } }) as never);
+    postCalendar.mockResolvedValueOnce(accepted(["101"]) as never);
+
+    const result = await createRoomBlock({
+      externalRoomIds: ["101"],
+      organizationId: ORG,
+      propertyName: "P",
+      range: { endDate: "2026-11-10", startDate: "2026-11-10" },
+      roomLabel: "101",
+      supabase: fake.client as never,
+    });
+
+    expect(result.ok).toBe(true);
+    const upserted = fake.writes.filter((write) => write.table === "room_blocks" && write.op === "upsert");
+    expect((upserted[0].payload as Array<{ end_date: string }>)[0].end_date).toBe("2026-11-20");
   });
 });

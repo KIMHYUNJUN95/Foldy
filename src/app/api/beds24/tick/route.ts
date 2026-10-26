@@ -10,6 +10,7 @@ import {
   decideBeds24Tick,
 } from "@/lib/beds24/tick-plan";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { safeEqualSecret } from "@/lib/api-secret";
 
 /**
  * Beds24 틱 — 쿨다운이 풀리면 멈춘 일을 이어받는다.
@@ -53,8 +54,8 @@ async function authorize(
 
   const cronSecret = process.env.CRON_SECRET?.trim();
   const webhookSecret = process.env.BEDS24_WEBHOOK_SECRET?.trim();
-  if (cronSecret && provided === cronSecret) return true;
-  if (webhookSecret && provided === webhookSecret) return true;
+  if (cronSecret && safeEqualSecret(provided, cronSecret)) return true;
+  if (webhookSecret && safeEqualSecret(provided, webhookSecret)) return true;
 
   const checked = await supabase.rpc("beds24_tick_token_ok", { p_token: provided });
   if (checked.error) {

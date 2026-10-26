@@ -9,7 +9,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/admin-session";
 import { canForceCompleteCleaning } from "@/lib/cleaning";
-import { maintenanceStatuses, type MaintenanceStatus } from "@/lib/maintenance-reports";
+import {
+  isMaintenanceTerminal,
+  maintenanceStatuses,
+  type MaintenanceStatus,
+} from "@/lib/maintenance-constants";
+import type { Database } from "@/types/database";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 function isValidUUID(value: string) {
@@ -35,24 +40,41 @@ export async function updateMaintenanceStatus(formData: FormData) {
 
   const supabase = await getSupabaseServerClient();
 
-  const { data: existing } = await supabase
+  const { data: existingRow } = await supabase
     .from("maintenance_reports")
-    .select("id")
+    .select("id, status")
     .eq("id", reportId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
 
-  if (!existing) {
+  if (!existingRow) {
     redirect("/admin/maintenance?error=not_found");
+  }
+  const existing = existingRow as { id: string; status: MaintenanceStatus };
+
+  // 완료시각 · 처리자는 진행 → 종료 전환에만 찍고, 다시 열면 지운다(모바일 updateMaintenanceHandling 과 같은 규칙).
+  const update: Database["public"]["Tables"]["maintenance_reports"]["Update"] = { status: newStatus };
+  const wasTerminal = isMaintenanceTerminal(existing.status);
+  const terminal = isMaintenanceTerminal(newStatus);
+  if (!wasTerminal && terminal) {
+    update.completed_at = new Date().toISOString();
+    update.completed_by = session.user.id;
+    update.completed_by_admin = true;
+  } else if (wasTerminal && !terminal) {
+    update.completed_at = null;
+    update.completed_by = null;
+    update.completed_by_admin = false;
   }
 
   // RLS가 행을 걸러내면 Supabase는 에러 없이 0행을 돌려준다. 영향 행 수를 확인하지 않으면 권한이
   // 없는 사용자(예: 남의 신고를 건드리는 staff)에게도 "변경됨"이라고 응답하게 된다 — 실제 버그였다.
+  // 읽은 상태 그대로일 때만 쓴다(동시 변경 덮어쓰기 방지).
   const { data: updated, error } = await supabase
     .from("maintenance_reports")
-    .update({ status: newStatus })
+    .update(update)
     .eq("id", reportId)
     .eq("organization_id", session.organization.id)
+    .eq("status", existing.status)
     .select("id");
 
   if (error || !updated || updated.length === 0) {
@@ -88,11 +110,14 @@ export async function applyMaintenanceException(input: {
   const supabase = await getSupabaseServerClient();
   const { data: existing } = await supabase
     .from("maintenance_reports")
-    .select("id, resolution_memo")
+    .select("id, status, resolution_memo")
     .eq("id", input.reportId)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
   if (!existing) return { ok: false, reason: "not_found" };
+  // 열림/진행 중인 건에만 개입한다 — 이미 종결된 건의 완료시각 · 처리자를 덮어쓰지 않는다.
+  const currentStatus = (existing as { status: MaintenanceStatus }).status;
+  if (isMaintenanceTerminal(currentStatus)) return { ok: false, reason: "invalid" };
 
   const previousMemo = (existing as { resolution_memo: string | null }).resolution_memo ?? "";
   const addition = input.memo.trim();
@@ -110,10 +135,11 @@ export async function applyMaintenanceException(input: {
     })
     .eq("id", input.reportId)
     .eq("organization_id", session.organization.id)
+    .in("status", ["open", "in_progress"])
     .select("id");
 
   if (error) return { ok: false, reason: "failed" };
-  if (!updated || updated.length === 0) return { ok: false, reason: "forbidden" };
+  if (!updated || updated.length === 0) return { ok: false, reason: "invalid" };
 
   revalidatePath("/admin/maintenance");
   revalidatePath(`/mobile/requests/maintenance/${input.reportId}`);

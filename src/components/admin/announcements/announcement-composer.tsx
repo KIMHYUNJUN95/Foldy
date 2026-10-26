@@ -172,7 +172,7 @@ export function AnnouncementComposer({
     const uploadedUrls: string[] = [];
     const uploadedPaths: string[] = [];
     const cleanup = () => {
-      if (isNew && uploadedPaths.length > 0) {
+      if (uploadedPaths.length > 0) {
         startTransition(async () => {
           await cleanupAnnouncementImagePaths(announcementId, uploadedPaths);
         });
@@ -277,7 +277,7 @@ export function AnnouncementComposer({
         </label>
         <label className="anw-nf">
           <span>{w.fBody}</span>
-          <textarea ref={bodyRef} name="body" rows={13} value={body} onChange={(event) => setBody(event.target.value)} placeholder={w.fBodyPh} disabled={busy} />
+          <textarea ref={bodyRef} name="body" rows={13} maxLength={10000} value={body} onChange={(event) => setBody(event.target.value)} placeholder={w.fBodyPh} disabled={busy} />
         </label>
 
         <div className="anw-photos">

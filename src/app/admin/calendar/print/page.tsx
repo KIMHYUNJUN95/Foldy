@@ -64,6 +64,7 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
     .filter((propertyName) => (data.selectedProperty ? propertyName === data.selectedProperty : true))
     .map((propertyName) => ({
       propertyName,
+      blocks: data.roomBlocks.filter((block) => block.propertyName === propertyName),
       reservations: data.reservations.filter((reservation) => reservation.propertyName === propertyName),
       rows: data.roomRows.filter((row) => row.propertyName === propertyName),
     }))
@@ -318,6 +319,23 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
           text-overflow: ellipsis;
         }
 
+        .admcal-print__block {
+          position: absolute;
+          top: 1.1mm;
+          height: 6.2mm;
+          border-radius: 6px;
+          border: 1px dashed #8a94a3;
+          background: repeating-linear-gradient(135deg, #eef0f3 0 2mm, #e3e6ea 2mm 4mm);
+          color: #5b6573;
+          font-size: 8.5px;
+          font-weight: 800;
+          line-height: 6mm;
+          padding: 0 1.6mm;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
         .admcal-print__empty {
           padding: 24px;
           border: 1px dashed #d9cfbf;
@@ -449,6 +467,34 @@ export default async function AdminCalendarPrintPage({ searchParams }: PageProps
                           />
                         );
                       })}
+
+                      {group.blocks
+                        .filter((block) => block.roomKey === row.key && block.startDate < rangeEndExclusive && block.endDate >= rangeStart)
+                        .map((block) => {
+                          // 블락은 「밤」의 범위이고 양끝을 포함한다 — 화면과 같이 끝에 하루를 더해 예약 막대와 눈금을 맞춘다.
+                          const exclusiveEnd = new Date(`${block.endDate}T00:00:00Z`);
+                          exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
+                          const blockEndExclusive = exclusiveEnd.toISOString().slice(0, 10);
+                          const visibleStart = block.startDate < rangeStart ? rangeStart : block.startDate;
+                          const visibleEnd = blockEndExclusive > rangeEndExclusive ? rangeEndExclusive : blockEndExclusive;
+                          const startUnit = diffDays(rangeStart, visibleStart);
+                          const span = Math.max(1, diffDays(visibleStart, visibleEnd));
+                          return (
+                            <div
+                              className="admcal-print__block"
+                              key={block.id}
+                              style={
+                                {
+                                  left: `calc(${startUnit} * var(--day-width) + 1.2mm)`,
+                                  width: `calc(${span} * var(--day-width) - 2.4mm)`,
+                                } as CSSProperties
+                              }
+                              title={`${copy.blockedRoom} · ${block.startDate} - ${block.endDate}`}
+                            >
+                              {span >= 2 ? copy.blockedRoom : ""}
+                            </div>
+                          );
+                        })}
 
                       {roomReservations.map((reservation) => {
                         const visibleStart =

@@ -343,12 +343,29 @@ export async function getAdminCalendarDashboardData(
       if (isExcludedOperationalProperty(row.property_name)) continue;
       if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
       const propertyName = getCanonicalPropertyName(row.property_name);
+      // 예약과 같은 해석기로 방 이름을 맞춘다(건물별 별칭 · 외부 방 이름까지 같은 규칙).
+      const resolvedBlockRoom = resolveReservationCanonicalRoomLabel(
+        { property_name: row.property_name, raw_payload: null, room_label: row.room_label },
+        {
+          globalExternalRoomToCanonical,
+          isAuthoritative: roomCatalog !== undefined,
+          lookups: roomLookups,
+        },
+      );
       const canonicalRoomKey =
-        getCanonicalRoomLabel(propertyName, row.room_label) || row.room_label.trim();
+        resolvedBlockRoom ?? (getCanonicalRoomLabel(propertyName, row.room_label) || row.room_label.trim());
       const displayRoomLabel =
         getDisplayRoomLabel(propertyName, canonicalRoomKey) || canonicalRoomKey;
       const roomKey = toRoomAxisKey(propertyName, displayRoomLabel);
-      if (!roomRowsByKey.has(roomKey)) continue;
+      if (!roomRowsByKey.has(roomKey)) {
+        // 맞는 행이 없으면 캘린더에서 조용히 사라진다 — 어떤 블락인지 로그를 남긴다(개인정보 없음).
+        console.warn("[admin-calendar] room block has no matching row", {
+          blockId: row.id,
+          propertyName: row.property_name,
+          roomLabel: row.room_label,
+        });
+        continue;
+      }
       roomBlocks.push({
         endDate: row.end_date,
         id: row.id,

@@ -213,16 +213,22 @@ function normalizeRating(value: number | null | undefined): number | null {
   return value;
 }
 
+// 허용 이미지 형식 — SVG 는 스크립트를 품을 수 있어 막는다. 확장자는 파일명이 아니라 MIME 에서 정한다.
+const COMPLAINT_IMAGE_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/heic": "heic",
+  "image/heif": "heif",
+};
+
 function safeExt(file: File): string {
-  const fromName = file.name.split(".").pop()?.toLowerCase();
-  if (fromName && /^[a-z0-9]+$/.test(fromName) && fromName.length <= 5) return fromName;
-  const fromType = file.type.split("/")[1];
-  if (fromType && /^[a-z0-9]+$/.test(fromType)) return fromType;
-  return "bin";
+  return COMPLAINT_IMAGE_EXT[file.type.toLowerCase()] ?? "bin";
 }
 
 function assertImageFile(file: File): void {
-  if (!file.type.startsWith("image/")) throw new Error("invalid_image_type");
+  if (!(file.type.toLowerCase() in COMPLAINT_IMAGE_EXT)) throw new Error("invalid_image_type");
   if (file.size > MAX_IMAGE_BYTES) throw new Error("image_too_large");
 }
 
@@ -242,6 +248,7 @@ export async function uploadComplaintImage(input: {
 }): Promise<string> {
   const { session, complaintId, file } = input;
   const organizationId = requireOrg(session);
+  if (!canWriteComplaint(session)) throw new Error("forbidden");
   assertImageFile(file);
   assertRecordId(complaintId, "invalid_complaint_id");
 
@@ -268,6 +275,7 @@ export async function uploadComplaintCommentImage(input: {
 }): Promise<string> {
   const { session, complaintId, commentId, file } = input;
   const organizationId = requireOrg(session);
+  if (!canWriteComment(session)) throw new Error("forbidden");
   assertImageFile(file);
   assertRecordId(complaintId, "invalid_complaint_id");
   assertRecordId(commentId, "invalid_comment_id");

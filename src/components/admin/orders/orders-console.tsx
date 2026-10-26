@@ -278,6 +278,9 @@ export function OrdersConsole({ locale, orders, loadError, todayKey }: OrdersCon
         startDate: filters.from,
         endDate: filters.to,
         status: view === "all" && filters.status !== "all" ? filters.status : undefined,
+        urgency: view === "all" && filters.urgency !== "all" ? filters.urgency : undefined,
+        building: filters.prop !== "all" ? filters.prop : undefined,
+        query: view === "all" && filters.query.trim() ? filters.query.trim() : undefined,
       }}
       labels={shared}
     />

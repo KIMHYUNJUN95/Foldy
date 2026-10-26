@@ -81,7 +81,12 @@ export type BlockWriteFailure =
   | "unblock_not_restored";
 
 export type BlockWriteResult =
-  | { ok: true; nights: number; roomIds: string[] }
+  /**
+   * `changedNights` — 이 쓰기로 **상태가 실제로 바뀐 밤**(2026-10-26). 걸기는 막기 전 하나라도 열려 있던 밤, 풀기는 풀기 전
+   * 하나라도 막혀 있던 밤. 변경 이력(`price_change_logs`)은 이 밤만 적는다 — 이미 막혀 있던 밤까지 「열림 → 막힘」으로 적으면
+   * 되돌리기가 원래 있던 차단을 풀었다(풀기도 반대로 같다).
+   */
+  | { ok: true; nights: number; roomIds: string[]; changedNights: string[] }
   | { ok: false; reason: BlockWriteFailure; detail?: string };
 
 /** 한 번에 막을 수 있는 밤 수. 실수로 1년을 막는 일을 서버에서도 막는다. */
@@ -328,6 +333,20 @@ export async function createRoomBlock(args: {
 
   // `room_blocks` 는 Beds24 동기화가 주인이라 **넣지 않아도 다음 동기화에 들어온다.** 다만 그
   // 사이(최대 15분) 화면에 안 보이면 「안 막혔나?」 하고 또 누른다. 같은 규칙으로 미리 넣어 둔다.
+  //
+  // 겹침 키가 시작일까지라(`organization_id,source,property_name,room_label,start_date`) 같은 시작일의 더 긴 차단 줄이 있으면
+  // 그대로 덮어 **줄었다**(10~20 차단 위에 10~12 를 다시 걸면 13~20 이 우리 표에서 사라졌다, 2026-10-26). 끝 날짜는 둘 중 늦은 쪽.
+  const sameStart = await args.supabase
+    .from("room_blocks")
+    .select("end_date")
+    .eq("organization_id", args.organizationId)
+    .eq("source", "beds24")
+    .eq("property_name", args.propertyName)
+    .eq("room_label", args.roomLabel)
+    .eq("start_date", args.range.startDate)
+    .maybeSingle();
+  const existingEnd = (sameStart.data as { end_date?: string | null } | null)?.end_date ?? null;
+  const mergedEnd = existingEnd && existingEnd > args.range.endDate ? existingEnd : args.range.endDate;
   await args.supabase.from("room_blocks").upsert(
     {
       organization_id: args.organizationId,
@@ -336,7 +355,7 @@ export async function createRoomBlock(args: {
       room_label: args.roomLabel,
       external_room_id: roomIds[0],
       start_date: args.range.startDate,
-      end_date: args.range.endDate,
+      end_date: mergedEnd,
       override_kind: "blackout",
       synced_at: nowIso,
     },
@@ -353,7 +372,25 @@ export async function createRoomBlock(args: {
   });
 
   await signalBeds24Change(args.organizationId, "blocks");
-  return { ok: true, nights: nights.length, roomIds };
+  return { changedNights: changedNightsOf(before.byRoom, roomIds, nights, "block"), ok: true, nights: nights.length, roomIds };
+}
+
+/**
+ * 쓰기 전 상태로 **바뀐 밤**을 고른다 — 유닛 중 하나라도 바뀌면 그 밤은 바뀐 것이다(한 방의 유닛은 함께 걸고 함께 푼다).
+ * 걸기: 하나라도 막혀 있지 않던 밤. 풀기: 하나라도 막혀 있던 밤.
+ */
+export function changedNightsOf(
+  before: ReadonlyMap<string, { overrides: ReadonlyMap<string, string | null> }>,
+  roomIds: readonly string[],
+  nights: readonly string[],
+  mode: "block" | "unblock",
+): string[] {
+  return nights.filter((night) =>
+    roomIds.some((roomId) => {
+      const blocked = before.get(roomId)?.overrides.get(night) === "blackout";
+      return mode === "block" ? !blocked : blocked;
+    }),
+  );
 }
 
 /**
@@ -444,6 +481,11 @@ export async function clearRoomBlock(args: {
   if (payload.length === 0) return { ok: false, reason: "invalid_room_id" };
 
   const nights = eachNight(args.range);
+
+  // 풀기 전 상태 — 변경 이력에 **정말 막혀 있던 밤만** 적으려고 읽는다(2026-10-26, `changedNights`). 못 읽으면 아무것도 쓰지
+  // 않고 돌려준다 — 걸기의 ① 과 같은 읽기다.
+  const before = await readNights({ externalRoomIds: roomIds, range: args.range, supabase: args.supabase });
+  if (!before.ok) return before;
 
   // 해제가 확인되지 않으면 **우리 표는 「막힘」 그대로**다(스냅샷 · room_blocks · 요금 표 모두 손대지 않는다). 그런데 Beds24 에서
   // 일부라도 풀렸으면 「화면엔 막힘, 실제로는 판매 중」이 된다 — 그래서 풀렸을 수 있는 밤을 다시 막아 둘을 맞춘다(2026-10-19).
@@ -549,7 +591,7 @@ export async function clearRoomBlock(args: {
   });
 
   await signalBeds24Change(args.organizationId, "blocks");
-  return { ok: true, nights: nights.length, roomIds };
+  return { changedNights: changedNightsOf(before.byRoom, roomIds, nights, "unblock"), ok: true, nights: nights.length, roomIds };
 }
 
 /**

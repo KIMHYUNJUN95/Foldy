@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ingestJobApplication } from "@/lib/recruit/ingest";
 import type { RecruitSource } from "@/lib/recruit/payload";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 /**
  * 채용 지원서 수신 엔드포인트 (2026-09-09).
@@ -26,26 +27,8 @@ export const dynamic = "force-dynamic";
 
 const SOURCES: readonly RecruitSource[] = ["applications", "applicants"];
 
-function resolveSecret(request: NextRequest) {
-  return (
-    request.headers.get("x-recruit-webhook-secret") ??
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    null
-  );
-}
-
-/**
- * 시크릿 비교는 길이가 같을 때만 바이트 단위로 전부 훑는다. 앞글자부터 다르면 즉시 반환하는
- * `===` 는 응답 시간으로 정답 접두사를 흘린다 — 공개 URL 이라 시도 횟수에 제한이 없다.
- */
-function secretMatches(provided: string, required: string): boolean {
-  if (provided.length !== required.length) return false;
-  let diff = 0;
-  for (let i = 0; i < provided.length; i += 1) {
-    diff |= provided.charCodeAt(i) ^ required.charCodeAt(i);
-  }
-  return diff === 0;
-}
+// 시크릿 비교는 공용 헬퍼(api-secret)가 상수 시간 · 길이 무관으로 한다 — 앞글자부터 다르면 즉시 반환하는
+// `===` 는 응답 시간으로 정답 접두사를 흘린다(공개 URL 이라 시도 횟수 제한 없음).
 
 type Item = { source: RecruitSource; docId: string; document: Record<string, unknown> };
 
@@ -73,8 +56,7 @@ export async function POST(request: NextRequest) {
     console.error("[recruit/webhook] RECRUIT_WEBHOOK_SECRET is not set — rejecting delivery");
     return NextResponse.json({ ok: false, error: "not_configured" }, { status: 503 });
   }
-  const provided = resolveSecret(request);
-  if (!provided || !secretMatches(provided, requiredSecret)) {
+  if (!requestMatchesSecret(request, [requiredSecret], { headers: ["x-recruit-webhook-secret"] })) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 

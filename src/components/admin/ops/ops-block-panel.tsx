@@ -91,6 +91,7 @@ export type BlockPanelCopy = {
   errBkPastDate: string;
   errBkSnapshotRead: string;
   errBkNotRestored: string;
+  errBkRoomBusy: string;
   /** 반영 안 된 구간 목록. `{ranges}` = 「302 10/26 → 10/29, …」. */
   bkUnapplied: string;
 };
@@ -124,6 +125,8 @@ export function blockErrorText(copy: BlockPanelCopy, error: BlockChangeError): s
     // 해제가 일부만 됐을 수 있고 되돌리지도 못했다 — 사람이 Beds24 에서 확인해야 한다.
     case "unblock_not_restored":
       return copy.errBkNotRestored;
+    case "room_busy":
+      return copy.errBkRoomBusy;
     default:
       return copy.errBkUnknownRoom;
   }

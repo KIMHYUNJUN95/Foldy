@@ -2,6 +2,7 @@
 
 import { requireAdminSession } from "@/lib/admin-session";
 import { buildAdminExportMeta, type AdminExportMeta } from "@/lib/admin-export-meta";
+import { tokyoToday } from "@/lib/tokyo-date";
 import type { AdminReportExportResult, AdminWorkbookExportResult } from "@/lib/admin-export-result";
 import { buildAdminTableReportHtml } from "@/lib/admin-table-report";
 import { buildAdminTableWorkbookBase64, type AdminTableSheet } from "@/lib/admin-table-workbook";
@@ -136,7 +137,7 @@ export async function exportOpsOccupancyWorkbook(payload: OpsOccupancyExportPayl
     });
     return {
       base64,
-      filename: `occupancy_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`,
+      filename: `occupancy_${tokyoToday().replace(/-/g, "")}.xlsx`,
       ok: true,
       rowCount: payload.rows.length,
     };

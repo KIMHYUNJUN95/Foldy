@@ -91,7 +91,8 @@ import {
 } from "@/lib/attendance-transport-report";
 import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
-import { resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
+import { isMonthEnded, isValidYm, resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
+import { tokyoToday } from "@/lib/tokyo-date";
 import { hasOverlappingSession } from "@/lib/attendance-overlap";
 import { isPlatformDeveloper } from "@/config/roles";
 
@@ -100,7 +101,8 @@ export type ReviewActionResult =
   | {
       ok: false;
       /** `overlap` = 같은 사람의 다른 유효 세션과 근무 시간이 겹친다(이중 지급 방지). */
-      reason: "forbidden" | "not_found" | "invalid" | "comment_required" | "overlap" | "error";
+      /** `already_handled` = 그 사이 다른 관리자가 먼저 가져갔거나 직원이 취소했다(0행 갱신). */
+      reason: "forbidden" | "not_found" | "invalid" | "comment_required" | "overlap" | "already_handled" | "error";
     };
 
 /** Admin-confirmed final values on approval (default to the requester's proposals when omitted). */
@@ -179,14 +181,17 @@ export async function setCorrectionInReview(requestId: string): Promise<ReviewAc
 
   const request = await loadRequest(service, organizationId, requestId);
   if (!request) return { ok: false, reason: "not_found" };
-  if (request.status !== "requested") return { ok: false, reason: "invalid" };
+  if (request.status !== "requested") return { ok: false, reason: "already_handled" };
 
   const upd = await service
     .from("attendance_correction_requests")
     .update({ status: "in_review", reviewed_by_user_id: session.user.id })
     .eq("id", requestId)
-    .eq("status", "requested");
+    .eq("status", "requested")
+    .select("id");
   if (upd.error) return { ok: false, reason: "error" };
+  // 0행 = 읽은 뒤 다른 관리자가 먼저 가져갔거나 직원이 취소했다 — 성공으로 보이면 안 된다(2026-10-26).
+  if (!upd.data || upd.data.length === 0) return { ok: false, reason: "already_handled" };
 
   revalidateSelfView();
   return { ok: true };
@@ -587,10 +592,12 @@ export type ManualSessionResult =
     };
 
 export type SimpleManualResult =
-  | { ok: true }
+  /** `updatedAt` = 갱신 뒤 세션의 `updated_at`(직접 수정만 돌려준다) — 다음 수정의 동시성 기준. */
+  | { ok: true; updatedAt?: string }
   | {
       ok: false;
       reason:
+        | "stale"
         | "forbidden"
         | "invalid"
         | "reason_required"
@@ -622,7 +629,19 @@ export type UpdateManualSessionInput = {
   clockInSiteId?: string | null;
   clockOutSiteId?: string | null;
   reviewState?: AttendanceReviewState;
+  /**
+   * 화면이 본 세션의 `updated_at`(낙관적 동시성, 2026-10-26). 주면 그 사이 바뀐 세션은 `stale` 로 거절한다 —
+   * 정정 승인 · 다른 관리자의 수정을 모르고 옛 값으로 덮어쓰지 않게.
+   */
+  expectedUpdatedAt?: string;
 };
+
+/** 같은 시각인가 — timestamptz 문자열은 표기(자릿수 · 오프셋)가 달라도 같은 순간일 수 있다. */
+function sameInstant(a: string, b: string): boolean {
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  return a === b || (Number.isFinite(ta) && ta === tb);
+}
 
 function isHhmm(v: string): boolean {
   return /^\d{2}:\d{2}$/.test(v);
@@ -811,6 +830,9 @@ export async function updateAttendanceSessionAdmin(
     .maybeSingle();
   const s = sRes.data as AttendanceSessionRow | null;
   if (!s) return { ok: false, reason: "not_found" };
+  if (input.expectedUpdatedAt !== undefined && !sameInstant(input.expectedUpdatedAt, s.updated_at)) {
+    return { ok: false, reason: "stale" };
+  }
   if (await isFinalizedUserMonth(service, organizationId, s.user_id, ymdToYm(s.operating_date))) {
     return { ok: false, reason: "finalized_locked" };
   }
@@ -899,12 +921,17 @@ export async function updateAttendanceSessionAdmin(
     review_state: s.review_state,
   };
 
+  // 읽은 행 그대로일 때만 쓴다 — 읽고 쓰는 사이 정정 승인 등이 끼어들면 0행 → `stale`.
   const updRes = await service
     .from("attendance_sessions")
     .update(update)
     .eq("id", s.id)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .eq("updated_at", s.updated_at)
+    .select("updated_at");
   if (updRes.error) return { ok: false, reason: "error" };
+  const updatedRow = (updRes.data ?? [])[0] as { updated_at: string } | undefined;
+  if (!updatedRow) return { ok: false, reason: "stale" };
 
   await bestEffortWrite(
     "attendance_session_audits: insert",
@@ -920,7 +947,7 @@ export async function updateAttendanceSessionAdmin(
   );
 
   revalidateSelfView();
-  return { ok: true };
+  return { ok: true, updatedAt: updatedRow.updated_at };
 }
 
 /** Invalidate a session instead of deleting it (privileged). Mandatory reason + audit. */
@@ -1083,7 +1110,7 @@ export type FinalizeResult =
   | { ok: true; id: string }
   | {
       ok: false;
-      reason: "forbidden" | "invalid" | "target_invalid" | "blocked" | "not_hourly" | "error";
+      reason: "forbidden" | "invalid" | "not_ended" | "target_invalid" | "blocked" | "not_hourly" | "error";
       blockers?: FinalizationBlockers;
     };
 
@@ -1108,7 +1135,9 @@ export async function finalizeAttendanceMonth(input: {
   if (!(await attendanceCan(service, organizationId, actorId, "payroll.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
-  if (!/^\d{4}-\d{2}$/.test(input.ym)) return { ok: false, reason: "invalid" };
+  if (!isValidYm(input.ym)) return { ok: false, reason: "invalid" };
+  // 끝나지 않은 달(이번 달 · 미래)은 마감하지 않는다 — 마감 뒤 출근이 생기면 금액이 어긋난다(2026-10-26).
+  if (!isMonthEnded(input.ym, tokyoToday())) return { ok: false, reason: "not_ended" };
 
   // 비활성(퇴사)이어도 이 조직 멤버면 된다 — 마지막 달 급여를 닫아야 한다(2026-10-22 검토).
   const member = await service
@@ -1225,7 +1254,7 @@ export async function reopenAttendanceMonth(input: {
   if (!(await attendanceCan(service, organizationId, actorId, "payroll.manage"))) {
     return { ok: false, reason: "forbidden" };
   }
-  if (!/^\d{4}-\d{2}$/.test(input.ym)) return { ok: false, reason: "invalid" };
+  if (!isValidYm(input.ym)) return { ok: false, reason: "invalid" };
   if (!input.reason.trim()) return { ok: false, reason: "reason_required" };
 
   const snap = await getCurrentFinalizedSnapshot(service, organizationId, input.userId, input.ym);
@@ -1318,7 +1347,7 @@ export async function exportMonthlyPayrollWorkbook(
 ): Promise<PayrollWorkbookResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  if (!/^\d{4}-\d{2}$/.test(ym)) return { ok: false, reason: "error" };
+  if (!isValidYm(ym)) return { ok: false, reason: "error" };
 
   const locale = session.user.preferredLanguage;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
@@ -1413,7 +1442,7 @@ async function buildUserPayrollExportData(
 > {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  if (!/^\d{4}-\d{2}$/.test(ym)) return { ok: false, reason: "error" };
+  if (!isValidYm(ym)) return { ok: false, reason: "error" };
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
   const actorId = session.user.id;
@@ -1621,7 +1650,7 @@ export async function exportMonthlyPayrollReport(
 ): Promise<PayrollReportResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  if (!/^\d{4}-\d{2}$/.test(ym)) return { ok: false, reason: "error" };
+  if (!isValidYm(ym)) return { ok: false, reason: "error" };
 
   const locale = session.user.preferredLanguage;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
@@ -1993,21 +2022,8 @@ export async function setHourlyRate(input: {
     .filter((r) => r.effective_from < input.effectiveFrom)
     .map((r) => r.id);
 
-  if (pendingIds.length > 0) {
-    const delRes = await service
-      .from("hourly_rate_history")
-      .delete()
-      .in("id", pendingIds);
-    if (delRes.error) return { ok: false, reason: "error" };
-  }
-  if (activeIds.length > 0) {
-    const closeRes = await service
-      .from("hourly_rate_history")
-      .update({ effective_to: closeIso })
-      .in("id", activeIds);
-    if (closeRes.error) return { ok: false, reason: "error" };
-  }
-
+  // 새 행을 **먼저** 넣는다 — 넣기가 실패하면 옛 행은 그대로라 시급이 비는 날이 생기지 않는다(2026-10-26).
+  // 닫기 · 지우기가 실패하면 방금 넣은 행을 지워 원래대로 돌린다.
   const ins = (await service
     .from("hourly_rate_history")
     .insert({
@@ -2021,6 +2037,29 @@ export async function setHourlyRate(input: {
     .select("id")
     .single()) as { data: { id: string } | null; error: { message: string } | null };
   if (ins.error || !ins.data) return { ok: false, reason: "error" };
+  const insertedId = ins.data.id;
+
+  if (pendingIds.length > 0) {
+    const delRes = await service
+      .from("hourly_rate_history")
+      .delete()
+      .in("id", pendingIds);
+    if (delRes.error) {
+      await service.from("hourly_rate_history").delete().eq("id", insertedId);
+      return { ok: false, reason: "error" };
+    }
+  }
+  if (activeIds.length > 0) {
+    const closeRes = await service
+      .from("hourly_rate_history")
+      .update({ effective_to: closeIso })
+      .in("id", activeIds);
+    if (closeRes.error) {
+      await service.from("hourly_rate_history").delete().eq("id", insertedId);
+      return { ok: false, reason: "error" };
+    }
+  }
+
 
   await bestEffortWrite(
     "audit_logs: insert",
@@ -2145,18 +2184,7 @@ export async function setEmploymentType(input: {
   const pendingIds = openRows.filter((r) => r.effective_from >= input.effectiveFrom).map((r) => r.id);
   const activeIds = openRows.filter((r) => r.effective_from < input.effectiveFrom).map((r) => r.id);
 
-  if (pendingIds.length > 0) {
-    const del = await service.from("employment_type_history").delete().in("id", pendingIds);
-    if (del.error) return { ok: false, reason: "error" };
-  }
-  if (activeIds.length > 0) {
-    const close = await service
-      .from("employment_type_history")
-      .update({ effective_to: closeIso })
-      .in("id", activeIds);
-    if (close.error) return { ok: false, reason: "error" };
-  }
-
+  // 새 행을 먼저 넣고 옛 행을 닫는다 — 넣기가 실패해도 옛 고용형태가 그대로 남는다(2026-10-26).
   const ins = (await service
     .from("employment_type_history")
     .insert({
@@ -2170,6 +2198,26 @@ export async function setEmploymentType(input: {
     .select("id")
     .single()) as { data: { id: string } | null; error: { message: string } | null };
   if (ins.error || !ins.data) return { ok: false, reason: "error" };
+  const insertedId = ins.data.id;
+
+  if (pendingIds.length > 0) {
+    const del = await service.from("employment_type_history").delete().in("id", pendingIds);
+    if (del.error) {
+      await service.from("employment_type_history").delete().eq("id", insertedId);
+      return { ok: false, reason: "error" };
+    }
+  }
+  if (activeIds.length > 0) {
+    const close = await service
+      .from("employment_type_history")
+      .update({ effective_to: closeIso })
+      .in("id", activeIds);
+    if (close.error) {
+      await service.from("employment_type_history").delete().eq("id", insertedId);
+      return { ok: false, reason: "error" };
+    }
+  }
+
 
   await bestEffortWrite(
     "audit_logs: insert",
@@ -2504,7 +2552,9 @@ async function buildTransportExportItems(
   if (!transport.isPrivileged) return { ok: false, reason: "forbidden" };
 
   const candidateRows = transport.rows.filter(
-    (r): r is AdminTransportRow & { reportId: string } => Boolean(r.reportId) && r.itemCount > 0,
+    // 승인된 청구만 내보낸다 — 합계가 급여에 들어가는 금액과 같아야 한다(2026-10-26).
+    (r): r is AdminTransportRow & { reportId: string } =>
+      Boolean(r.reportId) && r.itemCount > 0 && r.status === "approved",
   );
   if (candidateRows.length === 0) return { ok: false, reason: "empty" };
 
@@ -2564,7 +2614,7 @@ export type TransportWorkbookResult =
 export async function exportMonthlyTransportWorkbook(ym: string): Promise<TransportWorkbookResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  if (!/^\d{4}-\d{2}$/.test(ym)) return { ok: false, reason: "error" };
+  if (!isValidYm(ym)) return { ok: false, reason: "error" };
 
   const locale = session.user.preferredLanguage;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
@@ -2611,7 +2661,7 @@ export type TransportReportResult =
 export async function exportMonthlyTransportReport(ym: string): Promise<TransportReportResult> {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  if (!/^\d{4}-\d{2}$/.test(ym)) return { ok: false, reason: "error" };
+  if (!isValidYm(ym)) return { ok: false, reason: "error" };
 
   const locale = session.user.preferredLanguage;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";

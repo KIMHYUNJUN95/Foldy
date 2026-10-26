@@ -11,6 +11,7 @@ import {
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
+import { isValidYm } from "@/lib/attendance-clock";
 
 // Admin · Attendance · Review Queue (Slice 2).
 // Sessions table + multi-select bulk bar + right-detail session panel.
@@ -31,7 +32,7 @@ export default async function AdminAttendanceQueuePage({
   const c = dictionary.admin.attendanceConsole;
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const carriedYm =
-    typeof params.ym === "string" && /^\d{4}-\d{2}$/.test(params.ym) ? params.ym : currentTokyoYm();
+    isValidYm(params.ym) ? params.ym : currentTokyoYm();
   const initialFilter =
     params.filter === "review" ||
     params.filter === "pending" ||

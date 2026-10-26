@@ -18,6 +18,7 @@ vi.mock("@/lib/admin-session", () => ({
 }));
 vi.mock("@/lib/ops-admin", () => ({ canAccessOpsAdmin: () => true, canWriteOpsCalendar: () => true }));
 vi.mock("@/app/api/ops/calendar/reads", () => ({ readRoomNames: vi.fn() }));
+vi.mock("@/lib/beds24/live-signal", () => ({ signalBeds24Change: vi.fn(async () => undefined) }));
 vi.mock("@/lib/beds24/process-webhook-booking", () => ({
   processBeds24WebhookBooking: vi.fn(async () => ({ ok: true, reservationId: "res-1" })),
 }));
@@ -40,6 +41,7 @@ vi.mock("@/lib/beds24/calendar-client", async (importOriginal) => {
     fetchBeds24BookingById: vi.fn(async () => ({ error: "not_found", ok: false })),
     fetchBeds24Calendar: vi.fn(),
     postBeds24Booking: vi.fn(),
+    postBeds24Calendar: vi.fn(),
     postBeds24BookingUpdate: vi.fn(),
   };
 });
@@ -47,8 +49,10 @@ vi.mock("@/lib/beds24/calendar-client", async (importOriginal) => {
 let fake = createFakeSupabase({});
 vi.mock("@/lib/supabase/service", () => ({ getSupabaseServiceClient: () => fake.client }));
 
-const { submitManualBooking, submitReservationEdit } = await import("@/actions/ops-calendar");
+const { revertBlockChange, submitManualBooking, submitReservationEdit, submitRoomBlock } = await import("@/actions/ops-calendar");
 const calendarClient = await import("@/lib/beds24/calendar-client");
+const postCalendar = vi.mocked(calendarClient.postBeds24Calendar);
+const fetchBooking = vi.mocked(calendarClient.fetchBeds24BookingById);
 const fetchCalendar = vi.mocked(calendarClient.fetchBeds24Calendar);
 const postBooking = vi.mocked(calendarClient.postBeds24Booking);
 const postBookingUpdate = vi.mocked(calendarClient.postBeds24BookingUpdate);
@@ -107,6 +111,7 @@ beforeEach(() => {
   fetchCalendar.mockReset();
   postBooking.mockReset();
   postBookingUpdate.mockReset();
+  postCalendar.mockReset();
 });
 
 describe("submitManualBooking — 같은 방 동시 생성", () => {
@@ -244,7 +249,8 @@ describe("submitReservationEdit — 방 잠금 · Beds24 재확인", () => {
 
     const result = await submitReservationEdit(extend);
 
-    expect(result).toEqual({ ok: true });
+    // 다시 읽기가 안 됐다(가짜는 not_found) — Beds24 엔 반영됐지만 우리 표는 못 맞췄다 → 「반영 지연」(2026-10-26).
+    expect(result).toEqual({ ok: true, stale: true });
     const lockCalls = fake.rpcCalls.filter((call) => call.name === "beds24_try_lock");
     expect(lockCalls).toHaveLength(1);
     expect((lockCalls[0].args as { p_name: string }).p_name).toBe(`manual_booking:org-1:${ROOM_KEY}`);
@@ -259,8 +265,89 @@ describe("submitReservationEdit — 방 잠금 · Beds24 재확인", () => {
 
     const result = await submitReservationEdit({ ...extend, changes: { numAdult: 2 } });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, stale: true });
     expect(fake.rpcCalls.filter((call) => call.name === "beds24_try_lock")).toHaveLength(0);
     expect(fetchCalendar).not.toHaveBeenCalled();
+  });
+});
+
+describe("submitReservationEdit — 우리 표 다시 맞추기(반영 지연)", () => {
+  it("다시 읽어 우리 표를 맞췄으면 `stale` 없이 성공", async () => {
+    fake.tables.reservations = [
+      {
+        check_in_date: "2030-01-10",
+        check_out_date: "2030-01-11",
+        guest_name: "Kim Guest",
+        id: "res-1",
+        organization_id: "org-1",
+        raw_payload: { bookId: 900, numAdult: 1, numChild: 0, price: 10000, roomId: 5001 },
+        source: "beds24",
+        status: "confirmed",
+      },
+    ];
+    postBookingUpdate.mockResolvedValue({ ok: true } as never);
+    fetchBooking.mockResolvedValueOnce({ booking: { id: 900, numAdult: 2 }, ok: true } as never);
+
+    const result = await submitReservationEdit({
+      changes: { numAdult: 2 },
+      reservationId: "res-1",
+      roomIds: ["u1"],
+      roomKey: ROOM_KEY,
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+});
+
+/**
+ * 차단 걸기 · 풀기(2026-10-26) — 수기 예약과 같은 방 잠금, 변경 이력은 **정말 바뀐 밤만**, 되돌리기는 그 밤만.
+ */
+describe("submitRoomBlock — 방 잠금 · 바뀐 밤만 이력", () => {
+  const cells = ["2030-01-10", "2030-01-11"].map((date) => ({ date, roomIds: ["u1"], roomKey: ROOM_KEY, roomLabel: "101" }));
+
+  it("같은 방 잠금을 남이 들고 있으면 Beds24 를 부르지 않고 「방 사용 중」", async () => {
+    fake.client.rpc = async (name: string) => ({ data: name === "beds24_try_lock" ? false : true, error: null });
+
+    const result = await submitRoomBlock({ cells });
+
+    expect(result).toEqual({ error: "room_busy", ok: false });
+    expect(fetchCalendar).not.toHaveBeenCalled();
+    expect(postCalendar).not.toHaveBeenCalled();
+  });
+
+  it("이미 막혀 있던 밤은 이력에 남기지 않고, 되돌리기는 원래 열려 있던 밤만 푼다", async () => {
+    fake.tables.price_change_logs = [];
+    fetchCalendar
+      // 걸기 ① 막기 전 — 10일 열림, 11일은 원래 막혀 있음.
+      .mockResolvedValueOnce(
+        liveCalendar({ "2030-01-10": { numAvail: 1, override: null }, "2030-01-11": { numAvail: 0, override: "blackout" } }) as never,
+      )
+      // 걸기 ③ 되읽기.
+      .mockResolvedValueOnce(
+        liveCalendar({ "2030-01-10": { override: "blackout" }, "2030-01-11": { override: "blackout" } }) as never,
+      )
+      // 되돌리기(풀기) — 풀기 전 · 되읽기.
+      .mockResolvedValueOnce(liveCalendar({ "2030-01-10": { override: "blackout" } }) as never)
+      .mockResolvedValueOnce(liveCalendar({ "2030-01-10": { override: null } }) as never);
+    postCalendar.mockResolvedValue({
+      credit: { remaining: 100, resetInSec: null },
+      items: [{ accepted: true, error: null, errorCode: null, externalRoomId: "5001" }],
+    } as never);
+
+    const blocked = await submitRoomBlock({ cells });
+    expect(blocked.ok).toBe(true);
+    if (!blocked.ok) return;
+    const logs = fake.tables.price_change_logs as Array<{ stay_date: string; old_value: number; new_value: number }>;
+    expect(logs.map((log) => [log.stay_date, log.old_value, log.new_value])).toEqual([["2030-01-10", 0, 1]]);
+    // 잠금은 걸기 동안 잡고(수기 예약과 같은 이름) 끝나면 놓는다.
+    const lockCalls = fake.rpcCalls.filter((call) => call.name === "beds24_try_lock");
+    expect((lockCalls[0].args as { p_name: string }).p_name).toBe(`manual_booking:org-1:${ROOM_KEY}`);
+    expect(fake.rpcCalls.filter((call) => call.name === "beds24_release_lock")).toHaveLength(1);
+
+    const reverted = await revertBlockChange({ at: blocked.at });
+
+    expect(reverted).toEqual({ cells: 1, ok: true, skippedChanged: 0 });
+    const unblockPayload = postCalendar.mock.calls[1][0] as Array<{ calendar: Array<{ from: string; to: string }> }>;
+    expect(unblockPayload[0].calendar.map((segment) => [segment.from, segment.to])).toEqual([["2030-01-10", "2030-01-10"]]);
   });
 });

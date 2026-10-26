@@ -51,7 +51,12 @@ export function LostFoundActionModal({ kind, item, t, locale, sharedLabels, pend
   const [memo, setMemo] = useState("");
   const [method, setMethod] = useState<LostReturnMethod>("pickup");
   const [tracking, setTracking] = useState("");
-  const [dueDate, setDueDate] = useState(addDaysISO(item.dueDate, 14));
+  // 기본값은 「기한 + 14일」, 단 오늘 이전이면 내일(서버는 오늘 이후만 받는다).
+  const [dueDate, setDueDate] = useState(() => {
+    const next = addDaysISO(item.dueDate, 14);
+    const tomorrow = addDaysISO(tokyoToday(), 1);
+    return next < tomorrow ? tomorrow : next;
+  });
   const [status, setStatus] = useState<LostItemStatus>(
     item.status === "returned" || item.status === "disposed" ? "registered" : item.status,
   );

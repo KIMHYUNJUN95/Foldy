@@ -523,3 +523,8 @@ When created from an active cleaning timer, the request should automatically lin
 
 여전히 유효한 사실 하나: **구 CSV 경로(`/api/admin/export/*`)는 조직 전체에서 삭제됐다** — 청소 문서(07)·
 주문 문서(10)와 동일한 export 통합 작업의 일부다.
+
+## 2026-10-26 어드민 상태 변경 정합성
+
+- `updateMaintenanceStatus`(어드민 상세): 진행 → 종료(closed/cancelled)로 갈 때만 `completed_at`/`completed_by`/`completed_by_admin=true` 를 찍고, 다시 열면 지운다(모바일 `updateMaintenanceHandling` 과 같은 규칙). 읽은 상태 그대로일 때만 쓰는 조건부 업데이트(`.eq("status", 읽은 값)`).
+- `applyMaintenanceException`(강제 완료 / 무효): `open`/`in_progress` 건에만 적용(`.in("status", …)`). 이미 종결된 건은 `invalid` — 완료시각·처리자를 덮어쓰지 않는다.

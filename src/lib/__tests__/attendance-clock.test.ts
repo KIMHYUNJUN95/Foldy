@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
+import { isMonthEnded, isValidYm, resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
 
 /**
  * 출퇴근 시각 조합 (2026-10-01).
@@ -43,5 +43,29 @@ describe("resolveClockOutAfterClockIn", () => {
   it("월말 → 다음 달로 넘어간다", () => {
     const clockIn = tokyoWallClockInstant("2026-10-31", "23:00");
     expect(resolveClockOutAfterClockIn("2026-10-31", "02:00", clockIn)).toBe("2026-10-31T17:00:00.000Z");
+  });
+});
+
+describe("isValidYm", () => {
+  it("accepts YYYY-MM with month 01-12 only", () => {
+    expect(isValidYm("2026-10")).toBe(true);
+    expect(isValidYm("2026-01")).toBe(true);
+    expect(isValidYm("2026-12")).toBe(true);
+    expect(isValidYm("2026-00")).toBe(false);
+    expect(isValidYm("2026-13")).toBe(false);
+    expect(isValidYm("2026-99")).toBe(false);
+    expect(isValidYm("2026-1")).toBe(false);
+    expect(isValidYm(undefined)).toBe(false);
+  });
+});
+
+describe("isMonthEnded — 끝난 달만 마감", () => {
+  it("the current Tokyo month and future months are not ended", () => {
+    expect(isMonthEnded("2026-10", "2026-10-31")).toBe(false);
+    expect(isMonthEnded("2026-11", "2026-10-26")).toBe(false);
+  });
+  it("earlier months are ended, including across a year boundary", () => {
+    expect(isMonthEnded("2026-09", "2026-10-01")).toBe(true);
+    expect(isMonthEnded("2025-12", "2026-01-01")).toBe(true);
   });
 });

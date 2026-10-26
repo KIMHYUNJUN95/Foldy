@@ -3,6 +3,7 @@ import { syncOrganizationReviews } from "@/lib/beds24/reviews-sync";
 import { isBeds24SyncPaused } from "@/lib/beds24/sync-control";
 import { recordReviewSyncDone } from "@/lib/beds24/reviews-sync-manual";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { requestMatchesSecret } from "@/lib/api-secret";
 
 // Production collection trigger for Beds24 external reviews (Airbnb / Booking.com).
 //
@@ -46,13 +47,6 @@ const ROUTINE_SINCE_DAYS = 30;
 // 50건이 전량으로 오며, 여기에 기간 컷을 걸면 상한 탓에 다시 못 가져올 데이터를 버리게 된다.
 const FULL_SINCE_DAYS = 180;
 
-function resolveProvidedSecret(request: NextRequest) {
-  const fromBearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const fromHeader = request.headers.get("x-beds24-webhook-secret");
-  const fromQuery = request.nextUrl.searchParams.get("secret");
-  return fromBearer ?? fromHeader ?? fromQuery ?? null;
-}
-
 /**
  * Authorize a review-collection call. Same contract as /api/beds24/reconcile:
  *  - Vercel Cron's `Authorization: Bearer <CRON_SECRET>` header, or
@@ -66,10 +60,15 @@ function authorize(request: NextRequest): { ok: true } | { ok: false; status: nu
     return { ok: false, status: 404 };
   }
 
-  const provided = resolveProvidedSecret(request);
-  if (!provided) return { ok: false, status: 403 };
-  if (cronSecret && provided === cronSecret) return { ok: true };
-  if (webhookSecret && provided === webhookSecret) return { ok: true };
+  // 상수 시간 비교 · 보낸 후보(Bearer / 헤더 / 쿼리) 중 하나라도 맞으면 통과(2026-10-26, api-secret).
+  if (
+    requestMatchesSecret(request, [cronSecret, webhookSecret], {
+      headers: ["x-beds24-webhook-secret"],
+      query: true,
+    })
+  ) {
+    return { ok: true };
+  }
   return { ok: false, status: 403 };
 }
 

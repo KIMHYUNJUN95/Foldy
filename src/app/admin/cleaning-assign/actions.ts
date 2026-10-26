@@ -49,7 +49,7 @@ export async function assignToRoom(input: { date: string; roomKey: string; userI
   const [rooms, member] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date, session.user.id), isFieldMember(organizationId, input.userId)]);
   const room = rooms.find((item) => item.roomKey === input.roomKey);
   // 미뤘거나 처리 끝으로 둔 방에는 넣지 않는다(되돌린 뒤에).
-  if (!room || !member || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
+  if (!room || !member || room.status !== "pending" || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
   const result = await supabase.from("cleaning_assignments").insert({
     created_by: session.user.id,
     organization_id: organizationId,
@@ -266,16 +266,25 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
   const supabase = getSupabaseServiceClient();
   const room = (await loadAssignDayRooms(supabase, organizationId, input.date, session.user.id)).find((item) => item.roomKey === input.roomKey);
   if (!room) return { ok: false, reason: "invalid" };
+  // 청소 중 · 끝난 방, 이미 미룬 방, 이미 처리 끝인 방에는 다시 걸지 않는다(먼저 되돌린 뒤에). 원래 날짜는 서버가 아는 값과 같아야 한다.
+  if (room.status !== "pending" || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
+  if (input.originDate !== (room.carriedFrom ?? input.date)) return { ok: false, reason: "invalid" };
   const reason = String(input.reason ?? "").trim().slice(0, 120);
   // 그날 이 방 배정은 뺀다 — 뺀 사람을 미룸 줄에 남겨 「되돌리기」가 다시 넣게(이미 미룬 방을 다시 미루면 전에 뺀 사람과 합친다).
   const [current, previous] = await Promise.all([
     supabase.from("cleaning_assignments").select("user_id").eq("organization_id", organizationId).eq("work_date", input.date).eq("room_key", room.roomKey),
-    supabase.from("cleaning_room_holds").select("removed_user_ids").eq("organization_id", organizationId).eq("room_key", room.roomKey).eq("origin_date", input.originDate).maybeSingle(),
+    supabase.from("cleaning_room_holds").select("removed_user_ids, closed_session_id").eq("organization_id", organizationId).eq("room_key", room.roomKey).eq("origin_date", input.originDate).maybeSingle(),
   ]);
   if (current.error || previous.error) return { ok: false, reason: "error" };
   const removedUserIds = [...new Set([...(previous.data?.removed_user_ids ?? []), ...(current.data ?? []).map((row) => row.user_id)])];
   // 처리 끝은 청소 대시보드 강제완료처럼 그날 청소 기록(완료)을 남긴다 — 「처리 끝 · 청소 안 함」 표시(`closed_without_cleaning`),
   // 담당자는 누른 관리자 · 소요 시간 없음, 사람별 숫자에서는 빠진다. 되돌리기가 지우도록 미룸 줄에 기록 id 를 둔다.
+  // 기존 줄을 바꿔 거는 경우(기간이 지난 미룸 등) 전에 남긴 「처리 끝」 청소 기록은 먼저 지운다 — 고아 완료 기록 방지.
+  const oldClosedId = previous.data?.closed_session_id ?? null;
+  if (oldClosedId) {
+    const removedOld = await supabase.from("cleaning_sessions").delete().eq("organization_id", organizationId).eq("closed_without_cleaning", true).eq("id", oldClosedId);
+    if (removedOld.error) return { ok: false, reason: "error" };
+  }
   let closedSessionId: string | null = null;
   if (input.kind === "resolved") {
     const now = new Date().toISOString();
@@ -340,38 +349,46 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
   if (!isDateKey(input.originDate) || typeof input.roomKey !== "string") return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
+  // 지우기 전에 되돌릴 수 있는지부터 정한다 — 뺀 사람을 다시 넣어야 하는데 방을 못 찾으면 줄을 남겨 두고 conflict.
+  const existing = await supabase
+    .from("cleaning_room_holds")
+    .select("removed_user_ids, closed_session_id")
+    .eq("organization_id", organizationId)
+    .eq("room_key", input.roomKey)
+    .eq("origin_date", input.originDate);
+  if (existing.error) return { ok: false, reason: "error" };
+  if ((existing.data ?? []).length === 0) return { ok: false, reason: "conflict" };
+  const restore = [...new Set((existing.data ?? []).flatMap((row) => row.removed_user_ids ?? []))].slice(0, 10);
+  const room = restore.length > 0 && isEditableDate(input.date) ? (await loadAssignDayRooms(supabase, organizationId, input.date, session.user.id)).find((item) => item.roomKey === input.roomKey) : undefined;
+  if (restore.length > 0 && isEditableDate(input.date) && !room) return { ok: false, reason: "conflict" };
   const result = await supabase
     .from("cleaning_room_holds")
     .delete()
     .eq("organization_id", organizationId)
     .eq("room_key", input.roomKey)
     .eq("origin_date", input.originDate)
-    .select("removed_user_ids, closed_session_id");
+    .select("closed_session_id");
   if (result.error) return { ok: false, reason: "error" };
   // 처리 끝이 남긴 청소 기록도 지운다(표시가 붙은 것만 — 실제 청소 기록은 건드리지 않는다).
   const closedIds = (result.data ?? []).map((row) => row.closed_session_id).filter((id): id is string => Boolean(id));
   if (closedIds.length > 0) {
     await supabase.from("cleaning_sessions").delete().eq("organization_id", organizationId).eq("closed_without_cleaning", true).in("id", closedIds);
   }
-  const restore = [...new Set((result.data ?? []).flatMap((row) => row.removed_user_ids ?? []))].slice(0, 10);
-  if (restore.length > 0 && isEditableDate(input.date)) {
-    const room = (await loadAssignDayRooms(supabase, organizationId, input.date, session.user.id)).find((item) => item.roomKey === input.roomKey);
-    if (room) {
-      const members = await Promise.all(restore.map((userId) => isFieldMember(organizationId, userId)));
-      const rows = restore
-        .filter((_, index) => members[index])
-        .map((userId) => ({
-          created_by: session.user.id,
-          organization_id: organizationId,
-          property_name: room.propertyName,
-          room_key: room.roomKey,
-          room_label: room.roomLabel,
-          user_id: userId,
-          work_date: input.date,
-        }));
-      if (rows.length > 0) {
-        await supabase.from("cleaning_assignments").upsert(rows, { ignoreDuplicates: true, onConflict: "organization_id,work_date,room_key,user_id" });
-      }
+  if (room) {
+    const members = await Promise.all(restore.map((userId) => isFieldMember(organizationId, userId)));
+    const rows = restore
+      .filter((_, index) => members[index])
+      .map((userId) => ({
+        created_by: session.user.id,
+        organization_id: organizationId,
+        property_name: room.propertyName,
+        room_key: room.roomKey,
+        room_label: room.roomLabel,
+        user_id: userId,
+        work_date: input.date,
+      }));
+    if (rows.length > 0) {
+      await supabase.from("cleaning_assignments").upsert(rows, { ignoreDuplicates: true, onConflict: "organization_id,work_date,room_key,user_id" });
     }
   }
   await changed(session.organization.id);
@@ -501,12 +518,21 @@ export async function saveFixedStaff(input: { propertyName: string; entries: Arr
     seen.add(entry.userId);
     rows.push({ organization_id: organizationId, owner_id: session.user.id, position: rows.filter((row) => row.tier === entry.tier).length, property_name: propertyName, tier: entry.tier, user_id: entry.userId });
   }
-  const before = await supabase.from("cleaning_fixed_staff").select("user_id, tier").eq("organization_id", organizationId).eq("owner_id", session.user.id).eq("property_name", propertyName);
+  const before = await supabase.from("cleaning_fixed_staff").select("user_id, tier, position").eq("organization_id", organizationId).eq("owner_id", session.user.id).eq("property_name", propertyName);
+  if (before.error) return { ok: false, reason: "error" };
   const del = await supabase.from("cleaning_fixed_staff").delete().eq("organization_id", organizationId).eq("owner_id", session.user.id).eq("property_name", propertyName);
   if (del.error) return { ok: false, reason: "error" };
   if (rows.length > 0) {
     const insert = await supabase.from("cleaning_fixed_staff").insert(rows);
-    if (insert.error) return { ok: false, reason: "error" };
+    if (insert.error) {
+      // 지운 뒤 넣기가 실패하면 원래 목록을 되살린다(고정 인력이 통째로 사라지지 않게).
+      const restoreRows = (before.data ?? []).map((row) => ({ organization_id: organizationId, owner_id: session.user.id, position: row.position, property_name: propertyName, tier: row.tier, user_id: row.user_id }));
+      if (restoreRows.length > 0) {
+        const back = await supabase.from("cleaning_fixed_staff").insert(restoreRows);
+        if (back.error) console.error("[cleaning-assign] fixed staff restore failed", { code: back.error.code });
+      }
+      return { ok: false, reason: "error" };
+    }
   }
   await writeSettingLog(organizationId, session.user.id, { after: rows.map((r) => ({ tier: r.tier, userId: r.user_id })), area: "fixed", before: before.data ?? [], propertyName });
   revalidate();
@@ -562,6 +588,7 @@ export async function answerTraineeCheck(input: { userId: string; done: boolean;
   const session = await assigner();
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isUuid(input.userId) || !Number.isInteger(input.currentCount) || input.currentCount < 0) return { ok: false, reason: "invalid" };
+  if (!(await isFieldMember(session.organization.id, input.userId))) return { ok: false, reason: "invalid" };
   const patch = input.done ? { trainee: false } : { trainee_check_at: Math.min(99, input.currentCount + TRAINEE_CHECK_STEP) };
   const result = await getSupabaseServiceClient()
     .from("cleaning_staff_profiles")

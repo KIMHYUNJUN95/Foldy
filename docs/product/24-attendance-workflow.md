@@ -258,6 +258,9 @@ exports are kept in the payroll panel's Excel/PDF actions to avoid duplicate doc
 The monthly payroll toolbar also includes a `시급제만` export switch next to the PDF/Excel actions. When
 enabled, both monthly PDF and Excel exports include only hourly/mixed payroll rows with an active hourly
 rate, excluding salaried/staff rows whose hourly-rate cell is blank.
+**2026-10-27:** the switch now filters the **on-screen table too** (not only exports) and is **on by default** —
+the screen is for closing hourly pay. On-screen it keeps hourly / mixed rows plus anyone who worked with no
+employment type set (`employmentMissing`, needs fixing); the "next person to close" jump follows the visible rows.
 Payroll calculation consistency hardening (2026-07-03): admin payroll lists, staff detail, and monthly
 Excel/PDF exports now prefer finalized snapshot amounts once a user-month is closed, so later hourly-rate
 edits cannot alter locked payroll. Personal Excel/PDF daily rows are reconciled to the official monthly

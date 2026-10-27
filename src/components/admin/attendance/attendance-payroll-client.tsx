@@ -87,7 +87,9 @@ export function AttendancePayrollClient({
   const [panelId, setPanelId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string } | null>(null);
   const showToast = (msg: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, msg }));
-  const [exportHourlyOnly, setExportHourlyOnly] = useState(false);
+  // 「시급제만」 — 표와 Excel · PDF 를 같이 거른다. 이 화면은 시급 마감용이라 기본은 켬(2026-10-27).
+  // 고용 형태가 비었는데 근무한 사람(employmentMissing)은 손봐야 하므로 숨기지 않는다.
+  const [hourlyOnly, setHourlyOnly] = useState(true);
   // 한 번 클릭 마감(2026-10-15, 시안 Motion-C-Confirm-PC) — 확인 창 없이 마감 → 다음 직원으로 → 실행 취소 토스트.
   const [undo, setUndo] = useState<{ stamp: number; items: { userId: string; name: string }[] } | null>(null);
   const [undoPending, startUndo] = useTransition();
@@ -100,6 +102,9 @@ export function AttendancePayrollClient({
     return () => clearTimeout(t);
   }, [toast]);
 
+  const visibleRows = hourlyOnly
+    ? rows.filter((r) => r.employment === "hourly" || r.employment === "mixed" || r.employmentMissing)
+    : rows;
   const panelRow = panelId ? rows.find((r) => r.userId === panelId) ?? null : null;
 
   useEffect(() => {
@@ -115,8 +120,8 @@ export function AttendancePayrollClient({
 
   // 마감 → 줄 「확정」 → 표에서 다음에 마감할 수 있는 직원으로(없으면 패널 닫힘) · 토스트에 한 명 더.
   function handleFinalized(updated: AdminPayrollRow) {
-    const idx = rows.findIndex((r) => r.userId === updated.userId);
-    const order = [...rows.slice(idx + 1), ...rows.slice(0, Math.max(0, idx))];
+    const idx = visibleRows.findIndex((r) => r.userId === updated.userId);
+    const order = [...visibleRows.slice(idx + 1), ...visibleRows.slice(0, Math.max(0, idx))];
     const next = order.find((r) => !r.finalized && r.finalizationEligible && r.employment !== "salaried");
     applyRow(updated);
     setFresh(updated.userId);
@@ -207,10 +212,10 @@ export function AttendancePayrollClient({
         <span className="toolbar__spacer" />
         <button
           type="button"
-          className={`export-toggle${exportHourlyOnly ? " on" : ""}`}
+          className={`export-toggle${hourlyOnly ? " on" : ""}`}
           role="switch"
-          aria-checked={exportHourlyOnly}
-          onClick={() => setExportHourlyOnly((v) => !v)}
+          aria-checked={hourlyOnly}
+          onClick={() => setHourlyOnly((v) => !v)}
         >
           <span className="export-toggle__track" aria-hidden="true">
             <span className="export-toggle__knob" />
@@ -218,15 +223,15 @@ export function AttendancePayrollClient({
           <span className="export-toggle__label">{c.payExportHourlyOnly}</span>
         </button>
         <AdminExportButtons
-          onExportXls={() => exportMonthlyPayrollWorkbook(ym, { hourlyOnly: exportHourlyOnly })}
-          onExportPdf={() => exportMonthlyPayrollReport(ym, { hourlyOnly: exportHourlyOnly })}
+          onExportXls={() => exportMonthlyPayrollWorkbook(ym, { hourlyOnly })}
+          onExportPdf={() => exportMonthlyPayrollReport(ym, { hourlyOnly })}
           disabled={rows.length === 0}
           onToast={showToast}
           labels={shared}
         />
       </div>
 
-      {rows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <div className="state">
           <span className="state__ic empty">
             <Ic>
@@ -251,7 +256,7 @@ export function AttendancePayrollClient({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {visibleRows.map((r) => {
               const pill = payStatusPill(r, c);
               const sel = panelId === r.userId;
               const isSalaried = r.employment === "salaried";

@@ -353,6 +353,17 @@ Always set `model` when spawning an agent. Full rules: `docs/planning/05-ai-coll
 - Delegate broad reading; do small known lookups yourself. Narrow agent briefs with file ownership; short `path:line` reports;
   don't re-read what an agent verified; read big files by grep + offset; tail command output; one `npm run build` at the end.
 
+### Use installed skills actively (ABSOLUTE, 2026-10-27 사용자 지시)
+
+구현 · 수정을 할 때는 **그 작업에 맞는 설치된 스킬을 항상 적극적으로 쓴다** — 생각만 하지 말고 `Skill` 도구로 실제 호출한다.
+작업을 시작할 때 사용 가능한 스킬 목록에서 맞는 것을 고르고, 보고에 어떤 스킬을 썼는지 적는다.
+
+- 화면 · UI 구현 · 다듬기: `frontend-design` · `emil-design-eng` · `ui-ux-pro-max` · `apple-design-review` · `hallmark` 등
+- React · Next.js 코드: `vercel-react-best-practices`
+- Supabase · DB · RLS: `supabase` · `supabase-postgres-best-practices`
+- 버그: `investigate` · 리뷰: `code-review` · `review` · 정리: `simplify` · 화면 확인: `qa` · `run`
+- 맞는 스킬이 없을 때만 스킬 없이 진행하고, 그렇다고 보고에 적는다.
+
 ### Default execution order
 
 1. Read relevant docs and current implementation.

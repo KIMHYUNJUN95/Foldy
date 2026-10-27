@@ -178,6 +178,14 @@ Stop and ask before:
 - Changing multilingual strategy
 - Changing PWA-first direction
 
+## 설치된 스킬 적극 사용 (ABSOLUTE, 2026-10-27 사용자 지시)
+
+- 구현 · 수정할 때는 항상 그 작업에 맞는 설치된 스킬을 `Skill` 도구로 실제 호출해서 쓴다(생각만 하고 넘어가지 않기).
+- 화면 작업은 디자인 스킬(frontend-design · emil-design-eng · ui-ux-pro-max · apple-design-review · hallmark), React 코드는
+  vercel-react-best-practices, DB · RLS 는 supabase 스킬, 버그는 investigate, 리뷰 · 정리는 code-review · simplify, 확인은 qa · run.
+- 보고에 쓴 스킬을 적는다. 맞는 스킬이 없으면 없다고 적는다.
+- 자세한 목록은 `CLAUDE.md` → 「Use installed skills actively」.
+
 ## 모델 고르기 · 컨텍스트 토큰 아끼기 (2026-10-26, 사용자 지시)
 
 목적: 수정마다 **그 일에 맞는 가장 가벼운 모델**을 쓰고, 리드(메인 세션)의 컨텍스트에는 결론만 남겨 토큰 소모를 줄인다.

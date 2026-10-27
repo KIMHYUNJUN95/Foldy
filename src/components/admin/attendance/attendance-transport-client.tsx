@@ -10,8 +10,6 @@ import {
   ChevronDown,
   CircleAlert,
   LogOut,
-  Receipt,
-  RotateCcw,
   Wallet,
   X,
 } from "lucide-react";
@@ -536,7 +534,20 @@ function TransportPanel({
             <>
               {/* 항목(인라인 영수증 썸네일, 접을 수 있음) */}
               <div className="pblock">
-                <div className="pblock__t">{c.trPanelItemsTitle(items.length)}</div>
+                <div className="pblock__t trp-items-h">
+                  <span>{c.trPanelItemsTitle(items.length)}</span>
+                  {/* 영수증 보기는 결정이 아니라 위 항목 줄에 둔다(2026-10-27 하단 결정 줄 정리). */}
+                  {items.length > 0 ? (
+                    <a
+                      className="trp-receipt"
+                      href={`/admin/attendance/transport/receipt?ym=${ym}&user=${row.userId}`}
+                      target="stayops_receipt"
+                      rel="noopener"
+                    >
+                      {c.trReceiptEntry}
+                    </a>
+                  ) : null}
+                </div>
                 {items.length === 0 ? (
                   <div className="locknote">{c.trItemNoEvidence}</div>
                 ) : (
@@ -637,78 +648,55 @@ function TransportPanel({
           ) : null}
         </div>
 
-        <div className="panel__foot">
-          {items.length > 0 ? (
-            <a
-              className="btn btn--subtle btn--sm"
-              href={`/admin/attendance/transport/receipt?ym=${ym}&user=${row.userId}`}
-              target="stayops_receipt"
-              rel="noopener"
-              style={{ flex: 1 }}
-            >
-              <Ic>
-                <Receipt />
-              </Ic>
-              {c.trReceiptEntry}
-            </a>
-          ) : (
-            <span style={{ flex: 1 }} />
-          )}
-          {resolved ? (
+        {/* 결정 줄 — 같은 크기 버튼, 무게는 모양으로만(반려 글자 · 보완 요청 옅은 칸 · 승인 보라 칸, 2026-10-27). */}
+        {resolved ? (
+          <div className="panel__foot panel__foot--end">
             <button
               type="button"
-              className="btn btn--subtle"
-              style={{ flex: 1 }}
+              className="btn btn--text"
               onClick={() => setModal("reopen")}
               disabled={pending || !report}
             >
-              <Ic>
-                <RotateCcw />
-              </Ic>
               {pending ? c.trActionReopening : c.trPanelBtnReopen}
             </button>
-          ) : reviewable ? (
-            <>
+          </div>
+        ) : reviewable ? (
+          <div className="panel__foot panel__foot--decide">
+            <button
+              type="button"
+              className="btn btn--text-danger"
+              onClick={() => setModal("reject")}
+              disabled={pending || done || !report}
+            >
+              {pending ? c.trActionRejecting : c.trPanelBtnReject}
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setModal("requestFix")}
+              disabled={pending || done || !report}
+            >
+              {pending ? c.trActionRequestingFix : c.trPanelBtnRequestFix}
+            </button>
+            {done ? (
+              <button type="button" className="btn btn--ok cfm-done" disabled aria-live="polite">
+                <Ic>
+                  <Check />
+                </Ic>
+                <span className="cfm-lab">{c.trPanelBtnApprovedShort}</span>
+              </button>
+            ) : (
               <button
                 type="button"
-                className="btn trp-reject"
-                onClick={() => setModal("reject")}
+                className="btn btn--ok"
+                onClick={submitApprove}
                 disabled={pending || !report}
               >
-                {pending ? c.trActionRejecting : c.trPanelBtnReject}
+                {pending ? c.trActionApproving : c.trPanelBtnApprove}
               </button>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                style={{ flex: 1 }}
-                onClick={() => setModal("requestFix")}
-                disabled={pending || !report}
-              >
-                {pending ? c.trActionRequestingFix : c.trPanelBtnRequestFix}
-              </button>
-              {done ? (
-                <button type="button" className="btn btn--ok cfm-done" style={{ flex: 1.2 }} disabled aria-live="polite">
-                  <Ic>
-                    <Check />
-                  </Ic>
-                  <span className="cfm-lab">{c.trPanelBtnApprovedShort}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn--ok"
-                  style={{ flex: 1.2 }}
-                  onClick={submitApprove}
-                  disabled={pending || !report}
-                >
-                  {pending ? c.trActionApproving : c.trPanelBtnApprove}
-                </button>
-              )}
-            </>
-          ) : (
-            <span style={{ flex: 2.3 }} />
-          )}
-        </div>
+            )}
+          </div>
+        ) : null}
       </aside>
 
       {modal === "reject" ? (

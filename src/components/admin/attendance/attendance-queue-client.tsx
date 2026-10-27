@@ -1662,11 +1662,10 @@ function SessionPanel({
 
         {/* 할 일이 없는(이미 정상인) 세션엔 완료 버튼을 숨긴다 — 막힌 버튼은 헷갈린다(2026-10-27). */}
         {isInvalid || needsReview ? (
-          <div className="panel__foot">
+          <div className="panel__foot panel__foot--decide">
             <button
               type="button"
               className="btn btn--ok"
-              style={{ flex: 1 }}
               onClick={() => {
                 setEditOpen(false);
                 setModal("approve");
@@ -1674,9 +1673,6 @@ function SessionPanel({
               disabled={pending || restoreBlocked}
               title={restoreBlocked && !pending ? c.restoreNeedsCompleteNote : undefined}
             >
-              <Ic>
-                <Check />
-              </Ic>
               {pending
                 ? isInvalid
                   ? c.actionRestoring
@@ -2000,29 +1996,21 @@ function CorrectionPanel({
 
         {/* 처리 끝난 요청엔 누를 버튼이 없다 — 막힌 「처리 이력 · 재오픈」은 지웠다(2026-10-27). */}
         {!resolved ? (
-          <div className="panel__foot">
+          <div className="panel__foot panel__foot--decide">
             <button
               type="button"
-              className="btn btn--danger-ghost"
-              style={{ flex: 1 }}
+              className="btn btn--text-danger"
               onClick={() => setModal("reject")}
               disabled={pending}
             >
-              <Ic>
-                <Ban />
-              </Ic>
               {pending ? c.corrActionRejecting : c.corrPanelBtnReject}
             </button>
             <button
               type="button"
               className="btn btn--ok"
-              style={{ flex: 1.4 }}
               onClick={() => setModal("approve")}
               disabled={pending}
             >
-              <Ic>
-                <Check />
-              </Ic>
               {pending ? c.corrActionApproving : c.corrPanelBtnApprove}
             </button>
           </div>

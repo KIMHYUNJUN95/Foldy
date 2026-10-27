@@ -278,6 +278,9 @@ Permissions · Invite Codes · Attendance Sites/QR 등)은 위 3개 그룹의 �
   "시작일 – 종료일" 트리거 + 범위 선택 캘린더 팝오버, 2026-07-14 청소 기록 필터에서 처음 도입.
   팝오버는 `position:fixed` + 트리거 `getBoundingClientRect()` 기반 뷰포트 클램프 좌표라 스크롤
   가능한 조상의 `overflow`에 잘리지 않는다)
+- **오른쪽 패널 하단 결정 줄**(`.panel__foot--decide`, 2026-10-27) — 승인 · 반려 같은 결정 버튼은 같은 크기(높이 40 · 모서리 10),
+  무게는 모양으로만(반려 = `.btn--text-danger` 글자 · 중간 동작 = `.btn--ghost` 옅은 칸 · 주 동작 = `.btn--ok` 보라 칸, 채운 칸은 하나).
+  보기 · 이동(영수증 보기 등)은 결정 줄에 넣지 않는다. 처리 끝난 건은 `.panel__foot--end` + `.btn--text`(재오픈). 지금: 교통비 · 정정 요청 · 검토 큐.
 - `AdmDropdown`(`.dd`) — **어드민 콘솔의 단일 드롭다운 표준**. 네이티브 `<select>`와 필터 드롭다운을
   모두 대체한다. 값 편집·필터·정렬 어디서든 이 하나만 쓴다. 폼 제출용은 `DdFormSelect`(숨은 input
   래퍼)를 쓴다. CSS는 `admin-console.css`에 있어 모든 `.adm` 페이지에서 로드된다. **화면마다 다른

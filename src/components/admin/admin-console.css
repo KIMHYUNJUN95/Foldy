@@ -3205,8 +3205,9 @@
 .adm .panel .trp-row__miss { font-size: 12px; font-weight: 600; color: #c5282e; white-space: nowrap; }
 .adm .panel .trp-row__v { font-weight: 600; color: #16141f; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .panel .trp-row .trthumb { width: 28px; height: 28px; }
-.adm .panel__foot .trp-reject { flex: none; padding: 0 14px; background: transparent; border: 0; color: #c5282e; font-weight: 600; }
-.adm .panel__foot .trp-reject:hover { background: #fdecec; }
+.adm .panel .trp-items-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.adm .panel .trp-receipt { font-size: 13px; font-weight: 600; color: #7a52e6; text-decoration: none; white-space: nowrap; }
+.adm .panel .trp-receipt:hover { text-decoration: underline; }
 .adm .panel .panel__title.trp-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .adm .panel .trp-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; padding-top: 14px; border-top: 0.5px solid var(--separator); }
 .adm .panel .trp-total span { font-size: 13px; color: #6b6878; }
@@ -3336,3 +3337,18 @@
   .adm .wgseg__thumb, .adm .wgsw, .adm .wgsw i { transition: none; }
   .adm .wg-leave td, .adm .wg-leave td > * { animation: none; display: none; }
 }
+
+/* 패널 결정 줄 — 교통비 · 정정 요청 · 검토 큐 공용(2026-10-27 시안 「하단 결정 줄」).
+   버튼은 같은 크기, 무게는 모양으로만: 글자(반려) · 옅은 칸(보완 요청) · 보라 칸(승인). 채운 칸은 하나. */
+.adm .panel__foot--decide { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 8px; }
+.adm .panel__foot--end { justify-content: flex-end; }
+.adm .panel__foot--decide .btn,
+.adm .panel__foot--end .btn { height: 40px; border-radius: 10px; font-size: 14px; font-weight: 600; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease, opacity 140ms ease; }
+.adm .panel__foot--decide .btn:active:not(:disabled),
+.adm .panel__foot--end .btn:active:not(:disabled) { transform: scale(0.97); }
+.adm .panel__foot--decide .btn:disabled:not(.cfm-done) { opacity: 0.35; }
+.adm .panel__foot--end .btn { flex: none; }
+.adm .panel .btn--text-danger { background: transparent; border-color: transparent; color: #c5282e; }
+.adm .panel .btn--text-danger:hover:not(:disabled) { background: #fdf0f0; }
+.adm .panel .btn--text { background: transparent; border-color: transparent; color: #4a4857; padding: 0 14px; }
+.adm .panel .btn--text:hover:not(:disabled) { background: #f4f4f7; }

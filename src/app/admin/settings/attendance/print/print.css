@@ -78,6 +78,19 @@
     size: A4 portrait;
     margin: 8mm;
   }
+  /* `admin-console.css` 의 인쇄 규칙(`body * { visibility: hidden }` — 休暇届 #docSheet 전용)이 관리자
+     전체에 걸려 있어, 여기서 다시 보이게 하지 않으면 미리보기가 빈 종이가 된다(2026-10-28). */
+  html,
+  body {
+    background: #fff !important;
+  }
+  .qrsheet,
+  .qrsheet * {
+    visibility: visible;
+  }
+  [data-splash] {
+    display: none !important;
+  }
   .qrsheet {
     padding: 0;
     background: #fff;

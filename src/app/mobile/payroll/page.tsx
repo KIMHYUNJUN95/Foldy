@@ -6,7 +6,7 @@ import { adminLocaleTag } from "@/lib/admin-export-meta";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
-import { PAYROLL_PREP_START_YM } from "@/lib/payroll-prep";
+import { payrollPrepStartYm } from "@/lib/payroll-prep";
 import { attendanceCan } from "@/lib/attendance-review";
 import { getPayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -20,7 +20,7 @@ import { tokyoToday } from "@/lib/tokyo-date";
  * 모바일 급여 준비 — 알바 한 달 급여를 이름별로 보고 손 입력을 채운다(2026-10-25, 시안 Prep-Phone · PrepSheet-Phone · Prep-Fold · Prep-Tablet).
  * 도메인 계약: docs/product/39 §5-A. 숫자는 서버(`getPayrollPrep`)가 전부 낸다 — 여기서 다시 셈하지 않는다.
  * `?view=approve` — 폰에서 결재 화면(사장 확인표)을 연다(P5, 결재 단계에서만 의미가 있다).
- * 기본 달 = 도쿄의 지난달(급여는 지난달분을 준비한다), 새 계산이 시작된 달(`PAYROLL_PREP_START_YM`)보다 앞으로는 못 간다.
+ * 기본 달 = 도쿄의 지난달(급여는 지난달분을 준비한다), 새 계산이 시작된 달(`payrollPrepStartYm()` — 개발 서버는 더 앞 달 가능)보다 앞으로는 못 간다.
  */
 export const dynamic = "force-dynamic";
 
@@ -38,9 +38,10 @@ export default async function MobilePayrollPage({ searchParams }: { searchParams
 
   const todayMonth = tokyoToday().slice(0, 7);
   const lastMonth = shiftMonthKey(todayMonth, -1);
-  const defaultYm = lastMonth < PAYROLL_PREP_START_YM ? PAYROLL_PREP_START_YM : lastMonth;
+  const startYm = payrollPrepStartYm();
+  const defaultYm = lastMonth < startYm ? startYm : lastMonth;
   const requested = typeof params.ym === "string" && YM_RE.test(params.ym) ? params.ym : defaultYm;
-  const ym = requested < PAYROLL_PREP_START_YM ? PAYROLL_PREP_START_YM : requested;
+  const ym = requested < startYm ? startYm : requested;
 
   const [data, badges, canViewBank] = await Promise.all([
     getPayrollPrep(session, ym),
@@ -64,7 +65,7 @@ export default async function MobilePayrollPage({ searchParams }: { searchParams
         localeTag={adminLocaleTag(locale)}
         maxYm={todayMonth}
         view={params.view === "approve" ? "approve" : null}
-        minYm={PAYROLL_PREP_START_YM}
+        minYm={startYm}
         withholdingLabels={{ kou: settingsCopy.classKou, otsu: settingsCopy.classOtsu, hei: settingsCopy.classHei }}
       />
     </MobileShell>

@@ -4,6 +4,7 @@ import {
   EMPTY_PREP_MANUAL,
   manualFromTotal,
   payrollPrepAvailable,
+  payrollPrepStartYm,
   prepTotals,
   sortPrepRows,
   type PrepRowInput,
@@ -143,8 +144,18 @@ describe("prepTotals · sortPrepRows", () => {
 
 describe("helpers", () => {
   it("10월분부터 새 계산", () => {
-    expect(payrollPrepAvailable("2026-09")).toBe(false);
-    expect(payrollPrepAvailable("2026-10")).toBe(true);
+    expect(payrollPrepAvailable("2026-09", {})).toBe(false);
+    expect(payrollPrepAvailable("2026-10", {})).toBe(true);
+  });
+  it("개발 서버 스위치 FOLDY_DEV_PAYROLL_PREP_FROM — 운영 · Vercel · 잘못된 값은 무시", () => {
+    const dev = { NODE_ENV: "development", FOLDY_DEV_PAYROLL_PREP_FROM: "2026-08" };
+    expect(payrollPrepStartYm(dev)).toBe("2026-08");
+    expect(payrollPrepAvailable("2026-08", dev)).toBe(true);
+    expect(payrollPrepAvailable("2026-07", dev)).toBe(false);
+    expect(payrollPrepStartYm({ ...dev, NODE_ENV: "production" })).toBe("2026-10");
+    expect(payrollPrepStartYm({ ...dev, VERCEL: "1" })).toBe("2026-10");
+    expect(payrollPrepStartYm({ ...dev, FOLDY_DEV_PAYROLL_PREP_FROM: "2026-8" })).toBe("2026-10");
+    expect(payrollPrepStartYm({ ...dev, FOLDY_DEV_PAYROLL_PREP_FROM: "2026-12" })).toBe("2026-10");
   });
   it("칸 합계를 고치면 손 입력 = 합계 − 자동", () => {
     expect(manualFromTotal(2500, 2000)).toBe(500);

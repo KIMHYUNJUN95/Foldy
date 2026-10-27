@@ -18,8 +18,18 @@ import {
 /** 새 계산(구간별 분 합계 · 1엔 단위, 2026-10-27 전엔 실수령 10엔 올림)을 쓰는 첫 달 — 그 전 달은 지금 급여 검토 표 그대로(39 §11-10, 2026-10-25 결정 1). */
 export const PAYROLL_PREP_START_YM = "2026-10";
 
-export function payrollPrepAvailable(ym: string): boolean {
-  return ym >= PAYROLL_PREP_START_YM;
+/**
+ * 급여 준비를 여는 첫 달. 개발 서버에서만 `FOLDY_DEV_PAYROLL_PREP_FROM=YYYY-MM` 로 더 앞 달부터 열 수 있다
+ * (데모 조직의 실제 8 · 9월 급여로 마감 → 급여 준비 → 출력을 해 보기 위해, 2026-10-27). 운영(`NODE_ENV=production`)이나
+ * Vercel(`VERCEL` 있음)에서는 무시 — `devAllowsOpenMonthClose` 와 같은 규칙. 서버에서만 읽는다(클라이언트엔 이 값이 없다).
+ */
+export function payrollPrepStartYm(env: Record<string, string | undefined> = process.env): string {
+  const from = env.NODE_ENV !== "production" && !env.VERCEL ? env.FOLDY_DEV_PAYROLL_PREP_FROM : undefined;
+  return from && /^\d{4}-(0[1-9]|1[0-2])$/.test(from) && from < PAYROLL_PREP_START_YM ? from : PAYROLL_PREP_START_YM;
+}
+
+export function payrollPrepAvailable(ym: string, env: Record<string, string | undefined> = process.env): boolean {
+  return ym >= payrollPrepStartYm(env);
 }
 
 /** Foldy 추가수당 → 명세서 칸(2026-10-25 결정 4): 「일반」 → 주말수당, 「특별」 → 특별수당. 잔업수당은 손 입력만. */

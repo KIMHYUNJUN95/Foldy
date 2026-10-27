@@ -4,9 +4,12 @@
  *
  * 사용자가 근태 · 급여 기능을 처음부터 끝까지 직접 눌러 보도록:
  * - 로그인 계정 3개: 데모 관리자(owner · 사장 결재) · 데모 전무(전무 결재 · 휴가 승인) · 데모 알바(시급 알바, 본인 화면).
- * - 로그인하지 않는 직원 6명: 시급 알바 5명(원천세 갑 · 을 · 병 · 미설정, 현금 · 이체, 시급 변경, 고용보험, 계좌 확인 필요 등) + 월급 사무 1명(휴가).
- * - 9월 · 10월(어제까지) 출퇴근 · 휴식, 정정 요청 · 수기 입력 · 무효 · 퇴근 누락 · 검토 필요, 추가수당, 교통비, 휴가,
- *   급여 설정 · 계좌(확인 대기 · 유초 포함), 9월 급여 입력(→ 10월 「지난달 값 가져오기」 원본), 회사 급여 설정(결재자 · 고용보험료율).
+ * - 시급 알바 = **실제 8월 · 9월분 급여 파일의 사람들**(2026-10-27 사용자 지시 — 나중에 전부 지운다). `.env.demo-real-payroll.json`
+ *   (git 제외, scripts/dev/extract-real-payroll-demo.js 가 만든다)에서 읽는다: 이름 · 가타카나 · 시급 ①② · 분 단위 시간 · 일수 ·
+ *   교통비 · 조정분 · 잔업 · 甲乙丙 · 현금/이체. 8월 · 9월 출퇴근을 그 분 · 일수에 딱 맞게 만들어 급여 준비 금액이 원본과 같다
+ *   (9월 課税対象額 = 원본, 8월은 시급 × 분, 엑셀 ROUND ↔ Foldy 1엔 올림 차이 1엔 안쪽). 계좌는 넣지 않는다(실제 정보 없음 → 「확인 필요」).
+ * - 그 밖에 월급 사무 1명(휴가 견본). 데모 알바(로그인)는 10월만 근무 — 8 · 9월 합계가 원본과 같게.
+ * - 10월(어제까지) 견본: 퇴근 누락 + 정정 요청 · 추가수당 · 교통비 대기, 회사 급여 설정(결재자 · 고용보험료율).
  * - 근태 마감 · 결재 · 지급 확인은 넣지 않는다 — 사용자가 직접 해 보는 단계.
  *
  * 사용:
@@ -36,7 +39,10 @@ loadEnvFile(".env");
 const APPLY = process.argv.includes("--apply");
 const ORG_SLUG = "stayops-review-demo";
 const ACCOUNTS_FILE = ".env.demo-accounts";
-const MONTHS = ["2026-09", "2026-10"];
+const MONTHS = ["2026-08", "2026-09", "2026-10"];
+const REAL_FILE = ".env.demo-real-payroll.json";
+// 예전 가짜 시급 직원 — 다시 돌리면 근태 · 급여 데이터와 소속을 지운다.
+const RETIRED_EMAILS = ["hana", "li", "nguyen", "tanaka", "kim"].map((k) => `stayops.demo.${k}@haru-tokyo.com`);
 
 // login: 로그인 계정(비밀번호를 파일에 적는다). pay: 시급 알바 설정.
 const PEOPLE = [
@@ -44,35 +50,32 @@ const PEOPLE = [
   { key: "senmu", email: "stayops.demo.senmu@haru-tokyo.com", name: "데모 전무", role: "senior_managing_director", login: true, lang: "ko", gender: "female", birth: "1980-07-19", phone: "+81-90-0000-0101", leaveApprover: true },
   {
     key: "alba", email: "stayops.demo.alba@haru-tokyo.com", name: "데모 알바", kana: "デモ アルバ", role: "part_time_staff", login: true, lang: "ko", gender: "female", birth: "1999-11-08", phone: "+81-90-0000-0102", hire: "2026-04-01",
+    onlyMonths: ["2026-10"],
     pay: { rates: [["2026-04-01", 1250]], withholding: "kou", dependents: 0, method: "transfer", days: [1, 2, 3, 5, 6], bank: { bank: "三菱UFJ銀行", branch: "新宿支店", type: "ordinary", number: "1234567" } },
-  },
-  {
-    key: "hana", email: "stayops.demo.hana@haru-tokyo.com", name: "사토 하나", kana: "サトウ ハナ", role: "part_time_staff", lang: "ja", gender: "female", birth: "1997-02-14", phone: "+81-90-0000-0103", hire: "2025-12-01",
-    pay: { rates: [["2025-12-01", 1200], ["2026-10-16", 1300]], withholding: "kou", dependents: 0, method: "transfer", days: [1, 2, 3, 4, 5], bank: { bank: "三井住友銀行", branch: "浅草支店", type: "ordinary", number: "2345678" } },
-  },
-  {
-    key: "li", email: "stayops.demo.li@haru-tokyo.com", name: "리 웨이", kana: "リ ウェイ", role: "part_time_staff", lang: "en", gender: "male", birth: "2001-06-30", phone: "+81-90-0000-0104", hire: "2026-06-01",
-    pay: { rates: [["2026-06-01", 1150]], withholding: "otsu", dependents: 0, method: "cash", days: [0, 3, 6] },
-  },
-  {
-    key: "nguyen", email: "stayops.demo.nguyen@haru-tokyo.com", name: "응우옌 안", kana: "グエン アン", role: "part_time_staff", lang: "en", gender: "female", birth: "1998-09-21", phone: "+81-90-0000-0105", hire: "2026-03-01",
-    pay: {
-      rates: [["2026-03-01", 1150], ["2026-10-11", 1200], ["2026-10-21", 1250]], withholding: "kou", dependents: 2, method: "transfer", insurance: true, days: [1, 2, 4, 5, 6],
-      bank: { bank: "楽天銀行", branch: "第一営業支店", type: "ordinary", number: "7654321", pending: { bank: "みずほ銀行", branch: "渋谷支店", type: "ordinary", number: "3456789" } },
-    },
-  },
-  {
-    key: "tanaka", email: "stayops.demo.tanaka@haru-tokyo.com", name: "다나카 유키", kana: "タナカ ユキ", role: "part_time_staff", lang: "ja", gender: "male", birth: "2003-01-05", phone: "+81-90-0000-0106", hire: "2026-09-20",
-    pay: { rates: [["2026-09-20", 1200]], withholding: "hei", dependents: 0, method: "transfer", days: [0, 2, 4, 6], bank: { bank: "ゆうちょ銀行", branch: "〇一八店", type: "ordinary", number: "4567890" } },
-  },
-  // 「확인 필요」 견본 — 원천세 구분 없음 · 이체인데 계좌 없음 · 가타카나 없음.
-  {
-    key: "kim", email: "stayops.demo.kim@haru-tokyo.com", name: "김민수", role: "part_time_staff", lang: "ko", gender: "male", birth: "2000-04-17", phone: "+81-90-0000-0107", hire: "2026-08-01",
-    pay: { rates: [["2026-08-01", 1200]], withholding: null, dependents: 0, method: "transfer", days: [1, 3, 5] },
   },
   // 월급 사무 — 휴가 신청 · 승인 견본.
   { key: "office", email: "stayops.demo.office@haru-tokyo.com", name: "야마모토 레이", kana: "ヤマモト レイ", role: "office_admin", lang: "ja", gender: "female", birth: "1992-12-03", phone: "+81-90-0000-0108", hire: "2024-04-01", salaried: true },
 ];
+
+// 실제 급여 파일 사람들(있으면). months: { "YYYY-MM": { segments: [{ rate, minutes }], days, commute, overtime, adjust, adjustMonth, withholdingOverride?, withholdingReason? } }
+const REAL = fs.existsSync(REAL_FILE) ? JSON.parse(fs.readFileSync(REAL_FILE, "utf8")) : [];
+const realStart = (r) => Object.keys(r.months).sort()[0];
+REAL.forEach((r, n) => {
+  PEOPLE.push({
+    key: `real-${r.id}`,
+    email: `stayops.demo.real-${r.id}@haru-tokyo.com`,
+    name: r.ko ?? r.kana,
+    kana: r.kana,
+    role: "part_time_staff",
+    lang: "ko",
+    gender: null,
+    birth: null,
+    phone: `+81-90-0001-${String(n + 1).padStart(4, "0")}`, // 실제 번호 없음 — 데모 자리 번호(필수 칸)
+    hire: `${realStart(r)}-01`,
+    real: r,
+    pay: { withholding: r.cls, dependents: 0, method: r.method },
+  });
+});
 
 const SITES = [
   { name: "Demo House Shinjuku", property: "Demo House Shinjuku", lat: 35.6938, lng: 139.7034 },
@@ -109,15 +112,78 @@ function rng(seedText) {
   };
 }
 
+// 실제 사람의 달별 근무 — 일수만큼 달 전체에 고르게 펴고, 분은 시급 구간별로 나눠 하루하루에 싣는다(합계는 딱 맞게).
+// 시급 ② 는 마지막 며칠. 돌려줌: { days: [{ date, paid, rate }], rates: [[from, rate]] }
+function realSchedule(p) {
+  const days = [];
+  for (const ym of Object.keys(p.real.months).sort()) {
+    const m = p.real.months[ym];
+    const total = m.segments.reduce((sum, x) => sum + x.minutes, 0);
+    if (!total || !m.days) continue;
+    const all = daysOf(ym, "9999-12-31");
+    const count = Math.min(m.days, all.length);
+    const picked = Array.from({ length: count }, (_, i) => all[Math.floor(((i + 0.5) * all.length) / count)]);
+    const per = total / count;
+    let cursor = 0;
+    m.segments.forEach((seg, si) => {
+      const left = count - cursor;
+      const n = si === m.segments.length - 1 ? left : Math.min(left - 1, Math.max(1, Math.round(seg.minutes / per)));
+      const share = picked.slice(cursor, cursor + n);
+      cursor += n;
+      const base = Math.floor(seg.minutes / n);
+      const paid = share.map((_, k) => base + (k < seg.minutes - base * n ? 1 : 0));
+      const r = rng(`${p.key}:${ym}:${si}`);
+      for (let k = 0; k + 1 < paid.length; k += 2) {
+        const d = Math.min(Math.floor(r() * 25), paid[k + 1] - 60, paid[k] - 60);
+        if (d > 0) {
+          paid[k] += d;
+          paid[k + 1] -= d;
+        }
+      }
+      share.forEach((date, k) => days.push({ date, paid: paid[k], rate: seg.rate }));
+    });
+  }
+  const rates = [];
+  for (const d of days) if (!rates.length || rates.at(-1)[1] !== d.rate) rates.push([rates.length ? d.date : p.hire, d.rate]);
+  if (!rates.length) rates.push([p.hire, 1350]);
+  return { days, rates };
+}
+
 function plan() {
   console.log("조직: Foldy Demo (slug stayops-review-demo) — 다른 조직은 건드리지 않는다");
   for (const p of PEOPLE) {
+    if (p.real) continue;
     const kind = p.salaried ? "월급" : p.pay ? `시급 ${p.pay.rates.map((r) => `${r[1]}엔(${r[0]}~)`).join(" → ")}` : "";
     console.log(`${p.login ? "[로그인]" : "        "} ${p.name} <${p.email}> — ${p.role} ${kind}`);
   }
+  if (!REAL.length) console.log(`(${REAL_FILE} 없음 — 실제 급여 파일 사람 없이 넣는다. 먼저 extract-real-payroll-demo.js)`);
+  for (const ym of ["2026-08", "2026-09"]) {
+    const rows = PEOPLE.filter((p) => p.real?.months[ym]);
+    const minutes = rows.reduce((sum, p) => sum + p.real.months[ym].segments.reduce((a, x) => a + x.minutes, 0), 0);
+    const days = rows.reduce((sum, p) => sum + p.real.months[ym].days, 0);
+    const commute = rows.reduce((sum, p) => sum + p.real.months[ym].commute, 0);
+    console.log(`실제 ${ym}: ${rows.length}명 · ${(minutes / 60).toFixed(1)}시간 · ${days}일 · 교통비 ${commute.toLocaleString()}엔`);
+  }
+  // 넣기 전에 실제 사람마다 근무 일수 · 분 · 課税 금액이 원본과 맞는지 따진다(안 맞으면 멈춘다).
+  for (const p of PEOPLE.filter((x) => x.real)) {
+    const sched = realSchedule(p).days;
+    for (const [ym, m] of Object.entries(p.real.months)) {
+      const ds = sched.filter((d) => d.date.startsWith(ym));
+      const byRate = new Map();
+      for (const d of ds) byRate.set(d.rate, (byRate.get(d.rate) ?? 0) + d.paid);
+      const pay = [...byRate].reduce((sum, [rate, min]) => sum + Math.ceil((rate * min) / 60 - 1e-9), 0);
+      const want = m.segments.reduce((sum, x) => sum + x.minutes, 0);
+      const got = ds.reduce((sum, d) => sum + d.paid, 0);
+      if (got !== want || (want && ds.length !== Math.min(m.days, 31)) || new Set(ds.map((d) => d.date)).size !== ds.length) {
+        throw new Error(`${p.name} ${ym}: 분 ${got}/${want} · 일수 ${ds.length}/${m.days}`);
+      }
+      if (m.expectTaxable != null && pay + m.adjust + m.overtime !== m.expectTaxable) throw new Error(`${p.name} ${ym}: 課税 ${pay + m.adjust} ≠ ${m.expectTaxable}`);
+    }
+  }
   console.log(`기간: ${MONTHS.join(", ")} (어제까지) · 근무지 ${SITES.length}곳`);
-  console.log("10월 견본: 검토 필요 · 수기 입력 · 퇴근 누락 + 정정 요청 · 무효 · 시간 정정 요청 · 시급 3구간 · 추가수당 · 교통비 대기");
-  console.log("9월 급여 입력(특별수당 · 원천세 직접 입력 · 메모) → 10월 「지난달 값 가져오기」 원본");
+  console.log("10월 견본(데모 알바): 퇴근 누락 + 정정 요청 · 추가수당 · 교통비 대기");
+  console.log("8 · 9월 급여 입력: 조정분 · 잔업(원본) · 분 끝돈 조정 · 8월 구분이 다른 사람 원천세 직접 입력(원본 값)");
+  console.log(`지우는 예전 가짜 직원: ${RETIRED_EMAILS.length}명(근태 · 급여 · 소속)`);
   console.log("넣지 않음: 근태 마감 · 결재 · 지급 확인 (직접 해 보는 단계)");
 }
 
@@ -179,11 +245,11 @@ async function main() {
       const m = must(await db.from("memberships").select("organization_id").eq("user_id", found.id), "기존 소속");
       if (m.some((r) => r.organization_id !== orgId)) throw new Error(`${p.email} 은 다른 조직 계정이다 — 중단.`);
     }
-    const password = p.login ? saved[p.email] || `Demo-${crypto.randomBytes(9).toString("base64url")}` : null;
+    const password = p.login ? saved[p.email] || `Demo-${crypto.randomBytes(9).toString("base64url")}-7a` : null;
     if (!found) {
       const { data, error } = await db.auth.admin.createUser({
         email: p.email,
-        password: password || crypto.randomBytes(24).toString("base64url"),
+        password: password || `Nl-${crypto.randomBytes(24).toString("base64url")}-x9`, // 로그인 안 하는 계정 — 비밀번호 규칙(대 · 소문자 · 숫자)만 맞춘다
         email_confirm: true,
         user_metadata: { full_name: p.name },
       });
@@ -230,7 +296,15 @@ async function main() {
       Object.entries(passwords).map(([e, pw]) => `${e}=${pw}`).join("\n") + "\n",
     { mode: 0o600 },
   );
-  const allIds = Object.values(ids);
+  const retiredIds = [];
+  for (const email of RETIRED_EMAILS) {
+    const u = byEmail.get(email);
+    if (!u) continue;
+    const m = must(await db.from("memberships").select("organization_id").eq("user_id", u.id), "예전 직원 소속");
+    if (m.some((r) => r.organization_id !== orgId)) throw new Error(`${email} 은 다른 조직 계정이다 — 중단.`);
+    retiredIds.push(u.id);
+  }
+  const allIds = [...Object.values(ids), ...retiredIds];
   const A = ids.admin;
 
   // ── 지우기 (데모 조직 + 이 사람들만) ──
@@ -264,6 +338,7 @@ async function main() {
     must(await db.from(table).delete().eq("organization_id", orgId).in(col, allIds), `${table} 지우기`);
   }
   const monthFirsts = MONTHS.map((ym) => `${ym}-01`);
+  if (retiredIds.length) must(await db.from("memberships").delete().eq("organization_id", orgId).in("user_id", retiredIds), "예전 직원 소속 지우기");
   must(await db.from("payroll_month_approval_events").delete().eq("organization_id", orgId).in("target_month", monthFirsts), "결재 기록 지우기");
   must(await db.from("payroll_month_approvals").delete().eq("organization_id", orgId).in("target_month", monthFirsts), "결재 지우기");
 
@@ -311,8 +386,9 @@ async function main() {
     }
     if (!p.pay) continue;
     must(await db.from("employment_type_history").insert({ organization_id: orgId, user_id: id, employment_type: "hourly", effective_from: p.hire, created_by_user_id: A }), "고용형태");
-    const rates = p.pay.rates.map(([from, rate], i) => {
-      const next = p.pay.rates[i + 1];
+    const rateList = p.real ? realSchedule(p).rates : p.pay.rates;
+    const rates = rateList.map(([from, rate], i) => {
+      const next = rateList[i + 1];
       const to = next ? new Date(Date.parse(`${next[0]}T00:00:00Z`) - 86400000).toISOString().slice(0, 10) : null;
       return { organization_id: orgId, user_id: id, hourly_rate: rate, effective_from: from, effective_to: to, created_by_user_id: A };
     });
@@ -372,8 +448,36 @@ async function main() {
   const meta = []; // 세션 순서대로: { breakMinutes: [start, end] | null }
   for (const p of PEOPLE) {
     if (!p.pay && !p.salaried) continue;
+    if (p.real) {
+      // 출근 9:00 전후, 6시간 넘으면 휴식 1시간 — 쉰 시간을 뺀 분이 그날 몫과 딱 같다.
+      for (const d of realSchedule(p).days) {
+        const r = rng(`${p.key}:${d.date}`);
+        const site = r() < 0.5 ? siteIds[0] : siteIds[1];
+        const inMin = 8 * 60 + 50 + Math.floor(r() * 20);
+        const brk = d.paid > 360 ? [12 * 60 + Math.floor(r() * 10), 0] : null;
+        if (brk) brk[1] = brk[0] + 60;
+        const outMin = inMin + d.paid + (brk ? 60 : 0);
+        if (outMin > 23 * 60 + 30) throw new Error(`${p.name} ${d.date} 퇴근이 23:30 을 넘는다(${d.paid}분)`);
+        sessions.push({
+          organization_id: orgId,
+          user_id: ids[p.key],
+          operating_date: d.date,
+          status: "completed",
+          review_state: "normal",
+          manual_created: false,
+          clock_in_at: at(d.date, inMin),
+          clock_in_site_id: site,
+          clock_in_method: "gps_qr",
+          clock_out_at: at(d.date, outMin),
+          clock_out_site_id: site,
+          clock_out_method: "gps_qr",
+        });
+        meta.push({ key: p.key, date: d.date, brk });
+      }
+      continue;
+    }
     const workDays = p.salaried ? [1, 2, 3, 4, 5] : p.pay.days;
-    for (const ym of MONTHS) {
+    for (const ym of p.onlyMonths ?? MONTHS) {
       for (const date of daysOf(ym, today)) {
         if (date < (p.hire ?? "")) continue;
         if (!workDays.includes(weekday(date))) continue;
@@ -409,10 +513,10 @@ async function main() {
   };
   const extras = []; // 세션이 들어간 뒤 할 일
 
-  // 10월 견본
-  let i = nearest("hana", "2026-10-08");
+  // 10월 견본 — 전부 데모 알바(실제 사람들의 8 · 9월 숫자는 건드리지 않는다)
+  let i = nearest("alba", "2026-10-08");
   if (i >= 0) Object.assign(sessions[i], { review_state: "review_required", clock_in_accuracy_meters: 380 });
-  i = nearest("li", "2026-10-14");
+  i = nearest("alba", "2026-10-14");
   if (i >= 0) {
     Object.assign(sessions[i], {
       clock_in_method: "manual",
@@ -430,19 +534,14 @@ async function main() {
     Object.assign(sessions[i], { status: "open", clock_out_at: null, clock_out_site_id: null, clock_out_method: null });
     extras.push({ type: "missing_out", index: i });
   }
-  i = nearest("tanaka", "2026-10-03");
+  i = nearest("alba", "2026-10-03");
   if (i >= 0) {
     const s = sessions[i];
     sessions.push({ ...s, status: "invalid", clock_in_at: at(meta[i].date, 8 * 60 + 41), clock_out_at: null, clock_out_site_id: null, clock_out_method: null, invalidated_at: `${meta[i].date}T09:05:00+09:00`, invalidated_by_user_id: A, invalidated_reason: "출근을 두 번 눌러 중복 기록" });
-    meta.push({ key: "tanaka", date: meta[i].date, brk: null });
+    meta.push({ key: "alba", date: meta[i].date, brk: null });
   }
-  i = nearest("nguyen", "2026-10-17");
+  i = nearest("alba", "2026-10-17");
   if (i >= 0) extras.push({ type: "wrong_time", index: i });
-  i = nearest("hana", "2026-09-11");
-  if (i >= 0) {
-    sessions[i].review_state = "approved_correction";
-    extras.push({ type: "approved_sep", index: i });
-  }
 
   const inserted = await insertMany("attendance_sessions", sessions, "id, user_id, operating_date, status, clock_out_at");
   const breaks = [];
@@ -463,8 +562,6 @@ async function main() {
       corrections.push({ ...base, status: "requested", reason_type: "missing_clock_out", memo: "퇴근 버튼을 깜빡했어요. 18시에 퇴근했습니다.", desired_clock_out_at: at(date, 18 * 60), desired_clock_out_site_id: siteIds[0] });
     } else if (e.type === "wrong_time") {
       corrections.push({ ...base, status: "requested", reason_type: "wrong_time", memo: "QR 이 안 읽혀서 늦게 찍혔어요. 실제 출근은 9시입니다.", desired_clock_in_at: at(date, 9 * 60) });
-    } else if (e.type === "approved_sep") {
-      corrections.push({ ...base, status: "approved", reason_type: "wrong_time", memo: "출근 시각 정정", desired_clock_in_at: at(date, 9 * 60), review_comment: "확인했습니다", reviewed_by_user_id: A, reviewed_at: `${date}T19:00:00+09:00` });
     }
   }
   await insertMany("attendance_correction_requests", corrections);
@@ -473,7 +570,8 @@ async function main() {
   const allowances = [];
   inserted.forEach((s, k) => {
     const m = meta[k];
-    if (s.status !== "completed" || PEOPLE.find((p) => p.key === m.key)?.salaried) return;
+    const who = PEOPLE.find((p) => p.key === m.key);
+    if (s.status !== "completed" || who?.salaried || who?.real) return;
     const wd = weekday(m.date);
     if (wd === 0 || wd === 6) {
       allowances.push({ organization_id: orgId, target_date: m.date, target_user_id: s.user_id, allowance_type: "daily_fixed", amount_yen: 1000, category: "regular", memo: "주말 근무", status: "active", created_by_user_id: A });
@@ -484,11 +582,19 @@ async function main() {
 
   // ── 교통비 ──
   const transport = [
-    { key: "hana", ym: "2026-09", status: "approved", items: [["2026-09-02", 420], ["2026-09-09", 420], ["2026-09-16", 420]] },
-    { key: "hana", ym: "2026-10", status: "approved", items: [["2026-10-01", 420], ["2026-10-07", 420], ["2026-10-14", 420], ["2026-10-21", 420]] },
     { key: "alba", ym: "2026-10", status: "submitted", items: [["2026-10-06", 360], ["2026-10-13", 360], ["2026-10-20", 360]] },
-    { key: "nguyen", ym: "2026-10", status: "submitted", items: [["2026-10-09", 280], ["2026-10-16", 280]] },
   ];
+  // 실제 교통비(원본 通勤非課税) — 승인된 신청 하나, 근무일마다 나눠 적는다(끝돈은 마지막 날).
+  for (const p of PEOPLE.filter((x) => x.real)) {
+    const sched = realSchedule(p).days;
+    for (const [ym, m] of Object.entries(p.real.months)) {
+      if (!m.commute) continue;
+      const dates = sched.filter((d) => d.date.startsWith(ym)).map((d) => d.date);
+      if (!dates.length) dates.push(`${ym}-01`);
+      const each = Math.floor(m.commute / dates.length);
+      transport.push({ key: p.key, ym, status: "approved", memo: "출퇴근 교통비", items: dates.map((d, k) => [d, k === dates.length - 1 ? m.commute - each * (dates.length - 1) : each]) });
+    }
+  }
   for (const t of transport) {
     const total = t.items.reduce((sum, [, yen]) => sum + yen, 0);
     const submitted = `${t.ym}-25T20:00:00+09:00`;
@@ -511,17 +617,22 @@ async function main() {
     );
     await insertMany(
       "transport_reimbursement_items",
-      t.items.map(([date, yen], k) => ({ organization_id: orgId, report_id: report.id, user_id: ids[t.key], usage_date: date, amount_yen: yen, entry_mode: "manual", memo: "신주쿠 ↔ 아사쿠사 지하철", sort_order: k })),
+      t.items.map(([date, yen], k) => ({ organization_id: orgId, report_id: report.id, user_id: ids[t.key], usage_date: date, amount_yen: yen, entry_mode: "manual", memo: t.memo ?? "신주쿠 ↔ 아사쿠사 지하철", sort_order: k })),
     );
   }
 
-  // ── 9월 급여 입력 (10월 「지난달 값 가져오기」 원본) · 10월 입력 일부 ──
-  await insertMany("payroll_month_inputs", [
-    { organization_id: orgId, user_id: ids.hana, target_month: "2026-09-01", special: 5000, memo: "리더 수당", updated_by: A },
-    { organization_id: orgId, user_id: ids.li, target_month: "2026-09-01", withholding_override: 1200, withholding_override_reason: "본인 신고 기준 금액", updated_by: A },
-    { organization_id: orgId, user_id: ids.nguyen, target_month: "2026-09-01", memo: "9월부터 고용보험 가입", updated_by: A },
-    { organization_id: orgId, user_id: ids.tanaka, target_month: "2026-10-01", prev_adjustment: 1500, prev_adjustment_kind: "taxable", prev_adjustment_month: "2026-09-01", memo: "9월 근무 1시간 누락분", updated_by: A },
-  ]);
+  // ── 8 · 9월 급여 입력 — 원본의 조정분 · 잔업, 분으로 안 떨어지는 끝돈, 8월 구분이 지금과 다른 사람의 원천세(원본 값) ──
+  const inputs = [];
+  for (const p of PEOPLE.filter((x) => x.real)) {
+    for (const [ym, m] of Object.entries(p.real.months)) {
+      const row = { organization_id: orgId, user_id: ids[p.key], target_month: `${ym}-01`, updated_by: A };
+      if (m.overtime) row.overtime = m.overtime;
+      if (m.adjust) Object.assign(row, { prev_adjustment: m.adjust, prev_adjustment_kind: "taxable", prev_adjustment_month: `${m.adjustMonth}-01` });
+      if (m.withholdingOverride != null) Object.assign(row, { withholding_override: m.withholdingOverride, withholding_override_reason: m.withholdingReason });
+      if (Object.keys(row).length > 4) inputs.push(row);
+    }
+  }
+  await insertMany("payroll_month_inputs", inputs);
 
   // ── 휴가 (월급 사무) ──
   must(await db.from("annual_leave_baselines").insert({ organization_id: orgId, user_id: ids.office, base_amount: 10, bonus_amount: 1, baseline_date: "2026-04-01" }), "휴가 기준");
@@ -530,7 +641,7 @@ async function main() {
     { organization_id: orgId, user_id: ids.office, applicant_name: "야마모토 레이", leave_type: "annual", start_date: "2026-11-06", end_date: "2026-11-06", duration_unit: "am", days_count: 0.5, reason: "병원 진료", emergency_contact: "+81-90-0000-0108", status: "requested", submitted_at: `${today}T08:30:00+09:00` },
   ]);
 
-  console.log(`\n완료 — 세션 ${inserted.length} · 휴식 ${breaks.length} · 정정 ${corrections.length} · 추가수당 ${allowances.length} · 교통비 ${transport.length}`);
+  console.log(`\n완료 — 실제 ${REAL.length}명 · 급여 입력 ${inputs.length} · 세션 ${inserted.length} · 휴식 ${breaks.length} · 정정 ${corrections.length} · 추가수당 ${allowances.length} · 교통비 ${transport.length}`);
   console.log(`로그인 계정 · 비밀번호: ${ACCOUNTS_FILE} (git 제외)`);
 }
 

@@ -171,34 +171,6 @@ async function loadRequest(
   return (res.data as AttendanceCorrectionRequestRow | null) ?? null;
 }
 
-/** `requested` 정정을 `in_review` 로 옮긴다 (관리자가 담당). 요청만 바뀌고 세션은 그대로. */
-export async function setCorrectionInReview(requestId: string): Promise<ReviewActionResult> {
-  const session = await getCurrentAppSession();
-  if (!session || !hasOrganizationContext(session)) return { ok: false, reason: "error" };
-  const organizationId = session.organization.id;
-  const service = getSupabaseServiceClient();
-  if (!(await attendanceCan(service, organizationId, session.user.id, "attendance.manage"))) {
-    return { ok: false, reason: "forbidden" };
-  }
-
-  const request = await loadRequest(service, organizationId, requestId);
-  if (!request) return { ok: false, reason: "not_found" };
-  if (request.status !== "requested") return { ok: false, reason: "already_handled" };
-
-  const upd = await service
-    .from("attendance_correction_requests")
-    .update({ status: "in_review", reviewed_by_user_id: session.user.id })
-    .eq("id", requestId)
-    .eq("status", "requested")
-    .select("id");
-  if (upd.error) return { ok: false, reason: "error" };
-  // 0행 = 읽은 뒤 다른 관리자가 먼저 가져갔거나 직원이 취소했다 — 성공으로 보이면 안 된다(2026-10-26).
-  if (!upd.data || upd.data.length === 0) return { ok: false, reason: "already_handled" };
-
-  revalidateSelfView();
-  return { ok: true };
-}
-
 /**
  * 정정 요청을 승인하고, 관리자가 확정한 최종 값을 연결된 세션에 적용한다. 감사
  * 행도 남긴다. 세션이 없는(예외) 요청은 승인된 최종 출퇴근/근무지 값으로
@@ -1824,6 +1796,7 @@ export async function exportMonthlyPayrollReport(
 // ── 교통비 정산 — 관리자 검토 (Slice 5) ─────────────────────────
 // 교통비 보고서에 대한 권한 있는(owner / attendance_payroll_admin) 상태 전이:
 //   submitted/reviewing → approved | rejected | changes_requested
+//   (「검토 시작」(→ reviewing) 액션은 2026-10-27 버튼과 함께 뺐다 — 예전 reviewing 행은 그대로 처리된다)
 //   changes_requested → 근무자 재제출만 가능
 //   approved/rejected → 재개 (→ 'submitted')
 // `changes_requested` (마이그레이션 202607030001)는 보고서를 근무자에게 돌려보내 고쳐 다시 제출하게 한다
@@ -1848,7 +1821,6 @@ export type TransportReviewResult =
     };
 
 export type TransportReviewAction =
-  | "reviewing"
   | "approved"
   | "rejected"
   | "changes_requested"
@@ -1858,7 +1830,6 @@ export type TransportReviewAction =
 // 이미 결정된(승인/반려) 보고서를 `submitted` 로 돌려 검토 큐에
 // 다시 들어가게 한다 (승인됐던 것이라면 다시 승인될 때까지 급여 합계에서 빠진다).
 const TRANSPORT_ACTION_TARGET: Record<TransportReviewAction, TransportReportStatus> = {
-  reviewing: "reviewing",
   approved: "approved",
   rejected: "rejected",
   changes_requested: "changes_requested",
@@ -1868,7 +1839,6 @@ const TRANSPORT_ACTION_TARGET: Record<TransportReviewAction, TransportReportStat
 // 각 액션이 실행될 수 있는 원래 상태. `changes_requested` 보고서는 근무자에게 있으며
 // 관리자가 승인/반려/다른 수정 요청을 하기 전에 다시 제출되어야 한다.
 const TRANSPORT_ACTION_VALID_FROM: Record<TransportReviewAction, string[]> = {
-  reviewing: ["submitted"],
   approved: ["submitted", "reviewing"],
   rejected: ["submitted", "reviewing"],
   changes_requested: ["submitted", "reviewing"],

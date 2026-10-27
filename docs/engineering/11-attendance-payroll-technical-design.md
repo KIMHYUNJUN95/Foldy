@@ -316,7 +316,7 @@ creation / payroll / finalization / dashboard / export / notifications here.
   recency. (`not_finalized` = current Tokyo month for now -> the finalized-snapshot exclusion plugs in at
   Step 8.)
 - **Actions** `src/app/admin/attendance/actions.ts` (`"use server"`, service-role, all privilege-gated):
-  - `setCorrectionInReview(requestId)` -> `requested` -> `in_review` (request-only; no session change).
+  - ~~`setCorrectionInReview(requestId)`~~ — removed 2026-10-27 (the 「검토 시작」 button was dropped; approve / reject set `in_review` themselves).
   - `approveCorrectionRequest({ requestId, finalClockInAt?, finalClockOutAt?, finalSiteId?, comment? })`
     -> **authoritative application**: final values default to the requester's proposals but the admin can
     override; the linked session's clock-in/out times + sites are updated, a still-open session that now

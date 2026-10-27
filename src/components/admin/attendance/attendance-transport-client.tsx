@@ -381,20 +381,6 @@ function TransportPanel({
   const visibleItems =
     itemsExpanded || !itemsCollapsible ? items : items.slice(0, ITEMS_COLLAPSED);
 
-  function doReview() {
-    if (!report) return;
-    setErr(null);
-    startTransition(async () => {
-      const res = await setTransportReportReview({ reportId: report.id, action: "reviewing" });
-      if (res.ok) {
-        onStatusChange(row.userId, "reviewing", c.trActionDoneReview);
-      } else if (res.reason === "forbidden") {
-        setErr(c.actionForbidden);
-      } else {
-        setErr(res.reason === "finalized" ? c.trFinalizedLocked : c.actionFailed);
-      }
-    });
-  }
   function submitApprove() {
     if (!report) return;
     setErr(null);
@@ -631,16 +617,7 @@ function TransportPanel({
                     )}
                   </div>
                 </div>
-              ) : (
-                row.status === "submitted" ? (
-                  <div className="pblock trp-review">
-                    <span>{c.trPanelPermSub}</span>
-                    <button type="button" className="btn btn--ghost btn--sm" onClick={doReview} disabled={pending}>
-                      {pending ? c.trActionReviewing : c.trPanelBtnReview}
-                    </button>
-                  </div>
-                ) : null
-              )}
+              ) : null}
             </>
           )}
 

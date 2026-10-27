@@ -3196,7 +3196,6 @@
 .adm .panel .trp-kicker { display: flex; gap: 8px; font-size: 12px; color: var(--text-3); }
 .adm .panel .trp-kicker b { color: #c5282e; font-weight: 600; }
 .adm .panel .trp-name { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #16141f; }
-.adm .panel .trp-review { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: #6b6878; }
 .adm .panel .trp-row { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 6px 0; border-top: 0.5px solid var(--separator); font-size: 14px; }
 .adm .panel .trp-row:first-child { border-top: 0; }
 .adm .panel .trp-row__d { width: 40px; flex: none; color: var(--text-3); font-variant-numeric: tabular-nums; }

@@ -33,7 +33,6 @@ import {
   loadSessionAuditTrail,
   rejectCorrectionRequest,
   restoreAttendanceSession,
-  setCorrectionInReview,
   updateAttendanceSessionAdmin,
   type ClosedCorrections,
   type SessionAuditEntry,
@@ -1049,7 +1048,6 @@ export function AttendanceQueueClient({
             // 승인은 세션 시각을 바꾼다 — 세션 목록도 서버에서 다시 받는다(2026-10-26).
             router.refresh();
           }}
-          onStale={() => router.refresh()}
           onOpenSession={(sessionId) => setPanel({ kind: "sess", id: sessionId })}
         />
       ) : null}
@@ -1127,8 +1125,7 @@ function SessionPanel({
   // 관리자가 먼저 수동 정정으로 채워야 하므로, 그때까지 "복구 및 완료 처리" 는 막힌다.
   const restoreBlocked = isInvalid && (!item.clockInLabel || !item.clockOutLabel);
   // "검토 완료 처리" 는 review_required 로 표시된 세션(또는 복원할 무효 세션)에만 의미가 있다.
-  // 이미 정상인 세션은 검토할 게 없으므로 버튼을 비활성화한다 (의미 없는 감사 기록 방지).
-  const approveDisabled = pending || restoreBlocked || (!isInvalid && !needsReview);
+  // 이미 정상인 세션은 검토할 게 없으므로 버튼 자체를 숨긴다(아래 panel__foot, 2026-10-27).
 
   const auditKey = `${item.sessionId}:${auditReloadKey}`;
   // 파생 로딩: 현재 키의 비동기 로드가 끝나기 전까지 null (effect 안에서 동기 setState 금지).
@@ -1663,50 +1660,33 @@ function SessionPanel({
           ) : null}
         </div>
 
-        <div className="panel__foot">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            style={{ flex: 1 }}
-            disabled
-            title={c.panelMsgPendingNote}
-          >
-            <Ic>
-              <MessageSquare />
-            </Ic>
-            {c.panelBtnMessage}
-          </button>
-          <button
-            type="button"
-            className="btn btn--ok"
-            style={{ flex: 1.4 }}
-            onClick={() => {
-              setEditOpen(false);
-              setModal("approve");
-            }}
-            disabled={approveDisabled}
-            title={
-              approveDisabled && !pending
-                ? restoreBlocked
-                  ? c.restoreNeedsCompleteNote
-                  : c.panelReviewedNote
-                : undefined
-            }
-          >
-            <Ic>
-              <Check />
-            </Ic>
-            {pending
-              ? isInvalid
-                ? c.actionRestoring
-                : c.actionApproving
-              : isInvalid
-                ? c.panelBtnRestore
-                : needsReview
-                  ? c.panelBtnApprove
-                  : c.panelBtnReviewed}
-          </button>
-        </div>
+        {/* 할 일이 없는(이미 정상인) 세션엔 완료 버튼을 숨긴다 — 막힌 버튼은 헷갈린다(2026-10-27). */}
+        {isInvalid || needsReview ? (
+          <div className="panel__foot">
+            <button
+              type="button"
+              className="btn btn--ok"
+              style={{ flex: 1 }}
+              onClick={() => {
+                setEditOpen(false);
+                setModal("approve");
+              }}
+              disabled={pending || restoreBlocked}
+              title={restoreBlocked && !pending ? c.restoreNeedsCompleteNote : undefined}
+            >
+              <Ic>
+                <Check />
+              </Ic>
+              {pending
+                ? isInvalid
+                  ? c.actionRestoring
+                  : c.actionApproving
+                : isInvalid
+                  ? c.panelBtnRestore
+                  : c.panelBtnApprove}
+            </button>
+          </div>
+        ) : null}
       </aside>
 
       {modal === "invalidate" ? (
@@ -1754,7 +1734,6 @@ function CorrectionPanel({
   onClose,
   onUpdated,
   onOpenSession,
-  onStale,
 }: {
   row: AdminCorrectionRow;
   c: Att;
@@ -1762,7 +1741,6 @@ function CorrectionPanel({
   onUpdated: (updated: AdminCorrectionRow, toast: string) => void;
   onOpenSession: (sessionId: string) => void;
   /** 그 사이 바뀐 걸 알았을 때 — 부모가 서버에서 목록을 다시 받는다. */
-  onStale: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -1823,23 +1801,6 @@ function CorrectionPanel({
       }
     });
   }
-  function doClaim() {
-    setErr(null);
-    startTransition(async () => {
-      const res = await setCorrectionInReview(row.id);
-      if (res.ok) {
-        onUpdated({ ...row, status: "in_review" }, c.corrActionDoneClaim);
-      } else if (res.reason === "forbidden") {
-        setErr(c.actionForbidden);
-      } else if (res.reason === "already_handled") {
-        setErr(c.corrActionAlreadyHandled);
-        onStale();
-      } else {
-        setErr(c.actionFailed);
-      }
-    });
-  }
-
   return (
     <>
       <div className="panel-scrim on" onClick={onClose} />
@@ -2017,22 +1978,6 @@ function CorrectionPanel({
                     {c.panelPermRole}
                   </span>
                 </div>
-                {row.status === "requested" ? (
-                  <div className="permbtns">
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      style={{ flex: 1 }}
-                      onClick={doClaim}
-                      disabled={pending}
-                    >
-                      <Ic>
-                        <Pencil />
-                      </Ic>
-                      {pending ? c.corrActionClaiming : c.corrPanelBtnClaim}
-                    </button>
-                  </div>
-                ) : null}
               </div>
             </div>
           )}
@@ -2053,60 +1998,35 @@ function CorrectionPanel({
           ) : null}
         </div>
 
-        <div className="panel__foot">
-          {resolved ? (
-            <>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                style={{ flex: 1 }}
-                disabled
-                title={c.corrPendingNote}
-              >
-                <Ic>
-                  <Clock />
-                </Ic>
-                {c.corrPanelBtnHistory}
-              </button>
-              <button
-                type="button"
-                className="btn btn--subtle"
-                style={{ flex: 1 }}
-                disabled
-                title={c.corrPendingNote}
-              >
-                {c.corrPanelBtnReopen}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="btn btn--danger-ghost"
-                style={{ flex: 1 }}
-                onClick={() => setModal("reject")}
-                disabled={pending}
-              >
-                <Ic>
-                  <Ban />
-                </Ic>
-                {pending ? c.corrActionRejecting : c.corrPanelBtnReject}
-              </button>
-              <button
-                type="button"
-                className="btn btn--ok"
-                style={{ flex: 1.4 }}
-                onClick={() => setModal("approve")}
-                disabled={pending}
-              >
-                <Ic>
-                  <Check />
-                </Ic>
-                {pending ? c.corrActionApproving : c.corrPanelBtnApprove}
-              </button>
-            </>
-          )}
-        </div>
+        {/* 처리 끝난 요청엔 누를 버튼이 없다 — 막힌 「처리 이력 · 재오픈」은 지웠다(2026-10-27). */}
+        {!resolved ? (
+          <div className="panel__foot">
+            <button
+              type="button"
+              className="btn btn--danger-ghost"
+              style={{ flex: 1 }}
+              onClick={() => setModal("reject")}
+              disabled={pending}
+            >
+              <Ic>
+                <Ban />
+              </Ic>
+              {pending ? c.corrActionRejecting : c.corrPanelBtnReject}
+            </button>
+            <button
+              type="button"
+              className="btn btn--ok"
+              style={{ flex: 1.4 }}
+              onClick={() => setModal("approve")}
+              disabled={pending}
+            >
+              <Ic>
+                <Check />
+              </Ic>
+              {pending ? c.corrActionApproving : c.corrPanelBtnApprove}
+            </button>
+          </div>
+        ) : null}
       </aside>
 
       {modal === "approve" ? (

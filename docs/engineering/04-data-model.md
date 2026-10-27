@@ -2197,6 +2197,7 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 
 **2026-10-26 `uploaded_by`**(`202610260002`, 운영 적용): `uuid → profiles(id) on delete set null` — 관리자가 스캔본을 대신 올린 행이면 그 관리자, 본인이 올렸으면 null.
 대신 올린 행은 처음부터 `status = confirmed` · `confirmed_by = uploaded_by` · `ocr_used = false`. 쓰기는 `src/actions/staff-documents.ts`(41 「R4 구현」).
+지금 카드 바꾸기는 함수 `promote_staff_id_document(p_organization_id, p_user_id, p_document_id)`(`202610270001`, service role 만) — 사람 단위 잠금 안에서 이전 내리기 + 새로 올리기.
 
 ## 2026-10-23 `staff_id_ocr_reads` · `memberships.left_at` — 동의 기록 · 읽기 횟수 · 보관 기한 (`202610230003` · `202610230004`)
 

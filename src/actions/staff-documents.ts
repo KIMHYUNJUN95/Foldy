@@ -164,29 +164,17 @@ export async function saveStaffIdDocumentByAdmin(input: SaveStaffIdDocumentInput
     return { ok: false, errorKey: "failed" };
   }
 
-  // 내리기 → 올리기는 한 트랜잭션이 아니다. 같은 순간 본인도 제출해 올리기가 「지금 카드 하나」 규칙에 걸리면
-  // 새 행을 지우고 내렸던 카드를 되살린다 — 지금 카드가 0장이 되거나, 같은 문서 id 로 다시 저장이 영영 막히지 않게.
-  // 사진은 남겨 둔다(같은 id 로 다시 저장할 수 있게, 그만두면 `discardStaffIdUpload` 가 지운다).
-  const { data: previous } = await service
-    .from("staff_id_documents")
-    .select("id")
-    .eq("organization_id", org)
-    .eq("user_id", input.userId)
-    .eq("is_current", true);
-  const previousIds = (previous ?? []).map((row) => row.id);
-  const { error: demoteError } =
-    previousIds.length > 0
-      ? await service.from("staff_id_documents").update({ is_current: false }).eq("organization_id", org).in("id", previousIds)
-      : { error: null };
-  const { error: promoteError } = demoteError
-    ? { error: demoteError }
-    : await service.from("staff_id_documents").update({ is_current: true }).eq("organization_id", org).eq("id", input.documentId);
-  if (promoteError) {
-    console.error("[staff-documents] admin promote failed", promoteError.code);
+  // 이전 카드 내리기 + 새 카드 올리기는 DB 함수 하나(사람 단위 잠금, 202610270001) — 같은 순간 본인도 제출해도 차례로 처리된다.
+  // 실패하면 새 행만 지운다(이전 카드는 그대로). 사진은 남겨 같은 id 로 다시 저장할 수 있게 — 그만두면 `discardStaffIdUpload`,
+  // 창을 그냥 닫으면 매일 정리 작업(`cleanupOrphanIdUploads`)이 지운다.
+  const { data: promoted, error: promoteError } = await service.rpc("promote_staff_id_document", {
+    p_organization_id: org,
+    p_user_id: input.userId,
+    p_document_id: input.documentId,
+  });
+  if (promoteError || !promoted) {
+    console.error("[staff-documents] admin promote failed", promoteError?.code ?? "not_found");
     await service.from("staff_id_documents").delete().eq("organization_id", org).eq("id", input.documentId);
-    if (previousIds.length > 0 && !demoteError) {
-      await service.from("staff_id_documents").update({ is_current: true }).eq("organization_id", org).in("id", previousIds);
-    }
     return { ok: false, errorKey: "failed" };
   }
 
@@ -200,7 +188,7 @@ export async function saveStaffIdDocumentByAdmin(input: SaveStaffIdDocumentInput
 
 /**
  * 대신 올리기를 그만둘 때(취소 · 다른 사람으로 · 화면 닫기) 올려 둔 사진을 지운다 — 개인정보 사진이 행 없이 남지 않게.
- * 그 문서 id 로 저장된 행이 있으면 아무것도 지우지 않는다(이미 쓰는 사진). 창을 그냥 닫으면 불리지 못한다 — 41 「R4 구현」 남은 틈.
+ * 그 문서 id 로 저장된 행이 있으면 아무것도 지우지 않는다(이미 쓰는 사진). 창을 그냥 닫아 불리지 못하면 매일 정리 작업(`cleanupOrphanIdUploads`)이 지운다.
  */
 export async function discardStaffIdUpload(input: { userId: string; documentId: string }): Promise<{ ok: boolean }> {
   const session = await reviewerSession();

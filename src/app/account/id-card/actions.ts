@@ -181,16 +181,18 @@ export async function submitIdCard(input: SubmitIdCardInput): Promise<SubmitIdCa
     return { ok: false, errorKey: "failed" };
   }
 
-  const { error: demoteError } = await service
-    .from("staff_id_documents")
-    .update({ is_current: false })
-    .eq("organization_id", org)
-    .eq("user_id", uid)
-    .eq("is_current", true);
-  const { error: promoteError } = demoteError
-    ? { error: demoteError }
-    : await service.from("staff_id_documents").update({ is_current: true }).eq("id", input.documentId);
-  if (promoteError) return { ok: false, errorKey: "failed" };
+  // 이전 카드 내리기 + 새 카드 올리기는 DB 함수 하나(사람 단위 잠금, 202610270001) — 관리자 대신 올리기와 겹쳐도 차례로 처리된다.
+  // 실패하면 새 행만 지운다(이전 카드는 그대로, 사진은 다시 제출할 수 있게 남김 — 안 쓰이면 매일 정리 작업이 지운다).
+  const { data: promoted, error: promoteError } = await service.rpc("promote_staff_id_document", {
+    p_organization_id: org,
+    p_user_id: uid,
+    p_document_id: input.documentId,
+  });
+  if (promoteError || !promoted) {
+    console.error("[staff-documents] promote failed", promoteError?.code ?? "not_found");
+    await service.from("staff_id_documents").delete().eq("organization_id", org).eq("id", input.documentId);
+    return { ok: false, errorKey: "failed" };
+  }
 
   // 영문 이름은 가입 때 받지 않는다 — 재류카드의 로마자 이름으로 채운다(비어 있을 때만, 2026-10-23 사용자). 마이넘버 카드는 로마자가 없다.
   if (kind === "residence_card" && fields.nameRoman && !session.user.identity.nameEn) {

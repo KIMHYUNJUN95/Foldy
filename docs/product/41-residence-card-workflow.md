@@ -354,5 +354,11 @@ A4 인쇄도 앞면만(マイナンバーカード（表面）写し). 개인번
   - 대상에서 개발자 계정을 뺀다(목록과 같게). service role 쓰기는 모두 `organization_id` 조건.
   - 내리기 → 올리기는 한 트랜잭션이 아니다 — 같은 순간 본인도 제출해 「지금 카드 하나」 규칙에 걸리면 **새 행을 지우고 내렸던 카드를 되살린다**(지금 카드 0장 · 같은 id 재저장 막힘 방지). 사진은 남겨 다시 저장할 수 있게.
   - 올리고 저장하지 않은 채 폼이 사라지면(취소 · 다른 사람 · 화면 나가기) `discardStaffIdUpload` 가 그 문서 폴더 사진을 지운다(행이 있으면 안 지움).
-- **남은 틈**: 창 · 앱을 그냥 닫으면 지우기가 불리지 못해 사진이 남는다 — 행 없는 폴더를 지우는 정리 작업 후보. 본인 제출(`submitIdCard`)도 같은 두 틈(취소 사진 · 내리기/올리기 경합)이 있다 — 고치려면 DB 함수 하나로 묶는다.
+- **남은 틈 메움(2026-10-27)**:
+  - **지금 카드 바꾸기 = DB 함수 하나** `promote_staff_id_document(조직, 사람, 문서)`(마이그레이션 `202610270001`, service role 만 실행) — (조직, 사람) 단위 잠금을 잡고
+    이전 카드 내리기 + 새 카드 올리기를 한 트랜잭션으로. 본인 제출(`submitIdCard`)과 관리자 대신 올리기(`saveStaffIdDocumentByAdmin`)가 같이 쓴다 —
+    같은 순간 둘이 와도 차례로 처리되고 나중 것이 지금 카드(지금 카드 0장 · 하나 규칙 충돌 없음). 함수가 실패하면 새 행만 지우고 이전 카드는 그대로, 사진은 다시 저장할 수 있게 남긴다.
+  - **행 없는 사진 폴더 매일 정리** `cleanupOrphanIdUploads()`(`src/lib/staff-documents/retention.ts`, `/api/tasks/reminders` 크론) — 창 · 앱을 그냥 닫아 취소 지우기가 불리지 못한 사진.
+    `{조직}/{사람}/{문서id}/` 폴더에 그 문서 id 행이 없고 **안의 파일이 모두 24시간보다 오래됐을 때만** 지운다(올리는 중 · 이력 카드 사진은 안전). 한 번에 최대 100폴더.
+    테스트 `src/lib/__tests__/staff-document-orphan-cleanup.test.ts`.
 - 테스트 `src/lib/__tests__/staff-document-roster.test.ts` · `split-pane.test.ts`(staffDocs). 문구 `admin.users.console.docs*` · `tabDocs` · `mTabDocs` · `idCard.up*`(ko/ja/en).

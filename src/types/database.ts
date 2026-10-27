@@ -6704,6 +6704,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      promote_staff_id_document: {
+        Args: {
+          p_document_id: string
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       approve_attendance_correction_atomic: {
         Args: {
           p_action_type: string

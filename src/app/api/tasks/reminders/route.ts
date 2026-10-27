@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cleanupUnconfirmedSignups } from "@/lib/auth/unconfirmed-signup-cleanup";
-import { cleanupExpiredIdDocuments } from "@/lib/staff-documents/retention";
+import { cleanupExpiredIdDocuments, cleanupOrphanIdUploads } from "@/lib/staff-documents/retention";
 import { runTaskReminders } from "@/lib/notifications/task-reminders";
 import { runIdDocumentExpiryReminders } from "@/lib/notifications/id-document-reminders";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -73,6 +73,15 @@ async function handle(request: NextRequest) {
       console.error("[tasks/reminders] id document retention cleanup failed", error);
       idDocumentCleanup = { checked: false, error: "cleanup_failed" };
     }
+    let idUploadCleanup: Awaited<ReturnType<typeof cleanupOrphanIdUploads>> | { checked: false; error: string };
+    try {
+      idUploadCleanup = organizationIdParam
+        ? { checked: false, error: "skipped_for_org_run" }
+        : await cleanupOrphanIdUploads(service);
+    } catch (error) {
+      console.error("[tasks/reminders] orphan id upload cleanup failed", error);
+      idUploadCleanup = { checked: false, error: "cleanup_failed" };
+    }
     let idDocumentExpiry: Awaited<ReturnType<typeof runIdDocumentExpiryReminders>> | { checked: false; error: string };
     try {
       idDocumentExpiry = await runIdDocumentExpiryReminders(service, { organizationId: organizationIdParam ?? undefined });
@@ -80,7 +89,7 @@ async function handle(request: NextRequest) {
       console.error("[tasks/reminders] id document expiry reminders failed", error);
       idDocumentExpiry = { checked: false, error: "expiry_reminders_failed" };
     }
-    return NextResponse.json({ ok: true, ...result, signupCleanup, idDocumentCleanup, idDocumentExpiry });
+    return NextResponse.json({ ok: true, ...result, signupCleanup, idDocumentCleanup, idUploadCleanup, idDocumentExpiry });
   } catch (error) {
     console.error("[tasks/reminders] failed", error);
     return NextResponse.json({ ok: false, error: "reminders_failed" }, { status: 500 });

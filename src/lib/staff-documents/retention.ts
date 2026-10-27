@@ -130,3 +130,67 @@ async function purgeOwner(service: SupabaseClient<Database>, organizationId: str
     .eq("user_id", userId);
   return !printError;
 }
+
+const UUID_NAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** 올리고 저장 · 취소 사이 — 이 시간보다 새 사진은 아직 쓰는 중일 수 있어 건드리지 않는다. */
+export const ORPHAN_UPLOAD_GRACE_MS = 24 * 60 * 60 * 1000;
+/** 크론 한 번에 지우는 최대 폴더 수 — 남은 것은 다음 날. */
+const MAX_ORPHAN_FOLDERS_PER_RUN = 100;
+
+type ListedEntry = { name: string; id: string | null; created_at?: string | null; updated_at?: string | null };
+
+/**
+ * 행 없는 서류 사진 폴더 정리(docs/product/41 「R4 구현」 남은 틈, 2026-10-27). 매일 `/api/tasks/reminders` 크론.
+ *
+ * 사진은 `{조직}/{사람}/{문서id}/{front|back}-….jpg` 로 먼저 올라가고, 제출 · 저장해야 그 문서 id 로 표 행이 생긴다.
+ * 창 · 앱을 그냥 닫으면 취소 지우기(`discardStaffIdUpload`)가 불리지 못해 행 없는 폴더가 남는다 — 개인정보 사진이라 지운다.
+ * 폴더 안 파일이 **모두 24시간보다 오래됐고** 그 문서 id 의 행이 없을 때만 지운다(올리는 중인 사진 · 이력 카드 사진은 안전).
+ */
+export async function cleanupOrphanIdUploads(service: SupabaseClient<Database>, now = Date.now()) {
+  const bucket = service.storage.from(STAFF_DOCUMENT_BUCKET);
+  const listAll = async (prefix: string): Promise<ListedEntry[]> => {
+    const out: ListedEntry[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await bucket.list(prefix, { limit: PAGE, offset });
+      if (error) throw error;
+      out.push(...((data ?? []) as ListedEntry[]));
+      if ((data ?? []).length < PAGE) break;
+    }
+    return out;
+  };
+  const folders = (entries: ListedEntry[]) => entries.filter((e) => !e.id && UUID_NAME.test(e.name)).map((e) => e.name);
+
+  let removed = 0;
+  for (const org of folders(await listAll(""))) {
+    for (const user of folders(await listAll(org))) {
+      if (removed >= MAX_ORPHAN_FOLDERS_PER_RUN) return { checked: true, removed };
+      const docIds = folders(await listAll(`${org}/${user}`));
+      if (docIds.length === 0) continue;
+      const { data: rows, error } = await service
+        .from("staff_id_documents")
+        .select("id")
+        .eq("organization_id", org)
+        .in("id", docIds);
+      if (error) throw error;
+      const kept = new Set((rows ?? []).map((r) => r.id));
+      for (const docId of docIds) {
+        if (kept.has(docId) || removed >= MAX_ORPHAN_FOLDERS_PER_RUN) continue;
+        const prefix = `${org}/${user}/${docId}`;
+        const files = (await listAll(prefix)).filter((f) => f.id);
+        if (files.length === 0) continue;
+        const fresh = files.some((f) => {
+          const at = Date.parse(f.updated_at ?? f.created_at ?? "");
+          return !Number.isFinite(at) || now - at < ORPHAN_UPLOAD_GRACE_MS;
+        });
+        if (fresh) continue;
+        const { error: removeError } = await bucket.remove(files.map((f) => `${prefix}/${f.name}`));
+        if (removeError) {
+          console.error("[staff-documents/retention] orphan remove failed", removeError.message);
+          continue;
+        }
+        removed += 1;
+      }
+    }
+  }
+  return { checked: true, removed };
+}

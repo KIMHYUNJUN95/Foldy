@@ -1,5 +1,5 @@
 import type { PrepRow } from "@/lib/payroll-prep";
-import { SheetBuilder, type CellStyle, type ModelSheet } from "./sheet-model";
+import { SheetBuilder, fitWrappedRows, type CellStyle, type ModelSheet } from "./sheet-model";
 
 /**
  * 알바 급여 P4 — 세무사용 엑셀(`アルバイト給与一覧YYYYMMDD(税理士用).xlsx`) 모델. docs/product/39 §6.
@@ -75,6 +75,7 @@ export function buildTaxAccountantBook(input: TaxAccountantInput): ModelSheet[] 
     for (const [c, pick] of cols) b.set(`${c}${r}`, sum(pick), { ...num, font: { name: FONT, size: 11, bold: true } }, `SUM(${c}${first}:${c}${last})`);
     r += 2;
   }
+  fitWrappedRows(b.sheet);
   return [b.sheet];
 }
 

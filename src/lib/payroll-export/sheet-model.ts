@@ -146,6 +146,41 @@ export class SheetBuilder {
   }
 }
 
+/** 글자 폭(반각 = 1, 전각 · 한글 · 한자 = 2) — 행 높이 어림용. */
+function textUnits(text: string): number {
+  let n = 0;
+  for (const ch of text) n += /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\uff01-\uff60\uffe0-\uffe6]/.test(ch) ? 2 : 1;
+  return n;
+}
+
+/**
+ * 줄바꿈(wrap) 글자 칸이 열 폭을 넘으면 그 행을 몇 줄만큼 높인다(2026-10-27 — 社長確認用 「出勤日数 / 메모」 ·
+ * 備考가 두 줄로 접혀 위아래가 잘렸다). 정해 둔 높이보다 **낮추지는 않는다**. 여러 행 병합 칸은 건너뛴다.
+ * 엑셀 열 폭 1 = 11pt 글자 「0」 하나 — 글자 크기에 맞춰 칸에 들어가는 반각 글자 수를 어림한다(여유 10%).
+ */
+export function fitWrappedRows(sheet: ModelSheet): void {
+  const spans = new Map<string, { cols: number[]; multiRow: boolean }>();
+  for (const range of sheet.merges) {
+    const r = parseRange(range);
+    const cols: number[] = [];
+    for (let c = r.left; c <= r.right; c++) cols.push(c);
+    spans.set(`${colLetter(r.left)}${r.top}`, { cols, multiRow: r.bottom > r.top });
+  }
+  for (const [addr, cell] of sheet.cells) {
+    if (typeof cell.v !== "string" || !cell.v || !cell.s?.align?.wrap) continue;
+    const span = spans.get(addr);
+    if (span?.multiRow) continue;
+    const { row, col } = parseAddress(addr);
+    const width = (span?.cols ?? [col]).reduce((sum, c) => sum + (sheet.widths[c] ?? 8.43), 0);
+    const size = cell.s.font?.size ?? 11;
+    const perLine = Math.max(1, Math.floor(((width * 11) / size) * 0.9));
+    const lines = cell.v.split("\n").reduce((sum, part) => sum + Math.max(1, Math.ceil(textUnits(part) / perLine)), 0);
+    if (lines < 2) continue;
+    const need = Math.ceil(lines * size * 1.45 + 3);
+    if (need > (sheet.heights.get(row) ?? DEFAULT_ROW_HEIGHT)) sheet.heights.set(row, need);
+  }
+}
+
 /** 엑셀 `#,##0` 처럼 — HTML 에 값을 그릴 때. */
 export function formatCellText(cell: ModelCell): string {
   const v = cell.v;

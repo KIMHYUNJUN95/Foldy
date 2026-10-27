@@ -349,6 +349,27 @@ describe("rich sample", () => {
   });
 });
 
+describe("줄바꿈 칸 행 높이", () => {
+  it("긴 메모는 社長確認用 · 支給確認一覧 · 입력 시트 행을 높이고, 짧은 칸은 그대로", () => {
+    const long = buildPrepRow(
+      input({ userId: "L", name: "김", nameKatakana: "キム", manual: { ...EMPTY_PREP_MANUAL, memo: "주말에 특근하고 야근함 · 9월 근무 1시간 누락분" } }),
+    );
+    const short = buildPrepRow(input({ userId: "S", name: "나", nameKatakana: "ナ" }));
+    const sheets = buildPayrollBook({ ym: "2026-10", paydayDate: "2026-11-10", companyName: "テスト", taxYear: 2026, rows: [long, short] });
+    const rowOf = (sheetName: string, text: string) => {
+      const sh = sheets.find((x) => x.name === sheetName)!;
+      const [addr] = [...sh.cells].find(([, c]) => typeof c.v === "string" && c.v.includes(text))!;
+      return { sh, row: Number(addr.replace(/^[A-Z]+/, "")) };
+    };
+    for (const name of [SHEET.owner, SHEET.check, SHEET.transferInput]) {
+      const { sh, row } = rowOf(name, "주말에 특근");
+      expect(sh.heights.get(row)!, name).toBeGreaterThanOrEqual(25);
+    }
+    const owner = rowOf(SHEET.owner, "주말에 특근");
+    expect(owner.sh.heights.get(owner.row + 1)).toBe(15.95);
+  });
+});
+
 describe("P5 — 결재 도장 · 지급 확인", () => {
   it("결재 도장은 사장 확인표 G3 · H3, 지급 체크는 지급 확인 목록 「済」", () => {
     const rows = sample();

@@ -2,6 +2,7 @@ import type { PrepRow } from "@/lib/payroll-prep";
 import { withholdingTable } from "@/lib/withholding-tax";
 import {
   colLetter,
+  fitWrappedRows,
   SheetBuilder,
   sheetRef,
   type CellStyle,
@@ -540,7 +541,7 @@ function guideSheet(values: SettingsValues): ModelSheet {
     ["5", "明細は「現金_明細印刷」「振込_明細印刷」から印刷してください。"],
     ["6", "各印刷シートは A4・縦・1ページの幅に合わせる設定、1ページに2名分、中央に切り取り線があります。"],
     ["7", "切る前に右上の「検印」欄へ社長印・確認印を押してください。"],
-    ["8", "差引支給額は10円単位切上げです。"],
+    ["8", "差引支給額は1円単位です（10円単位の切上げはしません）。"],
     ["注意", "数式が入っているため、列・行・シートを削除するとエラーになります。"],
     ["今回設定", `支給年月：${values.month}　／　支給日：${values.payday}`],
   ];
@@ -548,7 +549,6 @@ function guideSheet(values: SettingsValues): ModelSheet {
     const r = i + 3;
     b.set(`A${r}`, k, { font: { name: "Meiryo", size: 10, bold: true }, fill: "D9EAF7", align: { h: "center", v: "middle" } });
     b.set(`B${r}`, text, { font: { name: "Meiryo", size: 10 }, align: { v: "top", wrap: true } });
-    if (text.length > 48) b.height(r, 27);
   });
   const s = b.sheet;
   s.hidden = true;
@@ -921,6 +921,7 @@ export function buildPayrollBook(input: PayrollBookInput): ModelSheet[] {
   ];
   const tax = taxSheet(input.taxYear);
   if (tax) sheets.push(tax);
+  sheets.forEach(fitWrappedRows);
   return sheets;
 }
 

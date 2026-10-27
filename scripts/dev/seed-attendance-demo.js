@@ -297,7 +297,10 @@ async function main() {
     { mode: 0o600 },
   );
   const retiredIds = [];
-  for (const email of RETIRED_EMAILS) {
+  // 지금 JSON 에 없는 예전 실제 사람 계정(`stayops.demo.real-*`)도 근태 · 급여 · 소속을 지운다.
+  const current = new Set(PEOPLE.map((p) => p.email));
+  const stale = [...byEmail.keys()].filter((e) => /^stayops\.demo\.real-[0-9a-f]+@haru-tokyo\.com$/.test(e) && !current.has(e));
+  for (const email of [...RETIRED_EMAILS, ...stale]) {
     const u = byEmail.get(email);
     if (!u) continue;
     const m = must(await db.from("memberships").select("organization_id").eq("user_id", u.id), "예전 직원 소속");
@@ -641,7 +644,7 @@ async function main() {
     { organization_id: orgId, user_id: ids.office, applicant_name: "야마모토 레이", leave_type: "annual", start_date: "2026-11-06", end_date: "2026-11-06", duration_unit: "am", days_count: 0.5, reason: "병원 진료", emergency_contact: "+81-90-0000-0108", status: "requested", submitted_at: `${today}T08:30:00+09:00` },
   ]);
 
-  console.log(`\n완료 — 실제 ${REAL.length}명 · 급여 입력 ${inputs.length} · 세션 ${inserted.length} · 휴식 ${breaks.length} · 정정 ${corrections.length} · 추가수당 ${allowances.length} · 교통비 ${transport.length}`);
+  console.log(`\n완료 — 지운 예전 계정 ${retiredIds.length} · 실제 ${REAL.length}명 · 급여 입력 ${inputs.length} · 세션 ${inserted.length} · 휴식 ${breaks.length} · 정정 ${corrections.length} · 추가수당 ${allowances.length} · 교통비 ${transport.length}`);
   console.log(`로그인 계정 · 비밀번호: ${ACCOUNTS_FILE} (git 제외)`);
 }
 

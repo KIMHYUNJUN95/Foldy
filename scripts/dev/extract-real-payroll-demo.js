@@ -4,7 +4,10 @@
  * docs/engineering/07-environment-setup.md 「Sample data — 근태 · 급여 데모」.
  *
  * 사용:
- *   node scripts/dev/extract-real-payroll-demo.js <8월분 新アルバイト給与管理.xlsx> <9월분 アルバイト給与一覧(税理士用).xlsx> [--same "9월 이름=8월 이름" ...]
+ *   node scripts/dev/extract-real-payroll-demo.js <8월분 新アルバイト給与管理.xlsx> [<9월분 アルバイト給与一覧(税理士用).xlsx>] [--same "9월 이름=8월 이름" ...]
+ *
+ * 2026-10-27 사용자 지시로 **지금 데모는 급여 엑셀(8월분, 9/10 지급) 하나만** 넣는다 — 세무사용은 빼고 돌린다.
+ * 세무사용을 주면 아래처럼 9월분도 만든다(금액만 있어 시간 · 시급을 추정하므로 쓰지 않음).
  *
  * - 8월분 급여 엑셀: 사람별 시급 ① · ② 와 분 단위 시간 · 조정분 · 잔업 · 교통비 · 일수 · 지급 방식 · 甲乙丙(備考2).
  *   시급 ② 는 달 끝에 오른 시급으로 본다(데모는 마지막 며칠을 새 시급으로).
@@ -37,7 +40,7 @@ const ceilPay = (rate, minutes) => Math.ceil((rate * minutes) / 60 - 1e-9);
 
 async function main() {
   const [bookPath, taxPath] = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && all[i - 1] !== "--same");
-  if (!bookPath || !taxPath) throw new Error("사용: node scripts/dev/extract-real-payroll-demo.js <급여 엑셀> <세무사용 엑셀> [--same \"9월=8월\"]");
+  if (!bookPath) throw new Error("사용: node scripts/dev/extract-real-payroll-demo.js <급여 엑셀> [<세무사용 엑셀>] [--same \"9월=8월\"]");
   const same = new Map();
   process.argv.forEach((a, i, all) => {
     if (a !== "--same") return;
@@ -63,13 +66,11 @@ async function main() {
     }
   }
 
-  // ── 9월분 세무사용 ──
-  const tax = new ExcelJS.Workbook();
-  await tax.xlsx.readFile(taxPath);
-  const ws = tax.worksheets[0];
+  // ── 9월분 세무사용(있을 때만) ──
   const sep = [];
+  const ws = taxPath ? await new ExcelJS.Workbook().xlsx.readFile(taxPath).then((wb) => wb.worksheets[0]) : null;
   let cls = null;
-  for (let r = 1; r <= ws.rowCount; r++) {
+  for (let r = 1; ws && r <= ws.rowCount; r++) {
     const a = val(ws.getCell(`A${r}`));
     if (typeof a === "string" && a.includes("欄")) {
       cls = CLASS[a[0]] ?? null;

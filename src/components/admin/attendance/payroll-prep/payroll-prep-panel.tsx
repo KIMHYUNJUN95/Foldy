@@ -8,6 +8,8 @@ import { manualFromTotal, type PrepManual, type PrepRow } from "@/lib/payroll-pr
 import type { PayrollPrepCopy } from "@/lib/payroll-prep-i18n";
 import { fillCopy, withholdingLabel, type PayrollSettingsCopy } from "@/lib/payroll-settings-i18n";
 import { MemberBankBlock } from "@/components/shared/payroll-bank/payroll-bank";
+import { exportPayslipsReport, exportPayslipsWorkbook } from "@/actions/payroll-exports";
+import { AdminExportButtons, type AdminExportLabels } from "../../shared/admin-export-buttons";
 import type { PayrollBankCopy } from "@/lib/payroll-bank-i18n";
 import { formatPrepDay, formatPrepTime, prepInitial } from "./prep-format";
 import "./payroll-prep.css";
@@ -136,6 +138,7 @@ export function PayrollPrepPanel({
   onBankChange,
   onSave,
   onClose,
+  exportLabels,
 }: {
   row: PrepRow;
   ym: string;
@@ -151,6 +154,8 @@ export function PayrollPrepPanel({
   onBankChange: () => void;
   onSave: PrepSave;
   onClose: () => void;
+  /** 이 사람 명세서만 Excel · PDF(docs/product/39 §6-3). 볼 권한이 없으면 null. */
+  exportLabels: AdminExportLabels | null;
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const m = row.manual;
@@ -226,6 +231,21 @@ export function PayrollPrepPanel({
         </button>
       </div>
       {ro ? <p className="ppr-ro">{copy.readOnly}</p> : null}
+
+      {exportLabels ? (
+        <div className="ppr-slip">
+          <span className="ppr-slip__t">
+            <b>{copy.slip}</b>
+            <small>{copy.slipThis}</small>
+          </span>
+          <AdminExportButtons
+            labels={exportLabels}
+            onExportXls={() => exportPayslipsWorkbook(ym, [row.userId])}
+            onExportPdf={() => exportPayslipsReport(ym, [row.userId])}
+            onToast={onBankToast}
+          />
+        </div>
+      ) : null}
 
       <div className="ppr-mm">
         <div className="ppr-mm__r">

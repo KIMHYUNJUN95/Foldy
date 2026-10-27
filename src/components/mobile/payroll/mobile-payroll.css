@@ -246,3 +246,59 @@
 @media (min-width: 1000px) and (min-height: 600px) {
   .mpp-seg--method { max-width: none; }
 }
+
+/* ── 명세서만 뽑기(docs/product/39 §6-3) — 파일 줄 › 시트(폰) · 가운데 카드(태블릿), 사람 칸 「명세서」 ── */
+.mpp-sheet, .mpp-ps {
+  --mpp-ink: #16141f; --mpp-soft: #6f6c7c; --mpp-pri: #7a52e6; --mpp-link: #5a30cf; --mpp-line: var(--separator, #e4e3e9);
+}
+.mpp-file__go { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
+.mpp-file__go .mpp-file__b b { color: var(--mpp-link); }
+.mpp-file__go > svg { flex: none; width: 20px; height: 20px; color: #b9b8c2; }
+.mpp-file__go:focus-visible { outline: 2px solid var(--mpp-pri); outline-offset: 2px; border-radius: 8px; }
+.mpp-file__btn:disabled { opacity: .45; }
+.mpp-file__btn--soft { background: #f1edfc; color: #5e3bc4; }
+.mpp-file__btn--white { background: #fff; color: #5e3bc4; }
+.mpp-file__btn--pri { background: var(--mpp-pri); color: #fff; }
+.mpp-file__btn--soft svg, .mpp-file__btn--white svg { color: currentColor; }
+.mpp-file__btn--pri svg { color: #fff; }
+
+.mpp-slip { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding: 12px 12px 12px 16px; border-radius: 16px; background: #f7f4fe; }
+.mpp-slip__b { flex: 1 1 120px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mpp-slip__b b { font-size: 15.5px; font-weight: 600; }
+.mpp-slip__b small { font-size: 12.5px; color: var(--mpp-soft); }
+
+.mpp-ps { display: flex; flex-direction: column; flex: 1; min-height: 0; color: var(--mpp-ink); }
+.mpp-ps__head { padding: 4px 20px 0; }
+.mpp-ps__head h2 { margin: 0; font-size: 19px; font-weight: 700; overflow-wrap: anywhere; }
+.mpp-ps__head p { margin: 2px 0 0; font-size: 13px; color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpp-ps__seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; margin-top: 14px; padding: 3px; border-radius: 11px; background: #f2f2f5; }
+.mpp-ps__seg button { min-height: 36px; padding: 0 6px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; color: #55545f; }
+.mpp-ps__seg button i { font-style: normal; color: var(--mpp-soft); font-variant-numeric: tabular-nums; }
+.mpp-ps__seg button[aria-checked="true"] { background: #fff; color: var(--mpp-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(20, 20, 30, .08); }
+.mpp-ps__search { display: flex; align-items: center; gap: 8px; height: 44px; margin-top: 10px; padding: 0 12px; border-radius: 11px; background: #f2f2f5; }
+.mpp-ps__search svg { flex: none; width: 17px; height: 17px; color: #8a8994; }
+.mpp-ps__search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--mpp-ink); outline: none; }
+.mpp-ps__search:focus-within { box-shadow: inset 0 0 0 1.5px var(--mpp-pri); }
+.mpp-ps__list { flex: 1; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px 0; }
+.mpp-ps__list ul { list-style: none; margin: 0; padding: 0; }
+.mpp-ps__all { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 52px; padding: 0; border: 0; border-bottom: 0.5px solid var(--mpp-line); background: transparent; font: inherit; font-size: 14.5px; font-weight: 600; color: #5e3bc4; }
+.mpp-ps__all .num { font-weight: 400; color: var(--mpp-soft); font-size: 13.5px; }
+.mpp-ps__row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 6px 0; border: 0; border-bottom: 0.5px solid var(--mpp-line); background: transparent; font: inherit; color: inherit; text-align: left; }
+.mpp-ps__ck { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #c7c6cf; transition: background-color 150ms ease-out, box-shadow 150ms ease-out; }
+.mpp-ps__ck svg { width: 12px; height: 10px; }
+.mpp-ps__ck path { stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 160ms var(--mpp-ease, cubic-bezier(.23, 1, .32, 1)); }
+.mpp-ps__row[aria-checked="true"] .mpp-ps__ck { background: var(--mpp-pri); box-shadow: none; }
+.mpp-ps__row[aria-checked="true"] .mpp-ps__ck path { stroke-dashoffset: 0; }
+.mpp-ps__b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mpp-ps__b b { font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
+.mpp-ps__b small { font-size: 12.5px; color: var(--mpp-soft); overflow-wrap: anywhere; }
+.mpp-ps__n { flex: none; font-size: 13.5px; color: var(--mpp-soft); font-variant-numeric: tabular-nums; }
+.mpp-ps__none { margin: 0; padding: 32px 0; text-align: center; font-size: 14.5px; color: var(--mpp-soft); }
+.mpp-ps__foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -0.5px 0 var(--mpp-line); }
+.mpp-ps__foot > span { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; }
+.mpp-ps button { touch-action: manipulation; }
+.mpp-ps button:focus-visible { outline: 2px solid var(--mpp-pri); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mpp-ps__ck, .mpp-ps__ck path { transition: none; }
+}

@@ -115,6 +115,21 @@ export type PayrollPrepCopy = {
   fileTaxHint: string;
   fileSaved: string; // "{name} 저장됨"
   fileOpened: string;
+  /** 고른 사람 명세서만(docs/product/39 §6-3). */
+  slip: string;
+  slipThis: string;
+  slipOnly: string;
+  slipOnlyHint: string;
+  slipSheetTitle: string;
+  slipSheetSub: string; // "{month} · …"
+  slipSearch: string;
+  slipSearchLabel: string;
+  slipPickAll: string;
+  slipPickOne: string; // "{name}"
+  slipPicked: string; // "{n}"
+  slipBarLabel: string;
+  slipClear: string;
+  slipNoMatch: string;
   fileFailed: string;
   fileBlocked: string;
   fileXls: string;
@@ -308,6 +323,20 @@ const ko: PayrollPrepCopy = {
   fileTaxHint: "원천세 구분별 지급 목록",
   fileSaved: "{name} 저장됨",
   fileOpened: "PDF 를 새 탭에 열었어요",
+  slip: "명세서",
+  slipThis: "이 사람 것만",
+  slipOnly: "명세서만 뽑기",
+  slipOnlyHint: "사람을 골라 그 사람 명세서만",
+  slipSheetTitle: "명세서 뽑을 사람",
+  slipSheetSub: "{month} · 고른 사람 것만",
+  slipSearch: "이름 · 가타카나",
+  slipSearchLabel: "이름 찾기",
+  slipPickAll: "전체 고르기",
+  slipPickOne: "{name} 고르기",
+  slipPicked: "{n}명",
+  slipBarLabel: "고른 사람 명세서",
+  slipClear: "고르기 해제",
+  slipNoMatch: "찾는 사람이 없어요",
   fileFailed: "파일을 만들지 못했어요",
   fileBlocked: "팝업이 막혔어요. 허용한 뒤 다시 눌러 주세요",
   fileXls: "Excel",
@@ -513,6 +542,20 @@ const ja: PayrollPrepCopy = {
   fileTaxHint: "源泉区分ごとの支給一覧",
   fileSaved: "{name} を保存しました",
   fileOpened: "PDFを新しいタブで開きました",
+  slip: "給与明細書",
+  slipThis: "この人の分だけ",
+  slipOnly: "明細書だけ出す",
+  slipOnlyHint: "人を選んで、その人の明細書だけ",
+  slipSheetTitle: "明細書を出す人",
+  slipSheetSub: "{month}・選んだ人の分だけ",
+  slipSearch: "名前・カタカナ",
+  slipSearchLabel: "名前で探す",
+  slipPickAll: "全員を選ぶ",
+  slipPickOne: "{name}を選ぶ",
+  slipPicked: "{n}名",
+  slipBarLabel: "選んだ人の明細書",
+  slipClear: "選択を解除",
+  slipNoMatch: "該当する人がいません",
   fileFailed: "ファイルを作れませんでした",
   fileBlocked: "ポップアップがブロックされました。許可してからもう一度押してください",
   fileXls: "Excel",
@@ -718,6 +761,20 @@ const en: PayrollPrepCopy = {
   fileTaxHint: "Pay list by tax column",
   fileSaved: "Saved {name}",
   fileOpened: "Opened the PDF in a new tab",
+  slip: "Payslip",
+  slipThis: "This person only",
+  slipOnly: "Payslips only",
+  slipOnlyHint: "Pick people, get just their payslips",
+  slipSheetTitle: "Who gets a payslip",
+  slipSheetSub: "{month} · selected people only",
+  slipSearch: "Name or katakana",
+  slipSearchLabel: "Find by name",
+  slipPickAll: "Select all",
+  slipPickOne: "Select {name}",
+  slipPicked: "{n} selected",
+  slipBarLabel: "Payslips for selected people",
+  slipClear: "Clear",
+  slipNoMatch: "No one matches",
   fileFailed: "Couldn't create the file",
   fileBlocked: "Pop-up blocked. Allow pop-ups and try again",
   fileXls: "Excel",

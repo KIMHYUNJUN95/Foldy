@@ -8,6 +8,8 @@ import { cancelPayrollApprovalRequest, requestPayrollApproval } from "@/actions/
 import {
   exportPayrollBookReport,
   exportPayrollBookWorkbook,
+  exportPayslipsReport,
+  exportPayslipsWorkbook,
   exportTaxAccountantReport,
   exportTaxAccountantWorkbook,
 } from "@/actions/payroll-exports";
@@ -71,6 +73,8 @@ export function PayrollPrepClient({
 
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 명세서만 뽑을 사람(docs/product/39 §6-3) — 체크 칸 · 아래 막대.
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
   const [, startRefresh] = useTransition();
   const [requesting, startRequest] = useTransition();
   const [carry, setCarry] = useState<{
@@ -92,6 +96,28 @@ export function PayrollPrepClient({
   );
   const totals = data.totals;
   const shownTotals = filter === "all" ? totals : prepTotals(rows);
+  const canPick = data.canView && all.length > 0;
+  const pickedIds = all.filter((r) => picked.has(r.userId)).map((r) => r.userId);
+  const shownPicked = rows.filter((r) => picked.has(r.userId)).length;
+  const allShownPicked = rows.length > 0 && shownPicked === rows.length;
+  function togglePick(id: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleShown() {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      for (const r of rows) {
+        if (allShownPicked) next.delete(r.userId);
+        else next.add(r.userId);
+      }
+      return next;
+    });
+  }
   const selected = selectedId
     ? (all.find((r) => r.userId === selectedId) ?? null)
     : null;
@@ -246,7 +272,7 @@ export function PayrollPrepClient({
   ];
 
   return (
-    <div className={`ppr${selected ? " has-panel" : ""}`}>
+    <div className={`ppr${selected ? " has-panel" : ""}${canPick ? " can-pick" : ""}`}>
       <div className="ppr-title">
         <b>{fillCopy(copy.title, { month: formatPrepMonth(ym, localeTag) })}</b>
         <span>
@@ -360,6 +386,14 @@ export function PayrollPrepClient({
       ) : (
         <div>
           <div className="ppr-th">
+            {canPick ? (
+              <PickBox
+                label={copy.slipPickAll}
+                checked={allShownPicked}
+                mixed={shownPicked > 0 && !allShownPicked}
+                onChange={toggleShown}
+              />
+            ) : null}
             <span>{copy.colName}</span>
             <span className="ppr-r">{copy.colHours}</span>
             <span className="ppr-r ppr-x">{copy.colBasePay}</span>
@@ -383,9 +417,16 @@ export function PayrollPrepClient({
             const needsClass = r.issues.includes("withholding");
             return (
               <div
-                className={`ppr-grp${r.userId === selectedId ? " sel" : ""}`}
+                className={`ppr-grp${r.userId === selectedId ? " sel" : ""}${picked.has(r.userId) ? " picked" : ""}`}
                 key={r.userId}
               >
+                {canPick ? (
+                  <PickBox
+                    label={fillCopy(copy.slipPickOne, { name: r.name })}
+                    checked={picked.has(r.userId)}
+                    onChange={() => togglePick(r.userId)}
+                  />
+                ) : null}
                 <button
                   type="button"
                   className="ppr-tr"
@@ -489,6 +530,25 @@ export function PayrollPrepClient({
         </div>
       )}
 
+      {pickedIds.length > 0 ? (
+        <div className="ppr-act-wrap">
+          <div className="ppr-act" role="toolbar" aria-label={copy.slipBarLabel}>
+            <b>
+              {fillCopy(copy.slipPicked, { n: pickedIds.length })} · {copy.slip}
+            </b>
+            <AdminExportButtons
+              labels={shared}
+              onExportXls={() => exportPayslipsWorkbook(ym, pickedIds)}
+              onExportPdf={() => exportPayslipsReport(ym, pickedIds)}
+              onToast={notice}
+            />
+            <button type="button" className="ppr-act__clr" onClick={() => setPicked(new Set())}>
+              {copy.slipClear}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="ppr-bar">
         <span>
           <span className="k">
@@ -550,6 +610,7 @@ export function PayrollPrepClient({
           onBankChange={refresh}
           onSave={saveInput}
           onClose={closePanel}
+          exportLabels={data.canView ? shared : null}
         />
       ) : null}
 
@@ -671,6 +732,42 @@ function CarryModal({
         </div>
       </div>
     </div>
+  );
+}
+
+/** 명세서 고르기 체크 칸 — 줄 버튼 밖에 둔다(버튼 안에 버튼 금지). 44px 누를 자리 · 18px 네모. */
+function PickBox({
+  label,
+  checked,
+  mixed = false,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  mixed?: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={mixed ? "mixed" : checked}
+      aria-label={label}
+      className={`ppr-pk${checked || mixed ? " on" : ""}`}
+      onClick={onChange}
+    >
+      <span aria-hidden="true">
+        {mixed ? (
+          <svg width="10" height="2" viewBox="0 0 10 2">
+            <path d="M1 1h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        ) : checked ? (
+          <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+            <path d="M1 5l3.5 3.5L11 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : null}
+      </span>
+    </button>
   );
 }
 

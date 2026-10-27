@@ -273,6 +273,7 @@ export function MobilePayroll({
       saveInput={saveInput}
       saveClass={saveClass}
       readOnlyNote={locked ? copy.lockedShort : undefined}
+      onSlipToast={showToast}
       bank={
         canViewBank
           ? {
@@ -529,7 +530,7 @@ export function MobilePayroll({
             </tbody>
           </table>
 
-          <PayrollFiles ym={ym} copy={copy} showToast={showToast} />
+          <PayrollFiles ym={ym} copy={copy} showToast={showToast} rows={rows} monthLabel={fillCopy(copy.title, { month: month(ym) })} localeTag={localeTag} />
 
           {phase === "prep" && data.canManage ? (
             <>
@@ -604,7 +605,7 @@ export function MobilePayroll({
         <div className="mpp-main" key={ym}>
           {header}
           <PayrollPayView {...roundProps} />
-          <PayrollFiles ym={ym} copy={copy} showToast={showToast} />
+          <PayrollFiles ym={ym} copy={copy} showToast={showToast} rows={rows} monthLabel={fillCopy(copy.title, { month: month(ym) })} localeTag={localeTag} />
         </div>
         {toastEl}
       </div>

@@ -11,6 +11,9 @@ import { fillCopy } from "@/lib/payroll-settings-i18n";
 import { WITHHOLDING_CLASSES, type WithholdingClass } from "@/lib/payroll-settings-rules";
 import { initialOf, num, fmtTime } from "./payroll-format";
 import { PayrollMoneyField } from "./payroll-money-field";
+import { PdfButton, XlsButton } from "./payroll-files";
+import type { PayrollToastState } from "./payroll-toast";
+import { exportPayslipsReport, exportPayslipsWorkbook } from "@/actions/payroll-exports";
 
 export type PayrollSaveInput = (row: PrepRow, patch: Partial<PrepManual>, field: string) => Promise<PrepManual | null>;
 
@@ -28,6 +31,7 @@ export function PayrollPerson({
   saveClass,
   readOnlyNote,
   bank,
+  onSlipToast,
 }: {
   row: PrepRow;
   ym: string;
@@ -44,6 +48,8 @@ export function PayrollPerson({
   readOnlyNote?: string;
   /** 급여 계좌 묶음 — `payroll.view` 가 있을 때만 넘어온다. */
   bank?: { copy: PayrollBankCopy; variant: BankVariant; onToast: (message: string) => void; onChange: () => void };
+  /** 이 사람 명세서만 Excel · PDF(docs/product/39 §6-3). */
+  onSlipToast?: (next: Omit<PayrollToastState, "id">) => void;
 }) {
   // 저장 응답으로 입력 칸을 바로 맞추고, 서버에서 새 줄이 오면(새로 읽기 · 되돌리기) 그쪽을 따른다.
   const [local, setLocal] = useState<PrepManual | null>(null);
@@ -129,6 +135,29 @@ export function PayrollPerson({
           <b className={`num${stale ? " is-stale" : ""}`}>{row.net == null ? "—" : `¥${num(row.net)}`}</b>
         </div>
       </div>
+
+      {onSlipToast ? (
+        <div className="mpp-slip">
+          <span className="mpp-slip__b">
+            <b>{copy.slip}</b>
+            <small>{copy.slipThis}</small>
+          </span>
+          <XlsButton
+            label={copy.fileXls}
+            run={() => exportPayslipsWorkbook(ym, [row.userId])}
+            copy={copy}
+            showToast={onSlipToast}
+            className="mpp-file__btn mpp-file__btn--white"
+          />
+          <PdfButton
+            label={copy.filePdf}
+            run={() => exportPayslipsReport(ym, [row.userId])}
+            copy={copy}
+            showToast={onSlipToast}
+            className="mpp-file__btn mpp-file__btn--pri"
+          />
+        </div>
+      ) : null}
 
       <h3 className="mpp-h4">{copy.monthMethod}</h3>
       <div className="mpp-seg mpp-seg--method" role="radiogroup" aria-label={copy.monthMethod}>

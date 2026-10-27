@@ -492,13 +492,17 @@ function slipSheet(name: string, inputName: string, rows: readonly PrepRow[], se
 
 type SettingsValues = { month: string; payday: string; company: string; title: string };
 
-function settingsSheet(input: PayrollBookInput, cash: number, transfer: number): { sheet: ModelSheet; values: SettingsValues } {
-  const values: SettingsValues = {
+function settingsValues(input: Pick<PayrollBookInput, "ym" | "paydayDate" | "companyName">): SettingsValues {
+  return {
     month: jpMonth(input.ym),
     payday: jpDate(input.paydayDate),
     company: input.companyName,
     title: payrollTitle(input.ym, input.paydayDate),
   };
+}
+
+function settingsSheet(input: PayrollBookInput, cash: number, transfer: number): { sheet: ModelSheet; values: SettingsValues } {
+  const values = settingsValues(input);
   const b = new SheetBuilder(SHEET.settings, [18, 28, 62, 8], { orientation: "portrait" });
   b.merge("A1:D1", "アルバイト給与管理 設定（Foldy で作成）", st.title(14));
   b.height(1, 22.5).height(3, 15.95);
@@ -902,11 +906,18 @@ function taxSheet(taxYear: number): ModelSheet | null {
 
 // ── 묶기 ──
 
+const byName = (a: PrepRow, b: PrepRow) => a.name.localeCompare(b.name, "ko");
+
+/** 현금 · 이체로 나눠 이름 순. 지급 방식이 아직 없는 사람은 이체 쪽에 둔다(확인 필요로 이미 걸려 있음). */
+function splitByMethod(rows: readonly PrepRow[]): { cash: PrepRow[]; transfer: PrepRow[] } {
+  return {
+    cash: rows.filter((r) => r.paymentMethod === "cash").sort(byName),
+    transfer: rows.filter((r) => r.paymentMethod !== "cash").sort(byName),
+  };
+}
+
 export function buildPayrollBook(input: PayrollBookInput): ModelSheet[] {
-  const byName = (a: PrepRow, b: PrepRow) => a.name.localeCompare(b.name, "ko");
-  const cash = input.rows.filter((r) => r.paymentMethod === "cash").sort(byName);
-  // 지급 방식이 아직 없는 사람은 이체 쪽에 둔다(확인 필요로 이미 걸려 있음).
-  const transfer = input.rows.filter((r) => r.paymentMethod !== "cash").sort(byName);
+  const { cash, transfer } = splitByMethod(input.rows);
   const { sheet: settings, values } = settingsSheet(input, cash.length, transfer.length);
   const sheets: ModelSheet[] = [
     guideSheet(values),
@@ -923,6 +934,28 @@ export function buildPayrollBook(input: PayrollBookInput): ModelSheet[] {
   if (tax) sheets.push(tax);
   sheets.forEach(fitWrappedRows);
   return sheets;
+}
+
+export const PAYSLIP_SHEET = "給与明細";
+
+/**
+ * 고른 사람 명세서만(docs/product/39 §6-3) — 급여 엑셀의 명세서와 같은 양식 · 같은 값, 한 장에 2명(현금 → 이체, 이름 순).
+ * 입력 시트가 없으니 수식은 빼고 값만 둔다.
+ */
+export function buildPayslipSheets(input: Pick<PayrollBookInput, "ym" | "paydayDate" | "companyName" | "rows">): ModelSheet[] {
+  const { cash, transfer } = splitByMethod(input.rows);
+  const sheet = slipSheet(PAYSLIP_SHEET, SHEET.cashInput, [...cash, ...transfer], settingsValues(input));
+  for (const cell of sheet.cells.values()) delete cell.f;
+  fitWrappedRows(sheet);
+  return [sheet];
+}
+
+/** `給与明細_2026年10月分_イソヨン.xlsx`(한 명) · `給与明細_2026年10月分_3名.xlsx`(여러 명). */
+export function payslipFilename(ym: string, rows: readonly Pick<PrepRow, "name" | "nameKatakana">[]): string {
+  const [y, m] = ym.split("-").map(Number);
+  const who =
+    rows.length === 1 ? (rows[0].nameKatakana?.trim() || rows[0].name).replace(/[\s\/\\:*?"<>|]+/g, "") : `${rows.length}名`;
+  return `給与明細_${y}年${m}月分_${who}.xlsx`;
 }
 
 /** `新アルバイト給与管理YYYYMMDD.xlsx`(지급일). */

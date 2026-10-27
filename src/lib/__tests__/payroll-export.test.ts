@@ -6,7 +6,10 @@ import { EMPTY_MEMBER_PAYROLL_SETTING } from "@/lib/payroll-settings-rules";
 import { withholdingTable } from "@/lib/withholding-tax";
 import {
   buildPayrollBook,
+  buildPayslipSheets,
+  PAYSLIP_SHEET,
   payrollBookFilename,
+  payslipFilename,
   payrollTitle,
   rowNote,
   SHEET,
@@ -414,5 +417,40 @@ describe("P5 — 결재 도장 · 지급 확인", () => {
     expect(check.cells.get(`I${cr}`)?.v).toBe("済");
     expect(check.cells.get(`H${tr}`)?.v).toBe("済");
     expect(check.cells.get(`I${tr}`)?.v ?? null).toBeNull();
+  });
+});
+
+describe("고른 사람 명세서만(§6-3)", () => {
+  const rows = rich();
+  const one = rows.find((r) => r.userId === "8")!;
+  const pick = (ids: string[]) =>
+    buildPayslipSheets({ ym: "2026-10", paydayDate: "2026-11-10", companyName: "가짜 회사", rows: rows.filter((r) => ids.includes(r.userId)) });
+
+  it("시트 한 장 · 수식 없음 · 급여 엑셀 명세서와 같은 값", () => {
+    const [sheet] = pick(["8"]);
+    expect(sheet.name).toBe(PAYSLIP_SHEET);
+    expect([...sheet.cells.values()].every((c) => c.f === undefined)).toBe(true);
+    const book = buildPayrollBook({ ym: "2026-10", paydayDate: "2026-11-10", companyName: "가짜 회사", taxYear: 2026, rows: [one] });
+    const full = book.find((s) => s.name === SHEET.transferSlip)!;
+    for (const [addr, cell] of full.cells) expect(sheet.cells.get(addr)?.v, addr).toEqual(cell.v);
+    expect(sheet.maxRow).toBe(28);
+  });
+
+  it("여러 명 — 현금 먼저 · 이름 순, 2명마다 쪽 나눔", () => {
+    const [sheet] = pick(["1", "3", "4", "7"]);
+    // 현금(다 · 라) → 이체(가 · 사)
+    expect([3, 31, 59, 87].map((r) => sheet.cells.get(`C${r}`)?.v)).toEqual(["다", "라", "가", "사"]);
+    expect(sheet.rowBreaks).toEqual([56]);
+  });
+
+  it("파일 이름 — 한 명은 가타카나(공백 없이), 여러 명은 인원", () => {
+    expect(payslipFilename("2026-10", [{ name: "이서연", nameKatakana: "イ ソヨン" }])).toBe("給与明細_2026年10月分_イソヨン.xlsx");
+    expect(payslipFilename("2026-10", [{ name: "이서연", nameKatakana: null }])).toBe("給与明細_2026年10月分_이서연.xlsx");
+    expect(payslipFilename("2026-10", rows.slice(0, 3))).toBe("給与明細_2026年10月分_3名.xlsx");
+  });
+
+  it("인쇄 HTML — 같은 양식", () => {
+    const html = buildSheetsHtml({ title: "t", sheets: pick(["1", "2", "3"]), printLabel: "Print", lang: "ja" });
+    expect(html.match(/給与明細書/g)?.length).toBe(3);
   });
 });

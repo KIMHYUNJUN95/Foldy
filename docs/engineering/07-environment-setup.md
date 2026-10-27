@@ -128,6 +128,10 @@ Delete seeded rows from the console UI (삭제 → 확인), or by the `[샘플]`
 
 #### Sample data — 근태 · 급여 데모 (`scripts/dev/seed-attendance-demo.js`, 2026-10-27)
 
+> **지금 상태(2026-10-27): 비워 둠.** 사용자 「실제 엑셀데이터랑 데모데이터도 지워줘 · 데모데이터는 나중에 한번에 전부 출시전에 넣을거야」 —
+> 「Foldy Demo」 조직의 기록을 전부 지움(조직 · 데모 로그인 계정 7개의 소속만 남김, 사용자가 대시보드 SQL 편집기에서 실행).
+> 실제 엑셀 38명은 계정까지 지웠고, 로컬 `.env.demo-real-payroll.json` 도 지웠다. 출시 전에 데모를 다시 넣을 때 아래 스크립트를 쓴다.
+
 근태 · 급여를 처음부터 끝까지 직접 눌러 보기 위한 데이터. **「Foldy Demo」 조직(slug `stayops-review-demo`)에만** 넣는다 —
 slug 가 다르면 멈추고, 지우는 범위도 그 조직 + 스크립트의 사람들뿐(실제 Haru 데이터는 건드리지 않음). 운영 DB 에 넣는다(앱이 운영 웹을 띄우므로).
 

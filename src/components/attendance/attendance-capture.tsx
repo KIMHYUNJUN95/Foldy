@@ -314,7 +314,8 @@ export function AttendanceCapture({
     phase === "result" && result && result.ok ? (
       <ClockDone result={result} isOut={isOut} userName={userName} locale={locale} onHome={goHome} copy={copy} />
     ) : phase === "result" && result ? (
-      <BottomSheet ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle} className="att att__result-sheet capw-sheet" onClose={onDismiss}>
+      // 스캔 화면(.att.capw, z-index 90) 위로 — 기본 z-[80] 이면 시트가 뒤에 깔려 실패가 안 보이고 꺼진 카메라 검은 화면에 멈춘다(2026-10-28).
+      <BottomSheet ariaLabel={isOut ? copy.resultOutTitle : copy.resultInTitle} className="att att__result-sheet capw-sheet" onClose={onDismiss} zIndexClassName="z-[100]">
         <ResultSheet result={result} isOut={isOut} locale={locale} onHome={goHome} onRetry={retry} copy={copy} />
       </BottomSheet>
     ) : null;

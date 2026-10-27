@@ -126,6 +126,26 @@ node scripts/dev/seed-linen-returns.js --apply --org <organization_id>
 
 Delete seeded rows from the console UI (삭제 → 확인), or by the `[샘플]` note prefix.
 
+#### Sample data — 근태 · 급여 데모 (`scripts/dev/seed-attendance-demo.js`, 2026-10-27)
+
+근태 · 급여를 처음부터 끝까지 직접 눌러 보기 위한 데이터. **「Foldy Demo」 조직(slug `stayops-review-demo`)에만** 넣는다 —
+slug 가 다르면 멈추고, 지우는 범위도 그 조직 + 스크립트의 사람들뿐(실제 Haru 데이터는 건드리지 않음). 운영 DB 에 넣는다(앱이 운영 웹을 띄우므로).
+
+- 로그인 계정 3개: 데모 관리자(owner · 사장 결재) · 데모 전무(전무 결재 · 휴가 승인) · 데모 알바(시급, 본인 화면). 비밀번호는 처음 만들 때
+  무작위로 정해 저장소 루트 `.env.demo-accounts`(git 제외, 권한 600)에 적고, 다시 돌려도 그 값을 쓴다.
+- 로그인하지 않는 직원 6명: 시급 5명(원천세 갑 · 을 · 병 · 미설정, 현금 · 이체, 시급 2 · 3구간, 고용보험, 계좌 확인 대기 · 유초 · 계좌 없음) + 월급 사무 1명(휴가).
+- 9월 · 10월(어제까지) 출퇴근 · 휴식, 10월 견본(검토 필요 · 수기 입력 · 퇴근 누락 + 정정 요청 · 무효 · 시간 정정 요청), 9월 승인된 정정,
+  추가수당(주말 일반 · 특별), 교통비(승인 · 대기), 휴가(승인 · 대기), 회사 급여 설정(지급일 10일 · 결재자 · 2026년도 고용보험 5.5‰),
+  9월 급여 입력(특별수당 · 원천세 직접 입력 · 메모 → 10월 「지난달 값 가져오기」 원본) · 10월 지난달 조정 1건.
+- 넣지 않는 것: 근태 마감 · 결재 · 지급 확인 · 세무사 송부 — 직접 해 보는 단계.
+
+```bash
+node scripts/dev/seed-attendance-demo.js           # dry run (계획만 출력)
+node scripts/dev/seed-attendance-demo.js --apply   # 넣기 — 이미 있으면 그 사람들의 근태 · 급여 데이터를 지우고 다시 넣음(처음 상태로 되돌리기)
+```
+
+저장소 루트(`.env` · `.env.local` 이 있는 곳)에서 돌린다. 다시 돌리면 테스트하며 바꾼 마감 · 결재 · 입력도 함께 처음 상태로 돌아간다.
+
 ### Testing the dev server on a phone over any network (Cloudflare quick tunnel)
 
 To open the local dev server on a phone **without** needing the same WiFi (works on cellular too):

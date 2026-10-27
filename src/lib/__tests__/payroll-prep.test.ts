@@ -38,7 +38,7 @@ function input(over: Partial<PrepRowInput>): PrepRowInput {
 }
 
 describe("buildPrepRow", () => {
-  it("시급 두 구간 + 특별수당 + 지난달 조정 −1,200 → 실수령 105,334(1엔 단위)", () => {
+  it("시급 두 구간 + 특별수당 + 지난달 조정 −1,200 → 실수령 105,333(1엔 단위)", () => {
     const row = buildPrepRow(
       input({
         paidMinutes: 30 * 60 + 48 * 60 + 40,
@@ -52,13 +52,13 @@ describe("buildPrepRow", () => {
         manual: { ...EMPTY_PREP_MANUAL, prevAdjustment: -1200, prevAdjustmentYm: "2026-08" },
       }),
     );
-    expect(row.segments.map((s) => s.pay)).toEqual([36000, 60834]); // 60,833.33 → 1엔 올림
-    expect(row.basePay).toBe(96834);
+    expect(row.segments.map((s) => s.pay)).toEqual([36000, 60833]); // 60,833.33 → 반올림
+    expect(row.basePay).toBe(96833);
     expect(row.special).toBe(2000);
     expect(row.adjustments).toBe(800);
-    expect(row.gross).toBe(105334);
+    expect(row.gross).toBe(105333);
     expect(row.withholding).toBe(0);
-    expect(row.net).toBe(105334);
+    expect(row.net).toBe(105333);
     expect(row.roundUpYen).toBeUndefined();
     expect(row.issues).toEqual([]);
   });

@@ -255,11 +255,11 @@ function inputSheet(name: string, title: string, rows: readonly PrepRow[], taxYe
     b.set(`C${r}`, row.nameKatakana ?? "", st.cell());
     b.set(`D${r}`, seg1?.rate ?? null, st.cell(YEN));
     b.set(`E${r}`, seg1 ? minutesToDays(seg1.paidMinutes) : null, st.cell(HOURS));
-    b.set(`F${r}`, seg1?.pay ?? "", st.cell(YEN), `IF(OR(D${r}="",E${r}=""),"",ROUNDUP(ROUND(D${r}*E${r}*24,6),0))`);
+    b.set(`F${r}`, seg1?.pay ?? "", st.cell(YEN), `IF(OR(D${r}="",E${r}=""),"",ROUND(ROUND(D${r}*E${r}*24,6),0))`);
     if (seg2) {
       b.set(`G${r}`, seg2.rate, st.cell(YEN));
       b.set(`H${r}`, minutesToDays(seg2.paidMinutes), st.cell(HOURS));
-      b.set(`I${r}`, seg2.pay, st.cell(YEN), `IF(OR(G${r}="",H${r}=""),"",ROUNDUP(ROUND(G${r}*H${r}*24,6),0))`);
+      b.set(`I${r}`, seg2.pay, st.cell(YEN), `IF(OR(G${r}="",H${r}=""),"",ROUND(ROUND(G${r}*H${r}*24,6),0))`);
     } else if (rest.length > 1) {
       // 시급 ③ 이상 — ② 칸에 나머지 구간 합(시급은 비우고 備考에 구간 메모).
       b.set(`G${r}`, null, st.cell(YEN));
@@ -268,7 +268,7 @@ function inputSheet(name: string, title: string, rows: readonly PrepRow[], taxYe
     } else {
       b.set(`G${r}`, null, st.cell(YEN));
       b.set(`H${r}`, null, st.cell(HOURS));
-      b.set(`I${r}`, "", st.cell(YEN), `IF(OR(G${r}="",H${r}=""),"",ROUNDUP(ROUND(G${r}*H${r}*24,6),0))`);
+      b.set(`I${r}`, "", st.cell(YEN), `IF(OR(G${r}="",H${r}=""),"",ROUND(ROUND(G${r}*H${r}*24,6),0))`);
     }
     b.set(`J${r}`, blankZero(row.prevAdjustmentTaxable), st.cell(YEN));
     b.set(`K${r}`, blankZero(row.overtime), st.cell(YEN));

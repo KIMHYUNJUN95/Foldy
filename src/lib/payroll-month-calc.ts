@@ -7,7 +7,7 @@ import { dailyHeiWithholding, monthlyWithholding } from "@/lib/withholding-tax";
  *
  * 엑셀 `新アルバイト給与管理` 입력 시트의 열을 그대로 낸다(F · I · J~O · P · Q · U · V · W · Z · AB).
  * ```
- * 支給額_k  = ROUNDUP(시급_k × 분_k ÷ 60)        ← 시급 구간별 그 달 분 합계에 한 번 곱함, 소수점이면 1엔 올림(2026-10-27)
+ * 支給額_k  = ROUND(시급_k × 분_k ÷ 60)          ← 시급 구간별 그 달 분 합계에 한 번 곱함, 1엔 미만 반올림(2026-10-27 — 실무 관행 · 원본 엑셀과 같게)
  * 課税計 P   = Σ支給額_k + 前月調整(과세) + 残業 + 週末 + 特別 + 通勤課税
  * 支給額合計 Q = P + 通勤非課税(+ 前月調整 교통비분)
  * 社会保険計 V = 雇用保険(가입자만)
@@ -142,11 +142,6 @@ export function excelRound(yen: number): number {
   return Math.sign(v) * Math.round(Math.abs(v));
 }
 
-/** 엑셀 ROUNDUP(x, 0) — 소수점이면 1엔 올림(2026-10-27 사용자 결정). 부동소수 끝은 먼저 맞춘다. */
-export function ceilYen(yen: number): number {
-  return Math.ceil(settleYen(yen));
-}
-
 /** 雇用保険 근로자 부담 — 賃金 × 율, 1엔 미만은 50전 이하 버림 · 넘으면 올림(급여에서 뗄 때의 법정 끝처리). */
 export function employmentInsurancePremium(wages: number, ratePerMille: number): number {
   const exact = settleYen((wages * ratePerMille) / 1000);
@@ -182,7 +177,7 @@ export function calculatePayrollMonth(input: PayrollMonthInput): PayrollMonthRes
   const segmentPays = input.segments.map((s) => ({
     hourlyRate: s.hourlyRate,
     paidMinutes: s.paidMinutes,
-    pay: ceilYen((s.hourlyRate * s.paidMinutes) / 60),
+    pay: excelRound((s.hourlyRate * s.paidMinutes) / 60),
   }));
   const basePay = segmentPays.reduce((sum, s) => sum + s.pay, 0);
 
@@ -190,9 +185,9 @@ export function calculatePayrollMonth(input: PayrollMonthInput): PayrollMonthRes
   const adjustCommute = manual.prevMonthAdjustmentKind === "commute" ? manual.prevMonthAdjustment : 0;
   if (manual.prevMonthAdjustment !== 0 && !manual.prevMonthAdjustmentYm) issues.push("prev_adjustment_month_missing");
 
-  const overtime = ceilYen(input.autoAllowances.overtime) + manual.overtime;
-  const weekend = ceilYen(input.autoAllowances.weekend) + manual.weekend;
-  const special = ceilYen(input.autoAllowances.special) + manual.special;
+  const overtime = excelRound(input.autoAllowances.overtime) + manual.overtime;
+  const weekend = excelRound(input.autoAllowances.weekend) + manual.weekend;
+  const special = excelRound(input.autoAllowances.special) + manual.special;
   const commuteTaxable = manual.commuteTaxable;
   const commuteNonTaxable = excelRound(input.commuteNonTaxable) + adjustCommute;
 

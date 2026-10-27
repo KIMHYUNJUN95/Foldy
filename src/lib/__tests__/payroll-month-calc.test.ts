@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   calculatePayrollMonth,
-  ceilYen,
   DEFAULT_PAYROLL_TAX_RULES,
   EXCEL_LEGACY_TAX_RULES,
   employmentInsurancePremium,
@@ -28,11 +27,11 @@ describe("끝처리", () => {
     expect(excelRound(-17.5)).toBe(-18);
   });
 
-  it("ceilYen — 소수점이면 1엔 올림, 부동소수 끝 무시(2026-10-27)", () => {
-    expect(ceilYen(18.33)).toBe(19);
-    expect(ceilYen(647.5)).toBe(648);
-    expect(ceilYen(100)).toBe(100);
-    expect(ceilYen(100.00000000000001)).toBe(100);
+  it("1엔 미만은 반올림 — 엑셀 ROUND 와 같게, 부동소수 끝 무시(2026-10-27)", () => {
+    // 시급 1,600엔 × 2분 = 53.33… → 53(예전 올림은 54)
+    expect(excelRound((1600 * 2) / 60)).toBe(53);
+    expect(excelRound(647.5)).toBe(648);
+    expect(excelRound(100.00000000000001)).toBe(100);
   });
 
   it("雇用保険 — 50전 이하 버림, 넘으면 올림", () => {
@@ -53,8 +52,8 @@ describe("끝처리", () => {
 });
 
 describe("calculatePayrollMonth", () => {
-  it("시급 구간별 월 합계 분에 한 번 곱하고 소수점은 1엔 올림(엑셀 ROUNDUP(시급 × 시간 × 24))", () => {
-    // 1,050 × 53시간 32분 = 1,050 × 3212 ÷ 60 = 56,210 / 1,100 × 1분 = 18.33 → 19
+  it("시급 구간별 월 합계 분에 한 번 곱하고 1엔 미만은 반올림(엑셀 ROUND(시급 × 시간 × 24))", () => {
+    // 1,050 × 53시간 32분 = 1,050 × 3212 ÷ 60 = 56,210 / 1,100 × 1분 = 18.33 → 18
     const r = calculatePayrollMonth(
       input({
         segments: [
@@ -63,8 +62,8 @@ describe("calculatePayrollMonth", () => {
         ],
       }),
     );
-    expect(r.segmentPays.map((s) => s.pay)).toEqual([56210, 19]);
-    expect(r.taxable).toBe(56229);
+    expect(r.segmentPays.map((s) => s.pay)).toEqual([56210, 18]);
+    expect(r.taxable).toBe(56228);
   });
 
   it("課税計 · 支給額合計 · 差引(1엔 단위) — 엑셀 열 순서대로", () => {
@@ -83,11 +82,11 @@ describe("calculatePayrollMonth", () => {
     );
     expect(r.segmentPays[0].pay).toBe(120140);
     expect(r.weekend).toBe(3000);
-    expect(r.special).toBe(1501); // 1,500.4 → 1엔 올림
+    expect(r.special).toBe(1500); // 1,500.4 → 반올림
     expect(r.overtime).toBe(1000);
-    expect(r.taxable).toBe(120140 - 500 + 1000 + 3000 + 1501);
+    expect(r.taxable).toBe(120140 - 500 + 1000 + 3000 + 1500);
     expect(r.grossTotal).toBe(r.taxable + 8420);
-    // 甲 0人: 課税計 125,141 → 表 [125,000, 127,000) 의 0人
+    // 甲 0人: 課税計 125,140 → 表 [125,000, 127,000) 의 0人
     expect(r.withholding).toBe(1190);
     expect(r.deductionTotal).toBe(1190);
     expect(r.netPay).toBe(r.grossTotal - 1190); // 10엔 올림 없음

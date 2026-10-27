@@ -71,14 +71,15 @@ export function roundToNearest10(yen: number): number {
 }
 
 /**
- * 1엔 단위 지급이 시작된 첫 달 — 이 달부터 월 합계는 소수점만 1엔 올림, 그 전 달은 10엔 올림 그대로(지급이 끝난 달).
- * 2026-10-27 사용자 결정 「1분 단위는 그대로, 1엔 단위로 지급 · 소수점이면 1엔 올림」. 새 급여 계산 첫 달(`PAYROLL_PREP_START_YM`)과 같다.
+ * 1엔 단위 지급이 시작된 첫 달 — 이 달부터 월 합계는 1엔 미만 반올림, 그 전 달은 10엔 올림 그대로(지급이 끝난 달).
+ * 2026-10-27 사용자 결정 「1분 단위는 그대로, 1엔 단위로 지급」 + 같은 날 「1엔 미만은 실무에서 흔한 반올림」(처음엔 올림이었다).
+ * 새 급여 계산 첫 달(`PAYROLL_PREP_START_YM`)과 같다.
  */
 export const ONE_YEN_PAY_START_YM = "2026-10";
 
-/** 그 달 월 합계 올림 — `ONE_YEN_PAY_START_YM` 부터 1엔, 그 전은 10엔. */
-export function ceilMonthlyPay(yen: number, ym: string): number {
-  return ym >= ONE_YEN_PAY_START_YM ? Math.ceil(settleYen(yen)) : roundToNearest10(yen);
+/** 그 달 월 합계 — `ONE_YEN_PAY_START_YM` 부터 1엔 미만 반올림(엑셀 ROUND), 그 전은 10엔 올림. 금액은 0 이상. */
+export function monthlyPayYen(yen: number, ym: string): number {
+  return ym >= ONE_YEN_PAY_START_YM ? Math.round(settleYen(yen)) : roundToNearest10(yen);
 }
 
 /** 유급 분 × 시급의 일 총액 (정확한 엔, 반올림 안 함). 1분 단위. */
@@ -389,8 +390,8 @@ export function calculateMonthlyPay<S extends PayCalcSession>(input: {
   const allowances = days.flatMap((d) => d.allowances);
   days.sort((a, b) => a.date.localeCompare(b.date));
 
-  // 월 합계 올림은 기본급 + 수당을 다 더한 뒤 한 번 — 2026-10월분부터 1엔(소수점만 올림), 그 전 달은 10엔.
-  const expectedGross = ceilMonthlyPay(totalGrossExact + totalRegularExact + totalSpecialExact, input.firstDay.slice(0, 7));
+  // 월 합계 올림은 기본급 + 수당을 다 더한 뒤 한 번 — 2026-10월분부터 1엔(1엔 미만 반올림), 그 전 달은 10엔.
+  const expectedGross = monthlyPayYen(totalGrossExact + totalRegularExact + totalSpecialExact, input.firstDay.slice(0, 7));
   // 각 항목은 가장 가까운 엔으로 반올림하고, 기본 급여가 월 합계 올림을 흡수해
   // base + 추가수당 + 특별수당이 항상 정확히 expectedGross 로 합쳐지게 한다.
   const allowanceRegularTotal = Math.round(settleYen(totalRegularExact));

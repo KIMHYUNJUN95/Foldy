@@ -142,13 +142,14 @@ describe("gapFillMinFrom — 빈 날 채우기는 지난달 1일부터", () => {
   });
 });
 
-describe("ceilMonthlyPay — 2026-10월분부터 1엔 단위(2026-10-27)", () => {
-  it("10월분부터는 소수점만 1엔 올림, 그 전 달은 10엔 올림", async () => {
-    const { ceilMonthlyPay, ONE_YEN_PAY_START_YM } = await import("@/lib/attendance-pay-calculation");
+describe("monthlyPayYen — 2026-10월분부터 1엔 단위(2026-10-27)", () => {
+  it("10월분부터는 1엔 미만 반올림, 그 전 달은 10엔 올림", async () => {
+    const { monthlyPayYen, ONE_YEN_PAY_START_YM } = await import("@/lib/attendance-pay-calculation");
     const { PAYROLL_PREP_START_YM } = await import("@/lib/payroll-prep");
     expect(ONE_YEN_PAY_START_YM).toBe(PAYROLL_PREP_START_YM);
-    expect(ceilMonthlyPay(93.2, "2026-10")).toBe(94);
-    expect(ceilMonthlyPay(100.00000000000001, "2026-10")).toBe(100);
-    expect(ceilMonthlyPay(93.2, "2026-09")).toBe(100);
+    expect(monthlyPayYen(93.2, "2026-10")).toBe(93);
+    expect(monthlyPayYen(93.5, "2026-10")).toBe(94);
+    expect(monthlyPayYen(100.00000000000001, "2026-10")).toBe(100);
+    expect(monthlyPayYen(93.2, "2026-09")).toBe(100);
   });
 });

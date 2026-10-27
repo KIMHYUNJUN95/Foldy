@@ -41,7 +41,7 @@ const minutesOf = (v) => {
 };
 const norm = (s) => String(s).normalize("NFKC").replace(/[\s　]+/g, " ").trim();
 const keyOf = (s) => norm(s).replace(/ /g, "");
-const ceilPay = (rate, minutes) => Math.ceil((rate * minutes) / 60 - 1e-9);
+const roundPay = (rate, minutes) => Math.round((rate * minutes) / 60);
 
 async function main() {
   const [bookPath, taxPath] = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && all[i - 1] !== "--same");
@@ -112,7 +112,7 @@ async function main() {
     if (min1 == null && a.rate1 && a.pay1) {
       // 시간 칸이 비고 금액만 있는 줄 — 금액에서 분을 거꾸로 내고 끝돈은 조정분.
       min1 = Math.floor((a.pay1 * 60) / a.rate1);
-      adjust += a.pay1 - ceilPay(a.rate1, min1);
+      adjust += a.pay1 - roundPay(a.rate1, min1);
     }
     if (a.rate1 && min1) rateSegs.push({ rate: a.rate1, minutes: min1 });
     if (a.rate2 && a.min2) rateSegs.push({ rate: a.rate2, minutes: a.min2 });
@@ -137,7 +137,7 @@ async function main() {
     p.cls = s.cls;
     p.months[taxYm] = {
       segments: minutes > 0 ? [{ rate: last, minutes }] : [], days: s.days, commute: s.commute, overtime: 0,
-      adjust: s.taxable - ceilPay(last, minutes), adjustMonth: bookYm, cls: s.cls, expectTaxable: s.taxable,
+      adjust: s.taxable - roundPay(last, minutes), adjustMonth: bookYm, cls: s.cls, expectTaxable: s.taxable,
     };
     people.set(k, p);
   }

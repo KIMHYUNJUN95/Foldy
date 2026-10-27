@@ -204,6 +204,21 @@ describe("payroll book", () => {
     expect(texts).not.toContain("丙欄アルバイト");
   });
 
+  it("세무사 엑셀 — 칸 순서 · 総支給額 = 課税対象額 + 交通費 · 差引 = 総支給額 − 源泉 · 테두리", () => {
+    const [sheet] = buildTaxAccountantBook({ ym: "2026-10", rows: sample() });
+    expect(["A2", "B2", "C2", "D2", "E2", "F2", "G2"].map((a) => sheet.cells.get(a)?.v)).toEqual([
+      "氏名", "課税対象額", "交通費", "総支給額", "源泉所得税", "差引支給額", "出勤日数",
+    ]);
+    const n = (a: string) => Number(sheet.cells.get(a)?.v ?? 0);
+    expect(sheet.cells.get("D3")?.f).toBe("B3+C3");
+    expect(n("D3")).toBe(n("B3") + n("C3"));
+    const f3 = sheet.cells.get("F3")!;
+    if (f3.f) expect(f3.f).toBe("D3-E3");
+    expect(n("F3")).toBe(n("D3") - n("E3"));
+    expect(sheet.cells.get("A3")?.s?.border).toBe("all");
+    expect(sheet.cells.get("A1")?.s?.border).toBeUndefined();
+  });
+
   it("세무사 엑셀 — 원천세 구분 없는 사람도 빠지지 않고 「区分未設定」 블록에", () => {
     const rows = rich();
     const [sheet] = buildTaxAccountantBook({ ym: "2026-10", rows });

@@ -175,6 +175,21 @@ export function PayrollPrepPanel({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+  // 패널 바깥을 누르면 닫는다(2026-10-27 사용자 요청). 다른 사람 줄은 그 줄이 사람을 바꾸고, 떠 있는 창
+  // (모달 · 달 고르기 · 토스트)은 그대로 둔다. 닫기 전에 입력 칸을 blur 해 칸마다 하는 저장이 먼저 돌게 한다.
+  useEffect(() => {
+    function onPointer(e: PointerEvent) {
+      const t = e.target;
+      if (!(t instanceof Element) || ref.current?.contains(t)) return;
+      if (t.closest("[data-prep-row], .ppr-lnk, [role='dialog'], .amp__pop, .ppr-toast-host, .adm-toast")) return;
+      if (document.querySelector("[role='dialog'], .amp__pop")) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && ref.current?.contains(active)) active.blur();
+      onClose();
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [onClose]);
 
   const save = (patch: Partial<PrepManual>, field: string) => onSave(row, patch, field);
   const total = (key: "overtime" | "weekend" | "special", label: string) => (n: number) =>

@@ -57,10 +57,10 @@ const PEOPLE = [
   { key: "office", email: "stayops.demo.office@haru-tokyo.com", name: "야마모토 레이", kana: "ヤマモト レイ", role: "office_admin", lang: "ja", gender: "female", birth: "1992-12-03", phone: "+81-90-0000-0108", hire: "2024-04-01", salaried: true },
 ];
 
-// 실제 급여 파일 사람들(있으면). months: { "YYYY-MM": { segments: [{ rate, minutes }], days, commute, overtime, adjust, adjustMonth, withholdingOverride?, withholdingReason? } }
+// 실제 급여 파일 사람들(있으면). months: { "YYYY-MM": { segments: [{ rate, minutes }], days, commute, overtime, weekend?, special?, adjust, adjustMonth, withholdingOverride?, withholdingReason? } }
 const REAL = fs.existsSync(REAL_FILE) ? JSON.parse(fs.readFileSync(REAL_FILE, "utf8")) : [];
 const realStart = (r) => Object.keys(r.months).sort()[0];
-REAL.forEach((r, n) => {
+REAL.forEach((r) => {
   PEOPLE.push({
     key: `real-${r.id}`,
     email: `stayops.demo.real-${r.id}@haru-tokyo.com`,
@@ -70,7 +70,11 @@ REAL.forEach((r, n) => {
     lang: "ko",
     gender: null,
     birth: null,
-    phone: `+81-90-0001-${String(n + 1).padStart(4, "0")}`, // 실제 번호 없음 — 데모 자리 번호(필수 칸)
+    // 실제 번호 없음 — 데모 자리 번호(필수 · 겹치면 안 되는 칸). 사람 id 에서 만들어 다시 돌려도 같은 번호.
+    phone: (() => {
+      const d = String(parseInt(r.id, 16) % 1e8).padStart(8, "0");
+      return `+81-80-${d.slice(0, 4)}-${d.slice(4)}`;
+    })(),
     hire: `${realStart(r)}-01`,
     real: r,
     pay: { withholding: r.cls, dependents: 0, method: r.method },
@@ -177,7 +181,7 @@ function plan() {
       if (got !== want || (want && ds.length !== Math.min(m.days, 31)) || new Set(ds.map((d) => d.date)).size !== ds.length) {
         throw new Error(`${p.name} ${ym}: 분 ${got}/${want} · 일수 ${ds.length}/${m.days}`);
       }
-      if (m.expectTaxable != null && pay + m.adjust + m.overtime !== m.expectTaxable) throw new Error(`${p.name} ${ym}: 課税 ${pay + m.adjust} ≠ ${m.expectTaxable}`);
+      if (m.expectTaxable != null && pay + m.adjust + m.overtime + (m.weekend ?? 0) + (m.special ?? 0) !== m.expectTaxable) throw new Error(`${p.name} ${ym}: 課税 ${pay + m.adjust} ≠ ${m.expectTaxable}`);
     }
   }
   console.log(`기간: ${MONTHS.join(", ")} (어제까지) · 근무지 ${SITES.length}곳`);
@@ -630,6 +634,8 @@ async function main() {
     for (const [ym, m] of Object.entries(p.real.months)) {
       const row = { organization_id: orgId, user_id: ids[p.key], target_month: `${ym}-01`, updated_by: A };
       if (m.overtime) row.overtime = m.overtime;
+      if (m.weekend) row.weekend = m.weekend;
+      if (m.special) row.special = m.special;
       if (m.adjust) Object.assign(row, { prev_adjustment: m.adjust, prev_adjustment_kind: "taxable", prev_adjustment_month: `${m.adjustMonth}-01` });
       if (m.withholdingOverride != null) Object.assign(row, { withholding_override: m.withholdingOverride, withholding_override_reason: m.withholdingReason });
       if (Object.keys(row).length > 4) inputs.push(row);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isMonthEnded, isValidYm, resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
+import { canCloseMonth, devAllowsOpenMonthClose, isMonthEnded, isValidYm, resolveClockOutAfterClockIn, tokyoWallClockInstant } from "@/lib/attendance-clock";
 
 /**
  * 출퇴근 시각 조합 (2026-10-01).
@@ -67,5 +67,21 @@ describe("isMonthEnded — 끝난 달만 마감", () => {
   it("earlier months are ended, including across a year boundary", () => {
     expect(isMonthEnded("2026-09", "2026-10-01")).toBe(true);
     expect(isMonthEnded("2025-12", "2026-01-01")).toBe(true);
+  });
+});
+
+describe("canCloseMonth — 개발 서버 테스트 스위치", () => {
+  const on = { NODE_ENV: "development", FOLDY_DEV_ALLOW_OPEN_MONTH_CLOSE: "1" };
+  it("스위치가 꺼져 있으면 끝난 달만", () => {
+    expect(canCloseMonth("2026-10", "2026-10-27", { NODE_ENV: "development" })).toBe(false);
+    expect(canCloseMonth("2026-09", "2026-10-27", { NODE_ENV: "development" })).toBe(true);
+  });
+  it("개발 서버에서 켜면 이번 달도 마감", () => {
+    expect(canCloseMonth("2026-10", "2026-10-27", on)).toBe(true);
+  });
+  it("운영 빌드 · Vercel 에서는 켜도 무시", () => {
+    expect(devAllowsOpenMonthClose({ ...on, NODE_ENV: "production" })).toBe(false);
+    expect(devAllowsOpenMonthClose({ ...on, VERCEL: "1" })).toBe(false);
+    expect(canCloseMonth("2026-10", "2026-10-27", { ...on, NODE_ENV: "production" })).toBe(false);
   });
 });

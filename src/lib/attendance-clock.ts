@@ -40,3 +40,21 @@ export function isValidYm(value: unknown): value is string {
 export function isMonthEnded(ym: string, tokyoTodayYmd: string): boolean {
   return ym < tokyoTodayYmd.slice(0, 7);
 }
+
+/**
+ * 개발 서버 전용 — 안 끝난 달도 근태 마감을 허락하는 테스트 스위치(2026-10-27). 데모에서 근태 마감 → 급여 준비 → 결재 →
+ * 지급 → 세무사 송부를 한 번에 돌려 보려고 만들었다. `FOLDY_DEV_ALLOW_OPEN_MONTH_CLOSE=1` 이어도 운영 빌드
+ * (`NODE_ENV=production`)나 Vercel(`VERCEL` 있음)에서는 **무시**한다 — 운영은 늘 끝난 달만 마감.
+ */
+export function devAllowsOpenMonthClose(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NODE_ENV !== "production" && !env.VERCEL && env.FOLDY_DEV_ALLOW_OPEN_MONTH_CLOSE === "1";
+}
+
+/** 마감할 수 있는 달인가 — 끝난 달이거나, 개발 서버 테스트 스위치가 켜졌을 때. */
+export function canCloseMonth(
+  ym: string,
+  tokyoTodayYmd: string,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return isMonthEnded(ym, tokyoTodayYmd) || devAllowsOpenMonthClose(env);
+}

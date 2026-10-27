@@ -93,7 +93,7 @@ import {
 } from "@/lib/attendance-transport-report";
 import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
-import { isMonthEnded, isValidYm, resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
+import { canCloseMonth, isValidYm, resolveClockOutAfterClockIn } from "@/lib/attendance-clock";
 import { tokyoToday } from "@/lib/tokyo-date";
 import { hasOverlappingSession } from "@/lib/attendance-overlap";
 import { isPlatformDeveloper } from "@/config/roles";
@@ -1221,7 +1221,8 @@ export async function finalizeAttendanceMonth(input: {
   }
   if (!isValidYm(input.ym)) return { ok: false, reason: "invalid" };
   // 끝나지 않은 달(이번 달 · 미래)은 마감하지 않는다 — 마감 뒤 출근이 생기면 금액이 어긋난다(2026-10-26).
-  if (!isMonthEnded(input.ym, tokyoToday())) return { ok: false, reason: "not_ended" };
+  // 개발 서버 테스트 스위치만 예외(운영에선 무시, 2026-10-27).
+  if (!canCloseMonth(input.ym, tokyoToday())) return { ok: false, reason: "not_ended" };
 
   // 비활성(퇴사)이어도 이 조직 멤버면 된다 — 마지막 달 급여를 닫아야 한다(2026-10-22 검토).
   const member = await service

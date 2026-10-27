@@ -146,6 +146,17 @@ node scripts/dev/seed-attendance-demo.js --apply   # 넣기 — 이미 있으면
 
 저장소 루트(`.env` · `.env.local` 이 있는 곳)에서 돌린다. 다시 돌리면 테스트하며 바꾼 마감 · 결재 · 입력도 함께 처음 상태로 돌아간다.
 
+#### 안 끝난 달 마감 — `FOLDY_DEV_ALLOW_OPEN_MONTH_CLOSE` (2026-10-27, 개발 서버 전용)
+
+```txt
+FOLDY_DEV_ALLOW_OPEN_MONTH_CLOSE=1
+```
+
+- 근태 마감은 원래 끝난 달만 된다(이번 달은 `not_ended`). 데모 데이터는 이번 달에 있어 흐름을 끝까지 못 눌러 보므로, 루트
+  `.env.local` 에 위 줄을 넣고 개발 서버를 다시 켜면 이번 달도 마감된다.
+- **운영(`NODE_ENV=production`) · Vercel(`VERCEL` 있음)에서는 코드가 무시한다.** Vercel 환경 변수에 넣지 말 것.
+- 다 보고 나면 줄을 지우거나 `0` 으로. 문서 24 「끝나지 않은 달은 마감 불가」.
+
 ### Testing the dev server on a phone over any network (Cloudflare quick tunnel)
 
 To open the local dev server on a phone **without** needing the same WiFi (works on cellular too):

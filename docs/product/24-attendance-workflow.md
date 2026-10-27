@@ -997,6 +997,10 @@ FK 를 채우는 것이 정답이지만 그건 운영 데이터 정리다. 그 �
   `buildTransportExportItems` 가 `status === "approved"` 인 보고서만 쓴다(상태 열은 그대로 「승인」).
 - **끝나지 않은 달은 마감 불가.** `finalizeAttendanceMonth` 가 도쿄 이번 달 · 미래 달이면 `not_ended`(`payActionNotEnded`)로 거절
   (`isMonthEnded`, `src/lib/attendance-clock.ts`).
+  - **개발 서버 테스트 스위치(2026-10-27).** 데모에서 이번 달(안 끝난 달)로 마감 → 급여 준비 → 결재 → 지급 → 세무사 송부를 끝까지
+    눌러 보려고 `FOLDY_DEV_ALLOW_OPEN_MONTH_CLOSE=1` 을 두면 `canCloseMonth` 가 안 끝난 달도 허락한다. **운영 빌드(`NODE_ENV=production`)
+    나 Vercel(`VERCEL` 있음)에서는 켜도 무시** — 운영은 늘 끝난 달만. 서버 검사 한 곳(`finalizeAttendanceMonth`)만 바뀌고 화면은 그대로.
+    테스트: `src/lib/__tests__/attendance-clock.test.ts`.
 - **마감된 달에는 打刻 불가.** `submitAttendanceScan` 이 오늘(도쿄) 달에 `finalized` 스냅숏이 있으면 GPS 검사 전에 `month_finalized` 로
   거절하고, 출근 화면이 「이번 달은 이미 마감됐어요」(`resultMonthFinalizedTitle/Sub`)를 띄운다. 관리자가 마감을 풀어야 기록된다.
 - **정정 승인 뒤 세션 목록 갱신.** 승인 · 무효 · 복구 · 직접 수정 · 일괄 처리 뒤 `router.refresh()` 하고, 큐 클라이언트가 새 `initialItems`

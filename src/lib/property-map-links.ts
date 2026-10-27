@@ -175,12 +175,12 @@ export const PROPERTY_MAP_META: PropertyMapMeta[] = [
     canonicalName: "STAY ARI Apartment Hotel",
     kind: "hotel",
     address: {
-      ko: "1-chōme-9-26 Ōkubo, Shinjuku City, Tokyo 169-0072",
-      ja: "1-chōme-9-26 Ōkubo, Shinjuku City, Tokyo 169-0072",
-      en: "1-chōme-9-26 Ōkubo, Shinjuku City, Tokyo 169-0072",
+      ko: "1 Chome-9-26 Okubo, Shinjuku City, Tokyo 169-0072",
+      ja: "1 Chome-9-26 Okubo, Shinjuku City, Tokyo 169-0072",
+      en: "1 Chome-9-26 Okubo, Shinjuku City, Tokyo 169-0072",
     },
     googleMapsUrl:
-      "https://www.google.com/maps/search/?api=1&query=1-9-26%20Okubo%2C%20Shinjuku%20City%2C%20Tokyo%20169-0072",
+      "https://www.google.com/maps/search/?api=1&query=1%20Chome-9-26%20Okubo%2C%20Shinjuku%20City%2C%20Tokyo%20169-0072",
     sharedAccess: [],
   },
 ];

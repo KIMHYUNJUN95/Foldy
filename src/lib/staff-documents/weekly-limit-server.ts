@@ -20,12 +20,16 @@ import {
  * 대상: 이 조직의 **지금 재류카드**(`is_current`)가 `extra_activity = 'weekly_28h'` 이고 확인 대기 · 확인됨인 사람.
  * 다시 찍기 요청(`returned`) 상태 카드는 값이 틀렸을 수 있어 보지 않는다. 일본 국적 · 취업 제한 없는 사람은 대상이 아니다.
  *
- * 권한: 칩은 체류 자격을 드러내므로 `staff_documents.view` 가 있는 사람에게만 보인다(`canSeeWeeklyLimit`).
+ * 권한: 칩은 체류 자격을 드러내므로 `staff_documents.view`(서류 보기) 또는 `attendance.manage`(근태 관리 — 시프트를 짜며 막아야 하는 사람,
+ * 2026-10-27 사용자 결정)가 있는 사람에게만 보인다(`canSeeWeeklyLimit`). 근태 관리만 있는 사람은 칩만 — 재류카드 내용은 여전히 서류 보기 권한.
  * 본인 화면은 자기 것만 읽는다(권한 불필요). 읽기는 service client + `organization_id` 로 조직을 가른다.
  */
 
 export function canSeeWeeklyLimit(session: AppSession): boolean {
-  return session.organization.id !== "platform" && session.capabilities.includes("staff_documents.view");
+  return (
+    session.organization.id !== "platform" &&
+    (session.capabilities.includes("staff_documents.view") || session.capabilities.includes("attendance.manage"))
+  );
 }
 
 const SESSION_SELECT = "id, user_id, operating_date, status, clock_in_at, clock_out_at, invalidated_at" as const;

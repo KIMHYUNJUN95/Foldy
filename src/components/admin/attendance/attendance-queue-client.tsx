@@ -35,6 +35,7 @@ import {
   restoreAttendanceSession,
   setCorrectionInReview,
   updateAttendanceSessionAdmin,
+  type ClosedCorrections,
   type SessionAuditEntry,
 } from "@/app/admin/attendance/actions";
 import { ImageLightbox } from "@/components/shell/image-lightbox";
@@ -74,6 +75,14 @@ function classifyIssue(item: ReviewQueueItem): IssueKind {
   if (item.isAbnormal) return "abnormal";
   if (!item.clockOutLabel) return "incomplete";
   return "review";
+}
+
+/** 수동 정정 · 수기 입력 뒤 토스트 — 같이 닫힌 정정 요청 수를 덧붙인다. */
+function withClosedCorrections(c: Att, base: string, closed?: ClosedCorrections): string {
+  const parts = [base];
+  if (closed?.approved) parts.push(c.corrClosedApproved.replace("{n}", String(closed.approved)));
+  if (closed?.rejected) parts.push(c.corrClosedRejected.replace("{n}", String(closed.rejected)));
+  return parts.join(" ");
 }
 
 function issueLabel(kind: IssueKind, c: Att): { t: string; s: string } {
@@ -1021,9 +1030,9 @@ export function AttendanceQueueClient({
             showToast(c.actionDoneRestore);
             router.refresh();
           }}
-          onEdited={(updated) => {
+          onEdited={(updated, closed) => {
             applyUpdated(updated);
-            showToast(c.actionDoneEdit);
+            showToast(withClosedCorrections(c, c.actionDoneEdit, closed));
             router.refresh();
           }}
           onStale={() => router.refresh()}
@@ -1092,7 +1101,7 @@ function SessionPanel({
   onInvalidated: (sessionId: string) => void;
   onApproved: (updated: ReviewQueueItem) => void;
   onRestored: (updated: ReviewQueueItem) => void;
-  onEdited: (updated: ReviewQueueItem) => void;
+  onEdited: (updated: ReviewQueueItem, closed?: ClosedCorrections) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -1113,6 +1122,7 @@ function SessionPanel({
   const urgent = isUrgent(item);
   const isInvalid = item.status === "invalid";
   const needsReview = item.reviewState === "review_required";
+  const correctionPending = item.correctionStatus === "requested" || item.correctionStatus === "in_review";
   // 무효 세션을 복원하면 완전한 세션이 되어야 한다 — 출퇴근 한쪽이 아직 비어 있으면
   // 관리자가 먼저 수동 정정으로 채워야 하므로, 그때까지 "복구 및 완료 처리" 는 막힌다.
   const restoreBlocked = isInvalid && (!item.clockInLabel || !item.clockOutLabel);
@@ -1183,7 +1193,11 @@ function SessionPanel({
           // "복구 및 완료 처리" 를 실행해야 한다 — 이제 양쪽이 모두 채워져 막힘이 풀린다.
           status:
             item.status === "invalid" ? item.status : nextIn && nextOut ? "completed" : item.status,
-        });
+          // 대기 중이던 정정 요청은 서버가 같이 닫았다(승인 · 반려).
+          ...(res.correctionsClosed && res.correctionsClosed.approved + res.correctionsClosed.rejected > 0
+            ? { correctionStatus: res.correctionsClosed.approved > 0 ? "approved" : "rejected" }
+            : {}),
+        }, res.correctionsClosed);
         setAuditReloadKey((k) => k + 1);
       } else if (res.reason === "forbidden") {
         setErr(c.actionForbidden);
@@ -1544,6 +1558,7 @@ function SessionPanel({
                     />
                   </div>
                 </div>
+                {correctionPending ? <p className="wedit__note">{c.panelEditCorrNote}</p> : null}
                 <div className="wreason">
                   <div className="wfield__l">{c.panelEditReasonLabel}</div>
                   <input

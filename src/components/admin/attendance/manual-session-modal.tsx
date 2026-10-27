@@ -91,7 +91,12 @@ export function ManualSessionModal({
         setErr(errText(res.reason));
         return;
       }
-      onDone(c.manualCreated);
+      // 그 날짜의 세션 없는 정정 요청을 서버가 같이 닫았으면 알려 준다.
+      const closed = res.correctionsClosed;
+      const parts = [c.manualCreated];
+      if (closed?.approved) parts.push(c.corrClosedApproved.replace("{n}", String(closed.approved)));
+      if (closed?.rejected) parts.push(c.corrClosedRejected.replace("{n}", String(closed.rejected)));
+      onDone(parts.join(" "));
     });
   }
 

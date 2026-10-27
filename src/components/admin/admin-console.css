@@ -2417,6 +2417,7 @@
 .adm .wprev.same { background:var(--surface2); color:var(--adm-muted); }
 .adm .wprev .ic { font-size:14px; margin-top:1px; }
 .adm .wedit__btns { display:flex; gap:8px; }
+.adm .wedit__note { margin:0; font-size:12px; line-height:1.5; color:var(--ink-soft); }
 
 /* ---- 휴가 콘솔: 하위 탭 바 (승인 심사 / 팀 캘린더 / 잔여·부여 / 승인자 관리 / 문서) ---- */
 /* 보기 탭 — 핸드오프 .lviews (leave.css): 아이콘+라벨 알약, 선택됨 = 리프트 그림자가 있는 꽉 찬 네이비. */

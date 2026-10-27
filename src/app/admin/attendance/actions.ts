@@ -15,6 +15,7 @@
 
 import { isPayrollMonthLocked } from "@/lib/payroll-approval-server";
 import { revalidatePath } from "next/cache";
+import { correctionMatchesFix } from "@/lib/attendance-correction-close";
 import {
   createNotification,
 } from "@/lib/notifications/create";
@@ -577,7 +578,7 @@ export async function rejectCorrectionRequest(
   // 그대로 둔다.
 
 export type ManualSessionResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; correctionsClosed?: ClosedCorrections }
   | {
       ok: false;
       reason:
@@ -594,7 +595,7 @@ export type ManualSessionResult =
 
 export type SimpleManualResult =
   /** `updatedAt` = 갱신 뒤 세션의 `updated_at`(직접 수정만 돌려준다) — 다음 수정의 동시성 기준. */
-  | { ok: true; updatedAt?: string }
+  | { ok: true; updatedAt?: string; correctionsClosed?: ClosedCorrections }
   | {
       ok: false;
       reason:
@@ -636,6 +637,89 @@ export type UpdateManualSessionInput = {
    */
   expectedUpdatedAt?: string;
 };
+
+/** 수동 정정 · 수기 입력이 함께 처리한 대기 중 정정 요청 수(화면 안내용). */
+export type ClosedCorrections = { approved: number; rejected: number };
+
+/**
+ * 관리자가 수동 정정 · 수기 입력으로 기록을 직접 고치면, 그 기록에 걸린 대기 중 정정 요청도 같이 닫는다(2026-10-27).
+ * 전에는 기록은 고쳐졌는데 요청이 「정정 대기」로 남아 근태 마감을 막고, 직원은 답을 못 받았다.
+ * - 직원이 바란 시각과 고친 결과가 같으면 「승인」, 다르면 「반려」 — 상태는 기존 승인 · 반려를 그대로 쓴다
+ *   (새 상태를 만들지 않음). 어느 쪽이든 관리자가 적은 정정 사유가 검토 코멘트로 남아 직원에게 보인다.
+ * - 세션은 이미 고쳐졌으니 요청의 희망 값을 다시 적용하지 않는다. 직원에게 승인 · 반려 알림을 보낸다.
+ * - 다른 검토자가 잡은 요청(in_review)도 닫는다 — 기록을 바꾼 쪽이 결과의 주인이다. 대기 상태일 때만 바꾸는
+ *   조건부 갱신이라 그 사이 처리된 요청은 건드리지 않는다.
+ */
+async function closePendingCorrectionsAfterManualFix(
+  service: ReturnType<typeof getSupabaseServiceClient>,
+  input: {
+    organizationId: string;
+    actorId: string;
+    userId: string;
+    /** 세션에 걸린 요청 — 없으면(수기 입력) 그 사람 · 그 날짜의 세션 없는 요청. */
+    sessionId: string | null;
+    operatingDate: string;
+    clockInAt: string | null;
+    clockOutAt: string | null;
+    reason: string;
+  },
+): Promise<ClosedCorrections> {
+  const closed: ClosedCorrections = { approved: 0, rejected: 0 };
+  let query = service
+    .from("attendance_correction_requests")
+    .select("id, requested_by_user_id, desired_clock_in_at, desired_clock_out_at, session_id")
+    .eq("organization_id", input.organizationId)
+    .eq("requested_by_user_id", input.userId)
+    .in("status", ["requested", "in_review"]);
+  query = input.sessionId
+    ? query.eq("session_id", input.sessionId)
+    : query.is("session_id", null).eq("target_date", input.operatingDate);
+  const res = await query;
+  if (res.error) {
+    console.warn("[attendance] pending corrections read failed:", res.error.message);
+    return closed;
+  }
+  const rows = (res.data ?? []) as {
+    id: string;
+    requested_by_user_id: string;
+    desired_clock_in_at: string | null;
+    desired_clock_out_at: string | null;
+    session_id: string | null;
+  }[];
+  if (rows.length === 0) return closed;
+  const subjectName = await getProfileName(service, input.userId);
+  const nowIso = new Date().toISOString();
+  for (const row of rows) {
+    const status = correctionMatchesFix(row, input.clockInAt, input.clockOutAt) ? "approved" : "rejected";
+    const upd = await service
+      .from("attendance_correction_requests")
+      .update({ status, review_comment: input.reason, reviewed_by_user_id: input.actorId, reviewed_at: nowIso })
+      .eq("id", row.id)
+      .eq("organization_id", input.organizationId)
+      .in("status", ["requested", "in_review"])
+      .select("id")
+      .maybeSingle();
+    if (upd.error || !upd.data) continue;
+    closed[status] += 1;
+    await createNotification(service, {
+      organizationId: input.organizationId,
+      recipientUserId: row.requested_by_user_id,
+      type: "attendance_activity",
+      href: `/mobile/attendance/correction/status?id=${row.id}`,
+      sourceType: "attendance",
+      sourceId: row.id,
+      dedupeKey: `attendance_correction_${status}:${row.id}:${row.requested_by_user_id}`,
+      payload: {
+        event: status === "approved" ? "correction_approved" : "correction_rejected",
+        subjectUserId: row.requested_by_user_id,
+        subjectName,
+        correctionId: row.id,
+        sessionId: row.session_id,
+      },
+    });
+  }
+  return closed;
+}
 
 /** 같은 시각인가 — timestamptz 문자열은 표기(자릿수 · 오프셋)가 달라도 같은 순간일 수 있다. */
 function sameInstant(a: string, b: string): boolean {
@@ -805,8 +889,20 @@ export async function createManualAttendanceSession(
       })
   );
 
+  // 그 날짜에 세션 없이 들어온 정정 요청(출근 기록 없음 등)이 있으면 같이 닫는다.
+  const correctionsClosed = await closePendingCorrectionsAfterManualFix(service, {
+    organizationId,
+    actorId,
+    userId: input.userId,
+    sessionId: null,
+    operatingDate: input.operatingDate,
+    clockInAt,
+    clockOutAt,
+    reason: input.reason.trim(),
+  });
+
   revalidateSelfView();
-  return { ok: true, id: sessionId };
+  return { ok: true, id: sessionId, correctionsClosed };
 }
 
 /** 출퇴근 세션을 권위 있게 수정한다 (권한 필요). 사유 필수 + 감사 기록. */
@@ -947,8 +1043,23 @@ export async function updateAttendanceSessionAdmin(
       })
   );
 
+  // 출퇴근 시각을 고쳤으면 이 근무에 걸린 대기 중 정정 요청도 같이 닫는다 — 검토 표시만 바꾼 수정은 그대로.
+  let correctionsClosed: ClosedCorrections | undefined;
+  if (s.status !== "invalid" && (clockInChanged || clockOutChanged)) {
+    correctionsClosed = await closePendingCorrectionsAfterManualFix(service, {
+      organizationId,
+      actorId,
+      userId: s.user_id,
+      sessionId: s.id,
+      operatingDate: s.operating_date,
+      clockInAt: clockInChanged ? (update.clock_in_at as string | null) : s.clock_in_at,
+      clockOutAt: clockOutChanged ? (update.clock_out_at as string | null) : s.clock_out_at,
+      reason: input.reason.trim(),
+    });
+  }
+
   revalidateSelfView();
-  return { ok: true, updatedAt: updatedRow.updated_at };
+  return { ok: true, updatedAt: updatedRow.updated_at, correctionsClosed };
 }
 
 /** 세션을 삭제하지 않고 무효 처리한다 (권한 필요). 사유 필수 + 감사 기록. */

@@ -89,6 +89,12 @@ PC 시급 패널 · 모바일 사용자 상세 · 급여 준비에서 관리자 
 - 스캐너 플러그인 바이너리에 VisionKit 비공개 클래스 이름 문자열 — App Store 심사 위험(문서 17).
 - 장기 방학(1일 8시간) 예외는 28시간 경고가 판정하지 않음 · 갱신 신청 중(특례기간)인 사람도 「만료」로 보임 — 문구는 「확인해 주세요」.
 
+## 2026-10-28 — PC 대시보드 「오늘 체크인 · 체크아웃」 한 화면에
+
+- 방 하나 한 줄(「객실 · 체크아웃 · 체크인」, `pairByRoom`) · 채널 색 점 · 건물 묶음 여러 단(1440 3단 · 1280 2단) · 구역 전체 폭, 오늘 할 일은 큐 아래로. 시안 https://claude.ai/artifact/18tu6HCknfViQM3piKm7mZ.
+- 문구 `resvRoom` · `resvTurnover` · `resvDirect` 새로, `sectTodayTitle` → 「오늘 체크인 · 체크아웃」(ko/ja/en). 테스트 `home-reservation-groups.test.ts`. 문서 05 「예약 현황」. 모바일 홈은 다음 순서.
+- 이어서(사용자 지적): 오늘 할 일을 대시보드에서 바로 체크(콘솔과 같은 저장 · 실행 취소 토스트, `dashboard-todos.tsx`), 방 하나뿐인 건물(오쿠보C)의 빈 객실 칸에 건물 이름. **커밋 안 함 — 컨펌 대기.**
+
 ## 2026-10-28 — 가격 개입 전환: 문의 · 차단 거르기 · 읽기 실패 표시
 
 - `getOpsPriceConversions`(`src/lib/ops-calendar.ts`) 가 Beds24 원본 상태를 같이 읽어 `isSalesCountedReservation` 으로 문의 · 요청 · 차단을 거른다(운영에 원본 inquiry 인데 우리 status confirmed 인 줄 4건 확인).

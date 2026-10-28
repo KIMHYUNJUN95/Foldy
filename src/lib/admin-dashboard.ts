@@ -64,6 +64,8 @@ export type TodoItem = {
   title: string;
   done: boolean;
   priority: string;
+  /** 반복 할 일이면 이 날짜(도쿄 운영일 = 오늘) 회차를 체크한다 — 대시보드 체크(2026-10-28). */
+  occurrenceDate: string;
 };
 
 export type AdminDashboardData = {
@@ -237,6 +239,7 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       title: t.title,
       done: t.status === "done" || t.status === "completed",
       priority: t.priority,
+      occurrenceDate: today,
     }))
     .slice(0, 6);
 

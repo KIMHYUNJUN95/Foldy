@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByBuilding } from "@/lib/home-reservation-groups";
+import { groupByBuilding, pairByRoom } from "@/lib/home-reservation-groups";
 
 /** 홈 체크인 · 체크아웃을 건물별로 묶는다 (2026-10-22). */
 type Row = { id: string; property: string; room: string };
@@ -41,5 +41,32 @@ describe("groupByBuilding", () => {
       { id: "y", property: "가부키초", room: "1" },
     ]);
     expect(groups.map((g) => g.label)).toEqual(["Kabukicho", "New Building"]);
+  });
+});
+
+/** 같은 방의 체크아웃 · 체크인을 한 줄로 (2026-10-28 대시보드 「오늘 예약」). */
+describe("pairByRoom", () => {
+  type R = { id: string; propertyName: string; roomLabel: string };
+  const r = (id: string, propertyName: string, roomLabel: string): R => ({ id, propertyName, roomLabel });
+
+  it("같은 건물 · 같은 방이면 나감과 들어옴을 한 줄로, 아니면 따로", () => {
+    const rows = pairByRoom(
+      [r("in1", "가부키초", "302"), r("in2", "가부키초", "401")],
+      [r("out1", "가부키초", "302"), r("out2", "아라키초A", "302")],
+    );
+    expect(rows.map((x) => [x.checkOut?.id ?? null, x.checkIn?.id ?? null])).toEqual([
+      ["out1", "in1"],
+      ["out2", null],
+      [null, "in2"],
+    ]);
+    expect(rows[0].key).toBe("out:out1|in:in1");
+  });
+
+  it("한 방에 두 번 들어오면 첫 체크인만 짝짓고 남는 것은 따로", () => {
+    const rows = pairByRoom([r("a", "가부키초", "1"), r("b", "가부키초", "1")], [r("o", "가부키초", "1")]);
+    expect(rows.map((x) => [x.checkOut?.id ?? null, x.checkIn?.id ?? null])).toEqual([
+      ["o", "a"],
+      [null, "b"],
+    ]);
   });
 });

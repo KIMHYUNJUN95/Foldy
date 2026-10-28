@@ -91,8 +91,6 @@
 /* 큐 · 할 일 · 예약 — 줄 목록 */
 .adm .dh-col7 { grid-column: span 7; padding-right: 28px; }
 .adm .dh-col5 { grid-column: span 5; padding-left: 28px; }
-.adm .dh-col5.dh-left { padding-left: 0; padding-right: 28px; }
-.adm .dh-col7.dh-right { padding-right: 0; padding-left: 28px; }
 .adm .dh-row {
   display: flex;
   align-items: center;
@@ -111,14 +109,38 @@
 .adm .dh-qic { width: 32px; height: 32px; flex: none; border-radius: 9px; background: #f4f4f7; color: #6b6878; display: flex; align-items: center; justify-content: center; }
 .adm .dh-qic .ic { font-size: 16px; }
 .adm .dh-urgent { font-size: 12px; font-weight: 600; color: #c5282e; }
-/* 예약 현황 건물 묶음(2026-10-22) — 머리줄은 구분선 없이 글자로만, 줄 구분선은 dh-row 가 그린다. */
-.adm .dh-bgrp + .dh-bgrp { margin-top: 14px; }
-.adm .dh-bgrp__h { display: flex; align-items: baseline; gap: 10px; padding: 8px 0 8px; }
-.adm .dh-bgrp__t { font-size: 13px; font-weight: 600; color: #16141f; }
-.adm .dh-kind { font-size: 12px; color: #6b6878; white-space: nowrap; }
+/* 오늘 체크인 · 체크아웃(2026-10-28, 시안 18tu6H…) — 방 하나 한 줄 「객실 · 체크아웃 · 체크인」, 건물 묶음을 여러 단으로.
+   단 수는 폭이 정한다(한 단 최소 360px — 1440 은 3단, 1280 은 2단). 묶음은 단을 넘어 쪼개지지 않는다. 세로선 없음. */
+.adm .dh-ch--next { margin-top: 28px; }
+.adm .dh-turns { columns: 3 360px; column-gap: 48px; }
+.adm .dh-turn { break-inside: avoid; padding-bottom: 24px; }
+.adm .dh-turn__h { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; }
+.adm .dh-turn__t { margin: 0; font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .dh-turn__cols, .adm .dh-turn__row { display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; align-items: center; }
+.adm .dh-turn__cols { height: 26px; font-size: 12px; color: #6b6878; }
+.adm .dh-turn__row { min-height: 40px; border-top: 0.5px solid var(--separator); }
+.adm .dh-turn__room { font-size: 13px; font-weight: 700; color: #16141f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm .dh-turn__out, .adm .dh-turn__in { min-width: 0; }
+.adm .dh-turn__guest { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.adm .dh-turn__name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a3746; }
+.adm .dh-turn__in .dh-turn__name { font-weight: 600; color: #16141f; }
+.adm .dh-turn__none { font-size: 13px; color: #c9c7d1; }
+.adm .dh-ch-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #d9d7e0; }
+.adm .dh-ch-dot--airbnb { background: #ff5a5f; }
+.adm .dh-ch-dot--booking { background: #003b95; }
+.adm .dh-ch-dot--direct { background: #8b8898; }
+.adm .dh-ch-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 4px; font-size: 12px; color: #6b6878; }
+.adm .dh-ch-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .adm .dh-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-3); border-top: 0.5px solid var(--separator); }
 .adm .dh-todo { display: flex; align-items: center; gap: 12px; min-height: 46px; border-top: 0.5px solid var(--separator); font-size: 14px; color: #16141f; }
 .adm .dh-todo__box { width: 20px; height: 20px; flex: none; box-sizing: border-box; border-radius: 6px; border: 1.5px solid #d0cfd8; display: flex; align-items: center; justify-content: center; color: #fff; }
+/* 대시보드에서 바로 체크(2026-10-28) — 진짜 체크 칸은 안 보이게 두고 모양은 dh-todo__box. 키보드 초점은 상자에 링. */
+.adm .dh-todo--action { position: relative; cursor: pointer; }
+.adm .dh-todo--action:hover .dh-todo__box { border-color: #7a52e6; }
+.adm .dh-todo__input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.adm .dh-todo__input:focus-visible + .dh-todo__box { box-shadow: 0 0 0 3px rgba(122, 82, 230, .25); }
+.adm .dh-todo--action:active .dh-todo__box { transform: scale(.92); }
+.adm .dh-todo__box { transition: transform 120ms ease-out, border-color 120ms ease; }
 .adm .dh-todo__box .ic { font-size: 12px; }
 .adm .dh-todo.is-done { color: var(--text-done); text-decoration: line-through; }
 .adm .dh-todo.is-done .dh-todo__box { background: #7a52e6; border-color: #7a52e6; }
@@ -129,7 +151,6 @@
 .adm .dh-trend__up, .adm .dh-trend__down { font-size: 9px; vertical-align: 1px; }
 .adm .dh-trend__up { color: #7a52e6; }
 .adm .dh-trend__down { color: #c5282e; }
-.adm .dh-kind--in { color: #5a30cf; font-weight: 600; }
 
 /* 월 가동률 — 선 · 면은 SVG(가로로 늘어남), 점 · 숫자는 HTML(늘어나지 않아 또렷하다) */
 .adm .dh-line { position: relative; height: 150px; }
@@ -182,14 +203,13 @@
 @keyframes dh-dot { from { opacity: 0; transform: translate(-50%, -50%) scale(.3); } }
 @keyframes dh-breathe { 50% { box-shadow: 0 0 0 7px rgba(122, 82, 230, .12); } }
 
-.adm .dh-row.is-fresh, .adm .dh-todo.is-fresh { animation: dh-wash 1800ms cubic-bezier(.23, 1, .32, 1) both; }
+.adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-turn__row.is-fresh { animation: dh-wash 1800ms cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes dh-wash { 0% { background-color: rgba(122, 82, 230, 0); transform: translateY(-6px); opacity: 0; } 14% { background-color: rgba(122, 82, 230, .12); transform: none; opacity: 1; } 100% { background-color: rgba(122, 82, 230, 0); } }
 .adm .dh-todo__t { position: relative; }
 .adm .dh-todo.is-done { text-decoration: none; }
 .adm .dh-todo.is-done .dh-todo__t::after { content: ""; position: absolute; left: 0; right: 0; top: 52%; height: 1px; background: currentColor; }
 .adm .dh-todo.is-done.is-fresh .dh-todo__t::after { transform-origin: 0 50%; animation: dh-fill 500ms cubic-bezier(.23, 1, .32, 1) 160ms both; }
 .adm .dh-todo.is-done.is-fresh .dh-todo__box { animation: dh-pop 460ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) both; }
-.adm .dh-row.is-fresh .dh-kind--in { animation: dh-pop 460ms linear(0.000,0.034,0.123,0.247,0.390,0.536,0.677,0.804,0.912,0.999,1.064,1.109,1.136,1.147,1.146,1.135,1.119,1.098,1.077,1.055,1.036,1.019,1.005,0.994,0.986,0.981,0.979,0.978,0.979,0.981,0.984,0.987,0.991,0.994,0.996,0.999,1.000,1.002,1.003,1.003,1.000) 200ms both; }
 
 /* 새로고침 때 PC 진입 화면(admin-entry)이 덮고 있는 동안 위 모션이 밑에서 끝나 버리지 않게 — 진입 화면이 걷히는 시점만큼
    html 의 --entry-d0 으로 미룬다(admin-entry.tsx 가 넣고 몇 초 뒤 뺀다). 앱 안에서 대시보드로 올 땐 0. */
@@ -207,5 +227,5 @@
 .adm .dh-line__dot.is-now { animation-delay: calc(var(--entry-d0, 0ms) + 560ms + var(--i, 0) * 260ms), calc(var(--entry-d0, 0ms) + 2400ms); }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm .dh-bar, .adm .dh-trend, .adm .dh-occ__arc, .adm .dh-occ__cap, .adm .dh-meter i, .adm .dh-mbar i, .adm .dh-mbar span, .adm .dh-line__svg, .adm .dh-line__dot, .adm .dh-line__v, .adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-todo__t::after, .adm .dh-todo__box, .adm .dh-kind--in { animation: none !important; }
+  .adm .dh-bar, .adm .dh-trend, .adm .dh-occ__arc, .adm .dh-occ__cap, .adm .dh-meter i, .adm .dh-mbar i, .adm .dh-mbar span, .adm .dh-line__svg, .adm .dh-line__dot, .adm .dh-line__v, .adm .dh-row.is-fresh, .adm .dh-todo.is-fresh, .adm .dh-turn__row.is-fresh, .adm .dh-todo__t::after, .adm .dh-todo__box { animation: none !important; }
 }

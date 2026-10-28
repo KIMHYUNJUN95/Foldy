@@ -2,10 +2,13 @@ import Link from "next/link";
 import "./admin-console.css";
 import "./dashboard-home.css";
 import { CleaningLiveCard } from "./cleaning-live-card";
+import { DashboardTodos } from "./dashboard-todos";
 import { DashboardBuildingMap, type MapCardCopy } from "./dashboard-building-map";
 import type { BuildingMapCopy } from "@/components/calendar/building-map/building-map";
 import { getPropertyLocation } from "@/lib/property-locations";
-import { groupByBuilding } from "@/lib/home-reservation-groups";
+import { groupByBuilding, pairByRoom } from "@/lib/home-reservation-groups";
+import { normalizeReservationSource } from "@/lib/beds24/source-normalization";
+import type { HomeReservationRow } from "@/lib/home";
 import { localizeBuildingName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { LiveWash } from "@/components/shared/live-wash";
 import { RollNumber } from "@/components/shared/roll-number";
@@ -25,9 +28,6 @@ const I = {
   ),
   cart: (
     <svg viewBox="0 0 24 24" fill="none"><path d="M3 4h2l2.4 11.2a2 2 0 002 1.6h7.7a2 2 0 002-1.5L21 8H6.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  ),
-  check: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4.5 4.5L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
   ),
 };
 
@@ -343,6 +343,25 @@ function OpsBlock({ ops, c, locale, buildingLabels }: { ops: DashboardOpsBlock; 
   );
 }
 
+/** 예약 출처 → 채널 점 색(리디자인 규칙: Airbnb 코랄 · Booking 남색 · 직접 회색 · 그 밖 옅은 회색). */
+function channelOf(source: string): "airbnb" | "booking" | "direct" | "other" {
+  const normalized = normalizeReservationSource(source);
+  if (normalized === "Airbnb") return "airbnb";
+  if (normalized === "Booking.com") return "booking";
+  if (normalized === "Direct" || normalized === "beds24") return "direct";
+  return "other";
+}
+
+function GuestCell({ row }: { row: HomeReservationRow | null }) {
+  if (!row) return <span className="dh-turn__none" aria-hidden="true">—</span>;
+  return (
+    <span className="dh-turn__guest" title={row.source ? `${row.guestName} · ${row.source}` : row.guestName}>
+      <i aria-hidden="true" className={`dh-ch-dot dh-ch-dot--${channelOf(row.source)}`} />
+      <span className="dh-turn__name">{row.guestName}</span>
+    </span>
+  );
+}
+
 function QueueBlock({
   data,
   c,
@@ -356,15 +375,10 @@ function QueueBlock({
   divided: boolean;
   buildingLabels: Record<string, string>;
 }) {
-  const resvGroups = groupByBuilding(
-    [
-      ...data.reservations.checkIns.map((r) => ({ r, key: `in-${r.id}`, isIn: true })),
-      ...data.reservations.checkOuts.map((r) => ({ r, key: `out-${r.id}`, isIn: false })),
-    ],
-    (x) => x.r.propertyName,
-    (x) => x.r.roomLabel,
-    buildingLabels,
-  );
+  // 같은 방의 체크아웃 · 체크인은 한 줄(2026-10-28, 시안 18tu6H…) — 건물별 묶음 · 운영 순서 · 객실 번호순은 그대로.
+  const turnRows = pairByRoom(data.reservations.checkIns, data.reservations.checkOuts);
+  const resvGroups = groupByBuilding(turnRows, (x) => x.propertyName, (x) => x.roomLabel, buildingLabels);
+  const turnovers = turnRows.filter((x) => x.checkIn && x.checkOut).length;
 
   return (
     <>
@@ -400,71 +414,80 @@ function QueueBlock({
             })}
             </LiveWash>
           )}
+
+          {/* 오늘 할 일은 큐 아래로(2026-10-28) — 「해야 할 일」을 위에 모으고, 예약 현황이 아래에서 전체 폭을 쓴다. 누르면 바로 완료. */}
+          <DashboardTodos
+            copy={{
+              todoDoneToast: c.todoDoneToast,
+              todoEmpty: c.todoEmpty,
+              todoFailed: c.todoFailed,
+              todoReopenToast: c.todoReopenToast,
+              todoTitle: c.todoTitle,
+              todoToggleLabel: c.todoToggleLabel,
+              todoUndo: c.todoUndo,
+            }}
+            todos={data.todos}
+          />
         </div>
       </div>
 
       <div className="dh-sec dh-sec--line">
         <b>{c.sectTodayTitle}</b>
-      </div>
-      <div className="dh-grid">
-        <div className="dh-col5 dh-left">
-          <div className="dh-ch">
-            <span className="dh-ct">{c.todoTitle}</span>
-            <span className="dh-cc" style={{ marginLeft: "auto" }}>{data.todos.filter((t) => t.done).length} / {data.todos.length}</span>
-          </div>
-          {data.todos.length === 0 ? (
-            <div className="dh-empty">{c.todoEmpty}</div>
-          ) : (
-            <LiveWash sig={data.todos.map((t) => `${t.id}:${t.done ? 1 : 0}`).join(",")}>
-              {data.todos.map((t) => (
-                <div className={`dh-todo${t.done ? " is-done" : ""}`} data-live={`${t.id}:${t.done ? 1 : 0}`} key={t.id}>
-                  <span className="dh-todo__box">{t.done ? <Ic>{I.check}</Ic> : null}</span>
-                  <span className="dh-todo__t">{t.title}</span>
-                </div>
-              ))}
-            </LiveWash>
-          )}
+        <span className="dh-cc">
+          {c.resvCheckIn} {data.reservations.checkIns.length} · {c.resvCheckOut} {data.reservations.checkOuts.length} · {c.resvTurnover} {turnovers}
+        </span>
+        <div className="dh-sec__end">
+          <Link className="dh-link" href="/admin/calendar">{c.dhAllLink} →</Link>
         </div>
-        <div className="dh-col7 dh-right">
-          <div className="dh-ch">
-            <span className="dh-ct">{c.resvTitle}</span>
-            <Link className="dh-link" href="/admin/calendar" style={{ marginLeft: "auto" }}>{c.dhAllLink} →</Link>
-          </div>
-          {resvGroups.length === 0 ? (
-            <div className="dh-empty">{c.resvEmpty}</div>
-          ) : (
-            <LiveWash
-              move
-              sig={[...data.reservations.checkIns.map((r) => `in-${r.id}`), ...data.reservations.checkOuts.map((r) => `out-${r.id}`)].join(",")}
-            >
-            {/* 건물별로 묶는다(2026-10-22) — 머리줄에 건물 이름과 체크인 · 체크아웃 수, 줄에는 객실 · 손님 · 채널. */}
-            {resvGroups.map((g) => {
-              const ins = g.items.filter((x) => x.isIn).length;
-              return (
-                <div className="dh-bgrp" key={g.key}>
-                  <div className="dh-bgrp__h">
-                    <span className="dh-bgrp__t">{g.label}</span>
-                    <span className="dh-cc">
-                      {c.resvCheckIn} {ins} · {c.resvCheckOut} {g.items.length - ins}
-                    </span>
-                  </div>
-                  {g.items.map(({ r, key, isIn }) => (
-                    <div className="dh-row" data-live={key} key={key} style={{ cursor: "default" }}>
-                      <span className="dh-room">{localizeRoomPlaceLabel(r.roomLabel, buildingLabels)}</span>
-                      <div className="dh-rb">
-                        <div className="dh-rt" style={{ fontWeight: 500 }}>{r.guestName}</div>
-                        {r.source ? <div className="dh-rs">{r.source}</div> : null}
-                      </div>
-                      <span className={`dh-kind${isIn ? " dh-kind--in" : ""}`}>{isIn ? c.resvCheckIn : c.resvCheckOut}</span>
+      </div>
+      {resvGroups.length === 0 ? (
+        <div className="dh-empty">{c.resvEmpty}</div>
+      ) : (
+        <>
+          {/* 건물 묶음을 신문처럼 여러 단으로(넓으면 3단, 1280 이면 2단) — 하루 치가 스크롤 없이 한 화면에. 단을 넘나드는 줄이
+              생겨 `move`(위에서 끼어드는 움직임)는 쓰지 않고 새 줄 물들기만. */}
+          <LiveWash sig={turnRows.map((x) => x.key).join(",")}>
+            <div className="dh-turns">
+              {resvGroups.map((g) => {
+                const ins = g.items.filter((x) => x.checkIn).length;
+                const outs = g.items.filter((x) => x.checkOut).length;
+                return (
+                  <section className="dh-turn" key={g.key}>
+                    <div className="dh-turn__h">
+                      <h3 className="dh-turn__t">{g.label}</h3>
+                      <span className="dh-cc">{c.resvCheckIn} {ins} · {c.resvCheckOut} {outs}</span>
                     </div>
-                  ))}
-                </div>
-              );
-            })}
-            </LiveWash>
-          )}
-        </div>
-      </div>
+                    <div className="dh-turn__cols" aria-hidden="true">
+                      <span>{c.resvRoom}</span>
+                      <span>{c.resvCheckOut}</span>
+                      <span>{c.resvCheckIn}</span>
+                    </div>
+                    {g.items.map((x) => (
+                      <div className="dh-turn__row" data-live={x.key} key={x.key}>
+                        {/* 방이 하나뿐인 건물(오쿠보 등)은 객실 표시가 비어 온다 — 건물 이름을 대신 쓴다. */}
+                        <span className="dh-turn__room">{x.roomLabel ? localizeRoomPlaceLabel(x.roomLabel, buildingLabels) : g.label}</span>
+                        <span className="dh-turn__out">
+                          {x.checkOut ? <span className="sr-only">{c.resvCheckOut} </span> : null}
+                          <GuestCell row={x.checkOut} />
+                        </span>
+                        <span className="dh-turn__in">
+                          {x.checkIn ? <span className="sr-only">{c.resvCheckIn} </span> : null}
+                          <GuestCell row={x.checkIn} />
+                        </span>
+                      </div>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
+          </LiveWash>
+          <div className="dh-ch-legend">
+            <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--airbnb" />Airbnb</span>
+            <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--booking" />Booking.com</span>
+            <span><i aria-hidden="true" className="dh-ch-dot dh-ch-dot--direct" />{c.resvDirect}</span>
+          </div>
+        </>
+      )}
     </>
   );
 }

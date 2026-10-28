@@ -12,7 +12,7 @@ import {
   tokyoMs,
   tokyoParts,
 } from "@/lib/ops-recent-bookings-range";
-import { ListLoading } from "./ops-price-wins-panel";
+import { ListFailed, ListLoading } from "./ops-price-wins-panel";
 import { useBuildingName } from "@/components/shared/building-names";
 import "./ops-calendar-tools-white.css";
 
@@ -56,6 +56,8 @@ export type RecentBookingsCopy = {
   rbWinHours: string;
   pwAllProperties: string;
   pwLoading: string;
+  listLoadFailed: string;
+  listRetry: string;
   pwBookedAt: string;
   rcClose: string;
   datePrev: string;
@@ -115,22 +117,27 @@ function activePreset(range: RecentRange | null): number | null {
 export function OpsRecentBookingsPanel({
   bookings,
   copy,
+  failed = false,
   localeTag,
   onApplyRange,
   onClose,
   onOpenReservation,
   onResetRange,
+  onRetry,
   propertyName,
   range,
 }: {
   /** `null` = 받는 중. */
   bookings: OpsRecentBooking[] | null;
   copy: RecentBookingsCopy;
+  /** 못 받았다(서버 읽기 실패) — 「불러오지 못했어요 · 다시 시도」. `bookings` 는 `null`. */
+  failed?: boolean;
   localeTag: string;
   onApplyRange: (from: string, to: string) => void;
   onClose: () => void;
   onOpenReservation: (booking: OpsRecentBooking) => void;
   onResetRange: () => void;
+  onRetry?: () => void;
   propertyName: string | null;
   range: RecentRange | null;
 }) {
@@ -204,7 +211,7 @@ export function OpsRecentBookingsPanel({
                 {copy.rbTitle} · {propertyName ?? copy.pwAllProperties}
               </span>
               <b className="stw-h__title">
-                {bookings ? copy.rbCount.replace("{n}", String(list.length)) : copy.pwLoading}
+                {bookings ? copy.rbCount.replace("{n}", String(list.length)) : failed ? copy.listLoadFailed : copy.pwLoading}
                 {range && (
                   <span className="stw-h__aside">
                     {" · "}
@@ -271,7 +278,9 @@ export function OpsRecentBookingsPanel({
         </div>
 
         <div className="panel__body stw-body">
-          {bookings === null ? (
+          {failed ? (
+            <ListFailed label={copy.listLoadFailed} onRetry={onRetry} retryLabel={copy.listRetry} />
+          ) : bookings === null ? (
             <ListLoading label={copy.pwLoading} />
           ) : list.length === 0 ? (
             <p className="stw-empty">{copy.rbEmpty}</p>

@@ -425,9 +425,13 @@ export function MobileOpsCalendar({
 
   // ── 가격 개입 성공(데스크톱과 같은 판정 · 같은 지연 로드) ─────────────────────────
   const [priceWinsOnly, setPriceWinsOnly] = useState(false);
-  const [conversionsState, setConversionsState] = useState<{ propertyKey: string; list: OpsPriceConversion[] } | null>(
-    null,
-  );
+  const [conversionsState, setConversionsState] = useState<{
+    propertyKey: string;
+    list: OpsPriceConversion[];
+    /** 서버 읽기 실패(2026-10-28) — 「0건」이 아니라 「불러오지 못했어요 · 다시 시도」. */
+    failed?: boolean;
+  } | null>(null);
+  const [conversionsRetry, setConversionsRetry] = useState(0);
   const propertyKey = selectedProperties.join("\n");
   // 보고 있는 창 × 건물만(2026-10-02 사용자 지시 — 달을 넘겨도 지난 목록이 남던 것). 바뀌면 「불러오는 중」부터.
   const windowStart = days[0]?.date ?? "";
@@ -442,13 +446,21 @@ export function MobileOpsCalendar({
       properties: propertyKey ? propertyKey.split("\n") : [],
       start: windowStart,
     }).then((result) => {
-      if (!result.ok || requestId !== conversionsRequestRef.current) return;
+      if (requestId !== conversionsRequestRef.current) return;
+      if (!result.ok) {
+        // 같은 창에서 이미 받은 목록이 있으면 그대로 둔다 — 처음부터 못 받았을 때만 실패로(데스크톱과 같다).
+        setConversionsState((prev) =>
+          prev && prev.propertyKey === conversionsKey && !prev.failed ? prev : { failed: true, list: [], propertyKey: conversionsKey },
+        );
+        return;
+      }
       setConversionsState({ list: result.conversions, propertyKey: conversionsKey });
     });
     // 서버 데이터가 새로 올 때마다(= 새 예약이 들어왔을 수 있다) 다시 판정한다 — 데스크톱과 같다.
-  }, [conversionsKey, days.length, propertyKey, rows, windowStart]);
+  }, [conversionsKey, conversionsRetry, days.length, propertyKey, rows, windowStart]);
+  const conversionsFailed = Boolean(conversionsState?.failed && conversionsState.propertyKey === conversionsKey);
   const priceConversions = useMemo(() => {
-    if (!conversionsState || conversionsState.propertyKey !== conversionsKey) return null;
+    if (!conversionsState || conversionsState.failed || conversionsState.propertyKey !== conversionsKey) return null;
     const visible = new Set(serverRooms.map((room) => room.key));
     return conversionsState.list.filter((conversion) => visible.has(conversion.roomKey));
   }, [conversionsState, conversionsKey, serverRooms]);
@@ -1517,7 +1529,7 @@ export function MobileOpsCalendar({
           type="button"
         >
           {copy.pwToggle}
-          <b>{priceConversions ? priceConversions.length : "…"}</b>
+          <b>{priceConversions ? priceConversions.length : conversionsFailed ? "!" : "…"}</b>
         </button>
         <button aria-haspopup="dialog" className="mops-chip" onClick={() => setOverlay({ kind: "wins" })} type="button">
           {copy.pwList}
@@ -1533,7 +1545,7 @@ export function MobileOpsCalendar({
           type="button"
         >
           {copy.rbToggle}
-          <b>{recentBookings ? recentBookings.length : "…"}</b>
+          <b>{recentBookings ? recentBookings.length : recent.failed ? "!" : "…"}</b>
         </button>
         {recentOnly && (
           <button aria-haspopup="dialog" className="mops-chip dashed" onClick={() => setOverlay({ kind: "recent" })} type="button">
@@ -2094,6 +2106,8 @@ export function MobileOpsCalendar({
             <OpsPriceWinsPanel
               conversions={priceConversions}
               copy={copy}
+              failed={conversionsFailed}
+              onRetry={() => setConversionsRetry((tick) => tick + 1)}
               localeTag={copy.localeTag}
               onClose={close}
               onOpenReservation={(conversion) =>
@@ -2167,6 +2181,8 @@ export function MobileOpsCalendar({
                     : null
               }
               range={recent.range}
+              failed={recent.failed}
+              onRetry={recent.retry}
             />
           </div>
           )}

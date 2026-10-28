@@ -1328,7 +1328,10 @@ export function OpsCalendarGrid({
   const [conversionsState, setConversionsState] = useState<{
     propertyKey: string;
     list: OpsPriceConversion[];
+    /** 서버 읽기 실패(2026-10-28) — 「0건」이 아니라 「불러오지 못했어요 · 다시 시도」. */
+    failed?: boolean;
   } | null>(null);
+  const [conversionsRetry, setConversionsRetry] = useState(0);
   /**
    * 고른 건물 목록을 **문자열 하나**로 — 서버가 새로고침마다 새 배열을 보내도 같은 선택이면 같은 값이라
    * 목록이 「불러오는 중」으로 깜빡이지 않는다. 건물 이름에 줄바꿈은 없다.
@@ -1347,13 +1350,21 @@ export function OpsCalendarGrid({
       properties: propertyKey ? propertyKey.split("\n") : [],
       start: windowStart,
     }).then((result) => {
-      if (!result.ok || requestId !== conversionsRequestRef.current) return;
+      if (requestId !== conversionsRequestRef.current) return;
+      if (!result.ok) {
+        // 같은 창에서 이미 받은 목록이 있으면 그대로 둔다(새로고침만 실패) — 처음부터 못 받았을 때만 실패로.
+        setConversionsState((prev) =>
+          prev && prev.propertyKey === conversionsKey && !prev.failed ? prev : { failed: true, list: [], propertyKey: conversionsKey },
+        );
+        return;
+      }
       setConversionsState({ list: result.conversions, propertyKey: conversionsKey });
     });
-  }, [conversionsKey, days.length, propertyKey, refreshGeneration, windowStart]);
-  /** 보이는 객실 것만(건물 필터를 따른다). `null` = 아직 받는 중. */
+  }, [conversionsKey, conversionsRetry, days.length, propertyKey, refreshGeneration, windowStart]);
+  const conversionsFailed = Boolean(conversionsState?.failed && conversionsState.propertyKey === conversionsKey);
+  /** 보이는 객실 것만(건물 필터를 따른다). `null` = 아직 받는 중(또는 실패 — `conversionsFailed`). */
   const priceConversions = useMemo(() => {
-    if (!conversionsState || conversionsState.propertyKey !== conversionsKey) return null;
+    if (!conversionsState || conversionsState.failed || conversionsState.propertyKey !== conversionsKey) return null;
     const visible = new Set(serverRooms.map((room) => room.key));
     return conversionsState.list.filter((conversion) => visible.has(conversion.roomKey));
   }, [conversionsState, conversionsKey, serverRooms]);
@@ -2465,7 +2476,7 @@ export function OpsCalendarGrid({
                   >
                     {copy.pwToggle}
                     {/* 판정은 격자가 그린 뒤 따로 온다 — 그 사이에는 숫자 대신 말줄임. */}
-                    <b className="scw-tb__n">{priceConversions ? priceConversions.length : "…"}</b>
+                    <b className="scw-tb__n">{priceConversions ? priceConversions.length : conversionsFailed ? "!" : "…"}</b>
                   </button>
                   {/* 최근 예약 — 가격을 건드리지 않았는데 정한 시간대에 들어온 예약. 시간대는 열린 목록에서 바꾼다. */}
                   <button
@@ -2482,7 +2493,7 @@ export function OpsCalendarGrid({
                     type="button"
                   >
                     {copy.rbToggle}
-                    <b className="scw-tb__n">{recentBookings ? recentBookings.length : "…"}</b>
+                    <b className="scw-tb__n">{recentBookings ? recentBookings.length : recent.failed ? "!" : "…"}</b>
                   </button>
                   {/* 이력 · 전송 로그 — 실패 · 멈춘 작업이 있으면 빨간 점 + 「실패 N」. */}
                   <button
@@ -3052,6 +3063,8 @@ export function OpsCalendarGrid({
                 : null
           }
           range={recent.range}
+          failed={recent.failed}
+          onRetry={recent.retry}
         />
       )}
 
@@ -3059,6 +3072,8 @@ export function OpsCalendarGrid({
         <OpsPriceWinsPanel
           conversions={priceConversions}
           copy={copy}
+          failed={conversionsFailed}
+          onRetry={() => setConversionsRetry((tick) => tick + 1)}
           localeTag={copy.localeTag}
           onClose={() => setPriceWinsOpen(false)}
           onOpenReservation={(conversion) => {

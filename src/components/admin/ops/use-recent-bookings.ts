@@ -44,6 +44,9 @@ export function useRecentBookings(args: {
     return () => window.clearInterval(timer);
   }, [activeCustom]);
 
+  // 다시 시도 — 요청 키에 넣어 같은 조건으로 한 번 더 받는다(2026-10-28).
+  const [retryTick, setRetryTick] = useState(0);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const [state, setState] = useState<{
     key: string;
     bookings: OpsRecentBooking[];
@@ -52,7 +55,7 @@ export function useRecentBookings(args: {
     isDefault: boolean;
     endsNow: boolean;
   } | null>(null);
-  const requestKey = `${propertyKey}#${windowStart}#${days}#${activeCustom?.from ?? ""}#${activeCustom?.to ?? ""}#${dayKey}#${activeCustom ? 0 : rollTick}`;
+  const requestKey = `${propertyKey}#${windowStart}#${days}#${activeCustom?.from ?? ""}#${activeCustom?.to ?? ""}#${dayKey}#${activeCustom ? 0 : rollTick}#${retryTick}`;
   const requestRef = useRef(0);
   useEffect(() => {
     requestRef.current += 1;
@@ -65,7 +68,12 @@ export function useRecentBookings(args: {
       start: windowStart,
       to: activeCustom?.to ?? null,
     }).then((result) => {
-      if (!result.ok || requestId !== requestRef.current) return;
+      if (requestId !== requestRef.current) return;
+      // 못 받으면 「받는 중」에 멈춰 두지 않는다 — 화면이 실패와 「다시 시도」를 띄운다.
+      if (!result.ok) {
+        setFailedKey(requestKey);
+        return;
+      }
       setState({
         bookings: result.bookings,
         endsNow: result.endsNow,
@@ -80,13 +88,16 @@ export function useRecentBookings(args: {
   const current = state && state.key === requestKey ? state : null;
   return useMemo(
     () => ({
-      /** `null` = 받는 중. */
+      /** `null` = 받는 중(또는 실패 — `failed`). */
       bookings: current?.bookings ?? null,
+      /** 지금 조건으로 못 받았다(서버 읽기 실패). */
+      failed: !current && failedKey === requestKey,
+      retry: () => setRetryTick((tick) => tick + 1),
       range: current ? { endsNow: current.endsNow, from: current.from, isDefault: current.isDefault, to: current.to } : null,
       /** 직접 지정 — 시작 · 끝 ISO. 오늘(도쿄)만 유지된다. */
       setRange: (from: string, to: string) => setCustom({ day: tokyoDateOf(Date.now()), from, to }),
       resetRange: () => setCustom(null),
     }),
-    [current],
+    [current, failedKey, requestKey],
   );
 }

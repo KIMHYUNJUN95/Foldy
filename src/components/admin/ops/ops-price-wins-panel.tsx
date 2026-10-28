@@ -36,6 +36,8 @@ export type PriceWinsCopy = {
   pwBookedAt: string;
   pwEmpty: string;
   pwLoading: string;
+  listLoadFailed: string;
+  listRetry: string;
   pwScopeNote: string;
   pwHoursAfter: string;
   pwTapHint: string;
@@ -65,8 +67,10 @@ const shortDate = (date: string) => date.slice(5).replace("-", "/");
 export function OpsPriceWinsPanel({
   conversions,
   copy,
+  failed = false,
   localeTag,
   onClose,
+  onRetry,
   onOpenReservation,
   propertyName,
   windowLabel,
@@ -77,8 +81,11 @@ export function OpsPriceWinsPanel({
    */
   conversions: OpsPriceConversion[] | null;
   copy: PriceWinsCopy;
+  /** 판정을 못 받았다(서버 읽기 실패) — 「불러오지 못했어요 · 다시 시도」. `conversions` 는 `null`. */
+  failed?: boolean;
   localeTag: string;
   onClose: () => void;
+  onRetry?: () => void;
   onOpenReservation: (conversion: OpsPriceConversion) => void;
   /** 건물 필터. 없으면 전체. */
   propertyName: string | null;
@@ -112,7 +119,7 @@ export function OpsPriceWinsPanel({
                 {copy.pwTitle} · {propertyName ?? copy.pwAllProperties}
               </span>
               <b className="stw-h__title">
-                {conversions ? copy.pwCount.replace("{n}", String(list.length)) : copy.pwLoading}
+                {conversions ? copy.pwCount.replace("{n}", String(list.length)) : failed ? copy.listLoadFailed : copy.pwLoading}
                 {averageHours !== null && (
                   <span className="stw-h__aside"> · {copy.pwAverage.replace("{h}", String(averageHours))}</span>
                 )}
@@ -130,7 +137,9 @@ export function OpsPriceWinsPanel({
         </div>
 
         <div className="panel__body stw-body">
-          {conversions === null ? (
+          {failed ? (
+            <ListFailed label={copy.listLoadFailed} onRetry={onRetry} retryLabel={copy.listRetry} />
+          ) : conversions === null ? (
             <ListLoading label={copy.pwLoading} />
           ) : list.length === 0 ? (
             <p className="stw-empty">{copy.pwEmpty}</p>
@@ -188,6 +197,20 @@ export function OpsPriceWinsPanel({
         </div>
       </aside>
     </>
+  );
+}
+
+/** 못 받았다(2026-10-28) — 빈 목록 대신 실패라고 말하고 다시 받게 한다. 「0건」처럼 보이면 안 된다. */
+export function ListFailed({ label, onRetry, retryLabel }: { label: string; onRetry?: () => void; retryLabel: string }) {
+  return (
+    <div className="stw-empty" role="alert">
+      <p className="stw-msg is-warn">{label}</p>
+      {onRetry ? (
+        <button className="stw-link" onClick={onRetry} type="button">
+          {retryLabel}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

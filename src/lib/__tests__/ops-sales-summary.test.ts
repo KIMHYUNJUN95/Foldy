@@ -199,6 +199,9 @@ describe("legacy helpers", () => {
     expect(isSalesCountedReservation({ raw: { status: "new" }, status: "no_show" })).toBe(true);
     expect(isSalesCountedReservation({ raw: { status: "confirmed" }, status: "cancelled" })).toBe(false);
     expect(isSalesCountedReservation({ raw: { status: "request" }, status: "confirmed" })).toBe(false);
+    // 가격 개입 전환이 이 필터를 같이 씀(2026-10-28) — 운영에 raw inquiry 인데 status confirmed 인 줄이 실제로 있다.
+    expect(isSalesCountedReservation({ raw: { status: "inquiry" }, status: "confirmed" })).toBe(false);
+    expect(isSalesCountedReservation({ raw: { status: "black" }, status: "confirmed" })).toBe(false);
     expect(isSalesCountedReservation({ raw: {}, status: "confirmed" })).toBe(true);
   });
 

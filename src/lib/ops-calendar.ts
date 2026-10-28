@@ -1505,29 +1505,25 @@ export async function getOpsPriceConversions(
         .range(from, to),
     ),
   ]);
-  if (roomRowsResult.error) {
-    console.error("[ops-calendar] room read failed", roomRowsResult.error);
-  }
-  if (logsResult.error) {
-    console.error("[ops-calendar] price attribution log read failed", logsResult.error);
-  }
-  const roomCatalog = roomRowsResult.error
-    ? undefined
-    : buildActiveRoomCatalog(roomRowsResult.data, { includeNonOperationalProperties: true });
+  // 읽기에 실패하면 **던진다**(2026-10-28) — 예전엔 기록만 남기고 빈 판정을 돌려줘 화면이 「가격 개입 성공 0」을 진짜 0건처럼
+  // 보였고, 최근 예약의 「가격 개입」 표시도 조용히 빠졌다. 호출부(`reads.ts`)가 받아 「불러오지 못했어요 · 다시 시도」로 띄운다.
+  if (roomRowsResult.error) throw new Error(`room read failed: ${roomRowsResult.error.message}`);
+  if (logsResult.error) throw new Error(`price attribution log read failed: ${logsResult.error.message}`);
+  const roomCatalog = buildActiveRoomCatalog(roomRowsResult.data, { includeNonOperationalProperties: true });
   const reservationRoomAxis = makeReservationRoomAxis(roomCatalog);
-  const { roomKeyByUuid } = mapRoomUnits(roomRowsResult.error ? [] : roomRowsResult.data);
+  const { roomKeyByUuid } = mapRoomUnits(roomRowsResult.data);
 
   const cells: AttributionCell[] = [];
   // 우리 작업이 쓴 칸(방·날짜·값 → 시각). 워커가 Beds24 에 쓰고 **우리 표를 고치기 전 몇 초 사이**에
   // 요금 동기화가 돌면 같은 변경이 「Beds24」로 한 번 더 남는다 — 그건 우리 개입이다.
   const jobWrites = new Map<string, number[]>();
-  for (const row of logsResult.data ?? []) {
+  for (const row of logsResult.data) {
     if (!row.job_id || !row.room_id) continue;
     const key = `${row.room_id}|${row.stay_date}|${row.new_value}`;
     jobWrites.set(key, [...(jobWrites.get(key) ?? []), Date.parse(row.created_at)]);
   }
   const DUPLICATE_WINDOW_MS = 15 * 60 * 1000;
-  for (const row of logsResult.data ?? []) {
+  for (const row of logsResult.data) {
     const roomKey = row.room_id ? roomKeyByUuid.get(row.room_id) : undefined;
     if (!roomKey) continue;
     if (!row.job_id) {
@@ -1561,24 +1557,27 @@ export async function getOpsPriceConversions(
 
   const stayDates = visibleCells.map((cell) => cell.stayDate).sort();
   // 바꾼 날짜를 덮는 확정 예약 전부 — 「그때 비어 있었나」를 재려면 창 밖 예약도 필요하다.
+  // 원본 `status` 도 읽는다 — 문의 · 차단(원본 `inquiry` · `request` · `black` …)은 우리 표에 `confirmed` 로 적혀도 예약이
+  // 아니다(2026-10-28 — 최근 예약 · 매출 요약과 같은 `isSalesCountedReservation`). 예전엔 이 거르기가 없어 가격을 바꾼 뒤
+  // 들어온 문의가 「성공」으로 잡히거나, 그 날짜를 「이미 차 있었다」로 만들어 진짜 성공을 놓칠 수 있었다.
   const bookingsResult = await readAllPages<Record<string, unknown>>((from, to) =>
     supabase
       .from("reservations")
-      .select(RESERVATION_SELECT)
+      .select(`${RESERVATION_SELECT}, sp_status:raw_payload->status`)
       .eq("organization_id", session.organization.id)
       .lte("check_in_date", stayDates[stayDates.length - 1])
       .gt("check_out_date", stayDates[0])
       .order("check_in_date", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to) as unknown as SlimReservationPage,
-  ).then(toReservationRows);
-  if (bookingsResult.error) {
-    console.error("[ops-calendar] price attribution booking read failed", bookingsResult.error);
-  }
+  );
+  if (bookingsResult.error) throw new Error(`price attribution booking read failed: ${bookingsResult.error.message}`);
   const attributionBookings: AttributionReservation[] = [];
   const shown = new Map<string, { row: ReservationRow; roomKey: string; propertyName: string; label: string }>();
-  for (const row of bookingsResult.data ?? []) {
+  for (const rawRow of bookingsResult.data) {
+    const row = toReservationRow(rawRow);
     if (row.status === "cancelled" || row.status === "no_show") continue;
+    if (!isSalesCountedReservation({ raw: { status: rawRow.sp_status }, status: row.status })) continue;
     if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
     const axis = reservationRoomAxis(row);
     const raw =

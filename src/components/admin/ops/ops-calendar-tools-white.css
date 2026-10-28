@@ -198,6 +198,17 @@
 
 .adm .stw-seg.is-fill > button { padding: 0 4px; }
 .adm .stw-rb__range { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+/* 가격 개입 표시(2026-10-28) — 머리 「손대지 않음 N · 가격 개입 N」, 이름 옆 옅은 보라 표시, 이전 → 이후 한 줄. */
+.adm .stw-rb__split { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 4px; font-size: 13px; color: var(--stw-ink2); }
+.adm .stw-rb__sep { color: var(--stw-faint2); }
+.adm .stw-rb__wincount { display: inline-flex; align-items: center; gap: 5px; }
+.adm .stw-rb__namerow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.adm .stw-rb__wintag {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border-radius: 5px;
+  background: var(--stw-v-soft); font-size: 11.5px; font-weight: 600; color: var(--stw-v-ink); white-space: nowrap;
+}
+.adm .stw-rb__wintag svg { width: 11px; height: 11px; stroke-width: 2.4; }
+.adm .stw-rb__winline { font-size: 11.5px; line-height: 1.45; color: var(--stw-v-ink); overflow-wrap: anywhere; }
 
 /* 모바일 시트 안 — 머리 · 탭 · 줄을 손가락 크기로(44px). 닫기 X 는 시트 계약상 숨긴다(mobile-ops-calendar.css). */
 .adm.mops-side .stw-h__title { font-size: 20px; }
@@ -210,6 +221,9 @@
 .adm.mops-side .stw-row { min-height: 64px; }
 .adm.mops-side .stw-row__name { font-size: 15px; }
 .adm.mops-side .stw-row__sub { font-size: 13px; }
+.adm.mops-side .stw-rb__split { font-size: 14px; }
+.adm.mops-side .stw-rb__wintag { height: 20px; font-size: 12px; }
+.adm.mops-side .stw-rb__winline { font-size: 12px; }
 .adm.mops-side .stw-btn { height: 40px; }
 .adm.mops-side .stw-body { scrollbar-width: none; }
 .adm.mops-side .stw-body::-webkit-scrollbar { display: none; }

@@ -325,6 +325,8 @@
 .adm .scw .opsg__bar.cancelled { background: #efeff3; color: var(--scw-faint); box-shadow: none; text-decoration: line-through; }
 .adm .scw .opsg__bar.pw-dim { opacity: 0.35; }
 .adm .scw .opsg__bar.pw-win { background: var(--scw-v); color: #fff; font-weight: 600; box-shadow: none; }
+/* 최근 예약을 켰을 때 가격 개입에도 잡힌 막대 — 이름 앞 내림 화살표(2026-10-28). */
+.opsg__winmark { display: inline-block; width: 11px; height: 11px; margin-right: 3px; vertical-align: -1px; stroke-width: 2.6; flex: none; }
 .adm .scw .opsg__bar:active { transform: scale(0.99); }
 .adm .scw .opsg__block {
   height: 15px; top: 3px; border-radius: 8px; background: var(--scw-ink); font-size: 9px; font-weight: 700; letter-spacing: 0.06em;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { TrendingDown, X } from "lucide-react";
 import { AdminDateRangePicker } from "@/components/admin/shared/admin-date-range-picker";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { OpsRecentBooking } from "@/lib/ops-calendar";
@@ -29,6 +29,9 @@ import "./ops-calendar-tools-white.css";
  * 화이트 리디자인(2026-10-16, 시안 SalesRecent-PC · Phone): 머리 「N건 · 24시간」 + 빠른 시간대 탭(1 · 6 · 24 · 48시간 ·
  * 3일 — 48시간 = 기본) + 날짜로 고르기(기존 범위 달력). 빠른 탭은 「지금부터 N시간 전 ~ 지금」을 직접 지정으로 보낸다
  * (`onApplyRange` — 서버가 끝을 지금으로 자른다). 줄 = 채널 점 · 손님 · 금액 / 객실 · 숙박 · 몇 분(시간) 전 / 채널 · 예약 시각.
+ *
+ * 가격 개입 표시(2026-10-28, 시안 62BkW7…): 가격 개입 성공에도 잡힌 예약은 빼지 않고 이름 옆 「가격 개입」 표시 + 이전 →
+ * 이후 · 몇 시간 만에 한 줄. 머리 아래 「손대지 않음 N · 가격 개입 N」(가격 개입이 하나라도 있을 때만).
  */
 
 export type RecentBookingsCopy = {
@@ -46,6 +49,11 @@ export type RecentBookingsCopy = {
   rbAgoMin: string;
   rbPresetHours: string;
   rbPresetDays: string;
+  rbPlainCount: string;
+  rbWinCount: string;
+  rbWinTag: string;
+  rbWinLine: string;
+  rbWinHours: string;
   pwAllProperties: string;
   pwLoading: string;
   pwBookedAt: string;
@@ -130,6 +138,7 @@ export function OpsRecentBookingsPanel({
   const bName = useBuildingName();
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { quietRestore: true });
   const list = bookings ?? [];
+  const winCount = list.filter((row) => row.priceWin).length;
   const [invalid, setInvalid] = useState(false);
   const [nowMsForRange] = useState(() => Date.now());
   const today = tokyoDateOf(nowMsForRange);
@@ -166,6 +175,18 @@ export function OpsRecentBookingsPanel({
     const { from, to } = presetRange(hours);
     onApplyRange(from, to);
   };
+  /** 「¥14,800 → ¥13,600 (−8%) · 바꾸고 6시간 만에」 — 이전 가격을 모르면 시간만. */
+  const winLine = (win: NonNullable<OpsRecentBooking["priceWin"]>) => {
+    const hours = String(Math.round(win.hoursToBooking));
+    if (win.oldAverage === null || win.newAverage === null) return copy.rbWinHours.replace("{h}", hours);
+    const pct = win.percent === null ? "" : `${win.percent > 0 ? "+" : win.percent < 0 ? "−" : ""}${Math.abs(win.percent)}%`;
+    return copy.rbWinLine
+      .replace("{from}", money(win.oldAverage))
+      .replace("{to}", money(win.newAverage))
+      .replace(" ({pct})", pct ? ` (${pct})` : "")
+      .replace("（{pct}）", pct ? `（${pct}）` : "")
+      .replace("{h}", hours);
+  };
   const ago = (iso: string) => {
     const minutes = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60_000));
     if (minutes < 60) return copy.rbAgoMin.replace("{m}", String(minutes));
@@ -192,6 +213,16 @@ export function OpsRecentBookingsPanel({
                 )}
               </b>
               <span className="stw-h__sub">{range ? recentRangeLabel(range, copy.rbNow) : "…"}</span>
+              {bookings && winCount > 0 ? (
+                <span className="stw-rb__split">
+                  <span>{copy.rbPlainCount.replace("{n}", String(list.length - winCount))}</span>
+                  <span aria-hidden="true" className="stw-rb__sep">·</span>
+                  <span className="stw-rb__wincount">
+                    <i aria-hidden="true" className="stw-dot is-v" />
+                    {copy.rbWinCount.replace("{n}", String(winCount))}
+                  </span>
+                </span>
+              ) : null}
             </div>
             <button aria-label={copy.rcClose} className="panel__x stw-x" onClick={onClose} type="button">
               <X />
@@ -251,7 +282,17 @@ export function OpsRecentBookingsPanel({
                   <button className="stw-row has-dot" onClick={() => onOpenReservation(row)} type="button">
                     <i aria-hidden="true" className={`stw-chdot is-${row.channel}`} />
                     <span className="stw-row__l">
-                      <b className="stw-row__name">{row.guestName}</b>
+                      {row.priceWin ? (
+                        <span className="stw-rb__namerow">
+                          <b className="stw-row__name">{row.guestName}</b>
+                          <span className="stw-rb__wintag">
+                            <TrendingDown aria-hidden="true" />
+                            {copy.rbWinTag}
+                          </span>
+                        </span>
+                      ) : (
+                        <b className="stw-row__name">{row.guestName}</b>
+                      )}
                       <span className="stw-row__sub">
                         {bName(row.propertyName)} {row.roomLabel === row.propertyName ? "" : row.roomLabel} · {shortDate(row.checkIn)} → {shortDate(row.checkOut)}
                       </span>
@@ -259,6 +300,7 @@ export function OpsRecentBookingsPanel({
                         {CHANNEL_LABEL[row.channel] ?? row.channel} ·{" "}
                         {copy.pwBookedAt.replace("{time}", stamp(row.bookedAt, localeTag))}
                       </span>
+                      {row.priceWin ? <span className="stw-rb__winline">{winLine(row.priceWin)}</span> : null}
                     </span>
                     <span className="stw-row__r">
                       <b className="stw-row__amt">{row.amount > 0 ? money(row.amount) : "—"}</b>

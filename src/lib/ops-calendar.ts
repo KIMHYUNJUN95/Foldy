@@ -1648,16 +1648,31 @@ export type OpsRecentBooking = {
   bookedAt: string;
   /** 예약 금액(매출 요약과 같은 읽기 — `invoiceItems` 합 → `price` → `amount`). 모르면 0. */
   amount: number;
+  /**
+   * 가격 개입 성공에도 잡혔으면 그 판정(2026-10-28 — 예전엔 목록에서 뺐다, 이제 표시만 붙인다). 아니면 `null`.
+   * 이전 → 이후는 그 예약의 바꾼 밤 평균.
+   */
+  priceWin: { oldAverage: number | null; newAverage: number | null; percent: number | null; hoursToBooking: number } | null;
 };
 
 /**
- * **최근 예약** — 정한 시간대(`fromMs` ≤ 예약 시각 < `toMs`)에 들어온 확정 예약 중 **가격 개입 성공에 잡힌 것을 뺀**
- * 순수 예약(2026-10-05 사용자 결정). 가격 개입 성공이 「가격을 바꿔서 팔렸다」라면 이건 「손대지 않았는데 팔리고
- * 있다」 — 수요가 붙는 날을 찾아 값을 올릴지 보는 용도다.
+ * **최근 예약** — 정한 시간대(`fromMs` ≤ 예약 시각 < `toMs`)에 들어온 확정 예약 **전부**. 가격 개입 성공에도 잡힌
+ * 예약은 빼지 않고 `priceWin` 을 붙인다(2026-10-28 사용자 결정 — 예전 2026-10-05 「뺀다」를 바꿈: 빼면 건수가 Beds24 와
+ * 어긋나고, 가격 개입은 추정이라 실제 예약을 숨기면 안 된다). 화면은 「손대지 않음 N · 가격 개입 N」으로 나눠 보여 준다.
  *
  * 범위는 가격 개입 성공과 같다 — **보고 있는 창에 숙박이 걸친 예약 × 고른 건물**. 예약 시각은 Beds24 `bookingTime`
- * (격자 · 가격 개입 판정과 같은 값), 없으면 넣지 않는다. 판정 대조를 위해 같은 창의 가격 개입 판정을 함께 돌린다.
+ * (격자 · 가격 개입 판정과 같은 값), 없으면 넣지 않는다. 표시를 붙이려고 같은 창의 가격 개입 판정을 함께 돌린다.
  */
+function priceWinOf(conversion: OpsPriceConversion | undefined): OpsRecentBooking["priceWin"] {
+  if (!conversion) return null;
+  return {
+    hoursToBooking: conversion.hoursToBooking,
+    newAverage: conversion.newAverage,
+    oldAverage: conversion.oldAverage,
+    percent: conversion.percent,
+  };
+}
+
 export async function getOpsRecentBookings(
   session: AppSession,
   filters: { properties?: readonly string[]; start: string; end: string; fromMs: number; toMs: number },
@@ -1683,14 +1698,13 @@ export async function getOpsRecentBookings(
   if (bookingsResult.error) throw new Error(bookingsResult.error.message);
   const roomCatalog = buildActiveRoomCatalog(roomRowsResult.data, { includeNonOperationalProperties: true });
   const reservationRoomAxis = makeReservationRoomAxis(roomCatalog);
-  const priceWon = new Set(conversions.map((conversion) => conversion.reservationId));
+  const priceWon = new Map(conversions.map((conversion) => [conversion.reservationId, conversion]));
   const wanted = new Set(filters.properties ?? []);
 
   const result: OpsRecentBooking[] = [];
   for (const raw of bookingsResult.data) {
     const row = toReservationRow(raw);
     if (row.status === "cancelled" || row.status === "no_show") continue;
-    if (priceWon.has(row.id)) continue;
     if (isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
     const bookingTime = (row.raw_payload as Record<string, unknown> | null)?.bookingTime;
     const bookedAtMs = typeof bookingTime === "string" ? Date.parse(bookingTime) : NaN;
@@ -1711,6 +1725,7 @@ export async function getOpsRecentBookings(
       checkIn: row.check_in_date,
       checkOut: row.check_out_date,
       guestName: row.guest_name,
+      priceWin: priceWinOf(priceWon.get(row.id)),
       propertyName: axis.propertyName,
       reservationId: row.id,
       roomKey: axis.roomKey,

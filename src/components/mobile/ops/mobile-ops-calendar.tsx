@@ -4,7 +4,7 @@ import { memo, useEffect, useMemo, useRef, useState, useTransition } from "react
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, TrendingDown } from "lucide-react";
 import {
   revertBlockChange,
   revertPriceJob,
@@ -472,6 +472,17 @@ export function MobileOpsCalendar({
     const visible = new Set(serverRooms.map((room) => room.key));
     return recent.bookings.filter((booking) => visible.has(booking.roomKey));
   }, [recent.bookings, serverRooms]);
+  /** 최근 예약 중 가격 개입에도 잡힌 막대 id — 최근 예약을 켰을 때 막대 앞 표시(2026-10-28, 데스크톱과 같다). */
+  const recentWinIdsByRoom = useMemo(() => {
+    const byRoom = new Map<string, string[]>();
+    for (const booking of recentBookings ?? []) {
+      if (!booking.priceWin) continue;
+      const list = byRoom.get(booking.roomKey);
+      if (list) list.push(booking.reservationId);
+      else byRoom.set(booking.roomKey, [booking.reservationId]);
+    }
+    return new Map([...byRoom].map(([roomKey, list]) => [roomKey, list.join("|")]));
+  }, [recentBookings]);
   const recentIdsByRoom = useMemo(() => {
     const ids = new Set((recentBookings ?? []).map((booking) => booking.reservationId));
     const byRoom = new Map<string, string[]>();
@@ -1720,6 +1731,7 @@ export function MobileOpsCalendar({
                         ? (recentIdsByRoom.get(room.key) ?? "")
                         : ""
                   }
+                  markIds={recentOnly && !priceWinsOnly ? (recentWinIdsByRoom.get(room.key) ?? "") : ""}
                 />
               );
             })}
@@ -2473,6 +2485,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
   today,
   urgFlags,
   winIds,
+  markIds,
 }: {
   copy: { blockLabel: string; bkPurposes: Record<string, string> };
   days: OpsCalendarDay[];
@@ -2490,12 +2503,15 @@ const MobileOpsRow = memo(function MobileOpsRow({
   urgFlags: string;
   /** 가격 개입 성공 막대 id(`|` 로 이음). 토글이 꺼져 있으면 빈 문자열. */
   winIds: string;
+  /** 「최근 예약」을 켰을 때 그중 가격 개입에도 잡힌 막대 id — 막대 앞 내림 화살표. */
+  markIds: string;
 }) {
   const bName = useBuildingName();
   const first = days[0]?.date ?? "";
   const last = days.at(-1)?.date ?? "";
   const indexOf = (date: string) => days.findIndex((day) => day.date === date);
   const wins = new Set(winIds ? winIds.split("|") : []);
+  const marks = new Set(markIds ? markIds.split("|") : []);
   // 보기 모드로 거른다 — 「취소 보기」면 취소만, 아니면 살아 있는 예약만(데스크톱과 같다).
   const bars = row.bars.filter((bar) => bar.isCancelled === showCancelled && bar.checkOut > first && bar.checkIn <= last);
   const barLanes = assignBarLanes(bars);
@@ -2572,6 +2588,7 @@ const MobileOpsRow = memo(function MobileOpsRow({
               key={bar.id}
               style={{ left, top: TOP_H + lane * LANE_H + BAR_DY, width: Math.max(12, right - left) }}
             >
+              {marks.has(bar.id) ? <TrendingDown aria-hidden="true" className="mops-winmark" /> : null}
               {bar.guestName}
             </span>
           );

@@ -44,7 +44,7 @@ import {
   prefetchSalesSummary,
   type SalesSummaryCopy,
 } from "@/components/admin/ops/ops-sales-summary-modal";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, TrendingDown } from "lucide-react";
 import { buildOpsDaySummaries } from "@/lib/ops-day-summary";
 import { BEDS24_LIVE_STATUS_EVENT, currentBeds24LiveStatus } from "@/components/shared/beds24-live-refresh";
 import { OpsNavLink } from "@/components/admin/ops/ops-nav";
@@ -429,6 +429,8 @@ type GridRowProps = {
   scopeOn: boolean;
   /** 이 행의 가격 개입 성공 막대 id(`|` 로 이음). 「가격 개입 성공」을 켰을 때만 채운다. */
   winIds: string;
+  /** 「최근 예약」을 켰을 때 그중 가격 개입 성공에도 잡힌 막대 id(`|` 로 이음) — 막대 앞에 내림 화살표(2026-10-28). */
+  markIds: string;
   /** 이 행에서 고른 날짜들(`|` 로 이음). **문자열이라** 다른 행의 선택이 바뀌어도 이 행은 안 다시 그린다. */
   selectedDates: string;
   /** 이 행 몫만 자른 낙관값(`sliceRowPending`) — 안 바뀐 행은 참조까지 같다. */
@@ -473,6 +475,7 @@ const OpsGridRow = memo(function OpsGridRow({
   canWrite,
   today,
   winIds,
+  markIds,
   moveFadeId,
   moveGhost,
 }: GridRowProps) {
@@ -482,6 +485,7 @@ const OpsGridRow = memo(function OpsGridRow({
   const roomBlocks = row.blocks;
   const selected = new Set(selectedDates ? selectedDates.split("|") : []);
   const wins = new Set(winIds ? winIds.split("|") : []);
+  const marks = new Set(markIds ? markIds.split("|") : []);
   // **켜면 취소만, 끄면 일반만.** 둘을 같이 그리면 같은 밤에 겹쳐 못 읽는다.
   const roomBars = allRoomBars.filter((bar) => bar.isCancelled === showCancelled);
   /**
@@ -758,6 +762,7 @@ const OpsGridRow = memo(function OpsGridRow({
                 // 브라우저 툴팁(이름 · 기간)은 두지 않는다(2026-10-01 사용자) — 막대를 지나갈 때마다 떠서 격자를
                 // 가린다. 자세한 것은 눌러서 예약 상세로.
               >
+                {marks.has(bar.id) ? <TrendingDown aria-hidden="true" className="opsg__winmark" /> : null}
                 {bar.guestName}
               </div>
             );
@@ -2003,6 +2008,17 @@ export function OpsCalendarGrid({
     }
     return new Map([...byRoom].map(([roomKey, list]) => [roomKey, list.join("|")]));
   }, [bars, recentIds]);
+  /** 행마다 최근 예약 중 가격 개입에도 잡힌 막대 id — 최근 예약을 켰을 때 막대 앞 표시. */
+  const recentWinIdsByRoom = useMemo(() => {
+    const byRoom = new Map<string, string[]>();
+    for (const booking of recentBookings ?? []) {
+      if (!booking.priceWin) continue;
+      const list = byRoom.get(booking.roomKey);
+      if (list) list.push(booking.reservationId);
+      else byRoom.set(booking.roomKey, [booking.reservationId]);
+    }
+    return new Map([...byRoom].map(([roomKey, list]) => [roomKey, list.join("|")]));
+  }, [recentBookings]);
   /** 행마다 고른 날짜(`|` 로 이음) — 문자열이라 다른 행이 바뀌어도 그 행의 값은 같다. */
   const selectedDatesByRoom = useMemo(() => {
     const byRoom = new Map<string, string[]>();
@@ -2843,6 +2859,7 @@ export function OpsCalendarGrid({
                       ? (recentIdsByRoom.get(room.key) ?? "")
                       : ""
                 }
+                markIds={recentOnly && !priceWinsOnly ? (recentWinIdsByRoom.get(room.key) ?? "") : ""}
               />
               );
             })}

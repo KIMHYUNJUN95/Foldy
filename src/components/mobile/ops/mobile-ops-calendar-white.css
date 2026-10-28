@@ -344,6 +344,8 @@
 .mops .mops-bar-r.bkng { background: #cfddf6; color: #1c3a78; }
 .mops .mops-bar-r.dir { background: #d3eedc; color: #1f6b3d; }
 .mops .mops-bar-r.pw-win { box-shadow: 0 0 0 1.5px var(--mw-pri); }
+/* 최근 예약을 켰을 때 가격 개입에도 잡힌 막대 — 이름 앞 내림 화살표(2026-10-28). */
+.mops-winmark { display: inline-block; width: 11px; height: 11px; margin-right: 3px; vertical-align: -1px; stroke-width: 2.6; flex: none; }
 .mops .mops-blk {
   border: 0;
   border-radius: 8px;

@@ -2,6 +2,7 @@ import "./auth-white.css";
 import Link from "next/link";
 import { LanguageSheet } from "@/app/auth/login/language-sheet";
 import { FoldyMark } from "@/components/brand/foldy-mark";
+import { NavCachePurge } from "@/components/shell/nav-cache-purge";
 import { LegalLink } from "@/components/legal/legal-overlay";
 import { legalOverlayProps } from "@/components/legal/legal-overlay-props";
 import { legalHref } from "@/components/legal/legal-page-shell";
@@ -47,6 +48,7 @@ export function AuthFrame({
     // 표시 언어를 여기서 명시한다. `<html lang>` 은 세션·쿠키 기준이라, 로그아웃 상태에서 `?lang=`
     // 로만 언어를 바꾼 첫 방문에는 실제 화면 언어와 어긋난다.
     <div className="authw" lang={locale}>
+      <NavCachePurge />
       <header className="authw__top">
         <div className="authw__brand">
           <FoldyMark />

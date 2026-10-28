@@ -9,6 +9,9 @@ describe("sanitizeNextPath", () => {
       ["protocol-relative path", "//evil.com"],
       ["backslash bypass /\\evil.com", "/\\evil.com"],
       ["double-backslash bypass /\\\\evil.com", "/\\\\evil.com"],
+      ["tab bypass /\\t/evil.com", "/\t/evil.com"],
+      ["newline bypass /\\n/evil.com", "/\n/evil.com"],
+      ["carriage-return bypass /\\r/evil.com", "/\r/evil.com"],
       ["no leading slash", "evil.com"],
       ["empty string", ""],
     ])("%s", (_, input) => {

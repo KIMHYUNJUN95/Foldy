@@ -1,4 +1,6 @@
-"use server";
+// 서버 전용 헬퍼다 — "use server" 로 두면 service role 로 아무 userId 나 가입시키는 함수가
+// 공개 서버 액션이 된다(2026-10-28 보안 점검). 호출은 onboarding 서버 액션에서만.
+import "server-only";
 
 import type { OrganizationRole } from "@/config/roles";
 import type { Database } from "@/types/database";

@@ -7,7 +7,12 @@
 import "server-only";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { AppSession } from "@/lib/session";
-import type { LeaveType, LeaveDurationUnit, LeaveStatus } from "@/lib/annual-leave-approvals-server";
+import {
+  isSessionLeaveApprover,
+  type LeaveType,
+  type LeaveDurationUnit,
+  type LeaveStatus,
+} from "@/lib/annual-leave-approvals-server";
 import { createLeaveRequest } from "@/lib/annual-leave-requests-server";
 import {
   getAnnualLeaveBaseline,
@@ -78,6 +83,10 @@ export async function getApplicantLeaveSummary(
   session: AppSession,
   userId: string,
 ): Promise<ApplicantLeaveSummary | null> {
+  // 남의 입사일 · 잔여는 결재자만 본다(2026-10-28 보안 점검). 본인 것은 누구나.
+  if (session.organization.id === "platform") return null;
+  if (userId !== session.user.id && !(await isSessionLeaveApprover(session))) return null;
+
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
 

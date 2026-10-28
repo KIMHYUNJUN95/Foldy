@@ -744,6 +744,9 @@ Current rules:
   elsewhere" and triggered a full `window.location.reload()` — a second, harder flash. Cache
   entries now carry an `x-so-cached-at` header (`NAV_CACHE` bumped to `stayops-nav-v2`; entries
   without the header read as stale, which is the safe direction).
+- **로그아웃 뒤 저장본 지우기 (2026-10-28 보안 점검)**: 화면 저장본(`stayops-nav-*`)은 로그인한 사람의 화면을 그대로 담아서,
+  공용 기기에서 로그아웃한 뒤 다음 사람이 같은 주소를 열면 앞사람 화면이 먼저 그려질 수 있었다. 로그인 화면(`AuthFrame`)이 뜨면
+  `NavCachePurge`(`src/components/shell/nav-cache-purge.tsx`)가 저장본을 모두 지운다 — 로그아웃은 어느 버튼이든 로그인 화면으로 끝난다.
 - **No stale-build paint — fixed (2026-10-19)**: a cached document from an **older deployment** was painted first; the
   follow-up `router.refresh()` then hit Next's build-id check and did a full reload, so the entry motion (`admin-entry` ·
   `app-splash`) played twice (Edge-installed admin app). Every response now carries `x-foldy-build` (deployment id,

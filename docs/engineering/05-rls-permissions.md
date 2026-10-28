@@ -172,17 +172,12 @@ Read:
 - Active organization members can read memberships in their organization.
 - Platform admins can read all.
 
-Create:
+Create / Update / Delete (2026-10-28 보안 점검):
 
-- Owner
-- Office Admin
-- Platform admins
-
-Update:
-
-- Owner
-- Office Admin
-- Platform admins
+- **로그인 사용자의 직접 쓰기 없음.** 정책 「owner office admin can manage memberships」를 지우고
+  `authenticated` · `anon` 의 insert · update · delete 를 회수했다(`202610280002_security_hardening.sql`).
+  그 정책은 바뀌는 행 · role 값을 보지 않아 office_admin 이 PostgREST 로 자기 role 을 owner 로 올릴 수 있었다.
+- 쓰기는 service role 서버 액션(`src/actions/users.ts` 등)과 초대 가입 RPC(security definer)만.
 
 Important:
 
@@ -192,8 +187,7 @@ Important:
   only, additionally gated by **developer default + `manage_users` delegation**
   (`actorCanManageUsersInOrg`, `src/lib/user-management-access.ts`) — an `owner` or `office_admin`
   without a delegation cannot actually change roles/statuses at `/admin/users`, even though the RLS
-  policies above still name them. Treat the Owner/Office Admin/Platform Create/Update policies above as
-  a **client-side-bypass backstop only**, not the real access rule. See
+  policies above still named them (those write policies were removed on 2026-10-28). See
   "2026-07-13 User/Permission Model Rework" below and `docs/product/27-permission-override-workflow.md`.
 
 ## invite_codes
@@ -1615,3 +1609,20 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - **예외 하나**: `undoFinishMyRoom` 은 끝난 기록을 진행 중으로 되돌린다. RLS 는 진행 중 → 끝남만 허용하므로 service-role 을 쓰되,
   서버가 **같은 조직 · 본인 기록 · 오늘 날짜 · 끝낸 지 2분 안**을 모두 확인한다(`reopenSessionCore`, `src/lib/cleaning-session-ops.ts`).
 - 현황판 읽기(`loadDayBoard` + 오늘 `cleaning_sessions`)는 service-role · 조직 id 필터 — 페이지가 먼저 `cleaning.assign` 을 확인한다.
+
+## 보안 점검 후속 (2026-10-28)
+
+저장소 전체 보안 점검에서 나온 문제를 고쳤다. DB 는 마이그레이션 `202610280002_security_hardening.sql`(**운영 적용 전**).
+
+| 문제 | 고친 곳 |
+| --- | --- |
+| office_admin 이 memberships 를 직접 고쳐 owner 로 승격 | memberships 쓰기 정책 삭제 + 쓰기 권한 회수(위 「memberships」) |
+| 정지 · 제외된 사람의 개인 부여 권한이 계속 통함(재류카드 열람 등) | `has_capability` — 개인 부여는 활성 멤버(또는 플랫폼 개발자)일 때만 |
+| 출퇴근 등록 기기의 `token_hash` · 만료 · 해지를 직접 바꿈 | `attendance_trusted_devices` UPDATE 정책 삭제 + 쓰기 권한 회수(등록 · 해지는 service role) |
+| 작성자가 글 · 기록의 `organization_id` 를 바꿔 다른 조직에 넣음 | `board_posts` · `bug_reports` · `linen_return_records` 에 `forbid_organization_id_change` 트리거 |
+| 로그인 후 주소 `next` 에 탭 · 줄바꿈을 넣어 외부로 보냄 | `sanitizeNextPath` 제어 문자 거부 + 해석 후 origin 확인(테스트 `safe-redirect.test.ts`) |
+| 아무 직원이나 동료 입사일 · 연차 잔여 조회 | `getApplicantLeaveSummary` — 본인 또는 연차 결재자만 |
+| `src/lib/auth-invite.ts` 가 `"use server"` 라 service role 가입 함수가 공개 액션 | `"use server"` → `server-only` |
+| 로그아웃 뒤 PWA 화면 저장본에 앞사람 화면이 남음 | 로그인 화면(`AuthFrame`)이 뜨면 `stayops-nav-*` 캐시 삭제(`NavCachePurge`) |
+
+남은 것: Beds24 웹훅은 `BEDS24_WEBHOOK_SECRET` 이 없으면 통과(fail-open) — 운영 값 확인 뒤 닫는다.

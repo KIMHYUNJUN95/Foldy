@@ -9,6 +9,7 @@ import { ManualComplaintList } from "@/components/admin/complaints/manual-compla
 import { ComplaintDetailPanel } from "@/components/admin/complaints/complaint-detail-panel";
 import { ComplaintCreateLauncher } from "@/components/admin/complaints/complaint-create-launcher";
 import { ComplaintsViewbar, type ViewbarSelect } from "@/components/admin/complaints/complaints-viewbar";
+import { ComplaintsExport } from "@/components/admin/complaints/complaints-export";
 import { PLATFORMS, type ComplaintPlatform } from "@/components/complaints/cx-platform";
 import type { PlacePickRow, ReservationPickRow } from "@/lib/complaint-reservations";
 import type { Complaint, ComplaintComment } from "@/lib/complaints";
@@ -332,7 +333,27 @@ export function ComplaintsConsole(props: Props) {
         { value: "count", label: copy.wSortCount },
       ],
     });
+    trailing = (
+      <div className="cxw-seg" role="radiogroup" aria-label={copy.viewRooms}>
+        <Link href={href({ by: null })} role="radio" aria-checked={props.roomsBy === "building"} className={props.roomsBy === "building" ? "on" : ""} scroll={false}>
+          {copy.wByBuilding}
+        </Link>
+        <Link href={href({ by: "room" })} role="radio" aria-checked={props.roomsBy === "room"} className={props.roomsBy === "room" ? "on" : ""} scroll={false}>
+          {copy.wByRoom}
+        </Link>
+      </div>
+    );
   }
+
+  // Excel · PDF — 고르기 다음, 지금 가져오기 · 등록 · 건물/객실 전환 앞(시안 92CCRr…). 내보내기는 complaint.manage 만
+  // (파일에 게스트 이름 · 예약 번호가 담긴다, 2026-10-28) — 서버 액션이 같은 권한을 다시 본다.
+  const exportNode = props.canModerate ? (
+    <ComplaintsExport
+      query={query}
+      disabled={view === "reviews" ? props.reviewTotal === 0 : view === "rooms" ? summaries.length === 0 : complaints.length === 0}
+      labels={sharedCopy}
+    />
+  ) : null;
 
   const tabs = [
     { id: "reviews", label: copy.viewReviews, href: href({ view: "reviews", st: null, mp: null, author: null, by: null, sort: null }) },
@@ -352,18 +373,10 @@ export function ComplaintsConsole(props: Props) {
         localeTag={LOCALE_TAG[locale]}
         selects={selects}
         trailing={
-          view === "rooms" ? (
-            <div className="cxw-seg" role="radiogroup" aria-label={copy.viewRooms}>
-              <Link href={href({ by: null })} role="radio" aria-checked={props.roomsBy === "building"} className={props.roomsBy === "building" ? "on" : ""} scroll={false}>
-                {copy.wByBuilding}
-              </Link>
-              <Link href={href({ by: "room" })} role="radio" aria-checked={props.roomsBy === "room"} className={props.roomsBy === "room" ? "on" : ""} scroll={false}>
-                {copy.wByRoom}
-              </Link>
-            </div>
-          ) : (
-            trailing
-          )
+          <>
+            {exportNode}
+            {trailing}
+          </>
         }
       />
 

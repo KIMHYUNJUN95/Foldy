@@ -621,6 +621,42 @@ export async function listComplaintComments(input: {
   return rows.map((row) => mapComment(row, info.get(row.created_by_user_id)));
 }
 
+export type ComplaintCommentDigest = { count: number; lastContent: string | null };
+
+/**
+ * 컴플레인 여러 건의 처리 기록 요약(개수 + 마지막 한 줄) — Excel · PDF 내보내기용.
+ * 본문 전체가 아니라 요약만 담는 것은 2026-10-28 결정(docs/product/25-complaint-workflow.md → 내보내기).
+ */
+export async function listComplaintCommentDigests(input: {
+  session: AppSession;
+  complaintIds: string[];
+}): Promise<Map<string, ComplaintCommentDigest>> {
+  const organizationId = requireOrg(input.session);
+  const out = new Map<string, ComplaintCommentDigest>();
+  if (input.complaintIds.length === 0) return out;
+
+  const supabase = await getSupabaseServerClient();
+  // `in` 목록이 너무 길면 주소가 넘친다 — 200개씩 나눠 읽는다.
+  for (let i = 0; i < input.complaintIds.length; i += 200) {
+    const ids = input.complaintIds.slice(i, i + 200);
+    const { data, error } = await untyped(supabase)
+      .from("complaint_comments")
+      .select("complaint_id, content, created_at")
+      .eq("organization_id", organizationId)
+      .in("complaint_id", ids)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    for (const row of (data ?? []) as { complaint_id: string; content: string | null }[]) {
+      const digest = out.get(row.complaint_id) ?? { count: 0, lastContent: null };
+      digest.count += 1;
+      digest.lastContent = row.content;
+      out.set(row.complaint_id, digest);
+    }
+  }
+  return out;
+}
+
 async function loadCommentForWrite(
   id: string,
   organizationId: string,

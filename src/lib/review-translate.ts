@@ -185,6 +185,34 @@ export async function translateReviewPart(input: {
 }
 
 /** 상세 화면이 한 번에 여는 번역 캐시(요청 없이 저장된 것만). */
+/**
+ * 리뷰 여러 건의 **이미 저장된** 번역 — Excel · PDF 내보내기용. 새로 번역하지 않는다(비용, 2026-10-28 결정).
+ * 리뷰 id 는 호출부가 세션 조직으로 거른 목록에서만 온다.
+ */
+export async function getStoredTranslationsForReviews(input: {
+  externalReviewIds: string[];
+  targetLocale: TranslationLocale;
+}): Promise<Map<string, Partial<Record<TranslationPart, string>>>> {
+  const out = new Map<string, Partial<Record<TranslationPart, string>>>();
+  if (input.externalReviewIds.length === 0) return out;
+  const service = getSupabaseServiceClient();
+  const db = untyped(service as unknown as SupabaseClient<unknown>);
+  for (let i = 0; i < input.externalReviewIds.length; i += 200) {
+    const { data, error } = await db
+      .from("review_translations")
+      .select("external_review_id, source_part, translated_text")
+      .in("external_review_id", input.externalReviewIds.slice(i, i + 200))
+      .eq("target_locale", input.targetLocale);
+    if (error) throw error;
+    for (const row of (data ?? []) as { external_review_id: string; source_part: TranslationPart; translated_text: string }[]) {
+      const parts = out.get(row.external_review_id) ?? {};
+      parts[row.source_part] = row.translated_text;
+      out.set(row.external_review_id, parts);
+    }
+  }
+  return out;
+}
+
 export async function getStoredTranslations(input: {
   externalReviewId: string;
   targetLocale: TranslationLocale;

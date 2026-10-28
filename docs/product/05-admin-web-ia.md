@@ -1131,6 +1131,8 @@ Management Console" → Current Implementation Note.
   번역 API를 호출하지 않으며, 같은 리뷰·언어 번역은 캐시를 재사용한다.
 - 플랫폼이 제공한 세부 평점은 상세에서만 조건부로 보인다. Booking.com 긍정/부정 본문과 리뷰 제목은 분리해
   표시하며, 본문 없이 점수만 있는 유효 리뷰도 일반 행으로 표시한다.
+- **Excel · PDF 내보내기 (2026-10-28):** 보기바 오른쪽 공용 `<AdminExportButtons>` — 지금 보기 하나 · 지금 고르기 그대로, `complaint.manage` 만.
+  모바일에는 없음. 열 · 규칙은 `docs/product/25-complaint-workflow.md` 「Excel · PDF 내보내기」.
 - Airbnb 비공개 피드백은 상세에서만, `비공개` 배지와 함께 공개 리뷰와 분리해 보여준다. Booking.com에 이미
   달린 OTA 답글은 읽기 전용으로만 표시하며 대시보드에서 답글을 작성·전송하지 않는다.
 - 외부 리뷰 기본 순서: 위험도 우선 → 낮은 원점수 → 최신 리뷰

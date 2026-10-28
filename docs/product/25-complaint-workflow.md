@@ -970,3 +970,21 @@ FBManual-Phone · FBCx-Phone · FBNew-Phone · FBNewConfirm-Phone · FBRooms-Pho
 
 - 컴플레인 이미지 업로드는 `complaint.write`, 코멘트 이미지는 `complaint.comment` 권한이 있어야 한다(서버 `lib/complaints.ts`).
 - 허용 형식은 JPEG · PNG · WebP · HEIC/HEIF 만(SVG 불가). 저장 확장자는 파일명이 아니라 MIME 에서 정한다.
+
+## Excel · PDF 내보내기 (2026-10-28, PC 만)
+
+시안 캔버스 `https://claude.ai/artifact/92CCRr161fJj86cr9vNqeR`. 결정은 사용자 「추천대로」(2026-10-28).
+
+- **PC 만.** 모바일(폰 · 폴드 · 태블릿)에는 넣지 않는다 — 파일로 뽑는 건 보고 · 정리 일이라 PC 에서 한다. 필요해지면 급여 모바일 「파일」처럼 붙인다.
+- **자리:** 보기바 오른쪽, 고르기 다음 · 지금 가져오기 / + 컴플레인 등록 / 건물별 · 객실별 앞. 공용 `<AdminExportButtons>`(모션 · 파일 카드 그대로).
+  테두리 없는 보기바라 여기서만 공용 버튼의 「긴 상태 글자 폭 미리 잡기」를 빼고 두 버튼을 2px 로 붙인다(`complaints-console.css`, 2026-10-28 사용자 「정렬이 어색해」).
+- **범위:** 지금 보고 있는 보기 하나, 지금 고르기 그대로. 클라이언트는 주소 쿼리만 넘기고 서버가 같은 조건으로 **전부** 다시 읽는다(「더 보기」로 펼친 개수와 무관).
+  - 외부 리뷰: 기간 · 플랫폼 · 건물 · 객실 · 낮은 평점만. 열 = 리뷰 날짜(도쿄) · 플랫폼 · 점수(`4 / 5`) · 낮은 평점 · 건물 · 객실 · 게스트 · 예약 번호 · 제목 · 리뷰 내용 · 좋았던 점 · 아쉬운 점 · 번역(저장된 것만). 합계 줄에 낮은 평점 건수.
+  - 수동 컴플레인: 상태 · 플랫폼 · 건물 · 작성자(기간 없음). 순서는 화면과 같다(미처리 먼저 · 최근 등록 순). 열 = 상태 · 등록일 · 플랫폼 · 평점 · 건물 · 객실 · 게스트 · 제목 · 내용 · 작성자 · 처리 기록 수 · 마지막 기록(첫 줄 120자).
+  - 건물 · 객실별: 기간 + 건물별/객실별 · 정렬 그대로. Airbnb · Booking.com 평균 · 리뷰 수 · 낮은 평점을 **따로**(척도가 달라 합치지 않음) + 낮은 평점 비율. 합계는 리뷰 수 · 낮은 평점만.
+- **번역 열:** `review_translations` 에 이미 있는 것만(내보내는 사람 언어). 내보낼 때 새로 번역하지 않는다 — 비용.
+- **비공개 피드백은 넣지 않는다** — 목록 · 집계 쿼리가 일부러 빼는 열이고(`docs/engineering/05-rls-permissions.md`), 상세에서만 본다.
+- **권한:** 버튼은 `complaint.manage`(기본: 대표 · 전무 · CS 관리자, 개발자)에게만 보이고 서버 액션도 같은 권한을 다시 본다(아니면 `forbidden`). 파일에 게스트 이름 · 예약 번호가 담기기 때문. 보기 권한(누구나)은 그대로.
+- 파일 이름 `guest-feedback_{reviews|rooms}_YYYYMMDD_YYYYMMDD.xlsx` · `guest-feedback_manual_YYYYMMDD.xlsx`. 제목 줄 = 기간 · 고른 조건 + 제목, 바닥 = 조직 / 생성일시(공용 양식).
+- 코드: `src/app/admin/complaints/export-actions.ts`(서버) · `src/components/admin/complaints/complaints-export.tsx`(버튼 + 토스트) ·
+  `listComplaintCommentDigests()`(`lib/complaints.ts`) · `getStoredTranslationsForReviews()`(`lib/review-translate.ts`). 문구 `complaints.export*`(ko · ja · en).

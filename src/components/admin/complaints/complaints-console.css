@@ -860,6 +860,14 @@
 .adm .cxw-viewbar .cxsync { margin-left: 0; }
 .adm .cxw-viewbar .cxsync .chipbtn { border: 0; background: transparent; box-shadow: none; font-weight: 600; color: #3a3746; }
 .adm .cxw-viewbar .cxsync__s { font-weight: 500; color: #6b6878; }
+/* Excel · PDF(2026-10-28) — 테두리 없는 보기바라 공용 버튼이 미리 잡아 두는 긴 상태 글자 폭(「다운로드됨」 등)이
+   빈칸으로 벌어져 보였다. 여기서만 그 폭을 빼고 두 버튼을 붙인다(누르면 그 순간만 글자만큼 넓어진다). */
+.adm .cxw-viewbar .axb-pair { gap: 2px; }
+.adm .cxw-viewbar .axb__sz { display: none; }
+.adm .cxw-viewbar button.axb { height: 36px; padding: 0 10px; gap: 6px; border: 0; border-radius: 10px; box-shadow: none; font-size: 14px; font-weight: 600; }
+.adm .cxw-viewbar button.axb.is-idle { background: transparent; color: #3a3746; }
+.adm .cxw-viewbar button.axb.is-busy { background: transparent; }
+.adm .cxw-viewbar button.axb.is-idle:hover:not(:disabled) { background: #f4f4f7; }
 .adm .cxw-create { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5a30cf; cursor: pointer; transition: background 150ms ease, transform 140ms ease; }
 .adm .cxw-create svg { width: 16px; height: 16px; }
 .adm .cxw-create:hover { background: #f4f1fd; }

@@ -36,6 +36,8 @@
 .mcw-cols span { height: 100%; flex: none; }
 .mcw-cols span.is-we { background: #fafafc; }
 .mcw-cols span.is-today { background: #f4f1fd; }
+/* 고른 날 열(2026-10-28) — 오늘보다 한 단계 진하게. 오늘을 고르면 이 색이 이긴다. */
+.mcw-cols span.is-sel { background: #ebe4fc; }
 .mcw-head { position: sticky; top: 0; z-index: 30; }
 .mcw-head__days, .mcw-head__empty { display: flex; }
 .mcw-head__days { background: transparent; }
@@ -207,3 +209,33 @@
 .mcw-rcode { font-size: 16px; }
 .mcw-brow__t b { font-size: 16px; }
 .mcw-brow__t span { font-size: 13px; }
+
+/* 날짜 고르기 · 누르는 자리(2026-10-28, 사용자 「누르기도 힘들고 특정 날짜를 선택해서 볼 수가 없어」).
+   칸 34 → 44(JS DAY_WIDTH). 날짜 칸은 버튼 — 누르면 그날을 고르고 열이 진한 보라 · 날짜 숫자가 보라 원.
+   막대는 보이는 높이(32) 그대로, 누르는 자리만 위아래로 줄 높이(48)까지 넓힌다. */
+.mcw-day { border: 0; font: inherit; font-size: 11px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mcw-day b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; transition: background 160ms ease, color 160ms ease; }
+.mcw-day.is-sel { background: #ebe4fc; }
+.mcw-day.is-sel b { background: var(--mcw-pri); color: #fff; }
+.mcw-day:active b { transform: scale(.94); }
+.mcw-bar::before { content: ""; position: absolute; inset: -8px 0; }
+.mcw-bar { overflow: visible; }
+.mcw-bar__t { overflow: hidden; }
+.mcw-month__pick { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 15px; font-weight: 600; color: var(--mcw-ink); cursor: pointer; transition: transform 140ms ease; }
+.mcw-month__pick svg { width: 16px; height: 16px; color: var(--text-3); }
+.mcw-month__pick:active { transform: scale(.97); }
+/* 고른 날 요약 — 격자 아래 한 줄, 누르면 그날 목록. */
+.mcw-sum { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 8px 0 4px; padding: 0 12px; border: 0; border-radius: 12px; background: #f6f4fc; font: inherit; font-size: 15px; color: var(--mcw-ink); text-align: left; cursor: pointer; transition: transform 140ms ease, background 150ms ease; }
+.mcw-sum b { font-weight: 700; white-space: nowrap; }
+.mcw-sum span { flex: 1; min-width: 0; font-size: 13px; color: var(--mcw-soft); }
+.mcw-sum svg { width: 16px; height: 16px; flex: none; color: var(--text-3); }
+.mcw-sum:active { transform: scale(.98); background: #efebfa; }
+/* 목록 기준일 — 누르면 날짜 고르기. */
+.mcw-ref { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 15px; color: var(--mcw-ink); cursor: pointer; transition: transform 140ms ease; }
+.mcw-ref span { font-size: 13px; color: var(--mcw-soft); }
+.mcw-ref b { font-weight: 700; }
+.mcw-ref svg { width: 16px; height: 16px; color: var(--text-3); }
+.mcw-ref:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) {
+  .mcw-day b, .mcw-month__pick, .mcw-sum, .mcw-ref { transition: none; }
+}

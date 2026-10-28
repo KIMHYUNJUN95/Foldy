@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UIEvent } from "react";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Phone } from "lucide-react";
@@ -9,6 +9,7 @@ import "./mobile-calendar.css";
 import { collectBlockedRooms } from "@/lib/room-blocks";
 import { type PropertyMapMeta, getPropertyAddress } from "@/lib/property-map-links";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
+import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
 import { BuildingPicker } from "@/components/calendar/building-picker";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -134,7 +135,9 @@ type MobileCalendarViewProps = {
   initialReservationId?: string | null;
 };
 
-const DAY_WIDTH = 34;
+// 하루 칸 44 — 34 일 때 1박 막대가 28px 라 손가락으로 누르기 힘들었다(2026-10-28 사용자 「누르기도 힘들다」).
+const DAY_WIDTH = 44;
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const ROOM_LABEL_WIDTH = 64;
 const CALENDAR_BAR_HEIGHT = 32;
 const CALENDAR_BAR_TOP = 8;
@@ -373,6 +376,7 @@ export function MobileCalendarView({
   initialReservationId,
 }: MobileCalendarViewProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   // 활성 건물은 실제 URL에서 먼저 구하고, 없으면 서버 prop 으로 대체한다.
   // /mobile/calendar 로의 부드러운 클라이언트 이동(router.push)은 프리페치/캐시된 RSC
   // 페이로드를 쓸 수 있고, 그 searchParams 가 URL 과 다를 수 있다(예: 파라미터 없는 건물 선택기 페이로드).
@@ -402,6 +406,9 @@ export function MobileCalendarView({
     return () => clearTimeout(timer);
   }, [copiedKey]);
   const [mode, setMode] = useState<"overview" | "lists" | "map">("overview");
+  // 고른 날(2026-10-28) — 날짜 칸을 누르거나 달 이름 → 날짜 고르기 시트로 바꾼다. 다른 달로 넘어가면 그 달 기본값으로.
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [selectedMapProperty, setSelectedMapProperty] = useState<PropertyMapMeta | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
@@ -432,6 +439,15 @@ export function MobileCalendarView({
   }, [roomMasterRooms, propertyRoomsMap, selectedProperty]);
 
   const rangeStart = `${selectedMonth}-01`;
+  // 고른 날: 이번에 누른 날 → 주소 `?date=`(시트로 다른 달을 고르면 실려 온다) → 오늘(보는 달이면) → 그 달 1일.
+  const urlDate = searchParams.get("date");
+  const selectedDate = pickedDate?.startsWith(selectedMonth)
+    ? pickedDate
+    : urlDate && DATE_KEY.test(urlDate) && urlDate.startsWith(selectedMonth)
+      ? urlDate
+      : today.startsWith(selectedMonth)
+        ? today
+        : rangeStart;
   const daysInMonth = useMemo(() => {
     const [year, month] = selectedMonth.split("-").map(Number);
     return new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -528,12 +544,11 @@ export function MobileCalendarView({
   }, [dates.length, rangeEndExclusive, rangeStart, scopedRoomBlocks]);
 
 
-  // today 는 서버(Asia/Tokyo)에서 넘어온다 -> 클라이언트에서 다시 계산하지 않는다
-  // findIndex(indexOf 아님)로 "date === today" 조건을 명시한다
-  const todayIndex = dates.findIndex((date) => date === today);
-  const isTodayInView = todayIndex !== -1;
-  // 목록 모드는 selectedMonth 와 상관없이 항상 실제 운영 "오늘" 스냅샷을 쓴다.
-  const listReferenceDate = today;
+  // today 는 서버(Asia/Tokyo)에서 넘어온다 -> 클라이언트에서 다시 계산하지 않는다(고른 날의 기본값).
+  const selectedIndex = dates.indexOf(selectedDate);
+  // 목록 · 요약 줄은 **고른 날** 기준(2026-10-28) — 예전엔 늘 오늘이라 다른 날 체크인을 볼 수 없었다.
+  // 기본값이 오늘이라 그냥 들어오면 예전과 같다.
+  const listReferenceDate = selectedDate;
 
   const activeRoomSet = useMemo(() => new Set(rooms), [rooms]);
   const activeReservations = useMemo(
@@ -665,16 +680,16 @@ export function MobileCalendarView({
 
   useEffect(() => {
     if (mode !== "overview") return;
-    if (!isTodayInView) return;
+    if (selectedIndex < 1) return;
     const container = scrollRef.current;
     if (!container) return;
     const scrollKey = `${selectedMonth}:${selectedProperty ?? ""}`;
     if (autoScrolledKeys.current.has(scrollKey)) return;
-    // 어제(today-1)가 왼쪽 가장자리에, 오늘이 그다음 열에 오도록 위치시키고,
+    // 고른 날(기본 오늘)의 전날이 왼쪽 가장자리에, 고른 날이 그다음 열에 오도록 위치시키고,
     // 나머지는 직접 스크롤해서 본다. 스크롤 내용의 전체 너비가 잡힌 뒤에 scrollLeft 를 설정하도록
     // rAF 를 두 번 미룬다(안 그러면 첫 열기 스크롤이 0으로 막힘).
     autoScrolledKeys.current.add(scrollKey);
-    const target = Math.max(0, todayIndex - 1) * DAY_WIDTH;
+    const target = (selectedIndex - 1) * DAY_WIDTH;
     const apply = () => {
       const el = scrollRef.current;
       if (!el) return;
@@ -683,7 +698,26 @@ export function MobileCalendarView({
     };
     const raf = requestAnimationFrame(() => requestAnimationFrame(apply));
     return () => cancelAnimationFrame(raf);
-  }, [mode, isTodayInView, todayIndex, selectedMonth, selectedProperty, updateVisibleDateRangeLabel]);
+  }, [mode, selectedIndex, selectedMonth, selectedProperty, updateVisibleDateRangeLabel]);
+
+  // 날짜 고르기 시트에서 고른 날 — 같은 달이면 그 자리로 부드럽게 옮기고, 다른 달이면 그 달을 서버에서 다시 읽는다.
+  const pickDate = useCallback(
+    (date: string) => {
+      haptic("light");
+      if (date.startsWith(selectedMonth)) {
+        setPickedDate(date);
+        const index = dates.indexOf(date);
+        scrollRef.current?.scrollTo({ left: Math.max(0, index - 1) * DAY_WIDTH, behavior: "smooth" });
+        return;
+      }
+      const params = new URLSearchParams();
+      if (selectedProperty) params.set("property", selectedProperty);
+      params.set("month", date.slice(0, 7));
+      params.set("date", date);
+      router.push(`/mobile/calendar?${params.toString()}`, { scroll: false });
+    },
+    [dates, router, selectedMonth, selectedProperty],
+  );
 
   useEffect(() => {
     if (mode !== "overview") return;
@@ -967,7 +1001,19 @@ export function MobileCalendarView({
             <Link aria-label={w.prevMonth} className="mcw-ib" href={`/mobile/calendar?${previousHref.toString()}`}>
               <ChevronLeft aria-hidden="true" />
             </Link>
-            <span className="num">{selectedMonthLabel}</span>
+            {/* 달 이름을 누르면 공용 날짜 고르기 시트(2026-10-28) — 화살표로는 하루씩 못 간다. */}
+            <button
+              aria-label={w.pickDateAria.replace("{date}", longDate(selectedDate))}
+              className="mcw-month__pick num"
+              onClick={() => {
+                haptic("light");
+                setIsDatePickerOpen(true);
+              }}
+              type="button"
+            >
+              {selectedMonthLabel}
+              <ChevronDown aria-hidden="true" />
+            </button>
             <Link aria-label={w.nextMonth} className="mcw-ib" href={`/mobile/calendar?${nextHref.toString()}`}>
               <ChevronRight aria-hidden="true" />
             </Link>
@@ -1020,7 +1066,8 @@ export function MobileCalendarView({
               onTouchMove={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               ref={scrollRef}
-              style={{ maxHeight: "calc(100dvh - 21rem - env(safe-area-inset-bottom, 0px))" }}
+              // 21rem → 24rem: 아래에 고른 날 요약 줄(44 + 여백)이 생겼다(2026-10-28).
+              style={{ maxHeight: "calc(100dvh - 24rem - env(safe-area-inset-bottom, 0px))" }}
             >
               <div className="mcw-grid__in" style={{ minWidth: `${ROOM_LABEL_WIDTH + dates.length * DAY_WIDTH}px` }}>
                 {/* 열 바탕 — 세로선 대신 주말은 옅은 회색, 오늘은 옅은 보라(PC 와 같은 규칙). */}
@@ -1029,7 +1076,7 @@ export function MobileCalendarView({
                     const dow = parseDate(date).getUTCDay();
                     return (
                       <span
-                        className={date === today ? "is-today" : dow === 0 || dow === 6 ? "is-we" : ""}
+                        className={cn(date === today ? "is-today" : dow === 0 || dow === 6 ? "is-we" : "", date === selectedDate && "is-sel")}
                         key={`c-${date}`}
                         style={{ width: `${DAY_WIDTH}px` }}
                       />
@@ -1042,15 +1089,25 @@ export function MobileCalendarView({
                     {dates.map((date) => {
                       const dow = parseDate(date).getUTCDay();
                       const isToday = date === today;
+                      const isSel = date === selectedDate;
+                      // 날짜 칸을 누르면 그날을 고른다(2026-10-28) — 아래 요약 줄 · 목록이 그날로 바뀐다.
                       return (
-                        <div
-                          className={cn("mcw-day", isToday && "is-today", dow === 6 && "is-sat", dow === 0 && "is-sun")}
+                        <button
+                          aria-label={longDate(date)}
+                          aria-pressed={isSel}
+                          className={cn("mcw-day", isToday && "is-today", isSel && "is-sel", dow === 6 && "is-sat", dow === 0 && "is-sun")}
                           key={date}
+                          onClick={() => {
+                            if (isSel) return;
+                            haptic("light");
+                            setPickedDate(date);
+                          }}
                           style={{ width: `${DAY_WIDTH}px` }}
+                          type="button"
                         >
                           <span>{isToday ? copy.today : weekdayFmt.format(parseDate(date))}</span>
                           <b className="num">{Number(date.slice(8, 10))}</b>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1137,6 +1194,24 @@ export function MobileCalendarView({
                 })}
               </div>
             </div>
+            {/* 고른 날 요약(2026-10-28) — 누르면 그날 목록. 오늘이 기본이라 그냥 들어오면 오늘 요약이다. */}
+            <button
+              className="mcw-sum"
+              onClick={() => {
+                haptic("light");
+                setMode("lists");
+              }}
+              type="button"
+            >
+              <b>{longDate(selectedDate)}</b>
+              <span className="num">
+                {w.daySummary
+                  .replace("{in}", String(checkInsToday.length))
+                  .replace("{out}", String(checkOutsToday.length))
+                  .replace("{empty}", String(emptyRoomLabels.length))}
+              </span>
+              <ChevronRight aria-hidden="true" />
+            </button>
             <p className="mcw-hint">
               <span className="mcw-legend">
                 <span>
@@ -1167,6 +1242,20 @@ export function MobileCalendarView({
         ) : (
           <div className={isTablet ? "mcw-split" : ""}>
             <div className="mcw-listcol">
+              {/* 목록 기준일 — 누르면 날짜 고르기(2026-10-28). 예전엔 늘 오늘이었다. */}
+              <button
+                aria-label={w.pickDateAria.replace("{date}", longDate(selectedDate))}
+                className="mcw-ref"
+                onClick={() => {
+                  haptic("light");
+                  setIsDatePickerOpen(true);
+                }}
+                type="button"
+              >
+                <span>{copy.listReferenceDate}</span>
+                <b>{longDate(selectedDate)}</b>
+                <ChevronDown aria-hidden="true" />
+              </button>
               <div className="mcw-tabs" role="tablist" aria-label={copy.listView}>
                 {listTabs.map((tab) => (
                   <button
@@ -1317,6 +1406,17 @@ export function MobileCalendarView({
             </div>
           </div>
         </BottomSheet>
+      ) : null}
+
+      {isDatePickerOpen ? (
+        <DatePickerSheet
+          labels={{ title: w.pickDate, prevMonth: w.prevMonth, nextMonth: w.nextMonth, today: copy.today }}
+          locale={locale}
+          onClose={() => setIsDatePickerOpen(false)}
+          onSelect={pickDate}
+          today={today}
+          value={selectedDate}
+        />
       ) : null}
 
       {isBuildingSheetOpen ? (

@@ -391,7 +391,9 @@ export default async function MobileCalendarPage({ searchParams }: MobileCalenda
       (item) =>
         !isExcludedOperationalProperty(item.property_name) &&
         !isExcludedOperationalRoom(item.property_name, item.room_label) &&
-        ((item.check_in_date < selectedMonthEndExclusive && item.check_out_date > monthStart) ||
+        // 체크아웃이 1일인 예약도 넘긴다(`>=`) — 목록이 고른 날 기준이 되어(2026-10-28) 1일을 고르면 그 체크아웃이 보여야 한다.
+        // 격자는 따로 `checkOut > 달 첫날` 로 거르므로 막대는 그려지지 않는다.
+        ((item.check_in_date < selectedMonthEndExclusive && item.check_out_date >= monthStart) ||
           (item.check_in_date <= today && item.check_out_date >= today)),
     );
 

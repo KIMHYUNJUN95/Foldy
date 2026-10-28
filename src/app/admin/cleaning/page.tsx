@@ -9,7 +9,8 @@ import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 
 // 청소 · 셋팅 대상은 예약에서만 나온다 — 요금 · 차단 신호로 다시 읽지 않는다(2026-10-19).
-const LIVE_KINDS = ["reservations"] as const;
+// 청소 시작 · 끝내기 · 되돌리기 · 강제 완료 · 배정 변경은 `cleaning_assign` 신호로 바로 다시 읽는다(2026-10-28, 전엔 1분 새로 고침만).
+const LIVE_KINDS = ["reservations", "cleaning_assign"] as const;
 
 // Admin · Cleaning — 오늘 현황 (real-time board) / 기록 (filterable history) console. Real
 // cleaning_sessions + 예약 데이터(src/lib/admin-cleaning.ts 참고) 기준, 2026-07-14 부터 실데이터 — 이전

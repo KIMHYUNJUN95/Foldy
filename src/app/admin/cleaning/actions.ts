@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/admin-session";
+import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import {
   getAdminCleaningHistory,
   type AdminCleaningHistoryItem,
@@ -351,10 +352,7 @@ export async function forceCompleteCleaningSession(
       .eq("id", input.sessionId)
       .eq("organization_id", organizationId);
     if (error) return { ok: false, reason: "error" };
-    // 강제 완료는 어드민 콘솔과 모바일 청소 화면 양쪽에 반영돼야 한다. 재검증이 없어서
-    // 콘솔이 `router.refresh()` 로 때우고 있었다 — 그러면 모바일은 낡은 채로 남는다.
-    revalidatePath("/admin/cleaning");
-    revalidatePath("/mobile/cleaning");
+    await afterForceComplete(organizationId);
     return { ok: true };
   }
 
@@ -372,9 +370,17 @@ export async function forceCompleteCleaningSession(
     completed_by_admin: session.user.id,
   });
   if (error) return { ok: false, reason: "error" };
-  // 강제 완료는 어드민 콘솔과 모바일 청소 화면 양쪽에 반영돼야 한다. 재검증이 없어서
-  // 콘솔이 `router.refresh()` 로 때우고 있었다 — 그러면 모바일은 낡은 채로 남는다.
+  await afterForceComplete(organizationId);
+  return { ok: true };
+}
+
+/**
+ * 강제 완료는 어드민 콘솔 · 모바일 청소 · 오늘 내 방 · 청소 현황판 · PC 배정 모두에 반영돼야 한다.
+ * 재검증만으로는 열려 있는 다른 사람 화면이 낡은 채로 남는다 — 청소 시작 · 끝내기와 같은 `cleaning_assign` 신호를 보낸다(2026-10-28).
+ */
+async function afterForceComplete(organizationId: string) {
   revalidatePath("/admin/cleaning");
   revalidatePath("/mobile/cleaning");
-  return { ok: true };
+  revalidatePath("/mobile/shift/today");
+  await signalCleaningAssignChange(organizationId).catch(() => undefined);
 }

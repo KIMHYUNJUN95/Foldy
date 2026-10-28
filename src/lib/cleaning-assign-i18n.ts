@@ -421,6 +421,65 @@ export type CleaningAssignCopy = {
   psRowNext: string;
   psRowNoNext: string;
   psDone: string;
+  // ── 모바일 — 오늘 내 방 그 자리에서 시작 · 청소 현황판(2026-10-28) ──
+  myStarting: string;
+  myFinish: string;
+  myFinishRoom: string;
+  myFinishing: string;
+  myFinishedToast: string;
+  myUndo: string;
+  myMateCleaning: string;
+  myTimerLabel: string;
+  myStartedAt: string;
+  myLost: string;
+  myIssue: string;
+  myOtherCleaning: string;
+  myErrStart: string;
+  myErrProcessed: string;
+  myErrActive: string;
+  myErrFinish: string;
+  myErrUndo: string;
+  boardTitle: string;
+  boardLive: string;
+  boardProgress: string;
+  boardFilterLabel: string;
+  boardFilterAll: string;
+  boardFilterDone: string;
+  boardFilterProgress: string;
+  boardFilterWaiting: string;
+  boardFilterOpen: string;
+  boardAttention: string;
+  boardLate: string;
+  boardLateTag: string;
+  boardPlanned: string;
+  boardIn: string;
+  boardGuests: string;
+  boardNoIn: string;
+  boardAdd: string;
+  boardView: string;
+  boardMinutes: string;
+  boardWaiting: string;
+  boardRecords: string;
+  boardWork: string;
+  boardEmpty: string;
+  boardEmptyFilter: string;
+  boardSheetQ: string;
+  boardSheetEdit: string;
+  boardPeopleHead: string;
+  boardOthers: string;
+  boardRoomsN: string;
+  boardNoRooms: string;
+  boardSaveOne: string;
+  boardSaveMany: string;
+  boardSavedOne: string;
+  boardSavedMany: string;
+  boardFailed: string;
+  boardConflict: string;
+  boardWillShow: string;
+  boardPaneEmpty: string;
+  boardLocked: string;
+  boardNoPeople: string;
+  boardUnchanged: string;
 };
 
 const ko: CleaningAssignCopy = {
@@ -821,6 +880,64 @@ const ko: CleaningAssignCopy = {
   overKeep: "그대로 두기",
   overKeys: "Enter 넣기 · Esc 그대로 두기",
   overTag: "{have}/{need} · {more}명 많음",
+  myStarting: "시작하는 중…",
+  myFinish: "청소 끝내기",
+  myFinishRoom: "{room} 청소 끝내기",
+  myFinishing: "끝내는 중…",
+  myFinishedToast: "{room} 끝냈어요 · {n}분",
+  myUndo: "되돌리기",
+  myMateCleaning: "같이 하는 사람이 청소 중이에요",
+  myTimerLabel: "청소 {n}분 지남",
+  myStartedAt: "{time} 시작",
+  myLost: "분실물 올리기",
+  myIssue: "고장 알리기",
+  myOtherCleaning: "목록에 없는 방 · 셋팅 청소",
+  myErrStart: "시작하지 못했어요. 다시 해 주세요",
+  myErrProcessed: "오늘 이미 누가 시작했거나 끝낸 방이에요",
+  myErrActive: "다른 방을 청소하는 중이에요. 그 방을 먼저 끝내 주세요",
+  myErrFinish: "끝내지 못했어요. 다시 해 주세요",
+  myErrUndo: "되돌리지 못했어요",
+  boardTitle: "청소 현황",
+  boardLive: "실시간",
+  boardProgress: "{n}개 중 {d}개 끝남",
+  boardFilterLabel: "상태로 거르기",
+  boardFilterAll: "전체",
+  boardFilterDone: "끝남",
+  boardFilterProgress: "청소 중",
+  boardFilterWaiting: "대기",
+  boardFilterOpen: "담당 없음",
+  boardAttention: "먼저 챙길 방",
+  boardLate: "{n}분째 시작 전",
+  boardLateTag: "{n}분 늦음",
+  boardPlanned: "{name} · {time} 시작 예정",
+  boardIn: "들어옴 {time}",
+  boardGuests: "{n}명",
+  boardNoIn: "오늘 들어오는 손님 없음",
+  boardAdd: "넣기",
+  boardView: "보기",
+  boardMinutes: "{n}분",
+  boardWaiting: "대기",
+  boardRecords: "지난 청소 기록",
+  boardWork: "직접 청소 · 셋팅 시작",
+  boardEmpty: "오늘 청소할 방이 없어요",
+  boardEmptyFilter: "이 상태인 방이 없어요",
+  boardSheetQ: "{room}에 누구를 넣을까요?",
+  boardSheetEdit: "{room} 담당",
+  boardPeopleHead: "오늘 나온 사람 · 가까운 사람 먼저 · 여러 명 고를 수 있어요",
+  boardOthers: "오늘 신청 안 한 사람 {n}명도 보기",
+  boardRoomsN: "오늘 방 {n}개",
+  boardNoRooms: "오늘 방 없음",
+  boardSaveOne: "{room}에 {name} 넣기",
+  boardSaveMany: "{room} 담당 저장",
+  boardSavedOne: "{room}에 {name} 님을 넣었어요",
+  boardSavedMany: "{room} 담당을 바꿨어요",
+  boardFailed: "저장하지 못했어요. 다시 해 주세요",
+  boardConflict: "방금 다른 담당자가 바꿨어요. 새로 불러왔어요",
+  boardWillShow: "넣으면 그 사람의 「오늘 내 방」에 바로 떠요",
+  boardPaneEmpty: "방을 누르면 여기서 담당을 넣어요",
+  boardLocked: "청소가 시작된 방은 여기서 바꾸지 않아요",
+  boardNoPeople: "오늘 나온 사람이 없어요",
+  boardUnchanged: "고른 사람이 그대로예요",
 };
 
 const ja: CleaningAssignCopy = {
@@ -1221,6 +1338,64 @@ const ja: CleaningAssignCopy = {
   overKeep: "そのままにする",
   overKeys: "Enter 入れる · Esc そのまま",
   overTag: "{have}/{need} · {more}人多い",
+  myStarting: "開始しています…",
+  myFinish: "清掃を終える",
+  myFinishRoom: "{room} の清掃を終える",
+  myFinishing: "終えています…",
+  myFinishedToast: "{room} を終えました · {n}分",
+  myUndo: "元に戻す",
+  myMateCleaning: "一緒の人が清掃中です",
+  myTimerLabel: "清掃 {n}分経過",
+  myStartedAt: "{time} 開始",
+  myLost: "忘れ物を登録",
+  myIssue: "故障を知らせる",
+  myOtherCleaning: "リストにない部屋・セッティング清掃",
+  myErrStart: "開始できませんでした。もう一度お試しください",
+  myErrProcessed: "今日すでに誰かが開始または完了した部屋です",
+  myErrActive: "別の部屋を清掃中です。先にその部屋を終えてください",
+  myErrFinish: "終えられませんでした。もう一度お試しください",
+  myErrUndo: "元に戻せませんでした",
+  boardTitle: "清掃状況",
+  boardLive: "リアルタイム",
+  boardProgress: "{n}室中 {d}室完了",
+  boardFilterLabel: "状態で絞り込む",
+  boardFilterAll: "すべて",
+  boardFilterDone: "完了",
+  boardFilterProgress: "清掃中",
+  boardFilterWaiting: "待機",
+  boardFilterOpen: "担当なし",
+  boardAttention: "先に確認する部屋",
+  boardLate: "{n}分経っても未開始",
+  boardLateTag: "{n}分遅れ",
+  boardPlanned: "{name} · {time} 開始予定",
+  boardIn: "チェックイン {time}",
+  boardGuests: "{n}名",
+  boardNoIn: "本日のチェックインなし",
+  boardAdd: "入れる",
+  boardView: "見る",
+  boardMinutes: "{n}分",
+  boardWaiting: "待機",
+  boardRecords: "過去の清掃記録",
+  boardWork: "自分で清掃・セッティング開始",
+  boardEmpty: "本日清掃する部屋はありません",
+  boardEmptyFilter: "この状態の部屋はありません",
+  boardSheetQ: "{room} に誰を入れますか?",
+  boardSheetEdit: "{room} の担当",
+  boardPeopleHead: "今日出勤の人 · 近い人から · 複数選べます",
+  boardOthers: "今日申請していない {n}人も見る",
+  boardRoomsN: "今日 {n}室",
+  boardNoRooms: "今日の部屋なし",
+  boardSaveOne: "{room} に {name} を入れる",
+  boardSaveMany: "{room} の担当を保存",
+  boardSavedOne: "{room} に {name} さんを入れました",
+  boardSavedMany: "{room} の担当を変更しました",
+  boardFailed: "保存できませんでした。もう一度お試しください",
+  boardConflict: "他の担当者が変更しました。最新の状態にしました",
+  boardWillShow: "入れるとその人の「今日の私の部屋」にすぐ表示されます",
+  boardPaneEmpty: "部屋をタップするとここで担当を入れられます",
+  boardLocked: "清掃が始まった部屋はここでは変更しません",
+  boardNoPeople: "今日出勤の人はいません",
+  boardUnchanged: "選んだ人は変わっていません",
 };
 
 const en: CleaningAssignCopy = {
@@ -1621,6 +1796,64 @@ const en: CleaningAssignCopy = {
   overKeep: "Keep as is",
   overKeys: "Enter to add · Esc to keep",
   overTag: "{have}/{need} · {more} over",
+  myStarting: "Starting…",
+  myFinish: "Finish cleaning",
+  myFinishRoom: "Finish {room}",
+  myFinishing: "Finishing…",
+  myFinishedToast: "{room} done · {n} min",
+  myUndo: "Undo",
+  myMateCleaning: "Your partner is cleaning this room",
+  myTimerLabel: "{n} min cleaning",
+  myStartedAt: "Started {time}",
+  myLost: "Report lost item",
+  myIssue: "Report an issue",
+  myOtherCleaning: "Other rooms · setup cleaning",
+  myErrStart: "Couldn’t start. Try again.",
+  myErrProcessed: "Someone already started or finished this room today.",
+  myErrActive: "You’re cleaning another room. Finish that one first.",
+  myErrFinish: "Couldn’t finish. Try again.",
+  myErrUndo: "Couldn’t undo.",
+  boardTitle: "Cleaning status",
+  boardLive: "Live",
+  boardProgress: "{d} of {n} done",
+  boardFilterLabel: "Filter by status",
+  boardFilterAll: "All",
+  boardFilterDone: "Done",
+  boardFilterProgress: "Cleaning",
+  boardFilterWaiting: "Waiting",
+  boardFilterOpen: "Unassigned",
+  boardAttention: "Needs attention",
+  boardLate: "Not started · {n} min",
+  boardLateTag: "{n} min late",
+  boardPlanned: "{name} · due {time}",
+  boardIn: "In {time}",
+  boardGuests: "{n} guests",
+  boardNoIn: "No check-in today",
+  boardAdd: "Assign",
+  boardView: "View",
+  boardMinutes: "{n} min",
+  boardWaiting: "Waiting",
+  boardRecords: "Past cleaning records",
+  boardWork: "Start cleaning yourself",
+  boardEmpty: "No rooms to clean today",
+  boardEmptyFilter: "No rooms in this state",
+  boardSheetQ: "Who should clean {room}?",
+  boardSheetEdit: "{room} assignees",
+  boardPeopleHead: "Working today · nearby first · pick one or more",
+  boardOthers: "Show {n} more not working today",
+  boardRoomsN: "{n} rooms today",
+  boardNoRooms: "No rooms yet",
+  boardSaveOne: "Assign {name} to {room}",
+  boardSaveMany: "Save {room} assignees",
+  boardSavedOne: "Assigned {name} to {room}",
+  boardSavedMany: "Updated {room} assignees",
+  boardFailed: "Couldn’t save. Try again.",
+  boardConflict: "Someone else just changed this. Reloaded.",
+  boardWillShow: "They’ll see it in “My rooms today” right away.",
+  boardPaneEmpty: "Tap a room to assign it here.",
+  boardLocked: "Rooms already started can’t be changed here.",
+  boardNoPeople: "No one is working today.",
+  boardUnchanged: "No changes",
 };
 
 const COPY: Record<Locale, CleaningAssignCopy> = { en, ja, ko };

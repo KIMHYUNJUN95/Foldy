@@ -1,20 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import {
-  canAccessMobileCleaning,
-  getCleaningOperatingDateKey,
-  getOrgProcessedCleaningRoomLabels,
-  isCleaningTaskKey,
-  type CleaningSessionRow,
-} from "@/lib/cleaning";
-import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
-import { getActiveRoomCatalog } from "@/lib/rooms";
+import { canAccessMobileCleaning } from "@/lib/cleaning";
+import { completeSessionCore, startSessionCore } from "@/lib/cleaning-session-ops";
+import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { getCurrentAppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isPlatformDeveloper } from "@/config/roles";
-import type { Database } from "@/types/database";
 
 const cleaningPath = "/mobile/cleaning";
 
@@ -52,65 +45,10 @@ export async function startCleaningSession(formData: FormData) {
     redirectWithError("not_allowed");
   }
 
-  const roomLabel = cleanText(formData.get("roomLabel"));
-  const taskKey = cleanText(formData.get("taskKey"));
-
-  if (roomLabel.length === 0 || roomLabel.length > 100 || !isCleaningTaskKey(taskKey)) {
-    redirectWithError("invalid_selection");
-  }
-
-  const supabase = await getSupabaseServerClient();
-
-  // **실제 방** 기준으로 받는다(2026-10-15). 아라키초는 한 방에 Beds24 계정이 둘이라(`401` 쉬는 계정 · `401_2_2` 판매 중)
-  // 쉬는 계정으로 들어온 예약의 카드가 판매 중 계정 라벨만 있는 카탈로그와 글자로 안 맞아 시작이 늘 거절됐다.
-  // 라벨은 카드가 보낸 그대로 저장한다 — 화면 · 콘솔이 그 라벨로 예약 카드와 짝을 짓는다.
-  const physicalRoom = physicalRoomKeyOfSessionLabel(roomLabel);
-  // 카탈로그가 없으면(객실 마스터 없음 · 읽기 오류 → undefined) 예전처럼 검사를 건너뛴다 — `getActiveRoomCatalog` 가
-  // 두 경우를 구분하지 않아, 막으면 객실 마스터가 없는 조직은 청소를 아예 시작하지 못한다.
-  const catalog = await getActiveRoomCatalog(session.organization.id, supabase).catch(() => undefined);
-  if (catalog !== undefined) {
-    const labels = catalog.map((item) => buildSessionRoomLabel(item.propertyName, item.canonicalRoomLabel));
-    const allowedPhysical = new Set(labels.map(physicalRoomKeyOfSessionLabel));
-    // 이름표가 아직 없는 새 건물은 실제 방 키를 못 만든다 — 그때는 예전처럼 글자 그대로 맞춰 본다.
-    const allowed = labels.includes(roomLabel) || (physicalRoom !== null && allowedPhysical.has(physicalRoom));
-    if (!allowed) {
-      redirectWithError("invalid_selection");
-    }
-  }
-
-  // 오늘 이미 in_progress 또는 completed 세션이 있는 방은 다시 시작하지 못하게 막는다 — 같은 실제 방의 다른 계정
-  // 라벨로 시작한 것도 막는다(「401」로 시작했는데 「401_2_2」로 또 시작하지 않게).
-  // 남이 시작한 방도 봐야 하므로 서비스 키로 읽는다(2026-10-26) — RLS 로는 `cleaning.read_all` 없는 직원이 본인 세션만
-  // 받아 같은 방을 두 번 시작할 수 있었다. 읽기에 실패하면 막는다(확인 못 한 채 시작시키지 않는다).
-  // 남는 틈: 두 사람이 같은 순간에 누르는 경쟁은 DB 유니크 인덱스(조직 · 날짜 · 실제 방)가 있어야 완전히 막힌다 — 문서 07 「남은 것」.
-  const todayActive = await getOrgProcessedCleaningRoomLabels(session.organization.id).catch(() => null);
-  if (todayActive === null) {
-    redirectWithError("start_failed");
-  }
-
-  const alreadyProcessed = todayActive.some(
-    (row) =>
-      row.room_label === roomLabel ||
-      (physicalRoom !== null && physicalRoomKeyOfSessionLabel(row.room_label) === physicalRoom),
-  );
-  if (alreadyProcessed) {
-    redirectWithError("already_processed_today");
-  }
-
-  const insert: Database["public"]["Tables"]["cleaning_sessions"]["Insert"] = {
-    cleaning_date: getCleaningOperatingDateKey(),
-    organization_id: session.organization.id,
-    room_label: roomLabel,
-    staff_user_id: session.user.id,
-    task_label: taskKey,
-  };
-
-  const { error } = await supabase
-    .from("cleaning_sessions")
-    .insert(insert);
-
-  if (error) {
-    redirectWithError(error.code === "23505" ? "already_active" : "start_failed");
+  // 검사 · 저장은 오늘 내 방과 같은 곳(`startSessionCore`) — 여기선 결과를 쿼리로 넘겨 청소 화면으로 돌아간다.
+  const result = await startSessionCore(session, cleanText(formData.get("roomLabel")), cleanText(formData.get("taskKey")));
+  if (!result.ok) {
+    redirectWithError(result.error);
   }
 
   redirect(`${cleaningPath}?started=1&n=${noticeNonce()}`);
@@ -194,6 +132,8 @@ export async function cancelCleaningSession(formData: FormData) {
     redirectWithError("active_not_found");
   }
 
+  // 관리자 청소 현황판이 새로고침 없이 「청소 중」을 지우게.
+  await signalCleaningAssignChange(session.organization.id).catch(() => undefined);
   redirect(`${cleaningPath}?cancelled=1&n=${noticeNonce()}`);
 }
 
@@ -208,50 +148,9 @@ export async function completeCleaningSession(formData: FormData) {
     redirectWithError("not_allowed");
   }
 
-  const sessionId = cleanText(formData.get("sessionId"));
-  const notes = cleanText(formData.get("notes"));
-
-  if (!sessionId) {
-    redirectWithError("missing_session");
-  }
-
-  const supabase = await getSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("cleaning_sessions")
-    .select("*")
-    .eq("id", sessionId)
-    .eq("organization_id", session.organization.id)
-    .eq("staff_user_id", session.user.id)
-    .eq("status", "in_progress")
-    .maybeSingle();
-
-  const activeSession = data as CleaningSessionRow | null;
-
-  if (error || !activeSession) {
-    redirectWithError("active_not_found");
-  }
-
-  const completedAt = new Date();
-  const startedAt = new Date(activeSession.started_at);
-  const durationSeconds = Math.max(
-    0,
-    Math.round((completedAt.getTime() - startedAt.getTime()) / 1000),
-  );
-  const update: Database["public"]["Tables"]["cleaning_sessions"]["Update"] = {
-    completed_at: completedAt.toISOString(),
-    duration_seconds: durationSeconds,
-    notes: notes || null,
-    status: "completed",
-  };
-
-  const { error: updateError } = await supabase
-    .from("cleaning_sessions")
-    .update(update)
-    .eq("id", activeSession.id)
-    .eq("status", "in_progress");
-
-  if (updateError) {
-    redirectWithError("complete_failed");
+  const result = await completeSessionCore(session, cleanText(formData.get("sessionId")), cleanText(formData.get("notes")));
+  if (!result.ok) {
+    redirectWithError(result.error);
   }
 
   redirect(`${cleaningPath}?completed=1&n=${noticeNonce()}`);

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { MobileShell } from "@/components/shell/mobile-shell";
-import { TodayRoomsView } from "@/components/mobile/shift/today-rooms-view";
+import { TodayRoomsView, type TodayRoomSession } from "@/components/mobile/shift/today-rooms-view";
+import { physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import { loadTodayRooms } from "@/lib/cleaning-assign/data";
@@ -31,7 +32,31 @@ export default async function MobileShiftTodayPage() {
   const locale = session.user.preferredLanguage;
   const copy = getCleaningAssignCopy(locale);
   const today = getCleaningOperatingDateKey();
-  const data = await loadTodayRooms(getSupabaseServiceClient(), session.organization.id, session.user.id, session.user.role, today);
+  const service = getSupabaseServiceClient();
+  const [data, sessionsResult] = await Promise.all([
+    loadTodayRooms(service, session.organization.id, session.user.id, session.user.role, today),
+    // 오늘 그 방의 청소 기록 — 그 자리에서 끝내기 · 타이머 · 되돌리기에 세션 id · 시작 시각이 필요하다(2026-10-28).
+    service
+      .from("cleaning_sessions")
+      .select("id, room_label, status, started_at, completed_at, duration_seconds, staff_user_id")
+      .eq("organization_id", session.organization.id)
+      .eq("cleaning_date", today)
+      .in("status", ["in_progress", "completed"])
+      .order("started_at", { ascending: false }),
+  ]);
+  const sessionByRoom = new Map<string, TodayRoomSession>();
+  for (const row of sessionsResult.data ?? []) {
+    const key = physicalRoomKeyOfSessionLabel(row.room_label);
+    if (!key || sessionByRoom.has(key)) continue;
+    sessionByRoom.set(key, {
+      id: row.id,
+      status: row.status === "completed" ? "completed" : "in_progress",
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      durationSeconds: row.duration_seconds,
+      mine: row.staff_user_id === session.user.id,
+    });
+  }
   const buildingLabels = getDictionary(locale).cleaning.buildingLabels;
   const rooms = data.rooms.map((room) => {
     const meta = getPropertyMapMeta(room.propertyName);
@@ -40,6 +65,7 @@ export default async function MobileShiftTodayPage() {
       buildingLabel: localizePropertyName(room.propertyName, buildingLabels),
       doorCode: meta?.roomAccess?.find((item) => item.roomLabel === room.roomLabel)?.code ?? null,
       mapsUrl: meta?.googleMapsUrl ?? null,
+      session: sessionByRoom.get(room.roomKey) ?? null,
     };
   });
   const navBadges = await navBadgesPromise;

@@ -1197,3 +1197,50 @@ RLS 상 `staff` / `part_time_staff` 는 **본인 세션만** 읽는다(실측: �
 
 - 강제 완료는 종료 시각이 시작 시각보다 늦어야 한다. 서버(`forceCompleteCleaningSession`)가 `duration <= 0` 이면 `invalid`, 모달은 확정 버튼을 막고 안내(`mDurInvalid`, ko/ja/en)를 보인다.
 - 콘솔 기록 탭: 강제 완료 성공 뒤 지금 보는 기간을 다시 읽고, 기간을 연달아 바꾸면 마지막 요청만 반영한다.
+
+## 2026-10-28 모바일 청소 현황판 · 알바는 「오늘 내 방」에서 시작 · 끝내기 (사용자 결정)
+
+시안: https://claude.ai/artifact/2riUcpk8KSm3ZX89Gpzmzt (「R · 」 붙은 보드). 메모리 `cleaning-board-myrooms-decision`.
+
+### 누가 어디서
+
+| 사람 | 화면 | 하는 일 |
+| --- | --- | --- |
+| 청소 작업자(`cleaning.work` — 알바 포함) | **오늘 내 방** `/mobile/shift/today` | 배정된 방을 그 자리에서 **시작 · 타이머 · 끝내기 · 되돌리기**(끝낸 뒤 2분 안). 분실물 · 수리 신고 링크 |
+| 배정 담당(`cleaning.assign`) | **청소** `/mobile/cleaning` = **청소 현황판** | 오늘 방마다 상태 보기 · 시작 전 방에 담당 넣기 · 빼기. **시작 버튼 없음** |
+| 둘 다 | `/mobile/cleaning?work=1` | 예전 청소 목록(목록에 없는 방 · 셋팅 청소). 「오늘 내 방」 아래 「목록에 없는 방 · 셋팅 청소」 · 현황판 아래 「직접 청소하기」 링크 |
+
+- 메뉴 「청소」는 `cleaning.assign` 이 있는 사람에게만 보인다(사이드 메뉴 · 하단 탭 둘 다 `canSeeNavItem` 으로 거름). UX 거르기일 뿐 — 페이지는
+  `cleaning.assign` 이 없거나 `work=1` · `date` · `started` · `completed` · `cancelled` · `error` · `lostReported` · `maintenanceReported` 가 붙어 오면 예전 목록을 그린다
+  (예전 링크 · 완료 뒤 돌아오기가 그대로 동작).
+- 「오늘 내 방」 메뉴 권한은 그대로 `cleaning.work`(대표 · 전무 · 현장 매니저 · 직원 · 알바가 이미 가짐 — 배정도 `cleaning.work` 사람만 받는다).
+
+### 청소 현황판 (`CleaningBoardScreen` → `CleaningBoardView`)
+
+- 데이터: PC 배정 하루 보기와 같은 `loadDayBoard()` + 오늘 `cleaning_sessions`(진행 중 · 끝남, 실제 방 키로 묶음). 계산은 `src/lib/cleaning-board.ts` 한 곳
+  (테스트 `src/lib/__tests__/cleaning-board.test.ts`).
+- 방 상태 다섯: **끝남**(✓ · 끝난 시각) · **청소 중**(한 시간에 한 바퀴 채워지는 원 · 흐른 분, 30초마다 다시 그림) · **대기** · **늦음**(담당 누구도 아직 아무 방도
+  시작 안 했고 가장 이른 출근 시각에서 30분 — `LATE_GRACE_MINUTES`) · **담당 없음**. 미룬 방 · 「처리 끝」 방 · 취소된 예약 방은 그리지 않는다(PC 배정에서 다룬다).
+- 위에서부터: 날짜 · 「청소 현황」 · 실시간 점 → 「N개 중 M개 끝남」 + 막대 하나 + 범례(= 거르기 버튼, `aria-pressed`) → **「먼저 챙길 방」**(담당 없음 먼저, 늦은 방은 많이 늦은 순,
+  옅은 주황 묶음) → 건물별 방 한 줄 → 「청소 기록」 · 「직접 청소하기」 링크.
+- **시작 전 방만** 누를 수 있다 → 담당 넣기: 오늘 나온 사람(신청 · 배정)만 위에, 같은 건물에 이미 방이 있는 사람 먼저, 그다음 방 적은 순. 신청 안 한 현장 인원은 「N명 더 보기」로 접음.
+  여러 명 고르기 · 지금 담당은 미리 체크 · 사람마다 방 수 막대 4칸. 저장은 차이만 `assignToRoom` / `unassignFromRoom`(`src/actions/cleaning-assign-room.ts`, PC 배정과 공용)로 보내고
+  확인 창 없이 **「되돌리기」 토스트**(거꾸로 보냄). 충돌이면 「방금 다른 사람이 바꿨어요」 + 새로 읽기.
+- 실시간: `Beds24LiveRefresh` kinds `cleaning_assign` · `reservations`. 청소 시작 · 끝내기 · 되돌리기 · 취소도 `cleaning_assign` 신호를 보낸다.
+- 폭: 폰 한 단 + 공용 `BottomSheet` · 폴드 건물 2열 + 시트 · 태블릿 가로 오른쪽 380px 옅은 회색 칸(고른 방 담당 넣기, 시트 없음).
+
+### 「오늘 내 방」 시작 · 끝내기
+
+- 서버 액션 `src/app/mobile/shift/today/actions.ts`: `startMyRoom` · `finishMyRoom` · `undoFinishMyRoom` — 모두 `cleaning.work` 확인. 실제 쓰기는
+  `src/lib/cleaning-session-ops.ts`(`startSessionCore` · `completeSessionCore` · `reopenSessionCore`)로, 예전 청소 화면 액션도 같은 코어를 쓴다.
+- 되돌리기: **내 기록 · 오늘 · 끝낸 지 2분 안**만. RLS 는 진행 중 → 끝남만 허용하므로 이 한 경우만 서버가 service-role 로 되돌린다(조건은 코드에서 다시 확인).
+- 끝내면 「{방} 끝냈어요 · N분」 + 되돌리기(6초). 햅틱: 시작 · 되돌리기 light, 끝 success, 실패 error.
+- **「보통 N분」은 아직 없다** — Foldy 에 그 값을 정하는 곳이 없고 운영 기록도 아직 0건. 나중에 방마다 기록이 5건 넘으면 중앙값으로 자동 계산한다(손으로 정하지 않음).
+- 열린 질문: 출근 기록 없이 청소를 시작하면 「출근 기록이 아직 없어요 · 출근하기」를 보일지 — 사용자 답 대기, 구현 안 함.
+
+### 실시간 연결 (2026-10-28)
+
+- 배정(`cleaning_assignments`)과 청소 기록(`cleaning_sessions`)을 바꾸는 모든 쓰기 — 배정 넣기 · 빼기 · 교체, 청소 시작 · 끝내기 · 되돌리기 · 취소,
+  **PC 강제 완료** — 가 `cleaning_assign` 신호를 보낸다(`signalCleaningAssignChange`).
+- 그 신호를 받아 바로 다시 읽는 화면: PC 청소 배정 · **PC 청소(`/admin/cleaning`)** · 모바일 청소 현황판 · 모바일 예전 청소 목록 · 오늘 내 방 · 내 시프트 · 사람별 시프트.
+  PC 청소는 전엔 예약 신호 + 1분 새로 고침뿐이라 알바의 시작 · 끝이 최대 1분 늦게 보였고, 강제 완료는 다른 화면에 새로 열어야 보였다.

@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { CalendarDays, Check, ChevronRight } from "lucide-react";
-import { startCleaningSession } from "@/app/mobile/cleaning/actions";
+import { finishMyRoom, startMyRoom, undoFinishMyRoom } from "@/app/mobile/shift/today/actions";
 import { useIsTablet } from "@/components/shell/split-list";
+import { TaskToast } from "@/components/tasks/task-toast";
+import { haptic } from "@/lib/haptics";
+import type { SessionOpError } from "@/lib/cleaning-session-ops";
 import { checkInText, dayLabel, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { AssignPlace, TodayRoom } from "@/lib/cleaning-assign/data";
@@ -19,7 +22,47 @@ import "./shift.css";
  * docs/product/37-cleaning-shift-assignment.md 「4-3」
  */
 
-type Room = TodayRoom & { buildingLabel: string; doorCode: string | null; mapsUrl: string | null };
+/** 오늘 그 방의 청소 기록(진행 중이거나 끝남) — 그 자리에서 끝내기 · 타이머 · 되돌리기용(2026-10-28). */
+export type TodayRoomSession = {
+  id: string;
+  status: "in_progress" | "completed";
+  startedAt: string;
+  completedAt: string | null;
+  durationSeconds: number | null;
+  /** 내가 시작한 기록인가 — 같이 하는 사람이 시작했으면 끝내기는 그 사람이 한다. */
+  mine: boolean;
+};
+
+type Room = TodayRoom & { buildingLabel: string; doorCode: string | null; mapsUrl: string | null; session: TodayRoomSession | null };
+
+type Toast = { stamp: number; message: string; undoSessionId: string | null };
+
+function errorText(error: SessionOpError, copy: CleaningAssignCopy): string {
+  if (error === "already_processed_today") return copy.myErrProcessed;
+  if (error === "already_active") return copy.myErrActive;
+  if (error === "complete_failed" || error === "active_not_found") return copy.myErrFinish;
+  if (error === "undo_failed") return copy.myErrUndo;
+  return copy.myErrStart;
+}
+
+/** 청소 중 흐른 시간 — 1초마다. 시작 시각은 서버 값이라 다시 열어도 이어진다. */
+function Elapsed({ startedAt, label }: { startedAt: string; label: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const total = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const text = h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+  return (
+    <span className="shf-timer__t" role="timer" aria-label={fill(label, { n: Math.floor(total / 60) })}>
+      {text}
+    </span>
+  );
+}
 
 type Data = {
   date: string;
@@ -50,21 +93,106 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
   const withText = (r: Room) => (r.mates.length > 0 ? r.mates.map((m) => m.name).join(" · ") : copy.alone);
   const stateText = (r: Room) => (r.status === "done" ? copy.stateDoneRoom : r.status === "progress" ? copy.stateProgressRoom : copy.stateWaitingRoom);
 
-  // 청소 시작 = 지금 청소 타이머 그대로(폼). 청소 중이면 청소 화면으로 이어서, 끝난 방은 기록.
-  const startButton = (r: Room, wide: boolean, withRoom: boolean) =>
-    r.status === "pending" ? (
-      <form action={startCleaningSession} className={wide ? "shf-cta__form" : undefined}>
-        <input type="hidden" name="roomLabel" value={r.sessionRoomLabel} />
-        <input type="hidden" name="taskKey" value="checkout" />
-        <button type="submit" className={`shf-btn is-pri${wide ? " is-wide" : ""}`}>
-          {withRoom ? fill(copy.startRoom, { room: roomName(r) }) : copy.startCleaning}
+  // 그 자리에서 시작 · 끝내기(2026-10-28) — 화면을 옮기지 않는다. 서버가 확인한 뒤에만 성공 햅틱(16 「햅틱」).
+  const [pending, startTransition] = useTransition();
+  const [busyRoom, setBusyRoom] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), toast.undoSessionId ? 6000 : 4000);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  const run = (r: Room, job: () => Promise<{ ok: true } | { ok: false; error: SessionOpError }>, onOk: () => void) => {
+    setBusyRoom(r.roomKey);
+    startTransition(async () => {
+      const result = await job();
+      setBusyRoom(null);
+      if (!result.ok) {
+        haptic("error");
+        setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
+        return;
+      }
+      onOk();
+    });
+  };
+  const start = (r: Room) => {
+    haptic("light");
+    run(r, () => startMyRoom({ roomLabel: r.sessionRoomLabel }), () => setToast(null));
+  };
+  const finish = (r: Room, sessionId: string) =>
+    startTransition(async () => {
+      setBusyRoom(r.roomKey);
+      const result = await finishMyRoom({ sessionId });
+      setBusyRoom(null);
+      if (!result.ok) {
+        haptic("error");
+        setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
+        return;
+      }
+      haptic("success");
+      setToast({
+        stamp: Date.now(),
+        message: fill(copy.myFinishedToast, { room: roomName(r), n: Math.max(1, Math.round(result.durationSeconds / 60)) }),
+        undoSessionId: sessionId,
+      });
+    });
+  const undo = (sessionId: string) => {
+    setToast(null);
+    haptic("light");
+    startTransition(async () => {
+      const result = await undoFinishMyRoom({ sessionId });
+      if (!result.ok) {
+        haptic("error");
+        setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
+      }
+    });
+  };
+
+  const actionButton = (r: Room, wide: boolean, withRoom: boolean) => {
+    const busy = pending && busyRoom === r.roomKey;
+    const cls = (tone: string) => `shf-btn ${tone}${wide ? " is-wide" : ""}`;
+    if (r.status === "pending") {
+      return (
+        <button type="button" className={cls("is-pri")} disabled={pending} aria-busy={busy} onClick={() => start(r)}>
+          {busy ? copy.myStarting : withRoom ? fill(copy.startRoom, { room: roomName(r) }) : copy.startCleaning}
         </button>
-      </form>
-    ) : (
-      <Link className={`shf-btn ${r.status === "progress" ? "is-pri" : "is-gray"}${wide ? " is-wide" : ""}`} href="/mobile/cleaning">
-        {r.status === "progress" ? copy.continueCleaning : copy.viewRecord}
+      );
+    }
+    if (r.status === "progress" && r.session?.status === "in_progress" && r.session.mine) {
+      const sessionId = r.session.id;
+      return (
+        <button type="button" className={cls("is-ink")} disabled={pending} aria-busy={busy} onClick={() => finish(r, sessionId)}>
+          {busy ? copy.myFinishing : withRoom ? fill(copy.myFinishRoom, { room: roomName(r) }) : copy.myFinish}
+        </button>
+      );
+    }
+    if (r.status === "progress") {
+      return <span className={`shf-note${wide ? " is-wide" : ""}`}>{copy.myMateCleaning}</span>;
+    }
+    return (
+      <Link className={cls("is-gray")} href="/mobile/cleaning">
+        {copy.viewRecord}
       </Link>
     );
+  };
+
+  /** 청소 중 — 큰 시간 + 시작 시각, 분실물 · 고장 바로가기(내가 시작한 기록만). */
+  const timerBlock = (r: Room) =>
+    r.status === "progress" && r.session?.status === "in_progress" ? (
+      <div className="shf-timer">
+        <div className="shf-timer__row">
+          <Elapsed startedAt={r.session.startedAt} label={copy.myTimerLabel} />
+          <span className="shf-timer__s">{fill(copy.myStartedAt, { time: tokyoTime(r.session.startedAt) })}</span>
+        </div>
+        {r.session.mine ? (
+          <div className="shf-quick">
+            <Link href={`/mobile/lost-found/new?sessionId=${r.session.id}`}>{copy.myLost}</Link>
+            <Link href={`/mobile/maintenance/new?sessionId=${r.session.id}`}>{copy.myIssue}</Link>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
 
   const facts = (r: Room) => [
     { k: copy.factCheckin, v: info(r) },
@@ -118,6 +246,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
             <span>{data.state === "none" ? copy.emptyBodyNone : data.state === "waiting" ? copy.emptyBodyWaiting : copy.emptyBodyFree}</span>
             {tomorrowText ? <span className="shf-empty__next">{`${fill(copy.tomorrowLine, { date: dayLabel(data.tomorrow.date, locale) })} · ${tomorrowText}`}</span> : null}
             <Link href="/mobile/shift">{copy.goMyShift}</Link>
+            <Link href="/mobile/cleaning?work=1">{copy.myOtherCleaning}</Link>
           </div>
         ) : (
           <>
@@ -154,11 +283,14 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
 
             {!isTablet && current ? (
               <section className="shf-now" aria-label={`${copy.nowRoom} ${roomName(current)}`}>
-                <span className="shf-cap">{`${copy.nowRoom} · ${current.buildingLabel}`}</span>
+                <span className={`shf-cap${current.status === "progress" ? " is-live" : ""}`}>
+                  {`${current.status === "progress" ? copy.stateProgressRoom : copy.nowRoom} · ${current.buildingLabel}`}
+                </span>
                 <div className="shf-now__id">
                   <b>{roomName(current)}</b>
                   {current.usualHeadcount > 1 ? <span>{copy.bigRoom}</span> : null}
                 </div>
+                {timerBlock(current)}
                 <div className="shf-facts">
                   {facts(current).map((f) => (
                     <div key={f.k} className="shf-fact">
@@ -173,7 +305,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
                     </a>
                   ) : null}
                 </div>
-                <div className="shf-now__inline">{startButton(current, false, false)}</div>
+                <div className="shf-now__inline">{actionButton(current, false, false)}</div>
               </section>
             ) : null}
 
@@ -229,21 +361,42 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
               </div>
             ) : null}
 
-            {!isTablet && current ? <div className="shf-cta">{startButton(current, true, true)}</div> : null}
+            {/* 배정에 없는 방 · 셋팅은 청소 화면에서 시작한다(2026-10-28 — 「청소」 메뉴는 배정 담당만 보이지만 화면은 그대로). */}
+            <Link className="shf-other" href="/mobile/cleaning?work=1">
+              <span>{copy.myOtherCleaning}</span>
+              <ChevronRight className="shf-chev" aria-hidden="true" />
+            </Link>
+
+            {!isTablet && current ? <div className="shf-cta">{actionButton(current, true, true)}</div> : null}
           </>
         )}
       </div>
+      {toast ? (
+        <TaskToast
+          key={toast.stamp}
+          message={toast.message}
+          onDismiss={() => setToast(null)}
+          action={toast.undoSessionId ? { label: copy.myUndo, onAction: () => undo(toast.undoSessionId as string) } : undefined}
+        />
+      ) : null}
 
       {isTablet && sel ? (
         <aside className="shf-pane" aria-label={`${sel.buildingLabel} ${roomName(sel)}`}>
           <div className="shf-detail">
             <div className="shf-detail__head">
-              <span className="shf-detail__day">{sel.roomKey === current?.roomKey ? `${copy.nowRoom} · ${sel.buildingLabel}` : sel.buildingLabel}</span>
+              <span className="shf-detail__day">
+                {sel.status === "progress"
+                  ? `${copy.stateProgressRoom} · ${sel.buildingLabel}`
+                  : sel.roomKey === current?.roomKey
+                    ? `${copy.nowRoom} · ${sel.buildingLabel}`
+                    : sel.buildingLabel}
+              </span>
               <div className="shf-now__id">
                 <b>{roomName(sel)}</b>
                 {sel.usualHeadcount > 1 ? <span>{copy.bigRoom}</span> : null}
               </div>
             </div>
+            {timerBlock(sel)}
             <div className="shf-list">
               {facts(sel).map((f) => (
                 <div key={f.k} className="shf-fact">
@@ -259,7 +412,7 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
               </a>
             ) : null}
             <span className="shf-sp" />
-            {startButton(sel, true, false)}
+            {actionButton(sel, true, false)}
           </div>
         </aside>
       ) : null}

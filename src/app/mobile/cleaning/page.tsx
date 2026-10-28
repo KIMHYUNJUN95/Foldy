@@ -10,6 +10,7 @@ import type { ManualBuildingOption, ManualRoomEntry } from "@/components/cleanin
 import { ManualCleaningForm } from "@/components/cleaning/manual-cleaning-form";
 import { SettingTargetsSheet, type SettingTargetSheetItem } from "@/components/cleaning/setting-targets-sheet";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { CleaningBoardScreen } from "@/app/mobile/cleaning/cleaning-board-screen";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import "@/components/mobile/cleaning-screen.css";
 import {
@@ -56,6 +57,8 @@ type MobileCleaningPageProps = {
     /** 결과 안내 갱신용(액션이 매번 새로 준다) — `CleaningNotice` 가 이 값이 바뀔 때마다 안내를 화면 안으로 끌어온다. */
     n?: string;
     started?: string;
+    /** 배정 담당이 현황판 대신 예전 「청소 시작」 목록을 보려 할 때(직접 청소 · 셋팅, 오늘 내 방 「목록에 없는 방」). */
+    work?: string;
   }>;
 };
 
@@ -345,7 +348,8 @@ function RowRight({
 }
 
 // 청소 · 셋팅 대상은 예약에서만 나온다 — 요금 · 차단 신호로 다시 읽지 않는다(2026-10-19).
-const LIVE_KINDS = ["reservations"] as const;
+// 다른 사람이 시작 · 끝낸 방, 관리자 강제 완료도 바로 보이게 `cleaning_assign` 신호도 받는다(2026-10-28).
+const LIVE_KINDS = ["reservations", "cleaning_assign"] as const;
 
 export default async function MobileCleaningPage({
   searchParams,
@@ -371,6 +375,15 @@ export default async function MobileCleaningPage({
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
   const copy = dictionary.cleaning;
+
+  // 배정 담당(`cleaning.assign`)에게 「청소」는 현황판이다(2026-10-28, 시안 2riUcpk…) — 방마다 담당 · 대기 / 청소 중 / 끝남,
+  // 담당 없는 방은 바로 넣기. 청소 시작 · 끝내기 결과로 돌아온 경우(started · completed · error …)와 「직접 청소」(work=1),
+  // 다른 날 기록 보기(date)는 예전 목록을 그린다. 알바는 「오늘 내 방」에서 시작하고, 이 목록은 배정에 없는 방 · 셋팅용으로 남는다.
+  const showsWorkList =
+    params.work === "1" || Boolean(params.date || params.started || params.completed || params.cancelled || params.error || params.lostReported || params.maintenanceReported);
+  if (session.capabilities.includes("cleaning.assign") && !showsWorkList) {
+    return <CleaningBoardScreen session={session} />;
+  }
 
   if (!canAccessMobileCleaning(session.user.role)) {
     redirect("/mobile");

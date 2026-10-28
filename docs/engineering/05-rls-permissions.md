@@ -1606,3 +1606,12 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - 결재 요청 · 요청 취소 · 지급 확인 체크 · 세무사 「보냄」 = `payroll.manage`. 결재 되돌리기(지급 중 · 체크 0) = `payroll.manage` 또는 그 회차 결재자.
 - 액션은 `src/actions/payroll-approval.ts`(모바일 · 대시보드 공용) — 막히면 redirect 대신 `forbidden`. 모든 대상은 `session.organization` 범위, 체크는 그 회차 스냅샷에 있는 사람만.
 - 잠금: 회차가 `preparing` 이 아니면 `savePayrollMonthInput` → `locked`, `reopenAttendanceMonth` → `payroll_locked`.
+
+## 2026-10-28 청소 현황판 · 「오늘 내 방」 시작 · 끝내기 (RLS 변경 없음)
+
+- 메뉴 「청소」(`/mobile/cleaning`)는 `cleaning.assign` 키가 있을 때만 보인다(UX 거르기). 현황판의 담당 넣기 · 빼기는 `src/actions/cleaning-assign-room.ts` 가
+  `cleaning.assign` 을 다시 보고(없으면 `forbidden` 결과, redirect 없음) service-role 로 쓴다 — PC 배정과 같은 함수.
+- 「오늘 내 방」 `startMyRoom` · `finishMyRoom` 은 `cleaning.work` 확인 뒤 사용자 클라이언트로 `cleaning_sessions` 를 쓴다(기존 정책 그대로).
+- **예외 하나**: `undoFinishMyRoom` 은 끝난 기록을 진행 중으로 되돌린다. RLS 는 진행 중 → 끝남만 허용하므로 service-role 을 쓰되,
+  서버가 **같은 조직 · 본인 기록 · 오늘 날짜 · 끝낸 지 2분 안**을 모두 확인한다(`reopenSessionCore`, `src/lib/cleaning-session-ops.ts`).
+- 현황판 읽기(`loadDayBoard` + 오늘 `cleaning_sessions`)는 service-role · 조직 id 필터 — 페이지가 먼저 `cleaning.assign` 을 확인한다.

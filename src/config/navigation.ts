@@ -150,11 +150,14 @@ const mobileNavOpsAutomation = {
   capability: "ops_admin.access",
 } as const satisfies NavigationItem;
 
+// 청소(2026-10-28) — 배정 담당(`cleaning.assign`)의 청소 현황판. 알바는 「오늘 내 방」에서 시작 · 끝내기를 하므로 이 메뉴가 없다.
+// 목록에 없는 방 · 셋팅 청소는 「오늘 내 방」 아래 링크(`/mobile/cleaning?work=1`)로 들어간다. docs/product/07-cleaning-workflow.md
 const mobileNavCleaning = {
   id: "cleaning",
   label: localizedNavigationLabels.mobile.cleaning,
   href: "/mobile/cleaning",
   icon: Sparkles,
+  capability: "cleaning.assign",
 } as const satisfies NavigationItem;
 
 // 내 시프트 · 오늘 내 방(2026-10-20) — 알바가 일할 날을 신청하고, 배정된 방을 본다. 청소 작업자(`cleaning.work`)만.

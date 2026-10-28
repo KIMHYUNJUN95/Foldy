@@ -119,6 +119,11 @@
 .shf-btn:disabled { opacity: .5; }
 .shf-btn.is-pri { background: #7a52e6; color: #fff; }
 .shf-btn.is-gray { background: #f4f4f7; color: #3a3746; }
+/* 끝내기 — 시작(보라)과 헷갈리지 않게 남색(2026-10-28 시안 2riUcpk…) */
+.shf-btn.is-ink { background: #2b2f55; color: #fff; }
+.shf-btn[aria-busy="true"] { opacity: .7; }
+.shf-note { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; font-size: 15px; color: #6b6878; }
+.shf-note.is-wide { width: 100%; }
 .shf-btn.is-wide { width: 100%; }
 .shf-cta__form { width: 100%; }
 .shf-textbtn { min-height: 44px; padding: 0 20px; border: 0; background: transparent; font: inherit; font-size: 17px; color: #3a3746; cursor: pointer; }
@@ -164,6 +169,19 @@
 .shf-fact > b.is-code { font-weight: 700; letter-spacing: .06em; }
 .shf-fact.is-link > span { flex: 1; width: auto; font-size: 17px; color: #7a52e6; }
 .shf-now__inline { display: none; padding-top: 16px; }
+/* 청소 중 — 큰 흐른 시간(이 화면의 기억 포인트) + 시작 시각, 분실물 · 고장 바로가기. 「보통 N분」은 기록이 쌓이면(문서 37 「남은 것」). */
+.shf-cap.is-live { display: inline-flex; align-items: center; gap: 6px; color: #5a30cf; font-weight: 600; }
+.shf-cap.is-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #7a52e6; animation: shf-live 2.4s ease-in-out infinite; }
+@keyframes shf-live { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.shf-timer { display: flex; flex-direction: column; gap: 14px; padding: 2px 0 14px; border-bottom: .5px solid #e4e3e9; }
+.shf-timer__row { display: flex; align-items: baseline; gap: 10px; }
+.shf-timer__t { font-size: 34px; line-height: 41px; font-weight: 600; color: #5a30cf; font-variant-numeric: tabular-nums; animation: shf-in 200ms cubic-bezier(.23, 1, .32, 1); }
+.shf-timer__s { font-size: 15px; color: #6b6878; font-variant-numeric: tabular-nums; }
+@keyframes shf-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.shf-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.shf-quick a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 8px; border-radius: 12px; background: #f2f2f7; color: #16141f; font-size: 15px; font-weight: 500; text-align: center; text-decoration: none; }
+.shf-other { display: flex; align-items: center; gap: 8px; min-height: 44px; color: #7a52e6; font-size: 15px; text-decoration: none; }
+.shf-other span { flex: 1; }
 .shf-rlist { display: flex; flex-direction: column; }
 .shf-rrow { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; padding: 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: default; }
 .shf-rrow__n { width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #7a52e6; color: #fff; font-size: 14px; font-weight: 600; }
@@ -212,6 +230,8 @@
   .shf-pane .shf-fact.is-card { padding: 0 16px; border-bottom: 0; border-radius: 12px; background: #fff; }
   .shf-pane .shf-cap { padding-left: 16px; }
   .shf-pane .shf-detail__head { padding: 0 4px; }
+  .shf-pane .shf-timer { padding: 0 4px 14px; border-bottom: 0; }
+  .shf-pane .shf-quick a { background: #fff; }
   .shf-pane .shf-uprow__main { padding-right: 4px; }
   .shf-rrow { cursor: pointer; margin: 0 -12px; padding: 0 12px; width: calc(100% + 24px); border-radius: 12px; }
   .shf-rrow.is-sel { background: #f4f1fd; }
@@ -221,6 +241,7 @@
   .shf-day__n, .shf-btn, .shf-prog__bar i, .shf-sw, .shf-sw i { transition: none; }
   .shf-day__ring, .shf-day__ring circle, .shf-day__n, .shf-mode, .shf-sw, .shf-mode__n b, .shf-toast, .shf-toast path { animation: none !important; }
   .shf-day.is-free .shf-day__ring { display: none; }
+  .shf-timer__t, .shf-cap.is-live::before { animation: none; }
 }
 
 /* 사람별 시프트 달력(관리자, 사용자 상세 → 시프트 · 2026-10-23 · 시안 72AoNd…). 달력 · 그날 조각은 person-shift.css(.psc-*) 공용. */

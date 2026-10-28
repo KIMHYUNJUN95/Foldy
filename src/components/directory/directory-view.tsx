@@ -19,7 +19,6 @@ export type DirectoryPerson = {
   name: string;
   role: string;
   roleLabel: string;
-  teamKind: string | null;
   phone: string;
   joinedAt: string | null;
   isSelf: boolean;
@@ -41,10 +40,7 @@ export type DirectoryCopy = {
   copyFailed: string;
   labelPhone: string;
   labelRole: string;
-  labelTeam: string;
   labelJoined: string;
-  teamField: string;
-  teamOffice: string;
   pickHint: string;
   clear: string;
   countUnit: string;
@@ -62,7 +58,6 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const groupLabel = { lead: copy.groupLead, field: copy.groupField, part: copy.groupPart, other: copy.groupOther };
-  const teamText = (kind: string | null) => (kind === "field" ? copy.teamField : kind === "office" ? copy.teamOffice : null);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -165,14 +160,14 @@ export function DirectoryView({ people, orgName, locale, copy }: { people: Direc
 
       {isTablet ? (
         <div className="drw-pane">
-          {selected ? <Profile key={selected.membershipId} person={selected} copy={copy} locale={locale} teamText={teamText(selected.teamKind)} /> : <p className="drw-hint">{copy.pickHint}</p>}
+          {selected ? <Profile key={selected.membershipId} person={selected} copy={copy} locale={locale} /> : <p className="drw-hint">{copy.pickHint}</p>}
         </div>
       ) : null}
     </div>
   );
 }
 
-function Profile({ person, copy, locale, teamText }: { person: DirectoryPerson; copy: DirectoryCopy; locale: string; teamText: string | null }) {
+function Profile({ person, copy, locale }: { person: DirectoryPerson; copy: DirectoryCopy; locale: string }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const joined = person.joinedAt
     ? new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" }).format(new Date(person.joinedAt))
@@ -202,7 +197,7 @@ function Profile({ person, copy, locale, teamText }: { person: DirectoryPerson; 
             {person.name}
             {person.isSelf ? <span className="drw-me">{copy.me}</span> : null}
           </h2>
-          <span>{[person.roleLabel, teamText].filter(Boolean).join(" · ")}</span>
+          <span>{person.roleLabel}</span>
         </div>
       </div>
       {person.phone && !person.isSelf ? (
@@ -222,8 +217,6 @@ function Profile({ person, copy, locale, teamText }: { person: DirectoryPerson; 
         <dd className="num">{formatPhoneDisplay(person.phone) || copy.noPhoneLong}</dd>
         <dt>{copy.labelRole}</dt>
         <dd>{person.roleLabel}</dd>
-        <dt>{copy.labelTeam}</dt>
-        <dd>{teamText ?? "—"}</dd>
         <dt>{copy.labelJoined}</dt>
         <dd className="num">{joined}</dd>
       </dl>

@@ -280,48 +280,8 @@ export async function setMemberStatus(membershipId: string, status: string): Pro
   return { ok: true };
 }
 
-/**
- * 멤버를 팀(현장/사무실 소속 또는 하위 팀)에 배정한다. `teamId` 가 null 이면 해제(미지정). 역할/상태와 같은
- * 권한 게이트(`manage_users`/최상위 관리자)를 쓴다. 팀은 멤버의 조직에 속해야 한다. 종류만이 아니라
- * 팀 id 를 받으므로 팀 CRUD 가 들어오면 하위 팀도 이미 지원된다.
- */
-export async function setMemberTeam(membershipId: string, teamId: string | null): Promise<ActionResult> {
-  const ctx = await resolveActor(membershipId);
-  if ("error" in ctx) return { ok: false, error: ctx.error };
-  if (!(await actorCanManageUsersInOrg(ctx.actorUserId, ctx.actorRole, ctx.membership.organization_id))) {
-    return { ok: false, error: "forbidden" };
-  }
-  const blocked = await guardProtectedTarget(ctx);
-  if (blocked) return { ok: false, error: blocked };
-
-  const service = getSupabaseServiceClient();
-  if (teamId) {
-    const { data: team } = await service
-      .from("teams")
-      .select("id, organization_id")
-      .eq("id", teamId)
-      .maybeSingle();
-    if (!team || (team as { organization_id: string }).organization_id !== ctx.membership.organization_id) {
-      return { ok: false, error: "invalid_team" };
-    }
-  }
-
-  const { data: beforeRow } = await service.from("memberships").select("team_id").eq("id", membershipId).maybeSingle();
-  const { error } = await service
-    .from("memberships")
-    .update({ team_id: teamId })
-    .eq("id", membershipId);
-  if (error) return { ok: false, error: "save_failed" };
-  await logUserAudit({
-    organizationId: ctx.membership.organization_id,
-    actorUserId: ctx.actorUserId,
-    action: "member.team",
-    targetId: membershipId,
-    metadata: { from: (beforeRow as { team_id: string | null } | null)?.team_id ?? null, to: teamId },
-  });
-  revalidateMember(membershipId);
-  return { ok: true };
-}
+// 소속 팀 바꾸기(`setMemberTeam`)는 2026-10-28 지웠다 — 소속(현장 · 사무실)은 역할로 이미 정해져 화면에서 뺐다.
+// `memberships.team_id` 값과 지난 이력(`member.team`)은 그대로 남는다.
 
 // 급여 담당 · 연차 결재자 · 일일 보고서 표시 토글은 권한 키(`payroll.*` · `attendance.manage` · `leave.approve` ·
 // `can_generate_report`)로 옮겨 지웠다(2026-10-21) — 개인 부여 · 차단(grantPermissionOverrideAction)으로 켜고 끈다.

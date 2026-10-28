@@ -14,12 +14,13 @@ import "./mobile-users.css";
 
 /**
  * 모바일 사용자 관리 — 멤버 목록(2026-10-20, 시안 ① ~ ③ · ⑭).
- * 큰 제목 → 멤버 / 초대코드 탭 → 검색(이름 · 이메일 · 전화) → 「역할 · 소속 · 상태 ⌄」 하나(누르면 거르기 시트) → 활성 · 비활성 묶음.
+ * 큰 제목 → 멤버 / 초대코드 탭 → 검색(이름 · 이메일 · 전화) → 「역할 · 상태 ⌄」 하나(누르면 거르기 시트) → 활성 · 비활성 묶음.
+ * 소속(현장 · 사무실)은 2026-10-28 뺐다 — 역할로 이미 정해진다.
  * 줄을 누르면 `/mobile/users/{membershipId}` — 태블릿 가로에서는 `SplitList` 가 오른쪽 칸에 연다. docs/product/17-user-profile-directory.md
  */
 
-type Filter = { status: "" | "active" | "inactive"; team: "" | "field" | "office"; role: string };
-const NO_FILTER: Filter = { status: "", team: "", role: "" };
+type Filter = { status: "" | "active" | "inactive"; role: string };
+const NO_FILTER: Filter = { status: "", role: "" };
 
 const initialOf = (name: string) => name.replace(/\(.*\)/, "").trim().charAt(0) || "?";
 
@@ -29,7 +30,7 @@ function matches(m: DirectoryMemberVM, query: string, f: Filter) {
   const hay = [m.name, m.email].join(" ").toLowerCase();
   const byQuery = !q || hay.includes(q) || (digits.length >= 2 && m.phone.replace(/\D/g, "").includes(digits));
   const byStatus = !f.status || (f.status === "active" ? m.status === "active" : m.status !== "active");
-  return byQuery && byStatus && (!f.team || m.teamKind === f.team) && (!f.role || m.role === f.role);
+  return byQuery && byStatus && (!f.role || m.role === f.role);
 }
 
 export function MobileUsersList({
@@ -48,7 +49,6 @@ export function MobileUsersList({
   const u = dict.admin.users;
   const c = u.console;
   const roleLabel = (role: string) => (dict.roles as Record<string, string>)[role] ?? role;
-  const teamLabel = (kind: string | null) => (kind === "field" ? c.teamFieldOption : kind === "office" ? c.teamOfficeOption : null);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>(NO_FILTER);
@@ -63,11 +63,10 @@ export function MobileUsersList({
   );
   const active = shown.filter((m) => m.status === "active");
   const inactive = shown.filter((m) => m.status !== "active");
-  const filterOn = Boolean(filter.status || filter.team || filter.role);
+  const filterOn = Boolean(filter.status || filter.role);
   const filterText = filterOn
     ? [
         filter.status === "active" ? c.statusActive : filter.status === "inactive" ? c.statusInactive : null,
-        filter.team ? teamLabel(filter.team) : null,
         filter.role ? roleLabel(filter.role) : null,
       ]
         .filter(Boolean)
@@ -85,7 +84,7 @@ export function MobileUsersList({
           {m.isSelf ? <span className="me">{c.selfChip}</span> : null}
         </span>
         <span className="muw-rm">
-          {[m.isDeveloper ? c.devRole : roleLabel(m.role), teamLabel(m.teamKind), m.status === "active" ? null : c.statusInactive]
+          {[m.isDeveloper ? c.devRole : roleLabel(m.role), m.status === "active" ? null : c.statusInactive]
             .filter(Boolean)
             .join(" · ")}
         </span>
@@ -193,12 +192,9 @@ export function MobileUsersList({
             title: c.mFilterTitle,
             all: c.mAll,
             status: u.status,
-            team: c.teamField,
             role: u.role,
             active: c.statusActive,
             inactive: c.statusInactive,
-            field: c.teamFieldOption,
-            office: c.teamOfficeOption,
             reset: c.mFilterReset,
             apply: c.mFilterApply,
           }}
@@ -221,7 +217,7 @@ function FilterSheet({
 }: {
   initial: Filter;
   count: (f: Filter) => number;
-  labels: Record<"title" | "all" | "status" | "team" | "role" | "active" | "inactive" | "field" | "office" | "reset" | "apply", string>;
+  labels: Record<"title" | "all" | "status" | "role" | "active" | "inactive" | "reset" | "apply", string>;
   roleLabel: (role: string) => string;
   onApply: (f: Filter) => void;
   onClose: () => void;
@@ -253,14 +249,6 @@ function FilterSheet({
               {chip(draft.status === "", labels.all, () => setDraft({ ...draft, status: "" }))}
               {chip(draft.status === "active", labels.active, () => setDraft({ ...draft, status: "active" }))}
               {chip(draft.status === "inactive", labels.inactive, () => setDraft({ ...draft, status: "inactive" }))}
-            </div>
-          </div>
-          <div className="muw-fg" role="group" aria-label={labels.team}>
-            <span>{labels.team}</span>
-            <div>
-              {chip(draft.team === "", labels.all, () => setDraft({ ...draft, team: "" }))}
-              {chip(draft.team === "field", labels.field, () => setDraft({ ...draft, team: "field" }))}
-              {chip(draft.team === "office", labels.office, () => setDraft({ ...draft, team: "office" }))}
             </div>
           </div>
           <div className="muw-fg" role="group" aria-label={labels.role}>

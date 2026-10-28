@@ -18,7 +18,6 @@ import {
   revokePermissionOverrideAction,
   setMemberRole,
   setMemberStatus,
-  setMemberTeam,
 } from "@/actions/users";
 import { capabilityGroupOf, groupPermissionRows } from "@/config/capability-groups";
 import { isOrgTopAdmin, officeAdminAssignableRoles, organizationRoles, type Role } from "@/config/roles";
@@ -100,12 +99,10 @@ export function UsersConsole({
   const u = dict.admin.users;
   const c = u.console;
   const roleLabel = (role: string) => (dict.roles as Record<string, string>)[role] ?? role;
-  const teamLabel = (kind: string | null) => (kind === "field" ? c.teamFieldOption : kind === "office" ? c.teamOfficeOption : "—");
   const { toast, showToast, dismiss } = useAdminToast();
 
   const [query, setQuery] = useState("");
   const [fRole, setFRole] = useState("");
-  const [fTeam, setFTeam] = useState("");
   const [fStatus, setFStatus] = useState("");
   const [fDoc, setFDoc] = useState(false);
   // idDoc 은 서버가 `staff_documents.view` 가 있을 때만 채운다 — 권한 없는 화면엔 칩도 거르기 칸도 없다.
@@ -133,19 +130,18 @@ export function UsersConsole({
       const hay = [m.name, m.email].join(" ").toLowerCase();
       const matchesQuery = !q || hay.includes(q) || (digits.length >= 2 && m.phone.replace(/\D/g, "").includes(digits));
       const matchesRole = !fRole || m.role === fRole;
-      const matchesTeam = !fTeam || m.teamKind === fTeam;
       const matchesStatus = !fStatus || (fStatus === "active" ? m.status === "active" : m.status !== "active");
       const matchesDoc = !fDoc || m.idDoc?.status === "pending";
-      return matchesQuery && matchesRole && matchesTeam && matchesStatus && matchesDoc;
+      return matchesQuery && matchesRole && matchesStatus && matchesDoc;
     });
-  }, [members, query, fRole, fTeam, fStatus, fDoc]);
+  }, [members, query, fRole, fStatus, fDoc]);
   const visibleIds = useMemo(() => new Set(filtered.map((m) => m.userId)), [filtered]);
   const pickedVisible = picked.filter((id) => visibleIds.has(id));
 
   const joined = (value: string | null) => (value ? value.slice(0, 10).replaceAll("-", ".") : "—");
   const open = (id: string) => router.push(`/admin/users?member=${id}`, { scroll: false });
   const close = () => router.push("/admin/users", { scroll: false });
-  const filtersOn = Boolean(query || fRole || fTeam || fStatus || fDoc);
+  const filtersOn = Boolean(query || fRole || fStatus || fDoc);
 
   return (
     <div className="usw">
@@ -179,17 +175,6 @@ export function UsersConsole({
           value={fRole}
           onChange={setFRole}
           options={[{ value: "", label: c.filterAllRoles }, ...organizationRoles.map((role) => ({ value: role, label: roleLabel(role) }))]}
-        />
-        <AdmDropdown
-          size="sm"
-          ariaLabel={c.teamField}
-          value={fTeam}
-          onChange={setFTeam}
-          options={[
-            { value: "", label: c.filterAllTeams },
-            { value: "field", label: c.teamFieldOption },
-            { value: "office", label: c.teamOfficeOption },
-          ]}
         />
         <AdmDropdown
           size="sm"
@@ -257,7 +242,6 @@ export function UsersConsole({
       <div className="usw-th" aria-hidden="true">
         <span>{u.name}</span>
         <span>{u.role}</span>
-        <span>{c.teamField}</span>
         <span>{c.wPhoneShort}</span>
         <span>{u.status}</span>
         <span className="r">{c.wJoined}</span>
@@ -272,7 +256,6 @@ export function UsersConsole({
               onClick={() => {
                 setQuery("");
                 setFRole("");
-                setFTeam("");
                 setFStatus("");
                 setFDoc(false);
               }}
@@ -319,7 +302,6 @@ export function UsersConsole({
                 </span>
               </span>
               <span className="usw-c">{m.isDeveloper ? c.devRole : roleLabel(m.role)}</span>
-              <span className="usw-c">{teamLabel(m.teamKind)}</span>
               <span className="usw-c num">{m.phone || "—"}</span>
               <span className={`usw-c${m.status === "active" ? "" : " is-dim"}`}>
                 {m.status === "active" ? c.statusActive : c.statusInactive}
@@ -381,31 +363,23 @@ function MemberPanel({
   // 물음표로 펼친 권한 설명(한 번에 하나).
   const [helpOpen, setHelpOpen] = useState<string | null>(null);
   const [optRole, setOptRole] = useState<string | null>(null);
-  const [optTeam, setOptTeam] = useState<string | null>(null);
   const [optStatus, setOptStatus] = useState<string | null>(null);
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled: confirm !== null || pending });
   const today = tokyoToday();
   const readOnly = m.isSelf || panel.lock !== null;
-  // 개발자 본인 줄 — 역할 · 상태 · 권한 · 삭제는 잠금 방지로 그대로 막지만(서버 self_update_blocked 등),
-  // 서버가 허용하는 소속 팀은 바꿀 수 있게 연다(2026-10-23 「개발자는 전부 가능」).
-  const selfTeamEditable = m.isSelf && panel.isDeveloperViewer && panel.lock === null;
-
-  const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.isDeveloper, panel.perms]);
+  // 소속(현장 · 사무실)은 화면에서 뺐다(2026-10-28 사용자 — 역할로 이미 정해진다). DB `memberships.team_id` 는 그대로 둔다.
+  const dataKey = JSON.stringify([m.role, m.status, m.isDeveloper, panel.perms]);
   const lastKey = useRef(dataKey);
   useEffect(() => {
     if (lastKey.current === dataKey) return;
     lastKey.current = dataKey;
     setOptimistic({});
     setOptRole(null);
-    setOptTeam(null);
     setOptStatus(null);
   }, [dataKey]);
 
   const role = optRole ?? m.role;
-  const teamId = optTeam ?? m.teamId ?? "";
   const status = optStatus ?? (m.status === "active" ? "active" : "suspended");
-  const team = panel.teams.find((t) => t.id === teamId);
-  const teamText = team ? (team.kind === "field" ? c.teamFieldOption : team.kind === "office" ? c.teamOfficeOption : team.name) : null;
 
   const longDate = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(locale, { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" }).format(new Date(iso)) : "—";
@@ -505,32 +479,6 @@ function MemberPanel({
       });
     }
   }
-  const teamControl =
-    panel.teams.length > 0 ? (
-      <>
-        <span className="usw-set__k">{c.teamField}</span>
-        <div className="usw-seg" role="radiogroup" aria-label={c.teamField}>
-          {panel.teams.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={teamId === t.id}
-              className={teamId === t.id ? "on" : ""}
-              disabled={pending}
-              onClick={() => {
-                if (teamId === t.id) return;
-                const before = optTeam;
-                setOptTeam(t.id);
-                run(() => setMemberTeam(m.membershipId, t.id), c.wToastTeam, () => setOptTeam(before));
-              }}
-            >
-              {t.kind === "field" ? c.teamFieldOption : t.kind === "office" ? c.teamOfficeOption : t.name}
-            </button>
-          ))}
-        </div>
-      </>
-    ) : null;
   const onCount = rows.filter((row) => row.on).length;
   const history = formatMemberHistory(panel.history, { dict, locale, teams: panel.teams });
 
@@ -657,7 +605,7 @@ function MemberPanel({
               {m.name || "—"}
               {m.isSelf ? <span className="usw-me">{c.selfChip}</span> : null}
             </h2>
-            <span>{[m.isDeveloper ? c.devRole : roleLabel(role), teamText].filter(Boolean).join(" · ")}</span>
+            <span>{m.isDeveloper ? c.devRole : roleLabel(role)}</span>
           </div>
           {!readOnly && !panel.lastOwner ? (
             <button type="button" className="usw-ic is-danger" aria-label={c.wDeleteAria} title={c.wDeleteAria} onClick={() => setConfirm("delete")}>
@@ -688,10 +636,7 @@ function MemberPanel({
           {panel.idDocument.canView ? <IdDocumentPanel canReview={panel.idDocument.canReview} doc={panel.idDocument.doc} locale={locale} printHref={panel.idDocument.printHref} /> : null}
 
           {readOnly ? (
-            <>
-              <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>
-              {selfTeamEditable && teamControl ? <div className="usw-set">{teamControl}</div> : null}
-            </>
+            <p className="usw-note">{m.isSelf ? c.wSelfNote : panel.lock === "dev" ? c.wLockDevNote : c.wLockTopNote}</p>
           ) : (
             <div className="usw-set">
               <span className="usw-set__k">{u.role}</span>
@@ -707,7 +652,6 @@ function MemberPanel({
                   run(() => setMemberRole(m.membershipId, value), c.wToastRole, () => setOptRole(before));
                 }}
               />
-              {teamControl}
               <span className="usw-set__k">{u.status}</span>
               <div className="usw-seg" role="radiogroup" aria-label={u.status}>
                 <button

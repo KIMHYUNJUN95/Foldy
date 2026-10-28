@@ -139,10 +139,16 @@ Mobile directory (`/mobile/directory`) — 화이트 리디자인(2026-10-14, �
 
 Admin user management (`/admin/users`) — 화이트 리디자인(2026-10-14, 시안 Users-PC · UsersGrant-PC · UsersDeact-PC):
 
-- Tabs 「멤버 목록 N · 멤버 초대 N」(shared `.lviews`; invite count = codes usable now) + search (name · email · phone digits) on one line; filters 역할 · 소속 · 상태 below.
-- Table: 이름+이메일 (「나」 on yourself) · 역할 · 소속 · 전화 · 상태 · 가입일. No save buttons in rows anymore.
+> **2026-10-28 소속(현장 · 사무실) 화면에서 뺌 (사용자 결정 — 역할로 이미 정해진다).** PC 「전체 소속」 거르기 · 표의 소속 열 ·
+> 패널 머리 「역할 · 소속」의 소속 · 소속 바꾸기 칸, 모바일 거르기 시트의 소속 줄 · 목록 줄 · 상세의 소속 칸(개발자 본인 줄 포함),
+> 직원 목록(`/mobile/directory`) 프로필의 소속을 모두 뺐다. 거르기 이름은 「역할 · 상태」. 서버 액션 `setMemberTeam` 도 지웠다.
+> DB `memberships.team_id` · `teams` 표와 지난 이력(「소속 A → B」)은 그대로 남는다(마이그레이션 없음 — 되돌릴 수 있다).
+> 아래 글에서 「소속」이 나오는 곳은 이 날 이전 설명이다.
+
+- Tabs 「멤버 목록 N · 멤버 초대 N」(shared `.lviews`; invite count = codes usable now) + search (name · email · phone digits) on one line; filters 역할 · 상태 below (소속 뺌 2026-10-28).
+- Table: 이름+이메일 (「나」 on yourself) · 역할 · 전화 · 상태 · 가입일. No save buttons in rows anymore.
 - Clicking a row opens the **right panel** (`?member=<membershipId>`, shared `.panel`). The old profile page `/admin/users/[id]` now redirects there.
-- Panel: avatar · name · `역할 · 소속`, trash (delete member → confirm modal) · close. 이메일 / 전화 / 가입. Then 역할 (dropdown) · 소속 (segment of the org's teams) · 상태 (활성 · 비활성).
+- Panel: avatar · name · 역할, trash (delete member → confirm modal) · close. 이메일 / 전화 / 가입. Then 역할 (dropdown) · 상태 (활성 · 비활성).
   - Role and team **save immediately** with a toast. Choosing 비활성 opens a confirm modal (그대로 두기 / 비활성으로 바꾸기) because it blocks sign-in (auth ban — only when no other org keeps an active membership, see below). 활성 saves immediately.
   - Office admins only see roles they may assign (`officeAdminAssignableRoles`); the server still enforces it.
 - 권한 — one list of switches (owner/전무/developer only; others see a one-line note). Each row says where it comes from: 역할로 받음 · 개인 부여(· 기한) · 개인 차단 · 꺼짐. Rules (server contract unchanged, `27-permission-override-workflow.md`):
@@ -227,11 +233,11 @@ emil-design-eng · frontend-design). 대시보드 `/admin/users`(멤버 · 패�
 화면(`src/components/mobile/users/*`, `mobile-users.css`):
 
 - **목록** `/mobile/users` — 큰 제목 34 · 「멤버 · 초대코드」 탭(주소가 다른 두 화면) · 검색(이름 · 이메일 · 전화 2자리 이상) ·
-  「역할 · 소속 · 상태 ⌄」 버튼 하나 → 거르기 시트(칩 · 「n명 보기」, 고른 값이 버튼 글자가 됨) · 활성 / 비활성 묶음(17). 줄 = 이름(나) / 역할 · 소속.
+  「역할 · 상태 ⌄」 버튼 하나 → 거르기 시트(칩 · 「n명 보기」, 고른 값이 버튼 글자가 됨) · 활성 / 비활성 묶음(17). 줄 = 이름(나) / 역할.
   결과가 없으면 「조건에 맞는 멤버가 없어요」 + 조건 지우기.
   `staff_documents.view` 가 있으면 거르기 줄에 「확인 대기 N」 토글(N>0 일 때만)과 줄 끝 서류 칩(확인 대기 · 만료됨 · 만료 임박 · 재제출 대기)이 보인다 — 문서 41 §10.
-- **상세** `/mobile/users/{membershipId}` — 이름 · 역할 · 소속, 빨간 휴지통(바꿀 수 있고 마지막 대표가 아닐 때만) → 연락처(전화는 하이픈 표시 · 누르면 걸기)
-  → 역할 ›(역할 시트 — 체크, 고르면 바로 저장 + 알림 「되돌리기」 6초 줄) · 소속 · 상태(비활성은 확인 시트, 먹색 버튼 — 다시 켤 수 있어서;
+- **상세** `/mobile/users/{membershipId}` — 이름 · 역할, 빨간 휴지통(바꿀 수 있고 마지막 대표가 아닐 때만) → 연락처(전화는 하이픈 표시 · 누르면 걸기)
+  → 역할 ›(역할 시트 — 체크, 고르면 바로 저장 + 알림 「되돌리기」 6초 줄) · 상태(비활성은 확인 시트, 먹색 버튼 — 다시 켤 수 있어서;
   바꾼 뒤 「되돌리기」) → 권한 스위치(둘째 줄 = 역할로 받음 · 개인 부여 · 기한 · 개인 차단, 7일 안 만료 · 차단은 빨강). 기한을 묻는 권한은 그 줄이
   옅은 보라로 펼쳐져 **무기한** · 1주 · 1개월 · 3개월 · 날짜(공용 날짜 시트, 내일부터). 삭제 확인은 빨간 버튼 + 「되돌릴 수 없어요」.
   나 · 대표/전무 · 개발자 계정은 자물쇠 안내 + 값만.

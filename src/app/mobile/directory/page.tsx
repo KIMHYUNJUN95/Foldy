@@ -45,22 +45,19 @@ export default async function MobileDirectoryPage() {
   const service = getSupabaseServiceClient();
   const { data: membershipData } = await service
     .from("memberships")
-    .select("id, user_id, role, status, joined_at, team_id")
+    .select("id, user_id, role, status, joined_at")
     .eq("organization_id", session.organization.id)
     .in("status", ["active", "invited"]);
 
-  const memberships = (membershipData ?? []) as Pick<MembershipRow, "id" | "user_id" | "role" | "status" | "joined_at" | "team_id">[];
+  const memberships = (membershipData ?? []) as Pick<MembershipRow, "id" | "user_id" | "role" | "status" | "joined_at">[];
   const userIds = memberships.map((m) => m.user_id);
-  const teamIds = [...new Set(memberships.map((m) => m.team_id).filter((id): id is string => Boolean(id)))];
 
-  const [{ data: profileData }, { data: teamData }, devIds] = await Promise.all([
+  const [{ data: profileData }, devIds] = await Promise.all([
     userIds.length > 0 ? service.from("profiles").select("id, name, phone_number").in("id", userIds) : Promise.resolve({ data: [] }),
-    teamIds.length > 0 ? service.from("teams").select("id, kind").in("id", teamIds) : Promise.resolve({ data: [] }),
     fetchPlatformDeveloperIds(userIds),
   ]);
 
   const profileMap = new Map(((profileData ?? []) as Pick<ProfileRow, "id" | "name" | "phone_number">[]).map((p) => [p.id, p]));
-  const teamKind = new Map(((teamData ?? []) as { id: string; kind: string }[]).map((team) => [team.id, team.kind]));
 
   const people: DirectoryPerson[] = memberships
     .map((m) => {
@@ -70,7 +67,6 @@ export default async function MobileDirectoryPage() {
         name: profile?.name ?? "—",
         role: m.role,
         roleLabel: roles[displayRoleKey(m.role, m.user_id, devIds)] ?? m.role,
-        teamKind: m.team_id ? teamKind.get(m.team_id) ?? null : null,
         phone: profile?.phone_number ?? "",
         joinedAt: m.joined_at,
         isSelf: m.user_id === session.user.id,
@@ -103,10 +99,7 @@ export default async function MobileDirectoryPage() {
           copyFailed: copy.copyFailed,
           labelPhone: copy.labelPhone,
           labelRole: copy.labelRole,
-          labelTeam: copy.labelTeam,
           labelJoined: copy.labelJoined,
-          teamField: copy.teamField,
-          teamOffice: copy.teamOffice,
           pickHint: copy.pickHint,
           clear: copy.clear,
           countUnit: copy.countUnit,

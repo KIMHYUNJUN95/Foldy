@@ -11,7 +11,6 @@ import {
   revokePermissionOverrideAction,
   setMemberRole,
   setMemberStatus,
-  setMemberTeam,
 } from "@/actions/users";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { DatePickerSheet } from "@/components/shell/date-picker-sheet";
@@ -109,55 +108,22 @@ export function MobileMemberDetail({
   // 물음표로 펼친 권한 설명(한 번에 하나).
   const [helpOpen, setHelpOpen] = useState<string | null>(null);
   const [optRole, setOptRole] = useState<string | null>(null);
-  const [optTeam, setOptTeam] = useState<string | null>(null);
   const [optStatus, setOptStatus] = useState<string | null>(null);
   const today = tokyoToday();
   const readOnly = m.isSelf || panel.lock !== null;
-  // 개발자 본인 — 역할 · 상태 · 권한 · 삭제는 잠금 방지로 막아 두고, 서버가 허용하는 소속 팀만 연다(2026-10-23).
-  const selfTeamEditable = m.isSelf && panel.isDeveloperViewer && panel.lock === null;
-
-  const dataKey = JSON.stringify([m.role, m.teamId, m.status, m.isDeveloper, panel.perms]);
+  // 소속(현장 · 사무실)은 화면에서 뺐다(2026-10-28 사용자 — 역할로 이미 정해진다). DB `memberships.team_id` 는 그대로 둔다.
+  const dataKey = JSON.stringify([m.role, m.status, m.isDeveloper, panel.perms]);
   const lastKey = useRef(dataKey);
   useEffect(() => {
     if (lastKey.current === dataKey) return;
     lastKey.current = dataKey;
     setOptimistic({});
     setOptRole(null);
-    setOptTeam(null);
     setOptStatus(null);
   }, [dataKey]);
 
   const role = optRole ?? m.role;
-  const teamId = optTeam ?? m.teamId ?? "";
   const status = optStatus ?? (m.status === "active" ? "active" : "suspended");
-  const team = panel.teams.find((t) => t.id === teamId);
-  const teamName = (t: { kind: string; name: string }) => (t.kind === "field" ? c.teamFieldOption : t.kind === "office" ? c.teamOfficeOption : t.name);
-  const teamSeg =
-    panel.teams.length > 0 ? (
-      <div className="muw-kv">
-        <span>{c.teamField}</span>
-        <div className="muw-seg" role="radiogroup" aria-label={c.teamField}>
-          {panel.teams.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={teamId === t.id}
-              disabled={pending}
-              onClick={() => {
-                if (teamId === t.id) return;
-                haptic("light");
-                const before = optTeam;
-                setOptTeam(t.id);
-                run(() => setMemberTeam(m.membershipId, t.id), c.wToastTeam, () => setOptTeam(before));
-              }}
-            >
-              {teamName(t)}
-            </button>
-          ))}
-        </div>
-      </div>
-    ) : null;
 
   const show = (next: Omit<UsersToast, "id">) => {
     setToast((prev) => ({ ...next, id: (prev?.id ?? 0) + 1 }));
@@ -417,7 +383,7 @@ export function MobileMemberDetail({
             {m.name || "—"}
             {m.isSelf ? <span className="me">{c.selfChip}</span> : null}
           </h1>
-          <span>{[m.isDeveloper ? c.devRole : roleLabel(role), team ? teamName(team) : null].filter(Boolean).join(" · ")}</span>
+          <span>{m.isDeveloper ? c.devRole : roleLabel(role)}</span>
         </div>
         {!readOnly && !panel.lastOwner ? (
           <button type="button" className="muw-ic is-danger" aria-label={c.wDeleteAria} onClick={() => setSheet("delete")}>
@@ -469,14 +435,6 @@ export function MobileMemberDetail({
             <span>{u.role}</span>
             <b>{m.isDeveloper ? c.devRole : roleLabel(m.role)}</b>
           </div>
-          {selfTeamEditable && teamSeg ? (
-            teamSeg
-          ) : (
-            <div className="muw-kv">
-              <span>{c.teamField}</span>
-              <b>{team ? teamName(team) : c.teamUnassigned}</b>
-            </div>
-          )}
           <div className="muw-kv">
             <span>{u.status}</span>
             <b>{m.status === "active" ? c.statusActive : c.statusInactive}</b>
@@ -494,7 +452,6 @@ export function MobileMemberDetail({
                 {panel.lastOwner ? null : <ChevronRight className="muw-chev" aria-hidden="true" />}
               </button>
             </div>
-            {teamSeg}
             <div className="muw-kv">
               <span>{u.status}</span>
               <div className="muw-seg" role="radiogroup" aria-label={u.status}>

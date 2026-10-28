@@ -11,7 +11,7 @@
 .adm .usw-filters { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .adm .usw-filters .dd > button { border: 0; background: transparent; box-shadow: none; }
 
-.adm .usw-th, .adm .usw-tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, 132px) 72px 136px 72px 92px; column-gap: 16px; align-items: center; padding: 0 12px; }
+.adm .usw-th, .adm .usw-tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, 132px) 136px 72px 92px; column-gap: 16px; align-items: center; padding: 0 12px; }
 .adm .usw-th { padding-bottom: 8px; border-bottom: 0.5px solid var(--separator); font-size: 12px; color: #6b6878; }
 .adm .usw-th .r, .adm .usw-c.r { text-align: right; }
 .adm .usw-rows { display: flex; flex-direction: column; }

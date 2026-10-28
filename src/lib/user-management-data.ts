@@ -36,7 +36,6 @@ export type DirectoryMemberVM = {
   joinedAt: string | null;
   isSelf: boolean;
   isDeveloper: boolean;
-  teamKind: string | null;
   /** 신분 서류 상태(칩용) — `staff_documents.view` 가 없으면 항상 null, 서류가 없어도 null. */
   idDoc: IdDocumentBadge | null;
 };
@@ -155,12 +154,6 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
       : { data: [] as { user_id: string }[] };
   const devIds = new Set(((paData ?? []) as { user_id: string }[]).map((row) => row.user_id));
 
-  // 멤버십별 팀 종류 (현장/사무실), 조직의 팀에서 해석한다.
-  const orgIds = [...new Set(memberships.map((membership) => membership.organization_id))];
-  const { data: teamData } =
-    orgIds.length > 0 ? await service.from("teams").select("id, kind").in("organization_id", orgIds) : { data: [] as { id: string; kind: string }[] };
-  const teamKindById = new Map(((teamData ?? []) as { id: string; kind: string }[]).map((team) => [team.id, team.kind]));
-
   // 서류 상태는 권한이 있을 때만 읽는다(없으면 데이터 자체가 화면으로 안 간다). 플랫폼 세션은 한 조직이 아니라 제외.
   const canViewIdDocs = session.capabilities.includes("staff_documents.view") && session.organization.id !== "platform";
   const idDocByUser = canViewIdDocs ? await loadIdDocumentBadges(session.organization.id) : new Map<string, IdDocumentBadge>();
@@ -178,7 +171,6 @@ export async function loadUserDirectory(session: AppSession): Promise<UserDirect
       joinedAt: membership.joined_at,
       isSelf: membership.user_id === session.user.id,
       isDeveloper: devIds.has(membership.user_id),
-      teamKind: membership.team_id ? teamKindById.get(membership.team_id) ?? null : null,
       idDoc: membership.organization_id === session.organization.id ? idDocByUser.get(membership.user_id) ?? null : null,
     };
   });

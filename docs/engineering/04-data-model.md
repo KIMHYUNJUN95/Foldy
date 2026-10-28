@@ -230,6 +230,9 @@ removed
 
 ## teams
 
+> **2026-10-28: 화면에서 안 쓴다.** 소속(현장 · 사무실)은 역할로 이미 정해져 사용자 관리 · 직원 목록에서 뺐고 바꾸는 액션
+> (`setMemberTeam`)도 지웠다. 표 · `memberships.team_id` 값은 그대로 둔다(지난 이력 표시용, 되돌릴 수 있게).
+
 **Phase 1 implemented (2026-07-14), migration `supabase/migrations/202607140001_teams.sql` — NOT yet
 applied to the linked Supabase project.** Within-org 소속(현장/사무실) split. The org stays the tenant
 boundary (see `docs/planning/01-decision-log.md` → 2026-07-14 "조직 모델 방향"); `teams` adds a

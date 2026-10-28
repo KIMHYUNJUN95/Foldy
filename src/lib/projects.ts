@@ -51,6 +51,11 @@ export type ProjectDetailData = {
   members: ProjectMemberInfo[];
   sections: ProjectSectionInfo[];
   tasks: TaskRecord[];
+  /**
+   * 멤버별 「아직 열린(open · in_progress) 내가 쓴 할 일」 수와 제목 최대 5개(2026-10-28) — 나가기 · 빼기
+   * 확인 시트가 「할 일 N개는 프로젝트에 남아요」 를 서버 값으로 그린다.
+   */
+  openTasksByAuthor: Record<string, { count: number; titles: string[] }>;
 };
 
 type ProfileName = { id: string; name: string };
@@ -91,6 +96,20 @@ function buildMembers(
       if (a.role !== b.role) return a.role === "owner" ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
+}
+
+/** 작성자별 열린 할 일 수 + 제목 최대 5개(목록 순서 그대로 — 최근 것부터). 소프트 삭제된 작업은 `tasks` 에 이미 없다. */
+export function countOpenTasksByAuthor(
+  tasks: Pick<TaskRecord, "createdByUserId" | "status" | "title">[],
+): Record<string, { count: number; titles: string[] }> {
+  const out: Record<string, { count: number; titles: string[] }> = {};
+  for (const t of tasks) {
+    if (t.status !== "open" && t.status !== "in_progress") continue;
+    const entry = (out[t.createdByUserId] ??= { count: 0, titles: [] });
+    entry.count += 1;
+    if (entry.titles.length < 5) entry.titles.push(t.title);
+  }
+  return out;
 }
 
 /**
@@ -238,5 +257,6 @@ export async function getProjectDetail(
     members,
     sections,
     tasks,
+    openTasksByAuthor: countOpenTasksByAuthor(tasks),
   };
 }

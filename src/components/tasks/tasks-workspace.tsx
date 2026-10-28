@@ -97,6 +97,8 @@ import { cn } from "@/lib/utils";
 import "./tasks-white.css";
 
 type Copy = Dictionary["tasks"];
+/** 같은 토스트 자리를 나눠 쓰는 종류 — 한 번에 하나만 보인다. */
+type ToastKind = "notice" | "skip" | "complete" | "delete";
 type View =
   | "today"
   | "tomorrow"
@@ -414,23 +416,38 @@ export function TasksWorkspace({
   const [deletedUndoIds, setDeletedUndoIds] = useState<string[] | null>(null);
   const deleteUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
-   * 완료 실행 취소와 삭제 실행 취소는 같은 자리(토스트 하나)를 쓴다. 둘이 겹치면 **가장 최근 것**을
-   * 보여 주고, 다른 쪽 상태는 그대로 둔다 — 하나를 치워도 다른 쪽 실행 취소가 사라지지 않는다
-   * (2026-10-26, 예전엔 닫기 한 번에 둘 다 비워졌다).
+   * 토스트는 한 번에 **하나만** 보인다(2026-10-28). 안내 · 건너뛰기 취소 · 완료 취소 · 삭제 취소가 같은
+   * 고정 자리(.toast-dock)를 쓰는데, 예전엔 동시에 떠서 겹치고 아래쪽 「실행 취소」가 가려졌다.
+   * 토스트가 새로 뜰 때마다 번호표(toastSeq)를 올리고, 살아 있는 것 중 번호가 가장 큰 것만 그린다 —
+   * 최근 것이 위로 오고, 치우면 아직 살아 있는 이전 것이 이어서 보인다(각자 자기 타이머 그대로).
    */
-  const [lastUndoKind, setLastUndoKind] = useState<"complete" | "delete">("complete");
-  const showDeleteUndo = useCallback((ids: string[]) => {
-    if (ids.length === 0) return;
-    if (deleteUndoTimer.current) clearTimeout(deleteUndoTimer.current);
-    setDeletedUndoIds(ids);
-    setLastUndoKind("delete");
-    deleteUndoTimer.current = setTimeout(() => setDeletedUndoIds(null), 6000);
+  const [toastSeq, setToastSeq] = useState<Record<ToastKind, number>>({
+    notice: 0,
+    skip: 0,
+    complete: 0,
+    delete: 0,
+  });
+  const toastSeqRef = useRef(0);
+  const bumpToast = useCallback((kind: ToastKind) => {
+    const n = ++toastSeqRef.current;
+    setToastSeq((cur) => ({ ...cur, [kind]: n }));
   }, []);
+  const showDeleteUndo = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      if (deleteUndoTimer.current) clearTimeout(deleteUndoTimer.current);
+      setDeletedUndoIds(ids);
+      bumpToast("delete");
+      deleteUndoTimer.current = setTimeout(() => setDeletedUndoIds(null), 6000);
+    },
+    [bumpToast],
+  );
   /** 서버 액션 실패 안내(완료 · 되돌리기 · 삭제 · 건너뛰기) — 이동 거절 토스트 자리를 함께 쓴다. */
   const notifyActionFailed = useCallback(() => {
     haptic("error");
     setMoveNotice("action_failed");
-  }, []);
+    bumpToast("notice");
+  }, [bumpToast]);
 
   // 삭제 확정 (메뉴의 단건 또는 다중 선택 일괄). 낙관적으로 행을 숨긴 뒤
   // 서버 일괄 삭제를 실행한다. 작성자 본인의 작업만 실제로 지워진다.
@@ -446,15 +463,17 @@ export function TasksWorkspace({
           ({ deletedIds } = await deleteTasksInList(ids));
         } catch {
           // 트랜지션이 끝나면 낙관적 숨김은 저절로 버려져 행이 돌아온다 — 이유만 알려 준다.
+          // 선택 모드와 고른 항목은 그대로 둔다(2026-10-28) — 바로 다시 시도할 수 있게.
           notifyActionFailed();
           return;
         }
+        // 서버가 확인한 뒤에야 선택 모드를 끝낸다.
+        setSelectMode(false);
+        setSelectedIds(new Set());
         // 실제로 지워진 것만 되돌릴 수 있다 — 남의 작업을 같이 골랐어도 그건 안 지워진다.
         showDeleteUndo(deletedIds);
       });
       setConfirmIds(null);
-      setSelectMode(false);
-      setSelectedIds(new Set());
     },
     [hideTasksOptimistically, notifyActionFailed, showDeleteUndo],
   );
@@ -498,9 +517,10 @@ export function TasksWorkspace({
       });
       if (skipUndoTimer.current) clearTimeout(skipUndoTimer.current);
       setSkipUndo({ taskId, date });
+      bumpToast("skip");
       skipUndoTimer.current = setTimeout(() => setSkipUndo(null), 6000);
     },
-    [notifyActionFailed],
+    [bumpToast, notifyActionFailed],
   );
   // 서버 액션은 상태 갱신 함수(updater) 밖에서 부른다 — updater 는 Strict Mode 에서 두 번 돌 수 있다.
   const undoSkipOccurrence = useCallback(() => {
@@ -596,14 +616,14 @@ export function TasksWorkspace({
       if (complete) {
         setUndoTask(task);
         setUndoOcc(occurrence?.date ?? null);
-        setLastUndoKind("complete");
+        bumpToast("complete");
         undoTimer.current = setTimeout(() => setUndoTask(null), 6000);
       } else {
         setUndoTask(null);
         setUndoOcc(null);
       }
     },
-    [runStatus],
+    [bumpToast, runStatus],
   );
   const handleUndo = useCallback(() => {
     haptic("light");
@@ -651,6 +671,7 @@ export function TasksWorkspace({
     const raf = requestAnimationFrame(() => {
       if (skipUndoTimer.current) clearTimeout(skipUndoTimer.current);
       setSkipUndo({ taskId, date });
+      bumpToast("skip");
       skipUndoTimer.current = setTimeout(() => setSkipUndo(null), 6000);
       const next = new URLSearchParams(searchParams.toString());
       next.delete("skippedTask");
@@ -659,7 +680,7 @@ export function TasksWorkspace({
       router.replace(`/mobile/tasks${query ? `?${query}` : ""}`, { scroll: false });
     });
     return () => cancelAnimationFrame(raf);
-  }, [router, searchParams]);
+  }, [bumpToast, router, searchParams]);
   /**
    * 빠른 추가 성공(`?created=1`) 처리 — **입력을 비우고 시트를 열어 둔다.**
    *
@@ -738,11 +759,22 @@ export function TasksWorkspace({
   const toastVisible = !!(
     moveNotice || skipUndo || undoTask || deletedUndoIds?.length
   );
-  // 완료 / 삭제 실행 취소 중 지금 보여 줄 쪽 — 둘 다 살아 있으면 최근 것(lastUndoKind).
-  const hasDeleteUndo = !!deletedUndoIds?.length;
-  const showCompleteUndo =
-    hydrated && !!undoTask && (lastUndoKind === "complete" || !hasDeleteUndo);
-  const showDeleteUndoToast = hydrated && hasDeleteUndo && !showCompleteUndo;
+  // 지금 보여 줄 토스트 하나 — 살아 있는 것 중 가장 최근(toastSeq 가 큰) 것.
+  const visibleToast: ToastKind | null = (() => {
+    const alive: Record<ToastKind, boolean> = {
+      notice: !!moveNotice,
+      skip: !!skipUndo,
+      complete: !!undoTask,
+      delete: !!deletedUndoIds?.length,
+    };
+    let best: ToastKind | null = null;
+    for (const k of ["notice", "skip", "complete", "delete"] as const) {
+      if (alive[k] && (best === null || toastSeq[k] >= toastSeq[best])) best = k;
+    }
+    return best;
+  })();
+  const showCompleteUndo = hydrated && visibleToast === "complete";
+  const showDeleteUndoToast = hydrated && visibleToast === "delete";
   // 반복 회차 상태(2026-07-30): taskId → (date → state). 완료/지연 판정에 사용.
   const occByTask = useMemo(() => {
     const m = new Map<string, Map<string, OccurrenceState>>();
@@ -1417,6 +1449,7 @@ export function TasksWorkspace({
                 disabled={true}
                 items={over}
                 onPersist={reorderTasks}
+                onPersistError={notifyActionFailed}
               />
             </section>
           ) : null}
@@ -1431,6 +1464,7 @@ export function TasksWorkspace({
                 items={mergeByDateOrder(todays, recToday, today)}
                 occurrenceDate={today}
                 onPersistDate={reorderDateTasks}
+                onPersistError={notifyActionFailed}
               />
             </section>
           ) : null}
@@ -1484,6 +1518,7 @@ export function TasksWorkspace({
                 items={mergeByDateOrder(list, recList, tomorrowDate)}
                 occurrenceDate={tomorrowDate}
                 onPersistDate={reorderDateTasks}
+                onPersistError={notifyActionFailed}
               />
             </section>
           )}
@@ -1509,7 +1544,8 @@ export function TasksWorkspace({
             noMatchState()
           ) : (
             <section className="tkw-sec">
-              <ReorderableTaskList cardProps={cardProps} disabled={reorderDisabled} items={list} onPersist={reorderTasks} />
+              <ReorderableTaskList cardProps={cardProps} disabled={reorderDisabled} items={list} onPersist={reorderTasks}
+                onPersistError={notifyActionFailed} />
             </section>
           )}
           {addRow}
@@ -2194,7 +2230,9 @@ export function TasksWorkspace({
             <div className="tkw-sheet">
               <p className="tkw-sheet__t">{pressTask.title}</p>
               <div className="tkw-act">
-                {canEditAny || pressTask.createdByUserId === currentUserId ? (
+                {canEditAny ||
+                pressTask.createdByUserId === currentUserId ||
+                pressTask.projectOwnerUserId === currentUserId ? (
                   <button
                     onClick={() => {
                       const id = pressTask.id;
@@ -2218,7 +2256,9 @@ export function TasksWorkspace({
                   <ListChecks aria-hidden="true" />
                   {copy.actionSelect}
                 </button>
-                {canEditAny || pressTask.createdByUserId === currentUserId ? (
+                {canEditAny ||
+                pressTask.createdByUserId === currentUserId ||
+                pressTask.projectOwnerUserId === currentUserId ? (
                   <button
                     className="is-red"
                     onClick={() => {
@@ -2292,7 +2332,7 @@ export function TasksWorkspace({
       {/* 이동 거절 안내 — 반복 작업을 옮기려 했을 때. 서버가 돌려주는 에러 코드별로 문구가 다르다:
           `recurring_series` = 표준 반복은 애초에 스와이프를 못 연다(줄이 이미 막지만, 다른 경로 대비),
           `duplicate_occurrence` = 그 날짜에 이미 회차가 있는 레거시 케이스. 모르는 값은 duplicate 문구로 폴백. */}
-      {moveNotice && hydrated ? (
+      {moveNotice && hydrated && visibleToast === "notice" ? (
         <TaskToast
           icon={moveNotice === "save_failed" || moveNotice === "action_failed" ? AlertTriangle : Repeat}
           message={
@@ -2345,7 +2385,7 @@ export function TasksWorkspace({
       ) : null}
 
       {/* 회차 건너뛰기 되돌리기 토스트 — skipped 는 영구 상태라 실행 취소 경로가 반드시 필요하다. */}
-      {skipUndo && hydrated ? (
+      {skipUndo && hydrated && visibleToast === "skip" ? (
         <TaskToast
           action={{ label: copy.undo, onAction: undoSkipOccurrence }}
           icon={SkipForward}

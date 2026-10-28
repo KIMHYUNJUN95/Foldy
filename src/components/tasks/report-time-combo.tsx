@@ -91,7 +91,8 @@ export function ReportTimeCombo({
       setActive(Math.min(opts.length - 1, Math.max(0, at + (e.key === "ArrowDown" ? 1 : -1))));
       return;
     }
-    if (e.key === "Enter") {
+    // 조합(IME) 중 Enter 는 글자 확정이다 — 시각을 제출하지 않는다.
+    if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
       e.preventDefault();
       const opt = opts[at];
       if (!opt) return;

@@ -1053,6 +1053,10 @@ participant rows. `priority`/`status` are text+check (not enums). Notification e
 `task_shared` / `task_updated` / `task_completed`; task photos reuse the `request-images` bucket
 (`task-images` / `task-update-images` subfolders). All writes go through service-role server
 actions with explicit permission checks; reads are RLS-scoped via `is_task_participant()`.
+2026-10-28 (`202610280001_task_write_grants.sql`): 할 일 · 프로젝트 계열 9개 표(`tasks` · `task_participants` · `task_updates` ·
+`task_occurrence_state` · `task_occurrence_order` · `task_report_schedules` · `projects` · `project_participants` · `project_sections`)
+에서 `anon` · `authenticated` 의 INSERT · UPDATE · DELETE · TRUNCATE 를 회수 — 사용자 권한은 SELECT 만, 쓰기는 service role 만.
+이유는 `docs/engineering/05-rls-permissions.md` → tasks.
 
 Personal todo / shared task inbox. Private by default, but expandable to one shared task with participant set and common status. See `docs/engineering/09-todo-task-technical-design.md`.
 
@@ -2147,7 +2151,7 @@ Beds24 에 없는 건물 · 객실을 룸 링크에서만 만든다. 캘린더 �
 ## 2026-10-20 `task_report_schedules` — 업무일지 예약 보내기
 
 `organization_id` · `user_id`(profiles) · `report_date`(도쿄 날짜) · `body`(예약 순간의 본문, 1~40,000자) · `send_at` · `status`(scheduled → sending → sent | failed, cancelled) ·
-`error`(이유 코드만) · `claimed_at` · `sent_at`. 부분 유니크 `(user_id, report_date) where status in ('scheduled','sending')`, 보낼 것 찾기 부분 인덱스 `(send_at) where status = 'scheduled'`.
+`error`(이유 코드만) · `claimed_at` · `sent_at`. 부분 유니크 `(organization_id, user_id, report_date) where status in ('scheduled','sending')`(2026-10-28 `202610280001` 에서 조직을 넣음 — 전엔 `(user_id, report_date)` 라 두 조직 소속이면 같은 날짜를 각 조직에서 예약하지 못했다), 보낼 것 찾기 부분 인덱스 `(send_at) where status = 'scheduled'`.
 RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules` · `task_report_tick_if_needed` · `task_report_tick_token_ok`(service role 만). 마이그레이션 `202610200005`.
 상세 `docs/product/18-todo-task-workflow.md` 「업무일지 예약 보내기」.
 

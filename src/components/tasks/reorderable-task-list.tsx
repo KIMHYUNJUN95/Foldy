@@ -14,6 +14,9 @@ type CardProps = Omit<
   "task" | "reorderable" | "reordering" | "onReorderHandleDown"
 >;
 
+/** 순서 저장 액션 결과 — `{ ok: false }` 이거나 던지면 실패다(void 를 돌려주는 옛 액션은 성공으로 본다). */
+type PersistResult = { ok: boolean } | void;
+
 type RowMetric = { id: string; top: number; height: number };
 
 function moveItem<T>(list: T[], from: number, to: number): T[] {
@@ -41,6 +44,7 @@ export function ReorderableTaskList({
   onPersist,
   occurrenceDate,
   onPersistDate,
+  onPersistError,
   behindByTask,
 }: {
   items: TaskRecord[];
@@ -49,7 +53,7 @@ export function ReorderableTaskList({
   behindByTask?: Map<string, number>;
   disabled?: boolean;
   /** 날짜 목록이 아닌 곳(관리함)에서 쓰는 단순 순서 저장. */
-  onPersist?: (orderedIds: string[]) => void;
+  onPersist?: (orderedIds: string[]) => Promise<PersistResult> | PersistResult;
   /**
    * 날짜 목록(오늘/내일)에서는 일회성과 반복 회차가 섞이고 저장처가 갈리므로, 항목별로 반복 여부를
    * 함께 넘긴다. 서버가 `tasks.sort_order` / `task_occurrence_order` 로 나눠 쓴다.
@@ -58,7 +62,9 @@ export function ReorderableTaskList({
   onPersistDate?: (
     occurrenceDate: string,
     items: { taskId: string; recurring: boolean }[],
-  ) => void;
+  ) => Promise<PersistResult> | PersistResult;
+  /** 저장이 실패하면(응답 `ok:false` 또는 던짐) 순서를 끌기 전으로 되돌린 뒤 불린다 — 부모가 실패 안내를 띄운다. */
+  onPersistError?: () => void;
 }) {
   const [order, setOrder] = useState<TaskRecord[]>(items);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -83,6 +89,7 @@ export function ReorderableTaskList({
   const onPersistRef = useRef(onPersist);
   const onPersistDateRef = useRef(onPersistDate);
   const occurrenceDateRef = useRef(occurrenceDate);
+  const onPersistErrorRef = useRef(onPersistError);
 
   // 한 번만 붙는 window 리스너(아래)가 현재 값을 읽도록 렌더 state/props 를 ref 에 비춘다.
   // 렌더 중에는 ref 에 쓸 수 없으므로 커밋 뒤 effect 에서 한다.
@@ -96,7 +103,8 @@ export function ReorderableTaskList({
     onPersistRef.current = onPersist;
     onPersistDateRef.current = onPersistDate;
     occurrenceDateRef.current = occurrenceDate;
-  }, [onPersist, onPersistDate, occurrenceDate]);
+    onPersistErrorRef.current = onPersistError;
+  }, [onPersist, onPersistDate, occurrenceDate, onPersistError]);
 
   // 서버 목록으로 다시 맞춘다 — 단, 드래그 중에는 하지 않는다(손가락 밑에서 행이 빠져나간다).
   // 저장된 정렬 뒤에는 다시 검증된 목록이 여기로 도착한다.
@@ -130,17 +138,32 @@ export function ReorderableTaskList({
       setDragId(null);
       setDragDelta(0);
       if (ti !== si) {
-        const next = moveItem(orderRef.current, si, ti);
+        const prev = orderRef.current;
+        const next = moveItem(prev, si, ti);
         setOrder(next);
         const date = occurrenceDateRef.current;
+        let pending: Promise<PersistResult> | PersistResult;
         if (date && onPersistDateRef.current) {
-          onPersistDateRef.current(
+          pending = onPersistDateRef.current(
             date,
             next.map((t) => ({ taskId: t.id, recurring: isStandardRecurrence(t.recurrenceRule) })),
           );
         } else {
-          onPersistRef.current?.(next.map((t) => t.id));
+          pending = onPersistRef.current?.(next.map((t) => t.id));
         }
+        // 저장이 실패하면 끌기 전 순서로 되돌린다 — 안 그러면 서버와 다른 순서가 새로고침까지 남는다(2026-10-28).
+        const rollback = () => {
+          // 그 사이 서버 목록이 새로 도착했다면(id 순서가 달라졌다면) 건드리지 않는다.
+          const nextKey = next.map((t) => t.id).join("\u0000");
+          setOrder((cur) => (cur.map((t) => t.id).join("\u0000") === nextKey ? prev : cur));
+          onPersistErrorRef.current?.();
+        };
+        Promise.resolve(pending).then(
+          (res) => {
+            if (res && res.ok === false) rollback();
+          },
+          rollback,
+        );
       }
     }
     function onMove(e: PointerEvent) {

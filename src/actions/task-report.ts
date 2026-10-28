@@ -118,34 +118,62 @@ export async function generateDailyReport(date: string): Promise<DailyReportResu
   const tmpl = REPORT_TEMPLATE[locale] ?? REPORT_TEMPLATE.ko;
 
   // 이 도쿄 날짜에 본인이 완료한 것. `task_updates` 의 `completed`/`reopened` 이벤트에서 계산한다
-  // (`tasks.status` 가 아님). 반복 업무는 완료하면 행을 다음 회차로 넘기고 `open` 으로 두므로
-  // `status=completed` 가 되지 않아 완료 기록은 로그에만 남는다. 업무별 순증(completed − reopened)으로
-  // 세면 반복 완료도 잡히고 같은 날 되돌린 것은 상쇄된다.
+  // (`tasks.status` 가 아님). 반복 업무는 완료해도 행이 `open` 그대로이고(2026-07-30 롤포워드 폐지 —
+  // 완료는 회차별 `task_occurrence_state` 에 든다) `status=completed` 가 되지 않아 완료 기록은 로그에만 남는다.
+  //
+  // 셈은 **(작업, 회차)별 마지막 사건**으로 한다(2026-10-28). 반복의 완료 · 다시 열기 로그는 `body` 에 회차
+  // 날짜를 남기므로 회차마다 따로 맞춘다 — 예전엔 작업별 합(완료 − 다시 열기)이라 두 회차를 완료하고 하나를
+  // 되돌려도 남거나 사라지는 게 뒤섞였다. 다시 열기는 **누가 했든** 그 완료를 지운다(동료가 「아직 아님」으로
+  // 되돌린 일을 내 일지에 올리지 않는다). 마지막 사건이 «내가 한 완료»일 때만 내 일지에 넣는다.
+  // 회차 날짜가 없는 예전 로그는 작업 하나를 한 칸으로 본다.
   const supabase = await getSupabaseServerClient();
   const dayStart = new Date(`${day}T00:00:00+09:00`);
   const dayStartIso = dayStart.toISOString();
   const dayEndIso = new Date(dayStart.getTime() + 86_400_000).toISOString(); // +09:00 범위 == 도쿄 하루
-  const { data: updData, error: updErr } = await supabase
+  const { data: mineData, error: mineErr } = await supabase
     .from("task_updates")
-    .select("task_id, update_type, created_at")
-    .in("update_type", ["completed", "reopened"])
+    .select("task_id")
+    .eq("update_type", "completed")
     .eq("created_by_user_id", session.user.id)
     .gte("created_at", dayStartIso)
-    .lt("created_at", dayEndIso)
-    .order("created_at", { ascending: true });
-  if (updErr) return { ok: false, reason: "error" };
+    .lt("created_at", dayEndIso);
+  if (mineErr) return { ok: false, reason: "error" };
+  const myTaskIds = [...new Set(((mineData ?? []) as { task_id: string }[]).map((r) => r.task_id))];
 
-  type Upd = { task_id: string; update_type: string };
-  const net = new Map<string, number>();
-  const order: string[] = []; // 첫 완료 순서대로 task_id
-  for (const r of (updData ?? []) as Upd[]) {
-    if (!net.has(r.task_id)) {
-      net.set(r.task_id, 0);
-      order.push(r.task_id);
-    }
-    net.set(r.task_id, (net.get(r.task_id) ?? 0) + (r.update_type === "completed" ? 1 : -1));
+  type Upd = { task_id: string; update_type: string; body: string | null; created_by_user_id: string };
+  let events: Upd[] = [];
+  if (myTaskIds.length > 0) {
+    const { data: updData, error: updErr } = await supabase
+      .from("task_updates")
+      .select("task_id, update_type, body, created_by_user_id, created_at")
+      .in("task_id", myTaskIds)
+      .in("update_type", ["completed", "reopened"])
+      .gte("created_at", dayStartIso)
+      .lt("created_at", dayEndIso)
+      .order("created_at", { ascending: true });
+    if (updErr) return { ok: false, reason: "error" };
+    events = (updData ?? []) as Upd[];
   }
-  const completedIds = order.filter((id) => (net.get(id) ?? 0) > 0);
+
+  const isOccurrenceKey = (body: string | null) => !!body && /^\d{4}-\d{2}-\d{2}$/.test(body);
+  const last = new Map<string, Upd>(); // `${task_id}|${회차}` → 마지막 사건
+  const firstDone = new Map<string, number>(); // task_id → 내 첫 완료 순번(목록 순서)
+  events.forEach((r, index) => {
+    const key = `${r.task_id}|${isOccurrenceKey(r.body) ? r.body : ""}`;
+    // 회차 없는 다시 열기(예전 로그 · 일회성)는 그 작업의 모든 칸을 닫는다.
+    if (r.update_type === "reopened" && !isOccurrenceKey(r.body)) {
+      for (const k of last.keys()) if (k.startsWith(`${r.task_id}|`)) last.set(k, r);
+    }
+    last.set(key, r);
+    if (r.update_type === "completed" && r.created_by_user_id === session.user.id && !firstDone.has(r.task_id)) {
+      firstDone.set(r.task_id, index);
+    }
+  });
+  const doneTasks = new Set<string>();
+  for (const r of last.values()) {
+    if (r.update_type === "completed" && r.created_by_user_id === session.user.id) doneTasks.add(r.task_id);
+  }
+  const completedIds = [...doneTasks].sort((a, b) => (firstDone.get(a) ?? 0) - (firstDone.get(b) ?? 0));
 
   // 제목을 가져온다(조직 범위. 완료 뒤 삭제된 업무는 그냥 빠진다).
   const titleById = new Map<string, string>();

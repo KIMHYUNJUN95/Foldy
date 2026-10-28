@@ -652,3 +652,14 @@
   .adm .atw-rpt__box, .adm .atw-rpt__box svg, .adm .atw-rpt__btn, .adm .atw-rpt__x, .adm .atw-rpt__wchip { transition: none; }
   .adm .atw-rpt__pop { animation: none; }
 }
+
+/* 건너뛴 날 — 상세 패널 (2026-10-28). 상자 없이 0.5px 구분선, 보라 글자 단추. */
+.adm .atw-d__sk { display: flex; flex-direction: column; padding-top: 16px; border-top: 0.5px solid var(--separator); }
+.adm .atw-d__skh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 4px; }
+.adm .atw-d__skh b { font-size: 14px; font-weight: 700; color: #16141f; }
+.adm .atw-d__skh span { font-size: 12px; color: var(--text-3); }
+.adm .atw-d__skr { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; font-size: 13px; color: #16141f; border-top: 0.5px solid var(--separator); }
+.adm .atw-d__skh + .row-collapse .atw-d__skr { border-top: 0; }
+.adm .atw-d__skb { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #7a52e6; cursor: pointer; white-space: nowrap; }
+.adm .atw-d__skb:hover { text-decoration: underline; text-underline-offset: 3px; }
+.adm .atw-d__skmore { align-self: stretch; min-height: 36px; border-top: 0.5px solid var(--separator); text-align: left; }

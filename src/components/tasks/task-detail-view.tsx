@@ -4,13 +4,15 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Pencil, Plus, Send, SkipForward, Trash2, UserMinus, UserPlus } from "lucide-react";
+import { AlertTriangle, ImageIcon, Inbox, MoreHorizontal, Pencil, Plus, Send, SkipForward, Trash2, UserMinus, UserPlus } from "lucide-react";
 import {
   addTaskUpdate,
   completeTask,
   deleteTask,
+  moveTaskToInbox,
   removeTaskParticipant,
   reopenTask,
+  restoreTaskToProject,
   setTaskProgress,
   shareTaskWithUsers,
   skipOccurrenceOn,
@@ -25,6 +27,8 @@ import { uploadRequestImages } from "@/components/requests/request-image-upload"
 import { calendarHref } from "@/components/tasks/linked-context-block";
 import { PhotoGallery } from "@/components/tasks/photo-gallery";
 import { SharePicker } from "@/components/tasks/share-picker";
+import { SkippedDaysSection } from "@/components/tasks/skipped-days-section";
+import { TaskToast } from "@/components/tasks/task-toast";
 import { addMinutesHHMM, CheckMark, contextLabelOf, prioRingClass } from "@/components/tasks/task-card";
 import { haptic } from "@/lib/haptics";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -123,7 +127,9 @@ export function TaskDetailView({
   imgCopy,
   locale,
   occurrenceDate,
+  projectTitle,
   returnView,
+  skippedDays,
   task,
   users,
 }: {
@@ -138,15 +144,31 @@ export function TaskDetailView({
   imgCopy: Dictionary["requestImages"];
   locale: Locale;
   occurrenceDate: string | null;
+  /** 프로젝트 작업일 때 그 프로젝트 이름(「관리함으로 옮기기」 부제). */
+  projectTitle?: string;
   returnView: "today" | "tomorrow" | "calendar";
+  /** 최근 30일에 건너뛴 회차(최신순). 반복 업무가 아니면 빈 배열. */
+  skippedDays?: string[];
   task: TaskDetail;
   users: ShareableUser[];
 }) {
   const router = useRouter();
   const w = copy.mobileWhite;
+  // 나가기 문구는 실제 작성자 기준 — 서버도 작성자 본인일 때만 「나가기 = 삭제」 다(프로젝트 주인 · 개발자는 아님).
+  const isAuthor = task.createdByUserId === currentUserId;
+  // 관리함으로 옮기기는 작성자(또는 개발자)만 — 프로젝트 주인 권한(2026-10-28)으로는 남의 할 일을 빼지 않는다.
+  // canEditCore 인데 작성자도 주인도 아니면 개발자다.
+  const canMoveToInbox =
+    isAuthor || (canEditCore && task.projectOwnerUserId !== currentUserId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [isMoving, startMoveTransition] = useTransition();
+  const [inboxToast, setInboxToast] = useState<
+    { kind: "moved"; projectId: string; sectionId: string | null } | { kind: "error" } | null
+  >(null);
+  const inboxToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; name: string } | null>(null);
   const [updatePhotosOpen, setUpdatePhotosOpen] = useState(false);
@@ -190,6 +212,45 @@ export function TaskDetailView({
     const id = requestAnimationFrame(() => setPendingStatus(null));
     return () => cancelAnimationFrame(id);
   }, [serverStatus, isTogglingStatus]);
+
+  function showInboxToast(next: NonNullable<typeof inboxToast>) {
+    if (inboxToastTimer.current) clearTimeout(inboxToastTimer.current);
+    setInboxToast(next);
+    inboxToastTimer.current = setTimeout(() => setInboxToast(null), 6000);
+  }
+  useEffect(() => () => {
+    if (inboxToastTimer.current) clearTimeout(inboxToastTimer.current);
+  }, []);
+
+  function moveToInbox() {
+    if (isMoving) return;
+    setMoreOpen(false);
+    startMoveTransition(async () => {
+      const res = await moveTaskToInbox(task.id);
+      if (!res.ok) {
+        haptic("error");
+        showInboxToast({ kind: "error" });
+        return;
+      }
+      haptic("success");
+      showInboxToast({ kind: "moved", projectId: res.previousProjectId, sectionId: res.previousSectionId });
+      router.refresh();
+    });
+  }
+
+  function undoMoveToInbox(prev: { projectId: string; sectionId: string | null }) {
+    setInboxToast(null);
+    startMoveTransition(async () => {
+      const res = await restoreTaskToProject(task.id, prev.projectId, prev.sectionId);
+      if (!res.ok) {
+        haptic("error");
+        showInboxToast({ kind: "error" });
+        return;
+      }
+      haptic("light");
+      router.refresh();
+    });
+  }
 
   function skipCurrentOccurrence() {
     if (!occurrenceDate || isSkippingOccurrence) return;
@@ -319,6 +380,16 @@ export function TaskDetailView({
         <span>{crumb}</span>
         {canEditCore ? (
           <>
+            {task.projectId && canMoveToInbox ? (
+              <button
+                aria-label={copy.moreActions}
+                className="tkw-icon"
+                onClick={() => setMoreOpen(true)}
+                type="button"
+              >
+                <MoreHorizontal aria-hidden="true" />
+              </button>
+            ) : null}
             <Link aria-label={copy.editTask} className="tkw-icon" href={`/mobile/tasks/${task.id}/edit`}>
               <Pencil aria-hidden="true" />
             </Link>
@@ -358,6 +429,9 @@ export function TaskDetailView({
 
       {task.description ? <p className="tkw-d__desc">{task.description}</p> : null}
       {!canEditCore ? <p className="tkw-d__note">{copy.coreEditHint.replace("{name}", task.authorName)}</p> : null}
+      {canEditCore && task.projectOwnerUserId === currentUserId && task.createdByUserId !== currentUserId ? (
+        <p className="tkw-d__note">{copy.projects.ownerCanEditNote}</p>
+      ) : null}
 
       {/* 상태 — 대기 | 진행 중 | 완료. 반복 업무는 그리지 않는다(2026-10-26): 행 상태는 언제나 열림이고
           완료는 회차별이라 「진행 중」이 성립하지 않는다 — 완료 / 되돌리기는 위의 큰 고리가 맡는다. */}
@@ -424,6 +498,14 @@ export function TaskDetailView({
       ) : null}
 
       <dl className="tkw-dl">
+        {task.authorLeftProject ? (
+          <>
+            <dt>{copy.projects.authorLabel}</dt>
+            <dd>
+              {task.authorName} <span style={{ color: "#6b6878" }}>· {copy.projects.authorLeftProject}</span>
+            </dd>
+          </>
+        ) : null}
         <dt>{copy.scheduleTitle}</dt>
         <dd className={cn(!scheduleText && "is-muted")}>{scheduleText || copy.scheduleEmpty}</dd>
         {task.recurrenceRule ? (
@@ -486,6 +568,11 @@ export function TaskDetailView({
           </>
         ) : null}
       </dl>
+
+      {/* 비어도 마운트해 둔다 — 마지막 줄을 되살린 뒤에도 「다시 건너뛰기」 토스트가 남아야 한다. */}
+      {isRecurring && skippedDays ? (
+        <SkippedDaysSection copy={copy} days={skippedDays} locale={locale} taskId={task.id} />
+      ) : null}
 
       {/* 업데이트 기록 */}
       <div className="tkw-up">
@@ -634,12 +721,46 @@ export function TaskDetailView({
                   type="button"
                 >
                   <UserMinus aria-hidden="true" />
-                  {canEditCore ? copy.leaveWarnAuthor : copy.leaveSelf}
+                  {isAuthor ? copy.leaveWarnAuthor : copy.leaveSelf}
                 </button>
               </div>
             </div>
           )}
         </BottomSheet>
+      ) : null}
+
+      {moreOpen && task.projectId && canMoveToInbox ? (
+        <BottomSheet ariaLabel={copy.moreActions} onClose={() => setMoreOpen(false)}>
+          <div className="tkw-sheet">
+            <p className="tkw-sheet__t">{task.title}</p>
+            <div className="tkw-act">
+              <button disabled={isMoving} onClick={moveToInbox} type="button">
+                <Inbox aria-hidden="true" />
+                <span>
+                  {copy.moveToInbox}
+                  <span className="tkw-act__s">{copy.moveToInboxSub.replace("{project}", projectTitle ?? "")}</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      ) : null}
+
+      {inboxToast ? (
+        <TaskToast
+          action={
+            inboxToast.kind === "moved"
+              ? {
+                  label: copy.moveToInboxUndo,
+                  onAction: () => undoMoveToInbox({ projectId: inboxToast.projectId, sectionId: inboxToast.sectionId }),
+                }
+              : undefined
+          }
+          icon={inboxToast.kind === "moved" ? Inbox : AlertTriangle}
+          message={inboxToast.kind === "moved" ? copy.movedToInbox : copy.moveToInboxFailed}
+          onDismiss={() => setInboxToast(null)}
+          tone={inboxToast.kind === "moved" ? "neutral" : "danger"}
+        />
       ) : null}
 
       {confirmDelete && canChooseRecurringDelete && occurrenceDate ? (
@@ -694,13 +815,13 @@ export function TaskDetailView({
 
       {confirmLeave ? (
         <BottomSheet
-          ariaLabel={canEditCore ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}
+          ariaLabel={isAuthor ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}
           onClose={() => setConfirmLeave(false)}
         >
           {({ close }) => (
             <div className="tkw-sheet">
-              <h2>{canEditCore ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}</h2>
-              <p className="tkw-sheet__sub">{canEditCore ? copy.leaveAuthorConfirmBody : copy.leaveConfirmBody}</p>
+              <h2>{isAuthor ? copy.leaveAuthorConfirmTitle : copy.leaveConfirmTitle}</h2>
+              <p className="tkw-sheet__sub">{isAuthor ? copy.leaveAuthorConfirmBody : copy.leaveConfirmBody}</p>
               <div className="tkw-btns2">
                 <button className="tkw-btn is-gray" onClick={close} type="button">
                   {copy.cancel}

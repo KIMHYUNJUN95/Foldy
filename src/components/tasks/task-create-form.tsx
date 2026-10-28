@@ -381,11 +381,19 @@ export function TaskCreateForm({
       for (const url of existingImgUrls) formData.append("imageUrls", url);
       const newPhotos = uploaderRef.current?.getItems() ?? [];
       const newSlots = Math.max(0, maxImages - existingImgUrls.length);
+      // 남은 칸보다 많이 골랐으면 조용히 자르지 않고 개수 초과 안내를 띄운 채 멈춘다(2026-10-28) —
+      // 업로더는 새 사진만 세므로 기존 사진 + 새 사진이 한도를 넘을 수 있다.
+      if (newPhotos.length > newSlots) {
+        setError(maxImages === 20 ? copy.photosCountError20 : imgCopy.errorCount);
+        submitLockRef.current = false;
+        setIsSubmitting(false);
+        return;
+      }
       if (newPhotos.length > 0 && newSlots > 0) {
         const requestId = crypto.randomUUID();
         try {
           const { imageUrls } = await uploadRequestImages({
-            items: newPhotos.slice(0, newSlots),
+            items: newPhotos,
             organizationId,
             requestId,
             requestType: "task-images",
@@ -667,7 +675,8 @@ export function TaskCreateForm({
                 aria-label={copy.tagPlaceholder}
                 onChange={(e) => setTagDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  // 조합(IME) 중 Enter 는 글자 확정이다 — 태그로 넣지 않는다.
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                     e.preventDefault();
                     addTag();
                   }

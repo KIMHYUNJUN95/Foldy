@@ -80,7 +80,6 @@ import {
   skipConsoleOccurrence,
   unskipConsoleOccurrence,
   generateConsoleReport,
-  sendConsoleReportToSlack,
   getConsoleProjectDetail,
   getConsoleTaskDetail,
   inviteConsoleProjectMembers,
@@ -115,6 +114,7 @@ import {
   getReportSchedule,
   listReportSchedules,
   scheduleDailyReport,
+  sendDailyReportNow,
   type ReportScheduleView,
 } from "@/actions/task-report-schedule";
 import {
@@ -139,6 +139,7 @@ import type { ProjectDetailData } from "@/lib/projects";
 import type { OccurrenceStateRecord, TaskDetail, TaskRecord } from "@/lib/tasks";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { haptic } from "@/lib/haptics";
+import { SKIPPED_DAYS_VISIBLE, selectRecentSkippedDays } from "@/lib/task-skipped-days";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { ProgressRing, TaskRing, ViewNav, type NavItem } from "./atw-parts";
@@ -152,6 +153,7 @@ import {
   dueDateOf,
   fill,
   fmtLong,
+  fmtMonthDay,
   fmtShort,
   fmtWeekday,
   initial,
@@ -201,6 +203,9 @@ import "./admin-tasks-console.css";
 import "./admin-tasks-white.css";
 
 type View = "today" | "tomorrow" | "inbox" | "shared" | "instr" | "completed" | "calendar";
+
+// 실행 취소 항목 번호 — 같은 항목일 때만 닫기 위한 식별자(렌더와 무관한 값이라 모듈 변수).
+let undoSeq = 0;
 
 type AddDraft = {
   /** "instr" = 지시 탭에서 바로 보내기. 대상이 반드시 있어야 저장된다(아래 `saveInlineAdd`). */
@@ -491,7 +496,16 @@ export function AdminTasksConsole({
   /** 사진 확대(작업 사진 · 노트 사진) — 공용 `ImageLightbox` 에 넘길 묶음과 시작 인덱스. */
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
   // Undo toast (Todoist-style): dark bottom-left toast with a "실행 취소" action, ~6s.
-  const [undo, setUndo] = useState<{ id: number; message: string; sub?: string; onUndo: () => void } | null>(null);
+  const [undo, setUndo] = useState<{
+    id: number;
+    message: string;
+    sub?: string;
+    actionLabel?: string;
+    onUndo: () => void;
+  } | null>(null);
+  // 「건너뛴 날」 — 되살리는 중이라 접히는 줄(`taskId|date`)과, 「더 보기」를 펼친 작업.
+  const [skLeaving, setSkLeaving] = useState<Set<string>>(new Set());
+  const [skExpanded, setSkExpanded] = useState<Set<string>>(new Set());
 
   // ── 이름 맵 ──────────────────────────────────────────────────────────
   const nameMap = useMemo(() => {
@@ -656,7 +670,8 @@ export function AdminTasksConsole({
   );
   const run = useCallback(
     (
-      fn: () => Promise<TaskActionResult>,
+      // 순서 · 프로젝트 멤버 액션은 `{ ok:false, reason }`, 나머지는 `{ ok:false, error }` 를 돌려준다 — 둘 다 받는다.
+      fn: () => Promise<TaskActionResult | { ok: true } | { ok: false; reason: string }>,
       opts?: {
         toast?: string;
         /** 성공 결과를 받는다 — 「오늘로 가져오기」처럼 결과에 따라 문구가 갈리는 경우가 있다. */
@@ -669,20 +684,29 @@ export function AdminTasksConsole({
         // 낙관적 반영은 서버 호출 **전에** — 실패하면 새 props 도착과 함께 자동으로 원복된다
         // (모바일 tasks-workspace.tsx 와 같은 useOptimistic 규칙).
         opts?.optimistic?.();
-        const res = await fn();
+        let res: TaskActionResult | { ok: true } | { ok: false; reason: string };
+        try {
+          res = await fn();
+        } catch {
+          // 네트워크 · 서버 오류로 액션이 던졌다 — 낙관적 반영은 이 트랜지션이 끝나면 원복된다.
+          opts?.onError?.();
+          haptic("error");
+          showToast(dict.errGeneric);
+          return;
+        }
         if (res.ok) {
           if (opts?.toast) showToast(opts.toast);
-          opts?.after?.(res);
+          opts?.after?.(res as Extract<TaskActionResult, { ok: true }>);
           // revalidatePath(CONSOLE_PATH) 를 모든 액션이 성공 경로에서 호출하므로(actions.ts 전수
           // 확인, 2026-08-25) router.refresh() 는 같은 갱신을 한 번 더 도는 중복 왕복이었다.
         } else {
           opts?.onError?.();
           haptic("error");
-          showToast(errMsg(res.error));
+          showToast(errMsg("error" in res ? res.error : res.reason));
         }
       });
     },
-    [errMsg, showToast],
+    [errMsg, showToast, dict.errGeneric],
   );
 
 
@@ -692,9 +716,14 @@ export function AdminTasksConsole({
     const t = setTimeout(() => setUndo(null), 6000);
     return () => clearTimeout(t);
   }, [undo]);
+  // 실행 취소는 한 번에 하나 — 새 항목이 오면 이전 것을 바꾼다. 실행 취소가 끝난 뒤 닫을 때는
+  // 그 사이 뜬 더 새로운 토스트를 지우지 않도록 **자기 항목일 때만** 닫는다(onUndo 의 clear).
   const showUndo = useCallback(
-    (message: string, onUndo: () => void, sub?: string) =>
-      setUndo({ id: Date.now(), message, onUndo, sub }),
+    (message: string, onUndo: (clear: () => void) => void, sub?: string, actionLabel?: string) => {
+      const id = ++undoSeq;
+      const clear = () => setUndo((cur) => (cur && cur.id === id ? null : cur));
+      setUndo({ id, message, onUndo: () => onUndo(clear), sub, actionLabel });
+    },
     [],
   );
 
@@ -836,9 +865,9 @@ export function AdminTasksConsole({
         after: (res) =>
           showUndo(
             dict.tCompleted,
-            () =>
+            (clear) =>
               run(() => toggleConsoleComplete(t.id, false, res.occurrenceDate ?? occDate), {
-                after: () => setUndo(null),
+                after: clear,
               }),
             sub,
           ),
@@ -882,8 +911,8 @@ export function AdminTasksConsole({
         after: () => {
           // 지운 작업을 보고 있었다면 선택만 푼다 — 상세 칸은 보기의 다음 첫 작업으로 넘어간다.
           setSel((cur) => (cur === t.id ? null : cur));
-          showUndo(dict.tDeletedUndoable, () =>
-            run(() => restoreConsoleTask(t.id), { after: () => setUndo(null) }),
+          showUndo(dict.tDeletedUndoable, (clear) =>
+            run(() => restoreConsoleTask(t.id), { after: clear }),
           );
         },
       });
@@ -899,9 +928,47 @@ export function AdminTasksConsole({
       setRecurDel(null);
       run(() => skipConsoleOccurrence(t.id, date), {
         after: () =>
-          showUndo(fill(dict.recurSkippedToast, { date: fmtShort(date, locale) }), () =>
-            run(() => unskipConsoleOccurrence(t.id, date), { after: () => setUndo(null) }),
+          showUndo(fill(dict.recurSkippedToast, { date: fmtShort(date, locale) }), (clear) =>
+            run(() => unskipConsoleOccurrence(t.id, date), { after: clear }),
           ),
+      });
+    },
+    [run, dict, locale, showUndo],
+  );
+  /**
+   * 상세의 「건너뛴 날 → 되살리기」 — 줄은 서버를 기다리지 않고 바로 접히고, 실패하면 다시 펴진다.
+   * 되살린 과거 날짜는 목록에 «밀림» 으로 다시 나타난다(서버 액션의 revalidate 가 데이터를 새로 가져온다).
+   */
+  const restoreSkippedDay = useCallback(
+    (t: TaskRecord, date: string) => {
+      const key = `${t.id}|${date}`;
+      const setLeave = (on: boolean) =>
+        setSkLeaving((cur) => {
+          const next = new Set(cur);
+          if (on) next.add(key);
+          else next.delete(key);
+          return next;
+        });
+      haptic("light");
+      setLeave(true);
+      run(() => unskipConsoleOccurrence(t.id, date), {
+        onError: () => setLeave(false),
+        after: () => {
+          haptic("success");
+          showUndo(
+            fill(dict.skDaysRestoredToast, { date: fmtMonthDay(date, locale) }),
+            (clear) =>
+              run(() => skipConsoleOccurrence(t.id, date), {
+                // 다시 건너뛴 줄은 접힘 표시를 풀어 둔다 — 새 데이터가 오면 접히지 않은 채로 나온다.
+                after: () => {
+                  setLeave(false);
+                  clear();
+                },
+              }),
+            undefined,
+            dict.skDaysSkipAgain,
+          );
+        },
       });
     },
     [run, dict, locale, showUndo],
@@ -1032,7 +1099,7 @@ export function AdminTasksConsole({
     (arr: TaskRecord[]) => arr.filter(matches),
     [matches],
   );
-  const hasActiveFilter = !!(q || prioFilter || dateFilter);
+  const hasActiveFilter = !!(q.trim() || prioFilter || dateFilter);
 
   // ── 작은 구성 요소 ─────────────────────────────────────────────────────────
   // 아바타는 한 가지 옅은 보라 톤(화이트 리디자인) — 사람마다 다른 색을 칠하지 않는다.
@@ -1378,6 +1445,8 @@ export function AdminTasksConsole({
       updatedAt: nowIso,
       participants: [],
       resolvedContext: null,
+      projectOwnerUserId: null,
+      authorLeftProject: false,
     };
 
     run(
@@ -1455,6 +1524,8 @@ export function AdminTasksConsole({
             if (filled !== addHasTitle) setAddHasTitle(filled);
           }}
           onKeyDown={(e) => {
+            // 한글 · 일본어 조합 중 Enter 는 글자 확정이라 저장하지 않는다.
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
             if (e.key === "Enter") saveInlineAdd();
           }}
         />
@@ -1509,7 +1580,7 @@ export function AdminTasksConsole({
             compact
             value={[]}
             pending={addPhotos}
-            maxImages={add.ctx === "project" ? 20 : 5}
+            maxImages={add.ctx === "project" && projectId ? 20 : 5}
             copy={photoCopy}
             onChange={(next) => setAddPhotos(next.pending)}
           />
@@ -1538,6 +1609,7 @@ export function AdminTasksConsole({
                   addTextRef.current.tagInput = e.target.value;
                 }}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                   const buf = addTextRef.current.tagInput;
                   if (e.key === "Enter" || e.key === ",") {
                     e.preventDefault();
@@ -1734,18 +1806,34 @@ export function AdminTasksConsole({
         setPop(null);
         return;
       }
-      run(
-        async () => {
-          for (const uid of removed) {
-            const res = await removeConsoleProjectMember(pid, uid);
-            if (!res.ok) return res;
-          }
-          return added.length
-            ? await inviteConsoleProjectMembers(pid, added)
-            : ({ ok: true } as TaskActionResult);
-        },
-        { toast: dict.tShared, after: () => setPop(null) },
-      );
+      const apply = () =>
+        run(
+          async () => {
+            for (const uid of removed) {
+              const res = await removeConsoleProjectMember(pid, uid);
+              if (!res.ok) return res;
+            }
+            return added.length
+              ? await inviteConsoleProjectMembers(pid, added)
+              : ({ ok: true } as TaskActionResult);
+          },
+          { toast: dict.tShared, after: () => setPop(null) },
+        );
+      if (removed.length === 0) {
+        apply();
+        return;
+      }
+      // 멤버를 빼면 그 사람은 프로젝트 할 일을 더 못 본다 — 확인을 받는다(2026-10-28). 수는 서버 값.
+      const name = removed.map((uid) => nameOf(uid)).join(", ");
+      const count = removed.reduce((sum, uid) => sum + (detail?.openTasksByAuthor[uid]?.count ?? 0), 0);
+      setConfirm({
+        message: `${fill(dict.confirmRemoveMemberTitle, { name })}\n${fill(
+          count > 0 ? dict.confirmRemoveMemberBody : dict.confirmRemoveMemberBodyNone,
+          { name, count },
+        )}`,
+        confirmLabel: dict.confirmRemoveMemberBtn,
+        onConfirm: apply,
+      });
       return;
     }
     if (p.src === "add") {
@@ -1823,17 +1911,28 @@ export function AdminTasksConsole({
     (ids: string[], onDone?: () => void) => {
       if (!ids.length) return;
       startTransition(async () => {
-        const res = await bulkDeleteConsoleTasks(ids);
+        let res: Awaited<ReturnType<typeof bulkDeleteConsoleTasks>>;
+        try {
+          res = await bulkDeleteConsoleTasks(ids);
+        } catch {
+          haptic("error");
+          showToast(dict.errGeneric);
+          return;
+        }
         if (!res.ok) {
+          haptic("error");
           showToast(errMsg(res.error));
           return;
         }
+        // 지워진 작업을 보고 있던 상세는 비운다(빈 상태로) — 없는 작업이 캐시로 계속 보이지 않게.
+        const gone = new Set([...res.deletedIds, ...res.leftIds]);
+        setSel((cur) => (cur && gone.has(cur) ? null : cur));
         const removed = res.deletedIds.length + res.leftIds.length;
         if (res.failedIds.length) {
           showToast(fill(dict.tBulkPartial, { n: removed, f: res.failedIds.length }));
         } else if (res.deletedIds.length) {
-          showUndo(fill(dict.tBulkDeleted, { n: removed }), () =>
-            run(() => restoreConsoleTasks(res.deletedIds), { after: () => setUndo(null) }),
+          showUndo(fill(dict.tBulkDeleted, { n: removed }), (clear) =>
+            run(() => restoreConsoleTasks(res.deletedIds), { after: clear }),
           );
         } else {
           showToast(fill(dict.tBulkDeleted, { n: removed }));
@@ -1867,19 +1966,36 @@ export function AdminTasksConsole({
     const ids = [...odPicked];
     if (ids.length === 0) return;
     startTransition(async () => {
-      const res = await dismissConsoleOverdue(ids);
+      let res: Awaited<ReturnType<typeof dismissConsoleOverdue>>;
+      try {
+        res = await dismissConsoleOverdue(ids);
+      } catch {
+        haptic("error");
+        showToast(dict.errGeneric);
+        return;
+      }
       if (!res.ok) {
+        haptic("error");
         showToast(errMsg(res.error));
         return;
       }
       setOdPicked(new Set());
+      setOdMode(null);
+      const gone = new Set(res.deletedIds);
+      setSel((cur) => (cur && gone.has(cur) ? null : cur));
       if (res.deletedIds.length > 0) {
         const restoreIds = res.deletedIds;
-        showUndo(fill(dict.tBulkDeleted, { n: restoreIds.length }), () =>
-          run(() => restoreConsoleTasks(restoreIds), { after: () => setUndo(null) }),
-        );
+        // 고른 것보다 적게 지워졌으면(서버가 내 지연 작업만 남긴다) 일부만 지워졌다고 알린다.
+        if (restoreIds.length < ids.length) {
+          showToast(fill(dict.tBulkPartial, { n: restoreIds.length, f: ids.length - restoreIds.length }));
+        } else {
+          showUndo(fill(dict.tBulkDeleted, { n: restoreIds.length }), (clear) =>
+            run(() => restoreConsoleTasks(restoreIds), { after: clear }),
+          );
+        }
       } else {
-        showToast(dict.tDeleted);
+        // 아무것도 지워지지 않았다 — 「삭제됨」이라고 말하지 않는다.
+        showToast(dict.errNotFound);
       }
     });
   };
@@ -2047,6 +2163,7 @@ export function AdminTasksConsole({
             recurring: isStandardRecurrence(items.find((t) => t.id === id)?.recurrenceRule ?? null),
           })),
         ),
+        { onError: () => setDateOrder(null) },
       );
     };
     return items.map((t) =>
@@ -2245,7 +2362,8 @@ export function AdminTasksConsole({
       if (from < 0 || to < 0) return;
       ids.splice(to, 0, ids.splice(from, 1)[0]);
       setInboxOrder(ids);
-      run(() => reorderConsoleTasks(ids));
+      // 저장에 실패하면 낙관적 순서를 버리고 서버 순서로 되돌린다.
+      run(() => reorderConsoleTasks(ids), { onError: () => setInboxOrder(null) });
     };
     if (items.length === 0 && !add)
       return hasActiveFilter ? (
@@ -2728,6 +2846,7 @@ export function AdminTasksConsole({
                     autoFocus
                     onChange={(e) => setSectionEdit({ ...sectionEdit, title: e.target.value })}
                     onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                       if (e.key === "Enter") saveSectionRename(summary.id, sectionEdit);
                       else if (e.key === "Escape") setSectionEdit(null);
                     }}
@@ -2788,6 +2907,7 @@ export function AdminTasksConsole({
                 autoFocus
                 onChange={(e) => setNewSection(e.target.value)}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                   if (e.key === "Enter") addSection(summary.id);
                   else if (e.key === "Escape") setSecAdding(false);
                 }}
@@ -2844,6 +2964,9 @@ export function AdminTasksConsole({
       } else {
         setReport({ date, text: "", loading: false, sending: false, error: res.reason });
       }
+    }).catch(() => {
+      // 서버 액션이 던져도 불러오는 중에 멈춰 있지 않게 — 오류 문구로 끝낸다.
+      setReport({ date, text: "", loading: false, sending: false, error: "error" });
     });
   };
 
@@ -2864,22 +2987,34 @@ export function AdminTasksConsole({
       showToast(dict.errGeneric);
     }
   };
-  const sendReportToSlack = () => {
-    if (!report || report.loading || report.error || report.sending) return;
+  /** 보내기에 성공하면 true — 예약을 거두는 쪽이 성공을 확인한 뒤에만 움직이게 한다. */
+  // 예약이 있어도 서버가 «먼저 보내고, 보낸 뒤에만 예약을 거둔다»(`sendDailyReportNow`, 2026-10-28) — 실패하면 예약이 그대로 남는다.
+  const sendReportToSlack = async (): Promise<boolean> => {
+    if (!report || report.loading || report.error || report.sending) return false;
     const { date } = report;
     setReport({ ...report, sending: true });
-    sendConsoleReportToSlack(date, reportEdited).then((res) => {
+    let res: Awaited<ReturnType<typeof sendDailyReportNow>>;
+    try {
+      res = await sendDailyReportNow(date, reportEdited);
+    } catch {
       setReport((current) => (current && current.date === date ? { ...current, sending: false } : current));
-      if (res.ok) {
-        showToast(dict.rptSlackSent);
-      } else if (res.reason === "not_configured") {
-        showToast(dict.rptSlackNotConfigured);
-      } else if (res.reason === "too_long") {
-        showToast(dict.rptSlackTooLong);
-      } else {
-        showToast(dict.rptSlackError);
-      }
-    });
+      haptic("error");
+      showToast(dict.rptSlackError);
+      return false;
+    }
+    setReport((current) => (current && current.date === date ? { ...current, sending: false } : current));
+    if (res.ok) {
+      showToast(dict.rptSlackSent);
+      return true;
+    }
+    if (res.reason === "not_configured") {
+      showToast(dict.rptSlackNotConfigured);
+    } else if (res.reason === "too_long") {
+      showToast(dict.rptSlackTooLong);
+    } else {
+      showToast(dict.rptSlackError);
+    }
+    return false;
   };
 
   // 「완료 · 기록」을 볼 때(업무일지 창을 닫은 뒤에도) 날짜 줄 예약 상태를 다시 읽는다.
@@ -3014,12 +3149,10 @@ export function AdminTasksConsole({
       await scheduleReport();
       return;
     }
+    const sent = await sendReportToSlack();
+    if (!sent) return;
     if (rptActive && report) {
-      const cancelled = await cancelDailyReportSchedule(report.date);
-      if (!cancelled.ok) {
-        setRptMsg({ tone: "bad", text: dict.rptSlackError });
-        return;
-      }
+      // 서버가 이미 예약을 거뒀다 — 화면 상태만 맞춘다.
       setRptSched(null);
       setRptSchedText(null);
       setReportSchedules((m) => {
@@ -3028,7 +3161,6 @@ export function AdminTasksConsole({
         return next;
       });
     }
-    sendReportToSlack();
   };
   useEffect(() => {
     reportDateRef.current = report?.date ?? null;
@@ -3442,7 +3574,10 @@ export function AdminTasksConsole({
   // 작성자 전용 규칙(일정·우선순위·연결·편집·삭제)은 서버와 같은 경계로 화면에서도 가른다.
   // ────────────────────────────────────────────────────────────────────────────────────────────
   function DetailPanel() {
-    const loaded = detail && detail.id === activeId ? detail : null;
+    // 목록에서 사라진 작업(내가 지웠거나 다른 사람이 지운 것)은 캐시된 상세로 계속 보여 주지 않는다 —
+    // 빈 상태로 둔다.
+    const inList = tasks.some((x) => x.id === activeId);
+    const loaded = inList && detail && detail.id === activeId ? detail : null;
     const t = loaded ?? tasks.find((x) => x.id === activeId) ?? null;
     if (!t) return null;
     // 반복은 행 status 가 늘 open 이라 완료 여부는 **연 회차**의 기록을 본다(모바일 상세와 같은 규칙).
@@ -3471,7 +3606,9 @@ export function AdminTasksConsole({
         : realStatus;
     const ownTask = isMine(t, meId);
     // 편집 · 삭제 단추를 보일지. 「누가 지시했나」 같은 표시는 실제 작성자(ownTask)로 가른다.
-    const mine = ownTask || meIsDeveloper;
+    // 프로젝트 주인도 멤버 할 일을 고친다(2026-10-28, 서버 canEditTaskCore 와 같은 규칙).
+    const ownerOfProject = !!t.projectOwnerUserId && t.projectOwnerUserId === meId;
+    const mine = ownTask || meIsDeveloper || ownerOfProject;
     const proj = t.projectId ? projById.get(t.projectId) : null;
     const d = dueDateOf(t) ?? t.scheduledDate ?? null;
     const trng = timeRange(t.timeLabel, t.durationMinutes);
@@ -3581,6 +3718,7 @@ export function AdminTasksConsole({
                     placeholder={dict.dpTagAdd}
                     onChange={(e) => setCoreEdit({ ...editing, tagInput: e.target.value })}
                     onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                       // Enter/쉼표로 확정, 빈 입력에서 Backspace 를 누르면 마지막 칩을 뺀다.
                       if (e.key === "Enter" || e.key === ",") {
                         e.preventDefault();
@@ -3721,6 +3859,11 @@ export function AdminTasksConsole({
             </div>
           )}
 
+          {ownerOfProject && !ownTask && (
+            <p className="is-soft" style={{ margin: 0, fontSize: 13, lineHeight: 1.5 }}>
+              {dict.dpOwnerCanEdit}
+            </p>
+          )}
           <dl className="atw-d__dl">
             <dt>{dict.w.dlSchedule}</dt>
             <dd>
@@ -3784,6 +3927,14 @@ export function AdminTasksConsole({
                 <dd className="is-soft">{t.tags.map((g) => `#${g}`).join(" ")}</dd>
               </>
             )}
+            {t.authorLeftProject && (
+              <>
+                <dt>{dict.dpAuthor}</dt>
+                <dd>
+                  {t.authorName || nameOf(t.createdByUserId)} <span className="is-soft">· {dict.dpAuthorLeft}</span>
+                </dd>
+              </>
+            )}
             {t.isDirective && !ownTask && (
               <>
                 <dt>{dict.vInstr}</dt>
@@ -3826,6 +3977,50 @@ export function AdminTasksConsole({
               </>
             )}
           </dl>
+
+          {recurring &&
+            (() => {
+              const days = selectRecentSkippedDays(occByTask.get(t.id) ?? [], tokyoToday());
+              if (days.length === 0) return null;
+              const open = skExpanded.has(t.id);
+              const more = Math.max(0, days.length - SKIPPED_DAYS_VISIBLE);
+              return (
+                <section className="atw-d__sk" aria-label={dict.skDaysTitle}>
+                  <div className="atw-d__skh">
+                    <b>{dict.skDaysTitle}</b>
+                    <span>{dict.skDaysRange}</span>
+                  </div>
+                  {(open ? days : days.slice(0, SKIPPED_DAYS_VISIBLE)).map((day) => (
+                    <div
+                      key={day}
+                      className="row-collapse"
+                      data-leaving={skLeaving.has(`${t.id}|${day}`) ? "" : undefined}
+                    >
+                      <div className="atw-d__skr">
+                        <span>{fmtLong(day, locale)}</span>
+                        <button
+                          type="button"
+                          className="atw-d__skb"
+                          aria-label={fill(dict.skDaysRestoreFor, { date: fmtLong(day, locale) })}
+                          onClick={() => restoreSkippedDay(t, day)}
+                        >
+                          {dict.skDaysRestore}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!open && more > 0 && (
+                    <button
+                      type="button"
+                      className="atw-d__skb atw-d__skmore"
+                      onClick={() => setSkExpanded((cur) => new Set(cur).add(t.id))}
+                    >
+                      {fill(more === 1 ? dict.skDaysMoreOne : dict.skDaysMore, { count: more })}
+                    </button>
+                  )}
+                </section>
+              );
+            })()}
 
           <section className="atw-d__log" aria-label={dict.w.updates}>
             <b className="atw-d__lt">{dict.w.updates}</b>
@@ -4322,7 +4517,7 @@ export function AdminTasksConsole({
   function RowMenu({ p }: { p: RowMenuPop }) {
     const t = tasks.find((x) => x.id === p.taskId);
     if (!t) return null;
-    const mine = isMine(t, meId) || meIsDeveloper;
+    const mine = isMine(t, meId) || meIsDeveloper || (!!t.projectOwnerUserId && t.projectOwnerUserId === meId);
     const close = () => setPop(null);
     return (
       <div className="pop menu">
@@ -4399,7 +4594,7 @@ export function AdminTasksConsole({
           </Link>
         )}
         {/* "관리함으로" = 프로젝트에서 빼기. 비프로젝트 작업은 이미 관리함이라 프로젝트 작업에만 노출. */}
-        {t.projectId && (
+        {t.projectId && (isMine(t, meId) || meIsDeveloper) && (
           <button
             className="mitem"
             onClick={() => {
@@ -5040,7 +5235,7 @@ export function AdminTasksConsole({
               undo.onUndo();
             }}
           >
-            {dict.undoBtn}
+            {undo.actionLabel ?? dict.undoBtn}
           </button>
           <button className="undobar__x" onClick={() => setUndo(null)} aria-label={dict.iaCancel}>
             <X size={15} />

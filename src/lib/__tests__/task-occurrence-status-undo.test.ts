@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * 반복 할 일 회차 대상 회귀 (2026-10-19, #14).
  *  a. 콘솔 상세의 상태 버튼은 **연 회차**를 완료한다 — 시리즈 앵커(첫 회차)로 폴백하지 않는다.
- *  b. 회차가 아닌 날 완료하면 서버가 가장 오래된 밀린 회차로 정산하므로, 그 **기록된 날짜**를
+ *  b. 회차가 아닌 날 완료하면 서버가 가장 최근 밀린 회차로(2026-10-28 전에는 가장 오래된 것) 정산하므로, 그 **기록된 날짜**를
  *     돌려주고 실행 취소가 그 날짜를 되살린다.
  *  c. 프로젝트에서 빠져 상한이 5장이 된 할 일을 고쳐도 기존 사진을 자르거나 스토리지에서 지우지 않는다.
  */
@@ -16,17 +16,22 @@ function makeQuery(table: string) {
   const filters: Array<[string, unknown]> = [];
   // `.overlaps(col, values)` — 배열 칼럼이 values 와 하나라도 겹치는 행(cleanupRemovedTaskImages 의 참조 확인).
   const overlapFilters: Array<[string, unknown[]]> = [];
+  // `.neq(col, v)` — 한 번만 완료되게 거는 조건부 갱신(2026-10-28).
+  const negFilters: Array<[string, unknown]> = [];
   let op: "select" | "update" | "delete" | "insert" | "upsert" = "select";
   let payload: Row | Row[] | null = null;
   const rows = () => (db[table] ??= []);
   const match = (r: Row) =>
     filters.every(([k, v]) => r[k] === v) &&
+    negFilters.every(([k, v]) => r[k] !== v) &&
     overlapFilters.every(([k, vs]) => Array.isArray(r[k]) && (r[k] as unknown[]).some((x) => vs.includes(x)));
   const run = () => {
     if (op === "select") return { data: rows().filter(match), error: null };
     if (op === "update") {
-      for (const r of rows().filter(match)) Object.assign(r, payload);
-      return { data: null, error: null };
+      const hit = rows().filter(match);
+      for (const r of hit) Object.assign(r, payload);
+      // `.update(...).select("id")` 는 바뀐 행을 돌려준다.
+      return { data: hit.map((r) => ({ ...r })), error: null };
     }
     if (op === "delete") {
       db[table] = rows().filter((r) => !match(r));
@@ -50,6 +55,14 @@ function makeQuery(table: string) {
     eq: (k: string, v: unknown) => {
       filters.push([k, v]);
       return q;
+    },
+    neq: (k: string, v: unknown) => {
+      negFilters.push([k, v]);
+      return q;
+    },
+    maybeSingle: async () => {
+      const r = run();
+      return { data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data, error: null };
     },
     overlaps: (k: string, vs: unknown[]) => {
       overlapFilters.push([k, vs]);

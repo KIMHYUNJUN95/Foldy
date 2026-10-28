@@ -1,22 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  generateDailyReport,
-  sendDailyReportToSlack,
-  type DailyReportResult,
-  type SendDailyReportToSlackResult,
-} from "@/actions/task-report";
+import { generateDailyReport, type DailyReportResult } from "@/actions/task-report";
 import { notifyProjectMembers, notifyTaskParticipants } from "@/lib/notifications/create";
 import type { TaskNotificationPayload } from "@/lib/notifications/types";
 import { getProjectDetail, type ProjectDetailData } from "@/lib/projects";
 import {
+  canEditTaskAsOwnerOrAuthor,
   canEditTaskCore,
+  getProjectMembership,
   getTaskScope,
   getShareableUsers,
   getTaskDetail,
   getTasksByIds,
   getVisibleTasks,
+  isValidHm,
+  isValidYmd,
   normalizeTaskDateTime,
   resolveRecurrenceRule,
   taskAnchorDate,
@@ -36,10 +35,12 @@ import {
 } from "@/lib/tasks-recurrence";
 import {
   clearOccurrenceState,
+  clearSkippedOccurrenceState,
   absorbEarlierOccurrences,
   releaseAbsorbedOccurrences,
   resolveCompletionOccurrence,
   completeOccurrence,
+  occurrenceAlreadyCompleted,
   occurrenceStatesForTask,
   setOccurrenceOrders,
   setTaskSortOrders,
@@ -54,6 +55,7 @@ import {
   sanitizeTaskImageUrls,
 } from "@/lib/task-images";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { linkedContextBelongsToOrg } from "@/lib/task-linked-context";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
 import type { Database } from "@/types/database";
 
@@ -148,6 +150,72 @@ function normalizeContext(ctx: ConsoleTaskContext | undefined) {
   };
 }
 
+/**
+ * 연결 id 가 이 조직 것인지 확인한다(2026-10-28) — 서비스 키 쓰기라 다른 조직 예약 id 를 막아 줄 곳이
+ * 여기뿐이다. 선택기가 조직 범위로만 고르게 해도 UI 를 믿지 않는다.
+ */
+async function contextBelongsToOrg(
+  session: Session,
+  ctx: ReturnType<typeof normalizeContext>,
+): Promise<boolean> {
+  return linkedContextBelongsToOrg(session.organization.id, {
+    propertyId: ctx.property_id,
+    roomId: ctx.room_id,
+    reservationId: ctx.reservation_id,
+  });
+}
+
+/**
+ * 프로젝트 할 일(소프트 삭제된 것 포함)이 가진 할 일 단위 사진 URL — 프로젝트를 지우기 직전에 모아 두고,
+ * 지운 뒤 `cleanupRemovedTaskImages` 로 넘긴다(2026-10-28, 모바일 `deleteProject` 와 같은 순서).
+ * 읽기가 실패하면 빈 목록(파일이 남는 쪽이 안전하다).
+ */
+async function collectProjectTaskImageUrls(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  projectId: string,
+  organizationId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("image_urls")
+    .eq("project_id", projectId)
+    .eq("organization_id", organizationId);
+  if (error) {
+    console.warn("[deleteConsoleProject] image collect failed:", error.message);
+    return [];
+  }
+  return [
+    ...new Set(((data ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? [])),
+  ];
+}
+
+/**
+ * 남의 작업을 되살릴 수 있는가(플랫폼 개발자) — **열 수 있는 작업(getTaskScope)만**(2026-10-28,
+ * 05 문서 규칙). 범위는 참여자 행 · 프로젝트 소속으로 정해져 소프트 삭제된 행도 담는다.
+ * 작성자 본인 것은 범위와 상관없이 되살린다.
+ */
+async function restorableIds(
+  session: Session,
+  rows: { id: string; created_by_user_id: string; project_id: string | null }[],
+): Promise<string[]> {
+  // 프로젝트 주인도 자기가 지운 멤버 할 일을 되살린다(2026-10-28, canEditTaskCore 와 같은 규칙).
+  const membership = await getProjectMembership(
+    rows.map((r) => r.project_id).filter((v): v is string => !!v),
+  );
+  const own = rows.filter((r) =>
+    canEditTaskAsOwnerOrAuthor(
+      session.user,
+      r.created_by_user_id,
+      r.project_id ? (membership.get(r.project_id)?.ownerUserId ?? null) : null,
+    ),
+  );
+  if (own.every((r) => r.created_by_user_id === session.user.id)) return own.map((r) => r.id);
+  const scope = await getTaskScope(session);
+  return own
+    .filter((r) => r.created_by_user_id === session.user.id || scope.taskIds.has(r.id))
+    .map((r) => r.id);
+}
+
 // 제출된 소요 시간을 1–1440분 블록 길이로 제한하고, 범위를 벗어나거나 없으면 null.
 function clampDuration(value: number | null): number | null {
   if (value == null || !Number.isFinite(value)) return null;
@@ -190,6 +258,9 @@ export async function createConsoleTask(input: {
   // 반복에는 날짜 기준점이 필요하다. 반복만 정하고 날짜가 없으면 오늘을 기준으로 삼는다
   // (Todoist: "매주 월수금" 은 오늘부터 시작) — repeat_needs_date 로 거절하지 않는다.
   if (repeat && !date) date = tokyoToday();
+  // 날짜 · 시각은 달력 · 시계에 실제로 있는 값만(2026-10-28) — 「2026-13-01」은 500, 「2026-02-31」은 3월로 굴렀다.
+  // 날짜는 `isValidYmd`, 시각은 `isValidHm`(lib/tasks).
+  if ((date && !isValidYmd(date)) || (time && !isValidHm(time))) return { ok: false, error: "invalid_date" };
 
   // 단일 날짜 모델: scheduledDate 는 항상 비어 있고 dueDate 가 그 하나의 날짜를 가진다.
   if (taskTimeWithoutDate({ scheduledDate: "", dueDate: date, time })) {
@@ -233,6 +304,8 @@ export async function createConsoleTask(input: {
   // 날짜 없는 개인/공유 빠른 추가는 대기 중인 Inbox 로 들어간다(Todoist 와 동일). 날짜가 있는 할 일과
   // 프로젝트 할 일은 inbox 가 아니다.
   const isInboxTask = !sched && !dueAt && !linkedProjectId;
+  const context = normalizeContext(input.context);
+  if (!(await contextBelongsToOrg(session, context))) return { ok: false, error: "forbidden" };
 
   const id = crypto.randomUUID();
   const recurrenceSeriesId = repeat ? id : null;
@@ -262,7 +335,7 @@ export async function createConsoleTask(input: {
     image_urls: sanitizeTaskImageUrls(input.imageUrls ?? [], !!linkedProjectId, session.organization.id),
     project_id: linkedProjectId,
     section_id: linkedSectionId,
-    ...normalizeContext(input.context),
+    ...context,
   };
   const { error } = await supabase.from("tasks").insert(insert);
   if (error) return { ok: false, error: "save_failed" };
@@ -335,6 +408,7 @@ async function completeInternal(
   const supabase = getSupabaseServiceClient();
   let recorded: string | undefined;
   // 이미 완료된 일회성 작업은 아무것도 하지 않는다(2026-10-26) — 두 번 눌러도 완료 기록 · 알림이 중복되지 않게.
+  // 읽어 둔 상태는 빠른 길일 뿐이고, 실제 막음은 아래 조건부 UPDATE(.neq completed)가 한다(2026-10-28).
   if (!isStandardRecurrence(task.recurrenceRule) && task.status === "completed") {
     return { ok: true };
   }
@@ -347,6 +421,11 @@ async function completeInternal(
       anchor: taskAnchorDate(task),
       requested: String(occurrenceDate ?? "").trim() || recurringAnchorDate(task),
     });
+    // 이미 완료된 회차면 아무것도 하지 않는다(2026-10-28, 모바일 `completeTask` 와 같은 규칙) — 완료 기록 ·
+    // 알림이 겹치지 않게. 결과는 성공으로 돌려 화면의 체크를 그대로 둔다.
+    if (await occurrenceAlreadyCompleted(task.id, occ)) {
+      return { ok: true, recorded: occ };
+    }
     const saved = await completeOccurrence({
       taskId: task.id,
       organizationId: session.organization.id,
@@ -365,19 +444,23 @@ async function completeInternal(
     });
     recorded = occ;
   } else {
-    const completed = await mustWrite(
-      "task: complete",
-      supabase
-        .from("tasks")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          completed_by_user_id: session.user.id,
-        })
-        .eq("id", task.id)
-        .eq("organization_id", session.organization.id),
-    );
-    if (!completed) return { ok: false };
+    // 아직 완료가 아닌 행만 바꾼다(2026-10-28) — 동시에 두 번 눌러도 한 번만 통과한다.
+    const { data: completedRows, error: completeError } = await supabase
+      .from("tasks")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        completed_by_user_id: session.user.id,
+      })
+      .eq("id", task.id)
+      .eq("organization_id", session.organization.id)
+      .neq("status", "completed")
+      .select("id");
+    if (completeError) {
+      console.error("[db-write] task: complete failed:", completeError.message);
+      return { ok: false };
+    }
+    if (!completedRows || completedRows.length === 0) return { ok: true };
   }
   await bestEffortWrite(
     "task_updates: insert",
@@ -385,6 +468,8 @@ async function completeInternal(
         task_id: task.id,
         created_by_user_id: session.user.id,
         update_type: "completed",
+        // 반복은 회차 날짜를 함께 남긴다(2026-10-28) — 업무일지가 (작업, 회차)별로 완료 · 다시 열기를 맞춘다.
+        body: recorded ?? null,
       })
   );
   await notify(
@@ -408,8 +493,10 @@ async function reopenInternal(
   occurrenceDate?: string,
 ): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
+  let reopenedOcc: string | null = null;
   if (isStandardRecurrence(task.recurrenceRule)) {
     const occ = String(occurrenceDate ?? "").trim() || recurringAnchorDate(task);
+    reopenedOcc = occ;
     // 지우기가 실패하면 «다시 열림» 기록을 남기지 않는다(2026-10-26).
     if (!(await clearOccurrenceState(task.id, occ))) return false;
     // 그 완료가 흡수했던 밀린 회차도 되살린다 — 아니면 취소해도 밀림 배지가 안 돌아온다.
@@ -435,17 +522,26 @@ async function reopenInternal(
         task_id: task.id,
         created_by_user_id: session.user.id,
         update_type: "reopened",
+        body: reopenedOcc, // 어느 회차를 다시 열었는지(업무일지 상쇄용)
       })
   );
   return true;
 }
 
 // ── 2. 상태 ───────────────────────────────────────────────────────────────
+const CONSOLE_STATUSES = new Set(["open", "in_progress", "completed"]);
+
+/**
+ * 권한은 모바일과 같다 — 작업을 열 수 있는 참여자(`resolveTask`)면 상태를 바꾼다(모바일 `completeTask` ·
+ * `setTaskProgress` 도 참여자에게 열려 있다). 상태 값은 세 가지만 받는다(2026-10-28) — 예전엔 클라이언트가
+ * 보낸 문자열을 그대로 써서 `cancelled` 같은 값도 들어갔다.
+ */
 export async function setConsoleTaskStatus(
   taskId: string,
   status: "open" | "in_progress" | "completed",
   occurrenceDate?: string,
 ): Promise<TaskActionResult> {
+  if (!CONSOLE_STATUSES.has(String(status))) return { ok: false, error: "forbidden" };
   const resolved = await resolveTask(taskId);
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
@@ -456,9 +552,12 @@ export async function setConsoleTaskStatus(
     revalidatePath(CONSOLE_PATH);
     return { ok: true, occurrenceDate: done.recorded };
   }
-  // 완료된 반복 발생분을 다시 여는 것(status→open)은 그 발생분의 상태를 지울 뿐 행은 건드리지 않는다.
-  // 열린 발생분이 진행 중 → 대기로 가는 것은 행 변경이라 아래로 넘어간다.
-  if (status === "open" && isStandardRecurrence(task.recurrenceRule)) {
+  if (isStandardRecurrence(task.recurrenceRule)) {
+    // 반복 업무의 행은 언제나 열림이다 — 완료는 회차별로 든다(2026-07-30). 행을 진행 중으로 바꾸면 모든 회차가
+    // 함께 «진행 중»이 된다. 모바일 `setTaskProgress` 와 같이 거절한다(2026-10-28).
+    if (status === "in_progress") return { ok: false, error: "forbidden" };
+    // 완료된 회차를 다시 여는 것(status→open)은 그 회차의 상태를 지울 뿐 행은 건드리지 않는다.
+    // 예전 데이터로 행이 진행 중인 반복이면 아래 행 갱신으로 넘어가 열림으로 돌린다.
     const occ = String(occurrenceDate ?? "").trim();
     const states = occ ? await occurrenceStatesForTask(task.id) : null;
     if (!occ || states?.get(occ) === "completed" || task.status !== "in_progress") {
@@ -471,24 +570,35 @@ export async function setConsoleTaskStatus(
   }
 
   const supabase = getSupabaseServiceClient();
-  await supabase
-    .from("tasks")
-    .update({
-      status,
-      completed_at: null,
-      completed_by_user_id: null,
-    })
-    .eq("id", task.id)
-    .eq("organization_id", session.organization.id);
-  await bestEffortWrite(
-    "task_updates: insert",
-    supabase.from("task_updates").insert({
-        task_id: task.id,
-        created_by_user_id: session.user.id,
-        // 완료된 할 일을 open 으로 되돌리면 재개로 보고, 다른 전환은 상태 변경으로 본다.
-        update_type: task.status === "completed" && status === "open" ? "reopened" : "status_changed",
+  const saved = await mustWrite(
+    "task: set status",
+    supabase
+      .from("tasks")
+      .update({
+        status,
+        completed_at: null,
+        completed_by_user_id: null,
       })
+      .eq("id", task.id)
+      .eq("organization_id", session.organization.id),
   );
+  if (!saved) return { ok: false, error: "save_failed" };
+  // 완료였던 작업은 어느 쪽으로 가든 완료 도장이 지워지므로 `reopened` 를 남긴다(2026-10-28) — 진행 중으로
+  // 바꿀 때 상태 변경만 적으면 기록 · 업무일지가 여전히 «완료»로 셌다. 진행 중으로 간 경우는 그 전환도 적는다.
+  // 여러 행 insert 는 키 모양이 같아야 해서(빠진 키는 NULL) body 를 모두 적는다.
+  const logs: Database["public"]["Tables"]["task_updates"]["Insert"][] = [];
+  if (task.status === "completed") {
+    logs.push({ task_id: task.id, created_by_user_id: session.user.id, update_type: "reopened", body: null });
+  }
+  if (task.status !== "completed" || status === "in_progress") {
+    logs.push({
+      task_id: task.id,
+      created_by_user_id: session.user.id,
+      update_type: "status_changed",
+      body: status,
+    });
+  }
+  await bestEffortWrite("task_updates: insert", supabase.from("task_updates").insert(logs));
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
 }
@@ -559,8 +669,8 @@ export async function skipConsoleOccurrence(
 }
 
 /**
- * 건너뛰기 되돌리기. `clearOccurrenceState` 는 상태 종류를 가리지 않으므로, 토스트가 떠 있는 사이
- * 같은 회차가 완료됐다면 그 완료까지 풀린다(회차 상태 칸이 하나뿐이라 종류별 삭제가 불가능).
+ * 건너뛰기 되돌리기(실행 취소 토스트 · 상세의 「건너뛴 날 → 되살리기」). «건너뜀» 상태일 때만 지운다
+ * (2026-10-28) — 그 사이 같은 회차가 완료됐다면 그 완료를 풀지 않는다.
  */
 export async function unskipConsoleOccurrence(
   taskId: string,
@@ -572,7 +682,7 @@ export async function unskipConsoleOccurrence(
   if (!resolved) return { ok: false, error: "not_found" };
   const { task } = resolved;
   if (!isConsoleOccurrenceDate(task, date)) return { ok: false, error: "invalid_date" };
-  if (!(await clearOccurrenceState(task.id, date))) return { ok: false, error: "save_failed" };
+  if (!(await clearSkippedOccurrenceState(task.id, date))) return { ok: false, error: "save_failed" };
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
 }
@@ -607,6 +717,7 @@ export async function updateConsoleTaskCore(input: {
   const nextRecurrenceRule = resolveRecurrenceRule(input.repeat, task.recurrenceRule);
   // 반복이 있는데 날짜가 없으면 오늘로 앵커(create 와 동일; repeat_needs_date 방지).
   if (nextRecurrenceRule && !date) date = tokyoToday();
+  if ((date && !isValidYmd(date)) || (time && !isValidHm(time))) return { ok: false, error: "invalid_date" };
 
   if (taskTimeWithoutDate({ scheduledDate: "", dueDate: date, time })) {
     return { ok: false, error: "time_needs_date" };
@@ -647,7 +758,11 @@ export async function updateConsoleTaskCore(input: {
       ? null
       : mergeTaskImageUrls(task.imageUrls, input.imageUrls, !!task.projectId, session.organization.id);
   if (nextImageUrls) update.image_urls = nextImageUrls;
-  if (input.context !== undefined) Object.assign(update, normalizeContext(input.context));
+  if (input.context !== undefined) {
+    const context = normalizeContext(input.context);
+    if (!(await contextBelongsToOrg(session, context))) return { ok: false, error: "forbidden" };
+    Object.assign(update, context);
+  }
 
   // 이번 수정에서 분리된 파일 — 클라이언트 입력이 아니라 서버가 아는 값으로 정한다.
   const removedImageUrls = nextImageUrls
@@ -725,7 +840,7 @@ export async function rescheduleConsoleTask(
     revalidatePath(CONSOLE_PATH);
     return { ok: true };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "invalid_date" };
+  if (!isValidYmd(date) || (time && !isValidHm(time))) return { ok: false, error: "invalid_date" };
 
   const { dueAt, allDay, timeLabel } = normalizeTaskDateTime({
     scheduledDate: "",
@@ -764,8 +879,8 @@ export async function rescheduleConsoleTask(
  * (`rescheduleOverdueTo` / `dismissOverdueTasks`)과 **같은 규칙으로 서버에서 다시 계산한다**:
  * 내가 만든 · 프로젝트 밖 · 활성 · 마감 토쿄일이 오늘 이전인 **일회성** 작업만 대상.
  *
- * 반복의 지연은 회차 단위(`task_occurrence_state`)라 여기서 제외한다 —
- * `carryConsoleOverdueToToday` / `skipConsoleOverdue` 가 따로 처리한다.
+ * 반복의 지연은 회차 단위(`task_occurrence_state`)라 여기서 제외한다 — 밀린 회차는 다음 완료가
+ * 흡수하고(`absorbEarlierOccurrences`), 한 회차만 빼려면 `skipConsoleOccurrence` 를 쓴다.
  */
 function isConsoleOverdueOwned(t: TaskRecord, today: string, userId: string): boolean {
   if (t.projectId || t.createdByUserId !== userId) return false;
@@ -783,7 +898,7 @@ export async function rescheduleConsoleOverdue(
   const session = await resolveSession();
   if (!session) return { ok: false, error: "auth" };
   const date = String(targetDate ?? "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "invalid_date" };
+  if (!isValidYmd(date)) return { ok: false, error: "invalid_date" };
   const allowed = new Set((taskIds ?? []).map((v) => String(v ?? "").trim()).filter(Boolean));
   if (allowed.size === 0) return { ok: true };
   const today = tokyoToday();
@@ -793,7 +908,7 @@ export async function rescheduleConsoleOverdue(
   if (targets.length === 0) return { ok: true };
 
   const supabase = getSupabaseServiceClient();
-  await Promise.all(
+  const results = await Promise.all(
     targets.map((t) =>
       supabase
         .from("tasks")
@@ -807,6 +922,8 @@ export async function rescheduleConsoleOverdue(
     ),
   );
   revalidatePath(CONSOLE_PATH);
+  // 일부라도 실패하면 알린다 — 화면은 전부 옮겨진 줄 안다.
+  if (results.some((r) => r.error)) return { ok: false, error: "save_failed" };
   return { ok: true };
 }
 
@@ -957,16 +1074,18 @@ export async function addConsoleNote(
   if (!text && photos.length === 0) return { ok: false, error: "empty" };
 
   const supabase = getSupabaseServiceClient();
-  await bestEffortWrite(
-    "task_updates: insert",
+  // 메모는 이 액션의 본 데이터다 — 저장이 실패했는데 성공을 돌려주면 입력이 사라진다(2026-10-28).
+  const saved = await mustWrite(
+    "task_updates: insert note",
     supabase.from("task_updates").insert({
         task_id: task.id,
         created_by_user_id: session.user.id,
         update_type: "note",
         body: text || null,
         image_urls: photos,
-      })
+      }),
   );
+  if (!saved) return { ok: false, error: "save_failed" };
   await notify(
     task.id,
     otherParticipantIds(task, session.user.id),
@@ -1010,13 +1129,15 @@ export async function restoreConsoleTask(taskId: string): Promise<TaskActionResu
   const supabase = getSupabaseServiceClient();
   const { data } = await supabase
     .from("tasks")
-    .select("created_by_user_id")
+    .select("created_by_user_id, project_id")
     .eq("id", id)
     .eq("organization_id", session.organization.id)
     .maybeSingle();
-  const row = data as { created_by_user_id: string } | null;
+  const row = data as { created_by_user_id: string; project_id: string | null } | null;
   if (!row) return { ok: false, error: "not_found" };
-  if (!isOwnerOrPlatformDeveloper(session.user, row.created_by_user_id)) return { ok: false, error: "forbidden" };
+  if ((await restorableIds(session, [{ id, ...row }])).length === 0) {
+    return { ok: false, error: "forbidden" };
+  }
   const { error } = await supabase
     .from("tasks")
     .update({ deleted_at: null })
@@ -1045,21 +1166,30 @@ export async function leaveConsoleTask(taskId: string): Promise<TaskActionResult
     return { ok: true };
   }
 
-  await supabase
-    .from("task_participants")
-    .delete()
-    .eq("task_id", task.id)
-    .eq("user_id", session.user.id);
+  // 내 참여자 행이 없으면 나갈 것이 없다(2026-10-28) — 남이 만든 **프로젝트** 작업은 참여자 행 없이 프로젝트
+  // 소속으로만 보인다. 예전엔 지울 행이 없는데도 «남은 참여자 0» 으로 보고 남의 작업을 비공개 · 지시 해제했다.
+  // 프로젝트 작업에서 빠지는 길은 프로젝트 나가기다.
+  if (!task.participants.some((p) => p.userId === session.user.id && p.role !== "author")) {
+    return { ok: false, error: "forbidden" };
+  }
+  const left = await mustWrite(
+    "task_participants: leave",
+    supabase.from("task_participants").delete().eq("task_id", task.id).eq("user_id", session.user.id),
+  );
+  if (!left) return { ok: false, error: "save_failed" };
   // 작성자 외 참여자가 없으면 할 일은 비공개로(지시도 해제) 돌아간다.
   const remainingNonAuthor = task.participants.filter(
     (p) => p.role !== "author" && p.userId !== session.user.id,
   ).length;
   if (remainingNonAuthor === 0) {
-    await supabase
-      .from("tasks")
-      .update({ is_shared: false, is_directive: false })
-      .eq("id", task.id)
-      .eq("organization_id", session.organization.id);
+    await bestEffortWrite(
+      "task: clear is_shared after last participant left",
+      supabase
+        .from("tasks")
+        .update({ is_shared: false, is_directive: false })
+        .eq("id", task.id)
+        .eq("organization_id", session.organization.id),
+    );
   }
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
@@ -1180,7 +1310,11 @@ export async function bulkDeleteConsoleTasks(taskIds: string[]): Promise<BulkDel
       continue;
     }
     if (canEditTaskCore(session, task)) mine.push(id);
-    else theirs.push(id);
+    // 남의 작업은 **내 참여자 행이 있을 때만** 나간다(2026-10-28, `leaveConsoleTask` 와 같은 규칙). 남이 만든
+    // 프로젝트 작업은 참여자 행이 없어 나갈 것이 없다 — 실패로 보고하고 그 작업은 건드리지 않는다.
+    else if (task.participants.some((p) => p.userId === session.user.id && p.role !== "author")) {
+      theirs.push(id);
+    } else failedIds.push(id);
   }
 
   if (mine.length) {
@@ -1214,11 +1348,14 @@ export async function bulkDeleteConsoleTasks(taskIds: string[]): Promise<BulkDel
         )
         .map(({ id }) => id);
       if (orphaned.length) {
-        await supabase
-          .from("tasks")
-          .update({ is_shared: false, is_directive: false })
-          .in("id", orphaned)
-          .eq("organization_id", session.organization.id);
+        await bestEffortWrite(
+          "tasks: clear is_shared after bulk leave",
+          supabase
+            .from("tasks")
+            .update({ is_shared: false, is_directive: false })
+            .in("id", orphaned)
+            .eq("organization_id", session.organization.id),
+        );
       }
     }
   }
@@ -1237,12 +1374,13 @@ export async function restoreConsoleTasks(taskIds: string[]): Promise<TaskAction
   // 삭제된 행은 getTaskDetail 에서 걸러지므로 여기서 작성자 여부를 직접 확인한다.
   const { data } = await supabase
     .from("tasks")
-    .select("id, created_by_user_id")
+    .select("id, created_by_user_id, project_id")
     .in("id", ids)
     .eq("organization_id", session.organization.id);
-  const own = ((data ?? []) as { id: string; created_by_user_id: string }[])
-    .filter((r) => isOwnerOrPlatformDeveloper(session.user, r.created_by_user_id))
-    .map((r) => r.id);
+  const own = await restorableIds(
+    session,
+    (data ?? []) as { id: string; created_by_user_id: string; project_id: string | null }[],
+  );
   if (!own.length) return { ok: false, error: "forbidden" };
   const { error } = await supabase
     .from("tasks")
@@ -1327,7 +1465,8 @@ export async function moveConsoleToInbox(taskId: string): Promise<TaskActionResu
   if (!resolved) return { ok: false, error: "not_found" };
   const { session, task } = resolved;
   // 프로젝트 작업을 프로젝트에서 빼는 것은 작성자(또는 개발자)만(2026-10-26) — 참여자가 남의 작업을 옮기지 못하게.
-  if (task.projectId && !canEditTaskCore(session, task)) return { ok: false, error: "forbidden" };
+  // 프로젝트 주인의 편집 권한(2026-10-28)은 여기 안 넓힌다 — 남의 할 일을 프로젝트 밖으로 빼지 않게.
+  if (task.projectId && !isOwnerOrPlatformDeveloper(session.user, task.createdByUserId)) return { ok: false, error: "forbidden" };
   const supabase = getSupabaseServiceClient();
   // 관리함 = "프로젝트 밖 모든 작업"(Todoist Inbox 모델). 관리함으로 이동 = 프로젝트에서 빼는 것
   // (날짜/시간/반복 유지). is_inbox 는 뷰를 가르지 않으므로 건드리지 않는다(날짜 있는 작업의 crumb 오표시 방지).
@@ -1411,13 +1550,6 @@ export async function createConsoleProject(
 // ── 11. 일일 보고(공용 직원 전용 생성기에 위임) ───────────────────────
 export async function generateConsoleReport(date: string): Promise<DailyReportResult> {
   return generateDailyReport(date);
-}
-
-export async function sendConsoleReportToSlack(
-  date: string,
-  text: string,
-): Promise<SendDailyReportToSlackResult> {
-  return sendDailyReportToSlack(date, text);
 }
 
 // ── 12. 오른쪽 패널용 할 일 상세 전체 불러오기(업데이트 + 해석된 컨텍스트) ─────
@@ -1542,6 +1674,8 @@ export async function deleteConsoleProjectSection(
       .eq("section_id", sectionId),
   );
   if (!cleared) return { ok: false, error: "delete_failed" };
+  // 섹션 행이 지워지면 FK(`on delete set null`)가 그 할 일들의 section_id 를 비운다 — 나중에 하나를 되살리면
+  // **섹션 없는 프로젝트 할 일**로 돌아와 프로젝트 화면의 기본 묶음에 보인다(2026-10-28 확인).
   const { error } = await supabase
     .from("project_sections")
     .delete()
@@ -1628,12 +1762,16 @@ export async function deleteConsoleProject(projectId: string): Promise<TaskActio
   if (!project) return { ok: false, error: "not_found" };
   if (!project.viewerCanManage) return { ok: false, error: "forbidden" };
   const supabase = getSupabaseServiceClient();
+  // cascade 는 행만 지우고 스토리지 사진은 남긴다(2026-10-28) — 지우기 전에 경로를 모아 둔다.
+  const imageUrls = await collectProjectTaskImageUrls(supabase, id, session.organization.id);
   const { error } = await supabase
     .from("projects")
     .delete()
     .eq("id", id)
     .eq("organization_id", session.organization.id);
   if (error) return { ok: false, error: "save_failed" };
+  // 행이 지워진 뒤에 지운다 — 공용 헬퍼가 «조직의 다른 할 일이 아직 쓰는 파일»은 남긴다.
+  await cleanupRemovedTaskImages(supabase, imageUrls, session.organization.id);
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
 }

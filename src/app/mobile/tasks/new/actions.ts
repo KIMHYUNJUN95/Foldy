@@ -5,6 +5,8 @@ import { notifyTaskParticipants } from "@/lib/notifications/create";
 import { getProjectDetail } from "@/lib/projects";
 import {
   getShareableUsers,
+  isValidHm,
+  isValidYmd,
   taskAnchorDateInput,
   taskNeedsRecurrenceDate,
   normalizeTaskDateTime,
@@ -17,6 +19,7 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { Database } from "@/types/database";
 import { bestEffortWrite } from "@/lib/db-write-guard";
 import { sanitizeTaskImageUrls } from "@/lib/task-images";
+import { linkedContextBelongsToOrg } from "@/lib/task-linked-context";
 
 function cleanText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -216,7 +219,25 @@ export async function createTask(formData: FormData) {
   const ctxRoomId = cleanText(formData.get("ctxRoomId")) || null;
   const ctxReservationId = cleanText(formData.get("ctxReservationId")) || null;
   const ctxGuestName = cleanText(formData.get("ctxGuestName")) || null;
+  // 연결 id 는 이 조직 것만(2026-10-28) — 서비스 키 insert 라 다른 조직 예약 id 를 막아 줄 곳이 여기뿐이다.
+  if (
+    !(await linkedContextBelongsToOrg(session.organization.id, {
+      propertyId: ctxPropertyId,
+      roomId: ctxRoomId,
+      reservationId: ctxReservationId,
+    }))
+  ) {
+    redirect("/mobile/tasks/new?error=forbidden");
+  }
 
+  // 비어 있지 않은 날짜 · 시각은 실제로 있는 값이어야 한다(2026-10-28) — 조용히 버리거나 굴리지 않는다.
+  if (
+    (scheduledDate && !isValidYmd(scheduledDate)) ||
+    (dueDate && !isValidYmd(dueDate)) ||
+    (time && !isValidHm(time))
+  ) {
+    redirect("/mobile/tasks/new?error=save_failed");
+  }
   // 특정 시각에는 날짜 기준점이 필요하다 — 조용히 버리지 말고 거절한다.
   if (taskTimeWithoutDate({ scheduledDate, dueDate, time })) {
     redirect("/mobile/tasks/new?error=time_needs_date");

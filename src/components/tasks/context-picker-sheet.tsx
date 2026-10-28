@@ -941,7 +941,8 @@ function ContextPickerBody({
                   className="h-12 w-full rounded-2xl border border-border bg-surface px-4 text-[15px] font-bold text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary"
                   onChange={(e) => setGuestDraft(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    // 한글 · 일본어 조합 중 Enter 는 글자 확정이라 제출하지 않는다(keyCode 229 = 조합 중).
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                       e.preventDefault();
                       handleGuestConfirm();
                     }

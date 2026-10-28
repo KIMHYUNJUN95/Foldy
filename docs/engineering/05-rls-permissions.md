@@ -625,6 +625,23 @@ use the RLS-scoped client; **all writes go through service-role server actions**
 permission checks (author-only core edits, participant workflow, author-leave = full delete,
 non-author-all-removed → private). Direct authenticated writes to `task_participants` are denied.
 
+**사용자 쓰기 권한 회수 (2026-10-28, `202610280001_task_write_grants.sql`).** 위 「쓰기는 모두 service-role 서버
+액션」은 앱 코드만의 약속이었고 DB 는 막지 않았다 — `authenticated` 에 `tasks` · `task_participants` · `task_updates` ·
+`projects` · `project_participants` · `project_sections` 의 INSERT · UPDATE · DELETE(운영 DB 는 TRUNCATE 까지)가 있었고,
+쓰기 RLS 정책은 「만든 사람 = 본인 + 같은 조직」만 봐서 project_id · image_urls · deleted_at 을 거르지 않았다. 그래서 직원
+누구나(알바 포함) 자기 토큰 + anon 키로 PostgREST 를 바로 불러 다른 팀 프로젝트에 할 일을 넣고, 사진 5장 / 20장 제한 ·
+저장 경로 검사를 건너뛰고, 소프트 삭제 대신 아예 지우고, `task_updates` 에 `update_type = 'completed'` · 아무 `created_at`
+을 넣어 업무일지 완료 기록을 꾸밀 수 있었다.
+
+- 이 마이그레이션이 위 6개 + `task_occurrence_state` · `task_occurrence_order` · `task_report_schedules` 에서 `anon` ·
+  `authenticated` 의 INSERT · UPDATE · DELETE · TRUNCATE 를 회수한다. **SELECT 는 그대로** — 읽기는 사용자 클라이언트 + RLS.
+- 앱의 쓰기는 이미 전부 service role(`src/app/mobile/tasks/**` · `src/app/admin/tasks/actions.ts` · `src/lib/task-occurrences.ts` ·
+  `src/actions/task-report-schedule.ts`)이라 동작은 바뀌지 않는다. 2026-10-28 코드 확인 — 사용자 세션 클라이언트
+  (`src/lib/tasks.ts` · `src/lib/projects.ts` · `src/actions/task-report.ts`)는 읽기만 한다.
+- 쓰기 RLS 정책은 지우지 않았다(권한이 없으면 정책까지 가지 않음). 사용자 쓰기를 다시 열려면 정책부터 다시 볼 것 —
+  지금 정책으로는 위 구멍이 그대로 열린다.
+- 새 할 일 · 프로젝트 계열 표는 `grant select … to authenticated` + `grant all … to service_role` 만 준다.
+
 **Soft delete (2026-07-29):** user task deletion sets `deleted_at` (not a row DELETE). This is
 enforced in the **query lib** (`.is("deleted_at", null)` on every list/detail read), **not in RLS** —
 RLS intentionally still returns soft-deleted rows so the author's `restoreTask` / `restoreConsoleTask`
@@ -669,13 +686,14 @@ role != 'part_time_staff'  OR  profiles.can_generate_report = true
 ## task_participants
 
 - Read: active participants on the parent task.
-- Create: controlled server action only.
-- Delete: original author may remove non-author participants; any participant may remove self.
+- Create: controlled server action only (service role — `authenticated` 쓰기 권한은 2026-10-28 회수).
+- Delete: original author may remove non-author participants; any participant may remove self (서버 액션이 판정).
 
 ## task_updates
 
 - Read: active participants on the parent task.
-- Create: active participants on the parent task.
+- Create: active participants on the parent task — **서버 액션(service role)으로만** 넣는다. 2026-10-28 전에는 INSERT 정책이
+  참여자에게 직접 쓰기를 열어 둬서 `update_type = 'completed'` · 아무 `created_at` 을 꾸밀 수 있었다 → 권한 회수(`202610280001`).
 - Update / delete: not required in the first slice unless product rules change later.
 
 ## task_occurrence_state
@@ -1442,6 +1460,10 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 ## task_report_schedules (2026-10-20)
 
 - SELECT: 본인 행만(`(select auth.uid()) = user_id`). INSERT · UPDATE · DELETE 정책 없음 — 서버 액션 · 틱 라우트가 service role 로 쓴다.
+  `anon` · `authenticated` 의 쓰기 권한은 `202610280001` 이 한 번 더 회수한다(원래 SELECT 만 줌).
+- 「살아 있는 예약 하나」 유니크 인덱스는 2026-10-28 부터 조직별 — `task_report_schedules_one_active_per_org`
+  `(organization_id, user_id, report_date) where status in ('scheduled','sending')`. 옛 `(user_id, report_date)` 는 두 조직에
+  속한 사람이 같은 날짜를 두 조직에서 각각 예약하지 못하게 막았다.
 - 예약 · 보내기 모두 업무일지 권한(`canGenerateDailyReport` 또는 `can_generate_report` 개인 지정)을 다시 본다 — 보낼 때도(퇴사 · 비활성 대비).
 
 ## 2026-10-21 시프트 신청 · 청소 배정 — service-role 전용 + `cleaning.assign`
@@ -1569,7 +1591,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 | 게시판 글 수정 | 작성자만 | 남의 글도(액션 시트 「글 수정」 노출) |
 | 컴플레인 본문 · 댓글 수정 | 작성자 + open | 작성자 · 상태 무관 (편집 UI 는 원래 없음, 서버만) |
 | 버그 제보 수정 · 삭제 · 상세 열기 | 제보자 + submitted | 제보자 · 상태 무관(상세에 삭제 노출) |
-| 투두 코어 편집 · 일정 · 삭제 · 되살리기 · 참여자 빼기 · 지시 전환 · 일괄 삭제 | 작성자만 | 가능 (`canEditTaskCore`) — **열 수 있는 작업(getTaskScope)만** |
+| 투두 코어 편집 · 일정 · 삭제 · 되살리기 · 참여자 빼기 · 지시 전환 · 일괄 삭제 | 작성자 · 프로젝트 할 일은 그 프로젝트 주인도(2026-10-28) | 가능 (`canEditTaskCore`) — **열 수 있는 작업(getTaskScope)만** |
 | 프로젝트 섹션(추가 · 이름 · 순서 · 삭제) · 멤버 · 프로젝트 삭제 | 소유자만 | 가능 (`viewerCanManage`). 「소유자는 못 나감」은 진짜 소유자(`viewerIsOwner`)만 |
 | 근태 정정 승인 · 반려 | 잡은 검토자만(in_review 잠금) | 넘겨받아 처리(비교-교체 `takeOverCorrectionReview`) |
 | 건의 보기 · 상태 변경 · 댓글 | 작성자 · 받는 사람 · 참조 / 상태는 받는 사람만 | 조직 전부 보기(「받은」 목록) · 상태 변경 · 댓글 (RLS 는 `is_platform_admin()` 으로 이미 통과) |
@@ -1609,6 +1631,32 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - **예외 하나**: `undoFinishMyRoom` 은 끝난 기록을 진행 중으로 되돌린다. RLS 는 진행 중 → 끝남만 허용하므로 service-role 을 쓰되,
   서버가 **같은 조직 · 본인 기록 · 오늘 날짜 · 끝낸 지 2분 안**을 모두 확인한다(`reopenSessionCore`, `src/lib/cleaning-session-ops.ts`).
 - 현황판 읽기(`loadDayBoard` + 오늘 `cleaning_sessions`)는 service-role · 조직 id 필터 — 페이지가 먼저 `cleaning.assign` 을 확인한다.
+
+## 2026-10-28 할 일 서버 액션 권한 점검 반영
+
+- **복구 범위**: `restoreTask` · `restoreTasksInList` · `restoreConsoleTask(s)` — 쓴 사람이 아니면(대표 · 플랫폼 개발자) 그 사람이 열 수 있는 할 일(`getTaskScope`, 지운 행 포함)만 되살린다. 전엔 조직 안 아무 지운 할 일이나 되살릴 수 있었다.
+- **상태 바꾸기(PC)**: `setConsoleTaskStatus` 는 `open` · `in_progress` · `completed` 만 받고, 반복 할 일의 진행 중은 막는다(모바일과 같다). 쓰기 실패는 `ok:false`.
+- **나가기 · 일괄 삭제**: 내 참여 행이 없는 남의 프로젝트 할 일은 `forbidden`/실패로 돌려주고 그 할 일을 바꾸지 않는다.
+- **연결 항목**: `property_id` · `room_id` · `reservation_id` 는 저장 전에 같은 조직인지 확인한다(`src/lib/task-linked-context.ts`).
+
+## 2026-10-28 프로젝트를 나간 · 빠진 사람의 할 일
+
+- **보기**: 프로젝트를 나가거나(`leaveProject`) 주인이 빼면(`removeProjectMember` · `removeConsoleProjectMember`) 그 사람은
+  그 프로젝트 할 일을 **하나도 못 본다 — 자기가 쓴 것도.** 할 일은 프로젝트에 남는다. 예외는 직접 초대받은 할 일
+  (`task_participants.role` 이 `author` 가 아닌 행). 앱 경계 `getTaskScope` → `buildTaskScope()` 가 멤버가 아닌 프로젝트의
+  author 행을 버려서 막는다 — 목록 · 상세 · 회차 상태 · 완료 기록 · 순서 · 콘솔이 모두 이 범위를 쓴다.
+- **쓰기**: `canEditTaskCore` = 작성자 · 플랫폼 개발자 · **그 할 일 프로젝트의 주인**(`canEditTaskAsOwnerOrAuthor`). 주인은 나간
+  멤버가 쓴 할 일까지 고치고 · 완료하고 · 지우고 · 되살린다(`restoreTask` · `restorableIds`). 「작성자가 나가면 = 삭제」
+  규칙(`removeTaskParticipant` · `leaveConsoleTask`)은 진짜 작성자에게만 그대로다.
+- **주인 권한이 닿지 않는 곳**: 「관리함으로 옮기기」(`moveTaskToInbox` · `restoreTaskToProject` · `moveConsoleToInbox`)는 작성자(또는 개발자)만 —
+  주인이 남의 할 일을 프로젝트 밖으로 빼면 다시 작성자에게만 보이게 되기 때문이다. 목록 일괄 삭제 · 되돌리기(`deleteTasksInList` ·
+  `restoreTasksInList`)는 `manageableListTaskIds` 로 「내 할 일 + 내가 주인인 프로젝트의 할 일(개발자는 열 수 있는 할 일)」만 건드린다.
+- **RLS 는 바꾸지 않았다(마이그레이션 없음).** 읽기는 RLS 가 더 넓다 — `tasks` select 정책은 `is_task_participant(id)` 를 보므로
+  나간 작성자도 사용자 JWT 로 PostgREST 를 직접 부르면 자기 행을 읽을 수 있고, `author can update/delete task` 정책도 작성자에게
+  열려 있다. 앱 화면 · 서버 액션은 모두 `getTaskScope` · service-role 경로라 닫혀 있다. DB 에서도 막으려면 정책에
+  「프로젝트 작업이면 `is_project_participant(project_id)` 또는 author 가 아닌 참여자 행」 조건을 더하는 새 마이그레이션이 필요하다(보류).
+- 쓰기 권한 회수(`202610280001_task_write_grants.sql`)는 위 「tasks」 절 참고 — **운영 DB 적용 전**.
+
 
 ## 보안 점검 후속 (2026-10-28)
 

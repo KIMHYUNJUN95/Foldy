@@ -85,6 +85,7 @@ function TaskRow({
     task.tags.length ? task.tags.slice(0, 2).map((t) => `#${t}`).join(" ") : null,
     task.imageUrls.length ? w.photos.replace("{n}", String(task.imageUrls.length)) : null,
     others > 0 && task.isShared ? w.shared.replace("{n}", String(others)) : null,
+    task.authorLeftProject ? `${task.authorName} · ${copy.projects.authorLeftProject}` : null,
   ].filter(Boolean);
   const href = recurring
     ? `/mobile/tasks/${task.id}?view=projects&occurrence=${tokyoToday()}`
@@ -190,11 +191,11 @@ export function ProjectDetailView({
     });
   };
 
-  const [, startReorder] = useTransition();
-  const persistSectionOrder = (orderedIds: string[]) => {
-    startReorder(async () => {
-      await reorderProjectSections(project.id, orderedIds);
-    });
+  // 실패 안내는 ReorderableSectionList 가 순서를 되돌린 뒤 onPersistError 로 부른다(2026-10-28).
+  const persistSectionOrder = (orderedIds: string[]) => reorderProjectSections(project.id, orderedIds);
+  const notifyFailed = () => {
+    haptic("error");
+    setToggleError(true);
   };
 
   // 멤버 초대 — 숨은 폼 없이 만든 FormData 로 직접 호출하므로, 선택한
@@ -206,7 +207,20 @@ export function ProjectDetailView({
       const fd = new FormData();
       fd.set("projectId", project.id);
       fd.set("shareJson", JSON.stringify(ids));
-      await inviteProjectMembers(fd);
+      let ok = false;
+      try {
+        const res = (await inviteProjectMembers(fd)) as { ok?: boolean } | void;
+        ok = !res || res.ok !== false;
+      } catch {
+        ok = false;
+      }
+      if (ok) {
+        haptic("success"); // 서버가 초대를 확인한 뒤에만
+      } else {
+        // 실패 — 고른 사람은 시트와 함께 사라졌으니 시트를 다시 열어 바로 재시도하게 하고 이유를 알린다.
+        setPickerOpen(true);
+        notifyFailed();
+      }
     });
   };
 
@@ -217,9 +231,14 @@ export function ProjectDetailView({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
   // 멤버 시트 — 공용 BottomSheet 가 슬라이드 + 드래그로 닫기 + Esc 생명주기를 맡는다.
   const [membersOpen, setMembersOpen] = useState(false);
   const openMembers = useCallback(() => setMembersOpen(true), []);
+
+  const ownerName = project.members.find((m) => m.role === "owner")?.name ?? "";
+  const myOpen = project.openTasksByAuthor[currentUserId] ?? { count: 0, titles: [] };
+  const removeCount = removeTarget ? (project.openTasksByAuthor[removeTarget.userId]?.count ?? 0) : 0;
 
   const unsectioned = project.tasks.filter((t) => !t.sectionId);
   const tasksOf = (sectionId: string) => project.tasks.filter((t) => t.sectionId === sectionId);
@@ -317,6 +336,7 @@ export function ProjectDetailView({
           isOwner={isOwner}
           onDelete={(s) => setDeleteSection(s)}
           onPersist={persistSectionOrder}
+          onPersistError={notifyFailed}
           onRename={(s) => setRenameTarget(s)}
           renderBody={(section) => (
             <>
@@ -481,10 +501,17 @@ export function ProjectDetailView({
       {/* 프로젝트 나가기 확인 */}
       {leaveOpen ? (
         <ConfirmSheet
-          body={p.leaveConfirmBody}
+          body={
+            myOpen.count > 0
+              ? p.leaveConfirmBody
+                  .replace("{count}", String(myOpen.count))
+                  .replace("{owner}", ownerName)
+              : p.leaveConfirmBodyNone
+          }
           cancelLabel={copy.cancel}
+          list={myOpen.titles}
           onClose={() => setLeaveOpen(false)}
-          title={p.leaveConfirmTitle}
+          title={p.leaveConfirmTitle.replace("{project}", project.title)}
         >
           <form action={leaveProject}>
             <input name="projectId" type="hidden" value={project.id} />
@@ -527,13 +554,18 @@ export function ProjectDetailView({
                     <span className="tkw-people__n">{m.name}</span>
                     <span className="tkw-people__r">{m.role === "owner" ? p.roleOwner : p.roleMember}</span>
                     {isOwner && m.role !== "owner" && m.userId !== project.createdByUserId ? (
-                      <form action={removeProjectMember}>
-                        <input name="projectId" type="hidden" value={project.id} />
-                        <input name="userId" type="hidden" value={m.userId} />
-                        <button aria-label={copy.deleteAction} className="tkw-people__x" type="submit">
-                          <X aria-hidden="true" />
-                        </button>
-                      </form>
+                      <button
+                        aria-label={`${p.removeMember} · ${m.name}`}
+                        className="tkw-people__x"
+                        onClick={() => {
+                          haptic("light");
+                          close();
+                          setRemoveTarget({ userId: m.userId, name: m.name });
+                        }}
+                        type="button"
+                      >
+                        <X aria-hidden="true" />
+                      </button>
                     ) : null}
                   </div>
                 ))}
@@ -541,6 +573,26 @@ export function ProjectDetailView({
             </div>
           )}
         </BottomSheet>
+      ) : null}
+
+      {/* 멤버 빼기 확인 — 그 사람이 쓴 열린 할 일 수는 서버 값(openTasksByAuthor). */}
+      {removeTarget ? (
+        <ConfirmSheet
+          body={(removeCount > 0 ? p.removeMemberBody : p.removeMemberBodyNone)
+            .replaceAll("{name}", removeTarget.name)
+            .replace("{count}", String(removeCount))}
+          cancelLabel={copy.cancel}
+          onClose={() => setRemoveTarget(null)}
+          title={p.removeMemberTitle.replace("{name}", removeTarget.name)}
+        >
+          <form action={removeProjectMember}>
+            <input name="projectId" type="hidden" value={project.id} />
+            <input name="userId" type="hidden" value={removeTarget.userId} />
+            <button className="tkw-btn is-danger" type="submit">
+              {p.removeMember}
+            </button>
+          </form>
+        </ConfirmSheet>
       ) : null}
 
       {pickerOpen ? (
@@ -573,12 +625,14 @@ function ConfirmSheet({
   body,
   cancelLabel,
   children,
+  list,
   onClose,
   title,
 }: {
   body: string;
   cancelLabel: string;
   children: React.ReactNode;
+  list?: string[];
   onClose: () => void;
   title: string;
 }) {
@@ -588,6 +642,13 @@ function ConfirmSheet({
         <div className="tkw-sheet">
           <h2>{title}</h2>
           <p className="tkw-sheet__sub">{body}</p>
+          {list && list.length > 0 ? (
+            <ul className="tkw-sheet__list">
+              {list.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
           <div className="tkw-btns2">
             <button className="tkw-btn is-gray" onClick={close} type="button">
               {cancelLabel}

@@ -1,5 +1,42 @@
 # Todo / Task Technical Design
 
+## 2026-10-28 반복 회차 감사 반영 (as-built)
+
+반복 회차 계산 · 완료 정산 · 알림의 결함 수정. 계산은 전부 `src/lib/tasks-recurrence.ts`(순수, 서버 ·
+클라이언트 공용) 한 곳이다. 회귀 테스트: `src/lib/__tests__/task-recurrence-audit-2026-10-28.test.ts`,
+`src/lib/__tests__/task-datetime-validation.test.ts`.
+
+- **월 · 연 반복은 앵커에서 바로 계산한다.** n 번째 회차 = `shiftMonthlyYmd(anchor, n)` /
+  `shiftYearlyYmd(anchor, n)`. 예전에는 직전 회차에서 한 칸씩 넘어가 말일 잘림이 굳었다(1/31 → 2/28 →
+  3/28 …, 2024-02-29 연 반복이 2028 에도 02-28). 이제 1/31 → 2/28 → 3/31, 2/29 → 평년 2/28 · 윤년 2/29.
+  매일 · 매주도 n 으로 바로 뛰어서, 예전 1500 단계 상한 때문에 4년 넘은 앵커가 회차를 놓치던 문제도 없다.
+- **요일 묶음 규칙(평일 · 주말 · `custom:`)은 맞지 않는 앵커를 내지 않는다.** 토요일 앵커의 「평일마다」는
+  월요일이 첫 회차다. `recurringOccurrencesInRange` 하나가 기준이라 `isRecurringOccurrenceDate` ·
+  `nextRecurringOccurrence` · 밀린 회차 · 모바일/콘솔 달력이 모두 같은 답을 낸다.
+- **밀린 회차는 상태 창(400일) 안만 센다.** `OCCURRENCE_STATE_WINDOW_DAYS = 400` 을 서버 읽기
+  (`getOccurrenceStates` / `getOccurrenceOrders`)와 `outstandingOverdueOccurrences` 가 함께 쓴다 — 창 밖
+  회차를 세면 끝낸 회차가 «밀림» 으로 되살아난다.
+- **회차 상태 읽기는 빠짐없이.** `getOccurrenceStates` / `getOccurrenceOrders` 가 조직 전체를 한 번에 읽어
+  PostgREST 1000행 상한에서 조용히 잘렸다. 이제 참여 범위 작업 id 로 좁혀(150개씩) `range` 로 끝까지 넘긴다.
+- **완료 정산은 가장 최근 미해결 회차.** 회차가 아닌 날 체크하면 `pickCompletionOccurrence` 가 그 날짜
+  이전의 **가장 최근** 미해결 회차로 정산하고, 더 오래된 것은 흡수가 치운다(예전에는 가장 오래된 것을
+  골라 금 · 월이 밀린 화요일 체크 뒤 월요일이 «1일 밀림» 으로 남았다).
+- **흡수는 오늘(도쿄) 이후를 건드리지 않는다.** `occurrencesToAbsorb` = `[anchor, min(완료일, 오늘))` 의
+  미해결 회차. 모바일 「내일」 탭에서 내일 회차를 체크하면 예전에는 열린 오늘 회차가 «이동» 처리돼
+  오늘 목록에서 사라졌다.
+- **이중 완료 가드용 헬퍼.** 순수 `isOccurrenceCompleted(states, date)` (`tasks-recurrence.ts`), 서버
+  `occurrenceAlreadyCompleted(taskId, date): Promise<boolean>` (`task-occurrences.ts`). 완료 액션은
+  `resolveCompletionOccurrence` 가 돌려준 날짜로 부른다.
+- **되돌리기의 한계(기록).** `releaseAbsorbedOccurrences` 는 `moved_to_date = 완료일` 인 `moved` 행을
+  지운다. 흡수가 만든 행과 예전 「오늘로 가져오기」(2026-07-30 ~ 08-25)가 만든 행은 모양이 같아 구분할 수
+  없어, 그날로 가져왔던 옛 행도 함께 지워질 수 있다. 옛 행은 그 기간 것뿐이라 그대로 둔다.
+- **반복 업무 알림은 회차 기준.** 아래 Notifications → Time-based 참고(`decideRecurringReminder`).
+- **날짜 · 시각 검증.** `isValidYmd`(달력에 있는 날짜) · `isValidHm`(00:00–23:59)을 `src/lib/tasks.ts` 에서
+  export. `normalizeTaskDateTime` · `taskTimeWithoutDate` 가 이것을 쓴다. 범위 밖 값은 미설정으로 본다.
+- **죽은 코드 삭제.** `tasks.ts` 의 `nextRecurringInstance` · `previousRecurringInstance` ·
+  `shiftRecurringTaskDates` · `isTaskOverdue` · `isTaskToday` · `isTaskActive` 와 롤포워드용 쌍둥이 날짜 계산,
+  `task-occurrences.ts` 의 `createCarryOverTask`(호출부 없음). `moveOccurrences` 는 흡수가 쓰므로 남긴다.
+
 ## 2026-10-26 mobile bug-fix pass (as-built)
 
 Server actions (`src/app/mobile/tasks/[id]/actions.ts`):
@@ -76,8 +113,9 @@ Status: First slice implemented (2026-06-10) — migrations `202606100003_todo_t
 `is_task_participant(task_id)` helper to avoid recursion; reads are RLS-scoped while **all writes go
 through service-role server actions** with explicit permission checks; notification_type gained
 `task_shared`/`task_updated`/`task_completed` and notifications fan out to participants; task photos
-reuse the `request-images` bucket (`task-images`/`task-update-images`). Recurrence now materializes
-real task-instance rows inside the active operating window.
+reuse the `request-images` bucket (`task-images`/`task-update-images`). Recurrence then materialized
+real task-instance rows inside the active operating window *(historical — replaced by roll-forward on
+2026-06-16, then by the fixed-anchor occurrence model on 2026-07-30)*.
 
 Completion + report (2026-06-13): manual complete / reopen is **re-introduced** and now drives a
 **완료/기록 (Completed)** tab plus a **daily-report generator** (free, template-based — no LLM).
@@ -339,7 +377,8 @@ As-built behavior (2026-06-11):
 - detailed create produces an organized task (`is_inbox = false`) via `createTask` — using the full create form is itself the deliberate "organize" act, so it does not land in Inbox
 - the Quick Add sheet's one-tap **Add to Today / Add to Tomorrow** shortcuts (`quickCreateTodayTask` / `quickCreateTomorrowTask`) also create organized tasks (`is_inbox = false`, `scheduled_date` set)
 - entry flow: the Quick Add sheet's **Save to Inbox** calls `quickCreateTask`; its **Full create** action links to `/mobile/tasks/new`, carrying any typed title via `?title=` (read into the form's `defaultTitle`, kept separate from `defaultDate` so Calendar's `?date=` prefill is unaffected). `/mobile/tasks/new` is the single full-create route, also used by the Calendar day sheet for date-prefilled creation.
-- a task leaves Inbox through deliberate actions afterward — the swipe move actions (`moveTaskToToday` / `moveTaskToTomorrow` set `is_inbox = false`) — never implicitly from field edits. (`moveTaskToInbox` / `moveTaskOutOfInbox` exist as actions but no current UI surface calls them.)
+- a task leaves Inbox through deliberate actions afterward — the swipe move actions (`moveTaskToToday` / `moveTaskToTomorrow` set `is_inbox = false`) — never implicitly from field edits. (Old `moveTaskToInbox` / `moveTaskOutOfInbox` / `setInbox` toggled `is_inbox`, which no view reads; removed 2026-10-28.)
+- **Mobile 「관리함으로 옮기기」 (2026-10-28):** detail crumb 「⋯」 → BottomSheet row, shown only for a project task to its author (`canEditTaskCore`). `moveTaskToInbox(taskId)` (`src/app/mobile/tasks/[id]/actions.ts`) = same as PC `moveConsoleToInbox`: `project_id`/`section_id` -> null, date · time · recurrence kept, `is_inbox` untouched; returns `{ ok: true, previousProjectId, previousSectionId } | { ok: false, reason }` (no redirect, callable from a client toast). Undo = `restoreTaskToProject(taskId, projectId, sectionId)`: author only, project must still be in `getTaskScope`, section restored only if it still belongs to that project. No confirm; toast 「관리함으로 옮겼어요 · 되돌리기」 (6s), haptics success/error. Dead i18n key `swipeInbox` removed.
 - shared tasks may remain in Inbox
 - shared Inbox membership is common to all participants
 
@@ -470,6 +509,10 @@ type TaskScope = { taskIds: Set<string>; projectIds: Set<string> };
 ```
 
 - `taskIds` = `task_participants` 의 내 행 ∪ 내가 속한 프로젝트에 달린 작업 id
+  - **예외(2026-10-28, 프로젝트 나가기):** 내가 멤버가 아닌 프로젝트의 작업에 걸린 **`author` 행은 뺀다**.
+    작성자는 언제나 author 행을 가지므로, 그대로 두면 나간 · 빠진 사람이 자기가 쓴 프로젝트 할 일을 계속 본다.
+    직접 초대 행(`role` 이 author 가 아닌 것)은 남는다. 규칙은 순수 함수 `buildTaskScope()` 하나 —
+    `src/lib/__tests__/task-project-leave.test.ts`.
 - `projectIds` = `project_participants` 의 내 행
 - `react.cache` 로 **요청당 1회**만 계산한다 — 한 페이지 로드가 목록/회차/완료 로그를 병렬로
   읽으므로 매번 다시 조회하면 같은 쿼리가 서너 번 나간다.
@@ -637,8 +680,10 @@ null) and **guard it to `null` unless `timeLabel` is set** (all-day tasks have n
 `yearly` recurrence rule was added to the engine: `"yearly"` in `STANDARD_RECURRENCE_RULES`, a
 `shiftYearlyYmd(ymd, ±1)` helper (month/day preserved, Feb-29 clamped), and cases in
 `nextOccurrenceDate` / `previousOccurrenceDate`; `resolveRecurrenceRule` accepts it automatically via the
-STANDARD list, so completion roll-forward / calendar previews / reminders support yearly with no extra
-change. The schedule sheet's Repeat sub-picker renders **contextual labels** (매주 {요일} / 매월 {일}일 /
+STANDARD list, so calendar previews / occurrence state / reminders support yearly with no extra
+change. *(2026-10-28: the roll-forward wording that stood here is obsolete — roll-forward was retired on
+2026-07-30, and `nextOccurrenceDate` / `previousOccurrenceDate` were deleted from `tasks.ts`. Yearly
+dates are now generated from the anchor — see 「2026-10-28 반복 회차 감사 반영」 at the top.)* The schedule sheet's Repeat sub-picker renders **contextual labels** (매주 {요일} / 매월 {일}일 /
 매년 {월 일}) derived from the selected date; display helpers (`repeatLabel` in card/detail) map `yearly`
 to `repeatYearly`.
 
@@ -741,7 +786,9 @@ write). See `docs/planning/01-decision-log.md` → "2026-07-30 롤포워드 폐�
   `anchor()` / `tokyoDateOf()` read only the Tokyo calendar date. **Detail rendering** honors
   `all_day`: an all-day due date is shown date-only (`longDateOnlyIso`), never `00:00`, so it cannot
   contradict the "All day" time row; only genuinely timed tasks render date + time.
-- inputs are validated: a date must match `YYYY-MM-DD` and a time `HH:MM`, otherwise it is treated as
+- inputs are validated: a date must be a **real calendar date** (`isValidYmd` — `2026-02-31` is
+  rejected, not rolled to 3/3) and a time a real `HH:MM` in 00:00–23:59 (`isValidHm` — `25:99` used to
+  throw a `RangeError` → 500; both 2026-10-28, exported from `src/lib/tasks.ts`), otherwise it is treated as
   unset (handles partial/invalid time states). Toggling all-day back on clears `time_label` and
   normalizes `all_day`/`due_at` with no stale leftovers.
 
@@ -777,9 +824,10 @@ As-built (2026-06-15):
   with no date (`tasks.errors.repeat_needs_date`), and both server actions re-check it.
 - ~~`materializeRecurringTasks()` pre-generated real occurrence rows for the active task window and
   was called by `getVisibleTasks` / `getProjectTasks` / `getTaskDetail` / the reminder cron before
-  each read.~~ **Deprecated by the 2026-06-16 Todoist-style roll-forward switch** (a recurring task is
-  now a single live row that rolls forward on completion; the calendar expands future occurrences
-  virtually via `recurringOccurrencesInRange`). No read path calls it anymore, and the dead helper
+  each read.~~ **Deprecated by the 2026-06-16 Todoist-style roll-forward switch**, which was itself
+  **retired on 2026-07-30**: a recurring task is now a single row with a fixed anchor that never rolls;
+  per-occurrence completion lives in `task_occurrence_state`, and the calendar expands occurrences
+  virtually via `recurringOccurrencesInRange`. No read path calls it anymore, and the dead helper
   (plus its private `getRecurrenceWindow` / `fastForwardRecurrenceCursor` / `buildRecurringTaskInsert`
   helpers) was **removed from the code on 2026-07-24**.
 - Series continuation uses the **latest occurrence row's** repeat rule. So changing repeat on the
@@ -834,12 +882,12 @@ custom:<d>[,<d>…]     d = JS 요일 (0=일 … 6=토), 중복 제거 + 오름�
 | 파일 | 함수 | 의미 |
 | --- | --- | --- |
 | `tasks-recurrence.ts` | `isStandardRecurrence` | 표준 6종 **+ `custom:요일`**. "살아있는 반복 작업인가" 게이트 |
-| `tasks.ts` | `hasRecurrenceMath` | 위와 동일 판정(신규). 롤포워드/롤백 게이트 |
-| `tasks.ts` | `isStandardRecurrenceRule` | 리터럴 6종만. 타입 좁히기 전용 |
+| ~~`tasks.ts`~~ | ~~`hasRecurrenceMath` / `isStandardRecurrenceRule`~~ | 2026-10-28 삭제 — 롤포워드 쌍둥이 계산과 함께 지움. `tasks.ts` 는 `STANDARD_RECURRENCE_RULES` 도 `tasks-recurrence.ts` 에서 가져온다 |
 
 **날짜 계산** — 기존 `weekdays`/`weekends`의 전진 스캔 루프를 요일 집합만 바꿔 재사용한다
-(`nextWeekdayOccurrence` / `stepToWeekday`). 앵커 날짜 자체는 규칙과 무관하게 항상 첫 항목으로
-포함되는데, 이는 `weekends` 등 기존 규칙과 **동일한 기존 동작**이다(앵커 = 그 작업의 현재 발생일).
+(`nextWeekdayOccurrence` / `stepToWeekday`). ~~앵커 날짜 자체는 규칙과 무관하게 항상 첫 항목으로
+포함된다.~~ **2026-10-28 변경:** 요일 묶음 규칙(평일 · 주말 · `custom:`)은 규칙에 맞는 날만 낸다 —
+첫 회차는 앵커 이후 처음 맞는 요일이다(맨 위 「2026-10-28 반복 회차 감사 반영」).
 
 **서버 검증** — `resolveRecurrenceRule`이 `custom:…`을 **재파싱 후 재직렬화**한다. 조작된 요청이
 `custom:5,1,1`이나 `custom:9`를 보내도 각각 `custom:1,5` / `null`로 정규화된다.
@@ -1108,11 +1156,15 @@ Time-based (system reminders, no actor → every participant incl. the author is
 
 - `task_due_soon` / `task_overdue` — produced only by `runTaskReminders` (`src/lib/notifications/
   task-reminders.ts`), driven once daily by Vercel Cron `/api/tasks/reminders` (08:00 JST; CRON_SECRET
-  guarded). The reminder run first materializes recurring task instances for the same active window,
-  then evaluates due dates. **Due soon** = active task whose `due_at` Tokyo date is today; **overdue**
-  = active task whose `due_at` Tokyo date is before today. One reminder per task per recipient ever
-  (dedupe key `task_due_soon|task_overdue:<taskId>`), so the daily run never re-spams an
-  already-notified task and overdue is a single first-cross notification, not an escalating series.
+  guarded). The run is **read-only** — it never creates occurrence rows. **One-off tasks:** due soon =
+  active task whose `due_at` Tokyo date is today; overdue = before today. One reminder per task per
+  recipient ever (dedupe key `task_due_soon|task_overdue:<taskId>`).
+  **Recurring tasks (2026-10-28):** `due_at` is the fixed anchor, not a deadline, so they are judged per
+  occurrence by `decideRecurringReminder` using `task_occurrence_state` (same 400-day window as the
+  screens): today is an open occurrence → due soon, key `task_due_soon:<taskId>:<today>`; otherwise the
+  newest open overdue occurrence → overdue, key `task_overdue:<taskId>:<that date>`. Before this, a
+  recurring task got 「기한 초과」 the day after creation and the permanent `task_overdue:<taskId>` key
+  then blocked every later reminder. If the state read fails, recurring reminders are skipped for that run.
 
 Implementation timing may still phase these, but the product direction is confirmed.
 
@@ -1171,7 +1223,17 @@ optional `section_id`). See `docs/product/23-project-workflow.md` for the produc
 **section delete also deletes its tasks** explicitly, since the section FK is `on delete set null`),
 `reorderProjectSections(projectId, orderedIds)` (owner; sets each `project_sections.sort_order` to its
 index, revalidates), `inviteProjectMembers` (owner; notify), `removeProjectMember` (owner; never the
-creator), `leaveProject` (member only; owner deletes instead). Permission boundary =
+creator; the phone × now opens a confirm sheet first), `leaveProject` (member only; owner deletes instead).
+**Leaving / being removed (2026-10-28):** the person loses every task of that project (their own included —
+`buildTaskScope` drops author rows for non-member projects); tasks stay in the project; direct-invite
+participant rows survive. `getProjectDetail` carries `openTasksByAuthor` (`countOpenTasksByAuthor`: open ·
+in_progress, non-deleted, count + up to 5 titles) for the leave / remove confirm copy.
+**Project owner edits every task (2026-10-28):** `TaskRecord.projectOwnerUserId` (owner row of
+`project_participants`, read in `hydrate` via `getProjectMembership`) feeds `canEditTaskAsOwnerOrAuthor()` —
+`canEditTaskCore` = author OR platform developer OR project owner. Same rule in restore paths (`restoreTask`,
+`restorableIds`). `TaskRecord.authorLeftProject` = author is no longer in the project's membership (false when the
+membership can't be read) → 「나감」 marker on the project row, mobile detail and PC detail.
+Permission boundary =
 `getProjectDetail(session, id)` (RLS-scoped read proves participation) plus a `viewerIsOwner` check for
 owner-only actions. Task complete/reopen reuse the existing `completeTask` / `reopenTask`.
 
@@ -1352,4 +1414,6 @@ myOwn(t, meId)      // !sentInstr — 내 일정 뷰(오늘/내일/관리함/캘
 - **회차 쓰기 실패**(`completeOccurrence` · `clearOccurrenceState` · `skipOccurrences` — 셋 다 boolean 반환)는 `save_failed` 로 돌려주고 완료 기록 · 알림을 남기지 않는다. 일회성 완료/다시 열기도 `mustWrite`.
 - **이미 완료된 일회성 작업**을 다시 완료하면 아무것도 하지 않는다(완료 기록 · 알림 중복 방지).
 - **회차 건너뛰기**(`skipConsoleOccurrence`)는 이미 상태(완료 · 옮김)가 있는 회차를 덮어쓰지 않는다(`already_resolved`, 이미 건너뜀이면 성공 처리).
-- **프로젝트 작업을 관리함으로 이동**(`moveConsoleToInbox`)은 작성자(또는 개발자, `canEditTaskCore`)만.
+- **건너뛴 날 되살리기**(2026-10-28): `clearSkippedOccurrenceState`(`task-occurrences.ts`)가 `state = 'skipped'` 행만 지운다. `unskipOccurrenceOn`(모바일, 이제 `{ ok }` 반환)과 `unskipConsoleOccurrence` 가 쓴다 — 완료된 회차는 풀리지 않는다. 모바일 상세 페이지는 반복 업무일 때 `occurrenceStatesForTask` 를 읽어 `selectRecentSkippedDays`(`task-skipped-days.ts`, 최근 30일 · 최신순)로 `skippedDays` 를 내려준다. 콘솔은 이미 가진 `occurrenceStates` 에서 같은 함수를 쓴다.
+- **프로젝트 작업을 관리함으로 이동**(`moveConsoleToInbox`)은 작성자(또는 개발자, `canEditTaskCore`)만. 2026-10-28 부터
+  `canEditTaskCore` 에 프로젝트 주인도 들어가므로 주인도 옮길 수 있다 — 남이 쓴 할 일을 옮기면 프로젝트 밖으로 나가 주인 범위에서 빠지고 작성자에게 돌아간다.

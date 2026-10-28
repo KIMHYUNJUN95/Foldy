@@ -12,9 +12,10 @@ import { isOwnerOrPlatformDeveloper } from "@/config/roles";
 // 두 반복 테이블이 서로 어긋날 수 없다(그 파일 헤더의 경고 참고).
 import {
   buildCustomRecurrenceRule,
-  isCustomWeekdayRecurrence,
+  OCCURRENCE_STATE_WINDOW_DAYS,
   type OccurrenceState,
   parseCustomWeekdays,
+  STANDARD_RECURRENCE_RULES,
 } from "@/lib/tasks-recurrence";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -94,6 +95,10 @@ export type TaskRecord = {
   updatedAt: string;
   participants: TaskParticipant[];
   resolvedContext: LinkedTaskContext | null;
+  /** 프로젝트 주인(project_participants 의 owner). 프로젝트 밖 작업이거나 멤버십을 읽을 수 없으면 null. */
+  projectOwnerUserId: string | null;
+  /** 작성자가 이 작업의 프로젝트에서 나갔거나 빠졌다(2026-10-28) — 「나감」 표시용. */
+  authorLeftProject: boolean;
 };
 
 export type TaskDetail = TaskRecord & { updates: TaskUpdateEntry[] };
@@ -129,58 +134,23 @@ export type NormalizedTaskDateTime = {
 };
 
 /**
- * 업무 날짜/시간 폼 입력이 어떻게 저장되는지의 단일 기준 — 다음이 공유한다:
- * `createTask` 와 `updateTaskCore` 가 어긋나지 않도록.
+ * `YYYY-MM-DD` 형식이면서 **달력에 실제로 있는 날짜**인가(2026-10-28).
  *
- * 규칙:
- * - `time_label` 은 업무의 선택적 시각("HH:MM"); `all_day = 시각 없음`.
- * - 시각은 업무가 날짜(scheduled 또는 due)에 고정될 때만 유지된다; 날짜가 전혀
- *   없으면 시각은 버려지고 업무는 종일로 남는다(떠다니는 시각 없음).
- * - `due_at` 은 due 날짜가 있을 때만 시각을 담는다(도쿄, +09:00); 종일 due
- *   날짜는 현지 00:00 으로 저장한다 — 기존의 의도된 패턴이며 `anchor()` 가
- *   도쿄 달력 날짜만 읽기 때문이다. due 날짜가 없으면 scheduled 날짜에 시각이
- *   보여도 `due_at` 은 null 이다(표시는 time_label 이 맡고 due_at 이 아님).
- * - 형식이 잘못되었거나 일부만 있는 날짜/시각 문자열은 미설정으로 본다.
+ * 형식만 보면 `2026-02-31` 이 통과해 `Date` 가 3/3 으로 굴려 저장했다. 폼 · URL 등 믿을 수 없는
+ * 입력의 날짜 검사는 이것을 쓴다(액션들이 각자 갖고 있던 `isValidYmd` 대신).
  */
-/** 이번 범위에서 사용자가 새로 지정할 수 있는 반복 규칙(가벼움, 표시 전용). */
-export const STANDARD_RECURRENCE_RULES = [
-  "daily",
-  "weekly",
-  "monthly",
-  "yearly",
-  "weekdays",
-  "weekends",
-] as const;
-type StandardRecurrenceRule = (typeof STANDARD_RECURRENCE_RULES)[number];
-
-function formatYmd(year: number, month: number, day: number): string {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+export function isValidYmd(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-function ymdDiffDays(from: string, to: string): number {
-  const [fy, fm, fd] = from.split("-").map(Number);
-  const [ty, tm, td] = to.split("-").map(Number);
-  const fromUtc = Date.UTC(fy, fm - 1, fd);
-  const toUtc = Date.UTC(ty, tm - 1, td);
-  return Math.round((toUtc - fromUtc) / (1000 * 60 * 60 * 24));
-}
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function shiftMonthlyYmd(ymd: string, months: number): string {
-  const [year, month, day] = ymd.split("-").map(Number);
-  const targetMonthIndex = month - 1 + months;
-  const targetYear = year + Math.floor(targetMonthIndex / 12);
-  const targetMonth = ((targetMonthIndex % 12) + 12) % 12 + 1;
-  return formatYmd(targetYear, targetMonth, Math.min(day, daysInMonth(targetYear, targetMonth)));
-}
-
-function shiftYearlyYmd(ymd: string, years: number): string {
-  const [year, month, day] = ymd.split("-").map(Number);
-  const targetYear = year + years;
-  return formatYmd(targetYear, month, Math.min(day, daysInMonth(targetYear, month)));
+/** `HH:MM` 이면서 00:00 ~ 23:59 인가(2026-10-28). `25:99` 는 예전에 저장 단계에서 500 을 냈다. */
+export function isValidHm(value: string | null | undefined): value is string {
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour <= 23 && minute <= 59;
 }
 
 export function taskAnchorDateInput(input: {
@@ -197,126 +167,11 @@ export function taskNeedsRecurrenceDate(
   return !!recurrenceRule && !anchorDate;
 }
 
-/** 여섯 개의 리터럴 규칙만 — 「반복인가?」 게이트에는 `hasRecurrenceMath` 를 쓴다. */
-function isStandardRecurrenceRule(value: string | null): value is StandardRecurrenceRule {
-  return !!value && (STANDARD_RECURRENCE_RULES as readonly string[]).includes(value);
-}
-
-/**
- * 규칙이 다음으로 넘어가면 true — 표준 규칙 여섯 개 + 커스텀 요일 규칙.
- * `@/lib/tasks-recurrence` 의 `isStandardRecurrence` 와 반드시 보조를 맞춰야 한다.
- */
-function hasRecurrenceMath(value: string | null): value is string {
-  return isStandardRecurrenceRule(value) || isCustomWeekdayRecurrence(value);
-}
-
-/** `fromDate` 이후 엄격히 다음이면서 요일이 집합에 속하는 날짜. */
-function stepToWeekday(weekdays: readonly number[], fromDate: string, step: 1 | -1): string {
-  let cursor = ymdShift(fromDate, step);
-  for (let guard = 0; guard < 7; guard++) {
-    const [year, month, day] = cursor.split("-").map(Number);
-    if (weekdays.includes(new Date(Date.UTC(year, month - 1, day)).getUTCDay())) return cursor;
-    cursor = ymdShift(cursor, step);
-  }
-  return cursor;
-}
-
-function nextOccurrenceDate(rule: string, fromDate: string): string {
-  const customDays = parseCustomWeekdays(rule);
-  if (customDays) return stepToWeekday(customDays, fromDate, 1);
-  if (rule === "daily") return ymdShift(fromDate, 1);
-  if (rule === "weekly") return ymdShift(fromDate, 7);
-  if (rule === "monthly") return shiftMonthlyYmd(fromDate, 1);
-  if (rule === "yearly") return shiftYearlyYmd(fromDate, 1);
-
-  let cursor = ymdShift(fromDate, 1);
-  while (true) {
-    const [year, month, day] = cursor.split("-").map(Number);
-    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    const matches =
-      rule === "weekdays"
-        ? weekday >= 1 && weekday <= 5
-        : weekday === 0 || weekday === 6;
-    if (matches) return cursor;
-    cursor = ymdShift(cursor, 1);
-  }
-}
-
-function previousOccurrenceDate(rule: string, fromDate: string): string {
-  const customDays = parseCustomWeekdays(rule);
-  if (customDays) return stepToWeekday(customDays, fromDate, -1);
-  if (rule === "daily") return ymdShift(fromDate, -1);
-  if (rule === "weekly") return ymdShift(fromDate, -7);
-  if (rule === "monthly") return shiftMonthlyYmd(fromDate, -1);
-  if (rule === "yearly") return shiftYearlyYmd(fromDate, -1);
-
-  let cursor = ymdShift(fromDate, -1);
-  while (true) {
-    const [year, month, day] = cursor.split("-").map(Number);
-    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    const matches =
-      rule === "weekdays" ? weekday >= 1 && weekday <= 5 : weekday === 0 || weekday === 6;
-    if (matches) return cursor;
-    cursor = ymdShift(cursor, -1);
-  }
-}
-
-// ── Todoist 식 반복 (살아 있는 업무 하나, 미리 만든 인스턴스 없음) ──────
-// 반복 업무는 `recurrence_rule` + 현재 회차 날짜를 가진 행 하나다.
-// 완료하면 같은 행이 다음 회차로 넘어가고, 캘린더는 미래 회차를 가상으로 펼친다
-// (표시 전용). 클라이언트 안전한 순수 날짜 계산(isStandardRecurrence /
-// recurringOccurrencesInRange)은 `@/lib/tasks-recurrence` 에 있고, TaskRecord 에 묶인 헬퍼는
-// 아래에 두며 서버 액션이 쓴다.
-
-/** 업무의 현재 회차 날짜(반복 기준점), 날짜가 없으면 null. */
-function currentInstanceOf(task: TaskRecord): string | null {
-  return task.recurrenceInstanceDate ?? taskAnchorDate(task);
-}
-
-/**
- * 반복 업무의 다음 회차 날짜, 표준 반복 업무가 아니면 null.
- *
- * 업무를 늦게 완료했다면(현재 회차가 이미 과거) 다음
- * 회차를 오늘 이후로 넘겨서 미래에 놓는다 — Todoist 의 「연체를 쌓지 않는다」
- * 동작이며, 놓친 날을 한 번 완료할 때마다 하나씩 따라가지 않는다. 규칙의
- * 요일 / 월중 일자 기준점은 유지된다(규칙을 반복 계산하고 원시 `today` 로 점프하지 않음).
- */
-export function nextRecurringInstance(task: TaskRecord): string | null {
-  if (!hasRecurrenceMath(task.recurrenceRule)) return null;
-  const current = currentInstanceOf(task);
-  if (!current) return null;
-  const today = tokyoToday();
-  let next = nextOccurrenceDate(task.recurrenceRule, current);
-  let guard = 0;
-  while (next <= today && guard++ < 1000) next = nextOccurrenceDate(task.recurrenceRule, next);
-  return next;
-}
-
-/** 이전 회차 날짜(넘긴 것을 되돌릴 때 사용), 표준 반복이 아니면 null. */
-export function previousRecurringInstance(task: TaskRecord): string | null {
-  if (!hasRecurrenceMath(task.recurrenceRule)) return null;
-  const current = currentInstanceOf(task);
-  return current ? previousOccurrenceDate(task.recurrenceRule, current) : null;
-}
-
-/**
- * 반복 업무를 `targetInstance` 로 옮기기 위한 날짜 필드 — scheduled/due 오프셋을 유지하고
- * 시각도 유지한다. 업무에 현재 회차 날짜가 없으면 null 을 돌려준다.
- */
-export function shiftRecurringTaskDates(
-  task: TaskRecord,
-  targetInstance: string,
-): { scheduledDate: string | null; dueAt: string | null; recurrenceInstanceDate: string } | null {
-  const current = currentInstanceOf(task);
-  if (!current) return null;
-  const delta = ymdDiffDays(current, targetInstance);
-  const scheduledDate = task.scheduledDate ? ymdShift(task.scheduledDate, delta) : null;
-  const dueDate = tokyoDateOf(task.dueAt);
-  const dueAt = dueDate
-    ? new Date(`${ymdShift(dueDate, delta)}T${task.timeLabel || "00:00"}:00+09:00`).toISOString()
-    : null;
-  return { scheduledDate, dueAt, recurrenceInstanceDate: targetInstance };
-}
+// ── 반복(고정 앵커 + 회차 상태, 2026-07-30) ─────────────────────────────────
+// 반복 업무는 `recurrence_rule` + 고정 앵커를 가진 행 하나이고, 완료해도 행이 넘어가지 않는다.
+// 회차별 완료 · 건너뜀 · 이동은 `task_occurrence_state` 에 남는다. 회차 날짜 계산은 클라이언트 안전한
+// `@/lib/tasks-recurrence` **한 곳**에만 있다 — 예전 이 파일의 롤포워드용 쌍둥이 계산(다음/이전
+// 인스턴스, 날짜 옮기기)은 쓰는 곳이 없어 2026-10-28 에 지웠다.
 
 /**
  * 제출된 반복 규칙을 저장 값으로 해석한다 — 문서화된 제품 규칙과
@@ -352,21 +207,33 @@ export function taskTimeWithoutDate(input: {
   dueDate: string;
   time: string;
 }): boolean {
-  const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
-  const isTime = (v: string) => /^\d{2}:\d{2}$/.test(v);
-  return isTime(input.time) && !isDate(input.scheduledDate) && !isDate(input.dueDate);
+  return isValidHm(input.time) && !isValidYmd(input.scheduledDate) && !isValidYmd(input.dueDate);
 }
 
+/**
+ * 업무 날짜/시간 폼 입력이 어떻게 저장되는지의 단일 기준 — `createTask` 와 `updateTaskCore` 가
+ * 어긋나지 않도록 함께 쓴다.
+ *
+ * 규칙:
+ * - `time_label` 은 업무의 선택적 시각("HH:MM"); `all_day = 시각 없음`.
+ * - 시각은 업무가 날짜(scheduled 또는 due)에 고정될 때만 유지된다; 날짜가 전혀
+ *   없으면 시각은 버려지고 업무는 종일로 남는다(떠다니는 시각 없음).
+ * - `due_at` 은 due 날짜가 있을 때만 시각을 담는다(도쿄, +09:00); 종일 due
+ *   날짜는 현지 00:00 으로 저장한다 — 기존의 의도된 패턴이며 `anchor()` 가
+ *   도쿄 달력 날짜만 읽기 때문이다.
+ * - 형식이 잘못되었거나 **달력에 없는 날짜(2026-02-31) · 범위 밖 시각(25:99)** 은 미설정으로
+ *   본다(2026-10-28). 예전에는 형식만 봐서 `25:99` 가 `toISOString()` RangeError → 500 을 냈고,
+ *   `02-31` 은 3/3 으로 굴려 저장됐다. 사용자에게 오류로 알리려면 액션이 저장 전에
+ *   `isValidYmd` · `isValidHm` 으로 먼저 거른다.
+ */
 export function normalizeTaskDateTime(input: {
   scheduledDate: string;
   dueDate: string;
   time: string;
 }): NormalizedTaskDateTime {
-  const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
-  const isTime = (v: string) => /^\d{2}:\d{2}$/.test(v);
-  const scheduledDate = isDate(input.scheduledDate) ? input.scheduledDate : null;
-  const dueDate = isDate(input.dueDate) ? input.dueDate : null;
-  const time = isTime(input.time) ? input.time : "";
+  const scheduledDate = isValidYmd(input.scheduledDate) ? input.scheduledDate : null;
+  const dueDate = isValidYmd(input.dueDate) ? input.dueDate : null;
+  const time = isValidHm(input.time) ? input.time : "";
   const timeOfDay = scheduledDate || dueDate ? time : "";
   const dueAt = dueDate
     ? new Date(`${dueDate}T${timeOfDay || "00:00"}:00+09:00`).toISOString()
@@ -379,30 +246,73 @@ export function normalizeTaskDateTime(input: {
   };
 }
 
-export function isTaskActive(task: TaskRecord): boolean {
-  return task.status !== "completed" && task.status !== "cancelled";
-}
-
-export function isTaskOverdue(task: TaskRecord): boolean {
-  const due = tokyoDateOf(task.dueAt);
-  return isTaskActive(task) && !!due && due < tokyoToday();
-}
-
-export function isTaskToday(task: TaskRecord): boolean {
-  if (!isTaskActive(task) || isTaskOverdue(task)) return false;
-  const today = tokyoToday();
-  return task.scheduledDate === today || tokyoDateOf(task.dueAt) === today;
+/**
+ * 작성자 · 플랫폼 개발자(2026-10-23) · **그 작업 프로젝트의 주인**(2026-10-28)이면 true.
+ * 프로젝트 주인은 나간 멤버가 쓴 할 일까지 고치고 · 완료하고 · 지운다 — 주인 없는 할 일이 남지 않게.
+ */
+export function canEditTaskAsOwnerOrAuthor(
+  user: { id: string; role: string | null | undefined },
+  createdByUserId: string,
+  projectOwnerUserId: string | null,
+): boolean {
+  if (isOwnerOrPlatformDeveloper(user, createdByUserId)) return true;
+  return projectOwnerUserId !== null && projectOwnerUserId === user.id;
 }
 
 /**
- * 작업 본문 · 일정 · 삭제 · 참여자 빼기 같은 「작성자만」 동작의 게이트. 플랫폼 개발자는 예외로 통과한다
- * (2026-10-23 「개발자는 전부 가능」). 개발자가 열 수 있는 작업(getTaskScope 범위) 안에서만 쓰인다.
+ * 작업 본문 · 일정 · 삭제 · 참여자 빼기 같은 「작성자만」 동작의 게이트. 플랫폼 개발자와 프로젝트 주인도
+ * 통과한다(`canEditTaskAsOwnerOrAuthor`). 열 수 있는 작업(getTaskScope 범위) 안에서만 쓰인다.
  */
 export function canEditTaskCore(
   session: Pick<AppSession, "user">,
-  task: Pick<TaskRecord, "createdByUserId">,
+  task: Pick<TaskRecord, "createdByUserId" | "projectOwnerUserId">,
 ): boolean {
-  return isOwnerOrPlatformDeveloper(session.user, task.createdByUserId);
+  return canEditTaskAsOwnerOrAuthor(session.user, task.createdByUserId, task.projectOwnerUserId);
+}
+
+/** 프로젝트별 주인 · 멤버 id. 행을 하나도 읽지 못한 프로젝트(RLS 로 가려짐)는 맵에 없다. */
+export type ProjectMembershipMap = Map<string, { ownerUserId: string | null; memberIds: Set<string> }>;
+
+export function buildProjectMembershipMap(
+  rows: Array<{ project_id: string; user_id: string; role: string }>,
+): ProjectMembershipMap {
+  const map: ProjectMembershipMap = new Map();
+  for (const r of rows) {
+    const entry = map.get(r.project_id) ?? { ownerUserId: null, memberIds: new Set<string>() };
+    entry.memberIds.add(r.user_id);
+    if (r.role === "owner") entry.ownerUserId = r.user_id;
+    map.set(r.project_id, entry);
+  }
+  return map;
+}
+
+/**
+ * 작성자가 프로젝트를 떠났는가. 멤버십을 읽을 수 없는 프로젝트(직접 초대로만 보는 작업)는 모르므로 false —
+ * 「나감」 을 잘못 붙이지 않는 쪽을 고른다.
+ */
+export function authorLeftProjectOf(
+  projectId: string | null,
+  createdByUserId: string,
+  membership: ProjectMembershipMap,
+): boolean {
+  if (!projectId) return false;
+  const entry = membership.get(projectId);
+  if (!entry) return false;
+  return !entry.memberIds.has(createdByUserId);
+}
+
+/** RLS 범위로 프로젝트 멤버십을 읽는다(주인은 언제나 자기 프로젝트 행을 읽을 수 있다). */
+export async function getProjectMembership(projectIds: string[]): Promise<ProjectMembershipMap> {
+  const unique = [...new Set(projectIds.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("project_participants")
+    .select("project_id, user_id, role")
+    .in("project_id", unique);
+  return buildProjectMembershipMap(
+    (data ?? []) as Array<{ project_id: string; user_id: string; role: string }>,
+  );
 }
 
 type ResContextRow = {
@@ -525,7 +435,9 @@ async function hydrate(rows: TaskRow[]): Promise<TaskRecord[]> {
     ),
   ];
 
-  const [profiles, resRows, propRows, roomRows] = await Promise.all([
+  const projectIds = rows.map((r) => r.project_id).filter((v): v is string => !!v);
+
+  const [profiles, resRows, propRows, roomRows, membership] = await Promise.all([
     userIds.size > 0
       ? supabase.from("profiles").select("id, name").in("id", Array.from(userIds)).then((r) => (r.data ?? []) as ProfileName[])
       : Promise.resolve([] as ProfileName[]),
@@ -542,6 +454,7 @@ async function hydrate(rows: TaskRow[]): Promise<TaskRecord[]> {
     roomIdsNoRes.length > 0
       ? supabase.from("rooms").select("id, room_label").in("id", roomIdsNoRes).then((r) => (r.data ?? []) as RoomContextRow[])
       : Promise.resolve([] as RoomContextRow[]),
+    getProjectMembership(projectIds),
   ]);
 
   const names = new Map<string, string>();
@@ -598,6 +511,10 @@ async function hydrate(rows: TaskRow[]): Promise<TaskRecord[]> {
       updatedAt: r.updated_at,
       participants,
       resolvedContext: buildLinkedContext(r, reservationMap, propertyNameMap, roomLabelMap),
+      projectOwnerUserId: r.project_id
+        ? (membership.get(r.project_id)?.ownerUserId ?? null)
+        : null,
+      authorLeftProject: authorLeftProjectOf(r.project_id, r.created_by_user_id, membership),
     };
   });
 }
@@ -624,30 +541,62 @@ export type TaskScope = { taskIds: Set<string>; projectIds: Set<string> };
  * `cache()` 로 요청당 1회만 계산한다. 한 페이지 로드가 목록/회차/완료로그를 병렬로 읽으므로
  * 매번 다시 조회하면 같은 쿼리가 서너 번 나간다.
  */
+/**
+ * 범위 계산의 순수 규칙(2026-10-28 「프로젝트를 나가면 그 프로젝트 할 일은 안 보인다」).
+ *
+ * - 내가 멤버인 프로젝트의 작업은 전부 보인다(`projectTaskIds`).
+ * - 참여자 행은 범위에 넣되, **내가 멤버가 아닌 프로젝트의 작업에 걸린 `author` 행은 버린다** — 작성자는
+ *   언제나 author 행을 갖고 있어서, 이걸 그대로 두면 나간 사람이 자기가 쓴 프로젝트 할 일을 계속 본다.
+ *   직접 초대(author 가 아닌 행)로 받은 작업은 프로젝트를 나가도 남는다.
+ */
+export function buildTaskScope(input: {
+  participantRows: Array<{ taskId: string; role: string; projectId: string | null }>;
+  memberProjectIds: Iterable<string>;
+  projectTaskIds: Iterable<string>;
+}): TaskScope {
+  const projectIds = new Set(input.memberProjectIds);
+  const taskIds = new Set<string>(input.projectTaskIds);
+  for (const r of input.participantRows) {
+    if (r.role === "author" && r.projectId && !projectIds.has(r.projectId)) continue;
+    taskIds.add(r.taskId);
+  }
+  return { taskIds, projectIds };
+}
+
 const loadTaskScope = cache(
   async (userId: string, organizationId: string): Promise<TaskScope> => {
     const supabase = await getSupabaseServerClient();
     const [partRes, projRes] = await Promise.all([
-      supabase.from("task_participants").select("task_id").eq("user_id", userId),
+      supabase.from("task_participants").select("task_id, role, tasks(project_id)").eq("user_id", userId),
       supabase.from("project_participants").select("project_id").eq("user_id", userId),
     ]);
-    const taskIds = new Set<string>();
-    for (const r of (partRes.data ?? []) as Array<{ task_id: string }>) taskIds.add(r.task_id);
-    const projectIds = new Set<string>();
-    for (const r of (projRes.data ?? []) as Array<{ project_id: string }>) {
-      projectIds.add(r.project_id);
-    }
+    const memberProjectIds = ((projRes.data ?? []) as Array<{ project_id: string }>).map(
+      (r) => r.project_id,
+    );
     // 프로젝트 작업은 작업별 참여자 없이 프로젝트 소속만으로 보인다 — 그 id 들도 범위에 넣어야
     // 회차/완료 로그 필터가 프로젝트 작업을 잘라내지 않는다.
-    if (projectIds.size > 0) {
+    let projectTaskIds: string[] = [];
+    if (memberProjectIds.length > 0) {
       const { data } = await supabase
         .from("tasks")
         .select("id")
         .eq("organization_id", organizationId)
-        .in("project_id", Array.from(projectIds));
-      for (const r of (data ?? []) as Array<{ id: string }>) taskIds.add(r.id);
+        .in("project_id", memberProjectIds);
+      projectTaskIds = ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
     }
-    return { taskIds, projectIds };
+    type PartRow = {
+      task_id: string;
+      role: string;
+      tasks: { project_id: string | null } | { project_id: string | null }[] | null;
+    };
+    return buildTaskScope({
+      participantRows: ((partRes.data ?? []) as PartRow[]).map((r) => {
+        const task = Array.isArray(r.tasks) ? r.tasks[0] : r.tasks;
+        return { taskId: r.task_id, role: r.role, projectId: task?.project_id ?? null };
+      }),
+      memberProjectIds,
+      projectTaskIds,
+    });
   },
 );
 
@@ -744,26 +693,50 @@ export type OccurrenceStateRecord = {
   movedToDate: string | null;
 };
 
+/** PostgREST 한 번 응답의 최대 행 수(Supabase 기본 `max-rows`). 이보다 많으면 조용히 잘린다. */
+const PAGE_SIZE = 1000;
+/** `.in("task_id", …)` 한 번에 넣는 id 수 — UUID 150개면 URL 이 6KB 남짓이라 안전하다. */
+const ID_CHUNK = 150;
+
 /**
- * 조직의 반복 업무에 대한 회차 단위 상태 행(RLS 로 참여자 멤버십 범위).
+ * 범위 안 작업 id 로 좁혀 회차 테이블을 **빠짐없이** 읽는다(2026-10-28).
+ *
+ * 예전에는 조직 전체를 한 번에 읽어서 PostgREST 의 1000행 상한에 걸리면 나머지가 조용히 빠졌고,
+ * 빠진 완료 회차가 화면에서 다시 «밀림» 으로 나타났다. 이제 id 묶음마다 `range` 로 끝까지 넘긴다.
+ * 읽기가 한 번이라도 실패하면 `null` — 반쪽 결과를 정상처럼 내보내지 않는다.
+ */
+async function selectOccurrenceRowsByTask<Row>(
+  taskIds: string[],
+  fetchPage: (
+    chunk: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown; error: { message?: string } | null }>,
+): Promise<Row[] | null> {
+  const out: Row[] = [];
+  for (let i = 0; i < taskIds.length; i += ID_CHUNK) {
+    const chunk = taskIds.slice(i, i + ID_CHUNK);
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await fetchPage(chunk, from, from + PAGE_SIZE - 1);
+      if (error) return null;
+      const rows = (data ?? []) as Row[];
+      out.push(...rows);
+      if (rows.length < PAGE_SIZE) break;
+    }
+  }
+  return out;
+}
+
+/**
+ * 보이는 반복 업무의 회차 단위 상태 행(RLS + 참여 범위).
  * 날짜별 회차 렌더(완료 상태), 지난 미완료 감지(기록 없음 = 아직 열림),
- * 건너뜀/이동 해석에 쓴다. 크기를 위해 최근 구간으로 제한한다 — 구간보다 오래된 해석된 상태는
- * 병적으로 오래된 밀린 항목에서만 의미가 있다. 넘겨진 옛 기준점은 최근 것이라 이
- * 구간이 활성 업무를 충분히 덮는다.
+ * 건너뜀/이동 해석에 쓴다. `OCCURRENCE_STATE_WINDOW_DAYS`(400일) 안만 읽고, 밀린 회차 계산
+ * (`outstandingOverdueOccurrences`)도 같은 창으로 잘라서 창 밖 회차가 «밀림» 으로 되살아나지 않는다.
  */
 export async function getOccurrenceStates(session: AppSession): Promise<OccurrenceStateRecord[]> {
   const supabase = await getSupabaseServerClient();
   const scope = await getTaskScope(session);
-  const since = ymdShift(tokyoToday(), -400);
-  const { data, error } = await supabase
-    .from("task_occurrence_state")
-    .select("task_id, occurrence_date, state, completed_by_user_id, moved_to_date")
-    .eq("organization_id", session.organization.id)
-    .gte("occurrence_date", since);
-  if (error) {
-    if (isMissingTable(error.message ?? "")) return [];
-    return [];
-  }
+  const since = ymdShift(tokyoToday(), -OCCURRENCE_STATE_WINDOW_DAYS);
   type Row = {
     task_id: string;
     occurrence_date: string;
@@ -771,15 +744,25 @@ export async function getOccurrenceStates(session: AppSession): Promise<Occurren
     completed_by_user_id: string | null;
     moved_to_date: string | null;
   };
-  return ((data ?? []) as Row[])
-    .filter((r) => scope.taskIds.has(r.task_id))
-    .map((r) => ({
-      taskId: r.task_id,
-      occurrenceDate: r.occurrence_date,
-      state: r.state as OccurrenceState,
-      completedByUserId: r.completed_by_user_id,
-      movedToDate: r.moved_to_date,
-    }));
+  const rows = await selectOccurrenceRowsByTask<Row>([...scope.taskIds], (chunk, from, to) =>
+    supabase
+      .from("task_occurrence_state")
+      .select("task_id, occurrence_date, state, completed_by_user_id, moved_to_date")
+      .eq("organization_id", session.organization.id)
+      .in("task_id", chunk)
+      .gte("occurrence_date", since)
+      .order("task_id", { ascending: true })
+      .order("occurrence_date", { ascending: true })
+      .range(from, to),
+  );
+  if (!rows) return [];
+  return rows.map((r) => ({
+    taskId: r.task_id,
+    occurrenceDate: r.occurrence_date,
+    state: r.state as OccurrenceState,
+    completedByUserId: r.completed_by_user_id,
+    movedToDate: r.moved_to_date,
+  }));
 }
 
 /**
@@ -865,21 +848,26 @@ export type OccurrenceOrderRecord = {
 export async function getOccurrenceOrders(session: AppSession): Promise<OccurrenceOrderRecord[]> {
   const supabase = await getSupabaseServerClient();
   const scope = await getTaskScope(session);
-  const since = ymdShift(tokyoToday(), -400);
-  const { data, error } = await supabase
-    .from("task_occurrence_order")
-    .select("task_id, occurrence_date, sort_order")
-    .eq("organization_id", session.organization.id)
-    .gte("occurrence_date", since);
-  if (error) return [];
+  const since = ymdShift(tokyoToday(), -OCCURRENCE_STATE_WINDOW_DAYS);
   type Row = { task_id: string; occurrence_date: string; sort_order: number };
-  return ((data ?? []) as Row[])
-    .filter((r) => scope.taskIds.has(r.task_id))
-    .map((r) => ({
-      taskId: r.task_id,
-      occurrenceDate: r.occurrence_date,
-      sortOrder: r.sort_order,
-    }));
+  // 상태 행과 같은 이유로 범위 id 로 좁히고 끝까지 넘긴다(2026-10-28, 1000행 상한).
+  const rows = await selectOccurrenceRowsByTask<Row>([...scope.taskIds], (chunk, from, to) =>
+    supabase
+      .from("task_occurrence_order")
+      .select("task_id, occurrence_date, sort_order")
+      .eq("organization_id", session.organization.id)
+      .in("task_id", chunk)
+      .gte("occurrence_date", since)
+      .order("task_id", { ascending: true })
+      .order("occurrence_date", { ascending: true })
+      .range(from, to),
+  );
+  if (!rows) return [];
+  return rows.map((r) => ({
+    taskId: r.task_id,
+    occurrenceDate: r.occurrence_date,
+    sortOrder: r.sort_order,
+  }));
 }
 
 /** 프로젝트에 속한 모든 업무(RLS 범위: 보는 사람이 프로젝트 참여자여야 함). */

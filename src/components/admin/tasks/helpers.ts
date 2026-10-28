@@ -53,6 +53,14 @@ export function fmtShort(ymd: string, locale: Locale): string {
     timeZone: "UTC",
   }).format(parseYmdUTC(ymd));
 }
+/** 요일 없는 «10월 26일» — 문장 안에 끼우는 날짜(토스트)용. */
+export function fmtMonthDay(ymd: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(parseYmdUTC(ymd));
+}
 export function fmtWeekday(ymd: string, locale: Locale): string {
   return new Intl.DateTimeFormat(localeTag(locale), { weekday: "short", timeZone: "UTC" }).format(
     parseYmdUTC(ymd),
@@ -324,8 +332,9 @@ export function ctxItems(t: TaskRecord): CtxItem[] {
 // ── 검색/우선순위/날짜 필터 ─────────────────────────────────────────────────────
 export type DateFilterKey = "today" | "week" | "overdue" | "nodate";
 export function matchQuery(t: TaskRecord, q: string, nameOf: (id: string) => string): boolean {
-  if (!q) return true;
-  const needle = q.toLowerCase();
+  // 공백만 있는 검색어는 필터가 아니다 — 화면의 다른 검색 판정(trim)과 같게 맞춘다.
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
   if (t.title.toLowerCase().includes(needle)) return true;
   if (nameOf(t.createdByUserId).toLowerCase().includes(needle)) return true;
   return t.tags.some((g) => g.toLowerCase().includes(needle));

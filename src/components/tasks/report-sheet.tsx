@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, ChevronRight, Clock, Copy, FileText, Lock, RefreshCw, Send, TriangleAlert } from "lucide-react";
-import { generateDailyReport, sendDailyReportToSlack } from "@/actions/task-report";
+import { generateDailyReport } from "@/actions/task-report";
 import {
   cancelDailyReportSchedule,
   getReportSchedule,
   scheduleDailyReport,
   type ReportScheduleView,
+  sendDailyReportNow,
 } from "@/actions/task-report-schedule";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import {
@@ -178,17 +179,26 @@ export function ReportSheet({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // 예약이 있어도 서버가 «먼저 보내고, 보낸 뒤에만 예약을 거둔다»(`sendDailyReportNow`, 2026-10-28) — 보내기가 실패하면 예약이 그대로 남는다.
   const onSlackSend = async () => {
     setSlackStatus("sending");
-    let result: Awaited<ReturnType<typeof sendDailyReportToSlack>>;
+    let result: Awaited<ReturnType<typeof sendDailyReportNow>>;
     try {
-      result = await sendDailyReportToSlack(date, text);
+      result = await sendDailyReportNow(date, text);
     } catch {
       setSlackStatus("error");
       return;
     }
     if (result.ok) {
       setSlackStatus("sent");
+      if (schedule?.status === "scheduled") {
+        setSchedule(null);
+        setScheduledText(null);
+      }
+      return;
+    }
+    if (result.reason === "busy") {
+      setSlackStatus("error");
       return;
     }
     // 서버가 준 사유를 **그대로** 보여준다. 예전에는 forbidden / empty 를 일반 오류로 접었는데,
@@ -309,15 +319,6 @@ export function ReportSheet({
     if (whenTime) {
       await onSchedule();
       return;
-    }
-    if (active) {
-      const cancelled = await cancelDailyReportSchedule(date);
-      if (!cancelled.ok) {
-        setScheduleMsg({ tone: "bad", text: copy.reportSlackError });
-        return;
-      }
-      setSchedule(null);
-      setScheduledText(null);
     }
     await onSlackSend();
   };

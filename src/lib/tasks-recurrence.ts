@@ -1,7 +1,7 @@
 /**
  * 순수 반복 날짜 계산 — **서버 import 없음**, 그래서 클라이언트 컴포넌트에서 안전하게 쓸 수 있다
- * (예: `tasks-workspace.tsx` 의 캘린더). TaskRecord 에 묶인 반복 헬퍼(롤오버,
- * 다음/이전 인스턴스)는 server-only 모듈을 끌어오는 `@/lib/tasks` 에 있다.
+ * (예: `tasks-workspace.tsx` 의 캘린더). 회차 계산은 **여기 하나뿐**이다 — 서버
+ * (`@/lib/tasks` · `task-occurrences` · 알림 크론)도 이 파일을 가져다 쓴다(2026-10-28 쌍둥이 정리).
  *
  * Todoist 방식 반복 (2026-06-16): 반복 작업은 살아 있는 행 하나이고, 앞으로의 회차는
  * 행으로 저장하지 않고 캘린더 미리보기용으로 즉석에서(여기서) 계산한다.
@@ -9,10 +9,8 @@
 
 import { ymdShift } from "@/lib/tokyo-date";
 
-// 반드시 `@/lib/tasks` 의 `STANDARD_RECURRENCE_RULES` (서버 전용 쌍둥이)와 동기화해야 한다.
-// 한쪽에만 있는 규칙은 두 코드 경로를 조용히 어긋나게 한다 — 예: 지연된
-// `yearly` 작업은 tasks.ts 로는 앞으로 굴러가지만 이 파일의 `isStandardRecurrence` 로 거르는
-// 닫기/일정 변경 분기에서는 **하드 삭제**된다.
+// 반복 규칙 표의 정본. `@/lib/tasks` 도 여기서 가져다 쓴다 — 예전에는 그쪽에 쌍둥이 표가 있었고,
+// 한쪽에만 있는 규칙 때문에 지연된 `yearly` 작업이 닫기/일정 변경 분기에서 **하드 삭제**된 적이 있다.
 export const STANDARD_RECURRENCE_RULES = [
   "daily",
   "weekly",
@@ -88,17 +86,6 @@ export function formatCustomWeekdays(rule: string | null, locale: string): strin
   return locale.startsWith("en") ? names.join(", ") : names.join("·");
 }
 
-/** `fromDate` 이후 엄격히 다음 날짜 중 요일이 `weekdays` 에 속하는 것. */
-function nextWeekdayOccurrence(weekdays: readonly number[], fromDate: string, step: 1 | -1): string {
-  let cursor = ymdShift(fromDate, step);
-  for (let guard = 0; guard < 7; guard++) {
-    const [year, month, day] = cursor.split("-").map(Number);
-    if (weekdays.includes(new Date(Date.UTC(year, month - 1, day)).getUTCDay())) return cursor;
-    cursor = ymdShift(cursor, step);
-  }
-  return cursor; // 비어 있지 않은 집합에서는 도달 불가; 반환 타입을 완전하게 유지한다
-}
-
 function formatYmd(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -138,23 +125,99 @@ export function isStandardRecurrence(value: string | null): boolean {
   return isStd(value) || isCustomWeekdayRecurrence(value);
 }
 
-function nextOccurrence(rule: string, fromDate: string): string {
-  const customDays = parseCustomWeekdays(rule);
-  if (customDays) return nextWeekdayOccurrence(customDays, fromDate, 1);
-  if (rule === "daily") return ymdShift(fromDate, 1);
-  if (rule === "weekly") return ymdShift(fromDate, 7);
-  if (rule === "monthly") return shiftMonthlyYmd(fromDate, 1);
-  if (rule === "yearly") return shiftYearlyYmd(fromDate, 1);
+/**
+ * 회차 상태를 읽는 창(일) — 서버 `getOccurrenceStates` 가 이만큼만 읽는다(2026-10-28).
+ * 밀린 회차 계산(`outstandingOverdueOccurrences`)도 같은 창으로 자른다. 창이 서로 다르면 창 밖의
+ * 완료 기록은 안 읽히는데 회차는 계속 세어져, 오래전에 끝낸 회차가 «밀림»으로 되살아난다.
+ */
+export const OCCURRENCE_STATE_WINDOW_DAYS = 400;
 
-  let cursor = ymdShift(fromDate, 1);
-  while (true) {
-    const [year, month, day] = cursor.split("-").map(Number);
-    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    const matches =
-      rule === "weekdays" ? weekday >= 1 && weekday <= 5 : weekday === 0 || weekday === 6;
-    if (matches) return cursor;
-    cursor = ymdShift(cursor, 1);
+const WEEKDAY_SETS: Record<"weekdays" | "weekends", readonly number[]> = {
+  weekdays: [1, 2, 3, 4, 5],
+  weekends: [0, 6],
+};
+
+/** 요일 묶음 규칙(평일 · 주말 · 사용자 지정)의 요일 집합. 해당 없으면 null. */
+function weekdaySetOf(rule: string): readonly number[] | null {
+  if (rule === "weekdays" || rule === "weekends") return WEEKDAY_SETS[rule];
+  return parseCustomWeekdays(rule);
+}
+
+function weekdayOfYmd(ymd: string): number {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function dayDiff(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+}
+
+function monthDiff(from: string, to: string): number {
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
+  return (ty - fy) * 12 + (tm - fm);
+}
+
+/**
+ * 반복 작업이 [start, end] (양끝 포함) 안에서 갖는 모든 회차 날짜, 캘린더 미리보기용.
+ * `anchor` 이전 날짜는 없다 (과거 미리보기 없음).
+ *
+ * **n 번째 회차는 항상 앵커에서 바로 계산한다(2026-10-28).** 예전에는 직전 회차에서 한 칸씩
+ * 넘어갔는데, 말일이 잘리면 그 잘린 날이 다음 기준이 돼 영영 돌아오지 않았다 — 1/31 → 2/28 →
+ * 3/28 → 4/28 …, 2024-02-29 연 반복은 2028 년에도 02-28 이었다. 이제 1/31 → 2/28 → 3/31,
+ * 2/29 → 2025~2027 은 2/28 → 2028 은 2/29 다.
+ *
+ * **요일 묶음 규칙(평일 · 주말 · 사용자 지정)은 규칙에 맞는 날만 낸다(2026-10-28).** 예전에는 앵커
+ * 자신을 무조건 첫 회차로 냈다 — 토요일에 만든 「평일마다」가 토요일에도 떴고, 지나면 «밀림» 으로
+ * 남았다. 이제 첫 회차는 앵커 이후 처음 맞는 요일이다. 매일 · 매주 · 매월 · 매년은 앵커가 곧 첫 회차다.
+ *
+ * 앞으로 건너뛰지 않고 해당 n 으로 바로 뛰므로, 아주 오래된 앵커도 정확하다(예전 1500 단계 상한이
+ * 4년 넘은 매일 반복에서 회차를 놓쳤다).
+ */
+export function recurringOccurrencesInRange(
+  rule: string | null,
+  anchor: string,
+  start: string,
+  end: string,
+): string[] {
+  if (rule === null || !isStandardRecurrence(rule)) return [];
+  const from = start > anchor ? start : anchor;
+  if (from > end) return [];
+  const out: string[] = [];
+
+  const weekdays = weekdaySetOf(rule);
+  if (weekdays) {
+    // 범위 안 날짜를 하루씩 보며 요일만 본다. 호출 범위는 달력 한 달 ~ 창(400일) 정도다.
+    for (let cursor = from, guard = 0; cursor <= end && guard < 4000; guard++) {
+      if (weekdays.includes(weekdayOfYmd(cursor))) out.push(cursor);
+      cursor = ymdShift(cursor, 1);
+    }
+    return out;
   }
+
+  if (rule === "daily" || rule === "weekly") {
+    const step = rule === "daily" ? 1 : 7;
+    let n = Math.max(0, Math.ceil(dayDiff(anchor, from) / step));
+    for (let guard = 0; guard < 4000; guard++, n++) {
+      const date = ymdShift(anchor, n * step);
+      if (date > end) break;
+      if (date >= from) out.push(date);
+    }
+    return out;
+  }
+
+  // monthly · yearly — 잘림 때문에 n 번째 날짜가 n 의 달 안에서 앞당겨질 수 있으니 한 칸 앞에서 시작한다.
+  const monthly = rule === "monthly";
+  const span = monthDiff(anchor, from);
+  let n = Math.max(0, (monthly ? span : Math.floor(span / 12)) - 1);
+  for (let guard = 0; guard < 4000; guard++, n++) {
+    const date = monthly ? shiftMonthlyYmd(anchor, n) : shiftYearlyYmd(anchor, n);
+    if (date > end) break;
+    if (date >= from) out.push(date);
+  }
+  return out;
 }
 
 /**
@@ -174,28 +237,6 @@ export function canMoveRecurringTo(
   if (!anchor || !isStandardRecurrence(rule)) return true;
   if (anchor === targetDate) return true;
   return recurringOccurrencesInRange(rule, anchor, targetDate, targetDate).length === 0;
-}
-
-/**
- * 반복 작업이 [start, end] (양끝 포함) 안에서 갖는 모든 회차 날짜, 캘린더 미리보기용.
- * `anchor` 부터 앞으로 생성하고, `start` 이전 날짜는 건너뛴다 (과거 미리보기 없음).
- */
-export function recurringOccurrencesInRange(
-  rule: string | null,
-  anchor: string,
-  start: string,
-  end: string,
-): string[] {
-  if (!isStandardRecurrence(rule) || rule === null) return [];
-  const out: string[] = [];
-  let cursor = anchor;
-  let guard = 0;
-  while (cursor < start && guard++ < 1500) cursor = nextOccurrence(rule, cursor);
-  while (cursor <= end && guard++ < 3000) {
-    if (cursor >= start) out.push(cursor);
-    cursor = nextOccurrence(rule, cursor);
-  }
-  return out;
 }
 
 /**
@@ -230,13 +271,6 @@ export function isResolvedOccurrenceState(state: OccurrenceState | undefined): b
 }
 
 /**
- * 반복 작업의 아직 열려 있는 **지연** 회차 날짜: `[anchor, today)` 안의 규칙 회차 중
- * 기록된 상태가 없는 것. `resolvedDates` 는 이 작업에 대해 이미 `task_occurrence_state` 행(완료/건너뜀/이동)을
- * 가진 occurrence_date 문자열 집합이다.
- * 표준이 아닌 규칙이거나 지연이 없으면 비어 있다. 자동 만료되지 않는다 — 날짜는 완료, 건너뜀,
- * 이동될 때까지 남는다 (결정 로그 2026-07-30 참고).
- */
-/**
  * `from`(포함) 이후 첫 회차. 반복이 아니거나 앵커가 없으면 null.
  *
  * **반복 업무의 `dueAt` 은 마감일이 아니라 앵커다** — 「7/30부터 평일마다」의 시작점이라 고정된
@@ -257,6 +291,16 @@ export function nextRecurringOccurrence(
   return occurrence ?? null;
 }
 
+/**
+ * 반복 작업의 아직 열려 있는 **지연** 회차 날짜: `[anchor, today)` 안의 규칙 회차 중
+ * 기록된 상태가 없는 것. `resolvedDates` 는 이 작업에 대해 이미 `task_occurrence_state` 행(완료/건너뜀/이동)을
+ * 가진 occurrence_date 문자열 집합이다.
+ * 표준이 아닌 규칙이거나 지연이 없으면 비어 있다. 자동 만료되지 않는다 — 날짜는 완료, 건너뜀,
+ * 이동될 때까지 남는다 (결정 로그 2026-07-30 참고).
+ *
+ * 시작은 `today - OCCURRENCE_STATE_WINDOW_DAYS` 로 자른다(2026-10-28) — 서버가 그 창 안의 상태
+ * 행만 읽으므로, 창 밖 회차를 세면 끝낸 회차가 «밀림» 으로 되살아난다.
+ */
 export function outstandingOverdueOccurrences(
   rule: string | null,
   anchor: string | null,
@@ -266,7 +310,54 @@ export function outstandingOverdueOccurrences(
   if (!anchor || !isStandardRecurrence(rule)) return [];
   const yesterday = ymdShift(today, -1);
   if (yesterday < anchor) return [];
-  return recurringOccurrencesInRange(rule, anchor, anchor, yesterday).filter(
+  const windowStart = ymdShift(today, -OCCURRENCE_STATE_WINDOW_DAYS);
+  const start = windowStart > anchor ? windowStart : anchor;
+  return recurringOccurrencesInRange(rule, anchor, start, yesterday).filter(
     (d) => !resolvedDates.has(d),
   );
+}
+
+/**
+ * 완료가 **실제로 정산하는 회차 날짜**(순수 판정, 2026-10-28 갱신).
+ *
+ * 요청 날짜가 회차면 그대로. 아니면(월·수·금 반복을 화요일에 체크) 그 날짜 **이전의 가장 최근**
+ * 미해결 회차로 정산한다 — 그보다 오래된 밀린 회차는 이어지는 흡수 단계가 치운다. 예전에는 가장
+ * 오래된 것을 골라, 금·월이 밀린 화요일에 체크하면 금요일만 끝나고 월요일이 «1일 밀림» 으로 남았다.
+ * 밀린 것도 없으면 요청 날짜 그대로(호출부의 기존 폴백).
+ */
+export function pickCompletionOccurrence(
+  rule: string | null,
+  anchor: string | null,
+  requested: string,
+  resolvedDates: ReadonlySet<string>,
+): string {
+  if (isRecurringOccurrenceDate(rule, anchor, requested)) return requested;
+  const open = outstandingOverdueOccurrences(rule, anchor, requested, resolvedDates);
+  return open[open.length - 1] ?? requested;
+}
+
+/**
+ * 회차 하나를 완료할 때 함께 흡수할(= `moved` 로 처리할) 밀린 회차 날짜(순수 판정, 2026-10-28).
+ *
+ * 대상은 `[anchor, min(완료일, 오늘))` 의 미해결 회차다. **오늘(도쿄) 이후는 절대 흡수하지 않는다** —
+ * 모바일 「내일」 탭에서 내일 회차를 체크하면 예전에는 아직 열려 있는 오늘 회차까지 «이동» 처리돼
+ * 오늘 목록에서 사라졌다. 오늘 몫은 오늘 따로 체크하는 것이다.
+ */
+export function occurrencesToAbsorb(
+  rule: string | null,
+  anchor: string | null,
+  completedDate: string,
+  today: string,
+  resolvedDates: ReadonlySet<string>,
+): string[] {
+  const cap = completedDate < today ? completedDate : today;
+  return outstandingOverdueOccurrences(rule, anchor, cap, resolvedDates);
+}
+
+/** 그 날짜 회차가 이미 **완료**로 기록돼 있는가 — 두 번 눌러 완료 기록 · 알림이 겹치지 않게 하는 가드. */
+export function isOccurrenceCompleted(
+  states: ReadonlyMap<string, OccurrenceState>,
+  occurrenceDate: string,
+): boolean {
+  return states.get(occurrenceDate) === "completed";
 }

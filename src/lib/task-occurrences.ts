@@ -1,12 +1,14 @@
 import "server-only";
 
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import type { TaskRecord } from "@/lib/tasks";
 import {
+  isOccurrenceCompleted,
   isRecurringOccurrenceDate,
-  outstandingOverdueOccurrences,
+  occurrencesToAbsorb,
+  pickCompletionOccurrence,
   type OccurrenceState,
 } from "@/lib/tasks-recurrence";
+import { tokyoToday } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 
 /**
@@ -63,6 +65,28 @@ export async function clearOccurrenceState(taskId: string, occurrenceDate: strin
   return true;
 }
 
+/**
+ * «건너뜀» 상태일 때만 지운다(2026-10-28) — 되살리기 사이에 같은 회차가 완료됐다면 그 완료를 풀지 않는다.
+ * 건너뜀이 아니어서 지울 게 없어도 성공(true)이다: 화면이 바라는 «건너뛴 상태가 아님» 이 이미 참이다.
+ */
+export async function clearSkippedOccurrenceState(
+  taskId: string,
+  occurrenceDate: string,
+): Promise<boolean> {
+  const supabase = getSupabaseServiceClient();
+  const { error } = await supabase
+    .from("task_occurrence_state")
+    .delete()
+    .eq("task_id", taskId)
+    .eq("occurrence_date", occurrenceDate)
+    .eq("state", "skipped");
+  if (error) {
+    console.error("[clearSkippedOccurrenceState] delete failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
 /** 지난 회차 날짜들을 건너뜀("삭제")으로 처리한다 — 영구 보관되며 다시 나타나지 않는다. */
 export async function skipOccurrences(args: {
   taskId: string;
@@ -89,7 +113,7 @@ export async function skipOccurrences(args: {
   return true;
 }
 
-/** 지난 회차 날짜들을 `movedTo` 로 옮김("오늘로 가져오기")으로 처리한다. */
+/** 밀린 회차 날짜들을 `movedTo` 로 옮김 처리한다 — 지금은 `absorbEarlierOccurrences` 만 쓴다. */
 export async function moveOccurrences(args: {
   taskId: string;
   organizationId: string;
@@ -142,19 +166,16 @@ export async function occurrenceStatesForTask(
 }
 
 /**
- * 이 완료가 **실제로 정산하는 회차 날짜**를 정한다 (2026-09-08).
+ * 이 완료가 **실제로 정산하는 회차 날짜**를 정한다 (2026-09-08, 2026-10-28 갱신).
  *
  * 문제. 반복은 밀린 회차가 있으면 **오늘이 회차가 아니어도** 오늘 목록에 뜬다(월·수·금 반복을
  * 화요일에 보는 경우). 그런데 카드는 «오늘» 을 회차 날짜로 넘기므로, 그대로 저장하면 **규칙에 없는
  * 화요일에 상태 행이 생긴다.** 실제로 그런 행이 만들어졌다(일매출 변동 시트작업 / 2026-09-08 화).
  *
- * 그 행은 회차 계산에서 무시되므로 목록은 맞게 보이지만, 두 가지가 어긋난다:
- *   1. 상세 화면은 `isRecurringOccurrenceDate` 로 회차를 검증하므로 그 날짜를 **유효하지 않다고**
- *      보고 완료 버튼을 감춘다.
- *   2. «어느 회차를 했는가» 가 기록에 남지 않는다 — 실제로 한 일은 **월요일 몫**이다.
- *
- * 그래서 요청받은 날짜가 회차가 아니면 **가장 오래된 미해결 회차**로 바꾼다. 화요일에 하는 일은
- * 「밀린 월요일 것」이지 「화요일 것」이 아니다. 밀린 것도 없으면 그대로 둔다(호출부의 기존 폴백).
+ * 그래서 요청받은 날짜가 회차가 아니면 **그 이전의 가장 최근 미해결 회차**로 바꾼다
+ * (`pickCompletionOccurrence`). 더 오래된 밀린 회차는 이어지는 `absorbEarlierOccurrences` 가 치운다.
+ * 2026-10-28 전에는 가장 오래된 것을 골라, 금·월이 밀린 화요일에 체크하면 월요일이 «1일 밀림» 으로
+ * 남았다.
  */
 export async function resolveCompletionOccurrence(args: {
   taskId: string;
@@ -165,21 +186,42 @@ export async function resolveCompletionOccurrence(args: {
 }): Promise<string> {
   if (isRecurringOccurrenceDate(args.rule, args.anchor, args.requested)) return args.requested;
   const states = await occurrenceStatesForTask(args.taskId);
-  const [oldest] = outstandingOverdueOccurrences(
-    args.rule,
-    args.anchor,
-    args.requested,
-    new Set(states.keys()),
+  return pickCompletionOccurrence(args.rule, args.anchor, args.requested, new Set(states.keys()));
+}
+
+/**
+ * 그 회차가 이미 완료로 기록돼 있는가(2026-10-28) — 완료 액션의 이중 완료 가드용.
+ * `resolveCompletionOccurrence` 가 돌려준 날짜로 부른다. 읽기 실패는 «완료 아님» 으로 본다
+ * (가드가 정상 완료를 막지 않게).
+ */
+export async function occurrenceAlreadyCompleted(
+  taskId: string,
+  occurrenceDate: string,
+): Promise<boolean> {
+  const supabase = getSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from("task_occurrence_state")
+    .select("state")
+    .eq("task_id", taskId)
+    .eq("occurrence_date", occurrenceDate)
+    .maybeSingle();
+  if (error || !data) return false;
+  return isOccurrenceCompleted(
+    new Map([[occurrenceDate, (data as { state: string }).state as OccurrenceState]]),
+    occurrenceDate,
   );
-  return oldest ?? args.requested;
 }
 
 /**
  * 완료를 되돌릴 때, **그 완료가 흡수했던 회차를 함께 되살린다** (2026-09-08).
  *
  * `absorbEarlierOccurrences` 가 밀린 회차를 `moved_to_date = <완료일>` 로 적어 두므로, 그 완료일을
- * 가리키는 `moved` 행만 정확히 지우면 된다. 이게 없으면 완료를 취소해도 **밀림 배지가 돌아오지
- * 않아**, 되돌리기가 반쪽이 된다(사용자는 「취소했는데 밀린 게 사라졌다」를 보게 된다).
+ * 가리키는 `moved` 행만 지운다. 이게 없으면 완료를 취소해도 **밀림 배지가 돌아오지 않아**, 되돌리기가
+ * 반쪽이 된다(사용자는 「취소했는데 밀린 게 사라졌다」를 보게 된다).
+ *
+ * 한계(2026-10-28 기록): 흡수가 만든 `moved` 행과 예전 「오늘로 가져오기」(2026-07-30 ~ 08-25)가 만든
+ * `moved` 행은 모양이 같아 구분할 수 없다. 그래서 그날로 가져왔던 옛 행도 함께 지워져 그 회차가 다시
+ * «밀림» 으로 보일 수 있다. 옛 행은 그 기간에 만든 것뿐이라 그대로 둔다.
  */
 export async function releaseAbsorbedOccurrences(
   taskId: string,
@@ -205,22 +247,24 @@ export async function releaseAbsorbedOccurrences(
  * 흡수했는가」가 남아, 나중에 «그날 왜 안 했지» 를 되짚을 수 있다. `skipped` 는 사용자가 명시적으로
  * 건너뛴 것을 뜻하므로 의미가 다르다.
  *
- * **완료한 날짜보다 앞선 것만** 건드린다. 캘린더에서 과거 회차를 직접 완료하는 경우, 그보다 뒤의
- * 미해결 회차까지 쓸어버리면 안 된다.
+ * 대상은 `[anchor, min(완료일, 오늘))` 이다(`occurrencesToAbsorb`). 캘린더에서 과거 회차를 직접
+ * 완료하면 그보다 뒤는 건드리지 않고, **내일 회차를 미리 완료해도 오늘(도쿄) 회차는 건드리지 않는다**
+ * (2026-10-28 — 예전에는 오늘 회차가 «이동» 처리돼 오늘 목록에서 사라졌다).
  */
 export async function absorbEarlierOccurrences(args: {
   taskId: string;
   organizationId: string;
   rule: string | null;
   anchor: string | null;
-  /** 방금 완료한 회차 날짜. 이 날짜 **미만**의 미해결 회차가 대상이다. */
+  /** 방금 완료한 회차 날짜. 이 날짜와 오늘 중 이른 쪽 **미만**의 미해결 회차가 대상이다. */
   completedDate: string;
 }): Promise<number> {
   const states = await occurrenceStatesForTask(args.taskId);
-  const dates = outstandingOverdueOccurrences(
+  const dates = occurrencesToAbsorb(
     args.rule,
     args.anchor,
-    args.completedDate, // "오늘"을 완료일로 두면 `[anchor, 완료일)` 이 대상이 된다
+    args.completedDate,
+    tokyoToday(),
     new Set(states.keys()),
   );
   if (dates.length === 0) return 0;
@@ -231,59 +275,6 @@ export async function absorbEarlierOccurrences(args: {
     movedTo: args.completedDate,
   });
   return dates.length;
-}
-
-/* ── 「오늘로 가져오기」 보충 사본 (2026-08-25) ──────────────────────────────────── */
-
-/**
- * 밀린 회차의 보충용 **일회성 사본** 1건을 만든다 — 제목·컨텍스트만 복사한 실행자 개인 작업이며
- * 반복도, 공유도 아니다. RLS 가 읽을 수 있도록 author 참여자 행을 함께 넣는다.
- *
- * 날짜는 `due_at` 하나로만 앵커한다(단일 날짜 모델). 지연 판정이 모바일·콘솔 양쪽 모두 `due_at` 만
- * 보기 때문에, `scheduled_date` 로 만들면 그날 못 끝냈을 때 오늘·지연·내일 어디에도 안 뜨고 관리함에만
- * 남는다(2026-08-25 수정).
- *
- * 모바일과 콘솔이 이 블록을 통째로 복붙해 갖고 있었다 — 쌍둥이가 어긋나는 것이 이 도메인의 반복된
- * 실패 모드라 한 곳으로 모은다.
- */
-export async function createCarryOverTask(args: {
-  task: TaskRecord;
-  organizationId: string;
-  userId: string;
-  date: string;
-}): Promise<void> {
-  const { task } = args;
-  const supabase = getSupabaseServiceClient();
-  const carryId = crypto.randomUUID();
-  await supabase.from("tasks").insert({
-    id: carryId,
-    organization_id: args.organizationId,
-    created_by_user_id: args.userId,
-    title: task.title,
-    description: task.description ?? null,
-    scheduled_date: null,
-    due_at: new Date(`${args.date}T00:00:00+09:00`).toISOString(),
-    all_day: true,
-    priority: task.priority,
-    status: "open",
-    is_inbox: false,
-    is_shared: false,
-    recurrence_rule: null,
-    recurrence_series_id: null,
-    recurrence_instance_date: null,
-    tags: task.tags,
-    property_id: task.resolvedContext?.propertyId ?? null,
-    room_id: task.resolvedContext?.roomId ?? null,
-    reservation_id: task.resolvedContext?.reservationId ?? null,
-    guest_name: task.resolvedContext?.guestName ?? null,
-  });
-  await supabase.from("task_participants").insert({
-    task_id: carryId,
-    user_id: args.userId,
-    role: "author",
-    is_first_recipient: false,
-    added_by_user_id: null,
-  });
 }
 
 /* ── 회차별 수동 순서 (task_occurrence_order, 2026-07-30) ─────────────────────────

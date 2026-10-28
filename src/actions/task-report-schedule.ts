@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
-import { generateDailyReport } from "@/actions/task-report";
+import {
+  generateDailyReport,
+  sendDailyReportToSlack,
+  type SlackSendFailureReason,
+} from "@/actions/task-report";
 
 /**
  * 업무일지 예약 보내기(2026-10-20, 시안 「업무일지 예약 보내기 · 시안」 A안).
@@ -174,4 +178,75 @@ export async function cancelDailyReportSchedule(date: string): Promise<{ ok: boo
   revalidatePath("/mobile/tasks");
   revalidatePath("/admin/tasks");
   return { ok: true };
+}
+
+export type SendDailyReportNowResult = { ok: true } | { ok: false; reason: SlackSendFailureReason | "busy" };
+
+/**
+ * 「지금 보내기」 — 예약이 있어도 **먼저 보내고, 보낸 뒤에만** 예약을 거둔다(2026-10-28).
+ *
+ * 예전엔 화면이 «예약 취소 → 보내기» 순서로 따로 불러서, 보내기가 실패하면(웹훅 오류 · 권한) 예약까지 사라져
+ * 일지가 아무 데도 안 나갔다. 순서를 서버 한 곳으로 모은다:
+ *   1. 살아 있는 예약을 `sending` 으로 잡아 둔다 — 그 사이 틱(`/api/tasks/report-tick`)이 같은 예약을 또
+ *      보내지 않게(틱은 `scheduled` 만 집어 간다). 이미 틱이 보내는 중이면 `busy`.
+ *   2. 지금 본문을 Slack 으로 보낸다(`sendDailyReportToSlack` — 권한 · 빈 일지 · 길이 판정 그대로).
+ *   3. 성공하면 잡아 둔 예약을 `cancelled` 로, 실패하면 `scheduled` 로 되돌려 예약이 그대로 살아 있게 한다.
+ */
+export async function sendDailyReportNow(date: string, editedText: string): Promise<SendDailyReportNowResult> {
+  const day = String(date ?? "").trim();
+  const session = await me();
+  if (!session) return { ok: false, reason: "forbidden" };
+  if (!isDay(day)) return { ok: false, reason: "error" };
+  const service = getSupabaseServiceClient();
+
+  const { data: claimed, error: claimError } = await service
+    .from("task_report_schedules")
+    .update({ status: "sending" })
+    .eq("user_id", session.user.id)
+    .eq("organization_id", session.organization.id)
+    .eq("report_date", day)
+    .eq("status", "scheduled")
+    .select("id");
+  if (claimError) {
+    console.warn("[report-schedule] send-now claim failed:", claimError.message);
+    return { ok: false, reason: "error" };
+  }
+  const claimedIds = ((claimed ?? []) as { id: string }[]).map((r) => r.id);
+  if (claimedIds.length === 0) {
+    // 잡은 예약이 없을 때, 틱이 이미 보내는 중이면 겹쳐 보내지 않는다.
+    const { data: sending } = await service
+      .from("task_report_schedules")
+      .select("id")
+      .eq("user_id", session.user.id)
+      .eq("organization_id", session.organization.id)
+      .eq("report_date", day)
+      .eq("status", "sending")
+      .limit(1);
+    if ((sending ?? []).length > 0) return { ok: false, reason: "busy" };
+  }
+
+  const settle = async (status: "cancelled" | "scheduled") => {
+    if (claimedIds.length === 0) return;
+    const { error } = await service
+      .from("task_report_schedules")
+      .update({ status })
+      .in("id", claimedIds)
+      .eq("organization_id", session.organization.id)
+      .eq("status", "sending");
+    if (error) console.warn(`[report-schedule] send-now settle(${status}) failed:`, error.message);
+  };
+
+  let sent: Awaited<ReturnType<typeof sendDailyReportToSlack>>;
+  try {
+    sent = await sendDailyReportToSlack(day, editedText);
+  } catch (error) {
+    console.warn("[report-schedule] send-now failed:", error);
+    sent = { ok: false, reason: "error" };
+  }
+  await settle(sent.ok ? "cancelled" : "scheduled");
+  if (claimedIds.length > 0) {
+    revalidatePath("/mobile/tasks");
+    revalidatePath("/admin/tasks");
+  }
+  return sent;
 }

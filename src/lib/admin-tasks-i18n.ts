@@ -210,6 +210,14 @@ export type AdminTasksDictionary = {
   recurDeleteAll: string;
   recurDeleteAllSub: string;
   recurSkippedToast: string;
+  skDaysTitle: string;
+  skDaysRange: string;
+  skDaysMore: string;
+  skDaysMoreOne: string;
+  skDaysRestore: string;
+  skDaysRestoreFor: string;
+  skDaysRestoredToast: string;
+  skDaysSkipAgain: string;
   instrRecv: string;
   instrSent: string;
   instrSentNote: string;
@@ -383,6 +391,13 @@ export type AdminTasksDictionary = {
   confirmLeaveMsg: string;
   confirmClearMsg: string;
   confirmDeleteBtn: string;
+  // 프로젝트 멤버 빼기 확인 · 「나감」 표시(2026-10-28). {name} · {count} 자리표시자 문자열.
+  confirmRemoveMemberTitle: string;
+  confirmRemoveMemberBody: string;
+  confirmRemoveMemberBodyNone: string;
+  confirmRemoveMemberBtn: string;
+  dpAuthorLeft: string;
+  dpOwnerCanEdit: string;
   // 레일
   railTodayTitle: string;
   railTodayProgress: string;
@@ -533,6 +548,7 @@ const ko: AdminTasksDictionary = {
   recurDeleteTitle: "반복되는 작업입니다", recurSkipOne: "{date}만 건너뛰기",
   recurSkipOneSub: "이 날짜만 넘어가고 반복은 계속됩니다", recurDeleteAll: "반복 전체 삭제",
   recurDeleteAllSub: "모든 날짜에서 사라집니다", recurSkippedToast: "{date} 건너뜀",
+  skDaysTitle: "건너뛴 날", skDaysRange: "최근 30일", skDaysMore: "{count}개 더 보기", skDaysMoreOne: "1개 더 보기", skDaysRestore: "되살리기", skDaysRestoreFor: "{date} 되살리기", skDaysRestoredToast: "{date}을 되살렸어요", skDaysSkipAgain: "다시 건너뛰기",
   instrRecv: "받은 지시", instrSent: "보낸 지시",
   instrSentNote: "지시한 업무는 대상자의 일정으로 잡힙니다. 내 “오늘” 목록에는 들어오지 않고, 이 화면에서 진행 상황만 챙깁니다.",
   instrRecvNote: "나에게 부여된 업무입니다. 내 “오늘 · 캘린더”에도 함께 표시되며, 상황을 바꾸면 지시한 사람에게 바로 공유됩니다.",
@@ -583,6 +599,12 @@ const ko: AdminTasksDictionary = {
   confirmLeaveMsg: "이 작업에서 나만 빠질까요?",
   confirmClearMsg: "지난 미완료 작업을 모두 정리할까요?",
   confirmDeleteBtn: "삭제",
+  confirmRemoveMemberTitle: "{name} 님을 뺄까요?",
+  confirmRemoveMemberBody: "{name} 님은 이 프로젝트를 더 볼 수 없어요. {name} 님이 쓴 할 일 {count}개는 프로젝트에 남고, 내가 고치거나 완료할 수 있어요.",
+  confirmRemoveMemberBodyNone: "{name} 님은 이 프로젝트를 더 볼 수 없어요.",
+  confirmRemoveMemberBtn: "빼기",
+  dpAuthorLeft: "프로젝트에서 나감",
+  dpOwnerCanEdit: "프로젝트 주인이라 고치고 · 완료하고 · 지울 수 있어요.",
   railTodayTitle: "오늘 진행 현황", railTodayProgress: "오늘 작업 진척률", railDoneToday: "오늘 완료", railUpcomingEmpty: "다가오는 일정이 없습니다",
   undoBtn: "실행 취소", undoNext: "다음: {date}", tDeletedUndoable: "작업을 삭제했습니다",
   selMode: "선택", selSelected: "{n}개 선택", selAll: "전체 선택", selClear: "선택 해제",
@@ -666,6 +688,7 @@ const ja: AdminTasksDictionary = {
   recurDeleteTitle: "繰り返しのタスクです", recurSkipOne: "{date}のみスキップ",
   recurSkipOneSub: "この日だけ飛ばし、繰り返しは続きます", recurDeleteAll: "繰り返しを全て削除",
   recurDeleteAllSub: "全ての日付から消えます", recurSkippedToast: "{date} をスキップ",
+  skDaysTitle: "スキップした日", skDaysRange: "直近30日", skDaysMore: "さらに{count}件を表示", skDaysMoreOne: "さらに1件を表示", skDaysRestore: "元に戻す", skDaysRestoreFor: "{date}を元に戻す", skDaysRestoredToast: "{date}を元に戻しました", skDaysSkipAgain: "もう一度スキップ",
   instrRecv: "受けた指示", instrSent: "送った指示",
   instrSentNote: "指示した業務は対象者の日程に入ります。自分の「今日」には入らず、この画面で進捗のみ確認します。",
   instrRecvNote: "自分に付与された業務です。自分の「今日 · カレンダー」にも表示され、状態を変えると指示者にすぐ共有されます。",
@@ -716,6 +739,12 @@ const ja: AdminTasksDictionary = {
   confirmLeaveMsg: "このタスクから自分だけ抜けますか？",
   confirmClearMsg: "過去の未完了タスクをすべて整理しますか？",
   confirmDeleteBtn: "削除",
+  confirmRemoveMemberTitle: "{name}さんを外しますか？",
+  confirmRemoveMemberBody: "{name}さんはこのプロジェクトを見られなくなります。{name}さんが作成したタスク{count}件はプロジェクトに残り、自分が編集・完了できます。",
+  confirmRemoveMemberBodyNone: "{name}さんはこのプロジェクトを見られなくなります。",
+  confirmRemoveMemberBtn: "外す",
+  dpAuthorLeft: "プロジェクトから退出",
+  dpOwnerCanEdit: "プロジェクトのオーナーなので、編集・完了・削除ができます。",
   railTodayTitle: "今日の進捗", railTodayProgress: "今日のタスク進捗率", railDoneToday: "本日完了", railUpcomingEmpty: "今後の予定はありません",
   undoBtn: "元に戻す", undoNext: "次回: {date}", tDeletedUndoable: "タスクを削除しました",
   selMode: "選択", selSelected: "{n}件選択", selAll: "すべて選択", selClear: "選択解除",
@@ -799,6 +828,7 @@ const en: AdminTasksDictionary = {
   recurDeleteTitle: "This task repeats", recurSkipOne: "Skip {date} only",
   recurSkipOneSub: "Skips this date; the series keeps running", recurDeleteAll: "Delete the whole series",
   recurDeleteAllSub: "Removes it from every date", recurSkippedToast: "Skipped {date}",
+  skDaysTitle: "Skipped days", skDaysRange: "Last 30 days", skDaysMore: "Show {count} more", skDaysMoreOne: "Show 1 more", skDaysRestore: "Restore", skDaysRestoreFor: "Restore {date}", skDaysRestoredToast: "Restored {date}", skDaysSkipAgain: "Skip again",
   instrRecv: "Received", instrSent: "Sent",
   instrSentNote: "Directives land on the recipient's schedule. They don't enter your Today; track progress here.",
   instrRecvNote: "Assigned to you. Also shown in your Today · Calendar; status changes are shared back to the sender.",
@@ -849,6 +879,12 @@ const en: AdminTasksDictionary = {
   confirmLeaveMsg: "Leave this task (you only)?",
   confirmClearMsg: "Clear all past unfinished tasks?",
   confirmDeleteBtn: "Delete",
+  confirmRemoveMemberTitle: "Remove {name}?",
+  confirmRemoveMemberBody: "{name} won't see this project anymore. Their {count} open tasks stay in the project, and you can edit or complete them.",
+  confirmRemoveMemberBodyNone: "{name} won't see this project anymore.",
+  confirmRemoveMemberBtn: "Remove",
+  dpAuthorLeft: "Left the project",
+  dpOwnerCanEdit: "As the project owner, you can edit, complete and delete this task.",
   railTodayTitle: "Today's progress", railTodayProgress: "Today's completion", railDoneToday: "Done today", railUpcomingEmpty: "Nothing upcoming",
   undoBtn: "Undo", undoNext: "Next: {date}", tDeletedUndoable: "Task deleted",
   selMode: "Select", selSelected: "{n} selected", selAll: "Select all", selClear: "Clear selection",

@@ -6,8 +6,11 @@ import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { canEditTaskCore, getShareableUsers, getTaskDetail, taskAnchorDate } from "@/lib/tasks";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { occurrenceStatesForTask } from "@/lib/task-occurrences";
-import { isRecurringOccurrenceDate } from "@/lib/tasks-recurrence";
+import { selectRecentSkippedDays } from "@/lib/task-skipped-days";
+import { isRecurringOccurrenceDate, isStandardRecurrence } from "@/lib/tasks-recurrence";
+import { tokyoToday } from "@/lib/tokyo-date";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -46,12 +49,25 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
     taskAnchorDate(task),
     candidateOccurrence,
   );
-  const [users, navBadges, occurrenceStates] = await Promise.all([
+  // 「관리함으로 옮기기」 부제에 프로젝트 이름을 보여 주려고, 프로젝트 작업일 때만 한 줄 읽는다.
+  const projectTitlePromise = task.projectId
+    ? getSupabaseServiceClient()
+        .from("projects")
+        .select("title")
+        .eq("id", task.projectId)
+        .eq("organization_id", session.organization.id)
+        .maybeSingle()
+        .then(({ data }) => (data as { title: string } | null)?.title ?? "")
+    : Promise.resolve("");
+  const [users, navBadges, occurrenceStates, projectTitle] = await Promise.all([
     getShareableUsers(session),
     navBadgesPromise,
     // 이 작업 한 건의 회차 상태만 읽어, 아래 두 값을 같은 결과에서 뽑는다. 조직 전체 회차 상태를
     // 끌어오면 날짜 한 건을 알려고 400일치 org 데이터를 읽게 된다.
-    matchesRule ? occurrenceStatesForTask(task.id) : Promise.resolve(new Map<string, string>()),
+    matchesRule || isStandardRecurrence(task.recurrenceRule)
+      ? occurrenceStatesForTask(task.id)
+      : Promise.resolve(new Map<string, string>()),
+    projectTitlePromise,
   ]);
   // "Still open" — unchanged meaning relied on by the detail view's "이 날짜만 건너뛰기" gate.
   const occurrenceDate =
@@ -59,7 +75,11 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
   // 완료 버튼용: 이 회차가 실제로 "완료"로 기록됐을 때만 그 날짜를 넘긴다(건너뛰기/이동은 완료가
   // 아니므로 제외 — 그 경우 아래에서 회차 컨텍스트가 없는 것과 동일하게 취급된다).
   const completedOccurrenceDate =
-    occurrenceStates.get(candidateOccurrence) === "completed" ? candidateOccurrence : null;
+    matchesRule && occurrenceStates.get(candidateOccurrence) === "completed" ? candidateOccurrence : null;
+  // 「건너뛴 날」 — 반복 업무의 최근 30일 건너뜀. 반복이 아니면 비어 구역이 안 그려진다.
+  const skippedDays = isStandardRecurrence(task.recurrenceRule)
+    ? selectRecentSkippedDays(occurrenceStates, tokyoToday())
+    : [];
   const returnView = ["today", "tomorrow", "calendar"].includes(query.view ?? "")
     ? (query.view as "today" | "tomorrow" | "calendar")
     : "today";
@@ -87,7 +107,9 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
         imgCopy={dict.requestImages}
         locale={locale}
         occurrenceDate={occurrenceDate}
+        projectTitle={projectTitle}
         returnView={returnView}
+        skippedDays={skippedDays}
         task={task}
         users={users}
       />

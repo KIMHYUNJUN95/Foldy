@@ -36,6 +36,7 @@ export function ReorderableSectionList({
   onRename,
   onDelete,
   onPersist,
+  onPersistError,
   renderBody,
 }: {
   sections: ProjectSectionInfo[];
@@ -49,7 +50,9 @@ export function ReorderableSectionList({
   countLabel?: string;
   onRename: (section: ProjectSectionInfo) => void;
   onDelete: (section: ProjectSectionInfo) => void;
-  onPersist: (orderedIds: string[]) => void;
+  onPersist: (orderedIds: string[]) => Promise<{ ok: boolean } | void> | { ok: boolean } | void;
+  /** 저장이 실패하면 순서를 끌기 전으로 되돌린 뒤 불린다. */
+  onPersistError?: () => void;
   renderBody: (section: ProjectSectionInfo) => React.ReactNode;
 }) {
   const [order, setOrder] = useState<ProjectSectionInfo[]>(sections);
@@ -67,6 +70,7 @@ export function ReorderableSectionList({
   const metricsRef = useRef<RowMetric[]>([]);
   const rowRefs = useRef(new Map<string, HTMLDivElement | null>());
   const onPersistRef = useRef(onPersist);
+  const onPersistErrorRef = useRef(onPersistError);
 
   useEffect(() => {
     orderRef.current = order;
@@ -76,7 +80,8 @@ export function ReorderableSectionList({
   }, [overIndex]);
   useEffect(() => {
     onPersistRef.current = onPersist;
-  }, [onPersist]);
+    onPersistErrorRef.current = onPersistError;
+  }, [onPersist, onPersistError]);
 
   // 서버 목록이 바뀔 때마다 다시 맞추되 — 드래그 중에는 절대 하지 않는다.
   useEffect(() => {
@@ -92,9 +97,21 @@ export function ReorderableSectionList({
       setDragId(null);
       setDragDelta(0);
       if (ti !== si) {
-        const next = moveItem(orderRef.current, si, ti);
+        const prev = orderRef.current;
+        const next = moveItem(prev, si, ti);
         setOrder(next);
-        onPersistRef.current(next.map((s) => s.id));
+        // 저장이 실패하면(ok:false · 던짐) 끌기 전 순서로 되돌리고 부모가 실패를 안내한다(2026-10-28).
+        const nextKey = next.map((s) => s.id).join("\u0000");
+        const rollback = () => {
+          setOrder((cur) => (cur.map((s) => s.id).join("\u0000") === nextKey ? prev : cur));
+          onPersistErrorRef.current?.();
+        };
+        Promise.resolve(onPersistRef.current(next.map((s) => s.id))).then(
+          (res) => {
+            if (res && res.ok === false) rollback();
+          },
+          rollback,
+        );
       }
     }
     function onMove(e: PointerEvent) {

@@ -57,6 +57,8 @@ type MobileCleaningPageProps = {
     /** 결과 안내 갱신용(액션이 매번 새로 준다) — `CleaningNotice` 가 이 값이 바뀔 때마다 안내를 화면 안으로 끌어온다. */
     n?: string;
     started?: string;
+    /** 출근 기록 없이 시작함(2026-10-29) — 시작 안내에 「출근하기」를 붙인다. */
+    noClockIn?: string;
     /** 배정 담당이 현황판 대신 예전 「청소 시작」 목록을 보려 할 때(직접 청소 · 셋팅, 오늘 내 방 「목록에 없는 방」). */
     work?: string;
   }>;
@@ -616,7 +618,20 @@ export default async function MobileCleaningPage({
         {!isToday ? <div className="cln-note">{isFuture ? copy.console.dateFutureNotice : copy.console.datePastNotice}</div> : null}
         {errorMessage ? <CleaningNotice className="cln-note is-danger" haptic="error" nonce={noticeNonce}>{errorMessage}</CleaningNotice> : null}
         {params.cancelled ? <CleaningNotice className="cln-note is-danger" nonce={noticeNonce}>{copy.cancelSuccess}</CleaningNotice> : null}
-        {params.started ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.startSuccess}</CleaningNotice> : null}
+        {params.started ? (
+          <CleaningNotice className="cln-note" nonce={noticeNonce}>
+            {copy.startSuccess}
+            {params.noClockIn ? (
+              <>
+                {" "}
+                {copy.startNoClockIn}{" "}
+                <Link className="cln-note__link" href="/mobile/attendance">
+                  {copy.startClockInGo}
+                </Link>
+              </>
+            ) : null}
+          </CleaningNotice>
+        ) : null}
         {params.completed ? <CleaningNotice className="cln-note cln-note--done" haptic="success" nonce={noticeNonce}>{copy.completeSuccess}</CleaningNotice> : null}
         {params.lostReported ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.lostReported}</CleaningNotice> : null}
         {params.maintenanceReported ? <CleaningNotice className="cln-note" nonce={noticeNonce}>{copy.maintenanceReported}</CleaningNotice> : null}

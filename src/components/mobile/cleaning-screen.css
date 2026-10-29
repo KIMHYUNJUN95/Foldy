@@ -30,6 +30,8 @@
 .cln-note { padding: 11px 14px; border-radius: 12px; background: #f1ecfd; color: #5a30cf; font-size: 13px; font-weight: 500; line-height: 1.5; }
 .cln-note.is-danger { background: #fdecec; color: #c5282e; }
 .cln-note.is-warn { background: #fdf3e6; color: #a8641c; }
+/* 출근 기록 없이 시작 — 안내 안 「출근하기」(2026-10-29). */
+.cln-note__link { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 
 /* 구역 제목 */
 .cln-h { display: flex; align-items: center; gap: 6px; min-height: 44px; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }

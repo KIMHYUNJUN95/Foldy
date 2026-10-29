@@ -1654,7 +1654,7 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 - **RLS 는 바꾸지 않았다(마이그레이션 없음).** 읽기는 RLS 가 더 넓다 — `tasks` select 정책은 `is_task_participant(id)` 를 보므로
   나간 작성자도 사용자 JWT 로 PostgREST 를 직접 부르면 자기 행을 읽을 수 있고, `author can update/delete task` 정책도 작성자에게
   열려 있다. 앱 화면 · 서버 액션은 모두 `getTaskScope` · service-role 경로라 닫혀 있다. DB 에서도 막으려면 정책에
-  「프로젝트 작업이면 `is_project_participant(project_id)` 또는 author 가 아닌 참여자 행」 조건을 더하는 새 마이그레이션이 필요하다(보류).
+  「프로젝트 작업이면 `is_project_participant(project_id)` 또는 author 가 아닌 참여자 행」 조건을 더하는 새 마이그레이션이 필요하다(보류 — **2026-10-29 사용자 결정: 보류 유지**, 쓰기는 `202610280001` 로 이미 막힘).
 - 쓰기 권한 회수(`202610280001_task_write_grants.sql`)는 위 「tasks」 절 참고 — **운영 DB 적용함 2026-10-29**.
 
 

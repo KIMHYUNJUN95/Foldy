@@ -439,6 +439,9 @@ export type CleaningAssignCopy = {
   myErrActive: string;
   myErrFinish: string;
   myErrUndo: string;
+  /** 오늘 출근 기록 없이 청소를 시작했을 때(2026-10-29). */
+  myNoClockIn: string;
+  myClockInGo: string;
   boardTitle: string;
   boardLive: string;
   boardProgress: string;
@@ -897,6 +900,8 @@ const ko: CleaningAssignCopy = {
   myErrActive: "다른 방을 청소하는 중이에요. 그 방을 먼저 끝내 주세요",
   myErrFinish: "끝내지 못했어요. 다시 해 주세요",
   myErrUndo: "되돌리지 못했어요",
+  myNoClockIn: "출근 기록이 아직 없어요",
+  myClockInGo: "출근하기",
   boardTitle: "청소 현황",
   boardLive: "실시간",
   boardProgress: "{n}개 중 {d}개 끝남",
@@ -1355,6 +1360,8 @@ const ja: CleaningAssignCopy = {
   myErrActive: "別の部屋を清掃中です。先にその部屋を終えてください",
   myErrFinish: "終えられませんでした。もう一度お試しください",
   myErrUndo: "元に戻せませんでした",
+  myNoClockIn: "まだ出勤の記録がありません",
+  myClockInGo: "出勤する",
   boardTitle: "清掃状況",
   boardLive: "リアルタイム",
   boardProgress: "{n}室中 {d}室完了",
@@ -1813,6 +1820,8 @@ const en: CleaningAssignCopy = {
   myErrActive: "You’re cleaning another room. Finish that one first.",
   myErrFinish: "Couldn’t finish. Try again.",
   myErrUndo: "Couldn’t undo.",
+  myNoClockIn: "You haven’t clocked in yet.",
+  myClockInGo: "Clock in",
   boardTitle: "Cleaning status",
   boardLive: "Live",
   boardProgress: "{d} of {n} done",

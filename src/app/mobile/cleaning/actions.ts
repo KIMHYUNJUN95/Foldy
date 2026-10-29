@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getTodayWorkState } from "@/lib/attendance-sessions";
 import { canAccessMobileCleaning } from "@/lib/cleaning";
 import { completeSessionCore, startSessionCore } from "@/lib/cleaning-session-ops";
 import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
@@ -46,12 +47,17 @@ export async function startCleaningSession(formData: FormData) {
   }
 
   // 검사 · 저장은 오늘 내 방과 같은 곳(`startSessionCore`) — 여기선 결과를 쿼리로 넘겨 청소 화면으로 돌아간다.
-  const result = await startSessionCore(session, cleanText(formData.get("roomLabel")), cleanText(formData.get("taskKey")));
+  // 오늘 출근 기록이 없으면 시작 안내에 「출근하기」를 붙인다(2026-10-29) — 시작은 막지 않는다.
+  const organizationId = session.organization?.id;
+  const [result, workState] = await Promise.all([
+    startSessionCore(session, cleanText(formData.get("roomLabel")), cleanText(formData.get("taskKey"))),
+    organizationId ? getTodayWorkState(organizationId, session.user.id) : Promise.resolve("working" as const),
+  ]);
   if (!result.ok) {
     redirectWithError(result.error);
   }
 
-  redirect(`${cleaningPath}?started=1&n=${noticeNonce()}`);
+  redirect(`${cleaningPath}?started=1${workState === "none" ? "&noClockIn=1" : ""}&n=${noticeNonce()}`);
 }
 
 export async function cancelCleaningSession(formData: FormData) {

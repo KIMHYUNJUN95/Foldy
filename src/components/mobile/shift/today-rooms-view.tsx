@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { CalendarDays, Check, ChevronRight } from "lucide-react";
 import { finishMyRoom, startMyRoom, undoFinishMyRoom } from "@/app/mobile/shift/today/actions";
@@ -35,7 +36,8 @@ export type TodayRoomSession = {
 
 type Room = TodayRoom & { buildingLabel: string; doorCode: string | null; mapsUrl: string | null; session: TodayRoomSession | null };
 
-type Toast = { stamp: number; message: string; undoSessionId: string | null };
+/** `clockIn` — 출근 기록 없이 시작했을 때 「출근하기」 버튼(2026-10-29). */
+type Toast = { stamp: number; message: string; undoSessionId: string | null; clockIn?: boolean };
 
 function errorText(error: SessionOpError, copy: CleaningAssignCopy): string {
   if (error === "already_processed_today") return copy.myErrProcessed;
@@ -76,6 +78,7 @@ type Data = {
 
 export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCopy; locale: string; data: Data }) {
   const isTablet = useIsTablet();
+  const router = useRouter();
   // 「어젯밤 바뀜」 · 같이 일하는 사람의 방 — 건물은 보는 사람 언어로, 독채는 건물 이름 하나만(2026-10-26).
   const bName = useBuildingName();
   const placeText = (place: AssignPlace) =>
@@ -99,26 +102,24 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
   const [toast, setToast] = useState<Toast | null>(null);
   useEffect(() => {
     if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), toast.undoSessionId ? 6000 : 4000);
+    const id = window.setTimeout(() => setToast(null), toast.undoSessionId || toast.clockIn ? 6000 : 4000);
     return () => window.clearTimeout(id);
   }, [toast]);
 
-  const run = (r: Room, job: () => Promise<{ ok: true } | { ok: false; error: SessionOpError }>, onOk: () => void) => {
+  const start = (r: Room) => {
+    haptic("light");
     setBusyRoom(r.roomKey);
     startTransition(async () => {
-      const result = await job();
+      const result = await startMyRoom({ roomLabel: r.sessionRoomLabel });
       setBusyRoom(null);
       if (!result.ok) {
         haptic("error");
         setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
         return;
       }
-      onOk();
+      // 시작은 됐다 — 오늘 출근 기록이 없으면 출근하러 가는 길만 알려 준다(막지 않음, 2026-10-29).
+      setToast(result.noClockIn ? { stamp: Date.now(), message: copy.myNoClockIn, undoSessionId: null, clockIn: true } : null);
     });
-  };
-  const start = (r: Room) => {
-    haptic("light");
-    run(r, () => startMyRoom({ roomLabel: r.sessionRoomLabel }), () => setToast(null));
   };
   const finish = (r: Room, sessionId: string) =>
     startTransition(async () => {
@@ -376,7 +377,13 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
           key={toast.stamp}
           message={toast.message}
           onDismiss={() => setToast(null)}
-          action={toast.undoSessionId ? { label: copy.myUndo, onAction: () => undo(toast.undoSessionId as string) } : undefined}
+          action={
+            toast.undoSessionId
+              ? { label: copy.myUndo, onAction: () => undo(toast.undoSessionId as string) }
+              : toast.clockIn
+                ? { label: copy.myClockInGo, onAction: () => router.push("/mobile/attendance") }
+                : undefined
+          }
         />
       ) : null}
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getTodayWorkState } from "@/lib/attendance-sessions";
 import { completeSessionCore, reopenSessionCore, startSessionCore, type SessionOpResult } from "@/lib/cleaning-session-ops";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
@@ -22,12 +23,19 @@ async function worker() {
   return session;
 }
 
-export async function startMyRoom(input: { roomLabel: string }): Promise<SessionOpResult<{ sessionId: string; startedAt: string }>> {
+export async function startMyRoom(
+  input: { roomLabel: string },
+): Promise<SessionOpResult<{ sessionId: string; startedAt: string; noClockIn: boolean }>> {
   const session = await worker();
   if (!session) return { ok: false, error: "not_allowed" };
-  const result = await startSessionCore(session, typeof input.roomLabel === "string" ? input.roomLabel.trim() : "", "checkout");
-  if (result.ok) refresh();
-  return result;
+  // 오늘 출근 기록이 없으면 「출근 기록이 아직 없어요 · 출근하기」를 띄운다(2026-10-29 사용자 결정) — 시작은 막지 않는다.
+  const [result, workState] = await Promise.all([
+    startSessionCore(session, typeof input.roomLabel === "string" ? input.roomLabel.trim() : "", "checkout"),
+    getTodayWorkState(session.organization.id, session.user.id),
+  ]);
+  if (!result.ok) return result;
+  refresh();
+  return { ...result, noClockIn: workState === "none" };
 }
 
 export async function finishMyRoom(input: { sessionId: string }): Promise<SessionOpResult<{ durationSeconds: number }>> {

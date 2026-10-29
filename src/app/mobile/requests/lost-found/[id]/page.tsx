@@ -15,6 +15,8 @@ import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import "@/components/requests/maintenance-detail.css";
 import "@/components/requests/lost-found-detail.css";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 type ListFilterQuery = {
   building?: string;
@@ -105,6 +107,7 @@ export default async function MobileLostItemDetailPage({ params, searchParams }:
   // 정보 줄 · 아래로 현장 처리(진행 중) 또는 처리 기록(완료). 상자 · 칩 · 아이콘 타일 없음.
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.detailTitle}>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <div className="mdw">
         {showCreatedBanner ? <p className="mdw-created">{copy.createdSuccess}</p> : null}
 

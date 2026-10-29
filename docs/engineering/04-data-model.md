@@ -2347,3 +2347,11 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
   `create_attendance_session_with_audit` · `approve_attendance_correction_atomic` · `set_attendance_history_atomic`.
 - 운영 확인(2026-10-23): 이력 등록 · 컬럼 · 트리거 · 제약 · 함수 7개 존재, `authenticated` 실행 권한 없음.
 
+
+## Realtime publication — 운영 화면 (2026-10-29)
+
+`202610290001_enable_ops_realtime.sql` 로 `tasks` · `task_occurrence_state` · `task_participants` · `task_updates` · `order_requests` ·
+`maintenance_reports` · `lost_items` · `notifications` · `attendance_correction_requests` · `transport_reimbursement_reports` · `attendance_sessions` 가
+`supabase_realtime` publication 에 들어간다(기존: `reservations` · `annual_leave_requests` · `job_applications`). replica identity 는 기본값 그대로 —
+INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence_state` · `task_participants` 삭제는 트리거
+`task_occurrence_state_touch_task` · `task_participants_touch_task`(함수 `touch_task_after_child_delete`)가 부모 `tasks.updated_at` 을 새로 써 UPDATE 신호를 낸다. 화면 쪽: `src/lib/live-sources.ts` · `src/components/shared/live-refresh.tsx`.

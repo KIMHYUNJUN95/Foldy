@@ -17,6 +17,8 @@ import {
 } from "@/lib/request-filters";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 type PageProps = {
   searchParams: Promise<{ date?: string; endDate?: string; startDate?: string }>;
@@ -66,6 +68,7 @@ export default async function MobileRequestsPage({ searchParams }: PageProps) {
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={dictionary.mobile.requestsTitle} split>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <SplitList detail="requests">
         {/* 화이트 리디자인(2026-10-13 · 10-14 문구 맞춤, 시안 Req-Phone): 제목 · 한 줄 → 옅은 타일 셋(아이콘 위 · 글자 아래). */}
         <div className="rqw-head">

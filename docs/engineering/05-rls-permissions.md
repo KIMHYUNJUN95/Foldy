@@ -1674,3 +1674,14 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
 | 로그아웃 뒤 PWA 화면 저장본에 앞사람 화면이 남음 | 로그인 화면(`AuthFrame`)이 뜨면 `stayops-nav-*` 캐시 삭제(`NavCachePurge`) |
 
 남은 것: Beds24 웹훅은 `BEDS24_WEBHOOK_SECRET` 이 없으면 통과(fail-open) — 운영 값 확인 뒤 닫는다.
+
+## 2026-10-29 Realtime `postgres_changes` — 할 일 · 요청 · 알림 · 근태 대기열
+
+- 마이그레이션 `202610290001_enable_ops_realtime.sql` 이 `tasks` · `task_occurrence_state` · `task_participants` · `task_updates` · `order_requests` ·
+  `maintenance_reports` · `lost_items` · `notifications` · `attendance_correction_requests` · `transport_reimbursement_reports` · `attendance_sessions` 를
+  `supabase_realtime` publication 에 넣는다. 정책은 새로 만들지 않았다 — Realtime 이 구독자마다 각 테이블의 **기존 select 정책**으로 거른다
+  (2026-10-29 운영 `pg_policies` 확인: 11개 모두 select 정책 있음; `attendance_sessions` 는 본인 또는 `can_manage_attendance_payroll`).
+- 함수 `touch_task_after_child_delete()` — `security definer`, `search_path = ''`, public · anon · authenticated 실행 권한 회수. `task_occurrence_state` ·
+  `task_participants` 의 문장 단위 AFTER DELETE 트리거로만 불려 지운 행의 할 일 `updated_at` 만 새로 쓴다(삭제 신호 대신). 예: 알바는 참여하지 않은 할 일 · 남의 정정 요청 신호를 받지 않는다.
+- 남이 나를 새 할 일에 넣으면 `tasks` INSERT 는 그 순간 내가 아직 참여자가 아니라 RLS 에 걸려 안 오고, `task_participants`(`user_id=eq.나`) INSERT 가 온다.
+- 클라이언트는 신호만 쓴다(행 값을 화면에 쓰지 않음). 구독 전에 사용자 JWT 를 `realtime.setAuth()` 로 싣는다 — anon 으로 붙으면 org 필터가 거절된다.

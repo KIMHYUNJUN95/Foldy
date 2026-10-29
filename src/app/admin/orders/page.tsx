@@ -4,6 +4,8 @@ import { getAdminOrders } from "@/lib/admin-orders";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { getNavigationLabel, adminNavigation } from "@/config/navigation";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 export default async function AdminOrdersPage() {
   const session = await requireAdminPageSession({ nextPath: "/admin/orders" });
@@ -14,6 +16,7 @@ export default async function AdminOrdersPage() {
   const title = navItem ? getNavigationLabel(navItem, locale) : dictionary.mobile.quickActions.order;
   return (
     <AdminShell activeItem="orders" title={title}>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <OrdersConsole locale={locale} orders={orders} loadError={loadError} todayKey={todayKey} />
     </AdminShell>
   );

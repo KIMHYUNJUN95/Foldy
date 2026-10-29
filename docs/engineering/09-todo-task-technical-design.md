@@ -1417,3 +1417,11 @@ myOwn(t, meId)      // !sentInstr — 내 일정 뷰(오늘/내일/관리함/캘
 - **건너뛴 날 되살리기**(2026-10-28): `clearSkippedOccurrenceState`(`task-occurrences.ts`)가 `state = 'skipped'` 행만 지운다. `unskipOccurrenceOn`(모바일, 이제 `{ ok }` 반환)과 `unskipConsoleOccurrence` 가 쓴다 — 완료된 회차는 풀리지 않는다. 모바일 상세 페이지는 반복 업무일 때 `occurrenceStatesForTask` 를 읽어 `selectRecentSkippedDays`(`task-skipped-days.ts`, 최근 30일 · 최신순)로 `skippedDays` 를 내려준다. 콘솔은 이미 가진 `occurrenceStates` 에서 같은 함수를 쓴다.
 - **프로젝트 작업을 관리함으로 이동**(`moveConsoleToInbox`)은 작성자(또는 개발자, `canEditTaskCore`)만. 2026-10-28 부터
   `canEditTaskCore` 에 프로젝트 주인도 들어가므로 주인도 옮길 수 있다 — 남이 쓴 할 일을 옮기면 프로젝트 밖으로 나가 주인 범위에서 빠지고 작성자에게 돌아간다.
+
+## 실시간 갱신 (2026-10-29)
+
+- 할 일 목록 · 프로젝트 · 상세(모바일) · PC 콘솔(`/admin/tasks`) · PC 대시보드 「오늘 할 일」이 새로고침 없이 바뀐다. 구독: `tasks` · `task_occurrence_state`(조직) ·
+  `task_participants`(나) · 상세는 + `task_updates`(그 할 일) — `taskLiveSources()` / `taskDetailLiveSources()` (`src/lib/live-sources.ts`).
+- 목록은 서버 props 를 `useOptimistic` 으로 그리므로 `router.refresh()` 가 그대로 흘러 들어간다(로컬 복사본 없음). 소프트 삭제라 삭제 · 되살리기도 UPDATE 신호로 온다.
+  회차 완료 되돌리기 · 「건너뛴 날」 되살리기 · 참여자 빼기(행 삭제)는 DB 트리거가 부모 할 일 `updated_at` 을 새로 써 UPDATE 신호로 온다 —
+  다만 빠진 그 사람에게는 신호가 없어(이제 못 봄) 다음 갱신 때. 공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.

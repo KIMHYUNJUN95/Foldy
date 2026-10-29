@@ -601,3 +601,9 @@ Important:
 - 거절(`rejectOrder`) · 재오픈(`reopenOrder`) · 상태 정정(`correctOrderStatus`)은 읽은 상태로 조건부 업데이트(`.eq("status", 읽은 값)`)하고 0행이면 `invalid`(동시 변경).
 - 정정으로 `ordered` 로 보내려면 배송일이 이미 있어야 한다(없으면 `invalid`). 거절 사유(`admin_memo`)는 종결 건을 되돌릴 때만 지우고, 거절 시 사유를 비워 두면 기존 메모를 유지한다.
 - Excel/PDF 내보내기는 기간 · 상태 외에 **긴급도 · 건물 · 검색어**(전체 기록 보기)도 서버에서 같이 거른다 — 화면에 보이는 목록과 같은 결과.
+
+## 실시간 갱신 (2026-10-29)
+
+- 요청 목록 · 상세(PC · 모바일) · 모바일 홈 활동 · PC 대시보드가 새로고침 없이 바뀐다 — 누가 올리거나 상태를 바꾸면 열어 둔 화면에 바로 보인다.
+  `requestLiveSources()` (`src/lib/live-sources.ts`) → `<LiveRefresh>`. 남이 **지운** 건은 다음 갱신 때 빠진다(삭제 신호 없음).
+  공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.

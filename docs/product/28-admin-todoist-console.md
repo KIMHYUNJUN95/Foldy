@@ -1061,3 +1061,11 @@ scope = 일회성(오늘 + 지연) + 오늘 미완료 반복 회차 + 반복 지
   컨텍스트 선택기는 건물 · 객실 · 예약 연결이지 프로젝트 연결이 아니다.
 - **「지금 보내기」 순서.** 서버 액션 `sendDailyReportNow`(`src/actions/task-report-schedule.ts`, 모바일과 공용) 하나가 처리한다 — 살아 있는 예약을 `sending` 으로 잡아 틱이 겹쳐 보내지 못하게 한 뒤 Slack 으로 **먼저 보내고**, 성공하면 예약을 `cancelled`, 실패하면 `scheduled` 로 되돌린다. 보내기가 실패하면 예약은 그대로 남는다. 틱이 이미 보내는 중이면 `busy`(오류 한 줄). 화면은 성공한 뒤에만 로컬 예약 상태를 지운다. 예전 `sendConsoleReportToSlack` 은 지웠다.
   (보내기 성공 후 취소가 실패하면 오류 문구로 알린다 — 예약이 한 번 더 나갈 수 있음.)
+
+## 실시간 갱신 (2026-10-29)
+
+- 할 일 목록 · 프로젝트 · 상세(모바일) · PC 콘솔(`/admin/tasks`) · PC 대시보드 「오늘 할 일」이 새로고침 없이 바뀐다. 구독: `tasks` · `task_occurrence_state`(조직) ·
+  `task_participants`(나) · 상세는 + `task_updates`(그 할 일) — `taskLiveSources()` / `taskDetailLiveSources()` (`src/lib/live-sources.ts`).
+- 목록은 서버 props 를 `useOptimistic` 으로 그리므로 `router.refresh()` 가 그대로 흘러 들어간다(로컬 복사본 없음). 소프트 삭제라 삭제 · 되살리기도 UPDATE 신호로 온다.
+  회차 완료 되돌리기 · 「건너뛴 날」 되살리기 · 참여자 빼기(행 삭제)는 DB 트리거가 부모 할 일 `updated_at` 을 새로 써 UPDATE 신호로 온다 —
+  다만 빠진 그 사람에게는 신호가 없어(이제 못 봄) 다음 갱신 때. 공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.

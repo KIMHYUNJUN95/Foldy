@@ -21,7 +21,8 @@ export type AdminNotifCopy = {
   viewAll: string;
 };
 
-export type AdminNotifData = { unread: number; items: NotificationView[]; copy: AdminNotifCopy | null };
+/** `userId` = 보는 사람 — 벨이 내 알림만 실시간 구독할 때 쓴다(2026-10-29). */
+export type AdminNotifData = { unread: number; items: NotificationView[]; copy: AdminNotifCopy | null; userId: string | null };
 
 async function scopeFromSession() {
   const session = await getCurrentAppSession();
@@ -35,7 +36,7 @@ async function scopeFromSession() {
 // 관리자 콘솔 벨 팝오버 — 최근 알림(화이트 리디자인 행, 클라이언트에서 묶음) + 실제 안 읽은 수.
 export async function getAdminNotifications(): Promise<AdminNotifData> {
   const ctx = await scopeFromSession();
-  if (!ctx) return { unread: 0, items: [], copy: null };
+  if (!ctx) return { unread: 0, items: [], copy: null, userId: null };
   const supabase = await getSupabaseServerClient();
   const w = getDictionary(ctx.locale).mobile.notifications.w;
   const copy: AdminNotifCopy = {
@@ -53,9 +54,9 @@ export async function getAdminNotifications(): Promise<AdminNotifData> {
     ]);
     const actorNames = await loadNotificationActorNames(supabase, list.items);
     const { views } = buildNotificationViews(list.items, { locale: ctx.locale, actorNames });
-    return { unread, items: views, copy };
+    return { unread, items: views, copy, userId: ctx.scope.userId };
   } catch {
-    return { unread: 0, items: [], copy };
+    return { unread: 0, items: [], copy, userId: ctx.scope.userId };
   }
 }
 

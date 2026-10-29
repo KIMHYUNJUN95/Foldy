@@ -3,6 +3,8 @@ import { LostFoundConsole } from "@/components/admin/lost-found/lost-found-conso
 import { getAdminLostFound } from "@/lib/admin-lost-found";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 // Admin · 분실물 — 보관 중 / 반환 / 폐기 내역 / 전체 기록 console (화이트 리디자인 2026-10-14). Claude Design
 // 핸드오프를 2026-07-16 에 이식했고 같은 날 실제 데이터(lost_items + 연결된 예약)에 연결함. 참고:
@@ -16,6 +18,7 @@ export default async function AdminLostFoundPage() {
 
   return (
     <AdminShell activeItem="lost-found" title={dictionary.lostFound.adminTitle}>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <LostFoundConsole locale={locale} items={items} loadError={loadError} />
     </AdminShell>
   );

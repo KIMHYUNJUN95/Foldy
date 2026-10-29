@@ -1502,3 +1502,12 @@ Management Console" → Current Implementation Note.
   「관리자 화면 권한이 없어요」(28px) · 회색 설명 두 줄 · **회색 캡슐 로그아웃**(보조 동작) · 맨 아래 휴대폰 앱 한 줄(휴대폰 아이콘). 로고는 왼쪽 위에 작게.
   작은 영문 라벨 · 회색 안내 상자는 뺐다. 메뉴 권한 없음(`AdminNoAccess`) — 카드 · 그림자 없이 본문 가운데에 아이콘 · 제목(17px) · 설명만.
   시안: https://claude.ai/artifact/SvFryUcRbE7bBRY8PenJqR
+
+## 실시간 갱신 (2026-10-29)
+
+- 열어 둔 콘솔도 다른 사람이 바꾼 것이 새로고침 없이 보인다. 공용 `LiveRefresh`(`src/components/shared/live-refresh.tsx`, 모바일과 같은 부품) —
+  테이블 변경 신호만 받아 `router.refresh()`, select RLS 를 통과한 신호만 온다. 규칙 · 한계(삭제 신호 없음)는 `docs/product/16-mobile-navigation.md`
+  「실시간 갱신 — 공용」. 테이블 하나짜리 `AdminLiveRefresh` 는 그 래퍼로 남겼다(연차 승인).
+- 붙은 화면: 대시보드 홈(오늘 할 일 · 요청 · 근태 확인 — Beds24 예약 신호는 그대로) · 할 일 · 주문 · 수리(목록 · 상세) · 분실물 · 근태 대기열(출퇴근 기록 · 정정 · 교통비 · 연차) ·
+  연차 승인 · 채용(기존).
+- 알림 벨은 서버 렌더가 아니라 스스로 불러오므로 `useLiveRefresh(notificationLiveSources(나), 다시 불러오기)` — 내 알림이 생기면 숫자 · 목록이 바로 바뀐다.

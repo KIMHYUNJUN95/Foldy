@@ -3,6 +3,8 @@ import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
 import { isPlatformDeveloper } from "@/config/roles";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { taskLiveSources } from "@/lib/live-sources";
 import { getFieldActivities } from "@/lib/field-activity";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
@@ -97,6 +99,7 @@ export default async function MobileTasksPage({ searchParams }: PageProps) {
 
   return (
     <MobileShell activeItem="tasks" badges={navBadges} title={dict.tasks.title} split>
+      <LiveRefresh sources={taskLiveSources(session.organization.id, session.user.id)} />
       <SplitList detail="tasks">
         <TasksWorkspace
           buildingLabels={dict.cleaning.buildingLabels}

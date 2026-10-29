@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import {
@@ -9,6 +9,8 @@ import {
   type AdminNotifData,
 } from "@/app/admin/notification-actions";
 import { NotificationRowBody, rowLabelIds } from "@/components/notifications/notification-row";
+import { useLiveRefresh } from "@/components/shared/live-refresh";
+import { notificationLiveSources } from "@/lib/live-sources";
 import { groupNotificationViews, type NotificationGroup } from "@/lib/notifications/grouping";
 import "@/components/notifications/notification-white.css";
 
@@ -32,12 +34,14 @@ export function NotificationBell({
   labels: { title: string; markAll: string; viewAll: string; empty: string };
 }) {
   const [open, setOpen] = useState(false);
-  const [data, setData] = useState<AdminNotifData>({ unread: 0, items: [], copy: null });
+  const [data, setData] = useState<AdminNotifData>({ unread: 0, items: [], copy: null, userId: null });
   const [reading, setReading] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // 처음 한 번 + 내 알림이 바뀔 때마다(실시간 신호, 2026-10-29) 다시 받아 온다.
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let alive = true;
     getAdminNotifications()
@@ -48,7 +52,9 @@ export function NotificationBell({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [reloadKey]);
+  const reload = useCallback(() => setReloadKey((n) => n + 1), []);
+  useLiveRefresh(data.userId ? notificationLiveSources(data.userId) : [], reload);
 
   useEffect(() => {
     if (!open) return;

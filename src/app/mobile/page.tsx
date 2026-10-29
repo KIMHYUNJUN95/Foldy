@@ -42,6 +42,8 @@ import { getCurrentAppSession, hasOrganizationContext, type AppSession } from "@
 import type { Dictionary, Locale } from "@/lib/i18n";
 import "@/components/mobile/home-screen.css";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 import { FoldyLoader } from "@/components/shared/foldy-loader";
 
 type QuickActionItem = {
@@ -447,6 +449,8 @@ export default async function MobileHomePage() {
     // 넓은 화면(폴드 · 태블릿)은 카드를 열로 나눠 쓴다(`home-screen.css` `.hm__grid` — 2026-10-05 시안 6b · 6c).
     <MobileShell activeItem="home" badges={navBadges} title={m.homeTitle} wide>
       <Beds24LiveRefresh organizationId={session.organization.id} />
+      {/* 홈 활동(주문 · 수리 · 분실물)은 요청 신호로 — 2026-10-29 */}
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       {/* 앱을 켤 때(세션당 한 번) 스플래시 — 시안 Motion-B-Splash-Phone */}
       <div className="hm pb-2">
         {/* 인사말 — 셸과 함께 바로 렌더된다(데이터 읽기 없음). */}

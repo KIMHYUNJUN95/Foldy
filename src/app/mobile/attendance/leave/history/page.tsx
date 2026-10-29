@@ -7,6 +7,8 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { listMyLeaveRequests } from "@/lib/annual-leave-requests-server";
 import { getDictionary } from "@/lib/i18n";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { attendanceQueueLiveSources } from "@/lib/live-sources";
 
 // L4 · 신청 내역 — 상태 필터 + 이력 리스트. 스티키 하단 액션(연차 신청하기)을 쓰므로 hideBottomNav.
 export default async function MobileLeaveHistoryPage() {
@@ -33,6 +35,7 @@ export default async function MobileLeaveHistoryPage() {
 
   return (
     <MobileShell activeItem="attendance" badges={navBadges} title={copy.histTitle}>
+      <LiveRefresh sources={attendanceQueueLiveSources(session.organization.id)} />
       <LeaveHistory locale={session.user.preferredLanguage} requests={requests} />
     </MobileShell>
   );

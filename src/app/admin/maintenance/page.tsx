@@ -3,6 +3,8 @@ import { MaintenanceConsole } from "@/components/admin/maintenance/maintenance-c
 import { getAdminMaintenance } from "@/lib/admin-maintenance";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 // Admin · 수리·점검 — 현황 보드 / 목록·이력 / 완료 콘솔. 디자인은 Claude Design
 // 핸드오프(2026-07-14)에서 가져와 같은 날 실제 데이터(maintenance_reports + 연결된 예약/청소)에 연결했다.
@@ -29,6 +31,7 @@ export default async function AdminMaintenancePage({
 
   return (
     <AdminShell activeItem="maintenance" title={dictionary.maintenance.adminTitle}>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       {errorMessage ? (
         <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
           {errorMessage}

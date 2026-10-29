@@ -686,6 +686,24 @@ Current rules:
   다시 불러온다 — 앱은 배포된 웹을 띄우므로 이게 곧 앱 업데이트. 단 입력칸에 포커스 · 시트 · 메뉴가 열림 · 글이 든 입력칸이 있으면 통째로는
   안 하고(쓴 글 보호) `router.refresh()` 만 — 화면 · 스크롤 · 입력은 그대로, 서버 내용만 새로. 오프라인이면 아무것도 안 한다. 로컬 확인: 1분
   자리 비움은 그대로, 6분은 새로 고침.
+- **실시간 갱신 — 공용 (2026-10-29)**: 화면을 열어 둔 동안 다른 사람이 바꾼 것도 새로고침 없이 보인다. `LiveRefresh`
+  (`src/components/shared/live-refresh.tsx`, PC · 모바일 공용)가 테이블 변경 **신호만** 받아 `router.refresh()` — 행 데이터는 소켓으로 쓰지
+  않고, 구독도 각 테이블의 select RLS 를 통과해야 신호가 온다(볼 수 없는 행은 신호도 없음). 600ms 디바운스, 숨은 탭은 보일 때 한 번,
+  60초 넘게 가려졌거나 소켓이 다시 붙거나 `online` 이면 한 번 따라잡기(`src/lib/live-refresh-schedule.ts`). 화면별 묶음은
+  `src/lib/live-sources.ts`. 테이블은 `supabase_realtime` publication 에 있어야 한다(`202610290001_enable_ops_realtime.sql`).
+  폴링이 아니다. 새 화면이 같이 쓰는 데이터를 보여 주면 서버 페이지에 `<LiveRefresh sources={…} />` 한 줄을 붙인다.
+
+  | 화면 | 구독 |
+  | --- | --- |
+  | 모바일 레이아웃(모든 `/mobile`) | 내 알림 — 종 · 사이드 메뉴 배지. **레이아웃엔 알림만**(할 일 · 요청을 여기 두면 상관없는 화면까지 매번 다시 그림) |
+  | 할 일 목록 · 프로젝트 · 상세(PC `/admin/tasks` 도) | `tasks` · `task_occurrence_state`(조직) · `task_participants`(나) · 상세는 + `task_updates`(그 할 일) |
+  | 홈 | 요청(주문 · 수리 · 분실물) — Beds24 신호는 그대로 |
+  | 요청 목록 · 주문/수리/분실물 상세 · 반환 · 폐기 목록 | `order_requests` · `maintenance_reports` · `lost_items` |
+  | 정정 처리 상태 · 연차 신청 내역 | `attendance_sessions` · `attendance_correction_requests` · `transport_reimbursement_reports` · `annual_leave_requests` |
+
+  알려진 한계: **삭제 신호는 없다**(replica identity 기본값) — 할 일은 소프트 삭제라 바로 반영되지만, 주문 · 수리 · 분실물을 남이 지우면
+  다음 갱신 때 빠진다. 반복 회차 완료 되돌리기 · 「건너뛴 날」 되살리기 · 참여자 빼기는 행을 지우지만 DB 트리거가 부모 할 일의 `updated_at` 을
+  새로 써서 `tasks` UPDATE 신호로 대신 온다. 단 **빠진 그 사람**은 이제 그 할 일을 못 봐서(RLS) 신호가 없다 — 그 사람 목록에선 다음 갱신 때 빠진다.
 - **접근성 — 공용 규칙 (2026-10-22 점검)**: axe(버튼 · 링크 이름 · 입력칸 이름 · 대비 · 누르는 크기 등)를 모바일 화면 54곳 × 폰 · 폴드 · 태블릿
   너비로 돌리고, 화면 밖에 있는데 화면 읽기(VoiceOver · TalkBack)가 닿는 요소 · 11px 미만 글자 · 28px 미만 누르는 자리를 따로 쟀다. 이름 없는
   버튼은 0곳이었다. 고친 것과 규칙:

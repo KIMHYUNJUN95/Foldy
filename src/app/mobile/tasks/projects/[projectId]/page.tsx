@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { SplitList } from "@/components/shell/split-list";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { taskLiveSources } from "@/lib/live-sources";
 import { ProjectDetailView } from "@/components/tasks/project-detail-view";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
@@ -48,6 +50,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
   return (
     <MobileShell activeItem="tasks" badges={navBadges} title={dict.tasks.title} split>
+      <LiveRefresh sources={taskLiveSources(session.organization.id, session.user.id)} />
       <SplitList detail="tasks">
         <ProjectDetailView
           buildingLabels={dict.cleaning.buildingLabels}

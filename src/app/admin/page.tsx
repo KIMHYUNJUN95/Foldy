@@ -7,6 +7,8 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession } from "@/lib/session";
 import { getAdminDashboard } from "@/lib/admin-dashboard";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { attendanceQueueLiveSources, requestLiveSources, taskLiveSources } from "@/lib/live-sources";
 import { GreetingLine } from "@/components/shared/greeting-line";
 import { canAccessOpsAdmin } from "@/lib/ops-admin";
 import { getDashboardOpsSummary } from "@/lib/ops-revenue-server";
@@ -54,6 +56,16 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     >
       {/* 하루 첫 진입 모션(약 1.8초) — 시안 Motion-PC-Entry-PC */}
       {session.organization ? <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} /> : null}
+      {/* 오늘 할 일 · 요청 · 근태 확인 카드 — 2026-10-29 */}
+      {session.organization ? (
+        <LiveRefresh
+          sources={[
+            ...taskLiveSources(session.organization.id, session.user.id),
+            ...requestLiveSources(session.organization.id),
+            ...attendanceQueueLiveSources(session.organization.id),
+          ]}
+        />
+      ) : null}
       <DashboardHome
         buildingLabels={dictionary.cleaning.buildingLabels}
         c={dictionary.admin.console}

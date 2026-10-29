@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { TaskDetailView } from "@/components/tasks/task-detail-view";
 import { MobileShell } from "@/components/shell/mobile-shell";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { taskDetailLiveSources } from "@/lib/live-sources";
 import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -97,6 +99,7 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
 
   return (
     <MobileShell activeItem="tasks" badges={navBadges} title={dict.tasks.detailTitle}>
+      <LiveRefresh sources={taskDetailLiveSources(session.organization.id, session.user.id, task.id)} />
       <TaskDetailView
         buildingLabels={dict.cleaning.buildingLabels}
         canEditCore={canEditTaskCore(session, task)}

@@ -1,5 +1,7 @@
 import { AdminShell } from "@/components/shell/admin-shell";
 import { AdminTasksConsole } from "@/components/admin/tasks/admin-tasks-console";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { taskLiveSources } from "@/lib/live-sources";
 import { adminNavigation, getNavigationLabel } from "@/config/navigation";
 import { getAdminTasksData } from "@/lib/admin-tasks";
 import { requireAdminPageSession } from "@/lib/admin-page-auth";
@@ -16,6 +18,7 @@ export default async function AdminTasksPage() {
 
   return (
     <AdminShell activeItem="recurring-work" title={title}>
+      <LiveRefresh sources={taskLiveSources(session.organization.id, session.user.id)} />
       <AdminTasksConsole locale={locale} data={data} organizationId={session.organization.id} />
     </AdminShell>
   );

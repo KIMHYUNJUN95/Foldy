@@ -2,6 +2,8 @@ import { AppSplash } from "@/components/mobile/app-splash";
 import { IdentityFillPrompt } from "@/components/identity/identity-fill-prompt";
 import { ImageFadeIn } from "@/components/shell/image-fade-in";
 import { ResumeRefresh } from "@/components/shell/resume-refresh";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { notificationLiveSources } from "@/lib/live-sources";
 import { BuildingNamesProvider } from "@/components/shared/building-names";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
@@ -47,6 +49,9 @@ export default async function MobileLayout({ children }: { children: React.React
       <ImageFadeIn />
       {/* 오래 나가 있다 돌아오면 새로 고치기(2026-10-22). */}
       <ResumeRefresh />
+      {/* 내 알림이 바뀌면 지금 화면을 다시 받는다 — 종 · 사이드 메뉴 배지 숫자가 같이 바뀐다(2026-10-29). 레이아웃엔 알림만 —
+          할 일 · 요청을 여기서 구독하면 상관없는 화면까지 매번 다시 그린다. */}
+      {session ? <LiveRefresh sources={notificationLiveSources(session.user.id)} /> : null}
       {/* 건물 이름을 보는 사람 언어로(2026-10-22) — 데이터는 한국어 정규 명칭이라 그릴 때 `useBuildingName()` 으로 바꾼다. */}
       <BuildingNamesProvider labels={dictionary.cleaning.buildingLabels}>{children}</BuildingNamesProvider>
     </>

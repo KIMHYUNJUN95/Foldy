@@ -528,3 +528,9 @@ When created from an active cleaning timer, the request should automatically lin
 
 - `updateMaintenanceStatus`(어드민 상세): 진행 → 종료(closed/cancelled)로 갈 때만 `completed_at`/`completed_by`/`completed_by_admin=true` 를 찍고, 다시 열면 지운다(모바일 `updateMaintenanceHandling` 과 같은 규칙). 읽은 상태 그대로일 때만 쓰는 조건부 업데이트(`.eq("status", 읽은 값)`).
 - `applyMaintenanceException`(강제 완료 / 무효): `open`/`in_progress` 건에만 적용(`.in("status", …)`). 이미 종결된 건은 `invalid` — 완료시각·처리자를 덮어쓰지 않는다.
+
+## 실시간 갱신 (2026-10-29)
+
+- 요청 목록 · 상세(PC · 모바일) · 모바일 홈 활동 · PC 대시보드가 새로고침 없이 바뀐다 — 누가 올리거나 상태를 바꾸면 열어 둔 화면에 바로 보인다.
+  `requestLiveSources()` (`src/lib/live-sources.ts`) → `<LiveRefresh>`. 남이 **지운** 건은 다음 갱신 때 빠진다(삭제 신호 없음).
+  공용 규칙: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.

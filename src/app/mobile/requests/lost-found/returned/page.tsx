@@ -9,6 +9,8 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { resolveRequestLocation } from "@/lib/request-location";
 import { getActiveRoomCatalogServer } from "@/lib/rooms";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 // Tokyo 운영일 기준 YYYY-MM-DD (서버/러너 타임존과 무관하게 일 경계 고정).
 function tokyoDateKey(iso: string): string {
@@ -97,6 +99,7 @@ export default async function ReturnedLostFoundPage() {
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.title} split>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <SplitList detail="requests">
         <LostFoundArchiveList
           filterLabel={dictionary.mobile.filterButton}

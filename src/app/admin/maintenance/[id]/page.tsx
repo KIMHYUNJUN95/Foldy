@@ -12,6 +12,8 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { getMaintenanceReportById, maintenanceStatuses, type MaintenanceStatus } from "@/lib/maintenance-reports";
 import { requireAdminSession } from "@/lib/admin-session";
 import { getDisplayRoomLabel, localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 const statusBadgeClass: Record<MaintenanceStatus, string> = {
   open: "border-blue-200 bg-blue-50 text-blue-700",
@@ -61,6 +63,7 @@ export default async function AdminMaintenanceDetailPage({
 
   return (
     <AdminShell activeItem="maintenance" title={copy.detailTitle}>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="flex items-center justify-between gap-3">
           <Link href="/admin/maintenance">

@@ -6,6 +6,8 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getCorrectionRequestView } from "@/lib/attendance-corrections";
 import { getDictionary } from "@/lib/i18n";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { attendanceQueueLiveSources } from "@/lib/live-sources";
 
 type PageProps = {
   searchParams: Promise<{ id?: string }>;
@@ -52,6 +54,7 @@ export default async function MobileAttendanceCorrectionStatusPage({ searchParam
 
   return (
     <MobileShell activeItem="attendance" badges={navBadges} title={dict.attendance.corrStatusPageTitle} hideBottomNav>
+      <LiveRefresh sources={attendanceQueueLiveSources(session.organization.id)} />
       <AttendanceCorrectionStatus request={request} locale={session.user.preferredLanguage} />
     </MobileShell>
   );

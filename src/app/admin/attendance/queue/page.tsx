@@ -12,6 +12,8 @@ import { requireAdminPageSession } from "@/lib/admin-page-auth";
 import { getDictionary } from "@/lib/i18n";
 import { AdminNoAccess } from "@/components/admin/shared/admin-no-access";
 import { isValidYm } from "@/lib/attendance-clock";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { attendanceQueueLiveSources } from "@/lib/live-sources";
 
 // 관리자 · 근태 · 검토 대기열 (슬라이스 2).
 // 세션 표 + 다중 선택 일괄 바 + 오른쪽 세션 상세 패널.
@@ -62,6 +64,7 @@ export default async function AdminAttendanceQueuePage({
 
   return (
     <AdminShell activeItem="attendance" title={c.headerQueue}>
+      <LiveRefresh sources={attendanceQueueLiveSources(session.organization.id)} />
       <AttendanceSubnav
         active="queue"
         monthLabel={carriedMonthLabel}

@@ -17,6 +17,8 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { tokyoToday } from "@/lib/tokyo-date";
 import "@/components/requests/maintenance-detail.css";
 import "@/components/requests/order-detail.css";
+import { LiveRefresh } from "@/components/shared/live-refresh";
+import { requestLiveSources } from "@/lib/live-sources";
 
 type ListFilterQuery = {
   scope?: string;
@@ -225,6 +227,7 @@ export default async function MobileOrderRequestDetailPage({
 
   return (
     <MobileShell activeItem="requests" badges={navBadges} title={copy.title}>
+      <LiveRefresh sources={requestLiveSources(session.organization.id)} />
       {/* 화이트 리디자인(2026-10-14, 시안 OrderDetail-Phone · OrderOffice-Phone): 상자 없는 한 줄 머리 · 배송 예정 ·
           품목 줄 · 사유 · 진행 3단 막대(누가 · 언제 기록은 DB 에 없어 단계만) · 사무실이면 처리 줄. */}
       <div className="mdw odw">

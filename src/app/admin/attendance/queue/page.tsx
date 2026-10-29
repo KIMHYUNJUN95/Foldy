@@ -35,13 +35,13 @@ export default async function AdminAttendanceQueuePage({
   const localeTag = locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : "en-US";
   const carriedYm =
     isValidYm(params.ym) ? params.ym : currentTokyoYm();
+  // 「정정 대기」 탭은 「정정 요청」으로 합쳤다(2026-10-29) — 옛 링크 `?filter=pending` 은 정정 요청으로.
   const initialFilter =
-    params.filter === "review" ||
-    params.filter === "pending" ||
-    params.filter === "corr" ||
-    params.filter === "all"
-      ? params.filter
-      : "review";
+    params.filter === "pending"
+      ? "corr"
+      : params.filter === "review" || params.filter === "corr" || params.filter === "all"
+        ? params.filter
+        : "review";
   const initialSearch = typeof params.q === "string" ? params.q.slice(0, 60) : "";
   const carriedMonthLabel = new Intl.DateTimeFormat(localeTag, {
     timeZone: "Asia/Tokyo",

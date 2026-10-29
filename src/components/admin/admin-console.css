@@ -1162,6 +1162,26 @@
 .adm .qrow__time { font-size: 11px; font-weight: 700; color: var(--faint); font-family: var(--mono); }
 .adm .qrow__chev { color: var(--faint); width: 16px; height: 16px; flex: 0 0 auto; font-size: 16px; }
 .adm .qrow__av { width: 26px; height: 26px; border-radius: 8px; font-size: 11px; color: #fff; }
+/* 패널 안에서 짝 레코드로 건너가는 한 줄(정정 요청 ↔ 근무, 2026-10-29) — 키보드로도 연다. */
+.adm .qrow--link {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--adm-surface);
+  font: inherit;
+  text-align: left;
+  transition: background-color 120ms ease, transform 120ms ease-out;
+}
+.adm .qrow--link:hover { background: var(--line); }
+.adm .qrow--link + .qrow--link { margin-top: 6px; }
+.adm .qrow--link:active { transform: scale(0.99); }
+.adm .qrow--link:focus-visible { outline: 2px solid var(--adm-primary); outline-offset: 2px; }
+.adm .qrow--link .qrow__s { display: block; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .qrow--link { transition: background-color 120ms ease; }
+  .adm .qrow--link:active { transform: none; }
+}
 
 /* 진행 바 */
 .adm .pbar { height: 5px; border-radius: 999px; background: var(--adm-surface); overflow: hidden; width: 90px; }

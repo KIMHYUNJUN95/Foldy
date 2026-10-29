@@ -7410,3 +7410,11 @@ Status: Confirmed (2026-10-19). 실제 Beds24 시험 대기.
   반복 회차 상태 · 참여자 행 삭제는 DB 트리거(`touch_task_after_child_delete`)가 부모 할 일 `updated_at` 을 건드려 UPDATE 신호로 대신한다(최종 리뷰에서 찾음).
 - 근태 대기열의 본 목록은 `attendance_sessions` — publication 에 같이 넣었다.
 - 마이그레이션 `202610290001_enable_ops_realtime.sql`. 상세: `docs/product/16-mobile-navigation.md` 「실시간 갱신 — 공용」.
+
+## 2026-10-29 — 근태 검토 큐: 「정정 대기」 탭을 「정정 요청」으로 합침
+
+- **사용자(2026-10-29):** 정정 대기 · 정정 요청이 둘 다 떠서 헷갈린다 → 합치기로. 시안 없이 로컬에서 확인.
+- 정정은 요청 단위로 처리하므로 「정정 요청」 탭만 남긴다. 탭은 검토 필요 · 정정 요청 · 전체 세션. 옛 `?filter=pending` 은 `corr` 로 연다.
+- 상태 이름은 「정정 요청 중」 하나로(ko · ja 修正申請中 · en Correction requested). 근무 패널 ↔ 정정 요청 패널은 서로 바로 열린다.
+- 추가 결정: 정정이 걸린 근무는 「검토 필요」에 같이 두지 않음 · 한 근무의 열린 정정 요청은 전부 한 줄씩 · 연결 줄은 테두리 없이 옅은 바탕.
+- 상세: `docs/product/24-attendance-workflow.md` 「검토 큐 탭 합치기」.

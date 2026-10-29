@@ -44,7 +44,8 @@ import { AdminTimePicker } from "../shared/admin-time-picker";
 import { useAdminPanelA11y } from "../shared/use-admin-panel-a11y";
 
 type Att = Dictionary["admin"]["attendanceConsole"];
-type Filter = "review" | "pending" | "corr" | "all";
+/** 「정정 대기」 탭은 「정정 요청」과 같은 일을 두 번 보여 줘서 없앴다(2026-10-29) — 옛 `?filter=pending` 은 page 에서 `corr` 로. */
+type Filter = "review" | "corr" | "all";
 type PanelRoute =
   | { kind: "sess"; id: string }
   | { kind: "corr"; id: string }
@@ -265,7 +266,6 @@ function isReviewRow(item: ReviewQueueItem): boolean {
 
 function filterRows(items: ReviewQueueItem[], f: Filter): ReviewQueueItem[] {
   if (f === "review") return items.filter(isReviewRow);
-  if (f === "pending") return items.filter(isPending);
   if (f === "all") return items;
   return [];
 }
@@ -379,7 +379,6 @@ export function AttendanceQueueClient({
   const counts = useMemo(
     () => ({
       review: items.filter(isReviewRow).length,
-      pending: items.filter(isPending).length,
       corr: corrections.length,
       all: items.length,
     }),
@@ -585,6 +584,10 @@ export function AttendanceQueueClient({
     panel?.kind === "sess" ? items.find((i) => i.sessionId === panel.id) ?? null : null;
   const panelCorrection =
     panel?.kind === "corr" ? corrections.find((r) => r.id === panel.id) ?? null : null;
+  // 근무 패널 → 그 근무에 걸린 열린 정정 요청 전부(목록은 requested · in_review 만 들고 있다).
+  const panelSessionCorrections = panelSession
+    ? corrections.filter((r) => r.sessionId === panelSession.sessionId)
+    : [];
 
   return (
     <div style={{ position: "relative" }}>
@@ -598,14 +601,6 @@ export function AttendanceQueueClient({
           >
             {c.filterReview}
             <span className="cnt">{counts.review}</span>
-          </button>
-          <button
-            type="button"
-            className={filter === "pending" ? "on" : ""}
-            onClick={() => changeFilter("pending")}
-          >
-            {c.filterPending}
-            <span className="cnt">{counts.pending}</span>
           </button>
           <button
             type="button"
@@ -886,13 +881,7 @@ export function AttendanceQueueClient({
             </span>
             <div className="state__t">{c.emptyTitle}</div>
             <div className="state__s">
-              {c.emptyBody(
-                filter === "review"
-                  ? c.filterReview
-                  : filter === "pending"
-                    ? c.filterPending
-                    : c.filterAll,
-              )}
+              {c.emptyBody(filter === "review" ? c.filterReview : c.filterAll)}
             </div>
           </div>
         </div>
@@ -1013,6 +1002,8 @@ export function AttendanceQueueClient({
         <SessionPanel
           item={panelSession}
           c={c}
+          corrections={panelSessionCorrections}
+          onOpenCorrection={(id) => setPanel({ kind: "corr", id })}
           onClose={() => setPanel(null)}
           onInvalidated={(id) => {
             removeOrUpdateAfterInvalidate(id);
@@ -1084,6 +1075,8 @@ export function AttendanceQueueClient({
 function SessionPanel({
   item,
   c,
+  corrections,
+  onOpenCorrection,
   onClose,
   onInvalidated,
   onApproved,
@@ -1093,6 +1086,9 @@ function SessionPanel({
 }: {
   item: ReviewQueueItem;
   c: Att;
+  /** 이 근무에 걸린 열린 정정 요청(여러 건이면 한 줄씩) — 누르면 그 정정 패널을 연다. */
+  corrections: AdminCorrectionRow[];
+  onOpenCorrection: (correctionId: string) => void;
   onClose: () => void;
   /** 그 사이 다른 사람이 세션을 바꿨을 때(`stale`) — 부모가 서버에서 목록을 다시 받는다. */
   onStale: () => void;
@@ -1423,6 +1419,36 @@ function SessionPanel({
               </div>
             </div>
           </div>
+
+          {/* 들어온 정정 요청 — 정정 패널의 「연결된 세션」과 짝 */}
+          {corrections.length > 0 ? (
+            <div className="pblock">
+              <div className="pblock__t">{c.panelCorrSection}</div>
+              {corrections.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className="qrow qrow--link"
+                  onClick={() => onOpenCorrection(r.id)}
+                >
+                  <span className="qrow__ic bg-info">
+                    <Ic>
+                      <Pencil />
+                    </Ic>
+                  </span>
+                  <span className="qrow__b">
+                    <span className="qrow__t">{corrFieldLabel(r.field, c)}</span>
+                    <span className="qrow__s mono">
+                      {r.beforeLabel} → {r.afterLabel}
+                    </span>
+                  </span>
+                  <span className="ic qrow__chev">
+                    <ChevronRight />
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {/* 활동 기록 */}
           <div className="pblock">
@@ -1912,14 +1938,9 @@ function CorrectionPanel({
           {row.sessionId ? (
             <div className="pblock">
               <div className="pblock__t">{c.corrPanelLinkedSection}</div>
-              <div
-                className="qrow"
-                style={{
-                  border: "1px solid var(--line-soft)",
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  cursor: "pointer",
-                }}
+              <button
+                type="button"
+                className="qrow qrow--link"
                 onClick={() => onOpenSession(row.sessionId!)}
               >
                 <span className="qrow__ic bg-warn">
@@ -1927,16 +1948,16 @@ function CorrectionPanel({
                     <Clock />
                   </Ic>
                 </span>
-                <div className="qrow__b">
-                  <div className="qrow__t">{c.corrPanelLinkedRowTitle}</div>
-                  <div className="qrow__s">
+                <span className="qrow__b">
+                  <span className="qrow__t">{c.corrPanelLinkedRowTitle}</span>
+                  <span className="qrow__s">
                     {c.corrPanelLinkedRowSub(row.dateLabel ?? row.operatingDate ?? "—")}
-                  </div>
-                </div>
+                  </span>
+                </span>
                 <span className="ic qrow__chev">
                   <ChevronRight />
                 </span>
-              </div>
+              </button>
             </div>
           ) : null}
 

@@ -255,7 +255,8 @@ export async function getAdminAttendanceBadgeStats(
   return {
     isPrivileged: true,
     ym,
-    queueOpen: reviewRows.length + (correctionsRes.count ?? 0),
+    // 검토 큐 탭 숫자와 같다: 「검토 필요」(열린 정정이 걸린 근무는 뺌) + 「정정 요청」(목록 상한 200건과 같게, 2026-10-29).
+    queueOpen: reviewRows.length + Math.min(correctionsRes.count ?? 0, CORRECTION_LIST_LIMIT),
     queueUrgent: reviewRows.filter((row) => !row.clock_out_at).length,
     payrollTargets,
     transportPending: transportRes.count ?? 0,
@@ -364,7 +365,7 @@ export async function getAdminAttendanceOverview(
   const isOpenCorrection = (r: AdminCorrectionRow) =>
     r.status === "requested" || r.status === "in_review";
   // "검토 필요" = 큐 페이지의 기본 `review` 탭이 보여주는 행과 같다: review_required 로
-  // 표시됐고 이미 정정 대기 묶음으로 넘어가지 않은 것. `getAttendanceReviewQueue` 를
+  // 표시됐고 열린 정정 요청이 걸리지 않은 것(그건 「정정 요청」 탭에서 센다). `getAttendanceReviewQueue` 를
   // 필터 없이 부르면 최근 세션 전부(상태 무관)를 돌려주므로, 예전에는 여기서 `review.length` 가 실제로 검토가 필요한 것만이 아니라
   // 가져온 세션 전체를 보고했다.
   const reviewRequiredRows = review.filter(

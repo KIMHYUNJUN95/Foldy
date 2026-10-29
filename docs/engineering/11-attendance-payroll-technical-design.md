@@ -865,7 +865,7 @@ directly instead of rendering placeholder dashboard values.
   card (검토 필요 세션 / 정정 요청 대기 / 진행 중 세션) is a link into the review queue pre-filtered to
   the blocking work. `검토 필요`·`진행 중` → `filter=review`, `정정 요청` → `filter=corr`, all carrying
   `?ym=<selected>&q=<staff name>`. The queue page (`/admin/attendance/queue`) now reads `filter`
-  (`review|pending|corr|all`, default `review`) and `q` (name search, ≤60 chars) from `searchParams` and
+  (`review|corr|all`, default `review`; the old `pending` tab was merged into `corr` on 2026-10-29 and `?filter=pending` now opens `corr`) and `q` (name search, ≤60 chars) from `searchParams` and
   seeds `AttendanceQueueClient`'s initial `filter` / `nameQuery`. On arrival the client also **auto-opens
   that staff member's side panel** — the first matching session (`filter=review`) or correction request
   (`filter=corr`) for the searched name — computed in the `panel` `useState` initializer (an explicit

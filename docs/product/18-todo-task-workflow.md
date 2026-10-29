@@ -1244,6 +1244,8 @@ Task completion was re-introduced (it had been removed in the 2026-06-12 IA clea
   `task_report_tick_token`, 주소 `task_report_tick_url`). 라우트는 `claim_due_task_report_schedules`(원자적으로 'sending', `for update skip locked`)로 가져가
   **보내기 직전에 권한을 다시 보고**(`canSendDailyReport` — 퇴사 · 비활성 · 역할 변경) Slack 으로 보낸다. 'sending' 에서 10분 넘게 멈춘 것은 다시 보내지 않고
   실패(stuck) — 두 번 나가는 것보다 「못 보냄」이 낫다. Slack 보내기 본체는 지금 보내기와 같은 `src/lib/daily-report-slack.ts`. 감사 기록 `scheduled: true`.
+  **2026-10-29** 「지금 보내기」도 '보내는 중'으로 잡을 때 `claimed_at` 을 적는다(전엔 안 적어서 도중에 멈추면 영영 안 풀리고 그 날짜가 계속 「보내는 중」으로 막혔다).
+  예약 · 지금 보내기는 시작할 때 그 날짜의 10분 넘은 '보내는 중'을 먼저 실패(stuck)로 푼다 — 틱이 돌지 않아도 막히지 않는다(`claimed_at` 없는 옛 행은 `updated_at` 기준, `src/lib/task-report-stuck.ts`).
 
 ## Daily Report (업무일지) — as-built (2026-06-13)
 

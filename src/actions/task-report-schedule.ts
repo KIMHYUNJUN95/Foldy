@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { stuckSendingOrFilter } from "@/lib/task-report-stuck";
 import {
   generateDailyReport,
   sendDailyReportToSlack,
@@ -46,6 +47,27 @@ async function me() {
   const session = await getCurrentAppSession();
   if (!session || !hasOrganizationContext(session)) return null;
   return session;
+}
+
+/**
+ * 이 날짜에 10분 넘게 「보내는 중」인 행을 `failed`('stuck')로 푼다 — 틱과 같은 기준(`src/lib/task-report-stuck.ts`).
+ * 지금 보내기가 도중에 멈춰 남은 행 때문에 그 날짜가 계속 `busy` 로 막히지 않게, 예약 · 지금 보내기 앞에서 먼저 부른다.
+ */
+async function releaseStuckSending(
+  service: ReturnType<typeof getSupabaseServiceClient>,
+  organizationId: string,
+  userId: string,
+  day: string,
+) {
+  const { error } = await service
+    .from("task_report_schedules")
+    .update({ status: "failed", error: "stuck" })
+    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
+    .eq("report_date", day)
+    .eq("status", "sending")
+    .or(stuckSendingOrFilter(Date.now()));
+  if (error) console.warn("[report-schedule] release stuck failed:", error.message);
 }
 
 /** 이 날짜의 최근 예약(취소된 것 빼고). 없으면 null. */
@@ -105,7 +127,8 @@ export async function scheduleDailyReport(date: string, editedText: string, send
   if (!session) return { ok: false, reason: "forbidden" };
   const service = getSupabaseServiceClient();
 
-  // 보내는 중이면 바꾸지 않는다(곧 끝난다).
+  // 보내는 중이면 바꾸지 않는다(곧 끝난다). 10분 넘게 갇힌 것은 먼저 푼다.
+  await releaseStuckSending(service, session.organization.id, session.user.id, day);
   const { data: active, error: activeError } = await service
     .from("task_report_schedules")
     .select("id, status")
@@ -191,6 +214,7 @@ export type SendDailyReportNowResult = { ok: true } | { ok: false; reason: Slack
  *      보내지 않게(틱은 `scheduled` 만 집어 간다). 이미 틱이 보내는 중이면 `busy`.
  *   2. 지금 본문을 Slack 으로 보낸다(`sendDailyReportToSlack` — 권한 · 빈 일지 · 길이 판정 그대로).
  *   3. 성공하면 잡아 둔 예약을 `cancelled` 로, 실패하면 `scheduled` 로 되돌려 예약이 그대로 살아 있게 한다.
+ *   3에 닿기 전에 서버가 멈추면 행이 `sending` 으로 남는다 → 10분 뒤 `failed`('stuck')로 풀린다(2026-10-29).
  */
 export async function sendDailyReportNow(date: string, editedText: string): Promise<SendDailyReportNowResult> {
   const day = String(date ?? "").trim();
@@ -198,10 +222,12 @@ export async function sendDailyReportNow(date: string, editedText: string): Prom
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isDay(day)) return { ok: false, reason: "error" };
   const service = getSupabaseServiceClient();
+  await releaseStuckSending(service, session.organization.id, session.user.id, day);
 
+  // `claimed_at` 도 적는다 — 이 요청이 도중에 멈추면 틱 · 위 풀기가 10분 뒤 이 행을 풀 수 있게(2026-10-29).
   const { data: claimed, error: claimError } = await service
     .from("task_report_schedules")
-    .update({ status: "sending" })
+    .update({ status: "sending", claimed_at: new Date().toISOString() })
     .eq("user_id", session.user.id)
     .eq("organization_id", session.organization.id)
     .eq("report_date", day)

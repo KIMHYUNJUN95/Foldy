@@ -44,7 +44,7 @@ import {
   prefetchSalesSummary,
   type SalesSummaryCopy,
 } from "@/components/admin/ops/ops-sales-summary-modal";
-import { Check, ChevronDown, TrendingDown } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, TrendingDown } from "lucide-react";
 import { buildOpsDaySummaries } from "@/lib/ops-day-summary";
 import { BEDS24_LIVE_STATUS_EVENT, currentBeds24LiveStatus } from "@/components/shared/beds24-live-refresh";
 import { OpsNavLink } from "@/components/admin/ops/ops-nav";
@@ -96,6 +96,8 @@ import {
 } from "@/lib/ops-calendar-selection";
 import { hasOpsLargeRooms, isOpsLargeRoom, orderOpsLargeRoomsFirst } from "@/lib/ops-large-rooms";
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
+import { opsVacantGapCells, opsVacantGaps, type OpsVacantGap, type OpsVacantGapLength, type OpsVacantGapSort } from "@/lib/ops-vacant-gaps";
+import { OpsVacantGapsPanel, type VacantGapsCopy } from "@/components/admin/ops/ops-vacant-gaps-panel";
 import { OPS_GAP_OPEN_EVENT } from "@/components/admin/ops/ops-gap-button";
 import { OPS_OPEN_RESERVATION_EVENT } from "@/components/shell/admin-guest-search";
 import { loadOpsReservationPlacement } from "@/actions/ops-calendar-search";
@@ -168,6 +170,7 @@ type Copy = {
   HistoryPanelCopy & { hsButton: string; hsAlertTitle: string } &
   SalesSummaryCopy & { ssButton: string } &
   PriceWinsCopy &
+  VacantGapsCopy & { vgToggle: string; vgHint: string; vgBack: string } &
   RecentBookingsCopy & {
     rbToggle: string;
     pwToggle: string;
@@ -1319,6 +1322,15 @@ export function OpsCalendarGrid({
 
   const [priceWinsOpen, setPriceWinsOpen] = useState(false);
   /*
+   * 빈 구간 목록(2026-10-29) — 보는 기간의 팔 수 있는 빈 밤을 구간으로(`ops-vacant-gaps.ts`). 줄을 고르면 그 칸을 골라
+   * 가격 수정으로 들어가고, 편집 열 위 「‹ 빈 구간」으로 목록에 돌아온다(길이 탭 · 정렬은 그대로).
+   */
+  const [vacantGapsOpen, setVacantGapsOpen] = useState(false);
+  const [gapLength, setGapLength] = useState<OpsVacantGapLength>("all");
+  const [gapSort, setGapSort] = useState<OpsVacantGapSort>("near");
+  /** 목록에서 고른 구간의 칸 — 지금 선택이 이것 그대로일 때만 「‹ 빈 구간」을 보인다. */
+  const [gapPickCells, setGapPickCells] = useState<OpsSelectionCell[] | null>(null);
+  /*
    * ── 가격 개입 전환은 **격자가 그린 뒤** 따로 받는다(2026-09-30 속도) ─────
    *
    * **보고 있는 창 × 고른 건물**만 판정한다(2026-10-02 사용자 지시 — 예전엔 최근 90일 전체라 달을 넘겨도 같은 목록이
@@ -1789,6 +1801,7 @@ export function OpsCalendarGrid({
     recentOpen ||
     historyOpen ||
     vacantOnly ||
+    vacantGapsOpen ||
     createHint;
   const escYields = (editMode && hasSelection) || Boolean(openBar) || Boolean(booking) || Boolean(activeDraft);
   useEffect(() => {
@@ -1807,6 +1820,7 @@ export function OpsCalendarGrid({
       setHistoryOpen(false);
       // 매출 요약은 자기 Esc 로 닫는다 — 여기서 바로 끄면 닫힘 애니메이션이 끊긴다.
       setVacantOnly(false);
+      setVacantGapsOpen(false);
       setCreateHint(false);
       // 마지막에 누른 툴바 버튼에 포커스가 남아 있으면, 키를 누른 순간 브라우저가 「키보드 조작」으로
       // 보고 포커스 링을 그린다 — 꺼진 버튼에 테두리만 남아 켜진 것처럼 보인다(2026-10-01).
@@ -2128,6 +2142,45 @@ export function OpsCalendarGrid({
     setScope(EMPTY_SCOPE);
     setDateAnchor(null);
     setSelectionState({ cells: urgentCells, scopeKeys: new Set() });
+  };
+
+  // 빈 구간 — 오늘 이후 · 예약도 차단도 없고 요금 칸이 있는 밤(요금 칸이 없으면 「안 판다」다).
+  const vacantGaps = opsVacantGaps({
+    dates,
+    isBlocked: (roomKey, date) =>
+      blockedCellKeys.has(selectionCellKey(roomKey, date)) || rateAt(roomKey, date)?.price == null,
+    isSold: (roomKey, date) => soldCells.has(selectionCellKey(roomKey, date)),
+    minStayAt: (roomKey, date) => rateAt(roomKey, date)?.minStay ?? null,
+    priceAt: (roomKey, date) => rateAt(roomKey, date)?.price ?? null,
+    roomKeys,
+    today,
+  });
+  const gapReturn = gapPickCells !== null && isExactCellSelection(selectedKeys, selection.length, gapPickCells);
+  const pickVacantGap = (gap: OpsVacantGap) => {
+    setVacantGapsOpen(false);
+    if (canWrite) {
+      setMode("price");
+      setScope(EMPTY_SCOPE);
+      setDateAnchor(null);
+      const cells = opsVacantGapCells(gap);
+      setSelectionState({ cells, scopeKeys: new Set() });
+      setGapPickCells(cells);
+    }
+    requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(`[data-ops-row="${CSS.escape(gap.roomKey)}"]`);
+      if (!row) return;
+      const top = row.getBoundingClientRect().top;
+      if (top < 120 || top > window.innerHeight - 80) {
+        window.scrollBy({ behavior: "smooth", top: top - window.innerHeight / 3 });
+      }
+    });
+  };
+  const roomTitleOf = (roomKey: string) => {
+    const room = rooms.find((candidate) => candidate.key === roomKey);
+    if (!room) return roomKey;
+    return room.displayRoomLabel === room.propertyName
+      ? bName(room.propertyName)
+      : `${bName(room.propertyName)} ${room.displayRoomLabel}`;
   };
 
   // 건물이 바뀌는 자리에 묶음 머리글을 넣는다. 건물 하나만 골랐어도 「객실 N」이 보여야
@@ -2459,6 +2512,17 @@ export function OpsCalendarGrid({
                   )}
                 </div>
                 <div className="scw-tools__right">
+                  {/* 빈 구간 — 보는 기간의 팔 수 있는 빈 밤을 구간으로 묶은 목록(2026-10-29). */}
+                  <button
+                    aria-haspopup="dialog"
+                    className={`scw-tb is-panel${vacantGapsOpen ? " on" : ""}`}
+                    onClick={() => setVacantGapsOpen((value) => !value)}
+                    title={copy.vgHint}
+                    type="button"
+                  >
+                    {copy.vgToggle}
+                    <b className="scw-tb__n">{vacantGaps.length}</b>
+                  </button>
                   {/* 가격 개입 성공 — 가격을 바꾸고 48시간 안에 그 방 · 그 날짜로 들어온 예약. 누르면 목록이 열리고
                       격자에서 그 예약만 진하게(닫으면 같이 끈다). */}
                   <button
@@ -2922,6 +2986,13 @@ export function OpsCalendarGrid({
                 {exitArmed ? copy.spwExitDiscard : copy.spwExit}
               </button>
             </div>
+            {gapReturn && mode === "price" && (
+              <button className="scw-sideback" onClick={() => setVacantGapsOpen(true)} type="button">
+                <ChevronLeft aria-hidden="true" />
+                {copy.vgBack}
+                <b>{vacantGaps.length}</b>
+              </button>
+            )}
             {exitArmed && (
               <p className="scw-sidewarn" role="status">
                 {copy.spwExitUnsaved.replace("{count}", String(selection.length))}
@@ -3065,6 +3136,25 @@ export function OpsCalendarGrid({
           range={recent.range}
           failed={recent.failed}
           onRetry={recent.retry}
+        />
+      )}
+
+      {vacantGapsOpen && (
+        <OpsVacantGapsPanel
+          copy={copy}
+          gaps={vacantGaps}
+          length={gapLength}
+          localeTag={copy.localeTag}
+          onClose={() => setVacantGapsOpen(false)}
+          onLength={setGapLength}
+          onPick={pickVacantGap}
+          onSort={setGapSort}
+          propertyOf={(roomKey) => bName(rooms.find((room) => room.key === roomKey)?.propertyName ?? "")}
+          roomKeys={roomKeys}
+          roomTitle={roomTitleOf}
+          sort={gapSort}
+          today={today}
+          windowLabel={opsWindowLabel(days)}
         />
       )}
 

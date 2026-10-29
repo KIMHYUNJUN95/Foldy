@@ -415,6 +415,17 @@
 .adm .scw-sideexit:active { transform: scale(0.97); }
 .adm .scw-sideexit.is-armed { background: #c4364b; }
 .adm .scw-sideexit.is-armed:hover { background: #a92c3f; }
+/* 빈 구간 목록에서 들어왔을 때만 — 「‹ 빈 구간 N」으로 목록에 돌아간다(2026-10-29). */
+.adm .scw-sideback {
+  flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; margin: -4px 0 -4px -4px;
+  padding: 0 6px 0 2px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--scw-v, #7a52e6); cursor: pointer; transition: color 140ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-sideback:hover { color: #5a30cf; }
+.adm .scw-sideback:active { transform: scale(0.97); }
+.adm .scw-sideback:focus-visible { outline: 2px solid #7a52e6; outline-offset: 1px; }
+.adm .scw-sideback svg { width: 16px; height: 16px; }
+.adm .scw-sideback b { font-weight: 600; font-variant-numeric: tabular-nums; }
 .adm .scw-sidewarn { margin: -8px 0 0; font-size: 13px; line-height: 1.4; color: #c4364b; animation: scwRise 200ms var(--scw-ease); }
 /* 이 화면의 1박 갭(가격 · 차단 모드) — 최소숙박 패널 머리 숫자의 작은 판. 0 이면 회색 한 줄. */
 .adm .scw-gapline {

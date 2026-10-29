@@ -210,6 +210,38 @@
 .adm .stw-rb__wintag svg { width: 11px; height: 11px; stroke-width: 2.4; }
 .adm .stw-rb__winline { font-size: 11.5px; line-height: 1.45; color: var(--stw-v-ink); overflow-wrap: anywhere; }
 
+/* 빈 구간 목록(2026-10-29) — 머리 「빈 구간 N  N박」, 길이는 글자 탭 한 줄 + 오른쪽 정렬 하나(칩 · 세그먼트 없음).
+   줄 = 맨 앞 큰 숫자(몇 박) · 객실 · 날짜 · 오른쪽 1박 평균. 색은 「오늘 · 내일 밤부터」에만. */
+.adm .stw-vg__total { margin-left: 8px; font-size: 15px; font-weight: 500; letter-spacing: 0; color: var(--stw-mute); }
+.adm .stw-vg__bar { display: flex; align-items: center; gap: 12px; margin-top: 14px; box-shadow: inset 0 -0.5px 0 var(--stw-line); }
+.adm .stw-vg__tabs { display: flex; flex-wrap: wrap; column-gap: 18px; min-width: 0; }
+.adm .stw-vg__tabs > button {
+  height: 38px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 13.5px; font-weight: 500;
+  color: var(--stw-mute); white-space: nowrap; cursor: pointer; transition: color 140ms ease, box-shadow 160ms var(--stw-ease);
+}
+.adm .stw-vg__tabs > button > span { margin-left: 4px; font-weight: 500; color: var(--stw-mute); }
+.adm .stw-vg__tabs > button.on { color: var(--stw-ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--stw-ink); }
+@media (hover: hover) and (pointer: fine) { .adm .stw-vg__tabs > button:hover { color: var(--stw-ink); } }
+.adm .stw-vg__tabs > button:focus-visible,
+.adm .stw-vg__sort:focus-visible { outline: 2px solid var(--stw-v); outline-offset: 2px; border-radius: 4px; }
+.adm .stw-vg__sort {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 38px; margin-left: auto; padding: 0 0 0 8px; border: 0;
+  background: transparent; font: inherit; font-size: 13px; color: var(--stw-ink2); white-space: nowrap; cursor: pointer;
+  transition: transform 140ms ease-out;
+}
+.adm .stw-vg__sort:active { transform: scale(0.97); }
+.adm .stw-vg__sort svg { width: 14px; height: 14px; color: var(--stw-mute); }
+.adm .stw-vg__list > .stw-item:first-child,
+.adm .stw-vg__list > .stw-item.is-first { border-top: 0; }
+.adm .stw-vg__head { display: block; padding: 10px 0 2px; font-size: 12px; font-weight: 700; color: var(--stw-mute); }
+.adm .stw-vg__row { gap: 12px; width: calc(100% + 20px); margin: 0 -10px; padding: 12px 10px; }
+.adm .stw-vg__n { flex: none; display: flex; align-items: baseline; gap: 2px; min-width: 34px; }
+.adm .stw-vg__n b { font-size: 18px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+.adm .stw-vg__n span { font-size: 12px; color: var(--stw-mute); }
+.adm .stw-vg__urg { font-size: 12px; line-height: 1.45; font-weight: 600; color: var(--stw-red); }
+.adm .stw-vg__note { font-size: 12px; line-height: 1.45; color: var(--stw-mute); }
+.adm .stw-vg__price { flex: none; font-size: 13.5px; font-weight: 600; line-height: 1.35; white-space: nowrap; }
+
 /* 모바일 시트 안 — 머리 · 탭 · 줄을 손가락 크기로(44px). 닫기 X 는 시트 계약상 숨긴다(mobile-ops-calendar.css). */
 .adm.mops-side .stw-h__title { font-size: 20px; }
 .adm.mops-side .stw-h__kicker { font-size: 13px; }
@@ -221,6 +253,17 @@
 .adm.mops-side .stw-row { min-height: 64px; }
 .adm.mops-side .stw-row__name { font-size: 15px; }
 .adm.mops-side .stw-row__sub { font-size: 13px; }
+.adm.mops-side .stw-vg__total { font-size: 16px; }
+.adm.mops-side .stw-vg__tabs > button,
+.adm.mops-side .stw-vg__sort { height: 44px; font-size: 15px; }
+.adm.mops-side .stw-vg__sort { font-size: 14px; }
+.adm.mops-side .stw-vg__row { padding: 14px 10px; }
+.adm.mops-side .stw-vg__n { min-width: 38px; }
+.adm.mops-side .stw-vg__n b { font-size: 20px; }
+.adm.mops-side .stw-vg__n span,
+.adm.mops-side .stw-vg__urg,
+.adm.mops-side .stw-vg__note { font-size: 13px; }
+.adm.mops-side .stw-vg__price { font-size: 14.5px; }
 .adm.mops-side .stw-rb__split { font-size: 14px; }
 .adm.mops-side .stw-rb__wintag { height: 20px; font-size: 12px; }
 .adm.mops-side .stw-rb__winline { font-size: 12px; }

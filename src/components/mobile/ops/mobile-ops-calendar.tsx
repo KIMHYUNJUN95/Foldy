@@ -78,6 +78,8 @@ import type { CellHistory } from "@/lib/ops-price-history";
 import { buildOpsScopeSummary } from "@/lib/ops-scope-summary";
 import { opsUrgentVacantCells } from "@/lib/ops-urgent-vacant";
 import { opsVacantRoomKeys } from "@/lib/ops-vacant-today";
+import { opsVacantGapCells, opsVacantGaps, type OpsVacantGap, type OpsVacantGapLength, type OpsVacantGapSort } from "@/lib/ops-vacant-gaps";
+import { OpsVacantGapsPanel } from "@/components/admin/ops/ops-vacant-gaps-panel";
 import { useBuildingName } from "@/components/shared/building-names";
 import "./mobile-ops-calendar.css";
 import "./mobile-ops-calendar-white.css";
@@ -130,7 +132,7 @@ type Jump = {
 type Pending = { token: number; value: number };
 type PanelKind = "price" | "minstay" | "block";
 type Overlay =
-  | { kind: PanelKind | "scope" | "history" | "wins" | "recent" | "jump" }
+  | { kind: PanelKind | "scope" | "history" | "wins" | "recent" | "jump" | "gaps" }
   | { kind: "reservation"; placement: OpsReservationPlacement }
   | { kind: "booking"; room: BookingPanelRoom; checkIn: string; checkOut: string }
   | { kind: "cellHistory"; roomKey: string; date: string }
@@ -415,12 +417,49 @@ export function MobileOpsCalendar({
 
   // 한 번에 고르는 버튼은 **다시 누르면 끈다** — 지금 선택이 그 칸들 그대로면 켜진 모양 · 누르면 해제(2026-10-02).
   const urgentPicked = isExactCellSelection(selectedKeys, selection.length, urgentCells);
+
+  // 빈 구간 목록(2026-10-29, 데스크톱과 같은 규칙 · 같은 패널) — 요금 칸이 없는 밤은 「안 판다」라 뺀다.
+  const vacantGaps = useMemo(
+    () =>
+      opsVacantGaps({
+        dates,
+        isBlocked: (roomKey, date) =>
+          blockedCells.has(selectionCellKey(roomKey, date)) || rateAt(roomKey, date)?.price == null,
+        isSold: (roomKey, date) => soldCells.has(selectionCellKey(roomKey, date)),
+        minStayAt: (roomKey, date) => rateAt(roomKey, date)?.minStay ?? null,
+        priceAt: (roomKey, date) => rateAt(roomKey, date)?.price ?? null,
+        roomKeys,
+        today,
+      }),
+    [blockedCells, dates, rateAt, roomKeys, soldCells, today],
+  );
+  const [gapLength, setGapLength] = useState<OpsVacantGapLength>("all");
+  const [gapSort, setGapSort] = useState<OpsVacantGapSort>("near");
+  /** 목록에서 고른 구간의 칸 — 지금 선택이 이것 그대로일 때만 가격 시트에 「‹ 빈 구간」. */
+  const [gapPickCells, setGapPickCells] = useState<OpsSelectionCell[] | null>(null);
+  const gapReturn = gapPickCells !== null && isExactCellSelection(selectedKeys, selection.length, gapPickCells);
   const gapsPicked = isExactCellSelection(selectedKeys, selection.length, selectableGaps);
   const openWith = (cells: OpsSelectionCell[], kind: PanelKind) => {
     if (cells.length === 0 || !canWrite) return;
     setScope(EMPTY_SCOPE);
     setSelState({ cells, scopeKeys: new Set() });
     setOverlay({ kind });
+  };
+  const pickVacantGap = (gap: OpsVacantGap) => {
+    if (!canWrite) {
+      setOverlay(null);
+      return;
+    }
+    const cells = opsVacantGapCells(gap);
+    setGapPickCells(cells);
+    openWith(cells, "price");
+  };
+  const roomTitleOf = (roomKey: string) => {
+    const room = rooms.find((candidate) => candidate.key === roomKey);
+    if (!room) return roomKey;
+    return room.displayRoomLabel === room.propertyName
+      ? bName(room.propertyName)
+      : `${bName(room.propertyName)} ${room.displayRoomLabel}`;
   };
 
   // ── 가격 개입 성공(데스크톱과 같은 판정 · 같은 지연 로드) ─────────────────────────
@@ -1512,6 +1551,16 @@ export function MobileOpsCalendar({
         )}
         <button
           aria-haspopup="dialog"
+          className="mops-chip"
+          onClick={() => setOverlay({ kind: "gaps" })}
+          title={copy.vgHint}
+          type="button"
+        >
+          {copy.vgToggle}
+          <b>{vacantGaps.length}</b>
+        </button>
+        <button
+          aria-haspopup="dialog"
           aria-pressed={scopeActive}
           className={`mops-chip${scopeActive ? " on" : ""}`}
           onClick={() => setOverlay({ kind: "scope" })}
@@ -1818,6 +1867,14 @@ export function MobileOpsCalendar({
               이유를 보여 준다. 「선택 해제」도 시트를 닫는다. */}
           {({ close }) =>
             panelKind === "price" ? (
+              <>
+              {gapReturn && (
+                <button className="mops-sheetback" onClick={() => setOverlay({ kind: "gaps" })} type="button">
+                  <ChevronLeft aria-hidden="true" />
+                  {copy.vgBack}
+                  <b>{vacantGaps.length}</b>
+                </button>
+              )}
               <MobileOpsPriceSheet
                 cells={editableCells}
                 copy={copy}
@@ -1834,6 +1891,7 @@ export function MobileOpsCalendar({
                 runWrite={runWrite}
                 scopeSummary={scopeSummary}
               />
+              </>
             ) : panelKind === "minstay" ? (
               <MobileOpsMinStaySheet
                 cells={editableCells.map((cell) => {
@@ -2095,6 +2153,31 @@ export function MobileOpsCalendar({
           <div className="adm ops mops-panel mops-side">
             <OpsHistoryPanel canWrite={canWrite} copy={copy} onClose={close} />
           </div>
+          )}
+        </BottomSheet>
+      )}
+
+      {overlay?.kind === "gaps" && (
+        <BottomSheet ariaLabel={copy.vgTitle} className="flex max-h-[88dvh] flex-col" onClose={() => setOverlay(null)}>
+          {({ close }) => (
+            <div className="adm ops mops-panel mops-side">
+              <OpsVacantGapsPanel
+                copy={copy}
+                gaps={vacantGaps}
+                length={gapLength}
+                localeTag={copy.localeTag}
+                onClose={close}
+                onLength={setGapLength}
+                onPick={pickVacantGap}
+                onSort={setGapSort}
+                propertyOf={(roomKey) => bName(rooms.find((room) => room.key === roomKey)?.propertyName ?? "")}
+                roomKeys={roomKeys}
+                roomTitle={roomTitleOf}
+                sort={gapSort}
+                today={today}
+                windowLabel={opsWindowLabel(days)}
+              />
+            </div>
           )}
         </BottomSheet>
       )}

@@ -694,3 +694,11 @@
   .mops-wseg > button:active,
   .mops-scope__days > button:active { transform: none; }
 }
+
+/* 빈 구간 목록에서 가격 시트로 들어왔을 때만 — 시트 맨 위 「‹ 빈 구간 N」(2026-10-29). */
+.mops-sheetback {
+  flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 0 -6px 12px;
+  padding: 0 8px 0 4px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #7a52e6;
+}
+.mops-sheetback svg { width: 18px; height: 18px; }
+.mops-sheetback b { font-weight: 600; font-variant-numeric: tabular-nums; }

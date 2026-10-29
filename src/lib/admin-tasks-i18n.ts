@@ -212,6 +212,7 @@ export type AdminTasksDictionary = {
   recurSkippedToast: string;
   skDaysTitle: string;
   skDaysRange: string;
+  skDaysUpcomingTitle: string;
   skDaysMore: string;
   skDaysMoreOne: string;
   skDaysRestore: string;
@@ -548,7 +549,7 @@ const ko: AdminTasksDictionary = {
   recurDeleteTitle: "반복되는 작업입니다", recurSkipOne: "{date}만 건너뛰기",
   recurSkipOneSub: "이 날짜만 넘어가고 반복은 계속됩니다", recurDeleteAll: "반복 전체 삭제",
   recurDeleteAllSub: "모든 날짜에서 사라집니다", recurSkippedToast: "{date} 건너뜀",
-  skDaysTitle: "건너뛴 날", skDaysRange: "최근 30일", skDaysMore: "{count}개 더 보기", skDaysMoreOne: "1개 더 보기", skDaysRestore: "되살리기", skDaysRestoreFor: "{date} 되살리기", skDaysRestoredToast: "{date}을 되살렸어요", skDaysSkipAgain: "다시 건너뛰기",
+  skDaysTitle: "건너뛴 날", skDaysRange: "최근 30일", skDaysUpcomingTitle: "앞으로 건너뛸 날", skDaysMore: "{count}개 더 보기", skDaysMoreOne: "1개 더 보기", skDaysRestore: "되살리기", skDaysRestoreFor: "{date} 되살리기", skDaysRestoredToast: "{date}을 되살렸어요", skDaysSkipAgain: "다시 건너뛰기",
   instrRecv: "받은 지시", instrSent: "보낸 지시",
   instrSentNote: "지시한 업무는 대상자의 일정으로 잡힙니다. 내 “오늘” 목록에는 들어오지 않고, 이 화면에서 진행 상황만 챙깁니다.",
   instrRecvNote: "나에게 부여된 업무입니다. 내 “오늘 · 캘린더”에도 함께 표시되며, 상황을 바꾸면 지시한 사람에게 바로 공유됩니다.",
@@ -688,7 +689,7 @@ const ja: AdminTasksDictionary = {
   recurDeleteTitle: "繰り返しのタスクです", recurSkipOne: "{date}のみスキップ",
   recurSkipOneSub: "この日だけ飛ばし、繰り返しは続きます", recurDeleteAll: "繰り返しを全て削除",
   recurDeleteAllSub: "全ての日付から消えます", recurSkippedToast: "{date} をスキップ",
-  skDaysTitle: "スキップした日", skDaysRange: "直近30日", skDaysMore: "さらに{count}件を表示", skDaysMoreOne: "さらに1件を表示", skDaysRestore: "元に戻す", skDaysRestoreFor: "{date}を元に戻す", skDaysRestoredToast: "{date}を元に戻しました", skDaysSkipAgain: "もう一度スキップ",
+  skDaysTitle: "スキップした日", skDaysRange: "直近30日", skDaysUpcomingTitle: "今後スキップする日", skDaysMore: "さらに{count}件を表示", skDaysMoreOne: "さらに1件を表示", skDaysRestore: "元に戻す", skDaysRestoreFor: "{date}を元に戻す", skDaysRestoredToast: "{date}を元に戻しました", skDaysSkipAgain: "もう一度スキップ",
   instrRecv: "受けた指示", instrSent: "送った指示",
   instrSentNote: "指示した業務は対象者の日程に入ります。自分の「今日」には入らず、この画面で進捗のみ確認します。",
   instrRecvNote: "自分に付与された業務です。自分の「今日 · カレンダー」にも表示され、状態を変えると指示者にすぐ共有されます。",
@@ -828,7 +829,7 @@ const en: AdminTasksDictionary = {
   recurDeleteTitle: "This task repeats", recurSkipOne: "Skip {date} only",
   recurSkipOneSub: "Skips this date; the series keeps running", recurDeleteAll: "Delete the whole series",
   recurDeleteAllSub: "Removes it from every date", recurSkippedToast: "Skipped {date}",
-  skDaysTitle: "Skipped days", skDaysRange: "Last 30 days", skDaysMore: "Show {count} more", skDaysMoreOne: "Show 1 more", skDaysRestore: "Restore", skDaysRestoreFor: "Restore {date}", skDaysRestoredToast: "Restored {date}", skDaysSkipAgain: "Skip again",
+  skDaysTitle: "Skipped days", skDaysRange: "Last 30 days", skDaysUpcomingTitle: "Upcoming skips", skDaysMore: "Show {count} more", skDaysMoreOne: "Show 1 more", skDaysRestore: "Restore", skDaysRestoreFor: "Restore {date}", skDaysRestoredToast: "Restored {date}", skDaysSkipAgain: "Skip again",
   instrRecv: "Received", instrSent: "Sent",
   instrSentNote: "Directives land on the recipient's schedule. They don't enter your Today; track progress here.",
   instrRecvNote: "Assigned to you. Also shown in your Today · Calendar; status changes are shared back to the sender.",

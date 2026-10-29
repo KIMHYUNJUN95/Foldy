@@ -10,7 +10,7 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { canEditTaskCore, getShareableUsers, getTaskDetail, taskAnchorDate } from "@/lib/tasks";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { occurrenceStatesForTask } from "@/lib/task-occurrences";
-import { selectRecentSkippedDays } from "@/lib/task-skipped-days";
+import { selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
 import { isRecurringOccurrenceDate, isStandardRecurrence } from "@/lib/tasks-recurrence";
 import { tokyoToday } from "@/lib/tokyo-date";
 
@@ -82,6 +82,10 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
   const skippedDays = isStandardRecurrence(task.recurrenceRule)
     ? selectRecentSkippedDays(occurrenceStates, tokyoToday())
     : [];
+  // 「앞으로 건너뛸 날」(2026-10-29) — 미리 건너뛰어 둔 회차, 가까운 날부터.
+  const upcomingSkippedDays = isStandardRecurrence(task.recurrenceRule)
+    ? selectUpcomingSkippedDays(occurrenceStates, tokyoToday())
+    : [];
   const returnView = ["today", "tomorrow", "calendar"].includes(query.view ?? "")
     ? (query.view as "today" | "tomorrow" | "calendar")
     : "today";
@@ -113,6 +117,7 @@ export default async function MobileTaskDetailPage({ params, searchParams }: Pag
         projectTitle={projectTitle}
         returnView={returnView}
         skippedDays={skippedDays}
+        upcomingSkippedDays={upcomingSkippedDays}
         task={task}
         users={users}
       />

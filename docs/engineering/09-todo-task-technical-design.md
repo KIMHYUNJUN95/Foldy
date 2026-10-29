@@ -1102,6 +1102,14 @@ Task-level images:
   still lists it in `image_urls`** (soft-deleted rows count). This closes «attach a colleague's photo URL,
   save, then remove it → their file is deleted». If the reference check errors, nothing is deleted
   (fail closed). Regression: `src/lib/__tests__/task-images-org-guard.test.ts`.
+- **Project delete also removes memo photos (2026-10-29).** Deleting a project cascades `projects → tasks →
+  task_updates` rows, but storage files stayed. `collectProjectImageUrls` (`task-images.ts`, shared by mobile
+  `deleteProject` and console `deleteConsoleProject`) collects, *before* the delete, both task photos and memo
+  (`task_updates.image_urls`) photos of the project's tasks (soft-deleted included). After the delete,
+  `cleanupRemovedTaskImages` handles task photos and the new `cleanupRemovedTaskUpdateImages` handles memo
+  photos — only `{org}/task-update-images/` objects no remaining `task_updates` row still lists; reference-check
+  error → nothing deleted. Section delete stays a soft delete (restorable), so it does not touch files.
+  Regression: `src/lib/__tests__/task-project-delete-images.test.ts`.
 
 Update-log images:
 

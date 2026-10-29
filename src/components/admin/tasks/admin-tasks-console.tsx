@@ -139,7 +139,7 @@ import type { ProjectDetailData } from "@/lib/projects";
 import type { OccurrenceStateRecord, TaskDetail, TaskRecord } from "@/lib/tasks";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { haptic } from "@/lib/haptics";
-import { SKIPPED_DAYS_VISIBLE, selectRecentSkippedDays } from "@/lib/task-skipped-days";
+import { SKIPPED_DAYS_VISIBLE, selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
 import { shiftMonthKey } from "@/components/admin/shared/admin-month-key";
 import { compressImageFile } from "@/components/announcements/announcement-image-uploader";
 import { ProgressRing, TaskRing, ViewNav, type NavItem } from "./atw-parts";
@@ -3980,35 +3980,49 @@ export function AdminTasksConsole({
 
           {recurring &&
             (() => {
-              const days = selectRecentSkippedDays(occByTask.get(t.id) ?? [], tokyoToday());
-              if (days.length === 0) return null;
+              const states = occByTask.get(t.id) ?? [];
+              const days = selectRecentSkippedDays(states, tokyoToday());
+              // 「앞으로 건너뛸 날」(2026-10-29) — 미리 건너뛰어 둔 회차, 지난 날 위에 따로.
+              const upcoming = selectUpcomingSkippedDays(states, tokyoToday());
+              if (days.length === 0 && upcoming.length === 0) return null;
               const open = skExpanded.has(t.id);
               const more = Math.max(0, days.length - SKIPPED_DAYS_VISIBLE);
+              const skRow = (day: string) => (
+                <div
+                  key={day}
+                  className="row-collapse"
+                  data-leaving={skLeaving.has(`${t.id}|${day}`) ? "" : undefined}
+                >
+                  <div className="atw-d__skr">
+                    <span>{fmtLong(day, locale)}</span>
+                    <button
+                      type="button"
+                      className="atw-d__skb"
+                      aria-label={fill(dict.skDaysRestoreFor, { date: fmtLong(day, locale) })}
+                      onClick={() => restoreSkippedDay(t, day)}
+                    >
+                      {dict.skDaysRestore}
+                    </button>
+                  </div>
+                </div>
+              );
               return (
                 <section className="atw-d__sk" aria-label={dict.skDaysTitle}>
-                  <div className="atw-d__skh">
-                    <b>{dict.skDaysTitle}</b>
-                    <span>{dict.skDaysRange}</span>
-                  </div>
-                  {(open ? days : days.slice(0, SKIPPED_DAYS_VISIBLE)).map((day) => (
-                    <div
-                      key={day}
-                      className="row-collapse"
-                      data-leaving={skLeaving.has(`${t.id}|${day}`) ? "" : undefined}
-                    >
-                      <div className="atw-d__skr">
-                        <span>{fmtLong(day, locale)}</span>
-                        <button
-                          type="button"
-                          className="atw-d__skb"
-                          aria-label={fill(dict.skDaysRestoreFor, { date: fmtLong(day, locale) })}
-                          onClick={() => restoreSkippedDay(t, day)}
-                        >
-                          {dict.skDaysRestore}
-                        </button>
+                  {upcoming.length > 0 && (
+                    <>
+                      <div className="atw-d__skh">
+                        <b>{dict.skDaysUpcomingTitle}</b>
                       </div>
+                      {upcoming.map(skRow)}
+                    </>
+                  )}
+                  {days.length > 0 && (
+                    <div className="atw-d__skh">
+                      <b>{dict.skDaysTitle}</b>
+                      <span>{dict.skDaysRange}</span>
                     </div>
-                  ))}
+                  )}
+                  {(open ? days : days.slice(0, SKIPPED_DAYS_VISIBLE)).map(skRow)}
                   {!open && more > 0 && (
                     <button
                       type="button"

@@ -1675,6 +1675,10 @@ Design in this order:
 - 서버 가드: `clearSkippedOccurrenceState` — `state = 'skipped'` 일 때만 지운다. 토스트 «실행 취소» 도 같은 함수를 쓰므로,
   그 사이 같은 회차가 완료됐다면 완료를 풀지 않는다.
 - 선택 로직은 순수 함수 `selectRecentSkippedDays` (`src/lib/task-skipped-days.ts`, 테스트 `task-skipped-days.test.ts`).
+- **2026-10-29 「앞으로 건너뛸 날」** — 오늘 뒤의 날을 미리 건너뛰어 둔 경우, 같은 구역 맨 위에 「앞으로 건너뛸 날」 묶음을 따로 둔다
+  (머리 줄은 제목만, 가까운 날부터 전부, 줄 · 「되살리기」 · 토스트는 위와 같다). 지난 날과 섞지 않는 이유: 「최근 30일」 표시가 틀려진다.
+  앞날을 되살리면 그냥 평소 회차로 돌아간다(밀림 아님). 두 묶음 사이는 20px 띄움, 세로줄 없음. 선택은 `selectUpcomingSkippedDays`.
+  문구 `tasks.skippedDaysUpcomingTitle` · 콘솔 `skDaysUpcomingTitle`(ko 「앞으로 건너뛸 날」 · ja 「今後スキップする日」 · en 「Upcoming skips」).
 
 모바일 작업 상세의 `…` 옵션 메뉴는 메뉴와 트리거 바깥을 누르면 즉시 닫힌다. 바깥 화면의 원래
 동작은 막지 않으며, 키보드 사용 시 `Escape` 로도 닫을 수 있다.
@@ -1875,3 +1879,5 @@ Design in this order:
   **화면으로 열면** 셸의 760px 대체 폭 대신 **가운데 540px 한 줄**로 그린다(버그 신고 · 제안함과 같은 폭).
 - 태블릿 가로에서 목록 줄을 눌러 **칸에 열린 상세 · 수정**(`html[data-pane]`)은 칸 폭을 그대로 쓴다 — 바뀐 것 없음.
 - 폰(< 600px)은 그대로. CSS 한 곳: `src/components/tasks/tasks-white.css` 「폴드 · 태블릿 — 상세 · 새 할 일 · 수정」.
+- **2026-10-29 없는 날짜 · 시각 문구** — 모바일 새 할 일 · 수정에서 「2026-02-31」 · 「25:00」 같은 값은 일반 「저장에 실패했습니다」 대신
+  `tasks.errors.invalid_date`(「없는 날짜나 시각이에요. 다시 확인해 주세요.」, ja · en 함께)로 되돌린다. 서버 오류 코드 `invalid_date`.

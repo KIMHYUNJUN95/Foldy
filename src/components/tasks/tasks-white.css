@@ -540,5 +540,6 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
 .tkw-sk__h span { font-size: 12px; color: var(--text-3); }
 .tkw-sk__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-size: 14px; color: #16141f; border-top: 0.5px solid var(--separator); }
 .tkw-sk__h + .row-collapse .tkw-sk__row { border-top: 0; }
+.tkw-sk .row-collapse + .tkw-sk__h { padding-top: 20px; }
 .tkw-sk__btn { min-height: 44px; padding: 0 0 0 12px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #7a52e6; cursor: pointer; white-space: nowrap; }
 .tkw-sk__more { align-self: flex-start; padding-left: 0; border-top: 0.5px solid var(--separator); width: 100%; text-align: left; }

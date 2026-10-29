@@ -5628,6 +5628,7 @@ const FALLBACK_DICTIONARY = {
     recurSkippedToastMobile: "Occurrence skipped",
     skippedDaysTitle: "Skipped days",
     skippedDaysRange: "Last 30 days",
+    skippedDaysUpcomingTitle: "Upcoming skips",
     skippedDaysMore: "Show {count} more",
     skippedDaysMoreOne: "Show 1 more",
     skippedDaysRestore: "Restore",
@@ -5971,6 +5972,7 @@ const FALLBACK_DICTIONARY = {
       upload_failed: "Photo upload failed. Please try again.",
       time_needs_date: "Pick a scheduled or due date before setting a time.",
       repeat_needs_date: "Pick a scheduled or due date before turning on repeat.",
+      invalid_date: "That date or time doesn't exist. Check it and try again.",
     } as Record<string, string>,
   },
   linenReturn: {
@@ -14127,6 +14129,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       recurSkippedToastMobile: "회차를 건너뛰었습니다",
       skippedDaysTitle: "건너뛴 날",
       skippedDaysRange: "최근 30일",
+      skippedDaysUpcomingTitle: "앞으로 건너뛸 날",
       skippedDaysMore: "{count}개 더 보기",
       skippedDaysMoreOne: "1개 더 보기",
       skippedDaysRestore: "되살리기",
@@ -14469,6 +14472,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         upload_failed: "사진 업로드에 실패했습니다. 다시 시도해주세요.",
         time_needs_date: "시간을 설정하기 전에 예정일이나 마감일을 먼저 선택하세요.",
         repeat_needs_date: "반복을 설정하기 전에 예정일이나 마감일을 먼저 선택하세요.",
+        invalid_date: "없는 날짜나 시각이에요. 다시 확인해 주세요.",
       },
     },
     linenReturn: {
@@ -22549,6 +22553,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
       recurSkippedToastMobile: "この回をスキップしました",
       skippedDaysTitle: "スキップした日",
       skippedDaysRange: "直近30日",
+      skippedDaysUpcomingTitle: "今後スキップする日",
       skippedDaysMore: "さらに{count}件を表示",
       skippedDaysMoreOne: "さらに1件を表示",
       skippedDaysRestore: "元に戻す",
@@ -22891,6 +22896,7 @@ const localeOverrides: Record<Locale, DeepPartial<typeof FALLBACK_DICTIONARY>> =
         upload_failed: "写真のアップロードに失敗しました。もう一度お試しください。",
         time_needs_date: "時間を設定する前に、予定日または締切日を選択してください。",
         repeat_needs_date: "繰り返しを設定する前に、予定日または締切日を選択してください。",
+        invalid_date: "存在しない日付または時刻です。確認してもう一度お試しください。",
       },
     },
     linenReturn: {

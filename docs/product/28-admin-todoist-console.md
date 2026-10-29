@@ -104,6 +104,7 @@
 에서 `selectRecentSkippedDays` 로 고른다(추가 조회 없음). 되살리기는 `unskipConsoleOccurrence`(건너뜀일 때만 지움)이고
 성공하면 하단 실행 취소 막대가 「{날짜}을 되살렸어요 · 다시 건너뛰기」로 뜬다(`showUndo` 에 단추 이름 인자 추가).
 카피는 `admin-tasks-i18n.ts` 의 `skDays*`. 상세는 `docs/product/18-todo-task-workflow.md` 「건너뛴 날」.
+2026-10-29: 미리 건너뛰어 둔 앞날은 같은 구역 위에 「앞으로 건너뛸 날」(`skDaysUpcomingTitle`) 묶음으로 따로, 가까운 날부터.
 
 ## 2026-08-07 mobile recurring-delete parity
 

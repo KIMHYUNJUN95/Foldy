@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectRecentSkippedDays } from "@/lib/task-skipped-days";
+import { selectRecentSkippedDays, selectUpcomingSkippedDays } from "@/lib/task-skipped-days";
 
 describe("selectRecentSkippedDays", () => {
   const today = "2026-10-28";
@@ -37,5 +37,18 @@ describe("selectRecentSkippedDays", () => {
 
   it("없으면 빈 배열", () => {
     expect(selectRecentSkippedDays([], today)).toEqual([]);
+  });
+});
+
+describe("selectUpcomingSkippedDays", () => {
+  it("오늘 뒤의 건너뜀만, 가까운 날부터", () => {
+    const states: Array<[string, string]> = [
+      ["2026-11-05", "skipped"],
+      ["2026-10-28", "skipped"],
+      ["2026-10-30", "skipped"],
+      ["2026-11-01", "moved"],
+      ["2026-10-20", "skipped"],
+    ];
+    expect(selectUpcomingSkippedDays(states, "2026-10-28")).toEqual(["2026-10-30", "2026-11-05"]);
   });
 });

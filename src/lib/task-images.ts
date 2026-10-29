@@ -108,6 +108,80 @@ export async function cleanupRemovedTaskImages(
   }
 }
 
+/**
+ * 메모(갱신 로그) 사진 정리 — `cleanupRemovedTaskImages` 의 `task-update-images` 판(2026-10-29).
+ * 우리 `${organizationId}/task-update-images/` 객체만, 아직 남은 메모(`task_updates.image_urls`)가 가리키는 파일은 남긴다.
+ * 참조 확인이 실패하면 아무것도 지우지 않는다(남는 파일보다 보이는 사진을 지우는 쪽이 해롭다).
+ */
+export async function cleanupRemovedTaskUpdateImages(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  removedUrls: string[],
+  organizationId: string,
+) {
+  const candidates = [...new Set(removedUrls)].filter((u) =>
+    isOrgTaskImageUrl(u, organizationId, "task-update-images"),
+  );
+  if (candidates.length === 0) return;
+  const { data: refs, error: refError } = await supabase
+    .from("task_updates")
+    .select("image_urls")
+    .overlaps("image_urls", candidates);
+  if (refError) {
+    console.error("[cleanupRemovedTaskUpdateImages] reference check failed:", refError.message);
+    return;
+  }
+  const stillReferenced = new Set(
+    ((refs ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? []),
+  );
+  const paths = candidates
+    .filter((u) => !stillReferenced.has(u))
+    .map((u) => extractRequestImagePath(u))
+    .filter((p): p is string => !!p);
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from(REQUEST_IMAGE_BUCKET).remove(paths);
+  if (error) console.error("[cleanupRemovedTaskUpdateImages] storage remove failed:", error.message);
+}
+
+/**
+ * 프로젝트를 지우기 직전에 — 그 프로젝트 할 일(소프트 삭제된 것 포함)의 할 일 사진과 메모 사진 URL.
+ * cascade 가 tasks · task_updates 행만 지우고 스토리지 파일은 남기므로, 지운 뒤 위 두 정리 헬퍼로 넘긴다.
+ * 모바일 `deleteProject` · 콘솔 `deleteConsoleProject` 가 같이 쓴다. 읽기가 실패하면 그 몫은 빈 목록(파일이 남는 쪽이 안전).
+ */
+export async function collectProjectImageUrls(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  projectId: string,
+  organizationId: string,
+): Promise<{ taskImageUrls: string[]; updateImageUrls: string[] }> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id, image_urls")
+    .eq("project_id", projectId)
+    .eq("organization_id", organizationId);
+  if (error) {
+    console.warn("[collectProjectImageUrls] task read failed:", error.message);
+    return { taskImageUrls: [], updateImageUrls: [] };
+  }
+  const rows = (data ?? []) as Array<{ id: string; image_urls: string[] | null }>;
+  const taskImageUrls = [...new Set(rows.flatMap((r) => r.image_urls ?? []))];
+  const updateImageUrls = new Set<string>();
+  // 주소 길이를 넘지 않게 나눠 읽는다.
+  for (let i = 0; i < rows.length; i += 150) {
+    const ids = rows.slice(i, i + 150).map((r) => r.id);
+    const { data: updates, error: updateError } = await supabase
+      .from("task_updates")
+      .select("image_urls")
+      .in("task_id", ids);
+    if (updateError) {
+      console.warn("[collectProjectImageUrls] update read failed:", updateError.message);
+      return { taskImageUrls, updateImageUrls: [] };
+    }
+    for (const u of ((updates ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? [])) {
+      updateImageUrls.add(u);
+    }
+  }
+  return { taskImageUrls, updateImageUrls: [...updateImageUrls] };
+}
+
 function isHttpUrl(u: string): boolean {
   return u.startsWith("https://") || u.startsWith("http://");
 }

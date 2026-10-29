@@ -130,6 +130,7 @@ export function TaskDetailView({
   projectTitle,
   returnView,
   skippedDays,
+  upcomingSkippedDays,
   task,
   users,
 }: {
@@ -149,6 +150,8 @@ export function TaskDetailView({
   returnView: "today" | "tomorrow" | "calendar";
   /** 최근 30일에 건너뛴 회차(최신순). 반복 업무가 아니면 빈 배열. */
   skippedDays?: string[];
+  /** 오늘 뒤에 미리 건너뛴 회차(가까운 날부터) — 「앞으로 건너뛸 날」 묶음. */
+  upcomingSkippedDays?: string[];
   task: TaskDetail;
   users: ShareableUser[];
 }) {
@@ -571,7 +574,13 @@ export function TaskDetailView({
 
       {/* 비어도 마운트해 둔다 — 마지막 줄을 되살린 뒤에도 「다시 건너뛰기」 토스트가 남아야 한다. */}
       {isRecurring && skippedDays ? (
-        <SkippedDaysSection copy={copy} days={skippedDays} locale={locale} taskId={task.id} />
+        <SkippedDaysSection
+          copy={copy}
+          days={skippedDays}
+          locale={locale}
+          taskId={task.id}
+          upcomingDays={upcomingSkippedDays ?? []}
+        />
       ) : null}
 
       {/* 업데이트 기록 */}

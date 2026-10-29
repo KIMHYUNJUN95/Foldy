@@ -8,7 +8,11 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getShareableUsers } from "@/lib/tasks";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { bestEffortWrite, mustWrite } from "@/lib/db-write-guard";
-import { cleanupRemovedTaskImages } from "@/lib/task-images";
+import {
+  cleanupRemovedTaskImages,
+  cleanupRemovedTaskUpdateImages,
+  collectProjectImageUrls,
+} from "@/lib/task-images";
 import type { Database } from "@/types/database";
 
 type Session = NonNullable<Awaited<ReturnType<typeof getCurrentAppSession>>>;
@@ -53,30 +57,6 @@ async function requireProject(
     redirect(PROJECTS_PATH);
   }
   return { session, project };
-}
-
-/**
- * 프로젝트 할 일(소프트 삭제된 것 포함)이 가진 할 일 단위 사진 URL. 프로젝트를 지우기 직전에 모아
- * 지운 뒤 `cleanupRemovedTaskImages` 로 넘긴다 — 콘솔 `deleteConsoleProject` 와 같은 순서.
- * 읽기가 실패하면 빈 목록(파일이 남는 쪽이 안전하다).
- */
-async function collectProjectTaskImageUrls(
-  supabase: ReturnType<typeof getSupabaseServiceClient>,
-  projectId: string,
-  organizationId: string,
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("image_urls")
-    .eq("project_id", projectId)
-    .eq("organization_id", organizationId);
-  if (error) {
-    console.warn("[deleteProject] image collect failed:", error.message);
-    return [];
-  }
-  return [
-    ...new Set(((data ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? [])),
-  ];
 }
 
 // 요청된 초대 대상을 조직의 활성 구성원과 대조한다(실패 시 막음). 본인은 뺀다.
@@ -163,9 +143,9 @@ export async function deleteProject(formData: FormData) {
     redirect(detailPath(id, "forbidden"));
   }
   const supabase = getSupabaseServiceClient();
-  // 지우기 전에 프로젝트 할 일(소프트 삭제된 것 포함)의 사진 경로를 모은다(2026-10-28) — cascade 가 행만
-  // 지우고 스토리지 파일은 남겨, 아무도 가리키지 않는 사진이 쌓였다.
-  const imageUrls = await collectProjectTaskImageUrls(supabase, id, session.organization.id);
+  // 지우기 전에 프로젝트 할 일(소프트 삭제된 것 포함)의 사진 · 메모 사진 경로를 모은다(2026-10-28 · 메모 사진 2026-10-29) —
+  // cascade 가 행만 지우고 스토리지 파일은 남겨, 아무도 가리키지 않는 사진이 쌓였다.
+  const { taskImageUrls, updateImageUrls } = await collectProjectImageUrls(supabase, id, session.organization.id);
   // cascade 가 참여자, 섹션, 프로젝트 할 일을 지운다(FK on delete cascade).
   // 실패하면 목록으로 보내지 않는다(2026-10-26) — 「지워졌다」고 믿게 한 뒤 다시 나타나는 것을 막는다.
   const deleted = await mustWrite(
@@ -174,7 +154,8 @@ export async function deleteProject(formData: FormData) {
   );
   if (!deleted) redirect(detailPath(id, "delete_failed"));
   // 행이 지워진 뒤에 지운다 — 공용 정리 헬퍼가 «조직의 다른 할 일이 아직 쓰는 파일»은 남긴다.
-  await cleanupRemovedTaskImages(supabase, imageUrls, session.organization.id);
+  await cleanupRemovedTaskImages(supabase, taskImageUrls, session.organization.id);
+  await cleanupRemovedTaskUpdateImages(supabase, updateImageUrls, session.organization.id);
   redirect(PROJECTS_PATH);
 }
 

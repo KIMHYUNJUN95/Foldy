@@ -317,13 +317,13 @@ export async function updateTaskCore(formData: FormData) {
   // 반복에는 날짜 기준이 필요하다. 날짜 없는 반복은 거부하지 않고 오늘로 기준을 잡는다(Todoist 방식).
   if (nextRecurrenceRule && !scheduledDate && !dueDate) scheduledDate = tokyoToday();
   // 비어 있지 않은 날짜 · 시각은 실제로 있는 값이어야 한다(2026-10-28) — 「2026-02-31」 · 「25:00」을 조용히
-  // 버리거나 굴리지 않고 수정 화면으로 되돌린다(새 키 없이 기존 save_failed 문구).
+  // 버리거나 굴리지 않고 수정 화면으로 되돌린다(「없는 날짜나 시각」 문구 invalid_date, 2026-10-29).
   if (
     (scheduledDate && !isValidYmd(scheduledDate)) ||
     (dueDate && !isValidYmd(dueDate)) ||
     (time && !isValidHm(time))
   ) {
-    redirect(`/mobile/tasks/${id}/edit?error=save_failed`);
+    redirect(`/mobile/tasks/${id}/edit?error=invalid_date`);
   }
   // 특정 시각에는 날짜 기준이 필요하다 — 조용히 버리지 않고 거부한다(수정 화면으로 되돌림).
   if (taskTimeWithoutDate({ scheduledDate, dueDate, time })) {

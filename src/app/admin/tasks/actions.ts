@@ -50,6 +50,8 @@ import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { isOwnerOrPlatformDeveloper } from "@/config/roles";
 import {
   cleanupRemovedTaskImages,
+  cleanupRemovedTaskUpdateImages,
+  collectProjectImageUrls,
   isOrgTaskImageUrl,
   mergeTaskImageUrls,
   sanitizeTaskImageUrls,
@@ -163,30 +165,6 @@ async function contextBelongsToOrg(
     roomId: ctx.room_id,
     reservationId: ctx.reservation_id,
   });
-}
-
-/**
- * 프로젝트 할 일(소프트 삭제된 것 포함)이 가진 할 일 단위 사진 URL — 프로젝트를 지우기 직전에 모아 두고,
- * 지운 뒤 `cleanupRemovedTaskImages` 로 넘긴다(2026-10-28, 모바일 `deleteProject` 와 같은 순서).
- * 읽기가 실패하면 빈 목록(파일이 남는 쪽이 안전하다).
- */
-async function collectProjectTaskImageUrls(
-  supabase: ReturnType<typeof getSupabaseServiceClient>,
-  projectId: string,
-  organizationId: string,
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("image_urls")
-    .eq("project_id", projectId)
-    .eq("organization_id", organizationId);
-  if (error) {
-    console.warn("[deleteConsoleProject] image collect failed:", error.message);
-    return [];
-  }
-  return [
-    ...new Set(((data ?? []) as Array<{ image_urls: string[] | null }>).flatMap((r) => r.image_urls ?? [])),
-  ];
 }
 
 /**
@@ -1762,8 +1740,8 @@ export async function deleteConsoleProject(projectId: string): Promise<TaskActio
   if (!project) return { ok: false, error: "not_found" };
   if (!project.viewerCanManage) return { ok: false, error: "forbidden" };
   const supabase = getSupabaseServiceClient();
-  // cascade 는 행만 지우고 스토리지 사진은 남긴다(2026-10-28) — 지우기 전에 경로를 모아 둔다.
-  const imageUrls = await collectProjectTaskImageUrls(supabase, id, session.organization.id);
+  // cascade 는 행만 지우고 스토리지 사진은 남긴다(2026-10-28 · 메모 사진 2026-10-29) — 지우기 전에 경로를 모아 둔다.
+  const { taskImageUrls, updateImageUrls } = await collectProjectImageUrls(supabase, id, session.organization.id);
   const { error } = await supabase
     .from("projects")
     .delete()
@@ -1771,7 +1749,8 @@ export async function deleteConsoleProject(projectId: string): Promise<TaskActio
     .eq("organization_id", session.organization.id);
   if (error) return { ok: false, error: "save_failed" };
   // 행이 지워진 뒤에 지운다 — 공용 헬퍼가 «조직의 다른 할 일이 아직 쓰는 파일»은 남긴다.
-  await cleanupRemovedTaskImages(supabase, imageUrls, session.organization.id);
+  await cleanupRemovedTaskImages(supabase, taskImageUrls, session.organization.id);
+  await cleanupRemovedTaskUpdateImages(supabase, updateImageUrls, session.organization.id);
   revalidatePath(CONSOLE_PATH);
   return { ok: true };
 }

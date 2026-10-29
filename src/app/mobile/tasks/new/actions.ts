@@ -236,7 +236,7 @@ export async function createTask(formData: FormData) {
     (dueDate && !isValidYmd(dueDate)) ||
     (time && !isValidHm(time))
   ) {
-    redirect("/mobile/tasks/new?error=save_failed");
+    redirect("/mobile/tasks/new?error=invalid_date");
   }
   // 특정 시각에는 날짜 기준점이 필요하다 — 조용히 버리지 말고 거절한다.
   if (taskTimeWithoutDate({ scheduledDate, dueDate, time })) {

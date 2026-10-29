@@ -441,6 +441,13 @@ button.tkw-nf__in .tkw-nf__v small { display: block; margin-top: 2px; font-size:
   .split-list[data-split="on"] > .split-list__list:has(.tkw) { border-right: 0; }
 }
 
+/* ── 폴드 · 태블릿 — 상세 · 새 할 일 · 수정을 화면으로 열었을 때(칸 밖) 가운데 540px 한 줄 (2026-10-29) ──
+   버그 신고 · 제안함과 같은 폭. 태블릿 칸(html[data-pane]) 안에서는 칸 폭을 그대로 쓴다. */
+@media (min-width: 600px) {
+  html:not([data-pane]) .tkw-d,
+  html:not([data-pane]) .tkw-form { width: 100%; max-width: 540px; margin-inline: auto; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tkw *, .tkw-sheet *, .tkw-fab, .tkw-selact { animation: none !important; transition: none !important; }
   .tkw-ck.is-checking svg { stroke-dashoffset: 0; }

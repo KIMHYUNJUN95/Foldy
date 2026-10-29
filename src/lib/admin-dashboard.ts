@@ -9,7 +9,6 @@ import { getDisplaySessionRoomLabel, localizeBuildingName, localizeRoomPlaceLabe
 import { getOrgMaintenanceReports } from "@/lib/maintenance-reports";
 import { getOrgLostItems } from "@/lib/lost-found";
 import { getOrgOrderRequests } from "@/lib/order-requests";
-import { getAttendanceReviewQueue, type ReviewQueueItem } from "@/lib/attendance-review";
 import { getVisibleAnnouncements } from "@/lib/announcements";
 import { getVisibleTasks } from "@/lib/tasks";
 import { getHomeCheckInOutReservations, type HomeReservationRow } from "@/lib/home";
@@ -76,11 +75,9 @@ export type AdminDashboardData = {
     checkOuts: number;
     cleaningInProgress: number;
     openRequests: number;
-    attendanceReview: number;
   };
   cleaning: CleaningLive[];
   queue: QueueEntry[];
-  attendance: ReviewQueueItem[];
   notices: NoticeItem[];
   todos: TodoItem[];
   reservations: {
@@ -92,10 +89,9 @@ export type AdminDashboardData = {
 };
 
 const EMPTY: AdminDashboardData = {
-  ops: { occupiedRooms: 0, totalRooms: 0, checkIns: 0, checkOuts: 0, cleaningInProgress: 0, openRequests: 0, attendanceReview: 0 },
+  ops: { occupiedRooms: 0, totalRooms: 0, checkIns: 0, checkOuts: 0, cleaningInProgress: 0, openRequests: 0 },
   cleaning: [],
   queue: [],
-  attendance: [],
   notices: [],
   todos: [],
   reservations: { checkIns: [], checkOuts: [] },
@@ -146,7 +142,6 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     maintenance,
     lost,
     orders,
-    review,
     announcements,
     tasks,
     reservations,
@@ -156,7 +151,6 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
     safe("maintenance", () => getOrgMaintenanceReports(session), []),
     safe("lost", () => getOrgLostItems(session), []),
     safe("orders", () => getOrgOrderRequests(session), []),
-    safe("attendanceReview", () => getAttendanceReviewQueue(session.organization.id, { limit: 8 }), []),
     safe("announcements", () => getVisibleAnnouncements(session), []),
     safe("tasks", () => getVisibleTasks(session), []),
     safe(
@@ -255,11 +249,9 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       checkOuts: todayCounts.checkOuts,
       cleaningInProgress: cleaning.length,
       openRequests: queue.length,
-      attendanceReview: review.length,
     },
     cleaning,
     queue,
-    attendance: review,
     notices,
     todos,
     reservations: resvLists,

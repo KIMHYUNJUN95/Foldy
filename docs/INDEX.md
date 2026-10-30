@@ -73,6 +73,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Permission Override Workflow](./product/27-permission-override-workflow.md) | Living | Time-bound per-user feature permission exceptions |
 | [Admin Todoist Console](./product/28-admin-todoist-console.md) | Living | Desktop Todoist/task operations console |
 | [Expense Receipt Workflow](./product/29-expense-receipt-workflow.md) | Draft | Transportation-adjacent expense receipt planning |
+| [Self Check-in Kiosk](./product/43-self-checkin-kiosk.md) | Draft | Building-tablet self check-in under Shinjuku ryokan rules (planning, decisions pending) |
 
 ## Design Docs
 

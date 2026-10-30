@@ -74,6 +74,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Admin Todoist Console](./product/28-admin-todoist-console.md) | Living | Desktop Todoist/task operations console |
 | [Expense Receipt Workflow](./product/29-expense-receipt-workflow.md) | Draft | Transportation-adjacent expense receipt planning |
 | [Self Check-in Kiosk](./product/43-self-checkin-kiosk.md) | Draft | Building-tablet self check-in — decision record (23 decisions, Hotelsmart survey) |
+| [Self Check-in QA · Rollout Plan](./planning/20-self-checkin-qa-rollout-plan.md) | Draft | QA gates, device checklist, pilot → all buildings, staff ops guide, schedule |
 | [Self Check-in PRD](./product/44-self-checkin-prd.md) | Draft | Requirements (FR/NFR), personas, journeys, KPIs, risks, acceptance criteria |
 
 ## Design Docs

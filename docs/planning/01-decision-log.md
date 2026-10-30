@@ -11,6 +11,7 @@ This file records important project decisions.
 ## 2026-10-30 셀프 체크인 — 만드는 자리 C · 본인 확인 동영상 · 사전 등록 (사용자)
 
 - **C**: 같은 저장소 `apps/checkin/` 에 독립 Next.js 앱, 같은 Supabase 의 **새 스키마 `checkin`**, Vercel 프로젝트 · 도메인 · Capacitor Android 앱 따로. **기존 Foldy 에 충돌 · 문제가 생기면 안 된다**(절대 조건) — 루트는 tsconfig `exclude` · eslint ignore 두 줄만, `public` 표는 읽기만, 직원 화면은 추가만. 43 §8-9.
+- **태블릿 앱 스택 = B, Kotlin · Jetpack Compose 순수 네이티브**(사용자 「B로 확정」) — 근거는 여권 초점(CameraX) · MRZ 자동 판독(ML Kit) · 동영상 · Device Owner 잠금 · 오프라인 큐. NFC 는 1차 제외(법 요건 아님 · 기기 미확인). 사전 등록은 Next.js 웹, 백엔드는 `apps/checkin` 라우트 + Supabase. 16 §1-0.
 - 본인 확인 첫 버전 = Hotelsmart 와 같은 **확인 동영상 촬영 저장**(5초 × 인원) + 직원 알림. 명부는 **도착 전 링크로 미리 + 태블릿에서 동영상 마무리**. 예약 찾기 = 6자리 코드 + 이름 · 날짜. 체크인 완료는 Foldy 안에서만(Beds24 쓰기 없음). 43 §8-6~8-10.
 
 ## 2026-10-28 할 일 결정 3가지 — 관리함 · 프로젝트에서 빠진 사람 · 건너뛴 날 (사용자 「추천대로」 → 「전부 구현 시작하자」)

@@ -73,7 +73,8 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Permission Override Workflow](./product/27-permission-override-workflow.md) | Living | Time-bound per-user feature permission exceptions |
 | [Admin Todoist Console](./product/28-admin-todoist-console.md) | Living | Desktop Todoist/task operations console |
 | [Expense Receipt Workflow](./product/29-expense-receipt-workflow.md) | Draft | Transportation-adjacent expense receipt planning |
-| [Self Check-in Kiosk](./product/43-self-checkin-kiosk.md) | Draft | Building-tablet self check-in under Shinjuku ryokan rules (planning, decisions pending) |
+| [Self Check-in Kiosk](./product/43-self-checkin-kiosk.md) | Draft | Building-tablet self check-in — decision record (23 decisions, Hotelsmart survey) |
+| [Self Check-in PRD](./product/44-self-checkin-prd.md) | Draft | Requirements (FR/NFR), personas, journeys, KPIs, risks, acceptance criteria |
 
 ## Design Docs
 
@@ -96,6 +97,7 @@ Historical: Retained for decision history but superseded by a newer document or 
 | [Attendance / Payroll Technical Design](./engineering/11-attendance-payroll-technical-design.md) | Living | Implemented attendance and hourly gross-pay technical design |
 | [Staff Suggestions Technical Design](./engineering/12-staff-suggestions-technical-design.md) | Living | Implemented visibility-aware suggestion technical design |
 | [Bug Report Technical Design](./engineering/13-bug-report-technical-design.md) | Living | Implemented bug-report schema, RLS, actions, and notification design |
+| [Self Check-in Technical Design](./engineering/16-self-checkin-technical-design.md) | Draft | Kiosk tablet stack (Capacitor + Kotlin plugins), checkin schema, API, native plugins |
 
 ## Archive
 

@@ -205,6 +205,8 @@ Implementation note:
     탭**하면 켜고 끈다(그 기기 localStorage `stayops:swipe-debug`). 화면 위에 빌드(`NEXT_PUBLIC_BUILD_SHA` — Vercel 커밋 앞 7자리) ·
     standalone 여부 · 기록 번호 · 돌아갈 곳 · 최근 터치 8개를 왜 받았는지/안 받았는지(메뉴 첫 화면 · 열린 시트 · 막힌 대상 · 갈 곳 없음 · 앱 밖으로 나감 ·
     판정 전 놓음 · 세로로 거절 · 막을 수 없는 touchmove · 놓을 때 거리/속도)를 띄운다. 개발자용이라 번역하지 않는다. 꺼져 있으면 비용 0.
+    **운영 빌드에서는 켤 수 없다(2026-10-31)** — 갤럭시 폴드를 펼쳐 잡다 손가락 세 개가 닿아 우연히 켜지고 저장돼 계속 떴다. 개발 빌드에서만 켜지고,
+    운영에서 다시 필요하면 `NEXT_PUBLIC_SWIPE_DEBUG=1` 로 빌드한다. 운영에서는 예전에 저장된 `stayops:swipe-debug` 값도 지운다.
     홈 화면 앱은 SW 가 HTML 을 stale-while-revalidate 로 내준다. 2026-10-19 부터 옛 배포의 저장본은 그리지 않지만, 이름표 확인이 1.5초를 넘기면(느린 망) 옛 빌드가 뜰 수 있어 빌드 표시로 먼저 확인한다.
   - 순수 판정(`history-model.ts` — 갈 곳 · 위 화면 · 방향 잠금 · 따라잡기 · 놓을 때 판정 · 마무리 곡선)은
     `src/lib/__tests__/swipe-back.test.ts`. 화면 목록(`mobile-screens.ts`)이 `src/app/mobile` 과 다르면 테스트가 실패한다.

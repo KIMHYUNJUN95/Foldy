@@ -5,6 +5,9 @@
  * 켜고 끈다(이 기기에만 저장). 켜져 있으면 화면 위쪽에 지금 빌드 · 기록 번호 · 돌아갈 곳 · 마지막 터치를 왜 받았는지/
  * 안 받았는지를 띄운다 — 「반응 없음」을 기기에서 바로 원인으로 좁히려는 것. 꺼져 있으면 아무것도 그리지 않는다.
  *
+ * 운영 빌드에서는 꺼 둔다(2026-10-31) — 폴드를 펼쳐 잡다 손가락 세 개가 닿아 직원 기기에 우연히 켜지고, 저장돼서 계속 떴다.
+ * 개발 빌드(`npm run dev`)에서만 켤 수 있고, 운영에서 다시 필요하면 `NEXT_PUBLIC_SWIPE_DEBUG=1` 로 빌드한다.
+ *
  * 문서: docs/product/16-mobile-navigation.md 「뒤로가기 — 화면 스와이프」 → 진단 표시
  */
 
@@ -12,12 +15,14 @@ import { getBackTarget, getHistoryIndex } from "./history-tracker";
 
 const STORAGE_KEY = "stayops:swipe-debug";
 const BUILD = process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev";
+const ALLOWED = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SWIPE_DEBUG === "1";
 
 let enabled: boolean | null = null;
 let panel: HTMLDivElement | null = null;
 const lines: string[] = [];
 
 function isEnabled(): boolean {
+  if (!ALLOWED) return false;
   if (enabled === null) {
     try {
       enabled = window.localStorage.getItem(STORAGE_KEY) === "1";
@@ -62,6 +67,15 @@ export function swipeDebug(message: string) {
 
 /** 세 손가락 탭으로 켜고 끄는 스위치를 단다. 루트에서 한 번만 부른다. */
 export function installSwipeDebugToggle() {
+  if (!ALLOWED) {
+    // 예전 빌드에서 켜 두고 저장된 값을 지운다 — 나중에 다시 허용해도 저절로 켜지지 않게.
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // 저장소가 막힌 기기 — 어차피 그리지 않는다.
+    }
+    return;
+  }
   const onTouchStart = (event: TouchEvent) => {
     if (event.touches.length === 1 && isEnabled()) {
       const inside = event.target instanceof Element && event.target.closest("[data-swipe-surface]");

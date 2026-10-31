@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     // Capacitor 네이티브 프로젝트(iOS · Android). 안의 JS 는 Capacitor 가 복사해 넣는 생성물이다(2026-10-06).
     "android/**",
     "ios/**",
+    // 세션별 작업 트리(.claude/worktrees/*) — 저장소 사본 + 각자의 .next 라 본 저장소 린트에 29만 건이 섞였다(2026-11-01).
+    ".claude/**",
   ]),
 ]);
 

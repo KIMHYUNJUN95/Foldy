@@ -96,6 +96,12 @@ Usage:
 - Invite links
 - PWA metadata if needed
 
+### 린트 범위 — 세션 작업 트리 제외 (2026-11-01)
+
+`eslint.config.mjs` 의 `globalIgnores` 에 `.claude/**` 를 둔다. 세션별 작업 트리(`.claude/worktrees/*`)는 저장소 사본과
+각자의 `.next` 를 품고 있어서, 본 저장소에서 `npm run lint` 를 돌리면 그 안까지 검사해 29만 건으로 실패했다.
+`ios/**` · `android/**` · `.handoff/**` 와 같은 이유로 뺀다 — 앱 코드 검사 범위는 그대로다.
+
 ### Local Dev Tools
 
 Optional local-only gate:

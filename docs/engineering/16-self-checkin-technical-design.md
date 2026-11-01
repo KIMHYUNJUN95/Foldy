@@ -98,7 +98,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 ```
 
 - 손님 쪽 트래픽은 전부 `apps/checkin` 도메인(API 포함). 태블릿 앱도 같은 API 를 기기 토큰으로 부른다. Foldy 도메인에는 손님 · 기기 경로가 없다.
-- **Beds24 쓰기는 Info 항목 1종만**(44 §14-5): `apps/checkin` 이 Beds24 토큰을 **읽기 전용 + bookings 쓰기** 범위로 따로 발급받아 환경 변수에 둔다(Foldy 의 토큰과 공유하지 않음).
+- **Beds24 API 호출 0 — 읽기 · 쓰기 모두 안 함**(2026-11-01, 44 §14-6): 예약은 Foldy 웹훅이 채운 `public.reservations` 에서만 읽는다(크레딧 0). `apps/checkin` 은 Beds24 토큰을 갖지 않는다. ~~Info 항목 1종 쓰기(44 §14-5)~~ 는 1차 제외.
 - `public` 스키마는 **읽기 전용**(`reservations` · `properties` · `rooms` · `property_operation_infos`). `checkin` → `public` FK 없음(id 값만 저장).
 - **계약(contract) 하나**: 명부 칸 · 필수(국적 · 일본 주소 여부에 따라) · 어린이 규칙 · 막는 경우 코드 · 문구 4개 언어 · 약관 버전 · 동영상 초를 서버가 `GET /api/kiosk/settings`(기기) · `GET /api/guest/[token]`(손님) 에 JSON 으로 담아 준다. 태블릿(Compose) 과 웹(React) 은 **그리기와 입력만** 하고, 검증의 최종 판정은 서버(`PUT guests` 가 계약으로 다시 검사). 계약 스키마는 `apps/checkin/src/lib/contract/schema.ts`(zod) 가 원본이고, Kotlin 모델은 그 JSON 과 1:1(수동 유지 · 계약 버전 번호로 호환성 검사).
 
@@ -137,7 +137,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `POST /api/kiosk/complete` | 태블릿 | 기기 토큰 + 세션 | 동의 · 전원 명부 · 동영상 검증 → `checked_in` · 방 번호 · 비밀번호(`property_operation_infos`) 반환 |
 | `POST /api/guest/claim` | 손님 웹(건물 고정 링크 `/p/<건물>`) | 없음(공개) — 이름 + 체크인 날짜 + 전화 뒤 4자리/OTA 예약 번호 3요소 | 일치하는 stay 가 **하나**면 토큰 발급(원문 1회) · IP · 건물당 속도 제한 · 5회 실패 10분 잠금 · 불일치 시 어떤 것이 틀렸는지 말하지 않음 |
 | `GET /api/guest/[token]` · `PUT …/guests` · `POST …/consent` | 손님 웹 | 링크 토큰 | 사전 등록(계약 JSON 포함) · 저장 · 동의(체크인 뒤 잠금) |
-| `POST /api/jobs/sync-stays` · `/retention` · `/remind` | 크론 | 크론 비밀값 | 동기화 · 자동 삭제 · 리마인드. **`sync-stays` 는 stay 를 만든 뒤 Beds24 에 `POST /bookings {id, infoItems:[{code:"FOLDY_CHECKIN", text}]}` 1회**(Foldy 루트 `src/lib/beds24/calendar-client.ts` 의 수정 호출과 같은 토큰 · 재시도 규칙을 **복사**해 `apps/checkin` 안에 둔다 — 루트 코드 import 없음). 실패는 `stays.beds24_info_synced_at` 비움 + 다음 틱 재시도, 체크인에는 영향 없음 |
+| `POST /api/jobs/sync-stays` · `/retention` · `/remind` | 크론 | 크론 비밀값 | 동기화 · 자동 삭제 · 리마인드. `sync-stays` 는 우리 DB(`public.reservations`)만 읽어 stay 를 만든다 — **Beds24 호출 없음**(2026-11-01, 44 §14-6). ~~stay 생성 뒤 Beds24 Info 항목 쓰기 · `stays.beds24_info_synced_at`~~ 는 1차 제외 |
 | Foldy `src/actions/checkin/*` | 직원 | Foldy 세션 + `checkin.*` | 현황 · 열람(서명 URL 1~5분, audit) · 확인함 · 대리 입력 · 내보내기 · 기기 · 건물 설정 |
 
 - 속도 제한: `find` 기기당 분당 20회, `guest/[token]` IP 당 분당 30회, `enroll` 분당 5회. 토큰 32바이트 랜덤 · DB 엔 sha256. 모든 응답에 `contract_version`.

@@ -8,6 +8,7 @@ import {
 } from "@/components/admin/cleaning/cleaning-console-data";
 import {
   cleaningOperatingTimeZone,
+  getCleaningOperatingDateKey,
   getCleaningStaffOptions,
   getOrgCleaningSessionsFiltered,
   getOrgTodayCleaningSessions,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/cleaning";
 import { getCleaningTargets, type SettingTarget } from "@/lib/cleaning-targets";
 import { isUnmeasuredSession, type UnmeasuredSessionLike } from "@/lib/cleaning-unmeasured";
+import { roomShareState, sessionRoomKeyLookup } from "@/lib/cleaning-assign/room-key";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { CleaningExportFilters } from "@/lib/export/cleaning-filters";
 import {
   buildLegacyAliasToRoomKeyMap,
@@ -43,6 +46,22 @@ import type { AppSession } from "@/lib/session";
 /** 끝낸 시각을 모르는 기록 — 「처리 끝」, 또는 알바가 다음 날 「청소했어요」로 닫은 기록(`isUnmeasuredSession`, 2026-11-02). */
 function endUnknown(row: UnmeasuredSessionLike): boolean {
   return Boolean(row.closed_without_cleaning) || isUnmeasuredSession(row);
+}
+
+/** 방 기록 → 사람마다 하나(`AdminCleaningTask.workers`). 기록은 started_at 내림차순으로 온다. */
+function workersOf(sessions: CleaningSessionRow[]): AdminCleaningTask["workers"] {
+  const byStaff = new Map<string, CleaningSessionRow>();
+  for (const s of sessions) {
+    if (s.closed_without_cleaning || (s.status !== "in_progress" && s.status !== "completed")) continue;
+    const prev = byStaff.get(s.staff_user_id);
+    if (!prev || (s.status === "in_progress" && prev.status !== "in_progress")) byStaff.set(s.staff_user_id, s);
+  }
+  return [...byStaff.values()].map((s) => ({
+    staffId: s.staff_user_id,
+    status: s.status === "in_progress" ? "progress" : "done",
+    start: formatTokyoTime(s.started_at),
+    end: s.status === "completed" && !endUnknown(s) ? formatTokyoTime(s.completed_at) : null,
+  }));
 }
 export type AdminCleaningStatus = "pending" | "progress" | "done" | "cancelled";
 
@@ -73,6 +92,21 @@ export type AdminCleaningTask = {
   closed: boolean;
   /** 끝낸 시각 모르는 완료 기록(알바가 다음 날 「청소했어요」로 닫음) — 강제 완료로 시각을 채울 수 있다(서버도 같은 판별). */
   unmeasured: boolean;
+  /**
+   * 2인 방에서 아직 기록이 없는 배정 직원(2026-11-02 점검 C1 — 각자 기록). 방이 「끝남」이어도 이 사람 몫은 대신 완료할 수 있다.
+   * 처리 끝 방 · 배정 없는 방은 빈 배열.
+   */
+  missingAssignees: string[];
+  /**
+   * 2인 방에서 일부만 끝냄(「1/2 끝남」, 2026-11-02 사용자 결정) — 끝낸 사람 수 · 필요한 수(그날 그 방 배정 인원). 그 밖에는 null.
+   * `status` 는 기록 기준(끝난 기록이면 done)이라 상세 · 대신 완료가 그대로 쓰고, 카드 · 칸 · KPI 는 `roomStatusOf` 로 「진행 중」으로 센다.
+   */
+  partial: { done: number; need: number } | null;
+  /**
+   * 이 방에서 일한 사람마다 기록 하나(처리 끝 · 취소 빼고, 사람마다 청소 중 우선 · 아니면 가장 최근 것) — 직원별 요약이 센다.
+   * 2인 방은 카드 담당(`staffId`)이 한 사람이라, 이걸로 세지 않으면 두 번째 사람의 몫이 빠진다(2026-11-03 리뷰).
+   */
+  workers: { staffId: string; status: "progress" | "done"; start: string | null; end: string | null }[];
   /**
    * 오늘 이 객실에서 취소된 세션 수. 취소는 모바일에서 "다시 청소 대상으로 되돌리는" 동작이라
    * (docs: cancelCleaningMessage) 카드 상태 자체는 `pending` 을 유지하고, 취소가 있었다는 사실만
@@ -218,7 +252,7 @@ export async function getAdminCleaningToday(
   const organizationId = session.organization.id;
 
   let loadError = false;
-  const [targetsResult, roomCatalog, orgTodaySessions, staff] = await Promise.all([
+  const [targetsResult, roomCatalog, orgTodaySessions, staff, assignRows] = await Promise.all([
     getCleaningTargets(organizationId, date).catch(() => {
       loadError = true;
       return null;
@@ -232,9 +266,28 @@ export async function getAdminCleaningToday(
       loadError = true;
       return [] as CleaningStaffOption[];
     }),
+    getSupabaseServiceClient()
+      .from("cleaning_assignments")
+      .select("room_key, user_id")
+      .eq("organization_id", organizationId)
+      .eq("work_date", date ?? getCleaningOperatingDateKey())
+      .then(({ data, error }) => {
+        // 못 읽으면 화면에 「일부를 못 불러옴」을 띄운다 — 조용히 비우면 「같이 한 사람 완료 처리」가 말없이 사라진다.
+        if (error) {
+          loadError = true;
+          console.error("[admin-cleaning] assignments read failed", { code: error.code });
+        }
+        return data ?? [];
+      }),
   ]);
 
   const catalog: ActiveRoomCatalogItem[] = roomCatalog ?? [];
+  // 그날 배정(방 → 사람) — 2인 방에서 아직 기록이 없는 사람을 찾는다. 배정 표는 서비스 전용이라 방 키 · 사람만 읽는다.
+  // 못 읽으면 빈 목록(예전처럼 방 하나에 기록 하나로 보인다).
+  const assigneesByRoom = new Map<string, string[]>();
+  for (const row of assignRows) assigneesByRoom.set(row.room_key, [...(assigneesByRoom.get(row.room_key) ?? []), row.user_id]);
+  // 청소 기록 라벨 → 배정 방 키(`sessionRoomKeyOf` 와 같은 결과) — 카드마다 카탈로그를 다시 훑지 않게 한 번 만든다.
+  const assignKeyOf = sessionRoomKeyLookup(catalog);
   const catalogLabelMap = buildSessionLabelToRoomKeyMap(catalog);
   const legacyAliasMap = buildLegacyAliasToRoomKeyMap(catalog);
   const staffNameById = new Map(staff.map((s) => [s.id, s.name] as const));
@@ -262,12 +315,27 @@ export async function getAdminCleaningToday(
       targetRoomKeys.add(physicalKey);
       const roomSessions = sessionsByRoomKey.get(physicalKey) ?? [];
       const matched = pickRelevantSession(roomSessions);
+      // 2인 방은 각자 기록 — 카드 담당 칸에 기록이 있는 사람을 모두, 아직 없는 배정 직원은 따로(대신 완료용).
+      const liveStaff = [...new Set(roomSessions.filter((s) => s.status !== "cancelled" && !s.closed_without_cleaning).map((s) => s.staff_user_id))];
+      const roomClosed = roomSessions.some((s) => s.status === "completed" && s.closed_without_cleaning);
+      const assignees = assigneesByRoom.get(assignKeyOf(target.sessionRoomLabel)) ?? [];
+
+      const staffNames = liveStaff.length > 1 ? liveStaff.map((id) => staffNameById.get(id) ?? "—").join(" · ") : null;
 
       // 취소만 있는 방은 모바일 큐에서 다시 "미처리"로 돌아가므로 콘솔에서도 `pending` 이 맞다.
       // 다만 취소가 있었다는 사실이 콘솔에서 완전히 사라지지 않도록 cancelledCount 로 남긴다.
       let status: AdminCleaningStatus = "pending";
       if (matched?.status === "in_progress") status = "progress";
       else if (matched?.status === "completed") status = "done";
+      // 방 기준 「1/2 끝남」 — PC 하루 보기 · 모바일 현황판과 같은 계산(`roomShareState`). 처리 끝 방은 세지 않는다.
+      const share = roomShareState(
+        roomSessions.map((s) => ({ staffId: s.staff_user_id, status: s.status, closed: Boolean(s.closed_without_cleaning) })),
+        assignees,
+      );
+      const partial = !roomClosed && status === "done" && share.partial ? { done: share.done, need: share.need } : null;
+      // 대신 완료할 같이 한 사람 — 방이 「1/2 끝남」(아직 다 안 끝남)일 때만. 방이 이미 끝났거나(끝낸 사람 수가 배정 인원에 닿음)
+      // 처리 끝 방이면 비운다 — 카드는 「끝남」인데 패널이 「빠진 사람」을 내미는 엇갈림을 막는다.
+      const missingAssignees = partial ? assignees.filter((id) => !liveStaff.includes(id)) : [];
 
       tasks.push({
         id: matched?.id ?? `pending:${target.roomKey}`,
@@ -280,7 +348,7 @@ export async function getAdminCleaningToday(
         type: matched ? taskLabelToType(matched.task_label) : "checkout",
         status,
         staffId: matched?.staff_user_id ?? null,
-        staffName: matched ? (staffNameById.get(matched.staff_user_id) ?? null) : null,
+        staffName: staffNames ?? (matched ? (staffNameById.get(matched.staff_user_id) ?? null) : null),
         start: formatTokyoTime(matched?.started_at ?? null),
         end: matched && !endUnknown(matched) ? formatTokyoTime(matched.completed_at) : null,
         note: matched?.notes ?? "",
@@ -288,6 +356,9 @@ export async function getAdminCleaningToday(
         proxy: Boolean(matched?.completed_by_admin),
         closed: Boolean(matched?.closed_without_cleaning),
         unmeasured: matched ? isUnmeasuredSession(matched) : false,
+        missingAssignees,
+        partial,
+        workers: workersOf(roomSessions),
         cancelledCount: countCancelled(roomSessions),
         guest: target.hasTurnover ? target.arrivingGuestName : null,
         pax: target.hasTurnover ? target.arrivingPax : null,
@@ -337,6 +408,9 @@ export async function getAdminCleaningToday(
       proxy: Boolean(relevant.completed_by_admin),
       closed: Boolean(relevant.closed_without_cleaning),
       unmeasured: isUnmeasuredSession(relevant),
+      missingAssignees: [],
+      partial: null,
+      workers: workersOf(sessions),
       cancelledCount: countCancelled(sessions),
       guest: null,
       pax: null,

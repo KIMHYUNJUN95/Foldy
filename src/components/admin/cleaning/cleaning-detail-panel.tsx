@@ -179,7 +179,7 @@ export function CleaningDetailPanel({
             </span>
           </div>
           <div className="panel__chips" style={{ marginTop: 11 }}>
-            <StatusPill status={status} t={t} />
+            <StatusPill status={status} t={t} partial={task?.partial ?? null} />
             <ReportBadges reports={reports} t={t} />
           </div>
         </div>
@@ -318,7 +318,25 @@ export function CleaningDetailPanel({
               그대로 남아 있으며 이 게이트는 UI 편의일 뿐이다. */}
           {/* 끝난 방은 감춘다 — 단, 알바가 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 기록(끝 시각 없음 · 처리 끝 아님)은
               관리자가 시각을 채우도록 연다(2026-11-02, 서버 `forceCompleteCleaningSession` 의 같은 예외). */}
-          {canForceComplete && !isHist && (status !== "done" || (task.sessionId !== null && task.unmeasured)) ? (
+          {/* 2인 방(각자 기록, 2026-11-02 점검 C1): 방이 「끝남」이어도 아직 기록이 없는 배정 직원 몫은 대신 완료할 수 있다 —
+              그 사람을 담당으로, 새 기록으로 연다(서버 `pickForceCompleteTarget` 이 같은 규칙 · 중복을 다시 본다). */}
+          {canForceComplete && !isHist && task && status === "done" && !(task.sessionId !== null && task.unmeasured) && task.missingAssignees.length > 0 ? (
+            <>
+              <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
+                {t.close}
+              </button>
+              <button
+                type="button"
+                className="btn btn--pri"
+                style={{ flex: 1.4 }}
+                onClick={() =>
+                  onOpenForceComplete({ ...task, sessionId: null, staffId: task.missingAssignees[0], start: null, end: null, note: "", unmeasured: false })
+                }
+              >
+                {t.forceDoneMissing}
+              </button>
+            </>
+          ) : canForceComplete && !isHist && (status !== "done" || (task.sessionId !== null && task.unmeasured)) ? (
             <>
               <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
                 {t.close}

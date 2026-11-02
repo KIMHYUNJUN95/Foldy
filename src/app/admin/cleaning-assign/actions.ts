@@ -264,6 +264,7 @@ export async function holdRoom(input: { date: string; roomKey: string; originDat
         duration_seconds: 0,
         notes: reason || null,
         organization_id: organizationId,
+        room_key: room.roomKey,
         room_label: room.sessionRoomLabel,
         staff_user_id: session.user.id,
         started_at: now,

@@ -66,14 +66,32 @@ export function typeLabel(type: CleaningTaskType, t: ConsoleCopy): string {
   return t.tySetup;
 }
 
-export function statusLabel(status: AdminCleaningStatus, t: ConsoleCopy): string {
+/**
+ * 방 기준 상태 — 2인 방에서 일부만 끝냈으면(「1/2 끝남」, `task.partial`) 아직 끝난 방이 아니라 「진행 중」으로 센다
+ * (2026-11-02 사용자 결정). 카드 · 칸 · KPI 가 이것으로 센다. 기록 기준 상태(`task.status`)는 상세 · 대신 완료가 그대로 쓴다.
+ */
+export function roomStatusOf(task: { status: AdminCleaningStatus; partial: { done: number; need: number } | null }): AdminCleaningStatus {
+  return task.partial ? "progress" : task.status;
+}
+
+export function statusLabel(status: AdminCleaningStatus, t: ConsoleCopy, partial?: { done: number; need: number } | null): string {
+  if (partial) return t.stPartial.replace("{done}", String(partial.done)).replace("{need}", String(partial.need));
   if (status === "pending") return t.stPending;
   if (status === "progress") return t.stProgress;
   if (status === "cancelled") return t.stCancelled;
   return t.stDone;
 }
 
-export function StatusPill({ status, t }: { status: AdminCleaningStatus; t: ConsoleCopy }) {
+export function StatusPill({
+  status: recordStatus,
+  t,
+  partial = null,
+}: {
+  status: AdminCleaningStatus;
+  t: ConsoleCopy;
+  partial?: { done: number; need: number } | null;
+}) {
+  const status = partial ? "progress" : recordStatus;
   const Icon = STATUS_ICON[status];
   const showIcon = status === "pending" || status === "cancelled";
   return (
@@ -85,7 +103,7 @@ export function StatusPill({ status, t }: { status: AdminCleaningStatus; t: Cons
       ) : (
         <span className="d" />
       )}
-      {statusLabel(status, t)}
+      {statusLabel(status, t, partial)}
     </span>
   );
 }

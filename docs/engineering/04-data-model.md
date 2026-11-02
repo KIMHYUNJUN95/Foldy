@@ -509,7 +509,9 @@ Notes:
 Cleaning timer and completion records.
 
 Migrations: `supabase/migrations/202605210001_cleaning_sessions.sql`,
-`supabase/migrations/202607150001_cleaning_sessions_admin_force_complete.sql`
+`supabase/migrations/202607150001_cleaning_sessions_admin_force_complete.sql`,
+`supabase/migrations/202610210005_cleaning_closed_without_cleaning.sql`,
+`supabase/migrations/202611020010_cleaning_shared_rooms.sql`
 
 Fields:
 
@@ -530,6 +532,8 @@ completed_by_admin uuid references profiles(id) on delete set null  -- admin id 
                                                                      -- for normal self-completion
 closed_without_cleaning boolean not null default false  -- 청소 배정 「처리 끝」이 남긴 기록(청소 안 함,
                                                          -- 202610210005). 담당자 = 누른 관리자, 소요 0
+room_key text                     -- 실제 방 키(배정 cleaning_assignments.room_key 와 같은 모양, 202611020010).
+                                  -- 앱이 넣는다. 비어 있으면(예전 기록) room_label 로 본다
 created_at timestamptz not null
 updated_at timestamptz not null
 ```
@@ -541,6 +545,30 @@ in_progress
 completed
 cancelled
 ```
+
+2인 방 — 각자 기록 (`202611020010_cleaning_shared_rooms.sql`, 2026-11-02 청소 점검 C1):
+
+- 부분 유니크 인덱스 `cleaning_sessions_one_per_user_room_day_idx` — (조직 · 운영일 · `coalesce(room_key, room_label)` · 직원),
+  `status in (in_progress, completed)` 이고 처리 끝이 아닌 기록. 한 사람은 그날 한 방에 기록 하나.
+- 트리거 `cleaning_sessions_room_capacity`(`cleaning_sessions_enforce_room_capacity`, security definer) — 진행 중 · 완료 기록을 넣거나
+  담당 · 날짜 · 상태를 바꿀 때 방마다 advisory lock 을 잡고 본다: 「처리 끝」 방이면 누구든 `cleaning_room_full`(detail resolved).
+  그날 그 방(`cleaning_assignments.room_key`)에 배정된 사람이면 통과(배정된 자리는 그 사람 몫). 배정 안 된 사람(배정 없는 방 포함)은
+  그 방에 다른 사람 기록이 하나라도 있으면 `cleaning_room_full`(detail taken). 같은 방 묶기: `coalesce(room_key, room_label)` 이 같거나
+  `room_label` 이 같으면 같은 방. 같은 사람이 상태만 바꾸는 경우(끝내기 · 되돌리기 · 시각 채우기)는 다시 보지 않는다. `room_label` ·
+  `room_key` 만 바뀌는 UPDATE(라벨 정리 스크립트)도 보지 않는다. 앱 판정은 `roomRecordDecision`(`src/lib/cleaning-assign/room-key.ts`)
+  하나 — 직원 시작(`startSessionCore`)과 관리자 강제 완료(`pickForceCompleteTarget`)가 같이 쓴다. 트리거 오류는 detail 로 구분한다:
+  `resolved` → 화면 「처리 끝 방」(`room_resolved`), `taken` → 「이미 처리된 방」. 다른 유니크 위반은 「이미 처리됨」으로 감추지 않는다.
+- 「처리 끝」 기록(`closed_without_cleaning`)은 검사 없이 같은 방 잠금만 잡는다 — 처리 끝 뒤의 시작은 막히고, 이미 청소 중인 방을 처리 끝으로
+  두는 것은 막지 않는다(그 사람은 끝내기를 그대로 할 수 있다). 배정을 못 읽으면 청소 화면은 2인 방 내 몫을 숨긴다(안전한 쪽 — 오늘 내 방에서
+  시작할 수 있다).
+- `room_key` 는 앱이 객실 카탈로그로 만든다. **카탈로그 읽기 오류면 시작 · 강제 완료를 막는다**(틀린 키가 기록에 남지 않게). 객실 마스터가
+  없는 조직(행 0개)은 예전처럼 라벨에서 만든다.
+- 배포 순서(2026-11-02 결정): 이 마이그레이션을 **앱보다 먼저**, 둘 다 **청소가 없는 밤에** 적용 · 배포한다. 배포 전에 생긴 그날 기록
+  (`room_key` 없음)이나 예전 앱 인스턴스가 넣는 기록은 키가 비어 들어가 — 트리거가 같은 라벨로는 묶지만 아라키초 쉬는 계정 라벨(`401_2_2`)은
+  못 묶고, 2인 방 두 번째 배정자를 배정으로 못 알아본다. 밤에 하면 그날 기록이 없어 이 틈이 생기지 않는다. 지난 날 기록(키 없음)은 앱
+  판정(`sameRoomRecords` 가 라벨에서 키를 만든다)이 묶는다.
+- `cleaning_assignments` 트리거 `cleaning_assignments_cancelled_day` — 그날 일정을 관리자가 취소한 사람
+  (`cleaning_shift_applications.cancelled_at`)에게 배정을 넣지 않는다(`cleaning_day_cancelled`). 살리는 길은 「다시 넣기」(취소를 먼저 푼다).
 
 Note: room_label and property are stored as free text rather than FKs to properties/rooms tables because cleaning sessions predate the room master and must survive property data changes. The room master (properties/rooms tables) is used for display and filtering but is not enforced as a FK here.
 

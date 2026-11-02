@@ -24,6 +24,7 @@ function room(roomKey: string, over: Partial<BoardRoom> = {}): BoardRoom {
     sessionRoomLabel: roomKey,
     source: "checkout",
     status: "pending",
+    partial: null,
     suggested: [],
     usualHeadcount: 1,
     ...over,
@@ -82,6 +83,19 @@ describe("buildCleaningBoard", () => {
     expect(rows[0].completedAt).toBe("2026-10-28T01:42:00Z");
     expect(rows[1].elapsedMinutes).toBe(23);
     expect(summary).toEqual({ done: 1, open: 1, progress: 1, total: 4, waiting: 1 });
+  });
+
+  it("2인 방 한 사람만 끝냄 — 청소 중 칸 · 「1/2 끝남」 · 끝난 기록으로 흐른 분을 세지 않음", () => {
+    const { rows, summary } = buildCleaningBoard({
+      now,
+      nowMinutes: 11 * 60 + 20,
+      people: [person("a"), person("b")],
+      rooms: [room("601", { people: [assigned("a"), assigned("b")], status: "progress", partial: { done: 1, need: 2 } })],
+      sessions: new Map([["601", { completedAt: "2026-10-28T01:42:00Z", startedAt: "2026-10-28T01:10:00Z" }]]),
+    });
+    expect(rows[0]).toMatchObject({ kind: "progress", partial: { done: 1, need: 2 }, elapsedMinutes: null, completedAt: null });
+    expect(summary.progress).toBe(1);
+    expect(summary.done).toBe(0);
   });
 
   it("출근 30분 지나도록 담당 누구도 시작 안 했으면 늦음, 다른 방을 하는 중이면 늦음 아님", () => {

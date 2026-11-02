@@ -65,8 +65,9 @@ function StatusIcon({ row, now }: { row: BoardViewRow; now: number }) {
   }
   if (row.kind === "progress") {
     // 한 시간에 한 바퀴 — 「얼마나 됐나」를 숫자 옆에서 모양으로도.
+    // 「1/2 끝남」은 끝낸 몫만큼 채운다.
     const minutes = row.startedAt ? Math.max(0, (now - new Date(row.startedAt).getTime()) / 60000) : 0;
-    const p = Math.min(minutes / 60, 0.999);
+    const p = row.partial ? Math.min(row.partial.done / row.partial.need, 0.999) : Math.min(minutes / 60, 0.999);
     const a = p * Math.PI * 2;
     const x = 11 + 9 * Math.sin(a);
     const y = 11 - 9 * Math.cos(a);
@@ -163,6 +164,7 @@ export function CleaningBoardView({
   const stateText = (row: BoardViewRow) => {
     if (row.kind === "done") return row.completedAt ? tokyoTime(row.completedAt) : copy.boardFilterDone;
     if (row.kind === "progress") {
+      if (row.partial) return fill(copy.statusPartial, row.partial);
       const minutes = row.startedAt ? Math.max(0, Math.floor((now - new Date(row.startedAt).getTime()) / 60000)) : row.elapsedMinutes;
       return minutes === null ? copy.boardFilterProgress : fill(copy.boardMinutes, { n: minutes });
     }

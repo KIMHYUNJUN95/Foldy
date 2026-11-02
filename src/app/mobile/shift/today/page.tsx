@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { TodayRoomsView, type TodayRoomSession } from "@/components/mobile/shift/today-rooms-view";
+import { shouldOfferStart } from "@/lib/cleaning-assign/room-key";
 import { todaySkipReason } from "@/lib/cleaning-assign/task-kind";
 import { physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
@@ -70,34 +71,57 @@ export default async function MobileShiftTodayPage() {
         startedAt: staleResult.data.started_at,
       }
     : null;
-  const sessionByRoom = new Map<string, TodayRoomSession>();
+  // 방마다 내 기록 · 다른 사람 기록(사람마다 가장 최근 것)을 따로 모은다 — 2인 방은 각자 기록(2026-11-02 점검 C1).
+  const sessionsByRoom = new Map<string, { mine: TodayRoomSession | null; others: Map<string, TodayRoomSession> }>();
   for (const row of sessionsResult.data ?? []) {
     // 이름표 규칙이 없는 새 건물은 물리 방 키가 없다 — 그때는 청소 기록 이름 그대로 키로 쓴다(`startMyRoom` 과 같은 맞추기).
     const key = physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label;
-    if (sessionByRoom.has(key)) continue;
-    sessionByRoom.set(key, {
+    const entry = sessionsByRoom.get(key) ?? { mine: null, others: new Map<string, TodayRoomSession>() };
+    sessionsByRoom.set(key, entry);
+    const mine = row.staff_user_id === session.user.id;
+    const value: TodayRoomSession = {
       id: row.id,
       status: row.status === "completed" ? "completed" : "in_progress",
       startedAt: row.started_at,
       completedAt: row.completed_at,
       durationSeconds: row.duration_seconds,
-      mine: row.staff_user_id === session.user.id,
-    });
+      mine,
+    };
+    if (mine) entry.mine = entry.mine ?? value;
+    else if (!entry.others.has(row.staff_user_id)) entry.others.set(row.staff_user_id, value);
   }
   const buildingLabels = getDictionary(locale).cleaning.buildingLabels;
   const rooms = data.rooms.map((room) => {
     const meta = getPropertyMapMeta(room.propertyName);
-    const roomSession = sessionByRoom.get(room.roomKey) ?? sessionByRoom.get(room.sessionRoomLabel) ?? null;
-    // 목록에서 빠진 방(예약 바뀜)은 늘 「대기」로, 「처리 끝」 방은 늘 「끝남」으로 온다 — 실제 청소 기록이 있으면 그 상태로 맞춘다
-    // (청소하는 사이 관리자가 처리 끝으로 둬도 「끝내기」를 누를 수 있게).
-    const status =
-      (room.changed || room.resolvedHold) && roomSession
-        ? roomSession.status === "completed"
-          ? ("done" as const)
-          : ("progress" as const)
-        : room.status;
+    const entry = sessionsByRoom.get(room.roomKey) ?? sessionsByRoom.get(room.sessionRoomLabel) ?? null;
+    const others = entry ? [...entry.others.values()] : [];
+    // 내 기록이 있으면 그것. 없으면 화면 규칙 하나(`shouldOfferStart` — 청소 화면과 같음): 그 방 다른 기록이 **같이 배정된 사람 것뿐이면**
+    // (2인 방) 나는 아직 「대기」 — 내 자리는 내 몫이다. 배정 안 된 사람이 해 둔 방은 그 기록으로 보여 준다(「끝남」 · 청소 중) — 이미
+    // 누가 치운 방을 다시 청소하지 않게(서버는 막지 않는다). 처리 끝 기록은 위 조회에서 빠지고 `resolvedHold` 로 따로 보인다.
+    const assigneeIds = new Set([session.user.id, ...room.mates.map((mate) => mate.userId)]);
+    const records = [
+      ...(entry?.mine ? [{ staffId: session.user.id, status: entry.mine.status, closed: false }] : []),
+      ...[...(entry?.others ?? new Map<string, TodayRoomSession>())].map(([staffId, record]) => ({ staffId, status: record.status, closed: false })),
+    ];
+    const mySlot = !entry?.mine && others.length > 0 && shouldOfferStart(records, session.user.id, assigneeIds);
+    // 남 기록을 보일 때는 청소 중인 것을 먼저(끝난 사람 · 청소 중인 사람이 같이 있으면 방은 아직 청소 중).
+    const shown = others.find((record) => record.status === "in_progress") ?? others[0] ?? null;
+    const roomSession = entry?.mine ?? (mySlot ? null : shown);
+    // 상태는 **내 눈 기준**: 내 기록 → 그 상태, 내 자리 남음 → 「대기」(처리 끝 방은 방 상태), 남 기록을 보이면 → 그 기록 상태,
+    // 기록 없음 → 방 상태(목록에서 빠진 방 · 처리 끝 방 포함). 방 상태(`room.status`)는 방 전체 기준(「1/2 끝남」은 청소 중)이라
+    // 내 줄에는 쓰지 않는다.
+    const fromSession = roomSession ? (roomSession.status === "completed" ? ("done" as const) : ("progress" as const)) : ("pending" as const);
+    let status = room.status;
+    if (entry?.mine) status = fromSession;
+    else if (mySlot) status = room.resolvedHold ? room.status : "pending";
+    else if (roomSession) status = fromSession;
+    const mates = room.mates.map((mate) => {
+      const record = entry?.others.get(mate.userId);
+      return { ...mate, state: record ? (record.status === "completed" ? ("done" as const) : ("progress" as const)) : null };
+    });
     return {
       ...room,
+      mates,
       status,
       // 오늘 청소 안 하는 이유 — 서버 `startMyRoom` 과 같은 규칙(`todaySkipReason`).
       skipReason: todaySkipReason({ ...room, status, hasSession: roomSession !== null }),

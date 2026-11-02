@@ -1,4 +1,5 @@
 import { rolesWithCapability } from "@/config/capabilities";
+import { roomRecordDecision, sameRoomRecords } from "@/lib/cleaning-assign/room-key";
 import {
   canAccessFieldOperations,
   type Role,
@@ -84,23 +85,22 @@ export function resolveForceCompleteDate(raw: string, operatingToday: string): s
 }
 
 /**
- * 세션 id 없이 들어온 강제 완료(콘솔에서 「대기」로 보인 방) — 같은 날 같은 **실제 방**에 진행 중이거나 끝난 기록이 있으면 막는다
- * (2026-11-02 점검 수정). 콘솔이 낡아 「대기」로 보였을 뿐 이미 누가 시작했거나 끝낸 방이다 — 그 기록을 다른 담당자 · 시각으로
- * 덮어쓰면 직원의 실제 시작 시각이 사라지고 다른 사람 몫이 된다. 새로 읽으면 진행 중 방은 세션 id 와 함께 다시 온다.
- * 취소된 기록은 보지 않는다(그 방은 대신 완료할 수 있다). `physicalKey` = `physicalRoomKeyOfSessionLabel`(401 ↔ 401_2_2 같은 방).
+ * 세션 id 없이 들어온 강제 완료(콘솔에서 「대기」로 보인 방, 또는 2인 방의 빠진 사람) — 새 완료 기록을 넣어도 되는지.
+ * 같은 날 같은 **실제 방** 기록(저장된 `room_key` — 없는 예전 기록은 라벨에서 — 또는 같은 라벨, 시작 검사 · DB 트리거와 같은 묶기)을 보고:
+ * - 「처리 끝」 방이면 막는다.
+ * - 나머지는 `canRecordInRoom`(2026-11-02 점검 C1) — 고른 직원이 그 방에 이미 기록이 있으면 막고, 그 방에 배정된 직원이면 넣는다
+ *   (2인 방은 각자 기록), 배정 안 된 직원이면 아무 기록이 없을 때만 — 남의 진행 중 기록을 가로채지 않는다(점검 A).
+ * 취소된 기록은 보지 않는다.
  */
 export function pickForceCompleteTarget(
-  rows: { room_label: string; status: string }[],
+  rows: { room_key?: string | null; room_label: string; status: string; staff_user_id: string; closed_without_cleaning?: boolean | null }[],
   roomLabel: string,
-  physicalKey: (label: string) => string | null,
+  roomKey: string,
+  staffId: string,
+  staffAssigned: boolean,
 ): "processed" | "insert" {
-  const physical = physicalKey(roomLabel);
-  const taken = rows.some(
-    (row) =>
-      (row.status === "completed" || row.status === "in_progress") &&
-      (row.room_label === roomLabel || (physical !== null && physicalKey(row.room_label) === physical)),
-  );
-  return taken ? "processed" : "insert";
+  // 직원 시작(`startSessionCore`)과 같은 판정 하나(`roomRecordDecision`) — 처리 끝 · 이미 기록 · 배정 안 됐는데 남 기록 → 처리됨.
+  return roomRecordDecision(sameRoomRecords(rows, roomLabel, roomKey), staffId, staffAssigned) === "ok" ? "insert" : "processed";
 }
 
 export function formatDuration(totalSeconds: number | null) {
@@ -199,23 +199,48 @@ export async function getOrgTodayCleaningRoomLabels(
  * `getOrgTodayCleaningRoomLabels` 는 RLS 클라이언트라 `cleaning.read_all` 이 없는 직원은 본인 세션만 받는다.
  * 그래서 남이 시작한 방이 목록에 그대로 남고, 서버의 「오늘 이미 처리된 객실」 검사도 통과해 **같은 방을 두 번
  * 시작**할 수 있었다. 이 조회는 서비스 키로 읽되 조직 · 날짜 · 상태로 좁히고 담당자 · 시각은 돌려주지 않는다 —
- * 「이 방은 이미 누가 맡았다」는 사실만 쓴다. 서버 전용(시작 액션 · 청소 화면 서버 컴포넌트)에서만 부른다.
+ * 「이 방은 이미 누가 맡았다」는 사실과 「보는 사람 자신의 기록인지」만 쓴다. 서버 전용(시작 액션 · 청소 화면 서버 컴포넌트)에서만 부른다.
  * 서비스 클라이언트는 동적 import — 이 파일은 클라이언트 컴포넌트도 가져다 쓴다.
  */
 export async function getOrgProcessedCleaningRoomLabels(
   organizationId: string,
   date?: string,
-): Promise<{ room_label: string; status: "in_progress" | "completed" }[]> {
+): Promise<{
+  rows: { room_label: string; status: "in_progress" | "completed"; staff_user_id: string; closed_without_cleaning: boolean }[];
+  /** 그날 배정(방 키 → 사람들) — 2인 방에서 화면이 시작을 내밀지 정한다(`shouldOfferStart`, 2026-11-02 점검 C1). */
+  assigneesByRoomKey: Map<string, Set<string>>;
+}> {
   const { getSupabaseServiceClient } = await import("@/lib/supabase/service");
-  const { data, error } = await getSupabaseServiceClient()
-    .from("cleaning_sessions")
-    .select("room_label, status")
-    .eq("organization_id", organizationId)
-    .eq("cleaning_date", date ?? getCleaningOperatingDateKey())
-    .in("status", ["in_progress", "completed"]);
+  const service = getSupabaseServiceClient();
+  const day = date ?? getCleaningOperatingDateKey();
+  const [sessions, assignments] = await Promise.all([
+    service
+      .from("cleaning_sessions")
+      .select("room_label, status, staff_user_id, closed_without_cleaning")
+      .eq("organization_id", organizationId)
+      .eq("cleaning_date", day)
+      .in("status", ["in_progress", "completed"]),
+    service.from("cleaning_assignments").select("room_key, user_id").eq("organization_id", organizationId).eq("work_date", day),
+  ]);
 
-  if (error) throw new Error(error.message);
-  return (data ?? []) as { room_label: string; status: "in_progress" | "completed" }[];
+  if (sessions.error) throw new Error(sessions.error.message);
+  // 배정을 못 읽으면 빈 배정으로(누가 시작한 방은 숨김 — 예전처럼). 시작은 서버가 다시 본다.
+  if (assignments.error) console.error("[cleaning] assignments read failed", { code: assignments.error.code });
+  const assigneesByRoomKey = new Map<string, Set<string>>();
+  for (const row of assignments.data ?? []) {
+    const set = assigneesByRoomKey.get(row.room_key) ?? new Set<string>();
+    set.add(row.user_id);
+    assigneesByRoomKey.set(row.room_key, set);
+  }
+  return {
+    rows: (sessions.data ?? []).map((row) => ({
+      room_label: row.room_label,
+      status: row.status as "in_progress" | "completed",
+      staff_user_id: row.staff_user_id,
+      closed_without_cleaning: Boolean(row.closed_without_cleaning),
+    })),
+    assigneesByRoomKey,
+  };
 }
 
 // 한 운영 날짜의 조직 전체(모든 직원) 세션 행 전체 — 관리자

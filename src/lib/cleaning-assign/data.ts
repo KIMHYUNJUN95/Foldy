@@ -450,6 +450,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
       sessionRoomLabel: first.roomLabel,
       source: "checkout",
       status: "pending",
+      partial: null,
       usualHeadcount: 1,
     };
     cancelledRooms.push(ghost);
@@ -906,7 +907,12 @@ export async function loadMyShift(
  * `changed` — 배정은 남았는데 오늘 청소 목록에서 빠진 방(예약 취소 · 체크아웃 날짜 변경). 알바에게 흐리게 「예약이 바뀌었어요 · 청소 안 함」.
  * `taskKey` — 시작할 때 쓰는 청소 종류(`todayTaskKey`, 서버 `startMyRoom` 이 같은 계산을 다시 한다).
  */
-export type TodayRoom = AssignRoom & { mates: { name: string; trainee: boolean }[]; changed: boolean; taskKey: TodayTaskKey };
+/** `mates[].state` — 2인 방에서 같이 하는 사람의 오늘 기록(페이지가 채운다, 2026-11-02 점검 C1). */
+export type TodayRoom = AssignRoom & {
+  mates: { userId: string; name: string; trainee: boolean; state?: "progress" | "done" | null }[];
+  changed: boolean;
+  taskKey: TodayTaskKey;
+};
 
 export async function loadTodayRooms(
   supabase: Client,
@@ -956,7 +962,7 @@ export async function loadTodayRooms(
       const room = roomBy.get(row.roomKey);
       const mates = todayRows
         .filter((r) => r.roomKey === row.roomKey && r.userId !== userId)
-        .map((r) => ({ name: names.get(r.userId) ?? "—", trainee: profileBy(r.createdBy, r.userId)?.trainee ?? false }));
+        .map((r) => ({ userId: r.userId, name: names.get(r.userId) ?? "—", trainee: profileBy(r.createdBy, r.userId)?.trainee ?? false }));
       const usualHeadcount = (row.createdBy ? usualBy.get(`${row.createdBy}|${row.roomKey}`) : undefined) ?? 1;
       if (room) return { ...room, mates, usualHeadcount, changed: false, taskKey: todayTaskKey(room, stayKeys) };
       // 그 사이 예약이 취소 · 변경돼 오늘 청소 목록에서 빠진 방 — 조용히 지우지 않고 「예약이 바뀌었어요 · 청소 안 함」으로 남긴다
@@ -983,6 +989,7 @@ export async function loadTodayRooms(
         sessionRoomLabel: buildSessionRoomLabel(row.propertyName, row.roomLabel),
         source: "checkout" as const,
         status: "pending" as const,
+        partial: null,
         usualHeadcount,
       };
     })

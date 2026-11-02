@@ -3,13 +3,13 @@ import "server-only";
 import {
   canAccessMobileCleaning,
   getCleaningOperatingDateKey,
-  getOrgProcessedCleaningRoomLabels,
   isCleaningTaskKey,
   type CleaningSessionRow,
 } from "@/lib/cleaning";
 import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
+import { roomRecordDecision, roomWriteErrorKind, sameRoomRecords, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
 import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
-import { getActiveRoomCatalog } from "@/lib/rooms";
+import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
 import type { AppSession } from "@/lib/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
@@ -43,6 +43,21 @@ export type SessionOpError =
 
 export type SessionOpResult<T = object> = ({ ok: true } & T) | { ok: false; error: SessionOpError };
 
+/**
+ * 시작 기록 넣기 실패 → 화면 사유. DB 가 마지막에 막는 경우(같은 순간 두 번 누름):
+ * - 방 트리거 `cleaning_room_full` — detail `resolved`(그 사이 관리자가 「처리 끝」) → 「처리 끝 방」, 그 밖 → 「이미 처리된 방」
+ * - 한 사람 · 하루 · 한 방 유니크 → 「이미 처리된 방」
+ * - 한 사람 진행 중 하나 유니크(`cleaning_sessions_one_active_per_org_user_idx`) → 「이미 다른 방 청소 중」
+ * 그 밖 오류는 「시작 못 함」 — 모르는 오류를 「이미 처리됨」으로 감추지 않는다.
+ */
+function insertFailure(error: { code?: string; message?: string; details?: string | null } | null): SessionOpError {
+  const kind = roomWriteErrorKind(error);
+  if (kind === "resolved") return "room_resolved";
+  if (kind === "taken") return "already_processed_today";
+  if (kind === "active") return "already_active";
+  return "start_failed";
+}
+
 /** 끝낸 뒤 「되돌리기」를 받아 주는 시간 — 토스트가 떠 있는 동안(6초)보다 넉넉히. */
 const UNDO_WINDOW_MS = 2 * 60 * 1000;
 
@@ -71,9 +86,14 @@ export async function startSessionCore(
   // 쉬는 계정으로 들어온 예약의 카드가 판매 중 계정 라벨만 있는 카탈로그와 글자로 안 맞아 시작이 늘 거절됐다.
   // 라벨은 카드가 보낸 그대로 저장한다 — 화면 · 콘솔이 그 라벨로 예약 카드와 짝을 짓는다.
   const physicalRoom = physicalRoomKeyOfSessionLabel(roomLabel);
-  // 카탈로그가 없으면(객실 마스터 없음 · 읽기 오류 → undefined) 예전처럼 검사를 건너뛴다 — `getActiveRoomCatalog` 가
-  // 두 경우를 구분하지 않아, 막으면 객실 마스터가 없는 조직은 청소를 아예 시작하지 못한다.
-  const catalog = await getActiveRoomCatalog(session.organization.id, supabase).catch(() => undefined);
+  // 객실 마스터가 없는 조직(행 0개 → undefined)은 예전처럼 검사를 건너뛴다. **읽기 오류는 막는다**(2026-11-02 점검 C1) —
+  // 카탈로그 없이 만든 방 키는 이름표 없는 새 건물에서 배정 키와 모양이 달라, 그 키가 기록에 그대로 남으면 같은 방을 못 묶는다.
+  const catalogRows = await fetchRoomCatalogRows(session.organization.id, supabase);
+  if (catalogRows.error) {
+    console.error("[cleaning] room catalog read failed", { message: catalogRows.error.message });
+    return fail("start_failed");
+  }
+  const catalog = buildActiveRoomCatalog(catalogRows.data);
   if (catalog !== undefined) {
     const labels = catalog.map((item) => buildSessionRoomLabel(item.propertyName, item.canonicalRoomLabel));
     const allowedPhysical = new Set(labels.map(physicalRoomKeyOfSessionLabel));
@@ -82,19 +102,34 @@ export async function startSessionCore(
     if (!allowed) return fail("invalid_selection");
   }
 
-  // 오늘 이미 in_progress 또는 completed 세션이 있는 방은 다시 시작하지 못하게 막는다 — 같은 실제 방의 다른 계정
-  // 라벨로 시작한 것도 막는다(「401」로 시작했는데 「401_2_2」로 또 시작하지 않게).
-  // 남이 시작한 방도 봐야 하므로 서비스 키로 읽는다(2026-10-26) — RLS 로는 `cleaning.read_all` 없는 직원이 본인 세션만
-  // 받아 같은 방을 두 번 시작할 수 있었다. 읽기에 실패하면 막는다(확인 못 한 채 시작시키지 않는다).
-  // 남는 틈: 두 사람이 같은 순간에 누르는 경쟁은 DB 유니크 인덱스(조직 · 날짜 · 실제 방)가 있어야 완전히 막힌다 — 문서 07 「남은 것」.
+  // 같은 날 같은 **실제 방** 기록을 본다(2026-11-02 점검 C1 — 2인 방은 각자 기록, `canRecordInRoom`). 막는 경우:
+  //   - 그 방이 「처리 끝」(관리자) — 청소 안 함.
+  //   - 내가 그 방에 이미 진행 중 · 완료 기록이 있음.
+  //   - 내가 그 방에 배정되지 않았는데 이미 누가 기록이 있음 — 배정 없는 방은 예전처럼 한 사람. 배정된 사람의 자리는 남이 먼저 해도 남는다.
+  // 아라키초 쉬는 계정 라벨(「401」 · 「401_2_2」)도 같은 방으로 묶는다(`room_key`, 없으면 라벨에서). 남이 시작한 방도 봐야 하므로
+  // 서비스 키로 읽는다(2026-10-26). 읽기에 실패하면 막는다. 같은 순간 두 번 눌러도 DB 트리거(`cleaning_sessions_room_capacity`,
+  // 방마다 잠금)와 유니크 인덱스(한 사람 · 하루 · 한 방)가 같은 규칙으로 막는다.
+  // 같은 방 묶기는 저장된 `room_key`(없는 예전 기록은 라벨에서) 또는 같은 라벨 — DB 트리거와 같다.
   // 중복 확인과 기록이 같은 운영일을 본다 — 날짜가 바뀌는 순간에도 같은 방을 두 번 시작하지 않게.
   const day = cleaningDate ?? getCleaningOperatingDateKey();
+  const roomKey = sessionRoomKeyOf(roomLabel, catalog);
   const service = getSupabaseServiceClient();
-  const [todayActive, holdResult] = await Promise.all([
-    getOrgProcessedCleaningRoomLabels(session.organization.id, day).catch(() => null),
+  const [dayResult, assigneeResult, holdResult] = await Promise.all([
+    service
+      .from("cleaning_sessions")
+      .select("room_key, room_label, staff_user_id, status, closed_without_cleaning")
+      .eq("organization_id", session.organization.id)
+      .eq("cleaning_date", day)
+      .in("status", ["in_progress", "completed"]),
+    service
+      .from("cleaning_assignments")
+      .select("user_id")
+      .eq("organization_id", session.organization.id)
+      .eq("work_date", day)
+      .eq("room_key", roomKey),
     // 관리자가 미룬 방(오늘이 미룬 기간 안)은 어느 시작 경로(오늘 내 방 · 청소 화면)에서도 시작하지 않는다(2026-11-02 리뷰).
     // 미룸 기록의 날짜(`origin_date`)는 **처음 청소해야 했던 날**이다 — 밀려 온 방을 오늘 미루면 지난 날짜로 남는다.
-    // 그래서 「그날 이전에 생긴 방 · 미룬 날이 그날 뒤」로 찾는다. 「처리 끝」은 처리 끝 기록(완료)이 남아 아래 중복 확인에서 막힌다.
+    // 그래서 「그날 이전에 생긴 방 · 미룬 날이 그날 뒤」로 찾는다.
     // 이름표 없는 새 건물(물리 키 없음)은 방 키를 못 만든다 — 그때는 그 기간의 미룸을 읽어 저장된 건물 · 방 이름으로 맞춘다
     // (미룬 방은 몇 개뿐이라 조직 전체를 읽어도 가볍다).
     (() => {
@@ -108,27 +143,29 @@ export async function startSessionCore(
       return physicalRoom ? query.eq("room_key", physicalRoom).limit(1) : query.limit(500);
     })(),
   ]);
-  if (todayActive === null || holdResult.error) return fail("start_failed");
+  if (dayResult.error || assigneeResult.error || holdResult.error) return fail("start_failed");
   const held = (holdResult.data ?? []).some(
     (row) => physicalRoom !== null || buildSessionRoomLabel(row.property_name, row.room_label) === roomLabel,
   );
   if (held) return fail("room_held");
-  const alreadyProcessed = todayActive.some(
-    (row) =>
-      row.room_label === roomLabel ||
-      (physicalRoom !== null && physicalRoomKeyOfSessionLabel(row.room_label) === physicalRoom),
+  const decision = roomRecordDecision(
+    sameRoomRecords(dayResult.data ?? [], roomLabel, roomKey),
+    session.user.id,
+    (assigneeResult.data ?? []).some((row) => row.user_id === session.user.id),
   );
-  if (alreadyProcessed) return fail("already_processed_today");
+  if (decision === "resolved") return fail("room_resolved");
+  if (decision !== "ok") return fail("already_processed_today");
 
   const insert: Database["public"]["Tables"]["cleaning_sessions"]["Insert"] = {
     cleaning_date: day,
     organization_id: session.organization.id,
+    room_key: roomKey,
     room_label: roomLabel,
     staff_user_id: session.user.id,
     task_label: taskKey,
   };
   const { data, error } = await supabase.from("cleaning_sessions").insert(insert).select("id, started_at").single();
-  if (error || !data) return fail(error?.code === "23505" ? "already_active" : "start_failed");
+  if (error || !data) return fail(insertFailure(error));
 
   await signal(session.organization.id);
   return { ok: true, sessionId: data.id, startedAt: data.started_at };

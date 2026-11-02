@@ -34,7 +34,7 @@ export function SwapDialog({ copy, date, locale, a, b, rooms, initial, label, bu
   const lockReason = (roomKey: string): string | null => {
     const room = roomBy.get(roomKey);
     if (!room) return copy.swapLocked;
-    if (room.status === "progress") return copy.statusProgress;
+    if (room.status === "progress") return room.partial ? fill(copy.statusPartial, room.partial) : copy.statusProgress;
     if (room.status === "done") return room.resolvedHold ? copy.tagResolved : copy.statusDone;
     if (room.deferredUntil) return copy.swapLocked;
     const ids = new Set(room.people.map((p) => p.userId));

@@ -6,7 +6,7 @@ import { getReservationGuests } from "@/lib/reservation-guests";
 import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { addDays } from "@/lib/cleaning-assign/day-state";
-import { physicalKeyOf } from "@/lib/cleaning-assign/room-key";
+import { physicalKeyOf, roomShareState, type RoomRecord } from "@/lib/cleaning-assign/room-key";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import {
   CALENDAR_BUILDING_ORDER,
@@ -57,6 +57,11 @@ export type AssignRoom = {
   /** 「처리 끝」으로 둔 방(청소 필요 없음) — 상태는 끝남, 「되돌리기」로 다시 미배정에. */
   resolvedHold: boolean;
   status: AssignRoomStatus;
+  /**
+   * 2인 방에서 일부만 끝냄(2026-11-02 사용자 결정 — 「1/2 끝남」). 끝낸 사람 수 · 필요한 수(그날 그 방 배정 인원). 이때 `status` 는
+   * `progress`(아직 다 끝난 방이 아님). 그 밖에는 null. 계산은 `roomShareState` 하나.
+   */
+  partial: { done: number; need: number } | null;
   usualHeadcount: number;
 };
 
@@ -193,7 +198,7 @@ export async function loadHeldRoomKeys(supabase: Client, organizationId: string,
   return out;
 }
 
-type SessionRow = { room_label: string; status: string; cleaning_date: string };
+type SessionRow = { room_label: string; status: string; cleaning_date: string; staff_user_id: string; closed_without_cleaning: boolean };
 
 /**
  * 하루 배정 대상 방. `date` 는 도쿄 운영일.
@@ -205,7 +210,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
   const holdFrom = addDays(date, -(MAX_DEFER_DAYS + CARRY_LOOKBACK_DAYS + 1));
   const yesterday = addDays(date, -1);
 
-  const [targets, extras, usedDaysResult, sessionsResult, roomSettingsResult, holdsResult] = await Promise.all([
+  const [targets, extras, usedDaysResult, sessionsResult, roomSettingsResult, holdsResult, todayAssignResult] = await Promise.all([
     getCleaningTargets(organizationId, date, supabase),
     supabase
       .from("cleaning_list_extra_rooms")
@@ -223,7 +228,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     readAllPages<SessionRow>((start, end) =>
       supabase
         .from("cleaning_sessions")
-        .select("room_label, status, cleaning_date")
+        .select("room_label, status, cleaning_date, staff_user_id, closed_without_cleaning")
         .eq("organization_id", organizationId)
         .gte("cleaning_date", holdFrom)
         .lte("cleaning_date", date)
@@ -240,8 +245,10 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
       .eq("organization_id", organizationId)
       .gte("origin_date", holdFrom)
       .lte("origin_date", date),
+    // 그날 배정(방 → 사람) — 2인 방 「1/2 끝남」을 세는 필요한 수.
+    supabase.from("cleaning_assignments").select("room_key, user_id").eq("organization_id", organizationId).eq("work_date", date),
   ]);
-  for (const result of [extras, usedDaysResult, sessionsResult, roomSettingsResult, holdsResult]) {
+  for (const result of [extras, usedDaysResult, sessionsResult, roomSettingsResult, holdsResult, todayAssignResult]) {
     if (result.error) throw new Error(result.error.message);
   }
 
@@ -270,7 +277,9 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
   // 청소 기록 이름(「건물 방」) 그대로를 키로 쓰고, 방 쪽도 `sessionRoomLabel` 로 한 번 더 찾는다 — 버리면 그 방은
   // 청소해도 늘 「대기」로 보이고 다음 날 「밀려 온 방」으로 다시 떴다(2026-11-02 리뷰).
   const completedDates = new Map<string, string[]>();
-  const todayStatus = new Map<string, AssignRoomStatus>();
+  const todayRecords = new Map<string, RoomRecord[]>();
+  const todayAssignees = new Map<string, string[]>();
+  for (const row of todayAssignResult.data ?? []) todayAssignees.set(row.room_key, [...(todayAssignees.get(row.room_key) ?? []), row.user_id]);
   const doneDatesOf = (room: { roomKey: string; sessionRoomLabel: string }) =>
     completedDates.get(room.roomKey) ?? completedDates.get(room.sessionRoomLabel) ?? [];
   for (const row of sessionsResult.data) {
@@ -281,14 +290,20 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
       completedDates.set(key, list);
     }
     if (row.cleaning_date === date) {
-      const prev = todayStatus.get(key);
-      if (row.status === "completed") todayStatus.set(key, "done");
-      else if (row.status === "in_progress" && prev !== "done") todayStatus.set(key, "progress");
+      // 2인 방은 각자 기록(2026-11-02 점검 C1) — 방 상태는 `roomShareState` 가 사람 단위 기록으로 정한다.
+      todayRecords.set(key, [
+        ...(todayRecords.get(key) ?? []),
+        { staffId: row.staff_user_id, status: row.status, closed: row.closed_without_cleaning },
+      ]);
     }
   }
 
   const rooms = new Map<string, AssignRoom>();
-  const base = (key: { roomKey: string; propertyName: string; roomLabel: string; sessionRoomLabel: string }): AssignRoom => ({
+  const shareOf = (key: { roomKey: string; sessionRoomLabel: string }) =>
+    roomShareState(todayRecords.get(key.roomKey) ?? todayRecords.get(key.sessionRoomLabel) ?? [], todayAssignees.get(key.roomKey) ?? []);
+  const base = (key: { roomKey: string; propertyName: string; roomLabel: string; sessionRoomLabel: string }): AssignRoom => {
+    const share = shareOf(key);
+    return {
     ...key,
     source: "checkout",
     hasTurnover: false,
@@ -303,9 +318,11 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     holdReason: null,
     deferredUntil: null,
     resolvedHold: false,
-    status: todayStatus.get(key.roomKey) ?? todayStatus.get(key.sessionRoomLabel) ?? "pending",
+    status: share.status,
+    partial: share.partial ? { done: share.done, need: share.need } : null,
     usualHeadcount: usual.get(key.roomKey) ?? 1,
-  });
+    };
+  };
 
   for (const target of targets.cleaningList) {
     const key = physicalKeyOf(target.canonicalPropertyName, target.canonicalRoomLabel);
@@ -340,6 +357,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     }
     if (hold?.kind === "resolved") {
       room.status = "done";
+      room.partial = null;
       room.resolvedHold = true;
       room.holdReason = hold.reason;
     }
@@ -356,6 +374,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
   const markHeld = (room: AssignRoom, hold: { kind: string; until_date: string | null; reason: string | null }) => {
     if (hold.kind === "resolved") {
       room.status = "done";
+      room.partial = null;
       room.resolvedHold = true;
     } else {
       room.deferredUntil = hold.until_date;

@@ -16,6 +16,7 @@ import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
 import type { CleaningStaffOption } from "@/lib/cleaning";
 import { fetchAdminCleaningHistory, forceCompleteCleaningSession } from "@/app/admin/cleaning/actions";
+import { roomStatusOf } from "@/components/admin/cleaning/cleaning-console-shared";
 import "./cleaning-console.css";
 import { BUILDING_ORDER, nowLabelTokyo, type BuildingKey, type CleaningTaskType } from "./cleaning-console-data";
 import { buildConsoleCopy, buildStaffDirectory } from "./cleaning-console-shared";
@@ -128,9 +129,10 @@ export function CleaningConsole({
   // 취소 카드(예약 대상이 없는 임의 청소가 취소된 건)는 청소 "대상"이 아니므로 KPI 분모에서 뺀다.
   // 카드 자체는 오늘 현황 보드에 계속 보인다.
   const countableTasks = tasks.filter((task) => task.status !== "cancelled");
-  const pendingCount = countableTasks.filter((task) => task.status === "pending").length;
-  const progressCount = countableTasks.filter((task) => task.status === "progress").length;
-  const doneCount = countableTasks.filter((task) => task.status === "done").length;
+  // 방 기준(2인 방 「1/2 끝남」은 진행 중) — `roomStatusOf`.
+  const pendingCount = countableTasks.filter((task) => roomStatusOf(task) === "pending").length;
+  const progressCount = countableTasks.filter((task) => roomStatusOf(task) === "progress").length;
+  const doneCount = countableTasks.filter((task) => roomStatusOf(task) === "done").length;
   const rate = countableTasks.length ? Math.round((doneCount / countableTasks.length) * 100) : 0;
   const setupCount = setupTargets.length;
 

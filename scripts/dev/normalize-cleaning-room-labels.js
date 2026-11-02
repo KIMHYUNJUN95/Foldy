@@ -188,12 +188,19 @@ function buildAliasMap(rooms) {
   }
 
   let updatedCount = 0;
+  const skippedDuplicates = [];
   if (apply && updates.length > 0) {
     for (const item of updates) {
       const { error } = await supabase
         .from("cleaning_sessions")
         .update({ room_label: item.to })
         .eq("id", item.id);
+      // 같은 사람 · 같은 날 · 같은 방 기록이 이미 그 라벨로 있으면 유니크 인덱스가 막는다
+      // (cleaning_sessions_one_per_user_room_day_idx, 2026-11-02) — 멈추지 않고 건너뛴 목록으로 보고한다.
+      if (error && error.code === "23505") {
+        skippedDuplicates.push(item);
+        continue;
+      }
       if (error) throw error;
       updatedCount += 1;
     }
@@ -209,6 +216,8 @@ function buildAliasMap(rooms) {
         scannedSessionCount: (sessions ?? []).length,
         candidateUpdateCount: updates.length,
         updatedCount,
+        skippedDuplicateCount: skippedDuplicates.length,
+        skippedDuplicates: skippedDuplicates.slice(0, 10),
         sampleUpdates: updates.slice(0, 10),
         unresolvedCount,
         unresolvedSamples,

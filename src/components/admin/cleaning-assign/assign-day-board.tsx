@@ -442,7 +442,9 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             </span>
           ) : null}
           {room.deferredUntil ? <span className="cas-tag is-warn">{fill(copy.deferredTo, { date: shortDate(room.deferredUntil) })}</span> : null}
-          {room.status === "progress" ? <span className="cas-tag is-pri">{copy.statusProgress}</span> : null}
+          {room.status === "progress" ? (
+            <span className="cas-tag is-pri">{room.partial ? fill(copy.statusPartial, room.partial) : copy.statusProgress}</span>
+          ) : null}
           {room.status === "done" ? <span className="cas-tag">{room.resolvedHold ? copy.tagResolved : copy.statusDone}</span> : null}
           {opts.open ? <span className="cas-room__note">{[roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · ")}</span> : null}
           {room.people.map((p) =>

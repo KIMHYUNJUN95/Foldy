@@ -33,10 +33,11 @@ import {
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
   localizeRoomPlaceLabel,
-  physicalRoomKeyOfSessionLabel,
 } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
+import { roomWriteErrorKind, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
+import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
 // 소요시간 포맷은 화면(오늘 현황 카드·기록 표·상세 패널)이 쓰는 fmtDur 를 그대로 재사용한다 —
 // 예전에는 여기에 같은 규칙을 한 번 더 구현해 두 벌이 갈릴 위험이 있었다.
 import { fmtDate, fmtDur, toMin, type BuildingKey, type CleaningTaskType } from "@/components/admin/cleaning/cleaning-console-data";
@@ -330,17 +331,33 @@ export async function forceCompleteCleaningSession(
     // 취소만 남은 방(콘솔 「취소됨」 카드)은 그 기록을 되살리지 않고 아래에서 새 완료 기록을 만든다 — 취소 이력은 남긴다.
     if (existing.data.status === "cancelled") sessionId = null;
   }
+  // 새 기록(세션 id 없음)일 때만 — 실제 방 키(`room_key`, 배정 방 키와 같은 모양)를 만들고 넣어도 되는지 본다(2026-11-02 점검 C1).
+  let roomKey: string | null = null;
   if (!sessionId) {
-    // 같은 날 같은 **실제 방**(쉬는 계정 라벨 포함)에 이미 기록이 있으면 막는다 — 남의 진행 중 기록을 가로채지 않는다.
-    // 남는 틈: 읽기 → 넣기 사이에 직원이 시작하는 경쟁은 DB 유니크 인덱스가 있어야 완전히 막힌다(문서 07 「남은 것」, 묶음 C).
-    const sameDay = await service
-      .from("cleaning_sessions")
-      .select("room_label, status")
-      .eq("organization_id", organizationId)
-      .eq("cleaning_date", cleaningDate)
-      .in("status", ["in_progress", "completed"]);
-    if (sameDay.error) return { ok: false, reason: "error" };
-    if (pickForceCompleteTarget(sameDay.data ?? [], roomLabel, physicalRoomKeyOfSessionLabel) === "processed") {
+    // 같은 날 같은 **실제 방**(쉬는 계정 라벨 포함) 기록을 보고 막는다 — 남의 진행 중 기록을 가로채지 않는다(점검 A).
+    // 2인 방은 각자 기록이라 그 방에 배정된 직원 몫은 넣을 수 있다(`pickForceCompleteTarget` → `canRecordInRoom`). 같은 순간 직원이
+    // 시작하는 경쟁은 DB 트리거 · 유니크 인덱스가 막는다(아래 insert 실패 → processed).
+    // 카탈로그 읽기 오류는 막는다 — 카탈로그 없이 만든 방 키는 이름표 없는 새 건물에서 배정 키와 모양이 달라 기록에 틀린 키가 남는다.
+    // 세 읽기를 함께 — 그 직원의 그날 배정은 방 키 없이 읽고(몇 줄뿐) 방 키를 안 뒤 메모리에서 맞춘다.
+    const [catalogRows, sameDay, staffAssignments] = await Promise.all([
+      fetchRoomCatalogRows(organizationId, service),
+      service
+        .from("cleaning_sessions")
+        .select("room_key, room_label, status, staff_user_id, closed_without_cleaning")
+        .eq("organization_id", organizationId)
+        .eq("cleaning_date", cleaningDate)
+        .in("status", ["in_progress", "completed"]),
+      service
+        .from("cleaning_assignments")
+        .select("room_key")
+        .eq("organization_id", organizationId)
+        .eq("work_date", cleaningDate)
+        .eq("user_id", input.staffId),
+    ]);
+    if (catalogRows.error || sameDay.error || staffAssignments.error) return { ok: false, reason: "error" };
+    roomKey = sessionRoomKeyOf(roomLabel, buildActiveRoomCatalog(catalogRows.data));
+    const staffAssigned = (staffAssignments.data ?? []).some((row) => row.room_key === roomKey);
+    if (pickForceCompleteTarget(sameDay.data ?? [], roomLabel, roomKey, input.staffId, staffAssigned) === "processed") {
       return { ok: false, reason: "processed" };
     }
   }
@@ -386,7 +403,8 @@ export async function forceCompleteCleaningSession(
       ? update.eq("status", "completed").eq("duration_seconds", 0).eq("closed_without_cleaning", false).eq("completed_at", unmeasuredAt ?? "")
       : update.eq("status", "in_progress")
     ).select("id");
-    if (error) return { ok: false, reason: "error" };
+    // 담당을 바꿔 완료할 때 그 사람이 이미 그 방 기록이 있거나 그 방에 배정 안 됐는데 남 기록이 있으면 DB 가 막는다(점검 C1) — 이미 처리된 방으로 알린다.
+    if (error) return { ok: false, reason: isRoomTakenError(error) ? "processed" : "error" };
     // 0행 = 읽은 뒤 그 사이에 직원이 끝냈거나 취소했다(또는 시각이 이미 채워졌다) — 덮어쓰지 않는다.
     if (!updated || updated.length === 0) return { ok: false, reason: "processed" };
     await afterForceComplete(organizationId);
@@ -395,6 +413,7 @@ export async function forceCompleteCleaningSession(
 
   const { error } = await service.from("cleaning_sessions").insert({
     organization_id: organizationId,
+    room_key: roomKey,
     room_label: roomLabel,
     task_label: taskTypeToTaskLabel(input.taskType),
     staff_user_id: input.staffId,
@@ -406,9 +425,15 @@ export async function forceCompleteCleaningSession(
     notes: input.note || null,
     completed_by_admin: session.user.id,
   });
-  if (error) return { ok: false, reason: "error" };
+  if (error) return { ok: false, reason: isRoomTakenError(error) ? "processed" : "error" };
   await afterForceComplete(organizationId);
   return { ok: true };
+}
+
+/** DB 가 마지막에 막은 경우(방 트리거 · 한 사람 한 방 유니크, 점검 C1) — 분류는 직원 시작과 같은 `roomWriteErrorKind`. 그 밖은 「오류」. */
+function isRoomTakenError(error: { message?: string; details?: string | null }): boolean {
+  const kind = roomWriteErrorKind(error);
+  return kind === "resolved" || kind === "taken";
 }
 
 /**

@@ -60,6 +60,8 @@ export type CleaningAssignCopy = {
   bigRoom: string; // "큰 방"
   statusProgress: string;
   statusDone: string;
+  /** 2인 방 일부만 끝냄 — 「1/2 끝남」({done} · {need}). */
+  statusPartial: string;
   deferredTo: string; // "{date}로 미룸"
   moreActions: string;
   deferNextDay: string;
@@ -435,6 +437,9 @@ export type CleaningAssignCopy = {
   myFinishedToast: string;
   myUndo: string;
   myMateCleaning: string;
+  /** 2인 방 「같이」 칸 — 같이 하는 사람의 오늘 기록(각자 기록, 2026-11-02 점검 C1). */
+  mateStateProgress: string;
+  mateStateDone: string;
   myTimerLabel: string;
   myStartedAt: string;
   myLost: string;
@@ -574,6 +579,7 @@ const ko: CleaningAssignCopy = {
   bigRoom: "큰 방",
   statusProgress: "청소 중",
   statusDone: "끝남",
+  statusPartial: "{done}/{need} 끝남",
   deferredTo: "{date}로 미룸",
   moreActions: "미루기 · 처리 끝",
   deferNextDay: "다음 날로 미루기",
@@ -930,6 +936,8 @@ const ko: CleaningAssignCopy = {
   myFinishedToast: "{room} 끝냈어요 · {n}분",
   myUndo: "되돌리기",
   myMateCleaning: "같이 하는 사람이 청소 중이에요",
+  mateStateProgress: "{name} · 청소 중",
+  mateStateDone: "{name} · 끝남",
   myTimerLabel: "청소 {n}분 지남",
   myStartedAt: "{time} 시작",
   myLost: "분실물 올리기",
@@ -1068,6 +1076,7 @@ const ja: CleaningAssignCopy = {
   bigRoom: "大部屋",
   statusProgress: "清掃中",
   statusDone: "完了",
+  statusPartial: "{done}/{need} 完了",
   deferredTo: "{date}に延期",
   moreActions: "延期 · 処理済み",
   deferNextDay: "翌日に延期",
@@ -1424,6 +1433,8 @@ const ja: CleaningAssignCopy = {
   myFinishedToast: "{room} を終えました · {n}分",
   myUndo: "元に戻す",
   myMateCleaning: "一緒の人が清掃中です",
+  mateStateProgress: "{name} · 清掃中",
+  mateStateDone: "{name} · 完了",
   myTimerLabel: "清掃 {n}分経過",
   myStartedAt: "{time} 開始",
   myLost: "忘れ物を登録",
@@ -1562,6 +1573,7 @@ const en: CleaningAssignCopy = {
   bigRoom: "Large room",
   statusProgress: "Cleaning",
   statusDone: "Done",
+  statusPartial: "{done}/{need} done",
   deferredTo: "Postponed to {date}",
   moreActions: "Postpone · close",
   deferNextDay: "Postpone to next day",
@@ -1918,6 +1930,8 @@ const en: CleaningAssignCopy = {
   myFinishedToast: "{room} done · {n} min",
   myUndo: "Undo",
   myMateCleaning: "Your partner is cleaning this room",
+  mateStateProgress: "{name} · cleaning",
+  mateStateDone: "{name} · done",
   myTimerLabel: "{n} min cleaning",
   myStartedAt: "Started {time}",
   myLost: "Report lost item",

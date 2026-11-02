@@ -42,17 +42,22 @@ export async function CleaningBoardScreen({ session }: { session: AppSession }) 
       .eq("organization_id", session.organization.id)
       .eq("cleaning_date", today)
       .in("status", ["in_progress", "completed"])
+      // 관리자 「처리 끝」 기록은 청소가 아니다(그 방은 현황판에 그리지 않는다).
+      .eq("closed_without_cleaning", false)
       .order("started_at", { ascending: false }),
   ]);
 
-  // 방마다 가장 최근 기록 하나(끝난 기록이 있으면 그것) — 실제 방 키로 묶는다(한 방에 Beds24 계정이 둘인 건물).
+  // 방마다 기록 하나 — 실제 방 키로 묶는다(한 방에 Beds24 계정이 둘인 건물). 청소 중인 기록이 있으면 그것(2인 방은 각자 기록이라
+  // 한 사람이 끝내도 다른 사람이 청소 중이면 방은 「청소 중」, 2026-11-02 점검 C1), 없으면 **가장 늦게 끝난** 기록 — 2인 방은 마지막
+  // 사람이 끝낸 시각이 방이 끝난 시각이다.
   const sessions = new Map<string, BoardSessionInfo>();
   for (const row of sessionsResult.data ?? []) {
-    const key = physicalRoomKeyOfSessionLabel(row.room_label);
-    if (!key) continue;
+    const key = physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label;
     const prev = sessions.get(key);
-    if (!prev || (row.status === "completed" && !prev.completedAt)) {
-      sessions.set(key, { completedAt: row.completed_at, startedAt: row.started_at });
+    const live = row.status === "in_progress";
+    const later = !live && prev?.completedAt != null && (row.completed_at ?? "") > prev.completedAt;
+    if (!prev || (live && prev.completedAt) || later) {
+      sessions.set(key, { completedAt: live ? null : row.completed_at, startedAt: row.started_at });
     }
   }
 
@@ -60,7 +65,7 @@ export async function CleaningBoardScreen({ session }: { session: AppSession }) 
   const roomByKey = new Map(board.rooms.map((room) => [room.roomKey, room]));
   const viewRows: BoardViewRow[] = rows.map((row) => {
     const room = roomByKey.get(row.roomKey);
-    const started = row.kind === "progress" ? (sessions.get(row.roomKey)?.startedAt ?? null) : null;
+    const started = row.kind === "progress" && !row.partial ? ((sessions.get(row.roomKey) ?? (room ? sessions.get(room.sessionRoomLabel) : undefined))?.startedAt ?? null) : null;
     return { ...row, info: room ? checkInText(room, copy) : "", startedAt: started };
   });
   const people: BoardViewPerson[] = board.people.map((p) => ({

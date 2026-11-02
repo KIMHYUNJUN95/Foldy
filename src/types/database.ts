@@ -2619,6 +2619,7 @@ export type Database = {
           id: string
           notes: string | null
           organization_id: string
+          room_key: string | null
           room_label: string
           staff_user_id: string
           started_at: string
@@ -2636,6 +2637,7 @@ export type Database = {
           id?: string
           notes?: string | null
           organization_id: string
+          room_key?: string | null
           room_label: string
           staff_user_id: string
           started_at?: string
@@ -2653,6 +2655,7 @@ export type Database = {
           id?: string
           notes?: string | null
           organization_id?: string
+          room_key?: string | null
           room_label?: string
           staff_user_id?: string
           started_at?: string

@@ -14,6 +14,7 @@ import {
   ReportBadges,
   buildingLabelOf,
   durLabel,
+  roomStatusOf,
   statusLabel,
   type ConsoleCopy,
   type StaffDirectory,
@@ -62,13 +63,19 @@ function RoomCard({
   onSelect: (id: string) => void;
 }) {
   const bRoom = useRoomPlaceLabel();
-  const minutes =
-    task.status === "progress" ? elapsedMin(task.start) : task.status === "done" ? durationMin(task.start, task.end) : null;
+  // 「1/2 끝남」 방은 지금 청소 중인 사람이 없고 다 끝나지도 않았다 — 끝난 한 사람의 소요 시간을 방 시간처럼 보이지 않는다.
+  const minutes = task.partial
+    ? null
+    : task.status === "progress"
+      ? elapsedMin(task.start)
+      : task.status === "done"
+        ? durationMin(task.start, task.end)
+        : null;
   const staffName = task.staffId ? staffLabelOf(task.staffId, staffDirectory) : "";
 
   return (
     <div
-      className={`cl-tile is-${task.status}${selected ? " sel" : ""}`}
+      className={`cl-tile is-${roomStatusOf(task)}${selected ? " sel" : ""}`}
       onClick={() => onSelect(task.id)}
       role="button"
       tabIndex={0}
@@ -84,7 +91,7 @@ function RoomCard({
         <span className="cl-tile__badges">
           <CancelledBadge count={task.cancelledCount} t={t} />
           <ReportBadges reports={task.reports} t={t} />
-          <span className={`cl-st cl-st--${task.status}`}>{statusLabel(task.status, t)}</span>
+          <span className={`cl-st cl-st--${roomStatusOf(task)}`}>{statusLabel(roomStatusOf(task), t, task.partial)}</span>
         </span>
       </div>
       <div className="cl-tile__type">
@@ -156,7 +163,7 @@ function BuildingSections(props: {
   return (
     <>
       {sections.map(({ key, label, items }) => {
-        const done = items.filter((task) => task.status === "done").length;
+        const done = items.filter((task) => roomStatusOf(task) === "done").length;
         const pct = Math.round((done / items.length) * 100);
         return (
           <div key={key}>
@@ -214,9 +221,9 @@ function StatusBuckets(props: {
     label: string;
     has: (task: AdminCleaningTask) => boolean;
   }> = [
-    { key: "pending", label: t.bkPending, has: (task) => task.status === "pending" },
-    { key: "progress", label: t.bkProgress, has: (task) => task.status === "progress" },
-    { key: "done", label: t.bkDone, has: (task) => task.status === "done" },
+    { key: "pending", label: t.bkPending, has: (task) => roomStatusOf(task) === "pending" },
+    { key: "progress", label: t.bkProgress, has: (task) => roomStatusOf(task) === "progress" },
+    { key: "done", label: t.bkDone, has: (task) => roomStatusOf(task) === "done" },
   ];
   if (hasCancelled) {
     buckets.push({ key: "cancelled", label: t.stCancelled, has: (task) => task.status === "cancelled" });
@@ -324,8 +331,9 @@ function StaffSummarySection({
 }) {
   // 완료했거나 지금 청소 중인 사람 — 시안 「완료 1 · 진행 1」(2026-10-13, 진행만 있는 사람도 보인다).
   // 청소 배정 「처리 끝」 기록은 누른 관리자의 청소가 아니다 — 직원별 요약에서 뺀다.
-  const worked = tasks.filter((task) => task.staffId && !task.closed && (task.status === "done" || task.status === "progress"));
-  const ids = new Set(worked.map((task) => task.staffId));
+  // 사람마다 기록으로 센다(`task.workers`) — 2인 방은 카드 담당이 한 사람이라 카드로 세면 두 번째 사람 몫이 빠진다.
+  const worked = tasks.filter((task) => !task.closed).flatMap((task) => task.workers);
+  const ids = new Set(worked.map((work) => work.staffId));
   const staffList = [...staffDirectory.values()].filter((s) => ids.has(s.id));
   if (!staffList.length) return null;
   return (
@@ -335,10 +343,10 @@ function StaffSummarySection({
       </div>
       <div className="cl-staff">
         {staffList.map((s) => {
-          const mine = worked.filter((task) => task.staffId === s.id);
-          const done = mine.filter((task) => task.status === "done");
+          const mine = worked.filter((work) => work.staffId === s.id);
+          const done = mine.filter((work) => work.status === "done");
           const prog = mine.length - done.length;
-          const durs = done.map((task) => durationMin(task.start, task.end)).filter((v): v is number => v != null);
+          const durs = done.map((work) => durationMin(work.start, work.end)).filter((v): v is number => v != null);
           const avg = durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null;
           return (
             <div className="cl-staffc" key={s.id}>

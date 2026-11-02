@@ -5,7 +5,7 @@ import type { BoardPerson, BoardRoom } from "@/lib/cleaning-assign/data";
  * 방마다 한 상태로 정리한다. 화면은 이것만 그린다(계산은 여기 한 곳, 테스트: `__tests__/cleaning-board.test.ts`).
  *
  * - 끝남: 오늘 끝낸 기록이 있음
- * - 청소 중: 진행 중 기록 — 흐른 분
+ * - 청소 중: 진행 중 기록 — 흐른 분. 2인 방에서 일부만 끝냈으면 「1/2 끝남」(`partial`, 흐른 분 없음)
  * - 늦음: 담당이 있는데 담당 누구도 아직 아무 방도 시작하지 않았고, 가장 이른 출근 시각에서 30분이 지남
  * - 대기: 담당이 있고 아직 시작 전(늦음 아님)
  * - 담당 없음: 담당이 아무도 없음
@@ -28,6 +28,8 @@ export type CleaningBoardRow = {
   people: { userId: string; name: string }[];
   /** 청소 중 — 흐른 분. */
   elapsedMinutes: number | null;
+  /** 2인 방 일부만 끝냄(「1/2 끝남」) — `kind` 는 progress. 계산은 `roomShareState`(방 상태와 같은 곳). */
+  partial: { done: number; need: number } | null;
   /** 끝남 — 끝난 시각(ISO). */
   completedAt: string | null;
   /** 늦음 — 출근 시각에서 지난 분 · 출근 시각(분) · 그 사람 이름. */
@@ -62,7 +64,8 @@ export function buildCleaningBoard(input: {
   }
 
   const rows = visible.map((room): CleaningBoardRow => {
-    const session = input.sessions.get(room.roomKey) ?? null;
+    // 이름표 규칙이 없는 새 건물은 기록이 「건물 방」 라벨로 묶여 온다 — 방 키로 못 찾으면 그 라벨로 찾는다.
+    const session = input.sessions.get(room.roomKey) ?? input.sessions.get(room.sessionRoomLabel) ?? null;
     const people = room.people.map((p) => ({ name: p.name, userId: p.userId }));
     let kind: BoardKind;
     let elapsedMinutes: number | null = null;
@@ -73,7 +76,8 @@ export function buildCleaningBoard(input: {
     if (room.status === "done") kind = "done";
     else if (room.status === "progress") {
       kind = "progress";
-      if (session && input.nowMinutes !== null) {
+      // 「1/2 끝남」은 지금 청소 중인 사람이 없다 — 끝난 기록의 시작 시각으로 흐른 분을 세지 않는다.
+      if (session && input.nowMinutes !== null && !room.partial) {
         elapsedMinutes = Math.max(0, Math.floor((input.now.getTime() - new Date(session.startedAt).getTime()) / 60000));
       }
     } else if (people.length === 0) kind = "open";
@@ -99,6 +103,7 @@ export function buildCleaningBoard(input: {
       completedAt: kind === "done" ? (session?.completedAt ?? null) : null,
       editable: room.status === "pending",
       elapsedMinutes,
+      partial: kind === "progress" ? room.partial : null,
       hasTurnover: room.hasTurnover,
       kind,
       lateMinutes,

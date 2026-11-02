@@ -26,6 +26,7 @@ import {
   isCleaningTaskKey,
 } from "@/lib/cleaning";
 import { getCleaningTargets } from "@/lib/cleaning-targets";
+import { sessionRoomKeyLookup, shouldOfferStart, type RoomRecord } from "@/lib/cleaning-assign/room-key";
 import { CleaningDaySwitcher } from "@/components/cleaning/cleaning-day-switcher";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -415,7 +416,10 @@ export default async function MobileCleaningPage({
     isToday ? Promise.resolve([]) : getCleaningStaffOptions(session.organization.id).catch(() => []),
     getCleaningTargets(session.organization.id, viewDate).catch(() => null),
     getActiveRoomCatalogServer(session.organization.id).catch(() => undefined),
-    getOrgProcessedCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
+    getOrgProcessedCleaningRoomLabels(session.organization.id, viewDate).catch(() => ({
+      rows: [] as { room_label: string; status: "in_progress" | "completed"; staff_user_id: string; closed_without_cleaning: boolean }[],
+      assigneesByRoomKey: new Map<string, Set<string>>(),
+    })),
     isToday ? Promise.resolve([]) : getOrgTodayCleaningRoomLabels(session.organization.id, viewDate).catch(() => []),
     getMobileNavBadges(),
   ]);
@@ -458,15 +462,28 @@ export default async function MobileCleaningPage({
   const unknownRoomLabelSamples: string[] = [];
   let unknownRoomLabelCount = 0;
   let resolvedByAliasCount = 0;
-  for (const s of orgProcessedSessions) {
+  // 누가 시작 · 끝낸 방은 숨긴다 — 단 화면 규칙 하나(`shouldOfferStart`, 오늘 내 방과 같음)로 나에게 시작을 내밀 방은 남긴다:
+  // 내가 그날 그 방에 배정됐고, 내 기록이 없고, 그 방 다른 기록이 모두 같이 배정된 사람 것일 때(2인 방 내 몫). 「처리 끝」 방 ·
+  // 배정 안 된 사람이 해 둔 방은 숨긴다. 서버(`startSessionCore` → `roomRecordDecision`)가 시작할 때 다시 본다.
+  const assignKeyOf = sessionRoomKeyLookup(roomCatalog);
+  const recordsByRoomKey = new Map<string, { assignKey: string; records: RoomRecord[] }>();
+  for (const s of orgProcessedSessions.rows) {
     const resolved = resolveRoomKey(s.room_label, catalogLabelMap, legacyAliasMap);
     if (resolved.matchedBy === "legacy_alias") resolvedByAliasCount += 1;
     if (resolved.roomKey !== null) {
-      processedRoomKeys.add(roomKeyOfSession(s.room_label, resolved.roomKey));
+      const key = roomKeyOfSession(s.room_label, resolved.roomKey);
+      const entry = recordsByRoomKey.get(key) ?? { assignKey: assignKeyOf(s.room_label), records: [] };
+      entry.records.push({ staffId: s.staff_user_id, status: s.status, closed: s.closed_without_cleaning });
+      recordsByRoomKey.set(key, entry);
       continue;
     }
     unknownRoomLabelCount += 1;
     if (unknownRoomLabelSamples.length < 5) unknownRoomLabelSamples.push(s.room_label);
+  }
+  for (const [key, entry] of recordsByRoomKey) {
+    const assignees = orgProcessedSessions.assigneesByRoomKey.get(entry.assignKey) ?? new Set<string>();
+    // 지난 날은 시작할 수 없어 「내 몫」을 남길 까닭이 없다 — 기록이 있는 방은 예전처럼 처리된 방으로 뺀다.
+    if (!isToday || !shouldOfferStart(entry.records, session.user.id, assignees)) processedRoomKeys.add(key);
   }
   // 과거 날짜용 — 객실별 "누가 언제 했는지". 오늘은 시작 버튼을 그려야 하므로 만들지 않는다.
   const recordByRoomKey = new Map<string, DayCleaningRecord>();
@@ -525,8 +542,12 @@ export default async function MobileCleaningPage({
     roomTitle: getLocalizedRoomTitle(target.canonicalPropertyName, target.canonicalRoomLabel, copy),
   }));
   const sessionLabelToLocalizedRoomTitleMap = buildSessionLabelToLocalizedRoomTitleMap(roomCatalog, copy);
-  // 조직 전체의 in_progress 개수 — KPI 일관성을 위해 큐 필터와 같은 범위
-  const inProgressCount = orgProcessedSessions.filter((s) => s.status === "in_progress").length;
+  // 조직 전체의 청소 중 **방** 수 — 2인 방에서 둘이 같이 청소 중이어도 방 하나(같은 방 묶기는 위 목록과 같은 실제 방 키).
+  const inProgressCount = new Set(
+    orgProcessedSessions.rows
+      .filter((s) => s.status === "in_progress" && !s.closed_without_cleaning)
+      .map((s) => physicalRoomKeyOfSessionLabel(s.room_label) ?? s.room_label),
+  ).size;
 
   // 진행 중인 청소가 있으면 새로 시작할 수 없다(유니크 인덱스) — 목록은 보여 주되 시작 버튼은 감춘다(2026-10-13).
   const startable = isToday && !activeSession;

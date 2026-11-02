@@ -132,7 +132,10 @@ export function TodayRoomsView({
   const orderOf = (r: Room) => (isBlocked(r) ? "–" : workRooms.indexOf(r) + 1);
   const roomName = (r: Room) => (r.roomLabel === r.propertyName ? r.buildingLabel : r.roomLabel);
   const info = (r: Room) => checkInText(r, copy);
-  const withText = (r: Room) => (r.mates.length > 0 ? r.mates.map((m) => m.name).join(" · ") : copy.alone);
+  // 2인 방은 각자 기록 — 같이 하는 사람이 시작 · 끝냈으면 이름 옆에 그 상태(2026-11-02 점검 C1).
+  const mateText = (m: Room["mates"][number]) =>
+    m.state === "progress" ? fill(copy.mateStateProgress, { name: m.name }) : m.state === "done" ? fill(copy.mateStateDone, { name: m.name }) : m.name;
+  const withText = (r: Room) => (r.mates.length > 0 ? r.mates.map(mateText).join(", ") : copy.alone);
   const stateText = (r: Room) =>
     r.skipReason ? skipCopy(r.skipReason, copy).state : r.status === "done" ? copy.stateDoneRoom : r.status === "progress" ? copy.stateProgressRoom : copy.stateWaitingRoom;
   const taskText = (r: Room) => (r.taskKey === "long_stay" ? copy.taskLongStay : r.taskKey === "simple" ? copy.taskSimple : null);

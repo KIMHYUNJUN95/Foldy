@@ -9,6 +9,7 @@ import { fmt, type Dictionary, type Locale } from "@/lib/i18n";
 import { BirthDateField } from "./birth-date-field";
 import { BackIcon, CameraIcon, CheckIcon } from "./icons";
 import { LangSwitch } from "./lang-switch";
+import { RouteQuestions, routeSummary } from "./route-questions";
 import { SeatRemover } from "./seat-remover";
 
 // 한 사람 명부(시안 W3). 웹은 여권을 판독하지 않는다 — 사진을 보며 손으로 넣는다(16 §6).
@@ -34,7 +35,7 @@ export type PersonInitial = {
 type Props = {
   token: string;
   locale: Locale;
-  dict: Pick<Dictionary, "person" | "common" | "guests">;
+  dict: Pick<Dictionary, "person" | "common" | "guests" | "route">;
   title: string;
   counter: string;
   initial: PersonInitial;
@@ -45,6 +46,8 @@ type Props = {
   countries: { code: string; name: string }[];
   editable: boolean;
   nextHref: string;
+  /** 대표자(외국 손님)는 저장한 뒤 「어디서 오셔서 어디로」 화면을 먼저 거친다(시안 W3s). */
+  routeHref: string;
   listHref: string;
   canRemove: boolean;
 };
@@ -179,7 +182,7 @@ export function PersonForm(props: Props) {
             return;
           }
         }
-        router.push(props.nextHref);
+        router.push(isRepresentative && foreign ? props.routeHref : props.nextHref);
         router.refresh();
       } catch {
         setMessage(dict.common.error);
@@ -389,7 +392,7 @@ export function PersonForm(props: Props) {
               <div>
                 <p className="text-[15px]">{fmt(dict.person.sameAsRep, { name: props.representativeName })}</p>
                 <p className="mt-1 text-[15px] text-[var(--muted)]">
-                  {[sharedFromRep.address, foreign ? sharedFromRep.prevStay : "", foreign ? sharedFromRep.nextDest : ""]
+                  {[sharedFromRep.address, foreign ? routeSummary(dict.route, sharedFromRep.prevStay, sharedFromRep.nextDest) : ""]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
@@ -414,17 +417,13 @@ export function PersonForm(props: Props) {
                   onChange={(event) => set("address", event.target.value)}
                 />
               </label>
-              {foreign ? (
-                <>
-                  <label>
-                    <span className="w-lab">{dict.person.prevStay}</span>
-                    <input className="w-in" value={form.prevStay} onChange={(event) => set("prevStay", event.target.value)} />
-                  </label>
-                  <label>
-                    <span className="w-lab">{dict.person.nextDest}</span>
-                    <input className="w-in" value={form.nextDest} onChange={(event) => set("nextDest", event.target.value)} />
-                  </label>
-                </>
+              {foreign && !isRepresentative ? (
+                <RouteQuestions
+                  copy={dict.route}
+                  prevStay={form.prevStay}
+                  nextDest={form.nextDest}
+                  onChange={(next) => setForm((current) => ({ ...current, ...next }))}
+                />
               ) : null}
             </>
           )}

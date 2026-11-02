@@ -14,6 +14,12 @@ import com.harutokyo.checkin.kiosk.contract.EnrollResponse
 import com.harutokyo.checkin.kiosk.contract.FindQuery
 import com.harutokyo.checkin.kiosk.contract.FindResponse
 import com.harutokyo.checkin.kiosk.contract.FindResult
+import com.harutokyo.checkin.kiosk.contract.GuestInput
+import com.harutokyo.checkin.kiosk.contract.RouteBody
+import com.harutokyo.checkin.kiosk.contract.SaveGuestBody
+import com.harutokyo.checkin.kiosk.contract.SaveResponse
+import com.harutokyo.checkin.kiosk.contract.SaveResult
+import com.harutokyo.checkin.kiosk.contract.saveResultOf
 import com.harutokyo.checkin.kiosk.contract.KioskStay
 import com.harutokyo.checkin.kiosk.contract.PartyResponse
 import com.harutokyo.checkin.kiosk.contract.findResultOf
@@ -157,6 +163,42 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
             return null
         }
         return runCatching { Api.json.decodeFromString<PartyResponse>(result.body) }.getOrNull()?.stay
+    }
+
+    /** 시안 T3c · T3n — 한 사람 명부 저장. */
+    suspend fun saveGuest(sessionId: String, guest: GuestInput): SaveResult =
+        post("/api/kiosk/guests", Api.json.encodeToString(SaveGuestBody(sessionId, guest)))
+
+    /** 시안 T3s — 전 숙박지 · 다음 행선지(대표자, 같은 값을 쓰는 동행자도). */
+    suspend fun saveRoute(sessionId: String, prevStay: String, nextDest: String): SaveResult =
+        post("/api/kiosk/route", Api.json.encodeToString(RouteBody(sessionId, prevStay, nextDest)))
+
+    /** 시안 T3 — 찍은 여권 사진(JPEG). 저장한 사람에게만. */
+    suspend fun uploadPassport(sessionId: String, guestId: String, jpeg: ByteArray): SaveResult {
+        val token = vault.get(KEY_TOKEN) ?: return SaveResult.Failed
+        val result = try {
+            Api.upload("/api/kiosk/passport", token, mapOf("session_id" to sessionId, "guest_id" to guestId), "passport.jpg", jpeg)
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return SaveResult.Failed
+        }
+        return saveResultOf(result.status, runCatching { Api.json.decodeFromString<SaveResponse>(result.body) }.getOrNull())
+    }
+
+    private suspend fun post(path: String, body: String): SaveResult {
+        val token = vault.get(KEY_TOKEN) ?: return SaveResult.Failed
+        val result = try {
+            Api.request("POST", path, token, body)
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return SaveResult.Failed
+        }
+        if (result.status == 401) {
+            forget(revoked = true)
+            return SaveResult.Failed
+        }
+        _state.update { it.copy(online = true) }
+        return saveResultOf(result.status, runCatching { Api.json.decodeFromString<SaveResponse>(result.body) }.getOrNull())
     }
 
     /** 직원 메뉴 「기기 다시 등록」 · 서버가 폐기를 알렸을 때. 토큰 · 저장된 설정을 지운다. */

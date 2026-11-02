@@ -38,13 +38,13 @@ import com.harutokyo.checkin.kiosk.kiosk.Kiosk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → T1 찾기 → T2 명부(→ 다음 묶음: 여권 · 동의 · 동영상 · 완료).
+// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → T1 찾기 → T2 명부 → T3 여권 · 확인 → T3s 어디서 · 어디로(→ 다음 묶음: 동의 · 동영상 · 완료).
 // 찾기 결과: 못 찾음 T1x · 지금은 못 함 T1b · 이미 체크인 T1c.
 // 손님이 손을 떼고 idleSecondsInput(기본 240초) 지나면 G1 로 돌아간다(FR-K12).
 
 private val PHRASE_BREAK = LineBreak(LineBreak.Strategy.HighQuality, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase)
 
-private enum class Screen { Language, Menu, Find, NotFound, Blocked, CheckedIn, Guests, ComingNext }
+private enum class Screen { Language, Menu, Find, NotFound, Blocked, CheckedIn, Guests, Passport, ComingNext }
 
 @Composable
 fun KioskRoot(model: KioskViewModel = viewModel()) {
@@ -200,8 +200,26 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     if (updated != null) stay = updated
                                     updated != null
                                 },
-                                onStart = { screen = Screen.ComingNext },
+                                onStart = { screen = if (current.guests.isNotEmpty() && emptySeats(current) == 0 && !needsRoute(current)) Screen.ComingNext else Screen.Passport },
                             )
+                        }
+                        Screen.Passport -> {
+                            val current = stay
+                            val id = session
+                            if (current != null && id != null) {
+                                PassportFlow(
+                                    stay = current,
+                                    onSave = { model.saveGuest(id, it) },
+                                    onUpload = { guestId, jpeg -> model.uploadPassport(id, guestId, jpeg) },
+                                    onRoute = { prev, next -> model.saveRoute(id, prev, next) },
+                                    onStay = { stay = it },
+                                    onSessionGone = reset,
+                                    onBack = { screen = Screen.Guests },
+                                    onCall = { screen = Screen.ComingNext },
+                                    // 다음 묶음: 동의 · 동영상 · 완료.
+                                    onDone = { screen = Screen.ComingNext },
+                                )
+                            }
                         }
                         Screen.ComingNext -> ComingNextScreen(onBack = { screen = Screen.Language })
                     }

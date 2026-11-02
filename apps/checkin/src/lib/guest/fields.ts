@@ -79,14 +79,16 @@ export type MissingField =
  * 한 사람이 다 됐는지(시안 W2 「다 됐어요」). 규칙(44 FR-W02 · 43 §2):
  *  - 모두: 이름 · 주소(동행자는 대표자 값을 그대로 저장)
  *  - 일본에 주소가 없는 사람(외국인): 국적 · 여권 번호 · 여권 사진 · 생년월일 · 성별 · 전 숙박지 · 다음 행선지
- *  - 「여권 없음」 어린이는 여권 번호 · 사진을 빼 준다
+ *  - 「여권 없음」 어린이 · 태블릿에서 직원 확인으로 넘긴 사람은 여권 번호 · 사진을 빼 준다
  */
 export function missingFields(guest: StoredGuest, hasPassportPhoto: boolean): MissingField[] {
   const missing: MissingField[] = [];
   if (!guest.name_roman) missing.push("name");
   if (!guest.address) missing.push("address");
   if (guest.has_japan_address) return missing;
-  const passportExempt = guest.guest_type === "child" && !!guest.no_passport_reason;
+  // 「child」 사유는 어린이만. 태블릿의 다른 사유(카메라 불가 · 여권 거부 등)는 직원 확인으로 넘기고 진행(44 FR-K16).
+  const reason = guest.no_passport_reason;
+  const passportExempt = !!reason && (reason !== "child" || guest.guest_type === "child");
   if (!guest.nationality) missing.push("nationality");
   if (!passportExempt && !guest.passport_number) missing.push("passport_number");
   if (!passportExempt && !hasPassportPhoto) missing.push("passport_photo");

@@ -93,7 +93,7 @@ fun shortDate(date: LocalDate): String {
 
 /** 위 줄: 뒤로 · 단계 막대 · (언어). */
 @Composable
-private fun StepTop(step: Int, onBack: () -> Unit, language: String? = null, onLanguage: (() -> Unit)? = null) {
+internal fun StepTop(step: Int, onBack: () -> Unit, language: String? = null, onLanguage: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         OutlineButton(str(R.string.back), onClick = onBack)
         Spacer(Modifier.weight(1f))
@@ -107,7 +107,7 @@ private fun StepTop(step: Int, onBack: () -> Unit, language: String? = null, onL
 
 /** 아래 줄: 직원 호출 · 큰 버튼. */
 @Composable
-private fun BottomRow(onCall: () -> Unit, primary: String, enabled: Boolean = true, onPrimary: () -> Unit) {
+internal fun BottomRow(onCall: () -> Unit, primary: String, enabled: Boolean = true, onPrimary: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
         OutlineButton(str(R.string.staff_call), onClick = onCall)
         Spacer(Modifier.weight(1f))
@@ -116,7 +116,7 @@ private fun BottomRow(onCall: () -> Unit, primary: String, enabled: Boolean = tr
 }
 
 @Composable
-private fun Heading(title: String, body: String?) {
+internal fun Heading(title: String, body: String?) {
     Text(title, color = G.Text, fontSize = 48.sp, fontWeight = FontWeight.Medium, lineHeight = 56.sp)
     if (body != null) {
         Spacer(Modifier.height(16.dp))
@@ -126,7 +126,7 @@ private fun Heading(title: String, body: String?) {
 
 /** 둘 중 하나 고르기(시안 .g-seg). */
 @Composable
-private fun Segmented(left: String, right: String, rightOn: Boolean, onPick: (Boolean) -> Unit) {
+internal fun Segmented(left: String, right: String, rightOn: Boolean, onPick: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).border(BorderStroke(1.dp, G.Line), Radius).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),

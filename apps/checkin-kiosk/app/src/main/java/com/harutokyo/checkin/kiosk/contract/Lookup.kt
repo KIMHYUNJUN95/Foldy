@@ -13,6 +13,9 @@ data class KioskGuest(
     val isChild: Boolean = false,
     val hasPassportPhoto: Boolean = false,
     val missing: List<String> = emptyList(),
+    val hasJapanAddress: Boolean = false,
+    /** 대표자만 — 확인 화면(T3c)에 주소를 미리 채운다. */
+    val address: String? = null,
 )
 
 @Serializable

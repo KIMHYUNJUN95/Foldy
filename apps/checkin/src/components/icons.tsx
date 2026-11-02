@@ -61,3 +61,20 @@ export function LockIcon({ className = "size-5" }: IconProps) {
     </svg>
   );
 }
+
+export function PlaneIcon({ className = "size-5" }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 13.5 21 4l-4 16-5-5-3 3v-5z" />
+    </svg>
+  );
+}
+
+export function BedIcon({ className = "size-5" }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 18V6M3 14h18v4M21 14v-2.5a2.5 2.5 0 0 0-2.5-2.5H11v5" />
+      <circle cx="7" cy="11" r="1.5" />
+    </svg>
+  );
+}

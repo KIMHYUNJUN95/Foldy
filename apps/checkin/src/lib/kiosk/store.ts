@@ -1,8 +1,10 @@
 import "server-only";
 
-import type { StayView } from "../guest/store";
+import type { DeviceRow } from "../device/auth";
+import { loadStayById, type StayView } from "../guest/store";
 import type { CheckinServiceClient } from "../supabase/service";
-import { heldByOther, kioskLanguageOf, type NameCandidate } from "./find";
+import { heldByOther, kioskGate, kioskLanguageOf, type NameCandidate } from "./find";
+import { kioskStatusAfterSave } from "./guests";
 
 // 태블릿 「예약 찾기」 읽기 · 쓰기(서비스 롤). 태블릿에는 이 파일이 만든 값만 넘긴다 — 원문 payload · 다른 예약은 넘기지 않는다.
 
@@ -138,6 +140,32 @@ export async function touchSession(db: CheckinServiceClient, sessionId: string, 
   return (data?.stay_id as string | undefined) ?? null;
 }
 
+/** 이 기기 세션의 stay — 세션이 끝났거나 · 다른 건물 · 막힌 기간이면 null(`session_gone`). */
+export async function openKioskStay(db: CheckinServiceClient, sessionId: string, device: DeviceRow, now: Date): Promise<StayView | null> {
+  const stayId = await touchSession(db, sessionId, device.id, now);
+  if (!stayId) return null;
+  const stay = await loadStayById(db, stayId);
+  if (!stay || stay.propertyKey !== device.property_key || kioskGate(stay, now).kind === "blocked") return null;
+  return stay;
+}
+
+/** 저장 뒤 다시 읽고, 미리 끝났던 예약이 덜 된 상태가 되면 pending 으로 내린다(태블릿은 올리지 않는다). */
+export async function reloadKioskStay(db: CheckinServiceClient, stayId: string): Promise<StayView | null> {
+  const stay = await loadStayById(db, stayId);
+  if (!stay) return null;
+  const next = kioskStatusAfterSave(stay);
+  if (next) {
+    const { error } = await db
+      .from("stays")
+      .update({ status: next, updated_at: new Date().toISOString() })
+      .eq("id", stay.id)
+      .eq("status", "pre_registered");
+    if (error) throw new Error(`stays 갱신 실패: ${error.message}`);
+    stay.status = next;
+  }
+  return stay;
+}
+
 export type KioskGuest = {
   id: string;
   name: string | null;
@@ -145,9 +173,12 @@ export type KioskGuest = {
   isChild: boolean;
   hasPassportPhoto: boolean;
   missing: string[];
+  hasJapanAddress: boolean;
+  /** 대표자만 — 확인 화면에서 주소를 미리 채우려고. */
+  address?: string | null;
 };
 
-/** 태블릿에 넘기는 예약 모양(시안 T2). 여권 번호 · 주소 같은 칸 값은 여기서 넘기지 않는다 — 사람별 화면에서 따로. */
+/** 태블릿에 넘기는 예약 모양(시안 T2). 여권 번호 같은 칸 값은 넘기지 않는다 — 주소만 대표자 것 하나. */
 export function kioskStayOf(stay: StayView) {
   const nights = Math.round((Date.parse(stay.checkOutDate) - Date.parse(stay.checkInDate)) / 86_400_000);
   return {
@@ -167,6 +198,8 @@ export function kioskStayOf(stay: StayView) {
         isChild: guest.guest_type === "child",
         hasPassportPhoto: guest.hasPassportPhoto,
         missing: guest.missing,
+        hasJapanAddress: guest.has_japan_address === true,
+        ...(guest.is_representative ? { address: guest.address } : {}),
       }),
     ),
   };

@@ -81,7 +81,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
     <PersonForm
       token={token}
       locale={locale}
-      dict={{ person: dict.person, common: dict.common, guests: dict.guests }}
+      dict={{ person: dict.person, common: dict.common, guests: dict.guests, route: dict.route }}
       title={isRepresentative ? dict.person.repTitle : guest?.name_roman || ordinal(position)}
       counter={fmt(dict.person.counter, { i: position, n: total })}
       initial={initial}
@@ -96,6 +96,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
       countries={countries}
       editable={stay.editable}
       nextHref={nextHref}
+      routeHref={`/r/${token}/route`}
       listHref={`/r/${token}?view=list`}
       // 새 사람 화면의 「안 와요」는 빈 자리가 남아 있을 때만(저장한 사람은 언제나).
       canRemove={!guest ? stay.guests.length < stay.partySize : !guest.is_representative}

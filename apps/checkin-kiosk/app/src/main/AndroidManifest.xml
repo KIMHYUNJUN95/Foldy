@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 여권 사진 면 찍기(FR-K07). 카메라가 없거나 막혀도 「직접 입력」으로 진행(FR-K16). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <!-- 개발 서버(adb reverse 로 127.0.0.1:3100)는 http — 127.0.0.1 에만 허용(network_security_config). 운영은 https 만. -->
     <application

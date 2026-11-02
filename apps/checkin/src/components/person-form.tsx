@@ -255,7 +255,7 @@ export function PersonForm(props: Props) {
                   event.target.value = "";
                 }}
               />
-              <p className="mt-2 text-[13px] text-[var(--muted)]">
+              <p className="mt-2 text-[15px] text-[var(--muted)]">
                 {photo ? (
                   <span className="inline-flex items-center gap-1 text-[var(--sage)]">
                     <CheckIcon /> {dict.person.photoAdded}
@@ -388,7 +388,7 @@ export function PersonForm(props: Props) {
             <div className="flex items-start justify-between gap-3 rounded-md bg-[var(--surface)] p-4">
               <div>
                 <p className="text-[15px]">{fmt(dict.person.sameAsRep, { name: props.representativeName })}</p>
-                <p className="mt-1 text-[13px] text-[var(--muted)]">
+                <p className="mt-1 text-[15px] text-[var(--muted)]">
                   {[sharedFromRep.address, foreign ? sharedFromRep.prevStay : "", foreign ? sharedFromRep.nextDest : ""]
                     .filter(Boolean)
                     .join(" · ")}
@@ -430,7 +430,7 @@ export function PersonForm(props: Props) {
           )}
         </fieldset>
 
-        <p className="mt-6 text-[13px] text-[var(--muted)]">{dict.person.retention}</p>
+        <p className="mt-6 text-[15px] text-[var(--muted)]">{dict.person.retention}</p>
         <div className="flex-1" />
         {!editable ? (
           <p className="mt-6 text-[14px] text-[var(--sand)]">{dict.person.locked}</p>

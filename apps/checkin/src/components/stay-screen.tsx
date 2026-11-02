@@ -56,7 +56,7 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
           {stay.guests.map((guest) => (
             <li key={guest.id} className="flex items-center justify-between py-3.5">
               <span className="text-[16px] font-medium">{guest.name_roman}</span>
-              <span className="text-[13px] text-[var(--muted)]">
+              <span className="text-[15px] text-[var(--muted)]">
                 {guest.is_representative
                   ? dict.guests.rep
                   : guest.guest_type === "child"
@@ -93,7 +93,7 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
         <ol className="mt-7 space-y-4 text-[16px] leading-relaxed">
           {[dict.done.step1, dict.done.step2, dict.done.step3].map((line, index) => (
             <li key={line} className="flex gap-3">
-              <span className="num w-4 text-[13px] leading-7 text-[var(--muted)]">{index + 1}</span>
+              <span className="num w-4 text-[14px] leading-7 text-[var(--muted)]">{index + 1}</span>
               <span>{line}</span>
             </li>
           ))}
@@ -156,20 +156,20 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
                   isNext ? "border-[var(--line-strong)]" : "border-[var(--line)]"
                 }`}
               >
-                <span className="num w-3.5 text-[13px] text-[var(--muted)]">{index + 1}</span>
+                <span className="num w-3.5 text-[14px] text-[var(--muted)]">{index + 1}</span>
                 <span className="flex flex-1 flex-col gap-0.5">
                   <b className="text-[17px] font-medium">{entry.label}</b>
-                  <small className="text-[13px] text-[var(--muted)]">{sub}</small>
+                  <small className="text-[15px] text-[var(--muted)]">{sub}</small>
                 </span>
                 {entry.done ? (
-                  <span className="inline-flex items-center gap-1 text-[13px] text-[var(--sage)]">
+                  <span className="inline-flex items-center gap-1 text-[15px] text-[var(--sage)]">
                     <CheckIcon />
                     {dict.guests.done}
                   </span>
                 ) : isNext ? (
-                  <span className="text-[13px] text-[var(--sand)]">{dict.guests.next}</span>
+                  <span className="text-[15px] text-[var(--sand)]">{dict.guests.next}</span>
                 ) : (
-                  <span className="text-[13px] text-[var(--muted)]">{dict.guests.left}</span>
+                  <span className="text-[15px] text-[var(--muted)]">{dict.guests.left}</span>
                 )}
                 <ChevronIcon className="size-4 text-[var(--muted)]" />
               </Link>
@@ -196,7 +196,7 @@ export function StayScreen({ stay, token, locale, view }: { stay: StayView; toke
               />
             </div>
           ) : null}
-          <p className="mt-4 text-[13px] leading-relaxed text-[var(--muted)]">{dict.guests.share}</p>
+          <p className="mt-4 text-[15px] leading-relaxed text-[var(--muted)]">{dict.guests.share}</p>
         </>
       ) : null}
       <div className="flex-1" />

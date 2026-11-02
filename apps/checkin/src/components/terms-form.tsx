@@ -78,14 +78,14 @@ export function TermsForm({ token, locale, dict, counter, countNote, termsText }
           <input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} />
           <span className="flex flex-col gap-0.5">
             <span className="text-[16px]">{dict.terms.terms}</span>
-            <small className="text-[13px] text-[var(--muted)]">{dict.terms.termsSub}</small>
+            <small className="text-[15px] text-[var(--muted)]">{dict.terms.termsSub}</small>
           </span>
         </label>
         <label className="w-check">
           <input type="checkbox" checked={privacy} onChange={(event) => setPrivacy(event.target.checked)} />
           <span className="flex flex-col gap-0.5">
             <span className="text-[16px]">{dict.terms.privacy}</span>
-            <small className="text-[13px] text-[var(--muted)]">{dict.terms.minors}</small>
+            <small className="text-[15px] text-[var(--muted)]">{dict.terms.minors}</small>
           </span>
         </label>
       </div>

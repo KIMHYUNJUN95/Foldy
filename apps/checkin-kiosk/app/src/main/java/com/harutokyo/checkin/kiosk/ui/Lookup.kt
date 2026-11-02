@@ -483,7 +483,7 @@ private fun InfoBox(label: String, modifier: Modifier, content: @Composable () -
 @Composable
 private fun StepButton(symbol: String, label: String, enabled: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.size(52.dp).border(BorderStroke(1.dp, if (enabled) G.LineStrong else G.Line), Radius)
+        Modifier.size(60.dp).border(BorderStroke(1.dp, if (enabled) G.LineStrong else G.Line), Radius)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
@@ -518,12 +518,12 @@ private fun SeatRow(number: Int, guest: KioskGuest?) {
             Text(sub, color = G.Muted, fontSize = 15.sp)
         }
         if (state == SeatState.Done) {
-            Box(Modifier.heightIn(min = 44.dp).border(BorderStroke(1.dp, Color(0xFF3A4030)), Radius).padding(horizontal = 16.dp, vertical = 10.dp)) {
-                Text("✓ " + str(R.string.guests_done), color = G.Sage, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Box(Modifier.heightIn(min = 60.dp).border(BorderStroke(1.dp, Color(0xFF3A4030)), Radius).padding(horizontal = 22.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                Text("✓ " + str(R.string.guests_done), color = G.Sage, fontSize = 18.sp, fontWeight = FontWeight.Medium)
             }
         } else {
-            Box(Modifier.heightIn(min = 44.dp).background(G.Sand, Radius).padding(horizontal = 16.dp, vertical = 10.dp)) {
-                Text(str(R.string.guests_need), color = G.Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Box(Modifier.heightIn(min = 60.dp).background(G.Sand, Radius).padding(horizontal = 22.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                Text(str(R.string.guests_need), color = G.Ink, fontSize = 18.sp, fontWeight = FontWeight.Medium)
             }
         }
     }

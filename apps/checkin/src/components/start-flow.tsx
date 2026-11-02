@@ -150,7 +150,7 @@ export function StartFlow({ building, buildingName, locale, dict, langPrompts, w
             >
               <span className="flex flex-1 flex-col gap-1">
                 <b className="text-[19px] font-medium">{LOCALE_NAMES[option]}</b>
-                <small className="text-[13px] text-[var(--muted)]">{langPrompts[option].hint}</small>
+                <small className="text-[15px] text-[var(--muted)]">{langPrompts[option].hint}</small>
               </span>
               <ChevronIcon className="size-4 text-[var(--muted)]" />
             </button>
@@ -213,7 +213,7 @@ export function StartFlow({ building, buildingName, locale, dict, langPrompts, w
         <ol className="mt-6 space-y-3 text-[15px] leading-relaxed">
           {[dict.notFound.tip1, dict.notFound.tip2, dict.notFound.tip3].map((tip, index) => (
             <li key={tip} className="flex gap-3">
-              <span className="num text-[13px] text-[var(--muted)]">{index + 1}</span>
+              <span className="num text-[14px] text-[var(--muted)]">{index + 1}</span>
               <span>{tip}</span>
             </li>
           ))}
@@ -268,7 +268,7 @@ export function StartFlow({ building, buildingName, locale, dict, langPrompts, w
                 onChange={set("reference")}
               />
             </label>
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">{dict.find.referenceHelp}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-[var(--muted)]">{dict.find.referenceHelp}</p>
             <button type="button" className="w-link mt-5 self-start text-left text-[15px]" onClick={() => setMode("phone")}>
               {dict.find.noReference}
             </button>
@@ -288,7 +288,7 @@ export function StartFlow({ building, buildingName, locale, dict, langPrompts, w
                 }
               />
             </label>
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">{dict.find.phoneHelp}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-[var(--muted)]">{dict.find.phoneHelp}</p>
             <button type="button" className="w-link mt-5 self-start text-left text-[15px]" onClick={() => setMode("reference")}>
               {dict.find.useReference}
             </button>

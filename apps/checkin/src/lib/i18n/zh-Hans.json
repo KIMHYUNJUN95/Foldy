@@ -1,0 +1,5 @@
+{
+  "meta": { "title": "自助入住" },
+  "start": { "button": "Start", "greeting": "欢迎。入住前可以先填写住宿登记。" },
+  "notFound": { "title": "找不到页面", "body": "请从预订消息中的链接重新打开。" }
+}

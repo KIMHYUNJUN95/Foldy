@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* 손님 화면 = 시안 G 「밤의 키오스크」 토큰(44 §12). */
+:root {
+  --bg: #0d0e10;
+  --surface: #17191c;
+  --line: #2a2d32;
+  --text: #f2f1ee;
+  --muted: #a3a6ac;
+  --sand: #cdbb9e;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: "Inter Tight", "Noto Sans JP", "Noto Sans KR", "Noto Sans SC", system-ui, sans-serif;
+  word-break: keep-all;
+}

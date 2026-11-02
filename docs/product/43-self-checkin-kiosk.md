@@ -257,7 +257,7 @@
 | **Beds24** | 손님 앱은 Beds24 를 직접 부르지 않는다 — Foldy 가 웹훅으로 채운 `public.reservations` 를 읽는다. Beds24 쓰기 없음(7-17 Foldy 안에서만 — §8-10) | Beds24 연동 코드 무변경 |
 
 - 나중에 다른 회사에 팔 때: `apps/checkin` + `checkin` 스키마를 그대로 떼어 **B(독립 제품)** 로 옮길 수 있다 — Foldy 의존은 「`public.reservations` 읽기」 한 곳뿐이라 그때 어댑터로 바꾼다.
-- 작업 순서(코드 착수 전 사용자 컨펌): ① 루트 두 줄(tsconfig · eslint) ② `apps/checkin` 뼈대 + `checkin` 스키마 마이그레이션 ③ 손님 앱(사전 등록 → 태블릿) ④ Foldy 직원 화면. 각 단계 끝에 **Foldy `npm run lint` · `npm run build` 가 전과 같은지** 확인.
+- 작업 순서(코드 착수 전 사용자 컨펌): ① 루트 세 줄(tsconfig · eslint · vitest) ② `apps/checkin` 뼈대 + `checkin` 스키마 마이그레이션 ③ 손님 앱(사전 등록 → 태블릿) ④ Foldy 직원 화면. 각 단계 끝에 **Foldy `npm run lint` · `npm run build` 가 전과 같은지** 확인.
 
 ### 8-10. 체크인 완료는 Foldy 안에서만 기록 — Beds24 쓰기 0 (2026-10-30 Info 항목 1종 → 2026-11-01 그것도 제외, 44 §14-6)
 

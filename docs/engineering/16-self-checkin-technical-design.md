@@ -93,10 +93,11 @@ apps/checkin-kiosk/                  ← Android 네이티브 앱 (Kotlin · Jet
     kiosk/     (Device Owner · Lock Task · 부팅 자동 실행)
     data/      (Room 암호화 DB · 전송 큐 WorkManager · API 클라이언트)
     contract/  (서버 계약 JSON 모델 — apps/checkin 과 같은 스키마)
-supabase/migrations/2026…_checkin_schema.sql    ← 같은 이력에 추가만 (43 §8-9)
+supabase/migrations/202611020001_checkin_schema.sql    ← 같은 이력에 추가만 (43 §8-9) · 초안, 운영 미적용
 Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/checkin   ← 직원 화면 (추가만, 4단계)
 ```
 
+- **루트 Foldy 와 떼어 두기(2026-11-02 적용)**: 루트 `tsconfig.json` exclude `apps` · `eslint.config.mjs` ignore `apps/**` · `vitest.config.ts` exclude `apps/**`(같이 `.claude/**` — 다른 세션 작업 트리 테스트가 섞이지 않게). `apps/checkin` 은 자기 `node_modules` · `.gitignore` · lint · test · build 를 따로 돈다. `.npmrc` 의 `legacy-peer-deps=true` 는 npm 10.9 설치 오류(arborist) 피하기용.
 - 손님 쪽 트래픽은 전부 `apps/checkin` 도메인(API 포함). 태블릿 앱도 같은 API 를 기기 토큰으로 부른다. Foldy 도메인에는 손님 · 기기 경로가 없다.
 - **Beds24 API 호출 0 — 읽기 · 쓰기 모두 안 함**(2026-11-01, 44 §14-6): 예약은 Foldy 웹훅이 채운 `public.reservations` 에서만 읽는다(크레딧 0). `apps/checkin` 은 Beds24 토큰을 갖지 않는다. ~~Info 항목 1종 쓰기(44 §14-5)~~ 는 1차 제외.
 - `public` 스키마는 **읽기 전용**(`reservations` · `properties` · `rooms` · `property_operation_infos`). `checkin` → `public` FK 없음(id 값만 저장).
@@ -119,6 +120,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `checkin.deletions` | stay_key · deleted_at · counts | 자동 삭제 기록(개인 정보 없음) |
 
 - **RLS**: `checkin.*` 는 **직원 읽기 정책만**(`public.memberships` + `checkin.view` / `checkin.documents` 권한 — Foldy 권한 표 그대로 읽음). 손님 · 기기 쓰기는 전부 서버 라우트(서비스 롤). anon 정책 없음, delete 정책 없음(43 §8-14). `audit_log` 는 insert 만.
+- **마이그레이션 초안(2026-11-02, `202611020001_checkin_schema.sql`, 운영 미적용)**: 위 11개 표 + 비공개 버킷 `checkin-documents`(60MB, jpeg · png · webp · mp4 · webm). 자식 표에도 `organization_id` 를 넣어 RLS 가 조인 없이 거른다. 읽기 정책은 `public.has_capability(organization_id, auth.uid(), 'checkin.view' | 'checkin.documents' | 'checkin.manage')`. `storage.objects` 정책은 두지 않는다(파일은 서버가 서명 URL 로만). **권한 키 등록(`capability_roles` 씨앗)은 4단계 직원 화면 때** — 그 전에는 플랫폼 관리자만 통과한다. 로컬 검증은 PGlite(표 11 · 정책 12 생성 확인).
 - **stays 생성**: Foldy Beds24 웹훅은 손대지 않는다. `apps/checkin` 의 `jobs/sync-stays`(5분 크론) 가 `public.reservations` 의 오늘 −1 ~ +30일 예약을 읽어 `stays` · `stay_rooms` 를 만들고 코드를 발급한다. **한 stay = 채널 예약 번호(`original_reservation_id`) 하나** — 방 여러 개 예약(같은 번호 줄이 여럿, 최근 6개월 19건)은 stay 1개 + `stay_rooms` 여러 개로 묶어, 예약 번호로 찾으면 방 전부가 한 번에 열린다(43 방 여러 개 규칙). 취소 · 날짜 · 인원 변경도 여기서 따라간다(체크인 뒤 변경은 기록만).
 - **보존**: `retain_until = check_out_date + 3년`(취소는 +30일). 매일 도쿄 04:00 `jobs/retention` 이 파일 → 줄 순으로 삭제.
 
@@ -183,7 +185,8 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 
 ## 9. 단계 (코드 착수는 사용자 컨펌 뒤)
 
-1. 루트 두 줄(tsconfig exclude · eslint ignore) · `apps/checkin` 뼈대 · `checkin` 스키마 마이그레이션(로컬) · 계약 스키마(zod) · `sync-stays` — Foldy 빌드 확인
+1. 루트 세 줄(tsconfig exclude · eslint ignore · vitest exclude) · `apps/checkin` 뼈대 · `checkin` 스키마 마이그레이션(로컬) · 계약 스키마(zod) · `sync-stays` — Foldy 빌드 확인
+   - 2026-11-02 진행: 루트 세 줄 ✅ · 뼈대(`/p/[building]` 시작 화면 · `/api/health` · 4개 언어 사전 · 서비스 클라이언트) ✅ · 마이그레이션 초안 ✅(운영 미적용) · 계약 스키마 ✅ · `sync-stays` ⬜
 2. 사전 등록 웹(명부 · 여권 업로드 · 동의) · 링크 발급 · 리마인드 크론
 3. 태블릿 앱: 뼈대(Compose · 기기 등록 · 계약 받기 · 잠금) → 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐
 4. Foldy 직원 화면(PC · 모바일) · 권한 키 · 내보내기 · 기기 · 건물 설정

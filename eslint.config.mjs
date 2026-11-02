@@ -22,6 +22,8 @@ const eslintConfig = defineConfig([
     "ios/**",
     // 세션별 작업 트리(.claude/worktrees/*) — 저장소 사본 + 각자의 .next 라 본 저장소 린트에 29만 건이 섞였다(2026-11-01).
     ".claude/**",
+    // 셀프 체크인 독립 앱(apps/checkin · apps/checkin-kiosk) — 자기 설정으로 따로 린트 · 빌드한다(2026-11-02, 16 §2).
+    "apps/**",
   ]),
 ]);
 

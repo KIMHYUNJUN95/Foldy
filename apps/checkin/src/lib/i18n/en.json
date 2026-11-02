@@ -1,0 +1,5 @@
+{
+  "meta": { "title": "Self check-in" },
+  "start": { "button": "Start", "greeting": "Welcome. You can fill in the guest register before you arrive." },
+  "notFound": { "title": "Page not found", "body": "Please open the link from your booking message again." }
+}

@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 // 화면은 세로 800×1280 기준(시안 G). Android 16+ 큰 화면은 세로 고정을 무시할 수 있어 가로(넓은 쪽이 긴 화면)에서는
 // 2열로 바꾸고, 넘치면 스크롤한다(한 화면에 스크롤 하나). 타일 · 단추 높이는 최소값이라 글자를 키우면 늘어난다.
 
-private val GUTTER = Modifier.padding(horizontal = 56.dp, vertical = 40.dp)
+internal val GUTTER = Modifier.padding(horizontal = 56.dp, vertical = 40.dp)
 
 /** 손님 화면 위 줄 — 표지(5초 누르면 직원) · 시각. */
 @Composable
@@ -50,7 +50,7 @@ private fun TopBar(onStaff: () -> Unit) {
 
 /** 위는 스크롤, 아래 줄(단추)은 늘 보이게. */
 @Composable
-private fun ScrollPage(bottom: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
+internal fun ScrollPage(bottom: (@Composable () -> Unit)? = null, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize().then(GUTTER)) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) { content() }
         if (bottom != null) {
@@ -119,6 +119,9 @@ private val LANGS = listOf(
     LangOption("zh-Hans", "简体中文", G.Sky),
     LangOption("ko", "한국어", G.Clay),
 )
+
+/** 언어 버튼에 쓰는 그 언어 이름(「日本語」 · 「English」 …). */
+fun languageName(code: String): String = LANGS.firstOrNull { it.code == code }?.name ?: code
 
 /** G1 — 언어 고르기. 손님이 없을 때 늘 이 화면. */
 @Composable

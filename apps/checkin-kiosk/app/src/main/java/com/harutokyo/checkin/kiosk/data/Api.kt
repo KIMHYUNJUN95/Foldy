@@ -11,7 +11,8 @@ import java.net.URL
 // 서버 호출(apps/checkin `/api/device/*` · `/api/kiosk/*`). 응답 몸은 실패해도 JSON(ok · error) — 그대로 읽는다.
 // 네트워크가 없으면 IOException → 화면은 「인터넷 연결 없음」, 저장된 설정으로 계속 동작(FR-K15).
 object Api {
-    val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+    // 찾기 요청(FindQuery)의 종류 칸은 서버 zod 와 같은 "mode".
+    val json = Json { ignoreUnknownKeys = true; explicitNulls = false; classDiscriminator = "mode" }
 
     class HttpResult(val status: Int, val body: String)
 

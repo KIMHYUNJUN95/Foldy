@@ -143,10 +143,15 @@ export async function loadStayByToken(db: CheckinServiceClient, rawToken: string
     .maybeSingle();
   if (linkError) throw new Error(`stay_tokens 읽기 실패: ${linkError.message}`);
   if (!link) return null;
+  return loadStayById(db, link.stay_id as string);
+}
+
+/** stay 하나를 명부까지 읽는다(사전 등록 웹 · 태블릿 공용). 취소 · 기간 지남은 null. */
+export async function loadStayById(db: CheckinServiceClient, stayId: string): Promise<StayView | null> {
   const { data: stay, error } = await db
     .from("stays")
     .select("id, organization_id, property_key, check_in_date, check_out_date, guest_count_expected, party_size, status, checkin_code, checked_in_at, retain_until")
-    .eq("id", link.stay_id as string)
+    .eq("id", stayId)
     .maybeSingle();
   if (error) throw new Error(`stays 읽기 실패: ${error.message}`);
   if (!stay || !(CLAIMABLE as readonly string[]).includes(stay.status as string)) return null;

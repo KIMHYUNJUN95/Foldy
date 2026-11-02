@@ -29,18 +29,22 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.harutokyo.checkin.kiosk.R
+import com.harutokyo.checkin.kiosk.contract.BlockReason
+import com.harutokyo.checkin.kiosk.contract.FindResult
+import com.harutokyo.checkin.kiosk.contract.KioskStay
 import com.harutokyo.checkin.kiosk.data.KioskViewModel
 import com.harutokyo.checkin.kiosk.data.Phase
 import com.harutokyo.checkin.kiosk.kiosk.Kiosk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → (다음 단계: 찾기 · 명부 …).
+// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → T1 찾기 → T2 명부(→ 다음 묶음: 여권 · 동의 · 동영상 · 완료).
+// 찾기 결과: 못 찾음 T1x · 지금은 못 함 T1b · 이미 체크인 T1c.
 // 손님이 손을 떼고 idleSecondsInput(기본 240초) 지나면 G1 로 돌아간다(FR-K12).
 
 private val PHRASE_BREAK = LineBreak(LineBreak.Strategy.HighQuality, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase)
 
-private enum class Screen { Language, Menu, ComingNext }
+private enum class Screen { Language, Menu, Find, NotFound, Blocked, CheckedIn, Guests, ComingNext }
 
 @Composable
 fun KioskRoot(model: KioskViewModel = viewModel()) {
@@ -49,22 +53,35 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
     var language by remember { mutableStateOf("ja") }
     var staff by remember { mutableStateOf(StaffStep.Closed) }
     var lastTouch by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    // 찾기 칸 · 결과(손님 한 명분 — 처음으로 돌아가면 지운다).
+    var form by remember { mutableStateOf(FindForm()) }
+    var findError by remember { mutableStateOf<String?>(null) }
+    var notFound by remember { mutableStateOf<FindResult?>(null) }
+    var blocked by remember { mutableStateOf<FindResult.Blocked?>(null) }
+    var session by remember { mutableStateOf<String?>(null) }
+    var stay by remember { mutableStateOf<KioskStay?>(null) }
+    val reset = {
+        screen = Screen.Language
+        language = "ja"
+        form = FindForm()
+        findError = null
+        notFound = null
+        blocked = null
+        session = null
+        stay = null
+    }
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current!!
 
     // 뒤로 가기로 앱을 나가지 못하게 — 화면 안 뒤로 버튼만 쓴다.
-    BackHandler {
-        screen = Screen.Language
-        language = "ja"
-    }
+    BackHandler { reset() }
 
     // 손님 화면이든 직원 PIN · 메뉴든 손을 떼고 idleSecondsInput 지나면 G1 로(직원 창이 열린 채 남지 않게).
     val idleSeconds = state.contract?.idleSecondsInput ?: 240
     LaunchedEffect(screen, staff, lastTouch, idleSeconds) {
         if (screen == Screen.Language && staff == StaffStep.Closed) return@LaunchedEffect
         delay(idleSeconds * 1000L)
-        screen = Screen.Language
-        language = "ja"
+        reset()
         staff = StaffStep.Closed
     }
 
@@ -106,13 +123,86 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                         )
                         Screen.Menu -> MenuScreen(
                             language = language,
-                            onBack = {
-                                screen = Screen.Language
-                                language = "ja"
-                            },
+                            onBack = reset,
                             onLanguage = { screen = Screen.Language },
-                            onPick = { screen = Screen.ComingNext },
+                            onPick = { screen = if (it == "checkin") Screen.Find else Screen.ComingNext },
                         )
+                        Screen.Find -> {
+                            val networkError = str(R.string.error_network)
+                            val serverError = str(R.string.error_server)
+                            FindScreen(
+                                form = form,
+                                languageName = languageName(language),
+                                error = findError,
+                                onForm = {
+                                    form = it
+                                    findError = null
+                                },
+                                onBack = { screen = Screen.Menu },
+                                onLanguage = { screen = Screen.Language },
+                                onCall = { screen = Screen.ComingNext },
+                                onSubmit = {
+                                    when (val result = model.find(form.query())) {
+                                        is FindResult.Found -> {
+                                            session = result.sessionId
+                                            stay = result.stay
+                                            // 예약 언어가 있으면 그 언어로(FR-K01) — 이 건물이 쓰는 언어일 때만.
+                                            val languages = state.contract?.languages.orEmpty()
+                                            if (result.language != null && result.language in languages) language = result.language
+                                            screen = if (result.checkedIn) Screen.CheckedIn else Screen.Guests
+                                        }
+                                        is FindResult.NotFound, is FindResult.Locked -> {
+                                            notFound = result
+                                            screen = Screen.NotFound
+                                        }
+                                        is FindResult.Blocked -> {
+                                            blocked = result
+                                            screen = Screen.Blocked
+                                        }
+                                        FindResult.Network -> findError = networkError
+                                        FindResult.Server -> findError = serverError
+                                    }
+                                },
+                            )
+                        }
+                        Screen.NotFound -> NotFoundScreen(
+                            form = form,
+                            remaining = (notFound as? FindResult.NotFound)?.remaining ?: 0,
+                            lockedUntil = (notFound as? FindResult.Locked)?.untilMillis,
+                            onBack = { screen = Screen.Find },
+                            onCall = { screen = Screen.ComingNext },
+                            onRetry = { screen = Screen.Find },
+                        )
+                        Screen.Blocked -> BlockedScreen(
+                            reason = blocked?.reason ?: BlockReason.Expired,
+                            checkInDate = blocked?.checkInDate,
+                            onBack = { screen = Screen.Find },
+                            onCall = { screen = Screen.ComingNext },
+                            onHome = reset,
+                        )
+                        Screen.CheckedIn -> stay?.let { current ->
+                            CheckedInScreen(
+                                stay = current,
+                                onBack = { screen = Screen.Find },
+                                onCall = { screen = Screen.ComingNext },
+                                onRoom = { screen = Screen.ComingNext },
+                                onMore = { screen = Screen.Guests },
+                                onHome = reset,
+                            )
+                        }
+                        Screen.Guests -> stay?.let { current ->
+                            GuestsScreen(
+                                stay = current,
+                                onBack = { screen = Screen.Find },
+                                onCall = { screen = Screen.ComingNext },
+                                onParty = { size ->
+                                    val updated = session?.let { model.setParty(it, size) }
+                                    if (updated != null) stay = updated
+                                    updated != null
+                                },
+                                onStart = { screen = Screen.ComingNext },
+                            )
+                        }
                         Screen.ComingNext -> ComingNextScreen(onBack = { screen = Screen.Language })
                     }
                 }

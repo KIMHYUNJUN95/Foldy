@@ -11,6 +11,12 @@ import com.harutokyo.checkin.kiosk.contract.CONTRACT_VERSION
 import com.harutokyo.checkin.kiosk.contract.Contract
 import com.harutokyo.checkin.kiosk.contract.DeviceInfo
 import com.harutokyo.checkin.kiosk.contract.EnrollResponse
+import com.harutokyo.checkin.kiosk.contract.FindQuery
+import com.harutokyo.checkin.kiosk.contract.FindResponse
+import com.harutokyo.checkin.kiosk.contract.FindResult
+import com.harutokyo.checkin.kiosk.contract.KioskStay
+import com.harutokyo.checkin.kiosk.contract.PartyResponse
+import com.harutokyo.checkin.kiosk.contract.findResultOf
 import com.harutokyo.checkin.kiosk.contract.PingResponse
 import com.harutokyo.checkin.kiosk.contract.SettingsResponse
 import com.harutokyo.checkin.kiosk.kiosk.PinGuard
@@ -42,6 +48,9 @@ data class KioskState(
 
 @Serializable
 private data class EnrollBody(val code: String, val deviceModel: String, val osVersion: String, val appVersion: String)
+
+@Serializable
+private data class PartyBody(val sessionId: String, val partySize: Int)
 
 @Serializable
 private data class PingBody(val battery: Int, val appVersion: String, val osVersion: String)
@@ -119,6 +128,35 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(phase = Phase.Ready, device = parsed.device, contract = contract, settingsVersion = parsed.settingsVersion, online = true)
         }
         return true
+    }
+
+    /** 예약 찾기(시안 T1 · T1k). 401 이면 기기가 해제된 것 — 등록 화면으로. */
+    suspend fun find(query: FindQuery): FindResult {
+        val token = vault.get(KEY_TOKEN) ?: return FindResult.Server
+        val result = try {
+            Api.request("POST", "/api/kiosk/find", token, Api.json.encodeToString(FindQuery.serializer(), query))
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return FindResult.Network
+        }
+        if (result.status == 401) {
+            forget(revoked = true)
+            return FindResult.Server
+        }
+        _state.update { it.copy(online = true) }
+        return findResultOf(runCatching { Api.json.decodeFromString<FindResponse>(result.body) }.getOrNull())
+    }
+
+    /** 시안 T2 인원 ±. 실패하면 null(화면은 그대로). */
+    suspend fun setParty(sessionId: String, partySize: Int): KioskStay? {
+        val token = vault.get(KEY_TOKEN) ?: return null
+        val result = try {
+            Api.request("POST", "/api/kiosk/party", token, Api.json.encodeToString(PartyBody(sessionId, partySize)))
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return null
+        }
+        return runCatching { Api.json.decodeFromString<PartyResponse>(result.body) }.getOrNull()?.stay
     }
 
     /** 직원 메뉴 「기기 다시 등록」 · 서버가 폐기를 알렸을 때. 토큰 · 저장된 설정을 지운다. */

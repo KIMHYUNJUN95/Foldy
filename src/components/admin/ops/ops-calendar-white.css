@@ -468,3 +468,72 @@
 /* 편집 중에는 오른쪽 열만큼 격자가 좁아진다 — 가격 글자를 한 단계 줄여 칸 안에 담는다. */
 .adm .scw.is-edit .opsg__price { font-size: 9.5px; letter-spacing: -0.05em; }
 .adm .scw.is-edit .scw-sum__c { font-size: 9px; letter-spacing: -0.05em; }
+
+/* ── 아래로 내리면 뜨는 바(`ops-float-bar.tsx`, 2026-11-02 시안 「R · 안 ① 다듬음」) ─────────────
+   `sticky` 라 격자 열 안에서만 붙고, 바 높이만큼 자리를 차지해 목록 끝의 방을 가리지 않는다.
+   나타날 때 200ms(빠르게 시작해 부드럽게 멈춤), 사라질 때 140ms 로 더 빠르게. 동작 줄이기면 투명도만. */
+.adm .scw-float {
+  position: sticky; bottom: 24px; z-index: 20;
+  display: flex; justify-content: center; margin-top: 18px; pointer-events: none;
+}
+.adm .scw-float__bar {
+  display: flex; align-items: center; gap: 4px; padding: 5px; max-width: 100%;
+  background: rgb(255 255 255 / 0.86);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+  border-radius: 999px;
+  box-shadow: 0 18px 40px -16px rgb(20 32 43 / 0.38), 0 2px 6px -2px rgb(20 32 43 / 0.1), 0 0 0 0.5px rgb(20 32 43 / 0.1);
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 140ms ease-in-out, transform 140ms ease-in-out;
+}
+.adm .scw-float.is-shown .scw-float__bar {
+  opacity: 1; transform: none; pointer-events: auto;
+  transition: opacity 200ms var(--scw-ease), transform 200ms var(--scw-ease);
+}
+.adm .scw-float__top {
+  width: 40px; height: 40px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 999px; background: transparent; color: var(--scw-ink2); cursor: pointer;
+  transition: background-color 160ms ease, transform 140ms var(--scw-ease);
+}
+.adm .scw-float__top svg { width: 18px; height: 18px; }
+.adm .scw-float__top:hover { background: rgb(22 20 31 / 0.05); }
+.adm .scw-float__top:active { transform: scale(0.94); }
+.adm .scw-float__ctx {
+  display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; max-width: 220px;
+  padding: 0 12px 0 4px; line-height: 1.25;
+}
+.adm .scw-float__bld {
+  font-size: 12.5px; font-weight: 600; color: var(--scw-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.adm .scw-float__per { font-size: 11.5px; color: var(--scw-mute); white-space: nowrap; }
+.adm .scw-float__btn {
+  position: relative; height: 40px; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--scw-ink2);
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color 160ms ease, transform 140ms var(--scw-ease), box-shadow 160ms ease;
+}
+.adm .scw-float__btn svg { width: 15px; height: 15px; }
+.adm .scw-float__btn:hover, .adm .scw-float__btn[aria-pressed="true"] { background: rgb(22 20 31 / 0.05); }
+.adm .scw-float__btn:active { transform: scale(0.97); }
+.adm .scw-float__btn.is-primary { background: var(--scw-v); color: #fff; padding: 0 18px; }
+.adm .scw-float__btn.is-primary:hover { background: #6a42dc; box-shadow: 0 6px 16px -8px rgb(90 48 207 / 0.8); }
+/* 짧은 안내 — 마우스를 0.4초 머물러야 뜬다(지나가며 깜빡이지 않게). 마우스 기기만. */
+.adm .scw-float__btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 12px); right: 0;
+  padding: 7px 11px; border-radius: 8px; background: var(--scw-ink); color: #fff;
+  font-size: 12px; font-weight: 500; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 8px 20px -10px rgb(20 32 43 / 0.6);
+  opacity: 0; transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .adm .scw-float__btn[data-tip]:hover::after {
+    opacity: 1; transform: none; transition: opacity 150ms ease 400ms, transform 150ms var(--scw-ease) 400ms;
+  }
+}
+.adm .scw-float__btn:focus-visible, .adm .scw-float__top:focus-visible { outline: 2px solid var(--scw-v); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .adm .scw-float__bar, .adm .scw-float.is-shown .scw-float__bar { transform: none; transition: opacity 120ms ease; }
+  .adm .scw-float__btn[data-tip]::after { transform: none; }
+}

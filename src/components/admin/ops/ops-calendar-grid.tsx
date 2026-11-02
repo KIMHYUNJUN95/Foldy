@@ -58,6 +58,7 @@ import {
 import { OpsPricePanel, type PanelCopy, type PanelCell } from "@/components/admin/ops/ops-price-panel";
 import { stayNights } from "@/lib/ops-manual-booking";
 import { OpsBookingDraft } from "@/components/admin/ops/ops-booking-draft";
+import { OpsFloatBar, type FloatBarCopy } from "@/components/admin/ops/ops-float-bar";
 import {
   watchOpsWriteJob,
   type OpsWriteKind,
@@ -164,6 +165,7 @@ type Copy = {
   ComponentProps<typeof OpsMinStayPanel>["copy"] &
   ComponentProps<typeof OpsBlockPanel>["copy"] &
   BookingPanelCopy & { mbPickCheckout: string } &
+  FloatBarCopy &
   ReservationCardCopy &
   HistoryCopy & { historyMore: string } &
   CellHistoryCardCopy &
@@ -916,6 +918,9 @@ export function OpsCalendarGrid({
    */
   const [mode, setMode] = useState<"off" | "price" | "minstay" | "block">("off");
   const editMode = mode !== "off";
+  /** 아래로 내리면 뜨는 바(`OpsFloatBar`)가 재는 것 — 맨 위 도구 줄과 격자 루트. */
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const gridRootRef = useRef<HTMLDivElement>(null);
   /** 지금 모드를 **비동기 콜백에서** 읽기 위한 ref — 클로저로 잡으면 저장 왕복 중 모드가
    * 바뀌어도(예: 「1박 갭 N」 버튼) 옛 모드로 착각한다(아래 `removeSentCells`). 렌더 중이 아니라
    * 효과에서 갱신한다(React Compiler 규칙 — 렌더 중 ref 변경 금지). */
@@ -2414,11 +2419,11 @@ export function OpsCalendarGrid({
      * 길게 봐야 한다.** 화이트 리디자인부터는 도구 줄까지 왼쪽 열에 들어가고, 오른쪽 열은 맨 위부터
      * 「가격 · 최소숙박 · 차단」 탭 + 패널이다.
      */
-    <div className={`opsw scw${editMode ? " is-edit" : ""}${createHint ? " is-hinting" : ""}`}>
+    <div className={`opsw scw${editMode ? " is-edit" : ""}${createHint ? " is-hinting" : ""}`} ref={gridRootRef}>
       <div className="opsw__body">
         <div className="scw-main">
           {/* ── 도구 줄 1 — 이동 · 건물 · 수기 예약 · 가격 수정 ── */}
-          <div className="scw-bar">
+          <div className="scw-bar" ref={toolbarRef}>
             {navBar}
             <div className="scw-spacer" />
             {mode === "off" ? (
@@ -2896,7 +2901,7 @@ export function OpsCalendarGrid({
         )}
         {roomsByProperty.map((group) => (
           <div key={group.property}>
-            <div className="opsg__group">
+            <div className="opsg__group" data-ops-property={group.property}>
               {bName(group.property)}
               <span className="opsg__gcount">
                 · {copy.roomCount.replace("{count}", String(group.rows.length))}
@@ -2943,6 +2948,24 @@ export function OpsCalendarGrid({
       </div>
       </div>
           )}
+
+          {/* 아래로 내리면 뜨는 바 — 도구 줄이 화면 위로 사라졌을 때만(`ops-float-bar.tsx`). */}
+          <OpsFloatBar
+            active={mode === "off"}
+            buildingLabel={bName}
+            canWrite={canWrite}
+            copy={copy}
+            createHint={createHint}
+            gridRootRef={gridRootRef}
+            onEdit={() => switchEditMode("price")}
+            onNewBooking={() => {
+              cancelDraft();
+              setCreateHint((value) => !value);
+            }}
+            periodLabel={opsWindowLabel(days)}
+            showNewBooking={!showCancelled}
+            toolbarRef={toolbarRef}
+          />
         </div>
 
         {/* 편집 중 오른쪽 열 — 맨 위 「가격 · 최소숙박 · 차단」 탭 + 그 패널(시안 SalesEdit-PC). */}

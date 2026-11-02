@@ -31,3 +31,38 @@ export function pickLocale(acceptLanguage: string | null | undefined): Locale {
   }
   return DEFAULT_LOCALE;
 }
+
+/** `{name}` 자리 바꾸기. */
+export function fmt(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key: string) => (key in vars ? String(vars[key]) : whole));
+}
+
+const INTL_TAG: Record<Locale, string> = { ja: "ja-JP", en: "en-US", "zh-Hans": "zh-Hans-CN", ko: "ko-KR" };
+
+export function intlTag(locale: Locale): string {
+  return INTL_TAG[locale];
+}
+
+/** 도쿄 날짜 "YYYY-MM-DD" 를 그 언어로(「10월 30일 (금)」). */
+export function formatStayDate(locale: Locale, isoDate: string, withWeekday = true): string {
+  return new Intl.DateTimeFormat(INTL_TAG[locale], {
+    timeZone: "Asia/Tokyo",
+    month: "long",
+    day: "numeric",
+    ...(withWeekday ? { weekday: "short" } : {}),
+  }).format(new Date(`${isoDate}T12:00:00+09:00`));
+}
+
+export function formatTokyoTime(locale: Locale, iso: string, withDate = false): string {
+  return new Intl.DateTimeFormat(INTL_TAG[locale], {
+    timeZone: "Asia/Tokyo",
+    ...(withDate ? { month: "long", day: "numeric" } : {}),
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+export function nightsBetween(checkIn: string, checkOut: string): number {
+  return Math.round((Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86_400_000);
+}

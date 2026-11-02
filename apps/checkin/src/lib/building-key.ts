@@ -24,3 +24,10 @@ export function buildingKeyOf(propertyName: string): string | null {
   }
   return null;
 }
+
+/** 건물 고정 링크 `/p/<키>` 로 열 수 있는 키. */
+export const BUILDING_KEYS: readonly string[] = RULES.map(([buildingKey]) => buildingKey);
+
+export function isBuildingKey(value: string): boolean {
+  return BUILDING_KEYS.includes(value);
+}

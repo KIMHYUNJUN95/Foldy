@@ -25,3 +25,27 @@ describe("checkin i18n", () => {
     expect(pickLocale(null)).toBe("ja");
   });
 });
+
+describe("checkin i18n 자리표시", () => {
+  it("같은 키는 4개 언어 모두 같은 {자리} 를 쓴다", () => {
+    const placeholders = (value: string) => [...new Set([...value.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))].sort().join(",");
+    const flat = (dict: unknown) =>
+      Object.fromEntries(
+        keys(dict).map((key) => [key, key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], dict)]),
+      ) as Record<string, string>;
+    const base = flat(ja);
+    for (const dict of [en, zhHans, ko]) {
+      const other = flat(dict);
+      for (const key of Object.keys(base)) expect([key, placeholders(other[key])]).toEqual([key, placeholders(base[key])]);
+    }
+  });
+
+  it("빈 문구가 없다", () => {
+    for (const dict of [ja, en, zhHans, ko]) {
+      for (const key of keys(dict)) {
+        const value = key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], dict);
+        expect([key, typeof value === "string" && value.trim().length > 0]).toEqual([key, true]);
+      }
+    }
+  });
+});

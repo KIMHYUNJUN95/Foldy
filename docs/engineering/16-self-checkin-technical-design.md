@@ -110,7 +110,9 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `checkin.devices` | id · organization_id · property_key · name · token_hash · registered_by · last_seen_at · revoked_at · app_version · device_model · os_version · battery | 기기 토큰(sha256) — 근태 `attendance_trusted_devices` 와 같은 방식 |
 | `checkin.enrollment_codes` | code(8자리) · property_key · expires_at(10분) · used_at | 기기 등록 1회용 |
 | `checkin.property_settings` | property_key · languages · welcome_text(jsonb 4개 언어) · terms_text(jsonb) · terms_version · required_fields(jsonb) · video_seconds_per_guest(5) · support_contacts(jsonb) · idle_seconds_input(240) · idle_seconds_done(30) · verification_method(`video` \| `staff_call` \| `auto_match`) · staff_pin_hash · mrz_autofill(bool) | 43 §8-6(3) 건물별 설정 — 계약의 재료 |
-| `checkin.stays` | id · organization_id · reservation_group_key(`original_reservation_id`) · property_key · check_in_date · check_out_date · guest_count_expected · checkin_code(6자리, org 안 unique · 기간 지나면 재사용) · status(`pending` \| `pre_registered` \| `in_progress` \| `checked_in` \| `expired` \| `cancelled`) · pre_reg_token_hash · pre_reg_sent_at · reminded_at · checked_in_at · verified_at · verified_by · retain_until | 예약 묶음 하나 = 체크인 하나(43 §8-13) |
+| `checkin.stays` | id · organization_id · reservation_group_key(`original_reservation_id`) · property_key · check_in_date · check_out_date · guest_count_expected · party_size(손님이 줄인 인원, 2026-11-02) · checkin_code(6자리, org 안 unique · 기간 지나면 재사용) · status(`pending` \| `pre_registered` \| `in_progress` \| `checked_in` \| `expired` \| `cancelled`) · pre_reg_token_hash · pre_reg_sent_at · reminded_at · checked_in_at · verified_at · verified_by · retain_until | 예약 묶음 하나 = 체크인 하나(43 §8-13) |
+| `checkin.stay_tokens` | token_hash(sha256, 기본 키) · stay_id · created_at | 손님 개인 링크 — stay 당 여러 개 · 최근 10개(2026-11-02, `202611020002`) |
+| `checkin.claim_attempts` | key_hash · ip_hash · succeeded · attempted_at | 「예약 찾기」 시도 — 잠금 · 속도 제한(IP 원문 없음, `202611020002`) |
 | `checkin.stay_rooms` | stay_id · reservation_id(public) · room_label · room_id | 여러 방 |
 | `checkin.guests` | id · stay_id · stay_room_id · is_representative · guest_type(`adult` \| `child`) · name_roman · name_kana · nationality(ISO 3166-1 alpha-3) · has_japan_address · address · postal_code · phone · email · birth_date · gender · occupation · passport_number · passport_expiry · prev_stay · next_dest · source(`beds24` \| `guest` \| `staff` \| `mrz`) · mrz_raw · mrz_valid(bool) · no_passport_reason | `mrz_*` = 판독 원문 · 체크섬 결과(직원이 손 입력과 비교) |
 | `checkin.guest_documents` | id · guest_id · kind(`passport` \| `face_video` \| `id_card`) · storage_path · byte_size · width · height · duration_s · captured_at · captured_on(`kiosk` \| `guest_web` \| `staff`) · device_id · replaced_by · retain_until · sha256 | 비공개 버킷 `checkin-documents`; sha256 로 전송 무결성 |
@@ -147,12 +149,17 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `POST /api/kiosk/document` | 태블릿 · 손님 웹 | 기기/링크 토큰 | 업로드 끝 보고(sha256 · 크기) → `guest_documents` 줄 |
 | `POST /api/kiosk/complete` | 태블릿 | 기기 토큰 + 세션 | 동의 · 전원 명부 · 동영상 검증 → `checked_in` · 방 번호 · 비밀번호(`property_operation_infos`) 반환 |
 | `POST /api/guest/claim` | 손님 웹(건물 고정 링크 `/p/<건물>`) | 없음(공개) — 이름 + 체크인 날짜 + **채널 예약 번호**(`reservations.original_reservation_id` — `raw_payload.apiReference` 와 같은 값, 대소문자 · 공백 · 하이픈 무시, 없으면 전화 뒤 4자리) 3요소(2026-11-01, 44 §14-7) | 일치하는 stay 가 **하나**면 토큰 발급(원문 1회) · IP · 건물당 속도 제한 · 5회 실패 10분 잠금 · 불일치 시 어떤 것이 틀렸는지 말하지 않음 |
-| `GET /api/guest/[token]` · `PUT …/guests` · `POST …/consent` | 손님 웹 | 링크 토큰 | 사전 등록(계약 JSON 포함) · 저장 · 동의(체크인 뒤 잠금) |
+| `PUT\|DELETE /api/guest/[token]/guests` · `POST …/passport` · `POST …/consent` | 손님 웹 | 링크 토큰 | 한 사람 저장(최대 20명) · 「이 사람은 안 와요」(DELETE — 저장한 동행자는 줄 · 여권 파일까지 지움, 빈 자리는 `stays.party_size` 만 줄임, 대표자 · 마지막 한 자리는 409) · 여권 사진(서버 multipart) · 동의(체크인 뒤 409 잠금). 화면 읽기는 라우트가 아니라 서버 페이지(`/r/[token]`)가 직접 한다(2026-11-02) |
 | `GET\|POST /api/jobs/sync-stays` · `/retention` · `/remind` | 크론 | 크론 비밀값(`Authorization: Bearer <CRON_SECRET>`) | 동기화 · 자동 삭제 · 리마인드. `sync-stays` 는 우리 DB(`public.reservations`)만 읽어 stay 를 만든다 — **Beds24 호출 없음**(2026-11-01, 44 §14-6). ~~stay 생성 뒤 Beds24 Info 항목 쓰기 · `stays.beds24_info_synced_at`~~ 는 1차 제외 |
 | Foldy `src/actions/checkin/*` | 직원 | Foldy 세션 + `checkin.*` | 현황 · 열람(서명 URL 1~5분, audit) · 확인함 · 대리 입력 · 내보내기 · 기기 · 건물 설정 |
 
 - 속도 제한: `find` 기기당 분당 20회, `guest/[token]` IP 당 분당 30회, `enroll` 분당 5회. 토큰 32바이트 랜덤 · DB 엔 sha256. 모든 응답에 `contract_version`.
 - 업로드: 클라이언트 → Supabase Storage 서명 URL 직접. 여권 JPEG 긴 변 2,400px · 품질 85(MRZ 가 읽히는 수준), 동영상 H.264 720p ≤ 5초 × n(상한 60초 · 약 1MB/초).
+- **손님 웹 여권 업로드는 서명 URL 대신 서버 multipart(2026-11-02 구현)**: 폰이 긴 변 2,400px · JPEG 0.85 로 줄여 `POST /api/guest/[token]/passport`(`guest_id` · `file`) 로 보낸다 → 서버가 앞 바이트로 형식 확인(jpeg · png · webp) · 10MB 상한 · stay 당 시간 40장 → `checkin-documents` 에 올리고 `guest_documents` 줄. 다시 올리면 앞 줄에 `replaced_by` 를 채우고 앞 파일은 지운다. 사진 한 장이 작아(≈1MB) 서명 URL 왕복 두 번보다 단순하다. 태블릿 동영상은 크기가 커서 서명 URL(`/api/kiosk/upload-url`) 그대로.
+- **`claim` 시도 기록(2026-11-02)**: `checkin.claim_attempts`(마이그레이션 `202611020002_checkin_guest_web.sql`, 운영 미적용) — IP 원문 없이 `HMAC(IP + 건물, CHECKIN_HASH_SECRET)`. 같은 키 10분 안 5회 실패 → 마지막 실패 + 10분까지 잠금(429 `locked`, `locked_until`), 같은 IP 분당 30회(429 `rate_limited`). 실패 응답은 `not_found` + 남은 횟수뿐 — 어느 칸이 틀렸는지 말하지 않는다.
+- **링크 토큰은 찾을 때마다 하나 더 발급, 앞 링크도 그대로 열림(2026-11-02 수정)**: `checkin.stay_tokens`(토큰 sha256 · stay · 만든 때, stay 지우면 같이 지움) — 32바이트 base64url 원문은 한 번만 돌려준다. stay 당 최근 10개만 남긴다. 일행에게 보낸 링크가 다시 찾기로 닫히지 않게 하려는 것. `stays.pre_reg_token_hash` 는 쓰지 않는다.
+- **실제 인원(2026-11-02)**: `stays.party_size` — 손님이 「이 사람은 안 와요」로 줄인 인원(null = 예약 인원). 명부 자리 = max(저장한 사람, party_size). 동의 화면은 저장한 사람 ≥ party_size 일 때만 열리고, 예약 인원 ≠ 명부 인원이면 「예약 N명 · 명부 M명 — 직원이 확인」 한 줄(막지 않음, 43 §8). 직원 화면 표시는 4단계.
+- 새 환경 변수: `CHECKIN_HASH_SECRET`(시도 기록 HMAC 키, 없으면 `claim` 이 500).
 
 ## 5. 태블릿 앱 (Kotlin · Jetpack Compose, `apps/checkin-kiosk`)
 
@@ -174,6 +181,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 ## 6. 손님 사전 등록 웹 (`apps/checkin`, Next.js)
 
 - Next.js 16 App Router · React 19 · Tailwind v4 — Foldy 와 같은 버전(의존성은 자기 `package.json`). 폰 세로 기준, 사진은 `<input capture=\"environment\">`(뒷카메라) 또는 파일, 클라이언트 리사이즈(긴 변 2,400px).
+- 생년월일은 연 · 월 · 일 세 칸(화면 언어로 표시, 영어는 월 · 일 · 연) — 휴대폰 기본 날짜 칸은 기기 언어로 나오고 오래된 연도 넘기기가 힘들어 바꿨다(2026-11-02).
 - i18n: `ja` 기본, en · zh-Hans · ko — 사전 파일은 `apps/checkin/src/lib/i18n/*.json`(계약 문구와 같은 키). Foldy `src/lib/i18n.ts` 는 쓰지 않는다.
 - 사전 등록에서는 MRZ 판독을 **하지 않는다**(브라우저 OCR 품질 문제) — 손님이 사진만 올리고 칸은 손으로; 태블릿에서 여권을 다시 찍으면 MRZ 로 자동 보정 · 대조(직원 화면에 「사전 입력 ≠ MRZ」 표시).
 - 상태는 서버가 원본, 단계마다 저장. 체크인 뒤에는 읽기 전용.
@@ -197,6 +205,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 1. 루트 세 줄(tsconfig exclude · eslint ignore · vitest exclude) · `apps/checkin` 뼈대 · `checkin` 스키마 마이그레이션(로컬) · 계약 스키마(zod) · `sync-stays` — Foldy 빌드 확인
    - 2026-11-02 진행: 루트 세 줄 ✅ · 뼈대(`/p/[building]` 시작 화면 · `/api/health` · 4개 언어 사전 · 서비스 클라이언트) ✅ · 마이그레이션 초안 ✅(운영 미적용) · 계약 스키마 ✅ · `sync-stays` ✅(아래 「sync-stays 동작」, 운영 연결 전)
 2. 사전 등록 웹(명부 · 여권 업로드 · 동의) · 링크 발급 · 리마인드 크론
+   - 2026-11-02 진행: 찾기(`/p/[building]` — 예약 번호 또는 전화 뒤 4자리 · 못 찾음 · 잠금) ✅ · 명부(`/r/[token]`) · 사람별 입력(`…/guest/[id]`) · 여권 사진 · 동의(`…/terms`) · 완료(코드) · 체크인 뒤 읽기 전용 ✅ · 4개 언어 ✅ · 단위 테스트 37개 ✅. **리마인드 크론은 보류**(메시지 보낼 길이 아직 없음 — L0 만). 실제 DB 왕복 테스트 · 운영 연결 전
 3. 태블릿 앱: 뼈대(Compose · 기기 등록 · 계약 받기 · 잠금) → 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐
 4. Foldy 직원 화면(PC · 모바일) · 권한 키 · 내보내기 · 기기 · 건물 설정
 5. 보존 크론 · 감사 기록 · 기기 체크리스트 · 한 건물 병행(43 §8-20)

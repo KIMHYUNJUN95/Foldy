@@ -151,6 +151,12 @@
 .shf-alert i { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #f07b1a; }
 .shf-alert span { font-size: 15px; line-height: 20px; }
 .shf-alert b { font-weight: 600; color: #b4500a; }
+/* 지난 날 끝내지 못한 청소(2026-11-02) — 상자 없이 제목과 같은 줄에서 시작 · 주황 제목, 닫기 버튼은 회색(삭제가 아니라 기록을 닫는 것) */
+.shf-stale { display: flex; flex-direction: column; gap: 12px; }
+.shf-stale__t { display: flex; flex-direction: column; gap: 4px; }
+.shf-stale__t b { font-size: 17px; font-weight: 600; color: #b4500a; }
+.shf-stale__t span { font-size: 15px; line-height: 20px; color: #3a3746; }
+.shf-stale__t .shf-stale__hint { font-size: 13px; line-height: 18px; color: #6b6878; }
 .shf-prog { display: flex; flex-direction: column; gap: 10px; }
 .shf-prog__row { display: flex; align-items: baseline; gap: 10px; }
 .shf-prog__row b { flex: 1; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }

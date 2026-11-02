@@ -16,7 +16,8 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
  * 같은 검사를 쓰도록 한 곳에 둔다. 권한은 `cleaning.assign` 능력 — 없으면 `null`(redirect 하지 않는다 · CLAUDE.md).
  */
 
-export type AssignFail = { ok: false; reason: "forbidden" | "invalid" | "conflict" | "error" };
+/** `cancelled` — 관리자가 그날 일정을 취소한 사람에게 방을 넣으려 함(먼저 「다시 넣기」). */
+export type AssignFail = { ok: false; reason: "forbidden" | "invalid" | "conflict" | "error" | "cancelled" };
 export type AssignOk<T = object> = { ok: true } & T;
 
 export const CLEANING_ASSIGN_PATHS = ["/admin/cleaning-assign", "/admin/cleaning-assign/settings", "/mobile/shift", "/mobile/shift/today", "/admin/cleaning", "/mobile/cleaning"];
@@ -52,8 +53,29 @@ export async function isFieldMember(organizationId: string, userId: string): Pro
   return members.some((member) => member.userId === userId);
 }
 
-/** 신청이 없으면 「관리자가 넣음」 신청을 만든다 · 취소된 날이면 살린다. */
-export async function ensureApplication(organizationId: string, userId: string, date: string, actorId: string) {
+/**
+ * 관리자가 그날 일정을 취소한 사람(`cleaning_shift_applications.cancelled_at` 있음) — 방 넣기 · 옮기기 · 출근 시각 바꾸기 전에 본다.
+ * 예전엔 방을 넣으면 `ensureApplication` 이 취소를 **조용히 풀어서**, 모바일 현황판 「담당 넣기」에서 그 사람을 고르면 관리자가
+ * 취소한 날이 되살아났다(2026-11-02 점검). 취소를 푸는 것은 「다시 넣기」(`addApplicantForDay`) 한 곳뿐이다.
+ */
+export async function cancelledUserIds(organizationId: string, date: string, userIds: string[]): Promise<Set<string> | null> {
+  if (userIds.length === 0) return new Set();
+  const { data, error } = await getSupabaseServiceClient()
+    .from("cleaning_shift_applications")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("work_date", date)
+    .in("user_id", userIds)
+    .not("cancelled_at", "is", null);
+  if (error) return null;
+  return new Set((data ?? []).map((row) => row.user_id));
+}
+
+/**
+ * 신청이 없으면 「관리자가 넣음」 신청을 만든다. 취소된 날은 `revive` 일 때만 살린다(「다시 넣기」) —
+ * 다른 쓰기는 먼저 `cancelledUserIds` 로 막고, 여기서도 조용히 살리지 않는다.
+ */
+export async function ensureApplication(organizationId: string, userId: string, date: string, actorId: string, options: { revive?: boolean } = {}) {
   const supabase = getSupabaseServiceClient();
   const existing = await supabase
     .from("cleaning_shift_applications")
@@ -64,7 +86,7 @@ export async function ensureApplication(organizationId: string, userId: string, 
     .maybeSingle();
   if (!existing.data) {
     await supabase.from("cleaning_shift_applications").insert({ created_by: actorId, organization_id: organizationId, source: "admin", user_id: userId, work_date: date });
-  } else if (existing.data.cancelled_at) {
+  } else if (existing.data.cancelled_at && options.revive) {
     await supabase
       .from("cleaning_shift_applications")
       .update({ cancel_request_note: null, cancel_requested_at: null, cancelled_at: null, cancelled_by: null, updated_at: new Date().toISOString() })

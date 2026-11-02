@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTodayWorkState } from "@/lib/attendance-sessions";
-import { completeSessionCore, reopenSessionCore, startSessionCore, type SessionOpResult } from "@/lib/cleaning-session-ops";
+import { closeStaleSessionCore, completeSessionCore, reopenSessionCore, startSessionCore, type SessionOpResult } from "@/lib/cleaning-session-ops";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 
 /**
@@ -42,6 +42,15 @@ export async function finishMyRoom(input: { sessionId: string }): Promise<Sessio
   const session = await worker();
   if (!session) return { ok: false, error: "not_allowed" };
   const result = await completeSessionCore(session, typeof input.sessionId === "string" ? input.sessionId : "", "");
+  if (result.ok) refresh();
+  return result;
+}
+
+/** 지난 날 끝내지 못한 내 청소를 닫는다(취소로) — 그래야 오늘 방을 시작할 수 있다. `closeStaleSessionCore` 설명 참고. */
+export async function closeStaleMyRoom(input: { sessionId: string }): Promise<SessionOpResult> {
+  const session = await worker();
+  if (!session) return { ok: false, error: "not_allowed" };
+  const result = await closeStaleSessionCore(session, typeof input.sessionId === "string" ? input.sessionId : "");
   if (result.ok) refresh();
   return result;
 }

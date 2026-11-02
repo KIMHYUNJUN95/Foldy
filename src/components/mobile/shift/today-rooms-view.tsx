@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { CalendarDays, Check, ChevronRight } from "lucide-react";
-import { finishMyRoom, startMyRoom, undoFinishMyRoom } from "@/app/mobile/shift/today/actions";
+import { closeStaleMyRoom, finishMyRoom, startMyRoom, undoFinishMyRoom } from "@/app/mobile/shift/today/actions";
 import { useIsTablet } from "@/components/shell/split-list";
 import { TaskToast } from "@/components/tasks/task-toast";
 import { haptic } from "@/lib/haptics";
@@ -34,6 +34,9 @@ export type TodayRoomSession = {
   mine: boolean;
 };
 
+/** 지난 날 시작하고 끝내지 않은 내 청소(2026-11-02) — 남아 있으면 오늘 방을 시작할 수 없어 맨 위에 띄운다. */
+export type StaleSession = { id: string; roomName: string; cleaningDate: string; startedAt: string };
+
 type Room = TodayRoom & { buildingLabel: string; doorCode: string | null; mapsUrl: string | null; session: TodayRoomSession | null };
 
 /** `clockIn` — 출근 기록 없이 시작했을 때 「출근하기」 버튼(2026-10-29). */
@@ -44,6 +47,7 @@ function errorText(error: SessionOpError, copy: CleaningAssignCopy): string {
   if (error === "already_active") return copy.myErrActive;
   if (error === "complete_failed" || error === "active_not_found") return copy.myErrFinish;
   if (error === "undo_failed") return copy.myErrUndo;
+  if (error === "close_failed") return copy.myErrClose;
   return copy.myErrStart;
 }
 
@@ -73,10 +77,21 @@ type Data = {
   mates: { name: string; rooms: AssignPlace[] }[];
   changedLastNight: { at: string; rooms: AssignPlace[] }[];
   state: ShiftDayState;
+  cancelled: boolean;
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 };
 
-export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCopy; locale: string; data: Data }) {
+export function TodayRoomsView({
+  copy,
+  locale,
+  data,
+  stale,
+}: {
+  copy: CleaningAssignCopy;
+  locale: string;
+  data: Data;
+  stale: StaleSession | null;
+}) {
   const isTablet = useIsTablet();
   const router = useRouter();
   // 「어젯밤 바뀜」 · 같이 일하는 사람의 방 — 건물은 보는 사람 언어로, 독채는 건물 이름 하나만(2026-10-26).
@@ -138,6 +153,26 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
         undoSessionId: sessionId,
       });
     });
+  // 지난 날 기록 닫기 — 서버가 닫은 뒤에만 사라진다(화면은 재검증으로 다시 그린다).
+  const [closedStaleId, setClosedStaleId] = useState<string | null>(null);
+  const closeStale = (sessionId: string) => {
+    haptic("light");
+    setBusyRoom("stale");
+    startTransition(async () => {
+      const result = await closeStaleMyRoom({ sessionId });
+      setBusyRoom(null);
+      if (!result.ok) {
+        haptic("error");
+        setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
+        return;
+      }
+      haptic("success");
+      // 새로 읽기가 끝나기 전에 같은 카드가 다시 눌리지 않게 바로 숨긴다.
+      setClosedStaleId(sessionId);
+      setToast({ stamp: Date.now(), message: copy.staleClosed, undoSessionId: null });
+      router.refresh();
+    });
+  };
   const undo = (sessionId: string) => {
     setToast(null);
     haptic("light");
@@ -240,11 +275,30 @@ export function TodayRoomsView({ copy, locale, data }: { copy: CleaningAssignCop
           <h1 className="shf-title">{copy.todayTitle}</h1>
         </div>
 
+        {stale && stale.id !== closedStaleId ? (
+          <section className="shf-stale" role="alert" aria-label={copy.staleHead}>
+            <span className="shf-stale__t">
+              <b>{copy.staleHead}</b>
+              <span>{fill(copy.staleBody, { room: stale.roomName, date: dayLabel(stale.cleaningDate, locale), time: tokyoTime(stale.startedAt) })}</span>
+              <span className="shf-stale__hint">{copy.staleHint}</span>
+            </span>
+            <button
+              type="button"
+              className="shf-btn is-gray is-wide"
+              disabled={pending}
+              aria-busy={pending && busyRoom === "stale"}
+              onClick={() => closeStale(stale.id)}
+            >
+              {pending && busyRoom === "stale" ? copy.staleClosing : copy.staleClose}
+            </button>
+          </section>
+        ) : null}
+
         {data.rooms.length === 0 ? (
           <div className="shf-empty">
             <CalendarDays className="shf-empty__ic" aria-hidden="true" />
             <b>{copy.emptyTitle}</b>
-            <span>{data.state === "none" ? copy.emptyBodyNone : data.state === "waiting" ? copy.emptyBodyWaiting : copy.emptyBodyFree}</span>
+            <span>{data.cancelled ? copy.emptyBodyCancelled : data.state === "none" ? copy.emptyBodyNone : data.state === "waiting" ? copy.emptyBodyWaiting : copy.emptyBodyFree}</span>
             {tomorrowText ? <span className="shf-empty__next">{`${fill(copy.tomorrowLine, { date: dayLabel(data.tomorrow.date, locale) })} · ${tomorrowText}`}</span> : null}
             <Link href="/mobile/shift">{copy.goMyShift}</Link>
             <Link href="/mobile/cleaning?work=1">{copy.myOtherCleaning}</Link>

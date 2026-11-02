@@ -76,11 +76,13 @@ export async function toggleApplicationForUser(input: { date: string; userId: st
   const organizationId = session.organization.id;
   const existing = await supabase
     .from("cleaning_shift_applications")
-    .select("user_id")
+    .select("user_id, cancelled_at")
     .eq("organization_id", organizationId)
     .eq("user_id", input.userId)
     .eq("work_date", input.date)
     .maybeSingle();
+  // 관리자가 취소한 날 — 줄을 지우면 취소가 풀리고 다음 누름에 새 신청이 생긴다. 「다시 넣기」만 푼다(2026-11-02).
+  if (existing.data?.cancelled_at) return { ok: false, reason: "cancelled" };
   if (existing.data) {
     const rooms = await supabase.from("cleaning_assignments").select("id").eq("organization_id", organizationId).eq("user_id", input.userId).eq("work_date", input.date).limit(1);
     if ((rooms.data ?? []).length > 0) return { ok: false, reason: "conflict" };

@@ -97,6 +97,9 @@ button.cbd-row { cursor: pointer; }
 .cbd-check svg { width: 14px; height: 14px; }
 .cbd-check.is-on { background: #7a52e6; border-color: #7a52e6; }
 .cbd-person:active .cbd-check { transform: scale(.9); }
+/* 그날 일정이 취소된 사람 — 고를 수 없음(2026-11-02) */
+.cbd-person.is-locked { cursor: default; opacity: .55; }
+.cbd-person.is-locked .cbd-load { visibility: hidden; }
 .cbd-more { min-height: 48px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: #7a52e6; text-align: left; cursor: pointer; }
 .cbd-assign__foot { display: flex; flex-direction: column; gap: 8px; }
 .cbd-cta { min-height: 50px; padding: 0 16px; border: 0; border-radius: 14px; background: #7a52e6; color: #fff; font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; transition: opacity 160ms ease, transform 160ms cubic-bezier(.23, 1, .32, 1); }

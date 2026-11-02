@@ -104,7 +104,7 @@ export function AssignPersonPanel({
         onMessage(copy.psDone);
       } else {
         haptic("error");
-        onMessage(result.reason === "conflict" ? copy.errAssigned : copy.failed);
+        onMessage(result.reason === "conflict" ? copy.errAssigned : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       router.refresh();
     });

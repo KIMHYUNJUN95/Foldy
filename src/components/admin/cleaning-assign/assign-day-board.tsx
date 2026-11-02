@@ -164,7 +164,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         if (success) showToast(success);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       router.refresh();
     });
@@ -203,7 +203,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         window.setTimeout(() => setChangedKeys(new Set()), 4000);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       router.refresh();
     });
@@ -217,7 +217,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         showToast(copy.heldUndone);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       setChangedKeys(new Set());
       router.refresh();
@@ -258,7 +258,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         setSeatUndo({ message: fill(copy.seatRemoved, { name, room: roomTitle(room) }), roomKey: room.roomKey, stamp: Date.now(), userId });
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       router.refresh();
     });
@@ -276,7 +276,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       if (result.ok) haptic("medium");
       else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : copy.failed);
+        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       router.refresh();
     });

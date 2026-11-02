@@ -199,7 +199,11 @@ export function CleaningBoardView({
       const failure = await apply(add, remove);
       if (failure) {
         haptic("error");
-        setToast({ message: failure === "conflict" ? copy.boardConflict : copy.boardFailed, stamp: Date.now(), undo: null });
+        setToast({
+          message: failure === "conflict" ? copy.boardConflict : failure === "cancelled" ? copy.boardDayCancelled : copy.boardFailed,
+          stamp: Date.now(),
+          undo: null,
+        });
         router.refresh();
         return;
       }
@@ -421,11 +425,24 @@ function AssignPanel({
     const on = picked.includes(p.userId);
     const places = [...new Set(p.rooms.map((r) => bName(r.propertyName)))].join(" · ");
     const load = p.rooms.length;
+    // 관리자가 그날 일정을 취소한 사람은 새로 넣을 수 없다(서버도 막는다) — 이미 이 방에 있으면 빼는 것만 된다(2026-11-02).
+    const locked = p.cancelled && !initial.includes(p.userId);
     return (
-      <button key={p.userId} type="button" className="cbd-person" aria-pressed={on} onClick={() => toggle(p.userId)}>
+      <button
+        key={p.userId}
+        type="button"
+        className={`cbd-person${locked ? " is-locked" : ""}`}
+        aria-pressed={on}
+        disabled={locked}
+        onClick={() => toggle(p.userId)}
+      >
         <span className="cbd-person__t">
           <b>{p.name}</b>
-          <span>{[places, load > 0 ? fill(copy.boardRoomsN, { n: load }) : copy.boardNoRooms].filter(Boolean).join(" · ")}</span>
+          <span>
+            {locked
+              ? copy.boardCancelledTag
+              : [places, load > 0 ? fill(copy.boardRoomsN, { n: load }) : copy.boardNoRooms].filter(Boolean).join(" · ")}
+          </span>
         </span>
         <span className="cbd-load" aria-hidden="true">
           {[0, 1, 2, 3].map((i) => (

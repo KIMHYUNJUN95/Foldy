@@ -916,6 +916,8 @@ export async function loadTodayRooms(
   mates: { name: string; rooms: AssignPlace[] }[];
   changedLastNight: { at: string; rooms: AssignPlace[] }[];
   state: ShiftDayState;
+  /** 「배정 없음」 중 관리자가 그날 일정을 취소한 경우 — 빈 화면 문구를 「방이 모두 배정됨」과 가른다(2026-11-02). */
+  cancelled: boolean;
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 }> {
   const tomorrow = addDays(date, 1);
@@ -1001,6 +1003,7 @@ export async function loadTodayRooms(
     rooms,
     startMinutes: app?.startMinutes ?? base,
     state: shiftDayState({ applied: Boolean(app), cancelled: Boolean(app?.cancelledAt), isPast: false, myRooms: mine.length, openRooms: todayOpen, totalRooms: todayTotal }),
+    cancelled: Boolean(app?.cancelledAt) && mine.length === 0,
     tomorrow: {
       date: tomorrow,
       rooms: tMine,

@@ -33,7 +33,8 @@ export type SessionOpError =
   | "missing_session"
   | "active_not_found"
   | "complete_failed"
-  | "undo_failed";
+  | "undo_failed"
+  | "close_failed";
 
 export type SessionOpResult<T = object> = ({ ok: true } & T) | { ok: false; error: SessionOpError };
 
@@ -169,6 +170,47 @@ export async function reopenSessionCore(
     .eq("status", "completed")
     .select("id");
   if (updateError || !reopened || reopened.length === 0) return fail("undo_failed");
+
+  await signal(session.organization.id);
+  return { ok: true };
+}
+
+/**
+ * 지난 날 끝내지 못한 내 청소 닫기(2026-11-02 점검 수정 — 오늘 내 방).
+ *
+ * 한 사람당 진행 중 기록은 하나라(`cleaning_sessions_one_active_per_org_user_idx`, 날짜 조건 없음) 어제 시작하고 끝내지 않은
+ * 기록이 남으면 오늘 방을 하나도 시작할 수 없다. 오늘 내 방은 오늘 기록만 읽어서 그 기록이 보이지도 않았다.
+ * 「지금 끝내기」로 닫으면 소요 시간이 하루를 넘겨 기록 · 통계가 틀어지므로 **취소로 닫는다**(기록은 남는다).
+ * 실제로 청소를 끝냈다면 관리자가 그날 화면에서 대신 완료(강제 완료)로 시각을 넣는다 — 취소된 기록은 그 검사에서 빠진다.
+ * 오늘 기록은 여기서 닫지 않는다(오늘 것은 화면의 끝내기를 쓴다).
+ */
+export async function closeStaleSessionCore(session: AppSession, sessionId: string): Promise<SessionOpResult> {
+  if (!canAccessMobileCleaning(session.user.role)) return fail("not_allowed");
+  if (!sessionId) return fail("missing_session");
+  const supabase = await getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("cleaning_sessions")
+    .select("id, cleaning_date")
+    .eq("id", sessionId)
+    .eq("organization_id", session.organization.id)
+    .eq("staff_user_id", session.user.id)
+    .eq("status", "in_progress")
+    .maybeSingle();
+  if (error || !data) return fail("active_not_found");
+  if (data.cleaning_date >= getCleaningOperatingDateKey()) return fail("close_failed");
+
+  // DB check 제약: 취소도 completed_at · duration_seconds 가 있어야 한다. 소요 시간은 **0** — 며칠에 걸친 「지금 − 시작」을 넣으면
+  // 취소를 빼지 않고 더하는 집계가 부풀려진다. 잰 적 없는 시간이라 0 이 맞다.
+  const { data: closed, error: updateError } = await supabase
+    .from("cleaning_sessions")
+    .update({ completed_at: new Date().toISOString(), duration_seconds: 0, status: "cancelled" })
+    .eq("id", sessionId)
+    .eq("organization_id", session.organization.id)
+    .eq("staff_user_id", session.user.id)
+    .eq("status", "in_progress")
+    .select("id");
+  if (updateError) return fail("close_failed");
+  if (!closed || closed.length === 0) return fail("active_not_found");
 
   await signal(session.organization.id);
   return { ok: true };

@@ -11,6 +11,7 @@ import {
 import {
   canForceCompleteCleaning,
   getCleaningOperatingDateKey,
+  pickForceCompleteTarget,
   resolveForceCompleteDate,
 } from "@/lib/cleaning";
 import {
@@ -32,6 +33,7 @@ import {
   getCanonicalPropertyName,
   getCanonicalRoomLabel,
   localizeRoomPlaceLabel,
+  physicalRoomKeyOfSessionLabel,
 } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 // 소요시간 포맷은 화면(오늘 현황 카드·기록 표·상세 패널)이 쓰는 fmtDur 를 그대로 재사용한다 —
@@ -250,7 +252,7 @@ export type ForceCompleteCleaningInput = {
 
 export type ForceCompleteCleaningResult =
   | { ok: true }
-  | { ok: false; reason: "forbidden" | "invalid" | "error" };
+  | { ok: false; reason: "forbidden" | "invalid" | "error" | "processed" };
 
 function taskTypeToTaskLabel(type: CleaningTaskType): string {
   if (type === "longstay") return "long_stay";
@@ -302,16 +304,37 @@ export async function forceCompleteCleaningSession(
   const service = getSupabaseServiceClient();
   const organizationId = session.organization.id;
 
+  // 강제 완료는 **진행 중인 기록을 끝내거나, 기록이 없는 방에 완료 기록을 만드는 것**만 한다(2026-11-02 점검 수정).
+  // 예전엔 상태를 보지 않고 덮어써서, 화면이 낡은 사이 직원이 끝낸 기록 · 취소한 기록의 시각 · 담당자가 바뀌었고,
+  // 세션 id 없이 보내면 같은 날 · 같은 방에 이미 기록이 있어도 완료 기록이 하나 더 생겼다.
   let cleaningDate = viewDate;
-  if (input.sessionId) {
+  let sessionId = input.sessionId ?? null;
+  if (sessionId) {
     const existing = await service
       .from("cleaning_sessions")
-      .select("cleaning_date")
-      .eq("id", input.sessionId)
+      .select("cleaning_date, status")
+      .eq("id", sessionId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (!existing.data) return { ok: false, reason: "invalid" };
+    if (existing.data.status === "completed") return { ok: false, reason: "processed" };
     cleaningDate = existing.data.cleaning_date;
+    // 취소만 남은 방(콘솔 「취소됨」 카드)은 그 기록을 되살리지 않고 아래에서 새 완료 기록을 만든다 — 취소 이력은 남긴다.
+    if (existing.data.status === "cancelled") sessionId = null;
+  }
+  if (!sessionId) {
+    // 같은 날 같은 **실제 방**(쉬는 계정 라벨 포함)에 이미 기록이 있으면 막는다 — 남의 진행 중 기록을 가로채지 않는다.
+    // 남는 틈: 읽기 → 넣기 사이에 직원이 시작하는 경쟁은 DB 유니크 인덱스가 있어야 완전히 막힌다(문서 07 「남은 것」, 묶음 C).
+    const sameDay = await service
+      .from("cleaning_sessions")
+      .select("room_label, status")
+      .eq("organization_id", organizationId)
+      .eq("cleaning_date", cleaningDate)
+      .in("status", ["in_progress", "completed"]);
+    if (sameDay.error) return { ok: false, reason: "error" };
+    if (pickForceCompleteTarget(sameDay.data ?? [], roomLabel, physicalRoomKeyOfSessionLabel) === "processed") {
+      return { ok: false, reason: "processed" };
+    }
   }
 
   const startIso = tokyoDateTimeIso(cleaningDate, input.start);
@@ -337,8 +360,8 @@ export async function forceCompleteCleaningSession(
     return { ok: false, reason: "invalid" };
   }
 
-  if (input.sessionId) {
-    const { error } = await service
+  if (sessionId) {
+    const { data: updated, error } = await service
       .from("cleaning_sessions")
       .update({
         status: "completed",
@@ -349,9 +372,13 @@ export async function forceCompleteCleaningSession(
         notes: input.note || null,
         completed_by_admin: session.user.id,
       })
-      .eq("id", input.sessionId)
-      .eq("organization_id", organizationId);
+      .eq("id", sessionId)
+      .eq("organization_id", organizationId)
+      .eq("status", "in_progress")
+      .select("id");
     if (error) return { ok: false, reason: "error" };
+    // 0행 = 읽은 뒤 그 사이에 직원이 끝냈거나 취소했다 — 덮어쓰지 않는다.
+    if (!updated || updated.length === 0) return { ok: false, reason: "processed" };
     await afterForceComplete(organizationId);
     return { ok: true };
   }

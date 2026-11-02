@@ -4,6 +4,7 @@ import { loadAssignDayRooms } from "@/lib/cleaning-assign/rooms";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
   assigner,
+  cancelledUserIds,
   changed,
   ensureApplication,
   isEditableDate,
@@ -30,6 +31,9 @@ export async function assignToRoom(input: { date: string; roomKey: string; userI
   const room = rooms.find((item) => item.roomKey === input.roomKey);
   // 미뤘거나 처리 끝으로 둔 방에는 넣지 않는다(되돌린 뒤에).
   if (!room || !member || room.status !== "pending" || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
+  const cancelled = await cancelledUserIds(organizationId, input.date, [input.userId]);
+  if (cancelled === null) return { ok: false, reason: "error" };
+  if (cancelled.has(input.userId)) return { ok: false, reason: "cancelled" };
   const result = await supabase.from("cleaning_assignments").insert({
     created_by: session.user.id,
     organization_id: organizationId,

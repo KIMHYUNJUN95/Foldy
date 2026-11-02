@@ -83,6 +83,26 @@ export function resolveForceCompleteDate(raw: string, operatingToday: string): s
   return raw <= operatingToday ? raw : null;
 }
 
+/**
+ * 세션 id 없이 들어온 강제 완료(콘솔에서 「대기」로 보인 방) — 같은 날 같은 **실제 방**에 진행 중이거나 끝난 기록이 있으면 막는다
+ * (2026-11-02 점검 수정). 콘솔이 낡아 「대기」로 보였을 뿐 이미 누가 시작했거나 끝낸 방이다 — 그 기록을 다른 담당자 · 시각으로
+ * 덮어쓰면 직원의 실제 시작 시각이 사라지고 다른 사람 몫이 된다. 새로 읽으면 진행 중 방은 세션 id 와 함께 다시 온다.
+ * 취소된 기록은 보지 않는다(그 방은 대신 완료할 수 있다). `physicalKey` = `physicalRoomKeyOfSessionLabel`(401 ↔ 401_2_2 같은 방).
+ */
+export function pickForceCompleteTarget(
+  rows: { room_label: string; status: string }[],
+  roomLabel: string,
+  physicalKey: (label: string) => string | null,
+): "processed" | "insert" {
+  const physical = physicalKey(roomLabel);
+  const taken = rows.some(
+    (row) =>
+      (row.status === "completed" || row.status === "in_progress") &&
+      (row.room_label === roomLabel || (physical !== null && physicalKey(row.room_label) === physical)),
+  );
+  return taken ? "processed" : "insert";
+}
+
 export function formatDuration(totalSeconds: number | null) {
   if (totalSeconds === null) {
     return "-";

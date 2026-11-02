@@ -150,6 +150,7 @@ export type CleaningAssignCopy = {
   roleLeader: string;
   more: string; // "{n}명 더 보기"
   conflict: string;
+  errDayCancelled: string;
   failed: string;
   done: string;
   added: string; // "{n}개 넣었어요"
@@ -345,6 +346,7 @@ export type CleaningAssignCopy = {
   emptyBodyNone: string;
   emptyBodyWaiting: string;
   emptyBodyFree: string;
+  emptyBodyCancelled: string;
   goMyShift: string;
   // ── 넣기 · 빼기(하루 보기, 2026-10-23) ──
   seatAdd: string;
@@ -439,6 +441,13 @@ export type CleaningAssignCopy = {
   myErrActive: string;
   myErrFinish: string;
   myErrUndo: string;
+  myErrClose: string;
+  staleHead: string;
+  staleBody: string;
+  staleHint: string;
+  staleClose: string;
+  staleClosing: string;
+  staleClosed: string;
   /** 오늘 출근 기록 없이 청소를 시작했을 때(2026-10-29). */
   myNoClockIn: string;
   myClockInGo: string;
@@ -478,6 +487,8 @@ export type CleaningAssignCopy = {
   boardSavedMany: string;
   boardFailed: string;
   boardConflict: string;
+  boardDayCancelled: string;
+  boardCancelledTag: string;
   boardWillShow: string;
   boardPaneEmpty: string;
   boardLocked: string;
@@ -627,6 +638,7 @@ const ko: CleaningAssignCopy = {
   roleLeader: "알바 리더",
   more: "{n}명 더 보기",
   conflict: "방금 다른 담당자가 바꿔서 새로 불러왔어요",
+  errDayCancelled: "이날 일정이 취소된 사람이에요. 먼저 「다시 넣기」를 눌러 주세요",
   failed: "저장하지 못했어요. 다시 시도해 주세요",
   done: "저장했어요",
   added: "{n}개 넣었어요",
@@ -814,6 +826,7 @@ const ko: CleaningAssignCopy = {
   emptyBodyNone: "신청하신 날이지만 그날 방이 모두 배정됐어요. 나오지 않아도 돼요.",
   emptyBodyWaiting: "신청하셨어요. 아직 방을 나누는 중이에요.",
   emptyBodyFree: "오늘은 신청하지 않은 날이에요.",
+  emptyBodyCancelled: "관리자가 오늘 일정을 취소했어요. 나오지 않아도 돼요.",
   goMyShift: "내 시프트 보기",  psOpen: "{name} 시프트 달력 열기",
   psClose: "닫기",
   psPrevPerson: "위 사람",
@@ -900,6 +913,13 @@ const ko: CleaningAssignCopy = {
   myErrActive: "다른 방을 청소하는 중이에요. 그 방을 먼저 끝내 주세요",
   myErrFinish: "끝내지 못했어요. 다시 해 주세요",
   myErrUndo: "되돌리지 못했어요",
+  myErrClose: "기록을 닫지 못했어요. 다시 눌러 주세요",
+  staleHead: "끝내지 못한 청소가 있어요",
+  staleBody: "{date} {time}에 시작한 {room} 청소가 아직 「청소 중」이에요. 닫아야 오늘 방을 시작할 수 있어요.",
+  staleHint: "그날 실제로 끝냈다면 관리자에게 말해 주세요. 끝낸 시각은 관리자가 넣어요.",
+  staleClose: "이 기록 닫기",
+  staleClosing: "닫는 중…",
+  staleClosed: "기록을 닫았어요. 오늘 방을 시작할 수 있어요",
   myNoClockIn: "출근 기록이 아직 없어요",
   myClockInGo: "출근하기",
   boardTitle: "청소 현황",
@@ -938,6 +958,8 @@ const ko: CleaningAssignCopy = {
   boardSavedMany: "{room} 담당을 바꿨어요",
   boardFailed: "저장하지 못했어요. 다시 해 주세요",
   boardConflict: "방금 다른 담당자가 바꿨어요. 새로 불러왔어요",
+  boardDayCancelled: "이 사람은 이날 일정이 취소됐어요. PC 배정 화면에서 「다시 넣기」를 먼저 해 주세요",
+  boardCancelledTag: "일정 취소됨",
   boardWillShow: "넣으면 그 사람의 「오늘 내 방」에 바로 떠요",
   boardPaneEmpty: "방을 누르면 여기서 담당을 넣어요",
   boardLocked: "청소가 시작된 방은 여기서 바꾸지 않아요",
@@ -1087,6 +1109,7 @@ const ja: CleaningAssignCopy = {
   roleLeader: "バイトリーダー",
   more: "あと{n}人を表示",
   conflict: "ほかの担当者が変更したため再読み込みしました",
+  errDayCancelled: "この日の予定が取り消された人です。先に「戻す」を押してください",
   failed: "保存できませんでした。もう一度お試しください",
   done: "保存しました",
   added: "{n}件入れました",
@@ -1274,6 +1297,7 @@ const ja: CleaningAssignCopy = {
   emptyBodyNone: "申請した日ですが、その日の部屋はすべて割り当て済みです。出勤しなくて大丈夫です。",
   emptyBodyWaiting: "申請済みです。まだ部屋を割り振っています。",
   emptyBodyFree: "今日は申請していない日です。",
+  emptyBodyCancelled: "管理者が今日の予定を取り消しました。出勤しなくて大丈夫です。",
   goMyShift: "マイシフトを見る",  psOpen: "{name}のシフトカレンダーを開く",
   psClose: "閉じる",
   psPrevPerson: "前の人",
@@ -1360,6 +1384,13 @@ const ja: CleaningAssignCopy = {
   myErrActive: "別の部屋を清掃中です。先にその部屋を終えてください",
   myErrFinish: "終えられませんでした。もう一度お試しください",
   myErrUndo: "元に戻せませんでした",
+  myErrClose: "記録を閉じられませんでした。もう一度押してください",
+  staleHead: "終わっていない清掃があります",
+  staleBody: "{date} {time}に始めた{room}の清掃がまだ「清掃中」です。閉じると今日の部屋を始められます。",
+  staleHint: "その日に実際に終えていたら管理者に伝えてください。終了時刻は管理者が入れます。",
+  staleClose: "この記録を閉じる",
+  staleClosing: "閉じています…",
+  staleClosed: "記録を閉じました。今日の部屋を始められます",
   myNoClockIn: "まだ出勤の記録がありません",
   myClockInGo: "出勤する",
   boardTitle: "清掃状況",
@@ -1398,6 +1429,8 @@ const ja: CleaningAssignCopy = {
   boardSavedMany: "{room} の担当を変更しました",
   boardFailed: "保存できませんでした。もう一度お試しください",
   boardConflict: "他の担当者が変更しました。最新の状態にしました",
+  boardDayCancelled: "この人はこの日の予定が取り消されています。先にPCの割り当て画面で「戻す」を押してください",
+  boardCancelledTag: "予定取消",
   boardWillShow: "入れるとその人の「今日の私の部屋」にすぐ表示されます",
   boardPaneEmpty: "部屋をタップするとここで担当を入れられます",
   boardLocked: "清掃が始まった部屋はここでは変更しません",
@@ -1547,6 +1580,7 @@ const en: CleaningAssignCopy = {
   roleLeader: "Part-time leader",
   more: "Show {n} more",
   conflict: "Another manager just changed this — reloaded",
+  errDayCancelled: "This person’s day was cancelled. Tap “Restore” first.",
   failed: "Couldn't save. Please try again",
   done: "Saved",
   added: "Added {n}",
@@ -1734,6 +1768,7 @@ const en: CleaningAssignCopy = {
   emptyBodyNone: "You applied, but all rooms that day are assigned. You don't need to come in.",
   emptyBodyWaiting: "You applied. Rooms are still being assigned.",
   emptyBodyFree: "You didn't apply for today.",
+  emptyBodyCancelled: "An admin cancelled your day. You don't need to come in.",
   goMyShift: "View my shifts",  psOpen: "Open {name}'s shift calendar",
   psClose: "Close",
   psPrevPerson: "Previous person",
@@ -1820,6 +1855,13 @@ const en: CleaningAssignCopy = {
   myErrActive: "You’re cleaning another room. Finish that one first.",
   myErrFinish: "Couldn’t finish. Try again.",
   myErrUndo: "Couldn’t undo.",
+  myErrClose: "Couldn’t close the record. Try again.",
+  staleHead: "A cleaning was never finished",
+  staleBody: "{room} cleaning started {date} {time} is still “in progress”. Close it to start today’s rooms.",
+  staleHint: "If you did finish it that day, tell an admin. They’ll enter the finish time.",
+  staleClose: "Close this record",
+  staleClosing: "Closing…",
+  staleClosed: "Closed. You can start today’s rooms now.",
   myNoClockIn: "You haven’t clocked in yet.",
   myClockInGo: "Clock in",
   boardTitle: "Cleaning status",
@@ -1858,6 +1900,8 @@ const en: CleaningAssignCopy = {
   boardSavedMany: "Updated {room} assignees",
   boardFailed: "Couldn’t save. Try again.",
   boardConflict: "Someone else just changed this. Reloaded.",
+  boardDayCancelled: "This person’s day was cancelled. Use “Restore” on the PC assignment screen first.",
+  boardCancelledTag: "Day cancelled",
   boardWillShow: "They’ll see it in “My rooms today” right away.",
   boardPaneEmpty: "Tap a room to assign it here.",
   boardLocked: "Rooms already started can’t be changed here.",

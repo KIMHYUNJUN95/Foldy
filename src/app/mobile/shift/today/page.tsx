@@ -10,7 +10,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getMobileNavBadges } from "@/lib/nav-badges";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getPropertyMapMeta } from "@/lib/property-map-links";
-import { localizePropertyName } from "@/lib/room-label-normalization";
+import { localizePropertyName, localizeRoomPlaceLabel } from "@/lib/room-label-normalization";
 import { getCurrentAppSession, hasOrganizationContext } from "@/lib/session";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -33,7 +33,7 @@ export default async function MobileShiftTodayPage() {
   const copy = getCleaningAssignCopy(locale);
   const today = getCleaningOperatingDateKey();
   const service = getSupabaseServiceClient();
-  const [data, sessionsResult] = await Promise.all([
+  const [data, sessionsResult, staleResult] = await Promise.all([
     loadTodayRooms(service, session.organization.id, session.user.id, session.user.role, today),
     // 오늘 그 방의 청소 기록 — 그 자리에서 끝내기 · 타이머 · 되돌리기에 세션 id · 시작 시각이 필요하다(2026-10-28).
     service
@@ -43,7 +43,29 @@ export default async function MobileShiftTodayPage() {
       .eq("cleaning_date", today)
       .in("status", ["in_progress", "completed"])
       .order("started_at", { ascending: false }),
+    // 지난 날 시작하고 끝내지 않은 **내** 청소(2026-11-02 점검 수정) — 진행 중은 한 사람 하나라 남아 있으면 오늘 방을
+    // 하나도 시작하지 못한다. 위 조회는 오늘 날짜만 봐서 이 기록이 화면에 안 보였다 → 맨 위에 띄우고 닫게 한다.
+    service
+      .from("cleaning_sessions")
+      .select("id, room_label, cleaning_date, started_at")
+      .eq("organization_id", session.organization.id)
+      .eq("staff_user_id", session.user.id)
+      .eq("status", "in_progress")
+      .lt("cleaning_date", today)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+  // 이 조회가 실패하면 카드가 안 뜨고 시작은 「다른 방 청소 중」으로만 막힌다 — 적어도 서버 기록은 남긴다.
+  if (staleResult.error) console.error("[shift-today] stale session read failed", { code: staleResult.error.code });
+  const stale = staleResult.data
+    ? {
+        id: staleResult.data.id,
+        roomName: localizeRoomPlaceLabel(staleResult.data.room_label, getDictionary(locale).cleaning.buildingLabels),
+        cleaningDate: staleResult.data.cleaning_date,
+        startedAt: staleResult.data.started_at,
+      }
+    : null;
   const sessionByRoom = new Map<string, TodayRoomSession>();
   for (const row of sessionsResult.data ?? []) {
     const key = physicalRoomKeyOfSessionLabel(row.room_label);
@@ -73,7 +95,7 @@ export default async function MobileShiftTodayPage() {
   return (
     <MobileShell activeItem="my-rooms" badges={navBadges} title={copy.todayTitle} wide>
       <Beds24LiveRefresh kinds={LIVE_KINDS} organizationId={session.organization.id} />
-      <TodayRoomsView copy={copy} locale={locale} data={{ ...data, rooms }} />
+      <TodayRoomsView copy={copy} locale={locale} data={{ ...data, rooms }} stale={stale} />
     </MobileShell>
   );
 }

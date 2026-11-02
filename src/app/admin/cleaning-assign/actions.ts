@@ -18,6 +18,7 @@ import { FLAG_THRESHOLD_OPTIONS, isAssignRuleKey, normalizeAssignRules, TRAINEE_
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import {
   assigner,
+  cancelledUserIds,
   changed,
   ensureApplication,
   isEditableDate,
@@ -73,6 +74,9 @@ export async function reassignRooms(input: { date: string; moves: RoomMove[] }):
     const room = roomBy.get(m.roomKey);
     if (!room || room.status !== "pending" || room.deferredUntil || room.resolvedHold || !memberIds.has(m.toUserId)) return { ok: false, reason: "invalid" };
   }
+  const cancelledTargets = await cancelledUserIds(organizationId, input.date, [...new Set(moves.map((m) => m.toUserId))]);
+  if (cancelledTargets === null) return { ok: false, reason: "error" };
+  if (cancelledTargets.size > 0) return { ok: false, reason: "cancelled" };
   const result = await supabase.rpc("cleaning_reassign_rooms", {
     p_actor: session.user.id,
     p_moves: moves.map((m) => ({ from_user_id: m.fromUserId, room_key: m.roomKey, to_user_id: m.toUserId })),
@@ -128,7 +132,8 @@ export async function addApplicantForDay(input: { date: string; userId: string }
   if (!session) return { ok: false, reason: "forbidden" };
   if (!isEditableDate(input.date) || !isUuid(input.userId)) return { ok: false, reason: "invalid" };
   if (!(await isFieldMember(session.organization.id, input.userId))) return { ok: false, reason: "invalid" };
-  await ensureApplication(session.organization.id, input.userId, input.date, session.user.id);
+  // 「다시 넣기」 — 관리자 취소를 푸는 유일한 길.
+  await ensureApplication(session.organization.id, input.userId, input.date, session.user.id, { revive: true });
   await changed(session.organization.id);
   return { ok: true };
 }
@@ -140,6 +145,12 @@ export async function setDayStartTime(input: { date: string; userId: string; tim
   if (!session) return { ok: false, reason: "forbidden" };
   const minutes = input.time === null ? null : timeToMinutes(input.time);
   if (!isEditableDate(input.date) || !isUuid(input.userId) || (input.time !== null && minutes === null)) return { ok: false, reason: "invalid" };
+  // 취소된 날에 시각을 넣으면 되살린 것처럼 보인다 — 넣기만 막고 지우기(null)는 그대로 둔다(2026-11-02).
+  if (minutes !== null) {
+    const cancelledDay = await cancelledUserIds(session.organization.id, input.date, [input.userId]);
+    if (cancelledDay === null) return { ok: false, reason: "error" };
+    if (cancelledDay.has(input.userId)) return { ok: false, reason: "cancelled" };
+  }
   await ensureApplication(session.organization.id, input.userId, input.date, session.user.id);
   const result = await getSupabaseServiceClient()
     .from("cleaning_shift_applications")
@@ -163,6 +174,12 @@ export async function addRoomForDay(input: { date: string; roomKey: string; note
   const option = (await loadCleaningRoomOptions(supabase, organizationId)).find((item) => item.roomKey === input.roomKey);
   if (!option) return { ok: false, reason: "invalid" };
   const note = String(input.note ?? "").trim().slice(0, 60);
+  // 함께 넣을 사람 중 그날 일정이 취소된 사람이 있으면 아무것도 쓰지 않고 알린다 — 조용히 빼면 방이 채워진 것처럼 보인다(2026-11-02).
+  const members = new Set((await loadFieldMembers(supabase, organizationId)).map((member) => member.userId));
+  const userIds = [...new Set((input.userIds ?? []).filter((id) => isUuid(id) && members.has(id)))].slice(0, 5);
+  const cancelledPicked = await cancelledUserIds(organizationId, input.date, userIds);
+  if (cancelledPicked === null) return { ok: false, reason: "error" };
+  if (cancelledPicked.size > 0) return { ok: false, reason: "cancelled" };
   const extra = await supabase.from("cleaning_list_extra_rooms").upsert(
     {
       created_by: session.user.id,
@@ -179,8 +196,6 @@ export async function addRoomForDay(input: { date: string; roomKey: string; note
     console.error("[cleaning-assign] extra room failed", { code: extra.error.code });
     return { ok: false, reason: "error" };
   }
-  const members = new Set((await loadFieldMembers(supabase, organizationId)).map((member) => member.userId));
-  const userIds = [...new Set((input.userIds ?? []).filter((id) => isUuid(id) && members.has(id)))].slice(0, 5);
   if (userIds.length > 0) {
     const insert = await supabase.from("cleaning_assignments").upsert(
       userIds.map((userId) => ({

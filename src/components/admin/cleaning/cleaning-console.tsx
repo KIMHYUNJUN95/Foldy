@@ -211,7 +211,12 @@ export function CleaningConsole({
         // 기록 탭이 낡은 채로 남지 않게 지금 보는 기간을 다시 읽는다.
         reloadHistory(historyFrom, historyTo);
       } else {
-        showToast(t.tDoneFailed);
+        showToast(res.reason === "processed" ? t.tDoneProcessed : t.tDoneFailed);
+        if (res.reason === "processed") {
+          setModalTask(null);
+          router.refresh();
+          reloadHistory(historyFrom, historyTo);
+        }
       }
     });
   }

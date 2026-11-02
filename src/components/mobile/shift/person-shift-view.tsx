@@ -88,7 +88,7 @@ export function PersonShiftView({
         setSheet(false);
       } else {
         haptic("error");
-        setMessage(result.reason === "conflict" ? copy.errAssigned : copy.failed);
+        setMessage(result.reason === "conflict" ? copy.errAssigned : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       }
       router.refresh();
     });

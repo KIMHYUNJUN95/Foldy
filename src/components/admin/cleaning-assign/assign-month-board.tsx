@@ -106,7 +106,7 @@ export function AssignMonthBoard({
   function toggleCell(userId: string, date: string) {
     startTransition(async () => {
       const result = await toggleApplicationForUser({ date, userId });
-      if (!result.ok) showToast(result.reason === "conflict" ? copy.errAssigned : copy.failed);
+      if (!result.ok) showToast(result.reason === "conflict" ? copy.errAssigned : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
       router.refresh();
     });
   }

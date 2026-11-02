@@ -147,15 +147,17 @@
     <string name="field_nationality">国籍</string>
     <string name="field_nationality_hint">三位字母代码(例: USA)</string>
     <string name="field_number">护照号码</string>
-    <string name="field_birth">出生日期</string>
-    <string name="field_birth_hint">例: 1990-05-12</string>
+    <string name="field_age">年龄</string>
+    <string name="field_age_hint">例: 32</string>
+    <string name="field_contact">联系方式（电话或邮箱，填一个即可）</string>
+    <string name="field_contact_hint">例: +81-90-1234-5678</string>
     <string name="field_gender">性别</string>
     <string name="gender_male">男</string>
     <string name="gender_female">女</string>
     <string name="field_address">本国住址</string>
     <string name="field_address_jp">日本住址</string>
     <string name="field_tap">点击输入</string>
-    <string name="shared_title">住址・前一晚住处・下一站</string>
+    <string name="shared_title">住址・联系方式・前一晚住处・下一站</string>
     <string name="shared_body">与预订人(%1$s)相同</string>
     <string name="confirm_next">没错，下一位</string>
     <string name="confirm_done">没错</string>
@@ -196,4 +198,16 @@
     <string name="city_other">其他・手动输入</string>
     <string name="city_other_hint">城市名</string>
     <string name="route_next">下一步</string>
+    <string name="consent_title">最后\n请同意</string>
+    <string name="consent_body">同意后，拍一段简短的确认视频就完成了。</string>
+    <string name="consent_point1">根据日本《旅馆业法》，我们会制作住宿登记。</string>
+    <string name="consent_point2">登记、护照照片和确认视频保存3年后删除。</string>
+    <string name="consent_point3">仅用于住宿登记，不提供给第三方。</string>
+    <string name="consent_terms">我同意住宿条款</string>
+    <string name="consent_terms_sub">入住 · 退房 · 住宿规则</string>
+    <string name="consent_read">查看条款全文</string>
+    <string name="consent_need">请勾选</string>
+    <string name="consent_go">同意并继续</string>
+    <string name="terms_close">关闭</string>
+    <string name="terms_empty">条款尚未登记。请询问工作人员。</string>
 </resources>

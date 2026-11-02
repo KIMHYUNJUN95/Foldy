@@ -79,6 +79,16 @@ object Mrz {
         )
     }
 
+    /** 일본 시각 오늘 — 나이는 도쿄 날짜 기준. */
+    fun tokyoToday(): LocalDate = LocalDate.now(java.time.ZoneId.of("Asia/Tokyo"))
+
+    /** yyyy-MM-dd 생년월일 → 만 나이. 형식이 틀리거나 미래면 null. */
+    fun ageOn(birthDate: String?, today: LocalDate = tokyoToday()): Int? {
+        val birth = birthDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        if (birth.isAfter(today)) return null
+        return java.time.Period.between(birth, today).years
+    }
+
     /** 검사 숫자(가중치 7 · 3 · 1). */
     fun check(field: String): Char {
         var sum = 0
@@ -124,9 +134,10 @@ object Mrz {
         val yy = yymmdd.substring(0, 2).toInt()
         val month = yymmdd.substring(2, 4).toInt()
         val day = yymmdd.substring(4, 6).toInt()
-        val nowYy = today.year % 100
-        // 생년월일: 올해 두 자리보다 크면 1900년대. 만료일: 늘 2000년대.
-        val year = if (past) (if (yy > nowYy) 1900 + yy else 2000 + yy) else 2000 + yy
-        return runCatching { LocalDate.of(year, month, day).toString() }.getOrNull()
+        // 생년월일: 2000년대로 읽어 미래면 1900년대. 만료일: 늘 2000년대.
+        val recent = runCatching { LocalDate.of(2000 + yy, month, day) }.getOrNull()
+        if (!past) return recent?.toString()
+        val date = if (recent != null && !recent.isAfter(today)) recent else runCatching { LocalDate.of(1900 + yy, month, day) }.getOrNull()
+        return date?.toString()
     }
 }

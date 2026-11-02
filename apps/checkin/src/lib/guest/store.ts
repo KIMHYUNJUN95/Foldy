@@ -14,9 +14,9 @@ const CLAIMABLE = ["pending", "pre_registered", "in_progress", "checked_in"] as 
 const EDITABLE = new Set(["pending", "pre_registered", "in_progress"]);
 
 const GUEST_COLUMNS =
-  "id, is_representative, guest_type, name_roman, name_kana, has_japan_address, nationality, passport_number, birth_date, gender, no_passport_reason, address, prev_stay, next_dest, source, created_at";
+  "id, is_representative, guest_type, name_roman, has_japan_address, nationality, passport_number, age, gender, contact, no_passport_reason, address, prev_stay, next_dest, source, created_at";
 
-export type GuestRow = StoredGuest & { id: string; name_kana: string | null; source: string; created_at: string };
+export type GuestRow = StoredGuest & { id: string; source: string; created_at: string };
 
 /** 지금 쓰는 여권 사진 경로(대체된 것 제외). */
 export async function currentPassportPath(db: CheckinServiceClient, guestId: string): Promise<string | null> {
@@ -127,7 +127,7 @@ async function ensureRepresentative(db: CheckinServiceClient, stay: { id: string
     stay_id: stay.id,
     is_representative: true,
     name_roman: name,
-    phone,
+    contact: phone,
     source: "beds24",
   });
   // 동시에 두 번 열면 한쪽은 unique(대표자 하나) 에 걸린다 — 이미 있으니 괜찮다.

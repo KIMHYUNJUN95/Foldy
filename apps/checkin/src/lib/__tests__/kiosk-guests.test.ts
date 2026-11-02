@@ -18,20 +18,20 @@ const guest = (over: Record<string, unknown> = {}) => ({
   hasJapanAddress: false,
   nationality: "twn",
   passportNumber: "31-23 456",
-  birthDate: "1994-03-08",
+  age: 32,
   gender: "female",
   ...over,
 });
 const parse = (over: Record<string, unknown> = {}) => kioskGuestBodySchema.safeParse({ sessionId, guest: guest(over) });
 
 describe("태블릿 명부 저장 — 입력 검사", () => {
-  it("웹과 같은 규칙(국적 · 여권 번호 · 날짜)", () => {
+  it("웹과 같은 규칙(국적 · 여권 번호 · 나이)", () => {
     const ok = parse();
     expect(ok.success && ok.data.guest.nationality).toBe("TWN");
     expect(ok.success && ok.data.guest.passportNumber).toBe("3123456");
-    const bad = parse({ nationality: "XXX", passportNumber: "12", birthDate: "2026-02-30" });
+    const bad = parse({ nationality: "XXX", passportNumber: "12", age: 200 });
     expect(bad.success).toBe(false);
-    if (!bad.success) expect(invalidFieldsOf(bad.error).sort()).toEqual(["birthDate", "nationality", "passportNumber"]);
+    if (!bad.success) expect(invalidFieldsOf(bad.error).sort()).toEqual(["age", "nationality", "passportNumber"]);
   });
 
   it("「child」 사유는 어린이만, 다른 사유는 누구나", () => {
@@ -82,6 +82,13 @@ describe("태블릿 명부 저장 — 저장할 칸", () => {
     });
   });
 
+  it("연락처는 대표자만 저장하고, 안 보내면 건드리지 않는다", () => {
+    expect(kioskGuestRow(input({ contact: "+1-415-555-0142" }), rep, false, "t", true).contact).toBe("+1-415-555-0142");
+    expect("contact" in kioskGuestRow(input({ contact: "+1-415-555-0142" }), rep, false, "t")).toBe(false);
+    expect("contact" in kioskGuestRow(input(), rep, false, "t", true)).toBe(false);
+    expect(kioskGuestRow(input(), rep, false, "t")).toMatchObject({ age: 32 });
+  });
+
   it("동행자는 비어 있었거나 대표자의 옛 값일 때만 따라간다", () => {
     const guests = [
       { id: "r", is_representative: true, address: "A", prev_stay: null, next_dest: null },
@@ -112,7 +119,8 @@ describe("빠진 칸 — 태블릿 여권 없음 사유", () => {
     has_japan_address: false,
     nationality: "TWN",
     passport_number: null,
-    birth_date: "1994-03-08",
+    age: 32,
+    contact: null,
     gender: "female",
     no_passport_reason: null,
     address: "Taipei",

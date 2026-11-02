@@ -118,18 +118,14 @@ create table checkin.guests (
   is_representative boolean not null default false,
   guest_type text not null default 'adult' check (guest_type in ('adult', 'child')),
   name_roman text,
-  name_kana text,
   nationality char(3),                           -- ISO 3166-1 alpha-3
   has_japan_address boolean,
   address text,
-  postal_code text,
-  phone text,
-  email text,
-  birth_date date,
+  -- 받는 칸은 법에 있는 것만(43 §2-1, 2026-11-03): 생년월일 · 카나 · 직업 · 이메일 · 우편번호 · 여권 만료일 칸 없음.
+  contact text,                                  -- 대표자만 — 전화 또는 이메일 하나
+  age smallint check (age between 0 and 130),    -- 신주쿠 규칙 10 「年齢」
   gender text,
-  occupation text,
   passport_number text,
-  passport_expiry date,
   prev_stay text,
   next_dest text,
   source text not null default 'guest' check (source in ('beds24', 'guest', 'staff', 'mrz')),

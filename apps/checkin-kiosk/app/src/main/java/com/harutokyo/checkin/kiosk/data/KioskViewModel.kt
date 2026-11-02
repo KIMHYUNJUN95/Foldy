@@ -14,6 +14,7 @@ import com.harutokyo.checkin.kiosk.contract.EnrollResponse
 import com.harutokyo.checkin.kiosk.contract.FindQuery
 import com.harutokyo.checkin.kiosk.contract.FindResponse
 import com.harutokyo.checkin.kiosk.contract.FindResult
+import com.harutokyo.checkin.kiosk.contract.ConsentBody
 import com.harutokyo.checkin.kiosk.contract.GuestInput
 import com.harutokyo.checkin.kiosk.contract.RouteBody
 import com.harutokyo.checkin.kiosk.contract.SaveGuestBody
@@ -172,6 +173,10 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
     /** 시안 T3s — 전 숙박지 · 다음 행선지(대표자, 같은 값을 쓰는 동행자도). */
     suspend fun saveRoute(sessionId: String, prevStay: String, nextDest: String): SaveResult =
         post("/api/kiosk/route", Api.json.encodeToString(RouteBody(sessionId, prevStay, nextDest)))
+
+    /** 시안 G3b — 약관 · 개인정보 두 칸 동의(대표자 이름으로 한 줄). */
+    suspend fun saveConsent(sessionId: String, locale: String): SaveResult =
+        post("/api/kiosk/consent", Api.json.encodeToString(ConsentBody(sessionId, terms = true, locale = locale)))
 
     /** 시안 T3 — 찍은 여권 사진(JPEG). 저장한 사람에게만. */
     suspend fun uploadPassport(sessionId: String, guestId: String, jpeg: ByteArray): SaveResult {

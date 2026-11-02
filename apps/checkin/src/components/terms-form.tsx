@@ -9,7 +9,8 @@ import type { Dictionary, Locale } from "@/lib/i18n";
 import { BackIcon } from "./icons";
 import { LangSwitch } from "./lang-switch";
 
-// 약관 동의(시안 W3b) — 두 칸 모두 체크해야 끝난다. 미성년자는 보호자가 대신(FR-K23).
+// 약관 동의(시안 W3b · 재수정 2) — 약관 한 칸. 개인정보는 법 의무로 받는 것이라 동의 칸 없이 위 안내로 알린다(43 §2-1).
+// 미성년자는 보호자가 대신(FR-K23).
 type Props = {
   token: string;
   locale: Locale;
@@ -23,7 +24,6 @@ type Props = {
 export function TermsForm({ token, locale, dict, counter, countNote, termsText }: Props) {
   const router = useRouter();
   const [terms, setTerms] = useState(false);
-  const [privacy, setPrivacy] = useState(false);
   const [showFull, setShowFull] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -34,7 +34,7 @@ export function TermsForm({ token, locale, dict, counter, countNote, termsText }
         const response = await fetch(`/api/guest/${token}/consent`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ terms, privacy, locale }),
+          body: JSON.stringify({ terms, locale }),
         });
         const body = (await response.json()) as { ok: boolean; error?: string };
         if (!body.ok) {
@@ -79,12 +79,6 @@ export function TermsForm({ token, locale, dict, counter, countNote, termsText }
           <span className="flex flex-col gap-0.5">
             <span className="text-[16px]">{dict.terms.terms}</span>
             <small className="text-[15px] text-[var(--muted)]">{dict.terms.termsSub}</small>
-          </span>
-        </label>
-        <label className="w-check">
-          <input type="checkbox" checked={privacy} onChange={(event) => setPrivacy(event.target.checked)} />
-          <span className="flex flex-col gap-0.5">
-            <span className="text-[16px]">{dict.terms.privacy}</span>
             <small className="text-[15px] text-[var(--muted)]">{dict.terms.minors}</small>
           </span>
         </label>
@@ -109,7 +103,7 @@ export function TermsForm({ token, locale, dict, counter, countNote, termsText }
       ) : (
         <p className="mt-6 text-[14px] text-[var(--muted)]">{dict.terms.hint}</p>
       )}
-      <button type="button" className="w-btn mt-4" disabled={!terms || !privacy || pending} onClick={submit}>
+      <button type="button" className="w-btn mt-4" disabled={!terms || pending} onClick={submit}>
         {dict.terms.submit}
       </button>
     </main>

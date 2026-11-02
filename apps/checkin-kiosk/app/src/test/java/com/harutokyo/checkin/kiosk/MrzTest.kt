@@ -61,4 +61,29 @@ class MrzTest {
         assertEquals("2030-01-01", result.expiryDate)
         assertTrue(result.valid)
     }
+
+    @Test
+    fun ageCountsFullYearsInTokyoDate() {
+        // 1974-08-12 생일: 2026-11-02 엔 52살, 생일 전날엔 51살, 생일 당일엔 52살.
+        assertEquals(52, Mrz.ageOn("1974-08-12", today))
+        assertEquals(51, Mrz.ageOn("1974-08-12", LocalDate.of(2026, 8, 11)))
+        assertEquals(52, Mrz.ageOn("1974-08-12", LocalDate.of(2026, 8, 12)))
+        assertEquals(0, Mrz.ageOn("2026-11-02", today))
+        assertNull(Mrz.ageOn("2027-01-01", today))
+        assertNull(Mrz.ageOn(null, today))
+        assertNull(Mrz.ageOn("not-a-date", today))
+    }
+
+    @Test
+    fun birthCenturyIsNeverInTheFuture() {
+        val number = "L898902C3"
+        fun birthOf(yymmdd: String): String? {
+            val body = number + Mrz.check(number) + "UTO" + yymmdd + Mrz.check(yymmdd) + "F" + "300101" + Mrz.check("300101") + "<<<<<<<<<<<<<<<" + "0"
+            return Mrz.parseLines(l1, body.padEnd(44, '<').take(44), today)?.birthDate
+        }
+        assertEquals("2026-03-01", birthOf("260301"))
+        // 같은 해라도 오늘(11-02)보다 뒤면 미래 → 1900년대.
+        assertEquals("1926-12-30", birthOf("261230"))
+        assertEquals("1927-01-01", birthOf("270101"))
+    }
 }

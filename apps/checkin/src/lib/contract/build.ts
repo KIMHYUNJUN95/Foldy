@@ -31,8 +31,8 @@ const DEFAULT_FIELDS: { key: FieldKey; required: boolean; foreignOnly: boolean }
   { key: "address", required: true, foreignOnly: false },
   { key: "nationality", required: true, foreignOnly: true },
   { key: "passport_number", required: true, foreignOnly: true },
-  { key: "prev_stay", required: true, foreignOnly: true },
-  { key: "next_dest", required: true, foreignOnly: true },
+  { key: "prev_stay", required: true, foreignOnly: false },
+  { key: "next_dest", required: true, foreignOnly: false },
 ];
 
 // 건물 설정이 칸을 바꿀 때의 모양: [{ key, required?, foreignOnly? }]. 모르는 키 · 잘못된 줄은 버린다.

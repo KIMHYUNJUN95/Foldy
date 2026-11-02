@@ -16,6 +16,8 @@ data class KioskGuest(
     val hasJapanAddress: Boolean = false,
     /** 대표자만 — 확인 화면(T3c)에 주소를 미리 채운다. */
     val address: String? = null,
+    /** 대표자만 — 연락처를 미리 채운다. */
+    val contact: String? = null,
 )
 
 @Serializable

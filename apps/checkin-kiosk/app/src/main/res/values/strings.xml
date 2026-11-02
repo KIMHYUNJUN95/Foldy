@@ -148,15 +148,17 @@
     <string name="field_nationality">国籍</string>
     <string name="field_nationality_hint">3文字のコード(例: USA)</string>
     <string name="field_number">パスポート番号</string>
-    <string name="field_birth">生年月日</string>
-    <string name="field_birth_hint">例: 1990-05-12</string>
+    <string name="field_age">年齢</string>
+    <string name="field_age_hint">例: 32</string>
+    <string name="field_contact">連絡先（電話かメール、どちらか1つ）</string>
+    <string name="field_contact_hint">例: +81-90-1234-5678</string>
     <string name="field_gender">性別</string>
     <string name="gender_male">男性</string>
     <string name="gender_female">女性</string>
     <string name="field_address">母国の住所</string>
     <string name="field_address_jp">日本の住所</string>
     <string name="field_tap">タップして入力</string>
-    <string name="shared_title">住所・前泊地・行き先</string>
+    <string name="shared_title">住所・連絡先・前泊地・行き先</string>
     <string name="shared_body">ご予約の方(%1$s)と同じにします</string>
     <string name="confirm_next">合っています。次の方へ</string>
     <string name="confirm_done">合っています</string>
@@ -197,4 +199,16 @@
     <string name="city_other">その他・入力</string>
     <string name="city_other_hint">都市名</string>
     <string name="route_next">次へ</string>
+    <string name="consent_title">最後に\n同意してください</string>
+    <string name="consent_body">同意すると、短い確認動画を撮って終わりです。</string>
+    <string name="consent_point1">日本の旅館業法にもとづき、宿泊者名簿を作成します。</string>
+    <string name="consent_point2">名簿 · パスポート写真 · 確認動画は3年保管したあと削除します。</string>
+    <string name="consent_point3">宿泊者名簿以外には使わず、第三者に渡しません。</string>
+    <string name="consent_terms">宿泊約款に同意します</string>
+    <string name="consent_terms_sub">チェックイン · チェックアウト · ハウスルール</string>
+    <string name="consent_read">約款の全文を見る</string>
+    <string name="consent_need">チェックしてください</string>
+    <string name="consent_go">同意して次へ</string>
+    <string name="terms_close">閉じる</string>
+    <string name="terms_empty">約款がまだ登録されていません。スタッフにお尋ねください。</string>
 </resources>

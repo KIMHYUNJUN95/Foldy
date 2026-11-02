@@ -114,7 +114,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `checkin.stay_tokens` | token_hash(sha256, 기본 키) · stay_id · created_at | 손님 개인 링크 — stay 당 여러 개 · 최근 10개(2026-11-02, `202611020002`) |
 | `checkin.claim_attempts` | key_hash · ip_hash · succeeded · attempted_at | 「예약 찾기」 시도 — 잠금 · 속도 제한(IP 원문 없음, `202611020002`) |
 | `checkin.stay_rooms` | stay_id · reservation_id(public) · room_label · room_id | 여러 방 |
-| `checkin.guests` | id · stay_id · stay_room_id · is_representative · guest_type(`adult` \| `child`) · name_roman · name_kana · nationality(ISO 3166-1 alpha-3) · has_japan_address · address · postal_code · phone · email · birth_date · gender · occupation · passport_number · passport_expiry · prev_stay · next_dest · source(`beds24` \| `guest` \| `staff` \| `mrz`) · mrz_raw · mrz_valid(bool) · no_passport_reason | `mrz_*` = 판독 원문 · 체크섬 결과(직원이 손 입력과 비교) |
+| `checkin.guests` | id · stay_id · stay_room_id · is_representative · guest_type(`adult` \| `child`) · name_roman · nationality(ISO 3166-1 alpha-3) · has_japan_address · address · contact(대표자만 — 전화 또는 이메일 하나) · age(0~130) · gender · passport_number · prev_stay · next_dest · source(`beds24` \| `guest` \| `staff` \| `mrz`) · mrz_raw · mrz_valid(bool) · no_passport_reason | `mrz_*` = 판독 원문 · 체크섬 결과(직원이 손 입력과 비교). **법에 있는 칸만(2026-11-03, 43 §2-1)** — 생년월일 · 카나 · 직업 · 이메일 · 우편번호 · 여권 만료일 칸 없앰(미적용 마이그레이션 202611020001 을 고침) |
 | `checkin.guest_documents` | id · guest_id · kind(`passport` \| `face_video` \| `id_card`) · storage_path · byte_size · width · height · duration_s · captured_at · captured_on(`kiosk` \| `guest_web` \| `staff`) · device_id · replaced_by · retain_until · sha256 | 비공개 버킷 `checkin-documents`; sha256 로 전송 무결성 |
 | `checkin.consents` | stay_id · guest_id(대표자) · terms_version · agreed_at · locale · device_id | 약관 동의 |
 | `checkin.sessions` | id · stay_id · device_id · started_at · last_step · step_payload(jsonb) · finished_at · abandoned_at · locked_until | 태블릿 진행(이어 하기 · 동시 잠금 — 다른 기기는 `locked_until` 안엔 거부) |
@@ -144,7 +144,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `GET /api/kiosk/settings` | 태블릿 | 기기 토큰 | **계약 JSON**(칸 · 규칙 · 문구 · 약관 · 초 · 연락처 · 계약 버전) |
 | `POST /api/kiosk/find` | 태블릿 | 기기 토큰 | 코드 또는 이름 + 날짜 → stay(그 건물 · 기간 안) · 방 · 미리 입력된 명부 · 막는 경우 코드 |
 | `POST /api/kiosk/session` | 태블릿 | 기기 토큰 | 세션 시작 · 잠금 · 이어 하기(`step_payload`) |
-| `POST /api/kiosk/guests` · `POST /api/kiosk/passport` · `POST /api/kiosk/route` | 태블릿 | 기기 토큰 + 세션 | 한 사람 명부 저장(MRZ 원문 · 체크섬도 받음) · 여권 사진(서버 multipart) · 전 숙박지 · 다음 행선지 — 2026-11-02 구현, 아래 「명부 저장 라우트」 |
+| `POST /api/kiosk/guests` · `POST /api/kiosk/passport` · `POST /api/kiosk/route` · `POST /api/kiosk/consent` | 태블릿 | 기기 토큰 + 세션 | 한 사람 명부 저장(MRZ 원문 · 체크섬도 받음) · 여권 사진(서버 multipart) · 전 숙박지 · 다음 행선지(2026-11-02) · 약관 동의(2026-11-03) — 아래 「명부 저장 라우트」 |
 | `POST /api/kiosk/upload-url` | 태블릿 · 손님 웹 | 기기/링크 토큰 | 서명 업로드 URL(종류 · 용량 · MIME · 1회) |
 | `POST /api/kiosk/document` | 태블릿 · 손님 웹 | 기기/링크 토큰 | 업로드 끝 보고(sha256 · 크기) → `guest_documents` 줄 |
 | `POST /api/kiosk/complete` | 태블릿 | 기기 토큰 + 세션 | 동의 · 전원 명부 · 동영상 검증 → `checked_in` · 방 번호 · 비밀번호(`property_operation_infos`) 반환 |
@@ -166,6 +166,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
   - `POST /api/kiosk/guests` `{sessionId, guest}` — 웹 `guestInputSchema` 그대로 + `noPassportReason`(`child` 는 어린이만 · `japan_resident` · `not_shown` · `camera_off` = 직원 확인 필요, FR-K16 — 여권 번호 null · 빠진 칸에서 여권 번호 · 사진 제외) + `mrz {raw ≤200, valid}`(있으면 `source = mrz`, `mrz_raw` · `mrz_valid`). 새 사람은 대표자 아님 · 최대 20명(`too_many`) · 주소를 안 보내면 대표자 주소 · 전 숙박지 · 다음 행선지 이어받기. 대표자 주소를 바꾸면 비어 있었거나 옛 값을 쓰던 동행자도 따라감.
   - `POST /api/kiosk/passport` multipart `session_id` · `guest_id` · `file` — 웹 여권 라우트와 같은 규칙(앞 바이트 형식 · 10MB · stay 당 시간 40장 · 대체 + 앞 파일 지움 · sha256 · `retain_until`), `captured_on = kiosk` · `device_id`.
   - `POST /api/kiosk/route` `{sessionId, prevStay, nextDest}`(각 1~120자) — 대표자에 저장, 비어 있었거나 대표자 옛 값을 쓰던 동행자도 따라감. 값 검사는 길이만(보기 값은 `src/lib/guest/route.ts`).
+  - `POST /api/kiosk/consent` `{sessionId, terms: true, locale}`(2026-11-03, 시안 G3b — 같은 날 개인정보 칸을 빼 `privacy` 없앰, 43 §2-1) — 대표자 이름 + `device_id` 로 `consents` 한 줄, `terms_version` 은 건물 설정. 이미 동의한 예약은 줄을 더 만들지 않는다. **웹과 달리 명부가 덜 됐어도 막지 않는다** — 「직원 확인 필요」로 넘긴 분이 있을 수 있고, 다 됐는지는 완료(`complete`)가 본다.
 - **계약 확장(2026-11-02, `CONTRACT_VERSION` 은 1 그대로)**: `termsText` · `idleSecondsInput`(30~900) · `idleSecondsDone`(5~120) · `mrzAutofill` · `supportContacts`(phone · line · whatsapp) · `staffPin`. 계약은 `buildContract(property_settings 줄)`(`src/lib/contract/build.ts`)이 만든다 — 줄이 없으면 기본값(4개 언어 · 칸: 이름(로마자) · 주소 필수, 국적 · 여권 번호 · 전 숙박지 · 다음 행선지는 외국인만 필수). 이름(로마자)은 설정으로도 필수를 끌 수 없다. 칸 이름은 사전 `fields` 4개 언어.
 - **직원 PIN(FR-K18)**: `property_settings.staff_pin_hash` = `pbkdf2-sha256$120000$<salt base64>$<hash base64>`(32바이트, `src/lib/device/pin.ts` `hashPin` · `verifyPin`, PIN 은 숫자 4~8자리). 계약의 `staffPin` 은 이 해시를 나눈 값(원문 PIN 은 어디에도 없음) — 태블릿이 오프라인에서도 같은 방식(Java `PBKDF2WithHmacSHA256`)으로 대조한다. PIN 을 정하는 화면은 4단계(건물 설정).
 
@@ -195,10 +196,16 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | 카메라 | CameraX 1.5.0(camera2 · lifecycle · view). **전면 카메라 먼저**(키오스크는 화면 위 카메라를 손님이 본다), 없으면 후면. 미리보기는 거울로 뒤집지 않는다(`scaleX = -1` 로 한 번 더 뒤집음 — 여권 글자가 바로 보여야 맞췄는지 안다). 미리보기 · 분석 · 찍기 셋을 한 번에 묶고 해상도는 1920×1080 근처. 권한은 처음 카메라 화면에서 묻고, 거절 · 카메라 없음 · 묶기 실패면 T3n(「카메라를 쓸 수 없어요」 + 「카메라가 켜지지 않아요」 줄 강조). `uses-feature camera.any required=false`. |
 | 저절로 찍기 | ML Kit 글자 읽기(`text-recognition:16.0.1`, 기기 안 모델 — 사용료 · 네트워크 없음)로 매 화면 MRZ 를 찾고, **같은 여권 번호가 0.8초 이어서 읽히면** 찍는다. 버튼을 찾지 않게. 8초 안에 못 찍으면 「직접 찍기」 버튼이 나온다(찍은 사진에서 한 번 더 읽음). 움직임: 하얀 번쩍임 없음 · 모서리 색 sage 150ms · 진행 막대(여권이 움직이면 200ms 에 비움). 사진은 긴 변 2,400px JPEG 88. |
 | MRZ 판독 | ICAO 9303 TD3(44자 × 2줄). 숫자 자리 O→0 등 고치기, 여권 번호는 O/0 바꿔 검사 숫자가 맞는 쪽, 독일 「D」→ DEU, 생년월일 세기는 오늘 기준 과거, 만료일은 미래. 번호 · 생년월일 검사 숫자가 틀리면 못 읽음(null), 만료일 · 선택 칸 · 합계까지 다 맞으면 `valid`. T3c 에 「검사 숫자가 맞아요」 또는 「한 번 더 봐 주세요」. 저장 때 `mrz {raw, valid}` 를 보내 서버가 `source = mrz` 로 남긴다. |
-| 확인 칸(T3c) | 성 · 이름 · 국적(세 글자 코드) · 여권 번호 · 생년월일(yyyy-MM-dd) · 성별 + **대표자만 본국 주소**. 동행자는 주소 칸 대신 「예약하신 분과 같게 적어요」 상자(서버가 대표자 값을 이어 준다 — 주소를 보내지 않음). 빈 칸 · 서버가 틀렸다는 칸은 빨간 테두리. 모드: 여권 읽음 · 직접 입력 · 어린이(여권 번호 없음, `child`) · 일본에 삶(이름 + 일본 주소, `hasJapanAddress`) · 직원 확인(`not_shown` · `camera_off`, 여권 번호는 있으면). |
+| 확인 칸(T3c) | 성 · 이름 · 국적(세 글자 코드) · 여권 번호 · **나이 · 성별(일본에 사는 분도)** + **대표자만 본국 주소 · 연락처(전화나 이메일 하나, 예약 값으로 미리 채움)**. 여권 생년월일은 나이 계산에만 쓰고 보내지 않는다(2026-11-03). 동행자는 주소 칸 대신 「예약하신 분과 같게 적어요」 상자(서버가 대표자 값을 이어 준다 — 주소를 보내지 않음). 빈 칸 · 서버가 틀렸다는 칸은 빨간 테두리. 모드: 여권 읽음 · 직접 입력 · 어린이(여권 번호 없음, `child`) · 일본에 삶(이름 + 일본 주소, `hasJapanAddress`) · 직원 확인(`not_shown` · `camera_off`, 여권 번호는 있으면). |
 | 다음 분 고르기 | 자리 순서대로, 이번에 저장한 분은 다시 묻지 않는다(서버가 아직 빠졌다고 해도 — 직원 확인으로 넘긴 분). 이 흐름은 전 숙박지 · 다음 행선지와 동행자 주소는 보지 않는다. 사진 올리기만 실패하면 같은 분을 고쳐 다시 저장 · 올린다. 세션이 끝났으면(`session_gone`) 처음으로. |
-| 행선지(T3s) | 「① 어젯밤은 어디서 주무셨어요?」(일본에 오늘 도착 / 일본 안 다른 곳 → 도쿄 · 오사카 · 교토 · 후쿠오카 · 직접 쓰기) · 「② 여기서 나간 뒤엔 어디로 가세요?」(일본을 떠남 / 일본 안 다른 곳 → 같은 도시). 저장 값은 짧은 일본어 `当日入国` · `出国` · `東京` · `大阪` · `京都` · `福岡` · 직접 쓴 글(60자) — 웹 `src/lib/guest/route.ts` 와 앱 `RouteValue` 가 같은 값(바꾸면 둘 다). 일본에 사는 대표자는 묻지 않는다. |
+| 행선지(T3s) | 「① 어젯밤은 어디서 주무셨어요?」(일본에 오늘 도착 / 일본 안 다른 곳 → 도쿄 · 오사카 · 교토 · 후쿠오카 · 직접 쓰기) · 「② 여기서 나간 뒤엔 어디로 가세요?」(일본을 떠남 / 일본 안 다른 곳 → 같은 도시). 저장 값은 짧은 일본어 `当日入国` · `出国` · `東京` · `大阪` · `京都` · `福岡` · 직접 쓴 글(60자) — 웹 `src/lib/guest/route.ts` 와 앱 `RouteValue` 가 같은 값(바꾸면 둘 다). ~~일본에 사는 대표자는 묻지 않는다~~ → 2026-11-03 부터 일본에 사는 분도 묻는다(신주쿠 규칙 10, 43 §2-1). |
 | 테스트 · 확인 | JUnit 24개(이번에 8개 — MRZ 4개: ICAO 견본 · OCR 잡음 · 검사 숫자 틀림 · 세기 · 독일, 흐름 4개: 다음 자리 · 행선지 여부 · 모드별 빈 칸 · 저장 몸통). **실기기 카메라 · 실제 여권 판독 · 800×1280 화면 확인은 아직** — 태블릿이 오면 FR-K07 AC-02(10개국 샘플)와 같이, 실제 저장은 운영 DB 적용 뒤 통합 테스트. |
+
+### 5-3. 약관 동의 · 확인 동영상 (2026-11-03, 3단계 네 번째 묶음)
+
+- **약관 동의(시안 G3b) 구현**: 명부가 끝나면(행선지까지) 아직 동의 안 한 예약은 G3b — 세 줄 안내 · 체크 칸 하나(숙박 약관, 줄 전체가 누르는 곳 104dp) — 3년 보관 · 다른 곳에 안 씀은 위 세 줄 안내가 알린다. 처음엔 개인정보 칸도 있었으나 2026-11-03 법 재확인으로 뺌(법 의무로 받는 정보라 동의 대신 알림, 43 §2-1) · 「약관 전문 보기」(계약 `termsText` 를 고른 언어 → 일본어 → 아무거나 순으로, 없으면 「직원에게 물어봐 주세요」, 화면 전체 · 뒤로 가기로 닫힘). 약관을 체크해야 큰 버튼이 켜진다. 웹에서 미리 동의한 예약은 건너뛴다. 파일 `ui/Consent.kt`. 다음은 아직 「다음 단계에서 만들어요」.
+- **확인 동영상은 시안 먼저(2026-11-03)**: 캔버스에 T5a 안내 · T5 녹화 중 · T5d 보내는 중(+ 영어 2장) — 한 영상(5초 × 인원, 5초마다 이름이 다음 분으로 · 구간 막대), 전면 · 거울 미리보기, 소리 없음 · 720p, 다 찍으면 저절로 보내기. **사용자 컨펌 뒤 구현.**
+- **빠른 체크인 시안(2026-11-03, 컨펌 대기)**: 「4명 3분」 목표로 흐름을 줄인 시안 F1~F7 — 대표자 여권으로 예약 찾기(MRZ 이름 + 오늘 날짜, G2 메뉴 · 이름 입력 없음) · 카메라를 끄지 않고 여권 → 「여권 내리고 카메라 보기」 5초 얼굴 → 다음 분 여권으로 저절로 · 마지막에 한 화면 모아 확인(검사 숫자 틀린 줄만 고침) · 행선지 + 약관 동의 한 화면 · 사진 · 영상은 뒤에서 보내고 서버 확인 뒤에만 완료 · 단계별 시각 기록(실측용). 예상: 사전 등록 없이 약 2분 50초, 사전 등록하면 약 1분. **승인되면 T3a~T3c · T3s · G3b · T5 시안과 지금 구현(`Passport.kt` · `Consent.kt`)을 이 흐름으로 다시 짠다.** 확인할 것: 사람별 5초 얼굴 영상이 보건소에 낸 방식(한 영상)과 같다고 봐도 되는지 — 회사 확인.
 
 ### 5-1. 뼈대 구현 상태 (2026-11-02, 3단계 첫 묶음)
 
@@ -221,12 +228,12 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 ## 6. 손님 사전 등록 웹 (`apps/checkin`, Next.js)
 
 - Next.js 16 App Router · React 19 · Tailwind v4 — Foldy 와 같은 버전(의존성은 자기 `package.json`). 폰 세로 기준, 사진은 `<input capture=\"environment\">`(뒷카메라) 또는 파일, 클라이언트 리사이즈(긴 변 2,400px).
-- 생년월일은 연 · 월 · 일 세 칸(화면 언어로 표시, 영어는 월 · 일 · 연) — 휴대폰 기본 날짜 칸은 기기 언어로 나오고 오래된 연도 넘기기가 힘들어 바꿨다(2026-11-02).
+- ~~생년월일은 연 · 월 · 일 세 칸~~ → **나이 한 칸(숫자)**, 성별과 함께 모든 분에게 묻는다. 대표자는 연락처 한 칸(예약 전화로 미리 채움). 카나 칸 없앰(2026-11-03, 43 §2-1).
 - i18n: `ja` 기본, en · zh-Hans · ko — 사전 파일은 `apps/checkin/src/lib/i18n/*.json`(계약 문구와 같은 키). Foldy `src/lib/i18n.ts` 는 쓰지 않는다.
 - 사전 등록에서는 MRZ 판독을 **하지 않는다**(브라우저 OCR 품질 문제) — 손님이 사진만 올리고 칸은 손으로; 태블릿에서 여권을 다시 찍으면 MRZ 로 자동 보정 · 대조(직원 화면에 「사전 입력 ≠ MRZ」 표시).
 - 상태는 서버가 원본, 단계마다 저장. 체크인 뒤에는 읽기 전용.
 - **글자 크기(2026-11-02, Impeccable 점검 뒤)**: 설명 · 도움말 · 줄 아래 글은 15px, 순서 번호는 14px. 13px 는 건물 이름 꼬리표(자간 넓힘) 하나만. 피곤한 손님이 폰으로 읽어서 — 시안 W2 · W3 · W3b · W5 도 같이 올렸다.
-- **전 숙박지 · 다음 행선지 화면 W3s(2026-11-02)**: 대표자가 명부를 저장하면 `/r/[token]/route` 로 — 태블릿 T3s 와 같은 두 질문 · 같은 저장 값(`src/lib/guest/route.ts`), `PUT /api/guest/[token]/route`(각 1~60자, 같은 값을 쓰던 동행자도 따라감). 명부 화면(W3)에서는 두 칸을 뺐고, 동행자 명부에는 대표자 값이 읽기 전용 요약으로 보인다. 일본에 사는 대표자는 묻지 않는다.
+- **전 숙박지 · 다음 행선지 화면 W3s(2026-11-02)**: 대표자가 명부를 저장하면 `/r/[token]/route` 로 — 태블릿 T3s 와 같은 두 질문 · 같은 저장 값(`src/lib/guest/route.ts`), `PUT /api/guest/[token]/route`(각 1~60자, 같은 값을 쓰던 동행자도 따라감). 명부 화면(W3)에서는 두 칸을 뺐고, 동행자 명부에는 대표자 값이 읽기 전용 요약으로 보인다. ~~일본에 사는 대표자는 묻지 않는다~~ → 2026-11-03 부터 일본에 사는 분도 묻는다(신주쿠 규칙 10, 43 §2-1).
 
 ## 7. 배포 · 운영
 
@@ -249,6 +256,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 2. 사전 등록 웹(명부 · 여권 업로드 · 동의) · 링크 발급 · 리마인드 크론
    - 2026-11-02 진행: 찾기(`/p/[building]` — 예약 번호 또는 전화 뒤 4자리 · 못 찾음 · 잠금) ✅ · 명부(`/r/[token]`) · 사람별 입력(`…/guest/[id]`) · 여권 사진 · 동의(`…/terms`) · 완료(코드) · 체크인 뒤 읽기 전용 ✅ · 4개 언어 ✅ · 단위 테스트 37개 ✅. **리마인드 크론은 보류**(메시지 보낼 길이 아직 없음 — L0 만). 실제 DB 왕복 테스트 · 운영 연결 전
 3. 태블릿 앱: 뼈대(Compose · 기기 등록 · 계약 받기 · 잠금) → 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐
+   - 2026-11-02 · 03 진행: 여권 찍기 · MRZ · 확인 · 여권 없음 · 행선지 ✅(§5-2, 저장 API 3개) · 약관 동의 ✅(§5-3, `/api/kiosk/consent`) · 확인 동영상 시안 그림(컨펌 대기) · 완료 · 오프라인 큐는 다음
    - 2026-11-02 진행: 서버 기기 라우트 3개(`enroll` · `ping` · `kiosk/settings`) · 계약 확장 · 직원 PIN 해시 ✅(테스트 47개) · 앱 뼈대(기기 등록 · 계약 받기 · 잠금 · G1 · G2 · 직원 PIN · 직원 메뉴 · 무조작 복귀 · 오프라인 사본) ✅(§5-1) · JUnit 12개 ✅ · 점검 뒤 고침 5개(PIN 잠금 · 직원 화면 무조작 닫기 · 잠금 글자 · 가로 · 큰 글자 · 다시 등록 확인) ✅ · 에뮬레이터(800×1280 · 1280×800 · 글자 1.3×/2×)에서 가짜 서버로 등록 → G1 → 4개 언어 메뉴 → PIN 틀림/맞음 → 직원 메뉴 → 다시 등록 · 오프라인 시작 · 해제된 기기 확인 ✅. 2026-11-02 두 번째 묶음: `kiosk/find` · `kiosk/party` ✅(테스트 58개) · 찾기 · 못 찾음 · 막힘 · 이미 체크인 · 명부 화면 ✅(JUnit 16개) · 에뮬레이터 + 가짜 서버로 한국어 이름 찾기 → 명부 → 인원 ± (저장한 사람 아래로 못 내림), 코드 4가지(이미 체크인 · 도착일 전 · 다른 기기 · 다른 건물), 5번 틀림 → 1분 잠금 초 세기, 일본어 예약 → 화면 일본어, 가로 1280×800 ✅. 남음: 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐 · 직원 호출, 실기기 Device Owner 잠금, 실제 DB 왕복
 4. Foldy 직원 화면(PC · 모바일) · 권한 키 · 내보내기 · 기기 · 건물 설정
 5. 보존 크론 · 감사 기록 · 기기 체크리스트 · 한 건물 병행(43 §8-20)

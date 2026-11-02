@@ -174,8 +174,9 @@ export type KioskGuest = {
   hasPassportPhoto: boolean;
   missing: string[];
   hasJapanAddress: boolean;
-  /** 대표자만 — 확인 화면에서 주소를 미리 채우려고. */
+  /** 대표자만 — 확인 화면에서 주소 · 연락처를 미리 채우려고. */
   address?: string | null;
+  contact?: string | null;
 };
 
 /** 태블릿에 넘기는 예약 모양(시안 T2). 여권 번호 같은 칸 값은 넘기지 않는다 — 주소만 대표자 것 하나. */
@@ -199,7 +200,7 @@ export function kioskStayOf(stay: StayView) {
         hasPassportPhoto: guest.hasPassportPhoto,
         missing: guest.missing,
         hasJapanAddress: guest.has_japan_address === true,
-        ...(guest.is_representative ? { address: guest.address } : {}),
+        ...(guest.is_representative ? { address: guest.address, contact: guest.contact } : {}),
       }),
     ),
   };

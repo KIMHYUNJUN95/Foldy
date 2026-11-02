@@ -6,7 +6,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { fmt, type Dictionary, type Locale } from "@/lib/i18n";
 
-import { BirthDateField } from "./birth-date-field";
 import { BackIcon, CameraIcon, CheckIcon } from "./icons";
 import { LangSwitch } from "./lang-switch";
 import { RouteQuestions, routeSummary } from "./route-questions";
@@ -14,17 +13,18 @@ import { SeatRemover } from "./seat-remover";
 
 // 한 사람 명부(시안 W3). 웹은 여권을 판독하지 않는다 — 사진을 보며 손으로 넣는다(16 §6).
 // 동행자의 주소 · 숙박지는 대표자 값을 그대로 저장하고(「바꾸기」로 따로), 서버가 다시 검사한다.
+// 받는 칸은 법에 있는 것만(43 §2-1): 성별 · 나이 · 숙박지는 모두, 연락처는 대표자만, 국적 · 여권은 외국인만.
 
 export type PersonInitial = {
   id?: string;
   lastName: string;
   firstName: string;
-  nameKana: string;
   guestType: "adult" | "child";
   hasJapanAddress: boolean;
   nationality: string;
   passportNumber: string;
-  birthDate: string;
+  age: number | null;
+  contact: string;
   gender: "male" | "female" | null;
   noPassport: boolean;
   address: string;
@@ -68,7 +68,7 @@ async function shrinkImage(file: File): Promise<Blob> {
   );
 }
 
-type FieldError = "lastName" | "firstName" | "nationality" | "passportNumber" | "birthDate";
+type FieldError = "lastName" | "firstName" | "nationality" | "passportNumber" | "age";
 
 export function PersonForm(props: Props) {
   const { token, locale, dict, initial, isRepresentative, sharedFromRep, editable } = props;
@@ -138,17 +138,17 @@ export function PersonForm(props: Props) {
             ...(shared.id ? { id: shared.id } : {}),
             lastName: shared.lastName,
             firstName: shared.firstName,
-            nameKana: shared.nameKana || undefined,
             guestType: shared.guestType,
             hasJapanAddress: shared.hasJapanAddress,
             nationality: foreign ? shared.nationality || undefined : undefined,
             passportNumber: showPassport ? shared.passportNumber || undefined : undefined,
-            birthDate: shared.birthDate || undefined,
+            age: shared.age ?? undefined,
             gender: shared.gender ?? undefined,
             noPassport: shared.guestType === "child" && shared.noPassport,
             address: shared.address || undefined,
-            prevStay: foreign ? shared.prevStay || undefined : undefined,
-            nextDest: foreign ? shared.nextDest || undefined : undefined,
+            contact: isRepresentative ? shared.contact || undefined : undefined,
+            prevStay: shared.prevStay || undefined,
+            nextDest: shared.nextDest || undefined,
           }),
         });
         const body = (await response.json()) as { ok: boolean; guest_id?: string; error?: string; fields?: string[] };
@@ -157,7 +157,7 @@ export function PersonForm(props: Props) {
             const map: Record<string, FieldError> = {
               nationality: "nationality",
               passportNumber: "passportNumber",
-              birthDate: "birthDate",
+              age: "age",
               lastName: "lastName",
               firstName: "firstName",
             };
@@ -182,7 +182,7 @@ export function PersonForm(props: Props) {
             return;
           }
         }
-        router.push(isRepresentative && foreign ? props.routeHref : props.nextHref);
+        router.push(isRepresentative ? props.routeHref : props.nextHref);
         router.refresh();
       } catch {
         setMessage(dict.common.error);
@@ -293,12 +293,7 @@ export function PersonForm(props: Props) {
             </label>
           </div>
 
-          {form.hasJapanAddress ? (
-            <label>
-              <span className="w-lab">{dict.person.nameKana}</span>
-              <input className="w-in" value={form.nameKana} onChange={(event) => set("nameKana", event.target.value)} />
-            </label>
-          ) : (
+          {foreign ? (
             <label>
               <span className="w-lab">{dict.person.nationality}</span>
               <select
@@ -315,7 +310,7 @@ export function PersonForm(props: Props) {
                 ))}
               </select>
             </label>
-          )}
+          ) : null}
 
           {showPassport ? (
             <label>
@@ -332,19 +327,23 @@ export function PersonForm(props: Props) {
             </label>
           ) : null}
 
-          {foreign ? (
-            <>
-              <label>
-                <span className="w-lab">{dict.person.birthDate}</span>
-                <BirthDateField
-                  locale={locale}
-                  value={form.birthDate}
-                  onChange={(iso) => set("birthDate", iso)}
-                  labels={{ year: dict.person.year, month: dict.person.month, day: dict.person.day }}
-                  invalid={invalid.includes("birthDate")}
-                />
-              </label>
-              <div>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
+            <label>
+              <span className="w-lab">{dict.person.age}</span>
+              <input
+                className="w-in num"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={3}
+                value={form.age ?? ""}
+                onChange={(event) => {
+                  const digits = event.target.value.replace(/\D/g, "").slice(0, 3);
+                  set("age", digits ? Number(digits) : null);
+                }}
+                {...err("age")}
+              />
+            </label>
+            <div>
                 <span className="w-lab">{dict.person.gender}</span>
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={dict.person.gender}>
                   {(["male", "female"] as const).map((value) => (
@@ -361,12 +360,11 @@ export function PersonForm(props: Props) {
                       }`}
                     >
                       {value === "male" ? dict.person.male : dict.person.female}
-                    </button>
-                  ))}
-                </div>
+                  </button>
+                ))}
               </div>
-            </>
-          ) : null}
+            </div>
+          </div>
 
           {!isRepresentative ? (
             <div className="flex flex-col gap-2">
@@ -392,7 +390,7 @@ export function PersonForm(props: Props) {
               <div>
                 <p className="text-[15px]">{fmt(dict.person.sameAsRep, { name: props.representativeName })}</p>
                 <p className="mt-1 text-[15px] text-[var(--muted)]">
-                  {[sharedFromRep.address, foreign ? routeSummary(dict.route, sharedFromRep.prevStay, sharedFromRep.nextDest) : ""]
+                  {[sharedFromRep.address, routeSummary(dict.route, sharedFromRep.prevStay, sharedFromRep.nextDest)]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
@@ -417,14 +415,25 @@ export function PersonForm(props: Props) {
                   onChange={(event) => set("address", event.target.value)}
                 />
               </label>
-              {foreign && !isRepresentative ? (
+              {isRepresentative ? (
+                <label>
+                  <span className="w-lab">{dict.person.contact}</span>
+                  <input
+                    className="w-in"
+                    autoComplete="tel"
+                    placeholder={dict.person.contactHelp}
+                    value={form.contact}
+                    onChange={(event) => set("contact", event.target.value)}
+                  />
+                </label>
+              ) : (
                 <RouteQuestions
                   copy={dict.route}
                   prevStay={form.prevStay}
                   nextDest={form.nextDest}
                   onChange={(next) => setForm((current) => ({ ...current, ...next }))}
                 />
-              ) : null}
+              )}
             </>
           )}
         </fieldset>

@@ -9,7 +9,7 @@ const row: PropertySettingsRow = {
   welcome_text: { ja: "ようこそ", en: "", ko: 3 },
   terms_text: { ko: "약관" },
   terms_version: 2,
-  required_fields: [{ key: "occupation", required: true }, { key: "name_roman", required: false }, { key: "bogus" }, "x"],
+  required_fields: [{ key: "next_dest", required: true }, { key: "name_roman", required: false }, { key: "bogus" }, "x"],
   video_seconds_per_guest: 5,
   support_contacts: { phone: " 03-0000-0000 ", fax: "1" },
   idle_seconds_input: 240,
@@ -36,7 +36,7 @@ describe("contract build", () => {
     expect(contract.languages).toEqual(["ja", "en"]);
     expect(contract.welcomeText).toEqual({ ja: "ようこそ" });
     expect(contract.termsText).toEqual({ ko: "약관" });
-    expect(contract.fields.find((field) => field.key === "occupation")?.required).toBe(true);
+    expect(contract.fields.find((field) => field.key === "next_dest")?.required).toBe(true);
     // 이름은 설정과 상관없이 필수.
     expect(contract.fields.find((field) => field.key === "name_roman")?.required).toBe(true);
     expect(contract.supportContacts).toEqual({ phone: "03-0000-0000" });

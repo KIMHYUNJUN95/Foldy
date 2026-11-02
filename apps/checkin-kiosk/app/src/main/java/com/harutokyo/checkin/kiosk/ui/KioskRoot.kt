@@ -32,19 +32,20 @@ import com.harutokyo.checkin.kiosk.R
 import com.harutokyo.checkin.kiosk.contract.BlockReason
 import com.harutokyo.checkin.kiosk.contract.FindResult
 import com.harutokyo.checkin.kiosk.contract.KioskStay
+import com.harutokyo.checkin.kiosk.contract.SaveResult
 import com.harutokyo.checkin.kiosk.data.KioskViewModel
 import com.harutokyo.checkin.kiosk.data.Phase
 import com.harutokyo.checkin.kiosk.kiosk.Kiosk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → T1 찾기 → T2 명부 → T3 여권 · 확인 → T3s 어디서 · 어디로(→ 다음 묶음: 동의 · 동영상 · 완료).
+// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → T1 찾기 → T2 명부 → T3 여권 · 확인 → T3s 어디서 · 어디로 → G3b 동의(→ 다음 묶음: 동영상 · 완료).
 // 찾기 결과: 못 찾음 T1x · 지금은 못 함 T1b · 이미 체크인 T1c.
 // 손님이 손을 떼고 idleSecondsInput(기본 240초) 지나면 G1 로 돌아간다(FR-K12).
 
 private val PHRASE_BREAK = LineBreak(LineBreak.Strategy.HighQuality, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase)
 
-private enum class Screen { Language, Menu, Find, NotFound, Blocked, CheckedIn, Guests, Passport, ComingNext }
+private enum class Screen { Language, Menu, Find, NotFound, Blocked, CheckedIn, Guests, Passport, Consent, ComingNext }
 
 @Composable
 fun KioskRoot(model: KioskViewModel = viewModel()) {
@@ -200,7 +201,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     if (updated != null) stay = updated
                                     updated != null
                                 },
-                                onStart = { screen = if (current.guests.isNotEmpty() && emptySeats(current) == 0 && !needsRoute(current)) Screen.ComingNext else Screen.Passport },
+                                onStart = { screen = if (current.guests.isNotEmpty() && emptySeats(current) == 0 && !needsRoute(current)) afterGuests(current) else Screen.Passport },
                             )
                         }
                         Screen.Passport -> {
@@ -216,8 +217,33 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     onSessionGone = reset,
                                     onBack = { screen = Screen.Guests },
                                     onCall = { screen = Screen.ComingNext },
-                                    // 다음 묶음: 동의 · 동영상 · 완료.
-                                    onDone = { screen = Screen.ComingNext },
+                                    onDone = { screen = afterGuests(stay ?: current) },
+                                )
+                            }
+                        }
+                        Screen.Consent -> {
+                            val id = session
+                            if (id != null) {
+                                ConsentScreen(
+                                    termsText = state.contract?.termsText.orEmpty(),
+                                    language = language,
+                                    onBack = { screen = Screen.Guests },
+                                    onCall = { screen = Screen.ComingNext },
+                                    onAgree = {
+                                        when (val saved = model.saveConsent(id, language)) {
+                                            is SaveResult.Saved -> {
+                                                stay = saved.stay
+                                                // 다음 묶음: 확인 동영상 · 완료.
+                                                screen = Screen.ComingNext
+                                                true
+                                            }
+                                            SaveResult.SessionGone -> {
+                                                reset()
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -253,6 +279,9 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
         }
     }
 }
+
+/** 명부가 끝난 뒤 — 아직 동의 전이면 동의(G3b), 미리 동의했으면 다음 단계. */
+private fun afterGuests(stay: KioskStay): Screen = if (stay.consented) Screen.ComingNext else Screen.Consent
 
 @Composable
 private fun Centered(text: String) {

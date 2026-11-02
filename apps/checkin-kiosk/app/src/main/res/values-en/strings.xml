@@ -147,15 +147,17 @@
     <string name="field_nationality">Nationality</string>
     <string name="field_nationality_hint">3-letter code (e.g. USA)</string>
     <string name="field_number">Passport number</string>
-    <string name="field_birth">Date of birth</string>
-    <string name="field_birth_hint">e.g. 1990-05-12</string>
+    <string name="field_age">Age</string>
+    <string name="field_age_hint">e.g. 32</string>
+    <string name="field_contact">Contact — phone or email, one is enough</string>
+    <string name="field_contact_hint">e.g. +81-90-1234-5678</string>
     <string name="field_gender">Sex</string>
     <string name="gender_male">Male</string>
     <string name="gender_female">Female</string>
     <string name="field_address">Home address</string>
     <string name="field_address_jp">Address in Japan</string>
     <string name="field_tap">Tap to enter</string>
-    <string name="shared_title">Address · last night · next stop</string>
+    <string name="shared_title">Address · contact · last night · next stop</string>
     <string name="shared_body">Same as the booker (%1$s)</string>
     <string name="confirm_next">Looks right, next guest</string>
     <string name="confirm_done">Looks right</string>
@@ -196,4 +198,16 @@
     <string name="city_other">Other · type it</string>
     <string name="city_other_hint">City name</string>
     <string name="route_next">Next</string>
+    <string name="consent_title">Last step:\nplease agree</string>
+    <string name="consent_body">After you agree, we take a short check video and you\'re done.</string>
+    <string name="consent_point1">We keep a guest register as required by Japan\'s Hotel Business Act.</string>
+    <string name="consent_point2">The register, passport photos and check videos are kept for 3 years, then deleted.</string>
+    <string name="consent_point3">They are used only for the guest register and never given to others.</string>
+    <string name="consent_terms">I agree to the terms of stay</string>
+    <string name="consent_terms_sub">Check-in, check-out and house rules</string>
+    <string name="consent_read">Read the full terms</string>
+    <string name="consent_need">Tick the box</string>
+    <string name="consent_go">Agree and continue</string>
+    <string name="terms_close">Close</string>
+    <string name="terms_empty">The terms haven\'t been added yet. Please ask our staff.</string>
 </resources>

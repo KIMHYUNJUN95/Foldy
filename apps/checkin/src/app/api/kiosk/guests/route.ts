@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if (!existing && stay.guests.length >= KIOSK_MAX_GUESTS) return json({ ok: false, error: "too_many" }, 409);
 
     const representative = stay.guests.find((guest) => guest.is_representative) ?? null;
-    const row = kioskGuestRow(input, representative, !existing, now.toISOString());
+    const row = kioskGuestRow(input, representative, !existing, now.toISOString(), !!existing?.is_representative);
 
     let guestId: string;
     if (existing) {

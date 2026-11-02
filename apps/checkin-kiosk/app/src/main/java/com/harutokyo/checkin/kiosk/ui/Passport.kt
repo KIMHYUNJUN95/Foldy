@@ -200,14 +200,16 @@ fun PassportFlow(
         )
         Step.Confirm -> {
             val askAddress = isRepresentative || mode == FormMode.Resident
+            val askContact = isRepresentative
             ConfirmScreen(
                 key = "${seat}-${mode}-${captured?.mrz?.raw}",
                 who = who,
                 mode = mode,
                 mrzValid = captured?.mrz?.valid,
-                initial = captured?.mrz?.let { draftOf(it, if (isRepresentative) representative?.address ?: guest?.address else null) }
-                    ?: PersonDraft(address = if (isRepresentative) guest?.address.orEmpty() else ""),
+                initial = captured?.mrz?.let { draftOf(it, if (isRepresentative) representative?.address ?: guest?.address else null, if (isRepresentative) representative?.contact ?: guest?.contact else null) }
+                    ?: PersonDraft(address = if (isRepresentative) guest?.address.orEmpty() else "", contact = if (isRepresentative) (representative?.contact ?: guest?.contact).orEmpty() else ""),
                 askAddress = askAddress,
+                askContact = askContact,
                 representativeName = if (!isRepresentative && mode != FormMode.Resident) representative?.name else null,
                 last = seat == seats - 1 && !needsRoute(stay),
                 canRetake = mode == FormMode.Mrz || mode == FormMode.Manual,
@@ -217,7 +219,7 @@ fun PassportFlow(
                     step = Step.Camera
                 },
                 onSubmit = { draft ->
-                    val input = guestInputOf(guest, draft, mode, reason, captured?.mrz, askAddress).let { if (savedId != null) it.copy(id = savedId) else it }
+                    val input = guestInputOf(guest, draft, mode, reason, captured?.mrz, askAddress, askContact).let { if (savedId != null) it.copy(id = savedId) else it }
                     when (val saved = onSave(input)) {
                         is SaveResult.Saved -> {
                             val id = saved.guestId ?: input.id
@@ -561,6 +563,7 @@ private fun ConfirmScreen(
     mrzValid: Boolean?,
     initial: PersonDraft,
     askAddress: Boolean,
+    askContact: Boolean,
     representativeName: String?,
     last: Boolean,
     canRetake: Boolean,
@@ -574,7 +577,7 @@ private fun ConfirmScreen(
     var saving by remember(key) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val submit = {
-        val empty = requiredMissing(draft, mode, askAddress)
+        val empty = requiredMissing(draft, mode, askAddress, askContact)
         if (empty.isNotEmpty()) {
             bad = empty
             failed = false
@@ -643,18 +646,18 @@ private fun ConfirmScreen(
                     Spacer(Modifier.weight(1f))
                 }
             }
-            Spacer(Modifier.height(18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
-                Field(str(R.string.field_birth), draft.birth, "birthDate" in bad, Modifier.weight(1f), hint = str(R.string.field_birth_hint), max = 10, number = true) {
-                    update(draft.copy(birth = it))
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(str(R.string.field_gender), color = if ("gender" in bad) G.Error else G.Muted, fontSize = 16.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Segmented(
-                        str(R.string.gender_male), str(R.string.gender_female), rightOn = draft.gender == "female",
-                    ) { female -> update(draft.copy(gender = if (female) "female" else "male")) }
-                }
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
+            Field(str(R.string.field_age), draft.age, "age" in bad, Modifier.weight(1f), hint = str(R.string.field_age_hint), max = 3, number = true) {
+                update(draft.copy(age = it.filter(Char::isDigit)))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(str(R.string.field_gender), color = if ("gender" in bad) G.Error else G.Muted, fontSize = 16.sp)
+                Spacer(Modifier.height(10.dp))
+                Segmented(
+                    str(R.string.gender_male), str(R.string.gender_female), rightOn = draft.gender == "female",
+                ) { female -> update(draft.copy(gender = if (female) "female" else "male")) }
             }
         }
         if (askAddress) {
@@ -671,6 +674,12 @@ private fun ConfirmScreen(
                 Text(str(R.string.shared_body, representativeName), color = G.Muted, fontSize = 16.sp)
             }
         }
+        if (askContact) {
+            Spacer(Modifier.height(18.dp))
+            Field(str(R.string.field_contact), draft.contact, "contact" in bad, Modifier.fillMaxWidth(), hint = str(R.string.field_contact_hint), max = 120, plain = true) {
+                update(draft.copy(contact = it))
+            }
+        }
     }
 }
 
@@ -685,6 +694,7 @@ private fun Field(
     max: Int = 60,
     number: Boolean = false,
     single: Boolean = true,
+    plain: Boolean = false,
     onChange: (String) -> Unit,
 ) {
     Column(modifier) {
@@ -697,7 +707,7 @@ private fun Field(
             textStyle = TextStyle(color = G.Text, fontSize = 24.sp),
             cursorBrush = SolidColor(G.Text),
             keyboardOptions = KeyboardOptions(
-                capitalization = if (single) KeyboardCapitalization.Characters else KeyboardCapitalization.Sentences,
+                capitalization = if (plain) KeyboardCapitalization.None else if (single) KeyboardCapitalization.Characters else KeyboardCapitalization.Sentences,
                 autoCorrectEnabled = false,
                 keyboardType = if (number) KeyboardType.Number else KeyboardType.Text,
                 imeAction = ImeAction.Next,

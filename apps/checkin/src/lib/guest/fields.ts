@@ -12,16 +12,10 @@ const optionalText = (max: number) =>
     .optional()
     .transform((value) => (value ? value : null));
 
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value));
-
 export const guestInputSchema = z.object({
   id: z.uuid().optional(),
   lastName: text(60).min(1),
   firstName: text(60).min(1),
-  nameKana: optionalText(60),
   guestType: z.enum(["adult", "child"]),
   hasJapanAddress: z.boolean(),
   nationality: z
@@ -36,13 +30,21 @@ export const guestInputSchema = z.object({
     .optional()
     .transform((value) => (value ? value.toUpperCase().replace(/[\s-]/g, "") : null))
     .refine((value) => value === null || /^[A-Z0-9]{5,12}$/.test(value), "passport_number"),
-  birthDate: isoDate.optional().transform((value) => value ?? null),
+  age: z
+    .number()
+    .int()
+    .min(0)
+    .max(130)
+    .optional()
+    .transform((value) => value ?? null),
   gender: z
     .enum(["male", "female"])
     .optional()
     .transform((value) => value ?? null),
   noPassport: z.boolean().default(false),
   address: optionalText(200),
+  // 대표자만 — 전화 또는 이메일 하나(동행자는 대표자 것). 서버가 동행자 값은 버린다.
+  contact: optionalText(120),
   prevStay: optionalText(120),
   nextDest: optionalText(120),
 });
@@ -56,7 +58,8 @@ export type StoredGuest = {
   has_japan_address: boolean | null;
   nationality: string | null;
   passport_number: string | null;
-  birth_date: string | null;
+  age: number | null;
+  contact: string | null;
   gender: string | null;
   no_passport_reason: string | null;
   address: string | null;
@@ -70,21 +73,28 @@ export type MissingField =
   | "nationality"
   | "passport_number"
   | "passport_photo"
-  | "birth_date"
+  | "age"
+  | "contact"
   | "gender"
   | "prev_stay"
   | "next_dest";
 
 /**
- * 한 사람이 다 됐는지(시안 W2 「다 됐어요」). 규칙(44 FR-W02 · 43 §2):
- *  - 모두: 이름 · 주소(동행자는 대표자 값을 그대로 저장)
- *  - 일본에 주소가 없는 사람(외국인): 국적 · 여권 번호 · 여권 사진 · 생년월일 · 성별 · 전 숙박지 · 다음 행선지
+ * 한 사람이 다 됐는지(시안 W2 「다 됐어요」). 규칙(44 FR-W02 · 43 §2-1 법 재확인 2026-11-03):
+ *  - 모두: 이름 · 주소 · 성별 · 나이 · 전 숙박지 · 다음 행선지(신주쿠 규칙 10 — 동행자는 대표자 값을 그대로 저장)
+ *  - 대표자: 연락처(전화 또는 이메일 하나)
+ *  - 일본에 주소가 없는 사람(외국인): 국적 · 여권 번호 · 여권 사진
  *  - 「여권 없음」 어린이 · 태블릿에서 직원 확인으로 넘긴 사람은 여권 번호 · 사진을 빼 준다
  */
 export function missingFields(guest: StoredGuest, hasPassportPhoto: boolean): MissingField[] {
   const missing: MissingField[] = [];
   if (!guest.name_roman) missing.push("name");
   if (!guest.address) missing.push("address");
+  if (guest.is_representative && !guest.contact) missing.push("contact");
+  if (!guest.gender) missing.push("gender");
+  if (guest.age === null) missing.push("age");
+  if (!guest.prev_stay) missing.push("prev_stay");
+  if (!guest.next_dest) missing.push("next_dest");
   if (guest.has_japan_address) return missing;
   // 「child」 사유는 어린이만. 태블릿의 다른 사유(카메라 불가 · 여권 거부 등)는 직원 확인으로 넘기고 진행(44 FR-K16).
   const reason = guest.no_passport_reason;
@@ -92,10 +102,6 @@ export function missingFields(guest: StoredGuest, hasPassportPhoto: boolean): Mi
   if (!guest.nationality) missing.push("nationality");
   if (!passportExempt && !guest.passport_number) missing.push("passport_number");
   if (!passportExempt && !hasPassportPhoto) missing.push("passport_photo");
-  if (!guest.birth_date) missing.push("birth_date");
-  if (!guest.gender) missing.push("gender");
-  if (!guest.prev_stay) missing.push("prev_stay");
-  if (!guest.next_dest) missing.push("next_dest");
   return missing;
 }
 

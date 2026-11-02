@@ -12,7 +12,6 @@ const localizedText = z.partialRecord(localeSchema, z.string());
 export const fieldKeySchema = z.enum([
   "name_roman",
   "address",
-  "occupation",
   "nationality",
   "passport_number",
   "next_dest",

@@ -36,18 +36,26 @@ export type SharedField = (typeof SHARED_FIELDS)[number];
 type Shared = Record<SharedField, string | null>;
 type SharingGuest = Shared & { id: string; is_representative: boolean };
 
-/** 저장할 칸(사람 하나). 주소를 안 보냈으면 칸을 비우지 않는다 — 새 사람이면 대표자 값을 이어받는다. */
-export function kioskGuestRow(input: KioskGuestInput, representative: Shared | null, isNew: boolean, nowIso: string) {
+/**
+ * 저장할 칸(사람 하나). 주소 · 연락처를 안 보냈으면 칸을 비우지 않는다 — 새 사람이면 대표자 주소 · 숙박지를 이어받는다.
+ * 연락처는 대표자만 저장한다(동행자는 대표자 것 — 43 §2-1).
+ */
+export function kioskGuestRow(
+  input: KioskGuestInput,
+  representative: Shared | null,
+  isNew: boolean,
+  nowIso: string,
+  isRepresentative = false,
+) {
   const noPassport = !!input.noPassportReason;
   const row: Record<string, unknown> = {
     guest_type: input.guestType,
     name_roman: nameRomanOf(input.lastName, input.firstName),
-    name_kana: input.nameKana,
     has_japan_address: input.hasJapanAddress,
     nationality: input.nationality,
     passport_number: noPassport ? null : input.passportNumber,
     no_passport_reason: input.noPassportReason ?? null,
-    birth_date: input.birthDate,
+    age: input.age,
     gender: input.gender,
     source: input.mrz ? "mrz" : "guest",
     updated_at: nowIso,
@@ -57,6 +65,7 @@ export function kioskGuestRow(input: KioskGuestInput, representative: Shared | n
     row.mrz_valid = input.mrz.valid;
   }
   if (input.address !== null) row.address = input.address;
+  if (isRepresentative && input.contact !== null) row.contact = input.contact;
   if (isNew && representative) {
     row.address ??= representative.address;
     row.prev_stay = representative.prev_stay;

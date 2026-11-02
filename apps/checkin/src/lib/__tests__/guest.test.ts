@@ -79,7 +79,8 @@ describe("명부 칸", () => {
     has_japan_address: false,
     nationality: "TWN",
     passport_number: "3123456",
-    birth_date: "1994-03-08",
+    age: 32,
+    contact: null,
     gender: "female",
     no_passport_reason: null,
     address: "Taipei",
@@ -90,20 +91,35 @@ describe("명부 칸", () => {
   it("외국인은 여권 사진까지 있어야 끝", () => {
     expect(missingFields(base, true)).toEqual([]);
     expect(missingFields(base, false)).toEqual(["passport_photo"]);
-    expect(missingFields({ ...base, nationality: null, prev_stay: null }, true)).toEqual(["nationality", "prev_stay"]);
+    expect(missingFields({ ...base, nationality: null, prev_stay: null }, true)).toEqual(["prev_stay", "nationality"]);
   });
 
   it("여권 없는 어린이는 여권 번호 · 사진을 빼 준다", () => {
     expect(missingFields({ ...base, guest_type: "child", no_passport_reason: "child", passport_number: null }, false)).toEqual([]);
   });
 
-  it("일본에 주소가 있으면 이름 · 주소만", () => {
-    const resident = { ...base, has_japan_address: true, nationality: null, passport_number: null, birth_date: null, gender: null };
+  it("일본에 주소가 있어도 성별 · 나이 · 숙박지는 받는다(신주쿠 규칙 10), 국적 · 여권은 빼 준다", () => {
+    const resident = { ...base, has_japan_address: true, nationality: null, passport_number: null };
     expect(missingFields(resident, false)).toEqual([]);
-    expect(missingFields({ ...resident, address: null }, false)).toEqual(["address"]);
+    expect(missingFields({ ...resident, address: null, gender: null, age: null, prev_stay: null }, false)).toEqual([
+      "address",
+      "gender",
+      "age",
+      "prev_stay",
+    ]);
   });
 
-  it("입력 검사: 국적 코드 · 여권 번호 · 날짜", () => {
+  it("연락처는 대표자만", () => {
+    expect(missingFields({ ...base, is_representative: true }, true)).toEqual(["contact"]);
+    expect(missingFields({ ...base, is_representative: true, contact: "+1-415-555-0142" }, true)).toEqual([]);
+    expect(missingFields(base, true)).toEqual([]);
+  });
+
+  it("나이 0 은 빈 칸이 아니다", () => {
+    expect(missingFields({ ...base, age: 0 }, true)).toEqual([]);
+  });
+
+  it("입력 검사: 국적 코드 · 여권 번호 · 나이", () => {
     const ok = guestInputSchema.parse({
       lastName: " lin ",
       firstName: "mei",
@@ -111,16 +127,19 @@ describe("명부 칸", () => {
       hasJapanAddress: false,
       nationality: "twn",
       passportNumber: "31 234-56",
-      birthDate: "1994-03-08",
+      age: 32,
       gender: "female",
     });
-    expect(ok).toMatchObject({ lastName: "lin", nationality: "TWN", passportNumber: "3123456", address: null });
+    expect(ok).toMatchObject({ lastName: "lin", nationality: "TWN", passportNumber: "3123456", address: null, contact: null, age: 32 });
+    expect(ok).not.toHaveProperty("nameKana");
     expect(nameRomanOf(" lin ", " mei ")).toBe("LIN MEI");
     const bad = (over: Record<string, unknown>) =>
       guestInputSchema.safeParse({ lastName: "A", firstName: "B", guestType: "adult", hasJapanAddress: false, ...over }).success;
     expect(bad({ nationality: "XXX" })).toBe(false);
     expect(bad({ passportNumber: "12" })).toBe(false);
-    expect(bad({ birthDate: "1994-02-30" })).toBe(false);
+    expect(bad({ age: 131 })).toBe(false);
+    expect(bad({ age: 3.5 })).toBe(false);
+    expect(bad({ age: "32" })).toBe(false);
     expect(bad({ lastName: "" })).toBe(false);
   });
 });

@@ -36,15 +36,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ toke
     const row = {
       guest_type: input.guestType,
       name_roman: nameRomanOf(input.lastName, input.firstName),
-      name_kana: input.nameKana,
       has_japan_address: input.hasJapanAddress,
       // 일본에 사는 외국인도 있어 국적을 일본으로 채우지 않는다 — 주소가 있으면 국적 · 여권은 법 요건이 아니다.
       nationality: input.nationality,
       passport_number: isChild && input.noPassport ? null : input.passportNumber,
       no_passport_reason: isChild && input.noPassport ? "child" : null,
-      birth_date: input.birthDate,
+      age: input.age,
       gender: input.gender,
       address: input.address,
+      // 연락처는 대표자만(동행자는 대표자 것 — 43 §2-1). 동행자가 보낸 값은 버린다.
+      contact: existing?.is_representative ? input.contact : null,
       prev_stay: input.prevStay,
       next_dest: input.nextDest,
       source: "guest",

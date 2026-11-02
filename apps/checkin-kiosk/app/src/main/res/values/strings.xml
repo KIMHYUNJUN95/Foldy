@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 기본(일본어). 문구 원본은 서버 계약 · apps/checkin 사전이고, 여기는 오프라인 대비 복사본(16 §5 ui/). -->
+<resources>
+    <string name="app_name">セルフチェックイン</string>
+    <string name="enroll_title">この端末を登録</string>
+    <string name="enroll_body">管理画面の「端末を追加」で表示された8桁のコードを入力してください。</string>
+    <string name="enroll_submit">登録</string>
+    <string name="enroll_working">登録しています…</string>
+    <string name="enroll_invalid">コードが違うか、期限が切れています。新しいコードを作ってください。</string>
+    <string name="enroll_rate">入力が多すぎます。1分後にもう一度お試しください。</string>
+    <string name="error_network">インターネットにつながっていません。</string>
+    <string name="error_server">サーバーでエラーが起きました。少し待ってからもう一度お試しください。</string>
+    <string name="loading">読み込んでいます…</string>
+    <string name="lang_ready">パスポートをご用意ください</string>
+    <string name="menu_title">ご用件をお選びください</string>
+    <string name="menu_checkin">チェックイン</string>
+    <string name="menu_checkin_body">予約者のお名前か予約番号で探します。パスポートをご用意ください。</string>
+    <string name="menu_start">はじめる</string>
+    <string name="menu_prereg">事前登録済みの方</string>
+    <string name="menu_prereg_body">メッセージで受け取ったQRコードをカメラにかざしてください。</string>
+    <string name="menu_guide">滞在中のご案内</string>
+    <string name="menu_guide_body">Wi-Fi・ゴミの出し方・チェックアウト方法</string>
+    <string name="coming_next">この画面は次の段階で作ります。</string>
+    <string name="back">戻る</string>
+    <string name="staff_pin_title">スタッフPIN</string>
+    <string name="staff_pin_wrong">PINが違います。</string>
+    <string name="staff_pin_unset">この建物のPINがまだ設定されていません。</string>
+    <string name="staff_menu_title">スタッフメニュー</string>
+    <string name="staff_refresh">設定を再取得</string>
+    <string name="staff_unlock">ロックを解除</string>
+    <string name="staff_relock">ロックし直す</string>
+    <string name="staff_reenroll">端末を登録し直す</string>
+    <string name="staff_close">閉じる</string>
+    <string name="staff_device">端末</string>
+    <string name="revoked">この端末は無効にされました。もう一度登録してください。</string>
+    <string name="offline">オフラインです。最後に受け取った設定で動いています。</string>
+    <string name="confirm">確認</string>
+    <string name="staff_reenroll_confirm">登録を消しますか？もう一度使うには、管理画面で新しい登録コードが必要です。</string>
+    <string name="staff_reenroll_do">登録を消す</string>
+    <string name="cancel">キャンセル</string>
+    <string name="staff_pin_locked">間違いが多すぎます。%1$d秒後にもう一度お試しください。</string>
+</resources>

@@ -167,5 +167,14 @@
     "okubo_c": "오쿠보C",
     "stay_ari": "STAY ARI Apartment Hotel",
     "sano": "사노"
+  },
+  "fields": {
+    "name_roman": "이름(로마자)",
+    "address": "주소",
+    "occupation": "직업",
+    "nationality": "국적",
+    "passport_number": "여권 번호",
+    "prev_stay": "전 숙박지",
+    "next_dest": "다음 행선지"
   }
 }

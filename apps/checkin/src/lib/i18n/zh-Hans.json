@@ -167,5 +167,14 @@
     "okubo_c": "大久保C",
     "stay_ari": "STAY ARI Apartment Hotel",
     "sano": "佐野"
+  },
+  "fields": {
+    "name_roman": "姓名（拼音）",
+    "address": "地址",
+    "occupation": "职业",
+    "nationality": "国籍",
+    "passport_number": "护照号码",
+    "prev_stay": "上一住宿地",
+    "next_dest": "下一目的地"
   }
 }

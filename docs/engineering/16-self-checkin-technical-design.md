@@ -160,6 +160,9 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 - **링크 토큰은 찾을 때마다 하나 더 발급, 앞 링크도 그대로 열림(2026-11-02 수정)**: `checkin.stay_tokens`(토큰 sha256 · stay · 만든 때, stay 지우면 같이 지움) — 32바이트 base64url 원문은 한 번만 돌려준다. stay 당 최근 10개만 남긴다. 일행에게 보낸 링크가 다시 찾기로 닫히지 않게 하려는 것. `stays.pre_reg_token_hash` 는 쓰지 않는다.
 - **실제 인원(2026-11-02)**: `stays.party_size` — 손님이 「이 사람은 안 와요」로 줄인 인원(null = 예약 인원). 명부 자리 = max(저장한 사람, party_size). 동의 화면은 저장한 사람 ≥ party_size 일 때만 열리고, 예약 인원 ≠ 명부 인원이면 「예약 N명 · 명부 M명 — 직원이 확인」 한 줄(막지 않음, 43 §8). 직원 화면 표시는 4단계.
 - 새 환경 변수: `CHECKIN_HASH_SECRET`(시도 기록 HMAC 키, 없으면 `claim` 이 500).
+- **기기 라우트 3개 구현(2026-11-02, 3단계 뼈대)**: `POST /api/device/enroll` — 8자리 코드(10분 · 한 번)를 조건부 update 한 번(`used_at is null` · `expires_at > now`)으로 써 버리고 `devices` 줄 + 기기 토큰(원문 1회, DB 엔 sha256) · 틀리면 404 `invalid_code` · 같은 IP 분당 5회(`claim_attempts`, 키 `device-enroll`) 넘으면 429. `POST /api/device/ping` — `last_seen` · 배터리 · 앱/OS 버전 저장, `settingsVersion`(= `property_settings.updated_at`, 없으면 `default`) 반환. `GET /api/kiosk/settings` — 기기 · `settingsVersion` · 계약. 기기 토큰이 없거나 틀리면 401 `unauthorized`, 해제된 기기는 401 `revoked`(`src/lib/device/auth.ts`).
+- **계약 확장(2026-11-02, `CONTRACT_VERSION` 은 1 그대로)**: `termsText` · `idleSecondsInput`(30~900) · `idleSecondsDone`(5~120) · `mrzAutofill` · `supportContacts`(phone · line · whatsapp) · `staffPin`. 계약은 `buildContract(property_settings 줄)`(`src/lib/contract/build.ts`)이 만든다 — 줄이 없으면 기본값(4개 언어 · 칸: 이름(로마자) · 주소 필수, 국적 · 여권 번호 · 전 숙박지 · 다음 행선지는 외국인만 필수). 이름(로마자)은 설정으로도 필수를 끌 수 없다. 칸 이름은 사전 `fields` 4개 언어.
+- **직원 PIN(FR-K18)**: `property_settings.staff_pin_hash` = `pbkdf2-sha256$120000$<salt base64>$<hash base64>`(32바이트, `src/lib/device/pin.ts` `hashPin` · `verifyPin`, PIN 은 숫자 4~8자리). 계약의 `staffPin` 은 이 해시를 나눈 값(원문 PIN 은 어디에도 없음) — 태블릿이 오프라인에서도 같은 방식(Java `PBKDF2WithHmacSHA256`)으로 대조한다. PIN 을 정하는 화면은 4단계(건물 설정).
 
 ## 5. 태블릿 앱 (Kotlin · Jetpack Compose, `apps/checkin-kiosk`)
 
@@ -177,6 +180,23 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 - 최소 SDK: Android 10(API 29). 타깃: 최신. 태블릿 권장: RAM 3GB+ · 전면 카메라 5MP+ · (선택) NFC — 👤 기종 확인 뒤 확정.
 - 화면 흐름(43 §4 · §8-6(3)): 언어 → 코드/이름 → 방 · 인원 확인 → 사람별(여권 촬영 → MRZ 자동 채움 → 확인 · 보충) → 약관 동의 → 얼굴 동영상 → 완료(방 번호 · 비밀번호 · 입실 안내) → 30초 뒤 처음.
 - 디자인 시안: 태블릿 7~8 화면 + 사전 등록 웹 + Foldy 직원 화면을 **별도 캔버스**로(메모리 규칙), 구현 전 컨펌.
+
+### 5-1. 뼈대 구현 상태 (2026-11-02, 3단계 첫 묶음)
+
+지은 것: 기기 등록(E) · 계약 받기 · 잠금 · 언어 고르기(G1) · 메뉴(G2) · 직원 PIN · 직원 메뉴 · 무조작 복귀 · 오프라인 표시. 찾기 · 명부 · 카메라 · MRZ · 동영상 · 완료 · 전송 큐는 다음 묶음(메뉴의 세 타일과 「Call staff」는 지금 「다음 단계에서 만들어요」 자리로 간다).
+
+| 정한 것 | 내용 · 위 표와 다른 점 |
+| --- | --- |
+| 패키지 · 도구 | `com.harutokyo.checkin.kiosk` · AGP 9.5.0(Kotlin 내장) · Kotlin compose/serialization 플러그인 2.4.21 · Gradle 9.8.2 · Compose BOM 2026.09.00 · compileSdk/targetSdk 37 · minSdk 29 · Java 17. 빌드는 Android Studio 의 JBR 로(`JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug`) — 이 Mac 의 기본 Java 27 은 Gradle 9.8 이 못 쓴다. `local.properties`(sdk.dir)는 각자 만든다(gitignore). |
+| 서버 주소 | 빌드 때 `-PcheckinApiBase=https://…`. 없으면 `http://127.0.0.1:3100` + `adb reverse tcp:3100 tcp:3100`(이 Mac 의 `apps/checkin` 개발 서버). **Android 17 은 앱이 사설 주소(에뮬레이터의 `10.0.2.2`)로 나가는 것을 막는다** — 처음엔 10.0.2.2 로 했다가 연결이 안 돼 바꿨다. http 는 `127.0.0.1` 에만 허용(network_security_config), 운영은 https 만. |
+| 통신 | Ktor 대신 `HttpURLConnection` + kotlinx.serialization(`data/Api.kt`) — 지금 부르는 곳이 3개뿐이라 라이브러리를 더하지 않았다. 찾기 · 업로드가 붙을 때 다시 본다. |
+| 토큰 · 설정 사본 | `EncryptedSharedPreferences`(폐기 예정) 대신 Android Keystore AES-GCM 키로 직접 암호화(`data/TokenVault.kt`). 기기 토큰과 마지막 계약 JSON 을 넣어 두고, 켤 때 사본으로 바로 G1 을 띄운 뒤 서버에서 새로 받는다(오프라인이면 사본으로 계속 + 위에 「오프라인」 줄). 백업 · 기기 이전에서 빠짐(`allowBackup=false` · `data_extraction_rules.xml`). |
+| 신호(ping) | WorkManager(최소 15분) 대신 ViewModel 코루틴 5분 반복. `settingsVersion` 이 바뀌면 계약을 다시 받는다. 401 이면 토큰 · 사본을 지우고 등록 화면 + 「이 기기는 해제됐어요」. |
+| 잠금 | 앱이 Device Owner 일 때만 `setLockTaskPackages` · `LOCK_TASK_FEATURE_NONE` · HOME 기본 앱 고정 · `startLockTask`(`kiosk/Kiosk.kt`). Device Owner 가 아니면(개발 에뮬레이터) 시스템 바만 숨긴다. 뒤로 가기는 앱이 먹고 G1 로. 직원 메뉴의 「잠금 풀기 · 다시 잠그기」는 Device Owner 일 때만 보인다. **실기기 Device Owner 잠금은 아직 확인 못 함**(👤 태블릿 · 프로비저닝 뒤). |
+| 직원 해제 | 표지 5초 누름 → PIN(숫자판, 기기에서 대조) → 직원 메뉴(기기 이름 · 건물 키 · 설정 다시 받기 · 잠금 풀기/다시 잠그기 · 기기 다시 등록 · 닫기). 직원 화면은 손님이 고른 언어가 아니라 **기기 언어**로. PIN 이 아직 없으면 「PIN 이 아직 정해지지 않았어요」. **PIN 5번 틀리면 1분 잠금**, 또 5번 틀릴 때마다 두 배(최대 15분, `kiosk/PinGuard.kt`) — 숫자판이 꺼지고 남은 초를 보인다. 맞히면 처음부터. 잠금은 ViewModel 에 있어 PIN 화면을 닫았다 열어도 남는다(앱을 다시 켜면 풀림 — 표지 5초 누름이 있어 받아들임). 「기기 다시 등록」은 한 번 더 묻는다(「이 기기의 등록을 지울까요?」 · 취소 / 등록 지우기 — 되돌릴 수 없고 새 등록 코드가 있어야 해서). 「잠금 풀기 · 다시 잠그기」 글자는 누를 때마다 실제 상태를 다시 읽는다. |
+| 화면 · 글자 | 시안 G 「밤의 키오스크」 토큰(`ui/Theme.kt` — 사전 등록 웹과 같은 색, 위 `ui/` 줄의 아이보리 · 네이비가 아님) · 시스템 글꼴. 손님 언어는 기기 설정을 바꾸지 않고 화면 안에서만(`Localized`) — 그래서 언어별 분할 설치를 껐다(`bundle.language.enableSplit=false`). 문구는 앱 리소스 4개 언어(`values`=ja · `values-en` · `values-zh-rCN` · `values-ko`). G1 제목 · 「Call staff」는 시안대로 여러 언어를 한 줄에. 줄바꿈: 일본어는 구절 단위(`LineBreak.WordBreak.Phrase`), 한국어는 띄어쓰기에서만(글자 사이에 U+2060 을 넣는 `keepKoreanWords()` — CSS `keep-all` 과 같은 효과, `str()` 로 모든 문구에). 영어는 복수형 경고를 피하려고 숫자를 끝에 둔다(「Seconds left: 58」). |
+| 무조작 · 화면 | 손을 떼고 `idleSecondsInput`(기본 240초) 지나면 G1 · 언어 ja 로 — **직원 화면(PIN · 직원 메뉴)이 열려 있어도 닫는다**(직원이 열어 두고 떠나도 손님에게 남지 않게). 화면 항상 켜짐. `FLAG_SECURE`(캡처 막기)는 **배포판만** — 개발판은 화면 확인 캡처가 필요하다. 세로 고정은 Android 16+ 큰 화면에서 무시될 수 있다(lint 경고) — 그래서 **가로 · 큰 글자에서도 깨지지 않게** 지었다: 화면마다 스크롤 한 겹 + 아래 버튼 고정(`ScrollPage`), 넓으면(가로) G1 은 2열 · G2 는 체크인 타일 옆에 작은 타일 둘, 버튼 · 타일 · 숫자 칸은 고정 높이 대신 최소 높이(글자가 커지면 같이 커짐), 한 줄의 타일은 높이를 맞춤. 회전 · 화면 크기 변경은 액티비티를 다시 만들지 않는다(`configChanges`). 글자 크기를 바꾸면 다시 만들어져 G1 로 간다(받아들임). 실기기에서 회전을 확인하고, 필요하면 Device Owner 정책으로 묶는다. 앱 아이콘은 아직 없음. |
+| 테스트 | JUnit 12개: PIN 잠금(5번 · 두 배 · 15분 끝 · 맞히면 처음부터) · 한국어 줄바꿈 · PIN 대조(서버 `hashPin` 이 만든 값 그대로 · 틀린 PIN · PIN 없음 · 다른 방식) · 계약 읽기(서버 `buildContract(null)` 출력을 `test/resources/contract-default.json` 으로 — 계약이 바뀌면 다시 뽑는다 · 모르는 칸 무시). |
 
 ## 6. 손님 사전 등록 웹 (`apps/checkin`, Next.js)
 
@@ -207,5 +227,6 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 2. 사전 등록 웹(명부 · 여권 업로드 · 동의) · 링크 발급 · 리마인드 크론
    - 2026-11-02 진행: 찾기(`/p/[building]` — 예약 번호 또는 전화 뒤 4자리 · 못 찾음 · 잠금) ✅ · 명부(`/r/[token]`) · 사람별 입력(`…/guest/[id]`) · 여권 사진 · 동의(`…/terms`) · 완료(코드) · 체크인 뒤 읽기 전용 ✅ · 4개 언어 ✅ · 단위 테스트 37개 ✅. **리마인드 크론은 보류**(메시지 보낼 길이 아직 없음 — L0 만). 실제 DB 왕복 테스트 · 운영 연결 전
 3. 태블릿 앱: 뼈대(Compose · 기기 등록 · 계약 받기 · 잠금) → 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐
+   - 2026-11-02 진행: 서버 기기 라우트 3개(`enroll` · `ping` · `kiosk/settings`) · 계약 확장 · 직원 PIN 해시 ✅(테스트 47개) · 앱 뼈대(기기 등록 · 계약 받기 · 잠금 · G1 · G2 · 직원 PIN · 직원 메뉴 · 무조작 복귀 · 오프라인 사본) ✅(§5-1) · JUnit 12개 ✅ · 점검 뒤 고침 5개(PIN 잠금 · 직원 화면 무조작 닫기 · 잠금 글자 · 가로 · 큰 글자 · 다시 등록 확인) ✅ · 에뮬레이터(800×1280 · 1280×800 · 글자 1.3×/2×)에서 가짜 서버로 등록 → G1 → 4개 언어 메뉴 → PIN 틀림/맞음 → 직원 메뉴 → 다시 등록 · 오프라인 시작 · 해제된 기기 확인 ✅. 남음: 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐, 실기기 Device Owner 잠금, 실제 DB 왕복
 4. Foldy 직원 화면(PC · 모바일) · 권한 키 · 내보내기 · 기기 · 건물 설정
 5. 보존 크론 · 감사 기록 · 기기 체크리스트 · 한 건물 병행(43 §8-20)

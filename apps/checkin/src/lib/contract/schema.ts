@@ -35,6 +35,17 @@ export const contractSchema = z.object({
   fields: z.array(contractFieldSchema).min(1),
   videoSecondsPerGuest: z.number().int().min(3).max(15),
   verificationMethod: z.enum(["video", "staff_call", "auto_match"]),
+  // 태블릿이 쓰는 건물 설정(2026-11-02, 3단계 뼈대). 아직 배포된 앱이 없어 버전은 1 그대로 늘렸다.
+  termsText: localizedText,
+  idleSecondsInput: z.number().int().min(30).max(900),
+  idleSecondsDone: z.number().int().min(5).max(120),
+  mrzAutofill: z.boolean(),
+  // 「직원에게 연락」 — 값은 건물 설정 그대로(전화 · LINE · WhatsApp). 비어 있으면 버튼만 숨긴다.
+  supportContacts: z.partialRecord(z.enum(["phone", "line", "whatsapp"]), z.string()),
+  // 직원 해제 PIN — 원문은 없다. 기기가 오프라인에서도 같은 방식(PBKDF2-SHA256)으로 대조한다. 설정 전이면 null.
+  staffPin: z
+    .object({ algorithm: z.literal("pbkdf2-sha256"), iterations: z.number().int().positive(), salt: z.string(), hash: z.string() })
+    .nullable(),
 });
 
 export type Contract = z.infer<typeof contractSchema>;

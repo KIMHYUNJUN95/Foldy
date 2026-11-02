@@ -11,6 +11,12 @@ describe("checkin contract", () => {
     fields: [{ key: "name_roman", required: true, label: { ja: "氏名", en: "Name" } }],
     videoSecondsPerGuest: 5,
     verificationMethod: "video",
+    termsText: {},
+    idleSecondsInput: 240,
+    idleSecondsDone: 30,
+    mrzAutofill: true,
+    supportContacts: {},
+    staffPin: null,
   };
 
   it("맞는 계약은 통과한다", () => {

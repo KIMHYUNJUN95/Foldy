@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Self check-in</string>
+    <string name="enroll_title">Register this tablet</string>
+    <string name="enroll_body">Enter the 8-digit code shown under \"Add device\" in the admin console.</string>
+    <string name="enroll_submit">Register</string>
+    <string name="enroll_working">Registering…</string>
+    <string name="enroll_invalid">That code is wrong or has expired. Create a new one.</string>
+    <string name="enroll_rate">Too many tries. Wait a minute and try again.</string>
+    <string name="error_network">Not connected to the internet.</string>
+    <string name="error_server">Something went wrong on the server. Wait a moment and try again.</string>
+    <string name="loading">Loading…</string>
+    <string name="lang_ready">Please have your passport ready</string>
+    <string name="menu_title">How can we help?</string>
+    <string name="menu_checkin">Check in</string>
+    <string name="menu_checkin_body">Find your booking by the guest name or booking number. Have your passport ready.</string>
+    <string name="menu_start">Start</string>
+    <string name="menu_prereg">I pre-registered</string>
+    <string name="menu_prereg_body">Show the QR code from your message to the camera.</string>
+    <string name="menu_guide">During your stay</string>
+    <string name="menu_guide_body">Wi-Fi, garbage, how to check out</string>
+    <string name="coming_next">This screen comes in the next step.</string>
+    <string name="back">Back</string>
+    <string name="staff_pin_title">Staff PIN</string>
+    <string name="staff_pin_wrong">Wrong PIN.</string>
+    <string name="staff_pin_unset">No PIN has been set for this building yet.</string>
+    <string name="staff_menu_title">Staff menu</string>
+    <string name="staff_refresh">Reload settings</string>
+    <string name="staff_unlock">Unlock</string>
+    <string name="staff_relock">Lock again</string>
+    <string name="staff_reenroll">Register again</string>
+    <string name="staff_close">Close</string>
+    <string name="staff_device">Device</string>
+    <string name="revoked">This tablet was removed. Register it again.</string>
+    <string name="offline">Offline. Running on the last settings received.</string>
+    <string name="confirm">Confirm</string>
+    <string name="staff_reenroll_confirm">Remove this device\'s registration? To use it again you need a new code from the admin screen.</string>
+    <string name="staff_reenroll_do">Remove registration</string>
+    <string name="cancel">Cancel</string>
+    <string name="staff_pin_locked">Too many wrong tries. Seconds left: %1$d</string>
+</resources>

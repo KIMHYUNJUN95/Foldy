@@ -167,5 +167,14 @@
     "okubo_c": "Okubo C",
     "stay_ari": "STAY ARI Apartment Hotel",
     "sano": "Sano"
+  },
+  "fields": {
+    "name_roman": "Name (as in passport)",
+    "address": "Address",
+    "occupation": "Occupation",
+    "nationality": "Nationality",
+    "passport_number": "Passport number",
+    "prev_stay": "Previous stay",
+    "next_dest": "Next destination"
   }
 }

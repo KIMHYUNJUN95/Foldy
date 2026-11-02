@@ -27,11 +27,14 @@ export async function assignToRoom(input: { date: string; roomKey: string; userI
   if (!isEditableDate(input.date) || !isUuid(input.userId) || typeof input.roomKey !== "string") return { ok: false, reason: "invalid" };
   const organizationId = session.organization.id;
   const supabase = getSupabaseServiceClient();
-  const [rooms, member] = await Promise.all([loadAssignDayRooms(supabase, organizationId, input.date, session.user.id), isFieldMember(organizationId, input.userId)]);
+  const [rooms, member, cancelled] = await Promise.all([
+    loadAssignDayRooms(supabase, organizationId, input.date, session.user.id),
+    isFieldMember(organizationId, input.userId),
+    cancelledUserIds(organizationId, input.date, [input.userId]),
+  ]);
   const room = rooms.find((item) => item.roomKey === input.roomKey);
   // 미뤘거나 처리 끝으로 둔 방에는 넣지 않는다(되돌린 뒤에).
   if (!room || !member || room.status !== "pending" || room.deferredUntil || room.resolvedHold) return { ok: false, reason: "invalid" };
-  const cancelled = await cancelledUserIds(organizationId, input.date, [input.userId]);
   if (cancelled === null) return { ok: false, reason: "error" };
   if (cancelled.has(input.userId)) return { ok: false, reason: "cancelled" };
   const result = await supabase.from("cleaning_assignments").insert({

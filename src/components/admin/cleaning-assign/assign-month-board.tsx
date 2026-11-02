@@ -103,7 +103,12 @@ export function AssignMonthBoard({
     });
   }
 
-  function toggleCell(userId: string, date: string) {
+  function toggleCell(userId: string, date: string, cancelled: boolean) {
+    // 취소된 날은 여기서 살리지 않는다 — 살리는 곳은 하루 보기의 「다시 넣기」 하나뿐(2026-11-02 점검 A4).
+    if (cancelled) {
+      showToast(copy.monthCancelledHint);
+      return;
+    }
     startTransition(async () => {
       const result = await toggleApplicationForUser({ date, userId });
       if (!result.ok) showToast(result.reason === "conflict" ? copy.errAssigned : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
@@ -181,6 +186,10 @@ export function AssignMonthBoard({
           <i className="cas-cellmark is-sug">1</i>
           {copy.legendSuggested}
         </span>
+        <span>
+          <i className="cas-cellx" aria-hidden="true" />
+          {copy.monthCancelledCell}
+        </span>
         <span>{copy.legendHint}</span>
       </div>
 
@@ -255,7 +264,9 @@ export function AssignMonthBoard({
                   <i className="cas-cellmark is-on">{cell.rooms}</i>
                 ) : sug > 0 ? (
                   <i className="cas-cellmark is-sug">{sug}</i>
-                ) : cell.applied && !cell.cancelled ? (
+                ) : cell.cancelled ? (
+                  <i className="cas-cellx" aria-hidden="true" />
+                ) : cell.applied ? (
                   <i className="cas-dot" />
                 ) : null;
               return (
@@ -265,8 +276,9 @@ export function AssignMonthBoard({
                   role="gridcell"
                   className={`cas-mcell${date === panelDate ? " is-picked" : ""}`}
                   disabled={pending || past || cell.rooms > 0}
-                  aria-label={`${person.name} ${shortDate(date)}`}
-                  onClick={() => toggleCell(person.userId, date)}
+                  aria-label={cell.cancelled ? `${person.name} ${shortDate(date)} · ${copy.monthCancelledCell}` : `${person.name} ${shortDate(date)}`}
+                  title={cell.cancelled && cell.rooms === 0 ? copy.monthCancelledCell : undefined}
+                  onClick={() => toggleCell(person.userId, date, cell.cancelled && cell.rooms === 0)}
                 >
                   {content}
                 </button>

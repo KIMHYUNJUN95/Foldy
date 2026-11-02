@@ -60,7 +60,10 @@ export function CleaningForceCompleteModal({
 }: ForceCompleteModalProps) {
   const bRoom = useRoomPlaceLabel();
   const [start, setStart] = useState(task.start ?? "11:00");
-  const [end, setEnd] = useState(nowLabel);
+  // 끝낸 시각 모르는 기록(다음 날 「청소했어요」)은 끝 시각을 비워 둔다 — 「지금」을 넣으면 그대로 눌렀을 때 하루를 넘긴
+  // 소요가 저장된다(2026-11-02 데모 확인). 관리자가 실제 시각을 골라야 「완료」가 눌린다.
+  // 지난 날(`nowLabel` 비어 있음)도 같은 이유로 비운다.
+  const [end, setEnd] = useState(task.unmeasured ? "" : nowLabel);
   const [staffId, setStaffId] = useState(task.staffId ?? "");
   const [note, setNote] = useState(task.note ?? "");
 
@@ -111,20 +114,24 @@ export function CleaningForceCompleteModal({
               <label className="fld__l">{t.mStartAt}</label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <AdminTimePicker value={start} onChange={setStart} ariaLabel={t.mStartAt} />
-                <button type="button" className="tpick__now" onClick={() => setStart(nowLabel)}>
-                  <Clock className="ic" aria-hidden="true" />
-                  {t.mNowBtn}
-                </button>
+                {nowLabel ? (
+                  <button type="button" className="tpick__now" onClick={() => setStart(nowLabel)}>
+                    <Clock className="ic" aria-hidden="true" />
+                    {t.mNowBtn}
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="fld">
               <label className="fld__l">{t.mEndAt}</label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <AdminTimePicker value={end} onChange={setEnd} ariaLabel={t.mEndAt} />
-                <button type="button" className="tpick__now" onClick={() => setEnd(nowLabel)}>
-                  <Clock className="ic" aria-hidden="true" />
-                  {t.mNowBtn}
-                </button>
+                {nowLabel ? (
+                  <button type="button" className="tpick__now" onClick={() => setEnd(nowLabel)}>
+                    <Clock className="ic" aria-hidden="true" />
+                    {t.mNowBtn}
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>

@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, defaultStartMinutes, monthDays, shiftDayState, type ShiftDayState } from "@/lib/cleaning-assign/day-state";
 import { loadApplications, loadAssignments, loadFieldMembers, loadProfilesByOwners, loadStaffProfiles, profileOf } from "@/lib/cleaning-assign/data";
 import { compareAssignRooms, loadRangeRooms } from "@/lib/cleaning-assign/rooms";
-import { physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
+import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
+import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
@@ -33,7 +34,8 @@ export type PersonShiftRoom = {
   roomLabel: string;
   mates: string[];
   /** 그 사람 청소 기록 — 끝난 것이 있으면 그것, 없으면 시작만 한 것. */
-  session: { startedAt: string; completedAt: string | null; minutes: number | null } | null;
+  /** `endUnknown` — 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 완료 기록(`isUnmeasuredSession`). */
+  session: { startedAt: string; completedAt: string | null; minutes: number | null; endUnknown: boolean } | null;
 };
 
 export type PersonShiftDetail = {
@@ -109,14 +111,16 @@ export async function loadPersonShift(
   for (const row of sessions.data ?? []) {
     if (row.closed_without_cleaning) continue;
     recordDates.add(row.cleaning_date);
-    const key = physicalRoomKeyOfSessionLabel(row.room_label);
-    if (!key) continue;
+    // 아는 건물이 아니면 저장된 라벨 그대로(아래에서 방의 세션 라벨로 다시 찾는다) — 새 건물 방 기록이 빠지지 않게.
+    const key = physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label;
     const id = `${row.cleaning_date}|${key}`;
     const prev = sessionBy.get(id);
     const done = row.status === "completed" && row.completed_at;
     if (prev?.completedAt && !done) continue;
     sessionBy.set(id, {
       completedAt: done ? row.completed_at : null,
+      // 다음 날 「청소했어요」로 닫은 기록은 끝낸 시각을 모른다 — 「09:00–09:00」처럼 보이지 않게 따로 표시한다.
+      endUnknown: Boolean(done) && isUnmeasuredSession(row),
       minutes: done && row.duration_seconds ? Math.round(row.duration_seconds / 60) : null,
       startedAt: row.started_at,
     });
@@ -191,7 +195,10 @@ export async function loadPersonShift(
             propertyName: row.propertyName,
             roomKey: row.roomKey,
             roomLabel: row.roomLabel,
-            session: sessionBy.get(`${day.date}|${row.roomKey}`) ?? null,
+            session:
+              sessionBy.get(`${day.date}|${row.roomKey}`) ??
+              sessionBy.get(`${day.date}|${buildSessionRoomLabel(row.propertyName, row.roomLabel)}`) ??
+              null,
           }))
           .sort(compareAssignRooms),
         startMinutes: startOf(day.date),

@@ -239,7 +239,8 @@ function getRowRoomLabel(
 }
 
 function minutesLabel(totalSeconds: number | null, copy: ReturnType<typeof getDictionary>["cleaning"]) {
-  if (totalSeconds === null) return "—";
+  // 0초 = 잰 적 없음(다음 날 「청소했어요」로 닫은 기록 · 취소) — 「0분」 대신 빈칸.
+  if (totalSeconds === null || totalSeconds === 0) return "—";
   const min = Math.round(totalSeconds / 60);
   const h = Math.floor(min / 60);
   const m = min % 60;

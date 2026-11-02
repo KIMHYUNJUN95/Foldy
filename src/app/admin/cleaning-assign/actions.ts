@@ -326,6 +326,17 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
   const restore = [...new Set((existing.data ?? []).flatMap((row) => row.removed_user_ids ?? []))].slice(0, 10);
   const room = restore.length > 0 && isEditableDate(input.date) ? (await loadAssignDayRooms(supabase, organizationId, input.date, session.user.id)).find((item) => item.roomKey === input.roomKey) : undefined;
   if (restore.length > 0 && isEditableDate(input.date) && !room) return { ok: false, reason: "conflict" };
+  // 다시 넣을 사람도 **지우기 전에** 정한다 — 지운 뒤에 읽다 실패하면 `removed_user_ids` 가 사라져 뺀 사람을 되찾을 길이 없다.
+  // 그 사이 그날 일정을 취소한 사람은 다시 넣지 않는다 — 취소된 날을 살리는 건 「다시 넣기」 하나뿐(2026-11-02 점검 A4).
+  let restoreIds: string[] = [];
+  if (room) {
+    const [members, cancelled] = await Promise.all([
+      Promise.all(restore.map((userId) => isFieldMember(organizationId, userId))),
+      cancelledUserIds(organizationId, input.date, restore),
+    ]);
+    if (cancelled === null) return { ok: false, reason: "error" };
+    restoreIds = restore.filter((userId, index) => members[index] && !cancelled.has(userId));
+  }
   const result = await supabase
     .from("cleaning_room_holds")
     .delete()
@@ -339,22 +350,17 @@ export async function releaseHold(input: { date: string; roomKey: string; origin
   if (closedIds.length > 0) {
     await supabase.from("cleaning_sessions").delete().eq("organization_id", organizationId).eq("closed_without_cleaning", true).in("id", closedIds);
   }
-  if (room) {
-    const members = await Promise.all(restore.map((userId) => isFieldMember(organizationId, userId)));
-    const rows = restore
-      .filter((_, index) => members[index])
-      .map((userId) => ({
-        created_by: session.user.id,
-        organization_id: organizationId,
-        property_name: room.propertyName,
-        room_key: room.roomKey,
-        room_label: room.roomLabel,
-        user_id: userId,
-        work_date: input.date,
-      }));
-    if (rows.length > 0) {
-      await supabase.from("cleaning_assignments").upsert(rows, { ignoreDuplicates: true, onConflict: "organization_id,work_date,room_key,user_id" });
-    }
+  if (room && restoreIds.length > 0) {
+    const rows = restoreIds.map((userId) => ({
+      created_by: session.user.id,
+      organization_id: organizationId,
+      property_name: room.propertyName,
+      room_key: room.roomKey,
+      room_label: room.roomLabel,
+      user_id: userId,
+      work_date: input.date,
+    }));
+    await supabase.from("cleaning_assignments").upsert(rows, { ignoreDuplicates: true, onConflict: "organization_id,work_date,room_key,user_id" });
   }
   await changed(session.organization.id);
   return { ok: true };

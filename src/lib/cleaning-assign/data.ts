@@ -11,10 +11,11 @@ import {
   timeToMinutes,
   type ShiftDayState,
 } from "@/lib/cleaning-assign/day-state";
-import { compareAssignRooms, loadAssignDayRooms, loadHeldRoomKeys, loadRangeRooms, type AssignRoom } from "@/lib/cleaning-assign/rooms";
+import { compareAssignRooms, loadAssignDayRooms, loadHeldRoomKeys, loadRangeRooms, loadStayKeysOrEmpty, type AssignRoom } from "@/lib/cleaning-assign/rooms";
+import { todayTaskKey, type TodayTaskKey } from "@/lib/cleaning-assign/task-kind";
 import { DEFAULT_FLAG_THRESHOLD, normalizeAssignRules, TRAINEE_FIRST_CHECK, type AssignRule } from "@/lib/cleaning-assign/rules";
 import { suggestAssignments, type SuggestPerson, type SuggestRoom, type Suggestion } from "@/lib/cleaning-assign/suggest";
-import { physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
+import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
@@ -901,7 +902,11 @@ export async function loadMyShift(
   };
 }
 
-export type TodayRoom = AssignRoom & { mates: { name: string; trainee: boolean }[] };
+/**
+ * `changed` — 배정은 남았는데 오늘 청소 목록에서 빠진 방(예약 취소 · 체크아웃 날짜 변경). 알바에게 흐리게 「예약이 바뀌었어요 · 청소 안 함」.
+ * `taskKey` — 시작할 때 쓰는 청소 종류(`todayTaskKey`, 서버 `startMyRoom` 이 같은 계산을 다시 한다).
+ */
+export type TodayRoom = AssignRoom & { mates: { name: string; trainee: boolean }[]; changed: boolean; taskKey: TodayTaskKey };
 
 export async function loadTodayRooms(
   supabase: Client,
@@ -921,11 +926,13 @@ export async function loadTodayRooms(
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 }> {
   const tomorrow = addDays(date, 1);
-  const [dayRooms, assign, apps, range] = await Promise.all([
+  const [dayRooms, assign, apps, range, stayKeys] = await Promise.all([
     loadAssignDayRooms(supabase, organizationId, date, null),
     loadAssignments(supabase, organizationId, date, tomorrow),
     loadApplications(supabase, organizationId, date, tomorrow, userId),
     loadRangeRooms(supabase, organizationId, tomorrow, tomorrow),
+    // 청소 종류(표시용)만 쓰는 값 — 못 읽어도 화면 전체를 깨지 않고 체크아웃으로 보인다(시작은 서버가 다시 계산).
+    loadStayKeysOrEmpty(supabase, organizationId, date),
   ]);
   const todayRows = assign.filter((row) => row.workDate === date);
   const mine = todayRows.filter((row) => row.userId === userId);
@@ -951,9 +958,12 @@ export async function loadTodayRooms(
         .filter((r) => r.roomKey === row.roomKey && r.userId !== userId)
         .map((r) => ({ name: names.get(r.userId) ?? "—", trainee: profileBy(r.createdBy, r.userId)?.trainee ?? false }));
       const usualHeadcount = (row.createdBy ? usualBy.get(`${row.createdBy}|${row.roomKey}`) : undefined) ?? 1;
-      if (room) return { ...room, mates, usualHeadcount };
-      // 그 사이 예약이 취소된 방 — 그래도 보여 준다(관리자가 정리할 때까지).
+      if (room) return { ...room, mates, usualHeadcount, changed: false, taskKey: todayTaskKey(room, stayKeys) };
+      // 그 사이 예약이 취소 · 변경돼 오늘 청소 목록에서 빠진 방 — 조용히 지우지 않고 「예약이 바뀌었어요 · 청소 안 함」으로 남긴다
+      // (관리자가 정리할 때까지). 시작은 화면 · 서버 모두 막는다(2026-11-02 점검 결정 ③).
       return {
+        changed: true,
+        taskKey: "checkout" as const,
         arrivingGuests: null,
         arrivingGuestName: null,
         carriedFrom: null,
@@ -970,7 +980,7 @@ export async function loadTodayRooms(
         propertyName: row.propertyName,
         roomKey: row.roomKey,
         roomLabel: row.roomLabel,
-        sessionRoomLabel: `${row.propertyName} ${row.roomLabel}`,
+        sessionRoomLabel: buildSessionRoomLabel(row.propertyName, row.roomLabel),
         source: "checkout" as const,
         status: "pending" as const,
         usualHeadcount,

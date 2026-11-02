@@ -34,7 +34,12 @@ export type SessionOpError =
   | "active_not_found"
   | "complete_failed"
   | "undo_failed"
-  | "close_failed";
+  | "close_failed"
+  | "room_changed"
+  | "room_held"
+  | "room_resolved"
+  | "not_assigned"
+  | "day_changed";
 
 export type SessionOpResult<T = object> = ({ ok: true } & T) | { ok: false; error: SessionOpError };
 
@@ -54,6 +59,8 @@ export async function startSessionCore(
   session: AppSession,
   roomLabel: string,
   taskKey: string,
+  /** 부른 쪽이 확인에 쓴 운영일 — 새벽 날짜가 바뀌는 순간 확인(어제)과 기록(오늘)이 갈리지 않게 그대로 쓴다. 없으면 지금 운영일. */
+  cleaningDate?: string,
 ): Promise<SessionOpResult<{ sessionId: string; startedAt: string }>> {
   if (!canAccessMobileCleaning(session.user.role)) return fail("not_allowed");
   if (roomLabel.length === 0 || roomLabel.length > 100 || !isCleaningTaskKey(taskKey)) return fail("invalid_selection");
@@ -80,8 +87,32 @@ export async function startSessionCore(
   // 남이 시작한 방도 봐야 하므로 서비스 키로 읽는다(2026-10-26) — RLS 로는 `cleaning.read_all` 없는 직원이 본인 세션만
   // 받아 같은 방을 두 번 시작할 수 있었다. 읽기에 실패하면 막는다(확인 못 한 채 시작시키지 않는다).
   // 남는 틈: 두 사람이 같은 순간에 누르는 경쟁은 DB 유니크 인덱스(조직 · 날짜 · 실제 방)가 있어야 완전히 막힌다 — 문서 07 「남은 것」.
-  const todayActive = await getOrgProcessedCleaningRoomLabels(session.organization.id).catch(() => null);
-  if (todayActive === null) return fail("start_failed");
+  // 중복 확인과 기록이 같은 운영일을 본다 — 날짜가 바뀌는 순간에도 같은 방을 두 번 시작하지 않게.
+  const day = cleaningDate ?? getCleaningOperatingDateKey();
+  const service = getSupabaseServiceClient();
+  const [todayActive, holdResult] = await Promise.all([
+    getOrgProcessedCleaningRoomLabels(session.organization.id, day).catch(() => null),
+    // 관리자가 미룬 방(오늘이 미룬 기간 안)은 어느 시작 경로(오늘 내 방 · 청소 화면)에서도 시작하지 않는다(2026-11-02 리뷰).
+    // 미룸 기록의 날짜(`origin_date`)는 **처음 청소해야 했던 날**이다 — 밀려 온 방을 오늘 미루면 지난 날짜로 남는다.
+    // 그래서 「그날 이전에 생긴 방 · 미룬 날이 그날 뒤」로 찾는다. 「처리 끝」은 처리 끝 기록(완료)이 남아 아래 중복 확인에서 막힌다.
+    // 이름표 없는 새 건물(물리 키 없음)은 방 키를 못 만든다 — 그때는 그 기간의 미룸을 읽어 저장된 건물 · 방 이름으로 맞춘다
+    // (미룬 방은 몇 개뿐이라 조직 전체를 읽어도 가볍다).
+    (() => {
+      const query = service
+        .from("cleaning_room_holds")
+        .select("room_key, property_name, room_label")
+        .eq("organization_id", session.organization.id)
+        .eq("kind", "defer")
+        .lte("origin_date", day)
+        .gt("until_date", day);
+      return physicalRoom ? query.eq("room_key", physicalRoom).limit(1) : query.limit(500);
+    })(),
+  ]);
+  if (todayActive === null || holdResult.error) return fail("start_failed");
+  const held = (holdResult.data ?? []).some(
+    (row) => physicalRoom !== null || buildSessionRoomLabel(row.property_name, row.room_label) === roomLabel,
+  );
+  if (held) return fail("room_held");
   const alreadyProcessed = todayActive.some(
     (row) =>
       row.room_label === roomLabel ||
@@ -90,7 +121,7 @@ export async function startSessionCore(
   if (alreadyProcessed) return fail("already_processed_today");
 
   const insert: Database["public"]["Tables"]["cleaning_sessions"]["Insert"] = {
-    cleaning_date: getCleaningOperatingDateKey(),
+    cleaning_date: day,
     organization_id: session.organization.id,
     room_label: roomLabel,
     staff_user_id: session.user.id,
@@ -180,30 +211,41 @@ export async function reopenSessionCore(
  *
  * 한 사람당 진행 중 기록은 하나라(`cleaning_sessions_one_active_per_org_user_idx`, 날짜 조건 없음) 어제 시작하고 끝내지 않은
  * 기록이 남으면 오늘 방을 하나도 시작할 수 없다. 오늘 내 방은 오늘 기록만 읽어서 그 기록이 보이지도 않았다.
- * 「지금 끝내기」로 닫으면 소요 시간이 하루를 넘겨 기록 · 통계가 틀어지므로 **취소로 닫는다**(기록은 남는다).
- * 실제로 청소를 끝냈다면 관리자가 그날 화면에서 대신 완료(강제 완료)로 시각을 넣는다 — 취소된 기록은 그 검사에서 빠진다.
+ * 「지금 끝내기」로 닫으면 소요 시간이 하루를 넘겨 기록 · 통계가 틀어지므로, 알바가 두 가지 중 고른다(2026-11-02 사용자 결정):
+ * - 「청소했어요」(`cleaned`) → 완료 · 소요 0초 · 끝 시각 = 시작 시각(「끝낸 시각 모름」). 관리자가 강제 완료로 시각을 채운다.
+ * - 「못 했어요」 → 취소 · 소요 0초. 방은 다음 날 「밀려 온 방」으로 다시 뜬다.
  * 오늘 기록은 여기서 닫지 않는다(오늘 것은 화면의 끝내기를 쓴다).
  */
-export async function closeStaleSessionCore(session: AppSession, sessionId: string): Promise<SessionOpResult> {
+export async function closeStaleSessionCore(session: AppSession, sessionId: string, cleaned: boolean): Promise<SessionOpResult> {
   if (!canAccessMobileCleaning(session.user.role)) return fail("not_allowed");
   if (!sessionId) return fail("missing_session");
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("cleaning_sessions")
-    .select("id, cleaning_date")
+    .select("id, cleaning_date, started_at")
     .eq("id", sessionId)
     .eq("organization_id", session.organization.id)
     .eq("staff_user_id", session.user.id)
     .eq("status", "in_progress")
     .maybeSingle();
-  if (error || !data) return fail("active_not_found");
+  // 읽기 오류는 「이미 닫힘」이 아니다 — 화면이 카드를 숨기지 않고 다시 시도하게 close_failed 로 돌려준다.
+  if (error) return fail("close_failed");
+  if (!data) return fail("active_not_found");
   if (data.cleaning_date >= getCleaningOperatingDateKey()) return fail("close_failed");
 
-  // DB check 제약: 취소도 completed_at · duration_seconds 가 있어야 한다. 소요 시간은 **0** — 며칠에 걸친 「지금 − 시작」을 넣으면
-  // 취소를 빼지 않고 더하는 집계가 부풀려진다. 잰 적 없는 시간이라 0 이 맞다.
+  // 알바가 고른다(2026-11-02 사용자 결정): 「청소했어요」 → 완료, 「못 했어요」 → 취소.
+  // - 완료: 그날 끝낸 방이라 다음 날 「밀려 온 방」으로 다시 뜨지 않는다. 끝낸 시각은 모르니 시작 시각 · 소요 0
+  //   이 「끝 = 시작 · 0초」 조합이 「끝낸 시각 모름」 표시다(`isUnmeasuredSession`) — 기록 · 사람별 달력은 끝 시각을 비우고,
+  //   관리자 강제 완료가 이 기록만 덮어써 시각을 채운다.
+  // - 취소: 소요 시간은 **0** — 며칠에 걸친 「지금 − 시작」을 넣으면 더하는 집계가 부풀려진다. 방은 다음 날 다시 뜬다.
+  // DB check 제약: 완료 · 취소 모두 completed_at · duration_seconds 가 있어야 한다.
   const { data: closed, error: updateError } = await supabase
     .from("cleaning_sessions")
-    .update({ completed_at: new Date().toISOString(), duration_seconds: 0, status: "cancelled" })
+    .update(
+      cleaned
+        ? { completed_at: data.started_at, duration_seconds: 0, status: "completed" }
+        : { completed_at: new Date().toISOString(), duration_seconds: 0, status: "cancelled" },
+    )
     .eq("id", sessionId)
     .eq("organization_id", session.organization.id)
     .eq("staff_user_id", session.user.id)

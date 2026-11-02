@@ -157,8 +157,12 @@
 .shf-stale__t b { font-size: 17px; font-weight: 600; color: #b4500a; }
 .shf-stale__t span { font-size: 15px; line-height: 20px; color: #3a3746; }
 .shf-stale__t .shf-stale__hint { font-size: 13px; line-height: 18px; color: #6b6878; }
+/* 「청소했어요」 · 「못 했어요」 — 폰은 위아래, 폴드 이상은 나란히. */
+.shf-stale__acts { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 600px) { .shf-stale__acts { grid-template-columns: 1fr 1fr; } }
 .shf-prog { display: flex; flex-direction: column; gap: 10px; }
 .shf-prog__row { display: flex; align-items: baseline; gap: 10px; }
+.shf-prog__note { display: block; font-size: 15px; line-height: 20px; color: #6b6878; }
 .shf-prog__row b { flex: 1; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .shf-prog__row span { font-size: 15px; color: #6b6878; font-variant-numeric: tabular-nums; }
 .shf-prog__bar { display: grid; gap: 4px; }
@@ -199,6 +203,9 @@
 .shf-rrow__text > span { font-size: 15px; line-height: 20px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shf-rrow__st { flex: none; font-size: 15px; color: #7a52e6; }
 .shf-rrow__st.is-done { color: #6b6878; }
+/* 오늘 청소 안 하는 방 — 투명도 대신 회색 글자로 흐리게(명암비 4.5:1 이상 유지, 16 「접근성」). */
+.shf-rrow.is-changed .shf-rrow__text b { color: #6b6878; }
+.shf-rrow.is-changed .shf-rrow__n { background: #ececf0; color: #55525f; }
 .shf-donerow { display: flex; align-items: center; gap: 12px; min-height: 52px; text-decoration: none; color: inherit; }
 .shf-donerow__ic { width: 22px; height: 22px; flex: none; padding: 4px; box-sizing: border-box; border-radius: 50%; background: #e5e5ea; color: #6b6878; }
 .shf-donerow__main { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }

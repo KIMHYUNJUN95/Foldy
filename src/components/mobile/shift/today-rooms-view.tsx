@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { CalendarDays, Check, ChevronRight } from "lucide-react";
+import type { TodaySkipReason } from "@/lib/cleaning-assign/task-kind";
 import { closeStaleMyRoom, finishMyRoom, startMyRoom, undoFinishMyRoom } from "@/app/mobile/shift/today/actions";
 import { useIsTablet } from "@/components/shell/split-list";
 import { TaskToast } from "@/components/tasks/task-toast";
@@ -37,10 +38,20 @@ export type TodayRoomSession = {
 /** 지난 날 시작하고 끝내지 않은 내 청소(2026-11-02) — 남아 있으면 오늘 방을 시작할 수 없어 맨 위에 띄운다. */
 export type StaleSession = { id: string; roomName: string; cleaningDate: string; startedAt: string };
 
-type Room = TodayRoom & { buildingLabel: string; doorCode: string | null; mapsUrl: string | null; session: TodayRoomSession | null };
+type Room = TodayRoom & { buildingLabel: string; doorCode: string | null; mapsUrl: string | null; session: TodayRoomSession | null; skipReason: TodaySkipReason | null };
 
 /** `clockIn` — 출근 기록 없이 시작했을 때 「출근하기」 버튼(2026-10-29). */
 type Toast = { stamp: number; message: string; undoSessionId: string | null; clockIn?: boolean };
+
+/** 화면이 낡아서 난 오류 — 알린 뒤 새로 읽는다. */
+const STALE_ERRORS: ReadonlySet<SessionOpError> = new Set(["room_changed", "room_held", "room_resolved", "not_assigned", "day_changed"]);
+
+/** 오늘 청소 안 하는 이유별 문구 — 줄 상태 · 시작 자리 안내. */
+function skipCopy(reason: TodaySkipReason, copy: CleaningAssignCopy): { state: string; note: string } {
+  if (reason === "held") return { state: copy.stateHeldRoom, note: copy.myHeldNote };
+  if (reason === "resolved") return { state: copy.stateResolvedRoom, note: copy.myResolvedNote };
+  return { state: copy.stateChangedRoom, note: copy.myChangedNote };
+}
 
 function errorText(error: SessionOpError, copy: CleaningAssignCopy): string {
   if (error === "already_processed_today") return copy.myErrProcessed;
@@ -48,6 +59,11 @@ function errorText(error: SessionOpError, copy: CleaningAssignCopy): string {
   if (error === "complete_failed" || error === "active_not_found") return copy.myErrFinish;
   if (error === "undo_failed") return copy.myErrUndo;
   if (error === "close_failed") return copy.myErrClose;
+  if (error === "room_changed") return copy.myErrChanged;
+  if (error === "room_held") return copy.myErrHeld;
+  if (error === "room_resolved") return copy.myErrResolved;
+  if (error === "not_assigned") return copy.myErrNotMine;
+  if (error === "day_changed") return copy.myErrDayChanged;
   return copy.myErrStart;
 }
 
@@ -98,18 +114,28 @@ export function TodayRoomsView({
   const bName = useBuildingName();
   const placeText = (place: AssignPlace) =>
     place.roomLabel === place.propertyName ? bName(place.propertyName) : `${bName(place.propertyName)} ${place.roomLabel}`;
-  const [selected, setSelected] = useState<string | null>(() => data.rooms.find((r) => r.status !== "done")?.roomKey ?? data.rooms[0]?.roomKey ?? null);
-  const done = data.rooms.filter((r) => r.status === "done").length;
+  // 오늘 청소하지 않는 방 — 흐리게 따로, 시작 · 진행 막대 · 번호에서 뺀다(2026-11-02 점검 B). 이유는 서버가 정해 온다
+  // (`skipReason` = `todaySkipReason`, `startMyRoom` 거절과 같은 규칙): 예약이 바뀜 · 관리자가 미룸 · 관리자가 처리 끝.
+  const isBlocked = (r: Room) => r.skipReason !== null;
+  const workRooms = data.rooms.filter((r) => !isBlocked(r));
+  const blockedRooms = data.rooms.filter(isBlocked);
+  const [selected, setSelected] = useState<string | null>(
+    () => workRooms.find((r) => r.status !== "done")?.roomKey ?? workRooms[0]?.roomKey ?? data.rooms[0]?.roomKey ?? null,
+  );
+  const done = workRooms.filter((r) => r.status === "done").length;
   const sel = data.rooms.find((r) => r.roomKey === selected) ?? null;
   // 지금 할 방 = 청소 중인 방, 없으면 순서상 첫 대기 방. 폰 · 폴드는 이 방 하나를 크게, 나머지는 「남은 방」 · 「끝난 방」 줄로.
-  const current = data.rooms.find((r) => r.status === "progress") ?? data.rooms.find((r) => r.status === "pending") ?? null;
-  const rest = data.rooms.filter((r) => r.status !== "done" && r.roomKey !== current?.roomKey);
-  const doneRooms = data.rooms.filter((r) => r.status === "done");
-  const orderOf = (r: Room) => data.rooms.indexOf(r) + 1;
+  const current = workRooms.find((r) => r.status === "progress") ?? workRooms.find((r) => r.status === "pending") ?? null;
+  const rest = workRooms.filter((r) => r.status !== "done" && r.roomKey !== current?.roomKey);
+  const doneRooms = workRooms.filter((r) => r.status === "done");
+  // 번호는 청소할 방끼리 1, 2, 3… — 청소 안 하는 방은 번호 대신 「–」(번호가 건너뛰지 않게).
+  const orderOf = (r: Room) => (isBlocked(r) ? "–" : workRooms.indexOf(r) + 1);
   const roomName = (r: Room) => (r.roomLabel === r.propertyName ? r.buildingLabel : r.roomLabel);
   const info = (r: Room) => checkInText(r, copy);
   const withText = (r: Room) => (r.mates.length > 0 ? r.mates.map((m) => m.name).join(" · ") : copy.alone);
-  const stateText = (r: Room) => (r.status === "done" ? copy.stateDoneRoom : r.status === "progress" ? copy.stateProgressRoom : copy.stateWaitingRoom);
+  const stateText = (r: Room) =>
+    r.skipReason ? skipCopy(r.skipReason, copy).state : r.status === "done" ? copy.stateDoneRoom : r.status === "progress" ? copy.stateProgressRoom : copy.stateWaitingRoom;
+  const taskText = (r: Room) => (r.taskKey === "long_stay" ? copy.taskLongStay : r.taskKey === "simple" ? copy.taskSimple : null);
 
   // 그 자리에서 시작 · 끝내기(2026-10-28) — 화면을 옮기지 않는다. 서버가 확인한 뒤에만 성공 햅틱(16 「햅틱」).
   const [pending, startTransition] = useTransition();
@@ -125,11 +151,13 @@ export function TodayRoomsView({
     haptic("light");
     setBusyRoom(r.roomKey);
     startTransition(async () => {
-      const result = await startMyRoom({ roomLabel: r.sessionRoomLabel });
+      const result = await startMyRoom({ roomLabel: r.sessionRoomLabel, date: data.date });
       setBusyRoom(null);
       if (!result.ok) {
         haptic("error");
         setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
+        // 화면이 낡아 예약이 바뀐 방을 눌렀다 — 새로 읽어 흐린 줄로 옮긴다.
+        if (STALE_ERRORS.has(result.error)) router.refresh();
         return;
       }
       // 시작은 됐다 — 오늘 출근 기록이 없으면 출근하러 가는 길만 알려 준다(막지 않음, 2026-10-29).
@@ -155,15 +183,22 @@ export function TodayRoomsView({
     });
   // 지난 날 기록 닫기 — 서버가 닫은 뒤에만 사라진다(화면은 재검증으로 다시 그린다).
   const [closedStaleId, setClosedStaleId] = useState<string | null>(null);
-  const closeStale = (sessionId: string) => {
+  const closeStale = (sessionId: string, cleaned: boolean) => {
     haptic("light");
-    setBusyRoom("stale");
+    setBusyRoom(cleaned ? "stale-done" : "stale-not");
     startTransition(async () => {
-      const result = await closeStaleMyRoom({ sessionId });
+      const result = await closeStaleMyRoom({ sessionId, cleaned });
       setBusyRoom(null);
       if (!result.ok) {
         haptic("error");
-        setToast({ stamp: Date.now(), message: errorText(result.error, copy), undoSessionId: null });
+        // 이미 다른 곳(관리자 등)에서 닫힌 기록이면 카드를 내리고 새로 읽는다 — 같은 실패를 되풀이하지 않게.
+        if (result.error === "active_not_found") {
+          setClosedStaleId(sessionId);
+          setToast({ stamp: Date.now(), message: copy.staleAlreadyClosed, undoSessionId: null });
+          router.refresh();
+          return;
+        }
+        setToast({ stamp: Date.now(), message: copy.myErrClose, undoSessionId: null });
         return;
       }
       haptic("success");
@@ -188,6 +223,9 @@ export function TodayRoomsView({
   const actionButton = (r: Room, wide: boolean, withRoom: boolean) => {
     const busy = pending && busyRoom === r.roomKey;
     const cls = (tone: string) => `shf-btn ${tone}${wide ? " is-wide" : ""}`;
+    if (r.skipReason) {
+      return <span className={`shf-note${wide ? " is-wide" : ""}`}>{skipCopy(r.skipReason, copy).note}</span>;
+    }
     if (r.status === "pending") {
       return (
         <button type="button" className={cls("is-pri")} disabled={pending} aria-busy={busy} onClick={() => start(r)}>
@@ -232,6 +270,7 @@ export function TodayRoomsView({
 
   const facts = (r: Room) => [
     { k: copy.factCheckin, v: info(r) },
+    ...(taskText(r) ? [{ k: copy.factTask, v: taskText(r) as string }] : []),
     { k: copy.factWith, v: withText(r) },
     ...(r.note ? [{ k: copy.factNote, v: r.note }] : []),
     ...(r.doorCode ? [{ k: copy.factDoor, v: r.doorCode, code: true }] : []),
@@ -250,10 +289,10 @@ export function TodayRoomsView({
     <button
       key={r.roomKey}
       type="button"
-      className={`shf-rrow${pickable && selected === r.roomKey ? " is-sel" : ""}`}
+      className={`shf-rrow${pickable && selected === r.roomKey ? " is-sel" : ""}${isBlocked(r) ? " is-changed" : ""}`}
       onClick={() => pickable && setSelected(r.roomKey)}
     >
-      <span className={`shf-rrow__n${r.status === "done" ? " is-done" : ""}`}>{orderOf(r)}</span>
+      <span className={`shf-rrow__n${r.status === "done" && !isBlocked(r) ? " is-done" : ""}`}>{orderOf(r)}</span>
       <span className="shf-rrow__main">
         <span className="shf-rrow__text">
           <b>
@@ -262,7 +301,7 @@ export function TodayRoomsView({
           </b>
           <span>{info(r)}</span>
         </span>
-        <span className={`shf-rrow__st${r.status === "done" ? " is-done" : ""}`}>{stateText(r)}</span>
+        <span className={`shf-rrow__st${r.status === "done" || isBlocked(r) ? " is-done" : ""}`}>{stateText(r)}</span>
       </span>
     </button>
   );
@@ -282,15 +321,26 @@ export function TodayRoomsView({
               <span>{fill(copy.staleBody, { room: stale.roomName, date: dayLabel(stale.cleaningDate, locale), time: tokyoTime(stale.startedAt) })}</span>
               <span className="shf-stale__hint">{copy.staleHint}</span>
             </span>
-            <button
-              type="button"
-              className="shf-btn is-gray is-wide"
-              disabled={pending}
-              aria-busy={pending && busyRoom === "stale"}
-              onClick={() => closeStale(stale.id)}
-            >
-              {pending && busyRoom === "stale" ? copy.staleClosing : copy.staleClose}
-            </button>
+            <div className="shf-stale__acts">
+              <button
+                type="button"
+                className="shf-btn is-pri is-wide"
+                disabled={pending}
+                aria-busy={pending && busyRoom === "stale-done"}
+                onClick={() => closeStale(stale.id, true)}
+              >
+                {pending && busyRoom === "stale-done" ? copy.staleClosing : copy.staleCleaned}
+              </button>
+              <button
+                type="button"
+                className="shf-btn is-gray is-wide"
+                disabled={pending}
+                aria-busy={pending && busyRoom === "stale-not"}
+                onClick={() => closeStale(stale.id, false)}
+              >
+                {pending && busyRoom === "stale-not" ? copy.staleClosing : copy.staleNotCleaned}
+              </button>
+            </div>
           </section>
         ) : null}
 
@@ -316,25 +366,35 @@ export function TodayRoomsView({
               </div>
             ))}
 
+            {workRooms.length === 0 ? (
+              // 배정된 방이 모두 오늘 청소하지 않는 방 — 「0개 중 0개」 막대 대신 한 줄 안내(아래 「오늘 청소 안 하는 방」 묶음은 그대로).
+              <div className="shf-prog" role="status">
+                <div className="shf-prog__row">
+                  <b>{copy.allSkippedTitle}</b>
+                </div>
+                <span className="shf-prog__note">{copy.allSkippedBody}</span>
+              </div>
+            ) : (
             <div className="shf-prog">
               <div className="shf-prog__row">
                 <b>{fill(copy.startAt, { time: timeLabel(data.startMinutes) })}</b>
-                <span>{fill(copy.progressDone, { n: data.rooms.length, d: done })}</span>
+                <span>{fill(copy.progressDone, { n: workRooms.length, d: done })}</span>
               </div>
               <div
                 className="shf-prog__bar"
                 role="progressbar"
                 aria-label={copy.todayTitle}
                 aria-valuemin={0}
-                aria-valuemax={data.rooms.length}
+                aria-valuemax={workRooms.length}
                 aria-valuenow={done}
-                style={{ gridTemplateColumns: `repeat(${data.rooms.length}, minmax(0, 1fr))` }}
+                style={{ gridTemplateColumns: `repeat(${workRooms.length}, minmax(0, 1fr))` }}
               >
-                {data.rooms.map((r) => (
+                {workRooms.map((r) => (
                   <i key={r.roomKey} className={r.status === "done" ? "is-done" : ""} />
                 ))}
               </div>
             </div>
+            )}
 
             {!isTablet && current ? (
               <section className="shf-now" aria-label={`${copy.nowRoom} ${roomName(current)}`}>
@@ -389,9 +449,16 @@ export function TodayRoomsView({
               </section>
             ) : null}
 
+            {!isTablet && blockedRooms.length > 0 ? (
+              <section className="shf-group" aria-label={copy.skippedRooms}>
+                <span className="shf-cap">{copy.skippedRooms}</span>
+                <div className="shf-rlist">{blockedRooms.map((r) => roomRow(r, false))}</div>
+              </section>
+            ) : null}
+
             {isTablet ? (
               <section className="shf-group" aria-label={copy.todayTitle}>
-                <div className="shf-rlist">{data.rooms.map((r) => roomRow(r, true))}</div>
+                <div className="shf-rlist">{[...workRooms, ...blockedRooms].map((r) => roomRow(r, true))}</div>
               </section>
             ) : null}
 

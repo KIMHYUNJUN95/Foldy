@@ -7,6 +7,7 @@ import {
   getOrgCleaningSessionsFiltered,
   isCleaningTaskKey,
 } from "@/lib/cleaning";
+import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { getDictionary } from "@/lib/i18n";
 import type { Database } from "@/types/database";
 import { getMobileNavBadges } from "@/lib/nav-badges";
@@ -122,6 +123,7 @@ export default async function CleaningRecordsPage({ searchParams }: PageProps) {
       staffName: s.staff_name,
       startedAt: s.started_at,
       completedAt: s.completed_at,
+      endUnknown: isUnmeasuredSession(s),
       durationSeconds: s.duration_seconds,
       status: s.status,
       notes: s.notes,

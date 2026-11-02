@@ -151,6 +151,8 @@ export type CleaningAssignCopy = {
   more: string; // "{n}명 더 보기"
   conflict: string;
   errDayCancelled: string;
+  monthCancelledCell: string;
+  monthCancelledHint: string;
   failed: string;
   done: string;
   added: string; // "{n}개 넣었어요"
@@ -407,6 +409,8 @@ export type CleaningAssignCopy = {
   psRoomTime: string;
   psRoomMinutes: string;
   psRoomStarted: string;
+  /** 다음 날 「청소했어요」로 닫은 기록 — 끝낸 시각 모름. */
+  psRoomEndUnknown: string;
   psRoomNotStarted: string;
   psNotStartedTag: string;
   psOpenDay: string;
@@ -442,10 +446,29 @@ export type CleaningAssignCopy = {
   myErrFinish: string;
   myErrUndo: string;
   myErrClose: string;
+  myErrChanged: string;
+  myChangedNote: string;
+  stateChangedRoom: string;
+  skippedRooms: string;
+  myErrHeld: string;
+  myErrNotMine: string;
+  myErrDayChanged: string;
+  myErrResolved: string;
+  allSkippedTitle: string;
+  allSkippedBody: string;
+  myHeldNote: string;
+  stateHeldRoom: string;
+  stateResolvedRoom: string;
+  myResolvedNote: string;
+  factTask: string;
+  taskLongStay: string;
+  taskSimple: string;
   staleHead: string;
   staleBody: string;
   staleHint: string;
-  staleClose: string;
+  staleCleaned: string;
+  staleNotCleaned: string;
+  staleAlreadyClosed: string;
   staleClosing: string;
   staleClosed: string;
   /** 오늘 출근 기록 없이 청소를 시작했을 때(2026-10-29). */
@@ -488,6 +511,7 @@ export type CleaningAssignCopy = {
   boardFailed: string;
   boardConflict: string;
   boardDayCancelled: string;
+  boardPartlySaved: string;
   boardCancelledTag: string;
   boardWillShow: string;
   boardPaneEmpty: string;
@@ -639,6 +663,8 @@ const ko: CleaningAssignCopy = {
   more: "{n}명 더 보기",
   conflict: "방금 다른 담당자가 바꿔서 새로 불러왔어요",
   errDayCancelled: "이날 일정이 취소된 사람이에요. 먼저 「다시 넣기」를 눌러 주세요",
+  monthCancelledCell: "일정 취소됨",
+  monthCancelledHint: "이날 일정이 취소된 사람이에요. 하루 보기의 「다시 넣기」로 살릴 수 있어요",
   failed: "저장하지 못했어요. 다시 시도해 주세요",
   done: "저장했어요",
   added: "{n}개 넣었어요",
@@ -864,6 +890,7 @@ const ko: CleaningAssignCopy = {
   psRoomTime: "{start} ~ {end}",
   psRoomMinutes: "{n}분",
   psRoomStarted: "{start} 시작 · 아직 안 끝남",
+  psRoomEndUnknown: "{start} 시작 · 끝난 시각 모름",
   psRoomNotStarted: "시작 안 함",
   psNotStartedTag: "미시작",
   psOpenDay: "하루 보기에서 열기",
@@ -914,10 +941,29 @@ const ko: CleaningAssignCopy = {
   myErrFinish: "끝내지 못했어요. 다시 해 주세요",
   myErrUndo: "되돌리지 못했어요",
   myErrClose: "기록을 닫지 못했어요. 다시 눌러 주세요",
+  myErrChanged: "예약이 바뀌어 오늘 청소하지 않는 방이에요",
+  myChangedNote: "예약이 바뀌었어요 · 청소 안 함",
+  stateChangedRoom: "예약 바뀜 · 청소 안 함",
+  skippedRooms: "오늘 청소 안 하는 방",
+  myErrHeld: "관리자가 미룬 방이에요 · 오늘 청소 안 함",
+  myErrNotMine: "내 배정에서 빠진 방이에요",
+  myErrDayChanged: "날짜가 바뀌었어요 · 오늘 방을 새로 불러올게요",
+  myErrResolved: "관리자가 처리 끝으로 둔 방이에요 · 오늘 청소 안 함",
+  allSkippedTitle: "오늘 청소할 방이 없어요",
+  allSkippedBody: "배정된 방이 모두 오늘 청소하지 않는 방이에요",
+  myHeldNote: "관리자가 미뤘어요 · 청소 안 함",
+  stateHeldRoom: "미룸 · 청소 안 함",
+  stateResolvedRoom: "처리 끝 · 청소 안 함",
+  myResolvedNote: "관리자가 처리 끝으로 뒀어요 · 청소 안 함",
+  factTask: "청소 종류",
+  taskLongStay: "장기 투숙 청소(손님 묵는 중)",
+  taskSimple: "간단 청소(오늘 체크인)",
   staleHead: "끝내지 못한 청소가 있어요",
   staleBody: "{date} {time}에 시작한 {room} 청소가 아직 「청소 중」이에요. 닫아야 오늘 방을 시작할 수 있어요.",
-  staleHint: "그날 실제로 끝냈다면 관리자에게 말해 주세요. 끝낸 시각은 관리자가 넣어요.",
-  staleClose: "이 기록 닫기",
+  staleHint: "청소를 끝냈다면 「청소했어요」, 못 했다면 「못 했어요」를 눌러 주세요. 못 한 방은 다시 청소할 방으로 돌아가고, 끝낸 시각은 관리자가 고칠 수 있어요.",
+  staleCleaned: "청소했어요",
+  staleNotCleaned: "못 했어요",
+  staleAlreadyClosed: "이미 닫힌 기록이에요",
   staleClosing: "닫는 중…",
   staleClosed: "기록을 닫았어요. 오늘 방을 시작할 수 있어요",
   myNoClockIn: "출근 기록이 아직 없어요",
@@ -959,6 +1005,7 @@ const ko: CleaningAssignCopy = {
   boardFailed: "저장하지 못했어요. 다시 해 주세요",
   boardConflict: "방금 다른 담당자가 바꿨어요. 새로 불러왔어요",
   boardDayCancelled: "이 사람은 이날 일정이 취소됐어요. PC 배정 화면에서 「다시 넣기」를 먼저 해 주세요",
+  boardPartlySaved: "앞의 변경은 저장됐어요",
   boardCancelledTag: "일정 취소됨",
   boardWillShow: "넣으면 그 사람의 「오늘 내 방」에 바로 떠요",
   boardPaneEmpty: "방을 누르면 여기서 담당을 넣어요",
@@ -1110,6 +1157,8 @@ const ja: CleaningAssignCopy = {
   more: "あと{n}人を表示",
   conflict: "ほかの担当者が変更したため再読み込みしました",
   errDayCancelled: "この日の予定が取り消された人です。先に「戻す」を押してください",
+  monthCancelledCell: "予定取り消し",
+  monthCancelledHint: "この日の予定が取り消された人です。日表示の「戻す」で戻せます",
   failed: "保存できませんでした。もう一度お試しください",
   done: "保存しました",
   added: "{n}件入れました",
@@ -1335,6 +1384,7 @@ const ja: CleaningAssignCopy = {
   psRoomTime: "{start} ~ {end}",
   psRoomMinutes: "{n}分",
   psRoomStarted: "{start} 開始 · 未完了",
+  psRoomEndUnknown: "{start} 開始 · 終了時刻不明",
   psRoomNotStarted: "未開始",
   psNotStartedTag: "未開始",
   psOpenDay: "日の画面で開く",
@@ -1385,10 +1435,29 @@ const ja: CleaningAssignCopy = {
   myErrFinish: "終えられませんでした。もう一度お試しください",
   myErrUndo: "元に戻せませんでした",
   myErrClose: "記録を閉じられませんでした。もう一度押してください",
+  myErrChanged: "予約が変わったため、今日は清掃しない部屋です",
+  myChangedNote: "予約が変わりました · 清掃なし",
+  stateChangedRoom: "予約変更 · 清掃なし",
+  skippedRooms: "今日は清掃しない部屋",
+  myErrHeld: "管理者が後回しにした部屋です · 今日は清掃なし",
+  myErrNotMine: "あなたの担当から外れた部屋です",
+  myErrDayChanged: "日付が変わりました · 今日の部屋を読み込み直します",
+  myErrResolved: "管理者が処理済みにした部屋です · 今日は清掃なし",
+  allSkippedTitle: "今日清掃する部屋はありません",
+  allSkippedBody: "担当の部屋はすべて今日は清掃しない部屋です",
+  myHeldNote: "管理者が後回しにしました · 清掃なし",
+  stateHeldRoom: "後回し · 清掃なし",
+  stateResolvedRoom: "処理済み · 清掃なし",
+  myResolvedNote: "管理者が処理済みにしました · 清掃なし",
+  factTask: "清掃の種類",
+  taskLongStay: "長期滞在清掃(滞在中)",
+  taskSimple: "簡易清掃(今日チェックイン)",
   staleHead: "終わっていない清掃があります",
   staleBody: "{date} {time}に始めた{room}の清掃がまだ「清掃中」です。閉じると今日の部屋を始められます。",
-  staleHint: "その日に実際に終えていたら管理者に伝えてください。終了時刻は管理者が入れます。",
-  staleClose: "この記録を閉じる",
+  staleHint: "清掃を終えていたら「清掃しました」、できなかったら「できませんでした」を押してください。できなかった部屋は清掃する部屋に戻り、終了時刻は管理者が直せます。",
+  staleCleaned: "清掃しました",
+  staleNotCleaned: "できませんでした",
+  staleAlreadyClosed: "すでに閉じられた記録です",
   staleClosing: "閉じています…",
   staleClosed: "記録を閉じました。今日の部屋を始められます",
   myNoClockIn: "まだ出勤の記録がありません",
@@ -1430,6 +1499,7 @@ const ja: CleaningAssignCopy = {
   boardFailed: "保存できませんでした。もう一度お試しください",
   boardConflict: "他の担当者が変更しました。最新の状態にしました",
   boardDayCancelled: "この人はこの日の予定が取り消されています。先にPCの割り当て画面で「戻す」を押してください",
+  boardPartlySaved: "それまでの変更は保存されました",
   boardCancelledTag: "予定取消",
   boardWillShow: "入れるとその人の「今日の私の部屋」にすぐ表示されます",
   boardPaneEmpty: "部屋をタップするとここで担当を入れられます",
@@ -1581,6 +1651,8 @@ const en: CleaningAssignCopy = {
   more: "Show {n} more",
   conflict: "Another manager just changed this — reloaded",
   errDayCancelled: "This person’s day was cancelled. Tap “Restore” first.",
+  monthCancelledCell: "Day cancelled",
+  monthCancelledHint: "This person’s day was cancelled. Use “Restore” in the day view to bring it back.",
   failed: "Couldn't save. Please try again",
   done: "Saved",
   added: "Added {n}",
@@ -1806,6 +1878,7 @@ const en: CleaningAssignCopy = {
   psRoomTime: "{start} – {end}",
   psRoomMinutes: "{n} min",
   psRoomStarted: "Started {start} · not finished",
+  psRoomEndUnknown: "Started {start} · end time unknown",
   psRoomNotStarted: "Not started",
   psNotStartedTag: "Not started",
   psOpenDay: "Open in day view",
@@ -1856,10 +1929,29 @@ const en: CleaningAssignCopy = {
   myErrFinish: "Couldn’t finish. Try again.",
   myErrUndo: "Couldn’t undo.",
   myErrClose: "Couldn’t close the record. Try again.",
+  myErrChanged: "The booking changed — this room isn’t cleaned today.",
+  myChangedNote: "Booking changed · no cleaning",
+  stateChangedRoom: "Booking changed",
+  skippedRooms: "Not cleaned today",
+  myErrHeld: "A manager postponed this room — no cleaning today.",
+  myErrNotMine: "This room is no longer assigned to you.",
+  myErrDayChanged: "The day changed — reloading today’s rooms.",
+  myErrResolved: "A manager closed this room — no cleaning today.",
+  allSkippedTitle: "Nothing to clean today",
+  allSkippedBody: "None of your assigned rooms are cleaned today.",
+  myHeldNote: "Postponed by a manager · no cleaning",
+  stateHeldRoom: "Postponed",
+  stateResolvedRoom: "Closed",
+  myResolvedNote: "Closed by a manager · no cleaning",
+  factTask: "Cleaning type",
+  taskLongStay: "Long stay (guest staying)",
+  taskSimple: "Quick clean (check-in today)",
   staleHead: "A cleaning was never finished",
   staleBody: "{room} cleaning started {date} {time} is still “in progress”. Close it to start today’s rooms.",
-  staleHint: "If you did finish it that day, tell an admin. They’ll enter the finish time.",
-  staleClose: "Close this record",
+  staleHint: "Tap “I cleaned it” if you finished, or “Didn’t clean” if not. Uncleaned rooms go back on the list; an admin can fix the finish time.",
+  staleCleaned: "I cleaned it",
+  staleNotCleaned: "Didn’t clean",
+  staleAlreadyClosed: "This record was already closed.",
   staleClosing: "Closing…",
   staleClosed: "Closed. You can start today’s rooms now.",
   myNoClockIn: "You haven’t clocked in yet.",
@@ -1901,6 +1993,7 @@ const en: CleaningAssignCopy = {
   boardFailed: "Couldn’t save. Try again.",
   boardConflict: "Someone else just changed this. Reloaded.",
   boardDayCancelled: "This person’s day was cancelled. Use “Restore” on the PC assignment screen first.",
+  boardPartlySaved: "Earlier changes were saved.",
   boardCancelledTag: "Day cancelled",
   boardWillShow: "They’ll see it in “My rooms today” right away.",
   boardPaneEmpty: "Tap a room to assign it here.",

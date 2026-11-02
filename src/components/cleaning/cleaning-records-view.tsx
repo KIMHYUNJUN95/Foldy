@@ -29,6 +29,8 @@ export type CleaningRecordItem = {
   staffName: string;
   startedAt: string;
   completedAt: string | null;
+  /** 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 완료 기록 — 끝 시각을 「-」로 보인다(시작 = 끝으로 저장돼 있다). */
+  endUnknown: boolean;
   durationSeconds: number | null;
   status: string;
   notes: string | null;
@@ -37,7 +39,8 @@ export type CleaningRecordItem = {
 // 간결한 사람용 시간 표기("1h 54m" / "8m 47s" / "34s"). 순수 함수 — lib/cleaning 을 클라이언트
 // 컴포넌트로 가져올 수 없다(서버 전용 Supabase 클라이언트를 끌어들이므로).
 function formatDuration(totalSeconds: number | null): string {
-  if (totalSeconds === null) return "-";
+  // 0초 = 잰 적 없음(다음 날 「청소했어요」로 닫은 기록 · 취소) — 「0s」 대신 빈칸.
+  if (totalSeconds === null || totalSeconds === 0) return "-";
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
@@ -197,7 +200,7 @@ export function CleaningRecordsView({
       {field(r.startLabel, fmtTime(selected.startedAt) || "-")}
       {field(
         r.endLabel,
-        selected.completedAt ? fmtTime(selected.completedAt) : r.ongoing,
+        selected.endUnknown ? "-" : selected.completedAt ? fmtTime(selected.completedAt) : r.ongoing,
       )}
       {field(
         r.durationLabel,
@@ -364,7 +367,7 @@ export function CleaningRecordsView({
                       <div className="flex items-center gap-2">
                         <span className={cn("size-1.5 shrink-0 rounded-full", statusTone(rec.status))} />
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                          {fmtTime(rec.startedAt)}–{rec.completedAt ? fmtTime(rec.completedAt) : ""}
+                          {fmtTime(rec.startedAt)}–{rec.completedAt && !rec.endUnknown ? fmtTime(rec.completedAt) : ""}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold tracking-[-0.01em] text-foreground">
                           {rec.title}

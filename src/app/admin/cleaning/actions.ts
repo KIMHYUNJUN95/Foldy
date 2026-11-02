@@ -36,6 +36,7 @@ import {
   physicalRoomKeyOfSessionLabel,
 } from "@/lib/room-label-normalization";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 // 소요시간 포맷은 화면(오늘 현황 카드·기록 표·상세 패널)이 쓰는 fmtDur 를 그대로 재사용한다 —
 // 예전에는 여기에 같은 규칙을 한 번 더 구현해 두 벌이 갈릴 위험이 있었다.
 import { fmtDate, fmtDur, toMin, type BuildingKey, type CleaningTaskType } from "@/components/admin/cleaning/cleaning-console-data";
@@ -309,15 +310,22 @@ export async function forceCompleteCleaningSession(
   // 세션 id 없이 보내면 같은 날 · 같은 방에 이미 기록이 있어도 완료 기록이 하나 더 생겼다.
   let cleaningDate = viewDate;
   let sessionId = input.sessionId ?? null;
+  let unmeasured = false;
+  let unmeasuredAt: string | null = null;
   if (sessionId) {
     const existing = await service
       .from("cleaning_sessions")
-      .select("cleaning_date, status")
+      .select("cleaning_date, status, started_at, completed_at, duration_seconds, closed_without_cleaning")
       .eq("id", sessionId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (!existing.data) return { ok: false, reason: "invalid" };
-    if (existing.data.status === "completed") return { ok: false, reason: "processed" };
+    // 완료 기록은 덮어쓰지 않는다 — 하나만 예외: 알바가 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 기록
+    // (`isUnmeasuredSession` — 소요 0초 · 끝 시각 = 시작 시각 · 「처리 끝」 아님)은 관리자가 시각을 채운다(2026-11-02 사용자 결정).
+    // 1초 안에 끝낸 정상 기록은 끝 시각이 시작과 달라 여기 걸리지 않는다.
+    unmeasured = isUnmeasuredSession(existing.data);
+    unmeasuredAt = unmeasured ? existing.data.completed_at : null;
+    if (existing.data.status === "completed" && !unmeasured) return { ok: false, reason: "processed" };
     cleaningDate = existing.data.cleaning_date;
     // 취소만 남은 방(콘솔 「취소됨」 카드)은 그 기록을 되살리지 않고 아래에서 새 완료 기록을 만든다 — 취소 이력은 남긴다.
     if (existing.data.status === "cancelled") sessionId = null;
@@ -361,7 +369,7 @@ export async function forceCompleteCleaningSession(
   }
 
   if (sessionId) {
-    const { data: updated, error } = await service
+    const update = service
       .from("cleaning_sessions")
       .update({
         status: "completed",
@@ -373,11 +381,13 @@ export async function forceCompleteCleaningSession(
         completed_by_admin: session.user.id,
       })
       .eq("id", sessionId)
-      .eq("organization_id", organizationId)
-      .eq("status", "in_progress")
-      .select("id");
+      .eq("organization_id", organizationId);
+    const { data: updated, error } = await (unmeasured
+      ? update.eq("status", "completed").eq("duration_seconds", 0).eq("closed_without_cleaning", false).eq("completed_at", unmeasuredAt ?? "")
+      : update.eq("status", "in_progress")
+    ).select("id");
     if (error) return { ok: false, reason: "error" };
-    // 0행 = 읽은 뒤 그 사이에 직원이 끝냈거나 취소했다 — 덮어쓰지 않는다.
+    // 0행 = 읽은 뒤 그 사이에 직원이 끝냈거나 취소했다(또는 시각이 이미 채워졌다) — 덮어쓰지 않는다.
     if (!updated || updated.length === 0) return { ok: false, reason: "processed" };
     await afterForceComplete(organizationId);
     return { ok: true };

@@ -17,6 +17,7 @@ import {
   type CleaningStaffOption,
 } from "@/lib/cleaning";
 import { getCleaningTargets, type SettingTarget } from "@/lib/cleaning-targets";
+import { isUnmeasuredSession, type UnmeasuredSessionLike } from "@/lib/cleaning-unmeasured";
 import type { CleaningExportFilters } from "@/lib/export/cleaning-filters";
 import {
   buildLegacyAliasToRoomKeyMap,
@@ -38,6 +39,11 @@ import type { AppSession } from "@/lib/session";
 // 보여 준다. 참고:
 // docs/product/07-cleaning-workflow.md → "2026-07-14 어드민 청소 대시보드 — 백엔드 연동".
 
+
+/** 끝낸 시각을 모르는 기록 — 「처리 끝」, 또는 알바가 다음 날 「청소했어요」로 닫은 기록(`isUnmeasuredSession`, 2026-11-02). */
+function endUnknown(row: UnmeasuredSessionLike): boolean {
+  return Boolean(row.closed_without_cleaning) || isUnmeasuredSession(row);
+}
 export type AdminCleaningStatus = "pending" | "progress" | "done" | "cancelled";
 
 export type AdminCleaningTask = {
@@ -65,6 +71,8 @@ export type AdminCleaningTask = {
   proxy: boolean;
   /** 청소 배정 「처리 끝」으로 남긴 기록(청소 안 함) — 대리 완료 대신 「처리 끝 · 청소 안 함」으로 보인다. */
   closed: boolean;
+  /** 끝낸 시각 모르는 완료 기록(알바가 다음 날 「청소했어요」로 닫음) — 강제 완료로 시각을 채울 수 있다(서버도 같은 판별). */
+  unmeasured: boolean;
   /**
    * 오늘 이 객실에서 취소된 세션 수. 취소는 모바일에서 "다시 청소 대상으로 되돌리는" 동작이라
    * (docs: cancelCleaningMessage) 카드 상태 자체는 `pending` 을 유지하고, 취소가 있었다는 사실만
@@ -274,11 +282,12 @@ export async function getAdminCleaningToday(
         staffId: matched?.staff_user_id ?? null,
         staffName: matched ? (staffNameById.get(matched.staff_user_id) ?? null) : null,
         start: formatTokyoTime(matched?.started_at ?? null),
-        end: matched?.closed_without_cleaning ? null : formatTokyoTime(matched?.completed_at ?? null),
+        end: matched && !endUnknown(matched) ? formatTokyoTime(matched.completed_at) : null,
         note: matched?.notes ?? "",
         reports: null, // 아래에서 세션 id 를 알게 되면 채움
         proxy: Boolean(matched?.completed_by_admin),
         closed: Boolean(matched?.closed_without_cleaning),
+        unmeasured: matched ? isUnmeasuredSession(matched) : false,
         cancelledCount: countCancelled(roomSessions),
         guest: target.hasTurnover ? target.arrivingGuestName : null,
         pax: target.hasTurnover ? target.arrivingPax : null,
@@ -322,11 +331,12 @@ export async function getAdminCleaningToday(
       staffId: relevant.staff_user_id,
       staffName: staffNameById.get(relevant.staff_user_id) ?? null,
       start: formatTokyoTime(relevant.started_at),
-      end: relevant.closed_without_cleaning ? null : formatTokyoTime(relevant.completed_at),
+      end: endUnknown(relevant) ? null : formatTokyoTime(relevant.completed_at),
       note: relevant.notes ?? "",
       reports: null,
       proxy: Boolean(relevant.completed_by_admin),
       closed: Boolean(relevant.closed_without_cleaning),
+      unmeasured: isUnmeasuredSession(relevant),
       cancelledCount: countCancelled(sessions),
       guest: null,
       pax: null,
@@ -427,7 +437,8 @@ function mapSessionToHistoryItem(
     staffName: s.staff_name,
     start: formatTokyoTime(s.started_at) ?? "",
     // 「처리 끝」 기록은 청소한 시간이 없다 — 총 · 평균 소요에 0분으로 섞이지 않게 비운다.
-    dur: s.duration_seconds == null || s.closed_without_cleaning ? null : Math.round(s.duration_seconds / 60),
+    // 소요 0초 = 잰 적 없음(알바가 다음 날 「청소했어요」로 닫은 기록 · 취소) — 0분으로 섞지 않는다.
+    dur: s.duration_seconds == null || s.duration_seconds === 0 || s.closed_without_cleaning ? null : Math.round(s.duration_seconds / 60),
     status: sessionStatusToAdminStatus(s.status),
     proxy: Boolean(s.completed_by_admin),
     closed: Boolean(s.closed_without_cleaning),

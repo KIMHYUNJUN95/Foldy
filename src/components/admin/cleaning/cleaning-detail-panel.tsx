@@ -36,6 +36,8 @@ type DetailPanelProps = {
   onOpenReport: (kind: "lost" | "issue") => void;
   /** 서버(canForceCompleteCleaning)가 내려준 권한. false면 강제완료 버튼 자체를 감춘다. */
   canForceComplete: boolean;
+  /** 현황에서 보고 있는 날(YYYY-MM-DD) — 카드 상세의 「날짜」. */
+  viewDate?: string;
   disabled?: boolean;
 };
 
@@ -52,6 +54,7 @@ export function CleaningDetailPanel({
   onOpenReport,
   canForceComplete,
   disabled,
+  viewDate,
 }: DetailPanelProps) {
   const bRoom = useRoomPlaceLabel();
   const panelRef = useAdminPanelA11y<HTMLElement>(onClose, { disabled });
@@ -138,7 +141,8 @@ export function CleaningDetailPanel({
   const start = task ? task.start : history!.start;
   const dur = task ? durationMin(task.start, task.end) : history!.dur;
   const localeTag = localeTagOf(locale);
-  const dateStr = fmtDate(isHist ? history!.date : todayDateKeyTokyo(), localeTag);
+  // 현황 카드는 **보고 있는 날** — 지난 날을 열어도 오늘 날짜가 찍히던 것을 고쳤다(2026-11-02).
+  const dateStr = fmtDate(isHist ? history!.date : (viewDate ?? todayDateKeyTokyo()), localeTag);
   const TypeIcon = TYPE_ICON[type];
 
   // 진행중·취소 세션은 duration 이 없으므로 종료 시각을 만들 수 없다 — 시간 블록을 "시작만"
@@ -227,7 +231,8 @@ export function CleaningDetailPanel({
               <div className="durbig">
                 <div className="durbig__v">{start}</div>
                 <span className="durbig__lbl">
-                  {t.startAt} · {t.elapsed} {durLabel(task ? elapsedMin(task.start) : null, t)}
+                  {/* 다음 날 「청소했어요」로 닫은 기록 — 진행 중이 아니라 끝낸 시각만 모른다(경과 시간을 세지 않는다). */}
+                  {task?.unmeasured ? `${t.startAt} · ${t.endUnknown}` : `${t.startAt} · ${t.elapsed} ${durLabel(task ? elapsedMin(task.start) : null, t)}`}
                 </span>
               </div>
             </div>
@@ -311,7 +316,9 @@ export function CleaningDetailPanel({
           {/* 강제완료는 권한이 있는 역할에게만 노출한다. cs_staff/staff 는 예전엔 모달을 다 채운
               뒤에야 사유 없는 실패 토스트를 받았다. 서버(canForceCompleteCleaning)의 검사는
               그대로 남아 있으며 이 게이트는 UI 편의일 뿐이다. */}
-          {canForceComplete && !isHist && status !== "done" ? (
+          {/* 끝난 방은 감춘다 — 단, 알바가 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 기록(끝 시각 없음 · 처리 끝 아님)은
+              관리자가 시각을 채우도록 연다(2026-11-02, 서버 `forceCompleteCleaningSession` 의 같은 예외). */}
+          {canForceComplete && !isHist && (status !== "done" || (task.sessionId !== null && task.unmeasured)) ? (
             <>
               <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={onClose}>
                 {t.close}

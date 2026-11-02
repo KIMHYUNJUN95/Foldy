@@ -6,19 +6,17 @@ import { getReservationGuests } from "@/lib/reservation-guests";
 import { GUEST_PAYLOAD_KEYS, slimPayloadOf, slimPayloadSelect } from "@/lib/reservation-payload-slim";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import { addDays } from "@/lib/cleaning-assign/day-state";
+import { physicalKeyOf } from "@/lib/cleaning-assign/room-key";
 import { tokyoDateOf } from "@/lib/tokyo-date";
 import {
   CALENDAR_BUILDING_ORDER,
-  buildRoomKey,
   buildSessionRoomLabel,
   compareRoomLabel,
-  getCanonicalPropertyName,
-  getCanonicalRoomLabel,
-  getDisplayRoomLabel,
   isExcludedOperationalProperty,
   isExcludedOperationalRoom,
   physicalRoomKeyOfSessionLabel,
 } from "@/lib/room-label-normalization";
+import type { StayKeys } from "@/lib/cleaning-assign/task-kind";
 import type { Database } from "@/types/database";
 
 /**
@@ -62,17 +60,49 @@ export type AssignRoom = {
   usualHeadcount: number;
 };
 
+/**
+ * 그날 밤 손님이 있는 방(물리 방 키) — 오늘 내 방 청소 종류(`todayTaskKey`)용(2026-11-02).
+ * `staying` = 어제 이전 체크인 · 오늘 이후 체크아웃, `arriving` = 오늘 체크인. 확정 예약만, 운영 제외 방은 뺀다.
+ * 하루에 걸친 예약만 읽어 방 수만큼이다.
+ */
+export async function loadStayKeys(supabase: Client, organizationId: string, date: string): Promise<StayKeys> {
+  const { data, error } = await supabase
+    .from("reservations")
+    .select("property_name, room_label, check_in_date")
+    .eq("organization_id", organizationId)
+    .eq("status", "confirmed")
+    .lte("check_in_date", date)
+    .gt("check_out_date", date);
+  if (error) throw new Error(error.message);
+  const staying = new Set<string>();
+  const arriving = new Set<string>();
+  for (const row of data ?? []) {
+    if (!row.property_name || !row.room_label) continue;
+    if (isExcludedOperationalProperty(row.property_name) || isExcludedOperationalRoom(row.property_name, row.room_label)) continue;
+    const { roomKey } = physicalKeyOf(row.property_name, row.room_label);
+    (row.check_in_date === date ? arriving : staying).add(roomKey);
+  }
+  return { arriving, staying };
+}
+
+/**
+ * `loadStayKeys` — 못 읽으면 빈 값(모든 방이 체크아웃 청소로 보인다). 청소 종류는 시작을 막을 이유가 아니라서
+ * 오늘 내 방 화면 · 시작 둘 다 이 한 가지 처리로 쓴다(로그는 남긴다).
+ */
+export async function loadStayKeysOrEmpty(supabase: Client, organizationId: string, date: string): Promise<StayKeys> {
+  try {
+    return await loadStayKeys(supabase, organizationId, date);
+  } catch (error) {
+    console.error("[cleaning-assign] stay keys", error);
+    return { arriving: new Set<string>(), staying: new Set<string>() };
+  }
+}
+
 /** 못 한 방을 몇 날 앞까지 찾는가. */
 const CARRY_LOOKBACK_DAYS = 7;
 /** 「날짜 정해 미루기」 최대 일수(서버 액션 `holdRoom` 과 같다) — 이만큼 앞의 미룸까지 찾아야 정한 날 다시 뜬다. */
 export const MAX_DEFER_DAYS = 60;
 
-export function physicalKeyOf(propertyName: string, roomLabel: string): { roomKey: string; propertyName: string; roomLabel: string; sessionRoomLabel: string } {
-  const cp = getCanonicalPropertyName(propertyName);
-  const cr = getCanonicalRoomLabel(cp, roomLabel);
-  const display = getDisplayRoomLabel(cp, cr);
-  return { roomKey: buildRoomKey(cp, display), propertyName: cp, roomLabel: display === cp ? cp : display, sessionRoomLabel: buildSessionRoomLabel(cp, cr) };
-}
 
 /** 날짜 범위의 청소 방(퇴실 + 수기 추가) — 월 보기 · 못 한 방 찾기용. 인원 정보 없이 가볍게. */
 export async function loadRangeRooms(
@@ -217,13 +247,34 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
 
   const usual = new Map((roomSettingsResult.data ?? []).map((row) => [row.room_key, row.usual_headcount]));
   const holds = new Map((holdsResult.data ?? []).map((row) => [`${row.room_key}|${row.origin_date}`, row]));
+  // 미룸 · 처리 끝은 그 방의 **그날까지 쌓인 청소**를 함께 덮는다(2026-11-02 점검). 밀려 온 방(처음 날 C)이 오늘(D) 체크아웃도 있을 때
+  // 관리자가 미루면 기록은 C 로 하나만 남는다 — 그러면 D 의 오늘 방 · 다음 날 D 에서 밀려 온 방이 미룸을 못 보고 그냥 떴다.
+  // 그래서 같은 방의 미룸 중 「C ≤ 그날 ≤ 미룬 날(만든 날)」 이고 아직 기간 안인 것을 그날 것으로도 본다. 미룬 뒤에 생긴 체크아웃은 덮지 않는다.
+  type HoldRow = NonNullable<typeof holdsResult.data>[number];
+  const holdsByKey = new Map<string, HoldRow[]>();
+  for (const row of holdsResult.data ?? []) {
+    holdsByKey.set(row.room_key, [...(holdsByKey.get(row.room_key) ?? []), row]);
+  }
+  const holdFor = (roomKey: string, origin: string) =>
+    holds.get(`${roomKey}|${origin}`) ??
+    holdsByKey
+      .get(roomKey)
+      ?.find(
+        (row) =>
+          row.origin_date < origin &&
+          (tokyoDateOf(row.created_at) ?? "") >= origin &&
+          (row.kind === "resolved" || (row.until_date !== null && row.until_date > date)),
+      );
 
-  // 청소 기록 — 물리 객실 키 → 끝낸 날짜들 · 오늘 상태.
+  // 청소 기록 — 물리 객실 키 → 끝낸 날짜들 · 오늘 상태. 이름표 규칙이 없는 새 건물은 물리 키가 없어
+  // 청소 기록 이름(「건물 방」) 그대로를 키로 쓰고, 방 쪽도 `sessionRoomLabel` 로 한 번 더 찾는다 — 버리면 그 방은
+  // 청소해도 늘 「대기」로 보이고 다음 날 「밀려 온 방」으로 다시 떴다(2026-11-02 리뷰).
   const completedDates = new Map<string, string[]>();
   const todayStatus = new Map<string, AssignRoomStatus>();
+  const doneDatesOf = (room: { roomKey: string; sessionRoomLabel: string }) =>
+    completedDates.get(room.roomKey) ?? completedDates.get(room.sessionRoomLabel) ?? [];
   for (const row of sessionsResult.data) {
-    const key = physicalRoomKeyOfSessionLabel(row.room_label);
-    if (!key) continue;
+    const key = physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label;
     if (row.status === "completed") {
       const list = completedDates.get(key) ?? [];
       list.push(row.cleaning_date);
@@ -252,7 +303,7 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     holdReason: null,
     deferredUntil: null,
     resolvedHold: false,
-    status: todayStatus.get(key.roomKey) ?? "pending",
+    status: todayStatus.get(key.roomKey) ?? todayStatus.get(key.sessionRoomLabel) ?? "pending",
     usualHeadcount: usual.get(key.roomKey) ?? 1,
   });
 
@@ -279,16 +330,22 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     });
   }
 
-  // 오늘 미룬 방(origin = 오늘).
+  // 오늘 미룬 방(origin = 오늘) — 또는 밀려 온 방을 오늘 미뤄 오늘 체크아웃까지 덮인 방(origin = 처음 날, 되돌리기도 그 날짜로).
   for (const room of rooms.values()) {
-    const hold = holds.get(`${room.roomKey}|${date}`);
-    if (hold?.kind === "defer" && hold.until_date && hold.until_date > date) {
+    const hold = holdFor(room.roomKey, date);
+    const deferred = hold?.kind === "defer" && hold.until_date !== null && hold.until_date > date;
+    if (hold && deferred) {
       room.deferredUntil = hold.until_date;
       room.holdReason = hold.reason;
     }
     if (hold?.kind === "resolved") {
       room.status = "done";
       room.resolvedHold = true;
+      room.holdReason = hold.reason;
+    }
+    if (hold && (deferred || hold.kind === "resolved") && hold.origin_date < date) {
+      room.carriedFrom = hold.origin_date;
+      room.carryDays = Math.round((Date.parse(date) - Date.parse(hold.origin_date)) / 86_400_000);
     }
   }
 
@@ -315,9 +372,9 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
     const range = await loadRangeRooms(supabase, organizationId, usedDays[0], yesterday);
     for (const origin of usedDays) {
       for (const candidate of range.get(origin)?.values() ?? []) {
-        const cleaned = (completedDates.get(candidate.roomKey) ?? []).some((d) => d >= origin && d < date);
+        const cleaned = doneDatesOf(candidate).some((d) => d >= origin && d < date);
         if (cleaned) continue;
-        const hold = holds.get(`${candidate.roomKey}|${origin}`);
+        const hold = holdFor(candidate.roomKey, origin);
         const carryDays = Math.round((Date.parse(date) - Date.parse(origin)) / 86_400_000);
         const isHeld = hold?.kind === "resolved" || (hold?.kind === "defer" && hold.until_date !== null && hold.until_date > date);
         if (isHeld) {
@@ -329,7 +386,8 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
         const existing = rooms.get(candidate.roomKey);
         if (existing) {
           // 오늘도 퇴실이 있는 방 — 오늘 방으로 두되 밀려 온 표시는 남긴다(가장 이른 날 기준).
-          if (!existing.carriedFrom || origin < existing.carriedFrom) {
+          // 미룬 방은 되돌리기가 미룸 기록의 날짜를 써야 하므로 그대로 둔다.
+          if (!existing.deferredUntil && !existing.resolvedHold && (!existing.carriedFrom || origin < existing.carriedFrom)) {
             existing.carriedFrom = origin;
             existing.carryDays = carryDays;
             existing.holdReason = existing.holdReason ?? hold?.reason ?? null;
@@ -351,7 +409,9 @@ export async function loadAssignDayRooms(supabase: Client, organizationId: strin
   // 7일보다 앞서 미룬 방 — 정한 날이 됐고 그 사이 청소 기록이 없으면 다시 띄운다(위 반복은 최근 7일만 본다).
   for (const hold of holdsResult.data ?? []) {
     if (hold.origin_date >= lookFrom) continue;
-    const cleaned = (completedDates.get(hold.room_key) ?? []).some((d) => d >= hold.origin_date && d < date);
+    const cleaned = doneDatesOf({ roomKey: hold.room_key, sessionRoomLabel: buildSessionRoomLabel(hold.property_name, hold.room_label) }).some(
+      (d) => d >= hold.origin_date && d < date,
+    );
     if (cleaned) continue;
     const carryDays = Math.round((Date.parse(date) - Date.parse(hold.origin_date)) / 86_400_000);
     const key = {

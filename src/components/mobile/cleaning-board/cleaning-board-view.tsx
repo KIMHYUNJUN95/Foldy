@@ -184,14 +184,19 @@ export function CleaningBoardView({
     const add = next.filter((id) => !before.includes(id));
     const remove = before.filter((id) => !next.includes(id));
     if (add.length === 0 && remove.length === 0) return;
+    // 한 사람씩 보낸다 — 중간에 실패하면 앞의 변경은 이미 저장돼 있다(`done`). 그때는 「일부만 저장」을 같이 알리고 새로 읽는다.
+    let done = 0;
     const apply = async (adds: string[], removes: string[]) => {
+      done = 0;
       for (const userId of adds) {
         const result = await assignToRoom({ date, roomKey: row.roomKey, userId });
         if (!result.ok) return result.reason;
+        done += 1;
       }
       for (const userId of removes) {
         const result = await unassignFromRoom({ date, roomKey: row.roomKey, userId });
         if (!result.ok) return result.reason;
+        done += 1;
       }
       return null;
     };
@@ -199,8 +204,9 @@ export function CleaningBoardView({
       const failure = await apply(add, remove);
       if (failure) {
         haptic("error");
+        const reason = failure === "conflict" ? copy.boardConflict : failure === "cancelled" ? copy.boardDayCancelled : copy.boardFailed;
         setToast({
-          message: failure === "conflict" ? copy.boardConflict : failure === "cancelled" ? copy.boardDayCancelled : copy.boardFailed,
+          message: done > 0 ? `${reason} · ${copy.boardPartlySaved}` : reason,
           stamp: Date.now(),
           undo: null,
         });
@@ -219,7 +225,9 @@ export function CleaningBoardView({
             const undoFailure = await apply(remove, add);
             if (undoFailure) {
               haptic("error");
-              setToast({ message: copy.boardFailed, stamp: Date.now(), undo: null });
+              // 되돌리기도 한 사람씩 보낸다 — 중간에 멈추면 앞의 것은 이미 되돌려졌다. 저장할 때와 같은 안내.
+              const reason = undoFailure === "conflict" ? copy.boardConflict : undoFailure === "cancelled" ? copy.boardDayCancelled : copy.boardFailed;
+              setToast({ message: done > 0 ? `${reason} · ${copy.boardPartlySaved}` : reason, stamp: Date.now(), undo: null });
             } else haptic("light");
             router.refresh();
           });

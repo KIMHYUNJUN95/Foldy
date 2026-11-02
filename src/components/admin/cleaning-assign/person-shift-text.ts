@@ -75,6 +75,7 @@ export function psRoomLine(room: PersonShiftRoom, kind: PsKind, copy: CleaningAs
   const mates = room.mates.length > 0 ? fill(copy.withMate, { names: room.mates.join(" · ") }) : copy.alone;
   if (kind === "worked" || kind === "noRecord") {
     const s = room.session;
+    if (s?.completedAt && s.endUnknown) return { right: "", sub: fill(copy.psRoomEndUnknown, { start: tokyoTime(s.startedAt) }), tone: "gray" };
     if (s?.completedAt) {
       return { right: s.minutes ? fill(copy.psRoomMinutes, { n: s.minutes }) : "", sub: fill(copy.psRoomTime, { end: tokyoTime(s.completedAt), start: tokyoTime(s.startedAt) }), tone: "gray" };
     }

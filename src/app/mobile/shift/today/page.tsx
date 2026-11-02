@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Beds24LiveRefresh } from "@/components/shared/beds24-live-refresh";
 import { MobileShell } from "@/components/shell/mobile-shell";
 import { TodayRoomsView, type TodayRoomSession } from "@/components/mobile/shift/today-rooms-view";
+import { todaySkipReason } from "@/lib/cleaning-assign/task-kind";
 import { physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
@@ -42,6 +43,9 @@ export default async function MobileShiftTodayPage() {
       .eq("organization_id", session.organization.id)
       .eq("cleaning_date", today)
       .in("status", ["in_progress", "completed"])
+      // 관리자 「처리 끝」이 남기는 완료 기록(`closed_without_cleaning`)은 청소가 아니다 — 넣으면 그 방이 「끝남」으로 보이고
+      // 청소 중이던 사람의 기록을 가려 「끝내기」가 사라진다(2026-11-02 리뷰). 처리 끝은 `resolvedHold` 로 따로 보인다.
+      .eq("closed_without_cleaning", false)
       .order("started_at", { ascending: false }),
     // 지난 날 시작하고 끝내지 않은 **내** 청소(2026-11-02 점검 수정) — 진행 중은 한 사람 하나라 남아 있으면 오늘 방을
     // 하나도 시작하지 못한다. 위 조회는 오늘 날짜만 봐서 이 기록이 화면에 안 보였다 → 맨 위에 띄우고 닫게 한다.
@@ -68,8 +72,9 @@ export default async function MobileShiftTodayPage() {
     : null;
   const sessionByRoom = new Map<string, TodayRoomSession>();
   for (const row of sessionsResult.data ?? []) {
-    const key = physicalRoomKeyOfSessionLabel(row.room_label);
-    if (!key || sessionByRoom.has(key)) continue;
+    // 이름표 규칙이 없는 새 건물은 물리 방 키가 없다 — 그때는 청소 기록 이름 그대로 키로 쓴다(`startMyRoom` 과 같은 맞추기).
+    const key = physicalRoomKeyOfSessionLabel(row.room_label) ?? row.room_label;
+    if (sessionByRoom.has(key)) continue;
     sessionByRoom.set(key, {
       id: row.id,
       status: row.status === "completed" ? "completed" : "in_progress",
@@ -82,12 +87,24 @@ export default async function MobileShiftTodayPage() {
   const buildingLabels = getDictionary(locale).cleaning.buildingLabels;
   const rooms = data.rooms.map((room) => {
     const meta = getPropertyMapMeta(room.propertyName);
+    const roomSession = sessionByRoom.get(room.roomKey) ?? sessionByRoom.get(room.sessionRoomLabel) ?? null;
+    // 목록에서 빠진 방(예약 바뀜)은 늘 「대기」로, 「처리 끝」 방은 늘 「끝남」으로 온다 — 실제 청소 기록이 있으면 그 상태로 맞춘다
+    // (청소하는 사이 관리자가 처리 끝으로 둬도 「끝내기」를 누를 수 있게).
+    const status =
+      (room.changed || room.resolvedHold) && roomSession
+        ? roomSession.status === "completed"
+          ? ("done" as const)
+          : ("progress" as const)
+        : room.status;
     return {
       ...room,
+      status,
+      // 오늘 청소 안 하는 이유 — 서버 `startMyRoom` 과 같은 규칙(`todaySkipReason`).
+      skipReason: todaySkipReason({ ...room, status, hasSession: roomSession !== null }),
       buildingLabel: localizePropertyName(room.propertyName, buildingLabels),
       doorCode: meta?.roomAccess?.find((item) => item.roomLabel === room.roomLabel)?.code ?? null,
       mapsUrl: meta?.googleMapsUrl ?? null,
-      session: sessionByRoom.get(room.roomKey) ?? null,
+      session: roomSession,
     };
   });
   const navBadges = await navBadgesPromise;

@@ -15,3 +15,5 @@ export function createCheckinServiceClient() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+export type CheckinServiceClient = ReturnType<typeof createCheckinServiceClient>;

@@ -122,6 +122,15 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 - **RLS**: `checkin.*` 는 **직원 읽기 정책만**(`public.memberships` + `checkin.view` / `checkin.documents` 권한 — Foldy 권한 표 그대로 읽음). 손님 · 기기 쓰기는 전부 서버 라우트(서비스 롤). anon 정책 없음, delete 정책 없음(43 §8-14). `audit_log` 는 insert 만.
 - **마이그레이션 초안(2026-11-02, `202611020001_checkin_schema.sql`, 운영 미적용)**: 위 11개 표 + 비공개 버킷 `checkin-documents`(60MB, jpeg · png · webp · mp4 · webm). 자식 표에도 `organization_id` 를 넣어 RLS 가 조인 없이 거른다. 읽기 정책은 `public.has_capability(organization_id, auth.uid(), 'checkin.view' | 'checkin.documents' | 'checkin.manage')`. `storage.objects` 정책은 두지 않는다(파일은 서버가 서명 URL 로만). **권한 키 등록(`capability_roles` 씨앗)은 4단계 직원 화면 때** — 그 전에는 플랫폼 관리자만 통과한다. 로컬 검증은 PGlite(표 11 · 정책 12 생성 확인).
 - **stays 생성**: Foldy Beds24 웹훅은 손대지 않는다. `apps/checkin` 의 `jobs/sync-stays`(5분 크론) 가 `public.reservations` 의 오늘 −1 ~ +30일 예약을 읽어 `stays` · `stay_rooms` 를 만들고 코드를 발급한다. **한 stay = 채널 예약 번호(`original_reservation_id`) 하나** — 방 여러 개 예약(같은 번호 줄이 여럿, 최근 6개월 19건)은 stay 1개 + `stay_rooms` 여러 개로 묶어, 예약 번호로 찾으면 방 전부가 한 번에 열린다(43 방 여러 개 규칙). 취소 · 날짜 · 인원 변경도 여기서 따라간다(체크인 뒤 변경은 기록만).
+- **sync-stays 동작(2026-11-02 구현, `apps/checkin/src/lib/sync/plan.ts` 판단 · `run.ts` 읽기 쓰기 · `GET|POST /api/jobs/sync-stays`)**:
+  - 읽는 범위: `public.reservations` 체크인 날짜 도쿄 오늘 −1 ~ +30일(취소 포함, 1,000줄씩). 묶음 = (조직, `original_reservation_id`). 번호가 비면 건너뛴다.
+  - 숙박 있는 줄 = 상태가 `cancelled` · `no_show` 가 아닌 것(43 「막는 경우」 표와 같다). 체크인 날짜 = 가장 이른 날, 체크아웃 = 가장 늦은 날, 예상 인원 = 방마다 성인 + 어린이 + 유아(모르면 방 하나 1명).
+  - 건물 키: `property_name` 을 `apps/checkin/src/lib/building-key.ts` 로 바꾼다(Foldy `room-label-normalization.ts` 와 같은 규칙을 따로 둠 — 건물이 늘면 두 곳을 같이 고친다). 모르는 건물은 건너뛰고 건수만 돌려준다.
+  - 없으면 만든다: `pending` + 6자리 코드(겹치면 다시 뽑기, 최대 8번) + `stay_rooms`. 전부 취소된 묶음은 만들지 않는다.
+  - 있으면 맞춘다: 열린 stay(`pending` · `pre_registered` · `in_progress`)는 바뀐 칸만 고치고 방을 더하거나 뺀다. 전부 취소되면 `cancelled` · `retain_until = 오늘 + 30일`. 취소됐다 살아나면 `pending` + 새 코드. `checked_in` · `expired` 는 바꾸지 않고 「체크인 뒤 변경」 건수만 센다(`audit_log` 는 사람 · 기기만 적는 칸이라 크론 기록은 4단계에서 정한다).
+  - 같은 묶음을 두 실행이 동시에 만들면 늦은 쪽은 건너뛰고 다음 실행이 맞춘다. 응답은 건수만(이름 · 예약 번호 없음), 오류 문구도 「sync_failed」만.
+  - 인증: `Authorization: Bearer <CRON_SECRET>` — Vercel Cron 이 GET 으로 부르므로 GET · POST 둘 다 받는다. 비밀값이 없으면 전부 401.
+  - 운영 연결 전 할 일: 마이그레이션 적용(사용자 컨펌) · Supabase API 노출 스키마에 `checkin` 추가 · Vercel `foldy-checkin` 프로젝트 환경 변수(`SUPABASE_URL` · `SUPABASE_SERVICE_ROLE_KEY` · `CRON_SECRET`) · 5분 크론 등록(Vercel 요금제에 따라 크론 간격 제한 확인).
 - **보존**: `retain_until = check_out_date + 3년`(취소는 +30일). 매일 도쿄 04:00 `jobs/retention` 이 파일 → 줄 순으로 삭제.
 
 ## 4. API (서버 라우트, `apps/checkin`)
@@ -139,7 +148,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 | `POST /api/kiosk/complete` | 태블릿 | 기기 토큰 + 세션 | 동의 · 전원 명부 · 동영상 검증 → `checked_in` · 방 번호 · 비밀번호(`property_operation_infos`) 반환 |
 | `POST /api/guest/claim` | 손님 웹(건물 고정 링크 `/p/<건물>`) | 없음(공개) — 이름 + 체크인 날짜 + **채널 예약 번호**(`reservations.original_reservation_id` — `raw_payload.apiReference` 와 같은 값, 대소문자 · 공백 · 하이픈 무시, 없으면 전화 뒤 4자리) 3요소(2026-11-01, 44 §14-7) | 일치하는 stay 가 **하나**면 토큰 발급(원문 1회) · IP · 건물당 속도 제한 · 5회 실패 10분 잠금 · 불일치 시 어떤 것이 틀렸는지 말하지 않음 |
 | `GET /api/guest/[token]` · `PUT …/guests` · `POST …/consent` | 손님 웹 | 링크 토큰 | 사전 등록(계약 JSON 포함) · 저장 · 동의(체크인 뒤 잠금) |
-| `POST /api/jobs/sync-stays` · `/retention` · `/remind` | 크론 | 크론 비밀값 | 동기화 · 자동 삭제 · 리마인드. `sync-stays` 는 우리 DB(`public.reservations`)만 읽어 stay 를 만든다 — **Beds24 호출 없음**(2026-11-01, 44 §14-6). ~~stay 생성 뒤 Beds24 Info 항목 쓰기 · `stays.beds24_info_synced_at`~~ 는 1차 제외 |
+| `GET\|POST /api/jobs/sync-stays` · `/retention` · `/remind` | 크론 | 크론 비밀값(`Authorization: Bearer <CRON_SECRET>`) | 동기화 · 자동 삭제 · 리마인드. `sync-stays` 는 우리 DB(`public.reservations`)만 읽어 stay 를 만든다 — **Beds24 호출 없음**(2026-11-01, 44 §14-6). ~~stay 생성 뒤 Beds24 Info 항목 쓰기 · `stays.beds24_info_synced_at`~~ 는 1차 제외 |
 | Foldy `src/actions/checkin/*` | 직원 | Foldy 세션 + `checkin.*` | 현황 · 열람(서명 URL 1~5분, audit) · 확인함 · 대리 입력 · 내보내기 · 기기 · 건물 설정 |
 
 - 속도 제한: `find` 기기당 분당 20회, `guest/[token]` IP 당 분당 30회, `enroll` 분당 5회. 토큰 32바이트 랜덤 · DB 엔 sha256. 모든 응답에 `contract_version`.
@@ -186,7 +195,7 @@ Foldy(루트) src/app/admin/checkin · src/app/mobile/checkin · src/actions/che
 ## 9. 단계 (코드 착수는 사용자 컨펌 뒤)
 
 1. 루트 세 줄(tsconfig exclude · eslint ignore · vitest exclude) · `apps/checkin` 뼈대 · `checkin` 스키마 마이그레이션(로컬) · 계약 스키마(zod) · `sync-stays` — Foldy 빌드 확인
-   - 2026-11-02 진행: 루트 세 줄 ✅ · 뼈대(`/p/[building]` 시작 화면 · `/api/health` · 4개 언어 사전 · 서비스 클라이언트) ✅ · 마이그레이션 초안 ✅(운영 미적용) · 계약 스키마 ✅ · `sync-stays` ⬜
+   - 2026-11-02 진행: 루트 세 줄 ✅ · 뼈대(`/p/[building]` 시작 화면 · `/api/health` · 4개 언어 사전 · 서비스 클라이언트) ✅ · 마이그레이션 초안 ✅(운영 미적용) · 계약 스키마 ✅ · `sync-stays` ✅(아래 「sync-stays 동작」, 운영 연결 전)
 2. 사전 등록 웹(명부 · 여권 업로드 · 동의) · 링크 발급 · 리마인드 크론
 3. 태블릿 앱: 뼈대(Compose · 기기 등록 · 계약 받기 · 잠금) → 찾기 · 명부 → 카메라 · MRZ → 동영상 → 완료 → 오프라인 큐
 4. Foldy 직원 화면(PC · 모바일) · 권한 키 · 내보내기 · 기기 · 건물 설정

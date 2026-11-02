@@ -353,6 +353,24 @@ Always set `model` when spawning an agent. Full rules: `docs/planning/05-ai-coll
 - Delegate broad reading; do small known lookups yourself. Narrow agent briefs with file ownership; short `path:line` reports;
   don't re-read what an agent verified; read big files by grep + offset; tail command output; one `npm run build` at the end.
 
+### Agent pipeline for every task (ABSOLUTE, 2026-11-03 사용자 지시)
+
+모든 작업은 에이전트 파이프라인으로 한다. 전문: `docs/planning/05-ai-collaboration-rules.md` → 「에이전트 작업 흐름」.
+
+0. **계획 [리드]** — 문서 읽기 → 작업 크기(소 · 중 · 대) 정하기 → 쪼개기 · 파일 담당 나누기 → 「시작할까요?」 (Rule 8)
+1. **구현 [에이전트]** — 코드 + 관련 문서를 같이 고친다. 바뀐 동작에는 **테스트를 새로 쓴다**(버그 수정은 실패하는 테스트 먼저).
+   스스로 `tsc` · lint · 바꾼 곳 테스트를 통과시킨 뒤 넘긴다. 맞는 스킬 호출.
+2. **독립 검사 [병렬 · 읽기 전용 · diff 만 받음]** — `code-review` + 바뀐 곳에 맞는 감사 에이전트(i18n · RLS · 도쿄 시간 ·
+   Beds24 · 모바일 셸 · 마이그레이션 영향 · 문서 동기화) + **실제로 돌려 보기**: 화면이 바뀌면 화면 확인(폰/폴드/태블릿 × ko/ja/en),
+   서버 · DB 가 바뀌면 실제 역할(service_role · 일반 사용자)로 읽기 · 쓰기(GRANT · RLS 포함). 운영 DB 에는 쓰지 않는다.
+   리드의 결론은 넘기지 않는다.
+3. **고치기** — 문제는 ①과 **같은 에이전트**에 `SendMessage` 로 이어서 맡기고, 필요한 검사만 다시 돈다(최대 2~3번).
+4. **마무리 [리드]** — 커밋 묻기 전에 **전체 `npm test` · `npm run lint` · `npm run build`** 를 리드가 돌리고 결과 줄을 보고에 적는다
+   → 「커밋할까요?」 → 허락 뒤 **리드가 직접** 커밋(내 파일만 지정). 커밋 에이전트는 쓰지 않는다.
+
+- 크기별: **소**(파일 1~2개 · 문구 · 색) = ① + 리뷰 하나 · **중**(기능 하나) = 전체 · **대**(여러 영역) = ① 병렬(worktree) + 저장된 Workflow.
+- 쓴 에이전트가 자기 코드를 검사하지 않는다. lint · build 같은 기계적 검사는 따로 에이전트를 두지 않는다.
+
 ### Use installed skills actively (ABSOLUTE, 2026-10-27 사용자 지시)
 
 구현 · 수정을 할 때는 **그 작업에 맞는 설치된 스킬을 항상 적극적으로 쓴다** — 생각만 하지 말고 `Skill` 도구로 실제 호출한다.

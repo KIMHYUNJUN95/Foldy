@@ -86,53 +86,22 @@
     <string name="done_more">같이 온 분 명부 마저 쓰기</string>
     <string name="done_more_body">아직 비어 있는 분: %1$d명</string>
     <string name="guests_title">예약을 찾았어요</string>
-    <string name="guests_body">방과 날짜를 확인하고, 묵는 분을 한 분씩 등록해 주세요.</string>
     <string name="guests_room">방</string>
     <string name="guests_dates">날짜</string>
     <string name="guests_nights">%1$d박</string>
     <string name="guests_party">묵는 분</string>
     <string name="guests_less">한 분 빼기</string>
     <string name="guests_more">한 분 더하기</string>
-    <string name="guests_rep">예약하신 분</string>
     <string name="guests_seat">%1$d번째 분</string>
-    <string name="guests_done">끝</string>
-    <string name="guests_need">여권 찍기</string>
-    <string name="guests_sub_done">다 넣었어요</string>
-    <string name="guests_sub_photo">여권만 찍으면 돼요</string>
-    <string name="guests_sub_empty">아직 아무것도 없어요</string>
-    <string name="guests_sub_partial">몇 칸이 남았어요</string>
-    <string name="guests_child_hint">어린이도 한 분으로 세어 주세요. 여권이 없으면 다음 화면에서 고를 수 있어요.</string>
-    <string name="guests_start">비어 있는 분부터 시작</string>
-    <string name="guests_next">다음으로</string>
     <string name="party_error">인원을 바꾸지 못했어요. 다시 해 주세요.</string>
-    <string name="passport_who">묵는 분 %1$d / %2$d</string>
-    <string name="passport_intro_title">여권 사진 면을 찍을게요</string>
-    <string name="passport_intro_body">카메라에 비추면 저절로 찍혀요. 이름 · 여권 번호 같은 칸은 여권에서 읽어 채워요.</string>
-    <string name="passport_intro_mrz">아래 두 줄이 다 보이면 돼요</string>
-    <string name="passport_tip_open">사진이 있는 면을 펴서 들어 주세요</string>
     <string name="passport_tip_lines">아래 두 줄이 손가락에 가리지 않게 해 주세요</string>
     <string name="passport_tip_glare">빛이 비치면 여권을 살짝 기울여 주세요</string>
     <string name="passport_none">여권이 없어요</string>
-    <string name="passport_retention">여권 사진은 숙박 명부로 3년 보관한 뒤 지워요. 다른 곳에 쓰지 않아요.</string>
-    <string name="passport_camera_on">카메라 켜기</string>
-    <string name="camera_title">여권을 틀에 맞춰 주세요</string>
-    <string name="camera_body">화면 위쪽 카메라를 향해 사진 면을 들어 주세요.</string>
     <string name="camera_up">카메라</string>
     <string name="camera_hold">그대로 잠깐만요</string>
     <string name="camera_find">아래 두 줄을 찾고 있어요</string>
-    <string name="camera_short_open">사진 면 펴기</string>
-    <string name="camera_short_lines">아래 두 줄 보이게</string>
-    <string name="camera_short_glare">반사 피하기</string>
-    <string name="camera_type">직접 입력할게요</string>
     <string name="camera_shutter">직접 찍기</string>
     <string name="camera_denied">카메라를 쓸 수 없어요</string>
-    <string name="reading_title">찍었어요. 읽는 중이에요</string>
-    <string name="reading_body">1~2초면 끝나요. 여권은 내려놓으셔도 돼요.</string>
-    <string name="reading_name">성명</string>
-    <string name="reading_number">여권 번호</string>
-    <string name="reading_rest">생년월일 · 국적 · 성별</string>
-    <string name="reading_done">읽음</string>
-    <string name="reading_wait">읽는 중</string>
     <string name="retake">다시 찍기</string>
     <string name="confirm_title">여권에서 읽었어요</string>
     <string name="confirm_body">맞는지 보고, 틀린 칸은 눌러서 고쳐 주세요.</string>
@@ -178,8 +147,6 @@
     <string name="nopass_camera">카메라가 켜지지 않아요</string>
     <string name="nopass_note">일본 숙박 명부에는 외국인 손님의 여권 번호가 필요해요. 여권 없이 적은 분은 직원이 따로 확인해요.</string>
     <string name="nopass_back">여권 찍기로 돌아가기</string>
-    <string name="route_title">어디서 오셔서, 어디로 가세요?</string>
-    <string name="route_body">일본 숙박 명부에 꼭 적어야 하는 두 가지예요. 도시 이름만 있으면 돼요.</string>
     <string name="route_q1">① 어젯밤은 어디서 주무셨어요?</string>
     <string name="route_q1_sub">이 숙소에 오기 바로 전에 묵은 곳</string>
     <string name="route_arrived">일본에 오늘 도착했어요</string>
@@ -197,17 +164,69 @@
     <string name="city_fukuoka">후쿠오카</string>
     <string name="city_other">그 밖 · 직접 쓰기</string>
     <string name="city_other_hint">도시 이름</string>
-    <string name="route_next">다음</string>
-    <string name="consent_title">마지막으로\n동의해 주세요</string>
-    <string name="consent_body">동의하면 짧은 확인 동영상을 찍고 끝나요.</string>
-    <string name="consent_point1">일본 여관업법에 따라 숙박 명부를 만들어요.</string>
-    <string name="consent_point2">명부 · 여권 사진 · 확인 동영상은 3년 보관한 뒤 지워요.</string>
-    <string name="consent_point3">숙박 명부 말고는 쓰지 않고, 남에게 주지 않아요.</string>
     <string name="consent_terms">숙박 약관에 동의해요</string>
     <string name="consent_terms_sub">체크인 · 체크아웃 · 하우스 룰</string>
     <string name="consent_read">약관 전문 보기</string>
-    <string name="consent_need">체크해 주세요</string>
-    <string name="consent_go">동의하고 다음으로</string>
     <string name="terms_close">닫기</string>
     <string name="terms_empty">약관이 아직 등록되지 않았어요. 직원에게 물어봐 주세요.</string>
+    <!-- 빠른 체크인(F1~F7b) -->
+    <string name="fast_f1_title">예약하신 분의 여권을 비춰 주세요</string>
+    <string name="fast_f1_body">여권 이름으로 오늘 예약을 찾아요. 이 사진은 그대로 명부에 쓰여요.</string>
+    <string name="fast_f1_by_code">코드로 찾기</string>
+    <string name="fast_f1_by_name">이름으로 찾기</string>
+    <string name="fast_f1_searching">예약을 찾고 있어요…</string>
+    <string name="fast_f1_retry">읽지 못했어요. 다시 비춰 주세요.</string>
+    <string name="fast_found_title">%1$s 님, 예약을 찾았어요</string>
+    <string name="fast_party_count">%1$d명</string>
+    <string name="fast_cards_title">여권 %1$d개를 지금 꺼내 주세요</string>
+    <string name="fast_cards_title_face">얼굴만 5초씩 찍으면 끝나요</string>
+    <string name="fast_cards_body">한 분씩 비추고 카메라를 5초 보면 끝나요. 다 해서 2분쯤이에요.</string>
+    <string name="fast_seat_rep">여권 찍힘 · 얼굴만 남았어요</string>
+    <string name="fast_seat_face">얼굴만 남았어요</string>
+    <string name="fast_seat_done">사전 등록으로 끝났어요</string>
+    <string name="fast_seat_todo">여권 · 얼굴 5초</string>
+    <string name="fast_child_note">어린이도 한 분으로 세어 주세요. 인원이 다르면</string>
+    <string name="fast_change_party">인원 바꾸기</string>
+    <string name="fast_start">시작</string>
+    <string name="fast_pass_title">%1$s 여권을 비춰 주세요</string>
+    <string name="fast_pass_toast">%1$s 님 끝 — 다음 분 여권을 비춰 주세요</string>
+    <string name="fast_face_title">여권을 내리고 카메라를 봐 주세요</string>
+    <string name="fast_face_sub_read">여권 읽음 ✓ · 얼굴 5초만 찍어요</string>
+    <string name="fast_face_sub">얼굴 5초만 찍어요</string>
+    <string name="fast_recording">녹화 중</string>
+    <string name="fast_face_after">끝나면 저절로 다음 분으로</string>
+    <string name="fast_review_title">%1$d분 다 읽었어요</string>
+    <string name="fast_review_body">한 번만 봐 주세요. 틀린 줄은 눌러서 고쳐요.</string>
+    <string name="fast_review_warn_digits">숫자가 하나 안 맞아요 — 눌러서 확인</string>
+    <string name="fast_review_warn_missing">빈 칸이 있어요 — 눌러서 채우기</string>
+    <string name="fast_age">%1$d세</string>
+    <string name="fast_place_title">사는 곳</string>
+    <string name="fast_place_country">나라</string>
+    <string name="fast_place_country_tag">여권에서</string>
+    <string name="fast_place_city">도시</string>
+    <string name="fast_place_city_hint">예: Chicago</string>
+    <string name="fast_contact">연락처 — 전화나 이메일 하나</string>
+    <string name="fast_contact_tag">예약에서</string>
+    <string name="fast_review_note">함께 묵는 분은 예약하신 분과 같게 적어요.</string>
+    <string name="fast_final_title">마지막 두 가지</string>
+    <string name="fast_final_title_one">마지막 한 가지</string>
+    <string name="fast_final_go">동의하고 끝내기</string>
+    <string name="fast_finish">끝내기</string>
+    <string name="fast_sending">보내는 중…</string>
+    <string name="fast_sending_body">잠시만 기다려 주세요.</string>
+    <string name="fast_retry">다시 보내기</string>
+    <string name="fast_retention">명부 · 여권 사본 · 얼굴 영상은 일본 여관업법에 따라 3년 보관한 뒤 지워요. 다른 곳에 쓰지 않아요.</string>
+    <string name="fast_face_turn">%1$s 님 차례예요. 준비되면 눌러 주세요</string>
+    <string-array name="fast_ordinals">
+        <item>첫 번째 분</item>
+        <item>두 번째 분</item>
+        <item>세 번째 분</item>
+        <item>네 번째 분</item>
+        <item>다섯 번째 분</item>
+        <item>여섯 번째 분</item>
+        <item>일곱 번째 분</item>
+        <item>여덟 번째 분</item>
+        <item>아홉 번째 분</item>
+        <item>열 번째 분</item>
+    </string-array>
 </resources>

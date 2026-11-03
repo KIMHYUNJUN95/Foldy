@@ -17,10 +17,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.LineBreak
@@ -31,21 +33,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.harutokyo.checkin.kiosk.R
 import com.harutokyo.checkin.kiosk.contract.BlockReason
 import com.harutokyo.checkin.kiosk.contract.FindResult
+import com.harutokyo.checkin.kiosk.camera.Captured
 import com.harutokyo.checkin.kiosk.contract.KioskStay
-import com.harutokyo.checkin.kiosk.contract.SaveResult
+import com.harutokyo.checkin.kiosk.contract.PassportQuery
 import com.harutokyo.checkin.kiosk.data.KioskViewModel
 import com.harutokyo.checkin.kiosk.data.Phase
+import com.harutokyo.checkin.kiosk.data.StepTimer
 import com.harutokyo.checkin.kiosk.kiosk.Kiosk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// 화면 흐름(16 §5): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → G2 메뉴 → T1 찾기 → T2 명부 → T3 여권 · 확인 → T3s 어디서 · 어디로 → G3b 동의(→ 다음 묶음: 동영상 · 완료).
-// 찾기 결과: 못 찾음 T1x · 지금은 못 함 T1b · 이미 체크인 T1c.
-// 손님이 손을 떼고 idleSecondsInput(기본 240초) 지나면 G1 로 돌아간다(FR-K12).
+// 화면 흐름(빠른 체크인): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → F1 여권 비추기(→ 예약 찾기) → F2 예약 찾음 → (자리마다 여권 · 얼굴 5초) → F6b 검토 → F7b 마지막 질문 + 동의 → 완료.
+// F1 에서 「코드로 찾기」 · 「이름으로 찾기」 → T1k · T1 (FindScreen). 찾기 결과: 못 찾음 T1x · 지금은 못 함 T1b · 이미 체크인 T1c.
+// 자리마다 화면은 ui/FastFlow.kt 안에서 돈다(Screen.Fast). 단계마다 걸린 시간은 StepTimer 가 「KioskTiming」 로그 한 줄로 남긴다.
+// 손님이 손을 떼고 idleSecondsInput(기본 240초) 지나면 G1 로 돌아간다(FR-K12) — 올리다 만 것은 버린다.
 
 private val PHRASE_BREAK = LineBreak(LineBreak.Strategy.HighQuality, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase)
 
-private enum class Screen { Language, Menu, Find, NotFound, Blocked, CheckedIn, Guests, Passport, Consent, ComingNext }
+private enum class Screen { Language, Scan, Find, NotFound, Blocked, CheckedIn, Fast, ComingNext }
 
 @Composable
 fun KioskRoot(model: KioskViewModel = viewModel()) {
@@ -57,25 +62,48 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
     // 찾기 칸 · 결과(손님 한 명분 — 처음으로 돌아가면 지운다).
     var form by remember { mutableStateOf(FindForm()) }
     var findError by remember { mutableStateOf<String?>(null) }
+    var scanError by remember { mutableStateOf<String?>(null) }
     var notFound by remember { mutableStateOf<FindResult?>(null) }
     var blocked by remember { mutableStateOf<FindResult.Blocked?>(null) }
     var session by remember { mutableStateOf<String?>(null) }
     var stay by remember { mutableStateOf<KioskStay?>(null) }
+    // F1 에서 찍은 대표자 여권(이름으로 찾은 경우엔 없음).
+    var firstShot by remember { mutableStateOf<Captured?>(null) }
+    val timer = remember { StepTimer() }
+    // 직원 부르기 — 흐름 위에 덮어 보여 준다(진행 중인 체크인 · 올리기 줄을 잃지 않게). G1 의 호출만 별도 화면이다.
+    var callOpen by remember { mutableStateOf(false) }
+    val callOpenNow by rememberUpdatedState(callOpen)
     val reset = {
+        callOpen = false
         screen = Screen.Language
         language = "ja"
         form = FindForm()
         findError = null
+        scanError = null
         notFound = null
         blocked = null
         session = null
         stay = null
+        firstShot = null
+        model.clearUploads()
+        timer.reset()
+    }
+    // 예약을 찾았다 — 예약 언어가 있으면 그 언어로(FR-K01, 이 건물이 쓰는 언어일 때만). 이미 체크인했으면 T1c, 아니면 F2.
+    fun foundStay(result: FindResult.Found, languages: List<String>, shot: Captured?) {
+        session = result.sessionId
+        model.openUploads(result.sessionId)
+        stay = result.stay
+        firstShot = shot
+        if (result.language != null && result.language in languages) language = result.language
+        screen = if (result.checkedIn) Screen.CheckedIn else Screen.Fast
     }
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current!!
 
     // 뒤로 가기로 앱을 나가지 못하게 — 화면 안 뒤로 버튼만 쓴다.
     BackHandler { reset() }
+    // 직원 부르기 창이 열려 있으면 뒤로 가기는 그 창만 닫는다(위 핸들러보다 나중에 등록 = 우선).
+    BackHandler(enabled = callOpen) { callOpen = false }
 
     // 손님 화면이든 직원 PIN · 메뉴든 손을 떼고 idleSecondsInput 지나면 G1 로(직원 창이 열린 채 남지 않게).
     val idleSeconds = state.contract?.idleSecondsInput ?: 240
@@ -84,6 +112,11 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
         delay(idleSeconds * 1000L)
         reset()
         staff = StaffStep.Closed
+    }
+
+    // 걸린 시간: 처음으로 돌아온 뒤 첫 손길부터 「language」 단계가 시작된다(G1 에 서 있던 시간은 재지 않는다).
+    LaunchedEffect(lastTouch) {
+        if (screen == Screen.Language && state.phase == Phase.Ready && staff == StaffStep.Closed) timer.enter("language")
     }
 
     // 잠금 상태는 직원 창을 열 때 다시 읽고, 풀기 · 잠그기 뒤엔 바로 바꾼다(단추 글자가 늦게 바뀌지 않게).
@@ -119,15 +152,61 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                             onCall = { screen = Screen.ComingNext },
                             onPick = { code ->
                                 language = code
-                                screen = Screen.Menu
+                                screen = Screen.Scan
                             },
                         )
-                        Screen.Menu -> MenuScreen(
-                            language = language,
-                            onBack = reset,
-                            onLanguage = { screen = Screen.Language },
-                            onPick = { screen = if (it == "checkin") Screen.Find else Screen.ComingNext },
-                        )
+                        Screen.Scan -> {
+                            val networkError = str(R.string.error_network)
+                            val serverError = str(R.string.error_server)
+                            LaunchedEffect(Unit) { timer.enter("f1") }
+                            ScanScreen(
+                                languageName = languageName(language),
+                                error = scanError,
+                                onBack = reset,
+                                onLanguage = { screen = Screen.Language },
+                                onCall = { callOpen = true },
+                                onByCode = {
+                                    form = form.copy(byCode = true)
+                                    screen = Screen.Find
+                                },
+                                onByName = {
+                                    form = form.copy(byCode = false)
+                                    screen = Screen.Find
+                                },
+                                onPassport = { shot ->
+                                    val mrz = shot.mrz ?: return@ScanScreen false
+                                    // 직원 부르기 창이 위에 열려 있으면 읽힌 여권은 버린다(창 뒤에서 F2 로 넘어가지 않게). 카메라는 다시 켜진다.
+                                    if (callOpenNow) return@ScanScreen false
+                                    scanError = null
+                                    // 못 찾음 화면에 같은 이름이 보이도록 찾기 칸에도 넣어 둔다(날짜는 오늘).
+                                    form = FindForm(byCode = false, lastName = mrz.surname, firstName = mrz.givenNames)
+                                    when (val result = model.find(PassportQuery(mrz.surname, mrz.givenNames))) {
+                                        is FindResult.Found -> {
+                                            foundStay(result, state.contract?.languages.orEmpty(), shot)
+                                            true
+                                        }
+                                        is FindResult.NotFound, is FindResult.Locked -> {
+                                            notFound = result
+                                            screen = Screen.NotFound
+                                            true
+                                        }
+                                        is FindResult.Blocked -> {
+                                            blocked = result
+                                            screen = Screen.Blocked
+                                            true
+                                        }
+                                        FindResult.Network -> {
+                                            scanError = networkError
+                                            false
+                                        }
+                                        FindResult.Server -> {
+                                            scanError = serverError
+                                            false
+                                        }
+                                    }
+                                },
+                            )
+                        }
                         Screen.Find -> {
                             val networkError = str(R.string.error_network)
                             val serverError = str(R.string.error_server)
@@ -139,19 +218,12 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     form = it
                                     findError = null
                                 },
-                                onBack = { screen = Screen.Menu },
+                                onBack = { screen = Screen.Scan },
                                 onLanguage = { screen = Screen.Language },
-                                onCall = { screen = Screen.ComingNext },
+                                onCall = { callOpen = true },
                                 onSubmit = {
                                     when (val result = model.find(form.query())) {
-                                        is FindResult.Found -> {
-                                            session = result.sessionId
-                                            stay = result.stay
-                                            // 예약 언어가 있으면 그 언어로(FR-K01) — 이 건물이 쓰는 언어일 때만.
-                                            val languages = state.contract?.languages.orEmpty()
-                                            if (result.language != null && result.language in languages) language = result.language
-                                            screen = if (result.checkedIn) Screen.CheckedIn else Screen.Guests
-                                        }
+                                        is FindResult.Found -> foundStay(result, state.contract?.languages.orEmpty(), null)
                                         is FindResult.NotFound, is FindResult.Locked -> {
                                             notFound = result
                                             screen = Screen.NotFound
@@ -170,85 +242,75 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                             form = form,
                             remaining = (notFound as? FindResult.NotFound)?.remaining ?: 0,
                             lockedUntil = (notFound as? FindResult.Locked)?.untilMillis,
-                            onBack = { screen = Screen.Find },
-                            onCall = { screen = Screen.ComingNext },
-                            onRetry = { screen = Screen.Find },
+                            onBack = { screen = Screen.Scan },
+                            onCall = { callOpen = true },
+                            onRetry = { screen = Screen.Scan },
                         )
                         Screen.Blocked -> BlockedScreen(
                             reason = blocked?.reason ?: BlockReason.Expired,
                             checkInDate = blocked?.checkInDate,
-                            onBack = { screen = Screen.Find },
-                            onCall = { screen = Screen.ComingNext },
+                            onBack = { screen = Screen.Scan },
+                            onCall = { callOpen = true },
                             onHome = reset,
                         )
                         Screen.CheckedIn -> stay?.let { current ->
                             CheckedInScreen(
                                 stay = current,
-                                onBack = { screen = Screen.Find },
-                                onCall = { screen = Screen.ComingNext },
+                                onBack = { screen = Screen.Scan },
+                                onCall = { callOpen = true },
                                 onRoom = { screen = Screen.ComingNext },
-                                onMore = { screen = Screen.Guests },
+                                onMore = { screen = Screen.Fast },
                                 onHome = reset,
                             )
                         }
-                        Screen.Guests -> stay?.let { current ->
-                            GuestsScreen(
-                                stay = current,
-                                onBack = { screen = Screen.Find },
-                                onCall = { screen = Screen.ComingNext },
-                                onParty = { size ->
-                                    val updated = session?.let { model.setParty(it, size) }
-                                    if (updated != null) stay = updated
-                                    updated != null
-                                },
-                                onStart = { screen = if (current.guests.isNotEmpty() && emptySeats(current) == 0 && !needsRoute(current)) afterGuests(current) else Screen.Passport },
-                            )
-                        }
-                        Screen.Passport -> {
+                        Screen.Fast -> {
                             val current = stay
                             val id = session
                             if (current != null && id != null) {
-                                PassportFlow(
+                                FastCheckin(
                                     stay = current,
-                                    onSave = { model.saveGuest(id, it) },
-                                    onUpload = { guestId, jpeg -> model.uploadPassport(id, guestId, jpeg) },
-                                    onRoute = { prev, next -> model.saveRoute(id, prev, next) },
+                                    first = firstShot,
+                                    language = language,
+                                    termsText = state.contract?.termsText.orEmpty(),
+                                    actions = FastActions(
+                                        save = { model.saveGuest(id, it) },
+                                        setParty = { model.setParty(id, it) },
+                                        saveRoute = { prev, next -> model.saveRoute(id, prev, next) },
+                                        saveConsent = { model.saveConsent(id, language) },
+                                        enqueuePassport = { guestId, jpeg -> model.enqueuePassport(id, guestId, jpeg) },
+                                        enqueueFace = { guestId, file -> model.enqueueFace(id, guestId, file) },
+                                        faceFailed = model::faceFailed,
+                                        retryUploads = model::retryUploads,
+                                        awaitUploads = model::awaitUploads,
+                                    ),
                                     onStay = { stay = it },
                                     onSessionGone = reset,
-                                    onBack = { screen = Screen.Guests },
-                                    onCall = { screen = Screen.ComingNext },
-                                    onDone = { screen = afterGuests(stay ?: current) },
-                                )
-                            }
-                        }
-                        Screen.Consent -> {
-                            val id = session
-                            if (id != null) {
-                                ConsentScreen(
-                                    termsText = state.contract?.termsText.orEmpty(),
-                                    language = language,
-                                    onBack = { screen = Screen.Guests },
-                                    onCall = { screen = Screen.ComingNext },
-                                    onAgree = {
-                                        when (val saved = model.saveConsent(id, language)) {
-                                            is SaveResult.Saved -> {
-                                                stay = saved.stay
-                                                // 다음 묶음: 확인 동영상 · 완료.
-                                                screen = Screen.ComingNext
-                                                true
-                                            }
-                                            SaveResult.SessionGone -> {
-                                                reset()
-                                                true
-                                            }
-                                            else -> false
-                                        }
+                                    // 처음 화면(F1)으로 — 이 예약의 올리기 줄 · 임시 파일을 비운다(다음 손님에게 넘어가지 않게).
+                                    onBack = {
+                                        model.clearUploads()
+                                        firstShot = null
+                                        session = null
+                                        stay = null
+                                        screen = Screen.Scan
+                                    },
+                                    onCall = { callOpen = true },
+                                    onStep = timer::enter,
+                                    onDone = {
+                                        timer.enter("done")
+                                        timer.finish()
+                                        screen = Screen.ComingNext
                                     },
                                 )
                             }
                         }
-                        Screen.ComingNext -> ComingNextScreen(onBack = { screen = Screen.Language })
+                        // 완료 화면(G4)은 다음 묶음 — 지금은 자리표시. 돌아가면 처음 상태로.
+                        Screen.ComingNext -> ComingNextScreen(onBack = reset)
                     }
+                }
+            }
+            if (callOpen) {
+                Box(Modifier.fillMaxSize().background(G.Bg).pointerInput(Unit) { detectTapGestures { } }) {
+                    Localized(language) { ComingNextScreen(onBack = { callOpen = false }) }
                 }
             }
             // 직원 화면은 손님이 고른 언어가 아니라 기기 언어로.
@@ -279,9 +341,6 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
         }
     }
 }
-
-/** 명부가 끝난 뒤 — 아직 동의 전이면 동의(G3b), 미리 동의했으면 다음 단계. */
-private fun afterGuests(stay: KioskStay): Screen = if (stay.consented) Screen.ComingNext else Screen.Consent
 
 @Composable
 private fun Centered(text: String) {

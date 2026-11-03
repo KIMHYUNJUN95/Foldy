@@ -15,3 +15,14 @@ export function sniffImageType(bytes: Uint8Array): "image/jpeg" | "image/png" | 
 }
 
 export const EXTENSION = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
+
+export const MAX_FACE_VIDEO_BYTES = 4 * 1024 * 1024;
+
+const VIDEO_BRANDS = new Set(["isom", "iso2", "iso4", "iso5", "iso6", "mp41", "mp42", "avc1", "M4V ", "qt  "]);
+
+/** MP4 · 3GP · MOV 는 4~8번째 바이트가 「ftyp」, 8~12번째가 허용 브랜드. 이름 · Content-Type 은 믿지 않는다(HEIC · AVIF · M4A 는 거절). */
+export function sniffVideoType(bytes: Uint8Array): "video/mp4" | null {
+  if (bytes.length < 12 || String.fromCharCode(...bytes.slice(4, 8)) !== "ftyp") return null;
+  const brand = String.fromCharCode(...bytes.slice(8, 12));
+  return VIDEO_BRANDS.has(brand) || brand.startsWith("3gp") ? "video/mp4" : null;
+}

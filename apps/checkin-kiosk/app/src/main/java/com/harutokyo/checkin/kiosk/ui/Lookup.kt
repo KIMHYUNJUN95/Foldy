@@ -405,74 +405,22 @@ fun seatStateOf(guest: KioskGuest?): SeatState = when {
     else -> SeatState.Partial
 }
 
-/** T2 — 예약 찾음 · 명부. 인원은 ± 로 바꾸되 막지 않는다(FR-K05). */
+/** 인원 − N + (시안 T2 의 칸 그대로 — 빠른 체크인 F2 「인원 바꾸기」 창이 가져다 쓴다). 줄일 때는 이미 저장한 분 수 밑으로 못 내린다. */
 @Composable
-fun GuestsScreen(
-    stay: KioskStay,
-    onBack: () -> Unit,
-    onCall: () -> Unit,
-    onParty: suspend (Int) -> Boolean,
-    onStart: () -> Unit,
-) {
-    var busy by remember { mutableStateOf(false) }
-    var partyError by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val change: (Int) -> Unit = { next ->
-        if (!busy) {
-            busy = true
-            scope.launch {
-                partyError = !onParty(next)
-                busy = false
-            }
-        }
-    }
-    val seats = maxOf(stay.partySize, stay.guests.size)
-    val allDone = emptySeats(stay) == 0
-    ScrollPage(bottom = { BottomRow(onCall, str(if (allDone) R.string.guests_next else R.string.guests_start), onPrimary = onStart) }) {
-        StepTop(2, onBack)
-        Spacer(Modifier.height(40.dp))
-        Heading(str(R.string.guests_title), str(R.string.guests_body))
-        Spacer(Modifier.height(32.dp))
-        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            InfoBox(str(R.string.guests_room), Modifier.weight(1f).fillMaxHeight()) {
-                Text(stay.rooms.joinToString(", ").ifEmpty { "—" }, color = G.Text, fontSize = 28.sp, fontWeight = FontWeight.Medium)
-            }
-            InfoBox(str(R.string.guests_dates), Modifier.weight(1f).fillMaxHeight()) {
-                val from = parseDate(stay.checkInDate)
-                val to = parseDate(stay.checkOutDate)
-                val dates = if (from != null && to != null) shortDate(from) + " → " + shortDate(to) else stay.checkInDate
-                Text(dates, color = G.Text, fontSize = 20.sp, fontWeight = FontWeight.Medium, lineHeight = 26.sp)
-                Text(str(R.string.guests_nights, stay.nights), color = G.Muted, fontSize = 14.sp)
-            }
-            InfoBox(str(R.string.guests_party), Modifier.weight(1f).fillMaxHeight()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    StepButton("−", str(R.string.guests_less), enabled = !busy && stay.partySize > maxOf(1, stay.guests.size)) { change(stay.partySize - 1) }
-                    Text(
-                        stay.partySize.toString(),
-                        color = G.Text, fontSize = 30.sp, fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    StepButton("+", str(R.string.guests_more), enabled = !busy && stay.partySize < 20) { change(stay.partySize + 1) }
-                }
-            }
-        }
-        if (partyError) {
-            Spacer(Modifier.height(10.dp))
-            Text(str(R.string.party_error), color = G.Error, fontSize = 15.sp)
-        }
-        Spacer(Modifier.height(32.dp))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(G.LineStrong))
-        for (index in 0 until seats) {
-            val guest = stay.guests.getOrNull(index)
-            SeatRow(index + 1, guest)
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(str(R.string.guests_child_hint), color = G.Muted, fontSize = 15.sp, lineHeight = 22.sp)
+internal fun PartyStepper(stay: KioskStay, busy: Boolean, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        StepButton("−", str(R.string.guests_less), enabled = !busy && stay.partySize > maxOf(1, stay.guests.size)) { onChange(stay.partySize - 1) }
+        Text(
+            stay.partySize.toString(),
+            color = G.Text, fontSize = 30.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        StepButton("+", str(R.string.guests_more), enabled = !busy && stay.partySize < 20) { onChange(stay.partySize + 1) }
     }
 }
 
 @Composable
-private fun InfoBox(label: String, modifier: Modifier, content: @Composable () -> Unit) {
+internal fun InfoBox(label: String, modifier: Modifier, content: @Composable () -> Unit) {
     Column(modifier.background(G.Surface, Radius).padding(horizontal = 20.dp, vertical = 18.dp)) {
         Text(label, color = G.Muted, fontSize = 15.sp)
         Spacer(Modifier.height(8.dp))
@@ -490,42 +438,4 @@ private fun StepButton(symbol: String, label: String, enabled: Boolean, onClick:
     ) {
         Text(symbol, color = if (enabled) G.Text else G.Line, fontSize = 26.sp)
     }
-}
-
-@Composable
-private fun SeatRow(number: Int, guest: KioskGuest?) {
-    val state = seatStateOf(guest)
-    val name = when {
-        guest?.name != null -> guest.name
-        else -> str(R.string.guests_seat, number)
-    }
-    val sub = buildList {
-        if (guest?.isRepresentative == true) add(str(R.string.guests_rep))
-        add(
-            when (state) {
-                SeatState.Done -> str(R.string.guests_sub_done)
-                SeatState.PhotoOnly -> str(R.string.guests_sub_photo)
-                SeatState.Partial -> str(R.string.guests_sub_partial)
-                SeatState.Empty -> str(R.string.guests_sub_empty)
-            },
-        )
-    }.joinToString(" · ")
-    Row(Modifier.fillMaxWidth().heightIn(min = 104.dp).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(number.toString(), color = G.Muted, fontSize = 15.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.width(44.dp))
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(name, color = G.Text, fontSize = 26.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(6.dp))
-            Text(sub, color = G.Muted, fontSize = 15.sp)
-        }
-        if (state == SeatState.Done) {
-            Box(Modifier.heightIn(min = 60.dp).border(BorderStroke(1.dp, Color(0xFF3A4030)), Radius).padding(horizontal = 22.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text("✓ " + str(R.string.guests_done), color = G.Sage, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-            }
-        } else {
-            Box(Modifier.heightIn(min = 60.dp).background(G.Sand, Radius).padding(horizontal = 22.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text(str(R.string.guests_need), color = G.Ink, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-    }
-    Box(Modifier.fillMaxWidth().height(1.dp).background(G.Line))
 }

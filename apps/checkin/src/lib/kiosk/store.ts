@@ -39,14 +39,14 @@ export async function readNameCandidates(
   db: CheckinServiceClient,
   organizationId: string,
   propertyKey: string,
-  checkInDate: string,
+  checkInDate: string | string[],
 ): Promise<{ stays: KioskStayRow[]; candidates: NameCandidate[] }> {
   const { data: stays, error } = await db
     .from("stays")
     .select(STAY_COLUMNS)
     .eq("organization_id", organizationId)
     .eq("property_key", propertyKey)
-    .eq("check_in_date", checkInDate);
+    .in("check_in_date", Array.isArray(checkInDate) ? checkInDate : [checkInDate]);
   if (error) throw new Error(`stays 읽기 실패: ${error.message}`);
   if (!stays?.length) return { stays: [], candidates: [] };
 
@@ -172,6 +172,7 @@ export type KioskGuest = {
   isRepresentative: boolean;
   isChild: boolean;
   hasPassportPhoto: boolean;
+  hasFaceVideo: boolean;
   missing: string[];
   hasJapanAddress: boolean;
   /** 대표자만 — 확인 화면에서 주소 · 연락처를 미리 채우려고. */
@@ -198,6 +199,7 @@ export function kioskStayOf(stay: StayView) {
         isRepresentative: guest.is_representative,
         isChild: guest.guest_type === "child",
         hasPassportPhoto: guest.hasPassportPhoto,
+        hasFaceVideo: guest.hasFaceVideo,
         missing: guest.missing,
         hasJapanAddress: guest.has_japan_address === true,
         ...(guest.is_representative ? { address: guest.address, contact: guest.contact } : {}),

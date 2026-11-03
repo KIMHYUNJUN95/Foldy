@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BUILDING_KEYS, isBuildingKey } from "../building-key";
 import { COUNTRIES, isCountryCode } from "../guest/countries";
 import { guestInputSchema, missingFields, nameRomanOf, type StoredGuest } from "../guest/fields";
-import { sniffImageType } from "../guest/image";
+import { sniffImageType, sniffVideoType } from "../guest/image";
 import { lockState, MAX_FAILURES } from "../guest/limits";
 import { matchClaim, normalizeReference, phoneLast4Of, sameName, type ClaimCandidate } from "../guest/match";
 import { hashGuestToken, isTokenShaped, newGuestToken } from "../guest/token";
@@ -194,5 +194,20 @@ describe("party", () => {
   it("keeps the representative", () => {
     expect(partyAfterRemoval(1, 1, false)).toBeNull();
     expect(partyAfterRemoval(1, 1, true)).toBeNull();
+  });
+});
+
+describe("영상 형식 확인", () => {
+  it("ftyp 를 가진 MP4 만 통과", () => {
+    const mp4 = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+    expect(sniffVideoType(mp4)).toBe("video/mp4");
+    const ftyp = (brand: string) => new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, ...[...brand].map((ch) => ch.charCodeAt(0))]);
+    expect(sniffVideoType(ftyp("3gp4"))).toBe("video/mp4");
+    expect(sniffVideoType(ftyp("qt  "))).toBe("video/mp4");
+    expect(sniffVideoType(ftyp("heic"))).toBeNull();
+    expect(sniffVideoType(ftyp("avif"))).toBeNull();
+    expect(sniffVideoType(ftyp("M4A "))).toBeNull();
+    expect(sniffVideoType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBeNull();
+    expect(sniffVideoType(new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74]))).toBeNull();
   });
 });

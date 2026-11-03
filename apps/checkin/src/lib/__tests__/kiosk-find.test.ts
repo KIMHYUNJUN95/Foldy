@@ -8,6 +8,9 @@ import {
   kioskLanguageOf,
   kioskLockState,
   matchByName,
+  matchByPassport,
+  matchByPassportStays,
+  passportSearchDates,
   pickByCode,
 } from "../kiosk/find";
 
@@ -111,5 +114,70 @@ describe("태블릿 예약 찾기 — 그 밖", () => {
     expect(clampPartySize(0, 0)).toBeNull();
     expect(clampPartySize(21, 1)).toBeNull();
     expect(clampPartySize(2.5, 1)).toBeNull();
+  });
+});
+
+describe("여권으로 예약 찾기", () => {
+  const c = (stayId: string, ...guestNames: string[]) => ({ stayId, guestNames });
+  it("가운데 이름이 있어도 찾는다", () => {
+    expect(matchByPassport([c("a", "Daniel Hu")], "HU", "DANIEL JAMES")).toBe("a");
+  });
+  it("성 · 이름 순서가 뒤집혀도 찾는다", () => {
+    expect(matchByPassport([c("a", "Hu Daniel")], "HU", "DANIEL JAMES")).toBe("a");
+  });
+  it("성이 다르면 찾지 않는다", () => {
+    expect(matchByPassport([c("a", "Daniel Smith")], "HU", "DANIEL JAMES")).toBeNull();
+  });
+  it("같은 이름 예약이 둘이면 아무것도 열지 않는다", () => {
+    expect(matchByPassport([c("a", "Daniel Hu"), c("b", "Daniel Hu")], "HU", "DANIEL")).toBeNull();
+  });
+  it("한 단어 예약 이름은 sameName 으로만 맞는다", () => {
+    expect(matchByPassport([c("a", "Daniel")], "HU", "DANIEL")).toBeNull();
+    expect(matchByPassport([c("a", "Madonna")], "MADONNA", "")).toBe("a");
+  });
+});
+
+describe("여권 찾기 날짜", () => {
+  it("오늘과 어제(도쿄)", () => {
+    expect(passportSearchDates(new Date("2026-11-05T12:00:00Z"))).toEqual(["2026-11-05", "2026-11-04"]);
+  });
+  it("UTC 로는 아직 전날인 도쿄 새벽", () => {
+    expect(passportSearchDates(new Date("2026-11-04T16:30:00Z"))).toEqual(["2026-11-05", "2026-11-04"]);
+  });
+  it("달 경계", () => {
+    expect(passportSearchDates(new Date("2026-12-01T00:00:00Z"))).toEqual(["2026-12-01", "2026-11-30"]);
+  });
+});
+
+describe("여권 찾기 — 예외", () => {
+  const c = (stayId: string, ...guestNames: string[]) => ({ stayId, guestNames });
+  it("MRZ 이름이 비어 있어도 여러 단어 예약은 sameName 으로 맞는다", () => {
+    expect(matchByPassport([c("a", "Hu Daniel")], "HU DANIEL", "")).toBe("a");
+    expect(matchByPassport([c("a", "Daniel Hu")], "HU", "")).toBeNull();
+  });
+  it("O'Brien 은 OBRIEN 과 맞는다", () => {
+    expect(matchByPassport([c("a", "O'Brien")], "OBRIEN", "")).toBe("a");
+    expect(matchByPassport([c("a", "Sean O'Brien")], "OBRIEN", "SEAN")).toBe("a");
+  });
+  it("예약 단어가 여권에 다 있어도 성이 안 맞으면 찾지 않는다", () => {
+    expect(matchByPassport([c("a", "Daniel James")], "HU", "DANIEL JAMES")).toBeNull();
+  });
+});
+
+describe("여권 찾기 — 상태로 좁히기", () => {
+  const today = "2026-11-05";
+  const names = (...ids: string[]) => ids.map((id) => ({ stayId: id, guestNames: ["Daniel Hu"] }));
+  const st = (id: string, status: string, checkInDate = today) => ({ id, status, checkInDate });
+  it("어제 체크인 끝난 것과 오늘 대기는 오늘 것", () => {
+    expect(matchByPassportStays(names("y", "t"), [st("y", "checked_in", "2026-11-04"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");
+  });
+  it("취소와 대기는 대기", () => {
+    expect(matchByPassportStays(names("x", "t"), [st("x", "cancelled"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");
+  });
+  it("오늘 대기가 둘이면 열지 않는다", () => {
+    expect(matchByPassportStays(names("a", "b"), [st("a", "pending"), st("b", "pending")], "HU", "DANIEL", today)).toBeNull();
+  });
+  it("어제 대기와 오늘 대기는 오늘 것", () => {
+    expect(matchByPassportStays(names("y", "t"), [st("y", "pending", "2026-11-04"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");
   });
 });

@@ -17,7 +17,7 @@ export type ClaimInput = {
 };
 
 // 이름: 대소문자 · 공백 · 점 · 하이픈 · 악센트 무시, 성 · 이름 순서 무시.
-function nameTokens(value: string): string[] {
+export function nameTokens(value: string): string[] {
   return value
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")

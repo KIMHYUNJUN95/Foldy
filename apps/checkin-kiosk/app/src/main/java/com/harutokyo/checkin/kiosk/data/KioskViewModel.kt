@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import java.io.File
 import java.io.IOException
 
 // 기기 상태: 등록(토큰) · 계약(설정) · 연결 · 폐기. 화면은 이 상태만 본다.
@@ -178,17 +179,57 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun saveConsent(sessionId: String, locale: String): SaveResult =
         post("/api/kiosk/consent", Api.json.encodeToString(ConsentBody(sessionId, terms = true, locale = locale)))
 
-    /** 시안 T3 — 찍은 여권 사진(JPEG). 저장한 사람에게만. */
-    suspend fun uploadPassport(sessionId: String, guestId: String, jpeg: ByteArray): SaveResult {
-        val token = vault.get(KEY_TOKEN) ?: return SaveResult.Failed
+    /** 빠른 체크인 — 얼굴 영상(MP4 5초). 저장한 사람에게만. */
+    suspend fun uploadFace(sessionId: String, guestId: String, file: File): UploadResult =
+        sendUpload { token -> Api.uploadFile("/api/kiosk/face", token, mapOf("session_id" to sessionId, "guest_id" to guestId), "face.mp4", "video/mp4", file) }
+
+    /** 뒤에서 차례로 올리는 줄(여권 사진 → 얼굴 영상). 화면은 기다리지 않는다. */
+    private val uploads = UploadQueue(viewModelScope) { job ->
+        when (job.kind) {
+            UploadKind.Passport -> job.jpeg?.let { uploadPassport(job.sessionId, job.guestId, it) } ?: UploadResult.GiveUp
+            UploadKind.Face -> job.file?.let { uploadFace(job.sessionId, job.guestId, it) } ?: UploadResult.GiveUp
+        }
+    }
+    val uploadCounts: StateFlow<UploadCounts> = uploads.counts
+
+    /** 예약을 찾았다 — 올리기 줄을 이 예약으로 연다(이전 손님 것은 비운다). */
+    fun openUploads(sessionId: String) = uploads.open(sessionId)
+
+    fun enqueuePassport(sessionId: String, guestId: String, jpeg: ByteArray) =
+        uploads.enqueue(UploadJob(UploadKind.Passport, sessionId, guestId, jpeg = jpeg))
+
+    /** 4MB 를 넘는 영상은 올리지 않고 얼굴 실패로 센다(서버 상한). */
+    fun enqueueFace(sessionId: String, guestId: String, file: File) {
+        if (!file.exists() || file.length() > MAX_FACE_BYTES) uploads.markFaceFailed(guestId, file)
+        else uploads.enqueue(UploadJob(UploadKind.Face, sessionId, guestId, file = file))
+    }
+
+    fun faceFailed(guestId: String) = uploads.markFaceFailed(guestId)
+
+    fun retryUploads() = uploads.retryFailed()
+
+    suspend fun awaitUploads(): UploadWait = uploads.awaitIdle()
+
+    /** 처음으로 돌아갈 때 — 못 보낸 것 · 임시 영상 파일을 버린다. */
+    fun clearUploads() = uploads.clear()
+
+    /** 업로드 한 건 — 401 이면 post() 처럼 기기 해제(등록 화면으로), 네트워크 오류는 Retry. */
+    private suspend fun sendUpload(call: suspend (String) -> Api.HttpResult): UploadResult {
+        val token = vault.get(KEY_TOKEN) ?: return UploadResult.Revoked
         val result = try {
-            Api.upload("/api/kiosk/passport", token, mapOf("session_id" to sessionId, "guest_id" to guestId), "passport.jpg", jpeg)
+            call(token)
         } catch (_: IOException) {
             _state.update { it.copy(online = false) }
-            return SaveResult.Failed
+            return UploadResult.Retry
         }
-        return saveResultOf(result.status, runCatching { Api.json.decodeFromString<SaveResponse>(result.body) }.getOrNull())
+        val outcome = uploadResultOf(result.status, runCatching { Api.json.decodeFromString<SaveResponse>(result.body) }.getOrNull())
+        if (outcome == UploadResult.Revoked) forget(revoked = true) else _state.update { it.copy(online = true) }
+        return outcome
     }
+
+    /** 시안 T3 — 찍은 여권 사진(JPEG). 저장한 사람에게만. */
+    suspend fun uploadPassport(sessionId: String, guestId: String, jpeg: ByteArray): UploadResult =
+        sendUpload { token -> Api.upload("/api/kiosk/passport", token, mapOf("session_id" to sessionId, "guest_id" to guestId), "passport.jpg", jpeg) }
 
     private suspend fun post(path: String, body: String): SaveResult {
         val token = vault.get(KEY_TOKEN) ?: return SaveResult.Failed

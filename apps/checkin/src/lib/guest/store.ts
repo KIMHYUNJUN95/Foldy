@@ -46,7 +46,7 @@ export type StayView = {
   retainUntil: string | null;
   editable: boolean;
   rooms: string[];
-  guests: (GuestRow & { hasPassportPhoto: boolean; missing: MissingField[] })[];
+  guests: (GuestRow & { hasPassportPhoto: boolean; hasFaceVideo: boolean; missing: MissingField[] })[];
   consented: boolean;
 };
 
@@ -169,15 +169,16 @@ export async function loadStayById(db: CheckinServiceClient, stayId: string): Pr
     guestRows.length
       ? db
           .from("guest_documents")
-          .select("guest_id")
-          .eq("kind", "passport")
+          .select("guest_id, kind")
+          .in("kind", ["passport", "face_video"])
           .is("replaced_by", null)
           .in("guest_id", guestRows.map((guest) => guest.id))
-      : Promise.resolve({ data: [] as { guest_id: string }[] }),
+      : Promise.resolve({ data: [] as { guest_id: string; kind: string }[] }),
     db.from("consents").select("id").eq("stay_id", stay.id).limit(1),
     db.from("stay_rooms").select("room_label").eq("stay_id", stay.id).order("room_label"),
   ]);
-  const withPhoto = new Set((docs ?? []).map((doc) => doc.guest_id as string));
+  const withPhoto = new Set((docs ?? []).filter((doc) => doc.kind === "passport").map((doc) => doc.guest_id as string));
+  const withFaceVideo = new Set((docs ?? []).filter((doc) => doc.kind === "face_video").map((doc) => doc.guest_id as string));
 
   return {
     id: stay.id as string,
@@ -196,6 +197,7 @@ export async function loadStayById(db: CheckinServiceClient, stayId: string): Pr
     guests: guestRows.map((guest) => ({
       ...guest,
       hasPassportPhoto: withPhoto.has(guest.id),
+      hasFaceVideo: withFaceVideo.has(guest.id),
       missing: missingFields(guest, withPhoto.has(guest.id)),
     })),
     consented: (consents ?? []).length > 0,

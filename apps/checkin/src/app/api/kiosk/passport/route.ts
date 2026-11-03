@@ -88,10 +88,15 @@ export async function POST(request: Request) {
     }
 
     if (previous?.length) {
-      await db
+      const { error: replaceError } = await db
         .from("guest_documents")
         .update({ replaced_by: doc.id })
         .in("id", previous.map((row) => row.id));
+      if (replaceError) {
+        await db.from("guest_documents").delete().eq("id", doc.id);
+        await db.storage.from(PASSPORT_BUCKET).remove([path]);
+        throw new Error(replaceError.message);
+      }
       await db.storage.from(PASSPORT_BUCKET).remove(previous.map((row) => row.storage_path as string));
     }
 

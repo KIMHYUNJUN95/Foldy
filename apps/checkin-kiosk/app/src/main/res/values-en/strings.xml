@@ -86,53 +86,22 @@
     <string name="done_more">Finish the guest list</string>
     <string name="done_more_body">Guests still empty: %1$d</string>
     <string name="guests_title">Booking found</string>
-    <string name="guests_body">Check the room and dates, then register each guest.</string>
     <string name="guests_room">Room</string>
     <string name="guests_dates">Dates</string>
     <string name="guests_nights">Nights: %1$d</string>
     <string name="guests_party">Guests</string>
     <string name="guests_less">Remove a guest</string>
     <string name="guests_more">Add a guest</string>
-    <string name="guests_rep">Booker</string>
     <string name="guests_seat">Guest %1$d</string>
-    <string name="guests_done">Done</string>
-    <string name="guests_need">Scan passport</string>
-    <string name="guests_sub_done">All entered</string>
-    <string name="guests_sub_photo">Just the passport photo left</string>
-    <string name="guests_sub_empty">Nothing entered yet</string>
-    <string name="guests_sub_partial">A few fields left</string>
-    <string name="guests_child_hint">Count children as guests too. If they have no passport, you can choose that next.</string>
-    <string name="guests_start">Start with the next guest</string>
-    <string name="guests_next">Next</string>
     <string name="party_error">Couldn\'t change the number of guests. Please try again.</string>
-    <string name="passport_who">Guest %1$d of %2$d</string>
-    <string name="passport_intro_title">We\'ll scan your passport photo page</string>
-    <string name="passport_intro_body">Hold it up to the camera and it scans by itself. Your name and passport number are filled in from the passport.</string>
-    <string name="passport_intro_mrz">Make sure the 2 lines at the bottom are visible</string>
-    <string name="passport_tip_open">Open it to the page with your photo</string>
     <string name="passport_tip_lines">Keep your fingers off the bottom 2 lines</string>
     <string name="passport_tip_glare">If light reflects, tilt it slightly</string>
     <string name="passport_none">I don\'t have a passport</string>
-    <string name="passport_retention">Passport photos are kept as part of the guest register for 3 years, then deleted. They aren\'t used for anything else.</string>
-    <string name="passport_camera_on">Turn on camera</string>
-    <string name="camera_title">Fit your passport in the frame</string>
-    <string name="camera_body">Hold the photo page up to the camera at the top of the screen.</string>
     <string name="camera_up">Camera</string>
     <string name="camera_hold">Hold still for a moment</string>
     <string name="camera_find">Looking for the 2 lines at the bottom</string>
-    <string name="camera_short_open">Open to the photo page</string>
-    <string name="camera_short_lines">Keep the bottom 2 lines clear</string>
-    <string name="camera_short_glare">Avoid glare</string>
-    <string name="camera_type">Type it in instead</string>
     <string name="camera_shutter">Take photo</string>
     <string name="camera_denied">The camera isn\'t available</string>
-    <string name="reading_title">Got it. Reading…</string>
-    <string name="reading_body">This takes a second or two. You can put the passport down.</string>
-    <string name="reading_name">Name</string>
-    <string name="reading_number">Passport number</string>
-    <string name="reading_rest">Date of birth · nationality · sex</string>
-    <string name="reading_done">Read</string>
-    <string name="reading_wait">Reading</string>
     <string name="retake">Retake</string>
     <string name="confirm_title">Read from your passport</string>
     <string name="confirm_body">Check the details and tap any box that\'s wrong to fix it.</string>
@@ -178,8 +147,6 @@
     <string name="nopass_camera">The camera won\'t turn on</string>
     <string name="nopass_note">Japan\'s guest register needs a passport number for foreign guests. Staff will follow up with anyone registered without one.</string>
     <string name="nopass_back">Back to the camera</string>
-    <string name="route_title">Where are you coming from, and where to next?</string>
-    <string name="route_body">Japan\'s guest register requires these two answers. A city name is enough.</string>
     <string name="route_q1">① Where did you stay last night?</string>
     <string name="route_q1_sub">The place you stayed right before this one</string>
     <string name="route_arrived">I arrived in Japan today</string>
@@ -197,17 +164,69 @@
     <string name="city_fukuoka">Fukuoka</string>
     <string name="city_other">Other · type it</string>
     <string name="city_other_hint">City name</string>
-    <string name="route_next">Next</string>
-    <string name="consent_title">Last step:\nplease agree</string>
-    <string name="consent_body">After you agree, we take a short check video and you\'re done.</string>
-    <string name="consent_point1">We keep a guest register as required by Japan\'s Hotel Business Act.</string>
-    <string name="consent_point2">The register, passport photos and check videos are kept for 3 years, then deleted.</string>
-    <string name="consent_point3">They are used only for the guest register and never given to others.</string>
     <string name="consent_terms">I agree to the terms of stay</string>
     <string name="consent_terms_sub">Check-in, check-out and house rules</string>
     <string name="consent_read">Read the full terms</string>
-    <string name="consent_need">Tick the box</string>
-    <string name="consent_go">Agree and continue</string>
     <string name="terms_close">Close</string>
     <string name="terms_empty">The terms haven\'t been added yet. Please ask our staff.</string>
+    <!-- 빠른 체크인(F1~F7b) -->
+    <string name="fast_f1_title">Show the passport of the person who booked</string>
+    <string name="fast_f1_body">We find today\'s booking from the passport name. This photo goes straight into the guest register.</string>
+    <string name="fast_f1_by_code">Find by code</string>
+    <string name="fast_f1_by_name">Find by name</string>
+    <string name="fast_f1_searching">Looking for your booking…</string>
+    <string name="fast_f1_retry">Couldn\'t read it. Please hold it up again.</string>
+    <string name="fast_found_title">%1$s, we found your booking</string>
+    <string name="fast_party_count">%1$d</string>
+    <string name="fast_cards_title">Get passports ready now: %1$d</string>
+    <string name="fast_cards_title_face">Just a 5-second face video each</string>
+    <string name="fast_cards_body">One person at a time: show the passport, then look at the camera for 5 seconds. About 2 minutes in all.</string>
+    <string name="fast_seat_rep">Passport scanned · face only left</string>
+    <string name="fast_seat_face">Face only left</string>
+    <string name="fast_seat_done">Done in pre-registration</string>
+    <string name="fast_seat_todo">Passport + 5-second face</string>
+    <string name="fast_child_note">Count children as one guest each. If the number is wrong:</string>
+    <string name="fast_change_party">Change guests</string>
+    <string name="fast_start">Start</string>
+    <string name="fast_pass_title">Show the passport for %1$s</string>
+    <string name="fast_pass_toast">%1$s is done — next person, show your passport</string>
+    <string name="fast_face_title">Lower the passport and look at the camera</string>
+    <string name="fast_face_sub_read">Passport read ✓ · 5 seconds of your face</string>
+    <string name="fast_face_sub">5 seconds of your face</string>
+    <string name="fast_recording">Recording</string>
+    <string name="fast_face_after">Moves on to the next person by itself</string>
+    <string name="fast_review_title">All %1$d read</string>
+    <string name="fast_review_body">Take one look. Tap a wrong line to fix it.</string>
+    <string name="fast_review_warn_digits">One number doesn\'t match — tap to check</string>
+    <string name="fast_review_warn_missing">Something is missing — tap to fill in</string>
+    <string name="fast_age">Age %1$d</string>
+    <string name="fast_place_title">Where you live</string>
+    <string name="fast_place_country">Country</string>
+    <string name="fast_place_country_tag">From passport</string>
+    <string name="fast_place_city">City</string>
+    <string name="fast_place_city_hint">e.g. Chicago</string>
+    <string name="fast_contact">Contact — one phone or email</string>
+    <string name="fast_contact_tag">From booking</string>
+    <string name="fast_review_note">Guests staying with you use the same details as the person who booked.</string>
+    <string name="fast_final_title">Two last things</string>
+    <string name="fast_final_title_one">One last thing</string>
+    <string name="fast_final_go">Agree and finish</string>
+    <string name="fast_finish">Finish</string>
+    <string name="fast_sending">Sending…</string>
+    <string name="fast_sending_body">One moment, please.</string>
+    <string name="fast_retry">Send again</string>
+    <string name="fast_retention">Under Japan\'s Hotel Business Act, the register, passport copy and face video are kept for 3 years and then deleted. They are not used for anything else.</string>
+    <string name="fast_face_turn">It\'s %1$s\'s turn. Press when ready</string>
+    <string-array name="fast_ordinals">
+        <item>Guest 1</item>
+        <item>Guest 2</item>
+        <item>Guest 3</item>
+        <item>Guest 4</item>
+        <item>Guest 5</item>
+        <item>Guest 6</item>
+        <item>Guest 7</item>
+        <item>Guest 8</item>
+        <item>Guest 9</item>
+        <item>Guest 10</item>
+    </string-array>
 </resources>

@@ -1,6 +1,6 @@
 // 태블릿 「예약 찾기」 판정(DB 없음 — 테스트로 덮는다). 44 FR-K01 · K02 · K03 · K04 · K17, 시안 T1 · T1k · T1x · T1b · T1c.
-import { sameName } from "../guest/match";
-import { todayTokyo } from "../tokyo-date";
+import { nameTokens, sameName } from "../guest/match";
+import { addDays, todayTokyo } from "../tokyo-date";
 
 export type KioskStayStatus = "pending" | "pre_registered" | "in_progress" | "checked_in" | "expired" | "cancelled";
 
@@ -26,6 +26,59 @@ export type NameCandidate = { stayId: string; guestNames: string[] };
 export function matchByName(candidates: NameCandidate[], lastName: string, firstName: string): string | null {
   const hits = candidates.filter((candidate) => candidate.guestNames.some((name) => sameName(name, lastName, firstName)));
   return hits.length === 1 ? hits[0].stayId : null;
+}
+
+/** 여권 찾기 후보 날짜 — 오늘 · 어제(도쿄). 자정 넘어 도착한 손님용. */
+export function passportSearchDates(now: Date): string[] {
+  const today = todayTokyo(now);
+  return [today, addDays(today, -1)];
+}
+
+/**
+ * 여권 MRZ(성 · 이름들)로 예약 찾기. sameName 이거나, 예약 이름이 2단어 이상이고 모두 여권 단어 안에 있으며
+ * 여권 성 단어가 예약 이름 안에 있으면 맞다(「Daniel Hu」 ↔ HU / DANIEL JAMES). 한 예약에만 맞을 때만 연다.
+ */
+export function passportHits(candidates: NameCandidate[], surname: string, givenNames: string): string[] {
+  const surnameTokens = nameTokens(surname);
+  const passportTokens = new Set([...surnameTokens, ...nameTokens(givenNames)]);
+  return candidates
+    .filter((candidate) =>
+      candidate.guestNames.some((name) => {
+        if (sameName(name, surname, givenNames)) return true;
+        const booked = nameTokens(name);
+        if (booked.length < 2 || surnameTokens.length === 0) return false;
+        return booked.every((token) => passportTokens.has(token)) && surnameTokens.every((token) => booked.includes(token));
+      }),
+    )
+    .map((candidate) => candidate.stayId);
+}
+
+export function matchByPassport(candidates: NameCandidate[], surname: string, givenNames: string): string | null {
+  const hits = passportHits(candidates, surname, givenNames);
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/**
+ * 취소 · 만료 예약은 빼고, 여럿이 맞으면 체크인 전인 것 → 오늘 도착인 것 순으로 좁힌다. 그래도 하나가 아니면 열지 않는다.
+ */
+export function matchByPassportStays(
+  candidates: NameCandidate[],
+  stays: { id: string; status: string; checkInDate: string }[],
+  surname: string,
+  givenNames: string,
+  today: string,
+): string | null {
+  const live = new Map(stays.filter((stay) => stay.status !== "cancelled" && stay.status !== "expired").map((stay) => [stay.id, stay]));
+  let ids = passportHits(candidates.filter((candidate) => live.has(candidate.stayId)), surname, givenNames);
+  if (ids.length > 1) {
+    const notDone = ids.filter((id) => live.get(id)?.status !== "checked_in");
+    if (notDone.length > 0) ids = notDone;
+  }
+  if (ids.length > 1) {
+    const arrivingToday = ids.filter((id) => live.get(id)?.checkInDate === today);
+    if (arrivingToday.length > 0) ids = arrivingToday;
+  }
+  return ids.length === 1 ? ids[0] : null;
 }
 
 /** 같은 코드가 여러 줄이면(취소된 옛 예약이 코드를 다시 쓴 경우) 진행 중인 것 → 가장 최근 것. */

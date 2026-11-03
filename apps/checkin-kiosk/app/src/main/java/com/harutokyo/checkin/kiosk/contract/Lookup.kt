@@ -18,6 +18,8 @@ data class KioskGuest(
     val address: String? = null,
     /** 대표자만 — 연락처를 미리 채운다. */
     val contact: String? = null,
+    /** 얼굴 영상(5초)이 이미 올라가 있다 — 있으면 빠른 체크인에서 얼굴 찍기를 건너뛴다. */
+    val hasFaceVideo: Boolean = false,
 )
 
 @Serializable
@@ -60,6 +62,11 @@ data class CodeQuery(val code: String) : FindQuery
 @Serializable
 @SerialName("name")
 data class NameQuery(val lastName: String, val firstName: String, val checkInDate: String) : FindQuery
+
+/** 여권 MRZ 의 성 · 이름으로 오늘 예약 찾기(빠른 체크인 F1). 이름은 비어 있을 수 있다. 몸통: {"mode":"passport","lastName":…,"firstName":…} */
+@Serializable
+@SerialName("passport")
+data class PassportQuery(val lastName: String, val firstName: String) : FindQuery
 
 /** 찾기 결과 — 화면이 갈 곳을 정한다. */
 sealed interface FindResult {

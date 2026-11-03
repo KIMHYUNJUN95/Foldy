@@ -86,53 +86,22 @@
     <string name="done_more">继续填写同行人登记</string>
     <string name="done_more_body">尚未填写: %1$d人</string>
     <string name="guests_title">找到您的预订了</string>
-    <string name="guests_body">请确认房间和日期，然后逐一登记入住的每一位。</string>
     <string name="guests_room">房间</string>
     <string name="guests_dates">日期</string>
     <string name="guests_nights">%1$d晚</string>
     <string name="guests_party">入住人数</string>
     <string name="guests_less">减少一位</string>
     <string name="guests_more">增加一位</string>
-    <string name="guests_rep">预订人</string>
     <string name="guests_seat">第%1$d位</string>
-    <string name="guests_done">完成</string>
-    <string name="guests_need">拍摄护照</string>
-    <string name="guests_sub_done">已全部填写</string>
-    <string name="guests_sub_photo">只差护照照片</string>
-    <string name="guests_sub_empty">还没有填写</string>
-    <string name="guests_sub_partial">还有几项未填</string>
-    <string name="guests_child_hint">儿童也请算作一位。没有护照的话可以在下一页选择。</string>
-    <string name="guests_start">从下一位开始</string>
-    <string name="guests_next">下一步</string>
     <string name="party_error">无法更改人数。请再试一次。</string>
-    <string name="passport_who">住客 %1$d / %2$d</string>
-    <string name="passport_intro_title">我们来拍护照照片页</string>
-    <string name="passport_intro_body">对准摄像头会自动拍摄。姓名、护照号码等会从护照读取并填入。</string>
-    <string name="passport_intro_mrz">露出最下面两行即可</string>
-    <string name="passport_tip_open">请翻开有照片的那一页</string>
     <string name="passport_tip_lines">请不要用手指挡住最下面两行</string>
     <string name="passport_tip_glare">如有反光，请稍微倾斜护照</string>
     <string name="passport_none">我没有护照</string>
-    <string name="passport_retention">护照照片作为住宿登记保存3年后删除，不会用于其他用途。</string>
-    <string name="passport_camera_on">打开摄像头</string>
-    <string name="camera_title">请把护照对准框内</string>
-    <string name="camera_body">请把照片页对准屏幕上方的摄像头。</string>
     <string name="camera_up">摄像头</string>
     <string name="camera_hold">请保持不动</string>
     <string name="camera_find">正在寻找最下面两行</string>
-    <string name="camera_short_open">翻开照片页</string>
-    <string name="camera_short_lines">露出最下面两行</string>
-    <string name="camera_short_glare">避免反光</string>
-    <string name="camera_type">我自己输入</string>
     <string name="camera_shutter">手动拍摄</string>
     <string name="camera_denied">无法使用摄像头</string>
-    <string name="reading_title">已拍摄，正在读取</string>
-    <string name="reading_body">只需1〜2秒，可以放下护照了。</string>
-    <string name="reading_name">姓名</string>
-    <string name="reading_number">护照号码</string>
-    <string name="reading_rest">出生日期・国籍・性别</string>
-    <string name="reading_done">已读取</string>
-    <string name="reading_wait">读取中</string>
     <string name="retake">重拍</string>
     <string name="confirm_title">已从护照读取</string>
     <string name="confirm_body">请确认内容，如有错误请点击修改。</string>
@@ -178,8 +147,6 @@
     <string name="nopass_camera">摄像头打不开</string>
     <string name="nopass_note">日本的住宿登记需要外国客人的护照号码。没有护照登记的客人，工作人员会另行确认。</string>
     <string name="nopass_back">返回拍摄护照</string>
-    <string name="route_title">您从哪里来，接下来去哪里?</string>
-    <string name="route_body">这是日本住宿登记必须填写的两项，写城市名即可。</string>
     <string name="route_q1">① 昨晚住在哪里?</string>
     <string name="route_q1_sub">来这里之前住的地方</string>
     <string name="route_arrived">我今天刚到日本</string>
@@ -197,17 +164,69 @@
     <string name="city_fukuoka">福冈</string>
     <string name="city_other">其他・手动输入</string>
     <string name="city_other_hint">城市名</string>
-    <string name="route_next">下一步</string>
-    <string name="consent_title">最后\n请同意</string>
-    <string name="consent_body">同意后，拍一段简短的确认视频就完成了。</string>
-    <string name="consent_point1">根据日本《旅馆业法》，我们会制作住宿登记。</string>
-    <string name="consent_point2">登记、护照照片和确认视频保存3年后删除。</string>
-    <string name="consent_point3">仅用于住宿登记，不提供给第三方。</string>
     <string name="consent_terms">我同意住宿条款</string>
     <string name="consent_terms_sub">入住 · 退房 · 住宿规则</string>
     <string name="consent_read">查看条款全文</string>
-    <string name="consent_need">请勾选</string>
-    <string name="consent_go">同意并继续</string>
     <string name="terms_close">关闭</string>
     <string name="terms_empty">条款尚未登记。请询问工作人员。</string>
+    <!-- 빠른 체크인(F1~F7b) -->
+    <string name="fast_f1_title">请出示预订人的护照</string>
+    <string name="fast_f1_body">我们将用护照上的姓名查找今天的预订。这张照片将直接用于住宿登记簿。</string>
+    <string name="fast_f1_by_code">用代码查找</string>
+    <string name="fast_f1_by_name">用姓名查找</string>
+    <string name="fast_f1_searching">正在查找预订…</string>
+    <string name="fast_f1_retry">未能读取，请再次出示。</string>
+    <string name="fast_found_title">%1$s，已找到您的预订</string>
+    <string name="fast_party_count">%1$d人</string>
+    <string name="fast_cards_title">请现在拿出护照：%1$d本</string>
+    <string name="fast_cards_title_face">只需每人拍5秒面部视频</string>
+    <string name="fast_cards_body">每人出示护照，再看镜头5秒即可。全部约2分钟。</string>
+    <string name="fast_seat_rep">护照已拍摄 · 仅剩面部</string>
+    <string name="fast_seat_face">仅剩面部</string>
+    <string name="fast_seat_done">已通过预先登记完成</string>
+    <string name="fast_seat_todo">护照 + 5秒面部</string>
+    <string name="fast_child_note">儿童也算一位。如果人数不对：</string>
+    <string name="fast_change_party">更改人数</string>
+    <string name="fast_start">开始</string>
+    <string name="fast_pass_title">请出示%1$s的护照</string>
+    <string name="fast_pass_toast">%1$s 已完成 — 请下一位出示护照</string>
+    <string name="fast_face_title">请放下护照，看向镜头</string>
+    <string name="fast_face_sub_read">护照已读取 ✓ · 拍摄5秒面部</string>
+    <string name="fast_face_sub">拍摄5秒面部</string>
+    <string name="fast_recording">录制中</string>
+    <string name="fast_face_after">结束后自动进入下一位</string>
+    <string name="fast_review_title">已读取全部%1$d位</string>
+    <string name="fast_review_body">请核对一遍，点击有误的行即可修改。</string>
+    <string name="fast_review_warn_digits">有一个数字不符 — 点击确认</string>
+    <string name="fast_review_warn_missing">有空栏 — 点击填写</string>
+    <string name="fast_age">%1$d岁</string>
+    <string name="fast_place_title">居住地</string>
+    <string name="fast_place_country">国家</string>
+    <string name="fast_place_country_tag">来自护照</string>
+    <string name="fast_place_city">城市</string>
+    <string name="fast_place_city_hint">例如: Chicago</string>
+    <string name="fast_contact">联系方式 — 电话或邮箱任选其一</string>
+    <string name="fast_contact_tag">来自预订</string>
+    <string name="fast_review_note">同住的客人将与预订人填写相同内容。</string>
+    <string name="fast_final_title">最后两项</string>
+    <string name="fast_final_title_one">最后一项</string>
+    <string name="fast_final_go">同意并完成</string>
+    <string name="fast_finish">完成</string>
+    <string name="fast_sending">发送中…</string>
+    <string name="fast_sending_body">请稍候。</string>
+    <string name="fast_retry">重新发送</string>
+    <string name="fast_retention">根据日本《旅馆业法》，住宿登记簿、护照复印件和面部视频将保存3年后删除，不用于其他用途。</string>
+    <string name="fast_face_turn">轮到 %1$s。准备好后请点击</string>
+    <string-array name="fast_ordinals">
+        <item>第1位</item>
+        <item>第2位</item>
+        <item>第3位</item>
+        <item>第4位</item>
+        <item>第5位</item>
+        <item>第6位</item>
+        <item>第7位</item>
+        <item>第8位</item>
+        <item>第9位</item>
+        <item>第10位</item>
+    </string-array>
 </resources>

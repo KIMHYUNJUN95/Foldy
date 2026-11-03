@@ -9,6 +9,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCase
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -50,15 +51,27 @@ class PassportScanner {
     internal val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     internal var lastNumber: String? = null
     internal var since = 0L
-    internal var fired = false
+    @Volatile internal var fired = false
     internal var lastMrz: MrzResult? = null
 
     /** 「직접 찍기」 — 지금 장면을 찍고, 사진에서 다시 읽는다. */
     suspend fun shoot(): Captured? {
-        fired = true
-        val bitmap = takeBitmap() ?: return null
+        // 자동 찍기가 이미 시작됐으면 수동 결과는 버린다(한 번만 쏜다).
+        if (!claim()) return null
+        val bitmap = takeBitmap()
+        if (bitmap == null) {
+            fired = false
+            return null
+        }
         val mrz = lastMrz ?: read(bitmap)
         return Captured(jpegOf(bitmap), mrz)
+    }
+
+    /** 자동 · 수동 중 먼저 부른 쪽만 true — 한 번만 찍는다. */
+    @Synchronized internal fun claim(): Boolean {
+        if (fired) return false
+        fired = true
+        return true
     }
 
     internal suspend fun takeBitmap(): Bitmap? {
@@ -130,8 +143,12 @@ fun PassportPreview(
     DisposableEffect(lifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
+        var bound: Array<UseCase> = emptyArray()
+        var disposed = false
         val main = ContextCompat.getMainExecutor(context)
         future.addListener({
+            // 이미 화면이 사라졌으면 붙이지 않는다(다음 화면의 카메라를 죽이지 않게).
+            if (disposed) return@addListener
             val camera = runCatching { future.get() }.getOrNull()
             if (camera == null) {
                 onUnavailable()
@@ -157,14 +174,20 @@ fun PassportPreview(
             scanner.capture = capture
             scanner.fired = false
             analysis.setAnalyzer(scanner.analysisExecutor) { image -> analyze(scanner, image, main, onUpdate, onCaptured) }
-            val bound = runCatching {
-                camera.unbindAll()
+            val result = runCatching {
                 camera.bindToLifecycle(lifecycleOwner, selector, preview, capture, analysis)
             }
-            if (bound.isFailure) onUnavailable() else main.execute { onUpdate(ScanUpdate(ScanPhase.Searching)) }
+            if (result.isFailure) {
+                onUnavailable()
+            } else {
+                bound = arrayOf(preview, capture, analysis)
+                main.execute { onUpdate(ScanUpdate(ScanPhase.Searching)) }
+            }
         }, main)
         onDispose {
-            provider?.unbindAll()
+            disposed = true
+            // 내가 붙인 것만 뗀다 — unbindAll 은 다음 화면이 막 붙인 카메라까지 죽인다.
+            if (bound.isNotEmpty()) provider?.unbind(*bound)
             scanner.capture = null
         }
     }
@@ -200,8 +223,7 @@ private fun analyze(
             // 검사 숫자가 다 맞는 쪽을 남긴다(같은 여권을 여러 장 읽는 동안).
             if (scanner.lastMrz?.documentNumber != mrz.documentNumber || mrz.valid) scanner.lastMrz = mrz
             val held = now - scanner.since
-            if (held >= PassportScanner.STEADY_MS && !scanner.fired) {
-                scanner.fired = true
+            if (held >= PassportScanner.STEADY_MS && scanner.claim()) {
                 main.execute { onUpdate(ScanUpdate(ScanPhase.Capturing, 1f)) }
                 Thread {
                     val bitmap = kotlinx.coroutines.runBlocking { scanner.takeBitmap() }

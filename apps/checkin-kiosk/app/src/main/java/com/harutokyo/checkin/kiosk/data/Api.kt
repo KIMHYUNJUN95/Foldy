@@ -4,7 +4,9 @@ import com.harutokyo.checkin.kiosk.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -16,6 +18,20 @@ object Api {
 
     /** 여권 사진 올리기(multipart: 글 칸들 + JPEG 한 장). */
     suspend fun upload(path: String, token: String, fields: Map<String, String>, fileName: String, jpeg: ByteArray): HttpResult =
+        upload(path, token, fields, fileName, "image/jpeg") { it.write(jpeg) }
+
+    /** 얼굴 영상 올리기(multipart: 글 칸들 + MP4 파일 한 개 — 파일에서 바로 흘려 보낸다). */
+    suspend fun uploadFile(path: String, token: String, fields: Map<String, String>, fileName: String, contentType: String, file: File): HttpResult =
+        upload(path, token, fields, fileName, contentType) { out -> file.inputStream().use { it.copyTo(out) } }
+
+    private suspend fun upload(
+        path: String,
+        token: String,
+        fields: Map<String, String>,
+        fileName: String,
+        contentType: String,
+        writeFile: (OutputStream) -> Unit,
+    ): HttpResult =
         withContext(Dispatchers.IO) {
             val boundary = "kiosk" + System.nanoTime()
             val connection = (URL(BuildConfig.API_BASE + path).openConnection() as HttpURLConnection).apply {
@@ -32,8 +48,8 @@ object Api {
                     for ((name, value) in fields) {
                         out.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
                     }
-                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\nContent-Type: image/jpeg\r\n\r\n".toByteArray())
-                    out.write(jpeg)
+                    out.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\nContent-Type: $contentType\r\n\r\n".toByteArray())
+                    writeFile(out)
                     out.write("\r\n--$boundary--\r\n".toByteArray())
                 }
                 val status = connection.responseCode

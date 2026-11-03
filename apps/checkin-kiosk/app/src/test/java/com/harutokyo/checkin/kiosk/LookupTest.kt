@@ -8,6 +8,7 @@ import com.harutokyo.checkin.kiosk.contract.FindResult
 import com.harutokyo.checkin.kiosk.contract.KioskGuest
 import com.harutokyo.checkin.kiosk.contract.KioskStay
 import com.harutokyo.checkin.kiosk.contract.NameQuery
+import com.harutokyo.checkin.kiosk.contract.PassportQuery
 import com.harutokyo.checkin.kiosk.contract.findResultOf
 import com.harutokyo.checkin.kiosk.data.Api
 import com.harutokyo.checkin.kiosk.ui.SeatState
@@ -27,6 +28,17 @@ class LookupTest {
         assertEquals("""{"mode":"code","code":"123456"}""", code)
         val name = Api.json.encodeToString(FindQuery.serializer(), NameQuery("HU", "DANIEL", "2026-11-05"))
         assertEquals("""{"mode":"name","lastName":"HU","firstName":"DANIEL","checkInDate":"2026-11-05"}""", name)
+        val passport = Api.json.encodeToString(FindQuery.serializer(), PassportQuery("HU", "DANIEL"))
+        assertEquals("""{"mode":"passport","lastName":"HU","firstName":"DANIEL"}""", passport)
+        // 이름이 비어도 칸은 그대로 간다(서버가 비어 있음을 허용).
+        assertEquals("""{"mode":"passport","lastName":"HU","firstName":""}""", Api.json.encodeToString(FindQuery.serializer(), PassportQuery("HU", "")))
+    }
+
+    @Test
+    fun guestFaceVideoFlagDefaultsToFalse() {
+        val stay = """{"stayId":"s","checkInDate":"2026-11-05","checkOutDate":"2026-11-07","nights":2,"partySize":2,"guestCountExpected":2,"guests":[{"id":"a","hasFaceVideo":true},{"id":"b"}]}"""
+        val parsed = Api.json.decodeFromString<KioskStay>(stay)
+        assertEquals(listOf(true, false), parsed.guests.map { it.hasFaceVideo })
     }
 
     @Test

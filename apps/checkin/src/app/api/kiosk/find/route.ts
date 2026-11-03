@@ -5,7 +5,8 @@ import { z } from "zod";
 import { authenticateDevice } from "@/lib/device/auth";
 import { clientIp, json, readJson, serverError } from "@/lib/guest/request";
 import { loadStayById } from "@/lib/guest/store";
-import { kioskGate, kioskLockState, matchByName, pickByCode, type KioskAttempt } from "@/lib/kiosk/find";
+import { todayTokyo } from "@/lib/tokyo-date";
+import { kioskGate, kioskLockState, matchByName, matchByPassportStays, passportSearchDates, pickByCode, type KioskAttempt } from "@/lib/kiosk/find";
 import { holdSession, kioskStayOf, readNameCandidates, readStayLanguage, readStaysByCode, type KioskStayRow } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
@@ -21,6 +22,11 @@ const bodySchema = z.discriminatedUnion("mode", [
     lastName: z.string().trim().min(1).max(60),
     firstName: z.string().trim().min(1).max(60),
     checkInDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }),
+  z.object({
+    mode: z.literal("passport"),
+    lastName: z.string().trim().min(1).max(60),
+    firstName: z.string().trim().max(60),
   }),
 ]);
 
@@ -56,6 +62,10 @@ export async function POST(request: Request) {
     let found: KioskStayRow | null = null;
     if (input.mode === "code") {
       found = pickByCode(await readStaysByCode(db, device.organization_id, input.code));
+    } else if (input.mode === "passport") {
+      const { stays, candidates } = await readNameCandidates(db, device.organization_id, device.property_key, passportSearchDates(now));
+      const stayId = matchByPassportStays(candidates, stays, input.lastName, input.firstName, todayTokyo(now));
+      found = stays.find((stay) => stay.id === stayId) ?? null;
     } else {
       const { stays, candidates } = await readNameCandidates(db, device.organization_id, device.property_key, input.checkInDate);
       const stayId = matchByName(candidates, input.lastName, input.firstName);

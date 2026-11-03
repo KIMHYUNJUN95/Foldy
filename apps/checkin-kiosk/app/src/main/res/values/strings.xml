@@ -87,53 +87,22 @@
     <string name="done_more">同行の方の宿泊者名簿を続ける</string>
     <string name="done_more_body">まだ空いている方: %1$d名</string>
     <string name="guests_title">ご予約が見つかりました</string>
-    <string name="guests_body">お部屋と日付を確認して、お泊まりの方をお一人ずつ登録してください。</string>
     <string name="guests_room">お部屋</string>
     <string name="guests_dates">日付</string>
     <string name="guests_nights">%1$d泊</string>
     <string name="guests_party">お泊まりの方</string>
     <string name="guests_less">一人減らす</string>
     <string name="guests_more">一人増やす</string>
-    <string name="guests_rep">ご予約の方</string>
     <string name="guests_seat">%1$d人目の方</string>
-    <string name="guests_done">完了</string>
-    <string name="guests_need">パスポート撮影</string>
-    <string name="guests_sub_done">すべて入力済みです</string>
-    <string name="guests_sub_photo">パスポートを撮るだけです</string>
-    <string name="guests_sub_empty">まだ何もありません</string>
-    <string name="guests_sub_partial">いくつか残っています</string>
-    <string name="guests_child_hint">お子さまもお一人として数えてください。パスポートがない場合は次の画面で選べます。</string>
-    <string name="guests_start">空いている方から始める</string>
-    <string name="guests_next">次へ</string>
     <string name="party_error">人数を変更できませんでした。もう一度お試しください。</string>
-    <string name="passport_who">ご宿泊の方 %1$d / %2$d</string>
-    <string name="passport_intro_title">パスポートの写真のページを撮ります</string>
-    <string name="passport_intro_body">カメラにかざすと自動で撮影します。名前やパスポート番号はパスポートから読み取って入力します。</string>
-    <string name="passport_intro_mrz">下の2行がすべて見えればOKです</string>
-    <string name="passport_tip_open">写真のあるページを開いて持ってください</string>
     <string name="passport_tip_lines">下の2行を指で隠さないでください</string>
     <string name="passport_tip_glare">光が反射したら少し傾けてください</string>
     <string name="passport_none">パスポートがありません</string>
-    <string name="passport_retention">パスポートの写真は宿泊者名簿として3年間保管した後に削除します。他の目的には使いません。</string>
-    <string name="passport_camera_on">カメラをオン</string>
-    <string name="camera_title">パスポートを枠に合わせてください</string>
-    <string name="camera_body">画面上のカメラに向けて、写真のページをかざしてください。</string>
     <string name="camera_up">カメラ</string>
     <string name="camera_hold">そのまま少しお待ちください</string>
     <string name="camera_find">下の2行を探しています</string>
-    <string name="camera_short_open">写真のページを開く</string>
-    <string name="camera_short_lines">下の2行が見えるように</string>
-    <string name="camera_short_glare">反射を避ける</string>
-    <string name="camera_type">自分で入力します</string>
     <string name="camera_shutter">手動で撮る</string>
     <string name="camera_denied">カメラを使えません</string>
-    <string name="reading_title">撮影しました。読み取り中です</string>
-    <string name="reading_body">1〜2秒で終わります。パスポートは下ろして大丈夫です。</string>
-    <string name="reading_name">氏名</string>
-    <string name="reading_number">パスポート番号</string>
-    <string name="reading_rest">生年月日・国籍・性別</string>
-    <string name="reading_done">読み取り済み</string>
-    <string name="reading_wait">読み取り中</string>
     <string name="retake">撮り直す</string>
     <string name="confirm_title">パスポートから読み取りました</string>
     <string name="confirm_body">内容を確認し、違う欄はタップして直してください。</string>
@@ -179,8 +148,6 @@
     <string name="nopass_camera">カメラがつきません</string>
     <string name="nopass_note">日本の宿泊者名簿には外国人のお客さまのパスポート番号が必要です。パスポートなしで入力した方はスタッフが別途確認します。</string>
     <string name="nopass_back">パスポート撮影に戻る</string>
-    <string name="route_title">どこから来て、どこへ行きますか?</string>
-    <string name="route_body">日本の宿泊者名簿に必ず記入する2つの項目です。都市名だけで大丈夫です。</string>
     <string name="route_q1">① 昨夜はどこに泊まりましたか?</string>
     <string name="route_q1_sub">この宿の直前に泊まった場所</string>
     <string name="route_arrived">今日日本に着きました</string>
@@ -198,17 +165,69 @@
     <string name="city_fukuoka">福岡</string>
     <string name="city_other">その他・入力</string>
     <string name="city_other_hint">都市名</string>
-    <string name="route_next">次へ</string>
-    <string name="consent_title">最後に\n同意してください</string>
-    <string name="consent_body">同意すると、短い確認動画を撮って終わりです。</string>
-    <string name="consent_point1">日本の旅館業法にもとづき、宿泊者名簿を作成します。</string>
-    <string name="consent_point2">名簿 · パスポート写真 · 確認動画は3年保管したあと削除します。</string>
-    <string name="consent_point3">宿泊者名簿以外には使わず、第三者に渡しません。</string>
     <string name="consent_terms">宿泊約款に同意します</string>
     <string name="consent_terms_sub">チェックイン · チェックアウト · ハウスルール</string>
     <string name="consent_read">約款の全文を見る</string>
-    <string name="consent_need">チェックしてください</string>
-    <string name="consent_go">同意して次へ</string>
     <string name="terms_close">閉じる</string>
     <string name="terms_empty">約款がまだ登録されていません。スタッフにお尋ねください。</string>
+    <!-- 빠른 체크인(F1~F7b) -->
+    <string name="fast_f1_title">ご予約された方のパスポートをかざしてください</string>
+    <string name="fast_f1_body">パスポートの名前で本日のご予約を探します。この写真はそのまま宿泊者名簿に使います。</string>
+    <string name="fast_f1_by_code">コードで探す</string>
+    <string name="fast_f1_by_name">お名前で探す</string>
+    <string name="fast_f1_searching">ご予約を探しています…</string>
+    <string name="fast_f1_retry">読み取れませんでした。もう一度かざしてください。</string>
+    <string name="fast_found_title">%1$s 様、ご予約が見つかりました</string>
+    <string name="fast_party_count">%1$d名</string>
+    <string name="fast_cards_title">パスポートを%1$d冊、今ご用意ください</string>
+    <string name="fast_cards_title_face">お顔の撮影(5秒)だけで終わります</string>
+    <string name="fast_cards_body">お一人ずつかざして、カメラを5秒見るだけ。全部で2分ほどです。</string>
+    <string name="fast_seat_rep">パスポート撮影済み・あとはお顔だけ</string>
+    <string name="fast_seat_face">あとはお顔だけ</string>
+    <string name="fast_seat_done">事前登録で完了済み</string>
+    <string name="fast_seat_todo">パスポート・お顔5秒</string>
+    <string name="fast_child_note">お子さまもお一人として数えてください。人数が違う場合は</string>
+    <string name="fast_change_party">人数を変更</string>
+    <string name="fast_start">はじめる</string>
+    <string name="fast_pass_title">%1$sのパスポートをかざしてください</string>
+    <string name="fast_pass_toast">%1$s 様は完了です — 次の方のパスポートをかざしてください</string>
+    <string name="fast_face_title">パスポートを下ろして、カメラを見てください</string>
+    <string name="fast_face_sub_read">パスポート読み取り済み ✓ ・お顔を5秒撮ります</string>
+    <string name="fast_face_sub">お顔を5秒撮ります</string>
+    <string name="fast_recording">録画中</string>
+    <string name="fast_face_after">終わると自動で次の方へ</string>
+    <string name="fast_review_title">%1$d名分、読み取りました</string>
+    <string name="fast_review_body">ご確認ください。違う行はタップして直せます。</string>
+    <string name="fast_review_warn_digits">数字が1つ合いません — タップして確認</string>
+    <string name="fast_review_warn_missing">未入力の欄があります — タップして入力</string>
+    <string name="fast_age">%1$d歳</string>
+    <string name="fast_place_title">お住まい</string>
+    <string name="fast_place_country">国</string>
+    <string name="fast_place_country_tag">パスポートから</string>
+    <string name="fast_place_city">都市</string>
+    <string name="fast_place_city_hint">例: Chicago</string>
+    <string name="fast_contact">連絡先 — 電話かメールを1つ</string>
+    <string name="fast_contact_tag">ご予約から</string>
+    <string name="fast_review_note">ご一緒の方はご予約の方と同じ内容で記入します。</string>
+    <string name="fast_final_title">あと2つだけ</string>
+    <string name="fast_final_title_one">あと1つだけ</string>
+    <string name="fast_final_go">同意して終わる</string>
+    <string name="fast_finish">終わる</string>
+    <string name="fast_sending">送信しています…</string>
+    <string name="fast_sending_body">しばらくお待ちください。</string>
+    <string name="fast_retry">もう一度送る</string>
+    <string name="fast_retention">宿泊者名簿・パスポートの写し・顔の動画は、旅館業法にもとづき3年間保管した後に削除します。他の目的には使いません。</string>
+    <string name="fast_face_turn">%1$s 様の番です。準備ができたら押してください</string>
+    <string-array name="fast_ordinals">
+        <item>1人目の方</item>
+        <item>2人目の方</item>
+        <item>3人目の方</item>
+        <item>4人目の方</item>
+        <item>5人目の方</item>
+        <item>6人目の方</item>
+        <item>7人目の方</item>
+        <item>8人目の方</item>
+        <item>9人目の方</item>
+        <item>10人目の方</item>
+    </string-array>
 </resources>

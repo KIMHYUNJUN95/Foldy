@@ -27,6 +27,9 @@ import com.harutokyo.checkin.kiosk.contract.SaveResult
 import com.harutokyo.checkin.kiosk.contract.saveResultOf
 import com.harutokyo.checkin.kiosk.contract.KioskStay
 import com.harutokyo.checkin.kiosk.contract.PartyResponse
+import com.harutokyo.checkin.kiosk.contract.ProveBody
+import com.harutokyo.checkin.kiosk.contract.ProveResult
+import com.harutokyo.checkin.kiosk.contract.proveResultOf
 import com.harutokyo.checkin.kiosk.contract.findResultOf
 import com.harutokyo.checkin.kiosk.contract.PingResponse
 import com.harutokyo.checkin.kiosk.contract.SettingsResponse
@@ -158,6 +161,23 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
         }
         _state.update { it.copy(online = true) }
         return findResultOf(runCatching { Api.json.decodeFromString<FindResponse>(result.body) }.getOrNull())
+    }
+
+    /** 이름으로 찾은 뒤 — 예약하신 분의 여권(MRZ 원문)으로 본인 확인. 맞으면 예약 내용이 온다. */
+    suspend fun prove(sessionId: String, mrzRaw: String): ProveResult {
+        val token = vault.get(KEY_TOKEN) ?: return ProveResult.Server
+        val result = try {
+            Api.request("POST", "/api/kiosk/prove", token, Api.json.encodeToString(ProveBody(sessionId, mrzRaw)))
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return ProveResult.Network
+        }
+        if (result.status == 401) {
+            forget(revoked = true)
+            return ProveResult.Server
+        }
+        _state.update { it.copy(online = true) }
+        return proveResultOf(result.status, runCatching { Api.json.decodeFromString<FindResponse>(result.body) }.getOrNull())
     }
 
     /** 시안 T2 인원 ±. 실패하면 null(화면은 그대로). */

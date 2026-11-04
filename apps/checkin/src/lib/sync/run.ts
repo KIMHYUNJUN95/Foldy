@@ -24,6 +24,7 @@ export type SyncResult = {
   roomsRemoved: number;
   changedAfterCheckin: number;
   unknownProperty: number;
+  excludedProperty: number;
   skippedConflicts: number;
 };
 
@@ -98,6 +99,7 @@ export async function runSyncStays(db: SupabaseClient, now: Date = new Date()): 
     roomsRemoved: 0,
     changedAfterCheckin: plan.changedAfterCheckin,
     unknownProperty: plan.unknownProperty,
+    excludedProperty: plan.excludedProperty,
     skippedConflicts: 0,
   };
 

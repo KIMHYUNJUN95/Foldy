@@ -261,9 +261,13 @@
     <string name="call_whatsapp">WhatsApp</string>
     <string name="g4_title_verify">需要确认护照</string>
     <string name="g4_title_blocked">无法打开此预订</string>
-    <string name="g4_verify_body">扫描护照后会立即显示房间密码。没有护照或不方便扫描时，请呼叫工作人员。</string>
+    <string name="g4_verify_body">此预订尚未完成身份确认。请呼叫工作人员。</string>
     <string name="g4_blocked_cancelled">该预订已取消。请呼叫工作人员。</string>
     <string name="g4_blocked_expired">该预订的入住期已过。请呼叫工作人员。</string>
-    <string name="g4_scan_passport">扫描护照</string>
-    <string name="nopass_proof_notice">此预订是通过姓名找到的，若无护照继续办理，最后需由工作人员确认后才能显示房间密码。您也可以现在呼叫工作人员。</string>
+    <string name="proof_title">请出示预订人的护照</string>
+    <string name="proof_body">这是为了确认预订。护照上的姓名与预订一致后，才会显示预订内容。</string>
+    <string name="proof_retry">未能读取，请再次出示。若仍不行，请点击“用代码查找”或呼叫工作人员。</string>
+    <string name="proof_mismatch">护照上的姓名与预订不一致。请出示预订人的护照，或点击“用代码查找”，或呼叫工作人员。</string>
+    <string name="proof_no_passport">我没有护照</string>
+    <string name="proof_retake">重新扫描</string>
 </resources>

@@ -261,9 +261,13 @@
     <string name="call_whatsapp">WhatsApp</string>
     <string name="g4_title_verify">Passport check needed</string>
     <string name="g4_title_blocked">This booking can\'t be opened</string>
-    <string name="g4_verify_body">Scan your passport and we\'ll show the room code right away. If you don\'t have it or can\'t scan it, please call our staff.</string>
+    <string name="g4_verify_body">This booking hasn\'t been verified yet. Please call our staff.</string>
     <string name="g4_blocked_cancelled">This booking was cancelled. Please call our staff.</string>
     <string name="g4_blocked_expired">This booking\'s stay period has passed. Please call our staff.</string>
-    <string name="g4_scan_passport">Scan passport</string>
-    <string name="nopass_proof_notice">This booking was found by name, so if you continue without a passport, our staff must confirm at the end before the room code can be shown. You can also call staff now.</string>
+    <string name="proof_title">Please show the booker\'s passport</string>
+    <string name="proof_body">This is to confirm the booking. If the name on the passport matches, we\'ll show your reservation.</string>
+    <string name="proof_retry">Couldn\'t read it. Please hold it up again. If it keeps failing, tap “Find by code” or call our staff.</string>
+    <string name="proof_mismatch">The name on the passport doesn\'t match the booking. Show the booker\'s passport, tap “Find by code”, or call our staff.</string>
+    <string name="proof_no_passport">I don\'t have a passport</string>
+    <string name="proof_retake">Scan again</string>
 </resources>

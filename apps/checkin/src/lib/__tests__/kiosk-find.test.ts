@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import {
   clampPartySize,
@@ -185,5 +186,16 @@ describe("여권 찾기 — 상태로 좁히기", () => {
   });
   it("어제 대기와 오늘 대기는 오늘 것", () => {
     expect(matchByPassportStays(names("y", "t"), [st("y", "pending", "2026-11-04"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");
+  });
+});
+
+describe("이름 찾기 응답은 stay 를 돌려주지 않는다", () => {
+  const source = readFileSync(new URL("../../app/api/kiosk/find/route.ts", import.meta.url), "utf8");
+  it("name 모드는 proof_needed 만 돌려준다", () => {
+    const block = source.slice(source.indexOf('if (input.mode === "name")'), source.indexOf("result: gate.kind"));
+    expect(block).toContain('result: "proof_needed"');
+    expect(block).toContain("session_id");
+    expect(block).not.toContain("stay:");
+    expect(block).not.toContain("checked_in_at");
   });
 });

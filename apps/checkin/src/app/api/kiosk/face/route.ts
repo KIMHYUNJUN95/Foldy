@@ -4,7 +4,7 @@ import { authenticateDevice } from "@/lib/device/auth";
 import { MAX_FACE_VIDEO_BYTES, sniffVideoType } from "@/lib/guest/image";
 import { json, serverError } from "@/lib/guest/request";
 import { PASSPORT_BUCKET } from "@/lib/guest/store";
-import { kioskStayOf, openKioskStay, reloadKioskStay } from "@/lib/kiosk/store";
+import { kioskStayOf, openProvenKioskStay, provenFailure, reloadKioskStay } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/face — 태블릿 얼굴 영상 5초 한 개(multipart: session_id · guest_id · file, video/mp4).
@@ -36,8 +36,9 @@ export async function POST(request: Request) {
     if (file.size === 0 || file.size > MAX_FACE_VIDEO_BYTES) return json({ ok: false, error: "too_large" }, 413);
     const now = new Date();
 
-    const stay = await openKioskStay(db, sessionId, device, now);
-    if (!stay) return json({ ok: false, error: "session_gone" }, 409);
+    const opened = await openProvenKioskStay(db, sessionId, device, now);
+    if ("error" in opened) return provenFailure(opened.error);
+    const { stay } = opened;
     if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
     const guest = stay.guests.find((row) => row.id === guestId);
     if (!guest) return json({ ok: false, error: "not_found" }, 404);

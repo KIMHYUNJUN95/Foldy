@@ -7,7 +7,6 @@ import com.harutokyo.checkin.kiosk.ui.FormMode
 import com.harutokyo.checkin.kiosk.ui.PersonDraft
 import com.harutokyo.checkin.kiosk.ui.SavedPerson
 import com.harutokyo.checkin.kiosk.ui.mrzDraftComplete
-import com.harutokyo.checkin.kiosk.ui.proofNoticeNeeded
 import com.harutokyo.checkin.kiosk.ui.reviewReady
 import com.harutokyo.checkin.kiosk.ui.seatComplete
 import org.junit.Assert.assertFalse
@@ -47,14 +46,5 @@ class ProofFlowTest {
         // 이번에 저장하지 않은 분은 서버가 알려 준 빈 칸으로 본다
         assertFalse(reviewReady(stay(a, KioskGuest("c", "X", missing = listOf("gender"))), mapOf("a" to SavedPerson(full, FormMode.Mrz, null, null))))
         assertTrue(reviewReady(stay(a, KioskGuest("c", "X")), mapOf("a" to SavedPerson(full, FormMode.Mrz, null, null))))
-    }
-
-    @Test
-    fun noPassportNoticeOnlyForNameLookupsWithoutASavedPassport() {
-        val full = PersonDraft("KIM", "A", "USA", "A1234567", "35", "male")
-        assertTrue(proofNoticeNeeded(true, emptyMap()))
-        assertFalse(proofNoticeNeeded(false, emptyMap()))
-        assertFalse(proofNoticeNeeded(true, mapOf("a" to SavedPerson(full, FormMode.Mrz, null, null))))
-        assertTrue(proofNoticeNeeded(true, mapOf("a" to SavedPerson(full, FormMode.Staff, null, null))))
     }
 }

@@ -187,10 +187,6 @@ fun reviewReady(stay: KioskStay, people: Map<String, SavedPerson>): Boolean = st
     else personMissing(guest).isNotEmpty()
 }
 
-/** 이름으로 찾은 예약은 여권이 저장돼야 방 비밀번호를 보여 준다 — 여권 없이 가려는 분께 미리 알릴지. */
-fun proofNoticeNeeded(byName: Boolean, people: Map<String, SavedPerson>): Boolean =
-    byName && people.values.none { it.mode == FormMode.Mrz }
-
 /** 대표자 사는 곳 칸을 묻는지 — 일본에 사는 분이 이미 주소를 썼거나, 서버에 주소가 있으면 묻지 않는다. */
 fun needsLivingPlace(representative: KioskGuest?, saved: SavedPerson?): Boolean {
     if (representative == null) return false

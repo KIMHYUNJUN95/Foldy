@@ -48,6 +48,25 @@ export function nameMatchesPassport(bookedName: string, surname: string, givenNa
   return booked.every((token) => passportTokens.has(token)) && surnameTokens.every((token) => booked.includes(token));
 }
 
+/**
+ * 본인 확인(prove) 전용 이름 맞추기 — 찾기보다 느슨하되 성과 이름을 구별한다. 여권의 성 단어 중 하나와 **첫 번째 이름 단어**가 모두
+ * 예약 이름 단어에 들어 있어야 맞다(순서는 무관 — 순서가 뒤집힌 동아시아 예약 `Kim Lee` ↔ `KIM/LEE` 도 맞음). 예약 이름이 한 단어면
+ * 정확히 같을 때(sameName)만. 여권에 이름이 없으면 성 단어가 모두 맞고 예약에 다른 단어가 없어야 한다.
+ * 한자 · 한글 예약 이름은 로마자와 못 맞춘다(코드나 직원으로).
+ */
+export function nameMatchesProve(bookedName: string, surname: string, givenNames: string): boolean {
+  if (sameName(bookedName, surname, givenNames)) return true;
+  const booked = new Set(nameTokens(bookedName));
+  if (booked.size < 2) return false;
+  const surnameTokens = nameTokens(surname);
+  const givenTokens = nameTokens(givenNames);
+  if (surnameTokens.length === 0) return false;
+  if (givenTokens.length === 0) {
+    return booked.size === new Set(surnameTokens).size && surnameTokens.every((token) => booked.has(token));
+  }
+  return surnameTokens.some((token) => booked.has(token)) && booked.has(givenTokens[0]);
+}
+
 export function passportHits(candidates: NameCandidate[], surname: string, givenNames: string): string[] {
   return candidates
     .filter((candidate) => candidate.guestNames.some((name) => nameMatchesPassport(name, surname, givenNames)))

@@ -107,8 +107,6 @@ fun FastCheckin(
     onBack: () -> Unit,
     onCall: () -> Unit,
     onStep: (String) -> Unit,
-    /** 이름으로 찾은 예약인가 — 여권이 저장돼야 방 비밀번호를 보여 주므로, 여권 없이 가려는 분께 미리 알린다. */
-    byName: Boolean,
     onDone: () -> Unit,
 ) {
     val stayNow by rememberUpdatedState(stay)
@@ -339,7 +337,6 @@ fun FastCheckin(
         FastPhase.NoPassport -> NoPassportScreen(
             who = header,
             cameraOff = reason == NoPassport.CameraOff,
-            proofNotice = proofNoticeNeeded(byName, people),
             onBack = {
                 reason = null
                 phase = FastPhase.Passport
@@ -535,8 +532,15 @@ fun ScanScreen(
     onByCode: () -> Unit,
     onByName: () -> Unit,
     onPassport: suspend (Captured) -> Boolean,
+    /** 이름으로 찾은 뒤 예약하신 분 여권으로 본인 확인하는 화면 — 제목이 바뀌고 「이름으로 찾기」 자리에 「여권이 없어요」가 온다. */
+    proof: Boolean = false,
+    onNoPassport: () -> Unit = {},
+    /** 이름이 맞지 않았다 — 카메라를 멈추고 메시지를 보이며 「다시 찍기」를 기다린다(같은 여권을 계속 보내 잠기지 않게). */
+    held: Boolean = false,
+    onRetake: () -> Unit = {},
 ) {
     var scanKey by remember { mutableIntStateOf(0) }
+    val heldNow by rememberUpdatedState(held)
     var working by remember { mutableStateOf(false) }
     var unreadable by remember { mutableStateOf(false) }
     var unavailable by remember { mutableStateOf(false) }
@@ -547,9 +551,16 @@ fun ScanScreen(
     ScrollPage(bottom = { Row { OutlineButton(str(R.string.staff_call), onClick = onCall) } }) {
         StepTop(1, onBack, languageName, onLanguage)
         Spacer(Modifier.height(36.dp))
-        Heading(str(R.string.fast_f1_title), str(R.string.fast_f1_body))
+        Heading(str(if (proof) R.string.proof_title else R.string.fast_f1_title), str(if (proof) R.string.proof_body else R.string.fast_f1_body))
         Spacer(Modifier.height(28.dp))
-        if (unavailable) {
+        if (held) {
+            Box(Modifier.fillMaxWidth().height(560.dp).background(G.Surface, Radius), contentAlignment = Alignment.Center) {
+                PrimaryButton(str(R.string.proof_retake)) {
+                    onRetake()
+                    scanKey += 1
+                }
+            }
+        } else if (unavailable) {
             Box(Modifier.fillMaxWidth().height(560.dp).background(G.Surface, Radius), contentAlignment = Alignment.Center) {
                 Text(str(R.string.camera_denied), color = G.Muted, fontSize = 19.sp)
             }
@@ -570,7 +581,7 @@ fun ScanScreen(
                                 val moved = onPassport(shot)
                                 if (!moved) {
                                     working = false
-                                    scanKey += 1
+                                    if (!heldNow) scanKey += 1
                                 }
                             }
                         }
@@ -585,12 +596,13 @@ fun ScanScreen(
         } else if (error != null) {
             Text(error, color = G.Error, fontSize = 16.sp)
         } else if (unreadable) {
-            Text(str(R.string.fast_f1_retry), color = G.Sand, fontSize = 17.sp)
+            Text(str(if (proof) R.string.proof_retry else R.string.fast_f1_retry), color = G.Sand, fontSize = 17.sp)
         }
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             OutlineButton(str(R.string.fast_f1_by_code), Modifier.weight(1f), onClick = onByCode)
-            OutlineButton(str(R.string.fast_f1_by_name), Modifier.weight(1f), onClick = onByName)
+            if (proof) OutlineButton(str(R.string.proof_no_passport), Modifier.weight(1f), onClick = onNoPassport)
+            else OutlineButton(str(R.string.fast_f1_by_name), Modifier.weight(1f), onClick = onByName)
         }
     }
 }

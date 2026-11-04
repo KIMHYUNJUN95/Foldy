@@ -1,7 +1,7 @@
 import { authenticateDevice } from "@/lib/device/auth";
 import { json, readJson, serverError } from "@/lib/guest/request";
 import { companionsFollowing, routeBodySchema } from "@/lib/kiosk/guests";
-import { kioskStayOf, openKioskStay, reloadKioskStay } from "@/lib/kiosk/store";
+import { kioskStayOf, openProvenKioskStay, provenFailure, reloadKioskStay } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/route — 전 숙박지 · 다음 행선지(시안 T3s, 신주쿠구 규칙 10 ⑦ · ⑧). 대표자에 저장하고,
@@ -19,8 +19,9 @@ export async function POST(request: Request) {
     if (!parsed.success) return json({ ok: false, error: "invalid" }, 400);
     const now = new Date();
 
-    const stay = await openKioskStay(db, parsed.data.sessionId, device, now);
-    if (!stay) return json({ ok: false, error: "session_gone" }, 409);
+    const opened = await openProvenKioskStay(db, parsed.data.sessionId, device, now);
+    if ("error" in opened) return provenFailure(opened.error);
+    const { stay } = opened;
     if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
     const representative = stay.guests.find((guest) => guest.is_representative);
     if (!representative) return json({ ok: false, error: "not_found" }, 404);

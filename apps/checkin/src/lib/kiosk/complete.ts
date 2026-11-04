@@ -1,5 +1,5 @@
 // 태블릿 「체크인 완료」 판정(DB 없음 — 테스트로 덮는다). 44 FR-K04 · K13 · K16, 16 §5-4.
-import { nameMatchesPassport } from "./find";
+import { nameMatchesProve, heldByOther } from "./find";
 import { parseMrzStrip } from "./mrz";
 import { roomForm } from "./rooms";
 
@@ -144,8 +144,8 @@ export function currentRoomLabels(
 // ── 번호를 주기 전 본인 확인(2026-11-04 결정, 체크인 전 · 후 같은 규칙) ─────
 // 증명은 **지금 이 찾기**의 것이지 예약의 것이 아니다. 찾을 때마다 세션의 `step_payload` 가 `{ found_by }` 로 새로 시작된다.
 //  - 코드(`code`) · 여권(`passport`)으로 찾았으면 그 자체가 증명.
-//  - 이름(`name`)으로 찾았으면 증명 없음 — 이 찾기 안에서 **검사 숫자가 맞는 MRZ 의 이름이 예약 이름과 맞는** 여권이 저장되면
-//    서버가 `passport_proof: true` 를 쓴다(guests 라우트). 명부에 남은 옛 MRZ · 사진은 보지 않는다.
+//  - 이름(`name`)으로 찾았으면 증명 없음 — `prove` 라우트가 여권 띠를 서버에서 읽어 이름이 예약 이름과 맞을 때만
+//    `passport_proof: true` 를 쓴다. 명부에 남은 옛 MRZ · 사진은 보지 않는다.
 export type FoundBy = "code" | "name" | "passport";
 
 export type SessionProof = { found_by: FoundBy; passport_proof?: true };
@@ -162,15 +162,30 @@ export function identityProven(payload: unknown): boolean {
   return foundBy === "name" && passportProof === true;
 }
 
+export type ProveOutcome = "proven" | "already" | "unreadable" | "name_mismatch";
+
 /**
- * 이름으로 찾은 세션에서 저장된 여권이 예약 이름과 맞는지. 이름 · 검사 결과는 태블릿이 보낸 값이 아니라 서버가 `raw` 띠를 직접
- * 읽어(검사 숫자 전부 통과 + 줄1 에서 성 · 이름) 얻는다. `raw` 가 없거나 못 읽으면 증명 없음.
+ * `prove` 판정. 이름 · 검사 결과는 태블릿이 보낸 값이 아니라 서버가 `mrz_raw` 띠를 직접 읽어(검사 숫자 전부 통과 + 줄1 의 성 · 이름) 얻는다.
+ * 이미 증명된 세션(코드 · 여권으로 찾음, 또는 이미 증명)은 `already`. 띠가 없거나 못 읽으면 `unreadable`, 읽혔는데 예약 이름과 다르면 `name_mismatch`.
  */
-export function grantsPassportProof(payload: unknown, mrzRaw: unknown, reservationNames: string[]): boolean {
-  if (!payload || typeof payload !== "object") return false;
-  const { found_by: foundBy, passport_proof: passportProof } = payload as Record<string, unknown>;
-  if (foundBy !== "name" || passportProof === true) return false;
+export function proveOutcome(payload: unknown, mrzRaw: unknown, reservationNames: string[]): ProveOutcome {
+  if (identityProven(payload)) return "already";
   const strip = parseMrzStrip(mrzRaw);
-  if (!strip) return false;
-  return reservationNames.some((name) => nameMatchesPassport(name, strip.surname, strip.givenNames));
+  if (!strip) return "unreadable";
+  return reservationNames.some((name) => nameMatchesProve(name, strip.surname, strip.givenNames)) ? "proven" : "name_mismatch";
+}
+
+// ── 찾기 때 잠금 ─────────────────────────────────────────────────────────────
+/**
+ * 같은 예약에 이 기기 말고 다른 기기가 진짜로 잡은 세션이 있으면 busy. 아니면 세션을 만들되, **이름으로 찾은 경우는 잠그지 않는다** —
+ * 이름만 아는 사람이 반복해서 진짜 손님을 `busy` 로 막지 못하게(잠금은 `prove` 가 증명한 뒤에 건다). 코드 · 여권은 바로 잠근다.
+ */
+export function holdDecision(
+  sessions: { device_id: string | null; locked_until: string | null; finished_at: string | null; abandoned_at: string | null }[],
+  deviceId: string,
+  now: Date,
+  foundBy: FoundBy,
+): { kind: "busy" } | { kind: "hold"; lock: boolean } {
+  if (heldByOther(sessions, deviceId, now)) return { kind: "busy" };
+  return { kind: "hold", lock: foundBy !== "name" };
 }

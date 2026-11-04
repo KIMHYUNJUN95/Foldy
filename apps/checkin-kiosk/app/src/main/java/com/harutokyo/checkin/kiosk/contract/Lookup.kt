@@ -71,6 +71,8 @@ data class PassportQuery(val lastName: String, val firstName: String) : FindQuer
 /** 찾기 결과 — 화면이 갈 곳을 정한다. */
 sealed interface FindResult {
     data class Found(val sessionId: String, val stay: KioskStay, val language: String?, val checkedIn: Boolean) : FindResult
+    /** 이름으로 찾았다 — 예약하신 분의 여권을 비춰 이름이 맞아야 예약 내용을 보여 준다(prove). 예약 내용은 아직 없다. */
+    data class ProofNeeded(val sessionId: String, val language: String?) : FindResult
     data class NotFound(val remaining: Int) : FindResult
     data class Locked(val untilMillis: Long) : FindResult
     data class Blocked(val reason: BlockReason, val checkInDate: String?) : FindResult
@@ -86,9 +88,10 @@ fun findResultOf(response: FindResponse?): FindResult {
     if (response.ok && response.sessionId != null && response.stay != null) {
         return FindResult.Found(response.sessionId, response.stay, response.language, response.result == "checked_in")
     }
+    if (response.ok && response.result == "proof_needed" && response.sessionId != null) return FindResult.ProofNeeded(response.sessionId, response.language)
     return when (response.error) {
         "not_found" -> FindResult.NotFound(response.remaining ?: 0)
-        "locked" -> FindResult.Locked(response.lockedUntil?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() } ?: (System.currentTimeMillis() + 60_000))
+        "locked" -> FindResult.Locked(lockedUntilOf(response.lockedUntil))
         "blocked" -> FindResult.Blocked(
             when (response.reason) {
                 "too_early" -> BlockReason.TooEarly
@@ -100,5 +103,44 @@ fun findResultOf(response: FindResponse?): FindResult {
             response.checkInDate,
         )
         else -> FindResult.Server
+    }
+}
+
+/** 잠금 해제 시각(서버가 ISO 로 준다). 못 읽으면 1분 뒤. */
+fun lockedUntilOf(value: String?): Long =
+    value?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() } ?: (System.currentTimeMillis() + 60_000)
+
+/** 예약하신 분 여권 확인(`POST /api/kiosk/prove`) 몸통 — mrz_raw 는 두 줄을 \n 으로 이은 원문. */
+@Serializable
+data class ProveBody(@SerialName("session_id") val sessionId: String, @SerialName("mrz_raw") val mrzRaw: String)
+
+sealed interface ProveResult {
+    /** 이름이 맞다 — 찾기 성공과 같은 모양(found / checked_in). */
+    data class Matched(val found: FindResult.Found) : ProveResult
+    data object Unreadable : ProveResult
+    data object NameMismatch : ProveResult
+
+    /** 예약이 닫혔다(session_gone) — 처음으로. */
+    data object SessionGone : ProveResult
+
+    /** 취소 · 기간 지남 · 사용 중(busy) 등 — 기존 막힘 화면. */
+    data class Blocked(val blocked: FindResult.Blocked) : ProveResult
+    data class Locked(val untilMillis: Long) : ProveResult
+    data object Network : ProveResult
+    data object Server : ProveResult
+}
+
+/** 서버 응답 → 결과. 테스트로 덮는다. verify_required 같은 나머지는 일반 오류. */
+fun proveResultOf(status: Int, response: FindResponse?): ProveResult {
+    if (response == null) return ProveResult.Server
+    val found = findResultOf(response)
+    if (found is FindResult.Found) return ProveResult.Matched(found)
+    if (found is FindResult.Blocked) return ProveResult.Blocked(found)
+    return when {
+        status == 409 && response.error == "session_gone" -> ProveResult.SessionGone
+        status == 400 && response.error == "unreadable" -> ProveResult.Unreadable
+        status == 403 && response.error == "name_mismatch" -> ProveResult.NameMismatch
+        status == 429 && response.error == "locked" -> ProveResult.Locked(lockedUntilOf(response.lockedUntil))
+        else -> ProveResult.Server
     }
 }

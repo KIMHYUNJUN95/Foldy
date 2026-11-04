@@ -11,7 +11,7 @@ import { holdSession, kioskStayOf, readNameCandidates, readStayLanguage, readSta
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/find — 태블릿 예약 찾기(44 FR-K02 · K03 · K04 · K17, 시안 T1 · T1k · T1x · T1b · T1c).
-// 6자리 코드, 또는 이름 + 체크인 날짜(이 기기의 건물만). 못 찾으면 어느 칸이 틀렸는지 말하지 않는다.
+// 6자리 코드, 또는 여권 이름, 또는 이름 + 체크인 날짜(이름은 stay 를 돌려주지 않고 proof_needed — 여권 확인 뒤 /api/kiosk/prove)(이 기기의 건물만). 못 찾으면 어느 칸이 틀렸는지 말하지 않는다.
 // 이 기기에서 연달아 5번 틀릴 때마다 1분 잠금. 찾으면 이 기기의 세션을 잡는다(다른 기기가 진행 중이면 막음).
 export const dynamic = "force-dynamic";
 
@@ -96,6 +96,11 @@ export async function POST(request: Request) {
     if (!stay) return json({ ok: false, error: "blocked", reason: "expired" }, 409);
     const sessionId = await holdSession(db, stay, device.id, now, input.mode);
     if (!sessionId) return json({ ok: false, error: "blocked", reason: "busy" }, 409);
+
+    // 이름만으로는 예약 정보(방 · 날짜 · 연락처)를 보여 주지 않는다 — 여권으로 본인 확인(`prove`)이 먼저다.
+    if (input.mode === "name") {
+      return json({ ok: true, result: "proof_needed", session_id: sessionId, language: await readStayLanguage(db, stay.id) });
+    }
 
     return json({
       ok: true,

@@ -126,6 +126,14 @@ describe("planSync", () => {
     expect(plan.unknownProperty).toBe(1);
   });
 
+  it("태블릿을 두지 않는 건물(사노)은 stay 도 코드도 만들지 않고 건너뛴 건수만 센다", () => {
+    const plan = planSync([resv({ property_name: "사노" }), resv({ id: "r2", original_reservation_id: "B2", property_name: "사노" })], [], [], TODAY);
+    expect(plan.inserts).toHaveLength(0);
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.excludedProperty).toBe(2);
+    expect(plan.unknownProperty).toBe(0);
+  });
+
   it("다른 조직의 같은 번호는 따로 본다", () => {
     const plan = planSync([resv(), resv({ id: "r5", organization_id: "org-2" })], [stay()], [{ id: "sr1", stay_id: "s1", reservation_id: "r1" }], TODAY);
     expect(plan.inserts.map((insert) => insert.organization_id)).toEqual(["org-2"]);

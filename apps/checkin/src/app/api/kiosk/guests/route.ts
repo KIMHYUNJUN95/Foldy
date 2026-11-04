@@ -7,7 +7,7 @@ import {
   kioskGuestBodySchema,
   kioskGuestRow,
 } from "@/lib/kiosk/guests";
-import { grantPassportProofIfMatching, kioskStayOf, openKioskStay, reloadKioskStay } from "@/lib/kiosk/store";
+import { kioskStayOf, openProvenKioskStay, provenFailure, reloadKioskStay } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/guests — 태블릿에서 한 사람 명부 저장(44 FR-K06 · K07 · K08 · K16 · K21). 이 기기가 잡은 세션으로만.
@@ -27,8 +27,9 @@ export async function POST(request: Request) {
     const { sessionId, guest: input } = parsed.data;
     const now = new Date();
 
-    const stay = await openKioskStay(db, sessionId, device, now);
-    if (!stay) return json({ ok: false, error: "session_gone" }, 409);
+    const opened = await openProvenKioskStay(db, sessionId, device, now);
+    if ("error" in opened) return provenFailure(opened.error);
+    const { stay } = opened;
     if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
 
     const existing = input.id ? stay.guests.find((guest) => guest.id === input.id) : undefined;
@@ -63,8 +64,6 @@ export async function POST(request: Request) {
       if (error) throw new Error(error.message);
       guestId = data.id as string;
     }
-
-    await grantPassportProofIfMatching(db, sessionId, stay, input.mrz?.raw);
 
     const refreshed = await reloadKioskStay(db, stay.id);
     if (!refreshed) return json({ ok: false, error: "session_gone" }, 409);

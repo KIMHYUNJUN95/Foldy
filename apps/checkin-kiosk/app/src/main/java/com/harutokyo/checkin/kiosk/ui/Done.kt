@@ -78,7 +78,6 @@ fun CompletionScreen(
     onSessionGone: () -> Unit,
     /** 명부가 덜 찼다고 할 때 빠른 체크인 화면으로 되돌린다 — 되돌렸으면 true(이 화면은 막다른 길을 그리지 않는다). */
     onRoster: () -> Boolean,
-    onVerify: () -> Unit,
     onCall: () -> Unit,
     onHome: () -> Unit,
 ) {
@@ -152,7 +151,6 @@ fun CompletionScreen(
     val verify = state is DoneState.VerifyRequired
     val primary = when {
         state is DoneState.Ready -> str(R.string.g4_finish)
-        verify -> str(R.string.g4_scan_passport)
         retryable -> str(R.string.g4_retry)
         else -> str(R.string.home)
     }
@@ -174,7 +172,7 @@ fun CompletionScreen(
     ) {
         ScrollPage(bottom = {
             if (state !is DoneState.Loading) {
-                BottomRow(onCall, primary, onPrimary = { if (verify) onVerify() else if (ready || !retryable) onHome() else attempt++ })
+                BottomRow(onCall, primary, onPrimary = { if (ready || !retryable) onHome() else attempt++ })
             }
         }) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -196,8 +194,8 @@ fun CompletionScreen(
                         Spacer(Modifier.height(32.dp))
                         StaffCallBlock(onCall)
                     }
-                    if (retryable || verify) {
-                        Spacer(Modifier.height(if (verify) 20.dp else 40.dp))
+                    if (retryable) {
+                        Spacer(Modifier.height(40.dp))
                         OutlineButton(str(R.string.home), onClick = onHome)
                     }
                 }

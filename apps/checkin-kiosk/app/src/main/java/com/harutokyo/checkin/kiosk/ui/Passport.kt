@@ -177,7 +177,7 @@ internal fun FailedScreen(who: String, photo: ByteArray?, second: Boolean, onBac
 
 /** T3n — 여권이 없으신가요? */
 @Composable
-internal fun NoPassportScreen(who: String, cameraOff: Boolean, proofNotice: Boolean, onBack: () -> Unit, onCall: () -> Unit, onPick: (NoPassport) -> Unit) {
+internal fun NoPassportScreen(who: String, cameraOff: Boolean, onBack: () -> Unit, onCall: () -> Unit, onPick: (NoPassport) -> Unit) {
     ScrollPage(bottom = {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             OutlineButton(str(R.string.staff_call), onClick = onCall)
@@ -192,14 +192,6 @@ internal fun NoPassportScreen(who: String, cameraOff: Boolean, proofNotice: Bool
         if (cameraOff) {
             Spacer(Modifier.height(16.dp))
             Text(str(R.string.camera_denied), color = G.Sand, fontSize = 17.sp)
-        }
-        if (proofNotice) {
-            Spacer(Modifier.height(24.dp))
-            Column(Modifier.fillMaxWidth().background(G.Sand.copy(alpha = 0.14f), Radius).border(BorderStroke(1.dp, G.Sand), Radius).padding(20.dp)) {
-                Text(str(R.string.nopass_proof_notice), color = G.Sand, fontSize = 18.sp, lineHeight = 27.sp)
-                Spacer(Modifier.height(16.dp))
-                StaffCallBlock(onCall)
-            }
         }
         Spacer(Modifier.height(32.dp))
         val options = buildList {

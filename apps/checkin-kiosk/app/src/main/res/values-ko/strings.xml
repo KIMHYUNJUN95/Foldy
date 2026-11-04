@@ -261,9 +261,13 @@
     <string name="call_whatsapp">WhatsApp</string>
     <string name="g4_title_verify">여권 확인이 필요해요</string>
     <string name="g4_title_blocked">이 예약은 열 수 없어요</string>
-    <string name="g4_verify_body">여권을 찍으면 방 비밀번호를 바로 보여 드려요. 여권이 없거나 찍기 어려우면 직원을 불러 주세요.</string>
+    <string name="g4_verify_body">이 예약은 아직 본인 확인이 끝나지 않았어요. 직원을 불러 주세요.</string>
     <string name="g4_blocked_cancelled">취소된 예약이에요. 직원을 불러 주세요.</string>
     <string name="g4_blocked_expired">이용 기간이 지난 예약이에요. 직원을 불러 주세요.</string>
-    <string name="g4_scan_passport">여권 찍기</string>
-    <string name="nopass_proof_notice">이름으로 찾은 예약이라, 여권 없이 계속하면 마지막에 직원이 확인해 줘야 방 비밀번호를 보여 드릴 수 있어요. 지금 직원을 부를 수도 있어요.</string>
+    <string name="proof_title">예약하신 분의 여권을 비춰 주세요</string>
+    <string name="proof_body">예약을 확인하기 위해서예요. 여권 이름이 예약과 맞으면 예약 내용을 보여 드려요.</string>
+    <string name="proof_retry">읽지 못했어요. 다시 비춰 주세요. 계속 안 되면 「코드로 찾기」를 누르거나 직원을 불러 주세요.</string>
+    <string name="proof_mismatch">여권의 이름이 예약과 달라요. 예약하신 분의 여권을 비추거나, 「코드로 찾기」를 누르거나, 직원을 불러 주세요.</string>
+    <string name="proof_no_passport">여권이 없어요</string>
+    <string name="proof_retake">다시 찍기</string>
 </resources>

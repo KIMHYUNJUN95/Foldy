@@ -36,6 +36,7 @@ import com.harutokyo.checkin.kiosk.contract.FindResult
 import com.harutokyo.checkin.kiosk.camera.Captured
 import com.harutokyo.checkin.kiosk.contract.KioskStay
 import com.harutokyo.checkin.kiosk.contract.PassportQuery
+import com.harutokyo.checkin.kiosk.contract.ProveResult
 import com.harutokyo.checkin.kiosk.data.KioskViewModel
 import com.harutokyo.checkin.kiosk.data.Phase
 import com.harutokyo.checkin.kiosk.data.StepTimer
@@ -50,7 +51,7 @@ import kotlinx.coroutines.launch
 
 private val PHRASE_BREAK = LineBreak(LineBreak.Strategy.HighQuality, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase)
 
-private enum class Screen { Language, Scan, Find, NotFound, Blocked, CheckedIn, Fast, Done }
+private enum class Screen { Language, Scan, Proof, Find, NotFound, Blocked, CheckedIn, Fast, Done }
 
 @Composable
 fun KioskRoot(model: KioskViewModel = viewModel()) {
@@ -69,10 +70,12 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
     var stay by remember { mutableStateOf<KioskStay?>(null) }
     // F1 에서 찍은 대표자 여권(이름으로 찾은 경우엔 없음).
     var firstShot by remember { mutableStateOf<Captured?>(null) }
-    // 방 비밀번호를 보려고 여권(또는 예약 코드)으로 다시 찾는 중 — 찾으면 F2 가 아니라 완료 화면으로 간다.
-    var verifying by remember { mutableStateOf(false) }
-    // 어떻게 찾았나(이름으로 찾은 예약은 여권이 저장돼야 비밀번호를 보여 준다) · 완료 화면이 빠른 체크인에서 왔나 · 명부 되돌리기는 한 번만.
-    var foundByName by remember { mutableStateOf(false) }
+    // 이름으로 찾았고 예약하신 분 여권으로 본인 확인을 기다리는 예약 번호 — 확인되기 전엔 예약 내용도 입력도 없다.
+    var proofSession by remember { mutableStateOf<String?>(null) }
+    // 이름이 안 맞아 멈춘 상태 · 마지막으로 보낸 여권 두 줄(같은 줄을 연달아 보내지 않는다).
+    var proofHeld by remember { mutableStateOf(false) }
+    var lastProofRaw by remember { mutableStateOf<String?>(null) }
+    // 완료 화면이 빠른 체크인에서 왔나 · 명부 되돌리기는 한 번만.
     var doneFromFast by remember { mutableStateOf(false) }
     var rosterBounced by remember { mutableStateOf(false) }
     val timer = remember { StepTimer() }
@@ -91,20 +94,22 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
         session = null
         stay = null
         firstShot = null
-        verifying = false
-        foundByName = false
+        proofSession = null
+        proofHeld = false
+        lastProofRaw = null
         doneFromFast = false
         rosterBounced = false
         model.clearUploads()
         timer.reset()
     }
     // 예약을 찾았다 — 예약 언어가 있으면 그 언어로(FR-K01, 이 건물이 쓰는 언어일 때만). 이미 체크인했으면 T1c, 아니면 F2.
-    fun foundStay(result: FindResult.Found, languages: List<String>, shot: Captured?, byName: Boolean = false) {
-        // 새로 찾았다 — 앞 찾기에서 얻은 확인(여권 · 되돌리기)은 모두 없던 일.
-        verifying = false
+    fun foundStay(result: FindResult.Found, languages: List<String>, shot: Captured?) {
+        // 새로 찾았다 — 앞 찾기의 확인 기다림 · 되돌리기는 모두 없던 일.
+        proofSession = null
+        proofHeld = false
+        lastProofRaw = null
         doneFromFast = false
         rosterBounced = false
-        foundByName = byName
         session = result.sessionId
         model.openUploads(result.sessionId)
         stay = result.stay
@@ -112,17 +117,23 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
         if (result.language != null && result.language in languages) language = result.language
         screen = if (result.checkedIn) Screen.CheckedIn else Screen.Fast
     }
-    // 다시 찾아 본인임이 확인됐다 — 같은 예약이면 그대로, 다른 예약이면 올리기 줄을 새로 열고 완료 요청을 다시 보낸다.
-    fun verified(result: FindResult.Found, languages: List<String>, shot: Captured?, byName: Boolean) {
-        if (result.sessionId != session) {
-            // 다른 예약이 잡혔다 — 바로 완료하지 않고 보통 길(F2 · 이미 체크인이면 T1c)로.
-            foundStay(result, languages, shot, byName)
-            return
-        }
-        stay = result.stay
-        verifying = false
+    // 이름으로 찾았다 — 예약 내용 없이 여권 확인 화면으로. 확인 전에는 올리기 줄도 열지 않는다.
+    fun proofNeeded(result: FindResult.ProofNeeded, languages: List<String>) {
+        proofSession = result.sessionId
+        proofHeld = false
+        lastProofRaw = null
+        session = null
+        stay = null
+        firstShot = null
         doneFromFast = false
-        screen = Screen.Done
+        rosterBounced = false
+        scanError = null
+        if (result.language != null && result.language in languages) language = result.language
+        screen = Screen.Proof
+    }
+    // 확인 기다림은 확인 화면과 그 잠금 화면에서만 산다 — 다른 어느 화면으로 나가도(막힘 · 언어 · 찾기 · 처음으로) 지워 다음 손님이 앞 손님 확인 화면으로 가지 않게.
+    LaunchedEffect(screen) {
+        if (screen != Screen.Proof && screen != Screen.NotFound) proofSession = null
     }
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current!!
@@ -210,7 +221,11 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     form = FindForm(byCode = false, lastName = mrz.surname, firstName = mrz.givenNames)
                                     when (val result = model.find(PassportQuery(mrz.surname, mrz.givenNames))) {
                                         is FindResult.Found -> {
-                                            if (verifying) verified(result, state.contract?.languages.orEmpty(), shot, false) else foundStay(result, state.contract?.languages.orEmpty(), shot)
+                                            foundStay(result, state.contract?.languages.orEmpty(), shot)
+                                            true
+                                        }
+                                        is FindResult.ProofNeeded -> {
+                                            proofNeeded(result, state.contract?.languages.orEmpty())
                                             true
                                         }
                                         is FindResult.NotFound, is FindResult.Locked -> {
@@ -235,6 +250,86 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                 },
                             )
                         }
+                        Screen.Proof -> {
+                            val networkError = str(R.string.error_network)
+                            val serverError = str(R.string.error_server)
+                            val mismatch = str(R.string.proof_mismatch)
+                            val retryHint = str(R.string.proof_retry)
+                            val id = proofSession
+                            ScanScreen(
+                                languageName = languageName(language),
+                                error = scanError,
+                                proof = true,
+                                held = proofHeld,
+                                onRetake = {
+                                    proofHeld = false
+                                    scanError = null
+                                },
+                                onBack = {
+                                    proofSession = null
+                                    screen = Screen.Scan
+                                },
+                                onLanguage = { screen = Screen.Language },
+                                onCall = { callOpen = true },
+                                onByCode = {
+                                    form = form.copy(byCode = true)
+                                    screen = Screen.Find
+                                },
+                                onByName = {},
+                                onNoPassport = { callOpen = true },
+                                onPassport = { shot ->
+                                    // 검사 숫자가 맞는 읽기만 보낸다. 직원 호출 창이 열려 있으면 버린다.
+                                    val mrz = shot.mrz?.takeIf { it.valid } ?: return@ScanScreen false
+                                    if (callOpenNow || id == null) return@ScanScreen false
+                                    // 방금 이름이 안 맞았던 같은 줄은 다시 보내지 않고 멈춘 채 메시지를 보인다.
+                                    if (mrz.raw == lastProofRaw) {
+                                        scanError = mismatch
+                                        proofHeld = true
+                                        return@ScanScreen false
+                                    }
+                                    scanError = null
+                                    when (val result = model.prove(id, mrz.raw)) {
+                                        // 맞다 — 찍은 여권을 대표자 것으로 이어 받아 보통 길로(F2 · 이미 체크인이면 T1c). 다시 찍지 않는다.
+                                        is ProveResult.Matched -> {
+                                            foundStay(result.found, state.contract?.languages.orEmpty(), shot)
+                                            true
+                                        }
+                                        ProveResult.Unreadable -> {
+                                            scanError = retryHint
+                                            false
+                                        }
+                                        ProveResult.NameMismatch -> {
+                                            scanError = mismatch
+                                            lastProofRaw = mrz.raw
+                                            proofHeld = true
+                                            false
+                                        }
+                                        ProveResult.SessionGone -> {
+                                            reset()
+                                            true
+                                        }
+                                        is ProveResult.Blocked -> {
+                                            blocked = result.blocked
+                                            screen = Screen.Blocked
+                                            true
+                                        }
+                                        is ProveResult.Locked -> {
+                                            notFound = FindResult.Locked(result.untilMillis)
+                                            screen = Screen.NotFound
+                                            true
+                                        }
+                                        ProveResult.Network -> {
+                                            scanError = networkError
+                                            false
+                                        }
+                                        ProveResult.Server -> {
+                                            scanError = serverError
+                                            false
+                                        }
+                                    }
+                                },
+                            )
+                        }
                         Screen.Find -> {
                             val networkError = str(R.string.error_network)
                             val serverError = str(R.string.error_server)
@@ -251,7 +346,8 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                 onCall = { callOpen = true },
                                 onSubmit = {
                                     when (val result = model.find(form.query())) {
-                                        is FindResult.Found -> if (verifying && form.byCode) verified(result, state.contract?.languages.orEmpty(), null, false) else foundStay(result, state.contract?.languages.orEmpty(), null, byName = !form.byCode)
+                                        is FindResult.Found -> foundStay(result, state.contract?.languages.orEmpty(), null)
+                                        is FindResult.ProofNeeded -> proofNeeded(result, state.contract?.languages.orEmpty())
                                         is FindResult.NotFound, is FindResult.Locked -> {
                                             notFound = result
                                             screen = Screen.NotFound
@@ -270,9 +366,9 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                             form = form,
                             remaining = (notFound as? FindResult.NotFound)?.remaining ?: 0,
                             lockedUntil = (notFound as? FindResult.Locked)?.untilMillis,
-                            onBack = { screen = Screen.Scan },
+                            onBack = { screen = if (proofSession != null) Screen.Proof else Screen.Scan },
                             onCall = { callOpen = true },
-                            onRetry = { screen = Screen.Scan },
+                            onRetry = { screen = if (proofSession != null) Screen.Proof else Screen.Scan },
                         )
                         Screen.Blocked -> BlockedScreen(
                             reason = blocked?.reason ?: BlockReason.Expired,
@@ -326,7 +422,6 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     },
                                     onCall = { callOpen = true },
                                     onStep = timer::enter,
-                                    byName = foundByName,
                                     onDone = {
                                         timer.enter("done")
                                         timer.finish()
@@ -355,10 +450,6 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     } else {
                                         false
                                     }
-                                },
-                                onVerify = {
-                                    verifying = true
-                                    screen = Screen.Scan
                                 },
                                 onCall = { callOpen = true },
                                 onHome = reset,

@@ -67,7 +67,12 @@ export type SyncPlan = {
   changedAfterCheckin: number;
   /** 건물 키를 모르는 예약 묶음 — 새 건물이면 building-key.ts 에 넣는다. */
   unknownProperty: number;
+  /** 태블릿을 두지 않는 건물(EXCLUDED_PROPERTY_KEYS)이라 건너뛴 예약 묶음. */
+  excludedProperty: number;
 };
+
+// 대행 운영 등 태블릿 체크인을 쓰지 않는 건물 — stay 도 체크인 코드도 만들지 않는다. 건물 키 판별(building-key.ts)은 그대로 둔다.
+export const EXCLUDED_PROPERTY_KEYS: ReadonlySet<string> = new Set(["sano"]);
 
 // Beds24 상태 중 숙박이 없는 것. 43 「막는 경우」 표: 취소 · no_show 는 「취소된 예약」으로 안내.
 const INACTIVE = new Set(["cancelled", "no_show"]);
@@ -108,6 +113,7 @@ export function planSync(
     roomDeletes: [],
     changedAfterCheckin: 0,
     unknownProperty: 0,
+    excludedProperty: 0,
   };
 
   const groups = new Map<string, ReservationRow[]>();
@@ -150,6 +156,10 @@ export function planSync(
     const propertyKey = buildingKeyOf(active[0].property_name);
     if (!propertyKey) {
       plan.unknownProperty += 1;
+      continue;
+    }
+    if (EXCLUDED_PROPERTY_KEYS.has(propertyKey)) {
+      plan.excludedProperty += 1;
       continue;
     }
     const fields = fieldsOf(active, propertyKey);

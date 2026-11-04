@@ -262,9 +262,13 @@
     <string name="call_whatsapp">WhatsApp</string>
     <string name="g4_title_verify">パスポートの確認が必要です</string>
     <string name="g4_title_blocked">このご予約は開けません</string>
-    <string name="g4_verify_body">パスポートを撮影すると、お部屋の暗証番号をすぐにお見せします。パスポートをお持ちでない場合や撮影が難しい場合は、スタッフをお呼びください。</string>
+    <string name="g4_verify_body">このご予約はまだ本人確認が済んでいません。スタッフをお呼びください。</string>
     <string name="g4_blocked_cancelled">キャンセルされたご予約です。スタッフをお呼びください。</string>
     <string name="g4_blocked_expired">ご利用期間が過ぎたご予約です。スタッフをお呼びください。</string>
-    <string name="g4_scan_passport">パスポートを撮る</string>
-    <string name="nopass_proof_notice">お名前で検索した予約のため、パスポートなしで進めると、最後にスタッフの確認が必要になります。今すぐスタッフを呼ぶこともできます。</string>
+    <string name="proof_title">予約された方のパスポートをかざしてください</string>
+    <string name="proof_body">ご予約の確認のためです。パスポートのお名前が予約と合えば、予約の内容をお見せします。</string>
+    <string name="proof_retry">読み取れませんでした。もう一度かざしてください。続かない場合は「コードで探す」を押すか、スタッフをお呼びください。</string>
+    <string name="proof_mismatch">パスポートのお名前が予約と合いません。予約された方のパスポートをかざすか、「コードで探す」を押すか、スタッフをお呼びください。</string>
+    <string name="proof_no_passport">パスポートがありません</string>
+    <string name="proof_retake">もう一度撮る</string>
 </resources>

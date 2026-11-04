@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authenticateDevice } from "@/lib/device/auth";
 import { json, readJson, serverError } from "@/lib/guest/request";
 import { isLocale } from "@/lib/i18n";
-import { kioskStayOf, openKioskStay, reloadKioskStay } from "@/lib/kiosk/store";
+import { kioskStayOf, openProvenKioskStay, provenFailure, reloadKioskStay } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/consent — 태블릿 약관 · 개인정보 두 칸 동의(시안 G3b, 44 FR-K09). 대표자 이름으로 한 줄 + 기기.
@@ -27,8 +27,9 @@ export async function POST(request: Request) {
     const parsed = kioskConsentSchema.safeParse(await readJson(request));
     if (!parsed.success) return json({ ok: false, error: "invalid" }, 400);
 
-    const stay = await openKioskStay(db, parsed.data.sessionId, device, new Date());
-    if (!stay) return json({ ok: false, error: "session_gone" }, 409);
+    const opened = await openProvenKioskStay(db, parsed.data.sessionId, device, new Date());
+    if ("error" in opened) return provenFailure(opened.error);
+    const { stay } = opened;
     if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
 
     if (!stay.consented) {

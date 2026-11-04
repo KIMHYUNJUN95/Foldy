@@ -2,9 +2,8 @@ import { z } from "zod";
 
 import { authenticateDevice } from "@/lib/device/auth";
 import { json, readJson, serverError } from "@/lib/guest/request";
-import { loadStayById } from "@/lib/guest/store";
-import { clampPartySize, kioskGate } from "@/lib/kiosk/find";
-import { kioskStayOf, touchSession } from "@/lib/kiosk/store";
+import { clampPartySize } from "@/lib/kiosk/find";
+import { kioskStayOf, openProvenKioskStay, provenFailure } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/party — 시안 T2 의 인원 ±(44 FR-K05: 예약과 달라도 막지 않고 직원 화면에 표시).
@@ -24,13 +23,9 @@ export async function POST(request: Request) {
     if (!parsed.success) return json({ ok: false, error: "invalid" }, 400);
     const now = new Date();
 
-    const stayId = await touchSession(db, parsed.data.sessionId, device.id, now);
-    if (!stayId) return json({ ok: false, error: "session_gone" }, 409);
-    const stay = await loadStayById(db, stayId);
-    if (!stay || stay.propertyKey !== device.property_key || kioskGate(stay, now).kind === "blocked") {
-      return json({ ok: false, error: "session_gone" }, 409);
-    }
-
+    const opened = await openProvenKioskStay(db, parsed.data.sessionId, device, now);
+    if ("error" in opened) return provenFailure(opened.error);
+    const { stay } = opened;
     if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
 
     const partySize = clampPartySize(parsed.data.partySize, stay.guests.length);

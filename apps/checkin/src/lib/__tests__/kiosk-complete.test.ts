@@ -9,13 +9,15 @@ import {
   matchRoomCodes,
   identityProven,
   freshProof,
-  grantsPassportProof,
+  proveOutcome,
+  holdDecision,
   GUEST_KEYBOX_BUILDINGS,
   needsStaffCheck,
   raceOutcome,
   sharedCodesOf,
   staffCheckCount,
 } from "../kiosk/complete";
+import { nameMatchesProve } from "../kiosk/find";
 import { parseMrzStrip } from "../kiosk/mrz";
 import { roomForm } from "../kiosk/rooms";
 
@@ -151,33 +153,78 @@ describe("다시 보기 · 경쟁 · 이름으로 찾은 경우", () => {
   const L2 = "L898902C36UTO7408122F1204159ZE184226B<<<<<10";
   const good = `${L1}\n${L2}`;
   const names = ["Anna Eriksson"];
-  it("서버가 띠를 읽는다 — 좋은 띠", () => {
+  it("서버가 띠를 읽는다 — 좋은 띠는 증명, 증명 판정은 이름으로 찾은 세션에서 나온다", () => {
     expect(parseMrzStrip(good)).toEqual({ surname: "ERIKSSON", givenNames: "ANNA MARIA" });
-    expect(grantsPassportProof(freshProof("name"), good, names)).toBe(true);
+    expect(proveOutcome(freshProof("name"), good, names)).toBe("proven");
   });
-  it("검사 숫자가 하나라도 틀리면 증명 없음", () => {
-    const bad = `${L1}\n${L2.slice(0, 13)}740813${L2.slice(19)}`; // 생년월일 바뀜
+  it("검사 숫자가 하나라도 틀리면 읽을 수 없는 띠", () => {
+    const bad = `${L1}\n${L2.slice(0, 13)}740813${L2.slice(19)}`;
     expect(parseMrzStrip(bad)).toBeNull();
-    expect(grantsPassportProof(freshProof("name"), bad, names)).toBe(false);
-    expect(parseMrzStrip(`${L1}\n${L2.slice(0, 43)}1`)).toBeNull(); // 합계
+    expect(proveOutcome(freshProof("name"), bad, names)).toBe("unreadable");
+    expect(parseMrzStrip(`${L1}\n${L2.slice(0, 43)}1`)).toBeNull();
   });
-  it("다른 사람의 좋은 띠에 예약 이름을 입력칸에 쳐도 증명 없음(입력 이름은 보지 않는다)", () => {
-    const other = `${"P<UTOSMITH<<JOHN".padEnd(44, "<")}
-${L2}`;
+  it("다른 사람의 좋은 띠는 이름이 달라 name_mismatch", () => {
+    const other = `${"P<UTOSMITH<<JOHN".padEnd(44, "<")}\n${L2}`;
     expect(parseMrzStrip(other)).toEqual({ surname: "SMITH", givenNames: "JOHN" });
-    expect(grantsPassportProof(freshProof("name"), other, names)).toBe(false);
+    expect(proveOutcome(freshProof("name"), other, names)).toBe("name_mismatch");
   });
-  it("깨진 띠 · 없는 띠는 증명 없음", () => {
-    expect(parseMrzStrip(undefined)).toBeNull();
+  it("띠가 없거나 깨졌으면 unreadable", () => {
+    expect(proveOutcome(freshProof("name"), undefined, names)).toBe("unreadable");
+    expect(proveOutcome(freshProof("name"), "garbage", names)).toBe("unreadable");
     expect(parseMrzStrip(L1)).toBeNull();
     expect(parseMrzStrip(`${L1}\n${L2.slice(0, 43)}`)).toBeNull();
     expect(parseMrzStrip(`${L1}\n${L2.replace("L8", "l8")}`)).toBeNull();
-    expect(grantsPassportProof(freshProof("name"), "garbage", names)).toBe(false);
   });
-  it("이름으로 찾은 세션에서만, 이미 증명됐거나 코드로 찾았으면 새로 주지 않는다", () => {
-    expect(grantsPassportProof(freshProof("code"), good, names)).toBe(false);
-    expect(grantsPassportProof({ found_by: "name", passport_proof: true }, good, names)).toBe(false);
-    expect(grantsPassportProof(freshProof("name"), good, ["Someone Else"])).toBe(false);
+  it("이미 증명된 세션(코드 · 여권 · 증명 끝)은 already", () => {
+    expect(proveOutcome(freshProof("code"), undefined, names)).toBe("already");
+    expect(proveOutcome({ found_by: "name", passport_proof: true }, "garbage", names)).toBe("already");
+  });
+  it("예약 이름과 다르면 name_mismatch", () => {
+    expect(proveOutcome(freshProof("name"), good, ["Someone Else"])).toBe("name_mismatch");
+  });
+});
+
+describe("본인 확인용 이름 맞추기(성 + 첫 이름)", () => {
+  it("실제 여권 표기: 성이 둘 · 접두어 · 가운데 이름 · 순서 뒤집힘", () => {
+    expect(nameMatchesProve("Ana Garcia", "GARCIA LOPEZ", "ANA")).toBe(true);
+    expect(nameMatchesProve("Maria Cruz", "DE LA CRUZ", "MARIA")).toBe(true);
+    expect(nameMatchesProve("Daniel James Hu", "HU", "DANIEL")).toBe(true);
+    expect(nameMatchesProve("Kim Lee", "KIM", "LEE")).toBe(true);
+  });
+  it("성이 없거나 첫 이름이 다르면 안 맞는다", () => {
+    expect(nameMatchesProve("Daniel James", "SMITH", "DANIEL JAMES")).toBe(false);
+    expect(nameMatchesProve("De Silva", "SILVA", "JOHN")).toBe(false);
+    expect(nameMatchesProve("Hu Mei", "HU", "DANIEL")).toBe(false);
+    expect(nameMatchesProve("Ana Garcia", "GARCIA", "MARIA")).toBe(false);
+  });
+  it("알려진 한계: 가운데 이름만 같은 가족(Daniel James Hu ↔ HU/JAMES)은 통과한다", () => {
+    expect(nameMatchesProve("Daniel James Hu", "HU", "JAMES")).toBe(true);
+  });
+  it("한 단어는 정확히 같아야 한다 · 이름 없는 여권은 성만 · 한자 예약은 못 맞춘다", () => {
+    expect(nameMatchesProve("Madonna", "MADONNA", "")).toBe(true);
+    expect(nameMatchesProve("Hu", "HU", "DANIEL")).toBe(false);
+    expect(nameMatchesProve("Hu Mei", "HU", "")).toBe(false);
+    expect(nameMatchesProve("胡 太郎", "HU", "TARO")).toBe(false);
+  });
+  it("prove 판정에서도 쓴다", () => {
+    const strip = `${"P<UTOGARCIA<LOPEZ<<ANA".padEnd(44, "<")}\nL898902C36UTO7408122F1204159ZE184226B<<<<<10`;
+    expect(proveOutcome(freshProof("name"), strip, ["Ana Garcia"])).toBe("proven");
+  });
+});
+
+describe("찾을 때 잠금 결정", () => {
+  const now = new Date("2026-11-04T03:00:00Z");
+  const other = { device_id: "d2", locked_until: "2026-11-04T03:04:00Z", finished_at: null, abandoned_at: null };
+  it("이름으로 찾으면 잠그지 않는다 · 코드 · 여권은 잠근다", () => {
+    expect(holdDecision([], "d1", now, "name")).toEqual({ kind: "hold", lock: false });
+    expect(holdDecision([], "d1", now, "code")).toEqual({ kind: "hold", lock: true });
+    expect(holdDecision([], "d1", now, "passport")).toEqual({ kind: "hold", lock: true });
+  });
+  it("다른 기기가 진짜로 잡고 있으면 이름으로 찾아도 busy", () => {
+    expect(holdDecision([other], "d1", now, "name")).toEqual({ kind: "busy" });
+  });
+  it("잠금 없는 다른 기기 세션(증명 안 된 이름 찾기)은 막지 않는다", () => {
+    expect(holdDecision([{ ...other, locked_until: null }], "d1", now, "code")).toEqual({ kind: "hold", lock: true });
   });
 });
 

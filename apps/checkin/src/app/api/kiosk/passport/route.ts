@@ -4,7 +4,7 @@ import { authenticateDevice } from "@/lib/device/auth";
 import { EXTENSION, MAX_PASSPORT_BYTES, sniffImageType } from "@/lib/guest/image";
 import { json, serverError } from "@/lib/guest/request";
 import { PASSPORT_BUCKET } from "@/lib/guest/store";
-import { kioskStayOf, openKioskStay, reloadKioskStay } from "@/lib/kiosk/store";
+import { kioskStayOf, openProvenKioskStay, provenFailure, reloadKioskStay } from "@/lib/kiosk/store";
 import { createCheckinServiceClient } from "@/lib/supabase/service";
 
 // POST /api/kiosk/passport — 태블릿 카메라 여권 사진 한 장(multipart: session_id · guest_id · file, 44 FR-K07).
@@ -36,8 +36,9 @@ export async function POST(request: Request) {
     if (file.size === 0 || file.size > MAX_PASSPORT_BYTES) return json({ ok: false, error: "too_large" }, 413);
     const now = new Date();
 
-    const stay = await openKioskStay(db, sessionId, device, now);
-    if (!stay) return json({ ok: false, error: "session_gone" }, 409);
+    const opened = await openProvenKioskStay(db, sessionId, device, now);
+    if ("error" in opened) return provenFailure(opened.error);
+    const { stay } = opened;
     if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
     const guest = stay.guests.find((row) => row.id === guestId);
     if (!guest) return json({ ok: false, error: "not_found" }, 404);

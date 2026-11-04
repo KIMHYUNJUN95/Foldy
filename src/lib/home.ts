@@ -234,6 +234,8 @@ export async function getHomeTodayActivity(
         .eq("organization_id", session.organization.id)
         .eq("cleaning_date", today)
         .eq("status", "completed")
+        // 활동 피드는 「청소한 기록」만 (docs/product/45 표 3 C3) — 처리 끝 제외.
+        .eq("closed_without_cleaning", false)
         .not("completed_at", "is", null)
         .order("completed_at", { ascending: false })
         .limit(limit),

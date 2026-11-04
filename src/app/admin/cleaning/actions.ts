@@ -37,6 +37,7 @@ import {
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { roomWriteErrorKind, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
+import { forceCompleteEndAllowed } from "@/lib/cleaning-assign/room-rules";
 import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
 // 소요시간 포맷은 화면(오늘 현황 카드·기록 표·상세 패널)이 쓰는 fmtDur 를 그대로 재사용한다 —
 // 예전에는 여기에 같은 규칙을 한 번 더 구현해 두 벌이 갈릴 위험이 있었다.
@@ -254,7 +255,7 @@ export type ForceCompleteCleaningInput = {
 
 export type ForceCompleteCleaningResult =
   | { ok: true }
-  | { ok: false; reason: "forbidden" | "invalid" | "error" | "processed" };
+  | { ok: false; reason: "forbidden" | "invalid" | "error" | "processed" | "future" };
 
 function taskTypeToTaskLabel(type: CleaningTaskType): string {
   if (type === "longstay") return "long_stay";
@@ -366,6 +367,10 @@ export async function forceCompleteCleaningSession(
   const endIso = tokyoDateTimeIso(cleaningDate, input.end);
   if (!startIso || !endIso) {
     return { ok: false, reason: "invalid" };
+  }
+  // 미래 시각은 거절한다(문서 45 A9) — 아직 안 끝난 청소가 끝난 기록으로 남는다. 미룬 방의 강제 완료는 막지 않는다.
+  if (!forceCompleteEndAllowed(endIso, Date.now())) {
+    return { ok: false, reason: "future" };
   }
   const durationSeconds = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 1000);
   // 종료가 시작보다 늦지 않으면 소요 0초 완료 기록이 생긴다 — 서버에서 막는다.

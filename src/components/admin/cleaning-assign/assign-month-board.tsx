@@ -8,7 +8,7 @@ import { toggleApplicationForUser } from "@/actions/cleaning-assign-shift";
 import { AdminMonthPicker } from "@/components/admin/shared/admin-month-picker";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import type { Dictionary } from "@/lib/i18n";
-import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { MonthBoard } from "@/lib/cleaning-assign/data";
 import { haptic } from "@/lib/haptics";
 import { AssignPersonPanel } from "./assign-person-panel";
@@ -25,7 +25,7 @@ import "./cleaning-assign.css";
 
 type Shared = Dictionary["admin"]["shared"];
 
-type Preview = { proposals: Map<string, number>; fill: number; open: number; shortDays: string[] };
+type Preview = { proposals: Map<string, number>; fill: number; open: number; shortDays: string[]; left: number };
 
 export function AssignMonthBoard({
   board,
@@ -84,7 +84,7 @@ export function AssignMonthBoard({
       }
       const proposals = new Map<string, number>();
       for (const p of result.proposals) proposals.set(`${p.userId}|${p.workDate}`, (proposals.get(`${p.userId}|${p.workDate}`) ?? 0) + 1);
-      setPreview({ fill: result.proposals.length, open: result.openTotal, proposals, shortDays: result.shortDays });
+      setPreview({ fill: result.proposals.length, left: result.leftTotal, open: result.openTotal, proposals, shortDays: result.shortDays });
     });
   }
 
@@ -111,7 +111,7 @@ export function AssignMonthBoard({
     }
     startTransition(async () => {
       const result = await toggleApplicationForUser({ date, userId });
-      if (!result.ok) showToast(result.reason === "conflict" ? copy.errAssigned : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+      if (!result.ok) showToast(result.reason === "conflict" ? copy.errAssigned : assignFailText(result.reason, copy));
       router.refresh();
     });
   }
@@ -163,6 +163,7 @@ export function AssignMonthBoard({
           {preview.shortDays.length > 0 ? (
             <span className="is-danger">{fill(copy.previewShort, { days: preview.shortDays.slice(0, 6).map(shortDate).join(" · "), n: preview.shortDays.length })}</span>
           ) : null}
+          {preview.left > 0 ? <span className="is-danger">{fill(copy.suggestShort, { n: preview.left })}</span> : null}
           <span className="cas-sp" />
           <button type="button" className="cas-btn is-ghost" onClick={() => setPreview(null)}>
             {copy.cancel}

@@ -19,7 +19,8 @@ import {
 } from "@/lib/cleaning";
 import { getCleaningTargets, type SettingTarget } from "@/lib/cleaning-targets";
 import { isUnmeasuredSession, type UnmeasuredSessionLike } from "@/lib/cleaning-unmeasured";
-import { roomShareState, sessionRoomKeyLookup } from "@/lib/cleaning-assign/room-key";
+import { sessionRoomKeyLookup } from "@/lib/cleaning-assign/room-key";
+import { consolePartial } from "@/lib/cleaning-assign/room-rules";
 import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import type { CleaningExportFilters } from "@/lib/export/cleaning-filters";
 import {
@@ -97,6 +98,8 @@ export type AdminCleaningTask = {
    * 처리 끝 방 · 배정 없는 방은 빈 배열.
    */
   missingAssignees: string[];
+  /** 그날 그 방 배정(기록 전 카드의 담당 표시 · 담당 거르기). */
+  assigneeIds: string[];
   /**
    * 2인 방에서 일부만 끝냄(「1/2 끝남」, 2026-11-02 사용자 결정) — 끝낸 사람 수 · 필요한 수(그날 그 방 배정 인원). 그 밖에는 null.
    * `status` 는 기록 기준(끝난 기록이면 done)이라 상세 · 대신 완료가 그대로 쓰고, 카드 · 칸 · KPI 는 `roomStatusOf` 로 「진행 중」으로 센다.
@@ -317,7 +320,6 @@ export async function getAdminCleaningToday(
       const matched = pickRelevantSession(roomSessions);
       // 2인 방은 각자 기록 — 카드 담당 칸에 기록이 있는 사람을 모두, 아직 없는 배정 직원은 따로(대신 완료용).
       const liveStaff = [...new Set(roomSessions.filter((s) => s.status !== "cancelled" && !s.closed_without_cleaning).map((s) => s.staff_user_id))];
-      const roomClosed = roomSessions.some((s) => s.status === "completed" && s.closed_without_cleaning);
       const assignees = assigneesByRoom.get(assignKeyOf(target.sessionRoomLabel)) ?? [];
 
       const staffNames = liveStaff.length > 1 ? liveStaff.map((id) => staffNameById.get(id) ?? "—").join(" · ") : null;
@@ -327,15 +329,8 @@ export async function getAdminCleaningToday(
       let status: AdminCleaningStatus = "pending";
       if (matched?.status === "in_progress") status = "progress";
       else if (matched?.status === "completed") status = "done";
-      // 방 기준 「1/2 끝남」 — PC 하루 보기 · 모바일 현황판과 같은 계산(`roomShareState`). 처리 끝 방은 세지 않는다.
-      const share = roomShareState(
-        roomSessions.map((s) => ({ staffId: s.staff_user_id, status: s.status, closed: Boolean(s.closed_without_cleaning) })),
-        assignees,
-      );
-      const partial = !roomClosed && status === "done" && share.partial ? { done: share.done, need: share.need } : null;
-      // 대신 완료할 같이 한 사람 — 방이 「1/2 끝남」(아직 다 안 끝남)일 때만. 방이 이미 끝났거나(끝낸 사람 수가 배정 인원에 닿음)
-      // 처리 끝 방이면 비운다 — 카드는 「끝남」인데 패널이 「빠진 사람」을 내미는 엇갈림을 막는다.
-      const missingAssignees = partial ? assignees.filter((id) => !liveStaff.includes(id)) : [];
+      // 방 기준 「1/2 끝남」 · 대신 완료할 같이 한 사람 — 수기 · 밀려 온 카드(아래)와 같은 계산(문서 45 C8).
+      const { partial, missingAssignees } = consolePartial(roomSessions, assignees, status);
 
       tasks.push({
         id: matched?.id ?? `pending:${target.roomKey}`,
@@ -356,6 +351,7 @@ export async function getAdminCleaningToday(
         proxy: Boolean(matched?.completed_by_admin),
         closed: Boolean(matched?.closed_without_cleaning),
         unmeasured: matched ? isUnmeasuredSession(matched) : false,
+        assigneeIds: assignees,
         missingAssignees,
         partial,
         workers: workersOf(roomSessions),
@@ -376,6 +372,8 @@ export async function getAdminCleaningToday(
     if (targetRoomKeys.has(roomKey)) continue;
     const relevant = pickRelevantSession(sessions) ?? sessions[0]; // started_at 내림차순
     if (!relevant) continue;
+    const assignees = assigneesByRoom.get(assignKeyOf(relevant.room_label)) ?? [];
+    const share = consolePartial(sessions, assignees, sessionStatusToAdminStatus(relevant.status));
 
     let buildingRaw = relevant.room_label;
     let room = getDisplaySessionRoomLabel(relevant.room_label);
@@ -408,8 +406,9 @@ export async function getAdminCleaningToday(
       proxy: Boolean(relevant.completed_by_admin),
       closed: Boolean(relevant.closed_without_cleaning),
       unmeasured: isUnmeasuredSession(relevant),
-      missingAssignees: [],
-      partial: null,
+      assigneeIds: assignees,
+      missingAssignees: share.missingAssignees,
+      partial: share.partial,
       workers: workersOf(sessions),
       cancelledCount: countCancelled(sessions),
       guest: null,

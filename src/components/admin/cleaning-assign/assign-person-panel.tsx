@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { loadPersonShiftForPanel } from "@/app/admin/cleaning-assign/actions";
 import { resolveCancelRequest, toggleApplicationForUser } from "@/actions/cleaning-assign-shift";
-import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { PersonShift } from "@/lib/cleaning-assign/person-shift";
 import { haptic } from "@/lib/haptics";
 import { localizeBuildingName } from "@/lib/room-label-normalization";
@@ -104,7 +104,7 @@ export function AssignPersonPanel({
         onMessage(copy.psDone);
       } else {
         haptic("error");
-        onMessage(result.reason === "conflict" ? copy.errAssigned : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+        onMessage(result.reason === "conflict" ? copy.errAssigned : assignFailText(result.reason, copy));
       }
       router.refresh();
     });

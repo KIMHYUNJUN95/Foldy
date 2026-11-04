@@ -38,7 +38,8 @@ export function shiftDayState(input: {
     if (myRooms > 0) return isPast ? "worked" : "assigned";
     return isPast ? "past" : "free";
   }
-  if (cancelled) return "none";
+  // 일정 취소 뒤에도 끝낸 방의 배정은 남는다(문서 45 A7) — 그 방이 있으면 「배정 없음」으로 숨기지 않는다.
+  if (cancelled && myRooms === 0) return "none";
   if (myRooms > 0) return isPast ? "worked" : "assigned";
   if (isPast) return "none";
   if (totalRooms > 0 && openRooms === 0) return "none";

@@ -12,6 +12,7 @@ import { useToastMotion } from "@/components/shell/use-toast-motion";
 import { dayLabel, monthName, monthTitle, timeLabel, weekdayShort } from "@/components/admin/cleaning-assign/format";
 import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { MyShiftDay, MyShiftDetail } from "@/lib/cleaning-assign/data";
+import { canRequestCancel } from "@/lib/cleaning-assign/room-rules";
 import { haptic } from "@/lib/haptics";
 import "./shift.css";
 
@@ -220,7 +221,7 @@ export function MyShiftView({ copy, locale, ym, today, nextYm, days, details, up
                 {copy.withdrawRequest}
               </button>
             </>
-          ) : detail.date >= today ? (
+          ) : canRequestCancel({ cancelled: detail.cancelled, date: detail.date, today }) ? (
             <>
               <button type="button" className="shf-textbtn is-danger" disabled={pending} onClick={() => cancelRequest(detail.date, false)}>
                 {copy.requestCancel}

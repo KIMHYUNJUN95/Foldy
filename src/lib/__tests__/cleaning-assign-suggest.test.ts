@@ -4,7 +4,7 @@ import { suggestAssignments, type SuggestPerson, type SuggestRoom } from "@/lib/
 
 const person = (userId: string, extra: Partial<SuggestPerson> = {}): SuggestPerson => ({
   userId,
-  roomsToday: 0,
+  loadToday: 0,
   propertiesToday: [],
   priority: false,
   trainee: false,
@@ -13,7 +13,7 @@ const person = (userId: string, extra: Partial<SuggestPerson> = {}): SuggestPers
   startMinutes: null,
   ...extra,
 });
-const room = (roomKey: string, propertyName = "A", need = 1, assigned: string[] = []): SuggestRoom => ({ roomKey, propertyName, need, assigned });
+const room = (roomKey: string, propertyName = "A", need = 1, assigned: string[] = []): SuggestRoom => ({ roomKey, propertyName, need, assigned, weight: 1 });
 
 describe("청소 배정 — 제안 규칙 정리", () => {
   it("모르는 키 · 중복은 버리고 빠진 키는 처음 값으로 맨 뒤에", () => {
@@ -33,7 +33,7 @@ describe("청소 배정 — 자동 제안", () => {
   it("배정 전인 사람부터 고르게 나눈다", () => {
     const out = suggestAssignments({
       rooms: [room("r1"), room("r2")],
-      people: [person("a", { roomsToday: 1 }), person("b"), person("c")],
+      people: [person("a", { loadToday: 1 }), person("b"), person("c")],
       rules,
       fixedTiers: {},
     });

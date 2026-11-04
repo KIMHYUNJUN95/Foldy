@@ -272,7 +272,9 @@
 }
 .maf-cf__card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
 .maf-cf__card p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: #4c4958; }
-.maf-cf__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.maf-cf__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* 글자 1.35배 · ja · en 에서 버튼 글자가 잘리지 않게 줄바꿈을 허용한다. */
+.maf-cf__btns .maf-btn { height: auto; min-height: 44px; min-width: 0; padding: 8px 12px; line-height: 1.25; text-align: center; white-space: normal; overflow-wrap: anywhere; }
 @keyframes maf-fade { from { opacity: 0; } }
 @keyframes maf-card { from { opacity: 0; transform: scale(.94); } }
 

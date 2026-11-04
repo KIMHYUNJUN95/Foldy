@@ -6,11 +6,13 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import { assignToRoom, unassignFromRoom } from "@/actions/cleaning-assign-room";
 import { dayLabel, timeLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
+import { MobileConfirm } from "@/components/mobile/mobile-confirm";
 import { useBuildingName } from "@/components/shared/building-names";
 import { BottomSheet } from "@/components/shell/bottom-sheet";
 import { useIsTablet } from "@/components/shell/split-list";
 import { TaskToast } from "@/components/tasks/task-toast";
-import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { addWarningText, assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { directAddWarnings } from "@/lib/cleaning-assign/room-rules";
 import {
   attentionRows,
   matchesFilter,
@@ -37,6 +39,8 @@ export type BoardViewPerson = {
   name: string;
   applied: boolean;
   cancelled: boolean;
+  /** 그날 몫(작은 방 1 · 큰 방 1.5) — 하루 몫 경고(문서 45 L6). */
+  load: number;
   rooms: { propertyName: string; roomKey: string; roomLabel: string }[];
 };
 
@@ -206,7 +210,7 @@ export function CleaningBoardView({
       const failure = await apply(add, remove);
       if (failure) {
         haptic("error");
-        const reason = failure === "conflict" ? copy.boardConflict : failure === "cancelled" ? copy.boardDayCancelled : copy.boardFailed;
+        const reason = failure === "conflict" ? copy.boardConflict : failure === "cancelled" ? copy.boardDayCancelled : failure === "has_record" || failure === "stale" ? assignFailText(failure, copy) : copy.boardFailed;
         setToast({
           message: done > 0 ? `${reason} · ${copy.boardPartlySaved}` : reason,
           stamp: Date.now(),
@@ -221,14 +225,15 @@ export function CleaningBoardView({
       setToast({
         message: onlyName ? fill(copy.boardSavedOne, { name: onlyName, room: roomName(row) }) : fill(copy.boardSavedMany, { room: roomName(row) }),
         stamp: Date.now(),
-        undo: () => {
+        // 시작한 방은 뺄 수만 있고 다시 넣을 수 없다(문서 45 A2~A4) — 되돌리기를 내밀지 않는다.
+        undo: !row.canAdd ? null : () => {
           setToast(null);
           startTransition(async () => {
             const undoFailure = await apply(remove, add);
             if (undoFailure) {
               haptic("error");
               // 되돌리기도 한 사람씩 보낸다 — 중간에 멈추면 앞의 것은 이미 되돌려졌다. 저장할 때와 같은 안내.
-              const reason = undoFailure === "conflict" ? copy.boardConflict : undoFailure === "cancelled" ? copy.boardDayCancelled : copy.boardFailed;
+              const reason = undoFailure === "conflict" ? copy.boardConflict : undoFailure === "cancelled" ? copy.boardDayCancelled : undoFailure === "has_record" || undoFailure === "stale" ? assignFailText(undoFailure, copy) : copy.boardFailed;
               setToast({ message: done > 0 ? `${reason} · ${copy.boardPartlySaved}` : reason, stamp: Date.now(), undo: null });
             } else haptic("light");
             router.refresh();
@@ -414,7 +419,11 @@ function AssignPanel({
   const initial = row.people.map((p) => p.userId);
   const [picked, setPicked] = useState<string[]>(initial);
   const [showOthers, setShowOthers] = useState(false);
-  const { today, others } = orderAssignCandidates(people, row.propertyName);
+  // 보통 인원 · 하루 몫을 넘겨 넣으면 막지 않고 확인 창을 띄운다(문서 45 L6).
+  const [confirming, setConfirming] = useState(false);
+  // 시작한 방은 사람을 더 넣지 않는다 — 지금 든 사람만 보여 준다(문서 45 A2~A4).
+  const candidates = row.canAdd ? people : people.filter((p) => initial.includes(p.userId));
+  const { today, others } = orderAssignCandidates(candidates, row.propertyName);
   const bName = useBuildingName();
 
   const toggle = (userId: string) => {
@@ -425,6 +434,11 @@ function AssignPanel({
   const removed = initial.filter((id) => !picked.includes(id));
   const changed = add.length > 0 || removed.length > 0;
   const onlyAdd = add.length === 1 && removed.length === 0 ? people.find((p) => p.userId === add[0]) : undefined;
+  const warning = directAddWarnings(
+    { assignedCount: initial.length - removed.length, usualHeadcount: row.usualHeadcount },
+    people.filter((p) => add.includes(p.userId)).map((p) => ({ load: p.load, name: p.name })),
+  );
+  const warningText = addWarningText(copy, warning, { room: roomName, usual: row.usualHeadcount });
   const ctaText = !changed
     ? copy.boardUnchanged
     : onlyAdd
@@ -436,7 +450,10 @@ function AssignPanel({
     const places = [...new Set(p.rooms.map((r) => bName(r.propertyName)))].join(" · ");
     const load = p.rooms.length;
     // 관리자가 그날 일정을 취소한 사람은 새로 넣을 수 없다(서버도 막는다) — 이미 이 방에 있으면 빼는 것만 된다(2026-11-02).
-    const locked = p.cancelled && !initial.includes(p.userId);
+    const inRoom = initial.includes(p.userId);
+    // 기록이 있는 사람은 그 방에서 빠지지 않는다(문서 45 표 2).
+    const hasRecord = inRoom && !row.people.find((seat) => seat.userId === p.userId)?.removable;
+    const locked = hasRecord || (p.cancelled && !inRoom);
     return (
       <button
         key={p.userId}
@@ -449,9 +466,11 @@ function AssignPanel({
         <span className="cbd-person__t">
           <b>{p.name}</b>
           <span>
-            {locked
-              ? copy.boardCancelledTag
-              : [places, load > 0 ? fill(copy.boardRoomsN, { n: load }) : copy.boardNoRooms].filter(Boolean).join(" · ")}
+            {hasRecord
+              ? copy.boardHasRecordTag
+              : locked
+                ? copy.boardCancelledTag
+                : [places, load > 0 ? fill(copy.boardRoomsN, { n: load }) : copy.boardNoRooms].filter(Boolean).join(" · ")}
           </span>
         </span>
         <span className="cbd-load" aria-hidden="true">
@@ -471,7 +490,7 @@ function AssignPanel({
       <div className="cbd-assign__head">
         <span className={row.kind === "open" ? "is-warn" : undefined}>{`${row.kind === "open" ? copy.boardFilterOpen : copy.boardSheetEdit.replace("{room}", roomName)} · ${buildingName}`}</span>
         <h2>{fill(copy.boardSheetQ, { room: roomName })}</h2>
-        <p>{row.info || copy.boardNoIn}</p>
+        <p>{row.canAdd ? row.info || copy.boardNoIn : copy.boardCantAdd}</p>
       </div>
       <div className="cbd-assign__list">
         <span className="cbd-cap">{copy.boardPeopleHead}</span>
@@ -487,11 +506,36 @@ function AssignPanel({
         ) : null}
       </div>
       <div className="cbd-assign__foot">
-        <button type="button" className="cbd-cta" disabled={!changed || pending} aria-busy={pending} onClick={() => onSave(picked)}>
+        <button
+          type="button"
+          className="cbd-cta"
+          disabled={!changed || pending}
+          aria-busy={pending}
+          onClick={() => {
+            if (warning.overHeadcount || warning.overCapNames.length > 0) {
+              haptic("light");
+              setConfirming(true);
+            } else onSave(picked);
+          }}
+        >
           {ctaText}
         </button>
         <span className="cbd-note">{copy.boardWillShow}</span>
       </div>
+      {confirming ? (
+        <MobileConfirm
+          title={warningText.title}
+          body={warningText.hint ? `${warningText.body} ${warningText.hint}` : warningText.body}
+          okLabel={warningText.confirm}
+          keepLabel={copy.overKeep}
+          busy={pending}
+          onKeep={() => setConfirming(false)}
+          onOk={() => {
+            setConfirming(false);
+            onSave(picked);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

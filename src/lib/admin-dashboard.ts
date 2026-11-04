@@ -13,6 +13,7 @@ import { getVisibleAnnouncements } from "@/lib/announcements";
 import { getVisibleTasks } from "@/lib/tasks";
 import { getHomeCheckInOutReservations, type HomeReservationRow } from "@/lib/home";
 import { getDictionary } from "@/lib/i18n";
+import { countDistinctRooms } from "@/lib/cleaning-record-rules";
 import {
   buildDashboardBuildingMap,
   fetchBuildingMapSource,
@@ -247,7 +248,8 @@ export async function getAdminDashboard(session: AppSession): Promise<AdminDashb
       totalRooms: todayCounts.total,
       checkIns: todayCounts.checkIns,
       checkOuts: todayCounts.checkOuts,
-      cleaningInProgress: cleaning.length,
+      // 숫자는 방 수(2인 방 = 1, docs/product/45 C6) — 위 `cleaning` 목록은 사람별 그대로.
+      cleaningInProgress: countDistinctRooms(cleaningSessions.filter((s) => s.status === "in_progress")),
       openRequests: queue.length,
     },
     cleaning,

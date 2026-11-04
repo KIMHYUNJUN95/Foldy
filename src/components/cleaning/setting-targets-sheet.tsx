@@ -102,6 +102,8 @@ export function SettingTargetsSheet({
                     <form action={startCleaningSession}>
                       <input name="roomLabel" type="hidden" value={item.roomLabel} />
                       <input name="taskKey" type="hidden" value="simple" />
+                      {/* 셋팅 목록의 방 — 목록 행과 같이 서버가 다시 확인한다(문서 45 C13). */}
+                      <input name="source" type="hidden" value="list" />
                       <Button
                         className="h-9 rounded-full border border-border bg-background px-3.5 text-xs font-black text-slate-800 shadow-none"
                         type="submit"

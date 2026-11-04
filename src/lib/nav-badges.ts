@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBoardUnreadCount } from "@/lib/board-queries";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
+import { countDistinctRooms } from "@/lib/cleaning-record-rules";
 import { countUnreadNotifications } from "@/lib/notifications/queries";
 import { getCurrentAppSession } from "@/lib/session";
 import { countPendingIdDocumentPeople } from "@/lib/staff-documents/server";
@@ -120,14 +121,16 @@ export const getMobileNavBadges = cache(async (): Promise<NavBadgeCounts> => {
   const [cleaning, orders, maintenance, lostToday, linenReturn, announcements, board, notifications, users] =
     await Promise.all([
       // 오늘 남은 청소 (도쿄): 시작했지만 아직 완료하지 않은 것.
-      safeCount(() =>
-        supabase
+      // 숫자는 방 수(2인 방 = 1, docs/product/45 C6) — 오늘 진행 중 기록은 적어서 방 키만 읽는다.
+      safeCount(async () => {
+        const res = await supabase
           .from("cleaning_sessions")
-          .select("id", { count: "exact", head: true })
+          .select("room_key, room_label")
           .eq("organization_id", orgId)
           .eq("cleaning_date", today)
-          .eq("status", "in_progress"),
-      ),
+          .eq("status", "in_progress");
+        return { count: res.error ? null : countDistinctRooms(res.data ?? []), error: res.error };
+      }),
       // 미승인(신규) 주문 요청.
       safeCount(() =>
         supabase

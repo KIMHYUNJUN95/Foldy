@@ -105,13 +105,14 @@
 .shf-uprow__main b.is-none { color: #6b6878; }
 .shf-uprow__main span { font-size: 15px; line-height: 20px; color: #6b6878; }
 .shf-up__empty { margin: 4px 0 0; font-size: 15px; line-height: 21px; color: #6b6878; }
-.shf-mate { display: flex; align-items: center; gap: 12px; min-height: 44px; border-bottom: .5px solid #e4e3e9; }
+.shf-mate { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; border-bottom: .5px solid #e4e3e9; }
 .shf-up .shf-mate:last-child { border-bottom: 0; }
-.shf-mate b { flex: 1; font-size: 17px; font-weight: 400; }
-.shf-mate span { font-size: 15px; color: #6b6878; }
+/* 이름은 한 줄 — 방 목록이 길면 둘 다 줄어 이름이 한 글자씩 세로로 깨졌다. 방 목록이 줄어들며 줄바꿈한다. */
+.shf-mate b { flex: 0 1 auto; min-width: 0; max-width: 50%; font-size: 17px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shf-mate span { flex: 1; min-width: 0; font-size: 15px; color: #6b6878; text-align: right; }
 .shf-mate.is-tomorrow { border-bottom: 0; }
 .shf-mate.is-tomorrow b { flex: none; font-size: 15px; color: #6b6878; }
-.shf-mate.is-tomorrow span { color: #16141f; font-size: 15px; }
+.shf-mate.is-tomorrow span { color: #16141f; font-size: 15px; text-align: left; }
 
 /* 버튼 — 주요 동작은 둥근 알약 하나, 취소 요청은 빨간 글자 */
 .shf-btn { display: inline-flex; align-items: center; justify-content: center; height: 50px; padding: 0 28px; border: 0; border-radius: 999px; font: inherit; font-size: 17px; font-weight: 600; text-decoration: none; cursor: pointer; transition: transform 160ms cubic-bezier(.23, 1, .32, 1), opacity 150ms ease; }
@@ -202,7 +203,7 @@
 .shf-rrow__text em { margin-left: 8px; font-style: normal; font-size: 15px; color: #6b6878; }
 .shf-rrow__text > span { font-size: 15px; line-height: 20px; color: #6b6878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shf-rrow__st { flex: none; font-size: 15px; color: #7a52e6; }
-.shf-rrow__st.is-done { color: #6b6878; }
+.shf-rrow__st.is-done { flex: 0 1 auto; min-width: 0; max-width: 48%; color: #6b6878; text-align: right; }
 /* 오늘 청소 안 하는 방 — 투명도 대신 회색 글자로 흐리게(명암비 4.5:1 이상 유지, 16 「접근성」). */
 .shf-rrow.is-changed .shf-rrow__text b { color: #6b6878; }
 .shf-rrow.is-changed .shf-rrow__n { background: #ececf0; color: #55525f; }

@@ -1,3 +1,4 @@
+import { DAILY_CAP } from "@/lib/cleaning-assign/suggest";
 import type { Locale } from "@/lib/i18n";
 
 /**
@@ -17,7 +18,7 @@ export type CleaningAssignCopy = {
   weekdaysShort: string; // "일,월,화,수,목,금,토"
   dateLong: string; // "{m}월 {d}일 ({w})"
   monthLabel: string; // "{y}년 {m}월"
-  live: string; // "실시간 · {ago} {name}님이 배정"
+  live: string; // "실시간 · {ago} {name} 님이 배정"
   liveNone: string;
   agoJustNow: string;
   agoMin: string; // "{n}분 전"
@@ -153,6 +154,22 @@ export type CleaningAssignCopy = {
   more: string; // "{n}명 더 보기"
   conflict: string;
   errDayCancelled: string;
+  errHasRecord: string;
+  errRoomChanged: string;
+  errBusyDay: string;
+  suggestShort: string; // "사람 모자람 · {n}개 남음"
+  capTitle: string;
+  capBody: string;
+  capConfirm: string;
+  capHint: string;
+  capManyTitle: string;
+  capManyBody: string;
+  overManyBody: string;
+  capSwapConfirm: string;
+  swapRecordLocked: string;
+  boardHasRecordTag: string;
+  boardCantAdd: string;
+  statePersonCancelledKept: string;
   monthCancelledCell: string;
   monthCancelledHint: string;
   failed: string;
@@ -537,7 +554,7 @@ const ko: CleaningAssignCopy = {
   weekdaysShort: "일,월,화,수,목,금,토",
   dateLong: "{m}월 {d}일 ({w})",
   monthLabel: "{y}년 {m}월",
-  live: "실시간 · {ago} {name}님이 배정",
+  live: "실시간 · {ago} {name} 님이 배정",
   liveNone: "실시간 · 아직 배정 없음",
   agoJustNow: "방금",
   agoMin: "{n}분 전",
@@ -668,6 +685,22 @@ const ko: CleaningAssignCopy = {
   roleLeader: "알바 리더",
   more: "{n}명 더 보기",
   conflict: "방금 다른 담당자가 바꿔서 새로 불러왔어요",
+  errHasRecord: "청소 기록이 있는 사람은 이 방에서 뺄 수 없어요",
+  errRoomChanged: "방 상태가 바뀌었어요. 새로 불러왔어요",
+  errBusyDay: "청소 중인 방이 있어요",
+  suggestShort: "사람 모자람 · {n}개 남음",
+  capTitle: "{name} 님은 오늘 몫 {cap}을 넘어요",
+  capBody: "지금 몫 {load}에 이 방 {weight}을 더하면 {next}이에요. 작은 방은 1, 큰 방은 1.5로 세요. 그래도 넣을까요?",
+  capConfirm: "그래도 넣기",
+  capHint: "{name} 님은 오늘 몫 {cap}도 넘어요({next}).",
+  capManyTitle: "오늘 몫을 넘는 사람이 있어요",
+  capManyBody: "{names} 님은 오늘 몫 {cap}을 넘어요. 작은 방은 1, 큰 방은 1.5로 세요.",
+  overManyBody: "이대로 넣으면 {total}명이 돼요.",
+  capSwapConfirm: "그래도 바꾸기",
+  swapRecordLocked: "기록 있음",
+  boardHasRecordTag: "기록 있음",
+  boardCantAdd: "이미 시작한 방이라 사람을 더 넣을 수 없어요. 기록이 없는 사람만 뺄 수 있어요.",
+  statePersonCancelledKept: "일정 취소 · 끝낸 방 {n}개 남김",
   errDayCancelled: "이날 일정이 취소된 사람이에요. 먼저 「다시 넣기」를 눌러 주세요",
   monthCancelledCell: "일정 취소됨",
   monthCancelledHint: "이날 일정이 취소된 사람이에요. 하루 보기의 「다시 넣기」로 살릴 수 있어요",
@@ -761,7 +794,7 @@ const ko: CleaningAssignCopy = {
   checkMore: "{n}명 더 · 표에서 신호 있는 사람만 보기",
   checkNone: "이번 달은 평균에서 크게 벗어난 사람이 없어요",
   attendanceLink: "출근 기록 보기",
-  readGuide: "방당 급여 = 그달 급여 ÷ 청소한 방(같이 한 방은 나눠 셈). 벗어났다고 잘못은 아니에요 — 다른 일 · 큰 방 · 이동이 많았을 수 있어요.",
+  readGuide: "방당 급여 = 그달 급여 ÷ 청소한 방(자기 기록이 있는 방만 1개). 벗어났다고 잘못은 아니에요 — 다른 일 · 큰 방 · 이동이 많았을 수 있어요.",
   chartCaption: "청소한 방(가로) · 급여(세로) — 선은 평균 방당 급여",
   colDays: "근무일",
   colAssigned: "배정 방",
@@ -1165,6 +1198,22 @@ const ja: CleaningAssignCopy = {
   roleLeader: "バイトリーダー",
   more: "あと{n}人を表示",
   conflict: "ほかの担当者が変更したため再読み込みしました",
+  errHasRecord: "清掃記録がある人はこの部屋から外せません",
+  errRoomChanged: "部屋の状態が変わりました。読み込み直しました",
+  errBusyDay: "清掃中の部屋があります",
+  suggestShort: "人手不足 · 残り{n}室",
+  capTitle: "{name}さんは今日の担当量 {cap} を超えます",
+  capBody: "今の担当量 {load} にこの部屋の {weight} を足すと {next} です。小さい部屋は1、大きい部屋は1.5で数えます。それでも入れますか？",
+  capConfirm: "それでも入れる",
+  capHint: "{name}さんは今日の担当量 {cap} も超えます（{next}）。",
+  capManyTitle: "今日の担当量を超える人がいます",
+  capManyBody: "{names}さんは今日の担当量 {cap} を超えます。小さい部屋は1、大きい部屋は1.5で数えます。",
+  overManyBody: "このまま入れると{total}人になります。",
+  capSwapConfirm: "それでも入れ替える",
+  swapRecordLocked: "記録あり",
+  boardHasRecordTag: "記録あり",
+  boardCantAdd: "すでに始まった部屋なので人を追加できません。記録がない人だけ外せます。",
+  statePersonCancelledKept: "予定取消 · 終えた部屋{n}室を残す",
   errDayCancelled: "この日の予定が取り消された人です。先に「戻す」を押してください",
   monthCancelledCell: "予定取り消し",
   monthCancelledHint: "この日の予定が取り消された人です。日表示の「戻す」で戻せます",
@@ -1258,7 +1307,7 @@ const ja: CleaningAssignCopy = {
   checkMore: "あと{n}人 · 表でシグナルのある人だけ表示",
   checkNone: "今月は平均から大きくずれた人はいません",
   attendanceLink: "出勤記録を見る",
-  readGuide: "1室あたり給与 = その月の給与 ÷ 清掃した部屋（一緒に入った部屋は分けて数える）。ずれていても誤りとは限りません — ほかの業務 · 大部屋 · 移動が多かった可能性があります。",
+  readGuide: "1室あたり給与 = その月の給与 ÷ 清掃した部屋（自分の記録がある部屋だけ1室）。ずれていても誤りとは限りません — ほかの業務 · 大部屋 · 移動が多かった可能性があります。",
   chartCaption: "清掃した部屋（横）· 給与（縦）— 線は平均 1室あたり給与",
   colDays: "勤務日",
   colAssigned: "割り当て部屋",
@@ -1662,6 +1711,22 @@ const en: CleaningAssignCopy = {
   roleLeader: "Part-time leader",
   more: "Show {n} more",
   conflict: "Another manager just changed this — reloaded",
+  errHasRecord: "Someone with a cleaning record can’t be taken off this room.",
+  errRoomChanged: "This room has changed. We’ve reloaded the list",
+  errBusyDay: "They have a room in progress.",
+  suggestShort: "Short-staffed · {n} left",
+  capTitle: "{name} would go over today’s limit of {cap}",
+  capBody: "Current load {load} plus this room {weight} makes {next}. Small rooms count as 1, big rooms as 1.5. Add anyway?",
+  capConfirm: "Add anyway",
+  capHint: "{name} would also go over today’s limit of {cap} ({next}).",
+  capManyTitle: "Over today’s limit",
+  capManyBody: "{names} would go over today’s limit of {cap}. Small rooms count as 1, big rooms as 1.5.",
+  overManyBody: "This makes {total}.",
+  capSwapConfirm: "Swap anyway",
+  swapRecordLocked: "Has record",
+  boardHasRecordTag: "Has record",
+  boardCantAdd: "This room has started, so no one can be added. You can only remove people without a record.",
+  statePersonCancelledKept: "Day cancelled · {n} finished kept",
   errDayCancelled: "This person’s day was cancelled. Tap “Restore” first.",
   monthCancelledCell: "Day cancelled",
   monthCancelledHint: "This person’s day was cancelled. Use “Restore” in the day view to bring it back.",
@@ -1755,7 +1820,7 @@ const en: CleaningAssignCopy = {
   checkMore: "{n} more · show only flagged people in the table",
   checkNone: "Nobody is far off the average this month",
   attendanceLink: "View attendance",
-  readGuide: "Pay per room = monthly pay ÷ rooms cleaned (shared rooms are split). Being off isn't a mistake — other work, large rooms or travel may explain it.",
+  readGuide: "Pay per room = monthly pay ÷ rooms cleaned (each room with your own record counts as 1). Being off isn't a mistake — other work, large rooms or travel may explain it.",
   chartCaption: "Rooms cleaned (across) · pay (up) — the line is average pay per room",
   colDays: "Days",
   colAssigned: "Assigned",
@@ -1945,7 +2010,7 @@ const en: CleaningAssignCopy = {
   myErrClose: "Couldn’t close the record. Try again.",
   myErrChanged: "The booking changed — this room isn’t cleaned today.",
   myChangedNote: "Booking changed · no cleaning",
-  stateChangedRoom: "Booking changed",
+  stateChangedRoom: "Booking changed · no cleaning",
   skippedRooms: "Not cleaned today",
   myErrHeld: "A manager postponed this room — no cleaning today.",
   myErrNotMine: "This room is no longer assigned to you.",
@@ -1954,8 +2019,8 @@ const en: CleaningAssignCopy = {
   allSkippedTitle: "Nothing to clean today",
   allSkippedBody: "None of your assigned rooms are cleaned today.",
   myHeldNote: "Postponed by a manager · no cleaning",
-  stateHeldRoom: "Postponed",
-  stateResolvedRoom: "Closed",
+  stateHeldRoom: "Postponed · no cleaning",
+  stateResolvedRoom: "Closed · no cleaning",
   myResolvedNote: "Closed by a manager · no cleaning",
   factTask: "Cleaning type",
   taskLongStay: "Long stay (guest staying)",
@@ -2024,5 +2089,37 @@ export function getCleaningAssignCopy(locale: Locale): CleaningAssignCopy {
 
 /** `{name}` 자리표시자 채우기. */
 export function fill(template: string, values: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match));
+  return template
+    .replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match))
+    // 영어 단수 — 「{n} rooms」 문구가 수십 개라 키마다 나누지 않고 여기서 하나로(CLAUDE.md 「English plurals」). 21 rooms · 1.5 는 그대로.
+    .replace(/(^|[^\d.])1 (room|guest|day|building)s\b/g, "$11 $2")
+    .replace(/(^|[^\d.])1 people\b/g, "$11 person");
+}
+
+/** 배정 서버 액션 실패 → 화면 문구. 화면마다 따로 고르지 않는다. */
+/** 인원 · 하루 몫 초과 확인 창 문구(문서 45 L6) — 방 추가 창 · 모바일 담당 넣기가 같이 쓴다. 인원 초과가 있으면 그게 제목, 몫 초과는 보조 줄. */
+export function addWarningText(
+  copy: CleaningAssignCopy,
+  warning: { overHeadcount: boolean; overCapNames: readonly string[]; total: number },
+  place: { room: string; usual: number },
+): { title: string; body: string; hint: string | null; confirm: string } {
+  const cap = warning.overCapNames.length > 0 ? fill(copy.capManyBody, { cap: DAILY_CAP, names: warning.overCapNames.join(" · ") }) : null;
+  if (warning.overHeadcount) {
+    return {
+      body: fill(copy.overManyBody, { total: warning.total }),
+      confirm: fill(copy.overConfirm, { total: warning.total }),
+      hint: cap,
+      title: fill(copy.overTitle, { n: Math.max(1, place.usual), room: place.room }),
+    };
+  }
+  return { body: cap ?? "", confirm: copy.capConfirm, hint: null, title: copy.capManyTitle };
+}
+
+export function assignFailText(reason: string, copy: CleaningAssignCopy): string {
+  if (reason === "conflict") return copy.conflict;
+  if (reason === "cancelled") return copy.errDayCancelled;
+  if (reason === "busy") return copy.errBusyDay;
+  if (reason === "has_record") return copy.errHasRecord;
+  if (reason === "stale") return copy.errRoomChanged;
+  return copy.failed;
 }

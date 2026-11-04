@@ -7,6 +7,7 @@ import {
   getOrgCleaningSessionsFiltered,
   isCleaningTaskKey,
 } from "@/lib/cleaning";
+import { isClosedRecord } from "@/lib/cleaning-record-rules";
 import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { getDictionary } from "@/lib/i18n";
 import type { Database } from "@/types/database";
@@ -124,7 +125,9 @@ export default async function CleaningRecordsPage({ searchParams }: PageProps) {
       startedAt: s.started_at,
       completedAt: s.completed_at,
       endUnknown: isUnmeasuredSession(s),
-      durationSeconds: s.duration_seconds,
+      // 「처리 끝」 기록은 청소한 시간이 없다 — 소요 시간을 비운다(관리자 기록 화면과 같은 처리, docs/product/45 C4).
+      closed: isClosedRecord(s),
+      durationSeconds: isClosedRecord(s) ? null : s.duration_seconds,
       status: s.status,
       notes: s.notes,
     };

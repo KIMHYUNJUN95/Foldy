@@ -3,7 +3,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, defaultStartMinutes, monthDays, shiftDayState, type ShiftDayState } from "@/lib/cleaning-assign/day-state";
 import { loadApplications, loadAssignments, loadFieldMembers, loadProfilesByOwners, loadStaffProfiles, profileOf } from "@/lib/cleaning-assign/data";
-import { compareAssignRooms, loadRangeRooms } from "@/lib/cleaning-assign/rooms";
+import { compareAssignRooms, countOpenRooms } from "@/lib/cleaning-assign/room-rules";
+import { loadRangeDayRooms } from "@/lib/cleaning-assign/rooms";
 import { isUnmeasuredSession } from "@/lib/cleaning-unmeasured";
 import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
@@ -77,8 +78,8 @@ export async function loadPersonShift(
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
-  const [range, apps, allAssign, sessions, viewerProfiles] = await Promise.all([
-    loadRangeRooms(supabase, organizationId, from, to),
+  const [plans, apps, allAssign, sessions, viewerProfiles] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, from, to, null),
     loadApplications(supabase, organizationId, from, to, userId),
     loadAssignments(supabase, organizationId, from, to),
     readAllPages<{ room_label: string; cleaning_date: string; started_at: string; completed_at: string | null; duration_seconds: number | null; status: string; closed_without_cleaning: boolean }>((start, end) =>
@@ -144,10 +145,8 @@ export async function loadPersonShift(
     for (const row of extra.data ?? []) names.set(row.id, row.name);
   }
 
-  const openOf = (date: string) => {
-    const assigned = assignedKeys.get(date) ?? new Set<string>();
-    return [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(key)).length;
-  };
+  // 미룸 · 처리 끝 · 끝난 방은 미배정으로 세지 않는다 — 하루 보기와 같은 계산(문서 45 C9 · C10).
+  const openOf = (date: string) => countOpenRooms(plans.get(date) ?? [], assignedKeys.get(date) ?? new Set());
   const stateOf = (date: string): ShiftDayState => {
     const app = appBy.get(date);
     return shiftDayState({
@@ -156,7 +155,7 @@ export async function loadPersonShift(
       isPast: date < today,
       myRooms: mineBy.get(date)?.length ?? 0,
       openRooms: openOf(date),
-      totalRooms: range.get(date)?.size ?? 0,
+      totalRooms: plans.get(date)?.length ?? 0,
     });
   };
 

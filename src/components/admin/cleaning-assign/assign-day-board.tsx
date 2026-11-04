@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowLeftRight, Check, MoreHorizontal, Phone, Plus, Search, UserPlus, X } from "lucide-react";
+import { ArrowLeftRight, Check, MoreHorizontal, Phone, Plus, Search, X } from "lucide-react";
 import {
   addApplicantForDay,
   addRoomForDay,
@@ -26,8 +26,11 @@ import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminToast, useAdminToast } from "@/components/admin/shared/admin-toast";
 import { AdminUndoToast } from "@/components/admin/shared/admin-undo-toast";
 import type { Dictionary } from "@/lib/i18n";
-import { fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { addWarningText, assignFailText, fill, type CleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
 import type { BoardPerson, BoardRoom, DayBoard } from "@/lib/cleaning-assign/data";
+import { canAddPerson, canHoldRoom, canRemovePerson, canSwapPerson, carryBadgeDays, directAddWarning, directAddWarnings, isOpenSectionRoom, needMoreCount, sortOpenSection } from "@/lib/cleaning-assign/room-rules";
+import { DAILY_CAP, roomWeight } from "@/lib/cleaning-assign/suggest";
+import { OverfillConfirm } from "./overfill-confirm";
 import { haptic } from "@/lib/haptics";
 import { agoText, checkInText, dayLabel, roleLabel, shortDate, timeLabel, timeValue, tokyoTime } from "./format";
 import { SwapDialog } from "./swap-dialog";
@@ -164,7 +167,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         if (success) showToast(success);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+        showToast(assignFailText(result.reason, copy));
       }
       router.refresh();
     });
@@ -186,7 +189,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         });
       } else {
         haptic("error");
-        showToast(copy.failed);
+        showToast(assignFailText(result.reason, copy));
       }
       router.refresh();
     });
@@ -203,7 +206,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         window.setTimeout(() => setChangedKeys(new Set()), 4000);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+        showToast(assignFailText(result.reason, copy));
       }
       router.refresh();
     });
@@ -217,7 +220,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
         showToast(copy.heldUndone);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+        showToast(assignFailText(result.reason, copy));
       }
       setChangedKeys(new Set());
       router.refresh();
@@ -234,9 +237,11 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
 
   const rooms = board.rooms.filter((room) => visibleProperty(room.propertyName));
   const cancelledRooms = rooms.filter((room) => room.cancelled && room.people.length > 0);
-  const openRooms = rooms.filter(
-    (room) => !room.cancelled && room.status === "pending" && !room.deferredUntil && (room.people.length === 0 || room.people.length < room.usualHeadcount || room.source === "carry"),
-  );
+  // 정한 날 도착한 · 밀려 온 방이 맨 위(문서 45 R10).
+  const openRooms = sortOpenSection(rooms.filter(isOpenSectionRoom));
+  const shortKeys = new Set(board.shortRoomKeys);
+  // 「N개 남음」은 눈앞 목록(「내 건물」 거르기) 기준(문서 45 L5).
+  const shortCount = openRooms.filter((room) => shortKeys.has(room.roomKey)).length;
   const openKeys = new Set(openRooms.map((room) => room.roomKey));
   const restRooms = rooms.filter((room) => !room.cancelled && !openKeys.has(room.roomKey));
   const byBuilding = new Map<string, BoardRoom[]>();
@@ -255,10 +260,13 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       const result = await unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId });
       if (result.ok) {
         haptic("light");
-        setSeatUndo({ message: fill(copy.seatRemoved, { name, room: roomTitle(room) }), roomKey: room.roomKey, stamp: Date.now(), userId });
+        // 청소 중 · 끝난 방은 뺄 수만 있고 다시 넣을 수 없다(문서 45 A2~A4) — 그때는 되돌리기를 내밀지 않는다.
+        const message = fill(copy.seatRemoved, { name, room: roomTitle(room) });
+        if (canAddPerson(room)) setSeatUndo({ message, roomKey: room.roomKey, stamp: Date.now(), userId });
+        else showToast(message);
       } else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+        showToast(assignFailText(result.reason, copy));
       }
       router.refresh();
     });
@@ -266,7 +274,9 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
 
   function addSeat(room: BoardRoom, userId: string, confirmed = false) {
     setSeatFor(null);
-    if (!confirmed && room.people.length >= Math.max(1, room.usualHeadcount)) {
+    // 보통 인원 · 하루 몫을 넘겨도 막지 않고 확인만 받는다(문서 37 4-2-e · 문서 45 L6).
+    const warning = directAddWarning({ assignedCount: room.people.length, usualHeadcount: room.usualHeadcount }, personById.get(userId)?.load ?? 0);
+    if (!confirmed && (warning.overHeadcount || warning.overCap)) {
       setOverfill({ room, userId });
       return;
     }
@@ -276,7 +286,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
       if (result.ok) haptic("medium");
       else {
         haptic("error");
-        showToast(result.reason === "conflict" ? copy.conflict : result.reason === "cancelled" ? copy.errDayCancelled : copy.failed);
+        showToast(assignFailText(result.reason, copy));
       }
       router.refresh();
     });
@@ -287,42 +297,33 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     const person = personById.get(userId);
     const total = room.people.length + 1;
     const trainee = Boolean(person?.trainee) || room.people.some((p) => p.trainee);
+    const load = person?.load ?? 0;
+    const weight = roomWeight(room.usualHeadcount);
+    const warning = directAddWarning({ assignedCount: room.people.length, usualHeadcount: room.usualHeadcount }, load);
+    const capWords = { cap: DAILY_CAP, load, name: person?.name ?? "", next: load + weight, weight };
+    const hints = [...(trainee ? [copy.overTrainee] : []), ...(warning.overHeadcount && warning.overCap ? [fill(copy.capHint, capWords)] : [])];
     return (
-      <>
-        <div className="modal-scrim on" onClick={() => setOverfill(null)} />
-        <div className="modal on cas-modal cas-over" role="alertdialog" aria-modal="true" aria-labelledby="cas-over-t" aria-describedby="cas-over-d">
-          <div className="cas-over__h">
-            <span className="cas-over__ic" aria-hidden="true">
-              <UserPlus />
+      <OverfillConfirm
+        copy={copy}
+        title={warning.overHeadcount ? fill(copy.overTitle, { n: usual, room: roomTitle(room) }) : fill(copy.capTitle, capWords)}
+        body={warning.overHeadcount ? fill(copy.overBody, { n: room.people.length, name: person?.name ?? "", names: room.people.map((p) => p.name).join(" · "), total }) : fill(copy.capBody, capWords)}
+        hints={hints}
+        confirmLabel={warning.overHeadcount ? fill(copy.overConfirm, { total }) : copy.capConfirm}
+        busy={pending}
+        onKeep={() => setOverfill(null)}
+        onConfirm={() => addSeat(room, userId, true)}
+      >
+        <div className="cas-over__faces">
+          {room.people.map((p) => (
+            <span key={p.userId} className="cas-over__face">
+              {p.name.slice(0, 1)}
             </span>
-            <h3 id="cas-over-t">{fill(copy.overTitle, { n: usual, room: roomTitle(room) })}</h3>
-          </div>
-          <p id="cas-over-d" className="cas-over__body">
-            {fill(copy.overBody, { n: room.people.length, name: person?.name ?? "", names: room.people.map((p) => p.name).join(" · "), total })}
-          </p>
-          <div className="cas-over__faces">
-            {room.people.map((p) => (
-              <span key={p.userId} className="cas-over__face">
-                {p.name.slice(0, 1)}
-              </span>
-            ))}
-            <span className="cas-over__face is-new">{person?.name.slice(0, 1)}</span>
-            <span className="cas-sp" />
-            <b>{fill(copy.overCount, { n: usual, total })}</b>
-          </div>
-          {trainee ? <p className="cas-over__hint">{copy.overTrainee}</p> : null}
-          <div className="cas-modal__f is-even">
-            <button type="button" className="cas-btn is-gray" onClick={() => setOverfill(null)}>
-              {copy.overKeep}
-            </button>
-            {/* Enter 로 바로 넣을 수 있게 확인 버튼에 처음 포커스. */}
-            <button type="button" className="cas-btn is-pri" autoFocus disabled={pending} onClick={() => addSeat(room, userId, true)}>
-              {fill(copy.overConfirm, { total })}
-            </button>
-          </div>
-          <span className="cas-over__keys">{copy.overKeys}</span>
+          ))}
+          <span className="cas-over__face is-new">{person?.name.slice(0, 1)}</span>
+          <span className="cas-sp" />
+          <b>{fill(copy.overCount, { n: usual, total })}</b>
         </div>
-      </>
+      </OverfillConfirm>
     );
   };
 
@@ -370,9 +371,9 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
     return (
       <div className="cas-pop is-wide cas-swappick" role="dialog" aria-label={copy.swapMenu} onClick={(event) => event.stopPropagation()}>
         <b className="cas-pop__t">{fill(copy.swapWho, { names: room.people.map((p) => p.name).join(" · "), room: roomName })}</b>
-        {room.people.length > 1 ? (
+        {room.people.filter((p) => canSwapPerson(room, p.hasRecord)).length > 1 ? (
           <div className="cas-swappick__from" role="radiogroup" aria-label={copy.swapFrom}>
-            {room.people.map((p) => (
+            {room.people.filter((p) => canSwapPerson(room, p.hasRecord)).map((p) => (
               <button key={p.userId} type="button" role="radio" aria-checked={roomSwap.fromId === p.userId} className={roomSwap.fromId === p.userId ? "on" : ""} onClick={() => setRoomSwap({ ...roomSwap, fromId: p.userId })}>
                 {p.name}
               </button>
@@ -394,12 +395,16 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
 
   const roomRow = (room: BoardRoom, opts: { open?: boolean; grouped?: boolean } = {}) => {
     const mine = picked ? room.people.some((p) => p.userId === picked.userId) : false;
-    const need = Math.max(0, room.usualHeadcount - room.people.length);
+    const need = needMoreCount(room, room.people.length);
     const origin = room.carriedFrom ?? board.date;
-    // 넣고 뺄 수 있는 방 — 청소 전이고 미루지 않은 방만(청소 중 · 끝남 · 처리 끝 · 미룸은 그대로 둔다).
-    const editable = room.status === "pending" && !room.deferredUntil;
-    const toggleable = Boolean(picked) && editable;
-    const canSeat = !picked && editable && room.people.length < Math.max(1, room.usualHeadcount);
+    // 넣기는 대기 방만, 빼기는 기록 없는 사람만(문서 45 표 2) — 판단은 공용 함수 하나.
+    const addable = canAddPerson(room);
+    const pickedSeat = picked ? room.people.find((p) => p.userId === picked.userId) : undefined;
+    const toggleable = Boolean(picked) && (pickedSeat ? canRemovePerson(room, pickedSeat.hasRecord) : addable);
+    const canSeat = !picked && addable && room.people.length < Math.max(1, room.usualHeadcount);
+    const carryDaysN = carryBadgeDays(room);
+    const swappable = canSwap ? room.people.filter((p) => canSwapPerson(room, p.hasRecord)) : [];
+    const holdable = canHoldRoom(room);
     // 제안 버튼(「김현준 넣기」)이 있으면 「+」는 아이콘만 — 다른 사람을 고를 때만 연다.
     const iconSeat = canSeat && Boolean(opts.open) && room.suggested.length > 0;
     return (
@@ -430,7 +435,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           {!opts.open ? <span className="cas-room__sub">{roomInfo(room)}</span> : null}
         </div>
         <div className="cas-room__body">
-          {room.source === "carry" && room.carryDays > 0 ? <span className="cas-tag is-warn">{fill(copy.tagCarry, { n: room.carryDays + 1 })}</span> : null}
+          {carryDaysN ? <span className="cas-tag is-warn">{fill(copy.tagCarry, { n: carryDaysN })}</span> : null}
           {room.source === "extra" ? <span className="cas-tag is-blue">{copy.tagExtra}</span> : null}
           {room.people.length > Math.max(1, room.usualHeadcount) ? (
             <span className="cas-tag is-over">
@@ -448,7 +453,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           {room.status === "done" ? <span className="cas-tag">{room.resolvedHold ? copy.tagResolved : copy.statusDone}</span> : null}
           {opts.open ? <span className="cas-room__note">{[roomInfo(room), room.note, room.holdReason].filter(Boolean).join(" · ")}</span> : null}
           {room.people.map((p) =>
-            !picked && editable ? (
+            !picked && canRemovePerson(room, p.hasRecord) ? (
               // 이름표 — 마우스를 올리면 ×, 누르면 바로 빠지고 5초 「되돌리기」.
               <span key={p.userId} className="cas-token" title={p.by ? `${p.by} · ${tokyoTime(p.at, true)}` : undefined}>
                 <span className="cas-av" aria-hidden="true">
@@ -506,14 +511,14 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             <button type="button" className="cas-btn is-ghost" disabled={pending} onClick={() => run(() => releaseHold({ date: board.date, originDate: origin, roomKey: room.roomKey }))}>
               {copy.undoHold}
             </button>
-          ) : room.status === "pending" ? (
+          ) : holdable || swappable.length > 0 ? (
             <div className="cas-menu">
               <button type="button" className="cas-icon" aria-label={copy.moreActions} aria-expanded={menuRoom === room.roomKey} onClick={() => setMenuRoom(menuRoom === room.roomKey ? null : room.roomKey)}>
                 <MoreHorizontal aria-hidden="true" />
               </button>
               {menuRoom === room.roomKey ? (
                 <div className="cas-pop" role="menu">
-                  {canSwap && room.people.length > 0 ? (
+                  {swappable.length > 0 ? (
                     <>
                       <button
                         type="button"
@@ -521,31 +526,35 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
                         className="is-swap"
                         onClick={(event) => {
                           event.stopPropagation();
-                          setRoomSwap({ fromId: room.people[0].userId, roomKey: room.roomKey });
+                          setRoomSwap({ fromId: swappable[0].userId, roomKey: room.roomKey });
                         }}
                       >
                         <ArrowLeftRight aria-hidden="true" />
                         {copy.swapMenu}
                       </button>
-                      <span className="cas-pop__sep" />
+                      {holdable ? <span className="cas-pop__sep" /> : null}
                     </>
                   ) : null}
-                  <button type="button" role="menuitem" onClick={() => setDeferRoom({ origin, reason: "", roomKey: room.roomKey, until: nextDay(board.date) })}>
-                    {copy.deferNextDay}
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => setDeferRoom({ origin, reason: "", roomKey: room.roomKey, until: "" })}>
-                    {copy.deferPick}
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuRoom(null);
-                      hold(room, { kind: "resolved", originDate: origin });
-                    }}
-                  >
-                    {copy.resolve}
-                  </button>
+                  {holdable ? (
+                    <>
+                      <button type="button" role="menuitem" onClick={() => setDeferRoom({ origin, reason: "", roomKey: room.roomKey, until: nextDay(board.date) })}>
+                        {copy.deferNextDay}
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => setDeferRoom({ origin, reason: "", roomKey: room.roomKey, until: "" })}>
+                        {copy.deferPick}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuRoom(null);
+                          hold(room, { kind: "resolved", originDate: origin });
+                        }}
+                      >
+                        {copy.resolve}
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
               {menuRoom === room.roomKey && roomSwap?.roomKey === room.roomKey ? roomSwapPicker(room) : null}
@@ -572,7 +581,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
   for (const room of openRooms) for (const s of room.suggested) if (!suggestFor.has(s.userId)) suggestFor.set(s.userId, `${label(room.propertyName)} ${room.roomLabel}`);
 
   const personSub = (p: BoardPerson) => {
-    if (p.cancelled) return copy.statePersonCancelled;
+    if (p.cancelled) return p.rooms.length > 0 ? fill(copy.statePersonCancelledKept, { n: p.rooms.length }) : copy.statePersonCancelled;
     if (p.rooms.length === 0) return suggestFor.has(p.userId) ? fill(copy.stateWaitingSuggest, { room: suggestFor.get(p.userId)! }) : copy.stateWaiting;
     const rooms = p.rooms.map((r) => `${label(r.propertyName)} ${r.roomLabel}${r.withOthers > 0 ? ` ${fill(copy.withOthers, { n: r.withOthers + 1 })}` : ""}`).join(" · ");
     return fill(copy.stateAssigned, { n: p.rooms.length, rooms });
@@ -622,7 +631,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           <i aria-hidden="true" />
           {board.lastChange ? fill(copy.live, { ago: agoText(board.lastChange.at, now, copy), name: board.lastChange.name }) : copy.liveNone}
         </span>
-        <span className="cas-sp" />
+        <div className="cas-bar__acts">
         <div className="cas-menu" ref={buildingMenu}>
           <button type="button" className="cas-btn is-ghost" aria-expanded={buildingPicker} onClick={() => setBuildingPicker(!buildingPicker)}>
             {onlyMine && board.mainProperties.length > 0 ? fill(copy.myBuildings, { list: mineList }) : copy.allBuildings} ⌄
@@ -671,6 +680,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             {copy.compareLink}
           </Link>
         ) : null}
+        </div>
       </div>
 
       <div className="cas-stats">
@@ -719,6 +729,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           <div className="cas-h">
             <h2>{copy.openTitle}</h2>
             <span className={openRooms.length ? "is-warn" : ""}>{openRooms.length}</span>
+            {shortCount > 0 ? <span className="is-warn">{fill(copy.suggestShort, { n: shortCount })}</span> : null}
             <span className="cas-sp" />
             {suggestCount > 0 && !picked ? (
               <button
@@ -752,7 +763,7 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
             <div key={room.roomKey} className="cas-room is-cancelled">
               <div className="cas-room__id">
                 <span className="cas-room__bld">{label(room.propertyName)}</span>
-                <span className="cas-room__no">{room.roomLabel}</span>
+                <span className="cas-room__no">{room.roomLabel === room.propertyName ? label(room.propertyName) : room.roomLabel}</span>
               </div>
               <div className="cas-room__body">
                 <span className="cas-tag is-danger">{copy.tagCancelled}</span>
@@ -761,17 +772,22 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
               <div className="cas-room__act is-stack">
                 {room.people.map((p) => (
                   <div key={p.userId} className="cas-room__pair">
-                    <button
-                      type="button"
-                      className="cas-btn is-gray"
-                      disabled={pending}
-                      onClick={() => {
-                        setPickId(p.userId);
-                        run(() => unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId: p.userId }));
-                      }}
-                    >
-                      {`${p.name} · ${copy.attachElsewhere}`}
-                    </button>
+                    {/* 예약 취소된 방 — 기록 없는 사람만 뺀다(문서 45 A6). */}
+                    {canRemovePerson(room, p.hasRecord) ? (
+                      <button
+                        type="button"
+                        className="cas-btn is-gray"
+                        disabled={pending}
+                        onClick={() => {
+                          setPickId(p.userId);
+                          run(() => unassignFromRoom({ date: board.date, roomKey: room.roomKey, userId: p.userId }));
+                        }}
+                      >
+                        {`${p.name} · ${copy.attachElsewhere}`}
+                      </button>
+                    ) : (
+                      <span className="cas-room__note">{`${p.name} · ${copy.boardHasRecordTag}`}</span>
+                    )}
                     <button type="button" className="cas-btn is-danger-text" disabled={pending} onClick={() => run(() => cancelPersonDay({ date: board.date, userId: p.userId }))}>
                       {copy.cancelDay}
                     </button>
@@ -1018,7 +1034,9 @@ export function AssignDayBoard({ board, copy, locale, today, shared, propertyLab
           date={board.date}
           locale={locale}
           label={label}
-          roomOptions={roomOptions}
+          roomOptions={roomOptions.filter((option) => !board.addBlockedRoomKeys.includes(option.roomKey))}
+          usualByRoomKey={board.usualByRoomKey}
+          boardRooms={board.rooms}
           people={applied.concat(notApplied)}
           busy={pending}
           onClose={() => setAddOpen(false)}
@@ -1158,6 +1176,8 @@ function AddRoomDialog({
   locale,
   label,
   roomOptions,
+  usualByRoomKey,
+  boardRooms,
   people,
   busy,
   onClose,
@@ -1168,6 +1188,8 @@ function AddRoomDialog({
   locale: string;
   label: (name: string) => string;
   roomOptions: { roomKey: string; propertyName: string; label: string }[];
+  usualByRoomKey: Record<string, number>;
+  boardRooms: BoardRoom[];
   people: BoardPerson[];
   busy: boolean;
   onClose: () => void;
@@ -1178,6 +1200,16 @@ function AddRoomDialog({
   const [roomKey, setRoomKey] = useState("");
   const [note, setNote] = useState("");
   const [userIds, setUserIds] = useState<string[]>([]);
+  // 보통 인원 · 하루 몫을 넘으면 막지 않고 확인 창을 띄운다(문서 45 L6).
+  const [confirming, setConfirming] = useState(false);
+  const usual = usualByRoomKey[roomKey] ?? 1;
+  const warning = directAddWarnings(
+    { assignedCount: boardRooms.find((room) => room.roomKey === roomKey)?.people.length ?? 0, usualHeadcount: usual },
+    people.filter((p) => userIds.includes(p.userId)).map((p) => ({ load: p.load, name: p.name })),
+  );
+  const pickedOption = roomOptions.find((option) => option.roomKey === roomKey);
+  const warningText = addWarningText(copy, warning, { room: pickedOption ? `${label(pickedOption.propertyName)} ${pickedOption.label}` : "", usual });
+  const submit = () => onSubmit({ note, roomKey, userIds });
   // 방 번호 순(7, 8, 3 … 처럼 섞여 오던 것 — 숫자는 숫자 크기대로).
   const rooms = roomOptions
     .filter((option) => option.propertyName === building)
@@ -1227,7 +1259,10 @@ function AddRoomDialog({
             keepFirst={false}
             searchPlaceholder={copy.searchName}
             noResultLabel={copy.searchNone}
-            onChange={(value) => value && !userIds.includes(value) && setUserIds([...userIds, value])}
+            onChange={(value) => {
+              if (!value || userIds.includes(value)) return;
+              setUserIds([...userIds, value]);
+            }}
             options={people.filter((p) => !userIds.includes(p.userId)).map((p) => ({ label: p.name, value: p.userId }))}
           />
         </div>
@@ -1235,11 +1270,22 @@ function AddRoomDialog({
           <button type="button" className="cas-btn is-gray" onClick={onClose}>
             {copy.cancel}
           </button>
-          <button type="button" className="cas-btn is-pri" disabled={busy || !roomKey} onClick={() => onSubmit({ note, roomKey, userIds })}>
+          <button
+            type="button"
+            className="cas-btn is-pri"
+            disabled={busy || !roomKey}
+            onClick={() => {
+              if (warning.overHeadcount || warning.overCapNames.length > 0) setConfirming(true);
+              else submit();
+            }}
+          >
             {userIds.length > 0 ? copy.addAndPut : copy.addOnly}
           </button>
         </div>
       </div>
+      {confirming ? (
+        <OverfillConfirm copy={copy} title={warningText.title} body={warningText.body} hints={warningText.hint ? [warningText.hint] : []} confirmLabel={warningText.confirm} busy={busy} onKeep={() => setConfirming(false)} onConfirm={submit} />
+      ) : null}
     </>
   );
 }

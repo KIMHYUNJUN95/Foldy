@@ -1574,6 +1574,8 @@ async function buildUserPayrollExportData(
     .select("cleaning_date, room_label, notes, completed_at")
     .eq("organization_id", organizationId)
     .eq("staff_user_id", userId)
+    // 「청소한 기록」 = 완료 + 처리 끝 아님 (docs/product/45 표 3 · src/lib/cleaning-record-rules.ts) — 취소 · 진행 중 제외.
+    .eq("status", "completed")
     .eq("closed_without_cleaning", false)
     .gte("cleaning_date", firstDay)
     .lte("cleaning_date", lastDay)

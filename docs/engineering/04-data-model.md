@@ -2192,7 +2192,7 @@ RLS: 본인 읽기만, 쓰기는 서버. 함수 `claim_due_task_report_schedules
 | --- | --- | --- |
 | `cleaning_shift_applications` | 사람 × 날짜(PK) | `source`(self/admin — 대신 넣음) · `start_time`(그날만 다른 출근) · `cancelled_at/by`(관리자가 그날 일정 취소 → 「배정 없음」) · `cancel_requested_at` · `cancel_request_note`(배정된 날 본인 취소 요청) |
 | `cleaning_assignments` | 날짜 × 방 × 사람 한 줄 | 유일 `(organization_id, work_date, room_key, user_id)` — 같은 사람을 같은 방에 두 번 못 넣음(동시 수정 보호). `property_name` · `room_label` · `created_by/at`. 배정 = 확정 |
-| `cleaning_room_holds` | 방 × 원래 날짜(PK) | `kind` defer(`until_date` 까지 숨김) / resolved(처리 끝) · `reason`(1~120) · `removed_user_ids uuid[]`(미룰 때 그날 배정에서 뺀 사람 — 되돌리기가 다시 넣음, 202610210003) · `closed_session_id`(처리 끝이 남긴 청소 기록 — 되돌리기가 지움, 202610210005) — 못 한 방은 다음 날 미배정 맨 위로 계속 뜨고, 이 줄이 있으면 숨김 |
+| `cleaning_room_holds` | 방 × 원래 날짜(PK) | `kind` defer(`until_date` 까지 숨김) / resolved(처리 끝) · `reason`(1~120) · `removed_user_ids uuid[]`(미룰 때 그날 배정에서 뺀 사람 — 되돌리기가 다시 넣음, 202610210003) · `closed_session_id`(처리 끝이 남긴 청소 기록 — 되돌리기가 지움, 202610210005) · `created_at`(미룸이 덮는 기준 날 = 관리자가 보고 있던 날 — 오늘 보기면 지금, 어제 보기면 그 날 0시, 다시 미루면 갱신, 2026-11-04 · `holdUpsertRow`) — 못 한 방은 다음 날 미배정 맨 위로 계속 뜨고, 이 줄이 있으면 숨김 |
 | `cleaning_assign_settings` | 담당(owner) × 1, PK `(organization_id, owner_id)` | `rules jsonb`(제안 규칙 켜기 · 순서, 키는 `src/lib/cleaning-assign/rules.ts`) · `flag_threshold`(월 비교표 기준 %, 기본 25) |
 | `cleaning_assign_setting_logs` | 설정 변경 한 번 | `changes jsonb`(area rules/fixed/staff/room) · `actor_id` |
 | `cleaning_fixed_staff` | 담당 × 건물 × 사람(PK) | `tier`(1~9순위) · `position` |

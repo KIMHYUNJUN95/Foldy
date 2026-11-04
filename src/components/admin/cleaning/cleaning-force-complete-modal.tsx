@@ -11,6 +11,7 @@ import { Clock, ShieldCheck, X } from "lucide-react";
 import { AdmDropdown } from "@/components/admin/shared/adm-dropdown";
 import { AdminTimePicker } from "@/components/admin/shared/admin-time-picker";
 import type { AdminCleaningTask } from "@/lib/admin-cleaning";
+import { forceCompleteDefaultStaff } from "@/lib/cleaning-assign/room-rules";
 import { fmtDur, toMin, type CleaningTaskType } from "./cleaning-console-data";
 import {
   StatusPill,
@@ -64,7 +65,7 @@ export function CleaningForceCompleteModal({
   // 소요가 저장된다(2026-11-02 데모 확인). 관리자가 실제 시각을 골라야 「완료」가 눌린다.
   // 지난 날(`nowLabel` 비어 있음)도 같은 이유로 비운다.
   const [end, setEnd] = useState(task.unmeasured ? "" : nowLabel);
-  const [staffId, setStaffId] = useState(task.staffId ?? "");
+  const [staffId, setStaffId] = useState(() => forceCompleteDefaultStaff(task, (id) => staffDirectory.has(id)));
   const [note, setNote] = useState(task.note ?? "");
 
   const durMin = toMin(end) != null && toMin(start) != null ? (toMin(end) as number) - (toMin(start) as number) : null;

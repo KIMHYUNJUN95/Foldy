@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 import { Check, Search } from "lucide-react";
 import type { AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
+import { consoleWhoIds } from "@/lib/cleaning-assign/room-rules";
 import { BUILDING_ORDER, durationMin, elapsedMin, type BuildingKey, type CleaningTaskType } from "./cleaning-console-data";
 import {
   CancelledBadge,
@@ -71,7 +72,7 @@ function RoomCard({
       : task.status === "done"
         ? durationMin(task.start, task.end)
         : null;
-  const staffName = task.staffId ? staffLabelOf(task.staffId, staffDirectory) : "";
+  const staffName = consoleWhoIds(task).map((id) => staffLabelOf(id, staffDirectory)).filter(Boolean).join(" · ");
 
   return (
     <div
@@ -331,7 +332,7 @@ function StaffSummarySection({
 }) {
   // 완료했거나 지금 청소 중인 사람 — 시안 「완료 1 · 진행 1」(2026-10-13, 진행만 있는 사람도 보인다).
   // 청소 배정 「처리 끝」 기록은 누른 관리자의 청소가 아니다 — 직원별 요약에서 뺀다.
-  // 사람마다 기록으로 센다(`task.workers`) — 2인 방은 카드 담당이 한 사람이라 카드로 세면 두 번째 사람 몫이 빠진다.
+  // 사람마다 기록으로 센다(`task.workers`) — 카드 담당 칸(`consoleWhoIds`)은 배정된 사람까지 보이므로 그 값으로 세면 안 한 일까지 세진다.
   const worked = tasks.filter((task) => !task.closed).flatMap((task) => task.workers);
   const ids = new Set(worked.map((work) => work.staffId));
   const staffList = [...staffDirectory.values()].filter((s) => ids.has(s.id));
@@ -389,11 +390,11 @@ export function TodayBoard({
   const q = query.trim().toLowerCase();
   const match = (task: AdminCleaningTask) => {
     if (propFilter !== "all" && task.building !== propFilter) return false;
-    if (staffFilter !== "all" && task.staffId !== staffFilter) return false;
+    if (staffFilter !== "all" && !consoleWhoIds(task).includes(staffFilter)) return false;
     if (typeFilter !== "all" && task.type !== typeFilter) return false;
     if (!q) return true;
     const buildingText = buildingLabelOf(task, buildingLabels).toLowerCase();
-    const staffText = task.staffId ? staffLabelOf(task.staffId, staffDirectory).toLowerCase() : "";
+    const staffText = consoleWhoIds(task).map((id) => staffLabelOf(id, staffDirectory)).join(" ").toLowerCase();
     return task.room.toLowerCase().includes(q) || staffText.includes(q) || buildingText.includes(q);
   };
   const all = tasks.filter((task) => task.type !== "setup" && match(task));

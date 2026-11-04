@@ -4,6 +4,7 @@
 // clean-views.js panel() 을 따른다. admin-console.css + cleaning-console.css 의 공용 .panel/.panel-scrim/
 // .pblock/.kv/.locknote/.rptiles primitive 를 쓴다. 데이터는
 // 2026-07-14 기준 실데이터(src/lib/admin-cleaning.ts)다.
+import { consoleWhoIds } from "@/lib/cleaning-assign/room-rules";
 import { BedDouble, ChevronRight, Info, PackageSearch, ShieldCheck, Wrench, X } from "lucide-react";
 import { useAdminPanelA11y } from "@/components/admin/shared/use-admin-panel-a11y";
 import type { AdminCleaningHistoryItem, AdminCleaningTask, AdminSettingTarget } from "@/lib/admin-cleaning";
@@ -157,6 +158,7 @@ export function CleaningDetailPanel({
   }
 
   const staff = staffId ? staffDirectory.get(staffId) : null;
+  const plannedStaff = task ? consoleWhoIds(task).filter((id) => id !== staffId).flatMap((id) => staffDirectory.get(id) ?? []) : [];
 
   return (
     <>
@@ -261,6 +263,24 @@ export function CleaningDetailPanel({
                   </div>
                 </div>
               ) : null}
+
+          {/* 대표 기록자 말고 그 방에 있는 사람 — 같이 기록한 사람 · 배정된 사람(카드 담당 칸과 같은 값). */}
+          {plannedStaff.length > 0 ? (
+            <div className="pblock">
+              {staff ? null : <div className="pblock__t">{t.pStaff}</div>}
+              {plannedStaff.map((person) => (
+                <div key={person.id} className="staffpill">
+                  <span className="staffpill__av" style={{ background: person.bg }}>
+                    {person.name.slice(0, 1)}
+                  </span>
+                  <div>
+                    <div className="staffpill__nm">{person.name}</div>
+                    <div className="staffpill__s">{t.pAssignee}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
             </div>
           ) : null}
 

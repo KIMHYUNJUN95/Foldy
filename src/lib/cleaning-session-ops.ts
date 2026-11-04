@@ -8,6 +8,8 @@ import {
 } from "@/lib/cleaning";
 import { signalCleaningAssignChange } from "@/lib/cleaning-assign/live";
 import { roomRecordDecision, roomWriteErrorKind, sameRoomRecords, sessionRoomKeyOf } from "@/lib/cleaning-assign/room-key";
+import { roomStartBlock, sessionCloseFields } from "@/lib/cleaning-assign/room-rules";
+import { loadAssignDayRooms } from "@/lib/cleaning-assign/rooms";
 import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
 import { buildActiveRoomCatalog, fetchRoomCatalogRows } from "@/lib/rooms";
 import type { AppSession } from "@/lib/session";
@@ -127,7 +129,8 @@ export async function startSessionCore(
       .eq("organization_id", session.organization.id)
       .eq("work_date", day)
       .eq("room_key", roomKey),
-    // 관리자가 미룬 방(오늘이 미룬 기간 안)은 어느 시작 경로(오늘 내 방 · 청소 화면)에서도 시작하지 않는다(2026-11-02 리뷰).
+    // 관리자가 미룬 방은 어느 시작 경로(오늘 내 방 · 청소 화면)에서도 시작하지 않는다(2026-11-02 리뷰). 먼저 그 기간 미룸이 있는지만 보고,
+    // 있으면 아래에서 하루 보기 계산으로 다시 판단한다 — 미룬 날 뒤의 새 체크아웃은 정상 방이다(문서 45 R9).
     // 미룸 기록의 날짜(`origin_date`)는 **처음 청소해야 했던 날**이다 — 밀려 온 방을 오늘 미루면 지난 날짜로 남는다.
     // 그래서 「그날 이전에 생긴 방 · 미룬 날이 그날 뒤」로 찾는다.
     // 이름표 없는 새 건물(물리 키 없음)은 방 키를 못 만든다 — 그때는 그 기간의 미룸을 읽어 저장된 건물 · 방 이름으로 맞춘다
@@ -147,7 +150,16 @@ export async function startSessionCore(
   const held = (holdResult.data ?? []).some(
     (row) => physicalRoom !== null || buildSessionRoomLabel(row.property_name, row.room_label) === roomLabel,
   );
-  if (held) return fail("room_held");
+  if (held) {
+    const rooms = await loadAssignDayRooms(service, session.organization.id, day, null).catch((error: unknown) => {
+      console.error("[cleaning] day rooms read failed", error);
+      return null;
+    });
+    if (!rooms) return fail("start_failed");
+    const block = roomStartBlock(rooms.find((room) => room.roomKey === roomKey || room.sessionRoomLabel === roomLabel), true);
+    if (block === "resolved") return fail("room_resolved");
+    if (block) return fail("room_held");
+  }
   const decision = roomRecordDecision(
     sameRoomRecords(dayResult.data ?? [], roomLabel, roomKey),
     session.user.id,
@@ -191,11 +203,12 @@ export async function completeSessionCore(
   const activeSession = data as CleaningSessionRow | null;
   if (error || !activeSession) return fail("active_not_found");
 
-  const completedAt = new Date();
-  const durationSeconds = Math.max(0, Math.round((completedAt.getTime() - new Date(activeSession.started_at).getTime()) / 1000));
+  // 지난 날 기록을 여기로 끝내도 소요는 0초 — 어떤 화면에서 와도 같은 규칙(문서 45 C12).
+  const fields = sessionCloseFields({ cleaned: true, cleaningDate: activeSession.cleaning_date, now: new Date(), startedAt: activeSession.started_at, today: getCleaningOperatingDateKey() });
+  const durationSeconds = fields.duration_seconds;
   const { data: updated, error: updateError } = await supabase
     .from("cleaning_sessions")
-    .update({ completed_at: completedAt.toISOString(), duration_seconds: durationSeconds, notes: notes || null, status: "completed" })
+    .update({ ...fields, notes: notes || null })
     .eq("id", activeSession.id)
     .eq("status", "in_progress")
     .select("id");
@@ -270,19 +283,13 @@ export async function closeStaleSessionCore(session: AppSession, sessionId: stri
   if (!data) return fail("active_not_found");
   if (data.cleaning_date >= getCleaningOperatingDateKey()) return fail("close_failed");
 
-  // 알바가 고른다(2026-11-02 사용자 결정): 「청소했어요」 → 완료, 「못 했어요」 → 취소.
-  // - 완료: 그날 끝낸 방이라 다음 날 「밀려 온 방」으로 다시 뜨지 않는다. 끝낸 시각은 모르니 시작 시각 · 소요 0
-  //   이 「끝 = 시작 · 0초」 조합이 「끝낸 시각 모름」 표시다(`isUnmeasuredSession`) — 기록 · 사람별 달력은 끝 시각을 비우고,
-  //   관리자 강제 완료가 이 기록만 덮어써 시각을 채운다.
-  // - 취소: 소요 시간은 **0** — 며칠에 걸친 「지금 − 시작」을 넣으면 더하는 집계가 부풀려진다. 방은 다음 날 다시 뜬다.
-  // DB check 제약: 완료 · 취소 모두 completed_at · duration_seconds 가 있어야 한다.
+  // 알바가 고른다(2026-11-02 사용자 결정): 「청소했어요」 → 완료, 「못 했어요」 → 취소. 값은 `sessionCloseFields` 하나(문서 45 C12).
+  // - 완료: 그날 끝낸 방이라 다음 날 「밀려 온 방」으로 다시 뜨지 않는다. 「끝 = 시작 · 0초」 조합이 「끝낸 시각 모름」 표시다
+  //   (`isUnmeasuredSession`) — 기록 · 사람별 달력은 끝 시각을 비우고, 관리자 강제 완료가 이 기록만 덮어써 시각을 채운다.
+  // - 취소: 방은 다음 날 다시 뜬다.
   const { data: closed, error: updateError } = await supabase
     .from("cleaning_sessions")
-    .update(
-      cleaned
-        ? { completed_at: data.started_at, duration_seconds: 0, status: "completed" }
-        : { completed_at: new Date().toISOString(), duration_seconds: 0, status: "cancelled" },
-    )
+    .update(sessionCloseFields({ cleaned, cleaningDate: data.cleaning_date, now: new Date(), startedAt: data.started_at, today: getCleaningOperatingDateKey() }))
     .eq("id", sessionId)
     .eq("organization_id", session.organization.id)
     .eq("staff_user_id", session.user.id)

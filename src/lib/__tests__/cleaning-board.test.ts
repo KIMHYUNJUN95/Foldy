@@ -39,6 +39,7 @@ function person(userId: string, over: Partial<BoardPerson> = {}): BoardPerson {
     cancelled: false,
     fixed: [],
     lastWorked: null,
+    load: 0,
     memo: null,
     monthDays: 0,
     name: userId,
@@ -59,7 +60,7 @@ function person(userId: string, over: Partial<BoardPerson> = {}): BoardPerson {
   };
 }
 
-const assigned = (userId: string) => ({ at: "", by: null, name: userId, trainee: false, userId });
+const assigned = (userId: string, hasRecord = false) => ({ at: "", by: null, hasRecord, name: userId, trainee: false, userId });
 const now = new Date("2026-10-28T02:20:00Z"); // 도쿄 11:20
 
 describe("buildCleaningBoard", () => {
@@ -105,7 +106,7 @@ describe("buildCleaningBoard", () => {
       people: [person("late", { startMinutes: 10 * 60 + 30 }), person("busy", { startMinutes: 9 * 60 })],
       rooms: [
         room("302", { people: [assigned("late")] }),
-        room("501", { people: [assigned("busy")], status: "progress" }),
+        room("501", { people: [assigned("busy", true)], status: "progress" }),
         room("502", { people: [assigned("busy")] }),
       ],
       sessions: new Map(),

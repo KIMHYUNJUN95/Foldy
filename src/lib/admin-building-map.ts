@@ -19,8 +19,11 @@ import {
   resolveReservationCanonicalRoomLabel,
   type ActiveRoomCatalogItem,
 } from "@/lib/rooms";
+import { dashboardRoomCleanState } from "@/lib/cleaning-record-rules";
+import { storedSessionRoomKey, type RoomRecord } from "@/lib/cleaning-assign/room-key";
 import { sortBuildings } from "@/lib/admin-calendar-dashboard";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { tokyoDayEndExclusive, tokyoDayStart } from "@/lib/tokyo-date";
 import type { Database } from "@/types/database";
 
@@ -79,7 +82,12 @@ type ReservationRow = {
   raw_payload: Database["public"]["Tables"]["reservations"]["Row"]["raw_payload"];
 };
 
-export type BuildingMapSource = { catalog: ActiveRoomCatalogItem[] | undefined; reservations: ReservationRow[] };
+export type BuildingMapSource = {
+  catalog: ActiveRoomCatalogItem[] | undefined;
+  reservations: ReservationRow[];
+  /** 오늘 방 키 → 배정된 사람들(2인 방 「1/2 끝남」 판단, C7). 못 읽었으면 undefined — 배정 없음(빈 객체)과 다르다. */
+  assignees?: Record<string, string[]>;
+};
 
 const FEED_LIMIT = 8;
 
@@ -105,13 +113,28 @@ export async function fetchBuildingMapSource(session: AppSession, today: string)
     getActiveRoomCatalog(session.organization.id, supabase),
   ]);
   if (around.error) throw around.error;
+  // `cleaning_assignments` 는 service_role 전용(authenticated 권한 회수, 마이그레이션 202610200007) — 호출자(관리자 웹 접근 확인 뒤)가 조직으로 좁혀 읽는다.
+  const assignRes = await getSupabaseServiceClient()
+    .from("cleaning_assignments")
+    .select("room_key, user_id")
+    .eq("organization_id", session.organization.id)
+    .eq("work_date", today);
+  let assignees: Record<string, string[]> | undefined;
+  if (assignRes.error) {
+    console.error("[admin-building-map] cleaning_assignments read failed", assignRes.error.message);
+  } else {
+    assignees = {};
+    for (const row of (assignRes.data ?? []) as { room_key: string; user_id: string }[]) {
+      (assignees[row.room_key] ??= []).push(row.user_id);
+    }
+  }
   const seen = new Set<string>();
   const reservations = [...((around.data ?? []) as ReservationRow[]), ...((fresh.data ?? []) as ReservationRow[])].filter((r) => {
     if (seen.has(r.id)) return false;
     seen.add(r.id);
     return true;
   });
-  return { catalog, reservations };
+  return { catalog, reservations, assignees };
 }
 
 export function buildDashboardBuildingMap(
@@ -199,19 +222,33 @@ export function buildDashboardBuildingMap(
     if (room && r.check_in_date <= today && r.check_out_date > today) a.stay.add(room);
   }
 
+  // 방 상태는 `roomShareState` 하나(docs/product/45 C7): 처리 끝은 끝남, 2인 방 「1/2 끝남」은 안 끝난 방.
+  // 활동 피드는 처리 끝 제외(C3).
+  const roomGroups = new Map<string, { at: { property: string; room: string }; records: RoomRecord[]; keys: Set<string> }>();
   for (const s of sessions) {
     if (s.status === "cancelled" || s.cleaning_date !== today) continue;
     const at = sessionPlace(s.room_label);
     if (!at) continue;
-    const a = get(at.property);
-    a.started.add(at.room);
-    if (s.status === "completed") a.done.add(at.room);
-    else a.cleaning.add(at.room);
+    const groupKey = `${at.property}\u0000${at.room}`;
+    const g = roomGroups.get(groupKey) ?? { at, records: [], keys: new Set<string>() };
+    g.records.push({ staffId: s.staff_user_id, status: s.status, closed: Boolean(s.closed_without_cleaning) });
+    g.keys.add(storedSessionRoomKey(s));
+    roomGroups.set(groupKey, g);
+    if (s.closed_without_cleaning) continue;
     feed.push(
       s.status === "completed" && s.completed_at
         ? { id: `clean-${s.id}`, kind: "cleanDone", property: at.property, room: at.room, at: s.completed_at, who: s.staff_name ?? "" }
         : { id: `cleanstart-${s.id}`, kind: "cleanStart", property: at.property, room: at.room, at: s.started_at, who: s.staff_name ?? "" },
     );
+  }
+  for (const g of roomGroups.values()) {
+    const assigneeIds = [...new Set([...g.keys].flatMap((k) => source.assignees?.[k] ?? []))];
+    const state = dashboardRoomCleanState(g.records, assigneeIds, source.assignees !== undefined);
+    if (state === "none") continue;
+    const a = get(g.at.property);
+    a.started.add(g.at.room);
+    if (state === "done") a.done.add(g.at.room);
+    else a.cleaning.add(g.at.room);
   }
 
   const buildings: DashBuilding[] = sortBuildings([...roomsByProperty.keys()]).map((property) => {

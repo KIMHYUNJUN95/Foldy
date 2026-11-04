@@ -71,6 +71,7 @@ export async function CleaningBoardScreen({ session }: { session: AppSession }) 
   const people: BoardViewPerson[] = board.people.map((p) => ({
     applied: p.applied,
     cancelled: p.cancelled,
+    load: p.load,
     name: p.name,
     rooms: p.rooms.map((r) => ({ propertyName: r.propertyName, roomKey: r.roomKey, roomLabel: r.roomLabel })),
     userId: p.userId,

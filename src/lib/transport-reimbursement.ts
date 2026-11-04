@@ -362,7 +362,9 @@ export async function getLinkedTransportCandidates(
     .select("id, cleaning_date, room_label, task_label")
     .eq("organization_id", organizationId)
     .eq("staff_user_id", userId)
-    // 청소 배정 「처리 끝」 기록은 실제로 그 건물에 간 것이 아니다.
+    // 「청소한 기록」 = 완료 + 처리 끝 아님 (docs/product/45 표 3 · src/lib/cleaning-record-rules.ts).
+    // 취소 · 진행 중 · 처리 끝은 후보가 아니다(건물에 갔지만 「못 했어요」로 닫은 날은 직접 입력). 이미 저장된 항목은 건드리지 않는다.
+    .eq("status", "completed")
     .eq("closed_without_cleaning", false)
     .gte("cleaning_date", first)
     .lte("cleaning_date", last)

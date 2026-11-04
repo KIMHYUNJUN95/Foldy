@@ -1,6 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { getCleaningOperatingDateKey } from "@/lib/cleaning";
 import { addDays, isDateKey } from "@/lib/cleaning-assign/day-state";
 import { loadFieldMembers } from "@/lib/cleaning-assign/data";
@@ -16,8 +17,12 @@ import { getSupabaseServiceClient } from "@/lib/supabase/service";
  * 같은 검사를 쓰도록 한 곳에 둔다. 권한은 `cleaning.assign` 능력 — 없으면 `null`(redirect 하지 않는다 · CLAUDE.md).
  */
 
-/** `cancelled` — 관리자가 그날 일정을 취소한 사람에게 방을 넣으려 함(먼저 「다시 넣기」). */
-export type AssignFail = { ok: false; reason: "forbidden" | "invalid" | "conflict" | "error" | "cancelled" };
+/**
+ * `cancelled` — 관리자가 그날 일정을 취소한 사람에게 방을 넣으려 함(먼저 「다시 넣기」).
+ * `stale` — 화면을 그린 뒤 방 상태가 바뀜(새로 읽고 안내). `invalid` 는 진짜 잘못된 입력만.
+ * `busy` — 그 사람이 그날 청소 중이라 일정을 취소할 수 없음(문서 45 A7). `has_record` — 기록이 있는 사람은 그 방에서 빠지지 않음(표 2).
+ */
+export type AssignFail = { ok: false; reason: "forbidden" | "invalid" | "conflict" | "error" | "cancelled" | "busy" | "has_record" | "stale" };
 export type AssignOk<T = object> = { ok: true } & T;
 
 export const CLEANING_ASSIGN_PATHS = ["/admin/cleaning-assign", "/admin/cleaning-assign/settings", "/mobile/shift", "/mobile/shift/today", "/admin/cleaning", "/mobile/cleaning"];
@@ -37,6 +42,20 @@ export async function assigner(): Promise<AppSession | null> {
   if (!session || !hasOrganizationContext(session)) return null;
   if (!session.capabilities.includes("cleaning.assign")) return null;
   return session;
+}
+
+/**
+ * 액션 본문을 감싼다 — 읽기 함수(`loadDaySessionRows` · `loadAssignDayRooms` 등)가 throw 하면 오류 화면 대신 `{ ok: false, reason: "error" }`.
+ * 이 파일은 `"use server"` 가 아니라 공개 액션이 되지 않는다. Next 내부 신호(redirect 등)는 그대로 넘긴다.
+ */
+export async function guardAssignAction<T>(name: string, body: () => Promise<T>): Promise<T | AssignFail> {
+  try {
+    return await body();
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error(`[cleaning-assign] ${name} failed`, error instanceof Error ? error.message : error);
+    return { ok: false, reason: "error" };
+  }
 }
 
 export const isUuid = (value: unknown): value is string =>
@@ -73,9 +92,9 @@ export async function cancelledUserIds(organizationId: string, date: string, use
 
 /**
  * 신청이 없으면 「관리자가 넣음」 신청을 만든다. 취소된 날은 `revive` 일 때만 살린다(「다시 넣기」) —
- * 다른 쓰기는 먼저 `cancelledUserIds` 로 막고, 여기서도 조용히 살리지 않는다.
+ * 다른 쓰기는 먼저 `cancelledUserIds` 로 막고, 여기서도 조용히 살리지 않는다. 실패하면 `false` — 부르는 쪽이 실패로 돌려준다(문서 45 A10).
  */
-export async function ensureApplication(organizationId: string, userId: string, date: string, actorId: string, options: { revive?: boolean } = {}) {
+export async function ensureApplication(organizationId: string, userId: string, date: string, actorId: string, options: { revive?: boolean } = {}): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
   const existing = await supabase
     .from("cleaning_shift_applications")
@@ -84,14 +103,30 @@ export async function ensureApplication(organizationId: string, userId: string, 
     .eq("user_id", userId)
     .eq("work_date", date)
     .maybeSingle();
+  if (existing.error) {
+    console.error("[cleaning-assign] application read failed", { code: existing.error.code });
+    return false;
+  }
   if (!existing.data) {
-    await supabase.from("cleaning_shift_applications").insert({ created_by: actorId, organization_id: organizationId, source: "admin", user_id: userId, work_date: date });
-  } else if (existing.data.cancelled_at && options.revive) {
-    await supabase
+    const inserted = await supabase.from("cleaning_shift_applications").insert({ created_by: actorId, organization_id: organizationId, source: "admin", user_id: userId, work_date: date });
+    // 같은 순간 다른 쪽이 만든 줄이면 그대로 쓴다.
+    if (inserted.error && inserted.error.code !== "23505") {
+      console.error("[cleaning-assign] application insert failed", { code: inserted.error.code });
+      return false;
+    }
+    return true;
+  }
+  if (existing.data.cancelled_at && options.revive) {
+    const revived = await supabase
       .from("cleaning_shift_applications")
       .update({ cancel_request_note: null, cancel_requested_at: null, cancelled_at: null, cancelled_by: null, updated_at: new Date().toISOString() })
       .eq("organization_id", organizationId)
       .eq("user_id", userId)
       .eq("work_date", date);
+    if (revived.error) {
+      console.error("[cleaning-assign] application revive failed", { code: revived.error.code });
+      return false;
+    }
   }
+  return true;
 }

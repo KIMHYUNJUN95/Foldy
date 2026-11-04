@@ -1,5 +1,6 @@
 "use client";
 
+import { recordListChip } from "@/lib/cleaning-record-rules";
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,6 +32,8 @@ export type CleaningRecordItem = {
   completedAt: string | null;
   /** 다음 날 「청소했어요」로 닫아 끝낸 시각을 모르는 완료 기록 — 끝 시각을 「-」로 보인다(시작 = 끝으로 저장돼 있다). */
   endUnknown: boolean;
+  /** 관리자가 「처리 끝」으로 닫은 기록 — 청소한 시간 없음. */
+  closed: boolean;
   durationSeconds: number | null;
   status: string;
   notes: string | null;
@@ -57,7 +60,8 @@ function shiftMonth(monthKey: string, delta: number): string {
   return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
 }
 
-function statusTone(status: string): string {
+function statusTone(status: string, closed = false): string {
+  if (closed) return "bg-slate-400";
   if (status === "completed") return "bg-emerald-500";
   if (status === "in_progress") return "bg-amber-500";
   return "bg-slate-300";
@@ -135,8 +139,8 @@ export function CleaningRecordsView({
   const dateKeys = Array.from(byDate.keys()).sort((a, b) => b.localeCompare(a));
 
   const totalSeconds = records.reduce((sum, rec) => sum + (rec.durationSeconds ?? 0), 0);
-  const statusLabel = (s: string) =>
-    s === "completed" ? r.status.completed : s === "cancelled" ? r.status.cancelled : r.status.in_progress;
+  const statusLabel = (s: string, closed = false) =>
+    closed ? r.status.closed : s === "completed" ? r.status.completed : s === "cancelled" ? r.status.cancelled : r.status.in_progress;
 
   const dayLabel = (key: string) =>
     new Intl.DateTimeFormat(locale, {
@@ -187,8 +191,8 @@ export function CleaningRecordsView({
             {selected.taskLabel}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-0.5 text-[11px] font-bold text-foreground">
-            <span className={cn("size-1.5 rounded-full", statusTone(selected.status))} />
-            {statusLabel(selected.status)}
+            <span className={cn("size-1.5 rounded-full", statusTone(selected.status, selected.closed))} />
+            {statusLabel(selected.status, selected.closed)}
           </span>
         </div>
       </>
@@ -200,14 +204,16 @@ export function CleaningRecordsView({
       {field(r.startLabel, fmtTime(selected.startedAt) || "-")}
       {field(
         r.endLabel,
-        selected.endUnknown ? "-" : selected.completedAt ? fmtTime(selected.completedAt) : r.ongoing,
+        selected.endUnknown || selected.closed ? "-" : selected.completedAt ? fmtTime(selected.completedAt) : r.ongoing,
       )}
       {field(
         r.durationLabel,
         <span className="font-mono">
           {selected.durationSeconds != null
             ? formatDuration(selected.durationSeconds)
-            : r.ongoing}
+            : selected.closed
+              ? "-"
+              : r.ongoing}
         </span>,
       )}
       {selected.notes ? field(r.notesLabel, selected.notes, true) : null}
@@ -365,18 +371,18 @@ export function CleaningRecordsView({
                       type="button"
                     >
                       <div className="flex items-center gap-2">
-                        <span className={cn("size-1.5 shrink-0 rounded-full", statusTone(rec.status))} />
+                        <span className={cn("size-1.5 shrink-0 rounded-full", statusTone(rec.status, rec.closed))} />
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                          {fmtTime(rec.startedAt)}–{rec.completedAt && !rec.endUnknown ? fmtTime(rec.completedAt) : ""}
+                          {fmtTime(rec.startedAt)}–{rec.completedAt && !rec.endUnknown && !rec.closed ? fmtTime(rec.completedAt) : ""}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold tracking-[-0.01em] text-foreground">
                           {rec.title}
                         </span>
                         <span className="shrink-0 rounded-full bg-slate-100 px-2 py-px text-[10px] font-bold text-slate-600">
-                          {rec.taskLabel}
+                          {recordListChip(rec, r.status.closed)}
                         </span>
                         <span className="shrink-0 font-mono text-[11px] tabular-nums text-foreground">
-                          {rec.durationSeconds != null ? formatDuration(rec.durationSeconds) : r.ongoing}
+                          {rec.durationSeconds != null ? formatDuration(rec.durationSeconds) : rec.closed ? "-" : r.ongoing}
                         </span>
                       </div>
                       {canViewOthers && rec.staffName ? (

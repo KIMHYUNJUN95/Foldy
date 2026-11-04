@@ -50,8 +50,9 @@ export function todaySkipReason(room: {
   const hold = holdSkipReason(room);
   if (hold === "resolved" && !room.hasSession) return "resolved";
   if (room.status !== "pending") return null;
-  if (room.changed) return "booking";
-  return hold === "held" ? "held" : null;
+  // 미룬 기간이라 목록에서 빠진 방은 예약이 바뀐 게 아니다 — 미룸이 먼저(문서 45 R8).
+  if (hold === "held") return "held";
+  return room.changed ? "booking" : null;
 }
 
 /**

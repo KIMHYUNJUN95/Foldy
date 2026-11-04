@@ -3,7 +3,7 @@ import { LiveWash } from "@/components/shared/live-wash";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { startCleaningSession } from "@/app/mobile/cleaning/actions";
+import { closeStaleCleaningSession, startCleaningSession } from "@/app/mobile/cleaning/actions";
 import { CleaningNotice } from "@/components/cleaning/cleaning-notice";
 import { CleaningCompletionPanel } from "@/components/cleaning/cleaning-completion-panel";
 import type { ManualBuildingOption, ManualRoomEntry } from "@/components/cleaning/manual-cleaning-form";
@@ -28,6 +28,11 @@ import {
 import { getCleaningTargets } from "@/lib/cleaning-targets";
 import { sessionRoomKeyLookup, shouldOfferStart, type RoomRecord } from "@/lib/cleaning-assign/room-key";
 import { CleaningDaySwitcher } from "@/components/cleaning/cleaning-day-switcher";
+import { dayLabel, tokyoTime } from "@/components/admin/cleaning-assign/format";
+import { fill, getCleaningAssignCopy } from "@/lib/cleaning-assign-i18n";
+import { startableListTargets } from "@/lib/cleaning-assign/room-rules";
+import { loadAddBlockedRoomKeys, loadAssignDayRooms } from "@/lib/cleaning-assign/rooms";
+import { getSupabaseServiceClient } from "@/lib/supabase/service";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getOnboardingState } from "@/lib/onboarding";
 import {
@@ -330,6 +335,8 @@ function RowRight({
       <form action={startCleaningSession}>
         <input type="hidden" name="roomLabel" value={roomLabel} />
         <input type="hidden" name="taskKey" value={taskKey} />
+        {/* 서버가 지금 목록을 다시 본다(문서 45 C13). 수기 경로(「기타 청소」)에는 이 값이 없다. */}
+        <input type="hidden" name="source" value="list" />
         <button className="cln-start" type="submit">
           {startLabel}
         </button>
@@ -379,6 +386,7 @@ export default async function MobileCleaningPage({
   const locale = session.user.preferredLanguage;
   const dictionary = getDictionary(locale);
   const copy = dictionary.cleaning;
+  const assignCopy = getCleaningAssignCopy(locale);
 
   // 배정 담당(`cleaning.assign`)에게 「청소」는 현황판이다(2026-10-28, 시안 2riUcpk…) — 방마다 담당 · 대기 / 청소 중 / 끝남,
   // 담당 없는 방은 바로 넣기. 청소 시작 · 끝내기 결과로 돌아온 경우(started · completed · error …)와 「직접 청소」(work=1),
@@ -507,10 +515,25 @@ export default async function MobileCleaningPage({
     });
   }
 
-  const filteredCleaningList = (cleaningTargets?.cleaningList ?? []).filter(
+  // 미룸 · 처리 끝인 방은 오늘 목록에 내밀지 않는다 — 서버 시작 막기와 같은 판단(문서 45 R7 · R8). 읽기에 실패하면 그대로 두고 서버가 막는다.
+  const holdView = isToday
+    ? await (async () => {
+        const service = getSupabaseServiceClient();
+        // 막는 미룸이 없으면 하루 목록(약 68일치 기록 · 30일치 예약)을 읽지 않는다 — 방의 미룸 · 처리 끝은 모두 이 줄에서 나온다.
+        const holds = await loadAddBlockedRoomKeys(service, session.organization.id, viewDate);
+        const rooms = holds.size > 0 ? await loadAssignDayRooms(service, session.organization.id, viewDate, null) : [];
+        return { holds, rooms };
+      })().catch((error: unknown) => {
+        console.error("[cleaning] hold read failed", error);
+        return null;
+      })
+    : null;
+  const withoutHeld = <T extends { roomKey: string; sessionRoomLabel: string }>(list: readonly T[]): readonly T[] =>
+    holdView ? startableListTargets(list, holdView.rooms, holdView.holds) : list;
+  const filteredCleaningList = withoutHeld(cleaningTargets?.cleaningList ?? []).filter(
     (t) => !processedRoomKeys.has(roomKeyOfTarget(t)),
   );
-  const filteredSettingList = (cleaningTargets?.settingList ?? []).filter(
+  const filteredSettingList = withoutHeld(cleaningTargets?.settingList ?? []).filter(
     (t) => !processedRoomKeys.has(roomKeyOfTarget(t)),
   );
 
@@ -669,9 +692,31 @@ export default async function MobileCleaningPage({
         ) : null}
         {/* 지난 날짜의 미완료 세션 — 유니크 인덱스가 날짜를 안 보므로 이게 남아 있으면 오늘
             아무것도 시작할 수 없다. 무엇이 막고 있는지와 푸는 방법을 알려준다(2026-08-04). */}
-        {staleActiveDate ? <div className="cln-note is-warn">{copy.staleActiveNotice.replace("{date}", staleActiveDate)}</div> : null}
+        {activeSession && staleActiveDate ? (
+          <section className="cln-stale" role="alert" aria-label={assignCopy.staleHead}>
+            <b>{assignCopy.staleHead}</b>
+            <p>{fill(assignCopy.staleBody, { date: dayLabel(staleActiveDate, locale), room: activeRoomTitle, time: tokyoTime(activeSession.started_at) })}</p>
+            <p className="cln-stale__hint">{assignCopy.staleHint}</p>
+            <div className="cln-stale__acts">
+              <form action={closeStaleCleaningSession}>
+                <input type="hidden" name="sessionId" value={activeSession.id} />
+                <input type="hidden" name="cleaned" value="1" />
+                <button className="cln-start" type="submit">
+                  {assignCopy.staleCleaned}
+                </button>
+              </form>
+              <form action={closeStaleCleaningSession}>
+                <input type="hidden" name="sessionId" value={activeSession.id} />
+                <input type="hidden" name="cleaned" value="0" />
+                <button className="cln-start is-ghost" type="submit">
+                  {assignCopy.staleNotCleaned}
+                </button>
+              </form>
+            </div>
+          </section>
+        ) : null}
 
-        {activeSession ? (
+        {activeSession && !staleActiveDate ? (
           <section className="cln-active">
             <h2 className="cln-h">{copy.activeCleaning}</h2>
             <CleaningCompletionPanel

@@ -11,11 +11,24 @@ import {
   timeToMinutes,
   type ShiftDayState,
 } from "@/lib/cleaning-assign/day-state";
-import { compareAssignRooms, loadAssignDayRooms, loadHeldRoomKeys, loadRangeRooms, loadStayKeysOrEmpty, type AssignRoom } from "@/lib/cleaning-assign/rooms";
+import { createSharedRoomReads, loadAddBlockedRoomKeys, loadAssignDayRooms, loadUsualByRoomKey, loadDaySessionRows, loadRangeDayRooms, loadStayKeysOrEmpty } from "@/lib/cleaning-assign/rooms";
+import { activeDeferUntil,
+  cleanedRoomCount,
+  compareAssignRooms,
+  countOpenRooms,
+  ghostAssignRoom,
+  canAddRoom,
+  isOpenRoom,
+  personHasRoomRecord,
+  personLoad,
+  suggestInputsForDay,
+  type AssignRoom,
+  type SessionRow,
+} from "@/lib/cleaning-assign/room-rules";
 import { todayTaskKey, type TodayTaskKey } from "@/lib/cleaning-assign/task-kind";
 import { DEFAULT_FLAG_THRESHOLD, normalizeAssignRules, TRAINEE_FIRST_CHECK, type AssignRule } from "@/lib/cleaning-assign/rules";
-import { suggestAssignments, type SuggestPerson, type SuggestRoom, type Suggestion } from "@/lib/cleaning-assign/suggest";
-import { buildSessionRoomLabel, physicalRoomKeyOfSessionLabel } from "@/lib/room-label-normalization";
+import { leftAfterSuggest, shortRoomKeys, suggestAssignments, type SuggestPerson, type SuggestRoom, type Suggestion } from "@/lib/cleaning-assign/suggest";
+import { buildSessionRoomLabel } from "@/lib/room-label-normalization";
 import { readAllPages } from "@/lib/supabase/read-all-pages";
 import type { Database } from "@/types/database";
 
@@ -326,7 +339,8 @@ async function loadAttendanceActivity(
 
 // ── 하루 보기 ────────────────────────────────────────────────────────────────────────────────────
 
-export type BoardRoomPerson = { userId: string; name: string; trainee: boolean; by: string | null; at: string };
+/** `hasRecord` — 이 방 그날 진행 중 · 완료 기록이 있나(취소 · 처리 끝 제외). 기록 있는 사람은 그 방에서 빠지지 않는다(문서 45 표 2). */
+export type BoardRoomPerson = { userId: string; name: string; trainee: boolean; by: string | null; at: string; hasRecord: boolean };
 
 export type BoardRoom = AssignRoom & {
   /** 배정했는데 그 사이 예약이 취소된 방(목록에서 사라짐) — 「취소됨」으로 남긴다. */
@@ -357,6 +371,8 @@ export type BoardPerson = {
   memo: string | null;
   fixed: { propertyName: string; tier: number }[];
   rooms: { roomKey: string; propertyName: string; roomLabel: string; withOthers: number }[];
+  /** 그날 몫(작은 방 1 · 큰 방 1.5) — 직접 넣을 때 상한 경고(문서 45 L6). */
+  load: number;
   lastWorked: string | null;
   monthDays: number;
 };
@@ -370,12 +386,15 @@ export type DayBoard = {
   properties: string[];
   lastChange: { name: string; at: string } | null;
   counts: { rooms: number; open: number; applied: number; assigned: number; waiting: number; notApplied: number };
+  /** 제안대로 넣어도 자리가 남는 방 수 — 「사람 모자람 · N개 남음」(문서 45 L5). */
+  /** 제안 뒤에도 사람이 모자란 방(L5) — 화면이 눈앞 목록(「내 건물」 거르기) 기준으로 센다. */
+  shortRoomKeys: string[];
+  /** 「방 추가」에서 고를 수 없는 방(문서 45 A2~A5). */
+  addBlockedRoomKeys: string[];
+  /** 이 담당 기준 큰 방 — 아직 목록에 없는 방을 추가할 때 하루 몫 경고용. */
+  /** 방 키 → 보통 인원 — 목록에 없는 방을 추가할 때의 인원 · 몫 경고(L6). 배정 담당마다 따로다. */
+  usualByRoomKey: Record<string, number>;
 };
-
-function needOf(room: AssignRoom, assigned: number): number {
-  if (room.status !== "pending" || room.deferredUntil) return 0;
-  return Math.max(0, room.usualHeadcount - assigned);
-}
 
 type DayBuild = { board: DayBoard; suggestPeople: SuggestPerson[]; suggestRooms: SuggestRoom[]; fixedTiers: Record<string, Record<string, number>> };
 
@@ -383,8 +402,21 @@ export async function loadDayBoard(supabase: Client, organizationId: string, dat
   return (await buildDay(supabase, organizationId, date, viewerId)).board;
 }
 
+/** 제안 대상 사람 — 하루 · 월이 같은 값(출근 시각 · 견습 등). */
+function suggestPersonOf(app: ApplicationRow, member: { role: string } | undefined, profile: StaffProfile, monthWorkDays: number) {
+  const known = member ?? { role: "part_time_staff" };
+  return {
+    monthDays: monthWorkDays,
+    priority: profile.priority,
+    startMinutes: app.startMinutes ?? profile.defaultStartMinutes ?? defaultStartMinutes(known.role),
+    trainee: profile.trainee,
+    trainer: isTrainer(known, profile),
+    userId: app.userId,
+  };
+}
+
 async function buildDay(supabase: Client, organizationId: string, date: string, viewerId: string): Promise<DayBuild> {
-  const [rooms, members, profiles, settings, fixedTiers, assignments, applications] = await Promise.all([
+  const [rooms, members, profiles, settings, fixedTiers, assignments, applications, daySessions, heldForAdd, usualByRoomKey] = await Promise.all([
     loadAssignDayRooms(supabase, organizationId, date, viewerId),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, viewerId),
@@ -392,6 +424,9 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
     loadFixedTiers(supabase, organizationId, viewerId),
     loadAssignments(supabase, organizationId, date, date),
     loadApplications(supabase, organizationId, date, date),
+    loadDaySessionRows(supabase, organizationId, date),
+    loadAddBlockedRoomKeys(supabase, organizationId, date),
+    loadUsualByRoomKey(supabase, organizationId, viewerId),
   ]);
   const memberById = new Map(members.map((m) => [m.userId, m]));
   // 신청자 · 배정자 중 현장 목록 밖(역할이 바뀐 사람 등)도 이름은 보여야 한다.
@@ -430,55 +465,15 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
   const cancelledRooms: AssignRoom[] = [];
   for (const [roomKey, rows] of byRoom) {
     if (roomByKey.has(roomKey)) continue;
-    const first = rows[0];
-    const ghost: AssignRoom = {
-      arrivingGuests: null,
-      arrivingGuestName: null,
-      carriedFrom: null,
-      carryDays: 0,
-      deferredUntil: null,
-      resolvedHold: false,
-      hasTurnover: false,
-      holdReason: null,
-      nextCheckInDate: null,
-      nextGuests: null,
-      nextGuestName: null,
-      note: null,
-      propertyName: first.propertyName,
-      roomKey,
-      roomLabel: first.roomLabel,
-      sessionRoomLabel: first.roomLabel,
-      source: "checkout",
-      status: "pending",
-      partial: null,
-      usualHeadcount: 1,
-    };
-    cancelledRooms.push(ghost);
+    cancelledRooms.push(ghostAssignRoom(rows[0]));
   }
 
   // 제안 — 신청했고 그날 일정이 살아 있는 사람만.
-  const suggestPeople: SuggestPerson[] = [];
-  for (const app of applications) {
-    if (app.cancelledAt) continue;
-    const member = memberById.get(app.userId) ?? { role: "part_time_staff" };
-    const profile = profileOf(profiles, app.userId);
-    const mine = byUser.get(app.userId) ?? [];
-    suggestPeople.push({
-      monthDays: monthDaysBy.get(app.userId)?.size ?? 0,
-      priority: profile.priority,
-      propertiesToday: [...new Set(mine.map((row) => row.propertyName))],
-      roomsToday: mine.length,
-      startMinutes: app.startMinutes ?? profile.defaultStartMinutes ?? defaultStartMinutes(member.role),
-      trainee: profile.trainee,
-      trainer: isTrainer(member, profile),
-      userId: app.userId,
-    });
-  }
-  const suggestRooms: SuggestRoom[] = rooms
-    .map((room) => ({ assigned: (byRoom.get(room.roomKey) ?? []).map((row) => row.userId), need: needOf(room, (byRoom.get(room.roomKey) ?? []).length), propertyName: room.propertyName, roomKey: room.roomKey }))
-    .filter((room) => room.need > 0)
-    // 밀려 온 방 먼저.
-    .sort((a, b) => Number(roomByKey.get(b.roomKey)!.source === "carry") - Number(roomByKey.get(a.roomKey)!.source === "carry"));
+  const { suggestPeople, suggestRooms } = suggestInputsForDay({
+    assignments,
+    people: applications.filter((app) => !app.cancelledAt).map((app) => suggestPersonOf(app, memberById.get(app.userId), profileOf(profiles, app.userId), monthDaysBy.get(app.userId)?.size ?? 0)),
+    rooms,
+  });
   const suggestions = suggestAssignments({ fixedTiers, people: suggestPeople, rooms: suggestRooms, rules: settings.rules });
   const suggestedBy = new Map<string, string[]>();
   for (const s of suggestions) suggestedBy.set(s.roomKey, [...(suggestedBy.get(s.roomKey) ?? []), s.userId]);
@@ -494,6 +489,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
       name: nameOf(row.userId) ?? "—",
       trainee: profileOf(profiles, row.userId).trainee,
       userId: row.userId,
+      hasRecord: personHasRoomRecord(daySessions, room, row.userId),
     })),
     suggested: (suggestedBy.get(room.roomKey) ?? []).map((userId) => ({ name: nameOf(userId) ?? "—", userId })),
   }));
@@ -517,6 +513,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
       cancelled: Boolean(app?.cancelledAt),
       fixed: (fixedByUser.get(userId) ?? []).sort((a, b) => a.tier - b.tier),
       lastWorked: activity.get(userId)?.last ?? null,
+      load: personLoad(mine, roomByKey),
       memo: profile.memo,
       monthDays: activity.get(userId)?.monthDays ?? 0,
       name: member.name,
@@ -542,11 +539,13 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
   const latest = assignments.at(-1) ?? null;
   const activeRooms = boardRooms.filter((room) => !room.cancelled);
   const board: DayBoard = {
+    addBlockedRoomKeys: [...new Set([...heldForAdd, ...rooms.filter((room) => !canAddRoom(room, false)).map((room) => room.roomKey)])],
+    usualByRoomKey,
     counts: {
       applied: applied.length,
       assigned: applied.filter((p) => p.rooms.length > 0).length,
       notApplied: people.filter((p) => !p.applied && members.some((m) => m.userId === p.userId)).length,
-      open: activeRooms.filter((room) => room.people.length === 0 && room.status === "pending" && !room.deferredUntil).length,
+      open: activeRooms.filter((room) => isOpenRoom(room, room.people.length)).length,
       rooms: activeRooms.length,
       waiting: applied.filter((p) => p.rooms.length === 0).length,
     },
@@ -557,6 +556,7 @@ async function buildDay(supabase: Client, organizationId: string, date: string, 
     properties: [...new Set(boardRooms.map((room) => room.propertyName))],
     rooms: boardRooms,
     rules: settings.rules,
+    shortRoomKeys: shortRoomKeys(suggestRooms, suggestions),
   };
   return { board, fixedTiers, suggestPeople, suggestRooms };
 }
@@ -590,50 +590,29 @@ export type MonthBoard = {
 };
 
 /**
- * 날짜 범위 안에서 이미 청소 중이거나 끝난 방(`날짜|물리 방 키`) — 하루 보기처럼 월 제안 · 미배정 수에서도 뺀다.
- * 오늘 이미 끝낸 방에 월 자동 제안이 사람을 또 넣지 않게 한다.
+ * 날짜별 미배정 방 수(오늘부터 그달 끝까지) — 하루 보기 날짜 고르기 달력에 숫자로 표시. 하루 보기와 같은 계산(`loadRangeDayRooms` — 문서 45 C9).
+ * 지난날은 세지 않는다(월 보기도 지난날 경고를 빨갛게 그리지 않는다).
  */
-async function loadFinishedRoomKeys(supabase: Client, organizationId: string, from: string, to: string): Promise<Set<string>> {
-  const rows = await readAllPages<{ room_label: string; cleaning_date: string }>((start, end) =>
-    supabase
-      .from("cleaning_sessions")
-      .select("room_label, cleaning_date")
-      .eq("organization_id", organizationId)
-      .gte("cleaning_date", from)
-      .lte("cleaning_date", to)
-      .in("status", ["in_progress", "completed"])
-      .order("id")
-      .range(start, end),
-  );
-  if (rows.error) throw new Error(rows.error.message);
-  const out = new Set<string>();
-  for (const row of rows.data) {
-    const key = physicalRoomKeyOfSessionLabel(row.room_label);
-    if (key) out.add(`${row.cleaning_date}|${key}`);
+function assignedKeysByDate(rows: readonly { workDate: string; roomKey: string }[]): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const row of rows) {
+    let set = out.get(row.workDate);
+    if (!set) out.set(row.workDate, (set = new Set()));
+    set.add(row.roomKey);
   }
   return out;
 }
 
-/**
- * 날짜별 미배정 방 수(오늘부터 그달 끝까지) — 하루 보기 날짜 고르기 달력에 숫자로 표시. 월 보기 미배정 수와 같은 기준(퇴실 + 수기 추가 − 배정 − 미룸 · 처리 끝).
- * 지난날은 세지 않는다(월 보기도 지난날 경고를 빨갛게 그리지 않는다).
- */
 export async function loadMonthOpenCounts(supabase: Client, organizationId: string, ym: string, today: string): Promise<Record<string, number>> {
   const days = monthDays(ym).filter((date) => date >= today);
   if (days.length === 0) return {};
   const from = days[0];
   const to = days.at(-1)!;
-  const [range, assignments, heldKeys, finished] = await Promise.all([
-    loadRangeRooms(supabase, organizationId, from, to),
-    loadAssignments(supabase, organizationId, from, to),
-    loadHeldRoomKeys(supabase, organizationId, from, to),
-    loadFinishedRoomKeys(supabase, organizationId, from, to),
-  ]);
-  const held = new Set([...heldKeys, ...finished]);
-  const assigned = new Set(assignments.map((row) => `${row.workDate}|${row.roomKey}`));
+  const [plans, assignments] = await Promise.all([loadRangeDayRooms(supabase, organizationId, from, to, null), loadAssignments(supabase, organizationId, from, to)]);
+  const assignedByDate = assignedKeysByDate(assignments);
   const out: Record<string, number> = {};
   for (const date of days) {
-    const open = [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(`${date}|${key}`) && !held.has(`${date}|${key}`)).length;
+    const open = countOpenRooms(plans.get(date) ?? [], assignedByDate.get(date) ?? new Set());
     if (open > 0) out[date] = open;
   }
   return out;
@@ -643,29 +622,23 @@ export async function loadMonthBoard(supabase: Client, organizationId: string, y
   const days = monthDays(ym);
   const from = days[0];
   const to = days.at(-1)!;
-  const [range, members, profiles, fixedTiers, assignments, applications, held] = await Promise.all([
-    loadRangeRooms(supabase, organizationId, from, to),
+  const [plans, members, profiles, fixedTiers, assignments, applications] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, from, to, ownerId),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, ownerId),
     loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, from, to),
     loadApplications(supabase, organizationId, from, to),
-    loadHeldRoomKeys(supabase, organizationId, from, to),
   ]);
-  const assignedRooms = new Map<string, Set<string>>();
+  const assignedRooms = assignedKeysByDate(assignments);
   const cellRooms = new Map<string, number>();
   for (const row of assignments) {
-    let set = assignedRooms.get(row.workDate);
-    if (!set) assignedRooms.set(row.workDate, (set = new Set()));
-    set.add(row.roomKey);
     cellRooms.set(`${row.userId}|${row.workDate}`, (cellRooms.get(`${row.userId}|${row.workDate}`) ?? 0) + 1);
   }
   const appKey = new Map(applications.map((a) => [`${a.userId}|${a.workDate}`, a]));
   const totals = days.map((date) => {
-    const rooms = range.get(date)?.size ?? 0;
-    const assigned = assignedRooms.get(date) ?? new Set<string>();
-    const open = [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(key) && !held.has(`${date}|${key}`)).length;
-    return { applied: applications.filter((a) => a.workDate === date && !a.cancelledAt).length, date, open, rooms };
+    const list = plans.get(date) ?? [];
+    return { applied: applications.filter((a) => a.workDate === date && !a.cancelledAt).length, date, open: countOpenRooms(list, assignedRooms.get(date) ?? new Set()), rooms: list.length };
   });
   const ids = [...new Set([...members.map((m) => m.userId), ...applications.map((a) => a.userId), ...assignments.map((a) => a.userId)])];
   const names = new Map(members.map((m) => [m.userId, m.name]));
@@ -705,30 +678,25 @@ export async function loadMonthBoard(supabase: Client, organizationId: string, y
   return { days, people, totals, ym };
 }
 
-/** 월 자동 제안 — 날짜마다 그날 신청자 · 미배정 방으로 하루 제안을 돌린다(이미 배정된 방은 그대로). */
+/** 월 자동 제안 — 날짜마다 그날 신청자 · 미배정 방으로 하루 제안을 돌린다(이미 배정된 방은 그대로). 방 목록 · 몫은 하루 보기와 같은 계산(문서 45 C9 · L4). */
 export async function computeMonthSuggestions(
   supabase: Client,
   organizationId: string,
   ym: string,
   fromDate: string,
   ownerId: string,
-): Promise<{ suggestions: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }>; openTotal: number; shortDays: string[] }> {
+): Promise<{ suggestions: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }>; openTotal: number; shortDays: string[]; leftTotal: number }> {
   const days = monthDays(ym).filter((date) => date >= fromDate);
-  if (days.length === 0) return { openTotal: 0, shortDays: [], suggestions: [] };
-  const [range, members, profiles, fixedTiers, settings, assignments, applications, roomSettings, heldKeys, finished] = await Promise.all([
-    loadRangeRooms(supabase, organizationId, days[0], days.at(-1)!),
+  if (days.length === 0) return { leftTotal: 0, openTotal: 0, shortDays: [], suggestions: [] };
+  const [plans, members, profiles, fixedTiers, settings, assignments, applications] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, days[0], days.at(-1)!, ownerId),
     loadFieldMembers(supabase, organizationId),
     loadStaffProfiles(supabase, organizationId, ownerId),
     loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignSettings(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, days[0], days.at(-1)!),
     loadApplications(supabase, organizationId, days[0], days.at(-1)!),
-    supabase.from("cleaning_room_settings").select("room_key, usual_headcount").eq("organization_id", organizationId).eq("owner_id", ownerId),
-    loadHeldRoomKeys(supabase, organizationId, days[0], days.at(-1)!),
-    loadFinishedRoomKeys(supabase, organizationId, days[0], days.at(-1)!),
   ]);
-  const held = new Set([...heldKeys, ...finished]);
-  const usual = new Map((roomSettings.data ?? []).map((row) => [row.room_key, row.usual_headcount]));
   const memberById = new Map(members.map((m) => [m.userId, m]));
   // 이번 달 근무 일수(방 수가 아니라 날 수) — 앞날에 제안한 날도 더해 가며 센다(「근무 일수 적은 사람 먼저」).
   const monthDaysOf = new Map<string, Set<string>>();
@@ -740,51 +708,32 @@ export async function computeMonthSuggestions(
   for (const row of assignments) addWorkDay(row.userId, row.workDate);
   const out: Array<Suggestion & { workDate: string; propertyName: string; roomLabel: string }> = [];
   let openTotal = 0;
+  let leftTotal = 0;
   const shortDays: string[] = [];
   for (const date of days) {
-    const dayRooms = range.get(date);
-    if (!dayRooms || dayRooms.size === 0) continue;
+    const dayRooms = plans.get(date) ?? [];
+    if (dayRooms.length === 0) continue;
     const dayAssign = assignments.filter((a) => a.workDate === date);
-    const byRoom = new Map<string, string[]>();
-    const byUser = new Map<string, AssignmentRow[]>();
-    for (const row of dayAssign) {
-      byRoom.set(row.roomKey, [...(byRoom.get(row.roomKey) ?? []), row.userId]);
-      byUser.set(row.userId, [...(byUser.get(row.userId) ?? []), row]);
-    }
-    const rooms: SuggestRoom[] = [...dayRooms.values()]
-      // 미루거나 처리 끝낸 방은 하루 보기처럼 제안에서 뺀다.
-      .filter((room) => !held.has(`${date}|${room.roomKey}`))
-      .sort(compareAssignRooms)
-      .map((room) => ({ assigned: byRoom.get(room.roomKey) ?? [], need: Math.max(0, (usual.get(room.roomKey) ?? 1) - (byRoom.get(room.roomKey)?.length ?? 0)), propertyName: room.propertyName, roomKey: room.roomKey }))
-      .filter((room) => room.need > 0);
+    const { suggestPeople: people, suggestRooms: rooms } = suggestInputsForDay({
+      assignments: dayAssign,
+      people: applications
+        .filter((a) => a.workDate === date && !a.cancelledAt)
+        .map((a) => suggestPersonOf(a, memberById.get(a.userId), profileOf(profiles, a.userId), monthDaysOf.get(a.userId)?.size ?? 0)),
+      rooms: dayRooms,
+    });
     openTotal += rooms.filter((room) => room.assigned.length === 0).length;
-    const people: SuggestPerson[] = applications
-      .filter((a) => a.workDate === date && !a.cancelledAt)
-      .map((a) => {
-        const member = memberById.get(a.userId) ?? { role: "part_time_staff" };
-        const profile = profileOf(profiles, a.userId);
-        const mine = byUser.get(a.userId) ?? [];
-        return {
-          monthDays: monthDaysOf.get(a.userId)?.size ?? 0,
-          priority: profile.priority,
-          propertiesToday: [...new Set(mine.map((row) => row.propertyName))],
-          roomsToday: mine.length,
-          startMinutes: a.startMinutes ?? profile.defaultStartMinutes ?? defaultStartMinutes(member.role),
-          trainee: profile.trainee,
-          trainer: isTrainer(member, profile),
-          userId: a.userId,
-        };
-      });
     const day = suggestAssignments({ fixedTiers, people, rooms, rules: settings.rules });
     const filledOpen = new Set(day.map((s) => s.roomKey));
     if (rooms.some((room) => room.assigned.length === 0 && !filledOpen.has(room.roomKey))) shortDays.push(date);
+    leftTotal += leftAfterSuggest(rooms, day);
+    const byKey = new Map(dayRooms.map((room) => [room.roomKey, room]));
     for (const s of day) {
-      const room = dayRooms.get(s.roomKey)!;
+      const room = byKey.get(s.roomKey)!;
       out.push({ ...s, propertyName: room.propertyName, roomLabel: room.roomLabel, workDate: date });
       addWorkDay(s.userId, date);
     }
   }
-  return { openTotal, shortDays, suggestions: out };
+  return { leftTotal, openTotal, shortDays, suggestions: out };
 }
 
 // ── 알바 화면 — 내 시프트 · 오늘 내 방 ─────────────────────────────────────────────────────────
@@ -799,6 +748,8 @@ export type MyShiftDetail = {
   state: ShiftDayState;
   startMinutes: number;
   cancelRequested: boolean;
+  /** 관리자가 그날 일정을 취소함 — 끝낸 방만 남은 날(문서 45 A7). 취소 요청을 내밀지 않는다. */
+  cancelled: boolean;
   rooms: { roomKey: string; propertyName: string; roomLabel: string; mates: string[] }[];
   /** 같이 일하는 사람 — 내가 배정된 날 중 오늘 · 내일만(서버가 거른다). */
   mates: { name: string; rooms: AssignPlace[] }[] | null;
@@ -815,8 +766,9 @@ export async function loadMyShift(
   const days = monthDays(ym);
   const from = days[0] < today ? days[0] : today;
   const to = addDays(today, 7) > days.at(-1)! ? addDays(today, 7) : days.at(-1)!;
-  const [range, myApps, allAssign] = await Promise.all([
-    loadRangeRooms(supabase, organizationId, from, to),
+  // 달력 「배정 없음」은 오늘부터만 미배정 수를 본다(`shiftDayState` — 지난 날은 보지 않는다).
+  const [plans, myApps, allAssign] = await Promise.all([
+    loadRangeDayRooms(supabase, organizationId, from > today ? from : today, to, null),
     loadApplications(supabase, organizationId, from, to, userId),
     loadAssignments(supabase, organizationId, from, to),
   ]);
@@ -838,10 +790,8 @@ export async function loadMyShift(
   };
   const stateOf = (date: string): ShiftDayState => {
     const app = appBy.get(date);
-    const total = range.get(date)?.size ?? 0;
-    const assigned = assignedKeys.get(date) ?? new Set<string>();
-    const open = [...(range.get(date)?.keys() ?? [])].filter((key) => !assigned.has(key)).length;
-    return shiftDayState({ applied: Boolean(app), cancelled: Boolean(app?.cancelledAt), isPast: date < today, myRooms: mineBy.get(date)?.length ?? 0, openRooms: open, totalRooms: total });
+    const list = plans.get(date) ?? [];
+    return shiftDayState({ applied: Boolean(app), cancelled: Boolean(app?.cancelledAt), isPast: date < today, myRooms: mineBy.get(date)?.length ?? 0, openRooms: countOpenRooms(list, assignedKeys.get(date) ?? new Set()), totalRooms: list.length });
   };
   const monthList = days.map((date) => ({
     cancelRequested: Boolean(appBy.get(date)?.cancelRequestedAt) && !appBy.get(date)?.cancelledAt,
@@ -873,6 +823,7 @@ export async function loadMyShift(
     }
     return {
       cancelRequested: Boolean(app?.cancelRequestedAt) && !app?.cancelledAt,
+      cancelled: Boolean(app?.cancelledAt),
       date,
       mates: showMates ? [...matesMap.entries()].map(([id, rooms]) => ({ name: names.get(id) ?? "—", rooms })) : null,
       rooms: mine
@@ -932,11 +883,12 @@ export async function loadTodayRooms(
   tomorrow: { date: string; state: ShiftDayState; rooms: number };
 }> {
   const tomorrow = addDays(date, 1);
-  const [dayRooms, assign, apps, range, stayKeys] = await Promise.all([
-    loadAssignDayRooms(supabase, organizationId, date, null),
+  const shared = createSharedRoomReads(supabase, organizationId, date, tomorrow);
+  const [dayRooms, assign, apps, tomorrowPlans, stayKeys] = await Promise.all([
+    loadAssignDayRooms(supabase, organizationId, date, null, shared),
     loadAssignments(supabase, organizationId, date, tomorrow),
     loadApplications(supabase, organizationId, date, tomorrow, userId),
-    loadRangeRooms(supabase, organizationId, tomorrow, tomorrow),
+    loadRangeDayRooms(supabase, organizationId, tomorrow, tomorrow, null, shared),
     // 청소 종류(표시용)만 쓰는 값 — 못 읽어도 화면 전체를 깨지 않고 체크아웃으로 보인다(시작은 서버가 다시 계산).
     loadStayKeysOrEmpty(supabase, organizationId, date),
   ]);
@@ -957,6 +909,7 @@ export async function loadTodayRooms(
   const usualBy = new Map((ownerRooms.data ?? []).map((row) => [`${row.owner_id}|${row.room_key}`, row.usual_headcount]));
   const profileBy = (owner: string | null, id: string) => (owner ? ownerProfiles.get(`${owner}|${id}`) : undefined);
   const roomBy = new Map(dayRooms.map((room) => [room.roomKey, room]));
+  const activeDefers = mine.some((row) => !roomBy.has(row.roomKey)) ? activeDeferUntil(await shared.holds(date, date), date) : new Map<string, string>();
   const rooms: TodayRoom[] = mine
     .map((row) => {
       const room = roomBy.get(row.roomKey);
@@ -974,7 +927,7 @@ export async function loadTodayRooms(
         arrivingGuestName: null,
         carriedFrom: null,
         carryDays: 0,
-        deferredUntil: null,
+        deferredUntil: activeDefers.get(row.roomKey) ?? null,
         resolvedHold: false,
         hasTurnover: false,
         holdReason: null,
@@ -1007,11 +960,12 @@ export async function loadTodayRooms(
   const app = apps.find((a) => a.workDate === date);
   const base = profileBy(mine[0]?.createdBy ?? null, userId)?.defaultStartMinutes ?? defaultStartMinutes(role);
   const todayTotal = dayRooms.length;
-  const todayOpen = dayRooms.filter((room) => !todayRows.some((r) => r.roomKey === room.roomKey)).length;
+  // 미룸 · 처리 끝 방은 미배정으로 세지 않는다(문서 45 C10).
+  const todayOpen = countOpenRooms(dayRooms, new Set(todayRows.map((row) => row.roomKey)));
   const tApp = apps.find((a) => a.workDate === tomorrow);
   const tRows = assign.filter((row) => row.workDate === tomorrow);
   const tAssigned = new Set(tRows.map((row) => row.roomKey));
-  const tRange = range.get(tomorrow);
+  const tPlan = tomorrowPlans.get(tomorrow) ?? [];
   const tMine = tRows.filter((row) => row.userId === userId).length;
   return {
     changedLastNight: changed.length ? [{ at: changed.at(-1)!.createdAt, rooms: changed.map((row) => ({ propertyName: row.propertyName, roomLabel: row.roomLabel })) }] : [],
@@ -1029,8 +983,8 @@ export async function loadTodayRooms(
         cancelled: Boolean(tApp?.cancelledAt),
         isPast: false,
         myRooms: tMine,
-        openRooms: [...(tRange?.keys() ?? [])].filter((key) => !tAssigned.has(key)).length,
-        totalRooms: tRange?.size ?? 0,
+        openRooms: countOpenRooms(tPlan, tAssigned),
+        totalRooms: tPlan.length,
       }),
     },
   };
@@ -1125,14 +1079,14 @@ export type CompareRow = {
   priority: boolean;
   days: number;
   assigned: number;
-  /** 청소한 방 — 같이 한 방은 나눠 센다(3명이면 0.33). */
+  /** 청소한 방 — 자기 기록이 있는 방만 1개, 나누지 않는다(문서 45 C5). */
   cleaned: number;
   paidMinutes: number;
   pay: number;
 };
 
 /**
- * 사람마다 그달 배정 방 · 청소한 방(그날 그 방 청소 기록이 끝났으면, 같이 들어간 사람 수로 나눔) · 근무 시간 · 급여.
+ * 사람마다 그달 배정 방 · 청소한 방(`cleanedRoomCount`) · 근무 시간 · 급여.
  * 급여는 근태 · 급여 화면과 같은 계산(`getMonthlyPayView`)을 그대로 읽는다 — 급여 계산은 바꾸지 않는다.
  * **호출하는 쪽이 급여 열람 권한을 먼저 확인한다.**
  */
@@ -1151,13 +1105,13 @@ export async function loadCompareRows(
     loadStaffProfiles(supabase, organizationId, ownerId),
     loadFixedTiers(supabase, organizationId, ownerId),
     loadAssignments(supabase, organizationId, from, to),
-    readAllPages<{ room_label: string; cleaning_date: string }>((start, end) =>
+    readAllPages<SessionRow>((start, end) =>
       supabase
         .from("cleaning_sessions")
-        .select("room_label, cleaning_date")
+        .select("room_key, room_label, status, cleaning_date, staff_user_id, closed_without_cleaning")
         .eq("organization_id", organizationId)
+        // 「청소한 기록」 = 완료이고 처리 끝이 아닌 기록(문서 45 표 3).
         .eq("status", "completed")
-        // 「처리 끝」 기록은 청소한 방이 아니다.
         .eq("closed_without_cleaning", false)
         .gte("cleaning_date", from)
         .lte("cleaning_date", to)
@@ -1166,13 +1120,6 @@ export async function loadCompareRows(
     ),
   ]);
   if (sessions.error) throw new Error(sessions.error.message);
-  const done = new Set<string>();
-  for (const row of sessions.data ?? []) {
-    const key = physicalRoomKeyOfSessionLabel(row.room_label);
-    if (key) done.add(`${row.cleaning_date}|${key}`);
-  }
-  const perRoom = new Map<string, number>();
-  for (const row of assignments) perRoom.set(`${row.workDate}|${row.roomKey}`, (perRoom.get(`${row.workDate}|${row.roomKey}`) ?? 0) + 1);
   const userIds = [...new Set(assignments.map((row) => row.userId))];
   const memberById = new Map(members.map((m) => [m.userId, m]));
   const missing = userIds.filter((id) => !memberById.has(id));
@@ -1184,12 +1131,11 @@ export async function loadCompareRows(
   const pays = await Promise.all(userIds.map((id) => payView(id).catch(() => ({ expectedGross: 0, finalizedGross: null, totalPaidMinutes: 0 }))));
   return userIds.map((userId, index) => {
     const mine = assignments.filter((row) => row.userId === userId);
-    const cleaned = mine.reduce((sum, row) => (done.has(`${row.workDate}|${row.roomKey}`) ? sum + 1 / (perRoom.get(`${row.workDate}|${row.roomKey}`) ?? 1) : sum), 0);
     const profile = profileOf(profiles, userId);
     const tiers = Object.values(fixedTiers).map((t) => t[userId]).filter((t): t is number => t !== undefined);
     return {
       assigned: mine.length,
-      cleaned: Math.round(cleaned * 100) / 100,
+      cleaned: cleanedRoomCount(sessions.data ?? [], userId),
       days: new Set(mine.map((row) => row.workDate)).size,
       fixedTier: tiers.length ? Math.min(...tiers) : null,
       name: names.get(userId) ?? "—",

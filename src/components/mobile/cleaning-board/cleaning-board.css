@@ -3,7 +3,7 @@
    docs/product/07-cleaning-workflow.md 「모바일 청소 현황판」 */
 
 .cbd { display: flex; min-height: 100%; color: #16141f; background: #fff; }
-.cbd-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding: 4px 16px 28px; }
+.cbd-col { container-type: inline-size; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding: 4px 16px 28px; }
 
 .cbd-head { display: flex; align-items: flex-end; gap: 12px; }
 .cbd-head__t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -41,9 +41,10 @@
 .cbd-attn { display: flex; flex-direction: column; padding: 2px 0 2px 14px; border-radius: 14px; background: #fff4ea; }
 .cbd-arow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 14px 8px 0; border: 0; border-bottom: .5px solid #f3dcc6; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .cbd-arow:last-child { border-bottom: 0; }
-.cbd-arow .cbd-room { width: auto; min-width: 44px; max-width: 34%; font-size: 17px; }
+.cbd-arow .cbd-room { font-size: 17px; }
 .cbd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.cbd-main span { font-size: 13px; line-height: 18px; color: #6b6878; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 자르지 않고 줄바꿈 — 건물 이름이 긴 STAY ARI 는 폰에서 두 줄을 넘겨 다음 체크인 날짜가 잘렸다. */
+.cbd-main span { font-size: 13px; line-height: 18px; color: #6b6878; overflow-wrap: anywhere; }
 .cbd-warn { font-size: 15px; font-weight: 600; line-height: 20px; color: #b4520a; }
 .cbd-pill { flex: none; padding: 7px 14px; border-radius: 999px; background: #7a52e6; color: #fff; font-size: 15px; font-weight: 600; white-space: nowrap; }
 .cbd-link { flex: none; font-size: 15px; font-weight: 600; color: #7a52e6; white-space: nowrap; }
@@ -61,7 +62,8 @@
 button.cbd-row { cursor: pointer; }
 .cbd-row.is-sel, .cbd-arow.is-sel { background: #f2effc; }
 .cbd-ic { width: 22px; height: 22px; flex: none; }
-.cbd-room { flex: none; width: 76px; font-size: 17px; font-weight: 600; line-height: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 폭을 모든 줄에서 같게 — 건물 이름이 방 이름인 줄(Okubo A)도 다음 글자 시작점이 맞는다. 큰 글자에서는 잘리지 않고 줄바꿈. */
+.cbd-room { flex: none; width: 76px; font-size: 17px; font-weight: 600; line-height: 22px; overflow-wrap: anywhere; }
 .cbd-who { flex: 1; min-width: 0; font-size: 15px; line-height: 20px; color: #3c3a46; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cbd-who.is-open, .cbd-who.is-done { color: #8e8c99; }
 .cbd-st { flex: none; font-size: 15px; line-height: 20px; color: #6b6878; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -112,6 +114,10 @@ button.cbd-row { cursor: pointer; }
 
 @media (min-width: 600px) {
   .cbd-col { padding: 12px 24px 32px; }
+}
+
+/* 2열은 화면 폭이 아니라 **이 칸의 폭**으로 정한다 — 태블릿(1100)은 사이드바 · 오른쪽 칸을 빼면 2열 한 줄이 166px 라 담당자 이름이 사라지고 상태 글자가 넘쳤다. */
+@container (min-width: 720px) {
   .cbd-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 28px; align-items: start; }
 }
 

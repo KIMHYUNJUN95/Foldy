@@ -177,3 +177,11 @@
 @media (prefers-reduced-motion: reduce) {
   .cln-row.is-just, .cln-row__fill, .cln-row__edge, .cln-row__ck, .cln-row__ck path, .cln-note--done { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
+
+/* 지난 날 끝내지 못한 청소 닫기(문서 45 C12) — 오늘 내 방과 같은 두 단추. */
+.cln-stale { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 12px; background: #fdf3e6; color: #6b4210; }
+.cln-stale b { font-size: 15px; font-weight: 700; }
+.cln-stale p { margin: 0; font-size: 13px; line-height: 19px; }
+.cln-stale__hint { opacity: .85; }
+.cln-stale__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.cln-start.is-ghost { background: #fff; color: #16141f; }

@@ -51,6 +51,12 @@ describe("contract build", () => {
 });
 
 describe("staff pin", () => {
+  it("Foldy 건물 설정이 만드는 해시와 같은 값 — 고정 벡터(Foldy checkin-cross-app.test.ts 에도 같은 값)", () => {
+    const stored = "pbkdf2-sha256$120000$MDEyMzQ1Njc4OWFiY2RlZg==$Mj2V/Qp/9Ws/rF9fWcmliH7KRiXnTrYlbfyrrBo7xn8=";
+    expect(hashPin("482913", Buffer.from("0123456789abcdef"))).toBe(stored);
+    expect(verifyPin("482913", stored)).toBe(true);
+  });
+
   it("맞는 PIN 만 통과한다", () => {
     const stored = hashPin("2468");
     expect(verifyPin("2468", stored)).toBe(true);

@@ -1685,3 +1685,13 @@ service_role 권한이 기본으로 붙지 않는다 — 적용 때 `permission 
   `task_participants` 의 문장 단위 AFTER DELETE 트리거로만 불려 지운 행의 할 일 `updated_at` 만 새로 쓴다(삭제 신호 대신). 예: 알바는 참여하지 않은 할 일 · 남의 정정 요청 신호를 받지 않는다.
 - 남이 나를 새 할 일에 넣으면 `tasks` INSERT 는 그 순간 내가 아직 참여자가 아니라 RLS 에 걸려 안 오고, `task_participants`(`user_id=eq.나`) INSERT 가 온다.
 - 클라이언트는 신호만 쓴다(행 값을 화면에 쓰지 않음). 구독 전에 사용자 JWT 를 `realtime.setAuth()` 로 싣는다 — anon 으로 붙으면 org 필터가 거절된다.
+
+## 2026-11-04 셀프 체크인 직원 — `checkin.view` · `checkin.documents` · `checkin.manage` (`202611040001`, 운영 미적용)
+
+- 기본 대표 · 전무, 개발자는 통과(`platformBypass`), 그 밖은 개인 부여만. 기한 · 차단 없음(`ops_admin.access` 와 같은 정책, 43 §8-16).
+- `checkin.view`: 도착 목록 · 명부 · 체크인 코드 보기. `checkin.documents`: 여권 사진 · 얼굴 영상 · 「확인함」. `checkin.manage`: 기기 · 건물 설정.
+- 서버 액션(`src/actions/checkin/*`)은 service_role 로 읽고 쓴다 — 세션의 키를 먼저 보고(`checkinGate`), 모든 쿼리에 세션의 `organization_id` 를 건다. 거부는 redirect 없이 `forbidden`. 다른 조직 줄은 `not_found`.
+- **`checkin` 스키마에는 authenticated · anon 권한도 RLS 정책도 없다**(RLS 만 켜짐 = service_role 외 전부 거부, 2026-11-04 독립 검사로 제거). 스키마를 API 에 노출해도 직원 JWT 로 읽거나 `audit_log` 를 쓸 수 없다. 권한 판정은 서버의 `checkinGate` 한 곳뿐이라 두 번째 벽이 없다 — service 클라이언트를 쓰는 새 액션은 반드시 이 문을 먼저 지난다. `checkin.*` 키는 `has_capability` 로 판정 가능하게 등록돼 있지만 이 표들의 정책에는 쓰이지 않는다.
+- 등록 코드: 화면 「새 코드」는 코드 값 + 조직 + 발급자 + 미사용 조건으로 그 코드 하나만 끝내고 기록한다(값 없음). 다른 사람 코드 값을 넘겨도 끝나지 않는다. 발급이나 패널 닫기로는 앞 코드가 끝나지 않아, 한 사람이 살아 있는 코드를 여러 개 가질 수 있다(각각 최대 10분, 연달아 등록하는 흐름). 태블릿 등록이 코드의 `created_by` 를 `devices.registered_by` 로 옮기고 `device_enrolled` 기록을 남긴다.
+- 민감 응답: 파일은 서명 URL 3분 · 볼 때마다 기록, `checkin.documents` 없으면 파일 줄 없음. 체크인 코드는 별도 액션 · 볼 때마다 기록(값 없음). `storage_path` · `mrz_raw` · `token_hash` · `staff_pin_hash` 는 화면으로 보내지 않는다.
+- 확인: 로컬 PGlite 에 마이그레이션을 돌려 표 13 · 정책 0 · RLS 전부 켜짐, authenticated · anon 의 SELECT · `audit_log` INSERT 거부(42501), service_role 쓰기 통과를 봤다(Supabase 역할 · `auth` · `storage` 는 흉내, 2026-11-04). 서버 액션 테스트는 가짜 DB 이고 Supabase 실제 프로젝트에서는 아직 안 돌려 봤다. 적용 전 할 일: 마이그레이션 2 + 1개 적용(사용자 컨펌) · API 노출 스키마에 `checkin` 추가.

@@ -2383,3 +2383,14 @@ RLS 켜짐 · 정책 없음 — service_role 만(GRANT `all to service_role`).
 `supabase_realtime` publication 에 들어간다(기존: `reservations` · `annual_leave_requests` · `job_applications`). replica identity 는 기본값 그대로 —
 INSERT · UPDATE 신호만, DELETE 는 오지 않는다. 대신 `task_occurrence_state` · `task_participants` 삭제는 트리거
 `task_occurrence_state_touch_task` · `task_participants_touch_task`(함수 `touch_task_after_child_delete`)가 부모 `tasks.updated_at` 을 새로 써 UPDATE 신호를 낸다. 화면 쪽: `src/lib/live-sources.ts` · `src/components/shared/live-refresh.tsx`.
+
+## 2026-11-02 · 11-04 `checkin` 스키마 — 셀프 체크인 (`202611020001` · `202611020002`, 운영 미적용)
+
+표 정의는 `docs/engineering/16-self-checkin-technical-design.md` §3. Foldy 직원 서버(2026-11-04)가 읽고 쓰는 범위만 적는다.
+
+- 타입: `src/types/database.ts` 의 `checkin` 스키마(직원 화면이 쓰는 10개 표, `claim_attempts` · `stay_tokens` · `deletions` 는 체크인 앱 전용이라 없음).
+- 읽기: `stays` · `stay_rooms` · `guests` · `guest_documents` · `consents` · `sessions` · `devices` · `property_settings`. `public.reservations`(예약자 이름 · 채널) · `public.profiles`(이름)도 함께.
+- 쓰기: `stays.verified_at` · `verified_by` · `updated_at`, `enrollment_codes` 추가 · 코드 하나의 `expires_at` 앞당기기, `devices.name` · `revoked_at`, `property_settings` 조건부 update · insert, `audit_log` 추가. 지우는 길은 없다. 태블릿 등록(`apps/checkin`)은 `devices.registered_by` 를 코드의 `created_by` 로 채운다.
+- 접근: service_role 만. authenticated · anon 에는 스키마 usage · 표 권한 · RLS 정책이 없다(직원 JWT 로 직접 읽는 길 없음).
+- check 제약: `property_settings.idle_seconds_input` 30~900 · `idle_seconds_done` 5~120(계약 스키마와 같음).
+- 평문 칼럼: `enrollment_codes.code`(8자리) · `stays.checkin_code`(6자리). 해시: `devices.token_hash`(sha256) · `property_settings.staff_pin_hash`(pbkdf2).

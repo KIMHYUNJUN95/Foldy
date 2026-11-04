@@ -6,16 +6,17 @@
 -- 원칙(43 §8-9): 기존 Foldy 에 영향 없음.
 --   · `public` 표는 바꾸지 않는다. `checkin` → `public` 외래 키도 두지 않는다(id 값만 저장).
 --   · 손님 · 태블릿의 쓰기는 전부 `apps/checkin` 서버 라우트(service_role). anon 정책 없음.
---   · 직원(Foldy 로그인)은 **읽기만** — 권한 `checkin.view` / `checkin.documents` / `checkin.manage`.
---     권한 키 등록(capability_roles · capability_policies)은 직원 화면 단계에서 따로 넣는다.
---     그 전까지 `has_capability()` 는 플랫폼 개발자만 true → 직원은 아무것도 못 본다(안전한 기본값).
+--   · 직원 화면(Foldy)도 서버 액션 + service_role 만 쓴다 — 권한 키(`checkin.*`)는 앱 서버가 본다(`checkinGate`).
+--     authenticated 에는 스키마 usage · 표 권한 · 정책을 **주지 않는다**. 스키마를 API 에 노출하면 직원 JWT 로
+--     체크인 코드 · 여권 번호 · MRZ · 기기 토큰 해시 · PIN 해시를 기록 없이 읽고, 기록(audit_log)을 위조할 수 있기 때문이다(2026-11-04 독립 검사).
+--     RLS 는 켠 채로 정책 없이 둔다 = service_role 말고는 전부 거부.
 --   · delete 정책 없음(43 §8-14). 자동 삭제는 서버 크론(`jobs/retention`)이 service_role 로.
 --   · 자식 표에도 organization_id 를 둔다 — RLS 가 부모 join 없이 한 줄로 판단(16 §3 보다 한 칸 추가).
 
 create schema if not exists checkin;
 
-revoke all on schema checkin from public, anon;
-grant usage on schema checkin to authenticated, service_role;
+revoke all on schema checkin from public, anon, authenticated;
+grant usage on schema checkin to service_role;
 
 -- ── 기기 ────────────────────────────────────────────────────────────────────
 create table checkin.devices (
@@ -57,8 +58,9 @@ create table checkin.property_settings (
   required_fields jsonb not null default '[]'::jsonb,
   video_seconds_per_guest smallint not null default 5 check (video_seconds_per_guest between 3 and 15),
   support_contacts jsonb not null default '{}'::jsonb,
-  idle_seconds_input smallint not null default 240,
-  idle_seconds_done smallint not null default 30,
+  -- 범위는 계약 스키마(apps/checkin contract/schema.ts)와 같다 — 어긋나면 태블릿이 계약을 받지 못한다.
+  idle_seconds_input smallint not null default 240 check (idle_seconds_input between 30 and 900),
+  idle_seconds_done smallint not null default 30 check (idle_seconds_done between 5 and 120),
   verification_method text not null default 'video'
     check (verification_method in ('video', 'staff_call', 'auto_match')),
   staff_pin_hash text,
@@ -216,8 +218,6 @@ create table checkin.deletions (
 );
 
 -- ── 권한 · RLS ──────────────────────────────────────────────────────────────
-grant select on all tables in schema checkin to authenticated;
-grant insert on checkin.audit_log to authenticated;
 grant all on all tables in schema checkin to service_role;
 grant usage, select on all sequences in schema checkin to service_role;
 
@@ -232,42 +232,6 @@ alter table checkin.consents enable row level security;
 alter table checkin.sessions enable row level security;
 alter table checkin.audit_log enable row level security;
 alter table checkin.deletions enable row level security;
-
--- 현황 · 명부: checkin.view
-create policy "checkin viewers read stays" on checkin.stays for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.view'));
-create policy "checkin viewers read stay rooms" on checkin.stay_rooms for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.view'));
-create policy "checkin viewers read guests" on checkin.guests for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.view'));
-create policy "checkin viewers read consents" on checkin.consents for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.view'));
-create policy "checkin viewers read sessions" on checkin.sessions for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.view'));
-
--- 여권 사진 · 동영상 줄: checkin.documents (파일 자체는 서버가 1~5분 서명 URL 로만 준다)
-create policy "checkin document viewers read documents" on checkin.guest_documents for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.documents'));
-
--- 기기 · 건물 설정 · 기록: checkin.manage
-create policy "checkin managers read devices" on checkin.devices for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.manage'));
-create policy "checkin managers read enrollment codes" on checkin.enrollment_codes for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.manage'));
-create policy "checkin managers read property settings" on checkin.property_settings for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.manage'));
-create policy "checkin managers read audit log" on checkin.audit_log for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.manage'));
-create policy "checkin managers read deletions" on checkin.deletions for select to authenticated
-  using (public.has_capability(organization_id, (select auth.uid()), 'checkin.manage'));
-
--- 기록은 본인 이름으로 넣기만(열람 · 내보내기 기록). update · delete 정책 없음.
-create policy "checkin viewers write own audit rows" on checkin.audit_log for insert to authenticated
-  with check (
-    actor_user_id = (select auth.uid())
-    and device_id is null
-    and public.has_capability(organization_id, (select auth.uid()), 'checkin.view')
-  );
 
 -- ── 파일 버킷(비공개) ───────────────────────────────────────────────────────
 -- storage.objects 정책은 두지 않는다: 업로드 · 열람 모두 서버가 만든 서명 URL 로만.

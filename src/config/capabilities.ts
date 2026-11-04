@@ -615,6 +615,40 @@ export const CAPABILITIES = {
     systemOnly: false,
     developerOnly: false,
   },
+  /**
+   * 셀프 체크인 직원 화면(2026-11-04, docs/product/44 FR-S09 · 43 §8-16) — 기본 대표 · 전무 · 개발자, 그 밖은 개인 부여만.
+   * `ops_admin.access` 와 같은 정책: 상시 업무라 기한 없음, 역할로 받는 사람이 차단 면역이라 차단 없음.
+   * 현황 · 명부 · 체크인 코드 보기.
+   */
+  "checkin.view": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 여권 사진 · 얼굴 영상 열람(1~5분 서명 URL, 볼 때마다 기록)과 그것을 보고 남기는 「확인함」. */
+  "checkin.documents": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
+  /** 태블릿 등록 코드 · 기기 관리 · 건물 설정. */
+  "checkin.manage": {
+    roles: ["owner", "senior_managing_director"],
+    individualGrant: true,
+    individualDeny: false,
+    asksExpiry: false,
+    platformBypass: true,
+    systemOnly: false,
+    developerOnly: false,
+  },
 } as const satisfies Record<string, CapabilityPolicy>;
 
 export type Capability = keyof typeof CAPABILITIES;

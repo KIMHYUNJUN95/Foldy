@@ -188,6 +188,9 @@ ops_admin.access            운영 관리자 영역 전체    ← 2026-09-17 추
 room_links.access           룸 링크                 ← 2026-10-02 추가
 board.moderate              게시판 신고 처리         ← 2026-10-06 추가
 automation.manage           자동화 설정 · 발송       ← 2026-10-06 추가 (역할 기본 없음 — 개인 부여만)
+checkin.view                셀프 체크인 현황 · 명부 · 코드 보기  ← 2026-11-04 추가
+checkin.documents           여권 사진 · 얼굴 영상 · 「확인함」   ← 2026-11-04 추가
+checkin.manage              체크인 기기 · 건물 설정             ← 2026-11-04 추가
 ```
 
 **`board.moderate`**(2026-10-06) — 게시판 신고 처리(모바일 `/mobile/board/reports` · 관리 `/admin/board-reports`). 역할 owner · office_admin
@@ -212,6 +215,8 @@ docs/product/36-automation-control.md.
 RLS 에서도 같은 키로 판정한다: `beds24_price_jobs` · `price_change_logs` · `beds24_block_logs` 의 SELECT 는
 `capability_organization_ids('ops_admin.access')`(= 호출자가 `has_capability` 참인 조직 목록)로 좁혀져 있다
 (2026-09-30, `202609300007`, docs/engineering/05-rls-permissions.md).
+
+**`checkin.*`**(2026-11-04) — 셀프 체크인 직원 화면. 대표 · 전무 역할, 개인 부여, 기한 · 차단 없음, 개발자 통과(`ops_admin.access` 와 같은 정책, 43 §8-16). 사용자 화면 권한 묶음 「셀프 체크인」. 판정은 `checkinGate`(`src/lib/checkin/server.ts`) 한 곳. DB 반영: `202611040001_checkin_capabilities.sql`(운영 미적용). docs/engineering/16 §4-1.
 
 앞으로 추가될 것(5단계에서 해당 기능을 옮길 때): `payroll.view` 등.
 

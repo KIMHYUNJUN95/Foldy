@@ -243,6 +243,14 @@ Electron 은 쓰지 않는다(설치 파일이 크다).
 - Maintenance (정비·시설)
 - Lost & Found (분실물)
 - Orders (주문·비품)
+- **Self check-in (셀프 체크인)** — `/admin/checkin`(+ `/devices` · `/settings`), 사이드바 항목은 `checkin.view` 가 있는 사람만(2026-11-04, 시안 S1 · S1c · S1d · S7 · S7b · S8).
+  탭 3개 — **오늘**(`checkin.view`): 공용 단일 날짜 피커(`AdminDatePicker`) + 건물 `AdmDropdown` + 요약(도착 · 체크인 됨 · 진행 중 · 도착 전 · 확인 필요) +
+  할 일 순 묶음(확인 필요 → 진행 중 → 도착 전 → 끝남) 목록, 줄 → 오른쪽 패널(인원 경고 · 체크인 코드 칸 · 사람별 명부 탭 · 여권 사진/영상(`checkin.documents`, 누를 때 서명 URL) ·
+  MRZ · 빠진 칸 · 동의 · 「확인함」). **기기**(`checkin.manage`): 목록 + 「기기 추가」(8자리 등록 코드, 한 번만 보임) + 이름 바꾸기 + 폐기(확인 창).
+  **건물 설정**(`checkin.manage`): 건물 고르고 언어 · 환영 문구 · 약관 · 동영상 초 · 연락처 · 직원 PIN(「설정됨」만, 값은 안 보임) 저장, 서버 `invalid.field` 는 해당 구역 옆에 표시.
+  탭은 링크(주소 이동), `checkin.manage` 가 없으면 「오늘」 탭만 보인다. 권한이 없으면 `AdminNoAccess`, 데이터가 아직 연결 전이면(`not_ready`) 「아직 준비 중」 빈 상태.
+  새 공용 프리미티브는 만들지 않고 `AdminDatePicker` · `AdmDropdown` · `useAdminPanelA11y` · `AdminToast` · 공용 `.panel` / `.modal` 위에 화면 고유 스타일만
+  `src/components/admin/checkin/checkin.css`(`.ck-*`)로 얹는다. 대신 입력(FR-S04) · 어제 이전 미체크인(S03) · 내보내기(S05)는 P1. docs/product/44 §4-4
 
 ### 인력 (People)
 

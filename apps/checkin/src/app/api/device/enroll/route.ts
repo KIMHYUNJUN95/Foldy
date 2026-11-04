@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       .eq("code", input.code)
       .is("used_at", null)
       .gt("expires_at", now.toISOString())
-      .select("organization_id, property_key, device_name")
+      .select("organization_id, property_key, device_name, created_by")
       .maybeSingle();
     if (codeError) throw new Error(codeError.message);
     await db.from("claim_attempts").insert({ key_hash: keyHash, ip_hash: ipHash, succeeded: !!code });
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
         property_key: code.property_key,
         name: code.device_name,
         token_hash: token.hash,
+        registered_by: code.created_by,
         last_seen_at: now.toISOString(),
         device_model: input.deviceModel ?? null,
         os_version: input.osVersion ?? null,
@@ -68,6 +69,16 @@ export async function POST(request: Request) {
       .select("id, property_key, name")
       .single();
     if (deviceError) throw new Error(deviceError.message);
+
+    // 기기는 이미 등록됐다 — 기록 실패로 토큰을 잃으면 코드만 날아가므로 로그만 남기고 성공으로 답한다.
+    const { error: auditError } = await db.from("audit_log").insert({
+      organization_id: code.organization_id,
+      actor_user_id: code.created_by,
+      device_id: device.id,
+      action: "device_enrolled",
+      meta: { property_key: code.property_key },
+    });
+    if (auditError) console.error("[device-enroll] audit_log 쓰기 실패:", auditError.message);
 
     return json({ ok: true, token: token.raw, device: { id: device.id, propertyKey: device.property_key, name: device.name } });
   } catch (error) {

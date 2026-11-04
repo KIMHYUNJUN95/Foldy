@@ -31,6 +31,7 @@ import {
   TrendingUp,
   Undo2,
   UserCog,
+  UserRoundCheck,
   UserSearch,
   Users,
   Wallet,
@@ -476,6 +477,14 @@ export const adminNavigation = [
     href: "/admin/complaints",
     icon: MessageSquareWarning,
   },
+  // 셀프 체크인(2026-11-04) — 도착 목록 · 기기 · 건물 설정. 보기 권한 `checkin.view` 가 있는 사람에게만 보인다. docs/product/44 §4-4
+  {
+    id: "checkin",
+    capability: "checkin.view",
+    label: localizedNavigationLabels.admin.checkin,
+    href: "/admin/checkin",
+    icon: UserRoundCheck,
+  },
   {
     id: "recruit",
     // 지원서는 민감 개인정보다 — 대표·전무 + 지정된 개인만 본다(2026-09-10 결정).
@@ -601,6 +610,7 @@ export const adminNavGroupOf: Record<string, AdminNavGroupKey> = {
   "linen-return": "operations",
   orders: "operations",
   complaints: "operations",
+  checkin: "operations",
   // 채용은 사람을 다루므로 「인력」 묶음이다 — 근태·사용자와 같은 자리.
   recruit: "people",
   // 인력

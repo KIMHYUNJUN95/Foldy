@@ -34,7 +34,7 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
       if (op === "update") {
         for (const row of matched) Object.assign(row, payload as Row);
         writes.push({ matched, op, payload, table });
-        return { data: matched, error: null };
+        return { data: single ? (matched[0] ?? null) : matched, error: null };
       }
       if (op === "delete") {
         tables[table] = rows().filter((row) => !matched.includes(row));
@@ -70,6 +70,10 @@ export function createFakeSupabase(tables: Record<string, Row[]>) {
       },
       gte(column: string, value: unknown) {
         filters.push((row) => String(row[column]) >= String(value));
+        return api;
+      },
+      gt(column: string, value: unknown) {
+        filters.push((row) => String(row[column]) > String(value));
         return api;
       },
       in(column: string, values: unknown[]) {

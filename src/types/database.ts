@@ -12,6 +12,494 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  // 셀프 체크인 스키마(202611020001 · 0002). 직원 화면이 쓰는 표만 — claim_attempts · stay_tokens · deletions 는 apps/checkin 전용.
+  checkin: {
+    Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          at: string
+          device_id: string | null
+          document_id: string | null
+          guest_id: string | null
+          id: number
+          meta: Json
+          organization_id: string
+          stay_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          at?: string
+          device_id?: string | null
+          document_id?: string | null
+          guest_id?: string | null
+          id?: number
+          meta?: Json
+          organization_id: string
+          stay_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          at?: string
+          device_id?: string | null
+          document_id?: string | null
+          guest_id?: string | null
+          id?: number
+          meta?: Json
+          organization_id?: string
+          stay_id?: string | null
+        }
+        Relationships: []
+      }
+      consents: {
+        Row: {
+          agreed_at: string
+          device_id: string | null
+          guest_id: string | null
+          id: string
+          locale: string
+          organization_id: string
+          stay_id: string
+          terms_version: number
+        }
+        Insert: {
+          agreed_at?: string
+          device_id?: string | null
+          guest_id?: string | null
+          id?: string
+          locale: string
+          organization_id: string
+          stay_id: string
+          terms_version: number
+        }
+        Update: {
+          agreed_at?: string
+          device_id?: string | null
+          guest_id?: string | null
+          id?: string
+          locale?: string
+          organization_id?: string
+          stay_id?: string
+          terms_version?: number
+        }
+        Relationships: []
+      }
+      devices: {
+        Row: {
+          app_version: string | null
+          battery: number | null
+          device_model: string | null
+          id: string
+          last_seen_at: string | null
+          name: string
+          organization_id: string
+          os_version: string | null
+          property_key: string
+          registered_at: string
+          registered_by: string | null
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          app_version?: string | null
+          battery?: number | null
+          device_model?: string | null
+          id?: string
+          last_seen_at?: string | null
+          name: string
+          organization_id: string
+          os_version?: string | null
+          property_key: string
+          registered_at?: string
+          registered_by?: string | null
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          app_version?: string | null
+          battery?: number | null
+          device_model?: string | null
+          id?: string
+          last_seen_at?: string | null
+          name?: string
+          organization_id?: string
+          os_version?: string | null
+          property_key?: string
+          registered_at?: string
+          registered_by?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      enrollment_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          device_name: string
+          expires_at: string
+          organization_id: string
+          property_key: string
+          used_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          device_name: string
+          expires_at?: string
+          organization_id: string
+          property_key: string
+          used_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          device_name?: string
+          expires_at?: string
+          organization_id?: string
+          property_key?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
+      guest_documents: {
+        Row: {
+          byte_size: number | null
+          captured_at: string
+          captured_on: string
+          device_id: string | null
+          duration_s: number | null
+          guest_id: string
+          height: number | null
+          id: string
+          kind: string
+          organization_id: string
+          replaced_by: string | null
+          retain_until: string | null
+          sha256: string | null
+          storage_path: string
+          width: number | null
+        }
+        Insert: {
+          byte_size?: number | null
+          captured_at?: string
+          captured_on: string
+          device_id?: string | null
+          duration_s?: number | null
+          guest_id: string
+          height?: number | null
+          id?: string
+          kind: string
+          organization_id: string
+          replaced_by?: string | null
+          retain_until?: string | null
+          sha256?: string | null
+          storage_path: string
+          width?: number | null
+        }
+        Update: {
+          byte_size?: number | null
+          captured_at?: string
+          captured_on?: string
+          device_id?: string | null
+          duration_s?: number | null
+          guest_id?: string
+          height?: number | null
+          id?: string
+          kind?: string
+          organization_id?: string
+          replaced_by?: string | null
+          retain_until?: string | null
+          sha256?: string | null
+          storage_path?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
+      guests: {
+        Row: {
+          address: string | null
+          age: number | null
+          contact: string | null
+          created_at: string
+          gender: string | null
+          guest_type: string
+          has_japan_address: boolean | null
+          id: string
+          is_representative: boolean
+          mrz_raw: string | null
+          mrz_valid: boolean | null
+          name_roman: string | null
+          nationality: string | null
+          next_dest: string | null
+          no_passport_reason: string | null
+          organization_id: string
+          passport_number: string | null
+          prev_stay: string | null
+          source: string
+          stay_id: string
+          stay_room_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          age?: number | null
+          contact?: string | null
+          created_at?: string
+          gender?: string | null
+          guest_type?: string
+          has_japan_address?: boolean | null
+          id?: string
+          is_representative?: boolean
+          mrz_raw?: string | null
+          mrz_valid?: boolean | null
+          name_roman?: string | null
+          nationality?: string | null
+          next_dest?: string | null
+          no_passport_reason?: string | null
+          organization_id: string
+          passport_number?: string | null
+          prev_stay?: string | null
+          source?: string
+          stay_id: string
+          stay_room_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          age?: number | null
+          contact?: string | null
+          created_at?: string
+          gender?: string | null
+          guest_type?: string
+          has_japan_address?: boolean | null
+          id?: string
+          is_representative?: boolean
+          mrz_raw?: string | null
+          mrz_valid?: boolean | null
+          name_roman?: string | null
+          nationality?: string | null
+          next_dest?: string | null
+          no_passport_reason?: string | null
+          organization_id?: string
+          passport_number?: string | null
+          prev_stay?: string | null
+          source?: string
+          stay_id?: string
+          stay_room_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      property_settings: {
+        Row: {
+          idle_seconds_done: number
+          idle_seconds_input: number
+          languages: string[]
+          mrz_autofill: boolean
+          organization_id: string
+          property_key: string
+          required_fields: Json
+          staff_pin_hash: string | null
+          support_contacts: Json
+          terms_text: Json
+          terms_version: number
+          updated_at: string
+          updated_by: string | null
+          verification_method: string
+          video_seconds_per_guest: number
+          welcome_text: Json
+        }
+        Insert: {
+          idle_seconds_done?: number
+          idle_seconds_input?: number
+          languages?: string[]
+          mrz_autofill?: boolean
+          organization_id: string
+          property_key: string
+          required_fields?: Json
+          staff_pin_hash?: string | null
+          support_contacts?: Json
+          terms_text?: Json
+          terms_version?: number
+          updated_at?: string
+          updated_by?: string | null
+          verification_method?: string
+          video_seconds_per_guest?: number
+          welcome_text?: Json
+        }
+        Update: {
+          idle_seconds_done?: number
+          idle_seconds_input?: number
+          languages?: string[]
+          mrz_autofill?: boolean
+          organization_id?: string
+          property_key?: string
+          required_fields?: Json
+          staff_pin_hash?: string | null
+          support_contacts?: Json
+          terms_text?: Json
+          terms_version?: number
+          updated_at?: string
+          updated_by?: string | null
+          verification_method?: string
+          video_seconds_per_guest?: number
+          welcome_text?: Json
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          abandoned_at: string | null
+          device_id: string | null
+          finished_at: string | null
+          id: string
+          last_step: string | null
+          locked_until: string | null
+          organization_id: string
+          started_at: string
+          stay_id: string
+          step_payload: Json
+        }
+        Insert: {
+          abandoned_at?: string | null
+          device_id?: string | null
+          finished_at?: string | null
+          id?: string
+          last_step?: string | null
+          locked_until?: string | null
+          organization_id: string
+          started_at?: string
+          stay_id: string
+          step_payload?: Json
+        }
+        Update: {
+          abandoned_at?: string | null
+          device_id?: string | null
+          finished_at?: string | null
+          id?: string
+          last_step?: string | null
+          locked_until?: string | null
+          organization_id?: string
+          started_at?: string
+          stay_id?: string
+          step_payload?: Json
+        }
+        Relationships: []
+      }
+      stay_rooms: {
+        Row: {
+          id: string
+          organization_id: string
+          reservation_id: string
+          room_id: string | null
+          room_label: string
+          stay_id: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          reservation_id: string
+          room_id?: string | null
+          room_label: string
+          stay_id: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          reservation_id?: string
+          room_id?: string | null
+          room_label?: string
+          stay_id?: string
+        }
+        Relationships: []
+      }
+      stays: {
+        Row: {
+          check_in_date: string
+          check_out_date: string
+          checked_in_at: string | null
+          checkin_code: string | null
+          created_at: string
+          guest_count_expected: number
+          id: string
+          organization_id: string
+          party_size: number | null
+          pre_reg_sent_at: string | null
+          pre_reg_token_hash: string | null
+          property_key: string
+          reminded_at: string | null
+          reservation_group_key: string
+          retain_until: string | null
+          status: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          check_in_date: string
+          check_out_date: string
+          checked_in_at?: string | null
+          checkin_code?: string | null
+          created_at?: string
+          guest_count_expected?: number
+          id?: string
+          organization_id: string
+          party_size?: number | null
+          pre_reg_sent_at?: string | null
+          pre_reg_token_hash?: string | null
+          property_key: string
+          reminded_at?: string | null
+          reservation_group_key: string
+          retain_until?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          check_in_date?: string
+          check_out_date?: string
+          checked_in_at?: string | null
+          checkin_code?: string | null
+          created_at?: string
+          guest_count_expected?: number
+          id?: string
+          organization_id?: string
+          party_size?: number | null
+          pre_reg_sent_at?: string | null
+          pre_reg_token_hash?: string | null
+          property_key?: string
+          reminded_at?: string | null
+          reservation_group_key?: string
+          retain_until?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       announcement_comments: {

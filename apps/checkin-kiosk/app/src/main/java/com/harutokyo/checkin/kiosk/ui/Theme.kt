@@ -1,6 +1,8 @@
 package com.harutokyo.checkin.kiosk.ui
 
+import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.content.res.Resources
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,7 +44,12 @@ fun Localized(code: String, content: @Composable () -> Unit) {
     val configuration = LocalConfiguration.current
     val localized = remember(code, configuration) {
         val config = Configuration(configuration).apply { setLocale(localeOf(code)) }
-        base.createConfigurationContext(config)
+        // createConfigurationContext 의 결과는 Activity 를 감싸지 않아 카메라 권한 요청(ActivityResultRegistryOwner) 등이
+        // Activity 를 못 찾는다. Activity 를 감싼 채 resources 만 그 언어 것으로 바꾼다.
+        val localizedResources = base.createConfigurationContext(config).resources
+        object : ContextWrapper(base) {
+            override fun getResources(): Resources = localizedResources
+        }
     }
     CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides localized.resources.configuration) {
         content()

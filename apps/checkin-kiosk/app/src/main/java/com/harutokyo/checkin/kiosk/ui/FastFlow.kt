@@ -107,6 +107,8 @@ fun FastCheckin(
     onBack: () -> Unit,
     onCall: () -> Unit,
     onStep: (String) -> Unit,
+    /** 이름으로 찾은 예약인가 — 여권이 저장돼야 방 비밀번호를 보여 주므로, 여권 없이 가려는 분께 미리 알린다. */
+    byName: Boolean,
     onDone: () -> Unit,
 ) {
     val stayNow by rememberUpdatedState(stay)
@@ -171,6 +173,17 @@ fun FastCheckin(
     fun saveCapture(c: Captured, guest: KioskGuest?) {
         val mrz = c.mrz ?: return
         if (savingCapture) return
+        // 성별 X · 읽히지 않은 생년월일이면 서버에 저장하지 않는다(저장하면 자리가 끝난 것으로 보이고 마지막에 막힌다) — 확인 화면에서 채운다.
+        if (!mrzDraftComplete(mrz)) {
+            reason = null
+            captured = c
+            mode = FormMode.Mrz
+            passportRead = true
+            faceId = null
+            faceBroken = false
+            phase = FastPhase.Confirm
+            return
+        }
         savingCapture = true
         reason = null
         faceBroken = false
@@ -326,6 +339,7 @@ fun FastCheckin(
         FastPhase.NoPassport -> NoPassportScreen(
             who = header,
             cameraOff = reason == NoPassport.CameraOff,
+            proofNotice = proofNoticeNeeded(byName, people),
             onBack = {
                 reason = null
                 phase = FastPhase.Passport
@@ -545,7 +559,8 @@ fun ScanScreen(
                     scanner = scanner,
                     height = 560.dp,
                     onCaptured = { shot ->
-                        if (shot.mrz == null) {
+                        // 못 읽었거나 검사 숫자가 틀리게 읽혔다 — 알리고 다시 읽는다(틀린 읽기는 예약 찾기에 보내지 않는다).
+                        if (shot.mrz == null || !shot.mrz.valid) {
                             unreadable = true
                             scanKey += 1
                         } else if (!working) {
@@ -863,7 +878,7 @@ private fun ReviewScreen(
     // 나라 이름: 여권 국적을 그 언어로 보여 주고, 명부에는 영어 이름으로 쓴다. 국적을 모르면 직접 쓴다.
     val countryShown = if (countryCode.isNotBlank()) countryName(countryCode, locale) else ""
     val countryStored = if (countryCode.isNotBlank()) countryName(countryCode, Locale.ENGLISH) else typedCountry
-    val ready = (!askPlace || (city.isNotBlank() && countryStored.isNotBlank())) && (!askContact || contact.isNotBlank())
+    val ready = reviewReady(stay, people) && (!askPlace || (city.isNotBlank() && countryStored.isNotBlank())) && (!askContact || contact.isNotBlank())
 
     ScrollPage(bottom = {
         Column {
@@ -1042,6 +1057,8 @@ private fun FinalScreen(
                         onSessionGone()
                         return@launch
                     }
+                    // 네트워크로 못 올린 사진 · 영상이 남았다 — 완료하면 예약이 닫혀 다시 못 보내므로 여기서 붙잡는다(다시 시도 · 직원 호출).
+                    // 서버가 영구 거절한 것(GiveUp)은 줄에 안 남아 막지 않는다 — 서버가 직원 확인으로 센다.
                     is UploadWait.Failed -> ok = false
                 }
             }

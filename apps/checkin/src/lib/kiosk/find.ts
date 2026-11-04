@@ -38,18 +38,19 @@ export function passportSearchDates(now: Date): string[] {
  * 여권 MRZ(성 · 이름들)로 예약 찾기. sameName 이거나, 예약 이름이 2단어 이상이고 모두 여권 단어 안에 있으며
  * 여권 성 단어가 예약 이름 안에 있으면 맞다(「Daniel Hu」 ↔ HU / DANIEL JAMES). 한 예약에만 맞을 때만 연다.
  */
-export function passportHits(candidates: NameCandidate[], surname: string, givenNames: string): string[] {
+/** 예약 이름 하나가 여권(성 · 이름들)에 맞는지 — 찾기와 본인 확인이 같은 판정을 쓴다. */
+export function nameMatchesPassport(bookedName: string, surname: string, givenNames: string): boolean {
+  if (sameName(bookedName, surname, givenNames)) return true;
   const surnameTokens = nameTokens(surname);
   const passportTokens = new Set([...surnameTokens, ...nameTokens(givenNames)]);
+  const booked = nameTokens(bookedName);
+  if (booked.length < 2 || surnameTokens.length === 0) return false;
+  return booked.every((token) => passportTokens.has(token)) && surnameTokens.every((token) => booked.includes(token));
+}
+
+export function passportHits(candidates: NameCandidate[], surname: string, givenNames: string): string[] {
   return candidates
-    .filter((candidate) =>
-      candidate.guestNames.some((name) => {
-        if (sameName(name, surname, givenNames)) return true;
-        const booked = nameTokens(name);
-        if (booked.length < 2 || surnameTokens.length === 0) return false;
-        return booked.every((token) => passportTokens.has(token)) && surnameTokens.every((token) => booked.includes(token));
-      }),
-    )
+    .filter((candidate) => candidate.guestNames.some((name) => nameMatchesPassport(name, surname, givenNames)))
     .map((candidate) => candidate.stayId);
 }
 
@@ -59,7 +60,9 @@ export function matchByPassport(candidates: NameCandidate[], surname: string, gi
 }
 
 /**
- * 취소 · 만료 예약은 빼고, 여럿이 맞으면 체크인 전인 것 → 오늘 도착인 것 순으로 좁힌다. 그래도 하나가 아니면 열지 않는다.
+ * 취소 · 만료 예약은 빼고 여권 이름으로 찾는다. 체크인 끝난 stay(묵는 중) 와 겹치면 어느 쪽인지 알 수 없으므로 열지 않는다
+ * (묵는 중인 동명이인이 오늘 도착하는 사람의 예약으로 들어가는 것을 막는다) — 손님은 코드나 이름으로 찾는다.
+ * 후보가 전부 도착 예정이면 예전 규칙대로 오늘 도착인 것으로 좁힌다. 그래도 하나가 아니면 열지 않는다.
  */
 export function matchByPassportStays(
   candidates: NameCandidate[],
@@ -70,10 +73,7 @@ export function matchByPassportStays(
 ): string | null {
   const live = new Map(stays.filter((stay) => stay.status !== "cancelled" && stay.status !== "expired").map((stay) => [stay.id, stay]));
   let ids = passportHits(candidates.filter((candidate) => live.has(candidate.stayId)), surname, givenNames);
-  if (ids.length > 1) {
-    const notDone = ids.filter((id) => live.get(id)?.status !== "checked_in");
-    if (notDone.length > 0) ids = notDone;
-  }
+  if (ids.length > 1 && ids.some((id) => live.get(id)?.status === "checked_in")) return null;
   if (ids.length > 1) {
     const arrivingToday = ids.filter((id) => live.get(id)?.checkInDate === today);
     if (arrivingToday.length > 0) ids = arrivingToday;

@@ -19,7 +19,6 @@
     <string name="menu_prereg_body">请将消息中收到的二维码对准摄像头。</string>
     <string name="menu_guide">入住期间指南</string>
     <string name="menu_guide_body">Wi-Fi、垃圾分类、退房方法</string>
-    <string name="coming_next">此画面将在下一阶段制作。</string>
     <string name="back">返回</string>
     <string name="staff_pin_title">工作人员PIN</string>
     <string name="staff_pin_wrong">PIN错误。</string>
@@ -83,8 +82,8 @@
     <string name="done_body">请选择需要的操作。</string>
     <string name="done_room">查看房间号和门锁密码</string>
     <string name="done_room_body">再输入一次6位入住码即可显示。</string>
-    <string name="done_more">继续填写同行人登记</string>
-    <string name="done_more_body">尚未填写: %1$d人</string>
+    <string name="done_more">补充同行人由工作人员协助</string>
+    <string name="done_more_body">点击查看工作人员联系方式</string>
     <string name="guests_title">找到您的预订了</string>
     <string name="guests_room">房间</string>
     <string name="guests_dates">日期</string>
@@ -175,7 +174,7 @@
     <string name="fast_f1_by_code">用代码查找</string>
     <string name="fast_f1_by_name">用姓名查找</string>
     <string name="fast_f1_searching">正在查找预订…</string>
-    <string name="fast_f1_retry">未能读取，请再次出示。</string>
+    <string name="fast_f1_retry">未能读取，请再次出示。若仍不行，请点击下方“用代码查找”或“用姓名查找”。</string>
     <string name="fast_found_title">%1$s，已找到您的预订</string>
     <string name="fast_party_count">%1$d人</string>
     <string name="fast_cards_title">请现在拿出护照：%1$d本</string>
@@ -229,4 +228,42 @@
         <item>第9位</item>
         <item>第10位</item>
     </string-array>
+
+    <!-- G4 완료 · 직원 호출 -->
+    <string name="g4_title">入住办理完成</string>
+    <string name="g4_title_problem">尚未完成</string>
+    <string name="g4_loading">正在获取房间信息…</string>
+    <string name="g4_guests">%1$d人</string>
+    <string name="g4_checkin">入住</string>
+    <string name="g4_checkout">退房</string>
+    <string name="g4_kind_door">门锁密码</string>
+    <string name="g4_kind_room">房间密码</string>
+    <string name="g4_kind_keybox">钥匙盒</string>
+    <string name="g4_kind_keybox_code">钥匙盒密码</string>
+    <string name="g4_kind_generic">密码</string>
+    <string name="g4_floor1">1楼</string>
+    <string name="g4_note_all">所有房间相同</string>
+    <string name="g4_shared_title">公用密码</string>
+    <string name="g4_use_shared">请使用下方的公用密码进入</string>
+    <string name="g4_address">地址</string>
+    <string name="g4_staff_code">密码将由工作人员告知。请点击下方“呼叫工作人员”。</string>
+    <string name="g4_countdown">%1$d秒后返回首页</string>
+    <string name="g4_finish">完成</string>
+    <string name="g4_retry">重试</string>
+    <string name="g4_incomplete_consent">尚未完成同意。请呼叫工作人员。</string>
+    <string name="g4_incomplete_roster">客人信息尚未填完。请呼叫工作人员。</string>
+    <string name="g4_incomplete_other">无法完成入住。请呼叫工作人员。</string>
+    <string name="call_title">呼叫工作人员</string>
+    <string name="call_body">请通过以下方式联系我们，我们会尽快协助。</string>
+    <string name="call_none">请直接联系前台工作人员。</string>
+    <string name="call_phone">电话</string>
+    <string name="call_line">LINE</string>
+    <string name="call_whatsapp">WhatsApp</string>
+    <string name="g4_title_verify">需要确认护照</string>
+    <string name="g4_title_blocked">无法打开此预订</string>
+    <string name="g4_verify_body">扫描护照后会立即显示房间密码。没有护照或不方便扫描时，请呼叫工作人员。</string>
+    <string name="g4_blocked_cancelled">该预订已取消。请呼叫工作人员。</string>
+    <string name="g4_blocked_expired">该预订的入住期已过。请呼叫工作人员。</string>
+    <string name="g4_scan_passport">扫描护照</string>
+    <string name="nopass_proof_notice">此预订是通过姓名找到的，若无护照继续办理，最后需由工作人员确认后才能显示房间密码。您也可以现在呼叫工作人员。</string>
 </resources>

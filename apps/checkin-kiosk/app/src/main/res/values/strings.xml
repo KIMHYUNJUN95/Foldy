@@ -20,7 +20,6 @@
     <string name="menu_prereg_body">メッセージで受け取ったQRコードをカメラにかざしてください。</string>
     <string name="menu_guide">滞在中のご案内</string>
     <string name="menu_guide_body">Wi-Fi・ゴミの出し方・チェックアウト方法</string>
-    <string name="coming_next">この画面は次の段階で作ります。</string>
     <string name="back">戻る</string>
     <string name="staff_pin_title">スタッフPIN</string>
     <string name="staff_pin_wrong">PINが違います。</string>
@@ -84,8 +83,8 @@
     <string name="done_body">ご用件を選んでください。</string>
     <string name="done_room">部屋番号・暗証番号を見る</string>
     <string name="done_room_body">チェックインコード6桁をもう一度入れると表示されます。</string>
-    <string name="done_more">同行の方の宿泊者名簿を続ける</string>
-    <string name="done_more_body">まだ空いている方: %1$d名</string>
+    <string name="done_more">同行の方の追加はスタッフがお手伝いします</string>
+    <string name="done_more_body">タップしてスタッフの連絡先を表示します</string>
     <string name="guests_title">ご予約が見つかりました</string>
     <string name="guests_room">お部屋</string>
     <string name="guests_dates">日付</string>
@@ -176,7 +175,7 @@
     <string name="fast_f1_by_code">コードで探す</string>
     <string name="fast_f1_by_name">お名前で探す</string>
     <string name="fast_f1_searching">ご予約を探しています…</string>
-    <string name="fast_f1_retry">読み取れませんでした。もう一度かざしてください。</string>
+    <string name="fast_f1_retry">読み取れませんでした。もう一度かざしてください。続かない場合は、下の「コードで探す」か「お名前で探す」を押してください。</string>
     <string name="fast_found_title">%1$s 様、ご予約が見つかりました</string>
     <string name="fast_party_count">%1$d名</string>
     <string name="fast_cards_title">パスポートを%1$d冊、今ご用意ください</string>
@@ -230,4 +229,42 @@
         <item>9人目の方</item>
         <item>10人目の方</item>
     </string-array>
+
+    <!-- G4 완료 · 직원 호출 -->
+    <string name="g4_title">チェックイン完了です</string>
+    <string name="g4_title_problem">まだ完了していません</string>
+    <string name="g4_loading">お部屋の情報を読み込んでいます…</string>
+    <string name="g4_guests">%1$d名</string>
+    <string name="g4_checkin">チェックイン</string>
+    <string name="g4_checkout">チェックアウト</string>
+    <string name="g4_kind_door">ドア暗証番号</string>
+    <string name="g4_kind_room">お部屋の暗証番号</string>
+    <string name="g4_kind_keybox">キーボックス</string>
+    <string name="g4_kind_keybox_code">キーボックス暗証番号</string>
+    <string name="g4_kind_generic">暗証番号</string>
+    <string name="g4_floor1">1階</string>
+    <string name="g4_note_all">全室共通</string>
+    <string name="g4_shared_title">共通の暗証番号</string>
+    <string name="g4_use_shared">下の共通の暗証番号でお入りください</string>
+    <string name="g4_address">住所</string>
+    <string name="g4_staff_code">暗証番号はスタッフがご案内します。下の「スタッフを呼ぶ」を押してください。</string>
+    <string name="g4_countdown">%1$d秒後に最初の画面に戻ります</string>
+    <string name="g4_finish">終了</string>
+    <string name="g4_retry">もう一度</string>
+    <string name="g4_incomplete_consent">ご同意がまだ完了していません。スタッフをお呼びください。</string>
+    <string name="g4_incomplete_roster">お客様情報の入力が足りません。スタッフをお呼びください。</string>
+    <string name="g4_incomplete_other">チェックインを完了できませんでした。スタッフをお呼びください。</string>
+    <string name="call_title">スタッフを呼ぶ</string>
+    <string name="call_body">下の連絡先までご連絡ください。すぐにご案内します。</string>
+    <string name="call_none">フロントのスタッフに直接お声がけください。</string>
+    <string name="call_phone">電話</string>
+    <string name="call_line">LINE</string>
+    <string name="call_whatsapp">WhatsApp</string>
+    <string name="g4_title_verify">パスポートの確認が必要です</string>
+    <string name="g4_title_blocked">このご予約は開けません</string>
+    <string name="g4_verify_body">パスポートを撮影すると、お部屋の暗証番号をすぐにお見せします。パスポートをお持ちでない場合や撮影が難しい場合は、スタッフをお呼びください。</string>
+    <string name="g4_blocked_cancelled">キャンセルされたご予約です。スタッフをお呼びください。</string>
+    <string name="g4_blocked_expired">ご利用期間が過ぎたご予約です。スタッフをお呼びください。</string>
+    <string name="g4_scan_passport">パスポートを撮る</string>
+    <string name="nopass_proof_notice">お名前で検索した予約のため、パスポートなしで進めると、最後にスタッフの確認が必要になります。今すぐスタッフを呼ぶこともできます。</string>
 </resources>

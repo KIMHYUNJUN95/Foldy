@@ -19,7 +19,6 @@
     <string name="menu_prereg_body">Show the QR code from your message to the camera.</string>
     <string name="menu_guide">During your stay</string>
     <string name="menu_guide_body">Wi-Fi, garbage, how to check out</string>
-    <string name="coming_next">This screen comes in the next step.</string>
     <string name="back">Back</string>
     <string name="staff_pin_title">Staff PIN</string>
     <string name="staff_pin_wrong">Wrong PIN.</string>
@@ -83,8 +82,8 @@
     <string name="done_body">Choose what you need.</string>
     <string name="done_room">See room number and door code</string>
     <string name="done_room_body">Enter your 6-digit check-in code again to see them.</string>
-    <string name="done_more">Finish the guest list</string>
-    <string name="done_more_body">Guests still empty: %1$d</string>
+    <string name="done_more">Staff will help add more guests</string>
+    <string name="done_more_body">Tap to see how to reach our staff</string>
     <string name="guests_title">Booking found</string>
     <string name="guests_room">Room</string>
     <string name="guests_dates">Dates</string>
@@ -175,7 +174,7 @@
     <string name="fast_f1_by_code">Find by code</string>
     <string name="fast_f1_by_name">Find by name</string>
     <string name="fast_f1_searching">Looking for your booking…</string>
-    <string name="fast_f1_retry">Couldn\'t read it. Please hold it up again.</string>
+    <string name="fast_f1_retry">Couldn\'t read it. Please hold it up again. If it keeps failing, tap “Find by code” or “Find by name” below.</string>
     <string name="fast_found_title">%1$s, we found your booking</string>
     <string name="fast_party_count">%1$d</string>
     <string name="fast_cards_title">Get passports ready now: %1$d</string>
@@ -229,4 +228,42 @@
         <item>Guest 9</item>
         <item>Guest 10</item>
     </string-array>
+
+    <!-- G4 완료 · 직원 호출 -->
+    <string name="g4_title">You\'re checked in</string>
+    <string name="g4_title_problem">Not finished yet</string>
+    <string name="g4_loading">Getting your room details…</string>
+    <string name="g4_guests">Guests: %1$d</string>
+    <string name="g4_checkin">Check-in</string>
+    <string name="g4_checkout">Check-out</string>
+    <string name="g4_kind_door">Door code</string>
+    <string name="g4_kind_room">Room code</string>
+    <string name="g4_kind_keybox">Key box</string>
+    <string name="g4_kind_keybox_code">Key box code</string>
+    <string name="g4_kind_generic">Code</string>
+    <string name="g4_floor1">1F</string>
+    <string name="g4_note_all">Same for all rooms</string>
+    <string name="g4_shared_title">Shared codes</string>
+    <string name="g4_use_shared">Use the shared code below to get in</string>
+    <string name="g4_address">Address</string>
+    <string name="g4_staff_code">Our staff will give you the code. Please tap “Call staff” below.</string>
+    <string name="g4_countdown">Back to start in %1$d s</string>
+    <string name="g4_finish">Done</string>
+    <string name="g4_retry">Try again</string>
+    <string name="g4_incomplete_consent">Your consent isn\'t finished yet. Please call our staff.</string>
+    <string name="g4_incomplete_roster">Some guest details are missing. Please call our staff.</string>
+    <string name="g4_incomplete_other">We couldn\'t finish check-in. Please call our staff.</string>
+    <string name="call_title">Call our staff</string>
+    <string name="call_body">Please contact us using the details below. We\'ll help right away.</string>
+    <string name="call_none">Please speak to our front desk staff.</string>
+    <string name="call_phone">Phone</string>
+    <string name="call_line">LINE</string>
+    <string name="call_whatsapp">WhatsApp</string>
+    <string name="g4_title_verify">Passport check needed</string>
+    <string name="g4_title_blocked">This booking can\'t be opened</string>
+    <string name="g4_verify_body">Scan your passport and we\'ll show the room code right away. If you don\'t have it or can\'t scan it, please call our staff.</string>
+    <string name="g4_blocked_cancelled">This booking was cancelled. Please call our staff.</string>
+    <string name="g4_blocked_expired">This booking\'s stay period has passed. Please call our staff.</string>
+    <string name="g4_scan_passport">Scan passport</string>
+    <string name="nopass_proof_notice">This booking was found by name, so if you continue without a passport, our staff must confirm at the end before the room code can be shown. You can also call staff now.</string>
 </resources>

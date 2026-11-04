@@ -3,6 +3,7 @@ import "server-only";
 import type { DeviceRow } from "../device/auth";
 import { loadStayById, type StayView } from "../guest/store";
 import type { CheckinServiceClient } from "../supabase/service";
+import { finishedWithinWindow, freshProof, grantsPassportProof, type FoundBy } from "./complete";
 import { heldByOther, kioskGate, kioskLanguageOf, type NameCandidate } from "./find";
 import { kioskStatusAfterSave } from "./guests";
 
@@ -40,13 +41,15 @@ export async function readNameCandidates(
   organizationId: string,
   propertyKey: string,
   checkInDate: string | string[],
+  /** 여권 찾기용 — 이 날(도쿄 오늘)에 묵고 있는 체크인 끝난 stay 도 후보에 넣는다(여러 밤 손님이 3일째 다시 비출 때). */
+  stayingOn?: string,
 ): Promise<{ stays: KioskStayRow[]; candidates: NameCandidate[] }> {
-  const { data: stays, error } = await db
-    .from("stays")
-    .select(STAY_COLUMNS)
-    .eq("organization_id", organizationId)
-    .eq("property_key", propertyKey)
-    .in("check_in_date", Array.isArray(checkInDate) ? checkInDate : [checkInDate]);
+  const dates = Array.isArray(checkInDate) ? checkInDate : [checkInDate];
+  let query = db.from("stays").select(STAY_COLUMNS).eq("organization_id", organizationId).eq("property_key", propertyKey);
+  query = stayingOn
+    ? query.or(`check_in_date.in.(${dates.join(",")}),and(status.eq.checked_in,check_in_date.lte.${stayingOn},check_out_date.gte.${stayingOn})`)
+    : query.in("check_in_date", dates);
+  const { data: stays, error } = await query;
   if (error) throw new Error(`stays 읽기 실패: ${error.message}`);
   if (!stays?.length) return { stays: [], candidates: [] };
 
@@ -97,6 +100,7 @@ export async function holdSession(
   stay: { id: string; organizationId: string },
   deviceId: string,
   now: Date,
+  foundBy: FoundBy,
 ): Promise<string | null> {
   const { data: sessions, error } = await db
     .from("sessions")
@@ -112,13 +116,14 @@ export async function holdSession(
   const lockedUntil = new Date(now.getTime() + SESSION_HOLD_MS).toISOString();
   const mine = (sessions ?? []).find((session) => session.device_id === deviceId);
   if (mine) {
-    const { error: updateError } = await db.from("sessions").update({ locked_until: lockedUntil }).eq("id", mine.id);
+    const { error: updateError } = await db.from("sessions").update({ locked_until: lockedUntil, step_payload: freshProof(foundBy) })
+      .eq("id", mine.id);
     if (updateError) throw new Error(`sessions 갱신 실패: ${updateError.message}`);
     return mine.id as string;
   }
   const { data: created, error: insertError } = await db
     .from("sessions")
-    .insert({ organization_id: stay.organizationId, stay_id: stay.id, device_id: deviceId, last_step: "found", locked_until: lockedUntil })
+    .insert({ organization_id: stay.organizationId, stay_id: stay.id, device_id: deviceId, last_step: "found", locked_until: lockedUntil, step_payload: freshProof(foundBy) })
     .select("id")
     .single();
   if (insertError) throw new Error(`sessions 만들기 실패: ${insertError.message}`);
@@ -147,6 +152,80 @@ export async function openKioskStay(db: CheckinServiceClient, sessionId: string,
   const stay = await loadStayById(db, stayId);
   if (!stay || stay.propertyKey !== device.property_key || kioskGate(stay, now).kind === "blocked") return null;
   return stay;
+}
+
+/**
+ * 완료 라우트 전용 — `openKioskStay` 와 같되, 이 기기가 방금(10분 안) 끝낸 세션도 받는다(응답을 못 받은 손님의 재시도).
+ * 끝난 세션은 이미 체크인된 예약일 때만. `touchSession` 은 그대로 둔다(다른 라우트는 끝난 세션을 계속 거절).
+ */
+export async function openKioskStayForComplete(
+  db: CheckinServiceClient,
+  sessionId: string,
+  device: DeviceRow,
+  now: Date,
+): Promise<{ stay: StayView; proof: unknown } | null> {
+  const { data: session, error } = await db
+    .from("sessions")
+    .select("stay_id, finished_at, abandoned_at, step_payload")
+    .eq("id", sessionId)
+    .eq("device_id", device.id)
+    .eq("organization_id", device.organization_id)
+    .maybeSingle();
+  if (error) throw new Error(`sessions 읽기 실패: ${error.message}`);
+  if (!session || session.abandoned_at) return null;
+  const proof = session.step_payload;
+
+  if (!session.finished_at) {
+    const stay = await openKioskStay(db, sessionId, device, now);
+    return stay ? { stay, proof } : null;
+  }
+  if (!finishedWithinWindow(session.finished_at as string, now)) return null;
+  const stay = await loadStayById(db, session.stay_id as string);
+  if (!stay || stay.organizationId !== device.organization_id || stay.propertyKey !== device.property_key) return null;
+  if (stay.status !== "checked_in" || kioskGate(stay, now).kind === "blocked") return null;
+  return { stay, proof };
+}
+
+/**
+ * 이름으로 찾은 세션에서 여권을 저장했을 때: 서버가 띠(mrz.raw)를 직접 읽어 검사 숫자가 맞고 그 이름이 예약 이름과 맞으면 이 찾기에 증명을 건다.
+ * 인쇄된 띠 자체가 진짜인지는 알 수 없다(검사 숫자만 맞춘 위조 띠는 통과). 실패해도 저장은 이미 끝났으므로 증명만 못 얻는다(로그에 손님 정보 없음).
+ */
+export async function grantPassportProofIfMatching(
+  db: CheckinServiceClient,
+  sessionId: string,
+  stay: { id: string; organizationId: string },
+  mrzRaw: string | undefined,
+): Promise<void> {
+  if (!mrzRaw) return;
+  const { data: session, error } = await db
+    .from("sessions")
+    .select("step_payload")
+    .eq("id", sessionId)
+    .eq("organization_id", stay.organizationId)
+    .maybeSingle();
+  if (error || !session) {
+    console.error("[kiosk-guests] sessions 읽기 실패:", error?.message);
+    return;
+  }
+  const { data: rooms, error: roomsError } = await db.from("stay_rooms").select("reservation_id").eq("stay_id", stay.id);
+  if (roomsError) return console.error("[kiosk-guests] stay_rooms 읽기 실패:", roomsError.message);
+  const ids = (rooms ?? []).map((room) => room.reservation_id as string);
+  if (!ids.length) return;
+  const { data: reservations, error: resError } = await db
+    .schema("public")
+    .from("reservations")
+    .select("guest_name")
+    .eq("organization_id", stay.organizationId)
+    .in("id", ids);
+  if (resError) return console.error("[kiosk-guests] reservations 읽기 실패:", resError.message);
+  const names = (reservations ?? []).map((row) => (row.guest_name as string | null) ?? "").filter(Boolean);
+  if (!grantsPassportProof(session.step_payload, mrzRaw, names)) return;
+  const { error: updateError } = await db
+    .from("sessions")
+    .update({ step_payload: { ...(session.step_payload as Record<string, unknown>), passport_proof: true } })
+    .eq("id", sessionId)
+    .eq("organization_id", stay.organizationId);
+  if (updateError) console.error("[kiosk-guests] sessions 갱신 실패:", updateError.message);
 }
 
 /** 저장 뒤 다시 읽고, 미리 끝났던 예약이 덜 된 상태가 되면 pending 으로 내린다(태블릿은 올리지 않는다). */

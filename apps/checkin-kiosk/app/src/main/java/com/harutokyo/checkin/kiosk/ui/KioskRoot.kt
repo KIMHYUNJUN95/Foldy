@@ -43,14 +43,14 @@ import com.harutokyo.checkin.kiosk.kiosk.Kiosk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// 화면 흐름(빠른 체크인): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → F1 여권 비추기(→ 예약 찾기) → F2 예약 찾음 → (자리마다 여권 · 얼굴 5초) → F6b 검토 → F7b 마지막 질문 + 동의 → 완료.
+// 화면 흐름(빠른 체크인): 등록 안 됨 → E 등록 / 등록됨 → G1 언어 → F1 여권 비추기(→ 예약 찾기) → F2 예약 찾음 → (자리마다 여권 · 얼굴 5초) → F6b 검토 → F7b 마지막 질문 + 동의 → 완료(G4).
 // F1 에서 「코드로 찾기」 · 「이름으로 찾기」 → T1k · T1 (FindScreen). 찾기 결과: 못 찾음 T1x · 지금은 못 함 T1b · 이미 체크인 T1c.
 // 자리마다 화면은 ui/FastFlow.kt 안에서 돈다(Screen.Fast). 단계마다 걸린 시간은 StepTimer 가 「KioskTiming」 로그 한 줄로 남긴다.
 // 손님이 손을 떼고 idleSecondsInput(기본 240초) 지나면 G1 로 돌아간다(FR-K12) — 올리다 만 것은 버린다.
 
 private val PHRASE_BREAK = LineBreak(LineBreak.Strategy.HighQuality, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase)
 
-private enum class Screen { Language, Scan, Find, NotFound, Blocked, CheckedIn, Fast, ComingNext }
+private enum class Screen { Language, Scan, Find, NotFound, Blocked, CheckedIn, Fast, Done }
 
 @Composable
 fun KioskRoot(model: KioskViewModel = viewModel()) {
@@ -69,6 +69,12 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
     var stay by remember { mutableStateOf<KioskStay?>(null) }
     // F1 에서 찍은 대표자 여권(이름으로 찾은 경우엔 없음).
     var firstShot by remember { mutableStateOf<Captured?>(null) }
+    // 방 비밀번호를 보려고 여권(또는 예약 코드)으로 다시 찾는 중 — 찾으면 F2 가 아니라 완료 화면으로 간다.
+    var verifying by remember { mutableStateOf(false) }
+    // 어떻게 찾았나(이름으로 찾은 예약은 여권이 저장돼야 비밀번호를 보여 준다) · 완료 화면이 빠른 체크인에서 왔나 · 명부 되돌리기는 한 번만.
+    var foundByName by remember { mutableStateOf(false) }
+    var doneFromFast by remember { mutableStateOf(false) }
+    var rosterBounced by remember { mutableStateOf(false) }
     val timer = remember { StepTimer() }
     // 직원 부르기 — 흐름 위에 덮어 보여 준다(진행 중인 체크인 · 올리기 줄을 잃지 않게). G1 의 호출만 별도 화면이다.
     var callOpen by remember { mutableStateOf(false) }
@@ -85,17 +91,38 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
         session = null
         stay = null
         firstShot = null
+        verifying = false
+        foundByName = false
+        doneFromFast = false
+        rosterBounced = false
         model.clearUploads()
         timer.reset()
     }
     // 예약을 찾았다 — 예약 언어가 있으면 그 언어로(FR-K01, 이 건물이 쓰는 언어일 때만). 이미 체크인했으면 T1c, 아니면 F2.
-    fun foundStay(result: FindResult.Found, languages: List<String>, shot: Captured?) {
+    fun foundStay(result: FindResult.Found, languages: List<String>, shot: Captured?, byName: Boolean = false) {
+        // 새로 찾았다 — 앞 찾기에서 얻은 확인(여권 · 되돌리기)은 모두 없던 일.
+        verifying = false
+        doneFromFast = false
+        rosterBounced = false
+        foundByName = byName
         session = result.sessionId
         model.openUploads(result.sessionId)
         stay = result.stay
         firstShot = shot
         if (result.language != null && result.language in languages) language = result.language
         screen = if (result.checkedIn) Screen.CheckedIn else Screen.Fast
+    }
+    // 다시 찾아 본인임이 확인됐다 — 같은 예약이면 그대로, 다른 예약이면 올리기 줄을 새로 열고 완료 요청을 다시 보낸다.
+    fun verified(result: FindResult.Found, languages: List<String>, shot: Captured?, byName: Boolean) {
+        if (result.sessionId != session) {
+            // 다른 예약이 잡혔다 — 바로 완료하지 않고 보통 길(F2 · 이미 체크인이면 T1c)로.
+            foundStay(result, languages, shot, byName)
+            return
+        }
+        stay = result.stay
+        verifying = false
+        doneFromFast = false
+        screen = Screen.Done
     }
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current!!
@@ -149,7 +176,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                             online = state.online,
                             hasContacts = !state.contract?.supportContacts.isNullOrEmpty(),
                             onStaff = { staff = StaffStep.Pin },
-                            onCall = { screen = Screen.ComingNext },
+                            onCall = { callOpen = true },
                             onPick = { code ->
                                 language = code
                                 screen = Screen.Scan
@@ -174,7 +201,8 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     screen = Screen.Find
                                 },
                                 onPassport = { shot ->
-                                    val mrz = shot.mrz ?: return@ScanScreen false
+                                    // 검사 숫자가 맞는 읽기만 예약 찾기에 보낸다 — 틀리게 읽힌 것은 다시 찍게 둔다.
+                                    val mrz = shot.mrz?.takeIf { it.valid } ?: return@ScanScreen false
                                     // 직원 부르기 창이 위에 열려 있으면 읽힌 여권은 버린다(창 뒤에서 F2 로 넘어가지 않게). 카메라는 다시 켜진다.
                                     if (callOpenNow) return@ScanScreen false
                                     scanError = null
@@ -182,7 +210,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     form = FindForm(byCode = false, lastName = mrz.surname, firstName = mrz.givenNames)
                                     when (val result = model.find(PassportQuery(mrz.surname, mrz.givenNames))) {
                                         is FindResult.Found -> {
-                                            foundStay(result, state.contract?.languages.orEmpty(), shot)
+                                            if (verifying) verified(result, state.contract?.languages.orEmpty(), shot, false) else foundStay(result, state.contract?.languages.orEmpty(), shot)
                                             true
                                         }
                                         is FindResult.NotFound, is FindResult.Locked -> {
@@ -223,7 +251,7 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                 onCall = { callOpen = true },
                                 onSubmit = {
                                     when (val result = model.find(form.query())) {
-                                        is FindResult.Found -> foundStay(result, state.contract?.languages.orEmpty(), null)
+                                        is FindResult.Found -> if (verifying && form.byCode) verified(result, state.contract?.languages.orEmpty(), null, false) else foundStay(result, state.contract?.languages.orEmpty(), null, byName = !form.byCode)
                                         is FindResult.NotFound, is FindResult.Locked -> {
                                             notFound = result
                                             screen = Screen.NotFound
@@ -258,8 +286,11 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                 stay = current,
                                 onBack = { screen = Screen.Scan },
                                 onCall = { callOpen = true },
-                                onRoom = { screen = Screen.ComingNext },
-                                onMore = { screen = Screen.Fast },
+                                onRoom = {
+                                    doneFromFast = false
+                                    screen = Screen.Done
+                                },
+                                onMore = { callOpen = true },
                                 onHome = reset,
                             )
                         }
@@ -295,22 +326,50 @@ fun KioskRoot(model: KioskViewModel = viewModel()) {
                                     },
                                     onCall = { callOpen = true },
                                     onStep = timer::enter,
+                                    byName = foundByName,
                                     onDone = {
                                         timer.enter("done")
                                         timer.finish()
-                                        screen = Screen.ComingNext
+                                        doneFromFast = true
+                                        screen = Screen.Done
                                     },
                                 )
                             }
                         }
-                        // 완료 화면(G4)은 다음 묶음 — 지금은 자리표시. 돌아가면 처음 상태로.
-                        Screen.ComingNext -> ComingNextScreen(onBack = reset)
+                        // G4 완료 — 방 번호 · 문 비밀번호. 비밀번호는 이 화면 상태에만 있고, 처음으로 돌아가면 화면과 함께 사라진다.
+                        Screen.Done -> session?.let { id ->
+                            CompletionScreen(
+                                language = language,
+                                idleSeconds = state.contract?.idleSecondsDone ?: 30,
+                                paused = callOpen,
+                                complete = { model.complete(id) },
+                                onSessionGone = reset,
+                                // 빠른 체크인 끝에서 명부가 덜 찼다고 하면 막다른 화면 대신 그 분들을 채우러 돌아간다(한 번만 — 다시 막히면 직원 호출).
+                                onRoster = {
+                                    if (doneFromFast && !rosterBounced) {
+                                        rosterBounced = true
+                                        doneFromFast = false
+                                        firstShot = null
+                                        screen = Screen.Fast
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                                onVerify = {
+                                    verifying = true
+                                    screen = Screen.Scan
+                                },
+                                onCall = { callOpen = true },
+                                onHome = reset,
+                            )
+                        }
                     }
                 }
             }
             if (callOpen) {
                 Box(Modifier.fillMaxSize().background(G.Bg).pointerInput(Unit) { detectTapGestures { } }) {
-                    Localized(language) { ComingNextScreen(onBack = { callOpen = false }) }
+                    Localized(language) { StaffCallScreen(contacts = state.contract?.supportContacts.orEmpty(), onBack = { callOpen = false }) }
                 }
             }
             // 직원 화면은 손님이 고른 언어가 아니라 기기 언어로.

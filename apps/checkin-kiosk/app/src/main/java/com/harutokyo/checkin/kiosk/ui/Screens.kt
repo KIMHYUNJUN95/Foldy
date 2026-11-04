@@ -231,14 +231,3 @@ private fun SmallTile(color: Color, title: String, body: String, modifier: Modif
         }
     }
 }
-
-/** 아직 안 지은 화면 자리. */
-@Composable
-fun ComingNextScreen(onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize().then(GUTTER)) {
-        OutlineButton(str(R.string.back), onClick = onBack)
-        Spacer(Modifier.weight(1f))
-        Text(str(R.string.coming_next), color = G.Muted, fontSize = 22.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-        Spacer(Modifier.weight(1f))
-    }
-}

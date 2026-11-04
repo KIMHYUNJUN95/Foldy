@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     if (input.mode === "code") {
       found = pickByCode(await readStaysByCode(db, device.organization_id, input.code));
     } else if (input.mode === "passport") {
-      const { stays, candidates } = await readNameCandidates(db, device.organization_id, device.property_key, passportSearchDates(now));
+      const { stays, candidates } = await readNameCandidates(db, device.organization_id, device.property_key, passportSearchDates(now), todayTokyo(now));
       const stayId = matchByPassportStays(candidates, stays, input.lastName, input.firstName, todayTokyo(now));
       found = stays.find((stay) => stay.id === stayId) ?? null;
     } else {
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
     const stay = await loadStayById(db, found.id);
     if (!stay) return json({ ok: false, error: "blocked", reason: "expired" }, 409);
-    const sessionId = await holdSession(db, stay, device.id, now);
+    const sessionId = await holdSession(db, stay, device.id, now, input.mode);
     if (!sessionId) return json({ ok: false, error: "blocked", reason: "busy" }, 409);
 
     return json({

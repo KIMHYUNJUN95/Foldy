@@ -14,6 +14,10 @@ import com.harutokyo.checkin.kiosk.contract.EnrollResponse
 import com.harutokyo.checkin.kiosk.contract.FindQuery
 import com.harutokyo.checkin.kiosk.contract.FindResponse
 import com.harutokyo.checkin.kiosk.contract.FindResult
+import com.harutokyo.checkin.kiosk.contract.CompleteBody
+import com.harutokyo.checkin.kiosk.contract.CompleteResponse
+import com.harutokyo.checkin.kiosk.contract.CompleteResult
+import com.harutokyo.checkin.kiosk.contract.completeResultOf
 import com.harutokyo.checkin.kiosk.contract.ConsentBody
 import com.harutokyo.checkin.kiosk.contract.GuestInput
 import com.harutokyo.checkin.kiosk.contract.RouteBody
@@ -100,7 +104,8 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
             parsed?.ok == true && parsed.token != null -> {
                 vault.put(KEY_TOKEN, parsed.token)
                 _state.update { it.copy(phase = Phase.Loading, device = parsed.device, revoked = false) }
-                refreshSettings()
+                // 등록 화면이 사라지면 부른 쪽 코루틴이 취소되므로 설정 받기는 viewModelScope 에서 이어간다.
+                viewModelScope.launch { refreshSettings() }
                 null
             }
             result.status == 429 -> EnrollError.RateLimited
@@ -178,6 +183,23 @@ class KioskViewModel(application: Application) : AndroidViewModel(application) {
     /** 시안 G3b — 약관 · 개인정보 두 칸 동의(대표자 이름으로 한 줄). */
     suspend fun saveConsent(sessionId: String, locale: String): SaveResult =
         post("/api/kiosk/consent", Api.json.encodeToString(ConsentBody(sessionId, terms = true, locale = locale)))
+
+    /** 시안 G4 — 체크인을 마치고 방 번호 · 문 비밀번호를 받는다(같은 요청을 다시 보내도 안전). 결과(비밀번호)는 로그에 남기지 않는다. */
+    suspend fun complete(sessionId: String): CompleteResult {
+        val token = vault.get(KEY_TOKEN) ?: return CompleteResult.Server
+        val result = try {
+            Api.request("POST", "/api/kiosk/complete", token, Api.json.encodeToString(CompleteBody(sessionId)))
+        } catch (_: IOException) {
+            _state.update { it.copy(online = false) }
+            return CompleteResult.Network
+        }
+        if (result.status == 401) {
+            forget(revoked = true)
+            return CompleteResult.Server
+        }
+        _state.update { it.copy(online = true) }
+        return completeResultOf(result.status, runCatching { Api.json.decodeFromString<CompleteResponse>(result.body) }.getOrNull())
+    }
 
     /** 빠른 체크인 — 얼굴 영상(MP4 5초). 저장한 사람에게만. */
     suspend fun uploadFace(sessionId: String, guestId: String, file: File): UploadResult =

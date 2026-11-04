@@ -168,14 +168,20 @@ describe("여권 찾기 — 상태로 좁히기", () => {
   const today = "2026-11-05";
   const names = (...ids: string[]) => ids.map((id) => ({ stayId: id, guestNames: ["Daniel Hu"] }));
   const st = (id: string, status: string, checkInDate = today) => ({ id, status, checkInDate });
-  it("어제 체크인 끝난 것과 오늘 대기는 오늘 것", () => {
-    expect(matchByPassportStays(names("y", "t"), [st("y", "checked_in", "2026-11-04"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");
+  it("묵는 중인 동명이인과 오늘 도착 동명이인이 겹치면 열지 않는다", () => {
+    expect(matchByPassportStays(names("y", "t"), [st("y", "checked_in", "2026-11-04"), st("t", "pending")], "HU", "DANIEL", today)).toBeNull();
+  });
+  it("둘 다 체크인 끝났어도 열지 않는다", () => {
+    expect(matchByPassportStays(names("y", "t"), [st("y", "checked_in", "2026-11-04"), st("t", "checked_in")], "HU", "DANIEL", today)).toBeNull();
   });
   it("취소와 대기는 대기", () => {
     expect(matchByPassportStays(names("x", "t"), [st("x", "cancelled"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");
   });
   it("오늘 대기가 둘이면 열지 않는다", () => {
     expect(matchByPassportStays(names("a", "b"), [st("a", "pending"), st("b", "pending")], "HU", "DANIEL", today)).toBeNull();
+  });
+  it("여러 밤 묵는 체크인 끝난 손님(3일째)은 그 하나로 찾는다", () => {
+    expect(matchByPassportStays(names("m"), [st("m", "checked_in", "2026-11-03")], "HU", "DANIEL", today)).toBe("m");
   });
   it("어제 대기와 오늘 대기는 오늘 것", () => {
     expect(matchByPassportStays(names("y", "t"), [st("y", "pending", "2026-11-04"), st("t", "pending")], "HU", "DANIEL", today)).toBe("t");

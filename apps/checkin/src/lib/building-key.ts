@@ -31,3 +31,21 @@ export const BUILDING_KEYS: readonly string[] = RULES.map(([buildingKey]) => bui
 export function isBuildingKey(value: string): boolean {
   return BUILDING_KEYS.includes(value);
 }
+
+// 건물 키 → Foldy 의 정규 숙소 이름(`public.property_operation_infos.canonical_name` 이 이 이름으로 저장된다).
+// Foldy `CANONICAL_TO_BUILDING_KEY`(room-label-normalization.ts)의 거꾸로 — 건물이 늘면 두 곳을 같이 고친다.
+const CANONICAL_NAME_BY_KEY: Readonly<Record<string, string>> = {
+  arakicho_a: "아라키초A",
+  arakicho_b: "아라키초B",
+  kabukicho: "가부키초",
+  takadanobaba: "다카다노바바",
+  okubo_a: "오쿠보A",
+  okubo_b: "오쿠보B",
+  okubo_c: "오쿠보C",
+  stay_ari: "STAY ARI Apartment Hotel",
+  sano: "사노",
+};
+
+export function canonicalNameOf(buildingKey: string): string | null {
+  return CANONICAL_NAME_BY_KEY[buildingKey] ?? null;
+}

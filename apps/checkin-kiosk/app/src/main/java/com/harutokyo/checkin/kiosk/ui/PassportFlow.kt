@@ -174,6 +174,23 @@ fun reviewWarnOf(person: SavedPerson?): ReviewWarn = when {
     else -> ReviewWarn.None
 }
 
+/** 이 분의 필수 칸이 다 찼는가 — 안 찼으면 저장하지 않고(자리를 끝낸 것으로 치지 않고) 확인 화면에서 채우게 한다. */
+fun seatComplete(person: SavedPerson): Boolean = requiredMissing(person.draft, person.mode, askAddress = false).isEmpty()
+
+/** 여권에서 읽은 것만으로 저장해도 되는가(성별 X · 읽히지 않은 생년월일이면 아니오 → 확인 화면). */
+fun mrzDraftComplete(mrz: MrzResult): Boolean = seatComplete(SavedPerson(draftOf(mrz, null), FormMode.Mrz, null, mrz))
+
+/** 검토 화면 「맞아요」 — 필수 칸이 빈 분이 한 명이라도 있으면 막는다. 이번에 저장한 분은 화면 입력으로, 아닌 분은 서버가 알려 준 빈 칸으로 본다. */
+fun reviewReady(stay: KioskStay, people: Map<String, SavedPerson>): Boolean = stay.guests.none { guest ->
+    val person = people[guest.id]
+    if (person != null) !person.confirmed && requiredMissing(person.draft, person.mode, askAddress = false).isNotEmpty()
+    else personMissing(guest).isNotEmpty()
+}
+
+/** 이름으로 찾은 예약은 여권이 저장돼야 방 비밀번호를 보여 준다 — 여권 없이 가려는 분께 미리 알릴지. */
+fun proofNoticeNeeded(byName: Boolean, people: Map<String, SavedPerson>): Boolean =
+    byName && people.values.none { it.mode == FormMode.Mrz }
+
 /** 대표자 사는 곳 칸을 묻는지 — 일본에 사는 분이 이미 주소를 썼거나, 서버에 주소가 있으면 묻지 않는다. */
 fun needsLivingPlace(representative: KioskGuest?, saved: SavedPerson?): Boolean {
     if (representative == null) return false

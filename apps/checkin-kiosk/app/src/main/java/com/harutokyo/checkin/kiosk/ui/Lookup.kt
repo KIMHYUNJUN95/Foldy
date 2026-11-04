@@ -385,7 +385,7 @@ fun CheckedInScreen(stay: KioskStay, onBack: () -> Unit, onCall: () -> Unit, onR
             ) {
                 Text(str(R.string.done_more), color = G.Text, fontSize = 30.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(12.dp))
-                Text(str(R.string.done_more_body, empty), color = G.Muted, fontSize = 17.sp)
+                Text(str(R.string.done_more_body), color = G.Muted, fontSize = 17.sp)
             }
         }
     }

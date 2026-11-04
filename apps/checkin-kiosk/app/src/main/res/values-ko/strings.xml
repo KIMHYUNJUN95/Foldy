@@ -19,7 +19,6 @@
     <string name="menu_prereg_body">메시지로 받은 QR 코드를 카메라에 비춰 주세요.</string>
     <string name="menu_guide">머무는 동안 안내</string>
     <string name="menu_guide_body">와이파이, 쓰레기 버리기, 체크아웃 방법</string>
-    <string name="coming_next">이 화면은 다음 단계에서 만들어요.</string>
     <string name="back">뒤로</string>
     <string name="staff_pin_title">직원 PIN</string>
     <string name="staff_pin_wrong">PIN 이 틀렸어요.</string>
@@ -83,8 +82,8 @@
     <string name="done_body">필요한 것을 골라 주세요.</string>
     <string name="done_room">방 번호 · 비밀번호 보기</string>
     <string name="done_room_body">체크인 코드 6자리를 한 번 더 넣으면 보여요.</string>
-    <string name="done_more">같이 온 분 명부 마저 쓰기</string>
-    <string name="done_more_body">아직 비어 있는 분: %1$d명</string>
+    <string name="done_more">같이 온 분 추가는 직원이 도와 드려요</string>
+    <string name="done_more_body">눌러서 직원 연락처를 확인하세요</string>
     <string name="guests_title">예약을 찾았어요</string>
     <string name="guests_room">방</string>
     <string name="guests_dates">날짜</string>
@@ -175,7 +174,7 @@
     <string name="fast_f1_by_code">코드로 찾기</string>
     <string name="fast_f1_by_name">이름으로 찾기</string>
     <string name="fast_f1_searching">예약을 찾고 있어요…</string>
-    <string name="fast_f1_retry">읽지 못했어요. 다시 비춰 주세요.</string>
+    <string name="fast_f1_retry">읽지 못했어요. 다시 비춰 주세요. 계속 안 되면 아래 「코드로 찾기」나 「이름으로 찾기」를 눌러 주세요.</string>
     <string name="fast_found_title">%1$s 님, 예약을 찾았어요</string>
     <string name="fast_party_count">%1$d명</string>
     <string name="fast_cards_title">여권 %1$d개를 지금 꺼내 주세요</string>
@@ -229,4 +228,42 @@
         <item>아홉 번째 분</item>
         <item>열 번째 분</item>
     </string-array>
+
+    <!-- G4 완료 · 직원 호출 -->
+    <string name="g4_title">체크인을 마쳤어요</string>
+    <string name="g4_title_problem">아직 마치지 못했어요</string>
+    <string name="g4_loading">방 정보를 불러오고 있어요…</string>
+    <string name="g4_guests">%1$d명</string>
+    <string name="g4_checkin">체크인</string>
+    <string name="g4_checkout">체크아웃</string>
+    <string name="g4_kind_door">문 비밀번호</string>
+    <string name="g4_kind_room">방 비밀번호</string>
+    <string name="g4_kind_keybox">키박스</string>
+    <string name="g4_kind_keybox_code">키박스 비밀번호</string>
+    <string name="g4_kind_generic">비밀번호</string>
+    <string name="g4_floor1">1층</string>
+    <string name="g4_note_all">모든 방이 같아요</string>
+    <string name="g4_shared_title">공용 비밀번호</string>
+    <string name="g4_use_shared">아래 공용 비밀번호로 들어가세요</string>
+    <string name="g4_address">주소</string>
+    <string name="g4_staff_code">비밀번호는 직원이 알려 드려요. 아래 「직원 호출」을 눌러 주세요.</string>
+    <string name="g4_countdown">%1$d초 뒤 처음 화면으로</string>
+    <string name="g4_finish">끝내기</string>
+    <string name="g4_retry">다시 해 보기</string>
+    <string name="g4_incomplete_consent">약관 동의가 아직 끝나지 않았어요. 직원을 불러 주세요.</string>
+    <string name="g4_incomplete_roster">손님 정보가 덜 입력됐어요. 직원을 불러 주세요.</string>
+    <string name="g4_incomplete_other">체크인을 마치지 못했어요. 직원을 불러 주세요.</string>
+    <string name="call_title">직원을 불러요</string>
+    <string name="call_body">아래 연락처로 알려 주세요. 바로 도와 드릴게요.</string>
+    <string name="call_none">프런트 직원에게 직접 말씀해 주세요.</string>
+    <string name="call_phone">전화</string>
+    <string name="call_line">LINE</string>
+    <string name="call_whatsapp">WhatsApp</string>
+    <string name="g4_title_verify">여권 확인이 필요해요</string>
+    <string name="g4_title_blocked">이 예약은 열 수 없어요</string>
+    <string name="g4_verify_body">여권을 찍으면 방 비밀번호를 바로 보여 드려요. 여권이 없거나 찍기 어려우면 직원을 불러 주세요.</string>
+    <string name="g4_blocked_cancelled">취소된 예약이에요. 직원을 불러 주세요.</string>
+    <string name="g4_blocked_expired">이용 기간이 지난 예약이에요. 직원을 불러 주세요.</string>
+    <string name="g4_scan_passport">여권 찍기</string>
+    <string name="nopass_proof_notice">이름으로 찾은 예약이라, 여권 없이 계속하면 마지막에 직원이 확인해 줘야 방 비밀번호를 보여 드릴 수 있어요. 지금 직원을 부를 수도 있어요.</string>
 </resources>

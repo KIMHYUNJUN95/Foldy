@@ -31,6 +31,8 @@ export async function POST(request: Request) {
       return json({ ok: false, error: "session_gone" }, 409);
     }
 
+    if (!stay.editable) return json({ ok: false, error: "locked" }, 409);
+
     const partySize = clampPartySize(parsed.data.partySize, stay.guests.length);
     if (partySize === null) return json({ ok: false, error: "invalid" }, 400);
     // 「미리 체크인 끝」이었는데 빈 자리가 생기면 다시 「진행 전」으로(사전 등록 웹의 refreshPreRegStatus 와 같은 규칙).
